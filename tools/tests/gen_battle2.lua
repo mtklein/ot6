@@ -51,13 +51,18 @@ H.run({ maxFrames = 60000 }, {
   end),
   -- win fight 1: mash A (beams) until no monsters alive, then mash through victory
   H.driveUntil(function()
-    return H.readWord(0x3C00) == 0 and H.readWord(0x3C02) == 0
-  end, 12000, { H.pressButtons({ "a" }, 6), H.waitFrames(30) }, "fight 1 won"),
+    local dead = H.readWord(0x3C00) == 0 and H.readWord(0x3C02) == 0
+    return dead or not H.battleLoadStarted()   -- or victory already tore down
+  end, 24000, {
+    H.pressButtons({ "a" }, 6), H.waitFrames(30),
+    H.pressButtons({ "a" }, 6), H.waitFrames(30),
+    H.pressButtons({ "a" }, 6), H.waitFrames(600),
+  }, "fight 1 won"),
   H.driveUntil(function()
     return not H.battleLoadStarted()
-  end, 6000, { H.pressButtons({ "a" }, 6), H.waitFrames(20) }, "back to field"),
+  end, 9000, { H.pressButtons({ "a" }, 6), H.waitFrames(24) }, "back to field"),
   H.waitFrames(60),
-  H.call(function() H.saveState("battle2_doorstep.mss") end),
+  H.saveState("battle2_doorstep.mss"),
   H.driveUntil(function() return H.battleLoadStarted() end, 8000, {
     H.hold({ "up" }), H.waitFrames(20), H.release(), H.waitFrames(2),
     H.pressButtons({ "a" }, 4),

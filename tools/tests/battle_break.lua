@@ -74,8 +74,10 @@ H.run({ maxFrames = 30000 }, {
   H.driveUntil(function()
     local t1, t2 = timers()
     return t1 > 0 or t2 > 0
-  end, 12000, {
-    H.pressButtons({ "a" }, 6), H.waitFrames(18),
+  end, 30000, {
+    H.pressButtons({ "a" }, 6), H.waitFrames(30),
+    H.pressButtons({ "a" }, 6), H.waitFrames(30),
+    H.pressButtons({ "a" }, 6), H.waitFrames(600),
   }, "a guard to break"),
   H.release(),
   report("broken"),

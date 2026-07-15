@@ -34,8 +34,35 @@ run: rom
 		open -n "$(CURDIR)/tools/Mesen.app" --args "$(CURDIR)/build/ot6.sfc"; \
 	fi
 
-test: rom
-	$(MESEN) --testrunner build/ot6.sfc tools/tests/smoke.lua
+# savestates regenerate only when ROM CONTENT changes (the file's
+# timestamp bumps on every build even when bytes are identical)
+STATE1 := build/states/battle_doorstep.mss.lua
+STATE2 := build/states/battle2_doorstep.mss.lua
+build/states/.rom-stamp: ff6/rom/ff6-en.sfc
+	@mkdir -p build/states
+	@cmp -s ff6/rom/ff6-en.sfc build/states/.rom-copy 2>/dev/null || \
+		{ cp ff6/rom/ff6-en.sfc build/states/.rom-copy; echo "rom content changed"; }
+	@touch build/states/.rom-stamp
+$(STATE1): build/states/.rom-stamp
+	@if [ build/states/.rom-copy -nt $(STATE1) ] || [ ! -f $(STATE1) ]; then \
+		tools/tests/run.sh tools/tests/gen_battle_state.lua; \
+	fi
+	@touch $(STATE1)
+$(STATE2): $(STATE1)
+	@if [ build/states/.rom-copy -nt build/states/battle2_doorstep.mss ] || [ ! -f build/states/battle2_doorstep.mss ]; then \
+		tools/tests/run.sh tools/tests/gen_battle2.lua; \
+	fi
+	@touch $(STATE2)
+
+test: rom $(STATE1) $(STATE2)
+	tools/tests/suite.sh
+
+goldens: rom $(STATE1) $(STATE2)
+	tools/tests/run.sh tools/tests/visual_f1.lua
+	@mkdir -p tools/tests/goldens
+	cp build/states/shots/visual_f1_idle.png tools/tests/goldens/
+	cp build/states/shots/visual_f1_menu.png tools/tests/goldens/
+	@echo "goldens captured from the current build - review before committing"
 
 clean:
 	$(MAKE) -C ff6 clean
