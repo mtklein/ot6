@@ -254,8 +254,12 @@ done:   rtl
 ; [ upload element icon tiles into the battle small font ]
 
 ; called from LoadMenuGfx right after the small font transfer (forced
-; blank). writes 5 tiles to cells $eb-$ef and 3 to $fb-$fd of the font at
-; vram $5800 (8 words per 2bpp tile).
+; blank). one 2bpp tile (8 words) per element, cell per Ot6ElemGlyphTbl.
+;
+; cell choice matters: vanilla battle tilemaps are junk-padded with codes
+; that point at blank font cells ($ee alone appears 1000+ times around the
+; screen borders) — filling those cells paints garbage at the edges. every
+; cell below was verified unreferenced in the battle tilemap regions.
 
 .proc Ot6LoadFontIcons_ext
         php
@@ -263,29 +267,57 @@ done:   rtl
         clr_a
         pha
         plb                     ; db = $00 for hardware registers
+        longi
         shorta
         lda     #$80
         sta     hVMAINC         ; increment on high byte, +1 word
+        ldx     #$0000          ; icon index (long,y indexing doesn't exist)
+@icon:  shorta
+        lda     f:Ot6ElemGlyphTbl,x
         longa
-        lda     #$5800+$eb*8
+        and     #$00ff
+        asl
+        asl
+        asl
+        clc
+        adc     #$5800          ; vram word address of the font cell
         sta     hVMADDL
-        ldx     #$0000
-@half1: lda     f:Ot6FontIcons,x
+        txa
+        asl
+        asl
+        asl
+        asl
+        tax                     ; x becomes data offset = icon * 16
+@word:  lda     f:Ot6FontIcons,x
         sta     hVMDATAL
         inx2
-        cpx     #$0050          ; 5 tiles ($eb-$ef)
-        bcc     @half1
-        lda     #$5800+$fb*8
-        sta     hVMADDL
-@half2: lda     f:Ot6FontIcons,x
-        sta     hVMDATAL
-        inx2
-        cpx     #$0080          ; 3 more tiles ($fb-$fd)
-        bcc     @half2
+        txa
+        and     #$000f
+        bne     @word
+        txa                     ; recover icon index: offset / 16
+        lsr
+        lsr
+        lsr
+        lsr
+        tax
+        cpx     #$0008
+        bcc     @icon
         plb
         plp
         rtl
 .endproc
+
+; element bit (fire $01 .. water $80) -> small font glyph/tile code.
+; the weakness strip draws from this same table.
+Ot6ElemGlyphTbl:
+        .byte   $eb             ; fire
+        .byte   $ec             ; ice
+        .byte   $ed             ; lightning
+        .byte   $64             ; poison ($ee is vanilla's border junk fill!)
+        .byte   $ef             ; wind
+        .byte   $fb             ; holy
+        .byte   $fc             ; earth
+        .byte   $fd             ; water
 
 ; 8x8 2bpp element icons, element-bit order (fire $01 ... water $80)
 Ot6FontIcons:
