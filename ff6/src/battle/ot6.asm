@@ -668,6 +668,9 @@ Ot6FontIcons:
         inx
         cpx     #$0054          ; last-flushed copies
         bcc     @clr2
+        sta     f:$7e0000+OT6_PIPCUR    ; live pip cell off, no stale erase
+        sta     f:$7e0000+OT6_PIPPREV
+        sta     f:$7e0000+OT6_LASTLR
         plx
         plp
         rtl
@@ -841,6 +844,7 @@ OT6_MAPBASE := $57b6            ; word scratch: field bg3 map base
         iny
         cpy     #$000c
         bcc     @slot
+        jsr     Ot6Boost        ; l/r boost input + live pip cell
         plb
         ply
         plx
@@ -987,6 +991,10 @@ OT6_HUDDIRTY := $57b8
 OT6_CODEX_MAGIC := $316000      ; word 'O6' = codex initialized
 OT6_CODEX       := $316010      ; one revealed-elements byte per species
 OT6_SPECIES     := $57c0        ; per-slot species stash (6 words)
+OT6_PIPCUR      := $57cc        ; live pip cell: menu-map word addr (0=off)
+OT6_PIPPREV     := $57ce        ; last flushed addr (for erase-on-move)
+OT6_PIPCELL     := $57d0        ; glyph|attr word to write
+OT6_LASTLR      := $57d2        ; last frame's L/R bits (edge detect)
 
 .proc Ot6BgHudMark
         .a8
@@ -1049,13 +1057,13 @@ Ot6LineBitTbl:
         clr_a
         pha
         plb                     ; db = 0 for hardware registers
+        lda     #$80
+        sta     hVMAINC
         lda     f:$7e0000+OT6_HUDDIRTY   ; lines changed since last flush?
-        jeq     @out
+        jeq     @pip                     ; (the live pip cell still runs)
         sta     f:$7e0000+OT6_HUDDIRTY+1 ; working copy (nmi-private)
         lda     #$00
         sta     f:$7e0000+OT6_HUDDIRTY
-        lda     #$80
-        sta     hVMAINC
         ldx     #$0000
 @line:  lda     f:$7e0000+OT6_HUDDIRTY+1
         lsr
@@ -1097,6 +1105,23 @@ Ot6LineBitTbl:
         shorta0
         cpx     #$0054          ; 6 monster lines x 14
         bcc     @line
+        ; live pip pseudo-line: one cell in the menu map (active char's
+        ; spendable bp during boost select). tiny, runs every nmi.
+@pip:   longa
+        lda     f:$7e0000+OT6_PIPPREV
+        beq     :+
+        cmp     f:$7e0000+OT6_PIPCUR
+        beq     :+
+        sta     hVMADDL                  ; moved/closed: blank the old cell
+        lda     #$21ff
+        sta     hVMDATAL
+:       lda     f:$7e0000+OT6_PIPCUR
+        sta     f:$7e0000+OT6_PIPPREV
+        beq     :+
+        sta     hVMADDL
+        lda     f:$7e0000+OT6_PIPCELL
+        sta     hVMDATAL
+:       shorta0
 @out:   plb
         ply
         plx
@@ -1108,6 +1133,103 @@ Ot6LineBitTbl:
 
 ; called from UpdateCharText every main-loop frame. skips while the
 ; battle menu text is not up yet (same gate vanilla uses for hp/mp).
+
+; [ l/r boost input + live pip feedback ]
+
+; runs every main-loop frame from the hud builder (db=$7e, a8/i16).
+; while a battle menu is open, R raises the active character's pending
+; boost (cap 3, and never past their bp) and L lowers it. the pips by
+; the party names show spendable bp (bp - pending), so feedback is
+; immediate: the flush's one-cell pseudo-line repaints the active row's
+; pip cell straight into the menu tilemap. window_open re-stages every
+; row on the next open, cleaning up any transient state.
+
+.proc Ot6Boost
+        .a8
+        .i16
+        lda     $7bca           ; battle menu open?
+        jeq     @off
+        ; edge-detect L/R from the held-buttons byte
+        lda     $0a
+        and     #$30            ; held L/R bits
+        sta     OT6_LASTLR+1    ; scratch: held ($57d3)
+        eor     OT6_LASTLR      ; changed since last frame
+        and     OT6_LASTLR+1    ; & held = newly pressed
+        pha
+        lda     OT6_LASTLR+1
+        sta     OT6_LASTLR      ; remember for next frame
+        ; active character -> entity offset in y
+        lda     $62ca
+        longa
+        and     #$0003
+        asl
+        tay
+        shorta0
+        pla
+        bit     #$10            ; R: boost up
+        beq     @tryl
+        lda     $3e9d,y
+        inc     a
+        cmp     #$04            ; spend at most 3
+        bcs     @show
+        cmp     $3e9c,y         ; and never more than current bp
+        beq     @store
+        bcs     @show
+@store: sta     $3e9d,y
+        bra     @show
+@tryl:  bit     #$20            ; L: boost down
+        beq     @show
+        lda     $3e9d,y
+        beq     @show
+        dec     a
+        sta     $3e9d,y
+@show:  ; live pip cell for the active character's menu row
+        lda     $62ca
+        ldx     #$0000
+@row:   cmp     $64d6,x         ; find the menu row showing this slot
+        beq     @found
+        inx
+        cpx     #$0004
+        bcc     @row
+        bra     @off            ; not on screen: disable the pseudo-line
+@found: ; map word = $7800 + (1 + row*2)*32 + 20
+        longa
+        txa
+        asl                     ; row*2
+        inc     a               ; +1
+        asl
+        asl
+        asl
+        asl
+        asl                     ; *32
+        clc
+        adc     #$7814          ; $7800 + 20
+        sta     f:$7e0000+OT6_PIPCUR
+        shorta0
+        ; glyph = pip cluster for spendable bp
+        lda     $3e9c,y
+        sec
+        sbc     $3e9d,y
+        bcs     :+
+        lda     #$00
+:       cmp     #$06
+        bcc     :+
+        lda     #$05
+:       longa
+        and     #$00ff
+        tax
+        shorta0
+        lda     f:Ot6PipCellTbl,x
+        sta     f:$7e0000+OT6_PIPCELL
+        lda     #$21
+        sta     f:$7e0000+OT6_PIPCELL+1
+        rts
+@off:   longa
+        lda     #$0000
+        sta     f:$7e0000+OT6_PIPCUR
+        shorta0
+        rts
+.endproc
 
 ; [ bp pip glyph for the party window name row ]
 

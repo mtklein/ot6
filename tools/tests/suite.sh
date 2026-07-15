@@ -12,7 +12,7 @@ fail=0; summary=""
 
 result() { summary="$summary\n  $1: $2"; }
 
-for t in smoke battle_entry battle_break battle_bp battle_codex visual_f1 visual_f2; do
+for t in smoke battle_entry battle_break battle_bp battle_boost battle_codex visual_f1 visual_f2; do
   "$RUN" "$ROOT/tools/tests/$t.lua" "$ROOT/build/states/suite_$t.log" >/dev/null 2>&1
   rc=$?
   if [ $rc -eq 0 ]; then
