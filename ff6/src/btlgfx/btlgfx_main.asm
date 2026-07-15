@@ -1725,6 +1725,7 @@ BattleNMI:
         lda     #$01
         sta     w7e7bcb       ; close menu
 @0cbc:  jsr     ClearSpriteData
+        jsl     Ot6EnemyHud_ext         ; ot6: after clear, before this frame's dma
         lda     #$08        ; next available sprite = 8
         sta     $71
         jsr     _c1b3ce       ; update roulette cursor

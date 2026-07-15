@@ -13,6 +13,7 @@ CODE_EXT_INC = 1
 .global Ot6ShieldGlyph_ext, Ot6LoadFontIcons_ext
 .global Ot6TrackTarget_ext, Ot6MonsterRow_ext, Ot6AbilityPad_ext
 .global Ot6ListIcon_ext, Ot6MagitekIcon_ext, Ot6LoreIcon_ext
+.global Ot6EnemyHud_ext
 
 ; battle graphics module
 .global SineTbl8, SineTbl16

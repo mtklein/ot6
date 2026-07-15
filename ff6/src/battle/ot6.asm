@@ -322,6 +322,8 @@ done:   rtl
         tax
         cpx     #$0008
         bcc     @icon
+        shorta
+        jsr     Ot6LoadObjTiles ; enemy-hud sprite tiles ride the same blank
         plb
         plp
         rtl
@@ -711,3 +713,281 @@ Ot6FontIcons:
 ; water ($fd)
         .byte   $00,$00,$30,$30,$4a,$7a,$4c,$4e
         .byte   $c6,$80,$7c,$7e,$7e,$7c,$3c,$00
+; obj tile vram word addresses (16 tiles, order: 8 icons, ?, B, digits 1-6)
+Ot6ObjTileAddrTbl:
+        .word   $3000          ; tile $100
+        .word   $3020          ; tile $102
+        .word   $3040          ; tile $104
+        .word   $3200          ; tile $120
+        .word   $3220          ; tile $122
+        .word   $3240          ; tile $124
+        .word   $3400          ; tile $140
+        .word   $3420          ; tile $142
+        .word   $3440          ; tile $144
+        .word   $3600          ; tile $160
+        .word   $3620          ; tile $162
+        .word   $2c00          ; tile $0c0
+        .word   $2c20          ; tile $0c2
+        .word   $2c40          ; tile $0c4
+        .word   $2c60          ; tile $0c6
+        .word   $2c80          ; tile $0c8
+
+; oam tile numbers matching the table above (low byte + name bit)
+Ot6ObjTileNumTbl:
+        .byte   $00, $01
+        .byte   $02, $01
+        .byte   $04, $01
+        .byte   $20, $01
+        .byte   $22, $01
+        .byte   $24, $01
+        .byte   $40, $01
+        .byte   $42, $01
+        .byte   $44, $01
+        .byte   $60, $01
+        .byte   $62, $01
+        .byte   $c0, $00
+        .byte   $c2, $00
+        .byte   $c4, $00
+        .byte   $c6, $00
+        .byte   $c8, $00
+
+; 4bpp tile data, 32 bytes each
+Ot6ObjTiles:
+        .byte   $10,$00,$38,$08,$3c,$04,$7c,$10
+        .byte   $7e,$10,$fe,$10,$7e,$00,$3c,$00
+        .byte   $00,$00,$00,$00,$00,$00,$00,$00
+        .byte   $00,$00,$00,$00,$02,$00,$3c,$00
+        .byte   $10,$00,$38,$28,$7c,$10,$fe,$10
+        .byte   $7e,$10,$3c,$28,$18,$00,$08,$00
+        .byte   $00,$00,$00,$00,$00,$00,$00,$00
+        .byte   $02,$00,$04,$00,$08,$00,$08,$00
+        .byte   $1e,$00,$3c,$00,$78,$00,$fc,$00
+        .byte   $3c,$00,$38,$00,$70,$00,$40,$00
+        .byte   $00,$00,$04,$00,$08,$00,$00,$00
+        .byte   $24,$00,$08,$00,$10,$00,$40,$00
+        .byte   $10,$10,$38,$08,$7c,$04,$7c,$20
+        .byte   $fe,$20,$fe,$00,$7e,$00,$3c,$00
+        .byte   $00,$00,$00,$00,$00,$00,$00,$00
+        .byte   $00,$00,$00,$00,$02,$00,$3c,$00
+        .byte   $00,$00,$7c,$04,$0c,$00,$fe,$04
+        .byte   $04,$00,$7c,$00,$18,$00,$00,$00
+        .byte   $00,$00,$00,$00,$08,$00,$02,$00
+        .byte   $04,$00,$00,$00,$18,$00,$00,$00
+        .byte   $10,$00,$18,$08,$7c,$10,$fe,$6c
+        .byte   $7e,$10,$1c,$08,$18,$00,$08,$00
+        .byte   $00,$00,$00,$00,$00,$00,$00,$00
+        .byte   $02,$00,$04,$00,$08,$00,$08,$00
+        .byte   $00,$00,$10,$00,$38,$10,$7c,$10
+        .byte   $7c,$30,$fe,$10,$fe,$00,$7e,$00
+        .byte   $00,$00,$00,$00,$00,$00,$00,$00
+        .byte   $00,$00,$00,$00,$00,$00,$7e,$00
+        .byte   $00,$00,$30,$00,$7a,$30,$4e,$02
+        .byte   $c6,$00,$7e,$02,$7e,$00,$3c,$00
+        .byte   $00,$00,$00,$00,$00,$00,$00,$00
+        .byte   $46,$00,$00,$00,$02,$00,$3c,$00
+        .byte   $3e,$00,$7f,$00,$47,$00,$0e,$00
+        .byte   $1c,$00,$18,$00,$1c,$00,$1c,$00
+        .byte   $02,$00,$39,$00,$41,$00,$02,$00
+        .byte   $04,$00,$18,$00,$04,$00,$1c,$00
+        .byte   $fe,$00,$ff,$00,$e7,$00,$fe,$00
+        .byte   $e7,$00,$e7,$00,$fe,$00,$fc,$00
+        .byte   $02,$00,$39,$00,$21,$00,$02,$00
+        .byte   $21,$00,$21,$00,$02,$00,$fc,$00
+        .byte   $38,$00,$78,$00,$78,$00,$38,$00
+        .byte   $38,$00,$38,$00,$7c,$00,$7c,$00
+        .byte   $08,$00,$08,$00,$48,$00,$08,$00
+        .byte   $08,$00,$08,$00,$04,$00,$7c,$00
+        .byte   $7e,$00,$ff,$00,$c7,$00,$0e,$00
+        .byte   $3c,$00,$70,$00,$ff,$00,$ff,$00
+        .byte   $02,$00,$79,$00,$c1,$00,$02,$00
+        .byte   $0c,$00,$10,$00,$01,$00,$ff,$00
+        .byte   $ff,$00,$fe,$00,$1c,$00,$3e,$00
+        .byte   $3f,$00,$87,$00,$fe,$00,$7c,$00
+        .byte   $01,$00,$f2,$00,$04,$00,$02,$00
+        .byte   $39,$00,$01,$00,$82,$00,$7c,$00
+        .byte   $1e,$00,$3e,$00,$6e,$00,$ce,$00
+        .byte   $ce,$00,$ff,$00,$ff,$00,$0c,$00
+        .byte   $02,$00,$12,$00,$22,$00,$42,$00
+        .byte   $42,$00,$01,$00,$f3,$00,$0c,$00
+        .byte   $ff,$00,$fe,$00,$fe,$00,$ff,$00
+        .byte   $07,$00,$e7,$00,$7e,$00,$7c,$00
+        .byte   $01,$00,$3e,$00,$02,$00,$f9,$00
+        .byte   $01,$00,$61,$00,$02,$00,$7c,$00
+        .byte   $3e,$00,$7c,$00,$e0,$00,$fe,$00
+        .byte   $ff,$00,$e7,$00,$7e,$00,$7c,$00
+        .byte   $02,$00,$1c,$00,$20,$00,$02,$00
+        .byte   $39,$00,$21,$00,$02,$00,$7c,$00
+
+; ------------------------------------------------------------------------------
+
+; [ upload obj tiles for the enemy hud ]
+
+; 16 sprites' top-left 8x8 quadrants (the other three quadrants of each
+; 16x16 are verified-blank vram). called from the font-icon uploader
+; while the screen is force-blanked and db = $00.
+
+.proc Ot6LoadObjTiles
+        .a8
+        .i16
+        ldx     #$0000          ; table index * 2
+@tile:  longa
+        lda     f:Ot6ObjTileAddrTbl,x
+        sta     hVMADDL
+        txa
+        asl
+        asl
+        asl
+        asl
+        phx
+        tax                     ; data offset = index * 32
+@word:  lda     f:Ot6ObjTiles,x
+        sta     hVMDATAL
+        inx
+        inx
+        txa
+        and     #$001f
+        bne     @word           ; tiles are 32 bytes: stop on alignment
+        shorta
+        plx
+        inx
+        inx
+        cpx     #$0020          ; 16 tiles done?
+        bcc     @tile
+        rts                     ; jsr-called from the font uploader
+.endproc
+
+; ------------------------------------------------------------------------------
+
+; [ per-frame enemy hud: shield digit + weakness slots under each monster ]
+
+; claims oam shadow entries 96-127 ($0480-$04ff, high-table bytes
+; $0518-$051f). for each living monster: [shield digit or B] then one
+; slot per weak element (icon if revealed, ? if not), anchored under the
+; monster sprite. called from DrawCursorSprites every battle frame.
+; db = $7e. entries beyond the claimed 32 are simply not drawn.
+
+OT6_OAM   := $0480              ; oam shadow, entry 96
+OT6_OAMHI := $0518              ; high table bytes for entries 96-127
+
+.proc Ot6EnemyHud_ext
+        .a8
+        .i16
+        php
+        longi
+        shorta0                 ; b = 0: tax/tay below stay clean
+        phx
+        phy
+        phb                     ; caller's db is NOT $7e here (bank 0):
+        lda     #$7e            ; battle vars and coords need bank $7e
+        pha
+        plb
+        ldx     #$0000          ; hide all 32 claimed entries
+@park:  lda     #$e0
+        sta     OT6_OAM+1,x
+        inx
+        inx
+        inx
+        inx
+        cpx     #$0080
+        bcc     @park
+        ldx     #$0000          ; clear high bits (x8=0, size=16x16)
+@hibit: stz     OT6_OAMHI,x
+        inx
+        cpx     #$0008
+        bcc     @hibit
+        ldx     #$0000          ; x = oam byte offset within our block
+        ldy     #$0000          ; y = monster slot offset (0,2,..,$0a)
+@slot:  lda     $3aa8,y
+        lsr
+        bcc     @next           ; not present
+        lda     $3eec,y
+        bit     #$c2
+        bne     @next           ; dead/petrified/zombie
+        ; pen anchor: under the monster, roughly centered
+        lda     $800f,y         ; monster center x (low byte)
+        sec
+        sbc     #$0c
+        sta     OT6_SCR_SLOT2   ; running pen x
+        lda     $804b,y         ; monster bottom y
+        clc
+        adc     $38             ; battle screen shake/scroll offset
+        inc
+        inc
+        sta     OT6_SCR_IDX     ; pen y
+        ; shield digit or B
+        lda     $3e90,y         ; broken timer
+        beq     @digit
+        lda     #$09            ; glyph 9 = 'B'
+        bra     @emit0
+@digit: lda     $3e40,y         ; shield current
+        beq     @weak           ; shieldless: no digit, straight to slots
+        cmp     #$07
+        bcc     :+
+        lda     #$06
+:       clc
+        adc     #$09            ; glyphs 10-15 = digits 1-6
+@emit0: jsr     Ot6EmitSprite
+@weak:  lda     #$01
+        sta     OT6_SCR_BIT     ; walking element bit
+        stz     OT6_SCR_COLS    ; element index
+@elem:  lda     OT6_SCR_BIT
+        beq     @next           ; walked past bit 7
+        and     $3be8,y         ; weak to this element?
+        beq     @ebump
+        lda     OT6_SCR_BIT
+        and     $3e91,y         ; revealed?
+        beq     @q
+        lda     OT6_SCR_COLS    ; glyph 0-7: the element icon
+        bra     @emit
+@q:     lda     #$08            ; glyph 8 = '?'
+@emit:  jsr     Ot6EmitSprite
+@ebump: asl     OT6_SCR_BIT
+        inc     OT6_SCR_COLS
+        bra     @elem
+@next:  iny
+        iny
+        cpy     #$000c
+        bcc     @slot
+        plb
+        ply
+        plx
+        plp
+        rtl
+.endproc
+
+; emit one hud sprite: a = glyph index, x = oam byte offset in our block
+; (advances by 4 when a sprite is placed), pen in OT6_SCR_SLOT2/IDX.
+; b must be 0 (caller guarantees via shorta0).
+.proc Ot6EmitSprite
+        .a8
+        .i16
+        cpx     #$0080
+        bcs     @full           ; claimed entries exhausted
+        pha                     ; glyph index
+        lda     OT6_SCR_SLOT2
+        sta     OT6_OAM,x       ; sprite x
+        clc
+        adc     #$09
+        sta     OT6_SCR_SLOT2   ; advance the pen
+        lda     OT6_SCR_IDX
+        sta     OT6_OAM+1,x     ; sprite y
+        pla
+        asl                     ; table stride 2: [tile low][name bit]
+        phx
+        tax
+        lda     f:Ot6ObjTileNumTbl,x
+        xba                     ; tile low byte parks in b
+        lda     f:Ot6ObjTileNumTbl+1,x
+        plx
+        ora     #$26            ; priority 2, palette 3, + name bit
+        sta     OT6_OAM+3,x
+        xba                     ; tile low byte back
+        sta     OT6_OAM+2,x
+        inx
+        inx
+        inx
+        inx
+        lda     #$00            ; scrub b (callers rely on b = 0 for tax)
+        xba
+@full:  rts
+.endproc
