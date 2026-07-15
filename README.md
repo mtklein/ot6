@@ -14,12 +14,17 @@ Design phase. See [docs/DESIGN.md](docs/DESIGN.md) for the mechanics design and
 ## Layout
 
 ```
-FF6.smc     # base ROM — bring your own, git-ignored, never committed
-docs/       # design, roadmap, research notes
-src/        # assembly patches (from M0)
-tools/      # build scripts, emulator test harness (from M0)
+ff6/        # full-game source (vendored everything8215/ff6 disassembly,
+            #   GPL-3.0) + OT6 code in ff6/src/battle/ot6.asm (bank F0)
+docs/       # design, roadmap, research notes, vendored-history patches
+tools/      # Mesen 2, flips, Lua battle-test harness (tools/tests/)
 build/      # built ROM + distributable .bps patch (git-ignored)
 ```
+
+The base ROM (git-ignored, never committed) lives at the repo root and in
+`ff6/vanilla/`. This repo tracks assets ripped from that dump for local
+convenience, so it stays **private**; the public artifact is the `.bps`
+patch from `make patch`.
 
 ## Legal
 

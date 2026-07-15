@@ -17,6 +17,12 @@ OT6_BREAK_TICKS := $10          ; a bit under vanilla stop duration ($12)
 
 .segment "ot6_code"
 
+; calling convention for every entry point here: 8-bit accumulator,
+; 16-bit index registers (the battle/btlgfx norm). procs that need other
+; widths switch explicitly (longa/shorta) and restore before returning.
+.a8
+.i16
+
 ; ------------------------------------------------------------------------------
 
 ; [ seed monster shields at battle init ]
