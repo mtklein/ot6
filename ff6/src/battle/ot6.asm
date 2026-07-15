@@ -10,6 +10,8 @@
 ;   $3e39,X  max shield points
 ;   $3e88,X  broken timer (nonzero = broken; ticks with status counters)
 ;   $3e89,X  revealed weakness elements (bitmask, same bits as $3be0)
+;   $3e9c,X  boost points (characters only, 0-5)
+;   $3e9d,X  pending boost for the next action (0-3)
 ; entity offsets: $00-$06 characters, $08-$12 monsters
 ; ------------------------------------------------------------------------------
 
@@ -584,6 +586,105 @@ Ot6FontIcons:
 ; water ($fd)
         .byte   $00,$00,$30,$30,$4a,$7a,$4c,$4e
         .byte   $c6,$80,$7c,$7e,$7e,$7c,$3c,$00
+
+
+; ------------------------------------------------------------------------------
+
+; [ seed boost points at battle start ]
+
+; called from InitBattle after its ram clears. runs in longa/longi
+; context (InitBattle's php/longai is still active) - widths pinned here.
+
+.proc Ot6InitBP
+        .a16
+        .i16
+        php
+        shorta0
+        lda     #$01
+        sta     $3e9c           ; characters open with 1 bp, octopath-style
+        sta     $3e9e
+        sta     $3ea0
+        sta     $3ea2
+        plp
+        rtl
+.endproc
+
+; ------------------------------------------------------------------------------
+
+; [ bp bookkeeping at the end of an entity's action ]
+
+; called just before EndAction once the actor has no pending actions.
+; characters: consume the pending boost if one was spent, otherwise
+; gain 1 bp (octopath's no-regen-after-boosting rule), capped at 5.
+; a8/i16, x = actor entity offset, a free
+
+.proc Ot6ActionEnd
+        php                     ; caller width varies: pin our own
+        longi
+        shorta0
+        .a8
+        .i16
+        txa                     ; width-neutral character test
+        cmp     #$08
+        bcs     done            ; monsters have no bp
+        lda     $3e9d,x         ; pending boost spent this action?
+        beq     @gain
+        sta     OT6_SCR_BIT     ; consume it: bp -= pending
+        lda     $3e9c,x
+        sec
+        sbc     OT6_SCR_BIT
+        bcs     :+
+        lda     #$00            ; (defensive clamp)
+:       sta     $3e9c,x
+        lda     #$00
+        sta     $3e9d,x         ; no regen on a boosted turn
+        bra     done
+@gain:  lda     $3e9c,x
+        cmp     #$05
+        bcs     done            ; capped at 5
+        inc
+        sta     $3e9c,x
+done:   plp
+        rtl
+.endproc
+
+; ------------------------------------------------------------------------------
+
+; [ boost the base damage of a boosted character action ]
+
+; called at the tail of the physical and magic base-damage calcs.
+; damage x2/x3/x4 for pending boost 1/2/3; the per-target 9999 cap
+; still applies downstream. a8/i16, x = attacker, 16-bit damage $11b0.
+
+.proc Ot6BoostDmg
+        php                     ; caller width varies: pin our own
+        longi
+        shorta0
+        .a8
+        .i16
+        txa                     ; width-neutral character test
+        cmp     #$08
+        bcs     done            ; monsters never boost
+        lda     $3e9d,x         ; pending boost level
+        beq     done
+        sta     OT6_SCR_BIT
+        longa
+        lda     $11b0
+@mul:   asl                     ; not a true xN, but x2/x4/x8 reads better
+        bcs     @cap            ; on 16-bit overflow, saturate
+        shorta                  ; 8-bit dec: a 16-bit rmw would clobber
+        dec     OT6_SCR_BIT     ; the row-glyph byte next door
+        longa                   ; (rep/sep leave z alone; a survives)
+        bne     @mul
+        bra     @store
+@cap:   lda     #$7fff
+@store: sta     $11b0
+        shorta0
+done:   plp
+        rtl
+.endproc
+
+; ------------------------------------------------------------------------------
 ; obj tile vram word addresses (16 tiles, order: 8 icons, ?, B, digits 1-6)
 Ot6ObjTileAddrTbl:
         .word   $3000          ; tile $100
@@ -828,6 +929,36 @@ OT6_OAMHI := $0518              ; high table bytes for entries 96-127
         iny
         cpy     #$000c
         bcc     @slot
+        ; character pass: bp digit (bp - pending) beside each hero
+        ldy     #$0000          ; character entity offset 0,2,4,6
+@cslot: lda     $3aa0,y
+        lsr
+        bcc     @cnext          ; character not present
+        lda     $3018,y         ; party mask nonzero = real slot
+        beq     @cnext
+        lda     $8033,y         ; character center x (low byte)
+        clc
+        adc     #$0a            ; digit sits at the hero's right shoulder
+        sta     OT6_SCR_SLOT2
+        lda     $8043,y         ; character bottom y
+        clc
+        adc     $38
+        sta     OT6_SCR_IDX
+        lda     $3e9c,y         ; bp
+        sec
+        sbc     $3e9d,y         ; minus pending boost = spendable shown
+        beq     @cnext          ; zero: draw nothing
+        bcc     @cnext
+        cmp     #$06
+        bcc     :+
+        lda     #$05
+:       clc
+        adc     #$09            ; glyphs 10-15 = digits 1-6
+        jsr     Ot6EmitSprite
+@cnext: iny
+        iny
+        cpy     #$0008
+        bcc     @cslot
         plb
         ply
         plx

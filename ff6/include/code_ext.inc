@@ -14,6 +14,7 @@ CODE_EXT_INC = 1
 .global Ot6AbilityPad_ext
 .global Ot6ListIcon_ext, Ot6MagitekIcon_ext, Ot6LoreIcon_ext
 .global Ot6EnemyHud_ext
+.global Ot6ActionEnd, Ot6BoostDmg, Ot6InitBP
 
 ; battle graphics module
 .global SineTbl8, SineTbl16

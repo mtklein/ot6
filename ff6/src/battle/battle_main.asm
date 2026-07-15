@@ -285,6 +285,7 @@ ExecAction:
         stz     $3ab5,x     ; clear advance wait counter
         lda     #$80        ;
         trb     $b0
+        jsl     Ot6ActionEnd            ; ot6: bp consume/gain for the actor
         jmp     EndAction
 @01d5:  stx     $3406       ; currently acting character/monster
 _01d8:  rts
@@ -6068,6 +6069,7 @@ InitBattle:
         bpl     @2402
         stz     $2f44       ; clear invisible monsters (clear status)
         stz     $2f4c       ; clear untargettable characters/monsters
+        jsl     Ot6InitBP               ; ot6: characters open with 1 bp
         stz     $2f4e       ; clear targettable characters/monsters
         stz     $2f53       ; clear h-flip for controlled targets (relm) and muddled characters
         stz     $b0         ; clear flags
@@ -7208,6 +7210,7 @@ _initdamage:
         adc     $11b0
         sta     $11b0
         shorta
+        jsl     Ot6BoostDmg             ; ot6: boosted action multiplier
         rts
 
 ; ------------------------------------------------------------------------------
@@ -7282,7 +7285,8 @@ CalcDmg:
         sec
         adc     $11b0
         sta     $11b0
-@2c1f:  plp
+@2c1f:  jsl     Ot6BoostDmg             ; ot6: boosted action multiplier
+        plp
         rts
 
 ; ------------------------------------------------------------------------------
