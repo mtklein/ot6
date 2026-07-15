@@ -46,6 +46,16 @@ watchdog needed.  A bare hang would only happen if a script bypasses
   `battle_doorstep.mss` and walks into the first battle (~30 s wall clock,
   PASS/FAIL on whether the battle engine actually comes up).  This is the
   tight iteration loop for battle/break-system changes.
+- `battle_firebeam.lua` - full interaction test: doorstep -> fresh battle ->
+  A/A/A drives MagiTek Fire Beam onto a guard; asserts each press visibly
+  changes the screen and the action resolves (guard HP drops).  Logs break
+  RAM (guard shields $3E44/$3E46, HP $3C00/$3C02, revealed masks
+  $3E95/$3E97, glyph row $3ECB+) and screenshots before/during/after --
+  `shots/fb_firing.png` shows the monster name window with the shield digit
+  ("Guard    2").
+- `probe23.lua` - positive control: input injection still works after
+  loadSavestate (A opens the MagiTek submenu, B closes it; fails loudly if
+  a press has no visible effect).
 - `probe16.lua` - diagnostic: savestate save/clobber/load round-trip
   (validates the exec-callback trampoline and the base64 codec).
 - `probe19.lua` - diagnostic: doorstep -> battle with screenshots + RAM
@@ -202,11 +212,15 @@ pixels are ever needed.
 
 ### Input injection quirks
 
-- `$4218/$4219` interception is only active while a press is scripted
-  (pass-through otherwise), and injected values look exactly like a real
-  idle/held standard pad (signature bits 0).
+- The `$4218/$4219` read override is registered always-on; injected values
+  are bit-identical to a real idle/held standard pad (signature bits 0).
 - The game polls once per frame via NMI auto-joypad; 4+ frame holds are
   reliably seen, 8 used for title Start presses.
+- The override is re-registered after every savestate load
+  (`rearmInputInjection()` inside the `loadState` step), in case the load
+  detaches memory callbacks.  `probe23.lua` is the positive control: after
+  loading `first_battle.mss`, A must open the MagiTek submenu and B must
+  close it (screenshot bytes compared; verified PASSing).
 - FF3us auto-plays its opening from the title screen even with no input;
   pressing Start during the logo also works.  With garbage/absent SRAM the
   save-select is skipped entirely on this path.
@@ -244,28 +258,22 @@ pixels are ever needed.
   but `( cmd & pid=$!; (sleep N; kill $pid) & wait $pid )` is the fallback
   pattern if a script without the library must be watchdogged.
 
-### BATTLE-ENTRY STATUS (2026-07-15)
+### BATTLE-ENTRY STATUS (2026-07-15): ALL GREEN
 
-Two regressions caught on the break-system ROM so far:
+Two regressions were caught on the break-system ROM and both are fixed:
 
-1. (fixed) Hard crash at battle init: CPU derailed into RAM, NMI disabled.
-   Root cause was an assembler width desync (.i8 immediates in .i16 battle
-   context) in the bank-F0 break module.
-2. (OPEN as of the .i8/.i16 fix) Battle init still hangs before the screen
-   ever unblanks: A/B evidence from the SAME `battle_doorstep.mss` +
-   identical scripted walk --
-     * base FF3us image: screen renders the battle at ~+120..180 frames
-       after the load begins (`battle_entry.lua` PASS in ~460 frames total);
-     * ot6.sfc: screen stays black past +2400 frames, $7E3ECB-$7E3ED2 glyph
-       buffer never written, battle UI never initializes -> FAIL.
-   Notably battle RAM partially fills on ot6 before the hang (party HP at
-   $7E3BF4; per-monster shield bytes become 02 02 at $7E3E44/$7E3E46 for
-   the two Guards), and a mid-battle savestate minted on the base image
-   RESUMES fine on ot6 (menus open, screen renders) -- so the battle loop
-   is healthy and the hang is isolated to the init/fade-in path.
+1. Hard crash at battle init (CPU derailed into RAM, NMI disabled): an
+   assembler width desync (.i8 immediates in .i16 battle context) in the
+   bank-F0 break module.
+2. Battle init hang (screen never unblanked past +2400 frames while battle
+   RAM partially filled).  Isolated by A/B: the same `battle_doorstep.mss`
+   + identical scripted walk rendered the battle at ~+120 frames on the
+   base FF3us image but stayed black on ot6; a base-minted mid-battle
+   state resumed fine on ot6, pinning the hang to the init/fade-in path.
 
-`first_battle.mss` currently in build/states was therefore minted on the
-base image (gen_battle_state.lua PASSes end-to-end there); regenerate it on
-ot6.sfc once battle init survives, at which point `battle_smoke.lua` (which
-asserts the $7E3ECB digit glyph) should go green and the monster name
-window can be screenshot-verified for shield digits.
+On the current build the whole suite passes against ot6.sfc:
+`gen_battle_state` mints both states end-to-end, `battle_entry` PASSes in
+~460 frames, `battle_smoke` asserts shields 02/02 at $7E3E44/$7E3E46 and
+digit glyph $B6 ("2") at $7E3ECB, and `battle_firebeam` drives a full
+MagiTek turn -- `shots/fb_firing.png` shows the monster name window
+rendering "Guard    2" (name + shield digit), confirmed visually.
