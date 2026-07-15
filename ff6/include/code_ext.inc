@@ -11,6 +11,8 @@ CODE_EXT_INC = 1
 
 ; ot6 module (bank f0, part of battle object)
 .global Ot6ShieldGlyph_ext, Ot6LoadFontIcons_ext
+.global Ot6TrackTarget_ext, Ot6MonsterRow_ext, Ot6AbilityPad_ext
+.global Ot6ListIcon_ext, Ot6MagitekIcon_ext, Ot6LoreIcon_ext
 
 ; battle graphics module
 .global SineTbl8, SineTbl16

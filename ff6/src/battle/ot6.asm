@@ -34,6 +34,8 @@ OT6_BREAK_TICKS := $10          ; a bit under vanilla stop duration ($12)
 ; a8/i16, x = monster prop offset, y = entity offset, preserves x/y
 
 .proc Ot6SeedShields
+        .a8
+        .i16
         tya                     ; entity offset, width-neutral test
         cmp     #$08
         bcc     done            ; rage load onto a character: no shields
@@ -59,6 +61,8 @@ done:   rtl
 ; a8/i16, y = target, $11a1 = attack elements, preserves x/y
 
 .proc Ot6Chip
+        .a8
+        .i16
         tya                     ; entity offset, width-neutral test
         cmp     #$08
         bcc     done            ; characters have no shields
@@ -103,6 +107,8 @@ done:   rtl
 ; a8/i16, y = target, $f0 = 16-bit damage, $f2 = heal flag
 
 .proc Ot6BrokenDmg
+        .a8
+        .i16
         tya                     ; entity offset, width-neutral test
         cmp     #$08
         bcc     done
@@ -126,6 +132,8 @@ done:   rtl
 ; a8/i16, x = entity
 
 .proc Ot6Gate
+        .a8
+        .i16
         lda     $3ef8,x
         bit     #$10
         bne     done            ; stop status: skip turn (z clear)
@@ -141,6 +149,8 @@ done:   rtl
 ; a8/i16, x = entity, a is free (caller reloads)
 
 .proc Ot6Tick
+        .a8
+        .i16
         lda     $3e88,x
         beq     done
         dec     $3e88,x
@@ -160,6 +170,8 @@ done:   rtl
 ; the name window diff check picks it up on the next frame
 
 .proc Ot6PokeRedraw
+        .a8
+        .i16
         dec     $ebff           ; db = $7e throughout battle code
         rts
 .endproc
@@ -174,6 +186,8 @@ done:   rtl
 ; preserves x/y and caller register widths.
 
 .proc Ot6BuildRowGlyphs
+        .a8
+        .i16
         php
         longi                   ; callers vary: battle init runs i8
         phx
@@ -224,6 +238,8 @@ done:   rtl
 
 ; jsl wrapper for hooks in vanilla banks
 .proc Ot6BuildRowGlyphsFar
+        .a8
+        .i16
         jsr     Ot6BuildRowGlyphs
         rtl
 .endproc
@@ -237,6 +253,8 @@ done:   rtl
 ; row slot byte of the menu text string.
 
 .proc Ot6ShieldGlyph_ext
+        .a8
+        .i16
         phx
         longa
         lda     ($48)
@@ -262,6 +280,8 @@ done:   rtl
 ; cell below was verified unreferenced in the battle tilemap regions.
 
 .proc Ot6LoadFontIcons_ext
+        .a8
+        .i16
         php
         phb
         clr_a
@@ -318,6 +338,324 @@ Ot6ElemGlyphTbl:
         .byte   $fb             ; holy
         .byte   $fc             ; earth
         .byte   $fd             ; water
+
+OT6_QMARK := $bf                ; '?' glyph (unrevealed weakness slot)
+
+; strip scratch (free odd bytes between the row-glyph slots; battle-only)
+OT6_SCR_SLOT2 := $3ecc          ; targeted monster offset (slot * 2)
+OT6_SCR_BIT   := $3ece          ; walking element bit
+OT6_SCR_IDX   := $3ed0          ; element index 0-7
+OT6_SCR_COLS  := $3ed2          ; strip columns drawn so far
+
+; ------------------------------------------------------------------------------
+
+; [ write one menu character ]
+
+; replicates btlgfx's DrawMenuKana buffer writes: char + attribute pairs
+; into the two row buffers. caller context: menu text drawing (dp $4a/$4c
+; buffer pointers, $4e attribute, y = column position, a8/i16, db=$7e).
+; a = character code; y advances by 2.
+
+.proc Ot6DrawChar
+        .a8
+        .i16
+        sta     ($4c),y
+        lda     #$ff
+        sta     ($4a),y
+        iny
+        lda     $4e
+        sta     ($4c),y
+        sta     ($4a),y
+        iny
+        rts
+.endproc
+
+; ------------------------------------------------------------------------------
+
+; [ track the battle target cursor for the weakness strip ]
+
+; called every frame from UpdateMenuState (btlgfx). while the target
+; cursor is on a monster (menu state $38), $3ed3 holds its slot (0-5);
+; otherwise $ff. pokes the name-window cache on change so the row
+; redraws as a strip (or back to a name).
+; a8/i16, db=$7e, a is free (caller reloads immediately)
+
+.proc Ot6TrackTarget_ext
+        .a8
+        .i16
+        lda     $7bc2           ; menu cursor state
+        cmp     #$38
+        bne     none            ; not targeting: no strip row
+        lda     $7b7e           ; monster target mask
+        beq     none
+        sta     OT6_SCR_BIT     ; caller width unknown: no index registers
+        lda     #$00
+@bit:   lsr     OT6_SCR_BIT
+        bcs     store           ; a = lowest set bit = targeted slot
+        inc
+        bra     @bit
+none:   lda     #$ff
+store:  cmp     $3ed3
+        beq     done            ; unchanged
+        sta     $3ed3
+        jsr     Ot6PokeRedraw   ; force the monster window to redraw
+done:   rtl
+.endproc
+
+; ------------------------------------------------------------------------------
+
+; [ weakness strip for the targeted monster's name row ]
+
+; called at the head of MenuTextCmd_0b (after IncTextPtr). if this row is
+; the targeted monster's group, draws 11 columns in place of the name:
+;   [shield digit or 'B'] [blank] [one slot per weak element: icon if
+;   revealed, '?' if not] [blanks to fill]
+; returns carry set if the strip was drawn (caller skips the name).
+; a8/i16, db=$7e, y = column, ($48) -> row slot byte, preserves x
+
+.proc Ot6MonsterRow_ext
+        .a8
+        .i16
+        lda     $3ed3
+        bmi     @no             ; $ff: no target, draw the normal name
+        asl
+        sta     OT6_SCR_SLOT2   ; targeted monster offset (slot * 2)
+        phx
+        ; compare this row's name id with the targeted monster's
+        longa
+        lda     OT6_SCR_SLOT2
+        and     #$00ff
+        tax
+        lda     $3388,x         ; targeted monster's name id
+        pha
+        lda     ($48)
+        and     #$0003
+        asl
+        tax
+        lda     $200d,x         ; this row's name id
+        cmp     $01,s
+        beq     @match
+        pla
+        shorta0
+        plx
+@no:    clc
+        rtl
+
+@match: pla
+        shorta0
+        lda     OT6_SCR_SLOT2
+        tax                     ; x = slot*2 (b stays 0 after shorta0)
+        ; column 1: shield state ('B' / digit / blank)
+        lda     $3e90,x         ; broken timer ($3e88 + 8)
+        beq     @digit
+        lda     #$81            ; 'B'
+        bra     @col0
+@digit: lda     $3e40,x         ; shield current ($3e38 + 8)
+        beq     @blk0
+        cmp     #$0a
+        bcc     :+
+        lda     #$09
+:       clc
+        adc     #$b4            ; digit glyph
+        bra     @col0
+@blk0:  lda     #$ff
+@col0:  jsr     Ot6DrawChar
+        lda     #$ff
+        jsr     Ot6DrawChar     ; column 2: gap
+        lda     #$02
+        sta     OT6_SCR_COLS
+        ; columns 3+: one slot per weak element
+        lda     #$01
+        sta     OT6_SCR_BIT
+        lda     #$00
+        sta     OT6_SCR_IDX
+@elem:  lda     OT6_SCR_BIT
+        beq     @fill           ; walked off bit 7: done
+        and     $3be8,x         ; weak to this element? ($3be0 + 8)
+        beq     @next
+        lda     OT6_SCR_BIT
+        and     $3e91,x         ; revealed? ($3e89 + 8)
+        beq     @qmark
+        phx
+        lda     OT6_SCR_IDX
+        tax
+        lda     f:Ot6ElemGlyphTbl,x
+        plx
+        bra     @slot
+@qmark: lda     #OT6_QMARK
+@slot:  jsr     Ot6DrawChar
+        inc     OT6_SCR_COLS
+@next:  asl     OT6_SCR_BIT
+        inc     OT6_SCR_IDX
+        bra     @elem
+        ; pad with blanks to 11 columns total
+@fill:  lda     OT6_SCR_COLS
+        cmp     #$0b
+        bcs     @done
+        lda     #$ff
+        jsr     Ot6DrawChar
+        inc     OT6_SCR_COLS
+        bra     @fill
+@done:  plx
+        sec
+        rtl
+.endproc
+
+; ------------------------------------------------------------------------------
+
+; [ ability element icon + padding for battle ability lists ]
+
+; replaces MenuTextCmd_11's pad logic; called right after MenuTextCmd_0f
+; drew the ability name, ($48) still pointing at the ability id.
+;   $ff empty slot:            three blanks (as vanilla)
+;   spells (< $36, 7 wide):    [element icon or blank][blank][blank]
+;   attacks (10 wide):         trailing blank replaced by the icon
+; a8/i16, db=$7e, y = column, preserves x
+
+.proc Ot6AbilityPad_ext
+        .a8
+        .i16
+        lda     ($48)
+        cmp     #$ff
+        beq     @blank3
+        cmp     #$36
+        bcs     @attack
+        jsr     Ot6ElemGlyphFor ; spell: icon (or blank) + two blanks
+        jsr     Ot6DrawChar
+        bra     @blank2
+@attack:
+        jsr     Ot6ElemGlyphFor
+        cmp     #$ff
+        beq     @done           ; no element: leave the name alone
+        dey
+        dey                     ; back up onto the name's last column
+        pha
+        lda     ($4c),y
+        cmp     #$ff
+        bne     @keep           ; 10-char name: no room for an icon
+        pla
+        jsr     Ot6DrawChar     ; overwrite trailing blank (y returns)
+        bra     @done
+@keep:  pla
+        iny
+        iny
+@done:  rtl
+@blank3:
+        lda     #$ff
+        jsr     Ot6DrawChar
+@blank2:
+        lda     #$ff
+        jsr     Ot6DrawChar
+        lda     #$ff
+        jsr     Ot6DrawChar
+        rtl
+.endproc
+
+; ------------------------------------------------------------------------------
+
+; [ element icon after an ability name in a battle list window ]
+
+; called after ListTextCmd_0f's name loops (battle ability lists draw
+; through the LIST text system, not the menu text system). $2c = ability
+; id, y = list column, b = tile attribute (must be preserved), ($53)/($51)
+; = list buffer pointers, $55 = second-plane attribute word.
+
+; common core: a = GLOBAL ability id; draws the element icon (if any)
+; at the current list column, preserving b (the tile attribute).
+.proc Ot6ListIconCommon
+        .a8
+        .i16
+        sta     OT6_SCR_IDX     ; ability id
+        xba
+        pha                     ; save the tile attribute living in b
+        xba
+        lda     OT6_SCR_IDX
+        jsr     Ot6ElemGlyphFor ; (clears b internally)
+        sta     OT6_SCR_BIT     ; glyph, or $ff for none
+        pla
+        xba                     ; restore attribute to b
+        lda     OT6_SCR_BIT     ; glyph, or $ff = blank: ALWAYS draw, so the
+        longa                   ; icon column can never go stale on reused
+        sta     ($53),y         ; row buffers (replicates DrawListLetter)
+        lda     $55
+        sta     ($51),y
+        shorta                  ; keep b intact for the caller
+        iny
+        iny
+        rts
+.endproc
+
+; generic battle lists ($2c already holds a global ability id)
+.proc Ot6ListIcon_ext
+        .a8
+        .i16
+        lda     $2c
+        jsr     Ot6ListIconCommon
+        rtl
+.endproc
+
+; magitek list: $2c is a local index into the magitek attacks (base $83)
+.proc Ot6MagitekIcon_ext
+        .a8
+        .i16
+        lda     $2c
+        clc
+        adc     #$83
+        jsr     Ot6ListIconCommon
+        rtl
+.endproc
+
+; lore list: $2c is a local lore index (base $8b)
+.proc Ot6LoreIcon_ext
+        .a8
+        .i16
+        lda     $2c
+        clc
+        adc     #$8b
+        jsr     Ot6ListIconCommon
+        rtl
+.endproc
+
+; ------------------------------------------------------------------------------
+
+; [ element glyph for an ability ]
+
+; a = ability id (0-255) -> a = element icon glyph, or $ff if the ability
+; has no element. first set element bit wins. preserves x/y.
+
+.proc Ot6ElemGlyphFor
+        .a8
+        .i16
+        phx
+        longa
+        and     #$00ff
+        asl                     ; id * 2
+        pha
+        asl
+        pha                     ; id * 4
+        asl                     ; id * 8
+        clc
+        adc     $01,s           ; + id*4
+        clc
+        adc     $03,s           ; + id*2  = id * 14
+        tax
+        pla
+        pla
+        shorta0
+        lda     f:MagicProp+1,x ; ability element byte
+        beq     @none
+        ldx     #$0000
+@bit:   lsr
+        bcs     @hit
+        inx
+        bra     @bit
+@hit:   lda     f:Ot6ElemGlyphTbl,x
+        plx
+        rts
+@none:  lda     #$ff
+        plx
+        rts
+.endproc
 
 ; 8x8 2bpp element icons, element-bit order (fire $01 ... water $80)
 Ot6FontIcons:

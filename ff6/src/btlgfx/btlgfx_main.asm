@@ -12533,7 +12533,8 @@ WindowBorderTileTbl:
 ; [ update menu state ]
 
 UpdateMenuState:
-@5524:  lda     w7e7bc2       ; menu cursor state
+@5524:  jsl     Ot6TrackTarget_ext      ; ot6: track target for weakness strip
+        lda     w7e7bc2       ; menu cursor state
         asl
         tax
         jmp     (.loword(UpdateMenuStateTbl),x)
@@ -15096,7 +15097,7 @@ ListTextCmd_06:
         lda     ($4f)
         cmp     #$ff
         bne     @64fd
-        lda     #AttackName::ITEM_SIZE
+        lda     #AttackName::ITEM_SIZE+1        ; ot6: also erase icon column
         jmp     _c166a5
 @64fd:  sta     $2c
         lda     #AttackName::ITEM_SIZE
@@ -15109,6 +15110,7 @@ ListTextCmd_06:
         inx
         dec     $40
         bne     @650a
+        jsl     Ot6MagitekIcon_ext      ; ot6: element icon after the name
         rts
 
 ; ------------------------------------------------------------------------------
@@ -15389,7 +15391,7 @@ ListTextCmd_19:
         sta     $2c
         cmp     #$ff
         bne     @6665
-        lda     #AttackName::ITEM_SIZE
+        lda     #AttackName::ITEM_SIZE+1        ; ot6: also erase icon column
         jmp     _c166a5
 @6665:  lda     #AttackName::ITEM_SIZE
         sta     $2e
@@ -15401,6 +15403,7 @@ ListTextCmd_19:
         inx
         dec     $40
         bne     @6670
+        jsl     Ot6LoreIcon_ext         ; ot6: element icon after the name
         rts
 
 ; ------------------------------------------------------------------------------
@@ -16048,6 +16051,8 @@ DrawNum3:
 
 MenuTextCmd_0b:
 @6993:  jsr     IncTextPtr
+        jsl     Ot6MonsterRow_ext       ; ot6: weakness strip when targeted
+        bcs     @done
         lda     #MonsterName::ITEM_SIZE
         sta     $10
         lda     ($48)
@@ -16066,7 +16071,7 @@ MenuTextCmd_0b:
         inx
         dec     $10
         bne     @69ad
-        rts
+@done:  rts
 @69b8:
 .if LANG_EN
         longa
@@ -16260,14 +16265,8 @@ MenuTextCmd_0e:
 
 MenuTextCmd_11:
 @6aaf:  jsr     MenuTextCmd_0f
-        lda     ($48)
-        cmp     #$ff
-        beq     @6abd
-        cmp     #$36
-        bcc     @6abd
+        jsl     Ot6AbilityPad_ext       ; ot6: element icon + pad
         rts
-@6abd:  lda     #3
-        jmp     DrawSpaces
 
 .endif
 
