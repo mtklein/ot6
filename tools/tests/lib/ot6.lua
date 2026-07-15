@@ -107,13 +107,25 @@ local padLo, padHi = 0, 0
 -- Always substitute the joypad registers (0 = nothing held).  The values are
 -- bit-identical to a real idle/held standard pad, and this always-on
 -- configuration is the one proven stable across many long headless runs.
-local padCallbackRef = emu.addMemoryCallback(function(addr)
-  if addr == 0x4218 then return padLo end
-  if addr == 0x4219 then return padHi end
-end, emu.callbackType.read, 0x4218, 0x4219)
+local padCallbackRef = nil
+
+-- (Re)register the $4218/$4219 read override.  Re-armed after every
+-- savestate load as a defensive measure in case the emulator drops or
+-- detaches memory callbacks across loads.
+function M.rearmInputInjection()
+  if padCallbackRef then
+    pcall(emu.removeMemoryCallback, padCallbackRef, emu.callbackType.read, 0x4218, 0x4219)
+    padCallbackRef = nil
+  end
+  padCallbackRef = emu.addMemoryCallback(function(addr)
+    if addr == 0x4218 then return padLo end
+    if addr == 0x4219 then return padHi end
+  end, emu.callbackType.read, 0x4218, 0x4219)
+end
+M.rearmInputInjection()
 
 -- Remove the joypad override entirely (reads become native again).  For
--- diagnosing interference; irreversible within a run.
+-- diagnosing interference; reversible via rearmInputInjection().
 function M.disableInputInjection()
   if padCallbackRef then
     emu.removeMemoryCallback(padCallbackRef, emu.callbackType.read, 0x4218, 0x4219)
@@ -259,6 +271,9 @@ function M.loadState(sidecarPath)
     M.waitFrames(2),
     M.call(function()
       checkReq(req, "savestate load")
+      -- defensive: re-register the joypad override in case the load
+      -- detached memory callbacks
+      M.rearmInputInjection()
     end),
   })
 end

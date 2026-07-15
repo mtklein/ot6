@@ -16132,7 +16132,7 @@ MenuTextCmd_0d:
         lda     ($48)
         cmp     #$ff
         bne     @69ec       ; branch if command slot is empty
-        lda     #BattleCmdName::ITEM_SIZE
+        lda     #BattleCmdName::ITEM_SIZE+2     ; ot6: +2 pads over shield digit
         jmp     DrawSpaces
 @69ec:  xba
         lda     #BattleCmdName::ITEM_SIZE
@@ -16147,7 +16147,8 @@ MenuTextCmd_0d:
         inx
         dec     $10
         bne     @69fe
-        rts
+        lda     #$02                ; ot6: clear stale monster-row columns
+        jmp     DrawSpaces
 
 ; ------------------------------------------------------------------------------
 
