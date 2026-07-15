@@ -52,6 +52,44 @@ OT6_BREAK_TICKS := $10          ; a bit under vanilla stop duration ($12)
         lda     #$06            ; ... capped at 6
 store:  sta     $3e38,y
         sta     $3e39,y
+        ; weakness codex: stash this slot's species and pre-reveal
+        ; anything already learned in past battles
+        phx
+        longa
+        txa
+        lsr
+        lsr
+        lsr
+        lsr
+        lsr                     ; monster prop offset / 32 = species id
+        sta     OT6_SPECIES-8,y
+        lda     f:OT6_CODEX_MAGIC
+        cmp     #$364f          ; 'O6' - codex bank initialized?
+        beq     @learned
+        ; first use (or no sram bank): wipe the table, then sign it.
+        ; without 32k sram the magic never sticks and the codex is a
+        ; harmless no-op: reads return open bus, merges are junk-free
+        ; because we only merge after the magic matches.
+        shorta0
+        ldx     #$0000
+@wipe:  sta     f:OT6_CODEX,x
+        inx
+        cpx     #$0180          ; 384 species
+        bcc     @wipe
+        longa
+        lda     #$364f
+        sta     f:OT6_CODEX_MAGIC
+        cmp     f:OT6_CODEX_MAGIC
+        bne     @nosram         ; write didn't stick: no codex bank
+@learned:
+        ldx     OT6_SPECIES-8,y ; species -> learned weakness bits
+        shorta0
+        lda     f:OT6_CODEX,x
+        ora     $3e89,y
+        sta     $3e89,y
+@nosram:
+        shorta0
+        plx
 done:   rtl
 .endproc
 
@@ -88,6 +126,14 @@ done:   rtl
 merge:  pla                     ; reveal all matched weaknesses
         ora     $3e89,y
         sta     $3e89,y
+        ; learn it forever: codex entry = everything revealed so far
+        ; (seed merged the old codex bits in, so this is monotonic)
+        phx
+        pha
+        ldx     OT6_SPECIES-8,y
+        pla
+        sta     f:OT6_CODEX,x
+        plx
         lda     $3e38,y
         beq     done            ; shieldless monster
         dec     a
@@ -933,6 +979,14 @@ OT6_MAPBASE := $57b6            ; word scratch: field bg3 map base
 
 OT6_HUDCOPY := $57de            ; second free gap (past special names)
 OT6_HUDDIRTY := $57b8
+
+; weakness codex: learned weaknesses persist across battles, octopath
+; style. lives in the second 8k sram bank (header sram size $05), which
+; vanilla save files never touch. species stash: one word per monster
+; slot so Ot6Chip can find the codex entry at reveal time.
+OT6_CODEX_MAGIC := $316000      ; word 'O6' = codex initialized
+OT6_CODEX       := $316010      ; one revealed-elements byte per species
+OT6_SPECIES     := $57c0        ; per-slot species stash (6 words)
 
 .proc Ot6BgHudMark
         .a8

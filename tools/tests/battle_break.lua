@@ -51,7 +51,9 @@ H.run({ maxFrames = 30000 }, {
 
   H.waitUntil(function() return H.battleActive() end, 900,
     "battle active", 30),
-  H.waitFrames(120),
+  -- input during the first window-open animation wedges the battle menu
+  -- (reproduced on a pristine vanilla-hooks build): settle well past it
+  H.waitFrames(240),
 
   -- 1. seeding
   H.call(function()
@@ -75,11 +77,29 @@ H.run({ maxFrames = 30000 }, {
     local t1, t2 = timers()
     return t1 > 0 or t2 > 0
   end, 30000, {
-    H.pressButtons({ "a" }, 6), H.waitFrames(30),
-    H.pressButtons({ "a" }, 6), H.waitFrames(30),
-    H.pressButtons({ "a" }, 6), H.waitFrames(600),
+    H.call(function() if H.readByte(0x7bca) ~= 0 then H.setPad({ "a" }) end end),
+    H.waitFrames(4),
+    H.call(function() H.setPad({}) end),
+    H.waitFrames(26),
   }, "a guard to break"),
   H.release(),
+  -- the beams that broke the guard went through the magitek list, whose
+  -- rendered rows persist in the menu map: assert the colored element
+  -- icon right of "Fire Beam" (a blank icon here = the pre-render only,
+  -- meaning the real list draw lost its icon column)
+  H.call(function()
+    local vr = emu.memType.snesVideoRam
+    local best = nil
+    for w = 0x6000, 0x7FF0 do
+      if (emu.readWord(w*2, vr) & 0xFF) == 0x85
+        and (emu.readWord(w*2+2, vr) & 0xFF) == 0xA2
+        and (emu.readWord(w*2+4, vr) & 0xFF) == 0xAB then
+        local icon = emu.readWord((w + 10) * 2, vr)
+        if best == nil or icon == 0x3DEB then best = icon end
+      end
+    end
+    H.assertEq(best, 0x3DEB, "fire icon glyph + red palette in the rendered list")
+  end),
   report("broken"),
   H.call(function()
     local s1, s2 = shields()

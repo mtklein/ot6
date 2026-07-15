@@ -25,7 +25,14 @@ H.run({ maxFrames = 20000 }, {
   H.call(function()
     H.screenshot("visual_f2_after_action")
     H.glyphCanary()   -- effect art must not clobber our font cells
-    if H.monstersPresent() then
+    local alive = false
+    for slot = 0, 5 do
+      -- the hud draws cells only for present AND un-dead monsters:
+      -- match the builder's own criterion ($3aa8 bit 0, $3eec $c2 clear)
+      if (H.readByte(0x3aa8 + slot*2) & 1) == 1
+        and (H.readByte(0x3eec + slot*2) & 0xc2) == 0 then alive = true end
+    end
+    if alive then
       H.assertEq(H.fieldHudPresent(), true, "hud survives the attack round")
     end
     H.assertEq(H.isPipGlyph(H.pipWord()), true, "pips survive the attack round")

@@ -274,6 +274,11 @@ function M.loadState(sidecarPath)
       -- defensive: re-register the joypad override in case the load
       -- detached memory callbacks
       M.rearmInputInjection()
+      -- determinism: savestates do NOT restore battery sram, so the
+      -- weakness codex persists across runs. invalidate it so every
+      -- test starts from a virgin codex (battle_codex re-teaches).
+      emu.write(0x316000, 0, emu.memType.snesMemory)
+      emu.write(0x316001, 0, emu.memType.snesMemory)
     end),
   })
 end

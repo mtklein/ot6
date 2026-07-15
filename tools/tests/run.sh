@@ -27,7 +27,18 @@ mkdir -p "$ROOT/build/states/shots"
 
 python3 "$ROOT/tools/tests/lib/compose.py" "$SCRIPT" "$COMPOSED" || exit 2
 
-"$MESEN" --testrunner "$ROM" "$COMPOSED" > "$LOG" 2>&1
+# Isolated portable Mesen for tests: the testrunner flushes battery saves
+# on exit and twice zeroed the user's in-game save (ot6.srm) when sharing
+# the real profile. A $HOME override is ignored on macOS, so tests run a
+# portable copy (settings.json beside the binary = portable mode).
+MESEN_TEST="$ROOT/build/mesen-test.app"
+if [ ! -x "$MESEN_TEST/Contents/MacOS/Mesen" ]; then
+  echo "creating portable test emulator (one-time copy)..."
+  cp -R "$ROOT/tools/Mesen.app" "$MESEN_TEST"
+  cp "$HOME/Library/Application Support/Mesen2/settings.json" \
+     "$MESEN_TEST/Contents/MacOS/settings.json"
+fi
+"$MESEN_TEST/Contents/MacOS/Mesen" --testrunner "$ROM" "$COMPOSED" > "$LOG" 2>&1
 code=$?
 
 python3 "$ROOT/tools/tests/lib/decode_b64.py" "$LOG" "$ROOT/build/states"

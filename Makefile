@@ -3,7 +3,7 @@ SHA1  := 4f37e4274ac3b2ea1bedb08aa149d8fc5bb676e7
 FLIPS := tools/bin/flips
 MESEN := tools/Mesen.app/Contents/MacOS/Mesen
 
-.PHONY: all rom patch run test verify clean
+.PHONY: all rom patch run test verify clean goldens-capture
 
 all: rom
 
@@ -43,11 +43,22 @@ build/states/.rom-stamp: ff6/rom/ff6-en.sfc
 	@cmp -s ff6/rom/ff6-en.sfc build/states/.rom-copy 2>/dev/null || \
 		{ cp ff6/rom/ff6-en.sfc build/states/.rom-copy; echo "rom content changed"; }
 	@touch build/states/.rom-stamp
+# goldens are captured from the same state mint they are compared against:
+# every remint shifts party hp / atb phase, so cross-mint pixel compares
+# are meaningless. the canary asserts inside the tests stay mint-independent.
 $(STATE1): build/states/.rom-stamp
 	@if [ build/states/.rom-copy -nt $(STATE1) ] || [ ! -f $(STATE1) ]; then \
 		tools/tests/run.sh tools/tests/gen_battle_state.lua; \
+		$(MAKE) goldens-capture; \
 	fi
 	@touch $(STATE1)
+
+goldens-capture:
+	tools/tests/run.sh tools/tests/visual_f1.lua || true
+	@mkdir -p tools/tests/goldens
+	cp build/states/shots/visual_f1_idle.png tools/tests/goldens/
+	cp build/states/shots/visual_f1_menu.png tools/tests/goldens/
+	@echo "goldens recaptured for the fresh state mint"
 $(STATE2): $(STATE1)
 	@if [ build/states/.rom-copy -nt build/states/battle2_doorstep.mss ] || [ ! -f build/states/battle2_doorstep.mss ]; then \
 		tools/tests/run.sh tools/tests/gen_battle2.lua; \

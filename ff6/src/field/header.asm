@@ -62,7 +62,7 @@ SnesHeader:
         .byte   $31                     ; HiROM, FastROM
         .byte   $02                     ; rom + ram + sram
         .byte   $0c                     ; rom size: 48 Mbit
-        .byte   $03                     ; sram size: 64 kbit
+        .byte   $05                     ; sram size: 256 kbit (ot6: weakness codex in the second 8k bank)
 .if LANG_EN
         .byte   $01                     ; destination: north america
         .byte   $33                     ; use extended header
