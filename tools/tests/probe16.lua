@@ -15,7 +15,7 @@ H.run({ maxFrames = 2000 }, {
   end),
   H.waitFrames(2),
   H.call(function()
-    assert(req.done and req.blob and #req.blob > 0, "savestate capture failed")
+    H.checkReq(req, "savestate capture")
     blob = req.blob
     H.log("state blob size: " .. #blob)
     H.writeWord(ADDR, (before ~ 0xFFFF) & 0xFFFF)
@@ -27,7 +27,7 @@ H.run({ maxFrames = 2000 }, {
   end),
   H.waitFrames(2),
   H.call(function()
-    assert(req.done, "savestate load failed")
+    H.checkReq(req, "savestate load")
     H.assertEq(H.readWord(ADDR), before, "WRAM word restored by loadSavestate")
     local head = blob:sub(1, 100000)
     H.assertEq(H.b64decode(H.b64encode(head)) == head, true, "b64 encode/decode round-trip")

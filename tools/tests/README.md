@@ -43,15 +43,23 @@ watchdog needed.  A bare hang would only happen if a script bypasses
   logging monster IDs and party HP.
 - `smoke.lua` - original ROM-content smoke test (OCTO name bytes).
 - `battle_entry.lua` - FAST battle-entry regression test: loads
-  `battle_doorstep.mss` and walks into the first battle (~30 s wall clock).
-  This is the tight iteration loop for battle/break-system changes.
-- `probe12.lua` - diagnostic: is expanded bank $F0 mapped? (bus vs file bytes)
-- `probe16.lua` - diagnostic: savestate save/clobber/load round-trip.
-- `probe17.lua` - harness self-test: 18k-frame runner+input longevity.
+  `battle_doorstep.mss` and walks into the first battle (~30 s wall clock,
+  PASS/FAIL on whether the battle engine actually comes up).  This is the
+  tight iteration loop for battle/break-system changes.
+- `probe16.lua` - diagnostic: savestate save/clobber/load round-trip
+  (validates the exec-callback trampoline and the base64 codec).
+- `probe19.lua` - diagnostic: doorstep -> battle with screenshots + RAM
+  dumps at +0/+60/+180/+420/+900/+1500/+2400 frames.
+- `probe22.lua` - diagnostic: resume `first_battle.mss`, press A/A/B to
+  poke the battle menus, screenshot each step (for UI iteration).
 
 Generated artifacts land in `build/states/` (savestates, `*.mss` +
 `*.mss.lua` sidecar) and `build/states/shots/` (PNG screenshots).
-The `.mss` files load fine in the Mesen GUI too.
+The `.mss` files load fine in the Mesen GUI too.  `build/states/` also
+holds `base_rom_for_comparison.sfc` (copy of the FF3us base image) --
+running any test against it instead of `build/ot6.sfc` gives an instant
+"is it our code or the harness?" A/B, and savestates cross-load between
+the two images.
 
 ## Writing a test
 
@@ -106,7 +114,11 @@ Plain functions (call from `H.call`/predicates):
   `H.battleActive()` (load started + monsters present + screen actually
   rendering, judged by screenshot PNG size), `H.screenLooksAlive()`,
   constants `H.MONSTER_IDS=$3F46`, `H.BATTLE_HP=$3BF4`, `H.BREAK_GLYPH=$3ECB`.
-  (Note: monster ID 0 = "Guard" is valid; empty slots read $FFFF.)
+  (Caveat: the six words at $3F46 are a liveness heuristic, not clean IDs --
+  monster #0 "Guard" is a valid 0x0000, empty slots read $FFFF, and healthy
+  vanilla battles still show one stale-garbage word there, e.g. 874B, from
+  power-on RAM randomization.  Treat `monstersPresent() > 0` as "battle has
+  occupants", nothing finer.)
 
 ## Mesen 2.1.1 Lua API facts (all verified empirically on this binary)
 
@@ -232,15 +244,28 @@ pixels are ever needed.
   but `( cmd & pid=$!; (sleep N; kill $pid) & wait $pid )` is the fallback
   pattern if a script without the library must be watchdogged.
 
-### REGRESSION CAUGHT AND FIXED (2026-07-15)
+### BATTLE-ENTRY STATUS (2026-07-15)
 
-First real catch: on the first break-system build, entering the first battle
-crashed the game -- battle RAM started filling ($7E3BF4 HP table, $7E3ECB
-glyph), then the screen stayed black forever with NMI disabled and the CPU
-executing RAM (`emu.getState()` cpu.k/pc in WRAM, SP pointing into ROM).
-The harness pinned it down to "battle load begins, engine never comes up",
-verified bank $F0 was correctly mapped (bus bytes at $F0:0000 == ROM file
-offset 0x300000, so not a mapping/expansion problem), which pointed at the
-new code itself; root cause was an assembler width desync (.i8 immediates
-in .i16 battle context) in the bank-F0 break module.  `battle_entry.lua`
-(doorstep -> battle in ~30 s) is the fast regression test guarding this.
+Two regressions caught on the break-system ROM so far:
+
+1. (fixed) Hard crash at battle init: CPU derailed into RAM, NMI disabled.
+   Root cause was an assembler width desync (.i8 immediates in .i16 battle
+   context) in the bank-F0 break module.
+2. (OPEN as of the .i8/.i16 fix) Battle init still hangs before the screen
+   ever unblanks: A/B evidence from the SAME `battle_doorstep.mss` +
+   identical scripted walk --
+     * base FF3us image: screen renders the battle at ~+120..180 frames
+       after the load begins (`battle_entry.lua` PASS in ~460 frames total);
+     * ot6.sfc: screen stays black past +2400 frames, $7E3ECB-$7E3ED2 glyph
+       buffer never written, battle UI never initializes -> FAIL.
+   Notably battle RAM partially fills on ot6 before the hang (party HP at
+   $7E3BF4; per-monster shield bytes become 02 02 at $7E3E44/$7E3E46 for
+   the two Guards), and a mid-battle savestate minted on the base image
+   RESUMES fine on ot6 (menus open, screen renders) -- so the battle loop
+   is healthy and the hang is isolated to the init/fade-in path.
+
+`first_battle.mss` currently in build/states was therefore minted on the
+base image (gen_battle_state.lua PASSes end-to-end there); regenerate it on
+ot6.sfc once battle init survives, at which point `battle_smoke.lua` (which
+asserts the $7E3ECB digit glyph) should go green and the monster name
+window can be screenshot-verified for shield digits.

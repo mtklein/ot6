@@ -17,9 +17,12 @@ OT6_BREAK_TICKS := $10          ; a bit under vanilla stop duration ($12)
 
 .segment "ot6_code"
 
-; calling convention for every entry point here: 8-bit accumulator,
-; 16-bit index registers (the battle/btlgfx norm). procs that need other
-; widths switch explicitly (longa/shorta) and restore before returning.
+; width discipline: callers vary (battle init calls some hooks with 8-bit
+; index registers!). every entry point either (a) uses only width-agnostic
+; instructions — no index immediates, no pushes — or (b) does php + longi
+; and restores. entity-offset checks use tya/cmp (width-neutral), never
+; cpy #imm. a-width is 8-bit at every hook site (verified per site in the
+; assembler listings).
 .a8
 .i16
 
@@ -31,7 +34,8 @@ OT6_BREAK_TICKS := $10          ; a bit under vanilla stop duration ($12)
 ; a8/i16, x = monster prop offset, y = entity offset, preserves x/y
 
 .proc Ot6SeedShields
-        cpy     #$0008
+        tya                     ; entity offset, width-neutral test
+        cmp     #$08
         bcc     done            ; rage load onto a character: no shields
         lda     f:MonsterProp+16,x
         lsr
@@ -55,7 +59,8 @@ done:   rtl
 ; a8/i16, y = target, $11a1 = attack elements, preserves x/y
 
 .proc Ot6Chip
-        cpy     #$0008
+        tya                     ; entity offset, width-neutral test
+        cmp     #$08
         bcc     done            ; characters have no shields
         lda     $3e88,y
         bne     done            ; already broken: no chip until recovery
@@ -98,7 +103,8 @@ done:   rtl
 ; a8/i16, y = target, $f0 = 16-bit damage, $f2 = heal flag
 
 .proc Ot6BrokenDmg
-        cpy     #$0008
+        tya                     ; entity offset, width-neutral test
+        cmp     #$08
         bcc     done
         lda     $3e88,y
         beq     done            ; not broken
@@ -169,6 +175,7 @@ done:   rtl
 
 .proc Ot6BuildRowGlyphs
         php
+        longi                   ; callers vary: battle init runs i8
         phx
         phy
         shorta

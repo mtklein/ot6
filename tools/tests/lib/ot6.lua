@@ -70,11 +70,12 @@ function M.b64decode(s)
   for i = 1, #s do
     local v = B64INV[s:byte(i)]
     if v then
-      n = n * 64 + v
+      n = (n << 6) | v
       bits = bits + 6
       if bits >= 8 then
         bits = bits - 8
-        out[#out + 1] = string.char(math.floor(n / 2 ^ bits) % 256)
+        out[#out + 1] = string.char((n >> bits) & 0xFF)
+        n = n & ((1 << bits) - 1) -- keep only the leftover bits (precision!)
       end
     end
   end
@@ -106,10 +107,20 @@ local padLo, padHi = 0, 0
 -- Always substitute the joypad registers (0 = nothing held).  The values are
 -- bit-identical to a real idle/held standard pad, and this always-on
 -- configuration is the one proven stable across many long headless runs.
-emu.addMemoryCallback(function(addr)
+local padCallbackRef = emu.addMemoryCallback(function(addr)
   if addr == 0x4218 then return padLo end
   if addr == 0x4219 then return padHi end
 end, emu.callbackType.read, 0x4218, 0x4219)
+
+-- Remove the joypad override entirely (reads become native again).  For
+-- diagnosing interference; irreversible within a run.
+function M.disableInputInjection()
+  if padCallbackRef then
+    emu.removeMemoryCallback(padCallbackRef, emu.callbackType.read, 0x4218, 0x4219)
+    padCallbackRef = nil
+    M.log("input injection disabled (joypad callback removed)")
+  end
+end
 
 -- Immediately set the held-button set ({"a","down"} or {a=true,down=true}).
 -- (Plain function; the step-flavored wrappers are below.)
@@ -175,9 +186,12 @@ function M.requestSaveState()
   local req = {}
   local ref
   ref = emu.addMemoryCallback(function()
-    if req.done then return end
+    if req.fired then return end
+    req.fired = true
+    local ok, err = pcall(function() req.blob = emu.createSavestate() end)
+    req.ok = ok and type(req.blob) == "string" and #req.blob > 0
+    req.error = err
     req.done = true
-    req.blob = emu.createSavestate()
     emu.removeMemoryCallback(ref, emu.callbackType.exec, 0x000000, 0xFFFFFF)
   end, emu.callbackType.exec, 0x000000, 0xFFFFFF)
   return req
@@ -187,13 +201,22 @@ function M.requestLoadState(blob)
   local req = {}
   local ref
   ref = emu.addMemoryCallback(function()
-    if req.done then return end
+    if req.fired then return end
+    req.fired = true
+    local ok, err = pcall(function() emu.loadSavestate(blob) end)
+    req.ok = ok
+    req.error = err
     req.done = true
-    emu.loadSavestate(blob)
     emu.removeMemoryCallback(ref, emu.callbackType.exec, 0x000000, 0xFFFFFF)
   end, emu.callbackType.exec, 0x000000, 0xFFFFFF)
   return req
 end
+
+local function checkReq(req, what)
+  assert(req and req.done, what .. " did not complete (trampoline never fired)")
+  assert(req.ok, what .. " failed: " .. tostring(req.error))
+end
+M.checkReq = checkReq
 
 -- Resolve a savestate sidecar to its base64 payload.  Normal path: the
 -- compose step embedded it as OT6_STATES[basename] (runtime loadfile() is
@@ -216,8 +239,7 @@ function M.saveState(name)
     M.call(function() req = M.requestSaveState() end),
     M.waitFrames(2),
     M.call(function()
-      assert(req.done and type(req.blob) == "string" and #req.blob > 0,
-        "savestate capture did not complete")
+      checkReq(req, "savestate capture")
       M.emitBlob(name, req.blob)
     end),
   })
@@ -236,7 +258,7 @@ function M.loadState(sidecarPath)
     end),
     M.waitFrames(2),
     M.call(function()
-      assert(req.done, "savestate load did not complete")
+      checkReq(req, "savestate load")
     end),
   })
 end
@@ -292,10 +314,12 @@ function M.battleLoadStarted()
 end
 
 -- Cheap "is anything on screen" check: an all-black 256x224 screenshot
--- compresses to ~750 bytes; real scenes are several KB.
+-- compresses to ~750 bytes, the battle-transition mosaic to ~2.3 KB, and a
+-- real battle scene (bg + sprites + UI windows) to ~10 KB.  4000 splits the
+-- transition from the real thing.
 function M.screenLooksAlive()
   local ok, png = pcall(emu.takeScreenshot)
-  return ok and type(png) == "string" and #png > 2000
+  return ok and type(png) == "string" and #png > 4000
 end
 
 -- True while a battle is fully up and RENDERING.  A crashed battle load

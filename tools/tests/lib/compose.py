@@ -31,9 +31,10 @@ def main() -> int:
     script = script_path.read_text()
     lib = LIB.read_text()
 
-    # collect referenced savestate sidecars
+    # collect referenced savestate sidecars: any "<path>.mss.lua" string
+    # literal in the script (scripts typically bind them to a STATE local)
     states = {}
-    for ref in re.findall(r'H\.loadState\(\s*"([^"]+\.mss\.lua)"', script):
+    for ref in re.findall(r'"([^"]+\.mss\.lua)"', script):
         p = Path(ref)
         if p.exists():
             content = p.read_text()
