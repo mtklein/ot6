@@ -24,8 +24,15 @@ patch: rom
 	$(FLIPS) --create --bps "$(BASE)" build/ot6.sfc build/dist/ot6-from-ff3us10.bps
 	@ls -la build/dist/ot6-from-ff3us10.bps
 
+# One GUI instance only: battery saves flush on exit, so a second instance
+# exiting later silently clobbers the first one's in-game saves.
 run: rom
-	open -n "$(CURDIR)/tools/Mesen.app" --args "$(CURDIR)/build/ot6.sfc"
+	@if ps -axo command | grep "MacOS/Mesen" | grep -v grep | grep -qv testrunner; then \
+		echo "Mesen is already running - use that window (a second instance"; \
+		echo "would clobber battery saves on exit)."; \
+	else \
+		open -n "$(CURDIR)/tools/Mesen.app" --args "$(CURDIR)/build/ot6.sfc"; \
+	fi
 
 test: rom
 	$(MESEN) --testrunner build/ot6.sfc tools/tests/smoke.lua
