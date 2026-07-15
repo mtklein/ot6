@@ -561,7 +561,10 @@ done:   rtl
 ; = list buffer pointers, $55 = second-plane attribute word.
 
 ; common core: a = GLOBAL ability id; draws the element icon (if any)
-; at the current list column, preserving b (the tile attribute).
+; at the current list column, preserving b (the tile attribute) for the
+; caller but recoloring our own icon via the palette bits: the battle
+; menu ships text palettes 0..7 with distinct color-3 hues (0 white,
+; 1 gray, 2 yellow, 3 blue, 6 green, 7 red).
 .proc Ot6ListIconCommon
         .a8
         .i16
@@ -570,20 +573,43 @@ done:   rtl
         pha                     ; save the tile attribute living in b
         xba
         lda     OT6_SCR_IDX
-        jsr     Ot6ElemGlyphFor ; (clears b internally)
-        sta     OT6_SCR_BIT     ; glyph, or $ff for none
-        pla
-        xba                     ; restore attribute to b
+        jsr     Ot6ElemGlyphFor ; glyph in a, element index in OT6_SCR_COLS,
+        sta     OT6_SCR_BIT     ;   b cleared internally
+        cmp     #$ff
+        beq     @keep           ; no element: blank glyph, caller's attr
+        phx
+        lda     OT6_SCR_COLS    ; element index 0-7
+        tax                     ; (b = 0 here, so tax is safe)
+        lda     f:Ot6ElemPalTbl,x
+        plx
+        sta     OT6_SCR_COLS    ; palette bits for this element
+        pla                     ; caller attr ...
+        and     #%11100011      ; ... palette bits swapped for our color
+        ora     OT6_SCR_COLS
+        bra     @attr
+@keep:  pla
+@attr:  xba                     ; b = attr for the 16-bit store
         lda     OT6_SCR_BIT     ; glyph, or $ff = blank: ALWAYS draw, so the
         longa                   ; icon column can never go stale on reused
         sta     ($53),y         ; row buffers (replicates DrawListLetter)
         lda     $55
         sta     ($51),y
-        shorta                  ; keep b intact for the caller
+        shorta                  ; b holds our attr; caller reloads per char
         iny
         iny
         rts
 .endproc
+
+; element index -> tilemap palette bits (palette << 2)
+Ot6ElemPalTbl:
+        .byte   7 << 2          ; fire: red
+        .byte   3 << 2          ; ice: blue
+        .byte   2 << 2          ; lightning: yellow
+        .byte   6 << 2          ; poison: green
+        .byte   0 << 2          ; wind: white
+        .byte   2 << 2          ; holy: yellow (star shape vs bolt zigzag)
+        .byte   1 << 2          ; earth: gray
+        .byte   3 << 2          ; water: blue (wave shape vs ice crystal)
 
 ; generic battle lists ($2c already holds a global ability id)
 .proc Ot6ListIcon_ext
@@ -649,7 +675,9 @@ done:   rtl
         bcs     @hit
         inx
         bra     @bit
-@hit:   lda     f:Ot6ElemGlyphTbl,x
+@hit:   txa
+        sta     OT6_SCR_COLS    ; element index, for palette selection
+        lda     f:Ot6ElemGlyphTbl,x
         plx
         rts
 @none:  lda     #$ff
