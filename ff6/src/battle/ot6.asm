@@ -372,136 +372,7 @@ OT6_SCR_COLS  := $3ed2          ; strip columns drawn so far
         rts
 .endproc
 
-; ------------------------------------------------------------------------------
 
-; [ track the battle target cursor for the weakness strip ]
-
-; called every frame from UpdateMenuState (btlgfx). while the target
-; cursor is on a monster (menu state $38), $3ed3 holds its slot (0-5);
-; otherwise $ff. pokes the name-window cache on change so the row
-; redraws as a strip (or back to a name).
-; a8/i16, db=$7e, a is free (caller reloads immediately)
-
-.proc Ot6TrackTarget_ext
-        .a8
-        .i16
-        lda     $7bc2           ; menu cursor state
-        cmp     #$38
-        bne     none            ; not targeting: no strip row
-        lda     $7b7e           ; monster target mask
-        beq     none
-        sta     OT6_SCR_BIT     ; caller width unknown: no index registers
-        lda     #$00
-@bit:   lsr     OT6_SCR_BIT
-        bcs     store           ; a = lowest set bit = targeted slot
-        inc
-        bra     @bit
-none:   lda     #$ff
-store:  cmp     $3ed3
-        beq     done            ; unchanged
-        sta     $3ed3
-        jsr     Ot6PokeRedraw   ; force the monster window to redraw
-done:   rtl
-.endproc
-
-; ------------------------------------------------------------------------------
-
-; [ weakness strip for the targeted monster's name row ]
-
-; called at the head of MenuTextCmd_0b (after IncTextPtr). if this row is
-; the targeted monster's group, draws 11 columns in place of the name:
-;   [shield digit or 'B'] [blank] [one slot per weak element: icon if
-;   revealed, '?' if not] [blanks to fill]
-; returns carry set if the strip was drawn (caller skips the name).
-; a8/i16, db=$7e, y = column, ($48) -> row slot byte, preserves x
-
-.proc Ot6MonsterRow_ext
-        .a8
-        .i16
-        lda     $3ed3
-        bmi     @no             ; $ff: no target, draw the normal name
-        asl
-        sta     OT6_SCR_SLOT2   ; targeted monster offset (slot * 2)
-        phx
-        ; compare this row's name id with the targeted monster's
-        longa
-        lda     OT6_SCR_SLOT2
-        and     #$00ff
-        tax
-        lda     $3388,x         ; targeted monster's name id
-        pha
-        lda     ($48)
-        and     #$0003
-        asl
-        tax
-        lda     $200d,x         ; this row's name id
-        cmp     $01,s
-        beq     @match
-        pla
-        shorta0
-        plx
-@no:    clc
-        rtl
-
-@match: pla
-        shorta0
-        lda     OT6_SCR_SLOT2
-        tax                     ; x = slot*2 (b stays 0 after shorta0)
-        ; column 1: shield state ('B' / digit / blank)
-        lda     $3e90,x         ; broken timer ($3e88 + 8)
-        beq     @digit
-        lda     #$81            ; 'B'
-        bra     @col0
-@digit: lda     $3e40,x         ; shield current ($3e38 + 8)
-        beq     @blk0
-        cmp     #$0a
-        bcc     :+
-        lda     #$09
-:       clc
-        adc     #$b4            ; digit glyph
-        bra     @col0
-@blk0:  lda     #$ff
-@col0:  jsr     Ot6DrawChar
-        lda     #$ff
-        jsr     Ot6DrawChar     ; column 2: gap
-        lda     #$02
-        sta     OT6_SCR_COLS
-        ; columns 3+: one slot per weak element
-        lda     #$01
-        sta     OT6_SCR_BIT
-        lda     #$00
-        sta     OT6_SCR_IDX
-@elem:  lda     OT6_SCR_BIT
-        beq     @fill           ; walked off bit 7: done
-        and     $3be8,x         ; weak to this element? ($3be0 + 8)
-        beq     @next
-        lda     OT6_SCR_BIT
-        and     $3e91,x         ; revealed? ($3e89 + 8)
-        beq     @qmark
-        phx
-        lda     OT6_SCR_IDX
-        tax
-        lda     f:Ot6ElemGlyphTbl,x
-        plx
-        bra     @slot
-@qmark: lda     #OT6_QMARK
-@slot:  jsr     Ot6DrawChar
-        inc     OT6_SCR_COLS
-@next:  asl     OT6_SCR_BIT
-        inc     OT6_SCR_IDX
-        bra     @elem
-        ; pad with blanks to 11 columns total
-@fill:  lda     OT6_SCR_COLS
-        cmp     #$0b
-        bcs     @done
-        lda     #$ff
-        jsr     Ot6DrawChar
-        inc     OT6_SCR_COLS
-        bra     @fill
-@done:  plx
-        sec
-        rtl
-.endproc
 
 ; ------------------------------------------------------------------------------
 
@@ -753,38 +624,38 @@ Ot6ObjTileNumTbl:
 
 ; 4bpp tile data, 32 bytes each
 Ot6ObjTiles:
-        .byte   $10,$00,$38,$08,$3c,$04,$7c,$10
-        .byte   $7e,$10,$fe,$10,$7e,$00,$3c,$00
-        .byte   $00,$00,$00,$00,$00,$00,$00,$00
-        .byte   $00,$00,$00,$00,$02,$00,$3c,$00
+        .byte   $00,$00,$08,$08,$04,$04,$10,$10
+        .byte   $10,$10,$10,$10,$02,$00,$3c,$00
+        .byte   $00,$10,$00,$30,$00,$38,$00,$6c
+        .byte   $00,$6e,$00,$ee,$02,$7c,$3c,$00
         .byte   $10,$00,$38,$28,$7c,$10,$fe,$10
         .byte   $7e,$10,$3c,$28,$18,$00,$08,$00
-        .byte   $00,$00,$00,$00,$00,$00,$00,$00
-        .byte   $02,$00,$04,$00,$08,$00,$08,$00
-        .byte   $1e,$00,$3c,$00,$78,$00,$fc,$00
-        .byte   $3c,$00,$38,$00,$70,$00,$40,$00
-        .byte   $00,$00,$04,$00,$08,$00,$00,$00
-        .byte   $24,$00,$08,$00,$10,$00,$40,$00
-        .byte   $10,$10,$38,$08,$7c,$04,$7c,$20
-        .byte   $fe,$20,$fe,$00,$7e,$00,$3c,$00
-        .byte   $00,$00,$00,$00,$00,$00,$00,$00
-        .byte   $00,$00,$00,$00,$02,$00,$3c,$00
-        .byte   $00,$00,$7c,$04,$0c,$00,$fe,$04
-        .byte   $04,$00,$7c,$00,$18,$00,$00,$00
-        .byte   $00,$00,$00,$00,$08,$00,$02,$00
+        .byte   $00,$10,$00,$10,$00,$6c,$00,$ee
+        .byte   $02,$6c,$04,$10,$08,$10,$08,$00
+        .byte   $00,$1e,$04,$38,$08,$70,$00,$fc
+        .byte   $24,$18,$08,$30,$10,$60,$40,$00
+        .byte   $00,$1e,$04,$38,$08,$70,$00,$fc
+        .byte   $24,$18,$08,$30,$10,$60,$40,$00
+        .byte   $10,$10,$38,$38,$7c,$7c,$7c,$7c
+        .byte   $fe,$fe,$fe,$fe,$7e,$7c,$3c,$00
+        .byte   $00,$00,$00,$30,$00,$78,$00,$5c
+        .byte   $00,$de,$00,$fe,$02,$7c,$3c,$00
+        .byte   $00,$00,$04,$04,$08,$00,$06,$04
         .byte   $04,$00,$00,$00,$18,$00,$00,$00
+        .byte   $00,$00,$78,$78,$0c,$04,$fa,$f8
+        .byte   $04,$00,$7c,$7c,$18,$00,$00,$00
         .byte   $10,$00,$18,$08,$7c,$10,$fe,$6c
         .byte   $7e,$10,$1c,$08,$18,$00,$08,$00
-        .byte   $00,$00,$00,$00,$00,$00,$00,$00
-        .byte   $02,$00,$04,$00,$08,$00,$08,$00
-        .byte   $00,$00,$10,$00,$38,$10,$7c,$10
-        .byte   $7c,$30,$fe,$10,$fe,$00,$7e,$00
-        .byte   $00,$00,$00,$00,$00,$00,$00,$00
-        .byte   $00,$00,$00,$00,$00,$00,$7e,$00
-        .byte   $00,$00,$30,$00,$7a,$30,$4e,$02
-        .byte   $c6,$00,$7e,$02,$7e,$00,$3c,$00
-        .byte   $00,$00,$00,$00,$00,$00,$00,$00
-        .byte   $46,$00,$00,$00,$02,$00,$3c,$00
+        .byte   $10,$10,$10,$10,$6c,$6c,$92,$92
+        .byte   $6e,$6c,$14,$10,$18,$10,$08,$00
+        .byte   $00,$00,$00,$10,$10,$38,$10,$7c
+        .byte   $30,$7c,$10,$fe,$00,$fe,$7e,$00
+        .byte   $00,$00,$10,$10,$28,$28,$6c,$6c
+        .byte   $4c,$4c,$ee,$ee,$fe,$fe,$7e,$00
+        .byte   $00,$00,$30,$30,$7a,$7a,$4e,$4e
+        .byte   $c6,$80,$7e,$7e,$7e,$7c,$3c,$00
+        .byte   $00,$00,$30,$30,$4a,$4a,$4c,$4c
+        .byte   $c6,$80,$7c,$7c,$7e,$7c,$3c,$00
         .byte   $3e,$00,$7f,$00,$47,$00,$0e,$00
         .byte   $1c,$00,$18,$00,$1c,$00,$1c,$00
         .byte   $02,$00,$39,$00,$41,$00,$02,$00
@@ -881,6 +752,15 @@ OT6_OAMHI := $0518              ; high table bytes for entries 96-127
         lda     #$7e            ; battle vars and coords need bank $7e
         pha
         plb
+        ldx     #$0000          ; own obj palette 3 outright: effects repaint
+        longa                   ; it, so rewrite all 16 colors every frame
+@hue:   lda     f:Ot6HudPal,x
+        sta     $7f60,x
+        inx
+        inx
+        cpx     #$0020
+        bcc     @hue
+        shorta0                 ; back to a8 AND rescrub b for tax below
         ldx     #$0000          ; hide all 32 claimed entries
 @park:  lda     #$e0
         sta     OT6_OAM+1,x
@@ -991,3 +871,24 @@ OT6_OAMHI := $0518              ; high table bytes for entries 96-127
         xba
 @full:  rts
 .endproc
+
+
+; hud icon hues, uploaded into obj palette 3's duplicate upper half
+; (cgram $b8+): body color index = 8 + element
+Ot6HudPal:
+        .word   $0000
+        .word   $7fff
+        .word   $77bb
+        .word   $6737
+        .word   $56b1
+        .word   $462d
+        .word   $35a9
+        .word   $2525
+        .word   $085f
+        .word   $7ecf
+        .word   $137f
+        .word   $1ba6
+        .word   $7ffb
+        .word   $3fbf
+        .word   $2639
+        .word   $7e29

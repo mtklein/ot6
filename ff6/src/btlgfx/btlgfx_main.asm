@@ -12534,8 +12534,7 @@ WindowBorderTileTbl:
 ; [ update menu state ]
 
 UpdateMenuState:
-@5524:  jsl     Ot6TrackTarget_ext      ; ot6: track target for weakness strip
-        lda     w7e7bc2       ; menu cursor state
+@5524:  lda     w7e7bc2       ; menu cursor state
         asl
         tax
         jmp     (.loword(UpdateMenuStateTbl),x)
@@ -16052,8 +16051,6 @@ DrawNum3:
 
 MenuTextCmd_0b:
 @6993:  jsr     IncTextPtr
-        jsl     Ot6MonsterRow_ext       ; ot6: weakness strip when targeted
-        bcs     @done
         lda     #MonsterName::ITEM_SIZE
         sta     $10
         lda     ($48)
