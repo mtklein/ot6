@@ -22,24 +22,25 @@ Repeatable build + test loop on this machine. What shipped (details in
 
 **Exit met:** edit → build → automated in-emulator verification, end to end.
 
-## M1 — Break system, elements only, WITH visible shields
+## M1 — Break system, elements only, WITH visible shields — ~90% ✅
 
-The highest value-per-line mechanic — and its display, which is
-MVP-critical (user priority): the shield count and weakness reveal are the
-feel of an Octopath battle.
+Mechanics **implemented and acceptance-tested live** (2026-07-15,
+`tools/tests/battle_break.lua` passes headless):
 
-- Per-enemy shield counter seeded from a new table (default: derived from
-  enemy rank); elemental weaknesses read from vanilla enemy data.
-- Chip on weakness hit, per hit for multi-hit actions.
-- Broken state: ATB reset + Stop-like status ~1 turn cycle, ×2 damage taken,
-  shields reset on recovery.
-- **Shield count displayed in the battle monster-list window; revealed
-  weaknesses shown as glyphs on target-select** (battle font already has
-  weapon icon glyphs; element glyphs added). Break feedback visible.
-- Scripted-battle regression via the Lua harness.
+- ✅ Shields seed per monster (2 + level/8, cap 6; per-monster table later).
+- ✅ Elemental weakness hits chip 1 SP; weakness revealed on first chip
+  (vanilla "Weak against X!" message fires once per element).
+- ✅ Break at 0 SP: turns skipped (pseudo-status timer), ×2 damage taken,
+  shields restore on recovery, revealed weaknesses persist.
+- ✅ Shield count digit beside each monster name ('B' while broken),
+  verified rendering in live combat screenshots.
+- ✅ Element icon tiles in the battle font ($eb-$ef/$fb-$fd), uploaded.
+- ⬜ **Remaining:** revealed-weakness glyph strip on target-select (design
+  in DESIGN.md; icons already in the font), and per-monster shield table
+  to replace the level formula (M6 tuning can absorb this).
 
-**Exit:** a Narshe-area fight demonstrates chip → break → punish with
-*on-screen* shields/weaknesses, no crashes across scripted battles.
+**Exit met** for mechanics + shield display; weakness strip carries into
+the next work block.
 
 ## M2 — BP economy + Cyan
 
