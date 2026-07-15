@@ -1,42 +1,44 @@
 #!/bin/sh
-# run.sh <script.lua> [watchdog_seconds] [output_file]
-# Runs a Lua script under the Mesen 2 headless testrunner against build/ot6.sfc.
-# - Captures all output to $OUT (default /tmp/mesen_run.out)
-# - Decodes any [b64:<tag>] screenshot/blob chunks in the output:
-#     * tags ending in .mss are written under build/states/
-#     * everything else is written as build/states/shots/<tag>.png
-# - Exits with the emu.stop() exit code (143 if the watchdog had to kill it).
+# run.sh <script.lua> [logfile] -- run a Lua test under Mesen 2's headless testrunner.
+#
+#   tools/tests/run.sh tools/tests/battle_smoke.lua
+#
+# * Composes the script with lib/ot6.lua into one flat file first
+#   (build/states/_composed.lua).  Runtime dofile()/loadfile() inside Mesen's
+#   sandboxed Lua crashes the emulator intermittently, so shared code and
+#   savestate payloads are inlined at compose time instead.
+# * Runs build/ot6.sfc (rebuild with `make rom` if you changed sources).
+# * All emulator/script output goes to the logfile
+#   (default: build/states/last_run.log).
+# * [b64:<tag>] payloads emitted by the script (savestates, screenshots) are
+#   decoded into build/states/ and build/states/shots/ afterwards.
+# * Exit code: 0 = pass, 1 = assertion/Lua error, 2 = frame budget exceeded.
+#   The [ot6] PASS/FAIL verdict in the log wins over the raw process code
+#   (Mesen occasionally dies with 255 and unflushed stdout).
 set -u
 ROOT="$(cd "$(dirname "$0")/../.." && pwd)"
 MESEN="$ROOT/tools/Mesen.app/Contents/MacOS/Mesen"
 ROM="$ROOT/build/ot6.sfc"
-SCRIPT="$1"
-SECS="${2:-300}"
-OUT="${3:-/tmp/mesen_run.out}"
+SCRIPT="${1:?usage: run.sh <script.lua> [logfile]}"
+LOG="${2:-$ROOT/build/states/last_run.log}"
+COMPOSED="$ROOT/build/states/_composed.lua"
 
 mkdir -p "$ROOT/build/states/shots"
 
-"$MESEN" --testrunner "$ROM" "$SCRIPT" > "$OUT" 2>&1 &
-pid=$!
-(
-  sleep "$SECS"
-  kill "$pid" 2>/dev/null
-) &
-watchdog=$!
-wait "$pid"
+python3 "$ROOT/tools/tests/lib/compose.py" "$SCRIPT" "$COMPOSED" || exit 2
+
+"$MESEN" --testrunner "$ROM" "$COMPOSED" > "$LOG" 2>&1
 code=$?
-kill "$watchdog" 2>/dev/null
 
-# Decode any base64 payloads: lines look like "[b64:tag] AAAA..."
-tags=$(grep -o '^\[b64:[^]]*\]' "$OUT" 2>/dev/null | sort -u | sed 's/^\[b64:\(.*\)\]$/\1/')
-for tag in $tags; do
-  case "$tag" in
-    *.mss) dest="$ROOT/build/states/$tag" ;;
-    *)     dest="$ROOT/build/states/shots/$tag.png" ;;
-  esac
-  grep "^\[b64:$tag\] " "$OUT" | sed "s/^\[b64:$tag\] //" | tr -d '\n' | base64 -d > "$dest" 2>/dev/null \
-    && echo "decoded: $dest ($(wc -c < "$dest" | tr -d ' ') bytes)"
-done
+python3 "$ROOT/tools/tests/lib/decode_b64.py" "$LOG" "$ROOT/build/states"
+grep '^\[ot6\]' "$LOG"
 
-echo "runner-exit: $code"
-exit "$code"
+if grep -q '^\[ot6\] PASS' "$LOG"; then
+  verdict=0
+elif grep -q '^\[ot6\] FAIL' "$LOG"; then
+  verdict=1
+else
+  verdict=$code
+fi
+echo "testrunner exit: $code (verdict: $verdict)"
+exit "$verdict"

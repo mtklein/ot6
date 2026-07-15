@@ -1,0 +1,43 @@
+{
+  "asset_label": "GenjuAttackDesc",
+  "inc_path": "include/text/genju_attack_desc_en.inc",
+  "char_tables": [
+    "big_symbols_en",
+    "null_terminated_en",
+    "text_en"
+  ],
+  "text": [
+    "Lightning-elemental attack",
+    "Fire-elemental attack",
+    "Ice-elemental attack",
+    "Silences enemies",
+    "Earth-elemental attack",
+    "Petrifies enemies",
+    "Non-elemental attack",
+    "Water-elemental attack",
+    "Confuses enemies",
+    "Party members use a Jump{n}attack",
+    "Ice/Fire/Lightning 3-way attack",
+    "Slices through enemies",
+    "Slices through enemies",
+    "Cuts through magic defenses",
+    "Mystic purity attack",
+    "Attack harms you and the{n}enemy",
+    "Turns enemy into an Item",
+    "Gradually recovers HP",
+    "Casts Shell on party",
+    "Casts Reflect on party",
+    "Makes the party invisible",
+    "Recovers HP",
+    "Protects the party",
+    "Casts Remedy on the party",
+    "Makes multi. images of the{n}party",
+    "Recovers HP",
+    "Recovers battle status",
+    "",
+    "",
+    "",
+    "",
+    ""
+  ]
+}

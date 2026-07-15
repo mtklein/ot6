@@ -1,0 +1,425 @@
+.ifndef MENU_TEXT_INC
+MENU_TEXT_INC = 1
+
+; ------------------------------------------------------------------------------
+
+; misc. individual text characters
+.define ZERO_CHAR                       $b4  ; 0
+.define COLON_CHAR                      $c1  ; :
+.define GAUGE_EMPTY_CHAR                $f0  ; {gauge_empty}
+.define GAUGE_FULL_CHAR                 $f8  ; {gauge_full}
+.define GAUGE_LEFT_CHAR                 $f9  ; {gauge_left}
+.define GAUGE_RIGHT_CHAR                $fa  ; {gauge_right}
+
+; ------------------------------------------------------------------------------
+
+; field menu text strings
+.define MAIN_MENU_WOUNDED               {$96,$a8,$ae,$a7,$9d,$9e,$9d,$ff}  ; Wounded 
+
+.define CHAR_BLOCK_1_LEVEL              BG1A, {10, 5}, {$8b,$95,$00}  ; LV
+.define CHAR_BLOCK_1_HP                 BG1A, {10, 6}, {$87,$8f,$00}  ; HP
+.define CHAR_BLOCK_1_MP                 BG1A, {10, 7}, {$8c,$8f,$00}  ; MP
+.define CHAR_BLOCK_1_HP_SLASH           BG1A, {17, 6}, {$c0,$00}  ; /
+.define CHAR_BLOCK_1_MP_SLASH           BG1A, {17, 7}, {$c0,$00}  ; /
+
+.define CHAR_BLOCK_2_LEVEL              BG1A, {10, 11}, {$8b,$95,$00}  ; LV
+.define CHAR_BLOCK_2_HP                 BG1A, {10, 12}, {$87,$8f,$00}  ; HP
+.define CHAR_BLOCK_2_MP                 BG1A, {10, 13}, {$8c,$8f,$00}  ; MP
+.define CHAR_BLOCK_2_HP_SLASH           BG1A, {17, 12}, {$c0,$00}  ; /
+.define CHAR_BLOCK_2_MP_SLASH           BG1A, {17, 13}, {$c0,$00}  ; /
+
+.define CHAR_BLOCK_3_LEVEL              BG1A, {10, 17}, {$8b,$95,$00}  ; LV
+.define CHAR_BLOCK_3_HP                 BG1A, {10, 18}, {$87,$8f,$00}  ; HP
+.define CHAR_BLOCK_3_MP                 BG1A, {10, 19}, {$8c,$8f,$00}  ; MP
+.define CHAR_BLOCK_3_HP_SLASH           BG1A, {17, 18}, {$c0,$00}  ; /
+.define CHAR_BLOCK_3_MP_SLASH           BG1A, {17, 19}, {$c0,$00}  ; /
+
+.define CHAR_BLOCK_4_LEVEL              BG1A, {10, 23}, {$8b,$95,$00}  ; LV
+.define CHAR_BLOCK_4_HP                 BG1A, {10, 24}, {$87,$8f,$00}  ; HP
+.define CHAR_BLOCK_4_MP                 BG1A, {10, 25}, {$8c,$8f,$00}  ; MP
+.define CHAR_BLOCK_4_HP_SLASH           BG1A, {17, 24}, {$c0,$00}  ; /
+.define CHAR_BLOCK_4_MP_SLASH           BG1A, {17, 25}, {$c0,$00}  ; /
+
+.define MAIN_MENU_ITEM                  BG3A, {24, 3}, {$88,$ad,$9e,$a6,$00}  ; Item
+.define MAIN_MENU_SKILLS                BG3A, {24, 5}, {$92,$a4,$a2,$a5,$a5,$ac,$00}  ; Skills
+.define MAIN_MENU_EQUIP                 BG3A, {24, 7}, {$84,$aa,$ae,$a2,$a9,$00}  ; Equip
+.define MAIN_MENU_RELIC                 BG3A, {24, 9}, {$91,$9e,$a5,$a2,$9c,$00}  ; Relic
+.define MAIN_MENU_STATUS                BG3A, {24, 11}, {$92,$ad,$9a,$ad,$ae,$ac,$00}  ; Status
+.define MAIN_MENU_CONFIG                BG3A, {24, 13}, {$82,$a8,$a7,$9f,$a2,$a0,$00}  ; Config
+.define MAIN_MENU_SAVE                  BG3A, {24, 15}, {$92,$9a,$af,$9e,$00}  ; Save
+.define MAIN_MENU_TIME                  BG3A, {25, 17}, {$93,$a2,$a6,$9e,$00}  ; Time
+.define MAIN_MENU_COLON                 BG3A, {27, 18}, {$c1,$00}  ; :
+.define MAIN_MENU_STEPS                 BG3A, {23, 21}, {$92,$ad,$9e,$a9,$ac,$00}  ; Steps
+.define MAIN_MENU_GIL                   BG3A, {23, 24}, {$86,$a9,$00}  ; Gp
+
+.define GAME_LOAD_YES                   BG3A, {26, 9}, {$98,$9e,$ac,$00}  ; Yes
+.define GAME_LOAD_NO                    BG3A, {26, 11}, {$8d,$a8,$00}  ; No
+.define GAME_LOAD_MSG_1                 BG3A, {23, 3}, {$93,$a1,$a2,$ac,$00}  ; This
+.define GAME_LOAD_MSG_2                 BG3A, {23, 5}, {$9d,$9a,$ad,$9a,$bf,$00}  ; data?
+
+.define GAME_SAVE_MSG_1                 BG3A, {23, 3}, {$84,$ab,$9a,$ac,$a2,$a7,$a0,$00}  ; Erasing
+.define GAME_SAVE_MSG_2                 BG3A, {23, 5}, {$9d,$9a,$ad,$9a,$c5,$00}  ; data.
+.define GAME_SAVE_MSG_3                 BG3A, {23, 7}, {$8e,$a4,$9a,$b2,$bf,$00}  ; Okay?
+
+.define MAIN_MENU_ORDER                 BG3B, {26, 3}, {$8e,$ab,$9d,$9e,$ab,$00}  ; Order
+
+; ------------------------------------------------------------------------------
+
+; colosseum menu text strings
+.define COLOSSEUM_ITEM_TITLE            BG3A, {2, 3}, {$82,$a8,$a5,$a8,$ac,$ac,$9e,$ae,$a6,$00}  ; Colosseum
+.define COLOSSEUM_ITEM_MSG              BG3A, {13, 3}, {$92,$9e,$a5,$9e,$9c,$ad,$ff,$9a,$a7,$ff,$88,$ad,$9e,$a6,$00}  ; Select an Item
+
+.define COLOSSEUM_CHAR_BLANK_NAME       BG3A, {22, 16}, {$ff,$ff,$ff,$ff,$ff,$ff,$00}  ;       
+.define COLOSSEUM_CHAR_MSG              BG3A, {6, 19}, {$92,$9e,$a5,$9e,$9c,$ad,$ff,$ad,$a1,$9e,$ff,$9c,$a1,$9a,$a5,$a5,$9e,$a7,$a0,$9e,$ab,$00}  ; Select the challenger
+.define COLOSSEUM_UNKNOWN_PRIZE         BG3A, {2, 3}, {$bf,$bf,$bf,$bf,$bf,$bf,$bf,$bf,$bf,$bf,$bf,$bf,$bf,$00}  ; ?????????????
+
+; ------------------------------------------------------------------------------
+
+; skills menu strings
+.define SKILLS_LIST_GENJU               BG3A, {2, 3}, {$84,$ac,$a9,$9e,$ab,$ac,$00}  ; Espers
+.define SKILLS_LIST_MAGIC               BG3A, {2, 5}, {$8c,$9a,$a0,$a2,$9c,$00}  ; Magic
+.define SKILLS_LIST_BUSHIDO             BG3A, {2, 9}, {$92,$b0,$9d,$93,$9e,$9c,$a1,$00}  ; SwdTech
+.define SKILLS_LIST_BLITZ               BG3A, {2, 11}, {$81,$a5,$a2,$ad,$b3,$00}  ; Blitz
+.define SKILLS_LIST_LORE                BG3A, {2, 13}, {$8b,$a8,$ab,$9e,$00}  ; Lore
+.define SKILLS_LIST_RAGE                BG3A, {2, 15}, {$91,$9a,$a0,$9e,$00}  ; Rage
+.define SKILLS_LIST_DANCE               BG3A, {2, 17}, {$83,$9a,$a7,$9c,$9e,$00}  ; Dance
+
+.define SKILLS_MP_COST                  BG3B, {23, 5}, {$8c,$8f,$c7,$ff,$ff,$ff,$ff,$00}  ; MP_    
+.define SKILLS_LORE_TITLE               BG3B, {23, 5}, {$8b,$a8,$ab,$9e,$00}  ; Lore
+.define SKILLS_RAGE_TITLE               BG3B, {23, 5}, {$91,$9a,$a0,$9e,$00}  ; Rage
+.define SKILLS_DANCE_TITLE              BG3B, {23, 5}, {$83,$9a,$a7,$9c,$9e,$00}  ; Dance
+.define SKILLS_GENJU_TITLE              BG3B, {23, 5}, {$84,$ac,$a9,$9e,$ab,$ac,$00}  ; Espers
+.define SKILLS_BLITZ_TITLE              BG3B, {23, 5}, {$81,$a5,$a2,$ad,$b3,$00}  ; Blitz
+.define SKILLS_BUSHIDO_TITLE            BG3B, {23, 5}, {$92,$b0,$9d,$93,$9e,$9c,$a1,$00}  ; SwdTech
+
+.define SKILLS_CHAR_LEVEL               BG1B, {18, 7}, {$8b,$95,$00}  ; LV
+.define SKILLS_CHAR_HP                  BG1B, {18, 9}, {$87,$8f,$00}  ; HP
+.define SKILLS_CHAR_MP                  BG1B, {18, 11}, {$8c,$8f,$00}  ; MP
+.define SKILLS_CHAR_HP_SLASH            BG1B, {25, 9}, {$c0,$00}  ; /
+.define SKILLS_CHAR_MP_SLASH            BG1B, {25, 11}, {$c0,$00}  ; /
+
+.define GENJU_EQUIP_ERROR_MSG           {$ff,$a1,$9a,$ac,$ff,$a2,$ad,$be,$00}  ;  has it!
+.define GENJU_LEARN_PCT                 BG1B, {24, 15}, {$92,$a4,$a2,$a5,$a5,$00}  ; Skill
+.define GENJU_LEARN_RATE                BG1B, {13, 15}, {$8b,$9e,$9a,$ab,$a7,$c5,$91,$9a,$ad,$9e,$00}  ; Learn.Rate
+.define GENJU_AT_LEVEL_UP               {$80,$ad,$ff,$a5,$9e,$af,$9e,$a5,$ff,$ae,$a9,$c5,$c5,$c5}  ; At level up...
+
+; ------------------------------------------------------------------------------
+
+; item menu text strings
+.define ITEM_TITLE                      BG3A, {2, 3}, {$88,$ad,$9e,$a6,$00}  ; Item
+.define ITEM_OPTION_USE                 BG3A, {10, 3}, {$94,$92,$84,$00}  ; USE
+.define ITEM_OPTION_ARRANGE             BG3A, {15, 3}, {$80,$91,$91,$80,$8d,$86,$84,$00}  ; ARRANGE
+.define ITEM_OPTION_RARE                BG3A, {24, 3}, {$91,$80,$91,$84,$00}  ; RARE
+
+.define ITEM_UNKNOWN_ATTACK             BG3B, {29, 23}, {$bf,$bf,$bf,$00}  ; ???
+.define ITEM_STRENGTH                   BG3B, {19, 15}, {$95,$a2,$a0,$a8,$ab,$00}  ; Vigor
+.define ITEM_STAMINA                    BG3B, {19, 19}, {$92,$ad,$9a,$a6,$a2,$a7,$9a,$00}  ; Stamina
+.define ITEM_MAG_PWR                    BG3B, {19, 21}, {$8c,$9a,$a0,$c5,$8f,$b0,$ab,$00}  ; Mag.Pwr
+.define ITEM_EVADE                      BG3B, {19, 27}, {$84,$af,$9a,$9d,$9e,$ff,$cd,$00}  ; Evade %
+.define ITEM_MAG_EVADE                  BG3B, {19, 31}, {$8c,$81,$a5,$a8,$9c,$a4,$cd,$00}  ; MBlock%
+.define ITEM_SPEED                      BG3B, {19, 17}, {$92,$a9,$9e,$9e,$9d,$00}  ; Speed
+.define ITEM_ATTACK_PWR                 BG3B, {19, 23}, {$81,$9a,$ad,$c5,$8f,$b0,$ab,$00}  ; Bat.Pwr
+.define ITEM_DEFENSE                    BG3B, {19, 25}, {$83,$9e,$9f,$9e,$a7,$ac,$9e,$00}  ; Defense
+.define ITEM_MAG_DEF                    BG3B, {19, 29}, {$8c,$9a,$a0,$c5,$83,$9e,$9f,$00}  ; Mag.Def
+.define ITEM_ELEMENT_HALF               BG3A, {2, 13}, {$b9,$b4,$cd,$ff,$83,$a6,$a0,$00}  ; 50% Dmg
+.define ITEM_ELEMENT_ABSORB             BG3A, {16, 13}, {$80,$9b,$ac,$a8,$ab,$9b,$ff,$87,$8f,$00}  ; Absorb HP
+.define ITEM_ELEMENT_NULL               BG3A, {2, 17}, {$8d,$a8,$ff,$84,$9f,$9f,$9e,$9c,$ad,$00}  ; No Effect
+.define ITEM_ELEMENT_WEAK               BG3A, {16, 17}, {$96,$9e,$9a,$a4,$ff,$a9,$ad,$00}  ; Weak pt
+.define ITEM_ATTACK_ELEMENT             BG3A, {2, 13}, {$80,$ad,$ad,$9a,$9c,$a4,$00}  ; Attack
+
+.define ITEM_STAT_SEP(yy)               BG3B, {27, yy}, {$d3,$00}  ; {2dot}
+.define ITEM_USAGE_MSG                  {$ff,$9c,$9a,$a7,$ff,$9b,$9e,$ff,$ae,$ac,$9e,$9d,$ff,$9b,$b2,$c1,$00}  ;  can be used by:
+
+.define ITEM_BUSHIDO                    BG3B, {19, 7}, {$92,$b0,$9d,$93,$9e,$9c,$a1,$00}  ; SwdTech
+.define ITEM_RUNIC                      BG3B, {19, 9}, {$91,$ae,$a7,$a2,$9c,$00}  ; Runic
+.define ITEM_2HAND                      BG3B, {19, 11}, {$b6,$c4,$a1,$9a,$a7,$9d,$00}  ; 2-hand
+.define ITEM_OWNED                      BG3A, {2, 7}, {$8e,$b0,$a7,$9e,$9d,$c1,$00}  ; Owned:
+.define ITEM_BLANK_QTY                  BG3A, {27, 9}, {$ff,$ff,$ff,$00}  ;    
+
+.define EVADE_MODIFIER_0                {$ff,$ff,$b4,$00}  ;   0
+.define EVADE_MODIFIER_PLUS_10          {$ca,$b5,$b4,$00}  ; +10
+.define EVADE_MODIFIER_PLUS_20          {$ca,$b6,$b4,$00}  ; +20
+.define EVADE_MODIFIER_PLUS_30          {$ca,$b7,$b4,$00}  ; +30
+.define EVADE_MODIFIER_PLUS_40          {$ca,$b8,$b4,$00}  ; +40
+.define EVADE_MODIFIER_PLUS_50          {$ca,$b9,$b4,$00}  ; +50
+.define EVADE_MODIFIER_MINUS_10         {$c4,$b5,$b4,$00}  ; -10
+.define EVADE_MODIFIER_MINUS_20         {$c4,$b6,$b4,$00}  ; -20
+.define EVADE_MODIFIER_MINUS_30         {$c4,$b7,$b4,$00}  ; -30
+.define EVADE_MODIFIER_MINUS_40         {$c4,$b8,$b4,$00}  ; -40
+.define EVADE_MODIFIER_MINUS_50         {$c4,$b9,$b4,$00}  ; -50
+
+.define STAT_MODIFIER_0                 {$ff,$b4}  ;  0
+.define STAT_MODIFIER_PLUS_1            {$ca,$b5}  ; +1
+.define STAT_MODIFIER_PLUS_2            {$ca,$b6}  ; +2
+.define STAT_MODIFIER_PLUS_3            {$ca,$b7}  ; +3
+.define STAT_MODIFIER_PLUS_4            {$ca,$b8}  ; +4
+.define STAT_MODIFIER_PLUS_5            {$ca,$b9}  ; +5
+.define STAT_MODIFIER_PLUS_6            {$ca,$ba}  ; +6
+.define STAT_MODIFIER_PLUS_7            {$ca,$bb}  ; +7
+.define STAT_MODIFIER_MINUS_1           {$c4,$b5}  ; -1
+.define STAT_MODIFIER_MINUS_2           {$c4,$b6}  ; -2
+.define STAT_MODIFIER_MINUS_3           {$c4,$b7}  ; -3
+.define STAT_MODIFIER_MINUS_4           {$c4,$b8}  ; -4
+.define STAT_MODIFIER_MINUS_5           {$c4,$b9}  ; -5
+.define STAT_MODIFIER_MINUS_6           {$c4,$ba}  ; -6
+.define STAT_MODIFIER_MINUS_7           {$c4,$bb}  ; -7
+
+; ------------------------------------------------------------------------------
+
+; equip/relic menu text strings
+.define EQUIP_RHAND                     BG3A, {2, 7}, {$91,$c4,$a1,$9a,$a7,$9d,$00}  ; R-hand
+.define EQUIP_LHAND                     BG3A, {2, 9}, {$8b,$c4,$a1,$9a,$a7,$9d,$00}  ; L-hand
+.define EQUIP_HEAD                      BG3A, {2, 11}, {$87,$9e,$9a,$9d,$00}  ; Head
+.define EQUIP_BODY                      BG3A, {2, 13}, {$81,$a8,$9d,$b2,$00}  ; Body
+.define EQUIP_RELIC1                    BG3A, {2, 11}, {$91,$9e,$a5,$a2,$9c,$00}  ; Relic
+.define EQUIP_RELIC2                    BG3A, {2, 13}, {$91,$9e,$a5,$a2,$9c,$00}  ; Relic
+.define EQUIP_BLANK_OPTIONS             BG3A, {2, 3}, {$ff,$ff,$ff,$ff,$ff,$ff,$ff,$ff,$ff,$ff,$ff,$ff,$ff,$ff,$ff,$ff,$ff,$ff,$ff,$ff,$ff,$ff,$ff,$ff,$ff,$ff,$ff,$ff,$00}  ;                             
+.define EQUIP_TITLE_EQUIP               BG3A, {24, 3}, {$84,$90,$94,$88,$8f,$00}  ; EQUIP
+.define EQUIP_TITLE_REMOVE              BG3A, {24, 3}, {$91,$84,$8c,$8e,$95,$84,$00}  ; REMOVE
+.define EQUIP_OPTION_EQUIP              BG3A, {2, 3}, {$84,$90,$94,$88,$8f,$00}  ; EQUIP
+.define EQUIP_OPTION_OPTIMUM            BG3A, {9, 3}, {$8e,$8f,$93,$88,$8c,$94,$8c,$00}  ; OPTIMUM
+.define EQUIP_OPTION_REMOVE             BG3A, {18, 3}, {$91,$8c,$8e,$95,$84,$00}  ; RMOVE
+.define EQUIP_OPTION_EMPTY              BG3A, {25, 3}, {$84,$8c,$8f,$93,$98,$00}  ; EMPTY
+.define RELIC_OPTION_EQUIP              BG3A, {4, 3}, {$84,$90,$94,$88,$8f,$00}  ; EQUIP
+.define RELIC_OPTION_REMOVE             BG3A, {11, 3}, {$91,$84,$8c,$8e,$95,$84,$00}  ; REMOVE
+
+.define EQUIP_STRENGTH                  BG3A, {16, 17}, {$95,$a2,$a0,$a8,$ab,$00}  ; Vigor
+.define EQUIP_SPEED                     BG3A, {16, 19}, {$92,$a9,$9e,$9e,$9d,$00}  ; Speed
+.define EQUIP_STAMINA                   BG3A, {16, 21}, {$92,$ad,$9a,$a6,$a2,$a7,$9a,$00}  ; Stamina
+.define EQUIP_MAG_PWR                   BG3A, {16, 23}, {$8c,$9a,$a0,$c5,$8f,$b0,$ab,$00}  ; Mag.Pwr
+.define EQUIP_ATTACK_PWR                BG3A, {16, 25}, {$81,$9a,$ad,$c5,$8f,$b0,$ab,$00}  ; Bat.Pwr
+.define EQUIP_DEFENSE                   BG3A, {16, 27}, {$83,$9e,$9f,$9e,$a7,$ac,$9e,$00}  ; Defense
+.define EQUIP_EVADE                     BG3A, {16, 29}, {$84,$af,$9a,$9d,$9e,$ff,$cd,$00}  ; Evade %
+.define EQUIP_MAG_DEF                   BG3A, {16, 31}, {$8c,$9a,$a0,$c5,$83,$9e,$9f,$00}  ; Mag.Def
+.define EQUIP_MAG_EVADE                 BG3A, {16, 33}, {$8c,$81,$a5,$a8,$9c,$a4,$cd,$00}  ; MBlock%
+.define EQUIP_ARROW(yy)                 BG3A, {26, yy}, {$d5,$00}  ; {rightarrow}
+
+.define EQUIP_EMPTY_MSG                 BG3A, {13, 3}, {$84,$a6,$a9,$ad,$b2,$00}  ; Empty
+.define EQUIP_OPTIMUM_MSG               BG3A, {12, 3}, {$8e,$a9,$ad,$a2,$a6,$ae,$a6,$00}  ; Optimum
+.define RELIC_EMPTY_MSG                 BG3A, {13, 5}, {$84,$a6,$a9,$ad,$b2,$00}  ; Empty
+.define RELIC_OPTIMUM_MSG               BG3A, {12, 5}, {$8e,$a9,$ad,$a2,$a6,$ae,$a6,$00}  ; Optimum
+.define EQUIP_CHANGED_MSG               BG3A, {6, 7}, {$84,$aa,$ae,$a2,$a9,$a6,$9e,$a7,$ad,$ff,$9c,$a1,$9a,$a7,$a0,$9e,$9d,$c5,$00}  ; Equipment changed.
+
+; these are unused in the English translation
+.define PARTY_EQUIP_SLOT1_RHAND         BG1A, {3, 4}, {$9f,$2d,$00}  ; みぎ
+.define PARTY_EQUIP_SLOT1_LHAND         BG1A, {17, 4}, {$63,$3f,$a9,$00}  ; ひだり
+.define PARTY_EQUIP_SLOT1_HEAD          BG1A, {3, 6}, {$8b,$7f,$9d,$00}  ; あたま
+.define PARTY_EQUIP_SLOT1_BODY          BG1A, {17, 6}, {$6b,$a7,$3f,$00}  ; からだ
+.define PARTY_EQUIP_SLOT1_RELIC1        BG1A, {3, 8}, {$8a,$6e,$54,$00}  ; アク１
+.define PARTY_EQUIP_SLOT1_RELIC2        BG1A, {17, 8}, {$8a,$6e,$55,$00}  ; アク２
+
+.define PARTY_EQUIP_SLOT2_RHAND         BG1A, {3, 12}, {$9f,$2d,$00}  ; みぎ
+.define PARTY_EQUIP_SLOT2_LHAND         BG1A, {17, 12}, {$63,$3f,$a9,$00}  ; ひだり
+.define PARTY_EQUIP_SLOT2_HEAD          BG1A, {3, 14}, {$8b,$7f,$9d,$00}  ; あたま
+.define PARTY_EQUIP_SLOT2_BODY          BG1A, {17, 14}, {$6b,$a7,$3f,$00}  ; からだ
+.define PARTY_EQUIP_SLOT2_RELIC1        BG1A, {3, 16}, {$8a,$6e,$54,$00}  ; アク１
+.define PARTY_EQUIP_SLOT2_RELIC2        BG1A, {17, 16}, {$8a,$6e,$55,$00}  ; アク２
+
+.define PARTY_EQUIP_SLOT3_RHAND         BG1A, {3, 20}, {$9f,$2d,$00}  ; みぎ
+.define PARTY_EQUIP_SLOT3_LHAND         BG1A, {17, 20}, {$63,$3f,$a9,$00}  ; ひだり
+.define PARTY_EQUIP_SLOT3_HEAD          BG1A, {3, 22}, {$8b,$7f,$9d,$00}  ; あたま
+.define PARTY_EQUIP_SLOT3_BODY          BG1A, {17, 22}, {$6b,$a7,$3f,$00}  ; からだ
+.define PARTY_EQUIP_SLOT3_RELIC1        BG1A, {3, 24}, {$8a,$6e,$54,$00}  ; アク１
+.define PARTY_EQUIP_SLOT3_RELIC2        BG1A, {17, 24}, {$8a,$6e,$55,$00}  ; アク２
+
+.define PARTY_EQUIP_SLOT4_RHAND         BG1A, {3, 28}, {$9f,$2d,$00}  ; みぎ
+.define PARTY_EQUIP_SLOT4_LHAND         BG1A, {17, 28}, {$63,$3f,$a9,$00}  ; ひだり
+.define PARTY_EQUIP_SLOT4_HEAD          BG1A, {3, 30}, {$8b,$7f,$9d,$00}  ; あたま
+.define PARTY_EQUIP_SLOT4_BODY          BG1A, {17, 30}, {$6b,$a7,$3f,$00}  ; からだ
+.define PARTY_EQUIP_SLOT4_RELIC1        BG1A, {3, 32}, {$8a,$6e,$54,$00}  ; アク１
+.define PARTY_EQUIP_SLOT4_RELIC2        BG1A, {17, 32}, {$8a,$6e,$55,$00}  ; アク２
+
+; ------------------------------------------------------------------------------
+
+; party menu text strings
+
+.define PARTY_LEVEL                     BG1A, {18, 8}, {$8b,$95,$00}  ; LV
+.define PARTY_HP                        BG1A, {18, 10}, {$87,$8f,$00}  ; HP
+.define PARTY_MP                        BG1A, {18, 12}, {$8c,$8f,$00}  ; MP
+.define PARTY_HP_SLASH                  BG1A, {25, 10}, {$c0,$00}  ; /
+.define PARTY_MP_SLASH                  BG1A, {25, 12}, {$c0,$00}  ; /
+
+.define PARTY_MSG                       BG1A, {10, 3}, {$85,$a8,$ab,$a6,$ff,$ff,$ff,$a0,$ab,$a8,$ae,$a9,$cb,$ac,$cc,$c5,$ff,$ff,$ff,$ff,$ff,$ff,$00}  ; Form   group(s).      
+.define PARTY_TITLE                     BG1A, {2, 3}, {$8b,$a2,$a7,$9e,$ae,$a9,$00}  ; Lineup
+.define PARTY_ERROR_MSG1                BG1A, {10, 3}, {$98,$a8,$ae,$ff,$a7,$9e,$9e,$9d,$ff,$ff,$ff,$a0,$ab,$a8,$ae,$a9,$cb,$ac,$cc,$be,$00}  ; You need   group(s)!
+.define PARTY_ERROR_MSG2                BG1A, {10, 3}, {$8d,$a8,$ff,$a8,$a7,$9e,$ff,$ad,$a1,$9e,$ab,$9e,$be,$ff,$ff,$ff,$ff,$ff,$ff,$ff,$00}  ; No one there!       
+
+; ------------------------------------------------------------------------------
+
+; status menu text strings
+.define STATUS_TITLE                    BG3A, {2, 2}, {$92,$ad,$9a,$ad,$ae,$ac,$00}  ; Status
+.define STATUS_HP_SLASH                 BG1A, {17, 8}, {$c0,$00}  ; /
+.define STATUS_MP_SLASH                 BG1A, {17, 9}, {$c0,$00}  ; /
+.define STATUS_EVADE_PERCENT            BG3A, {29, 28}, {$cd,$00}  ; %
+.define STATUS_MAG_EVADE_PERCENT        BG3C, {29, 0}, {$cd,$00}  ; %
+.define STATUS_LEVEL                    BG1A, {10, 7}, {$8b,$95,$00}  ; LV
+.define STATUS_HP                       BG1A, {10, 8}, {$87,$8f,$00}  ; HP
+.define STATUS_MP                       BG1A, {10, 9}, {$8c,$8f,$00}  ; MP
+.define STATUS_STRENGTH                 BG3A, {3, 26}, {$95,$a2,$a0,$a8,$ab,$00}  ; Vigor
+.define STATUS_STAMINA                  BG3A, {3, 30}, {$92,$ad,$9a,$a6,$a2,$a7,$9a,$00}  ; Stamina
+.define STATUS_MAG_PWR                  BG3C, {3, 0}, {$8c,$9a,$a0,$c5,$8f,$b0,$ab,$00}  ; Mag.Pwr
+.define STATUS_EVADE                    BG3A, {16, 28}, {$84,$af,$9a,$9d,$9e,$ff,$cd,$00}  ; Evade %
+.define STATUS_MAG_EVADE                BG3C, {16, 0}, {$8c,$81,$a5,$a8,$9c,$a4,$cd,$00}  ; MBlock%
+.define STATUS_STRENGTH_SEP             BG3A, {10, 26}, {$d3,$00}  ; {2dot}
+.define STATUS_SPEED_SEP                BG3A, {10, 28}, {$d3,$00}  ; {2dot}
+.define STATUS_STAMINA_SEP              BG3A, {10, 30}, {$d3,$00}  ; {2dot}
+.define STATUS_MAG_PWR_SEP              BG3C, {10, 0}, {$d3,$00}  ; {2dot}
+.define STATUS_DEFENSE_SEP              BG3A, {25, 26}, {$d3,$00}  ; {2dot}
+.define STATUS_EVADE_SEP                BG3A, {25, 28}, {$d3,$00}  ; {2dot}
+.define STATUS_ATTACK_PWR_SEP           BG3A, {25, 24}, {$d3,$00}  ; {2dot}
+.define STATUS_MAG_DEF_SEP              BG3A, {25, 30}, {$d3,$00}  ; {2dot}
+.define STATUS_MAG_EVADE_SEP            BG3C, {25, 0}, {$d3,$00}  ; {2dot}
+.define STATUS_SPEED                    BG3A, {3, 28}, {$92,$a9,$9e,$9e,$9d,$00}  ; Speed
+.define STATUS_ATTACK_PWR               BG3A, {16, 24}, {$81,$9a,$ad,$c5,$8f,$b0,$ab,$00}  ; Bat.Pwr
+.define STATUS_DEFENSE                  BG3A, {16, 26}, {$83,$9e,$9f,$9e,$a7,$ac,$9e,$00}  ; Defense
+.define STATUS_MAG_DEF                  BG3A, {16, 30}, {$8c,$9a,$a0,$c5,$83,$9e,$9f,$00}  ; Mag.Def
+.define STATUS_YOUR_EXP                 BG3A, {2, 16}, {$98,$a8,$ae,$ab,$ff,$84,$b1,$a9,$c1,$00}  ; Your Exp:
+.define STATUS_LEVEL_UP_EXP             BG3A, {2, 20}, {$85,$a8,$ab,$ff,$a5,$9e,$af,$9e,$a5,$ff,$ae,$a9,$c1,$00}  ; For level up:
+
+; ------------------------------------------------------------------------------
+
+; shop menu text strings
+.define SHOP_TYPE_1                     BG3A, {2, 3}, {$96,$9e,$9a,$a9,$a8,$a7,$00}  ; Weapon
+.define SHOP_TYPE_2                     BG3A, {3, 3}, {$80,$ab,$a6,$a8,$ab,$00}  ; Armor
+.define SHOP_TYPE_3                     BG3A, {3, 3}, {$88,$ad,$9e,$a6,$00}  ; Item
+.define SHOP_TYPE_4                     BG3A, {2, 3}, {$91,$9e,$a5,$a2,$9c,$ac,$00}  ; Relics
+.define SHOP_TYPE_5                     BG3A, {2, 3}, {$95,$9e,$a7,$9d,$a8,$ab,$00}  ; Vendor
+.define SHOP_OPTIONS                    BG3A, {3, 7}, {$81,$94,$98,$ff,$ff,$92,$84,$8b,$8b,$ff,$ff,$84,$97,$88,$93,$00}  ; BUY  SELL  EXIT
+.define SHOP_GIL_1                      BG3A, {28, 7}, {$86,$8f,$00}  ; GP
+.define SHOP_GIL_2                      BG3A, {17, 11}, {$86,$8f,$00}  ; GP
+.define SHOP_OWNED                      BG3A, {21, 9}, {$8e,$b0,$a7,$9e,$9d,$c1,$00}  ; Owned:
+.define SHOP_EQUIPPED                   BG3A, {21, 13}, {$84,$aa,$ae,$a2,$a9,$a9,$9e,$9d,$c1,$00}  ; Equipped:
+.define SHOP_POWER                      BG3A, {3, 13}, {$81,$9a,$ad,$ff,$8f,$b0,$ab,$00}  ; Bat Pwr
+.define SHOP_DEFENSE                    BG3A, {3, 13}, {$83,$9e,$9f,$9e,$a7,$ac,$9e,$00}  ; Defense
+.define SHOP_DOTS                       BG3A, {14, 13}, {$c7,$00}  ; _
+.define SHOP_GREETING_MSG               BG3A, {11, 3}, {$87,$a2,$be,$ff,$82,$9a,$a7,$ff,$88,$ff,$a1,$9e,$a5,$a9,$ff,$b2,$a8,$ae,$bf,$00}  ; Hi! Can I help you?
+.define SHOP_BUY_MSG                    BG3A, {11, 3}, {$87,$9e,$a5,$a9,$ff,$b2,$a8,$ae,$ab,$ac,$9e,$a5,$9f,$be,$00}  ; Help yourself!
+.define SHOP_BUY_QTY_MSG                BG3A, {11, 3}, {$87,$a8,$b0,$ff,$a6,$9a,$a7,$b2,$bf,$00}  ; How many?
+.define SHOP_SELL_MSG                   BG3A, {11, 3}, {$96,$a1,$9a,$ad,$9c,$a1,$9a,$ff,$a0,$a8,$ad,$bf,$00}  ; Whatcha got?
+.define SHOP_SELL_QTY_MSG               BG3A, {11, 3}, {$87,$a8,$b0,$ff,$a6,$9a,$a7,$b2,$bf,$00}  ; How many?
+.define SHOP_BYE_MSG                    BG3A, {11, 3}, {$81,$b2,$9e,$be,$ff,$ff,$ff,$ff,$ff,$ff,$ff,$ff,$ff,$ff,$00}  ; Bye!          
+.define SHOP_NOT_ENOUGH_GIL_MSG         BG3A, {11, 3}, {$98,$a8,$ae,$ff,$a7,$9e,$9e,$9d,$ff,$a6,$a8,$ab,$9e,$ff,$86,$8f,$be,$00}  ; You need more GP!
+.define SHOP_TOO_MANY_MSG               BG3A, {11, 3}, {$93,$a8,$a8,$ff,$a6,$9a,$a7,$b2,$be,$ff,$ff,$ff,$ff,$ff,$ff,$ff,$00}  ; Too many!       
+.define SHOP_ONLY_ONE_MSG               BG3A, {11, 3}, {$8e,$a7,$9e,$c3,$ac,$ff,$a9,$a5,$9e,$a7,$ad,$b2,$be,$ff,$00}  ; One's plenty! 
+
+; ------------------------------------------------------------------------------
+
+; config menu text strings
+.define CONFIG_COLOR_ARROW_BLANK        BG1B, {22, 18}, {$ff,$ff,$ff,$ff,$ff,$ff,$ff,$00}  ;        
+.define CONFIG_COLOR_ARROW(xx)          BG1B, {xx, 18}, {$d4,$00}  ; {uparrow}
+
+.define CONFIG_CONTROLLER               BG1A, {3, 21}, {$82,$a8,$a7,$ad,$ab,$a8,$a5,$a5,$9e,$ab,$00}  ; Controller
+.define CONFIG_WAIT                     BG1A, {22, 5}, {$96,$9a,$a2,$ad,$00}  ; Wait
+.define CONFIG_FAST                     BG1A, {14, 8}, {$85,$9a,$ac,$ad,$00}  ; Fast
+.define CONFIG_SLOW                     BG1A, {22, 8}, {$92,$a5,$a8,$b0,$00}  ; Slow
+.define CONFIG_CMD_SHORT                BG1A, {22, 11}, {$92,$a1,$a8,$ab,$ad,$00}  ; Short
+.define CONFIG_GAUGE_ON                 BG1A, {14, 13}, {$8e,$a7,$00}  ; On
+.define CONFIG_GAUGE_OFF                BG1A, {22, 13}, {$8e,$9f,$9f,$00}  ; Off
+.define CONFIG_STEREO                   BG1A, {14, 15}, {$92,$ad,$9e,$ab,$9e,$a8,$00}  ; Stereo
+.define CONFIG_MONO                     BG1A, {22, 15}, {$8c,$a8,$a7,$a8,$00}  ; Mono
+.define CONFIG_MEMORY                   BG1A, {22, 17}, {$8c,$9e,$a6,$a8,$ab,$b2,$00}  ; Memory
+.define CONFIG_OPTIMUM                  BG1A, {14, 19}, {$8e,$a9,$ad,$a2,$a6,$ae,$a6,$00}  ; Optimum
+.define CONFIG_CTRL_MULTI               BG1A, {22, 21}, {$8c,$ae,$a5,$ad,$a2,$a9,$a5,$9e,$00}  ; Multiple
+.define CONFIG_BATTLE_SPEED_NUM         BG1A, {14, 7}, {$b5,$ff,$b6,$ff,$b7,$ff,$b8,$ff,$b9,$ff,$ba,$00}  ; 1 2 3 4 5 6
+.define CONFIG_MSG_SPEED_NUM            BG1A, {14, 9}, {$b5,$ff,$b6,$ff,$b7,$ff,$b8,$ff,$b9,$ff,$ba,$00}  ; 1 2 3 4 5 6
+.define CONFIG_CURSOR                   BG1A, {3, 17}, {$82,$ae,$ab,$ac,$a8,$ab,$00}  ; Cursor
+
+.define CONFIG_TITLE                    BG3A, {24, 2}, {$82,$a8,$a7,$9f,$a2,$a0,$00}  ; Config
+.define CONFIG_BATTLE_MODE              BG1A, {3, 5}, {$81,$9a,$ad,$c5,$8c,$a8,$9d,$9e,$00}  ; Bat.Mode
+.define CONFIG_BATTLE_SPEED             BG1A, {3, 7}, {$81,$9a,$ad,$c5,$92,$a9,$9e,$9e,$9d,$00}  ; Bat.Speed
+.define CONFIG_MSG_SPEED                BG1A, {3, 9}, {$8c,$ac,$a0,$c5,$92,$a9,$9e,$9e,$9d,$00}  ; Msg.Speed
+.define CONFIG_CMD_SET                  BG1A, {3, 11}, {$82,$a6,$9d,$c5,$92,$9e,$ad,$00}  ; Cmd.Set
+.define CONFIG_GAUGE                    BG1A, {3, 13}, {$86,$9a,$ae,$a0,$9e,$00}  ; Gauge
+.define CONFIG_SOUND                    BG1A, {3, 15}, {$92,$a8,$ae,$a7,$9d,$00}  ; Sound
+.define CONFIG_REEQUIP                  BG1A, {3, 19}, {$91,$9e,$9e,$aa,$ae,$a2,$a9,$00}  ; Reequip
+.define CONFIG_ACTIVE                   BG1A, {14, 5}, {$80,$9c,$ad,$a2,$af,$9e,$00}  ; Active
+.define CONFIG_CMD_WINDOW               BG1A, {14, 11}, {$96,$a2,$a7,$9d,$a8,$b0,$00}  ; Window
+.define CONFIG_RESET                    BG1A, {14, 17}, {$91,$9e,$ac,$9e,$ad,$00}  ; Reset
+.define CONFIG_EMPTY                    BG1A, {22, 19}, {$84,$a6,$a9,$ad,$b2,$00}  ; Empty
+.define CONFIG_CTRL_SINGLE              BG1A, {14, 21}, {$92,$a2,$a7,$a0,$a5,$9e,$00}  ; Single
+
+.define CONFIG_MAGIC_ORDER              BG1B, {3, 5}, {$8c,$9a,$a0,$c5,$8e,$ab,$9d,$9e,$ab,$00}  ; Mag.Order
+.define CONFIG_WINDOW_LABEL             BG1B, {3, 13}, {$96,$a2,$a7,$9d,$a8,$b0,$00}  ; Window
+.define CONFIG_COLOR                    BG1B, {3, 15}, {$82,$a8,$a5,$a8,$ab,$00}  ; Color
+.define CONFIG_MAGIC_ORDER_A            BG1B, {14, 7}, {$80,$d3,$00}  ; A{2dot}
+.define CONFIG_MAGIC_ORDER_B            BG1B, {14, 9}, {$81,$d3,$00}  ; B{2dot}
+.define CONFIG_MAGIC_ORDER_C            BG1B, {14, 11}, {$82,$d3,$00}  ; C{2dot}
+.define CONFIG_COLOR_BAR_R              BG1B, {18, 19}, {$f9,$f0,$f0,$f0,$f0,$f0,$f0,$f0,$f0,$fa,$00}  ; {gauge_left}{gauge_empty}{gauge_empty}{gauge_empty}{gauge_empty}{gauge_empty}{gauge_empty}{gauge_empty}{gauge_empty}{gauge_right}
+.define CONFIG_COLOR_BAR_G              BG1B, {18, 21}, {$f9,$f0,$f0,$f0,$f0,$f0,$f0,$f0,$f0,$fa,$00}  ; {gauge_left}{gauge_empty}{gauge_empty}{gauge_empty}{gauge_empty}{gauge_empty}{gauge_empty}{gauge_empty}{gauge_empty}{gauge_right}
+.define CONFIG_COLOR_BAR_B              BG1B, {18, 23}, {$f9,$f0,$f0,$f0,$f0,$f0,$f0,$f0,$f0,$fa,$00}  ; {gauge_left}{gauge_empty}{gauge_empty}{gauge_empty}{gauge_empty}{gauge_empty}{gauge_empty}{gauge_empty}{gauge_empty}{gauge_right}
+.define CONFIG_COLOR_R                  BG1B, {14, 19}, {$91,$00}  ; R
+.define CONFIG_COLOR_G                  BG1B, {14, 21}, {$86,$00}  ; G
+.define CONFIG_COLOR_B                  BG1B, {14, 23}, {$81,$00}  ; B
+.define CONFIG_WINDOW_NUM               BG1B, {14, 13}, {$b5,$ff,$b6,$ff,$b7,$ff,$b8,$ff,$b9,$ff,$ba,$ff,$bb,$ff,$bc,$00}  ; 1 2 3 4 5 6 7 8
+.define CONFIG_MAGIC_ORDER_NUM          BG1B, {14, 5}, {$b5,$ff,$b6,$ff,$b7,$ff,$b8,$ff,$b9,$ff,$ba,$00}  ; 1 2 3 4 5 6
+.define CONFIG_FONT                     BG1B, {14, 15}, {$85,$a8,$a7,$ad,$00}  ; Font
+.define CONFIG_WINDOW                   BG1B, {22, 15}, {$96,$a2,$a7,$9d,$a8,$b0,$00}  ; Window
+
+.define CONFIG_RETURN                   BG1B, {25, 14}, {$a5,$47,$79,$00}  ; もどす (Return)
+.define CONFIG_COLOR_BOX                BG1B, {22, 17}, {$01,$02,$03,$04,$05,$06,$07,$00}  ; {1}{2}{3}{4}{5}{6}{7}
+.define CONFIG_MAGIC_TYPE_1             {$e8,$87,$9e,$9a,$a5,$a2,$a7,$a0,$ff,$ff}  ; {white}Healing  
+.define CONFIG_MAGIC_TYPE_2             {$e9,$80,$ad,$ad,$9a,$9c,$a4,$ff,$ff,$ff}  ; {black}Attack   
+.define CONFIG_MAGIC_TYPE_3             {$ea,$84,$9f,$9f,$9e,$9c,$ad,$ff,$ff,$ff}  ; {effect}Effect   
+
+.define CMD_ARRANGE_TITLE               BG3A, {3, 2}, {$80,$ab,$ab,$9a,$a7,$a0,$9e,$00}  ; Arrange
+
+.define CHAR_CTRL_TITLE                 BG3A, {2, 12}, {$82,$a8,$a7,$ad,$ab,$a8,$a5,$a5,$9e,$ab,$00}  ; Controller
+.define CHAR_1_CTRL_1                   BG3A, {12, 15}, {$82,$a7,$ad,$a5,$ab,$b5,$00}  ; Cntlr1
+.define CHAR_1_CTRL_2                   BG3A, {21, 15}, {$82,$a7,$ad,$a5,$ab,$b6,$00}  ; Cntlr2
+.define CHAR_2_CTRL_1                   BG3A, {12, 17}, {$82,$a7,$ad,$a5,$ab,$b5,$00}  ; Cntlr1
+.define CHAR_2_CTRL_2                   BG3A, {21, 17}, {$82,$a7,$ad,$a5,$ab,$b6,$00}  ; Cntlr2
+.define CHAR_3_CTRL_1                   BG3A, {12, 19}, {$82,$a7,$ad,$a5,$ab,$b5,$00}  ; Cntlr1
+.define CHAR_3_CTRL_2                   BG3A, {21, 19}, {$82,$a7,$ad,$a5,$ab,$b6,$00}  ; Cntlr2
+.define CHAR_4_CTRL_1                   BG3A, {12, 21}, {$82,$a7,$ad,$a5,$ab,$b5,$00}  ; Cntlr1
+.define CHAR_4_CTRL_2                   BG3A, {21, 21}, {$82,$a7,$ad,$a5,$ab,$b6,$00}  ; Cntlr2
+
+; ------------------------------------------------------------------------------
+
+; save menu text strings
+.define SAVE_SLOT_1_EMPTY               BG3A, {3, 8}, {$84,$a6,$a9,$ad,$b2,$00}  ; Empty
+.define SAVE_SLOT_2_EMPTY               BG3A, {3, 15}, {$84,$a6,$a9,$ad,$b2,$00}  ; Empty
+.define SAVE_SLOT_3_EMPTY               BG3A, {3, 22}, {$84,$a6,$a9,$ad,$b2,$00}  ; Empty
+.define SAVE_SLOT_1_TIME                BG3A, {3, 10}, {$93,$a2,$a6,$9e,$00}  ; Time
+.define SAVE_SLOT_2_TIME                BG3A, {3, 17}, {$93,$a2,$a6,$9e,$00}  ; Time
+.define SAVE_SLOT_3_TIME                BG3A, {3, 24}, {$93,$a2,$a6,$9e,$00}  ; Time
+.define SAVE_SLOT_1_TIME_COLON          BG3A, {4, 11}, {$c1,$00}  ; :
+.define SAVE_SLOT_2_TIME_COLON          BG3A, {4, 18}, {$c1,$00}  ; :
+.define SAVE_SLOT_3_TIME_COLON          BG3A, {4, 25}, {$c1,$00}  ; :
+.define SAVE_SLOT_1_LEVEL               BG3A, {25, 8}, {$8b,$95,$00}  ; LV
+.define SAVE_SLOT_2_LEVEL               BG3A, {25, 15}, {$8b,$95,$00}  ; LV
+.define SAVE_SLOT_3_LEVEL               BG3A, {25, 22}, {$8b,$95,$00}  ; LV
+.define SAVE_SLOT_1_HP_SLASH            BG3A, {25, 10}, {$c0,$00}  ; /
+.define SAVE_SLOT_2_HP_SLASH            BG3A, {25, 17}, {$c0,$00}  ; /
+.define SAVE_SLOT_3_HP_SLASH            BG3A, {25, 24}, {$c0,$00}  ; /
+
+.define SAVE_TITLE                      BG3A, {15, 4}, {$92,$9a,$af,$9e,$00}  ; Save
+.define NEW_GAME_TITLE                  BG3A, {13, 4}, {$8d,$9e,$b0,$ff,$86,$9a,$a6,$9e,$00}  ; New Game
+
+; ------------------------------------------------------------------------------
+
+; element symbols
+.define ELEMENT_SYMBOLS                 {$dd,$da,$d6,$d9,$de,$d8,$db,$dc,$00}  ; {water}{earth}{holy}{wind}{poison}{lightning}{ice}{fire}
+
+; ------------------------------------------------------------------------------
+
+; name change menu text
+.define NAME_CHANGE_MSG                 BG1B, {9, 3}, {$8f,$a5,$9e,$9a,$ac,$9e,$ff,$9e,$a7,$ad,$9e,$ab,$ff,$9a,$ff,$a7,$9a,$a6,$9e,$c5,$00}  ; Please enter a name.
+
+.define NAME_CHANGE_LETTERS_1           {$80,$81,$82,$83,$84,$9a,$9b,$9c,$9d,$9e}  ; ABCDEabcde
+.define NAME_CHANGE_LETTERS_2           {$85,$86,$87,$88,$89,$9f,$a0,$a1,$a2,$a3}  ; FGHIJfghij
+.define NAME_CHANGE_LETTERS_3           {$8a,$8b,$8c,$8d,$8e,$a4,$a5,$a6,$a7,$a8}  ; KLMNOklmno
+.define NAME_CHANGE_LETTERS_4           {$8f,$90,$91,$92,$93,$a9,$aa,$ab,$ac,$ad}  ; PQRSTpqrst
+.define NAME_CHANGE_LETTERS_5           {$94,$95,$96,$97,$98,$ae,$af,$b0,$b1,$b2}  ; UVWXYuvwxy
+.define NAME_CHANGE_LETTERS_6           {$99,$be,$bf,$c0,$c1,$b3,$c2,$c3,$c4,$c5}  ; Z!?/:z”'-.
+.define NAME_CHANGE_LETTERS_7           {$b4,$b5,$b6,$b7,$b8,$b9,$ba,$bb,$bc,$bd}  ; 0123456789
+
+; ------------------------------------------------------------------------------
+
+; final order menu text strings
+.define FINAL_ORDER_END                 BG1A, {4, 31}, {$84,$a7,$9d,$00}  ; End
+.define FINAL_ORDER_RESET               BG1A, {4, 5}, {$91,$9e,$ac,$9e,$ad,$00}  ; Reset
+.define FINAL_ORDER_MSG                 BG1A, {10, 3}, {$83,$9e,$ad,$9e,$ab,$a6,$a2,$a7,$9e,$ff,$a8,$ab,$9d,$9e,$ab,$00}  ; Determine order
+
+; ------------------------------------------------------------------------------
+
+.endif

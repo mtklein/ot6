@@ -1,0 +1,31 @@
+{
+  "asset_label": "RareItemDesc",
+  "inc_path": "include/text/rare_item_desc_en.inc",
+  "char_tables": [
+    "big_symbols_en",
+    "null_terminated_en",
+    "text_en"
+  ],
+  "text": [
+    "Cider, taken from a merchant.",
+    "An old clock-key,{n}found on a soldier.",
+    "A yummy fish",
+    "Just a fish",
+    "A rotten fish",
+    "Fish",
+    "A heavy weight.{n}Put it into a chest, and_",
+    "Thanks for all those flowers!{n}I'm worried about you_",
+    "Piece of coral, found in the{n}cave near Ebot's Rock.",
+    "Simple book on machinery_{n}And ``Book of Secrets''_",
+    "At a star-shaped mountain{n}range_",
+    "Rust solvent",
+    "An opera singer's autograph",
+    "Pretty, red manicure",
+    "Has a small scratch",
+    "A convex lens",
+    "A stone never seen",
+    "A very curious picture",
+    "Quite a common picture",
+    "A pendant worn by the girl{n}who pilots the Magitek Armor."
+  ]
+}

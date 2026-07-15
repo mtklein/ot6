@@ -1,0 +1,29 @@
+{
+  "asset_label": "GenjuBonusName",
+  "inc_path": "include/text/genju_bonus_name_en.inc",
+  "item_size": 9,
+  "char_tables": [
+    "small_symbols_en",
+    "text_en",
+    "fixed_length_en"
+  ],
+  "text": [
+    "HP{pad}+{pad}10%",
+    "HP{pad}+{pad}30%",
+    "HP{pad}+{pad}50%",
+    "MP{pad}+{pad}10%",
+    "MP{pad}+{pad}30%",
+    "MP{pad}+{pad}50%",
+    "HP{pad}+{pad}100%",
+    "LV{pad}+{pad}30%",
+    "LV{pad}+{pad}50%",
+    "Strengh+1",
+    "Strengh+2",
+    "Speed{pad}+{pad}1",
+    "Speed{pad}+{pad}2",
+    "Stamina+1",
+    "Stamina+2",
+    "MagPwr+1",
+    "MagPwr+2"
+  ]
+}

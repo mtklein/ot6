@@ -1,0 +1,35 @@
+{
+  "asset_label": "GenjuBonusDesc",
+  "inc_path": "include/text/genju_bonus_desc_en.inc",
+  "char_tables": [
+    "big_symbols_en",
+    "null_terminated_en",
+    "text_en"
+  ],
+  "text": [
+    "10% bonus in HP increase",
+    "30% bonus in HP increase",
+    "50% bonus in HP increase",
+    "10% bonus in MP increase",
+    "30% bonus in MP increase",
+    "50% bouns in MP increase",
+    "Double bonus in HP increase",
+    "Not applicable",
+    "Nothing",
+    "Strength +1 at next level up",
+    "Strength +2 at next level up",
+    "Speed +1 at next level up",
+    "Speed +2 at next level up",
+    "Stamina +1 at next level up",
+    "Stamina +2 at next level up",
+    "Mag Pwr +1 at next level up",
+    "Mag Pwr +2 at next level up",
+    "",
+    "",
+    "",
+    "",
+    "",
+    "",
+    ""
+  ]
+}

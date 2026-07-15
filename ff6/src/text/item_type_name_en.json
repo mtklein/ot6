@@ -1,0 +1,27 @@
+{
+  "asset_label": "ItemTypeName",
+  "inc_path": "include/text/item_type_name_en.inc",
+  "item_size": 7,
+  "char_tables": [
+    "text_en",
+    "fixed_length_en"
+  ],
+  "text": [
+    "DIRK",
+    "SWORD",
+    "LANCE",
+    "KNIFE",
+    "ROD",
+    "BRUSH",
+    "STARS",
+    "SPECIAL",
+    "GAMBLER",
+    "CLAW",
+    "SHIELD",
+    "HELMET",
+    "ARMOR",
+    "TOOL",
+    "SKEAN",
+    "RELIC"
+  ]
+}

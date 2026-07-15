@@ -1,0 +1,19 @@
+{
+  "asset_label": "BushidoName",
+  "inc_path": "include/text/bushido_name_en.inc",
+  "item_size": 12,
+  "char_tables": [
+    "text_en",
+    "fixed_length_en"
+  ],
+  "text": [
+    "Dispatch",
+    "Retort",
+    "Slash",
+    "Quadra Slam",
+    "Empowerer",
+    "Stunner",
+    "Quadra Slice",
+    "Cleave"
+  ]
+}

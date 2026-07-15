@@ -2,7 +2,5 @@
 *.sfc
 *.srm
 /build/
-/ff6/
-/Flips/
 /tools/Mesen.app/
 /tools/bin/

@@ -1,0 +1,43 @@
+{
+  "asset_label": "StatusName",
+  "inc_path": "include/text/status_name_en.inc",
+  "item_size": 10,
+  "char_tables": [
+    "text_en",
+    "fixed_length_en"
+  ],
+  "text": [
+    "Wound",
+    "Petrify",
+    "Imp",
+    "Clear",
+    "",
+    "Poison",
+    "Zombie",
+    "Dark",
+    "Psyche",
+    "Seizure",
+    "Muddled",
+    "Berserk",
+    "Mute",
+    "Image",
+    "Near Fatal",
+    "Condemned",
+    "Reflect",
+    "Safe",
+    "Shell",
+    "Stop",
+    "Haste",
+    "Slow",
+    "Regen",
+    "",
+    "Float",
+    "",
+    "",
+    "",
+    "",
+    "Life 3",
+    "",
+    ""
+  ]
+}

@@ -1,0 +1,19 @@
+{
+  "asset_label": "BlitzDesc",
+  "inc_path": "include/text/blitz_desc_en.inc",
+  "char_tables": [
+    "big_symbols_en",
+    "null_terminated_en",
+    "text_en"
+  ],
+  "text": [
+    "Cuts through an enemy's{n}defenses",
+    "Mystical purity slams an enemy",
+    "Puts the drop on an enemy",
+    "Fire-attack slams enemies",
+    "Refreshes other party members",
+    "Wind-attack slams enemies",
+    "Recovers party at own expense",
+    "Strikes a mortal blow"
+  ]
+}

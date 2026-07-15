@@ -1,0 +1,39 @@
+{
+  "asset_label": "GenjuAttackName",
+  "inc_path": "include/text/genju_attack_name_en.inc",
+  "item_size": 10,
+  "char_tables": [
+    "big_symbols_en",
+    "text_en",
+    "fixed_length_en"
+  ],
+  "text": [
+    "Bolt Fist",
+    "Inferno",
+    "Gem Dust",
+    "Hope Song",
+    "Earth Aura",
+    "Demon Eye",
+    "Chaos Wing",
+    "Sea Song",
+    "Cat Rain",
+    "Sonic Dive",
+    "Tri-Dazer",
+    "Atom Edge",
+    "True Edge",
+    "Sun Flare",
+    "Justice",
+    "Purifier",
+    "Metamorph",
+    "Life Guard",
+    "Wall",
+    "Ruby Power",
+    "Fader",
+    "Reviver",
+    "Earth Wall",
+    "Heal Horn",
+    "Moon Song",
+    "Group Hug",
+    "Rebirth"
+  ]
+}

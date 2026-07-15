@@ -1,0 +1,35 @@
+{
+  "asset_label": "LoreDesc",
+  "inc_path": "include/text/lore_desc_en.inc",
+  "char_tables": [
+    "big_symbols_en",
+    "null_terminated_en",
+    "text_en"
+  ],
+  "text": [
+    "Begins doom countdown",
+    "Begins doom roulette",
+    "Water-elemental damage",
+    "Wind/Water elemental damage",
+    "Wind-elemental damage",
+    "1000 damage",
+    "Casts Shell/Safe on party",
+    "HP lowering attack",
+    "Use own HP to help party",
+    "Casts ``Doom'' on LV5, 10, 15, _{n}enemy",
+    "Casts ``Flare'' on LV2, 4, 6, _{n}enemy",
+    "Casts ``Muddle'' on LV3, 6, 9, _{n}enemy",
+    "Status attack on wall-protected{n}enemy",
+    "Pearl attack on LV ? enemy",
+    "Damage in proportion to # of{n}steps",
+    "Throws up anti-elemental{n}barrier",
+    "Cuts enemy's level by 1/2",
+    "Inflicts status ailment on an{n}enemy",
+    "Uses own HP to save the party",
+    "Switches status with an enemy's",
+    "Damages and Muddles an enemy",
+    "Damage pierces enemies'{n}defenses",
+    "Mortal damage pierces enemies'{n}defenses",
+    "Forfeit life to inflict mortal{n}damage"
+  ]
+}
