@@ -6,11 +6,14 @@ with URLs: [research/toolchain.md](research/toolchain.md).
 ## The build
 
 We build the whole game from source via the **everything8215/ff6
-disassembly** (GPL-3.0), cloned at `ff6/` (its own git repo; our changes go
-on its `ot6` branch). The base ROM lives in `ff6/vanilla/` and assets are
-ripped from it once (`make rip`). Verified: `make ff6-en` reproduces retail
-FF3us 1.0 **byte-for-byte** (CRC32 A27F1C7A), including retail's famously
-wrong internal SNES checksum.
+disassembly** (GPL-3.0), vendored directly at `ff6/` (upstream 1ea47b5;
+pre-flatten commit history preserved in docs/history/). The base ROM lives
+in `ff6/vanilla/` (git-ignored) and assets are ripped from it once
+(`make rip`). Verified: the unmodified tree's `make ff6-en` reproduces
+retail FF3us 1.0 **byte-for-byte** (CRC32 A27F1C7A), including retail's
+famously wrong internal SNES checksum. OT6 code lives in
+`ff6/src/battle/ot6.asm` (expanded bank $F0) plus minimal jsl shims in
+vanilla banks.
 
 Top-level `Makefile` targets:
 
@@ -30,14 +33,16 @@ control verified to exit 1).
 ## Installed pieces
 
 - **cc65** (ca65/ld65) + **numpy** — via Homebrew (build + asset encoders).
-- **Flips CLI** — built from source (github.com/Alcaro/Flips), binary at
-  `tools/bin/flips`.
+- **Flips CLI** — binary at `tools/bin/flips` (git-ignored). Rebuild:
+  clone github.com/Alcaro/Flips, `make CFLAGS=-O2`, copy `flips` in.
 - **Mesen 2.1.1** — official macOS ARM64 release zip (77 MB) from
   github.com/SourMesen/Mesen2, unpacked to `tools/Mesen.app`. Debugger has
   breakpoints/memory watch/trace and **ca65 symbol integration** — the
   build already emits `ff6/rom/ff6-en.dbg` for source-level debugging.
-- ff6 disassembly clone at `ff6/`, Flips clone at `Flips/` — both
-  git-ignored by the outer repo, as are `tools/Mesen.app` and `tools/bin`.
+- Everything is one flat git repo; only the ROMs, `build/`,
+  `tools/Mesen.app`, and `tools/bin` are ignored. Ripped assets ARE
+  tracked for local convenience → the repo stays private; publish via
+  `make patch` BPS or a strip pass.
 
 ## Gotchas learned the hard way
 
@@ -50,12 +55,19 @@ control verified to exit 1).
   to satisfy Gatekeeper. Headless testrunner runs fine from the terminal.
 - macOS has no `timeout`; testrunner also has its own `timeout=N` arg if a
   test ever wedges.
-- `make distclean` in `ff6/` deletes ripped (copyrighted) assets INCLUDING
-  any we've modified — our hello-world lives in a ripped JSON, so don't run
-  distclean casually; real OT6 data changes should eventually be applied by
-  script/patch at build time so they survive a re-rip.
-- The rip/build regenerates some tracked `.inc` files in `ff6/` — expected
-  noise on the `ot6` branch; commit deliberately.
+- `make distclean` in `ff6/` deletes ripped assets including modified ones
+  — recoverable via `git restore` now that they're tracked, but still
+  don't run it casually.
+- **ca65 width state is inherited across `.include`**: any asm file pulled
+  into a module inherits the `.a8/.a16/.i8/.i16` assumptions active at the
+  inclusion point. ALWAYS declare the expected widths at the top of a new
+  file — we lost a debugging round to `cpy #imm` assembling a 1-byte
+  operand while the CPU ran 16-bit indexes (instruction-stream desync,
+  hung battle init).
+- Mesen Lua: `emu.createSavestate`/`loadSavestate` must run inside an
+  exec memory callback, not event callbacks; sandboxed Lua can't
+  `dofile` (compose scripts flat) or write files (tunnel artifacts as
+  base64 over stdout — see tools/tests/run.sh).
 
 ## Reference docs for the asm work (see research/)
 
