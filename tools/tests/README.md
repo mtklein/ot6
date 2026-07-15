@@ -134,8 +134,16 @@ Plain functions (call from `H.call`/predicates):
   0000) while a press is scripted.  This drives title/menus/field/dialogs
   reliably.
 - Savestates: `emu.createSavestate()` returns the state as a binary string;
-  `emu.loadSavestate(blob)` takes one back.  (`saveSavestateAsync`-style slot
-  functions from Mesen 1 do not exist in this build.)
+  `emu.loadSavestate(blob)` takes one back.  BUT both may only be called
+  "inside an exec memory operation callback for the main CPU" -- calling
+  them from an event callback raises that exact error.  The library wraps
+  them in a one-shot trampoline (`H.requestSaveState()` /
+  `H.requestLoadState(blob)`): register an exec memory callback over
+  $000000-$FFFFFF, do the work on its first fire (the next executed
+  instruction), remove the callback from within itself, harvest the result
+  a frame later.  The step constructors `H.saveState(name)` /
+  `H.loadState(sidecar)` package that dance.  (`saveSavestateAsync`-style
+  slot functions from Mesen 1 do not exist in this build.)
 - Screenshots: `emu.takeScreenshot()` **works headless** and returns a
   256x224 RGB PNG as a string; it returns an *empty string* during the first
   ~100 frames (before the first decoded frame).
@@ -176,8 +184,9 @@ pixels are ever needed.
   (except the wide, forgiving title-screen window).
 - The intro is otherwise stable: identical input scripts produced the same
   scene sequence on every run observed.
-- `emu.createSavestate()/loadSavestate()` round-trip works from Lua when
-  called inside a frame callback (the runner's coroutine qualifies).
+- `emu.createSavestate()/loadSavestate()` round-trip works from Lua, but
+  ONLY inside an exec memory callback (see the trampoline above);
+  `probe16.lua` is the regression test for the mechanism.
 
 ### Input injection quirks
 
@@ -223,15 +232,15 @@ pixels are ever needed.
   but `( cmd & pid=$!; (sleep N; kill $pid) & wait $pid )` is the fallback
   pattern if a script without the library must be watchdogged.
 
-### KNOWN ISSUE CAUGHT BY THIS HARNESS (2026-07-15)
+### REGRESSION CAUGHT AND FIXED (2026-07-15)
 
-On the current break-system ROM (`build/ot6.sfc`, 4 MiB, `ot6_code` segment
-at $F0:0000), entering the first battle **crashes the game**: the battle
-module starts loading (party battle-HP at $7E3BF4 fills in, $7E3ECB gets a
-digit glyph $BA), then the screen stays black forever; `emu.getState()`
-shows NMI + auto-joypad-read disabled, `cpu.k/pc` pointing into RAM and SP
-into ROM space - i.e. crashed, not slow.  Bank $F0 *is* correctly mapped
-(bus reads at $F0:0000 match ROM file offset 0x300000), so it is a code bug,
-not a mapping/expansion problem.  `gen_battle_state.lua` therefore currently
-exits 1 after emitting `battle_doorstep.mss`; once the crash is fixed, rerun
-it to mint `first_battle.mss`, then `battle_smoke.lua` guards the regression.
+First real catch: on the first break-system build, entering the first battle
+crashed the game -- battle RAM started filling ($7E3BF4 HP table, $7E3ECB
+glyph), then the screen stayed black forever with NMI disabled and the CPU
+executing RAM (`emu.getState()` cpu.k/pc in WRAM, SP pointing into ROM).
+The harness pinned it down to "battle load begins, engine never comes up",
+verified bank $F0 was correctly mapped (bus bytes at $F0:0000 == ROM file
+offset 0x300000, so not a mapping/expansion problem), which pointed at the
+new code itself; root cause was an assembler width desync (.i8 immediates
+in .i16 battle context) in the bank-F0 break module.  `battle_entry.lua`
+(doorstep -> battle in ~30 s) is the fast regression test guarding this.

@@ -36,6 +36,8 @@
 
 local M = {}
 
+local seqStep -- forward declaration (defined in the step-runner section)
+
 -- ---------------------------------------------------------------- logging --
 function M.log(msg)
   -- print goes to the testrunner's stdout.  Deliberately NOT emu.log():
@@ -155,36 +157,88 @@ function M.assertEq(got, want, what)
 end
 
 -- ------------------------------------------------------------- savestates --
--- Mesen's sandboxed Lua cannot write files, so savestates round-trip through
--- stdout: saveState() emits the blob as [b64:<name>] lines and run.sh writes
+-- Mesen 2 requires emu.createSavestate()/emu.loadSavestate() to run inside
+-- an EXEC memory callback for the main CPU ("This function must be called
+-- inside an exec memory operation callback"), not an event callback.  So
+-- requests go through a one-shot trampoline: register an exec callback over
+-- the full address space, do the work on its first fire (the very next
+-- instruction the CPU executes), and unregister from within the callback.
+-- Results are harvested a frame or two later by the calling step.
+--
+-- Persistence: sandboxed Lua cannot write files, so blobs round-trip through
+-- stdout: [b64:<name>] lines that run.sh decodes into
 --   build/states/<name>          (raw Mesen savestate, loadable in the GUI)
 --   build/states/<name>.lua      (sidecar: `return "<base64>"`)
--- loadState() reads the sidecar back via loadfile().
-function M.saveState(name)
-  local blob = emu.createSavestate()
-  assert(type(blob) == "string" and #blob > 0, "createSavestate returned nothing")
-  M.emitBlob(name, blob)
-  return #blob
+-- and lib/compose.py embeds referenced sidecars back in as OT6_STATES.
+
+function M.requestSaveState()
+  local req = {}
+  local ref
+  ref = emu.addMemoryCallback(function()
+    if req.done then return end
+    req.done = true
+    req.blob = emu.createSavestate()
+    emu.removeMemoryCallback(ref, emu.callbackType.exec, 0x000000, 0xFFFFFF)
+  end, emu.callbackType.exec, 0x000000, 0xFFFFFF)
+  return req
 end
 
-function M.loadState(sidecarPath)
+function M.requestLoadState(blob)
+  local req = {}
+  local ref
+  ref = emu.addMemoryCallback(function()
+    if req.done then return end
+    req.done = true
+    emu.loadSavestate(blob)
+    emu.removeMemoryCallback(ref, emu.callbackType.exec, 0x000000, 0xFFFFFF)
+  end, emu.callbackType.exec, 0x000000, 0xFFFFFF)
+  return req
+end
+
+-- Resolve a savestate sidecar to its base64 payload.  Normal path: the
+-- compose step embedded it as OT6_STATES[basename] (runtime loadfile() is
+-- avoided -- file loading in this sandbox crashes the emulator; see README).
+function M.resolveStateB64(sidecarPath)
   local base = sidecarPath:match("[^/]+$")
-  local b64
   if type(OT6_STATES) == "table" and OT6_STATES[base] then
-    -- normal path: lib/compose.py embedded the sidecar at compose time
-    -- (runtime loadfile() is avoided -- file loading in this sandbox has
-    -- crashed the emulator; see README WORKING NOTES).
-    b64 = OT6_STATES[base]
-  else
-    local chunk, err = loadfile(sidecarPath)
-    assert(chunk, "cannot load savestate sidecar " .. sidecarPath ..
-      " (not embedded, loadfile failed: " .. tostring(err) .. ")")
-    b64 = chunk()
+    return OT6_STATES[base]
   end
-  local blob = M.b64decode(b64)
-  assert(#blob > 0, "empty savestate blob for " .. sidecarPath)
-  emu.loadSavestate(blob)
-  return #blob
+  local chunk, err = loadfile(sidecarPath)
+  assert(chunk, "cannot load savestate sidecar " .. sidecarPath ..
+    " (not embedded, loadfile failed: " .. tostring(err) .. ")")
+  return chunk()
+end
+
+-- STEP: capture the current state and emit it as build/states/<name>.
+function M.saveState(name)
+  local req
+  return seqStep({
+    M.call(function() req = M.requestSaveState() end),
+    M.waitFrames(2),
+    M.call(function()
+      assert(req.done and type(req.blob) == "string" and #req.blob > 0,
+        "savestate capture did not complete")
+      M.emitBlob(name, req.blob)
+    end),
+  })
+end
+
+-- STEP: load a savestate captured earlier (path to the .mss.lua sidecar).
+function M.loadState(sidecarPath)
+  local req
+  return seqStep({
+    M.call(function()
+      local blob = M.b64decode(M.resolveStateB64(sidecarPath))
+      assert(#blob > 0, "empty savestate blob for " .. sidecarPath)
+      M.log("loading savestate " .. sidecarPath:match("[^/]+$") ..
+        " (" .. #blob .. " bytes)")
+      req = M.requestLoadState(blob)
+    end),
+    M.waitFrames(2),
+    M.call(function()
+      assert(req.done, "savestate load did not complete")
+    end),
+  })
 end
 
 -- ------------------------------------------------------------ screenshots --
@@ -259,7 +313,7 @@ end
 
 M.frame = 0
 
-local function seqStep(steps)
+seqStep = function(steps)
   return {
     i = 1,
     tick = function(self)

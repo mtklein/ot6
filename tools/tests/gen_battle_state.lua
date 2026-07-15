@@ -20,7 +20,7 @@
 
 local H = dofile("/Users/mtklein/ot6/tools/tests/lib/ot6.lua")
 
-local doorstep, doorstepPrev = nil, nil
+local doorstep, doorstepPrev, saveReq = nil, nil, nil
 
 H.run({ maxFrames = 60000 }, {
   -- 1. Title screen: press Start a few times while the logo is up.  (The
@@ -39,9 +39,15 @@ H.run({ maxFrames = 60000 }, {
     H.hold({ "up" }), H.waitFrames(20), H.release(), H.waitFrames(2),
     H.pressButtons({ "a" }, 4),
     H.call(function()
-      if H.frame % 150 < 30 then
+      -- rolling doorstep capture via the exec-callback trampoline:
+      -- harvest last cycle's request, then issue a new one every ~150 frames
+      if saveReq and saveReq.done and saveReq.blob then
         doorstepPrev = doorstep
-        doorstep = emu.createSavestate()
+        doorstep = saveReq.blob
+        saveReq = nil
+      end
+      if not saveReq and H.frame % 150 < 30 then
+        saveReq = H.requestSaveState()
       end
     end),
   }, "first battle load"),
@@ -66,8 +72,8 @@ H.run({ maxFrames = 60000 }, {
         ids[1], ids[2], ids[3], ids[4], ids[5], ids[6]))
       local hp = H.partyHp()
       H.log(string.format("party battle hp: %d %d %d %d", hp[1], hp[2], hp[3], hp[4]))
-      H.saveState("first_battle.mss")
     end),
+    H.saveState("first_battle.mss"),
   }, {
     -- battle load began but the engine never came up (screen stayed black):
     -- this is the regression signature this harness exists to catch.

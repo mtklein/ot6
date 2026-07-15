@@ -18,12 +18,14 @@ rom: verify
 	@mkdir -p build
 	cp ff6/rom/ff6-en.sfc build/ot6.sfc
 
+# patch basename must differ from the ROM's, or Mesen auto-applies it on load
 patch: rom
-	$(FLIPS) --create --bps "$(BASE)" build/ot6.sfc build/ot6.bps
-	@ls -la build/ot6.bps
+	@mkdir -p build/dist
+	$(FLIPS) --create --bps "$(BASE)" build/ot6.sfc build/dist/ot6-from-ff3us10.bps
+	@ls -la build/dist/ot6-from-ff3us10.bps
 
 run: rom
-	open -a "$(CURDIR)/tools/Mesen.app" "$(CURDIR)/build/ot6.sfc"
+	open -n "$(CURDIR)/tools/Mesen.app" --args "$(CURDIR)/build/ot6.sfc"
 
 test: rom
 	$(MESEN) --testrunner build/ot6.sfc tools/tests/smoke.lua

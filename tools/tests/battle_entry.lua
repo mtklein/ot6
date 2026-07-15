@@ -17,10 +17,7 @@ local STATE = "/Users/mtklein/ot6/build/states/battle_doorstep.mss.lua"
 
 H.run({ maxFrames = 8000 }, {
   H.waitFrames(20),
-  H.call(function()
-    local bytes = H.loadState(STATE)
-    H.log("loaded doorstep savestate (" .. bytes .. " bytes)")
-  end),
+  H.loadState(STATE),
   H.waitFrames(10),
   H.call(function() H.screenshot("entry_doorstep") end),
 
