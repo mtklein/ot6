@@ -50,13 +50,16 @@ H.run({ maxFrames = 60000 }, {
     H.writeWord(0x3C02, 1)
   end),
   -- win fight 1: mash A (beams) until no monsters alive, then mash through victory
+  -- pulse A only while a battle menu is open: phase-proof progression
+  -- (blind timed patterns desync against regenerated states' atb phase)
   H.driveUntil(function()
     local dead = H.readWord(0x3C00) == 0 and H.readWord(0x3C02) == 0
     return dead or not H.battleLoadStarted()   -- or victory already tore down
   end, 24000, {
-    H.pressButtons({ "a" }, 6), H.waitFrames(30),
-    H.pressButtons({ "a" }, 6), H.waitFrames(30),
-    H.pressButtons({ "a" }, 6), H.waitFrames(600),
+    H.call(function() if H.readByte(0x7bca) ~= 0 then H.setPad({ "a" }) end end),
+    H.waitFrames(4),
+    H.call(function() H.setPad({}) end),
+    H.waitFrames(26),
   }, "fight 1 won"),
   H.driveUntil(function()
     return not H.battleLoadStarted()
@@ -74,6 +77,5 @@ H.run({ maxFrames = 60000 }, {
     local ids = H.monsterIds()
     H.log(string.format("fight2 monster ids: %04X %04X %04X %04X %04X %04X",
       ids[1], ids[2], ids[3], ids[4], ids[5], ids[6]))
-    auditAnchors("fight2")
   end),
 })

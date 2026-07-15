@@ -1,21 +1,6 @@
 
--- shared canary: assert OT6's sprite tiles still hold OT6's art.
--- catches formation art clobbering our claimed VRAM (the fight-2 bug).
-local function ot6TileSum(t)
-  local vr = emu.memType.snesVideoRam
-  local base = (t < 0x100 and (0x2000 + t*16) or (0x3000 + (t-0x100)*16)) * 2
-  local sum = 0
-  for b = 0, 31 do sum = sum + emu.read(base + b, vr) end
-  return sum
-end
-local function canary(H)
-  local expect = { [0x100]=944, [0x144]=568, [0x0C2]=1736, [0x164]=1683, [0x1A0]=654 }
-  for t, want in pairs(expect) do
-    local got = ot6TileSum(t)
-    H.assertEq(got, want, string.format("OT6 tile %03X intact (VRAM clobber canary)", t))
-  end
-end
-
+-- visual canary for fight 2 (second formation): same checks as fight 1,
+-- run again after an attack round since effect art loads mid-fight.
 local H = dofile("/Users/mtklein/ot6/tools/tests/lib/ot6.lua")
 local STATE = "/Users/mtklein/ot6/build/states/battle2_doorstep.mss.lua"
 H.run({ maxFrames = 20000 }, {
@@ -30,13 +15,19 @@ H.run({ maxFrames = 20000 }, {
   H.waitFrames(200),
   H.call(function()
     H.screenshot("visual_f2_idle")
-    canary(H)   -- pre-action: tiles usually still intact
+    H.glyphCanary()
+    H.assertEq(H.fieldHudPresent(), true, "under-monster hud on the field map")
+    H.assertEq(H.isPipGlyph(H.pipWord()), true, "party row 1 shows bp pips")
   end),
   H.pressButtons({ "a" }, 6), H.waitFrames(30),
   H.pressButtons({ "a" }, 6), H.waitFrames(30),
   H.pressButtons({ "a" }, 6), H.waitFrames(600),
   H.call(function()
     H.screenshot("visual_f2_after_action")
-    canary(H)   -- KNOWN-FAIL: attack effect art clobbers our sprite tiles
+    H.glyphCanary()   -- effect art must not clobber our font cells
+    if H.monstersPresent() then
+      H.assertEq(H.fieldHudPresent(), true, "hud survives the attack round")
+    end
+    H.assertEq(H.isPipGlyph(H.pipWord()), true, "pips survive the attack round")
   end),
 })

@@ -325,7 +325,7 @@ done:   rtl
         cpx     #$0008
         bcc     @icon
         shorta
-        jsr     Ot6LoadObjTiles ; enemy-hud sprite tiles ride the same blank
+        jsr     Ot6LoadBgGlyphs ; hud glyphs into free font cells
         plb
         plp
         rtl
@@ -605,6 +605,24 @@ Ot6FontIcons:
         sta     $3e9e
         sta     $3ea0
         sta     $3ea2
+        ; clear the bg-hud shadow (prev addresses especially: garbage here
+        ; would make the first flush erase random vram)
+        longa
+        clr_a
+        phx
+        ldx     #$0000
+@clr:   sta     f:$7e0000+OT6_SHADOW,x
+        inx
+        inx
+        cpx     #$005e          ; shadow, map base, dirty (+spare)
+        bcc     @clr
+        ldx     #$0000
+@clr2:  sta     f:$7e0000+OT6_HUDCOPY,x
+        inx
+        inx
+        cpx     #$0054          ; last-flushed copies
+        bcc     @clr2
+        plx
         plp
         rtl
 .endproc
@@ -685,334 +703,98 @@ done:   plp
 .endproc
 
 ; ------------------------------------------------------------------------------
-; obj tile vram word addresses (16 tiles, order: 8 icons, ?, B, digits 1-6)
-Ot6ObjTileAddrTbl:
-        .word   $3000          ; tile $100
-        .word   $3020          ; tile $102
-        .word   $3040          ; tile $104
-        .word   $3200          ; tile $120
-        .word   $3220          ; tile $122
-        .word   $3240          ; tile $124
-        .word   $3400          ; tile $140
-        .word   $3420          ; tile $142
-        .word   $3440          ; tile $144
-        .word   $3600          ; tile $160
-        .word   $3620          ; tile $162
-        .word   $2c00          ; tile $0c0
-        .word   $2c20          ; tile $0c2
-        .word   $2c40          ; tile $0c4
-        .word   $2c60          ; tile $0c6
-        .word   $2c80          ; tile $0c8
-        .word   $3640          ; tile $164
-        .word   $3660          ; tile $166
-        .word   $3680          ; tile $168
-        .word   $3800          ; tile $180
-        .word   $3820          ; tile $182
-        .word   $3840          ; tile $184
-        .word   $3a00          ; tile $1a0
 
-; oam tile numbers matching the table above (low byte + name bit)
-Ot6ObjTileNumTbl:
-        .byte   $00, $01
-        .byte   $02, $01
-        .byte   $04, $01
-        .byte   $20, $01
-        .byte   $22, $01
-        .byte   $24, $01
-        .byte   $40, $01
-        .byte   $42, $01
-        .byte   $44, $01
-        .byte   $60, $01
-        .byte   $62, $01
-        .byte   $c0, $00
-        .byte   $c2, $00
-        .byte   $c4, $00
-        .byte   $c6, $00
-        .byte   $c8, $00
-        .byte   $64, $01
-        .byte   $66, $01
-        .byte   $68, $01
-        .byte   $80, $01
-        .byte   $82, $01
-        .byte   $84, $01
-        .byte   $a0, $01
+; [ upload the bg hud glyphs into free font cells ]
 
-; 4bpp tile data, 32 bytes each
-Ot6ObjTiles:
-        .byte   $00,$00,$08,$08,$04,$04,$10,$10
-        .byte   $10,$10,$10,$10,$02,$00,$3c,$00
-        .byte   $00,$10,$00,$30,$00,$38,$00,$6c
-        .byte   $00,$6e,$00,$ee,$02,$7c,$3c,$00
-        .byte   $10,$00,$38,$28,$7c,$10,$fe,$10
-        .byte   $7e,$10,$3c,$28,$18,$00,$08,$00
-        .byte   $00,$10,$00,$10,$00,$6c,$00,$ee
-        .byte   $02,$6c,$04,$10,$08,$10,$08,$00
-        .byte   $00,$1e,$04,$38,$08,$70,$00,$fc
-        .byte   $24,$18,$08,$30,$10,$60,$40,$00
-        .byte   $00,$1e,$04,$38,$08,$70,$00,$fc
-        .byte   $24,$18,$08,$30,$10,$60,$40,$00
-        .byte   $10,$10,$38,$38,$7c,$7c,$7c,$7c
-        .byte   $fe,$fe,$fe,$fe,$7e,$7c,$3c,$00
-        .byte   $00,$00,$00,$30,$00,$78,$00,$5c
-        .byte   $00,$de,$00,$fe,$02,$7c,$3c,$00
-        .byte   $00,$00,$04,$04,$08,$00,$06,$04
-        .byte   $04,$00,$00,$00,$18,$00,$00,$00
-        .byte   $00,$00,$78,$78,$0c,$04,$fa,$f8
-        .byte   $04,$00,$7c,$7c,$18,$00,$00,$00
-        .byte   $10,$00,$18,$08,$7c,$10,$fe,$6c
-        .byte   $7e,$10,$1c,$08,$18,$00,$08,$00
-        .byte   $10,$10,$10,$10,$6c,$6c,$92,$92
-        .byte   $6e,$6c,$14,$10,$18,$10,$08,$00
-        .byte   $00,$00,$00,$10,$10,$38,$10,$7c
-        .byte   $30,$7c,$10,$fe,$00,$fe,$7e,$00
-        .byte   $00,$00,$10,$10,$28,$28,$6c,$6c
-        .byte   $4c,$4c,$ee,$ee,$fe,$fe,$7e,$00
-        .byte   $00,$00,$30,$30,$7a,$7a,$4e,$4e
-        .byte   $c6,$80,$7e,$7e,$7e,$7c,$3c,$00
-        .byte   $00,$00,$30,$30,$4a,$4a,$4c,$4c
-        .byte   $c6,$80,$7c,$7c,$7e,$7c,$3c,$00
-        .byte   $3e,$00,$7f,$00,$47,$00,$0e,$00
-        .byte   $1c,$00,$18,$00,$1c,$00,$1c,$00
-        .byte   $02,$00,$39,$00,$41,$00,$02,$00
-        .byte   $04,$00,$18,$00,$04,$00,$1c,$00
-        .byte   $fe,$00,$ff,$00,$e7,$00,$fe,$00
-        .byte   $e7,$00,$e7,$00,$fe,$00,$fc,$00
-        .byte   $02,$00,$39,$00,$21,$00,$02,$00
-        .byte   $21,$00,$21,$00,$02,$00,$fc,$00
-        .byte   $38,$00,$78,$00,$78,$00,$38,$00
-        .byte   $38,$00,$38,$00,$7c,$00,$7c,$00
-        .byte   $08,$00,$08,$00,$48,$00,$08,$00
-        .byte   $08,$00,$08,$00,$04,$00,$7c,$00
-        .byte   $7e,$00,$ff,$00,$c7,$00,$0e,$00
-        .byte   $3c,$00,$70,$00,$ff,$00,$ff,$00
-        .byte   $02,$00,$79,$00,$c1,$00,$02,$00
-        .byte   $0c,$00,$10,$00,$01,$00,$ff,$00
-        .byte   $ff,$00,$fe,$00,$1c,$00,$3e,$00
-        .byte   $3f,$00,$87,$00,$fe,$00,$7c,$00
-        .byte   $01,$00,$f2,$00,$04,$00,$02,$00
-        .byte   $39,$00,$01,$00,$82,$00,$7c,$00
-        .byte   $1e,$00,$3e,$00,$6e,$00,$ce,$00
-        .byte   $ce,$00,$ff,$00,$ff,$00,$0c,$00
-        .byte   $02,$00,$12,$00,$22,$00,$42,$00
-        .byte   $42,$00,$01,$00,$f3,$00,$0c,$00
-        .byte   $ff,$00,$fe,$00,$fe,$00,$ff,$00
-        .byte   $07,$00,$e7,$00,$7e,$00,$7c,$00
-        .byte   $01,$00,$3e,$00,$02,$00,$f9,$00
-        .byte   $01,$00,$61,$00,$02,$00,$7c,$00
-        .byte   $3e,$00,$7c,$00,$e0,$00,$fe,$00
-        .byte   $ff,$00,$e7,$00,$7e,$00,$7c,$00
-        .byte   $02,$00,$1c,$00,$20,$00,$02,$00
-        .byte   $39,$00,$21,$00,$02,$00,$7c,$00
+; 13 2bpp tiles (shield-with-count 1-6/B, pip clusters 0-5) written to
+; the battle font at vram $5800 + cell*8. runs inside the font uploader
+; (db = $00, forced blank).
 
-; shield icon
-        .byte   $7e,$00,$ff,$24,$ff,$00,$ff,$24
-        .byte   $ff,$00,$7e,$00,$3c,$00,$18,$00
-        .byte   $00,$00,$00,$00,$00,$00,$00,$00
-        .byte   $81,$00,$42,$00,$24,$00,$18,$00
-; pips 0/5
-        .byte   $00,$00,$db,$db,$db,$db,$00,$00
-        .byte   $6c,$6c,$6c,$6c,$00,$00,$00,$00
-        .byte   $00,$00,$db,$00,$db,$00,$00,$00
-        .byte   $6c,$00,$6c,$00,$00,$00,$00,$00
-; pips 1/5
-        .byte   $00,$00,$db,$1b,$db,$1b,$00,$00
-        .byte   $6c,$6c,$6c,$6c,$00,$00,$00,$00
-        .byte   $00,$00,$1b,$00,$1b,$00,$00,$00
-        .byte   $6c,$00,$6c,$00,$00,$00,$00,$00
-; pips 2/5
-        .byte   $00,$00,$db,$03,$db,$03,$00,$00
-        .byte   $6c,$6c,$6c,$6c,$00,$00,$00,$00
-        .byte   $00,$00,$03,$00,$03,$00,$00,$00
-        .byte   $6c,$00,$6c,$00,$00,$00,$00,$00
-; pips 3/5
-        .byte   $00,$00,$db,$00,$db,$00,$00,$00
-        .byte   $6c,$6c,$6c,$6c,$00,$00,$00,$00
-        .byte   $00,$00,$00,$00,$00,$00,$00,$00
-        .byte   $6c,$00,$6c,$00,$00,$00,$00,$00
-; pips 4/5
-        .byte   $00,$00,$db,$00,$db,$00,$00,$00
-        .byte   $6c,$0c,$6c,$0c,$00,$00,$00,$00
-        .byte   $00,$00,$00,$00,$00,$00,$00,$00
-        .byte   $0c,$00,$0c,$00,$00,$00,$00,$00
-; pips 5/5
-        .byte   $00,$00,$db,$00,$db,$00,$00,$00
-        .byte   $6c,$00,$6c,$00,$00,$00,$00,$00
-        .byte   $00,$00,$00,$00,$00,$00,$00,$00
-        .byte   $00,$00,$00,$00,$00,$00,$00,$00
-; ------------------------------------------------------------------------------
-
-; [ upload obj tiles for the enemy hud ]
-
-; 16 sprites' top-left 8x8 quadrants (the other three quadrants of each
-; 16x16 are verified-blank vram). called from the font-icon uploader
-; while the screen is force-blanked and db = $00.
-
-.proc Ot6LoadObjTiles
+.proc Ot6LoadBgGlyphs
         .a8
         .i16
-        ldx     #$0000          ; table index * 2
-@tile:  longa
-        lda     f:Ot6ObjTileAddrTbl,x
+        ldx     #$0000          ; glyph index
+@tile:  phx
+        lda     f:Ot6BgGlyphCellTbl,x
+        longa
+        and     #$00ff
+        asl
+        asl
+        asl
+        clc
+        adc     #$5800
         sta     hVMADDL
-        txa
+        txa                     ; data offset = index * 16
         asl
         asl
         asl
         asl
-        phx
-        tax                     ; data offset = index * 32
-@word:  lda     f:Ot6ObjTiles,x
+        tax
+        ldy     #$0008          ; 8 words per 2bpp tile
+@word:  lda     f:Ot6BgGlyphData,x
         sta     hVMDATAL
         inx
         inx
-        txa
-        and     #$001f
-        bne     @word           ; tiles are 32 bytes: stop on alignment
+        dey
+        bne     @word
         shorta
         plx
         inx
-        inx
-        cpx     #$002e          ; 23 tiles done?
+        cpx     #$000d          ; 13 glyphs
         bcc     @tile
-        rts                     ; jsr-called from the font uploader
+        rts
 .endproc
 
 ; ------------------------------------------------------------------------------
 
-; [ per-frame enemy hud: shield digit + weakness slots under each monster ]
+; [ per-frame bg hud: rebuild the shadow line buffer ]
 
-; claims oam shadow entries 96-127 ($0480-$04ff, high-table bytes
-; $0518-$051f). for each living monster: [shield digit or B] then one
-; slot per weak element (icon if revealed, ? if not), anchored under the
-; monster sprite. called from DrawCursorSprites every battle frame.
-; db = $7e. entries beyond the claimed 32 are simply not drawn.
+; the hud lives on the bg3 field tilemap; this main-loop pass fills a
+; shadow buffer in bank $7f, and the nmi flush copies it to vram during
+; vblank. shadow at $7f:fe00, 10 lines x 12 bytes:
+;   +0  vram word address of the line's first cell (0 = line disabled)
+;   +2  five tilemap words (glyph | attr << 8)
+; monsters: [shield-with-count][up to 4 weakness slots]. heroes: one
+; pip-cluster cell. entities animate and drift, so each line remembers
+; its previous address; the flush blanks the old cells when it moves.
+; line layout: +0 cur addr (0 = disabled), +2 prev addr, +4 five cells.
 
-OT6_OAM   := $0480              ; oam shadow, entry 96
-OT6_OAMHI := $0518              ; high table bytes for entries 96-127
+OT6_SHADOW  := $5762            ; lines, stride 14 (trace-verified free)
+OT6_MAPBASE := $57b6            ; word scratch: field bg3 map base
 
-.proc Ot6EnemyHud_ext
+.proc Ot6BgHud_ext
         .a8
         .i16
         php
         longi
-        shorta0                 ; b = 0: tax/tay below stay clean
+        shorta0
         phx
         phy
-        phb                     ; caller's db is NOT $7e here (bank 0):
-        lda     #$7e            ; battle vars and coords need bank $7e
+        phb
+        lda     #$7e
         pha
         plb
-        ldx     #$0000          ; own obj palette 3 outright: effects repaint
-        longa                   ; it, so rewrite all 16 colors every frame
-@hue:   lda     f:Ot6HudPal,x
-        sta     $7f60,x
-        inx
-        inx
-        cpx     #$0020
-        bcc     @hue
-        shorta0                 ; back to a8 AND rescrub b for tax below
-        ldx     #$0000          ; hide all 32 claimed entries
-@park:  lda     #$e0
-        sta     OT6_OAM+1,x
-        inx
-        inx
-        inx
-        inx
-        cpx     #$0080
-        bcc     @park
-        ldx     #$0000          ; clear high bits (x8=0, size=16x16)
-@hibit: stz     OT6_OAMHI,x
-        inx
-        cpx     #$0008
-        bcc     @hibit
-        ldx     #$0000          ; x = oam byte offset within our block
-        ldy     #$0000          ; y = monster slot offset (0,2,..,$0a)
-@slot:  lda     $3aa8,y
-        lsr
-        bcc     @next           ; not present
-        lda     $3eec,y
-        bit     #$c2
-        bne     @next           ; dead/petrified/zombie
-        ; pen anchor: under the monster, roughly centered
-        lda     $800f,y         ; monster center x (low byte)
-        sec
-        sbc     #$0c
-        sta     OT6_SCR_SLOT2   ; running pen x
-        lda     $804b,y         ; monster bottom y
+        ; field bg3 map base (word address) from the hdma-fed value
+        longa
+        lda     $897b
+        and     #$00fc
+        xba                     ; << 8 == (>>2) << 10
+        sta     f:$7e0000+OT6_MAPBASE
+        shorta0
+        ldy     #$0000          ; monster slot offset
+        ldx     #$0000          ; shadow byte offset
+@slot:  jsr     Ot6BgHudLine
+        jsr     Ot6BgHudMark
+        longa
+        txa
         clc
-        adc     $38             ; battle screen shake/scroll offset
-        inc
-        inc
-        sta     OT6_SCR_IDX     ; pen y
-        ; shield icon, then the count (or B)
-        lda     $3e40,y
-        ora     $3e90,y
-        beq     @weak           ; never had shields: no icon either
-        lda     #$10            ; glyph 16 = shield icon
-        jsr     Ot6EmitSprite
-        lda     $3e90,y         ; broken timer
-        beq     @digit
-        lda     #$09            ; glyph 9 = 'B'
-        bra     @emit0
-@digit: lda     $3e40,y         ; shield current
-        beq     @weak           ; shieldless: no digit, straight to slots
-        cmp     #$07
-        bcc     :+
-        lda     #$06
-:       clc
-        adc     #$09            ; glyphs 10-15 = digits 1-6
-@emit0: jsr     Ot6EmitSprite
-@weak:  lda     #$01
-        sta     OT6_SCR_BIT     ; walking element bit
-        stz     OT6_SCR_COLS    ; element index
-@elem:  lda     OT6_SCR_BIT
-        beq     @next           ; walked past bit 7
-        and     $3be8,y         ; weak to this element?
-        beq     @ebump
-        lda     OT6_SCR_BIT
-        and     $3e91,y         ; revealed?
-        beq     @q
-        lda     OT6_SCR_COLS    ; glyph 0-7: the element icon
-        bra     @emit
-@q:     lda     #$08            ; glyph 8 = '?'
-@emit:  jsr     Ot6EmitSprite
-@ebump: asl     OT6_SCR_BIT
-        inc     OT6_SCR_COLS
-        bra     @elem
-@next:  iny
+        adc     #$000e
+        tax
+        shorta0
+        iny
         iny
         cpy     #$000c
         bcc     @slot
-        ; character pass: bp digit (bp - pending) beside each hero
-        ldy     #$0000          ; character entity offset 0,2,4,6
-@cslot: lda     $3aa0,y
-        lsr
-        bcc     @cnext          ; character not present
-        lda     $3018,y         ; party mask nonzero = real slot
-        beq     @cnext
-        lda     $8033,y         ; character center x (low byte)
-        clc
-        adc     #$0a            ; digit sits at the hero's right shoulder
-        sta     OT6_SCR_SLOT2
-        lda     $8043,y         ; character bottom y
-        clc
-        adc     $38
-        sta     OT6_SCR_IDX
-        lda     $3e9c,y         ; bp
-        sec
-        sbc     $3e9d,y         ; minus pending boost = spendable shown
-        bcs     :+
-        lda     #$00
-:       cmp     #$06
-        bcc     :+
-        lda     #$05
-:       clc
-        adc     #$11            ; glyphs 17-22 = pip clusters 0-5 filled
-        jsr     Ot6EmitSprite
-@cnext: iny
-        iny
-        cpy     #$0008
-        bcc     @cslot
         plb
         ply
         plx
@@ -1020,60 +802,369 @@ OT6_OAMHI := $0518              ; high table bytes for entries 96-127
         rtl
 .endproc
 
-; emit one hud sprite: a = glyph index, x = oam byte offset in our block
-; (advances by 4 when a sprite is placed), pen in OT6_SCR_SLOT2/IDX.
-; b must be 0 (caller guarantees via shorta0).
-.proc Ot6EmitSprite
+; one monster line. x = shadow line base (kept), y = monster slot offset.
+.proc Ot6BgHudLine
         .a8
         .i16
-        cpx     #$0080
-        bcs     @full           ; claimed entries exhausted
-        pha                     ; glyph index
-        lda     OT6_SCR_SLOT2
-        sta     OT6_OAM,x       ; sprite x
-        clc
-        adc     #$09
-        sta     OT6_SCR_SLOT2   ; advance the pen
-        lda     OT6_SCR_IDX
-        sta     OT6_OAM+1,x     ; sprite y
-        pla
-        asl                     ; table stride 2: [tile low][name bit]
+        longa
+        lda     #$0000          ; disable line
+        sta     f:$7e0000+OT6_SHADOW,x
+        lda     #$21ff          ; blank all five cells
+        sta     f:$7e0000+OT6_SHADOW+4,x
+        sta     f:$7e0000+OT6_SHADOW+6,x
+        sta     f:$7e0000+OT6_SHADOW+8,x
+        sta     f:$7e0000+OT6_SHADOW+10,x
+        sta     f:$7e0000+OT6_SHADOW+12,x
+        shorta0
+        lda     $3aa8,y
+        lsr
+        jcc     @off            ; monster not present
+        ; line vram addr = base + ((bottomy+4)/8)*32 + centerx/8 - 1
         phx
-        tax
-        lda     f:Ot6ObjTileNumTbl,x
-        xba                     ; tile low byte parks in b
-        lda     f:Ot6ObjTileNumTbl+1,x
+        lda     $804b,y
+        clc
+        adc     #$04
+        and     #$f8            ; row * 8
+        longa
+        and     #$00ff
+        asl
+        asl                     ; row * 32
+        clc
+        adc     f:$7e0000+OT6_MAPBASE
+        pha
+        shorta0
+        lda     $800f,y
+        lsr
+        lsr
+        lsr
+        dec
+        longa
+        and     #$00ff
+        clc
+        adc     $01,s
+        plx                     ; (discard pushed row sum)
+        plx                     ; restore shadow base
+        phx
+        sta     f:$7e0000+OT6_SHADOW,x  ; enable line
+        shorta0
         plx
-        ora     #$26            ; priority 2, palette 3, + name bit
-        sta     OT6_OAM+3,x
-        xba                     ; tile low byte back
-        sta     OT6_OAM+2,x
+        ; dead monsters: cells stay blank, line stays live (erases old art)
+        lda     $3eec,y
+        bit     #$c2
+        jne     @done
+        ; cell 0: shield-with-count
+        lda     $3e90,y
+        beq     @count
+        lda     #$71            ; shield-B
+        bra     @shld
+@count: lda     $3e40,y
+        beq     @slots          ; shieldless
+        cmp     #$07
+        bcc     :+
+        lda     #$06
+:       phx
+        longa
+        and     #$00ff
+        tax
+        shorta0
+        lda     f:Ot6ShieldCellTbl-1,x
+        plx
+@shld:  sta     f:$7e0000+OT6_SHADOW+4,x
+        ; weakness slots into cells 1-4
+@slots: phx                     ; base on stack for the cap test
+        lda     #$01
+        sta     OT6_SCR_BIT
+        lda     #$00
+        sta     OT6_SCR_IDX     ; element index
+@elem:  lda     OT6_SCR_BIT
+        beq     @edone
+        and     $3be8,y
+        beq     @next
         inx
-        inx
-        inx
-        inx
-        lda     #$00            ; scrub b (callers rely on b = 0 for tax)
-        xba
-@full:  rts
+        inx                     ; claim the next cell
+        txa
+        sec
+        sbc     $01,s           ; cells used so far (byte diff, same page)
+        cmp     #$09
+        bcs     @edone          ; past slot cell 4 (offsets +6..+12)
+        lda     OT6_SCR_BIT
+        and     $3e91,y
+        beq     @q
+        phx
+        lda     OT6_SCR_IDX
+        longa
+        and     #$00ff
+        tax
+        shorta0
+        lda     f:Ot6ElemGlyphTbl,x
+        sta     $3ed3           ; scratch: glyph (strip's old slot, free)
+        lda     f:Ot6ElemPalTbl,x
+        ora     #$21
+        plx
+        sta     f:$7e0000+OT6_SHADOW+5,x
+        lda     $3ed3
+        sta     f:$7e0000+OT6_SHADOW+4,x
+        bra     @next
+@q:     lda     #$bf            ; '?', default attr already in place
+        sta     f:$7e0000+OT6_SHADOW+4,x
+@next:  asl     OT6_SCR_BIT
+        inc     OT6_SCR_IDX
+        bra     @elem
+@edone: plx
+@done:
+@off:   rts
 .endproc
 
 
-; hud icon hues, uploaded into obj palette 3's duplicate upper half
-; (cgram $b8+): body color index = 8 + element
-Ot6HudPal:
-        .word   $0000
-        .word   $7fff
-        .word   $77bb
-        .word   $6737
-        .word   $56b1
-        .word   $462d
-        .word   $35a9
-        .word   $2525
-        .word   $085f
-        .word   $7ecf
-        .word   $137f
-        .word   $1ba6
-        .word   $7ffb
-        .word   $3fbf
-        .word   $2639
-        .word   $7e29
+; ------------------------------------------------------------------------------
+
+; [ vblank flush: shadow lines -> bg3 field tilemap ]
+
+; called from the battle nmi right after the oam dma.
+
+; [ mark a hud line dirty if it changed since the last flush ]
+
+; x = shadow line base, y = monster slot*2 (both preserved). compares the
+; line's cur addr + cells against the last-flushed copy at $7ffea0; on any
+; difference, updates the copy and sets this line's bit in the dirty byte. the
+; prev-addr word (+2) is flush-owned and excluded. this keeps the nmi
+; flush nearly free on quiet frames: heavy per-frame vram writes in nmi
+; starve the window-scroll hdma and wedge the battle menus.
+
+OT6_HUDCOPY := $57de            ; second free gap (past special names)
+OT6_HUDDIRTY := $57b8
+
+.proc Ot6BgHudMark
+        .a8
+        .i16
+        longa
+        lda     f:$7e0000+OT6_SHADOW,x
+        cmp     f:$7e0000+OT6_HUDCOPY,x
+        bne     @diff
+        lda     f:$7e0000+OT6_SHADOW+4,x
+        cmp     f:$7e0000+OT6_HUDCOPY+4,x
+        bne     @diff
+        lda     f:$7e0000+OT6_SHADOW+6,x
+        cmp     f:$7e0000+OT6_HUDCOPY+6,x
+        bne     @diff
+        lda     f:$7e0000+OT6_SHADOW+8,x
+        cmp     f:$7e0000+OT6_HUDCOPY+8,x
+        bne     @diff
+        lda     f:$7e0000+OT6_SHADOW+10,x
+        cmp     f:$7e0000+OT6_HUDCOPY+10,x
+        bne     @diff
+        lda     f:$7e0000+OT6_SHADOW+12,x
+        cmp     f:$7e0000+OT6_HUDCOPY+12,x
+        bne     @diff
+        shorta0
+        rts
+@diff:  lda     f:$7e0000+OT6_SHADOW,x
+        sta     f:$7e0000+OT6_HUDCOPY,x
+        lda     f:$7e0000+OT6_SHADOW+4,x
+        sta     f:$7e0000+OT6_HUDCOPY+4,x
+        lda     f:$7e0000+OT6_SHADOW+6,x
+        sta     f:$7e0000+OT6_HUDCOPY+6,x
+        lda     f:$7e0000+OT6_SHADOW+8,x
+        sta     f:$7e0000+OT6_HUDCOPY+8,x
+        lda     f:$7e0000+OT6_SHADOW+10,x
+        sta     f:$7e0000+OT6_HUDCOPY+10,x
+        lda     f:$7e0000+OT6_SHADOW+12,x
+        sta     f:$7e0000+OT6_HUDCOPY+12,x
+        shorta0
+        phx
+        tyx                     ; long-indexed is x-only
+        lda     f:Ot6LineBitTbl,x
+        plx
+        ora     f:$7e0000+OT6_HUDDIRTY
+        sta     f:$7e0000+OT6_HUDDIRTY
+        rts
+.endproc
+
+Ot6LineBitTbl:
+        .byte   $01,$00,$02,$00,$04,$00,$08,$00,$10,$00,$20,$00
+
+.proc Ot6BgHudFlush_ext
+        .a8
+        .i16
+        php
+        longi
+        shorta0
+        phx
+        phy
+        phb
+        clr_a
+        pha
+        plb                     ; db = 0 for hardware registers
+        lda     f:$7e0000+OT6_HUDDIRTY   ; lines changed since last flush?
+        jeq     @out
+        sta     f:$7e0000+OT6_HUDDIRTY+1 ; working copy (nmi-private)
+        lda     #$00
+        sta     f:$7e0000+OT6_HUDDIRTY
+        lda     #$80
+        sta     hVMAINC
+        ldx     #$0000
+@line:  lda     f:$7e0000+OT6_HUDDIRTY+1
+        lsr
+        sta     f:$7e0000+OT6_HUDDIRTY+1
+        bcc     @skip
+        longa
+        lda     f:$7e0000+OT6_SHADOW+2,x         ; prev
+        beq     @write
+        cmp     f:$7e0000+OT6_SHADOW,x           ; moved?
+        beq     @write
+        sta     hVMADDL                          ; blank the old cells
+        lda     #$21ff
+        sta     hVMDATAL
+        sta     hVMDATAL
+        sta     hVMDATAL
+        sta     hVMDATAL
+        sta     hVMDATAL
+@write: lda     f:$7e0000+OT6_SHADOW,x
+        sta     f:$7e0000+OT6_SHADOW+2,x         ; prev = cur
+        tay
+        beq     @skip
+        sty     hVMADDL
+        lda     f:$7e0000+OT6_SHADOW+4,x
+        sta     hVMDATAL
+        lda     f:$7e0000+OT6_SHADOW+6,x
+        sta     hVMDATAL
+        lda     f:$7e0000+OT6_SHADOW+8,x
+        sta     hVMDATAL
+        lda     f:$7e0000+OT6_SHADOW+10,x
+        sta     hVMDATAL
+        lda     f:$7e0000+OT6_SHADOW+12,x
+        sta     hVMDATAL
+@skip:  shorta0
+        longa
+        txa
+        clc
+        adc     #$000e
+        tax
+        shorta0
+        cpx     #$0054          ; 6 monster lines x 14
+        bcc     @line
+@out:   plb
+        ply
+        plx
+        plp
+        rtl
+.endproc
+
+; [ bp pip refresh: redraw the name rows when spendable bp changes ]
+
+; called from UpdateCharText every main-loop frame. skips while the
+; battle menu text is not up yet (same gate vanilla uses for hp/mp).
+
+; [ bp pip glyph for the party window name row ]
+
+; menu text command $13, reached from template $01 (character names) only.
+; +$4a = staging pointer w7e5b95 + row*28, so the menu row is recoverable
+; without trusting any earlier command's state. empty rows draw blank.
+
+.proc Ot6PipGlyph_ext
+        .a8
+        .i16
+        phx
+        longa
+        lda     $4a             ; staging base for this row
+        sec
+        sbc     #$5b95
+        shorta                  ; keep a: row*28 fits in 8 bits (0/28/56/84)
+        ldx     #$0000
+:       cmp     #$1c            ; /28 -> menu row
+        bcc     :+
+        sbc     #$1c
+        inx
+        bra     :-
+:       lda     f:$7e64d6,x     ; menu row -> character slot
+        cmp     #$ff
+        beq     @blank
+        asl                     ; slot -> entity offset
+        longa
+        and     #$0006
+        tax
+        shorta0
+        lda     f:$7e3e9c,x     ; bp
+        sec
+        sbc     f:$7e3e9d,x     ; minus pending
+        bcs     :+
+        lda     #$00
+:       cmp     #$06
+        bcc     :+
+        lda     #$05
+:       longa
+        and     #$00ff
+        tax
+        shorta0
+        lda     f:Ot6PipCellTbl,x
+        plx
+        rtl
+@blank: lda     #$ff
+        plx
+        rtl
+.endproc
+
+; shield-with-count glyph cells (counts 1-6)
+Ot6ShieldCellTbl:
+        .byte   $65,$66,$67,$69,$6a,$6b
+
+; pip cluster cells (0-5 filled)
+Ot6PipCellTbl:
+        .byte   $72,$73,$75,$76,$77,$79
+
+; bg hud glyph cells (2bpp, verified junk-free in both formations)
+Ot6BgGlyphCellTbl:
+        .byte   $65
+        .byte   $66
+        .byte   $67
+        .byte   $69
+        .byte   $6a
+        .byte   $6b
+        .byte   $71
+        .byte   $72
+        .byte   $73
+        .byte   $75
+        .byte   $76
+        .byte   $77
+        .byte   $79
+
+Ot6BgGlyphData:
+; shield-1
+        .byte   $7e,$00,$91,$7e,$b1,$7e,$91,$7e
+        .byte   $52,$3c,$3c,$38,$18,$00,$00,$00
+; shield-2
+        .byte   $7e,$00,$b1,$7e,$89,$7e,$91,$7e
+        .byte   $62,$3c,$3c,$38,$18,$00,$00,$00
+; shield-3
+        .byte   $7e,$00,$b1,$7e,$89,$7e,$91,$7e
+        .byte   $4a,$3c,$34,$38,$18,$00,$00,$00
+; shield-4
+        .byte   $7e,$00,$a9,$7e,$a9,$7e,$b9,$7e
+        .byte   $4a,$3c,$2c,$18,$18,$00,$00,$00
+; shield-5
+        .byte   $7e,$00,$b9,$7e,$a1,$7e,$b1,$7e
+        .byte   $4a,$3c,$3c,$38,$18,$00,$00,$00
+; shield-6
+        .byte   $7e,$00,$99,$7e,$a1,$7e,$b9,$7e
+        .byte   $6a,$3c,$3c,$38,$18,$00,$00,$00
+; shield-B
+        .byte   $7e,$00,$b1,$7e,$a9,$7e,$b1,$7e
+        .byte   $6a,$3c,$34,$38,$18,$00,$00,$00
+; pips-0
+        .byte   $00,$00,$db,$00,$db,$00,$00,$00
+        .byte   $6c,$00,$6c,$00,$00,$00,$00,$00
+; pips-1
+        .byte   $00,$00,$db,$c0,$db,$c0,$00,$00
+        .byte   $6c,$00,$6c,$00,$00,$00,$00,$00
+; pips-2
+        .byte   $00,$00,$db,$d8,$db,$d8,$00,$00
+        .byte   $6c,$00,$6c,$00,$00,$00,$00,$00
+; pips-3
+        .byte   $00,$00,$db,$db,$db,$db,$00,$00
+        .byte   $6c,$00,$6c,$00,$00,$00,$00,$00
+; pips-4
+        .byte   $00,$00,$db,$db,$db,$db,$00,$00
+        .byte   $6c,$60,$6c,$60,$00,$00,$00,$00
+; pips-5
+        .byte   $00,$00,$db,$db,$db,$db,$00,$00
+        .byte   $6c,$6c,$6c,$6c,$00,$00,$00,$00

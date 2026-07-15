@@ -1,21 +1,6 @@
 
--- shared canary: assert OT6's sprite tiles still hold OT6's art.
--- catches formation art clobbering our claimed VRAM (the fight-2 bug).
-local function ot6TileSum(t)
-  local vr = emu.memType.snesVideoRam
-  local base = (t < 0x100 and (0x2000 + t*16) or (0x3000 + (t-0x100)*16)) * 2
-  local sum = 0
-  for b = 0, 31 do sum = sum + emu.read(base + b, vr) end
-  return sum
-end
-local function canary(H)
-  local expect = { [0x100]=944, [0x144]=568, [0x0C2]=1736, [0x164]=1683, [0x1A0]=654 }
-  for t, want in pairs(expect) do
-    local got = ot6TileSum(t)
-    H.assertEq(got, want, string.format("OT6 tile %03X intact (VRAM clobber canary)", t))
-  end
-end
-
+-- visual canary for fight 1: OT6 font cells intact (vs ROM source), the
+-- under-monster hud on the bg3 field map, and bp pips in the party window.
 local H = dofile("/Users/mtklein/ot6/tools/tests/lib/ot6.lua")
 local STATE = "/Users/mtklein/ot6/build/states/battle_doorstep.mss.lua"
 H.run({ maxFrames = 20000 }, {
@@ -29,7 +14,9 @@ H.run({ maxFrames = 20000 }, {
   H.waitUntil(function() return H.battleActive() end, 900, "battle active", 30),
   H.waitFrames(200),
   H.call(function()
-    canary(H)
+    H.glyphCanary()
+    H.assertEq(H.fieldHudPresent(), true, "under-monster hud on the field map")
+    H.assertEq(H.pipWord(), 0x2173, "party row 1 shows 1 spendable bp")
     H.screenshot("visual_f1_idle")
   end),
   H.waitFrames(40),               -- settle: command menu opens on its own
@@ -45,7 +32,7 @@ H.run({ maxFrames = 20000 }, {
   end, 900, "ability list rendered", 20),
   H.call(function()
     H.screenshot("visual_f1_menu")   -- for humans; goldens use the idle frame
-    canary(H)
+    H.glyphCanary()
     -- deterministic menu check: find "Fire Beam" in the ability tilemap and
     -- assert the icon cell after it is the fire glyph in the fire palette
     local vr = emu.memType.snesVideoRam

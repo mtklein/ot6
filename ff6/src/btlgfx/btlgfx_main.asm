@@ -1484,6 +1484,7 @@ _c10a16:
         stx     hDMA7::SIZE
         lda     #BIT_7
         sta     hMDMAEN
+        jsl     Ot6BgHudFlush_ext       ; ot6: dirty hud lines -> bg3 map
         clr_a
         sta     hCGADD       ; copy bg palettes to ppu (non battle-bg)
         ldx     #$2202
@@ -1725,7 +1726,6 @@ BattleNMI:
         lda     #$01
         sta     w7e7bcb       ; close menu
 @0cbc:  jsr     ClearSpriteData
-        jsl     Ot6EnemyHud_ext         ; ot6: after clear, before this frame's dma
         lda     #$08        ; next available sprite = 8
         sta     $71
         jsr     _c1b3ce       ; update roulette cursor
@@ -9501,7 +9501,10 @@ set_item_add_data:
 
 _c144a2:
 window_open:
-@44a2:  lda     #$01
+@44a2:  lda     w7e7bca       ; ot6: on a closed->open transition, no
+        bne     @44ac         ; text render is in flight, so bp pips can
+        jsr     DrawCharNames ; re-stage with the names (nested opens have
+@44ac:  lda     #$01          ; live text state - never touch those)
         sta     w7e7b98
         jsr     _c14445       ; update inventory with obtained items
         jsr     _c14759
@@ -9518,7 +9521,8 @@ window_open:
 ; [ update hp/gauge graphics ]
 
 UpdateCharText:
-@44be:  lda     w7e7b98       ;
+@44be:  jsl     Ot6BgHud_ext            ; ot6: hud shadow (main loop, cheap
+        lda     w7e7b98       ;        nmi: heavy nmi work wedges menus)
         ora     w7e7b9c
         bne     @44d7
         lda     w7e7b99       ;
@@ -10040,20 +10044,6 @@ normal_window_data_set:
 
 _c1476d:
 @476d:  .byte   $00,$1c,$38,$54
-
-; ------------------------------------------------------------------------------
-
-; [  ]
-
-; unused
-
-@4771:  clr_ax
-        lda     #$21
-@4775:  sta     w7e5b95+1,x
-        inx2
-        cpx     #$0070
-        bne     @4775
-        rts
 
 ; ------------------------------------------------------------------------------
 
@@ -15570,7 +15560,7 @@ MenuTextCmdTbl:
         .addr   MenuTextCmd_10
         .addr   MenuTextCmd_11
         .addr   MenuTextCmd_12
-        .addr   TextCmdUnused
+        .addr   Ot6PipTextCmd           ; ot6: $13 = bp pip glyph
         .addr   TextCmdUnused
         .addr   TextCmdUnused
         .addr   TextCmdUnused
@@ -15590,6 +15580,15 @@ MenuTextCmdTbl:
 
 TextCmdUnused:
 @6747:  rts
+
+; ------------------------------------------------------------------------------
+
+; [ ot6: menu text command $13: draw bp pip glyph ]
+
+Ot6PipTextCmd:
+        jsl     Ot6PipGlyph_ext
+        jmp     DrawMenuLetter
+
 
 ; ------------------------------------------------------------------------------
 
@@ -45075,7 +45074,7 @@ MenuText::_0:
 
 ; menu text region $01: character names
 MenuText::_1:
-@e1d9:  .byte   $07,$00,$ff,$01,$08,$00,$ff,$01,$09,$00,$ff,$01,$0a,$00,$ff,$00
+@e1d9:  .byte   $07,$00,$13,$01,$08,$00,$13,$01,$09,$00,$13,$01,$0a,$00,$13,$00
 
 ; menu text region $02: current hp (all characters)
 MenuText::_2:

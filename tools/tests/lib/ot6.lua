@@ -373,6 +373,74 @@ seqStep = function(steps)
 end
 
 -- Wait n frames.
+-- ------------------------------------------------------------ ot6 canary --
+-- Every OT6 font cell in VRAM must match its ROM source data, byte for
+-- byte.  Catches battle/effect art clobbering our claimed font cells (the
+-- fight-2 bug class) without hardcoding sums: the expected bytes come from
+-- the ROM itself, so glyph art edits never stale the canary.
+function M.glyphCanary()
+  local vr, rom = emu.memType.snesVideoRam, emu.memType.snesPrgRom
+  local function findSig(sig)
+    for base = 0x300000, 0x300FF0 do
+      local hit = true
+      for i = 1, 16 do
+        if emu.read(base+i-1, rom) ~= sig[i] then hit = false; break end
+      end
+      if hit then return base end
+    end
+    return nil
+  end
+  -- first 16 bytes of Ot6FontIcons (fire) and Ot6BgGlyphData (shield-1)
+  local icons = findSig({0x10,0x10,0x30,0x38,0x38,0x3c,0x6c,0x7c,
+                         0x6e,0x7e,0xee,0xfe,0x7e,0x7c,0x3c,0x00})
+  local bg    = findSig({0x7e,0x00,0x91,0x7e,0xb1,0x7e,0x91,0x7e,
+                         0x52,0x3c,0x3c,0x38,0x18,0x00,0x00,0x00})
+  M.assertEq(icons ~= nil, true, "Ot6FontIcons found in rom bank F0")
+  M.assertEq(bg ~= nil, true, "Ot6BgGlyphData found in rom bank F0")
+  local function checkTile(cell, romBase, tag)
+    local v = 0xB000 + cell*16          -- 2bpp font cell in vram
+    for i = 0, 15 do
+      local got, want = emu.read(v+i, vr), emu.read(romBase+i, rom)
+      M.assertEq(got, want, string.format("%s: cell %02X byte %d", tag, cell, i))
+    end
+  end
+  local iconCells = {0xeb,0xec,0xed,0x64,0xef,0xfb,0xfc,0xfd}
+  for k, cell in ipairs(iconCells) do
+    checkTile(cell, icons + (k-1)*16, "element icon")
+  end
+  for k = 1, 13 do
+    local cell = emu.read(bg - 14 + k, rom)  -- Ot6BgGlyphCellTbl precedes the data
+    checkTile(cell, bg + (k-1)*16, "hud glyph")
+  end
+end
+
+-- true if any OT6 shield/broken glyph word sits in the bg3 field-area map
+-- (the under-monster hud). formation-agnostic presence check.
+function M.fieldHudPresent()
+  local vr = emu.memType.snesVideoRam
+  local reg = M.readByte(0x897b)
+  local base = ((reg - (reg % 4)) * 256) * 2
+  local set = {[0x65]=1,[0x66]=1,[0x67]=1,[0x69]=1,[0x6a]=1,[0x6b]=1,[0x71]=1}
+  for off = 0, 0x7FE, 2 do
+    if emu.read(base+off+1, vr) == 0x21 and set[emu.read(base+off, vr)] then
+      return true
+    end
+  end
+  return false
+end
+
+-- party-window bp pip glyph word for menu row 0 (first party member)
+function M.pipWord()
+  local reg = M.readByte(0x897f)
+  local base = ((reg - (reg % 4)) * 256) * 2
+  return emu.readWord(base + 0x68, emu.memType.snesVideoRam)
+end
+
+function M.isPipGlyph(w)
+  local set = {[0x72]=1,[0x73]=1,[0x75]=1,[0x76]=1,[0x77]=1,[0x79]=1}
+  return (w >> 8) == 0x21 and set[w & 0xFF] ~= nil
+end
+
 function M.waitFrames(n)
   local c = 0
   return {

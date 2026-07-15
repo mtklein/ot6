@@ -7,7 +7,7 @@ ROOT="$(cd "$(dirname "$0")/../.." && pwd)"
 RUN="$ROOT/tools/tests/run.sh"
 GOLD="$ROOT/tools/tests/goldens"
 SHOTS="$ROOT/build/states/shots"
-XFAIL="visual_f2"   # sprite HUD clobbered by formation art; green after BG rework
+XFAIL=""   # keep empty; XPASS fails the suite to force cleanup
 fail=0; summary=""
 
 result() { summary="$summary\n  $1: $2"; }
