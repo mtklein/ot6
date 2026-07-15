@@ -42,17 +42,25 @@ Mechanics **implemented and acceptance-tested live** (2026-07-15,
 **Exit met** for mechanics + shield display; weakness strip carries into
 the next work block.
 
-## M2 — BP economy + Cyan
+## M2 — BP economy + boost input — ✅ core (2026-07-15)
 
-- BP accrual (+1 on turn, cap 5, no-regen after boosting), spend ≤3 at
-  action confirm.
-- Boost effects, first pass: Attack +1 hit/BP; a flat damage multiplier for
-  skills/magic.
-- BP display (MVP: numeric next to name/HP).
-- Cyan converted: charge gauge removed, Bushido menu priced in BP per DESIGN.
+- ✅ BP accrual (+1 on turn, cap 5, no-regen after boosting), seed 1.
+- ✅ Boost damage multiplier ×2/×4/×8, both damage-calc tails.
+- ✅ **L/R boost select** in the battle menu (spend ≤3, never past bp),
+  with live BP-pip feedback (`battle_boost.lua`).
+- ✅ BP display: Octopath-style pips beside each party name (5 sockets,
+  bright = spendable), re-staged every menu open + live during boost.
+- ✅ **Weakness codex** (pulled forward from M3's tracking): reveals
+  persist across battles in the second SRAM bank (`battle_codex.lua`).
+- ✅ Under-monster HUD on the BG3 field map: shield-with-count glyph
+  ('B' broken) + per-weakness revealed-icon/'?' cells — the M1
+  "weakness strip" is superseded by this.
+- ⬜ Cyan converted (charge gauge → BP Bushido): post-demo, he is not
+  reachable in the demo stretch.
+- ⬜ Attack +1 hit/BP and per-skill boost effects: with M3/M4.
 
-**Exit:** Lete River stretch playable with boost decisions mattering; Cyan
-usable start to finish without the charge gauge.
+**Exit met** for the demo scope: the full probe → chip → break → boost →
+nuke loop is playable with visible state everywhere. See DEMO.md.
 
 ## M3 — Weapon classes + reveal
 
