@@ -703,6 +703,13 @@ Ot6ObjTileAddrTbl:
         .word   $2c40          ; tile $0c4
         .word   $2c60          ; tile $0c6
         .word   $2c80          ; tile $0c8
+        .word   $3640          ; tile $164
+        .word   $3660          ; tile $166
+        .word   $3680          ; tile $168
+        .word   $3800          ; tile $180
+        .word   $3820          ; tile $182
+        .word   $3840          ; tile $184
+        .word   $3a00          ; tile $1a0
 
 ; oam tile numbers matching the table above (low byte + name bit)
 Ot6ObjTileNumTbl:
@@ -722,6 +729,13 @@ Ot6ObjTileNumTbl:
         .byte   $c4, $00
         .byte   $c6, $00
         .byte   $c8, $00
+        .byte   $64, $01
+        .byte   $66, $01
+        .byte   $68, $01
+        .byte   $80, $01
+        .byte   $82, $01
+        .byte   $84, $01
+        .byte   $a0, $01
 
 ; 4bpp tile data, 32 bytes each
 Ot6ObjTiles:
@@ -790,6 +804,41 @@ Ot6ObjTiles:
         .byte   $02,$00,$1c,$00,$20,$00,$02,$00
         .byte   $39,$00,$21,$00,$02,$00,$7c,$00
 
+; shield icon
+        .byte   $7e,$00,$ff,$24,$ff,$00,$ff,$24
+        .byte   $ff,$00,$7e,$00,$3c,$00,$18,$00
+        .byte   $00,$00,$00,$00,$00,$00,$00,$00
+        .byte   $81,$00,$42,$00,$24,$00,$18,$00
+; pips 0/5
+        .byte   $00,$00,$db,$db,$db,$db,$00,$00
+        .byte   $6c,$6c,$6c,$6c,$00,$00,$00,$00
+        .byte   $00,$00,$db,$00,$db,$00,$00,$00
+        .byte   $6c,$00,$6c,$00,$00,$00,$00,$00
+; pips 1/5
+        .byte   $00,$00,$db,$1b,$db,$1b,$00,$00
+        .byte   $6c,$6c,$6c,$6c,$00,$00,$00,$00
+        .byte   $00,$00,$1b,$00,$1b,$00,$00,$00
+        .byte   $6c,$00,$6c,$00,$00,$00,$00,$00
+; pips 2/5
+        .byte   $00,$00,$db,$03,$db,$03,$00,$00
+        .byte   $6c,$6c,$6c,$6c,$00,$00,$00,$00
+        .byte   $00,$00,$03,$00,$03,$00,$00,$00
+        .byte   $6c,$00,$6c,$00,$00,$00,$00,$00
+; pips 3/5
+        .byte   $00,$00,$db,$00,$db,$00,$00,$00
+        .byte   $6c,$6c,$6c,$6c,$00,$00,$00,$00
+        .byte   $00,$00,$00,$00,$00,$00,$00,$00
+        .byte   $6c,$00,$6c,$00,$00,$00,$00,$00
+; pips 4/5
+        .byte   $00,$00,$db,$00,$db,$00,$00,$00
+        .byte   $6c,$0c,$6c,$0c,$00,$00,$00,$00
+        .byte   $00,$00,$00,$00,$00,$00,$00,$00
+        .byte   $0c,$00,$0c,$00,$00,$00,$00,$00
+; pips 5/5
+        .byte   $00,$00,$db,$00,$db,$00,$00,$00
+        .byte   $6c,$00,$6c,$00,$00,$00,$00,$00
+        .byte   $00,$00,$00,$00,$00,$00,$00,$00
+        .byte   $00,$00,$00,$00,$00,$00,$00,$00
 ; ------------------------------------------------------------------------------
 
 ; [ upload obj tiles for the enemy hud ]
@@ -823,7 +872,7 @@ Ot6ObjTiles:
         plx
         inx
         inx
-        cpx     #$0020          ; 16 tiles done?
+        cpx     #$002e          ; 23 tiles done?
         bcc     @tile
         rts                     ; jsr-called from the font uploader
 .endproc
@@ -895,7 +944,12 @@ OT6_OAMHI := $0518              ; high table bytes for entries 96-127
         inc
         inc
         sta     OT6_SCR_IDX     ; pen y
-        ; shield digit or B
+        ; shield icon, then the count (or B)
+        lda     $3e40,y
+        ora     $3e90,y
+        beq     @weak           ; never had shields: no icon either
+        lda     #$10            ; glyph 16 = shield icon
+        jsr     Ot6EmitSprite
         lda     $3e90,y         ; broken timer
         beq     @digit
         lda     #$09            ; glyph 9 = 'B'
@@ -947,13 +1001,13 @@ OT6_OAMHI := $0518              ; high table bytes for entries 96-127
         lda     $3e9c,y         ; bp
         sec
         sbc     $3e9d,y         ; minus pending boost = spendable shown
-        beq     @cnext          ; zero: draw nothing
-        bcc     @cnext
-        cmp     #$06
+        bcs     :+
+        lda     #$00
+:       cmp     #$06
         bcc     :+
         lda     #$05
 :       clc
-        adc     #$09            ; glyphs 10-15 = digits 1-6
+        adc     #$11            ; glyphs 17-22 = pip clusters 0-5 filled
         jsr     Ot6EmitSprite
 @cnext: iny
         iny
