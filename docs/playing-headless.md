@@ -91,6 +91,41 @@ high-level path by looking at the map. `probe_navto.lua` demonstrates
 the full loop end to end (boot save → calibrate → walk → hit encounter →
 clear it).
 
+### Reading the map from data (not by playing)
+
+The field collision map is in RAM as data, so routes can be *computed*
+rather than discovered by trial and error. From the vendored
+disassembly (`src/field/map.asm`, `player.asm`, `scroll.asm`):
+
+| RAM | meaning |
+|---|---|
+| `$7F0000` | BG1 tilemap, `row*256 + col` (one tile-type byte per position) |
+| `$7E7600[tile]` | tile properties; `& 0x07 == 0x07` marks a **counter/wall** (impassable) |
+| `$7E7700[tile]` | directional exit bits (low nibble); often all-open on floor |
+| `$86` / `$87` | map width / height masks (power-of-two wrap) |
+
+`tools/tests/probe_collision.lua` reads these, flood-fills the walkable
+graph from the party, and renders the reachable region as ASCII — the
+real map, straight from RAM. From that you can BFS a shortest path to
+any tile (e.g. the northernmost corridor end / a gate) with no playing.
+
+**Model gaps and the isometric caveat.** The `$7600` counter test gives
+walls correctly; z-level, ledge, and event blocks aren't fully captured
+by these two tables, so treat the static graph as *optimistic* and
+movement-verify each executed step (blocklist an edge and re-plan when a
+pressed move doesn't advance). One hard case: the **Narshe opening mine
+is isometric** — a single button press moves the party diagonally in
+`(fieldX,fieldY)` tile space (e.g. "down" moved `(33,22)→(32,24)`), so
+cardinal-BFS execution doesn't map 1:1 to buttons there. Normal cardinal
+maps (overworld, towns, most dungeons) execute directly; the isometric
+intro mine needs the button→tile-delta lattice characterized per map, or
+a save placed past it. `gen_whelk.lua` is the WIP route script (BFS +
+movement-verified execution) that this caveat still blocks.
+
+Field-walk input note: press-release cycles move the party reliably; a
+single long continuous hold via the joypad injection does not. Drive
+steps as short holds, not one sustained press.
+
 ### Reaching a balance fixture
 
 The demo doorstep is the mech-suit intro — beam party, no clean
