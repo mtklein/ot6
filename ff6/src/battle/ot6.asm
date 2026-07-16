@@ -743,13 +743,150 @@ done:   rtl
 
 ; ------------------------------------------------------------------------------
 
+; [ fold a boosted spell to its higher tier, at action-queue time ]
+
+; called from CreateAction after GetMPCost banked the BASE spell's mp
+; into $3620 and just before $3a7a (command | attack << 8) is written
+; into the queue. a boosted character's tiered spell is queued as its
+; -ra/-ga tier: every execution path then uses the higher tier's own
+; record for name, animation, and power, while bp stays the only
+; price. pending 1 = one tier up, 2-3 = two. x = the actor's entity
+; offset (CreateAction's own indexing). preserves a/x/y.
+
+.proc Ot6QueueFold
+        .a8
+        php                     ; caller widths vary: pin our own
+        longi
+        .i16
+        pha
+        lda     $3a7a           ; command
+        cmp     #$02
+        beq     @cmdok          ; $02 magic
+        cmp     #$17
+        beq     @cmdok          ; $17 x-magic
+        cmp     #$0c
+        bne     @keep           ; $0c lore
+@cmdok: txa                     ; width-neutral character test
+        cmp     #$08
+        bcs     @keep           ; monsters never boost
+        lda     $3e9d,x         ; pending boost
+        beq     @keep
+        cmp     #$02
+        bcc     :+
+        lda     #$02            ; at most two tiers up
+:       sta     OT6_SCR_BIT     ; tier steps
+        phx
+        ldx     #$0000
+@row:   lda     f:Ot6FoldTbl,x
+        cmp     $3a7b           ; attack id
+        beq     @hit
+        inx
+        inx
+        inx
+        cpx     #$0018          ; 8 families x [base, +1, +2]
+        bcc     @row
+        plx
+        bra     @keep
+@hit:   txa                     ; row offset (< $18, fits 8 bits)
+        clc
+        adc     OT6_SCR_BIT
+        longa
+        and     #$00ff
+        tax
+        shorta0
+        lda     f:Ot6FoldTbl,x
+        sta     $3a7b           ; queue the folded tier
+        plx
+@keep:  pla
+        plp
+        rtl
+.endproc
+
+; ------------------------------------------------------------------------------
+
+; [ boost preview in ability lists ]
+
+; replaces ListTextCmd_0f's `lda ($4f) / sta $2c` (exactly four bytes).
+; while the active character has boost pending, tiered spells render
+; under their folded name — browsing Fire with two boosts pending shows
+; "Fire 3" before the choice is made. $2c is render-scoped (name + our
+; element icon); the mp column and confirm logic read the list data, so
+; cost display and selectability stay on the base spell. list renders
+; per open; a mid-list R/L press shows at the next open (the arrow cell
+; tracks live either way). a8/i16, db=$7e, d=0; preserves x/y and b.
+
+.proc Ot6PreviewList_ext
+        .a8
+        .i16
+        lda     ($4f)           ; the row's ability id
+        sta     $2c
+        xba
+        pha                     ; preserve b (drawlistletter's attr)
+        lda     $2c
+        cmp     #$36
+        bcs     @done           ; spells only
+        phx
+        phy
+        longa
+        lda     $62ca           ; active character slot
+        and     #$0003
+        asl
+        tay
+        shorta0
+        lda     $3e9d,y         ; pending boost
+        beq     @out
+        cmp     #$02
+        bcc     :+
+        lda     #$02            ; at most two tiers up
+:       sta     OT6_SCR_BIT     ; tier steps
+        ldx     #$0000
+@row:   lda     f:Ot6FoldTbl,x
+        cmp     $2c
+        beq     @hit
+        inx
+        inx
+        inx
+        cpx     #$0018
+        bcc     @row
+        bra     @out
+@hit:   txa                     ; row offset (< $18, fits 8 bits)
+        clc
+        adc     OT6_SCR_BIT
+        longa
+        and     #$00ff
+        tax
+        shorta0
+        lda     f:Ot6FoldTbl,x
+        sta     $2c             ; render the folded tier's name
+@out:   ply
+        plx
+@done:  pla
+        xba                     ; b restored
+        lda     $2c
+        rtl
+.endproc
+
+; spell tier families: base, one boost, two boosts
+Ot6FoldTbl:
+        .byte   $00,$05,$09     ; fire, fire 2, fire 3
+        .byte   $01,$06,$0a     ; ice line
+        .byte   $02,$07,$0b     ; bolt line
+        .byte   $03,$08,$08     ; poison, bio (caps)
+        .byte   $2d,$2e,$2f     ; cure line
+        .byte   $30,$31,$31     ; life, life 2 (caps)
+        .byte   $19,$28,$28     ; slow, slow 2 (caps)
+        .byte   $1f,$27,$27     ; haste, haste2 (caps)
+
+; ------------------------------------------------------------------------------
+
 ; [ boost the base damage of a boosted character action ]
 
 ; called at the tail of the physical and magic base-damage calcs.
 ; damage x2/x3/x4 for pending boost 1/2/3; the per-target 9999 cap
 ; still applies downstream. a8/i16, x = attacker, 16-bit damage $11b0.
-; fight and capture spend their boost on extra swings instead
-; (Ot6FightBoost), so the multiplier skips them.
+; fight and capture spend their boost on extra swings (Ot6FightBoost),
+; and tier-family spells spend it on tiers (Ot6QueueFold) — the
+; multiplier serves everything else. $3a7d = the action's attack id.
 
 .proc Ot6BoostDmg
         php                     ; caller width varies: pin our own
@@ -766,6 +903,20 @@ done:   rtl
         beq     done            ; $06 capture: same fight path
         lda     $3e9d,x         ; pending boost level
         beq     done
+        phx
+        ldx     #$0000
+@scan:  lda     f:Ot6FoldTbl,x  ; tier-family spell? tiers are the boost
+        cmp     $3a7d
+        beq     @tier
+        inx
+        cpx     #$0018
+        bcc     @scan
+        plx
+        lda     $3e9d,x         ; pending boost level (reload)
+        bra     @mul0
+@tier:  plx
+        bra     done
+@mul0:
         sta     OT6_SCR_BIT
         longa
         lda     $11b0

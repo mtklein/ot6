@@ -55,12 +55,22 @@ the next work block.
 - ✅ Under-monster HUD on the BG3 field map: shield-with-count glyph
   ('B' broken) + per-weakness revealed-icon/'?' cells — the M1
   "weakness strip" is superseded by this.
+- ✅ **Boost feedback** (2026-07-16): ching/buzz/click on R/L, pending
+  boost as a pulsing arrow cell (the party window is double-buffered —
+  live cells paint both bands), and boosted spell lists preview folded
+  names before the choice is made.
+- ✅ **Attack +1 hit per BP** (2026-07-16): extra swings via the vanilla
+  alternating-hands machinery; Genji Glove doubles the bonus.
+- ✅ **Boost-tier spell folding** (2026-07-16): Fire → Fire 2 → Fire 3
+  at 1/2 BP, queued as the higher tier (name, animation, power) with
+  the base spell's MP cost; tier-family spells never take the generic
+  multiplier. Fire/Ice/Bolt/Poison/Cure/Life/Slow/Haste lines.
 - ⬜ Cyan converted (charge gauge → BP Bushido): post-demo, he is not
   reachable in the demo stretch.
-- ⬜ Attack +1 hit/BP and per-skill boost effects: with M3/M4.
 
 **Exit met** for the demo scope: the full probe → chip → break → boost →
-nuke loop is playable with visible state everywhere. See DEMO.md.
+nuke loop is playable with visible state everywhere — and boosting is
+audible, visible, and previewed. See DEMO.md.
 
 ## M3 — Weapon classes + reveal
 

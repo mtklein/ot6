@@ -30,8 +30,25 @@ BPS-capable patcher, or just:
 ## Controls
 
 - **R** during your command menu: commit +1 BP to the coming action
-  (max 3, never more than you have). **L** takes one back. The pips
-  dim as you commit. Boost multiplies damage ×2/×4/×8.
+  (max 3, never more than you have). **L** takes one back.
+- Every press answers: R rings a "ching" (a buzz when you can't), L
+  clicks, and while boost is pending the cell by your name swaps to
+  1–3 fat arrows pulsing yellow/white. The pips return when you're
+  back to zero.
+
+## What boost buys
+
+- **Fight**: +1 real hit per BP (a Genji Glove pair swings both hands
+  again, doubling the bonus, the same way it doubles everything else).
+- **Tiered spells fold**: Fire boosted once casts as Fire 2, twice as
+  Fire 3 — the higher tier's name, animation, and power, while MP is
+  charged for the base spell. BP is the price, not MP. Fire/Ice/Bolt/
+  Poison/Cure/Life/Slow/Haste lines all fold.
+- **Everything else**: damage ×2/×4/×8.
+- **The list tells you first**: open a spell list while boost is
+  pending and tiered spells are listed under their folded names —
+  browsing Fire with two boosts pending reads "Fire 3", with the MP
+  cost still the base spell's. What you see is what will cast.
 
 ## Systems live under the hood
 
@@ -48,15 +65,15 @@ BPS-capable patcher, or just:
 ## Verification
 
 `make test` runs the whole gate headless: smoke, battle_entry,
-battle_break, battle_bp, battle_boost, battle_codex, visual_f1,
-visual_f2, plus a same-mint pixel golden — across two battle
-formations. All green at every commit on main.
+battle_break, battle_bp, battle_boost, battle_hits, battle_fold,
+battle_preview, battle_codex, hud_stability, visual_f1, visual_f2,
+plus a same-mint pixel golden. All green at every commit on main.
 
 ## Known limits (by design, for now)
 
 - Break/weakness system is element-only; weapon classes come in M3.
-- Boost multiplies damage; per-skill boost effects (extra Attack hits,
-  spell-tier folding) come with M3/M4.
+- A mid-list R/L press updates the pips and arrows live, but the
+  folded spell names refresh at the next list open.
 - Cyan's BP-priced Bushido menu is implemented-after-demo (he isn't
   reachable in the demo stretch).
 - Enemy shield counts use the level formula; a per-monster table is

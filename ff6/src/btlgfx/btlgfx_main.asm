@@ -15272,8 +15272,8 @@ ListTextCmd_11:
 
 ListTextCmd_0f:
 @6598:  jsr     IncListTextPtr
-        lda     ($4f)
-        sta     $2c
+        jsl     Ot6PreviewList_ext      ; ot6: same bytes as lda ($4f) /
+                                        ; sta $2c, plus boost tier preview
         cmp     #$ff
         bne     @65a8
         lda     #MagicName::ITEM_SIZE

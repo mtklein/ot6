@@ -12961,6 +12961,7 @@ CreateAction:
         tay
         jsr     GetMPCost
         sta     $3620,y     ; add to mp cost queue
+        jsl     Ot6QueueFold            ; ot6: boost folds spell tiers
         longa
         lda     $3a7a       ; command/attack
         sta     $3420,y     ; add to command/attack queue
