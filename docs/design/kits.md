@@ -30,10 +30,11 @@ family, different collection method.
 Boost-tier folding means kits list **base spells only** — Fire is a
 kit entry; Fire 2/3 are what boosting does to it.
 
-Physical chip classes are **slashing / piercing / bludgeoning**
-(see weapon-classes.md v2); some attacks are deliberately
-**null-break** — big dumb damage that chips nothing, the physical
-cousin of non-elemental magic.
+Physical chip classes are **slashing / piercing / bludgeoning /
+special ¤** (see weapon-classes.md v2.1); the weapon sets Fight's
+class while abilities carry their own, and some attacks are
+deliberately **null-break** — big dumb damage that chips nothing,
+the physical cousin of non-elemental magic.
 
 ---
 
@@ -63,11 +64,14 @@ The 8 Tools, verbatim ✦ — learned by acquisition.
   Discount* (shops half price), *Overcharge* (+1 AutoCrossbow hit
   per 2 BP).
 
-### Sabin — Monk (bludgeoning: fists)
+### Sabin — Monk (bludgeoning: fists; claws buy slashing)
 
 The 8 Blitzes, verbatim ✦ — vanilla level table preserved ✦, button
 inputs stay. Fists are the heart of the **bludgeoning** class
-(fists, staves, rods) — Pummel-as-blade never sat right.
+(fists, staves, rods) — Pummel-as-blade never sat right. Equipping
+claws switches his *Fight* to slashing ✦, but blitz classes are
+immutable: Pummel with claws on is still bludgeoning. The weapon
+slot is his second class, the ability list is his first.
 
 | # | Blitz | Chip | Level |
 |---|---|---|---|
@@ -119,23 +123,25 @@ lives on Terra, Fenix Downs, and Sraphim, and nowhere else.
 
 | # | Spell | Level |
 |---|---|---|
-| 1 | Fire ✦ | join (vanilla 3) |
+| 1 | Fire ✦ (hides Ultima — see below) | join (vanilla 3) |
 | 2 | Cure | join (vanilla 1) |
 | 3 | Drain | 12 (vanilla) |
 | 4 | Life | 18 (vanilla) |
 | 5 | Break | 24 |
 | 6 | Pearl | 30 |
 | 7 | Merton | 33 |
-| 8 | **Ultima** ✦ (divine) | story, very late — see below |
+| 8 | **Trance** (divine) | Zozo awakening (story) |
 
-- **Ultima is the fourth fold ✦.** Vanilla's table already teaches
-  Terra Ultima at level 99 — a birthright nobody ever meets. OT6
-  makes it real: after a very-late story unlock, Terra casting Fire
-  at 3 BP folds past Firaga into **Ultima**. Everyone else gets
-  Ultima the expected way — equip Ragnarok. Her divine transcends
-  the spell system itself, which is the whole character.
-- Trance: no longer the divine slot; candidate esper-state mechanic
-  gated on Broken enemies. Parked as an open question.
+- **Ultima is the fourth fold, not a slot ✦.** Vanilla's table
+  already teaches Terra Ultima at level 99 — a birthright nobody
+  ever meets. OT6 makes it real without spending a menu row: after a
+  very-late story unlock, Terra casting Fire at 3 BP folds past
+  Firaga into **Ultima**. It never appears in her list until the
+  moment the fold preview renders it. Everyone else gets Ultima the
+  expected way — equip Ragnarok.
+- **Trance keeps the divine slot**: her esper-state apex — usable
+  only while an enemy is Broken, or costing the full 5-BP bank
+  (DESIGN.md's two candidates; playtest decides in M6).
 - Passive candidates: *Esperkin* (spells chip 2 on weakness),
   *Mag-Armor* (magic taken −25%), *Afterglow* (first cast each
   battle costs 0 MP).
@@ -193,12 +199,12 @@ ice/order/tempo. The duality reads clearer than vanilla ever made it.
 - **Shadow — Assassin (piercing, thrown)**: Throw ✦ signature; smoke
   and exit tricks; divine **Assassinate** — instant kill a Broken
   non-boss. Interceptor is a passive.
-- **Setzer — Gambler/Merchant (null-break: dice, cards; darts =
+- **Setzer — Gambler/Merchant (special ¤: dice, cards; darts =
   piercing)**: Slots ✦ signature; Coin Toss, Hired Help (pay GP for
   effects) carry the merchant house; divine **Jackpot** — a
-  Fixed-Dice triple payoff, never Slots itself ✦. His weapons are
-  the poster children for null-break: huge numbers, no chip, row
-  ignored (vanilla charm, preserved ✦).
+  Fixed-Dice triple payoff, never Slots itself ✦. Ordinary dice and
+  cards chip ¤; the wildest oddballs (Fixed Dice) are null-break —
+  huge numbers, no chip, row ignored (vanilla charm, preserved ✦).
 - **Mog — Dancer (piercing: spear)**: the 8 Dances verbatim ✦,
   learned by dancing on each terrain ✦; divine **Water Rondo**, kept
   WoB-missable, vanilla-style. Easy and perfect.
@@ -219,14 +225,14 @@ prunes the kit all game. Same model, different collection verbs:
   he witnesses, equips 5. Divine: a taught-only capstone lore
   (Grand Train candidate, WoR).
 
-- **Relm — Painter (null-break: brush)**: Sketch ✦ signature (bug
+- **Relm — Painter (special ¤: brush)**: Sketch ✦ signature (bug
   preserved ✦ — it eats a save now and then, and that's canon);
   support/trickster kit TBD.
 
 ## Open questions for the driver
 
-1. Terra's Trance, now that Ultima owns the divine slot: esper state
-   gated on Broken enemies, a 5-BP overdrive, or cut for WoB?
+1. Trance's gate: Broken-enemies-only, the full 5-BP bank, or
+   either? (It kept the divine slot now that Ultima rides Fire.)
 2. Gau's divine: a specific capstone beast, or the stable's 5th slot
    upgraded to hold anything?
 3. Curated-kit slot count: 5 for both Gau and Strago, or asymmetric

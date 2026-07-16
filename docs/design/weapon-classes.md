@@ -1,34 +1,43 @@
-# Weapon classes & the break spread — design dive v2 (2026-07-16)
+# Weapon classes & the break spread — design dive v2.1 (2026-07-16)
 
 Scope: World of Balance. Locked ✦.
 
-## Three physical classes + null ✦-leaning
+## Four physical classes ✦
 
 v1's six classes had two problems the driver called: fists-as-blade
 felt wrong on Sabin, and a one-wielder class (katana) made Cyan feel
-mandatory wherever katana locks appeared. v2 goes physical-intuitive:
+mandatory wherever katana locks appeared. The physical trio covers
+the logical attacks; **Special (¤)** catches everything the logical
+classes don't — and it's a real, breakable class, so oddball-weapon
+parties keep a chip axis. 4 physical + 8 elemental = 12 weakness
+axes: Octopath's exact count.
 
 | Class | What's in it | Wielders (WoB) | Icon |
 |---|---|---|---|
-| **slashing** | swords, katanas, boomerangs, claws? (open Q1) | Terra, Celes, Cyan, Locke-alt | $d9 |
+| **slashing** | swords, katanas, claws | Terra, Celes, Cyan, Sabin-alt | $d9 |
 | **piercing** | spears, daggers, thrown edges, crossbow bolts, darts, fangs | Edgar, Locke, Shadow, Mog, Gau, Setzer-alt | $da |
-| **bludgeoning** | fists, staves, rods, flails | Sabin, Strago, Relm-alt | $dc |
-| **null-break** | dice, cards, brushes, gambler oddballs | Setzer, Relm | — |
+| **bludgeoning** | fists, staves, rods, flails, boomerangs (ranged bludgeon) | Sabin, Strago, Relm-alt, Locke-alt | $dc |
+| **special ¤** | dice, cards, brushes, any little oddball the logical three don't claim | Setzer, Relm | new ¤ glyph |
 
+- **The weapon sets Fight's class; abilities carry their own ✦.**
+  Sabin with claws equipped *slashes* when he Fights — but Pummel is
+  still bludgeoning, whatever is on his hands. Ability class bytes
+  are immutable; only the basic attack reads the equipped weapon.
+  (Claws are how the monk buys into a second class, the same way
+  Edgar's Chainsaw buys him slashing.)
 - **Bludgeoning / piercing / slashing covers the basic physicals**
   intuitively — players can guess a body's weakness before probing
   (armored → bludgeon or pierce, plated → slash, soft → pierce…),
   and probing confirms.
-- **Null-break is a feature, not a gap ✦**: some attacks are just
-  big dumb damage that chips nothing — the physical mirror of
-  non-elemental magic. Dice roll huge and teach nothing. This is
-  also the pressure valve for oddball weapons that would otherwise
-  force a silly classification.
+- **Null-break stays, as a property, not a class ✦**: some attacks
+  are just big dumb damage that chips nothing — the physical mirror
+  of non-elemental magic. A per-weapon/per-skill flag: the wildest
+  oddballs (Fixed Dice…) roll huge and teach nothing, while ordinary
+  ¤ weapons chip Special-weak enemies.
 - Cyan is a slashing *specialist* (Flurry ×4 is the best slash chip
   in the game), never the only slashing key — Terra/Celes swords
-  cover the class when he's absent. The lopsidedness concern is
-  structurally gone, and class-coverage balance stays a standing
-  question we re-ask every milestone ✦.
+  cover the class when he's absent. Class-coverage balance stays a
+  standing question we re-ask every milestone ✦.
 - The 8 elements stay untouched ✦.
 - **Row jank preserved ✦**: weapons that ignore row in vanilla
   (boomerangs, dice, cards, darts…) keep ignoring row. That charm
@@ -48,7 +57,7 @@ scenario split is the stress test:
 | **Sabin scenario** | bludgeon, slash (Cyan), pierce (Gau) | holy, fire, wind | Phantom Train: holy + slash featured |
 | **Terra/Banon scenario** | slash, pierce, bludgeon (Banon rod) | fire, ice, bolt, poison | mage-check spread |
 | Zozo | reunited | most | first "read the room" dungeon |
-| Opera → Vector | + null-break Setzer | — | pierce-weak fliers (darts still chip) |
+| Opera → Vector | + special ¤ (Setzer) | — | pierce-weak fliers + the first ¤-weak enemies |
 | Magitek factory | all | all | armored spread: bludgeon/pierce featured |
 | Sealed Gate / Thamasa | + Strago/Relm | + lores | spirits: bludgeon-immune, arcane-elemental |
 | Floating Continent | final WoB party | all | the exam: every class and element locks once |
@@ -87,10 +96,8 @@ new battle code:
 
 ## Open questions for the driver
 
-1. Claws: slashing (cat-scratch fiction) or bludgeoning (they're on
-   Sabin's monk hands)? Current lean: slashing, so monk fists stay
-   pure bludgeon and claws become his "reach into slash" purchase.
-2. Boomerangs: slashing (blade arc) as listed, or null-break
-   (returning oddball)?
-3. How many null-break weapons before probing feels unrewarding in
-   a Setzer/Relm party? (Their SKILLS still chip — is that enough?)
+1. ¤-weak density: how many Special-weak enemies per stretch keeps a
+   Setzer/Relm party probing happily without making ¤ a skeleton key?
+   (First instinct: rare before the Opera, steady after.)
+2. The ¤ icon needs a font cell — draw a little sparkle/asterisk in
+   the same family as the element icons, or borrow a vanilla glyph?

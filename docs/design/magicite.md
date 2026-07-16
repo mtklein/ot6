@@ -42,19 +42,19 @@ passive is the part of the job you keep.
 
 | Esper | Source | Spells (base) | Stat mod | Passive | Permit | Notes |
 |---|---|---|---|---|---|---|
-| Ramuh | Zozo | Bolt, Rasp | +1 magic | *Conductor*: bolt spells chip +1 | spear | the storm-lancer job |
+| Ramuh | Zozo | Bolt, Rasp | +1 magic | *Conductor*: bolt spells chip +1 | piercing | the storm-lancer job |
 | Kirin | Zozo | Cure, Regen | +1 stamina | *Mender*: heals never miss the row | — | the medic job |
-| Stray | Zozo | Muddle, Imp | +1 speed | *Alley Cat*: +5 evade | blade | the trickster job |
+| Stray | Zozo | Muddle, Imp | +1 speed | *Alley Cat*: +5 evade | slashing (claws) | the trickster job |
 | Siren | Zozo | Mute, Sleep | +1 speed | *Lullaby*: sleepers take +50% chip | — | the controller job |
-| Ifrit | Magitek factory | Fire, Drain | +1 vigor | *Kindling*: fire spells chip +1 | blade | the brawler-mage |
-| Shiva | Magitek factory | Ice, Osmose | +1 magic | *Frostbite*: ice chip +1 | rod→arcana | the classic |
+| Ifrit | Magitek factory | Fire, Drain | +1 vigor | *Kindling*: fire spells chip +1 | slashing (claws) | the brawler-mage |
+| Shiva | Magitek factory | Ice, Osmose | +1 magic | *Frostbite*: ice chip +1 | bludgeoning (rods) | the classic |
 | Unicorn | Zozo (late) | Remedy, Safe | +1 stamina | *Purity*: status durations halved | — | the paladin-adjacent |
 | Maduin | Sealed Gate | Fire, Ice, Bolt | +2 magic | *Trinity*: first spell each battle +1 tier | — | Terra's inheritance: the pure mage job |
 | Shoat | Vector aftermath | Break, Doom | +1 magic | *Gorgon Eye*: Break may (25%) chip 2 | — | the executioner |
 | Phantom | Magitek factory | Vanish, Sleep | +1 speed | *Ghostwalk*: first hit taken each battle misses | — | the assassin's second |
 | Carbunkl | Sealed Gate | Rflect, Shell | +1 stamina | *Facet*: Runic feeds +1 more BP | — | Celes's natural pairing |
 | Bismark | Thamasa | Slow, (Water lore-alike) | +1 vigor | *Tidal*: water chip +1 | — | see open Q2 |
-| Golem | Jidoor auction | Safe, Protect-alike | +2 stamina | *Bulwark*: party takes −10% physical | spear | the wall job |
+| Golem | Jidoor auction | Safe, Protect-alike | +2 stamina | *Bulwark*: party takes −10% physical | piercing | the wall job |
 | ZoneSeek | Jidoor auction | Shell, Haste | +1 magic | *Ward*: magic taken −10% (party) | — | the abjurer |
 | Sraphim | Tzen (buy) | Cure, Life | +1 stamina | *Grace*: KO'd allies keep their BP | — | the white-mage job |
 
