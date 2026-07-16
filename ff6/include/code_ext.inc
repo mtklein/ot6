@@ -18,6 +18,7 @@ CODE_EXT_INC = 1
 .global Ot6PreviewList_ext
 .global Ot6BoostMarksNmi_ext
 .global Ot6RestageGate_ext
+.global Ot6MarkFontDirty_ext
 .global Ot6C1Rtl, DrawMagicListText, _c15a17, _c15729
 
 ; battle graphics module

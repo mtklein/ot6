@@ -337,6 +337,26 @@ done:   rtl
 
 ; ------------------------------------------------------------------------------
 
+; [ a battle dialogue clobbered our font cells; flag a re-lay ]
+
+; called from _c143b9 (dialogue close, small-font restore) in bank C1.
+; that restore uploads vanilla SmallFontGfx to vram $5800 — right over
+; our element icons and hud glyphs — via WaitTfrVRAM, which returns
+; mid-frame, so we can't re-write vram synchronously here. instead we
+; raise a flag and let the battle nmi re-lay the icons in vblank (where
+; direct vram writes actually land). width-agnostic: absolute store.
+
+.proc Ot6MarkFontDirty_ext
+        php
+        sep     #$20            ; a8 (index width irrelevant)
+        lda     #$01
+        sta     f:$7e0000+OT6_FONTDIRTY
+        plp
+        rtl
+.endproc
+
+; ------------------------------------------------------------------------------
+
 ; [ upload element icon tiles into the battle small font ]
 
 ; called from LoadMenuGfx right after the small font transfer (forced
@@ -693,7 +713,7 @@ Ot6FontIcons:
         sta     f:$7e0000+OT6_PIPCUR    ; live pip cell off, no stale erase
         sta     f:$7e0000+OT6_PIPPREV
         sta     f:$7e0000+OT6_LASTLR
-        sta     f:$7e0000+OT6_RESTAGE
+        sta     f:$7e0000+OT6_RESTAGE   ; also clears OT6_FONTDIRTY (next byte)
         plx
         plp
         rtl
@@ -1358,6 +1378,7 @@ OT6_PIPPREV     := $57ce        ; last flushed addr (for erase-on-move)
 OT6_PIPCELL     := $57d0        ; glyph|attr word to write
 OT6_LASTLR      := $57d2        ; last frame's L/R bits (edge detect)
 OT6_RESTAGE     := $57d4        ; open list wants a re-render (boost moved)
+OT6_FONTDIRTY   := $57d5        ; a battle dialogue clobbered our font cells
 
 .proc Ot6BgHudFlush_ext
         .a8
@@ -1371,6 +1392,15 @@ OT6_RESTAGE     := $57d4        ; open list wants a re-render (boost moved)
         clr_a
         pha
         plb                     ; db = 0 for hardware registers
+        ; a battle dialogue clobbered our font cells? re-lay them now, in
+        ; vblank (this nmi), where direct vram writes actually land — then
+        ; clear the flag. once per dialogue, so near-free.
+        lda     f:$7e0000+OT6_FONTDIRTY
+        beq     @nofont
+        lda     #$00            ; (stz has no long-addressing mode)
+        sta     f:$7e0000+OT6_FONTDIRTY
+        jsl     Ot6LoadFontIcons_ext
+@nofont:
         lda     #$80
         sta     hVMAINC
         ldx     #$0000

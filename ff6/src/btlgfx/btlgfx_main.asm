@@ -9383,7 +9383,8 @@ _c143b9:
         ldx     #.loword(SmallFontGfx)
         ldy     #$5800
         lda     #^SmallFontGfx
-        jmp     WaitTfrVRAM
+        jsl     Ot6MarkFontDirty_ext   ; ot6: a dialogue clobbered $5800; the
+        jmp     WaitTfrVRAM            ; battle nmi re-lays our icons in vblank
 
 ; ------------------------------------------------------------------------------
 
