@@ -601,11 +601,20 @@ function M.tileAligned()
         | M.readByte(0x086c) | (M.readByte(0x086d) & 0x0F)) == 0
 end
 
--- An event script is executing iff the 24-bit event PC {$e5,$e6,$e7} is off
--- its idle parking value $ca/0000.
+-- A REAL event script is executing iff the 24-bit event PC {$e5,$e6,$e7}
+-- points into the event-script segment (banks $CA-$CC) and is off its idle
+-- parking value $ca/0000.  The bank test matters: ambient NPC object
+-- scripts (a stove flame, a wandering townsperson) run through the same
+-- interpreter out of their RAM queue -- the PC reads $80xxxx (WRAM mirror)
+-- for one frame at a time, every few frames, forever on such maps.  Those
+-- excursions are not "an event is running", and counting them broke every
+-- consecutive-calm-frames predicate (measured in Arvis's house: $800000
+-- one frame in four).
 function M.eventRunning()
-  return not (M.readByte(0x00e5) == 0 and M.readByte(0x00e6) == 0
-          and M.readByte(0x00e7) == 0xCA)
+  local bank = M.readByte(0x00e7)
+  if bank < 0xCA or bank > 0xCC then return false end
+  return not (bank == 0xCA and M.readByte(0x00e5) == 0
+          and M.readByte(0x00e6) == 0)
 end
 
 -- A dialog window is open and waiting for a keypress ($ba dialog state,
@@ -962,6 +971,81 @@ function M.navTo(txIn, tyIn, opts)
       M.setPad({ [dir] = true })
     end),
   }, "navTo")
+end
+
+-- Ride out a NON-INTERACTIVE story stretch: long automatic events with
+-- intermittent dialogs and scripted battles (the esper-scene class).  The
+-- hands-off companion to navTo -- no walking, no plan, just keep the story
+-- unstuck until pred() is truthy (checked every frame; raises after
+-- maxFrames).  Frames are classified with navTo's 3-frame debounce (the
+-- battle/dialog signal bytes live in RAM the field module also scribbles
+-- on; acting on a one-frame ghost would tap A on the open field):
+--   battle  -> kill-bit everything present + edge-tap A through the text.
+--              A formation matching opts.spare is a scripted set-piece:
+--              never kill-bitted, and hands OFF for its first 300 frames,
+--              THEN edge-tapped.  Both halves are load-bearing (measured,
+--              esper zap): the set-piece ends via a monster-turn battle
+--              event, and A pressed during the load queues player actions
+--              that keep the turn engine busy forever -- but once the
+--              event owns the stage (its opening battle dialog is up by
+--              ~250 frames), it stalls without A to advance that text;
+--   dialog  -> edge-tap A;
+--   anything else -> neutral pad.  Control lost means an event is walking
+--              the party; control held means the story is between beats.
+--              Either way blind A is worse than patience: on the open
+--              field it talks to NPCs and re-fires triggers.
+function M.advanceStory(pred, maxFrames, opts)
+  opts = opts or {}
+  local spareSet = {}
+  for _, w in ipairs(opts.spare or {}) do spareSet[w] = true end
+  local aPhase = 0
+  local battN, dlgN = 0, 0
+  local hb = -600                      -- heartbeat: log immediately, then every 600
+  return M.driveUntil(function()
+    local done = pred()
+    if done then M.setPad({}) end
+    return done
+  end, maxFrames or 20000, {
+    M.call(function()
+      aPhase = (aPhase + 1) % 8
+      if M.frame - hb >= 600 then
+        hb = M.frame
+        M.log(string.format(
+          "story f%d map=%d (%d,%d) ctl=%s algn=%s dlg=%s batt=%s ev=%s",
+          M.frame, M.mapId(), M.fieldX(), M.fieldY(),
+          tostring(M.hasControl()), tostring(M.tileAligned()),
+          tostring(M.dialogWaiting()), tostring(M.battleLoadStarted()),
+          tostring(M.eventRunning())))
+      end
+      battN = M.battleLoadStarted() and battN + 1 or 0
+      dlgN  = M.dialogWaiting() and dlgN + 1 or 0
+      if battN >= 3 then
+        if battN == 3 then             -- rising edge: name the fight once
+          local w = M.formationWords()
+          M.log(string.format("story: battle up (%04X %04X %04X %04X %04X %04X)",
+            w[1], w[2], w[3], w[4], w[5], w[6]))
+        end
+        if next(spareSet) and M.formationHas(spareSet) then
+          M.setPad(battN > 300 and aPhase < 4 and { "a" } or {})
+          return
+        end
+        if M.monstersPresent() > 0 then
+          for slot = 0, 5 do
+            if M.readByte(0x3aa8 + slot * 2) % 2 == 1 then
+              M.writeByte(0x3eec + slot * 2, M.readByte(0x3eec + slot * 2) | 0x80)
+            end
+          end
+        end
+        M.setPad(aPhase < 4 and { "a" } or {})
+        return
+      end
+      if dlgN >= 3 then
+        M.setPad(aPhase < 4 and { "a" } or {})
+        return
+      end
+      M.setPad({})
+    end),
+  }, "advanceStory")
 end
 
 function M.run(opts, steps)

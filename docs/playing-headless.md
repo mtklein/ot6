@@ -63,14 +63,26 @@ Addresses (from the vendored disassembly, `src/field/player.asm` /
 | `$0743` | party facing (0=up 1=right 2=down 3=left) |
 | `$087C` low nibble | party movement type: **2 = user-controlled**, 4 = event-controlled |
 | `$1EB9` bit 7 | **user has no control** (cutscene/event) |
-| `$0084` / `$0059` | map loading / menu opening |
-| `$E5`-`$E7` | 24-bit event script PC; **idle = `$CA0000`** |
+| `$0084` / `$0059` | map loading / menu opening (`$0059` stays `1` for a whole event-opened menu, e.g. the naming screen) |
+| `$E5`-`$E7` | 24-bit event script PC; **idle = `$CA0000`**, real scripts run in banks `$CA`-`$CC` |
 | `$BA` / `$D3` | both `1` = a dialog is open, waiting for a keypress |
 | `$B2` | party z-level (bit 0 upper, bit 1 lower) |
 
 Events can walk the party with `$1EB9`/`$0084`/`$0059` all looking
 innocent, so control gating checks the movement type and event PC too —
-that's `H.hasControl()`.
+that's `H.hasControl()`. Two event-PC subtleties, both load-bearing:
+
+- Ambient NPC **object scripts** (a stove flame, a wanderer) execute
+  through the same interpreter out of their RAM queue — the PC reads
+  `$80xxxx` (WRAM mirror) for one frame at a time, every few frames,
+  forever on such maps. `H.eventRunning()` therefore requires the PC to
+  be inside banks `$CA`-`$CC`; treating any non-idle value as "event
+  running" starves every consecutive-calm-frames predicate.
+- A stood-on **event trigger re-fires every 4 frames**. Once its switch
+  makes it a no-op, the cycle is 3 frames of event (movement type 4) and
+  1 frame of control, forever. Routes must step OFF a trigger tile (a
+  raw held direction lands in the 1-frame windows) before waiting for
+  calm; no calm predicate can be satisfied while parked on one.
 
 Dialog advancing is **edge-triggered**: one held A yields exactly one
 page. Advancing multiple pages takes press-RELEASE-press (4 frames on /
@@ -101,6 +113,14 @@ Harness API (`tools/tests/lib/ot6.lua`):
   `$3EEC` bit 7) and edge-tap A through the victory text. Formations
   whose species words appear in `spare` are never kill-bitted — clearing
   the fight a route exists to reach is a script bug, so it errors.
+- `H.advanceStory(pred, maxFrames, opts)` — ride out a non-interactive
+  story stretch (long automatic events, intermittent dialogs, scripted
+  battles) until `pred()`: battles are kill-bitted and edge-tapped,
+  dialogs edge-tapped, everything else gets a neutral pad. A formation
+  in `opts.spare` is a set-piece: never kill-bitted, hands off for its
+  first 300 frames (A during the load queues player actions that starve
+  the battle event that ends it), then edge-tapped (its battle dialogs
+  stall without A). This is how the esper-zap scene is crossed.
 - `H.navDump()` — one-line navigator state (debugging).
 
 ### True passability (the engine's own rules, from RAM)
