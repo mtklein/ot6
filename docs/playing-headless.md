@@ -109,22 +109,31 @@ graph from the party, and renders the reachable region as ASCII — the
 real map, straight from RAM. From that you can BFS a shortest path to
 any tile (e.g. the northernmost corridor end / a gate) with no playing.
 
-**Model gaps and the isometric caveat.** The `$7600` counter test gives
-walls correctly; z-level, ledge, and event blocks aren't fully captured
-by these two tables, so treat the static graph as *optimistic* and
-movement-verify each executed step (blocklist an edge and re-plan when a
-pressed move doesn't advance). One hard case: the **Narshe opening mine
-is isometric** — a single button press moves the party diagonally in
-`(fieldX,fieldY)` tile space (e.g. "down" moved `(33,22)→(32,24)`), so
-cardinal-BFS execution doesn't map 1:1 to buttons there. Normal cardinal
-maps (overworld, towns, most dungeons) execute directly; the isometric
-intro mine needs the button→tile-delta lattice characterized per map, or
-a save placed past it. `gen_whelk.lua` is the WIP route script (BFS +
-movement-verified execution) that this caveat still blocks.
+Movement is **cardinal** (grid-oriented): up=−Y, down=+Y, left=−X,
+right=+X, one tile per step. Two things that bit me and are now fixed:
 
-Field-walk input note: press-release cycles move the party reliably; a
-single long continuous hold via the joypad injection does not. Drive
-steps as short holds, not one sustained press.
+- **Use the live position, not the cache.** `H.fieldX/Y` read the party
+  object's pixel coords (`$086a`/`$086d`) `>> 4`. The `$1fc0`/`$1fc1`
+  tile bytes are a *lazily-updated cache* that goes stale mid-walk —
+  navigating on them produces garbage. (This was the root cause of an
+  earlier "the map is isometric" misdiagnosis: stale coords + unreliable
+  continuous-hold made cardinal movement *look* diagonal.)
+- **Drive steps as short press-release holds**, not one long continuous
+  hold — continuous holds via the joypad injection don't walk reliably,
+  and a single press may only turn the party (hold ~22 frames so one
+  press both turns and steps).
+
+**Model gaps → movement-verify.** The `$7600` counter test (`& 7 == 7`)
+gives ordinary walls correctly, but **bridge / z-level** passability
+(`CheckPlayerMove` has extra bridge logic) and event tiles aren't
+captured, so the static graph is *optimistic*. Treat it as a hint and
+verify each executed step: blocklist an edge and re-plan when a pressed
+move doesn't advance. `gen_whelk.lua` does this and **autonomously walks
+the party ~15 tiles up the Narshe mine corridor to the gate chamber**;
+the last few gate tiles are bridge/z-level tiles the counter-only model
+mis-reads (the party can stand where the model says "wall"), so reaching
+the trigger there still needs the bridge-passability bits added to the
+collision model. That's the open piece; the corridor navigation works.
 
 ### Reaching a balance fixture
 

@@ -593,8 +593,12 @@ local runnerStarted = false
 -- per step (corridors bend; never assume up=-y), which also makes the
 -- primitives robust across maps.
 
-function M.fieldX() return M.readByte(0x1fc0) end
-function M.fieldY() return M.readByte(0x1fc1) end
+-- LIVE tile position = party-object pixel coords >> 4 ($086a x / $086d y,
+-- 16-bit).  The $1fc0/$1fc1 bytes are a lazily-updated cache and go stale
+-- mid-walk, so never navigate on them.  Movement is cardinal here:
+-- up=-Y down=+Y left=-X right=+X (one tile per step).
+function M.fieldX() return M.readWord(0x086a) >> 4 end
+function M.fieldY() return M.readWord(0x086d) >> 4 end
 function M.mapId() return M.readWord(0x1f64) end
 
 -- true only when the party can actually be walked this frame
