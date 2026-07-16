@@ -583,6 +583,180 @@ end
 
 -- The runner.  steps: list of step objects.  opts.maxFrames: global budget.
 local runnerStarted = false
+-- ------------------------------------------------------------- field --
+-- Field navigation, so routes are coordinate-aware instead of blind
+-- timed holds (which desync on any map).  Addresses from the vendored
+-- disassembly: party tile x/y $1fc0/$1fc1 (src/field/player.asm
+-- InitPlayerPos), map index $1f64 (battle.asm), player-control gate
+-- $1eb9 bit7 + map-load $84 + menu-opening $59 (player.asm
+-- UpdatePlayerMovement).  Movement axis/sign is discovered empirically
+-- per step (corridors bend; never assume up=-y), which also makes the
+-- primitives robust across maps.
+
+function M.fieldX() return M.readByte(0x1fc0) end
+function M.fieldY() return M.readByte(0x1fc1) end
+function M.mapId() return M.readWord(0x1f64) end
+
+-- true only when the party can actually be walked this frame
+function M.hasControl()
+  return (M.readByte(0x1eb9) & 0x80) == 0
+     and M.readByte(0x0084) == 0
+     and M.readByte(0x0059) == 0
+     and not M.battleActive()
+end
+
+-- Kill everything in the current battle via each monster's own status
+-- byte (present bit $3aa8 bit0 -> set dead $3eec bit7) and tap A through
+-- the victory/exp text.  Returns a step that resolves when the battle is
+-- fully torn down.  This is the gen_whelk idiom, promoted.
+function M.clearBattle(maxFrames)
+  return M.driveUntil(function()
+    return not M.battleActive() and not M.battleLoadStarted()
+  end, maxFrames or 9000, {
+    M.call(function()
+      if M.battleActive() then
+        for slot = 0, 5 do
+          if M.readByte(0x3aa8 + slot * 2) % 2 == 1 then
+            M.writeByte(0x3eec + slot * 2, M.readByte(0x3eec + slot * 2) | 0x80)
+          end
+        end
+      end
+      M.setPad({ "a" })            -- also advance victory/exp text
+    end),
+    M.waitFrames(6),
+    M.call(function() M.setPad({}) end),
+    M.waitFrames(10),
+  }, "clear battle")
+end
+
+-- One navigation tick toward (tx,ty): held in nav state so it composes
+-- as a single driveUntil body.  Greedy on the larger remaining axis,
+-- falls back to the other axis on a wall, and escapes pockets by trying
+-- the two away-directions; clears any encounter that fires mid-walk.
+-- Self-calibrating: learns which coord each button moves and its sign
+-- from observed deltas, so it never assumes the map's orientation.
+local DIRS = { "up", "down", "left", "right" }
+
+function M.navDump()
+  local t = {}
+  for _, b in ipairs({"up","down","left","right"}) do
+    local m = NAV.map[b]
+    if m then t[#t+1] = b..">"..m.axis..(m.sign>0 and "+" or "-") end
+  end
+  return table.concat(t, " ")
+end
+function M.navReset()
+  NAV = { dir = nil, held = 0, lastX = nil, lastY = nil, stuck = 0,
+          map = {}, wall = {}, probe = 0 }
+end
+M.navReset()
+
+-- targets may be numbers or thunks (resolved each tick, so a route can
+-- aim at a coord it only knows at runtime)
+local function resolve(v) return type(v) == "function" and v() or v end
+
+-- does button b reduce the distance to (dx,dy remaining)?  only answerable
+-- once b is calibrated (NAV.map[b] = {axis, sign}).
+local function helps(b, dx, dy)
+  local m = NAV.map[b]
+  if not m then return nil end
+  local d = (m.axis == "x") and dx or dy
+  return (d > 0 and m.sign > 0) or (d < 0 and m.sign < 0)
+end
+
+-- pick a button to press toward (tx,ty): a calibrated helper that isn't
+-- currently walled first; then an uncalibrated probe (avoiding walls);
+-- then ANY calibrated mover to route around a wall (wall-following);
+-- last resort, an unwalled probe.  NAV.wall is the set of directions
+-- known blocked from the CURRENT tile, cleared whenever we move.
+local function navPick(tx, ty)
+  local x, y = M.fieldX(), M.fieldY()
+  local dx, dy = tx - x, ty - y
+  if dx == 0 and dy == 0 then return nil end
+  -- 1. a calibrated direction that helps and isn't walled
+  for _, b in ipairs(DIRS) do
+    if not NAV.wall[b] and helps(b, dx, dy) then return b end
+  end
+  -- 2. an uncalibrated direction to probe (calibration), not walled
+  for _, b in ipairs(DIRS) do
+    if not NAV.map[b] and not NAV.wall[b] then return b end
+  end
+  -- 3. wall-follow: any calibrated mover not walled, even if it helps
+  --    only one axis or temporarily overshoots the other
+  for _, b in ipairs(DIRS) do
+    if not NAV.wall[b] and NAV.map[b] then return b end
+  end
+  -- 4. everything's walled from here: rotate a probe to shake loose
+  NAV.probe = (NAV.probe + 1) % 4
+  return DIRS[NAV.probe + 1]
+end
+
+-- returns a driveUntil that walks to (tx,ty) on the current map, or until
+-- `arrive` (optional pred) is true; clears encounters; gives up after
+-- `stuckCap` blocked direction-changes.
+function M.navTo(txIn, tyIn, opts)
+  opts = opts or {}
+  local stuckCap = opts.stuckCap or 24
+  local maxFrames = opts.maxFrames or 20000
+  local arrive = opts.arrive
+  M.navReset()
+  return M.driveUntil(function()
+    if arrive and arrive() then return true end
+    return M.fieldX() == resolve(txIn) and M.fieldY() == resolve(tyIn)
+       and M.hasControl()
+  end, maxFrames, {
+    M.call(function()
+      if M.battleActive() or M.battleLoadStarted() then
+        -- clear inline: kill + advance (clearBattle as raw actions)
+        if M.battleActive() then
+          for slot = 0, 5 do
+            if M.readByte(0x3aa8 + slot * 2) % 2 == 1 then
+              M.writeByte(0x3eec + slot * 2, M.readByte(0x3eec + slot * 2) | 0x80)
+            end
+          end
+        end
+        M.setPad({ "a" })
+        NAV.dir = nil            -- re-pick after the fight
+        return
+      end
+      if not M.hasControl() then M.setPad({ "a" }); return end  -- event/dialog
+      local x, y = M.fieldX(), M.fieldY()
+      -- learn from the previous held direction's effect
+      if NAV.dir and NAV.lastX then
+        local ddx, ddy = x - NAV.lastX, y - NAV.lastY
+        if ddx ~= 0 or ddy ~= 0 then                 -- moved: calibrate
+          if math.abs(ddx) >= math.abs(ddy) and ddx ~= 0 then
+            NAV.map[NAV.dir] = { axis = "x", sign = ddx > 0 and 1 or -1 }
+          elseif ddy ~= 0 then
+            NAV.map[NAV.dir] = { axis = "y", sign = ddy > 0 and 1 or -1 }
+          end
+          NAV.stuck = 0; NAV.wall = {}              -- new tile: walls reset
+        else
+          NAV.held = NAV.held + 1
+          if NAV.held >= 3 then                     -- held a wall ~3 samples
+            NAV.wall[NAV.dir] = true
+            NAV.stuck = NAV.stuck + 1
+            NAV.dir = nil
+          end
+        end
+      end
+      if not NAV.dir then
+        NAV.dir = navPick(resolve(txIn), resolve(tyIn))
+        NAV.held = 0
+      end
+      NAV.lastX, NAV.lastY = x, y
+      if NAV.dir then M.setPad({ [NAV.dir] = true }) else M.setPad({}) end
+      if NAV.stuck > stuckCap then
+        error(string.format("navTo stuck at x=%d y=%d target x=%d y=%d",
+          x, y, resolve(txIn), resolve(tyIn)), 0)
+      end
+    end),
+    M.waitFrames(10),
+    M.call(function() M.setPad({}) end),
+    M.waitFrames(2),
+  }, "navTo")
+end
+
 function M.run(opts, steps)
   assert(not runnerStarted, "ot6.run() called twice")
   runnerStarted = true
