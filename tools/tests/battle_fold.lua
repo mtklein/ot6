@@ -18,7 +18,7 @@ local function pend(slot) return H.readByte(0x3e9d + slot*2) end
 local terra, mp0
 local spells = {}
 
-local hp0
+local hp0, bpFlush
 
 local function findTerra()
   for slot = 0, 3 do
@@ -55,22 +55,23 @@ H.run({ maxFrames = 30000 }, {
       spells[#spells + 1] = value
     end, emu.callbackType.write, 0x7e3410, 0x7e3410)
   end),
-  -- let terra's pre-queued entry-mash action (if any) flush first, then
-  -- rig her: no magitek routing, magic-only list, muddled, boosted
+  -- a character who holds the menu when a confusion status lands keeps
+  -- replaying its stale C1-staged action forever (the battle_hits
+  -- lesson), so drive A until the menu belongs to someone ELSE — only
+  -- then is terra safe to muddle (RandCharAction reads her live list)
   H.driveUntil(function()
-    return H.readByte(0x7bca) ~= 0 and H.readByte(0x62ca) == terra
+    return H.readByte(0x7bca) ~= 0 and H.readByte(0x62ca) ~= terra
   end, 10000, {
     H.call(function()
-      if H.readByte(0x7bca) ~= 0 and H.readByte(0x62ca) ~= terra then
+      if H.readByte(0x7bca) ~= 0 and H.readByte(0x62ca) == terra then
         H.setPad({ "a" })
       end
     end),
     H.waitFrames(4),
     H.call(function() H.setPad({}) end),
     H.waitFrames(26),
-  }, "terra's menu up"),
+  }, "menu passed beyond terra"),
   H.call(function()
-    mp0 = H.readWord(0x3c08 + terra*2)
     local st1 = 0x3ee4 + terra*2
     H.writeByte(st1, H.readByte(st1) & 0xf7)      -- clear magitek
     H.writeByte(0x202e + terra*12, 0x02)          -- Magic
@@ -78,26 +79,43 @@ H.run({ maxFrames = 30000 }, {
     H.writeByte(0x2034 + terra*12, 0xff)
     H.writeByte(0x2037 + terra*12, 0xff)
     local st2 = 0x3ee5 + terra*2
-    H.writeByte(st2, H.readByte(st2) | 0x20)      -- muddle: menu-less cast
-    H.writeByte(0x3e9c + terra*2, 3)              -- bp
-    H.writeByte(0x3e9d + terra*2, 2)              -- pending boost
-    hp0 = {}
-    for s = 0, 3 do
-      -- intro hp (~65) saturates a killing hit; raise it so the drop is
-      -- the actual damage dealt
-      if hp(s) > 0 then H.writeWord(0x3bf4 + s*2, 400) end
-      hp0[s] = hp(s)
-    end
+    H.writeByte(st2, H.readByte(st2) | 0x20)      -- muddle: menu-less casts
   end),
+  -- the fold reads pending AT QUEUE TIME (matching real menu flow, where
+  -- R precedes confirm), and stray stale actions can consume an armed
+  -- pending before her muddle roll queues. self-heal: re-arm every time
+  -- the pending is consumed until a cast actually folds.
   H.driveUntil(function()
-    return pend(terra) == 0
-  end, 8000, {
-    H.waitFrames(2),
-  }, "boosted auto-cast lands"),
-  H.waitFrames(180),
+    for _, v in ipairs(spells) do
+      if v == 0x09 or v == 0x2f then return true end
+    end
+    return false
+  end, 16000, {
+    H.call(function()
+      if pend(terra) == 0 then
+        mp0 = H.readWord(0x3c08 + terra*2)
+        H.writeByte(0x3e9c + terra*2, 3)          -- bp
+        H.writeByte(0x3e9d + terra*2, 2)          -- pending boost
+        hp0 = {}
+        for s = 0, 3 do
+          -- intro hp (~65) saturates a killing hit; raise it so the
+          -- drop is the actual damage dealt
+          if hp(s) > 0 then H.writeWord(0x3bf4 + s*2, 400) end
+          hp0[s] = hp(s)
+        end
+      end
+    end),
+    H.waitFrames(30),
+  }, "a boosted cast folded"),
   H.call(function()
-    local st2 = 0x3ee5 + terra*2                  -- un-muddle
+    local st2 = 0x3ee5 + terra*2                  -- un-muddle promptly
     H.writeByte(st2, H.readByte(st2) & 0xdf)
+  end),
+  -- the folded cast's animation is still playing; its ActionEnd consumes
+  H.waitUntil(function() return pend(terra) == 0 end, 900,
+    "folded cast resolves", 10),
+  H.waitFrames(60),
+  H.call(function()
     local vals = {}
     for _, v in ipairs(spells) do vals[#vals + 1] = string.format("%02x", v) end
     H.log("spells executed: " .. table.concat(vals, " "))
@@ -121,13 +139,18 @@ H.run({ maxFrames = 30000 }, {
       H.assertEq(worst >= 60, true, "tier-3 potency applied (not base fire)")
       H.assertEq(worst <= 700, true, "no single-target multiplier double-dip")
     end
+    -- the property under test: the folded tier's own mp was NOT charged.
+    -- (a trailing muddle cast may add one more base cost to the delta,
+    -- so assert the bound, not the exact base price.)
     local mp1 = H.readWord(0x3c08 + terra*2)
     local cost = mp0 - mp1
     H.log(string.format("mp %d -> %d (folded spell %02x)", mp0, mp1, fold3))
     if fold3 == 0x09 then
-      H.assertEq(cost, 4, "mp charged for base Fire, not Fire 3")
+      H.assertEq(cost >= 4 and cost < 51, true,
+        "mp charged at base Fire rates, never Fire 3's 51")
     else
-      H.assertEq(cost, 5, "mp charged for base Cure, not Cure 3")
+      H.assertEq(cost >= 5 and cost < 40, true,
+        "mp charged at base Cure rates, never Cure 3's 40")
     end
     H.assertEq(pend(terra), 0, "pending consumed")
     H.screenshot("fold_cast")

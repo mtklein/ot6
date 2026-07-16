@@ -8,6 +8,7 @@ local function pend(slot) return H.readByte(0x3e9d + slot*2) end
 local function bp(slot) return H.readByte(0x3e9c + slot*2) end
 local actor
 local cellSeen, cellFrames = {}, 0
+local markSeen, parkFrames = {}, 0
 
 -- sfx request counters: boost feedback must be audible. each request is an
 -- inc (nonzero write) consumed by UpdateSfx's stz, so count nonzero writes.
@@ -60,6 +61,9 @@ H.run({ maxFrames = 30000 }, {
   -- live cell while boosting: the arrow-3 glyph, pulsing yellow/white, in
   -- BOTH window bands (rows 1+2r and 9+2r — the visible copy alternates).
   -- temporal sample (single frames can't see a pulse — or a strobe).
+  -- the same window checks the over-character sprite mark: oam entry
+  -- 96+slot carries the pending-3 tile ($cc), obj pal 3 / priority 3
+  -- ($36), on screen (parked sprites sit at y $e0).
   H.waitUntil(function()
     local reg = H.readByte(0x897f)
     local base = ((reg - (reg % 4)) * 256) * 2
@@ -69,6 +73,10 @@ H.run({ maxFrames = 30000 }, {
     local hi = emu.readWord(base + (9 + row*2)*0x40 + 40, emu.memType.snesVideoRam)
     cellSeen[lo] = (cellSeen[lo] or 0) + 1
     if hi ~= lo then cellSeen[hi] = (cellSeen[hi] or 0) + 1 end
+    local oam = 0x0300 + (96 + actor) * 4
+    local key = string.format("%02x/%02x/y%s", H.readByte(oam + 2),
+      H.readByte(oam + 3), H.readByte(oam + 1) < 0xe0 and "on" or "off")
+    markSeen[key] = (markSeen[key] or 0) + 1
     cellFrames = cellFrames + 1
     return cellFrames >= 40
   end, 160, "arrow pulse sampled", 1),
@@ -84,6 +92,17 @@ H.run({ maxFrames = 30000 }, {
       H.assertEq(w == 0x216d or w == 0x296d, true,
         string.format("only arrow-3 words in the live cell, both bands (got %04x)", w))
     end
+    local mparts, other = {}, 0
+    for k, n in pairs(markSeen) do
+      mparts[#mparts + 1] = k .. " x" .. n
+      if k ~= "cc/36/yon" and k ~= "cc/36/yoff" then other = other + n end
+    end
+    H.log("sprite mark states seen: " .. table.concat(mparts, ", "))
+    -- lua sampling races vanilla's park vs our same-frame rewrite, so a
+    -- chunk of mid-frame reads see y=$e0; the dma only ships the rewrite.
+    H.assertEq((markSeen["cc/36/yon"] or 0) >= 20, true,
+      "boost mark floats over the character (arrow-3 tile, pal 3)")
+    H.assertEq(other, 0, "and nothing else ever occupies the mark entry")
   end),
   H.pressButtons({ "l" }, 6), H.waitFrames(20),
   H.call(function()
@@ -108,4 +127,9 @@ H.run({ maxFrames = 30000 }, {
     H.assertEq(bp(actor), 1, "boost consumed (3-2), regen skipped")
     H.assertEq(pend(actor), 0, "pending cleared after the action")
   end),
+  -- with no pending left, the mark must leave the field (parked at $e0)
+  H.waitUntil(function()
+    parkFrames = (parkFrames or 0) + 1
+    return parkFrames >= 20 and H.readByte(0x0300 + (96 + actor)*4 + 1) == 0xe0
+  end, 300, "mark parked after the action", 1),
 })

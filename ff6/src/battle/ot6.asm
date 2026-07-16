@@ -372,6 +372,7 @@ done:   rtl
         bcc     @icon
         shorta
         jsr     Ot6LoadBgGlyphs ; hud glyphs into free font cells
+        jsr     Ot6LoadObjArrows; boost-mark sprites into free obj tiles
         plb
         plp
         rtl
@@ -975,6 +976,158 @@ done:   plp
         cpx     #$0010          ; 16 glyphs
         bcc     @tile
         rts
+.endproc
+
+; ------------------------------------------------------------------------------
+
+; [ upload the boost-mark sprite tiles ]
+
+; three 16x16 arrow glyphs (1/2/3 chevrons) into obj tiles 200/202/204
+; (quads with 216/217 etc. below) — verified blank + unreferenced by
+; any oam entry in both formations, idle and through attack effects
+; (probe_objtiles.lua). obj chr base is word $2000 (obsel $61), 4bpp.
+; runs inside the font uploader: db = $00, forced blank, vmainc $80.
+
+.proc Ot6LoadObjArrows
+        .a8
+        .i16
+        longa
+        ldx     #$0000          ; data offset; table offset = x >> 4
+@tile:  phx                     ; (long,y indexing doesn't exist)
+        txa
+        lsr
+        lsr
+        lsr
+        lsr                     ; tile index * 2
+        tax
+        lda     f:Ot6ObjArrowAddrTbl,x
+        sta     hVMADDL
+        plx
+        ldy     #$0010          ; 16 words per 4bpp tile
+@word:  lda     f:Ot6ObjArrowData,x
+        sta     hVMDATAL
+        inx
+        inx
+        dey
+        bne     @word
+        cpx     #$0180          ; 12 tiles x 32 bytes
+        bcc     @tile
+        shorta
+        rts
+.endproc
+
+; vram word addresses of the arrow tiles: quads at 200, 202, 204
+; ($2000 + tile*16), each TL, TR, BL, BR
+Ot6ObjArrowAddrTbl:
+        .word   $2c80,$2c90,$2d80,$2d90
+        .word   $2ca0,$2cb0,$2da0,$2db0
+        .word   $2cc0,$2cd0,$2dc0,$2dd0
+
+Ot6ObjArrowData:
+; boost-one: 16x16 as tiles TL, TR, BL, BR
+        .byte   $00,$00,$00,$00,$00,$00,$08,$08,$0e,$0e,$0f,$0f,$0f,$0f,$0f,$0f
+        .byte   $00,$00,$00,$00,$00,$00,$08,$08,$0e,$0e,$0f,$0f,$0f,$0f,$0f,$0f
+        .byte   $00,$00,$00,$00,$00,$00,$00,$00,$00,$00,$80,$80,$e0,$e0,$f8,$f8
+        .byte   $00,$00,$00,$00,$00,$00,$00,$00,$00,$00,$80,$80,$e0,$e0,$f8,$f8
+        .byte   $0f,$0f,$0f,$0f,$0f,$0f,$0e,$0e,$08,$08,$00,$00,$00,$00,$00,$00
+        .byte   $0f,$0f,$0f,$0f,$0f,$0f,$0e,$0e,$08,$08,$00,$00,$00,$00,$00,$00
+        .byte   $f8,$f8,$e0,$e0,$80,$80,$00,$00,$00,$00,$00,$00,$00,$00,$00,$00
+        .byte   $f8,$f8,$e0,$e0,$80,$80,$00,$00,$00,$00,$00,$00,$00,$00,$00,$00
+; boost-two: 16x16 as tiles TL, TR, BL, BR
+        .byte   $00,$00,$00,$00,$00,$00,$00,$00,$40,$40,$60,$60,$78,$78,$7e,$7e
+        .byte   $00,$00,$00,$00,$00,$00,$00,$00,$40,$40,$60,$60,$78,$78,$7e,$7e
+        .byte   $00,$00,$00,$00,$00,$00,$00,$00,$80,$80,$c0,$c0,$f0,$f0,$fc,$fc
+        .byte   $00,$00,$00,$00,$00,$00,$00,$00,$80,$80,$c0,$c0,$f0,$f0,$fc,$fc
+        .byte   $7e,$7e,$78,$78,$60,$60,$40,$40,$00,$00,$00,$00,$00,$00,$00,$00
+        .byte   $7e,$7e,$78,$78,$60,$60,$40,$40,$00,$00,$00,$00,$00,$00,$00,$00
+        .byte   $fc,$fc,$f0,$f0,$c0,$c0,$80,$80,$00,$00,$00,$00,$00,$00,$00,$00
+        .byte   $fc,$fc,$f0,$f0,$c0,$c0,$80,$80,$00,$00,$00,$00,$00,$00,$00,$00
+; boost-three: 16x16 as tiles TL, TR, BL, BR
+        .byte   $00,$00,$00,$00,$00,$00,$00,$00,$00,$00,$84,$84,$c6,$c6,$f7,$f7
+        .byte   $00,$00,$00,$00,$00,$00,$00,$00,$00,$00,$84,$84,$c6,$c6,$f7,$f7
+        .byte   $00,$00,$00,$00,$00,$00,$00,$00,$00,$00,$20,$20,$30,$30,$bc,$bc
+        .byte   $00,$00,$00,$00,$00,$00,$00,$00,$00,$00,$20,$20,$30,$30,$bc,$bc
+        .byte   $f7,$f7,$c6,$c6,$84,$84,$00,$00,$00,$00,$00,$00,$00,$00,$00,$00
+        .byte   $f7,$f7,$c6,$c6,$84,$84,$00,$00,$00,$00,$00,$00,$00,$00,$00,$00
+        .byte   $bc,$bc,$30,$30,$20,$20,$00,$00,$00,$00,$00,$00,$00,$00,$00,$00
+        .byte   $bc,$bc,$30,$30,$20,$20,$00,$00,$00,$00,$00,$00,$00,$00,$00,$00
+
+; ------------------------------------------------------------------------------
+
+; [ boost marks: arrows above every boosting character ]
+
+; called from the battle nmi right after ClearSpriteData parked the
+; frame's sprites (and after vanilla reset its allocator) — parked
+; entries stay parked unless we claim them, so cleanup is free. draws
+; oam entry 96+slot (16x16, obj palette 3, priority 3) above each
+; character with pending boost, tracking their animated coords live;
+; marks ride from the R press until the boosted action resolves.
+; also re-asserts our two pal-3 colors every frame (effects use pal 3
+; as scratch) with the same yellow/white pulse as the menu cell.
+; db = $00 in this hook (oam shadow + dp live in bank 0); game state
+; reads go through $7e long addressing.
+
+.proc Ot6BoostMarksNmi_ext
+        php
+        longi
+        shorta
+        .a8
+        .i16
+        phb
+        clr_a
+        pha
+        plb                     ; db = $00
+        phx
+        phy
+        ; own obj palette 3's color 15 every frame: yellow/white pulse
+        longa
+        lda     $98             ; nmi frame counter
+        and     #$0008
+        bne     :+
+        lda     #$1bff          ; yellow
+        bra     :++
+:       lda     #$7fff          ; white
+:       sta     f:$7e7f7e       ; pal 3 color 15 in the palette buffer
+        shorta
+        ldx     #$0000          ; slot * 2
+@slot:  lda     f:$7e3e9d,x     ; pending boost
+        beq     @next
+        dec
+        asl
+        clc
+        adc     #$c8            ; tile: $c8/$ca/$cc for 1/2/3
+        pha
+        txa
+        asl                     ; slot * 4 = oam entry offset
+        longa
+        and     #$00ff
+        clc
+        adc     #$0480          ; entry 96 + slot
+        tay
+        lda     f:$7e8033,x     ; char x + 8
+        sec
+        sbc     #$0018          ; one sprite-width in front of the face
+        shorta                  ; (heroes face left; vanilla draws chars
+        sta     $0000,y         ; in front of same-priority higher oam
+        longa                   ; entries, so overlap would hide us)
+        lda     f:$7e803b,x     ; char y + 8
+        sec
+        sbc     #$0008          ; level with the head
+        shorta
+        sta     $0001,y         ; sprite y
+        pla
+        sta     $0002,y         ; tile
+        lda     #$36            ; palette 3, priority 3
+        sta     $0003,y
+@next:  inx
+        inx
+        cpx     #$0008
+        bcc     @slot
+        ply
+        plx
+        plb
+        plp
+        rtl
 .endproc
 
 ; ------------------------------------------------------------------------------

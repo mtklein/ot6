@@ -8,7 +8,7 @@ local H = dofile("/Users/mtklein/ot6/tools/tests/lib/ot6.lua")
 local STATE = "/Users/mtklein/ot6/build/states/battle_doorstep.mss.lua"
 local function pend(slot) return H.readByte(0x3e9d + slot*2) end
 local terra
-local clicks, clickRef
+
 
 local function findTerra()
   for slot = 0, 3 do
@@ -62,33 +62,26 @@ H.run({ maxFrames = 30000 }, {
     H.call(function() H.setPad({}) end),
     H.waitFrames(26),
   }, "terra's menu up"),
-  -- back out of any list a stray entry-mash A opened, then rig the boost
-  H.pressButtons({ "b" }, 6), H.waitFrames(24),
-  H.pressButtons({ "b" }, 6), H.waitFrames(24),
   H.call(function()
     H.writeByte(0x3e9c + terra*2, 3)
     H.writeByte(0x3e9d + terra*2, 2)
-    clicks = 0
-    clickRef = emu.addMemoryCallback(function(addr, value)
-      if value ~= 0 then clicks = clicks + 1 end
-    end, emu.callbackType.write, 0x000094, 0x000094)
   end),
-  -- one verified cursor step down: MagiTek -> Magic
-  H.driveUntil(function() return clicks >= 1 end, 1200, {
-    H.call(function() if clicks == 0 then H.setPad({ "down" }) end end),
+  -- the cursor's start row and any stray-open list are mint-dependent, so
+  -- walk by goal: close whatever's open, step one row, open, and check
+  -- for the folded name — converges from any start state within a lap
+  H.driveUntil(function() return fire3InList() end, 4000, {
+    H.call(function() if not fire3InList() then H.setPad({ "b" }) end end),
     H.waitFrames(6),
     H.call(function() H.setPad({}) end),
-    H.waitFrames(24),
-  }, "cursor on Magic"),
-  H.call(function()
-    emu.removeMemoryCallback(clickRef, emu.callbackType.write, 0x000094, 0x000094)
-  end),
-  -- open the list until the folded preview is actually rendered
-  H.driveUntil(function() return fire3InList() end, 2400, {
+    H.waitFrames(20),
+    H.call(function() if not fire3InList() then H.setPad({ "down" }) end end),
+    H.waitFrames(6),
+    H.call(function() H.setPad({}) end),
+    H.waitFrames(20),
     H.call(function() if not fire3InList() then H.setPad({ "a" }) end end),
     H.waitFrames(6),
     H.call(function() H.setPad({}) end),
-    H.waitFrames(30),
+    H.waitFrames(34),
   }, "list shows Fire 3 preview"),
   H.waitFrames(30),
   H.call(function()

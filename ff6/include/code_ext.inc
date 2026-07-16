@@ -16,6 +16,7 @@ CODE_EXT_INC = 1
 .global Ot6BgHud_ext, Ot6BgHudFlush_ext, Ot6PipGlyph_ext
 .global Ot6ActionEnd, Ot6BoostDmg, Ot6InitBP
 .global Ot6PreviewList_ext
+.global Ot6BoostMarksNmi_ext
 
 ; battle graphics module
 .global SineTbl8, SineTbl16

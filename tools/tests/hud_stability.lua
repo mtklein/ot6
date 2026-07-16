@@ -33,6 +33,7 @@ local function lineCount(set)
   return n
 end
 local baseline, changes = nil, 0
+local actorSlot, bpBefore
 local function stableWatch(tag, nframes)
   local count = 0
   return H.waitUntil(function()
@@ -71,13 +72,21 @@ H.run({ maxFrames = 30000 }, {
   H.call(function()
     H.assertEq(changes, 0, "idle hud perfectly stable for 600 frames")
   end),
-  -- one attack round: BG3 is contested during the effect, then must heal
-  H.driveUntil(function() return H.readByte(0x3e9c + H.readByte(0x62ca)*2) ~= 1 end, 8000, {
-    H.call(function() if H.readByte(0x7bca) ~= 0 then H.setPad({ "a" }) end end),
-    H.waitFrames(4),
-    H.call(function() H.setPad({}) end),
-    H.waitFrames(26),
-  }, "action lands"),
+  -- one attack round: BG3 is contested during the effect, then must
+  -- heal. menus eat inputs on some mints, so berserk the party instead:
+  -- forced menu-less auto-actions (magitek chars fire random beams —
+  -- exactly the effect art that contests BG3)
+  H.call(function()
+    actorSlot = H.readByte(0x62ca)
+    bpBefore = H.readByte(0x3e9c + actorSlot*2)
+    for slot = 0, 3 do
+      local a = 0x3ee5 + slot*2
+      H.writeByte(a, H.readByte(a) | 0x10)
+    end
+  end),
+  H.waitUntil(function()
+    return H.readByte(0x3e9c + actorSlot*2) ~= bpBefore
+  end, 8000, "action lands", 10),
   H.waitFrames(120),   -- recovery window
   H.call(function()
     baseline = cellset()
