@@ -833,7 +833,6 @@ OT6_MAPBASE := $57b6            ; word scratch: field bg3 map base
         ldy     #$0000          ; monster slot offset
         ldx     #$0000          ; shadow byte offset
 @slot:  jsr     Ot6BgHudLine
-        jsr     Ot6BgHudMark
         longa
         txa
         clc
@@ -856,48 +855,26 @@ OT6_MAPBASE := $57b6            ; word scratch: field bg3 map base
 .proc Ot6BgHudLine
         .a8
         .i16
+        lda     $3aa8,y
+        lsr
+        bcs     @on
+        ; monster gone: disable the line (flush blanks the old cells once)
         longa
-        lda     #$0000          ; disable line
+        lda     #$0000
         sta     f:$7e0000+OT6_SHADOW,x
-        lda     #$21ff          ; blank all five cells
+        shorta0
+        rts
+@on:    ; blank the five cell words, rebuild below. the anchor word at +0
+        ; is only committed at the very end (and only once per battle):
+        ; the NMI flush can fire mid-rebuild, so the enable is the commit.
+        longa
+        lda     #$21ff
         sta     f:$7e0000+OT6_SHADOW+4,x
         sta     f:$7e0000+OT6_SHADOW+6,x
         sta     f:$7e0000+OT6_SHADOW+8,x
         sta     f:$7e0000+OT6_SHADOW+10,x
         sta     f:$7e0000+OT6_SHADOW+12,x
         shorta0
-        lda     $3aa8,y
-        lsr
-        jcc     @off            ; monster not present
-        ; line vram addr = base + ((bottomy+4)/8)*32 + centerx/8 - 1
-        phx
-        lda     $804b,y
-        clc
-        adc     #$04
-        and     #$f8            ; row * 8
-        longa
-        and     #$00ff
-        asl
-        asl                     ; row * 32
-        clc
-        adc     f:$7e0000+OT6_MAPBASE
-        pha
-        shorta0
-        lda     $800f,y
-        lsr
-        lsr
-        lsr
-        dec
-        longa
-        and     #$00ff
-        clc
-        adc     $01,s
-        plx                     ; (discard pushed row sum)
-        plx                     ; restore shadow base
-        phx
-        sta     f:$7e0000+OT6_SHADOW,x  ; enable line
-        shorta0
-        plx
         ; dead monsters: cells stay blank, line stays live (erases old art)
         lda     $3eec,y
         bit     #$c2
@@ -961,8 +938,44 @@ OT6_MAPBASE := $57b6            ; word scratch: field bg3 map base
         inc     OT6_SCR_IDX
         bra     @elem
 @edone: plx
-@done:
-@off:   rts
+@done:  ; commit: latch the anchor once per battle. monsters never move
+        ; ("moving" coords are attack-animation transients that made the
+        ; line jitter and blink), so compute only while still disabled.
+        longa
+        lda     f:$7e0000+OT6_SHADOW,x
+        bne     @keep
+        shorta0
+        phx
+        lda     $804b,y
+        clc
+        adc     #$07            ; first row fully past the monster's tile
+        and     #$f8            ; box: monsters blink by redrawing their
+                                ; own box, and an anchor rounded into its
+                                ; last row flickers with every blink
+        longa
+        and     #$00ff
+        asl
+        asl                     ; row * 32
+        clc
+        adc     f:$7e0000+OT6_MAPBASE
+        pha
+        shorta0
+        lda     $800f,y
+        lsr
+        lsr
+        lsr
+        dec
+        longa
+        and     #$00ff
+        clc
+        adc     $01,s
+        plx                     ; (discard pushed row sum)
+        plx                     ; restore shadow base
+        phx
+        sta     f:$7e0000+OT6_SHADOW,x  ; enable line (atomic word)
+        plx
+@keep:  shorta0
+        rts
 .endproc
 
 
@@ -972,17 +985,8 @@ OT6_MAPBASE := $57b6            ; word scratch: field bg3 map base
 
 ; called from the battle nmi right after the oam dma.
 
-; [ mark a hud line dirty if it changed since the last flush ]
-
-; x = shadow line base, y = monster slot*2 (both preserved). compares the
-; line's cur addr + cells against the last-flushed copy at $7ffea0; on any
-; difference, updates the copy and sets this line's bit in the dirty byte. the
-; prev-addr word (+2) is flush-owned and excluded. this keeps the nmi
-; flush nearly free on quiet frames: heavy per-frame vram writes in nmi
-; starve the window-scroll hdma and wedge the battle menus.
-
-OT6_HUDCOPY := $57de            ; second free gap (past special names)
-OT6_HUDDIRTY := $57b8
+OT6_HUDCOPY := $57de            ; (retired; kept for the memory map)
+OT6_HUDDIRTY := $57b8           ; (retired)
 
 ; weakness codex: learned weaknesses persist across battles, octopath
 ; style. lives in the second 8k sram bank (header sram size $05), which
@@ -995,55 +999,6 @@ OT6_PIPCUR      := $57cc        ; live pip cell: menu-map word addr (0=off)
 OT6_PIPPREV     := $57ce        ; last flushed addr (for erase-on-move)
 OT6_PIPCELL     := $57d0        ; glyph|attr word to write
 OT6_LASTLR      := $57d2        ; last frame's L/R bits (edge detect)
-
-.proc Ot6BgHudMark
-        .a8
-        .i16
-        longa
-        lda     f:$7e0000+OT6_SHADOW,x
-        cmp     f:$7e0000+OT6_HUDCOPY,x
-        bne     @diff
-        lda     f:$7e0000+OT6_SHADOW+4,x
-        cmp     f:$7e0000+OT6_HUDCOPY+4,x
-        bne     @diff
-        lda     f:$7e0000+OT6_SHADOW+6,x
-        cmp     f:$7e0000+OT6_HUDCOPY+6,x
-        bne     @diff
-        lda     f:$7e0000+OT6_SHADOW+8,x
-        cmp     f:$7e0000+OT6_HUDCOPY+8,x
-        bne     @diff
-        lda     f:$7e0000+OT6_SHADOW+10,x
-        cmp     f:$7e0000+OT6_HUDCOPY+10,x
-        bne     @diff
-        lda     f:$7e0000+OT6_SHADOW+12,x
-        cmp     f:$7e0000+OT6_HUDCOPY+12,x
-        bne     @diff
-        shorta0
-        rts
-@diff:  lda     f:$7e0000+OT6_SHADOW,x
-        sta     f:$7e0000+OT6_HUDCOPY,x
-        lda     f:$7e0000+OT6_SHADOW+4,x
-        sta     f:$7e0000+OT6_HUDCOPY+4,x
-        lda     f:$7e0000+OT6_SHADOW+6,x
-        sta     f:$7e0000+OT6_HUDCOPY+6,x
-        lda     f:$7e0000+OT6_SHADOW+8,x
-        sta     f:$7e0000+OT6_HUDCOPY+8,x
-        lda     f:$7e0000+OT6_SHADOW+10,x
-        sta     f:$7e0000+OT6_HUDCOPY+10,x
-        lda     f:$7e0000+OT6_SHADOW+12,x
-        sta     f:$7e0000+OT6_HUDCOPY+12,x
-        shorta0
-        phx
-        tyx                     ; long-indexed is x-only
-        lda     f:Ot6LineBitTbl,x
-        plx
-        ora     f:$7e0000+OT6_HUDDIRTY
-        sta     f:$7e0000+OT6_HUDDIRTY
-        rts
-.endproc
-
-Ot6LineBitTbl:
-        .byte   $01,$00,$02,$00,$04,$00,$08,$00,$10,$00,$20,$00
 
 .proc Ot6BgHudFlush_ext
         .a8
@@ -1059,17 +1014,8 @@ Ot6LineBitTbl:
         plb                     ; db = 0 for hardware registers
         lda     #$80
         sta     hVMAINC
-        lda     f:$7e0000+OT6_HUDDIRTY   ; lines changed since last flush?
-        jeq     @pip                     ; (the live pip cell still runs)
-        sta     f:$7e0000+OT6_HUDDIRTY+1 ; working copy (nmi-private)
-        lda     #$00
-        sta     f:$7e0000+OT6_HUDDIRTY
         ldx     #$0000
-@line:  lda     f:$7e0000+OT6_HUDDIRTY+1
-        lsr
-        sta     f:$7e0000+OT6_HUDDIRTY+1
-        bcc     @skip
-        longa
+@line:  longa
         lda     f:$7e0000+OT6_SHADOW+2,x         ; prev
         beq     @write
         cmp     f:$7e0000+OT6_SHADOW,x           ; moved?

@@ -1484,7 +1484,6 @@ _c10a16:
         stx     hDMA7::SIZE
         lda     #BIT_7
         sta     hMDMAEN
-        jsl     Ot6BgHudFlush_ext       ; ot6: dirty hud lines -> bg3 map
         clr_a
         sta     hCGADD       ; copy bg palettes to ppu (non battle-bg)
         ldx     #$2202
@@ -1671,7 +1670,11 @@ BattleNMI:
         lda     w7e6298
         sta     f:hVMDATAL
         shorta0
-@0c17:  jsr     _c102fa       ; update hdma #3 and #5
+@0c17:  jsl     Ot6BgHudFlush_ext       ; ot6: hud cells paint LAST - the
+        jsr     _c102fa       ; update hdma #3 and #5    animation-bg restore
+                              ; earlier in this nmi refills our area with
+                              ; $01EE every other frame during monster
+                              ; actions, and whoever writes last wins
         jsr     _c10373
         jsr     _c10347       ; update hdma #7
         jsr     _c103fb
