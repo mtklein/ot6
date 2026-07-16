@@ -413,8 +413,8 @@ function M.glyphCanary()
   for k, cell in ipairs(iconCells) do
     checkTile(cell, icons + (k-1)*16, "element icon")
   end
-  for k = 1, 13 do
-    local cell = emu.read(bg - 14 + k, rom)  -- Ot6BgGlyphCellTbl precedes the data
+  for k = 1, 16 do
+    local cell = emu.read(bg - 17 + k, rom)  -- Ot6BgGlyphCellTbl precedes the data
     checkTile(cell, bg + (k-1)*16, "hud glyph")
   end
 end

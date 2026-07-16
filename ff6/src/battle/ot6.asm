@@ -789,7 +789,7 @@ done:   plp
         shorta
         plx
         inx
-        cpx     #$000d          ; 13 glyphs
+        cpx     #$0010          ; 16 glyphs
         bcc     @tile
         rts
 .endproc
@@ -1053,21 +1053,39 @@ OT6_LASTLR      := $57d2        ; last frame's L/R bits (edge detect)
         bcc     @line
         ; live pip pseudo-line: one cell in the menu map (active char's
         ; spendable bp during boost select). tiny, runs every nmi.
+        ; the party window is double-buffered: each name row is staged at
+        ; map row 1+2r AND at 9+2r (+$100 words), and the window scroll
+        ; picks a band (the active character's visible copy is the yellow
+        ; one). paint BOTH so the live cell shows no matter which band is
+        ; on screen (writing only the low band made boost feedback
+        ; invisible whenever the high band was up).
 @pip:   longa
         lda     f:$7e0000+OT6_PIPPREV
-        beq     :+
+        beq     @cur
         cmp     f:$7e0000+OT6_PIPCUR
-        beq     :+
+        beq     @cur
         sta     hVMADDL                  ; moved/closed: blank the old cell
         lda     #$21ff
         sta     hVMDATAL
-:       lda     f:$7e0000+OT6_PIPCUR
+        lda     f:$7e0000+OT6_PIPPREV
+        clc
+        adc     #$0100                   ; ...and its band twin
+        sta     hVMADDL
+        lda     #$21ff
+        sta     hVMDATAL
+@cur:   lda     f:$7e0000+OT6_PIPCUR
         sta     f:$7e0000+OT6_PIPPREV
-        beq     :+
+        beq     @pdone
         sta     hVMADDL
         lda     f:$7e0000+OT6_PIPCELL
         sta     hVMDATAL
-:       shorta0
+        lda     f:$7e0000+OT6_PIPCUR
+        clc
+        adc     #$0100
+        sta     hVMADDL
+        lda     f:$7e0000+OT6_PIPCELL
+        sta     hVMDATAL
+@pdone: shorta0
 @out:   plb
         ply
         plx
@@ -1117,11 +1135,14 @@ OT6_LASTLR      := $57d2        ; last frame's L/R bits (edge detect)
         lda     $3e9d,y
         inc     a
         cmp     #$04            ; spend at most 3
-        bcs     @show
+        bcs     @deny
         cmp     $3e9c,y         ; and never more than current bp
         beq     @store
-        bcs     @show
+        bcs     @deny
 @store: sta     $3e9d,y
+        inc     $6281           ; ching (spc $2c): boost committed
+        bra     @show
+@deny:  inc     $95             ; error buzz: at cap or out of bp
         bra     @show
 @tryl:  bit     #$20            ; L: boost down
         beq     @show
@@ -1129,6 +1150,7 @@ OT6_LASTLR      := $57d2        ; last frame's L/R bits (edge detect)
         beq     @show
         dec     a
         sta     $3e9d,y
+        inc     $94             ; cursor click: boost taken back
 @show:  ; live pip cell for the active character's menu row
         lda     $62ca
         ldx     #$0000
@@ -1152,8 +1174,22 @@ OT6_LASTLR      := $57d2        ; last frame's L/R bits (edge detect)
         adc     #$7814          ; $7800 + 20
         sta     f:$7e0000+OT6_PIPCUR
         shorta0
-        ; glyph = pip cluster for spendable bp
-        lda     $3e9c,y
+        ; glyph: pending boost -> arrow cluster pulsing yellow/white
+        ; (the loud "you are boosting" signal); else spendable pips
+        lda     $3e9d,y
+        beq     @pips
+        longa
+        and     #$00ff
+        tax
+        shorta0
+        lda     f:Ot6ArrowCellTbl-1,x
+        sta     f:$7e0000+OT6_PIPCELL
+        lda     $0e             ; frame counter: pulse every 8 frames
+        and     #$08            ; palette 2 (yellow) <-> 0 (white)
+        ora     #$21
+        sta     f:$7e0000+OT6_PIPCELL+1
+        rts
+@pips:  lda     $3e9c,y         ; pip cluster for spendable bp
         sec
         sbc     $3e9d,y
         bcs     :+
@@ -1234,7 +1270,12 @@ Ot6ShieldCellTbl:
 Ot6PipCellTbl:
         .byte   $72,$73,$75,$76,$77,$79
 
-; bg hud glyph cells (2bpp, verified junk-free in both formations)
+; boost arrow cells (pending 1-3)
+Ot6ArrowCellTbl:
+        .byte   $68,$6c,$6d
+
+; bg hud glyph cells (2bpp, verified junk-free in both formations —
+; probe_cells.lua rechecks candidates idle + post-action)
 Ot6BgGlyphCellTbl:
         .byte   $65
         .byte   $66
@@ -1249,6 +1290,9 @@ Ot6BgGlyphCellTbl:
         .byte   $76
         .byte   $77
         .byte   $79
+        .byte   $68
+        .byte   $6c
+        .byte   $6d
 
 Ot6BgGlyphData:
 ; shield-1
@@ -1290,3 +1334,12 @@ Ot6BgGlyphData:
 ; pips-5
         .byte   $00,$00,$db,$db,$db,$db,$00,$00
         .byte   $6c,$6c,$6c,$6c,$00,$00,$00,$00
+; boost-1: one fat right arrow
+        .byte   $00,$00,$20,$20,$30,$30,$38,$38
+        .byte   $3c,$3c,$38,$38,$30,$30,$00,$00
+; boost-2: two medium arrows
+        .byte   $00,$00,$00,$00,$88,$88,$cc,$cc
+        .byte   $ee,$ee,$cc,$cc,$88,$88,$00,$00
+; boost-3: three narrow arrows
+        .byte   $00,$00,$00,$00,$92,$92,$db,$db
+        .byte   $db,$db,$92,$92,$00,$00,$00,$00
