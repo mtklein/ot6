@@ -40,20 +40,10 @@ OT6_BREAK_TICKS := $10          ; a bit under vanilla stop duration ($12)
         .i16
         tya                     ; entity offset, width-neutral test
         cmp     #$08
-        bcc     done            ; rage load onto a character: no shields
-        lda     f:MonsterProp+16,x
-        lsr
-        lsr
-        lsr
-        clc
-        adc     #$02            ; shields = 2 + level / 8 ...
-        cmp     #$07
-        bcc     store
-        lda     #$06            ; ... capped at 6
-store:  sta     $3e38,y
-        sta     $3e39,y
-        ; weakness codex: stash this slot's species and pre-reveal
-        ; anything already learned in past battles
+        bcs     @on             ; rage load onto a character: no shields
+        rtl
+@on:    lda     f:MonsterProp+16,x
+        sta     OT6_SCR_BIT     ; stash the level (x gets repurposed)
         phx
         longa
         txa
@@ -63,6 +53,36 @@ store:  sta     $3e38,y
         lsr
         lsr                     ; monster prop offset / 32 = species id
         sta     OT6_SPECIES-8,y
+        ; authored shields first: bosses and marked trash live in the
+        ; override table; everyone else uses the level formula
+        ldx     #$0000
+@scan:  lda     f:Ot6ShieldTbl,x
+        cmp     #$ffff
+        beq     @formula
+        cmp     OT6_SPECIES-8,y
+        beq     @hit
+        inx
+        inx
+        inx
+        bra     @scan
+@hit:   shorta0
+        lda     f:Ot6ShieldTbl+2,x
+        bra     @seed
+@formula:
+        shorta0
+        lda     OT6_SCR_BIT     ; level
+        lsr
+        lsr
+        lsr
+        clc
+        adc     #$02            ; shields = 2 + level / 8 ...
+        cmp     #$07
+        bcc     @seed
+        lda     #$06            ; ... capped at 6
+@seed:  sta     $3e38,y
+        sta     $3e39,y
+        ; weakness codex: pre-reveal anything learned in past battles
+        longa
         lda     f:OT6_CODEX_MAGIC
         cmp     #$364f          ; 'O6' - codex bank initialized?
         beq     @learned
@@ -1678,6 +1698,21 @@ OT6_RESTAGE     := $57d4        ; open list wants a re-render (boost moved)
         plx
         rtl
 .endproc
+
+; per-species shield overrides: bosses get authored counts, marked
+; trash gets flavor, and 0 means explicitly shieldless (no display —
+; whelk's shell stays the wrong answer, exactly as vanilla intended).
+; format: .word species id (monster prop offset / 32), .byte shields;
+; $ffff terminates. everyone else uses the 2 + level/8 formula.
+Ot6ShieldTbl:
+        .word   $0019
+        .byte   3               ; lobo: bitier trash, and the table's
+                                ;   permanent regression coverage
+        .word   $0100
+        .byte   0               ; whelk (the shell)
+        .word   $0135
+        .byte   4               ; whelk head: the first boss break
+        .word   $ffff
 
 ; shield-with-count glyph cells (counts 1-6)
 Ot6ShieldCellTbl:

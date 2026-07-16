@@ -18,6 +18,8 @@ H.run({ maxFrames = 20000 }, {
     H.glyphCanary()
     H.assertEq(H.fieldHudPresent(), true, "under-monster hud on the field map")
     H.assertEq(H.isPipGlyph(H.pipWord()), true, "party row 1 shows bp pips")
+    -- the species override table beats the level formula: lobos seed 3
+    H.assertEq(H.readByte(0x3e40), 3, "lobo shields come from the species table")
   end),
   H.pressButtons({ "a" }, 6), H.waitFrames(30),
   H.pressButtons({ "a" }, 6), H.waitFrames(30),
