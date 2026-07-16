@@ -717,11 +717,39 @@ done:   plp
 
 ; ------------------------------------------------------------------------------
 
+; [ extra swings for a boosted fight ]
+
+; called from FightAttack right after the vanilla swing count lands in
+; $3a70 (1, or 7 with offering). swings alternate hands and empty-hand
+; swings whiff, so +2 swings per pending bp = +1 real hit for a
+; one-weapon character — and a genji-glove pair swings both hands
+; again, doubling the bonus, exactly like it doubles everything else.
+; a8/i16, x = attacker entity offset.
+
+.proc Ot6FightBoost
+        .a8
+        .i16
+        txa                     ; width-neutral character test
+        cmp     #$08
+        bcs     done            ; monsters never boost
+        lda     $3e9d,x         ; pending boost level
+        beq     done
+        asl                     ; two swings per bp
+        clc
+        adc     $3a70
+        sta     $3a70
+done:   rtl
+.endproc
+
+; ------------------------------------------------------------------------------
+
 ; [ boost the base damage of a boosted character action ]
 
 ; called at the tail of the physical and magic base-damage calcs.
 ; damage x2/x3/x4 for pending boost 1/2/3; the per-target 9999 cap
 ; still applies downstream. a8/i16, x = attacker, 16-bit damage $11b0.
+; fight and capture spend their boost on extra swings instead
+; (Ot6FightBoost), so the multiplier skips them.
 
 .proc Ot6BoostDmg
         php                     ; caller width varies: pin our own
@@ -732,6 +760,10 @@ done:   plp
         txa                     ; width-neutral character test
         cmp     #$08
         bcs     done            ; monsters never boost
+        lda     $b5             ; current command
+        beq     done            ; $00 fight: boost = extra swings
+        cmp     #$06
+        beq     done            ; $06 capture: same fight path
         lda     $3e9d,x         ; pending boost level
         beq     done
         sta     OT6_SCR_BIT

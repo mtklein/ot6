@@ -3452,6 +3452,7 @@ _161b:  tyx
         bcc     @1626
         lda     #$07
 @1626:  sta     $3a70
+        jsl     Ot6FightBoost           ; ot6: boosted fight swings again
         jsr     CheckTargetsPresent
         jsr     _c23865
         lda     #$02
