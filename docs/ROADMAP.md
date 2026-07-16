@@ -57,8 +57,14 @@ the next work block.
   "weakness strip" is superseded by this.
 - ✅ **Boost feedback** (2026-07-16): ching/buzz/click on R/L, pending
   boost as a pulsing arrow cell (the party window is double-buffered —
-  live cells paint both bands), and boosted spell lists preview folded
-  names before the choice is made.
+  live cells paint both bands), boosted spell lists preview folded
+  names before the choice is made, and an arrow mark floats beside
+  every boosting character on the battlefield until their action
+  resolves.
+- ✅ **C toolchain pilot** (2026-07-16): Calypsi 65816 compiles
+  `ff6/src/c/` into blobs pinned at `$f0f000`, exercised in-battle by
+  the gate (battle_c). Menu-heavy M4/M5 modules can be written in C;
+  hooks and NMI code stay ca65. First real port candidate: the codex.
 - ✅ **Attack +1 hit per BP** (2026-07-16): extra swings via the vanilla
   alternating-hands machinery; Genji Glove doubles the bonus.
 - ✅ **Boost-tier spell folding** (2026-07-16): Fire → Fire 2 → Fire 3

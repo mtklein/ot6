@@ -647,6 +647,7 @@ Ot6FontIcons:
         .i16
         php
         shorta0
+        jsr     Ot6CSpikeProbe  ; c toolchain spike: publish a witness
         lda     #$01
         sta     $3e9c           ; characters open with 1 bp, octopath-style
         sta     $3e9e
@@ -1679,3 +1680,46 @@ Ot6BgGlyphData:
 ; boost-3: three narrow arrows
         .byte   $00,$00,$00,$00,$92,$92,$db,$db
         .byte   $db,$db,$92,$92,$00,$00,$00,$00
+
+; ------------------------------------------------------------------------------
+
+; [ calypsi-compiled C modules ]
+
+; the c toolchain spike: ff6/src/c/*.c compiled by calypsi (cc65816
+; --target snes, large code/data models), linked by ln65816 against
+; ot6-rom.scm which pins section farcode at $f0f000 — the ot6_c
+; segment below pins the same address on the ld65 side, so both
+; linkers agree by construction. regenerate with tools/cc/build-c.sh;
+; symbol offsets into the blob come from ff6/src/c/ot6c.map.
+;
+; calypsi 65816 abi (learned from -S output): 16-bit native modes,
+; first int-sized arg in A, later args pushed as words (first at 4,s
+; inside the callee), result in A, far functions end in rtl. leaf
+; functions that touch no globals need no direct-page context at all.
+
+.segment "ot6_c"
+
+Ot6CBlob:
+        .incbin "../c/ot6c.raw"
+ot6_c_mix := Ot6CBlob           ; unsigned char ot6_c_mix(uchar a, uchar b)
+
+.segment "ot6_code"
+
+; [ c spike probe: call the compiled leaf, publish a witness ]
+
+; runs once per battle init. the harness asserts the exact value, which
+; proves compile -> link -> blob -> jsl -> abi -> return end to end.
+
+.proc Ot6CSpikeProbe
+        .a8
+        .i16
+        php
+        longa
+        pea     $0004           ; second arg, a word on the stack
+        lda     #$0003          ; first arg in a
+        jsl     ot6_c_mix
+        sta     f:$7e57dc       ; witness: 3*2 + 4 + 1 = 11
+        pla                     ; caller pops the stacked arg
+        plp
+        rts
+.endproc

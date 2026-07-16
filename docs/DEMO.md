@@ -35,6 +35,9 @@ BPS-capable patcher, or just:
   clicks, and while boost is pending the cell by your name swaps to
   1–3 fat arrows pulsing yellow/white. The pips return when you're
   back to zero.
+- Out on the battlefield, a matching arrow mark floats beside every
+  boosting character — it rides from the R press until their boosted
+  action resolves, so you can read everyone's commitment at a glance.
 
 ## What boost buys
 
