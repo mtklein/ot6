@@ -20,6 +20,12 @@ prefs = cfg.setdefault("Preferences", {})
 prefs["OverrideSaveDataFolder"] = True
 prefs["SaveDataFolder"] = saves          # dedicated, isolated from the user's
 
+# Mesen's per-Lua-slice watchdog defaults to 1 SECOND; a slow frame callback
+# (e.g. a BFS over the collision grid) can be killed SILENTLY at that setting
+# (the error only goes to the invisible script-window log), wedging the run.
+# 30 s keeps the watchdog as a hang backstop without biting real work.
+cfg.setdefault("Debug", {}).setdefault("ScriptWindow", {})["ScriptTimeout"] = 30
+
 with open(dst, "w", encoding="utf-8") as f:
     json.dump(cfg, f)
 

@@ -14,9 +14,12 @@ tools/tests/run.sh tools/tests/battle_smoke.lua       # load savestate -> assert
 `run.sh` wraps:
 
 ```sh
-tools/Mesen.app/Contents/MacOS/Mesen --testrunner build/ot6.sfc <script.lua>
+Mesen --testrunner --timeout=600 --enableStdout build/ot6.sfc <composed.lua>
 ```
 
+(`--timeout=600` overrides the testrunner's default 100-second wall-clock
+cap — expiry exits 255 with truncated stdout; `--enableStdout` mirrors the
+otherwise-invisible script-window log, where Lua watchdog errors land),
 captures all output to `build/states/last_run.log` (second arg overrides),
 decodes any `[b64:...]` artifacts the script emitted (see below), prints the
 `[ot6]` log lines, and exits with the script's `emu.stop()` code:
@@ -62,6 +65,13 @@ watchdog needed.  A bare hang would only happen if a script bypasses
   dumps at +0/+60/+180/+420/+900/+1500/+2400 frames.
 - `probe22.lua` - diagnostic: resume `first_battle.mss`, press A/A/B to
   poke the battle menus, screenshot each step (for UI iteration).
+- `gen_whelk.lua` - boot the injected save and BFS-navigate the Narshe
+  mines to the Whelk fight (see `docs/playing-headless.md`); emits
+  `build/states/whelk_doorstep.mss` (field, one tile short of the
+  trigger) and a `whelk_battle` screenshot.  ~2800 frames / ~15 s.
+- `probe_canstep.lua` - validates `H.canStep` (the CheckPlayerMove
+  port) against real movement at the boot area; renders the model's view
+  of the neighborhood as ASCII.
 
 Generated artifacts land in `build/states/` (savestates, `*.mss` +
 `*.mss.lua` sidecar) and `build/states/shots/` (PNG screenshots).
@@ -128,7 +138,12 @@ Plain functions (call from `H.call`/predicates):
   monster #0 "Guard" is a valid 0x0000, empty slots read $FFFF, and healthy
   vanilla battles still show one stale-garbage word there, e.g. 874B, from
   power-on RAM randomization.  Treat `monstersPresent() > 0` as "battle has
-  occupants", nothing finer.)
+  occupants", nothing finer.  For identifying a *specific* fight, match the
+  formation species words at $57C0 via `H.formationHas`, gated on
+  `battleLoadStarted()`.)
+- Field navigation (`H.fieldX/Y`, `H.hasControl`, `H.tileAligned`,
+  `H.dialogWaiting`, `H.canStep`, `H.bfsPath`, `H.navTo`, `H.clearBattle`):
+  see `docs/playing-headless.md` for the RAM tables and the design.
 
 ## Mesen 2.1.1 Lua API facts (all verified empirically on this binary)
 
@@ -147,14 +162,11 @@ Plain functions (call from `H.call`/predicates):
 - Memory callbacks: `emu.addMemoryCallback(fn, emu.callbackType.read|write|exec,
   startAddr [, endAddr] [, cpuType] [, memType])`; a read callback returning a
   value replaces the value the CPU sees.
-- Input: `emu.setInput(buttonTable, port [, subport])` and `emu.getInput(port)`
-  exist **but are useless headless**: with the default `settings.json` (`{}`)
-  no controller device is attached to any port (0-4), `getInput` returns `{}`
-  and `setInput` is a silent no-op.  The harness instead intercepts CPU reads
-  of the SNES auto-joypad registers `$4218/$4219` with a read memory callback
-  and substitutes button bits (`$4219` = B Y Sel St U D L R, `$4218` = A X L R
-  0000) while a press is scripted.  This drives title/menus/field/dialogs
-  reliably.
+- Input: `emu.setInput(input, port)` applied inside an `inputPolled` event
+  callback (setInput's effect lasts until the next poll, so pushing the
+  held-button table on every poll makes the ROM latch it each frame).  This
+  drives title/menus/field/dialogs reliably; `probe_setinput.lua` asserts the
+  injected buttons show up in the CPU-visible `$4218/$4219` registers.
 - Savestates: `emu.createSavestate()` returns the state as a binary string;
   `emu.loadSavestate(blob)` takes one back.  BUT both may only be called
   "inside an exec memory operation callback for the main CPU" -- calling
@@ -210,17 +222,18 @@ pixels are ever needed.
   ONLY inside an exec memory callback (see the trampoline above);
   `probe16.lua` is the regression test for the mechanism.
 
-### Input injection quirks
+### Input injection
 
-- The `$4218/$4219` read override is registered always-on; injected values
-  are bit-identical to a real idle/held standard pad (signature bits 0).
+- `H.setPad()` records the held-button set; an `inputPolled` event callback
+  pushes it into the emulator with `emu.setInput(input, 0)` on every poll.
 - The game polls once per frame via NMI auto-joypad; 4+ frame holds are
   reliably seen, 8 used for title Start presses.
-- The override is re-registered after every savestate load
-  (`rearmInputInjection()` inside the `loadState` step), in case the load
-  detaches memory callbacks.  `probe23.lua` is the positive control: after
-  loading `first_battle.mss`, A must open the MagiTek submenu and B must
-  close it (screenshot bytes compared; verified PASSing).
+- Dialog/menu-text advancing is EDGE-triggered: a held A yields exactly one
+  page; multi-page text needs press-release cycling (4 frames on / 4 off).
+- `probe23.lua` is the positive control: after loading `first_battle.mss`,
+  A must open the MagiTek submenu and B must close it (screenshot bytes
+  compared).  `probe_input.lua` proves held input drives movement across a
+  long run.
 - FF3us auto-plays its opening from the title screen even with no input;
   pressing Start during the logo also works.  With garbage/absent SRAM the
   save-select is skipped entirely on this path.
@@ -245,13 +258,15 @@ pixels are ever needed.
   same work as a callback-driven step machine is stable.  Root cause not
   confirmed (likely Mesen's per-callback instruction-watchdog `lua_sethook`
   interacting with coroutine threads); just avoid coroutines entirely.
-- Other intermittent 255s were seen in scripts that polled `emu.getState()`
-  every frame or ran with no memory callback registered; the library keeps
-  the `$4218/19` read callback always-on and avoids `getState()` in polling
-  loops (screenshot size stands in for "is the screen rendering").
-  `getState()` is fine for one-shot debugging.  A 255 exit with stdout ending
-  mid-boot-spam means the crash happened later but unflushed output was lost
-  (stdout is block-buffered); rerun the command.
+- A 255 exit with truncated stdout means a wall-clock cap expired, not a
+  mystery crash: the testrunner defaults to 100 seconds (run.sh passes
+  `--timeout=600`) and Mesen's per-Lua-slice watchdog defaults to 1 second
+  (`pin_test_saves.py` pins `Debug.ScriptWindow.ScriptTimeout = 30`; its
+  kills are silent except in the `--enableStdout`-mirrored script log).
+  stdout is block-buffered, so output stops well before the actual death.
+- Avoid `emu.getState()` in per-frame polling loops (crash-correlated;
+  screenshot size stands in for "is the screen rendering").  One-shot use
+  for debugging is fine.
 - `emu.stop()` from the initial script body works; from callbacks it works
   too (used everywhere here).
 - No `timeout` command on macOS; not needed since `H.run` guarantees exit,

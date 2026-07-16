@@ -47,7 +47,12 @@ python3 "$ROOT/tools/tests/lib/pin_test_saves.py" \
   "$HOME/Library/Application Support/Mesen2/settings.json" \
   "$MESEN_TEST/Contents/MacOS/settings.json" \
   "$TEST_SAVES"
-"$MESEN_TEST/Contents/MacOS/Mesen" --testrunner "$ROM" "$COMPOSED" > "$LOG" 2>&1
+# --timeout=600: Mesen's testrunner has a hard DEFAULT 100-second wall-clock
+# cap (exit -1/255 + truncated stdout on expiry) that reaped long runs; keep
+# a cap as the only defense against a genuinely hung emulator, just a roomy one.
+# --enableStdout mirrors the (otherwise invisible) script log window to
+# stdout, surfacing silent Lua watchdog kills.
+"$MESEN_TEST/Contents/MacOS/Mesen" --testrunner --timeout=600 --enableStdout "$ROM" "$COMPOSED" > "$LOG" 2>&1
 code=$?
 
 python3 "$ROOT/tools/tests/lib/decode_b64.py" "$LOG" "$ROOT/build/states"

@@ -94,57 +94,47 @@ function M.emitBlob(tag, data)
 end
 
 -- ------------------------------------------------------------------ input --
--- SNES auto-joypad bit layout for pad 1:
---   $4219 (high): B Y Select Start Up Down Left Right
---   $4218 (low):  A X L R 0 0 0 0
-local BTN = {
-  a = { 0, 0x80 }, x = { 0, 0x40 }, l = { 0, 0x20 }, r = { 0, 0x10 },
-  b = { 1, 0x80 }, y = { 1, 0x40 }, select = { 1, 0x20 }, start = { 1, 0x10 },
-  up = { 1, 0x08 }, down = { 1, 0x04 }, left = { 1, 0x02 }, right = { 1, 0x01 },
-}
-local padLo, padHi = 0, 0
+-- Controller input the proper Mesen way: emu.setInput(input, port) applied
+-- inside an `inputPolled` event callback -- the officially recommended
+-- pattern (setInput's effect lasts until the next poll, so applying it on
+-- every poll guarantees the ROM latches our state each frame).  Port 0 is a
+-- SnesController in the test config, so setInput is live.
+local ALL_BTN = { "a", "b", "x", "y", "l", "r", "select", "start",
+                  "up", "down", "left", "right" }
+local curPad = {}
+for _, b in ipairs(ALL_BTN) do curPad[b] = false end
 
--- Always substitute the joypad registers (0 = nothing held).  The values are
--- bit-identical to a real idle/held standard pad, and this always-on
--- configuration is the one proven stable across many long headless runs.
-local padCallbackRef = nil
+local inputCbRef = nil
 
--- (Re)register the $4218/$4219 read override.  Re-armed after every
--- savestate load as a defensive measure in case the emulator drops or
--- detaches memory callbacks across loads.
+-- (Re)register the inputPolled callback that pushes curPad into the
+-- emulator.  Idempotent; call sites re-arm defensively after savestate
+-- loads.
 function M.rearmInputInjection()
-  if padCallbackRef then
-    pcall(emu.removeMemoryCallback, padCallbackRef, emu.callbackType.read, 0x4218, 0x4219)
-    padCallbackRef = nil
+  if not inputCbRef then
+    inputCbRef = emu.addEventCallback(function()
+      emu.setInput(curPad, 0)             -- NB: (input, port) -- input first!
+    end, emu.eventType.inputPolled)
   end
-  padCallbackRef = emu.addMemoryCallback(function(addr)
-    if addr == 0x4218 then return padLo end
-    if addr == 0x4219 then return padHi end
-  end, emu.callbackType.read, 0x4218, 0x4219)
 end
 M.rearmInputInjection()
 
--- Remove the joypad override entirely (reads become native again).  For
--- diagnosing interference; reversible via rearmInputInjection().
 function M.disableInputInjection()
-  if padCallbackRef then
-    emu.removeMemoryCallback(padCallbackRef, emu.callbackType.read, 0x4218, 0x4219)
-    padCallbackRef = nil
-    M.log("input injection disabled (joypad callback removed)")
+  if inputCbRef then
+    pcall(emu.removeEventCallback, inputCbRef, emu.eventType.inputPolled)
+    inputCbRef = nil
+    M.log("input injection disabled (inputPolled callback removed)")
   end
 end
 
--- Immediately set the held-button set ({"a","down"} or {a=true,down=true}).
--- (Plain function; the step-flavored wrappers are below.)
+-- Set the held-button set ({"a","down"} or {a=true,down=true}); every other
+-- button is released (the script fully owns the pad -- no human player).
 function M.setPad(buttons)
-  padLo, padHi = 0, 0
+  for _, b in ipairs(ALL_BTN) do curPad[b] = false end
   for k, v in pairs(buttons or {}) do
     local name = (type(k) == "number") and v or (v and k or nil)
-    local s = name and BTN[name]
-    if s then
-      if s[1] == 0 then padLo = padLo | s[2] else padHi = padHi | s[2] end
-    elseif name then
-      error("unknown button: " .. tostring(name))
+    if name then
+      if curPad[name] == nil then error("unknown button: " .. tostring(name)) end
+      curPad[name] = true
     end
   end
 end
@@ -589,175 +579,388 @@ local runnerStarted = false
 -- disassembly: party tile x/y $1fc0/$1fc1 (src/field/player.asm
 -- InitPlayerPos), map index $1f64 (battle.asm), player-control gate
 -- $1eb9 bit7 + map-load $84 + menu-opening $59 (player.asm
--- UpdatePlayerMovement).  Movement axis/sign is discovered empirically
--- per step (corridors bend; never assume up=-y), which also makes the
--- primitives robust across maps.
+-- UpdatePlayerMovement).  Movement is CARDINAL and grid-oriented:
+-- up=-Y down=+Y left=-X right=+X, one tile per step; passability is
+-- computed from RAM with an exact port of the engine's CheckPlayerMove
+-- (player.asm), so routes are found by BFS, not discovered by playing.
 
 -- LIVE tile position = party-object pixel coords >> 4 ($086a x / $086d y,
 -- 16-bit).  The $1fc0/$1fc1 bytes are a lazily-updated cache and go stale
--- mid-walk, so never navigate on them.  Movement is cardinal here:
--- up=-Y down=+Y left=-X right=+X (one tile per step).
+-- mid-walk, so never navigate on them.
 function M.fieldX() return M.readWord(0x086a) >> 4 end
 function M.fieldY() return M.readWord(0x086d) >> 4 end
 function M.mapId() return M.readWord(0x1f64) end
 
--- true only when the party can actually be walked this frame
+-- At rest exactly on a tile: every sub-tile position bit is zero (sub-pixel
+-- bytes $0869/$086c plus the low 4 pixel bits of each 16-bit coord).
+-- Position samples for navigation are only valid when this holds -- the
+-- tile coord (pixel>>4) flips EARLY (~1px in) when moving up/left but only
+-- at completion moving down/right, so mid-step reads are direction-skewed.
+function M.tileAligned()
+  return (M.readByte(0x0869) | (M.readByte(0x086a) & 0x0F)
+        | M.readByte(0x086c) | (M.readByte(0x086d) & 0x0F)) == 0
+end
+
+-- An event script is executing iff the 24-bit event PC {$e5,$e6,$e7} is off
+-- its idle parking value $ca/0000.
+function M.eventRunning()
+  return not (M.readByte(0x00e5) == 0 and M.readByte(0x00e6) == 0
+          and M.readByte(0x00e7) == 0xCA)
+end
+
+-- A dialog window is open and waiting for a keypress ($ba dialog state,
+-- $d3 waiting-for-key).  Advancing is EDGE-triggered: one held A yields
+-- exactly one edge; multiple pages need press-RELEASE-press (4 on / 4 off).
+function M.dialogWaiting()
+  return M.readByte(0x00ba) == 1 and M.readByte(0x00d3) == 1
+end
+
+-- true only when the party can actually be walked this frame.  Beyond the
+-- control-gate flags this checks the party movement type ($087c low nibble:
+-- 2 = user-controlled, 4 = event-controlled -- events can walk the party
+-- with every other flag looking innocent) and the event PC.  Deliberately
+-- cheap: RAM reads only, no screenshots (battleLoadStarted is the battle
+-- gate; battleActive()'s screen check has no business in a per-frame poll).
 function M.hasControl()
   return (M.readByte(0x1eb9) & 0x80) == 0
      and M.readByte(0x0084) == 0
      and M.readByte(0x0059) == 0
-     and not M.battleActive()
+     and (M.readByte(0x087c) & 0x0F) == 2
+     and not M.eventRunning()
+     and not M.battleLoadStarted()
+end
+
+-- Six formation species words for the current battle ($57c0+2i); the
+-- goal-formation guards below match on these.
+M.FORMATION = 0x57C0
+function M.formationWords()
+  local w = {}
+  for i = 0, 5 do w[i + 1] = M.readWord(M.FORMATION + i * 2) end
+  return w
+end
+function M.formationHas(set)          -- set: { [speciesWord] = true, ... }
+  for i = 0, 5 do
+    if set[M.readWord(M.FORMATION + i * 2)] then return true end
+  end
+  return false
 end
 
 -- Kill everything in the current battle via each monster's own status
 -- byte (present bit $3aa8 bit0 -> set dead $3eec bit7) and tap A through
 -- the victory/exp text.  Returns a step that resolves when the battle is
--- fully torn down.  This is the gen_whelk idiom, promoted.
-function M.clearBattle(maxFrames)
+-- fully torn down.  The A taps are EDGE-pressed (4 on / 4 off): dialog and
+-- victory-text advancing is edge-triggered, so a continuous hold yields
+-- exactly one page ever.  `spare` (optional list of formation species
+-- words) is the goal-formation guard: if the battle we're asked to clear
+-- IS the goal fight, that's a script bug -- fail loudly instead of
+-- silently instakilling the thing the route exists to reach.
+function M.clearBattle(maxFrames, spare)
+  local spareSet = {}
+  for _, w in ipairs(spare or {}) do spareSet[w] = true end
+  local aPhase = 0
   return M.driveUntil(function()
-    return not M.battleActive() and not M.battleLoadStarted()
+    return not M.battleLoadStarted()   -- implies battleActive() false too
   end, maxFrames or 9000, {
     M.call(function()
-      if M.battleActive() then
+      aPhase = (aPhase + 1) % 8
+      if M.battleLoadStarted() and M.monstersPresent() > 0 then
+        if next(spareSet) and M.formationHas(spareSet) then
+          error("clearBattle: refusing to kill a spared formation " ..
+            string.format("(%04X %04X %04X %04X %04X %04X)",
+              table.unpack(M.formationWords())), 0)
+        end
         for slot = 0, 5 do
           if M.readByte(0x3aa8 + slot * 2) % 2 == 1 then
             M.writeByte(0x3eec + slot * 2, M.readByte(0x3eec + slot * 2) | 0x80)
           end
         end
       end
-      M.setPad({ "a" })            -- also advance victory/exp text
+      M.setPad(aPhase < 4 and { "a" } or {})
     end),
-    M.waitFrames(6),
-    M.call(function() M.setPad({}) end),
-    M.waitFrames(10),
   }, "clear battle")
 end
 
--- One navigation tick toward (tx,ty): held in nav state so it composes
--- as a single driveUntil body.  Greedy on the larger remaining axis,
--- falls back to the other axis on a wall, and escapes pockets by trying
--- the two away-directions; clears any encounter that fires mid-walk.
--- Self-calibrating: learns which coord each button moves and its sign
--- from observed deltas, so it never assumes the map's orientation.
-local DIRS = { "up", "down", "left", "right" }
+-- ----------------------------------------------- true passability model --
+-- Exact port of the engine's own step check, CheckPlayerMove
+-- (src/field/player.asm @4e16).  Tile id at (x,y) = the BG1 tilemap byte
+-- $7f0000[y*256+x]; its properties are p1 = $7e7600[id], p2 = $7e7700[id].
+-- A step from cur=(x,y) toward dir is allowed iff ALL of:
+--   1. p2(cur) has the direction's exit bit (up=$08 right=$01 down=$04
+--      left=$02 -- player.asm DirectionBitTbl);
+--   2. p1(dst)&7 ~= 7 (counter/wall tile);
+--   3. the bridge/z-level rules pass (below, transcribed branch for
+--      branch; party z-level = $b2 low bits, bit0 upper / bit1 lower);
+--   4. no object occupies dst: $7e2000[dstY*256+dstX] bit7 SET means free
+--      (the engine allows crossing UNDER an occupied bridge tile; we skip
+--      that special case -- conservative, and movement-verify covers it).
+local DIRS   = { "up", "right", "down", "left" }
+local DIRIDX = { up = 0, right = 1, down = 2, left = 3 }
+local DIRBIT = { up = 0x08, right = 0x01, down = 0x04, left = 0x02 }
+local DELTA  = { up = { 0, -1 }, right = { 1, 0 },
+                 down = { 0, 1 }, left = { -1, 0 } }
 
-function M.navDump()
-  local t = {}
-  for _, b in ipairs({"up","down","left","right"}) do
-    local m = NAV.map[b]
-    if m then t[#t+1] = b..">"..m.axis..(m.sign>0 and "+" or "-") end
-  end
-  return table.concat(t, " ")
+-- BG1 tilemap byte for a tile (the map wraps at 256 in both axes)
+function M.maptile(x, y)
+  return M.readByte(0x7F0000 + (y & 0xFF) * 256 + (x & 0xFF))
 end
+
+-- the step check, parameterized on the party z-level so the pathfinder can
+-- track z along a hypothetical path instead of assuming it constant
+local function stepAllowed(x, y, dir, z)
+  local d = DELTA[dir]
+  local nx, ny = x + d[1], y + d[2]
+  local c = M.readByte(0x7E7600 + M.maptile(x, y))     -- p1(cur)
+  local e = M.readByte(0x7E7700 + M.maptile(x, y))     -- p2(cur), exit bits
+  local t = M.readByte(0x7E7600 + M.maptile(nx, ny))   -- p1(dst)
+  if (e & 0x0F & DIRBIT[dir]) == 0 then return false end -- no exit that way
+  if (t & 0x07) == 0x07 then return false end            -- counter/wall
+  if (c & 0x04) ~= 0 then                 -- cur is a bridge tile:
+    if (z & 0x01) ~= 0 then               --   party upper: dst must not be
+      if (t & 0x02) ~= 0 then return false end          -- lower-only
+    else                                  --   party lower: dst must not be
+      if (t & 0x01) ~= 0 then return false end          -- upper-only
+    end
+  elseif (t & 0x03) == 0x03 then          -- dst walkable on both z-levels
+    -- always allowed
+  elseif (c & 0x03) == 0x03 then          -- cur on both: any dst EXCEPT a
+    if (t & 0x04) ~= 0 then return false end            -- bridge tile
+  elseif (((c & 0x03) ~ 0x03) & (t & 0x03)) ~= 0 then
+    return false                          -- z-levels incompatible
+  end
+  if (M.readByte(0x7E2000 + (ny & 0xFF) * 256 + (nx & 0xFF)) & 0x80) == 0 then
+    return false                          -- an NPC/object stands there
+  end
+  return true
+end
+
+-- can the party step from tile (x,y) toward dir RIGHT NOW (live z-level)?
+function M.canStep(x, y, dir)
+  return stepAllowed(x, y, dir, M.readByte(0x00b2) & 0x03)
+end
+
+-- party z-level after stepping OFF (x,y): kept on a bridge/both tile,
+-- otherwise taken from the tile being left (player.asm @4eef)
+local function zAfter(x, y, z)
+  local c = M.readByte(0x7E7600 + M.maptile(x, y))
+  if (c & 0x07) >= 0x03 then return z end
+  return c & 0x03
+end
+
+local function edgeKey(x, y, dir)
+  return ((y & 0xFF) * 256 + (x & 0xFF)) * 4 + DIRIDX[dir]
+end
+
+-- BFS a path from the party's CURRENT tile to (tx,ty) over stepAllowed
+-- edges, tracking the z-level a walker would carry along each candidate
+-- path (nodes are (x,y,z) triples).  `blockedEdges` (optional, keys from
+-- edgeKey) prunes edges the executor has PROVEN wrong empirically.
+-- Returns a list of direction strings, or nil (unreachable / >4096 nodes).
+function M.bfsPath(tx, ty, blockedEdges)
+  blockedEdges = blockedEdges or {}
+  local sx, sy = M.fieldX(), M.fieldY()
+  local sz = M.readByte(0x00b2) & 0x03
+  local function nkey(x, y, z) return (z << 16) | ((y & 0xFF) << 8) | (x & 0xFF) end
+  local seen = { [nkey(sx, sy, sz)] = true }
+  local q, qi = { { sx, sy, sz } }, 1
+  local parent = {}                       -- nkey -> { parentNkey, dir }
+  while qi <= #q do
+    local x, y, z = q[qi][1], q[qi][2], q[qi][3]
+    qi = qi + 1
+    if x == tx and y == ty then           -- collect dirs back to the start
+      local dirs, k = {}, nkey(x, y, z)
+      while parent[k] do
+        table.insert(dirs, 1, parent[k][2])
+        k = parent[k][1]
+      end
+      return dirs
+    end
+    if qi > 4096 then return nil end      -- sane radius: give up, not hang
+    local zn = zAfter(x, y, z)
+    for _, dir in ipairs(DIRS) do
+      if not blockedEdges[edgeKey(x, y, dir)] and stepAllowed(x, y, dir, z) then
+        local d = DELTA[dir]
+        local k = nkey(x + d[1], y + d[2], zn)
+        if not seen[k] then
+          seen[k] = true
+          parent[k] = { nkey(x, y, z), dir }
+          q[#q + 1] = { x + d[1], y + d[2], zn }
+        end
+      end
+    end
+  end
+  return nil
+end
+
+-- ------------------------------------------------------- BFS navigation --
+NAV = {}
 function M.navReset()
-  NAV = { dir = nil, held = 0, lastX = nil, lastY = nil, stuck = 0,
-          map = {}, wall = {}, probe = 0 }
+  NAV = { blocked = {}, nblocked = 0, plan = 0, idx = 0, hb = 0 }
 end
 M.navReset()
+function M.navDump()   -- debugging one-liner (kept from the old navigator)
+  return string.format("bfs plan=%d idx=%d blocked=%d",
+    NAV.plan or 0, NAV.idx or 0, NAV.nblocked or 0)
+end
 
 -- targets may be numbers or thunks (resolved each tick, so a route can
 -- aim at a coord it only knows at runtime)
 local function resolve(v) return type(v) == "function" and v() or v end
 
--- does button b reduce the distance to (dx,dy remaining)?  only answerable
--- once b is calibrated (NAV.map[b] = {axis, sign}).
-local function helps(b, dx, dy)
-  local m = NAV.map[b]
-  if not m then return nil end
-  local d = (m.axis == "x") and dx or dy
-  return (d > 0 and m.sign > 0) or (d < 0 and m.sign < 0)
-end
-
--- pick a button to press toward (tx,ty): a calibrated helper that isn't
--- currently walled first; then an uncalibrated probe (avoiding walls);
--- then ANY calibrated mover to route around a wall (wall-following);
--- last resort, an unwalled probe.  NAV.wall is the set of directions
--- known blocked from the CURRENT tile, cleared whenever we move.
-local function navPick(tx, ty)
-  local x, y = M.fieldX(), M.fieldY()
-  local dx, dy = tx - x, ty - y
-  if dx == 0 and dy == 0 then return nil end
-  -- 1. a calibrated direction that helps and isn't walled
-  for _, b in ipairs(DIRS) do
-    if not NAV.wall[b] and helps(b, dx, dy) then return b end
-  end
-  -- 2. an uncalibrated direction to probe (calibration), not walled
-  for _, b in ipairs(DIRS) do
-    if not NAV.map[b] and not NAV.wall[b] then return b end
-  end
-  -- 3. wall-follow: any calibrated mover not walled, even if it helps
-  --    only one axis or temporarily overshoots the other
-  for _, b in ipairs(DIRS) do
-    if not NAV.wall[b] and NAV.map[b] then return b end
-  end
-  -- 4. everything's walled from here: rotate a probe to shake loose
-  NAV.probe = (NAV.probe + 1) % 4
-  return DIRS[NAV.probe + 1]
-end
-
--- returns a driveUntil that walks to (tx,ty) on the current map, or until
--- `arrive` (optional pred) is true; clears encounters; gives up after
--- `stuckCap` blocked direction-changes.
+-- Walk to tile (tx,ty) on the current map: BFS a plan over the true
+-- passability model, then execute it ONE VERIFIED STEP at a time.  Each
+-- iteration (only when user-controlled and tile-aligned): hold the step's
+-- direction until the tile coord changes, release (a begun 16px step
+-- always completes), wait for tile-alignment, and check the landing
+-- against the plan.  A press that never moves us proves the model wrong
+-- for that edge: blocklist it (persists across re-plans within this
+-- navTo) and re-BFS.  Any deviation from the plan (event force-moves,
+-- post-battle drift) also re-plans -- BFS is cheap, guessing isn't.
+-- Encounters that fire mid-walk are cleared inline with the kill-bit
+-- idiom UNLESS the formation matches opts.spare (the goal fight: hands
+-- off, let opts.arrive see it).  Dialogs are advanced with EDGE-pressed
+-- A; other control losses (events walking the party) get a neutral pad.
+--   opts.arrive    extra terminator predicate (checked before everything)
+--   opts.maxFrames frame budget -> error (default 20000)
+--   opts.spare     list of formation species words never to kill-bit
 function M.navTo(txIn, tyIn, opts)
   opts = opts or {}
-  local stuckCap = opts.stuckCap or 24
   local maxFrames = opts.maxFrames or 20000
   local arrive = opts.arrive
+  local spareSet = {}
+  for _, w in ipairs(opts.spare or {}) do spareSet[w] = true end
   M.navReset()
+  local plan, idx = nil, 1
+  local pend = nil          -- the in-flight/unverified step
+  local aPhase = 0          -- edge-press phasing for A (4 on / 4 off)
+  local battN, dlgN, lostN = 0, 0, 0   -- debounce counters (see below)
+  local function drop(why)  -- discard the plan, saying why (once, not per frame)
+    if plan or pend then
+      M.log(string.format("nav: %s at (%d,%d); plan dropped", why,
+        M.fieldX(), M.fieldY()))
+    end
+    plan, pend = nil, nil
+    NAV.plan, NAV.idx = 0, 0
+  end
   return M.driveUntil(function()
-    if arrive and arrive() then return true end
-    return M.fieldX() == resolve(txIn) and M.fieldY() == resolve(tyIn)
-       and M.hasControl()
+    local done
+    if arrive and arrive() then
+      done = true
+    else
+      done = M.fieldX() == resolve(txIn) and M.fieldY() == resolve(tyIn)
+         and M.hasControl() and M.tileAligned()
+    end
+    if done then M.setPad({}) end
+    return done
   end, maxFrames, {
     M.call(function()
-      if M.battleActive() or M.battleLoadStarted() then
-        -- clear inline: kill + advance (clearBattle as raw actions)
-        if M.battleActive() then
+      aPhase = (aPhase + 1) % 8
+      if M.frame - NAV.hb >= 600 then
+        NAV.hb = M.frame
+        M.log(string.format("nav f%d (%d,%d) %s", M.frame, M.fieldX(),
+          M.fieldY(), M.navDump()))
+      end
+      -- classify the frame, DEBOUNCED: the battle/dialog signals live in
+      -- RAM the field module also scribbles on, so require 3 consecutive
+      -- frames before acting -- a real battle/dialog persists for hundreds.
+      -- Acting on a 1-frame ghost would tap A on the open field.
+      battN = M.battleLoadStarted() and battN + 1 or 0
+      dlgN  = M.dialogWaiting() and dlgN + 1 or 0
+      lostN = M.hasControl() and 0 or lostN + 1
+      -- 1. battle: clear it, but NEVER the goal formation
+      if battN >= 3 then
+        drop("battle")
+        if next(spareSet) and M.formationHas(spareSet) then
+          M.setPad({})                 -- goal fight: hands off, arrive() sees it
+          return
+        end
+        if M.monstersPresent() > 0 then
           for slot = 0, 5 do
             if M.readByte(0x3aa8 + slot * 2) % 2 == 1 then
               M.writeByte(0x3eec + slot * 2, M.readByte(0x3eec + slot * 2) | 0x80)
             end
           end
         end
-        M.setPad({ "a" })
-        NAV.dir = nil            -- re-pick after the fight
+        M.setPad(aPhase < 4 and { "a" } or {})
         return
       end
-      if not M.hasControl() then M.setPad({ "a" }); return end  -- event/dialog
+      -- 2. dialog waiting for a keypress: edge-tap A through it
+      if dlgN >= 3 then
+        drop("dialog")
+        M.setPad(aPhase < 4 and { "a" } or {})
+        return
+      end
+      -- 3. any other control loss (event walking the party, fades, or a
+      --    yet-undebounced battle/dialog): neutral pad and wait -- jamming
+      --    directions or A only corrupts state
+      if lostN > 0 or battN > 0 or dlgN > 0 then
+        if lostN >= 3 then drop("control lost") end
+        M.setPad({})
+        return
+      end
+      -- 4. a step is in flight: hold until the tile coord changes
+      if pend and pend.holding then
+        if M.fieldX() ~= pend.x or M.fieldY() ~= pend.y then
+          pend.holding = false         -- it'll glide to rest on its own
+          M.setPad({})
+          return
+        end
+        pend.held = pend.held + 1
+        if pend.held > 30 then         -- never moved: the model was wrong
+          NAV.blocked[edgeKey(pend.x, pend.y, pend.dir)] = true
+          NAV.nblocked = NAV.nblocked + 1
+          M.log(string.format("nav: edge (%d,%d)->%s blocked in reality; re-plan",
+            pend.x, pend.y, pend.dir))
+          plan, pend = nil, nil
+          M.setPad({})
+          return
+        end
+        M.setPad({ [pend.dir] = true })
+        return
+      end
+      -- 5. between steps: position samples are only valid at rest on a tile
+      if not M.tileAligned() then M.setPad({}); return end
       local x, y = M.fieldX(), M.fieldY()
-      -- learn from the previous held direction's effect
-      if NAV.dir and NAV.lastX then
-        local ddx, ddy = x - NAV.lastX, y - NAV.lastY
-        if ddx ~= 0 or ddy ~= 0 then                 -- moved: calibrate
-          if math.abs(ddx) >= math.abs(ddy) and ddx ~= 0 then
-            NAV.map[NAV.dir] = { axis = "x", sign = ddx > 0 and 1 or -1 }
-          elseif ddy ~= 0 then
-            NAV.map[NAV.dir] = { axis = "y", sign = ddy > 0 and 1 or -1 }
-          end
-          NAV.stuck = 0; NAV.wall = {}              -- new tile: walls reset
+      -- 6. verify the landing of the last step against the plan
+      if pend then
+        if x == pend.tx and y == pend.ty then
+          pend = nil                   -- clean step, plan still on track
         else
-          NAV.held = NAV.held + 1
-          if NAV.held >= 3 then                     -- held a wall ~3 samples
-            NAV.wall[NAV.dir] = true
-            NAV.stuck = NAV.stuck + 1
-            NAV.dir = nil
-          end
+          local d = DELTA[pend.dir]
+          local along = (x - pend.x) * d[1] + (y - pend.y) * d[2]
+          local perp  = (x - pend.x) * d[2] + (y - pend.y) * d[1]
+          if perp ~= 0 or along < 1 then
+            -- landed somewhere the pressed direction can't explain
+            NAV.blocked[edgeKey(pend.x, pend.y, pend.dir)] = true
+            NAV.nblocked = NAV.nblocked + 1
+          end                          -- (same-direction slide: edge was fine)
+          M.log(string.format("nav: step (%d,%d)->%s landed (%d,%d); re-plan",
+            pend.x, pend.y, pend.dir, x, y))
+          plan, pend = nil, nil
         end
       end
-      if not NAV.dir then
-        NAV.dir = navPick(resolve(txIn), resolve(tyIn))
-        NAV.held = 0
+      -- 7. (re)plan when we have no plan or it ran out
+      if plan and idx > #plan then plan = nil end
+      if not plan then
+        plan = M.bfsPath(resolve(txIn), resolve(tyIn), NAV.blocked)
+        idx = 1
+        if not plan then
+          error(string.format(
+            "navTo: no path (%d,%d)->(%d,%d) [%d edges blocklisted]",
+            x, y, resolve(txIn), resolve(tyIn), NAV.nblocked), 0)
+        end
+        NAV.plan, NAV.idx = #plan, idx
+        M.log(string.format("nav: planned %d steps from (%d,%d)", #plan, x, y))
+        if #plan == 0 then M.setPad({}); return end  -- pred will notice
       end
-      NAV.lastX, NAV.lastY = x, y
-      if NAV.dir then M.setPad({ [NAV.dir] = true }) else M.setPad({}) end
-      if NAV.stuck > stuckCap then
-        error(string.format("navTo stuck at x=%d y=%d target x=%d y=%d",
-          x, y, resolve(txIn), resolve(tyIn)), 0)
-      end
+      -- 8. launch the next step
+      local dir = plan[idx]
+      idx = idx + 1
+      NAV.idx = idx
+      local d = DELTA[dir]
+      pend = { x = x, y = y, dir = dir, tx = x + d[1], ty = y + d[2],
+               held = 0, holding = true }
+      M.setPad({ [dir] = true })
     end),
-    M.waitFrames(10),
-    M.call(function() M.setPad({}) end),
-    M.waitFrames(2),
   }, "navTo")
 end
 
