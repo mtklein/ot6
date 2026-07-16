@@ -48,10 +48,10 @@ BPS-capable patcher, or just:
   charged for the base spell. BP is the price, not MP. Fire/Ice/Bolt/
   Poison/Cure/Life/Slow/Haste lines all fold.
 - **Everything else**: damage ×2/×4/×8.
-- **The list tells you first**: open a spell list while boost is
-  pending and tiered spells are listed under their folded names —
-  browsing Fire with two boosts pending reads "Fire 3", with the MP
-  cost still the base spell's. What you see is what will cast.
+- **The list tells you first, live**: spell lists show tiered spells
+  under their folded names, and they re-fold in place as you tap R
+  and L — "Cure — Fire" becomes "Cure 2 — Fire 2" mid-browse, with
+  the MP cost still the base spell's. What you see is what will cast.
 
 ## Systems live under the hood
 
@@ -75,8 +75,6 @@ plus a same-mint pixel golden. All green at every commit on main.
 ## Known limits (by design, for now)
 
 - Break/weakness system is element-only; weapon classes come in M3.
-- A mid-list R/L press updates the pips and arrows live, but the
-  folded spell names refresh at the next list open.
 - Cyan's BP-priced Bushido menu is implemented-after-demo (he isn't
   reachable in the demo stretch).
 - Enemy shield counts use the level formula; a per-monster table is

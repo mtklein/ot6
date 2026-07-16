@@ -673,6 +673,7 @@ Ot6FontIcons:
         sta     f:$7e0000+OT6_PIPCUR    ; live pip cell off, no stale erase
         sta     f:$7e0000+OT6_PIPPREV
         sta     f:$7e0000+OT6_LASTLR
+        sta     f:$7e0000+OT6_RESTAGE
         plx
         plp
         rtl
@@ -1336,6 +1337,7 @@ OT6_PIPCUR      := $57cc        ; live pip cell: menu-map word addr (0=off)
 OT6_PIPPREV     := $57ce        ; last flushed addr (for erase-on-move)
 OT6_PIPCELL     := $57d0        ; glyph|attr word to write
 OT6_LASTLR      := $57d2        ; last frame's L/R bits (edge detect)
+OT6_RESTAGE     := $57d4        ; open list wants a re-render (boost moved)
 
 .proc Ot6BgHudFlush_ext
         .a8
@@ -1478,6 +1480,8 @@ OT6_LASTLR      := $57d2        ; last frame's L/R bits (edge detect)
         bcs     @deny
 @store: sta     $3e9d,y
         inc     $6281           ; ching (spc $2c): boost committed
+        lda     #$80
+        sta     OT6_RESTAGE     ; open lists re-fold their names
         bra     @show
 @deny:  inc     $95             ; error buzz: at cap or out of bp
         bra     @show
@@ -1488,6 +1492,8 @@ OT6_LASTLR      := $57d2        ; last frame's L/R bits (edge detect)
         dec     a
         sta     $3e9d,y
         inc     $94             ; cursor click: boost taken back
+        lda     #$80
+        sta     OT6_RESTAGE     ; open lists re-fold their names
 @show:  ; live pip cell for the active character's menu row
         lda     $62ca
         ldx     #$0000
@@ -1547,6 +1553,80 @@ OT6_LASTLR      := $57d2        ; last frame's L/R bits (edge detect)
         lda     #$0000
         sta     f:$7e0000+OT6_PIPCUR
         shorta0
+        rts
+.endproc
+
+; ------------------------------------------------------------------------------
+
+; [ re-render the open magic list when boost moved ]
+
+; polled once per frame from the battle main loop just before the
+; menu-text pump. runs menu state $0d's WORK — clear the line
+; transfer buffer, stage the four visible row-pairs from the scroll
+; top, arm each line's vram transfer — without its completion
+; transitions (those queue window-flow steps that eventually walk
+; the window shut; re-entering the state taught us that the hard
+; way). the re-staged rows run through Ot6PreviewList_ext, so the
+; fold preview redraws with the current pending; the window stays
+; parked in browse the whole time. a8/i16, db = $7e.
+
+; the staging routines are jsr-linkage C1 locals; call them from here
+; with the rts->rtl thunk: [bank][ret16][thunk16] on the stack, jml —
+; their rts lands on Ot6C1Rtl, whose rtl comes home.
+.macro jsr_c1 target
+        phk
+        pea     :+ -1
+        pea     .loword(Ot6C1Rtl)-1
+        jml     f:target
+:
+.endmacro
+
+; flag protocol: 0 idle, $80 fresh request (Ot6Boost), 1-3 lines left
+; in an active cycle. one line per frame: the nmi's _c15d99 drains a
+; single $80-byte line buffer ($5e4d) per frame, which is exactly why
+; vanilla's state $0d stages one row-pair per tick.
+
+.proc Ot6RestageGate_ext
+        .a8
+        .i16
+        lda     f:$7e0000+OT6_RESTAGE
+        beq     @no
+        lda     $7bca           ; menu closed: stale flag
+        beq     @drop
+        lda     $7bc2           ; the per-frame menu state: $0e = magic
+        cmp     #$0e            ; list up and browsing (idle machinery)
+        bne     @wait
+        lda     $7ba9           ; a line transfer is still queued:
+        bne     @no             ; let the nmi drain it first
+        lda     f:$7e0000+OT6_RESTAGE
+        bmi     @fresh
+        ; mid-cycle: stage the next line
+        jsr     @draw
+        bcs     @drop           ; fourth line: cycle complete
+        lda     f:$7e0000+OT6_RESTAGE
+        dec
+        sta     f:$7e0000+OT6_RESTAGE
+        rtl
+@fresh: phx
+        jsr_c1  _c15a17         ; clear the line transfer buffer
+        ldx     $62ca           ; active character slot (vanilla does
+        lda     $8913,x         ; this same 16-bit ldx)
+        sta     $7ba6           ; draw cursor = this list's scroll top
+        lda     #$80
+        sta     $7ba5           ; reset the 4-line staging cycle
+        plx
+        jsr     @draw           ; line one, now
+        lda     #$03            ; three more, one per frame
+        sta     f:$7e0000+OT6_RESTAGE
+        rtl
+@wait:  lda     f:$7e0000+OT6_RESTAGE
+        bmi     @no             ; fresh request: keep it until browsable
+@drop:  lda     #$00            ; cycle complete (or abandoned mid-way)
+        sta     f:$7e0000+OT6_RESTAGE
+@no:    rtl
+@draw:  lda     $7ba6           ; stage one row-pair and arm its
+        jsr_c1  DrawMagicListText       ; transfer; carry = list done
+        jsr_c1  _c15729
         rts
 .endproc
 

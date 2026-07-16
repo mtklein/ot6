@@ -299,7 +299,9 @@ BtlGfx_0b:
         jsr     _c14759
         jsr     _c147ac
         inc     w7e7bbb       ; enable menu window update
-@0186:  rtl
+@0186:
+Ot6C1Rtl:                     ; ot6: rts->rtl thunk for calling this
+        rtl                   ; bank's jsr-linkage routines from afar
 
 ; ------------------------------------------------------------------------------
 
@@ -1741,7 +1743,9 @@ BattleNMI:
         lda     w7e62bf       ; branch if character color palettes are up to date
         bne     @0cdd
         jsr     UpdateCharPal
-@0cdd:  jsr     _c15b14       ; update menu windows
+@0cdd:  jsl     Ot6RestageGate_ext      ; ot6: boost moved while a list is
+                                        ; open? re-fold its names in place
+        jsr     _c15b14       ; update menu windows
         jsr     _c15a5c       ; update menu text
         lda     w7e7b85       ; branch if menu doesn't open instantly
         beq     @0cf4
