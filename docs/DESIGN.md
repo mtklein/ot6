@@ -6,6 +6,15 @@ retuned around them.
 
 Sections marked **TBD** are open design questions, not commitments.
 
+Deep dives (2026-07-16, WoB scope): [character kits & learn
+schedules](design/kits.md), [weapon classes & the break
+spread](design/weapon-classes.md), [magicite sub-jobs](design/magicite.md).
+
+**House rule: vanilla's bugs stay.** Useless stats, the Sketch bug,
+row jank — the original game not being quite right is part of its
+charm, and OT6 only touches vanilla behavior where a pillar demands
+it.
+
 ## Pillars
 
 1. **Sharp silhouettes.** Every character is one job: exactly 8 active skills

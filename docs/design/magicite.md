@@ -1,0 +1,76 @@
+# Magicite as sub-jobs — design dive v1 (2026-07-16)
+
+Scope: World of Balance espers. Status: **proposal for review**;
+locked ✦. Pillar (DESIGN.md ✦): equipping a magicite grants its kit
+*while equipped* — nothing is taught permanently, level-up stat
+bonuses are deleted, one copy of each exists, summon = once per
+battle as the sub-job's divine.
+
+## What one magicite carries
+
+Five slots, all data-table work (menu plumbing lands M5):
+
+1. **Spells** — 2–3 *base-tier* spells (boost folds the tiers, so a
+   Ramuh bearer with 2 BP already casts Bolt 3).
+2. **Stat mod** — flat while-equipped (+magic, +speed…), replacing
+   vanilla's permanent level-up bonuses ✦.
+3. **Passive** — one, active while equipped (esper passives compete
+   with character passives for build identity).
+4. **Weapon permit** — at most one extra weapon class allowed in the
+   equip menu (see weapon-classes.md; battle code never checks it).
+5. **Summon** — the divine, once per battle ✦.
+
+Sub-job fantasy check: a magicite should read as a *job*, not a
+spell bag — its spells, passive, and permit should rhyme.
+
+## The WoB roster
+
+| Esper | Source | Spells (base) | Stat mod | Passive | Permit | Notes |
+|---|---|---|---|---|---|---|
+| Ramuh | Zozo | Bolt, Rasp | +1 magic | *Conductor*: bolt spells chip +1 | spear | the storm-lancer job |
+| Kirin | Zozo | Cure, Regen | +1 stamina | *Mender*: heals never miss the row | — | the medic job |
+| Stray | Zozo | Muddle, Imp | +1 speed | *Alley Cat*: +5 evade | blade | the trickster job |
+| Siren | Zozo | Mute, Sleep | +1 speed | *Lullaby*: sleepers take +50% chip | — | the controller job |
+| Ifrit | Magitek factory | Fire, Drain | +1 vigor | *Kindling*: fire spells chip +1 | blade | the brawler-mage |
+| Shiva | Magitek factory | Ice, Osmose | +1 magic | *Frostbite*: ice chip +1 | rod→arcana | the classic |
+| Unicorn | Zozo (late) | Remedy, Safe | +1 stamina | *Purity*: status durations halved | — | the paladin-adjacent |
+| Maduin | Sealed Gate | Fire, Ice, Bolt | +2 magic | *Trinity*: first spell each battle +1 tier | — | Terra's inheritance: the pure mage job |
+| Shoat | Vector aftermath | Break, Doom | +1 magic | *Gorgon Eye*: Break may (25%) chip 2 | — | the executioner |
+| Phantom | Magitek factory | Vanish, Sleep | +1 speed | *Ghostwalk*: first hit taken each battle misses | — | the assassin's second |
+| Carbunkl | Sealed Gate | Rflect, Shell | +1 stamina | *Facet*: Runic feeds +1 more BP | — | Celes's natural pairing |
+| Bismark | Thamasa | Slow, (Water lore-alike) | +1 vigor | *Tidal*: water chip +1 | — | see open Q2 |
+| Golem | Jidoor auction | Safe, Protect-alike | +2 stamina | *Bulwark*: party takes −10% physical | spear | the wall job |
+| ZoneSeek | Jidoor auction | Shell, Haste | +1 magic | *Ward*: magic taken −10% (party) | — | the abjurer |
+| Sraphim | Tzen (buy) | Cure, Life | +1 stamina | *Grace*: KO'd allies keep their BP | — | the white-mage job |
+
+- The **kit-forming question** per character: which esper completes
+  them? (Celes+Carbunkl = the rune fortress; Locke+Stray = the
+  ghost thief; Edgar+Golem = the siege engine; Sabin+Ifrit = the
+  fire fist.) The one-copy rule ✦ makes those choices exclusive —
+  that's the party puzzle.
+- Espers granting *permits* stay rare (3 in WoB) so multi-weapon
+  characters feel like builds, not defaults.
+- Summon-as-divine cadence ✦: the summon replaces the character's own
+  divine for the battle? **No** — both exist, but both share the
+  "once per battle, apex moment" register. Playtest for redundancy
+  in M6.
+
+## Learning & JP interaction
+
+Nothing here is *learned* — that's the point ✦. JP never buys esper
+content; esper content never becomes permanent. The only overlap:
+passives. Character passives (kits.md) are permanent unlocks;
+esper passives are loaners. Stacking is allowed but the M6 pass
+watches for degenerate pairs (Facet + Rune Eater = 3 BP per Runic —
+almost certainly fine, Runic still eats the turn).
+
+## Open questions for the driver
+
+1. Level-up bonus deletion ✦ is locked, but do espers still gate
+   *anything* permanent (vanilla players expect growth from them)?
+   Current answer: no — permanence lives in JP kits only.
+2. Water has no base spell in vanilla's list (it's lore/esper
+   territory). Bismark either grants the only Water spell in the
+   game (special!) or a Slow/Haste utility pair instead. Which?
+3. Maduin's *Trinity* (first cast +1 tier free) — too strong a
+   folding interaction, or exactly the flavor of "Terra's blood"?
