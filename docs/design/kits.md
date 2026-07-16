@@ -1,210 +1,235 @@
-# Character kits & learn schedules — design dive v1 (2026-07-16)
+# Character kits & learn schedules — design dive v2 (2026-07-16)
 
-Scope: World of Balance. WoR is more work, not different work.
-Status: **proposal for review** — locked items are marked ✦.
+Scope: World of Balance (kits complete or nearly so by its end; WoR
+deepens via magicite, not new lists). Locked items are marked ✦.
 
-## The organizing principle: native learning verbs
+## The organizing principles
 
-FF6 already tells us *how* each character learns — it just never
-committed to it as identity. OT6 keeps each character's native
-learning verb and reshapes the lists to exactly 8:
+**Native learning verbs.** FF6 already tells us *how* each character
+learns; OT6 keeps each verb and reshapes the lists to exactly 8:
 
 | Verb | Characters | Vanilla precedent |
 |---|---|---|
-| **By level** | Sabin (Blitz), Cyan (Bushido), Terra & Celes (natural magic) | the vanilla tables, preserved |
-| **By item** | Edgar (Tools are objects you find/buy) | vanilla tool possession |
-| **By deed** | Mog (dance per terrain), Strago (lore by observation), Gau (rage by capture) | vanilla mechanics, preserved |
+| **By level** | Sabin (Blitz), Cyan (Bushido), Terra & Celes (natural magic — the vanilla table, largely verbatim) | preserved |
+| **By item** | Edgar (Tools are objects you find/buy) | preserved |
+| **By deed** | Mog (dance per terrain), Strago (lore by observation), Gau (rage by capture) | preserved |
 | **By story** | every signature (free at join ✦) and most divines | — |
 
-JP (M4) is the **accelerator, not the gate**: spending JP buys the
-next unlock early (a blitz before its level, a tool before its shop).
-Until the JP menu exists, the native verbs carry the whole schedule —
-nothing blocks on menu-bank work.
+**No JP, probably ✦-leaning.** The native verbs may carry the entire
+schedule — everything below is scriptable with zero menu-bank work.
+Octopath's early-game arc (develop one job, feel it complete, then
+branch into subjobs and open up) falls out naturally: kits fill
+through the WoB, then magicite arrives late-WoB/WoR as the breadth
+layer. JP returns only if playtesting wants a pacing knob.
+
+**Curated kits (the Ochette/Hikari model).** Two characters learn
+MORE than 8 and equip a curated subset (~5 slots): Gau and Strago.
+Everyone else's 8 are fixed. Curating IS their identity — same verb
+family, different collection method.
 
 Boost-tier folding means kits list **base spells only** — Fire is a
-kit entry, Fire 2/3 are what boosting does to it.
+kit entry; Fire 2/3 are what boosting does to it.
 
-Passives unlock at 2/4/6/8 skills learned (M4+; candidates listed,
-none locked).
+Physical chip classes are **slashing / piercing / bludgeoning**
+(see weapon-classes.md v2); some attacks are deliberately
+**null-break** — big dumb damage that chips nothing, the physical
+cousin of non-elemental magic.
 
 ---
 
 ## The constrained three
 
-### Edgar — Machinist (spear)
+### Edgar — Machinist (piercing: spear)
 
-The 8 Tools, verbatim ✦ — learned by acquisition (buy/find), the most
-literal "learn by item" in the game.
+The 8 Tools, verbatim ✦ — learned by acquisition.
 
 | # | Tool | Chip | Source (WoB) |
 |---|---|---|---|
-| 1 | AutoCrossbow ✦ | ranged ×4 hits | join (signature) |
+| 1 | AutoCrossbow ✦ | piercing ×4 | join (signature) |
 | 2 | NoiseBlaster | — (confuse) | Figaro shop |
 | 3 | BioBlaster | poison | Figaro shop |
 | 4 | Flash | — (blind) | Figaro shop, restocked South Figaro |
-| 5 | Drill | spear | Figaro castle, after the sand dive |
-| 6 | Chainsaw | sword | Zozo chest (vanilla) |
-| 7 | Debilitator | sets a random weakness ✦ | Vector shop |
-| 8 | **Air Anchor** (divine) | — | Magitek factory find |
+| 5 | Drill | piercing | Figaro castle, after the sand dive |
+| 6 | Chainsaw | slashing | Zozo chest (vanilla) |
+| 7 | Debilitator | adds + reveals a random weakness ✦ | Vector shop |
+| 8 | **Overclock** ✦ (divine) | — | Magitek factory (story) |
 
-- AutoCrossbow's 4 hits × ranged chip = the party's first shield
-  shredder; Drill pierces armored shields (spear-weak).
-- Debilitator is the proto-OT6 tool — in OT6 it *adds* a weakness to
-  the enemy's set and reveals it.
-- Divine note: Air Anchor as-found is vanilla jank (death sentence);
-  candidate true divine instead: **Overclock** — use two tools in one
-  action. Air Anchor stays the *item*, Overclock the apex verb. TBD.
+- Divine locked ✦: **Overclock** — use two tools in one action. Air
+  Anchor stays a findable *item* mid-kit gag, not the capstone.
+- AutoCrossbow ×4 piercing = the first shield shredder; Drill the
+  armored-boss answer; Chainsaw covers slashing so Edgar alone spans
+  two physical classes through tools.
 - Passive candidates: *Tinkerer* (tools ignore blind), *Royal
-  Discount* (shops half price — vanilla joke preserved as a passive),
-  *Overcharge* (+1 AutoCrossbow hit per 2 BP).
+  Discount* (shops half price), *Overcharge* (+1 AutoCrossbow hit
+  per 2 BP).
 
-### Sabin — Monk (blade)
+### Sabin — Monk (bludgeoning: fists)
 
-The 8 Blitzes, verbatim ✦ — vanilla level table preserved ✦ (jank and
-all): button inputs stay.
+The 8 Blitzes, verbatim ✦ — vanilla level table preserved ✦, button
+inputs stay. Fists are the heart of the **bludgeoning** class
+(fists, staves, rods) — Pummel-as-blade never sat right.
 
 | # | Blitz | Chip | Level |
 |---|---|---|---|
-| 1 | Pummel ✦ | blade ×2 | join (6) |
+| 1 | Pummel ✦ | bludgeoning ×2 | join (6) |
 | 2 | AuraBolt | holy | 10 |
-| 3 | Suplex | — | 15 |
+| 3 | Suplex | bludgeoning | 15 |
 | 4 | Fire Dance | fire | 21 |
 | 5 | Mantra | — (heal) | 26 |
 | 6 | Air Blade | wind | 33 |
 | 7 | Spiraler | — | 42 |
-| 8 | **Bum Rush** (divine) | blade ×8 | 51 / Duncan (WoR) |
+| 8 | **Bum Rush** (divine) | bludgeoning ×8 | 51 / Duncan |
 
-- WoB naturally yields 4-6 blitzes — the kit *grows through* the WoB
-  and finishes in WoR, which is the right pacing for a level verb.
-- Chip logic: multi-hit blitzes are Sabin's shredders; elemental
-  blitzes are his probes.
-- Passive candidates: *Iron Fist* (unarmed counts as blade weapon),
-  *Discipline* (+1 BP when striking a Broken enemy), *Second Wind*
-  (Mantra also grants 1 BP).
+- Passive candidates: *Iron Fist* (unarmed counts as a bludgeon
+  weapon), *Discipline* (+1 BP when striking a Broken enemy),
+  *Second Wind* (Mantra also grants 1 BP).
 
-### Cyan — Samurai (katana)
+### Cyan — Samurai (slashing: katana)
 
-The 8 Bushido priced in BP ✦ (charge gauge deleted ✦) — the BP
-economy showcase. Vanilla level schedule preserved.
+The 8 Bushido priced in BP ✦ (charge gauge deleted ✦). Katana now
+lives inside **slashing** with swords — Cyan is a slashing
+*specialist* (multi-hit slash chips nobody else matches), not a
+mandatory key for katana-only locks. Vanilla level schedule kept.
 
 | # | Tech | BP | Chip | Level |
 |---|---|---|---|---|
-| 1 | Fang ✦ | 0 | katana | join |
+| 1 | Fang ✦ | 0 | slashing | join |
 | 2 | Sky | 1 | — (counter stance) | 6 |
-| 3 | Tiger | 1 | katana | 12 |
-| 4 | Flurry | 2 | katana ×4 | 15 |
+| 3 | Tiger | 1 | slashing | 12 |
+| 4 | Flurry | 2 | slashing ×4 | 15 |
 | 5 | Dragon | 2 | — (drain) | 24 |
-| 6 | Eclipse | 3 | katana, all enemies | 34 |
+| 6 | Eclipse | 3 | slashing, all enemies | 34 |
 | 7 | Tempest | 3 | wind ×4 | 44 |
 | 8 | **Oblivion** (divine) | 3, target must be Broken | — | Phantom Train farewell (story) |
 
-- Oblivion at the Doma grief beat: the one divine that's both story
-  AND the system lesson (it *requires* a Break).
 - Passive candidates: *Vengeance* (+1 BP whenever any enemy Breaks),
-  *Retort* (vanilla counter, rebadged as a passive), *Zanshin* (Sky
-  also chips 1 when it counters).
+  *Retort* (vanilla counter as a passive), *Zanshin* (Sky chips 1
+  when it counters).
 
 ---
 
 ## The middle three
 
-### Terra — Esper mage (sword, fire lean)
+### Terra — Esper mage (slashing: sword, fire lean)
 
-Natural-magic verb (level table, trimmed to the kit). Base spells
-only — boost folds the tiers.
+Vanilla's natural-magic table, trimmed to base tiers with the levels
+compressed so the list completes late-WoB. Vanilla makes her the
+game's only natural raise-learner (Life at 18) — kept, so revival
+lives on Terra, Fenix Downs, and Sraphim, and nowhere else.
 
 | # | Spell | Level |
 |---|---|---|
-| 1 | Fire ✦ | join |
-| 2 | Cure | join |
-| 3 | Poison | 6 |
-| 4 | Drain | 12 |
-| 5 | Slow | 18 |
-| 6 | Break | 24 |
-| 7 | Pearl | 33 |
-| 8 | **Trance** (divine) | Zozo awakening (story) |
+| 1 | Fire ✦ | join (vanilla 3) |
+| 2 | Cure | join (vanilla 1) |
+| 3 | Drain | 12 (vanilla) |
+| 4 | Life | 18 (vanilla) |
+| 5 | Break | 24 |
+| 6 | Pearl | 30 |
+| 7 | Merton | 33 |
+| 8 | **Ultima** ✦ (divine) | story, very late — see below |
 
-- Trance: usable only while an enemy is Broken OR with a full 5-BP
-  bank (DESIGN.md's two candidates — playtest decides, M6).
-- Passive candidates: *Esperkin* (spells chip 2 SP on weakness),
-  *Mag-Armor* (magic damage taken −25%), *Afterglow* (first cast each
+- **Ultima is the fourth fold ✦.** Vanilla's table already teaches
+  Terra Ultima at level 99 — a birthright nobody ever meets. OT6
+  makes it real: after a very-late story unlock, Terra casting Fire
+  at 3 BP folds past Firaga into **Ultima**. Everyone else gets
+  Ultima the expected way — equip Ragnarok. Her divine transcends
+  the spell system itself, which is the whole character.
+- Trance: no longer the divine slot; candidate esper-state mechanic
+  gated on Broken enemies. Parked as an open question.
+- Passive candidates: *Esperkin* (spells chip 2 on weakness),
+  *Mag-Armor* (magic taken −25%), *Afterglow* (first cast each
   battle costs 0 MP).
 
-### Locke — Thief (blade)
+### Locke — Thief (piercing: dagger)
 
-Story-verb learner (his kit grows at heists and rescues, not levels).
+Story-verb learner. More than steal-steal-steal: probe, redistribute,
+corrode — and a little merchant blood (he'd say TREASURE HUNTER).
 
 | # | Skill | Effect | Source |
 |---|---|---|---|
 | 1 | Steal ✦ | vanilla steal | join |
-| 2 | Mug | steal + blade damage | South Figaro escape |
-| 3 | Trickshot | ranged chip (thrown coin arc) | Lete River |
+| 2 | Mug | steal + piercing damage | South Figaro escape |
+| 3 | Trickshot | piercing chip at range (thrown coin) | Lete River |
 | 4 | Filch | steal 1 BP from the target | Opera house |
-| 5 | Dismantle | armor corrode: −defense, chips blade | Vector |
-| 6 | Smokescreen | party dodge up, exit cover | Sealed Gate |
+| 5 | Bestow | give an ally 1 BP | Vector (merchant beat) |
+| 6 | Dismantle | armor corrode: −defense, piercing chip | Sealed Gate |
 | 7 | Appraise | reveal one enemy's full weakness row | Thamasa |
 | 8 | **Master's Mark** (divine) | steal from all enemies + reveal everything | Floating Continent |
 
-- The BP-theft (user's idea, DESIGN.md TBD) lands as *Filch* —
-  economy-vs-economy is the thief fantasy in this system.
-- Passive candidates: *Sticky Fingers* (failed steal keeps the turn's
-  BP gain), *Treasure Sense* (field: chest count on map), *First
-  Strike* (battle opens with +1 BP for Locke).
+- Filch/Bestow make him the economy's hands: take BP from enemies,
+  hand it to allies. Tactically he's tempo, not just loot.
+- Passive candidates: *Sticky Fingers* (failed steal keeps the
+  turn's BP gain), *First Strike* (battle opens +1 BP for Locke),
+  *Fence* (steals sell for more).
 
-### Celes — Rune Knight (sword, ice lean)
+### Celes — Rune Knight (slashing: sword, ice lean)
 
-Natural-magic verb like Terra; defense converted into tempo.
+Vanilla natural-magic levels nearly verbatim — the table was already
+a rune knight's: sensing, warding, hastening. Deliberately mirrors
+Terra: both share Cure; fire/life/transcendence against
+ice/order/tempo. The duality reads clearer than vanilla ever made it.
 
 | # | Spell/Skill | Level |
 |---|---|---|
 | 1 | Runic ✦ (absorbs next spell → **+1 BP** ✦) | join |
-| 2 | Ice | join |
-| 3 | Cure | 8 |
-| 4 | Scan | 14 |
-| 5 | Safe | 20 |
-| 6 | Haste | 26 |
-| 7 | Imp | 32 |
-| 8 | **Absolute Zero** (divine) | Opera / Magitek factory (story) |
+| 2 | Ice | join (vanilla 1) |
+| 3 | Cure | 4 (vanilla) |
+| 4 | Imp | 13 (vanilla) |
+| 5 | Scan | 18 (vanilla) |
+| 6 | Safe | 22 (vanilla) |
+| 7 | Haste | 32 (vanilla) |
+| 8 | **RunicBlade** (divine, leaning) | Opera / Magitek factory (story) |
 
-- Absolute Zero: heavy ice, all enemies, double chip vs revealed
-  ice-weakness. Candidate alternative: *RunicBlade* stance (Runic
-  that also reflects). TBD.
-- Passive candidates: *Rune Eater* (Runic feeds 2 BP instead of 1 at
-  6 skills), *Cold Blood* (ice spells chip +1), *Aegis* (magic taken
-  while at 0 pending −20%).
+- Divine leaning ✦-ward: **RunicBlade** — a Runic stance that also
+  *reflects* what it eats (absorb the MP as BP, bounce the spell).
+  Absolute Zero stays the listed alternate until playtest.
+- Passive candidates: *Rune Eater* (Runic feeds 2 BP), *Cold Blood*
+  (ice chips +1), *Aegis* (magic taken at 0 pending −20%).
 
 ---
 
 ## Sketches (join order, WoB)
 
-- **Shadow — Assassin (blade, thrown/ranged)**: Throw ✦ signature;
-  kit of smoke/exit/dog tricks; divine **Assassinate** — instant kill
-  a Broken non-boss. Interceptor is a passive, not a skill.
-- **Setzer — Gambler (ranged)**: Slots ✦ signature; Coin Toss, Hired
-  Help (GP-for-effects economy pieces); divine **Jackpot** — a
-  Fixed-Dice triple payoff, never Slots itself ✦.
-- **Mog — Dancer (spear)**: the 8 Dances verbatim ✦, learned by
-  dancing on each terrain ✦ (vanilla verb preserved exactly); divine
-  = **Water Rondo** kept WoB-missable, vanilla-style.
+- **Shadow — Assassin (piercing, thrown)**: Throw ✦ signature; smoke
+  and exit tricks; divine **Assassinate** — instant kill a Broken
+  non-boss. Interceptor is a passive.
+- **Setzer — Gambler/Merchant (null-break: dice, cards; darts =
+  piercing)**: Slots ✦ signature; Coin Toss, Hired Help (pay GP for
+  effects) carry the merchant house; divine **Jackpot** — a
+  Fixed-Dice triple payoff, never Slots itself ✦. His weapons are
+  the poster children for null-break: huge numbers, no chip, row
+  ignored (vanilla charm, preserved ✦).
+- **Mog — Dancer (piercing: spear)**: the 8 Dances verbatim ✦,
+  learned by dancing on each terrain ✦; divine **Water Rondo**, kept
+  WoB-missable, vanilla-style. Easy and perfect.
 
-## Deliberately last (flexible, light until the systems above prove out)
+## Curated kits (the Ochette/Hikari pair)
 
-- **Gau — Beast Tamer (innate fangs)**: Leap→Capture (H'aanit model):
-  captured beasts become his 8 equipable skills. The 250-rage table
-  retires; a curated stable ships in M6. Direction only for now.
-- **Strago — Scholar (arcana)**: 8 Lores by observation ✦ (vanilla
-  verb); Aqua Breath free signature; **Analyze** cheap at #2 (the
-  Cyrus role: full weakness reveal). List TBD after the bestiary's
-  weakness spread lands.
-- **Relm — Painter (arcana)**: Sketch ✦ signature (bug preserved ✦ —
-  it's charming right up until it eats a save, and that's canon);
+Both learn an open-ended collection and **equip ~5** — the player
+prunes the kit all game. Same model, different collection verbs:
+
+- **Gau — Beast Tamer (piercing: fangs)**: Leap→**Capture** ✦
+  (H'aanit/Ochette). Captured beasts' signature moves fill his
+  stable; he equips 5 as controllable skills. The 250-entry berserk
+  Rage table retires; the stable is curated in M6. Divine: TBD, a
+  capstone beast.
+- **Strago — Scholar (bludgeoning: rod)**: Lores by observation ✦
+  (Cyrus/Hikari). Aqua Breath free ✦; **Analyze** cheap and early ✦
+  (full weakness reveal — the party's scout tool). Learns every lore
+  he witnesses, equips 5. Divine: a taught-only capstone lore
+  (Grand Train candidate, WoR).
+
+- **Relm — Painter (null-break: brush)**: Sketch ✦ signature (bug
+  preserved ✦ — it eats a save now and then, and that's canon);
   support/trickster kit TBD.
 
 ## Open questions for the driver
 
-1. Edgar's divine: Air Anchor-as-found vs Overclock-as-apex?
-2. Terra's Trance gate: Broken-only, 5-BP bank, or either?
-3. Celes: Absolute Zero vs RunicBlade as the divine?
-4. Locke's Trickshot: is a ranged-chip probe on the thief right, or
-   should he stay pure blade and trade Trickshot for a second
-   steal-flavor skill?
+1. Terra's Trance, now that Ultima owns the divine slot: esper state
+   gated on Broken enemies, a 5-BP overdrive, or cut for WoB?
+2. Gau's divine: a specific capstone beast, or the stable's 5th slot
+   upgraded to hold anything?
+3. Curated-kit slot count: 5 for both Gau and Strago, or asymmetric
+   (Gau 5, Strago 6)?
+4. Does Bestow (Locke) step on Hired Help (Setzer), or is
+   BP-vs-GP economy distinct enough?

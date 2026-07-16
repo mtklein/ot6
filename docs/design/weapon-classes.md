@@ -1,100 +1,96 @@
-# Weapon classes & the break spread — design dive v1 (2026-07-16)
+# Weapon classes & the break spread — design dive v2 (2026-07-16)
 
-Scope: World of Balance. Status: **proposal for review** — locked ✦.
+Scope: World of Balance. Locked ✦.
 
-## Six classes, not eight
+## Three physical classes + null ✦-leaning
 
-DESIGN.md floated eight; six is better. Every class needs enough
-wielders and enough weak enemies that "weak to X" is a decision, not
-trivia. Merges (per the driver's instinct):
+v1's six classes had two problems the driver called: fists-as-blade
+felt wrong on Sabin, and a one-wielder class (katana) made Cyan feel
+mandatory wherever katana locks appeared. v2 goes physical-intuitive:
 
-| Class | Weapons folded in | Wielders (WoB) | Icon |
+| Class | What's in it | Wielders (WoB) | Icon |
 |---|---|---|---|
-| **sword** | swords, greatswords | Terra, Celes, (Edgar alt) | $d9 |
-| **katana** | katana | Cyan | $db |
-| **spear** | spears, lances | Edgar, Mog | $da |
-| **blade** | dirks/daggers, claws, thrown edges | Locke, Shadow, Sabin | $d8 |
-| **ranged** | cards, dice, darts, boomerangs, crossbow bolts | Setzer, Locke (Trickshot), Edgar (AutoCrossbow) | $e0 |
-| **arcana** | rods, brushes | Strago, Relm, Gau (innate fangs read as arcana? **no — see open Q1**) | $dc |
+| **slashing** | swords, katanas, boomerangs, claws? (open Q1) | Terra, Celes, Cyan, Locke-alt | $d9 |
+| **piercing** | spears, daggers, thrown edges, crossbow bolts, darts, fangs | Edgar, Locke, Shadow, Mog, Gau, Setzer-alt | $da |
+| **bludgeoning** | fists, staves, rods, flails | Sabin, Strago, Relm-alt | $dc |
+| **null-break** | dice, cards, brushes, gambler oddballs | Setzer, Relm | — |
 
-- Claws + daggers merge into **blade** ✦-leaning: it gives the
-  Locke/Shadow/Sabin trio one shared identity ("fast close steel"),
-  which matters because trash coverage comes in trios per scenario
-  split (below).
-- Katana stays its own class: Cyan is one character, but bushido is
-  multi-hit-rich, and "weak to katana" enemies make him the answer
-  somewhere — a one-character class is a *spotlight*, not waste.
-- The 8 elements stay untouched ✦ (vanilla bits, richer than
-  Octopath's 6).
+- **Bludgeoning / piercing / slashing covers the basic physicals**
+  intuitively — players can guess a body's weakness before probing
+  (armored → bludgeon or pierce, plated → slash, soft → pierce…),
+  and probing confirms.
+- **Null-break is a feature, not a gap ✦**: some attacks are just
+  big dumb damage that chips nothing — the physical mirror of
+  non-elemental magic. Dice roll huge and teach nothing. This is
+  also the pressure valve for oddball weapons that would otherwise
+  force a silly classification.
+- Cyan is a slashing *specialist* (Flurry ×4 is the best slash chip
+  in the game), never the only slashing key — Terra/Celes swords
+  cover the class when he's absent. The lopsidedness concern is
+  structurally gone, and class-coverage balance stays a standing
+  question we re-ask every milestone ✦.
+- The 8 elements stay untouched ✦.
+- **Row jank preserved ✦**: weapons that ignore row in vanilla
+  (boomerangs, dice, cards, darts…) keep ignoring row. That charm
+  survives contact with the new system untouched.
 
 ## How weaknesses spread (the coverage rule)
 
-**Rule ✦: at every stretch of the WoB, the *current possible party's*
-kit must be able to chip every non-boss encounter.** Not "some party"
-— the party the story hands you.
+**Rule ✦: at every stretch of the WoB, the *story's actual party*
+must be able to chip every non-boss encounter.** The three-way
+scenario split is the stress test:
 
-The scenario split is the stress test and the proof of the design:
-
-| Stretch | Party classes on hand | Elements on hand | So enemies there are weak to… |
+| Stretch | Physical classes on hand | Elements | Enemies there lean |
 |---|---|---|---|
-| Narshe intro | (magitek) | fire, bolt, heal-as-probe | fire/bolt beams — tutorial-obvious |
-| Figaro → Kolts | sword, blade, ranged, spear | fire, cure, poison | any two of those, generously |
-| Lete River | + arcana (Banon) | + holy-ish | water beasts weak to bolt (fiction) + spear |
-| **Locke scenario** | blade, ranged only | none | *every* South Figaro enemy weak to blade or ranged ✦ |
-| **Sabin scenario** | blade, katana, (arcana via Gau) | holy, fire, wind | Phantom Train: holy + katana featured |
-| **Terra/Banon scenario** | sword, spear, arcana | fire, ice, bolt, poison | classic mage-check spread |
-| Zozo | reunited | most | mixed — first "read the room" dungeon |
-| Opera → Vector | + Setzer: ranged | — | ranged-weak fliers around the southern continent |
-| Magitek factory | everyone | all | armored spread: spear/katana featured, bolt-immunes appear |
-| Sealed Gate / Thamasa | + Strago/Relm arcana | + lores | arcana-weak spirits; Analyze becomes the scout tool |
-| Floating Continent | final WoB party | all | the exam: every class and element gets one lock |
+| Narshe intro | (magitek) | fire, bolt | beam-weak, tutorial-obvious |
+| Figaro → Kolts | slash, pierce, bludgeon (full trio by Sabin) | fire, cure, poison | generous mix |
+| **Locke scenario** | pierce only | none | *everything* South Figaro pierces ✦ |
+| **Sabin scenario** | bludgeon, slash (Cyan), pierce (Gau) | holy, fire, wind | Phantom Train: holy + slash featured |
+| **Terra/Banon scenario** | slash, pierce, bludgeon (Banon rod) | fire, ice, bolt, poison | mage-check spread |
+| Zozo | reunited | most | first "read the room" dungeon |
+| Opera → Vector | + null-break Setzer | — | pierce-weak fliers (darts still chip) |
+| Magitek factory | all | all | armored spread: bludgeon/pierce featured |
+| Sealed Gate / Thamasa | + Strago/Relm | + lores | spirits: bludgeon-immune, arcane-elemental |
+| Floating Continent | final WoB party | all | the exam: every class and element locks once |
 
-- **Elemental weaknesses**: keep vanilla's bits wherever they exist ✦
-  (fire beasts fear ice, undead fear holy/fire — the fiction already
-  wrote them); *add* bits only where a stretch would otherwise have a
-  hole.
-- **Weapon weaknesses** (the new byte, M3): assigned by *body
-  reading* — armored → spear (pierce), plated/segmented → katana
-  (slash), soft/quick → blade, flying/small → ranged, spectral/
-  construct → arcana, big dumb muscle → sword. Players should be able
-  to *guess* before they probe; probing confirms.
-- Shields ✦: trash 1–3, minibosses 4–6, bosses 6–12 with telegraphs
-  (DESIGN.md); the per-monster table is authored in M6 against this
-  spread.
+- **Elemental weaknesses**: vanilla's bits stay wherever they exist ✦;
+  add only where a stretch has a hole.
+- **Weapon weaknesses** (the new byte, M3): assigned by body reading —
+  guessable, then confirmed by probe.
+- Shields ✦: trash 1–3, minibosses 4–6, bosses 6–12 with telegraphs;
+  per-monster table authored in M6 against this spread.
 
 ## Weapons as chip carriers
 
-Vanilla already ships elemental weapons (Flame Knife, Blizzard,
-ThunderBlade…). In OT6 a weapon chips **its class, and its element
-too if it has one** ✦ — a Flame Knife is a blade probe *and* a fire
-probe in one swing. That makes shop upgrades and chest finds read as
-tactical acquisitions, not stat ticks, all the way through the WoB.
+A weapon chips **its class, plus its element if it has one** ✦ — a
+Flame Knife is a piercing probe and a fire probe in one swing. In
+vanilla, elemental weapons rotate in and out on raw stats; here every
+chest and shop upgrade is a tactical acquisition. Multi-hit actions
+chip per hit ✦ (AutoCrossbow, Flurry, boosted Fight).
 
-Multi-hit actions chip per hit ✦ (DESIGN.md): AutoCrossbow ×4,
-Flurry ×4, boosted Fight +1/BP — the shredder roles.
+## Skills carry their own class ✦
 
-## Multiple weapon classes per character (engine integration)
+The chip check reads the *action's* class byte, never the wielder's:
+Trickshot is piercing on a dagger thief, AutoCrossbow is piercing
+from a spear machinist, Suplex is bludgeoning regardless of claws.
+(M3's per-skill class/element byte provides this for free.)
 
-Base rule: one class per character (the table above). Two sanctioned
-exceptions, both data-driven, no new battle code:
+## Multiple weapon classes per character
 
-1. **Skills carry their own class** — Trickshot is ranged on a blade
-   character; AutoCrossbow is ranged on a spear character. The chip
-   check reads the *action's* class byte, not the wielder's. (M3
-   already needs a per-skill class/element byte; this falls out
-   free.)
+Base rule: one class per character. Two data-driven exceptions, no
+new battle code:
+
+1. **Skills** (above) — a kit can reach outside its weapon class.
 2. **Magicite weapon permits** (M5): an equipped esper may grant one
-   extra weapon-class permit (e.g. Ramuh permits spears on Terra).
-   Engine-wise this is menu-bank equip-legality only: the battle side
-   always reads the class of the *item actually equipped*. No battle
-   code changes at all.
+   extra weapon-class permit. Kept deliberately spare ✦ — a knob to
+   gesture with, not a system to balance around.
 
 ## Open questions for the driver
 
-1. Gau's innate attack: arcana (feral-as-magic), blade (fangs =
-   fast close), or his own hidden 7th class that only rages use?
-2. Should "ranged" ignore row? (Vanilla back-row halving; Octopath
-   has no rows. Leaving row jank intact ✦-leaning, but ranged
-   ignoring it is one bit of dignity for Setzer.)
-3. Katana spotlight density: how many katana-weak enemies per stretch
-   keeps Cyan shining without making him mandatory?
+1. Claws: slashing (cat-scratch fiction) or bludgeoning (they're on
+   Sabin's monk hands)? Current lean: slashing, so monk fists stay
+   pure bludgeon and claws become his "reach into slash" purchase.
+2. Boomerangs: slashing (blade arc) as listed, or null-break
+   (returning oddball)?
+3. How many null-break weapons before probing feels unrewarding in
+   a Setzer/Relm party? (Their SKILLS still chip — is that enough?)

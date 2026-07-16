@@ -89,12 +89,17 @@ audible, visible, and previewed. See DEMO.md.
 **Exit:** full break loop indistinguishable in structure from Octopath's:
 probe, reveal, chip, break, nuke.
 
-## M4 — Skill lists + JP
+## M4 — Skill lists on the native verbs
 
 - Per-character 8-skill kits enforced; boost-tier spell folding
-  (Fire/Fira/Firaga via BP) replaces spell-tier bloat.
-- Magic AP → JP; purchase menu (menu-bank work); escalating costs; passives
-  unlock at 2/4/6/8.
+  already shipped with the demo.
+- Learn schedules scripted on each character's native verb (levels,
+  items, deeds, story — design/kits.md): **likely no JP system at
+  all**; JP returns only if playtesting wants a pacing knob.
+- Curated-kit machinery for Gau and Strago (learn many, equip ~5 —
+  the Ochette/Hikari model); menu-bank work shifts here from the
+  cancelled JP purchase menu, and the C toolchain carries it.
+- Passives unlock at 2/4/6/8 skills learned.
 
 **Exit:** fresh save through Zozo with every character on their kit.
 

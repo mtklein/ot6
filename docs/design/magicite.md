@@ -1,27 +1,42 @@
-# Magicite as sub-jobs — design dive v1 (2026-07-16)
+# Magicite as sub-jobs — design dive v2 (2026-07-16)
 
-Scope: World of Balance espers. Status: **proposal for review**;
-locked ✦. Pillar (DESIGN.md ✦): equipping a magicite grants its kit
-*while equipped* — nothing is taught permanently, level-up stat
-bonuses are deleted, one copy of each exists, summon = once per
-battle as the sub-job's divine.
+Scope: World of Balance espers. Locked ✦. Pillar (DESIGN.md ✦):
+equipping a magicite grants its kit *while equipped* — spells are
+never taught permanently, level-up stat bonuses are deleted, one
+copy of each exists, summon = once per battle as the sub-job's
+divine. One deliberate exception below: **passives are learned**.
 
 ## What one magicite carries
 
 Five slots, all data-table work (menu plumbing lands M5):
 
 1. **Spells** — 2–3 *base-tier* spells (boost folds the tiers, so a
-   Ramuh bearer with 2 BP already casts Bolt 3).
+   Ramuh bearer with 2 BP already casts Bolt 3). While-equipped only,
+   always.
 2. **Stat mod** — flat while-equipped (+magic, +speed…), replacing
    vanilla's permanent level-up bonuses ✦.
-3. **Passive** — one, active while equipped (esper passives compete
-   with character passives for build identity).
-4. **Weapon permit** — at most one extra weapon class allowed in the
-   equip menu (see weapon-classes.md; battle code never checks it).
+3. **Passive** — active while equipped, and **teachable ✦**: carry
+   the esper long enough and its passive is learned — it joins the
+   character's permanent passive pool and can be slotted even with a
+   different esper equipped. This is Octopath's job+subjob passive
+   mix-and-match, gestured at through espers: your build is your
+   history of who you've carried.
+   - **Learning meter**: a fixed count of *battles fought while
+     equipped* (a deed, like dances and lores — not levels). Trash
+     espers ~15 battles, marquee ones ~25. Stored per character?
+     **No — per esper, party-wide ✦-leaning**: one copy of each
+     esper exists, so "who carried it" barely matters and party-wide
+     keeps the save format trivial.
+   - Passive slots per character stay capped (up to 4, DESIGN.md),
+     so learning more passives deepens *choice*, not power.
+4. **Weapon permit** — at most one extra weapon class in the equip
+   menu (see weapon-classes.md; battle code never checks it). Kept
+   deliberately spare ✦ — a development knob, not a pillar.
 5. **Summon** — the divine, once per battle ✦.
 
 Sub-job fantasy check: a magicite should read as a *job*, not a
-spell bag — its spells, passive, and permit should rhyme.
+spell bag — its spells, passive, and permit should rhyme, and the
+passive is the part of the job you keep.
 
 ## The WoB roster
 
@@ -55,20 +70,21 @@ spell bag — its spells, passive, and permit should rhyme.
   "once per battle, apex moment" register. Playtest for redundancy
   in M6.
 
-## Learning & JP interaction
+## Learning summary
 
-Nothing here is *learned* — that's the point ✦. JP never buys esper
-content; esper content never becomes permanent. The only overlap:
-passives. Character passives (kits.md) are permanent unlocks;
-esper passives are loaners. Stacking is allowed but the M6 pass
-watches for degenerate pairs (Facet + Rune Eater = 3 BP per Runic —
-almost certainly fine, Runic still eats the turn).
+Spells, stats, permits, summons: while-equipped, never learned ✦.
+Passives: learned by battles-carried (above) — the one form of
+esper permanence, replacing vanilla's stat-bonus grind with build
+collection. Character passives (kits.md) and esper passives share
+the same slots; the M6 pass watches for degenerate pairs (Facet +
+Rune Eater = 3 BP per Runic — probably fine, Runic still eats the
+turn).
 
 ## Open questions for the driver
 
-1. Level-up bonus deletion ✦ is locked, but do espers still gate
-   *anything* permanent (vanilla players expect growth from them)?
-   Current answer: no — permanence lives in JP kits only.
+1. Battle-count tuning: is ~15/~25 right, and should the count show
+   on the esper screen as a little meter (recommended: yes, meters
+   are the fun part)?
 2. Water has no base spell in vanilla's list (it's lore/esper
    territory). Bismark either grants the only Water spell in the
    game (special!) or a Slow/Haste utility pair instead. Which?
