@@ -20,18 +20,35 @@ local function weakenMonsters()
   end
 end
 
-local function fightClear(tag)
-  return H.driveUntil(function() return not H.battleActive() end, 6000, {
+-- poke ONCE (weaken + berserk: menu-less auto-actions finish any
+-- fight; repeated poking stalls it), wait it out, then tap A through
+-- the victory text for a fixed beat
+local function addFightClear(steps, tag)
+  steps[#steps + 1] = H.waitFrames(200)  -- battle transitions settle
+  steps[#steps + 1] = H.driveUntil(function()
+    return not H.battleActive()
+  end, 9000, {
     H.call(function()
       if H.battleActive() then
-        weakenMonsters()
-        if H.readByte(0x7bca) ~= 0 then H.setPad({ "a" }) end
+        -- no player actions needed: declare every present monster dead
+        -- through its own status byte and let the engine tear down
+        for slot = 0, 5 do
+          local a = 0x3eec + slot*2
+          if H.readByte(0x3aa8 + slot*2) % 2 == 1 then
+            H.writeByte(a, H.readByte(a) | 0x80)
+          end
+        end
+        H.setPad({ "a" })   -- also advance victory/exp text
       end
     end),
-    H.waitFrames(4),
+    H.waitFrames(6),
     H.call(function() H.setPad({}) end),
-    H.waitFrames(26),
+    H.waitFrames(24),
   }, tag)
+  for _ = 1, 10 do
+    steps[#steps + 1] = H.pressButtons({ "a" }, 4)
+    steps[#steps + 1] = H.waitFrames(26)
+  end
 end
 
 local steps = {
@@ -44,17 +61,17 @@ local steps = {
   }, "fight 2 load"),
   H.waitUntil(function() return H.battleActive() end, 900, "fight 2 active", 30),
   H.waitFrames(120),
-  fightClear("fight 2 cleared"),
-  H.waitFrames(240),
-  H.call(function() H.screenshot("walk_00") end),
 }
+addFightClear(steps, "fight 2 cleared")
+steps[#steps + 1] = H.waitFrames(240)
+steps[#steps + 1] = H.call(function() H.screenshot("walk_00") end)
 
 for i, leg in ipairs(ROUTE) do
   steps[#steps + 1] = H.hold({ leg[1] })
   steps[#steps + 1] = H.waitFrames(leg[2])
   steps[#steps + 1] = H.release()
   steps[#steps + 1] = H.waitFrames(10)
-  steps[#steps + 1] = fightClear("leg " .. i .. " clear")
+  addFightClear(steps, "leg " .. i .. " clear")
   steps[#steps + 1] = H.call(function()
     H.screenshot(string.format("walk_%02d", i))
   end)
