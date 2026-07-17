@@ -190,6 +190,25 @@ lands in M4. Fun mechanics don't wait on menu plumbing.
 - **Save format** → JP reuses the existing per-character AP storage; BP and
   shields are battle-only state, so saves stay compatible.
 
+## Difficulty transform (ruling 2026-07-17)
+
+Enemy **identity** is vanilla-sacred — weaknesses, AI, sprites, and the
+ROM property record never change. Enemy **difficulty** numbers are
+OT6's tuning surface, applied as a *runtime transform*: at monster
+seed time (the same bank-F0 hook that seeds shields), each
+non-authored species' battle HP — current and max copies — is
+multiplied by a per-species-band value in 16ths (`Ot6HpMulTbl`),
+clamped at 16 bits. Authored `Ot6ShieldTbl` species are exempt (boss
+difficulty is bosses-wob.md's job, planned as HP *cuts*), as are
+scene-change battles whose monsters carry HP over. Current values:
+2x for species $00–$BF (the WoB demo's trash), 1x above. Vanilla is
+too easy for the loop to express — mines trash died in one action,
+so neither boosting nor breaking could ever fire (Measurement #1);
+2x puts intro trash at 3–5 real actions with the danger budget
+intact (Measurement #3, the sweep). XP/gil stay vanilla; stamina
+stays derived from vanilla HP; fraction-of-HP attacks read the
+transformed cells and scale with the monster.
+
 ## Scaling to endgame (rulings 2026-07-16)
 
 How the balance plan survives late-game numbers:

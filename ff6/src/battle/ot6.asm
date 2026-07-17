@@ -117,9 +117,136 @@ OT6_BREAK_TICKS := $10          ; a bit under vanilla stop duration ($12)
         sta     $3e9d,y
 @nosram:
         shorta0
+        jsr     Ot6HpScale      ; ot6: difficulty transform (trash hp)
         plx
 done:   rtl
 .endproc
+
+; ------------------------------------------------------------------------------
+
+; [ difficulty transform: scale trash battle hp at monster seed time ]
+
+; enemy IDENTITY (weaknesses, ai, sprites, the rom prop record) is
+; vanilla-sacred; enemy DIFFICULTY numbers are ot6's tuning surface —
+; applied here as a runtime transform, so the rom data never changes.
+; both battle-ram copies of the loaded hp ($3bf4 current, $3c1c max —
+; LoadMonsterProp's only hp stores; every monster load funnels through
+; it) are multiplied by a per-band value in 16ths, clamped at $ffff.
+;
+; exemptions, by construction:
+;   - authored species (any Ot6ShieldTbl row: bosses + tutorial trash)
+;     — boss difficulty is bosses-wob.md's job (it plans hp CUTS), and
+;     the gate's battle fixtures are authored species, so their damage
+;     arithmetic stays byte-stable
+;   - $3a47.7 battles (Cmd_20 scene change, monsters carry hp): the
+;     cells hold prior-stage hp, transformed once already —
+;     LoadMonsterProp's own hp store honors the same gate
+;   - rage loads never reach here (character path exits the seed hook)
+;
+; stamina stays vanilla: LoadMonsterProp derives it from max hp BEFORE
+; this hook runs — deliberate (a stat, not an hp copy). fraction-of-hp
+; attacks (doom gaze etc.) read the transformed cells at cast time and
+; scale with the monster: correct.
+;
+; called from the tail of Ot6SeedShields, monster path only. a8/i16,
+; y = entity offset ($08+), species already stashed at OT6_SPECIES-8,y.
+; preserves y (x is stack-saved by the caller); exits a8, b=0.
+; clobbers the OT6_SCR battle scratch (init-time: nothing else live).
+
+.proc Ot6HpScale
+        .a8
+        .i16
+        lda     $3a47
+        bmi     done            ; monsters kept hp: no fresh load to scale
+        longa
+        ldx     #$0000
+@scan:  lda     f:Ot6ShieldTbl,x
+        cmp     #$ffff
+        beq     @band           ; end of table: non-authored, transform
+        cmp     OT6_SPECIES-8,y
+        beq     @exempt         ; authored species: hp is theirs to keep
+        inx
+        inx
+        inx
+        inx
+        bra     @scan
+@band:  lda     OT6_SPECIES-8,y ; species -> census band 0-3
+        ldx     #$0000
+        cmp     #$0060
+        bcc     @mul
+        inx
+        cmp     #$00c0
+        bcc     @mul
+        inx
+        cmp     #$0100
+        bcc     @mul
+        inx
+@mul:   shorta0
+        lda     f:Ot6HpMulTbl,x
+        cmp     #$10
+        beq     done            ; 1x: identity, leave the cells alone
+        longa                   ; b cleared above: a = the mult byte
+        sta     OT6_SCR_IDX     ; kept across both cells
+        lda     $3bf4,y
+        jsr     hpmul
+        sta     $3bf4,y         ; current hp
+        lda     $3c1c,y
+        jsr     hpmul
+        sta     $3c1c,y         ; max hp
+@exempt:
+        shorta0
+done:   rts
+
+; [ a = clamp16(a * mult / 16), mult byte in OT6_SCR_IDX ]
+; a16/i16. shift-add through a 24-bit product — the /16 must come
+; AFTER the multiply ((hp/16)*mult zeroes 15-hp intro trash), and the
+; product genuinely needs bit 16+ (8000 hp x 2.5 = 20000 fits, but
+; its product doesn't). clobbers x + scratch; preserves y.
+hpmul:  .a16
+        sta     OT6_SCR_SLOT2   ; multiplicand
+        lda     OT6_SCR_IDX
+        xba
+        sta     OT6_SCR_BIT     ; mult << 8: msb-first bit walker
+        clr_a
+        sta     OT6_SCR_COLS    ; product bits 16-23
+        ldx     #$0008
+@bit:   asl                     ; product <<= 1 (24-bit)
+        rol     OT6_SCR_COLS
+        asl     OT6_SCR_BIT     ; next multiplier bit into carry
+        bcc     @next
+        clc
+        adc     OT6_SCR_SLOT2   ; product += multiplicand
+        bcc     @next
+        inc     OT6_SCR_COLS
+@next:  dex
+        bne     @bit
+        lsr     OT6_SCR_COLS    ; /16 (24-bit shift right x4)
+        ror
+        lsr     OT6_SCR_COLS
+        ror
+        lsr     OT6_SCR_COLS
+        ror
+        lsr     OT6_SCR_COLS
+        ror
+        ldx     OT6_SCR_COLS
+        beq     @fits
+        lda     #$ffff          ; clamp: 16-bit cells, 16-bit truth
+@fits:  rts
+.endproc
+
+; hp multiplier per species-id band, in 16ths ($10 = 1x, $28 = 2.5x).
+; bands follow the species census: $00-$5f the wob trash the demo
+; fights, $60-$bf mid trash, $c0-$ff late trash, $100+ bosses/events.
+; authored rows are exempt above this table ever applies; $100+ stays
+; 1x so unauthored event species (doom gaze's saved-hp reload
+; especially — it re-seeds current hp AFTER LoadMonsterProp's store)
+; never compound across encounters.
+Ot6HpMulTbl:
+        .byte   $20             ; $000-$05f: 2x — swept (measurement #3)
+        .byte   $20             ; $060-$0bf: 2x — wob mid trash, by census
+                                ;   arithmetic; stretch fixtures pending
+        .byte   $10             ; $0c0-$0ff: 1x — wor, unmeasured
+        .byte   $10             ; $100+ (keep 1x: see doom gaze note)
 
 ; ------------------------------------------------------------------------------
 

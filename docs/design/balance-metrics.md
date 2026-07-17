@@ -125,3 +125,82 @@ simulated-loop lab. Measured BEFORE the $f2 gate fix; tek now chips
 - R-boost DOES engage inside magitek menus (pending moved 0->2, a
   1-BP boosted beam dealt ~2x) — boost tutorialization can start at
   the Whelk.
+
+## Measurement #3 — difficulty transform sweep (2026-07-17)
+
+The runtime difficulty transform is in: at monster seed time
+(`Ot6HpScale`, called from the `Ot6SeedShields` tail), every
+non-authored species' battle HP — both cells, `$3bf4` current and
+`$3c1c` max — is multiplied by a per-species-band value in 16ths from
+`Ot6HpMulTbl` (bank F0). Authored `Ot6ShieldTbl` species (bosses +
+tutorial trash) are exempt; `$3a47.7` carried-HP scene changes are
+skipped; vanilla ROM data is untouched. Swept the early band
+($00–$5F) across 1x/2x/3x/4x on `bal_mines.lua` (same rig as
+Measurement #1: seeded draws, 8 loadState-independent battles per
+policy per multiplier, identical seeds across multipliers — the table
+byte is the only variable). 128 battles, 0 voids, 0 deaths.
+
+Counting note: the dequeue-side action counter emits two queue
+entries per real action (verified against BP-regen stamps in the
+action traces; Measurement #1's published turns were already real).
+Turns below are real player actions.
+
+| mult | policy | turns | frames | dmg taken | chips | breaks | 3-BP spends |
+|---|---|---|---|---|---|---|---|
+| 1x | baseline | 2.0 | 744 | 4 | 0 | 0 | 0 |
+| 1x | boost3 | 2.0 | 744 | 4 | 0 | 0 | 0 |
+| 1x | greedy | 2.0 | 840 | 5 | 0 | 0 | 0 |
+| 1x | fire | 2.0 | 1517 | 7 | 13 | 0 | 0 |
+| 2x | baseline | 3.1 | 1456 | 10 | 0 | 0 | 0 |
+| 2x | boost3 | 2.8 | 1284 | 9 | 0 | 0 | 0 (bank reaches 3) |
+| 2x | greedy | 2.8 | 1320 | 9 | 0 | 0 | 0 (spends 1s) |
+| 2x | fire | 2.0 | 1517 | 7 | 13 | 0 | 0 |
+| 3x | baseline | 4.9 | 2609 | 19 | 0 | 0 | 0 |
+| 3x | boost3 | 4.1 | 2251 | 19 | 0 | 0 | 3/8 battles |
+| 3x | greedy | 3.4 | 1736 | 11 | 0 | 0 | 0 (spends 1s) |
+| 3x | fire | 2.0 | 1548 | 8 | 13 | 0 | 0 |
+| 4x | baseline | 5.4 | 2923 | 21 | 0 | 0 | 0 |
+| 4x | boost3 | 4.4 | 2463 | 20 | 0 | 0 | 5/8 battles |
+| 4x | greedy | 3.9 | 2070 | 13 | 0 | 0 | 0 (spends 1s) |
+| 4x | fire | 2.4 | 1907 | 8 | 13 | 0 | 0 |
+
+Per-formation baseline TTK (real turns): 2x — Rat,Rat 4 / Repo,Vap 3
+/ Vap,Vap 2. 3x — 6 / 4–5 / 4. 4x — 6 / 5–6 / 4. Real enemy actions
+(baseline): 1.4 / 3.0 / 6.0 / 6.9 across the four multipliers; Terra
+(77 max HP) never ended below 66 at 2x, 45 at 3–4x, no deaths.
+Measured damage constants at L5: Fight ≈ 33–35 per swing, unweak
+Fire ≈ 112–122, weak Fire ≥ 96 in every observed kill (×2 ⇒ ~230).
+
+Band scorecard: **2x is the only column that clears TTK (3.1, every
+formation 2–4) and the danger budget (3.0) together**, and it's where
+the 3-BP bank first *reaches* 3 mid-fight. 3x/4x overshoot both
+bands (Rat,Rat = 6 real turns, 6–7 enemy actions) in exchange for
+boost3's spend window actually firing. greedy *beats* boost3
+wherever boosting expresses (3.4 vs 4.1 at 3x) — banking overshoots
+sub-150-HP targets, so the "greedy must lose" band is a boss-fight
+property, not an intro-trash one (Measurement #2's Whelk shell
+counters are where over-commitment costs).
+
+The tradeoff, quantified: breaks stayed 0 in all 128 battles, and
+that is arithmetic, not tuning. Formula trash has 2 shields; an
+alive-break needs the monster to survive two weak-element hits
+(~230 each), i.e. ~460+ HP — Vaporite would need ≥31x, Were-Rat
+≥19x, an order of magnitude past the TTK band (2x). "Breakable
+intro trash" and "3–5 action fights" are unsatisfiable
+simultaneously in the elemental-probe channel. The workable channel
+is weapon-class chips: Fight (~35) does NOT one-shot 2x trash
+(48–140 HP), so two alive chips fit easily — but formula species
+carry no class weaknesses, so trash class-chipping requires M6
+authoring class rows onto marked trash (the `Ot6ShieldTbl` flavor
+mechanism that already exists). Disposition: intro trash is
+TTK-tuned at 2x; the first break stays the Whelk head's authored
+4·pierce (verified live by `whelkbal_tek`); trash breaks arrive
+with M6 class-weakness data, not with HP multipliers.
+
+Shipped values (`Ot6HpMulTbl`, 16ths): $20/$20/$10/$10 — band
+$00–$5F 2x (swept, above), band $60–$BF 2x (census arithmetic: WoB
+mid trash HP 119–495 keeps the same damage:HP shape; stretch
+fixtures should confirm), bands $C0–$FF and $100+ 1x (WoR
+unmeasured; $100+ additionally guards Doom Gaze's saved-HP reload
+from compounding). Gate: full suite green twice at these values,
+story-chain fixtures re-minted, Whelk head untouched at 1600 HP.
