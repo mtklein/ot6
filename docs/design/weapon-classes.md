@@ -43,18 +43,19 @@ axes: Octopath's exact count.
   (boomerangs, dice, cards, darts…) keep ignoring row. That charm
   survives contact with the new system untouched.
 
-## The icon IS the class
+## The item icon shows the break class
 
-Weapons wear their break class as their item icon, everywhere names
-render — item menu, shops, equip, battle lists. One taxonomy,
-propagated by data: the icon byte leads every item name, so every
-surface follows for free, and the item menu's type column reads
-SLASH / PIERCE / BLUNT / SPECIAL off the same byte. Classless (Heal
-Rod) shows a small dash. Armor, relic, tool, and consumable icons
-stay vanilla. v1 borrows the vanilla sword/spear/staff/sparkle
-glyphs for the four classes. Corollary: wanting more icon
-distinction is a signal to expand the class system — never to grow a
-second, flavor-only taxonomy beside it.
+Each weapon's item icon is its break class icon, on every surface
+that renders item names: item menu, shops, equip, battle lists. The
+icon byte is the first byte of the item name, so a single data table
+covers every surface, and the item menu's type column reads
+SLASH / PIERCE / BLUNT / SPECIAL from the same byte. Classless
+weapons (Heal Rod) show a small dash. Armor, relic, tool, and
+consumable icons are unchanged from vanilla. v1 reuses the vanilla
+sword/spear/staff/sparkle glyphs for the four classes. Rule: if we
+ever want more visual distinction between weapon types, that is a
+reason to consider another weapon class, not to add a second
+icon set with no mechanical meaning.
 
 ## How weaknesses spread (the coverage rule)
 

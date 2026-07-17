@@ -101,9 +101,9 @@ audible, visible, and previewed. See DEMO.md.
   classified; Blitzes/SwdTechs/Tools assigned.
 - ✅ Per-species class weaknesses ride the authored shield table (WoB boss
   arc through Nerapa + tutorial trash); codex v2 remembers classes.
-- ✅ **The icon IS the class**: weapons wear their break class as their
-  item icon everywhere names render; the type column reads
-  SLASH/PIERCE/BLUNT/SPECIAL; inventory Arrange groups by class for free.
+- ✅ **Class icons**: each weapon's item icon is its break class icon on
+  every surface that renders item names; the type column reads
+  SLASH/PIERCE/BLUNT/SPECIAL; inventory Arrange groups by class.
 - ⬜ Strago's Analyze (rides M4 kit work).
 
 **Exit met:** the break loop is structurally Octopath's — probe, reveal,
