@@ -5,7 +5,10 @@ local goodFire, goodShield
 -- vanish until the next battle (the Whelk-dialogue bug the user hit).
 -- The fix: the dialogue-close path (_c143b9 -> Ot6FontRestoreMark_ext)
 -- runs the vanilla small-font restore to COMPLETION, then sets
--- OT6_FONTDIRTY ($57d5), and the battle NMI re-lays our icons in vblank
+-- OT6_FONTDIRTY ($57b9; relocated from $57d5, which turned out to be
+-- byte 0 of vanilla's banner name scratch — see battle_banner), and the
+-- battle NMI re-lays our icons in vblank, ONE ~128-byte slice per frame
+-- (6 stages; a single-shot re-lay was ~46 scanlines and tore the frame).
 -- (flag-after-restore ordering matters: battle_dlgmenu gates the real
 -- dialogue flow). This test drives the MECHANISM directly: corrupt the
 -- icon cells in vram, raise the flag, and confirm the NMI restores them
@@ -13,7 +16,8 @@ local goodFire, goodShield
 local H = dofile("/Users/mtklein/ot6/tools/tests/lib/ot6.lua")
 local STATE = "/Users/mtklein/ot6/build/states/battle_doorstep.mss.lua"
 local vr = emu.memType.snesVideoRam
-local FONTDIRTY = 0x57d5
+local FONTDIRTY = 0x57b9
+local RELAY_STAGES = 6
 
 -- a couple of our font cells (fire icon $eb, a hud shield glyph $65) at
 -- vram $b000 + cell*16 (2bpp small font)
@@ -52,9 +56,9 @@ H.run({ maxFrames = 30000 }, {
     H.assertEq(cellBytes(0xeb) ~= goodFire, true, "cells corrupted")
   end),
   -- raise the dirty flag exactly as the dialogue-close hook does
-  H.call(function() H.writeByte(FONTDIRTY, 1) end),
-  -- the battle NMI must re-lay our icons within a frame or two and clear
-  -- the flag
+  H.call(function() H.writeByte(FONTDIRTY, RELAY_STAGES) end),
+  -- the battle NMI re-lays one slice per frame; all six stages plus
+  -- budget-gate deferrals land well inside this window
   H.waitUntil(function()
     return H.readByte(FONTDIRTY) == 0 and cellBytes(0xeb) == goodFire
   end, 300, "nmi re-laid the font icons", 1),

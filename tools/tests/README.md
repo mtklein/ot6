@@ -85,6 +85,21 @@ line reports its worker and wall time.
 - `probe_canstep.lua` - validates `H.canStep` (the CheckPlayerMove
   port) against real movement at the boot area; renders the model's view
   of the neighborhood as ASCII.
+- `battle_banner.lua` - TEMPORAL gate for the banner screen-tear: exec
+  callbacks at the battle NMI's entry / flush start / flush end / post-
+  INIDISP sample `ppu.scanline` on EVERY frame through a Fire Beam cast
+  (named banners: vanilla writes its name scratch at $7E57D5) and assert
+  the whole NMI tail stays inside vblank (scanline 225..261), plus
+  OT6_FONTDIRTY ($57B9) stays clear and the under-monster HUD cells are
+  still painted in VRAM afterwards.  Pre-fix this measured the flush
+  ending at scanline 292 (30 lines into active display) on banner
+  frames -- the user-visible flash/tear.
+- `probe_banner.lua` - the measurement instrument behind battle_banner:
+  per-frame scanline table (NMI entry / flush start / flush end / post-
+  INIDISP) plus $57D5, large-transfer flag/size, and a 44-frame
+  screenshot burst across the banner window.
+- `probe_57b9.lua` - write-watcher over $7E57B9-BF (OT6_FONTDIRTY's
+  relocated home) with $7E57D5 as positive control; logs writer PCs.
 
 Generated artifacts land in `build/states/` (savestates, `*.mss` +
 `*.mss.lua` sidecar) and `build/states/shots/` (PNG screenshots).
@@ -197,6 +212,20 @@ Plain functions (call from `H.call`/predicates):
 - `emu.getState()` returns a huge table (cpu.*, ppu.*, spc.*,
   internalRegisters.*, frameCount...).  Handy: `cpu.k/cpu.pc` (crash triage),
   `ppu.screenBrightness`, `internalRegisters.enableNmi`.
+  **The keys are FLAT dotted strings**: `s["ppu.scanline"]`, `s["cpu.pc"]` --
+  `s.ppu` is nil, and indexing it "nested" throws (silently, inside a
+  callback: the rest of that callback invocation is skipped with no log).
+  It works inside exec-memory and event callbacks too; `ppu.scanline`
+  (0-261, NMI fires at 225) is how battle_banner samples vblank timing.
+- Narrow exec memory callbacks on ROM code use CPU-bus addresses and DO
+  fire for bank C1/C2 (`emu.addMemoryCallback(fn, emu.callbackType.exec,
+  0xC10BA7, 0xC10BA7)` fires once per battle NMI); they do NOT fire for
+  bank F0 code.  PRG-file-offset forms fire never (0x010BA7) or on the
+  wrong thing; use the bus form.
+- Reading $2137/$213D via `emu.read(..., emu.memType.snesMemory)` does NOT
+  trigger the H/V counter latch side effect -- both return 0.  Sample the
+  scanline from Lua via `getState()["ppu.scanline"]`; from 65816 code the
+  real register latch works fine (the flush's re-lay budget gate does it).
 - `emu.getScriptDataFolder()` returns `true` (not a path) in this build -
   don't rely on it.
 

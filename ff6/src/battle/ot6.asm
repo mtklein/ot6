@@ -451,10 +451,14 @@ done:   rtl
 ; $400 bytes per frame and returns only after the LAST chunk has landed
 ; in vram — and only THEN raise OT6_FONTDIRTY so the battle nmi re-lays
 ; our icons over a fully-restored font (in vblank, where direct vram
-; writes actually land).
+; writes actually land). the re-lay is STAGED: OT6_FONTDIRTY counts
+; stages remaining, and the nmi flush runs one ~128-byte slice per
+; frame — the whole 768-byte re-lay measured ~46 scanlines of PIO,
+; more than an entire vblank, so a single-shot re-lay tore the frame
+; (probe_banner measured end-of-flush at scanline 292 of 262).
 ;
-; both halves of this ordering are the whelk garbled-menu bug fix
-; (battle_dlgmenu is the regression gate):
+; both halves of the restore-then-flag ordering are the whelk
+; garbled-menu bug fix (battle_dlgmenu is the regression gate):
 ;   * the first cut of this shim ran BEFORE the jmp WaitTfrVRAM and
 ;     clobbered A with the flag value, so the "restore" streamed $1000
 ;     bytes of bank-$01 open bus over the font and every battle menu
@@ -468,7 +472,7 @@ done:   rtl
         php
         sep     #$20            ; a8 (index width irrelevant)
         pha
-        lda     #$01
+        lda     #OT6_RELAY_STAGES
         sta     f:$7e0000+OT6_FONTDIRTY
         pla
         plp
@@ -486,6 +490,12 @@ done:   rtl
 ; that point at blank font cells ($ee alone appears 1000+ times around the
 ; screen borders) — filling those cells paints garbage at the edges. every
 ; cell below was verified unreferenced in the battle tilemap regions.
+;
+; the upload is split into six ~128-byte slices so the nmi flush can
+; re-lay the font one slice per vblank after a battle dialogue (the
+; whole 768 bytes as PIO measured ~46 scanlines — more than a vblank).
+; this entry point runs ALL slices back to back: it is only called in
+; forced blank (battle init), where budget is unlimited.
 
 .proc Ot6LoadFontIcons_ext
         .a8
@@ -499,6 +509,24 @@ done:   rtl
         shorta
         lda     #$80
         sta     hVMAINC         ; increment on high byte, +1 word
+        jsr     Ot6LoadElemIcons
+        jsr     Ot6LoadBgGlyphsA
+        jsr     Ot6LoadBgGlyphsB
+        jsr     Ot6LoadObjArrowsA
+        jsr     Ot6LoadObjArrowsB
+        jsr     Ot6LoadObjArrowsC
+        plb
+        plp
+        rtl
+.endproc
+
+; [ re-lay slice: the eight element icon tiles (128 bytes) ]
+
+; a8/i16, db = $00, vmainc $80. exits a8. clobbers a/x/y.
+
+.proc Ot6LoadElemIcons
+        .a8
+        .i16
         ldx     #$0000          ; icon index (long,y indexing doesn't exist)
 @icon:  shorta
         lda     f:Ot6ElemGlyphTbl,x
@@ -531,11 +559,7 @@ done:   rtl
         cpx     #$0008
         bcc     @icon
         shorta
-        jsr     Ot6LoadBgGlyphs ; hud glyphs into free font cells
-        jsr     Ot6LoadObjArrows; boost-mark sprites into free obj tiles
-        plb
-        plp
-        rtl
+        rts
 .endproc
 
 ; element bit (fire $01 .. water $80) -> small font glyph/tile code.
@@ -833,9 +857,13 @@ Ot6FontIcons:
         sta     f:$7e0000+OT6_PIPCUR    ; live pip cell off, no stale erase
         sta     f:$7e0000+OT6_PIPPREV
         sta     f:$7e0000+OT6_LASTLR
-        sta     f:$7e0000+OT6_RESTAGE   ; also clears OT6_FONTDIRTY (next byte)
-        plx                             ; (OT6_ATKCLASS sits in the shadow
-                                        ;   strip: the @clr loop covered it)
+        sta     f:$7e0000+OT6_RESTAGE   ; word store: the high byte lands on
+                                        ;   vanilla's $57d5 name scratch —
+                                        ;   harmless at init (vanilla always
+                                        ;   writes it before reading)
+        plx                             ; (OT6_ATKCLASS and OT6_FONTDIRTY sit
+                                        ;   in the shadow strip: the @clr
+                                        ;   loop covered them)
         plp
         rtl
 .endproc
@@ -1102,14 +1130,13 @@ done:   plp
 
 ; [ upload the bg hud glyphs into free font cells ]
 
-; 13 2bpp tiles (shield-with-count 1-6/B, pip clusters 0-5) written to
-; the battle font at vram $5800 + cell*8. runs inside the font uploader
-; (db = $00, forced blank).
+; 16 2bpp tiles (shield-with-count 1-6/B, pip clusters 0-5, boost cells)
+; written to the battle font at vram $5800 + cell*8, as two 8-tile
+; slices (~128 bytes each — one fits a vblank-tail re-lay stage).
+; a8/i16, db = $00, vmainc $80. exits a8. clobbers a/x/y.
 
-.proc Ot6LoadBgGlyphs
-        .a8
-        .i16
-        ldx     #$0000          ; glyph index
+.macro ot6_glyph_slice first, last
+        ldx     #first          ; glyph index
 @tile:  phx
         lda     f:Ot6BgGlyphCellTbl,x
         longa
@@ -1136,9 +1163,21 @@ done:   plp
         shorta
         plx
         inx
-        cpx     #$0010          ; 16 glyphs
+        cpx     #last
         bcc     @tile
         rts
+.endmacro
+
+.proc Ot6LoadBgGlyphsA
+        .a8
+        .i16
+        ot6_glyph_slice $0000, $0008
+.endproc
+
+.proc Ot6LoadBgGlyphsB
+        .a8
+        .i16
+        ot6_glyph_slice $0008, $0010
 .endproc
 
 ; ------------------------------------------------------------------------------
@@ -1149,13 +1188,13 @@ done:   plp
 ; (quads with 216/217 etc. below) — verified blank + unreferenced by
 ; any oam entry in both formations, idle and through attack effects
 ; (probe_objtiles.lua). obj chr base is word $2000 (obsel $61), 4bpp.
-; runs inside the font uploader: db = $00, forced blank, vmainc $80.
+; 12 tiles x 32 bytes, as three 4-tile slices (~128 bytes each — one
+; fits a vblank-tail re-lay stage).
+; a8/i16, db = $00, vmainc $80. exits a8. clobbers a/x/y.
 
-.proc Ot6LoadObjArrows
-        .a8
-        .i16
+.macro ot6_arrow_slice first, last
         longa
-        ldx     #$0000          ; data offset; table offset = x >> 4
+        ldx     #first          ; data offset; table offset = x >> 4
 @tile:  phx                     ; (long,y indexing doesn't exist)
         txa
         lsr
@@ -1173,10 +1212,28 @@ done:   plp
         inx
         dey
         bne     @word
-        cpx     #$0180          ; 12 tiles x 32 bytes
+        cpx     #last
         bcc     @tile
         shorta
         rts
+.endmacro
+
+.proc Ot6LoadObjArrowsA
+        .a8
+        .i16
+        ot6_arrow_slice $0000, $0080
+.endproc
+
+.proc Ot6LoadObjArrowsB
+        .a8
+        .i16
+        ot6_arrow_slice $0080, $0100
+.endproc
+
+.proc Ot6LoadObjArrowsC
+        .a8
+        .i16
+        ot6_arrow_slice $0100, $0180
 .endproc
 
 ; vram word addresses of the arrow tiles: quads at 200, 202, 204
@@ -1510,10 +1567,23 @@ OT6_PIPPREV     := $57ce        ; last flushed addr (for erase-on-move)
 OT6_PIPCELL     := $57d0        ; glyph|attr word to write
 OT6_LASTLR      := $57d2        ; last frame's L/R bits (edge detect)
 OT6_RESTAGE     := $57d4        ; open list wants a re-render (boost moved)
-OT6_FONTDIRTY   := $57d5        ; a battle dialogue clobbered our font cells
-                                ; ($57d6+ is NOT ours: vanilla battle gfx
-                                ;   scribbles there — measured, see
-                                ;   OT6_ATKCLASS above)
+OT6_FONTDIRTY   := $57b9        ; font re-lay stages remaining (0 = clean).
+                                ; RELOCATED from $57d5: vanilla reserves
+                                ; $57d5..$5854 as the battle name-scratch
+                                ; string (ram_res w7e57d5,128 — GfxCmd_01
+                                ; attack names, GfxCmd_11 monster specials,
+                                ; swdtech/esper name loaders ALL write
+                                ; byte 0 nonzero), so every named-attack
+                                ; banner spuriously triggered a full
+                                ; ~46-scanline font re-lay in the nmi tail
+                                ; and tore the frame (probe_banner: flush
+                                ; end at scanline 292; battle_banner is
+                                ; the regression gate). $57b9 is the spare
+                                ; byte after OT6_ATKCLASS, inside the m2
+                                ; trace-verified strip and the InitBP @clr
+                                ; (probe_57b9 write-watch: only bank-F0
+                                ; writers). $57d5+ is vanilla's alone.
+OT6_RELAY_STAGES := 6           ; icons, glyphs x2, arrows x3 (~128b each)
 
 .proc Ot6BgHudFlush_ext
         .a8
@@ -1527,17 +1597,56 @@ OT6_FONTDIRTY   := $57d5        ; a battle dialogue clobbered our font cells
         clr_a
         pha
         plb                     ; db = 0 for hardware registers
-        ; a battle dialogue clobbered our font cells? re-lay them now, in
-        ; vblank (this nmi), where direct vram writes actually land — then
-        ; clear the flag. once per dialogue, so near-free.
+        lda     #$80
+        sta     hVMAINC         ; word writes for the stages and the lines
+        ; a battle dialogue clobbered our font cells? re-lay them ONE
+        ; ~128-byte slice per nmi (OT6_FONTDIRTY counts stages left).
+        ; the full 768-byte re-lay is ~46 scanlines of PIO — more than
+        ; a whole vblank — so a single-shot re-lay tore the frame it
+        ; ran on (probe_banner measured flush end at scanline 292/262).
+        ; staging self-heals over 6 frames and each slice is gated on
+        ; the live v counter: only start one with >= 14 lines of vblank
+        ; left (slice ~9 + flush ~3 + hdma/inidisp tail ~2), else retry
+        ; next nmi. quiet-battle flush start measured 240-250, so the
+        ; gate passes within a frame or two.
         lda     f:$7e0000+OT6_FONTDIRTY
         beq     @nofont
-        lda     #$00            ; (stz has no long-addressing mode)
+        lda     hSLHV           ; software-latch the h/v counters
+        lda     hSTAT78         ; reset the opvct read flip-flop
+        lda     hOPVCT          ; v low byte
+        xba                     ; stash it in b
+        lda     hOPVCT          ; v bit 8 (in bit 0)
+        lsr                     ; -> carry
+        xba                     ; a = v low byte (xba preserves carry)
+        bcs     @nofont         ; v >= 256: 6 lines left, too late
+        cmp     #$e1            ; v < 225: not vblank (defensive)
+        bcc     @nofont
+        cmp     #$f9            ; v > 248: too late to start a slice
+        bcs     @nofont
+        lda     f:$7e0000+OT6_FONTDIRTY
+        dec     a
         sta     f:$7e0000+OT6_FONTDIRTY
-        jsl     Ot6LoadFontIcons_ext
+        beq     @s0             ; a = stage 5..0, most visible first
+        cmp     #$01
+        beq     @s1
+        cmp     #$02
+        beq     @s2
+        cmp     #$03
+        beq     @s3
+        cmp     #$04
+        beq     @s4
+        jsr     Ot6LoadElemIcons        ; 5: menu element icons
+        bra     @nofont
+@s4:    jsr     Ot6LoadBgGlyphsA        ; 4: hud shield glyphs
+        bra     @nofont
+@s3:    jsr     Ot6LoadBgGlyphsB        ; 3: hud pip/boost glyphs
+        bra     @nofont
+@s2:    jsr     Ot6LoadObjArrowsA      ; 2-0: boost-mark obj tiles
+        bra     @nofont
+@s1:    jsr     Ot6LoadObjArrowsB
+        bra     @nofont
+@s0:    jsr     Ot6LoadObjArrowsC
 @nofont:
-        lda     #$80
-        sta     hVMAINC
         ldx     #$0000
 @line:  longa
         lda     f:$7e0000+OT6_SHADOW+2,x         ; prev
