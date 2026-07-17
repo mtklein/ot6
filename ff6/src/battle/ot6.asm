@@ -10,9 +10,11 @@
 ;   $3e39,X  max shield points
 ;   $3e88,X  broken timer (nonzero = broken; ticks with status counters)
 ;   $3e89,X  revealed weakness elements (bitmask, same bits as $3be0)
-;   $3e9c,X  boost points (characters only, 0-5)
-;   $3e9d,X  pending boost for the next action (0-3)
-; entity offsets: $00-$06 characters, $08-$12 monsters
+;   $3e9c,X  characters: boost points (0-5) · monsters: class weaknesses
+;   $3e9d,X  characters: pending boost (0-3) · monsters: revealed classes
+; entity offsets: $00-$06 characters, $08-$12 monsters. the split $3e9c
+; table works because every consumer is entity-gated (cmp #$08) — bp code
+; never touches monster rows, class code never touches character rows.
 ; ------------------------------------------------------------------------------
 
 OT6_BREAK_TICKS := $10          ; a bit under vanilla stop duration ($12)
@@ -64,13 +66,16 @@ OT6_BREAK_TICKS := $10          ; a bit under vanilla stop duration ($12)
         inx
         inx
         inx
+        inx                     ; 4-byte records: species, shields, classes
         bra     @scan
 @hit:   shorta0
+        lda     f:Ot6ShieldTbl+3,x
+        sta     $3e9c,y         ; authored class weaknesses (monster half)
         lda     f:Ot6ShieldTbl+2,x
         bra     @seed
 @formula:
-        shorta0
-        lda     OT6_SCR_BIT     ; level
+        shorta0                 ; formula species carry no class weakness
+        lda     OT6_SCR_BIT     ; level ($3e9c,y stays InitBattle-zeroed)
         lsr
         lsr
         lsr
@@ -84,20 +89,20 @@ OT6_BREAK_TICKS := $10          ; a bit under vanilla stop duration ($12)
         ; weakness codex: pre-reveal anything learned in past battles
         longa
         lda     f:OT6_CODEX_MAGIC
-        cmp     #$364f          ; 'O6' - codex bank initialized?
-        beq     @learned
-        ; first use (or no sram bank): wipe the table, then sign it.
+        cmp     #$374f          ; 'O7' - codex layout v2 initialized?
+        beq     @learned        ;   (v2 = elements + classes; the bump
+        ; first use (or no sram bank): wipe both tables, then sign it.
         ; without 32k sram the magic never sticks and the codex is a
         ; harmless no-op: reads return open bus, merges are junk-free
         ; because we only merge after the magic matches.
-        shorta0
+        shorta0                 ;   re-wipes any 'O6'-era bank once)
         ldx     #$0000
 @wipe:  sta     f:OT6_CODEX,x
         inx
-        cpx     #$0180          ; 384 species
+        cpx     #$0300          ; 384 species x (elements, classes)
         bcc     @wipe
         longa
-        lda     #$364f
+        lda     #$374f
         sta     f:OT6_CODEX_MAGIC
         cmp     f:OT6_CODEX_MAGIC
         bne     @nosram         ; write didn't stick: no codex bank
@@ -107,6 +112,9 @@ OT6_BREAK_TICKS := $10          ; a bit under vanilla stop duration ($12)
         lda     f:OT6_CODEX,x
         ora     $3e89,y
         sta     $3e89,y
+        lda     f:OT6_CODEX_CLASS,x
+        ora     $3e9d,y
+        sta     $3e9d,y
 @nosram:
         shorta0
         plx
@@ -117,12 +125,14 @@ done:   rtl
 
 ; [ chip shields on an elemental weakness hit ]
 
-; called from the weak-element branch of CalcTargetDmg (match confirmed)
-; a8/i16, y = target, $11a1 = attack elements, preserves x/y
+; called from the weak-element branch of CalcTargetDmg (match confirmed).
+; a8, y = target, $11a1 = attack elements, preserves x/y. INDEX WIDTH
+; VARIES: the per-target damage loop runs i8 (CalcAttackEffect is .i8),
+; so everything here is width-agnostic except the codex store, which
+; pins i16 for its word-sized species load.
 
 .proc Ot6Chip
         .a8
-        .i16
         tya                     ; entity offset, width-neutral test
         cmp     #$08
         bcc     done            ; characters have no shields
@@ -147,13 +157,21 @@ merge:  pla                     ; reveal all matched weaknesses
         ora     $3e89,y
         sta     $3e89,y
         ; learn it forever: codex entry = everything revealed so far
-        ; (seed merged the old codex bits in, so this is monotonic)
+        ; (seed merged the old codex bits in, so this is monotonic).
+        ; species is a word: pin i16 for the load — under the caller's
+        ; i8 the ldx truncated species >= $100 onto the wrong codex
+        ; slot (m1 latent bug; guard/lobo were too small to catch it).
+        ; entity offsets survive the rep: 8-bit index mode forces the
+        ; high bytes to zero.
+        php
+        longi
         phx
         pha
         ldx     OT6_SPECIES-8,y
         pla
         sta     f:OT6_CODEX,x
         plx
+        plp
         lda     $3e38,y
         beq     done            ; shieldless monster
         dec     a
@@ -169,14 +187,106 @@ done:   rtl
 
 ; ------------------------------------------------------------------------------
 
+; [ every landed hit: weapon-class chip, then broken double ]
+
+; replaces the bare broken-double jsl at the elemental join @0c1e, so it
+; runs for every damaging hit against every target — including hits whose
+; element was absorbed/nulled/forcefielded (the blade still lands) and
+; hits with no element at all (most weapons). a8 (CalcTargetDmg pins it);
+; the damage loop runs i8, so pin i16 here for the chip's species/codex
+; indexing — entity offsets survive the rep, 8-bit index mode forces the
+; high bytes to zero. preserves x/y.
+
+.proc Ot6HitJoin
+        .a8
+        php
+        longi
+        jsr     Ot6ClassChip
+        plp
+        jmp     Ot6BrokenDmg    ; tail-call: its rtl returns to vanilla
+.endproc
+
+; ------------------------------------------------------------------------------
+
+; [ chip shields on a weapon-class weakness hit ]
+
+; the class twin of Ot6Chip, called from Ot6HitJoin for every landed hit:
+; class chip is not gated on the attack having an element. a8/i16 (the
+; join pinned i16), y = target, OT6_ATKCLASS = the attack's class byte
+; (set at load time by Ot6WeaponClass/Ot6SkillClass/Ot6ItemClass).
+; preserves x/y. same flow as the elements: reveal, message, codex,
+; chip, break. differences, by design:
+;   - no vanilla x2 on a class-weak hit — the damage bonus for classes
+;     is the break window itself (elemental weak x2 is vanilla's rule
+;     and stays vanilla's alone)
+;   - wound/petrify and heal-flagged hits never chip (elements can't
+;     reach their weak branch in those states, so this is parity, not
+;     a new rule; the one asymmetry is undead drain-reversal, which
+;     element chip allows — vanilla jank — and class chip doesn't)
+
+.proc Ot6ClassChip
+        .a8
+        .i16
+        tya                     ; entity offset, width-neutral test
+        cmp     #$08
+        bcc     done            ; characters have no shields
+        lda     f:$7e0000+OT6_ATKCLASS
+        beq     done            ; classless action: chips nothing
+        bmi     done            ; null-break property: teaches nothing
+        and     $3e9c,y         ; monster's class weaknesses
+        beq     done            ; no match
+        sta     OT6_SCR_BIT     ; the matched class bit (exactly one)
+        lda     $3e88,y
+        bne     done            ; already broken: no chip until recovery
+        lda     $3ee4,y
+        bit     #$c0
+        bne     done            ; wound/petrify: the hit was theater
+        lda     $f2
+        bne     done            ; healing hits teach nothing, chip nothing
+        lda     $3e9d,y
+        eor     #$ff
+        and     OT6_SCR_BIT
+        beq     merge           ; matched class already revealed
+        lda     #$45            ; "Weak against slashing" etc. ($45 + class)
+        sta     $3401
+        lda     OT6_SCR_BIT
+@bit:   lsr
+        bcs     merge           ; message index for the matched class
+        inc     $3401
+        bra     @bit
+merge:  lda     OT6_SCR_BIT     ; reveal the matched class
+        ora     $3e9d,y
+        sta     $3e9d,y
+        ; learn it forever, like the elements (join already pinned i16)
+        phx
+        pha
+        ldx     OT6_SPECIES-8,y
+        pla
+        sta     f:OT6_CODEX_CLASS,x
+        plx
+        lda     $3e38,y
+        beq     done            ; shieldless monster
+        dec     a
+        sta     $3e38,y
+        bne     refresh
+        lda     #OT6_BREAK_TICKS
+        sta     $3e88,y         ; shields down: BREAK
+refresh:
+        jsr     Ot6BuildRowGlyphs
+        jsr     Ot6PokeRedraw
+done:   rts
+.endproc
+
+; ------------------------------------------------------------------------------
+
 ; [ double damage against a broken target ]
 
-; called at the join of the elemental damage block, i.e. for every hit
-; a8/i16, y = target, $f0 = 16-bit damage, $f2 = heal flag
+; the tail of Ot6HitJoin (the join of the elemental damage block, i.e.
+; every hit). a8, y = target, $f0 = 16-bit damage, $f2 = heal flag;
+; width-agnostic on the index side (the damage loop runs i8).
 
 .proc Ot6BrokenDmg
         .a8
-        .i16
         tya                     ; entity offset, width-neutral test
         cmp     #$08
         bcc     done
@@ -189,6 +299,102 @@ done:   rtl
         asl     $f0
         rol     $f1
 done:   rtl
+.endproc
+
+; ------------------------------------------------------------------------------
+
+; [ note the executing attack's weapon class, at load time ]
+
+; three loaders cover every damage path, and each STORES ALWAYS — zero
+; for the classless — so a stale class can never leak between attacks:
+;   Ot6SkillClass   LoadMagicProp: every spell-record attack (magic,
+;                   skills, lores, dances, espers, enemy attacks, the
+;                   $ee "battle" record that fronts fight/steal/jump,
+;                   and the dot-tick pseudo-attacks)
+;   Ot6WeaponClass  _magicpunch: fight/capture/jump weapon swings, per
+;                   hand per swing (the weapon sets Fight's class)
+;   Ot6ItemClass    CalcItemEffect: items, tools, thrown weapons
+; the chip itself reads OT6_ATKCLASS per target in Ot6ClassChip.
+
+; a = ability id (preserved). caller a8; index width varies — pin.
+
+.proc Ot6SkillClass
+        .a8
+        php
+        longi
+        .i16
+        phx
+        pha                     ; the ability id, for the scan compares
+        ldx     #$0000
+@scan:  lda     f:Ot6SkillClassTbl,x
+        cmp     #$ff
+        beq     @miss           ; end of table: classless ability
+        cmp     $01,s
+        beq     @hit
+        inx
+        inx
+        bra     @scan
+@hit:   lda     f:Ot6SkillClassTbl+1,x
+        bra     @store
+@miss:  lda     #$00
+@store: sta     f:$7e0000+OT6_ATKCLASS
+        pla
+        plx
+        plp
+        rtl
+.endproc
+
+; [ x = attacker entity offset (+1 for a left-hand swing), a free ]
+
+; called right after _magicpunch banks the hand's weapon element, so
+; $3ca8,x is the swinging hand's item id. monsters keep a graphics code
+; there (MonsterProp+26), not an item — their swings carry no class.
+; (raged gau inherits the rage monster's graphics code into both hands
+; — SetRage — so his raged fights can read a junk class: a known wart
+; until rage is retired for capture. plain gau punches bludgeon, $ff.)
+
+.proc Ot6WeaponClass
+        .a8
+        php
+        longi
+        .i16
+        txa                     ; entity+hand: chars $00-$07, else monster
+        cmp     #$08
+        bcs     @none
+        lda     $3ca8,x         ; the swinging hand's item id
+        phx
+        longa
+        and     #$00ff
+        tax
+        shorta0
+        lda     f:Ot6WeapClassTbl,x
+        plx
+        bra     @store
+@none:  lda     #$00
+@store: sta     f:$7e0000+OT6_ATKCLASS
+        plp
+        rtl
+.endproc
+
+; [ a = item id (preserved, as is the entry carry: tools/throw flag) ]
+
+.proc Ot6ItemClass
+        .a8
+        php
+        longi
+        .i16
+        phx
+        pha                     ; item id, restored for the caller
+        longa
+        and     #$00ff
+        tax
+        shorta0
+        lda     f:Ot6WeapClassTbl,x
+        sta     f:$7e0000+OT6_ATKCLASS
+        pla
+        plx
+        plp
+        rtl
 .endproc
 
 ; ------------------------------------------------------------------------------
@@ -714,7 +920,8 @@ Ot6FontIcons:
         sta     f:$7e0000+OT6_PIPPREV
         sta     f:$7e0000+OT6_LASTLR
         sta     f:$7e0000+OT6_RESTAGE   ; also clears OT6_FONTDIRTY (next byte)
-        plx
+        plx                             ; (OT6_ATKCLASS sits in the shadow
+                                        ;   strip: the @clr loop covered it)
         plp
         rtl
 .endproc
@@ -1364,14 +1571,25 @@ OT6_MAPBASE := $57b6            ; word scratch: field bg3 map base
 ; called from the battle nmi right after the oam dma.
 
 OT6_HUDCOPY := $57de            ; (retired; kept for the memory map)
-OT6_HUDDIRTY := $57b8           ; (retired)
+OT6_ATKCLASS := $57b8           ; the executing attack's class byte: one of
+                                ;   $01/$02/$04/$08 (+$80 null-break), 0 =
+                                ;   classless. set by the three load hooks,
+                                ;   read per target by Ot6ClassChip. lives
+                                ;   in retired OT6_HUDDIRTY's byte — inside
+                                ;   the m2 trace-verified strip and the
+                                ;   InitBP clear. (first pick $57d6 turned
+                                ;   out to be live vanilla scratch: the
+                                ;   battle_class write-watcher caught
+                                ;   foreign bytes $84/$85/$ab there.)
 
 ; weakness codex: learned weaknesses persist across battles, octopath
 ; style. lives in the second 8k sram bank (header sram size $05), which
 ; vanilla save files never touch. species stash: one word per monster
-; slot so Ot6Chip can find the codex entry at reveal time.
-OT6_CODEX_MAGIC := $316000      ; word 'O6' = codex initialized
+; slot so the chip procs can find the codex entry at reveal time.
+OT6_CODEX_MAGIC := $316000      ; word 'O7' = codex layout v2 initialized
 OT6_CODEX       := $316010      ; one revealed-elements byte per species
+OT6_CODEX_CLASS := $316190      ; one revealed-classes byte per species
+                                ;   (contiguous after OT6_CODEX: one wipe)
 OT6_SPECIES     := $57c0        ; per-slot species stash (6 words)
 OT6_PIPCUR      := $57cc        ; live pip cell: menu-map word addr (0=off)
 OT6_PIPPREV     := $57ce        ; last flushed addr (for erase-on-move)
@@ -1379,6 +1597,9 @@ OT6_PIPCELL     := $57d0        ; glyph|attr word to write
 OT6_LASTLR      := $57d2        ; last frame's L/R bits (edge detect)
 OT6_RESTAGE     := $57d4        ; open list wants a re-render (boost moved)
 OT6_FONTDIRTY   := $57d5        ; a battle dialogue clobbered our font cells
+                                ; ($57d6+ is NOT ours: vanilla battle gfx
+                                ;   scribbles there — measured, see
+                                ;   OT6_ATKCLASS above)
 
 .proc Ot6BgHudFlush_ext
         .a8
@@ -1729,19 +1950,133 @@ OT6_FONTDIRTY   := $57d5        ; a battle dialogue clobbered our font cells
         rtl
 .endproc
 
-; per-species shield overrides: bosses get authored counts, marked
-; trash gets flavor, and 0 means explicitly shieldless (no display —
-; whelk's shell stays the wrong answer, exactly as vanilla intended).
-; format: .word species id (monster prop offset / 32), .byte shields;
-; $ffff terminates. everyone else uses the 2 + level/8 formula.
+; per-species shield + class-weakness overrides: bosses get authored
+; counts, marked trash gets flavor, and shields 0 means explicitly
+; shieldless (no display — whelk's shell stays the wrong answer, exactly
+; as vanilla intended; scripted set-pieces draw no gauge: a silent hud
+; says "this one is theater"). format: .word species id (monster prop
+; offset / 32), .byte shields, .byte class weaknesses; $ffff terminates.
+; unlisted species use the 2 + level/8 formula and carry no class
+; weakness. elemental rows are NOT here — vanilla element bits stay in
+; monster data, and the element ADDS in bosses-wob.md are m6 data entry.
+; shields/classes follow docs/design/bosses-wob.md v1; deviations:
+;   - lobo keeps 3 (authored pre-bosses-wob; the doc proposes 2)
+;   - kefka: vanilla uses ONE species ($14a) for the imperial camp gags
+;     AND the narshe defense, so the narshe row (6 · slash+pierce) wins;
+;     the camp fights inherit it (doc wanted 3 there). per-formation
+;     overrides are an m6 question.
+;   - piranha and iron fist wear their boss-block's class row (the doc
+;     gives fight-level rows, not per-add rows): judgment calls.
+;   - guardian/tritoch: multiple records each, WoB story order can't
+;     tell them apart from here — ALL drawn shieldless for the WoB;
+;     the WoR pass must re-author the real WoR fights' records.
 Ot6ShieldTbl:
+        ; narshe intro / escape
+        .word   $0000
+        .byte   2, OT6_PIERCE   ; guard: armored infantry, the tekmissile
+                                ;   probe (2 = formula value, kept honest)
         .word   $0019
-        .byte   3               ; lobo: bitier trash, and the table's
+        .byte   3, OT6_PIERCE   ; lobo: bitier trash, and the table's
                                 ;   permanent regression coverage
         .word   $0100
-        .byte   0               ; whelk (the shell)
-        .word   $0135
-        .byte   4               ; whelk head: the first boss break
+        .byte   0, $00          ; whelk (the shell)
+        .word   $0134
+        .byte   4, OT6_PIERCE   ; whelk head: the first boss break.
+                                ;   $0134 'Head' is the narshe fight
+                                ;   (gen_whelk measured it at $57c0);
+                                ;   m1 authored $0135, the WoR
+                                ;   presenter's head, so the real head
+                                ;   had been seeding by formula (2).
+                                ;   note: $0134 has NO vanilla fire
+                                ;   weak — the tutorial's fire probe
+                                ;   is an m6 element ADD, not vanilla
+        .word   $0064
+        .byte   4, OT6_PIERCE   ; marshal: mog's fight, mog's class
+        ; mt. kolts / lete river
+        .word   $0103
+        .byte   5, OT6_BLUDG    ; vargas: you couldn't break him without
+                                ;   the monk
+        .word   $014d
+        .byte   2, OT6_SLASH    ; ipooh
+        .word   $012c
+        .byte   5, OT6_SLASH|OT6_PIERCE ; ultros 1: the row he keeps all game
+        ; the three-scenario split
+        .word   $0104
+        .byte   5, OT6_PIERCE   ; tunnelarmor: mug and daggers
+        .word   $014a
+        .byte   6, OT6_SLASH|OT6_PIERCE ; kefka (camp gags + narshe defense
+                                ;   share this record — see block comment)
+        .word   $0044
+        .byte   4, OT6_BLUDG    ; telstar
+        .word   $001a
+        .byte   2, OT6_PIERCE   ; doberman
+        .word   $0106
+        .byte   6, OT6_BLUDG    ; ghosttrain: suplex is CORRECT now
+        .word   $0155
+        .byte   5, OT6_SLASH|OT6_BLUDG  ; rizopas: the coverage-rule poster child
+        .word   $0154
+        .byte   1, OT6_SLASH|OT6_BLUDG  ; piranha: the chum wave
+        ; zozo / opera / the factory
+        .word   $0107
+        .byte   6, OT6_PIERCE|OT6_BLUDG ; dadaluma: break the crouch
+        .word   $006c
+        .byte   2, OT6_PIERCE|OT6_BLUDG ; iron fist
+        .word   $012d
+        .byte   6, OT6_SLASH|OT6_PIERCE ; ultros 2: same row, one more shield
+        .word   $0109
+        .byte   6, OT6_PIERCE   ; ifrit
+        .word   $0108
+        .byte   6, OT6_SLASH    ; shiva
+        .word   $010a
+        .byte   7, OT6_SLASH|OT6_PIERCE ; number 024: the classes are the
+                                ;   handhold while wallchange spins
+        .word   $010b
+        .byte   7, OT6_PIERCE   ; number 128 (body)
+        .word   $013f
+        .byte   3, OT6_SLASH    ; right blade
+        .word   $0140
+        .byte   3, OT6_SLASH    ; left blade
+        .word   $010d
+        .byte   6, OT6_PIERCE   ; crane (element sides verified at m6 entry)
+        .word   $010e
+        .byte   6, OT6_PIERCE   ; crane
+        ; sealed gate / thamasa / the floating continent
+        .word   $012e
+        .byte   7, OT6_SLASH|OT6_PIERCE ; ultros 3: the row, third verse
+        .word   $0116
+        .byte   7, OT6_PIERCE   ; flameeater
+        .word   $00de
+        .byte   1, $00          ; balloon: vanilla ice/water pops them
+        .word   $0168
+        .byte   7, OT6_SLASH|OT6_PIERCE ; ultros 4: one last time
+        .word   $012f
+        .byte   4, OT6_BLUDG    ; chupon: no bludgeon, no bragging rights
+        .word   $0113
+        .byte   8, OT6_PIERCE   ; airforce
+        .word   $0145
+        .byte   3, OT6_PIERCE   ; laser gun
+        .word   $0147
+        .byte   3, OT6_PIERCE   ; missilebay: the part-break cancel
+        .word   $0146
+        .byte   1, OT6_SLASH|OT6_PIERCE|OT6_BLUDG|OT6_SPECIAL
+                                ; speck: any weapon in the game breaks it
+        .word   $0117
+        .byte   11, OT6_SLASH|OT6_PIERCE ; atmaweapon: the WoB final exam
+                                ;   (hud shield glyphs cap at 6 — display
+                                ;   saturates, the count is true)
+        .word   $0118
+        .byte   5, OT6_SLASH|OT6_PIERCE ; nerapa: sprint fight, low gauge
+        ; scripted set-pieces: no gauge drawn
+        .word   $0111
+        .byte   0, $00          ; guardian
+        .word   $0112
+        .byte   0, $00          ; guardian
+        .word   $0114
+        .byte   0, $00          ; tritoch
+        .word   $0115
+        .byte   0, $00          ; tritoch
+        .word   $0144
+        .byte   0, $00          ; tritoch
         .word   $ffff
 
 ; shield-with-count glyph cells (counts 1-6)
@@ -1868,3 +2203,8 @@ ot6_c_mix := Ot6CBlob           ; unsigned char ot6_c_mix(uchar a, uchar b)
         plp
         rts
 .endproc
+
+; ------------------------------------------------------------------------------
+
+; weapon/ability class data (m3)
+        .include "ot6_class.asm"

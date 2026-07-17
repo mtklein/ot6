@@ -1874,7 +1874,7 @@ CalcTargetDmg:
         bmi     @0c1e
         asl     $f0
         rol     $f1
-@0c1e:  jsl     Ot6BrokenDmg            ; ot6: broken targets take double
+@0c1e:  jsl     Ot6HitJoin              ; ot6: class chip, then broken double
         lda     $11a9       ; item special effect
         cmp     #$04
         bne     @0c28       ; branch if not atma weapon
@@ -6861,6 +6861,7 @@ InitAttacker:
 LoadMagicProp:
 @2966:  phx
         php
+        jsl     Ot6SkillClass           ; ot6: the ability's own class
         xba
         lda     #$0e        ; 14 bytes each
         jsr     MultAB
@@ -6951,6 +6952,7 @@ _magicpunch:
         trb     $b3
         lda     $3b90,x
         sta     $11a1
+        jsl     Ot6WeaponClass          ; ot6: the swinging hand's class
         lda     $3b7c,x
         sta     $11a8
         lda     $3d34,x
@@ -6997,6 +6999,7 @@ CalcItemEffect:
 _magicitem:
 @2a37:  phx
         php
+        jsl     Ot6ItemClass            ; ot6: tools/thrown chip their item
         pha
         phx
         ldx     #$0f

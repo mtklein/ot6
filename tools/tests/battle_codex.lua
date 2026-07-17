@@ -24,7 +24,7 @@ H.run({ maxFrames = 45000 }, {
   H.waitFrames(240),
   H.call(function()
     H.assertEq(sram(0x316000), 0x4f, "codex magic 'O' written at first seed")
-    H.assertEq(sram(0x316001), 0x36, "codex magic '6' written at first seed")
+    H.assertEq(sram(0x316001), 0x37, "codex magic '7' (v2: elements+classes)")
     local species = H.readWord(0x57c4)   -- guard slot (entity $0c) stash
     H.log(string.format("guard species=%d codex byte=%02x", species, sram(0x316010+species)))
     H.writeByte(0x3bec, H.readByte(0x3bec) | 0x01)   -- poke guard 1 fire-weak

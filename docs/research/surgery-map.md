@@ -97,11 +97,13 @@ brokenTimer · `$3E89,X` flags/revealed · `$3E9C/$3E9D,X` spare (M2 BP) ·
 
 ## 7. Gotchas
 
-1. **Stale generated text includes**: editing any `*_msg` JSON shifts
-   string offsets, but plain `make` regenerates only the `.dat`, NOT
-   `include/text/attack_msg_en.inc` (per-string offsets → pointer table)
-   → silent pointer corruption. Wire `tools/romtools/update_array_inc.py`
-   into the text build before touching message JSON.
+1. **Stale generated text includes** — CLOSED (re-verified during M3):
+   `romtools.encode_text` ends by calling `update_array_inc` itself, so
+   plain `make` regenerates `include/text/attack_msg_en.inc` together
+   with the `.dat` whenever a message JSON changes. No extra wiring
+   needed. Residual trap: calling `rt.encode_text` on a hand-built
+   asset_def that still carries an `inc_path` (e.g. a sizing probe)
+   rewrites the real include as a side effect — strip `inc_path` first.
 2. Only `src/<mod>/<mod>_main.asm` is assembled per module — new files must
    be `.include`d from it (ot6.asm already is).
 3. Cross-module entry points go in `include/code_ext.inc` (`.global`
