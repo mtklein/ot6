@@ -8,7 +8,9 @@ Sections marked **TBD** are open design questions, not commitments.
 
 Deep dives (2026-07-16, WoB scope): [character kits & learn
 schedules](design/kits.md), [weapon classes & the break
-spread](design/weapon-classes.md), [magicite sub-jobs](design/magicite.md).
+spread](design/weapon-classes.md), [magicite sub-jobs](design/magicite.md),
+[the SP economy](design/sp-economy.md), [balance
+measurement](design/balance-metrics.md).
 
 **House rule: vanilla's bugs stay.** Useless stats, the Sketch bug,
 row jank — the original game not being quite right is part of its
