@@ -96,3 +96,32 @@ measures next on `whelk_doorstep` — the authored boss row
 (4·pierce) against TekMissile is the first place chips→break→×2 can
 actually happen. Trash boost economics want a ≥3-real-turn fixture
 (post-split scenarios or Lete River).
+
+## Measurement #2 — Whelk boss, magitek party (2026-07-16)
+
+From `whelkbal_run.lua` (policies: beams-baseline / pierce-probe /
+mixed-naive; 5 loadState-independent legit fights each) plus a
+simulated-loop lab. Measured BEFORE the $f2 gate fix; tek now chips
+(verified 4->3 live post-fix by `whelkbal_tek.lua`).
+
+- As then shipped: 0 chips, 0 breaks, any policy — the $f2 gate bug
+  silenced every magitek attack. Since fixed.
+- pierce-probe beat beams-baseline by ~30-40% TTK (11.6k vs 16.6k+
+  frames) but purely on TekMissile's raw 3.2x damage — nothing on
+  screen tied it to the break system. mixed-naive LOST 5/5: MegaVolt
+  shell counters are the whole danger budget, and Terra KO = game
+  over (her 77 HP is the fight's real HP bar).
+- The retract cycle is the fight's true clock: head untargetable
+  ~40-53% of wall time, queued attacks retarget into the shell and
+  eat counters, and the break timer FREEZES while the head hides (a
+  window can span 8.2k wall frames with ~2.2k targetable).
+- Arithmetic: pierce-only 4 chips can't happen — three teks (~540
+  each) kill the 1600-HP head one chip short. The designed tutorial
+  line ("three beams and a TekMissile, broken inside two rounds")
+  requires the head's fire-weak ADD, which is therefore load-bearing
+  M6 data, not polish. Boss band as shipped: 0 windows; simulated
+  best case <1 window/fight — the add (or a shields/HP retune) is
+  what buys the ~2-window target.
+- R-boost DOES engage inside magitek menus (pending moved 0->2, a
+  1-BP boosted beam dealt ~2x) — boost tutorialization can start at
+  the Whelk.
