@@ -4,9 +4,11 @@
 Usage: whelkbal_agg.py <log> [<log> ...]      (one policy per log)
 
 Same line grammar as bal_aggregate.py: `[ot6] [metrics] b=<k> <key>=<value>`.
-Turn counts come from the exec-verified cast counters (casts_*), not the
-queue-dequeue player_actions (which double-counts through two queues in
-this fight -- measured: player_actions == 2 x casts exactly).
+Turn counts come from the exec-verified cast counters (casts_*). The
+driver's player_actions line now also emits real actions (it de-duplicates
+the two-queue dequeue count; before 2026-07-17 that line ran 2x real --
+measured then: raw dequeues == 2 x casts exactly). casts_* stays the
+primary here because it is verified against the exec byte, not inferred.
 """
 import re
 import sys

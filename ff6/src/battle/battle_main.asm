@@ -15355,6 +15355,7 @@ WinBattle:
         inc     $2f40       ; high byte of variable 3
 @5dde:  dex2                ; next monster
         bpl     @5db0
+        jsl     Ot6RewardScale_ext      ; ot6: random-encounter xp/gil scale
         lda     $2f35       ; total experience
         sta     $e8
         lda     $2f36

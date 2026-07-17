@@ -1,9 +1,10 @@
-BASE  := Final Fantasy III (USA).sfc
-SHA1  := 4f37e4274ac3b2ea1bedb08aa149d8fc5bb676e7
-FLIPS := tools/bin/flips
-MESEN := tools/Mesen.app/Contents/MacOS/Mesen
+BASE    := Final Fantasy III (USA).sfc
+SHA1    := 4f37e4274ac3b2ea1bedb08aa149d8fc5bb676e7
+FLIPS   := tools/bin/flips
+MESEN   := tools/Mesen.app/Contents/MacOS/Mesen
+VERSION := 0.1
 
-.PHONY: all rom patch run test verify clean goldens-capture
+.PHONY: all rom patch run test verify clean goldens-capture release
 
 all: rom
 
@@ -23,6 +24,15 @@ patch: rom
 	@mkdir -p build/dist
 	$(FLIPS) --create --bps "$(BASE)" build/ot6.sfc build/dist/ot6-from-ff3us10.bps
 	@ls -la build/dist/ot6-from-ff3us10.bps
+
+# release: build the ROM, run the full gate, then emit the distribution
+# patch plus release notes from docs/release-notes-template.md (X.Y in
+# the template becomes $(VERSION); override with `make release VERSION=0.2`).
+release: test
+	@mkdir -p build/release
+	$(FLIPS) --create --bps "$(BASE)" build/ot6.sfc "build/release/ot6-v$(VERSION).bps"
+	sed 's/X\.Y/$(VERSION)/g' docs/release-notes-template.md > build/release/RELEASE_NOTES.md
+	@ls -la build/release/
 
 # One GUI instance only: battery saves flush on exit, so a second instance
 # exiting later silently clobbers the first one's in-game saves.

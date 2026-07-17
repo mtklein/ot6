@@ -73,6 +73,10 @@ RNG streams `$1fa1`/`$1fa2`, loadState-independent battles, paired
 samples across policies; aggregate with `bal_aggregate.py`). 8
 battles per policy, full pool coverage, 0 voids, 0 deaths.
 
+Note: the turns published in this table were already real actions (the
+drivers' raw dequeue counter ran 2x real until fixed on 2026-07-17; the
+drivers now emit real actions directly).
+
 | policy | turns | frames | chips | breaks | verdict |
 |---|---|---|---|---|---|
 | baseline | 2 | 744 | 0 | 0 | pierce hits nothing in the pool |
@@ -204,3 +208,51 @@ fixtures should confirm), bands $C0–$FF and $100+ 1x (WoR
 unmeasured; $100+ additionally guards Doom Gaze's saved-HP reload
 from compounding). Gate: full suite green twice at these values,
 story-chain fixtures re-minted, Whelk head untouched at 1600 HP.
+
+## Measurement #4 — encounter-rate and reward parity (2026-07-17)
+
+Measurement #3 doubled trash HP, and 2x-HP fights run ~2x longer. Two
+paired runtime knobs now conserve pace: the per-step encounter danger
+increment is scaled by `Ot6DangerMulW` (16ths, shipped $08 = 0.5x) in
+both per-step battle checks, and at victory a random encounter's xp
+and gil sums are scaled by `Ot6RewardMulW` (shipped $20 = 2x). Random
+encounters are identified by a marker the two field/world trigger
+paths set and battle init consumes; event and boss battles never carry
+it. The knob product is pinned at $100 (1.0): change them as a pair.
+
+Measured by `mines_pace.lua`: the bal_mines fixture and pacing route,
+8 paired seeded samples per arm, danger counter zeroed per sample
+(vanilla zeroes it at every trigger, so a cold start equals the
+steady-state inter-encounter interval; the fixture's warm counter had
+masked the knob entirely — paired steps came out identical). The
+vanilla arm pokes all three knobs (`Ot6HpMulTbl` band0, danger,
+reward) to $10 in the loaded ROM image; the scale routines are exact
+at $10, so that arm is vanilla's arithmetic exactly. 16/16 samples
+completed, 0 voids, 0 deaths; xp/gil deltas read from save data after
+victory (`$1611`/`$1860`), so clamps and AddExp are included.
+
+| arm | steps/enc (mean, min–max) | fight frames | xp/enc | gil/enc |
+|---|---|---|---|---|
+| vanilla (all 1x) | 25.6 (6–44) | 990 | 45.2 | 51.2 |
+| ours ($08/$20/$20) | 42.6 (21–59) | 1713 | 90.5 | 102.5 |
+
+Parity products, ours : vanilla (tolerance 0.8–1.25 for v0.1):
+
+- Combat time per step — (fight frames / steps): 40.2 vs 38.7 =
+  **1.04**. Half the encounters at roughly double the fight length
+  holds combat time per step at vanilla's value; the mixture helps
+  (Vaporite pairs die to the same swing count at 2x HP, Were-Rat
+  pairs take the full 2.2x, and the average lands on parity).
+- XP per step: 2.12 vs 1.77 = **1.20**. Per-encounter rewards are
+  exactly 2x (Rat,Rat 42→84, Vap,Vap 46→92, Repo+Vap 48→96; gil
+  44→88, 58→116, 54→108), but the encounter rate measured 0.60x
+  rather than 0.50x — the trigger needs the rng byte under the
+  counter high byte, and seeds whose stream reaches a low byte early
+  fire at the same step on both arms (4 of 8 pairs were identical),
+  compressing the rate effect. 0.60 x 2 = 1.20; inside the band,
+  leaning generous. Gil per step: 2.40 vs 2.00 = the same **1.20**.
+
+Fight-frame cross-check: this driver clocks from battle-active to
+last kill (~246 frames of load/settle included on both arms);
+removing that constant gives 1467 vs 744 = 1.97x, matching
+Measurement #3's 1456 vs 744 protocol numbers.

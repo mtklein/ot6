@@ -117,10 +117,64 @@ OT6_BREAK_TICKS := $10          ; a bit under vanilla stop duration ($12)
         sta     $3e9d,y
 @nosram:
         shorta0
+        jsr     Ot6ElemAdd      ; ot6: element adds (m6 weakness data)
         jsr     Ot6HpScale      ; ot6: difficulty transform (trash hp)
         plx
 done:   rtl
 .endproc
+
+; ------------------------------------------------------------------------------
+
+; [ element adds: widen a species' weak-element byte at monster seed time ]
+
+; enemy identity stays vanilla in ROM; an element ADD is a runtime
+; transform like Ot6HpScale, applied one hook later than the load: the
+; mask is OR'd into the loaded weak byte $3be0,y (LoadRageProp stores it
+; from MonsterProp+25 immediately before the seed hook), so the chip
+; path, vanilla's weak x2 damage, and the hud weakness slots all read
+; one truth. re-loads (retract cycles, scene changes) re-apply the OR:
+; idempotent by construction.
+;
+; single row shipped: the whelk head ($134) gains fire. the boss
+; tutorial's designed line -- three fire beams and a TekMissile, broken
+; inside one head-present phase -- needs four chippable hits, and the
+; head has no vanilla fire weak (measurement #2 called this add
+; load-bearing m6 data).
+;
+; called from the tail of Ot6SeedShields, monster path only. a8/i16,
+; y = entity offset, species stashed at OT6_SPECIES-8,y. clobbers a/x
+; (the caller stack-saved x). exits a8.
+
+.proc Ot6ElemAdd
+        .a8
+        .i16
+        longa
+        ldx     #$0000
+@scan:  lda     f:Ot6ElemAddTbl,x
+        cmp     #$ffff
+        beq     @none
+        cmp     OT6_SPECIES-8,y
+        beq     @hit
+        inx
+        inx
+        inx
+        inx                     ; 4-byte records: species, elements, pad
+        bra     @scan
+@hit:   shorta0
+        lda     f:Ot6ElemAddTbl+2,x
+        ora     $3be0,y
+        sta     $3be0,y
+        rts
+@none:  shorta0
+        rts
+.endproc
+
+; per-species element adds: .word species id, .byte element mask
+; (fire $01 .. water $80), .byte pad; $ffff terminates.
+Ot6ElemAddTbl:
+        .word   $0134
+        .byte   $01, $00        ; whelk head: + fire (the tutorial probe)
+        .word   $ffff
 
 ; ------------------------------------------------------------------------------
 
@@ -247,6 +301,176 @@ Ot6HpMulTbl:
                                 ;   arithmetic; stretch fixtures pending
         .byte   $10             ; $0c0-$0ff: 1x — wor, unmeasured
         .byte   $10             ; $100+ (keep 1x: see doom gaze note)
+
+; ------------------------------------------------------------------------------
+
+; [ encounter-rate knob + reward conservation ]
+
+; fights at 2x hp run ~2x longer (measurement #3: 1456f vs 744f), so the
+; per-step encounter danger increment is scaled DOWN and random-battle
+; rewards are scaled UP by the inverse: combat time per step and xp/gil
+; per step both track vanilla. the two knobs are 16ths and their product
+; is pinned at $100 (1.0) by the conservation rule — change them as a
+; pair or the level/shop pacing drifts.
+
+Ot6DangerMulW:
+        .word   $0008           ; per-step danger increment x 8/16 (0.5x)
+Ot6RewardMulW:
+        .word   $0020           ; random-battle xp+gil x 32/16 (2x)
+
+; [ per-step danger increment, scaled ]
+
+; replaces the vanilla `lda $1f6e / adc f:<rate table>,x` pair in the two
+; per-step battle checks (CheckBattleSub in field, CheckBattleWorld on
+; the world map): the caller loads its own rate table entry, this scales
+; it and adds the danger counter. a16/i16 (both call sites), entry a =
+; the vanilla rate; exit a = $1f6e + rate * Ot6DangerMulW / 16 with
+; carry = 16-bit overflow, so the caller's bcc/#$ff00 clamp is
+; unchanged. at $10 the scale is exact identity (product/16 = rate).
+; preserves x/y and db; the 24-bit shift-add uses the OT6_SCR battle
+; scratch (no battle is live during a field step; field/world code
+; never touches $3ecc-$3ed3 — grepped).
+
+.proc Ot6DangerStep
+        .a16
+        .i16
+        phb
+        phx
+        pea     $7e7e
+        plb
+        plb                     ; db = $7e: absolute rmw on the scratch
+        sta     OT6_SCR_SLOT2   ; multiplicand (the rate)
+        lda     f:Ot6DangerMulW
+        and     #$00ff
+        xba
+        sta     OT6_SCR_BIT     ; mult << 8: msb-first bit walker
+        lda     #$0000
+        sta     OT6_SCR_COLS    ; product bits 16-23
+        sta     a:OT6_RANDPEND  ; step hygiene: word-clears the random-
+                                ;   encounter marker AND last battle's
+                                ;   flag. runs before this step's roll,
+                                ;   so a trigger still marks; kills any
+                                ;   pre-first-battle ram junk the moment
+                                ;   the player takes a danger-checked
+                                ;   step (see the OT6_RANDBTL comment)
+        ldx     #$0008
+@bit:   asl                     ; product low <<= 1
+        rol     OT6_SCR_COLS
+        asl     OT6_SCR_BIT     ; next multiplier bit into carry
+        bcc     @next
+        clc
+        adc     OT6_SCR_SLOT2
+        bcc     @next
+        inc     OT6_SCR_COLS
+@next:  dex
+        bne     @bit
+        lsr     OT6_SCR_COLS    ; /16 (24-bit shift right x4)
+        ror
+        lsr     OT6_SCR_COLS
+        ror
+        lsr     OT6_SCR_COLS
+        ror
+        lsr     OT6_SCR_COLS
+        ror
+        ldx     OT6_SCR_COLS
+        beq     :+
+        lda     #$ffff          ; saturate; the caller clamps the sum anyway
+:       clc
+        adc     a:$1f6e         ; the danger counter (same cell the callers
+        plx                     ;   see: db=$7e is wram, db=$00 mirrors it)
+        plb
+        rtl
+.endproc
+
+; [ mark the coming battle as a random encounter ]
+
+; called from the two trigger-success paths (right after they zero the
+; danger counter). InitBP consumes the marker into OT6_RANDBTL, so it
+; can never outlive one battle. a8 at both sites; clobbers a.
+
+.proc Ot6MarkRandom
+        .a8
+        lda     #OT6_RANDMAGIC
+        sta     f:$7e0000+OT6_RANDPEND
+        rtl
+.endproc
+
+; [ scale a random battle's xp and gil by the inverse of the rate knob ]
+
+; called from WinBattle immediately after the per-monster reward sums:
+; exp is 24-bit at $2f35-$2f37, gil 24-bit at $2f3e-$2f40. event and
+; boss battles never carry the OT6_RANDBTL flag and pass through
+; untouched; veldt battles carry it but their exp sum is zero by
+; vanilla's own rule, so only their gil scales. runs BEFORE the cat-hood
+; gil double and the per-character exp divide, so relics and party size
+; stack on the scaled sums exactly as they stack on vanilla's.
+; a16/i16 at the call site; clobbers a/x/y and the OT6_SCR scratch
+; (init-time victory path: the hud builder is not concurrent).
+
+.proc Ot6RewardScale_ext
+        .a16
+        .i16
+        lda     a:OT6_RANDBTL-1 ; flag in the high byte (word read at -1:
+        and     #$ff00          ;   $57bc pending is zeroed by init)
+        beq     done
+        ldx     #$2f35          ; exp sum
+        jsr     scale24
+        ldx     #$2f3e          ; gil sum
+        jsr     scale24
+done:   rtl
+
+; [ 24-bit sum at 0,x *= Ot6RewardMulW / 16, clamped $ffffff ]
+scale24:
+        lda     a:$0000,x
+        sta     OT6_SCR_SLOT2   ; value low word
+        lda     a:$0001,x
+        and     #$ff00
+        xba
+        sta     OT6_SCR_BIT     ; value high byte
+        stz     OT6_SCR_IDX     ; product bits 0-15
+        stz     OT6_SCR_COLS    ; product bits 16-31
+        phx
+        lda     f:Ot6RewardMulW
+        and     #$00ff
+        xba
+        tay                     ; mult << 8: msb-first walker in y
+        ldx     #$0008
+@bit:   asl     OT6_SCR_IDX
+        rol     OT6_SCR_COLS    ; product <<= 1 (32-bit)
+        tya
+        asl
+        tay                     ; next multiplier bit into carry
+        bcc     @next
+        lda     OT6_SCR_IDX
+        clc
+        adc     OT6_SCR_SLOT2
+        sta     OT6_SCR_IDX
+        lda     OT6_SCR_COLS
+        adc     OT6_SCR_BIT
+        sta     OT6_SCR_COLS
+@next:  dex
+        bne     @bit
+        ldx     #$0004
+@shr:   lsr     OT6_SCR_COLS    ; /16 (32-bit shift right x4)
+        ror     OT6_SCR_IDX
+        dex
+        bne     @shr
+        plx
+        lda     OT6_SCR_COLS
+        cmp     #$0100
+        bcc     @fit
+        lda     #$00ff          ; clamp: 24-bit sums, 24-bit truth
+        sta     OT6_SCR_COLS
+        lda     #$ffff
+        sta     OT6_SCR_IDX
+@fit:   lda     OT6_SCR_IDX
+        sta     a:$0000,x
+        shorta
+        lda     OT6_SCR_COLS
+        sta     a:$0002,x       ; byte store: +3 is not ours to touch
+        longa
+        rts
+.endproc
 
 ; ------------------------------------------------------------------------------
 
@@ -959,6 +1183,22 @@ Ot6FontIcons:
         php
         shorta0
         jsr     Ot6CSpikeProbe  ; c toolchain spike: publish a witness
+        ; consume the random-encounter marker: the field trigger set
+        ; OT6_RANDPEND (to the magic value) just before this battle
+        ; started; latch a normalized 0/1 as THIS battle's flag and clear
+        ; the marker, so event battles (which never pass the trigger)
+        ; always read a stale-proof 0. the magic compare rejects pre-
+        ; first-battle ram junk on playlines that never took a danger-
+        ; checked step (probe_57ba_strip caught $ff riding the srm boot).
+        lda     f:$7e0000+OT6_RANDPEND
+        cmp     #OT6_RANDMAGIC
+        beq     @mark
+        lda     #$00
+        bra     @latch
+@mark:  lda     #$01
+@latch: sta     f:$7e0000+OT6_RANDBTL
+        lda     #$00
+        sta     f:$7e0000+OT6_RANDPEND
         lda     #$01
         sta     $3e9c           ; characters open with 1 bp, octopath-style
         sta     $3e9e
@@ -973,8 +1213,11 @@ Ot6FontIcons:
 @clr:   sta     f:$7e0000+OT6_SHADOW,x
         inx
         inx
-        cpx     #$005e          ; shadow, map base, dirty (+spare)
-        bcc     @clr
+        cpx     #$0058          ; shadow, map base, atkclass+fontdirty --
+        bcc     @clr            ;   STOPS at $57b9: the $57ba-$57bf strip
+                                ;   (C witness + random-encounter flags)
+                                ;   must survive init (see the strip's
+                                ;   block comment at OT6_CWITNESS)
         ldx     #$0000
 @clr2:  sta     f:$7e0000+OT6_HUDCOPY,x
         inx
@@ -1712,6 +1955,43 @@ OT6_FONTDIRTY   := $57b9        ; font re-lay stages remaining (0 = clean).
                                 ; writers). $57d5+ is vanilla's alone.
 OT6_RELAY_STAGES := 6           ; icons, glyphs x2, arrows x3 (~128b each)
 
+; the spare strip $57ba-$57bf (between OT6_FONTDIRTY and OT6_SPECIES,
+; inside the m2 trace-verified free range; probe_57ba_strip write-watch:
+; only bank-F0 writers). InitBP's @clr loop deliberately stops at $57b9:
+; $57ba is rewritten every init by the spike probe anyway, and clearing
+; $57bc would eat the random-encounter marker the field just set.
+OT6_CWITNESS := $57ba           ; word: the C toolchain spike's result
+                                ;   (Ot6CSpikeProbe; battle_c.lua asserts
+                                ;   it. RELOCATED from $57dc: that byte
+                                ;   sits inside vanilla's $57d5-$5854
+                                ;   battle name-scratch string, the same
+                                ;   banner-tear collision family that
+                                ;   moved OT6_FONTDIRTY.)
+OT6_RANDPEND := $57bc           ; the NEXT battle is a random encounter:
+                                ;   holds OT6_RANDMAGIC, set by
+                                ;   Ot6MarkRandom from the two field/world
+                                ;   random-battle triggers; consumed
+                                ;   (compared + cleared) by InitBP.
+OT6_RANDBTL  := $57bd           ; THIS battle is a random encounter
+                                ;   (InitBP's normalized 0/1 copy of the
+                                ;   marker; read at victory by
+                                ;   Ot6RewardScale_ext). the copy-and-
+                                ;   clear protocol means a marker can
+                                ;   never leak past one battle: every
+                                ;   InitBattle refreshes $57bd and zeroes
+                                ;   $57bc, so an event battle after a
+                                ;   fled or lost random encounter reads
+                                ;   0. two junk defenses on top (the
+                                ;   strip is init-exempt, so power-on/
+                                ;   menu junk lives here until the first
+                                ;   battle -- probe_57ba_strip measured
+                                ;   $ff on the srm-boot line): the marker
+                                ;   is a magic value, not "nonzero", and
+                                ;   Ot6DangerStep word-clears both bytes
+                                ;   on every danger-checked field step.
+OT6_RANDMAGIC := $a5            ; the marker value (junk is $00/$ff in
+                                ;   every observed boot line)
+
 .proc Ot6BgHudFlush_ext
         .a8
         .i16
@@ -2348,7 +2628,7 @@ ot6_c_mix := Ot6CBlob           ; unsigned char ot6_c_mix(uchar a, uchar b)
         pea     $0004           ; second arg, a word on the stack
         lda     #$0003          ; first arg in a
         jsl     ot6_c_mix
-        sta     f:$7e57dc       ; witness: 3*2 + 4 + 1 = 11
+        sta     f:$7e0000+OT6_CWITNESS  ; witness word: 3*2 + 4 + 1 = 11
         pla                     ; caller pops the stacked arg
         plp
         rts

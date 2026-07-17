@@ -32,11 +32,16 @@
 -- Policies (POLICY knob):
 --   beams   fire beam at the default target every turn (never tek);
 --           Heal Force while the head hides. "ignores the pierce
---           weakness" control.
+--           weakness" control. (With the head's fire-weak ADD, beams
+--           now chip too -- this is no longer a zero-chip control.)
 --   pierce  terra: TekMissile at the head until it breaks, beams into
 --           the break window, TekMissile again as shields re-arm;
 --           vicks/wedge: fire beams. Heal Force while the head hides.
---           The designed tutorial line.
+--   tutorial the designed line the fire-weak ADD exists for: everyone
+--           beams the head (3 fire chips), and terra spends her action
+--           on TekMissile exactly when one shield remains -- the 4th
+--           chip. beams into the break window; Heal Force while the
+--           head hides.
 --   naive   everyone confirms their first beam at the default target
 --           (A-A-A), always. The mash-through player.
 local H = dofile("/Users/mtklein/ot6/tools/tests/lib/ot6.lua")
@@ -59,6 +64,7 @@ local PEND  = 0x3e9d               -- char pending boost, +slot*2
 local SHLD  = 0x3e40               -- monster cur shields, +slot*2 (odd = max)
 local TIMER = 0x3e90               -- monster broken timer, +slot*2
 local CWEAK = 0x3ea4               -- monster class weaknesses, +slot*2
+local WEAK  = 0x3be8               -- monster weak elements, +slot*2
 local ALIVE = 0x3aa8               -- monster presence bit0, +slot*2
 local MSTAT = 0x3eec               -- monster status-1, +slot*2 ($c2 = gone)
 local SPEC  = 0x57c0               -- formation species words
@@ -112,6 +118,10 @@ local function seqFor(actor)
      and not broken() and shields() > 0 then
     return { "a", "down", "down", "down", "right", "a", "a" }
   end
+  if POLICY == "tutorial" and actor == terra
+     and not broken() and shields() == 1 then
+    return { "a", "down", "down", "down", "right", "a", "a" }
+  end
   return { "a", "a", "a" }
 end
 
@@ -153,6 +163,8 @@ local function resetBattleState()
   S = {
     t0 = 0, frames = 0,
     playerActions = 0, enemyActions = 0, counterActions = 0,
+    playerDequeues = 0, enemyDequeues = 0,
+    headDequeues = 0, shellDequeues = 0,
     headActions = 0, shellActions = 0,
     playerDmg = 0, playerDmgBroken = 0, monsterHeal = 0,
     enemyDmg = 0, partyHeal = 0,
@@ -227,15 +239,33 @@ local function sample()
     while qShadow[qi] ~= cur do
       local v = H.readByte(q.base + qShadow[qi])
       if (v & 0x80) == 0 then
+        -- each real action passes through TWO queues (advance-wait +
+        -- action; measured in this fight: raw player dequeues == 2x the
+        -- exec-verified cast counters). player/enemy/head/shell action
+        -- lines emit REAL actions: every second dequeue of a bucket
+        -- credits one. counter_actions stays a raw counter-queue
+        -- dequeue tally (subset diagnostics).
         if q.counter then S.counterActions = S.counterActions + 1 end
         if v < 8 then
-          S.playerActions = S.playerActions + 1
-          actTrace[#actTrace + 1] = string.format("%d:%d",
-            S.playerActions, S.playerDmg)
+          S.playerDequeues = S.playerDequeues + 1
+          if S.playerDequeues % 2 == 0 then
+            S.playerActions = S.playerActions + 1
+            actTrace[#actTrace + 1] = string.format("%d:%d",
+              S.playerActions, S.playerDmg)
+          end
         else
-          S.enemyActions = S.enemyActions + 1
-          if hs and v == 8 + hs*2 then S.headActions = S.headActions + 1 end
-          if ss and v == 8 + ss*2 then S.shellActions = S.shellActions + 1 end
+          S.enemyDequeues = S.enemyDequeues + 1
+          if S.enemyDequeues % 2 == 0 then
+            S.enemyActions = S.enemyActions + 1
+          end
+          if hs and v == 8 + hs*2 then
+            S.headDequeues = S.headDequeues + 1
+            if S.headDequeues % 2 == 0 then S.headActions = S.headActions + 1 end
+          end
+          if ss and v == 8 + ss*2 then
+            S.shellDequeues = S.shellDequeues + 1
+            if S.shellDequeues % 2 == 0 then S.shellActions = S.shellActions + 1 end
+          end
         end
       end
       qShadow[qi] = (qShadow[qi] + 1) & 0xff
@@ -483,6 +513,9 @@ local function battleBlock(k)
         if hs == nil or ss == nil then voidReason = "slots_missing" end
         if hs and H.readByte(SHLD + hs*2) ~= 4 then voidReason = "bad_seed" end
         if hs and H.readByte(CWEAK + hs*2) ~= 2 then voidReason = "bad_class" end
+        if hs and (H.readByte(WEAK + hs*2) & 0x01) == 0 then
+          voidReason = "no_fire_add"   -- the Ot6ElemAddTbl row must land
+        end
         if voidReason then report() return end
         for slot = 0, 3 do
           if H.readByte(CHID + slot*2) == 0 then terra = slot end
@@ -497,9 +530,9 @@ local function battleBlock(k)
             local hp = H.readWord(MHP + slot*2)
             mons[#mons + 1] = { slot = slot, hp = hp, hp0 = hp, dmg = 0 }
             mline("mon_detail", string.format(
-              "s%d:sp%04X:hp%d:cweak%02x:sh%d/%d", slot,
+              "s%d:sp%04X:hp%d:cweak%02x:weak%02x:sh%d/%d", slot,
               H.readWord(SPEC + slot*2), hp,
-              H.readByte(CWEAK + slot*2),
+              H.readByte(CWEAK + slot*2), H.readByte(WEAK + slot*2),
               H.readByte(SHLD + slot*2), H.readByte(SHLD + slot*2 + 1)))
           end
         end

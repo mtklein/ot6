@@ -7,6 +7,9 @@ Each log carries per-battle lines of the form
     [ot6] [metrics] b=<k> <key>=<value>
 one policy per log (the policy key repeats per battle). Voided samples
 (key `void`) are tallied separately and excluded from averages.
+player_actions/enemy_actions are real actions (the drivers de-duplicate
+the two-queue dequeue count as of 2026-07-17; logs from before then
+carry 2x on those two keys).
 """
 import re
 import sys

@@ -152,8 +152,8 @@ Loop:   lsr2
         bne     Loop
 :       and     #$03
         cmp     #$03
-        beq     NoBattle
-        sta     $1a
+        jeq     NoBattle        ; (long branch: the ot6 hooks below pushed
+        sta     $1a             ;   NoBattle past beq range)
         lda     $11df
         and     #$03
         asl2
@@ -164,9 +164,8 @@ Loop:   lsr2
         ora     f:WorldBattleRateTbl+1,x
         beq     NoBattle
         longa
-        lda     $1f6e
-        clc
-        adc     f:WorldBattleRateTbl,x
+        lda     f:WorldBattleRateTbl,x  ; per-step danger increment
+        jsl     Ot6DangerStep           ; ot6: scale by the rate knob, add $1f6e
         bcc     :+
         lda     #$ff00
 :       sta     $1f6e
@@ -176,6 +175,7 @@ Loop:   lsr2
         bcs     NoBattle
         stz     $1f6e
         stz     $1f6f
+        jsl     Ot6MarkRandom           ; ot6: the next battle is a random encounter
         lda     $24
         cmp     #$ff
         jeq     GetVeldtBattle          ; jump if a veldt sector
@@ -376,8 +376,8 @@ Loop:   lsr2
         ora     f:SubBattleRateTbl+1,x
         jeq     MoogleCharm             ; return if battle probability is zero
         longa_clc
-        lda     $1f6e                   ; random battle counter
-        adc     f:SubBattleRateTbl,x    ; add random battle rate (max #$ff00)
+        lda     f:SubBattleRateTbl,x    ; random battle rate (max #$ff00)
+        jsl     Ot6DangerStep           ; ot6: scale by the rate knob, add $1f6e
         bcc     :+
         lda     #$ff00
 :       sta     $1f6e
@@ -387,6 +387,7 @@ Loop:   lsr2
         bcs     Done                    ; return if counter didn't overflow
         stz     $1f6e                   ; clear random battle counter
         stz     $1f6f
+        jsl     Ot6MarkRandom           ; ot6: the next battle is a random encounter
         ldx     a:$0082
         lda     f:SubBattleGroup,x      ; get the map's battle group
         longa

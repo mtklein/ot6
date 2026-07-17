@@ -140,6 +140,7 @@ local S = {
   t0 = 0,                          -- H.frame at arm; all frame stats relative
   frames = 0,
   playerActions = 0, enemyActions = 0, counterActions = 0,
+  playerDequeues = 0, enemyDequeues = 0,
   playerDmg = 0, playerDmgBroken = 0, monsterHeal = 0,
   enemyDmg = 0, partyHeal = 0,
   regens = 0, boosts = { 0, 0, 0 },
@@ -212,9 +213,23 @@ local function sample()
     while qShadow[qi] ~= cur do
       local v = H.readByte(q.base + qShadow[qi])
       if (v & 0x80) == 0 then
+        -- each real action passes through TWO queues (advance-wait +
+        -- action), so raw dequeues run exactly 2x real actions.
+        -- player_actions/enemy_actions emit REAL actions: every second
+        -- dequeue of a side credits one. counter_actions stays a raw
+        -- counter-queue dequeue tally (subset diagnostics).
         if q.counter then S.counterActions = S.counterActions + 1 end
-        if v < 8 then S.playerActions = S.playerActions + 1
-        else S.enemyActions = S.enemyActions + 1 end
+        if v < 8 then
+          S.playerDequeues = S.playerDequeues + 1
+          if S.playerDequeues % 2 == 0 then
+            S.playerActions = S.playerActions + 1
+          end
+        else
+          S.enemyDequeues = S.enemyDequeues + 1
+          if S.enemyDequeues % 2 == 0 then
+            S.enemyActions = S.enemyActions + 1
+          end
+        end
       end
       qShadow[qi] = (qShadow[qi] + 1) & 0xff
     end
