@@ -86,6 +86,19 @@ OT6_BREAK_TICKS := $10          ; a bit under vanilla stop duration ($12)
         lda     #$06            ; ... capped at 6
 @seed:  sta     $3e38,y
         sta     $3e39,y
+        ; reveals start hidden. the seed no longer trusts the caller to have
+        ; zeroed these: InitBattle's $3a20-$3ed3 clear does, but the Cmd_20
+        ; scene-change reload (multi-phase bosses, reinforcements) re-runs the
+        ; seed with NO such clear, and uninitialized ram would hand it garbage
+        ; too -- either way the stale bits, OR'd with the codex below, showed
+        ; every weakness revealed from battle start (the hud '?'-gate reads
+        ; exactly $3e89/$3e9d). monster path only (y >= $08 past @on), so a
+        ; character's $3e9d pending-boost row is never touched. with 32k sram
+        ; the codex re-merge below restores real reveals (chips write them
+        ; through), so a same-monster retract cycle keeps its reveals.
+        lda     #$00
+        sta     $3e89,y         ; revealed weakness elements
+        sta     $3e9d,y         ; revealed classes (monster half)
         ; weakness codex: pre-reveal anything learned in past battles
         longa
         lda     f:OT6_CODEX_MAGIC
