@@ -176,12 +176,9 @@ merge:  pla                     ; reveal all matched weaknesses
         beq     done            ; shieldless monster
         dec     a
         sta     $3e38,y
-        bne     refresh
+        bne     done
         lda     #OT6_BREAK_TICKS
         sta     $3e88,y         ; shields down: BREAK
-refresh:
-        jsr     Ot6BuildRowGlyphs
-        jsr     Ot6PokeRedraw
 done:   rtl
 .endproc
 
@@ -241,8 +238,11 @@ done:   rtl
         lda     $3ee4,y
         bit     #$c0
         bne     done            ; wound/petrify: the hit was theater
-        lda     $f2
-        bne     done            ; healing hits teach nothing, chip nothing
+        lda     $f2             ; resolved spell flags3 (absorb/undead-drain
+        lsr                     ;   reversals already folded in); ONLY bit 0
+        bcs     done            ; means heal — $20 can't-dodge etc. ride the
+                                ; same byte, and gating on the whole byte
+                                ; silenced every flagged skill's chip
         lda     $3e9d,y
         eor     #$ff
         and     OT6_SCR_BIT
@@ -268,12 +268,9 @@ merge:  lda     OT6_SCR_BIT     ; reveal the matched class
         beq     done            ; shieldless monster
         dec     a
         sta     $3e38,y
-        bne     refresh
+        bne     done
         lda     #OT6_BREAK_TICKS
         sta     $3e88,y         ; shields down: BREAK
-refresh:
-        jsr     Ot6BuildRowGlyphs
-        jsr     Ot6PokeRedraw
 done:   rts
 .endproc
 
@@ -282,8 +279,11 @@ done:   rts
 ; [ double damage against a broken target ]
 
 ; the tail of Ot6HitJoin (the join of the elemental damage block, i.e.
-; every hit). a8, y = target, $f0 = 16-bit damage, $f2 = heal flag;
-; width-agnostic on the index side (the damage loop runs i8).
+; every hit). a8, y = target, $f0 = 16-bit damage, $f2 = resolved spell
+; flags3 (bit 0 = this hit heals, absorb/undead-drain reversals folded
+; in); width-agnostic on the index side (the damage loop runs i8).
+; plain drains (bit 1, bit 0 clear) DO double — vanilla's elemental-weak
+; x2 applies to drains too, and the break window follows vanilla's rule.
 
 .proc Ot6BrokenDmg
         .a8
@@ -292,8 +292,9 @@ done:   rts
         bcc     done
         lda     $3e88,y
         beq     done            ; not broken
-        lda     $f2
-        bne     done            ; healing/drain: don't double
+        lda     $f2             ; heal bit ONLY — the whole-byte gate let
+        lsr                     ;   $20 can't-dodge block the double for
+        bcs     done            ;   every beam and skill that carries it
         lda     $f1
         bmi     done            ; avoid 16-bit overflow (matches vanilla)
         asl     $f0
@@ -431,116 +432,14 @@ done:   rtl
         bne     done
         lda     $3e39,x         ; recovered: shields back to max
         sta     $3e38,x         ; (revealed weaknesses stay revealed)
-        jsr     Ot6BuildRowGlyphs
-        jsr     Ot6PokeRedraw
 done:   rtl
 .endproc
 
 ; ------------------------------------------------------------------------------
-
-; [ force the monster name window to redraw ]
-
-; invalidates btlgfx's monster-name cache (w7eebff, first byte);
-; the name window diff check picks it up on the next frame
-
-.proc Ot6PokeRedraw
-        .a8
-        .i16
-        dec     $ebff           ; db = $7e throughout battle code
-        rts
-.endproc
-
-; ------------------------------------------------------------------------------
-
-; [ rebuild the per-row shield glyphs for the monster name window ]
-
-; one glyph per name row ($200d grouping): $ff blank, 'B' if any monster in
-; the group is broken, else the lowest shield count in the group as a digit.
-; row glyphs live at $3ecb,X (X = 0,2,4,6 matching the $200d row offsets).
-; preserves x/y and caller register widths.
-
-.proc Ot6BuildRowGlyphs
-        .a8
-        .i16
-        php
-        longi                   ; callers vary: battle init runs i8
-        phx
-        phy
-        shorta
-        ldx     #$0000
-@row:   lda     #$ff            ; default: blank
-        sta     $3ecb,x
-        ldy     #$0000          ; monster slot offset ($00-$0a)
-@slot:  lda     $3aa8,y
-        lsr
-        bcc     @next           ; monster not present
-        lda     $3eec,y
-        bit     #$c2
-        bne     @next           ; dead, petrified, or zombie
-        longa
-        lda     $3388,y         ; monster name id
-        cmp     $200d,x
-        shorta
-        bne     @next           ; not this row's group
-        lda     $3e90,y         ; broken timer (monster tables = entity + 8)
-        beq     @shield
-        lda     #$81            ; 'B': broken beats any digit
-        sta     $3ecb,x
-        bra     @next
-@shield:
-        lda     $3e40,y         ; current shield points
-        beq     @next           ; shieldless: leave blank
-        cmp     #$0a
-        bcc     :+
-        lda     #$09
-:       clc
-        adc     #$b4            ; digit glyph ($b4 = '0')
-        cmp     $3ecb,x
-        bcs     @next           ; keep the smaller glyph ('B' or lower digit)
-        sta     $3ecb,x
-@next:  iny2
-        cpy     #$000c
-        bcc     @slot
-        inx2
-        cpx     #$0008
-        bcc     @row
-        ply
-        plx
-        plp
-        rts
-.endproc
-
-; jsl wrapper for hooks in vanilla banks
-.proc Ot6BuildRowGlyphsFar
-        .a8
-        .i16
-        jsr     Ot6BuildRowGlyphs
-        rtl
-.endproc
-
-; ------------------------------------------------------------------------------
-
-; [ shield glyph for the monster name row being drawn ]
-
-; called from btlgfx MenuTextCmd_0b in place of the trailing blank;
-; returns the glyph in a for DrawMenuLetter. ($48) still points at the
-; row slot byte of the menu text string.
-
-.proc Ot6ShieldGlyph_ext
-        .a8
-        .i16
-        phx
-        longa
-        lda     ($48)
-        and     #$0003
-        asl
-        tax
-        shorta0
-        lda     $3ecb,x
-        plx
-        rtl
-.endproc
-
+; (m1's monster-window shield digit — the $3ecb row-glyph buffer, its
+; builder, and the MenuTextCmd_0b glyph hook — is retired: it was
+; redundant with the under-enemy hud and read as an enemy COUNT.
+; $3ecb-$3ed3 stays ours; the odd bytes below still serve as scratch.)
 ; ------------------------------------------------------------------------------
 
 ; [ a battle dialogue clobbered our font cells; restore, then flag a re-lay ]
@@ -653,7 +552,7 @@ Ot6ElemGlyphTbl:
 
 OT6_QMARK := $bf                ; '?' glyph (unrevealed weakness slot)
 
-; strip scratch (free odd bytes between the row-glyph slots; battle-only)
+; battle-only scratch (unused vanilla ram $3ecb-$3ed3, ours since m1)
 OT6_SCR_SLOT2 := $3ecc          ; targeted monster offset (slot * 2)
 OT6_SCR_BIT   := $3ece          ; walking element bit
 OT6_SCR_IDX   := $3ed0          ; element index 0-7
@@ -1188,7 +1087,7 @@ Ot6FoldTbl:
 @mul:   asl                     ; not a true xN, but x2/x4/x8 reads better
         bcs     @cap            ; on 16-bit overflow, saturate
         shorta                  ; 8-bit dec: a 16-bit rmw would clobber
-        dec     OT6_SCR_BIT     ; the row-glyph byte next door
+        dec     OT6_SCR_BIT     ; the scratch byte next door
         longa                   ; (rep/sep leave z alone; a survives)
         bne     @mul
         bra     @store

@@ -15259,8 +15259,7 @@ UpdateMonsterGfxBuf:
         beq     @5d25
         lda     #$02
         tsb     $b1
-@5d25:  jsl     Ot6BuildRowGlyphsFar    ; ot6: refresh shield glyph buffer
-        rts
+@5d25:  rts
 
 ; ------------------------------------------------------------------------------
 

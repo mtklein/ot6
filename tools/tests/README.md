@@ -66,9 +66,8 @@ line reports its worker and wall time.
   A/A/A drives MagiTek Fire Beam onto a guard; asserts each press visibly
   changes the screen and the action resolves (guard HP drops).  Logs break
   RAM (guard shields $3E44/$3E46, HP $3C00/$3C02, revealed masks
-  $3E95/$3E97, glyph row $3ECB+) and screenshots before/during/after --
-  `shots/fb_firing.png` shows the monster name window with the shield digit
-  ("Guard    2").
+  $3E95/$3E97) and screenshots before/during/after.  (The monster-window
+  shield digit is retired -- the under-enemy HUD is the shield display.)
 - `probe23.lua` - positive control: input injection still works after
   loadSavestate (A opens the MagiTek submenu, B closes it; fails loudly if
   a press has no visible effect).
@@ -111,7 +110,7 @@ H.run({ maxFrames = 60000 }, {              -- frame budget failsafe -> exit 2
   H.hold({ "up" }), H.waitFrames(20), H.release(),
   H.waitUntil(function() return H.battleLoadStarted() end, 5000, "battle"),
   H.call(function()
-    H.assertEq(H.readByte(0x7E3ECB), 0xBA, "break glyph")
+    H.assertEq(H.readByte(0x7E3E44), 2, "guard shields")
     H.screenshot("my_tag")                  -- -> build/states/shots/my_tag.png
     H.saveState("my_state.mss")             -- -> build/states/my_state.mss
   end),
@@ -147,7 +146,7 @@ Plain functions (call from `H.call`/predicates):
   `H.battleLoadStarted()` (HP table at $3BF4 populated),
   `H.battleActive()` (load started + monsters present + screen actually
   rendering, judged by screenshot PNG size), `H.screenLooksAlive()`,
-  constants `H.MONSTER_IDS=$3F46`, `H.BATTLE_HP=$3BF4`, `H.BREAK_GLYPH=$3ECB`.
+  constants `H.MONSTER_IDS=$3F46`, `H.BATTLE_HP=$3BF4`.
   (Caveat: the six words at $3F46 are a liveness heuristic, not clean IDs --
   monster #0 "Guard" is a valid 0x0000, empty slots read $FFFF, and healthy
   vanilla battles still show one stale word there, e.g. 874B, left over

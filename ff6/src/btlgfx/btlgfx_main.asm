@@ -16093,9 +16093,9 @@ MenuTextCmd_0b:
         inx                 ; next letter
         dec     $10
         bne     @69c9
-        jsl     Ot6ShieldGlyph_ext      ; ot6: shield count instead of blank
-        jmp     DrawMenuLetter
-
+        lda     #$ff        ; trailing blank (vanilla; ot6's m1 shield
+        jmp     DrawMenuLetter  ; digit here is retired — the under-enemy
+                            ; hud is THE shield display)
 .else
         asl3
         tax
@@ -16144,8 +16144,8 @@ MenuTextCmd_0d:
         lda     ($48)
         cmp     #$ff
         bne     @69ec       ; branch if command slot is empty
-        lda     #BattleCmdName::ITEM_SIZE+2     ; ot6: +2 pads over shield digit
-        jmp     DrawSpaces
+        lda     #BattleCmdName::ITEM_SIZE+2     ; ot6: +2 clears stale
+        jmp     DrawSpaces                      ;   monster-row columns
 @69ec:  xba
         lda     #BattleCmdName::ITEM_SIZE
         sta     $10

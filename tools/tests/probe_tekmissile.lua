@@ -142,6 +142,17 @@ H.run({ maxFrames = 30000 }, {
   H.waitFrames(45),
   H.call(function() H.screenshot("tekmissile_pierce_msg2") end),
 
+  -- the drive stopped at the LOAD ($02 on the class byte); the missile
+  -- lands frames later. UNCONDITIONAL: TekMissile carries flags3 $20
+  -- ("can't dodge" -- it cannot miss) and its default target is a
+  -- pierce-weak guard, so the chip and reveal MUST arrive. this assert
+  -- used to be gated on the reveal having happened, which let the
+  -- whole-byte $f2 gate ship a ROM where flagged skills never chipped.
+  H.waitUntil(function()
+    local r1, r2 = crev()
+    return (r1 | r2) & 0x02 == 0x02
+  end, 900, "TekMissile's chip reveals piercing on a guard", 10),
+
   H.call(function()
     local r1, r2 = crev()
     local s1, s2 = H.readByte(0x3E44), H.readByte(0x3E46)
@@ -152,13 +163,11 @@ H.run({ maxFrames = 30000 }, {
       "hand, only the skill loader (TekMissile) can have stored it")
     H.assertEq(classWrites[0x01] or 0, 0,
       "and the sword's slash never loaded: terra never swung it")
-    -- if TekMissile happened to hit a pierce-weak guard, the chip fired
-    if (r1 | r2) & 0x02 == 0x02 then
-      local species = H.readWord(0x57C4)
-      H.assertEq(sram(0x316190 + species) & 0x02, 0x02,
-        "class codex learned piercing from the ability chip")
-      H.log("bonus: the ability chip also revealed + learned the class")
-    end
+    H.assertEq(s1 < 2 or s2 < 2, true,
+      "the revealing TekMissile hit also chipped a shield")
+    local species = H.readWord(0x57C4)
+    H.assertEq(sram(0x316190 + species) & 0x02, 0x02,
+      "class codex learned piercing from the ability chip")
     local parts = {}
     for v, n in pairs(classWrites) do
       parts[#parts + 1] = string.format("%02x:%d", v, n)

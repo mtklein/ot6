@@ -7,7 +7,7 @@
 --     H.waitFrames(60),
 --     H.pressButtons({ "start" }, 8),
 --     H.waitUntil(function() return H.battleActive() end, 5000, "battle"),
---     H.call(function() H.assertEq(H.readByte(0x7E3ECB), 0xBA, "glyph") end),
+--     H.call(function() H.assertEq(H.readByte(0x7E3E44), 2, "shields") end),
 --   })
 --
 -- The script is a LIST OF STEPS consumed one per frame by a startFrame event
@@ -290,11 +290,9 @@ end
 -- ----------------------------------------------------- FF6 battle signals --
 -- $7E3F46: 6 x 16-bit monster IDs for the current battle ($FFFF = empty
 -- slot; note monster #0 "Guard" is a valid 0x0000).  $7E3BF4: 4 x 16-bit
--- party battle HP ($FFFF outside battle).  $7E3ECB: OT6 break-system digit
--- glyph ($B4-$BD) while the battle UI is live.
+-- party battle HP ($FFFF outside battle).
 M.MONSTER_IDS = 0x3F46
 M.BATTLE_HP = 0x3BF4
-M.BREAK_GLYPH = 0x3ECB
 
 function M.monsterIds()
   local ids = {}

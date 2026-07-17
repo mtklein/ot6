@@ -9,7 +9,6 @@
 --
 -- Also dumps the OT6 break-system RAM:
 --   $7E3E40, $7E3E42, ... per-monster shield current (stride 2 from $7E3E38+8)
---   $7E3ECB-$7E3ED2     row glyph buffer (digit glyphs $B4-$BD in battle)
 --
 -- Exit codes: 0 = battle active with sane values, 1 = any assert failed.
 
@@ -52,17 +51,17 @@ H.run({ maxFrames = 3600 }, {
     H.log("shield current words $7E3E40+2i: " .. table.concat(sw, " "))
     H.log("shield current bytes $7E3E40-$7E3E4B: " .. table.concat(sb, " "))
 
-    local glyphs = {}
-    for a = 0x3ECB, 0x3ED2 do
-      glyphs[#glyphs + 1] = string.format("%02X", H.readByte(a))
+    -- at least one present monster must carry a seeded shield count
+    -- (the retired monster-window digit used to stand in for this)
+    local seeded = false
+    for i = 0, 5 do
+      if H.readByte(0x3AA8 + i * 2) % 2 == 1
+        and H.readByte(0x3E40 + i * 2) > 0 then seeded = true end
     end
-    H.log("row glyph buffer $7E3ECB-$7E3ED2: " .. table.concat(glyphs, " "))
-
-    local g = H.readByte(H.BREAK_GLYPH)
-    if not (g >= 0xB4 and g <= 0xBD) then
-      error(string.format("break glyph $7E3ECB = %02X not a digit glyph ($B4-$BD)", g), 0)
+    if not seeded then
+      error("no present monster carries a seeded shield count", 0)
     end
-    H.log(string.format("break glyph $7E3ECB = %02X (digit %d)", g, g - 0xB4))
+    H.log("shield seed present on a live monster")
 
     H.screenshot("battle_smoke")
   end),

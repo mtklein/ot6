@@ -10,7 +10,7 @@ CODE_EXT_INC = 1
 .global UpdateEquip_ext, CalcMagicEffect_ext
 
 ; ot6 module (bank f0, part of battle object)
-.global Ot6ShieldGlyph_ext, Ot6LoadFontIcons_ext
+.global Ot6LoadFontIcons_ext
 .global Ot6AbilityPad_ext
 .global Ot6ListIcon_ext, Ot6MagitekIcon_ext, Ot6LoreIcon_ext
 .global Ot6BgHud_ext, Ot6BgHudFlush_ext, Ot6PipGlyph_ext

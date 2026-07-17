@@ -38,7 +38,8 @@ H.run({ maxFrames = 8000 }, {
         ids[1], ids[2], ids[3], ids[4], ids[5], ids[6]))
       local hp = H.partyHp()
       H.log(string.format("party battle hp: %d %d %d %d", hp[1], hp[2], hp[3], hp[4]))
-      H.log(string.format("break glyph $7E3ECB = %02X", H.readByte(H.BREAK_GLYPH)))
+      H.log(string.format("guard shields $7E3E44,$7E3E46 = %d,%d",
+        H.readByte(0x3E44), H.readByte(0x3E46)))
     end),
   }, {
     H.call(function()

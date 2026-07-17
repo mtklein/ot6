@@ -10,7 +10,6 @@
 --   $7E3E44/$7E3E46  guard shield current (monster slots 2/3)
 --   $7E3C00/$7E3C02  guard HP words
 --   $7E3E95/$7E3E97  revealed masks
---   $7E3ECB-$7E3ED2  row glyph buffer (expect $B4-$BD digits in battle)
 --
 -- This doubles as the key input experiment: driving the battle with buttons
 -- when NO savestate was loaded mid-battle (the doorstep load happens in the
@@ -24,14 +23,11 @@ local STATE = "/Users/mtklein/ot6/build/states/battle_doorstep.mss.lua"
 
 local function ramReport(tag)
   return H.call(function()
-    local g = {}
-    for a = 0x3ECB, 0x3ED2 do g[#g + 1] = string.format("%02X", H.readByte(a)) end
     H.log(string.format("%s shields[$3E44,$3E46]=%02X,%02X hp[$3C00,$3C02]=%04X,%04X " ..
-        "revealed[$3E95,$3E97]=%02X,%02X glyphs[$3ECB+]=%s",
+        "revealed[$3E95,$3E97]=%02X,%02X",
       tag, H.readByte(0x3E44), H.readByte(0x3E46),
       H.readWord(0x3C00), H.readWord(0x3C02),
-      H.readByte(0x3E95), H.readByte(0x3E97),
-      table.concat(g, " ")))
+      H.readByte(0x3E95), H.readByte(0x3E97)))
   end)
 end
 
