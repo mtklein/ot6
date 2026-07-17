@@ -1199,6 +1199,7 @@ Ot6FontIcons:
 @latch: sta     f:$7e0000+OT6_RANDBTL
         lda     #$00
         sta     f:$7e0000+OT6_RANDPEND
+        sta     f:$7e0000+OT6_HUDVEIL   ; a stale veil never survives init
         lda     #$01
         sta     $3e9c           ; characters open with 1 bp, octopath-style
         sta     $3e9e
@@ -1960,6 +1961,8 @@ OT6_RELAY_STAGES := 6           ; icons, glyphs x2, arrows x3 (~128b each)
 ; only bank-F0 writers). InitBP's @clr loop deliberately stops at $57b9:
 ; $57ba is rewritten every init by the spike probe anyway, and clearing
 ; $57bc would eat the random-encounter marker the field just set.
+; occupants: $57ba-$57bb CWITNESS, $57bc RANDPEND, $57bd RANDBTL,
+; $57be HUDVEIL (init-cleared one byte at a time in InitBP), $57bf spare.
 OT6_CWITNESS := $57ba           ; word: the C toolchain spike's result
                                 ;   (Ot6CSpikeProbe; battle_c.lua asserts
                                 ;   it. RELOCATED from $57dc: that byte
@@ -1991,6 +1994,48 @@ OT6_RANDBTL  := $57bd           ; THIS battle is a random encounter
                                 ;   on every danger-checked field step.
 OT6_RANDMAGIC := $a5            ; the marker value (junk is $00/$ff in
                                 ;   every observed boot line)
+OT6_HUDVEIL  := $57be           ; nonzero = a monster entry/exit animation
+                                ;   owns bg3: the flush writes vanilla's
+                                ;   $01ee junk fill over each live hud
+                                ;   line instead of its cells (shadow
+                                ;   untouched). set/cleared by
+                                ;   Ot6EntryExitVeil_ext, cleared by
+                                ;   InitBP (the strip is init-exempt, so
+                                ;   power-on junk here would blank the
+                                ;   hud from battle one).
+
+; [ monster entry/exit animations: veil the under-enemy hud ]
+
+; every jsl DoMonsterEntryExit site in bank c1 is re-pointed here (same
+; four bytes, no code motion). the entry/exit effect family — the whelk
+; retract's FADE_DOWN/FADE_UP wipes especially — sweeps the battle-field
+; bg3 region with a per-scanline scroll wave (hdma #2, fed from the
+; w7e4af5 table the effect animates), and it assumes the field map holds
+; nothing visible but its own mask tiles: vanilla blanks even its banner
+; rows to the $01ee junk fill before scrolling. our under-enemy hud
+; lines ride that same map, so the wipe smeared their glyphs across the
+; screen (v0.1 whelk playtest; battle_whelkwipe is the regression gate —
+; veiling exactly the hud words removed every stray pixel, measured
+; against the base image frame by frame). while the veil byte is set the
+; nmi flush writes the $01ee fill over each live line instead of its
+; cells — the field map is word-identical to vanilla's for the whole
+; animation — and the shadow itself is untouched, so the first flush
+; after the effect repaints the hud exactly as built (or blanks it, if
+; the monster left with the effect). a8/i16 at every call site (battle
+; gfx script context); the anim returns a8/i16 on every path, sep #$20
+; is belt and suspenders.
+
+.proc Ot6EntryExitVeil_ext
+        .a8
+        .i16
+        lda     #$01
+        sta     f:$7e0000+OT6_HUDVEIL
+        jsl     DoMonsterEntryExit
+        sep     #$20
+        lda     #$00
+        sta     f:$7e0000+OT6_HUDVEIL
+        rtl
+.endproc
 
 .proc Ot6BgHudFlush_ext
         .a8
@@ -2072,6 +2117,9 @@ OT6_RANDMAGIC := $a5            ; the marker value (junk is $00/$ff in
         tay
         beq     @skip
         sty     hVMADDL
+        lda     f:$7e0000+OT6_HUDVEIL-1          ; veil rides the high byte
+        and     #$ff00                           ;   (low byte = randbtl)
+        bne     @veil
         lda     f:$7e0000+OT6_SHADOW+4,x
         sta     hVMDATAL
         lda     f:$7e0000+OT6_SHADOW+6,x
@@ -2082,6 +2130,13 @@ OT6_RANDMAGIC := $a5            ; the marker value (junk is $00/$ff in
         sta     hVMDATAL
         lda     f:$7e0000+OT6_SHADOW+12,x
         sta     hVMDATAL
+        bra     @skip
+@veil:  lda     #$01ee          ; an entry/exit anim owns bg3: vanilla's
+        sta     hVMDATAL        ;   junk fill, so the scroll wave sweeps
+        sta     hVMDATAL        ;   a map word-identical to vanilla's
+        sta     hVMDATAL
+        sta     hVMDATAL
+        sta     hVMDATAL
 @skip:  shorta0
         longa
         txa
@@ -2090,7 +2145,7 @@ OT6_RANDMAGIC := $a5            ; the marker value (junk is $00/$ff in
         tax
         shorta0
         cpx     #$0054          ; 6 monster lines x 14
-        bcc     @line
+        jcc     @line           ; (veil branch grew the body past bcc)
         ; live pip pseudo-line: one cell in the menu map (active char's
         ; spendable bp during boost select). tiny, runs every nmi.
         ; the party window is double-buffered: each name row is staged at

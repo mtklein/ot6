@@ -100,6 +100,24 @@ line reports its worker and wall time.
   screenshot burst across the banner window.
 - `probe_57b9.lua` - write-watcher over $7E57B9-BF (OT6_FONTDIRTY's
   relocated home) with $7E57D5 as positive control; logs writer PCs.
+- `battle_whelkwipe.lua` - gate for the monster entry/exit wipe: the
+  whelk retract cycle (FADE_DOWN/FADE_UP) sweeps the battle-field BG3
+  region with a per-scanline scroll wave, so the field map must hold
+  nothing but vanilla's tiles while the effect runs.
+  Drives the fight passively (Heal Force) to both transitions, trips an
+  exec callback on DoMonsterEntryExit (C2/E668), and asserts every
+  animation frame at cell level: no OT6-claimed glyph char anywhere in
+  the field map, every live hud line veiled to vanilla's $01ee fill
+  (OT6_HUDVEIL $57BE is the wrapper's own end marker).  After each
+  transition: hud gone with the head, hud repainted on return,
+  glyphCanary.  No pixel compares, so it stays mint-independent.
+- `probe_whelkwipe.lua` / `probe_whelkwipe2.lua` - the measurement
+  instruments behind battle_whelkwipe: frame-by-frame screenshots of
+  both transitions plus BG3 field-map/small-font readback diffs
+  (probe_whelkwipe) and per-scanline BG3 scroll-table RLE, full map
+  dumps, and whole-font-vs-SmallFontGfx compares (probe_whelkwipe2).
+  Run either against build/states/base_rom_for_comparison.sfc for the
+  vanilla ground truth (sed the TAG local first so shot names differ).
 
 Generated artifacts land in `build/states/` (savestates, `*.mss` +
 `*.mss.lua` sidecar) and `build/states/shots/` (PNG screenshots).

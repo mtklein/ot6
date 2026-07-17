@@ -16,7 +16,7 @@ RUN="$ROOT/tools/tests/run.sh"
 GOLD="$ROOT/tools/tests/goldens"
 SHOTS="$ROOT/build/states/shots"
 JOBS="${OT6_JOBS:-4}"
-TESTS="smoke battle_entry battle_break battle_class battle_bp battle_boost battle_hits battle_fold battle_preview battle_codex battle_c battle_fontrestore battle_banner battle_dlgmenu hud_stability visual_f1 visual_f2"
+TESTS="smoke battle_entry battle_break battle_class battle_bp battle_boost battle_hits battle_fold battle_preview battle_codex battle_c battle_fontrestore battle_banner battle_dlgmenu battle_whelkwipe hud_stability visual_f1 visual_f2"
 XFAIL=""   # keep empty; XPASS fails the suite to force cleanup
 fail=0; summary=""
 

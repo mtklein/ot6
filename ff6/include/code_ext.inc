@@ -20,7 +20,9 @@ CODE_EXT_INC = 1
 .global Ot6RestageGate_ext
 .global Ot6FontRestoreMark_ext
 .global Ot6DangerStep, Ot6MarkRandom
+.global Ot6EntryExitVeil_ext
 .global Ot6C1Rtl, DrawMagicListText, _c15a17, _c15729, WaitTfrVRAM_far
+.global DoMonsterEntryExit
 
 ; battle graphics module
 .global SineTbl8, SineTbl16

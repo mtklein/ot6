@@ -22138,7 +22138,7 @@ GfxCmd_12:
         pha
         clr_a
         sta     ($76),y
-        jsl     DoMonsterEntryExit
+        jsl     Ot6EntryExitVeil_ext    ; ot6: hud-veiled DoMonsterEntryExit
         clr_ax
 @934c:  stz     w7e62c2,x
         stz     w7e618b,x
@@ -22169,7 +22169,7 @@ GfxCmd_12:
         lda     $2f48
         and     #$0f
         sta     ($76),y
-        jsl     DoMonsterEntryExit
+        jsl     Ot6EntryExitVeil_ext    ; ot6: hud-veiled DoMonsterEntryExit
         pla
         sta     $201e
         rts
@@ -22203,14 +22203,14 @@ GfxCmd_13:
         bne     @93cb
         jsr     InitMonsterGfx
         jsr     WaitTfrMonsterGfx
-@93cb:  jsl     DoMonsterEntryExit
+@93cb:  jsl     Ot6EntryExitVeil_ext    ; ot6: hud-veiled DoMonsterEntryExit
         rts
 @93d0:  ldy     #2
         lda     $201e
         and     w7e61ab
         and     ($76),y     ; affected monsters
         beq     @93e1
-        jsl     DoMonsterEntryExit
+        jsl     Ot6EntryExitVeil_ext    ; ot6: hud-veiled DoMonsterEntryExit
 @93e1:  rts
 
 ; ------------------------------------------------------------------------------
