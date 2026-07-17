@@ -161,8 +161,9 @@ research/prior-art.md.)
 Equipping a magicite grants, only while equipped:
 - its spell/skill list (castable through the same boost-tier rules),
 - possibly a weapon-class permit **(TBD)**,
-- flat stat modifiers — replacing vanilla's permanent level-up bonuses, so
-  builds are swappable, not grind-locked,
+- its passives, one of them a stat bump — a fixed, constant upgrade, never
+  a per-level bonus — learned for keeps by carrying the esper long enough
+  (the one deliberate exception to while-equipped: design/magicite.md),
 - its summon, once per battle, as the sub-job's divine skill.
 
 Vanilla esper records already store a spell list with learn rates; we reuse
@@ -188,6 +189,28 @@ lands in M4. Fun mechanics don't wait on menu plumbing.
   investigate raising the cap later. **(TBD)**
 - **Save format** → JP reuses the existing per-character AP storage; BP and
   shields are battle-only state, so saves stay compatible.
+
+## Scaling to endgame (rulings 2026-07-16)
+
+How the balance plan survives late-game numbers:
+
+- **Scale in hits, not multipliers** (soft guideline). FF6's 9999 per-hit
+  cap saturates raw damage multipliers as base damage grows; extra hits,
+  extra targets, extra effects, and tier-folds (Fire→Fira→Firaga→Ultima)
+  scale straight past it. Late-game boost effects default to that shape —
+  ludonarrative exceptions are welcome; it's a default, not a law.
+- **Don't fight the game's nature.** Vanilla's late-game power blowouts
+  (Economizer, Gem Box, Offering…) are handled as they present themselves,
+  not preemptively re-priced. Octopath itself is fun and breezy when
+  overpowered — the probe→break→nuke loop stays engaging independent of
+  strict difficulty. This sharpens the house rule up top rather than
+  contradicting it.
+- **No per-level esper bonuses.** Vanilla's +1/+2-per-level esper bonuses
+  are out of the sub-job model. Stat growth from magicite comes only as
+  learnable-permanent passives — Octopath's Support Skills — each a fixed,
+  constant upgrade, chunky but non-compounding. OT's sizing is ~+50 on a
+  999-scale stat; translate to FF6's stat ranges at tuning. Details:
+  design/magicite.md.
 
 ## Out of scope (for now)
 

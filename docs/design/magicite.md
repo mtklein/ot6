@@ -13,14 +13,20 @@ Five slots, all data-table work (menu plumbing lands M5):
 1. **Spells** — 2–3 *base-tier* spells (boost folds the tiers, so a
    Ramuh bearer with 2 BP already casts Bolt 3). While-equipped only,
    always.
-2. **Stat mod** — flat while-equipped (+magic, +speed…), replacing
-   vanilla's permanent level-up bonuses ✦.
+2. **Stat passive** — a fixed, constant stat bump (+magic, +speed…)
+   that behaves exactly like the passive below: active while
+   equipped, and learnable ✦. The *only* stat growth magicite
+   grants — vanilla's per-level bonuses stay deleted, and there is
+   no while-equipped-only stat mod either. Octopath's Support-Skill
+   shape: chunky but non-compounding. OT sizes these ~+50 on a
+   999-scale stat; translate to FF6's stat ranges at tuning —
+   roster magnitudes below are placeholders.
 3. **Passive** — active while equipped, and **teachable ✦**: carry
-   the esper long enough and its passive is learned — it joins the
-   character's permanent passive pool and can be slotted even with a
-   different esper equipped. This is Octopath's job+subjob passive
-   mix-and-match, gestured at through espers: your build is your
-   history of who you've carried.
+   the esper long enough and its passives are learned — they join
+   the character's permanent passive pool and can be slotted even
+   with a different esper equipped. This is Octopath's job+subjob
+   passive mix-and-match, gestured at through espers: your build is
+   your history of who you've carried.
    - **Learning meter**: a fixed count of *battles fought while
      equipped* (a deed, like dances and lores — not levels). Trash
      espers ~15 battles, marquee ones ~25. Stored per character?
@@ -28,19 +34,21 @@ Five slots, all data-table work (menu plumbing lands M5):
      esper exists, so "who carried it" barely matters and party-wide
      keeps the save format trivial.
    - Passive slots per character stay capped (up to 4, DESIGN.md),
-     so learning more passives deepens *choice*, not power.
+     so learning more passives deepens *choice*, not power — and
+     stat passives compete for those same slots, which is the
+     non-compounding backstop.
 4. **Weapon permit** — at most one extra weapon class in the equip
    menu (see weapon-classes.md; battle code never checks it). Kept
    deliberately spare ✦ — a development knob, not a pillar.
 5. **Summon** — the divine, once per battle ✦.
 
 Sub-job fantasy check: a magicite should read as a *job*, not a
-spell bag — its spells, passive, and permit should rhyme, and the
-passive is the part of the job you keep.
+spell bag — its spells, passives, and permit should rhyme, and the
+passives are the part of the job you keep.
 
 ## The WoB roster
 
-| Esper | Source | Spells (base) | Stat mod | Passive | Permit | Notes |
+| Esper | Source | Spells (base) | Stat passive | Passive | Permit | Notes |
 |---|---|---|---|---|---|---|
 | Ramuh | Zozo | Bolt, Rasp | +1 magic | *Conductor*: bolt spells chip +1 | piercing | the storm-lancer job |
 | Kirin | Zozo | Cure, Regen | +1 stamina | *Mender*: heals never miss the row | — | the medic job |
@@ -72,13 +80,13 @@ passive is the part of the job you keep.
 
 ## Learning summary
 
-Spells, stats, permits, summons: while-equipped, never learned ✦.
-Passives: learned by battles-carried (above) — the one form of
-esper permanence, replacing vanilla's stat-bonus grind with build
-collection. Character passives (kits.md) and esper passives share
-the same slots; the M6 pass watches for degenerate pairs (Facet +
-Rune Eater = 3 BP per Runic — probably fine, Runic still eats the
-turn).
+Spells, permits, summons: while-equipped, never learned ✦.
+Passives, the stat bump included: learned by battles-carried
+(above) — the one form of esper permanence, replacing vanilla's
+stat-bonus grind with build collection. Character passives
+(kits.md) and esper passives share the same slots; the M6 pass
+watches for degenerate pairs (Facet + Rune Eater = 3 BP per Runic
+— probably fine, Runic still eats the turn).
 
 ## Open questions for the driver
 
@@ -90,3 +98,7 @@ turn).
    game (special!) or a Slow/Haste utility pair instead. Which?
 3. Maduin's *Trinity* (first cast +1 tier free) — too strong a
    folding interaction, or exactly the flavor of "Terra's blood"?
+4. The stat ruling gives every esper *two* passives riding one
+   learning meter, which was tuned for a single payoff. Land
+   together at the threshold, or staggered — the stat bump early
+   (~10 battles) as a drip, the named passive at the full count?
