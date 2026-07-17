@@ -5,6 +5,21 @@ a save/savestate that demos the new behavior. Order is chosen so the two
 signature systems (Break, BP) are playable against vanilla content early —
 menus, data entry, and balance come after the fun is proven.
 
+## The headline metric: the playable frontier
+
+Progress is measured in playtest terms: **how far into the game we'd tell a
+playtester to play before stopping.** A rung is reached when the fixture
+pipeline reaches it, the balance bands measure green there, and every
+recruited character's kit is honest there.
+
+| rung | stop point | gated on |
+|---|---|---|
+| **1 (current)** | **the Moogle defense** (~1 hour: mines → Whelk → escape) | arming now: difficulty transform, encounter/XP/gil conservation, Whelk fire-add |
+| 2 | Figaro → Vargas | fixtures one stretch deeper; band-2 sweep; the Bio Blaster × poison-empire discovery beat; Narshe school text |
+| 3 | scenario split → Narshe reunion | **Cyan BP-Bushido** (bosses already authored through here) |
+| 4 | Zozo / first espers | M5 magicite sub-jobs |
+| 5 | end of WoB (Floating Continent) | M4 kits + sweeps (boss data already reaches Nerapa) |
+
 ## M0 — Toolchain ✅ (done 2026-07-14)
 
 Repeatable build + test loop on this machine. What shipped (details in
@@ -78,16 +93,21 @@ the next work block.
 nuke loop is playable with visible state everywhere — and boosting is
 audible, visible, and previewed. See DEMO.md.
 
-## M3 — Weapon classes + reveal
+## M3 — Weapon classes + reveal — ✅ core (2026-07-16)
 
-- Weapon-class table for all weapons; per-enemy weapon-weakness byte
-  (new side table in expanded ROM).
-- Skill chip assignments (each Blitz/Tool/Lore/Dance gets class or element).
-- Discovered-weakness tracking per battle; target-select shows known
-  weaknesses + shield count (text MVP). Strago's Analyze added.
+- ✅ Four physical classes (slash/pierce/bludgeon/special ¤); the weapon
+  sets Fight's class per swing, abilities keep their own; null-break as a
+  per-weapon property (Fixed Dice). All 90 WoB weapon-icon items
+  classified; Blitzes/SwdTechs/Tools assigned.
+- ✅ Per-species class weaknesses ride the authored shield table (WoB boss
+  arc through Nerapa + tutorial trash); codex v2 remembers classes.
+- ✅ **The icon IS the class**: weapons wear their break class as their
+  item icon everywhere names render; the type column reads
+  SLASH/PIERCE/BLUNT/SPECIAL; inventory Arrange groups by class for free.
+- ⬜ Strago's Analyze (rides M4 kit work).
 
-**Exit:** full break loop indistinguishable in structure from Octopath's:
-probe, reveal, chip, break, nuke.
+**Exit met:** the break loop is structurally Octopath's — probe, reveal,
+chip, break, nuke — on both element and class axes.
 
 ## M4 — Skill lists on the native verbs
 
