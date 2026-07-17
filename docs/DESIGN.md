@@ -85,6 +85,11 @@ state (Stop-like) for roughly one full turn cycle; all damage it takes is
 ×2; its weakness list is locked revealed for the rest of the battle. On
 recovery, shields reset to `shield_max`.
 
+**Shielded resistance.** While an enemy still has shields and is not broken it
+takes reduced damage (×0.5), so the swing from shielded to broken is about ×4
+for an off-weakness hit (×2 for an on-weakness one) — boosting into an
+unbroken, non-weak target is the worst return on BP, which is the point.
+
 **Reveal.** Weaknesses start hidden. Chipping one reveals that entry;
 Strago's Analyze reveals everything (he is the Cyrus of this party).
 

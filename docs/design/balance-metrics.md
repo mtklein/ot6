@@ -256,3 +256,194 @@ Fight-frame cross-check: this driver clocks from battle-active to
 last kill (~246 frames of load/settle included on both arms);
 removing that constant gives 1467 vs 744 = 1.97x, matching
 Measurement #3's 1456 vs 744 protocol numbers.
+
+## Measurement #5 — co-tune sweep: resistance × HP, and boost pedagogy (2026-07-17)
+
+Two provisional constants shipped together at HEAD 2968c11: SHIELDED
+RESISTANCE (`Ot6ShieldedMulW`, damage × mul/16 while a monster has
+shields and is not broken; $08 = 0.5x) and the HP-band multiplier
+(`Ot6HpMulTbl` band0 $20 = 2x). Both lengthen fights, and stacking
+them overshoots the snappy-fight band — 2x HP alone gave ~3.1 baseline
+actions (Measurement #3), and halving damage on top pushes toward a
+slog. This sweep finalizes both and verifies the boost-pedagogy goal.
+
+The grid was run by poking the two ROM bytes per battle rather than
+rebuilding per cell (proven equivalent by Measurement #4's vanilla
+arm — the scale routines read the same `f:Ot6HpMulTbl` /
+`f:Ot6ShieldedMulW` bytes a rebuild would bake). The shipped values
+were then set by a real source edit and verified by the full gate.
+
+### The design goal (from the owner)
+
+Spending BP should feel WASTED when boosting into an unbroken,
+non-weak enemy. Correct BP use is: boost to break, boost to wipe an
+already-broken enemy, or boost through a trivial fight. The measurable
+target is an ORDERING of damage-per-BP by target state:
+
+    broken  >>  shielded-and-weak  >>  shielded-and-unweak
+
+### The metric — damage-per-BP by target state (`bal_dpb.lua`)
+
+The mines pool is too fragile to express boosts (trash dies in ~2
+actions) and its formula species carry no class weakness, so the
+ordering is measured in a pinned laboratory built on the guard
+fixture. Each frame the driver pins two guards into an exact state and
+pins the party BP/pending, then records every Fire Beam HP-drop with
+the (state, boost) label. Fire Beam base is the same in every phase
+(casters pinned level 5 / mag 10), so the per-state multiplier is the
+only variable:
+
+    shielded-unweak   base × R              (R = Ot6ShieldedMulW/16)
+    shielded-weak     base ×2 × R           (vanilla fire-weak, then shielded)
+    broken            base ×2               (shields down, R does not apply)
+
+8 samples per (state, boost). Marginal = boosted − unboosted; per-BP =
+marginal / 3. Fire Beam base ≈ 140; a 3-BP boost multiplies it ~8×
+(Fire → Firaga potency), identically in every state.
+
+Damage-per-BP, swept across resistance (same lab, resistance poked):
+
+| resistance | unweak /BP | weak /BP | broken /BP | ratio broken:weak:unweak |
+|---|---|---|---|---|
+| **0.5x ($08)** | 169.6 | 322.5 | 660.6 | **3.89 : 1.90 : 1.00** |
+| 0.75x ($0c) | 254.5 | 483.7 | 660.6 | 2.60 : 1.90 : 1.00 |
+| 1x/off ($10) | 339.4 | 644.9 | 660.6 | 1.95 : 1.90 : 1.00 |
+
+The ordering holds at every resistance, but its SHAPE is set by the
+constant. Broken per-BP is fixed (660.6 — shields are down, so
+resistance never applies); unweak and weak both scale up toward broken
+as resistance rises. At 1x (off) a shielded-weak hit (644.9) essentially
+TIES broken (660.6): with no attenuation a weakness hit already
+collects vanilla's ×2, so there is no damage reason to spend the extra
+effort to break. At 0.5x the ladder is a clean doubling — broken buys
+~2× what a weakness buys, a weakness buys ~2× what an off-weakness hit
+buys (4:2:1). **0.5x is the resistance that makes "boost to break" AND
+"hit the weakness" both pay, and makes boosting into shielded-unweak
+visibly the worst return (a quarter of a broken boost).**
+
+### The bad-player policy and boost logging (`bal_mines.lua`)
+
+A new `badboost` policy banks to 3 BP then dumps a 3-BP boosted FIGHT
+at the default target. Fight is pierce and every mines-pool species is
+formula (no class weakness), so this boost ALWAYS lands in a
+shielded-unweak target — the canonical "boost feels wasted" misplay.
+`bal_mines` now also logs every boosted action's target state at cast
+(a `boost_states` line): in the pool these read `l3:shielded:wk*:sh2`,
+i.e. a level-3 boost into a still-shielded target the weapon does not
+match. For this pool `badboost` coincides with `boost3` (Fight matches
+no pool weakness either way) — that coincidence IS the finding: when
+your weapon matches no weakness, the BP economy IS the bad play.
+
+### The co-tune grid
+
+HP band0 {1x, 1.5x, 2x} × resistance {0.5x, 0.75x, 1x}, 5 policies, 8
+battles each, seeded (identical draws across cells). The informative
+subset run: the full HP=1x row (all three resistances) and the full
+R=0.5x column (all three HP), a cross centred on the winner. Skipped
+as dominated (and listed, not silently truncated): 1.5x/0.75x
+(partial), 1.5x/1x, 2x/0.75x, 2x/1x — the 1.5x and 2x rows are already
+slogs at the ship resistance, and raising resistance only makes the
+baseline FASTER (less "noticeably slower"), so none can beat 1x/0.5x.
+
+Real player actions (TTK), baseline enemy actions (danger), and the
+bad-player vs baseline:
+
+| cell (HP × R) | baseline TTK | fire TTK | badboost TTK | baseline enemyA | baseline dmg-taken |
+|---|---|---|---|---|---|
+| **1x × 0.5x** | **3.4** | 2.0 | 2.9 | 3.6 | 14.6 |
+| 1x × 0.75x | 2.5 | 2.0 | 2.5 | 2.0 | 7.2 |
+| 1x × 1x/off | 2.1 | 2.0 | 2.1 | 1.5 | 6.4 |
+| 1.5x × 0.5x | 5.5 | 2.0 | 4.5 | 7.1 | 26.6 |
+| 2x × 0.5x (was shipped) | 5.7 | 2.4 | 4.9 | 7.0 | 28.7 |
+
+The last row is the pre-sweep shipped cell: baseline 5.7 real actions, 7.0
+enemy actions, and 28.7 damage taken — a heavy fraction of solo Terra's
+~80–90 HP, the slog the co-tune fixes. Dropping HP to 1x at the same
+resistance takes baseline to 3.4 / 3.6 / 14.6.
+
+Band scorecard (F1 fire loop-player TTK 3–5; F2 baseline 1.3–2× fire,
+noticeably slower but not a slog; F3 baseline enemyA ≤3; F4 badboost
+within 20% TTK / 25% dmg of baseline; the pedagogy ordering is
+resistance-set, measured by `bal_dpb`):
+
+| cell | F1 | F2 | F3 | F4 | pedagogy |
+|---|---|---|---|---|---|
+| **1x × 0.5x** | ✗ | ✓ (1.69×) | ~ (3.6) | ✓ (0.85×/0.92×) | clean 4:2:1 |
+| 1x × 0.75x | ✗ | ✗ (1.25×) | ✓ | ✓ | flatter 2.6:1.9:1 |
+| 1x × 1x | ✗ | ✗ (1.06×) | ✓ | ✓ | collapsed 1.95:1.9:1 |
+| 1.5x × 0.5x | ✗ | ✗ (2.75×) | ✗ (7.1) | ✓ | clean 4:2:1 |
+
+**No cell satisfies all four bands, and it is not a tuning failure.**
+F1 (fire loop-player 3–5 actions) fails in EVERY cell because fire
+one-shots the fragile trash (Vaporite ~15 HP, Were-Rat 24 HP, both
+fire-weak) — the loop-player is 2 actions everywhere, and no HP
+multiplier in the tested range fixes it (Vaporite would need ~22×,
+Were-Rat ~14×). This is Measurement #1/#3's "the loop cannot express
+vs intro trash," inherited: trash breaks and true loop-expression
+arrive with M6 class-weakness authoring, not with an HP dial.
+
+### Shipped values and rationale
+
+`Ot6HpMulTbl` band0 $20 → **$10 (1x)**, band1 $20 → **$10 (1x, tracks
+band0)**; `Ot6ShieldedMulW` **$0008 (0.5x, unchanged, finalized)**.
+Table now $10/$10/$10/$10.
+
+- Resistance 0.5x is the primary call: it gives the cleanest
+  damage-per-BP ladder (4:2:1), which is Measurement #5's whole point.
+  0.75x/1x flatten it (at 1x a weakness hit ties a broken one).
+- At 0.5x resistance, HP 1x is the only band0 that keeps the baseline
+  loop-IGNORER "noticeably slower than the loop but not a slog" (3.4 =
+  1.69× fire; 1.5x → 5.5 = 2.75× = slog, F2/F3 fail). It also makes the
+  bad-player ≈ baseline (badboost 2.9 vs baseline 3.4, 0.85× TTK; dmg
+  13.5 vs 14.6, 0.92×) — the BP is nearly wasted, versus the fire loop
+  at 2.0 (0.59×). The one miss is danger (baseline enemyA 3.6 vs ≤3),
+  and it is marginal against a SOLO L5 Terra who loses only ~14.6 HP of
+  her ~80–90 (she ends every fight above two-thirds); a real party
+  spreads that further.
+- The multiplier had lengthened fights by inflating EVERY player's HP
+  bar equally, which did not reward the loop. Shielded resistance
+  lengthens only off-weakness fights — the loop-ignorer runs ~2×
+  longer while a weakness-exploiter stays vanilla-fast, which is the
+  Octopath feel. So resistance REPLACES the HP multiplier as the
+  fight-lengthener; the multiplier stands down to 1x.
+- 1x HP + 0.5x resistance puts the baseline fight at ~2× vanilla
+  length (1703 vs ~744 frames), which is the regime Measurement #4's
+  danger/reward knobs were tuned for — so the pace economy stays valid
+  WITHOUT retuning it. Band1 tracks band0 to 1x so that regime is
+  uniform across bands (a mixed 1x/2x table would put mid-trash at ~4×
+  length and under-conserve encounters there). Band1 mid-trash stays
+  unmeasured — parity extrapolation, stretch fixtures pending.
+
+Gate: full suite green twice at these values, story-chain fixtures
+re-minted. No battle-test bound moved: every gate fixture is an
+authored (HP-exempt) species or party HP, and the resistance constant
+is unchanged, so battle_break's ~4× ratio and battle_bp's boost
+numbers stand as-is.
+
+### Whelk re-check at the shipped resistance (`whelkbal_run.lua`)
+
+The Whelk head ($0134) and shell ($0100) are authored species, exempt
+from the HP multiplier, so only the (unchanged) 0.5x resistance
+touches this fight; the head arrives at its first break window with
+more HP because pre-break damage is halved. Tutorial + pierce
+policies, boss untouched (shields/HP/fire-add are a separate decision).
+The wall-clock cap truncated the runs mid-fight, so n is 3 (tutorial) /
+4 (pierce); the tutorial result is consistent across all three:
+
+| policy | windows/fight | uptime | won | TTK (beam/tek casts, won) | notes |
+|---|---|---|---|---|---|
+| tutorial | **1.0** | ~13% | 3/3 | ~6 beams + 1–2 teks | 4 chips → break every fight; the designed line completes |
+| pierce | 0.5 | ~14% | 2/4 | ~3 teks | 2 Terra deaths to shell MegaVolt counters (the Measurement #2 danger) |
+
+Resistance is load-bearing for getting even ONE window: the head arrives
+at the break with more HP (pre-break damage halved), so the tutorial's
+four chips (three fire beams on the fire-weak head + one TekMissile)
+land the break BEFORE the raw damage kills it — Measurement #2 had the
+head dying "one chip short" pre-resistance (0 windows). But the party's
+broken-window nuke (×2) then finishes the fight INSIDE that first window,
+so a second break cycle never happens. So resistance alone moved the
+Whelk from 0 → ~1 window, ~13% uptime — still short of the ~2-window /
+20–30% boss band. Closing to 2 windows needs a boss HP/shield bump
+(more head HP so the broken window can't one-shot it), which is a
+separate decision and was NOT done here. The designed tutorial line
+completes reliably at the shipped resistance.

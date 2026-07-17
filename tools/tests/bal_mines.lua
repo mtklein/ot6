@@ -38,6 +38,15 @@ local H = dofile("/Users/mtklein/ot6/tools/tests/lib/ot6.lua")
 local POLICY = "baseline"
 local STATE = "/Users/mtklein/ot6/build/states/mines_chase.mss.lua"
 local NBATTLES = 8
+-- co-tune poke (Measurement #5): if set, write these into the ROM before each
+-- battle so the HP-multiplier x resistance grid sweeps without a rebuild.
+-- POKE_HP -> Ot6HpMulTbl band0 ($10=1x, $18=1.5x, $20=2x); POKE_SHIELD ->
+-- Ot6ShieldedMulW ($08=0.5x, $0c=0.75x, $10=1x/off). nil = shipped bytes.
+-- Proven equivalent to a rebuild by mines_pace.lua (Measurement #4).
+local POKE_HP = nil
+local POKE_SHIELD = nil
+local ROM_HPMUL  = 0x300173         -- Ot6HpMulTbl band0
+local ROM_SHIELD = 0x30033C         -- Ot6ShieldedMulW (word, low byte)
 -- $1fa2 seeds (formation draw): group slots for map 50 at $1fa3=0x61 --
 -- slot0 = Vaporite x2, slot1 = Were-Rat x2, slot2/3 = RepoMan+Vaporite.
 -- false = leave the state's natural values (draw = Were-Rat x2 after 9
@@ -176,6 +185,20 @@ function POLICIES.fire()
   if H.readWord(PMP + slot*2) < 4 then return { "a" } end
   return fireCastPulse()
 end
+-- the deliberate BAD-PLAYER (Measurement #5): bank to 3, then dump a 3-BP
+-- boosted FIGHT at the default target. Fight is pierce, and every mines-pool
+-- species is formula (no class weakness), so this boost ALWAYS lands in a
+-- shielded-unweak target -- the canonical "boost feels wasted" misplay. For
+-- this pool it coincides with boost3 (Fight matches nothing either way);
+-- the point is the framing and the outcome-vs-baseline comparison.
+function POLICIES.badboost()
+  local slot = menuSlot()
+  if slot == nil then return nil end
+  if bp(slot) >= 3 or pend(slot) > 0 then
+    return commitThenConfirm(slot, 3)
+  end
+  return { "a" }
+end
 local probeActions = 0             -- reset per battle
 function POLICIES.probe1()
   local slot = menuSlot()
@@ -203,6 +226,7 @@ local function resetBattleState()
     regens = 0, boosts = { 0, 0, 0 },
     chips = 0, breaks = 0, breakFrames = {}, firstBreak = -1,
     brokenUptime = 0,
+    boostLog = {},                  -- per boosted action: state at cast
     result = "budget",
   }
   mons, chars, qShadow = {}, {}, {}
@@ -310,6 +334,20 @@ local function sample()
     elseif b < c.bp then
       local lvl = c.bp - b
       if lvl >= 1 and lvl <= 3 then S.boosts[lvl] = S.boosts[lvl] + 1 end
+      -- classify the default target's state at the moment BP was spent, so
+      -- every boosted action is logged (Measurement #5). Fight matches no
+      -- pool weakness, so a boosted Fight here is "shielded-unweak".
+      local tgt
+      for _, m in ipairs(mons) do
+        if monsterAlive(m.slot) then tgt = m.slot break end
+      end
+      if tgt then
+        local st = broken(tgt) and "broken"
+          or (H.readByte(SHLD + tgt*2) > 0 and "shielded" or "shieldless")
+        local wk = H.readByte(WEAK + tgt*2)
+        S.boostLog[#S.boostLog + 1] = string.format("l%d:%s:wk%02x:sh%d",
+          lvl, st, wk, H.readByte(SHLD + tgt*2))
+      end
     end
     c.bp = b
   end
@@ -390,6 +428,7 @@ local function report()
   mline("terra_mp_end", H.readWord(PMP))
   mline("bp_curve", table.concat(bpTrace, ","))
   mline("action_trace", table.concat(actTrace, ","))
+  mline("boost_states", table.concat(S.boostLog, ","))
 end
 
 -- ----------------------------------------------------- battle blocks --
@@ -440,6 +479,17 @@ local function battleBlock(k)
     H.waitFrames(10),
     H.waitUntil(calm(20), 1200, "field control (b=" .. k .. ")"),
     H.call(function()
+      -- co-tune poke (survives loadState: ROM is not savestate-backed)
+      if POKE_HP ~= nil then
+        emu.write(ROM_HPMUL, POKE_HP, emu.memType.snesPrgRom)
+        H.assertEq(H.readRomByte(ROM_HPMUL), POKE_HP, "hp band0 poked")
+      end
+      if POKE_SHIELD ~= nil then
+        emu.write(ROM_SHIELD, POKE_SHIELD, emu.memType.snesPrgRom)
+        H.assertEq(H.readRomByte(ROM_SHIELD), POKE_SHIELD, "resistance poked")
+      end
+      mline("knob_hp", string.format("%02x", H.readRomByte(ROM_HPMUL)))
+      mline("knob_shield", string.format("%02x", H.readRomByte(ROM_SHIELD)))
       if seed.fa1 then H.writeByte(0x1fa1, seed.fa1) end
       if seed.fa2 then H.writeByte(0x1fa2, seed.fa2) end
       mline("seed_1fa1", string.format("%02x", H.readByte(0x1fa1)))

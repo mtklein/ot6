@@ -295,10 +295,25 @@ hpmul:  .a16
 ; 1x so unauthored event species (doom gaze's saved-hp reload
 ; especially — it re-seeds current hp AFTER LoadMonsterProp's store)
 ; never compound across encounters.
+;
+; measurement #5 stood the multiplier DOWN to 1x. it and shielded
+; resistance both lengthen fights, and stacking 2x hp with the 0.5x
+; resistance overshot the snappy-fight band (baseline mines TTK ~6 real
+; actions, a slog). the co-tune sweep found 1x hp x 0.5x resistance is
+; the sweet spot: shielded resistance now carries the "fights are
+; longer" load (it halves off-weakness damage, so the loop-IGNORER's
+; fight runs ~2x longer — matching measurement #4's pace-knob regime —
+; while a weakness-exploiting player stays vanilla-fast). the multiplier
+; had done that job by inflating EVERY player's hp bar equally, which
+; did not reward the loop; resistance does. band1 tracks band0 to 1x so
+; the global danger/reward knobs stay conserved across bands (a mixed
+; 1x/2x table would put mid-trash fights at ~4x length). band1 mid-trash
+; stays unmeasured — parity extrapolation pending stretch fixtures.
 Ot6HpMulTbl:
-        .byte   $20             ; $000-$05f: 2x — swept (measurement #3)
-        .byte   $20             ; $060-$0bf: 2x — wob mid trash, by census
-                                ;   arithmetic; stretch fixtures pending
+        .byte   $10             ; $000-$05f: 1x — swept (measurement #5:
+                                ;   resistance carries the lengthening)
+        .byte   $10             ; $060-$0bf: 1x — tracks band0 (parity;
+                                ;   mid trash unmeasured, fixtures pending)
         .byte   $10             ; $0c0-$0ff: 1x — wor, unmeasured
         .byte   $10             ; $100+ (keep 1x: see doom gaze note)
 
@@ -684,7 +699,15 @@ done:   rtl
 
 Ot6ShieldedMulW:
         .word   $0008           ; damage x 8/16 (0.5x) while shielded;
-                                ;   $10 = identity (vanilla arithmetic)
+                                ;   $10 = identity (vanilla arithmetic).
+                                ;   measurement #5 FINALIZED 0.5x: it makes
+                                ;   the damage-per-BP ladder a clean doubling
+                                ;   (broken:weak:unweak = 4:2:1), so boosting
+                                ;   to break and hitting the weakness both
+                                ;   pay and boosting into shielded-unweak is
+                                ;   visibly the worst return. 0.75x/1x flatten
+                                ;   the ladder (at 1x a weakness hit ties a
+                                ;   broken one — no reason to break).
 
 .proc Ot6ShieldedDmg
         .a8
