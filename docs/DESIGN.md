@@ -9,7 +9,7 @@ Sections marked **TBD** are open design questions, not commitments.
 Deep dives (2026-07-16, WoB scope): [character kits & learn
 schedules](design/kits.md), [weapon classes & the break
 spread](design/weapon-classes.md), [magicite sub-jobs](design/magicite.md),
-[the SP economy](design/sp-economy.md), [balance
+[the MP economy](design/mp-economy.md), [balance
 measurement](design/balance-metrics.md).
 
 **House rule: vanilla's bugs stay.** Useless stats, the Sketch bug,
@@ -26,7 +26,7 @@ it.
    first Tool/Blitz/Bushido/Dance…) is skill #1, free, from the moment they
    join. The divine slot holds a *new* apex expression of the character —
    never the identity itself.
-2. **Break or be broken.** Every enemy has Shield Points and a hidden weakness
+2. **Break or be broken.** Every enemy has shields and a hidden weakness
    set (elements + weapon classes). Chip shields by hitting weaknesses; at 0
    the enemy Breaks — loses its turn and takes double damage.
 3. **Spend turns like money.** Boost Points: +1 per turn, bank up to 5, spend
@@ -76,11 +76,11 @@ matrix richer.
 two weakness bytes — one elemental (enemy records already store elemental
 weakness bits in vanilla), one weapon-class (new side table in expanded ROM).
 
-**Chip.** Any damaging hit that matches a weakness removes 1 SP. Multi-hit
-actions chip per hit — Edgar's AutoCrossbow and Cyan's Flurry become shield
-shredders, exactly the role multi-hits play in Octopath.
+**Chip.** Any damaging hit that matches a weakness removes 1 shield.
+Multi-hit actions chip per hit — Edgar's AutoCrossbow and Cyan's Flurry
+become shield shredders, exactly the role multi-hits play in Octopath.
 
-**Break.** At 0 SP: the enemy's ATB resets and it's inflicted with a Broken
+**Break.** At 0 shields: the enemy's ATB resets and it's inflicted with a Broken
 state (Stop-like) for roughly one full turn cycle; all damage it takes is
 ×2; its weakness list is locked revealed for the rest of the battle. On
 recovery, shields reset to `shield_max`.
