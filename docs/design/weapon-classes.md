@@ -17,7 +17,7 @@ axes: Octopath's exact count.
 | **slashing** | swords, katanas, claws | Terra, Celes, Cyan, Sabin-alt | $d9 |
 | **piercing** | spears, daggers, thrown edges, crossbow bolts, darts, fangs | Edgar, Locke, Shadow, Mog, Gau, Setzer-alt | $da |
 | **bludgeoning** | fists, staves, rods, flails, boomerangs (ranged bludgeon) | Sabin, Strago, Relm-alt, Locke-alt | $dc |
-| **special ¤** | dice, cards, brushes, any little oddball the logical three don't claim | Setzer, Relm | new ¤ glyph |
+| **special ¤** | dice, cards, brushes, any little oddball the logical three don't claim | Setzer, Relm | $df |
 
 - **The weapon sets Fight's class; abilities carry their own ✦.**
   Sabin with claws equipped *slashes* when he Fights — but Pummel is
@@ -42,6 +42,19 @@ axes: Octopath's exact count.
 - **Row jank preserved ✦**: weapons that ignore row in vanilla
   (boomerangs, dice, cards, darts…) keep ignoring row. That charm
   survives contact with the new system untouched.
+
+## The icon IS the class
+
+Weapons wear their break class as their item icon, everywhere names
+render — item menu, shops, equip, battle lists. One taxonomy,
+propagated by data: the icon byte leads every item name, so every
+surface follows for free, and the item menu's type column reads
+SLASH / PIERCE / BLUNT / SPECIAL off the same byte. Classless (Heal
+Rod) shows a small dash. Armor, relic, tool, and consumable icons
+stay vanilla. v1 borrows the vanilla sword/spear/staff/sparkle
+glyphs for the four classes. Corollary: wanting more icon
+distinction is a signal to expand the class system — never to grow a
+second, flavor-only taxonomy beside it.
 
 ## How weaknesses spread (the coverage rule)
 
@@ -101,3 +114,5 @@ new battle code:
    (First instinct: rare before the Opera, steady after.)
 2. The ¤ icon needs a font cell — draw a little sparkle/asterisk in
    the same family as the element icons, or borrow a vanilla glyph?
+   (v1 borrows the vanilla sparkle at $df; a bespoke ¤ can replace
+   the art in place later — every consumer keys on the code.)
