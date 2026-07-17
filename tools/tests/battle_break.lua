@@ -18,9 +18,14 @@
 --   3b. THE BROKEN X2 FOR A FLAGS3-$20 ATTACK: Fire Beam carries flags3
 --      $20 (can't dodge), and the old whole-byte $f2 gate silently denied
 --      it the broken double. The breaking hit lands with the timer already
---      set, so its recorded drop must be ~2x the first (unbroken) chip's
---      drop on the same guard: bounded 1.5x-3x (vanilla's 224..255/256
---      damage spread keeps the true ratio inside [1.75, 2.29]).
+--      set, so its recorded drop must be ~4x the first (unbroken) chip's
+--      drop on the same guard: the first chip is elemental-weak x2 THEN
+--      shielded-resistance x0.5 (guards are authored 2-shield species, so
+--      Ot6ShieldedDmg attenuates while their shields hold) = ~1x base,
+--      while the breaking hit's chip empties the shields BEFORE the damage
+--      tail runs, so it collects weak x2 AND broken x2 unattenuated = ~4x
+--      base. Bounded 3x-6x (vanilla's 224..255/256 damage spread keeps the
+--      true ratio inside [3.51, 4.55]; measured live: 134 -> 536B).
 --   4. the broken timer expires -> shields restore to max, revealed mask
 --      SURVIVES recovery
 --
@@ -163,10 +168,15 @@ H.run({ maxFrames = 30000 }, {
     local first, last = seq[1], seq[#seq]
     H.assertEq(first.broken, false, "first chip landed unbroken")
     H.assertEq(last.broken, true, "breaking hit landed with the timer up")
-    H.assertEq(last.d * 2 > first.d * 3, true,
-      "broken beam hit >= 1.5x the unbroken chip (the x2 collected)")
-    H.assertEq(last.d < first.d * 3, true,
-      "and < 3x (a double, not something wilder)")
+    -- shielded resistance moved these bounds deliberately (measurement
+    -- #5): unbroken chip = weak x2 * shielded x0.5 = ~1x base; breaking
+    -- hit = weak x2 * broken x2, unattenuated (its chip zeroed the
+    -- shields before the damage tail) = ~4x base. ratio ~4x, true range
+    -- [3.51, 4.55] under vanilla's 224..255/256 spread.
+    H.assertEq(last.d > first.d * 3, true,
+      "broken beam hit > 3x the shielded chip (0.5x lifted, x2 collected)")
+    H.assertEq(last.d < first.d * 6, true,
+      "and < 6x (weak x2 * broken x2, not something wilder)")
     H.screenshot("break_broken")
   end),
 

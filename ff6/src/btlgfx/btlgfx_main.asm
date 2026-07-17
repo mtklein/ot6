@@ -15195,7 +15195,8 @@ ListTextCmd_0e:
         inx
         dec     $40
         bne     @6578
-        rts
+        jsl     Ot6ToolListIcon_ext     ; ot6: tools window only — class
+        rts                             ;   icon over the trailing blank
 
 ; ------------------------------------------------------------------------------
 

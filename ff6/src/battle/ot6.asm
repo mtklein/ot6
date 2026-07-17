@@ -550,6 +550,7 @@ done:   rtl
         php
         longi
         jsr     Ot6ClassChip
+        jsr     Ot6ShieldedDmg  ; ot6: sturdiness while shields hold
         plp
         jmp     Ot6BrokenDmg    ; tail-call: its rtl returns to vanilla
 .endproc
@@ -651,6 +652,90 @@ done:   rts
         asl     $f0
         rol     $f1
 done:   rtl
+.endproc
+
+; ------------------------------------------------------------------------------
+
+; [ shielded resistance: damage attenuates while shields hold ]
+
+; the sturdiness half of the break loop (measurement #5): while a monster
+; has shields remaining and is not broken, every damaging hit it takes is
+; multiplied by Ot6ShieldedMulW/16. one global knob, no per-species
+; column until a sweep demands one. the emergent ordering IS the design:
+;   off-weakness hit        x0.5        (feels wasted)
+;   element-weak hit        ~x1         (vanilla weak x2, then x0.5 —
+;                                        the chip is the real payoff)
+;   broken                  x2+         (Ot6BrokenDmg, shields down)
+; gates, all by construction:
+;   - $3e38 nonzero = shields up and not broken. shieldless species
+;     (authored 0 rows: whelk shell, tritoch, formula 0s) and broken
+;     monsters both sit at 0 and pass through untouched — shields==0
+;     means NO shield system, never "attenuate"
+;   - the breaking hit itself is NOT attenuated: both chip procs run
+;     before this tail, so its read of $3e38 already sees 0 with the
+;     broken timer up, and Ot6BrokenDmg doubles it instead
+;   - resolved heals pass through (the $f2 bit-0 discipline, same as
+;     the chip gates and the broken double: absorbs and undead drain
+;     reversals must never shrink)
+; called from Ot6HitJoin between the class chip and the broken double.
+; a8/i16 (the join pinned i16), y = target, $f0 = 16-bit damage,
+; db = $7e. preserves x/y; the 24-bit shift-add reuses the OT6_SCR
+; battle scratch (Ot6ClassChip's use of it this hit is already dead).
+
+Ot6ShieldedMulW:
+        .word   $0008           ; damage x 8/16 (0.5x) while shielded;
+                                ;   $10 = identity (vanilla arithmetic)
+
+.proc Ot6ShieldedDmg
+        .a8
+        .i16
+        tya                     ; entity offset, width-neutral test
+        cmp     #$08
+        bcc     done            ; characters carry no shields
+        lda     $3e38,y
+        beq     done            ; 0 = broken or shieldless: no attenuation
+        lda     $f2             ; resolved heal bit ONLY (chip-gate rule)
+        lsr
+        bcs     done
+        lda     f:Ot6ShieldedMulW
+        cmp     #$10
+        beq     done            ; identity: vanilla arithmetic, exactly
+        phx
+        longa
+        lda     $f0             ; 16-bit damage
+        sta     OT6_SCR_SLOT2   ; multiplicand
+        lda     f:Ot6ShieldedMulW
+        and     #$00ff
+        xba
+        sta     OT6_SCR_BIT     ; mult << 8: msb-first bit walker
+        clr_a
+        sta     OT6_SCR_COLS    ; product bits 16-23
+        ldx     #$0008
+@bit:   asl                     ; product <<= 1 (24-bit)
+        rol     OT6_SCR_COLS
+        asl     OT6_SCR_BIT     ; next multiplier bit into carry
+        bcc     @next
+        clc
+        adc     OT6_SCR_SLOT2   ; product += multiplicand
+        bcc     @next
+        inc     OT6_SCR_COLS
+@next:  dex
+        bne     @bit
+        lsr     OT6_SCR_COLS    ; /16 (24-bit shift right x4)
+        ror
+        lsr     OT6_SCR_COLS
+        ror
+        lsr     OT6_SCR_COLS
+        ror
+        lsr     OT6_SCR_COLS
+        ror
+        ldx     OT6_SCR_COLS
+        beq     @fits
+        lda     #$ffff          ; clamp: a mult past $10 could overflow
+@fits:  sta     $f0
+        shorta0
+        plx
+done:   rts
 .endproc
 
 ; ------------------------------------------------------------------------------
@@ -1057,7 +1142,9 @@ OT6_SCR_COLS  := $3ed2          ; strip columns drawn so far
         rts
 .endproc
 
-; element index -> tilemap palette bits (palette << 2)
+; element index -> tilemap palette bits (palette << 2); indices 8-11 are
+; the four weapon classes (Ot6ElemGlyphFor's class fallback): menu-white,
+; exactly how the same icons render as item-name leading glyphs
 Ot6ElemPalTbl:
         .byte   7 << 2          ; fire: red
         .byte   3 << 2          ; ice: blue
@@ -1067,6 +1154,10 @@ Ot6ElemPalTbl:
         .byte   2 << 2          ; holy: yellow (star shape vs bolt zigzag)
         .byte   1 << 2          ; earth: gray
         .byte   3 << 2          ; water: blue (wave shape vs ice crystal)
+        .byte   0 << 2          ; slash: white
+        .byte   0 << 2          ; pierce: white
+        .byte   0 << 2          ; bludgeon: white
+        .byte   0 << 2          ; special ¤: white
 
 ; generic battle lists ($2c already holds a global ability id)
 .proc Ot6ListIcon_ext
@@ -1101,15 +1192,94 @@ Ot6ElemPalTbl:
 
 ; ------------------------------------------------------------------------------
 
-; [ element glyph for an ability ]
+; [ class icon after a tool name in the battle Tools list ]
 
-; a = ability id (0-255) -> a = element icon glyph, or $ff if the ability
-; has no element. first set element bit wins. preserves x/y.
+; tail of ListTextCmd_0e, the item-name drawer every battle item list
+; shares. only the TOOLS window decorates ($7bc2 holds menu state $2e
+; for every row it stages): item/throw/equip rows already wear a
+; weapon's class as the leading name icon, and a second copy there
+; would be noise — but tools keep their vanilla wrench icons ✦, so the
+; class rides after the name, exactly where abilities show theirs.
+; the icon replaces the name field's trailing blank (the field is
+; always fully rewritten by the name loop, so the column can never go
+; stale); a full 13-char name has no blank and keeps all its letters —
+; autocrossbow, by the same rule that trims 10-char ability names in
+; Ot6AbilityPad. classless tools ($00) and null-break rows draw
+; nothing. a8/i16, db=$7e, $2c = the item id just named, y = list
+; column past the name, b = tile attribute (preserved).
+
+.proc Ot6ToolListIcon_ext
+        .a8
+        .i16
+        xba
+        pha                     ; stash the tile attr living in b
+        xba
+        lda     a:$7bc2         ; battle menu state under update
+        cmp     #$2e            ; $2e = the tools window staging its rows
+        bne     @out
+        phx
+        lda     $2c             ; the item id the row just named
+        longa
+        and     #$00ff
+        tax
+        shorta0
+        lda     f:Ot6WeapClassTbl,x
+        plx
+        beq     @out            ; classless tool: nothing to teach
+        bmi     @out            ; null-break: teaches nothing, shows nothing
+        sta     OT6_SCR_BIT
+        phx
+        ldx     #$0000
+@bit:   lsr     OT6_SCR_BIT
+        bcs     @glyph
+        inx
+        bra     @bit
+@glyph: lda     f:Ot6ClassGlyphTbl,x
+        plx
+        sta     OT6_SCR_BIT     ; the class glyph
+        dey
+        dey                     ; back onto the name's last column
+        lda     ($53),y
+        cmp     #$ff
+        bne     @full           ; 13-char name: no room for an icon
+        pla                     ; the caller's attr ...
+        xba                     ; ... into b for the 16-bit store
+        lda     OT6_SCR_BIT
+        longa
+        sta     ($53),y         ; glyph | attr<<8 (replicates DrawListLetter)
+        lda     $55
+        sta     ($51),y
+        shorta                  ; b holds the attr; caller reloads per char
+        iny
+        iny
+        rtl
+@full:  iny
+        iny
+@out:   pla
+        xba                     ; restore b for the caller
+        rtl
+.endproc
+
+; ------------------------------------------------------------------------------
+
+; [ element glyph for an ability — or its weapon-class glyph ]
+
+; a = ability id (0-255) -> a = element icon glyph, or the ability's
+; CLASS icon glyph when it has no element (Ot6SkillClassTbl: physical
+; skills wear their class exactly where spells wear their element —
+; TekMissile shows pierce in the magitek list, Pummel bludgeon, quadra
+; slam slash), or $ff for the classless-and-elementless rest. first set
+; bit wins on both axes; an element always beats the class (the design:
+; "consult the class when the ability has no element"). null-break rows
+; would advertise a class they never chip, so bit 7 hides the icon too.
+; OT6_SCR_COLS = palette index: 0-7 element hues, 8-11 the class rows.
+; preserves x/y.
 
 .proc Ot6ElemGlyphFor
         .a8
         .i16
         phx
+        pha                     ; the ability id, for the class fallback
         longa
         and     #$00ff
         asl                     ; id * 2
@@ -1126,7 +1296,7 @@ Ot6ElemPalTbl:
         pla
         shorta0
         lda     f:MagicProp+1,x ; ability element byte
-        beq     @none
+        beq     @class
         ldx     #$0000
 @bit:   lsr
         bcs     @hit
@@ -1134,13 +1304,51 @@ Ot6ElemPalTbl:
         bra     @bit
 @hit:   txa
         sta     OT6_SCR_COLS    ; element index, for palette selection
+        pla                     ; (discard the stashed id)
         lda     f:Ot6ElemGlyphTbl,x
         plx
         rts
-@none:  lda     #$ff
+@class: ; elementless: a physical skill's class carries the icon
+        ldx     #$0000
+@scan:  lda     f:Ot6SkillClassTbl,x
+        cmp     #$ff
+        beq     @none           ; end of table: classless ability
+        cmp     $01,s
+        beq     @found
+        inx
+        inx
+        bra     @scan
+@found: lda     f:Ot6SkillClassTbl+1,x
+        bmi     @none           ; null-break: teaches nothing, shows nothing
+        ldx     #$0000
+@cbit:  lsr
+        bcs     @cidx
+        inx
+        bra     @cbit
+@cidx:  txa
+        clc
+        adc     #$08
+        sta     OT6_SCR_COLS    ; palette index 8-11: the class rows
+        pla                     ; (discard the stashed id)
+        lda     f:Ot6ClassGlyphTbl,x
+        plx
+        rts
+@none:  pla                     ; (discard the stashed id)
+        lda     #$ff
         plx
         rts
 .endproc
+
+; class bit index (slash 0 .. special 3) -> small font glyph. these four
+; cells ship IN the vanilla small font (they are the item icons the m3
+; weapon renames lean on), so unlike the element icons they need no
+; upload: every battle text system and the bg3 field map index the same
+; $5800 font tiles.
+Ot6ClassGlyphTbl:
+        .byte   $d9             ; slash: the sword icon
+        .byte   $da             ; pierce: the spear icon
+        .byte   $dc             ; bludgeon: the staff icon
+        .byte   $df             ; special ¤: the sparkle icon
 
 ; 8x8 2bpp element icons, element-bit order (fire $01 ... water $80)
 Ot6FontIcons:
@@ -1730,7 +1938,8 @@ Ot6ObjArrowData:
 ; vblank. shadow at $7f:fe00, 10 lines x 12 bytes:
 ;   +0  vram word address of the line's first cell (0 = line disabled)
 ;   +2  five tilemap words (glyph | attr << 8)
-; monsters: [shield-with-count][up to 4 weakness slots]. heroes: one
+; monsters: [shield-with-count][up to 4 weakness slots — elements, then
+; weapon classes, revealed icon or '?' on both axes]. heroes: one
 ; pip-cluster cell. entities animate and drift, so each line remembers
 ; its previous address; the flush blanks the old cells when it moves.
 ; line layout: +0 cur addr (0 = disabled), +2 prev addr, +4 five cells.
@@ -1824,14 +2033,20 @@ OT6_MAPBASE := $57b6            ; word scratch: field bg3 map base
         lda     f:Ot6ShieldCellTbl-1,x
         plx
 @shld:  sta     f:$7e0000+OT6_SHADOW+4,x
-        ; weakness slots into cells 1-4
+        ; weakness slots into cells 1-4: elements first (vanilla's own
+        ; data), then the class weaknesses, sharing the same four cells.
+        ; a fifth weakness truncates — the deliberate cap: the row is
+        ; five cells wide (the shadow strip has no room for more without
+        ; moving the $57c0+ occupants), and no authored WoB species
+        ; exceeds 4 total today (speck's 4 classes ride an element-free
+        ; body). revealed-vs-'?' behavior is identical on both axes.
 @slots: phx                     ; base on stack for the cap test
         lda     #$01
         sta     OT6_SCR_BIT
         lda     #$00
         sta     OT6_SCR_IDX     ; element index
 @elem:  lda     OT6_SCR_BIT
-        beq     @edone
+        beq     @cls            ; elements walked: on to the classes
         and     $3be8,y
         beq     @next
         inx
@@ -1840,7 +2055,8 @@ OT6_MAPBASE := $57b6            ; word scratch: field bg3 map base
         sec
         sbc     $01,s           ; cells used so far (byte diff, same page)
         cmp     #$09
-        bcs     @edone          ; past slot cell 4 (offsets +6..+12)
+        jcs     @edone          ; past slot cell 4 (offsets +6..+12) —
+                                ;   long branch: the class loop sits between
         lda     OT6_SCR_BIT
         and     $3e91,y
         beq     @q
@@ -1864,6 +2080,46 @@ OT6_MAPBASE := $57b6            ; word scratch: field bg3 map base
 @next:  asl     OT6_SCR_BIT
         inc     OT6_SCR_IDX
         bra     @elem
+@cls:   ; class-weakness slots: same claim/cap flow, from the authored
+        ; class mask ($3e9c monster half, seeded at battle init) and the
+        ; revealed-classes byte the chips and codex maintain. the icons
+        ; are the vanilla item-class glyphs, white like the '?' (the
+        ; default $21 attr from the fill is already in place — only the
+        ; glyph byte is written, exactly like the '?' cell).
+        lda     #$01
+        sta     OT6_SCR_BIT
+        lda     #$00
+        sta     OT6_SCR_IDX     ; class index 0-3
+@cbit:  lda     OT6_SCR_BIT
+        cmp     #$10
+        bcs     @edone          ; all four classes walked
+        and     $3ea4,y         ; monster class weaknesses ($3e9c + 8)
+        beq     @cnext
+        inx
+        inx                     ; claim the next cell
+        txa
+        sec
+        sbc     $01,s           ; cells used so far (byte diff, same page)
+        cmp     #$09
+        bcs     @edone          ; past slot cell 4
+        lda     OT6_SCR_BIT
+        and     $3ea5,y         ; revealed classes ($3e9d + 8)
+        beq     @cq
+        phx
+        lda     OT6_SCR_IDX
+        longa
+        and     #$00ff
+        tax
+        shorta0
+        lda     f:Ot6ClassGlyphTbl,x
+        plx
+        sta     f:$7e0000+OT6_SHADOW+4,x
+        bra     @cnext
+@cq:    lda     #$bf            ; '?', default attr already in place
+        sta     f:$7e0000+OT6_SHADOW+4,x
+@cnext: asl     OT6_SCR_BIT
+        inc     OT6_SCR_IDX
+        bra     @cbit
 @edone: plx
 @done:  ; commit: latch the anchor once per battle. monsters never move
         ; ("moving" coords are attack-animation transients that made the

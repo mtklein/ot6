@@ -29,7 +29,25 @@
 --      terra is un-berserked, her real commands restored, and her menu
 --      driven to TekMissile -- a flags3-nonzero classed skill MUST chip a
 --      pierce-weak guard (the whole-byte $f2 gate silently blocked every
---      such chip; this is the regression gate for the bit-0 narrowing)
+--      such chip; this is the regression gate for the bit-0 narrowing).
+--      the drive traverses terra's magitek list, so its rendered rows
+--      also carry the v0.2 ability-list assert: TekMissile (elementless,
+--      Ot6SkillClassTbl pierce) wears the pierce class icon after its
+--      name, where elemental abilities wear their element icon
+--   9. tools-list phase (STAGED -- no fixture reaches a Tools user):
+--      three tool items are poked into the battle inventory ($2686
+--      stride 5: id / usage flags, bit $40 = the tools-window scan bit /
+--      targeting / qty) and terra's command slot 0 becomes Tools ($09).
+--      opening it renders the tools list through ListTextCmd_0e +
+--      Ot6ToolListIcon_ext: Chain Saw wears slash, Drill wears pierce
+--      (each replacing the name field's trailing blank), NoiseBlaster
+--      (classless, and a full-width 13-char name) keeps its last letter
+--
+-- The under-enemy HUD is asserted around phases 0-2: an authored-pierce
+-- guard with no element weakness shows [shield]['?'] before any probe,
+-- and the '?' becomes the pierce class icon ($da, white like the '?')
+-- once the class is revealed -- the class slots ride the exact
+-- revealed-vs-'?' machinery the element slots use.
 --
 -- Element weaknesses are zeroed on both guards at setup so the magitek
 -- holder's stale beams (and poison DoT) can't move shields: every shield
@@ -115,6 +133,38 @@ local s1c, s2c -- shield snapshot for the no-chip phases
 local terra    -- terra's party slot (char id 0)
 local terraCmds, terraSt1 = {}, nil  -- her pre-lab commands + status 1
 
+-- under-enemy HUD: the first weakness-slot word after each shield glyph
+-- on the bg3 field map (one per live hud line)
+local SHIELDG = {[0x65]=1,[0x66]=1,[0x67]=1,[0x69]=1,[0x6a]=1,[0x6b]=1,[0x71]=1}
+local function hudSlotWords()
+  local vr = emu.memType.snesVideoRam
+  local reg = H.readByte(0x897b)
+  local base = ((reg - (reg % 4)) * 256) * 2
+  local t = {}
+  for off = 0, 0x7FC, 2 do
+    if emu.read(base + off + 1, vr) == 0x21 and SHIELDG[emu.read(base + off, vr)] then
+      t[#t + 1] = emu.readWord(base + off + 2, vr)
+    end
+  end
+  return t
+end
+
+-- battle menu map: word address of a rendered glyph sequence (or nil)
+local function findName(seq)
+  local vr = emu.memType.snesVideoRam
+  for w = 0x6000, 0x7FF0 do
+    local hit = true
+    for i = 1, #seq do
+      if (emu.readWord((w + i - 1) * 2, vr) & 0xFF) ~= seq[i] then
+        hit = false
+        break
+      end
+    end
+    if hit then return w end
+  end
+  return nil
+end
+
 -- non-vacuity watcher: record every value the attack-class byte ($57b8)
 -- is loaded with, so the no-chip phases can PROVE swings of the expected
 -- class actually resolved while they ran
@@ -173,6 +223,19 @@ H.run({ maxFrames = 90000 }, {
     H.assertEq(sram(0x316001), 0x37, "codex magic '7' after v2 re-init")
   end),
   report("seeded"),
+
+  -- hud: guards carry no element weakness, so each line's first slot is
+  -- the CLASS slot -- '?' until a probe reveals it (codex was wiped)
+  H.waitUntil(function() return #hudSlotWords() >= 2 end, 300,
+    "both guard hud lines up", 10),
+  H.call(function()
+    local slots = hudSlotWords()
+    for i, w in ipairs(slots) do
+      H.assertEq(w, 0x21BF,
+        string.format("hud line %d: unprobed class shows the '?' slot", i))
+    end
+    H.screenshot("class_hud_qmark")
+  end),
 
   -- lab setup: no element chip possible, tough guards, berserk Fight.
   -- terra's real commands + status are saved first: phase 8 restores
@@ -242,6 +305,17 @@ H.run({ maxFrames = 90000 }, {
     H.assertEq(sram(0x316190 + species) & 0x02, 0x02,
       "class codex learned piercing")
   end),
+
+  -- hud: the revealed class replaces its '?' with the pierce icon ($da,
+  -- white -- the same glyph the menus use for piercing weapons). waitUntil:
+  -- the revealing swing's animation can contest bg3 for a few dozen frames.
+  H.waitUntil(function()
+    for _, w in ipairs(hudSlotWords()) do
+      if w == 0x21DA then return true end
+    end
+    return false
+  end, 600, "revealed pierce icon in the hud row", 10),
+  H.call(function() H.screenshot("class_hud_pierce") end),
 
   -- 3. keep swinging until a break
   H.driveUntil(function()
@@ -362,6 +436,83 @@ H.run({ maxFrames = 90000 }, {
     H.assertEq((r1 | r2) & 0x01, 0, "and reveal nothing")
   end),
 
+  -- 7b. edge: a resolved HEAL is never scaled by the shielded-resistance
+  -- multiplier. Ot6ShieldedDmg gates on $f2 bit 0 exactly as the chip
+  -- procs do, so an absorbed hit (which flips that bit) must add the SAME
+  -- hp whether the target still holds shields or not. same-guard proof
+  -- (guard 1 is the reliably-swung target; berserk rarely picks guard 2):
+  -- two windows on guard 1, shielded then shieldless, both fire-absorbing
+  -- from phase 7 so every fire slash heals it. a roomy max hp keeps the
+  -- heal off the clamp. while shielded the heal survives ONLY via the
+  -- $f2 gate -- if that gate were broken the shielded window's heal would
+  -- come back ~half the shieldless window's, far under the 0.75x floor.
+  -- (the shieldless-DAMAGE half of the edge -- 0 shields takes full,
+  -- unattenuated damage -- is proven in battle_break: the breaking hit
+  -- lands at broken x2 with the shields already at 0, and its ~4x ratio
+  -- only holds because that 0-shield hit is NOT attenuated.)
+  -- the metric is the AVERAGE hp per absorbed hit, not the single biggest:
+  -- the vanilla heal roll (224..255/256 of the formula) makes the max a
+  -- noisy one-sample estimator, but the per-hit mean over a window
+  -- converges to the same value regardless of shield state -- unless the
+  -- shielded window's heals were scaled, which would halve its mean.
+  H.call(function()
+    H.writeByte(0x3E94, 0)                        -- guard 1 not broken
+    H.writeByte(0x3EA8, 0)                         -- no class weak: shields stay put
+    H.writeWord(0x3C28, 10000)                    -- guard 1 max hp: heal headroom
+    H.vars.sumsh, H.vars.cntsh = 0, 0
+    H.vars.sumno, H.vars.cntno = 0, 0
+  end),
+  -- adaptive windows: drive each state until it has banked enough heals
+  -- (guard 1's berserk hit-rate drifts across the fight, so a fixed frame
+  -- count under-samples one window). 12 heals each keeps the mean stable.
+  -- window 1: SHIELDED (the heal survives whole ONLY via the $f2 gate)
+  H.call(function()
+    H.writeByte(0x3E44, 2)
+    H.writeWord(0x3C00, 3000); H.vars.ph = 3000
+  end),
+  H.driveUntil(function() return H.vars.cntsh >= 12 end, 15000, {
+    H.call(function()
+      pinParty()
+      local h = H.readWord(0x3C00)
+      if h > H.vars.ph then
+        H.vars.sumsh = H.vars.sumsh + (h - H.vars.ph)
+        H.vars.cntsh = H.vars.cntsh + 1
+      end
+      if h > 8000 or h < 1000 then h = 3000; H.writeWord(0x3C00, 3000) end
+      H.vars.ph = h
+    end),
+    H.waitFrames(1),
+  }, "12 heals on the shielded guard"),
+  -- window 2: SHIELDLESS (heal passes the $3e38==0 gate instead)
+  H.call(function()
+    H.writeByte(0x3E44, 0)
+    H.writeWord(0x3C00, 3000); H.vars.ph = 3000
+  end),
+  H.driveUntil(function() return H.vars.cntno >= 12 end, 15000, {
+    H.call(function()
+      pinParty()
+      local h = H.readWord(0x3C00)
+      if h > H.vars.ph then
+        H.vars.sumno = H.vars.sumno + (h - H.vars.ph)
+        H.vars.cntno = H.vars.cntno + 1
+      end
+      if h > 8000 or h < 1000 then h = 3000; H.writeWord(0x3C00, 3000) end
+      H.vars.ph = h
+    end),
+    H.waitFrames(1),
+  }, "12 heals on the shieldless guard"),
+  H.call(function()
+    local avgsh = H.vars.sumsh / H.vars.cntsh
+    local avgno = H.vars.sumno / H.vars.cntno
+    H.log(string.format("guard 1 mean heal/hit: shielded=%.1f (n=%d) shieldless=%.1f (n=%d)",
+      avgsh, H.vars.cntsh, avgno, H.vars.cntno))
+    -- unattenuated: the means match within the roll spread. an 0.5x
+    -- attenuation of the shielded window would drop its mean to ~half,
+    -- far under this floor (0.8x).
+    H.assertEq(avgsh * 5 >= avgno * 4, true,
+      "mean heal while shielded is NOT attenuated (>= 0.8x the shieldless mean)")
+  end),
+
   -- 8. flagged-skill phase: TekMissile (flags3 $20) must chip. restore
   -- the lab to pierce-weak, hand terra her real menu back, and walk it:
   -- MagiTek -> down x3, right (her 2x4 grid's bottom-right cell) -> fire
@@ -432,6 +583,101 @@ H.run({ maxFrames = 90000 }, {
     local species = H.readWord(0x57C4)
     H.assertEq(sram(0x316190 + species) & 0x02, 0x02,
       "class codex holds piercing after the skill chip")
+    -- ability list: the drive rendered terra's magitek list on the way
+    -- to TekMissile, and rendered rows persist in the menu map (the
+    -- battle_break precedent). TekMissile is elementless, so its icon
+    -- column must carry the Ot6SkillClassTbl pierce glyph in white --
+    -- exactly where Fire Beam carries its red element icon.
+    local tek = findName({0x93,0x9e,0xa4,0x8c,0xa2,0xac,0xac,0xa2,0xa5,0x9e})
+    H.assertEq(tek ~= nil, true, "TekMissile row rendered in the menu map")
+    H.assertEq(emu.readWord((tek + 10) * 2, emu.memType.snesVideoRam), 0x21DA,
+      "pierce class icon right of TekMissile in the magitek list")
     H.screenshot("class_tek")
+  end),
+
+  -- 9. tools-list phase: stage the cheapest reachable Tools render.
+  -- no fixture carries a Tools user (magitek intro party), so the
+  -- inventory and command list are poked: battle items $2686 stride 5
+  -- gain Chain Saw / Drill / NoiseBlaster with the $40 tools-scan flag
+  -- (LoadItemProp derives it from item type 0; poked directly), and ALL
+  -- of terra's command slots become Tools ($09). the in-battle command
+  -- cursor persists across turns (phase 8 left it on the MagiTek cell),
+  -- so poking only slot 0 would let the drive's 'a' open the wrong
+  -- window -- with every slot Tools, whatever cell the cursor rests on
+  -- opens the tools window (menu state $2e), whose rows render through
+  -- ListTextCmd_0e + Ot6ToolListIcon_ext.
+  --
+  -- The battle tools window is a TWO-COLUMN grid and only its first row
+  -- is on-screen (verified live: a third tool lands in an unrendered
+  -- second row). So the two asserted tools ride slots 0/1 -- Chain Saw
+  -- (col 0, slashing) and Drill (col 1, piercing) -- and both wear their
+  -- class icon after the name, exactly where a magitek skill wears its
+  -- element icon. NoiseBlaster fills slot 2 (the hidden row) purely so
+  -- the list has the 3-entry shape that renders cleanly.
+  H.call(function()
+    local inv = { 0xa6, 0xa8, 0xa3 }   -- Chain Saw, Drill, NoiseBlaster
+    for i, id in ipairs(inv) do
+      local a = 0x2686 + (i - 1) * 5
+      H.writeByte(a, id)
+      H.writeByte(a + 1, 0x40)         -- tools flag
+      H.writeByte(a + 2, 0x01)         -- targeting (render-only phase)
+      H.writeByte(a + 3, 1)            -- qty
+    end
+    for i = 0, 3 do H.writeByte(0x202E + terra * 12 + i * 3, 0x09) end
+    H.vars.tplan, H.vars.tpf = nil, 1
+    H.log("tools lab: inventory staged, terra commands = Tools")
+  end),
+  H.driveUntil(function()
+    -- the first row is drawn once Chain Saw (col 0) renders
+    return findName({0x82,0xa1,0x9a,0xa2,0xa7}) ~= nil   -- "Chain"
+  end, 20000, {
+    -- same scripted-lap discipline the TekMissile drive (phase 8) proved:
+    -- when terra holds the menu, converge to the root command list, then
+    -- one 'a' opens Tools (every slot is Tools). the long idle tail lets
+    -- the rows render before the predicate fires; input mid window-open
+    -- wedges the staged rows, so the settle after 'a' is generous.
+    H.call(function()
+      repokeHp()
+      pinParty()
+      if H.readByte(0x7bca) == 0 or H.readByte(0x62CA) ~= terra then
+        H.vars.tplan = nil
+        H.setPad({})
+        return
+      end
+      local p = H.vars.tplan
+      if p == nil or H.vars.tpf > #p then
+        p = {}
+        local function tap(btn, on, off)
+          for _ = 1, on do p[#p + 1] = { btn } end
+          for _ = 1, off do p[#p + 1] = {} end
+        end
+        tap("b", 6, 16); tap("b", 6, 16)   -- converge to the root menu
+        tap("a", 6, 60)                    -- open Tools (any slot -> $2e)
+        for _ = 1, 120 do p[#p + 1] = {} end
+        H.vars.tplan, H.vars.tpf = p, 1
+      end
+      H.setPad(p[H.vars.tpf])
+      H.vars.tpf = H.vars.tpf + 1
+    end),
+  }, "the tools window renders its rows"),
+  H.release(),
+  H.waitFrames(20),
+  H.call(function()
+    -- both first-row tools wear their class glyph in the name field's
+    -- last column ({tool} leading icon + name, then the class icon), so
+    -- findName lands on the letters and the glyph rides at +11 -- the
+    -- same column the '{tool}Chain Saw' / '{tool}Drill' names leave blank.
+    -- Chain Saw (col 0): slashing -> the slash icon $d9.
+    local saw = findName({0x82,0xa1,0x9a,0xa2,0xa7})       -- "Chain"
+    H.assertEq(saw ~= nil, true, "Chain Saw row rendered")
+    H.assertEq(emu.readWord((saw + 11) * 2, emu.memType.snesVideoRam), 0x21D9,
+      "slash class icon after Chain Saw in the tools list")
+    -- Drill (col 1): piercing -> the spear icon $da, exactly as TekMissile
+    -- wears it in the magitek list above.
+    local drill = findName({0x83,0xab,0xa2,0xa5,0xa5})     -- "Drill"
+    H.assertEq(drill ~= nil, true, "Drill row rendered")
+    H.assertEq(emu.readWord((drill + 11) * 2, emu.memType.snesVideoRam), 0x21DA,
+      "pierce class icon after Drill in the tools list")
+    H.screenshot("class_tools")
   end),
 })

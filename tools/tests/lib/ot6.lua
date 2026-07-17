@@ -374,7 +374,10 @@ end
 function M.glyphCanary()
   local vr, rom = emu.memType.snesVideoRam, emu.memType.snesPrgRom
   local function findSig(sig)
-    for base = 0x300000, 0x300FF0 do
+    -- scan the whole OT6 slice of bank F0: v0.2 grew the code ahead of the
+    -- bg glyph table (Ot6BgGlyphData sits at ~$F0109A now), so the window
+    -- has to reach past the first 4K it used to fit inside.
+    for base = 0x300000, 0x303FF0 do
       local hit = true
       for i = 1, 16 do
         if emu.read(base+i-1, rom) ~= sig[i] then hit = false; break end

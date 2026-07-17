@@ -54,6 +54,10 @@ H.run({ maxFrames = 30000 }, {
     H.screenshot("bp_after")
     H.assertEq(b[actor + 1], 1, "boost consumed: 4 - 3 = 1, no regen")
     H.assertEq(H.readByte(0x3E9D + actor * 2), 0, "pending cleared")
+    -- shielded guards attenuate every hit 0.5x (measurement #5), so both
+    -- the plain and boosted beams above land at half their vanilla sizes;
+    -- the x4 boost multiplier keeps the boosted hit well past 250 anyway
+    -- (measured post-resistance: plain 65, boosted 435).
     H.assertEq(dmg > 250, true, "x8 boost outsized (casters differ: terra base ~46, vicks ~130)")
   end),
 })

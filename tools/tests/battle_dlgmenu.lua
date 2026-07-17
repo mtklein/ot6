@@ -28,7 +28,9 @@ local SMALLFONT_ROM = 0x047FC0          -- C4/7FC0 in the headerless image
 local function claimedCells()
   local rom = emu.memType.snesPrgRom
   local function findSig(sig)
-    for base = 0x300000, 0x300FF0 do
+    -- v0.2 grew bank F0 ahead of the bg glyph table (~$F0109A now), so the
+    -- scan window reaches past the first 4K it used to fit inside.
+    for base = 0x300000, 0x303FF0 do
       local hit = true
       for i = 1, 16 do
         if emu.read(base+i-1, rom) ~= sig[i] then hit = false; break end
