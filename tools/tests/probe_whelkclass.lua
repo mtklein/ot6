@@ -22,10 +22,11 @@
 -- Also screenshots the reveal moment ("Weak against piercing" battle
 -- message) right after the first class chip.
 --
--- NO MENUS ARE DRIVEN: battles that open with a scripted battle dialog
--- ("VICKS: Hold it!") draw every menu with garbage-staged rows and
--- reject deep list selections -- a pre-M3 bug (reproduced on the
--- committed ROM; see probe_whelkmenu.lua). Instead this borrows
+-- NO MENUS ARE DRIVEN: this was written while battles that open with a
+-- scripted battle dialog ("VICKS: Hold it!") still drew every menu as
+-- font noise (fixed since -- Ot6FontRestoreMark_ext; battle_dlgmenu is
+-- the gate). The berserk drive stays: it is simpler and independent of
+-- menu timing. Instead this borrows
 -- battle_hits's berserk trick twice over:
 --   - terra: berserk + magitek status CLEARED + a Fight-only command
 --     list + a dirk in hand -> auto-Fight = piercing weapon chips

@@ -3,10 +3,13 @@ local goodFire, goodShield
 -- cells at vram $5800, and the vanilla small-font restore on close brings
 -- back only the vanilla glyphs — so our element icons / hud glyphs
 -- vanish until the next battle (the Whelk-dialogue bug the user hit).
--- The fix: the restore path (_c143b9) sets OT6_FONTDIRTY ($57d5), and the
--- battle NMI re-lays our icons in vblank. This test drives the MECHANISM
--- directly: corrupt the icon cells in vram, raise the flag, and confirm
--- the NMI restores them and clears the flag.
+-- The fix: the dialogue-close path (_c143b9 -> Ot6FontRestoreMark_ext)
+-- runs the vanilla small-font restore to COMPLETION, then sets
+-- OT6_FONTDIRTY ($57d5), and the battle NMI re-lays our icons in vblank
+-- (flag-after-restore ordering matters: battle_dlgmenu gates the real
+-- dialogue flow). This test drives the MECHANISM directly: corrupt the
+-- icon cells in vram, raise the flag, and confirm the NMI restores them
+-- and clears the flag.
 local H = dofile("/Users/mtklein/ot6/tools/tests/lib/ot6.lua")
 local STATE = "/Users/mtklein/ot6/build/states/battle_doorstep.mss.lua"
 local vr = emu.memType.snesVideoRam

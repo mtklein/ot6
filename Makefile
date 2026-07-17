@@ -38,6 +38,7 @@ run: rom
 # timestamp bumps on every build even when bytes are identical)
 STATE1 := build/states/battle_doorstep.mss.lua
 STATE2 := build/states/battle2_doorstep.mss.lua
+STATE3 := build/states/whelk_doorstep.mss.lua
 build/states/.rom-stamp: ff6/rom/ff6-en.sfc
 	@mkdir -p build/states
 	@cmp -s ff6/rom/ff6-en.sfc build/states/.rom-copy 2>/dev/null || \
@@ -64,8 +65,16 @@ $(STATE2): $(STATE1)
 		tools/tests/run.sh tools/tests/gen_battle2.lua; \
 	fi
 	@touch $(STATE2)
+# whelk doorstep: the dialog-opening boss fight battle_dlgmenu gates.
+# gen_whelk boots from the SRM sidecar (build/states/playthrough_srm.mss.lua,
+# local fixture from make_srm_sidecar.sh), so this mint needs that sidecar.
+$(STATE3): $(STATE2)
+	@if [ build/states/.rom-copy -nt build/states/whelk_doorstep.mss ] || [ ! -f build/states/whelk_doorstep.mss ]; then \
+		tools/tests/run.sh tools/tests/gen_whelk.lua; \
+	fi
+	@touch $(STATE3)
 
-test: rom $(STATE1) $(STATE2)
+test: rom $(STATE1) $(STATE2) $(STATE3)
 	tools/tests/suite.sh
 
 goldens: rom $(STATE1) $(STATE2)

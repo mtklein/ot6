@@ -543,20 +543,35 @@ done:   rtl
 
 ; ------------------------------------------------------------------------------
 
-; [ a battle dialogue clobbered our font cells; flag a re-lay ]
+; [ a battle dialogue clobbered our font cells; restore, then flag a re-lay ]
 
-; called from _c143b9 (dialogue close, small-font restore) in bank C1.
-; that restore uploads vanilla SmallFontGfx to vram $5800 — right over
-; our element icons and hud glyphs — via WaitTfrVRAM, which returns
-; mid-frame, so we can't re-write vram synchronously here. instead we
-; raise a flag and let the battle nmi re-lay the icons in vblank (where
-; direct vram writes actually land). width-agnostic: absolute store.
+; called from _c143b9 (dialogue close, small-font restore) in bank C1 in
+; TAIL position, with WaitTfrVRAM's parameters live in the registers
+; (A = source bank, X = source, Y = vram dest, $10 = size). we pass them
+; straight through to the vanilla staged restore — WaitTfrVRAM streams
+; $400 bytes per frame and returns only after the LAST chunk has landed
+; in vram — and only THEN raise OT6_FONTDIRTY so the battle nmi re-lays
+; our icons over a fully-restored font (in vblank, where direct vram
+; writes actually land).
+;
+; both halves of this ordering are the whelk garbled-menu bug fix
+; (battle_dlgmenu is the regression gate):
+;   * the first cut of this shim ran BEFORE the jmp WaitTfrVRAM and
+;     clobbered A with the flag value, so the "restore" streamed $1000
+;     bytes of bank-$01 open bus over the font and every battle menu
+;     after a scripted dialogue rendered as noise;
+;   * raising the flag BEFORE the restore let the nmi re-lay fire
+;     between restore chunks, and the later chunks squashed the icons
+;     right back to vanilla (the original icons-vanish symptom).
 
-.proc Ot6MarkFontDirty_ext
+.proc Ot6FontRestoreMark_ext
+        jsl     WaitTfrVRAM_far ; registers pass through untouched
         php
         sep     #$20            ; a8 (index width irrelevant)
+        pha
         lda     #$01
         sta     f:$7e0000+OT6_FONTDIRTY
+        pla
         plp
         rtl
 .endproc

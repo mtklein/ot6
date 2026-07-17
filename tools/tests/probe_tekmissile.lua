@@ -9,8 +9,8 @@
 --
 -- Runs in the guard fight (battle_doorstep), which opens with NO battle
 -- dialog: its menus stage clean (battle_break asserts the rendered
--- magitek list), unlike the whelk fight's pre-existing garbage-menu bug
--- (probe_whelkmenu.lua). Guards are authored pierce-weak, so no
+-- magitek list). (Dialog-opening fights used to garble every menu; that
+-- is fixed and gated by battle_dlgmenu.) Guards are authored pierce-weak, so no
 -- weakness pokes are needed -- only their element rows are zeroed so
 -- stray beams can't chip, and HP is pinned so nothing dies.
 --
