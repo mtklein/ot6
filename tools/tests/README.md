@@ -34,6 +34,19 @@ Scripts built on the library always terminate on their own; no external
 watchdog needed.  A bare hang would only happen if a script bypasses
 `H.run()`'s frame budget.
 
+### Parallel runs
+
+`run.sh` honors `OT6_WORKER=<id>`: the portable emulator copy, saves dir,
+composed file, default log, and artifact dir all move under
+`build/test-workers/w<id>/`, so runs with distinct ids (and the default
+id-less run) are safe concurrently -- the emulator writes into its profile
+on exit, so concurrent instances must never share an app copy.  `suite.sh`
+honors `OT6_JOBS=N` (default 4 = the P-core knee; 1 = serial) and fans its
+tests out across workers; every suite test is a pure savestate load (the
+mints run as Makefile prerequisites first), so order doesn't matter.
+Suite logs stay at `build/states/suite_<t>.log` either way, and each test
+line reports its worker and wall time.
+
 ## Files
 
 - `lib/ot6.lua` - harness library (see header comment for full API).
@@ -68,7 +81,8 @@ watchdog needed.  A bare hang would only happen if a script bypasses
 - `gen_whelk.lua` - boot the injected save and BFS-navigate the Narshe
   mines to the Whelk fight (see `docs/playing-headless.md`); emits
   `build/states/whelk_doorstep.mss` (field, one tile short of the
-  trigger) and a `whelk_battle` screenshot.  ~2800 frames / ~15 s.
+  trigger) and a `whelk_battle` screenshot.  PASSes at frame 2813 with
+  byte-identical artifacts every run, ~8.5 s wall.
 - `probe_canstep.lua` - validates `H.canStep` (the CheckPlayerMove
   port) against real movement at the boot area; renders the model's view
   of the neighborhood as ASCII.
@@ -136,8 +150,8 @@ Plain functions (call from `H.call`/predicates):
   constants `H.MONSTER_IDS=$3F46`, `H.BATTLE_HP=$3BF4`, `H.BREAK_GLYPH=$3ECB`.
   (Caveat: the six words at $3F46 are a liveness heuristic, not clean IDs --
   monster #0 "Guard" is a valid 0x0000, empty slots read $FFFF, and healthy
-  vanilla battles still show one stale-garbage word there, e.g. 874B, from
-  power-on RAM randomization.  Treat `monstersPresent() > 0` as "battle has
+  vanilla battles still show one stale word there, e.g. 874B, left over
+  from earlier RAM traffic.  Treat `monstersPresent() > 0` as "battle has
   occupants", nothing finer.  For identifying a *specific* fight, match the
   formation species words at $57C0 via `H.formationHas`, gated on
   `battleLoadStarted()`.)
@@ -210,14 +224,27 @@ Empty-string result only occurs in the first ~2 s before the video decoder
 has a frame.  `emu.getScreenBuffer()` also exists (table of RGB ints) if raw
 pixels are ever needed.
 
-### Savestate determinism
+### Determinism (by construction)
 
-- Battle-trigger frame varied by +-2 frames across identical runs
-  (16508/16510) - Mesen's default power-on RAM randomization feeds FF6's RNG.
-  Therefore scripts key off RAM *signals*, never absolute frame numbers
-  (except the wide, forgiving title-screen window).
-- The intro is otherwise stable: identical input scripts produced the same
-  scene sequence on every run observed.
+Test runs are bit-reproducible: identical scripts PASS at identical frames
+with byte-identical artifacts (savestates AND screenshots), serial or
+parallel.  Three harness pins make it so:
+
+- `pin_test_saves.py` pins `Snes.RamPowerOnState = "AllZeros"`.  FF6 reads
+  uninitialized RAM, so Mesen's default `Random` fed the RNG different
+  garbage every boot -- battle-trigger frames drifted (+-frames, extra
+  encounters) and minted savestates embedded the garbage.
+- `pin_test_saves.py` pins `Snes.DisableFrameSkipping = true`.  Frame-skip
+  picks rendered frames by HOST timing, so screenshots (and the framebuffer
+  inside savestates) varied run-to-run, worse under parallel load.
+- `run.sh` wipes `<saves>/*.srm` before every launch.  The testrunner
+  flushes battery on exit and reloads it next boot, so a stale srm is a
+  hidden cross-run coupling channel; tests that need a save inject it
+  explicitly (SRM sidecars).
+
+Scripts still key off RAM *signals* rather than absolute frame numbers --
+not because frames drift at runtime anymore, but because every ROM or
+route edit shifts them.
 - `emu.createSavestate()/loadSavestate()` round-trip works from Lua, but
   ONLY inside an exec memory callback (see the trampoline above);
   `probe16.lua` is the regression test for the mechanism.

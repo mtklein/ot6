@@ -19,7 +19,13 @@ corrupted by a test run (it was zeroed twice before this split):
   run by `tools/tests/lib/pin_test_saves.py` (it rewrites the portable
   `settings.json` with an explicit `SaveDataFolder` override), so the
   two directories can't share a file even if your Mesen settings later
-  grow their own override.
+  grow their own override. Worker runs (`OT6_WORKER=<id>`, see the
+  tests README) repeat the same scheme under `build/test-workers/w<id>/`.
+
+`run.sh` also wipes `<saves>/*.srm` before every launch: the testrunner
+flushes battery on exit and reloads it next boot, so a stale srm is a
+hidden cross-run coupling channel. Tests that need a save inject it
+explicitly (next section); the disk srm is residue.
 
 Copy from your play save into the testing world on demand:
 
@@ -32,9 +38,9 @@ data is never committed.
 
 ## Booting a save headless
 
-Headless Mesen always boots SRAM zeroed (battery loading is GUI-only),
-so the harness *injects* the save into SRAM at boot and drives the
-title's Continue. In-game saves are pure vanilla-layout data with no
+Headless tests boot SRAM zeroed by construction (the pre-launch srm
+wipe above), so the harness *injects* the save into SRAM at boot and
+drives the title's Continue. In-game saves are pure vanilla-layout data with no
 code dependency, so a sidecar made once keeps loading across ROM
 rebuilds — unlike savestates (`.mss`), which snapshot RAM+CPU and break
 when code moves.
@@ -206,7 +212,9 @@ fight the formation species words at `$57C0` read `0x0100` and
 before the first fight, stale words after one, so gate any read on
 `battleLoadStarted()`). The whelk-done event switch is `$1EA6` bit
 `$20`; once set, the trigger is inert — the script asserts it clear at
-boot. Full run ≈ 2800 frames, ~15 s wall.
+boot. Full run: PASS at frame 2813, ~8.5 s wall, byte-identical
+artifacts every run (the harness pins power-on RAM and frame
+rendering — see Runtime limits).
 
 ### Reaching a balance fixture
 
@@ -232,5 +240,15 @@ harness:
   the error only reaches the script-window log, which run.sh's
   `--enableStdout` mirrors to stdout.
 
+`pin_test_saves.py` also pins the test profile for determinism —
+`Snes.RamPowerOnState = "AllZeros"` (FF6 reads uninitialized RAM, so
+random power-on RAM drifted encounter RNG and PASS frames run-to-run),
+`Snes.DisableFrameSkipping = true` (frame-skip picks rendered frames by
+host timing, so screenshots and savestate framebuffers varied), and
+`Audio.EnableAudio = false` (inert headless; hygiene). Test profiles
+deliberately diverge from the play profile here: runs are bit-reproducible
+by construction.
+
 Frame budgets (`H.run`'s `maxFrames`) remain the per-script failsafe;
-the gen_whelk route fits in 9000 frames ≈ 15 s wall.
+the gen_whelk route budgets 9000 frames and completes at 2813 ≈ 8.5 s
+wall.

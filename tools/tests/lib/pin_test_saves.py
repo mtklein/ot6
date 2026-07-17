@@ -26,6 +26,19 @@ prefs["SaveDataFolder"] = saves          # dedicated, isolated from the user's
 # 30 s keeps the watchdog as a hang backstop without biting real work.
 cfg.setdefault("Debug", {}).setdefault("ScriptWindow", {})["ScriptTimeout"] = 30
 
+# Determinism pins -- test profiles deliberately diverge from the user's play
+# profile on these three, whatever the source settings say:
+snes = cfg.setdefault("Snes", {})
+# FF6 reads uninitialized RAM, so RamPowerOnState=Random makes identical runs
+# drift (extra encounters, +-frames) and embeds garbage in minted savestates.
+snes["RamPowerOnState"] = "AllZeros"
+# Frame-skip picks which frames actually render based on HOST timing, so
+# screenshots and the framebuffer embedded in savestates vary run-to-run
+# (and under parallel load) unless every frame renders.
+snes["DisableFrameSkipping"] = True
+# Audio is inert under --testrunner (no device opened); pinned off as hygiene.
+cfg.setdefault("Audio", {})["EnableAudio"] = False
+
 with open(dst, "w", encoding="utf-8") as f:
     json.dump(cfg, f)
 

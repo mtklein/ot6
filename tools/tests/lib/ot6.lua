@@ -550,6 +550,14 @@ end
 
 -- Run the body steps in a loop until pred() is truthy (checked between body
 -- cycles and every frame via pollEvery=frames).  Raises after maxFrames.
+-- Completion RELEASES the pad: pred can fire mid-body-cycle, abandoning the
+-- body wherever it stands, and a button it was holding at that instant must
+-- not stay stuck into the steps that follow.  (A stuck d-pad auto-repeats
+-- the battle-menu cursor and a stuck A confirms into target selection --
+-- both bit battle_boost/battle_preview when input injection moved to
+-- hardware-faithful next-poll timing.  navTo/advanceStory/clearBattle
+-- already release in their preds; this is the same contract for every
+-- drive.)
 function M.driveUntil(pred, maxFrames, steps, what)
   what = what or "condition"
   local body = seqStep(steps)
@@ -557,6 +565,7 @@ function M.driveUntil(pred, maxFrames, steps, what)
   return {
     tick = function()
       if pred() then
+        M.setPad({})
         M.log("driveUntil '" .. what .. "' satisfied after " .. waited .. " frames")
         return "done"
       end
