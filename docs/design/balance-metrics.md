@@ -65,3 +65,34 @@ Known blind spots, accepted for v1: damage is attributed by victim
 (monster-on-monster muddle damage would count as player damage), and
 `$340a` immediate actions bypass the action-count queues — both noted
 as TODOs in the lua header.
+
+## Measurement #1 — mines_chase, Terra L5 solo (2026-07-16)
+
+First live numbers, from `bal_mines.lua` (seeded formation draws via
+RNG streams `$1fa1`/`$1fa2`, loadState-independent battles, paired
+samples across policies; aggregate with `bal_aggregate.py`). 8
+battles per policy, full pool coverage, 0 voids, 0 deaths.
+
+| policy | turns | frames | chips | breaks | verdict |
+|---|---|---|---|---|---|
+| baseline | 2 | 744 | 0 | 0 | pierce hits nothing in the pool |
+| boost3 | 2 | 744 | 0 | 0 | **never boosts — bank hits 2 as the fight ends** |
+| greedy | 2 | 840 | 0 | 0 | same kills, +13% time, more damage taken |
+| fire | 2 | 1517 | 13 | 0 | chips land; nothing survives its first chip |
+
+Findings against the bands above: intro trash sits BELOW the trash
+TTK band (2 real turns vs the proposed 3–5) — every pool member dies
+to one action, so neither the BP economy (first 3-boost window =
+turn 3) nor a break (two chip-hits on a living target) can express.
+This is arithmetic, not variance: boost is a strictly-losing button
+here, and that is measured, not felt. Repo Man (6/16 of draws) is
+unchippable by this party (poison-only weakness) — the coverage
+rule's first live counterexample, tutorial-stretch edition.
+
+Dispositions: the mines pool is tutorial texture, not tuning
+material (whether it should *become* tuning material is an M6
+design call that trades against vanilla trash jank). The break loop
+measures next on `whelk_doorstep` — the authored boss row
+(4·pierce) against TekMissile is the first place chips→break→×2 can
+actually happen. Trash boost economics want a ≥3-real-turn fixture
+(post-split scenarios or Lete River).
