@@ -17,4 +17,12 @@ ROM="Final Fantasy III (USA).sfc"
 [ -e "$HERE/tools/Mesen.app" ] || ln -s "$MAIN/tools/Mesen.app" "$HERE/tools/Mesen.app"
 [ -e "$HERE/tools/bin" ] || ln -s "$MAIN/tools/bin" "$HERE/tools/bin"
 
+# Seed the main tree's minted savestates so boot-chain fixtures don't replay
+# the whole game. Safe against drift: .rom-copy rides along, and the
+# Makefile's content-compare gate remints anything whose ROM bytes differ.
+if [ -d "$MAIN/build/states" ] && [ ! -d "$HERE/build/states" ]; then
+  mkdir -p "$HERE/build"
+  cp -R "$MAIN/build/states" "$HERE/build/states"
+fi
+
 echo "worktree ready: ROM copied, Mesen/flips linked"
