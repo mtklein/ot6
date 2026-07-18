@@ -870,6 +870,12 @@ local function resolve(v) return type(v) == "function" and v() or v end
 --   opts.arrive    extra terminator predicate (checked before everything)
 --   opts.maxFrames frame budget -> error (default 20000)
 --   opts.spare     list of formation species words never to kill-bit
+--   opts.noPathRetries  BFS-no-path retries, 45 idle frames apart, before
+--                  erroring (default 20).  A no-path is often TRANSIENT:
+--                  an NPC standing in a one-tile corridor blocks the
+--                  object map exactly while its scene runs (the Figaro
+--                  gate guard, measured), and erroring instantly turned
+--                  every such scene into a route failure.
 function M.navTo(txIn, tyIn, opts)
   opts = opts or {}
   local maxFrames = opts.maxFrames or 20000
@@ -881,6 +887,7 @@ function M.navTo(txIn, tyIn, opts)
   local pend = nil          -- the in-flight/unverified step
   local aPhase = 0          -- edge-press phasing for A (4 on / 4 off)
   local battN, dlgN, lostN = 0, 0, 0   -- debounce counters (see below)
+  local noPathN, pause = 0, 0          -- no-path retry state
   local function drop(why)  -- discard the plan, saying why (once, not per frame)
     if plan or pend then
       M.log(string.format("nav: %s at (%d,%d); plan dropped", why,
@@ -967,6 +974,7 @@ function M.navTo(txIn, tyIn, opts)
       end
       -- 5. between steps: position samples are only valid at rest on a tile
       if not M.tileAligned() then M.setPad({}); return end
+      if pause > 0 then pause = pause - 1; M.setPad({}); return end
       local x, y = M.fieldX(), M.fieldY()
       -- 6. verify the landing of the last step against the plan
       if pend then
@@ -992,10 +1000,23 @@ function M.navTo(txIn, tyIn, opts)
         plan = M.bfsPath(resolve(txIn), resolve(tyIn), NAV.blocked)
         idx = 1
         if not plan then
-          error(string.format(
-            "navTo: no path (%d,%d)->(%d,%d) [%d edges blocklisted]",
-            x, y, resolve(txIn), resolve(tyIn), NAV.nblocked), 0)
+          -- transient blockage patience: idle 45 frames and re-search.
+          -- the blocklist is forgiven first (a condemned edge may be the
+          -- only corridor once the blocker moves off it).
+          noPathN = noPathN + 1
+          if noPathN > (opts.noPathRetries or 20) then
+            error(string.format(
+              "navTo: no path (%d,%d)->(%d,%d) [%d edges blocklisted, %d retries]",
+              x, y, resolve(txIn), resolve(tyIn), NAV.nblocked, noPathN - 1), 0)
+          end
+          if NAV.nblocked > 0 then NAV.blocked, NAV.nblocked = {}, 0 end
+          M.log(string.format("nav: no path (%d,%d)->(%d,%d); waiting (retry %d)",
+            x, y, resolve(txIn), resolve(tyIn), noPathN))
+          pause = 45
+          M.setPad({})
+          return
         end
+        noPathN = 0
         NAV.plan, NAV.idx = #plan, idx
         M.log(string.format("nav: planned %d steps from (%d,%d)", #plan, x, y))
         if #plan == 0 then M.setPad({}); return end  -- pred will notice
