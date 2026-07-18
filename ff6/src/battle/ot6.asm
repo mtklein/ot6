@@ -1480,12 +1480,10 @@ Ot6FontIcons:
                                 ;   (C witness + random-encounter flags)
                                 ;   must survive init (see the strip's
                                 ;   block comment at OT6_CWITNESS)
-        ldx     #$0000
-@clr2:  sta     f:$7e0000+OT6_HUDCOPY,x
-        inx
-        inx
-        cpx     #$0054          ; last-flushed copies
-        bcc     @clr2
+        ; (removed: an 84-byte clear loop over OT6_HUDCOPY, a retired
+        ;  feature's buffer. $57de is inside vanilla's `ram_res w7e57d5,
+        ;  128`, so the loop was zeroing vanilla's name/banner scratch at
+        ;  every battle init for nothing. Nothing reads OT6_HUDCOPY.)
         sta     f:$7e0000+OT6_PIPCUR    ; live pip cell off, no stale erase
         sta     f:$7e0000+OT6_PIPPREV
         sta     f:$7e0000+OT6_LASTLR
@@ -2010,9 +2008,28 @@ Ot6ObjArrowData:
 ; Impact is latched, not transient: the @done commit below keeps a
 ; nonzero anchor forever (`bne @keep`), so a garbage anchor written by a
 ; menu open persists for the rest of the battle.
-; NOT YET FIXED: needs either a relocation off $5755-$57d4 or dropping
-; the latch. Reproduction (predicted, untested): open the battle Magic
-; list and watch the HUD line-0 anchor.
+; CONFIRMED LIVE 2026-07-18 by tools/tests/probe_shadow_overlap.lua:
+; with a party command repointed at Item, DrawItemListText ran and bank
+; C1 wrote $5762-$5767 from C1:4C90. The anchor came out $00FF (item-name
+; bytes read as an address) where a clean run leaves $55E7 -- and the
+; latch below then drives every NMI flush from $00FF for the rest of the
+; battle. NOTE the magitek list drawer alone does NOT reproduce it (it
+; writes only +5/+11, stopping at $5761), which is why the original
+; Fight-only trace came back clean.
+;
+; NOT YET FIXED. The fix is relocation, not delatching: vanilla clobbers
+; the PREV pointer too, and prev drives the blanking write, so a garbage
+; prev is a stray write to an arbitrary VRAM address that recompute-and-
+; compare would not prevent. Relocation needs 84 contiguous battle-live
+; bytes, and the obvious neighbourhoods are ruled out:
+;   $576b-$57b5  75 bytes (vanilla's writes stop at $576b) -- 9 short
+;   $57b6-$57d4  taken by the OT6 strip
+;   $5715-$5854  all four btlgfx `ram_res` blocks, contiguous, no gap
+;   $3e4c-$3e87  Special/Preliminary Status (notes/battle-ram.txt:1015+)
+;   $3e38/$3e88/$3e9c tables -- fully spent by OT6 already
+; Whatever is chosen must be write-watch verified across a battle that
+; OPENS A COMMAND LIST, not merely grepped and not traced on a Fight-only
+; fixture. That shortcut is what produced this bug.
 OT6_SHADOW  := $5762            ; lines, stride 14
 OT6_MAPBASE := $57b6            ; word scratch: field bg3 map base
 
@@ -2243,7 +2260,10 @@ OT6_MAPBASE := $57b6            ; word scratch: field bg3 map base
 
 ; called from the battle nmi right after the oam dma.
 
-OT6_HUDCOPY := $57de            ; (retired; kept for the memory map)
+OT6_HUDCOPY := $57de            ; (retired, and NOT ours to use: $57de is
+                                ;  inside vanilla's `ram_res w7e57d5, 128`.
+                                ;  kept only so the memory map records that
+                                ;  this range is vanilla's, not free.)
 OT6_ATKCLASS := $57b8           ; the executing attack's class byte: one of
                                 ;   $01/$02/$04/$08 (+$80 null-break), 0 =
                                 ;   classless. set by the three load hooks,
