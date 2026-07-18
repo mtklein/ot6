@@ -2,6 +2,8 @@
 *.sfc
 *.srm
 /build/
-/tools/Mesen.app/
-/tools/bin/
+# no trailing slash: in agent worktrees these are SYMLINKS to the main
+# tree (tools/worktree-setup.sh), and dir-only patterns do not match those
+/tools/Mesen.app
+/tools/bin
 /tools/calypsi/
