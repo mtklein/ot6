@@ -9,6 +9,9 @@ You supply your own ROM — `Final Fantasy III (USA).sfc`, SHA-1
 `4f37e4274ac3b2ea1bedb08aa149d8fc5bb676e7`. Drop it at the repo root. The build
 verifies the hash and refuses anything else.
 
+`brew bundle` installs the Homebrew tools (cc65, sdl2); Mesen and Flips are
+not brew-installable — [docs/TOOLING.md](docs/TOOLING.md) has those steps.
+
 ```sh
 make rom     # build build/ot6.sfc
 make test    # full headless gate: 21 tests + pixel goldens (a few minutes)

@@ -64,9 +64,10 @@ BPS-capable patcher, or just:
 
 ## Verification
 
-`make test` runs the whole gate headless — 20 tests plus same-mint pixel
+`make test` runs the whole gate headless — 21 tests plus same-mint pixel
 goldens; `tools/tests/suite.sh` is the list of record (this doc used to
-enumerate 12 and drifted). Green as of the v0.1 tag.
+enumerate 12 and drifted). Green as of the v0.1 tag; the 21st test
+(probe_shadow_overlap) joined after, in 6275f02.
 
 ## Known limits (by design, for now)
 

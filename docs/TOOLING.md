@@ -32,13 +32,31 @@ control verified to exit 1).
 
 ## Installed pieces
 
-- **cc65** (ca65/ld65) + **numpy** — via Homebrew (build + asset encoders).
+The Homebrew pieces are captured in the root `Brewfile` — `brew bundle` from
+the repo root installs them in one go (the non-brew pieces below still need
+the manual steps at each bullet).
+
+- **cc65** (ca65/ld65) — via Homebrew. numpy is no longer needed
+  (2026-07-18): `ff6/tools/fix_checksum.py` was rewritten onto stdlib
+  `struct`, output verified byte-identical, so the build's only python
+  requirement is any `python3` ≥3.9 — Command Line Tools 3.9.6 suffices.
+  numpy imports survive only in the asset re-encoders (`brr.py`,
+  `monster_stencil.py`, `shuffle_rng.py`), whose outputs are tracked.
 - **Flips CLI** — binary at `tools/bin/flips` (git-ignored). Rebuild:
   clone github.com/Alcaro/Flips, `make CFLAGS=-O2`, copy `flips` in.
 - **Mesen 2.1.1** — official macOS ARM64 release zip (77 MB) from
   github.com/SourMesen/Mesen2, unpacked to `tools/Mesen.app`. Debugger has
   breakpoints/memory watch/trace and **ca65 symbol integration** — the
   build already emits `ff6/rom/ff6-en.dbg` for source-level debugging.
+- **sdl2** — via Homebrew; a hard Mesen runtime dependency.
+  MesenCore.dylib's only non-system link is
+  `/opt/homebrew/opt/sdl2/lib/libSDL2-2.0.0.dylib` (otool -L). Invisible
+  until a machine lacked it: the .app bundles no SDL, and the core dylib
+  only exists once the .NET host extracts it to
+  `~/Library/Application Support/Mesen2/` — so the first launch after the
+  2026-07-18 reformat died as DllNotFoundException → Abort trap 6.
+  [research/toolchain.md](research/toolchain.md)'s Mesen entry said
+  "needs `brew install sdl2`" all along; this list omitted it.
 - **Calypsi 65816 C toolchain 5.17** — macOS pkg from
   github.com/hth313/Calypsi-tool-chains, expanded (not installed) to
   `tools/calypsi/expanded/...` (git-ignored; x86_64 binaries run under
@@ -72,6 +90,17 @@ control verified to exit 1).
 - `make distclean` in `ff6/` deletes ripped assets including modified ones
   — recoverable via `git restore` now that they're tracked, but still
   don't run it casually.
+- **Fresh clone**: all 665 `.lz` files are generated (compressed from
+  tracked sources by `ff6/tools/ff6_lzss.py`) and git-ignored, so a fresh
+  clone has none — and the vendored Makefile computes module deps with
+  `$(wildcard)`, so files that don't exist yet are not prerequisites and
+  nothing schedules the `%.lz: %` rule. The first build dies in ca65 on
+  the missing includes. Regeneration is mechanical: enumerate the sources
+  and make each `.lz` target by name — the pattern rule works when asked.
+- A failed recipe used to leave a half-built, unchecksummed
+  `rom/ff6-en.sfc` that the next `make` treated as up-to-date. Both
+  Makefiles now set `.DELETE_ON_ERROR:` (added 2026-07-18), so a failed
+  recipe's target is deleted instead.
 - **ca65 width state is inherited across `.include`**: any asm file pulled
   into a module inherits the `.a8/.a16/.i8/.i16` assumptions active at the
   inclusion point. ALWAYS declare the expected widths at the top of a new

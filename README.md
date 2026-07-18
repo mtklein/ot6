@@ -30,7 +30,7 @@ Drop that file at the repo root, then:
 
 ```sh
 make rom     # build build/ot6.sfc
-make test    # full headless correctness gate (20 tests + pixel goldens)
+make test    # full headless correctness gate (21 tests + pixel goldens)
 make run     # launch the built ROM in Mesen (GUI)
 make patch   # emit a distributable .bps
 ```

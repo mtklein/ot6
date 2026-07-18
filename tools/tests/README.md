@@ -82,11 +82,20 @@ line reports its worker and wall time.
   dumps at +0/+60/+180/+420/+900/+1500/+2400 frames.
 - `probe22.lua` - diagnostic: resume `first_battle.mss`, press A/A/B to
   poke the battle menus, screenshot each step (for UI iteration).
-- `gen_whelk.lua` - boot the injected save and BFS-navigate the Narshe
-  mines to the Whelk fight (see `docs/playing-headless.md`); emits
+- `gen_whelk_poweron.lua` - the suite's whelk mint: COLD POWER-ON ->
+  intro -> Narshe streets -> mines -> BFS to (42,6); emits
   `build/states/whelk_doorstep.mss` (field, one tile short of the
-  trigger) and a `whelk_battle` screenshot.  PASSes at frame 2813 with
-  byte-identical artifacts every run, ~8.5 s wall.
+  trigger) plus a positive-control `whelk_battle` screenshot.  Needs no
+  save file at all, so it works on a fresh clone; mint at frame 24333,
+  byte-identical every run, ~74 s wall.  The mint waits 14 idle frames
+  before saving: the doorstep's frame phase decides the fight's ATB
+  roll, and some phases stage Bio Blast's poison icon ($64) into the
+  magitek list, tripping battle_dlgmenu's $80+-only staging scan.
+- `gen_whelk.lua` - the retired SRM-based ancestor: boot an injected
+  play save and BFS the mines to the same doorstep (see
+  `docs/playing-headless.md`).  Kept because probe_slots and the
+  balance instruments still consume `make_srm_sidecar.sh` saves;
+  requires a pre-Whelk save, which no longer exists locally.
 - `probe_canstep.lua` - validates `H.canStep` (the CheckPlayerMove
   port) against real movement at the boot area; renders the model's view
   of the neighborhood as ASCII.
