@@ -1997,7 +1997,23 @@ Ot6ObjArrowData:
 ; its previous address; the flush blanks the old cells when it moves.
 ; line layout: +0 cur addr (0 = disabled), +2 prev addr, +4 five cells.
 
-OT6_SHADOW  := $5762            ; lines, stride 14 (trace-verified free)
+; !!! KNOWN OVERLAP -- NOT FREE. $5762 sits 13 bytes inside vanilla's
+; `ram_res w7e5755, 128` (btlgfx/btlgfx_ram.inc:71). The battle
+; command-list text drawers (DrawMagicListText, DrawItemListText,
+; DrawToolsListText, ... in btlgfx_main.asm ~10757-11360) write
+; $5755-$576a: indexed loops bounded `cpx #$0013` plus explicit stores
+; to +14/+15/+17/+21. That is exactly line 0 of this buffer. Both
+; writers ship in build/ot6.sfc (10x `sta $5755,x` in bank C1, 3x
+; `sta $7e5762,x` in bank F0).
+; The old "trace-verified free" note was true only of the fixture it was
+; traced on -- a Fight-only fight, where no command list ever opens.
+; Impact is latched, not transient: the @done commit below keeps a
+; nonzero anchor forever (`bne @keep`), so a garbage anchor written by a
+; menu open persists for the rest of the battle.
+; NOT YET FIXED: needs either a relocation off $5755-$57d4 or dropping
+; the latch. Reproduction (predicted, untested): open the battle Magic
+; list and watch the HUD line-0 anchor.
+OT6_SHADOW  := $5762            ; lines, stride 14
 OT6_MAPBASE := $57b6            ; word scratch: field bg3 map base
 
 .proc Ot6BgHud_ext
@@ -2174,9 +2190,15 @@ OT6_MAPBASE := $57b6            ; word scratch: field bg3 map base
         inc     OT6_SCR_IDX
         bra     @cbit
 @edone: plx
-@done:  ; commit: latch the anchor once per battle. monsters never move
-        ; ("moving" coords are attack-animation transients that made the
-        ; line jitter and blink), so compute only while still disabled.
+@done:  ; commit: latch the anchor once per battle, because recomputing every
+        ; frame made the line jitter and blink on attack-animation coord
+        ; transients. NOTE the justification once written here -- "monsters
+        ; never move" -- is not established: vanilla recomputes both source
+        ; arrays ($800f/$804b) from a tile base plus animation offsets
+        ; (btlgfx_main.asm:1040), and the Whelk retract cycle and entry/exit
+        ; effects visibly move things. The latch is a jitter workaround, and
+        ; it is also what makes the OT6_SHADOW overlap above permanent
+        ; instead of a one-frame blink. Recompute-and-compare would fix both.
         longa
         lda     f:$7e0000+OT6_SHADOW,x
         bne     @keep
@@ -2262,7 +2284,13 @@ OT6_FONTDIRTY   := $57b9        ; font re-lay stages remaining (0 = clean).
                                 ; byte after OT6_ATKCLASS, inside the m2
                                 ; trace-verified strip and the InitBP @clr
                                 ; (probe_57b9 write-watch: only bank-F0
-                                ; writers). $57d5+ is vanilla's alone.
+                                ; writers).
+; CAREFUL: the boundary is NOT "$57d5+ is vanilla's alone" (an earlier
+; note here said that, and it is what made $5762 look safe). btlgfx_ram.inc
+; reserves TWO buffers: w7e5755,128 AND w7e57d5,128 -- both vanilla's.
+; What the probes actually establish is narrower and still holds:
+; vanilla's writes into the $5755 buffer stop at $576b, so the OT6 strip
+; from $57b6 up is empirically clear. Below $576b is NOT. See OT6_SHADOW.
 OT6_RELAY_STAGES := 6           ; icons, glyphs x2, arrows x3 (~128b each)
 
 ; the spare strip $57ba-$57bf (between OT6_FONTDIRTY and OT6_SPECIES,
