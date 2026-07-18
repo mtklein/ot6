@@ -129,10 +129,18 @@ H.run({ maxFrames = 30000 }, {
   end),
 
   -- ------------------------------------------------------------------ --
-  -- 4. random encounter: pace east-west over battle-enabled plains until
-  -- one fires, kill-bit it, and measure the aftermath frame by frame.
+  -- 4. random encounter: pace over battle-enabled plains until one
+  -- fires, kill-bit it, and measure the aftermath frame by frame.
+  -- The up-step trace above parked us on (84,33), the Narshe GATE
+  -- STRIP -- prop $0007, battles DISABLED -- and this probe's first
+  -- revision paced right/left along it for 12000 fruitless frames
+  -- (that non-result is itself recorded in world-map-nav.md).  Step
+  -- back down to the enabled row first and pace down/up: the danger
+  -- word grows +$30 per landing there (probe_world2) and the roll wins
+  -- within a handful of cycles.
   -- ------------------------------------------------------------------ --
   H.call(function() P("== pacing for a random encounter ==") end),
+  H.hold({ "down" }), H.waitFrames(20), H.release(), H.waitFrames(4),
   H.call(function()
     trace.preBattle = nil
   end),
@@ -150,9 +158,9 @@ H.run({ maxFrames = 30000 }, {
     end
     return trace.preBattle ~= nil
   end, 12000, {
-    -- 20-frame paced holds; alternate east/west so the probe stays local
-    H.hold({ "right" }), H.waitFrames(24), H.release(), H.waitFrames(4),
-    H.hold({ "left" }), H.waitFrames(24), H.release(), H.waitFrames(4),
+    -- paced holds between (84,34) and (84,35), both battle-enabled
+    H.hold({ "down" }), H.waitFrames(24), H.release(), H.waitFrames(4),
+    H.hold({ "up" }), H.waitFrames(24), H.release(), H.waitFrames(4),
   }, "random encounter fires"),
 
   H.clearBattle(9000),
