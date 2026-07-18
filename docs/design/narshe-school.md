@@ -178,8 +178,9 @@ $0275 / $0274 become false and rejoin this exercise.
   repo encoder re-encodes the same text to ~118.5 KB (Square's tool
   wasn't greedy). First json edit rebuilds both banks: ROM dialog
   bytes churn wholesale (harmless — everything reaches dialog data
-  through DlgPtrs, cc/e602), and real slack is ~8.4 KB. Measured
-  post-change total: 118,805 B (slack 8,427).
+  through DlgPtrs, cc/e602), and real slack is ~8.4 KB. Built
+  post-change total: 65,554 + 53,302 = 118,856 B (slack 8,376); the
+  bank split lands at id 1715 (`Dlg1::ARRAY_LENGTH` → DlgBankInc).
 - **Element glyphs in dialog:** the dialog charset maps $76–$7E to
   {fire}-style escapes, but no vanilla string uses them and the M2
   icons live in battle-font cells $eb–$ef/$fb–$fd only. Unverified in

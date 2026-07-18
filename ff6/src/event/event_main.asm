@@ -84226,7 +84226,7 @@ _cc338f:
 _cc339c:
         if_switch $00A4=1, _cc33a6
         dlg $0257
-                ; This is a classroom for the beginner. Here we answer your questions about the world.
+                ; This is a classroom for the beginner. The war has new rules: shields, Breaks, Boosts.
                 ; Think of us as your advisors…
         return
 _cc33a6:
@@ -84250,7 +84250,7 @@ _cc33b8:
                 dir DOWN
                 end
         dlg $0257
-                ; This is a classroom for the beginner. Here we answer your questions about the world.
+                ; This is a classroom for the beginner. The war has new rules: shields, Breaks, Boosts.
                 ; Think of us as your advisors…
         wait_30f
         obj_script NPC_27
@@ -84293,6 +84293,7 @@ _cc33f0:
         dlg $025D
                 ; Ha!
                 ; Sometimes monsters lurk inside of treasure chests!
+                ; The one beside me bites. Open it and practice your Breaks!
         return
 _cc33f4:
         dlg $025E
@@ -84335,7 +84336,9 @@ _cc340b:
         return
 _cc340f:
         dlg $0264
-                ; When selecting a spell, press the L or R Button to select multiple targets.
+                ; The “?” by a monster’s shields are weaknesses it hasn’t shown you. Probe with everything!
+                ; A true hit turns “?” into the weakness itself. What you learn, you know forever.
+                ; Each ability bears the mark of its element. Match the mark to the weakness.
         return
 _cc3413:
         dlg $0265
@@ -84349,7 +84352,8 @@ _cc3417:
         return
 _cc341b:
         dlg $0267
-                ; White numerals appearing during battle are damage points. Green numerals are recovery points.
+                ; The number under a monster is its shields. Hit a weakness, the right element or weapon, and one falls.
+                ; At zero it Breaks: it loses its turns and takes double damage until it recovers. Strike NOW!
         return
 _cc341f:
         dlg $0268
@@ -84635,11 +84639,13 @@ _cc368a:
         return
 _cc368e:
         dlg $026D
-                ; 3-way attack indicates a fire, ice and lightning attack.
+                ; The dots by each name are Boost Points. You gain 1 a turn, and can bank 5.
+                ; The R Button spends up to 3 on the command you’re choosing. The L Button takes them back.
         return
 _cc3692:
         dlg $026E
-                ; “Rflect” spells will fade over time, and can’t block certain magic attacks.
+                ; Boost folds magic: Fire becomes Fire 2, then Fire 3, for the base spell’s MP.
+                ; Watch the spell list as you tap the R Button. What you see is what will cast.
         return
 _cc3696:
         dlg $026F
@@ -84652,7 +84658,8 @@ _cc3696:
         return
 _cc369a:
         dlg $0270
-                ; When multiple images of your characters flash on the screen, weapons won’t touch you.
+                ; Boosting has a price: a turn you boost earns no Boost Point.
+                ; And shields blunt wrong hits to half strength. Greed loses. Spend into weakness, or into the Broken.
         return
 _cc369e:
         dlg $0271
@@ -84688,10 +84695,9 @@ _cc36b5:
         return
 _cc36b9:
         dlg $0276
-                ; “About Rflect”
-                ; “Rflect” doesn’t block spells that have been “Rflected” off others.
-                ; Enemy protected by Rflect?
-                ; Try bouncing an attack off a Rflect-protected individual in your party!
+                ; A deserter from the Empire swears their armored machines shrug off blade and fire alike.
+                ; “Every armor fears one right tool,” he said.
+                ; Find it, and even the Empire Breaks.
         return
 _cc36bd:
         switch $02A0=1
