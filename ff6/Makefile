@@ -1,4 +1,7 @@
 
+# (ot6) delete half-written targets when a recipe fails, e.g. fix_checksum dying mid-build
+.DELETE_ON_ERROR:
+
 # the assembler
 ASM = ca65
 ASMFLAGS = -g -I include

@@ -4,6 +4,9 @@ FLIPS   := tools/bin/flips
 MESEN   := tools/Mesen.app/Contents/MacOS/Mesen
 VERSION := 0.1
 
+# A failed recipe (e.g. the checksum step dying mid-build) leaves a half-built target the next make treats as up-to-date — bit us twice on 2026-07-18.
+.DELETE_ON_ERROR:
+
 .PHONY: all rom patch run test verify clean goldens-capture release
 
 all: rom
