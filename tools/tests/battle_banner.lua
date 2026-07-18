@@ -37,7 +37,7 @@ local H = dofile("/Users/mtklein/ot6/tools/tests/lib/ot6.lua")
 local STATE = "/Users/mtklein/ot6/build/states/battle_doorstep.mss.lua"
 local vr = emu.memType.snesVideoRam
 local FONTDIRTY = 0x57B9
-local SHADOW = 0x5762           -- 6 lines x 14 bytes: cur,prev,5 cells
+local SHADOW = H.SHADOW         -- 6 lines x 14 bytes: cur,prev,5 cells
 
 local armed = false
 local rec = {}                  -- per-frame {f, nmi, fs, fe, id, fd}

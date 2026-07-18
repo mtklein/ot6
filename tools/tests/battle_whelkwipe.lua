@@ -76,7 +76,7 @@ local function assertWipeVanilla(what)
     end
   end
   for line = 0, 5 do
-    local cur = H.readWord(0x5762 + line * 14)
+    local cur = H.readWord(H.shadowLine(line))
     if cur ~= 0 then
       for cell = 0, 4 do
         local w = emu.readWord((cur + cell) * 2, VR)

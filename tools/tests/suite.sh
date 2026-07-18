@@ -16,7 +16,7 @@ RUN="$ROOT/tools/tests/run.sh"
 GOLD="$ROOT/tools/tests/goldens"
 SHOTS="$ROOT/build/states/shots"
 JOBS="${OT6_JOBS:-4}"
-TESTS="smoke battle_entry battle_break battle_reveal battle_reveal_poweron battle_class battle_bp battle_boost battle_hits battle_fold battle_preview battle_codex battle_c battle_fontrestore battle_banner battle_dlgmenu battle_whelkwipe hud_stability visual_f1 visual_f2"
+TESTS="smoke battle_entry battle_break battle_reveal battle_reveal_poweron battle_class battle_bp battle_boost battle_hits battle_fold battle_preview battle_codex battle_c battle_fontrestore battle_banner battle_dlgmenu battle_whelkwipe probe_shadow_overlap hud_stability visual_f1 visual_f2"
 
 # Tests that must run under a dirty RAM fill (see battle_reveal_poweron): they
 # boot from power-on, so the fill reaches battle init instead of being masked

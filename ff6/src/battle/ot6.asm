@@ -1475,8 +1475,18 @@ Ot6FontIcons:
 @clr:   sta     f:$7e0000+OT6_SHADOW,x
         inx
         inx
-        cpx     #$0058          ; shadow, map base, atkclass+fontdirty --
-        bcc     @clr            ;   STOPS at $57b9: the $57ba-$57bf strip
+        cpx     #$0054          ; 84 = the six shadow lines
+        bcc     @clr
+                                ; the shadow now lives at $ecf1, so it is no
+                                ; longer contiguous with MAPBASE/ATKCLASS/
+                                ; FONTDIRTY and this second loop is required
+                                ; -- one loop over $58 used to cover both.
+        ldx     #$0000
+@clr2:  sta     f:$7e0000+OT6_MAPBASE,x
+        inx
+        inx
+        cpx     #$0004          ; $57b6-$57b9: map base, atkclass, fontdirty
+        bcc     @clr2           ;   STOPS at $57ba: the $57ba-$57bf strip
                                 ;   (C witness + random-encounter flags)
                                 ;   must survive init (see the strip's
                                 ;   block comment at OT6_CWITNESS)
@@ -1986,7 +1996,11 @@ Ot6ObjArrowData:
 
 ; the hud lives on the bg3 field tilemap; this main-loop pass fills a
 ; shadow buffer in bank $7f, and the nmi flush copies it to vram during
-; vblank. shadow at $7f:fe00, 10 lines x 12 bytes:
+; vblank. shadow at OT6_SHADOW, 6 lines x 14 bytes:
+; (this line once read "$7f:fe00, 10 lines x 12 bytes" -- stale on both
+;  counts, and $7ffe00 was never free: it is 1536 bytes into the LZ
+;  decompression ring $7ff800-$7fffff, which battle init alone rewrites
+;  when it decompresses StatusGfx.)
 ;   +0  vram word address of the line's first cell (0 = line disabled)
 ;   +2  five tilemap words (glyph | attr << 8)
 ; monsters: [shield-with-count][up to 4 weakness slots — elements, then
@@ -1995,42 +2009,38 @@ Ot6ObjArrowData:
 ; its previous address; the flush blanks the old cells when it moves.
 ; line layout: +0 cur addr (0 = disabled), +2 prev addr, +4 five cells.
 
-; !!! KNOWN OVERLAP -- NOT FREE. $5762 sits 13 bytes inside vanilla's
-; `ram_res w7e5755, 128` (btlgfx/btlgfx_ram.inc:71). The battle
-; command-list text drawers (DrawMagicListText, DrawItemListText,
-; DrawToolsListText, ... in btlgfx_main.asm ~10757-11360) write
-; $5755-$576a: indexed loops bounded `cpx #$0013` plus explicit stores
-; to +14/+15/+17/+21. That is exactly line 0 of this buffer. Both
-; writers ship in build/ot6.sfc (10x `sta $5755,x` in bank C1, 3x
-; `sta $7e5762,x` in bank F0).
-; The old "trace-verified free" note was true only of the fixture it was
-; traced on -- a Fight-only fight, where no command list ever opens.
-; Impact is latched, not transient: the @done commit below keeps a
-; nonzero anchor forever (`bne @keep`), so a garbage anchor written by a
-; menu open persists for the rest of the battle.
-; CONFIRMED LIVE 2026-07-18 by tools/tests/probe_shadow_overlap.lua:
-; with a party command repointed at Item, DrawItemListText ran and bank
-; C1 wrote $5762-$5767 from C1:4C90. The anchor came out $00FF (item-name
-; bytes read as an address) where a clean run leaves $55E7 -- and the
-; latch below then drives every NMI flush from $00FF for the rest of the
-; battle. NOTE the magitek list drawer alone does NOT reproduce it (it
-; writes only +5/+11, stopping at $5761), which is why the original
-; Fight-only trace came back clean.
+; Lives at $7eecf1, past the end of vanilla's battle-graphics RAM chain.
+; Four independent lines of evidence, since a bad answer here is what put
+; this buffer inside live vanilla RAM the first time (see below):
+;   1. btlgfx_ram.inc's chain ends at label w7eecf0 and is capped by
+;      `.assert _ram_offset <= $7ef800` (btlgfx_ram.inc:1001) -- an
+;      assembler-enforced invariant, so btlgfx cannot grow in without
+;      failing the build. menu_ram.inc's chain tops out near $7e9849.
+;   2. notes/battle-ram.txt:2183 documents "$ECF1-$F7FF -" (nothing),
+;      with the hypotenuse table starting at $F800.
+;   3. no literal reference, symbol, mvn/mvp target, or DMA/WRAM-port
+;      loop in ff6/src or ff6/include lands in the range.
+;   4. runtime write-watch over $7eecf1-$7ef7ff across a boss fight, four
+;      forced command lists, a soak and a victory: zero writes -- while
+;      the positive controls fired in the same run (DrawItemListText ran,
+;      bank C1 wrote $5755-$576a).
 ;
-; NOT YET FIXED. The fix is relocation, not delatching: vanilla clobbers
-; the PREV pointer too, and prev drives the blanking write, so a garbage
-; prev is a stray write to an arbitrary VRAM address that recompute-and-
-; compare would not prevent. Relocation needs 84 contiguous battle-live
-; bytes, and the obvious neighbourhoods are ruled out:
-;   $576b-$57b5  75 bytes (vanilla's writes stop at $576b) -- 9 short
-;   $57b6-$57d4  taken by the OT6 strip
-;   $5715-$5854  all four btlgfx `ram_res` blocks, contiguous, no gap
-;   $3e4c-$3e87  Special/Preliminary Status (notes/battle-ram.txt:1015+)
-;   $3e38/$3e88/$3e9c tables -- fully spent by OT6 already
-; Whatever is chosen must be write-watch verified across a battle that
-; OPENS A COMMAND LIST, not merely grepped and not traced on a Fight-only
-; fixture. That shortcut is what produced this bug.
-OT6_SHADOW  := $5762            ; lines, stride 14
+; DO NOT extend past $7ef11f. PushMode7Vars (world/init.asm:1414) block-
+; moves $7ef120-$7ef7ff via `mvn`, which no `sta` grep can find and which
+; a fixture without a world-map battle never exercises. 1071 bytes are
+; available; we use 84 and stop well short.
+;
+; WHY IT MOVED: this was $5762, annotated "trace-verified free". It was
+; not -- $5762 sits 13 bytes inside vanilla's `ram_res w7e5755, 128`
+; (btlgfx/btlgfx_ram.inc:71), and the battle command-list text drawers
+; write $5755-$576a. The original trace ran a Fight-only fixture, where
+; no command list ever opens, so it never saw them. Reproduced in
+; tools/tests/probe_shadow_overlap.lua: DrawItemListText ran and bank C1
+; wrote $5762-$5767, leaving the anchor at $00FF; the latch below then
+; drove every NMI flush from $00FF for the rest of the battle. The
+; magitek list drawer alone does NOT reproduce it (it stops at $5761),
+; which is why a magitek-only fixture reads as an all-clear.
+OT6_SHADOW  := $ecf1            ; lines, stride 14
 OT6_MAPBASE := $57b6            ; word scratch: field bg3 map base
 
 .proc Ot6BgHud_ext

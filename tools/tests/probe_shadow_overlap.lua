@@ -1,35 +1,26 @@
--- probe_shadow_overlap.lua -- does vanilla actually write into OT6_SHADOW?
+-- probe_shadow_overlap.lua -- regression gate for the OT6_SHADOW overlap.
 --
--- OT6_SHADOW ($5762, 6 lines x stride 14) is annotated "trace-verified
--- free", but it sits 13 bytes inside vanilla's `ram_res w7e5755, 128`
--- (btlgfx/btlgfx_ram.inc:71).  The battle command-list text drawers
--- (DrawMagicListText / DrawItemListText / DrawToolsListText / ... in
--- btlgfx_main.asm) write $5755-$576a -- exactly line 0 of the buffer.
--- The original trace almost certainly ran a Fight-only fixture, where no
--- command list is ever opened, so it never saw them.
+-- HISTORY.  OT6_SHADOW used to live at $5762, annotated "trace-verified
+-- free".  It was not: $5762 sits 13 bytes inside vanilla's `ram_res
+-- w7e5755, 128` (btlgfx/btlgfx_ram.inc:71), and the battle command-list
+-- text drawers write $5755-$576a.  This probe reproduced it -- with the
+-- party's top command repointed at Item, DrawItemListText ran and bank C1
+-- wrote $7E5762-$7E5767, leaving the HUD line-0 anchor at $00FF, which the
+-- latch at Ot6BgHudLine's @done then made permanent for the battle.
+-- OT6_SHADOW now lives at $ecf1, past the end of vanilla's battle-graphics
+-- RAM chain.  See the block comment at the symbol for the evidence.
 --
--- This drives the whelk doorstep into a battle and OPENS THE MAGITEK LIST
--- (battle_dlgmenu's flow), watching $7E5762-$7E576F -- line 0's anchor,
--- prev pointer, and cells.  A write from any bank other than $F0 proves
--- the overlap is live.  $7E57B9 rides along as the negative control: it
--- is inside the same vanilla reservation but ABOVE where vanilla's writes
--- stop ($576b), so it must stay bank-F0-only.
+-- WHAT THIS ASSERTS NOW, both directions:
+--   1. nothing but bank F0 writes the NEW home ($7eecf1+)
+--   2. nothing from bank F0 writes the OLD home ($7e5762+) -- we vacated
 --
--- Severity note: the anchor is latched (`bne @keep` at Ot6BgHudLine's
--- @done), so a nonzero garbage anchor is never recomputed -- corruption
--- persists for the rest of the battle rather than blinking once.
---
--- RESULT 2026-07-18: CONFIRMED LIVE.  With the party's top command
--- repointed at Item, DrawItemListText ran 8x and bank C1 wrote
--- $7E5762-$7E5767 from C1:4C90 -- line 0's anchor, prev pointer and
--- cells 0-1.  The anchor came out $00FF (item-name bytes read as an
--- address); the magitek-only path leaves a valid $55E7.  Latched, so
--- $00FF then drives every NMI flush for the rest of the battle.
---
--- NOTE the magitek list drawer alone does NOT reproduce this: it writes
--- only +5/+11, stopping at $5761, one byte short.  That is why the
--- original trace came back clean, and why this probe forces a real Item
--- list.  A fixture that only ever opens the magitek menu proves nothing.
+-- THE FIXTURE MATTERS.  The magitek list drawer writes only +5/+11 and
+-- stops at $5761, one byte short of the old buffer -- so a Fight-only or
+-- magitek-only battle sees nothing and reads as an all-clear.  That is
+-- exactly how the original trace got it wrong.  This probe therefore
+-- clears magitek status, repoints the party's commands at Item/Magic, and
+-- FAILS LOUDLY if no command-list drawer actually ran: a quiet result must
+-- never be mistaken for a clean one.
 local H = dofile("/Users/mtklein/ot6/tools/tests/lib/ot6.lua")
 local STATE = "/Users/mtklein/ot6/build/states/whelk_doorstep.mss.lua"
 local WHELK = { [0x0134] = true }
@@ -51,7 +42,13 @@ local function watch(lo, hi)
   end, emu.callbackType.write, lo, hi)
 end
 
-watch(0x7E5755, 0x7E576F)   -- vanilla buffer base THROUGH OT6_SHADOW line 0
+-- OT6_SHADOW now lives at $ecf1 (see ot6.asm). Two assertions:
+--   1. nothing but bank F0 writes the NEW home
+--   2. nothing from bank F0 writes the OLD home -- i.e. we really vacated
+local NEW_LO, NEW_HI = 0x7EECF1, 0x7EECFE   -- new line 0 (anchor+prev+cells)
+local OLD_LO, OLD_HI = 0x7E5762, 0x7E576F   -- old line 0, now vanilla's alone
+watch(NEW_LO, NEW_HI)
+watch(OLD_LO, OLD_HI)
 watch(0x7E57B9, 0x7E57B9)   -- control: above vanilla's write ceiling
 
 local foreign = {}          -- writers from banks other than F0
@@ -133,27 +130,29 @@ H.run({ maxFrames = 30000 }, {
       for pc, n in pairs(h.pcs) do
         H.log(string.format("    %s x%d", pc, n))
         local bank = tonumber(pc:sub(1, 2), 16)
-        if bank ~= 0xF0 and a >= 0x7E5762 and a <= 0x7E576F then
-          foreign[#foreign + 1] = string.format("$%06X <- %s", a, pc)
+        if bank ~= 0xF0 and a >= NEW_LO and a <= NEW_HI then
+          foreign[#foreign + 1] = string.format("FOREIGN into new home: $%06X <- %s", a, pc)
+        end
+        if bank == 0xF0 and a >= OLD_LO and a <= OLD_HI then
+          foreign[#foreign + 1] = string.format("OT6 still writing OLD home: $%06X <- %s", a, pc)
         end
       end
     end
-    H.log(string.format("anchor $5762 now reads $%04X", H.readWord(0x5762)))
+    H.log(string.format("new anchor $ecf1 = $%04X   old $5762 = $%04X (vanilla's now)",
+      H.readWord(0xecf1), H.readWord(0x5762)))
     local ranDrawer = false
     for name, n in pairs(drawers) do
       H.log(string.format("drawer %s ran %dx", name, n))
       ranDrawer = true
     end
     if not ranDrawer then
-      H.log("NO command-list drawer ran -- this path proves NOTHING about " ..
-            "the overlap; the menu drive needs work")
+      error("no command-list drawer ran -- the fixture did not exercise the " ..
+            "overlap path, so a clean result would be meaningless")
     end
-
     if #foreign > 0 then
-      H.log("OVERLAP CONFIRMED LIVE -- non-bank-F0 writers into OT6_SHADOW:")
       for _, f in ipairs(foreign) do H.log("  " .. f) end
-    else
-      H.log("no foreign writers observed on this path")
+      error(#foreign .. " shadow-buffer violation(s) -- see log")
     end
+    H.log("ok: new home bank-F0 only, old home fully vacated")
   end),
 }, "shadow overlap probe")

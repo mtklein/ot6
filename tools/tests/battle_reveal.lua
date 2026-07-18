@@ -20,13 +20,13 @@
 --
 -- Guards sit in monster slots 2/3 -> entity $0C/$0E. revealed elems
 -- $3E95/$3E97, weak elems $3BEC/$3BEE, HP $3C00/$3C02, party levels $3B18+2i,
--- mag.pwr $3B41+2i. HUD shadow line for slot s is at $5762 + s*14; the four
+-- mag.pwr $3B41+2i. HUD shadow line for slot s is H.shadowLine(s); the four
 -- weakness cells are the low bytes at +6/+8/+10/+12 ('?' = $BF, fire = $EB).
 local H = dofile("/Users/mtklein/ot6/tools/tests/lib/ot6.lua")
 local STATE = "/Users/mtklein/ot6/build/states/battle_doorstep.mss.lua"
 
 local function present(slot) return (H.readByte(0x3aa8 + slot * 2) & 1) == 1 end
-local function wcell(slot, k) return H.readByte(0x5762 + slot * 14 + 6 + k * 2) end  -- k=0..3
+local function wcell(slot, k) return H.readByte(H.shadowLine(slot) + 6 + k * 2) end  -- k=0..3
 
 -- One-shot: the instant the seed begins, re-dirty every monster reveal mask.
 -- This is the state the Cmd_20 reload (and uninitialized RAM) hands the seed;

@@ -300,6 +300,16 @@ end
 M.MONSTER_IDS = 0x3F46
 M.BATTLE_HP = 0x3BF4
 
+-- OT6 HUD tilemap shadow: 6 lines x stride 14 (+0 cur addr, +2 prev addr,
+-- +4 five tilemap words).  MUST track OT6_SHADOW in ff6/src/battle/ot6.asm.
+-- It lived at $5762 until 2026-07-18, when that turned out to be inside
+-- vanilla's `ram_res w7e5755, 128` -- three suite tests had the old address
+-- copy-pasted in and silently started reading vanilla's buffer when it
+-- moved.  Read it from here, never inline, so the next move is one edit.
+M.SHADOW = 0xECF1
+M.SHADOW_STRIDE = 14
+function M.shadowLine(line) return M.SHADOW + line * M.SHADOW_STRIDE end
+
 function M.monsterIds()
   local ids = {}
   for i = 0, 5 do ids[i + 1] = M.readWord(M.MONSTER_IDS + i * 2) end

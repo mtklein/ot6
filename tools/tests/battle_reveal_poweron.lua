@@ -24,7 +24,7 @@
 local H = dofile("/Users/mtklein/ot6/tools/tests/lib/ot6.lua")
 
 local function present(slot) return (H.readByte(0x3aa8 + slot * 2) & 1) == 1 end
-local function wcell(slot, k) return H.readByte(0x5762 + slot * 14 + 6 + k * 2) end
+local function wcell(slot, k) return H.readByte(H.shadowLine(slot) + 6 + k * 2) end
 
 -- Snapshot every monster reveal mask at the FIRST seed entry ($F00000): AFTER
 -- InitBattle's clear, BEFORE any seed zeroing. Under the AllOnes fill these

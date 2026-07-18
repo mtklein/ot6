@@ -99,8 +99,8 @@ H.run({ maxFrames = 70000 }, {
         local relm = H.readByte(0x3e91 + slot * 2)
         local rcls = H.readByte(0x3ea5 + slot * 2)
         local welm = H.readByte(0x3be8 + slot * 2)
-        local c0 = H.readByte(0x5762 + slot * 14 + 6)
-        local c1 = H.readByte(0x5762 + slot * 14 + 8)
+        local c0 = H.readByte(H.shadowLine(slot) + 6)
+        local c1 = H.readByte(H.shadowLine(slot) + 8)
         H.log(string.format("BATTLE slot%d sp=%04X weakE=%02X revE=%02X revC=%02X cell0=%02X cell1=%02X",
           slot, H.readWord(0x57c0 + slot * 2), welm, relm, rcls, c0, c1))
         if relm ~= 0 or rcls ~= 0 then revealed = true end
