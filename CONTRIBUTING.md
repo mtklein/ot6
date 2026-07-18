@@ -14,7 +14,7 @@ not brew-installable — [docs/TOOLING.md](docs/TOOLING.md) has those steps.
 
 ```sh
 make rom     # build build/ot6.sfc
-make test    # full headless gate: 21 tests + pixel goldens (a few minutes)
+make test    # full headless gate: 22 tests + pixel goldens (a few minutes)
 make run     # launch the built ROM in Mesen (GUI)
 ```
 
