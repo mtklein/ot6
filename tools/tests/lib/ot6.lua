@@ -610,11 +610,22 @@ local runnerStarted = false
 -- computed from RAM with an exact port of the engine's CheckPlayerMove
 -- (player.asm), so routes are found by BFS, not discovered by playing.
 
+-- The active party's object record: $0803 holds the BYTE OFFSET of the
+-- party leader's object block (`ldy $0803; lda $086a,y` -- player.asm,
+-- reset.asm, everywhere).  Character 0 (TERRA) owns object offset 0, and
+-- TERRA led every fixture up to the Moogle defense, so absolute reads of
+-- $086A/$087C were silently correct for months -- until the defense made
+-- LOCKE (object offset $29) the leader and the lib kept watching TERRA's
+-- knocked-out body: position froze at her (14,12) while party 1 stood at
+-- (14,14), and hasControl never went true (measured, gen_moogle run 2).
+-- Every party-relative read MUST go through this offset.
+local function pobj() return M.readWord(0x0803) end
+
 -- LIVE tile position = party-object pixel coords >> 4 ($086a x / $086d y,
--- 16-bit).  The $1fc0/$1fc1 bytes are a lazily-updated cache and go stale
--- mid-walk, so never navigate on them.
-function M.fieldX() return M.readWord(0x086a) >> 4 end
-function M.fieldY() return M.readWord(0x086d) >> 4 end
+-- 16-bit, offset by $0803).  The $1fc0/$1fc1 bytes are a lazily-updated
+-- cache and go stale mid-walk, so never navigate on them.
+function M.fieldX() return M.readWord(0x086a + pobj()) >> 4 end
+function M.fieldY() return M.readWord(0x086d + pobj()) >> 4 end
 function M.mapId() return M.readWord(0x1f64) end
 
 -- At rest exactly on a tile: every sub-tile position bit is zero (sub-pixel
@@ -623,8 +634,9 @@ function M.mapId() return M.readWord(0x1f64) end
 -- tile coord (pixel>>4) flips EARLY (~1px in) when moving up/left but only
 -- at completion moving down/right, so mid-step reads are direction-skewed.
 function M.tileAligned()
-  return (M.readByte(0x0869) | (M.readByte(0x086a) & 0x0F)
-        | M.readByte(0x086c) | (M.readByte(0x086d) & 0x0F)) == 0
+  local po = pobj()
+  return (M.readByte(0x0869 + po) | (M.readByte(0x086a + po) & 0x0F)
+        | M.readByte(0x086c + po) | (M.readByte(0x086d + po) & 0x0F)) == 0
 end
 
 -- A REAL event script is executing iff the 24-bit event PC {$e5,$e6,$e7}
@@ -651,16 +663,17 @@ function M.dialogWaiting()
 end
 
 -- true only when the party can actually be walked this frame.  Beyond the
--- control-gate flags this checks the party movement type ($087c low nibble:
--- 2 = user-controlled, 4 = event-controlled -- events can walk the party
--- with every other flag looking innocent) and the event PC.  Deliberately
--- cheap: RAM reads only, no screenshots (battleLoadStarted is the battle
--- gate; battleActive()'s screen check has no business in a per-frame poll).
+-- control-gate flags this checks the party movement type ($087c,y low
+-- nibble via the $0803 offset: 2 = user-controlled, 4 = event-controlled
+-- -- events can walk the party with every other flag looking innocent)
+-- and the event PC.  Deliberately cheap: RAM reads only, no screenshots
+-- (battleLoadStarted is the battle gate; battleActive()'s screen check
+-- has no business in a per-frame poll).
 function M.hasControl()
   return (M.readByte(0x1eb9) & 0x80) == 0
      and M.readByte(0x0084) == 0
      and M.readByte(0x0059) == 0
-     and (M.readByte(0x087c) & 0x0F) == 2
+     and (M.readByte(0x087c + pobj()) & 0x0F) == 2
      and not M.eventRunning()
      and not M.battleLoadStarted()
 end
