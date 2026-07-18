@@ -7,9 +7,38 @@ turn economy.
 
 ## Status
 
-Design phase. See [docs/DESIGN.md](docs/DESIGN.md) for the mechanics design and
-[docs/ROADMAP.md](docs/ROADMAP.md) for milestones. Toolchain notes land in
-[docs/TOOLING.md](docs/TOOLING.md).
+**v0.1 released** ([tag](https://github.com/mtklein/ot6/releases/tag/v0.1)) —
+playable from the start through the Moogle defense, roughly an hour. Break and
+boost are both live: enemies carry shields and hidden weaknesses, hitting a
+weakness chips a shield, and breaking drops defenses hard. Boost banks turns
+and folds spell tiers (Fire → Fira → Firaga).
+
+Work in progress toward the next rung, Figaro → Vargas. See
+[docs/ROADMAP.md](docs/ROADMAP.md) for milestones and the "playable frontier"
+metric, and [docs/DESIGN.md](docs/DESIGN.md) for the mechanics design.
+
+## Quick start
+
+You supply your own ROM; it is not included. The build verifies it by SHA-1
+and refuses anything else:
+
+```
+Final Fantasy III (USA).sfc    sha1 4f37e4274ac3b2ea1bedb08aa149d8fc5bb676e7
+```
+
+Drop that file at the repo root, then:
+
+```sh
+make rom     # build build/ot6.sfc
+make test    # full headless correctness gate (20 tests + pixel goldens)
+make run     # launch the built ROM in Mesen (GUI)
+make patch   # emit a distributable .bps
+```
+
+`make test` runs the whole suite headlessly under Mesen's testrunner — no
+window, no clicking. It takes a few minutes. See
+[tools/tests/README.md](tools/tests/README.md) for how the harness works and
+how to write a test.
 
 ## Layout
 
@@ -21,14 +50,13 @@ tools/      # Mesen 2, flips, Lua battle-test harness (tools/tests/)
 build/      # built ROM + distributable .bps patch (git-ignored)
 ```
 
-The base ROM (git-ignored, never committed) lives at the repo root and in
-`ff6/vanilla/`. This repo tracks assets ripped from that dump for local
-convenience, so it stays **private**; the public artifact is the `.bps`
-patch from `make patch`.
+Nearly all OT6 code lives in expanded bank `$F0`; vanilla banks carry only
+minimal `jsl` hook shims. [docs/TOOLING.md](docs/TOOLING.md) covers the
+toolchain and [docs/research/](docs/research/) holds the reverse-engineering
+notes.
 
-## Legal
+## Contributing
 
-This repository contains only original code, patches, and documentation.
-No ROM or copyrighted game data is committed or distributed. You must supply
-your own legally obtained copy of the game; the build process applies our
-patches to it locally.
+See [CONTRIBUTING.md](CONTRIBUTING.md). Issues are tracked
+[here](https://github.com/mtklein/ot6/issues) — including known defects with
+reproductions, which are a reasonable place to start.

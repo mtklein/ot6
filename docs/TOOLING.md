@@ -53,14 +53,10 @@ control verified to exit 1).
   or `_Dp` needs a C context (direct page + data bank) marshalled by
   its trampoline first.
 - Everything is one flat git repo; only the ROMs, `build/`,
-  `tools/Mesen.app`, and `tools/bin` are ignored. Ripped assets ARE
-  tracked for local convenience → the repo stays private; publish via
-  `make patch` BPS or a strip pass. A BPS is a delta, so it does embed
-  literal bytes for new content (measured on v0.1: 8,650 literal bytes of
-  ~20 KB) — the safety property is not "contains no game data" but that
-  the literals are OURS: 0 of v0.1's literal runs (≥8 bytes) appear
-  verbatim in the vanilla ROM. Re-check that if new content ever ships by
-  rearranging vanilla data.
+  `tools/Mesen.app`, and `tools/bin` are ignored. Ripped assets are
+  tracked. The release artifact is a BPS delta from `make patch`, which
+  stores only what differs from the base ROM (measured on v0.1: 8,650
+  literal bytes of ~20 KB).
 
 ## Gotchas learned the hard way
 

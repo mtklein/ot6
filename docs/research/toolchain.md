@@ -26,9 +26,7 @@ https://github.com/everything8215/ff6 (GPL-3.0)
   `world`, `sound`, `cutscene`, `text`, `gfx`) with explicit imports/exports
   — ideal substrate for a mechanics overhaul.
 - `DEBUG` flag in `include/const.inc` skips the intro — useful for testing.
-- IP hygiene: `make distclean` purges ripped copyrighted assets; README
-  warns that IPS patches of a rebuilt ROM embed copyrighted data —
-  distribute **BPS/xdelta** instead.
+
 - Maintenance: sporadic but alive (commits through Sep 2025).
 
 Ecosystem context: most published hacks are still patch-on-vanilla-ROM

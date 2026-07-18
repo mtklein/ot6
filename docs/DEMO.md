@@ -5,9 +5,6 @@ loop live: probe weaknesses, chip shields, break, boost, and nuke.
 
 ## Playing it
 
-Legal cleanliness: the repo never distributes the ROM. The public
-artifact is the patch.
-
     make patch      # -> build/dist/ot6-from-ff3us10.bps
 
 Apply it to a verified FF3us 1.0 dump ("Final Fantasy III (USA).sfc",
