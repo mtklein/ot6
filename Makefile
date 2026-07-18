@@ -79,11 +79,13 @@ $(STATE2): $(STATE1)
 	fi
 	@touch $(STATE2)
 # whelk doorstep: the dialog-opening boss fight battle_dlgmenu gates.
-# gen_whelk boots from the SRM sidecar (build/states/playthrough_srm.mss.lua,
-# local fixture from make_srm_sidecar.sh), so this mint needs that sidecar.
+# gen_whelk_poweron mints it from COLD POWER-ON -- plays the New Game intro
+# through the Narshe gauntlet to the mines -- so it needs no SRM sidecar and
+# works on a fresh clone (the old gen_whelk booted a git-ignored human-save
+# sidecar, a fresh-clone trap).
 $(STATE3): $(STATE2)
 	@if [ build/states/.rom-copy -nt build/states/whelk_doorstep.mss ] || [ ! -f build/states/whelk_doorstep.mss ]; then \
-		tools/tests/run.sh tools/tests/gen_whelk.lua; \
+		tools/tests/run.sh tools/tests/gen_whelk_poweron.lua; \
 	fi
 	@touch $(STATE3)
 
