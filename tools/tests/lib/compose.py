@@ -47,10 +47,20 @@ def main() -> int:
         return 1
 
     # collect referenced savestate sidecars: any "<path>.mss.lua" string
-    # literal in the script (scripts typically bind them to a STATE local)
+    # literal in the script (scripts typically bind them to a STATE local).
+    # Scripts hardcode the MAIN tree's absolute path (Mesen's sandbox has no
+    # cwd, so the reference must be a fixed string) -- which strands git
+    # worktrees: a state regenerated there lands in the WORKTREE's
+    # build/states, the main-tree path doesn't exist, and composition
+    # silently embeds nothing (the run then fails at loadState).  So resolve
+    # each miss against this tree's own build/states (lib/ -> tests/ ->
+    # tools/ -> root) before giving up; the lib looks states up by basename
+    # (resolveStateB64), so where the sidecar was found doesn't matter.
     states = {}
     for ref in re.findall(r'"([^"]+\.mss\.lua)"', script):
         p = Path(ref)
+        if not p.exists():
+            p = HERE.parent.parent.parent / "build" / "states" / p.name
         if p.exists():
             content = p.read_text()
             m = re.search(r'return\s+"([A-Za-z0-9+/=]+)"', content)
