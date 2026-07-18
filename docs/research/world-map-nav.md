@@ -7,6 +7,28 @@ on-foot navigation is simpler. Pins below are from the disassembly and
 `rom/ff6-en.dbg`. Items marked LIVE-PROBE need confirmation in the
 emulator when the build lands.
 
+> **Audited 2026-07-18.** This doc was written before the executor was
+> built, and several mechanism claims were inferred rather than read. Two
+> were wrong and are corrected inline below (the step latch; world reload
+> on random battles). These further items were flagged by the audit but
+> NOT independently confirmed — treat each as suspect until read:
+> - **Mode detection mask.** The rule here uses `& 0x1FF`, but
+>   `field/reset.asm:66` masks `#$03ff`. Bit 9 is a live flag
+>   (`field/entrance.asm:117-126` tests `#$0200` and stores the full word),
+>   so `$0200|worldId` is reachable and the two disagree about it.
+> - **Battle-zone formula.** The arithmetic matches, but it reads
+>   `$1F60/$1F61`, not the live `$E0/$E2` — and those are re-snapshotted
+>   *after* the battle check, so the zone may lag the party's tile. The
+>   world selector term (`$1F64 << 8`) is also omitted, which is what
+>   makes the table 512 B rather than 256.
+> - **Vehicle check.** `$11FA & 3` is necessary but not sufficient:
+>   `world/init.asm:93-94` forces airship from `$11F3` first.
+> - **Forest bit.** The bit is right, but in `GetPlayerInput` forest means
+>   *skip* the clear; the flag is SET in `MovePlayer` on aligned frames.
+> - **"A freshly loaded party is aligned."** Unsupported — `world/init.asm`
+>   writes only the tile bytes and never zeroes `$DF`/`$E1`, so alignment
+>   on load is inherited, not established.
+
 ## Mode detection
 
 Top-level dispatch: `ff6/src/field/reset.asm:64-77`. Read `$1F64`:
@@ -69,18 +91,21 @@ BG/zone.
   pad injection drives world movement unchanged.
 - 16 sub-units/frame, tile = 256 units => 16 frames/tile, same cadence
   as the field.
-- **Movement is smooth, not tile-locked.** `GetPlayerInput` re-zeroes
-  velocity each frame and only re-sets it while a direction is held;
-  there is no step-completion latch. Releasing mid-tile strands the
-  party at a non-zero fraction. Hitting a wall zeroes velocity exactly
-  at the tile boundary (clean), so only a voluntary mid-transit release
-  strands you.
-  - Executor consequence: hold each straight run for a whole number of
-    16-frame ticks (N tiles = N*16 frames) and verify `$DF/$E1` low
-    bytes are 0 before releasing. Do NOT reuse the field walker's
-    "release the instant the tile coord flips" idiom — that flips at
-    fraction rollover and would strand on release latency. LIVE-PROBE:
-    confirm mid-tile release strands (code strongly implies yes).
+- **Movement IS latched to the step.** `MovePlayer` gates its whole body,
+  including the `jsr GetPlayerInput`, on `$DF == 0 && $E1 == 0`
+  (`world/move.asm:834-841`); if either velocity byte is nonzero it jumps
+  straight to the velocity-integration tail. So once velocity is set, the
+  step runs to the next tile boundary and no input is read meanwhile.
+  That gate is the step-completion latch.
+  - This section previously asserted the opposite — that `GetPlayerInput`
+    re-zeroes velocity every frame, that there is no latch, and that a
+    mid-tile release strands the party at a fraction — and built a whole
+    control law on it (hold whole 16-frame ticks, never use the field
+    walker's release-on-tile-flip idiom). That rule solves a problem the
+    code does not have. Its own LIVE-PROBE line conceded the point was
+    only inferred ("code strongly implies yes"); the code implies the
+    reverse. Re-derive the executor's release strategy from the gate
+    before building it.
 
 ## Encounters
 
@@ -89,9 +114,14 @@ BG/zone.
 (`field/battle.asm:97-214`) uses the SAME `$1F6E` danger counter and
 the SAME OT6 `Ot6DangerStep`/`Ot6MarkRandom` hooks as the field's
 `CheckBattleSub`, so the encounter-rate scale and the random-vs-event
-marker already cover the world map. On-foot random battles do not
-reload the world: after the fight `WorldMain` resumes with position
-untouched. `H.clearBattle` and the kill-bit idiom (`$3AA8` bit0 ->
+marker already cover the world map. **On-foot random battles DO reload
+the world** — `move.asm:916-921` sets the reload bit in `$e8` right after
+the battle call and `world_start.asm:465-482` reads it and jumps to
+`ReloadMap`. Position and facing survive only because `move.asm:890-893`
+snapshots them into `$1F60/$1F61/$1F68` first; `$DF/$E1/$E3/$E5` do not
+survive, and the executor should expect a fade plus re-init (many
+frames). This doc previously said the world is not reloaded and position
+is untouched. `H.clearBattle` and the kill-bit idiom (`$3AA8` bit0 ->
 `$3EEC` bit7) work unchanged (battle module is engine-agnostic).
 
 Zone index (`battle.asm:122-136`):

@@ -41,7 +41,7 @@ Key per-combatant tables:
 Global: $3A44 battle counter (increments every 16 frames). Display-side ATB:
 $3218 (gauge %), $322C advance wait duration.
 
-Region shape: battle logic variables ≈ 7E:2000-3FFF; 7E:4000-F7FF belongs to
+Region shape: battle logic variables ≈ 7E:2000-3FFF; 7E:4000-ECFF belongs to
 the battle **graphics** module (HDMA/sprite/animation buffers).
 
 ### Free RAM for new per-combatant state

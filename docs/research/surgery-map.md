@@ -23,7 +23,7 @@ C2/C1 addresses (names, not pins — linking is symbolic).
 | C2/5B06 | `_c25b06:` wear-off | 14939–14963 | `$b8` bits 0–3 used, **4–7 free**; → `CreateImmediateAction` cmd `$29` |
 | C2/4E91 / 5161 | `CreateImmediateAction:` / `Cmd_29:` | 12881–94 / 13335–67 | queue primitive / wear-off handler |
 | C2/09D2 | `CalcSpeed:` | 1539–1571 | ATB constant (M2 BP timing) |
-| — | `InitBattle:` | 6053–6067 | zeroes `$3A20–$3ED3`, $FF-fills `$2000–$341F` — auto-inits our RAM |
+| — | `InitBattle:` | 6053–6067 | zeroes `$3A20–$3ED3`, $FF-fills `$2000–$341F` — but see the reload caveat below |
 | — | `ExecAttack:` | 8015; msg pickup 8111–8118 | `$3401` ≠ $ff → battle-script cmd $02 (show message) |
 
 ## 2. Free battle RAM — verified unreferenced in all of src/ + include/
@@ -31,6 +31,15 @@ C2/C1 addresses (names, not pins — linking is symbolic).
 - **Three whole unused per-entity tables** (2 B/combatant, $14 stride):
   `$3E38–$3E4B`, `$3E88–$3E9B`, `$3E9C–$3EAF` → 60 bytes. Also `$3ECB–$3ED3`
   (9 global bytes). All zeroed each battle by `InitBattle`.
+- **RELOAD CAVEAT — do not assume this RAM self-initializes.** `InitBattle`
+  zeroes the range on a normal battle start, but a **Cmd_20 mid-battle
+  monster reload runs no InitBattle clear** (`battle_main.asm:7519`), so
+  whatever the previous occupant left is still there. An earlier version of
+  this doc summarized the clear as "auto-inits our RAM", and that
+  assumption cost two bugs: a stale nonzero broken timer starting a monster
+  pre-broken (`ot6.asm:108`) and stale reveal bits being OR'd into a fresh
+  seed (`ot6.asm:114`), fixed in `ec31638` / `65d031a`. Anything OT6 parks
+  here must clear itself at seed time.
 - Battle logic uses bare hex addresses (no RAM label file); only btlgfx has
   `src/btlgfx/btlgfx_ram.inc` ($7E4000+).
 
@@ -68,9 +77,16 @@ brokenTimer · `$3E89,X` flags/revealed · `$3E9C/$3E9D,X` spare (M2 BP) ·
   when `$200d` changes; bump cache to force.
 - Targeting: `_c17795:` ~18256 (state $38); `UpdateMenuState_38:` 16767+
   (masks `w7e7b7d/7b7e`); `DrawCursorSprites:` 26828.
-- **Bank C1 slack is only $1B bytes** — C1-side shims must be a jsl or a
-  few bytes; put logic in F0 or in `btlgfx_code_far` (bank C2, ~$5C9 slack
-  after $C2FAA3).
+- **Bank C1 is now 100% FULL** — `ff6-en.map` shows `btlgfx_code`
+  occupying `C10000-C1FFFF` (Size=010000) and the last bytes of the bank
+  image are code, not $FF fill. The "$1B bytes" here was VANILLA's margin;
+  OT6's C1 `jsl` shims consumed all 27 and a vanilla dead routine was
+  deleted to fit. Budget nothing off this line. Overflow is a loud ld65
+  error, not silent corruption.
+- `btlgfx_code_far` (bank C2) has **$1C9 = 457 bytes** free
+  (`C2A800-C2FAA3`, next segment `decompress_code` at `C2FC6D`) — this doc
+  previously said ~$5C9, a 3x overestimate of the exact fallback it
+  recommends for the C1 overflow above.
 
 ## 5. Fonts / glyphs
 
@@ -82,14 +98,22 @@ brokenTimer · `$3E89,X` flags/revealed · `$3E9C/$3E9D,X` spare (M2 BP) ·
   $DC staff $DD brush $DE star $DF special $E0 card $E1 claw $E2 shield
   $E3 helm $E4 armor $E5 tool $E6 scroll $E7 relic. Digits $B4–$BD. ATB
   gauge pieces $F0–$FA.
-- **Free small-font cells (blank + unmapped): $D0, $D1, $EB–$EF, $FB–$FD**
-  → element icons at $EB–$EF/$FB–$FD in element-bit order (fire→water).
+- **Free small-font cells (blank + unmapped): $D0, $D1, $EB–$ED, $EF,
+  $FB–$FD.** NOT $EE: it is blank, but vanilla uses `$01ee` as the battle
+  BG tile-buffer clear fill (`btlgfx_main.asm:4479`), so an icon placed
+  there paints itself over the screen borders. OT6 hit this and moved
+  poison to `$64` (`ot6.asm:1060`, "$ee is vanilla's border junk fill!").
+  The 128 blank low cells `$00-$7F` are the other supply OT6 actually
+  draws on (`Ot6BgGlyphCellTbl`).
 
 ## 6. Linker cfg facts
 
-- `battle_code` floats from $C20000, ends $C26468 → **919 bytes ($397) of
-  shim budget** before anything moves; overruns = hard ld65 error (pins at
-  $8a70/$fc6d), never silent.
+- `battle_code` floats from $C20000 → **864 bytes ($360) of shim budget**
+  before anything moves (`ff6-en.map`: `battle_code C20000-C2649F`, next
+  `cutscene_code C26800`); OT6 has spent 55. Re-read the map rather than
+  trusting this number — it was 919 when written. Note this measures
+  ALIGNMENT slack, not the true ceiling (the `$8a70` pin). Overruns = hard
+  ld65 error, never silent.
 - bank_f0 spans $F0–$FF as one area — keep `ot6_code` under 64 KB (65816
   code can't cross bank boundary); split areas per-bank when needed.
 - Header size byte already $0c (=4 MB); fix_checksum degenerates to plain

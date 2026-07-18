@@ -30,7 +30,7 @@ matching the classic addresses), so both are cited by C2/xxxx address.
 | C2/0C9E | post-calc damage modification (random, row, …) | ×2 damage vs Broken |
 | C2/0BD3–0C1E | per-target elemental handling — absorb $3BCC (0BE2), null $3BCD (0BF2), half $3BE1 (0C00), **weak $3BE0 (0C0E)**; priority absorb→null→half→weak | **break chip hook** — weakness match already computed here |
 | C2/2E27 | monster elemental properties loaded from ROM ($CF0017,X) | seed per-battle weakness/shield state |
-| C2/09D2 | ATB gauge-constant calc ("CalcSpeed"): chars `(Speed+20)*C`, C=48/96/126 | BP accrual timing |
+| C2/09D2 | ATB gauge-constant calc ("CalcSpeed"): chars `(Speed+20)*C >> 4`, C=48/96/126 | BP accrual timing |
 | C2/08C6 (gate 08D5–08F2) | per-entity pre-action gate: exits if Death/Petrify, **Stop ($10 @ $3EF8)**, **Freeze ($02 @ $3EF9)** | Broken entities skip turns here |
 | C2/22FB | hit determination: `PEA $8040` (Sleep,Petrify) / `PEA $0210` (Freeze,Stop) → always hit | Broken targets always hit — vanilla precedent is exactly Octopath's rule |
 | C2/5A83 / 5AA3 | periodic tick: `$3ADC,X += $3ADD,X`; on overflow decrement Stop timer $3AF1,X | Broken-timer countdown lives here |
