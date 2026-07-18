@@ -74,8 +74,16 @@ OT6_BREAK_TICKS := $10          ; a bit under vanilla stop duration ($12)
         lda     f:Ot6ShieldTbl+2,x
         bra     @seed
 @formula:
-        shorta0                 ; formula species carry no class weakness
-        lda     OT6_SCR_BIT     ; level ($3e9c,y stays InitBattle-zeroed)
+        shorta0                 ; a=0 (clr_a); formula species: no class weak
+        sta     $3e9c,y         ; clear the class-weak mask. like the reveal
+                                ;   masks below it must not survive a Cmd_20
+                                ;   reload (no InitBattle clear) or the hud
+                                ;   draws PHANTOM class-weakness cells for a
+                                ;   fresh formula monster. the authored @hit
+                                ;   path OVERWRITES $3e9c (store above), so it
+                                ;   self-clears; the formula path never wrote
+                                ;   it and must zero it here.
+        lda     OT6_SCR_BIT     ; level
         lsr
         lsr
         lsr
@@ -86,18 +94,27 @@ OT6_BREAK_TICKS := $10          ; a bit under vanilla stop duration ($12)
         lda     #$06            ; ... capped at 6
 @seed:  sta     $3e38,y
         sta     $3e39,y
-        ; reveals start hidden. the seed no longer trusts the caller to have
-        ; zeroed these: InitBattle's $3a20-$3ed3 clear does, but the Cmd_20
-        ; scene-change reload (multi-phase bosses, reinforcements) re-runs the
-        ; seed with NO such clear, and uninitialized ram would hand it garbage
-        ; too -- either way the stale bits, OR'd with the codex below, showed
-        ; every weakness revealed from battle start (the hud '?'-gate reads
-        ; exactly $3e89/$3e9d). monster path only (y >= $08 past @on), so a
-        ; character's $3e9d pending-boost row is never touched. with 32k sram
-        ; the codex re-merge below restores real reveals (chips write them
+        ; per-monster battle-start state the seed must not inherit on the
+        ; Cmd_20 scene-change reload (multi-phase bosses, reinforcements, the
+        ; whelk head's retract cycle): it re-runs the seed via InitMonsters
+        ; with NO InitBattle $3a20-$3ed3 clear. on the FRESH path InitBattle
+        ; already zeroes these (write-trace confirms: its clear stores $00 here
+        ; before the seed runs), so this is belt-and-suspenders there and
+        ; load-bearing only on reload. monster path only (y >= $08 past @on):
+        ; the character rows are never touched. with 32k sram the codex
+        ; re-merge below restores genuinely-earned reveals (chips write them
         ; through), so a same-monster retract cycle keeps its reveals.
         lda     #$00
-        sta     $3e89,y         ; revealed weakness elements
+        sta     $3e88,y         ; broken timer: a stale nonzero reload-starts
+                                ;   the monster BROKEN (Ot6Gate skips its turn,
+                                ;   2x damage, the hud shield cell draws the
+                                ;   broken glyph). the seed otherwise never
+                                ;   writes it, so a reload inherits the slot's
+                                ;   prior occupant.
+        sta     $3e89,y         ; revealed weakness elements: stale bits, OR'd
+                                ;   with the codex below, draw weaknesses as
+                                ;   revealed from battle start instead of '?'
+                                ;   (the hud '?'-gate reads $3e89/$3e9d)
         sta     $3e9d,y         ; revealed classes (monster half)
         ; weakness codex: pre-reveal anything learned in past battles
         longa

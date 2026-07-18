@@ -38,8 +38,10 @@ local function armSeedDirtier()
     if fired then return end
     fired = true
     for slot = 0, 5 do
-      emu.write(0x3e91 + slot * 2, 0xFF, emu.memType.snesWorkRam)
-      emu.write(0x3ea5 + slot * 2, 0xFF, emu.memType.snesWorkRam)
+      emu.write(0x3e91 + slot * 2, 0xFF, emu.memType.snesWorkRam)  -- revealed elems
+      emu.write(0x3ea5 + slot * 2, 0xFF, emu.memType.snesWorkRam)  -- revealed classes
+      emu.write(0x3e90 + slot * 2, 0xFF, emu.memType.snesWorkRam)  -- broken timer
+      emu.write(0x3ea4 + slot * 2, 0xFF, emu.memType.snesWorkRam)  -- class-weak mask
     end
     emu.removeMemoryCallback(seedRef, emu.callbackType.exec, 0xF00000, 0xF00000)
   end, emu.callbackType.exec, 0xF00000, 0xF00000)
@@ -64,13 +66,30 @@ H.run({ maxFrames = 45000 }, {
     local checked = 0
     for slot = 0, 5 do
       if present(slot) then
+        local sp   = H.readWord(0x57c0 + slot * 2)
         local relm = H.readByte(0x3e91 + slot * 2)
         local rcls = H.readByte(0x3ea5 + slot * 2)
-        H.log(string.format("slot%d sp=%d revE=%02X revC=%02X cells=%02X,%02X,%02X,%02X",
-          slot, H.readWord(0x57c0 + slot * 2), relm, rcls,
+        local brk  = H.readByte(0x3e90 + slot * 2)  -- broken timer ($3e88+8)
+        local clsW = H.readByte(0x3ea4 + slot * 2)  -- class-weak mask ($3e9c+8)
+        H.log(string.format("slot%d sp=%d revE=%02X revC=%02X brk=%02X clsW=%02X cells=%02X,%02X,%02X,%02X",
+          slot, sp, relm, rcls, brk, clsW,
           wcell(slot, 0), wcell(slot, 1), wcell(slot, 2), wcell(slot, 3)))
         H.assertEq(relm, 0, "slot "..slot.." revealed-elements hidden despite seed garbage")
         H.assertEq(rcls, 0, "slot "..slot.." revealed-classes hidden despite seed garbage")
+        -- broken timer ($3e88): the seed now clears it, so a monster handed
+        -- $FF at seed (as a Cmd_20 reload would) must NOT start BROKEN.
+        H.assertEq(brk, 0, "slot "..slot.." broken timer cleared (not broken) despite seed garbage")
+        -- class-weak mask ($3e9c): the $FF must be REPLACED, never OR'd, by the
+        -- seed's authoritative value -- else the hud draws phantom class cells.
+        -- The doorstep Guards are AUTHORED (species 0, class PIERCE $02): the
+        -- @hit path OVERWRITES, so it lands exactly $02 over the $FF (confirming
+        -- overwrite-not-OR). A formula species would land 0 via the @formula
+        -- clear; no formula species is reachable in this fixture, but the clear
+        -- is the same lda#0/sta idiom the reveal masks above exercise.
+        H.assertEq(clsW ~= 0xFF, true, "slot "..slot.." class-weak mask replaced, not OR'd (got FF)")
+        if sp == 0 then
+          H.assertEq(clsW, 0x02, "slot "..slot.." authored Guard class-weak overwritten to PIERCE $02")
+        end
         for k = 0, 3 do
           local g = wcell(slot, k)
           -- a drawn weakness cell must be '?' ($BF) or blank ($FF/$00); a real

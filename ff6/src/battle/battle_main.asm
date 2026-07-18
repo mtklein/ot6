@@ -7515,6 +7515,17 @@ LoadRageProp:
         lda     f:MonsterProp+31,x   ; special attack data
         sta     $322d,y
         lda     f:MonsterProp+25,x   ; weak elements
+        ; ot6 note: this vanilla ORA (not a store) inherits the slot's PRIOR
+        ; weak-elements on a Cmd_20 reload, which runs no InitBattle
+        ; $3a20-$3ed3 clear. the ot6 hud draws and chips $3be0, so a reload
+        ; dropping a DIFFERENT species onto a weakness-bearing slot would show
+        ; phantom element weaknesses. LEFT VANILLA by the house rule: not
+        ; reachable in the current demo -- the only reachable Cmd_20 reload is
+        ; the whelk head's SAME-species retract (idempotent OR, no phantom),
+        ; and InitBattle clears $3be0 on every fresh battle so vanilla weak-x2
+        ; damage is byte-for-byte untouched. changing the ORA to a store would
+        ; alter that vanilla load. re-audit when species-swapping reloads
+        ; (reinforcements, multi-phase bosses) enter play past the demo range.
         ora     $3be0,y
         sta     $3be0,y
         jsl     Ot6SeedShields          ; ot6: seed shield points

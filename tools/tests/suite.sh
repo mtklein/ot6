@@ -16,7 +16,18 @@ RUN="$ROOT/tools/tests/run.sh"
 GOLD="$ROOT/tools/tests/goldens"
 SHOTS="$ROOT/build/states/shots"
 JOBS="${OT6_JOBS:-4}"
-TESTS="smoke battle_entry battle_break battle_reveal battle_class battle_bp battle_boost battle_hits battle_fold battle_preview battle_codex battle_c battle_fontrestore battle_banner battle_dlgmenu battle_whelkwipe hud_stability visual_f1 visual_f2"
+TESTS="smoke battle_entry battle_break battle_reveal battle_reveal_poweron battle_class battle_bp battle_boost battle_hits battle_fold battle_preview battle_codex battle_c battle_fontrestore battle_banner battle_dlgmenu battle_whelkwipe hud_stability visual_f1 visual_f2"
+
+# Tests that must run under a dirty RAM fill (see battle_reveal_poweron): they
+# boot from power-on, so the fill reaches battle init instead of being masked
+# by a savestate load. AllOnes is dirty AND deterministic. run.sh rewrites the
+# pin every run, so this env applies to exactly the one invocation.
+ram_env_for() {
+  case "$1" in
+    battle_reveal_poweron) echo "OT6_RAM_POWERON=AllOnes" ;;
+    *) echo "" ;;
+  esac
+}
 XFAIL=""   # keep empty; XPASS fails the suite to force cleanup
 fail=0; summary=""
 
@@ -53,7 +64,7 @@ if [ "$JOBS" -gt 1 ]; then
       for t in $TESTS; do
         if [ $((i % JOBS)) -eq "$w" ]; then
           t0=$(python3 -c 'import time; print(time.time())')
-          OT6_WORKER="$w" "$RUN" "$CDIR/$t.lua" "$ROOT/build/states/suite_$t.log" >/dev/null 2>&1
+          env $(ram_env_for "$t") OT6_WORKER="$w" "$RUN" "$CDIR/$t.lua" "$ROOT/build/states/suite_$t.log" >/dev/null 2>&1
           rc=$?
           secs=$(python3 -c "import time; print(f'{time.time()-$t0:.1f}')")
           echo "$rc $w $secs" > "$RDIR/$t"
@@ -79,7 +90,7 @@ if [ "$JOBS" -gt 1 ]; then
   fi
 else
   for t in $TESTS; do
-    "$RUN" "$ROOT/tools/tests/$t.lua" "$ROOT/build/states/suite_$t.log" >/dev/null 2>&1
+    env $(ram_env_for "$t") "$RUN" "$ROOT/tools/tests/$t.lua" "$ROOT/build/states/suite_$t.log" >/dev/null 2>&1
     verdict "$t" "$?" ""
   done
 fi

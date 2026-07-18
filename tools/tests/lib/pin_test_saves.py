@@ -8,7 +8,7 @@ the manual-play save (~/Library/.../Saves) and the repeatable-testing saves
 (build/mesen-test-saves) physically incapable of sharing a file, regardless
 of what the source settings say now or grow to say later.
 """
-import json, sys
+import json, os, sys
 
 src, dst, saves = sys.argv[1], sys.argv[2], sys.argv[3]
 
@@ -31,7 +31,12 @@ cfg.setdefault("Debug", {}).setdefault("ScriptWindow", {})["ScriptTimeout"] = 30
 snes = cfg.setdefault("Snes", {})
 # FF6 reads uninitialized RAM, so RamPowerOnState=Random makes identical runs
 # drift (extra encounters, +-frames) and embeds garbage in minted savestates.
-snes["RamPowerOnState"] = "AllZeros"
+# Default AllZeros for reproducibility; OT6_RAM_POWERON overrides it for the
+# dirty-RAM reveal investigation/gate (AllOnes = deterministic AND dirty, so
+# it exercises what a real power-on garbage boot hands the battle-init clear).
+ram = os.environ.get("OT6_RAM_POWERON", "AllZeros")
+snes["EnableRandomPowerOnState"] = (ram == "Random")
+snes["RamPowerOnState"] = "AllZeros" if ram == "Random" else ram
 # Frame-skip picks which frames actually render based on HOST timing, so
 # screenshots and the framebuffer embedded in savestates vary run-to-run
 # (and under parallel load) unless every frame renders.
