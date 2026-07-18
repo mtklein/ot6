@@ -1,8 +1,8 @@
 #!/usr/bin/env python3
 
 import binascii
+import struct
 import sys
-import numpy as np
 import romtools as rt
 
 
@@ -31,18 +31,18 @@ if __name__ == "__main__":
     rom_file = open(rom_path, 'r+b')
 
     checksum_offset = 0xFFDC  # 0x7FDC for LoROM
-    checksum = np.array([0xAAAA, 0x5555], dtype=np.uint16)
+    checksum = [0xAAAA, 0x5555]  # [complement, checksum] pair of little-endian uint16
 
     # write a dummy checksum in the SNES header
     rom_file.seek(checksum_offset)
-    rom_file.write(checksum.tobytes())
+    rom_file.write(struct.pack('<2H', *checksum))
 
     # read the ROM data and calculate the SNES checksum
     rom_file.seek(0)
     rom_bytes = bytearray(rom_file.read())
     checksum[1] = mirror_sum(rom_bytes)
     checksum[0] = checksum[1] ^ 0xFFFF
-    rom_bytes[checksum_offset:checksum_offset+4] = checksum.tobytes()
+    rom_bytes[checksum_offset:checksum_offset+4] = struct.pack('<2H', *checksum)
 
     # print the result
     print('SNES Checksum:', rt.hex_string(checksum[1], 4))
@@ -50,5 +50,5 @@ if __name__ == "__main__":
 
     # write the calculated checksum in the SNES header
     rom_file.seek(checksum_offset)
-    rom_file.write(checksum.tobytes())
+    rom_file.write(struct.pack('<2H', *checksum))
     rom_file.close()
