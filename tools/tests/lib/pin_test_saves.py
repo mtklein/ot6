@@ -35,8 +35,12 @@ snes = cfg.setdefault("Snes", {})
 # dirty-RAM reveal investigation/gate (AllOnes = deterministic AND dirty, so
 # it exercises what a real power-on garbage boot hands the battle-init clear).
 ram = os.environ.get("OT6_RAM_POWERON", "AllZeros")
+# Mesen's headless testrunner fills from RamPowerOnState (NOT the boolean
+# EnableRandomPowerOnState -- which alone leaves the fill at AllZeros). Drive
+# the state name directly so "Random" actually randomises RAM per boot; the
+# boolean is set alongside for the GUI code path's benefit.
 snes["EnableRandomPowerOnState"] = (ram == "Random")
-snes["RamPowerOnState"] = "AllZeros" if ram == "Random" else ram
+snes["RamPowerOnState"] = ram
 # Frame-skip picks which frames actually render based on HOST timing, so
 # screenshots and the framebuffer embedded in savestates vary run-to-run
 # (and under parallel load) unless every frame renders.
