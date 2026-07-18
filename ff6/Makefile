@@ -24,7 +24,7 @@ ROMS = $(foreach V, $(VERSIONS), $(ROM_DIR)/$(V).sfc)
 SPC_PRG = src/sound/ff6-spc.dat
 
 .PHONY: all rip clean distclean mml spc wav rng event monster_gfx text dte \
-	$(VERSIONS) $(MODULES)
+	lz $(VERSIONS) $(MODULES)
 
 # disable default suffix rules
 .SUFFIXES:
@@ -88,15 +88,69 @@ OBJ_FILES_EN1 = $(foreach M,$(MODULES),$(OBJ_DIR)/$(M)_en1.o)
 # list of modules
 MODULES = field btlgfx battle menu sound cutscene event world gfx text
 
+# (ot6) Compressed-data files the assembler reads at eval time, derived
+# from TRACKED SOURCES so the list is complete even in a tree with zero
+# .lz files. The module deps below are parse-time $(wildcard)s, so a .lz
+# that does not exist yet is invisible to them and never gets scheduled;
+# deriving from existing .lz would inherit that circularity. Two
+# reference classes: eight directories consumed wholesale through
+# .sprintf-built filenames (grep cannot see those names), and literal
+# .incbin paths ($(wildcard) drops sources absent from this rip, e.g.
+# the jp-only title/status graphics).
+LZ_SPRINTF_DIRS = src/field/map_tile_prop src/field/map_tileset \
+	src/field/overlay_prop src/field/sub_tilemap \
+	src/gfx/battle_bg_tiles src/gfx/battle_bg_gfx \
+	src/gfx/map_gfx_bg3 src/gfx/map_anim_gfx_bg3
+LZ_LITERAL_SRC = \
+	src/gfx/airship1.4bpp src/gfx/airship2.4bpp \
+	src/gfx/attack_mode7.4bpp src/gfx/attack_mode7.scr \
+	src/gfx/credits.4bpp src/gfx/ending_font.2bpp \
+	src/gfx/ending1.4bpp src/gfx/ending2.4bpp src/gfx/ending3.4bpp \
+	src/gfx/ending4.4bpp src/gfx/ending5.4bpp \
+	src/gfx/floating_cont.4bpp src/gfx/magitek_train.cgx \
+	src/gfx/minimap_1.4bpp src/gfx/minimap_2.4bpp \
+	src/gfx/ruin_cutscene.4bpp \
+	src/gfx/status_en.4bpp src/gfx/status_jp.4bpp \
+	src/gfx/title_opening_en.4bpp src/gfx/title_opening_jp.4bpp \
+	src/gfx/vector_approach.4bpp src/gfx/vector_approach.scr \
+	src/gfx/world_1_bg.4bpp src/gfx/world_2_bg.4bpp \
+	src/gfx/world_3_bg.4bpp src/gfx/world_3.pal \
+	src/gfx/world_anim_sprite.4bpp src/gfx/world_misc_sprite.4bpp \
+	src/gfx/world_backdrop.4bpp src/gfx/world_backdrop.scr \
+	src/gfx/world_choco_1.4bpp src/gfx/world_choco_2.4bpp \
+	src/world/world_1_tilemap.dat src/world/world_2_tilemap.dat \
+	src/world/world_3_tilemap.dat
+LZ_FILES := $(addsuffix .lz,\
+	$(filter-out %.lz,$(foreach D,$(LZ_SPRINTF_DIRS),$(wildcard $(D)/*))) \
+	$(wildcard $(LZ_LITERAL_SRC)))
+
+# (ot6) This explicit rule is what keeps the .lz files on disk: mentioned
+# only by pattern rules (the module objects) they would be chain
+# intermediates, which make builds, uses, and then DELETES at the end of
+# the run -- observed as `rm src/...lz` after an otherwise clean build,
+# forcing full recompression every make. Doubles as a manual pre-build:
+# `make lz`.
+lz: $(LZ_FILES)
+
 # generate rules for making each module
+# (ot6) $(LZ_FILES) is order-only: it guarantees every .lz exists and is
+# fresh before assembly without making all objects stale whenever any one
+# .lz changes; per-object staleness comes from the wildcard deps and the
+# ca65 depfiles below.
 define MAKE_MODULE
 $1_SRC := $(wildcard src/$1/*) $(wildcard src/$1/*/*)
-$$(OBJ_DIR)/$1_%.o: $$($1_SRC) $$(INC_FILES)
+$$(OBJ_DIR)/$1_%.o: $$($1_SRC) $$(INC_FILES) | $$(LZ_FILES)
 	@mkdir -p $$(OBJ_DIR)
-	$$(ASM) $$(ASMFLAGS) -l $$(@:o=lst) src/$1/$1_main.asm -o $$@
+	$$(ASM) $$(ASMFLAGS) --create-dep $$(@:o=d) -l $$(@:o=lst) src/$1/$1_main.asm -o $$@
 endef
 
 $(foreach M, $(MODULES), $(eval $(call MAKE_MODULE,$(M))))
+
+# (ot6) Exact per-object dependencies recorded by ca65 on the previous
+# build (.include and .incbin files alike, so cross-module data like
+# src/world/*.dat.lz is covered). These cannot replace $(LZ_FILES) for a
+# fresh clone: no .d file exists before the first successful build.
+-include $(wildcard $(OBJ_DIR)/*.d)
 
 # temporary compressed cutscene program file
 LZ_DIR = temp_lz

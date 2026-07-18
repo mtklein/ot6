@@ -4,6 +4,7 @@
 *.lz
 *.bin
 *.o
+*.d
 *.lst
 *.map
 *.sh
