@@ -86,9 +86,15 @@ state (Stop-like) for roughly one full turn cycle; all damage it takes is
 recovery, shields reset to `shield_max`.
 
 **Shielded resistance.** While an enemy still has shields and is not broken it
-takes reduced damage (×0.5), so the swing from shielded to broken is about ×4
-for an off-weakness hit (×2 for an on-weakness one) — boosting into an
-unbroken, non-weak target is the worst return on BP, which is the point.
+takes reduced damage (×0.5), so the swing from shielded to broken is ×4 —
+and ×4 on-weakness too, not ×2: vanilla's weakness ×2 (`asl $f0` at
+`battle_main.asm:1874`) lands BEFORE `Ot6HitJoin` applies the shielded/broken
+factor, so the two stack. The full ladder against an unbroken-unweak
+baseline is 8 (broken+weak) : 4 (broken) : 2 (shielded+weak) : 1. The
+published 4:2:1 damage-per-BP measurement samples broken-and-UNWEAK, so it
+never measures the strongest state. Either way the conclusion holds:
+boosting into an unbroken, non-weak target is the worst return on BP,
+which is the point.
 
 **Reveal.** Weaknesses start hidden. Chipping one reveals that entry;
 Strago's Analyze reveals everything (he is the Cyrus of this party).
@@ -207,14 +213,36 @@ non-authored species' battle HP — current and max copies — is
 multiplied by a per-species-band value in 16ths (`Ot6HpMulTbl`),
 clamped at 16 bits. Authored `Ot6ShieldTbl` species are exempt (boss
 difficulty is bosses-wob.md's job, planned as HP *cuts*), as are
-scene-change battles whose monsters carry HP over. Current values:
-2x for species $00–$BF (the WoB demo's trash), 1x above. Vanilla is
-too easy for the loop to express — mines trash died in one action,
-so neither boosting nor breaking could ever fire (Measurement #1);
-2x puts intro trash at 3–5 real actions with the danger budget
-intact (Measurement #3, the sweep). XP/gil stay vanilla; stamina
-stays derived from vanilla HP; fraction-of-HP attacks read the
-transformed cells and scale with the monster.
+scene-change battles whose monsters carry HP over. Stamina stays
+derived from vanilla HP; fraction-of-HP attacks read the transformed
+cells and scale with the monster.
+
+**The HP dial is not the difficulty lever — shielded resistance is**
+(ruling 2026-07-17, Measurement #5, commit `ffbab89`). `Ot6HpMulTbl`
+ships **1x in every band**; the mechanism is kept present and neutral
+for future per-stretch bumps. The reason is that a flat HP bump
+rewarded nothing: it lengthened every fight equally whether or not the
+player engaged the loop. Resistance is selective — it halves only
+off-weakness damage, so weakness-exploiters stay vanilla-fast while
+players who ignore the loop slog. Measured damage-per-BP came out a
+clean 4:2:1 (broken : weak+chips : unbroken-unweak), and a
+boost-into-sponge policy performs the same as never boosting. See
+`design/balance-metrics.md` for the measurements and DESIGN's
+resistance section for the mechanic.
+
+Vanilla being too easy for the loop to express is still true and still
+the problem being solved (mines trash died in one action, so neither
+boosting nor breaking could ever fire — Measurement #1); resistance is
+the answer that stuck. Honest limit: no HP dial makes intro trash
+expressive, because fire one-shots 15–24 HP mobs at any multiplier —
+that is M6 class-weakness authoring, not a difficulty number.
+
+The encounter economy carries its own pair, unrelated to HP:
+`Ot6DangerMulW = $0008` (0.5x per-step danger, i.e. fewer fights) and
+`Ot6RewardMulW = $0020` (2x xp+gil on random battles), so XP- and
+gil-per-step stay ≈ vanilla. XP/gil are *not* vanilla per battle;
+they are scaled by the inverse of the rate so the level curve keeps
+vanilla's pacing.
 
 ## Scaling to endgame (rulings 2026-07-16)
 

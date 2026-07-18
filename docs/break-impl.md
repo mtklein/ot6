@@ -37,6 +37,10 @@ monsters don't overlap needs, so tables can be shared if space gets tight.
    frozen, attacks never miss it, timers pause) with the Stop counter set to
    ~1.5 turn-cycles (tune: Stop's vanilla #$12 ticks ≈ our baseline);
    queue break feedback (message/flash).
+   *SUPERSEDED BY WHAT SHIPPED:* every claim about vanilla Stop here is
+   correct, but OT6 does not use it — the shipped break runs a private
+   broken timer at `$3e88,y` gated by `Ot6Gate`. Read this file as the
+   original spec, not as a description of the code.
 4. **Punish**: in the post-calc damage-mod routine, if target `brokenFlag`,
    damage ×2 (asl with 16-bit clamp to $270F cap handling — copy how the
    routine's other doublers clamp).

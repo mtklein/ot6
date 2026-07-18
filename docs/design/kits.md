@@ -73,16 +73,20 @@ claws switches his *Fight* to slashing ✦, but blitz classes are
 immutable: Pummel with claws on is still bludgeoning. The weapon
 slot is his second class, the ability list is his first.
 
+Levels below are `BlitzLevelTbl` (`field/event.asm:1240`), read out, not
+recalled — an earlier draft of this table was wrong in six of eight rows
+while still marked "vanilla preserved ✦".
+
 | # | Blitz | Chip | Level |
 |---|---|---|---|
-| 1 | Pummel ✦ | bludgeoning ×2 | join (6) |
-| 2 | AuraBolt | holy | 10 |
-| 3 | Suplex | bludgeoning | 15 |
-| 4 | Fire Dance | fire | 21 |
-| 5 | Mantra | — (heal) | 26 |
-| 6 | Air Blade | wind | 33 |
+| 1 | Pummel ✦ | bludgeoning ×2 | 1 (has it at join) |
+| 2 | AuraBolt | holy | 6 |
+| 3 | Suplex | bludgeoning | 10 |
+| 4 | Fire Dance | fire | 15 |
+| 5 | Mantra | — (heal) | 23 |
+| 6 | Air Blade | wind | 30 |
 | 7 | Spiraler | — | 42 |
-| 8 | **Bum Rush** (divine) | bludgeoning ×8 | 51 / Duncan |
+| 8 | **Bum Rush** (divine) | bludgeoning ×8 | 70 / Duncan |
 
 - Passive candidates: *Iron Fist* (unarmed counts as a bludgeon
   weapon), *Discipline* (+1 BP when striking a Broken enemy),

@@ -14,8 +14,9 @@ not used.
   save RAM, and menu plumbing. OT6 adds no new resource and no
   new name; it widens who pays from that pool.
 - **Three currencies.** HP is danger, MP is sustain, BP is
-  spikes. The break interacts with all three: the 2x difficulty
-  transform (DESIGN.md) makes probing necessary, the
+  spikes. The break interacts with all three: shielded resistance
+  (DESIGN.md — the HP multiplier retired to 1x) makes probing
+  necessary by halving off-weakness damage, the
   restore-on-break passive (below) makes breaks MP income, and
   boosting spends the BP bank into the ×2 window.
 - **The free floor.** Attack, Defend, Item, and Row never cost

@@ -1,7 +1,9 @@
 # M3 implementation — weapon classes + reveal (built + gate-green)
 
-**Status (phase 2 complete):** ROM builds clean (`make rom`, +12 C2 bytes
-absorbed, no ld65 overflow); full `make test` gate green (15/15 + golden);
+**Status (phase 2 complete; body below is phase-1 vintage and NOT swept --
+where the header and the body disagree, the header is current):** ROM builds
+clean (`make rom`, +12 C2 bytes absorbed, no ld65 overflow); full `make test`
+gate green (+ golden);
 the story fixture chain re-mints and passes (gen_whelk 2813 · gen_arvis
 4842 · gen_narshe_escape 4132 · gen_mines_chase 4047). Live-verified on
 the real Whelk boss (probe_whelkclass) and the skill-vs-weapon class path
@@ -119,7 +121,9 @@ message collision, codex-viewer surface.
 
 ## Test plan
 
-`tools/tests/battle_class.lua` (WRITTEN, NOT RUN — phase 2): doorstep
+`tools/tests/battle_class.lua` (this said WRITTEN, NOT RUN — stale: it is in
+`suite.sh` and runs every gate; its remaining `GUESS` markers are the thing
+to sweep, not whether it runs): doorstep
 guards now authored pierce-weak, so the seed itself is under test.
 Berserk-forced Fight (battle_hits pattern), element weaknesses zeroed so
 only the class path can move shields; phases: authored seed → slash = no

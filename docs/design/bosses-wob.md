@@ -132,7 +132,9 @@ piercing.
 ### 3. Vargas (+ two Ipoohs)
 
 Party: Terra, Locke, Edgar — Sabin storms in at the midpoint with
-Pummel (and AuraBolt, if the climb got him to 10).
+Pummel and, at vanilla level 6, almost certainly AuraBolt too. (An
+earlier draft put AuraBolt at level 10 and treated it as a maybe; it
+is level 6, so plan the fight assuming holy chip is present.)
 
 **Shields:** 5 · **Weak:** poison, holy + bludgeoning. Ipoohs: 2 ·
 fire + slashing.
@@ -374,17 +376,26 @@ Party: the factory four (Setzer is flying the getaway).
 
 | part | shields | weak |
 |---|---|---|
-| Left Crane | 6 | fire + piercing |
-| Right Crane | 6 | bolt + piercing |
+| Left Crane ($10D) | 6 | water + piercing |
+| Right Crane ($10E) | 6 | bolt, water + piercing |
 
-(The opposed fire/bolt pair is vanilla's; which element sits on
-which side gets verified against the bestiary at data entry.)
+(Decoded from `monster_prop.dat` +25, not recalled: `$10D` weak =
+water, absorbs bolt; `$10E` weak = bolt|water, absorbs fire. An
+earlier draft here read the opposed fire/bolt pair as vanilla's
+weaknesses — that pair is in the ABSORB bytes, and neither Crane is
+fire-weak. Vanilla's shared weakness is water.)
 
-- **The Cranes taught FF6 to telegraph ✦.** Vanilla already prints
-  its charge counters — fire charging, bolt charging — and detonates
-  **Fireball** / **Giga Volt** a few turns later. OT6 doesn't add
-  their telegraph; it *inherits* it, verbatim, as the system it
-  always wanted to be. Break cancels the charge.
+- **The Cranes' vanilla charge is element-driven, not a fuse.** Read
+  from `ai_script.asm`: both counters live in the COUNTER half of the
+  script, gated on `if_element FIRE` / `if_element LIGHTNING` — the
+  level rises only when the player hits a Crane with the element it
+  absorbs, and the payoffs are **Fire 3** and **Giga Volt**. There is
+  a separate genuine timer move (`if_battle_timer 60` → Magnitude8).
+  So this is NOT the one-ATB-cycle fuse the boss contract defines
+  above, and an earlier draft claiming OT6 "inherits it, verbatim"
+  was wrong. Giving the Cranes a contract-shaped telegraph is real
+  work, not free. "Break cancels the charge" is a design intent to
+  build, not a vanilla behavior to inherit.
 - **Break story:** the WoB's effective-12 moment: two live gauges,
   two fuses on independent clocks. Tunnel one Crane and the other's
   charge lands. Splash the wrong element and you heal its sibling —
@@ -509,7 +520,12 @@ examines rhythm, not roster.
 
 Party: your three, with the continent collapsing behind them.
 
-**Shields:** 5 · **Weak:** fire, holy + slashing, piercing.
+**Shields:** 5 · **Weak:** ice, bolt, holy + slashing, piercing.
+(Decoded, not recalled: `$118` weak = ice|bolt|holy and **absorbs
+fire**. An earlier draft listed fire as a weakness — authoring that
+would put a chip trigger on an absorber, where vanilla reverses the
+damage sign — and dropped vanilla's ice and bolt, against the
+"keep vanilla's bits ✦" rule at the top of this doc.)
 
 - The curse opens *untelegraphed*: **Condemned** on the whole party
   before your first input — vanilla's ambush, preserved. The

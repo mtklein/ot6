@@ -67,15 +67,16 @@ BPS-capable patcher, or just:
 
 ## Verification
 
-`make test` runs the whole gate headless: smoke, battle_entry,
-battle_break, battle_bp, battle_boost, battle_hits, battle_fold,
-battle_preview, battle_codex, hud_stability, visual_f1, visual_f2,
-plus a same-mint pixel golden. All green at every commit on main.
+`make test` runs the whole gate headless — 20 tests plus same-mint pixel
+goldens; `tools/tests/suite.sh` is the list of record (this doc used to
+enumerate 12 and drifted). Green as of the v0.1 tag.
 
 ## Known limits (by design, for now)
 
-- Break/weakness system is element-only; weapon classes come in M3.
+- (M3 shipped: weapon classes chip shields alongside elements.)
 - Cyan's BP-priced Bushido menu is implemented-after-demo (he isn't
   reachable in the demo stretch).
-- Enemy shield counts use the level formula; a per-monster table is
-  M6 tuning.
+- Enemy shield counts come from an authored per-species table where one
+  exists (`Ot6ShieldTbl`, 43 species today, checked before the level
+  formula); everything else still falls back to the level formula
+  (2 + level/8, cap 6). Broad M6 authoring is the remaining work.

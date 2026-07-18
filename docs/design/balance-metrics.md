@@ -407,9 +407,16 @@ Table now $10/$10/$10/$10.
   Octopath feel. So resistance REPLACES the HP multiplier as the
   fight-lengthener; the multiplier stands down to 1x.
 - 1x HP + 0.5x resistance puts the baseline fight at ~2× vanilla
-  length (1703 vs ~744 frames), which is the regime Measurement #4's
-  danger/reward knobs were tuned for — so the pace economy stays valid
-  WITHOUT retuning it. Band1 tracks band0 to 1x so that regime is
+  length, which is the regime Measurement #4's danger/reward knobs were
+  tuned for — so the pace economy stays valid WITHOUT retuning it.
+  **UNSOURCED:** this bullet carried "1703 vs ~744 frames", and 1703
+  appears in no grid table and no surviving `build/states/bal_*.log`
+  (the one surviving baseline arm logs `frames=736`, whose config is not
+  recorded). Every other headline number in this doc traces to a table
+  or a driver; this one does not, and it is the sole basis for NOT
+  re-sweeping danger/reward after the HP multiplier retired. Re-run the
+  1x×0.5x baseline arm of `bal_mines.lua` and read `frames` from the log
+  before relying on it. Band1 tracks band0 to 1x so that regime is
   uniform across bands (a mixed 1x/2x table would put mid-trash at ~4×
   length and under-conserve encounters there). Band1 mid-trash stays
   unmeasured — parity extrapolation, stretch fixtures pending.
