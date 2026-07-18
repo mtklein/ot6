@@ -165,11 +165,18 @@ done:   rtl
 ; one truth. re-loads (retract cycles, scene changes) re-apply the OR:
 ; idempotent by construction.
 ;
-; single row shipped: the whelk head ($134) gains fire. the boss
+; two rows shipped. the whelk head ($134) gains fire: the boss
 ; tutorial's designed line -- three fire beams and a TekMissile, broken
 ; inside one head-present phase -- needs four chippable hits, and the
 ; head has no vanilla fire weak (measurement #2 called this add
-; load-bearing m6 data).
+; load-bearing m6 data). vargas ($103) gains holy: bosses-wob.md's
+; vargas entry reads "poison, holy + bludgeoning", and vanilla gives
+; him poison only (monster_prop.dat +25 = $08) -- holy is the chip
+; sabin's arrival is supposed to switch on, and aurabolt already
+; carries it ($5e element byte = $20 in vanilla spell data), so this
+; row is the whole remaining distance. runtime proof (the holy chip
+; landing) waits on the vargas-doorstep fixture, queued with the
+; route work.
 ;
 ; called from the tail of Ot6SeedShields, monster path only. a8/i16,
 ; y = entity offset, species stashed at OT6_SPECIES-8,y. clobbers a/x
@@ -204,6 +211,8 @@ done:   rtl
 Ot6ElemAddTbl:
         .word   $0134
         .byte   $01, $00        ; whelk head: + fire (the tutorial probe)
+        .word   $0103
+        .byte   $20, $00        ; vargas: + holy (sabin's aurabolt)
         .word   $ffff
 
 ; ------------------------------------------------------------------------------

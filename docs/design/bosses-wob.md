@@ -570,6 +570,22 @@ damage sign — and dropped vanilla's ice and bolt, against the
    chip.
 7. **Vanilla-script audit** (M6 data entry): TunnelArmor's quake =
    Magnitude8; Number 128's sweep = Gale Cut; Crane left/right
-   element sides; Nerapa's full script; the poison bits on
-   Marshal/Vargas/Kefka/Dadaluma; Telstar's reinforcement call;
-   Guardian's WoB location.
+   element sides; Nerapa's full script; Telstar's reinforcement call;
+   Guardian's WoB location. The poison bits on
+   Marshal/Vargas/Kefka/Dadaluma are audited (decoded from
+   `monster_prop.dat` +25, not recalled — the file is byte-identical
+   to vanilla `$CF0000`):
+
+   | species | id | weak byte | verdict |
+   |---|---|---|---|
+   | Marshal | $0064 | $08 poison | vanilla agrees — no add |
+   | Vargas | $0103 | $08 poison | poison vanilla; **holy is an add** — authored (`Ot6ElemAddTbl`) |
+   | Kefka | $014a | $00 — | **poison is an add** — still M6 data entry |
+   | Dadaluma | $0107 | $08 poison | vanilla agrees — no add |
+
+   ($14a is the camp/Narshe Kefka both blocks share; the $11a/$12a
+   Kefka records are the level-83/71 endgame ones, out of WoB scope.
+   Same pass, adjacent claims: Ipooh $014d reads $01 fire — the fire
+   weak above is vanilla, no add — and the chip keys are real data,
+   AuraBolt ($5e) carrying $20 holy and BioBlaster's attack ($7d)
+   $08 poison in the vanilla spell records.)
