@@ -29,16 +29,18 @@ cfg.setdefault("Debug", {}).setdefault("ScriptWindow", {})["ScriptTimeout"] = 30
 # Determinism pins -- test profiles deliberately diverge from the user's play
 # profile on these three, whatever the source settings say:
 snes = cfg.setdefault("Snes", {})
-# FF6 reads uninitialized RAM, so RamPowerOnState=Random makes identical runs
-# drift (extra encounters, +-frames) and embeds garbage in minted savestates.
+# FF6 reads RAM it has never written, so RamPowerOnState=Random makes identical
+# runs drift (extra encounters, +-frames) and embeds garbage in minted savestates.
 # Default AllZeros for reproducibility; OT6_RAM_POWERON overrides it for the
 # dirty-RAM reveal investigation/gate (AllOnes = deterministic AND dirty, so
 # it exercises what a real power-on garbage boot hands the battle-init clear).
 ram = os.environ.get("OT6_RAM_POWERON", "AllZeros")
-# Mesen's headless testrunner fills from RamPowerOnState (NOT the boolean
-# EnableRandomPowerOnState -- which alone leaves the fill at AllZeros). Drive
-# the state name directly so "Random" actually randomises RAM per boot; the
-# boolean is set alongside for the GUI code path's benefit.
+# RamPowerOnState is the ONLY thing that picks the fill -- for WRAM, SPC RAM,
+# VRAM/CGRAM/OAM and cartridge SRAM alike. EnableRandomPowerOnState does not
+# touch RAM at all; its one use on the SNES path is randomising PPU registers
+# (brightness, Mode7 matrices, BG mode, layer enables), so leaving it on for
+# Random deliberately dirties the PPU too. This once wrote "AllZeros" whenever
+# Random was asked for, so no headless run had ever exercised random RAM.
 snes["EnableRandomPowerOnState"] = (ram == "Random")
 snes["RamPowerOnState"] = ram
 # Frame-skip picks which frames actually render based on HOST timing, so

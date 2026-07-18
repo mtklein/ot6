@@ -1,12 +1,19 @@
 #!/usr/bin/env python3
 """Compose a self-contained Lua test file for Mesen's testrunner.
 
-Why: loading shared code with dofile()/loadfile() inside Mesen 2.1.1's
-sandboxed Lua correlates strongly with intermittent emulator crashes
-(process exit 255) later in the run, while single-file scripts are stable.
-So instead of loading lib/ot6.lua at runtime, this script textually inlines
-it (and any savestate sidecars the script references) producing one flat
-file with no runtime file access at all.
+Why: runtime dofile()/loadfile() RAISE under Mesen's default setting
+Debug.ScriptWindow.AllowIoOsAccess=false (Lua/lauxlib.c:776) -- the error is
+clean and names the setting, but an unguarded dofile at script load means no
+callbacks ever register, the emulator free-runs, and the testrunner's
+wall-clock cap reaps it as exit 255.  That signature is what an earlier note
+here called "intermittent emulator crashes"; it was neither intermittent nor
+a crash.
+
+Flipping that setting would make runtime loading work.  We do not, and
+inline instead: one flat file is hermetic, which is worth more to a
+reproducible suite than the convenience.  So this script textually inlines
+lib/ot6.lua (and any savestate sidecars the script references) into one file
+with no runtime file access at all.
 
 Transformations:
   1. The line `local H = dofile(".../lib/ot6.lua")` is replaced by the lib

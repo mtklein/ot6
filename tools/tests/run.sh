@@ -4,9 +4,11 @@
 #   tools/tests/run.sh tools/tests/battle_smoke.lua
 #
 # * Composes the script with lib/ot6.lua into one flat file first
-#   (build/states/_composed.lua).  Runtime dofile()/loadfile() inside Mesen's
-#   sandboxed Lua crashes the emulator intermittently, so shared code and
-#   savestate payloads are inlined at compose time instead.  A script that is
+#   (build/states/_composed.lua).  Runtime dofile()/loadfile() raise under
+#   Mesen's default AllowIoOsAccess=false setting (a raise at script load
+#   registers no callbacks, so the run then dies on the wall-clock cap --
+#   that is the "255 crash", not a crash).  Inlining keeps runs hermetic;
+#   see compose.py.  A script that is
 #   ALREADY composed (first line carries compose.py's marker) runs as-is --
 #   suite.sh pre-composes every test once so a mid-suite lib edit can't split
 #   a suite across two libs.
@@ -18,12 +20,14 @@
 # * OT6_WORKER=<id> reroutes EVERYTHING the run touches -- portable app copy,
 #   saves dir, composed file, default log, artifact decode dir -- under
 #   build/test-workers/w<id>/, so runs with distinct ids (and the default,
-#   id-less run) are safe concurrently.  The emulator writes into its profile
-#   on exit (settings.json, Debugger/*.cdl, SaveStates/ auto-slots), so
-#   concurrent instances must never share an app copy.
+#   id-less run) are safe concurrently.  Two workers must never share an app
+#   copy: run.sh rewrites settings.json into the bundle every launch (so they
+#   would race on each other's SaveDataFolder) and the emulator writes
+#   Debugger/*.cdl there.  (It does NOT write settings back -- the testrunner
+#   sets DisableSaveSettings -- and never creates SaveStates/.)
 # * Exit code: 0 = pass, 1 = assertion/Lua error, 2 = frame budget exceeded.
 #   The [ot6] PASS/FAIL verdict in the log wins over the raw process code
-#   (Mesen occasionally dies with 255 and unflushed stdout).
+#   (a 255 with unflushed stdout is a wall-clock cap, not a crash).
 set -u
 ROOT="$(cd "$(dirname "$0")/../.." && pwd)"
 ROM="$ROOT/build/ot6.sfc"
@@ -80,8 +84,10 @@ rm -f "$TEST_SAVES"/*.srm
 # --timeout=600: Mesen's testrunner has a hard DEFAULT 100-second wall-clock
 # cap (exit -1/255 + truncated stdout on expiry) that reaped long runs; keep
 # a cap as the only defense against a genuinely hung emulator, just a roomy one.
-# --enableStdout mirrors the (otherwise invisible) script log window to
-# stdout, surfacing silent Lua watchdog kills.
+# --enableStdout mirrors the EMULATOR message log to stdout.  It does NOT
+# carry Lua errors or watchdog kills -- those go to the script log, which
+# nothing reads headless.  A script that goes quiet has told you nothing;
+# print() is the only channel out.  Kept for the ROM-info banner.
 "$MESEN_TEST/Contents/MacOS/Mesen" --testrunner --timeout=600 --enableStdout "$ROM" "$COMPOSED" > "$LOG" 2>&1
 code=$?
 

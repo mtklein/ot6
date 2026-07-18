@@ -5,8 +5,12 @@
 #
 #   tools/tests/make_srm_sidecar.sh
 #
-# Headless Mesen always boots SRAM zeroed (battery loading is GUI-only),
-# so gen_whelk / probe_slots / probe_srmboot inject this instead. In-game
+# Mesen loads battery saves headless exactly as it does in the GUI (the
+# testrunner takes the ordinary LoadRom path), but run.sh deliberately wipes
+# <saves>/*.srm every launch and pins the save folder away from the user's,
+# so no battery file is ever there to load -- SRAM comes up holding whatever
+# RamPowerOnState filled it with (zeros by default; 0xFF under AllOnes).
+# gen_whelk / probe_slots / probe_srmboot inject this sidecar instead. In-game
 # saves are pure vanilla-layout data with no code dependency, so a sidecar
 # made once keeps loading across ROM rebuilds -- regenerate only when you
 # save further in the GUI and want the harness to start from there.

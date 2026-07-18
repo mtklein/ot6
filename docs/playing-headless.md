@@ -78,12 +78,21 @@ Events can walk the party with `$1EB9`/`$0084`/`$0059` all looking
 innocent, so control gating checks the movement type and event PC too —
 that's `H.hasControl()`. Two event-PC subtleties, both load-bearing:
 
-- Ambient NPC **object scripts** (a stove flame, a wanderer) execute
-  through the same interpreter out of their RAM queue — the PC reads
-  `$80xxxx` (WRAM mirror) for one frame at a time, every few frames,
-  forever on such maps. `H.eventRunning()` therefore requires the PC to
-  be inside banks `$CA`-`$CC`; treating any non-idle value as "event
-  running" starves every consecutive-calm-frames predicate.
+- On maps with ambient NPC activity (a stove flame, a wanderer) the event
+  PC at `$E5`-`$E7` reads `$80xxxx` for one frame at a time, every few
+  frames, forever (measured in Arvis's house: `$800000` one frame in
+  four). `H.eventRunning()` therefore requires the PC to be inside banks
+  `$CA`-`$CC`; treating any non-idle value as "event running" starves
+  every consecutive-calm-frames predicate.
+  An earlier note here explained the `$80` as NPC object scripts running
+  "through the same interpreter out of their RAM queue". That mechanism is
+  wrong: object scripts use a separate interpreter with its own pointer in
+  `$2A`/`$2C` (`field/obj.asm:4516`), seeded from event-script ROM, and no
+  field-module write to `$E5`-`$E7` ever sets bank `$80`. The likely truth
+  is duller — `$E5`-`$E7` are shared direct-page scratch that 30+ files
+  write, so a non-`$CA` bank just means some other subsystem parked a
+  pointer there. The true source of `$80` is UNVERIFIED; the bank gate is
+  correct either way, so this is a comprehension hazard, not a bug.
 - A stood-on **event trigger re-fires every 4 frames**. Once its switch
   makes it a no-op, the cycle is 3 frames of event (movement type 4) and
   1 frame of control, forever. Routes must step OFF a trigger tile (a
@@ -208,8 +217,9 @@ tile-aligned while user-controlled fires the event, which force-walks
 the party down to (42,7), shows dialogs `$0B6E` / `$0B6F` (edge-tapped
 through), and starts the Whelk battle (formation `$01B0`). During the
 fight the formation species words at `$57C0` read `0x0100` and
-`0x0134` — match on those (`$57C0` is battle scratch: power-on garbage
-before the first fight, stale words after one, so gate any read on
+`0x0134` — match on those (`$57C0` is battle scratch: whatever
+`RamPowerOnState` filled it with before the first fight — zeros under the
+pinned test profile — and stale words after one, so gate any read on
 `battleLoadStarted()`). The whelk-done event switch is `$1EA6` bit
 `$20`; once set, the trigger is inert — the script asserts it clear at
 boot. Full run: PASS at frame 2813, ~8.5 s wall, byte-identical
@@ -236,13 +246,17 @@ harness:
   255) with truncated, block-buffered stdout.
 - `pin_test_saves.py` sets `Debug.ScriptWindow.ScriptTimeout = 30`
   (seconds). This per-Lua-slice watchdog defaults to **1 s** and kills a
-  slow frame callback (a big BFS, say) *silently* under `--testrunner` —
-  the error only reaches the script-window log, which run.sh's
-  `--enableStdout` mirrors to stdout.
+  slow frame callback (a big BFS, say) *silently* under `--testrunner`.
+  Nothing surfaces it: the error goes to the script log, which only the GUI
+  script window reads. `--enableStdout` mirrors the *emulator* log, not
+  that one. Script errors are invisible headless — `print()` is the only
+  channel out, so a test that goes quiet is telling you nothing.
 
 `pin_test_saves.py` also pins the test profile for determinism —
-`Snes.RamPowerOnState = "AllZeros"` (FF6 reads uninitialized RAM, so
-random power-on RAM drifted encounter RNG and PASS frames run-to-run),
+`Snes.RamPowerOnState = "AllZeros"` (FF6 reads RAM it has never written,
+and Mesen's SNES default is `Random`, so runs diverged — three `Random`
+boots give three different WRAM hashes, two `AllZeros` boots are
+byte-identical; the pin is what makes runs bit-stable),
 `Snes.DisableFrameSkipping = true` (frame-skip picks rendered frames by
 host timing, so screenshots and savestate framebuffers varied), and
 `Audio.EnableAudio = false` (inert headless; hygiene). Test profiles

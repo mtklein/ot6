@@ -18,21 +18,24 @@
 --   0 = steps completed         1 = Lua error / failed assert / timeout
 --   2 = frame budget exceeded   (testrunner exit code = emu.stop code)
 --
--- WHY NO COROUTINES: linear coroutine-style scripting was tried first and
--- crashed Mesen 2.1.1 intermittently-but-often (process exit 255, stdout
--- lost).  Callback-driven state machines have been stable across every long
--- run, so the library builds scripts as explicit step lists instead.
+-- WHY STEP LISTS: the library builds scripts as explicit step lists driven
+-- by a startFrame callback.  This was originally justified by "coroutines
+-- crash Mesen" -- they do not; that was the testrunner's wall-clock cap
+-- (exit 255, stdout lost) misread as a crash, and coroutines run clean.
+-- The step style stays because the whole suite is written in it.
 --
--- Environment notes (Mesen 2.1.1, discovered empirically):
---  * Lua 5.4.  io and os are nil (sandbox); print() goes to the testrunner's
---    stdout; emu.log() only goes to the GUI log window (invisible headless).
---  * dofile()/loadfile() DO work, so binary blobs are smuggled in/out as
---    base64: out via print("[b64:tag] ..."), in via generated .lua sidecars.
---    tools/tests/run.sh decodes [b64:*] payloads after each run.
---  * No controller is attached to any port in the testrunner's default
---    config (settings.json {}), so emu.setInput() is a no-op.  Input is
---    injected instead by intercepting CPU reads of the SNES auto-joypad
---    registers $4218/$4219 with a read-type memory callback.
+-- Environment notes (Mesen 2.1.1, verified against Mesen's source):
+--  * Lua 5.4.  print() goes to the testrunner's stdout.  emu.log() goes to
+--    the SCRIPT log, which nothing reads headless -- and --enableStdout does
+--    NOT mirror it (that flag mirrors the emulator message log).  Lua errors
+--    and watchdog kills land there too, i.e. silently.  print() or nothing.
+--  * io/os are nil and dofile()/loadfile() raise, but that is the setting
+--    Debug.ScriptWindow.AllowIoOsAccess (default false), not a fixed
+--    sandbox.  We keep it off and inline everything at compose time, so
+--    binary blobs travel as base64: out via print("[b64:tag] ..."), in via
+--    compose-time embedding.  run.sh decodes [b64:*] payloads after a run.
+--  * Port 0 is a SnesController in the test config, so emu.setInput() is
+--    live; input is pushed from an inputPolled callback (see below).
 
 local M = {}
 
@@ -220,18 +223,18 @@ local function checkReq(req, what)
 end
 M.checkReq = checkReq
 
--- Resolve a savestate sidecar to its base64 payload.  Normal path: the
--- compose step embedded it as OT6_STATES[basename] (runtime loadfile() is
--- avoided -- file loading in this sandbox crashes the emulator; see README).
+-- Resolve a savestate sidecar to its base64 payload.  compose.py embedded it
+-- as OT6_STATES[basename]; that is the only path.  There is no loadfile()
+-- fallback because loadfile RAISES under the default sandbox setting
+-- (Debug.ScriptWindow.AllowIoOsAccess=false), so a fallback could never fire
+-- -- it would only replace a clear error with a confusing one.
 function M.resolveStateB64(sidecarPath)
   local base = sidecarPath:match("[^/]+$")
   if type(OT6_STATES) == "table" and OT6_STATES[base] then
     return OT6_STATES[base]
   end
-  local chunk, err = loadfile(sidecarPath)
-  assert(chunk, "cannot load savestate sidecar " .. sidecarPath ..
-    " (not embedded, loadfile failed: " .. tostring(err) .. ")")
-  return chunk()
+  error("savestate sidecar not embedded: " .. sidecarPath ..
+    " (compose.py inlines these; run through run.sh, not raw)")
 end
 
 -- STEP: capture the current state and emit it as build/states/<name>.
@@ -261,8 +264,11 @@ function M.loadState(sidecarPath)
     M.waitFrames(2),
     M.call(function()
       checkReq(req, "savestate load")
-      -- defensive: re-register the joypad override in case the load
-      -- detached memory callbacks
+      -- Savestate loads do NOT detach callbacks (nothing in Mesen's load
+      -- path clears them; battle_banner registers exec callbacks before its
+      -- load and records straight through).  This call is a no-op once
+      -- inputCbRef is set; kept only so the input hook is guaranteed live
+      -- on paths that load before ever arming it.
       M.rearmInputInjection()
       -- determinism: savestates do NOT restore battery sram, so the
       -- weakness codex persists across runs. invalidate it so every

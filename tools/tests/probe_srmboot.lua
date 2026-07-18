@@ -1,5 +1,6 @@
 -- probe_srmboot: boot with the player's in-game save injected into SRAM
--- (headless boots zero SRAM; battery loading is GUI-only), drive the
+-- (run.sh wipes the battery file every launch, so SRAM boots as whatever
+-- RamPowerOnState filled it with -- not from disk), drive the
 -- title into Continue, and screenshot where the save puts us. In-game
 -- saves are pure data in vanilla layout — no code dependency — so this
 -- works across ROM rebuilds, unlike savestates.

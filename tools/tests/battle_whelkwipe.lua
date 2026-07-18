@@ -91,7 +91,7 @@ local function assertWipeVanilla(what)
 end
 
 -- trip wire on DoMonsterEntryExit (vanilla C2/E668); registered after
--- the savestate load (loads can detach memory callbacks)
+-- the savestate load (ordering is historical; loads do NOT detach callbacks)
 local trips = 0
 local tripped = false
 local function armTripWire()

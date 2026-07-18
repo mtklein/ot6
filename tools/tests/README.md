@@ -19,7 +19,8 @@ Mesen --testrunner --timeout=600 --enableStdout build/ot6.sfc <composed.lua>
 
 (`--timeout=600` overrides the testrunner's default 100-second wall-clock
 cap — expiry exits 255 with truncated stdout; `--enableStdout` mirrors the
-otherwise-invisible script-window log, where Lua watchdog errors land),
+EMULATOR message log, which is not where Lua errors land — see "Script
+errors are invisible headless" below),
 captures all output to `build/states/last_run.log` (second arg overrides),
 decodes any `[b64:...]` artifacts the script emitted (see below), prints the
 `[ot6]` log lines, and exits with the script's `emu.stop()` code:
@@ -39,8 +40,12 @@ watchdog needed.  A bare hang would only happen if a script bypasses
 `run.sh` honors `OT6_WORKER=<id>`: the portable emulator copy, saves dir,
 composed file, default log, and artifact dir all move under
 `build/test-workers/w<id>/`, so runs with distinct ids (and the default
-id-less run) are safe concurrently -- the emulator writes into its profile
-on exit, so concurrent instances must never share an app copy.  `suite.sh`
+id-less run) are safe concurrently -- `run.sh` rewrites `settings.json`
+into the bundle every launch (so two workers sharing one would race on
+each other's `SaveDataFolder`) and the emulator writes `Debugger/*.cdl`
+there, so concurrent instances must never share an app copy.  (The
+testrunner does NOT write settings back -- `DisableSaveSettings` is set --
+and never creates `SaveStates/`.)  `suite.sh`
 honors `OT6_JOBS=N` (default 4 = the P-core knee; 1 = serial) and fans its
 tests out across workers; every suite test is a pure savestate load (the
 mints run as Makefile prerequisites first), so order doesn't matter.
@@ -131,8 +136,10 @@ the two images.
 
 A test is a LIST OF STEPS handed to `H.run`; a `startFrame` callback consumes
 them, one frame at a time (zero-frame steps like `H.call` chain within a
-frame).  **Do not use Lua coroutines** -- they crash this Mesen build (see
-WORKING NOTES); the step style below is the stable pattern.
+frame).  The step style below is the house pattern.  (An older note here
+claimed coroutines crash this build; that was the exit-255 wall-clock cap
+misread as a crash -- see WORKING NOTES.  Coroutines work.  The step machine
+stays because the whole suite is written in it, not because it has to.)
 
 ```lua
 local H = dofile("/Users/mtklein/ot6/tools/tests/lib/ot6.lua")
@@ -195,9 +202,17 @@ Plain functions (call from `H.call`/predicates):
 
 - Runner: `Mesen --testrunner <rom> <script.lua>`; process exit code is the
   integer passed to `emu.stop(code)`.
-- **Lua 5.4** with `io` and `os` REMOVED (nil).  `print()` -> stdout.
-  `emu.log()` -> GUI log window only (invisible headless).  `dofile()` /
-  `loadfile()` / `load()` work, which is how binary blobs get back in.
+- **Lua 5.4**.  `print()` -> stdout.  `emu.log()` -> the SCRIPT log, which
+  no headless process ever reads (invisible; not mirrored by
+  `--enableStdout`).  `load()` (from a string) works.
+  `io` / `os` are nil and `dofile()` / `loadfile()` RAISE -- but that is a
+  SETTING, not a property of the sandbox:
+  `Debug.ScriptWindow.AllowIoOsAccess` (default false;
+  `ScriptingContext.cpp:66`, `Lua/lauxlib.c:776`).  Flip it and all four
+  work; Mesen's own error text names the setting.  `pin_test_saves.py`
+  already writes that config section.  We leave it off and compose scripts
+  flat (see compose.py) -- that is a choice for hermetic runs, not a
+  constraint we are forced into.
 - Memory: `emu.read(addr, emu.memType.X)`, `emu.readWord`, `emu.read16/32`,
   `emu.write*`.  Useful memTypes: `snesWorkRam` (128 KiB WRAM, offset-based),
   `snesPrgRom` (ROM file), `snesMemory` (CPU bus), `snesDebug` (bus,
@@ -237,9 +252,15 @@ Plain functions (call from `H.call`/predicates):
   (0-261, NMI fires at 225) is how battle_banner samples vblank timing.
 - Narrow exec memory callbacks on ROM code use CPU-bus addresses and DO
   fire for bank C1/C2 (`emu.addMemoryCallback(fn, emu.callbackType.exec,
-  0xC10BA7, 0xC10BA7)` fires once per battle NMI); they do NOT fire for
-  bank F0 code.  PRG-file-offset forms fire never (0x010BA7) or on the
-  wrong thing; use the bus form.
+  0xC10BA7, 0xC10BA7)` fires once per battle NMI).  They fire for bank F0
+  too -- `battle_reveal`, `battle_reveal_poweron` and `probe_reveal_trace`
+  all hook $F00000 and pass.  (This bullet used to claim F0 never fires,
+  contradicting three tests in the suite.)  PRG-file-offset forms fire
+  never (0x010BA7) or on the wrong thing; use the bus form.
+- Memory callbacks SURVIVE `emu.loadSavestate()`; nothing in the load path
+  clears them (`SaveStateManager.cpp` only raises `StateLoaded`).
+  `battle_banner` relies on this -- it registers four exec callbacks before
+  its `H.loadState` and records through to a PASS.
 - Reading $2137/$213D via `emu.read(..., emu.memType.snesMemory)` does NOT
   trigger the H/V counter latch side effect -- both return 0.  Sample the
   scanline from Lua via `getState()["ppu.scanline"]`; from 65816 code the
@@ -321,25 +342,39 @@ route edit shifts them.
 
 ### Mesen quirks discovered
 
-- The testrunner only works if `~/Library/Application Support/Mesen2/settings.json`
-  exists (even `{}`).  Do not delete it.
-- stdout also carries `[CPU] Uninitialized memory read: ...` debug spam from
-  FF6's habit of reading uninitialized RAM; filter for `[ot6]` / `[probe]`.
-- **Lua coroutines crash this build.**  A coroutine-based runner (script body
-  resumed once per frame) died with process exit 255 and truncated stdout on
-  4 of 4 long runs -- even with a body of pure-Lua waits and prints.  The
-  same work as a callback-driven step machine is stable.  Root cause not
-  confirmed (likely Mesen's per-callback instruction-watchdog `lua_sethook`
-  interacting with coroutine threads); just avoid coroutines entirely.
-- A 255 exit with truncated stdout means a wall-clock cap expired, not a
-  mystery crash: the testrunner defaults to 100 seconds (run.sh passes
+- Do not delete `~/Library/Application Support/Mesen2/settings.json`.  The
+  reason is OURS, not Mesen's: `run.sh` feeds that path to
+  `pin_test_saves.py`, which opens it unconditionally and would raise --
+  and run.sh never checks that script's exit code.  The testrunner itself
+  does not need it; a `settings.json` beside the binary puts Mesen in
+  portable mode and fully determines its home folder
+  (`ConfigManager.cs:177`), which is exactly what run.sh writes.
+- stdout also carries `[CPU] Uninitialized memory read: ...` debug spam;
+  filter for `[ot6]` / `[probe]`.  It is *read-before-write* tracking (the
+  debugger flags any address read before it has ever been written this
+  power-on) and says nothing about the RAM fill -- it appears under
+  `AllZeros` just as it does under `Random` (89 vs 145 lines over 600
+  frames, measured).  It only shows up headless because the testrunner
+  force-enables the debugger via Mesen's `ConsoleMode` flag.
+- **A 255 exit with truncated stdout means a wall-clock cap expired, not a
+  mystery crash.**  The testrunner defaults to 100 seconds (run.sh passes
   `--timeout=600`) and Mesen's per-Lua-slice watchdog defaults to 1 second
-  (`pin_test_saves.py` pins `Debug.ScriptWindow.ScriptTimeout = 30`; its
-  kills are silent except in the `--enableStdout`-mirrored script log).
+  (`pin_test_saves.py` pins `Debug.ScriptWindow.ScriptTimeout = 30`).
   stdout is block-buffered, so output stops well before the actual death.
-- Avoid `emu.getState()` in per-frame polling loops (crash-correlated;
-  screenshot size stands in for "is the screen rendering").  One-shot use
-  for debugging is fine.
+  ANY error at script load has the same signature: no callbacks register,
+  the emulator free-runs, the cap reaps it.  A bare syntax error looks
+  identical to a "crash".
+- **Script errors are invisible headless.**  `--enableStdout` mirrors the
+  EMULATOR message log (`MessageManager`); Lua errors and watchdog kills go
+  to the SCRIPT log, a separate 500-row buffer only the GUI script window
+  ever reads.  There is no bridge.  `print()` is the only channel out of a
+  script, so a test that goes quiet is telling you nothing -- add prints.
+- Retired claims, all one misdiagnosis: this section used to say coroutines
+  crashed the build, that runtime `dofile` crashed it, and that
+  `emu.getState()` in a poll loop was crash-correlated.  All three were the
+  255 cap above.  Coroutines run clean 4/4 at 20k frames; `dofile` raises a
+  tidy error naming the setting that enables it; `battle_banner` calls
+  `getState()` four times a frame in production and passes.
 - `emu.stop()` from the initial script body works; from callbacks it works
   too (used everywhere here).
 - No `timeout` command on macOS; not needed since `H.run` guarantees exit,

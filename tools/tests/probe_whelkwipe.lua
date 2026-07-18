@@ -24,7 +24,8 @@ local SHOT_EVERY = 1               -- screenshot cadence inside a burst
 -- ------------------------------------------------------------ trip wire --
 -- DoMonsterEntryExit entry point (vanilla bank-C2 code, verified
 -- byte-identical in both images).  Fires once per entry/exit animation.
--- Registered AFTER the savestate load (loads can detach memory callbacks).
+-- Registered AFTER the savestate load (ordering is historical; loads do NOT
+-- detach memory callbacks -- nothing in Mesen's load path clears them).
 local TRIP_PC = 0xC2E668
 local trips = {}                   -- { {frame=, type=, mask=}, ... }
 local tripped = false

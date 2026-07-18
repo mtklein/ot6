@@ -5,7 +5,7 @@
 --
 -- Requires build/states/first_battle.mss.lua, produced by gen_battle_state.lua
 -- (run.sh's compose step embeds the sidecar payload into the script, since
--- Mesen's Lua sandbox has no io library and runtime file loads are unstable).
+-- runtime file loads raise under Mesen's default AllowIoOsAccess setting).
 --
 -- Also dumps the OT6 break-system RAM:
 --   $7E3E40, $7E3E42, ... per-monster shield current (stride 2 from $7E3E38+8)

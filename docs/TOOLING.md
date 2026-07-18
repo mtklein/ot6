@@ -20,7 +20,7 @@ Top-level `Makefile` targets:
 | Target | Does |
 |---|---|
 | `make rom` | verify base-ROM SHA1 → build `ff6/rom/ff6-en.sfc` → copy to `build/ot6.sfc` |
-| `make patch` | emit distributable `build/ot6.bps` (Flips; BPS never contains game data) |
+| `make patch` | emit distributable `build/ot6.bps` (Flips; stores only what differs from the base ROM) |
 | `make run` | open the built ROM in Mesen (GUI) |
 | `make test` | headless Mesen testrunner, runs `tools/tests/smoke.lua`, exit code = pass/fail |
 
@@ -55,7 +55,12 @@ control verified to exit 1).
 - Everything is one flat git repo; only the ROMs, `build/`,
   `tools/Mesen.app`, and `tools/bin` are ignored. Ripped assets ARE
   tracked for local convenience → the repo stays private; publish via
-  `make patch` BPS or a strip pass.
+  `make patch` BPS or a strip pass. A BPS is a delta, so it does embed
+  literal bytes for new content (measured on v0.1: 8,650 literal bytes of
+  ~20 KB) — the safety property is not "contains no game data" but that
+  the literals are OURS: 0 of v0.1's literal runs (≥8 bytes) appear
+  verbatim in the vanilla ROM. Re-check that if new content ever ships by
+  rearranging vanilla data.
 
 ## Gotchas learned the hard way
 
@@ -64,8 +69,8 @@ control verified to exit 1).
   script). Its home folder on macOS is `~/Library/Application
   Support/Mesen2/`; an existing `settings.json` (even `{}`) skips the
   wizard. Already handled here.
-- Mesen is unsigned: the **first GUI launch** may need right-click → Open
-  to satisfy Gatekeeper. Headless testrunner runs fine from the terminal.
+- Mesen is ad-hoc signed but **not notarized** (no Team ID), so Gatekeeper
+  rejects it: the **first GUI launch** may need right-click → Open. Headless testrunner runs fine from the terminal.
 - macOS has no `timeout`; testrunner also has its own `timeout=N` arg if a
   test ever wedges.
 - `make distclean` in `ff6/` deletes ripped assets including modified ones
@@ -78,9 +83,12 @@ control verified to exit 1).
   operand while the CPU ran 16-bit indexes (instruction-stream desync,
   hung battle init).
 - Mesen Lua: `emu.createSavestate`/`loadSavestate` must run inside an
-  exec memory callback, not event callbacks; sandboxed Lua can't
-  `dofile` (compose scripts flat) or write files (tunnel artifacts as
-  base64 over stdout — see tools/tests/run.sh).
+  exec memory callback, not event callbacks (Mesen enforces this and says
+  so). `dofile` and file writes are blocked by a **default-off setting**,
+  `Debug.ScriptWindow.AllowIoOsAccess`, not by a fixed sandbox — flipping
+  it enables both. We leave it off and compose scripts flat, tunnelling
+  artifacts as base64 over stdout, because hermetic runs are worth more
+  than the convenience — see tools/tests/run.sh.
 
 ## Reference docs for the asm work (see research/)
 
