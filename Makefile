@@ -71,7 +71,6 @@ goldens-capture:
 	tools/tests/run.sh tools/tests/visual_f1.lua || true
 	@mkdir -p tools/tests/goldens
 	cp build/states/shots/visual_f1_idle.png tools/tests/goldens/
-	cp build/states/shots/visual_f1_menu.png tools/tests/goldens/
 	@echo "goldens recaptured for the fresh state mint"
 $(STATE2): $(STATE1)
 	@if [ build/states/.rom-copy -nt build/states/battle2_doorstep.mss ] || [ ! -f build/states/battle2_doorstep.mss ]; then \
@@ -96,7 +95,6 @@ goldens: rom $(STATE1) $(STATE2)
 	tools/tests/run.sh tools/tests/visual_f1.lua
 	@mkdir -p tools/tests/goldens
 	cp build/states/shots/visual_f1_idle.png tools/tests/goldens/
-	cp build/states/shots/visual_f1_menu.png tools/tests/goldens/
 	@echo "goldens captured from the current build - review before committing"
 
 clean:
