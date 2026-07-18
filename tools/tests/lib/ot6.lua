@@ -1087,6 +1087,321 @@ function M.advanceStory(pred, maxFrames, opts)
   }, "advanceStory")
 end
 
+-- ------------------------------------------------------- world map nav --
+-- The overworld is a separate engine (ff6/src/world/) with its own
+-- position registers and a 1-bit passability rule; every field predicate
+-- above is meaningless there.  The world module keeps DP=$0000
+-- (world_start.asm has no phd/pld; its menu path reads $e0 plain), so
+-- these are absolute zero-page addresses:
+--   $E0/$E2  tile x/y -- the high bytes of the 16-bit position words at
+--            $DF/$E1 (word = tile*256 + fraction; move.asm integrates
+--            velocity into them at @1e56)
+--   $DF/$E1  low bytes = sub-tile fraction; both zero <=> at rest.
+--            Moving down/right the tile byte flips at step completion;
+--            moving up/left it borrows through on the FIRST frame (both
+--            measured, probe_world step traces) -- same direction skew
+--            as the field, so position samples gate on worldAligned()
+--   $E3/$E5  16-bit velocity; GetPlayerInput zeroes both every aligned
+--            frame, then sets +-$10 for a held passable direction
+--   $F6     facing 0=up 1=right 2=down 3=left
+--   $E7     bit0 = world event script running (Figaro/Narshe triggers)
+--   $19     fade/exit trigger (nonzero = leaving the world map)
+--   $E8     bit0 = menu opening, bit3 = once-per-tile event/battle
+--            latch, bit4 = reload-world (battle return, zone eater)
+--
+-- MOVEMENT IS LATCHED TO THE STEP: MovePlayer gates its whole body,
+-- input read included, on both fractions being zero (move.asm:834-841),
+-- so a begun step always glides to the next tile boundary -- a 4-frame
+-- tap was measured carrying the party a full tile with velocity held at
+-- $10 for all 16 frames (probe_world).  The executor therefore just
+-- holds the planned direction whenever it is aligned; releases are
+-- never needed mid-step.
+
+-- On the world map iff (word $1F64 & $3FF) < 3: the top-level dispatch
+-- masks #$03ff (field/reset.asm:66).  Raw compares are wrong there --
+-- entrance/parent records ride flag bits in the high byte (measured
+-- $2000 on the world after the Narshe exit; $0200|55 entering Figaro).
+function M.worldMode() return (M.readWord(0x1f64) & 0x3FF) < 3 end
+-- which world: 0=WoB 1=WoR 2=Serpent Trench (GetWorldTileProp masks the
+-- LOW BYTE only, move.asm @21d7)
+function M.worldId() return M.readWord(0x1f64) & 0xFF end
+
+function M.worldX() return M.readByte(0x00e0) end
+function M.worldY() return M.readByte(0x00e2) end
+function M.worldAligned()
+  return M.readByte(0x00df) == 0 and M.readByte(0x00e1) == 0
+end
+
+-- WorldTileProp = $EE9B14 (world/tile_prop.asm:4) -> rom file $2E9B14;
+-- 256 words per world, index = worldId*512 + tiletype*2.  Cached per
+-- world id on first use (512 rom reads once, not per BFS node).
+local WORLD_PROP_FILE = 0x2E9B14
+local worldPropCache, worldPropWorld = nil, nil
+function M.worldTileProp(x, y)
+  local w = M.worldId()
+  if worldPropWorld ~= w then
+    worldPropCache, worldPropWorld = {}, w
+    for t = 0, 255 do
+      worldPropCache[t] = M.readRomWord(WORLD_PROP_FILE + w * 512 + t * 2)
+    end
+  end
+  local t = M.readByte(0x7F0000 + (y & 0xFF) * 256 + (x & 0xFF))
+  return worldPropCache[t]
+end
+
+-- A step onto (x,y) is legal on foot iff bit4 ($0010) of the DESTINATION
+-- tile's property word is clear -- the engine checks nothing else, no
+-- exit bits / z-levels / object map (GetPlayerInput tests exactly this
+-- per direction, move.asm @1ead..@1ff3; verified live: predictions from
+-- this rule matched real movement at the Narshe spawn, probe_world).
+-- Other bits, informational: $20 forest (legal, sets the hidden flag),
+-- $40 random battles enabled here.
+function M.worldPassable(x, y)
+  return (M.worldTileProp(x, y) & 0x0010) == 0
+end
+function M.worldCanStep(x, y, dir)
+  local d = DELTA[dir]
+  return M.worldPassable(x + d[1], y + d[2])
+end
+
+local function worldEdgeKey(x, y, dir)
+  return ((y & 0xFF) * 256 + (x & 0xFF)) * 4 + DIRIDX[dir]
+end
+
+-- BFS a path from the party's CURRENT world tile to (tx,ty).  The map
+-- wraps at 256 in both axes.  `blockedEdges` (keys from worldEdgeKey)
+-- prunes edges the executor has proven wrong, same contract as the
+-- field bfsPath.  The node cap is 20000, not the field's 4096: world
+-- legs run 60+ tiles (Narshe->Figaro BFS'd 63 steps, probe_world3) and
+-- the search disc grows with them.
+function M.worldBfs(tx, ty, blockedEdges)
+  blockedEdges = blockedEdges or {}
+  local sx, sy = M.worldX(), M.worldY()
+  local function key(x, y) return (y & 0xFF) * 256 + (x & 0xFF) end
+  local seen = { [key(sx, sy)] = true }
+  local q, qi = { { sx, sy } }, 1
+  local parent = {}
+  while qi <= #q do
+    local x, y = q[qi][1], q[qi][2]
+    qi = qi + 1
+    if x == tx and y == ty then
+      local dirs, k = {}, key(x, y)
+      while parent[k] do
+        table.insert(dirs, 1, parent[k][2])
+        k = parent[k][1]
+      end
+      return dirs
+    end
+    if qi > 20000 then return nil end
+    for _, dir in ipairs(DIRS) do
+      if not blockedEdges[worldEdgeKey(x, y, dir)] then
+        local d = DELTA[dir]
+        local nx, ny = (x + d[1]) & 0xFF, (y + d[2]) & 0xFF
+        local k = key(nx, ny)
+        if not seen[k] and M.worldPassable(nx, ny) then
+          seen[k] = true
+          parent[k] = { key(x, y), dir }
+          q[#q + 1] = { nx, ny }
+        end
+      end
+    end
+  end
+  return nil
+end
+
+-- true when the world engine will accept a step this frame: on the world
+-- map, no world event script ($E7 bit0 -- the Figaro/Narshe gate events
+-- run through it), not fading out to a field map ($19), and none of
+-- $E8's takeover bits: bit0 menu opening, bit5 battle pending/running
+-- (set the INSTANT the encounter roll wins, move.asm's `ora #$20`
+-- before BattleZoom -- long before battleLoadStarted's HP-table signal,
+-- which is what let a battle transition masquerade as a dead edge in
+-- gen_figaro run 1), bit4 reload-world (the post-battle fade/init).
+-- battleLoadStarted is still checked for the battle interior itself.
+-- ($E9 reads $04 during normal control -- measured -- so it is
+-- deliberately not gated on.)
+function M.worldHasControl()
+  return M.worldMode()
+     and M.readByte(0x0019) == 0
+     and (M.readByte(0x00e7) & 0x01) == 0
+     and (M.readByte(0x00e8) & 0x31) == 0
+     and not M.battleLoadStarted()
+end
+
+-- Walk to world tile (tx,ty): the field navTo's verified-step loop on
+-- the world engine.  Differences, each measured (probe_world/3):
+--  * hold-through: input is read only at tile boundaries, so the walker
+--    holds the planned direction continuously; a landing is verified
+--    when the fractions return to zero, and only then is the next
+--    direction chosen (re-plan on any mismatch, blocklist an edge whose
+--    press provably never moved us)
+--  * battles RELOAD THE WORLD: move.asm:916-921 snapshots the tile into
+--    $1F60/$1F61 before Battle_ext and world_start.asm:465-482 reruns
+--    ReloadMap after -- measured: kill-bit clear, then ~95 frames of
+--    fade/init, position and facing back exactly, danger counter zeroed.
+--    The walker clears non-spared battles inline (kill-bit + edge-A) and
+--    stalls until the reload finishes (aligned + full brightness) before
+--    planning again
+--  * no dialog branch: world triggers run world event scripts, not the
+--    field dialog engine; $BA/$D3 are stale field RAM here
+--   opts.arrive    extra terminator (checked first, every frame)
+--   opts.maxFrames frame budget -> error (default 20000)
+--   opts.spare     formation species words never to kill-bit
+function M.worldNavTo(txIn, tyIn, opts)
+  opts = opts or {}
+  local maxFrames = opts.maxFrames or 20000
+  local arrive = opts.arrive
+  local spareSet = {}
+  for _, w in ipairs(opts.spare or {}) do spareSet[w] = true end
+  local blocked, nblocked = {}, 0
+  local plan, idx = nil, 1
+  local pend = nil
+  local aPhase = 0
+  local battN = 0
+  local hb = -600
+  local function resolveT(v) return type(v) == "function" and v() or v end
+  return M.driveUntil(function()
+    local done
+    if arrive and arrive() then
+      done = true
+    else
+      done = M.worldX() == resolveT(txIn) and M.worldY() == resolveT(tyIn)
+         and M.worldHasControl() and M.worldAligned()
+    end
+    if done then M.setPad({}) end
+    return done
+  end, maxFrames, {
+    M.call(function()
+      aPhase = (aPhase + 1) % 8
+      if M.frame - hb >= 600 then
+        hb = M.frame
+        M.log(string.format("wnav f%d (%d,%d) plan=%s idx=%d blocked=%d",
+          M.frame, M.worldX(), M.worldY(),
+          plan and tostring(#plan) or "-", idx, nblocked))
+      end
+      battN = M.battleLoadStarted() and battN + 1 or 0
+      -- 1. battle: clear it (never a spared formation), then let the
+      --    world reload run out before touching the plan again
+      if battN >= 3 then
+        plan, pend = nil, nil
+        if next(spareSet) and M.formationHas(spareSet) then
+          M.setPad({})
+          return
+        end
+        if M.monstersPresent() > 0 then
+          for slot = 0, 5 do
+            if M.readByte(0x3aa8 + slot * 2) % 2 == 1 then
+              M.writeByte(0x3eec + slot * 2, M.readByte(0x3eec + slot * 2) | 0x80)
+            end
+          end
+        end
+        M.setPad(aPhase < 4 and { "a" } or {})
+        return
+      end
+      -- 2. anything that is not plain walkable control: hands off (the
+      --    post-battle reload, world event scripts, fades)
+      if battN > 0 or not M.worldHasControl() then M.setPad({}); return end
+      -- 3. mid-step: the latch owns it; keep the pad as-is
+      if not M.worldAligned() then return end
+      -- 4. the reload's own fade ends before brightness is back; a step
+      --    launched into the fade works but leaves position samples one
+      --    frame stale -- cheap to just wait it out (getState only runs
+      --    at rest, not per frame)
+      if (emu.getState()["ppu.screenBrightness"] or 0) < 15 then
+        M.setPad({})
+        return
+      end
+      local x, y = M.worldX(), M.worldY()
+      -- 5. verify the landing of the last step
+      if pend then
+        if x == pend.tx and y == pend.ty then
+          pend = nil
+        elseif x == pend.x and y == pend.y then
+          -- still on the start tile.  1-2 aligned frames here are normal
+          -- launch latency (the pad applies at the next input poll and
+          -- velocity lands the frame after); a press that has not moved
+          -- us in 10 is provably refused by the engine.
+          pend.stall = pend.stall + 1
+          if pend.stall > 10 then
+            blocked[worldEdgeKey(pend.x, pend.y, pend.dir)] = true
+            nblocked = nblocked + 1
+            M.log(string.format("wnav: edge (%d,%d)->%s dead; re-plan",
+              pend.x, pend.y, pend.dir))
+            plan, pend = nil, nil
+            M.setPad({})
+            return
+          end
+          M.setPad({ [pend.dir] = true })
+          return
+        else
+          M.log(string.format("wnav: step (%d,%d)->%s landed (%d,%d); re-plan",
+            pend.x, pend.y, pend.dir, x, y))
+          plan, pend = nil, nil
+        end
+      end
+      -- 6. (re)plan.  If the blocklist made the target unreachable,
+      -- forgive it once and re-search clean before giving up: world
+      -- corridors run one tile wide (the desert pass measured so), and
+      -- a single falsely-condemned edge there would otherwise be fatal
+      -- while a genuinely dead edge just gets re-condemned next lap.
+      if plan and idx > #plan then plan = nil end
+      if not plan then
+        plan = M.worldBfs(resolveT(txIn), resolveT(tyIn), blocked)
+        if not plan and nblocked > 0 then
+          M.log(string.format(
+            "wnav: no path with %d blocked edges; amnesty + re-plan", nblocked))
+          blocked, nblocked = {}, 0
+          plan = M.worldBfs(resolveT(txIn), resolveT(tyIn), blocked)
+        end
+        idx = 1
+        if not plan then
+          error(string.format(
+            "worldNavTo: no path (%d,%d)->(%d,%d) [%d edges blocklisted]",
+            x, y, resolveT(txIn), resolveT(tyIn), nblocked), 0)
+        end
+        M.log(string.format("wnav: planned %d steps from (%d,%d)", #plan, x, y))
+        if #plan == 0 then M.setPad({}); return end
+      end
+      -- 7. launch the next step and hold it
+      local dir = plan[idx]
+      idx = idx + 1
+      local d = DELTA[dir]
+      pend = { x = x, y = y, dir = dir,
+               tx = (x + d[1]) & 0xFF, ty = (y + d[2]) & 0xFF, stall = 0 }
+      M.setPad({ [dir] = true })
+    end),
+  }, "worldNavTo")
+end
+
+-- Drive a route that crosses engine modes: legs = { {mode="field", x, y,
+-- opts}, {mode="world", x, y, opts}, ... }.  Between legs the engine is
+-- expected to change modes on its own (an exit tile fires as the
+-- previous leg lands, a world trigger loads a field map); each leg first
+-- waits for its declared mode plus the matching settle gates -- control,
+-- tile alignment, full screen brightness, then a 30-frame margin, the
+-- post-map-load discipline every field fixture uses -- and only then
+-- dispatches the mode's navigator.
+function M.route(legs)
+  local steps = {}
+  for _, leg in ipairs(legs) do
+    local isWorld = leg.mode == "world"
+    steps[#steps + 1] = M.waitUntil(function()
+      if isWorld then
+        return M.worldHasControl() and M.worldAligned()
+      end
+      return not M.worldMode() and M.hasControl() and M.tileAligned()
+    end, (leg.opts and leg.opts.modeWait) or 1200,
+      "route: " .. leg.mode .. " mode + control", 5)
+    steps[#steps + 1] = M.waitUntil(function()
+      return (emu.getState()["ppu.screenBrightness"] or 0) >= 15
+    end, 900, "route: " .. leg.mode .. " fade-in", 10)
+    steps[#steps + 1] = M.waitFrames(30)
+    steps[#steps + 1] = isWorld and M.worldNavTo(leg.x, leg.y, leg.opts)
+                        or M.navTo(leg.x, leg.y, leg.opts)
+  end
+  return seqStep(steps)
+end
+
 function M.run(opts, steps)
   assert(not runnerStarted, "ot6.run() called twice")
   runnerStarted = true

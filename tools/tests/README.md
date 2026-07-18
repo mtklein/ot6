@@ -206,6 +206,11 @@ Plain functions (call from `H.call`/predicates):
 - Field navigation (`H.fieldX/Y`, `H.hasControl`, `H.tileAligned`,
   `H.dialogWaiting`, `H.canStep`, `H.bfsPath`, `H.navTo`, `H.clearBattle`):
   see `docs/playing-headless.md` for the RAM tables and the design.
+- World-map navigation (`H.worldMode`, `H.worldId`, `H.worldX/Y`,
+  `H.worldAligned`, `H.worldPassable/worldCanStep`, `H.worldBfs`,
+  `H.worldHasControl`, `H.worldNavTo`, and `H.route` -- the field/world
+  handoff driver): see `docs/research/world-map-nav.md` for the RAM
+  tables and every measured mechanism claim.
 
 ## Mesen 2.1.1 Lua API facts (all verified empirically on this binary)
 
