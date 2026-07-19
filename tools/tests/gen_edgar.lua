@@ -1,14 +1,16 @@
 -- gen_edgar.lua -- from figaro_doorstep.mss (TERRA + LOCKE at map 55
 -- (28,42), the Figaro Castle gate): walk in, BUY THE TOOLS in the only
 -- window the game ever offers, take the throne-room audience with EDGAR,
--- and mint figaro_intro.mss on the far side of his intro scene.
+-- then cross the castle to the MATRON and ride her flashback -- the beat
+-- that puts Edgar back on his throne and unblocks the rest of the
+-- chapter.  Mints figaro_intro.mss (after the audience) and
+-- figaro_matron.mss (after the flashback, $0308 set again).
 --
--- SCOPE.  This is the first half of the Figaro chapter.  The second half
--- (matron -> Kefka -> the burning night -> the submerge) is mapped out in
--- full below and is NOT driven here: the matron's map is behind a stretch
--- of castle the navigator cannot yet plan through, and the exact blocker
--- is written up under "WHERE THIS STOPS" at the end of this header so the
--- next pass starts from evidence instead of from the entrance tables.
+-- SCOPE.  Stops with Edgar respawned.  The remainder (second audience ->
+-- Kefka -> the confrontation -> LOCKE's regroup -> the burning night ->
+-- the submerge and the chocobos) is read out of the event source below,
+-- and the walking it needs is the same door/staircase machinery this
+-- script already uses -- see "WHAT REMAINS" at the end of this header.
 --
 -- THE MECHANISM (why "talk to Edgar twice" is not the story; every line
 -- number is ff6/src/event/event_main.asm unless said otherwise):
@@ -111,29 +113,40 @@
 --       -> (80,18) -> 55 (33,33) = ring
 --   and comes back the mirror way through 59 (82,10) -> 60 (97,25).
 --
--- WHERE THIS STOPS, and what the next pass needs.  That staircase route
---   was driven end to end and it WORKS -- the party reached the ring at
---   55 (33,33) -- but it lands on the ring's EAST band, and the ring is
---   itself two bands:
---     east  (x >= 32): carries the guest-wing doors (44,19)/(44,26);
---     west  (x <= 24): carries the matron doors (12,19)/(12,26) and
---                      (23,31) -> 59 (66,49).
---   The castle block at x=24..32 separates them for y=31..42, and the one
---   row that joins them, y=43, is where navTo walked and stuck: BFS plans
---   straight along it and the engine refuses the step (measured at both
---   (28,43) and (32,43): "edge ->left blocked in reality").  So reaching
---   the matron needs the WEST band, i.e. 59 (66,50) -> 55 (23,33), and the
---   only room holding (66,50) is 59's {(65,43),(64,42),(66,50)}, which
---   pairs with {(49,59),(50,60)} and is entered from neither -- another
---   closed component, and by the same tell as the last one: the chamber
---   behind 55 (23,24) floods to 79 tiles reaching (50,57) but stops three
---   tiles short of the (50,60) door.  That gap is almost certainly one
---   more diagonal staircase.
---   The durable fix is to teach the passability model the engine's
---   diagonal branch (player.asm:378-455, tiles with $b8 & $c0, movement
---   directions 5..8) instead of hand-holding each stair with a pushUntil;
---   that would also stop BFS routing along map borders, which is the other
+--   THE RING IS TWO BANDS, which is why the route takes the WEST stair
+--   and not the east one:
+--     east  (x >= 32), via map 60: carries the guest-wing doors
+--                      (44,19)/(44,26);
+--     west  (x <= 24), via 59 (66,50): carries the matron doors
+--                      (12,19)/(12,26) and (23,31) -> 59 (66,49).
+--   The castle block at x=24..32 separates them for y=31..42 and the one
+--   row that joins them, y=43, is a map border the engine refuses to walk
+--   (BFS plans straight along it; measured "edge ->left blocked in
+--   reality" at both (28,43) and (32,43)).  So the matron needs the WEST
+--   band, reached by the chamber staircase above, and the guest wing --
+--   which the burning night needs -- takes the map-60 stair instead.
+--
+--   FOUR staircases are hand-held with pushUntil on this route: the
+--   chamber -> west wing one, and three more inside the matron's own room
+--   (its (67,27) arrival floods to FOUR tiles).  The durable fix is to
+--   teach the passability model the engine's diagonal branch
+--   (player.asm:378-455, tiles with $b8 & $c0, movement directions 5..8)
+--   instead; that would also stop BFS routing along map borders, the other
 --   way this walk failed.
+--
+-- WHAT REMAINS, for the pass that finishes the chapter.  Every beat is
+--   already decoded above; what is left is walking and cutscene-riding:
+--     * second audience: back to 58 via 55 (23,26) -> courtyard ->
+--       (28,13) -> 59 (27,28) -> (27,13).  Returning from the west ring
+--       means re-crossing the chamber stair the other way (59 (64,42) ->
+--       (49,59)), which was not measured;
+--     * Kefka's arrival leaves EDGAR alone; talk BOTH troopers (objects
+--       21 and 22) then Kefka (object 20) -- $01F0/$01F1 are map-local, so
+--       the gate scene's earlier $01F0 is gone;
+--     * LOCKE (object 27, at (28,15)) regroups the party and arms $0313;
+--     * the guest-room LOCKE is map 59 (82,45), reached via the EAST ring
+--       (map-60 stair, then 55 (44,26) -> 59 (79,52));
+--     * the submerge is the courtyard guard (object 19) once $01F8 is set.
 --
 -- DOORS.  Entrance records fire when the party STANDS on the source tile
 --   (entrance.asm CheckShortEntrance), but a castle door tile is a WALL
@@ -251,6 +264,26 @@ local function crossDoor(sx, sy, dm, dx, dy, what, fixed)
       H.assertEq(map(), dm, what .. ": landed on the right map")
       H.log(string.format("%s: DONE (%d,%d) frame=%d", what,
         H.fieldX(), H.fieldY(), H.frame))
+    end),
+  })
+end
+
+-- Hold `dir` until pred(): the escape hatch for stretches the step model
+-- cannot plan.  Figaro's staircases are DIAGONAL-movement tiles
+-- (player.asm:378 branches on $b8 & $c0 and moves the party diagonally on
+-- a single direction press), and the library's passability port models
+-- only the four cardinal exits -- so BFS sees solid wall where the game
+-- has a staircase, and half the castle reads unreachable.
+local function pushUntil(dir, pred, what, budget)
+  return seq({
+    H.driveUntil(pred, budget or 900, {
+      H.call(function() H.setPad({ [dir] = true }) end),
+    }, what),
+    H.release(),
+    H.waitFrames(20),
+    H.logStep(function()
+      return string.format("%s: at map=%d (%d,%d) f%d", what, map(),
+        H.fieldX(), H.fieldY(), H.frame)
     end),
   })
 end
@@ -512,5 +545,61 @@ H.run({ maxFrames = 120000 }, {
   H.saveState("figaro_intro.mss"),
   H.logStep(function()
     return string.format("figaro_intro minted at frame %d", H.frame)
+  end),
+
+  -- ==================================================================== --
+  -- PHASE 5: THE MATRON -- the beat both earlier attempts died on.  Her
+  -- room (map 57) hangs off the castle's WEST ring, and the only way onto
+  -- that ring is the chamber behind 55 (23,24): its floor reaches (48,58)
+  -- and from there one continuous RIGHT walks a diagonal staircase through
+  -- (49,59)/(50,60), takes 59 (50,60) -> 59 (65,43) and carries on into
+  -- the west wing.  The wing's door (66,50) is the ring's west band.
+  -- (The EAST ring, reached the mirror way through map 60, carries the
+  -- guest-wing doors instead; the castle block at x=24..32 keeps the two
+  -- bands apart and the row that joins them, y=43, is a map border the
+  -- engine refuses to walk.)
+  -- ==================================================================== --
+  crossDoor(102, 56, 59, 27, 15, "D7 throne room -> throne hall"),
+  crossDoor(27, 29, 55, 28, 15, "D8 throne hall -> inner courtyard"),
+  crossDoor(23, 24, 59, 47, 60, "D9 inner courtyard -> west chamber"),
+  H.navTo(48, 58, { maxFrames = 6000 }),
+  -- x>=68, not >=66: the stair's own landing tiles are still diagonal-only,
+  -- and stopping the hold on the first one leaves the party on a ledge
+  -- where a plain DOWN press does nothing (measured at (66,44)).  Ride the
+  -- hold to the wing's floor.
+  pushUntil("right", function() return map() == 59 and H.fieldX() >= 68 end,
+    "D10 west chamber -> west wing (diagonal stair)", 1200),
+  pushUntil("down", function() return map() == 59 and H.fieldY() >= 48 end,
+    "D11 down into the west wing"),
+  crossDoor(66, 50, 55, 23, 33, "D12 west wing -> WEST RING"),
+  crossDoor(12, 26, 57, 67, 27, "D13 west ring -> matron's room"),
+  H.call(function() where("matron's room") end),
+
+  -- and one more stair INSIDE her room: the (67,27) arrival floods to
+  -- FOUR tiles.  Up onto the landing, west along the diagonal to (60,24),
+  -- up to her floor, and only then can BFS see her.
+  pushUntil("up", function() return map() == 57 and H.fieldY() <= 26 end,
+    "D14 matron's room: onto the landing"),
+  pushUntil("left", function() return map() == 57 and H.fieldX() <= 60 end,
+    "D15 matron's room: west along the stair"),
+  pushUntil("up", function() return map() == 57 and H.fieldY() <= 21 end,
+    "D16 matron's room: up to her floor"),
+
+  talkTo(17, "MATRON", 9000),
+  commitName("sabin_naming"),
+  H.advanceStory(calm(30, function()
+    return map() == 57 and sw(0x0005) == 1
+  end), 30000),
+  H.call(function()
+    H.assertEq(sw(0x0005), 1, "flashback ran ($0005 set)")
+    H.assertEq(sw(0x0308), 1, "EDGAR RESPAWNED on the throne ($0308 set)")
+    H.assertEq(sw(0x0316), 1, "$0316 set (chancellor armed)")
+    H.assertEq(map(), 57, "back in the matron's room")
+    where("flashback done")
+    H.screenshot("figaro_matron")
+  end),
+  H.saveState("figaro_matron.mss"),
+  H.logStep(function()
+    return string.format("figaro_matron minted at frame %d", H.frame)
   end),
 })

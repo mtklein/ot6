@@ -109,9 +109,9 @@ test: rom $(STATE1) $(STATE2) $(STATE3)
 #                   -> gen_moogle         -> moogle_defense, moogle_cleared
 #                   -> gen_worldmap       -> worldmap_narshe
 #                   -> gen_figaro         -> figaro_doorstep
-#                   -> gen_edgar          -> figaro_intro
+#                   -> gen_edgar          -> figaro_intro, figaro_matron
 FRONTIER := arvis_wake narshe_streets moogle_doorstep moogle_cleared \
-            worldmap_narshe figaro_doorstep figaro_intro
+            worldmap_narshe figaro_doorstep figaro_intro figaro_matron
 
 # mint <state> from <script> once its ROM-content gate says it is stale
 define mint
@@ -135,6 +135,9 @@ build/states/figaro_doorstep.mss.lua: build/states/worldmap_narshe.mss.lua
 	$(call mint,figaro_doorstep,gen_figaro)
 build/states/figaro_intro.mss.lua: build/states/figaro_doorstep.mss.lua
 	$(call mint,figaro_intro,gen_edgar)
+# same script, later mint; gate on its own file so a half-run re-runs
+build/states/figaro_matron.mss.lua: build/states/figaro_intro.mss.lua
+	$(call mint,figaro_matron,gen_edgar)
 
 frontier: rom $(STATE1) $(STATE2) $(STATE3) \
           $(patsubst %,build/states/%.mss.lua,$(FRONTIER))

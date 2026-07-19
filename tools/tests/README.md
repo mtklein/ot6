@@ -15,8 +15,8 @@ make frontier                                   # mint the deep story states (sl
 `make test` mints only the three states the suite asserts on.  The
 STORY CHAIN past the whelk -- arvis_wake, narshe_streets,
 moogle_doorstep, moogle_cleared, worldmap_narshe, figaro_doorstep,
-figaro_intro -- lives behind `make frontier`, which nothing in the gate
-depends on: each link is a multi-minute scripted playthrough that
+figaro_intro, figaro_matron -- lives behind `make frontier`, which
+nothing in the gate depends on: each link is a multi-minute scripted playthrough that
 consumes the previous link's savestate, and the suite's remint cost has
 to stay what it was.  The links use the same ROM-content gate as the
 suite's states, so a rebuild that changes no bytes re-mints nothing.
@@ -109,15 +109,18 @@ line reports its worker and wall time.
 - `gen_edgar.lua` - Figaro Castle, gate to the throne: walks
   `figaro_doorstep.mss` in, buys the BioBlaster + NoiseBlaster from the
   tool merchant (the ONLY window - the merchant refuses once EDGAR or
-  SABIN is in the party), takes Edgar's audience, and emits
-  `figaro_intro.mss`.  Its header documents four measured mechanisms the
+  SABIN is in the party), takes Edgar's audience, then crosses the
+  castle to the MATRON and rides her flashback, which is what puts
+  Edgar back on his throne ($0308).  Emits `figaro_intro.mss` and
+  `figaro_matron.mss`.  Its header documents four measured mechanisms the
   entrance/NPC tables do not give you: event switches $01F0..$01FF are
   per-map scratch (`LoadMap` zeroes $1EBE/$1EBF), NPC activation is
   decided by the party FACING byte and a two-frame turn press does not
   set it, castle doors are walls until `CheckDoor` so every crossing is
   navTo-a-neighbour plus one hold, and the shop menu must be driven by
-  state ($7E0026) not by timing.  It also maps the rest of the chapter
-  and names the one gap still blocking it.
+  state ($7E0026) not by timing.  It also documents the castle's
+  disconnected walking regions and the four diagonal staircases the
+  route hand-holds, and maps the beats it stops short of.
 - `probe_canstep.lua` - validates `H.canStep` (the CheckPlayerMove
   port) against real movement at the boot area; renders the model's view
   of the neighborhood as ASCII.  NB the port covers the engine's four
