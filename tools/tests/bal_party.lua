@@ -84,10 +84,33 @@ local FIXTURES = {
     seeds = { {fa1=0x37,fa2=0x00}, {fa1=0x6e,fa2=0x01}, {fa1=0xa5,fa2=0x02},
               {fa1=0xdc,fa2=0x03}, {fa1=0x13,fa2=0x04}, {fa1=0x4a,fa2=0x05} },
   },
-  -- Map 95 is Mt. Kolts' ENTRANCE map and carries no encounter group: a run
-  -- here paced 437 tiles across six samples and drew nothing, voiding every
-  -- sample as a timeout. Kept as the record of that, and as the doorstep
-  -- gen_kolts_pool.lua crosses from; measure the mountain on kolts_pool.
+  -- The OTHER Mt. Kolts pool, and the one the mountain is mostly made of.
+  -- kolts_pool stands on map 100, group 63 (Brawler-pair / Tusker-pair);
+  -- maps 96/97 carry group 61, which is CIRPIUS x3 at 93.75% of draws.
+  -- Cirpius is the species the v0.3 trash pass exists for -- no vanilla
+  -- weakness of any kind, three at a time, the mountain's most common
+  -- fight -- and it is the one place a GROUP tool answers a GROUP enemy,
+  -- so it needs its own fixture. Minted by gen_kolts_cave.lua, which is
+  -- gen_kolts' K2 crossing plus gen_kolts_pool's "prove an encounter
+  -- fires" tail. Arrival is (16,22); the lane is RIGHT (the mint's own
+  -- probe picked it and paced 96 without leaving it).
+  kolts_cave = {
+    state = "/Users/mtklein/ot6/build/states/kolts_cave.mss.lua",
+    mode = "field", map = 96, lane = "right",
+    seeds = { {fa1=0x37,fa2=0x00}, {fa1=0x6e,fa2=0x01}, {fa1=0xa5,fa2=0x02},
+              {fa1=0xdc,fa2=0x03}, {fa1=0x13,fa2=0x04}, {fa1=0x4a,fa2=0x05} },
+  },
+  -- Map 95, Mt. Kolts' ENTRANCE map: a run here paced 437 tiles across six
+  -- samples and drew nothing, voiding every sample as a timeout. The
+  -- diagnosis written here was "carries no encounter group" and it was
+  -- WRONG -- map 95 carries group 61, the same Cirpius/Tusker pool as maps
+  -- 96/97 (`sub_battle_group.dat[95]` = 61). What it does not carry is the
+  -- ENABLE BIT: map properties are 33 bytes at `map_prop.dat[map*33]` and
+  -- byte 5 bit 7 is the flag `CheckBattleSub` tests (`lda $0525 / bpl Done`,
+  -- field/battle.asm:332). Map 95 reads $00; so does map 74, which likewise
+  -- has a group (59) it can never draw. The observation stands, the
+  -- mechanism did not. Kept as the doorstep gen_kolts_pool.lua crosses
+  -- from; measure the mountain on kolts_pool and kolts_cave.
   kolts_doorstep = {
     state = "/Users/mtklein/ot6/build/states/kolts_doorstep.mss.lua",
     mode = "field", map = 95,
@@ -147,13 +170,50 @@ local SEEDS = FX.seeds              -- $1FA1 (step roll) / $1FA2 (formation)
 -- Ot6HpMulTbl band0. nil = leave the shipped byte.
 local POKE_SHIELD = nil
 local POKE_HP = nil
+-- POKE_AUTHORING: nil = the v0.3 trash weakness rows as they ship.
+-- "off" = neutralise them in the loaded ROM image, which is the BEFORE arm
+-- of the authoring measurement. Doing it by poke rather than by two builds
+-- is not a shortcut, it is the better experiment: both arms then run
+-- against the SAME savestate mint, the same party HP/MP/gil and the same
+-- seeds, so the only difference between them is the ten bytes below. (Two
+-- builds cannot give that -- the fixture is minted by PLAYING the game, and
+-- a ROM where the trash has weaknesses is a ROM where the mint's own fights
+-- go differently.) Measurement #4 established the equivalence of poking the
+-- loaded image to rebuilding: the scanners read these very bytes.
+--   * Ot6ElemAddTbl -- the six v0.3 rows are the LAST six, so writing the
+--     $FFFF terminator over the first of them hides exactly those and
+--     leaves the eight boss/armor rows above untouched.
+--   * Ot6ShieldTbl -- Brawler's row is in the MIDDLE, and only $FFFF ends
+--     that scan, so it is disabled by rewriting its species id to $0FFF:
+--     4095 is past the 384-species table (monster_prop.dat is 12288 bytes
+--     / 32), so it can never match and the rows after it stay live.
+local POKE_AUTHORING = nil
 -- ROM offsets are BUILD-SPECIFIC and HAVE drifted once (bal_mines' header
 -- tells that story: eighteen bytes early, poking live code while reporting
 -- a grid). Re-derive after any bank-F0 edit:
---   grep -oE 'name="Ot6ShieldedMulW"[^;]*' ff6/rom/ff6-en.dbg  -> val=0xF0034E
+--   grep -oE 'name="Ot6ShieldedMulW"[^;]*' ff6/rom/ff6-en.dbg  -> val=0xF0037E
 -- and subtract $C00000.
-local ROM_HPMUL  = 0x300185         -- Ot6HpMulTbl band0
-local ROM_SHIELD = 0x30034E         -- Ot6ShieldedMulW (word, low byte)
+-- These two moved on 2026-07-19 ($300185 -> $3001B5, $30034E -> $30037E):
+-- the v0.3 trash rows grew Ot6ElemAddTbl and Ot6ShieldTbl, and everything
+-- after them in bank F0 slid. The drift guard below caught it on the first
+-- run, which is exactly what it is for -- a stale offset would have poked
+-- live code and reported a grid.
+local ROM_HPMUL  = 0x3001B5         -- Ot6HpMulTbl band0
+local ROM_SHIELD = 0x30037E         -- Ot6ShieldedMulW (word, low byte)
+-- Ot6ElemAddTbl $F000E0 + 8 rows * 4 = the first v0.3 trash row ($0086
+-- cirpius); Ot6ShieldTbl $F01067 + 5 rows * 4 = brawler's ($000B). Both
+-- read out of ff6/rom/ff6-en.dbg the same way the two knobs above do:
+--   grep -oE 'name="Ot6ElemAddTbl",[^;]*val=0x[0-9A-F]+' ff6/rom/ff6-en.dbg
+-- then subtract $C00000 and count rows in the source table.
+local ROM_ELEMADD_V3 = 0x300100     -- word: species id of the first v0.3 row
+-- and the three Ot6ShieldTbl rows the pass added: brawler (row 5, shields
+-- + SLASH), cirpius and tusker (rows 6/7, shields only)
+local ROM_SHIELDROWS_V3 = { 0x30107B, 0x30107F, 0x301083 }
+-- what those words MUST read before we touch them; a mismatch means the
+-- table moved and the offsets are stale (the same drift that once had
+-- bal_mines poking live code while reporting a grid)
+local AUTHORING_OK = { [ROM_ELEMADD_V3] = 0x0086, [0x30107B] = 0x000b,
+                       [0x30107F] = 0x0086, [0x301083] = 0x007a }
 -- every value either knob is ever set to, shipped or swept: a byte outside
 -- this set means the offset no longer points at a knob
 local KNOB_OK = { [0x02]=true, [0x03]=true, [0x04]=true, [0x06]=true,
@@ -176,6 +236,12 @@ local RVEAL = 0x3e91               -- monster revealed elements, +slot*2
 local WEAK  = 0x3be8               -- monster weak elements, +slot*2
 local WKC   = 0x3ea4               -- monster class-weak mask, +slot*2
                                    --   ($3e9c's monster half: chars +0..+6)
+local RVEALC = 0x3ea5              -- monster revealed CLASSES, +slot*2
+                                   --   ($3e9d's monster half; Ot6ClassChip
+                                   --   ORs the matched bit in as it chips,
+                                   --   ot6.asm:736-738 -- the class twin of
+                                   --   RVEAL, and the gate a kit needs to
+                                   --   know a class weakness was found)
 local ALIVE = 0x3aa8               -- monster presence bit0, +slot*2
 local MSTAT = 0x3eec               -- monster status-1, +slot*2 ($c2 = gone)
 local CHARIX = 0x3ed9              -- battle slot -> character index, +slot*2
@@ -204,14 +270,26 @@ end
 local function pokeCmd(slot, cmd)
   for i = 0, 3 do H.writeByte(CMDTBL + slot*12 + i*3, cmd) end
 end
-local function anyRevealed(mask)
-  for slot = 0, 5 do
-    if monsterAlive(slot) and (H.readByte(RVEAL + slot*2) & mask) ~= 0 then
-      return true
-    end
-  end
-  return false
-end
+-- What the player KNOWS, not what is currently on screen. These read the
+-- battle-scoped accumulators the sampler ORs the living monsters' reveal
+-- cells into every frame, and that stickiness is a correctness fix, not a
+-- convenience (2026-07-19). $3E91/$3EA5 are PER-MONSTER cells: chip the
+-- first of a pair, learn its weakness, kill it -- and the bit dies with it,
+-- so a poll over living monsters said the board was unread again. Measured
+-- consequence, on a Brawler pair: Edgar's probe swing chipped and revealed
+-- SLASH, the Brawler died, and his `slash` exploit rung then failed its
+-- gate and dropped him to AutoCrossbow for the rest of the fight --
+-- `char_plan=s0:probe_bio*1+probe_swing*1+xbow*1`, 1 chip out of 4
+-- available, 0 breaks. No player forgets a weakness because the monster
+-- that taught it fell over; the codex (OT6_CODEX_CLASS) does not either.
+-- Their own upvalues, not fields of S: S is declared BELOW these helpers, so
+-- naming it here compiles to a global read and dies with "attempt to index a
+-- nil value (global 'S')" on the first menu of the first battle.
+local seenElem, seenClass = 0, 0
+local function seenReset() seenElem, seenClass = 0, 0 end
+local function seenAdd(e, c) seenElem = seenElem | e seenClass = seenClass | c end
+local function anyRevealed(mask) return (seenElem & mask) ~= 0 end
+local function anyRevealedClass(mask) return (seenClass & mask) ~= 0 end
 
 local ROSTER = {
   [0x00]="TERRA", [0x01]="LOCKE", [0x02]="CYAN",  [0x03]="SHADOW",
@@ -269,9 +347,40 @@ local KITS = {
     { tag = "steal", cmd = CMD.steal, want = "probe_turn" },
     { tag = "fight", cmd = CMD.fight },
   },
-  -- UNEXERCISED (no fixture carries them yet); see metrics_battle.lua
+  -- EDGAR carries the stretch's two DELIBERATE keys and this ladder is
+  -- what drives them. It grew two probe rungs and one exploit rung for
+  -- the v0.3 trash-weakness pass, because as written the poison rung
+  -- could never fire: `want = "weak_poison"` waits for poison to be
+  -- REVEALED, and the only thing in the party that casts poison is the
+  -- BioBlaster itself. Circular -- so Edgar has to be willing to SPEND a
+  -- turn finding out, exactly as Terra spends one on probe_fire and Locke
+  -- one on Steal. Two turns, in the order a player would try them:
+  --   probe_swing the SWORD first. It is the cheapest probe there is -- no
+  --               menu, no item, the thing the A button already does -- and
+  --               Edgar's Mithril Blade is the party's only slashing weapon
+  --               (ot6_class.asm:59), so this rung is the sole way any
+  --               driver can discover a slash row. Brawler's, for one.
+  --   probe_bio   then the tool, if the blade taught nothing. Free (0 MP)
+  --               and it targets the whole enemy side (magic_prop_en.dat
+  --               $7d: tgt $6a), so one turn probes every monster in the
+  --               formation at once.
+  -- and `bio`/`slash` exploit whichever answered. THE ORDER WAS MEASURED,
+  -- not assumed. Tool-first was tried and it is strictly worse, for a
+  -- reason worth keeping: Brawler ABSORBS poison (monster_prop.dat +$0177
+  -- = $08), so a tool-first Edgar opens every Brawler fight by HEALING both
+  -- of them -- 75 to 86 HP of it per fight, which the driver reports as
+  -- `monster_heal` -- and only reaches the blade on his second turn, by
+  -- which time Locke and Terra have spent the monster's HP and the break
+  -- lands on a corpse. It made the MASH arm chip Brawlers better than the
+  -- loop arm (3.5 chips / 1.5 breaks vs 1.0 / 0.0), which is backwards.
+  -- The trap is real and stays in the game; leading with the free probe is
+  -- simply what a player does, and it is what the loop needs here.
   [0x04] = { name = "EDGAR",
     { tag = "bio", cmd = CMD.tools, want = "weak_poison",
+      pick = function(slot) return toolsCursor(slot, TOOL.bioblaster) end },
+    { tag = "slash", cmd = CMD.fight, want = "weak_slash" },
+    { tag = "probe_swing", cmd = CMD.fight, want = "probe1" },
+    { tag = "probe_bio", cmd = CMD.tools, want = "probe2",
       pick = function(slot) return toolsCursor(slot, TOOL.bioblaster) end },
     { tag = "xbow", cmd = CMD.tools,
       pick = function(slot) return toolsCursor(slot, TOOL.autocrossbow) end },
@@ -293,6 +402,17 @@ POLICIES.greedy   = { boost = function(slot)
   return bp(slot) >= 1 and math.min(bp(slot), 3) or 0 end, probe = true }
 POLICIES.badboost = { boost = function(slot)
   return bp(slot) >= 3 and 3 or 0 end, probe = false, force = "fight" }
+-- mash: LITERALLY holding A. Every character Fights with what is equipped,
+-- nobody boosts, nobody opens a menu. Added 2026-07-19 for the trash
+-- weakness pass, which has to answer "does the mash arm chip by accident?"
+-- and could not: `baseline` has no probe discipline but still lets Edgar
+-- fall through to AutoCrossbow, because that rung carries no `want` gate.
+-- That is a fine denominator (and stays one -- every published measurement
+-- uses it) but it is not a masher: it swings PIERCE from Edgar where a
+-- masher swings his Mithril Blade's SLASH. The two arms differ by exactly
+-- that, so run both and read `chips` in each.
+POLICIES.mash     = { boost = function() return 0 end,
+                      probe = false, force = "fight" }
 
 -- ------------------------------------------------------ accumulators --
 local S, C, bySlot, mons, qShadow
@@ -303,6 +423,7 @@ local voidReason, paceSteps
 local actTrace
 
 local function resetBattleState()
+  seenReset()           -- battles are loadState-independent: so is knowledge
   S = {
     t0 = 0, frames = 0,
     playerActions = 0, enemyActions = 0, counterActions = 0,
@@ -363,7 +484,31 @@ local function entryOk(rec, entry, pol)
   if not hasCmd(rec, entry.cmd) then return false end
   if entry.mp and H.readWord(PMP + rec.slot*2) < entry.mp then return false end
   if entry.want == "weak_fire" then return pol.probe and anyRevealed(0x01) end
-  if entry.want == "weak_poison" then return pol.probe and anyRevealed(0x20) end
+  -- poison is element bit $08. This read $20 (PEARL) until 2026-07-19 --
+  -- the bit order is fire $01, ice $02, bolt $04, poison $08, wind $10,
+  -- pearl $20, earth $40, water $80 (Ot6Chip walks it from bit 0 at
+  -- ot6.asm:627-633, and Ot6ElemAddTbl's own rows read $08 for the poison
+  -- armor line). The rung had never been driven, so the wrong bit had
+  -- never cost a measurement; it would have cost this one.
+  if entry.want == "weak_poison" then return pol.probe and anyRevealed(0x08) end
+  if entry.want == "weak_slash" then
+    return pol.probe and anyRevealedClass(0x01)     -- OT6_SLASH
+  end
+  -- probe1/probe2: Edgar's FIRST and SECOND information turns. The gate is
+  -- "nothing *Edgar* can exploit is known yet", not Terra's "nothing at all
+  -- is known" -- and that distinction is load-bearing, not pedantry. Edgar's
+  -- ladder can act on poison and on a class; it can do nothing whatever with
+  -- a revealed FIRE, which is Terra's key. Under the board-wide gate, Terra
+  -- probing first and finding fire (Tusker is fire-weak) stopped Edgar
+  -- probing before he ever opened Tools, so the poison rung stayed dead for
+  -- exactly the species it was authored for. Reading only REVEALED bits
+  -- keeps this honest: the gate sees what the player sees, never the
+  -- monster's hidden weak byte.
+  if entry.want == "probe1" or entry.want == "probe2" then
+    local unread = not anyRevealed(0x08) and not anyRevealedClass(0xff)
+    local n = (entry.want == "probe1") and 0 or 1
+    return pol.probe and unread and rec.actions == n
+  end
   if entry.want == "probe_turn" then
     -- this actor's opening information turn, taken only while the board
     -- is unread. Covers Locke's Steal and Terra's Fire alike -- an
@@ -529,9 +674,25 @@ local function sample()
     else S.unattributedBreaks = S.unattributedBreaks + 1 end
     pendBreaks[i] = nil
   end
+  -- `monsterAlive and broken`, not bare `broken` -- the same predicate
+  -- brokenNow above uses, and it was NOT the same before 2026-07-19. The
+  -- broken timer is $10 ticks decremented on the monster's own turn
+  -- (ot6.asm:20, :1140), so a monster that breaks and DIES to the breaking
+  -- hit never ticks it down: the corpse stays "broken" for the rest of the
+  -- fight and every frame of it was counted as break uptime. That is the
+  -- worst possible failure mode for this metric, because break-and-die is
+  -- precisely the pathology the uptime number exists to detect -- it
+  -- reported 58% uptime on a Brawler pair where `player_actions_broken`
+  -- was 0, i.e. where the window never existed at all.
+  -- accumulate what the player has been told, before anyone dies of it
+  for slot = 0, 5 do
+    if monsterAlive(slot) then
+      seenAdd(H.readByte(RVEAL + slot*2), H.readByte(RVEALC + slot*2))
+    end
+  end
   local anyBroken = false
   for _, m in ipairs(mons) do
-    if broken(m.slot) then anyBroken = true end
+    if monsterAlive(m.slot) and broken(m.slot) then anyBroken = true end
     local hp = H.readWord(MHP + m.slot*2)
     if hp < m.hp then
       local d = m.hp - hp
@@ -584,7 +745,27 @@ local function sample()
   local aliveC = 0
   for _, c in ipairs(C) do if c.hp > 0 then aliveC = aliveC + 1 end end
   if aliveC == 0 then S.result = "wiped" return true end
-  if not H.battleLoadStarted() then S.result = "torn_down" return true end
+  -- The teardown probe scans the WHOLE party, not slot 0. lib/ot6.lua's
+  -- H.battleLoadStarted() reads one word -- M.BATTLE_HP = $3BF4, which is
+  -- battle slot 0's current HP (lib/ot6.lua:301,:336) -- and calls a zero
+  -- there "no battle". That held for every fixture before this one because
+  -- no slot-0 character ever died in them. On kolts_pool slot 0 is EDGAR
+  -- and a Tusker pair kills him in four enemy actions, so the driver
+  -- declared `torn_down` and abandoned battles that were still being
+  -- fought: 9 of 48 samples in the first authoring sweep, each one cut at
+  -- the exact frame Edgar fell, with TTK, damage taken and the win/loss
+  -- ledger all truncated with it. Scanning all four slots asks the question
+  -- the probe meant to ask ("is anyone still standing in a battle?"); the
+  -- all-dead case is the `wiped` branch immediately above, so the two
+  -- together cover it. Left local rather than pushed into lib/ot6.lua: 24
+  -- gate tests call H.battleLoadStarted() and none of them has a slot-0
+  -- death, so widening the shared helper buys nothing and risks all of them.
+  local anyC = false
+  for i = 0, 3 do
+    local hp = H.readWord(PHP + i*2)
+    if hp ~= 0xffff and hp ~= 0 and hp < 10000 then anyC = true end
+  end
+  if not anyC then S.result = "torn_down" return true end
   local aliveM = 0
   for _, m in ipairs(mons) do
     if monsterAlive(m.slot) then aliveM = aliveM + 1 end
@@ -865,8 +1046,37 @@ local function battleBlock(k)
         emu.write(ROM_SHIELD, POKE_SHIELD, emu.memType.snesPrgRom)
         H.assertEq(H.readRomByte(ROM_SHIELD), POKE_SHIELD, "resistance poked")
       end
+      -- the authoring arm, same drift-guard-then-poke discipline. Guard on
+      -- the SHIPPED value, so a re-run after the poke (the ROM image is not
+      -- savestate-backed, so battle 2 sees battle 1's poke) is a no-op
+      -- rather than a false drift alarm.
+      if POKE_AUTHORING == "off" then
+        for addr, want in pairs(AUTHORING_OK) do
+          local seen = H.readRomWord(addr)
+          if seen ~= want and seen ~= 0xffff and seen ~= 0x0fff then
+            error(string.format(
+              "authoring layout drift: $%06X reads $%04X, want $%04X -- "
+              .. "re-derive from ff6/rom/ff6-en.dbg", addr, seen, want), 0)
+          end
+        end
+        -- byte pair, not writeWord: emu.write is the call the two knobs
+        -- above already use against snesPrgRom, and there is no
+        -- H.writeRomWord in lib/ot6.lua to borrow.
+        local function pokeRomWord(addr, v)
+          emu.write(addr, v & 0xff, emu.memType.snesPrgRom)
+          emu.write(addr + 1, (v >> 8) & 0xff, emu.memType.snesPrgRom)
+          H.assertEq(H.readRomWord(addr), v,
+            string.format("authoring poke landed at $%06X", addr))
+        end
+        pokeRomWord(ROM_ELEMADD_V3, 0xffff)   -- hide the six element rows
+        for _, a in ipairs(ROM_SHIELDROWS_V3) do
+          pokeRomWord(a, 0x0fff)              -- make each shield row inert
+        end
+      end
       mline("knob_hp", string.format("%02x", H.readRomByte(ROM_HPMUL)))
       mline("knob_shield", string.format("%02x", H.readRomByte(ROM_SHIELD)))
+      mline("knob_authoring", string.format("%04x/%04x",
+        H.readRomWord(ROM_ELEMADD_V3), H.readRomWord(ROM_BRAWLER_ROW)))
       mline("fixture", FIXTURE)
       -- cold danger counter + seeded rolls: battle k is the same battle in
       -- every policy arm (mines_pace.lua Measurement #4)
