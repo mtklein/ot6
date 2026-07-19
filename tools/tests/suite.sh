@@ -75,25 +75,48 @@ verdict() {
 if [ "$JOBS" -gt 1 ]; then
   WROOT="$ROOT/build/test-workers"
   CDIR="$WROOT/suite-composed"; RDIR="$WROOT/suite-results"
-  rm -rf "$CDIR" "$RDIR"; mkdir -p "$CDIR" "$RDIR"
+  CLAIMS="$WROOT/suite-claims"
+  rm -rf "$CDIR" "$RDIR" "$CLAIMS"; mkdir -p "$CDIR" "$RDIR" "$CLAIMS"
   for t in $TESTS; do
     python3 "$ROOT/tools/tests/lib/compose.py" \
       "$ROOT/tools/tests/$t.lua" "$CDIR/$t.lua" >/dev/null \
       || { echo "compose failed: $t"; exit 1; }
   done
+  # Execution order for the pull queue below: front-load the known long
+  # runners. Workers used to get a STATIC i%JOBS slice, and that was the whole
+  # problem -- it pinned battle_class (~156s) AND battle_vargas (~64s) AND four
+  # more onto one worker (~311s of work) while another drained in ~60s and then
+  # sat idle. The fix is two things: (1) a dynamic claim queue -- each worker
+  # grabs the NEXT unclaimed test as it frees up, so fast workers pull more --
+  # and (2) longest-first order, so no worker ever starts a 156s test after the
+  # rest have drained. That is textbook LPT scheduling: measured makespan
+  # ~311s -> ~168s at JOBS=4, against a ~156s floor (the single longest test,
+  # which no amount of fan-out can split). This list is ONLY a hint -- every
+  # test not named here still runs (appended in canonical order below), and if
+  # these durations drift the worst case is a little idle tail, never a lost or
+  # double-run test. Keep the biggest handful in front; exact order past that
+  # barely moves the makespan.
+  in_list() { case " $2 " in *" $1 "*) return 0 ;; *) return 1 ;; esac; }
+  SCHED_LONG="battle_class battle_reveal_poweron battle_vargas battle_whelkwipe battle_hits battle_codex battle_dmgnum battle_break battle_runic probe_shadow_overlap battle_dlgmenu hud_stability"
+  ORDER=""
+  for t in $SCHED_LONG; do in_list "$t" "$TESTS" && ORDER="$ORDER $t"; done
+  for t in $TESTS; do in_list "$t" "$ORDER" || ORDER="$ORDER $t"; done
   w=0
   while [ "$w" -lt "$JOBS" ]; do
     (
-      i=0
-      for t in $TESTS; do
-        if [ $((i % JOBS)) -eq "$w" ]; then
-          t0=$(python3 -c 'import time; print(time.time())')
-          env $(ram_env_for "$t") OT6_WORKER="$w" "$RUN" "$CDIR/$t.lua" "$ROOT/build/states/suite_$t.log" >/dev/null 2>&1
-          rc=$?
-          secs=$(python3 -c "import time; print(f'{time.time()-$t0:.1f}')")
-          echo "$rc $w $secs" > "$RDIR/$t"
-        fi
-        i=$((i + 1))
+      for t in $ORDER; do
+        # Atomic claim: whoever creates the marker first runs the test; the
+        # rest skip on. mkdir is the portable filesystem compare-and-swap, so
+        # no test runs twice and (because every worker walks the whole list)
+        # none is ever left unclaimed. Result files keep the same
+        # "rc w secs" shape the verdict loop and the golden's worker lookup
+        # already read, so nothing downstream changes.
+        mkdir "$CLAIMS/$t" 2>/dev/null || continue
+        t0=$(python3 -c 'import time; print(time.time())')
+        env $(ram_env_for "$t") OT6_WORKER="$w" "$RUN" "$CDIR/$t.lua" "$ROOT/build/states/suite_$t.log" >/dev/null 2>&1
+        rc=$?
+        secs=$(python3 -c "import time; print(f'{time.time()-$t0:.1f}')")
+        echo "$rc $w $secs" > "$RDIR/$t"
       done
     ) &
     w=$((w + 1))
