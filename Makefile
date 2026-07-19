@@ -166,7 +166,10 @@ FRONTIER := arvis_wake narshe_streets moogle_doorstep moogle_cleared \
             terra_clifftop terra_done sabin_world sabin_camp \
             cyan_defence camp_intro kefka_done camp_cleared \
             doma_defended sfigaro_town sfigaro_passage celes_freed \
-            sfigaro_escape tunnelarmr_doorstep locke_done
+            sfigaro_escape tunnelarmr_doorstep locke_done \
+            t2_scenario_hub t2_rapids_start t2_rapids_done \
+            t2_terra_narshe t2_terra_caves t2_terra_clifftop \
+            t2_terra_done two_done
 
 # mint <state> from <script> once its ROM-content gate says it is stale.
 #
@@ -341,6 +344,59 @@ build/states/tunnelarmr_doorstep.mss.lua: build/states/sfigaro_escape.mss.lua
 	$(call mint,tunnelarmr_doorstep,gen_tunnelarmr)
 build/states/locke_done.mss.lua: build/states/tunnelarmr_doorstep.mss.lua
 	$(call mint,locke_done,gen_tunnelarmr)
+
+# ---- SCENARIO STACKING: the road to the reunion --------------------------
+# The reunion _caadb9 (event_main.asm:26683) needs $0021 && $001E && $0044 in
+# ONE playthrough; each honest chain sets one.  compose.py's OT6_STACK prefix
+# replays a whole chain's ROUTE LOGIC from a different boot: `smint` composes
+# the same generator with every .mss basename prefixed, so it boots the
+# prefixed predecessor and mints prefixed artifacts -- the honest states are
+# never touched.  Stack order LOCKE (honest) -> TERRA (t2_) -> SABIN (s3_):
+#  * Terra's is the shortest chain, so the first stacking layer -- the one
+#    that had to prove the mechanism -- replays the least;
+#  * the THIRD chain's hub return fires the reunion instead of reaching the
+#    hub (the if_all at :26654), so whichever chain goes last cannot end on
+#    its own "back at the hub" gate.  That final leg belongs to
+#    gen_narshe_battle, and Sabin's chain -- still growing its back half --
+#    is the one whose ending was free to leave unconsumed.
+define smint
+	@if [ build/states/.rom-copy -nt build/states/$(1).mss ] || [ ! -f build/states/$(1).mss ]; then \
+		OT6_STACK=$(2) tools/tests/run.sh tools/tests/$(3).lua; \
+	fi
+	@touch build/states/$(1).mss.lua
+endef
+
+# the seed: the stacked Terra chain's "scenario_hub" IS the Locke ending.
+# cp both halves (state + sidecar) under the same content gate the mints
+# use, so a locke_done re-mint (ROM changed) re-seeds and the stack replays.
+build/states/t2_scenario_hub.mss.lua: build/states/locke_done.mss.lua
+	@if [ build/states/.rom-copy -nt build/states/t2_scenario_hub.mss ] || [ ! -f build/states/t2_scenario_hub.mss ]; then \
+		cp build/states/locke_done.mss build/states/t2_scenario_hub.mss; \
+		cp build/states/locke_done.mss.lua build/states/t2_scenario_hub.mss.lua; \
+		echo "stack seed: t2_scenario_hub <- locke_done"; \
+	fi
+	@touch build/states/t2_scenario_hub.mss.lua
+build/states/t2_rapids_start.mss.lua: build/states/t2_scenario_hub.mss.lua
+	$(call smint,t2_rapids_start,t2_,gen_rapids)
+build/states/t2_rapids_done.mss.lua: build/states/t2_rapids_start.mss.lua
+	$(call smint,t2_rapids_done,t2_,gen_rapids)
+build/states/t2_terra_narshe.mss.lua: build/states/t2_rapids_done.mss.lua
+	$(call smint,t2_terra_narshe,t2_,gen_terra_narshe)
+build/states/t2_terra_caves.mss.lua: build/states/t2_terra_narshe.mss.lua
+	$(call smint,t2_terra_caves,t2_,gen_terra_caves)
+build/states/t2_terra_clifftop.mss.lua: build/states/t2_terra_caves.mss.lua
+	$(call smint,t2_terra_clifftop,t2_,gen_terra_clifftop)
+build/states/t2_terra_done.mss.lua: build/states/t2_terra_clifftop.mss.lua
+	$(call smint,t2_terra_done,t2_,gen_terra_done)
+# the acceptance gate: asserts BOTH flags on the stacked ending and re-saves
+# it under the canonical name (gen_two_done.lua's header says why the assert
+# lives outside the mechanically-prefixed chain).
+build/states/two_done.mss.lua: build/states/t2_terra_done.mss.lua
+	$(call mint,two_done,gen_two_done)
+# SABIN's slot (consumed when his back half lands): seed s3_scenario_hub
+# from two_done, replay his whole chain with OT6_STACK=s3_ ending at his
+# deepest pre-hub state, and let gen_narshe_battle boot that -- its hub
+# return IS the reunion.  The rules mirror the t2_ block one-for-one.
 
 frontier: rom $(STATE1) $(STATE2) $(STATE3) \
           $(patsubst %,build/states/%.mss.lua,$(FRONTIER))

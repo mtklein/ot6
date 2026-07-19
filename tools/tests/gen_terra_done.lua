@@ -31,10 +31,20 @@
 --    scenario -- it is the way.
 --
 -- WHERE IT LANDS.  _caad4c (:26626) tears the party down to SCENARIO_MOG and
--- reloads map 9; with $0021 set but $001E and $0044 still clear it takes the
--- `if_any` at :26665 to _caadb4 and plays dlg $0B8C, "Choose a scenario…
--- kupo!", skipping the first-visit recap $016F.  The mint is the first
--- controllable frame after that.
+-- reloads map 9; with $0021 set (and NOT all three scenario flags set -- the
+-- `if_all` at :26654 to the reunion _caadb9 only opens on $0021 && $001E &&
+-- $0044) it takes the `if_any` at :26665 to _caadb4 and plays dlg $0B8C,
+-- "Choose a scenario… kupo!", skipping the first-visit recap $016F.  The
+-- mint is the first controllable frame after that.
+--
+-- STACK-CLEAN: this generator also runs under OT6_STACK (booted from a
+-- t2_terra_clifftop that descends from locke_done, $001E=1), so every claim
+-- about the OTHER scenarios' flags is asserted as UNCHANGED-SINCE-BOOT, not
+-- as zero -- "this route never touches Locke's or Sabin's state" is the
+-- real invariant, and it is the same assertion in both runs.  The one thing
+-- it must NOT be stacked into is the all-three boot: then _caad4c fires the
+-- reunion instead of returning the hub, and the finish gate here would time
+-- out.  gen_narshe_battle owns that hub return.
 local H = dofile("/Users/mtklein/ot6/tools/tests/lib/ot6.lua")
 local CLIFF = "/Users/mtklein/ot6/build/states/terra_clifftop.mss.lua"
 
@@ -89,10 +99,19 @@ local function where(tag)
     sw(0x00A4)))
 end
 
+-- the other scenarios' completion flags and hub NPCs, sampled at boot:
+-- asserted UNCHANGED at the finish (see STACK-CLEAN above)
+local boot = {}
+
 H.run({ maxFrames = 60000 }, {
   H.loadState(CLIFF),
   H.waitFrames(30),
   H.call(function()
+    for _, id in ipairs({ 0x001E, 0x0044, 0x0329, 0x032A }) do
+      boot[id] = sw(id)
+    end
+    H.assertEq(boot[0x001E] == 1 and boot[0x0044] == 1, false,
+      "not booted from an all-three stack (that boot belongs to gen_narshe_battle)")
     H.assertEq(map(), 20, "booted on map 20, the clifftop above Narshe")
     H.assertEq(H.fieldX(), 27, "at the arrival tile x=27")
     H.assertEq(H.fieldY(), 8, "at the arrival tile y=8")
@@ -150,15 +169,19 @@ H.run({ maxFrames = 60000 }, {
     H.assertEq(H.battleLoadStarted(), false, "no battle")
     H.assertEq(sw(0x0021), 1,
       "$0021 SET -- TERRA/BANON's scenario is complete (_ccb3fa, :104954)")
-    H.assertEq(sw(0x001E), 0, "$001E still clear -- LOCKE's scenario is not")
-    H.assertEq(sw(0x0044), 0, "$0044 still clear -- nor SABIN's")
-    -- the hub is down to two choices: _ccb3fa cleared all three NPCs that
+    H.assertEq(sw(0x001E), boot[0x001E],
+      "$001E unchanged -- this route never touches LOCKE's scenario")
+    H.assertEq(sw(0x0044), boot[0x0044],
+      "$0044 unchanged -- nor SABIN's")
+    -- this scenario's own hub NPCs are gone: _ccb3fa cleared all three that
     -- ran _cb094e (event_main.asm:104956-104958)
     H.assertEq(sw(0x032B), 0, "$032B clear -- BANON's hub NPC is gone")
     H.assertEq(sw(0x032C), 0, "$032C clear -- TERRA's too")
     H.assertEq(sw(0x032D), 0, "$032D clear -- and EDGAR's")
-    H.assertEq(sw(0x0329), 1, "$0329 still set -- LOCKE's NPC is still waiting")
-    H.assertEq(sw(0x032A), 1, "$032A still set -- and SABIN's")
+    H.assertEq(sw(0x0329), boot[0x0329],
+      "$0329 unchanged -- LOCKE's hub NPC is whatever the boot left it")
+    H.assertEq(sw(0x032A), boot[0x032A],
+      "$032A unchanged -- and SABIN's")
     -- and the party is Mog alone again
     H.assertEq((H.readByte(0x185d) & 0x07) ~= 0, true, "SCENARIO_MOG is the party")
     H.assertEq((H.readByte(0x1850) & 0x07) ~= 0, false, "TERRA out")
