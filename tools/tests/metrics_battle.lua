@@ -879,6 +879,12 @@ H.run({ maxFrames = METRICS_FRAMES + 12000 }, {
         if BUFF_HP > 0 then H.writeWord(MHP + slot*2, BUFF_HP) end
         local hp = H.readWord(MHP + slot*2)
         mons[#mons + 1] = { slot = slot, hp = hp, hp0 = hp, dmg = 0 }
+        -- what the fixture actually was, so a report is readable without
+        -- re-deriving the formation from the state
+        H.log(string.format(
+          "[metrics-ev] mon s%d sp%04X hp%d weak%02X shields%d/%d",
+          slot, H.readWord(0x57c0 + slot*2), hp, H.readByte(WEAK + slot*2),
+          H.readByte(SHLD + slot*2), H.readByte(SHLD + slot*2 + 1)))
       end
     end
     for qi, q in ipairs(QUEUES) do qShadow[qi] = H.readByte(q.ptr) end
