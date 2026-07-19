@@ -231,13 +231,20 @@ TTK-tuned at 2x; the first break stays the Whelk head's authored
 4·pierce (verified live by `whelkbal_tek`); trash breaks arrive
 with M6 class-weakness data, not with HP multipliers.
 
-Shipped values (`Ot6HpMulTbl`, 16ths): $20/$20/$10/$10 — band
-$00–$5F 2x (swept, above), band $60–$BF 2x (census arithmetic: WoB
-mid trash HP 119–495 keeps the same damage:HP shape; stretch
-fixtures should confirm), bands $C0–$FF and $100+ 1x (WoR
-unmeasured; $100+ additionally guards Doom Gaze's saved-HP reload
-from compounding). Gate: full suite green twice at these values,
-story-chain fixtures re-minted, Whelk head untouched at 1600 HP.
+Values shipped AT THE TIME (`Ot6HpMulTbl`, 16ths): $20/$20/$10/$10
+— band $00–$5F 2x (swept, above), band $60–$BF 2x (census
+arithmetic: WoB mid trash HP 119–495 keeps the same damage:HP
+shape; stretch fixtures should confirm), bands $C0–$FF and $100+ 1x
+(WoR unmeasured; $100+ additionally guards Doom Gaze's saved-HP
+reload from compounding). Gate: full suite green twice at these
+values, story-chain fixtures re-minted, Whelk head untouched at
+1600 HP.
+
+**Superseded — do not read the line above as current.** Measurement
+#5 retired the HP dial entirely; the table ships $10/$10/$10/$10
+(all 1x) and shielded resistance carries difficulty instead. See
+Measurement #5 below and `Ot6HpMulTbl` in ot6.asm for the live
+values.
 
 ## Measurement #4 — encounter-rate and reward parity (2026-07-17)
 
