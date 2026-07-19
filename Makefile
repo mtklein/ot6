@@ -158,7 +158,8 @@ FRONTIER := arvis_wake narshe_streets moogle_doorstep moogle_cleared \
             kolts_cave vargas_doorstep vargas_won returner_hideout \
             banon_joined lete_river scenario_hub locke_scenario \
             rapids_start rapids_done terra_narshe terra_caves \
-            terra_clifftop terra_done
+            terra_clifftop terra_done \
+            sabin_world sabin_camp
 
 # mint <state> from <script> once its ROM-content gate says it is stale
 define mint
@@ -256,6 +257,15 @@ build/states/terra_clifftop.mss.lua: build/states/terra_caves.mss.lua
 # out the far side with $0021 set -- the scenario complete, back at the hub
 build/states/terra_done.mss.lua: build/states/terra_clifftop.mss.lua
 	$(call mint,terra_done,gen_terra_done)
+# ---- SABIN's scenario: the longest of the three v0.3 branches ----
+# gen_sabin_world: the hub dispatch, the overworld landing at (161,36),
+# SHADOW's house (map 115) and the walk to the Imperial Camp.  Two states
+# from one script so an experiment on the house replays 700 frames, not the
+# hub as well.
+build/states/sabin_world.mss.lua: build/states/scenario_hub.mss.lua
+	$(call mint,sabin_world,gen_sabin_world)
+build/states/sabin_camp.mss.lua: build/states/sabin_world.mss.lua
+	$(call mint,sabin_camp,gen_sabin_world)
 
 frontier: rom $(STATE1) $(STATE2) $(STATE3) \
           $(patsubst %,build/states/%.mss.lua,$(FRONTIER))
