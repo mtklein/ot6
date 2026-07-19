@@ -3,7 +3,9 @@
 # worktree root. The gitignored pieces a worktree lacks are seeded from the
 # main tree: the base ROM (copied — make verify hashes it) plus Mesen.app
 # and tools/bin (symlinked — run.sh clones its own portable Mesen copy per
-# run, so a shared read-only source bundle is safe). Generated build
+# run, so a shared read-only source bundle is safe; that safety rests on
+# run.sh copying with -L, since a plain cp -R would propagate THIS symlink
+# and hand every worker a link to the one shared bundle). Generated build
 # products (.lz compression, ca65 depfiles) need no seeding: ff6/Makefile
 # schedules them from tracked sources, so plain `make` builds them.
 set -eu

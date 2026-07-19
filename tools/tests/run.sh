@@ -65,16 +65,33 @@ fi
 
 # One-time portable emulator copy. cp -c = APFS clonefile: instant and ~zero
 # physical disk; falls back to a plain copy on non-APFS filesystems.
-if [ ! -x "$MESEN_TEST/Contents/MacOS/Mesen" ]; then
+#
+# -L (dereference) is load-bearing, not hygiene.  In a git worktree
+# tools/Mesen.app is itself a SYMLINK into the main tree (worktree-setup.sh
+# makes it one, on the premise that a read-only source bundle is safe to
+# share), and `cp -R` copies a symlink SOURCE as a symlink rather than
+# walking it.  Every worker's "private" bundle was therefore one more link to
+# the single main-tree bundle -- so all of them, across ALL agents'
+# worktrees, shared one settings.json and raced on the rewrite below.  The
+# isolation this script promises held in the main tree (a real directory
+# there, so the copy was real) and was silently absent in exactly the
+# worktrees that fan tests out.  Test it with -L too, so a tree already
+# poisoned by that bug re-creates the bundle instead of trusting a link that
+# resolves fine.  (rm -rf on a symlink unlinks it; the target is untouched.)
+if [ -L "$MESEN_TEST" ] || [ ! -x "$MESEN_TEST/Contents/MacOS/Mesen" ]; then
   echo "creating portable test emulator (one-time copy)..."
   rm -rf "$MESEN_TEST"
-  cp -c -R "$ROOT/tools/Mesen.app" "$MESEN_TEST" 2>/dev/null || cp -R "$ROOT/tools/Mesen.app" "$MESEN_TEST"
+  cp -c -RL "$ROOT/tools/Mesen.app" "$MESEN_TEST" 2>/dev/null || cp -RL "$ROOT/tools/Mesen.app" "$MESEN_TEST"
 fi
-# (re)write the portable settings every run so the override can't drift
+# (re)write the portable settings every run so the override can't drift.
+# Its exit code is checked: a failed pin leaves whatever settings.json the
+# bundle already had, which is exactly the unpinned state the determinism
+# guarantees exclude (and, before the -L fix above, another worker's).
+# Refusing the run beats reporting a green that never had the pins.
 python3 "$ROOT/tools/tests/lib/pin_test_saves.py" \
   "$HOME/Library/Application Support/Mesen2/settings.json" \
   "$MESEN_TEST/Contents/MacOS/settings.json" \
-  "$TEST_SAVES"
+  "$TEST_SAVES" || { echo "pin_test_saves.py failed; refusing to run unpinned"; exit 2; }
 
 # Fresh battery every run: the testrunner flushes SRAM to <saves>/*.srm on
 # exit and silently reloads it next boot -- a stale srm is a hidden

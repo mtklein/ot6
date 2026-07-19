@@ -55,7 +55,11 @@ into the bundle every launch (so two workers sharing one would race on
 each other's `SaveDataFolder`) and the emulator writes `Debugger/*.cdl`
 there, so concurrent instances must never share an app copy.  (The
 testrunner does NOT write settings back -- `DisableSaveSettings` is set --
-and never creates `SaveStates/`.)  `suite.sh`
+and never creates `SaveStates/`.)  That copy is made with `cp -RL`: in a
+worktree `tools/Mesen.app` is a symlink into the main tree, and a plain
+`cp -R` copies the symlink itself, which silently gave every worker -- in
+every agent's worktree at once -- a link to one shared bundle and one
+shared `settings.json`.  `suite.sh`
 honors `OT6_JOBS=N` (default 4 = the P-core knee; 1 = serial) and fans its
 tests out across workers; every suite test is a pure savestate load (the
 mints run as Makefile prerequisites first), so order doesn't matter.
@@ -386,8 +390,9 @@ route edit shifts them.
 
 - Do not delete `~/Library/Application Support/Mesen2/settings.json`.  The
   reason is OURS, not Mesen's: `run.sh` feeds that path to
-  `pin_test_saves.py`, which opens it unconditionally and would raise --
-  and run.sh never checks that script's exit code.  The testrunner itself
+  `pin_test_saves.py`, which opens it unconditionally and would raise.
+  run.sh now checks that exit code and aborts (exit 2) rather than running
+  against whatever settings.json the bundle already held.  The testrunner itself
   does not need it; a `settings.json` beside the binary puts Mesen in
   portable mode and fully determines its home folder
   (`ConfigManager.cs:177`), which is exactly what run.sh writes.
