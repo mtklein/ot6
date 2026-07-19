@@ -20,7 +20,10 @@
 -- that command, no menu input -- and is un-muddled the moment the stance
 -- bit appears, so nothing re-queues it (QueueAction :496-498 would clear
 -- $3E4C.2 on her next action, which doubles as this test's guard that
--- she never took a turn mid-measurement).
+-- she never took a turn mid-measurement).  She is then held off the turn
+-- order by her ATB byte rather than by stop status -- stop is the one
+-- thing RunicEffect's CheckStatus gate rejects, so stopping her would
+-- delete the mechanic under test.  See pin().
 --
 -- THE CONTROL IS THE POINT.  Terra casts twice into the same standing
 -- stance; the ONLY difference is the spell's own runic-able flag --
@@ -29,7 +32,8 @@
 -- the ROM (C4/6AC0 -> PRG 0x046AC0), so the test asserts against the
 -- shipped data rather than a hardcoded spell list:
 --   negative -- magitek status left ON, so muddle rolls MagiTek beams
---     ($83-$8A, bit 3 CLEAR).  Stance stays up, MP flat, BP FLAT.
+--     (bit 3 CLEAR across the whole range; runs land on $81/$84).
+--     Stance stays up, MP flat, BP FLAT.
 --   positive -- magitek cleared and a Magic-only list, so she rolls real
 --     magic (Fire $00 / Cure $2D, bit 3 SET).  Stance clears, MP rises,
 --     BP +1.
