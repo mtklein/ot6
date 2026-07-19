@@ -15,7 +15,7 @@ make frontier                                   # mint the deep story states (sl
 `make test` mints only the three states the suite asserts on.  The
 STORY CHAIN past the whelk -- arvis_wake, narshe_streets,
 moogle_doorstep, moogle_cleared, worldmap_narshe, figaro_doorstep,
-figaro_intro, figaro_matron -- lives behind `make frontier`, which
+figaro_intro, figaro_matron, figaro_cleared -- lives behind `make frontier`, which
 nothing in the gate depends on: each link is a multi-minute scripted playthrough that
 consumes the previous link's savestate, and the suite's remint cost has
 to stay what it was.  The links use the same ROM-content gate as the
@@ -110,13 +110,18 @@ line reports its worker and wall time.
   `docs/playing-headless.md`).  Kept because probe_slots and the
   balance instruments still consume `make_srm_sidecar.sh` saves;
   requires a pre-Whelk save, which no longer exists locally.
-- `gen_edgar.lua` - Figaro Castle, gate to the throne: walks
+- `gen_edgar.lua` - THE WHOLE FIGARO CHAPTER, gate to world map: walks
   `figaro_doorstep.mss` in, buys the BioBlaster + NoiseBlaster from the
   tool merchant (the ONLY window - the merchant refuses once EDGAR or
-  SABIN is in the party), takes Edgar's audience, then crosses the
+  SABIN is in the party), takes Edgar's audience, crosses the
   castle to the MATRON and rides her flashback, which is what puts
-  Edgar back on his throne ($0308).  Emits `figaro_intro.mss` and
-  `figaro_matron.mss`.  Its header documents four measured mechanisms the
+  Edgar back on his throne ($0308), then returns for the second audience
+  and KEFKA's arrival, works the confrontation (BOTH troopers, then
+  Kefka), LOCKE's regroup, the burning night and the submerge, and rides
+  the chocobos out.  Emits `figaro_intro.mss` (frame 5804),
+  `figaro_matron.mss` (10433) and `figaro_cleared.mss` (32071 - world
+  map, TERRA + LOCKE + EDGAR, tools carried, party on a chocobo).
+  Its header documents four measured mechanisms the
   entrance/NPC tables do not give you: event switches $01F0..$01FF are
   per-map scratch (`LoadMap` zeroes $1EBE/$1EBF), NPC activation is
   decided by the party FACING byte and a two-frame turn press does not

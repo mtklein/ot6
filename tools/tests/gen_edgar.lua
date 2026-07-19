@@ -1,16 +1,24 @@
--- gen_edgar.lua -- from figaro_doorstep.mss (TERRA + LOCKE at map 55
--- (28,42), the Figaro Castle gate): walk in, BUY THE TOOLS in the only
--- window the game ever offers, take the throne-room audience with EDGAR,
--- then cross the castle to the MATRON and ride her flashback -- the beat
--- that puts Edgar back on his throne and unblocks the rest of the
--- chapter.  Mints figaro_intro.mss (after the audience) and
--- figaro_matron.mss (after the flashback, $0308 set again).
+-- gen_edgar.lua -- THE WHOLE FIGARO CHAPTER, from figaro_doorstep.mss
+-- (TERRA + LOCKE at map 55 (28,42), the castle gate) to the world map
+-- outside the sand.  Walk in, BUY THE TOOLS in the only window the game
+-- ever offers, take the throne-room audience with EDGAR, cross the castle
+-- to the MATRON and ride her flashback (the beat that puts Edgar back on
+-- his throne), take the second audience into KEFKA's arrival, work the
+-- confrontation, LOCKE's regroup and the burning night, and finally let
+-- the castle submerge and ride the chocobos out.  Mints three states:
+--   figaro_intro.mss    after the first audience ($0004 set)
+--   figaro_matron.mss   after the flashback ($0308 set again)
+--   figaro_cleared.mss  first controllable frame on the world map,
+--                       TERRA + LOCKE + EDGAR, tools carried
 --
--- SCOPE.  Stops with Edgar respawned.  The remainder (second audience ->
--- Kefka -> the confrontation -> LOCKE's regroup -> the burning night ->
--- the submerge and the chocobos) is read out of the event source below,
--- and the walking it needs is the same door/staircase machinery this
--- script already uses -- see "WHAT REMAINS" at the end of this header.
+-- ROUTING IS DONE FROM THE ENTRANCE TABLES, not by exploring: every
+-- crossDoor below names a real record in ff6/src/field/trigger/
+-- short_entrance.dat (6-byte records, srcX/srcY/map/flags/dstX/dstY per
+-- field/short_entrance.inc), indexed per map by the _N offsets in that
+-- .inc.  The castle's whole door graph is 12 records on map 55, 23 on 59,
+-- 2 each on 57 and 60, and one 2-tile LONG entrance out of the throne
+-- room -- which is what makes the "disconnected regions" note below
+-- checkable rather than folklore.
 --
 -- THE MECHANISM (why "talk to Edgar twice" is not the story; every line
 -- number is ff6/src/event/event_main.asm unless said otherwise):
@@ -138,19 +146,27 @@
 --   needs -- takes the map-60 stair instead.  BFS still does not know about
 --   entrance triggers; keep route legs off y=43.
 --
--- WHAT REMAINS, for the pass that finishes the chapter.  Every beat is
---   already decoded above; what is left is walking and cutscene-riding:
---     * second audience: back to 58 via 55 (23,26) -> courtyard ->
---       (28,13) -> 59 (27,28) -> (27,13).  Returning from the west ring
---       means re-crossing the chamber stair the other way (59 (64,42) ->
---       (49,59)), which was not measured;
---     * Kefka's arrival leaves EDGAR alone; talk BOTH troopers (objects
---       21 and 22) then Kefka (object 20) -- $01F0/$01F1 are map-local, so
---       the gate scene's earlier $01F0 is gone;
---     * LOCKE (object 27, at (28,15)) regroups the party and arms $0313;
---     * the guest-room LOCKE is map 59 (82,45), reached via the EAST ring
---       (map-60 stair, then 55 (44,26) -> 59 (79,52));
---     * the submerge is the courtyard guard (object 19) once $01F8 is set.
+-- THE ROSTER CHANGES FOUR TIMES, so nothing may read a fixed character
+--   slot.  LOCKE leaves during the first audience; the Kefka scene makes
+--   the party EDGAR ALONE (`char_party EDGAR, 1 / party_chars EDGAR /
+--   char_party TERRA, 0 / delete_obj TERRA`, :16401-16407); LOCKE's
+--   regroup hands it back to TERRA alone and DELETES Edgar again
+--   (`char_party EDGAR, 0 / delete_obj EDGAR` :16813-16814,
+--   `party_chars TERRA` :16818); the burning night makes it EDGAR alone
+--   once more (:16944-16949).  Only after the submerge are all three in
+--   the party at once (asserted at the mint, by party byte not by slot).
+--   Every position read in this script goes through the $0803 party-object
+--   offset (H.fieldX/fieldY), which is what makes that survivable.
+--
+-- OBJECT NUMBERS are map-NPC index + 16, in npc_prop.asm order.  Map 55:
+--   19 courtyard guard {24,16} $0315 -> _ca5f9f (the submerge), 20 KEFKA
+--   {28,57} $03FE -> _ca6f02, 21/22 the two troopers {27,58}/{29,58}
+--   $03FE -> _ca6ee6/_ca6ef2, 27 LOCKE {28,15} $0311 -> _ca6f60.  Map 58:
+--   16 is the throne EDGAR.  Map 59: 19 the guest-room LOCKE {82,45}
+--   $0313 -> _ca700e, 25 the tool merchant.  The table positions are only
+--   where they SPAWN -- Kefka and the troopers walk up from y=57/58 during
+--   his scene and are at (28,28)/(29,27)/(27,27) when control returns --
+--   so talkTo tracks them by their live object coords, never these.
 --
 -- DOORS.  Entrance records fire when the party STANDS on the source tile
 --   (entrance.asm CheckShortEntrance), but a castle door tile is a WALL
@@ -160,7 +176,10 @@
 --   navTo(a neighbouring tile) + one continuous hold, and crossDoor
 --   derives which neighbour by BFS rather than assuming (Figaro uses all
 --   four: 55 (28,38) is entered from below, 59 (27,29) from above,
---   55 (12,19) from the right).
+--   55 (12,19) from the right).  A STAIRCASE entrance is the other kind:
+--   its tile is ordinary walkable floor, so BFS routes straight over it
+--   and the crossing can happen before the hold ever starts -- crossDoor
+--   treats a map change during its approach as arrival for that reason.
 local H = dofile("/Users/mtklein/ot6/tools/tests/lib/ot6.lua")
 local DOOR = "/Users/mtklein/ot6/build/states/figaro_doorstep.mss.lua"
 
@@ -189,6 +208,32 @@ local function calm(n, extra)
   local cnt = 0
   return function()
     local ok = H.hasControl() and H.tileAligned() and (not extra or extra())
+    cnt = ok and cnt + 1 or 0
+    return cnt >= n
+  end
+end
+
+-- calm()'s world-module twin, for after the submerge: the overworld is a
+-- separate engine with its own position and control registers, and every
+-- field predicate above reads meaningless RAM there (docs/research/
+-- world-map-nav.md).
+--
+-- THE BRIGHTNESS TERM IS LOAD-BEARING, and n is 120 rather than 30.  The
+-- submerge cutscene VISITS the world map in the middle of itself --
+-- `load_map 0, {64,76}` (event_main.asm:14731) is the shot of the castle
+-- going under, and sixteen frames later :14737 loads map 55 straight back.
+-- During that visit the world module is up, no world event is running yet
+-- and $19/$E8 are clear, so worldHasControl() is TRUE for ~56 frames on a
+-- fully black screen (measured: brightness 0 throughout, then the event
+-- engine takes $E7 bit0 at +56 and the screen only lights afterwards).
+-- A 30-frame calm window latched onto exactly that and minted a state
+-- 5700 frames early.  Requiring control and a lit screen SIMULTANEOUSLY
+-- rejects it, because the two never overlap during the transient.
+local function worldCalm(n)
+  local cnt = 0
+  return function()
+    local ok = H.worldMode() and H.worldHasControl() and H.worldAligned()
+      and (emu.getState()["ppu.screenBrightness"] or 0) >= 15
     cnt = ok and cnt + 1 or 0
     return cnt >= n
   end
@@ -225,17 +270,35 @@ local aPhase = 0
 --     side in roughly equal measure (55 (28,38) from below, 59 (27,29)
 --     from above, 55 (12,19) from the right), and a first attempt that
 --     assumed "always from below" walked into walls.  So the staging tile
---     and the hold direction are DERIVED: BFS each of the four neighbours
---     and take the first one that is actually reachable right now.
+--     and the hold direction are DERIVED: BFS each neighbour and take the
+--     first one that is actually reachable right now.
+-- The neighbour set is all EIGHT, not four: a door at the head of a
+-- staircase can only be entered diagonally.  59 (64,42), the west wing's
+-- way back into the chamber, is the worked example -- it sits on the "\"
+-- stair (64,42)/(65,43)/(66,44) and its only approach is up-left from
+-- (65,43), i.e. a LEFT press.  With four candidates crossDoor fell through
+-- to its own default and navTo then spent 20 retries proving there is no
+-- path to it.  A diagonal candidate has to clear one extra test: the move
+-- must be one the engine would actually produce there (H.canStep), since
+-- a left press only goes up-left on a tile that says so.
+local DIAGSTAGE = {
+  { 0, 1, "up" }, { 0, -1, "down" }, { -1, 0, "right" }, { 1, 0, "left" },
+  { -1, 1, "upright" }, { -1, -1, "downright" },
+  { 1, -1, "downleft" }, { 1, 1, "upleft" },
+}
 local function crossDoor(sx, sy, dm, dx, dy, what, fixed)
   local pick, startMap
   local function stage()
     if not pick then
       pick = fixed
       if not pick then
-        for _, c in ipairs({ { sx, sy + 1, "up" }, { sx, sy - 1, "down" },
-                             { sx - 1, sy, "right" }, { sx + 1, sy, "left" } }) do
-          if H.bfsPath(c[1], c[2]) then pick = c; break end
+        for _, c in ipairs(DIAGSTAGE) do
+          local cx, cy, move = sx + c[1], sy + c[2], c[3]
+          local press = H.movePress(move)
+          if H.bfsPath(cx, cy)
+             and (press == move or H.canStep(cx, cy, move)) then
+            pick = { cx, cy, press }; break
+          end
         end
       end
       pick = pick or { sx, sy + 1, "up" }
@@ -247,8 +310,18 @@ local function crossDoor(sx, sy, dm, dx, dy, what, fixed)
   local settled = calm(20)
   return seq({
     H.call(function() pick, startMap = nil, map() end),
+    -- The walk to the staging tile can TAKE THE DOOR BY ITSELF.  A
+    -- staircase entrance sits on an ordinary walkable tile (unlike a
+    -- castle door, which is a wall until CheckDoor opens it), BFS knows
+    -- nothing about entrance triggers, and it will happily route across
+    -- one: approaching 60 (96,26) from (103,29), the plan crossed the
+    -- entrance tile itself and the party was on map 59 before the hold
+    -- ever started -- navTo then burned 20 retries looking for a tile on
+    -- a map it had already left.  A map change IS arrival; the far-side
+    -- assert below still checks it was the right one.
     H.navTo(function() return stage()[1] end, function() return stage()[2] end,
-      { maxFrames = 9000 }),
+      { maxFrames = 9000,
+        arrive = function() return map() ~= startMap end }),
     H.driveUntil(function()
       return map() ~= startMap or (H.fieldX() == dx and H.fieldY() == dy)
     end, 1800, {
@@ -548,11 +621,9 @@ H.run({ maxFrames = 120000 }, {
   crossDoor(23, 24, 59, 47, 60, "D9 inner courtyard -> west chamber"),
   -- D10 is the chamber's diagonal staircase, and with the model reading
   -- the engine's diagonal branch it is an ordinary door crossing: BFS
-  -- walks (48,58)->(49,59) itself.  The staging tile is named explicitly
-  -- because the entrance tile (50,60) is reached DIAGONALLY and
-  -- crossDoor's automatic search only tries the four cardinal neighbours.
-  crossDoor(50, 60, 59, 65, 43, "D10 west chamber -> west wing",
-    { 49, 59, "right" }),
+  -- walks (48,58)->(49,59) itself and crossDoor's staging search finds
+  -- the diagonal approach on its own.
+  crossDoor(50, 60, 59, 65, 43, "D10 west chamber -> west wing"),
   crossDoor(66, 50, 55, 23, 33, "D12 west wing -> WEST RING"),
   crossDoor(12, 26, 57, 67, 27, "D13 west ring -> matron's room"),
   H.call(function() where("matron's room") end),
@@ -577,5 +648,149 @@ H.run({ maxFrames = 120000 }, {
   H.saveState("figaro_matron.mss"),
   H.logStep(function()
     return string.format("figaro_matron minted at frame %d", H.frame)
+  end),
+
+  -- ==================================================================== --
+  -- PHASE 6: back to the throne for the SECOND AUDIENCE.  The west band
+  -- is a cul-de-sac: its only way out is the wing door 55 (23,31), so the
+  -- return re-crosses the chamber staircase from the other side.  That
+  -- one is D-K3 below and it is the door the four-neighbour staging
+  -- search could not find: 59 (64,42) sits on the "\" stair
+  -- (64,42)/(65,43)/(66,44) and is reachable ONLY up-left from (65,43).
+  -- ==================================================================== --
+  crossDoor(67, 28, 55, 12, 28, "K1 matron's room -> WEST RING"),
+  crossDoor(23, 31, 59, 66, 49, "K2 west ring -> west wing"),
+  crossDoor(64, 42, 59, 49, 59, "K3 west wing -> west chamber (stair)"),
+  crossDoor(47, 61, 55, 23, 26, "K4 west chamber -> inner courtyard"),
+  crossDoor(28, 13, 59, 27, 28, "K5 inner courtyard -> throne hall"),
+  crossDoor(27, 13, 58, 102, 55, "K6 throne hall -> THRONE ROOM"),
+  H.call(function() where("second audience") end),
+
+  -- ==================================================================== --
+  -- PHASE 7: KEFKA.  With $0004=1 the throne Edgar's _ca6623 forks to
+  -- _ca6d63 (:16367): the messenger, Kefka's arrival, $0311=1 / $03FE=1 /
+  -- $0315=0 (:16392-16394), the party becomes EDGAR alone and control
+  -- returns out in the courtyard (`player_ctrl_on / $0308=0`, :16638).
+  -- ==================================================================== --
+  talkTo(16, "EDGAR (second audience)", 9000),
+  H.advanceStory(calm(30, function()
+    return map() == 55 and sw(0x0311) == 1
+  end), 30000),
+  H.call(function()
+    H.assertEq(sw(0x0311), 1, "Kefka scene ran ($0311 set)")
+    H.assertEq(sw(0x0315), 0, "$0315 cleared by the scene")
+    H.assertEq(map(), 55, "control returns in the courtyard")
+    where("Kefka arrived")
+    H.screenshot("figaro_kefka")
+  end),
+
+  -- ==================================================================== --
+  -- PHASE 8: the confrontation, then LOCKE's regroup.  _ca6f02 returns
+  -- immediately unless BOTH $01F0 and $01F1 are set (:16659-16663), and
+  -- those are the two troopers' own switches.  They live in the MAP-LOCAL
+  -- $01F0..$01FF range, so the gate scene's $01F0 from Phase 1 died at the
+  -- first door and both troopers have to be talked to here, after Kefka
+  -- arrives -- talking only one leaves Kefka a no-op with no diagnostic.
+  -- ==================================================================== --
+  talkTo(21, "trooper east", 9000),
+  H.advanceStory(calm(20, function() return sw(0x01F0) == 1 end), 9000),
+  H.call(function() H.assertEq(sw(0x01F0), 1, "$01F0 set (east trooper)") end),
+  talkTo(22, "trooper west", 9000),
+  H.advanceStory(calm(20, function() return sw(0x01F1) == 1 end), 9000),
+  H.call(function() H.assertEq(sw(0x01F1), 1, "$01F1 set (west trooper)") end),
+  talkTo(20, "KEFKA", 9000),
+  H.advanceStory(calm(30, function()
+    return map() == 55 and sw(0x0006) == 1
+  end), 30000),
+  H.call(function()
+    H.assertEq(sw(0x0006), 1, "confrontation done ($0006 set)")
+    where("Kefka done")
+  end),
+  talkTo(27, "LOCKE (regroup)", 9000),
+  H.advanceStory(calm(30, function()
+    return map() == 55 and sw(0x0313) == 1
+  end), 30000),
+  H.call(function()
+    H.assertEq(sw(0x0313), 1, "$0313 set (guest-room LOCKE armed)")
+    H.assertEq(sw(0x0315), 1, "$0315 set (courtyard guard re-armed)")
+    H.assertEq(sw(0x01FF), 1, "$01FF set (regroup done)")
+    where("regrouped")
+  end),
+
+  -- ==================================================================== --
+  -- PHASE 9: the burning night.  The guest-room LOCKE (map 59 (82,45),
+  -- spawn $0313) runs _ca700e, which is the whole night: the party becomes
+  -- EDGAR alone again, map 55 reloads at night with STARTUP_EVENT, and it
+  -- ends `$01F8=1 / player_ctrl_on` (:17070-17071).  He hangs off the EAST
+  -- band, so this is the map-60 crossing the west route never needed.
+  -- ==================================================================== --
+  crossDoor(33, 24, 60, 103, 29, "K7 inner courtyard -> map 60"),
+  crossDoor(96, 26, 59, 81, 11, "K8 map 60 -> east wing (diagonal stair)"),
+  crossDoor(80, 18, 55, 33, 33, "K9 east wing -> EAST RING"),
+  crossDoor(44, 26, 59, 79, 52, "K10 east ring -> guest wing"),
+  talkTo(19, "LOCKE (guest room)", 9000),
+  H.advanceStory(calm(30, function()
+    return map() == 55 and sw(0x01F8) == 1
+  end), 40000),
+  H.call(function()
+    H.assertEq(sw(0x01F8), 1, "the burning night ran ($01F8 set)")
+    H.assertEq(map(), 55, "back on map 55, at night")
+    where("burning night")
+    H.screenshot("figaro_night")
+  end),
+
+  -- ==================================================================== --
+  -- PHASE 10: THE SUBMERGE.  Not a trigger: the courtyard guard (object
+  -- 19, spawn $0315) forks _ca5f9f on $01F8 (:14288) into _ca5fba -- the
+  -- chocobos (:14330-14405) and finally `load_map 0, {64,76}` (:14731),
+  -- the world map outside the sand.  From there it is world-module RAM,
+  -- not field RAM, so the settle predicate switches too.
+  -- ==================================================================== --
+  talkTo(19, "courtyard guard (submerge)", 9000),
+  H.advanceStory(worldCalm(120), 90000),
+  H.waitFrames(30),
+  H.call(function()
+    H.assertEq(H.worldMode(), true, "on the world map")
+    H.assertEq(H.worldId(), 0, "World of Balance")
+    H.assertEq(H.worldHasControl(), true, "and controllable")
+    -- roster: TERRA + LOCKE + EDGAR, by party byte, not by slot index
+    local inParty = {}
+    for c = 0, 15 do
+      if (H.readByte(0x1850 + c) & 0x07) ~= 0 then inParty[c] = true end
+    end
+    H.assertEq(inParty[4] or false, true, "EDGAR in the party ($1854)")
+    H.assertEq(inParty[0] or false, true, "TERRA in the party ($1850)")
+    H.assertEq(inParty[1] or false, true, "LOCKE in the party ($1851)")
+    -- the shop survived the chapter: this whole route exists so that it can
+    H.assertEq(invCount(0xA4), 1, "BioBlaster still carried")
+    H.assertEq(invCount(0xA3), 1, "NoiseBlaster still carried")
+    H.assertEq(invCount(0xAA), 1, "AutoCrossbow still carried")
+    -- THE PARTY LANDS ON A CHOCOBO ($11FA&3 = 2 selects InitChoco,
+    -- world/init.asm:95-102), and that matters to whoever navigates from
+    -- this state: InitChoco (init.asm:402) never initialises the world
+    -- tile-position registers $E0/$E2 -- only InitWorld does, from $1F60
+    -- (init.asm:758-762) -- so H.worldX/worldY read 0 here and
+    -- H.worldNavTo cannot be used until the party is off the bird.  The
+    -- state itself is fine: control is live, the minimap draws, and the
+    -- screenshot shows the party in the desert.  Asserted, not assumed,
+    -- so this stops being true loudly rather than quietly.
+    H.assertEq(H.readByte(0x11fa) & 3, 2, "riding a chocobo ($11FA&3=2)")
+    H.log(string.format(
+      "world id=%d $E0/$E2=(%d,%d) [zero: chocobo, see above] " ..
+      "chars=$1EDC=%04X gil=%d",
+      H.worldId(), H.worldX(), H.worldY(), H.readWord(0x1edc), gil()))
+    for c = 0, 15 do
+      if inParty[c] then
+        local base = 0x1600 + 37 * c
+        H.log(string.format("char %2d actor=%02X level=%d hp=%d party-byte=%02X",
+          c, H.readByte(base), H.readByte(base + 8), H.readWord(base + 9),
+          H.readByte(0x1850 + c)))
+      end
+    end
+    H.screenshot("figaro_cleared")
+  end),
+  H.saveState("figaro_cleared.mss"),
+  H.logStep(function()
+    return string.format("figaro_cleared minted at frame %d", H.frame)
   end),
 })
