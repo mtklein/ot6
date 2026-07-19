@@ -1720,14 +1720,121 @@ Ot6FoldTbl:
 
 ; ------------------------------------------------------------------------------
 
+; [ boost picks the bushido tech — the charge gauge, deleted ]
+
+; replaces UpdateMenuState_37's clock (btlgfx_main.asm @7d5f): the gauge
+; ceiling `lda $2020 / inc / sta $36`, the every-4-frames `inc w7e7b82`,
+; and the wrap check that followed it. vanilla ran a free bar — the
+; counter climbed one unit per 4 frames, the tech was counter >> 5 (128
+; frames a level, ~15 s to walk all eight known), it wrapped past the last
+; one learned, and A latched whatever level it happened to be showing into
+; $2bb0,y (btlgfx_main.asm:19083). the CLOCK is the part that is foreign
+; here, so the clock is the part that goes: bp picks the level instead.
+; every other piece of vanilla's window is untouched and now renders a
+; STATIC selector that tracks L/R live — the numerals, the grey-out of
+; unlearned techs (_c2a860), the bar, the A-button latch, FixPlayerAttack's
+; +$55 (battle_main.asm:12811), Cmd_07's dispatch (battle_main.asm:3901,
+; including its retort/sky stance special case).
+;
+; the ladder is kits.md's BP column: fang 0 · sky/tiger 1 · flurry/dragon
+; 2 · eclipse/tempest 3. eight techs do not fit four boost levels, so a
+; band holds up to three and the table names each band's TOP tech; the
+; ceiling below — vanilla's own $2020, techs known - 1, the same value that
+; capped the bar — then drops it to the best one cyan has actually learned.
+; a band's expression therefore UPGRADES as he levels, which is the spell
+; fold's grammar one rung up: fire is fire until a boost makes it fira, and
+; the 1-bp band is sky until level 12 makes it tiger. the cost of that
+; choice, stated plainly: the lower tech of each band is transitional (sky
+; reachable L6-11, flurry L15-23, eclipse L34-43). flurry going quiet at 24
+; costs the multi-hit shredder DESIGN.md names by name, until tempest
+; restores that role at 44. the bands are DATA precisely so playtest can
+; re-cut them without touching code.
+;
+; oblivion (tech 8) is deliberately NOT in the ladder. kits.md prices it at
+; 3 bp "target must be Broken", and that gate cannot be read from here:
+; this runs at command-latch time and swdtech is in RetargetCmdTbl
+; (battle_main.asm:12818), so the target does not exist yet. shipping it
+; anyway would both skip its own gate and retire eclipse and tempest, so
+; the 3-bp band tops out at tempest until the divine pass (terra's trance,
+; summon-once-per-battle) wires target-time gates. cyan learns oblivion off
+; the phantom train, far past the rung-3 gate this work unblocks.
+;
+; bp is READ, never written: the spend is whatever Ot6Boost banked in
+; $3e9d, so Ot6ActionEnd consumes it and skips that turn's regen exactly as
+; for any other action, and the <=3 / never-past-bp caps stay Ot6Boost's
+; alone. bp the ladder cannot spend (three points at level 1 still buys
+; fang) is spent, not refunded — the same deal a mage takes when a third
+; point on fire buys nothing past firaga.
+;
+; entry: from UpdateMenuState_37 — db=$7e, d=0, a8/i16, y=0 (the bar draw
+; downstream indexes w7e7a73,y with it). returns a = the chosen level, as
+; the vanilla block it replaces did. clobbers x.
+
+.proc Ot6BushidoTier
+        .a8
+        .i16
+        lda     $62ca           ; active character slot
+        longa
+        and     #$0003
+        asl
+        tax                     ; -> entity offset
+        shorta0
+        lda     $3e9d,x         ; pending boost
+        cmp     #$04
+        bcc     :+
+        lda     #$03            ; (defensive: Ot6Boost already caps at 3)
+:       longa
+        and     #$00ff
+        tax
+        shorta0
+        lda     f:Ot6BushidoTierTbl,x
+        longa
+        and     #$00ff
+        pha                     ; the band's top tech, parked on the STACK.
+        shorta0                 ;   the two scratch bytes in reach are both
+                                ;   somebody's — $36 is btlgfx's (and only
+                                ;   the display call site rewrites it right
+                                ;   after us; the latch site does not), and
+                                ;   OT6_SCR_BIT is the hud builder's. the
+                                ;   stack owes nobody and survives an nmi.
+        ldx     $2020           ; techs known - 1. a WORD (InitSkills stores
+                                ;   it with stx, battle_main.asm:14495), and
+                                ;   $ffff on every save before cyan joins —
+                                ;   which our own test fixture is.
+        cpx     #$0008
+        bcc     :+
+        ldx     #$0000          ; nothing learned: fang is all there is
+:       txa                     ; ceiling, 0-7
+        cmp     $01,s           ; ... against the band top (the pushed word's
+        bcc     :+              ;   low byte). below it: the ceiling IS the
+        lda     $01,s           ;   level; else the band top is
+:       plx                     ; drop the parked word (x is dead here)
+        pha
+        asl5                    ; level * 32 — the counter value vanilla's
+        sta     $7b82           ;   bar drew, so w7e7b82 still feeds the
+        pla                     ;   latch, the fill, and the numerals
+        rtl
+.endproc
+
+; bushido tier ladder: boost level -> that band's top tech, 0-based as the
+; swdtech window numbers them (+$55 downstream makes the attack id).
+Ot6BushidoTierTbl:
+        .byte   $00             ; 0 bp: fang
+        .byte   $02             ; 1 bp: tiger   (sky below L12)
+        .byte   $04             ; 2 bp: dragon  (flurry below L24)
+        .byte   $06             ; 3 bp: tempest (eclipse below L44)
+
+; ------------------------------------------------------------------------------
+
 ; [ boost the base damage of a boosted character action ]
 
 ; called at the tail of the physical and magic base-damage calcs.
 ; damage x2/x3/x4 for pending boost 1/2/3; the per-target 9999 cap
 ; still applies downstream. a8/i16, x = attacker, 16-bit damage $11b0.
 ; fight and capture spend their boost on extra swings (Ot6FightBoost),
-; and tier-family spells spend it on tiers (Ot6QueueFold) — the
-; multiplier serves everything else. $3a7d = the action's attack id.
+; tier-family spells spend it on tiers (Ot6QueueFold), and bushido
+; spends it on the tech ladder (Ot6BushidoTier) — the multiplier serves
+; everything else. $3a7d = the action's attack id.
 
 .proc Ot6BoostDmg
         php                     ; caller width varies: pin our own
@@ -1742,6 +1849,11 @@ Ot6FoldTbl:
         beq     done            ; $00 fight: boost = extra swings
         cmp     #$06
         beq     done            ; $06 capture: same fight path
+        cmp     #$07
+        beq     done            ; $07 bushido: boost bought the tech tier,
+                                ;   so it must not also buy a multiplier —
+                                ;   the same no-double-dip the tier-family
+                                ;   scan below enforces for folded spells
         lda     $3e9d,x         ; pending boost level
         beq     done
         phx

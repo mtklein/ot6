@@ -19080,8 +19080,11 @@ UpdateMenuState_37:
         bpl     @7d56       ; branch if a button is not pressed
         inc     $96         ; play cursor sound effect (select)
         jsr     _c16d56       ; get pointer to current character slot data (battle menu)
-        lda     w7e7b82       ; swdtech bar counter / 32
-        lsr5
+        jsl     Ot6BushidoTier  ; ot6: was `lda w7e7b82 / lsr5` — the level the
+                                ; ticking bar happened to be showing. asking
+                                ; the ladder directly makes the latch exact on
+                                ; the window's FIRST frame too, where the bar
+                                ; still reads 0 from UpdateMenuState_35's stz.
         sta     $2bb0,y     ; attack index
         lda     w7e62ca
         sta     $2bae,y     ; character slot
@@ -19107,19 +19110,12 @@ UpdateMenuState_37:
         bne     @7d6c
         plx
         clr_ay
-        lda     $2020
-        inc
-        sta     $36
-        lda     $0e         ; frame counter
-        and     #$03
-        bne     @7d8d       ; branch every 4 frames
-        inc     w7e7b82       ; increment swdtech bar counter
-@7d8d:  lda     w7e7b82
-        lsr5
-        cmp     $36
-        bne     @7d9d       ; branch if it hasn't reached the max value
-        clr_a
-        sta     w7e7b82       ; reset the swdtech bar counter
+        jsl     Ot6BushidoTier  ; ot6: the charge gauge's clock, deleted.
+                                ; vanilla ticked w7e7b82 every 4 frames and
+                                ; wrapped it past $2020 (techs known - 1);
+                                ; boost picks the tech now and this returns
+                                ; the level in a, as that block did. the
+                                ; window below is vanilla, unchanged.
 @7d9d:  inc
         sta     $36
         clr_ax
