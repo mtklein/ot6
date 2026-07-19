@@ -216,6 +216,81 @@ done:   rtl
 ; bosses-wob.md caught twice in draft (nerapa listed fire, which it
 ; absorbs; the cranes' absorb pair was read as their weak pair).
 ;
+; ---- the v0.3 TRASH pass: six rows that make the break happen ----
+;
+; everything above is a boss or a set-piece. these six are ordinary
+; random encounters, and they exist because measurement #7 established
+; that the break -- the mechanic this hack is named for -- had never once
+; happened in play: `player_actions_broken` was 0.0 across 168 battles,
+; because every species without an authored row takes Ot6SeedShields'
+; @formula path, which CLEARS $3e9c (:76-85), so formula trash carries no
+; class weakness and most of it carries no reachable element either.
+;
+; WHY ELEMENT ROWS AND NOT Ot6ShieldTbl CLASS ROWS. the party that walks
+; this stretch is terra, locke and edgar, and they arrive at mt. kolts
+; carrying a mithril knife, a dirk and a mithril blade (char_prop.asm:152,
+; :162, :197) -- which ot6_class.asm:49, :48 and :59 make PIERCE, PIERCE
+; and SLASH. so the party's three default swings already cover half the
+; class ring, and the other half has no wielder at all: bludgeoning
+; arrives with sabin, who joins at the TOP of the mountain, and special
+; not until setzer. a class row on this stretch is therefore either a
+; FREEBIE (slash/pierce -- holding A chips it, which is measurement #7's
+; own +PIERCE finding: the mash arm started chipping by accident and the
+; mash-vs-loop gap CLOSED) or a REPO MAN (bludg/special -- nothing in the
+; party can chip it, and the fight has no loop at all). the class axis is
+; degenerate here. the element axis is not: terra's fire costs 4 mp and a
+; magic menu, edgar's bio blaster costs a tools dive (item $a4 -> attack
+; $7d, magic_prop_en.dat record $7d: element $08, targets $6a = ALL
+; enemies, power 20, 0 mp), and NEITHER of them is what the A button does.
+;
+; so the stretch gets exactly two live keys and this table splits it
+; between them. fire is vanilla's and already opens eight of the fifteen
+; species the stretch draws (leafer, dark wind, hornet, bleary, crawly,
+; trilium, tusker, vaporite); poison opened exactly one (greasemonk,
+; +$1519 = $08). six rows even that up, so the per-fight question becomes
+; "which of edgar's two menus" asked against a body you can read:
+;
+;   $086 cirpius   +$10D9  vanilla $00 none       -> $08   134 hp
+;   $07a tusker    +$0F59  vanilla $01 fire       -> $09   270 hp
+;   $05c sand ray  +$0B99  vanilla $82 ice|water  -> $8A    67 hp
+;   $05d areneid   +$0BB9  vanilla $82 ice|water  -> $8A    87 hp
+;   $012 rhodox    +$0259  vanilla $00 none       -> $08   119 hp
+;   $015 rhinotaur +$02B9  vanilla $00 none       -> $08   232 hp
+;
+; four of those six had NO weakness the stretch party could reach --
+; cirpius and rhodox had no weakness at all, sand ray and areneid are
+; ice|water and nobody carries either (terra's natural list is cure 1,
+; fire 3, antdot 6, drain 12 -- field/event.asm:1248-1251, so FIRE is her
+; whole offensive element ring at this point in the story). they are the
+; coverage rule's live counterexamples on the route the v0.2 demo ships,
+; and cirpius is the worst of them: it is 93.75% of the draws on mt.
+; kolts maps 95/96/97 and it comes THREE AT A TIME, so the mountain's
+; most common fight was three unchippable birds.
+;
+; the two that already had fire are here for a different reason, and it
+; is arithmetic. an element chip that empties the last shield takes
+; vanilla's weak x2, then skips Ot6ShieldedDmg (shields are already 0),
+; then takes Ot6BrokenDmg's x2 -- 4x base on the breaking hit itself. at
+; terra's ~110 base that is ~440, and NOTHING on this mountain except
+; tusker has the hp to survive its own break through the fire channel.
+; bio blaster's per-target damage is a fraction of that (power 20, split
+; over the whole enemy side), so poison is the channel that can open a
+; window instead of closing the fight. tusker at 270 hp is the one body
+; big enough for that window to be wide, which is why it gets poison on
+; TOP of vanilla's fire: fire stays the burst answer to a 270-hp wall,
+; poison becomes the break answer, and the player picks.
+;
+; and the shelf-F read that falls out of it, which is the best accident
+; in this table: brawler ($00b) ABSORBS poison (+$0177 = $08). map 100
+; draws brawler-pair 62.5% and tusker-pair 37.5%, so on the same shelf the
+; same tool breaks one formation and HEALS the other. brawler's answer is
+; a class row in Ot6ShieldTbl instead (see there); the trap is vanilla's
+; own byte and stays untouched.
+;
+; every one of the six was checked at +$17/+$18 the same way the boss rows
+; were. five read $00/$00; rhinotaur absorbs BOLT (+$02B7 = $04) and nulls
+; nothing, so poison is clear on it too. no row here feeds an absorber.
+;
 ; deliberately NOT authored, so the next author does not re-litigate:
 ;   - trooper ($065, +$0cb9 = $08) and rider ($03f, +$07f9 = $09) are
 ;     already poison-weak in VANILLA. the narshe defense waves need
@@ -235,6 +310,25 @@ done:   rtl
 ;     formula's 2 shields stand: unlisted species are meant to fall
 ;     through, and inventing a key for a fight the player is supposed to
 ;     walk away from is spec no design doc asked for.
+;   - the stretch's ALREADY-FIRE-WEAK trash: leafer ($017 +$02F9 = $81),
+;     dark wind ($028 = $01), hornet ($02e = $01), bleary ($063 = $01),
+;     crawly ($062 = $01), trilium ($032 = $01), vaporite ($046 = $21).
+;     the coverage rule is already satisfied for every one of them by
+;     terra's fire, and a SECOND key would only make the probe a formality.
+;     none of them can hold a break window either -- 33 to 147 hp against
+;     a 4x breaking hit -- and measurement #7 proved that directly on
+;     leafer: a synthetic class row there produced 0.7 breaks a fight and
+;     every one landed at 100% of fight length, `player_actions_broken`
+;     still 0. these are texture, not tuning material, the same
+;     disposition measurement #1 gave the mines pool.
+;   - brawler ($00b) is the one species on the mountain that gets a CLASS
+;     row rather than an element one, because poison is the one element it
+;     must not have (it absorbs it, +$0177 = $08) and its vanilla ice
+;     (+$0179 = $02) has no wielder until celes. see Ot6ShieldTbl.
+;   - greasemonk ($0a8 +$1519 = $08) is already poison-weak in VANILLA, so
+;     the south-figaro plains had one live key before this pass and an
+;     add here would be a no-op ora that lies about who authored it --
+;     the same rule the trooper/rider rows above are held to.
 ;
 ; called from the tail of Ot6SeedShields, monster path only. a8/i16,
 ; y = entity offset, species stashed at OT6_SPECIES-8,y. clobbers a/x
@@ -286,6 +380,34 @@ Ot6ElemAddTbl:
         .byte   $09, $00        ; kefka (narshe defense): + poison|fire
         .word   $0104
         .byte   $02, $00        ; tunnelarmor: + ice (keeps bolt|water)
+        ; the v0.3 trash pass -- the break made reachable in ordinary
+        ; fights. poison is edgar's bio blaster, the stretch's only
+        ; deliberate key the A button does not already swing.
+        .word   $0086
+        .byte   $08, $00        ; cirpius: + poison. had NO weakness at
+                                ;   all, and it is 93.75% of mt. kolts
+                                ;   maps 95/96/97 THREE at a time -- one
+                                ;   group tool chips the whole flock
+        .word   $007a
+        .byte   $08, $00        ; tusker: + poison (keeps fire). 270 hp,
+                                ;   the only body on the mountain that
+                                ;   survives its own break; fire stays
+                                ;   the burst, poison becomes the window
+        .word   $005c
+        .byte   $08, $00        ; sand ray: + poison (keeps ice|water,
+                                ;   neither of which the figaro-desert
+                                ;   party can cast)
+        .word   $005d
+        .byte   $08, $00        ; areneid: + poison (same desert, same
+                                ;   dead ice|water pair)
+        .word   $0012
+        .byte   $08, $00        ; rhodox: + poison. had no weakness, and
+                                ;   it is 275% of the south-figaro plains
+                                ;   forest draw
+        .word   $0015
+        .byte   $08, $00        ; rhinotaur: + poison. had no weakness;
+                                ;   232 hp is the plains' break-capable
+                                ;   body (absorbs BOLT, not poison)
         .word   $ffff
 
 ; ------------------------------------------------------------------------------
@@ -3062,6 +3184,101 @@ Ot6ShieldTbl:
         .word   $0064
         .byte   4, OT6_PIERCE   ; marshal: mog's fight, mog's class
         ; mt. kolts / lete river
+        ; ---- mt. kolts trash: the v0.3 rows that make the break happen.
+        ; all three carry TWO shields, and that number is the finding, not
+        ; a taste. a break only opens a WINDOW if the target still has more
+        ; hp than the breaking hit; the breaking hit is 4x base through the
+        ; element channel (vanilla weak x2, no Ot6ShieldedDmg because the
+        ; shields are already gone, then Ot6BrokenDmg x2) and 2x through
+        ; the class one. so the count is really "how late does the break
+        ; land", and measurement #8 swept 1/2/3 live with bal_party's
+        ; BUFF_SHIELDS against the real pools:
+        ;
+        ;   shields   cirpius x3        tusker x2
+        ;   3 (fmla)  break at 100%     break at 100%
+        ;             actions_broken 0  actions_broken 0
+        ;   2         break at 78-90%   break at 51-57%
+        ;             actions_broken 1  actions_broken 1-2
+        ;   1         (not swept)       break at 28-53%
+        ;             --                actions_broken 0
+        ;
+        ; the formula's 3 is one chip too many: by the time the last shield
+        ; falls the party has already spent the monster, so the break lands
+        ; on a corpse -- which is exactly what "breaks 6/6, uptime 1 frame"
+        ; meant in measurements #5 and #6, restated with a cause. and 1 is
+        ; one too few for the ELEMENT channel: with no chip to soften it
+        ; first, 4x base (bio blaster measures ~87 a target on a poison-weak
+        ; body, so ~350) simply exceeds a 270-hp tusker outright and the
+        ; break is the kill again. 2 is the count where the loop exists.
+        ;
+        ; brawler takes 2 for consistency with its pool-mates, and it is
+        ; the one authored species whose window does NOT open at it: 137 hp
+        ; against an 84-point breaking hit has the margin in principle, but
+        ; terra and locke spend it before edgar's SECOND swing lands, and
+        ; with one chipper against a pair the two chips often land on
+        ; different brawlers and neither breaks. measured, `boost3`: 2.0
+        ; chips, 0 breaks. what would close it is a slashing carrier whose
+        ; per-hit damage is small enough to chip twice cheaply -- cyan's
+        ; flurry, edgar's chainsaw -- and neither exists at mt. kolts. the
+        ; row still buys the reveal, the chips, and (when mashed, where
+        ; edgar swings the blade every turn) a real break: 3.0 chips, 1.0
+        ; breaks. it is coverage plus a lesson, not a window; said plainly
+        ; rather than tuned until the number looked right.
+        .word   $000b
+        .byte   2, OT6_SLASH    ; brawler: the mountain's one CLASS row,
+                                ;   and the only one on the stretch. it
+                                ;   is here because brawler ABSORBS
+                                ;   poison (monster_prop.dat +$0177 =
+                                ;   $08), so the bio-blaster answer the
+                                ;   rest of mt. kolts teaches would HEAL
+                                ;   it, and its vanilla ice (+$0179 =
+                                ;   $02) has no wielder until celes.
+                                ;   slash, not pierce, because slash is
+                                ;   the scarce key: terra's mithril knife
+                                ;   and locke's dirk are both PIERCE
+                                ;   (ot6_class.asm:49,:48) and so is
+                                ;   edgar's autocrossbow, while edgar's
+                                ;   mithril blade (:59) is the party's
+                                ;   ONLY slashing weapon -- so the answer
+                                ;   to a brawler is edgar closing the
+                                ;   tools menu, which is a move nothing
+                                ;   else on this mountain asks for.
+                                ;   the class channel is also the only one
+                                ;   on this mountain that CAN hold a
+                                ;   window: Ot6ClassChip takes no vanilla
+                                ;   weak x2, so the breaking hit is 2x
+                                ;   base, and edgar's blade measures ~42
+                                ;   base here -- ~84 against 137 hp fits,
+                                ;   where fire (~110 base -> ~440) and the
+                                ;   bio blaster (~87 -> ~350) do not.
+        .word   $0086
+        .byte   2, $00          ; cirpius: SHIELDS ONLY, no class byte --
+                                ;   its weakness is the poison row in
+                                ;   Ot6ElemAddTbl and this row exists
+                                ;   purely to take the count off the
+                                ;   formula's 3. that is a legitimate use
+                                ;   of this table (the whelk shell's
+                                ;   `0, $00` is the same shape) and it is
+                                ;   the cheapest way to move the break
+                                ;   off the corpse: 3 -> 2 takes cirpius
+                                ;   from actions_broken 0 to 1.
+        .word   $007a
+        .byte   2, $00          ; tusker: shields only, same reason. at
+                                ;   270 hp it is the widest window on the
+                                ;   mountain (uptime 20.5%) and at the
+                                ;   formula's 3 it had none at all.
+                                ; note the coupling these three share: an
+                                ; Ot6ShieldTbl row also exempts its
+                                ; species from Ot6HpScale. inert today
+                                ; (every band ships $10 = 1x) but real if
+                                ; the hp dial ever reopens, and it is why
+                                ; the four OVERWORLD species in this pass
+                                ; took Ot6ElemAddTbl rows only -- an
+                                ; element add carries no such exemption,
+                                ; so where a species needs a weakness but
+                                ; not a shield count, the element table is
+                                ; the cheaper instrument. these three need
+                                ; the count.
         .word   $0103
         .byte   5, OT6_BLUDG    ; vargas: you couldn't break him without
                                 ;   the monk
