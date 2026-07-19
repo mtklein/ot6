@@ -680,4 +680,24 @@ H.run({ maxFrames = 90000 }, {
       "pierce class icon after Drill in the tools list")
     H.screenshot("class_tools")
   end),
+
+  -- LIVENESS, and it is not decoration. Every assertion in this phase reads
+  -- a tilemap the window already drew -- which a FROZEN machine satisfies
+  -- just as well as a running one, and did: Ot6ToolListIcon_ext (ot6.asm)
+  -- spun the battle NMI forever on a CLASSLESS tool row, and this test came
+  -- back green straight through it. MEASURED, by reverting that fix and
+  -- re-running: all 40 assertions above pass -- both tools rows, both class
+  -- icons -- with $98 not advancing at all. The fixture is why it never
+  -- showed: its only classless tool (NoiseBlaster) sits in the list's
+  -- unrendered second row while the two asserted tools ride the first, so
+  -- the lock lands after the last thing this test looks at. It surfaced in
+  -- battle_vargas instead, where the BioBlaster is list entry 0. $98 is the
+  -- battle NMI's own frame counter (btlgfx_main.asm:1783), so a stall now
+  -- fails here rather than passing on stale VRAM.
+  H.call(function() H.vars.nmi0 = H.readByte(0x0098) end),
+  H.waitFrames(30),
+  H.call(function()
+    H.assertEq(H.readByte(0x0098) ~= H.vars.nmi0, true,
+      "the battle NMI is still running after the tools window rendered")
+  end),
 })

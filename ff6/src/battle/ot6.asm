@@ -1287,6 +1287,16 @@ Ot6ElemPalTbl:
         shorta0
         lda     f:Ot6WeapClassTbl,x
         plx
+        cmp     #$00            ; RETEST. plx sets n/z from the value it
+                                ; PULLED, so the two guards below were reading
+                                ; the caller's restored x — never the class
+                                ; byte. x is ListTextCmd_0e's ItemName cursor
+                                ; (id*13 + 13), nonzero and positive for every
+                                ; item, so both guards fell through on a
+                                ; CLASSLESS tool and @bit spun on a zero
+                                ; OT6_SCR_BIT forever — a hard lock, measured
+                                ; at $F0:057D with the battle nmi's $98
+                                ; frozen. see battle_vargas.lua proof 3.
         beq     @out            ; classless tool: nothing to teach
         bmi     @out            ; null-break: teaches nothing, shows nothing
         sta     OT6_SCR_BIT
