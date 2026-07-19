@@ -137,6 +137,18 @@ Pummel and, at vanilla level 6, almost certainly AuraBolt too. (An
 earlier draft put AuraBolt at level 10 and treated it as a maybe; it
 is level 6, so plan the fight assuming holy chip is present.)
 
+MEASURED, in `battle_vargas.lua` off the rung-2 fixtures: he seeds
+**5/5 with class row $04 (bludgeoning)**, the Ipoohs 2/2 slash-weak,
+and his weak byte reads **$28 — poison|holy**, the holy bit being
+`Ot6ElemAddTbl`'s add on top of vanilla's poison. "Storms in at the
+midpoint" is literal and structural, not flavour: Sabin gets **no
+turns at all** until Vargas's own reaction script fires
+`battle_event $07/$08` (hp ≤ 10880, then ≤ 10368,
+`ai_script.asm:4392-4404`) and blows the trio offstage. He joins at
+level 9 on this route, so AuraBolt is present as planned; AuraBolt
+takes a shield and reveals holy, Pummel takes another and reveals the
+bludgeon class, and that same Pummel is what kills him.
+
 **Shields:** 5 · **Weak:** poison, holy + bludgeoning. Ipoohs: 2 ·
 fire + slashing.
 
