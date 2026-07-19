@@ -2934,15 +2934,39 @@ OT6_HUDVEIL  := $57be           ; nonzero = a monster entry/exit animation
 ; monster data, and the element ADDS in bosses-wob.md are m6 data entry.
 ; shields/classes follow docs/design/bosses-wob.md v1; deviations:
 ;   - lobo keeps 3 (authored pre-bosses-wob; the doc proposes 2)
-;   - kefka: vanilla uses ONE species ($14a) for the imperial camp gags
-;     AND the narshe defense, so the narshe row (6 · slash+pierce) wins;
-;     the camp fights inherit it (doc wanted 3 there). per-formation
-;     overrides are an m6 question.
 ;   - piranha and iron fist wear their boss-block's class row (the doc
 ;     gives fight-level rows, not per-add rows): judgment calls.
 ;   - guardian/tritoch: multiple records each, WoB story order can't
 ;     tell them apart from here — ALL drawn shieldless for the WoB;
 ;     the WoR pass must re-author the real WoR fights' records.
+;
+; not a deviation, but it reads like a gap: kefka has one row and the
+; imperial camp gags are NOT it — they need none. $14a is
+; MONSTER::KEFKA_NARSHE (const.inc:1222), and it appears in exactly two
+; of the 576 formation records — 489 and 505 — with `battle 57` -> group
+; 57 -> 505 the narshe defense. the camp gags run `battle 56`
+; (event_main.asm:40683 and :40743) -> group 56, whose two slots BOTH
+; point at formation 504 — and 504 has no monster in it: present mask $00
+; and all six id slots the $01ff empty sentinel (battle_monsters.dat
+; +$1d88 = 00 00 ff ff ff ff ff ff 00 00 00 00 00 00 3f; the mask is
+; rolled into $3aa8 at battle_main.asm:7692, and the sentinel skips
+; LoadMonsterProp at :7718). nothing is loaded, so Ot6SeedShields —
+; reached only from the monster/rage load — never sees them. what those
+; fights run on instead is character ai: battle_prop.dat +$7e0 sets $2f49
+; bit 7 with $2f4a = $04 (LoadBattleProp :7994, dispatch :7813), script
+; kefka_imp_camp_1, whose slot 0 is
+; CHAR_PROP::KEFKA_1|CHAR_AI_FLAG_ENEMY_CHAR (char_ai.asm:163) — the
+; event has already dressed a party slot as him (char_prop VICKS,
+; KEFKA_1, event_main.asm:40675; CHAR::VICKS = 15, CHAR_PROP::KEFKA_1 =
+; $29) and revives that actor between rounds (clr_status VICKS, DEAD /
+; max_hp VICKS, :40739) because he has character hp. gauging a character
+; actor would be a per-formation feature, not a table row.
+;
+; this comment used to say vanilla shared ONE species between the camp
+; and narshe and that the camp fights "inherited" the $14a row. they
+; cannot: the camp has its own id ($16f, MONSTER::KEFKA_IMP_CAMP,
+; const.inc:1259) and even that is only the actor's ai script, never a
+; loaded record. see docs/design/bosses-wob.md "6-7. Imperial Camp".
 Ot6ShieldTbl:
         ; narshe intro / escape
         .word   $0000
@@ -2977,8 +3001,10 @@ Ot6ShieldTbl:
         .word   $0104
         .byte   5, OT6_PIERCE   ; tunnelarmor: mug and daggers
         .word   $014a
-        .byte   6, OT6_SLASH|OT6_PIERCE ; kefka (camp gags + narshe defense
-                                ;   share this record — see block comment)
+        .byte   6, OT6_SLASH|OT6_PIERCE ; kefka: the NARSHE DEFENSE record
+                                ;   only (MONSTER::KEFKA_NARSHE). the
+                                ;   imperial camp gags carry no monster
+                                ;   entity at all — see block comment
         .word   $0044
         .byte   4, OT6_BLUDG    ; telstar
         .word   $001a
