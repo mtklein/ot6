@@ -82,12 +82,35 @@ one kit where banking BP has intrinsic purpose. Measurement #3
 (balance-metrics.md) found greedy spending beats banking
 against trash, so for every other kit banking needs a boss to
 justify it; Cyan's later techs require the bank, so the
-decision exists in every fight he is in. Boosting is ordinary:
-no limit — BP spent beyond a tech's tier requirement boosts it
-with the same scaling logic as any other action. Roadmap rung
-3's BP-Bushido gate stands; the MP column joins the same data
+decision exists in every fight he is in. Roadmap rung 3's
+BP-Bushido gate stands; the MP column joins the same data
 pass. Detailed Cyan tuning is deliberately deferred until he
 is playtestable.
+
+**Amended by what shipped (M3, `Ot6BushidoTier`).** The BP half
+landed; the MP half is still the M4 data pass, so Bushido costs
+0 MP today and the rows above are unbuilt. Two clauses of the
+ruling above did not survive contact:
+
+- "BP spent beyond a tech's tier requirement boosts it with the
+  same scaling logic as any other action" is not what shipped.
+  Boost *selects* the tech rather than gating a menu choice, so
+  there is no surplus to scale: a spend always buys the best
+  tech it can reach. Bushido is excluded from `Ot6BoostDmg`'s
+  multiplier for the same no-double-dip reason folded spells
+  are. Unusable spend (three points before Cyan has learned past
+  Fang) is consumed, not refunded — the deal a mage already
+  takes on a third point on Fire. A menu that lets him pick a
+  *lower* tech than his spend affords is what would revive the
+  surplus case; it is not built, and it needs the menu bank.
+- "the wait still exists — later techs need a fuller bank"
+  holds, and is now the whole mechanic rather than a
+  requirement checked against one: banking to 3 is the only way
+  to reach the top band.
+
+The MP column, when it lands, prices the cast on top of the
+band the BP bought; nothing above about the split ("BP is the
+tier price, MP the cast price") changed.
 
 ## Early pools, from the character data
 

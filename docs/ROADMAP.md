@@ -16,7 +16,7 @@ recruited character's kit is honest there.
 |---|---|---|
 | 1 | the Moogle defense (~1 hour: mines → Whelk → escape) | shipped in v0.1: difficulty transform, encounter/XP/gil conservation, Whelk fire-add |
 | **2 (current)** | **Figaro → Vargas** | fixtures one stretch deeper; band-2 sweep; the Bio Blaster × poison-empire discovery beat; Narshe school text |
-| 3 | scenario split → Narshe reunion | **Cyan BP-Bushido** (bosses already authored through here) |
+| 3 | scenario split → Narshe reunion | ~~Cyan BP-Bushido~~ shipped (M3, `Ot6BushidoTier`; kits.md); remaining: fixtures reaching the split, and Cyan's MP column (mp-economy.md). Bosses already authored through here |
 | 4 | Zozo / first espers | M5 magicite sub-jobs |
 | 5 | end of WoB (Floating Continent) | M4 kits + sweeps (boss data already reaches Nerapa) |
 

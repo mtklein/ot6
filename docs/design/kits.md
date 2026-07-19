@@ -110,6 +110,45 @@ mandatory key for katana-only locks. Vanilla level schedule kept.
 | 7 | Tempest | 3 | wind ×4 | 44 |
 | 8 | **Oblivion** (divine) | 3, target must be Broken | — | Phantom Train farewell (story) |
 
+**Shipped (M3).** `Ot6BushidoTier` (ff6/src/battle/ot6.asm) replaces the
+charge gauge's clock in `UpdateMenuState_37`; the window, its numerals,
+the grey-out of unlearned techs, the A-button latch, `FixPlayerAttack`'s
+`+$55` and `Cmd_07` are all vanilla and untouched. The BP column above
+is read as a *band*, and boost selects the band: the table names each
+band's top tech and vanilla's own `$2020` (techs known - 1, the value
+that used to cap the bar) drops it to the best one Cyan has learned.
+
+| BP | band | selects |
+|---|---|---|
+| 0 | Fang | Fang |
+| 1 | Sky, Tiger | Tiger from L12, Sky before |
+| 2 | Flurry, Dragon | Dragon from L24, Flurry before |
+| 3 | Eclipse, Tempest | Tempest from L44, Eclipse before |
+
+Consequences, all deliberate and all data-editable (the bands are a
+4-byte table, not code):
+
+- **The lower tech of a band is transitional** — Sky is reachable L6-11,
+  Flurry L15-23, Eclipse L34-43. A band's expression upgrading as Cyan
+  levels is the spell fold's grammar one rung up (Fire is Fire until a
+  boost makes it Fira). The cost is that Flurry's multi-hit shredder
+  role goes quiet L24-43 until Tempest restores it.
+- **Oblivion is out of the ladder.** Its gate is "target must be
+  Broken", and that cannot be read at command-latch time — swdtech is in
+  `RetargetCmdTbl`, so no target exists yet. It waits on the divine pass
+  (Terra's Trance, summon-once-per-battle); shipping it ungated would
+  also have retired Eclipse and Tempest. Cyan learns it off the Phantom
+  Train regardless, far past the rung-3 gate this unblocked.
+- **BP is read, never written.** `Ot6ActionEnd` consumes the spend and
+  skips that turn's regen exactly as for any other action, and the ≤3 /
+  never-past-bank caps stay `Ot6Boost`'s. Bushido is excluded from
+  `Ot6BoostDmg`'s multiplier for the same reason folded spells are: the
+  points bought the tech, so they must not also buy damage. Spend the
+  ladder cannot use (three points at L1 still buys Fang) is spent, not
+  refunded — the deal a mage already takes on a third point on Fire.
+
+Gate: `tools/tests/battle_bushido.lua`.
+
 - Passive candidates: *Vengeance* (+1 BP whenever any enemy Breaks),
   *Retort* (vanilla counter as a passive), *Zanshin* (Sky chips 1
   when it counters).
