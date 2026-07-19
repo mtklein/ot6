@@ -50,7 +50,59 @@ local H = dofile("/Users/mtklein/ot6/tools/tests/lib/ot6.lua")
 
 -- ------------------------------------------------------------- knobs --
 local POLICY = "baseline"
-local STATE = "/Users/mtklein/ot6/build/states/worldmap_narshe.mss.lua"
+-- FIXTURE names a row of FIXTURES below. The header's "point this driver at
+-- a Kolts fixture; nothing else has to change" was WRONG by one thing --
+-- the pacer. worldmap_narshe is on the WORLD map (worldX/worldMode); every
+-- stretch fixture past it is a FIELD map (fieldX/mapId), which is
+-- bal_mines' pacer, not this one's. So the pacing lane is per-fixture and
+-- the two pacers both live here; everything downstream of "a battle
+-- started" is shared and untouched.
+local FIXTURE = "worldmap_narshe"
+local FIXTURES = {
+  -- Measurement #6's fixture, kept byte-identical (state, seeds, spawn) so
+  -- its numbers stay the continuity baseline for every later sweep.
+  worldmap_narshe = {
+    state = "/Users/mtklein/ot6/build/states/worldmap_narshe.mss.lua",
+    mode = "world", spawn = 84,
+    seeds = { {fa1=0x37}, {fa1=0x6e}, {fa1=0xa5},
+              {fa1=0xdc}, {fa1=0x13}, {fa1=0x4a} },
+  },
+  -- The rung-2 stretch the playtester is actually in. $1FA2 is seeded too:
+  -- unlike the Narshe world spawn (one formation in every sample) a
+  -- mountain pool has several slots, and the formation draw has to be
+  -- pinned or the arms are not paired.
+  --
+  -- `lane` names the direction to step OFF the spawn tile. Without it the
+  -- pacer takes the first direction the passability model allows, and on
+  -- shelf F that is LEFT -- onto (7,13), which is the entrance back to map
+  -- 95 (gen_kolts' mountain flood: "F ... exits (7,13)->95"). The party
+  -- would leave the map on its first step, every sample. Passability cannot
+  -- see entrance records, so the safe direction is named, not derived.
+  kolts_pool = {
+    state = "/Users/mtklein/ot6/build/states/kolts_pool.mss.lua",
+    mode = "field", map = 100, lane = "right",
+    seeds = { {fa1=0x37,fa2=0x00}, {fa1=0x6e,fa2=0x01}, {fa1=0xa5,fa2=0x02},
+              {fa1=0xdc,fa2=0x03}, {fa1=0x13,fa2=0x04}, {fa1=0x4a,fa2=0x05} },
+  },
+  -- Map 95 is Mt. Kolts' ENTRANCE map and carries no encounter group: a run
+  -- here paced 437 tiles across six samples and drew nothing, voiding every
+  -- sample as a timeout. Kept as the record of that, and as the doorstep
+  -- gen_kolts_pool.lua crosses from; measure the mountain on kolts_pool.
+  kolts_doorstep = {
+    state = "/Users/mtklein/ot6/build/states/kolts_doorstep.mss.lua",
+    mode = "field", map = 95,
+    seeds = { {fa1=0x37,fa2=0x00}, {fa1=0x6e,fa2=0x01}, {fa1=0xa5,fa2=0x02},
+              {fa1=0xdc,fa2=0x03}, {fa1=0x13,fa2=0x04}, {fa1=0x4a,fa2=0x05} },
+  },
+  south_figaro = {
+    state = "/Users/mtklein/ot6/build/states/south_figaro.mss.lua",
+    mode = "field", map = 75,
+    seeds = { {fa1=0x37,fa2=0x00}, {fa1=0x6e,fa2=0x01}, {fa1=0xa5,fa2=0x02},
+              {fa1=0xdc,fa2=0x03}, {fa1=0x13,fa2=0x04}, {fa1=0x4a,fa2=0x05} },
+  },
+}
+local FX = assert(FIXTURES[FIXTURE], "unknown FIXTURE: " .. tostring(FIXTURE))
+local STATE = FX.state
 local NBATTLES = 6
 -- BUFF_HP: 0 = measure the pool as it ships. >0 = set every monster's HP
 -- to this before the clock starts, which is metrics_battle.lua's own
@@ -60,14 +112,53 @@ local NBATTLES = 6
 -- measures the INSTRUMENT and the loop's shape; the unbuffed arm is the
 -- honest stretch number. Never mix them in one table.
 local BUFF_HP = 0
+-- BUFF_SHIELDS: 0 = the shields Ot6SeedShields really seeded (authored row,
+-- or the level formula 2 + level/8 capped at 6). >0 = overwrite every
+-- monster's CURRENT and MAX shield cell with this before the clock starts.
+-- This is the shield-count lever measured WITHOUT a ROM edit: the formula
+-- is inline code, so a source change would have to be rebuilt per cell,
+-- while the seeded cells are plain WRAM and the whole break system reads
+-- them and nothing else. Like BUFF_HP it is a synthetic arm -- label it,
+-- never average it with the shipped one.
+local BUFF_SHIELDS = 0
+-- BUFF_CLASS: 0 = the class-weakness mask Ot6SeedShields really seeded,
+-- which for every FORMULA species is $00 -- no class weakness at all (the
+-- @formula path explicitly clears $3e9c). >0 = OR this mask into every
+-- monster's class-weak cell, i.e. simulate an authored Ot6ShieldTbl row
+-- WITHOUT authoring one. OT6_SLASH $01, OT6_PIERCE $02, OT6_BLUDG $04.
+--
+-- This is the "what would authoring buy" arm, and it is the only way to
+-- ask that question before the authoring exists. It matters because the
+-- two chip channels are NOT interchangeable: an element-weak hit collects
+-- vanilla's x2 and a class-weak hit collects nothing ("the damage bonus
+-- for classes is the break window itself", Ot6ClassChip), so the breaking
+-- hit is 4x base through the element channel and 2x base through the class
+-- channel. Which channel does the chipping decides whether a broken target
+-- can survive its own break.
+local BUFF_CLASS = 0
 local PACE_FRAMES = 7000            -- pacing budget per battle
 local BATTLE_FRAMES = 9000          -- policy-driven battle budget
-local SPAWN_X = 84                  -- pace between SPAWN_X and SPAWN_X-1
--- $1FA1 seeds (encounter-step roll). The world pool at the Narshe spawn
--- drew one formation ($0017) in every probe sample, so these vary the
--- STEP the encounter fires on rather than the formation -- which is what
--- decorrelates the samples. Same seeds in every policy arm.
-local SEEDS = { 0x37, 0x6e, 0xa5, 0xdc, 0x13, 0x4a }
+local SEEDS = FX.seeds              -- $1FA1 (step roll) / $1FA2 (formation)
+
+-- Difficulty-knob poke, bal_mines.lua's mechanism verbatim (Measurement #4
+-- proved poking the loaded ROM image equals a rebuild: the scale routines
+-- read these very bytes). POKE_SHIELD -> Ot6ShieldedMulW in 16ths ($10 =
+-- 1x/off, $08 = 0.5x, $06 = 0.375x, $04 = 0.25x, $02 = 0.125x); POKE_HP ->
+-- Ot6HpMulTbl band0. nil = leave the shipped byte.
+local POKE_SHIELD = nil
+local POKE_HP = nil
+-- ROM offsets are BUILD-SPECIFIC and HAVE drifted once (bal_mines' header
+-- tells that story: eighteen bytes early, poking live code while reporting
+-- a grid). Re-derive after any bank-F0 edit:
+--   grep -oE 'name="Ot6ShieldedMulW"[^;]*' ff6/rom/ff6-en.dbg  -> val=0xF0034E
+-- and subtract $C00000.
+local ROM_HPMUL  = 0x300185         -- Ot6HpMulTbl band0
+local ROM_SHIELD = 0x30034E         -- Ot6ShieldedMulW (word, low byte)
+-- every value either knob is ever set to, shipped or swept: a byte outside
+-- this set means the offset no longer points at a knob
+local KNOB_OK = { [0x02]=true, [0x03]=true, [0x04]=true, [0x06]=true,
+                  [0x08]=true, [0x0c]=true, [0x10]=true, [0x18]=true,
+                  [0x20]=true }
 
 -- --------------------------------------------------------- addresses --
 -- (all cited in metrics_battle.lua's header; kept in the same order)
@@ -83,6 +174,8 @@ local SHLD  = 0x3e40               -- monster cur shields, +slot*2
 local TIMER = 0x3e90               -- monster broken timer, +slot*2
 local RVEAL = 0x3e91               -- monster revealed elements, +slot*2
 local WEAK  = 0x3be8               -- monster weak elements, +slot*2
+local WKC   = 0x3ea4               -- monster class-weak mask, +slot*2
+                                   --   ($3e9c's monster half: chars +0..+6)
 local ALIVE = 0x3aa8               -- monster presence bit0, +slot*2
 local MSTAT = 0x3eec               -- monster status-1, +slot*2 ($c2 = gone)
 local CHARIX = 0x3ed9              -- battle slot -> character index, +slot*2
@@ -213,6 +306,13 @@ local function resetBattleState()
   S = {
     t0 = 0, frames = 0,
     playerActions = 0, enemyActions = 0, counterActions = 0,
+    -- "breaks per fight" is a misleading number on its own: Measurement #6
+    -- broke 6/6 fights and every break landed on the killing blow, so the
+    -- reward the whole system is built around was never once collected.
+    -- These two say whether a WINDOW existed, not whether a break fired:
+    -- actions the party got to take against a broken target, and enemy
+    -- turns skipped while it was broken.
+    playerActionsBroken = 0, enemyActionsBroken = 0,
     playerDequeues = 0, enemyDequeues = 0,
     playerDmg = 0, playerDmgBroken = 0, monsterHeal = 0,
     monsterSelfDmg = 0, unattributedDmg = 0,
@@ -372,6 +472,12 @@ end
 -- ------------------------------------------------- per-frame sampler --
 local function sample()
   S.frames = H.frame - S.t0
+  -- read the broken state BEFORE walking the queues, so an action dequeued
+  -- this frame is credited against the board it is actually acting on
+  local brokenNow = false
+  for _, m in ipairs(mons) do
+    if monsterAlive(m.slot) and broken(m.slot) then brokenNow = true end
+  end
   for qi, q in ipairs(QUEUES) do
     local cur = H.readByte(q.ptr)
     while qShadow[qi] ~= cur do
@@ -386,6 +492,9 @@ local function sample()
           S.playerDequeues = S.playerDequeues + 1
           if S.playerDequeues % 2 == 0 then
             S.playerActions = S.playerActions + 1
+            if brokenNow then
+              S.playerActionsBroken = S.playerActionsBroken + 1
+            end
           end
           local rec = bySlot[v // 2]
           if rec then
@@ -400,6 +509,9 @@ local function sample()
           S.enemyDequeues = S.enemyDequeues + 1
           if S.enemyDequeues % 2 == 0 then
             S.enemyActions = S.enemyActions + 1
+            if brokenNow then
+              S.enemyActionsBroken = S.enemyActionsBroken + 1
+            end
           end
         end
       end
@@ -515,10 +627,15 @@ local function report()
   end
   mline("formation", table.concat(sp, ","))
   mline("buff_hp", BUFF_HP)
+  mline("buff_shields", BUFF_SHIELDS)
+  mline("buff_class", BUFF_CLASS)
   mline("result", S.result)
   mline("frames", S.frames)
   mline("player_actions", S.playerActions)
   mline("enemy_actions", S.enemyActions)
+  -- the window, not the event (see resetBattleState)
+  mline("player_actions_broken", S.playerActionsBroken)
+  mline("enemy_actions_broken", S.enemyActionsBroken)
   mline("counter_actions", S.counterActions)
   mline("player_dmg", S.playerDmg)
   mline("player_dmg_broken", S.playerDmgBroken)
@@ -616,15 +733,22 @@ local function seqStepList(steps)
   }
 end
 
-local function calmWorld(n)
+-- "the party is standing still, in control, on the map we expect" -- the
+-- world and field halves ask different modules, so the settle predicate is
+-- per-fixture the same way the pacer is.
+local function calmField(n)
   local cnt = 0
   return function()
-    cnt = (H.worldHasControl() and H.worldAligned()) and cnt + 1 or 0
+    local ok = (FX.mode == "world")
+      and (H.worldHasControl() and H.worldAligned())
+      or  (H.hasControl() and H.tileAligned()
+           and (H.mapId() & 0x1ff) == FX.map)
+    cnt = ok and cnt + 1 or 0
     return cnt >= n
   end
 end
 
-local function paceStep(k)
+local function paceWorld(k)
   -- Pace two world tiles until a battle starts loading. Never raises from
   -- the predicate: void reasons flow into the report instead.
   local battN, waited, lastX = 0, 0, nil
@@ -641,10 +765,77 @@ local function paceStep(k)
       local x = H.worldX()
       if lastX ~= nil and x ~= lastX then paceSteps = paceSteps + 1 end
       lastX = x
-      H.setPad({ [(x >= SPAWN_X) and "left" or "right"] = true })
+      H.setPad({ [(x >= FX.spawn) and "left" or "right"] = true })
     end),
     H.waitFrames(1),
   }, "encounter fires (b=" .. k .. ")")
+end
+
+-- The four presses and how to undo each, for the field lane picker.
+local BACK = { left = "right", right = "left", up = "down", down = "up" }
+local LANE_ORDER = { "left", "right", "up", "down" }
+
+local function paceField(k)
+  -- bal_mines' field pacer, with the lane chosen LIVE instead of hardcoded.
+  -- bal_mines could name (78,58)<->(77,58) because it owns one fixture;
+  -- this driver is pointed at whatever stretch is being measured, and a
+  -- fixture whose spawn tile has a wall to its left would otherwise pace
+  -- zero steps and void every sample as a timeout while looking like an
+  -- encounter-free map. H.canStep models the live z-level and the object
+  -- map, so the first direction it allows is a lane the party can really
+  -- walk; the party oscillates spawn <-> that neighbour.
+  --
+  -- A random encounter fires THROUGH an event script (EventScript_RandBattle,
+  -- field/battle.asm), so eventRunning alone is normal here: pacing goes
+  -- hands-off during any event and only voids if no battle follows within
+  -- 600 frames.
+  local battN, evHold, waited = 0, 0, 0
+  local lane, lastXY = nil, nil
+  return H.driveUntil(function()
+    waited = waited + 1
+    battN = H.battleLoadStarted() and battN + 1 or 0
+    if battN >= 3 then H.setPad({}) return true end
+    if H.eventRunning() or H.dialogWaiting() then
+      evHold = evHold + 1
+    elseif H.hasControl() then
+      evHold = 0
+    end
+    if evHold >= 600 then voidReason = "event_no_battle" H.setPad({}) return true end
+    if (H.mapId() & 0x1ff) ~= FX.map then
+      voidReason = "left_map" H.setPad({}) return true
+    end
+    if waited >= PACE_FRAMES then voidReason = "pace_timeout" H.setPad({}) return true end
+    return false
+  end, PACE_FRAMES + 600, {
+    H.call(function()
+      if not (H.hasControl() and H.tileAligned()) then H.setPad({}) return end
+      local x, y = H.fieldX(), H.fieldY()
+      if lane == nil then
+        -- FX.lane first when the fixture names one (an exit tile the
+        -- passability model cannot see); otherwise scan.
+        for _, m in ipairs(FX.lane and { FX.lane } or LANE_ORDER) do
+          if H.canStep(x, y, m) then
+            lane = { ax = x, ay = y, out = m, back = BACK[m] }
+            break
+          end
+        end
+        if lane == nil then
+          voidReason = "walled_in" H.setPad({}) return
+        end
+        H.log(string.format("[metrics-ev] b=%d lane (%d,%d) %s/%s",
+          k, x, y, lane.out, lane.back))
+      end
+      local xy = x * 1000 + y
+      if lastXY ~= nil and xy ~= lastXY then paceSteps = paceSteps + 1 end
+      lastXY = xy
+      H.setPad({ [(x == lane.ax and y == lane.ay) and lane.out or lane.back] = true })
+    end),
+    H.waitFrames(1),
+  }, "encounter fires (b=" .. k .. ")")
+end
+
+local function paceStep(k)
+  return (FX.mode == "world") and paceWorld(k) or paceField(k)
 end
 
 local function battleBlock(k)
@@ -652,13 +843,39 @@ local function battleBlock(k)
     H.call(function() B = k resetBattleState() end),
     H.loadState(STATE),
     H.waitFrames(10),
-    H.waitUntil(calmWorld(20), 1800, "world control (b=" .. k .. ")"),
+    H.waitUntil(calmField(20), 1800, "field control (b=" .. k .. ")"),
     H.call(function()
-      -- cold danger counter + seeded step roll: battle k is the same
-      -- battle in every policy arm (mines_pace.lua Measurement #4)
+      -- drift guard FIRST: poking a stale offset corrupts the ROM image
+      -- and every number after it, silently. Raise instead.
+      for _, g in ipairs({ { ROM_HPMUL, "Ot6HpMulTbl" },
+                           { ROM_SHIELD, "Ot6ShieldedMulW" } }) do
+        local seen = H.readRomByte(g[1])
+        if not KNOB_OK[seen] then
+          error(string.format(
+            "knob layout drift: %s at $%06X reads $%02X -- re-derive from "
+            .. "ff6/rom/ff6-en.dbg", g[2], g[1], seen), 0)
+        end
+      end
+      -- the poke survives loadState: ROM is not savestate-backed
+      if POKE_HP ~= nil then
+        emu.write(ROM_HPMUL, POKE_HP, emu.memType.snesPrgRom)
+        H.assertEq(H.readRomByte(ROM_HPMUL), POKE_HP, "hp band0 poked")
+      end
+      if POKE_SHIELD ~= nil then
+        emu.write(ROM_SHIELD, POKE_SHIELD, emu.memType.snesPrgRom)
+        H.assertEq(H.readRomByte(ROM_SHIELD), POKE_SHIELD, "resistance poked")
+      end
+      mline("knob_hp", string.format("%02x", H.readRomByte(ROM_HPMUL)))
+      mline("knob_shield", string.format("%02x", H.readRomByte(ROM_SHIELD)))
+      mline("fixture", FIXTURE)
+      -- cold danger counter + seeded rolls: battle k is the same battle in
+      -- every policy arm (mines_pace.lua Measurement #4)
       H.writeWord(DANGER, 0)
-      H.writeByte(0x1fa1, SEEDS[k] or 0)
+      local sd = SEEDS[k] or {}
+      if sd.fa1 then H.writeByte(0x1fa1, sd.fa1) end
+      if sd.fa2 then H.writeByte(0x1fa2, sd.fa2) end
       mline("seed_1fa1", string.format("%02x", H.readByte(0x1fa1)))
+      mline("seed_1fa2", string.format("%02x", H.readByte(0x1fa2)))
     end),
     paceStep(k),
     H.cond(function() return voidReason ~= nil end, {
@@ -679,6 +896,15 @@ local function battleBlock(k)
         for slot = 0, 5 do
           if monsterAlive(slot) then
             if BUFF_HP > 0 then H.writeWord(MHP + slot*2, BUFF_HP) end
+            if BUFF_SHIELDS > 0 then
+              H.writeByte(SHLD + slot*2, BUFF_SHIELDS)      -- current
+              H.writeByte(SHLD + slot*2 + 1, BUFF_SHIELDS)  -- max (refill)
+            end
+            if BUFF_CLASS > 0 then
+              -- monster half of $3e9c (chars at +0..+6, monsters at +8)
+              H.writeByte(WKC + slot*2,
+                H.readByte(WKC + slot*2) | BUFF_CLASS)
+            end
             local hp = H.readWord(MHP + slot*2)
             mons[#mons + 1] = { slot = slot, hp = hp, hp0 = hp, dmg = 0 }
             mline("mon_detail", string.format(

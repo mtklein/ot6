@@ -603,3 +603,207 @@ Instrument caveats for whoever reads these numbers next: two thirds of
 the stretch party, one formation, a synthetic HP arm, and Edgar/Sabin
 kit rungs that have never been driven. Repointing `bal_party.lua` at a
 Kolts fixture requires nothing but the `STATE` knob.
+
+## Measurement #7 — the resistance sweep that landed nothing, and the reason the break has never happened (2026-07-19)
+
+This one was commissioned as a tuning pass: the playtester's opening
+report was "breaking and boosting just don't really matter — too much
+damage is making it through," Measurement #6 agreed from the instrument
+side (1.5–2.0 turns against a 3–5 band, boost3 spending zero BP), and the
+brief was to sweep `Ot6ShieldedMulW` down until the loop mattered.
+
+**Nothing was landed. `Ot6ShieldedMulW` stays `$0008` (0.5x) and so does
+every other tuning constant.** Three more playtest reports arrived while
+the sweep ran, and together with the numbers they say the resistance
+constant is not the problem. What the sweep found instead is why the
+break — the mechanic the whole system is named for — has never once
+happened in play, and it is not a dial.
+
+### What the instrument grew
+
+`bal_party.lua` said in its own header that pointing it at a Kolts
+fixture "requires nothing but the `STATE` knob." That was wrong by one
+thing, the pacer: `worldmap_narshe` is on the WORLD map and every
+stretch fixture past it is a FIELD map. Both pacers now live in the
+driver behind a `FIXTURES` table. Also added: the `POKE_SHIELD`/`POKE_HP`
+knob poke with bal_mines' drift guard (verified against this build —
+`Ot6ShieldedMulW` still at `$F0034E`), and three metrics the questions
+below needed.
+
+`kolts_doorstep` turned out to be unmeasurable and that is worth
+recording: map 95 is Mt. Kolts' ENTRANCE map and carries no encounter
+group. A run paced **437 tiles across six samples and drew zero
+encounters**, voiding every sample as a timeout. `gen_kolts_pool.lua`
+crosses gen_kolts' K1 onto map 100 shelf F and mints `kolts_pool.mss`
+there; it asserts an encounter actually fires before it calls the fixture
+good, because map 95 passed every other check and was still worthless.
+The fixture carries the real stretch three — **EDGAR, LOCKE, TERRA** — so
+Edgar's Tools rungs are driven here for the first time.
+
+**Break uptime is now a first-class metric**, because "breaks per fight"
+is a misleading number on its own: Measurement #6 broke 6/6 fights and
+every break landed on the killing blow. `player_actions_broken` counts
+player actions that got to land on a broken target — the window, not the
+event. The owner's v0.3 target ("the break is the penultimate round, and
+we can easily make the kill on broken enemies") is exactly
+`player_actions_broken` ≈ 1.
+
+### The sweep — early pool (`worldmap_narshe`, Leafer `$0017`, 33 HP, fire-weak, 2 shields; LOCKE L6 + TERRA L4)
+
+6 battles per cell, paired seeds, 0 voids, 0 residuals. `mash` =
+`baseline`, `loop` = `boost3`.
+
+| resistance | mash TTK | loop TTK | TTK gap | mash taken | loop taken | breaks | actions broken |
+|---|---|---|---|---|---|---|---|
+| 1x (off) | 1.0 | 2.0 | **0.50x** | 0.0 | 0.0 | 0 | 0 |
+| **0.5x (shipped)** | 1.7 | 2.0 | **0.83x** | 0.0 | 0.0 | 0 | 0 |
+| 0.375x | 2.5 | 2.0 | 1.25x | 5.0 | 0.0 | 0 | 0 |
+| 0.25x | 3.7 | 2.0 | **1.83x** | 7.2 | 0.0 | 0 | 0 |
+| 0.1875x | 4.7 | 3.0 | 1.56x | 10.5 | 7.8 | 0 | 0 |
+| 0.125x | 7.0 | 4.0 | 1.75x | 15.0 | 7.8 | 1.0 | **0** |
+
+Two things read straight off this table. First, **at the shipped value
+the loop LOSES to mashing on the early pool** (0.83x — the probe turn
+costs more than the weakness buys), and at 1x it loses twice as badly.
+That is the playtester's first report, quantified: on early trash,
+breaking and boosting really do not matter, because they are strictly
+worse than holding A. Second, **no resistance produces a break window.**
+`player_actions_broken` is 0 in all 144 battles; at 0.125x the one break
+that fires lands at 100% of fight length — the killing blow, again.
+
+### The Kolts corroboration (`kolts_pool`, all at the shipped 0.5x)
+
+Then three more playtest reports landed: Kolts killed Locke and forced a
+grind; then, at L8–9, "hard if i don't boost, but easy if i do... maybe
+we've got the balance just right." The Kolts numbers agree, hard:
+
+| policy | TTK | taken | enemy actions | chips | breaks | result |
+|---|---|---|---|---|---|---|
+| baseline (mash) | 8.2 | **224.7** | 9.0 | 0 | 0 | **3 won / 3 WIPED** |
+| boost3 (loop) | 7.3 | 136.3 | 5.8 | 1.0 | 0 | 6 won |
+| greedy | 6.2 | 128.2 | 4.2 | 0.5 | 0 | 6 won |
+| badboost | 8.0 | 220.3 | 7.5 | 0 | 0 | **3 won / 3 WIPED** |
+
+**Mashing wipes half of all Mt. Kolts encounters; engaging the loop wins
+every one and takes 40% less damage.** The gap the driver asked for is
+here — it just is not a TTK gap (1.11x), it is a *survival* gap, and a
+player feels that as "hard if I don't boost, easy if I do." The shipped
+constant is doing its job on this stretch. Lowering it would lengthen the
+losing arm and deepen a hole the playtester already fell into.
+
+So the resistance sweep's honest verdict is: **the early pool's problem
+is not resistance, and the Kolts stretch does not want it touched.** Held
+at 0.5x.
+
+### The break, and why it has never happened
+
+Two Kolts formations, both 3 shields: **Brawler `$000B`** (137 HP, weak
+ICE) and **Tusker `$007A`** (270 HP, weak FIRE). The party is Edgar,
+Locke, Terra; Terra knows Fire and Cure. So half this pool has *no
+reachable weakness at all* — nobody carries ice — and against the other
+half only Terra chips. Measured: `shield_chips` peaks at 2 of the 6 a
+formation needs, and **breaks are 0 across all 24 battles.**
+
+That is the whole answer, and it is a chip-RATE problem, not a threshold
+problem. The proof is the shield arm: re-run with trash shields forced
+from 3 to 2 and the mash arm is **byte-identical** to the shipped one
+(8.2 TTK, 224.7 taken, 0 chips, 3 wipes). Lowering a bar changes nothing
+when nobody can reach it — every non-authored species takes the
+`@formula` path, which explicitly *clears* `$3e9c`, so **no formula
+species has any class weakness and Locke's Fight and Edgar's
+AutoCrossbow can never chip anything.**
+
+The synthetic arm settles what authoring would buy. `BUFF_CLASS` ORs a
+class mask into `$3ea4` at battle start — an authored `Ot6ShieldTbl` row
+without the row. One PIERCE bit on the Kolts trash, resistance untouched
+at 0.5x:
+
+| Kolts arm | policy | TTK | taken | chips | breaks | break at | uptime | **actions broken** | result |
+|---|---|---|---|---|---|---|---|---|---|
+| as shipped | baseline | 8.2 | 224.7 | 0.0 | 0.0 | — | 0.0% | **0.0** | 3 won / 3 wiped |
+| as shipped | boost3 | 7.3 | 136.3 | 1.0 | 0.0 | — | 0.0% | **0.0** | 6 won |
+| shields 3→2 | baseline | 8.2 | 224.7 | 0.0 | 0.0 | — | 0.0% | 0.0 | 3 won / 3 wiped |
+| **+PIERCE** | baseline | **5.8** | **92.7** | 6.0 | 2.0 | 39% | **62.2%** | **1.0** | **6 won** |
+| **+PIERCE** | boost3 | 6.5 | 92.7 | 5.5 | 1.5 | 75% | 28.1% | **1.2** | **6 won** |
+| +PIERCE | greedy | 5.2 | 91.3 | 3.8 | 1.0 | 96% | 4.3% | 0.2 | 6 won |
+| +PIERCE | badboost | 7.5 | 137.3 | 6.0 | 2.0 | 48% | 53.6% | 1.3 | 6 won |
+
+One authored bit turns the break from never-happening into the shape the
+owner asked for: **breaks 0 → 2.0 per fight, uptime 0% → 62%, and
+`player_actions_broken` = 1.0 — the kill landing on a broken enemy, which
+is the v0.3 target stated exactly.** It also makes the stretch *safer and
+shorter*, not harder: TTK 8.2 → 5.8, damage taken 224.7 → 92.7, wipes 3/6
+→ 0/6. And the window carries the damage economy the way the design
+wanted — 235.5 of Edgar's 302 damage (**78%**) lands through it.
+
+**Why the class channel and not the element channel.** `Ot6ClassChip` is
+explicit: "no vanilla x2 on a class-weak hit — the damage bonus for
+classes is the break window itself." So the hit that empties the shields
+is *4x base* through the element channel (vanilla weak x2, then broken
+x2) and only *2x base* through the class channel. That factor of two is
+the difference between a monster that survives its own break and one that
+does not, and it is why every break measured so far has been a killing
+blow: they were all Terra's Fire. The condition, from the measured
+numbers, is **HP > (S-1)·c·R + 2c** for a chipper hitting for `c` — with
+Locke's Fight at c≈45, R=0.5, S=3 that is HP > ~135. Live: the window
+opened on Tusker (270 HP) in 3/3 fights and never once on Brawler (137
+HP), which is that threshold landing exactly where the arithmetic puts
+it.
+
+### What this rules out, and what it asks for
+
+- **Resistance is not the lever for the early pool.** Leafer has 33 HP
+  and one Terra Fire does ~82 base; the breaking hit is 4x that. The
+  monster would need ~10x its HP to survive its own break — the same
+  order Measurements #3 and #5 computed independently (Vaporite ≥31x,
+  Were-Rat ≥19x, ~22x, ~14x). Confirmed live: authoring a class row onto
+  the early pool *does* produce breaks (0.7/fight) but they still land at
+  **100% of fight length** and `player_actions_broken` stays **0**.
+  Early trash cannot express the break window at any setting of any knob
+  measured here. It is too small to survive being broken.
+- **Shield count is not the lever** while the chip rate is zero — proven
+  by the byte-identical 3→2 arm above. It becomes a real lever *after*
+  class rows exist, and should be tuned then, not now.
+- **The HP dial stays retired.** Nothing here re-opens it: at Kolts the
+  HP that matters is already there (270 HP produced the window unaided),
+  and at the early pool the required multiplier is ~10x, which
+  Measurement #5 already showed is a slog.
+
+**What to author** (the driver asked to be handed species): the two Mt.
+Kolts trash species, **`$000B` Brawler** and **`$007A` Tusker**, plus the
+world-map trash **`$0017` Leafer** for the Narshe/Figaro stretch — noting
+that Leafer buys chips and reveals but *cannot* buy a window at 33 HP.
+`$0019` Lobo already has a row (3, PIERCE); these do not.
+
+One design caveat, measured and worth stating before anyone authors:
+**the class you choose decides whether the break is discovered or
+stumbled into.** PIERCE is what Edgar's AutoCrossbow and Locke's dagger
+already swing, so authoring PIERCE made the *mash* arm chip by accident —
+which is why the mash-vs-loop gap CLOSES in that arm (1.11x → 0.90x TTK).
+Both arms got much better in absolute terms, so this is not a regression;
+but a class the party's default attack does not already carry is what
+makes the probe a real decision rather than a freebie.
+
+### What remains unmeasured
+
+- **The grind question, untouched.** The playtester reached the good
+  Kolts experience at L8–9, but only after dying and backtracking. Nobody
+  has measured whether natural progression *delivers* L8–9 by Mt. Kolts,
+  and if it lands players at L6–7 the fight is unfair by default and the
+  fix is the `Ot6DangerMulW`/`Ot6RewardMulW` pair (product pinned at 1.0),
+  not resistance. `mines_pace.lua` is the instrument; this needs a
+  stretch-length route, not a per-battle fixture.
+- **Vargas and the boss band.** `vargas_doorstep` exists and was not
+  driven here; the playtester liked the fight ("managing boosts weaknesses
+  was helpful") but reported breaks still not mattering. Vargas is
+  authored (5, BLUDG) so he is the one fight where the class channel
+  already exists — the natural next measurement.
+- **South Figaro.** `south_figaro.mss` is map 75, the town, and carries no
+  encounter group; the cave (maps 71/73/70/72) is the pool for that
+  stretch and has no fixture.
+- The Kolts pool as sampled is two formations from shelf F. Deeper
+  shelves (D, B) and the Sabin-era party are unmeasured.
+- `greedy` still beats `boost3` on TTK in every cell measured, at both
+  pools — the "greedy must lose" band has now failed in Measurements #3,
+  #5, #6 and #7 and should probably be restated as a boss-fight property
+  or dropped.

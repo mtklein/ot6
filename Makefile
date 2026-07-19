@@ -117,11 +117,12 @@ test: rom $(STATE1) $(STATE2) $(STATE3)
 #                                            figaro_cleared
 #                   -> gen_kolts          -> south_figaro, kolts_doorstep,
 #                                            vargas_doorstep
+#                   -> gen_kolts_pool     -> kolts_pool
 #                   -> gen_vargas         -> vargas_won
 FRONTIER := arvis_wake narshe_streets moogle_doorstep moogle_cleared \
             worldmap_narshe figaro_doorstep figaro_intro figaro_matron \
-            figaro_cleared south_figaro kolts_doorstep vargas_doorstep \
-            vargas_won
+            figaro_cleared south_figaro kolts_doorstep kolts_pool \
+            vargas_doorstep vargas_won
 
 # mint <state> from <script> once its ROM-content gate says it is stale
 define mint
@@ -157,6 +158,12 @@ build/states/kolts_doorstep.mss.lua: build/states/south_figaro.mss.lua
 	$(call mint,kolts_doorstep,gen_kolts)
 build/states/vargas_doorstep.mss.lua: build/states/kolts_doorstep.mss.lua
 	$(call mint,vargas_doorstep,gen_kolts)
+# gen_kolts_pool: one crossing past the doorstep onto map 100 shelf F.  The
+# doorstep map (95) is transit only and carries no encounter group -- 437
+# paced tiles there drew nothing -- so balance runs that want the Mt. Kolts
+# trash pool need this one, not kolts_doorstep.
+build/states/kolts_pool.mss.lua: build/states/kolts_doorstep.mss.lua
+	$(call mint,kolts_pool,gen_kolts_pool)
 # gen_vargas: the fight itself, finished by Pummel, and the reunion
 build/states/vargas_won.mss.lua: build/states/vargas_doorstep.mss.lua
 	$(call mint,vargas_won,gen_vargas)

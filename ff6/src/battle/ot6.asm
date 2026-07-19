@@ -820,6 +820,22 @@ Ot6ShieldedMulW:
                                 ;   visibly the worst return. 0.75x/1x flatten
                                 ;   the ladder (at 1x a weakness hit ties a
                                 ;   broken one — no reason to break).
+                                ;   measurement #7 RE-SWEPT it under a
+                                ;   playtest that read as "the loop doesn't
+                                ;   matter" (1x/0.5x/0.375x/0.25x/0.1875x/
+                                ;   0.125x x 4 policies x 2 pools) and kept
+                                ;   0.5x: on the mt kolts pool, mashing WIPES
+                                ;   3 of 6 encounters here while engaging the
+                                ;   loop wins 6/6 and takes 40% less damage,
+                                ;   so lowering it only deepens a hole the
+                                ;   playtester already fell into. the thing
+                                ;   that reads as "the loop doesn't matter"
+                                ;   on EARLY trash is not this constant —
+                                ;   it's that formula species carry no class
+                                ;   weakness (@formula clears $3e9c), so
+                                ;   fight/tools chip nothing and the break
+                                ;   never fires. that is Ot6ShieldTbl
+                                ;   authoring, not a damage dial.
 
 .proc Ot6ShieldedDmg
         .a8
