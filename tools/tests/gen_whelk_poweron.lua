@@ -353,15 +353,29 @@ H.run({ maxFrames = 60000 }, {
       H.assertEq(whelkDone(), false,
         "whelk-done switch $1EA6 bit $20 is CLEAR (trigger still live)")
     end),
-    -- 14 idle frames before the mint: the doorstep's frame phase decides the
-    -- whelk fight's battle-start ATB roll, i.e. WHOSE menu opens first.
-    -- battle_dlgmenu's staging scan allows only $80+ tiles in the magitek
-    -- list rows; TERRA's list stages Bio Blast's poison element icon (OT6
-    -- cell $64, the one claimed icon cell below $80), so a Terra-first mint
-    -- fails it.  Measured over mint+N idle frames (probe_atb_roll): N=
-    -- 0,1,2,5,8,10,11,17,18,20 give Terra first (dirty), 3,9,12..16,19,21
-    -- give Wedge/Vicks (clean).  14 is the center of the widest clean
-    -- plateau (12..16), so +-2 frames of upstream drift stay green.
+    -- A short settle before the mint.  DO NOT TUNE THIS NUMBER.
+    --
+    -- It used to be load-bearing and it should never have been.  The
+    -- doorstep's frame phase decides the whelk fight's battle-start ATB
+    -- roll, i.e. whose menu opens first, and battle_dlgmenu's staging scan
+    -- used to allow only $80+ tiles -- which rejected TERRA's magitek list,
+    -- because Bio Blast's poison element icon is OT6 cell $64 and $64 is
+    -- below $80 (ot6.asm:1158, where poison takes $64 precisely because
+    -- vanilla's border fill owns $ee).  So this parked 14 frames, measured
+    -- as the centre of a "clean plateau" of rolls that opened somebody
+    -- else's menu.
+    --
+    -- That was a coin flip wearing a constant's clothes: a Terra-first menu
+    -- is an ordinary, correct, player-visible screen, so the plateau was a
+    -- property of a wrong assertion, not of the fixture, and every ROM
+    -- change re-minted this state and re-rolled the dice.  battle_dlgmenu
+    -- now accepts the element icons its own claimedCells() derives, and is
+    -- documented menu-owner independent.  Nothing downstream reads the ATB
+    -- roll any more.
+    --
+    -- If a downstream test ever fails as a function of this number again,
+    -- that test is encoding an assumption about the roll that was never
+    -- true in general -- fix the assertion, not the frame count.
     H.waitFrames(14),
     H.saveState("whelk_doorstep.mss"),
     H.logStep(function()

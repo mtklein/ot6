@@ -12,6 +12,15 @@
 --   (every claimed OT6 cell == its bank-F0 data, every other byte ==
 --   SmallFontGfx) -> open the magitek list -> staged-row map-word asserts
 --   -> a deep row selects, targets, and EXECUTES ($3410 exec watch).
+--
+-- MENU OWNER DOES NOT MATTER, deliberately.  The battle-start ATB roll
+-- decides whose menu opens first, and every assert here is written to hold
+-- for any of them: everyone in this fight rides magitek armor, so the top
+-- command opens a magitek list whoever holds it; the "Ice" probe and the
+-- $83-$8a exec watch are beam-family checks common to all those lists; and
+-- assertStagingSane accepts the element icons any of those lists stages.
+-- It was not always so -- see the block comment there -- and the fixture
+-- generator must NOT be tuned to steer the roll on this test's behalf.
 local H = dofile("/Users/mtklein/ot6/tools/tests/lib/ot6.lua")
 local STATE = "/Users/mtklein/ot6/build/states/whelk_doorstep.mss.lua"
 local WHELK = { [0x0134] = true }
@@ -44,13 +53,16 @@ local function claimedCells()
   local bg    = findSig({0x7e,0x00,0x91,0x7e,0xb1,0x7e,0x91,0x7e,
                          0x52,0x3c,0x3c,0x38,0x18,0x00,0x00,0x00})
   H.assertEq(icons ~= nil and bg ~= nil, true, "OT6 glyph data found in rom")
-  local claimed = {}
+  local claimed, elemIcons = {}, {}
   local iconCells = {0xeb,0xec,0xed,0x64,0xef,0xfb,0xfc,0xfd}
-  for k, cell in ipairs(iconCells) do claimed[cell] = icons + (k-1)*16 end
+  for k, cell in ipairs(iconCells) do
+    claimed[cell] = icons + (k-1)*16
+    elemIcons[cell] = k                  -- 1-based element index, fire..water
+  end
   for k = 1, 16 do
     claimed[emu.read(bg - 17 + k, rom)] = bg + (k-1)*16
   end
-  return claimed
+  return claimed, elemIcons
 end
 local function assertFontIntact(what)
   local vr, rom = emu.memType.snesVideoRam, emu.memType.snesPrgRom
@@ -85,20 +97,56 @@ local function iceStaged()
   end
   return false
 end
--- whole-map scan of the staging rows: every word is either fill/pad or a
--- small-font tile ($80+); anything below $80 (bar the $ee/$ff fills'
--- neighbors none exist) means garbage got staged
+-- Whole-map scan of the staging rows.  Every word must be a cell that
+-- really carries art: a small-font text tile ($80+), or one of the eight
+-- OT6 element icons.  Anything else means garbage got staged.
+--
+-- The icon half is not a concession, it is the rule.  Ability list rows
+-- are drawn by Ot6ListIconCommon / Ot6AbilityPad_ext (ot6.asm), which
+-- append the ability's element glyph from Ot6ElemGlyphTbl -- and that
+-- table puts POISON at font cell $64, below the text range, with the
+-- comment that says why: "$ee is vanilla's border junk fill!"
+-- (ot6.asm:1158).  The other seven icons happen to land at $eb $ec $ed
+-- $ef $fb $fc $fd, all >= $80, which is the only reason a $80+-only rule
+-- ever looked correct.
+--
+-- Measured on this fixture (probe dump of $7c00-$7d3f with the magitek
+-- list open): row $7c70 reads "Bio Blast" followed by word $3964 --
+-- tile $164 = font cell $64, palette 6, which is exactly
+-- Ot6ElemPalTbl's ".byte 6 << 2 ; poison: green".  That word is correct,
+-- intentional, player-visible art.  The old rule called it garbage, so
+-- the test could only pass on the battle-start ATB rolls where somebody
+-- OTHER than Terra held the first menu -- i.e. it was a coin flip on
+-- which ROM bytes happened to be assembled, which is the one thing
+-- CONTRIBUTING.md says a gate must never be.
+--
+-- The allowed set is derived, not listed here: claimedCells() finds the
+-- icon data in bank F0 by signature scan, and assertFontIntact() then
+-- byte-compares every claimed cell's vram against that rom data -- so a
+-- wrong cell list fails the font check loudly rather than quietly
+-- widening this one.
 local function assertStagingSane()
   local vr = emu.memType.snesVideoRam
+  local _, elemIcons = claimedCells()
+  local seen = {}
   for w = 0x400, 0x53f do
     local base = (0x7800 + w) * 2
     local tile = emu.read(base, vr)
-    if tile < 0x80 then
+    if tile < 0x80 and not elemIcons[tile] then
       error(string.format("staging row word $%04x holds tile $%02x " ..
-        "(below the text/font range)", 0x7800 + w, tile), 0)
+        "(neither a text tile nor an OT6 element icon)", 0x7800 + w, tile), 0)
     end
+    if elemIcons[tile] then seen[tile] = (seen[tile] or 0) + 1 end
   end
-  H.log("ok: staged list rows hold only text-range tiles")
+  -- observation, not an assertion: which lists stage icons depends on
+  -- whose menu the ATB roll opened, and that is legitimately either way
+  local s = {}
+  for tile, n in pairs(seen) do
+    s[#s+1] = string.format("$%02x x%d", tile, n)
+  end
+  table.sort(s)
+  H.log("ok: staged list rows hold only text tiles + OT6 element icons"
+    .. (#s > 0 and ("; icons staged: " .. table.concat(s, " ")) or ""))
 end
 
 local execs = {}
@@ -146,6 +194,12 @@ H.run({ maxFrames = 12000 }, {
   H.call(function() H.setPad({}) end),
   H.waitFrames(300),
   H.call(function()
+    -- name the menu owner: nothing asserts on it (see the header), but a
+    -- failure that IS roll-dependent should say so in its own log instead
+    -- of making the next reader re-measure the ATB phase
+    local actor = H.readByte(0x62ca)
+    H.log(string.format("first menu: actor slot %d, char id $%02x", actor,
+      H.readByte(0x3ed8 + actor * 2)))
     assertFontIntact("untouched first menu after opening dialogues")
     H.screenshot("dlgmenu_untouched")
     emu.addMemoryCallback(function(addr, value)
