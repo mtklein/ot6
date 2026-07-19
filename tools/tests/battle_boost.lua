@@ -61,9 +61,11 @@ H.run({ maxFrames = 30000 }, {
   -- live cell while boosting: the arrow-3 glyph, pulsing yellow/white, in
   -- BOTH window bands (rows 1+2r and 9+2r — the visible copy alternates).
   -- temporal sample (single frames can't see a pulse — or a strobe).
-  -- the same window checks the over-character sprite mark: oam entry
-  -- 96+slot carries the pending-3 tile ($cc), obj pal 3 / priority 3
-  -- ($36), on screen (parked sprites sit at y $e0).
+  -- the same window checks that the RETIRED over-character sprite mark
+  -- stays retired: oam entry 96+slot must remain parked (y $e0).  It used
+  -- to carry the pending-3 tile $cc at attr $36, out of obj tiles that
+  -- turned out to be vanilla's damage-numeral vram -- the "chevrons turn
+  -- into numbers" bug; battle_dmgnum.lua is the dedicated gate.
   H.waitUntil(function()
     local reg = H.readByte(0x897f)
     local base = ((reg - (reg % 4)) * 256) * 2
@@ -95,14 +97,13 @@ H.run({ maxFrames = 30000 }, {
     local mparts, other = {}, 0
     for k, n in pairs(markSeen) do
       mparts[#mparts + 1] = k .. " x" .. n
-      if k ~= "cc/36/yon" and k ~= "cc/36/yoff" then other = other + n end
+      -- tile/attr bytes are vanilla's leftovers now; only "is it on
+      -- screen" matters, and it never may be
+      if k:sub(-3) == "yon" then other = other + n end
     end
     H.log("sprite mark states seen: " .. table.concat(mparts, ", "))
-    -- lua sampling races vanilla's park vs our same-frame rewrite, so a
-    -- chunk of mid-frame reads see y=$e0; the dma only ships the rewrite.
-    H.assertEq((markSeen["cc/36/yon"] or 0) >= 20, true,
-      "boost mark floats over the character (arrow-3 tile, pal 3)")
-    H.assertEq(other, 0, "and nothing else ever occupies the mark entry")
+    H.assertEq(other, 0,
+      "the retired boost-mark oam entry stays parked and unused")
   end),
   H.pressButtons({ "l" }, 6), H.waitFrames(20),
   H.call(function()

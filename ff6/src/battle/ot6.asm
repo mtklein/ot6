@@ -989,11 +989,15 @@ done:   rtl
 ; screen borders) — filling those cells paints garbage at the edges. every
 ; cell below was verified unreferenced in the battle tilemap regions.
 ;
-; the upload is split into six ~128-byte slices so the nmi flush can
+; the upload is split into three ~128-byte slices so the nmi flush can
 ; re-lay the font one slice per vblank after a battle dialogue (the
-; whole 768 bytes as PIO measured ~46 scanlines — more than a vblank).
+; whole 384 bytes as PIO measured ~23 scanlines — more than a vblank).
 ; this entry point runs ALL slices back to back: it is only called in
 ; forced blank (battle init), where budget is unlimited.
+;
+; (was six slices: three more uploaded the over-character boost-mark OBJ
+;  tiles, retired because they sat in vanilla's damage-numeral vram —
+;  see the block comment where Ot6BoostMarksNmi_ext used to live.)
 
 .proc Ot6LoadFontIcons_ext
         .a8
@@ -1010,9 +1014,6 @@ done:   rtl
         jsr     Ot6LoadElemIcons
         jsr     Ot6LoadBgGlyphsA
         jsr     Ot6LoadBgGlyphsB
-        jsr     Ot6LoadObjArrowsA
-        jsr     Ot6LoadObjArrowsB
-        jsr     Ot6LoadObjArrowsC
         plb
         plp
         rtl
@@ -1953,173 +1954,56 @@ done:   plp
 
 ; ------------------------------------------------------------------------------
 
-; [ upload the boost-mark sprite tiles ]
+; [ retired: the over-character boost marks ]
 
-; three 16x16 arrow glyphs (1/2/3 chevrons) into obj tiles 200/202/204
-; (quads with 216/217 etc. below) — verified blank + unreferenced by
-; any oam entry in both formations, idle and through attack effects
-; (probe_objtiles.lua). obj chr base is word $2000 (obsel $61), 4bpp.
-; 12 tiles x 32 bytes, as three 4-tile slices (~128 bytes each — one
-; fits a vblank-tail re-lay stage).
-; a8/i16, db = $00, vmainc $80. exits a8. clobbers a/x/y.
-
-.macro ot6_arrow_slice first, last
-        longa
-        ldx     #first          ; data offset; table offset = x >> 4
-@tile:  phx                     ; (long,y indexing doesn't exist)
-        txa
-        lsr
-        lsr
-        lsr
-        lsr                     ; tile index * 2
-        tax
-        lda     f:Ot6ObjArrowAddrTbl,x
-        sta     hVMADDL
-        plx
-        ldy     #$0010          ; 16 words per 4bpp tile
-@word:  lda     f:Ot6ObjArrowData,x
-        sta     hVMDATAL
-        inx
-        inx
-        dey
-        bne     @word
-        cpx     #last
-        bcc     @tile
-        shorta
-        rts
-.endmacro
-
-.proc Ot6LoadObjArrowsA
-        .a8
-        .i16
-        ot6_arrow_slice $0000, $0080
-.endproc
-
-.proc Ot6LoadObjArrowsB
-        .a8
-        .i16
-        ot6_arrow_slice $0080, $0100
-.endproc
-
-.proc Ot6LoadObjArrowsC
-        .a8
-        .i16
-        ot6_arrow_slice $0100, $0180
-.endproc
-
-; vram word addresses of the arrow tiles: quads at 200, 202, 204
-; ($2000 + tile*16), each TL, TR, BL, BR
-Ot6ObjArrowAddrTbl:
-        .word   $2c80,$2c90,$2d80,$2d90
-        .word   $2ca0,$2cb0,$2da0,$2db0
-        .word   $2cc0,$2cd0,$2dc0,$2dd0
-
-Ot6ObjArrowData:
-; boost-one: 16x16 as tiles TL, TR, BL, BR
-        .byte   $00,$00,$00,$00,$00,$00,$08,$08,$0e,$0e,$0f,$0f,$0f,$0f,$0f,$0f
-        .byte   $00,$00,$00,$00,$00,$00,$08,$08,$0e,$0e,$0f,$0f,$0f,$0f,$0f,$0f
-        .byte   $00,$00,$00,$00,$00,$00,$00,$00,$00,$00,$80,$80,$e0,$e0,$f8,$f8
-        .byte   $00,$00,$00,$00,$00,$00,$00,$00,$00,$00,$80,$80,$e0,$e0,$f8,$f8
-        .byte   $0f,$0f,$0f,$0f,$0f,$0f,$0e,$0e,$08,$08,$00,$00,$00,$00,$00,$00
-        .byte   $0f,$0f,$0f,$0f,$0f,$0f,$0e,$0e,$08,$08,$00,$00,$00,$00,$00,$00
-        .byte   $f8,$f8,$e0,$e0,$80,$80,$00,$00,$00,$00,$00,$00,$00,$00,$00,$00
-        .byte   $f8,$f8,$e0,$e0,$80,$80,$00,$00,$00,$00,$00,$00,$00,$00,$00,$00
-; boost-two: 16x16 as tiles TL, TR, BL, BR
-        .byte   $00,$00,$00,$00,$00,$00,$00,$00,$40,$40,$60,$60,$78,$78,$7e,$7e
-        .byte   $00,$00,$00,$00,$00,$00,$00,$00,$40,$40,$60,$60,$78,$78,$7e,$7e
-        .byte   $00,$00,$00,$00,$00,$00,$00,$00,$80,$80,$c0,$c0,$f0,$f0,$fc,$fc
-        .byte   $00,$00,$00,$00,$00,$00,$00,$00,$80,$80,$c0,$c0,$f0,$f0,$fc,$fc
-        .byte   $7e,$7e,$78,$78,$60,$60,$40,$40,$00,$00,$00,$00,$00,$00,$00,$00
-        .byte   $7e,$7e,$78,$78,$60,$60,$40,$40,$00,$00,$00,$00,$00,$00,$00,$00
-        .byte   $fc,$fc,$f0,$f0,$c0,$c0,$80,$80,$00,$00,$00,$00,$00,$00,$00,$00
-        .byte   $fc,$fc,$f0,$f0,$c0,$c0,$80,$80,$00,$00,$00,$00,$00,$00,$00,$00
-; boost-three: 16x16 as tiles TL, TR, BL, BR
-        .byte   $00,$00,$00,$00,$00,$00,$00,$00,$00,$00,$84,$84,$c6,$c6,$f7,$f7
-        .byte   $00,$00,$00,$00,$00,$00,$00,$00,$00,$00,$84,$84,$c6,$c6,$f7,$f7
-        .byte   $00,$00,$00,$00,$00,$00,$00,$00,$00,$00,$20,$20,$30,$30,$bc,$bc
-        .byte   $00,$00,$00,$00,$00,$00,$00,$00,$00,$00,$20,$20,$30,$30,$bc,$bc
-        .byte   $f7,$f7,$c6,$c6,$84,$84,$00,$00,$00,$00,$00,$00,$00,$00,$00,$00
-        .byte   $f7,$f7,$c6,$c6,$84,$84,$00,$00,$00,$00,$00,$00,$00,$00,$00,$00
-        .byte   $bc,$bc,$30,$30,$20,$20,$00,$00,$00,$00,$00,$00,$00,$00,$00,$00
-        .byte   $bc,$bc,$30,$30,$20,$20,$00,$00,$00,$00,$00,$00,$00,$00,$00,$00
-
-; ------------------------------------------------------------------------------
-
-; [ boost marks: arrows above every boosting character ]
-
-; called from the battle nmi right after ClearSpriteData parked the
-; frame's sprites (and after vanilla reset its allocator) — parked
-; entries stay parked unless we claim them, so cleanup is free. draws
-; oam entry 96+slot (16x16, obj palette 3, priority 3) above each
-; character with pending boost, tracking their animated coords live;
-; marks ride from the R press until the boosted action resolves.
-; also re-asserts our two pal-3 colors every frame (effects use pal 3
-; as scratch) with the same yellow/white pulse as the menu cell.
-; db = $00 in this hook (oam shadow + dp live in bank 0); game state
-; reads go through $7e long addressing.
-
-.proc Ot6BoostMarksNmi_ext
-        php
-        longi
-        shorta
-        .a8
-        .i16
-        phb
-        clr_a
-        pha
-        plb                     ; db = $00
-        phx
-        phy
-        ; own obj palette 3's color 15 every frame: yellow/white pulse
-        longa
-        lda     $98             ; nmi frame counter
-        and     #$0008
-        bne     :+
-        lda     #$1bff          ; yellow
-        bra     :++
-:       lda     #$7fff          ; white
-:       sta     f:$7e7f7e       ; pal 3 color 15 in the palette buffer
-        shorta
-        ldx     #$0000          ; slot * 2
-@slot:  lda     f:$7e3e9d,x     ; pending boost
-        beq     @next
-        dec
-        asl
-        clc
-        adc     #$c8            ; tile: $c8/$ca/$cc for 1/2/3
-        pha
-        txa
-        asl                     ; slot * 4 = oam entry offset
-        longa
-        and     #$00ff
-        clc
-        adc     #$0480          ; entry 96 + slot
-        tay
-        lda     f:$7e8033,x     ; char x + 8
-        sec
-        sbc     #$0018          ; one sprite-width in front of the face
-        shorta                  ; (heroes face left; vanilla draws chars
-        sta     $0000,y         ; in front of same-priority higher oam
-        longa                   ; entries, so overlap would hide us)
-        lda     f:$7e803b,x     ; char y + 8
-        sec
-        sbc     #$0008          ; level with the head
-        shorta
-        sta     $0001,y         ; sprite y
-        pla
-        sta     $0002,y         ; tile
-        lda     #$36            ; palette 3, priority 3
-        sta     $0003,y
-@next:  inx
-        inx
-        cpx     #$0008
-        bcc     @slot
-        ply
-        plx
-        plb
-        plp
-        rtl
-.endproc
+; v0.2 RC playtest: "the boost chevrons sometimes turn into numbers", at
+; no pattern the player could name.  They were not chevrons turning into
+; numbers -- they were vanilla's damage numerals, drawn in tiles OT6 had
+; taken.
+;
+; Three 16x16 arrow sprites used to live in obj tiles 200/202/204 (quads
+; with 216-221), i.e. vram words $2c80-$2dd0.  ff6/notes/battle-ram.txt:
+; 2206 labels that whole span: "$2C00 Damage Numeral Graphics / $2CC0
+; Miss Graphics".  GfxCmd_0b picks a numeral's vram destination from two
+; four-entry tables indexed by the rotating counter w7e632e
+; (btlgfx_main.asm:24697 and :24781, tables at :24795):
+;     bottom halves  $2d00,$2d40,$2d80,$2dc0
+;     top halves     $2c00,$2c40,$2c80,$2cc0
+; $80 bytes each (:1021).  Counter phase 2 covers boost-1 and boost-2;
+; phase 3 covers boost-3.  Between them the four-phase rotation
+; overwrites every one of the twelve tiles, so half of all damage numbers
+; shown stamped digits over the chevrons -- intermittent, and keyed to a
+; counter the player cannot see.  probe_objarrow.lua measured it: first
+; divergence with counter=2 and dest=$2d80 exactly as predicted, and
+; 2141 of 3000 sampled frames held clobbered art.
+;
+; The old comment here claimed these tiles were "verified blank +
+; unreferenced by any oam entry ... idle and through attack effects".
+; Both halves were true and neither was sufficient: battle init CLEARS
+; $2c00-$3000 (btlgfx_main.asm:2244), so the tiles do read blank, and
+; they are unreferenced right up until a numeral fires.  A snapshot
+; cannot see a destination chosen at run time -- the exact "something was
+; absent, so it was assumed free" failure CONTRIBUTING.md warns about.
+;
+; There is nowhere to move them.  Measured, not assumed: probe_objsentinel
+; .lua fills the whole obj region with a sentinel AFTER init and plays a
+; battle, so a zero-over-zero write cannot masquerade as untouched.  Only
+; tiles 224-511 survive, and both blocks are spoken for --
+; $2e00-$3000 is a blanket $400-byte init load (btlgfx_main.asm:2347) of
+; hand-pointer/page-indicator/reflect/shield art, and probe_objtail.lua
+; finds every tile in it either non-blank or oam-referenced;
+; $3000-$4000 is monster graphics, which TfrMonsterGfx blankets with a
+; fixed $2000-byte transfer every battle (btlgfx_main.asm:5410), so its
+; apparent slack is only this formation's art being small.
+;
+; So the marks are gone rather than relocated.  Boost feedback keeps the
+; channel that provably works: the party-window pip cell, which swaps to
+; an arrow cluster pulsing yellow/white while a boost is pending (Ot6Boost
+; @show) out of OT6's own 2bpp font cells -- glyph-canary verified, and
+; battle_boost.lua gates it.  A future re-do wanting the floating badge
+; back should draw it on the bg3 field map through the existing
+; Ot6BgHud shadow/flush machinery (already OT6 territory, already veiled
+; against entry/exit effects) rather than claim obj tiles again.
 
 ; ------------------------------------------------------------------------------
 
@@ -2452,7 +2336,9 @@ OT6_FONTDIRTY   := $57b9        ; font re-lay stages remaining (0 = clean).
 ; What the probes actually establish is narrower and still holds:
 ; vanilla's writes into the $5755 buffer stop at $576b, so the OT6 strip
 ; from $57b6 up is empirically clear. Below $576b is NOT. See OT6_SHADOW.
-OT6_RELAY_STAGES := 6           ; icons, glyphs x2, arrows x3 (~128b each)
+OT6_RELAY_STAGES := 3           ; icons, glyphs x2 (~128b each). was 6:
+                                ;   three arrow-tile stages retired with
+                                ;   the over-character boost marks.
 
 ; the spare strip $57ba-$57bf (between OT6_FONTDIRTY and OT6_SPECIES,
 ; inside the m2 trace-verified free range; probe_57ba_strip write-watch:
@@ -2576,26 +2462,14 @@ OT6_HUDVEIL  := $57be           ; nonzero = a monster entry/exit animation
         lda     f:$7e0000+OT6_FONTDIRTY
         dec     a
         sta     f:$7e0000+OT6_FONTDIRTY
-        beq     @s0             ; a = stage 5..0, most visible first
+        beq     @s0             ; a = stage 2..0, most visible first
         cmp     #$01
         beq     @s1
-        cmp     #$02
-        beq     @s2
-        cmp     #$03
-        beq     @s3
-        cmp     #$04
-        beq     @s4
-        jsr     Ot6LoadElemIcons        ; 5: menu element icons
+        jsr     Ot6LoadElemIcons        ; 2: menu element icons
         bra     @nofont
-@s4:    jsr     Ot6LoadBgGlyphsA        ; 4: hud shield glyphs
+@s1:    jsr     Ot6LoadBgGlyphsA        ; 1: hud shield glyphs
         bra     @nofont
-@s3:    jsr     Ot6LoadBgGlyphsB        ; 3: hud pip/boost glyphs
-        bra     @nofont
-@s2:    jsr     Ot6LoadObjArrowsA      ; 2-0: boost-mark obj tiles
-        bra     @nofont
-@s1:    jsr     Ot6LoadObjArrowsB
-        bra     @nofont
-@s0:    jsr     Ot6LoadObjArrowsC
+@s0:    jsr     Ot6LoadBgGlyphsB        ; 0: hud pip/boost glyphs
 @nofont:
         ldx     #$0000
 @line:  longa

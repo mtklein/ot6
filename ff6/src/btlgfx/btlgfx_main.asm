@@ -1733,7 +1733,6 @@ BattleNMI:
 @0cbc:  jsr     ClearSpriteData
         lda     #$08        ; next available sprite = 8
         sta     $71
-        jsl     Ot6BoostMarksNmi_ext    ; ot6: arrows above boosting chars
         jsr     _c1b3ce       ; update roulette cursor
         jsr     UpdateSprites
         jsr     _c10659       ; update character/monster positions
