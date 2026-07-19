@@ -17,14 +17,12 @@
 #   (default: build/states/last_run.log).
 # * [b64:<tag>] payloads emitted by the script (savestates, screenshots) are
 #   decoded into build/states/ and build/states/shots/ afterwards.
-# * OT6_WORKER=<id> reroutes EVERYTHING the run touches -- portable app copy,
-#   saves dir, composed file, default log, artifact decode dir -- under
+# * OT6_WORKER=<id> reroutes EVERYTHING the run touches -- Mesen's config
+#   home, saves dir, composed file, default log, artifact decode dir -- under
 #   build/test-workers/w<id>/, so runs with distinct ids (and the default,
-#   id-less run) are safe concurrently.  Two workers must never share an app
-#   copy: run.sh rewrites settings.json into the bundle every launch (so they
-#   would race on each other's SaveDataFolder) and the emulator writes
-#   Debugger/*.cdl there.  (It does NOT write settings back -- the testrunner
-#   sets DisableSaveSettings -- and never creates SaveStates/.)
+#   id-less run) are safe concurrently.  No worker owns a copy of the
+#   emulator: they all exec ONE shared read-only bundle and are kept apart by
+#   CFFIXED_USER_HOME instead (see "shared emulator" below).
 # * Exit code: 0 = pass, 1 = assertion/Lua error, 2 = frame budget exceeded.
 #   The [ot6] PASS/FAIL verdict in the log wins over the raw process code
 #   (a 255 with unflushed stdout is a wall-clock cap, not a crash).
@@ -33,27 +31,23 @@ ROOT="$(cd "$(dirname "$0")/../.." && pwd)"
 ROM="$ROOT/build/ot6.sfc"
 SCRIPT="${1:?usage: run.sh <script.lua> [logfile]}"
 
-# Isolated portable Mesen for tests: the testrunner flushes battery saves
-# on exit and twice zeroed the user's in-game save (ot6.srm) when sharing
-# the real profile. A $HOME override is ignored on macOS, so tests run a
-# portable copy (settings.json beside the binary = portable mode). We
-# ALSO force an explicit SaveDataFolder override to a dedicated testing
-# dir, so the user's save stays untouchable even if their settings later
-# grow an override that would otherwise be inherited (the manual-play
-# save and the repeatable-testing saves never share a directory).
+# Mesen's config home is the isolation boundary, so it moves per worker
+# exactly like the saves dir, the composed script and the logs do.
 if [ -n "${OT6_WORKER:-}" ]; then
   WDIR="$ROOT/build/test-workers/w$OT6_WORKER"
-  MESEN_TEST="$WDIR/Mesen.app"
+  MESEN_HOME="$WDIR/home"
   TEST_SAVES="$WDIR/saves"
   COMPOSED="$WDIR/composed.lua"
   LOG="${2:-$WDIR/last_run.log}"
   ART="$WDIR/artifacts"
+  STALE_APP="$WDIR/Mesen.app"
 else
-  MESEN_TEST="$ROOT/build/mesen-test.app"
+  MESEN_HOME="$ROOT/build/mesen-test-home"
   TEST_SAVES="$ROOT/build/mesen-test-saves"
   COMPOSED="$ROOT/build/states/_composed.lua"
   LOG="${2:-$ROOT/build/states/last_run.log}"
   ART="$ROOT/build/states"
+  STALE_APP="$ROOT/build/mesen-test.app"
 fi
 mkdir -p "$TEST_SAVES" "$ART/shots"
 
@@ -63,34 +57,139 @@ else
   python3 "$ROOT/tools/tests/lib/compose.py" "$SCRIPT" "$COMPOSED" || exit 2
 fi
 
-# One-time portable emulator copy. cp -c = APFS clonefile: instant and ~zero
-# physical disk; falls back to a plain copy on non-APFS filesystems.
+# ------------------------------------------------------------ shared emulator
+# Every worker on this machine execs ONE read-only Mesen bundle, and nothing
+# ever writes inside it.  Workers are kept apart by giving each its own Mesen
+# CONFIG HOME rather than its own copy of the app.
 #
-# -L (dereference) is load-bearing, not hygiene.  In a git worktree
-# tools/Mesen.app is itself a SYMLINK into the main tree (worktree-setup.sh
-# makes it one, on the premise that a read-only source bundle is safe to
-# share), and `cp -R` copies a symlink SOURCE as a symlink rather than
-# walking it.  Every worker's "private" bundle was therefore one more link to
-# the single main-tree bundle -- so all of them, across ALL agents'
-# worktrees, shared one settings.json and raced on the rewrite below.  The
-# isolation this script promises held in the main tree (a real directory
-# there, so the copy was real) and was silently absent in exactly the
-# worktrees that fan tests out.  Test it with -L too, so a tree already
-# poisoned by that bug re-creates the bundle instead of trusting a link that
-# resolves fine.  (rm -rf on a symlink unlinks it; the target is untouched.)
-if [ -L "$MESEN_TEST" ] || [ ! -x "$MESEN_TEST/Contents/MacOS/Mesen" ]; then
-  echo "creating portable test emulator (one-time copy)..."
-  rm -rf "$MESEN_TEST"
-  cp -c -RL "$ROOT/tools/Mesen.app" "$MESEN_TEST" 2>/dev/null || cp -RL "$ROOT/tools/Mesen.app" "$MESEN_TEST"
+# Mesen picks that home exactly one of two ways, both measured here:
+#   * PORTABLE -- a settings.json sitting beside the binary wins over
+#     everything else, unconditionally.  That is how this script used to
+#     isolate workers, and it is why each needed a private 413MB bundle: the
+#     config lived INSIDE the app, so sharing an app meant sharing (and
+#     racing on) one settings.json.  See 2bf5045 for what that cost.
+#   * otherwise -- ~/Library/Application Support/Mesen2, resolved through
+#     CoreFoundation.  $HOME does NOT move it: with HOME set to a scratch dir
+#     a run still wrote its .srm and Debugger/*.cdl into the real profile,
+#     because .NET reaches SpecialFolder.ApplicationData via
+#     NSSearchPathForDirectoriesInDomains, which takes the home from the
+#     password database (the binary carries the giveaway symbol
+#     GetHomeDirectory:TryGetHomeDirectoryFromPasswd).  CFFIXED_USER_HOME,
+#     Core Foundation's own home override, DOES move it -- settings, saves,
+#     Debugger/*.cdl, the lot.
+#
+# So: strip settings.json from the shared copy, which makes it non-portable,
+# and hand each worker its own CFFIXED_USER_HOME.  The isolation is strictly
+# stronger than the copy scheme it replaces -- there is no per-worker state
+# inside the app to race on, because there is no per-worker app.
+#
+# Why a COPY of tools/Mesen.app and not tools/Mesen.app itself: the user's
+# manual-play profile (`make run`) lives in that bundle as precisely the
+# settings.json that forces portable mode, so execing it would put every
+# worker back on one shared config.  The harness must not depend on the
+# mutable state of the play bundle, so it keeps its own stripped copy.
+#
+# ONE copy, machine-wide, under ~/Library/Caches -- not one per worker, and
+# not one per worktree.  Mesen is ad-hoc signed but NOT notarized (see
+# docs/TOOLING.md), so macOS runs a first-launch Gatekeeper assessment on
+# every NEW bundle path: a user-visible "Verifying Mesen..." dialog and a
+# multi-second scan of all 413MB (measured: 4.7s and 6.1s on two fresh paths
+# against 0.3-0.5s once the path is known).  The old scheme minted four of
+# those per tree and four more every time an agent made a worktree.  Clearing
+# quarantine does not help -- `xattr -cr` before first launch still cost 5.5s,
+# and the kernel puts com.apple.provenance straight back on exec -- because
+# the trigger is the new bundle path, not the flag.
+SRC_APP="$ROOT/tools/Mesen.app"
+MESEN_CACHE="$HOME/Library/Caches/ot6"
+SHARED_APP="$MESEN_CACHE/Mesen-test.app"
+# Rebuild the shared copy when the source bundle changes (a Mesen upgrade).
+# -L: in a worktree tools/Mesen.app is a symlink into the main tree.
+SRC_STAMP=$(stat -Lf '%z %m' "$SRC_APP/Contents/MacOS/Mesen" 2>/dev/null) || {
+  echo "no Mesen at $SRC_APP (run tools/worktree-setup.sh?)"; exit 2; }
+
+shared_app_ready() {
+  [ -x "$SHARED_APP/Contents/MacOS/Mesen" ] &&
+  [ ! -e "$SHARED_APP/Contents/MacOS/settings.json" ] &&
+  [ "$(cat "$SHARED_APP.stamp" 2>/dev/null)" = "$SRC_STAMP" ]
+}
+
+if ! shared_app_ready; then
+  # suite.sh starts every worker within milliseconds of the others, so on a
+  # cold cache all of them arrive here at once.  Whoever wins the mkdir builds
+  # it; the rest wait for that one build instead of racing to install over
+  # each other (mv of a directory onto an existing directory nests it rather
+  # than replacing it, which would corrupt the bundle).
+  mkdir -p "$MESEN_CACHE"
+  LOCK="$MESEN_CACHE/.build.lock"
+  if mkdir "$LOCK" 2>/dev/null; then held=1; else
+    held=""; waited=0
+    while [ -d "$LOCK" ] && ! shared_app_ready; do
+      sleep 1; waited=$((waited + 1))
+      [ "$waited" -gt 180 ] && { echo "stale lock $LOCK; remove it and retry"; exit 2; }
+    done
+    shared_app_ready || { mkdir "$LOCK" 2>/dev/null && held=1; }
+  fi
+  if [ -n "$held" ]; then
+    # Release the lock however we leave: a run that dies mid-build must not
+    # wedge every later worker behind a lock nobody holds.
+    trap 'rm -rf "$LOCK"' EXIT INT TERM
+    echo "creating shared test emulator (one-time; expect a Gatekeeper scan)..."
+    TMP="$MESEN_CACHE/.build.$$"
+    rm -rf "$TMP" "$SHARED_APP" "$SHARED_APP.stamp"
+    # cp -c = APFS clonefile: instant and ~zero physical disk.  -L because in
+    # a worktree the source is a symlink and cp -R would copy the LINK.
+    cp -c -RL "$SRC_APP" "$TMP" 2>/dev/null || cp -RL "$SRC_APP" "$TMP" || {
+      rm -rf "$TMP"; echo "could not copy $SRC_APP"; exit 2; }
+    # The whole point: no settings.json (nor the .bak rotation Mesen leaves
+    # beside it) may survive into the copy, or portable mode wins and every
+    # worker is back on one shared config.
+    rm -f "$TMP/Contents/MacOS/settings.json" "$TMP"/Contents/MacOS/settings.*.bak
+    # Profile dirs the source bundle accumulated while it was portable belong
+    # to the user's play profile, not to the tests; they must not ride along.
+    rm -rf "$TMP/Contents/MacOS/Saves" "$TMP/Contents/MacOS/SaveStates" \
+           "$TMP/Contents/MacOS/RecentGames" "$TMP/Contents/MacOS/Debugger"
+    mv "$TMP" "$SHARED_APP"
+    printf '%s' "$SRC_STAMP" > "$SHARED_APP.stamp"
+    rm -rf "$LOCK"; trap - EXIT INT TERM
+  fi
 fi
-# (re)write the portable settings every run so the override can't drift.
-# Its exit code is checked: a failed pin leaves whatever settings.json the
-# bundle already had, which is exactly the unpinned state the determinism
-# guarantees exclude (and, before the -L fix above, another worker's).
-# Refusing the run beats reporting a green that never had the pins.
+shared_app_ready || { echo "shared test emulator missing at $SHARED_APP"; exit 2; }
+
+# A tree from before this scheme still has a 413MB per-worker bundle sitting
+# in build/.  Nothing reads it any more, so reclaim it on the way past rather
+# than leave it to rot -- and, more to the point, so a tree can never quietly
+# keep running the old private-copy path.  Test -L as well as -e: the bug in
+# 2bf5045 left some of these as symlinks, and -e alone is false for a symlink
+# whose target has since gone.
+if [ -L "$STALE_APP" ] || [ -e "$STALE_APP" ]; then rm -rf "$STALE_APP"; fi
+
+# The worker's private Mesen config home.  Mesen copies its native libs and
+# the Satellaview firmware into a fresh home on first use (~29MB); pre-clone
+# them (cp -c again, so eight worker homes cost eight sets of pointers rather
+# than 232MB) and Mesen leaves them alone -- its copy is
+# copy-if-missing, and -p keeps the mtimes it stamps them with.  Re-seed from
+# scratch when the emulator changes, so a home can never serve a stale
+# MesenCore.dylib to a newer binary.
+MESEN2="$MESEN_HOME/Library/Application Support/Mesen2"
+if [ "$(cat "$MESEN_HOME/.stamp" 2>/dev/null)" != "$SRC_STAMP" ]; then
+  rm -rf "$MESEN_HOME"; mkdir -p "$MESEN2"
+  for f in MesenCore.dylib MesenNesDB.txt libHarfBuzzSharp.dylib libSkiaSharp.dylib Satellaview; do
+    [ -e "$SHARED_APP/Contents/MacOS/$f" ] || continue   # let Mesen seed it itself
+    cp -c -Rp "$SHARED_APP/Contents/MacOS/$f" "$MESEN2/$f" 2>/dev/null ||
+      cp -Rp "$SHARED_APP/Contents/MacOS/$f" "$MESEN2/$f"
+  done
+  printf '%s' "$SRC_STAMP" > "$MESEN_HOME/.stamp"
+fi
+
+# (Re)write this worker's settings every run so the pins can't drift.  Its
+# exit code is checked: a failed pin leaves whatever settings.json the home
+# already had, which is exactly the unpinned state the determinism guarantees
+# exclude.  Refusing the run beats reporting a green that never had the pins.
+# With no settings.json at all Mesen ignores --testrunner and opens the GUI
+# setup wizard, so this is also what keeps a fresh home headless.
 python3 "$ROOT/tools/tests/lib/pin_test_saves.py" \
   "$HOME/Library/Application Support/Mesen2/settings.json" \
-  "$MESEN_TEST/Contents/MacOS/settings.json" \
+  "$MESEN2/settings.json" \
   "$TEST_SAVES" || { echo "pin_test_saves.py failed; refusing to run unpinned"; exit 2; }
 
 # Fresh battery every run: the testrunner flushes SRAM to <saves>/*.srm on
@@ -105,7 +204,11 @@ rm -f "$TEST_SAVES"/*.srm
 # carry Lua errors or watchdog kills -- those go to the script log, which
 # nothing reads headless.  A script that goes quiet has told you nothing;
 # print() is the only channel out.  Kept for the ROM-info banner.
-"$MESEN_TEST/Contents/MacOS/Mesen" --testrunner --timeout=600 --enableStdout "$ROM" "$COMPOSED" > "$LOG" 2>&1
+# CFFIXED_USER_HOME is the isolation boundary; HOME rides along so that
+# anything reading the plain variable lands in the same private tree.
+env CFFIXED_USER_HOME="$MESEN_HOME" HOME="$MESEN_HOME" \
+  "$SHARED_APP/Contents/MacOS/Mesen" --testrunner --timeout=600 --enableStdout \
+  "$ROM" "$COMPOSED" > "$LOG" 2>&1
 code=$?
 
 python3 "$ROOT/tools/tests/lib/decode_b64.py" "$LOG" "$ART"

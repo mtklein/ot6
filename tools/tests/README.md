@@ -55,24 +55,52 @@ watchdog needed.  A bare hang would only happen if a script bypasses
 
 ### Parallel runs
 
-`run.sh` honors `OT6_WORKER=<id>`: the portable emulator copy, saves dir,
+`run.sh` honors `OT6_WORKER=<id>`: Mesen's **config home**, saves dir,
 composed file, default log, and artifact dir all move under
 `build/test-workers/w<id>/`, so runs with distinct ids (and the default
-id-less run) are safe concurrently -- `run.sh` rewrites `settings.json`
-into the bundle every launch (so two workers sharing one would race on
-each other's `SaveDataFolder`) and the emulator writes `Debugger/*.cdl`
-there, so concurrent instances must never share an app copy.  (The
-testrunner does NOT write settings back -- `DisableSaveSettings` is set --
-and never creates `SaveStates/`.)  That copy is made with `cp -RL`: in a
-worktree `tools/Mesen.app` is a symlink into the main tree, and a plain
-`cp -R` copies the symlink itself, which silently gave every worker -- in
-every agent's worktree at once -- a link to one shared bundle and one
-shared `settings.json`.  `suite.sh`
+id-less run) are safe concurrently.  `suite.sh`
 honors `OT6_JOBS=N` (default 4 = the P-core knee; 1 = serial) and fans its
 tests out across workers; every suite test is a pure savestate load (the
 mints run as Makefile prerequisites first), so order doesn't matter.
 Suite logs stay at `build/states/suite_<t>.log` either way, and each test
 line reports its worker and wall time.
+
+**No worker owns a copy of the emulator.**  Every worker on the machine
+execs one shared, read-only bundle at
+`~/Library/Caches/ot6/Mesen-test.app` -- cloned from `tools/Mesen.app`
+once per machine, with its `settings.json` stripped so it is *not* in
+portable mode -- and each is given its own `CFFIXED_USER_HOME`.  That
+sends its settings, its battery saves and its `Debugger/*.cdl` into
+`build/test-workers/w<id>/home/`, so nothing is ever written inside the
+app and there is no per-worker emulator state left to race on.  The
+shared copy is rebuilt automatically when `tools/Mesen.app` changes (a
+size+mtime stamp beside it); `make clean` does not remove it, and it
+should not -- see the Gatekeeper note below.
+
+Two things that replaced, both easy to re-break:
+
+* Workers used to each get a private 413MB copy of the bundle, because a
+  `settings.json` beside the binary puts Mesen in **portable mode** and
+  that file then *is* the config -- so a shared bundle meant one shared
+  `SaveDataFolder` for everyone to race on (`2bf5045` has the forensics).
+  Portable mode wins over every other mechanism, which is why the shared
+  copy must never be allowed to grow a `settings.json`.  It is also why
+  the copy exists at all rather than exec'ing `tools/Mesen.app` directly:
+  the user's manual-play profile (`make run`) lives in that bundle as
+  exactly such a file.
+* Mesen is ad-hoc signed but **not notarized**, so macOS runs a
+  first-launch Gatekeeper assessment on every *new bundle path*: a
+  user-visible "Verifying Mesen…" dialog and a multi-second scan of all
+  413MB (measured 4.7s and 6.1s on fresh paths, against 0.3-0.5s once the
+  path is known).  The old scheme minted four of those per tree and four
+  more for every agent worktree.  Clearing quarantine does **not** help --
+  `xattr -cr` before first launch still cost 5.5s, and the kernel puts
+  `com.apple.provenance` straight back on exec -- because the trigger is
+  the new path, not the flag.  Keeping the shared copy at one stable
+  machine-wide location is the whole fix.
+
+(The testrunner does NOT write settings back -- `DisableSaveSettings` is
+set -- and never creates `SaveStates/`.)
 
 ## Files
 
@@ -477,12 +505,27 @@ route edit shifts them.
 
 - Do not delete `~/Library/Application Support/Mesen2/settings.json`.  The
   reason is OURS, not Mesen's: `run.sh` feeds that path to
-  `pin_test_saves.py`, which opens it unconditionally and would raise.
-  run.sh now checks that exit code and aborts (exit 2) rather than running
-  against whatever settings.json the bundle already held.  The testrunner itself
-  does not need it; a `settings.json` beside the binary puts Mesen in
-  portable mode and fully determines its home folder
-  (`ConfigManager.cs:177`), which is exactly what run.sh writes.
+  `pin_test_saves.py` as the BASE it pins on top of, and it opens it
+  unconditionally and would raise.  run.sh checks that exit code and aborts
+  (exit 2) rather than running against whatever settings.json the worker
+  home already held.
+- **`$HOME` does not move Mesen's config folder on macOS; `CFFIXED_USER_HOME`
+  does.**  Mesen picks its home folder one of two ways: a `settings.json`
+  beside the binary puts it in portable mode and fully determines the home
+  (`ConfigManager.cs:177`), and otherwise it is
+  `~/Library/Application Support/Mesen2`.  That second path is
+  `Environment.GetFolderPath(SpecialFolder.ApplicationData)`, which on macOS
+  .NET resolves through `NSSearchPathForDirectoriesInDomains` and takes the
+  home from the **password database**, not the environment -- the binary
+  carries the giveaway `GetHomeDirectory:TryGetHomeDirectoryFromPasswd`.
+  Proof: run the testrunner with `HOME` pointed at a scratch dir and it
+  still writes its `.srm` and `Debugger/*.cdl` into the real profile;
+  add `CFFIXED_USER_HOME` (Core Foundation's own home override) and
+  everything -- settings, saves, cdl, even the ~29MB of native libs Mesen
+  seeds into a fresh home -- lands in the scratch dir instead.  Portable
+  mode still beats both, so a bundle with a `settings.json` ignores
+  `CFFIXED_USER_HOME` entirely.  This is what `run.sh` uses to keep
+  parallel workers apart without copying the emulator.
 - stdout also carries `[CPU] Uninitialized memory read: ...` debug spam;
   filter for `[ot6]` / `[probe]`.  It is *read-before-write* tracking (the
   debugger flags any address read before it has ever been written this

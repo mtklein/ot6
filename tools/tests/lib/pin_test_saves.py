@@ -1,16 +1,28 @@
 #!/usr/bin/env python3
 """pin_test_saves.py <src_settings> <dst_settings> <saves_dir>
 
-Copy the user's Mesen settings into the portable test app, but FORCE the
-battery-save folder to a dedicated testing directory. The user was burned
-twice by the testrunner flushing battery to their real ot6.srm; this makes
-the manual-play save (~/Library/.../Saves) and the repeatable-testing saves
-(build/mesen-test-saves) physically incapable of sharing a file, regardless
-of what the source settings say now or grow to say later.
+Copy the user's Mesen settings into a worker's private Mesen config home,
+but FORCE the battery-save folder to a dedicated testing directory. The user
+was burned twice by the testrunner flushing battery to their real ot6.srm;
+this makes the manual-play save (~/Library/.../Saves) and the
+repeatable-testing saves (build/test-workers/w<id>/saves) physically
+incapable of sharing a file, regardless of what the source settings say now
+or grow to say later.
+
+<dst_settings> is the worker's own
+<home>/Library/Application Support/Mesen2/settings.json -- run.sh points
+Mesen at that home with CFFIXED_USER_HOME, so writing here isolates a worker
+without giving it a private copy of the emulator (see run.sh's
+"shared emulator" note).  It used to be a settings.json INSIDE a per-worker
+app bundle, which is what made the copies necessary in the first place.
 """
 import json, os, sys
 
 src, dst, saves = sys.argv[1], sys.argv[2], sys.argv[3]
+
+# A worker home is disposable (run.sh re-seeds it whenever the emulator
+# changes), so never assume the directory survived.
+os.makedirs(os.path.dirname(dst) or ".", exist_ok=True)
 
 # Mesen writes its settings.json with a UTF-8 BOM; read it back the same way.
 with open(src, encoding="utf-8-sig") as f:

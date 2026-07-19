@@ -83,8 +83,23 @@ the manual steps at each bullet).
   script). Its home folder on macOS is `~/Library/Application
   Support/Mesen2/`; an existing `settings.json` (even `{}`) skips the
   wizard. Already handled here.
+- **Moving that home folder: `CFFIXED_USER_HOME`, never `$HOME`.** Mesen
+  resolves it via .NET's `SpecialFolder.ApplicationData`, which on macOS
+  goes through `NSSearchPathForDirectoriesInDomains` and reads the home
+  from the password database — so `$HOME` is simply ignored (a testrunner
+  run with `HOME` redirected still wrote its `.srm` into the real
+  profile). Core Foundation's `CFFIXED_USER_HOME` does move it. A
+  `settings.json` beside the binary (portable mode) overrides both.
+  `tools/tests/run.sh` relies on all three facts; see its "shared
+  emulator" header.
 - Mesen is ad-hoc signed but **not notarized** (no Team ID), so Gatekeeper
   rejects it: the **first GUI launch** may need right-click → Open. Headless testrunner runs fine from the terminal.
+  It also means every **new bundle path** costs a first-launch assessment —
+  a "Verifying Mesen…" dialog and a ~5s scan of the whole 413MB bundle
+  (measured against 0.3-0.5s for an already-known path). `xattr -cr` does
+  not suppress it; the trigger is the path, not the quarantine flag. This
+  is why the harness keeps ONE shared test bundle machine-wide instead of
+  a copy per worker.
 - macOS has no `timeout`; testrunner also has its own `timeout=N` arg if a
   test ever wedges.
 - `make distclean` in `ff6/` deletes ripped assets including modified ones

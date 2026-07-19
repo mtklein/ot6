@@ -14,13 +14,14 @@ corrupted by a test run (it was zeroed twice before this split):
 - **Your manual-play save** lives in Mesen's normal profile
   (`~/Library/Application Support/Mesen2/Saves/ot6.srm`). Tests never
   read or write it directly.
-- **Repeatable-testing saves** live in `build/mesen-test-saves/`. The
-  portable test Mesen (`build/mesen-test.app`) is forced there every
-  run by `tools/tests/lib/pin_test_saves.py` (it rewrites the portable
-  `settings.json` with an explicit `SaveDataFolder` override), so the
-  two directories can't share a file even if your Mesen settings later
-  grow their own override. Worker runs (`OT6_WORKER=<id>`, see the
-  tests README) repeat the same scheme under `build/test-workers/w<id>/`.
+- **Repeatable-testing saves** live in `build/mesen-test-saves/`. Tests
+  run the shared read-only emulator against a private Mesen config home
+  (`build/mesen-test-home/`, selected with `CFFIXED_USER_HOME`), and
+  `tools/tests/lib/pin_test_saves.py` writes that home's `settings.json`
+  with an explicit `SaveDataFolder` override every run — so the two
+  directories can't share a file even if your Mesen settings later grow
+  their own override. Worker runs (`OT6_WORKER=<id>`, see the tests
+  README) repeat the same scheme under `build/test-workers/w<id>/`.
 
 `run.sh` also wipes `<saves>/*.srm` before every launch: the testrunner
 flushes battery on exit and reloads it next boot, so a stale srm is a
