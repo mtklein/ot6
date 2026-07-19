@@ -2904,9 +2904,32 @@ OT6_HUDVEIL  := $57be           ; nonzero = a monster entry/exit animation
         lda     $32cc,y
         inc     a               ; $ff (nothing pending) -> 0
         beq     :+
-        pla
+@cmtd:  pla
         bra     @show
-:       pla
+        ; ...and committed just the same while the CONFIRMED action still
+        ; sits in the user-action queue ($2bae + 0/8/$10/$18, char slot or
+        ; $ff -- GetPlayerAction's ring, battle_main.asm:12643). the C1
+        ; confirm freezes the payload -- bushido's A latches the tech into
+        ; $2bb0 at that instant -- but $32cc only goes live when C2 drains
+        ; the ring, and C2 drains between actions: 1 frame when idle, more
+        ; when something is executing. an L/R edge inside that window
+        ; changed the CHARGE without changing the tech
+        ; (probe_bushidobusy: tempest latched at 3, one L landed, bp fell
+        ; 2 -- tempest for two). magic never showed it only because its
+        ; consumer, Ot6QueueFold, reads pending at drain time too.
+:       lda     $2bae
+        cmp     $62ca
+        beq     @cmtd
+        lda     $2bb6
+        cmp     $62ca
+        beq     @cmtd
+        lda     $2bbe
+        cmp     $62ca
+        beq     @cmtd
+        lda     $2bc6
+        cmp     $62ca
+        beq     @cmtd
+        pla
         bit     #$10            ; R: boost up
         beq     @tryl
         lda     $3e9d,y
