@@ -807,3 +807,352 @@ makes the probe a real decision rather than a freebie.
   pools — the "greedy must lose" band has now failed in Measurements #3,
   #5, #6 and #7 and should probably be restated as a boss-fight property
   or dropped.
+
+## Measurement #8 — the trash weakness pass: the break made reachable (2026-07-19)
+
+Measurement #7 ended by naming three species to author and one caveat
+about which axis to author them on. This is that pass, and the first
+thing it did was re-derive the pools instead of trusting the three
+names — which turned out to matter, because the Mt. Kolts pool is
+**four** trash species, not two, and the one Measurement #7 never saw is
+the most common enemy on the mountain.
+
+### The enumeration, from the tables rather than from a fixture
+
+The chain is `SubBattleGroup[map]` → `RandBattleGroup[group*8]` (four
+formation words, drawn at 31.25/31.25/31.25/6.25%) →
+`BattleMonsters[formation*15]` → `MonsterProp[species*32]`, all read
+straight out of `ff6/src/field/battle.asm:391-406` and
+`battle_main.asm:8005` / `:7316`. Levels and HP from `+16` and `+8`;
+weak/null/absorb re-derived at `+25`/`+24`/`+23` (`battle_main.asm:7517`
+and `:7564`, the latter a 16-bit load, so `+23` is absorb and `+24` is
+null).
+
+**Two map-property corrections fall straight out of it, and one of them
+is in this document.** Measurement #7 recorded that Mt. Kolts map 95
+"carries no encounter group" after pacing 437 encounterless tiles there.
+It carries group 61. What it does not carry is the enable bit: map
+properties are 33 bytes at `map_prop.dat[map*33]` and byte 5 bit 7 is
+the random-battle enable `CheckBattleSub` tests at `battle.asm:332`
+(`lda $0525 / bpl Done`). Map 95 reads `$00`. Same for map 74, which
+carries group 59 and cannot draw it either. The observation was right and
+the mechanism was wrong; `kolts_pool` was still the correct fixture to
+mint.
+
+The stretch the v0.2 demo ships, pool by pool. Shields are the seed
+formula 2 + level/8 unless a row says otherwise:
+
+| Where | Map/group | Species | L | HP | Shld | vanilla weak | null | absorb |
+|---|---|---|---|---|---|---|---|---|
+| WoB north grass/forest | groups 0, 2 | Leafer `$0017` | 5 | 33 | 2 | fire\|water | — | ice |
+| " | " | Dark Wind `$0028` | 5 | 34 | 2 | fire | — | — |
+| WoB desert (Figaro) | group 1 | Sand Ray `$005C` | 6 | 67 | 2 | **ice\|water** | — | — |
+| " | " | Areneid `$005D` | 6 | 87 | 2 | **ice\|water** | — | — |
+| S. Figaro cave | maps 72/73, groups 59/60 | Hornet `$002E` | 6 | 92 | 2 | fire | — | — |
+| " | " | Bleary `$0063` | 7 | 119 | 2 | fire | — | — |
+| " | " | Crawly `$0062` | 7 | 122 | 2 | fire | — | — |
+| WoB south grass/forest | groups 3, 4 | Rhodox `$0012` | 7 | 119 | 2 | **none** | — | — |
+| " | " | Rhinotaur `$0015` | 8 | 232 | 3 | **none** | — | bolt |
+| " | " | GreaseMonk `$00A8` | 8 | 132 | 3 | poison | — | — |
+| Mt. Kolts caves | maps 96/97, group 61 | **Cirpius `$0086`** | 10 | 134 | 3 | **none** | — | — |
+| Mt. Kolts, everywhere | groups 61/62/63/64 | Tusker `$007A` | 10 | 270 | 3 | fire | — | — |
+| Mt. Kolts shelves | map 100, group 63 | Brawler `$000B` | 9 | 137 | 3 | ice | — | **poison** |
+| Mt. Kolts Vargas side | maps 98/99/102, group 62 | Trilium `$0032` | 9 | 147 | 3 | fire | — | water |
+| Mt. Kolts map 101 | group 64 | Vaporite `$0046` | 5 | 15 | 2 | fire\|pearl | — | bolt |
+
+Formation shapes that matter: group 61 is **Cirpius ×3** at 93.75% of
+draws (the fourth slot adds a Tusker), group 63 is Brawler-pair 62.5% /
+Tusker-pair 37.5%, group 62 is Trilium-pair 62.5%. None of these fifteen
+species had an authored row; `$0019` Lobo (3, PIERCE) is the nearest one
+and it belongs to the Narshe intro.
+
+**Six of the fifteen had no key the stretch party could reach.** Cirpius
+and Rhodox have no vanilla weakness at all; Sand Ray and Areneid are
+ice|water; Brawler is ice; Rhinotaur has none. Measurement #7 reported
+Kolts as "half this pool has no reachable weakness"; across the whole
+stretch it was worse than that, and the worst single case is Cirpius,
+because *three at a time at 93.75%* means the mountain's most common
+fight was three unchippable birds.
+
+### The design problem, and why the axis is elements
+
+A weakness only creates a decision if the party cannot hit it by
+accident. Measurement #7's synthetic PIERCE arm proved the failure mode:
+authoring a class the party already swings made the **mash** arm chip,
+and the mash-vs-loop gap closed from 1.11× to 0.90×.
+
+Reading the actual starting equipment says the strict version of that
+rule is **unsatisfiable on this stretch by any class row**. Terra carries
+a Mithril Knife and Locke a Dirk — both PIERCE (`ot6_class.asm:49,:48`)
+— and Edgar a Mithril Blade, SLASH (`:59`); `char_prop.asm:152,:162,:197`.
+So the party's three default swings already cover half the class ring,
+and the other half has no wielder: bludgeoning arrives with Sabin, who
+joins at the *top* of the mountain, and special not until Setzer. Every
+class row here is a freebie or a Repo Man.
+
+The element axis is not degenerate, and it is genuinely deliberate:
+Terra's Fire costs 4 MP and a Magic menu, Edgar's Bio Blaster costs a
+Tools dive, and neither is what the A button does. There are exactly two
+live keys — Terra's natural list is Cure 1 / Fire 3 / Antdot 6 / Drain 12
+(`field/event.asm:1248`), so fire is her whole offensive ring here, and
+poison is the Bio Blaster the Figaro shop sells and `gen_kolts.lua:594`
+verifies is still carried at the mountain.
+
+**And only one of those two keys can open a window, which is arithmetic,
+not taste.** An element chip that empties the last shield takes vanilla's
+weak ×2, then skips `Ot6ShieldedDmg` (shields are already 0), then takes
+`Ot6BrokenDmg`'s ×2 — **4× base on the breaking hit itself**. Terra's
+Fire is ~110 base here, so her break is ~440 and nothing on this mountain
+except Tusker has the HP to survive it. Bio Blaster is power 20 spread
+over the whole enemy side (`magic_prop_en.dat` record `$7d`: element
+`$08`, targeting `$6a`, 0 MP), so its per-chip damage is a fraction of
+that. **Fire is the finisher; poison is the opener.** That is the whole
+shape of the pass.
+
+### What was authored, and why, per species
+
+Six `Ot6ElemAddTbl` rows and one `Ot6ShieldTbl` row. Every one was
+checked at `+23`/`+24` before authoring, the discipline the boss rows are
+held to; five read `$00/$00` and Rhinotaur absorbs bolt, not poison.
+
+- **Cirpius `$0086` → +poison, and an `Ot6ShieldTbl` row `2, $00`.** The
+  flagship. It had no weakness of any kind, it is 93.75% of the cave
+  draws, and it comes in threes — and Bio Blaster targets the whole enemy
+  side, so one deliberate action chips the entire flock. Strictly
+  deliberate: no default swing in the party is poison, and Terra's Fire
+  cannot touch it either. The shield row carries no class byte at all; it
+  exists only to take the count off the formula (see the sweep below).
+- **Tusker `$007A` → +poison keeping vanilla fire, and `2, $00`.** 270 HP
+  is the widest window on the mountain. Fire stays the burst answer to a
+  270-HP wall; poison becomes the break answer; the player picks which.
+- **Brawler `$000B` → `Ot6ShieldTbl` row `2, OT6_SLASH`.** The one class
+  row on the stretch, and it is here because Brawler **absorbs poison**
+  (`monster_prop.dat +$0177 = $08`) — the answer the rest of the mountain
+  teaches would *heal* it — while its vanilla ice has no wielder until
+  Celes. Slash rather than pierce because slash is the **scarce** key:
+  Edgar's Mithril Blade is the party's only slashing weapon, so a Brawler
+  is the fight where Edgar closes the Tools menu, a move nothing else on
+  the mountain asks for.
+- **Sand Ray `$005C`, Areneid `$005D`, Rhodox `$0012`, Rhinotaur
+  `$0015` → +poison, element rows only.** Coverage, on the overworld
+  either side of South Figaro. Three had no reachable key at all. The
+  pedagogy lines up: you buy the Bio Blaster at Figaro and the desert
+  immediately outside is where it starts paying. No shield rows — there
+  is no fixture on those maps, and setting a count nobody has measured is
+  how the HP dial got shipped twice.
+
+### The shield count is the lever, and this is the sweep that set it
+
+Measurement #7 predicted this: "shield count is not the lever *while the
+chip rate is zero* — it becomes a real lever after class rows exist, and
+should be tuned then, not now." Now is then, and it turns out to be the
+lever that decides whether the break is a *window* or a *funeral*.
+
+A break opens a window only if the target still has more HP than the
+**breaking hit** — and the breaking hit is large, because the chip that
+empties the last shield skips `Ot6ShieldedDmg` (shields are already zero)
+and then collects `Ot6BrokenDmg`'s ×2. Through the element channel that
+is 4× base; through the class channel 2×. Measured bases for this party:
+Terra's Fire ~110, Edgar's Bio Blaster ~87 per target on a poison-weak
+body, Edgar's Mithril Blade ~42. So the shield count is really the
+question *how late does the break land*, and the party's own damage is
+the clock.
+
+Swept live with `bal_party`'s `BUFF_SHIELDS` against the real pools, 6
+battles a cell, `boost3`:
+
+| shields | Cirpius ×3 | Tusker ×2 | Brawler ×2 |
+|---|---|---|---|
+| **3** (the formula) | break at 100%, **actions broken 0** | break at 100%, **0** | break at 71%, **0** |
+| **2** (authored) | break at 78%, **actions broken 1.0** | break at 51%, **1.0**, uptime 20.5% | break at 100%, **1.0** |
+| **1** | — | break at 53%, **0** | break at 72%, **0** |
+
+The formula's 3 is one chip too many: the party has already spent the
+monster by the time the last shield falls, so the break lands on a
+corpse. That is what "breaks 6/6, uptime 1 frame" meant in Measurements
+#5 and #6, now restated with a cause rather than as a curiosity. And 1 is
+one too few for the *element* channel: with no earlier chip to soften it,
+4× base (~350) simply exceeds a 270-HP Tusker outright, and the break is
+the kill again. **2 is the count at which the loop exists**, on all three
+bodies, and it sits inside `weapon-classes.md`'s trash band of 1–3.
+
+**Deliberately left alone, so the next author does not re-litigate.** The
+seven already-fire-weak species (Leafer, Dark Wind, Hornet, Bleary,
+Crawly, Trilium, Vaporite) satisfy the coverage rule through Terra
+already; a second key would make the probe a formality. None of them can
+hold a window either — 33 to 147 HP against a 4× breaking hit — and
+Measurement #7 proved that directly on Leafer: a synthetic class row
+there produced 0.7 breaks a fight and every one landed at 100% of fight
+length with `player_actions_broken` still 0. **Intro and cave trash stay
+texture, not tuning material**, the disposition Measurement #1 gave the
+mines pool. GreaseMonk is already poison-weak in vanilla and an add would
+be a no-op `ora` that lies about who authored it.
+
+**The coupling, stated because it is a real cost.** An `Ot6ShieldTbl` row
+also exempts its species from `Ot6HpScale`. That is inert today (every
+band ships `$10` = 1×) but real if the HP dial ever reopens, and it would
+make the three Kolts species that carry rows the only ones that do not
+scale with their pool-mates. It is also why the four overworld species
+took element rows only: **an `Ot6ElemAddTbl` row carries no such
+exemption**, so where a species needs a weakness but not a shield count,
+the element table is the cheaper instrument. These three need the count.
+
+### What the instrument grew, and four ways it had been lying
+
+None of the numbers below could be taken until `bal_party.lua` was fixed
+in four places. Three of them were latent because no earlier fixture
+could expose them; all four are the kind that produce a plausible table
+rather than an obvious failure.
+
+1. **The poison rung read the wrong element bit.** Edgar's Bio Blaster
+   rung gated on `anyRevealed(0x20)` — that is **pearl**. Poison is
+   `$08` (`Ot6Chip` walks the mask from bit 0, ot6.asm:627; the armor
+   line's own rows read `$08`). The rung had never been driven, so the
+   wrong bit had never cost a measurement. It would have cost this one.
+2. **The probe rungs were circular.** `bio` waited for poison to be
+   *revealed*, and the only thing in the party that casts poison is the
+   Bio Blaster itself, so it could never fire. Edgar now spends probe
+   turns the way Terra spends one on Fire and Locke one on Steal — and
+   the gate is "nothing **Edgar** can exploit is known", not "nothing at
+   all is known", because he can do nothing with a revealed *fire* and
+   the board-wide gate let Terra's probe stop his before he opened Tools.
+3. **`H.battleLoadStarted()` reads party slot 0's HP** (`M.BATTLE_HP =
+   $3BF4`, lib/ot6.lua:301,:336) and calls a zero there "no battle". On
+   `kolts_pool` slot 0 is **EDGAR**, and a Tusker pair kills him in four
+   enemy actions — so the driver declared `torn_down` and abandoned
+   battles that were still being fought: **9 of 48 samples in the first
+   sweep**, each cut at the exact frame Edgar fell, with TTK, damage
+   taken and the win/loss ledger truncated with it. The teardown probe
+   now scans all four slots. Left local to the driver: 24 gate tests call
+   the shared helper and none of them has a slot-0 death.
+4. **`break_uptime_frames` was counting corpses.** The broken timer is
+   `$10` ticks decremented on the monster's own turn (ot6.asm:20, :1140),
+   so a monster that breaks and *dies to the breaking hit* never ticks it
+   down — the body stays "broken" for the rest of the fight and every
+   frame was counted as uptime. It reported **58% uptime on a Brawler
+   pair where `player_actions_broken` was 0**, i.e. where the window did
+   not exist at all. That is the worst possible failure mode for this
+   metric, because break-and-die is precisely the pathology it exists to
+   detect. Uptime now requires the broken monster to be alive, as
+   `player_actions_broken` always did. **Every uptime figure in
+   Measurements #5–#7 should be read as an upper bound.**
+5. And one modelling fix: **reveals are now sticky for the battle.**
+   `$3E91`/`$3EA5` are per-monster cells, so chipping the first of a pair,
+   learning its weakness and killing it made the board read unread again
+   — Edgar's exploit rung then failed its gate and dropped him to
+   AutoCrossbow for the rest of the fight. No player forgets a weakness
+   because the monster that taught it fell over, and the codex does not
+   either.
+
+Also new: the `mash` policy (literally hold A — every character Fights
+with what is equipped, nobody boosts, nobody opens a menu), because
+`baseline` is a fine denominator but is *not* a masher: it lets Edgar
+fall through to AutoCrossbow, which swings PIERCE where a masher swings
+his Mithril Blade's SLASH. The "does the mash arm chip by accident?"
+question cannot be asked of `baseline`. And a fixture: **`kolts_cave`**
+(map 96), because `kolts_pool` is map 100 and that is one of Mt. Kolts'
+*four* encounter groups.
+
+### The measurement — before and after, on the same mint
+
+Both arms run against the **same savestate**, the same seeds and the same
+party; the only difference between them is the authored bytes, switched
+off in the loaded ROM image by `bal_party`'s new `POKE_AUTHORING` knob
+(the six `Ot6ElemAddTbl` rows hidden behind an early `$FFFF`, the three
+`Ot6ShieldTbl` rows made inert with a species id of `$0FFF`). That is a
+better experiment than two builds, because the fixture is minted by
+*playing the game* and a ROM where the trash has weaknesses is a ROM
+where the mint's own fights go differently. Measurement #4 established
+the equivalence of poking the loaded image to rebuilding.
+
+Two fixtures, 6 paired battles a cell, **48 battles, 0 voids, 0 nonzero
+residuals, 0 menu stalls**. `mash` is the new literal-hold-A policy;
+`loop` is `boost3`.
+
+**`kolts_cave` — map 96, group 61. Cirpius ×3 (4 of 6 draws) and
+Tusker + Cirpius ×3 (2 of 6).** The mountain's most common fight, never
+measured before this pass.
+
+| arm | TTK | **actions broken** | uptime | break at | damage taken | chips | breaks | result |
+|---|---|---|---|---|---|---|---|---|
+| mash, before | 14.2 | 0.0 | 0% | — | 243.3 | 0.0 | 0.0 | 3 won / 3 lost |
+| mash, after | 14.2 | 0.0 | 0% | — | 243.3 | 0.0 | 0.0 | 3 won / 3 lost |
+| loop, before | 9.2 | 0.0 | 0% | — | 170.7 | 0.0 | 0.0 | 5 won / 1 lost |
+| **loop, after** | **8.0** | **1.2** | **16.7%** | 83% | **117.5** | **4.7** | **1.8** | **6 won / 0** |
+
+**`kolts_pool` — map 100, group 63. Brawler ×2 (3 of 6) and Tusker ×2
+(3 of 6).**
+
+| arm | TTK | **actions broken** | uptime | break at | damage taken | chips | breaks | result |
+|---|---|---|---|---|---|---|---|---|
+| mash, before | 10.0 | 0.0 | 0% | — | 233.3 | 0.0 | 0.0 | 3 won / 3 lost |
+| mash, after | 9.2 | 0.0 | 0% | 62% | 210.2 | 1.8 | 0.8 | 3 won / 3 lost |
+| loop, before | 7.8 | 0.0 | 0% | — | 151.5 | 1.5 | 0.0 | 6 won / 0 |
+| **loop, after** | **7.5** | 0.0 | 2.7% | 57% | **138.3** | **3.0** | **1.0** | 6 won / 0 |
+
+Five things read off those two tables.
+
+1. **The break happens, and it is the shape the owner asked for.** On the
+   cave pool `player_actions_broken` goes **0.0 → 1.2**: the kill lands on
+   a broken enemy. Breaks 0 → 1.8 a fight, uptime 0% → 16.7%, and 16% of
+   the party's damage now arrives through the window. On the four-monster
+   draw (Tusker + Cirpius ×3) it is **2.0 actions broken and 27.8%
+   uptime** — the widest window measured anywhere outside a boss.
+2. **The mash arm does not chip the element rows. Byte-identical.** Every
+   cell of the cave's mash arm — TTK, damage taken, chips, breaks, the
+   win/loss ledger — is the *same number* before and after. Poison is
+   reachable only through a Tools dive, so a player holding A cannot
+   stumble into it. That is the requirement the PIERCE experiment failed,
+   met exactly.
+3. **The one class row is chipped by mashing, and it is named rather than
+   hidden.** On the shelf pool the mash arm goes 0.0 → 1.8 chips and
+   0.0 → 0.8 breaks, because Edgar's Mithril Blade swings SLASH whether
+   or not anyone meant it to. It buys the masher 10% off the clock and
+   23 HP; it does not save a single Tusker fight. This is the freebie horn
+   of the design problem, priced.
+4. **The stretch got safer when played well, and no harder when played
+   badly.** Loop-arm damage taken falls 170.7 → 117.5 on the cave (−31%)
+   and 151.5 → 138.3 on the shelf (−9%); the cave's loop arm goes from 5
+   wins and a loss to **6 and 0**. The mash arm's wipe count is unchanged
+   in both pools (3/3 and 3/3). Nothing in this pass makes Mt. Kolts
+   harder or asks for a grind.
+5. **The mash-vs-loop gap WIDENED, which is the point.** On the cave,
+   before: 1.54× on time and 1.43× on damage taken. After: **1.78× on
+   time and 2.07× on damage**, plus 3 wipes against 0. Mashing did not get
+   worse — the loop got better, which is the only direction this system
+   should ever move.
+
+### What is still not right, said plainly
+
+- **Brawler's window does not open.** 137 HP against an 84-point breaking
+  hit has the margin in principle, but Terra and Locke spend it before
+  Edgar's second swing lands, and against a *pair* his two chips
+  frequently land on different Brawlers so neither breaks: 2.0 chips, 0
+  breaks in the loop arm. The row still buys the reveal, the chips and —
+  when mashed, where Edgar swings every turn — a real break (3.7 chips,
+  1.7 breaks). What would close it is a slashing carrier whose per-hit
+  damage is small enough to chip twice cheaply: Cyan's Flurry, Edgar's
+  Chainsaw. Neither exists at Mt. Kolts. **This is outside the data
+  tables and I did not invent a weapon to fix it.**
+- **Tusker on the shelf pool gets breaks but almost no window** (2.0
+  breaks, 4.7% uptime, 0 actions broken) while the *same species* in the
+  cave's four-monster draw gets 2.0 actions broken. The difference is
+  focus: with two monsters the party's damage concentrates and spends the
+  break margin, with four it spreads. Formation size is a real variable
+  in this system and nothing has ever tuned against it.
+- **The overworld rows are unmeasured.** Sand Ray, Areneid, Rhodox and
+  Rhinotaur have no fixture — the WoB desert and the South Figaro plains
+  are not on any minted state. Those four rows are coverage fixes made
+  on the same reasoning as the Kolts ones, and they should be measured
+  before anyone claims a number for them.
+- **The probe ORDER matters more than expected, and the instrument has to
+  pick one.** Leading with the blade and leading with the Bio Blaster are
+  different fights: tool-first opens every Brawler encounter by *healing*
+  both of them (75–86 HP, reported as `monster_heal`) but reaches the
+  poison species a turn sooner (Cirpius uptime 21.2% vs 9.8%). A real
+  player reads the body and leads correctly per species; the driver
+  cannot, so it leads with the free probe. Both orderings were measured
+  and the difference is recorded here rather than averaged away.
+- The early pool is untouched and **provably so**: `worldmap_narshe`
+  (Leafer) runs byte-identical with the authoring on and off, which is
+  the regression control for this pass.
