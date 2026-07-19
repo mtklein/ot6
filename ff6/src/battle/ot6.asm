@@ -2715,12 +2715,43 @@ OT6_HUDVEIL  := $57be           ; nonzero = a monster entry/exit animation
 ; [ l/r boost input + live pip feedback ]
 
 ; runs every main-loop frame from the hud builder (db=$7e, a8/i16).
-; while a battle menu is open, R raises the active character's pending
-; boost (cap 3, and never past their bp) and L lowers it. the pips by
-; the party names show spendable bp (bp - pending), so feedback is
-; immediate: the flush's one-cell pseudo-line repaints the active row's
-; pip cell straight into the menu tilemap. window_open re-stages every
-; row on the next open, cleaning up any transient state.
+; while a battle menu is open AND the actor's action is still being
+; composed, R raises the active character's pending boost (cap 3, and
+; never past their bp) and L lowers it. the pips by the party names show
+; spendable bp (bp - pending), so feedback is immediate: the flush's
+; one-cell pseudo-line repaints the active row's pip cell straight into
+; the menu tilemap. window_open re-stages every row on the next open,
+; cleaning up any transient state.
+;
+; "still being composed" is $32cc,y = $ff, the actor's pending-action
+; command-list pointer (battle_main.asm:254 sets it to $ff when nothing
+; is pending; CreateNormalAction:@4ecb tests it the same way). Measured
+; across a real menu walk (probe_lateboost.lua): $ff through command
+; select, the ability list AND target select, then a live pointer the
+; instant the target is confirmed.
+;
+; That boundary is the fix for a v0.2 RC playtest report ("you can boost
+; after selecting the ability" / "it looks cosmetic"). Two different
+; things were happening either side of the confirm, and only one was a
+; bug:
+;   * DURING target select the spend is fully effective and stays legal
+;     -- DESIGN.md prices boost "when confirming an action", and
+;     Ot6QueueFold reads pending from CreateAction, which runs after
+;     target select. Measured: R at the target cursor folded Fire to
+;     Fire 3 ($09 at $3410), charged 2 bp (5 -> 3), and dealt tier-3
+;     damage. The playtester read it as cosmetic because the spell-list
+;     preview -- the thing the Narshe school teaches them to watch -- is
+;     closed by then, and because the over-character chevrons they WERE
+;     watching were rendering as damage numerals (the other defect).
+;   * AFTER the confirm it was theft. CreateAction has already frozen
+;     the tier, but Ot6ActionEnd still charges whatever pending reads at
+;     action end. Measured: two more R presses post-confirm took pending
+;     2 -> 3, the queued spell stayed Fire 3, damage was identical (319
+;     both ways), and bp fell 5 -> 2. Three points paid, two points'
+;     worth delivered.
+; Refusing silently rather than buzzing: the menu lingers open for a few
+; frames after every confirm, so a buzz here would fire on ordinary play
+; and teach the player that a legal boost had been rejected.
 
 .proc Ot6Boost
         .a8
@@ -2744,6 +2775,16 @@ OT6_HUDVEIL  := $57be           ; nonzero = a monster entry/exit animation
         tay
         shorta0
         pla
+        ; the action is committed once the actor has a command-list
+        ; pointer: the tier is already frozen, so a spend here would be
+        ; charged and buy nothing. display only from that point on.
+        pha
+        lda     $32cc,y
+        inc     a               ; $ff (nothing pending) -> 0
+        beq     :+
+        pla
+        bra     @show
+:       pla
         bit     #$10            ; R: boost up
         beq     @tryl
         lda     $3e9d,y
