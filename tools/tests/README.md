@@ -9,7 +9,17 @@ scripted input, assert on RAM, and capture screenshots/savestates.
 make rom                                        # build build/ot6.sfc
 tools/tests/run.sh tools/tests/gen_battle_state.lua   # power-on -> first battle -> savestate
 tools/tests/run.sh tools/tests/battle_smoke.lua       # load savestate -> assert battle state
+make frontier                                   # mint the deep story states (slow)
 ```
+
+`make test` mints only the three states the suite asserts on.  The
+STORY CHAIN past the whelk -- arvis_wake, narshe_streets,
+moogle_doorstep, moogle_cleared, worldmap_narshe, figaro_doorstep,
+figaro_intro -- lives behind `make frontier`, which nothing in the gate
+depends on: each link is a multi-minute scripted playthrough that
+consumes the previous link's savestate, and the suite's remint cost has
+to stay what it was.  The links use the same ROM-content gate as the
+suite's states, so a rebuild that changes no bytes re-mints nothing.
 
 `run.sh` wraps:
 
@@ -96,9 +106,24 @@ line reports its worker and wall time.
   `docs/playing-headless.md`).  Kept because probe_slots and the
   balance instruments still consume `make_srm_sidecar.sh` saves;
   requires a pre-Whelk save, which no longer exists locally.
+- `gen_edgar.lua` - Figaro Castle, gate to the throne: walks
+  `figaro_doorstep.mss` in, buys the BioBlaster + NoiseBlaster from the
+  tool merchant (the ONLY window - the merchant refuses once EDGAR or
+  SABIN is in the party), takes Edgar's audience, and emits
+  `figaro_intro.mss`.  Its header documents four measured mechanisms the
+  entrance/NPC tables do not give you: event switches $01F0..$01FF are
+  per-map scratch (`LoadMap` zeroes $1EBE/$1EBF), NPC activation is
+  decided by the party FACING byte and a two-frame turn press does not
+  set it, castle doors are walls until `CheckDoor` so every crossing is
+  navTo-a-neighbour plus one hold, and the shop menu must be driven by
+  state ($7E0026) not by timing.  It also maps the rest of the chapter
+  and names the one gap still blocking it.
 - `probe_canstep.lua` - validates `H.canStep` (the CheckPlayerMove
   port) against real movement at the boot area; renders the model's view
-  of the neighborhood as ASCII.
+  of the neighborhood as ASCII.  NB the port covers the engine's four
+  CARDINAL exits only: Figaro's staircases are diagonal-movement tiles
+  (`player.asm:378`, `$b8 & $c0`) and read as solid wall to `canStep` /
+  `bfsPath`, which is why parts of that castle look unreachable.
 - `battle_banner.lua` - TEMPORAL gate for the banner screen-tear: exec
   callbacks at the battle NMI's entry / flush start / flush end / post-
   INIDISP sample `ppu.scanline` on EVERY frame through a Fire Beam cast

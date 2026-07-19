@@ -7,7 +7,7 @@ VERSION := 0.1
 # A failed recipe (e.g. the checksum step dying mid-build) leaves a half-built target the next make treats as up-to-date — bit us twice on 2026-07-18.
 .DELETE_ON_ERROR:
 
-.PHONY: all rom patch run test verify clean goldens-capture release
+.PHONY: all rom patch run test verify clean goldens-capture release frontier
 
 all: rom
 
@@ -90,6 +90,55 @@ $(STATE3): $(STATE2)
 
 test: rom $(STATE1) $(STATE2) $(STATE3)
 	tools/tests/suite.sh
+
+# ---------------------------------------------------------------- frontier --
+# The story chain past the whelk, as gated state rules.  `test` deliberately
+# does NOT depend on any of it: every one of these is a multi-minute scripted
+# playthrough, and the suite's remint cost has to stay what it was.  Build it
+# on demand with `make frontier` (or name one state) when you need a fixture
+# deeper in the game than whelk_doorstep.
+#
+# Each link consumes the previous link's savestate, so the order below is the
+# order the game is played, and each rule uses the same content-compare gate
+# as the suite's states: re-mint only when the ROM BYTES changed (a build
+# bumps every timestamp even when nothing moved).
+#
+#   whelk_doorstep  -> gen_arvis          -> arvis_wake
+#                   -> gen_narshe_escape  -> narshe_escape_start, narshe_streets
+#                   -> gen_mines_chase    -> mines_chase, moogle_doorstep
+#                   -> gen_moogle         -> moogle_defense, moogle_cleared
+#                   -> gen_worldmap       -> worldmap_narshe
+#                   -> gen_figaro         -> figaro_doorstep
+#                   -> gen_edgar          -> figaro_intro
+FRONTIER := arvis_wake narshe_streets moogle_doorstep moogle_cleared \
+            worldmap_narshe figaro_doorstep figaro_intro
+
+# mint <state> from <script> once its ROM-content gate says it is stale
+define mint
+	@if [ build/states/.rom-copy -nt build/states/$(1).mss ] || [ ! -f build/states/$(1).mss ]; then \
+		tools/tests/run.sh tools/tests/$(2).lua; \
+	fi
+	@touch build/states/$(1).mss.lua
+endef
+
+build/states/arvis_wake.mss.lua: $(STATE3)
+	$(call mint,arvis_wake,gen_arvis)
+build/states/narshe_streets.mss.lua: build/states/arvis_wake.mss.lua
+	$(call mint,narshe_streets,gen_narshe_escape)
+build/states/moogle_doorstep.mss.lua: build/states/narshe_streets.mss.lua
+	$(call mint,moogle_doorstep,gen_mines_chase)
+build/states/moogle_cleared.mss.lua: build/states/moogle_doorstep.mss.lua
+	$(call mint,moogle_cleared,gen_moogle)
+build/states/worldmap_narshe.mss.lua: build/states/moogle_cleared.mss.lua
+	$(call mint,worldmap_narshe,gen_worldmap)
+build/states/figaro_doorstep.mss.lua: build/states/worldmap_narshe.mss.lua
+	$(call mint,figaro_doorstep,gen_figaro)
+build/states/figaro_intro.mss.lua: build/states/figaro_doorstep.mss.lua
+	$(call mint,figaro_intro,gen_edgar)
+
+frontier: rom $(STATE1) $(STATE2) $(STATE3) \
+          $(patsubst %,build/states/%.mss.lua,$(FRONTIER))
+	@echo "frontier states up to date: $(FRONTIER)"
 
 goldens: rom $(STATE1) $(STATE2)
 	tools/tests/run.sh tools/tests/visual_f1.lua
