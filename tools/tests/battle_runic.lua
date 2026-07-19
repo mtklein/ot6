@@ -25,6 +25,12 @@
 -- thing RunicEffect's CheckStatus gate rejects, so stopping her would
 -- delete the mechanic under test.  See pin().
 --
+-- The raise itself is made ABSORB-PROOF rather than lucky: the caster is
+-- disarmed to the beam family and her queue drained before the stance
+-- goes up, so no runic-able spell can be in flight while it does.  That
+-- guard is the fifth scaffolding fact and the one that bites hardest
+-- when it is missing -- the full measurement is at enterRunic().
+--
 -- THE CONTROL IS THE POINT.  Terra casts twice into the same standing
 -- stance; the ONLY difference is the spell's own runic-able flag --
 -- MagicProp byte 3 bit 3, the gate RunicEffect tests at :8486-8488.
@@ -96,6 +102,18 @@ end
 local terra, celes = nil, nil
 local spells, mark, cycles = {}, 0, 0
 local holdCeles = false   -- see pin(): keeps her in the stance, off the queue
+
+-- Frames on which Celes's stance bit went from set to clear.  Exactly two
+-- sites in the ROM clear $3E4C.2 -- QueueAction (battle_main.asm:496-498,
+-- her own next action) and RunicEffect (:8497-8499, an absorb) -- and
+-- ot6.asm never writes $3E4C at all, so pairing this list against the
+-- resolved-id list tells them apart with no PC guessing and no ROM
+-- addresses to go stale: a clear with an absorbable id in the same window
+-- is RunicEffect doing its job, a clear without one is a turn she was
+-- supposed to be held out of.  That distinction is not cosmetic -- it is
+-- the fixture-vs-product question this test would otherwise leave open.
+local stanceClears = {}
+local stanceUp = false    -- shadow of $3E4C.2, kept from the written value
 
 
 -- the newest resolved id of the requested class since the phase mark
@@ -211,8 +229,48 @@ end
 -- drive Celes into the stance for real, then freeze her there.
 -- (repeatN(1, ...) is the public way to fold a step LIST into the single
 -- step object H.run's sequencer expects.)
+--
+-- RAISING THE STANCE IS THE FRAGILE MOMENT, so the window is made
+-- absorb-proof before it opens rather than hoped through.
+--
+-- The hazard is this test's own scaffolding.  Both drives below service
+-- foreign menus by tapping A -- they have to, or a ready character's open
+-- menu parks the action queue and muddled Celes never gets the turn she
+-- needs (see serviceWait).  But the character whose menu they service is
+-- the CASTER, and after a positive phase she is still armed with a
+-- Magic-only list.  So the servicing taps commit real, runic-able spells,
+-- and whether one of them resolves before or after Cmd_0b sets $3E4C.2 is
+-- a coin flip on ROM timing.  Lose it and RunicEffect eats the stance the
+-- moment it goes up -- correctly, doing exactly its job -- and the next
+-- assert downstream reports a missing stance with no hint of why.
+--
+-- Measured, at the commit this guard was written for (probe trace of every
+-- $3E4C write with the writing PC): the "capped" raise took 3003 frames
+-- with a Cure ($2d) committing every few hundred frames throughout; the
+-- stance went up at f5746 (pc C2/1973 = Cmd_0b, battle_main.asm:4083) with
+-- the caster's pending-action pointer $32CC already live at $7e; that Cure
+-- resolved 113 frames later at f5859 and cleared the stance from C2/3572
+-- (RunicEffect, :8499), inside the following baseline's settle.  The
+-- "first" raise took 157 frames with $32CC = $ff and never saw it.
+--
+-- So: disarm the caster to the family that CANNOT be absorbed, then drain
+-- what she already committed, and only then raise.  Both halves are
+-- derived, not timed.  The disarm rests on the same MagicProp classifier
+-- the install phase proves non-vacuous (magitek beams have byte 3 bit 3
+-- clear across the whole range); the drain rests on $32CC,x = $ff meaning
+-- "nothing queued" (battle_main.asm:254, and CreateNormalAction:@4ecb
+-- tests it the same way).  After this the only thing the caster can put in
+-- flight is a beam, which RunicEffect's own gate ($11A3 bit 3, :8486-8488)
+-- refuses -- which is precisely what the negative control proves.
 local function enterRunic(label)
   return H.repeatN(1, {
+    H.call(function()
+      muddle(terra, false)
+      armTerra(false)           -- beams only: nothing absorbable can commit
+    end),
+    H.driveUntil(function() return H.readByte(0x32cc + terra * 2) == 0xff end,
+      6000, { H.call(pin), H.waitFrames(1) },
+      "the caster has nothing absorbable queued (" .. label .. ")"),
     -- she needs a turn to raise the stance, so let her back onto the
     -- queue for exactly as long as that takes
     H.call(function() holdCeles = false end),
@@ -299,7 +357,9 @@ end
 -- makes a stray turn tick fail HERE and loudly, instead of quietly
 -- becoming the +1 a later phase would credit to the absorb.
 local function baseline(value)
+  local at, from = 0, 0
   return H.repeatN(1, {
+    H.call(function() at, from = #spells, H.frame end),
     pinnedWait(180),
     H.call(function()
       H.writeByte(0x3e9c + celes * 2, value)
@@ -308,8 +368,33 @@ local function baseline(value)
     end),
     pinnedWait(90),
     H.call(function()
+      -- NAME THE CAUSE BEFORE THE SYMPTOM.  An absorb landing inside the
+      -- settle is the one event that eats the stance without moving the
+      -- bank, because at a full bank Ot6RunicBP's +1 is capped away
+      -- (ot6.asm, `cmp #$05 / bcs done`) -- so the bank assert below is
+      -- BLIND to it at baseline(5), and the stance assert reports only
+      -- that the stance is gone.  That is how a stray cast from this
+      -- test's own menu servicing read as "Runic ended early".  Check the
+      -- ids that actually resolved in the window instead.
+      local stray = nil
+      for i = at + 1, #spells do
+        if runicable(spells[i]) then stray = spells[i] end
+      end
+      H.assertEq(stray and string.format("$%02x", stray) or "none", "none",
+        "nothing absorbable resolved while the baseline settled")
       H.assertEq(bp(celes), value,
         "the bank settled at the baseline (no stray turn tick in the window)")
+      -- and with the absorb ruled out above, any clear left in this window
+      -- is a turn the ATB pin was supposed to prevent.  The bank assert
+      -- CANNOT see that one at baseline(5): the turn's +1 regen is capped
+      -- away at a full bank, which is exactly why this used to surface as
+      -- an unexplained missing stance.
+      local drops = 0
+      for _, f in ipairs(stanceClears) do
+        if f >= from then drops = drops + 1 end
+      end
+      H.assertEq(drops, 0,
+        "and she took no turn while it settled (the ATB pin held)")
       H.assertEq(stance(celes), true, "and Runic is still standing")
       snapshot()
       H.log(string.format("baseline: bp=%d mp=%d stance=%s",
@@ -343,6 +428,17 @@ H.run({ maxFrames = 60000 }, {
     benchOthers()
     emu.addMemoryCallback(function(_, v) spells[#spells + 1] = v end,
       emu.callbackType.write, 0x7e3410, 0x7e3410)
+    -- Edge-detect off the WRITTEN VALUE, never off a read-back: whether a
+    -- Mesen write callback runs before or after the store lands is not
+    -- something this test should be betting on, and a wrong guess would
+    -- make the counter silently always-zero -- a check that passes because
+    -- it never ran.  Shadowing the byte needs no such assumption.
+    stanceUp = stance(celes)
+    emu.addMemoryCallback(function(_, v)
+      local was = stanceUp
+      stanceUp = v & RUNIC_BIT ~= 0
+      if was and not stanceUp then stanceClears[#stanceClears + 1] = H.frame end
+    end, emu.callbackType.write, 0x7e3e4c + celes * 2, 0x7e3e4c + celes * 2)
     H.log(string.format("terra=slot %d, celes=slot %d (char id $%02x)",
       terra, celes, H.readByte(0x3ed8 + celes * 2)))
     -- the classifier itself must not be vacuous: prove it separates the
@@ -393,6 +489,13 @@ H.run({ maxFrames = 60000 }, {
     H.assertEq(id ~= nil, true, "a runic-able spell really resolved")
     H.assertEq(stance(celes), false,
       "RunicEffect consumed the stance ($3E4C.2 cleared)")
+    -- POSITIVE CONTROL for the stance-clear watch itself.  The baselines
+    -- assert that watch saw NOTHING; if it were miswired it would report
+    -- nothing here too, and every one of those asserts would be passing
+    -- for the wrong reason.  A real absorb just happened, so it must have
+    -- caught at least one edge.
+    H.assertEq(#stanceClears > 0, true,
+      "the stance-clear watch registered this absorb (it is not blind)")
     H.assertEq(mp(celes) > before.mp, true,
       "the vanilla half still happens: the spell became MP")
     H.assertEq(bp(celes), before.bp + 1,
