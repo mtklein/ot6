@@ -13,9 +13,15 @@
 --            rewards). With all three at identity the encounter
 --            arithmetic, fight HP, and rewards are vanilla's exactly
 --            (the scale routines are exact at $10).
---   ours     the shipped values ($20 = 2x HP, $08 = 0.5x danger, $20 =
+--   ours     the shipped values ($10 = 1x HP, $08 = 0.5x danger, $20 =
 --            2x rewards); the ROM bytes are re-poked to shipped values
 --            defensively in case a vanilla run preceded in this process.
+--            Measurement #4 ran this arm when band0 shipped $20 (2x HP);
+--            Measurement #5 stood it down to $10 (ot6.asm:352,
+--            balance-metrics.md:417), so at the current ship point the
+--            two arms differ in danger and reward only -- a re-run
+--            measures the rate/reward half of the parity product, not
+--            the fight-length half #4 also reported.
 --
 -- Per sample: loadState -> poke arm -> seed $1fa1/$1fa2 -> pace until a
 -- random encounter fires (steps counted) -> mash A (baseline policy) to
@@ -23,19 +29,32 @@
 -- exp $1611-13 delta, party gil $1860-62 delta -- ground truth, after
 -- AddExp/gil clamps). Greppable lines: [ot6] [pace] b=<k> <key>=<value>.
 --
--- ROM knob offsets are BUILD-SPECIFIC (bank F0 layout): derived from
--- ff6/rom/ff6-en.dbg for the build under test. The GUARD bytes below
--- fail the run loudly if the offsets drift.
+-- ROM knob offsets are BUILD-SPECIFIC (bank F0 layout) and DO drift: all
+-- three below were exactly $12 low ($300173/$300177/$300179) against the
+-- build of 2026-07-18 -- the same drift bal_mines.lua and bal_dpb.lua
+-- carried (fixed in 8e405a9, which handed this file off). $12 low is
+-- inside Ot6HpScale's /16 tail, which ends where Ot6HpMulTbl begins:
+-- they read $6A/$6A/$D2, the `ror` of a `lsr OT6_SCR_COLS / ror` pair
+-- and the low operand byte of the next `lsr` (battle_en.lst @ $000173,
+-- $000177, $000179). Re-derive from ff6/rom/ff6-en.dbg after any bank-F0
+-- edit:
+--   grep -oE 'name="Ot6DangerMulW"[^;]*' ff6/rom/ff6-en.dbg -> val=0xF00189
+-- and subtract $C00000 (HiROM: bank $C0 is file offset $000000, and
+-- Mesen's snesPrgRom is indexed by file offset). KNOB_OK below fails the
+-- run loudly if they drift again.
 local H = dofile("/Users/mtklein/ot6/tools/tests/lib/ot6.lua")
 
 -- ------------------------------------------------------------- knobs --
 local ARM = "vanilla"
 local STATE = "/Users/mtklein/ot6/build/states/mines_chase.mss.lua"
 local NSAMPLES = 8
-local ROM_HPMUL  = 0x300173        -- Ot6HpMulTbl (band0 byte)
-local ROM_DANGER = 0x300177        -- Ot6DangerMulW (word)
-local ROM_REWARD = 0x300179        -- Ot6RewardMulW (word)
-local SHIP = { hp = 0x20, danger = 0x08, reward = 0x20 }
+local ROM_HPMUL  = 0x300185        -- Ot6HpMulTbl (band0 byte)
+local ROM_DANGER = 0x300189        -- Ot6DangerMulW (word)
+local ROM_REWARD = 0x30018B        -- Ot6RewardMulW (word)
+-- every value any of the three knobs is ever set to, shipped or poked: a
+-- byte outside this set means the offset no longer points at a knob
+local KNOB_OK = { [0x08]=true, [0x0c]=true, [0x10]=true, [0x18]=true, [0x20]=true }
+local SHIP = { hp = 0x10, danger = 0x08, reward = 0x20 }
 local PACE_FRAMES = 9000
 local BATTLE_FRAMES = 9000
 -- $1fa1 spread (encounter-step roll) x $1fa2 (formation slot, the
@@ -90,11 +109,19 @@ local function pokeArm()
   local hp, dg, rw
   if ARM == "vanilla" then hp, dg, rw = 0x10, 0x10, 0x10
   else hp, dg, rw = SHIP.hp, SHIP.danger, SHIP.reward end
-  -- guard: the shipped bytes (or a prior poke of ours) must be at the
-  -- documented offsets, or the .dbg-derived layout has drifted
-  local seen = H.readRomByte(ROM_HPMUL)
-  if seen ~= SHIP.hp and seen ~= 0x10 then
-    error(string.format("knob layout drift: HpMulTbl byte $%02X", seen), 0)
+  -- drift guard FIRST, on ALL THREE: poking a stale offset corrupts the
+  -- ROM image and every number after it, silently. Raise instead. (The
+  -- old guard checked only ROM_HPMUL, so the danger and reward offsets
+  -- could drift unnoticed even while it held.)
+  for _, g in ipairs({ { ROM_HPMUL,  "Ot6HpMulTbl"   },
+                       { ROM_DANGER, "Ot6DangerMulW" },
+                       { ROM_REWARD, "Ot6RewardMulW" } }) do
+    local seen = H.readRomByte(g[1])
+    if not KNOB_OK[seen] then
+      error(string.format(
+        "knob layout drift: %s at $%06X reads $%02X -- re-derive from "
+        .. "ff6/rom/ff6-en.dbg", g[2], g[1], seen), 0)
+    end
   end
   emu.write(ROM_HPMUL,  hp, emu.memType.snesPrgRom)
   emu.write(ROM_DANGER, dg, emu.memType.snesPrgRom)
