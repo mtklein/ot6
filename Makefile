@@ -147,11 +147,18 @@ test: rom $(STATE1) $(STATE2) $(STATE3)
 #                   -> gen_lete           -> lete_river
 #                   -> gen_scenario       -> scenario_hub
 #                   -> gen_scenario_locke -> locke_scenario
+#   scenario_hub    -> gen_rapids         -> rapids_start, rapids_done
+#                   -> gen_terra_narshe   -> terra_narshe
+#                   -> gen_terra_caves    -> terra_caves
+#                   -> gen_terra_clifftop -> terra_clifftop
+#                   -> gen_terra_done     -> terra_done
 FRONTIER := arvis_wake narshe_streets moogle_doorstep moogle_cleared \
             worldmap_narshe figaro_doorstep figaro_intro figaro_matron \
             figaro_cleared south_figaro kolts_doorstep kolts_pool \
             kolts_cave vargas_doorstep vargas_won returner_hideout \
-            banon_joined lete_river scenario_hub locke_scenario
+            banon_joined lete_river scenario_hub locke_scenario \
+            rapids_start rapids_done terra_narshe terra_caves \
+            terra_clifftop terra_done
 
 # mint <state> from <script> once its ROM-content gate says it is stale
 define mint
@@ -223,6 +230,32 @@ build/states/scenario_hub.mss.lua: build/states/lete_river.mss.lua
 # scenario_hub the same way; only this one is built.
 build/states/locke_scenario.mss.lua: build/states/scenario_hub.mss.lua
 	$(call mint,locke_scenario,gen_scenario_locke)
+# ---- the TERRA/BANON scenario: the shortest of the three, from the hub ----
+# gen_rapids: talk to Terra at the hub, resume the raft down the lower Lete
+# (the FORCED battle 8 plus two if_rand fights), spill onto the world map.
+# Two mints: rapids_start is the cheap doorstep UPSTREAM of the forced fight;
+# rapids_done is on foot on the World of Balance NE of Narshe.
+build/states/rapids_start.mss.lua: build/states/scenario_hub.mss.lua
+	$(call mint,rapids_start,gen_rapids)
+build/states/rapids_done.mss.lua: build/states/rapids_start.mss.lua
+	$(call mint,rapids_done,gen_rapids)
+# gen_terra_narshe: the world walk into Narshe and the townsfolk's turn-away
+# at the checkpoint (which shoves the party back south, $001F set)
+build/states/terra_narshe.mss.lua: build/states/rapids_done.mss.lua
+	$(call mint,terra_narshe,gen_terra_narshe)
+# gen_terra_caves: open the secret wall Locke used (an EXAMINE facing up on
+# (15,57)) and step into the mines -- the only fixture in this scenario's
+# random-encounter pool
+build/states/terra_caves.mss.lua: build/states/terra_narshe.mss.lua
+	$(call mint,terra_caves,gen_terra_caves)
+# gen_terra_clifftop: the length of the caves -- maps 41/20-pocket/48/49/50 --
+# including map 49's 13-gate ordered block maze, out onto the clifftop
+build/states/terra_clifftop.mss.lua: build/states/terra_caves.mss.lua
+	$(call mint,terra_clifftop,gen_terra_clifftop)
+# gen_terra_done: into Arvis's house, onto the meeting trigger _ccb3fa, and
+# out the far side with $0021 set -- the scenario complete, back at the hub
+build/states/terra_done.mss.lua: build/states/terra_clifftop.mss.lua
+	$(call mint,terra_done,gen_terra_done)
 
 frontier: rom $(STATE1) $(STATE2) $(STATE3) \
           $(patsubst %,build/states/%.mss.lua,$(FRONTIER))
