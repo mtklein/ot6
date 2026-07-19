@@ -15,8 +15,8 @@ recruited character's kit is honest there.
 | rung | stop point | gated on |
 |---|---|---|
 | 1 | the Moogle defense (~1 hour: mines → Whelk → escape) | shipped in v0.1: difficulty transform, encounter/XP/gil conservation, Whelk fire-add |
-| **2 (current)** | **Figaro → Vargas** | fixtures one stretch deeper; band-2 sweep; the Bio Blaster × poison-empire discovery beat; Narshe school text |
-| 3 | scenario split → Narshe reunion | ~~Cyan BP-Bushido~~ shipped (M3, `Ot6BushidoTier`; kits.md); remaining: fixtures reaching the split, and Cyan's MP column (mp-economy.md). Bosses already authored through here |
+| 2 | Figaro → Vargas | shipped in v0.2: fixtures to the Vargas doorstep, the Narshe school, the Bio Blaster as poison key, Vargas's holy add. Band-2 sweep measured (Measurement #6) but *not* tuned — playtest endorsed the shipped resistance at Kolts; break uptime on trash remains ~0% |
+| **3 (current)** | **scenario split → Kefka at Narshe** | ~~Cyan BP-Bushido~~ shipped (M3, `Ot6BushidoTier`; kits.md); remaining: fixtures reaching and crossing the split, the Narshe defense's 3-party machinery, Celes's Runic→BP, and Cyan's MP column (mp-economy.md). Enemy data authored through here (armor line + Kefka poison) |
 | 4 | Zozo / first espers | M5 magicite sub-jobs |
 | 5 | end of WoB (Floating Continent) | M4 kits + sweeps (boss data already reaches Nerapa) |
 
