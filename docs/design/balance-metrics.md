@@ -26,6 +26,17 @@ Policies are swappable functions in the lua (`POLICY` knob):
 three, `greedy` spends every point the turn it appears. Baseline is
 the denominator for everything.
 
+Since 2026-07-18 a policy sets only the **boost discipline**; what a
+character actually *does* with the turn comes from a per-character
+**kit** table (`KITS`, keyed on the character index at `$3ED9+slot*2`),
+so one named policy plays a whole party — Terra probes and exploits with
+Fire, Locke opens with Steal then Fights, Edgar's Tools carry
+pierce/poison, Sabin inputs Blitz. Every stat fans out per party slot
+(`char_actions`, `char_dmg`, `char_chips`, `char_breaks`, `char_boosts`,
+`char_bp_*`, `char_dmg_taken`) using the same `sN:value` CSV the monster
+lines already used; the aggregate keys are unchanged, so older logs
+still tabulate.
+
 ## Proposed target bands (for the driver)
 
 | Band | Proposed target |
@@ -61,10 +72,29 @@ becomes checkable: per stretch, every formation shows a sane TTK band
 and a nonzero break rate *with that stretch's party*. Boss states get
 their own band row (break windows, uptime) once a boss is reachable.
 
-Known blind spots, accepted for v1: damage is attributed by victim
-(monster-on-monster muddle damage would count as player damage), and
-`$340a` immediate actions bypass the action-count queues — both noted
-as TODOs in the lua header.
+Known blind spots. The victim-attribution one is **fixed** as of
+2026-07-18: damage, chips and breaks are credited to the entity whose
+action is running, read from the battle loop's own action-queue
+dequeues, so monster-on-monster muddle damage no longer lands in
+`player_dmg` — it is reported separately as `monster_self_dmg`. What
+remains:
+
+- **Attribution is action-granular, not hit-granular**, and one frame of
+  slack sits at each action boundary. There is no WRAM address carrying
+  the attacker at damage-apply time: `ApplyDmg` reads it off the stack
+  (`lda $02,s`, `battle_main.asm:2960`), `$32E0,y` is a retaliation
+  blacklist written only on death (`:8662`), and `$3406` reads negative
+  across the damage frames because `ExecAction`'s `sec / ror $3406`
+  (`:194`) invalidates it on entry. The drivers publish a `_residual` per
+  metric and `bp_action_skew` as an independent cross-check, and
+  `bal_aggregate.py` fails the run on any nonzero residual.
+- `$340a` **immediate actions** (battle-start scripts, final attacks)
+  bypass all three queues, so they are uncounted *and* leave the actor
+  shadow stale. Rare in WoB trash.
+- **Menu travel is not modelled.** The driver selects a command by
+  writing it into all four command cells and reaches a list entry by
+  writing the cursor triple, so the instrument measures "this character
+  used this action", not "a human navigated to it".
 
 ## Measurement #1 — mines_chase, Terra L5 solo (2026-07-16)
 
@@ -454,3 +484,115 @@ Whelk from 0 → ~1 window, ~13% uptime — still short of the ~2-window /
 (more head HP so the broken window can't one-shot it), which is a
 separate decision and was NOT done here. The designed tutorial line
 completes reliably at the shipped resistance.
+
+## Measurement #6 — the first PARTY numbers, and the instrument that got them (2026-07-18)
+
+Every instrument before this one drove a solo party, so the coverage
+rule in `weapon-classes.md` ("the story's actual party chips every
+non-boss encounter") was not checkable for any stretch with more than
+one character. `metrics_battle.lua` and the new `bal_party.lua` now
+drive a party and attribute every stat per member; this section is the
+first run of that instrument, and it is a MEASUREMENT, not a tuning
+pass. Nothing was changed as a result of it.
+
+**Fixture.** `worldmap_narshe.mss` — LOCKE (battle slot 0, L6,
+Fight/Steal/Item) and TERRA (slot 1, L4, Fight/Magic/Item, knowing Fire
+and Cure) on the WoB tile `gen_figaro.lua` walks south from. This is the
+closest existing state to the Figaro → Kolts stretch and the only
+2-character fixture on a map with live random encounters; **it is missing
+EDGAR**, whose state is still being minted, so these are two thirds of
+the stretch party and the Edgar/Sabin kit rungs are written but
+undriven. The pool at that spawn drew one formation in every sample:
+species `$0017`, single monster, 33 HP, weak `$81` (fire), 2 shields.
+
+**Protocol.** bal_mines' discipline, unchanged: loadState-independent
+battles, `$1FA1` seeded per battle index so battle *k* is the same battle
+in every arm (verified — every arm paced identical step counts
+89/48/47/35/45/72), danger counter zeroed per sample, phase jitter on
+the settle. 4 policies × 2 HP arms × 6 battles = **48 battles, 0 voids,
+48 wins, 0 wipes, 0 menu stalls**, and every per-battle identity check
+closed to zero.
+
+### Arm A — the pool as it ships
+
+| policy | turns | frames | dmg taken | enemyA | chips | breaks |
+|---|---|---|---|---|---|---|
+| baseline | 1.7 | 152 | 0 | 0.0 | 0 | 0 |
+| boost3 | 2.0 | 361 | 0 | 0.0 | 6 | 0 |
+| greedy | 1.5 | 321 | 0 | 0.0 | 6 | 0 |
+| badboost | 1.7 | 152 | 0 | 0.0 | 0 | 0 |
+
+Against the bands: TTK **1.5–2.0 vs the proposed 3–5**, danger budget
+**0.0 vs ≤3** — the monster never gets a turn at all. Breaks are 0
+because the one chip a fire probe lands also kills. This is
+Measurement #1's "the loop cannot express vs intro trash" again, one
+stretch later and with a party: two characters at L4/L6 delete a 33-HP
+world-pool monster before it acts. `badboost` is byte-identical to
+`baseline` here for the same reason it was in Measurement #5 — with no
+reachable weakness the two policies make the same moves.
+
+### Arm B — the same fixture with monster HP pinned to 400
+
+A synthetic buff (`BUFF_HP`), not a proposal: it exists to make the loop
+express so the *instrument* can be read, and it must never be averaged
+with Arm A. What it shows is the shape of the loop, not a tuning target.
+
+| policy | turns | frames | dmg taken | enemyA | chips | breaks |
+|---|---|---|---|---|---|---|
+| baseline | 19.0 | 5711 | 45.7 | 8.5 | 0 | 0 |
+| boost3 | 4.0 | 1353 | 7.8 | 1.0 | 12 | **6** |
+| greedy | 3.5 | 1343 | 8.3 | 1.0 | 12 | **6** |
+| badboost | 12.8 | 4090 | 34.2 | 5.8 | 0 | 0 |
+
+Per character (per-battle averages):
+
+| policy | who | actions | dmg | dmg through break | chips | breaks | BP spent | did |
+|---|---|---|---|---|---|---|---|---|
+| baseline | LOCKE | 9.5 | 219.8 | 0 | 0 | 0 | 0 | Fight |
+| baseline | TERRA | 9.5 | 180.2 | 0 | 0 | 0 | 0 | Fight |
+| boost3 | LOCKE | 2.0 | 22.5 | 0 | 0 | 0 | 0 | Steal, Fight |
+| boost3 | TERRA | 2.0 | **377.5** | 298.5 | 12 | 6 | 0 | Fire ×2 |
+| greedy | LOCKE | 1.5 | 11.3 | 0 | 0 | 0 | 6 | Steal, Fight |
+| greedy | TERRA | 2.0 | 388.7 | 161.8 | 12 | 6 | 6 | Fire ×2 |
+| badboost | LOCKE | 6.5 | 225.3 | 0 | 0 | 0 | 18 | Fight |
+| badboost | TERRA | 6.3 | 174.7 | 0 | 0 | 0 | 18 | Fight |
+
+Findings, stated as measurements:
+
+1. **The loop pays, hugely, and it is the PROBE that pays — not the
+   boost.** Weakness-exploiting play is 4.8× faster than ignoring it
+   (4.0 vs 19.0 turns) and takes 6× less damage. But `boost3` spent
+   **zero** BP in all six fights: the fight ends in two actions per
+   character, so the bank never reaches 3. Measurement #1's "boost3 never
+   boosts" survives into a party. `boost3` vs `baseline` here therefore
+   measures probing, and the boost axis is only isolated by `greedy` vs
+   `boost3` (3.5 vs 4.0) and `badboost` vs `baseline` (12.8 vs 19.0).
+2. **The break fires but the window never opens.** 6/6 fights broke, and
+   `first_break_frame` was the *last* frame of every one of them
+   (`break_uptime_frames = 1`). The chip that empties the shields and the
+   doubled hit that lands on the newly broken target are the same hit, and
+   it kills. Same shape as the Whelk in Measurement #5. The "first break
+   by the 2nd–3rd action" band is met; the "uptime 20–30%" band is not
+   reachable while the breaking hit is also lethal.
+3. **The damage-per-BP ladder reproduces in a live party fight.** A
+   traced fight: probe Fire (shielded-weak) 82, Locke's Fight 23, exploit
+   Fire (breaks, then doubles) **295**. The 3.6× ratio between a broken
+   hit and a shielded-weak one matches `bal_dpb`'s pinned-lab 4:2:1 at
+   the shipped 0.5× resistance, now corroborated outside the lab.
+4. **greedy again beats boost3** (3.5 vs 4.0), so the "greedy must lose"
+   band still fails outside boss fights — consistent with Measurements
+   #3 and #5.
+5. **`badboost` is worth flagging.** It buys 1.5× TTK over baseline
+   (12.8 vs 19.0) by dumping 3-BP Fights into a shielded, unweak target.
+   Measurement #5 found badboost ≈ baseline in ~3-turn fights and drew
+   the "the BP is nearly wasted" conclusion from it. In a long fight the
+   same misplay compounds and pays. Whether "boost feels wasted" is a
+   short-fight-only property is a real question for the driver — but note
+   this arm is a synthetic 400-HP buff, so it is a question, not a result.
+6. **A party spreads damage taken**, as Measurement #5 guessed it would:
+   baseline damage is split 25.5 / 20.2 across the two members.
+
+Instrument caveats for whoever reads these numbers next: two thirds of
+the stretch party, one formation, a synthetic HP arm, and Edgar/Sabin
+kit rungs that have never been driven. Repointing `bal_party.lua` at a
+Kolts fixture requires nothing but the `STATE` knob.
