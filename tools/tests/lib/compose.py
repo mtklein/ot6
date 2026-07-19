@@ -27,8 +27,27 @@ Transformations:
      hash, in a comment and a print() at the head of the composed file.
 
 Usage: compose.py <script.lua> <out.lua>
+
+SCENARIO STACKING (OT6_STACK): the v0.3 scenario routes each replay one
+branch of the SAME three-way split, and the reunion gate (_caadb9,
+event_main.asm:26683) needs all three completed in ONE playthrough.  The
+route generators hardcode both their boot sidecar ("scenario_hub.mss.lua")
+and their output names ("rapids_done.mss"), so replaying a route from
+another scenario's endpoint used to mean either duplicating a 600-line
+generator or clobbering the honest single-scenario states.  Instead:
+`OT6_STACK=<prefix>` makes composition rewrite the BASENAME of every
+`.mss`/`.mss.lua` string literal in the SCRIPT (never the lib), so
+`OT6_STACK=t2_` composes gen_rapids into a script that boots
+t2_scenario_hub.mss.lua and emits t2_rapids_*.mss.  The Makefile seeds
+t2_scenario_hub as a copy of locke_done, and the whole Terra chain then
+replays on top of the Locke ending -- same route logic, different boot,
+distinct artifacts.  This lives at compose time because that is where
+sidecar literals are already resolved (the tree-precedence rules above);
+the generators stay byte-identical, and the re-mint gate keeps working
+because stacked artifacts are ordinary files on the same .rom-copy clock.
 """
 import hashlib
+import os
 import re
 import sys
 from pathlib import Path
@@ -59,6 +78,28 @@ def digest(b64: str) -> str:
 
 class CrossTree(Exception):
     """A referenced sidecar exists ONLY outside the composing tree."""
+
+
+# Any .mss / .mss.lua string literal: group 1 = directory part (kept),
+# group 2 = the basename the stack prefix goes onto.
+_MSS_LIT = re.compile(r'"((?:[^"]*/)?)([A-Za-z0-9_]+\.mss(?:\.lua)?)"')
+
+
+def stack_rewrite(script: str, prefix: str) -> str:
+    """Prefix the basename of every .mss/.mss.lua literal in `script`.
+
+    Both directions must move together: prefixing only loadState references
+    would boot gen_rapids from t2_scenario_hub and then let it OVERWRITE the
+    honest rapids_start/rapids_done with states minted from a contaminated
+    boot -- the exact silent-wrong-artifact class the resolver selftest
+    exists for.  Screenshot tags carry no .mss suffix and are untouched;
+    comments mentioning state names get rewritten too, which is harmless.
+    """
+    if not prefix:
+        return script
+    if not re.fullmatch(r"[A-Za-z0-9_]+", prefix):
+        raise ValueError(f"OT6_STACK={prefix!r}: prefix must be [A-Za-z0-9_]+")
+    return _MSS_LIT.sub(lambda m: f'"{m.group(1)}{prefix}{m.group(2)}"', script)
 
 
 def resolve_sidecar(ref, root):
@@ -162,6 +203,24 @@ def selftest() -> int:
         check("in-tree literal outside build/states still resolves",
               resolve_sidecar(str(odd / "x.mss.lua"), work), odd / "x.mss.lua")
 
+    # -- stack_rewrite: both directions of a route must move together --
+    src = ('local HUB = "/Users/x/ot6/build/states/scenario_hub.mss.lua"\n'
+           'H.saveState("rapids_done.mss")\n'
+           'H.screenshot("rapids_battle1")\n')
+    got = stack_rewrite(src, "t2_")
+    check("stack prefixes the boot sidecar reference",
+          '"/Users/x/ot6/build/states/t2_scenario_hub.mss.lua"' in got, True)
+    check("stack prefixes the emitted state name",
+          'H.saveState("t2_rapids_done.mss")' in got, True)
+    check("stack leaves screenshot tags alone",
+          'H.screenshot("rapids_battle1")' in got, True)
+    check("empty prefix is the identity", stack_rewrite(src, ""), src)
+    try:
+        stack_rewrite(src, "bad/../prefix")
+        check("stack refuses a non-word prefix", "no raise", "ValueError")
+    except ValueError:
+        check("stack refuses a non-word prefix", "ValueError", "ValueError")
+
     print("selftest: " + ("ok" if ok else "FAILED"))
     return 0 if ok else 1
 
@@ -184,6 +243,15 @@ def main() -> int:
     if script.startswith(MARKER):
         print(f"error: {script_path} is already composed; refusing to re-compose")
         return 1
+
+    # Scenario stacking: rewrite state basenames BEFORE sidecar collection,
+    # so the resolver sees (and embeds) the prefixed names.  Script only --
+    # the lib's own .mss mentions are documentation, and rewriting the lib
+    # would make the composed lib differ per prefix for no behavioral reason.
+    stack = os.environ.get("OT6_STACK", "")
+    if stack:
+        script = stack_rewrite(script, stack)
+        print(f"stack prefix {stack!r} applied to {script_path}")
 
     # Collect referenced savestate sidecars: any "<path>.mss.lua" string
     # literal in the script (scripts typically bind them to a STATE local).
