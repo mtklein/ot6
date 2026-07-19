@@ -199,7 +199,91 @@ local function climbStep()
   end)
 end
 
-H.run({ maxFrames = 60000 }, {
+-- ------------------------------------------------------- the mint's proof --
+-- The captured doorstep, held in memory until the sweep clears it.  Emitting
+-- only after validation means a run that fails leaves NO whelk_doorstep.mss
+-- behind to be mistaken for a good one.
+local mintReq, doorstep = nil, nil
+
+-- The single deliberate step onto the trigger (verbatim from gen_whelk.lua
+-- :74-99): the event force-walks the party down and opens the edge-triggered
+-- dialogs $0B6E/$0B6F; a random encounter on the way is cleared like any
+-- other.  A fresh step object per call -- H.driveUntil bodies are stateful.
+local function stepOntoTrigger()
+  return H.call(function()
+    aPhase = (aPhase + 1) % 8
+    if H.battleLoadStarted() then
+      if whelk() then H.setPad({}); return end     -- pred fires next frame
+      clearRandomStep()
+      return
+    end
+    if H.dialogWaiting() then                       -- $0B6E then $0B6F
+      H.setPad(aPhase < 4 and { "a" } or {})
+      return
+    end
+    if not H.hasControl() then H.setPad({}); return end  -- event walking us
+    if not H.tileAligned() then H.setPad({}); return end -- glide out steps
+    -- at rest with control: step toward the trigger (down = re-approach if
+    -- we somehow stand on/above an unfired trigger)
+    H.setPad(H.fieldY() <= 5 and { down = true } or { up = true })
+  end)
+end
+
+-- DID A COMMAND LIST ACTUALLY DRAW?  Every battle list-text template writes
+-- vanilla's staging buffer at $7e5755 (`ram_res w7e5755, 128`,
+-- btlgfx/btlgfx_ram.inc:71) -- the item family fills $5755-$5767, magic
+-- $5755-$5764, magitek $5755-$5761 (`cpx #$000d`, madou_line_mess_set).  The
+-- shortest of the three still covers this window, so watching it detects a
+-- list of ANY command without repointing anybody's commands first.
+--
+-- Keyed on the BUFFER, never on a drawer's instruction address.  This ROM's
+-- bank C1 sits 11 bytes below ff6/notes/ff3u.asm (DrawMagicListText is at
+-- C1/4DC0 per ff6/rom/ff6-en.map:539, not the notes' C1/4DB5), which is how
+-- probe_shadow_overlap ended up with an exec watch on an operand byte that
+-- could never fire.  Vanilla's RAM reservations do not move; its code does.
+--
+-- Measured quiet: this window takes ZERO writes while the battle sits
+-- settled and zero at the command level, then 60 from bank C1 the moment a
+-- list opens.  So a nonzero count is a list, not hud chatter.
+local listWrites = 0
+emu.addMemoryCallback(function()
+  local ok, bank = pcall(function() return emu.getState()["cpu.k"] end)
+  if ok and bank ~= 0xF0 then listWrites = listWrites + 1 end
+end, emu.callbackType.write, 0x7E5755, 0x7E5761)
+
+-- WHY A SWEEP AND NOT A SEARCH, and why the settle above is arbitrary now.
+--
+-- Battle init seeds the RNG index from the game-time frame counter --
+-- `lda $021e / asl2 / sta $be` (battle_main.asm:6092-6094) -- and $021E
+-- ticks once per frame, wrapping at 60 (time_calc, C3/13C8-C3/1410).  So the
+-- doorstep's frame phase picks one of sixty battle seeds, InitGauge draws
+-- the starting ATB gauges off it (battle_main.asm:6230+), and that decides
+-- whose menu opens first.  That much the old comment here had right.
+--
+-- What it had wrong is that the mint can steer it.  It cannot: the seed is
+-- set at BATTLE init, not at the doorstep, so every consumer adds its own
+-- walk length to the mint's phase before the roll happens.  Measured, all
+-- three consumers on one identical fixture (sha 84209ed55945):
+--   probe_shadow_overlap  264 frames doorstep -> fight
+--   battle_whelkwipe      266
+--   battle_dlgmenu        267
+-- Three walks, three residues of $021E, three different seeds.  One knob
+-- here cannot set three rolls, so "advance a frame and re-check" would only
+-- move the coin flip around -- it would satisfy whichever consumer the mint
+-- happened to imitate and re-roll the other two.
+--
+-- The useful thing the mint CAN do is prove the fixture does not depend on
+-- the roll at all.  So: replay the doorstep at four spread phases, and
+-- require of each that the Whelk fight comes up, a battle command menu
+-- opens, and a command list actually draws.  Four seeds is not sixty --
+-- this is a roll-dependence detector, not a proof over the whole seed space
+-- -- but it is the difference between a fixture that happened to work once
+-- and one that has been shown to work across rolls.  A phase that fails is
+-- the real defect and must be fixed in the consumer's drive, NOT by
+-- retuning the settle above.
+local SWEEP = { 0, 7, 23, 41 }
+
+local steps = {
   -- ===================================================================== --
   -- Phase 1: power-on -> title -> automatic intro march.
   -- Reused VERBATIM from gen_battle_state.lua:26-34 (the only existing
@@ -353,74 +437,111 @@ H.run({ maxFrames = 60000 }, {
       H.assertEq(whelkDone(), false,
         "whelk-done switch $1EA6 bit $20 is CLEAR (trigger still live)")
     end),
-    -- A short settle before the mint.  DO NOT TUNE THIS NUMBER.
-    --
-    -- It used to be load-bearing and it should never have been.  The
-    -- doorstep's frame phase decides the whelk fight's battle-start ATB
-    -- roll, i.e. whose menu opens first, and battle_dlgmenu's staging scan
-    -- used to allow only $80+ tiles -- which rejected TERRA's magitek list,
-    -- because Bio Blast's poison element icon is OT6 cell $64 and $64 is
-    -- below $80 (ot6.asm:1158, where poison takes $64 precisely because
-    -- vanilla's border fill owns $ee).  So this parked 14 frames, measured
-    -- as the centre of a "clean plateau" of rolls that opened somebody
-    -- else's menu.
-    --
-    -- That was a coin flip wearing a constant's clothes: a Terra-first menu
-    -- is an ordinary, correct, player-visible screen, so the plateau was a
-    -- property of a wrong assertion, not of the fixture, and every ROM
-    -- change re-minted this state and re-rolled the dice.  battle_dlgmenu
-    -- now accepts the element icons its own claimedCells() derives, and is
-    -- documented menu-owner independent.  Nothing downstream reads the ATB
-    -- roll any more.
-    --
-    -- If a downstream test ever fails as a function of this number again,
-    -- that test is encoding an assumption about the roll that was never
-    -- true in general -- fix the assertion, not the frame count.
+    -- A short settle before the capture.  THE NUMBER IS ARBITRARY, and the
+    -- sweep below is what makes that safe to say -- see its block comment.
     H.waitFrames(14),
-    H.saveState("whelk_doorstep.mss"),
-    H.logStep(function()
-      return string.format("doorstep minted at (42,6), frame %d", H.frame)
+    H.call(function() mintReq = H.requestSaveState() end),
+    H.waitFrames(2),
+    H.call(function()
+      H.checkReq(mintReq, "doorstep savestate capture")
+      doorstep = mintReq.blob
+      H.log(string.format("doorstep captured at (42,6), frame %d (%d bytes) " ..
+        "-- NOT emitted until the sweep below passes", H.frame, #doorstep))
     end),
-
-    -- the deliberate step (verbatim from gen_whelk.lua:74-99): single-step up
-    -- onto (42,5); the event force-walks the party down and opens the
-    -- edge-triggered dialogs; a random encounter on this step is cleared like
-    -- any other (the goal fight is what we are driving toward).  This is the
-    -- POSITIVE CONTROL for the mint -- it proves the state we just saved really
-    -- is one step from the Whelk, so a bad doorstep fails loudly here rather
-    -- than silently shipping a dud (CONTRIBUTING.md: a quiet test is not a
-    -- passing test).
-    H.driveUntil(function() return whelk() end, 2200, {
-      H.call(function()
-        aPhase = (aPhase + 1) % 8
-        if H.battleLoadStarted() then
-          if whelk() then H.setPad({}); return end     -- pred fires next frame
-          clearRandomStep()
-          return
-        end
-        if H.dialogWaiting() then                       -- $0B6E then $0B6F
-          H.setPad(aPhase < 4 and { "a" } or {})
-          return
-        end
-        if not H.hasControl() then H.setPad({}); return end  -- event walking us
-        if not H.tileAligned() then H.setPad({}); return end -- glide out steps
-        -- at rest with control: step toward the trigger (down = re-approach if
-        -- we somehow stand on/above an unfired trigger)
-        H.setPad(H.fieldY() <= 5 and { down = true } or { up = true })
-      end),
-    }, "whelk event fires"),
   }),
+}
 
-  -- the fight is loading; let it come up on screen and prove it's the Whelk
-  -- (gen_whelk.lua:103-112).
-  H.call(function() H.setPad({}) end),
-  H.waitUntilSoft(function() return H.battleActive() end, 900, "whelk_up", 30),
-  H.call(function()
-    H.assertEq(whelk(), true, "Whelk formation words present at $57C0")
-    local w = H.formationWords()
-    H.log(string.format("formation: %04X %04X %04X %04X %04X %04X (screen up=%s)",
-      w[1], w[2], w[3], w[4], w[5], w[6], tostring(H.vars.whelk_up)))
-    H.screenshot("poweron_whelk_battle")
-    H.log(string.format("WHELK battle at frame %d (power-on route)", H.frame))
-  end),
-})
+-- ===================================================================== --
+-- Phase 5: THE SWEEP.  Replay the captured doorstep at each phase and
+-- require a usable fight of every one.  This is also the mint's positive
+-- control -- it takes the same deliberate step onto (42,5) the old
+-- single-shot control did, four times, and asks more of each.
+-- ===================================================================== --
+local seen = {}
+for _, k in ipairs(SWEEP) do
+  local tag = string.format("sweep +%d", k)
+  local shot = {}
+  local loadReq
+  local phaseSteps = {
+    H.call(function() loadReq = H.requestLoadState(doorstep) end),
+    H.waitFrames(2),
+    H.call(function()
+      H.checkReq(loadReq, tag .. ": doorstep reload")
+      -- same two writes H.loadState makes: savestates do not restore battery
+      -- sram, so invalidate the weakness codex the way every consumer does
+      emu.write(0x316000, 0, emu.memType.snesMemory)
+      emu.write(0x316001, 0, emu.memType.snesMemory)
+      listWrites = 0
+    end),
+    H.waitFrames(k),        -- the phase itself: k more ticks of $021E
+    H.call(function()
+      shot.t0 = H.readByte(0x021e)
+      H.assertEq(H.fieldX() == 42 and H.fieldY() == 6, true,
+        tag .. ": reloaded state is the doorstep (42,6)")
+    end),
+    H.driveUntil(function() return whelk() end, 2200,
+      { stepOntoTrigger() }, tag .. ": whelk event fires"),
+    H.call(function() H.setPad({}) end),
+    H.waitUntil(function() return H.battleActive() end, 900,
+      tag .. ": whelk up", 30),
+    H.waitFrames(240),
+    -- a battle command menu must open: every consumer's first drive in this
+    -- fight waits on exactly this byte
+    H.driveUntil(function() return H.readByte(0x7bca) ~= 0 end, 4000, {
+      H.call(function()
+        local n = (H.vars.mn or 0) + 1 ; H.vars.mn = n
+        H.setPad(n % 60 < 4 and { "a" } or {})
+      end),
+    }, tag .. ": a battle command menu opens"),
+    H.call(function()
+      H.setPad({})
+      shot.actor = H.readByte(0x62ca) & 3
+      shot.charid = H.readByte(0x3ed8 + shot.actor * 2)
+      listWrites = 0        -- only count what the presses below cause
+    end),
+    H.waitFrames(120),
+    -- ...and a command list must draw from it.  No command surgery: everyone
+    -- in this fight rides magitek armor, so A on the top command opens the
+    -- magitek list whoever the roll picked.
+    H.driveUntil(function() return listWrites > 0 end, 1200, {
+      H.pressButtons({ "a" }, 4), H.waitFrames(90),
+      H.pressButtons({ "b" }, 4), H.waitFrames(45),
+      H.pressButtons({ "down" }, 4), H.waitFrames(30),
+    }, tag .. ": a command list draws"),
+    H.call(function()
+      H.assertEq(listWrites > 0, true, tag .. ": command list really drew")
+      seen[#seen + 1] = string.format("%s: $021e=$%02x -> menu slot %d char $%02x, "
+        .. "%d list writes", tag, shot.t0 or 0, shot.actor, shot.charid, listWrites)
+      H.log(seen[#seen])
+    end),
+  }
+  for _, s in ipairs(phaseSteps) do steps[#steps + 1] = s end
+end
+
+steps[#steps + 1] = H.call(function()
+  H.log("---- doorstep proved usable at every swept phase ----")
+  for _, line in ipairs(seen) do H.log("  " .. line) end
+end)
+
+-- the last sweep phase left us in the fight; prove it's the Whelk
+-- (gen_whelk.lua:103-112).
+steps[#steps + 1] = H.call(function() H.setPad({}) end)
+steps[#steps + 1] =
+  H.waitUntilSoft(function() return H.battleActive() end, 900, "whelk_up", 30)
+steps[#steps + 1] = H.call(function()
+  H.assertEq(whelk(), true, "Whelk formation words present at $57C0")
+  local w = H.formationWords()
+  H.log(string.format("formation: %04X %04X %04X %04X %04X %04X (screen up=%s)",
+    w[1], w[2], w[3], w[4], w[5], w[6], tostring(H.vars.whelk_up)))
+  H.screenshot("poweron_whelk_battle")
+  H.log(string.format("WHELK battle at frame %d (power-on route)", H.frame))
+end)
+
+-- EMIT LAST, after every assertion above has held.  A failed run leaves no
+-- whelk_doorstep.mss at all rather than an unvalidated one.
+steps[#steps + 1] = H.call(function()
+  H.emitBlob("whelk_doorstep.mss", doorstep)
+  H.log("doorstep minted")
+end)
+
+H.run({ maxFrames = 60000 }, steps)

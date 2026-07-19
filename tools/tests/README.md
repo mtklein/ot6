@@ -136,11 +136,21 @@ set -- and never creates `SaveStates/`.)
   intro -> Narshe streets -> mines -> BFS to (42,6); emits
   `build/states/whelk_doorstep.mss` (field, one tile short of the
   trigger) plus a positive-control `whelk_battle` screenshot.  Needs no
-  save file at all, so it works on a fresh clone; mint at frame 24479,
-  byte-identical every run, ~74 s wall.  The mint waits 14 idle frames
-  before saving: the doorstep's frame phase decides the fight's ATB
-  roll, and some phases stage Bio Blast's poison icon ($64) into the
-  magitek list, tripping battle_dlgmenu's $80+-only staging scan.
+  save file at all, so it works on a fresh clone; byte-identical every
+  run.  The state is CAPTURED, then VALIDATED, then emitted: a sweep
+  replays it at four spread frame phases and requires of each that the
+  Whelk fight comes up, a battle command menu opens, and a command list
+  actually draws.  A run that fails leaves no `whelk_doorstep.mss` at
+  all rather than an unvalidated one.  The sweep exists because the
+  doorstep's frame phase seeds the battle RNG (`lda $021e / asl2 /
+  sta $be`, battle_main.asm:6092-6094) and therefore picks whose menu
+  opens first — but the mint cannot steer that for anybody, because the
+  seed is set at BATTLE init and each consumer adds its own walk length
+  first (measured on one identical fixture: probe_shadow_overlap 264
+  frames, battle_whelkwipe 266, battle_dlgmenu 267 — three walks, three
+  seeds, and on one ROM three different menu owners).  So the mint
+  proves the fixture works across rolls instead of tuning a settle to
+  chase one.
 - `gen_whelk.lua` - the retired SRM-based ancestor: boot an injected
   play save and BFS the mines to the same doorstep (see
   `docs/playing-headless.md`).  Kept because probe_slots and the

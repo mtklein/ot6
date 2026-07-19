@@ -193,6 +193,16 @@ local steps = {
   H.waitFrames(240),
   H.call(function()
     claimed = claimedCharSet()
+    -- Name the roll.  Nothing here asserts on it -- the retract cycle is the
+    -- head's own timer and policyPulse is menu-agnostic, which is why this
+    -- test passed unchanged on a ROM where the roll handed the first menu to
+    -- three different characters.  But if this ever DOES time out waiting for
+    -- a transition, the next reader should not have to re-measure the ATB
+    -- phase to find out who was holding the menu (battle_dlgmenu:196-202 logs
+    -- the same thing for the same reason).
+    local actor = H.readByte(0x62ca) & 3
+    H.log(string.format("menu owner at settle: slot %d, char id $%02x",
+      actor, H.readByte(0x3ed8 + actor * 2)))
     H.assertEq(H.formationHas({ [0x0134] = true }), true, "whelk head fight")
     H.assertEq(H.fieldHudPresent(), true, "hud up before the retract")
     H.assertEq(H.readByte(0x57be), 0, "veil idle before the retract")
