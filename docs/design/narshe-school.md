@@ -155,14 +155,38 @@ $025C curatives, $025E/$06D2 relics ($06D2 is shared with a WoR scene —
 out of fence anyway), $025F buttons, $0260 equip arrows, $0261 Wait
 mode, $0262 run, $0263 ATB/pass, $0265 Row/Defense, $0266 pincer,
 $0268 back row, $0269/$026A statuses, $026B undead, $026C Life 3/Regen,
-$026F Runic/Morph/Dance/Rage (Runic is vanilla in the ROM today; the
-+1-BP Runic is design, not code), $0271 experience, $0272 near-fatal,
+$0271 experience, $0272 near-fatal,
 $0273/$0274 espers (vanilla esper mechanics are what's live today),
 $0275 SwdTech (charge gauge still live today), $0277–$027D color demo,
 $03A5/$03A6 chocobo (shared with stables).
 
-When Runic-as-BP, the Bushido menu, or magicite sub-jobs ship, $026F /
-$0275 / $0274 become false and rejoin this exercise.
+When the Bushido menu or magicite sub-jobs ship, $0275 / $0274 become
+false and rejoin this exercise.
+
+## Rung 3 shipped: $026F names the Boost Point
+
+$026F (Runic/Morph/Dance/Rage) left this list when Runic-as-BP became
+code. A playtester finishing the rewritten school reported the advisor
+"still describes runic as absorbing MP without mentioning BP" — and the
+line was accurate, which is what made it a defect: kits.md:169 has
+always specified **absorbs next spell → +1 BP**, and the ROM only ever
+did the MP half. Ot6RunicBP (ff6/src/battle/ot6.asm, hooked into
+vanilla's RunicEffect) closed that gap; only then could the text move.
+
+Page 1 only, minimal diff, Morph and Dance/Rage untouched:
+
+> ``Runic''
+> Turns many magic attacks into MP, and earns a Boost Point! Can be
+> used repeatedly.
+
+"Boost Point" is the term $0270 already teaches, so the lesson borrows
+vocabulary the player has met rather than inventing any. Measured
+against the budget above: page 1 goes 3 → 4 rendered lines, which is
+the page maximum and exactly where the Morph page already sits, so no
+5th-line auto-pause is introduced. `tools/tests/school.lua` now asserts
+$026F's encoded bytes alongside $0257 and $0276, and
+`tools/tests/battle_runic.lua` asserts the mechanic the line promises —
+so the text and the code fail separately if either is reverted.
 
 ## Text-machine constraints (measured)
 

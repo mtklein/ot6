@@ -84650,7 +84650,7 @@ _cc3692:
 _cc3696:
         dlg $026F
                 ; “Runic”
-                ; Turns many magic attacks into MP! Can be used repeatedly.
+                ; Turns many magic attacks into MP, and earns a Boost Point! Can be used repeatedly.
                 ; “Morph”
                 ; Increases Attack and Magic power. Duration increases with battles fought.
                 ; “Dance” and “Rage”

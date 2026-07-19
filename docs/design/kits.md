@@ -234,6 +234,18 @@ ice/order/tempo. The duality reads clearer than vanilla ever made it.
 | 7 | Haste | 32 (vanilla) |
 | 8 | **RunicBlade** (divine, leaning) | Opera / Magitek factory (story) |
 
+- **Row 1 is code now, not only design** (`Ot6RunicBP`, ot6.asm, hooked
+  into vanilla's `RunicEffect`): the absorb still becomes MP and now
+  also banks 1 BP. Rulings, all covered by `battle_runic.lua` — an
+  absorb at a full bank is **capped, never wrapped**; the
+  no-regen-after-boost rule does **not** gate it, because that rule
+  governs a turn's own end-of-action tick while the absorb is paid
+  during the *caster's* action, so boosting the turn she raises Runic
+  still gets paid for what she catches; and only the Runic *command*
+  pays, not the separate "enemy runic" stance a raging Gau can carry.
+  Vanilla's own gate is untouched — what Runic can eat is still the
+  spell's `MagicProp` absorb flag, which excludes every esper and every
+  MagiTek beam. The Narshe school's $026F now names the BP.
 - Divine leaning ✦-ward: **RunicBlade** — a Runic stance that also
   *reflects* what it eats (absorb the MP as BP, bounce the spell).
   Absolute Zero stays the listed alternate until playtest.
