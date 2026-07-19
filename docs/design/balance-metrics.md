@@ -1162,3 +1162,9 @@ Five things read off those two tables.
 - The early pool is untouched and **provably so**: `worldmap_narshe`
   (Leafer) runs byte-identical with the authoring on and off, which is
   the regression control for this pass.
+- **Fixture provenance, stated.** `kolts_pool` and `kolts_cave` were
+  minted from a ROM that differed from the shipped one by the three
+  shield-count rows settled at the end of the sweep. The paired design is
+  unaffected — both arms of every comparison read the *same* state — but
+  the absolute numbers may shift by a little on a fresh mint, which the
+  content gate will force the next time anyone runs `make frontier`.
