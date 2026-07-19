@@ -49,6 +49,8 @@ local function WKE(s) return 0x3BE0 + (8 + s * 2) end   -- weak elements
 local function WKC(s) return 0x3E9C + (8 + s * 2) end   -- weak classes
 local function RVC(s) return 0x3E9D + (8 + s * 2) end   -- revealed classes
 local function MHP(s) return 0x3BFC + s * 2 end
+-- status 3; bit $10 is stop, which is the bit Ot6Gate reads to skip a turn
+local function ST3(e) return 0x3EF8 + e end
 
 local function bp(s)   return H.readByte(0x3E9C + s * 2) end
 local function pend(s) return H.readByte(0x3E9D + s * 2) end
@@ -62,12 +64,18 @@ local TECH = { [0] = "fang", "sky", "tiger", "flurry",
 
 local OT6_SLASH = 0x01
 local FLURRY = 3                      -- tech index; attack id $55 + 3 = $58
+-- Flurry's four hits measured 81 total on this fixture (intro stats, guards
+-- shielded so the 0.5x resistance applies).  A double dip would be
+-- Ot6BoostDmg's x4 on top, ~324, so the bound only has to sit between: 240
+-- leaves 3x headroom over the roll and still fails a multiplied hit.
+local DMG_CAP = 240
 
 local actor                           -- the party slot whose menu we drive
 local ceiling = 7                     -- pinned $2020: techs known - 1
 local pinPend = nil                   -- when set, pending boost is held here
 local pinBp = true                    -- hold the bank full (off for the end)
 local pinShields = true
+local pinHp = true                    -- off once we want to measure damage
 local spells = {}                     -- every attack id that reached $3410
 
 local function pinCyan()
@@ -93,8 +101,9 @@ local function pinGuards()
     H.writeByte(WKE(s), 0)              -- no element weakness: class chips only
     H.writeByte(WKC(s), OT6_SLASH)      -- slashing-weak, so bushido chips
     H.writeByte(TM(s), 0)               -- never broken (x2 would muddy damage)
-    H.writeWord(MHP(s), 0xF000)         -- a hit never kills
-    H.writeByte(0x3F00 + s * 2, H.readByte(0x3F00 + s * 2) | 0x10)  -- stopped
+    local st3 = ST3(8 + s * 2)
+    H.writeByte(st3, H.readByte(st3) | 0x10)   -- stopped: nothing contests
+    if pinHp then H.writeWord(MHP(s), 0xF000) end   -- a hit never kills
     if pinShields then H.writeByte(SH(s), 8) end
   end
 end
@@ -118,7 +127,7 @@ local SWEEP = {
 }
 local seenLevels, sweepRows = {}, 0
 local barSeen, barFrames = {}, 0
-local sh0 = {}
+local sh0, hp0 = {}, {}
 
 H.run({ maxFrames = 40000 }, {
   H.waitFrames(20),
@@ -243,10 +252,18 @@ H.run({ maxFrames = 40000 }, {
   H.waitFrames(8),
   H.call(function()
     H.assertEq(level(), FLURRY, "the tech about to be latched is flurry")
+    -- park the other two Cyans so only the boosted tech moves guard HP
+    for _, s in ipairs(PARTY) do
+      if s ~= actor then
+        H.writeByte(ST3(s * 2), H.readByte(ST3(s * 2)) | 0x10)
+      end
+    end
+    pinHp = false                      -- let the damage stand to be measured
     for _, s in ipairs(GUARDS) do
       H.writeByte(SH(s), 8)
       H.writeByte(RVC(s), 0)           -- nothing revealed yet
       sh0[s] = 8
+      hp0[s] = H.readWord(MHP(s))
     end
     H.assertEq(H.readByte(RVC(GUARDS[1])), 0, "no class revealed before the tech")
   end),
@@ -293,6 +310,17 @@ H.run({ maxFrames = 40000 }, {
     end
     H.assertEq(chipped, true, "the tech chipped a slashing-weak guard's shields")
     H.assertEq(revealed, true, "and revealed the slash class ($01)")
+
+    -- no double dip: the two points bought FLURRY, so they must not also
+    -- buy Ot6BoostDmg's x4.  Same shape as battle_fold's bound on a folded
+    -- Fire 3 -- the gate itself is structural (the $07 test in Ot6BoostDmg),
+    -- so this only has to separate 1x from 4x, not pin the roll.
+    local dmg = 0
+    for _, s in ipairs(GUARDS) do dmg = dmg + (hp0[s] - H.readWord(MHP(s))) end
+    H.log(string.format("flurry dealt %d across both guards", dmg))
+    H.assertEq(dmg > 0, true, "the tech actually dealt damage")
+    H.assertEq(dmg < DMG_CAP, true,
+      "boost bought the tech, not a damage multiplier too")
 
     -- the economy: 5 banked, 2 spent, and no +1 on a turn that boosted
     H.log(string.format("bp %d -> %d, pending %d", 5, bp(actor), pend(actor)))
