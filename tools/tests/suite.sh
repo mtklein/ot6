@@ -28,6 +28,30 @@ ram_env_for() {
     *) echo "" ;;
   esac
 }
+# FRONTIER-GATED TESTS.  battle_vargas asserts on vargas_doorstep.mss, which
+# only `make frontier` mints -- and reaching it means replaying the whole
+# story chain, nine multi-minute scripted playthroughs.  Making `make test`
+# depend on that would multiply the gate's cost by an order of magnitude,
+# which is the exact cost the frontier exists to keep out of it.  So the test
+# joins the suite the moment its fixture exists and is reported SKIPPED --
+# never silently dropped -- when it does not.  `make frontier-test` is the
+# one command that always runs it.
+FRONTIER_TESTS="battle_vargas"
+frontier_fixture() {
+  case "$1" in
+    battle_vargas) echo "$ROOT/build/states/vargas_doorstep.mss" ;;
+    *) echo "" ;;
+  esac
+}
+skipped=""
+for t in $FRONTIER_TESTS; do
+  if [ -f "$(frontier_fixture "$t")" ]; then
+    TESTS="$TESTS $t"
+  else
+    skipped="$skipped $t"
+  fi
+done
+
 XFAIL=""   # keep empty; XPASS fails the suite to force cleanup
 fail=0; summary=""
 
@@ -104,6 +128,10 @@ for g in visual_f1_idle; do
   else
     result "golden $g" "FAIL (screenshot never emitted)"; fail=1
   fi
+done
+
+for t in $skipped; do
+  result "$t" "skip (needs \`make frontier\`: $(frontier_fixture "$t") absent)"
 done
 
 printf "OT6 suite:%b\n" "$summary"

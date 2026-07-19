@@ -7,7 +7,7 @@ VERSION := 0.1
 # A failed recipe (e.g. the checksum step dying mid-build) leaves a half-built target the next make treats as up-to-date — bit us twice on 2026-07-18.
 .DELETE_ON_ERROR:
 
-.PHONY: all rom patch run test verify clean goldens-capture release frontier
+.PHONY: all rom patch run test verify clean goldens-capture release frontier frontier-test
 
 all: rom
 
@@ -115,9 +115,13 @@ test: rom $(STATE1) $(STATE2) $(STATE3)
 #                   -> gen_figaro         -> figaro_doorstep
 #                   -> gen_edgar          -> figaro_intro, figaro_matron,
 #                                            figaro_cleared
+#                   -> gen_kolts          -> south_figaro, kolts_doorstep,
+#                                            vargas_doorstep
+#                   -> gen_vargas         -> vargas_won
 FRONTIER := arvis_wake narshe_streets moogle_doorstep moogle_cleared \
             worldmap_narshe figaro_doorstep figaro_intro figaro_matron \
-            figaro_cleared
+            figaro_cleared south_figaro kolts_doorstep vargas_doorstep \
+            vargas_won
 
 # mint <state> from <script> once its ROM-content gate says it is stale
 define mint
@@ -146,10 +150,30 @@ build/states/figaro_matron.mss.lua: build/states/figaro_intro.mss.lua
 	$(call mint,figaro_matron,gen_edgar)
 build/states/figaro_cleared.mss.lua: build/states/figaro_matron.mss.lua
 	$(call mint,figaro_cleared,gen_edgar)
+# gen_kolts: the chocobo dismount, the South Figaro cave, and the mountain
+build/states/south_figaro.mss.lua: build/states/figaro_cleared.mss.lua
+	$(call mint,south_figaro,gen_kolts)
+build/states/kolts_doorstep.mss.lua: build/states/south_figaro.mss.lua
+	$(call mint,kolts_doorstep,gen_kolts)
+build/states/vargas_doorstep.mss.lua: build/states/kolts_doorstep.mss.lua
+	$(call mint,vargas_doorstep,gen_kolts)
+# gen_vargas: the fight itself, finished by Pummel, and the reunion
+build/states/vargas_won.mss.lua: build/states/vargas_doorstep.mss.lua
+	$(call mint,vargas_won,gen_vargas)
 
 frontier: rom $(STATE1) $(STATE2) $(STATE3) \
           $(patsubst %,build/states/%.mss.lua,$(FRONTIER))
 	@echo "frontier states up to date: $(FRONTIER)"
+
+# The suite INCLUDING its frontier-gated tests.  battle_vargas asserts on
+# vargas_doorstep, and `test` deliberately does not depend on it: minting it
+# replays the whole story chain, which is the cost the frontier exists to
+# keep out of the gate.  suite.sh picks the test up automatically once the
+# fixture is on disk and reports it as skipped when it is not, so this target
+# is just "mint the frontier, then run the same suite".
+frontier-test: frontier
+	python3 tools/tests/lib/compose.py --selftest
+	tools/tests/suite.sh
 
 goldens: rom $(STATE1) $(STATE2)
 	tools/tests/run.sh tools/tests/visual_f1.lua

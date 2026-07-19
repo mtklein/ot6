@@ -15,11 +15,19 @@ make frontier                                   # mint the deep story states (sl
 `make test` mints only the three states the suite asserts on.  The
 STORY CHAIN past the whelk -- arvis_wake, narshe_streets,
 moogle_doorstep, moogle_cleared, worldmap_narshe, figaro_doorstep,
-figaro_intro, figaro_matron, figaro_cleared -- lives behind `make frontier`, which
+figaro_intro, figaro_matron, figaro_cleared, south_figaro,
+kolts_doorstep, vargas_doorstep, vargas_won -- lives behind
+`make frontier`, which
 nothing in the gate depends on: each link is a multi-minute scripted playthrough that
 consumes the previous link's savestate, and the suite's remint cost has
 to stay what it was.  The links use the same ROM-content gate as the
 suite's states, so a rebuild that changes no bytes re-mints nothing.
+
+ONE suite test is FRONTIER-GATED: `battle_vargas` asserts on
+`vargas_doorstep.mss`.  suite.sh adds it the moment that file exists and
+reports it as `skip` when it does not -- never silently drops it -- so
+`make test` costs what it always did and `make frontier-test` (mint the
+chain, then run the same suite) is the command that always runs it.
 
 `run.sh` wraps:
 
@@ -133,6 +141,49 @@ line reports its worker and wall time.
   earlier pass needed are retired), why map 55's row y=43 must stay off
   every route (it is a world-exit trigger, not a wall), and maps the
   beats it stops short of.
+- `gen_kolts.lua` - rung 2's last route leg: figaro_cleared (world map,
+  ON A CHOCOBO) to the Vargas doorstep on Mt. Kolts.  Mints
+  `south_figaro.mss` (frame 6699), `kolts_doorstep.mss` (8133) and
+  `vargas_doorstep.mss` (20240).  Its header documents three mechanisms
+  no table in the ROM gives you: the CHOCOBO DISMOUNT (InitChoco never
+  writes $E0/$E2, so worldNavTo cannot plan until a held B walks the
+  LandAirship -> descent -> ExitVehicle -> ReloadMap -> InitWorld chain),
+  that the FIGARO DESERT CANNOT REACH SOUTH FIGARO ON FOOT (1165 tiles
+  bounded at y<=95 versus a separate 422-tile southern region -- the link
+  is the South Figaro cave, and its mouth is walled by two NPCs who only
+  move when talked to), and that MT. KOLTS'S MAP 100 IS SIX DISCONNECTED
+  SHELVES whose way in is a LONG entrance (map 96 (12,8) -> map 102) --
+  the short table's advertised (7,48)->98 is the way OUT, which is why
+  Vargas's walk-on parks him on it.  Also: the crossing settle must not
+  wait on `hasControl`, because the caves' async cutscenes flip the
+  party's movement-type byte every few frames.
+- `gen_vargas.lua` - the fight, and the frontier's last rung-2 link:
+  boots vargas_doorstep, clamps Vargas under his own script's second
+  threshold so `battle_event $07/$08` put SABIN on the field, kills him
+  with a real PUMMEL input, rides the reunion and mints `vargas_won.mss`
+  (frame 11426, SABIN level 9 in the party for good).
+- `battle_vargas.lua` - FRONTIER-GATED gate for rung 2's boss: Vargas
+  seeds 5/5 with class row $04 (OT6_BLUDG) and Ipoohs 2/2 slash-weak,
+  his weak byte reads exactly $28 = poison|holy (the poison bit is
+  vanilla, the HOLY bit is Ot6ElemAddTbl's row -- this is the assertion
+  that fails if that row is dropped), AuraBolt's holy chips a shield and
+  reveals $20, Pummel's bludgeon chips another and reveals $04, and the
+  same Pummel ends the fight through `if_attack PUMMEL -> battle_event
+  $09 / kill_monsters ALL`.  Both Blitzes are driven as real pad EDGES
+  into the code window, not poked.
+- `probe_vargas.lua` - the instrument behind both: dumps the seeded
+  formation, gauge, element and class rows and SABIN's join level, and
+  answers the two questions the sources do not -- that SABIN gets NO
+  turns until the script's phase-two transition (measured: 9000 frames
+  of entities 0/1/2 taking turns and entity 3 never), and what the
+  harness's kill-bit idiom does to a boss whose death is scripted (it
+  ends the fight cleanly in 117 frames -- `if_self_dead / boss_death`
+  sits ahead of the Pummel branch -- but the scripted finish is the one
+  the fixtures are minted through).
+- `probe_dismount.lua` - the measurement instrument for getting off the
+  chocobo: records the whole B -> $19=3 -> descent -> $11FA=0 ->
+  InitWorld state machine frame by frame, asserts $E0/$E2 come back live
+  from $1F60/$1F61, and plans (without walking) both rung-2 world legs.
 - `probe_canstep.lua` - validates `H.canStep` (the movement-model port)
   against real movement, in two parts, one per engine branch.  Part 1,
   CARDINAL (`CheckPlayerMove`): four directions x two rounds at the mines
