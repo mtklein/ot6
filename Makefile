@@ -123,11 +123,12 @@ test: rom $(STATE1) $(STATE2) $(STATE3)
 #                   -> gen_banon          -> banon_joined
 #                   -> gen_lete           -> lete_river
 #                   -> gen_scenario       -> scenario_hub
+#                   -> gen_scenario_locke -> locke_scenario
 FRONTIER := arvis_wake narshe_streets moogle_doorstep moogle_cleared \
             worldmap_narshe figaro_doorstep figaro_intro figaro_matron \
             figaro_cleared south_figaro kolts_doorstep kolts_pool vargas_doorstep \
             vargas_won returner_hideout banon_joined \
-            lete_river scenario_hub
+            lete_river scenario_hub locke_scenario
 
 # mint <state> from <script> once its ROM-content gate says it is stale
 define mint
@@ -187,6 +188,11 @@ build/states/lete_river.mss.lua: build/states/banon_joined.mss.lua
 # three-way split -- the entry point of the v0.3 arc
 build/states/scenario_hub.mss.lua: build/states/lete_river.mss.lua
 	$(call mint,scenario_hub,gen_scenario)
+# one step PAST the hub: proves the split is dispatchable and hands the v0.3
+# Locke chain its doorstep.  The Sabin and Terra/Banon branches start from
+# scenario_hub the same way; only this one is built.
+build/states/locke_scenario.mss.lua: build/states/scenario_hub.mss.lua
+	$(call mint,locke_scenario,gen_scenario_locke)
 
 frontier: rom $(STATE1) $(STATE2) $(STATE3) \
           $(patsubst %,build/states/%.mss.lua,$(FRONTIER))
