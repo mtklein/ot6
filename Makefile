@@ -119,10 +119,11 @@ test: rom $(STATE1) $(STATE2) $(STATE3)
 #                                            vargas_doorstep
 #                   -> gen_kolts_pool     -> kolts_pool
 #                   -> gen_vargas         -> vargas_won
+#                   -> gen_returner       -> returner_hideout
 FRONTIER := arvis_wake narshe_streets moogle_doorstep moogle_cleared \
             worldmap_narshe figaro_doorstep figaro_intro figaro_matron \
             figaro_cleared south_figaro kolts_doorstep kolts_pool \
-            vargas_doorstep vargas_won
+            vargas_doorstep vargas_won returner_hideout
 
 # mint <state> from <script> once its ROM-content gate says it is stale
 define mint
@@ -167,6 +168,10 @@ build/states/kolts_pool.mss.lua: build/states/kolts_doorstep.mss.lua
 # gen_vargas: the fight itself, finished by Pummel, and the reunion
 build/states/vargas_won.mss.lua: build/states/vargas_doorstep.mss.lua
 	$(call mint,vargas_won,gen_vargas)
+# ---- rung 3: the road to the scenario split ----
+# gen_returner: off the mountain's north side and across the world map
+build/states/returner_hideout.mss.lua: build/states/vargas_won.mss.lua
+	$(call mint,returner_hideout,gen_returner)
 
 frontier: rom $(STATE1) $(STATE2) $(STATE3) \
           $(patsubst %,build/states/%.mss.lua,$(FRONTIER))
