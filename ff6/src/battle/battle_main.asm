@@ -8505,6 +8505,7 @@ RunicEffect:
         lda     $3018,y
         tsb     $ee
         shorta
+        jsl     Ot6RunicBP  ; ot6: this absorb pays its rune knight +1 bp
 @355e:  dey2
         bpl     @3538
         lda     $ee

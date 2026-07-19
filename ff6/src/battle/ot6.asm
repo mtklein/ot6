@@ -1657,6 +1657,64 @@ done:   plp
 
 ; ------------------------------------------------------------------------------
 
+; [ a runic absorb pays its rune knight a boost point ]
+
+; called from RunicEffect's per-entity loop (battle_main.asm:8508) at the
+; one instruction where the absorb is already CERTAIN. vanilla walks all
+; ten entities there and drops out three ways before that point: target
+; not present ($3aa0.0, :8494), no runic stance at all ($3e4c.1|.2,
+; :8497), and a CheckStatus gate that discards a dead / petrified /
+; asleep / stopped / frozen / hidden runic-er (:8500-8503). only a
+; survivor of all three reaches the `tsb $ee` that enrolls it in the
+; absorbing set (:8506), and $ee is exactly what the routine then
+; retargets its mp-restore onto (:8517-8523). so this hook re-derives no
+; eligibility of its own -- arriving here IS the absorb.
+;
+; WHICH stance ate it still has to be told apart. vanilla cleared bit 2
+; -- the Runic command's own bit, set by Cmd_0b (:4081-4083) -- four
+; instructions up at :8498, but deliberately left bit 1, "enemy runic",
+; seeded from MonsterProp+30 at :7421. that seed does reach a CHARACTER
+; entity, because the same monster-property loader runs for Gau's Rage
+; (Ot6SeedShields guards the identical case, this file). bit 1 still set
+; here therefore means this entity ate the spell as a raging monster
+; rather than as a rune knight, and it banks nothing.
+;
+; two economy rulings, both deliberate:
+;   - the bank cap is Ot6ActionEnd's, untouched: an absorb at 5 bp is
+;     simply capped. it never wraps, and it never mints a sixth pip that
+;     Ot6Boost's `cmp $3e9c` would then happily let her spend.
+;   - the no-regen-after-boost rule does NOT gate this. that rule
+;     (Ot6ActionEnd) is about a turn's own end-of-action tick; an absorb
+;     is an out-of-turn reward paid during the CASTER's action, and the
+;     caster's own ActionEnd leaves at its `cmp #$08` monster gate
+;     (:1620) without ever reaching her row. so a Celes who boosted the
+;     turn she raised Runic is still paid for what she catches -- the
+;     stance costs her the turn either way, and taxing it twice would
+;     make boosting into Runic strictly worse than not boosting.
+;
+; a8 (vanilla's `shorta` is the instruction immediately before), index
+; width either -- no index immediates and no pushes, per this file's
+; width discipline; RunicEffect itself runs .i8. y = the absorbing
+; entity's offset, a clobbered (dead: the loop reloads at :8492).
+
+.proc Ot6RunicBP
+        .a8
+        tya                     ; width-neutral character test
+        cmp     #$08
+        bcs     done            ; monsters bank no bp
+        lda     $3e4c,y
+        and     #$02            ; survived as enemy runic: a raging gau
+        bne     done            ;   ate it, not a rune knight
+        lda     $3e9c,y
+        cmp     #$05
+        bcs     done            ; the bank cap holds; an absorb never wraps
+        inc
+        sta     $3e9c,y
+done:   rtl
+.endproc
+
+; ------------------------------------------------------------------------------
+
 ; [ extra swings for a boosted fight ]
 
 ; called from FightAttack right after the vanilla swing count lands in
