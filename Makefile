@@ -159,7 +159,7 @@ FRONTIER := arvis_wake narshe_streets moogle_doorstep moogle_cleared \
             banon_joined lete_river scenario_hub locke_scenario \
             rapids_start rapids_done terra_narshe terra_caves \
             terra_clifftop terra_done sabin_world sabin_camp \
-            cyan_defence camp_intro
+            cyan_defence camp_intro kefka_done camp_cleared
 
 # mint <state> from <script> once its ROM-content gate says it is stale
 define mint
@@ -274,6 +274,14 @@ build/states/cyan_defence.mss.lua: build/states/sabin_camp.mss.lua
 	$(call mint,cyan_defence,gen_sabin_camp)
 build/states/camp_intro.mss.lua: build/states/cyan_defence.mss.lua
 	$(call mint,camp_intro,gen_sabin_camp)
+# gen_sabin_kefka: the LEO scene, the poisoning, both KEFKA script-battles,
+# the pursuit, and the handoff back to CYAN on the Doma grounds.
+build/states/kefka_done.mss.lua: build/states/camp_intro.mss.lua
+	$(call mint,kefka_done,gen_sabin_kefka)
+# gen_sabin_doma: CYAN's run home through the Doma Castle room maze, the
+# family scene, and the handoff back to SABIN at the castle gate.
+build/states/camp_cleared.mss.lua: build/states/kefka_done.mss.lua
+	$(call mint,camp_cleared,gen_sabin_doma)
 
 frontier: rom $(STATE1) $(STATE2) $(STATE3) \
           $(patsubst %,build/states/%.mss.lua,$(FRONTIER))
