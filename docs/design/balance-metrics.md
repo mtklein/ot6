@@ -1098,12 +1098,16 @@ Five things read off those two tables.
    the party's damage now arrives through the window. On the four-monster
    draw (Tusker + Cirpius ×3) it is **2.0 actions broken and 27.8%
    uptime** — the widest window measured anywhere outside a boss.
-2. **The mash arm does not chip the element rows. Byte-identical.** Every
-   cell of the cave's mash arm — TTK, damage taken, chips, breaks, the
-   win/loss ledger — is the *same number* before and after. Poison is
-   reachable only through a Tools dive, so a player holding A cannot
-   stumble into it. That is the requirement the PIERCE experiment failed,
-   met exactly.
+2. **The mash arm does not chip the element rows, and the logs are
+   identical line for line.** Diffing the cave's two mash arms, the only
+   lines that differ are the ones reporting the *input* — `mon_detail`
+   reads `weak00:sh3/3` before and `weak08:sh2/2` after. Every outcome
+   metric across all six battles is the same number, with a single frame
+   of drift in one of them (`frames=2441` vs `2440`). Note that even the
+   shield COUNT changed, 3 → 2, and the masher's fight did not move:
+   poison is reachable only through a Tools dive, so a player holding A
+   never touches the gauge at all. That is the requirement the PIERCE
+   experiment failed, met exactly.
 3. **The one class row is chipped by mashing, and it is named rather than
    hidden.** On the shelf pool the mash arm goes 0.0 → 1.8 chips and
    0.0 → 0.8 breaks, because Edgar's Mithril Blade swings SLASH whether
