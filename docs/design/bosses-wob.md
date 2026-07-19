@@ -20,15 +20,16 @@ Stated once, assumed by every block:
 - **Breaks don't get a boss nerf.** Turn loss and ×2 apply to
   AtmaWeapon exactly as to a Lobo. Shields are the only boss knob.
 - **Scripts beat state.** Scripted beats — Vargas's Pummel finish,
-  Kefka's camp flees, Chupon's Sneeze, the espers crashing Ultros's
-  bridge party — fire regardless of break state. The gauge is a
-  combat system, not a story editor.
+  Chupon's Sneeze, the espers crashing Ultros's bridge party — fire
+  regardless of break state. The gauge is a combat system, not a
+  story editor. (Kefka's camp flees used to head this list. They
+  turned out to have no state to beat — no monster, no gauge; see 6.)
 - **Proposed ruling: counters sleep while Broken.** A Broken enemy
   loses its counters along with its turns (Whelk's shell goes quiet
   for the window). Octopath-faithful; driver call, open question 1.
 - **A shieldless nameplate is information.** Scripted set-pieces
-  (Tritoch, Guardian) draw no gauge at all — the HUD's silence tells
-  the player this one is theater.
+  (Tritoch, Guardian, the Imperial Camp Kefka) draw no gauge at all —
+  the HUD's silence tells the player this one is theater.
 
 Numbers below are shields only; boss HP falls under the global
 −25–35% cut and is tuned in M6. Elemental rows keep vanilla's bits
@@ -51,7 +52,7 @@ and his shields grow instead. The player learns; Ultros doesn't.
 | 3 | Vargas | Mt. Kolts | 5 (Ipoohs 2) |
 | 4 | Ultros ① | Lete River | 5 |
 | 5 | TunnelArmor | Locke scenario | 5 |
-| 6 | Kefka ×2 | Imperial Camp (Sabin) | 3 |
+| 6 | Kefka ×2 | Imperial Camp (Sabin) | — (no gauge) |
 | 7 | Telstar | Imperial Camp (Sabin) | 4 (Dobermans 2) |
 | 8 | GhostTrain | Phantom Train (Sabin) | 6 |
 | 9 | Rizopas | Baren Falls (Sabin) | 5 (Piranhas 1) |
@@ -184,10 +185,18 @@ their exam is the Narshe defense. Per-party notes below.
 
 ### 5. TunnelArmor — South Figaro escape (Locke + Celes)
 
-**Shields:** 5 · **Weak:** bolt, ice + piercing. Bolt is vanilla's
-machine bit and neither of them can cast it — codex trivia today,
-payoff later. Ice is added: Celes's join spell needs a socket, and
-"frozen coolant lines" reads fine on a digging machine.
+**Shields:** 5 · **Weak:** bolt, water, ice + piercing. (Decoded, not
+recalled: `$104` weak = **bolt|water** — `monster_prop.dat` +25 reads
+`$84` — and +23/+24 are both `$00`, so it absorbs nothing and nulls
+nothing. An earlier draft printed the bolt bit and silently dropped
+the water one, against the "keep vanilla's bits ✦" rule at the top of
+this doc; same slip logged at Nerapa below.) Bolt *and* water are
+vanilla's machine bits and this party can produce neither — the only
+water in the WoB this early is a thrown Water Edge, Throw is Shadow's
+✦ and he is two scenarios away, and Locke's list is verbs, not
+elements (kits.md) — so both bits are codex trivia today, payoff
+later. Ice is the add: Celes's join spell needs a socket, and "frozen
+coolant lines" reads fine on a digging machine.
 
 - **Telegraph:** the drill spools down and the tunnel groans → its
   buried quake (Magnitude8 — audit list). **Runic eats it.** The
@@ -197,16 +206,48 @@ payoff later. Ice is added: Celes's join spell needs a socket, and
   boss's biggest move literally funds the break.
 - **Break story:** Mug and daggers pierce-chip, Ice chips, and 5
   shields across two bodies lands the break right around the first
-  fuse. Small fight, complete grammar.
+  fuse. Small fight, complete grammar. Note what the coverage rule is
+  actually resting on here: both vanilla element bits are dead keys
+  for this duo, so the whole proof is the added Ice plus the piercing
+  class. Narrow either and the fight has no chip engine at all.
 
 ### 6–7. Imperial Camp (Sabin, with Shadow drifting in and out)
 
-**Kefka ×2:** 3 shields · poison + slashing. The gag fights — he
-takes a few hits and flees, twice, waiter line intact. No telegraph;
-he isn't staying. 3 shields is gag tier on purpose: breakable if you
-rush, and the flee script fires either way — scripts beat state. A
-break here is worth nothing but the pleasure of it, which is worth
-plenty.
+**Kefka ×2: no gauge — there is no monster in this fight.** (Decoded,
+not recalled.) Both gags run `battle 56, IMP_CAMP` (event_main.asm
+:40683 and :40743). Group 56 in `event_battle_group.dat` points both
+its slots at **formation 504**, and formation 504 in
+`battle_monsters.dat` (+`$1d88`) is `00 00 ff ff ff ff ff ff 00 00 00
+00 00 00 3f`: the present mask is **`$00`** and all six id slots are
+`$ff` with byte 14 = `$3f` setting every high bit — six copies of
+`$1ff`, vanilla's empty-slot sentinel (battle_main.asm:7720). Nothing
+is loaded. What `battle_prop.dat` (+`$7e0`) enables instead is
+**character AI script `$04`**, `kefka_imp_camp_1`, whose slot 0 is
+`CHAR_PROP::KEFKA_1|CHAR_AI_FLAG_ENEMY_CHAR` (char_ai.asm:163) — and
+the event has already dressed a party slot as him on the way in:
+`char_prop VICKS, KEFKA_1` (event_main.asm:40675; CHAR::VICKS = 15,
+CHAR_PROP::KEFKA_1 = `$29`).
+
+So the clown you punch at the camp is a **character actor** wearing
+Kefka's name, sprite and palette, flipped to the enemy side and
+running monster AI script `$016f`. He has character HP, which is why
+the event can revive and refill him between rounds with `clr_status
+VICKS, DEAD` / `max_hp VICKS` (event_main.asm:40739). No `MonsterProp`
+record is ever read for him: no weak byte, no absorb byte, no shield
+seed — `Ot6SeedShields` is reached only from the monster/rage load and
+returns immediately for character entity offsets in any case
+(ot6.asm:43).
+
+**An earlier draft gave these fights 3 shields · poison + slashing.
+That is unimplementable as written** — there is no monster entity to
+hang a species row on, and the per-formation hook that would be needed
+to gauge a character actor is a feature, not a table row.
+
+Which is the right answer anyway: the gags are theater and should read
+as theater. He takes a few hits and flees, twice, waiter line intact,
+and the silent HUD says so up front — Tritoch's rule, one scenario
+later. If a future pass genuinely wants a breakable clown here, that
+is new machinery and belongs in the roadmap, not in the shield table.
 
 **Telstar:** 4 shields · bolt + bludgeoning (Dobermans 2 · piercing).
 - **Telegraph:** its antenna sparks and it radios for backup → a
@@ -217,14 +258,21 @@ plenty.
 
 ### 8. GhostTrain — the Phantom Train (Sabin, Cyan, Shadow)
 
-**Shields:** 6 · **Weak:** fire, holy + bludgeoning.
+**Shields:** 6 · **Weak:** fire, bolt, holy + bludgeoning ·
+**absorbs poison.** (Decoded, not recalled: `$106` weak =
+**fire|bolt|holy** — `monster_prop.dat` +25 reads `$25` — and +23
+reads **`$08`, poison absorbed**; +24 is `$00`. An earlier draft
+dropped vanilla's bolt bit and never mentioned the absorb at all.)
 
 - **Telegraph:** the whistle screams down the corridor → **Evil
   Toot**, party-wide status roulette. Break the boiler before the
   note lands; Acid Rain between fuses keeps the healing honest.
 - **Break story:** the scenario's gifts are the keys — AuraBolt is
-  holy chip at range, Pummel ×2 grinds, Shadow's elemental skeans
-  probe fire. Cyan can't chip his own scenario's capstone, and
+  holy chip at range, Pummel ×2 grinds, and Shadow's elemental skeans
+  probe two of the three element bits, not one: Fire Skean is fire
+  (item `$ab` → spell `$51`) and Bolt Edge is bolt (`$ad` → `$53`),
+  both legal chips once vanilla's bolt bit is back in the row where it
+  belongs. Cyan can't chip his own scenario's capstone, and
   that's deliberate: the Phantom Train farewell is where **Oblivion**
   unlocks (kits.md), and Oblivion wants Broken targets — the train
   is his divine's first legal kill. Break it FOR him.
@@ -233,6 +281,19 @@ plenty.
   train is bludgeon-weak; the system canonizes the meme. The undead
   flag stays too: one Fenix Down ends it instantly, break state be
   damned. Cheese outranks systems; house rule.
+- **Jank ✦: poison HEALS the Phantom Train.** Vanilla, so it stays —
+  but it needs writing down where an author will hit it. Edgar's Bio
+  Blaster is poison: the Throw/Tools table maps item `$a4` to spell
+  `$7d` (battle_main.asm:6577) and that spell's element byte is `$08`.
+  The Narshe school's rung-2 seed now teases exactly that tool as the
+  answer to armored things ("Every armor fears one right tool",
+  narshe-school.md). Point it at this boss and vanilla's absorb branch
+  flips the damage sign and jumps clear past the weakness branch where
+  the shield chip lives (battle_main.asm:1850, chip at :1872): the hit
+  heals the train *and* chips nothing. Nothing is broken today —
+  Edgar is on Terra's leg and this party carries no poison — so the
+  trap is latent, not live. Do not hang a poison beat on the Phantom
+  Train, and re-read this before routing Edgar onto it.
 
 ### 9. Rizopas, after the Piranha school — Baren Falls (Sabin + Cyan)
 
@@ -546,7 +607,8 @@ damage sign — and dropped vanilla's ice and bolt, against the
 |---|---|
 | Tritoch (Narshe intro) | one-shots the trio; cutscene in battle clothes |
 | Guardian (Vector) | invincible in the WoB — its script says come back later, and the silent HUD says so up front (confirm its WoB palace encounter at data entry) |
-| Chupon's Sneeze, Kefka's camp flees, Vargas's finish | in their blocks above: scripts beat state |
+| Kefka ×2 (Imperial Camp) | no monster entity at all — formation 504 is empty and the fight runs on character AI `$04`; see 6 above |
+| Chupon's Sneeze, Vargas's finish | in their blocks above: scripts beat state |
 
 ## Open questions for the driver
 
@@ -580,11 +642,16 @@ damage sign — and dropped vanilla's ice and bolt, against the
    |---|---|---|---|
    | Marshal | $0064 | $08 poison | vanilla agrees — no add |
    | Vargas | $0103 | $08 poison | poison vanilla; **holy is an add** — authored (`Ot6ElemAddTbl`) |
-   | Kefka | $014a | $00 — | **poison is an add** — still M6 data entry |
+   | Kefka (Narshe) | $014a | $00 — | **poison is an add** — still M6 data entry |
    | Dadaluma | $0107 | $08 poison | vanilla agrees — no add |
 
-   ($14a is the camp/Narshe Kefka both blocks share; the $11a/$12a
-   Kefka records are the level-83/71 endgame ones, out of WoB scope.
+   ($14a is the **Narshe defense** Kefka and nothing else. A scan of
+   all 576 formation records puts him in exactly two — 489 (with the
+   Ice Dragon) and 505, and 505 is what group 57 / `battle 57` reaches
+   at event_main.asm:106362, the fight he "won't forget." The camp
+   gags share no record with him because they carry no monster at all;
+   see 6 above. The $11a/$12a Kefka records are the level-83/71
+   endgame ones, out of WoB scope.
    Same pass, adjacent claims: Ipooh $014d reads $01 fire — the fire
    weak above is vanilla, no add — and the chip keys are real data,
    AuraBolt ($5e) carrying $20 holy and BioBlaster's attack ($7d)
