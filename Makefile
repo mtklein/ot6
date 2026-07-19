@@ -88,7 +88,11 @@ $(STATE3): $(STATE2)
 	fi
 	@touch $(STATE3)
 
+# compose.py's selftest is pure python and gates the suite: it is the positive
+# control for sidecar resolution, and a wrong resolution silently tests the
+# wrong ROM's savestates rather than failing.
 test: rom $(STATE1) $(STATE2) $(STATE3)
+	python3 tools/tests/lib/compose.py --selftest
 	tools/tests/suite.sh
 
 # ---------------------------------------------------------------- frontier --
