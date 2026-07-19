@@ -149,9 +149,9 @@ test: rom $(STATE1) $(STATE2) $(STATE3)
 #                   -> gen_scenario_locke -> locke_scenario
 FRONTIER := arvis_wake narshe_streets moogle_doorstep moogle_cleared \
             worldmap_narshe figaro_doorstep figaro_intro figaro_matron \
-            figaro_cleared south_figaro kolts_doorstep kolts_pool vargas_doorstep \
-            vargas_won returner_hideout banon_joined \
-            lete_river scenario_hub locke_scenario
+            figaro_cleared south_figaro kolts_doorstep kolts_pool \
+            kolts_cave vargas_doorstep vargas_won returner_hideout \
+            banon_joined lete_river scenario_hub locke_scenario
 
 # mint <state> from <script> once its ROM-content gate says it is stale
 define mint
@@ -193,6 +193,13 @@ build/states/vargas_doorstep.mss.lua: build/states/kolts_doorstep.mss.lua
 # trash pool need this one, not kolts_doorstep.
 build/states/kolts_pool.mss.lua: build/states/kolts_doorstep.mss.lua
 	$(call mint,kolts_pool,gen_kolts_pool)
+# gen_kolts_cave: one more crossing, onto map 96.  Shelf F (map 100) is
+# encounter group 63 -- Brawler/Tusker -- and that is ONE of the mountain's
+# four groups.  Maps 96/97 carry group 61, which is CIRPIUS x3 at 93.75% of
+# draws: the mountain's most common fight, and the one the trash-weakness
+# pass is built around.  kolts_pool cannot draw it, so it needs its own.
+build/states/kolts_cave.mss.lua: build/states/kolts_pool.mss.lua
+	$(call mint,kolts_cave,gen_kolts_cave)
 # gen_vargas: the fight itself, finished by Pummel, and the reunion
 build/states/vargas_won.mss.lua: build/states/vargas_doorstep.mss.lua
 	$(call mint,vargas_won,gen_vargas)
