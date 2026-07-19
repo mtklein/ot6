@@ -1116,11 +1116,17 @@ Five things read off those two tables.
    wins and a loss to **6 and 0**. The mash arm's wipe count is unchanged
    in both pools (3/3 and 3/3). Nothing in this pass makes Mt. Kolts
    harder or asks for a grind.
-5. **The mash-vs-loop gap WIDENED, which is the point.** On the cave,
-   before: 1.54× on time and 1.43× on damage taken. After: **1.78× on
-   time and 2.07× on damage**, plus 3 wipes against 0. Mashing did not get
-   worse — the loop got better, which is the only direction this system
-   should ever move.
+5. **The mash-vs-loop gap WIDENED where the axis is clean, and narrowed
+   slightly where it is not.** On the cave — poison only — before: 1.54×
+   on time and 1.43× on damage taken; after: **1.78× on time and 2.07× on
+   damage**, plus 3 wipes against 0. Mashing did not get worse, the loop
+   got better, which is the only direction this system should ever move.
+   On the shelf pool, where Brawler's class row leaks chips to the
+   masher, the gap goes the other way by a hair: 1.28× → 1.23× on time,
+   1.54× → 1.52× on damage. That is the PIERCE experiment's failure in
+   miniature, confined to one species out of the seven authored, and it
+   is the price of the only body on the mountain whose answer could not
+   be an element.
 
 ### What is still not right, said plainly
 
