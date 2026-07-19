@@ -120,10 +120,11 @@ test: rom $(STATE1) $(STATE2) $(STATE3)
 #                   -> gen_kolts_pool     -> kolts_pool
 #                   -> gen_vargas         -> vargas_won
 #                   -> gen_returner       -> returner_hideout
+#                   -> gen_banon          -> banon_joined
 FRONTIER := arvis_wake narshe_streets moogle_doorstep moogle_cleared \
             worldmap_narshe figaro_doorstep figaro_intro figaro_matron \
             figaro_cleared south_figaro kolts_doorstep kolts_pool \
-            vargas_doorstep vargas_won returner_hideout
+            vargas_doorstep vargas_won returner_hideout banon_joined
 
 # mint <state> from <script> once its ROM-content gate says it is stale
 define mint
@@ -172,6 +173,9 @@ build/states/vargas_won.mss.lua: build/states/vargas_doorstep.mss.lua
 # gen_returner: off the mountain's north side and across the world map
 build/states/returner_hideout.mss.lua: build/states/vargas_won.mss.lua
 	$(call mint,returner_hideout,gen_returner)
+# gen_banon: the hideout's conversation graph, ending on the raft's doorstep
+build/states/banon_joined.mss.lua: build/states/returner_hideout.mss.lua
+	$(call mint,banon_joined,gen_banon)
 
 frontier: rom $(STATE1) $(STATE2) $(STATE3) \
           $(patsubst %,build/states/%.mss.lua,$(FRONTIER))
