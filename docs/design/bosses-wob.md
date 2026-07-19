@@ -149,6 +149,20 @@ level 9 on this route, so AuraBolt is present as planned; AuraBolt
 takes a shield and reveals holy, Pummel takes another and reveals the
 bludgeon class, and that same Pummel is what kills him.
 
+Edgar's BioBlaster is measured too now, and it carries a correction to
+the break story below. The poison chip itself works exactly as planned —
+item `$a4` resolves to attack `$7d`, element `$08`, and it takes a
+shield and reveals poison, while the same party's plain weapon swings
+land on Vargas and move nothing (`battle_vargas.lua`'s control). But
+**it cannot reach him while an Ipooh is alive.** BioBlaster's item
+targeting byte is `$6a` — group-targeting with `$01 MANUAL` *clear*, so
+the cursor cannot be walked — and `key_target_2`'s INIT_GROUP branch
+(`btlgfx_main.asm @7875`) aims at monster group A and only falls
+through to group B when A is empty. This formation is Ipoohs in A,
+Vargas alone in B. Measured over one fight: seven straight BioBlasters
+into the Ipoohs' group ($06, then $04 once the first died) before the
+eighth found him ($01), ~9500 frames in.
+
 **Shields:** 5 · **Weak:** poison, holy + bludgeoning. Ipoohs: 2 ·
 fire + slashing.
 
@@ -160,7 +174,10 @@ fire + slashing.
   bear screen while the script insists you're losing. Then Sabin
   arrives and the chip engine starts: Pummel ×2 bludgeoning,
   AuraBolt for holy. Mechanics and narrative agree: you couldn't
-  break him without the monk.
+  break him without the monk. **The escorts gate the key** (measured,
+  above): the spray goes to the Ipoohs' target group until both are
+  down, so phase one reads clear the adds, *then* spend the tool —
+  which is a better beat than the design assumed, and free.
 - **Jank ✦: the Blitz gate stays.** Doom Fist's Condemned countdown
   on Sabin, the Pummel-input finish, all of it — he dies to the
   script, not to HP. Breaking him is setup, not checkmate: what the
