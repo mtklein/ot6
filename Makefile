@@ -160,7 +160,8 @@ FRONTIER := arvis_wake narshe_streets moogle_doorstep moogle_cleared \
             rapids_start rapids_done terra_narshe terra_caves \
             terra_clifftop terra_done sabin_world sabin_camp \
             cyan_defence camp_intro kefka_done camp_cleared \
-            doma_defended sfigaro_town sfigaro_passage celes_freed
+            doma_defended sfigaro_town sfigaro_passage celes_freed \
+            sfigaro_escape tunnelarmr_doorstep locke_done
 
 # mint <state> from <script> once its ROM-content gate says it is stale
 define mint
@@ -303,6 +304,17 @@ build/states/sfigaro_passage.mss.lua: build/states/sfigaro_town.mss.lua
 # her, and the sleeping soldier's clock key
 build/states/celes_freed.mss.lua: build/states/sfigaro_passage.mss.lua
 	$(call mint,celes_freed,gen_celes)
+# gen_tunnelarmr: the clock's secret passage (the ONLY basement exit), the
+# escape through maps 87/86 to town, the world, the Figaro cave walked in
+# from the south (world (75,102) is an event trigger, not an entrance), and
+# TunnelArmr (battle 67, $0104) -- which ends the Locke scenario ($001E=1,
+# back at the hub).  Three states.
+build/states/sfigaro_escape.mss.lua: build/states/celes_freed.mss.lua
+	$(call mint,sfigaro_escape,gen_tunnelarmr)
+build/states/tunnelarmr_doorstep.mss.lua: build/states/sfigaro_escape.mss.lua
+	$(call mint,tunnelarmr_doorstep,gen_tunnelarmr)
+build/states/locke_done.mss.lua: build/states/tunnelarmr_doorstep.mss.lua
+	$(call mint,locke_done,gen_tunnelarmr)
 
 frontier: rom $(STATE1) $(STATE2) $(STATE3) \
           $(patsubst %,build/states/%.mss.lua,$(FRONTIER))
