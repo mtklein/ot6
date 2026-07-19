@@ -160,7 +160,7 @@ FRONTIER := arvis_wake narshe_streets moogle_doorstep moogle_cleared \
             rapids_start rapids_done terra_narshe terra_caves \
             terra_clifftop terra_done sabin_world sabin_camp \
             cyan_defence camp_intro kefka_done camp_cleared \
-            doma_defended
+            doma_defended sfigaro_town sfigaro_passage
 
 # mint <state> from <script> once its ROM-content gate says it is stale
 define mint
@@ -288,6 +288,16 @@ build/states/camp_cleared.mss.lua: build/states/kefka_done.mss.lua
 # starting line (the escape walk itself is the next leg).
 build/states/doma_defended.mss.lua: build/states/camp_cleared.mss.lua
 	$(call mint,doma_defended,gen_sabin_escape)
+
+# ---- rung 4: LOCKE's scenario, hub -> South Figaro -> TunnelArmr ----
+# gen_sfigaro: the occupied town.  The gate soldier (battle 11), then the
+# cafe's cider runner -- STOLEN from, not killed, because the merchant's
+# clothes come off the steal's reaction script and nothing else -- then the
+# old man's password and the rich man's secret passage.
+build/states/sfigaro_town.mss.lua: build/states/locke_scenario.mss.lua
+	$(call mint,sfigaro_town,gen_sfigaro)
+build/states/sfigaro_passage.mss.lua: build/states/sfigaro_town.mss.lua
+	$(call mint,sfigaro_passage,gen_sfigaro)
 
 frontier: rom $(STATE1) $(STATE2) $(STATE3) \
           $(patsubst %,build/states/%.mss.lua,$(FRONTIER))
