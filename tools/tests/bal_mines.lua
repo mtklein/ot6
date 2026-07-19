@@ -45,8 +45,20 @@ local NBATTLES = 8
 -- Proven equivalent to a rebuild by mines_pace.lua (Measurement #4).
 local POKE_HP = nil
 local POKE_SHIELD = nil
-local ROM_HPMUL  = 0x300173         -- Ot6HpMulTbl band0
-local ROM_SHIELD = 0x30033C         -- Ot6ShieldedMulW (word, low byte)
+-- ROM offsets are BUILD-SPECIFIC (bank F0 layout) and DO drift: these two
+-- were $300173/$30033C, both exactly $12 low, and read $6A/$88 -- live
+-- code bytes, not knobs -- against the build of 2026-07-18. A sweep run
+-- at those offsets would have poked eighteen bytes early and reported
+-- nonsense knob values while claiming to measure a co-tune grid. Re-derive
+-- from ff6/rom/ff6-en.dbg after any bank-F0 edit:
+--   grep -oE 'name="Ot6HpMulTbl"[^;]*' ff6/rom/ff6-en.dbg   -> val=0xF00185
+-- and subtract $C00000. KNOB_OK below fails the run loudly if they drift
+-- again, the way mines_pace.lua already guarded its copies.
+local ROM_HPMUL  = 0x300185         -- Ot6HpMulTbl band0
+local ROM_SHIELD = 0x30034E         -- Ot6ShieldedMulW (word, low byte)
+-- every value either knob is ever set to, shipped or swept: a byte
+-- outside this set means the offset no longer points at a knob
+local KNOB_OK = { [0x08]=true, [0x0c]=true, [0x10]=true, [0x18]=true, [0x20]=true }
 -- $1fa2 seeds (formation draw): group slots for map 50 at $1fa3=0x61 --
 -- slot0 = Vaporite x2, slot1 = Were-Rat x2, slot2/3 = RepoMan+Vaporite.
 -- false = leave the state's natural values (draw = Were-Rat x2 after 9
@@ -479,6 +491,17 @@ local function battleBlock(k)
     H.waitFrames(10),
     H.waitUntil(calm(20), 1200, "field control (b=" .. k .. ")"),
     H.call(function()
+      -- drift guard FIRST: poking a stale offset corrupts the ROM image
+      -- and every number after it, silently. Raise instead.
+      for _, g in ipairs({ { ROM_HPMUL, "Ot6HpMulTbl" },
+                           { ROM_SHIELD, "Ot6ShieldedMulW" } }) do
+        local seen = H.readRomByte(g[1])
+        if not KNOB_OK[seen] then
+          error(string.format(
+            "knob layout drift: %s at $%06X reads $%02X -- re-derive from "
+            .. "ff6/rom/ff6-en.dbg", g[2], g[1], seen), 0)
+        end
+      end
       -- co-tune poke (survives loadState: ROM is not savestate-backed)
       if POKE_HP ~= nil then
         emu.write(ROM_HPMUL, POKE_HP, emu.memType.snesPrgRom)

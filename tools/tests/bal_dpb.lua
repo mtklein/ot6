@@ -44,9 +44,15 @@ local MENU  = 0x7BCA
 local ACTOR = 0x62CA
 local PIN_HP = 0xF000               -- guards pinned here; a hit never kills
 
--- resistance / hp knobs, read live from ROM for the log
-local ROM_SHIELD = 0x30033C         -- Ot6ShieldedMulW (word, low byte)
-local ROM_HPMUL  = 0x300173         -- Ot6HpMulTbl band0
+-- resistance / hp knobs, read live from ROM for the log.
+-- BUILD-SPECIFIC offsets, and they HAVE drifted once: both were $12 low
+-- ($30033C/$300173) and read live code bytes ($88/$6A) against the build
+-- of 2026-07-18, so this lab's header line reported a resistance it was
+-- not measuring at. Re-derive from ff6/rom/ff6-en.dbg (val=0xF0034E etc,
+-- minus $C00000) after any bank-F0 edit; the guard below fails loudly.
+local ROM_SHIELD = 0x30034E         -- Ot6ShieldedMulW (word, low byte)
+local ROM_HPMUL  = 0x300185         -- Ot6HpMulTbl band0
+local KNOB_OK = { [0x08]=true, [0x0c]=true, [0x10]=true, [0x18]=true, [0x20]=true }
 -- POKE_SHIELD: if set, write this into Ot6ShieldedMulW before the phases,
 -- so the ordering can be swept across resistance without a rebuild ($08=0.5x,
 -- $0c=0.75x, $10=1x). nil = leave the shipped byte. HP band0 is irrelevant
@@ -180,6 +186,15 @@ H.run({ maxFrames = 60000 }, {
   H.waitFrames(240),
   -- equalize the three casters so Fire Beam base is caster-independent
   H.call(function()
+    for _, g in ipairs({ { ROM_HPMUL, "Ot6HpMulTbl" },
+                         { ROM_SHIELD, "Ot6ShieldedMulW" } }) do
+      local seen = H.readRomByte(g[1])
+      if not KNOB_OK[seen] then
+        error(string.format(
+          "knob layout drift: %s at $%06X reads $%02X -- re-derive from "
+          .. "ff6/rom/ff6-en.dbg", g[2], g[1], seen), 0)
+      end
+    end
     if POKE_SHIELD ~= nil then
       emu.write(ROM_SHIELD, POKE_SHIELD, emu.memType.snesPrgRom)
       H.assertEq(H.readRomByte(ROM_SHIELD), POKE_SHIELD, "resistance poked")
