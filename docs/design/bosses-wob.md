@@ -225,7 +225,11 @@ water in the WoB this early is a thrown Water Edge, Throw is Shadow's
 ✦ and he is two scenarios away, and Locke's list is verbs, not
 elements (kits.md) — so both bits are codex trivia today, payoff
 later. Ice is the add: Celes's join spell needs a socket, and "frozen
-coolant lines" reads fine on a digging machine.
+coolant lines" reads fine on a digging machine. **The ice row is
+authored** (`Ot6ElemAddTbl` `$0104` + `$02`, weak byte resolves
+`$84` → `$86`); the 5 shields and piercing were already in
+`Ot6ShieldTbl`. Inert to the suite until a Locke+Celes fixture reaches
+`battle 67` (event_main.asm:21005).
 
 - **Telegraph:** the drill spools down and the tunnel groans → its
   buried quake (Magnitude8 — audit list). **Runic eats it.** The
@@ -323,6 +327,17 @@ dropped vanilla's bolt bit and never mentioned the absorb at all.)
   Edgar is on Terra's leg and this party carries no poison — so the
   trap is latent, not live. Do not hang a poison beat on the Phantom
   Train, and re-read this before routing Edgar onto it.
+- **The train is a poison dead zone, boss *and* chest.** Decoded while
+  authoring the armor line: `$0156` Specter — the monster-in-a-box in
+  this same scenario (map 153, treasure 114 → event battle group 34 →
+  formation 476) — also **absorbs poison** (+$2ad7 = `$08`), and is
+  fire|holy weak in vanilla (+$2ad9 = `$21`). So the one element the
+  v0.3 arc teaches is the one element that fails twice on this train.
+  Specter gets **no authored row**: vanilla's fire and holy are both
+  live keys here (Shadow's Fire Skean, Sabin's AuraBolt — the same two
+  the break story above already leans on), and adding poison would put
+  a chip trigger on an absorber, the exact error caught in draft at
+  Nerapa and the Cranes.
 
 ### 9. Rizopas, after the Piranha school — Baren Falls (Sabin + Cyan)
 
@@ -348,6 +363,15 @@ Party: all seven, three squads on the snowfield.
 
 **Shields:** 6 · **Weak:** poison, fire + piercing, slashing.
 
+**Authored, and the whole row is an add.** `$014a`'s vanilla weak byte
+(`monster_prop.dat` +$2959) is `$00` — the arc's final boss shipped with
+no weakness of any kind — so `Ot6ElemAddTbl` carries `$09` (poison|fire)
+outright; +$2957/+$2958 are both `$00`, so nothing is absorbed or
+nulled. The 6 shields and the two classes were already in
+`Ot6ShieldTbl`. This is the v0.3 stop line: with the row in, the
+snowfield's waves and the clown at the end of them answer to the same
+poison key the school sold in Narshe.
+
 - **Telegraph:** he giggles and frost crawls the ground → **Ice 2**
   across the engaged squad.
 - **Break story:** the waves drain resources before the man himself,
@@ -358,6 +382,63 @@ Party: all seven, three squads on the snowfield.
   makes it *your* routing problem, which is the whole charm.
 - **Jank:** the strategy layer stays untouched, and his spell list
   stays court-mage petty. He hasn't eaten any gods yet.
+
+## The armor line — the school's one right tool
+
+Not bosses, but authored here because this is where the weakness data
+lives. The Narshe school's rung-2 seed promises that "their armored
+machines shrug off blade and fire alike… Every armor fears one right
+tool" (narshe-school.md:119-121). That line shipped before any enemy
+could answer it. Four species make it true, each gaining **poison**
+(`$08`) in `Ot6ElemAddTbl` — Edgar's Bio Blaster, item `$a4` → attack
+`$7d`, element `$08`:
+
+| species | id | weak byte (+25) | vanilla | authored add | result |
+|---|---|---|---|---|---|
+| M-TekArmor | `$0042` | +$0859 | `$04` bolt | `$08` | `$0c` bolt\|poison |
+| HeavyArmor | `$009F` | +$13f9 | `$84` bolt\|water | `$08` | `$8c` bolt\|poison\|water |
+| Leader | `$014E` | +$29d9 | `$00` — | `$08` | `$08` poison |
+| Grunt | `$014F` | +$29f9 | `$00` — | `$08` | `$08` poison |
+
+Vanilla's bits are kept, per the ✦ rule at the top of this doc — the
+add is an `ora` into the loaded weak byte, never a replacement. All
+four read `$00` at +23/+24, so none of them absorbs or nulls poison.
+
+Leader and Grunt are the finding that justifies the pass: they had **no
+weakness of any kind**, so for the Imperial Camp's own foot soldiers the
+school's line was not merely unpaid, it was false — an ungaugeable wall
+where the tutorial promised a key. They are `battle 13`/`14`
+(event_main.asm:41221, :41452, formations 59/60/63); M-TekArmor is the
+camp's machine (`battle 15`/`16`/`17`, formations 25/27/34) and the
+desert chase (`battle 65`); HeavyArmor is South Figaro's guards
+(`battle 11`, TOWN_EXT, event_main.asm:20344).
+
+**Where it pays off loudest:** formation 88 — Trooper + HeavyArmor — is
+a Narshe defense wave (`battle 23`, event_main.asm:108505). The Troopers
+were *already* poison-weak in vanilla (`$0065` +$0cb9 = `$08`; Riders
+`$003F` +$07f9 = `$09` fire|poison), so with HeavyArmor's row in, the
+entire wave and the Kefka at the end of it open to one tool. **No rows
+authored for Trooper or Rider** — vanilla already agrees, and a
+redundant add would be a no-op `ora` that misreports who authored what.
+Same verdict Marshal and Dadaluma got in the Q7 audit.
+
+**No `Ot6ShieldTbl` rows for the armor line either**, deliberately. Two
+reasons. First, the formula already gives them sane counts (M-TekArmor
+3, HeavyArmor 3, Grunt 3, Leader 3 at levels 8/13/12/12) and this doc
+specs no shields for trash that isn't a boss's escort. Second and
+stronger: **authoring a shield row exempts a species from `Ot6HpScale`**
+(ot6.asm, the `Ot6ShieldTbl` scan in the HP transform). That exemption
+is inert today — every HP band ships 1× — but the armor line is exactly
+the population HP tuning will want when it reopens: common imperial
+trash spanning three scenarios. Taking a shield row now would quietly
+carve a hole in that surface for no benefit, since the element add
+works from its own table on its own scan. Leaving them formula-fed
+costs nothing and keeps them tunable.
+
+And the fiction agrees with the restraint: the school promises *one*
+right tool. Giving the armor line a weapon-class weakness as well would
+hand the player two, and dilute the one lesson the seed was written to
+teach.
 
 ## Zozo
 
@@ -671,7 +752,7 @@ damage sign — and dropped vanilla's ice and bolt, against the
    |---|---|---|---|
    | Marshal | $0064 | $08 poison | vanilla agrees — no add |
    | Vargas | $0103 | $08 poison | poison vanilla; **holy is an add** — authored (`Ot6ElemAddTbl`) |
-   | Kefka (Narshe) | $014a | $00 — | **poison is an add** — still M6 data entry |
+   | Kefka (Narshe) | $014a | $00 — | **poison is an add** — authored (`Ot6ElemAddTbl`, `$09` with fire) |
    | Dadaluma | $0107 | $08 poison | vanilla agrees — no add |
 
    ($14a is the **Narshe defense** Kefka and nothing else. A scan of

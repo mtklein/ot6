@@ -135,6 +135,19 @@ on a boosted turn (Ot6ActionEnd), folds per Ot6FoldTbl with base-tier
 MP (Ot6QueueFold), live list re-fold (Ot6PreviewList_ext). The seed pays off with
 Edgar's Bio Blaster ("tool" is the wink) without naming it.
 
+**The rung-2 seed is now backed by data.** When $0276 shipped, the
+"armored machines" it describes could not answer it — M-TekArmor was
+bolt-weak, HeavyArmor bolt|water, and Leader and Grunt had no weakness
+at all, so against the camp's own foot soldiers the advisor was simply
+wrong. Four `Ot6ElemAddTbl` rows give the line poison (`$08`, Bio
+Blaster's element), keeping every vanilla bit; the decode, the story
+locations and the reasoning for what was *not* authored are in
+bosses-wob.md, "The armor line — the school's one right tool". Two
+cautions for anyone writing to this seed: the Phantom Train **absorbs**
+poison, boss and chest monster alike, and the seed's own room is two
+scenarios away from Edgar — the tool is real, but the player meets the
+armor before they can always answer it.
+
 ## Kept vanilla (lesson still true)
 
 $0258 WoR greeter, $0259 spring, $025A/$06D4 save point, $025B pots,

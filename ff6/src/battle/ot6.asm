@@ -165,18 +165,76 @@ done:   rtl
 ; one truth. re-loads (retract cycles, scene changes) re-apply the OR:
 ; idempotent by construction.
 ;
-; two rows shipped. the whelk head ($134) gains fire: the boss
-; tutorial's designed line -- three fire beams and a TekMissile, broken
-; inside one head-present phase -- needs four chippable hits, and the
-; head has no vanilla fire weak (measurement #2 called this add
-; load-bearing m6 data). vargas ($103) gains holy: bosses-wob.md's
-; vargas entry reads "poison, holy + bludgeoning", and vanilla gives
-; him poison only (monster_prop.dat +25 = $08) -- holy is the chip
-; sabin's arrival is supposed to switch on, and aurabolt already
-; carries it ($5e element byte = $20 in vanilla spell data), so this
-; row is the whole remaining distance. runtime proof (the holy chip
-; landing) waits on the vargas-doorstep fixture, queued with the
-; route work.
+; the whelk head ($134) gains fire: the boss tutorial's designed line
+; -- three fire beams and a TekMissile, broken inside one head-present
+; phase -- needs four chippable hits, and the head has no vanilla fire
+; weak (measurement #2 called this add load-bearing m6 data). vargas
+; ($103) gains holy: bosses-wob.md's vargas entry reads "poison, holy +
+; bludgeoning", and vanilla gives him poison only (monster_prop.dat +25
+; = $08) -- holy is the chip sabin's arrival is supposed to switch on,
+; and aurabolt already carries it ($5e element byte = $20 in vanilla
+; spell data), so this row is the whole remaining distance. proven at
+; runtime by battle_vargas.lua.
+;
+; the v0.3 arc adds six more. four of them are the ARMOR LINE, and they
+; exist to make one piece of dialog true: the narshe school's rung-2
+; seed promises "their armored machines shrug off blade and fire alike
+; ... every armor fears one right tool" (narshe-school.md:119-121), and
+; the tool is edgar's bio blaster (item $a4 -> attack $7d, element $08
+; poison -- battle_main.asm:6577). the seed was shipped before the
+; enemies it describes could answer it. decoded fresh from
+; monster_prop.dat at species*32 +$19 (weak; the offset is vanilla's own
+; -- battle_main.asm:7517 loads MonsterProp+25), each row keeping every
+; vanilla bit and adding poison:
+;
+;   $042 m-tekarmor  +$0859  vanilla $04 bolt        -> $0c
+;   $09f heavyarmor  +$13f9  vanilla $84 bolt|water  -> $8c
+;   $14e leader      +$29d9  vanilla $00 none        -> $08
+;   $14f grunt       +$29f9  vanilla $00 none        -> $08
+;
+; note the two that read $00: leader and grunt had NO weakness of any
+; kind, so the school's line was not merely unfulfilled for them, it was
+; false -- an unbreakable gauge on the imperial camp's own foot soldiers
+; (battle 13/14 -> formations 59/60/63, event_main.asm:41221 etc).
+;
+; and two boss rows bosses-wob.md already specified but m6 never entered:
+;
+;   $14a kefka       +$2959  vanilla $00 none        -> $09 poison|fire
+;   $104 tunnelarmor +$2099  vanilla $84 bolt|water  -> $86 (+ice)
+;
+; $14a is MONSTER::KEFKA_NARSHE and nothing else -- the imperial camp
+; gags load no monster record at all (Ot6ShieldTbl's block comment has
+; the full decode). he is the v0.3 stop line, and vanilla left him with
+; no weakness whatsoever. tunnelarmor's ice is celes's join spell buying
+; a socket: vanilla's bolt and water are both dead keys for the
+; locke+celes duo, so without the add the fight's only element chip is
+; nothing at all (bosses-wob.md "5. TunnelArmor").
+;
+; ALL SIX were checked against +$17 (absorb) and +$18 (null) before
+; authoring; every one reads $00/$00, so no row here puts a chip trigger
+; on an absorber. that check is not ceremony -- it is the exact error
+; bosses-wob.md caught twice in draft (nerapa listed fire, which it
+; absorbs; the cranes' absorb pair was read as their weak pair).
+;
+; deliberately NOT authored, so the next author does not re-litigate:
+;   - trooper ($065, +$0cb9 = $08) and rider ($03f, +$07f9 = $09) are
+;     already poison-weak in VANILLA. the narshe defense waves need
+;     nothing; formation 88 is trooper+heavyarmor, so with the armor row
+;     above the whole wave answers to the one tool. an add here would be
+;     a no-op ora that lies about who authored it.
+;   - specter ($156) ABSORBS poison (+$2ad7 = $08) and is fire|holy weak
+;     (+$2ad9 = $21). it is a monster-in-a-box on the phantom train (map
+;     153, treasure 114 -> event battle group 34 -> formation 476) --
+;     the same train whose boss also absorbs poison. the train is a
+;     poison DEAD ZONE, boss and chest alike; vanilla's fire|holy are
+;     live keys there (shadow's fire skean, sabin's aurabolt) so it
+;     needs no add, and the one element this arc is about would heal it.
+;   - siegfried ($131) has no vanilla weakness, absorb or null ($00 at
+;     +$2637/+$2638/+$2639). the phantom train gag who flees (battle 109,
+;     event_main.asm:65247) and bosses-wob.md gives him no block. the
+;     formula's 2 shields stand: unlisted species are meant to fall
+;     through, and inventing a key for a fight the player is supposed to
+;     walk away from is spec no design doc asked for.
 ;
 ; called from the tail of Ot6SeedShields, monster path only. a8/i16,
 ; y = entity offset, species stashed at OT6_SPECIES-8,y. clobbers a/x
@@ -213,6 +271,21 @@ Ot6ElemAddTbl:
         .byte   $01, $00        ; whelk head: + fire (the tutorial probe)
         .word   $0103
         .byte   $20, $00        ; vargas: + holy (sabin's aurabolt)
+        ; the armor line -- the narshe school's rung-2 seed made true.
+        ; one tool (bio blaster, poison) opens every armored machine.
+        .word   $0042
+        .byte   $08, $00        ; m-tekarmor: + poison (keeps bolt)
+        .word   $009f
+        .byte   $08, $00        ; heavyarmor: + poison (keeps bolt|water)
+        .word   $014e
+        .byte   $08, $00        ; leader: + poison (vanilla had none)
+        .word   $014f
+        .byte   $08, $00        ; grunt: + poison (vanilla had none)
+        ; the arc's stop line, and the scenario boss that had no key
+        .word   $014a
+        .byte   $09, $00        ; kefka (narshe defense): + poison|fire
+        .word   $0104
+        .byte   $02, $00        ; tunnelarmor: + ice (keeps bolt|water)
         .word   $ffff
 
 ; ------------------------------------------------------------------------------
