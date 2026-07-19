@@ -274,6 +274,8 @@ local KITS = {
   [0x00] = { name = "TERRA",
     { tag = "fire", cmd = CMD.magic, mp = 4, want = "weak_fire",
       pick = function(slot) return magicCursor(slot, SPELL.fire) end },
+    { tag = "probe_fire", cmd = CMD.magic, mp = 4, want = "probe_elem",
+      pick = function(slot) return magicCursor(slot, SPELL.fire) end },
     { tag = "fight", cmd = CMD.fight },
     -- in magitek armor she has no Fight at all; the beam is the swing
     { tag = "tek", cmd = CMD.magitek },
@@ -434,6 +436,16 @@ local function entryOk(rec, entry, pol)
   if entry.mp and H.readWord(PMP + rec.slot*2) < entry.mp then return false end
   if entry.want == "weak_fire" then return pol.probe and anyRevealed(0x01) end
   if entry.want == "weak_poison" then return pol.probe and anyRevealed(0x20) end
+  if entry.want == "probe_elem" then
+    -- the OTHER half of a weakness rung, and the half a first draft
+    -- forgot: an elemental weakness is only REVEALED by hitting it, so a
+    -- kit that casts Fire "once fire is revealed" never casts Fire at
+    -- all. Measured: 6/6 world-pool fights with a fire-weak monster and
+    -- Terra never cast. So spend an early turn on the element while the
+    -- board is still unread -- bal_mines.lua's probe1 rotation, per
+    -- character.
+    return pol.probe and not anyRevealed(0xff) and rec.actions == 0
+  end
   if entry.want == "probe_turn" then
     -- a probe turn is a cheap information turn: take it only while
     -- nothing is revealed yet, and only on the opening turn (bp and the
@@ -807,6 +819,13 @@ local function report()
     tSum = tSum + c.taken
     wSum = wSum + c.bpWrites
   end
+  -- bp_action_skew reads a steady -1 on a won fight and that is
+  -- EXPECTED, not slack: the sampler's stop condition fires the frame the
+  -- last monster dies, which is before the killing action reaches
+  -- Ot6ActionEnd, so its bp write is never observed. Measured constant at
+  -- -1 across 6/6 world-pool battles regardless of action count (1 or 2)
+  -- and on battle2_doorstep. A skew that GROWS with actions would mean
+  -- the dequeue pairing is wrong; a steady -1 means it is right.
   mline("actions_sum", aSum)
   mline("actions_residual", S.playerActions - aSum)
   mline("bp_action_skew", wSum - aSum)
