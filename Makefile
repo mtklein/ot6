@@ -158,8 +158,8 @@ FRONTIER := arvis_wake narshe_streets moogle_doorstep moogle_cleared \
             kolts_cave vargas_doorstep vargas_won returner_hideout \
             banon_joined lete_river scenario_hub locke_scenario \
             rapids_start rapids_done terra_narshe terra_caves \
-            terra_clifftop terra_done \
-            sabin_world sabin_camp
+            terra_clifftop terra_done sabin_world sabin_camp \
+            cyan_defence camp_intro
 
 # mint <state> from <script> once its ROM-content gate says it is stale
 define mint
@@ -266,6 +266,14 @@ build/states/sabin_world.mss.lua: build/states/scenario_hub.mss.lua
 	$(call mint,sabin_world,gen_sabin_world)
 build/states/sabin_camp.mss.lua: build/states/sabin_world.mss.lua
 	$(call mint,sabin_camp,gen_sabin_world)
+# gen_sabin_camp: one step south of the camp gate hands the game to CYAN on
+# map 120 for ~9,000 frames (the Doma defence, name menu and all) before
+# SABIN gets it back.  cyan_defence is minted mid-run so an experiment on
+# the commander fight replays 800 frames instead of 6,000.
+build/states/cyan_defence.mss.lua: build/states/sabin_camp.mss.lua
+	$(call mint,cyan_defence,gen_sabin_camp)
+build/states/camp_intro.mss.lua: build/states/cyan_defence.mss.lua
+	$(call mint,camp_intro,gen_sabin_camp)
 
 frontier: rom $(STATE1) $(STATE2) $(STATE3) \
           $(patsubst %,build/states/%.mss.lua,$(FRONTIER))
