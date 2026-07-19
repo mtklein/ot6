@@ -20,7 +20,12 @@ verify:
 rom: verify
 	$(MAKE) -C ff6 ff6-en
 	@mkdir -p build
-	cp ff6/rom/ff6-en.sfc build/ot6.sfc
+	@# Copy only when the bytes actually differ. `rom` is PHONY, so its recipe
+	@# runs on every `make frontier` (which lists rom as a prerequisite); an
+	@# unconditional cp would rewrite build/ot6.sfc under the worker-isolated
+	@# mints that `make -jN frontier` now runs in parallel, and a mint's Mesen
+	@# reads that very file at boot. Same cmp-guard the state mints already use.
+	@cmp -s ff6/rom/ff6-en.sfc build/ot6.sfc || cp ff6/rom/ff6-en.sfc build/ot6.sfc
 
 # No distributable may be built from an untested ROM.  `test` stamps the
 # sha1 of the exact ROM the suite passed on; `tested` refuses unless the
@@ -163,10 +168,31 @@ FRONTIER := arvis_wake narshe_streets moogle_doorstep moogle_cleared \
             doma_defended sfigaro_town sfigaro_passage celes_freed \
             sfigaro_escape tunnelarmr_doorstep locke_done
 
-# mint <state> from <script> once its ROM-content gate says it is stale
+# mint <state> from <script> once its ROM-content gate says it is stale.
+#
+# Worker-isolated, so `make -jN frontier` can mint the mutually independent
+# story branches at once: everything up to scenario_hub is a serial trunk (each
+# link boots the previous doorstep), but FROM the hub the three scenarios --
+# locke_scenario, the rapids/terra_* chain and the sabin_* chain -- share no
+# state, and kolts_pool/kolts_cave hang off the doorstep in parallel with the
+# Vargas rung. A bare run.sh routes EVERYTHING through one default tree
+# (build/mesen-test-home, build/mesen-test-saves, build/states/_composed.lua,
+# one log), so two concurrent bare mints would race on the settings pin, the
+# composed script and the srm wipe. OT6_WORKER gives each its own tree; the id
+# is the STATE NAME, so distinct mints never collide and make hands out no ids.
+#
+# run.sh puts a worker's decoded artifacts under its own dir, so the mint lands
+# in build/test-workers/w<state>/artifacts/, not build/states/. Harvest it back
+# (state + sidecar) so the next link's compose.py finds it in build/states/
+# exactly as before. Determinism is unaffected: a savestate captures emulator
+# state, which the config-home path cannot touch, and pin_test_saves writes the
+# same determinism pins into every worker -- verified byte-identical to a serial
+# mint. `&&` so a failed mint skips the harvest and fails the recipe (.DELETE_ON_ERROR).
 define mint
 	@if [ build/states/.rom-copy -nt build/states/$(1).mss ] || [ ! -f build/states/$(1).mss ]; then \
-		tools/tests/run.sh tools/tests/$(2).lua; \
+		OT6_WORKER=$(1) tools/tests/run.sh tools/tests/$(2).lua && \
+		cp "build/test-workers/w$(1)/artifacts/$(1).mss" "build/states/$(1).mss" && \
+		cp "build/test-workers/w$(1)/artifacts/$(1).mss.lua" "build/states/$(1).mss.lua"; \
 	fi
 	@touch build/states/$(1).mss.lua
 endef
