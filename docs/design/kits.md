@@ -147,6 +147,11 @@ Consequences, all deliberate and all data-editable (the bands are a
   ladder cannot use (three points at L1 still buys Fang) is spent, not
   refunded — the deal a mage already takes on a third point on Fire.
 
+Note the Chip column above is finer-grained than what ships: the class
+table (`ot6_class.asm:185-192`) marks all eight slashing, per
+weapon-classes.md's "Cyan is a slashing specialist". Sky's and Dragon's
+"—" and Tempest's wind are unbuilt refinements, not a contradiction.
+
 Gate: `tools/tests/battle_bushido.lua`.
 
 - Passive candidates: *Vengeance* (+1 BP whenever any enemy Breaks),

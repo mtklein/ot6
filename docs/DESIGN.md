@@ -129,8 +129,7 @@ it keeps every spell list at 8 without losing the power curve, and it makes
 boosting mean something on every kit, not just attackers.
 
 **Cyan is the BP showcase.** The charge gauge — the most disliked mechanic in
-vanilla — is deleted. Bushido becomes a normal menu of 8 techniques priced in
-BP:
+vanilla — is deleted. The 8 techniques are priced in BP:
 
 | # | Tech | BP |
 |---|---|---|
@@ -142,6 +141,12 @@ BP:
 | 6 | Eclipse | 3 |
 | 7 | Tempest | 3 |
 | 8 | Oblivion | 3, usable only on a Broken enemy (divine) |
+
+Shipped (M3): there is no submenu. Boost *selects* the tech, the way it
+folds a mage's spell tier — the BP column above reads as a band, and
+vanilla's own count of techs known clamps each band to the best one Cyan
+has learned. Oblivion sits outside the ladder until divine gating exists.
+Mapping, consequences, and the reasoning: design/kits.md.
 
 Candidate passive: *Vengeance* — Cyan gains +1 BP whenever any enemy breaks.
 
