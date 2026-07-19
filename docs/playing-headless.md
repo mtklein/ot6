@@ -116,11 +116,14 @@ Harness API (`tools/tests/lib/ot6.lua`):
   type 2, event PC idle, no battle loading). Cheap RAM reads only.
 - `H.eventRunning()`, `H.dialogWaiting()` — the event-PC and dialog
   checks from the table above.
-- `H.canStep(x, y, dir)` — true passability for one step, from RAM (next
-  section).
+- `H.canStep(x, y, move)` — true passability for one step, from RAM (next
+  section). `move` is one of the eight: `up right down left` plus
+  `upright downright downleft upleft`.
+- `H.movePress(move)` — the button that executes a move (a diagonal is
+  pressed `left` or `right`; the tile decides which diagonal).
 - `H.bfsPath(tx, ty [, blockedEdges])` — BFS over `canStep` edges from
   the party's current tile (z-level tracked along each candidate path);
-  returns a list of direction strings or nil.
+  returns a list of move names or nil.
 - `H.navTo(tx, ty, opts)` — BFS-driven walker, below. Targets may be
   numbers or thunks (resolved each tick, for runtime-known coords).
 - `H.clearBattle(maxFrames, spare)` — win the current fight headlessly:
@@ -146,14 +149,17 @@ discovered. From the vendored disassembly (`src/field/map.asm`,
 
 | RAM | meaning |
 |---|---|
-| `$7F0000` | BG1 tilemap, `row*256 + col` (one tile-type byte per position) |
-| `$7E7600[tile]` | tile properties: bits 0/1 z-level, bit 2 bridge, `& 7 == 7` counter/wall |
+| `$7F0000` | BG1 tilemap, `row*256 + col` (one tile-type byte per position); coordinates wrap at `$86`/`$87`, the map's own size masks, **not** at 256 (`player.asm:1387-1412`) |
+| `$7E7600[tile]` | tile properties: bits 0/1 z-level, bit 2 bridge, `& 7 == 7` counter/wall, bits 6/7 diagonal movement |
 | `$7E7700[tile]` | directional exit bits: up `$08`, right `$01`, down `$04`, left `$02` |
 | `$7E2000[row*256+col]` | object map; bit 7 **set = free**, clear = an NPC/object stands there |
 
-`H.canStep` is an exact port of the engine's step check,
-`CheckPlayerMove` (`src/field/player.asm`). A step from `cur` toward a
-direction is allowed iff **all** of:
+`UpdatePlayerMovement` (`player.asm:325`) reads the d-pad and takes one
+of **two** branches, and `H.canStep` ports both.
+
+#### The cardinal branch (`player.asm:456` → `CheckPlayerMove`)
+
+A step from `cur` toward a direction is allowed iff **all** of:
 
 1. `$7700(cur)` has the direction's exit bit;
 2. `$7600(dst) & 7 ≠ 7` (counter/wall);
@@ -168,18 +174,60 @@ direction is allowed iff **all** of:
 
 Stepping off a non-bridge tile sets the party z-level from that tile's
 z bits, so `bfsPath` carries a z-level along each candidate path rather
-than assuming the live `$B2` stays valid. `probe_canstep.lua`
-validates the port against real movement (predict, press, compare —
-including a blocked press) and renders the model's view of the
-neighborhood as ASCII.
+than assuming the live `$B2` stays valid.
+
+#### The diagonal branch (`player.asm:379`)
+
+The engine tests the party's **own** tile before reading the d-pad
+(`player.asm:368-377`). If `$7600(cur) & $c0` is set — and it is not a
+bridge tile the party is standing on the lower z-level of — then a
+**left or right press moves the party diagonally**, one tile in each
+axis. Which diagonal is a property of the tile, not of the press:
+
+| `$7600(cur)` bit | right press | left press |
+|---|---|---|
+| bit 7 `$80` (`\` tiles) | down-right (dir `$06`) | up-left (dir `$08`) |
+| bit 6 `$40` (`/` tiles) | up-right (dir `$05`) | down-left (dir `$07`) |
+
+Bit 7 wins when both are set. The destination test is the whole of it:
+`$7600(dst)` must carry the **same** diagonal bit and must not be
+exactly `$f7`. This branch consults nothing else — not the exit bits,
+not the counter rule, not the z-level rules, not the object map — and
+never calls `CheckDoor`. `_c04f8d` (`player.asm:1286`) maps directions
+`$05`–`$08` to exactly those four neighbours, and `CalcObjMoveDir`
+(`obj.asm:5521`) drives both axes at the cardinal rate, so a diagonal
+step costs the same 16 frames as a straight one.
+
+Up and down presses are not handled by this branch at all
+(`player.asm:380`/`:405` test only the right/left bits) and fall through
+to the cardinal path — as does a left/right press whose diagonal
+destination is refused (`:396`, `:400`, `:417`, `:426` all jump into the
+cardinal code). So on a diagonal tile the diagonal is **tried first**,
+and the cardinal move of the same press happens only when the diagonal
+is refused. That is why `canStep(x, y, "right")` is *false* where the
+engine would turn a right press into a diagonal.
+
+Every staircase in Figaro Castle is built from these tiles. While the
+model knew only the cardinal branch they read as solid wall: map 55 fell
+into three regions BFS could not join, a DFS over the real door graph
+visited 14 rooms without reaching the castle ring, and `gen_edgar.lua`
+had to hand-hold four staircases with raw held presses. Those hand-holds
+are retired.
+
+`probe_canstep.lua` validates both branches against real movement
+(predict, press, compare) — the cardinal one at the mines boot area
+including a blocked press, the diagonal one by sweeping all four presses
+across each tile of the matron's staircase in Figaro and asserting the
+sweep produced a real diagonal, a real cardinal fallback and a real
+refusal. It renders the model's view of the neighborhood as ASCII.
 
 ### Executing a route: navTo
 
-Movement is **cardinal** (up=−Y, down=+Y, left=−X, right=+X, one tile
-per step); the engine reads *held* direction bits and processes a party
-action every 4 frames; a walk step is 16 frames (1px/frame) and always
-completes once started. A press turns *and* steps in the same action
-when the step is allowed; a blocked press just turns.
+A step is one tile per press (up=−Y, down=+Y, left=−X, right=+X), plus
+the four diagonals above; the engine reads *held* direction bits and
+processes a party action every 4 frames; a walk step is 16 frames
+(1px/frame) and always completes once started. A press turns *and* steps
+in the same action when the step is allowed; a blocked press just turns.
 
 `H.navTo(tx, ty, opts)` BFS-plans on `canStep` and executes one
 verified step at a time. Each iteration (only when user-controlled and

@@ -100,7 +100,7 @@ line reports its worker and wall time.
   intro -> Narshe streets -> mines -> BFS to (42,6); emits
   `build/states/whelk_doorstep.mss` (field, one tile short of the
   trigger) plus a positive-control `whelk_battle` screenshot.  Needs no
-  save file at all, so it works on a fresh clone; mint at frame 24333,
+  save file at all, so it works on a fresh clone; mint at frame 24479,
   byte-identical every run, ~74 s wall.  The mint waits 14 idle frames
   before saving: the doorstep's frame phase decides the fight's ATB
   roll, and some phases stage Bio Blast's poison icon ($64) into the
@@ -123,14 +123,24 @@ line reports its worker and wall time.
   set it, castle doors are walls until `CheckDoor` so every crossing is
   navTo-a-neighbour plus one hold, and the shop menu must be driven by
   state ($7E0026) not by timing.  It also documents the castle's
-  disconnected walking regions and the four diagonal staircases the
-  route hand-holds, and maps the beats it stops short of.
-- `probe_canstep.lua` - validates `H.canStep` (the CheckPlayerMove
-  port) against real movement at the boot area; renders the model's view
-  of the neighborhood as ASCII.  NB the port covers the engine's four
-  CARDINAL exits only: Figaro's staircases are diagonal-movement tiles
-  (`player.asm:378`, `$b8 & $c0`) and read as solid wall to `canStep` /
-  `bfsPath`, which is why parts of that castle look unreachable.
+  disconnected walking regions, the diagonal staircases that join them
+  (BFS plans those itself now - the four `pushUntil` hand-holds an
+  earlier pass needed are retired), why map 55's row y=43 must stay off
+  every route (it is a world-exit trigger, not a wall), and maps the
+  beats it stops short of.
+- `probe_canstep.lua` - validates `H.canStep` (the movement-model port)
+  against real movement, in two parts, one per engine branch.  Part 1,
+  CARDINAL (`CheckPlayerMove`): four directions x two rounds at the mines
+  boot area, plus a wall case; renders the model's view of the
+  neighborhood as ASCII.  Part 2, DIAGONAL (`player.asm:379`): boots
+  `figaro_matron.mss` and sweeps the matron's own staircase - all four
+  presses on each of its tiles, comparing the exact displacement the model
+  predicts against the exact displacement the engine produces.  A tile
+  whose prop byte has `$c0` set turns a left/right press into a diagonal
+  move, which is what every Figaro staircase is made of.  The part-2
+  assertions demand the sweep actually produced all three outcomes the
+  branch can have (a diagonal, a diagonal-refused-to-cardinal fallback,
+  and a refused press), so it cannot pass by exercising nothing.
 - `battle_banner.lua` - TEMPORAL gate for the banner screen-tear: exec
   callbacks at the battle NMI's entry / flush start / flush end / post-
   INIDISP sample `ppu.scanline` on EVERY frame through a Fire Beam cast
@@ -254,8 +264,11 @@ Plain functions (call from `H.call`/predicates):
   formation species words at $57C0 via `H.formationHas`, gated on
   `battleLoadStarted()`.)
 - Field navigation (`H.fieldX/Y`, `H.hasControl`, `H.tileAligned`,
-  `H.dialogWaiting`, `H.canStep`, `H.bfsPath`, `H.navTo`, `H.clearBattle`):
-  see `docs/playing-headless.md` for the RAM tables and the design.
+  `H.dialogWaiting`, `H.canStep`, `H.movePress`, `H.bfsPath`, `H.navTo`,
+  `H.clearBattle`): see `docs/playing-headless.md` for the RAM tables and
+  the design.  Moves are the four cardinals plus the four diagonals a
+  left/right press produces on a `$c0` tile; `H.movePress(move)` gives the
+  button that executes one.
 - World-map navigation (`H.worldMode`, `H.worldId`, `H.worldX/Y`,
   `H.worldAligned`, `H.worldPassable/worldCanStep`, `H.worldBfs`,
   `H.worldHasControl`, `H.worldNavTo`, and `H.route` -- the field/world

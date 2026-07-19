@@ -99,17 +99,19 @@
 --   on map 55 (29,7), which is an 11-tile roof platform, not the ring;
 --   55 (23,24) -> 59 (47,60) is a dead-end chamber.
 --
---   THE LINK IS A DIAGONAL STAIRCASE, and it is invisible to the model.
---   The library's passability port covers the engine's four CARDINAL
---   exits; it does not implement the diagonal branch (player.asm:378,
---   `lda $b8 / and #$c0 / bne` -- on a diagonal-movement tile ONE
---   direction press moves the party diagonally).  Every tile of such a
---   staircase therefore reads as solid wall to BFS.  Measured: on map 60
---   the party standing at (98,24) and simply HOLDING LEFT walks down the
---   stair through (97,25) and (96,26), takes that entrance, and comes out
---   on map 59 at (79,12) -- the east wing, whose door (80,18) opens onto
---   the ring at 55 (33,33).  So the route reaches the ring as
---     55 (33,24) -> 60 (103,29) -> [hold LEFT from (98,24)] -> 59 (81,11)
+--   THE LINK IS A DIAGONAL STAIRCASE.  Every Figaro staircase is built from
+--   tiles whose property byte has $c0 set, where a LEFT or RIGHT press moves
+--   the party diagonally (player.asm:379-453).  The library's passability
+--   port used to model only the four CARDINAL exits, so those tiles read as
+--   solid wall and half the castle was unreachable; the model now ports
+--   that branch too (lib/ot6.lua, "true passability model"), and BFS plans
+--   and verifies diagonal steps like any other -- validated tile by tile in
+--   probe_canstep part 2.  Measured: on map 60 the party standing at
+--   (98,24) and simply HOLDING LEFT walks down the stair through (97,25)
+--   and (96,26), takes that entrance, and comes out on map 59 at (79,12) --
+--   the east wing, whose door (80,18) opens onto the ring at 55 (33,33).
+--   So the ring is reachable as
+--     55 (33,24) -> 60 (103,29) -> [LEFT from (98,24)] -> 59 (81,11)
 --       -> (80,18) -> 55 (33,33) = ring
 --   and comes back the mirror way through 59 (82,10) -> 60 (97,25).
 --
@@ -119,20 +121,22 @@
 --                      (44,19)/(44,26);
 --     west  (x <= 24), via 59 (66,50): carries the matron doors
 --                      (12,19)/(12,26) and (23,31) -> 59 (66,49).
---   The castle block at x=24..32 separates them for y=31..42 and the one
---   row that joins them, y=43, is a map border the engine refuses to walk
---   (BFS plans straight along it; measured "edge ->left blocked in
---   reality" at both (28,43) and (32,43)).  So the matron needs the WEST
---   band, reached by the chamber staircase above, and the guest wing --
---   which the burning night needs -- takes the map-60 stair instead.
---
---   FOUR staircases are hand-held with pushUntil on this route: the
---   chamber -> west wing one, and three more inside the matron's own room
---   (its (67,27) arrival floods to FOUR tiles).  The durable fix is to
---   teach the passability model the engine's diagonal branch
---   (player.asm:378-455, tiles with $b8 & $c0, movement directions 5..8)
---   instead; that would also stop BFS routing along map borders, the other
---   way this walk failed.
+--   The castle block at x=24..32 separates them for y=31..42, and the one
+--   row that joins them, y=43, CANNOT BE WALKED ACROSS -- but not for the
+--   reason an earlier pass here recorded ("a map border the engine
+--   refuses").  Map 55 is 64x64 ($86/$87 = $3f/$3f, map_prop.dat record
+--   33*55+23 = $aa), so y=43 is nowhere near an edge, and every tile along
+--   it reads p1=$02 / p2=$8f -- ordinary floor, all four exits.  y=43 is
+--   map 55's WORLD-EXIT ROW: the long entrance (0,43) length 63 fires on
+--   arrival (entrance.asm CheckLongEntrance), and a walker that steps onto
+--   it is on the world map a second later.  Measured from figaro_doorstep:
+--   one DOWN press from (28,42) lands (28,43), and 84 frames later the
+--   party is outside the castle.  What the earlier pass logged as "edge
+--   (28,43)->left blocked in reality" was navTo holding a direction during
+--   that map load.  So: the matron needs the WEST band, reached by the
+--   chamber staircase above, and the guest wing -- which the burning night
+--   needs -- takes the map-60 stair instead.  BFS still does not know about
+--   entrance triggers; keep route legs off y=43.
 --
 -- WHAT REMAINS, for the pass that finishes the chapter.  Every beat is
 --   already decoded above; what is left is walking and cutscene-riding:
@@ -264,26 +268,6 @@ local function crossDoor(sx, sy, dm, dx, dy, what, fixed)
       H.assertEq(map(), dm, what .. ": landed on the right map")
       H.log(string.format("%s: DONE (%d,%d) frame=%d", what,
         H.fieldX(), H.fieldY(), H.frame))
-    end),
-  })
-end
-
--- Hold `dir` until pred(): the escape hatch for stretches the step model
--- cannot plan.  Figaro's staircases are DIAGONAL-movement tiles
--- (player.asm:378 branches on $b8 & $c0 and moves the party diagonally on
--- a single direction press), and the library's passability port models
--- only the four cardinal exits -- so BFS sees solid wall where the game
--- has a staircase, and half the castle reads unreachable.
-local function pushUntil(dir, pred, what, budget)
-  return seq({
-    H.driveUntil(pred, budget or 900, {
-      H.call(function() H.setPad({ [dir] = true }) end),
-    }, what),
-    H.release(),
-    H.waitFrames(20),
-    H.logStep(function()
-      return string.format("%s: at map=%d (%d,%d) f%d", what, map(),
-        H.fieldX(), H.fieldY(), H.frame)
     end),
   })
 end
@@ -556,35 +540,27 @@ H.run({ maxFrames = 120000 }, {
   -- the west wing.  The wing's door (66,50) is the ring's west band.
   -- (The EAST ring, reached the mirror way through map 60, carries the
   -- guest-wing doors instead; the castle block at x=24..32 keeps the two
-  -- bands apart and the row that joins them, y=43, is a map border the
-  -- engine refuses to walk.)
+  -- bands apart and the row that joins them, y=43, is map 55's world-exit
+  -- trigger row -- see the header.)
   -- ==================================================================== --
   crossDoor(102, 56, 59, 27, 15, "D7 throne room -> throne hall"),
   crossDoor(27, 29, 55, 28, 15, "D8 throne hall -> inner courtyard"),
   crossDoor(23, 24, 59, 47, 60, "D9 inner courtyard -> west chamber"),
-  H.navTo(48, 58, { maxFrames = 6000 }),
-  -- x>=68, not >=66: the stair's own landing tiles are still diagonal-only,
-  -- and stopping the hold on the first one leaves the party on a ledge
-  -- where a plain DOWN press does nothing (measured at (66,44)).  Ride the
-  -- hold to the wing's floor.
-  pushUntil("right", function() return map() == 59 and H.fieldX() >= 68 end,
-    "D10 west chamber -> west wing (diagonal stair)", 1200),
-  pushUntil("down", function() return map() == 59 and H.fieldY() >= 48 end,
-    "D11 down into the west wing"),
+  -- D10 is the chamber's diagonal staircase, and with the model reading
+  -- the engine's diagonal branch it is an ordinary door crossing: BFS
+  -- walks (48,58)->(49,59) itself.  The staging tile is named explicitly
+  -- because the entrance tile (50,60) is reached DIAGONALLY and
+  -- crossDoor's automatic search only tries the four cardinal neighbours.
+  crossDoor(50, 60, 59, 65, 43, "D10 west chamber -> west wing",
+    { 49, 59, "right" }),
   crossDoor(66, 50, 55, 23, 33, "D12 west wing -> WEST RING"),
   crossDoor(12, 26, 57, 67, 27, "D13 west ring -> matron's room"),
   H.call(function() where("matron's room") end),
 
-  -- and one more stair INSIDE her room: the (67,27) arrival floods to
-  -- FOUR tiles.  Up onto the landing, west along the diagonal to (60,24),
-  -- up to her floor, and only then can BFS see her.
-  pushUntil("up", function() return map() == 57 and H.fieldY() <= 26 end,
-    "D14 matron's room: onto the landing"),
-  pushUntil("left", function() return map() == 57 and H.fieldX() <= 60 end,
-    "D15 matron's room: west along the stair"),
-  pushUntil("up", function() return map() == 57 and H.fieldY() <= 21 end,
-    "D16 matron's room: up to her floor"),
-
+  -- Her room's own staircase (the "\" tiles (66,26)/(65,25)/(64,24)) needed
+  -- three more hand-holds before the fix -- the (67,27) arrival flooded to
+  -- FOUR tiles.  talkTo's own navTo crosses it now: BFS finds an 11-step
+  -- plan from (67,27) to her doorstep, two of them diagonal (probe_canstep).
   talkTo(17, "MATRON", 9000),
   commitName("sabin_naming"),
   H.advanceStory(calm(30, function()

@@ -605,10 +605,12 @@ local runnerStarted = false
 -- disassembly: party tile x/y $1fc0/$1fc1 (src/field/player.asm
 -- InitPlayerPos), map index $1f64 (battle.asm), player-control gate
 -- $1eb9 bit7 + map-load $84 + menu-opening $59 (player.asm
--- UpdatePlayerMovement).  Movement is CARDINAL and grid-oriented:
--- up=-Y down=+Y left=-X right=+X, one tile per step; passability is
--- computed from RAM with an exact port of the engine's CheckPlayerMove
--- (player.asm), so routes are found by BFS, not discovered by playing.
+-- UpdatePlayerMovement).  Movement is grid-oriented, one tile per step:
+-- up=-Y down=+Y left=-X right=+X, PLUS the four diagonals a left/right
+-- press produces on a diagonal-movement tile (every Figaro staircase).
+-- Passability is computed from RAM by porting both of the engine's
+-- movement branches (see "true passability model" below), so routes are
+-- found by BFS, not discovered by playing.
 
 -- The active party's object record: $0803 holds the BYTE OFFSET of the
 -- party leader's object block (`ldy $0803; lda $086a,y` -- player.asm,
@@ -729,38 +731,118 @@ function M.clearBattle(maxFrames, spare)
 end
 
 -- ----------------------------------------------- true passability model --
--- Exact port of the engine's own step check, CheckPlayerMove
--- (src/field/player.asm @4e16).  Tile id at (x,y) = the BG1 tilemap byte
--- $7f0000[y*256+x]; its properties are p1 = $7e7600[id], p2 = $7e7700[id].
--- A step from cur=(x,y) toward dir is allowed iff ALL of:
+-- Port of the engine's own step check.  UpdatePlayerMovement
+-- (src/field/player.asm:325) reads the d-pad and takes ONE of two branches;
+-- both are modelled here, because Figaro Castle is built out of the second.
+--
+-- Tile id at (x,y) = the BG1 tilemap byte $7f0000[y*256+x]; its properties
+-- are p1 = $7e7600[id] (the prop byte the engine keeps for the party's own
+-- tile in $b8) and p2 = $7e7700[id] (directional exits, in $b9).
+--
+-- CARDINAL branch (@4978, player.asm:456-507 -> CheckPlayerMove @4e16,
+-- player.asm:1072).  A step from cur=(x,y) toward dir is allowed iff ALL of:
 --   1. p2(cur) has the direction's exit bit (up=$08 right=$01 down=$04
---      left=$02 -- player.asm DirectionBitTbl);
+--      left=$02 -- player.asm DirectionBitTbl:1210);
 --   2. p1(dst)&7 ~= 7 (counter/wall tile);
 --   3. the bridge/z-level rules pass (below, transcribed branch for
 --      branch; party z-level = $b2 low bits, bit0 upper / bit1 lower);
 --   4. no object occupies dst: $7e2000[dstY*256+dstX] bit7 SET means free
 --      (the engine allows crossing UNDER an occupied bridge tile; we skip
 --      that special case -- conservative, and movement-verify covers it).
+--
+-- DIAGONAL branch (@48d4, player.asm:379-453).  UpdatePlayerMovement tests
+-- the party's OWN tile first (player.asm:368-377): if p1(cur) & $c0 is set
+-- -- and it is not a bridge tile the party is standing on the lower z-level
+-- of -- a LEFT or RIGHT press moves the party DIAGONALLY instead, one tile
+-- in each axis.  Which diagonal is a property of the tile, not the press:
+--   p1 bit7 ($80), "\" tiles:  right -> down-right (dir $06, :403)
+--                              left  -> up-left    (dir $08, :420)
+--   p1 bit6 ($40), "/" tiles:  right -> up-right   (dir $05, :394)
+--                              left  -> down-left  (dir $07, :429)
+-- bit7 wins when both are set (:385 `bmi`, :410 `bpl`).  The destination
+-- tests are the whole of it: p1(dst) must carry the SAME diagonal bit and
+-- must not be exactly $f7 (:389-393, :399-402, :416-419, :424-428).  The
+-- branch consults NOTHING else -- not p2's exit bits, not the counter rule,
+-- not the z-level rules, not the object map (it never touches $7e2000 and
+-- never calls GetObjMapAdjacent), and it never calls CheckDoor.  The
+-- movement direction it stores in $087e is 5..8, and _c04f8d (player.asm
+-- :1286) maps those to exactly the four diagonal neighbours; CalcObjMoveDir
+-- (obj.asm:5521) then drives both axes at the cardinal rate, so a diagonal
+-- step is one tile in x AND one in y (ObjMoveRateH/V rows for dir 5..8).
+-- UP and DOWN presses are not handled by this branch at all (:380/:405 test
+-- only $07 bit0/bit1) and fall through to the cardinal path, as does a
+-- left/right press whose diagonal destination fails (:396, :400, :417, :426
+-- all jump into @4978).  So on a diagonal tile the diagonal is TRIED FIRST
+-- and the cardinal move of the same press only happens when it is refused:
+-- that is why stepAllowed says "no" to a cardinal left/right that the
+-- engine would turn into a diagonal.
+--
+-- The four cardinal names double as press names; the four diagonal names
+-- are moves the model plans and verifies but never presses directly.
+-- DIRS/DIRIDX stay CARDINAL: they are the world map's move set too, and the
+-- overworld module (ff6/src/world/) has no diagonal branch at all -- its
+-- GetPlayerInput tests one passability bit per cardinal direction
+-- (move.asm @1ead..@1ff3).  Only the field walks diagonals.
 local DIRS   = { "up", "right", "down", "left" }
 local DIRIDX = { up = 0, right = 1, down = 2, left = 3 }
 local DIRBIT = { up = 0x08, right = 0x01, down = 0x04, left = 0x02 }
 local DELTA  = { up = { 0, -1 }, right = { 1, 0 },
-                 down = { 0, 1 }, left = { -1, 0 } }
+                 down = { 0, 1 }, left = { -1, 0 },
+                 upright = { 1, -1 }, downright = { 1, 1 },
+                 downleft = { -1, 1 }, upleft = { -1, -1 } }
+-- the FIELD's move set: the four presses plus the four diagonals they can
+-- turn into.  PRESS is the button a move is executed with.
+local MOVES  = { "up", "right", "down", "left",
+                 "upright", "downright", "downleft", "upleft" }
+local MOVEIDX = { up = 0, right = 1, down = 2, left = 3,
+                  upright = 4, downright = 5, downleft = 6, upleft = 7 }
+local PRESS  = { up = "up", right = "right", down = "down", left = "left",
+                 upright = "right", downright = "right",
+                 downleft = "left", upleft = "left" }
 
--- BG1 tilemap byte for a tile (the map wraps at 256 in both axes)
+-- BG1 tilemap byte for a tile.  The tilemap's row stride is 256 ($7f0000 +
+-- row*256 + col: UpdateLocalTiles builds its row pointers as {lo=0,hi=row},
+-- player.asm:1385-1399), but the COORDINATES wrap at the map's own size
+-- masks $86/$87, not at 256 (`and $86` / `and $87`, player.asm:1387-1412).
+-- Those come from InitScrollClip via ScrollClipTbl = $0f/$1f/$3f/$7f
+-- (scroll.asm:298-320, table at :244), so they are never zero and no
+-- guard is needed; Figaro's exterior map 55 is $3f/$3f, its interiors
+-- $7f/$3f (map_prop.dat record 33*map + 23).
 function M.maptile(x, y)
-  return M.readByte(0x7F0000 + (y & 0xFF) * 256 + (x & 0xFF))
+  local xm, ym = M.readByte(0x0086), M.readByte(0x0087)
+  return M.readByte(0x7F0000 + (y & ym) * 256 + (x & xm))
+end
+
+-- The diagonal move a `press` produces standing on the tile whose prop byte
+-- is `c` at party z-level `z`, or nil if this press moves cardinally here.
+-- Transcribed from player.asm:368-429 (see the branch table above).
+local function diagStep(x, y, c, press, z)
+  if press ~= "left" and press ~= "right" then return nil end  -- :380/:405
+  if (c & 0xC0) == 0 then return nil end                       -- :374-376
+  if (c & 0x04) ~= 0 and z == 0x02 then return nil end         -- :368-373
+  local bit = (c & 0x80) ~= 0 and 0x80 or 0x40                 -- :385/:410
+  local mv
+  if bit == 0x80 then mv = press == "right" and "downright" or "upleft"
+  else                mv = press == "right" and "upright"   or "downleft" end
+  local d = DELTA[mv]
+  local t = M.readByte(0x7E7600 + M.maptile(x + d[1], y + d[2]))
+  if t == 0xF7 or (t & bit) == 0 then return nil end           -- :389-:428
+  return mv
 end
 
 -- the step check, parameterized on the party z-level so the pathfinder can
 -- track z along a hypothetical path instead of assuming it constant
-local function stepAllowed(x, y, dir, z)
-  local d = DELTA[dir]
-  local nx, ny = x + d[1], y + d[2]
+local function stepAllowed(x, y, move, z)
   local c = M.readByte(0x7E7600 + M.maptile(x, y))     -- p1(cur)
+  local press = PRESS[move]
+  local diag = diagStep(x, y, c, press, z)
+  if move ~= press then return move == diag end  -- asked about a diagonal
+  if diag then return false end     -- this press moves diagonally, not here
+  local d = DELTA[move]
+  local nx, ny = x + d[1], y + d[2]
   local e = M.readByte(0x7E7700 + M.maptile(x, y))     -- p2(cur), exit bits
   local t = M.readByte(0x7E7600 + M.maptile(nx, ny))   -- p1(dst)
-  if (e & 0x0F & DIRBIT[dir]) == 0 then return false end -- no exit that way
+  if (e & 0x0F & DIRBIT[move]) == 0 then return false end -- no exit that way
   if (t & 0x07) == 0x07 then return false end            -- counter/wall
   if (c & 0x04) ~= 0 then                 -- cur is a bridge tile:
     if (z & 0x01) ~= 0 then               --   party upper: dst must not be
@@ -781,28 +863,37 @@ local function stepAllowed(x, y, dir, z)
   return true
 end
 
--- can the party step from tile (x,y) toward dir RIGHT NOW (live z-level)?
-function M.canStep(x, y, dir)
-  return stepAllowed(x, y, dir, M.readByte(0x00b2) & 0x03)
+-- can the party make `move` from tile (x,y) RIGHT NOW (live z-level)?
+-- `move` is any of MOVES: the four presses, or one of the four diagonals
+-- (true only where the engine would turn that press into that diagonal).
+function M.canStep(x, y, move)
+  return stepAllowed(x, y, move, M.readByte(0x00b2) & 0x03)
 end
 
+-- the button that executes `move` (diagonals are pressed left/right)
+function M.movePress(move) return PRESS[move] end
+
 -- party z-level after stepping OFF (x,y): kept on a bridge/both tile,
--- otherwise taken from the tile being left (player.asm @4eef)
+-- otherwise taken from the tile being left (player.asm @4eef, :1196-1201).
+-- The diagonal branch spells the same rule out longhand -- keep z if the
+-- tile is a bridge ($04) or is both-z-levels ($03), else take $b8&3
+-- (player.asm:432-439) -- so one function serves both branches.
 local function zAfter(x, y, z)
   local c = M.readByte(0x7E7600 + M.maptile(x, y))
   if (c & 0x07) >= 0x03 then return z end
   return c & 0x03
 end
 
-local function edgeKey(x, y, dir)
-  return ((y & 0xFF) * 256 + (x & 0xFF)) * 4 + DIRIDX[dir]
+local function edgeKey(x, y, move)
+  return ((y & 0xFF) * 256 + (x & 0xFF)) * 8 + MOVEIDX[move]
 end
 
 -- BFS a path from the party's CURRENT tile to (tx,ty) over stepAllowed
 -- edges, tracking the z-level a walker would carry along each candidate
 -- path (nodes are (x,y,z) triples).  `blockedEdges` (optional, keys from
 -- edgeKey) prunes edges the executor has PROVEN wrong empirically.
--- Returns a list of direction strings, or nil (unreachable / >4096 nodes).
+-- Returns a list of MOVES names (four cardinals plus the four diagonals a
+-- press turns into on a diagonal tile), or nil (unreachable / >4096 nodes).
 function M.bfsPath(tx, ty, blockedEdges)
   blockedEdges = blockedEdges or {}
   local sx, sy = M.fieldX(), M.fieldY()
@@ -824,7 +915,7 @@ function M.bfsPath(tx, ty, blockedEdges)
     end
     if qi > 4096 then return nil end      -- sane radius: give up, not hang
     local zn = zAfter(x, y, z)
-    for _, dir in ipairs(DIRS) do
+    for _, dir in ipairs(MOVES) do
       if not blockedEdges[edgeKey(x, y, dir)] and stepAllowed(x, y, dir, z) then
         local d = DELTA[dir]
         local k = nkey(x + d[1], y + d[2], zn)
@@ -969,7 +1060,7 @@ function M.navTo(txIn, tyIn, opts)
           M.setPad({})
           return
         end
-        M.setPad({ [pend.dir] = true })
+        M.setPad({ [PRESS[pend.dir]] = true })
         return
       end
       -- 5. between steps: position samples are only valid at rest on a tile
@@ -981,11 +1072,18 @@ function M.navTo(txIn, tyIn, opts)
         if x == pend.tx and y == pend.ty then
           pend = nil                   -- clean step, plan still on track
         else
+          -- Landed off-plan.  A slide FURTHER along the same move (the
+          -- engine can carry more than one tile) leaves the edge itself
+          -- proven good; anything else condemns it.  Tested as "the
+          -- displacement is a positive whole multiple of the move's
+          -- delta", which holds for the diagonals too -- the old
+          -- along/perp pair assumed a cardinal unit vector and would have
+          -- condemned every correct diagonal step (delta (1,-1) scores
+          -- along 2, perp -2).
           local d = DELTA[pend.dir]
-          local along = (x - pend.x) * d[1] + (y - pend.y) * d[2]
-          local perp  = (x - pend.x) * d[2] + (y - pend.y) * d[1]
-          if perp ~= 0 or along < 1 then
-            -- landed somewhere the pressed direction can't explain
+          local dx, dy = x - pend.x, y - pend.y
+          local k = math.max(math.abs(dx), math.abs(dy))
+          if not (k > 0 and dx == d[1] * k and dy == d[2] * k) then
             NAV.blocked[edgeKey(pend.x, pend.y, pend.dir)] = true
             NAV.nblocked = NAV.nblocked + 1
           end                          -- (same-direction slide: edge was fine)
@@ -1028,7 +1126,7 @@ function M.navTo(txIn, tyIn, opts)
       local d = DELTA[dir]
       pend = { x = x, y = y, dir = dir, tx = x + d[1], ty = y + d[2],
                held = 0, holding = true }
-      M.setPad({ [dir] = true })
+      M.setPad({ [PRESS[dir]] = true })   -- a diagonal is pressed left/right
     end),
   }, "navTo")
 end
