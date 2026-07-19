@@ -167,7 +167,7 @@ local KITS = {
   [0x00] = { name = "TERRA",
     { tag = "fire", cmd = CMD.magic, mp = 4, want = "weak_fire",
       pick = function(slot) return magicCursor(slot, SPELL.fire) end },
-    { tag = "probe_fire", cmd = CMD.magic, mp = 4, want = "probe_elem",
+    { tag = "probe_fire", cmd = CMD.magic, mp = 4, want = "probe_turn",
       pick = function(slot) return magicCursor(slot, SPELL.fire) end },
     { tag = "fight", cmd = CMD.fight },
     { tag = "tek", cmd = CMD.magitek },
@@ -264,17 +264,12 @@ local function entryOk(rec, entry, pol)
   if entry.mp and H.readWord(PMP + rec.slot*2) < entry.mp then return false end
   if entry.want == "weak_fire" then return pol.probe and anyRevealed(0x01) end
   if entry.want == "weak_poison" then return pol.probe and anyRevealed(0x20) end
-  if entry.want == "probe_elem" then
-    -- the OTHER half of a weakness rung, and the half a first draft
-    -- forgot: an elemental weakness is only REVEALED by hitting it, so a
-    -- kit that casts Fire "once fire is revealed" never casts Fire at
-    -- all. Measured: 6/6 world-pool fights with a fire-weak monster and
-    -- Terra never cast. So spend an early turn on the element while the
-    -- board is still unread -- bal_mines.lua's probe1 rotation, per
-    -- character.
-    return pol.probe and not anyRevealed(0xff) and rec.actions == 0
-  end
   if entry.want == "probe_turn" then
+    -- this actor's opening information turn, taken only while the board
+    -- is unread. Covers Locke's Steal and Terra's Fire alike -- an
+    -- element is only REVEALED by hitting it, so an exploit rung alone
+    -- can never fire. One probe per actor, then stop. (Full rationale in
+    -- metrics_battle.lua.)
     return pol.probe and not anyRevealed(0xff) and rec.actions == 0
   end
   return true
