@@ -7,7 +7,7 @@ VERSION := 0.1
 # A failed recipe (e.g. the checksum step dying mid-build) leaves a half-built target the next make treats as up-to-date — bit us twice on 2026-07-18.
 .DELETE_ON_ERROR:
 
-.PHONY: all rom patch run test verify clean goldens-capture release frontier frontier-test
+.PHONY: all rom patch run test tested verify clean goldens-capture release frontier frontier-test
 
 all: rom
 
@@ -22,8 +22,28 @@ rom: verify
 	@mkdir -p build
 	cp ff6/rom/ff6-en.sfc build/ot6.sfc
 
+# No distributable may be built from an untested ROM.  `test` stamps the
+# sha1 of the exact ROM the suite passed on; `tested` refuses unless the
+# ROM on disk is still that one.  This is structural on purpose: a human
+# (or an agent) reading "green" off a scrolled-past terminal, or piping
+# the suite through `tail` so the shell reports tail's exit status, is
+# how v0.2 got tagged without anyone actually knowing the gate was green.
+# Nothing here is allowed to depend on remembering to look.
+STAMP := build/.suite-pass
+
+tested: rom
+	@test -f $(STAMP) || { \
+		echo "ERROR: no suite has passed on this tree — run 'make test'"; exit 1; }
+	@have=`shasum -a 1 build/ot6.sfc | cut -d' ' -f1`; \
+	 want=`cat $(STAMP)`; \
+	 [ "$$have" = "$$want" ] || { \
+		echo "ERROR: build/ot6.sfc ($$have) is not the ROM the suite passed on"; \
+		echo "       ($$want) — run 'make test' before building a distributable"; \
+		exit 1; }
+	@echo "suite verified green for this exact ROM"
+
 # patch basename must differ from the ROM's, or Mesen auto-applies it on load
-patch: rom
+patch: tested
 	@mkdir -p build/dist
 	$(FLIPS) --create --bps "$(BASE)" build/ot6.sfc build/dist/ot6-from-ff3us10.bps
 	@ls -la build/dist/ot6-from-ff3us10.bps
@@ -31,7 +51,7 @@ patch: rom
 # release: build the ROM, run the full gate, then emit the distribution
 # patch plus release notes from docs/release-notes-template.md (X.Y in
 # the template becomes $(VERSION); override with `make release VERSION=0.2`).
-release: test
+release: test tested
 	@mkdir -p build/release
 	$(FLIPS) --create --bps "$(BASE)" build/ot6.sfc "build/release/ot6-v$(VERSION).bps"
 	sed 's/X\.Y/$(VERSION)/g' docs/release-notes-template.md > build/release/RELEASE_NOTES.md
@@ -93,7 +113,10 @@ $(STATE3): $(STATE2)
 # wrong ROM's savestates rather than failing.
 test: rom $(STATE1) $(STATE2) $(STATE3)
 	python3 tools/tests/lib/compose.py --selftest
+	@rm -f $(STAMP)
 	tools/tests/suite.sh
+	@shasum -a 1 build/ot6.sfc | cut -d' ' -f1 > $(STAMP)
+	@echo "suite green — stamped `cat $(STAMP)`"
 
 # ---------------------------------------------------------------- frontier --
 # The story chain past the whelk, as gated state rules.  `test` deliberately
