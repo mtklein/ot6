@@ -121,10 +121,13 @@ test: rom $(STATE1) $(STATE2) $(STATE3)
 #                   -> gen_vargas         -> vargas_won
 #                   -> gen_returner       -> returner_hideout
 #                   -> gen_banon          -> banon_joined
+#                   -> gen_lete           -> lete_river
+#                   -> gen_scenario       -> scenario_hub
 FRONTIER := arvis_wake narshe_streets moogle_doorstep moogle_cleared \
             worldmap_narshe figaro_doorstep figaro_intro figaro_matron \
-            figaro_cleared south_figaro kolts_doorstep kolts_pool \
-            vargas_doorstep vargas_won returner_hideout banon_joined
+            figaro_cleared south_figaro kolts_doorstep kolts_pool vargas_doorstep \
+            vargas_won returner_hideout banon_joined \
+            lete_river scenario_hub
 
 # mint <state> from <script> once its ROM-content gate says it is stale
 define mint
@@ -176,6 +179,14 @@ build/states/returner_hideout.mss.lua: build/states/vargas_won.mss.lua
 # gen_banon: the hideout's conversation graph, ending on the raft's doorstep
 build/states/banon_joined.mss.lua: build/states/returner_hideout.mss.lua
 	$(call mint,banon_joined,gen_banon)
+# gen_lete: the short walk to the raft -- kept its own link so that a failed
+# experiment on the river replays 530 frames, not the whole hideout
+build/states/lete_river.mss.lua: build/states/banon_joined.mss.lua
+	$(call mint,lete_river,gen_lete)
+# gen_scenario: the river (steered past its vanilla loop), ULTROS, and the
+# three-way split -- the entry point of the v0.3 arc
+build/states/scenario_hub.mss.lua: build/states/lete_river.mss.lua
+	$(call mint,scenario_hub,gen_scenario)
 
 frontier: rom $(STATE1) $(STATE2) $(STATE3) \
           $(patsubst %,build/states/%.mss.lua,$(FRONTIER))

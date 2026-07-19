@@ -93,11 +93,19 @@
 -- (25,23) trigger is _cb002b (:37880), the scrap-of-paper gag, and it opens
 -- a CHOICE PROMPT this script never reasoned about.  It sits 5 steps from
 -- the escort's endpoint and the walks to SABIN pass near it, so pinning
--- every plan off it would be brittle.  It is provably inert instead: it
--- opens `if_any switch $01B4=0 / switch $01B2=0 -> EventReturn` and $01B2
--- reads 0 here (measured).  Rather than trust that, the mint asserts $016B
--- -- the flag _cb002b sets the instant it fires -- is still clear, which
--- catches it by outcome no matter which tile the navigator chose.
+-- every plan off it would be brittle.  It cannot fire on a walk-past,
+-- though, and the reason is worth writing down because the same fact runs
+-- the whole Lete River (see gen_scenario.lua's header): _cb002b opens
+-- `if_any switch $01B4=0 / switch $01B2=0 -> EventReturn`, and $01B0-$01B7
+-- ARE NOT STORY SWITCHES.  Switch N lives at bit N&7 of $1E80+(N>>3), so
+-- those eight alias the byte $1EB6 -- the field engine's control-flags byte,
+-- rewritten every frame by UpdateCtrlFlags (field/event.asm:5415-5432) with
+-- bits 0-3 = the party's facing direction one-hot and bit4 = "A is held".
+-- So the gag's real condition is "A pressed while facing DOWN": it is an
+-- EXAMINE, not a step trigger, and walking over the tile does nothing.
+-- Rather than trust even that, the mint asserts $016B -- the flag _cb002b
+-- sets the instant it fires -- is still clear, which catches it by outcome
+-- no matter which tile the navigator chose.
 local H = dofile("/Users/mtklein/ot6/tools/tests/lib/ot6.lua")
 local DOOR = "/Users/mtklein/ot6/build/states/returner_hideout.mss.lua"
 
