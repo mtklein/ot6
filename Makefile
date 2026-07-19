@@ -159,7 +159,8 @@ FRONTIER := arvis_wake narshe_streets moogle_doorstep moogle_cleared \
             banon_joined lete_river scenario_hub locke_scenario \
             rapids_start rapids_done terra_narshe terra_caves \
             terra_clifftop terra_done sabin_world sabin_camp \
-            cyan_defence camp_intro kefka_done camp_cleared
+            cyan_defence camp_intro kefka_done camp_cleared \
+            doma_defended
 
 # mint <state> from <script> once its ROM-content gate says it is stale
 define mint
@@ -282,6 +283,11 @@ build/states/kefka_done.mss.lua: build/states/camp_intro.mss.lua
 # family scene, and the handoff back to SABIN at the castle gate.
 build/states/camp_cleared.mss.lua: build/states/kefka_done.mss.lua
 	$(call mint,camp_cleared,gen_sabin_doma)
+# gen_sabin_escape: the Doma courtyard defence -- three talk-to-CYAN fights,
+# CYAN joins, everyone mounts Magitek.  Stops at (14,30), the escape's
+# starting line (the escape walk itself is the next leg).
+build/states/doma_defended.mss.lua: build/states/camp_cleared.mss.lua
+	$(call mint,doma_defended,gen_sabin_escape)
 
 frontier: rom $(STATE1) $(STATE2) $(STATE3) \
           $(patsubst %,build/states/%.mss.lua,$(FRONTIER))
