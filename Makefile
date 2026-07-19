@@ -160,7 +160,7 @@ FRONTIER := arvis_wake narshe_streets moogle_doorstep moogle_cleared \
             rapids_start rapids_done terra_narshe terra_caves \
             terra_clifftop terra_done sabin_world sabin_camp \
             cyan_defence camp_intro kefka_done camp_cleared \
-            doma_defended sfigaro_town sfigaro_passage
+            doma_defended sfigaro_town sfigaro_passage celes_freed
 
 # mint <state> from <script> once its ROM-content gate says it is stale
 define mint
@@ -298,6 +298,11 @@ build/states/sfigaro_town.mss.lua: build/states/locke_scenario.mss.lua
 	$(call mint,sfigaro_town,gen_sfigaro)
 build/states/sfigaro_passage.mss.lua: build/states/sfigaro_town.mss.lua
 	$(call mint,sfigaro_passage,gen_sfigaro)
+# gen_celes: the passage, the rich man's mansion (a warp maze, entered by a
+# deep door), the basement, the Celes chains cutscene + naming menu, freeing
+# her, and the sleeping soldier's clock key
+build/states/celes_freed.mss.lua: build/states/sfigaro_passage.mss.lua
+	$(call mint,celes_freed,gen_celes)
 
 frontier: rom $(STATE1) $(STATE2) $(STATE3) \
           $(patsubst %,build/states/%.mss.lua,$(FRONTIER))
