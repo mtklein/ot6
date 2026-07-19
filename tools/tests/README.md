@@ -146,6 +146,24 @@ line reports its worker and wall time.
   screenshot burst across the banner window.
 - `probe_57b9.lua` - write-watcher over $7E57B9-BF (OT6_FONTDIRTY's
   relocated home) with $7E57D5 as positive control; logs writer PCs.
+- `battle_bushido.lua` - gate for BP-Bushido: boost points pick Cyan's
+  tech and vanilla's charge gauge is gone.  Cyan is not recruitable
+  until v0.3, so he is INSTALLED into the opening guard fight the way
+  the balance labs pin state -- CHAR::CYAN into $3ED8, a Bushido-only
+  command list at $202E (stride 12), the weapon SWDTECH flag in
+  $3BA4/$3BA5 (without it UpdateCmd_02 greys the command out), and a
+  pinned $2020 standing in for his level.  Asserts the clock is dead
+  (150 settled in-window frames, one bar value -- vanilla stepped every
+  4 frames), the whole tier ladder including its learn-clamped rows,
+  that Oblivion stays out of reach, the 3-BP spend cap, and that the
+  chosen tech resolves: Flurry's $58 reaches $3410, chips a
+  slashing-weak guard, reveals the slash class, and consumes the boost
+  with no regen.
+- `probe_bushido.lua` - the measurement instrument behind it: logs the
+  menu state, w7e7b82, pending boost and $3410 across the same install,
+  and answers the questions the source alone does not (does one A press
+  reach menu state $37, does L/R still move the boost inside that
+  window, what does the bar actually do per frame).
 - `battle_whelkwipe.lua` - gate for the monster entry/exit wipe: the
   whelk retract cycle (FADE_DOWN/FADE_UP) sweeps the battle-field BG3
   region with a per-scanline scroll wave, so the field map must hold
