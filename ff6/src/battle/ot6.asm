@@ -1692,6 +1692,7 @@ Ot6FontIcons:
         lda     #$00
         sta     f:$7e0000+OT6_RANDPEND
         sta     f:$7e0000+OT6_HUDVEIL   ; a stale veil never survives init
+        sta     f:$7e0000+OT6_ANIMTICK  ; nor a stuck anchor-adopt gate
         lda     #$01
         sta     $3e9c           ; characters open with 1 bp, octopath-style
         sta     $3e9e
@@ -2340,12 +2341,52 @@ done:   plp
 ; write $5755-$576a. The original trace ran a Fight-only fixture, where
 ; no command list ever opens, so it never saw them. Reproduced in
 ; tools/tests/probe_shadow_overlap.lua: DrawItemListText ran and bank C1
-; wrote $5762-$5767, leaving the anchor at $00FF; the latch below then
-; drove every NMI flush from $00FF for the rest of the battle. The
-; magitek list drawer alone does NOT reproduce it (it stops at $5761),
-; which is why a magitek-only fixture reads as an all-clear.
+; wrote $5762-$5767, leaving the anchor at $00FF; the anchor latch that
+; lived at Ot6BgHudLine's @done then drove every NMI flush from $00FF
+; for the rest of the battle. The magitek list drawer alone does NOT
+; reproduce it (it stops at $5761), which is why a magitek-only fixture
+; reads as an all-clear. (The latch has since become recompute-and-
+; compare -- see @done -- so an equivalent anchor stomp today would
+; self-heal on the next main-loop tick. The relocation stays load-
+; bearing all the same: an overlap corrupts continuously in both
+; directions, and OT6 writing vanilla's live buffer was the worse half.)
 OT6_SHADOW  := $ecf1            ; lines, stride 14
 OT6_MAPBASE := $57b6            ; word scratch: field bg3 map base
+
+; [ frame-tick provenance: who ticked this frame? ]
+
+; battle frames advance through exactly two procs, both of which reach the
+; hud builder via `jsr UpdateCharText`: BtlGfx_01 (btlgfx_main @01fb,
+; "called from main battle loop, and 4 times after each attack animation")
+; and WaitFrame (@022a, "used during animations").  every coordinate
+; transient the animation engine imposes on the monster position arrays --
+; magic_init_131long zeroing/setting the $8057 priority shifts and
+; displacing $80cf by -$0100 (btlgfx_main.asm:39277-39297), AnimCmd_80_82's
+; all-slot x shove (:29906), AnimCmd_e2/e3's per-frame y animation
+; (:33206-33279), the PushObjPos/PopObjPos block-hop family (:28045/:28081)
+; -- lives on WaitFrame-ticked frames and is unwound by its own script
+; before BtlGfx_01 ticks resume: PopObjPos restores what PushObjPos saved,
+; $80/$84 restores $80/$83's y displacement, $e3 restores from w7e64e8.
+; (a script that ended WITHOUT restoring would visibly displace the
+; monster in vanilla too, at which point following it is correct, not
+; stale.)  so "this frame was ticked by WaitFrame" is exactly "these
+; coords may be animation transients", and the hud anchor holds; on
+; BtlGfx_01 ticks the coords are settled by construction and the anchor
+; may adopt.  both call sites verified a8/i16 (bank C1 battle context).
+
+.proc Ot6TickQuiet_ext
+        .a8
+        lda     #$00
+        sta     f:$7e0000+OT6_ANIMTICK
+        rtl
+.endproc
+
+.proc Ot6TickAnim_ext
+        .a8
+        lda     #$01
+        sta     f:$7e0000+OT6_ANIMTICK
+        rtl
+.endproc
 
 .proc Ot6BgHud_ext
         .a8
@@ -2394,14 +2435,22 @@ OT6_MAPBASE := $57b6            ; word scratch: field bg3 map base
         lda     $3aa8,y
         lsr
         bcs     @on
-        ; monster gone: disable the line (flush blanks the old cells once)
+        ; monster gone: disable the line (flush blanks the old cells
+        ; once). compare-before-store like the anchor commit at @done: an
+        ; already-disabled line writes nothing, so a static battlefield
+        ; means ZERO anchor stores across all six lines -- the exact
+        ; invariant battle_hudtrack's write watch asserts. (this store
+        ; ran unconditionally for years; empty slots were rewriting
+        ; $0000 over $0000 every frame, invisible but noisy.)
         longa
+        lda     f:$7e0000+OT6_SHADOW,x
+        beq     @off
         lda     #$0000
         sta     f:$7e0000+OT6_SHADOW,x
-        shorta0
+@off:   shorta0
         rts
 @on:    ; blank the five cell words, rebuild below. the anchor word at +0
-        ; is only committed at the very end (and only once per battle):
+        ; is only committed at the very end (and only when it changes):
         ; the NMI flush can fire mid-rebuild, so the enable is the commit.
         longa
         lda     #$21ff
@@ -2521,21 +2570,58 @@ OT6_MAPBASE := $57b6            ; word scratch: field bg3 map base
         inc     OT6_SCR_IDX
         bra     @cbit
 @edone: plx
-@done:  ; commit: latch the anchor once per battle, because recomputing every
+@done:  ; commit: recompute-and-compare, adopted only on quiet ticks.
+        ; HISTORY. this was a once-per-battle latch ("recomputing every
         ; frame made the line jitter and blink on attack-animation coord
-        ; transients. NOTE the justification once written here -- "monsters
-        ; never move" -- is not established: vanilla recomputes both source
-        ; arrays ($800f/$804b) from a tile base plus animation offsets
-        ; (btlgfx_main.asm:1040), and the Whelk retract cycle and entry/exit
-        ; effects visibly move things. The latch is a jitter workaround, and
-        ; it is also what makes the OT6_SHADOW overlap above permanent
-        ; instead of a one-frame blink. Recompute-and-compare would fix both.
+        ; transients"), which also made any post-arm divergence permanent:
+        ; the founding $5762 overlap corruption (probe_shadow_overlap), a
+        ; Cmd_20 reload swapping a slot's monster, any scripted move. the
+        ; transients are now READ and NAMED (Ot6TickQuiet_ext's block
+        ; comment lists them with line numbers): every one rides frames
+        ; ticked by the animation interpreter, so the anchor HOLDS on
+        ; those (OT6_ANIMTICK set) and recomputes on main-loop ticks,
+        ; where the coords are settled by construction. identical frames
+        ; compare equal and write nothing -- the jitter fix -- while a
+        ; genuine change (one that survives into a quiet frame) is
+        ; adopted within a frame or two -- the staleness fix. gated by
+        ; battle_hudtrack (all three directions), hud_stability,
+        ; battle_whelkwipe, battle_banner, and the visual goldens.
+        ;
+        ; the row source is NOT the frame's raw $804b: cur_poi_set
+        ; (btlgfx_main.asm:1032, run every frame at :1738) derives it as
+        ; $80cf + height*8 - 8 + $8057, and $8057 is a sprite-priority
+        ; bias with a PATH-DEPENDENT value -- seeded per species from
+        ; MonsterOverlap at monster load (btlgfx_main.asm:4671; whelk
+        ; head = 8, guards = 0), zeroed for ALL slots by every $80/$83
+        ; animation init (magic_init_131long, :39277), and never re-
+        ; seeded until the next monster load (the whelk retract's Cmd_20
+        ; reload among them). raw $804b would therefore hop the whelk
+        ; head's line one row the first time any spell lands and park it
+        ; there. so: strip the LIVE $8057 back out and re-apply the
+        ; LOAD-TIME species seed -- exactly the row the latch captured
+        ; at arm time, now stable across the whole $8057 lifecycle. the
+        ; column source $800f = $80c3 + width*4 has no such term. 8-bit
+        ; low-byte reads throughout, as always: transients riding the
+        ; high bytes ($80/$83's -$0100 y displacement, stashed/restored
+        ; at :39292/:29884) never see us. (the slot-5 leap/seize writer
+        ; at btlgfx_main.asm:1133 bypasses monster load, so its species
+        ; stash is stale -- unowned territory, same as under the latch:
+        ; no WoB-covered content drives it.)
+        lda     f:$7e0000+OT6_ANIMTICK
+        bne     @keep           ; animation interpreter owns this frame:
+                                ;   coords may be transients -- hold
+        phx                     ; save shadow line base
         longa
-        lda     f:$7e0000+OT6_SHADOW,x
-        bne     @keep
+        lda     OT6_SPECIES,y   ; slot species (== monster index)
+        tax
         shorta0
-        phx
+        lda     f:MonsterOverlap,x
+        sta     OT6_SCR_BIT     ; the load-time $8057 seed
         lda     $804b,y
+        sec
+        sbc     $8057,y         ; strip the live priority shift...
+        clc
+        adc     OT6_SCR_BIT     ; ...re-apply the load-time seed
         clc
         adc     #$07            ; first row fully past the monster's tile
         and     #$f8            ; box: monsters blink by redrawing their
@@ -2561,8 +2647,14 @@ OT6_MAPBASE := $57b6            ; word scratch: field bg3 map base
         plx                     ; (discard pushed row sum)
         plx                     ; restore shadow base
         phx
-        sta     f:$7e0000+OT6_SHADOW,x  ; enable line (atomic word)
-        plx
+        cmp     f:$7e0000+OT6_SHADOW,x
+        beq     @asis           ; unchanged: write nothing at all
+        sta     f:$7e0000+OT6_SHADOW,x  ; adopt (atomic word: the enable
+                                        ;   is still the commit -- the
+                                        ;   nmi flush can fire mid-frame,
+                                        ;   and the flush's prev/cur pass
+                                        ;   blanks the vacated cells)
+@asis:  plx
 @keep:  shorta0
         rts
 .endproc
@@ -2635,7 +2727,8 @@ OT6_RELAY_STAGES := 3           ; icons, glyphs x2 (~128b each). was 6:
 ; $57ba is rewritten every init by the spike probe anyway, and clearing
 ; $57bc would eat the random-encounter marker the field just set.
 ; occupants: $57ba-$57bb CWITNESS, $57bc RANDPEND, $57bd RANDBTL,
-; $57be HUDVEIL (init-cleared one byte at a time in InitBP), $57bf spare.
+; $57be HUDVEIL, $57bf ANIMTICK (HUDVEIL and ANIMTICK init-cleared one
+; byte at a time in InitBP).
 OT6_CWITNESS := $57ba           ; word: the C toolchain spike's result
                                 ;   (Ot6CSpikeProbe; battle_c.lua asserts
                                 ;   it. RELOCATED from $57dc: that byte
@@ -2676,6 +2769,24 @@ OT6_HUDVEIL  := $57be           ; nonzero = a monster entry/exit animation
                                 ;   InitBP (the strip is init-exempt, so
                                 ;   power-on junk here would blank the
                                 ;   hud from battle one).
+OT6_ANIMTICK := $57bf           ; nonzero = this frame was ticked by the
+                                ;   animation interpreter (WaitFrame,
+                                ;   btlgfx_main @022a "used during
+                                ;   animations") rather than the main
+                                ;   battle loop (BtlGfx_01 @01fb). set/
+                                ;   cleared by Ot6TickAnim_ext /
+                                ;   Ot6TickQuiet_ext (bank F0, keeping
+                                ;   the strip's F0-only writer invariant)
+                                ;   via same-size jsr repoints of the two
+                                ;   `jsr UpdateCharText` sites. the hud
+                                ;   builder holds anchor adoption while
+                                ;   set -- animation coord transients
+                                ;   never reach the anchor. cleared by
+                                ;   InitBP (init-exempt strip: power-on
+                                ;   junk would freeze anchor adoption --
+                                ;   though the first main-loop tick,
+                                ;   BtlGfx_00's own jsl BtlGfx_01
+                                ;   included, self-heals it anyway).
 
 ; [ monster entry/exit animations: veil the under-enemy hud ]
 
@@ -2760,12 +2871,43 @@ OT6_HUDVEIL  := $57be           ; nonzero = a monster entry/exit animation
         bra     @nofont
 @s0:    jsr     Ot6LoadBgGlyphsB        ; 0: hud pip/boost glyphs
 @nofont:
+        ; TWO WRITE DISCIPLINES BELOW, on purpose (audit 2026-07-19).
+        ; steady-state cell writes (prev == cur) are NOT v-gated: a write
+        ; spilled past vblank is dropped by the PPU, and the rewrite-
+        ; every-nmi design heals it next frame -- rewriting every nmi is
+        ; already mandatory because the animation-bg restore junk-fills
+        ; the area every other frame during monster actions (see the
+        ; call-site comment, btlgfx_main @0c17). one-shot transitions
+        ; (prev != cur: a line moved, enabled at a new address after a
+        ; move, or disabled) have NO next-frame rewrite to heal them --
+        ; a dropped blank-at-prev would strand stale glyphs -- so they
+        ; are admission-gated on the live v counter and DEFERRED when
+        ; late: prev only advances after the blank ran inside an
+        ; admitted window, so the whole transition redoes next nmi
+        ; until it lands. within the window a drop is impossible by
+        ; arithmetic: admission ends at v=248, the worst burst (all six
+        ; lines + pip transitioning at once) is ~70 words ~ 9 scanlines
+        ; at the measured PIO rate (~8 words/scanline, the font-slice
+        ; numbers above), ending ~257 < 262. residual accepted risk,
+        ; documented not hidden: a transition deferred into a veil
+        ; window leaves old glyphs one extra frame if the nmi is ALSO
+        ; late -- needs a genuine move adopted on the exact frame an
+        ; entry effect starts plus consecutive late nmis; no covered
+        ; content produces the first half, and defer-retry bounds it
+        ; at frames, not battles.
         ldx     #$0000
 @line:  longa
         lda     f:$7e0000+OT6_SHADOW+2,x         ; prev
         beq     @write
         cmp     f:$7e0000+OT6_SHADOW,x           ; moved?
         beq     @write
+        shorta0                                  ; one-shot: gate it
+        jsr     @late
+        bcs     @skip           ; too late: hold prev, redo whole
+                                ;   transition next nmi (@skip opens
+                                ;   with shorta0, so a8 entry is fine)
+        longa
+        lda     f:$7e0000+OT6_SHADOW+2,x         ; reload prev (gate ate a)
         sta     hVMADDL                          ; blank the old cells
         lda     #$21ff
         sta     hVMDATAL
@@ -2820,6 +2962,15 @@ OT6_HUDVEIL  := $57be           ; nonzero = a monster entry/exit animation
         beq     @cur
         cmp     f:$7e0000+OT6_PIPCUR
         beq     @cur
+        ; pip moved/closed: the same one-shot blank hazard as the lines
+        ; (this one predates the anchor rework -- every menu-cursor hop
+        ; was an ungated one-shot), same cure: defer when late, redo
+        ; next nmi (@pdone opens with shorta0, a8 entry is fine)
+        shorta0
+        jsr     @late
+        bcs     @pdone
+        longa
+        lda     f:$7e0000+OT6_PIPPREV            ; reload (gate ate a)
         sta     hVMADDL                  ; moved/closed: blank the old cell
         lda     #$21ff
         sta     hVMDATAL
@@ -2847,6 +2998,26 @@ OT6_HUDVEIL  := $57be           ; nonzero = a monster entry/exit animation
         plx
         plp
         rtl
+; local: enough vblank left for a one-shot transition write? (a8, db=0;
+; clobbers a; carry SET = too late, defer.) constants mirror the font
+; slice gate above: v must be in [225,248] -- past 248 the worst-case
+; transition burst (~9 scanlines at the measured PIO rate, see the
+; @nofont comment) could run into active display, where the PPU drops
+; VRAM writes and a one-shot has no next-frame rewrite to heal it.
+@late:  lda     hSLHV           ; software-latch the h/v counters
+        lda     hSTAT78         ; reset the opvct read flip-flop
+        lda     hOPVCT          ; v low byte
+        xba
+        lda     hOPVCT          ; v bit 8 (in bit 0)
+        lsr                     ; -> carry
+        xba                     ; a = v low byte (xba preserves carry)
+        bcs     @l1             ; v >= 256: too late (carry already set)
+        cmp     #$e1
+        bcc     @l0             ; v < 225: not vblank (defensive) -- defer
+        cmp     #$f9            ; carry = (v >= 249) = too late
+        rts
+@l0:    sec
+@l1:    rts
 .endproc
 
 ; [ bp pip refresh: redraw the name rows when spendable bp changes ]

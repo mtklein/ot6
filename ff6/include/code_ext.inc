@@ -23,8 +23,12 @@ CODE_EXT_INC = 1
 .global Ot6FontRestoreMark_ext
 .global Ot6DangerStep, Ot6MarkRandom
 .global Ot6EntryExitVeil_ext
+.global Ot6TickQuiet_ext, Ot6TickAnim_ext
 .global Ot6C1Rtl, DrawMagicListText, _c15a17, _c15729, WaitTfrVRAM_far
 .global DoMonsterEntryExit
+.global MonsterOverlap          ; per-species $8057 seed (btlgfx data);
+                                ;   the hud anchor re-derives load-time
+                                ;   rows from it (ot6.asm Ot6BgHudLine)
 
 ; battle graphics module
 .global SineTbl8, SineTbl16

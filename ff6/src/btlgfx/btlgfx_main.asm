@@ -399,7 +399,9 @@ BtlGfx_01:
         jsr     UpdateMenuWindow
         jsr     _c12f79       ; update character status change animations
         jsr     _c102ca       ; update battle menu
-        jsr     UpdateCharText
+        jsr     Ot6TickQuiet_c1 ; ot6: UpdateCharText behind a same-size
+                                ;   repoint -- marks this a MAIN-LOOP tick
+                                ;   (settled coords) for the hud anchor
         jsl     UpdateCondemnNum
         jsr     MonsterDeathAnim
         jsl     UpdateFacingDir
@@ -430,7 +432,10 @@ WaitFrame:
         jsr     WaitVblank
         jsr     UpdateMenuWindow
         jsr     _c102ca       ; update battle menu
-        jsr     UpdateCharText
+        jsr     Ot6TickAnim_c1  ; ot6: UpdateCharText behind a same-size
+                                ;   repoint -- marks this an ANIMATION
+                                ;   tick (coords may be transients), so
+                                ;   the hud anchor holds
         jsl     UpdateCondemnNum
         jsl     UpdateFacingDir
         lda     w7ee9ef
@@ -49020,3 +49025,29 @@ ItemJumpThrowAnim:
         .incbin "item_jump_throw_anim.dat"
 
 ; ------------------------------------------------------------------------------
+
+; ------------------------------------------------------------------------------
+
+; [ ot6: frame-tick provenance shims ]
+
+; same-size (3-byte jsr) repoints of the two `jsr UpdateCharText` sites --
+; BtlGfx_01 (main battle loop tick) and WaitFrame (animation interpreter
+; tick) -- so Ot6BgHudLine can tell settled frames from transient ones
+; WITHOUT any btlgfx_code size change: battle_banner and probe_banner pin
+; battle-NMI code addresses ($C10BA7/$C10C17/$C10C1B/$C10CA4), and this
+; bank sits $23 bytes short of full, so insertions are doubly off the
+; table.  the shims live in the pinned ot6_c1 tail segment (ld65 raises an
+; overlap error if btlgfx_code ever grows into it), jsl to bank F0 for the
+; actual flag write (the $57ba-$57bf strip keeps its bank-F0-only writer
+; invariant, probe_57ba_strip), and fall through to the real
+; UpdateCharText with the caller's return address untouched.
+
+.segment "ot6_c1"
+
+Ot6TickQuiet_c1:
+        jsl     Ot6TickQuiet_ext
+        jmp     UpdateCharText
+
+Ot6TickAnim_c1:
+        jsl     Ot6TickAnim_ext
+        jmp     UpdateCharText
