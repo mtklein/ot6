@@ -109,6 +109,15 @@ H.run({ maxFrames = 12000 }, {
   H.waitFrames(200),
   H.call(function() armed = false end),
 
+  -- the 16x16 anim-mode veil (battle_hudanim16) hides the hud while an
+  -- animation holds battlefield bg3 in 16x16 tiles ($896F bit $40) -- an
+  -- enemy action can still be mid-effect after the fixed ride above, and
+  -- its window would read $01EE where the self-heal check wants cells.
+  -- settle to 8x8 with the flush's repaint landed first.
+  H.waitUntil(function()
+    return H.readByte(0x896f) % 128 < 64 and H.fieldHudPresent()
+  end, 600, "bg3 back to 8x8, hud repainted", 5),
+
   H.call(function()
     -- 0. the instrument actually ran
     H.assertEq(#rec >= 250, true, "instrument recorded >=250 frames (got " ..

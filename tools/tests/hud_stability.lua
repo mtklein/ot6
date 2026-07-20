@@ -88,6 +88,33 @@ H.run({ maxFrames = 30000 }, {
     return H.readByte(0x3e9c + actorSlot*2) ~= bpBefore
   end, 8000, "action lands", 10),
   H.waitFrames(120),   -- recovery window
+  -- un-berserk and let the action queue drain (battle_hudtrack's idiom)
+  -- before the stability watch: the party stays berserk otherwise, and
+  -- every further beam is an animation whose 16x16 window the anim-mode
+  -- veil (battle_hudanim16) now legitimately blanks the hud through --
+  -- "stays put" is a steady-state property, so measure it in steady state.
+  H.call(function()
+    for slot = 0, 3 do
+      local a = 0x3ee5 + slot*2
+      H.writeByte(a, H.readByte(a) & 0xEF)
+    end
+    H.writeWord(0x3C00, 500); H.writeWord(0x3C02, 500)
+  end),
+  -- an instantaneous check raced the queue: un-berserking cancels no
+  -- already-queued action, so a beam could still land between a one-shot
+  -- "hud is back" sample and the baseline.  require the settled state --
+  -- no animation script, bg3 in 8x8, hud painted -- to hold for 60
+  -- CONSECUTIVE frames before baselining.
+  (function()
+    local calm = 0
+    return H.waitUntil(function()
+      local ok = H.readByte(0x57bf) == 0
+        and H.readByte(0x896f) % 128 < 64
+        and H.fieldHudPresent()
+      calm = ok and calm + 1 or 0
+      return calm >= 60
+    end, 2400, "queue drained, bg3 8x8, hud repainted, 60 frames calm", 1)
+  end)(),
   H.call(function()
     baseline = cellset()
     H.log("post-attack cells: " .. baseline)

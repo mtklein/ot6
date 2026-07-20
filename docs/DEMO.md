@@ -76,7 +76,7 @@ asserts on a fixture only `make frontier` mints (Vargas's ledge, the
 Battle for Narshe, the Mt. Kolts cave pool, the moogle defense), so
 `make test` reports them as skipped until those fixtures exist rather
 than dragging the whole story chain into the gate. `make frontier-test`
-mints the chain and runs the same suite with them included (37 tests).
+mints the chain and runs the same suite with them included (38 tests).
 
 ## Known limits (by design, for now)
 
