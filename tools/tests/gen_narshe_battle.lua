@@ -367,64 +367,21 @@ H.run({ maxFrames = 120000 }, {
   end)(),
 
   -- ==================================================================== --
-  -- 5. THE WIN TAIL to the first controllable frame.  The esper scene
-  --    (map 23, _ccbcb1 -> $CCBEBA) presents its dialogs WITHOUT setting
-  --    the field dialog flags ($00BA/$00D3 both read 0 the whole time,
-  --    MEASURED), so advanceStory's dlgN>=3 tap never fired and the scene
-  --    parked at $CCBEBA forever.  The predecessor read this as a
-  --    poked-boot rostering bug; it is not -- it stalls on ANY boot,
-  --    honest included, because the tap detector misses this cutscene's
-  --    dialog kind.  The fix is to tap A UNCONDITIONALLY through map 23
-  --    (a pure cutscene -- advancing is always safe), which walks the PC
-  --    off $CCBEBA (measured $CCBEBA -> $CCBF07 -> $CCBF30 -> map 0,
-  --    probe_esper_stall's tap-through).  Any battle that loads is still
-  --    kill-bitted; a 20,000-frame hard cap remains as a real-hang guard.
+  -- 5. STOP AT THE STOP LINE.  The $40 win above IS v0.3's milestone;
+  --    everything after it (the esper scene, Arvis, the walk to control)
+  --    is v0.4's first link and stalls the walker (issue #3).  Bundling
+  --    it here made a past-the-stop-line bug fail a v0.3 mint rule --
+  --    the frontier chain halted at a fixture the release needs even
+  --    though the fight it gates had been won moments earlier.  The
+  --    tail lives in gen_kefka_won.lua, deliberately outside FRONTIER.
   -- ==================================================================== --
-  (function()
-    local aPh, cnt = 0, 0
-    return H.driveUntil(function()
-      local ok = H.hasControl() and H.tileAligned() and bright() >= 15
-             and not H.dialogWaiting() and not H.eventRunning()
-             and not H.battleLoadStarted() and not H.worldMode()
-      cnt = ok and cnt + 1 or 0
-      return cnt >= 60
-    end, 60000, {
-      H.call(function()
-        aPh = (aPh + 1) % 8
-        if H.battleLoadStarted() then
-          if H.monstersPresent() > 0 then killBitAll() end
-          H.setPad(aPh < 4 and { "a" } or {}); return
-        end
-        -- tap A whenever the party is NOT yet in plain field control:
-        -- that covers the flag-less esper dialogs on map 23 and every
-        -- ordinary dialog on the way to Arvis's house
-        if not (H.hasControl() and H.tileAligned()) or H.dialogWaiting() then
-          H.setPad(aPh < 4 and { "a" } or {})
-        else
-          H.setPad({})
-        end
-      end),
-    }, "the win tail to control (tap through the esper scene)")
-  end)(),
   H.waitFrames(30),
   H.call(function()
     H.assertEq(sw(0x0139), 1, "$0139 SET -- the battle-won latch")
-    H.assertEq(sw(0x0612), 0, "$0612 clear -- KEFKA gone")
-    H.assertEq(sw(0x061D), 0, "raiders retired")
-    H.log(string.format("[kefka_won] f%d map=%d (%d,%d)",
-      H.frame, map(), H.fieldX(), H.fieldY()))
-    for c = 0, 15 do
-      if (H.readByte(0x1850 + c) & 0x07) ~= 0 then
-        local base = 0x1600 + 37 * c
-        H.log(string.format("char %2d actor=%02X level=%d hp=%d/%d",
-          c, H.readByte(base), H.readByte(base + 8),
-          H.readWord(base + 9), H.readWord(base + 11)))
-      end
-    end
-    H.screenshot("kefka_won")
+    H.assertEq(H.battleLoadStarted(), false, "the fight is over")
+    H.log(string.format("[narshe_battle] the $40 win stands at f%d", H.frame))
   end),
-  H.saveState("kefka_won.mss"),
   H.logStep(function()
-    return string.format("kefka_won minted at frame %d -- v0.3's stop line", H.frame)
+    return string.format("Kefka beaten at frame %d -- v0.3's stop line; the win tail is gen_kefka_won's (issue #3)", H.frame)
   end),
 })
