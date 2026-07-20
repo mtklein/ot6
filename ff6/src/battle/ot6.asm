@@ -2573,13 +2573,41 @@ OT6_MAPBASE := $57b6            ; word scratch: field bg3 map base
         .i16
         lda     $3aa8,y
         lsr
-        bcs     @on
-        ; monster gone: disable the line (flush blanks the old cells
-        ; once). compare-before-store like the anchor commit at @done: an
-        ; already-disabled line writes nothing, so a static battlefield
-        ; means ZERO anchor stores across all six lines -- the exact
-        ; invariant battle_hudtrack's write watch asserts. (this store
-        ; ran unconditionally for years; empty slots were rewriting
+        bcc     @gone           ; slot empty
+        ; the slot is filled -- but is the monster ON SCREEN yet?  at battle
+        ; entry a monster is flagged present ($3aa8) from init, while its
+        ; sprite is not drawn until its fly-in animation runs: the "monsters
+        ; shown" mask $201e (notes/battle-ram.txt:422 "--654321 monsters
+        ; shown"; the sprite drawers gate on it, btlgfx_main.asm:5639/:5772,
+        ; and DoMonsterEntryExit SETS a monster's bit as its entry completes,
+        ; :45554) holds 0 for that whole fade-in window -- measured $00
+        ; across probe_caveentry f84..128, while the sprites are absent.  the
+        ; hud gated only on $3aa8, so it painted each entering monster's
+        ; shield/'?' cells into empty space: a scatter of white glyphs on the
+        ; still-dark battlefield BEFORE the fight resolved, worst with the
+        ; cave's 3-5 fly-in trash (Cirpius/Hornet/Bleary), which is where the
+        ; v0.3-rc1 playtest first caught it ("a bunch of characters overdrawn
+        ; in white text ... when there are a bunch of enemies").  the entry
+        ; ANIMATION itself is already veiled (Ot6EntryExitVeil); this closes
+        ; the gap BEFORE it by gating the hud on the same mask the sprites
+        ; use.  (a dead monster also clears its $201e bit, but the $3eec
+        ; dead-cell path below already blanks that line -- the two agree.)
+        phx                     ; save the shadow line base
+        longa
+        tya
+        lsr                     ; monster slot 0-5 (y is the 2-byte offset)
+        tax
+        shorta0
+        lda     f:Ot6ShownBitTbl,x
+        plx                     ; restore the shadow line base
+        and     a:$201e
+        bne     @on             ; present AND shown: draw
+@gone:  ; monster gone, or present but not yet entered: disable the line
+        ; (flush blanks the old cells once). compare-before-store like the
+        ; anchor commit at @done: an already-disabled line writes nothing, so
+        ; a static battlefield means ZERO anchor stores across all six lines
+        ; -- the exact invariant battle_hudtrack's write watch asserts. (this
+        ; store ran unconditionally for years; empty slots were rewriting
         ; $0000 over $0000 every frame, invisible but noisy.)
         longa
         lda     f:$7e0000+OT6_SHADOW,x
@@ -2800,6 +2828,12 @@ OT6_MAPBASE := $57b6            ; word scratch: field bg3 map base
 @keep:  shorta0
         rts
 .endproc
+
+; monster slot (0-5) -> its bit in the $201e "monsters shown" mask. slot s is
+; bit s: verified by measurement, probe_caveentry read $201e=$1c for the three
+; Cirpius that loaded into slots 2/3/4.
+Ot6ShownBitTbl:
+        .byte   $01,$02,$04,$08,$10,$20
 
 
 ; ------------------------------------------------------------------------------

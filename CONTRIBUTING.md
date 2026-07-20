@@ -14,9 +14,10 @@ not brew-installable — [docs/TOOLING.md](docs/TOOLING.md) has those steps.
 
 ```sh
 make rom     # build build/ot6.sfc
-make test    # full headless gate: 31 tests + pixel goldens (a few minutes)
-             # + 1 frontier-gated test (battle_vargas) once `make frontier`
-             # has minted its fixture; `make frontier-test` does both
+make test    # full headless gate: 29 tests + pixel goldens (a few minutes)
+             # + frontier-gated tests (battle_vargas, battle_flyin,
+             # battle_kefka) once `make frontier` has minted their fixtures;
+             # `make frontier-test` does both
 make run     # launch the built ROM in Mesen (GUI)
 ```
 

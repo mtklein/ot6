@@ -41,11 +41,16 @@ ram_env_for() {
 # until Sabin's chain lands and the scenario stack mints reunion_ready (see
 # the Makefile's stacking block).  Wired now so the day that state exists,
 # the gate grows by itself.
-FRONTIER_TESTS="battle_vargas battle_kefka"
+# battle_flyin gates on kolts_cave.mss: it needs a fight whose monsters FLY IN
+# (present-but-not-shown at entry), which the suite's non-frontier fights do
+# not have -- kolts_cave's map-96 pool is 93.75% Cirpius x3.  It guards the
+# entry hud gate ($201E) added for the v0.3-rc1 cave "white text overdraw".
+FRONTIER_TESTS="battle_vargas battle_kefka battle_flyin"
 frontier_fixture() {
   case "$1" in
     battle_vargas) echo "$ROOT/build/states/vargas_doorstep.mss" ;;
     battle_kefka)  echo "$ROOT/build/states/kefka_doorstep.mss" ;;
+    battle_flyin)  echo "$ROOT/build/states/kolts_cave.mss" ;;
     *) echo "" ;;
   esac
 }

@@ -23,15 +23,18 @@ consumes the previous link's savestate, and the suite's remint cost has
 to stay what it was.  The links use the same ROM-content gate as the
 suite's states, so a rebuild that changes no bytes re-mints nothing.
 
-TWO suite tests are FRONTIER-GATED: `battle_vargas` asserts on
-`vargas_doorstep.mss`, and `battle_kefka` on `kefka_doorstep.mss` (the
-Battle for Narshe -- deeper still, since its boot needs the REUNION: all
-three scenarios completed in one playthrough via the Makefile's scenario
-STACK, which waits on Sabin's chain's back half).  suite.sh adds each the
-moment its fixture exists and reports it as `skip` when it does not --
-never silently drops it -- so `make test` costs what it always did and
-`make frontier-test` (mint the chain, then run the same suite) is the
-command that always runs whatever is mintable.
+THREE suite tests are FRONTIER-GATED: `battle_vargas` asserts on
+`vargas_doorstep.mss`, `battle_flyin` on `kolts_cave.mss` (the entry hud
+gate -- it needs a fight whose monsters fly in, present-but-not-shown at
+battle start, which only a fixture past the frontier reaches), and
+`battle_kefka` on `kefka_doorstep.mss` (the Battle for Narshe -- deeper
+still, since its boot needs the REUNION: all three scenarios completed in
+one playthrough via the Makefile's scenario STACK, which waits on Sabin's
+chain's back half).  suite.sh adds each the moment its fixture exists and
+reports it as `skip` when it does not -- never silently drops it -- so
+`make test` costs what it always did and `make frontier-test` (mint the
+chain, then run the same suite) is the command that always runs whatever
+is mintable.
 
 `run.sh` wraps:
 
@@ -213,6 +216,16 @@ set -- and never creates `SaveStates/`.)
   same Pummel ends the fight through `if_attack PUMMEL -> battle_event
   $09 / kill_monsters ALL`.  Both Blitzes are driven as real pad EDGES
   into the code window, not poked.
+- `battle_flyin.lua` - FRONTIER-GATED (kolts_cave.mss).  Guards the entry
+  hud gate: a monster is flagged present (`$3AA8`) from battle init, but
+  its sprite is not drawn until its fly-in animation runs, so the hud must
+  not paint its shield/'?' cells before the "monsters shown" mask `$201E`
+  covers it.  Paces map 96's Cirpius-x3 pool and asserts, every frame of
+  the ~45-frame fly-in, that each present-but-unshown line is DISABLED and
+  the bg3 field map holds zero OT6 glyphs; positive controls that the
+  window was sampled and that the hud comes back once the birds land.
+  Fails loudly on the pre-fix `cur=$54AC` (the glyphs the v0.3-rc1 cave
+  playtest saw floating on the still-dark battlefield).
 - `probe_vargas.lua` - the instrument behind both: dumps the seeded
   formation, gauge, element and class rows and SABIN's join level, and
   answers the two questions the sources do not -- that SABIN gets NO
