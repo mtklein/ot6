@@ -64,7 +64,7 @@ BPS-capable patcher, or just:
 
 ## Verification
 
-`make test` runs the whole gate headless — 28 tests plus same-mint pixel
+`make test` runs the whole gate headless — 29 tests plus same-mint pixel
 goldens; `tools/tests/suite.sh` is the list of record (this doc used to
 enumerate 12 and drifted). Green as of the v0.1 tag; the 21st test
 (probe_shadow_overlap) joined after, in 6275f02.
@@ -73,7 +73,7 @@ One more, `battle_vargas`, is FRONTIER-GATED: it fights Vargas on Mt.
 Kolts out of `vargas_doorstep.mss`, which only `make frontier` mints, so
 `make test` reports it as skipped until that fixture exists rather than
 dragging the whole story chain into the gate. `make frontier-test` mints
-the chain and runs the same suite with it included (29 tests).
+the chain and runs the same suite with it included (31 tests).
 
 ## Known limits (by design, for now)
 
