@@ -65,7 +65,8 @@ BPS-capable patcher, or just:
 ## Verification
 
 `make test` runs the whole gate headless — 30 tests plus same-mint pixel
-goldens; `tools/tests/suite.sh` is the list of record (this doc used to
+goldens, plus the mp-cost A/B's ON half on the flagged variant ROM;
+`tools/tests/suite.sh` is the list of record (this doc used to
 enumerate 12 and drifted). Green as of the v0.1 tag; the 21st test
 (probe_shadow_overlap) joined after, in 6275f02.
 

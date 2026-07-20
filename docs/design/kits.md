@@ -44,16 +44,25 @@ the physical cousin of non-elemental magic.
 
 The 8 Tools, verbatim ✦ — learned by acquisition.
 
-| # | Tool | Chip | Source (WoB) |
-|---|---|---|---|
-| 1 | AutoCrossbow ✦ | piercing ×4 | join (signature) |
-| 2 | NoiseBlaster | — (confuse) | Figaro shop |
-| 3 | BioBlaster | poison | Figaro shop |
-| 4 | Flash | — (blind) | Figaro shop, restocked South Figaro |
-| 5 | Drill | piercing | Figaro castle, after the sand dive |
-| 6 | Chainsaw | slashing | Zozo chest (vanilla) |
-| 7 | Debilitator | adds + reveals a random weakness ✦ | Vector shop |
-| 8 | **Overclock** ✦ (divine) | — | Magitek factory (story) |
+| # | Tool | MP | Chip | Source (WoB) |
+|---|---|---|---|---|
+| 1 | AutoCrossbow ✦ | 4 | piercing ×4 | join (signature) |
+| 2 | NoiseBlaster | 6 | — (confuse) | Figaro shop |
+| 3 | BioBlaster | 8 | poison | Figaro shop |
+| 4 | Flash | 6 | — (blind) | Figaro shop, restocked South Figaro |
+| 5 | Drill | 16 | piercing | Figaro castle, after the sand dive |
+| 6 | Chainsaw | 18 | slashing | Zozo chest (vanilla) |
+| 7 | Debilitator | 10 | adds + reveals a random weakness ✦ | Vector shop |
+| 8 | **Overclock** ✦ (divine) | Σ | — | Magitek factory (story) |
+
+The MP column is mp-economy.md's "scaled by tier 3–20" (AutoCrossbow 3–4,
+Drill/Chainsaw 12–20, Debilitator 8–12): gil buys the tool once, MP is the
+per-use operating cost. It lives in `Ot6AbilityCostTbl` keyed by **tool item
+id** ($a3–$aa, the same keying ot6_class.asm uses for tool classes), charged
+under `OT6_MP_COSTS`. The mid-kit gag Air Anchor ($a9, the findable harpoon)
+is costed 14 alongside them. **Overclock** fires two tools, so it has no single
+price — its cost is the **sum (Σ)** of the two it fires, wired the day Overclock
+is built (it is not yet).
 
 - Divine locked ✦: **Overclock** — use two tools in one action. Air
   Anchor stays a findable *item* mid-kit gag, not the capstone.
@@ -77,16 +86,20 @@ Levels below are `BlitzLevelTbl` (`field/event.asm:1240`), read out, not
 recalled — an earlier draft of this table was wrong in six of eight rows
 while still marked "vanilla preserved ✦".
 
-| # | Blitz | Chip | Level |
-|---|---|---|---|
-| 1 | Pummel ✦ | bludgeoning ×2 | 1 (has it at join) |
-| 2 | AuraBolt | holy | 6 |
-| 3 | Suplex | bludgeoning | 10 |
-| 4 | Fire Dance | fire | 15 |
-| 5 | Mantra | — (heal) | 23 |
-| 6 | Air Blade | wind | 30 |
-| 7 | Spiraler | — | 42 |
-| 8 | **Bum Rush** (divine) | bludgeoning ×8 | 70 / Duncan |
+| # | Blitz | MP | Chip | Level |
+|---|---|---|---|---|
+| 1 | Pummel ✦ | 2 | bludgeoning ×2 | 1 (has it at join) |
+| 2 | AuraBolt | 5 | holy | 6 |
+| 3 | Suplex | 7 | bludgeoning | 10 |
+| 4 | Fire Dance | 9 | fire | 15 |
+| 5 | Mantra | 8 | — (heal) | 23 |
+| 6 | Air Blade | 12 | wind | 30 |
+| 7 | Spiraler | 18 | — | 42 |
+| 8 | **Bum Rush** (divine) | 30 | bludgeoning ×8 | 70 / Duncan |
+
+The MP column is mp-economy.md's "scaled by tier 2–30" made concrete (Pummel
+the 2-MP signature, mid-kit 5–12, Bum Rush the 30-MP capstone); it lives in
+`Ot6AbilityCostTbl` keyed by attack id $5d–$64, charged under `OT6_MP_COSTS`.
 
 - Passive candidates: *Iron Fist* (unarmed counts as a bludgeon
   weapon), *Discipline* (+1 BP when striking a Broken enemy),
@@ -99,16 +112,33 @@ lives inside **slashing** with swords — Cyan is a slashing
 *specialist* (multi-hit slash chips nobody else matches), not a
 mandatory key for katana-only locks. Vanilla level schedule kept.
 
-| # | Tech | BP | Chip | Level |
-|---|---|---|---|---|
-| 1 | Fang ✦ | 0 | slashing | join |
-| 2 | Sky | 1 | — (counter stance) | 6 |
-| 3 | Tiger | 1 | slashing | 12 |
-| 4 | Flurry | 2 | slashing ×4 | 15 |
-| 5 | Dragon | 2 | — (drain) | 24 |
-| 6 | Eclipse | 3 | slashing, all enemies | 34 |
-| 7 | Tempest | 3 | wind ×4 | 44 |
-| 8 | **Oblivion** (divine) | 3, target must be Broken | — | Phantom Train farewell (story) |
+| # | Tech | BP | MP | Chip | Level |
+|---|---|---|---|---|---|
+| 1 | Fang ✦ | 0 | 1 | slashing | join |
+| 2 | Sky | 1 | 2 | — (counter stance) | 6 |
+| 3 | Tiger | 1 | 3 | slashing | 12 |
+| 4 | Flurry | 2 | 4 | slashing ×4 | 15 |
+| 5 | Dragon | 2 | 5 | — (drain) | 24 |
+| 6 | Eclipse | 3 | 6 | slashing, all enemies | 34 |
+| 7 | Tempest | 3 | 7 | wind ×4 | 44 |
+| 8 | **Oblivion** (divine) | 3, target must be Broken | 8 | — | Phantom Train farewell (story) |
+
+**The MP column (proposed v0.4, was TBD).** mp-economy.md priced Bushido "BP
+tier + discounted MP 1–8" and deferred the numbers to Cyan's playtest; this is
+that column, proposed from the BP-tier structure so the charge-side groundwork
+had data to carry. It is monotonic with the BP band (0→1, 1→2–3, 2→4–5, 3→6–8)
+and rides ~⅓ of a comparable Blitz/Tool — Flurry's slashing ×4 costs 4 MP where
+Sabin's Air Blade costs 12 and Edgar's Drill 16 — because, per the ruling, the
+**banked-BP requirement is the real price and the MP only prices the cast**.
+Fang is the cheapest row of any kit (1 MP, the "free-to-learn is not
+free-to-use" floor); Oblivion tops the band at 8 even though it is out of the
+current boost ladder (priced ready for the divine pass). Cyan's ~18-MP L5 pool
+affords the low ladder (Fang/Sky/Tiger/Flurry = 1/2/3/4) and outgrows the rest
+on his level schedule, so a light column keeps him acting while the bank
+builds — the whole point of the one kit where banking BP has intrinsic purpose.
+These numbers live in `Ot6AbilityCostTbl` (ff6/src/battle/ot6.asm), charged
+only under the `OT6_MP_COSTS` build flag (default off until the menu can
+display them — see mp-economy.md).
 
 **Shipped (M3).** `Ot6BushidoTier` (ff6/src/battle/ot6.asm) replaces the
 charge gauge's clock in `UpdateMenuState_37`; the window, its numerals,

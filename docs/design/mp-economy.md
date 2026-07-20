@@ -88,8 +88,10 @@ pass. Detailed Cyan tuning is deliberately deferred until he
 is playtestable.
 
 **Amended by what shipped (M3, `Ot6BushidoTier`).** The BP half
-landed; the MP half is still the M4 data pass, so Bushido costs
-0 MP today and the rows above are unbuilt. Two clauses of the
+landed; the MP half is now BUILT (v0.4) but dormant — Bushido
+costs 0 MP in the shipped ROM and its priced column
+(kits.md, proposed there) charges only under `OT6_MP_COSTS`
+(see "Where it lands / M4" below). Two clauses of the
 ruling above did not survive contact:
 
 - "BP spent beyond a tech's tier requirement boosts it with the
@@ -223,18 +225,75 @@ pass still watches Osmose-cycling next to Facet + Rune Eater.
 
 ## Where it lands
 
-- **M4 — costs and refill.** Skill MP costs are data in the
-  same ability records the kit tables edit: the 14-byte record
-  already carries an MP-cost byte for IDs 81–255 — Blitzes,
-  SwdTechs, Tools, Dances (research/data-formats.md). Pricing
-  is data entry; the code is one dispatch change — commands
-  that skip the MP check stop skipping it — plus menu gray-out
-  at 0. The level-up refill is a small battle-bank hook where
-  level-ups apply (DoLevelUp). Costs and refill ship together:
-  costs alone are attrition without income; refill alone is
-  free lunch. Demo rungs 1–2 are unaffected (guest verbs stay
-  free, Terra's magic is already costed); rung 2–3 fixtures
-  re-measure when it lands.
+- **M4 — costs and refill. The charge side is BUILT (v0.4),
+  dormant behind a flag.** The prediction below held exactly:
+  the code was one dispatch change. Vanilla's `GetMPCost`
+  (battle_main.asm) prices only magic/lore/summon/x-magic;
+  every other command — Blitz, Bushido, Tools, the free floor —
+  falls through it returning 0, so the universal charge at
+  `CalcAttackEffect` (the `$3a4c` subtract, and its
+  insufficient-MP fizzle) never fires for them. `Ot6AbilityCost`
+  (ff6/src/battle/ot6.asm) is the single hook, right after that
+  `GetMPCost`: for the three costed verbs it swaps the 0 for the
+  kit price. Charge AND the insufficient-MP **refusal** are both
+  already universal — they act on whatever `$3620`→`$3a4c` holds
+  — so nothing new was needed there. The cost data is NOT the
+  record's +$05 byte after all (GetMPCost reads the character
+  spell-list copy for magic, ignores it for the rest); it is a
+  parallel bank-$F0 table `Ot6AbilityCostTbl`, keyed by the id
+  already in `$3a7b` (attack id $5d–$64 Blitz, $55–$5c Bushido;
+  tool item id $a3–$aa Tools) — the same shape as the class and
+  element tables. Numbers are kits.md's columns (Cyan's proposed
+  there for the first time).
+  - **Why dormant, not shipped enabled.** The one magic-specific
+    piece is the menu grey-out/display (`CheckMagicEnabled`):
+    the Magic menu shows an MP column and greys unaffordable
+    spells, but the Blitz/Bushido/Tools menus show no cost and
+    check no MP. A silent charge on a menu that says nothing is a
+    hidden tax, and there is no honest subset that can ship
+    enabled now (no new verb's menu can show a cost without the
+    menu-bank work, which needs the not-yet-reinstalled Calypsi
+    C toolchain). So the whole mechanic gates on a build-time
+    flag **`OT6_MP_COSTS`, default off**: with it off, not one
+    byte of the machinery is assembled and the ROM is
+    byte-identical to the pre-feature baseline; with it on
+    (`make -C ff6 ff6-en-mp`), the charge and refusal land. The
+    A/B is proven both ways by `tools/tests/battle_mpcost.lua`
+    (self-detecting: charge+refusal on the ON ROM, free+absent on
+    the shipped OFF ROM). It flips on the day the menu can
+    display costs — see the menu work order below.
+  - The level-up refill (the income half) is NOT built here — it
+    is a separate battle-bank hook where level-ups apply
+    (DoLevelUp), and costs+refill must ship together (costs alone
+    are attrition without income). That, plus the menu display,
+    is what still gates flipping the flag on.
+  - Demo rungs 1–2 are unaffected (guest verbs stay free,
+    Terra's magic is already costed); rung 2–3 fixtures
+    re-measure when it lands.
+
+  **The menu work order (for when Calypsi C lands).** To flip
+  `OT6_MP_COSTS` on honestly, the menu bank must show and enforce
+  these costs the way it already does for Magic:
+  - The Magic menu's cost column and grey-out are
+    `UpdateEnabledMagic` / `CheckMagicEnabled` (battle_main.asm)
+    walking the character spell list and comparing each spell's
+    MP byte against current MP. Blitz/Bushido/Tools have no
+    equivalent — their menus (btlgfx bank C1 / menu bank C3) draw
+    no MP column and run no enable pass.
+  - Needed: (1) a per-row cost lookup for those menus that reads
+    `Ot6AbilityCostTbl` (already the runtime authority, so the
+    menu and the charge can never disagree); (2) a draw routine
+    that renders the cost string in the ability-list window
+    (the same MP-column cell Magic uses — small-font digits
+    $B4–$BD, per surgery-map.md §5); (3) a grey-out/refuse pass
+    that disables (or blocks confirm on) a row whose cost exceeds
+    current MP, mirroring `CheckMagicEnabled`. The Bushido window
+    is special: it is `UpdateMenuState_37` (already OT6-owned via
+    `Ot6BushidoTier`), and the cost shown must track the
+    boost-selected tech, whose id is what `Ot6AbilityCost` reads.
+  - This is C3/C1 menu-bank work (research/battle-code-map.md
+    notes the C3 Compendium is fully commented, so it is
+    well-lit); it is the reason the charge shipped dormant.
 - **M5 — passives.** The anchor pair rides the esper passive
   machinery; max-MP-up rides the stat channel.
 - **M6 — numbers.** The harness (balance-metrics.md) grows MP
