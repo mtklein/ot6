@@ -3319,7 +3319,33 @@ OT6_SCRIPTBUSY := $57bf         ; nonzero = a battle animation script
         longa
         lda     f:$7e0000+OT6_SHADOW+2,x         ; reload prev (gate ate a)
         sta     hVMADDL                          ; blank the old cells
-        lda     #$21ff
+        ; the blank word is vanilla's $01ee junk fill, NOT $21ff.  cells a
+        ; line abandons (a move or a disable) are rewritten ONCE, here, and
+        ; then belong to nobody: no next-nmi repaint heals them, so whatever
+        ; word this writes sits in the field map until vanilla's next
+        ; ClearBG3TileBuf.  $21ff -- priority-set char $1ff -- was invisible
+        ; in 8x8 (the char is a blank cell in the $5800 font page), but under
+        ; an animation's bg3-16x16 window (the $896f flips the veil below
+        ; already handles for LIVE cells) a 16x16 map cell renders char n
+        ; plus n+1/n+$10/n+$11: $1ff pulls tiles $200/$20f/$210 -- past the
+        ; font page, into the animation-gfx region -- at TOP priority.  the
+        ; measured face (probe_lete_entrance, the Lete River forced battle 8,
+        ; both die rolls): the monster-entrance slide walks every hud line
+        ; sideways across the map, abandoning 63-92 cells ($21ff each, map
+        ; dump in the probe log) while the slide itself holds $896f=$59 --
+        ; and those cells render as a full-width band of white junk over the
+        ; entering monsters for the effect's last ~15 frames, until the
+        ; effect's own cleanup refills the buffer.  the owner's "white flash
+        ; at the START of the fight, as the enemies are appearing ... too
+        ; quick to screenshot" -- reliable in exactly the fights whose
+        ; entrance slides shown monsters under live hud lines.  $01ee is the
+        ; word vanilla holds in every field cell it did not draw itself,
+        ; priority-CLEAR, safe in BOTH tile modes (its 16x16 neighbors
+        ; $1ef/$1fe/$1ff are priority-clear with it, under the battle bg) --
+        ; the same word the veil below writes over live cells and the entry
+        ; wipes sweep.  an abandoned cell is now word-identical to a cell we
+        ; never touched.
+        lda     #$01ee
         sta     hVMDATAL
         sta     hVMDATAL
         sta     hVMDATAL
@@ -3440,7 +3466,13 @@ OT6_SCRIPTBUSY := $57bf         ; nonzero = a battle animation script
         longa
         lda     f:$7e0000+OT6_PIPPREV            ; reload (gate ate a)
         sta     hVMADDL                  ; moved/closed: blank the old cell
-        lda     #$21ff
+        lda     #$21ff          ; $21ff HERE is correct, on purpose: the pip
+                                ;   lives in the party-window MENU map, whose
+                                ;   hdma $2105 sections ($8973/$8977) no anim
+                                ;   ever flips to 16x16 -- the field-map
+                                ;   blank above had to become $01ee (the
+                                ;   entrance-flash fix), but $01ee is the
+                                ;   FIELD map's fill, not this map's
         sta     hVMDATAL
         lda     f:$7e0000+OT6_PIPPREV
         clc

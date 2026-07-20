@@ -223,8 +223,13 @@ H.run({ maxFrames = 30000 }, {
   H.call(function()
     -- the flush re-hung the cells: blank-old covers A0..A0+4, write-new
     -- covers A0+2..A0+6, so the net is head word blanked and the old
-    -- head glyph now sitting one cell pair to the right
-    H.assertEq(vramWord(oldAnchor), 0x21ff, "old head cell blanked")
+    -- head glyph now sitting one cell pair to the right.  the blank word
+    -- is vanilla's $01EE fill: an abandoned cell must be word-identical
+    -- to one never touched, or an animation's bg3-16x16 window renders
+    -- it as junk (the Lete entrance flash -- battle_hudtrail's bug; a
+    -- $21FF here was that bug's fingerprint, not part of this test's
+    -- contract, which only needs "no glyph left behind").
+    H.assertEq(vramWord(oldAnchor), 0x01ee, "old head cell blanked")
     H.assertEq(vramWord(oldAnchor + 2), oldCell, "cells re-hung at +2")
     H.screenshot("hudtrack_postmove")
     liveMark = snap()
