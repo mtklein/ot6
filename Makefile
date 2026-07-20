@@ -325,10 +325,17 @@ build/states/doma_defended.mss.lua: build/states/camp_cleared.mss.lua
 # flap (navTo drops its plan on the flap; see the generator header).
 build/states/camp_escaped.mss.lua: build/states/doma_defended.mss.lua
 	$(call mint,camp_escaped,gen_sabin_magitek)
+# gen_sabin_forest: the Phantom Forest -- world (178,82) into map 132, the
+# 132->133->134->135->140 chain (map 133's one-way recovery spring is a
+# MANDATORY conveyor past its back-exit; each map's arrival brushes a back-exit
+# so crossings pick interior waypoints), then boarding the Phantom Train at 140
+# (72,11) -> map 145.  Mints forest_done on the train.
+build/states/forest_done.mss.lua: build/states/camp_escaped.mss.lua
+	$(call mint,forest_done,gen_sabin_forest)
 # SABIN's continuation states join the frontier additively (a += line, kept off
 # the base := list so the other scenario agents' FRONTIER edits never collide
 # with this one).  Extended in place as each leg lands.
-FRONTIER += camp_escaped
+FRONTIER += camp_escaped forest_done
 
 # ---- rung 4: LOCKE's scenario, hub -> South Figaro -> TunnelArmr ----
 # gen_sfigaro: the occupied town.  The gate soldier (battle 11), then the
