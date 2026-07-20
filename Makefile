@@ -438,26 +438,79 @@ build/states/t2_terra_done.mss.lua: build/states/t2_terra_clifftop.mss.lua
 # lives outside the mechanically-prefixed chain).
 build/states/two_done.mss.lua: build/states/t2_terra_done.mss.lua
 	$(call mint,two_done,gen_two_done)
-# SABIN's slot (consumed when his back half lands).  ORDER REVISED from
-# "Sabin last" after the reunion spike: whichever chain returns to the hub
-# THIRD rides the reunion instead of reaching the hub, so its FINAL leg
-# must be reunion-aware -- and gen_terra_done (ours) already is (it mints
-# reunion_ready.mss on an all-three boot; see its header).  So Sabin runs
-# SECOND and Terra's chain replays LAST:
-#   s2_scenario_hub <- locke_done  (cp seed, same shape as t2_)
-#   s2_* : Sabin's whole chain with OT6_STACK=s2_, ending at his hub
-#          return ($001E+$0044 = two flags, no reunion) -- mirror the t2_
-#          rules one-for-one when his ending generator exists
-#   t3_scenario_hub <- s2_<sabin-ending>
-#   t3_* : gen_rapids .. gen_terra_clifftop with OT6_STACK=t3_
-#   reunion_ready.mss.lua: gen_terra_done with OT6_STACK=t3_ -- its
-#          all-three fork rides _caadb9's reunion to the map-22 staging
-#          and mints t3_reunion_ready; a gen_two_done-shaped acceptance
-#          re-saves it as reunion_ready
-# Then append to FRONTIER: the s2_/t3_ names, reunion_ready,
-# narshe_battle, kefka_doorstep, kefka_won -- the rules below are already
-# live, just unlisted so `make frontier` stays green while the boot is
-# unmintable.
+# ---- the FULL stack: SABIN second (s2_), TERRA last (t3_) ----------------
+# ORDER (from the reunion spike): whichever chain returns to the hub THIRD
+# rides the reunion instead of reaching the hub, so the final leg must be
+# reunion-aware -- gen_terra_done is (its all-three fork mints
+# t3_reunion_ready at the map-22 staging).  Sabin's chain replays SECOND on
+# top of locke_done, ending at his hub return ($001E+$0044, no reunion).
+build/states/s2_scenario_hub.mss.lua: build/states/locke_done.mss.lua
+	@if [ build/states/.rom-copy -nt build/states/s2_scenario_hub.mss ] || [ ! -f build/states/s2_scenario_hub.mss ]; then \
+		cp build/states/locke_done.mss build/states/s2_scenario_hub.mss; \
+		cp build/states/locke_done.mss.lua build/states/s2_scenario_hub.mss.lua; \
+		echo "stack seed: s2_scenario_hub <- locke_done"; \
+	fi
+	@touch build/states/s2_scenario_hub.mss.lua
+build/states/s2_sabin_world.mss.lua: build/states/s2_scenario_hub.mss.lua
+	$(call smint,s2_sabin_world,s2_,gen_sabin_world)
+build/states/s2_sabin_camp.mss.lua: build/states/s2_sabin_world.mss.lua
+	$(call smint,s2_sabin_camp,s2_,gen_sabin_world)
+build/states/s2_cyan_defence.mss.lua: build/states/s2_sabin_camp.mss.lua
+	$(call smint,s2_cyan_defence,s2_,gen_sabin_camp)
+build/states/s2_camp_intro.mss.lua: build/states/s2_cyan_defence.mss.lua
+	$(call smint,s2_camp_intro,s2_,gen_sabin_camp)
+build/states/s2_kefka_done.mss.lua: build/states/s2_camp_intro.mss.lua
+	$(call smint,s2_kefka_done,s2_,gen_sabin_kefka)
+build/states/s2_camp_cleared.mss.lua: build/states/s2_kefka_done.mss.lua
+	$(call smint,s2_camp_cleared,s2_,gen_sabin_doma)
+build/states/s2_doma_defended.mss.lua: build/states/s2_camp_cleared.mss.lua
+	$(call smint,s2_doma_defended,s2_,gen_sabin_escape)
+build/states/s2_camp_escaped.mss.lua: build/states/s2_doma_defended.mss.lua
+	$(call smint,s2_camp_escaped,s2_,gen_sabin_magitek)
+build/states/s2_forest_done.mss.lua: build/states/s2_camp_escaped.mss.lua
+	$(call smint,s2_forest_done,s2_,gen_sabin_forest)
+build/states/s2_train_done.mss.lua: build/states/s2_forest_done.mss.lua
+	$(call smint,s2_train_done,s2_,gen_sabin_train)
+build/states/s2_falls_done.mss.lua: build/states/s2_train_done.mss.lua
+	$(call smint,s2_falls_done,s2_,gen_sabin_falls)
+build/states/s2_gau_joined.mss.lua: build/states/s2_falls_done.mss.lua
+	$(call smint,s2_gau_joined,s2_,gen_sabin_gau)
+build/states/s2_sabin_done.mss.lua: build/states/s2_gau_joined.mss.lua
+	$(call smint,s2_sabin_done,s2_,gen_sabin_trench)
+# TERRA/BANON's chain replays LAST, on top of two completions:
+build/states/t3_scenario_hub.mss.lua: build/states/s2_sabin_done.mss.lua
+	@if [ build/states/.rom-copy -nt build/states/t3_scenario_hub.mss ] || [ ! -f build/states/t3_scenario_hub.mss ]; then \
+		cp build/states/s2_sabin_done.mss build/states/t3_scenario_hub.mss; \
+		cp build/states/s2_sabin_done.mss.lua build/states/t3_scenario_hub.mss.lua; \
+		echo "stack seed: t3_scenario_hub <- s2_sabin_done"; \
+	fi
+	@touch build/states/t3_scenario_hub.mss.lua
+build/states/t3_rapids_start.mss.lua: build/states/t3_scenario_hub.mss.lua
+	$(call smint,t3_rapids_start,t3_,gen_rapids)
+build/states/t3_rapids_done.mss.lua: build/states/t3_rapids_start.mss.lua
+	$(call smint,t3_rapids_done,t3_,gen_rapids)
+build/states/t3_terra_narshe.mss.lua: build/states/t3_rapids_done.mss.lua
+	$(call smint,t3_terra_narshe,t3_,gen_terra_narshe)
+build/states/t3_terra_caves.mss.lua: build/states/t3_terra_narshe.mss.lua
+	$(call smint,t3_terra_caves,t3_,gen_terra_caves)
+build/states/t3_terra_clifftop.mss.lua: build/states/t3_terra_caves.mss.lua
+	$(call smint,t3_terra_clifftop,t3_,gen_terra_clifftop)
+# gen_terra_done on the all-three boot takes its REUNION FORK: rides
+# _caadb9's cutscene to the map-22 staging and mints t3_reunion_ready.
+build/states/t3_reunion_ready.mss.lua: build/states/t3_terra_clifftop.mss.lua
+	$(call smint,t3_reunion_ready,t3_,gen_terra_done)
+# the acceptance gate (gen_two_done's shape, one layer up): assert ALL
+# THREE flags + the reunion on the stacked ending and re-save it as the
+# canonical reunion_ready -- the boot gen_narshe_battle consumes.
+build/states/reunion_ready.mss.lua: build/states/t3_reunion_ready.mss.lua
+	$(call mint,reunion_ready,gen_reunion_ready)
+FRONTIER += s2_scenario_hub s2_sabin_world s2_sabin_camp s2_cyan_defence \
+            s2_camp_intro s2_kefka_done s2_camp_cleared s2_doma_defended \
+            s2_camp_escaped s2_forest_done s2_train_done s2_falls_done \
+            s2_gau_joined s2_sabin_done t3_scenario_hub t3_rapids_start \
+            t3_rapids_done t3_terra_narshe t3_terra_caves \
+            t3_terra_clifftop t3_reunion_ready reunion_ready \
+            narshe_battle kefka_doorstep kefka_won
 
 # ---- the Battle for Narshe (waiting on reunion_ready) ---------------------
 # gen_narshe_battle: reunion staging -> BANON -> the three-party assignment
