@@ -8,6 +8,12 @@ ROOT="$(cd "$(dirname "$0")/../.." && pwd)"
 CAL="$ROOT/tools/calypsi/expanded/Payload/usr/local/lib/calypsi-65816-5.17/bin"
 CD="$ROOT/ff6/src/c"
 
+# cc65816 ignores -o for -S output and writes the .s into the CURRENT
+# directory (measured on 5.17 during the 2026-07-20 restore: run from the
+# repo root it left a stray ./ot6spike.s and never touched the tracked
+# one). cd into the source dir so the tracked .s is the one regenerated,
+# from wherever the script is invoked.
+cd "$CD"
 "$CAL/cc65816" --target snes --code-model large --data-model large \
     -O2 --speed -S "$CD/ot6spike.c" -o "$CD/ot6spike.s"
 "$CAL/as65816" "$CD/ot6spike.s" -o "$CD/ot6spike.o"
