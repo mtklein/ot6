@@ -23,7 +23,7 @@ CODE_EXT_INC = 1
 .global Ot6FontRestoreMark_ext
 .global Ot6DangerStep, Ot6MarkRandom
 .global Ot6EntryExitVeil_ext
-.global Ot6TickQuiet_ext, Ot6TickAnim_ext
+.global Ot6ScriptBegin_ext, Ot6ScriptEnd_ext
 .global Ot6C1Rtl, DrawMagicListText, _c15a17, _c15729, WaitTfrVRAM_far
 .global DoMonsterEntryExit
 .global MonsterOverlap          ; per-species $8057 seed (btlgfx data);

@@ -89,7 +89,11 @@ BtlGfxTbl:
         .addr   BtlGfx_01
         .addr   BtlGfx_02
         .addr   BtlGfx_03
-        .addr   BtlGfx_04
+        .addr   Ot6BtlGfx04_c1  ; ot6: same-size repoint -- brackets the
+                                ;   battle script with OT6_SCRIPTBUSY so
+                                ;   the hud anchor holds while animation
+                                ;   scripts can impose coord transients
+                                ;   (real BtlGfx_04 runs inside)
         .addr   BtlGfx_05
         .addr   BtlGfx_06
         .addr   BtlGfx_07
@@ -399,9 +403,7 @@ BtlGfx_01:
         jsr     UpdateMenuWindow
         jsr     _c12f79       ; update character status change animations
         jsr     _c102ca       ; update battle menu
-        jsr     Ot6TickQuiet_c1 ; ot6: UpdateCharText behind a same-size
-                                ;   repoint -- marks this a MAIN-LOOP tick
-                                ;   (settled coords) for the hud anchor
+        jsr     UpdateCharText
         jsl     UpdateCondemnNum
         jsr     MonsterDeathAnim
         jsl     UpdateFacingDir
@@ -432,10 +434,7 @@ WaitFrame:
         jsr     WaitVblank
         jsr     UpdateMenuWindow
         jsr     _c102ca       ; update battle menu
-        jsr     Ot6TickAnim_c1  ; ot6: UpdateCharText behind a same-size
-                                ;   repoint -- marks this an ANIMATION
-                                ;   tick (coords may be transients), so
-                                ;   the hud anchor holds
+        jsr     UpdateCharText
         jsl     UpdateCondemnNum
         jsl     UpdateFacingDir
         lda     w7ee9ef
@@ -49028,26 +49027,33 @@ ItemJumpThrowAnim:
 
 ; ------------------------------------------------------------------------------
 
-; [ ot6: frame-tick provenance shims ]
+; [ ot6: battle-script bracket for the hud anchor ]
 
-; same-size (3-byte jsr) repoints of the two `jsr UpdateCharText` sites --
-; BtlGfx_01 (main battle loop tick) and WaitFrame (animation interpreter
-; tick) -- so Ot6BgHudLine can tell settled frames from transient ones
-; WITHOUT any btlgfx_code size change: battle_banner and probe_banner pin
-; battle-NMI code addresses ($C10BA7/$C10C17/$C10C1B/$C10CA4), and this
-; bank sits $23 bytes short of full, so insertions are doubly off the
-; table.  the shims live in the pinned ot6_c1 tail segment (ld65 raises an
-; overlap error if btlgfx_code ever grows into it), jsl to bank F0 for the
-; actual flag write (the $57ba-$57bf strip keeps its bank-F0-only writer
-; invariant, probe_57ba_strip), and fall through to the real
-; UpdateCharText with the caller's return address untouched.
+; BtlGfxTbl's $04 entry is repointed here (a same-size .addr edit) so
+; that OT6_SCRIPTBUSY brackets exactly the frames on which an animation
+; script can impose monster-coordinate transients -- BtlGfx_04 "execute
+; battle script" is the container every action animation, monster
+; special, entry/exit effect and battle event runs under.  bracketing
+; the CONTAINER rather than tick provenance is a measured correction:
+; probe_animtick showed ~101 of 120 menu-idle frames tick through
+; WaitFrame (the battle menu is modal inside a gfx command), so "ticked
+; by WaitFrame" meant "most of an interactive battle", not "animating".
+;
+; discipline: no btlgfx_code size change (battle_banner and probe_banner
+; pin battle-NMI code addresses $C10BA7/$C10C17/$C10C1B/$C10CA4, and the
+; bank sits $23 bytes short of full), so the wrapper lives in the pinned
+; ot6_c1 tail segment (ld65 raises an overlap error if btlgfx_code ever
+; grows into it) and the flag writes happen in bank F0 (the $57ba-$57bf
+; strip keeps its bank-F0-only writer invariant, probe_57ba_strip).
+; dispatch is `jmp (BtlGfxTbl,x)` from ExecBtlGfx_ext, so the wrapper
+; owns the frame: jsl into the real BtlGfx_04 (its rtl lands back here),
+; then clear the flag and rtl to ExecBtlGfx's caller.  BtlGfx_04 reads
+; no entry registers (first act is CopyPal, which clr_ax's).
 
 .segment "ot6_c1"
 
-Ot6TickQuiet_c1:
-        jsl     Ot6TickQuiet_ext
-        jmp     UpdateCharText
-
-Ot6TickAnim_c1:
-        jsl     Ot6TickAnim_ext
-        jmp     UpdateCharText
+Ot6BtlGfx04_c1:
+        jsl     Ot6ScriptBegin_ext
+        jsl     BtlGfx_04
+        jsl     Ot6ScriptEnd_ext
+        rtl

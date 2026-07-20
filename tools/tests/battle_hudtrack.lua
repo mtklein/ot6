@@ -8,10 +8,15 @@
 -- traded that jitter for permanent staleness: any genuine battlefield
 -- change after arm time (a scripted move, a Cmd_20 reload swapping a
 -- slot's monster, corruption of the anchor itself) was kept for the rest
--- of the battle.  The recompute-and-compare design adopts the anchor only
--- on frames ticked by the main loop (BtlGfx_01), holds it on frames
--- ticked by the animation interpreter (WaitFrame), and writes only on
--- real change.
+-- of the battle.  The recompute-and-compare design recomputes every
+-- frame, holds while a battle animation script is executing
+-- (OT6_SCRIPTBUSY brackets BtlGfx_04 -- the container all transient-
+-- imposing scripts run under), and writes only on real change.  An
+-- earlier cut gated on tick provenance (BtlGfx_01 vs WaitFrame) and
+-- this test's phase 3 caught it holding forever: probe_animtick
+-- measured ~101 of 120 menu-idle frames ticking through WaitFrame
+-- (the menu is modal inside a gfx command), so "WaitFrame = animating"
+-- was false and the gate never opened during interactive battle.
 --
 -- THREE PHASES, both directions loudly, asserted as write-count DELTAS
 -- against a watch over all six lines' anchor words:
@@ -171,7 +176,15 @@ H.run({ maxFrames = 30000 }, {
     s.n = s.n + 1
     return s.n >= 90
   end, 3000, "slot position settled for 90 consecutive frames", 1),
-  H.call(function()
+  -- inject only while NO battle script is in flight (OT6_SCRIPTBUSY,
+  -- $57bf, == 0): an action mid-flight has PushObjPos-saved the old
+  -- coords and its PopObjPos would silently erase the injection
+  -- (measured: probe_animtick watched $800f snap back to 48 when a
+  -- guard action's restore fired over the moved value).  injecting at
+  -- flag==0 is safe both ways: a script starting AFTER the injection
+  -- pushes-and-pops the MOVED coords, so the move survives it.
+  H.waitUntil(function()
+    if H.readByte(0x57bf) ~= 0 then return false end
     oldAnchor = H.readWord(SHADOW + mover * STRIDE)
     oldCell = vramWord(oldAnchor)
     old800f = H.readWord(0x800f + mover * 2)
@@ -181,19 +194,33 @@ H.run({ maxFrames = 30000 }, {
     H.log(string.format(
       "moved slot %d: $80c3 %d -> %d, anchor was $%04x head cell $%04x",
       mover, x, x + 16, oldAnchor, oldCell))
-  end),
-  H.waitFrames(10),
+    H.vars.movedAt = H.frame
+    return true
+  end, 1800, "a script-free frame to inject the move on", 1),
+  -- adoption lands at the next script-free builder pass.  in this
+  -- fixture the guards act nearly continuously (probe_animtick: the
+  -- busy flag is up ~95% of interactive time), so the gap -- and with
+  -- it the adoption -- can be seconds out.  that latency is the
+  -- design's honest beat: adopt only what a settled frame shows.
+  H.waitUntil(function()
+    return H.readWord(SHADOW + mover * STRIDE) == (oldAnchor + 2) % 0x10000
+  end, 900, "anchor adopts the moved monster (old + 2 words for 16px)", 1),
   H.call(function()
-    -- positive control: vanilla itself tracked the move
+    H.log(string.format("adopted %d frames after injection",
+      H.frame - H.vars.movedAt))
+    -- positive control: vanilla itself still tracks the move (an
+    -- in-flight restore would have snapped $800f back and the adopt
+    -- wait above would have timed out instead)
     H.assertEq(H.readWord(0x800f + mover * 2), (old800f + 16) % 0x10000,
       "cur_poi_set followed the move (the battlefield really changed)")
-    local now = H.readWord(SHADOW + mover * STRIDE)
-    H.log(string.format("anchor $%04x -> $%04x after the move (%d writes)",
-      oldAnchor, now, delta(liveMark, { mover })))
-    H.assertEq(now, oldAnchor + 2,
-      "anchor adopted the moved monster (old + 2 words for 16px)")
     H.assertEq(delta(liveMark, { mover }), 2,
       "exactly one word store adopted it (2 byte writes)")
+  end),
+  -- give the NMI flush a few frames to execute the transition (its
+  -- one-shot blank+rehang is v-counter admission-gated and may defer
+  -- a frame when the NMI runs late)
+  H.waitFrames(5),
+  H.call(function()
     -- the flush re-hung the cells: blank-old covers A0..A0+4, write-new
     -- covers A0+2..A0+6, so the net is head word blanked and the old
     -- head glyph now sitting one cell pair to the right

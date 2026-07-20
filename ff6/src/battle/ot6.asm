@@ -1692,7 +1692,7 @@ Ot6FontIcons:
         lda     #$00
         sta     f:$7e0000+OT6_RANDPEND
         sta     f:$7e0000+OT6_HUDVEIL   ; a stale veil never survives init
-        sta     f:$7e0000+OT6_ANIMTICK  ; nor a stuck anchor-adopt gate
+        sta     f:$7e0000+OT6_SCRIPTBUSY ; nor a stuck anchor-adopt gate
         lda     #$01
         sta     $3e9c           ; characters open with 1 bp, octopath-style
         sta     $3e9e
@@ -2353,38 +2353,50 @@ done:   plp
 OT6_SHADOW  := $ecf1            ; lines, stride 14
 OT6_MAPBASE := $57b6            ; word scratch: field bg3 map base
 
-; [ frame-tick provenance: who ticked this frame? ]
+; [ battle-script bracket: is an animation script executing? ]
 
-; battle frames advance through exactly two procs, both of which reach the
-; hud builder via `jsr UpdateCharText`: BtlGfx_01 (btlgfx_main @01fb,
-; "called from main battle loop, and 4 times after each attack animation")
-; and WaitFrame (@022a, "used during animations").  every coordinate
-; transient the animation engine imposes on the monster position arrays --
-; magic_init_131long zeroing/setting the $8057 priority shifts and
-; displacing $80cf by -$0100 (btlgfx_main.asm:39277-39297), AnimCmd_80_82's
-; all-slot x shove (:29906), AnimCmd_e2/e3's per-frame y animation
-; (:33206-33279), the PushObjPos/PopObjPos block-hop family (:28045/:28081)
-; -- lives on WaitFrame-ticked frames and is unwound by its own script
-; before BtlGfx_01 ticks resume: PopObjPos restores what PushObjPos saved,
-; $80/$84 restores $80/$83's y displacement, $e3 restores from w7e64e8.
-; (a script that ended WITHOUT restoring would visibly displace the
-; monster in vanilla too, at which point following it is correct, not
-; stale.)  so "this frame was ticked by WaitFrame" is exactly "these
-; coords may be animation transients", and the hud anchor holds; on
-; BtlGfx_01 ticks the coords are settled by construction and the anchor
-; may adopt.  both call sites verified a8/i16 (bank C1 battle context).
+; every coordinate transient the animation engine imposes on the monster
+; position arrays -- magic_init_131long zeroing/setting the $8057
+; priority shifts and displacing $80cf by -$0100 (btlgfx_main.asm:
+; 39277-39297), AnimCmd_80_82's all-slot x shove (:29906), AnimCmd_e2/
+; e3's per-frame y animation (:33206-33279), the PushObjPos/PopObjPos
+; block-hop family (:28045/:28081) -- runs from a battle animation
+; script, and every such script executes inside BtlGfx_04 "execute
+; battle script" (btlgfx_main @9512): action animations, monster
+; specials, entry/exit effects, battle events.  scripts restore their
+; transients before they end (PopObjPos restores what PushObjPos saved,
+; $80/$84 restores $80/$83's y displacement, $e3 restores from
+; w7e64e8), so script-free frames see settled coords by construction --
+; and a script that ended WITHOUT restoring has visibly parked the
+; monster there in vanilla too, at which point following it is correct,
+; not stale.  so the anchor holds while OT6_SCRIPTBUSY is up and adopts
+; on script-free frames.
+;
+; the flag is raised/cleared by the Ot6BtlGfx04_c1 wrapper behind
+; BtlGfxTbl's $04 entry (same-size .addr repoint; see the block comment
+; there for the C1 layout discipline).  DESIGN HISTORY, measured not
+; guessed: the first cut here keyed on tick provenance instead --
+; BtlGfx_01 ("called from main battle loop") = settled, WaitFrame
+; ("used during animations") = transient, via same-size repoints of
+; their two `jsr UpdateCharText` sites.  probe_animtick killed it: with
+; a battle menu open, ~101 of 120 idle frames tick through WaitFrame
+; (the menu is MODAL inside a gfx command), so the anchor held through
+; the whole interactive battle and battle_hudtrack's phase 3 stayed
+; red -- the sprite moved, the "recompute" never got a frame it was
+; willing to adopt on.  the script container is the discriminator the
+; tick path only approximated.
 
-.proc Ot6TickQuiet_ext
+.proc Ot6ScriptBegin_ext
         .a8
-        lda     #$00
-        sta     f:$7e0000+OT6_ANIMTICK
+        lda     #$01
+        sta     f:$7e0000+OT6_SCRIPTBUSY
         rtl
 .endproc
 
-.proc Ot6TickAnim_ext
+.proc Ot6ScriptEnd_ext
         .a8
-        lda     #$01
-        sta     f:$7e0000+OT6_ANIMTICK
+        lda     #$00
+        sta     f:$7e0000+OT6_SCRIPTBUSY
         rtl
 .endproc
 
@@ -2576,11 +2588,14 @@ OT6_MAPBASE := $57b6            ; word scratch: field bg3 map base
         ; transients"), which also made any post-arm divergence permanent:
         ; the founding $5762 overlap corruption (probe_shadow_overlap), a
         ; Cmd_20 reload swapping a slot's monster, any scripted move. the
-        ; transients are now READ and NAMED (Ot6TickQuiet_ext's block
-        ; comment lists them with line numbers): every one rides frames
-        ; ticked by the animation interpreter, so the anchor HOLDS on
-        ; those (OT6_ANIMTICK set) and recomputes on main-loop ticks,
-        ; where the coords are settled by construction. identical frames
+        ; transients are now READ and NAMED (Ot6ScriptBegin_ext's block
+        ; comment lists them with line numbers): every one runs inside a
+        ; battle animation script, so the anchor HOLDS while one executes
+        ; (OT6_SCRIPTBUSY, bracketing BtlGfx_04) and recomputes on
+        ; script-free frames, where coords are settled by construction
+        ; (probe_animtick MEASURED the beat: menu-idle frames are mostly
+        ; WaitFrame ticks, so tick provenance was the wrong gate -- the
+        ; script container is the right one). identical frames
         ; compare equal and write nothing -- the jitter fix -- while a
         ; genuine change (one that survives into a quiet frame) is
         ; adopted within a frame or two -- the staleness fix. gated by
@@ -2607,8 +2622,8 @@ OT6_MAPBASE := $57b6            ; word scratch: field bg3 map base
         ; at btlgfx_main.asm:1133 bypasses monster load, so its species
         ; stash is stale -- unowned territory, same as under the latch:
         ; no WoB-covered content drives it.)
-        lda     f:$7e0000+OT6_ANIMTICK
-        bne     @keep           ; animation interpreter owns this frame:
+        lda     f:$7e0000+OT6_SCRIPTBUSY
+        bne     @keep           ; a battle script owns this frame:
                                 ;   coords may be transients -- hold
         phx                     ; save shadow line base
         longa
@@ -2727,7 +2742,7 @@ OT6_RELAY_STAGES := 3           ; icons, glyphs x2 (~128b each). was 6:
 ; $57ba is rewritten every init by the spike probe anyway, and clearing
 ; $57bc would eat the random-encounter marker the field just set.
 ; occupants: $57ba-$57bb CWITNESS, $57bc RANDPEND, $57bd RANDBTL,
-; $57be HUDVEIL, $57bf ANIMTICK (HUDVEIL and ANIMTICK init-cleared one
+; $57be HUDVEIL, $57bf SCRIPTBUSY (HUDVEIL and SCRIPTBUSY init-cleared one
 ; byte at a time in InitBP).
 OT6_CWITNESS := $57ba           ; word: the C toolchain spike's result
                                 ;   (Ot6CSpikeProbe; battle_c.lua asserts
@@ -2769,24 +2784,21 @@ OT6_HUDVEIL  := $57be           ; nonzero = a monster entry/exit animation
                                 ;   InitBP (the strip is init-exempt, so
                                 ;   power-on junk here would blank the
                                 ;   hud from battle one).
-OT6_ANIMTICK := $57bf           ; nonzero = this frame was ticked by the
-                                ;   animation interpreter (WaitFrame,
-                                ;   btlgfx_main @022a "used during
-                                ;   animations") rather than the main
-                                ;   battle loop (BtlGfx_01 @01fb). set/
-                                ;   cleared by Ot6TickAnim_ext /
-                                ;   Ot6TickQuiet_ext (bank F0, keeping
-                                ;   the strip's F0-only writer invariant)
-                                ;   via same-size jsr repoints of the two
-                                ;   `jsr UpdateCharText` sites. the hud
-                                ;   builder holds anchor adoption while
-                                ;   set -- animation coord transients
-                                ;   never reach the anchor. cleared by
+OT6_SCRIPTBUSY := $57bf         ; nonzero = a battle animation script
+                                ;   (BtlGfx_04 "execute battle script")
+                                ;   is executing, so monster coords may
+                                ;   be animation transients. raised/
+                                ;   cleared by Ot6ScriptBegin_ext /
+                                ;   Ot6ScriptEnd_ext (bank F0, keeping
+                                ;   the strip's F0-only writer
+                                ;   invariant) from the Ot6BtlGfx04_c1
+                                ;   wrapper behind BtlGfxTbl's $04
+                                ;   entry. the hud builder holds anchor
+                                ;   adoption while set. cleared by
                                 ;   InitBP (init-exempt strip: power-on
-                                ;   junk would freeze anchor adoption --
-                                ;   though the first main-loop tick,
-                                ;   BtlGfx_00's own jsl BtlGfx_01
-                                ;   included, self-heals it anyway).
+                                ;   junk would freeze anchor adoption)
+                                ;   and self-healing besides: the first
+                                ;   completed script clears it.
 
 ; [ monster entry/exit animations: veil the under-enemy hud ]
 
