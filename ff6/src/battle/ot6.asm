@@ -1853,6 +1853,14 @@ done:   rtl
         txa                     ; width-neutral character test
         cmp     #$08
         bcs     done            ; monsters never boost
+        lda     $b1             ; counterattacks never boost: they execute
+        lsr                     ;   through ExecRetal, which sets $b1.0
+        bcs     done            ;   (battle_main.asm:12435) and ends at an
+                                ;   UNHOOKED EndAction -- so the pending
+                                ;   would be delivered but never charged.
+                                ;   a black belt counter with pending 3
+                                ;   measured 7 swings, free
+                                ;   (probe_ctrboost).
         lda     $3e9d,x         ; pending boost level
         beq     done
         asl                     ; two swings per bp
@@ -1880,6 +1888,11 @@ done:   rtl
         longi
         .i16
         pha
+        lda     $b1             ; a counter's fold would be free the same
+        lsr                     ;   way: ai counter scripts (a raged gau's)
+        bcs     @keep           ;   route through CreateAction under
+                                ;   ExecRetal's $b1.0, and no ActionEnd
+                                ;   ever charges what they queue
         lda     $3a7a           ; command
         cmp     #$02
         beq     @cmdok          ; $02 magic
@@ -2125,6 +2138,13 @@ Ot6BushidoTierTbl:
         txa                     ; width-neutral character test
         cmp     #$08
         bcs     done            ; monsters never boost
+        lda     $b1             ; counterattacks never boost (the $b1.0
+        lsr                     ;   flag ExecRetal raises): interceptor's
+        bcs     done            ;   dog rides command $02 attack $fc/$fd
+                                ;   (battle_main.asm:12606) -- no exemption
+                                ;   below would catch it, and the counter
+                                ;   path never reaches Ot6ActionEnd to
+                                ;   charge what it delivered
         lda     $b5             ; current command
         beq     done            ; $00 fight: boost = extra swings
         cmp     #$06
