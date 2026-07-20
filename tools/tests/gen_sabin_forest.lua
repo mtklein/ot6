@@ -151,7 +151,22 @@ H.run({ maxFrames = 120000 }, {
   H.call(function()
     H.assertEq(H.worldMode(), true, "start on the World of Balance")
     H.assertEq(sw(0x0037), 1, "$0037 set -- escape done")
-    H.log(string.format("[forest] start world (%d,%d)", H.worldX(), H.worldY()))
+    -- PIN SHADOW for the walk.  The camp exit ran `clr_b_switch $4B`
+    -- (event_main.asm:42251), so battle switch $4B -- "shadow won't leave
+    -- after battle", field byte $1dd2 bit $08, copied to $3ebd per battle
+    -- by the $1dc9+x -> $3eb4+x block at battle_main.asm:6100 -- is CLEAR
+    -- for this whole walk, and every encounter the route kill-bits rolls
+    -- Rand<$10 at its win to walk Shadow off (battle_main.asm:11976-11991).
+    -- The roll is vanilla-legit; a fixture chain on a fixed lineage is one
+    -- phase shift from a 1/16 no-Shadow mint -- the 2026-07-20 remint
+    -- rolled exactly that, and forest_done minted without him because
+    -- nothing here asserted him (fixed below).  Pin the bit for the walk
+    -- and restore the boot value before the save, so the state carries the
+    -- story's own byte, not the pin.
+    H.vars.dd2boot = H.readByte(0x1dd2) & 0x08
+    H.writeByte(0x1dd2, H.readByte(0x1dd2) | 0x08)
+    H.log(string.format("[forest] start world (%d,%d) $1dd2 pinned (was &08=%d)",
+      H.worldX(), H.worldY(), H.vars.dd2boot))
   end),
 
   -- world -> Phantom Forest map 132
@@ -273,6 +288,10 @@ H.run({ maxFrames = 120000 }, {
     H.assertEq(sw(0x0038), 1, "$0038 set -- train discovered")
     H.assertEq(inParty(5), true, "SABIN aboard")
     H.assertEq(inParty(2), true, "CYAN aboard")
+    H.assertEq(inParty(3), true, "SHADOW aboard (the $4B pin held)")
+    -- restore the story's own bit before the capture (see the boot pin)
+    H.writeByte(0x1dd2,
+      (H.readByte(0x1dd2) & 0xF7) | (H.vars.dd2boot or 0))
     H.assertEq(sw(0x003A), 0, "$003A clear -- Ghost Train not yet beaten")
     H.log(string.format("[forest_done] f%d map=%d (%d,%d) $0038=%d $017C=%d",
       H.frame, mapIdx(), H.fieldX(), H.fieldY(), sw(0x0038), sw(0x017C)))

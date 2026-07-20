@@ -113,10 +113,12 @@ end
 local function swDump(tag)
   H.log(string.format(
     "[train %s] map=%d (%d,%d) $0039=%d $017C=%d $017E=%d $017F=%d "..
-    "$0180=%d $0182=%d $0183=%d $0184=%d $0185=%d $0186=%d $003A=%d $003B=%d",
+    "$0180=%d $0182=%d $0183=%d $0184=%d $0185=%d $0186=%d $003A=%d $003B=%d "..
+    "shdw=%s/$1dd2=%02X/av=%02X",
     tag, mapIdx(), H.fieldX(), H.fieldY(), sw(0x39), sw(0x17C), sw(0x17E),
     sw(0x17F), sw(0x180), sw(0x182), sw(0x183), sw(0x184), sw(0x185),
-    sw(0x186), sw(0x3A), sw(0x3B)))
+    sw(0x186), sw(0x3A), sw(0x3B),
+    tostring(inParty(3)), H.readByte(0x1dd2), H.readByte(0x1ede)))
 end
 
 -- scripted train fights ("real"): pin the party, clamp the monsters to
@@ -323,6 +325,16 @@ H.run({ maxFrames = 200000 }, {
     H.assertEq(sw(0x38), 1, "$0038 set -- train discovered")
     H.assertEq(sw(0x39), 0, "$0039 clear -- not yet departed")
     swDump("start")
+    -- PIN SHADOW aboard, gen_sabin_forest's contract (see its boot pin for
+    -- the full mechanism): battle switch $4B is still story-CLEAR through
+    -- the train's collision fights -- the story only re-sets it at the
+    -- jump-off scene (event_main.asm:63061) and clears it again in the
+    -- post-ride cleanup (:66151) -- so every win here rolls the 1/16.
+    -- Pin for the leg, restore the boot value before the save; the story's
+    -- own mid-leg writes land on top of the pin harmlessly (no battles run
+    -- between the cleanup clear and the save).
+    H.vars.dd2boot = H.readByte(0x1dd2) & 0x08
+    H.writeByte(0x1dd2, H.readByte(0x1dd2) | 0x08)
   end),
 
   -- ---- rear half ----
@@ -336,6 +348,25 @@ H.run({ maxFrames = 200000 }, {
   holdDrive("left", function() return mapIdx() == 145 end, "-> car B", 4000),
   settle(145, "car B"),
   H.call(function() H.assertEq(sw(0x17E), 1, "$017E -- this 145 is car B") end),
+  -- Car B's aisle first gets a plain HELD walk, and only then bfs: on the
+  -- 2026-07-20 lineage the ghosts' wander phase parked a pair mid-aisle
+  -- long enough that the object map showed a full cut (both rows claimed
+  -- at one column) for longer than navTo's whole no-path patience -- while
+  -- the ENGINE walked straight through the same stretch, the moving party
+  -- shouldering past as gaps opened (measured: hold-left crossed the
+  -- "cut" and reached (4,7) in 419 frames while bfs still saw no path).
+  -- The model is honestly conservative here -- it reads the object map at
+  -- one instant; a held walk renegotiates every frame.  Same idiom as the
+  -- exits' holdDrive; navTo then lands the final tiles precisely.
+  (function()
+    local n = 0
+    return H.driveUntil(function()
+      n = n + 1
+      return H.fieldX() <= 4 or n > 900
+    end, 1000, {
+      H.call(function() H.setPad({ left = true }) end),
+    }, "car B's aisle, held through the ghost wander")
+  end)(),
   H.navTo(2, 7, { maxFrames = 12000 }),
   holdDrive("left", function() return mapIdx() == 142 end, "B west exit", 4000),
   settle(142, "pocket (50,8)"),
@@ -523,9 +554,9 @@ H.run({ maxFrames = 200000 }, {
         phase = (phase + 1) % 8
         if H.frame - hb >= 900 then
           hb = H.frame
-          H.log(string.format("ride f%d map=%d world=%s dlg=%s $003B=%d",
+          H.log(string.format("ride f%d map=%d world=%s dlg=%s $003B=%d shdw=%s",
             H.frame, mapIdx(), tostring(H.worldMode()),
-            tostring(H.dialogWaiting()), sw(0x3B)))
+            tostring(H.dialogWaiting()), sw(0x3B), tostring(inParty(3))))
         end
         if H.dialogWaiting() then H.setPad(phase < 4 and { "a" } or {}); return end
         H.setPad({})
@@ -545,6 +576,9 @@ H.run({ maxFrames = 200000 }, {
     H.assertEq(inParty(5), true, "SABIN in the party")
     H.assertEq(inParty(2), true, "CYAN in the party")
     H.assertEq(inParty(3), true, "SHADOW in the party (rejoined, $018D dance)")
+    -- restore the story's own $4B bit before the capture (see the boot pin)
+    H.writeByte(0x1dd2,
+      (H.readByte(0x1dd2) & 0xF7) | (H.vars.dd2boot or 0))
     H.log(string.format("[train_done] f%d world (%d,%d)",
       H.frame, H.worldX(), H.worldY()))
     H.screenshot("train_done")
