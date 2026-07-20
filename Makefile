@@ -332,10 +332,18 @@ build/states/camp_escaped.mss.lua: build/states/doma_defended.mss.lua
 # (72,11) -> map 145.  Mints forest_done on the train.
 build/states/forest_done.mss.lua: build/states/camp_escaped.mss.lua
 	$(call mint,forest_done,gen_sabin_forest)
+# gen_sabin_train: the Phantom Train, boarding to the Ghost Train's fall --
+# the maze decoded and driven (car interiors are REUSED per physical car
+# with $017E/$0180 as bookkeeping; the chase, the two-pull lever, the strip
+# route, the valves, and battle 68 fought with real Blitz inputs: the
+# 6-shield OT6_BLUDG row chip-proven at runtime).  Ends on the world map
+# at (178,93) with $003A/$003B set.
+build/states/train_done.mss.lua: build/states/forest_done.mss.lua
+	$(call mint,train_done,gen_sabin_train)
 # SABIN's continuation states join the frontier additively (a += line, kept off
 # the base := list so the other scenario agents' FRONTIER edits never collide
 # with this one).  Extended in place as each leg lands.
-FRONTIER += camp_escaped forest_done
+FRONTIER += camp_escaped forest_done train_done
 
 # ---- rung 4: LOCKE's scenario, hub -> South Figaro -> TunnelArmr ----
 # gen_sfigaro: the occupied town.  The gate soldier (battle 11), then the
