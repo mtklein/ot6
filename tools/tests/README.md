@@ -250,6 +250,12 @@ set -- and never creates `SaveStates/`.)
 - `probe_bg3anim.lua` - the first measurement of the display state: runs
   first_battle's Fire Beam (bg3-scripted, $2105=$59 for ~70 frames while
   bg3 stays on the main screen) with a full map-census log per frame.
+- `probe_896f.lua` - write-watcher over the battlefield $2105 shadow
+  ($7E896F): every writer PC and value through a Cirpius battle with a
+  Terra cast.  Measured writer set: C1/B1AF=$59 (InitAnimType's bg1-gfx
+  path, btlgfx_main.asm:26350), C2/F762=$51 (the priority-dropping circle
+  family), C1/C1D8=$19 (weapon-swing bg1-only 16x16), restores at
+  C1/B0AB and C1/C20A -- the flips battle_hudanim16's veil answers.
 - `probe_vargas.lua` - the instrument behind both: dumps the seeded
   formation, gauge, element and class rows and SABIN's join level, and
   answers the two questions the sources do not -- that SABIN gets NO
