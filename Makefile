@@ -318,6 +318,17 @@ build/states/camp_cleared.mss.lua: build/states/kefka_done.mss.lua
 # starting line (the escape walk itself is the next leg).
 build/states/doma_defended.mss.lua: build/states/camp_cleared.mss.lua
 	$(call mint,doma_defended,gen_sabin_escape)
+# gen_sabin_magitek: the Imperial Camp escape -- ride the fight/interlude
+# gauntlet out to the World of Balance.  Battles 15/16/17 are each WON BY
+# TAP-A (kill-bit -> GameOver softlock), and each latchless re-firing trigger
+# is left by holding the corridor's walkable direction through the ~25% control
+# flap (navTo drops its plan on the flap; see the generator header).
+build/states/camp_escaped.mss.lua: build/states/doma_defended.mss.lua
+	$(call mint,camp_escaped,gen_sabin_magitek)
+# SABIN's continuation states join the frontier additively (a += line, kept off
+# the base := list so the other scenario agents' FRONTIER edits never collide
+# with this one).  Extended in place as each leg lands.
+FRONTIER += camp_escaped
 
 # ---- rung 4: LOCKE's scenario, hub -> South Figaro -> TunnelArmr ----
 # gen_sfigaro: the occupied town.  The gate soldier (battle 11), then the
