@@ -18,6 +18,18 @@
 .include "macros.inc"
 .include "code_ext.inc"
 
+; ot6 (v0.4): "every ability costs MP". Default OFF -- the charge machinery
+; (Ot6AbilityCost + Ot6AbilityCostTbl, ot6.asm) lands tested-but-DORMANT
+; until the menu bank can DISPLAY and grey-out these costs (needs the Calypsi
+; C toolchain, not yet reinstalled). A silent charge on a menu that shows no
+; cost is a hidden tax and must not ship, so the whole mechanic gates on this
+; one build-time symbol. Build the ON variant with `-D OT6_MP_COSTS=1`; with
+; the flag off (the shipped ROM) NOT ONE byte of the machinery is assembled,
+; so the ROM is byte-identical to vanilla-OT6. See docs/design/mp-economy.md.
+.ifndef OT6_MP_COSTS
+OT6_MP_COSTS = 0
+.endif
+
 ; ------------------------------------------------------------------------------
 
 .include "battle/ai_script.inc"
@@ -12975,6 +12987,9 @@ CreateAction:
         asl
         tay
         jsr     GetMPCost
+.if OT6_MP_COSTS
+        jsl     Ot6AbilityCost          ; ot6 v0.4: price blitz/bushido/tools
+.endif
         sta     $3620,y     ; add to mp cost queue
         jsl     Ot6QueueFold            ; ot6: boost folds spell tiers
         longa

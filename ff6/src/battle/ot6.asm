@@ -2013,6 +2013,133 @@ Ot6FoldTbl:
         .byte   $1f,$27,$27     ; haste, haste2 (caps)
 
 ; ------------------------------------------------------------------------------
+.if OT6_MP_COSTS
+; ------------------------------------------------------------------------------
+
+; [ price a costed verb's action at queue time (v0.4 -- OT6_MP_COSTS) ]
+
+; the "one dispatch change" docs/design/mp-economy.md's M4 note predicts.
+; vanilla's GetMPCost (battle_main.asm) returns a cost only for magic, lore,
+; summon and x-magic; every other command -- blitz, bushido, tools, the free
+; floor, the free-exception verbs -- falls through it returning 0, so the
+; universal charge at CalcAttackEffect (the $3a4c subtract, and its
+; insufficient-mp FIZZLE) never fires for them. this hook runs on the same A
+; the queue store consumes, right after GetMPCost: for the three costed verbs
+; it swaps the 0 for the kit price, keyed by the resolved id ALREADY sitting
+; in $3a7b at queue time --
+;   blitz  ($0a): attack id  $5d-$64   (FixPlayerAttack's +$5d)
+;   bushido($07): attack id  $55-$5c   (FixPlayerAttack's +$55)
+;   tools  ($09): tool item id $a3-$aa (Cmd_09 resolves it as $b6-$a2)
+; those three id ranges are disjoint, so ONE $ff-terminated (key,cost) table
+; serves all three; the command gate keeps a stray id under any OTHER verb
+; from ever matching a row. an id absent from the table charges 0 -- a
+; missing price is FREE, never a garbage charge -- and every command that is
+; not one of the three returns vanilla's own A untouched (magic stays priced
+; on its own ruler, the free floor stays free).
+;
+; the charge AND the refusal are BOTH already universal (they act on whatever
+; $3620 -> $3a4c holds); the ONLY magic-specific piece is the menu grey-out /
+; cost display (CheckMagicEnabled), which is the menu-bank work this whole
+; flag waits on. that is why a hidden charge must not ship enabled: the menu
+; still shows these verbs no number.
+;
+; boost never raises the price: blitz and tools keep one id no matter the
+; boost, and a boosted bushido has already queued the tech its BP bought
+; (Ot6BushidoTier / Ot6QueueFold leaves $3a7b at that tech), whose own
+; per-tech price is exactly what should be charged -- BP buys the tier, MP
+; prices the cast (mp-economy.md).
+;
+; entry (jsl from CreateAction, right after jsr GetMPCost): a8/i16,
+; A = vanilla cost, X = attacker entity, Y = queue slot. db=$7e (the site
+; Ot6QueueFold reads $3a7a/$3a7b from one instruction later). preserves X
+; and Y (the store needs Y, Ot6QueueFold needs X); returns A = final cost.
+
+.proc Ot6AbilityCost
+        .a8
+        .i16
+        php
+        longi
+        pha                     ; vanilla cost, parked (restored if we defer)
+        lda     $3a7a           ; command
+        cmp     #$07
+        beq     @costed         ; bushido
+        cmp     #$09
+        beq     @costed         ; tools
+        cmp     #$0a
+        beq     @costed         ; blitz
+        pla                     ; some other verb: hand back vanilla's cost
+        plp
+        rtl
+@costed:
+        pla                     ; drop the parked cost (it is 0 for these)
+        phx
+        ldx     #$0000
+@scan:  lda     f:Ot6AbilityCostTbl,x
+        cmp     #$ff
+        beq     @free           ; ran off the table: unpriced ability is free
+        cmp     $3a7b           ; the resolved id (attack id / tool item id)
+        beq     @hit
+        inx
+        inx                     ; 2-byte records: key, cost
+        bra     @scan
+@hit:   lda     f:Ot6AbilityCostTbl+1,x
+        bra     @done
+@free:  lda     #$00
+@done:  plx
+        plp
+        rtl
+.endproc
+
+; (key, cost) pairs, $ff terminates. keys are exactly the id already in $3a7b
+; at queue time, disjoint across the three verbs. numbers are docs/design/
+; kits.md's per-row columns priced on docs/design/mp-economy.md's rulers:
+; the vanilla spell scale (Fire 4, Fire 2 20, Fire 3 51), sabin's ~3-mp base
+; pool sizing the floor of every ladder, and "free-to-learn is not
+; free-to-use" -- a signature is the CHEAPEST row of its kit, never costless.
+Ot6AbilityCostTbl:
+        ; -- Blitz (Sabin), cmd $0a, attack ids $5d-$64. mp-economy.md:
+        ;    "scaled by tier 2-30: Pummel 2-3, mid-kit 6-15, Bum Rush at top".
+        .byte   $5d,  2         ; Pummel     L1  signature -- cheapest row
+        .byte   $5e,  5         ; AuraBolt   L6  holy chip
+        .byte   $5f,  7         ; Suplex     L10 bludgeon
+        .byte   $60,  9         ; Fire Dance L15 fire, all
+        .byte   $61,  8         ; Mantra     L23 party heal (utility, off-ramp)
+        .byte   $62, 12         ; Air Blade  L30 wind, all
+        .byte   $63, 18         ; Spiraler   L42
+        .byte   $64, 30         ; Bum Rush   L70 divine, bludgeon x8 -- the top
+        ; -- Bushido (Cyan), cmd $07, attack ids $55-$5c. kits.md left this
+        ;    column TBD; PROPOSED here from the BP-tier structure. ruling
+        ;    (mp-economy.md): "BP tier + discounted MP 1-8" -- the BP ladder
+        ;    is the real price, so MP rides ~1/3 of a comparable blitz/tool.
+        ;    monotonic with the BP band (0->1, 1->2-3, 2->4-5, 3->6-8).
+        .byte   $55,  1         ; Fang     BP0 signature -- the game's cheapest
+        .byte   $56,  2         ; Sky      BP1 counter stance
+        .byte   $57,  3         ; Tiger    BP1 slash
+        .byte   $58,  4         ; Flurry   BP2 slash x4 (Air Blade 12 -> ~1/3)
+        .byte   $59,  5         ; Dragon   BP2 drain
+        .byte   $5a,  6         ; Eclipse  BP3 slash, all
+        .byte   $5b,  7         ; Tempest  BP3 wind x4
+        .byte   $5c,  8         ; Oblivion BP3+Broken divine -- out of the
+                                ;   ladder until the divine pass; priced ready
+        ; -- Tools (Edgar), cmd $09, tool ITEM ids $a3-$aa. mp-economy.md:
+        ;    "scaled by tier 3-20: AutoCrossbow 3-4, Drill/Chainsaw 12-20,
+        ;    Debilitator 8-12". gil buys the tool once; MP is the per-use cost.
+        .byte   $aa,  4         ; AutoCrossbow signature, piercing x4 shredder
+        .byte   $a3,  6         ; NoiseBlaster confuse
+        .byte   $a4,  8         ; BioBlaster   poison, all -- the armor-break key
+        .byte   $a5,  6         ; Flash        blind, all
+        .byte   $a8, 16         ; Drill        armored-boss answer, pierce
+        .byte   $a6, 18         ; Chain Saw    slashing + instant-death chance
+        .byte   $a7, 10         ; Debilitator  adds + reveals a weakness (probe)
+        .byte   $a9, 14         ; Air Anchor   mid-kit gag (harpoon / doom)
+        ; Overclock (the divine "use two tools") has no single tool item id:
+        ; its price is the SUM of the two tools it fires -- wired the day
+        ; Overclock is built (kits.md: Magitek-factory story unlock).
+        .byte   $ff
+
+; ------------------------------------------------------------------------------
+.endif   ; OT6_MP_COSTS
+; ------------------------------------------------------------------------------
 
 ; [ boost picks the bushido tech — the charge gauge, deleted ]
 
