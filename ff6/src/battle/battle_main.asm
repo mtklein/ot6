@@ -9351,10 +9351,10 @@ TargetEffect_52:
         shorta_sec
         beq     @3a01
         inc     $3401
-        lda     $3b18,x
-        adc     #$32
-        bcs     @39d8
-        sbc     $3b18,y
+        jsl     Ot6StealBoostLevel      ; ot6: boost tilts the success chance
+        adc     #$32                    ;   (a=level+tier, carry set; 3 bp
+        bcs     @39d8                    ;   clamps to $ff so this overflows ->
+        sbc     $3b18,y                  ;   vanilla's own bcs guarantees it)
         bcc     @3a01
         bmi     @39d8
         sta     $ee
@@ -9366,13 +9366,11 @@ TargetEffect_52:
         jsr     RandA
         cmp     $ee
         bcs     @3a01
-@39d8:  phy
-        jsr     Rand
-        cmp     #$20
-        bcc     @39e1
-        iny
-@39e1:  lda     $3308,y
-        ply
+@39d8:  jsl     Ot6StealSlot            ; ot6: boost biases the pick to the
+                                        ;   rare slot (3 bp = rare-if-present);
+                                        ;   0 bp is the vanilla 1/8 roll. a =
+                                        ;   picked item ($ff only at 0 bp),
+                                        ;   x/y preserved for the grant+clear.
         cmp     #$ff
         beq     @3a01
         sta     $2f35
