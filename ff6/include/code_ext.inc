@@ -17,7 +17,11 @@ CODE_EXT_INC = 1
 .global Ot6BgHud_ext, Ot6BgHudFlush_ext, Ot6PipGlyph_ext
 .global Ot6ActionEnd, Ot6BoostDmg, Ot6InitBP
 .global Ot6BushidoTier
+<<<<<<< HEAD
 .global Ot6StealBoostLevel, Ot6StealSlot   ; boost-tiered steal (chance verb)
+=======
+.global Ot6BlitzListOpen         ; v0.3 blitz-as-menu: _c1776b -> tools shell
+>>>>>>> da1c691 (blitz: the command becomes a menu -- the pad-edge code reader dies, the Tools window shell picks a learned blitz)
 .global Ot6AbilityCost           ; v0.4 mp-cost hook (only defined/referenced
                                  ;   under OT6_MP_COSTS; a weak decl otherwise)
 .global Ot6PreviewList_ext

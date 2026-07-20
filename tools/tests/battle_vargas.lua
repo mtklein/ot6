@@ -90,12 +90,12 @@ local HOLY, POISON = 0x20, 0x08
 local PUMMEL, AURABOLT = 0x5D, 0x5E
 local BIOBLASTER, BIO_ATK = 0xA4, 0x7D  -- item id -> the attack it resolves to
 local CMD_TOOLS = 0x09                  -- battle command id (gen_arvis CMDNAME)
+local CMD_BLITZ = 0x0A                  -- blitz command id (opens the menu now)
 local SABIN_E = 3                       -- entity index SABIN joins into
 local EDGAR_E = 0                       -- entity index EDGAR holds (asserted)
 local MENU, ACTOR, MSTATE = 0x7BCA, 0x62CA, 0x7BC2
-local ST_BLITZ = 0x3D                   -- UpdateMenuState_3d, the code window
 local ST_CMD   = 0x05                   -- the command list, cursor live
-local ST_TOOLS = 0x30                   -- UpdateMenuState_30, the tools list
+local ST_TOOLS = 0x30                   -- UpdateMenuState_30, the tools/blitz list
 local ST_TGT   = 0x38                   -- UpdateMenuState_38, target select
 local CMDTBL   = 0x202E                 -- in-battle commands, slot*12 + i*3
 local ITEMLIST = 0x4005                 -- wItemList (btlgfx_ram.inc:36), 3/entry
@@ -248,37 +248,48 @@ local function toolPulse()
   return nil                            -- transient open/close: hands off
 end
 
--- One Blitz, driven the way a player drives it: wait for SABIN's command
--- list, DOWN to slot 1 (Blitz), A to open the code window, then the code as
--- discrete pad EDGES.  UpdateMenuState_3d (btlgfx_main.asm:17219) records
--- edges into a rolling buffer on a 64-frame timeout, so a held direction is
--- ONE input however long it is held; 4 on / 4 off is the same edge discipline
--- dialogs need.  Masks from BlitzButtonMaskTbl (:17002): LEFT $0200, RIGHT
--- $0100, DOWN $0400, DOWN_LEFT $0600 (both bits -- one press, two buttons),
--- A $0080.
-local function blitz(code, name)
-  local steps = {
+-- One Blitz, driven the way v0.3 makes it a menu: wait for SABIN's command
+-- list, poke Blitz ($0a) into all four command cells (the pokeCmd idiom, so
+-- whichever row the cursor rests on opens it), A to open.  _c1776b now hands
+-- off to the Tools window shell in blitz mode (Ot6BlitzListOpen fills
+-- wItemList with the LEARNED blitzes, keyed by the resolved attack id $5D..
+-- $64), so the wanted blitz is picked exactly like a tool: scan wItemList for
+-- its id, WRITE the cursor triple ($895F/$8963/$8967) to that cell, A to
+-- confirm.  The confirm shim (UpdateMenuState_30) subtracts $5D back to the
+-- raw index cmd $0a stores -- the same byte UpdateMenuState_3d used to write.
+local function blitz(skillId, name)
+  return H.cond(function() return true end, {
     H.driveUntil(function()
       return H.readByte(MENU) ~= 0 and H.readByte(ACTOR) == SABIN_E
          and H.readByte(MSTATE) == ST_CMD
     end, 12000, { H.call(tapUnlessSabin), H.waitFrames(1) },
       name .. ": SABIN's command list"),
     H.waitFrames(10),
-    H.pressButtons({ "down" }, 4), H.waitFrames(8),
-    H.pressButtons({ "a" }, 4), H.waitFrames(10),
     H.call(function()
-      H.assertEq(H.readByte(MSTATE), ST_BLITZ,
-        name .. ": the blitz code window is open (menu state $3d)")
+      for i = 0, 3 do H.writeByte(CMDTBL + SABIN_E * 12 + i * 3, CMD_BLITZ) end
+    end),
+    H.pressButtons({ "a" }, 4), H.waitFrames(10),
+    H.driveUntil(function()
+      return H.readByte(ACTOR) == SABIN_E and H.readByte(MSTATE) == ST_TOOLS
+    end, 3000, { H.call(tapUnlessSabin), H.waitFrames(1) },
+      name .. ": the blitz list is open (tools-shell state $30)"),
+    H.call(function()
+      local row = nil
+      for i = 0, 7 do
+        if H.readByte(ITEMLIST + i * 3) == skillId then row = i end
+      end
+      H.assertEq(row ~= nil, true,
+        name .. ": listed in the rendered blitz menu (wItemList)")
+      local slot = H.readByte(ACTOR)
+      H.writeByte(0x895F + slot, 0)         -- scroll
+      H.writeByte(0x8963 + slot, row % 2)   -- column
+      H.writeByte(0x8967 + slot, row // 2)  -- row
       snap(name .. " window")
     end),
-  }
-  for _, b in ipairs(code) do
-    steps[#steps + 1] = H.pressButtons(b, 4)
-    steps[#steps + 1] = H.waitFrames(5)
-  end
-  steps[#steps + 1] = H.pressButtons({ "a" }, 4)
-  steps[#steps + 1] = H.waitFrames(8)
-  return H.cond(function() return true end, steps)
+    H.waitFrames(2),                        -- let the list redraw under the cursor
+    H.pressButtons({ "a" }, 4),
+    H.waitFrames(8),
+  })
 end
 
 local nBefore = 0                       -- gauge-write count before a chip
@@ -475,10 +486,10 @@ H.run({ maxFrames = 60000 }, {
   end),
 
   -- ===================================================================== --
-  -- 4: HOLY.  AuraBolt = DOWN, DOWN-LEFT, LEFT, A (BlitzCode entry 1).
+  -- 4: HOLY.  AuraBolt (Blitz 1, resolved attack id $5e) picked from the menu.
   -- ===================================================================== --
   H.call(function() nBefore = #shWrites end),
-  blitz({ { "down" }, { "down", "left" }, { "left" } }, "AURABOLT"),
+  blitz(AURABOLT, "AURABOLT"),
   H.driveUntil(function() return #shWrites > nBefore end, 2400, {
     H.call(tapUnlessSabin),
   }, "AURABOLT reaches the gauge"),
@@ -496,13 +507,14 @@ H.run({ maxFrames = 60000 }, {
   end),
 
   -- ===================================================================== --
-  -- 5 + 6: BLUDGEONING, and the finish.  Pummel = LEFT, RIGHT, LEFT, A.
-  -- Vargas answers `if_attack PUMMEL` with battle_event $09 +
-  -- kill_monsters ALL, so this same input is both the class proof and the
-  -- win path; the shield write and the teardown are asserted separately.
+  -- 5 + 6: BLUDGEONING, and the finish.  Pummel (Blitz 0, resolved attack id
+  -- $5d) picked from the menu.  Vargas answers `if_attack PUMMEL` with
+  -- battle_event $09 + kill_monsters ALL, so this same selection is both the
+  -- class proof and the win path; the shield write and the teardown are
+  -- asserted separately.
   -- ===================================================================== --
   H.call(function() nBefore = #shWrites end),
-  blitz({ { "left" }, { "right" }, { "left" } }, "PUMMEL"),
+  blitz(PUMMEL, "PUMMEL"),
   H.driveUntil(function() return #shWrites > nBefore end, 2400, {
     H.call(tapUnlessSabin),
   }, "PUMMEL reaches the gauge"),

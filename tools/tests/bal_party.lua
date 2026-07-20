@@ -252,8 +252,9 @@ local QUEUES = {                   -- `shadow`: dispatches an attack?
   { base = 0x3820, ptr = 0x3a66, counter = false, shadow = true  }, -- ExecAction
   { base = 0x3920, ptr = 0x3a68, counter = true,  shadow = true  }, -- ExecRetal
 }
+-- blitz is now a menu that reuses the tools window (state $30 = ST.tools).
 local ST = { root = 0x05, spell = 0x0e, tools = 0x30, magitek = 0x2a,
-             item = 0x0a, blitz = 0x3d, target = 0x38 }
+             item = 0x0a, target = 0x38 }
 
 local function bp(slot) return H.readByte(BP + slot*2) end
 local function pend(slot) return H.readByte(PEND + slot*2) end
@@ -307,6 +308,7 @@ local CMD = { fight = 0x00, item = 0x01, magic = 0x02, steal = 0x05,
               tools = 0x09, blitz = 0x0a, magitek = 0x1d }
 local SPELL = { fire = 0x00, cure = 0x2d }
 local TOOL  = { autocrossbow = 0xaa, bioblaster = 0xa4 }
+local BLITZ = { pummel = 0x5d, aurabolt = 0x5e }          -- resolved attack ids
 local SPELLBASE = { [0] = 0x0000, [1] = 0x013c, [2] = 0x0278, [3] = 0x03b4 }
 local function magicCursor(slot, spellId)
   local base = 0x2092 + SPELLBASE[slot]
@@ -387,7 +389,8 @@ local KITS = {
     { tag = "fight", cmd = CMD.fight },
   },
   [0x05] = { name = "SABIN",
-    { tag = "blitz", cmd = CMD.blitz, combo = { "left", "right" } },
+    { tag = "blitz", cmd = CMD.blitz,
+      pick = function(slot) return toolsCursor(slot, BLITZ.pummel) end },
     { tag = "fight", cmd = CMD.fight },
   },
 }
@@ -470,11 +473,10 @@ local function newChar(slot)
 end
 
 -- ------------------------------------------------- turn state machine --
-local ep = { slot = nil, entry = nil, want = 0, placed = false,
-             comboIx = 1, pulses = 0 }
+local ep = { slot = nil, entry = nil, want = 0, placed = false, pulses = 0 }
 local function resetEpisode()
   ep.slot, ep.entry, ep.want, ep.placed = nil, nil, 0, false
-  ep.comboIx, ep.pulses = 1, 0
+  ep.pulses = 0
 end
 
 local function entryOk(rec, entry, pol)
@@ -564,12 +566,6 @@ local function pulse()
     return { "a" }
   end
   if st == ST.magitek or st == ST.item then return { "a" } end
-  if st == ST.blitz then
-    local combo = ep.entry.combo or {}
-    local b = combo[ep.comboIx]
-    ep.comboIx = ep.comboIx + 1
-    return b and { b } or { "a" }
-  end
   if st == ST.target then return { "a" } end
   return nil
 end

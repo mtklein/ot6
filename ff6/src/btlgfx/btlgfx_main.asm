@@ -10841,7 +10841,12 @@ DrawToolsListText:
         sta     w7e5755+5       ; set 1st item id
         lda     wItemList::Index+3,y
         sta     w7e5755+11       ; set 2nd item id
-        jsr     InitListTextTfr
+        lda     w7e6168         ; ot6: blitz mode? swap item-name code $0e -> $0f
+        beq     :+              ;   so both columns render from AttackName
+        lda     #$0f
+        sta     w7e5755+4
+        sta     w7e5755+10
+:       jsr     InitListTextTfr
         jsr     DrawListText
         ply
         rts
@@ -12607,7 +12612,7 @@ UpdateMenuStateTbl:
         .addr   UpdateMenuState_3a
         .addr   UpdateMenuState_3b
         .addr   UpdateMenuState_3c
-        .addr   UpdateMenuState_3d
+        .addr   UpdateMenuState_00      ; ot6: state $3d (blitz pad-edge) retired
         .addr   UpdateMenuState_3e
         .addr   UpdateMenuState_3f
         .addr   UpdateMenuState_40
@@ -12794,7 +12799,8 @@ CloseCmdWindow:
 
 UpdateMenuState_2f:
 CloseToolsWindow:
-@5697:  lda     #$21
+@5697:  stz     w7e6168     ; ot6: every tools/blitz close leaves blitz mode
+        lda     #$21
         sta     w7e7bf0
         clr_a
         jmp     _c15a2c
@@ -13090,7 +13096,8 @@ set_buf_item:
 
 ; check items 0-63
 MakeToolsList_00:
-@5836:  lda     #$40        ; tools flag
+@5836:  stz     w7e6168     ; ot6: real tools open (phase 0) leaves blitz mode
+        lda     #$40        ; tools flag
         bra     _583c
 
 MakeThrowList_00:
@@ -15287,7 +15294,11 @@ ListTextCmd_0f:
                                         ; sta $2c, plus boost tier preview
         cmp     #$ff
         bne     @65a8
-        lda     #MagicName::ITEM_SIZE
+        lda     w7e6168             ; ot6: an empty blitz cell must blank the
+        beq     :+                  ;   whole attack-name column -- MagicName's
+        lda     #AttackName::ITEM_SIZE  ;   narrower blank would leave the right
+        jmp     _c166a5             ;   of the cell stale.  spell rows (flag 0)
+:       lda     #MagicName::ITEM_SIZE   ;   keep the vanilla width.
         jmp     _c166a5
 @65a8:  cmp     #$36
         bcc     @65e8
@@ -15296,7 +15307,13 @@ ListTextCmd_0f:
         bcc     @65cc
         sec
         sbc     #$51
-        xba
+        sta     $2c             ; ot6: index -> Mult8NoHW multiplicand.  the
+                                ;   vanilla `xba` here dropped the index and
+                                ;   left $2c = the id, so AttackName was read at
+                                ;   id*size (out of bounds); this branch was
+                                ;   only ever dead until the blitz menu ($0f)
+                                ;   drove it.  b still holds the draw attribute
+                                ;   Ot6PreviewList_ext preserved.
         lda     #AttackName::ITEM_SIZE
         sta     $2e
         sta     $40
@@ -17217,72 +17234,10 @@ CheckBlitzCode:
 
 ; ------------------------------------------------------------------------------
 
-; [ update menu state $3d: blitz ]
-
-UpdateMenuState_3d:
-@6ff8:  lda     w7e7bcb
-        beq     @7000
-        jmp     @7083
-@7000:  ldx     $0a
-        beq     @702c       ; branch if no buttons are pressed
-        ldx     $0a
-        cpx     w7ee9e2
-        beq     @7034       ; branch if buttons didn't change from last frame
-        lda     #$40
-        sta     w7ee9e4       ; reset blitz code counter to 64 frames
-        lda     w7ee9e1
-        and     #$0f
-        asl
-        tax
-        inc     w7ee9e1       ; increment blitz button input pointer
-        longa
-        lda     $0a
-        sta     w7ee9e2       ; combine buttons pressed this frame and buttons pressed last frame
-        ora     w7ee9fe,x
-        sta     w7ee9fe,x     ; save button input
-        shorta0
-        bra     @7034
-@702c:  stx     w7ee9e2
-        lda     #$01
-        sta     w7ee9e5
-@7034:  dec     w7ee9e4       ; decrement blitz code counter
-        bne     @703e       ; branch if it didn't expire
-        clr_ax
-        stx     w7ee9fe       ; clear the first button input to invalidate the entire combo
-@703e:  lda     w7e6268
-        bpl     @707c       ; branch if a button is not pressed
-        inc     $96         ; play cursor sound effect (select)
-        jsr     CheckBlitzCode
-        sta     w7e6168
-        jsr     _c16d56
-        lda     w7e6168
-        sta     $2bb0,y     ; attack
-        lda     w7e7b7d
-        sta     $2bb1,y     ; character targets
-        lda     w7e7b7e
-        sta     $2bb2,y     ; monster targets
-        lda     w7e62ca
-        sta     $2bae,y     ; character slot
-        stz     w7e7b7d
-        stz     w7e7b7e
-        stz     w7e7b7f
-        lda     w7e7a83
-        sta     w7e7bc2
-        inc     w7e7bcb
-        inc     w7e7b80
-        rts
-@707c:  lda     w7e6268+1
-        bpl     @7095       ; branch if b button is not pressed
-        inc     $96
-@7083:  stz     w7e7b7d
-        stz     w7e7b7e
-        stz     w7e7b7f
-        lda     w7e7a83
-        sta     w7e7bc2
-        stz     w7e7ae9
-@7095:  rts
-
-; ------------------------------------------------------------------------------
+; ot6 (blitz-as-menu): UpdateMenuState_3d -- the vanilla pad-edge blitz input
+; state -- was deleted here. Nothing sets menu state $3d anymore (its only
+; setter, _c1776b, now opens the tools-shell menu), so its dispatch slot points
+; at UpdateMenuState_00 (rts). ~158 bytes reclaimed from btlgfx_code.
 
 ; [  ]
 
@@ -18238,25 +18193,15 @@ _c17767:
 
 ; ------------------------------------------------------------------------------
 
-; [ init blitz input ]
+; [ open blitz menu ]
 
+; ot6 (blitz-as-menu): vanilla armed the pad-edge combo buffer and went to
+; menu state $3d (UpdateMenuState_3d, now deleted). we hand off to bank $f0,
+; which fills wItemList with the learned blitzes and stages the tools window,
+; then reuse the Tools window shell to pick one.
 _c1776b:
-@776b:  ldx     $0a
-        stx     w7ee9e2
-        lda     #$ff
-        sta     w7ee9e4
-        stz     w7ee9e5
-        clr_ax
-@777a:  stz     w7ee9fe,x                 ; clear blitz inputs
-        inx
-        cpx     #$0020
-        bne     @777a
-        stz     w7ee9e1
-        stz     w7e6168
-        lda     #TARGET::SELF
-        sta     w7e7a84
-        lda     #$3d                    ; go to blitz menu state
-        bra     _7797
+        jsl     Ot6BlitzListOpen
+        jmp     OpenToolsWindow
 
 ; ------------------------------------------------------------------------------
 
@@ -20658,7 +20603,19 @@ UpdateMenuState_30:
         bne     @8809         ; branch if valid
         inc     $95
         bra     @8818
-@8809:  lda     wItemList::Index,x
+@8809:  lda     w7e6168         ; ot6: blitz mode? queue it, no target select
+        beq     :+
+        jsr     _c16d56         ; y = this character's action-queue slot
+        lda     wItemList::Index,x      ; selected row = attack id $5d + blitz index
+        sec
+        sbc     #$5d            ; -> raw blitz index 0-7 (what cmd $0a stores)
+        sta     $2bb0,y         ; attack (blitz retargets, so no target write)
+        lda     w7e62ca
+        sta     $2bae,y         ; character slot
+        inc     w7e7b80         ; commit the queued action
+        inc     w7e7bcb         ; close the menu (state $30 sees this -> $2f)
+        rts
+:       lda     wItemList::Index,x
         sta     w7e7a85         ; set item being used
         lda     wItemList::Flags,x                 ; copy targeting flags
         sta     w7e7a84

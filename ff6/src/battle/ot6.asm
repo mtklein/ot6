@@ -2247,6 +2247,75 @@ Ot6BushidoTierTbl:
 
 ; ------------------------------------------------------------------------------
 
+; [ open the Blitz command as a menu (v0.3 -- blitz-as-menu, stage 1) ]
+
+; vanilla Blitz had no window: _c1776b armed the 64-frame pad-edge buffer and
+; UpdateMenuState_3d matched button codes. This module deletes that path and
+; drives Blitz through the Tools window shell instead. _c1776b now jsl's here,
+; then jmp's OpenToolsWindow: we fill wItemList ourselves with the LEARNED
+; blitzes, raise the mode flag the two btlgfx shims read (w7e6168, freed when
+; UpdateMenuState_3d went), reset the shared cursor, and jump the tools state
+; machine straight to its draw phase (w7e7b9e=4) so it skips the four
+; inventory-scan phases it would run for real tools.
+;
+; the row id we store is the resolved attack id $5d+i (Pummel $5d .. Bum Rush
+; $64): ListTextCmd_0f renders ids >=$51 from AttackName for free, and the
+; confirm shim subtracts $5d back to the raw index 0-7 that cmd $0a expects --
+; the SAME index UpdateMenuState_3d wrote, so FixPlayerAttack (validates i
+; against $1d28, adds +$5d) and the Vargas AI (reads the resolved $5d) are
+; untouched. Only LEARNED blitzes appear, so that validation never trips.
+;
+; entry: jsl from _c1776b (btlgfx C1), db=$7e, a8/i16. clobbers a/x/y (the
+; caller's next act is jmp OpenToolsWindow, which reloads what it needs).
+
+.proc Ot6BlitzListOpen
+        .a8
+        .i16
+        ; --- pack the learned blitzes into wItemList ($7e4005, 3 bytes/row) ---
+        ldx     #$0000          ; wItemList write offset
+        ldy     #$0000          ; blitz index 0-7
+        lda     $1d28           ; known-blitz bitmask (the byte FixPlayerAttack
+@bit:   lsr                     ;   validates); carry = bit for blitz Y
+        bcc     @next
+        pha                     ; park the shifted mask on the stack -- $36 and
+        tya                     ;   OT6_SCR_BIT both have owners here, the stack
+        clc                     ;   owes nobody and survives an nmi
+        adc     #$5d            ; attack id $5d + blitz index
+        sta     $4005,x         ; wItemList::Index
+        inx
+        inx
+        inx                     ; next row
+        pla                     ; unpark the mask
+@next:  iny
+        cpy     #$0008
+        bne     @bit
+        ; --- $ff-terminate through the 8-cell (4x2) window ---
+        lda     #$ff
+@pad:   cpx     #$0018          ; 8 rows * 3 bytes
+        bcs     @padded
+        sta     $4005,x
+        inx
+        inx
+        inx
+        bra     @pad
+@padded:
+        ; --- reset the shared list cursor/scroll for the active character ---
+        ldx     $62ca           ; active character slot (0-3); STZ needs abs,X
+        stz     $895f,x         ; scroll position
+        stz     $8963,x         ; cursor column
+        stz     $8967,x         ; cursor row
+        stz     $7ba5           ; force MakeToolsList_04 to re-init the window
+        ; --- jump the tools state machine to its draw phase ---
+        lda     #$04
+        sta     $7b9e           ; w7e7b9e (MakeToolsList phase) -> MakeToolsList_04
+        ; --- raise the blitz-mode flag the row-draw / confirm shims read ---
+        lda     #$01
+        sta     $6168           ; w7e6168
+        rtl
+.endproc
+
+; ------------------------------------------------------------------------------
+
 ; [ boost the base damage of a boosted character action ]
 
 ; called at the tail of the physical and magic base-damage calcs.

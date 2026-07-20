@@ -39,8 +39,8 @@
 -- 6/6 shields with class row $04 = OT6_BLUDG off Ot6ShieldTbl, weakElem $25
 -- keeps vanilla fire|bolt|holy), then SABIN's AuraBolt (holy $20) takes a
 -- shield and reveals the element, his Pummel (OT6_BLUDG) takes another and
--- reveals the class -- both driven as real pad edges through the Blitz code
--- window, battle_vargas's idiom.  Party HP is pinned per frame and the
+-- reveals the class -- both picked from the v0.3 Blitz menu (the Tools window
+-- shell), state-driven like battle_vargas.  Party HP is pinned per frame and the
 -- train is then clamped to 1 hp so the engine's own next swing ends it:
 -- the win bit $40 is earned (its event tail is _ca5ea9 -- a kill-bit here
 -- is a GameOver-park, measured).  Scripted battle 47 runs the same way.
@@ -71,7 +71,9 @@ local GHOSTTRAIN = 0x0106
 local OT6_BLUDG, HOLY = 0x04, 0x20
 local PUMMEL, AURABOLT = 0x5D, 0x5E
 local MENU, ACTOR, MSTATE = 0x7BCA, 0x62CA, 0x7BC2
-local ST_CMD, ST_BLITZ = 0x05, 0x3D
+local ST_CMD, ST_TOOLS = 0x05, 0x30     -- command list; tools-shell blitz list
+local CMD_BLITZ = 0x0A                   -- blitz command id (opens the menu)
+local CMDTBL, ITEMLIST = 0x202E, 0x4005  -- command cells; wItemList rows
 local function SH(s)  return 0x3E38 + (8 + s * 2) end
 local function SMX(s) return 0x3E39 + (8 + s * 2) end
 local function RVE(s) return 0x3E89 + (8 + s * 2) end
@@ -84,6 +86,29 @@ local function pinParty()
 end
 
 local gSlot, sabinE = nil, nil          -- found at battle-up, asserted
+local sabinCmds = {}                     -- SABIN's real command cells, restored
+                                         --   between chips (so a stray tap on his
+                                         --   menu queues FIGHT, not an $ff blitz)
+
+-- While a chip is being driven, keep SABIN's HP up and STOP everyone else --
+-- his companions AND the train (battle_bushido's pin idiom, status-3 stop bit
+-- $10, entity stride 2; monsters at offset 8+slot*2).  Only SABIN then takes
+-- turns, so a missed blitz re-opens on a clean, uncontested menu instead of one
+-- buried under piled-up enemy-turn messages.  The win comes from the HP clamp
+-- below, not the train's own swings, so stopping it costs the fixture nothing.
+local function pinFight()
+  pinParty()
+  for e = 0, 3 do
+    if sabinE and e ~= sabinE then
+      local st3 = 0x3EF8 + e * 2
+      H.writeByte(st3, H.readByte(st3) | 0x10)
+    end
+  end
+  if gSlot then
+    local st3 = 0x3EF8 + (8 + gSlot * 2)
+    H.writeByte(st3, H.readByte(st3) | 0x10)
+  end
+end
 
 local function swDump(tag)
   H.log(string.format(
@@ -183,47 +208,66 @@ local function tapUnlessSabin()
   end
 end
 
--- one Blitz as real pad edges (battle_vargas's driver): SABIN's command
--- list -> DOWN to Blitz -> A -> the code -> A.  The list-wait also
--- un-sticks a lingering code window (a rejected code can leave SABIN's
--- menu open, which tapUnlessSabin would hands-off forever).
-local function blitz(code, name)
-  local steps = {
-    H.driveUntil(function()
-      return H.readByte(MENU) ~= 0 and H.readByte(ACTOR) == sabinE
-         and H.readByte(MSTATE) == ST_CMD
-    end, 12000, { H.call(function()
-      if H.readByte(MENU) ~= 0 and H.readByte(ACTOR) == sabinE
-         and H.readByte(MSTATE) == ST_BLITZ then
-        aPh = (aPh + 1) % 8
-        pinParty()
-        H.setPad(aPh < 4 and { "b" } or {})   -- back out of a stale window
-      else
-        tapUnlessSabin()
-      end
-    end), H.waitFrames(1) },
-      name .. ": SABIN's command list"),
-    H.waitFrames(10),
-    H.pressButtons({ "down" }, 4), H.waitFrames(8),
-    H.pressButtons({ "a" }, 4), H.waitFrames(10),
+-- one Blitz from the v0.3 menu, driven state-by-state (battle_vargas /
+-- metrics_battle's idiom).  This is an active-time, multi-actor fight, so a
+-- companion's turn can interrupt SABIN's menu at any frame; a rigid open ->
+-- confirm sequence races and queues stray unaimed ($ff) blitzes.  Each pulse we
+-- read the live state and do exactly one right thing: advance ANOTHER actor
+-- (A -> their Fight), poke Blitz + A in SABIN's command list, or -- in the
+-- tools-shell blitz list -- write the cursor onto the wanted row (by its
+-- resolved attack id in wItemList) and A in the SAME frame.  We only ever tap A
+-- on SABIN once a real blitz row is under the cursor, so no $ff blitz is queued.
+local function blitz(skillId, name)
+  local queued = false
+  return H.driveUntil(function() return queued end, 8000, {
     H.call(function()
-      H.assertEq(H.readByte(MSTATE), ST_BLITZ,
-        name .. ": the blitz code window is open (menu state $3d)")
+      pinFight()
+      local menu = H.readByte(MENU)
+      local actor = H.readByte(ACTOR)
+      local st = H.readByte(MSTATE)
+      if menu == 0 then
+        H.setPad({})
+      elseif actor ~= sabinE then
+        aPh = (aPh + 1) % 8
+        H.setPad(aPh < 4 and { "a" } or {})            -- advance another actor
+      elseif st == ST_CMD then
+        for i = 0, 3 do H.writeByte(CMDTBL + sabinE * 12 + i * 3, CMD_BLITZ) end
+        H.setPad({ "a" })                              -- open the blitz menu
+      elseif st == ST_TOOLS then
+        local row = nil
+        for i = 0, 7 do
+          if H.readByte(ITEMLIST + i * 3) == skillId then row = i end
+        end
+        if row ~= nil then
+          H.writeByte(0x895F + sabinE, 0)              -- cursor onto the row,
+          H.writeByte(0x8963 + sabinE, row % 2)        --   then confirm it this
+          H.writeByte(0x8967 + sabinE, row // 2)       --   same frame
+          H.setPad({ "a" })
+          queued = true
+        else
+          H.setPad({})
+        end
+      else
+        H.setPad({})                                    -- SABIN mid-transition
+      end
     end),
-  }
-  for _, b in ipairs(code) do
-    steps[#steps + 1] = H.pressButtons(b, 4)
-    steps[#steps + 1] = H.waitFrames(5)
-  end
-  steps[#steps + 1] = H.pressButtons({ "a" }, 4)
-  steps[#steps + 1] = H.waitFrames(8)
-  return H.cond(function() return true end, steps)
+    H.waitFrames(2),
+    H.call(function()
+      H.setPad({})
+      -- once committed, hand SABIN's real commands back so a stray tap during
+      -- the resolve queues a harmless FIGHT, never an unaimed blitz.
+      if queued then
+        for i = 0, 3 do H.writeByte(CMDTBL + sabinE * 12 + i * 3, sabinCmds[i]) end
+      end
+    end),
+    H.waitFrames(6),
+  }, name .. ": queue " .. name)
 end
 
 -- drive one chip to the gauge, retrying the blitz if a cast misses or a
 -- code is rejected: each attempt is the real input, and the loop's exit
 -- is the ENGINE's gauge write, never a poke.
-local function chip(code, name, want)
+local function chip(skillId, name, want)
   local seq = {}
   for attempt = 1, 4 do
     local waited = 0
@@ -234,11 +278,31 @@ local function chip(code, name, want)
         return string.format("[b68] %s attempt %d (shields=%d)",
           name, attempt, H.readByte(SH(gSlot)))
       end),
-      blitz(code, name .. " #" .. attempt),
+      blitz(skillId, name .. " #" .. attempt),
       H.driveUntil(function()
         waited = waited + 1
-        return H.readByte(SH(gSlot)) <= want or waited > 2400
-      end, 3000, { H.call(tapUnlessSabin), H.waitFrames(1) },
+        -- the chip landed, OR (after the cast has had time to resolve) SABIN's
+        -- command list is back up -- his turn came round again, so the cast
+        -- MISSED.  Retrying off that fresh menu re-opens cleanly; waiting the
+        -- full 2400 instead lets the fight wedge (enemy turns pile up while the
+        -- poked menu sits open and unresponsive).
+        return H.readByte(SH(gSlot)) <= want
+           or (waited > 300 and H.readByte(MENU) ~= 0
+               and H.readByte(ACTOR) == sabinE and H.readByte(MSTATE) == ST_CMD)
+           or waited > 2400
+      end, 3000, { H.call(function()
+        pinFight()
+        -- move OTHER party members along (tap A -> their default Fight), but
+        -- NEVER tap while a menu belongs to SABIN, in any state: his command
+        -- cells are poked all-Blitz, and a tap near one of his transient menu
+        -- frames queues an unaimed ($ff) blitz that clogs the queue.
+        if H.readByte(MENU) ~= 0 and H.readByte(ACTOR) ~= sabinE then
+          aPh = (aPh + 1) % 8
+          H.setPad(aPh < 4 and { "a" } or {})
+        else
+          H.setPad({})
+        end
+      end), H.waitFrames(1) },
         name .. " #" .. attempt .. " resolve-or-retry"),
       H.call(function()
         H.log(string.format(
@@ -400,6 +464,7 @@ H.run({ maxFrames = 200000 }, {
     local lv = H.readByte(0x3B18 + sabinE * 2)
     H.log(string.format("[b68] ghosttrain slot %d, SABIN entity %d lv %d",
       gSlot, sabinE, lv))
+    for i = 0, 3 do sabinCmds[i] = H.readByte(CMDTBL + sabinE * 12 + i * 3) end
     H.assertEq(lv >= 6, true, "SABIN level 6+ -- AuraBolt learned")
     -- the authored row, live: this is the runtime proof of GhostTrain's
     -- 6-shield OT6_BLUDG entry in Ot6ShieldTbl
@@ -415,7 +480,7 @@ H.run({ maxFrames = 200000 }, {
   end),
 
   -- AURABOLT: holy takes a shield and reveals the element
-  chip({ { "down" }, { "down", "left" }, { "left" } }, "AURABOLT", 5),
+  chip(AURABOLT, "AURABOLT", 5),
   H.call(function()
     H.assertEq(H.readByte(0x3410), AURABOLT,
       "the resolved skill was AuraBolt ($5e)")
@@ -426,7 +491,7 @@ H.run({ maxFrames = 200000 }, {
   end),
 
   -- PUMMEL: bludgeon takes a shield and reveals the class
-  chip({ { "left" }, { "right" }, { "left" } }, "PUMMEL", 4),
+  chip(PUMMEL, "PUMMEL", 4),
   H.call(function()
     H.assertEq(H.readByte(0x3410), PUMMEL,
       "the resolved skill was Pummel ($5d)")

@@ -13,9 +13,9 @@
 --
 -- THE KILL IS PUMMEL, not damage.  Vargas has 11600 HP and the reaction
 -- script answers `if_attack PUMMEL` with `battle_event $09 / kill_monsters
--- ALL, FADE_HORIZONTAL` (ai_script.asm:4385-4388).  Driven as real Blitz
--- input: LEFT, RIGHT, LEFT, A as discrete pad EDGES into the code window
--- (UpdateMenuState_3d, btlgfx_main.asm:17219; masks at :17002).
+-- ALL, FADE_HORIZONTAL` (ai_script.asm:4385-4388).  Pummel is picked from the
+-- v0.3 blitz menu (the Tools window shell in blitz mode): the cursor is
+-- written onto its row (resolved attack id $5d) and confirmed.
 -- (For the record, measured in probe_vargas: the harness's kill-bit idiom
 -- ALSO ends this fight cleanly -- `if_self_dead / boss_death` sits ahead of
 -- the Pummel branch at :4382 and fires -- but the scripted finish is the one
@@ -25,7 +25,10 @@ local DOOR = "/Users/mtklein/ot6/build/states/vargas_doorstep.mss.lua"
 
 local SABIN_E = 3
 local MENU, ACTOR, MSTATE = 0x7BCA, 0x62CA, 0x7BC2
-local ST_BLITZ, ST_CMD = 0x3D, 0x05
+local ST_CMD, ST_TOOLS = 0x05, 0x30     -- command list; tools-shell blitz list
+local CMD_BLITZ = 0x0A                   -- blitz command id (opens the menu)
+local CMDTBL, ITEMLIST = 0x202E, 0x4005  -- command cells; wItemList rows
+local PUMMEL = 0x5D                       -- resolved attack id of Blitz 0
 local aPh = 0
 local function bright() return emu.getState()["ppu.screenBrightness"] or 0 end
 local function pinParty()
@@ -66,21 +69,34 @@ H.run({ maxFrames = 60000 }, {
     end),
   }, "SABIN takes the field"),
 
-  -- PUMMEL: DOWN to Blitz, A, then LEFT RIGHT LEFT A
+  -- PUMMEL from the blitz menu: poke Blitz ($0a) into SABIN's command cells,
+  -- A to open the tools-shell list, write the cursor onto Pummel's row (its
+  -- resolved attack id $5d), A to confirm.
   H.driveUntil(function()
     return H.readByte(MENU) ~= 0 and H.readByte(ACTOR) == SABIN_E
        and H.readByte(MSTATE) == ST_CMD
   end, 12000, { H.call(tapUnlessSabin), H.waitFrames(1) }, "SABIN's command list"),
   H.waitFrames(10),
-  H.pressButtons({ "down" }, 4), H.waitFrames(8),
-  H.pressButtons({ "a" }, 4), H.waitFrames(10),
   H.call(function()
-    H.assertEq(H.readByte(MSTATE), ST_BLITZ, "blitz code window open")
+    for i = 0, 3 do H.writeByte(CMDTBL + SABIN_E * 12 + i * 3, CMD_BLITZ) end
   end),
-  H.pressButtons({ "left" }, 4),  H.waitFrames(5),
-  H.pressButtons({ "right" }, 4), H.waitFrames(5),
-  H.pressButtons({ "left" }, 4),  H.waitFrames(5),
-  H.pressButtons({ "a" }, 4),     H.waitFrames(8),
+  H.pressButtons({ "a" }, 4), H.waitFrames(10),
+  H.driveUntil(function()
+    return H.readByte(ACTOR) == SABIN_E and H.readByte(MSTATE) == ST_TOOLS
+  end, 3000, { H.call(tapUnlessSabin), H.waitFrames(1) }, "the blitz list opens"),
+  H.call(function()
+    local row = nil
+    for i = 0, 7 do
+      if H.readByte(ITEMLIST + i * 3) == PUMMEL then row = i end
+    end
+    H.assertEq(row ~= nil, true, "Pummel ($5d) is in the rendered blitz list")
+    local slot = H.readByte(ACTOR)
+    H.writeByte(0x895F + slot, 0)
+    H.writeByte(0x8963 + slot, row % 2)
+    H.writeByte(0x8967 + slot, row // 2)
+  end),
+  H.waitFrames(2),
+  H.pressButtons({ "a" }, 4), H.waitFrames(8),
   H.call(function()
     H.log(string.format("PUMMEL entered at f%d ($3410=$%02X)",
       H.frame, H.readByte(0x3410)))

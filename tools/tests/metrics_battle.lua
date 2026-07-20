@@ -185,8 +185,9 @@ end
 -- just-opening window, the wedge bal_mines.lua:123-127 works around with
 -- timers.
 local MSTATE = 0x7bc2
+-- blitz is now a menu that reuses the tools window (state $30 = ST.tools).
 local ST = { root = 0x05, spell = 0x0e, tools = 0x30, magitek = 0x2a,
-             item = 0x0a, blitz = 0x3d, target = 0x38 }
+             item = 0x0a, target = 0x38 }
 
 -- HOW A COMMAND IS SELECTED. The command window is a 1-column x 4-row
 -- list whose cursor lives at $890F+slot (btlgfx_main.asm:18707/18897,
@@ -258,17 +259,18 @@ end
 
 -- ------------------------------------------------------------- kits --
 -- What a character DOES with a turn, independent of the boost discipline
--- the policy sets. An entry is { tag, cmd, pick = <cursor setter>, combo
--- = <buttons to feed a combo reader>, mp = <mp floor>, want = <gate> };
--- the first entry whose command the actor actually owns and whose gate
--- passes is taken, so a kit reads as a preference ladder and an actor
--- without the command falls through to the next line.
+-- the policy sets. An entry is { tag, cmd, pick = <cursor setter>,
+-- mp = <mp floor>, want = <gate> }; the first entry whose command the actor
+-- actually owns and whose gate passes is taken, so a kit reads as a
+-- preference ladder and an actor without the command falls through to the
+-- next line.
 --
 -- KITS[character index] = that ladder. Written for the whole
 -- Figaro->Kolts party; a fixture only exercises the members it carries,
 -- and the report's char_plan line says which lines actually fired.
 local SPELL = { fire = 0x00, cure = 0x2d }
 local TOOL  = { autocrossbow = 0xaa, bioblaster = 0xa4 }  -- item_name_en.json
+local BLITZ = { pummel = 0x5d, aurabolt = 0x5e }          -- resolved attack ids
 local KITS = {
   -- TERRA: Fire is the party's elemental probe and its weakness nuke.
   [0x00] = { name = "TERRA",
@@ -297,12 +299,13 @@ local KITS = {
       pick = function(slot) return toolsCursor(slot, TOOL.autocrossbow) end },
     { tag = "fight", cmd = CMD.fight },
   },
-  -- SABIN: Blitz has no list and no cursor -- state $3d is a button-COMBO
-  -- reader (btlgfx_main.asm:17219), so the entry feeds the combo instead
-  -- of pointing at a cell. Pummel is left,right. UNEXERCISED for the same
-  -- reason as Edgar; flagged, not assumed.
+  -- SABIN: Blitz is a menu now (v0.3) -- it reuses the Tools window shell
+  -- (state $30), rows PACKED at $4005 like the tools list but keyed by the
+  -- resolved attack id, so it points at a cell exactly like a tool.
+  -- UNEXERCISED for the same reason as Edgar; flagged, not assumed.
   [0x05] = { name = "SABIN",
-    { tag = "blitz", cmd = CMD.blitz, combo = { "left", "right" } },
+    { tag = "blitz", cmd = CMD.blitz,
+      pick = function(slot) return toolsCursor(slot, BLITZ.pummel) end },
     { tag = "fight", cmd = CMD.fight },
   },
   -- Magitek-era bodies: MagiTek's list opens on Fire Beam, which is the
@@ -417,12 +420,11 @@ end
 -- dodge with timers. `nudge` is the only fallback left: if a state
 -- persists far longer than a menu ever should, back out with B and
 -- replan.
-local ep = { slot = nil, entry = nil, want = 0, placed = false,
-             comboIx = 1, pulses = 0 }
+local ep = { slot = nil, entry = nil, want = 0, placed = false, pulses = 0 }
 
 local function resetEpisode()
   ep.slot, ep.entry, ep.want, ep.placed = nil, nil, 0, false
-  ep.comboIx, ep.pulses = 1, 0
+  ep.pulses = 0
 end
 
 -- is this kit entry playable for this actor, under this policy, now?
@@ -514,12 +516,6 @@ local function pulse()
     return { "a" }
   end
   if st == ST.magitek or st == ST.item then return { "a" } end
-  if st == ST.blitz then
-    local combo = ep.entry.combo or {}
-    local b = combo[ep.comboIx]
-    ep.comboIx = ep.comboIx + 1
-    return b and { b } or { "a" }
-  end
   if st == ST.target then return { "a" } end
   return nil                            -- transient open/close: hands off
 end
