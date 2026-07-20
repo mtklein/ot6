@@ -23,11 +23,15 @@ consumes the previous link's savestate, and the suite's remint cost has
 to stay what it was.  The links use the same ROM-content gate as the
 suite's states, so a rebuild that changes no bytes re-mints nothing.
 
-ONE suite test is FRONTIER-GATED: `battle_vargas` asserts on
-`vargas_doorstep.mss`.  suite.sh adds it the moment that file exists and
-reports it as `skip` when it does not -- never silently drops it -- so
-`make test` costs what it always did and `make frontier-test` (mint the
-chain, then run the same suite) is the command that always runs it.
+TWO suite tests are FRONTIER-GATED: `battle_vargas` asserts on
+`vargas_doorstep.mss`, and `battle_kefka` on `kefka_doorstep.mss` (the
+Battle for Narshe -- deeper still, since its boot needs the REUNION: all
+three scenarios completed in one playthrough via the Makefile's scenario
+STACK, which waits on Sabin's chain's back half).  suite.sh adds each the
+moment its fixture exists and reports it as `skip` when it does not --
+never silently drops it -- so `make test` costs what it always did and
+`make frontier-test` (mint the chain, then run the same suite) is the
+command that always runs whatever is mintable.
 
 `run.sh` wraps:
 

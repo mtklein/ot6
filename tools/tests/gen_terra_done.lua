@@ -41,10 +41,19 @@
 -- t2_terra_clifftop that descends from locke_done, $001E=1), so every claim
 -- about the OTHER scenarios' flags is asserted as UNCHANGED-SINCE-BOOT, not
 -- as zero -- "this route never touches Locke's or Sabin's state" is the
--- real invariant, and it is the same assertion in both runs.  The one thing
--- it must NOT be stacked into is the all-three boot: then _caad4c fires the
--- reunion instead of returning the hub, and the finish gate here would time
--- out.  gen_narshe_battle owns that hub return.
+-- real invariant, and it is the same assertion in both runs.
+--
+-- THE ALL-THREE BOOT (the t3_ stack, once Sabin's chain lands): with
+-- $001E and $0044 both carried in, _ccb3fa's `switch $0021=1 / call
+-- _caad4c` opens the if_all at :26654 and the hub return IS THE REUNION
+-- (_caadb9 -> "The three have reached Narshe" -> _ccb4da, ~10,400 frames
+-- of pure cutscene measured on the poked twin, probe_narshe_spike).  On
+-- that boot this file takes its REUNION FORK below: instead of the hub
+-- gate it rides the cutscene to the map-22 staging -- party at (20,9),
+-- $0045 set, first controllable frame -- and mints reunion_ready.mss,
+-- the state gen_narshe_battle boots.  The fork is written from the
+-- measured spike ride; it has not yet had a live all-three run (that
+-- needs Sabin's ending), which is exactly the run that will prove it.
 local H = dofile("/Users/mtklein/ot6/tools/tests/lib/ot6.lua")
 local CLIFF = "/Users/mtklein/ot6/build/states/terra_clifftop.mss.lua"
 
@@ -90,7 +99,7 @@ local function landed(m, n)
     return cnt >= (n or 20)
   end
 end
-local settleHouse, settleHub = landed(30), landed(9)
+local settleHouse, settleHub, settleStaging = landed(30), landed(9), landed(22)
 
 local function where(tag)
   H.log(string.format("[%s] f%d map=%d (%d,%d) ctl=%s $0019=%d $0021=%d " ..
@@ -100,8 +109,12 @@ local function where(tag)
 end
 
 -- the other scenarios' completion flags and hub NPCs, sampled at boot:
--- asserted UNCHANGED at the finish (see STACK-CLEAN above)
+-- asserted UNCHANGED at the finish (see STACK-CLEAN above).  When BOTH
+-- other completions ride in, the finish is the REUNION FORK instead.
 local boot = {}
+local function reunionBoot()
+  return boot[0x001E] == 1 and boot[0x0044] == 1
+end
 
 H.run({ maxFrames = 60000 }, {
   H.loadState(CLIFF),
@@ -110,8 +123,9 @@ H.run({ maxFrames = 60000 }, {
     for _, id in ipairs({ 0x001E, 0x0044, 0x0329, 0x032A }) do
       boot[id] = sw(id)
     end
-    H.assertEq(boot[0x001E] == 1 and boot[0x0044] == 1, false,
-      "not booted from an all-three stack (that boot belongs to gen_narshe_battle)")
+    if reunionBoot() then
+      H.log("ALL-THREE boot: the finish line is the REUNION, not the hub")
+    end
     H.assertEq(map(), 20, "booted on map 20, the clifftop above Narshe")
     H.assertEq(H.fieldX(), 27, "at the arrival tile x=27")
     H.assertEq(H.fieldY(), 8, "at the arrival tile y=8")
@@ -157,49 +171,80 @@ H.run({ maxFrames = 60000 }, {
   end }),
   H.release(),
   H.call(function() where("_ccb3fa running") end),
-  H.advanceStory(function()
-    return sw(0x0021) == 1 and settleHub()
-  end, 60000),
-  H.waitFrames(30),
 
-  H.call(function()
-    H.assertEq(map(), 9, "back on map 9, the SCENARIO HUB")
-    H.assertEq(H.hasControl(), true, "controllable")
-    H.assertEq(H.tileAligned(), true, "tile-aligned")
-    H.assertEq(H.battleLoadStarted(), false, "no battle")
-    H.assertEq(sw(0x0021), 1,
-      "$0021 SET -- TERRA/BANON's scenario is complete (_ccb3fa, :104954)")
-    H.assertEq(sw(0x001E), boot[0x001E],
-      "$001E unchanged -- this route never touches LOCKE's scenario")
-    H.assertEq(sw(0x0044), boot[0x0044],
-      "$0044 unchanged -- nor SABIN's")
-    -- this scenario's own hub NPCs are gone: _ccb3fa cleared all three that
-    -- ran _cb094e (event_main.asm:104956-104958)
-    H.assertEq(sw(0x032B), 0, "$032B clear -- BANON's hub NPC is gone")
-    H.assertEq(sw(0x032C), 0, "$032C clear -- TERRA's too")
-    H.assertEq(sw(0x032D), 0, "$032D clear -- and EDGAR's")
-    H.assertEq(sw(0x0329), boot[0x0329],
-      "$0329 unchanged -- LOCKE's hub NPC is whatever the boot left it")
-    H.assertEq(sw(0x032A), boot[0x032A],
-      "$032A unchanged -- and SABIN's")
-    -- and the party is Mog alone again
-    H.assertEq((H.readByte(0x185d) & 0x07) ~= 0, true, "SCENARIO_MOG is the party")
-    H.assertEq((H.readByte(0x1850) & 0x07) ~= 0, false, "TERRA out")
-    H.assertEq((H.readByte(0x1854) & 0x07) ~= 0, false, "EDGAR out")
-    H.assertEq((H.readByte(0x185e) & 0x07) ~= 0, false, "BANON out")
-    for c = 0, 15 do
-      if (H.readByte(0x1850 + c) & 0x07) ~= 0 then
-        local base = 0x1600 + 37 * c
-        H.log(string.format("char %2d actor=%02X level=%d hp=%d/%d",
-          c, H.readByte(base), H.readByte(base + 8),
-          H.readWord(base + 9), H.readWord(base + 11)))
+  H.cond(reunionBoot, {
+    -- ------------------------------------------------------------------ --
+    -- THE REUNION FORK (all-three boot): _caad4c's if_all fires _caadb9 ->
+    -- _ccb4da, ~10,400 frames of dialog-tap cutscene ending on the map-22
+    -- staging (measured on the poked twin, probe_narshe_spike).  Mint
+    -- reunion_ready.mss at the first controllable frame.
+    -- ------------------------------------------------------------------ --
+    H.advanceStory(function()
+      return sw(0x0021) == 1 and settleStaging()
+    end, 60000),
+    H.waitFrames(30),
+    H.call(function()
+      H.assertEq(map(), 22, "the reunion ends on map 22, the battlefield staging")
+      H.assertEq(H.fieldX(), 20, "staging spawn x=20")
+      H.assertEq(H.fieldY(), 9, "staging spawn y=9")
+      H.assertEq(sw(0x0045), 1, "$0045 set -- the staging handoff ran")
+      H.assertEq(sw(0x0021), 1, "$0021 SET -- and it completed the trio")
+      H.assertEq(sw(0x0132), 0, "$0132 clear -- the defense is not live yet")
+      where("reunion_ready")
+      H.screenshot("reunion_ready")
+    end),
+    H.saveState("reunion_ready.mss"),
+    H.logStep(function()
+      return string.format("reunion_ready minted at frame %d -- the Battle " ..
+        "for Narshe is bootable", H.frame)
+    end),
+  }, {
+    -- ------------------------------------------------------------------ --
+    -- THE HUB RETURN (one or two completions): "Choose a scenario…kupo!"
+    -- ------------------------------------------------------------------ --
+    H.advanceStory(function()
+      return sw(0x0021) == 1 and settleHub()
+    end, 60000),
+    H.waitFrames(30),
+    H.call(function()
+      H.assertEq(map(), 9, "back on map 9, the SCENARIO HUB")
+      H.assertEq(H.hasControl(), true, "controllable")
+      H.assertEq(H.tileAligned(), true, "tile-aligned")
+      H.assertEq(H.battleLoadStarted(), false, "no battle")
+      H.assertEq(sw(0x0021), 1,
+        "$0021 SET -- TERRA/BANON's scenario is complete (_ccb3fa, :104954)")
+      H.assertEq(sw(0x001E), boot[0x001E],
+        "$001E unchanged -- this route never touches LOCKE's scenario")
+      H.assertEq(sw(0x0044), boot[0x0044],
+        "$0044 unchanged -- nor SABIN's")
+      -- this scenario's own hub NPCs are gone: _ccb3fa cleared all three
+      -- that ran _cb094e (event_main.asm:104956-104958)
+      H.assertEq(sw(0x032B), 0, "$032B clear -- BANON's hub NPC is gone")
+      H.assertEq(sw(0x032C), 0, "$032C clear -- TERRA's too")
+      H.assertEq(sw(0x032D), 0, "$032D clear -- and EDGAR's")
+      H.assertEq(sw(0x0329), boot[0x0329],
+        "$0329 unchanged -- LOCKE's hub NPC is whatever the boot left it")
+      H.assertEq(sw(0x032A), boot[0x032A],
+        "$032A unchanged -- and SABIN's")
+      -- and the party is Mog alone again
+      H.assertEq((H.readByte(0x185d) & 0x07) ~= 0, true, "SCENARIO_MOG is the party")
+      H.assertEq((H.readByte(0x1850) & 0x07) ~= 0, false, "TERRA out")
+      H.assertEq((H.readByte(0x1854) & 0x07) ~= 0, false, "EDGAR out")
+      H.assertEq((H.readByte(0x185e) & 0x07) ~= 0, false, "BANON out")
+      for c = 0, 15 do
+        if (H.readByte(0x1850 + c) & 0x07) ~= 0 then
+          local base = 0x1600 + 37 * c
+          H.log(string.format("char %2d actor=%02X level=%d hp=%d/%d",
+            c, H.readByte(base), H.readByte(base + 8),
+            H.readWord(base + 9), H.readWord(base + 11)))
+        end
       end
-    end
-    where("terra_done")
-    H.screenshot("terra_done")
-  end),
-  H.saveState("terra_done.mss"),
-  H.logStep(function()
-    return string.format("terra_done minted at frame %d", H.frame)
-  end),
+      where("terra_done")
+      H.screenshot("terra_done")
+    end),
+    H.saveState("terra_done.mss"),
+    H.logStep(function()
+      return string.format("terra_done minted at frame %d", H.frame)
+    end),
+  }),
 })

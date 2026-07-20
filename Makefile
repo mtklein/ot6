@@ -393,10 +393,39 @@ build/states/t2_terra_done.mss.lua: build/states/t2_terra_clifftop.mss.lua
 # lives outside the mechanically-prefixed chain).
 build/states/two_done.mss.lua: build/states/t2_terra_done.mss.lua
 	$(call mint,two_done,gen_two_done)
-# SABIN's slot (consumed when his back half lands): seed s3_scenario_hub
-# from two_done, replay his whole chain with OT6_STACK=s3_ ending at his
-# deepest pre-hub state, and let gen_narshe_battle boot that -- its hub
-# return IS the reunion.  The rules mirror the t2_ block one-for-one.
+# SABIN's slot (consumed when his back half lands).  ORDER REVISED from
+# "Sabin last" after the reunion spike: whichever chain returns to the hub
+# THIRD rides the reunion instead of reaching the hub, so its FINAL leg
+# must be reunion-aware -- and gen_terra_done (ours) already is (it mints
+# reunion_ready.mss on an all-three boot; see its header).  So Sabin runs
+# SECOND and Terra's chain replays LAST:
+#   s2_scenario_hub <- locke_done  (cp seed, same shape as t2_)
+#   s2_* : Sabin's whole chain with OT6_STACK=s2_, ending at his hub
+#          return ($001E+$0044 = two flags, no reunion) -- mirror the t2_
+#          rules one-for-one when his ending generator exists
+#   t3_scenario_hub <- s2_<sabin-ending>
+#   t3_* : gen_rapids .. gen_terra_clifftop with OT6_STACK=t3_
+#   reunion_ready.mss.lua: gen_terra_done with OT6_STACK=t3_ -- its
+#          all-three fork rides _caadb9's reunion to the map-22 staging
+#          and mints t3_reunion_ready; a gen_two_done-shaped acceptance
+#          re-saves it as reunion_ready
+# Then append to FRONTIER: the s2_/t3_ names, reunion_ready,
+# narshe_battle, kefka_doorstep, kefka_won -- the rules below are already
+# live, just unlisted so `make frontier` stays green while the boot is
+# unmintable.
+
+# ---- the Battle for Narshe (waiting on reunion_ready) ---------------------
+# gen_narshe_battle: reunion staging -> BANON -> the three-party assignment
+# menu (P1=TERRA+EDGAR+CELES, P2=CYAN+SABIN, P3=LOCKE+GAU) -> defense live
+# -> the measured cliff descent -> KEFKA'S doorstep -> the scripted win.
+# Validated end-to-end on the poked spike twin (OT6_STACK=spike_); the
+# rules run unchanged the day reunion_ready exists.
+build/states/narshe_battle.mss.lua: build/states/reunion_ready.mss.lua
+	$(call mint,narshe_battle,gen_narshe_battle)
+build/states/kefka_doorstep.mss.lua: build/states/narshe_battle.mss.lua
+	$(call mint,kefka_doorstep,gen_narshe_battle)
+build/states/kefka_won.mss.lua: build/states/kefka_doorstep.mss.lua
+	$(call mint,kefka_won,gen_narshe_battle)
 
 frontier: rom $(STATE1) $(STATE2) $(STATE3) \
           $(patsubst %,build/states/%.mss.lua,$(FRONTIER))

@@ -36,10 +36,16 @@ ram_env_for() {
 # joins the suite the moment its fixture exists and is reported SKIPPED --
 # never silently dropped -- when it does not.  `make frontier-test` is the
 # one command that always runs it.
-FRONTIER_TESTS="battle_vargas"
+# battle_kefka gates on kefka_doorstep.mss, which is deeper still: it needs
+# the REUNION (all three scenarios in one playthrough), so it stays skipped
+# until Sabin's chain lands and the scenario stack mints reunion_ready (see
+# the Makefile's stacking block).  Wired now so the day that state exists,
+# the gate grows by itself.
+FRONTIER_TESTS="battle_vargas battle_kefka"
 frontier_fixture() {
   case "$1" in
     battle_vargas) echo "$ROOT/build/states/vargas_doorstep.mss" ;;
+    battle_kefka)  echo "$ROOT/build/states/kefka_doorstep.mss" ;;
     *) echo "" ;;
   esac
 }
