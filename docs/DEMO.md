@@ -64,7 +64,7 @@ BPS-capable patcher, or just:
 
 ## Verification
 
-`make test` runs the whole gate headless — 31 tests plus same-mint pixel
+`make test` runs the whole gate headless — 32 tests plus same-mint pixel
 goldens, plus the mp-cost A/B's ON half on the flagged variant ROM;
 `tools/tests/suite.sh` is the list of record (this doc used to
 enumerate 12 and drifted). Green as of the v0.1 tag; the 21st test
