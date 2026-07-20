@@ -190,7 +190,21 @@ local steps = {
   }, "whelk event fires"),
   H.call(function() H.setPad({}) end),
   H.waitUntil(function() return H.battleActive() end, 900, "whelk up", 30),
-  H.waitFrames(240),
+  -- The whelk's scripted battle intro dialogue re-uploads the small font for
+  -- its whole ~13s run (window_mess_open_init), clobbering OT6's glyph tiles;
+  -- the clobber fix (battle_hudclobber) veils the under-enemy hud while it is
+  -- up, so this settle -- which used to land mid-intro and see the hud drawn
+  -- from blanked tiles ("present" but junk) -- now taps through the intro and
+  -- waits for a font-whole, un-veiled hud before the retract checks below.
+  -- past the intro when the first battle menu opens (7bca): the dialogue is
+  -- closed by then, the font restored (its close re-lays), the hud un-veiled.
+  H.driveUntil(function()
+    return H.readByte(0x7bca) ~= 0 and H.readByte(0x64d5) == 0 and H.fieldHudPresent()
+  end, 4000, {
+    H.call(function() if H.readByte(0x7bca) == 0 then H.setPad({ "a" }) else H.setPad({}) end end),
+    H.waitFrames(10), H.release(), H.waitFrames(10),
+  }, "whelk intro dialogue dismissed, menu up, hud font whole"),
+  H.waitFrames(120),
   H.call(function()
     claimed = claimedCharSet()
     -- Name the roll.  Nothing here asserts on it -- the retract cycle is the

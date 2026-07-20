@@ -3262,6 +3262,32 @@ OT6_SCRIPTBUSY := $57bf         ; nonzero = a battle animation script
         lda     f:$7e0000+OT6_HUDVEIL-1          ; veil rides the high byte
         and     #$ff00                           ;   (low byte = randbtl)
         bne     @veil
+        ; hud glyph TILES unreliable? veil (hide) the hud, don't draw from them.
+        ; a battle dialog window (window_mess_open_init, _c142e4, btlgfx_main
+        ; .asm:9264) opens by ClearDlgGfxBuf-ing the whole small font and
+        ; re-uploading it to $5800 in four TfrDlgTextGfx passes -- a full
+        ; $5800-$5fff blank + message glyphs, which zeroes OUR borrowed glyph
+        ; cells ($64-$79, $eb-$fd: all blank in SmallFontGfx).  the vanilla
+        ; staged restore (Ot6FontRestoreMark, hooking _c143b9) fires on the
+        ; dialog CLOSE only, and the window keeps re-uploading as it prints, so
+        ; from open until the close re-lay finishes -- and for the WHOLE fight
+        ; when the script never issues a close (measured: probe_moogfont /
+        ; probe_moogjunk, battle 115 Kefka flashback -- the under-enemy hud
+        ; drew break/shield/icon glyphs from blanked tiles for ~5000/9000
+        ; frames: junk over and around the enemies).  so while a dialog window
+        ; is up (w7e64d5, the open latch: _c14312 sets it, _c143cc/BattleEvent
+        ; Cmd_10 re-lay then clear it) OR a re-lay is mid-flight (OT6_FONTDIRTY,
+        ; the close's staged restore), hold the veil: the hud is cleanly hidden
+        ; (vanilla's $01ee fill, exactly like an entry/exit anim), never junk,
+        ; and repaints once the tiles are whole again.  neither flag is set by
+        ; the attack-name banner (battle_banner: FONTDIRTY stays 0, hud stays
+        ; painted).  the dialog draws in $80+ letter cells, disjoint from ours.
+        lda     f:$7e0000+$64d5                  ; dialog window open?
+        and     #$00ff
+        bne     @veil
+        lda     f:$7e0000+OT6_FONTDIRTY          ; font re-lay in flight?
+        and     #$00ff
+        bne     @veil
         lda     f:$7e0000+OT6_SHADOW+4,x
         sta     hVMDATAL
         lda     f:$7e0000+OT6_SHADOW+6,x
