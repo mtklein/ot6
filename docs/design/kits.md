@@ -246,6 +246,39 @@ corrode — and a little merchant blood (he'd say TREASURE HUNTER).
   turn's BP gain), *First Strike* (battle opens +1 BP for Locke),
   *Fence* (steals sell for more).
 
+**Boost-tiered Steal (shipped M3).** Steal is the party's first *chance verb*:
+it rolls dice, so BP buys certainty, not potency (DESIGN.md's canon rule — "on
+chance verbs boost guarantees"). Each point tilts BOTH axes of the vanilla
+gamble — the success chance and the common-vs-rare pick — monotonically, and the
+full spend converts it:
+
+| BP | Success | Item pick |
+|----|---------|-----------|
+| 0 | **vanilla, to the byte** — level+50−targetLevel, Sneak Ring doubles it | vanilla: 1/8 rare, 7/8 common; an empty picked slot still yields nothing |
+| 1 | +40 to the effective level (a hard steal → a coin flip; a coin flip → a near-lock) | 3/8 rare when both present; never "nothing" on a hit (takes whichever slot is filled) |
+| 2 | +90 (level parity now auto-succeeds) | 3/4 rare when both present; same fallback |
+| 3 | **guaranteed** (the level clamps to $ff, so the roll is skipped entirely) | **rare if present, else the common** — taken outright, no roll |
+
+Rulings that fall out of the vanilla math (see `tools/tests/battle_steal.lua`):
+
+- **Sneak Ring** keeps helping the un-boosted and partial tiers — it doubles the
+  residual success chance at 0–2 BP exactly as in vanilla. At 3 BP it is moot:
+  the level clamp overflows *before* the chance value is ever formed, so the ring
+  is never consulted. Nobody stacks a relic onto a certainty.
+- **Boost never conjures loot.** An enemy with nothing to steal, or one already
+  looted (both slots cleared), yields vanilla's "nothing" at every tier — the
+  $ffff top-check drops out before the tier logic runs. 3 BP guarantees a steal
+  *if there is something to steal*, and "rare if present" falls back to the
+  common when there is no rare (guarantee ≠ conjuring).
+- **No damage, no multiplier.** Steal deals none, and the Ot6BoostDmg command
+  gate ($05) makes sure boost never sneaks one in: a chance verb answers to
+  guarantee, not the ×2/×4/×8 a damage verb takes. This is what keeps the two
+  axes legible — and it pre-declares **Mug's** ruling. Mug is *steal + piercing
+  damage*: when it ships, boost drives exactly ONE axis (the damage multiply OR
+  the steal guarantee, TBD by playtest), never both, or the canon rule stops
+  reading cleanly. The steal half rides its unboosted vanilla odds unless boost
+  is spent on it.
+
 ### Celes — Rune Knight (slashing: sword, ice lean)
 
 Vanilla natural-magic levels nearly verbatim — the table was already
@@ -298,6 +331,25 @@ ice/order/tempo. The duality reads clearer than vanilla ever made it.
 - **Mog — Dancer (piercing: spear)**: the 8 Dances verbatim ✦,
   learned by dancing on each terrain ✦; divine **Water Rondo**, kept
   WoB-missable, vanilla-style. Easy and perfect.
+  - **Boost-tiered Dance (design canon — awaiting Mog's rung to build).**
+    Dance is a *chance verb* like Steal, so boost buys certainty in the dance's
+    own vocabulary (DESIGN.md canon rule). **Keep the possession** — Mog still
+    dances on his own once it starts; that loss of control IS the dance. Boost
+    spent at dance-start buys choreography: **1–2 BP removes the stumble** (the
+    ~1/16 wrong-terrain misfire) and shifts the four-move weights toward the
+    stronger moves; **3 BP = the dance's best move every turn for the whole
+    trance** — fully choreographed, no roll. Same shape as Steal: 0 BP is
+    vanilla to the byte, each point narrows the gamble, the full spend converts
+    it. This is approved-verbatim design, not yet coded — it lands when Mog's kit
+    does (WoB), reusing the same pending-BP read + Ot6ActionEnd charge Steal
+    already proves out.
+
+**The chance-verb family.** Steal (shipped) and Dance (above) are the first two;
+**Sketch (Relm), Slot (Setzer), and Rage (Gau)** answer to the SAME rule when
+their rungs arrive — each rolls dice, so each spends BP on certainty in its own
+terms (a chosen sketch, a fixed reel, a picked rage) rather than on a potency it
+doesn't have. Held in reserve deliberately: coupling steal odds to a *broken*
+enemy (revisit after the v0.3 break-uptime playtest).
 
 ## Curated kits (the Ochette/Hikari pair)
 

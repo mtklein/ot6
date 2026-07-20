@@ -128,6 +128,20 @@ it casts as Fira; twice, Firaga. This is the single best trick in the design:
 it keeps every spell list at 8 without losing the power curve, and it makes
 boosting mean something on every kit, not just attackers.
 
+**The canon rule: on damage verbs boost multiplies; on chance verbs boost
+guarantees.** A verb that rolls dice — Steal, Dance, and their family (Sketch,
+Slot, Rage) — doesn't have a "potency" to tier, so BP buys *certainty* instead,
+spoken in that verb's own vocabulary. The gamble narrows with each point and the
+full 3-BP spend converts it outright. **Steal is the shipped example** (M3,
+Locke): 0 BP is vanilla to the byte — the level roll, the 1/8 rare slot, the
+Sneak Ring doubling, all untouched; each BP tilts both the success chance and
+the rare bias; 3 BP is a guaranteed steal that takes the rare item *if the enemy
+has one* (boost buys certainty, never loot the enemy never had). It deals no
+damage and takes no multiplier — a chance verb answers to guarantee, not
+potency, and keeping the two axes disjoint is what keeps the rule legible.
+Steal's tier table and the full ruling live in design/kits.md; Dance's approved
+shape (built when Mog's rung lands) is there too.
+
 **Cyan is the BP showcase.** The charge gauge — the most disliked mechanic in
 vanilla — is deleted. The 8 techniques are priced in BP:
 

@@ -31,7 +31,14 @@ not used.
   being free under Octopath rules.
 - **Boost never raises MP cost.** The shipped tier fold queues
   Fire 3 at Fire's cost (DEMO.md): BP is the tier price, MP the
-  cast price. That split ports unchanged to every costed verb.
+  cast price. That split ports unchanged to every costed verb —
+  including the now-shipped **boost-tiered Steal** (kits.md): its
+  BP buys the guarantee, and its MP question is unchanged by the
+  boost, riding the M4 costing (the "flat small ~2" row below)
+  exactly like every other free-in-vanilla verb. Steal charges no
+  MP today for the same reason the rest don't: the universal
+  charge stays dormant behind OT6_MP_COSTS until the menu can
+  display costs.
 - **One price scale.** Kit skills live in the same ability
   records as spells (research/data-formats.md), so they price
   on the vanilla spell ruler: Fire 4, Fire 2 20, Fire 3 51.
