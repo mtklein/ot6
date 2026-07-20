@@ -28,7 +28,7 @@
 #   (a 255 with unflushed stdout is a wall-clock cap, not a crash).
 set -u
 ROOT="$(cd "$(dirname "$0")/../.." && pwd)"
-ROM="$ROOT/build/ot6.sfc"
+ROM="${OT6_ROM:-$ROOT/build/ot6.sfc}"
 SCRIPT="${1:?usage: run.sh <script.lua> [logfile]}"
 
 # Mesen's config home is the isolation boundary, so it moves per worker
