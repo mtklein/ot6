@@ -3311,9 +3311,11 @@ OT6_SCRIPTBUSY := $57bf         ; nonzero = a battle animation script
         beq     @write
         shorta0                                  ; one-shot: gate it
         jsr     @late
-        bcs     @skip           ; too late: hold prev, redo whole
+        jcs     @skip           ; too late: hold prev, redo whole
                                 ;   transition next nmi (@skip opens
                                 ;   with shorta0, so a8 entry is fine)
+                                ;   (long branch: the 16x16-mode veil
+                                ;   check grew the body past bcs reach)
         longa
         lda     f:$7e0000+OT6_SHADOW+2,x         ; reload prev (gate ate a)
         sta     hVMADDL                          ; blank the old cells
@@ -3356,6 +3358,38 @@ OT6_SCRIPTBUSY := $57bf         ; nonzero = a battle animation script
         bne     @veil
         lda     f:$7e0000+OT6_FONTDIRTY          ; font re-lay in flight?
         and     #$00ff
+        bne     @veil
+        ; battlefield bg3 in 16x16 TILE MODE?  an animation owns the layer --
+        ; veil.  the animation inits flip the battlefield's $2105 shadow
+        ; ($896f) to 16x16 bg3 tiles for an effect's run -- InitAnimType's
+        ; bg1-target and bg1-gfx paths (btlgfx_main.asm:26304/:26348,
+        ; `ora #$40`/`ora #$50`) and the circle/mask init families
+        ; (:47410 `ora #$48`, :48362 `and #$f7 / ora #$40`) -- because the
+        ; effect uses bg3 as its own canvas/color-math mask.  vanilla clears
+        ; the field map first (ClearBG3TileBuf/TfrBG3Tiles) and can assume
+        ; nothing of its own shows: its $01ee fill is priority-CLEAR,
+        ; underneath the opaque battle bg in every mode.  our hud cells are
+        ; priority-SET ($21xx), and in 16x16 mode a map cell renders at
+        ; DOUBLED size and position pulling three NEIGHBOR tiles (char n
+        ; draws n, n+1, n+$10, n+$11) -- so any live line inside the
+        ; effect's scroll window paints doubled break-icon blocks flanked by
+        ; neighbor-tile bars: "break icons amongst other things that look
+        ; like junk memory", over and around the monsters, in fights with no
+        ; dialogue -- the owner's residual v0.2 sighting after the fly-in
+        ; and dialogue-clobber fixes.  measured (probe_junk16, map 96's
+        ; natural Cirpius x3, hud rows 5/8): a plain CURE runs 42 frames at
+        ; $2105=$59 with both rows inside the (0,0) window -- 424 flagged
+        ; frames, screenshots match the report; Fire's $51 phase (priority
+        ; flag dropped) and plain Fights ($19: bg1-only 16x16) stay
+        ; invisible, which is why the sighting was intermittent.  while the
+        ; bit is up, hold the veil: $01ee is exactly the word vanilla wants
+        ; in every cell it did not draw itself, in both tile modes.  (the
+        ; main loop can flip $896f mid-frame between our nmi reads; the
+        ; exposure is bounded at one partial frame at effect onset, below
+        ; per-frame sampling -- battle_hudanim16 samples per frame and
+        ; passes.)
+        lda     f:$7e0000+$896f                  ; battlefield $2105 shadow
+        and     #$0040                           ;   bg3 tile size 16x16?
         bne     @veil
         lda     f:$7e0000+OT6_SHADOW+4,x
         sta     hVMDATAL
