@@ -24,12 +24,13 @@
 -- OT6_STACK=spike_ -- compose rewrites every state basename, so the same
 -- file boots the spike state and mints spike_narshe_battle /
 -- spike_kefka_doorstep (the stacking mechanism validating the fixture
--- generator, no duplication).  KNOWN LIMIT of the poked run: the win
--- tail stalls in the map-23 esper scene (probe_esper_stall: the
--- interpreter waits on TERRA's object, blocked by a misplaced actor --
--- the poked boot's CYAN/GAU were never rostered, so their records are
--- garbage).  The stall check below names itself when that happens; the
--- honest boot rosters everyone in Sabin's scenario.
+-- generator, no duplication).  THE MAP-23 ESPER STALL, corrected: the win
+-- tail parks at $CCBEBA (the reunion cutscene) on EVERY boot, honest
+-- included -- not a poked-boot rostering bug as first thought.  Its
+-- dialogs never set the field dialog flags ($00BA/$00D3 = 0, measured),
+-- so a tap-on-dialogWaiting driver never advances them.  Step 5 taps A
+-- unconditionally through map 23 instead; measured to walk the PC off
+-- $CCBEBA to the overworld (probe_esper_stall's tap-through).
 --
 -- EVERY MECHANISM HERE WAS MEASURED FIRST (probe_narshe_spike*,
 -- probe_kefka_npc, probe_kefka_fight -- spike lineage, commits
@@ -366,26 +367,44 @@ H.run({ maxFrames = 120000 }, {
   end)(),
 
   -- ==================================================================== --
-  -- 5. THE WIN TAIL to the first controllable frame, with the known
-  --    map-23 stall NAMED if it fires (poked boots only, per the header).
+  -- 5. THE WIN TAIL to the first controllable frame.  The esper scene
+  --    (map 23, _ccbcb1 -> $CCBEBA) presents its dialogs WITHOUT setting
+  --    the field dialog flags ($00BA/$00D3 both read 0 the whole time,
+  --    MEASURED), so advanceStory's dlgN>=3 tap never fired and the scene
+  --    parked at $CCBEBA forever.  The predecessor read this as a
+  --    poked-boot rostering bug; it is not -- it stalls on ANY boot,
+  --    honest included, because the tap detector misses this cutscene's
+  --    dialog kind.  The fix is to tap A UNCONDITIONALLY through map 23
+  --    (a pure cutscene -- advancing is always safe), which walks the PC
+  --    off $CCBEBA (measured $CCBEBA -> $CCBF07 -> $CCBF30 -> map 0,
+  --    probe_esper_stall's tap-through).  Any battle that loads is still
+  --    kill-bitted; a 20,000-frame hard cap remains as a real-hang guard.
   -- ==================================================================== --
   (function()
-    local cnt, stallN = 0, 0
-    return H.advanceStory(function()
-      local stalled = map() == 23 and H.eventRunning()
-                  and not H.dialogWaiting() and not H.battleLoadStarted()
-      stallN = stalled and stallN + 1 or 0
-      if stallN >= 9000 then
-        error("the map-23 esper-scene stall (probe_esper_stall): the " ..
-          "interpreter is waiting on a blocked actor.  Expected on POKED " ..
-          "boots (unrostered CYAN/GAU); on the honest chain this is new", 0)
-      end
+    local aPh, cnt = 0, 0
+    return H.driveUntil(function()
       local ok = H.hasControl() and H.tileAligned() and bright() >= 15
              and not H.dialogWaiting() and not H.eventRunning()
              and not H.battleLoadStarted() and not H.worldMode()
       cnt = ok and cnt + 1 or 0
       return cnt >= 60
-    end, 60000)
+    end, 60000, {
+      H.call(function()
+        aPh = (aPh + 1) % 8
+        if H.battleLoadStarted() then
+          if H.monstersPresent() > 0 then killBitAll() end
+          H.setPad(aPh < 4 and { "a" } or {}); return
+        end
+        -- tap A whenever the party is NOT yet in plain field control:
+        -- that covers the flag-less esper dialogs on map 23 and every
+        -- ordinary dialog on the way to Arvis's house
+        if not (H.hasControl() and H.tileAligned()) or H.dialogWaiting() then
+          H.setPad(aPh < 4 and { "a" } or {})
+        else
+          H.setPad({})
+        end
+      end),
+    }, "the win tail to control (tap through the esper scene)")
   end)(),
   H.waitFrames(30),
   H.call(function()
