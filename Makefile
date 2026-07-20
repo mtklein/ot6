@@ -422,9 +422,22 @@ build/states/locke_done.mss.lua: build/states/tunnelarmr_doorstep.mss.lua
 #    its own "back at the hub" gate.  That final leg belongs to
 #    gen_narshe_battle, and Sabin's chain -- still growing its back half --
 #    is the one whose ending was free to leave unconsumed.
+# Worker-isolated exactly like `mint` -- smint used to run BARE, and under
+# `make -jN` the s2_/t2_/t3_ stacks become runnable together (all three hang
+# off locke_done), so two bare smints raced on the ONE default composed file
+# and settings pin -- the precise hazard the worker-isolation comment above
+# describes.  Measured fallout (2026-07-20 remint): t2_terra_narshe minted
+# with the party on map 3 while its own run reported PASS (it had executed a
+# concurrent stack's composed script), and t2_terra_caves's rule "succeeded"
+# -- touch and all -- without ever writing its state.  The `&&` chain also
+# makes a failed stack mint fail its RULE, which the bare form did not
+# guarantee.  OT6_WORKER and OT6_STACK compose fine: the worker picks the
+# tree, the stack prefix picks the state names inside it.
 define smint
 	@if [ build/states/.rom-copy -nt build/states/$(1).mss ] || [ ! -f build/states/$(1).mss ]; then \
-		OT6_STACK=$(2) tools/tests/run.sh tools/tests/$(3).lua; \
+		OT6_WORKER=$(1) OT6_STACK=$(2) tools/tests/run.sh tools/tests/$(3).lua && \
+		cp "build/test-workers/w$(1)/artifacts/$(1).mss" "build/states/$(1).mss" && \
+		cp "build/test-workers/w$(1)/artifacts/$(1).mss.lua" "build/states/$(1).mss.lua"; \
 	fi
 	@touch build/states/$(1).mss.lua
 endef
