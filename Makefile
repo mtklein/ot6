@@ -340,10 +340,29 @@ build/states/forest_done.mss.lua: build/states/camp_escaped.mss.lua
 # at (178,93) with $003A/$003B set.
 build/states/train_done.mss.lua: build/states/forest_done.mss.lua
 	$(call mint,train_done,gen_sabin_train)
+# gen_sabin_falls: Baren Falls -- the jump, battle 18 mid-fall (RIZOPAS
+# surfaces in slot 5 off the piranhas' death script, its authored
+# 5-shield SLASH|BLUDG row read live), SHADOW's exit, GAU named on the
+# Veldt shore.
+build/states/falls_done.mss.lua: build/states/train_done.mss.lua
+	$(call mint,falls_done,gen_sabin_falls)
+# gen_sabin_gau: Mobliz's Dried Meat, the Veldt grind (GAU appears on the
+# 3/8 end-of-battle roll), and his return-visit self-recruit -- the
+# generator header documents the one concession ($3EBD bit 1) and the
+# measured reason the first-visit feed cannot be driven.
+build/states/gau_joined.mss.lua: build/states/falls_done.mss.lua
+	$(call mint,gau_joined,gen_sabin_gau)
+# gen_sabin_trench: Crescent Mountain's helmet chain (GAU-gated), the
+# Serpent Trench ridden as a real VEHICLE script (LEFT held through both
+# arrow windows = the mainline), Nikeah, and the ferry's option-1 prompt --
+# $0044=1 and the hub.  SABIN's scenario closes here.
+build/states/sabin_done.mss.lua: build/states/gau_joined.mss.lua
+	$(call mint,sabin_done,gen_sabin_trench)
 # SABIN's continuation states join the frontier additively (a += line, kept off
 # the base := list so the other scenario agents' FRONTIER edits never collide
 # with this one).  Extended in place as each leg lands.
-FRONTIER += camp_escaped forest_done train_done
+FRONTIER += camp_escaped forest_done train_done falls_done gau_joined \
+            sabin_done
 
 # ---- rung 4: LOCKE's scenario, hub -> South Figaro -> TunnelArmr ----
 # gen_sfigaro: the occupied town.  The gate soldier (battle 11), then the
