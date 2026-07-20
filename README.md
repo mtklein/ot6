@@ -7,16 +7,15 @@ turn economy.
 
 ## Status
 
-**v0.2 released** ([tag](https://github.com/mtklein/ot6/releases/tag/v0.2)) —
-playable from the start through Vargas at the top of Mt. Kolts, roughly an
-hour and a quarter. Break and boost are both live: enemies carry shields and
+**v0.3 released** ([tag](https://github.com/mtklein/ot6/releases/tag/v0.3)) —
+playable from the start through the Battle for Narshe: all three scenarios
+of the split, the reunion, and Kefka beaten on the cliffs. Break and boost are both live: enemies carry shields and
 hidden weaknesses, hitting a weakness chips a shield, and breaking drops
 defenses hard. Boost banks turns and folds spell tiers (Fire → Fira → Firaga).
 The Narshe school teaches all of it, and Edgar's Bio Blaster makes poison a
 real key.
 
-Work in progress toward the next rung, the scenario split through Kefka at
-Narshe. See [docs/ROADMAP.md](docs/ROADMAP.md) for milestones and the
+Work in progress toward the next rung, up through Zozo — the first espers. See [docs/ROADMAP.md](docs/ROADMAP.md) for milestones and the
 "playable frontier" metric, and [docs/DESIGN.md](docs/DESIGN.md) for the
 mechanics design.
 
