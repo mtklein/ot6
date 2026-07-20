@@ -24,7 +24,7 @@ ROMS = $(foreach V, $(VERSIONS), $(ROM_DIR)/$(V).sfc)
 SPC_PRG = src/sound/ff6-spc.dat
 
 .PHONY: all rip clean distclean mml spc wav rng event monster_gfx text dte \
-	lz $(VERSIONS) $(MODULES)
+	lz ff6-en-mp $(VERSIONS) $(MODULES)
 
 # disable default suffix rules
 .SUFFIXES:
@@ -258,5 +258,35 @@ $(FF6_EN1_PATH): cfg/ff6-en.cfg spc mml text_en monster_gfx $(OBJ_FILES_EN1)
 	@printf '.segment "cutscene_lz"\n.incbin "cutscene.lz"' > $(CUTSCENE_LZ_ASM)
 	$(ASM) --bin-include-dir $(LZ_DIR) $(CUTSCENE_LZ_ASM) -o $(CUTSCENE_LZ).o
 	$(LINK) $(LINKFLAGS) --dbgfile $(@:sfc=dbg) -m $(@:sfc=map) -o $@ -C $< $(OBJ_FILES_EN1) $(CUTSCENE_LZ).o
+	@$(RM) -rf $(LZ_DIR)
+	$(FIX_CHECKSUM) $@
+
+# --------------------------------------------------------------------- ot6 --
+# v0.4 "every ability costs MP" -- the OT6_MP_COSTS=1 ON build, for the A/B
+# mpcost gate (tools/tests/battle_mpcost.lua). ONLY the battle module reads
+# the flag (battle_main.asm + ot6.asm) -- the other nine assemble to
+# byte-identical objects with it set or clear -- so this rebuilds JUST the
+# battle object with the flag and relinks it against the stock en objects.
+# It is the ff6-en recipe verbatim but for that one substituted object, and
+# it proves the ON path assembles and links cheaply. The battle object is
+# named battlemp_en.o (NOT battle_en-mp.o) so it can't collide with the
+# generated battle_%.o pattern rule, which would build it flag-clear.
+OBJ_BATTLE_MP = $(OBJ_DIR)/battlemp_en.o
+OBJ_FILES_EN_MP = $(patsubst $(OBJ_DIR)/battle_en.o,$(OBJ_BATTLE_MP),$(OBJ_FILES_EN))
+
+ff6-en-mp: $(ROM_DIR)/ff6-en-mp.sfc
+
+$(OBJ_BATTLE_MP): $(battle_SRC) $(INC_FILES) | $(LZ_FILES)
+	@mkdir -p $(OBJ_DIR)
+	$(ASM) $(ASMFLAGS) -D LANG_EN=1 -D ROM_VERSION=0 -D OT6_MP_COSTS=1 \
+		--create-dep $(@:o=d) -l $(@:o=lst) src/battle/battle_main.asm -o $@
+
+$(ROM_DIR)/ff6-en-mp.sfc: cfg/ff6-en.cfg spc mml text_en monster_gfx $(OBJ_FILES_EN_MP)
+	@mkdir -p $(LZ_DIR) $(ROM_DIR)
+	$(LINK) $(LINKFLAGS) -o "" -C $< $(OBJ_FILES_EN_MP)
+	python3 tools/encode_cutscene.py $(CUTSCENE_LZ:lz=bin) $(CUTSCENE_LZ)
+	@printf '.segment "cutscene_lz"\n.incbin "cutscene.lz"' > $(CUTSCENE_LZ_ASM)
+	$(ASM) --bin-include-dir $(LZ_DIR) $(CUTSCENE_LZ_ASM) -o $(CUTSCENE_LZ).o
+	$(LINK) $(LINKFLAGS) --dbgfile $(@:sfc=dbg) -m $(@:sfc=map) -o $@ -C $< $(OBJ_FILES_EN_MP) $(CUTSCENE_LZ).o
 	@$(RM) -rf $(LZ_DIR)
 	$(FIX_CHECKSUM) $@

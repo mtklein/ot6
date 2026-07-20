@@ -7,7 +7,7 @@ VERSION := 0.3
 # A failed recipe (e.g. the checksum step dying mid-build) leaves a half-built target the next make treats as up-to-date — bit us twice on 2026-07-18.
 .DELETE_ON_ERROR:
 
-.PHONY: all rom patch run test tested verify clean goldens-capture release frontier frontier-test
+.PHONY: all rom patch run test tested verify clean goldens-capture release frontier frontier-test mpcost-rom
 
 all: rom
 
@@ -116,10 +116,28 @@ $(STATE3): $(STATE2)
 # compose.py's selftest is pure python and gates the suite: it is the positive
 # control for sidecar resolution, and a wrong resolution silently tests the
 # wrong ROM's savestates rather than failing.
-test: rom $(STATE1) $(STATE2) $(STATE3)
+# ot6 v0.4 "every ability costs MP": the ON half of the OT6_MP_COSTS A/B.
+# Only the battle module reads the flag, so ff6-en-mp rebuilds just that
+# object and relinks against the stock en objects (see ff6/Makefile). The ON
+# ROM MUST differ from the shipped OFF ROM or the flag is dead code. The
+# suite runs battle_mpcost.lua on the OFF (shipped) ROM -- asserting the verb
+# stays FREE and the cost table is ABSENT, i.e. the machinery is dormant; the
+# `test` recipe below runs the SAME self-detecting script on this ON ROM,
+# asserting the charge and the insufficient-mp refusal. Two runs, both states,
+# one instrument -- the fix_checksum rewrite's A/B technique lifted to behavior.
+mpcost-rom: rom
+	$(MAKE) -C ff6 ff6-en-mp
+	@if cmp -s build/ot6.sfc ff6/rom/ff6-en-mp.sfc; then \
+		echo "ERROR: OT6_MP_COSTS ON ROM is byte-identical to the OFF ROM — flag is dead"; \
+		exit 1; fi
+	@echo "OT6_MP_COSTS ON variant built and confirmed distinct from the OFF ROM"
+
+test: rom mpcost-rom $(STATE1) $(STATE2) $(STATE3)
 	python3 tools/tests/lib/compose.py --selftest
 	@rm -f $(STAMP)
 	tools/tests/suite.sh
+	@echo "-- mpcost A/B: the ON half (charge + refusal) on the flagged variant --"
+	OT6_ROM=$(CURDIR)/ff6/rom/ff6-en-mp.sfc tools/tests/run.sh tools/tests/battle_mpcost.lua
 	@shasum -a 1 build/ot6.sfc | cut -d' ' -f1 > $(STAMP)
 	@echo "suite green — stamped `cat $(STAMP)`"
 
