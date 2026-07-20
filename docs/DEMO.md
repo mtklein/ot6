@@ -64,7 +64,7 @@ BPS-capable patcher, or just:
 
 ## Verification
 
-`make test` runs the whole gate headless — 30 tests plus same-mint pixel
+`make test` runs the whole gate headless — 31 tests plus same-mint pixel
 goldens, plus the mp-cost A/B's ON half on the flagged variant ROM;
 `tools/tests/suite.sh` is the list of record (this doc used to
 enumerate 12 and drifted). Green as of the v0.1 tag; the 21st test
@@ -74,7 +74,7 @@ One more, `battle_vargas`, is FRONTIER-GATED: it fights Vargas on Mt.
 Kolts out of `vargas_doorstep.mss`, which only `make frontier` mints, so
 `make test` reports it as skipped until that fixture exists rather than
 dragging the whole story chain into the gate. `make frontier-test` mints
-the chain and runs the same suite with it included (31 tests).
+the chain and runs the same suite with it included (33 tests).
 
 ## Known limits (by design, for now)
 
