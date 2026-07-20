@@ -377,7 +377,15 @@ H.run({ maxFrames = 120000 }, {
   -- ==================================================================== --
   H.waitFrames(30),
   H.call(function()
-    H.assertEq(sw(0x0139), 1, "$0139 SET -- the battle-won latch")
+    -- the win verdict is battle_kefka's, verbatim: the $40 path leaves the
+    -- party OFF the {25,5} lose-path save point with the win scene owning
+    -- the stage.  ($0139 is NOT set here -- it latches later, inside the
+    -- win scene's tail; asserting it at battle-exit was measured wrong.)
+    local atSave = H.fieldX() == 25 and H.fieldY() == 5
+    H.assertEq(atSave, false,
+      "NOT at the {25,5} save point -- the lose path did not run")
+    H.assertEq(H.eventRunning() or H.dialogWaiting(), true,
+      "the win scene owns the stage (_ccbcb1)")
     H.assertEq(H.battleLoadStarted(), false, "the fight is over")
     H.log(string.format("[narshe_battle] the $40 win stands at f%d", H.frame))
   end),
