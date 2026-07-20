@@ -528,7 +528,7 @@ FRONTIER += s2_scenario_hub s2_sabin_world s2_sabin_camp s2_cyan_defence \
             s2_gau_joined s2_sabin_done t3_scenario_hub t3_rapids_start \
             t3_rapids_done t3_terra_narshe t3_terra_caves \
             t3_terra_clifftop t3_reunion_ready reunion_ready \
-            narshe_battle kefka_doorstep
+            narshe_battle kefka_doorstep kefka_won
 
 # ---- the Battle for Narshe (waiting on reunion_ready) ---------------------
 # gen_narshe_battle: reunion staging -> BANON -> the three-party assignment
@@ -540,11 +540,11 @@ build/states/narshe_battle.mss.lua: build/states/reunion_ready.mss.lua
 	$(call mint,narshe_battle,gen_narshe_battle)
 build/states/kefka_doorstep.mss.lua: build/states/narshe_battle.mss.lua
 	$(call mint,kefka_doorstep,gen_narshe_battle)
-# kefka_won is v0.4's FIRST link, not v0.3's last: its mint rides the
-# post-victory esper scene, which stalls the walker (issue #3).  It stays
-# OUT of FRONTIER so a past-the-stop-line bug cannot halt the chain that
-# mints the release's fixtures (it did, once).  Build it by name once #3
-# closes: `make build/states/kefka_won.mss.lua`.
+# kefka_won is v0.4's FIRST link and the honest chain's head: the win tail
+# (esper scene, TERRA's flight, the Arvis regroup and its party-select
+# menu) mints the map-30 boot the Zozo arc consumes.  Issue #3 -- the
+# scene stalling every walker -- is closed; the three waits it was made of
+# are decoded in gen_kefka_won's header.
 build/states/kefka_won.mss.lua: build/states/kefka_doorstep.mss.lua
 	$(call mint,kefka_won,gen_kefka_won)
 

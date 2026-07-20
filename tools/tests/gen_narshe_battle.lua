@@ -24,13 +24,13 @@
 -- OT6_STACK=spike_ -- compose rewrites every state basename, so the same
 -- file boots the spike state and mints spike_narshe_battle /
 -- spike_kefka_doorstep (the stacking mechanism validating the fixture
--- generator, no duplication).  THE MAP-23 ESPER STALL, corrected: the win
--- tail parks at $CCBEBA (the reunion cutscene) on EVERY boot, honest
--- included -- not a poked-boot rostering bug as first thought.  Its
--- dialogs never set the field dialog flags ($00BA/$00D3 = 0, measured),
--- so a tap-on-dialogWaiting driver never advances them.  Step 5 taps A
--- unconditionally through map 23 instead; measured to walk the PC off
--- $CCBEBA to the overworld (probe_esper_stall's tap-through).
+-- generator, no duplication).  THE MAP-23 ESPER STALL, decoded at last
+-- (issue #3): $CCBEBA is the resume address after `battle 78` -- the
+-- TRITOCH_MORPH set-piece both dialog-flag watching and battleLoadStarted
+-- are blind to -- and past it the tail wants the party-select menu
+-- DRIVEN, not tapped at.  The full three-wait read and the working drive
+-- live in gen_kefka_won.lua, which owns everything past this file's stop
+-- line.
 --
 -- EVERY MECHANISM HERE WAS MEASURED FIRST (probe_narshe_spike*,
 -- probe_kefka_npc, probe_kefka_fight -- spike lineage, commits
