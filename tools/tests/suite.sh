@@ -45,12 +45,18 @@ ram_env_for() {
 # (present-but-not-shown at entry), which the suite's non-frontier fights do
 # not have -- kolts_cave's map-96 pool is 93.75% Cirpius x3.  It guards the
 # entry hud gate ($201E) added for the v0.3-rc1 cave "white text overdraw".
-FRONTIER_TESTS="battle_vargas battle_kefka battle_flyin"
+# battle_hudclobber gates on moogle_doorstep.mss: it needs a fight with a
+# mid-battle DIALOGUE while the under-enemy hud is live (the Narshe Magitek-
+# flashback, Kefka's "Uwee, hee, hee!").  The dialogue re-uploads the small
+# font and blanks OT6's glyph tiles; the gate proves the hud never renders from
+# them (the "junk over/around enemies" sighting) and the flush stays in vblank.
+FRONTIER_TESTS="battle_vargas battle_kefka battle_flyin battle_hudclobber"
 frontier_fixture() {
   case "$1" in
-    battle_vargas) echo "$ROOT/build/states/vargas_doorstep.mss" ;;
-    battle_kefka)  echo "$ROOT/build/states/kefka_doorstep.mss" ;;
-    battle_flyin)  echo "$ROOT/build/states/kolts_cave.mss" ;;
+    battle_vargas)     echo "$ROOT/build/states/vargas_doorstep.mss" ;;
+    battle_kefka)      echo "$ROOT/build/states/kefka_doorstep.mss" ;;
+    battle_flyin)      echo "$ROOT/build/states/kolts_cave.mss" ;;
+    battle_hudclobber) echo "$ROOT/build/states/moogle_doorstep.mss" ;;
     *) echo "" ;;
   esac
 }
@@ -108,7 +114,7 @@ if [ "$JOBS" -gt 1 ]; then
   # double-run test. Keep the biggest handful in front; exact order past that
   # barely moves the makespan.
   in_list() { case " $2 " in *" $1 "*) return 0 ;; *) return 1 ;; esac; }
-  SCHED_LONG="battle_class battle_reveal_poweron battle_vargas battle_whelkwipe battle_hits battle_codex battle_dmgnum battle_break battle_runic probe_shadow_overlap battle_dlgmenu hud_stability"
+  SCHED_LONG="battle_class battle_reveal_poweron battle_vargas battle_whelkwipe battle_hudclobber battle_hits battle_codex battle_dmgnum battle_break battle_runic probe_shadow_overlap battle_dlgmenu hud_stability"
   ORDER=""
   for t in $SCHED_LONG; do in_list "$t" "$TESTS" && ORDER="$ORDER $t"; done
   for t in $TESTS; do in_list "$t" "$ORDER" || ORDER="$ORDER $t"; done
