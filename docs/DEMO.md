@@ -70,13 +70,14 @@ goldens, plus the mp-cost A/B's ON half on the flagged variant ROM;
 enumerate 12 and drifted). Green as of the v0.1 tag; the 21st test
 (probe_shadow_overlap) joined after, in 6275f02.
 
-Five more — `battle_vargas`, `battle_kefka`, `battle_flyin`,
-`battle_hudclobber`, `battle_hudanim16` — are FRONTIER-GATED: each
-asserts on a fixture only `make frontier` mints (Vargas's ledge, the
-Battle for Narshe, the Mt. Kolts cave pool, the moogle defense), so
-`make test` reports them as skipped until those fixtures exist rather
-than dragging the whole story chain into the gate. `make frontier-test`
-mints the chain and runs the same suite with them included (38 tests).
+Six more — `battle_vargas`, `battle_kefka`, `battle_flyin`,
+`battle_hudclobber`, `battle_hudanim16`, `battle_hudtrail` — are
+FRONTIER-GATED: each asserts on a fixture only `make frontier` mints
+(Vargas's ledge, the Battle for Narshe, the Mt. Kolts cave pool, the
+moogle defense, the Lete River raft), so `make test` reports them as
+skipped until those fixtures exist rather than dragging the whole story
+chain into the gate. `make frontier-test` mints the chain and runs the
+same suite with them included (39 tests).
 
 ## Known limits (by design, for now)
 
