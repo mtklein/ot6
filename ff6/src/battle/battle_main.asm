@@ -15837,6 +15837,7 @@ DoLevelUp:
         lda     #999
 @612c:  ora     $ee         ; mp boost
         sta     $160f,x     ; set new max mp
+        jsl     Ot6LevelUpHeal  ; ot6: refill current HP/MP to the new maxima
         plp
         rts
 

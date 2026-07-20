@@ -3720,5 +3720,112 @@ ot6_c_mix := Ot6CBlob           ; unsigned char ot6_c_mix(uchar a, uchar b)
 
 ; ------------------------------------------------------------------------------
 
+; [ v0.4: full HP/MP restore on level up ]
+;
+; Octopath's rule, ported whole (docs/design/mp-economy.md "Full HP/MP restore
+; on level up"): a character who gains a level refills current HP and MP to the
+; new maxima. The owner framed it "HP/SP/MP"; this project retired SP (the pool
+; is MP, mp-economy.md preamble) and boost points are battle-scoped RAM that
+; resets every fight -- the $1600 record carries only HP ($1609/$160b) and MP
+; ($160d/$160f), so the implementable meaning is HP + MP. No third pool exists
+; in the record to restore.
+;
+; Called by a jsl at the tail of vanilla DoLevelUp (battle_main.asm, right after
+; it stores the raised max MP), so the max HP/MP this refills TO are already the
+; post-level values -- refilling before the raise would undershoot by the level's
+; gain. X = record pointer, Y = battle slot, A = 16-bit (DoLevelUp is mid-longa).
+;
+; WHY the battle copies ($3bf4,y / $3c08,y), not the record's own current cells
+; ($1609,x / $160d,x): the victory sequence runs WinBattle FIRST, then UpdateSRAM
+; (battle_main.asm:11982-11983). UpdateSRAM copies each character's END-OF-BATTLE
+; battle HP/MP ($3bf4/$3c08) back over the record's current HP/MP
+; (battle_main.asm:12136-12141). A refill written to the record here would be
+; silently clobbered a few instructions later; the battle cell is the authority
+; at this moment, and UpdateSRAM carries it into save RAM for us. (Refilling the
+; record instead was the first, quietly-wrong version of this hook.)
+;
+; MULTI-LEVEL: CheckLevelUp loops DoLevelUp once per level gained
+; (battle_main.asm:15773-15780), so this runs once per level and each pass reads
+; the freshly-raised max -- the last pass leaves the battle cell at the final
+; max. MULTI-CHARACTER: WinBattle's reward loop (battle_main.asm:15443-15461)
+; visits each live party slot, and Y (the slot) survives down into DoLevelUp
+; because ExecBtlGfx preserves it (phy/ply, battle_main.asm:16396/16410) -- the
+; same invariant vanilla itself leans on when it reads $3ed8,y one instruction
+; after `jsr CheckLevelUp` (battle_main.asm:15456). A character who takes no
+; level never enters DoLevelUp, so their damaged battle HP/MP flow through
+; UpdateSRAM un-restored (the negative control battle_levelup.lua asserts).
+;
+; The refill TARGET is the effective max, decoded through the boost tier the top
+; two bits of $160b/$160f carry, mirroring CalcMaxHPMP (battle_main.asm:6673) and
+; capped like LoadCharProp (:6616 HP<10000, :6622 MP<1000). Masking the base
+; alone would undershoot a character wearing an HP/MP-boost relic; the stale
+; battle max $3c1c/$3c30 was computed pre-level at LoadCharProp time, so it is
+; not the new max either.
+
+.proc Ot6LevelUpHeal
+        php
+        longa                   ; 16-bit A for the maxima; index already 16-bit
+                                ; here (vanilla indexes $160b,x with record ptrs
+                                ; past $ff), so it is left untouched
+        lda     $160b,x         ; new max HP: base | boost tier (bits 15..14)
+        jsr     Ot6EffMax
+        cmp     #10000          ; LoadCharProp's HP ceiling (battle_main.asm:6616)
+        bcc     :+
+        lda     #9999
+:       sta     $3bf4,y         ; battle current HP := new max
+        lda     $160f,x         ; new max MP: base | boost tier
+        jsr     Ot6EffMax
+        cmp     #1000           ; LoadCharProp's MP ceiling (battle_main.asm:6622)
+        bcc     :+
+        lda     #999
+:       sta     $3c08,y         ; battle current MP := new max
+        shorta                  ; back to the file-wide 8-bit assembler state;
+                                ; plp restores the caller's real width
+        plp
+        rtl
+.endproc
+
+; effective maximum from a $160b/$160f-encoded field, mirroring CalcMaxHPMP
+; (battle_main.asm:6673): the top two bits pick a boost tier added to the
+; low-14-bit base -- 00 +0%, 01 +25%, 10 +50%, 11 +12.5%. A(16)=base|tier in,
+; A(16)=base+boost out (uncapped -- the caller clamps). Scratch $ee is dead at
+; the call site: DoLevelUp is finished with it and LearnAbilities never reads it
+; (battle_main.asm:15983). X and Y are preserved.
+
+.proc Ot6EffMax
+        .a16                    ; entered mid-longa; A is 16-bit throughout
+        pha                     ; encoded max
+        and     #$3fff          ; base
+        sta     $ee
+        pla
+        and     #$c000          ; boost tier
+        beq     @base           ; 00 -> +0%
+        cmp     #$8000
+        beq     @half           ; 10 -> +50% (base>>1)
+        bcs     @eighth         ; 11 -> +12.5% (base>>3)
+        lda     $ee             ; 01 -> +25% (base>>2)
+        lsr
+        lsr
+        bra     @sum
+@eighth:
+        lda     $ee
+        lsr
+        lsr
+        lsr
+        bra     @sum
+@half:
+        lda     $ee
+        lsr
+@sum:   clc
+        adc     $ee             ; base + boost delta
+        rts
+@base:
+        lda     $ee
+        rts
+        .a8                     ; restore the file-wide assembler width
+.endproc
+
+; ------------------------------------------------------------------------------
+
 ; weapon/ability class data (m3)
         .include "ot6_class.asm"
