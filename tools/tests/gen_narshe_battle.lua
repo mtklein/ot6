@@ -375,17 +375,18 @@ H.run({ maxFrames = 120000 }, {
   --    though the fight it gates had been won moments earlier.  The
   --    tail lives in gen_kefka_won.lua, deliberately outside FRONTIER.
   -- ==================================================================== --
-  H.waitFrames(30),
+  -- the win verdict is battle_kefka's, but WAITED FOR rather than sampled
+  -- at a fixed offset: after a 227-frame kill-bit win the battle module is
+  -- still fading at +30 frames and the win scene has not yet seized the
+  -- stage (measured -- the same predicate read true in battle_kefka only
+  -- because its real-play fight ran ~2000 frames before sampling).  $0139
+  -- is NOT asserted here at all; it latches later, inside the scene's tail.
+  H.waitUntil(function() return H.eventRunning() or H.dialogWaiting() end,
+    900, "the win scene owns the stage (_ccbcb1)", 10),
   H.call(function()
-    -- the win verdict is battle_kefka's, verbatim: the $40 path leaves the
-    -- party OFF the {25,5} lose-path save point with the win scene owning
-    -- the stage.  ($0139 is NOT set here -- it latches later, inside the
-    -- win scene's tail; asserting it at battle-exit was measured wrong.)
     local atSave = H.fieldX() == 25 and H.fieldY() == 5
     H.assertEq(atSave, false,
       "NOT at the {25,5} save point -- the lose path did not run")
-    H.assertEq(H.eventRunning() or H.dialogWaiting(), true,
-      "the win scene owns the stage (_ccbcb1)")
     H.assertEq(H.battleLoadStarted(), false, "the fight is over")
     H.log(string.format("[narshe_battle] the $40 win stands at f%d", H.frame))
   end),
