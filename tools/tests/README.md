@@ -226,6 +226,30 @@ set -- and never creates `SaveStates/`.)
   window was sampled and that the hud comes back once the birds land.
   Fails loudly on the pre-fix `cur=$54AC` (the glyphs the v0.3-rc1 cave
   playtest saw floating on the still-dark battlefield).
+- `battle_hudanim16.lua` - FRONTIER-GATED (kolts_cave.mss, battle_flyin's
+  fixture).  Guards the anim-mode veil: battle animation inits flip the
+  battlefield's $2105 shadow (`$896F`) to 16x16 bg3 tiles while an effect
+  uses bg3 as its canvas or color-math mask, and in that mode a map cell
+  renders at doubled size/position pulling three neighbor tiles -- so any
+  live hud line inside the effect's scroll window drew doubled break-icon
+  blocks flanked by neighbor-tile junk over and around the monsters (the
+  owner's no-dialogue "break icons amongst junk" sighting, present since
+  v0.2; a plain CURE against the Cirpius x3 pool -- hud rows 5/8, inside
+  the idle window -- showed it for 42 straight frames).  Paces the natural
+  pool, lets the entry veil finish, drives ~2 Terra casts, and asserts per
+  frame: no live hud cell holds a painted glyph while `$896F` bit `$40` is
+  up (1338 violations pre-fix), with positive controls that >= 24 such
+  frames were sampled, at least one live line read veiled ($01EE), the
+  dialogue latch stayed 0 (the no-dialogue clause), and the hud repaints
+  whole (glyphCanary) after.
+- `probe_junk16.lua` - the reproduction instrument behind it: same fixture
+  and drive plus per-frame $2105/$212C/scroll/anchor traces, a claimed-
+  glyph-in-window detector with screenshot bursts, and a borrowed-font
+  canary.  Its `j16_*_hudvis` shots are the sighting: doubled shield/'?'
+  glyphs and neighbor-tile bars over the battlefield during Cure.
+- `probe_bg3anim.lua` - the first measurement of the display state: runs
+  first_battle's Fire Beam (bg3-scripted, $2105=$59 for ~70 frames while
+  bg3 stays on the main screen) with a full map-census log per frame.
 - `probe_vargas.lua` - the instrument behind both: dumps the seeded
   formation, gauge, element and class rows and SABIN's join level, and
   answers the two questions the sources do not -- that SABIN gets NO

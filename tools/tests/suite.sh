@@ -50,13 +50,21 @@ ram_env_for() {
 # flashback, Kefka's "Uwee, hee, hee!").  The dialogue re-uploads the small
 # font and blanks OT6's glyph tiles; the gate proves the hud never renders from
 # them (the "junk over/around enemies" sighting) and the flush stays in vblank.
-FRONTIER_TESTS="battle_vargas battle_kefka battle_flyin battle_hudclobber"
+# battle_hudanim16 gates on kolts_cave.mss too: it needs a formation whose hud
+# rows sit inside the battlefield's 16x16 scroll window (Cirpius x3, rows 5/8)
+# plus a caster whose animation flips bg3 to 16x16 tiles with the priority
+# flag kept (Terra's Cure).  It guards the anim-mode veil: the hud must never
+# render while $896F holds bg3-16x16 -- the owner's no-dialogue "break icons
+# amongst junk over and around the enemies", the residual sighting after the
+# fly-in and dialogue-clobber fixes.
+FRONTIER_TESTS="battle_vargas battle_kefka battle_flyin battle_hudclobber battle_hudanim16"
 frontier_fixture() {
   case "$1" in
     battle_vargas)     echo "$ROOT/build/states/vargas_doorstep.mss" ;;
     battle_kefka)      echo "$ROOT/build/states/kefka_doorstep.mss" ;;
     battle_flyin)      echo "$ROOT/build/states/kolts_cave.mss" ;;
     battle_hudclobber) echo "$ROOT/build/states/moogle_doorstep.mss" ;;
+    battle_hudanim16)  echo "$ROOT/build/states/kolts_cave.mss" ;;
     *) echo "" ;;
   esac
 }
