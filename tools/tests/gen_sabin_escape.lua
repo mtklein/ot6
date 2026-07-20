@@ -353,43 +353,70 @@ end
 -- TALK TO CYAN UNTIL A FIGHT SWITCH FLIPS.  cx/cy are thunks (CYAN moves
 -- between waves).  The success test is the FIGHT SWITCH ITSELF, never "an
 -- event ran" -- the courtyard's floor triggers make the latter fire
--- spuriously (see the header).  Shape proven by probe: one clean navTo to a
--- FIXED neighbour tile, then a tight face-then-edge-A poke that re-plans
--- NOTHING.  A whole talk is up to `rounds` such (navTo, poke) pairs, flat
--- and never repeatN -- repeatN cannot replay navTo/driveUntil bodies -- so a
--- poke that whiffs (CYAN edged away, or SABIN landed a tile off) just
--- re-approaches on the next round.
-local function talkForFight(cx, cy, wantSw, what, budget, rounds)
-  rounds = rounds or 5
+-- spuriously (see the header).  ONE flap-tolerant driver: hold bfsPath's
+-- first step toward CYAN until adjacent, then face-and-A until the switch.
+-- This replaced a navTo-per-round loop that hard-timed-out on the stacked
+-- (s2_) boot -- navTo drops its plan on the courtyard flap, and its
+-- timeout RAISES, so one unlucky boot phase killed the whole run.  The two
+-- real fixes are in the driver below: the ungated A-drive, and the
+-- bfsPath-hold approach.
+local function talkForFight(cx, cy, wantSw, what, budget)
   local function cxr() return type(cx) == "function" and cx() or cx end
   local function cyr() return type(cy) == "function" and cy() or cy end
-  -- the reachable neighbour of CYAN nearest SABIN right now (snapshot per
-  -- round); prefer the one already adjacent so a good poke is not abandoned
-  local tgt = { 0, 0 }
-  local function snapTarget()
-    local x, y = cxr(), cyr()
-    local sx, sy = H.fieldX(), H.fieldY()
-    if math.abs(x - sx) + math.abs(y - sy) == 1 then tgt = { sx, sy }; return end
-    local best, bd = nil, 1e9
-    for _, d in ipairs({ { 0, 1 }, { -1, 0 }, { 1, 0 }, { 0, -1 } }) do
-      local nx, ny = x + d[1], y + d[2]
-      local p = H.bfsPath(nx, ny)
-      if p then
-        local dist = #p
-        if dist < bd then best, bd = { nx, ny }, dist end
-      end
-    end
-    tgt = best or { x, y + 1 }
+  local function adjacentToCyan()
+    return math.abs(cxr() - H.fieldX()) + math.abs(cyr() - H.fieldY()) == 1
   end
-  local function pokeRound(i)
-    local phase, waited = 0, 0
-    return H.driveUntil(function() return sw(wantSw) == 1 or waited > 900 end,
-      1100, {
+  -- pick the nearest reachable CYAN-neighbour and the FIRST step toward it,
+  -- via bfsPath -- a PURE function of the passability map (no control
+  -- needed), so it routes around the courtyard walls the way navTo would
+  -- while staying readable through the floor-trigger flap.
+  local function stepToward()
+    local x, y = cxr(), cyr()
+    local best, bd = nil, nil
+    for _, d in ipairs({ { 0, 1 }, { -1, 0 }, { 1, 0 }, { 0, -1 } }) do
+      local p = H.bfsPath(x + d[1], y + d[2])
+      if p and (not bd or #p < bd) then best, bd = p, #p end
+    end
+    return best and best[1] or nil        -- a MOVES name, or nil if adjacent
+  end
+  -- APPROACH IS FLAP-TOLERANT, not navTo.  The courtyard is paved with
+  -- re-firing floor triggers (the header's _cb13b9) that seize $087C ~1
+  -- frame in 3; navTo drops its plan on every control loss (lib navTo) and
+  -- thrashes -- caught CYAN on one boot's phase, hard-timed-out on another
+  -- (the s2_ stack).  So take bfsPath's first step and HOLD it through the
+  -- flap: a step begins on each clean frame and un-aligns the party off the
+  -- trigger, the magitek leg's fix.  Kill-bit any wave that fires mid-walk.
+  local function approachStep(phase)
+    if inBattle() then
+      for s = 0, 5 do
+        if H.readByte(0x3aa8 + s * 2) % 2 == 1 then
+          H.writeByte(0x3eec + s * 2, H.readByte(0x3eec + s * 2) | 0x80)
+        end
+      end
+      H.setPad(phase < 4 and { "a" } or {}); return
+    end
+    if H.dialogWaiting() then H.setPad(phase < 4 and { "a" } or {}); return end
+    local mv = stepToward()
+    -- movePress maps the four diagonals a $c0 tile makes to a cardinal; the
+    -- courtyard is plain floor, so mv is already a cardinal in practice
+    H.setPad(mv and { [H.movePress(mv)] = true } or {})
+  end
+  -- ONE flap-tolerant driver, no navTo: when not adjacent to CYAN, hold
+  -- the approach axis; when adjacent, run the face-then-dense-A poke.  The
+  -- success test is the FIGHT SWITCH ITSELF (or a battle loading), never
+  -- "an event ran" -- the floor triggers make the latter fire spuriously.
+  local phase = 0
+  local steps = {
+    H.logStep(function()
+      return string.format("escape: talk CYAN(%d,%d) from (%d,%d) for %s",
+        cxr(), cyr(), H.fieldX(), H.fieldY(), what)
+    end),
+    H.driveUntil(function() return sw(wantSw) == 1 end, budget or 14000, {
       H.call(function()
         phase = (phase + 1) % 8
-        waited = waited + 1
+        if not adjacentToCyan() then approachStep(phase); return end
+        -- adjacent: face + dense A (see the cadence note below)
         if inBattle() then
-          waited = 0
           for s = 0, 5 do
             if H.readByte(0x3aa8 + s * 2) % 2 == 1 then
               H.writeByte(0x3eec + s * 2, H.readByte(0x3eec + s * 2) | 0x80)
@@ -397,41 +424,27 @@ local function talkForFight(cx, cy, wantSw, what, budget, rounds)
           end
           H.setPad(phase < 4 and { "a" } or {}); return
         end
-        if H.dialogWaiting() then
-          waited = 0; H.setPad(phase < 4 and { "a" } or {}); return
-        end
-        if not (H.hasControl() and H.tileAligned()) then H.setPad({}); return end
-        local x, y = cxr(), cyr()
-        local sx, sy = H.fieldX(), H.fieldY()
-        if math.abs(x - sx) + math.abs(y - sy) ~= 1 then H.setPad({}); return end
-        local dx, dy = x - sx, y - sy
+        if H.dialogWaiting() then H.setPad(phase < 4 and { "a" } or {}); return end
+        local dx, dy = cxr() - H.fieldX(), cyr() - H.fieldY()
         local dir = dx == 1 and "right" or dx == -1 and "left"
                  or dy == 1 and "down" or "up"
+        -- adjacency/facing are read off the LIVE object map (valid even
+        -- while the floor-trigger flap owns $087C), so the A-drive is NOT
+        -- gated on hasControl: the flap steals control ~1 frame in 3 and
+        -- setPad only lands at the next poll, so an A-edge gated on
+        -- "controllable now" usually presses on a frame the flap has since
+        -- taken -- why a phase-locked 4-on/4-off caught the talk on one
+        -- boot and starved 14 pokes on another (same control ratio,
+        -- different phase).  A tight 2-frame A cadence puts a fresh
+        -- off->on edge every other frame; one is polled clean within a few.
         if facing() ~= FACE[dir] then H.setPad({ [dir] = true })
         else H.setPad(phase < 4 and { "a" } or {}) end
       end),
-    }, what .. " poke " .. i)
-  end
-  local steps = { H.logStep(function()
-    return string.format("escape: talk CYAN(%d,%d) from (%d,%d) for %s",
-      cxr(), cyr(), H.fieldX(), H.fieldY(), what)
-  end) }
-  for i = 1, rounds do
-    steps[#steps + 1] = H.cond(function() return sw(wantSw) == 0 end, {
-      H.call(function() snapTarget() end),
-      H.navTo(function() return tgt[1] end, function() return tgt[2] end, {
-        maxFrames = math.floor((budget or 12000) / rounds),
-        arrive = function()
-          return sw(wantSw) == 1 or (H.fieldX() == tgt[1] and H.fieldY() == tgt[2]
-             and H.hasControl() and H.tileAligned())
-        end,
-      }),
-      pokeRound(i),
-    }, {})
-  end
-  steps[#steps + 1] = H.call(function()
-    H.assertEq(sw(wantSw), 1, what .. " -- switch set")
-  end)
+    }, what),
+    H.call(function()
+      H.assertEq(sw(wantSw), 1, what .. " -- switch set")
+    end),
+  }
   return H.cond(function() return true end, steps)
 end
 
