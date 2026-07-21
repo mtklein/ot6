@@ -7,12 +7,12 @@
 # the target, so the content gate would never get a chance to fire -- issue #2.
 #
 # The state->generator map is not maintained here; it is read straight out of
-# the `$(call mint,...)` / `$(call smint,...)` lines that already carry it, so
+# the `$(call mint,...)` lines (plain and stacked) that already carry it, so
 # a frontier link added to the Makefile is covered the moment it lands, with no
 # second list to keep in sync (the Zozo route is adding links as we speak).
 #
-#   $(call mint,<state>,<generator>)            -> state, generator = fields 1,2
-#   $(call smint,<state>,<prefix>,<generator>)  -> state, generator = fields 1,3
+#   $(call mint,<state>,<generator>)           -> state, generator = fields 1,2
+#   $(call mint,<state>,<generator>,<prefix>)  -> stacked; same fields 1,2
 #
 # Each emitted line ADDS prerequisites to a target the Makefile already gives a
 # recipe; make merges the two prerequisite sets (only the Makefile side carries
@@ -29,5 +29,5 @@ echo "# Ties each frontier state to its generator + lib/ot6.lua (issue #2)."
 grep -oE '\$\(call mint,[A-Za-z0-9_]+,[A-Za-z0-9_]+\)' "$mk" \
   | sed -E 's#.*mint,([A-Za-z0-9_]+),([A-Za-z0-9_]+)\).*#build/states/\1.mss.lua: tools/tests/\2.lua tools/tests/lib/ot6.lua#'
 
-grep -oE '\$\(call smint,[A-Za-z0-9_]+,[A-Za-z0-9_]*,[A-Za-z0-9_]+\)' "$mk" \
-  | sed -E 's#.*smint,([A-Za-z0-9_]+),[A-Za-z0-9_]*,([A-Za-z0-9_]+)\).*#build/states/\1.mss.lua: tools/tests/\2.lua tools/tests/lib/ot6.lua#'
+grep -oE '\$\(call mint,[A-Za-z0-9_]+,[A-Za-z0-9_]+,[A-Za-z0-9_]*\)' "$mk" \
+  | sed -E 's#.*mint,([A-Za-z0-9_]+),([A-Za-z0-9_]+),[A-Za-z0-9_]*\).*#build/states/\1.mss.lua: tools/tests/\2.lua tools/tests/lib/ot6.lua#'

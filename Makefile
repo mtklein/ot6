@@ -220,10 +220,16 @@ build/states/frontier-deps.mk: Makefile tools/tests/lib/frontier_deps.sh
 # state, which the config-home path cannot touch, and pin_test_saves writes the
 # same determinism pins into every worker -- verified byte-identical to a serial
 # mint. `&&` so a failed mint skips the harvest and fails the recipe (.DELETE_ON_ERROR).
+#
+# An optional THIRD arg makes it a STACKED mint: <state>,<script>,<prefix>
+# adds OT6_STACK=<prefix> to the run, so compose.py replays the generator's
+# route logic against prefix_-named fixtures instead of the honest ones --
+# the SCENARIO STACKING section below owns that story.  Empty third arg
+# (every two-arg call) is a plain mint, exactly as before the fold.
 define mint
 	@if sh tools/tests/lib/frontier_stamp.sh needsmint $(1) $(2); then \
-		echo "[frontier] mint $(1) <- $(2)"; \
-		OT6_WORKER=$(1) tools/tests/run.sh tools/tests/$(2).lua && \
+		echo "[frontier] mint $(1) <- $(2)$(if $(3), (stack $(3)))"; \
+		OT6_WORKER=$(1)$(if $(3), OT6_STACK=$(3)) tools/tests/run.sh tools/tests/$(2).lua && \
 		cp "build/test-workers/w$(1)/artifacts/$(1).mss" "build/states/$(1).mss" && \
 		cp "build/test-workers/w$(1)/artifacts/$(1).mss.lua" "build/states/$(1).mss.lua" && \
 		sh tools/tests/lib/frontier_stamp.sh write $(1) $(2); \
@@ -424,10 +430,11 @@ build/states/locke_done.mss.lua: build/states/tunnelarmr_doorstep.mss.lua
 # ---- SCENARIO STACKING: the road to the reunion --------------------------
 # The reunion _caadb9 (event_main.asm:26683) needs $0021 && $001E && $0044 in
 # ONE playthrough; each honest chain sets one.  compose.py's OT6_STACK prefix
-# replays a whole chain's ROUTE LOGIC from a different boot: `smint` composes
-# the same generator with every .mss basename prefixed, so it boots the
-# prefixed predecessor and mints prefixed artifacts -- the honest states are
-# never touched.  Stack order LOCKE (honest) -> TERRA (t2_) -> SABIN (s3_):
+# replays a whole chain's ROUTE LOGIC from a different boot: a stacked mint
+# ($(call mint,<state>,<script>,<prefix>)) composes the same generator with
+# every .mss basename prefixed, so it boots the prefixed predecessor and
+# mints prefixed artifacts -- the honest states are never touched.  Stack
+# order LOCKE (honest) -> TERRA (t2_) -> SABIN (s3_):
 #  * Terra's is the shortest chain, so the first stacking layer -- the one
 #    that had to prove the mechanism -- replays the least;
 #  * the THIRD chain's hub return fires the reunion instead of reaching the
@@ -435,9 +442,10 @@ build/states/locke_done.mss.lua: build/states/tunnelarmr_doorstep.mss.lua
 #    its own "back at the hub" gate.  That final leg belongs to
 #    gen_narshe_battle, and Sabin's chain -- still growing its back half --
 #    is the one whose ending was free to leave unconsumed.
-# Worker-isolated exactly like `mint` -- smint used to run BARE, and under
-# `make -jN` the s2_/t2_/t3_ stacks become runnable together (all three hang
-# off locke_done), so two bare smints raced on the ONE default composed file
+# Worker-isolated exactly like the plain mints -- the stack mints (a separate
+# `smint` macro before the fold) used to run BARE, and under `make -jN` the
+# s2_/t2_/t3_ stacks become runnable together (all three hang off
+# locke_done), so two bare stack mints raced on the ONE default composed file
 # and settings pin -- the precise hazard the worker-isolation comment above
 # describes.  Measured fallout (2026-07-20 remint): t2_terra_narshe minted
 # with the party on map 3 while its own run reported PASS (it had executed a
@@ -446,39 +454,37 @@ build/states/locke_done.mss.lua: build/states/tunnelarmr_doorstep.mss.lua
 # makes a failed stack mint fail its RULE, which the bare form did not
 # guarantee.  OT6_WORKER and OT6_STACK compose fine: the worker picks the
 # tree, the stack prefix picks the state names inside it.
-define smint
-	@if sh tools/tests/lib/frontier_stamp.sh needsmint $(1) $(3); then \
-		echo "[frontier] mint $(1) <- $(3) (stack $(2))"; \
-		OT6_WORKER=$(1) OT6_STACK=$(2) tools/tests/run.sh tools/tests/$(3).lua && \
-		cp "build/test-workers/w$(1)/artifacts/$(1).mss" "build/states/$(1).mss" && \
-		cp "build/test-workers/w$(1)/artifacts/$(1).mss.lua" "build/states/$(1).mss.lua" && \
-		sh tools/tests/lib/frontier_stamp.sh write $(1) $(3); \
+
+# stackseed <prefixed hub> <source state> -- a stacked chain's "scenario_hub"
+# IS the previous chain's ending.  cp both halves (state + sidecar) under the
+# same content gate the mints use, so a source re-mint (ROM changed, or the
+# chain below replayed) re-seeds and the stack above replays.  No generator
+# and no worker: seeding is a pure copy, so there is nothing to isolate and
+# frontier_deps.sh correctly finds no .lua to tie it to.
+define stackseed
+	@if [ build/states/.rom-copy -nt build/states/$(1).mss ] || [ ! -f build/states/$(1).mss ] || [ build/states/$(2).mss -nt build/states/$(1).mss ]; then \
+		cp build/states/$(2).mss build/states/$(1).mss; \
+		cp build/states/$(2).mss.lua build/states/$(1).mss.lua; \
+		echo "stack seed: $(1) <- $(2)"; \
 	fi
 	@touch build/states/$(1).mss.lua
 endef
 
 # the seed: the stacked Terra chain's "scenario_hub" IS the Locke ending.
-# cp both halves (state + sidecar) under the same content gate the mints
-# use, so a locke_done re-mint (ROM changed) re-seeds and the stack replays.
 build/states/t2_scenario_hub.mss.lua: build/states/locke_done.mss.lua
-	@if [ build/states/.rom-copy -nt build/states/t2_scenario_hub.mss ] || [ ! -f build/states/t2_scenario_hub.mss ] || [ build/states/locke_done.mss -nt build/states/t2_scenario_hub.mss ]; then \
-		cp build/states/locke_done.mss build/states/t2_scenario_hub.mss; \
-		cp build/states/locke_done.mss.lua build/states/t2_scenario_hub.mss.lua; \
-		echo "stack seed: t2_scenario_hub <- locke_done"; \
-	fi
-	@touch build/states/t2_scenario_hub.mss.lua
+	$(call stackseed,t2_scenario_hub,locke_done)
 build/states/t2_rapids_start.mss.lua: build/states/t2_scenario_hub.mss.lua
-	$(call smint,t2_rapids_start,t2_,gen_rapids)
+	$(call mint,t2_rapids_start,gen_rapids,t2_)
 build/states/t2_rapids_done.mss.lua: build/states/t2_rapids_start.mss.lua
-	$(call smint,t2_rapids_done,t2_,gen_rapids)
+	$(call mint,t2_rapids_done,gen_rapids,t2_)
 build/states/t2_terra_narshe.mss.lua: build/states/t2_rapids_done.mss.lua
-	$(call smint,t2_terra_narshe,t2_,gen_terra_narshe)
+	$(call mint,t2_terra_narshe,gen_terra_narshe,t2_)
 build/states/t2_terra_caves.mss.lua: build/states/t2_terra_narshe.mss.lua
-	$(call smint,t2_terra_caves,t2_,gen_terra_caves)
+	$(call mint,t2_terra_caves,gen_terra_caves,t2_)
 build/states/t2_terra_clifftop.mss.lua: build/states/t2_terra_caves.mss.lua
-	$(call smint,t2_terra_clifftop,t2_,gen_terra_clifftop)
+	$(call mint,t2_terra_clifftop,gen_terra_clifftop,t2_)
 build/states/t2_terra_done.mss.lua: build/states/t2_terra_clifftop.mss.lua
-	$(call smint,t2_terra_done,t2_,gen_terra_done)
+	$(call mint,t2_terra_done,gen_terra_done,t2_)
 # the acceptance gate: asserts BOTH flags on the stacked ending and re-saves
 # it under the canonical name (gen_two_done.lua's header says why the assert
 # lives outside the mechanically-prefixed chain).
@@ -491,60 +497,50 @@ build/states/two_done.mss.lua: build/states/t2_terra_done.mss.lua
 # t3_reunion_ready at the map-22 staging).  Sabin's chain replays SECOND on
 # top of locke_done, ending at his hub return ($001E+$0044, no reunion).
 build/states/s2_scenario_hub.mss.lua: build/states/locke_done.mss.lua
-	@if [ build/states/.rom-copy -nt build/states/s2_scenario_hub.mss ] || [ ! -f build/states/s2_scenario_hub.mss ] || [ build/states/locke_done.mss -nt build/states/s2_scenario_hub.mss ]; then \
-		cp build/states/locke_done.mss build/states/s2_scenario_hub.mss; \
-		cp build/states/locke_done.mss.lua build/states/s2_scenario_hub.mss.lua; \
-		echo "stack seed: s2_scenario_hub <- locke_done"; \
-	fi
-	@touch build/states/s2_scenario_hub.mss.lua
+	$(call stackseed,s2_scenario_hub,locke_done)
 build/states/s2_sabin_world.mss.lua: build/states/s2_scenario_hub.mss.lua
-	$(call smint,s2_sabin_world,s2_,gen_sabin_world)
+	$(call mint,s2_sabin_world,gen_sabin_world,s2_)
 build/states/s2_sabin_camp.mss.lua: build/states/s2_sabin_world.mss.lua
-	$(call smint,s2_sabin_camp,s2_,gen_sabin_world)
+	$(call mint,s2_sabin_camp,gen_sabin_world,s2_)
 build/states/s2_cyan_defence.mss.lua: build/states/s2_sabin_camp.mss.lua
-	$(call smint,s2_cyan_defence,s2_,gen_sabin_camp)
+	$(call mint,s2_cyan_defence,gen_sabin_camp,s2_)
 build/states/s2_camp_intro.mss.lua: build/states/s2_cyan_defence.mss.lua
-	$(call smint,s2_camp_intro,s2_,gen_sabin_camp)
+	$(call mint,s2_camp_intro,gen_sabin_camp,s2_)
 build/states/s2_kefka_done.mss.lua: build/states/s2_camp_intro.mss.lua
-	$(call smint,s2_kefka_done,s2_,gen_sabin_kefka)
+	$(call mint,s2_kefka_done,gen_sabin_kefka,s2_)
 build/states/s2_camp_cleared.mss.lua: build/states/s2_kefka_done.mss.lua
-	$(call smint,s2_camp_cleared,s2_,gen_sabin_doma)
+	$(call mint,s2_camp_cleared,gen_sabin_doma,s2_)
 build/states/s2_doma_defended.mss.lua: build/states/s2_camp_cleared.mss.lua
-	$(call smint,s2_doma_defended,s2_,gen_sabin_escape)
+	$(call mint,s2_doma_defended,gen_sabin_escape,s2_)
 build/states/s2_camp_escaped.mss.lua: build/states/s2_doma_defended.mss.lua
-	$(call smint,s2_camp_escaped,s2_,gen_sabin_magitek)
+	$(call mint,s2_camp_escaped,gen_sabin_magitek,s2_)
 build/states/s2_forest_done.mss.lua: build/states/s2_camp_escaped.mss.lua
-	$(call smint,s2_forest_done,s2_,gen_sabin_forest)
+	$(call mint,s2_forest_done,gen_sabin_forest,s2_)
 build/states/s2_train_done.mss.lua: build/states/s2_forest_done.mss.lua
-	$(call smint,s2_train_done,s2_,gen_sabin_train)
+	$(call mint,s2_train_done,gen_sabin_train,s2_)
 build/states/s2_falls_done.mss.lua: build/states/s2_train_done.mss.lua
-	$(call smint,s2_falls_done,s2_,gen_sabin_falls)
+	$(call mint,s2_falls_done,gen_sabin_falls,s2_)
 build/states/s2_gau_joined.mss.lua: build/states/s2_falls_done.mss.lua
-	$(call smint,s2_gau_joined,s2_,gen_sabin_gau)
+	$(call mint,s2_gau_joined,gen_sabin_gau,s2_)
 build/states/s2_sabin_done.mss.lua: build/states/s2_gau_joined.mss.lua
-	$(call smint,s2_sabin_done,s2_,gen_sabin_trench)
+	$(call mint,s2_sabin_done,gen_sabin_trench,s2_)
 # TERRA/BANON's chain replays LAST, on top of two completions:
 build/states/t3_scenario_hub.mss.lua: build/states/s2_sabin_done.mss.lua
-	@if [ build/states/.rom-copy -nt build/states/t3_scenario_hub.mss ] || [ ! -f build/states/t3_scenario_hub.mss ] || [ build/states/s2_sabin_done.mss -nt build/states/t3_scenario_hub.mss ]; then \
-		cp build/states/s2_sabin_done.mss build/states/t3_scenario_hub.mss; \
-		cp build/states/s2_sabin_done.mss.lua build/states/t3_scenario_hub.mss.lua; \
-		echo "stack seed: t3_scenario_hub <- s2_sabin_done"; \
-	fi
-	@touch build/states/t3_scenario_hub.mss.lua
+	$(call stackseed,t3_scenario_hub,s2_sabin_done)
 build/states/t3_rapids_start.mss.lua: build/states/t3_scenario_hub.mss.lua
-	$(call smint,t3_rapids_start,t3_,gen_rapids)
+	$(call mint,t3_rapids_start,gen_rapids,t3_)
 build/states/t3_rapids_done.mss.lua: build/states/t3_rapids_start.mss.lua
-	$(call smint,t3_rapids_done,t3_,gen_rapids)
+	$(call mint,t3_rapids_done,gen_rapids,t3_)
 build/states/t3_terra_narshe.mss.lua: build/states/t3_rapids_done.mss.lua
-	$(call smint,t3_terra_narshe,t3_,gen_terra_narshe)
+	$(call mint,t3_terra_narshe,gen_terra_narshe,t3_)
 build/states/t3_terra_caves.mss.lua: build/states/t3_terra_narshe.mss.lua
-	$(call smint,t3_terra_caves,t3_,gen_terra_caves)
+	$(call mint,t3_terra_caves,gen_terra_caves,t3_)
 build/states/t3_terra_clifftop.mss.lua: build/states/t3_terra_caves.mss.lua
-	$(call smint,t3_terra_clifftop,t3_,gen_terra_clifftop)
+	$(call mint,t3_terra_clifftop,gen_terra_clifftop,t3_)
 # gen_terra_done on the all-three boot takes its REUNION FORK: rides
 # _caadb9's cutscene to the map-22 staging and mints t3_reunion_ready.
 build/states/t3_reunion_ready.mss.lua: build/states/t3_terra_clifftop.mss.lua
-	$(call smint,t3_reunion_ready,t3_,gen_terra_done)
+	$(call mint,t3_reunion_ready,gen_terra_done,t3_)
 # the acceptance gate (gen_two_done's shape, one layer up): assert ALL
 # THREE flags + the reunion on the stacked ending and re-save it as the
 # canonical reunion_ready -- the boot gen_narshe_battle consumes.
