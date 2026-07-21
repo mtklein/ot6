@@ -96,11 +96,12 @@ end
 local trips = 0
 local tripped = false
 local function armTripWire()
+  local addr = H.sym("DoMonsterEntryExit")   -- was hardcoded 0xC2E668 (bank $C2)
   emu.addMemoryCallback(function()
     if tripped then return end
     tripped = true
     trips = trips + 1
-  end, emu.callbackType.exec, 0xC2E668, 0xC2E668)
+  end, emu.callbackType.exec, addr, addr)
 end
 
 -- passive driver: Heal Force every turn (whelkbal's settle discipline)
