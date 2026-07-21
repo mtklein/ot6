@@ -39,9 +39,14 @@
 --    flips the party to upper), then the SAME tiles again as upright
 --    diagonals -- (32,16)/(33,15)/(34,14) carry $44/$49 bridge-diag props
 --    that only engage at z=1 -- onto the y=13 strip and west to (30,13),
---    facing DOWN at him.  His tile is handed to the pathfinder as an
---    extra wall: it is object-occupied until the win, and a first-step
---    aimed through it stalls forever.
+--    facing DOWN at him.  That loop is the LAST rung of THREE: the whole
+--    corridor from the (30,22) landing is a switchback ladder of the same
+--    motif (full measured tile dump at corridorDir below), and it is
+--    driven SCRIPTED, not pathfound -- the bridge-diag tiles move
+--    differently per z, so followPath's all-z-seeded BFS mispredicts the
+--    live engine there and oscillates at y=19 forever (measured twice,
+--    9000-frame timeouts, x wandering 30..35).  Dadaluma's (30,14) stays
+--    object-occupied until the win; the scripted route never aims at it.
 --  * THE FIGHT: battle 69 = formation 438 = DADALUMA $0107 + two $006C
 --    sidekicks (measured words 0107 006C 006C FFFF FFFF FFFF).  The
 --    post-battle event _ca5ea9 gates on battle-switch $40 exactly like
@@ -283,6 +288,134 @@ local function stairFollow()
   }, "stair conveyor -> P12b")
 end
 
+-- the TOP-roof z-loop corridor, (30,22) -> (30,13): route direction(s) as
+-- a pure function of tile, canStep-gated -- stairDir's pattern, for a
+-- cousin of stairDir's reason.  followPath's firstStep seeds its BFS at
+-- ALL FOUR z-levels (the party carries exactly one), and this corridor is
+-- the one leg where that lies: its bridge-diag tiles move DIFFERENTLY per
+-- z (diagonal at z=1, plain floor at z=2 -- player.asm's own c&$04 + z==2
+-- suppression, transcribed in diagStep above), so the phantom-z first
+-- step keeps disagreeing with the live engine and the leg oscillates on
+-- the y=19 strip forever (measured twice: 9000-frame timeouts, x
+-- wandering 30..35; it once passed on an older ROM by RNG luck).
+--
+-- The corridor itself, measured (p1/p2 dump of x24..40 y8..24 from
+-- zozo_arrival -- the street is the same map 221, so the decompressed
+-- prop tables are live there), is a THREE-RUNG SWITCHBACK of the header's
+-- z-loop motif.  Every rung is the same four bytes: a $0B drop tile, a
+-- $41 "/" beam base (zAfter flips the party to upper stepping off it), a
+-- $44/$44/$49 upright chain, and a $03 both-z strip top:
+--   A: (30,22)R (31,22)D (31,23)R $41(32,23) /$44(33,22)(34,21)
+--      $49(35,20) U-> y=19 strip, west (35,19)..(31,19)
+--   B: (31,19)D (31,20)R $41(32,20) /$44(33,19)(34,18)
+--      $49(35,17) U-> y=16 strip, west (35,16)..(30,16)
+--   C: (30,16)D (30,17)R $41(31,17) /$44(32,16)(33,15)
+--      $49(34,14) U-> (34,13), west along y=13 to (30,13)
+--      -- rung C is exactly the header's documented loop.
+-- The loop tiles (33,19)/(32,16) are stood on TWICE -- flat westbound on
+-- the lower level, diagonally on the climb -- so their entry lists the
+-- climb first and canStep (live z) picks: upright is dead at z=2 by the
+-- bridge suppression and alive at z=1, when it is also the right move.
+-- THE DRIVE PULSES THE PAD: press only while tile-aligned, clear it the
+-- frame the step commits.  A direction still held at the arrival instant
+-- CHAINS -- the engine latches the next step before this callback can
+-- swap the pad (measured here: the leg's first held right chained
+-- (30,22)->(31,22)->(32,22) and parked off-route for the whole 9000-frame
+-- budget).  stairFollow can hold its presses because every stairDir
+-- corner is map-fenced and the column is body-throttled besides; this
+-- corridor's turns are open floor ((32,22) is plain $0A), so no press may
+-- outlive its own step.  Pulsing is also what keeps the one walkable
+-- overshoot on the route, door (35,15) north of the y=16 strip, from
+-- ever firing.  The $49 beam tops carry no east exit (p2=$0E), so the
+-- diagonal chains are fenced by the map itself either way.  A tile off
+-- this table (or a body on the next tile) parks the pad and waits,
+-- stairFollow-style; the 300-frame heartbeat names the stuck tile.
+local CORRIDOR = {}
+local function corr(x, y, dirs) CORRIDOR[key(x, y)] = dirs end
+corr(30, 22, { "right" })            -- rung A: hook east-south to the base
+corr(31, 22, { "down" })
+corr(32, 22, { "left" })             -- recovery: the measured pre-pulse
+                                     -- chaining overshoot parked here
+corr(31, 23, { "right" })
+corr(32, 23, { "upright" })          -- $41 base: diag fires at any z
+corr(33, 22, { "upright" })          -- $44
+corr(34, 21, { "upright" })          -- $44
+corr(35, 20, { "up" })               -- $49 top; no east exit
+corr(35, 19, { "left" })             -- y=19 strip westbound (z drops to 2)
+corr(34, 19, { "left" })
+corr(33, 19, { "upright", "left" })  -- LOOP tile: climb at z=1, cross at z=2
+corr(32, 19, { "left" })
+corr(31, 19, { "down" })             -- rung B: hook south to the base
+corr(31, 20, { "right" })
+corr(32, 20, { "upright" })          -- $41 base
+corr(34, 18, { "upright" })          -- $44 ((33,19) is the loop tile above)
+corr(35, 17, { "up" })               -- $49 top
+corr(35, 16, { "left" })             -- y=16 strip westbound
+corr(34, 16, { "left" })
+corr(33, 16, { "left" })
+corr(32, 16, { "upright", "left" })  -- LOOP tile: rung C's chain
+corr(31, 16, { "left" })
+corr(30, 16, { "down" })             -- rung C: the header's documented loop
+corr(30, 17, { "right" })
+corr(31, 17, { "upright" })          -- $41 base -- "the / beam at (31,17)"
+corr(33, 15, { "upright" })          -- $44 ((32,16) is the loop tile above)
+corr(34, 14, { "up" })               -- $49 top -> the y=13 strip
+corr(34, 13, { "left" })             -- west to the doorstep
+corr(33, 13, { "left" })
+corr(32, 13, { "left" })             -- $44 crossed flat (z=2 here, always)
+corr(31, 13, { "left" })
+-- Arrival must be QUIET, not merely positioned: the map rolls random
+-- encounters (gen_zozo5 measured the same on the tower porch), and the
+-- first clean walk of this route rolled trash on its FINAL steps -- a
+-- position-only arrive fired while the battle load was already in flight
+-- ($4c mid-fade, the object map's NPC byte cleared, battleLoadStarted
+-- latched), and the minted doorstep booted INTO that battle, starving the
+-- talk that follows (hasControl never true; measured via probe replay of
+-- the contaminated state).  So the pred demands twenty straight settled()
+-- frames at (30,13) -- jumpRow's calm-counter, aimed at a tile -- and a
+-- last-step roll is kill-bitted by the same interrupt every other leg
+-- carries, BEFORE the mint instead of inside it.
+local function corridorFollow()
+  local hb, calm = 0, 0
+  return H.driveUntil(function()
+    local there = H.fieldX() == 30 and H.fieldY() == 13 and settled()
+    calm = there and calm + 1 or 0
+    if calm >= 20 then
+      H.setPad({})
+      return true
+    end
+    return false
+  end, 9000, {
+    H.call(function()
+      hb = hb + 1
+      if hb % 300 == 0 then
+        H.log(string.format("[corridor] f+%d at (%d,%d)", hb,
+          H.fieldX(), H.fieldY()))
+      end
+      if H.battleLoadStarted() then
+        killBitAll()
+        H.setPad(hb % 8 < 4 and { "a" } or {})
+        return
+      end
+      if H.dialogWaiting() then
+        H.setPad(hb % 8 < 4 and { "a" } or {})
+        return
+      end
+      if not H.hasControl() then H.setPad({}); return end
+      -- the pulse: a press must not outlive its own step (see above)
+      if not H.tileAligned() then H.setPad({}); return end
+      local x, y = H.fieldX(), H.fieldY()
+      for _, mv in ipairs(CORRIDOR[key(x, y)] or {}) do
+        if H.canStep(x, y, mv) then
+          H.setPad({ [H.movePress(mv)] = true })
+          return
+        end
+      end
+      H.setPad({})
+    end),
+  }, "z-loop corridor -> (30,13)")
+end
+
 -- hold `dir` across a whole jump row; both of the row's facing-gated
 -- triggers fire under the one hold, and the landing leaves the party
 -- facing up so nothing re-fires.  pred names the far strip.
@@ -348,13 +481,18 @@ H.run({ maxFrames = 90000 }, {
   end, 4500, "J33 row eastbound"),
   door(31, 30, 225, "P14a -> bridge room"),
   door(30, 34, 221, "P15b -> TOP roof (30,22)"),
-  followPath(30, 13, { maxFrames = 9000, extraWalls = { { 30, 14 } } }),
+  corridorFollow(),
 
-  -- the doorstep: one A-press from battle 69
+  -- the doorstep: one A-press from battle 69.  The extra beat plus the
+  -- settled assert keep this mint honest: the state is the suite's boot
+  -- point, so a battle-load or event in flight here poisons everything
+  -- downstream (see corridorFollow's arrive note for the measured case).
+  H.waitFrames(60),
   H.call(function()
     H.assertEq(map(), 221, "on the roof (map 221)")
     H.assertEq(H.fieldX() == 30 and H.fieldY() == 13, true,
       "at (30,13), north of the gentleman")
+    H.assertEq(settled(), true, "doorstep is QUIET -- no battle/event in flight")
     H.assertEq(sw(0x034A), 1, "$034A still set -- he waits below")
     H.log(string.format("[dadaluma_doorstep] f%d at (%d,%d)",
       H.frame, H.fieldX(), H.fieldY()))
