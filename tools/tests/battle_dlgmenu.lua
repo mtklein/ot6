@@ -1,3 +1,4 @@
+-- @suite slow
 -- battle_dlgmenu: battles that OPEN with a scripted battle dialogue must
 -- come back with intact, working menus.  Regression gate for the whelk
 -- garbled-menu bug (first bad: 0666392): Ot6MarkFontDirty_ext was hooked

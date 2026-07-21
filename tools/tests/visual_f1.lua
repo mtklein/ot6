@@ -1,3 +1,4 @@
+-- @suite
 
 -- visual canary for fight 1 (idle): OT6 font cells intact (vs ROM
 -- source), the under-monster hud on the bg3 field map, and bp pips in

@@ -1,3 +1,4 @@
+-- @suite frontier=moogle_doorstep slow
 -- battle_hudclobber: a battle dialogue must never leave the under-enemy HUD
 -- drawing from blanked glyph tiles -- junk over and around the enemies.
 --

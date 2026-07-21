@@ -1,3 +1,4 @@
+-- @suite slow
 -- battle_runic.lua -- Celes's signature: a Runic absorb pays MP *and* a
 -- boost point.
 --

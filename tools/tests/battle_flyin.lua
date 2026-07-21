@@ -1,3 +1,4 @@
+-- @suite frontier=kolts_cave
 -- battle_flyin: the under-enemy hud must not paint a monster that has not
 -- entered yet.
 --

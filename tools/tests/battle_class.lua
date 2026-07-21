@@ -1,3 +1,4 @@
+-- @suite slow
 -- battle_class.lua -- M3 acceptance: weapon-class chip -> reveal -> break.
 --
 --   tools/tests/run.sh tools/tests/battle_class.lua

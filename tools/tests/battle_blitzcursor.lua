@@ -1,3 +1,4 @@
+-- @suite
 -- battle_blitzcursor.lua -- v0.3 Blitz-as-menu: it obeys Config>Cursor.
 --
 -- Vanilla's battle command lists (Magic, Tools, Item, ...) REMEMBER where the

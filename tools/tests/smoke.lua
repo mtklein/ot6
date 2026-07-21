@@ -1,3 +1,4 @@
+-- @suite
 -- Smoke test: verify the build pipeline produced an OT6 ROM, then exit.
 -- Exit code 0 = pass, 1 = fail.
 --

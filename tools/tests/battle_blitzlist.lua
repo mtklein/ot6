@@ -1,3 +1,4 @@
+-- @suite
 -- battle_blitzlist.lua -- v0.3 Blitz-as-menu: the selector itself.
 --
 -- Vanilla Blitz had no window: UpdateMenuState_3d (btlgfx_main.asm, now

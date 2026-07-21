@@ -1,3 +1,4 @@
+-- @suite
 -- battle_c: the Calypsi C toolchain spike, witnessed in a live battle.
 -- Ot6InitBP calls the compiled-from-C leaf ot6_c_mix(3, 4) through the
 -- documented ABI and publishes the result at OT6_CWITNESS = $7e57ba

@@ -1,3 +1,4 @@
+-- @suite
 -- battle_reveal.lua -- the reveal-gate regression test. Guards against the
 -- GUI bug where every enemy weakness icon showed REVEALED from battle start
 -- instead of '?'.

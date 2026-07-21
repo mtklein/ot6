@@ -1,3 +1,4 @@
+-- @suite slow
 -- battle_dmgnum: OT6 keeps its hands off vanilla's damage-numeral vram.
 --
 -- The v0.2 RC playtest bug: "the boost chevrons sometimes turn into

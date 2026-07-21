@@ -1,3 +1,4 @@
+-- @suite slow
 -- battle_reveal_poweron.lua -- the dirty-RAM, fresh-battle reveal gate.
 -- Reproduces the USER'S condition (RamPowerOnState != AllZeros) that a
 -- savestate-loading test structurally cannot: it boots from POWER-ON -- no

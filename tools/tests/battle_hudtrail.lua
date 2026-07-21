@@ -1,3 +1,4 @@
+-- @suite frontier=rapids_start
 -- battle_hudtrail: cells the under-enemy hud ABANDONS must hold vanilla's
 -- $01EE fill -- never a priority-set word -- so an animation's bg3-16x16
 -- window can't render them.

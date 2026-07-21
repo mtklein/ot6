@@ -1,3 +1,4 @@
+-- @suite
 -- probe_ctrboost.lua -- does a pending boost leak into COUNTERATTACKS?
 --
 -- Counterattacks execute through ExecRetal (battle_main.asm:12430), which

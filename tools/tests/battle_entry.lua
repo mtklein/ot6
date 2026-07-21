@@ -1,3 +1,4 @@
+-- @suite
 -- battle_entry.lua -- FAST battle-entry regression test (~30s wall clock).
 --
 --   tools/tests/run.sh tools/tests/battle_entry.lua

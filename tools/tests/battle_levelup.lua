@@ -1,3 +1,4 @@
+-- @suite
 -- battle_levelup.lua -- v0.4 gate: FULL HP/MP RESTORE ON LEVEL UP.
 --
 --   tools/tests/run.sh tools/tests/battle_levelup.lua

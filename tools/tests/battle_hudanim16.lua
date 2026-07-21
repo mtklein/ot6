@@ -1,3 +1,4 @@
+-- @suite frontier=kolts_cave
 -- battle_hudanim16: the under-enemy hud must never render while the
 -- battlefield BG3 is in 16x16 tile mode.
 --

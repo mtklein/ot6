@@ -1,3 +1,4 @@
+-- @suite
 -- battle_boost: L/R boost-select in the battle menu, end to end.
 --   R raises the active character's pending boost (cap 3, never past bp),
 --   L lowers it, the party-window pip cell tracks live, and the boosted

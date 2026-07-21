@@ -1,3 +1,4 @@
+-- @suite
 -- battle_esperstats.lua -- M5 espers-as-sub-jobs, the WHILE-EQUIPPED STAT BOOST
 -- (the owner's fork-4 pick) plus a per-esper kit confirmation for the four Zozo
 -- espers.  Companion to battle_subjob.lua, which proved the additive spell GRANT

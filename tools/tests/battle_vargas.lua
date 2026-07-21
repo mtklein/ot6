@@ -1,3 +1,4 @@
+-- @suite frontier=vargas_doorstep slow
 -- battle_vargas.lua -- rung 2's boss gate: VARGAS's break gauge, the three
 -- chips that are supposed to reach it, and the scripted finish.
 --

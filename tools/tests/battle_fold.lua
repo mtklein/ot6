@@ -1,3 +1,4 @@
+-- @suite
 -- battle_fold: boost folds tiered spells — Terra casting with 2 BP
 -- pending executes the spell two tiers up (queued as the -ra/-ga id in
 -- CreateAction, so name, animation, and power are the higher tier's own),

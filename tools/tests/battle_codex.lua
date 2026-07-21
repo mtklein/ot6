@@ -1,3 +1,4 @@
+-- @suite slow
 -- battle_codex: weakness codex - reveals persist across battles (OT-style).
 -- fight 1: reveal a poked fire weakness on a guard, assert the codex (sram
 -- bank $31) learned it. then win, walk to fight 2, and assert a codex

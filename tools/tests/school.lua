@@ -1,3 +1,4 @@
+-- @suite
 -- School test: the Narshe Beginner's House teaches OT6, not vanilla.
 -- Exit code 0 = pass, 1 = fail.  (smoke.lua pattern: pure ROM bytes.)
 --

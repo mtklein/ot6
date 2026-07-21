@@ -1,3 +1,4 @@
+-- @suite
 -- battle_mpcost.lua -- v0.4 "every ability costs MP": the OT6_MP_COSTS A/B.
 --
 -- ONE self-detecting instrument, run on BOTH builds (this is the whole A/B the

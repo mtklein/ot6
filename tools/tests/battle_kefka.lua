@@ -1,3 +1,4 @@
+-- @suite frontier=kefka_doorstep
 -- battle_kefka.lua -- FRONTIER-GATED gate for v0.3's stop-line boss: the
 -- Battle for Narshe's KEFKA, fought for REAL from kefka_doorstep.mss
 -- (party 1 = TERRA+EDGAR+CELES at (19,36), KEFKA one tile below --

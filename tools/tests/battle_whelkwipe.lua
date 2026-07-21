@@ -1,3 +1,4 @@
+-- @suite slow
 -- battle_whelkwipe: the whelk head's retract cycle (monster entry/exit
 -- FADE_DOWN/FADE_UP wipes) must render from vanilla's tiles only.
 --

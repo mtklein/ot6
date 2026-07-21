@@ -1,3 +1,4 @@
+-- @suite slow
 -- battle_break.lua -- THE M1 acceptance test: chip -> break -> recover, live.
 --
 --   tools/tests/run.sh tools/tests/battle_break.lua

@@ -1,3 +1,4 @@
+-- @suite slow
 -- battle_divines.lua -- the kit-8 DIVINES whose gates are read at RESOLUTION.
 --
 --   tools/tests/run.sh tools/tests/battle_divines.lua

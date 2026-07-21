@@ -1,3 +1,4 @@
+-- @suite
 -- battle_banner.lua -- TEMPORAL gate: attack-name banners must not tear.
 --
 --   tools/tests/run.sh tools/tests/battle_banner.lua

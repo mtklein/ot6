@@ -1,3 +1,4 @@
+-- @suite
 
 -- visual canary for fight 2 (second formation): same checks as fight 1,
 -- run again after an attack round since effect art loads mid-fight.

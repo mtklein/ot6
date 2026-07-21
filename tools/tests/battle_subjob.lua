@@ -1,3 +1,4 @@
+-- @suite
 -- battle_subjob.lua -- M5 espers-as-sub-jobs, the FORK-INDEPENDENT core: an
 -- equipped esper GRANTS its spells to the in-battle Magic list (additively), the
 -- grant never teaches permanently, and level-up esper stat bonuses are gone.

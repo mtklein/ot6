@@ -1,3 +1,4 @@
+-- @suite slow
 -- battle_hits: a boosted Fight swings again — +2 swings per pending BP
 -- (one real hit per BP for a one-weapon character; a genji pair swings
 -- both hands again). The magitek party has no Fight command, so the test

@@ -1,3 +1,4 @@
+-- @suite slow
 -- hud_stability: the under-monster HUD must be rock-solid across TIME.
 -- single-frame snapshots can pass while the HUD strobes (it happened);
 -- this test watches the actual cell words frame by frame.

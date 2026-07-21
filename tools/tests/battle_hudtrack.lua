@@ -1,3 +1,4 @@
+-- @suite
 -- battle_hudtrack: the under-monster HUD anchor must TRACK the battlefield.
 --
 -- THE DEBT THIS GATES.  Ot6BgHudLine's anchor word (OT6_SHADOW+0 per line)

@@ -1,3 +1,4 @@
+-- @suite
 -- battle_preview: the un-made choice telegraphs its boost. With 2 BP
 -- pending, opening Terra's magic list renders "Fire 3" in Fire's row
 -- (Ot6PreviewList_ext folds the render-scoped id) while cost and

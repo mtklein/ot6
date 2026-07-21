@@ -16,7 +16,39 @@ RUN="$ROOT/tools/tests/run.sh"
 GOLD="$ROOT/tools/tests/goldens"
 SHOTS="$ROOT/build/states/shots"
 JOBS="${OT6_JOBS:-4}"
-TESTS="smoke school battle_entry battle_break battle_reveal battle_reveal_poweron battle_class battle_bp battle_boost battle_bushido battle_steal probe_bushidobusy probe_ctrboost battle_runic battle_hits battle_fold battle_subjob battle_preview battle_codex battle_c battle_fontrestore battle_banner battle_dlgmenu battle_whelkwipe battle_dmgnum battle_lateboost battle_hudtrack battle_levelup battle_mpcost probe_shadow_overlap hud_stability visual_f1 visual_f2 battle_blitzlist battle_blitzcursor battle_divines battle_esperstats"
+# -------------------------------------------------------------- test discovery
+# Suite membership is SELF-DECLARED, one marker per test file, so adding a test
+# is a one-line edit to that test's OWN .lua -- never the shared list that every
+# integration used to edit in lockstep (the merge magnet this replaced).  A test
+# opts in with a directive comment on its first line:
+#
+#   -- @suite                          plain member
+#   -- @suite slow                     member; a long-runner (LPT ordering hint)
+#   -- @suite frontier=<fixture>       member IFF build/states/<fixture>.mss
+#                                      exists -- else reported SKIPPED, never
+#                                      silently dropped (see FRONTIER-GATED below)
+#   -- @suite frontier=<fixture> slow  frontier member that is also a long-runner
+#
+# The four lists suite.sh used to hand-sync -- TESTS, FRONTIER_TESTS,
+# frontier_fixture(), SCHED_LONG -- are ALL derived here in one pass from those
+# markers.  The glob expands in sorted order, so discovery is deterministic; and
+# because every suite test is a pure savestate load that run.sh isolates, the
+# order tests run and print in carries no meaning (README: "order doesn't
+# matter").  Membership and gating are what must be exact, and they are.
+SUITE=""; FRONTIER_TESTS=""; FRONTIER_FIX=""; SLOW=""
+for f in "$ROOT"/tools/tests/*.lua; do
+  grep -q '^-- @suite' "$f" || continue
+  t=$(basename "$f" .lua)
+  attrs=$(sed -n 's/^-- @suite *//p' "$f" | head -n1)   # text after "@suite"
+  fix=$(printf '%s' "$attrs" | sed -n 's/.*frontier=\([A-Za-z0-9_]*\).*/\1/p')
+  if [ -n "$fix" ]; then
+    FRONTIER_TESTS="$FRONTIER_TESTS $t"; FRONTIER_FIX="$FRONTIER_FIX $t=$fix"
+  else
+    SUITE="$SUITE $t"
+  fi
+  case " $attrs " in *" slow "*) SLOW="$SLOW $t" ;; esac
+done
+TESTS="$SUITE"
 
 # Tests that must run under a dirty RAM fill (see battle_reveal_poweron): they
 # boot from power-on, so the fill reaches battle init instead of being masked
@@ -28,52 +60,19 @@ ram_env_for() {
     *) echo "" ;;
   esac
 }
-# FRONTIER-GATED TESTS.  battle_vargas asserts on vargas_doorstep.mss, which
-# only `make frontier` mints -- and reaching it means replaying the whole
-# story chain, nine multi-minute scripted playthroughs.  Making `make test`
-# depend on that would multiply the gate's cost by an order of magnitude,
-# which is the exact cost the frontier exists to keep out of it.  So the test
-# joins the suite the moment its fixture exists and is reported SKIPPED --
-# never silently dropped -- when it does not.  `make frontier-test` is the
-# one command that always runs it.
-# battle_kefka gates on kefka_doorstep.mss, which is deeper still: it needs
-# the REUNION (all three scenarios in one playthrough), so it stays skipped
-# until Sabin's chain lands and the scenario stack mints reunion_ready (see
-# the Makefile's stacking block).  Wired now so the day that state exists,
-# the gate grows by itself.
-# battle_flyin gates on kolts_cave.mss: it needs a fight whose monsters FLY IN
-# (present-but-not-shown at entry), which the suite's non-frontier fights do
-# not have -- kolts_cave's map-96 pool is 93.75% Cirpius x3.  It guards the
-# entry hud gate ($201E) added for the v0.3-rc1 cave "white text overdraw".
-# battle_hudclobber gates on moogle_doorstep.mss: it needs a fight with a
-# mid-battle DIALOGUE while the under-enemy hud is live (the Narshe Magitek-
-# flashback, Kefka's "Uwee, hee, hee!").  The dialogue re-uploads the small
-# font and blanks OT6's glyph tiles; the gate proves the hud never renders from
-# them (the "junk over/around enemies" sighting) and the flush stays in vblank.
-# battle_hudanim16 gates on kolts_cave.mss too: it needs a formation whose hud
-# rows sit inside the battlefield's 16x16 scroll window (Cirpius x3, rows 5/8)
-# plus a caster whose animation flips bg3 to 16x16 tiles with the priority
-# flag kept (Terra's Cure).  It guards the anim-mode veil: the hud must never
-# render while $896F holds bg3-16x16 -- the owner's no-dialogue "break icons
-# amongst junk over and around the enemies", the residual sighting after the
-# fly-in and dialogue-clobber fixes.
-# battle_hudtrail gates on rapids_start.mss: it needs an entrance that SLIDES
-# shown monsters under live hud lines while holding bg3-16x16 (the Lete River
-# forced battle 8, either die roll).  It guards the abandoned-cell fill: cells
-# a hud line leaves behind must hold vanilla's $01EE, never a priority-set
-# word -- the owner's "white flash at the START of the fight, as the enemies
-# are appearing", the residual sighting after all three fixes above.
-FRONTIER_TESTS="battle_vargas battle_kefka battle_flyin battle_hudclobber battle_hudanim16 battle_hudtrail"
-frontier_fixture() {
-  case "$1" in
-    battle_vargas)     echo "$ROOT/build/states/vargas_doorstep.mss" ;;
-    battle_kefka)      echo "$ROOT/build/states/kefka_doorstep.mss" ;;
-    battle_flyin)      echo "$ROOT/build/states/kolts_cave.mss" ;;
-    battle_hudclobber) echo "$ROOT/build/states/moogle_doorstep.mss" ;;
-    battle_hudanim16)  echo "$ROOT/build/states/kolts_cave.mss" ;;
-    battle_hudtrail)   echo "$ROOT/build/states/rapids_start.mss" ;;
-    *) echo "" ;;
-  esac
+# FRONTIER-GATED TESTS.  A frontier test asserts on a fixture that only
+# `make frontier` mints -- reaching it replays the whole story chain, many
+# multi-minute scripted playthroughs, the very cost the frontier exists to keep
+# out of `make test`.  Such a test declares `-- @suite frontier=<fixture>` and
+# joins the suite the instant build/states/<fixture>.mss exists; until then it is
+# reported SKIPPED (below), never silently dropped.  `make frontier-test` mints
+# the chain first, so it always runs whatever is mintable.  The per-test WHY --
+# which fixture, and why that formation is the one that exercises the gate --
+# lives in each test's own header now, right under its @suite marker.
+frontier_fixture() {   # test name -> the abs .mss path from its @suite marker
+  for pair in $FRONTIER_FIX; do
+    case "$pair" in "$1="*) echo "$ROOT/build/states/${pair#*=}.mss"; return ;; esac
+  done
 }
 skipped=""
 for t in $FRONTIER_TESTS; do
@@ -83,6 +82,17 @@ for t in $FRONTIER_TESTS; do
     skipped="$skipped $t"
   fi
 done
+
+# `suite.sh --list` -- print what discovery resolved, run nothing, exit.  A fast
+# check that a new @suite marker took: which tests would run, which are SKIPPED
+# for an absent fixture, which count as long-runners.  `make test` calls suite.sh
+# with no args, so this never touches the gate.
+if [ "${1:-}" = "--list" ]; then
+  set -- $TESTS;   echo "TESTS ($#): $*"
+  set -- $skipped; echo "SKIPPED ($#): $*"
+  set -- $SLOW;    echo "SLOW ($#): $*"
+  exit 0
+fi
 
 XFAIL=""   # keep empty; XPASS fails the suite to force cleanup
 fail=0; summary=""
@@ -123,16 +133,18 @@ if [ "$JOBS" -gt 1 ]; then
   # and (2) longest-first order, so no worker ever starts a 156s test after the
   # rest have drained. That is textbook LPT scheduling: measured makespan
   # ~311s -> ~168s at JOBS=4, against a ~156s floor (the single longest test,
-  # which no amount of fan-out can split). This list is ONLY a hint -- every
-  # test not named here still runs (appended in canonical order below), and if
-  # these durations drift the worst case is a little idle tail, never a lost or
-  # double-run test. Keep the biggest handful in front; exact order past that
-  # barely moves the makespan.
+  # which no amount of fan-out can split). The long-runner set is ONLY a hint,
+  # and it now comes from the `slow` attribute on tests' @suite markers ($SLOW,
+  # discovered up top) instead of a hand-kept list here -- the list that used to
+  # drift out of sync with TESTS. Every test still runs whether or not it is
+  # marked slow (unmarked ones are appended below); a mis-marked duration just
+  # costs a little idle tail, never a lost or double-run test. $SLOW is in sorted
+  # order, which still front-loads the two longest (battle_class, battle_divines)
+  # into the first wave -- all LPT needs; exact order past that barely moves the
+  # makespan.
   in_list() { case " $2 " in *" $1 "*) return 0 ;; *) return 1 ;; esac; }
-  SCHED_LONG="battle_class battle_reveal_poweron battle_vargas battle_whelkwipe battle_subjob battle_hudclobber battle_hits battle_codex battle_dmgnum battle_break battle_runic probe_shadow_overlap battle_dlgmenu hud_stability"
-  SCHED_LONG="battle_divines battle_class battle_reveal_poweron battle_vargas battle_whelkwipe battle_hudclobber battle_hits battle_codex battle_dmgnum battle_break battle_runic probe_shadow_overlap battle_dlgmenu hud_stability"
   ORDER=""
-  for t in $SCHED_LONG; do in_list "$t" "$TESTS" && ORDER="$ORDER $t"; done
+  for t in $SLOW; do in_list "$t" "$TESTS" && ORDER="$ORDER $t"; done
   for t in $TESTS; do in_list "$t" "$ORDER" || ORDER="$ORDER $t"; done
   w=0
   while [ "$w" -lt "$JOBS" ]; do

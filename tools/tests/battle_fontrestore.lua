@@ -1,3 +1,4 @@
+-- @suite
 -- battle_fontrestore: a battle dialogue uploads its text over our font
 local goodFire, goodShield
 -- cells at vram $5800, and the vanilla small-font restore on close brings

@@ -1,3 +1,4 @@
+-- @suite slow
 -- probe_shadow_overlap.lua -- regression gate for the OT6_SHADOW overlap.
 --
 -- HISTORY.  OT6_SHADOW used to live at $5762, annotated "trace-verified

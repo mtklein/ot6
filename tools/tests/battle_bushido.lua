@@ -1,3 +1,4 @@
+-- @suite
 -- battle_bushido.lua -- BP-Bushido: boost points pick Cyan's tech, and the
 -- vanilla charge gauge is gone.
 --

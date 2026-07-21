@@ -1,3 +1,4 @@
+-- @suite
 -- battle_bp.lua v2: BP verification tracking the actual active character
 local H = dofile("/Users/mtklein/ot6/tools/tests/lib/ot6.lua")
 local STATE = "/Users/mtklein/ot6/build/states/battle_doorstep.mss.lua"

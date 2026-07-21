@@ -1,3 +1,4 @@
+-- @suite
 -- battle_steal.lua -- boost-tiered Steal, the first "chance verb" of the
 -- canon rule DESIGN.md states: on damage verbs boost multiplies; on chance
 -- verbs boost GUARANTEES. Unboosted Steal is pure vanilla; each BP tilts the

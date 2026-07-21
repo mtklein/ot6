@@ -1,3 +1,4 @@
+-- @suite
 -- probe_bushidobusy.lua -- the bushido latch race, with C2 busy.
 --
 -- probe_bushidorace measured the idle case: $32cc goes live ONE frame
