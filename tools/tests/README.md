@@ -13,14 +13,14 @@ make frontier                                   # mint the deep story states (sl
 ```
 
 `make test` mints only the three states the suite asserts on.  The
-STORY CHAIN past the whelk -- arvis_wake, narshe_streets,
-moogle_doorstep, moogle_cleared, worldmap_narshe, figaro_doorstep,
-figaro_intro, figaro_matron, figaro_cleared, south_figaro,
-kolts_doorstep, vargas_doorstep, vargas_won -- lives behind
+STORY CHAIN past the whelk -- the Narshe escape, the Figaro chapter,
+Mt. Kolts and Vargas, the three-scenario reunion and the Battle for
+Narshe, and on through Kefka to Zozo -- lives behind
 `make frontier`, which
 nothing in the gate depends on: each link is a multi-minute scripted playthrough that
 consumes the previous link's savestate, and the suite's remint cost has
-to stay what it was.  A minted link is a function of the ROM bytes, its
+to stay what it was.  (The Makefile's `FRONTIER` list is the authoritative
+set of minted states.)  A minted link is a function of the ROM bytes, its
 generator `gen_*.lua`, and the shared test library every generator
 `dofile()`s -- both halves of it, `lib/ot6.lua` (battle core) and
 `lib/ot6_field.lua` (field/world navigation), since `lib/compose.py`
@@ -51,18 +51,31 @@ generator+lib (the gap where `make test` picks up a frontier fixture
 without ever running the mint gate).  Issue #2: before this, the gate keyed
 on the ROM alone, so a generator or lib edit silently kept a stale fixture.
 
-THREE suite tests are FRONTIER-GATED: `battle_vargas` asserts on
-`vargas_doorstep.mss`, `battle_flyin` on `kolts_cave.mss` (the entry hud
-gate -- it needs a fight whose monsters fly in, present-but-not-shown at
-battle start, which only a fixture past the frontier reaches), and
-`battle_kefka` on `kefka_doorstep.mss` (the Battle for Narshe -- deeper
-still, since its boot needs the REUNION: all three scenarios completed in
-one playthrough via the Makefile's scenario STACK, which waits on Sabin's
-chain's back half).  suite.sh adds each the moment its fixture exists and
-reports it as `skip` when it does not -- never silently drops it -- so
-`make test` costs what it always did and `make frontier-test` (mint the
-chain, then run the same suite) is the command that always runs whatever
+Some suite tests are FRONTIER-GATED: each declares
+`-- @suite frontier=<fixture>` and asserts on a state only `make frontier`
+mints -- `battle_vargas` on `vargas_doorstep.mss`, `battle_flyin` on
+`kolts_cave.mss` (the entry hud gate -- a fight whose monsters fly in,
+present-but-not-shown at battle start), `battle_kefka` on
+`kefka_doorstep.mss` (the Battle for Narshe -- deeper still, since its boot
+needs the REUNION: all three scenarios completed in one playthrough via the
+Makefile's scenario STACK), and others.  `tools/tests/suite.sh --list`
+prints the current gated set.  suite.sh adds each the moment its fixture
+exists and reports it as `skip` when it does not -- never silently drops it
+-- so `make test` costs what it always did and `make frontier-test` (mint
+the chain, then run the same suite) is the command that always runs whatever
 is mintable.
+
+The **scenario STACK** turns those three opening chains (Locke, Terra,
+Sabin) into one lineage.  The reunion needs all three completed in a single
+playthrough, but each honest chain sets only its own flag, so a *stacked*
+mint replays a chain's route logic from a different boot: `OT6_STACK=<prefix>`
+makes `compose.py` rewrite every `.mss` basename in the script (never the
+lib), so the same generator boots a prefixed predecessor and emits prefixed
+artifacts, leaving the honest states untouched.  The Makefile seeds each
+stacked hub from the previous chain's ending (`stackseed`) and stacks the
+`t2_`/`s2_`/`t3_` layers up to `reunion_ready`.  The full account is the
+Makefile's `SCENARIO STACKING` section and `compose.py`'s `SCENARIO STACKING
+(OT6_STACK)` docstring.
 
 `run.sh` wraps:
 
@@ -403,6 +416,14 @@ H.run({ maxFrames = 60000 }, {              -- frame budget failsafe -> exit 2
 ```
 
 `H.log()` goes to stdout (`[ot6]` prefix); plain `print()` also works.
+
+**Registering it in the suite.**  A test opts into `make test` with a
+first-line marker in its own file -- `-- @suite` (plain), `-- @suite slow`
+(a long-runner; an LPT scheduling hint), or `-- @suite frontier=<fixture>`
+(runs only once `make frontier` has minted `build/states/<fixture>.mss`).
+Adding a test is thus a one-line edit to that test, never to a shared list;
+`tools/tests/suite.sh --list` shows what discovery resolved, and the marker
+grammar is documented at the head of `tools/tests/suite.sh`.
 
 ### Library reference (abridged)
 

@@ -260,22 +260,26 @@ tile-aligned.
 
 ### The Whelk fixture
 
-`gen_whelk.lua` runs the whole stack deterministically: boot the
-injected save (party at (33,22), map 41, Narshe mines), `navTo(42, 6)`,
-mint `whelk_doorstep.mss` there, then take one deliberate step north.
-The Whelk event trigger is the single tile **(42,5)**; stepping onto it
-tile-aligned while user-controlled fires the event, which force-walks
-the party down to (42,7), shows dialogs `$0B6E` / `$0B6F` (edge-tapped
-through), and starts the Whelk battle (formation `$01B0`). During the
-fight the formation species words at `$57C0` read `0x0100` and
-`0x0134` — match on those (`$57C0` is battle scratch: whatever
-`RamPowerOnState` filled it with before the first fight — zeros under the
-pinned test profile — and stale words after one, so gate any read on
-`battleLoadStarted()`). The whelk-done event switch is `$1EA6` bit
-`$20`; once set, the trigger is inert — the script asserts it clear at
-boot. Full run: PASS at frame 2813, ~8.5 s wall, byte-identical
-artifacts every run (the harness pins power-on RAM and frame
-rendering — see Runtime limits).
+`gen_whelk_poweron.lua` runs the whole stack deterministically from a
+COLD POWER-ON — no injected save, so it works on a fresh clone. It plays
+the New Game intro and the Narshe gauntlet down to the mines (map 41),
+rides the security-door blast scene, then `navTo(42, 6)` and mints
+`whelk_doorstep.mss` one tile short of the trigger. (Its retired
+SRM-based ancestor `gen_whelk.lua` instead booted an injected play save
+at (33,22) and BFS'd the mines to the same doorstep.) The Whelk event
+trigger is the single tile **(42,5)**; stepping onto it tile-aligned
+while user-controlled fires the event, which force-walks the party down,
+shows dialogs `$0B6E` / `$0B6F` (edge-tapped through), and starts the
+Whelk battle. During the fight the formation species words at `$57C0`
+read `0x0100` and `0x0134` — match on those (`$57C0` is battle scratch:
+whatever `RamPowerOnState` filled it with before the first fight — zeros
+under the pinned test profile — and stale words after one, so gate any
+read on `battleLoadStarted()`). The whelk-done event switch is `$1EA6`
+bit `$20`; once set, the trigger is inert — the script asserts it clear
+at boot, then (positive control) takes the one deliberate step onto the
+trigger to prove the fight comes up. Artifacts are byte-identical every
+run (the harness pins power-on RAM and frame rendering — see Runtime
+limits).
 
 ### Reaching a balance fixture
 
@@ -315,5 +319,6 @@ deliberately diverge from the play profile here: runs are bit-reproducible
 by construction.
 
 Frame budgets (`H.run`'s `maxFrames`) remain the per-script failsafe;
-the gen_whelk route budgets 9000 frames and completes at 2813 ≈ 8.5 s
-wall.
+the whelk power-on mint, for one, plays the entire New Game intro before
+it reaches the mines — tens of thousands of frames (its header has the
+phase-by-phase route).

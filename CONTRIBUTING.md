@@ -14,10 +14,11 @@ not brew-installable — [docs/TOOLING.md](docs/TOOLING.md) has those steps.
 
 ```sh
 make rom     # build build/ot6.sfc
-make test    # full headless gate: 35 tests + pixel goldens (a few minutes)
-             # + the frontier-gated tests (suite.sh's FRONTIER_TESTS) once
-             # `make frontier` has minted their fixtures;
-             # `make frontier-test` does both
+make test    # full headless gate: the self-registering suite (a few minutes),
+             # discovered from each test's `-- @suite` marker -- see
+             # `tools/tests/suite.sh --list`.  Frontier-gated tests join once
+             # `make frontier` has minted their fixtures; `make frontier-test`
+             # does both
 make run     # launch the built ROM in Mesen (GUI)
 ```
 

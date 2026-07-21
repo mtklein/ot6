@@ -563,8 +563,8 @@ local function battleBlock(k)
   })
 end
 
--- seqStepList: plain sequential composition (H.seqStep is local to the
--- lib, so rebuild the trivial version here)
+-- seqStepList: plain sequential composition.  (H.seqStep is public now, but
+-- the lib reserves it for ot6_field's route(); tests keep this trivial copy.)
 function seqStepList(steps)
   return {
     i = 1,

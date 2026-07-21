@@ -425,7 +425,7 @@ local function report()
 end
 
 -- ----------------------------------------------------- battle blocks --
--- seqStepList: plain sequential composition (H.seqStep is lib-local)
+-- seqStepList: plain sequential composition (H.seqStep is public, but the lib reserves it for ot6_field's route())
 local function seqStepList(steps)
   return {
     i = 1,

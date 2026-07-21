@@ -435,15 +435,17 @@ build/states/locke_done.mss.lua: build/states/tunnelarmr_doorstep.mss.lua
 # replays a whole chain's ROUTE LOGIC from a different boot: a stacked mint
 # ($(call mint,<state>,<script>,<prefix>)) composes the same generator with
 # every .mss basename prefixed, so it boots the prefixed predecessor and
-# mints prefixed artifacts -- the honest states are never touched.  Stack
-# order LOCKE (honest) -> TERRA (t2_) -> SABIN (s3_):
-#  * Terra's is the shortest chain, so the first stacking layer -- the one
+# mints prefixed artifacts -- the honest states are never touched.  The full
+# stack is LOCKE (honest) -> SABIN (s2_) -> TERRA (t3_); the earlier two_done
+# milestone (LOCKE + TERRA, t2_) proved the mechanism on Terra's chain:
+#  * Terra's is the shortest chain, so that first stacking layer -- the one
 #    that had to prove the mechanism -- replays the least;
 #  * the THIRD chain's hub return fires the reunion instead of reaching the
 #    hub (the if_all at :26654), so whichever chain goes last cannot end on
 #    its own "back at the hub" gate.  That final leg belongs to
-#    gen_narshe_battle, and Sabin's chain -- still growing its back half --
-#    is the one whose ending was free to leave unconsumed.
+#    gen_narshe_battle.  Terra takes it -- gen_terra_done's all-three fork is
+#    already reunion-aware -- so Sabin's (now-complete) chain goes second and
+#    its clean hub-return ending seeds the Terra layer.
 # Worker-isolated exactly like the plain mints -- the stack mints (a separate
 # `smint` macro before the fold) used to run BARE, and under `make -jN` the
 # s2_/t2_/t3_ stacks become runnable together (all three hang off

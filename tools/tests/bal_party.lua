@@ -954,8 +954,9 @@ end
 -- ----------------------------------------------------- battle blocks --
 assert(POLICIES[POLICY], "unknown POLICY: " .. tostring(POLICY))
 
--- seqStepList: plain sequential composition (H.seqStep is local to the
--- lib, so rebuild the trivial version here -- same as bal_mines.lua)
+-- seqStepList: plain sequential composition.  (H.seqStep is public now, but
+-- the lib reserves it for ot6_field's route(); tests keep this trivial copy
+-- -- same as bal_mines.lua.)
 local function seqStepList(steps)
   return {
     i = 1,

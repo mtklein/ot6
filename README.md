@@ -36,16 +36,17 @@ Drop that file at the repo root, then:
 
 ```sh
 make rom     # build build/ot6.sfc
-make test    # full headless correctness gate (35 tests + pixel goldens + the mp-cost A/B)
+make test    # full headless correctness gate (the whole suite + the mp-cost A/B)
 make frontier-test  # the same gate plus its frontier-gated tests (slow: mints the story chain)
 make run     # launch the built ROM in Mesen (GUI)
 make patch   # emit a distributable .bps
 ```
 
 `make test` runs the whole suite headlessly under Mesen's testrunner — no
-window, no clicking. It takes a few minutes. See
-[tools/tests/README.md](tools/tests/README.md) for how the harness works and
-how to write a test.
+window, no clicking. It takes a few minutes. Tests self-register with a
+`-- @suite` marker, so `tools/tests/suite.sh --list` shows exactly what runs;
+see [tools/tests/README.md](tools/tests/README.md) for how the harness works
+and how to write a test.
 
 ## Layout
 
