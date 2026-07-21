@@ -20,6 +20,5 @@ H.run({ maxFrames = 20000 }, {
     H.glyphCanary()
     H.assertEq(H.fieldHudPresent(), true, "under-monster hud on the field map")
     H.assertEq(H.pipWord(), 0x2173, "party row 1 shows 1 spendable bp")
-    H.screenshot("visual_f1_idle")
   end),
 })

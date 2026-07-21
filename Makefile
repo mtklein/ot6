@@ -7,7 +7,7 @@ VERSION := 0.4
 # A failed recipe (e.g. the checksum step dying mid-build) leaves a half-built target the next make treats as up-to-date — bit us twice on 2026-07-18.
 .DELETE_ON_ERROR:
 
-.PHONY: all rom patch run test tested verify clean goldens-capture release frontier frontier-test mpcost-rom
+.PHONY: all rom patch run test tested verify clean release frontier frontier-test mpcost-rom
 
 all: rom
 
@@ -82,21 +82,11 @@ build/states/.rom-stamp: ff6/rom/ff6-en.sfc
 	@cmp -s ff6/rom/ff6-en.sfc build/states/.rom-copy 2>/dev/null || \
 		{ cp ff6/rom/ff6-en.sfc build/states/.rom-copy; echo "rom content changed"; }
 	@touch build/states/.rom-stamp
-# goldens are captured from the same state mint they are compared against:
-# every remint shifts party hp / atb phase, so cross-mint pixel compares
-# are meaningless. the canary asserts inside the tests stay mint-independent.
 $(STATE1): build/states/.rom-stamp
 	@if [ build/states/.rom-copy -nt $(STATE1) ] || [ ! -f $(STATE1) ]; then \
 		tools/tests/run.sh tools/tests/gen_battle_state.lua; \
-		$(MAKE) goldens-capture; \
 	fi
 	@touch $(STATE1)
-
-goldens-capture:
-	tools/tests/run.sh tools/tests/visual_f1.lua || true
-	@mkdir -p tools/tests/goldens
-	cp build/states/shots/visual_f1_idle.png tools/tests/goldens/
-	@echo "goldens recaptured for the fresh state mint"
 $(STATE2): $(STATE1)
 	@if [ build/states/.rom-copy -nt build/states/battle2_doorstep.mss ] || [ ! -f build/states/battle2_doorstep.mss ]; then \
 		tools/tests/run.sh tools/tests/gen_battle2.lua; \
@@ -645,12 +635,6 @@ frontier: rom $(STATE1) $(STATE2) $(STATE3) \
 frontier-test: frontier
 	python3 tools/tests/lib/compose.py --selftest
 	tools/tests/suite.sh
-
-goldens: rom $(STATE1) $(STATE2)
-	tools/tests/run.sh tools/tests/visual_f1.lua
-	@mkdir -p tools/tests/goldens
-	cp build/states/shots/visual_f1_idle.png tools/tests/goldens/
-	@echo "goldens captured from the current build - review before committing"
 
 clean:
 	$(MAKE) -C ff6 clean

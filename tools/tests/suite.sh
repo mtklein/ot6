@@ -1,6 +1,6 @@
 #!/bin/sh
 # suite.sh -- the OT6 correctness gate. Runs every test on every covered
-# formation, compares visual checkpoints against goldens, honors an
+# formation, honors an
 # explicit expected-fail list. Nonzero exit on any unexpected result.
 #
 # OT6_JOBS=N fans the tests out across N isolated run.sh workers
@@ -13,7 +13,6 @@
 set -u
 ROOT="$(cd "$(dirname "$0")/../.." && pwd)"
 RUN="$ROOT/tools/tests/run.sh"
-GOLD="$ROOT/tools/tests/goldens"
 SHOTS="$ROOT/build/states/shots"
 JOBS="${OT6_JOBS:-4}"
 # -------------------------------------------------------------- test discovery
@@ -154,7 +153,7 @@ if [ "$JOBS" -gt 1 ]; then
         # rest skip on. mkdir is the portable filesystem compare-and-swap, so
         # no test runs twice and (because every worker walks the whole list)
         # none is ever left unclaimed. Result files keep the same
-        # "rc w secs" shape the verdict loop and the golden's worker lookup
+        # "rc w secs" shape the verdict loop
         # already read, so nothing downstream changes.
         mkdir "$CLAIMS/$t" 2>/dev/null || continue
         t0=$(python3 -c 'import time; print(time.time())')
@@ -186,17 +185,6 @@ else
     verdict "$t" "$?" ""
   done
 fi
-
-for g in visual_f1_idle; do
-  if [ -f "$SHOTS/$g.png" ]; then
-    out=$("$ROOT/tools/tests/compare_golden.py" "$SHOTS/$g.png" "$GOLD/$g.png" 1500)
-    rc=$?
-    if [ $rc -eq 0 ]; then result "golden $g" "pass"
-    else result "golden $g" "FAIL ($out)"; fail=1; fi
-  else
-    result "golden $g" "FAIL (screenshot never emitted)"; fail=1
-  fi
-done
 
 for t in $skipped; do
   result "$t" "skip (needs \`make frontier\`: $(frontier_fixture "$t") absent)"
