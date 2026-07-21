@@ -1,8 +1,36 @@
 -- probe_climb.lua -- the maze crack: arrival -> building door (44,48) ->
--- 225(12,43) diagonal-stair interior -> onward door (21,14) -> 221(49,39),
--- a maze rooftop.  Then DIAGONAL-flood the landing island and report which
--- jumps / Dadaluma / tower / onward doors it reaches.  navTo IS diagonal-
--- aware (bfsPath uses the 8 MOVES); only my probe floods were cardinal.
+-- 225(12,43) diagonal-stair interior -> onward door -> a 221 rooftop.
+-- DIAGONAL-flood the landing and report reachable jumps/Dadaluma/doors.
+-- navTo IS diagonal-aware (bfsPath uses the 8 MOVES); only my probe floods
+-- were cardinal, which is what made the interiors look sealed.
+--
+-- SUCCESSOR ROUTE NOTES -- the EXACT Zozo door tables (from
+-- short_entrance.dat; my early probes used off-by-one guesses, hence the
+-- dead crossings).  Doors are two-way; a crossing is navTo-a-neighbour +
+-- one held press onto the source tile.
+--
+-- map 221 (rooftops) -> map 225 (interiors), source(221) -> dest(225):
+--   (13,21)->225(124,55)  (23,17)->225(83,61)   (42,28)->225(98,61)CLOCK
+--   (43,24)->225(110,54)  (44,48)->225(12,43)   (44,41)->225(11,16)
+--   (49,38)->225(21,14)   (54,35)->225(66,56)   (38,57)->225(52,56)
+--   (35,53)->225(48,48)   (34,50)->225(59,34)   (30,42)->225(47,10)
+--   (35,33)->225(11,61)   (31,30)->225(30,61)   (30,21)->225(30,33)
+--   (35,15)->225(35,13)   (15,39)->225(118,26)  (12,36)->225(104,26)
+--   (49,31)->179          (33,9)->226(82,37) TOWER (Dadaluma-roof exit)
+--
+-- map 225 (interiors) -> map 221 (rooftops), source(225) -> dest(221):
+--   (12,44)->221(44,49)   (11,17)->221(44,42)*  (21,15)->221(49,39)
+--   (52,57)->221(38,58)   (47,47)->221(35,54)   (59,35)->221(34,51)
+--   (46,9)->221(30,43)**  (118,27)->221(15,40)  (104,27)->221(12,37)
+--   (83,62)->221(23,18)   (124,56)->221(13,22)  (98,62)->221(42,29)
+--   (110,55)->221(43,25)* (66,57)->221(54,36)   (11,62)->221(35,34)
+--   (30,62)->221(31,31)   (30,34)->221(30,22)** (35,14)->221(35,16)**
+--   * measured DEAD 2-3 tile pockets (44,42) and (43,25).
+--   ** the DADALUMA-region exits (221 x30-35): the 225 interior holding
+--      (46,9)/(30,34)/(35,14) is the one to reach; it is NOT the (44,48)
+--      building (that one only reaches (12,44)/(21,15)/(11,17)).  Which
+--      rooftop enters it (via 221 (30,43)/(30,22)/(35,16)) is the open
+--      question -- reached across the jump-39/33 rows and/or the crane.
 local H = dofile("/Users/mtklein/ot6/tools/tests/lib/ot6.lua")
 local function map() return H.mapId() & 0x1ff end
 local function bright() return emu.getState()["ppu.screenBrightness"] or 0 end
