@@ -76,6 +76,43 @@ def digest(b64: str) -> str:
     return hashlib.sha256(b64.encode()).hexdigest()[:12]
 
 
+def stamp_check(name, root):
+    """Consume-time half of the issue #2 freshness gate.
+
+    The mint-time gate (Makefile + lib/frontier_stamp.sh) re-mints a frontier
+    fixture when its generator or lib/ot6.lua changes -- but only when
+    `make frontier` runs.  A fixture can still reach a test WITHOUT that: the
+    suite adds a frontier-gated test the moment its .mss exists, and
+    `make test` never builds the frontier, so a state that worktree-setup
+    seeded from another tree (and a local generator edit has since drifted)
+    would be embedded and asserted on silently.  The mint records
+    `<sha256(generator++lib)> <generator>` in build/states/<base>.stamp; here we
+    recompute it for the fixture we are about to embed and, on a mismatch,
+    return a loud line the composed file prints through the [ot6] channel.
+
+    Returns None when there is nothing to check -- no stamp (the suite's own
+    states, the stack seeds, or a fixture minted before this gate existed) or a
+    generator that has since been removed -- so it never invents a warning.
+    """
+    base = name[:-len(".mss.lua")] if name.endswith(".mss.lua") else name
+    stamp = root / "build" / "states" / (base + ".stamp")
+    if not stamp.exists():
+        return None
+    parts = stamp.read_text().split()
+    if len(parts) != 2:
+        return None
+    recorded, gen = parts
+    gen_lua = root / "tools" / "tests" / (gen + ".lua")
+    if not gen_lua.exists():
+        return None
+    cur = hashlib.sha256(gen_lua.read_bytes() + LIB.read_bytes()).hexdigest()
+    if cur == recorded[:64]:
+        return None
+    return (f"fixture {base} is STALE -- minted from {gen}+lib "
+            f"sha {recorded[:12]}, current script hashes {cur[:12]}; "
+            f"re-run `make frontier` to refresh it (issue #2)")
+
+
 class CrossTree(Exception):
     """A referenced sidecar exists ONLY outside the composing tree."""
 
@@ -292,6 +329,16 @@ def main() -> int:
         for name, b64 in states.items():
             preamble.append(f'print("[ot6] state {name} sha={digest(b64)} '
                             f'<- {sources[name]}")\n')
+        # issue #2: warn LOUDLY if an embedded fixture no longer matches the
+        # generator+lib it was minted from (a drift the mint gate refreshes only
+        # under `make frontier`, which `make test` never runs).  Non-fatal: the
+        # print lands in the [ot6] log run.sh and suite.sh both surface.
+        for name in states:
+            stale = stamp_check(name, ROOT)
+            if stale:
+                preamble.append(f"-- WARNING (issue #2): {stale}\n")
+                preamble.append(f'print("[ot6] WARNING: {stale}")\n')
+                print(f"WARNING: {stale}")
 
     out, replaced = list(preamble), False
     for line in script.splitlines(keepends=True):

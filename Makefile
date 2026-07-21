@@ -149,9 +149,14 @@ test: rom mpcost-rom $(STATE1) $(STATE2) $(STATE3)
 # deeper in the game than whelk_doorstep.
 #
 # Each link consumes the previous link's savestate, so the order below is the
-# order the game is played, and each rule uses the same content-compare gate
-# as the suite's states: re-mint only when the ROM BYTES changed (a build
-# bumps every timestamp even when nothing moved).
+# order the game is played.  A minted state is a function of THREE inputs --
+# the ROM bytes, its generator .lua, and lib/ot6.lua (the shared driver every
+# generator dofile()s) -- and the gate re-mints when ANY of the three changed
+# by CONTENT (a build or a checkout bumps timestamps without moving bytes, so
+# mtime alone would re-mint spuriously).  ROM bytes ride the .rom-copy clock as
+# before; the generator+lib half is frontier_stamp.sh, wired in below.  Issue
+# #2: keying on the ROM alone silently kept fixtures a since-edited generator
+# or lib would no longer mint the same way.
 #
 #   whelk_doorstep  -> gen_arvis          -> arvis_wake
 #                   -> gen_narshe_escape  -> narshe_escape_start, narshe_streets
@@ -189,7 +194,22 @@ FRONTIER := arvis_wake narshe_streets moogle_doorstep moogle_cleared \
             t2_terra_narshe t2_terra_caves t2_terra_clifftop \
             t2_terra_done two_done
 
-# mint <state> from <script> once its ROM-content gate says it is stale.
+# The generator+lib half of the freshness gate (issue #2).  For a generator or
+# lib edit to re-mint, make has to RECONSIDER the state's target, which it only
+# does when a declared prerequisite is newer -- so each state's .mss.lua must
+# depend on the .lua that mints it and on lib/ot6.lua.  That state->generator
+# map already lives in the $(call mint,...) lines, so rather than hand-list it a
+# second time (and have it rot as the Zozo route adds links), frontier_deps.sh
+# greps it back out into a generated fragment we -include.  A new link is thus
+# gated the moment it is added.  The prerequisite makes make LOOK; the recipe's
+# frontier_stamp.sh gate is what decides mint-or-skip by CONTENT, so a bumped
+# mtime with identical bytes still re-mints nothing.
+build/states/frontier-deps.mk: Makefile tools/tests/lib/frontier_deps.sh
+	@mkdir -p build/states
+	@sh tools/tests/lib/frontier_deps.sh Makefile > $@
+-include build/states/frontier-deps.mk
+
+# mint <state> from <script> once its (ROM, generator, lib) gate says it is stale.
 #
 # Worker-isolated, so `make -jN frontier` can mint the mutually independent
 # story branches at once: everything up to scenario_hub is a serial trunk (each
@@ -210,10 +230,12 @@ FRONTIER := arvis_wake narshe_streets moogle_doorstep moogle_cleared \
 # same determinism pins into every worker -- verified byte-identical to a serial
 # mint. `&&` so a failed mint skips the harvest and fails the recipe (.DELETE_ON_ERROR).
 define mint
-	@if [ build/states/.rom-copy -nt build/states/$(1).mss ] || [ ! -f build/states/$(1).mss ]; then \
+	@if sh tools/tests/lib/frontier_stamp.sh needsmint $(1) $(2); then \
+		echo "[frontier] mint $(1) <- $(2)"; \
 		OT6_WORKER=$(1) tools/tests/run.sh tools/tests/$(2).lua && \
 		cp "build/test-workers/w$(1)/artifacts/$(1).mss" "build/states/$(1).mss" && \
-		cp "build/test-workers/w$(1)/artifacts/$(1).mss.lua" "build/states/$(1).mss.lua"; \
+		cp "build/test-workers/w$(1)/artifacts/$(1).mss.lua" "build/states/$(1).mss.lua" && \
+		sh tools/tests/lib/frontier_stamp.sh write $(1) $(2); \
 	fi
 	@touch build/states/$(1).mss.lua
 endef
@@ -434,10 +456,12 @@ build/states/locke_done.mss.lua: build/states/tunnelarmr_doorstep.mss.lua
 # guarantee.  OT6_WORKER and OT6_STACK compose fine: the worker picks the
 # tree, the stack prefix picks the state names inside it.
 define smint
-	@if [ build/states/.rom-copy -nt build/states/$(1).mss ] || [ ! -f build/states/$(1).mss ]; then \
+	@if sh tools/tests/lib/frontier_stamp.sh needsmint $(1) $(3); then \
+		echo "[frontier] mint $(1) <- $(3) (stack $(2))"; \
 		OT6_WORKER=$(1) OT6_STACK=$(2) tools/tests/run.sh tools/tests/$(3).lua && \
 		cp "build/test-workers/w$(1)/artifacts/$(1).mss" "build/states/$(1).mss" && \
-		cp "build/test-workers/w$(1)/artifacts/$(1).mss.lua" "build/states/$(1).mss.lua"; \
+		cp "build/test-workers/w$(1)/artifacts/$(1).mss.lua" "build/states/$(1).mss.lua" && \
+		sh tools/tests/lib/frontier_stamp.sh write $(1) $(3); \
 	fi
 	@touch build/states/$(1).mss.lua
 endef
@@ -446,7 +470,7 @@ endef
 # cp both halves (state + sidecar) under the same content gate the mints
 # use, so a locke_done re-mint (ROM changed) re-seeds and the stack replays.
 build/states/t2_scenario_hub.mss.lua: build/states/locke_done.mss.lua
-	@if [ build/states/.rom-copy -nt build/states/t2_scenario_hub.mss ] || [ ! -f build/states/t2_scenario_hub.mss ]; then \
+	@if [ build/states/.rom-copy -nt build/states/t2_scenario_hub.mss ] || [ ! -f build/states/t2_scenario_hub.mss ] || [ build/states/locke_done.mss -nt build/states/t2_scenario_hub.mss ]; then \
 		cp build/states/locke_done.mss build/states/t2_scenario_hub.mss; \
 		cp build/states/locke_done.mss.lua build/states/t2_scenario_hub.mss.lua; \
 		echo "stack seed: t2_scenario_hub <- locke_done"; \
@@ -476,7 +500,7 @@ build/states/two_done.mss.lua: build/states/t2_terra_done.mss.lua
 # t3_reunion_ready at the map-22 staging).  Sabin's chain replays SECOND on
 # top of locke_done, ending at his hub return ($001E+$0044, no reunion).
 build/states/s2_scenario_hub.mss.lua: build/states/locke_done.mss.lua
-	@if [ build/states/.rom-copy -nt build/states/s2_scenario_hub.mss ] || [ ! -f build/states/s2_scenario_hub.mss ]; then \
+	@if [ build/states/.rom-copy -nt build/states/s2_scenario_hub.mss ] || [ ! -f build/states/s2_scenario_hub.mss ] || [ build/states/locke_done.mss -nt build/states/s2_scenario_hub.mss ]; then \
 		cp build/states/locke_done.mss build/states/s2_scenario_hub.mss; \
 		cp build/states/locke_done.mss.lua build/states/s2_scenario_hub.mss.lua; \
 		echo "stack seed: s2_scenario_hub <- locke_done"; \
@@ -510,7 +534,7 @@ build/states/s2_sabin_done.mss.lua: build/states/s2_gau_joined.mss.lua
 	$(call smint,s2_sabin_done,s2_,gen_sabin_trench)
 # TERRA/BANON's chain replays LAST, on top of two completions:
 build/states/t3_scenario_hub.mss.lua: build/states/s2_sabin_done.mss.lua
-	@if [ build/states/.rom-copy -nt build/states/t3_scenario_hub.mss ] || [ ! -f build/states/t3_scenario_hub.mss ]; then \
+	@if [ build/states/.rom-copy -nt build/states/t3_scenario_hub.mss ] || [ ! -f build/states/t3_scenario_hub.mss ] || [ build/states/s2_sabin_done.mss -nt build/states/t3_scenario_hub.mss ]; then \
 		cp build/states/s2_sabin_done.mss build/states/t3_scenario_hub.mss; \
 		cp build/states/s2_sabin_done.mss.lua build/states/t3_scenario_hub.mss.lua; \
 		echo "stack seed: t3_scenario_hub <- s2_sabin_done"; \

@@ -20,8 +20,28 @@ kolts_doorstep, vargas_doorstep, vargas_won -- lives behind
 `make frontier`, which
 nothing in the gate depends on: each link is a multi-minute scripted playthrough that
 consumes the previous link's savestate, and the suite's remint cost has
-to stay what it was.  The links use the same ROM-content gate as the
-suite's states, so a rebuild that changes no bytes re-mints nothing.
+to stay what it was.  A minted link is a function of three inputs -- the
+ROM bytes, its generator `gen_*.lua`, and `lib/ot6.lua` (the shared driver
+every generator `dofile()`s) -- and its freshness gate re-mints when ANY of
+them changes by CONTENT (a rebuild or a checkout bumps timestamps without
+moving bytes, so a plain mtime would re-mint spuriously).  ROM bytes ride
+the `.rom-copy` clock; the generator+lib half is `lib/frontier_stamp.sh`,
+which stamps each state `build/states/<state>.stamp` with
+`sha256(generator ++ lib) <generator>` at mint time and re-mints on a
+mismatch.  `lib/frontier_deps.sh` reads the state->generator map out of the
+Makefile's `$(call mint,...)` lines into a generated `-include` so make
+actually reconsiders a state when its generator or lib changes (a new
+frontier link is gated the moment it lands).  Editing one generator
+re-mints only the states it feeds (and their descendants down the chain);
+editing `lib/ot6.lua` re-mints the whole frontier, since every route runs
+through it -- an acceptable cost because the lib is stable (it is the rare
+file to change) while generators churn constantly, so the coarse lib axis
+fires seldom and the precise per-generator axis carries the everyday load.
+`lib/compose.py` re-checks the same stamp at CONSUME time and prints a loud
+`[ot6] WARNING` if a fixture a test is about to boot has drifted from its
+generator+lib (the gap where `make test` picks up a frontier fixture
+without ever running the mint gate).  Issue #2: before this, the gate keyed
+on the ROM alone, so a generator or lib edit silently kept a stale fixture.
 
 THREE suite tests are FRONTIER-GATED: `battle_vargas` asserts on
 `vargas_doorstep.mss`, `battle_flyin` on `kolts_cave.mss` (the entry hud
