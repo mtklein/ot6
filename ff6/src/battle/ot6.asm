@@ -2297,9 +2297,12 @@ Ot6BushidoTierTbl:
 ; drives Blitz through the Tools window shell instead. _c1776b now jsl's here,
 ; then jmp's OpenToolsWindow: we fill wItemList ourselves with the LEARNED
 ; blitzes, raise the mode flag the two btlgfx shims read (w7e6168, freed when
-; UpdateMenuState_3d went), reset the shared cursor, and jump the tools state
-; machine straight to its draw phase (w7e7b9e=4) so it skips the four
-; inventory-scan phases it would run for real tools.
+; UpdateMenuState_3d went), and jump the tools state machine straight to its
+; draw phase (w7e7b9e=4) so it skips the four inventory-scan phases it would
+; run for real tools.  We deliberately do NOT reset the shared cursor: the
+; Tools shell already honored the Config>Cursor (Memory/Reset) setting for it
+; at command-window-open time, and re-zeroing it here would defeat that -- see
+; @padded.
 ;
 ; the row id we store is the resolved attack id $5d+i (Pummel $5d .. Bum Rush
 ; $64): ListTextCmd_0f renders ids >=$51 from AttackName for free, and the
@@ -2342,11 +2345,20 @@ Ot6BushidoTierTbl:
         inx
         bra     @pad
 @padded:
-        ; --- reset the shared list cursor/scroll for the active character ---
-        ldx     $62ca           ; active character slot (0-3); STZ needs abs,X
-        stz     $895f,x         ; scroll position
-        stz     $8963,x         ; cursor column
-        stz     $8967,x         ; cursor row
+        ; --- LEAVE the shared cursor triple alone: honor Config>Cursor ---
+        ; the Tools shell already applied the Cursor (Memory/Reset) setting to
+        ; this character's triple ($895f scroll / $8963 col / $8967 row) when the
+        ; command window opened -- UpdateMenuState_04 (btlgfx_main.asm:13343)
+        ; reads f:$001d4e, and when bit6 is CLEAR (Reset) stz-loops the whole
+        ; 92-byte cursor block $890f..$896a to zero; when SET (Memory) it skips
+        ; that loop, so last turn's positions survive.  The old code here zeroed
+        ; the triple UNCONDITIONALLY, overriding that decision and snapping
+        ; Blitz to the top row whatever the setting -- the owner-reported bug.
+        ; Blitz reuses the Tools triple under the same per-slot index ($62ca),
+        ; so doing nothing makes it obey the bit exactly like Tools/Magic/Item.
+        ; A remembered row indexes the packed $5d+i list directly (in-battle the
+        ; learned set is fixed), so no id-to-row mapping is needed.  We still
+        ; force a fresh window re-init below.
         stz     $7ba5           ; force MakeToolsList_04 to re-init the window
         ; --- jump the tools state machine to its draw phase ---
         lda     #$04
