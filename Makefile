@@ -561,6 +561,24 @@ build/states/kefka_doorstep.mss.lua: build/states/narshe_battle.mss.lua
 build/states/kefka_won.mss.lua: build/states/kefka_doorstep.mss.lua
 	$(call mint,kefka_won,gen_kefka_won)
 
+# ---- v0.4: the search for TERRA (kefka_won -> Zozo) -----------------------
+# gen_zozo1_submerge: Arvis's front door (the rung-1 blocker NPC is gone;
+# the corridor exit's clifftop perch is post-battle ISOLATED) -> the south
+# gate -> the EAST castle trigger world {64,76} ($010B, set by kefka_won's
+# tail) -> keep -> the WEST engine-room door -> the attendant's Kohlingen
+# choice (index 0 in $056E) -> the scripted crossing -> castle parked WEST
+# ($010C).  NO underwater battles on this route -- battle 19/20/21 belong
+# to Sabin's Serpent Trench, a survey confusion this chain retires.
+build/states/figaro_submerged.mss.lua: build/states/kefka_won.mss.lua
+	$(call mint,figaro_submerged,gen_zozo1_submerge)
+# gen_zozo2_arrival: out of the west castle (row y=43 exits to the parent
+# the ride re-pinned), the long south-then-north world hook around Zozo's
+# mountain ring (177 steps, verified against the same tile-prop rule the
+# engine walks), onto {22,92} -> map 221's street.
+build/states/zozo_arrival.mss.lua: build/states/figaro_submerged.mss.lua
+	$(call mint,zozo_arrival,gen_zozo2_arrival)
+FRONTIER += figaro_submerged zozo_arrival
+
 frontier: rom $(STATE1) $(STATE2) $(STATE3) \
           $(patsubst %,build/states/%.mss.lua,$(FRONTIER))
 	@echo "frontier states up to date: $(FRONTIER)"
