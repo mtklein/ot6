@@ -69,11 +69,7 @@ H.run({ maxFrames = 40000 }, {
   H.waitFrames(20),
   H.loadState(STATE),
   H.waitFrames(10),
-  H.driveUntil(function() return H.battleLoadStarted() end, 4000, {
-    H.hold({ "up" }), H.waitFrames(20), H.release(), H.waitFrames(2),
-    H.pressButtons({ "a" }, 4),
-  }, "battle load"),
-  H.waitUntil(function() return H.battleActive() end, 900, "battle active", 30),
+  H.enterEncounter(),
   H.waitFrames(240),
   -- the menu has to belong to a caster who owns a foldable spell; Terra
   -- is char index 0 (battle_fold.lua finds her the same way)

@@ -616,6 +616,35 @@ function M.driveUntil(pred, maxFrames, steps, what)
   }
 end
 
+-- STEP: the canonical first-battle entry from a doorstep fixture.  The
+-- battle_doorstep savestate parks the party one step short of its
+-- encounter trigger, and entering the fight is always the same dance:
+-- hold up long enough to commit the step (20 frames), release and let
+-- the engine settle (2), tap A (pressButtons' 4 on / 2 off -- clears any
+-- incidental dialog), and cycle until the battle module starts loading;
+-- then wait for the battle to be fully up and RENDERING.  battleActive()
+-- takes a screenshot per poll (screenLooksAlive), so the wait polls
+-- every 30 frames, not every frame.
+--
+-- Deliberately option-free: dozens of tests enter their first fight
+-- through this exact sequence, and the constants are part of each
+-- test's frame/RNG landing -- a different hold or wait changes which
+-- frame the encounter fires on.  This helper exists so that majority is
+-- ONE definition instead of a fleet-wide copy-paste (31 verbatim copies
+-- when it was extracted, several already drifted); a test that needs a
+-- different entry (another direction, other timeouts, kill-bit
+-- handling, a story scene that walks into its own fight) keeps writing
+-- its own drive.
+function M.enterEncounter()
+  return seqStep({
+    M.driveUntil(function() return M.battleLoadStarted() end, 4000, {
+      M.hold({ "up" }), M.waitFrames(20), M.release(), M.waitFrames(2),
+      M.pressButtons({ "a" }, 4),
+    }, "battle load"),
+    M.waitUntil(function() return M.battleActive() end, 900, "battle active", 30),
+  })
+end
+
 -- The runner.  steps: list of step objects.  opts.maxFrames: global budget.
 local runnerStarted = false
 -- ------------------------------------------------------------- field --

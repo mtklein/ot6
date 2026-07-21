@@ -844,12 +844,7 @@ H.run({ maxFrames = METRICS_FRAMES + 12000 }, {
   H.waitFrames(20),
   H.loadState(STATE),
   H.waitFrames(10),
-  -- battle-load idiom, verbatim from battle_boost
-  H.driveUntil(function() return H.battleLoadStarted() end, 4000, {
-    H.hold({ "up" }), H.waitFrames(20), H.release(), H.waitFrames(2),
-    H.pressButtons({ "a" }, 4),
-  }, "battle load"),
-  H.waitUntil(function() return H.battleActive() end, 900, "battle active", 30),
+  H.enterEncounter(),
   -- input during the first window-open animation wedges the battle menu
   H.waitFrames(240),
   H.waitFrames(SETTLE_EXTRA),      -- 0 = no jitter, completes same frame

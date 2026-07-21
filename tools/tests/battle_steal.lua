@@ -144,11 +144,7 @@ H.run({ maxFrames = 200000 }, {
   H.waitFrames(20),
   H.loadState(STATE),
   H.waitFrames(10),
-  H.driveUntil(function() return H.battleLoadStarted() end, 4000, {
-    H.hold({ "up" }), H.waitFrames(20), H.release(), H.waitFrames(2),
-    H.pressButtons({ "a" }, 4),
-  }, "battle load"),
-  H.waitUntil(function() return H.battleActive() end, 900, "battle active", 30),
+  H.enterEncounter(),
   H.driveUntil(function() return H.readByte(MENU) ~= 0 end, 3000, {
     H.call(pin), H.waitFrames(1),
   }, "menu opens (Locke installed)"),
