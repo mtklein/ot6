@@ -124,6 +124,7 @@ mpcost-rom: rom
 
 test: rom mpcost-rom $(STATE1) $(STATE2) $(STATE3)
 	python3 tools/tests/lib/compose.py --selftest
+	sh tools/tests/lib/frontier_stamp_selftest.sh
 	@rm -f $(STAMP)
 	tools/tests/suite.sh
 	@echo "-- mpcost A/B: the ON half (charge + refusal) on the flagged variant --"

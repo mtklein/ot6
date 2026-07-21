@@ -12,8 +12,8 @@
 # (a `git checkout`, a worktree cp) re-mints nothing.
 #
 # The gate lives in one small script, not inline in the mint macro, so the
-# decision is unit-testable without the emulator (see frontier_gate_selftest
-# in the Makefile) and reads identically for `mint` and `smint`.
+# decision is unit-testable without the emulator (frontier_stamp_selftest.sh,
+# run by `make test`) and reads identically for `mint` and `smint`.
 #
 #   frontier_stamp.sh needsmint <state> <generator>  # exit 0 = re-mint, 1 = fresh
 #   frontier_stamp.sh write     <state> <generator>  # record the provenance stamp
