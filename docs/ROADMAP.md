@@ -17,8 +17,8 @@ recruited character's kit is honest there.
 | 1 | the Moogle defense (~1 hour: mines → Whelk → escape) | shipped in v0.1: difficulty transform, encounter/XP/gil conservation, Whelk fire-add |
 | 2 | Figaro → Vargas | shipped in v0.2: fixtures to the Vargas doorstep, the Narshe school, the Bio Blaster as poison key, Vargas's holy add. Band-2 sweep measured (Measurement #6) but *not* tuned — playtest endorsed the shipped resistance at Kolts; break uptime on trash remains ~0% |
 | 3 | scenario split → Kefka at Narshe | shipped in v0.3. ~~Cyan BP-Bushido~~ shipped (M3, `Ot6BushidoTier`; kits.md); remaining: fixtures reaching and crossing the split, the Narshe defense's 3-party machinery, Celes's Runic→BP, and Cyan's MP column (mp-economy.md). Enemy data authored through here (armor line + Kefka poison) |
-| **4 (current)** | **through Zozo — Dadaluma beaten, sub-jobs in hand** | M5 magicite sub-jobs; the Zozo balance pass; the crane-maze/Ramuh route |
-| 5 | end of WoB (Opera → Floating Continent) | M4 kits + the wide tuning/telegraph pass; "every ability costs MP" goes live with the cost-display menu work (boss data already reaches Nerapa) |
+| 4 | through Zozo — Dadaluma beaten, sub-jobs in hand | shipped in v0.4: M5 magicite sub-jobs (grant + stat bump), the Zozo balance pass (measured), the crane-maze/Ramuh route, Blitz-as-menu, boost-tiered Steal, full HP/MP restore on level-up, Cyan's Oblivion |
+| **5 (current)** | **end of WoB (Opera → Floating Continent)** | M4 kits + the wide tuning/telegraph pass; "every ability costs MP" goes live with the cost-display menu work (boss data already reaches Nerapa); the remaining espers; RunicBlade (Celes's divine, deferred from v0.4 pending its design call) |
 
 ## Releases
 
@@ -37,12 +37,12 @@ links). What each delivers:
 - **v0.3** — through Kefka at Narshe. All three scenario-split routes,
   the reunion, and the three-party Battle for Narshe. Cyan joins with
   Bushido rebuilt on Boost Points; Celes with Runic that banks a BP.
-- **v0.4 (in progress)** — through Zozo. Espers become sub-jobs (equip
-  grants spells + a stat bump; *augment*, not replace, for the born
-  mages); Blitz becomes a menu; Steal gains the chance-verb canon; full
-  HP/MP restore on level-up; the divine capstones (Oblivion / RunicBlade
-  / Assassinate). Per-ability MP cost is built but dormant. Balance-tuned
-  through Zozo.
+- **v0.4** — through Zozo. Espers become sub-jobs (equip grants spells +
+  a stat bump; *augment*, not replace, for the born mages); Blitz becomes
+  a menu; Steal gains the chance-verb canon; full HP/MP restore on
+  level-up; Cyan's Oblivion divine (Assassinate built dormant behind
+  Shadow; RunicBlade deferred to v0.5 pending its design call).
+  Per-ability MP cost is built but dormant. Balance-tuned through Zozo.
 - **v0.5 (next)** — the rest of the World of Balance (Opera → Vector →
   Magitek factory → Floating Continent). "Every ability costs MP" goes
   live with the cost-display menu work (Calypsi C); the remaining espers
@@ -164,7 +164,7 @@ Landing across releases rather than as one block:
 
 **Exit:** fresh save through Zozo with every character on their kit.
 
-## M5 — Magicite as sub-jobs — 🔨 in progress (v0.4)
+## M5 — Magicite as sub-jobs — 🔨 core shipped v0.4, roster continues v0.5
 
 - Esper equip grants its spell list live (usable while equipped, gone
   when unequipped); permanent learning and level-up esper bonuses

@@ -7,15 +7,19 @@ turn economy.
 
 ## Status
 
-**v0.3 released** ([tag](https://github.com/mtklein/ot6/releases/tag/v0.3)) —
-playable from the start through the Battle for Narshe: all three scenarios
-of the split, the reunion, and Kefka beaten on the cliffs. Break and boost are both live: enemies carry shields and
-hidden weaknesses, hitting a weakness chips a shield, and breaking drops
-defenses hard. Boost banks turns and folds spell tiers (Fire → Fira → Firaga).
-The Narshe school teaches all of it, and Edgar's Bio Blaster makes poison a
-real key.
+**v0.4 released** ([tag](https://github.com/mtklein/ot6/releases/tag/v0.4)) —
+playable from the start through Zozo: the escape from Narshe, the crane
+maze, Dadaluma beaten, and Ramuh's offer on the roof. Magicite are sub-jobs
+now — equip an esper and its spells join your Magic list, with a stat bump,
+while you hold it, augmenting the born mages rather than replacing them.
+Blitz becomes a menu, Steal guarantees the rare at three boost pips, and
+level-ups fully restore HP and MP. Break and boost remain the spine: enemies
+carry shields and hidden weaknesses, hitting a weakness chips a shield, and
+breaking drops defenses hard; boost banks turns and folds spell tiers
+(Fire → Fira → Firaga).
 
-Work in progress toward the next rung, up through Zozo — the first espers. See [docs/ROADMAP.md](docs/ROADMAP.md) for milestones and the
+Work in progress toward the next rung, the rest of the World of Balance
+(Opera → Vector → the Floating Continent). See [docs/ROADMAP.md](docs/ROADMAP.md) for milestones and the
 "playable frontier" metric, and [docs/DESIGN.md](docs/DESIGN.md) for the
 mechanics design.
 
