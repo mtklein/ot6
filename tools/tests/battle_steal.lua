@@ -58,7 +58,7 @@ local pinBe = nil                    -- the seed to pin at the next steal roll
 local armRoll = nil                  -- armed by $3401->2, fired at RandA (exec)
 local beSaved = nil                  -- natural $be, handed back when the steal ends
 local RNGTBL = 0x00FD00              -- ROM offset of RNGTbl (CPU C0/FD00)
-local RANDA = 0xC24B94               -- battle RandA entry (ff6-en.map; re-derive
+local RANDA = 0xC24B98               -- battle RandA entry (ff6-en.map; re-derive
                                      --   if bank $C2 shifts). Pinning $be HERE,
                                      --   the instant the roll runs, is the only
                                      --   pin that survives to it.
