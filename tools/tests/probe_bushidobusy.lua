@@ -47,6 +47,11 @@ local function inWindow() return st() == ST_BUSHIDO end
 
 local function pinCyan(withBank)
   H.writeWord(KNOWN, 7)
+  -- Oblivion (tech 7) is now selectable at BP3 once the divine is unspent
+  -- (Ot6BushidoTier). This probe is about the busy-C2 charge race at the
+  -- TEMPEST rung, not the divine, so pin every character's divine SPENT
+  -- ($3ECB low nibble) -- Ot6BushidoTier then drops BP3 back to Tempest (6).
+  H.writeByte(0x3ECB, 0x0F)
   for _, s in ipairs(PARTY) do
     H.writeByte(0x3ED8 + s * 2, 0x02)
     local st1 = 0x3EE4 + s * 2

@@ -8183,6 +8183,11 @@ CalcAttackEffect:
         stz     $3a54
         jsr     ClearGfxParams
         jsr     ChooseTarget
+        jsl     Ot6Oblivion     ; ot6: divine gate -- ChooseTarget has set $b8/$b9,
+                                ;   so the Broken/boss test finally has its target.
+                                ;   x=attacker, $3a7d=attack id, props still editable.
+        jsl     Ot6Assassinate  ; ot6: Shadow's divine -- same seam, Broken non-boss
+                                ;   instant kill (dormant until Shadow is fielded).
         phx
         lda     $b8         ; targets
         jsr     CountBits

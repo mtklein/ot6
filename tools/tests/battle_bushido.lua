@@ -26,8 +26,11 @@
 --      actually learned when the band's top is above Cyan's level.  The
 --      sweep must produce several distinct techs, so a routine that returned
 --      a constant cannot pass it.
---   3. Oblivion (tech 8) is NOT reachable: no amount of R gets past Tempest.
---      It is out of the ladder until divine gating lands (ot6.asm).
+--   3. Oblivion (tech 8) IS reachable at BP3 now that divine gating landed
+--      (Ot6Oblivion, hooked in CalcAttackEffect): the 3-bp band tops at Oblivion once
+--      Cyan has learned it and while his once-per-battle latch is clear -- the
+--      state this fixture is in (nothing has spent it). The broken-vs-unbroken
+--      RESOLUTION gate and the spent-reverts-to-Tempest rule are battle_divines.
 --   4. The spend caps at 3 and never exceeds the bank (Ot6Boost's rule,
 --      unchanged -- Bushido reads $3E9D, it never writes it).
 --   5. The chosen tech RESOLVES: Flurry's id reaches $3410 ("last spell
@@ -119,7 +122,9 @@ local SWEEP = {
   { 0, 7, 0 },   -- fang: the free tier
   { 1, 7, 2 },   -- tiger tops the 1-bp band
   { 2, 7, 4 },   -- dragon tops the 2-bp band
-  { 3, 7, 6 },   -- tempest tops the 3-bp band -- NOT oblivion
+  { 3, 7, 7 },   -- OBLIVION tops the 3-bp band now (divine gating landed);
+                 --   the latch is clear in this fixture, so 7 stands
+
   { 1, 1, 1 },   -- L6-11 cyan: the 1-bp band is still sky
   { 2, 3, 3 },   -- L15-23 cyan: the 2-bp band is still flurry
   { 3, 5, 5 },   -- L34-43 cyan: the 3-bp band is still eclipse
@@ -239,7 +244,7 @@ H.run({ maxFrames = 40000 }, {
     H.log(string.format("after five R presses: pending=%d tech=%d (%s)",
       pend(actor), level() + 1, TECH[level()]))
     H.assertEq(pend(actor), 3, "the spend caps at 3 (Ot6Boost, unchanged)")
-    H.assertEq(level(), 6, "and 3 bp tops out at tempest -- oblivion is out")
+    H.assertEq(level(), 7, "and 3 bp now tops out at OBLIVION (divine unspent)")
     H.screenshot("bushido_boosted")
   end),
 

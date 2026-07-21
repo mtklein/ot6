@@ -16,7 +16,7 @@ RUN="$ROOT/tools/tests/run.sh"
 GOLD="$ROOT/tools/tests/goldens"
 SHOTS="$ROOT/build/states/shots"
 JOBS="${OT6_JOBS:-4}"
-TESTS="smoke school battle_entry battle_break battle_reveal battle_reveal_poweron battle_class battle_bp battle_boost battle_bushido battle_steal probe_bushidobusy probe_ctrboost battle_runic battle_hits battle_fold battle_subjob battle_preview battle_codex battle_c battle_fontrestore battle_banner battle_dlgmenu battle_whelkwipe battle_dmgnum battle_lateboost battle_hudtrack battle_levelup battle_mpcost probe_shadow_overlap hud_stability visual_f1 visual_f2 battle_blitzlist battle_blitzcursor"
+TESTS="smoke school battle_entry battle_break battle_reveal battle_reveal_poweron battle_class battle_bp battle_boost battle_bushido battle_steal probe_bushidobusy probe_ctrboost battle_runic battle_hits battle_fold battle_subjob battle_preview battle_codex battle_c battle_fontrestore battle_banner battle_dlgmenu battle_whelkwipe battle_dmgnum battle_lateboost battle_hudtrack battle_levelup battle_mpcost probe_shadow_overlap hud_stability visual_f1 visual_f2 battle_blitzlist battle_blitzcursor battle_divines"
 
 # Tests that must run under a dirty RAM fill (see battle_reveal_poweron): they
 # boot from power-on, so the fill reaches battle init instead of being masked
@@ -130,6 +130,7 @@ if [ "$JOBS" -gt 1 ]; then
   # barely moves the makespan.
   in_list() { case " $2 " in *" $1 "*) return 0 ;; *) return 1 ;; esac; }
   SCHED_LONG="battle_class battle_reveal_poweron battle_vargas battle_whelkwipe battle_subjob battle_hudclobber battle_hits battle_codex battle_dmgnum battle_break battle_runic probe_shadow_overlap battle_dlgmenu hud_stability"
+  SCHED_LONG="battle_divines battle_class battle_reveal_poweron battle_vargas battle_whelkwipe battle_hudclobber battle_hits battle_codex battle_dmgnum battle_break battle_runic probe_shadow_overlap battle_dlgmenu hud_stability"
   ORDER=""
   for t in $SCHED_LONG; do in_list "$t" "$TESTS" && ORDER="$ORDER $t"; done
   for t in $TESTS; do in_list "$t" "$ORDER" || ORDER="$ORDER $t"; done

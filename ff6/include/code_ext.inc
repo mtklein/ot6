@@ -17,6 +17,8 @@ CODE_EXT_INC = 1
 .global Ot6BgHud_ext, Ot6BgHudFlush_ext, Ot6PipGlyph_ext
 .global Ot6ActionEnd, Ot6BoostDmg, Ot6InitBP
 .global Ot6BushidoTier
+.global Ot6Oblivion              ; divine: Bushido tech 8, broken-gated in CalcAttackEffect
+.global Ot6Assassinate           ; divine: Shadow, broken non-boss instant-kill
 .global Ot6StealBoostLevel, Ot6StealSlot   ; boost-tiered steal (chance verb)
 .global Ot6BlitzListOpen         ; v0.3 blitz-as-menu: _c1776b -> tools shell
 .global Ot6AbilityCost           ; v0.4 mp-cost hook (only defined/referenced
