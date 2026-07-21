@@ -26,7 +26,10 @@ ROM="Final Fantasy III (USA).sfc"
 # Makefile's content-compare gate remints anything whose ROM bytes differ.
 if [ -d "$MAIN/build/states" ] && [ ! -d "$HERE/build/states" ]; then
   mkdir -p "$HERE/build"
-  cp -R "$MAIN/build/states" "$HERE/build/states"
+  # -p: preserve mtimes -- without it, copy-order can leave .rom-copy newer
+  # than the states it was minted for, tripping the mtime half of needsmint
+  # into an honest-looking (hours-long) full remint in every fresh worktree.
+  cp -Rp "$MAIN/build/states" "$HERE/build/states"
 fi
 
 echo "worktree ready: ROM copied, Mesen/flips linked"
