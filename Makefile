@@ -577,7 +577,13 @@ build/states/figaro_submerged.mss.lua: build/states/kefka_won.mss.lua
 # engine walks), onto {22,92} -> map 221's street.
 build/states/zozo_arrival.mss.lua: build/states/figaro_submerged.mss.lua
 	$(call mint,zozo_arrival,gen_zozo2_arrival)
-FRONTIER += figaro_submerged zozo_arrival
+# gen_zozo3_clock: the street's CAFE door (42,28) -> the clock room (map
+# 225) -> the clock tile {98,59} (an A+facing-up tile interaction, not an
+# NPC) -> 6:10:50 across three CHAINED choice dialogs, each verified by its
+# own $01F* latch -> the hidden staircase opens ($01F0).
+build/states/zozo_clock_solved.mss.lua: build/states/zozo_arrival.mss.lua
+	$(call mint,zozo_clock_solved,gen_zozo3_clock)
+FRONTIER += figaro_submerged zozo_arrival zozo_clock_solved
 
 frontier: rom $(STATE1) $(STATE2) $(STATE3) \
           $(patsubst %,build/states/%.mss.lua,$(FRONTIER))
