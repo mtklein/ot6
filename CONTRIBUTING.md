@@ -14,7 +14,7 @@ not brew-installable — [docs/TOOLING.md](docs/TOOLING.md) has those steps.
 
 ```sh
 make rom     # build build/ot6.sfc
-make test    # full headless gate: 33 tests + pixel goldens (a few minutes)
+make test    # full headless gate: 35 tests + pixel goldens (a few minutes)
              # + the frontier-gated tests (suite.sh's FRONTIER_TESTS) once
              # `make frontier` has minted their fixtures;
              # `make frontier-test` does both
