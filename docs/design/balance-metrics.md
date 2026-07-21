@@ -1172,3 +1172,196 @@ Five things read off those two tables.
   unaffected — both arms of every comparison read the *same* state — but
   the absolute numbers may shift by a little on a fresh mint, which the
   content gate will force the next time anyone runs `make frontier`.
+
+## Measurement #9 — the search-for-Terra → Zozo pass: the town made a loop, the boss left alone, the corridor named (2026-07-21)
+
+Measurement #8 authored the break onto Mt. Kolts with Terra in the party.
+This is the same author-then-MEASURE loop one stretch later, and the party
+has changed underneath it: **Terra is GONE — she is the search target — and
+the stretch runs on LOCKE + CELES + EDGAR + SABIN.** That single fact sets
+the whole pass. The two DELIBERATE keys (the ones the A button does not
+swing) are **poison** = Edgar's Bio Blaster and **ice** = Celes; there is
+**no native fire at all**, so every fire-only body on the route is a dead
+weakness for this party — the fire hole, flagged where it bites below.
+
+### What the instrument grew
+
+`bal_party.lua` could not drive this stretch as it stood, in four ways:
+
+1. **No CELES kit.** The KITS table had Terra/Locke/Edgar/Sabin; Celes fell
+   to Fight-only, so ice — half the stretch's reachable answers — was never
+   cast. Added `[0x06]` CELES: an ice exploit rung and an ice probe rung
+   (Ice2 if she owns it, else Ice — natural list Ice 1 / Cure 4 / Ice2 26 /
+   Ice3 42), the exact twin of Terra's Fire kit, plus the `weak_ice` gate
+   (element bit `$02`).
+2. **No boss trigger.** Dadaluma is a talk-fired event battle, not a random
+   encounter, so the pacer could never reach it. A `trigger = "talk"` lane
+   faces the gentleman NPC and presses A through the dialog to battle 69 —
+   gen_zozo4's own trigger, reshaped into the driveUntil/voidReason contract.
+   A boss also wants fewer, longer samples (`FX.nbattles`/`battleFrames`).
+3. **A latent crash.** `knob_authoring` read `ROM_BRAWLER_ROW`, a name that
+   was used but never defined — an undefined-global error on the first
+   battle report. Defined it as `ROM_SHIELDROWS_V3[1]`.
+4. **Stale ROM offsets.** The `Ot6ShieldTbl` base had drifted `$F01067 ->
+   $F00F78` at HEAD (bank F0 grew above it), so the authoring-poke offsets
+   were 239 bytes stale; then this pass's own rows slid them again. Re-derived
+   both times from `ff6/rom/ff6-en.sfc`.
+
+One instrument caveat found and left standing: at the 240-frame base settle,
+battle 1 occasionally arms before the fourth party slot's HP is written, so
+that one battle reads a 3-member party. It biases at most one of six samples
+by one character and never recurred past b=1; the four-member battles carry
+the aggregates. Worth a longer base settle next pass.
+
+### The three pools, enumerated from the tables
+
+- **Zozo town** — `zozo_arrival`, map 221 group 78 (and map 225 group 77, its
+  sibling, no fixture). Gabbldegak `$0DF` (350 HP, L15), Harvester `$04E`
+  (428, L16), HadesGigas `$053` (1200, L16), SlamDancer `$052` (392, L15) —
+  **all poison-weak in vanilla**, none absorbing or nulling poison. The
+  weakness is already there; only the shield COUNT is the question.
+- **Dadaluma** — `dadaluma_doorstep`, boss `$0107` (3270 HP), authored
+  `6, PIERCE|BLUDG` + vanilla poison, revives two `$006C` sidekicks.
+- **The corridor** — the western-WoB overworld the party roams SEARCHING for
+  Terra before Zozo. No world fixture stands in it. Its no-weakness trash is
+  the coverage problem; details below.
+
+### Zozo town: mashing WIPES, and the formula lands the break on a corpse
+
+The headline, measured on `zozo_arrival`, 6 battles a policy:
+
+| arm | won | TTK | taken | chips | breaks | actions_broken | break lands |
+|---|---|---|---|---|---|---|---|
+| **mash** (hold A) | **0/6 WIPED** | 13.3 | 841.7 | 0 | 0 | 0 | — |
+| loop, formula (3–4 sh) | 5/6 | 10.7 | 581.5 | 42 | 7 | ~0.4 | 90–95% |
+
+**The Terra-less party CANNOT mash Zozo.** With no fire and no reachable
+class weakness in the pool, holding A chips nothing (0 chips, 6/6 wipe) —
+worse than Mt. Kolts, which only wiped 3/6. The loop rescues it (5/6), but
+the break lands at 90–95% of the fight, on or beside the killing blow, and
+the two L16 tanks (HadesGigas 1200 HP, Harvester) at their formula 4 shields
+**never break at all** — the two-tank draw wiped even the loop. This is
+Measurement #8's Kolts finding on a bigger body: the formula count is too
+high, so the break is a funeral, not a window.
+
+The shield sweep (bal_party `BUFF_SHIELDS`, boost3, 6 battles a cell):
+
+| shields | won | TTK | taken | actions_broken | break lands |
+|---|---|---|---|---|---|
+| formula (3–4) | 5/6 | 10.7 | 581.5 | ~0.4 | 90–95% (corpse) |
+| 3 (all) | 6/6 | 10.3 | 553.5 | 0.17 | 89–100% (corpse) |
+| **2 (all)** | **6/6** | **9.8** | **433.0** | **1.83** | **62–84% (WINDOW)** |
+
+Exactly Kolts' answer: **2 is the count where the loop exists.** At 3 (and
+the formula's 3–4) the break still lands on the corpse; at 2 it lands
+penultimate, the tanks break, the wipe becomes a clean win, and the loop
+takes ~48% less damage than mashing. So four **shields-only** `Ot6ShieldTbl`
+rows (`2, $00`), the Cirpius/Tusker shape — SlamDancer `$052`, Harvester
+`$04E`, HadesGigas `$053`, Gabbldegak `$0DF`. No class byte: the town's
+answer is the tool, never the A button. ABSORB/NULL re-checked at
+`+$17`/`+$18` — HadesGigas absorbs EARTH (irrelevant to poison), the rest
+absorb nothing, none null poison. SlamDancer is the map-225 sibling with no
+fixture, authored by interpolation inside the measured `$04E`/`$0DF` bracket.
+
+The authored re-measure, on the rebuilt ROM (every town `mon_detail` now
+reads `sh2/2`):
+
+| arm | won | TTK | taken | chips | breaks | actions_broken | break lands |
+|---|---|---|---|---|---|---|---|
+| loop, **AUTHORED 2** | **6/6** | **9.7** | **414.0** | 32 | 15 | **2.0** | **62–84%** |
+
+It reproduces the synthetic arm (433 → 414 taken, 1.83 → 2.0 actions broken),
+which is the confirmation that the rows, not a poke, carry it. **The break is
+the penultimate round and the kill lands on a broken enemy — the v0.3 target,
+met on a v0.4 party.**
+
+### Dadaluma: the window is right, so the shields are left alone
+
+The boss, `dadaluma_doorstep`, as it ships (6 shields, `PIERCE|BLUDG` +
+vanilla poison), sampled for its jitter distribution:
+
+| arm | won | TTK | taken | chips | breaks | actions_broken | uptime | break at |
+|---|---|---|---|---|---|---|---|---|
+| mash | **0/4 WIPED** | 10.8 | 1337 | 5 | 0 | 0 | 0% | — |
+| loop (boost3) | **4/4** | 10.0 | 570 | 24 | 1 | 2.0 | 13.3% | 86% |
+
+Read it and you do not touch his shields. **Mashing wipes 4/4; the loop wins
+4/4** and takes 57% less damage, and `player_actions_broken = 2` says the
+kill lands inside the window every time. The break comes through the CLASS
+channel — Dadaluma is `PIERCE|BLUDG`-weak, which Locke's Dirk, Sabin's fists
+and Edgar's AutoCrossbow all swing — so the mash arm *does* chip him (5 freebie
+chips), but **6 shields is exactly the count that keeps those 5 freebie chips
+one short of a break**, forcing the deliberate boosted play that actually wins.
+`monster_heal = 0`: the break lands before he self-heals, and it cancels the
+JUMP, which is the whole design of the fight. Uptime (13.3%) sits below the
+20–30% boss band for the same reason the Whelk did in Measurement #5 — the
+party bursts him inside the first window, so a second cycle never opens. That
+is a *strong-loop* property, not a broken window; widening it means more boss
+HP, a boss-design decision, not a shield tweak. **Dadaluma unchanged.**
+
+### The corridor: the census was right about the AREA, and it needs a fixture
+
+The brief's corridor census (Stray Cat `$018`, Baskervor `$01d`, Chimera
+`$01f`, Red Fang `$078`, Ralph `$07b` as the no-weakness trash; FossilFang
+`$023` and Iron Fist `$06c` as the poison absorbers; Bomb `$04f`/Grenade
+`$0aa` as the fire absorbers) does **not** match the sectors of a straight
+Figaro→Zozo line — decoding `world_battle_group.dat` for those tiles draws
+`$078`/`$02A`/`$06C`/`$08C`/`$090` instead. The reconciliation is that
+"search for Terra" is not a straight line: the party *roams the western/
+southern WoB*, and the census species live exactly there (Stray Cat across
+world-idx 17–119, Ralph 140–247, Chimera 8–157, and so on). So the census is
+right about the AREA; what is missing is a state that stands in it.
+
+What that decoding settles cleanly, and what it does not:
+
+- **The absorbers are already answered and stay untouched.** Iron Fist `$06c`
+  absorbs poison (`+$0D97 = $08`) and wears its `2, PIERCE|BLUDG` class row
+  (Locke pierces, Sabin bludgeons). FossilFang `$023` absorbs poison too but
+  is **ICE-weak**, which Celes casts — so ice is its key, not the tool. Sand
+  Ray `$05c`/Areneid `$05d` are already `+poison` (Measurement #8) AND ice-weak.
+  The desert half of the region is covered without a new row, and poisoning any
+  of these would be the GhostTrain trap. Left alone.
+- **The no-weakness five are the real hole, and they took poison.** Stray Cat
+  `$018`, Baskervor `$01d`, Chimera `$01f`, Red Fang `$078`, Ralph `$07b` — no
+  vanilla weakness of any element, and a formula species carries no class
+  weakness, so the Terra-less party could not chip them at all. Five
+  `Ot6ElemAddTbl` rows, `+poison`, every one verified `$00` at `+$17`/`+$18`/
+  `+$19` (weak/null/absorb all clear). Element table only, no shield row —
+  Measurement #8's overworld discipline: coverage where a species needs a
+  reachable key but no measured shield count, and no `Ot6HpScale` exemption
+  where none was earned.
+- **These five are UNMEASURED, said plainly.** No world fixture stands in the
+  search region, exactly as the WoB-desert rows of Measurement #8 were
+  unmeasured. Coverage is the claim (a reachable key exists); the break WINDOW
+  is not, and Chimera at 2237 HP versus Stray Cat at 156 will behave very
+  differently at the tool's per-target damage. The structural fix is a
+  `zozo_corridor` world fixture — the gen_kolts_pool move — minted in the
+  western WoB; then this table's shield question can be swept the way the town's
+  was.
+- **The fire hole, flagged and NOT force-fixed.** A few western-WoB bodies are
+  fire- or wind-weak ONLY — `$090` (fire, 492 HP), `$08C` (fire|wind), `$02A`
+  (wind) — and this party casts neither, so their vanilla weakness is dead for
+  it. They are left as-is rather than blindly double-keyed with poison: whether
+  they even sit on the walked route is precisely what the missing fixture would
+  answer, and inventing a second key for a body you have not seen fight is how
+  the HP dial shipped twice. Named here, not papered over.
+
+### What is settled and what is not
+
+- **Settled, measured:** the Zozo town loop exists at 2 shields (mash 0/6 →
+  loop 6/6, break penultimate, `actions_broken` 2.0); Dadaluma's window is
+  functional and his shields are correct as shipped (mash 0/4 → loop 4/4).
+- **Under-levelled party, flagged not fixed.** Every town arm ends with a
+  `min_hp_end` of 0 — the loop WINS but a character is KO'd doing it (Locke
+  starts these fights on 106 HP). Whether natural progression delivers a party
+  that survives Zozo more comfortably is Measurement #7's grind question,
+  unanswered here and NOT a data-table lever; if the party arrives too weak the
+  fix is the `Ot6DangerMulW`/`Ot6RewardMulW` pace pair, not a shield.
+- **Unmeasured:** the five corridor rows (no world fixture); SlamDancer's map
+  225 (interpolated); the fire-hole bodies (`$090`/`$08C`/`$02A`); Celes's ice
+  against Crawler `$05b` (3200 HP, ice-only) — Crawler did not draw on maps 221
+  or 225 in any sample, so it is a Zozo body the town-pool fixture never sees.
+- **The mash arm never chipped the town rows** — shields-only, poison-only,
+  and a masher never opens Tools — so, as in Measurement #8, the authoring is
+  invisible to the player who holds A and pays off only for the one who reads
+  the room.

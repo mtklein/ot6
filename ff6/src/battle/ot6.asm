@@ -408,6 +408,49 @@ Ot6ElemAddTbl:
         .byte   $08, $00        ; rhinotaur: + poison. had no weakness;
                                 ;   232 hp is the plains' break-capable
                                 ;   body (absorbs BOLT, not poison)
+        ; ---- the v0.4 SEARCH-FOR-TERRA corridor: five poison rows for the
+        ; western-WoB overworld the party roams looking for terra before Zozo.
+        ; the party is LOCKE+CELES+EDGAR+SABIN and its two DELIBERATE keys are
+        ; poison (edgar's bio blaster) and ice (celes) -- there is NO fire,
+        ; terra is the search target. these five draw across the western/
+        ; southern WoB sectors and every one is a coverage hole: no vanilla
+        ; weakness of ANY element, and a formula species carries no class
+        ; weakness, so before this row the terra-less party could not chip them
+        ; at all. poison is the natural key (a Tools dive, not the A button) and
+        ; the group target answers the packs. verified against monster_prop.dat
+        ; +$19/$18/$17 -- weak/null/absorb all read $00 on all five, so no row
+        ; here feeds an absorber (the GhostTrain trap):
+        ;   $018 stray cat  156 hp    $01d baskervor 750 hp
+        ;   $01f chimera   2237 hp    $078 red fang  325 hp
+        ;   $07b ralph      620 hp
+        ; NOT poisoned, because they already have a reachable answer and poison
+        ; would be the WRONG one: iron fist $06c ABSORBS poison (+$0d97 = $08)
+        ; and wears a class row in Ot6ShieldTbl (locke's pierce / sabin's
+        ; bludg); fossilfang $023 ABSORBS poison too but is ICE-weak, which
+        ; celes casts, so ice is its key. sand ray $05c / areneid $05d are
+        ; already +poison above AND ice-weak. the desert half of this region is
+        ; covered without a row here.
+        ; UNMEASURED, and said plainly: no world-map fixture stands in this
+        ; region (the search arc is not on any minted state), so these five are
+        ; coverage on the same census+arithmetic footing measurement #8 gave the
+        ; figaro-desert rows -- shields left to the formula, element table only
+        ; (no HpScale exemption), numbers to be taken once a corridor fixture is
+        ; minted. THE FIRE HOLE, flagged: a few western-WoB bodies are fire- or
+        ; wind-weak ONLY ($090 fire, $08c fire|wind, $02a wind) and this party
+        ; casts neither, so their vanilla weakness is dead for it. they are left
+        ; as-is rather than blindly double-keyed: whether they even sit on the
+        ; walked route is exactly what the missing fixture would settle. see
+        ; measurement #9.
+        .word   $0018
+        .byte   $08, $00        ; stray cat: no weakness, absorbs nothing
+        .word   $001d
+        .byte   $08, $00        ; baskervor: 750 hp, break-capable body
+        .word   $001f
+        .byte   $08, $00        ; chimera: 2237 hp, the region's wall
+        .word   $0078
+        .byte   $08, $00        ; red fang: on the task census and the tables
+        .word   $007b
+        .byte   $08, $00        ; ralph: no weakness, absorbs nothing
         .word   $ffff
 
 ; ------------------------------------------------------------------------------
@@ -4019,6 +4062,47 @@ Ot6ShieldTbl:
         .word   $0154
         .byte   1, OT6_SLASH|OT6_BLUDG  ; piranha: the chum wave
         ; zozo / opera / the factory
+        ; ---- the v0.4 ZOZO TOWN pass: four poison-trash rows, shields only.
+        ; the search-for-terra party is LOCKE+CELES+EDGAR+SABIN -- TERRA IS
+        ; GONE, she is the search target -- so there is no native fire at all,
+        ; and poison = edgar's bio blaster is the town's break key. every town
+        ; thug is ALREADY poison-weak in vanilla (slamdancer $052, harvester
+        ; $04e, gabbldegak $0df, hadesgigas $053), so unlike the kolts pass this
+        ; is NOT an element add: the weakness is there and reachable, and what
+        ; the formula got wrong is the shield COUNT. these are L15-16 trash, so
+        ; 2 + level/8 seeds 3 (gabbldegak/slamdancer, L15) or 4 (harvester/hades-
+        ; gigas, L16). swept live on zozo_arrival (map 221) with bal_party's
+        ; BUFF_SHIELDS, boost3, 6 battles a cell:
+        ;
+        ;   shields   won   dmg taken   actions_broken   break lands at
+        ;   formula   5/6     582         ~0.4             90-95% (corpse)
+        ;   3         6/6     554         0.17             89-100% (corpse)
+        ;   2         6/6     433         1.83             62-84% (WINDOW)
+        ;
+        ; the tanks are the tell: at the formula's 4, hadesgigas (1200 hp) and
+        ; harvester never broke at all, and the two-tank draw WIPED even the
+        ; loop -- MASH wipes 6/6 in this town (the terra-less party has no fire
+        ; and no reachable class weakness here, so holding A never chips), the
+        ; loop 5/6. at 2 shields they break penultimate, the wipe becomes a
+        ; clean win, and the loop takes 48% less damage than mashing does. this
+        ; is measurement #8's kolts finding on a bigger body: the formula's
+        ; count lands the break on a corpse, 2 is where the loop exists.
+        ; ABSORB/NULL re-check (+$17/+$18), the boss-row discipline: hadesgigas
+        ; absorbs EARTH and the rest absorb nothing; NONE of the four absorb or
+        ; null poison, so the count change never turns the town's answer sour.
+        ; shields-only, no class byte (like cirpius/tusker): the answer is the
+        ; TOOL, never the A button -- see measurement #9.
+        .word   $0052
+        .byte   2, $00          ; slamdancer (map 225 sibling of the measured
+                                ;   pool, bracketed by $04e 428hp / $0df 350hp)
+        .word   $004e
+        .byte   2, $00          ; harvester: 428 hp, a 4-shield tank at formula
+        .word   $0053
+        .byte   2, $00          ; hadesgigas: 1200 hp, the town wall; 4->2 is
+                                ;   what lets its break window open at all
+        .word   $00df
+        .byte   2, $00          ; gabbldegak: comes 4 at a time, and bio's
+                                ;   group target chips the whole pack at once
         .word   $0107
         .byte   6, OT6_PIERCE|OT6_BLUDG ; dadaluma: break the crouch
         .word   $006c

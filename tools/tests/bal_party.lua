@@ -49,7 +49,17 @@
 local H = dofile("/Users/mtklein/ot6/tools/tests/lib/ot6.lua")
 
 -- ------------------------------------------------------------- knobs --
-local POLICY = "baseline"
+-- env overrides (2026-07-21 v0.4 Zozo pass): running a policy x fixture x
+-- shield-count matrix by hand is a lot of edits, so the four knobs a sweep
+-- touches read an env var first and fall back to the literal default below.
+-- pcall-guarded: if Mesen's lua sandbox hides os.getenv the read simply
+-- yields the default, so the file still runs edited-by-hand exactly as before.
+local function envcfg(name)
+  local ok, v = pcall(function() return os.getenv(name) end)
+  if ok and v and v ~= "" then return v end
+  return nil
+end
+local POLICY = envcfg("BAL_POLICY") or "baseline"
 -- FIXTURE names a row of FIXTURES below. The header's "point this driver at
 -- a Kolts fixture; nothing else has to change" was WRONG by one thing --
 -- the pacer. worldmap_narshe is on the WORLD map (worldX/worldMode); every
@@ -57,7 +67,7 @@ local POLICY = "baseline"
 -- bal_mines' pacer, not this one's. So the pacing lane is per-fixture and
 -- the two pacers both live here; everything downstream of "a battle
 -- started" is shared and untouched.
-local FIXTURE = "worldmap_narshe"
+local FIXTURE = envcfg("BAL_FIXTURE") or "worldmap_narshe"
 local FIXTURES = {
   -- Measurement #6's fixture, kept byte-identical (state, seeds, spawn) so
   -- its numbers stay the continuity baseline for every later sweep.
@@ -123,10 +133,38 @@ local FIXTURES = {
     seeds = { {fa1=0x37,fa2=0x00}, {fa1=0x6e,fa2=0x01}, {fa1=0xa5,fa2=0x02},
               {fa1=0xdc,fa2=0x03}, {fa1=0x13,fa2=0x04}, {fa1=0x4a,fa2=0x05} },
   },
+  -- v0.4 Zozo stretch. Party is LOCKE + CELES + EDGAR + SABIN (TERRA is
+  -- GONE -- she is the search target). zozo_arrival lands on the Zozo
+  -- street, map 221 group 78: Gabbldegak $0DF / Harvester $04E /
+  -- HadesGigas $053, all poison-weak in vanilla (Edgar's Bio Blaster is
+  -- the town's break key). No lane named: the street's first walkable
+  -- neighbour is fine to oscillate on; the pacer scans for it.
+  zozo_arrival = {
+    state = "/Users/mtklein/ot6/build/states/zozo_arrival.mss.lua",
+    mode = "field", map = 221,
+    seeds = { {fa1=0x37,fa2=0x00}, {fa1=0x6e,fa2=0x01}, {fa1=0xa5,fa2=0x02},
+              {fa1=0xdc,fa2=0x03}, {fa1=0x13,fa2=0x04}, {fa1=0x4a,fa2=0x05} },
+  },
+  -- The Dadaluma boss ($0107, +2x $006C sidekicks it revives). Not a
+  -- random encounter: the party stands at (30,13) one tile north of the
+  -- gentleman NPC (30,14); facing DOWN and pressing A opens the dialog
+  -- that fires battle 69 (gen_zozo4_dadaluma's own trigger). `trigger =
+  -- "talk"` swaps the random-encounter pacer for that face-and-A drive.
+  -- Seeds are inert here (fixed formation), so the six samples differ only
+  -- by settle jitter -- a distribution of the SAME boss fight, whelkbal's
+  -- shape. BOSS_FRAMES is longer: 3270 HP + revives + self-heal is a slog.
+  dadaluma_doorstep = {
+    state = "/Users/mtklein/ot6/build/states/dadaluma_doorstep.mss.lua",
+    mode = "field", map = 221, trigger = "talk", face = "down",
+    nbattles = 4, battleFrames = 24000, runFrames = 240000,
+    seeds = { {}, {}, {}, {} },
+  },
 }
 local FX = assert(FIXTURES[FIXTURE], "unknown FIXTURE: " .. tostring(FIXTURE))
 local STATE = FX.state
-local NBATTLES = 6
+-- a boss is one fixed fight sampled for its jitter distribution, not a pool
+-- to cover, so it wants fewer, longer samples (FX.nbattles).
+local NBATTLES = FX.nbattles or 6
 -- BUFF_HP: 0 = measure the pool as it ships. >0 = set every monster's HP
 -- to this before the clock starts, which is metrics_battle.lua's own
 -- fixture-buff knob and the only way to make this pool express the loop
@@ -143,7 +181,7 @@ local BUFF_HP = 0
 -- while the seeded cells are plain WRAM and the whole break system reads
 -- them and nothing else. Like BUFF_HP it is a synthetic arm -- label it,
 -- never average it with the shipped one.
-local BUFF_SHIELDS = 0
+local BUFF_SHIELDS = tonumber(envcfg("BAL_BUFF_SHIELDS") or "") or 0
 -- BUFF_CLASS: 0 = the class-weakness mask Ot6SeedShields really seeded,
 -- which for every FORMULA species is $00 -- no class weakness at all (the
 -- @formula path explicitly clears $3e9c). >0 = OR this mask into every
@@ -160,7 +198,10 @@ local BUFF_SHIELDS = 0
 -- can survive its own break.
 local BUFF_CLASS = 0
 local PACE_FRAMES = 7000            -- pacing budget per battle
-local BATTLE_FRAMES = 9000          -- policy-driven battle budget
+-- policy-driven battle budget. A boss ($0107 Dadaluma: 3270 HP, revives two
+-- sidekicks, self-heals) runs far longer than trash, so a fixture may raise
+-- it; 9000 is the trash default.
+local BATTLE_FRAMES = FX.battleFrames or 9000
 local SEEDS = FX.seeds              -- $1FA1 (step roll) / $1FA2 (formation)
 
 -- Difficulty-knob poke, bal_mines.lua's mechanism verbatim (Measurement #4
@@ -187,7 +228,7 @@ local POKE_HP = nil
 --     that scan, so it is disabled by rewriting its species id to $0FFF:
 --     4095 is past the 384-species table (monster_prop.dat is 12288 bytes
 --     / 32), so it can never match and the rows after it stay live.
-local POKE_AUTHORING = nil
+local POKE_AUTHORING = envcfg("BAL_AUTHORING")   -- "off" = neutralise rows
 -- ROM offsets are BUILD-SPECIFIC and HAVE drifted once (bal_mines' header
 -- tells that story: eighteen bytes early, poking live code while reporting
 -- a grid). Re-derive after any bank-F0 edit:
@@ -198,22 +239,36 @@ local POKE_AUTHORING = nil
 -- after them in bank F0 slid. The drift guard below caught it on the first
 -- run, which is exactly what it is for -- a stale offset would have poked
 -- live code and reported a grid.
-local ROM_HPMUL  = 0x3001B5         -- Ot6HpMulTbl band0
-local ROM_SHIELD = 0x30037E         -- Ot6ShieldedMulW (word, low byte)
+local ROM_HPMUL  = 0x3001c9         -- Ot6HpMulTbl band0
+local ROM_SHIELD = 0x300392         -- Ot6ShieldedMulW (word, low byte)
 -- Ot6ElemAddTbl $F000E0 + 8 rows * 4 = the first v0.3 trash row ($0086
--- cirpius); Ot6ShieldTbl $F01067 + 5 rows * 4 = brawler's ($000B). Both
+-- cirpius); Ot6ShieldTbl $F00F78 + 5 rows * 4 = brawler's ($000B). Both
 -- read out of ff6/rom/ff6-en.dbg the same way the two knobs above do:
 --   grep -oE 'name="Ot6ElemAddTbl",[^;]*val=0x[0-9A-F]+' ff6/rom/ff6-en.dbg
 -- then subtract $C00000 and count rows in the source table.
+-- RE-DERIVED 2026-07-21 (v0.4 Zozo pass, TWICE): first the drift that
+-- landed at HEAD moved the Ot6ShieldTbl base $F01067 -> $F00F78; then this
+-- pass's own authoring moved everything after Ot6ElemAddTbl a second time.
+-- Measurement #9 added five poison rows to Ot6ElemAddTbl (the western-WoB
+-- search trash) and four shield rows to Ot6ShieldTbl (the Zozo town), so
+-- Ot6HpMulTbl/Ot6ShieldedMulW and the three v0.3 Kolts shield-row offsets
+-- each slid +$14 (the five 4-byte element rows). The Ot6ElemAddTbl
+-- first-v3-row offset ($300100, cirpius) is BEFORE the new rows and did not
+-- move. Verified by dumping the table rows straight from ff6/rom/ff6-en.sfc.
 local ROM_ELEMADD_V3 = 0x300100     -- word: species id of the first v0.3 row
--- and the three Ot6ShieldTbl rows the pass added: brawler (row 5, shields
--- + SLASH), cirpius and tusker (rows 6/7, shields only)
-local ROM_SHIELDROWS_V3 = { 0x30107B, 0x30107F, 0x301083 }
+-- and the three v0.3 Ot6ShieldTbl rows: brawler (SLASH), cirpius, tusker.
+-- (the v0.4 Zozo-town rows sit AFTER these in the Zozo section, so they did
+-- not move the Kolts three relative to the ShieldTbl base.)
+local ROM_SHIELDROWS_V3 = { 0x300fa0, 0x300fa4, 0x300fa8 }
+-- brawler's row = ROM_SHIELDROWS_V3[1]; the knob_authoring report line reads
+-- it as the ShieldTbl witness (referenced but never defined before this
+-- pass -- an undefined-global crash on the first battle report).
+local ROM_BRAWLER_ROW = ROM_SHIELDROWS_V3[1]
 -- what those words MUST read before we touch them; a mismatch means the
 -- table moved and the offsets are stale (the same drift that once had
 -- bal_mines poking live code while reporting a grid)
-local AUTHORING_OK = { [ROM_ELEMADD_V3] = 0x0086, [0x30107B] = 0x000b,
-                       [0x30107F] = 0x0086, [0x301083] = 0x007a }
+local AUTHORING_OK = { [ROM_ELEMADD_V3] = 0x0086, [0x300fa0] = 0x000b,
+                       [0x300fa4] = 0x0086, [0x300fa8] = 0x007a }
 -- every value either knob is ever set to, shipped or swept: a byte outside
 -- this set means the offset no longer points at a knob
 local KNOB_OK = { [0x02]=true, [0x03]=true, [0x04]=true, [0x06]=true,
@@ -306,7 +361,7 @@ local ROSTER = {
 -- rather than pressing toward them.
 local CMD = { fight = 0x00, item = 0x01, magic = 0x02, steal = 0x05,
               tools = 0x09, blitz = 0x0a, magitek = 0x1d }
-local SPELL = { fire = 0x00, cure = 0x2d }
+local SPELL = { fire = 0x00, ice = 0x01, ice2 = 0x06, ice3 = 0x0a, cure = 0x2d }
 local TOOL  = { autocrossbow = 0xaa, bioblaster = 0xa4 }
 local BLITZ = { pummel = 0x5d, aurabolt = 0x5e }          -- resolved attack ids
 local SPELLBASE = { [0] = 0x0000, [1] = 0x013c, [2] = 0x0278, [3] = 0x03b4 }
@@ -391,6 +446,26 @@ local KITS = {
   [0x05] = { name = "SABIN",
     { tag = "blitz", cmd = CMD.blitz,
       pick = function(slot) return toolsCursor(slot, BLITZ.pummel) end },
+    { tag = "fight", cmd = CMD.fight },
+  },
+  -- CELES is the v0.4 Zozo party's ICE carrier -- the deliberate key the A
+  -- button does not swing, the twin of Terra's Fire one stretch earlier
+  -- (Terra is GONE this stretch, so there is no native fire at all). Her
+  -- natural list is Ice 1 / Cure 4 / Antdot 8 / Scan 18 / Ice2 26 / Ice3 42
+  -- (field/event.asm NaturalMagic, celes block), so ICE is her whole
+  -- offensive ring here; the pick takes the strongest ice she owns. Ice
+  -- answers the corridor's fire-absorbing Bombs/Grenades (ice|water weak),
+  -- FossilFang (ice among its weaks, and it ABSORBS the poison answer), and
+  -- the Zozo outlier Crawler ($05b, ice-only). In the poison town her ice
+  -- reveals nothing, so she probes once and falls to her SLASH Fight --
+  -- Edgar's Bio Blaster carries that pool, not her.
+  [0x06] = { name = "CELES",
+    { tag = "ice", cmd = CMD.magic, mp = 5, want = "weak_ice",
+      pick = function(slot) return magicCursor(slot, SPELL.ice2)
+                                 or magicCursor(slot, SPELL.ice) end },
+    { tag = "probe_ice", cmd = CMD.magic, mp = 5, want = "probe_turn",
+      pick = function(slot) return magicCursor(slot, SPELL.ice2)
+                                 or magicCursor(slot, SPELL.ice) end },
     { tag = "fight", cmd = CMD.fight },
   },
 }
@@ -486,6 +561,9 @@ local function entryOk(rec, entry, pol)
   if not hasCmd(rec, entry.cmd) then return false end
   if entry.mp and H.readWord(PMP + rec.slot*2) < entry.mp then return false end
   if entry.want == "weak_fire" then return pol.probe and anyRevealed(0x01) end
+  -- ice is element bit $02 (fire $01, ice $02, bolt $04, poison $08 ...);
+  -- Celes's exploit rung, the twin of Terra's weak_fire.
+  if entry.want == "weak_ice" then return pol.probe and anyRevealed(0x02) end
   -- poison is element bit $08. This read $20 (PEARL) until 2026-07-19 --
   -- the bit order is fire $01, ice $02, bolt $04, poison $08, wind $10,
   -- pearl $20, earth $40, water $80 (Ot6Chip walks it from bit 0 at
@@ -1011,7 +1089,40 @@ local function paceField(k)
   }, "encounter fires (b=" .. k .. ")")
 end
 
+-- A talk-triggered boss ($0107 Dadaluma) is not a random encounter: the
+-- party stands one tile north of the gentleman NPC and pressing A opens the
+-- dialog that fires battle 69. This is gen_zozo4_dadaluma's own trigger,
+-- reshaped into the pacer's driveUntil/voidReason contract: face FX.face,
+-- press A, and A through whatever dialog pages until a battle loads. No
+-- pacing, so a boss fixture on a random-encounter map never risks drawing a
+-- stray trash fight first.
+local function paceTalk(k)
+  local battN, waited, ph = 0, 0, 0
+  return H.driveUntil(function()
+    waited = waited + 1
+    battN = H.battleLoadStarted() and battN + 1 or 0
+    if battN >= 3 then H.setPad({}) return true end
+    if (H.mapId() & 0x1ff) ~= FX.map then
+      voidReason = "left_map" H.setPad({}) return true
+    end
+    if waited >= PACE_FRAMES then voidReason = "talk_timeout" H.setPad({}) return true end
+    return false
+  end, PACE_FRAMES + 600, {
+    H.call(function()
+      ph = (ph + 1) % 24
+      if H.battleLoadStarted() then H.setPad({}) return end
+      if H.dialogWaiting() then H.setPad(ph % 4 < 2 and { "a" } or {}) return end
+      if not H.hasControl() then H.setPad({}) return end
+      if ph < 6 then H.setPad({ [FX.face or "down"] = true })
+      elseif ph < 12 then H.setPad({ "a" })
+      else H.setPad({}) end
+    end),
+    H.waitFrames(1),
+  }, "talk fires (b=" .. k .. ")")
+end
+
 local function paceStep(k)
+  if FX.trigger == "talk" then return paceTalk(k) end
   return (FX.mode == "world") and paceWorld(k) or paceField(k)
 end
 
@@ -1162,4 +1273,4 @@ blocks[#blocks + 1] = H.call(function()
     POLICY, NBATTLES, BUFF_HP))
 end)
 
-H.run({ maxFrames = 200000 }, blocks)
+H.run({ maxFrames = FX.runFrames or 200000 }, blocks)
