@@ -14134,6 +14134,10 @@ InitSpellList:
         bpl     @55a1
 @55ae:  dex2
         bpl     @5589
+        jsl     Ot6UnionEspers   ; M5: equipped espers add their spells to the
+                                 ;   union so the compacted list has slots for
+                                 ;   them (ot6.asm); the per-character grant keeps
+                                 ;   each one only for its esper's holder
         lda     $1d54       ; spell order
         and     #$07
         tax
@@ -14303,7 +14307,9 @@ AddToSpellList_02:
 @5704:  bcs     AddToSpellList_00
         phy
         tay
-        lda     ($f0),y
+        jsl     Ot6EsperSpellKnown   ; M5: an equipped esper's spells read as
+                                     ;   $ff-known here (ot6.asm), additively --
+                                     ;   innate spells above are untouched
         ply
         inc
         beq     AddToSpellList_00

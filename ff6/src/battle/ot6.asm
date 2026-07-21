@@ -4399,5 +4399,151 @@ ot6_c_mix := Ot6CBlob           ; unsigned char ot6_c_mix(uchar a, uchar b)
 
 ; ------------------------------------------------------------------------------
 
+; [ M5 espers-as-sub-jobs: an equipped esper grants its spells to the Magic list ]
+;
+; Replaces the learned-status read `lda ($f0),y` inside ValidateSpellList's
+; AddToSpellList_02 (battle_main.asm), the read whose $ff result marks a spell
+; known/castable (`... inc / beq add`).  Y = the spell id (0..$35), $f0 = the
+; character's $1a6e learned-spell table pointer ($1a6e + char*$36, set at the
+; head of ValidateSpellList).  A(8) is returned as the EFFECTIVE learned status:
+; $ff when the spell is castable, the real (< $ff) learn% otherwise.
+;
+; ADDITIVE, fork-independent core.  Two ways a spell is castable:
+;   1. innate -- $1a6e says $ff.  Read first and returned unchanged, so a
+;      character's own known spells are never touched.  This is the whole reason
+;      the read happens before the esper check: the augment/replace fork only
+;      differs in whether innate spells are later SUPPRESSED, and suppression is
+;      not built here.
+;   2. granted -- the character's equipped esper ($f7, the byte ValidateSpellList
+;      already banked at its head; negative = none) lists this spell id in its
+;      GenjuProp row.  UpdateEnabledMagic/CheckMagicEnabled then enable and draw
+;      it for free.  Equip Ramuh -> Bolt/Rasp cast; unequip ($f7 negative) -> the
+;      bmi makes this proc return the untouched vanilla status, i.e. inert.
+;
+; The GenjuProp row is esper*11 (GetGenjuPropPtr, battle_main.asm:16155),
+; computed inline because that helper lives in the battle bank and this proc does
+; not: 11e = ((e*4 + e)*2 + e).  Only the five spell-id bytes (+1,+3,+5,+7,+9)
+; are scanned; the learn-rate bytes are all zero under M5 (genju_prop.asm) and
+; irrelevant to the grant, which keys on the id alone.
+;
+; CONTRACT: a8/i16, D=0, DBR = the caller's (jsl preserves it, so `($f0),y`
+; reads the same $1a6e region ValidateSpellList does).  Preserves X -- the loop's
+; dispatch selector, live across every iteration -- and Y, the spell id the
+; caller's `ply` restores anyway.  Clobbers A (the return) and the dead scratch
+; $ee (written and read with no call between, so it needs no reserved cell).
+.proc Ot6EsperSpellKnown
+        .a8
+        .i16
+        lda     ($f0),y         ; vanilla learned status for spell id Y
+        inc
+        beq     @grant          ; $ff -> innately known: keep it ($ff)
+        lda     $f7             ; this character's equipped esper (neg = none)
+        bmi     @vanilla        ; no esper worn -> the vanilla (non-$ff) status
+        phx                     ; X is the loop's dispatch selector -- preserve
+        longa                   ; 16-bit for the *11 product (max 26*11 = 286)
+        and     #$00ff          ; A = esper index e (0..26)
+        sta     $ee             ; local scratch: stored and reloaded within this
+        asl                     ;   proc with no call between, so no ValidateSpell
+        asl                     ;   frame cell is reserved for it
+        clc
+        adc     $ee             ; 4e + e = 5e
+        asl                     ; 10e
+        clc
+        adc     $ee             ; 10e + e = 11e (GenjuProp row offset)
+        tax
+        shorta
+        tya                     ; A = spell id (low byte; Y's high byte is 0)
+        cmp     f:GenjuProp+1,x ; the esper's five taught-spell IDs
+        beq     @hit
+        cmp     f:GenjuProp+3,x
+        beq     @hit
+        cmp     f:GenjuProp+5,x
+        beq     @hit
+        cmp     f:GenjuProp+7,x
+        beq     @hit
+        cmp     f:GenjuProp+9,x
+        beq     @hit
+        plx                     ; not granted: restore X, fall to the vanilla read
+@vanilla:
+        lda     ($f0),y         ; the real (< $ff) learn%, Y intact
+        rtl
+@hit:   plx                     ; granted: restore X, then resolve as known
+@grant: lda     #$ff
+        rtl
+.endproc
+
+; ------------------------------------------------------------------------------
+
+; [ M5: seed the master spell-list union with equipped espers' granted spells ]
+;
+; Called once from InitSpellList (battle_main.asm) right after its actor loop
+; unions the party's INNATELY-known spells into $3034, and before that union is
+; compacted and sorted into the per-character lists.  The in-battle Magic list is
+; COMPACTED to exactly the spells present in $3034, so a borrowed spell no party
+; member knows has no slot for the per-character hook (Ot6EsperSpellKnown) to keep
+; -- measured: equip Ramuh with nobody knowing Bolt/Rasp and $208e never lists
+; them.  This adds each equipped esper's GenjuProp spell-ids to $3034 so the slots
+; exist; ValidateSpellList's per-character pruning then keeps each spell only for
+; the character actually wearing the granting esper (the additive core).  So the
+; correct core is TWO hooks, not one: this union seed plus the per-character grant.
+;
+; Entered from InitSpellList's a8/i8 world.  $3010 (record pointers) is already
+; set -- InitParty (battle_main.asm:7749) runs before InitChars (:6123) which
+; calls InitSpellList -- so each slot's equipped esper is $161e indexed by
+; $3010,slot, exactly as ValidateSpellList reads it.  a/x/y and P are restored via
+; php/plp.  Scratch $ee is written and reread with no call between.
+.proc Ot6UnionEspers
+        php
+        longi                   ; 16-bit index for $3010 word reads and row math
+        shorta                  ; 8-bit A
+        ldx     #$0006          ; party entity offsets 6,4,2,0
+@slot:  lda     $3ed8,x         ; actor id
+        cmp     #$0c
+        bcs     @next           ; empty/special/gogo/umaro -- no esper to grant
+        phx
+        ldy     $3010,x         ; this slot's record pointer
+        lda     $161e,y         ; equipped esper (neg = none)
+        bmi     @done
+        longa                   ; row = esper*11 (GetGenjuPropPtr, :16155)
+        and     #$00ff
+        sta     $ee
+        asl
+        asl
+        clc
+        adc     $ee             ; 5e
+        asl
+        clc
+        adc     $ee             ; 11e
+        tax                     ; X = GenjuProp row offset
+        shorta
+        lda     f:GenjuProp+1,x ; the esper's five taught-spell IDs
+        jsr     @add
+        lda     f:GenjuProp+3,x
+        jsr     @add
+        lda     f:GenjuProp+5,x
+        jsr     @add
+        lda     f:GenjuProp+7,x
+        jsr     @add
+        lda     f:GenjuProp+9,x
+        jsr     @add
+@done:  plx
+@next:  dex
+        dex
+        bpl     @slot
+        plp
+        rtl
+; add spell id A to the union $3034[id] := id, skipping $ff (empty slot / NONE)
+@add:   cmp     #$ff
+        beq     @ret
+        longa
+        and     #$00ff
+        tay                     ; Y = spell id (clean 16-bit)
+        shorta
+        sta     $3034,y         ; A low byte = id -> $3034[id]
+@ret:   rts
+.endproc
+
+; ------------------------------------------------------------------------------
+
 ; weapon/ability class data (m3)
         .include "ot6_class.asm"

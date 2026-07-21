@@ -22,6 +22,10 @@ CODE_EXT_INC = 1
 .global Ot6AbilityCost           ; v0.4 mp-cost hook (only defined/referenced
                                  ;   under OT6_MP_COSTS; a weak decl otherwise)
 .global Ot6PreviewList_ext
+.global Ot6EsperSpellKnown       ; M5 espers-as-sub-jobs: equipped esper grants
+                                 ;   its spells to the in-battle Magic list
+.global Ot6UnionEspers           ; M5: seed the master-list union with equipped
+                                 ;   espers' spells so the compacted list has slots
 .global Ot6BoostMarksNmi_ext
 .global Ot6RestageGate_ext
 .global Ot6FontRestoreMark_ext
