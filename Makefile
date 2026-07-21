@@ -583,7 +583,22 @@ build/states/zozo_arrival.mss.lua: build/states/figaro_submerged.mss.lua
 # own $01F* latch -> the hidden staircase opens ($01F0).
 build/states/zozo_clock_solved.mss.lua: build/states/zozo_arrival.mss.lua
 	$(call mint,zozo_clock_solved,gen_zozo3_clock)
-FRONTIER += figaro_submerged zozo_arrival zozo_clock_solved
+# gen_zozo4_dadaluma: the crane maze.  The city is a DIRECTED island graph
+# once door tiles are modeled as the walk-on teleports they are: five doors
+# (P9/P10b/P11a/P12b/P14a/P15b in probe_climb's pair naming), the stair
+# room's bandit conveyor (seven walkers own its one-wide column forever --
+# followed, not pathed), both jump rows ($1EB6 facing-gated step-on
+# triggers, chained under one held direction), and the z-level loop onto
+# the y=13 strip beside DADALUMA at (30,14).  Doorstep = (30,13), one
+# A-press short; the fight is battle 69 (formation 438, $0107 + 2x $006C),
+# won by the kill-bit like Kefka/Vargas (_ca5ea9 gates on b-switch $40).
+# The win clears $034A and opens the tower porch gen_zozo5 climbs.
+build/states/dadaluma_doorstep.mss.lua: build/states/zozo_arrival.mss.lua
+	$(call mint,dadaluma_doorstep,gen_zozo4_dadaluma)
+build/states/dadaluma_won.mss.lua: build/states/dadaluma_doorstep.mss.lua
+	$(call mint,dadaluma_won,gen_zozo4_dadaluma)
+FRONTIER += figaro_submerged zozo_arrival zozo_clock_solved \
+            dadaluma_doorstep dadaluma_won
 
 frontier: rom $(STATE1) $(STATE2) $(STATE3) \
           $(patsubst %,build/states/%.mss.lua,$(FRONTIER))
