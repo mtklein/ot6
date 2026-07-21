@@ -20,23 +20,31 @@ kolts_doorstep, vargas_doorstep, vargas_won -- lives behind
 `make frontier`, which
 nothing in the gate depends on: each link is a multi-minute scripted playthrough that
 consumes the previous link's savestate, and the suite's remint cost has
-to stay what it was.  A minted link is a function of three inputs -- the
-ROM bytes, its generator `gen_*.lua`, and `lib/ot6.lua` (the shared driver
-every generator `dofile()`s) -- and its freshness gate re-mints when ANY of
-them changes by CONTENT (a rebuild or a checkout bumps timestamps without
-moving bytes, so a plain mtime would re-mint spuriously).  ROM bytes ride
+to stay what it was.  A minted link is a function of the ROM bytes, its
+generator `gen_*.lua`, and the shared test library every generator
+`dofile()`s -- both halves of it, `lib/ot6.lua` (battle core) and
+`lib/ot6_field.lua` (field/world navigation), since `lib/compose.py`
+inlines the pair into every composed script -- and its freshness gate
+re-mints when ANY of them changes by CONTENT (a rebuild or a checkout
+bumps timestamps without moving bytes, so a plain mtime would re-mint
+spuriously).  ROM bytes ride
 the `.rom-copy` clock; the generator+lib half is `lib/frontier_stamp.sh`,
 which stamps each state `build/states/<state>.stamp` with
-`sha256(generator ++ lib) <generator>` at mint time and re-mints on a
+`sha256(generator ++ ot6.lua ++ ot6_field.lua) <generator>` at mint time
+and re-mints on a
 mismatch.  `lib/frontier_deps.sh` reads the state->generator map out of the
 Makefile's `$(call mint,...)` lines into a generated `-include` so make
 actually reconsiders a state when its generator or lib changes (a new
 frontier link is gated the moment it lands).  Editing one generator
 re-mints only the states it feeds (and their descendants down the chain);
-editing `lib/ot6.lua` re-mints the whole frontier, since every route runs
-through it -- an acceptable cost because the lib is stable (it is the rare
+editing either lib half re-mints the whole frontier, since every route runs
+through them -- an acceptable cost because the lib is stable (it is the rare
 file to change) while generators churn constantly, so the coarse lib axis
 fires seldom and the precise per-generator axis carries the everyday load.
+(Splitting the lib in two narrows even that: a battle-core edit and a
+nav-stack edit no longer churn one shared file's history, though either
+still re-mints the frontier -- the fixture really was minted by walking
+routes through both halves.)
 `lib/compose.py` re-checks the same stamp at CONSUME time and prints a loud
 `[ot6] WARNING` if a fixture a test is about to boot has drifted from its
 generator+lib (the gap where `make test` picks up a frontier fixture
@@ -131,7 +139,14 @@ set -- and never creates `SaveStates/`.)
 
 ## Files
 
-- `lib/ot6.lua` - harness library (see header comment for full API).
+- `lib/ot6.lua` - harness library, battle core: steps/input/memory/
+  savestates/battle signals/canaries plus the shared field-state reads
+  (see header comment for full API).
+- `lib/ot6_field.lua` - harness library, navigation half: passability
+  model, BFS, `navTo`/`worldNavTo`/`advanceStory`/`route`.  Inlined by
+  `lib/compose.py` right after `ot6.lua` into every composed script; tests
+  still write only the one `dofile(".../lib/ot6.lua")` line and see one
+  merged `H`.
 - `lib/decode_b64.py` - decodes `[b64:tag]` stdout payloads into files.
 - `gen_battle_state.lua` - title screen -> New Game -> intro -> Narshe ->
   walk into the first guard battle; emits `build/states/battle_doorstep.mss`

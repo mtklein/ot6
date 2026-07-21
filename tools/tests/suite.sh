@@ -8,8 +8,8 @@
 # is a pure savestate load -- the mints (gen_battle_state, gen_battle2)
 # run as Makefile prerequisites BEFORE the suite -- so tests are
 # independent and fan out freely. Tests are composed once up front:
-# composing reads lib/ot6.lua live, and a mid-suite edit must not split
-# the suite across two libs.
+# composing reads lib/ot6.lua + lib/ot6_field.lua live, and a mid-suite
+# edit must not split the suite across two libs.
 set -u
 ROOT="$(cd "$(dirname "$0")/../.." && pwd)"
 RUN="$ROOT/tools/tests/run.sh"

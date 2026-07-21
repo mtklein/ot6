@@ -104,7 +104,9 @@ Dialog advancing is **edge-triggered**: one held A yields exactly one
 page. Advancing multiple pages takes press-RELEASE-press (4 frames on /
 4 off works).
 
-Harness API (`tools/tests/lib/ot6.lua`):
+Harness API (`tools/tests/lib/ot6.lua` for the battle core and the shared
+field-state reads; `tools/tests/lib/ot6_field.lua` for the navigation
+stack -- compose inlines both, so scripts see one `H`):
 
 - `H.fieldX()`, `H.fieldY()`, `H.mapId()` — live position (pixel `>> 4`;
   never navigate on the `$1FC0` cache) / map.

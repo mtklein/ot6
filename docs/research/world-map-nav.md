@@ -1,7 +1,7 @@
 # World-map navigation — engine notes
 
 Ground-truth for `H.worldNavTo` (the overworld analog of the field
-`navTo` in `tools/tests/lib/ot6.lua`). The world map is a separate
+`navTo` in `tools/tests/lib/ot6_field.lua`). The world map is a separate
 Mode-7 engine (`ff6/src/world/`) from the field engine, but on-foot
 navigation is simpler. Pins below are from the disassembly and
 `rom/ff6-en.dbg`.
@@ -191,7 +191,7 @@ Ported as-is: BFS structure, target thunks, re-plan-on-deviation,
 `opts.arrive`/`maxFrames`/`opts.spare`; kill-bit battle clearing with
 3-frame debounce; pad injection.
 
-New/rebuilt (all in `lib/ot6.lua`, world section): position source
+New/rebuilt (all in `lib/ot6_field.lua`, world section): position source
 (`$E0/$E2` + `$DF/$E1` alignment); 1-bit `worldPassable`/
 `worldCanStep` with a per-world prop cache; `worldBfs` (20000-node
 cap — world legs run 60+ tiles); the hold-through-latch executor;

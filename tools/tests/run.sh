@@ -3,7 +3,8 @@
 #
 #   tools/tests/run.sh tools/tests/battle_smoke.lua
 #
-# * Composes the script with lib/ot6.lua into one flat file first
+# * Composes the script with the lib (ot6.lua + ot6_field.lua) into one
+#   flat file first
 #   (build/states/_composed.lua).  Runtime dofile()/loadfile() raise under
 #   Mesen's default AllowIoOsAccess=false setting (a raise at script load
 #   registers no callbacks, so the run then dies on the wall-clock cap --

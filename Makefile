@@ -140,14 +140,16 @@ test: rom mpcost-rom $(STATE1) $(STATE2) $(STATE3)
 # deeper in the game than whelk_doorstep.
 #
 # Each link consumes the previous link's savestate, so the order below is the
-# order the game is played.  A minted state is a function of THREE inputs --
-# the ROM bytes, its generator .lua, and lib/ot6.lua (the shared driver every
-# generator dofile()s) -- and the gate re-mints when ANY of the three changed
-# by CONTENT (a build or a checkout bumps timestamps without moving bytes, so
-# mtime alone would re-mint spuriously).  ROM bytes ride the .rom-copy clock as
-# before; the generator+lib half is frontier_stamp.sh, wired in below.  Issue
-# #2: keying on the ROM alone silently kept fixtures a since-edited generator
-# or lib would no longer mint the same way.
+# order the game is played.  A minted state is a function of the ROM bytes,
+# its generator .lua, and the shared test library every generator dofile()s --
+# both halves of it, lib/ot6.lua and lib/ot6_field.lua, since compose.py
+# inlines the pair into every composed script -- and the gate re-mints when
+# ANY of them changed by CONTENT (a build or a checkout bumps timestamps
+# without moving bytes, so mtime alone would re-mint spuriously).  ROM bytes
+# ride the .rom-copy clock as before; the generator+lib half is
+# frontier_stamp.sh, wired in below.  Issue #2: keying on the ROM alone
+# silently kept fixtures a since-edited generator or lib would no longer mint
+# the same way.
 #
 #   whelk_doorstep  -> gen_arvis          -> arvis_wake
 #                   -> gen_narshe_escape  -> narshe_escape_start, narshe_streets
@@ -188,7 +190,7 @@ FRONTIER := arvis_wake narshe_streets moogle_doorstep moogle_cleared \
 # The generator+lib half of the freshness gate (issue #2).  For a generator or
 # lib edit to re-mint, make has to RECONSIDER the state's target, which it only
 # does when a declared prerequisite is newer -- so each state's .mss.lua must
-# depend on the .lua that mints it and on lib/ot6.lua.  That state->generator
+# depend on the .lua that mints it and on both lib halves.  That state->generator
 # map already lives in the $(call mint,...) lines, so rather than hand-list it a
 # second time (and have it rot as the Zozo route adds links), frontier_deps.sh
 # greps it back out into a generated fragment we -include.  A new link is thus
