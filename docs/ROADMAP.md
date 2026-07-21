@@ -17,8 +17,45 @@ recruited character's kit is honest there.
 | 1 | the Moogle defense (~1 hour: mines → Whelk → escape) | shipped in v0.1: difficulty transform, encounter/XP/gil conservation, Whelk fire-add |
 | 2 | Figaro → Vargas | shipped in v0.2: fixtures to the Vargas doorstep, the Narshe school, the Bio Blaster as poison key, Vargas's holy add. Band-2 sweep measured (Measurement #6) but *not* tuned — playtest endorsed the shipped resistance at Kolts; break uptime on trash remains ~0% |
 | 3 | scenario split → Kefka at Narshe | shipped in v0.3. ~~Cyan BP-Bushido~~ shipped (M3, `Ot6BushidoTier`; kits.md); remaining: fixtures reaching and crossing the split, the Narshe defense's 3-party machinery, Celes's Runic→BP, and Cyan's MP column (mp-economy.md). Enemy data authored through here (armor line + Kefka poison) |
-| **4 (current)** | **Zozo / first espers — through Zozo, Dadaluma beaten, sub-jobs in hand** | M5 magicite sub-jobs |
-| 5 | end of WoB (Floating Continent) | M4 kits + sweeps (boss data already reaches Nerapa) |
+| **4 (current)** | **through Zozo — Dadaluma beaten, sub-jobs in hand** | M5 magicite sub-jobs; the Zozo balance pass; the crane-maze/Ramuh route |
+| 5 | end of WoB (Opera → Floating Continent) | M4 kits + the wide tuning/telegraph pass; "every ability costs MP" goes live with the cost-display menu work (boss data already reaches Nerapa) |
+
+## Releases
+
+The rungs ship as tagged `.bps` patches ([README](../README.md) has the
+links). What each delivers:
+
+- **v0.1** — through the Moogle defense. Break + BP/boost live: shields,
+  hidden weaknesses, chip → break → ×2, boost banking, spell folding
+  (Fire → Fira → Firaga).
+- **v0.2 / v0.2.1** — through Vargas at Mt. Kolts. The Narshe school
+  teaches the loop; Edgar's Bio Blaster makes poison a real key; Vargas
+  fights with a shield gauge under the scripted Pummel finish. Break
+  authored to *land* — shields empty a round before the kill, so the
+  Broken window is a real part of ordinary fights. (.2.1 was a HUD-pip
+  fix.)
+- **v0.3** — through Kefka at Narshe. All three scenario-split routes,
+  the reunion, and the three-party Battle for Narshe. Cyan joins with
+  Bushido rebuilt on Boost Points; Celes with Runic that banks a BP.
+- **v0.4 (in progress)** — through Zozo. Espers become sub-jobs (equip
+  grants spells + a stat bump; *augment*, not replace, for the born
+  mages); Blitz becomes a menu; Steal gains the chance-verb canon; full
+  HP/MP restore on level-up; the divine capstones (Oblivion / RunicBlade
+  / Assassinate). Per-ability MP cost is built but dormant. Balance-tuned
+  through Zozo.
+- **v0.5 (next)** — the rest of the World of Balance (Opera → Vector →
+  Magitek factory → Floating Continent). "Every ability costs MP" goes
+  live with the cost-display menu work (Calypsi C); the remaining espers
+  and kits; the wide weakness/telegraph authoring pass.
+
+**Design canon:** *on damage verbs boost multiplies; on chance verbs
+boost guarantees.* Steal shipped it in v0.4 (3 BP = a guaranteed steal of
+the rare); Dance / Sketch / Slot / Rage inherit it when their characters
+arrive.
+
+**Release discipline:** every distributable is built through `make patch`,
+which refuses any ROM the test suite has not stamped green; a human
+playtests each rung before it is tagged.
 
 ## M0 — Toolchain ✅ (done 2026-07-14)
 
@@ -109,33 +146,55 @@ audible, visible, and previewed. See DEMO.md.
 **Exit met:** the break loop is structurally Octopath's — probe, reveal,
 chip, break, nuke — on both element and class axes.
 
-## M4 — Skill lists on the native verbs
+## M4 — Skill lists on the native verbs — 🔨 shipping piecemeal
 
-- Per-character 8-skill kits enforced; boost-tier spell folding
-  already shipped with the demo.
-- Learn schedules scripted on each character's native verb (levels,
-  items, deeds, story — design/kits.md): **likely no JP system at
-  all**; JP returns only if playtesting wants a pacing knob.
-- Curated-kit machinery for Gau and Strago (learn many, equip ~5 —
-  the Ochette/Hikari model); menu-bank work shifts here from the
-  cancelled JP purchase menu, and the C toolchain carries it.
-- Passives unlock at 2/4/6/8 skills learned.
+Landing across releases rather than as one block:
+- ✅ **Boost-tier spell folding** (v0.1). ✅ **Cyan's Bushido rebuilt on
+  BP** (v0.3, charge gauge deleted). ✅ **Celes's Runic banks a BP**
+  (v0.3). ✅ **Blitz becomes a menu** (v0.4, the fighting-game input
+  retired the same way Cyan's gauge was). ✅ **Boost-tiered Steal** +
+  the chance-verb canon (v0.4). ✅ **Full HP/MP restore on level-up**
+  (v0.4). ✅ **Divine capstones** — Oblivion/RunicBlade/Assassinate (v0.4).
+- ⬜ **Per-character 8-skill kits enforced** with scripted learn
+  schedules (levels/items/deeds/story — design/kits.md): **likely no JP
+  system**; JP returns only if playtesting wants a pacing knob.
+- ⬜ **Curated-kit machinery** for Gau/Strago (learn many, equip ~5 — the
+  Ochette/Hikari model); menu-bank work on the C toolchain.
+- ⬜ **Passives** unlock at 2/4/6/8 skills learned.
 
 **Exit:** fresh save through Zozo with every character on their kit.
 
-## M5 — Magicite as sub-jobs
+## M5 — Magicite as sub-jobs — 🔨 in progress (v0.4)
 
-- Esper equip grants spell list + stat mods while equipped; permanent
-  learning removed; summon = once-per-battle divine.
-- Level-up esper bonuses removed (replaced by the equip mods).
+- Esper equip grants its spell list live (usable while equipped, gone
+  when unequipped); permanent learning and level-up esper bonuses
+  removed; summon stays a once-per-battle divine.
+- **Augment, not replace** (owner call): the born mages (Terra/Celes)
+  keep their innate spells and the esper adds a second job; everyone
+  else's magic *is* whatever magicite they hold — pure Octopath sub-job.
+- **Stat mods are the simple while-equipped kind** for v0.4 (hold it,
+  get the bump); the "earn-it-by-carrying" passive version is deferred.
+- Boost spell-folding is source-agnostic, so a borrowed Fire folds to
+  Firaga under boost for free.
+- v0.4 authors the Zozo espers (Ramuh + Kirin/Siren/Stray); the rest of
+  the WoB roster lands in v0.5.
 
 **Exit:** swapping magicite mid-dungeon visibly swaps a character's kit.
 
-## M6 — Tuning pass
+## M6 — Tuning pass — 🔨 per-stretch, alongside each release
 
-- Shield values + weakness sets hand-authored for Narshe → Zozo encounters
-  and bosses; global enemy HP reduction; boss telegraphs.
-- Playtest loop with scripted battle regressions.
+Runs with each rung's balance pass rather than as one late block; the
+lesson (Measurements #5–#8) is that break/boost only *land* with
+authored weaknesses, and only measured against real fixtures:
+- ✅ **Mt. Kolts** authored + measured (v0.2): shielded resistance
+  carries difficulty (HP dial retired to 1×); breaks land a round before
+  the kill; the weakness axis must be reachable but not the default swing.
+- 🔨 **Zozo** (v0.4): poison-clean town (Bio Blaster is the key), the
+  corridor's poison/fire absorbers authored around, no-weakness trash
+  given a reachable axis. Fire is a coverage hole this stretch (Terra is
+  the search target, absent).
+- ⬜ **Rest of the WoB** (v0.5): the wide weakness/telegraph pass; global
+  enemy HP; boss telegraphs. Boss shield/class data already reaches Nerapa.
 
 **Exit:** the opening third of the game plays as a coherent Octopath-like.
 
