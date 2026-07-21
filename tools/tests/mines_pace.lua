@@ -30,30 +30,28 @@
 -- AddExp/gil clamps). Greppable lines: [ot6] [pace] b=<k> <key>=<value>.
 --
 -- ROM knob offsets are BUILD-SPECIFIC (bank F0 layout) and DO drift: all
--- three below were exactly $12 low ($300173/$300177/$300179) against the
--- build of 2026-07-18 -- the same drift bal_mines.lua and bal_dpb.lua
+-- three below were once exactly $12 low ($300173/$300177/$300179) against
+-- the build of 2026-07-18 -- the same drift bal_mines.lua and bal_dpb.lua
 -- carried (fixed in 8e405a9, which handed this file off). $12 low is
 -- inside Ot6HpScale's /16 tail, which ends where Ot6HpMulTbl begins:
 -- they read $6A/$6A/$D2, the `ror` of a `lsr OT6_SCR_COLS / ror` pair
--- and the low operand byte of the next `lsr` (battle_en.lst @ $000173,
--- $000177, $000179). Re-derive from ff6/rom/ff6-en.dbg after any bank-F0
--- edit:
---   grep -oE 'name="Ot6DangerMulW"[^;]*' ff6/rom/ff6-en.dbg -> val=0xF00189
--- and subtract $C00000 (HiROM: bank $C0 is file offset $000000, and
--- Mesen's snesPrgRom is indexed by file offset). KNOB_OK below fails the
--- run loudly if they drift again.
+-- and the low operand byte of the next `lsr`. They now derive from
+-- ff6/rom/ff6-en.dbg at compose time via H.sym (`& 0x3FFFFF` for the
+-- snesPrgRom file offset; HiROM bank $F0 -> $30xxxx), so they cannot go
+-- stale by hand and no drift guard is needed.
 local H = dofile("/Users/mtklein/ot6/tools/tests/lib/ot6.lua")
 
 -- ------------------------------------------------------------- knobs --
 local ARM = "vanilla"
 local STATE = "/Users/mtklein/ot6/build/states/mines_chase.mss.lua"
 local NSAMPLES = 8
-local ROM_HPMUL  = 0x300185        -- Ot6HpMulTbl (band0 byte)
-local ROM_DANGER = 0x300189        -- Ot6DangerMulW (word)
-local ROM_REWARD = 0x30018B        -- Ot6RewardMulW (word)
--- every value any of the three knobs is ever set to, shipped or poked: a
--- byte outside this set means the offset no longer points at a knob
-local KNOB_OK = { [0x08]=true, [0x0c]=true, [0x10]=true, [0x18]=true, [0x20]=true }
+-- All three derive from ff6/rom/ff6-en.dbg at compose time (H.sym), so a
+-- bank-$F0 shift can no longer stale them and no drift guard is needed.
+-- `& 0x3FFFFF` maps the CPU address to the snesPrgRom file offset ($F0 ->
+-- $30xxxx).
+local ROM_HPMUL  = H.sym("Ot6HpMulTbl")   & 0x3FFFFF   -- band0 byte
+local ROM_DANGER = H.sym("Ot6DangerMulW") & 0x3FFFFF   -- word
+local ROM_REWARD = H.sym("Ot6RewardMulW") & 0x3FFFFF   -- word
 local SHIP = { hp = 0x10, danger = 0x08, reward = 0x20 }
 local PACE_FRAMES = 9000
 local BATTLE_FRAMES = 9000
@@ -109,20 +107,8 @@ local function pokeArm()
   local hp, dg, rw
   if ARM == "vanilla" then hp, dg, rw = 0x10, 0x10, 0x10
   else hp, dg, rw = SHIP.hp, SHIP.danger, SHIP.reward end
-  -- drift guard FIRST, on ALL THREE: poking a stale offset corrupts the
-  -- ROM image and every number after it, silently. Raise instead. (The
-  -- old guard checked only ROM_HPMUL, so the danger and reward offsets
-  -- could drift unnoticed even while it held.)
-  for _, g in ipairs({ { ROM_HPMUL,  "Ot6HpMulTbl"   },
-                       { ROM_DANGER, "Ot6DangerMulW" },
-                       { ROM_REWARD, "Ot6RewardMulW" } }) do
-    local seen = H.readRomByte(g[1])
-    if not KNOB_OK[seen] then
-      error(string.format(
-        "knob layout drift: %s at $%06X reads $%02X -- re-derive from "
-        .. "ff6/rom/ff6-en.dbg", g[2], g[1], seen), 0)
-    end
-  end
+  -- The three offsets are H.sym-derived, so a poke can no longer land on a
+  -- stale byte; the drift guard that used to gate this write is gone.
   emu.write(ROM_HPMUL,  hp, emu.memType.snesPrgRom)
   emu.write(ROM_DANGER, dg, emu.memType.snesPrgRom)
   emu.write(ROM_REWARD, rw, emu.memType.snesPrgRom)

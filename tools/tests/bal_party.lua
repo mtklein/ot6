@@ -229,51 +229,33 @@ local POKE_HP = nil
 --     4095 is past the 384-species table (monster_prop.dat is 12288 bytes
 --     / 32), so it can never match and the rows after it stay live.
 local POKE_AUTHORING = envcfg("BAL_AUTHORING")   -- "off" = neutralise rows
--- ROM offsets are BUILD-SPECIFIC and HAVE drifted once (bal_mines' header
--- tells that story: eighteen bytes early, poking live code while reporting
--- a grid). Re-derive after any bank-F0 edit:
---   grep -oE 'name="Ot6ShieldedMulW"[^;]*' ff6/rom/ff6-en.dbg  -> val=0xF0037E
--- and subtract $C00000.
--- These two moved on 2026-07-19 ($300185 -> $3001B5, $30034E -> $30037E):
--- the v0.3 trash rows grew Ot6ElemAddTbl and Ot6ShieldTbl, and everything
--- after them in bank F0 slid. The drift guard below caught it on the first
--- run, which is exactly what it is for -- a stale offset would have poked
--- live code and reported a grid.
-local ROM_HPMUL  = 0x3001c9         -- Ot6HpMulTbl band0
-local ROM_SHIELD = 0x300392         -- Ot6ShieldedMulW (word, low byte)
--- Ot6ElemAddTbl $F000E0 + 8 rows * 4 = the first v0.3 trash row ($0086
--- cirpius); Ot6ShieldTbl $F00F78 + 5 rows * 4 = brawler's ($000B). Both
--- read out of ff6/rom/ff6-en.dbg the same way the two knobs above do:
---   grep -oE 'name="Ot6ElemAddTbl",[^;]*val=0x[0-9A-F]+' ff6/rom/ff6-en.dbg
--- then subtract $C00000 and count rows in the source table.
--- RE-DERIVED 2026-07-21 (v0.4 Zozo pass, TWICE): first the drift that
--- landed at HEAD moved the Ot6ShieldTbl base $F01067 -> $F00F78; then this
--- pass's own authoring moved everything after Ot6ElemAddTbl a second time.
--- Measurement #9 added five poison rows to Ot6ElemAddTbl (the western-WoB
--- search trash) and four shield rows to Ot6ShieldTbl (the Zozo town), so
--- Ot6HpMulTbl/Ot6ShieldedMulW and the three v0.3 Kolts shield-row offsets
--- each slid +$14 (the five 4-byte element rows). The Ot6ElemAddTbl
--- first-v3-row offset ($300100, cirpius) is BEFORE the new rows and did not
--- move. Verified by dumping the table rows straight from ff6/rom/ff6-en.sfc.
-local ROM_ELEMADD_V3 = 0x300100     -- word: species id of the first v0.3 row
--- and the three v0.3 Ot6ShieldTbl rows: brawler (SLASH), cirpius, tusker.
--- (the v0.4 Zozo-town rows sit AFTER these in the Zozo section, so they did
--- not move the Kolts three relative to the ShieldTbl base.)
-local ROM_SHIELDROWS_V3 = { 0x300fa0, 0x300fa4, 0x300fa8 }
+-- Bank-$F0 offsets are BUILD-SPECIFIC and drifted repeatedly (bal_mines'
+-- header tells that story: eighteen bytes early, poking live code while
+-- reporting a grid; and these Kolts rows slid +$14 twice in the v0.4 Zozo
+-- pass alone). The TABLE BASES now derive from ff6/rom/ff6-en.dbg at compose
+-- time via H.sym, so they can no longer go stale by hand; `& 0x3FFFFF` maps
+-- each CPU address to its snesPrgRom file offset (bank $F0 -> $30xxxx).
+local ROM_HPMUL  = H.sym("Ot6HpMulTbl") & 0x3FFFFF       -- band0 byte
+local ROM_SHIELD = H.sym("Ot6ShieldedMulW") & 0x3FFFFF   -- word, low byte
+-- The v0.3 authoring rows, as (derived base) + (row index * 4-byte stride):
+-- Ot6ElemAddTbl row 8 = the first v0.3 trash row ($0086 cirpius); the three
+-- Ot6ShieldTbl rows are brawler ($000B, row 5), cirpius ($0086, row 6),
+-- tusker ($007A, row 7). Only the ROW INDEX is written out now -- the base is
+-- derived, and AUTHORING_OK below still verifies the species at each row
+-- before the destructive poke, since a row can move WITHIN its table.
+local ROM_ELEMADD_V3    = (H.sym("Ot6ElemAddTbl") & 0x3FFFFF) + 8 * 4
+local SHIELDTBL         = H.sym("Ot6ShieldTbl") & 0x3FFFFF
+local ROM_SHIELDROWS_V3 = { SHIELDTBL + 5 * 4, SHIELDTBL + 6 * 4, SHIELDTBL + 7 * 4 }
 -- brawler's row = ROM_SHIELDROWS_V3[1]; the knob_authoring report line reads
--- it as the ShieldTbl witness (referenced but never defined before this
--- pass -- an undefined-global crash on the first battle report).
+-- it as the ShieldTbl witness.
 local ROM_BRAWLER_ROW = ROM_SHIELDROWS_V3[1]
--- what those words MUST read before we touch them; a mismatch means the
--- table moved and the offsets are stale (the same drift that once had
--- bal_mines poking live code while reporting a grid)
-local AUTHORING_OK = { [ROM_ELEMADD_V3] = 0x0086, [0x300fa0] = 0x000b,
-                       [0x300fa4] = 0x0086, [0x300fa8] = 0x007a }
--- every value either knob is ever set to, shipped or swept: a byte outside
--- this set means the offset no longer points at a knob
-local KNOB_OK = { [0x02]=true, [0x03]=true, [0x04]=true, [0x06]=true,
-                  [0x08]=true, [0x0c]=true, [0x10]=true, [0x18]=true,
-                  [0x20]=true }
+-- what those words MUST read before the authoring poke touches them; a
+-- mismatch now means a row moved WITHIN its table (the base can't be stale --
+-- it's derived), so the row indices above need bumping.
+local AUTHORING_OK = { [ROM_ELEMADD_V3]       = 0x0086,
+                       [ROM_SHIELDROWS_V3[1]] = 0x000b,
+                       [ROM_SHIELDROWS_V3[2]] = 0x0086,
+                       [ROM_SHIELDROWS_V3[3]] = 0x007a }
 
 -- --------------------------------------------------------- addresses --
 -- (all cited in metrics_battle.lua's header; kept in the same order)
@@ -1133,17 +1115,10 @@ local function battleBlock(k)
     H.waitFrames(10),
     H.waitUntil(calmField(20), 1800, "field control (b=" .. k .. ")"),
     H.call(function()
-      -- drift guard FIRST: poking a stale offset corrupts the ROM image
-      -- and every number after it, silently. Raise instead.
-      for _, g in ipairs({ { ROM_HPMUL, "Ot6HpMulTbl" },
-                           { ROM_SHIELD, "Ot6ShieldedMulW" } }) do
-        local seen = H.readRomByte(g[1])
-        if not KNOB_OK[seen] then
-          error(string.format(
-            "knob layout drift: %s at $%06X reads $%02X -- re-derive from "
-            .. "ff6/rom/ff6-en.dbg", g[2], g[1], seen), 0)
-        end
-      end
+      -- ROM_HPMUL/ROM_SHIELD are H.sym-derived table bases now, so the old
+      -- "does this still read a knob byte" drift guard is redundant and gone.
+      -- (The authoring arm below keeps its own guard: it pokes base+ROW_INDEX
+      -- offsets, and a row can still move within a table.)
       -- the poke survives loadState: ROM is not savestate-backed
       if POKE_HP ~= nil then
         emu.write(ROM_HPMUL, POKE_HP, emu.memType.snesPrgRom)
@@ -1153,17 +1128,20 @@ local function battleBlock(k)
         emu.write(ROM_SHIELD, POKE_SHIELD, emu.memType.snesPrgRom)
         H.assertEq(H.readRomByte(ROM_SHIELD), POKE_SHIELD, "resistance poked")
       end
-      -- the authoring arm, same drift-guard-then-poke discipline. Guard on
-      -- the SHIPPED value, so a re-run after the poke (the ROM image is not
-      -- savestate-backed, so battle 2 sees battle 1's poke) is a no-op
-      -- rather than a false drift alarm.
+      -- the authoring arm keeps a row-species guard before its destructive
+      -- poke: the table BASE is H.sym-derived (can't be stale), but these
+      -- addresses are base + a hardcoded ROW INDEX, and a row can move within
+      -- its table. Guard on the SHIPPED value, so a re-run after the poke (the
+      -- ROM image is not savestate-backed, so battle 2 sees battle 1's poke)
+      -- is a no-op rather than a false alarm.
       if POKE_AUTHORING == "off" then
         for addr, want in pairs(AUTHORING_OK) do
           local seen = H.readRomWord(addr)
           if seen ~= want and seen ~= 0xffff and seen ~= 0x0fff then
             error(string.format(
-              "authoring layout drift: $%06X reads $%04X, want $%04X -- "
-              .. "re-derive from ff6/rom/ff6-en.dbg", addr, seen, want), 0)
+              "authoring row drift: $%06X reads $%04X, want $%04X -- the "
+              .. "ShieldTbl/ElemAddTbl base auto-derives, so a row moved "
+              .. "within the table; bump its row index", addr, seen, want), 0)
           end
         end
         -- byte pair, not writeWord: emu.write is the call the two knobs

@@ -58,9 +58,12 @@ local V_fail, V_common, V_rare       -- $be seeds derived from RNGTbl at runtime
 local pinBe = nil                    -- the seed to pin at the next steal roll
 local armRoll = nil                  -- armed by $3401->2, fired at RandA (exec)
 local beSaved = nil                  -- natural $be, handed back when the steal ends
-local RNGTBL = 0x00FD00              -- ROM offset of RNGTbl (CPU C0/FD00)
-local RANDA = 0xC24B98               -- battle RandA entry (ff6-en.map; re-derive
-                                     --   if bank $C2 shifts). Pinning $be HERE,
+local RNGTBL = H.sym("RNGTbl") & 0x3FFFFF   -- RNGTbl as a snesPrgRom FILE
+                                     --   offset (CPU $C0FD00 -> $00FD00)
+local RANDA = H.sym("RandA")         -- battle RandA entry (CPU addr). Both
+                                     --   derived from ff6-en.dbg at compose
+                                     --   time, so a bank-$C0/$C2 shift can no
+                                     --   longer stale them. Pinning $be HERE,
                                      --   the instant the roll runs, is the only
                                      --   pin that survives to it.
 
@@ -170,12 +173,9 @@ H.run({ maxFrames = 200000 }, {
       tostring(V_fail), tostring(V_common), tostring(V_rare)))
     H.assertEq(V_fail ~= nil and V_common ~= nil and V_rare ~= nil, true,
       "RNGTbl yields a fail / common / rare seed")
-    -- drift guard: RANDA must still point at RandA's opening `phx` ($DA). A
-    -- bank-$C2 edit ahead of RandA (e.g. the Blitz path) shifts it; re-derive
-    -- from ff6/rom/ff6-en.map (name="RandA" val=0x......) rather than debug a
-    -- silent mispin.
-    H.assertEq(H.readRomByte(RANDA & 0x3FFFFF), 0xDA, string.format(
-      "RANDA ($%06X) no longer opens RandA -- re-derive from ff6-en.map", RANDA))
+    -- (RANDA is H.sym("RandA") now -- derived from ff6-en.dbg at compose time,
+    -- so the old "does RANDA still open RandA's phx" drift guard is redundant:
+    -- the address cannot be stale by construction.)
 
     -- $3401 message code (1=entry, 2=past empty check, 3=stole); $ff = cleared.
     -- The 2 ARMS the seed; the RandA exec callback applies it the instant the

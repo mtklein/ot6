@@ -3,29 +3,37 @@
 -- genuine move; this instruments who ticks each frame and what the
 -- builder's gate actually reads.
 --
--- Exec callbacks on THIS BUILD's addresses (from ff6-en.dbg / rom bytes,
--- 2026-07-19 build acda1813; throwaway probe, not a suite member, so
--- hardcoded addresses are acceptable here):
---   $F00963  Ot6ScriptBegin_ext entry ($04 wrapper raise)
---   $F0096A  Ot6ScriptEnd_ext entry ($04 wrapper clear)
---   $F00AC6  Ot6BgHudLine @done gate: lda f:$7e57bf (per line, per frame)
+-- Exec callbacks on THIS BUILD's addresses, derived from ff6-en.dbg at
+-- compose time via H.sym (was hardcoded to the 2026-07-19 build acda1813 and
+-- had gone stale -- the whole bank slid ~$1B0 forward since). All three are
+-- bank-$F0 CPU addresses used directly as exec-callback targets:
+--   Ot6ScriptBegin_ext entry        ($04 wrapper raise)
+--   Ot6ScriptEnd_ext entry          ($04 wrapper clear)
+--   Ot6BgHudLine + 0x128 @done gate  lda f:$7e57bf (per line, per frame).
+--     Only this last one is base+offset: @done is an internal label, so its
+--     $128 offset into the routine is found by hand (the `lda f:$7e57bf` =
+--     AF BF 57 7E, the sole such read in the proc); the base auto-derives.
 local H = dofile("/Users/mtklein/ot6/tools/tests/lib/ot6.lua")
 local STATE = "/Users/mtklein/ot6/build/states/battle_doorstep.mss.lua"
+
+local BEGIN_EXT = H.sym("Ot6ScriptBegin_ext")
+local END_EXT   = H.sym("Ot6ScriptEnd_ext")
+local HUD_DONE  = H.sym("Ot6BgHudLine") + 0x128
 
 local begin, done, gates, gate1 = 0, 0, 0, 0
 local tracing = false
 local perframe = {}
 emu.addMemoryCallback(function()
   begin = begin + 1
-end, emu.callbackType.exec, 0xF00963, 0xF00963)
+end, emu.callbackType.exec, BEGIN_EXT, BEGIN_EXT)
 emu.addMemoryCallback(function()
   done = done + 1
-end, emu.callbackType.exec, 0xF0096A, 0xF0096A)
+end, emu.callbackType.exec, END_EXT, END_EXT)
 emu.addMemoryCallback(function()
   if not tracing then return end
   gates = gates + 1
   if H.readByte(0x57bf) ~= 0 then gate1 = gate1 + 1 end
-end, emu.callbackType.exec, 0xF00AC6, 0xF00AC6)
+end, emu.callbackType.exec, HUD_DONE, HUD_DONE)
 
 -- what does C2 dispatch? ExecBtlGfx_ext entry = C10000 (btlgfx @0000);
 -- log each command byte (A at entry) with its frame.

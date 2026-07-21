@@ -159,6 +159,25 @@ function M.writeWord(addr, v) emu.writeWord(wramOffset(addr), v, emu.memType.sne
 function M.readRomByte(addr) return emu.read(addr, emu.memType.snesPrgRom) end
 function M.readRomWord(addr) return emu.readWord(addr, emu.memType.snesPrgRom) end
 
+-- OT6 symbol address, derived from ff6/rom/ff6-en.dbg at COMPOSE time and
+-- injected as the global OT6_SYMS (lib/compose.py, the same mechanism that
+-- embeds savestate sidecars as OT6_STATES).  Returns the ca65 `val`: a 24-bit
+-- SNES *CPU* address (e.g. RandA = 0xC24B98) -- exactly what an exec/read
+-- memory callback wants.  For a snesPrgRom FILE offset (readRomByte/Word),
+-- mask & 0x3FFFFF: banks $C0-$FF are HiROM, so file = cpu & 0x3FFFFF ($C0:0000
+-- -> $000000, $F0:0000 -> $300000).  Errors clearly if the symbol is absent,
+-- which means the ROM was not (re)built, the name is wrong, or the script was
+-- run raw instead of through run.sh (which composes OT6_SYMS in).  This is the
+-- always-correct-by-derivation replacement for hand-maintained address
+-- literals that went stale on every bank-$F0/$C2/$C0 shift.
+function M.sym(name)
+  if type(OT6_SYMS) == "table" and OT6_SYMS[name] then
+    return OT6_SYMS[name]
+  end
+  error("symbol " .. tostring(name) .. " not in ff6-en.dbg -- rebuild the ROM "
+    .. "(compose.py derives OT6_SYMS from ff6/rom/ff6-en.dbg; run via run.sh)", 2)
+end
+
 -- ----------------------------------------------------------------- assert --
 function M.assertEq(got, want, what)
   if got ~= want then
