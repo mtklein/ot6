@@ -597,8 +597,16 @@ build/states/dadaluma_doorstep.mss.lua: build/states/zozo_arrival.mss.lua
 	$(call mint,dadaluma_doorstep,gen_zozo4_dadaluma)
 build/states/dadaluma_won.mss.lua: build/states/dadaluma_doorstep.mss.lua
 	$(call mint,dadaluma_won,gen_zozo4_dadaluma)
+# gen_zozo5_ramuh: the tower door (33,9) -> map 226 -> TERRA (talked from the
+# WEST, {80,17} facing right: her tile is z-upper and the south tile z-lower,
+# CheckNPCs' z-match rejects it) -> the pure-dialog RAMUH scene -> the four
+# magicite (SIREN/KIRIN/STRAY bumped from {82,13}, collision tiles one row
+# below their prop coords) -> the leave cutscene (its party_menu wants START)
+# -> $0054=1 at {57,45}, v0.4's stop line.  Terra found catatonic, no rejoin.
+build/states/zozo_done.mss.lua: build/states/dadaluma_won.mss.lua
+	$(call mint,zozo_done,gen_zozo5_ramuh)
 FRONTIER += figaro_submerged zozo_arrival zozo_clock_solved \
-            dadaluma_doorstep dadaluma_won
+            dadaluma_doorstep dadaluma_won zozo_done
 
 frontier: rom $(STATE1) $(STATE2) $(STATE3) \
           $(patsubst %,build/states/%.mss.lua,$(FRONTIER))
