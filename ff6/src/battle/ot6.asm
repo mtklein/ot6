@@ -4809,5 +4809,171 @@ ot6_c_mix := Ot6CBlob           ; unsigned char ot6_c_mix(uchar a, uchar b)
 
 ; ------------------------------------------------------------------------------
 
+; [ M5 espers-as-sub-jobs: a while-equipped stat mod (the owner's fork-4 pick) ]
+;
+; Vanilla applied an esper's GenjuProp bonus byte at LEVEL-UP (DoLevelUp ->
+; GenjuBonusTbl, battle_main.asm:15826/:15960) -- a permanent, accumulating write
+; to the character stat record ($161a strength / $161b speed / $161c stamina /
+; $161d mag.pwr).  The M5 core DELETED that: every GenjuProp bonus byte is $ff, so
+; DoLevelUp bmi-skips it (:15827) and the record never grows.  The owner's call
+; (ROADMAP M5) is the WHILE-EQUIPPED model instead: hold the esper, get the bump;
+; unequip, it is gone -- reversible, never written to the persistent record.
+;
+; WHERE IT APPLIES -- the battle-side stat copy, NOT $161a-$161d.  FF6 already has
+; a while-equipped stat mechanism: EQUIPMENT.  UpdateEquip (bank C1) folds a
+; character's gear bonuses into the $1100 property buffer ($11a6 vigor, $11a4
+; speed, $11a2 stamina, $11a0 mag.pwr), and UpdateEquipBattle
+; (battle_main.asm:6749) copies that buffer into the battle-side effective stats
+; ($3b2c vigor*2, $3b19 speed, $3b40 stamina, $3b41 mag.pwr) -- the values the
+; damage/hit/ATB math actually reads.  Those copies are rebuilt from base+gear at
+; every battle init and on every mid-battle re-derivation (morph/revert/revive --
+; the :5639 UpdateEquipBattle call), and are NEVER written back to the $16xx
+; record.  So an esper mod added there is reversible BY CONSTRUCTION: it exists
+; only for as long as the esper is worn at (re-)derivation time.  This proc is
+; jsl'd at the TOP of UpdateEquipBattle, right after it points D at $1100 and
+; before it reads the buffer, so the esper mod rides the SAME path as a gear
+; bonus -- vanilla then does the vigor-doubling, the $ff caps, and the dual speed
+; store ($3b19 + the write-only $3b2d dummy) for free.  Covering both
+; UpdateEquipBattle callers (init + re-derive) makes the esper bump survive a
+; mid-battle revive exactly as a relic's +Vigor does.  Adding at the damage-calc
+; sites instead was rejected: vigor/magpwr/stamina/speed each feed several
+; formulas, so it would be many hooks where this is one, and it would have to
+; re-implement the reversibility the per-battle rebuild already gives.
+;
+; THE DATA -- an OT6-side table, NOT the repurposed GenjuProp bonus byte.  The
+; byte was tempting (its GENJU_BONUS enum already spells +Str/+Spd/+Stam/+MagPwr),
+; but the core set every one to $ff precisely so DoLevelUp skips it, and DoLevelUp
+; reads that byte UNCONDITIONALLY (:15826).  Re-authoring it to a positive value
+; to mean "while-equipped mod" would re-arm the vanilla LEVEL-UP bump we just
+; deleted -- reviving the permanent record write and breaking battle_subjob's
+; deletion control (scenario D) -- unless DoLevelUp were ALSO edited to force the
+; skip.  That is shared-code surgery for no gain.  A parallel bank-$f0 table keyed
+; by esper index (the shape Ot6FoldTbl / Ot6AbilityCostTbl already use) keeps the
+; whole new mechanism in ot6.asm, leaves the GenjuProp bytes at $ff, and keeps the
+; two stat lifetimes (deleted level-up vs new while-equipped) off one shared byte.
+;
+; +STAT ONLY for v0.4; HP/MP% DEFERRED.  The GENJU_BONUS HP_x/MP_x are a percent
+; of a max that would then shift on equip/unequip (max-HP moving mid-battle is the
+; fiddly case the brief flags).  v0.4 ships the four flat stat mods only; the
+; table selector has no HP/MP encoding, so the deferral is structural, not a
+; runtime skip.  HP/MP% is a v0.5 item.
+;
+; CONTRACT: entered from UpdateEquipBattle with D=$1100, DBR=$7e, X = character
+; battle index; caller register widths are unknown (the :5639 path enters i8), so
+; the proc saves P and re-establishes its own.  Widening the index to i16 is safe:
+; an i8 caller's XH is hardware-forced to $00 and X here is a small slot index, so
+; the widen always yields the true index.  X is preserved for the
+; UpdateEquipBattle body; A/Y are dead across this point (the body re-derives Y at
+; its head).  Scratch is stack + registers only -- no DP cell is touched (D=$1100
+; would alias the property buffer).
+;
+; while-equipped stat selectors: high nibble of an Ot6EsperStatTbl byte (low
+; nibble = magnitude in base-stat points); $00 = no mod.
+OT6_SM_NONE   = $00
+OT6_SM_VIGOR  = $10             ; -> $11a6 buffer (vanilla doubles it into $3b2c)
+OT6_SM_SPEED  = $20             ; -> $11a4 buffer ($3b19)
+OT6_SM_STAM   = $30             ; -> $11a2 buffer ($3b40)
+OT6_SM_MAGPWR = $40             ; -> $11a0 buffer ($3b41)
+
+.proc Ot6EsperStatMod
+        php
+        longai                  ; a16/i16 (safe widen; see contract)
+        phx                     ; preserve the caller's character battle index
+        lda     $3010,x         ; this character's $16xx record pointer
+        tax
+        shorta                  ; a8
+        lda     $161e,x         ; equipped esper (bit7 set / $ff = none)
+        bmi     @out
+        longa                   ; a16: clean the index for the table lookup
+        and     #$00ff          ; esper index 0..26
+        tax
+        shorta                  ; a8
+        lda     f:Ot6EsperStatTbl,x   ; packed mod: [stat sel : 4][magnitude : 4]
+        beq     @out            ; $00 -> this esper has no while-equipped mod
+        pha                     ; hold the packed byte for the selected branch
+        lsr4                    ; A = stat selector 1..4
+        cmp     #1
+        beq     @vigor
+        cmp     #2
+        beq     @speed
+        cmp     #3
+        beq     @stam
+; selector 4 = mag.pwr -> buffer $11a0
+        pla                     ; packed
+        and     #$0f            ; magnitude
+        clc
+        adc     $a0             ; += buffer mag.pwr (D=$1100 -> $11a0)
+        bcc     @wm
+        lda     #$ff            ; byte cap, matching vanilla's stat caps
+@wm:    sta     $a0
+        bra     @out
+@vigor:                         ; buffer $11a6 (vanilla later doubles it into $3b2c)
+        pla
+        and     #$0f
+        clc
+        adc     $a6
+        bcc     @wv
+        lda     #$ff
+@wv:    sta     $a6
+        bra     @out
+@speed:                         ; buffer $11a4 (-> $3b19, and the $3b2d dummy)
+        pla
+        and     #$0f
+        clc
+        adc     $a4
+        bcc     @wp
+        lda     #$ff
+@wp:    sta     $a4
+        bra     @out
+@stam:                          ; buffer $11a2 (-> $3b40)
+        pla
+        and     #$0f
+        clc
+        adc     $a2
+        bcc     @ws
+        lda     #$ff
+@ws:    sta     $a2
+@out:   longi                   ; i16 to match the phx width
+        plx                     ; restore the character battle index
+        plp
+        rtl
+.endproc
+
+; Ot6EsperStatTbl -- one packed byte per esper index (GenjuProp order), read by
+; Ot6EsperStatMod while that esper is worn.  Only the four Zozo espers (the v0.4
+; playable frontier) are authored; the rest are $00 (no mod), a data-append for
+; v0.5 exactly like their spell lists (genju_prop.asm).  Magnitudes are M6
+; placeholders picked to be felt but not swingy (~10% of an early base stat).
+Ot6EsperStatTbl:
+        .byte   OT6_SM_STAM   | 3       ;  0 ramuh    +3 stamina (canon; vanilla STAMINA_1)
+        .byte   OT6_SM_NONE             ;  1 ifrit
+        .byte   OT6_SM_NONE             ;  2 shiva
+        .byte   OT6_SM_SPEED  | 2       ;  3 siren    +2 speed (tempo/control caster)
+        .byte   OT6_SM_NONE             ;  4 terrato
+        .byte   OT6_SM_NONE             ;  5 shoat
+        .byte   OT6_SM_NONE             ;  6 maduin
+        .byte   OT6_SM_NONE             ;  7 bismark
+        .byte   OT6_SM_MAGPWR | 3       ;  8 stray    +3 mag.pwr (vanilla MAGPWR_1)
+        .byte   OT6_SM_NONE             ;  9 palidor
+        .byte   OT6_SM_NONE             ; 10 tritoch
+        .byte   OT6_SM_NONE             ; 11 odin
+        .byte   OT6_SM_NONE             ; 12 raiden
+        .byte   OT6_SM_NONE             ; 13 bahamut
+        .byte   OT6_SM_NONE             ; 14 alexandr
+        .byte   OT6_SM_NONE             ; 15 crusader
+        .byte   OT6_SM_NONE             ; 16 ragnarok
+        .byte   OT6_SM_MAGPWR | 3       ; 17 kirin    +3 mag.pwr (healer; heal potency)
+        .byte   OT6_SM_NONE             ; 18 zoneseek
+        .byte   OT6_SM_NONE             ; 19 carbunkl
+        .byte   OT6_SM_NONE             ; 20 phantom
+        .byte   OT6_SM_NONE             ; 21 sraphim
+        .byte   OT6_SM_NONE             ; 22 golem
+        .byte   OT6_SM_NONE             ; 23 unicorn
+        .byte   OT6_SM_NONE             ; 24 fenrir
+        .byte   OT6_SM_NONE             ; 25 starlet
+        .byte   OT6_SM_NONE             ; 26 phoenix
+
+; ------------------------------------------------------------------------------
+
 ; weapon/ability class data (m3)
         .include "ot6_class.asm"

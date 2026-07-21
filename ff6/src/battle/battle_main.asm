@@ -6751,6 +6751,10 @@ UpdateEquipBattle:
 @286d:  phd
         pea     $1100       ; set direct page to $1100
         pld
+        jsl     Ot6EsperStatMod   ; M5: an equipped esper adds a live +stat to this
+                                  ;   character's $1100 stat buffer BEFORE the copy
+                                  ;   below reads it (ot6.asm) -- while-equipped,
+                                  ;   reversible, never written to the $16xx record
         lda     $c9         ; armor
         cmp     #$9f
         bne     @2883       ; branch if not $9f (moogle suit)

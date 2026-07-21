@@ -28,6 +28,8 @@ CODE_EXT_INC = 1
                                  ;   its spells to the in-battle Magic list
 .global Ot6UnionEspers           ; M5: seed the master-list union with equipped
                                  ;   espers' spells so the compacted list has slots
+.global Ot6EsperStatMod          ; M5: while-equipped stat mod -- an equipped esper
+                                 ;   adds a live +stat to the battle-side stat copy
 .global Ot6BoostMarksNmi_ext
 .global Ot6RestageGate_ext
 .global Ot6FontRestoreMark_ext

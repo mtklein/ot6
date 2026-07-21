@@ -130,8 +130,13 @@ make_genju_prop {MERTON, 0}, {METEOR, 0}, {}, {}, {}
 ; 16: ragnarok
 make_genju_prop {ULTIMA, 0}, {}, {}, {}, {}
 
-; 17: kirin
-make_genju_prop {CURE, 0}, {CURE_2, 0}, {REGEN, 0}, {ANTDOT, 0}, {SCAN, 0}
+; 17: kirin -- healer kit.  CURE is BASE-TIER: it folds to Cure2/Cure3 under boost
+;   via Ot6FoldTbl (ot6.asm), so the vanilla pre-folded CURE_2 grant is DROPPED --
+;   the Ramuh precedent is "grant the base tier, let boost do the tiering."  A
+;   granted Cure2 would otherwise sit as an un-foldable dead tier beside the
+;   foldable Cure (kits.md: kits list base spells only).  Regen/Antdot/Scan are in
+;   no fold family, so they are already correct as-is.
+make_genju_prop {CURE, 0}, {REGEN, 0}, {ANTDOT, 0}, {SCAN, 0}, {}
 
 ; 18: zoneseek
 make_genju_prop {RASP, 0}, {OSMOSE, 0}, {SHELL, 0}, {}, {}
