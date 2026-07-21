@@ -31,6 +31,24 @@
 --      building (that one only reaches (12,44)/(21,15)/(11,17)).  Which
 --      rooftop enters it (via 221 (30,43)/(30,22)/(35,16)) is the open
 --      question -- reached across the jump-39/33 rows and/or the crane.
+--
+-- THE DOOR-CROSSING TECHNIQUE (measured working): navTo the DOOR SOURCE
+-- tile itself with { arrive = function() return map()==<dest> end } --
+-- stepping onto a 221<->225 door tile transitions immediately (these are
+-- walk-on transitions, NOT CheckDoor walls, so no held press is needed,
+-- unlike castle doors).  navTo-to-a-NEIGHBOUR then a held press does NOT
+-- work here and wasted several runs.
+--
+-- CONFIRMED HOP CHAIN so far (all measured, each a clean crossing):
+--   arrival street (61,44)
+--     -navTo(44,48)->            225 (12,44) interior  [159-tile diagonal]
+--     -navTo(21,15) arrive 221-> 221 (49,39) rooftop   [26 tiles]
+--       this roof's only onward door is (54,35)->225(66,56) -- the NEXT
+--       building; the jump rows and Dadaluma are still hops beyond it.
+--   The (44,48) building's other exits are DEAD ((11,17)->pocket (44,42);
+--   the (12,44) side is the entrance).  A successor continues from
+--   221(49,39): cross (54,35)->225(66,56), flood, follow its onward doors,
+--   and keep hopping toward a rooftop bearing 221(30,43)/(30,22)/(35,16).
 local H = dofile("/Users/mtklein/ot6/tools/tests/lib/ot6.lua")
 local function map() return H.mapId() & 0x1ff end
 local function bright() return emu.getState()["ppu.screenBrightness"] or 0 end
