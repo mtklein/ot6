@@ -10841,11 +10841,13 @@ DrawToolsListText:
         sta     w7e5755+5       ; set 1st item id
         lda     wItemList::Index+3,y
         sta     w7e5755+11       ; set 2nd item id
-        lda     w7e6168         ; ot6: blitz mode? hand the row to bank F0, which
-        beq     :+              ;   swaps both names to AttackName ($0f) and, in
-        jsl     Ot6BlitzRowDecorate ; the priced build, stamps each MP cost after
-:       jsr     InitListTextTfr ;   the name (kept off the FULL C1 bank: one jsl)
-        jsr     DrawListText
+        lda     w7e6168         ; ot6: blitz mode? both rows hand off to bank F0.
+        bne     @blitz          ;   blitz swaps both names to AttackName ($0f) and
+        jsl     Ot6ToolRowDecorate ; real tools: stamp each MP cost (leading, before
+        bra     @tfr               ;   the name).  both decorators are unconditional
+@blitz: jsl     Ot6BlitzRowDecorate ; here -- the cost gating lives in the battle
+@tfr:   jsr     InitListTextTfr ;   object, so the shared C1 bank pays one jsl either
+        jsr     DrawListText    ;   way and nomp stays byte-identical.
         ply
         rts
 

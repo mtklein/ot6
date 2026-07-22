@@ -2724,6 +2724,62 @@ done:   plp
 
 ; ------------------------------------------------------------------------------
 
+; [ draw one Tools menu row's MP costs -- a leading 2-digit price per name ]
+;
+; DrawToolsListText (btlgfx, bank C1) jsl's here for a REAL tools row (the
+; not-blitz arm), the twin of the Ot6BlitzRowDecorate call one branch over.
+; Unlike Blitz, the vanilla tools row already draws correctly, so this shim is
+; PURE cost stamping: in the nomp battle object the OT6_MP_COSTS block below is
+; empty and the proc is a no-op that leaves the vanilla two-name layout byte for
+; byte.  ALWAYS assembled -- the shared C1 object calls it in both builds -- so
+; the flag gating lives here in the battle object, never in btlgfx.
+;
+; LAYOUT / FIT FINDING (see build/states/shots/tools_cost_display.png): the
+; tools window is two columns of 13-wide ITEM names (AutoCrossbow, NoiseBlaster,
+; ...), and those already fill the row edge to edge -- a Blitz-style cost AFTER
+; each name overflows the 32-tile screen (verified: probe_tools_2col rendered
+; the bare names reaching the right border).  A true single column would fit a
+; trailing cost but needs the tools window to SCROLL (it is a fixed 4x2 grid
+; whose max-scroll is hardwired to zero), which means re-cutting the shared
+; item/throw cursor + draw state machine -- out of proportion for a cost label.
+; So the cost goes in the row's LEADING space pair instead: the template's
+; "$05,$02 draw-two-spaces" ahead of name 1 (buffer +0/+1) and its "$ff $ff"
+; gap ahead of name 2 (+6/+7) are each exactly the two tiles ListText cmd $02
+; draws a 2-digit number into.  Same 31-tile width, all 8 tools, no re-layout;
+; the price reads immediately left of the name it belongs to.
+;
+; entry from a jsl: db=$7e, a8 on return, i16 (Ot6CostFor needs it), Y unused
+; here (the ids sit at fixed buffer offsets).  w7e5755 = $5755; the literals
+; below are its +0/+1 (cost 1), +5 (id 1), +6/+7 (cost 2), +11 (id 2).  cmd $02
+; renders a 0 as two blanks, so an empty ($ff) cell -- Ot6CostFor returns 0 for
+; an unpriced id -- draws the same clean gap the vanilla spaces did.
+.proc Ot6ToolRowDecorate
+        php
+        sep     #$20
+        .a8
+        .i16
+.if ::OT6_MP_COSTS              ; :: -- force the file-scope flag from in-proc
+        lda     $575a           ; w7e5755+5  = column-1 tool id (DrawToolsListText
+        jsl     Ot6CostFor      ;   just wrote it); id -> MP cost (0 if $ff/unpriced)
+        pha
+        lda     #$02            ; +0: number command (replaces $05 draw-spaces)
+        sta     $5755
+        pla
+        sta     $5756           ; +1: column-1 cost (replaces the space count $02)
+        lda     $5760           ; w7e5755+11 = column-2 tool id
+        jsl     Ot6CostFor
+        pha
+        lda     #$02            ; +6: number command (replaces the $ff gap space)
+        sta     $575b
+        pla
+        sta     $575c           ; +7: column-2 cost (replaces the $ff gap space)
+.endif
+        plp
+        rtl
+.endproc
+
+; ------------------------------------------------------------------------------
+
 ; [ boost the base damage of a boosted character action ]
 
 ; called at the tail of the physical and magic base-damage calcs.

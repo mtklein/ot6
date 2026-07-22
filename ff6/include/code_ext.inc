@@ -25,6 +25,11 @@ CODE_EXT_INC = 1
                                  ;   (name->$0f swap always; MP cost only under
                                  ;   OT6_MP_COSTS). ALWAYS defined -- the stock C1
                                  ;   btlgfx object jsl's it in both builds.
+.global Ot6ToolRowDecorate       ; menu-bank: DrawToolsListText's real-tools row
+                                 ;   shim -- a leading MP cost before each tool
+                                 ;   name (cost only under OT6_MP_COSTS; a no-op
+                                 ;   otherwise). ALWAYS defined -- the shared C1
+                                 ;   btlgfx object jsl's it in both builds.
 .global Ot6AbilityCost           ; v0.4 mp-cost hook (only defined/referenced
                                  ;   under OT6_MP_COSTS; a weak decl otherwise)
 .global Ot6CostFor               ; pure leaf: attack/tool id in A -> MP cost in A
