@@ -132,21 +132,37 @@ replace '?' cells and persist in the SRAM codex, shielded resistance
 ×0.5 off-weakness (Ot6ShieldedDmg, finalized 0.5x), BP open 1 / +1 per
 turn / cap 5 / spend ≤3 (Ot6InitBP, Ot6ActionEnd, Ot6Boost), no regen
 on a boosted turn (Ot6ActionEnd), folds per Ot6FoldTbl with base-tier
-MP (Ot6QueueFold), live list re-fold (Ot6PreviewList_ext). The seed pays off with
-Edgar's Bio Blaster ("tool" is the wink) without naming it.
+MP (Ot6QueueFold), live list re-fold (Ot6PreviewList_ext).
 
-**The rung-2 seed is now backed by data.** When $0276 shipped, the
-"armored machines" it describes could not answer it — M-TekArmor was
-bolt-weak, HeavyArmor bolt|water, and Leader and Grunt had no weakness
-at all, so against the camp's own foot soldiers the advisor was simply
-wrong. Four `Ot6ElemAddTbl` rows give the line poison (`$08`, Bio
-Blaster's element), keeping every vanilla bit; the decode, the story
-locations and the reasoning for what was *not* authored are in
-bosses-wob.md, "The armor line — the school's one right tool". Two
-cautions for anyone writing to this seed: the Phantom Train **absorbs**
-poison, boss and chest monster alike, and the seed's own room is two
-scenarios away from Edgar — the tool is real, but the player meets the
-armor before they can always answer it.
+**⚠ The rung-2 seed ($0276) is now contradicted by the mechanics, and
+the dialog wants a rewrite.** When $0276 shipped, the "armored machines"
+it describes could not answer it, so v0.3 gave the imperial line poison
+(Bio Blaster's element) and the seed read true. The **v0.6
+break-coverage pass retired that framing.** A fixed-party audit found
+poison is Edgar-only, and the parties that fight the imperial line — Cyan
+solo at Doma, all of Sabin's scenario, Locke solo, two of three Narshe
+squads — carry no Edgar, so "one right tool = poison" left the line
+**unbreakable by its own forced parties.** The fix moved the line onto
+**weapon-class** weaknesses (pierce/slash/bludg, per the party). So the
+seed's two promises are now false:
+
+- "their armored machines **shrug off blade**…" — false: a precise blade
+  (pierce), and the samurai's cut (slash), are exactly the answer.
+- "Every armor fears **one right tool**" — false: there are several,
+  chosen per enemy; poison is one Edgar option among them, and Leader and
+  Grunt no longer have poison at all.
+
+Full scheme and rationale: bosses-wob.md, "The imperial soldier line."
+
+**The dialog itself was NOT changed by the break pass** — $0276 is a
+story/dialog line, and this doc's fence (above) makes such an edit its
+own sanctioned change, not a rider on a data pass. The seed is left stale
+and flagged: a rewrite is owed, and it should now teach *match the tool
+to the foe* (the general break lesson $0264 already gestures at this)
+rather than *one tool fits all armor*. Until then `school.lua` still
+asserts the old $0276 bytes, so the stale line stays pinned, not
+drifting — and this note is the pointer for whoever takes the school's
+sanction next.
 
 ## Kept vanilla (lesson still true)
 

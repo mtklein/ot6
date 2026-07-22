@@ -318,9 +318,11 @@ dropped vanilla's bolt bit and never mentioned the absorb at all.)
   but it needs writing down where an author will hit it. Edgar's Bio
   Blaster is poison: the Throw/Tools table maps item `$a4` to spell
   `$7d` (battle_main.asm:6577) and that spell's element byte is `$08`.
-  The Narshe school's rung-2 seed now teases exactly that tool as the
-  answer to armored things ("Every armor fears one right tool",
-  narshe-school.md). Point it at this boss and vanilla's absorb branch
+  The Narshe school's rung-2 seed still teases that tool as the answer to
+  armored things ("Every armor fears one right tool", narshe-school.md) —
+  a framing the v0.6 break pass retired (see "The imperial soldier line"),
+  but the poison-heal trap here is vanilla and stands regardless. Point
+  Bio Blaster at this boss and vanilla's absorb branch
   flips the damage sign and jumps clear past the weakness branch where
   the shield chip lives (battle_main.asm:1850, chip at :1872): the hit
   heals the train *and* chips nothing. Nothing is broken today —
@@ -368,9 +370,12 @@ Party: all seven, three squads on the snowfield.
 no weakness of any kind — so `Ot6ElemAddTbl` carries `$09` (poison|fire)
 outright; +$2957/+$2958 are both `$00`, so nothing is absorbed or
 nulled. The 6 shields and the two classes were already in
-`Ot6ShieldTbl`. This is the v0.3 stop line: with the row in, the
-snowfield's waves and the clown at the end of them answer to the same
-poison key the school sold in Narshe.
+`Ot6ShieldTbl`. Kefka himself stays **wide** — poison|fire + piercing,
+slashing — so any squad you route to him can break him. His **waves**
+(Trooper, HeavyArmor, Rider) used to lean on the same poison the school
+sold, which only the Edgar squad could cast; the v0.6 pass gave them
+slash\|pierce class rows so every player-assigned squad has a key (see
+"The imperial soldier line" below).
 
 - **Telegraph:** he giggles and frost crawls the ground → **Ice 2**
   across the engaged squad.
@@ -383,62 +388,122 @@ poison key the school sold in Narshe.
 - **Jank:** the strategy layer stays untouched, and his spell list
   stays court-mage petty. He hasn't eaten any gods yet.
 
-## The armor line — the school's one right tool
+## The imperial soldier line — every party gets a key
 
 Not bosses, but authored here because this is where the weakness data
-lives. The Narshe school's rung-2 seed promises that "their armored
-machines shrug off blade and fire alike… Every armor fears one right
-tool" (narshe-school.md:119-121). That line shipped before any enemy
-could answer it. Four species make it true, each gaining **poison**
-(`$08`) in `Ot6ElemAddTbl` — Edgar's Bio Blaster, item `$a4` → attack
-`$7d`, element `$08`:
+lives, and because the **v0.6 break-coverage pass rewrote the whole
+idea.** (This section replaces the old "one right tool" writeup, kept in
+git history.)
 
-| species | id | weak byte (+25) | vanilla | authored add | result |
-|---|---|---|---|---|---|
-| M-TekArmor | `$0042` | +$0859 | `$04` bolt | `$08` | `$0c` bolt\|poison |
-| HeavyArmor | `$009F` | +$13f9 | `$84` bolt\|water | `$08` | `$8c` bolt\|poison\|water |
-| Leader | `$014E` | +$29d9 | `$00` — | `$08` | `$08` poison |
-| Grunt | `$014F` | +$29f9 | `$00` — | `$08` | `$08` poison |
+**The doctrine that was.** The Narshe school's rung-2 seed promised "their
+armored machines shrug off blade and fire alike… Every armor fears one
+right tool" (narshe-school.md), the tool being Edgar's Bio Blaster
+(poison, `$08`). Four species got a poison `Ot6ElemAddTbl` add so the
+seed would not be a lie. It made **poison the sole key to the imperial
+line.**
 
-Vanilla's bits are kept, per the ✦ rule at the top of this doc — the
-add is an `ora` into the loaded weak byte, never a replacement. All
-four read `$00` at +23/+24, so none of them absorbs or nulls poison.
+**Why that broke.** The fixed-party audit walked every forced section and
+found the hole: **the parties that actually fight this line carry no
+Edgar, so no poison.** Cyan's solo Doma duel is slash-only; Sabin's whole
+scenario has no poison; Locke solo in occupied South Figaro is
+pierce-only; the Narshe defense is a player-assigned 3-way split where at
+most one squad holds Edgar. So "one right tool = poison" left the
+imperial line **unbreakable by the exact party the game hands you.**
 
-Leader and Grunt are the finding that justifies the pass: they had **no
-weakness of any kind**, so for the Imperial Camp's own foot soldiers the
-school's line was not merely unpaid, it was false — an ungaugeable wall
-where the tutorial promised a key. They are `battle 13`/`14`
-(event_main.asm:41221, :41452, formations 59/60/63); M-TekArmor is the
-camp's machine (`battle 15`/`16`/`17`, formations 25/27/34) and the
-desert chase (`battle 65`); HeavyArmor is South Figaro's guards
-(`battle 11`, TOWN_EXT, event_main.asm:20344).
+**The fix: a weapon class, chosen per the forced party.** Poison is no
+longer special — it is one Edgar-reachable key among several. Each
+species gets an `Ot6ShieldTbl` row whose class *every party that fights
+it* can reach:
 
-**Where it pays off loudest:** formation 88 — Trooper + HeavyArmor — is
-a Narshe defense wave (`battle 23`, event_main.asm:108505). The Troopers
-were *already* poison-weak in vanilla (`$0065` +$0cb9 = `$08`; Riders
-`$003F` +$07f9 = `$09` fire|poison), so with HeavyArmor's row in, the
-entire wave and the Kefka at the end of it open to one tool. **No rows
-authored for Trooper or Rider** — vanilla already agrees, and a
-redundant add would be a no-op `ora` that misreports who authored what.
-Same verdict Marshal and Dadaluma got in the Q7 audit.
+| species | id | shields · class | forced party → its key | thematic |
+|---|---|---|---|---|
+| Soldier | `$0001` | 2 · slash\|pierce | Cyan duel (slash) · Sabin+Shadow camp `b44` (Shadow pierce) | cut, or seam |
+| Templar | `$0002` | 3 · pierce (+bolt) | Sabin+Shadow camp `b44` (Shadow throw / Bolt Edge) | elite plate; blade in the gap, metal conducts |
+| Leader | `$014E` | 3 · slash | Cyan SOLO Doma duel `b46` | the samurai out-cuts the commander |
+| Grunt | `$014F` | 2 · slash\|bludg | Doma defense `b13` (Cyan slash + Sabin bludg) | two heroes overwhelm a footman |
+| Cadet | `$0176` | 3 · slash\|bludg | Doma defense `b14` (same two) | ditto, a bigger body |
+| Officer | `$0175` | 2 · pierce | Locke SOLO S.Figaro `b9` | the thief's dagger finds the seam |
+| Trooper | `$0065` | 2 · slash\|pierce | Narshe waves — any squad | slash for Cyan/Sabin, pierce for Locke/Gau |
+| Rider | `$003F` | 3 · slash\|pierce | Narshe waves — any squad | ditto (fire still breaks it on the train) |
+| HeavyArmor | `$009F` | 3 · slash\|pierce | Locke SOLO `b11` (pierce) + Narshe wave (slash) | heavy plate; a blade at the seams |
 
-**No `Ot6ShieldTbl` rows for the armor line either**, deliberately. Two
-reasons. First, the formula already gives them sane counts (M-TekArmor
-3, HeavyArmor 3, Grunt 3, Leader 3 at levels 8/13/12/12) and this doc
-specs no shields for trash that isn't a boss's escort. Second and
-stronger: **authoring a shield row exempts a species from `Ot6HpScale`**
-(ot6.asm, the `Ot6ShieldTbl` scan in the HP transform). That exemption
-is inert today — every HP band ships 1× — but the armor line is exactly
-the population HP tuning will want when it reopens: common imperial
-trash spanning three scenarios. Taking a shield row now would quietly
-carve a hole in that surface for no benefit, since the element add
-works from its own table on its own scan. Leaving them formula-fed
-costs nothing and keeps them tunable.
+Shields track the early-war band (2 basic infantry, 3 for the elite /
+heavier / duel bodies). **Class chips ignore absorb/null**, so
+HeavyArmor's vanilla water-absorb and everyone's stray element bits never
+sour the break — the class is a clean, always-legal key.
 
-And the fiction agrees with the restraint: the school promises *one*
-right tool. Giving the armor line a weapon-class weakness as well would
-hand the player two, and dilute the one lesson the seed was written to
-teach.
+**The palette (owner's taste).** Armored soldiers read as **pierce** (a
+blade finds the gaps) with **lightning** where a party can conduct it:
+the machines (M-TekArmor, HeavyArmor) are natively bolt-weak in vanilla,
+and Templar gains bolt (`$04`) here for Shadow's Bolt Edge at the camp.
+The Cyan SOLO duel is **slash** — the samurai out-cuts them, and it reads
+as a swordfight. Sabin's brawls add **bludg** — a monk caves the plate.
+Deliberately *varied*, not a blanket row: the key is whichever hero is
+standing in front of the enemy.
+
+**Element table, after the pass.** M-TekArmor and HeavyArmor keep their
+poison adds — a party that fights them can cast it (Shadow's bolt at the
+camp; Edgar at the Narshe waves), on top of vanilla bolt. **Leader and
+Grunt lost their poison adds**: those were the pure "one tool" artifacts,
+the two species with *no* vanilla weakness at all, and poison is
+unreachable in both their forced fights (a solo duel; a Cyan+Sabin
+defense), so the add was dead data that also drew an unresolvable `?` on
+a fight the class row already answers. Templar's row verified `$00/$00`
+at +$17/+$18 before authoring, the same discipline the rest of the table
+holds to.
+
+**Trooper and Rider are the reversal worth naming.** The old writeup left
+them element-only ("vanilla already agrees, no row needed") because they
+are poison-weak in vanilla. But the Narshe defense is *semi-free* —
+squads are player-assigned, and a Cyan+Sabin or Locke+Gau squad reaches
+neither poison nor any vanilla element on these bodies. So v0.6 gives
+both a slash\|pierce class row: vanilla poison stays the Edgar squad's
+key, the class is every other squad's. Formation 88 (Trooper+HeavyArmor,
+`battle 23`, event_main.asm:108505) now opens to whatever a squad holds,
+not to Edgar alone.
+
+**M-TekArmor gets no new row** — it is already breakable by the party
+that fights it (Shadow's Bolt Edge / the Magitek bolt beam at the camp),
+so it was never a gap; it carries the bolt half of the palette natively.
+
+**⚠ The school seed is now contradicted, by design.** The rung-2 dialog
+($0276) still says the armor "shrugs off blade" and fears "one right
+tool." The new fiction inverts both — a precise blade *is* the answer
+(pierce/slash), and there are several tools, not one. The class rows are
+the mechanic; the shipped dialog is stale and wants a rewrite under the
+school's own story/dialog sanction (narshe-school.md's fence). Flagged
+here and in that doc; **not** edited in this pass — a dialog change is out
+of scope for a data/break pass.
+
+**The one place theme bent to coverage.** The palette's default for
+armored soldiers is pierce+bolt, but the Doma courtyard defense party
+(Sabin bludg + Cyan slash) can cast *neither* pierce nor bolt. Grunt and
+Cadet therefore take slash\|bludg rather than the default — the owner's
+"Sabin's brawls are bludgeon" rule is exactly the escape hatch. Called
+out so a future author doesn't "correct" them back to pierce and re-open
+the gap.
+
+## The Serpent Trench — three aquatics, three keys
+
+Sabin + Cyan + Gau ride the trench (`battle 19`/`20`/`21`, UNDERWATER,
+event_main.asm:21194+; the party is placed together at the ride's entry
+`_ca8ae3`). Their melee ring is **bludg** (Sabin), **slash** (Cyan) and
+**pierce** (Gau's Hardened). Every trench aquatic was a formula species
+whose vanilla element the party can't reach — Anguiform is bolt-only (no
+bolt in the party) and Actaneon/Aspik are fire-weak but Sabin's Fire
+Dance is L15-gated — and all three **absorb water**, so a careless
+element add would heal them. Class is the clean answer, and the trio's
+three keys map one-to-one onto the three creatures:
+
+| species | id | shields · class | thematic |
+|---|---|---|---|
+| Anguiform | `$003A` | 2 · slash | a slippery eel, cut by Cyan's blade |
+| Actaneon | `$005E` | 2 · bludg | a shelled crustacean, cracked by Sabin's fists |
+| Aspik | `$0059` | 2 · pierce | a coiled asp, punctured by Gau's fanged strike |
+
+Vanilla bits are kept (dead or level-gated for this party, live for a
+later party that carries the element); class chips ignore the
+water-absorb.
 
 ## Zozo
 
