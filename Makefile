@@ -639,6 +639,16 @@ FRONTIER += figaro_submerged zozo_arrival zozo_clock_solved \
 build/states/opera_doorstep.mss.lua: build/states/zozo_done.mss.lua
 	$(call mint,opera_doorstep,gen_opera1_doorstep)
 FRONTIER += opera_doorstep
+# gen_opera2_open: opera_doorstep -> DRIVE the opera-open cutscene chain on map
+# 209 (talk _ca9337 -> the letter $0331 -> the Setzer intro + name_menu ->
+# $0340=1, the opera opens) -> travel 209 -> Jidoor (198, its south edge exits
+# to world {27,132}) -> world -> the OPERA HOUSE (map 237, world {45,154}) ->
+# parked at {60,49} below the now-VISIBLE IMPRESARIO ({60,48}, _caae15).  Mints
+# opera_open, one A-press from the performance (the aria).  The name_menu and
+# every TEXT_ONLY page ride on a hasControl-gated A/START stall fallback.
+build/states/opera_open.mss.lua: build/states/opera_doorstep.mss.lua
+	$(call mint,opera_open,gen_opera2_open)
+FRONTIER += opera_open
 
 frontier: rom $(STATE1) $(STATE2) $(STATE3) \
           $(patsubst %,build/states/%.mss.lua,$(FRONTIER))
