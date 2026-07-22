@@ -2220,6 +2220,70 @@ Ot6AbilityCostTbl:
         .byte   $ff
 
 ; ------------------------------------------------------------------------------
+
+; [ grey a menu row the active caster cannot afford -- magic's grey-out ported ]
+;
+; vanilla magic greys an unaffordable spell: UpdateEnabledMagic compares each
+; spell's MP cost to the caster's current MP, and DrawMagicListText's
+; GetTextColor turns the "can't pay" answer into $04, OR'd into the row's $21
+; white font-palette byte to make $25 (grey).  Blitz and Tools draw through the
+; tools-window shell, never the magic list, so they never inherited that
+; machinery -- this is it, in the menu bank.  Given a row's MP cost in A it
+; returns the SAME $04/$00 magic OR's in: $04 (grey the row) when the active
+; caster cannot pay, $00 (leave it white) when they can -- the decorator OR's
+; it straight into the ListText $21 white palette byte, exactly as GetTextColor
+; feeds `ora w7e5755+3`.  The caster is $62ca (the active slot DrawMagicListText
+; itself indexes by) and its live MP is $3c08,slot*2 -- the very cell
+; CalcAttackEffect's universal charge later subtracts from, so the menu greys
+; precisely what the charge would refuse.  A 0 cost (an empty pad cell, or an
+; unpriced id Ot6CostFor returned 0 for) is always affordable, so a blank row
+; never greys.
+;
+; SCOPE: this ports the VISUAL half of magic's affordance (grey the row).  The
+; other half -- magic's `lda $2093,x / bmi` at the A-button that no-ops the
+; confirm on a disabled spell (btlgfx UpdateMenuState_3b @81ae) -- would live in
+; the tools/blitz confirm (UpdateMenuState_3c @8809).  That is btlgfx (bank C1),
+; a STOCK object linked into BOTH the shipped and the nomp ROM (only the battle
+; object is rebuilt per-flag), so a confirm gate there would shift the nomp
+; baseline byte-for-byte -- the one thing this flag must never do.  So the block
+; stays where it already is and costs no bytes: CalcAttackEffect's universal
+; insufficient-MP fizzle refuses the cast at execution (MP is never overspent,
+; battle_mpcost.lua's REFUSAL half), and the unmistakable grey tells the player
+; before they get there.  If the block ever moves menu-side, it belongs beside
+; @8809 gated on this same Ot6AbilityGrey answer.
+;
+; a8/i16, db=$7e (the decorators' bank; $3c08/$62ca are $7e battle RAM).  in:
+; A = MP cost.  out: A = $00 (white) | $04 (grey).  preserves X and Y -- the
+; blitz decorator indexes Qty,y across the call, and both keep their buffer
+; pointers.  rtl (jsl), the twin entry-shape of Ot6CostFor beside it.
+.proc Ot6AbilityGrey
+        .a8
+        .i16
+        phx
+        pha                     ; park the 8-bit cost at $01,s
+        lda     $62ca           ; active caster slot (magic's own draw index)
+        longa
+        and     #$0003
+        asl                     ; slot -> entity offset (stride 2: chars 0/2/4/6)
+        tax
+        shorta                  ; back to 8-bit A (reloaded next, so no clr)
+        lda     $3c09,x         ; current MP, high byte
+        bne     @afford         ; >= 256 MP: nothing in a kit costs that much
+        lda     $3c08,x         ; current MP, low byte
+        cmp     $01,s           ; MP - cost: C SET iff MP >= cost (affordable)
+        bcs     @afford
+        pla                     ; can't pay -- drop the parked cost
+        plx
+        lda     #$04            ; the disabled bit ($21 | $04 = $25 grey)
+        rtl
+@afford:
+        pla
+        plx
+        lda     #$00            ; stays $21 white
+        rtl
+.endproc
+
+; ------------------------------------------------------------------------------
 .endif   ; OT6_MP_COSTS
 ; ------------------------------------------------------------------------------
 
@@ -2695,6 +2759,13 @@ done:   plp
         ; it, a gap space, then column 2's name and its own cost. ListText cmd
         ; $02 draws two digits with a blank tens-place, so a 0 cost (a padded
         ; empty cell, Qty pre-zeroed) renders as two blanks -- a clean gap.
+        ; The $04,$21 font at +2/+3 (rode in from the copied template) colors the
+        ; column-1 name AND its trailing cost together; grey that byte when the
+        ; caster can't afford the row, the twin of magic greying spell+MP as one.
+        lda     $4006,y         ; wItemList::Qty,y     (column-1 cost)
+        jsl     Ot6AbilityGrey  ; -> $04 grey / $00 white; preserves X and Y
+        ora     $5758           ; +3   column-1 font palette: $21 -> $21/$25
+        sta     $5758
         lda     #$02
         sta     $575b           ; +6   number command      (column-1 cost)
         lda     $4006,y         ; wItemList::Qty,y         (column-1 cost value)
@@ -2703,8 +2774,10 @@ done:   plp
         sta     $575d           ; +8   space between the columns
         lda     #$04
         sta     $575e           ; +9   set-font command
-        lda     #$21
-        sta     $575f           ; +10  white
+        lda     $4009,y         ; column-2 cost -- grey column 2's font the same
+        jsl     Ot6AbilityGrey  ;   way; +9/+10 colors column-2's name AND cost
+        ora     #$21            ; +10  font palette: $21 white or $25 grey
+        sta     $575f
         lda     #$0f
         sta     $5760           ; +11  name command         (column 2)
         lda     $4008,y         ; wItemList::Index+3,y     (column-2 id, moved)
@@ -2724,15 +2797,18 @@ done:   plp
 
 ; ------------------------------------------------------------------------------
 
-; [ draw one Tools menu row's MP costs -- a leading 2-digit price per name ]
+; [ draw one Tools menu row -- a leading 2-digit price per name, greyed if
+;   the caster can't afford it ]
 ;
 ; DrawToolsListText (btlgfx, bank C1) jsl's here for a REAL tools row (the
 ; not-blitz arm), the twin of the Ot6BlitzRowDecorate call one branch over.
-; Unlike Blitz, the vanilla tools row already draws correctly, so this shim is
-; PURE cost stamping: in the nomp battle object the OT6_MP_COSTS block below is
-; empty and the proc is a no-op that leaves the vanilla two-name layout byte for
-; byte.  ALWAYS assembled -- the shared C1 object calls it in both builds -- so
-; the flag gating lives here in the battle object, never in btlgfx.
+; Unlike Blitz, the vanilla tools row already draws correctly, so this shim
+; only stamps each tool's MP cost and greys the pair (name + price) the caster
+; cannot pay for -- Ot6AbilityGrey, the same $21->$25 magic uses.  In the nomp
+; battle object the OT6_MP_COSTS block below is empty and the proc is a no-op
+; that leaves the vanilla two-name layout byte for byte.  ALWAYS assembled --
+; the shared C1 object calls it in both builds -- so the flag gating lives here
+; in the battle object, never in btlgfx.
 ;
 ; LAYOUT / FIT FINDING (see build/states/shots/tools_cost_display.png): the
 ; tools window is two columns of 13-wide ITEM names (AutoCrossbow, NoiseBlaster,
@@ -2742,37 +2818,61 @@ done:   plp
 ; trailing cost but needs the tools window to SCROLL (it is a fixed 4x2 grid
 ; whose max-scroll is hardwired to zero), which means re-cutting the shared
 ; item/throw cursor + draw state machine -- out of proportion for a cost label.
-; So the cost goes in the row's LEADING space pair instead: the template's
-; "$05,$02 draw-two-spaces" ahead of name 1 (buffer +0/+1) and its "$ff $ff"
-; gap ahead of name 2 (+6/+7) are each exactly the two tiles ListText cmd $02
-; draws a 2-digit number into.  Same 31-tile width, all 8 tools, no re-layout;
-; the price reads immediately left of the name it belongs to.
+; So the cost goes in the row's LEADING pair instead, and each column is laid
+; out [font][cost][name] so its one font command colors the price and the name
+; as a unit (what greying needs).  The template's "$05,$02 draw-two-spaces"
+; ahead of name 1 (buffer +0/+1) and its "$ff $ff" gap ahead of name 2 (+6/+7)
+; become the two font commands; the two costs move to +2/+3 and +8/+9 (the old
+; font slots).  A $04 font command draws nothing, so the price still lands on
+; the same two tiles immediately left of its name: same 31-tile width, all 8
+; tools, no re-layout.
 ;
-; entry from a jsl: db=$7e, a8 on return, i16 (Ot6CostFor needs it), Y unused
-; here (the ids sit at fixed buffer offsets).  w7e5755 = $5755; the literals
-; below are its +0/+1 (cost 1), +5 (id 1), +6/+7 (cost 2), +11 (id 2).  cmd $02
-; renders a 0 as two blanks, so an empty ($ff) cell -- Ot6CostFor returns 0 for
-; an unpriced id -- draws the same clean gap the vanilla spaces did.
+; entry from a jsl: db=$7e, a8 on return, i16 (Ot6CostFor / Ot6AbilityGrey need
+; it), Y unused here (the ids sit at fixed buffer offsets).  w7e5755 = $5755;
+; the literals below are its +5 (id 1) and +11 (id 2), with font/cost stamped at
+; +0..+3 and +6..+9.  cmd $02 renders a 0 as two blanks, so an empty ($ff) cell
+; -- Ot6CostFor returns 0 for an unpriced id -- draws the same clean gap the
+; vanilla spaces did, and Ot6AbilityGrey leaves a 0-cost cell white.
 .proc Ot6ToolRowDecorate
         php
         sep     #$20
         .a8
         .i16
 .if ::OT6_MP_COSTS              ; :: -- force the file-scope flag from in-proc
-        lda     $575a           ; w7e5755+5  = column-1 tool id (DrawToolsListText
-        jsl     Ot6CostFor      ;   just wrote it); id -> MP cost (0 if $ff/unpriced)
-        pha
-        lda     #$02            ; +0: number command (replaces $05 draw-spaces)
-        sta     $5755
+        ; Reorder each column to [font][cost][name] so ONE font command colors a
+        ; tool's price AND its name.  The just-landed price display put the cost
+        ; tile BEFORE the column's font command, so greying the font (to match
+        ; magic) could not reach the number; sliding the font ahead of the cost
+        ; fixes it at no cost in width -- a $04 font command draws nothing, so
+        ; the price still sits on the same two tiles immediately left of its
+        ; name.  Column 1: font -> +0/+1 (was the $05,$02 draw-spaces), cost ->
+        ; +2/+3 (was the $04,$21 font).  Column 2: font -> +6/+7 (was the $ff,$ff
+        ; column gap), cost -> +8/+9 (was the second $04,$21 font).  The name
+        ; commands (+4,+10) and their ids (+5,+11, DrawToolsListText's) stay put.
+        lda     $575a           ; +5 = column-1 tool id (DrawToolsListText wrote it)
+        jsl     Ot6CostFor      ;   id -> MP cost (0 if $ff/unpriced)
+        pha                     ; park column-1 cost
+        jsl     Ot6AbilityGrey  ;   cost -> $04 grey / $00 white; preserves X,Y
+        ora     #$21            ; +1: font palette -- $21 white or $25 grey
+        sta     $5756
+        lda     #$04
+        sta     $5755           ; +0: font command (colors column-1 cost + name)
+        lda     #$02
+        sta     $5757           ; +2: number command (column-1 cost)
         pla
-        sta     $5756           ; +1: column-1 cost (replaces the space count $02)
-        lda     $5760           ; w7e5755+11 = column-2 tool id
+        sta     $5758           ; +3: column-1 cost value
+        lda     $5760           ; +11 = column-2 tool id
         jsl     Ot6CostFor
-        pha
-        lda     #$02            ; +6: number command (replaces the $ff gap space)
-        sta     $575b
+        pha                     ; park column-2 cost
+        jsl     Ot6AbilityGrey
+        ora     #$21            ; +7: font palette -- $21 white or $25 grey
+        sta     $575c
+        lda     #$04
+        sta     $575b           ; +6: font command (colors column-2 cost + name)
+        lda     #$02
+        sta     $575d           ; +8: number command (column-2 cost)
         pla
-        sta     $575c           ; +7: column-2 cost (replaces the $ff gap space)
+        sta     $575e           ; +9: column-2 cost value
 .endif
         plp
         rtl
