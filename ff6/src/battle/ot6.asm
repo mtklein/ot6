@@ -176,26 +176,42 @@ done:   rtl
 ; spell data), so this row is the whole remaining distance. proven at
 ; runtime by battle_vargas.lua.
 ;
-; the v0.3 arc adds six more. four of them are the ARMOR LINE, and they
-; exist to make one piece of dialog true: the narshe school's rung-2
-; seed promises "their armored machines shrug off blade and fire alike
-; ... every armor fears one right tool" (narshe-school.md:119-121), and
-; the tool is edgar's bio blaster (item $a4 -> attack $7d, element $08
-; poison -- battle_main.asm:6577). the seed was shipped before the
-; enemies it describes could answer it. decoded fresh from
-; monster_prop.dat at species*32 +$19 (weak; the offset is vanilla's own
-; -- battle_main.asm:7517 loads MonsterProp+25), each row keeping every
-; vanilla bit and adding poison:
+; the v0.3 arc added ARMOR-LINE rows here under a doctrine the v0.6
+; break-coverage pass has since RETIRED. the doctrine was the narshe
+; school's rung-2 seed: "their armored machines shrug off blade and fire
+; alike ... every armor fears one right tool" (narshe-school.md:119-121),
+; the tool being edgar's bio blaster (item $a4 -> attack $7d, element $08
+; poison -- battle_main.asm:6577). that made POISON the sole key to the
+; imperial line, and the fixed-party audit found the hole: the forced
+; parties that fight this line -- Cyan solo at Doma, Sabin's whole
+; scenario, Locke solo in South Figaro, two of the three Narshe squads --
+; carry no Edgar and so no poison, and could not break armored trash at
+; all. v0.6 moves the SOLDIER LINE onto weapon-CLASS rows in Ot6ShieldTbl
+; (pierce/slash/bludg, chosen per the party that actually fights each --
+; the decode and rationale live there and in bosses-wob.md). poison is
+; now one Edgar key among several, not the one; the school's "shrug off
+; blade / one right tool" seed is contradicted by the new fiction ("a
+; blade finds the gaps") and wants a dialog revision under the school's
+; own sanction -- flagged, not touched here.
 ;
-;   $042 m-tekarmor  +$0859  vanilla $04 bolt        -> $0c
-;   $09f heavyarmor  +$13f9  vanilla $84 bolt|water  -> $8c
-;   $14e leader      +$29d9  vanilla $00 none        -> $08
-;   $14f grunt       +$29f9  vanilla $00 none        -> $08
+; what REMAINS poison-keyed in this table are the two MACHINES, where a
+; party that fights them can actually cast it, each row keeping every
+; vanilla bit (decoded from monster_prop.dat at species*32 +$19; the
+; offset is vanilla's own -- battle_main.asm:7517 loads MonsterProp+25):
 ;
-; note the two that read $00: leader and grunt had NO weakness of any
-; kind, so the school's line was not merely unfulfilled for them, it was
-; false -- an unbreakable gauge on the imperial camp's own foot soldiers
-; (battle 13/14 -> formations 59/60/63, event_main.asm:41221 etc).
+;   $042 m-tekarmor  +$0859  vanilla $04 bolt        -> $0c bolt|poison
+;   $09f heavyarmor  +$13f9  vanilla $84 bolt|water  -> $8c (+ slash|pierce
+;                            class in Ot6ShieldTbl)
+;   $002 templar     +$0059  vanilla $08 poison      -> $0c bolt|poison
+;                            (+bolt: metal conducts, Shadow's Bolt Edge;
+;                            + a pierce class row in Ot6ShieldTbl)
+;
+; leader ($14e) and grunt ($14f) had poison ADDS here in v0.3 -- they had
+; no vanilla weakness of any kind, so poison was their only gauge -- and
+; v0.6 REMOVED both: their forced fights (Cyan's solo duel; Cyan+Sabin's
+; Doma courtyard defense) carry no poison, so the add was dead data that
+; also drew an unresolvable '?' on a swordfight. both are class-keyed now
+; (leader slash; grunt slash|bludg -- Ot6ShieldTbl).
 ;
 ; and two boss rows bosses-wob.md already specified but m6 never entered:
 ;
@@ -210,11 +226,11 @@ done:   rtl
 ; locke+celes duo, so without the add the fight's only element chip is
 ; nothing at all (bosses-wob.md "5. TunnelArmor").
 ;
-; ALL SIX were checked against +$17 (absorb) and +$18 (null) before
-; authoring; every one reads $00/$00, so no row here puts a chip trigger
-; on an absorber. that check is not ceremony -- it is the exact error
-; bosses-wob.md caught twice in draft (nerapa listed fire, which it
-; absorbs; the cranes' absorb pair was read as their weak pair).
+; EVERY row here was checked against +$17 (absorb) and +$18 (null) before
+; authoring; every one reads $00/$00 (templar included), so no row here
+; puts a chip trigger on an absorber. that check is not ceremony -- it is
+; the exact error bosses-wob.md caught twice in draft (nerapa listed fire,
+; which it absorbs; the cranes' absorb pair was read as their weak pair).
 ;
 ; ---- the v0.3 TRASH pass: six rows that make the break happen ----
 ;
@@ -293,10 +309,14 @@ done:   rtl
 ;
 ; deliberately NOT authored, so the next author does not re-litigate:
 ;   - trooper ($065, +$0cb9 = $08) and rider ($03f, +$07f9 = $09) are
-;     already poison-weak in VANILLA. the narshe defense waves need
-;     nothing; formation 88 is trooper+heavyarmor, so with the armor row
-;     above the whole wave answers to the one tool. an add here would be
-;     a no-op ora that lies about who authored it.
+;     already poison-weak in VANILLA, so no ELEMENT add is authored for
+;     them. but v0.6 DID give both a slash|pierce CLASS row (Ot6ShieldTbl):
+;     the Narshe defense is a player-assigned 3-way split, and the squads
+;     without Edgar (e.g. Cyan+Sabin, Locke+Gau) reach neither poison nor
+;     any vanilla element on these bodies -- only a weapon class. vanilla
+;     poison stays the Edgar-squad's key; the class row is every other
+;     squad's. formation 88 (trooper+heavyarmor) now opens to whatever a
+;     squad holds, not to Edgar alone.
 ;   - specter ($156) ABSORBS poison (+$2ad7 = $08) and is fire|holy weak
 ;     (+$2ad9 = $21). it is a monster-in-a-box on the phantom train (map
 ;     153, treasure 114 -> event battle group 34 -> formation 476) --
@@ -365,16 +385,20 @@ Ot6ElemAddTbl:
         .byte   $01, $00        ; whelk head: + fire (the tutorial probe)
         .word   $0103
         .byte   $20, $00        ; vargas: + holy (sabin's aurabolt)
-        ; the armor line -- the narshe school's rung-2 seed made true.
-        ; one tool (bio blaster, poison) opens every armored machine.
+        ; the armor line -- v0.6 break-coverage pass (block comment above).
+        ; the soldier line is CLASS-keyed now (Ot6ShieldTbl); what stays
+        ; here is poison on the two MACHINES plus templar's conducting bolt.
         .word   $0042
-        .byte   $08, $00        ; m-tekarmor: + poison (keeps bolt)
+        .byte   $08, $00        ; m-tekarmor: + poison (keeps bolt; Shadow's
+                                ;   Bolt Edge is the live camp key)
         .word   $009f
-        .byte   $08, $00        ; heavyarmor: + poison (keeps bolt|water)
-        .word   $014e
-        .byte   $08, $00        ; leader: + poison (vanilla had none)
-        .word   $014f
-        .byte   $08, $00        ; grunt: + poison (vanilla had none)
+        .byte   $08, $00        ; heavyarmor: + poison (keeps bolt|water;
+                                ;   Edgar's key at the Narshe waves. ALSO a
+                                ;   slash|pierce class row -- Ot6ShieldTbl)
+        .word   $0002
+        .byte   $04, $00        ; templar: + bolt (vanilla $08 poison ->
+                                ;   $0c bolt|poison; metal conducts, Shadow's
+                                ;   Bolt Edge. ALSO a pierce class row)
         ; the arc's stop line, and the scenario boss that had no key
         .word   $014a
         .byte   $09, $00        ; kefka (narshe defense): + poison|fire
@@ -4600,6 +4624,83 @@ Ot6ShieldTbl:
         .byte   5, OT6_SLASH|OT6_BLUDG  ; rizopas: the coverage-rule poster child
         .word   $0154
         .byte   1, OT6_SLASH|OT6_BLUDG  ; piranha: the chum wave
+        ; ---- the v0.6 BREAK-COVERAGE pass: class rows that close the
+        ; fixed-party gaps the audit found across the three scenarios. every
+        ; species below was a FORMULA monster (no class weakness) whose
+        ; forced party could reach none of its vanilla/added ELEMENTS -- so
+        ; it was unbreakable by the exact party the game hands you. the fix
+        ; is a weapon class, chosen per that party (class chips ignore
+        ; absorb/null, so the water/bolt these bodies absorb never matters).
+        ; shields track the early-war trash/miniboss band (2 basic, 3
+        ; elite). NOTE the trade: an Ot6ShieldTbl row exempts a species from
+        ; Ot6HpScale, which the armor-line ElemAddTbl block deliberately
+        ; avoided -- but a class weakness has nowhere else to live, so
+        ; per-party breakability takes that trade here (HpScale ships 1x,
+        ; inert today). palette: armored soldiers read PIERCE (a blade finds
+        ; the gaps) + lightning where a party can conduct it; the Cyan SOLO
+        ; duel is SLASH (the samurai out-cuts them); Sabin's brawls add
+        ; BLUDG (a monk caves the plate). decode + rationale: bosses-wob.md.
+        ;
+        ; -- imperial soldier line --
+        .word   $0001
+        .byte   2, OT6_SLASH|OT6_PIERCE ; soldier: Cyan's duel cuts it
+                                ;   (slash), Shadow's throw finds the seam
+                                ;   (pierce). camp pursuit b44 + Cyan-solo b43
+        .word   $0002
+        .byte   3, OT6_PIERCE   ; templar: camp elite (b44); Shadow's throw
+                                ;   (pierce) / Bolt Edge (+bolt in ElemAddTbl)
+        .word   $014e
+        .byte   3, OT6_SLASH    ; leader: Cyan SOLO Doma duel (b46). slash
+                                ;   only -- the samurai out-cuts the
+                                ;   commander; no other party fights him, so
+                                ;   no unreachable '?' clutters the swordfight
+        .word   $014f
+        .byte   2, OT6_SLASH|OT6_BLUDG ; grunt: Doma courtyard defense (b13),
+                                ;   held by Cyan (slash) + Sabin (bludg) --
+                                ;   neither reaches pierce/bolt, so the
+                                ;   palette bends to who holds the line
+        .word   $0176
+        .byte   3, OT6_SLASH|OT6_BLUDG ; cadet: same Doma defense (b14), same
+                                ;   two heroes, a bigger body
+        .word   $0175
+        .byte   2, OT6_PIERCE   ; officer: Locke SOLO occupied South Figaro
+                                ;   (b9). pierce -- Locke's dagger is his one
+                                ;   key, so it is the one weakness shown
+        .word   $0065
+        .byte   2, OT6_SLASH|OT6_PIERCE ; trooper: Narshe defense waves. the
+                                ;   player-assigned 3-way split needs BOTH
+                                ;   classes -- slash for a Cyan/Sabin squad,
+                                ;   pierce for a Locke/Gau squad. keeps
+                                ;   vanilla poison (the Edgar squad's key)
+        .word   $003f
+        .byte   3, OT6_SLASH|OT6_PIERCE ; rider: also a Narshe wave; same
+                                ;   squad coverage. keeps vanilla fire|poison,
+                                ;   so Shadow's Fire Skean still breaks it on
+                                ;   the Phantom Train
+        .word   $009f
+        .byte   3, OT6_SLASH|OT6_PIERCE ; heavyarmor: Locke SOLO S.Figaro
+                                ;   guards (b11 -> pierce) AND a Narshe wave
+                                ;   (formation 88 -> slash for a Cyan/Sabin
+                                ;   squad). keeps vanilla bolt|water + poison
+        .word   $013a
+        .byte   2, OT6_PIERCE   ; merchant: Locke SOLO disguise fight (b10). a
+                                ;   civilian with NO vanilla weakness at all,
+                                ;   unbreakable by anyone before this row;
+                                ;   pierce is Locke's dagger, kept simple
+        ; -- Serpent Trench (Sabin + Cyan + Gau: bludg + slash + pierce).
+        ; each aquatic answers to a different member's kit, so the trio's
+        ; three keys map one-to-one onto the three creatures. all three
+        ; absorb water and their vanilla element (bolt/fire) is a dead or
+        ; level-gated key for this party -- class is the reliable break.
+        .word   $003a
+        .byte   2, OT6_SLASH    ; anguiform: a slippery eel, cut by Cyan's
+                                ;   blade (vanilla bolt is dead here)
+        .word   $005e
+        .byte   2, OT6_BLUDG    ; actaneon: a shelled crustacean, cracked by
+                                ;   Sabin's fists (vanilla fire needs L15)
+        .word   $0059
+        .byte   2, OT6_PIERCE   ; aspik: a coiled asp, punctured by Gau's
+                                ;   fanged strike (vanilla fire needs L15)
         ; zozo / opera / the factory
         ; ---- the v0.4 ZOZO TOWN pass: four poison-trash rows, shields only.
         ; the search-for-terra party is LOCKE+CELES+EDGAR+SABIN -- TERRA IS
