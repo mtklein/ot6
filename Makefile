@@ -626,6 +626,20 @@ build/states/zozo_done.mss.lua: build/states/dadaluma_won.mss.lua
 FRONTIER += figaro_submerged zozo_arrival zozo_clock_solved \
             dadaluma_doorstep dadaluma_won zozo_done
 
+# ---- v0.5 Beat A: the Opera (zozo_done -> the Blackjack) ------------------
+# gen_opera1_doorstep: zozo_done -> the world -> JIDOOR (map 198, entered at
+# {15,61}) -> its north BUMP door {16,13}->{16,12} -> map 209 (the opera-plot
+# room) -> parked at {117,20} facing UP, one A-press below the IMPRESARIO
+# ({117,19}, _ca9337).  The survey's "park at the opera-house foyer impresario"
+# is WRONG: the opera house (map 237, world {45,154}) keeps its impresario
+# HIDDEN ($0340) behind a "closed" sign until the opera-open cutscene -- which
+# BEGINS at this map-209 talk ("Maria!?" -> the letter $0331 -> the Setzer
+# name-menu -> $0340=1).  The generator self-verifies (after the mint) that
+# one A-press fires _ca9337, so the banked state is never a dead press short.
+build/states/opera_doorstep.mss.lua: build/states/zozo_done.mss.lua
+	$(call mint,opera_doorstep,gen_opera1_doorstep)
+FRONTIER += opera_doorstep
+
 frontier: rom $(STATE1) $(STATE2) $(STATE3) \
           $(patsubst %,build/states/%.mss.lua,$(FRONTIER))
 	@echo "frontier states up to date: $(FRONTIER)"
