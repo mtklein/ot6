@@ -1391,3 +1391,23 @@ specifics, both the healthy shape:
 Verdict, verbatim: **"It's perfect."** Read forward, this is the kill-vs-break
 TTK baseline the #6 break-weakness pass and the WoB route must hold to —
 nothing should die faster than this.
+
+## Playtest verdict — progression pull and the grind curve (2026-07-22)
+
+Same session as above. Two more signals, both about progression:
+
+- **The weakness loop is generating demand for the right tools.** The
+  playtester "was really feeling the lack of Fire Dance" (Sabin's fire AoE,
+  learned at L15; he reached the Imperial Camp at L14) and **"went and
+  recruited Shadow because I needed him."** That is the design thesis working
+  end to end: enemies wear weaknesses → the player wants the tools that hit
+  them → he levels and recruits to get them. The want was created by the
+  fights, not by a checklist — including seeking out an *optional* recruit.
+- **The grind question, answered.** Measurement #7 flagged "the grind
+  question, untouched" as its one open thread — whether natural random-
+  encounter EXP delivers a strong-enough party without forcing a grind. The
+  playtester, at L14 in the Imperial Camp with Fire Dance one level ahead:
+  **"Exp curve from random encounters feels perfect too."** The pace places
+  the thing he wants just out of reach, so he plays forward to earn it rather
+  than grinding for it. #7's last open thread closes green; the
+  `Ot6RewardMulW`/`Ot6DangerMulW` pace pair is delivering as shipped.
