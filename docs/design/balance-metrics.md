@@ -1365,3 +1365,29 @@ What that decoding settles cleanly, and what it does not:
   and a masher never opens Tools — so, as in Measurement #8, the authoring is
   invisible to the player who holds A and pays off only for the one who reads
   the room.
+
+## Playtest verdict — kill-before-break holds (2026-07-22)
+
+Measurement #7 opened on the fear that FF6's damage would let you delete
+things before the break loop engaged — the reason `actions_broken` was 0.0
+across 168 battles. Measurement #8 authored the trash weaknesses to make the
+break reachable. This is the playtest confirmation that the pair landed, on
+the very species #7 measured.
+
+The owner asked directly — *"is it still too easy to kill things before
+breaking?"* — and the playtester answered **"No, it feels great,"** with two
+specifics, both the healthy shape:
+
+- **On-level enemies take +2 boost to one-shot.** Deleting an on-level foe is
+  now a choice you pay BP for, not the default — so leaving it alive to break
+  stays the attractive line. The one-shot exists, but it is priced.
+- **Terra opens Fire2 to wipe the Leafers returning through her scenario.**
+  This is the *good* kind of killing-before-breaking: the Leafer (`$0017`,
+  fire-weak — Measurement #7's own trash) melts to an AoE aimed at its
+  weakness. That the balance still rewards this, rather than making every
+  fight spongy, is the proof it was not over-corrected. Exploit-the-weakness
+  is the fantasy; trivially-delete-everything was the bug.
+
+Verdict, verbatim: **"It's perfect."** Read forward, this is the kill-vs-break
+TTK baseline the #6 break-weakness pass and the WoB route must hold to —
+nothing should die faster than this.
