@@ -82,7 +82,12 @@ local function WKC(s) return 0x3E9C + (8 + s * 2) end
 local function RVC(s) return 0x3E9D + (8 + s * 2) end
 local function MHP(s) return 0x3BFC + s * 2 end
 local function pinParty()
-  for e = 0, 3 do H.writeWord(0x3BF4 + e * 2, H.readWord(0x3C1C + e * 2)) end
+  for e = 0, 3 do
+    H.writeWord(0x3BF4 + e * 2, H.readWord(0x3C1C + e * 2))  -- HP = max
+    -- v0.5: MP costs LIVE. The chips ARE AuraBolt (5 MP) + Pummel (2 MP); an
+    -- unpinned SABIN fizzles them and the shield/element/class asserts fail.
+    H.writeWord(0x3C30 + e * 2, 99); H.writeWord(0x3C08 + e * 2, 99)  -- max+cur MP
+  end
 end
 
 local gSlot, sabinE = nil, nil          -- found at battle-up, asserted

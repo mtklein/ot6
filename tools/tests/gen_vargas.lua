@@ -32,7 +32,15 @@ local PUMMEL = 0x5D                       -- resolved attack id of Blitz 0
 local aPh = 0
 local function bright() return emu.getState()["ppu.screenBrightness"] or 0 end
 local function pinParty()
-  for e = 0, 3 do H.writeWord(0x3BF4 + e * 2, H.readWord(0x3C1C + e * 2)) end
+  for e = 0, 3 do
+    H.writeWord(0x3BF4 + e * 2, H.readWord(0x3C1C + e * 2))  -- HP = max: no wipe
+    -- v0.5: MP costs are LIVE. THE KILL IS PUMMEL (2 MP) via Vargas's reaction
+    -- script; an unpinned SABIN whose Pummel fizzles kills him the WRONG way
+    -- (HP depletion, not the scripted finish) and the post-fight event never
+    -- fires -- advanceStory then hangs. Pin MP (cur+max) so the blitz affords.
+    H.writeWord(0x3C30 + e * 2, 99)                          -- max MP
+    H.writeWord(0x3C08 + e * 2, 99)                          -- current MP
+  end
 end
 -- Tap A unless SABIN's own command window is up: Vargas's script talks, and
 -- a battle dialog blocks the queue until dismissed.
