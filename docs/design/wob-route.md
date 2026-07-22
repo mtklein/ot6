@@ -294,3 +294,17 @@ Before/alongside Beat A:
 - Frontier/mint machinery: `Makefile` (FRONTIER lists; `mint`/`stackseed` macros)
 - Opera event source: `ff6/src/event/event_main.asm` ~22308–28700
 - World/vehicle nav: `docs/research/world-map-nav.md`; `tools/tests/lib/ot6_field.lua`
+
+## Beat A — measured corrections (2026-07-22, from authoring)
+
+Corrections to the scoping assumptions, measured while authoring the Opera:
+
+- **Roster at `zozo_done` is LOCKE + CELES only** (measured `$1850`: LOCKE=$C1, CELES=$51, rest $00) — the Zozo leave-cutscene forces `party_menu {LOCKE,CELES}`, not the six the scoping guessed. Gates every "who can break this" call for Beats A–B.
+- **The opera OPENS via a Jidoor cutscene, not the opera house.** Talk impresario `_ca9337` on **map 209**, reached from **Jidoor (map 198) north bump-door (16,13→16,12)**: Maria/Celes resemblance → letter (`$0331`) → Setzer intro + `name_menu` → `$0340=1`. The opera-house impresario (map 237, `_caae15`) is hidden behind `$0340` until then.
+- **The aria is a choice puzzle (clockPick-class), not a timed walk.** Stage trigger `_cabafd` (map 238, 97,7), three lyric forks; correct sequence **{0,1,0}** → `$0111=1`.
+- **Ultros ② = battle 134, `$012d`, 6 shields, slash|pierce** (`Ot6ShieldTbl`, ot6.asm:4757).
+- **Geography:** Zozo exit column x=63 → world (23,92); Jidoor = world (27,130)→map 198; opera house = world (45,154)→map 237.
+
+**Fixtures banked (gated):** `opera_doorstep` (map 209 Jidoor impresario), `opera_open` (map 237, `$0340=1`).
+
+**Remaining in Beat A** (boot `opera_open`): the intro drives to **map 234 backstage (16,46), `$0055=1`**; then aria nav (234 → stage door → map 238 trigger, gated `$0056=1`) → {0,1,0} → the **rafter chase** (catwalk maze 233→231→239→232 + `$0355` + likely timer) → **Ultros ②** kill-bit (`ultros2_won`) → Setzer + Blackjack (`setzer_joined`).
