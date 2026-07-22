@@ -131,8 +131,8 @@ and rides ~⅓ of a comparable Blitz/Tool — Flurry's slashing ×4 costs 4 MP w
 Sabin's Air Blade costs 12 and Edgar's Drill 16 — because, per the ruling, the
 **banked-BP requirement is the real price and the MP only prices the cast**.
 Fang is the cheapest row of any kit (1 MP, the "free-to-learn is not
-free-to-use" floor); Oblivion tops the band at 8 even though it is out of the
-current boost ladder (priced ready for the divine pass). Cyan's ~18-MP L5 pool
+free-to-use" floor); Oblivion tops the ladder at 8 MP — the window's divine top
+rung once Cyan has learned all eight (the moving window, below). Cyan's ~18-MP L5 pool
 affords the low ladder (Fang/Sky/Tiger/Flurry = 1/2/3/4) and outgrows the rest
 on his level schedule, so a light column keeps him acting while the bank
 builds — the whole point of the one kit where banking BP has intrinsic purpose.
@@ -140,42 +140,62 @@ These numbers live in `Ot6AbilityCostTbl` (ff6/src/battle/ot6.asm), charged
 under the `OT6_MP_COSTS` build flag — which **v0.5 flipped ON by default**, so
 the shipped ROM charges them (see mp-economy.md).
 
-**Shipped (M3).** `Ot6BushidoTier` (ff6/src/battle/ot6.asm) replaces the
-charge gauge's clock in `UpdateMenuState_37`; the window, its numerals,
-the grey-out of unlearned techs, the A-button latch, `FixPlayerAttack`'s
-`+$55` and `Cmd_07` are all vanilla and untouched. The BP column above
-is read as a *band*, and boost selects the band: the table names each
-band's top tech and vanilla's own `$2020` (techs known - 1, the value
-that used to cap the bar) drops it to the best one Cyan has learned.
+**Shipped (v0.5, issue #5).** `Ot6BushidoTier` (ff6/src/battle/ot6.asm)
+replaces the charge gauge's clock in `UpdateMenuState_37`; the window, its
+numerals, the grey-out of unlearned techs, the A-button latch,
+`FixPlayerAttack`'s `+$55` and `Cmd_07` are all vanilla and untouched. Boost
+0/1/2/3 selects a **moving window of four** — Cyan's top four *learned* techs,
+weakest → strongest. With `ceiling` = vanilla's own `$2020` (techs known − 1,
+the value that used to cap the bar), `base = max(0, ceiling−3)` and boost picks
+`min(base+boost, ceiling)`. Pure arithmetic — no table.
 
-| BP | band | selects |
+| techs known | window (BP 0 / 1 / 2 / 3) | retired |
 |---|---|---|
-| 0 | Fang | Fang |
-| 1 | Sky, Tiger | Tiger from L12, Sky before |
-| 2 | Flurry, Dragon | Dragon from L24, Flurry before |
-| 3 | Eclipse, Tempest | Tempest from L44, Eclipse before |
+| ≤ 4 | all of them, in learn order | — (every learned tech reachable) |
+| 5 (through Dragon) | Sky / Tiger / Flurry / Dragon | Fang |
+| 6 (through Eclipse) | Tiger / Flurry / Dragon / Eclipse | Fang, Sky |
+| 8 (full kit) | Dragon / Eclipse / Tempest / **Oblivion** | Fang…Flurry |
 
-Consequences, all deliberate and all data-editable (the bands are a
-4-byte table, not code):
+This **fixes #5**. The old design read the BP column as four *bands* and named
+each band's top tech, clamped to the ceiling — so a 3-tech Cyan (Fang/Sky/Tiger)
+got Fang at 0× and Tiger at every higher boost, and could never cast the Sky he
+had learned: a *learned* tech made uncastable. The window never skips a middle
+tech; only the weakest retire, as Cyan outgrows them.
 
-- **The lower tech of a band is transitional** — Sky is reachable L6-11,
-  Flurry L15-23, Eclipse L34-43. A band's expression upgrading as Cyan
-  levels is the spell fold's grammar one rung up (Fire is Fire until a
-  boost makes it Fira). The cost is that Flurry's multi-hit shredder
-  role goes quiet L24-43 until Tempest restores it.
-- **Oblivion is out of the ladder.** Its gate is "target must be
-  Broken", and that cannot be read at command-latch time — swdtech is in
-  `RetargetCmdTbl`, so no target exists yet. It waits on the divine pass
-  (Terra's Trance, summon-once-per-battle); shipping it ungated would
-  also have retired Eclipse and Tempest. Cyan learns it off the Phantom
-  Train regardless, far past the rung-3 gate this unblocked.
-- **BP is read, never written.** `Ot6ActionEnd` consumes the spend and
-  skips that turn's regen exactly as for any other action, and the ≤3 /
-  never-past-bank caps stay `Ot6Boost`'s. Bushido is excluded from
-  `Ot6BoostDmg`'s multiplier for the same reason folded spells are: the
-  points bought the tech, so they must not also buy damage. Spend the
-  ladder cannot use (three points at L1 still buys Fang) is spent, not
-  refunded — the deal a mage already takes on a third point on Fire.
+The three open questions, settled at build time and documented in
+`Ot6BushidoTier`'s header:
+
+- **Utility techs retire with the window.** Sky's counter stance and Dragon's
+  drain go quiet once Cyan out-levels them — a real cost, not just weak damage.
+  Ruling: ship the auto-window as-is, no special-casing of utility. The
+  player-chosen **loadout** (the #5 sequel) is where a player pins a utility
+  tech in a slot; playtest is the filter.
+- **No affordable floor.** The 0× slot is always the cheapest tech *in the
+  window*, so it slides up (gets pricier) as Cyan levels — accepted, because his
+  MP pool grows on the same schedule.
+- **Oblivion is the window's conditional top rung**, not a case bolted outside
+  it. At full kit the window is Dragon/Eclipse/Tempest/Oblivion and BP3 lands on
+  Oblivion (tech 7) by the same `base+boost` sum as any other rung — it falls out
+  for free, so it is *cleaner* as the top rung than as a separate invocation. It
+  fires exactly as the divine pass built it: selected only when learned and
+  unspent, gated at resolution by `Ot6Oblivion` (target must be Broken), and
+  dropped back to Tempest (6) here for the rest of any battle whose once-per-
+  battle latch is set. `battle_divines` gates that shape (BP3 = Oblivion clear,
+  Tempest spent).
+
+**BP is read, never written.** `Ot6ActionEnd` consumes the spend and skips that
+turn's regen exactly as for any other action, and the ≤3 / never-past-bank caps
+stay `Ot6Boost`'s. Bushido is excluded from `Ot6BoostDmg`'s multiplier for the
+same reason folded spells are: the points bought the tech, so they must not also
+buy damage. Spend the window cannot use (three points at L1 still buys Fang) is
+spent, not refunded — the deal a mage already takes on a third point on Fire.
+
+**The Bushido menu UI is still the vanilla numeral gauge** — converting it to
+show the four windowed techs by name + MP cost + grey-out is deferred: it is a
+genuine redesign of the bespoke numeral-gauge window in the *stock* btlgfx bank
+(a new window template + rewritten NMI DMA + a battle-bank renderer to keep the
+nomp baseline byte-identical), not a decorator stamp like Blitz/Tools. It lands
+with the loadout follow-up, which shares the same window.
 
 Note the Chip column above is finer-grained than what ships: the class
 table (`ot6_class.asm:185-192`) marks all eight slashing, per
