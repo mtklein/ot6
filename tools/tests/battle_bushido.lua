@@ -6,7 +6,9 @@
 -- counter w7e7b82 climbed one unit every 4 frames, the tech was counter >> 5,
 -- it wrapped past $2020 (techs known - 1), and A latched whatever level it
 -- happened to be showing.  OT6 deletes the CLOCK and lets the boost bank pick
--- the level instead (Ot6BushidoTier, ot6.asm), clamped by that same $2020.
+-- the tech instead (Ot6BushidoTier, ot6.asm): a MOVING WINDOW OF FOUR (issue
+-- #5) where boost 0/1/2/3 selects Cyan's top four LEARNED techs weakest ->
+-- strongest, the window bounded by that same $2020.
 -- Everything downstream is vanilla: the +$55 in FixPlayerAttack, Cmd_07's
 -- dispatch, and Ot6SkillClassTbl's slashing classification of all eight.
 --
@@ -22,19 +24,22 @@
 --   1. THE CLOCK IS DEAD.  150 consecutive in-window frames with the boost
 --      held still must show ONE bar value.  Vanilla would step ~38 times
 --      across that span, so a reverted hook fails here first and loudly.
---   2. The ladder, over a sweep of (boost spent, techs known): 0 bp buys
---      Fang, 1 Tiger, 2 Dragon, 3 Tempest -- each dropping to the best tech
---      actually learned when the band's top is above Cyan's level.  The
---      sweep must produce several distinct techs, so a routine that returned
---      a constant cannot pass it.
---   3. Oblivion (tech 8) IS reachable at BP3 now that divine gating landed
---      (Ot6Oblivion, hooked in CalcAttackEffect): the 3-bp band tops at Oblivion once
---      Cyan has learned it and while his once-per-battle latch is clear -- the
---      state this fixture is in (nothing has spent it). The broken-vs-unbroken
---      RESOLUTION gate and the spent-reverts-to-Tempest rule are battle_divines.
+--   2. THE MOVING WINDOW OF FOUR, over a sweep of (boost spent, techs known):
+--      boost 0/1/2/3 lands on the base..base+3 techs of the top-four window
+--      (base = max(0, ceiling-3), capped at ceiling).  While four or fewer are
+--      known every learned tech is reachable -- 3 techs give Dispatch/Retort/
+--      Slash at 0/1/2, so the Retort the OLD band design skipped is asserted
+--      back.  Learn a fifth and the window slides up one, retiring the weakest.
+--      The sweep walks N = 3,4,5,6,8 and pins EACH tech the four boosts select,
+--      so a band-compressor (or a constant) fails on the very first slid row.
+--   3. Oblivion (tech 8) is the window's TOP RUNG at full kit: with all eight
+--      learned the window is {4,5,6,7} and BP3 lands on 7 = Oblivion, gated at
+--      RESOLUTION by Ot6Oblivion (hooked in CalcAttackEffect) and reachable
+--      while the once-per-battle latch is clear -- the state this fixture is in.
+--      The broken-vs-unbroken gate and spent-reverts-to-Tempest are battle_divines.
 --   4. The spend caps at 3 and never exceeds the bank (Ot6Boost's rule,
 --      unchanged -- Bushido reads $3E9D, it never writes it).
---   5. The chosen tech RESOLVES: Flurry's id reaches $3410 ("last spell
+--   5. The chosen tech RESOLVES: Quadra Slam's id reaches $3410 ("last spell
 --      used", InitTarget_02 battle_main.asm:6545), it chips a slashing-weak
 --      guard and reveals the slash class, and the boost is consumed with no
 --      +1 regen that turn (Ot6ActionEnd).
@@ -61,15 +66,16 @@ local function pend(s) return H.readByte(0x3E9D + s * 2) end
 local function level() return H.readByte(BAR) // 32 end
 local function inWindow() return H.readByte(MSTATE) == ST_BUSHIDO end
 
--- vanilla tech names, in the order the swdtech window numbers them, under
--- the kit names docs/design/kits.md gives them
-local TECH = { [0] = "fang", "sky", "tiger", "flurry",
-               "dragon", "eclipse", "tempest", "oblivion" }
+-- the ACTUAL in-game tech names (ff6/src/text/bushido_name_en.json), in the
+-- order the swdtech window numbers them.  tech 7 (Cleave) is the divine the
+-- code calls Oblivion.
+local TECH = { [0] = "Dispatch", "Retort", "Slash", "Quadra Slam",
+               "Empowerer", "Stunner", "Quadra Slice", "Cleave" }
 
 local OT6_SLASH = 0x01
-local FLURRY = 3                      -- tech index; attack id $55 + 3 = $58
--- Flurry's four hits measured 81 total on this fixture (intro stats, guards
--- shielded so the 0.5x resistance applies).  A double dip would be
+local QSLAM = 3                       -- Quadra Slam: tech index; id $55 + 3 = $58
+-- Quadra Slam's four hits measured 81 total on this fixture (intro stats,
+-- guards shielded so the 0.5x resistance applies).  A double dip would be
 -- Ot6BoostDmg's x4 on top, ~324, so the bound only has to sit between: 240
 -- leaves 3x headroom over the roll and still fails a multiplied hit.
 local DMG_CAP = 240
@@ -126,21 +132,45 @@ end
 local function pin() pinCyan(); pinGuards() end
 
 -- ------------------------------------------------------------------ sweep --
--- {boost spent, techs known - 1, expected tech index}.  The clamped rows are
--- the whole reason the ladder is a band and not a 1:1 map: a band drops to
--- the best tech Cyan has actually learned, so its expression upgrades as he
--- levels (sky -> tiger at 12, flurry -> dragon at 24).
+-- {boost spent, techs known - 1 (the ceiling), expected tech index}.  This
+-- walks the MOVING WINDOW OF FOUR: base = max(0, ceiling-3), and boost 0/1/2/3
+-- selects tech min(base+boost, ceiling).  The window is grouped by N (techs
+-- known): each group pins all four boosts, so we assert the exact four techs
+-- boost reaches AND that they slide as N grows.  The old band table -- which
+-- named each band's TOP tech (0/2/4/7) and clamped it -- fails the very first
+-- N=3 group (it gave 0/2/2/2, skipping Retort).
 local SWEEP = {
-  { 0, 7, 0 },   -- fang: the free tier
-  { 1, 7, 2 },   -- tiger tops the 1-bp band
-  { 2, 7, 4 },   -- dragon tops the 2-bp band
-  { 3, 7, 7 },   -- OBLIVION tops the 3-bp band now (divine gating landed);
-                 --   the latch is clear in this fixture, so 7 stands
+  -- N=3 (ceiling 2), window {0,1,2}: every learned tech reachable.  Row 2 is
+  -- issue #5's headline -- boost 1 reaches Retort, which the band design could
+  -- not (it jumped 0-bp Dispatch straight to Slash).  Boost 3 caps at Slash.
+  { 0, 2, 0 },   -- Dispatch
+  { 1, 2, 1 },   -- Retort   <- the fix: a mid-tech the old bands skipped
+  { 2, 2, 2 },   -- Slash
+  { 3, 2, 2 },   -- Slash (boost overruns a 3-tech window -> capped at ceiling)
 
-  { 1, 1, 1 },   -- L6-11 cyan: the 1-bp band is still sky
-  { 2, 3, 3 },   -- L15-23 cyan: the 2-bp band is still flurry
-  { 3, 5, 5 },   -- L34-43 cyan: the 3-bp band is still eclipse
-  { 3, 0, 0 },   -- L1 cyan: three points still only buy fang
+  -- N=4 (ceiling 3), window {0,1,2,3}: the full base kit, 1:1 across the four
+  -- boosts -- Dispatch/Retort/Slash/Quadra Slam.
+  { 0, 3, 0 }, { 1, 3, 1 }, { 2, 3, 2 }, { 3, 3, 3 },
+
+  -- N=5 (ceiling 4), window {1,2,3,4}: Dispatch has RETIRED off the bottom.
+  { 0, 4, 1 },   -- Retort   (weakest still in the window)
+  { 1, 4, 2 },   -- Slash
+  { 2, 4, 3 },   -- Quadra Slam
+  { 3, 4, 4 },   -- Empowerer
+
+  -- N=6 (ceiling 5), window {2,3,4,5}: Retort has retired too.
+  { 0, 5, 2 },   -- Slash
+  { 1, 5, 3 },   -- Quadra Slam
+  { 2, 5, 4 },   -- Empowerer
+  { 3, 5, 5 },   -- Stunner
+
+  -- N=8 (ceiling 7), window {4,5,6,7}: his top four.  Boost 3 lands on 7 =
+  -- Oblivion (Cleave), the window's conditional top rung; the once-per-battle
+  -- latch is clear in this fixture, so 7 stands.
+  { 0, 7, 4 },   -- Empowerer
+  { 1, 7, 5 },   -- Stunner
+  { 2, 7, 6 },   -- Quadra Slice
+  { 3, 7, 7 },   -- Cleave / Oblivion (the divine top rung)
 }
 local seenLevels, sweepRows = {}, 0
 local barSeen, barFrames = {}, 0
@@ -176,7 +206,8 @@ H.run({ maxFrames = 40000 }, {
   }, "the swdtech window opens (menu state $37)"),
   H.call(function() H.screenshot("bushido_window") end),
 
-  -- 1. THE CLOCK IS DEAD.  Boost held at 1, so the ladder says tiger ($40).
+  -- 1. THE CLOCK IS DEAD.  Boost held at 1 with all eight techs known (window
+  -- {4,5,6,7}), so the window selects Stunner -- tech 5, bar 5*32 = $a0.
   -- The first in-window frames still carry UpdateMenuState_35's `stz
   -- w7e7b82`: steps run on startFrame, so the earliest samples are taken
   -- before Ot6BushidoTier has run even once.  Settle past that, then the
@@ -205,10 +236,10 @@ H.run({ maxFrames = 40000 }, {
     H.assertEq(sampled >= 140, true, "the window stayed open to be sampled")
     -- vanilla stepped the counter every 4 frames and would show ~36 values
     H.assertEq(distinct, 1, "the charge gauge does not tick: one bar value")
-    H.assertEq(barSeen[0x40], sampled, "and it is the ladder's tiger ($40)")
+    H.assertEq(barSeen[0xA0], sampled, "and it is the window's Stunner ($a0)")
   end),
 
-  -- 2/3. the ladder, including the learn-clamped rows
+  -- 2/3. the moving window of four, group by group as N grows
   H.driveUntil(function() return sweepRows > #SWEEP end, 4000, {
     H.call(function()
       local row = SWEEP[math.min(sweepRows + 1, #SWEEP)]
@@ -235,8 +266,9 @@ H.run({ maxFrames = 40000 }, {
     local n = 0
     for _ in pairs(seenLevels) do n = n + 1 end
     H.log("distinct techs reached across the sweep: " .. n)
-    -- a routine that ignored bp and returned a constant would score 1
-    H.assertEq(n >= 6, true, "boost really moves the selection")
+    -- the window walk reaches EVERY tech 0-7 across the N groups; a band
+    -- compressor skips the middle ones and a constant scores 1
+    H.assertEq(n >= 8, true, "boost + the sliding window reach all eight techs")
   end),
 
   -- 4. the spend cap, driven by real R presses inside the window
@@ -256,15 +288,18 @@ H.run({ maxFrames = 40000 }, {
     H.screenshot("bushido_boosted")
   end),
 
-  -- 5. latch flurry and follow it to a resolved, slashing chip
+  -- 5. latch Quadra Slam and follow it to a resolved, slashing chip.  N=5
+  -- (ceiling 4), window {1,2,3,4}: boost 2 -> base 1 + 2 = tech 3, a slid-
+  -- window pick (Dispatch retired).  The OLD band table gave tech 4 here
+  -- (dragon, id $59), so the resolved $58 also proves the mechanic changed.
   H.call(function()
-    ceiling, pinPend = FLURRY, 2       -- L15-23 cyan: 2 bp is flurry
+    ceiling, pinPend = 4, 2
     pinShields = false
     pin()
   end),
   H.waitFrames(8),
   H.call(function()
-    H.assertEq(level(), FLURRY, "the tech about to be latched is flurry")
+    H.assertEq(level(), QSLAM, "the tech about to be latched is Quadra Slam")
     -- park the other two Cyans so only the boosted tech moves guard HP
     for _, s in ipairs(PARTY) do
       if s ~= actor then
@@ -289,7 +324,7 @@ H.run({ maxFrames = 40000 }, {
   -- stop pinning the boost so Ot6ActionEnd's arithmetic is observable
   H.call(function() pinPend, pinBp = nil, false end),
   H.driveUntil(function()
-    for _, v in ipairs(spells) do if v == 0x55 + FLURRY then return true end end
+    for _, v in ipairs(spells) do if v == 0x55 + QSLAM then return true end end
     return false
   end, 12000, {
     H.call(function()
@@ -299,7 +334,7 @@ H.run({ maxFrames = 40000 }, {
     H.waitFrames(4),
     H.call(function() H.setPad({}) end),
     H.waitFrames(20),
-  }, "flurry reaches $3410"),
+  }, "Quadra Slam reaches $3410"),
   H.waitUntil(function() return pend(actor) == 0 end, 1200,
     "the boosted tech resolves", 10),
   H.waitFrames(60),
@@ -307,9 +342,9 @@ H.run({ maxFrames = 40000 }, {
     local ids = {}
     for _, v in ipairs(spells) do ids[#ids + 1] = string.format("%02x", v) end
     H.log("attack ids that reached $3410: " .. table.concat(ids, " "))
-    local sawFlurry = false
-    for _, v in ipairs(spells) do if v == 0x55 + FLURRY then sawFlurry = true end end
-    H.assertEq(sawFlurry, true, "2 bp executed flurry ($58), not fang ($55)")
+    local sawQslam = false
+    for _, v in ipairs(spells) do if v == 0x55 + QSLAM then sawQslam = true end end
+    H.assertEq(sawQslam, true, "2 bp executed Quadra Slam ($58), not Empowerer ($59)")
 
     -- the class chip: bushido is slashing (Ot6SkillClassTbl), the guards are
     -- pinned slashing-weak, so the tech must chip and reveal
@@ -324,13 +359,13 @@ H.run({ maxFrames = 40000 }, {
     H.assertEq(chipped, true, "the tech chipped a slashing-weak guard's shields")
     H.assertEq(revealed, true, "and revealed the slash class ($01)")
 
-    -- no double dip: the two points bought FLURRY, so they must not also
+    -- no double dip: the two points bought Quadra Slam, so they must not also
     -- buy Ot6BoostDmg's x4.  Same shape as battle_fold's bound on a folded
     -- Fire 3 -- the gate itself is structural (the $07 test in Ot6BoostDmg),
     -- so this only has to separate 1x from 4x, not pin the roll.
     local dmg = 0
     for _, s in ipairs(GUARDS) do dmg = dmg + (hp0[s] - H.readWord(MHP(s))) end
-    H.log(string.format("flurry dealt %d across both guards", dmg))
+    H.log(string.format("Quadra Slam dealt %d across both guards", dmg))
     H.assertEq(dmg > 0, true, "the tech actually dealt damage")
     H.assertEq(dmg < DMG_CAP, true,
       "boost bought the tech, not a damage multiplier too")

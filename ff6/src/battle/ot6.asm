@@ -2346,28 +2346,36 @@ Ot6AbilityCostTbl:
 ; +$55 (battle_main.asm:12811), Cmd_07's dispatch (battle_main.asm:3901,
 ; including its retort/sky stance special case).
 ;
-; the ladder is kits.md's BP column: fang 0 · sky/tiger 1 · flurry/dragon
-; 2 · eclipse/tempest 3. eight techs do not fit four boost levels, so a
-; band holds up to three and the table names each band's TOP tech; the
-; ceiling below — vanilla's own $2020, techs known - 1, the same value that
-; capped the bar — then drops it to the best one cyan has actually learned.
-; a band's expression therefore UPGRADES as he levels, which is the spell
-; fold's grammar one rung up: fire is fire until a boost makes it fira, and
-; the 1-bp band is sky until level 12 makes it tiger. the cost of that
-; choice, stated plainly: the lower tech of each band is transitional (sky
-; reachable L6-11, flurry L15-23, eclipse L34-43). flurry going quiet at 24
-; costs the multi-hit shredder DESIGN.md names by name, until tempest
-; restores that role at 44. the bands are DATA precisely so playtest can
-; re-cut them without touching code.
+; the mapping is a MOVING WINDOW OF FOUR (issue #5): boost 0/1/2/3 selects
+; cyan's top four LEARNED techs, weakest -> strongest. every boost level lands
+; on a distinct, useful tech (boost is never dead) and cyan always wields his
+; best four. base = max(0, ceiling-3), tech = min(base + boost, ceiling), where
+; ceiling is vanilla's own $2020 (techs known - 1, the same value that capped
+; the bar). while he knows four or fewer techs base is 0 and every learned tech
+; is reachable -- 0/1/2/3 land on exactly the ones he has. this REPLACES the
+; old band table, which named each of four bands' TOP tech (fang / tiger /
+; dragon / oblivion) and clamped it to the ceiling, so a 3-tech cyan got
+; Dispatch / Slash / Slash / Slash and could never cast the Retort he had
+; learned -- issue #5's bug. learn a fifth tech and the window slides up one,
+; retiring the WEAKEST; never a mid-tier tech skipped.
 ;
-; oblivion (tech 8) is deliberately NOT in the ladder. kits.md prices it at
-; 3 bp "target must be Broken", and that gate cannot be read from here:
-; this runs at command-latch time and swdtech is in RetargetCmdTbl
-; (battle_main.asm:12818), so the target does not exist yet. shipping it
-; anyway would both skip its own gate and retire eclipse and tempest, so
-; the 3-bp band tops out at tempest until the divine pass (terra's trance,
-; summon-once-per-battle) wires target-time gates. cyan learns oblivion off
-; the phantom train, far past the rung-3 gate this work unblocks.
+; the retire is a real tradeoff: the low techs carry utility (Retort's counter
+; stance $56, Empowerer's drain $59) and MP-cheapness that go quiet as cyan
+; out-levels them. resolved for v0.5 (see docs/design/kits.md): ship the auto-
+; window as-is, no special-casing of utility or a cheap-floor -- his MP pool
+; grows with him, and the player-chosen loadout (the #5 sequel) is where the
+; retire is answered. playtest is the filter.
+;
+; oblivion (tech 7, the divine) is the window's CONDITIONAL TOP RUNG, not a
+; case bolted outside it: at full kit the window is {4,5,6,7} and boost 3 lands
+; on 7 = oblivion by the same base+boost sum as any other rung -- it falls out
+; for free. it is SELECTED here only when learned (ceiling 7) and unspent, and
+; still fires exactly as before: gated at RESOLUTION by Ot6Oblivion (hooked
+; after ChooseTarget -- the target does not exist at this command-latch time,
+; swdtech being in RetargetCmdTbl), and dropped back to tempest (6) here for
+; the rest of any battle whose once-per-battle latch is already set. cyan
+; learns oblivion off the phantom train, so the top rung is oblivion only at
+; full kit.
 ;
 ; bp is READ, never written: the spend is whatever Ot6Boost banked in
 ; $3e9d, so Ot6ActionEnd consumes it and skips that turn's regen exactly as
@@ -2389,57 +2397,66 @@ Ot6AbilityCostTbl:
         asl
         tax                     ; -> entity offset
         shorta0
-        lda     $3e9d,x         ; pending boost
+        lda     $3e9d,x         ; pending boost 0-3
         cmp     #$04
         bcc     :+
         lda     #$03            ; (defensive: Ot6Boost already caps at 3)
-:       longa
-        and     #$00ff
-        tax
-        shorta0
-        lda     f:Ot6BushidoTierTbl,x
-        longa
-        and     #$00ff
-        pha                     ; the band's top tech, parked on the STACK.
-        shorta0                 ;   the two scratch bytes in reach are both
-                                ;   somebody's — $36 is btlgfx's (and only
-                                ;   the display call site rewrites it right
-                                ;   after us; the latch site does not), and
-                                ;   OT6_SCR_BIT is the hud builder's. the
-                                ;   stack owes nobody and survives an nmi.
-        lda     $2020           ; techs known - 1, LOW BYTE ONLY (issue #4).
-                                ;   the value is 0-7, but InitSkills stores it
-                                ;   with a 16-bit `stx $2020` (battle_main.asm:
-                                ;   14532) and CountBits leaves that store's HIGH
-                                ;   byte uninitialized -- $FF02 in the Doma solo
-                                ;   fight, $ffff before cyan joins. read as a WORD
-                                ;   (old `ldx`), the junk high byte makes even a
-                                ;   real 2-tech ceiling test `>= 8` and collapse
-                                ;   to 0, pinning Cyan to Dispatch no matter his
-                                ;   techs or boost. read a8: the junk high byte is
-                                ;   ignored, and a genuinely-unlearned $ff (low
-                                ;   byte) still trips >= 8 into the fang path.
+:       pha                     ; park boost. the two scratch bytes in reach are
+                                ;   both somebody's — $36 is btlgfx's (and only
+                                ;   the display call site rewrites it right after
+                                ;   us; the latch site does not), and OT6_SCR_BIT
+                                ;   is the hud builder's. the stack owes nobody
+                                ;   and survives an nmi.
+        lda     $2020           ; techs known - 1 (the ceiling), LOW BYTE ONLY
+                                ;   (issue #4). InitSkills stores it with a 16-bit
+                                ;   `stx $2020` (battle_main.asm:14532) over
+                                ;   CountBits's uninitialized HIGH byte -- $FF02 in
+                                ;   the Doma solo fight, $ffff before cyan joins.
+                                ;   read as a WORD (the old `ldx`) the junk high
+                                ;   byte made even a real 2-tech ceiling `>= 8` and
+                                ;   collapse to 0, pinning Cyan to Dispatch. read
+                                ;   a8 the junk is ignored, and a genuinely-
+                                ;   unlearned $ff (low byte) still trips >= 8 into
+                                ;   the nothing-learned path.
         cmp     #$08
         bcc     :+
-        lda     #$00            ; nothing learned: fang is all there is
-:       ; a = ceiling, 0-7
-        cmp     $01,s           ; ... against the band top (the pushed word's
-        bcc     :+              ;   low byte). below it: the ceiling IS the
-        lda     $01,s           ;   level; else the band top is
-:       plx                     ; drop the parked word (x is dead here)
-        ; the 3-bp band now tops at OBLIVION (tech 7): a resolution-time gate
-        ; exists (Ot6Oblivion, hooked after ChooseTarget in CalcAttackEffect), so
-        ; it is finally safe to SELECT here. the ceiling above only lets 7 through
-        ; once cyan has
-        ; actually learned it ($2020 >= 7 -- the phantom-train unlock), and
-        ; this block drops it back to TEMPEST (6) for the rest of any battle in
-        ; which he has already spent it. so BP3 = oblivion the once, tempest
-        ; thereafter -- eclipse/tempest are never retired, they are exactly what
-        ; a spent-or-unlearned divine falls to. (a divine is spent only on a
-        ; broken, killable target; an unbroken/boss target falls to tempest at
-        ; RESOLUTION and leaves the latch clear, so the menu keeps offering it.)
+        lda     #$00            ; nothing learned: only tech 0 (Dispatch) exists
+:       pha                     ; park ceiling ($01,s ; boost now $02,s)
+        ; --- the moving window of four (issue #5) --------------------------------
+        ; boost 0/1/2/3 selects Cyan's TOP FOUR learned techs, weakest ->
+        ; strongest: base = max(0, ceiling-3), tech = min(base + boost, ceiling).
+        ; while he knows four or fewer, base is 0 and EVERY learned tech is
+        ; reachable (0/1/2/3 land on the four he has); learn a fifth and the
+        ; window slides up one, retiring the weakest. no table -- pure arithmetic.
+        sec
+        sbc     #$03            ; ceiling - 3   (A still = ceiling)
+        bcs     :+
+        lda     #$00            ; ceiling < 3: base floors at 0 (the window is all
+:       ;                       ;   of {0..ceiling}, fewer than four techs)
+        clc
+        adc     $02,s           ; base + boost -> the tentative tech
+        cmp     $01,s           ; vs the ceiling
+        bcc     :+
+        lda     $01,s           ; cap at ceiling -- bites only when boost overruns
+:       ;                       ;   a <4-tech window (e.g. 3 bp, 3 techs known)
+        sta     $02,s           ; stash the chosen tech over the parked boost byte
+        pla                     ; drop the parked ceiling
+        pla                     ; a = chosen tech 0-7 (stack balanced)
+        ; the window's top rung IS Oblivion (tech 7) once Cyan has learned all
+        ; eight: ceiling 7, boost 3 -> base 4 + 3 = 7, by the same base+boost sum
+        ; as any other rung -- the divine falls out of the window for free, no
+        ; special case bolted outside it. it still fires exactly as before:
+        ; SELECTED here only when learned (ceiling 7) and unspent, gated at
+        ; RESOLUTION by Ot6Oblivion (hooked after ChooseTarget in CalcAttackEffect
+        ; -- the target does not exist at this command-latch time, swdtech being
+        ; in RetargetCmdTbl). read the once-per-battle latch here and drop a spent
+        ; Oblivion back to Tempest (6) so BP3 keeps a live top rung -- eclipse/
+        ; tempest are never retired, they are exactly what a spent-or-unlearned
+        ; divine falls to. (a divine is spent only on a broken, killable target;
+        ; an unbroken/boss target folds to tempest at RESOLUTION and leaves the
+        ; latch clear, so the menu keeps offering it.)
         cmp     #$07
-        bne     @level          ; not oblivion: the band top stands as-is
+        bne     @level          ; not oblivion: the chosen tech stands
         lda     $62ca           ; re-derive the active char's entity bit
         and     #$03
         asl                     ; slot * 2 = entity offset
@@ -2459,17 +2476,6 @@ Ot6AbilityCostTbl:
         pla                     ;   latch, the fill, and the numerals
         rtl
 .endproc
-
-; bushido tier ladder: boost level -> that band's top tech, 0-based as the
-; swdtech window numbers them (+$55 downstream makes the attack id).
-Ot6BushidoTierTbl:
-        .byte   $00             ; 0 bp: fang
-        .byte   $02             ; 1 bp: tiger   (sky below L12)
-        .byte   $04             ; 2 bp: dragon  (flurry below L24)
-        .byte   $07             ; 3 bp: OBLIVION (tempest below the phantom-train
-                                ;   unlock, or once the divine is spent -- the
-                                ;   ceiling + Ot6BushidoTier's spent-check drop
-                                ;   7 to 6; eclipse below L44 as before)
 
 ; ==============================================================================
 ; DIVINE ABILITIES (kit slot 8) -- resolution-time gates + once-per-battle latch

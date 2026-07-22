@@ -34,8 +34,8 @@ local ST_BUSHIDO = 0x37
 local PARTY = { 0, 1, 2 }
 local GUARDS = { 2, 3 }                  -- monster slots -> entity 8+slot*2
 local OT6_SLASH = 0x01
-local FLURRY = 3                          -- tech index; attack id $55+3 = $58
-local FLURRY_COST = 4                     -- Ot6AbilityCostTbl: $58 -> 4
+local QSLAM = 3                           -- Quadra Slam: tech index; id $55+3 = $58
+local QSLAM_COST = 4                      -- Ot6AbilityCostTbl: $58 -> 4
 local GUARD_HP = 0xF000                   -- pinned high so a hit never kills
 
 local function CURMP(s) return 0x3C08 + s * 2 end
@@ -64,8 +64,8 @@ local mode                               -- "on" (charges) | "off" (free)
 -- un-driven character just waits at its menu, it never auto-acts, so leaving
 -- the others un-driven is enough isolation. `active` is the slot being pinned.
 local active, chargeSlot, refuseSlot
-local ceiling = FLURRY                    -- techs known-1: clamp the 2-bp band to Flurry
-local pinPend = 2                         -- 2 bp -> Flurry band
+local ceiling = 4                         -- techs known-1: window {1,2,3,4}
+local pinPend = 2                         -- 2 bp -> Quadra Slam (tech 3, base 1 + 2)
 local casterMp = 50                       -- re-pinned each frame until a latch
 local pinCaster = true
 local spells = {}                         -- attack ids seen at $3410 (cleared per scenario)
@@ -110,7 +110,8 @@ local function pin() pinCyan(); pinGuards() end
 
 -- open the swdtech window, settle the boost band onto the wanted tech, latch
 -- it, run it to $3410. clears the spell log first so each scenario waits for
--- ITS OWN execution. techIdx picks the tech (0=Fang no-boost, 3=Flurry@2bp).
+-- ITS OWN execution. techIdx is the tech the (pend, ceil) window selects
+-- (0 = Dispatch at 0 bp / ceiling 3; 3 = Quadra Slam at 2 bp / ceiling 4).
 local function latchTech(tag, techIdx, pend, ceil)
   local attackId = 0x55 + techIdx
   return H.repeatN(1, {
@@ -184,7 +185,7 @@ H.run({ maxFrames = 40000 }, {
     end
     local want = {                        -- kits.md's authored numbers
       [0x5d] = 2,  [0x64] = 30,           -- Blitz:   Pummel, Bum Rush
-      [0x55] = 1,  [0x58] = 4, [0x5c] = 8, -- Bushido: Fang, Flurry, Oblivion
+      [0x55] = 1,  [0x58] = 4, [0x5c] = 8, -- Bushido: Dispatch, Quadra Slam, Cleave
       [0xaa] = 4,  [0xa8] = 16, [0xa6] = 18, -- Tools:  AutoCrossbow, Drill, Chain Saw
     }
     for id, c in pairs(want) do
@@ -204,15 +205,15 @@ H.run({ maxFrames = 40000 }, {
     pin()
     H.log("charge actor = slot " .. chargeSlot)
   end),
-  latchTech("affordable", FLURRY, 2, FLURRY),   -- Flurry: 2 bp, ceiling clamps to it
+  latchTech("affordable", QSLAM, 2, 4),   -- Quadra Slam: 2 bp, window {1,2,3,4}
   H.call(function()
     local left, dmg = mp(chargeSlot), (GUARD_HP * #GUARDS) - guardHp()
-    H.log(string.format("affordable flurry: MP 50 -> %d, guard damage %d", left, dmg))
+    H.log(string.format("affordable Quadra Slam: MP 50 -> %d, guard damage %d", left, dmg))
     H.assertEq(dmg > 0, true, "the tech landed its hit (both builds)")
     if mode == "on" then
-      H.assertEq(left, 50 - FLURRY_COST, "ON: flurry charged exactly its table cost (4)")
+      H.assertEq(left, 50 - QSLAM_COST, "ON: Quadra Slam charged exactly its table cost (4)")
     else
-      H.assertEq(left, 50, "OFF: flurry is free -- vanilla behavior, the negative control")
+      H.assertEq(left, 50, "OFF: Quadra Slam is free -- vanilla behavior, the negative control")
     end
     H.screenshot("mpcost_" .. mode .. "_affordable")
   end),
@@ -221,7 +222,7 @@ H.run({ maxFrames = 40000 }, {
   -- The insufficient-mp path is vanilla's own; on the OFF build the tech is
   -- free so there is nothing to refuse -- run this half only under the flag.
   -- The refusal actor is the NEXT of the opening wave (a different, still-full
-  -- slot); Fang (tech 0, cost 1, no boost), MP 0 < 1 fizzles.
+  -- slot); Dispatch (tech 0, cost 1, no boost, window {0,1,2,3}), MP 0 < 1 fizzles.
   H.cond(function() return mode == "on" end, {
     H.driveUntil(function()
       return H.readByte(MENU) ~= 0 and H.readByte(ACTOR) ~= chargeSlot
@@ -233,10 +234,10 @@ H.run({ maxFrames = 40000 }, {
       pin()
       H.log("refuse actor = slot " .. refuseSlot)
     end),
-    latchTech("unaffordable", 0, 0, 7),
+    latchTech("unaffordable", 0, 0, 3),
     H.call(function()
       local left, dmg = mp(refuseSlot), (GUARD_HP * #GUARDS) - guardHp()
-      H.log(string.format("unaffordable fang: MP stayed %d, guard damage %d", left, dmg))
+      H.log(string.format("unaffordable Dispatch: MP stayed %d, guard damage %d", left, dmg))
       H.assertEq(left, 0, "ON: too little MP is REFUSED -- MP not driven negative")
       H.assertEq(dmg, 0, "ON: and the refused tech dealt no damage (fizzled)")
       H.screenshot("mpcost_on_refused")
