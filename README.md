@@ -7,7 +7,7 @@ turn economy.
 
 ## Status
 
-**v0.4 released** ([tag](https://github.com/mtklein/ot6/releases/tag/v0.4)) —
+**v0.4.1 released** ([tag](https://github.com/mtklein/ot6/releases/tag/v0.4.1)) —
 playable from the start through Zozo: the escape from Narshe, the crane
 maze, Dadaluma beaten, and Ramuh's offer on the roof. Magicite are sub-jobs
 now — equip an esper and its spells join your Magic list, with a stat bump,
