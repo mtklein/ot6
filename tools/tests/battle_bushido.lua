@@ -83,7 +83,13 @@ local pinHp = true                    -- off once we want to measure damage
 local spells = {}                     -- every attack id that reached $3410
 
 local function pinCyan()
-  H.writeWord(KNOWN, ceiling)
+  -- issue #4 regression: pin $2020 with a GARBAGE HIGH BYTE, the way InitSkills
+  -- really leaves it (it stores CountBits's uninitialized high byte via `stx`;
+  -- measured $FF02 in the Doma solo fight). Before the byte-read fix in
+  -- Ot6BushidoTier, this read as $FFxx, tripped `>= 8`, and collapsed EVERY
+  -- ceiling to 0 -- Cyan frozen at Dispatch regardless of techs or boost.
+  -- Pinning a clean word here (the old code) is exactly why the suite missed it.
+  H.writeWord(KNOWN, 0xFF00 | ceiling)
   for _, s in ipairs(PARTY) do
     H.writeByte(0x3ED8 + s * 2, 0x02)                 -- CHAR::CYAN
     local st1 = 0x3EE4 + s * 2
