@@ -10841,12 +10841,10 @@ DrawToolsListText:
         sta     w7e5755+5       ; set 1st item id
         lda     wItemList::Index+3,y
         sta     w7e5755+11       ; set 2nd item id
-        lda     w7e6168         ; ot6: blitz mode? swap item-name code $0e -> $0f
-        beq     :+              ;   so both columns render from AttackName
-        lda     #$0f
-        sta     w7e5755+4
-        sta     w7e5755+10
-:       jsr     InitListTextTfr
+        lda     w7e6168         ; ot6: blitz mode? hand the row to bank F0, which
+        beq     :+              ;   swaps both names to AttackName ($0f) and, in
+        jsl     Ot6BlitzRowDecorate ; the priced build, stamps each MP cost after
+:       jsr     InitListTextTfr ;   the name (kept off the FULL C1 bank: one jsl)
         jsr     DrawListText
         ply
         rts

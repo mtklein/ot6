@@ -2132,12 +2132,33 @@ Ot6FoldTbl:
         rtl
 @costed:
         pla                     ; drop the parked cost (it is 0 for these)
+        lda     $3a7b           ; the resolved id (attack id / tool item id)
+        jsl     Ot6CostFor      ; pure table scan: id -> cost in A
+        plp
+        rtl
+.endproc
+
+; ------------------------------------------------------------------------------
+
+; [ price one ability by its id -- the reusable cost authority ]
+;
+; the table SCAN, split out of Ot6AbilityCost so the menu bank can price a row
+; without paying the command gate. Ot6AbilityCost reads $3a7a/$3a7b at queue
+; time; a menu row already HOLDS the id it is about to draw, so it needs only
+; this leaf. PURE: id in A, cost in A ($00 if the id is unpriced), reads no
+; $3a7x. keys are disjoint per verb (blitz $5d-$64, bushido $55-$5c, tools
+; $a3-$aa), so the id alone selects the row. preserves X and Y; a8/i16.
+; rtl (jsl) -- one entry for bank F0 and any cross-bank caller alike.
+.proc Ot6CostFor
+        .a8
+        .i16
         phx
+        pha                     ; park the id to match against each table key
         ldx     #$0000
 @scan:  lda     f:Ot6AbilityCostTbl,x
         cmp     #$ff
-        beq     @free           ; ran off the table: unpriced ability is free
-        cmp     $3a7b           ; the resolved id (attack id / tool item id)
+        beq     @free           ; ran off the table: unpriced id is free
+        cmp     $01,s           ; table key vs the parked id
         beq     @hit
         inx
         inx                     ; 2-byte records: key, cost
@@ -2145,8 +2166,9 @@ Ot6FoldTbl:
 @hit:   lda     f:Ot6AbilityCostTbl+1,x
         bra     @done
 @free:  lda     #$00
-@done:  plx
-        plp
+@done:  sta     $01,s           ; overwrite the parked id with its cost
+        pla                     ; A = cost
+        plx
         rtl
 .endproc
 
@@ -2588,6 +2610,12 @@ done:   plp
         clc                     ;   owes nobody and survives an nmi
         adc     #$5d            ; attack id $5d + blitz index
         sta     $4005,x         ; wItemList::Index
+.if ::OT6_MP_COSTS              ; :: -- ca65 resolves .if in the proc's local
+                                ;   scope; force the file-scope flag
+        jsl     Ot6CostFor      ; A(id) -> A(cost); preserves X and Y
+        sta     $4006,x         ; wItemList::Qty = MP cost -- Qty is otherwise
+                                ;   free here, and the row-draw shim reads it
+.endif
         inx
         inx
         inx                     ; next row
@@ -2600,6 +2628,9 @@ done:   plp
 @pad:   cpx     #$0018          ; 8 rows * 3 bytes
         bcs     @padded
         sta     $4005,x
+.if ::OT6_MP_COSTS              ; :: -- force the file-scope flag from in-proc
+        stz     $4006,x         ; Qty=0: an empty cell's cost draws as two blanks
+.endif
         inx
         inx
         inx
@@ -2626,6 +2657,68 @@ done:   plp
         ; --- raise the blitz-mode flag the row-draw / confirm shims read ---
         lda     #$01
         sta     $6168           ; w7e6168
+        rtl
+.endproc
+
+; ------------------------------------------------------------------------------
+
+; [ draw one Blitz menu row -- the names, and (priced build) their MP cost ]
+;
+; DrawToolsListText (btlgfx, bank C1 -- FULL) jsl's here for a blitz-mode row,
+; in place of the two inline "$0e item-name -> $0f attack-name" stores it used
+; to do. Relocating that swap into bank F0 buys the priced build room to ALSO
+; stamp an MP cost after each name without growing the full C1 bank: the whole
+; feature costs C1 a single 4-byte jsl (net -4 bytes there), the logic all rides
+; here. This is the first menu-bank module -- the visual half of the mp-cost
+; feature the hidden charge has been waiting on.
+;
+; the line buffer w7e5755 already holds the copied Tools template plus the two
+; row ids (the caller wrote Index,y -> +5 and Index+3,y -> +11 before the jsl);
+; w7e6168 is the blitz flag the caller just tested. entry from a jsl: db=$7e
+; (the caller draws through it), a8, Y = drawn-row * 6 -- so Qty,y is the left
+; cell's cost and Qty+3,y the right cell's. clobbers A only (the caller reloads
+; it in InitListTextTfr and never re-uses this derived Y).
+;
+; ALWAYS assembled: the stock C1 object jsl's it in BOTH the priced and the
+; OT6_MP_COSTS=0 baseline build, so it must resolve in both. Only the cost
+; stamping is flag-gated -- the nomp row stays the byte-identical two-name
+; layout. w7e5755 = $5755 near; the numeric literals below are its +4..+15.
+.proc Ot6BlitzRowDecorate
+        php
+        sep     #$20            ; 8-bit A for the byte stores
+        .a8
+        .i16
+        lda     #$0f            ; left cell: render from AttackName, not ItemName
+        sta     $5759           ; w7e5755+4  -- name command, column 1
+.if ::OT6_MP_COSTS              ; :: -- force the file-scope flag from in-proc
+        ; the name is a fixed 10-wide field; stamp a 2-digit MP cost right after
+        ; it, a gap space, then column 2's name and its own cost. ListText cmd
+        ; $02 draws two digits with a blank tens-place, so a 0 cost (a padded
+        ; empty cell, Qty pre-zeroed) renders as two blanks -- a clean gap.
+        lda     #$02
+        sta     $575b           ; +6   number command      (column-1 cost)
+        lda     $4006,y         ; wItemList::Qty,y         (column-1 cost value)
+        sta     $575c           ; +7
+        lda     #$ff
+        sta     $575d           ; +8   space between the columns
+        lda     #$04
+        sta     $575e           ; +9   set-font command
+        lda     #$21
+        sta     $575f           ; +10  white
+        lda     #$0f
+        sta     $5760           ; +11  name command         (column 2)
+        lda     $4008,y         ; wItemList::Index+3,y     (column-2 id, moved)
+        sta     $5761           ; +12
+        lda     #$02
+        sta     $5762           ; +13  number command       (column-2 cost)
+        lda     $4009,y         ; wItemList::Qty+3,y       (column-2 cost value)
+        sta     $5763           ; +14
+        stz     $5764           ; +15  terminator
+.else
+        lda     #$0f            ; nomp baseline: the old layout -- swap column 2's
+        sta     $575f           ;   name only (w7e5755+10), no cost, no re-layout
+.endif
+        plp
         rtl
 .endproc
 

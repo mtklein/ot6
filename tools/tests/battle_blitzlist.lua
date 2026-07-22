@@ -37,7 +37,13 @@ local ST_CMD, ST_TOOLS = 0x05, 0x30
 local CMD_BLITZ = 0x0A
 local CMDTBL, ITEMLIST, KNOWN = 0x202E, 0x4005, 0x1D28
 local PUMMEL, AURABOLT, SUPLEX = 0x5D, 0x5E, 0x5F
-local LEARNED = 0x05                   -- bit0 Pummel + bit2 Suplex; bit1 (AuraBolt) OFF
+local AIRBLADE, BUMRUSH = 0x62, 0x64
+-- MP costs the row-draw stamps (Ot6AbilityCostTbl, ot6.asm), keyed by attack id.
+local COST = { [PUMMEL] = 2, [SUPLEX] = 7, [AIRBLADE] = 12, [BUMRUSH] = 30 }
+-- Learn a set spanning 1- AND 2-digit costs so the screenshot shows the cost
+-- column's real fit: Pummel(2) Suplex(7) AirBlade(12) Spiraler(18) BumRush(30).
+-- bit1 (AuraBolt) stays OFF -- the learned-only assertion still holds.
+local LEARNED = 0xE5                   -- bits 0,2,5,6,7
 
 local PARTY = { 0, 1, 2 }
 -- FF6 English font glyphs: 'A'..'Z' = $80.., 'a'..'z' = $9a.. (the mapping
@@ -106,21 +112,37 @@ H.run({ maxFrames = 40000 }, {
   }, "the blitz list opens (tools-shell state $30)"),
   H.waitFrames(6),                     -- let every row finish drawing
   H.call(function() H.screenshot("blitzlist_window") end),
+  -- the spike deliverable: the open Blitz menu with each name's MP cost drawn.
+  H.call(function() H.screenshot("blitz_cost_display") end),
 
-  -- 1. LEARNED-ONLY ROWS -----------------------------------------------------
+  -- 1. LEARNED-ONLY ROWS + STAMPED MP COST -----------------------------------
   H.call(function()
-    local ids = {}
-    for i = 0, 7 do ids[i] = H.readByte(ITEMLIST + i * 3) end
-    H.log(string.format("wItemList rows: %02x %02x %02x %02x %02x %02x %02x %02x",
+    local ids, qty = {}, {}
+    for i = 0, 7 do
+      ids[i] = H.readByte(ITEMLIST + i * 3)
+      qty[i] = H.readByte(ITEMLIST + i * 3 + 1)     -- wItemList::Qty = the cost
+    end
+    H.log(string.format("wItemList ids : %02x %02x %02x %02x %02x %02x %02x %02x",
       ids[0], ids[1], ids[2], ids[3], ids[4], ids[5], ids[6], ids[7]))
+    H.log(string.format("wItemList cost: %3d %3d %3d %3d %3d %3d %3d %3d",
+      qty[0], qty[1], qty[2], qty[3], qty[4], qty[5], qty[6], qty[7]))
     H.assertEq(ids[0], PUMMEL, "row 0 is Pummel ($5d, bit0)")
     H.assertEq(ids[1], SUPLEX, "row 1 is Suplex ($5f, bit2) -- AuraBolt (bit1) skipped")
-    H.assertEq(ids[2], 0xFF, "row 2 terminates: only the two learned blitzes are packed")
+    H.assertEq(ids[2], AIRBLADE, "row 2 is Air Blade ($62, bit5)")
+    H.assertEq(ids[4], BUMRUSH, "row 4 is Bum Rush ($64, bit7)")
+    H.assertEq(ids[5], 0xFF, "the list terminates after the five learned blitzes")
 
     H.assertEq(findName(NM.Pummel) ~= nil, true, "\"Pummel\" is drawn in the menu")
     H.assertEq(findName(NM.Suplex) ~= nil, true, "\"Suplex\" is drawn in the menu")
     H.assertEq(findName(NM.AuraBolt), nil,
       "\"AuraBolt\" is NOT drawn -- an unlearned blitz never appears")
+
+    -- the cost the row-draw stamps: Ot6BlitzListOpen ran each id through
+    -- Ot6CostFor and parked the price in Qty (Pummel 2, Suplex 7, and the
+    -- 2-digit Bum Rush 30 -- the worst-case width the screenshot must fit).
+    H.assertEq(qty[0], COST[PUMMEL],  "Pummel's stamped cost is 2")
+    H.assertEq(qty[1], COST[SUPLEX],  "Suplex's stamped cost is 7")
+    H.assertEq(qty[4], COST[BUMRUSH], "Bum Rush's stamped cost is 30 (2-digit)")
   end),
 
   -- 2. THE OLD CODE IS DEAD ---------------------------------------------------

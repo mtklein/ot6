@@ -21,8 +21,14 @@ CODE_EXT_INC = 1
 .global Ot6Assassinate           ; divine: Shadow, broken non-boss instant-kill
 .global Ot6StealBoostLevel, Ot6StealSlot   ; boost-tiered steal (chance verb)
 .global Ot6BlitzListOpen         ; v0.3 blitz-as-menu: _c1776b -> tools shell
+.global Ot6BlitzRowDecorate      ; menu-bank: DrawToolsListText's blitz row shim
+                                 ;   (name->$0f swap always; MP cost only under
+                                 ;   OT6_MP_COSTS). ALWAYS defined -- the stock C1
+                                 ;   btlgfx object jsl's it in both builds.
 .global Ot6AbilityCost           ; v0.4 mp-cost hook (only defined/referenced
                                  ;   under OT6_MP_COSTS; a weak decl otherwise)
+.global Ot6CostFor               ; pure leaf: attack/tool id in A -> MP cost in A
+                                 ;   (OT6_MP_COSTS only; battle-object-internal)
 .global Ot6PreviewList_ext
 .global Ot6EsperSpellKnown       ; M5 espers-as-sub-jobs: equipped esper grants
                                  ;   its spells to the in-battle Magic list
