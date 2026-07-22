@@ -92,6 +92,10 @@ local function pinParty()
     H.writeByte(stealRare(ENT_C(s)), cfg.rare)                 -- this scenario's slots
     H.writeByte(stealCommon(ENT_C(s)), cfg.common)
     if cfg.pinHp then H.writeWord(0x3BF4 + s * 2, 999) end
+    H.writeWord(0x3C08 + s * 2, 99)   -- MP: Steal costs 2 MP now (v0.5) -- keep
+                                      --   the stealer solvent so it never fizzles
+                                      --   (the MP economy itself is battle_stealmp's
+                                      --   job; here Steal just has to RESOLVE)
   end
   if actor then
     for _, s in ipairs(PARTY) do                               -- only the actor acts

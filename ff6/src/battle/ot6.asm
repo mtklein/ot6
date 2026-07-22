@@ -2097,6 +2097,17 @@ Ot6FoldTbl:
 ; not one of the three returns vanilla's own A untouched (magic stays priced
 ; on its own ruler, the free floor stays free).
 ;
+; steal (cmd $05) is a fourth costed verb, but a SINGLE ability rather than a
+; list: FixPlayerAttack omits it from CmdWithAttackTbl, so it never earns a
+; per-ability id in a disjoint range (its queue-time $3a7b is the menu's raw
+; attack byte, not a table key). so it takes a FLAT-COST path keyed on the
+; command alone -- cmd $05 -> 2 MP, mp-economy.md's "flat small" for the
+; probe-collect verb -- and never consults the id table. (routing it through
+; the table would also have to dodge a coincidence: steal's own special-effect
+; id $a4, set at execute time in Cmd_05, is already the tool key for
+; BioBlaster.) confirmed absolute (owner, 2026-07-22): only the basic Fight
+; command is free; every other verb costs MP as its kit comes online.
+;
 ; the charge AND the refusal are BOTH already universal (they act on whatever
 ; $3620 -> $3a4c holds); the ONLY magic-specific piece is the menu grey-out /
 ; cost display (CheckMagicEnabled), which is the menu-bank work this whole
@@ -2121,6 +2132,8 @@ Ot6FoldTbl:
         longi
         pha                     ; vanilla cost, parked (restored if we defer)
         lda     $3a7a           ; command
+        cmp     #$05
+        beq     @steal          ; steal: one verb, one flat price -- no id
         cmp     #$07
         beq     @costed         ; bushido
         cmp     #$09
@@ -2129,6 +2142,11 @@ Ot6FoldTbl:
         beq     @costed         ; blitz
         pla                     ; some other verb: hand back vanilla's cost
         plp
+        rtl
+@steal:
+        pla                     ; drop the parked cost (0 for steal)
+        lda     #$02            ; flat 2 MP -- the probe-collect verb prices
+        plp                     ;   like the cheapest spell (mp-economy.md)
         rtl
 @costed:
         pla                     ; drop the parked cost (it is 0 for these)

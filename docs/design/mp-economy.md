@@ -28,17 +28,24 @@ not used.
   level gate, no JP. Signatures become the cheapest rows of
   their kits (1–4 MP), not costless: the driver's directive is
   that verbs free in vanilla — Steal and Tools by name — stop
-  being free under Octopath rules.
+  being free under Octopath rules. **Confirmed absolute (owner,
+  2026-07-22): only the basic Fight command is free — every
+  other verb costs MP as its character's kit comes online. (Item
+  is inventory-gated, not an MP verb.)**
 - **Boost never raises MP cost.** The shipped tier fold queues
   Fire 3 at Fire's cost (DEMO.md): BP is the tier price, MP the
   cast price. That split ports unchanged to every costed verb —
   including the now-shipped **boost-tiered Steal** (kits.md): its
   BP buys the guarantee, and its MP question is unchanged by the
   boost, riding the M4 costing (the "flat small ~2" row below)
-  exactly like every other free-in-vanilla verb. Steal charges no
-  MP today for the same reason the rest don't: the universal
-  charge stays dormant behind OT6_MP_COSTS until the menu can
-  display costs.
+  exactly like every other free-in-vanilla verb. **Steal is
+  costed as of v0.5** (this change): cmd $05 takes a flat-cost
+  path in `Ot6AbilityCost` — a single verb with one price, 2 MP,
+  keyed on the command rather than an ability-id table row (Steal
+  has no per-ability id in the disjoint ranges the id table
+  keys on) — and is charged, and refused when the pool is short,
+  by the same universal machinery as Blitz/Bushido/Tools. With
+  `OT6_MP_COSTS` off it reverts to free, byte-for-byte.
 - **One price scale.** Kit skills live in the same ability
   records as spells (research/data-formats.md), so they price
   on the vanilla spell ruler: Fire 4, Fire 2 20, Fire 3 51.

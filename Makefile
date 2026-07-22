@@ -131,6 +131,7 @@ test: rom nomp-rom $(STATE1) $(STATE2) $(STATE3)
 	tools/tests/suite.sh
 	@echo "-- mpcost A/B: the OFF half (free — the negative control) on the nomp baseline --"
 	OT6_ROM=$(CURDIR)/ff6/rom/ff6-en-nomp.sfc tools/tests/run.sh tools/tests/battle_mpcost.lua
+	OT6_ROM=$(CURDIR)/ff6/rom/ff6-en-nomp.sfc tools/tests/run.sh tools/tests/battle_stealmp.lua
 	@shasum -a 1 build/ot6.sfc | cut -d' ' -f1 > $(STAMP)
 	@echo "suite green — stamped `cat $(STAMP)`"
 
