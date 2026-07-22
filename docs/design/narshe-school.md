@@ -116,9 +116,9 @@ capitalized as proper mechanics; shields stay common.
 
 **$0276 — the rung-2 seed (left room, deepest corner):**
 
-> A deserter from the Empire swears their armored machines shrug off
-> blade and fire alike.{page}``Every armor fears one right tool,'' he
-> said.{n}Find it, and even the Empire Breaks.
+> A deserter from the Empire says their armored machines turn a careless
+> blow aside.{page}``Every plate has its seam, and no two the same,'' he
+> said.{n}Bring the weapon that fits, and even the Empire Breaks.
 
 **$025D — the practice dare (right room, beside the monster chest):**
 
@@ -134,35 +134,32 @@ turn / cap 5 / spend ≤3 (Ot6InitBP, Ot6ActionEnd, Ot6Boost), no regen
 on a boosted turn (Ot6ActionEnd), folds per Ot6FoldTbl with base-tier
 MP (Ot6QueueFold), live list re-fold (Ot6PreviewList_ext).
 
-**⚠ The rung-2 seed ($0276) is now contradicted by the mechanics, and
-the dialog wants a rewrite.** When $0276 shipped, the "armored machines"
-it describes could not answer it, so v0.3 gave the imperial line poison
-(Bio Blaster's element) and the seed read true. The **v0.6
-break-coverage pass retired that framing.** A fixed-party audit found
-poison is Edgar-only, and the parties that fight the imperial line — Cyan
-solo at Doma, all of Sabin's scenario, Locke solo, two of three Narshe
-squads — carry no Edgar, so "one right tool = poison" left the line
-**unbreakable by its own forced parties.** The fix moved the line onto
-**weapon-class** weaknesses (pierce/slash/bludg, per the party). So the
-seed's two promises are now false:
+**The rung-2 seed ($0276) was rewritten under the school's own sanction
+(2026-07-22) to match the v0.6 break-coverage pass.** When $0276 first
+shipped, the "armored machines" it describes could not answer it, so v0.3
+gave the imperial line poison (Bio Blaster's element) and the old seed —
+"shrug off blade and fire alike… every armor fears one right tool" — read
+true. The **v0.6 break-coverage pass retired that framing.** A fixed-party
+audit found poison is Edgar-only, and the parties that fight the imperial
+line — Cyan solo at Doma, all of Sabin's scenario, Locke solo, two of
+three Narshe squads — carry no Edgar, so "one right tool = poison" would
+have left the line **unbreakable by its own forced parties.** The fix
+moved the line onto **varied, per-party** weaknesses
+(pierce/slash/bolt/bludgeon, chosen so every forced party carries a key),
+which made both of the old seed's promises false: a precise blade (pierce)
+and the samurai's cut (slash) are exactly the answer, and there is no
+single "one right tool" — poison is now one Edgar option among several,
+and Leader and Grunt no longer have poison at all.
 
-- "their armored machines **shrug off blade**…" — false: a precise blade
-  (pierce), and the samurai's cut (slash), are exactly the answer.
-- "Every armor fears **one right tool**" — false: there are several,
-  chosen per enemy; poison is one Edgar option among them, and Leader and
-  Grunt no longer have poison at all.
+The seed now teaches the true lesson: armor turns a careless blow aside,
+but every plate has a seam, and no two are the same — bring the weapon
+your party carries. That is the *match the tool to the foe* lesson $0264
+already gestures at, not *one tool fits all armor*. The rewrite was made
+as its own change sanctioned by this doc's fence (above), not a rider on
+the data pass; `school.lua` now asserts the **new** $0276 bytes, so the
+line and its mechanics fail separately if either is reverted.
 
 Full scheme and rationale: bosses-wob.md, "The imperial soldier line."
-
-**The dialog itself was NOT changed by the break pass** — $0276 is a
-story/dialog line, and this doc's fence (above) makes such an edit its
-own sanctioned change, not a rider on a data pass. The seed is left stale
-and flagged: a rewrite is owed, and it should now teach *match the tool
-to the foe* (the general break lesson $0264 already gestures at this)
-rather than *one tool fits all armor*. Until then `school.lua` still
-asserts the old $0276 bytes, so the stale line stays pinned, not
-drifting — and this note is the pointer for whoever takes the school's
-sanction next.
 
 ## Kept vanilla (lesson still true)
 

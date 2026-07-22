@@ -637,7 +637,7 @@
     "Seems you have a piece of Magicite.{page}Want to learn more about Espers?{n}{choice} Yes{n}{choice} No",
     "To use an Esper it must be equipped. Choose ``Skills'' from the menu, then select ``Espers.''{page}During battle, select Magic, and press up on the Control Pad. Press the A Button to use the Esper.{page}Remember, an Esper can only be used once per battle.{page}{n}{tab:9}Learning Magic{page}Learn new spells by equipping Espers. Switch Espers to learn different sets of spells.{page}The higher the ``Learning Speed'' the faster a spell is learned.{page}When equipped, some Espers will raise qualities (Strength, HP, MP etc.) to their maximum limits at the next ``level up.''",
     "Each SwdTech sword has its own unique name.{page}You'll gain more SwdTech skills over time.",
-    "A deserter from the Empire swears their armored machines shrug off blade and fire alike.{page}``Every armor fears one right tool,'' he said.{n}Find it, and even the Empire Breaks.",
+    "A deserter from the Empire says their armored machines turn a careless blow aside.{page}``Every plate has its seam, and no two the same,'' he said.{n}Bring the weapon that fits, and even the Empire Breaks.",
     "Color changes indicate changes in status.",
     "Blue = Rflect{n}{n}Spells are reflected. {wait:8}{key}",
     "Yellow = ``Safe''{n}{n}Defense up! {wait:8}{key}",

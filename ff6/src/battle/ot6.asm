@@ -179,7 +179,7 @@ done:   rtl
 ; the v0.3 arc added ARMOR-LINE rows here under a doctrine the v0.6
 ; break-coverage pass has since RETIRED. the doctrine was the narshe
 ; school's rung-2 seed: "their armored machines shrug off blade and fire
-; alike ... every armor fears one right tool" (narshe-school.md:119-121),
+; alike ... every armor fears one right tool" (narshe-school.md history),
 ; the tool being edgar's bio blaster (item $a4 -> attack $7d, element $08
 ; poison -- battle_main.asm:6577). that made POISON the sole key to the
 ; imperial line, and the fixed-party audit found the hole: the forced
@@ -189,10 +189,11 @@ done:   rtl
 ; all. v0.6 moves the SOLDIER LINE onto weapon-CLASS rows in Ot6ShieldTbl
 ; (pierce/slash/bludg, chosen per the party that actually fights each --
 ; the decode and rationale live there and in bosses-wob.md). poison is
-; now one Edgar key among several, not the one; the school's "shrug off
-; blade / one right tool" seed is contradicted by the new fiction ("a
-; blade finds the gaps") and wants a dialog revision under the school's
-; own sanction -- flagged, not touched here.
+; now one Edgar key among several, not the one; the school's old "shrug
+; off blade / one right tool" seed contradicted the new fiction ("a blade
+; finds the gaps"), so it took a dialog revision under the school's own
+; sanction (2026-07-22, narshe-school.md) -- $0276 now teaches "every
+; plate has its seam ... bring the weapon that fits."
 ;
 ; what REMAINS poison-keyed in this table are the two MACHINES, where a
 ; party that fights them can actually cast it, each row keeping every

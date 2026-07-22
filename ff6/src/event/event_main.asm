@@ -84695,9 +84695,9 @@ _cc36b5:
         return
 _cc36b9:
         dlg $0276
-                ; A deserter from the Empire swears their armored machines shrug off blade and fire alike.
-                ; “Every armor fears one right tool,” he said.
-                ; Find it, and even the Empire Breaks.
+                ; A deserter from the Empire says their armored machines turn a careless blow aside.
+                ; “Every plate has its seam, and no two the same,” he said.
+                ; Bring the weapon that fits, and even the Empire Breaks.
         return
 _cc36bd:
         switch $02A0=1

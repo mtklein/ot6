@@ -318,10 +318,11 @@ dropped vanilla's bolt bit and never mentioned the absorb at all.)
   but it needs writing down where an author will hit it. Edgar's Bio
   Blaster is poison: the Throw/Tools table maps item `$a4` to spell
   `$7d` (battle_main.asm:6577) and that spell's element byte is `$08`.
-  The Narshe school's rung-2 seed still teases that tool as the answer to
+  The Narshe school's rung-2 seed once teased that tool as the answer to
   armored things ("Every armor fears one right tool", narshe-school.md) —
-  a framing the v0.6 break pass retired (see "The imperial soldier line"),
-  but the poison-heal trap here is vanilla and stands regardless. Point
+  a framing the v0.6 break pass retired and the seed's own rewrite has
+  since dropped (see "The imperial soldier line"), but the poison-heal
+  trap here is vanilla and stands regardless. Point
   Bio Blaster at this boss and vanilla's absorb branch
   flips the damage sign and jumps clear past the weakness branch where
   the shield chip lives (battle_main.asm:1850, chip at :1872): the hit
@@ -466,14 +467,14 @@ not to Edgar alone.
 that fights it (Shadow's Bolt Edge / the Magitek bolt beam at the camp),
 so it was never a gap; it carries the bolt half of the palette natively.
 
-**⚠ The school seed is now contradicted, by design.** The rung-2 dialog
-($0276) still says the armor "shrugs off blade" and fears "one right
-tool." The new fiction inverts both — a precise blade *is* the answer
+**The school seed now matches, by design.** The rung-2 dialog ($0276) was
+rewritten under the school's own story/dialog sanction (narshe-school.md's
+fence) to teach the new fiction — armor turns a careless blow aside, but
+every plate has a seam, and no two are the same; bring the weapon that
+fits. Both of the old promises are gone: a precise blade *is* the answer
 (pierce/slash), and there are several tools, not one. The class rows are
-the mechanic; the shipped dialog is stale and wants a rewrite under the
-school's own story/dialog sanction (narshe-school.md's fence). Flagged
-here and in that doc; **not** edited in this pass — a dialog change is out
-of scope for a data/break pass.
+the mechanic; `school.lua` now pins the new dialog bytes, so text and data
+fail separately if either drifts.
 
 **The one place theme bent to coverage.** The palette's default for
 armored soldiers is pierce+bolt, but the Doma courtyard defense party
