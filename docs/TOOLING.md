@@ -20,9 +20,9 @@ Top-level `Makefile` targets:
 | Target | Does |
 |---|---|
 | `make rom` | verify base-ROM SHA1 → build `ff6/rom/ff6-en.sfc` → copy to `build/ot6.sfc` |
-| `make test` | full headless correctness gate: the `compose.py --selftest` and frontier-stamp selftests, then the marker-discovered suite (`tools/tests/suite.sh`), then the MP-cost A/B on the flagged variant; stamps the passing ROM's sha1. Exit code = pass/fail |
+| `make test` | full headless correctness gate: the `compose.py --selftest` and frontier-stamp selftests, then the marker-discovered suite (`tools/tests/suite.sh`) — which runs the MP-cost A/B's charge+refusal half on the shipped ROM — then the free-behavior half on the `nomp` baseline; stamps the passing ROM's sha1. Exit code = pass/fail |
 | `make tested` | gate: refuse unless `build/ot6.sfc` is the exact ROM `make test` last passed on (guards distributables) |
-| `make mpcost-rom` | build the `OT6_MP_COSTS` ("every ability costs MP") ON variant `ff6/rom/ff6-en-mp.sfc` and assert it differs from the shipped OFF ROM — the A/B's ON half |
+| `make nomp-rom` | build the `OT6_MP_COSTS=0` baseline `ff6/rom/ff6-en-nomp.sfc` (the pre-feature vanilla-OT6 build) and assert it differs from the shipped ON ROM — the A/B's OFF control (since v0.5 the shipped ROM charges MP; "every ability costs MP" is live by default) |
 | `make patch` | (needs `tested`) emit the distributable BPS `build/dist/ot6-from-ff3us10.bps` (Flips; stores only what differs from the base ROM) |
 | `make release` | build, run the full gate, then emit `build/release/ot6-v$(VERSION).bps` plus release notes |
 | `make run` | open the built ROM in Mesen (GUI) |

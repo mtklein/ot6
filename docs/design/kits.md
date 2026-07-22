@@ -137,8 +137,8 @@ affords the low ladder (Fang/Sky/Tiger/Flurry = 1/2/3/4) and outgrows the rest
 on his level schedule, so a light column keeps him acting while the bank
 builds — the whole point of the one kit where banking BP has intrinsic purpose.
 These numbers live in `Ot6AbilityCostTbl` (ff6/src/battle/ot6.asm), charged
-only under the `OT6_MP_COSTS` build flag (default off until the menu can
-display them — see mp-economy.md).
+under the `OT6_MP_COSTS` build flag — which **v0.5 flipped ON by default**, so
+the shipped ROM charges them (see mp-economy.md).
 
 **Shipped (M3).** `Ot6BushidoTier` (ff6/src/battle/ot6.asm) replaces the
 charge gauge's clock in `UpdateMenuState_37`; the window, its numerals,

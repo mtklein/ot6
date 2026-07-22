@@ -18,16 +18,19 @@
 .include "macros.inc"
 .include "code_ext.inc"
 
-; ot6 (v0.4): "every ability costs MP". Default OFF -- the charge machinery
-; (Ot6AbilityCost + Ot6AbilityCostTbl, ot6.asm) lands tested-but-DORMANT
-; until the menu bank can DISPLAY and grey-out these costs (needs the Calypsi
-; C toolchain, not yet reinstalled). A silent charge on a menu that shows no
-; cost is a hidden tax and must not ship, so the whole mechanic gates on this
-; one build-time symbol. Build the ON variant with `-D OT6_MP_COSTS=1`; with
-; the flag off (the shipped ROM) NOT ONE byte of the machinery is assembled,
-; so the ROM is byte-identical to vanilla-OT6. See docs/design/mp-economy.md.
+; ot6 (v0.5): "every ability costs MP" -- now LIVE by default. The charge
+; machinery (Ot6AbilityCost + Ot6AbilityCostTbl, ot6.asm) prices Blitz,
+; Bushido and Tools at queue time. v0.4 shipped it DORMANT (default off)
+; because a charge on a menu that shows no cost is a hidden tax; v0.5 turns it
+; ON as the headline combat-economy change, alongside the menu-bank cost
+; display that ends the silence. This symbol stays the ONE build-time gate:
+; the default (1) is the shipped, charging ROM, and an explicit
+; `-D OT6_MP_COSTS=0` reassembles the pre-feature vanilla-OT6 baseline -- NOT
+; one byte of the machinery -- kept as the differ-checked regression control
+; (ff6-en-nomp; tools/tests/battle_mpcost.lua proves both halves). See
+; docs/design/mp-economy.md.
 .ifndef OT6_MP_COSTS
-OT6_MP_COSTS = 0
+OT6_MP_COSTS = 1
 .endif
 
 ; ------------------------------------------------------------------------------

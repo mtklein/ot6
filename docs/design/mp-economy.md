@@ -233,7 +233,9 @@ pass still watches Osmose-cycling next to Facet + Rune Eater.
 ## Where it lands
 
 - **M4 — costs and refill. The charge side is BUILT (v0.4),
-  dormant behind a flag.** The prediction below held exactly:
+  and v0.5 flipped it ON by default** (see "Why dormant" below —
+  the flag now ships live; the shipped ROM charges MP). The
+  prediction below held exactly:
   the code was one dispatch change. Vanilla's `GetMPCost`
   (battle_main.asm) prices only magic/lore/summon/x-magic;
   every other command — Blitz, Bushido, Tools, the free floor —
@@ -260,15 +262,18 @@ pass still watches Osmose-cycling next to Facet + Rune Eater.
     hidden tax, and there is no honest subset that can ship
     enabled now (no new verb's menu can show a cost without the
     menu-bank work, which needs the not-yet-reinstalled Calypsi
-    C toolchain). So the whole mechanic gates on a build-time
-    flag **`OT6_MP_COSTS`, default off**: with it off, not one
-    byte of the machinery is assembled and the ROM is
-    byte-identical to the pre-feature baseline; with it on
-    (`make -C ff6 ff6-en-mp`), the charge and refusal land. The
-    A/B is proven both ways by `tools/tests/battle_mpcost.lua`
-    (self-detecting: charge+refusal on the ON ROM, free+absent on
-    the shipped OFF ROM). It flips on the day the menu can
-    display costs — see the menu work order below.
+    C toolchain). So the whole mechanic gated on a build-time
+    flag **`OT6_MP_COSTS`**. **v0.5 flipped it: the flag now
+    defaults ON, so the shipped ROM charges MP — the headline
+    v0.5 combat-economy change, landing alongside the menu-bank
+    cost display that ends the silence.** An explicit
+    `-D OT6_MP_COSTS=0` still reassembles the pre-feature
+    vanilla-OT6 baseline (not one byte of the machinery,
+    byte-identical to what shipped before), kept as the
+    differ-checked regression control (`make -C ff6 ff6-en-nomp`
+    → `ff6-en-nomp.sfc`). The A/B is proven both ways by
+    `tools/tests/battle_mpcost.lua` (self-detecting: charge+refusal
+    on the shipped ON ROM, free+absent on the `nomp` baseline).
   - The level-up refill (the income half) is NOT built here — it
     is a separate battle-bank hook where level-ups apply
     (DoLevelUp), and costs+refill must ship together (costs alone

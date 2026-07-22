@@ -1,25 +1,29 @@
 -- @suite
--- battle_mpcost.lua -- v0.4 "every ability costs MP": the OT6_MP_COSTS A/B.
+-- battle_mpcost.lua -- v0.5 "every ability costs MP": the OT6_MP_COSTS A/B.
 --
 -- ONE self-detecting instrument, run on BOTH builds (this is the whole A/B the
 -- task asks for -- the same technique the fix_checksum rewrite used, lifted
--- from bytes to behavior):
---   * on the shipped, flag-OFF ROM (build/ot6.sfc, the suite's default) the
---     cost table is ABSENT from bank F0 -- none of the machinery is assembled,
---     the ROM is byte-identical to the pre-feature baseline (94cc426...) -- so
---     the test asserts the verb is FREE (vanilla behavior). This is the
---     negative control: the identical Bushido tech charges nothing.
---   * on the flag-ON variant (build/ot6-mpcosts.sfc, built by `make -C ff6
---     ff6-en-mp`, handed here via OT6_ROM) the table is present with kits.md's
---     numbers, and the test asserts the CHARGE and the insufficient-mp REFUSAL.
+-- from bytes to behavior). v0.5 flipped the flag ON by default, so the A/B's
+-- premise INVERTS: the SHIPPED ROM now charges, and the flag-OFF build is the
+-- control.
+--   * on the shipped, flag-ON ROM (build/ot6.sfc, the suite's default) the
+--     cost table is PRESENT in bank F0 with kits.md's numbers, so the test
+--     asserts the CHARGE and the insufficient-mp REFUSAL. This is the live
+--     shipped behavior.
+--   * on the flag-OFF baseline (ff6/rom/ff6-en-nomp.sfc, built by `make -C ff6
+--     ff6-en-nomp`, handed here via OT6_ROM) the cost table is ABSENT from
+--     bank F0 -- none of the machinery is assembled, the ROM is byte-identical
+--     to the pre-feature vanilla-OT6 baseline -- so the test asserts the verb
+--     is FREE. This is the negative control: the identical Bushido tech
+--     charges nothing.
 --
 -- The mechanism under test: vanilla's GetMPCost prices only magic/lore/summon/
 -- x-magic; Blitz/Bushido/Tools fall through it at 0, so the universal charge
 -- at CalcAttackEffect ($3a4c subtract, insufficient-mp fizzle) never fires for
 -- them. Ot6AbilityCost (ot6.asm) swaps that 0 for the kit price keyed by the
--- id already in $3a7b. Charge AND refusal are both already universal -- only
--- the menu grey-out/display is magic-specific, which is the menu-bank work
--- this flag waits on (docs/design/mp-economy.md).
+-- id already in $3a7b. Charge AND refusal are both universal; the menu
+-- grey-out/display that ships alongside (menu bank) is what let the flag turn
+-- on (docs/design/mp-economy.md).
 local H = dofile("/Users/mtklein/ot6/tools/tests/lib/ot6.lua")
 local STATE = "/Users/mtklein/ot6/build/states/battle_doorstep.mss.lua"
 

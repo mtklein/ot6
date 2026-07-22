@@ -122,7 +122,17 @@ local toolTurns, nudges, tgtMask = 0, 0, nil
 -- Keep the party upright: Vargas hits hard, a wipe ends the run before it
 -- has measured anything, and party HP is not what any of this is about.
 local function pinParty()
-  for e = 0, 3 do H.writeWord(0x3BF4 + e * 2, H.readWord(0x3C1C + e * 2)) end
+  for e = 0, 3 do
+    H.writeWord(0x3BF4 + e * 2, H.readWord(0x3C1C + e * 2))   -- HP = max: no wipe
+    -- v0.5 costs are LIVE. This test drives Edgar's BioBlaster (8 MP) across
+    -- ~8 tool turns (the Ipooh-gate walk, see "WHY THE IPOOH POKE") plus
+    -- Sabin's AuraBolt (5) and Pummel (2). Edgar's WoB pool (~19) cannot fund
+    -- eight 8-MP casts, and this test is about the CHIP CLASSES, not scarcity,
+    -- so pin MP high (both cur and max -- max is below the 8-MP cost here) so a
+    -- costed verb never fizzles mid-drive.
+    H.writeWord(0x3C30 + e * 2, 99)                          -- max MP
+    H.writeWord(0x3C08 + e * 2, 99)                          -- current MP
+  end
 end
 
 -- metrics_battle's liveness criterion (the hud builder's own): present bit

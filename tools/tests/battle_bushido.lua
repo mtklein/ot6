@@ -95,6 +95,11 @@ local function pinCyan()
     H.writeByte(0x3BA4 + s * 2, H.readByte(0x3BA4 + s * 2) | 0x02)
     H.writeByte(0x3BA5 + s * 2, H.readByte(0x3BA5 + s * 2) | 0x02)
     H.writeWord(0x3BF4 + s * 2, 999)                  -- nobody dies mid-bench
+    -- v0.5 costs are LIVE: pin MP high so the costed tech never fizzles on an
+    -- empty pool (the intro fixture's installed slots carry little/no MP).
+    -- Scarcity is not this test's subject -- the tier ladder and the chip are.
+    H.writeWord(0x3C08 + s * 2, 99)                   -- current MP
+    H.writeWord(0x3C30 + s * 2, 99)                   -- max MP (nothing clamps it)
   end
   if actor and pinBp then H.writeByte(0x3E9C + actor * 2, 5) end
   if actor and pinPend then H.writeByte(0x3E9D + actor * 2, pinPend) end
