@@ -308,3 +308,70 @@ Corrections to the scoping assumptions, measured while authoring the Opera:
 **Fixtures banked (gated):** `opera_doorstep` (map 209 Jidoor impresario), `opera_open` (map 237, `$0340=1`).
 
 **Remaining in Beat A** (boot `opera_open`): the intro drives to **map 234 backstage (16,46), `$0055=1`**; then aria nav (234 → stage door → map 238 trigger, gated `$0056=1`) → {0,1,0} → the **rafter chase** (catwalk maze 233→231→239→232 + `$0355` + likely timer) → **Ultros ②** kill-bit (`ultros2_won`) → Setzer + Blackjack (`setzer_joined`).
+
+## Beat A — second pass: legs 3–4 banked, flower-dance blocker (2026-07-22)
+
+Two more legs banked as gated FRONTIER links, the aria forks solved, and the
+aria's post-fork **flower dance** hit as the blocker. Everything below is
+measured (probes `probe_opera_aria`/`_route`/`_stage`/`_ariafire`/`_aria3`/
+`_dance*`/`_objscan`, all committed).
+
+**Fixtures banked (gated):**
+- **`opera_backstage`** (`gen_opera3_backstage`) — `opera_open` → talk the
+  IMPRESARIO (`_caae15`) → RIDE the performance intro → controllable on **map
+  234 (the THEATER SEATING), {16,46} facing DOWN, `$0055=1`**. The intro is
+  *not* ~14,400 frames (survey guess): it settles to control near frame ~6k;
+  the ride terminates on 30 straight `settled()` frames on a non-237 map.
+- **`opera_stage`** (`gen_opera4_stage`) — backstage → **Route A** onto the
+  stage: **map 238 {99,20}, `$0056=1`** (aria ARMED), one `navTo(97,7)` from
+  the aria.
+
+**Door topology (decoded from `short_entrance.dat`, maps 234/237/238):**
+- 234 stage doors `{4,24}`→238`{117,14}` and `{28,24}`→238`{114,36}` **both
+  land in a 238 BACKSTAGE region (x≥109) that is passability-DISCONNECTED from
+  the stage.** The stage is reached via the opera-house interior instead:
+- **Route A:** 234`{25,49}`→237`{72,32}` (theater floor exit) → walk RIGHT to
+  237`{82,32}`→238`{100,22}` (the stage door) → talk CELES `{99,19}`
+  (`obj_event _caba44`→`_cabaa8`, sets `$0056=1`, returns control at `{99,20}`)
+  → the aria trigger `_cabafd {97,7}` fires (gate `$0056=1 & $0057=0`).
+  237's IMPRESARIO is at `{60,48}`, off the `{72,32}`→`{82,32}` walk, so the
+  performance trigger is never re-armed in passing.
+
+**The aria forks — SOLVED.** Step onto 238`{97,7}` → `_cabafd` fades and loads
+**map 236 (the castle stage)**. Three chained `choice` dialogs, correct
+sequence **{0,1,0}** (fork1 `_cabb3d`(0)/`_cabb35`(1); fork2 `_cabc1d`(0)/
+`_cabc25`(1); fork3 `_cabc71`(0)/`_cabc69`(1)). Driven clockPick-style off
+`$056e`/`$056f` (see `probe_opera_aria3.lua`); the three correct picks ride the
+long music-synced choreography cleanly, no fail, ending with control **as CELES
+at map 236 {5,21}**.
+
+**THE BLOCKER — the flower dance (map 236 stairs, under a timer).** After the
+forks, `start_timer 0, 2336, _cabd21` runs; on expiry `_cabd21`→fail→`load_map
+0` (dumped to the world). Measured grace ≈2287 frames from control-return. To
+reach `$0111=1` (aria solved) the party must:
+1. Complete the **Draco waltz**: NPC `{12,14}`=DRACO (`_cabd35`, gated `$0300`)
+   → touch him 3× to set `$01F0`→`$01F1`→`$01F2` (`_cabd5c`/`_cabd6a`/`_cabd7a`),
+   he leads/moves each time.
+2. Then the **FLOWERS** appear: NPC `{12,19}` (`_cabf27`, gfx FLOWERS) → touch
+   → `$0057=1` (it is *not* interactable before the waltz — measured: standing
+   on `{12,19}` with A does nothing).
+3. Then the **balcony**: step trigger `{8,9}`=`_cabe6d` (gate `if $0057=0
+   EventReturn`) → the final verses → **`$0111=1`**, lands 238`{98,7}`.
+
+The obstruction is **map-236 stair navigation**: tiles `03`/`09`/`0B` break the
+`canStep`/`bfsPath` model — CELES oscillates in the `(13–14,18–19)` pocket and
+cannot climb to Draco `{12,14}`, the flowers `{12,19}`, or the balcony `{8,9}`.
+Four driver strategies (manhattan-greedy, adaptive nearest-NPC chase,
+flowers-first, x=12 column-climb) all stalled there; `$01F0` set at most once,
+never `$01F1`+, and the field-object array (`stride 0x29`, X@`$086a` Y@`$086d`;
+CELES=obj#6, play NPCs obj#3`(14,18)`/#7#8#10#12`(13–15,13)`/#9`(8,6)`) shows the
+NPCs not visibly moving. **What's needed:** a hand-coded map-236 stair
+tile→direction table (the `gen_zozo4_dadaluma` `corridorFollow` precedent),
+plus the exact Draco talk-positions/object-id per waltz step, fit inside the
+~2336-frame timer. This gates ALL downstream Beat A work (rafters/Ultros②/
+Setzer sit past `$0111=1`). `battle_ultros2.lua` stays skipped until
+`ultros2_doorstep` exists.
+
+Dev checkpoint (not gated, timer-running): `aria_postfork.mss` — map 236 {5,21}
+just after the forks, minted by `probe_opera_postfork.lua` for fast dance
+iteration.
