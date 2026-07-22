@@ -1,6 +1,7 @@
 *.smc
 *.sfc
 *.srm
+*.bps
 /build/
 # no trailing slash: in agent worktrees these are SYMLINKS to the main
 # tree (tools/worktree-setup.sh), and dir-only patterns do not match those
