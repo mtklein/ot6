@@ -2278,14 +2278,22 @@ Ot6AbilityCostTbl:
                                 ;   after us; the latch site does not), and
                                 ;   OT6_SCR_BIT is the hud builder's. the
                                 ;   stack owes nobody and survives an nmi.
-        ldx     $2020           ; techs known - 1. a WORD (InitSkills stores
-                                ;   it with stx, battle_main.asm:14495), and
-                                ;   $ffff on every save before cyan joins —
-                                ;   which our own test fixture is.
-        cpx     #$0008
+        lda     $2020           ; techs known - 1, LOW BYTE ONLY (issue #4).
+                                ;   the value is 0-7, but InitSkills stores it
+                                ;   with a 16-bit `stx $2020` (battle_main.asm:
+                                ;   14532) and CountBits leaves that store's HIGH
+                                ;   byte uninitialized -- $FF02 in the Doma solo
+                                ;   fight, $ffff before cyan joins. read as a WORD
+                                ;   (old `ldx`), the junk high byte makes even a
+                                ;   real 2-tech ceiling test `>= 8` and collapse
+                                ;   to 0, pinning Cyan to Dispatch no matter his
+                                ;   techs or boost. read a8: the junk high byte is
+                                ;   ignored, and a genuinely-unlearned $ff (low
+                                ;   byte) still trips >= 8 into the fang path.
+        cmp     #$08
         bcc     :+
-        ldx     #$0000          ; nothing learned: fang is all there is
-:       txa                     ; ceiling, 0-7
+        lda     #$00            ; nothing learned: fang is all there is
+:       ; a = ceiling, 0-7
         cmp     $01,s           ; ... against the band top (the pushed word's
         bcc     :+              ;   low byte). below it: the ceiling IS the
         lda     $01,s           ;   level; else the band top is
