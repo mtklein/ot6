@@ -663,6 +663,17 @@ FRONTIER += opera_backstage
 build/states/opera_stage.mss.lua: build/states/opera_backstage.mss.lua
 	$(call mint,opera_stage,gen_opera4_stage)
 FRONTIER += opera_stage
+# gen_opera5_dance: opera_stage -> fire the aria trigger {97,7} -> map 236 -> the
+# lyric forks {0,1,0} -> the FLOWER DANCE.  Map 236 is z-split (09 upper / 02
+# lower / 03,0b bridges), which breaks bfsPath, so the two stair legs run on
+# HAND-CODED per-tile tables (corridorFollow).  Waltz DRACO (obj#19 @ {12,19})
+# x3 by greedy-chase in the uniform basin -> flowers (obj#16) -> $0057; then
+# climb the z-split stairs to the balcony {8,9} -> _cabe6d stops the timer and
+# rides the wedding-waltz finale (load 233 rafters -> load 238) -> $0111=1.
+# Mints opera_dance_done on map 238 {98,7} -- the aria solved (blocker cracked).
+build/states/opera_dance_done.mss.lua: build/states/opera_stage.mss.lua
+	$(call mint,opera_dance_done,gen_opera5_dance)
+FRONTIER += opera_dance_done
 
 frontier: rom $(STATE1) $(STATE2) $(STATE3) \
           $(patsubst %,build/states/%.mss.lua,$(FRONTIER))
