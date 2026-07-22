@@ -375,3 +375,52 @@ Setzer sit past `$0111=1`). `battle_ultros2.lua` stays skipped until
 Dev checkpoint (not gated, timer-running): `aria_postfork.mss` — map 236 {5,21}
 just after the forks, minted by `probe_opera_postfork.lua` for fast dance
 iteration.
+
+## Beat A — third pass: the flower dance is CRACKED ($0111=1, gated)
+
+`gen_opera5_dance.lua` mints **`opera_dance_done`** (FRONTIER-gated, `make test`
+green) — map 238 {98,7}, `$0111=1`, the aria SOLVED. Everything below is
+measured (probes `probe_opera_geom`/`_occ`/`_dance5`–`_dance8`, all committed).
+
+**The blocker was a Z-SPLIT map, not "stairs break canStep."** Map 236's p1
+tile props partition the floor by z-level: **`09` = upper-z only, `02` =
+lower-z only, `03`/`0b` = both-z BRIDGE tiles** (stepping OFF a `09` drops the
+party to z=1, off a `02` to z=2, off a `03`/`0b` KEEPS z — player.asm `zAfter`).
+The lib's `bfsPath` seeds one z and *simulates* `zAfter` along each candidate
+path, but the live engine's z diverges across the `09`↔`02`↔`03`↔`0b` joins, so
+`bfsPath` returns **no path** from the postfork basin (5,21) to the dance area.
+Confirmed by `probe_opera_dance5` (no path to (12,19)/(8,9)/(12,14)). The fix is
+`gen_zozo4_dadaluma`'s `corridorFollow` verbatim: **two hand-coded per-tile
+direction tables** driven one `canStep`-gated step at a time on the **live z**
+(always correct), pulsing the pad so no press outlives its step.
+
+**The record's Draco/flowers coordinates were SWAPPED.** Measured truth:
+- **DRACO = obj#19 (=NPC_4=$13) starts AT (12,19)**, OCCUPYING it — that
+  occupancy (`$7E2000` bit7 clear, `probe_opera_occ`) is what SEALS the basin
+  from the upper region. (12,14) is just open floor above.
+- **Stand at (11,19)** (basin edge, reachable) and touch Draco to the RIGHT.
+  Each touch runs `_cabd35`/`_cabd5c`/`_cabd6a`: he leads a SLOW step that hops
+  him a few tiles around the basin — all uniform `09`, so a **greedy `canStep`
+  chase catches him** — and sets `$01F0`→`$01F1`→`$01F2`.
+- A **4th touch** runs `_cabd7a`: Draco is hidden, the **FLOWERS (obj#16=NPC_1)
+  spawn at (12,19)**. Touch them (`_cabf27`) → `$0057=1`, which moves NPC_1 away
+  and **FREES (12,19)** — only now does the climb to the upper region open.
+- **Balcony:** climb (12,19)→(12,14) up the x=12 corridor, RIGHT to (14,14), UP
+  the `0b` column (14,13/12/11)→(14,10), LEFT along y=10 to (11,10), UP to the
+  y=9 strip, LEFT to (8,9). The route **detours right/up AWAY from (8,9)** —
+  exactly why the prior manhattan-greedy drivers oscillated. Stepping onto (8,9)
+  fires `_cabe6d` (gated `$0057`): it **`stop_timer`s**, then rides the
+  wedding-waltz finale (TEXT_ONLY verses → `load_map 233` rafters →
+  `load_map 238`) and sets **`$0111=1`** on 238 at (98,7). `rideOpen`
+  (gen_opera3's stall-safe A/START rider) carries that untimed tail.
+
+**Timing:** the 2336-frame timer arms as control returns on 236 (~2287 grace);
+climb+waltz+flowers+balcony-to-(8,9) measured ~1348 frames — comfortable margin.
+
+**Fixtures banked (gated):** `opera_dance_done` (`gen_opera5_dance`).
+
+**Remaining in Beat A** (boot `opera_dance_done`, map 238 {98,7} `$0111=1`): the
+**rafter chase** (Ultros drops in — `_cabf31`/`_cabf3e` dlg $04C8, `$0058=1`;
+catwalk maze 233→231→239→232 + `$0355` + a timer → **battle 134 Ultros②**
+`$012d`·6·slash|pierce, kill-bit `ultros2_won`) → Setzer + the Blackjack.
+`battle_ultros2.lua` stays skipped until `ultros2_doorstep` exists.
