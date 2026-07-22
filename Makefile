@@ -649,6 +649,20 @@ FRONTIER += opera_doorstep
 build/states/opera_open.mss.lua: build/states/opera_doorstep.mss.lua
 	$(call mint,opera_open,gen_opera2_open)
 FRONTIER += opera_open
+# gen_opera3_backstage: opera_open -> talk the IMPRESARIO (_caae15) -> RIDE the
+# performance intro -> the party lands controllable BACKSTAGE in the theater,
+# map 234 {16,46}, $0055=1 (performance underway).  Mints opera_backstage.
+build/states/opera_backstage.mss.lua: build/states/opera_open.mss.lua
+	$(call mint,opera_backstage,gen_opera3_backstage)
+FRONTIER += opera_backstage
+# gen_opera4_stage: opera_backstage -> ROUTE A onto the STAGE.  The theater's
+# stage doors {4,24}/{28,24} land in a disconnected 238 backstage, so the stage
+# is reached via the opera-house interior: 234 {25,49}->237 {72,32}, walk to
+# 237 {82,32}->238 {100,22}; then talk CELES {99,19} (_caba44) to ARM the aria
+# ($0056=1).  Mints opera_stage, parked {99,20} one navTo from the aria {97,7}.
+build/states/opera_stage.mss.lua: build/states/opera_backstage.mss.lua
+	$(call mint,opera_stage,gen_opera4_stage)
+FRONTIER += opera_stage
 
 frontier: rom $(STATE1) $(STATE2) $(STATE3) \
           $(patsubst %,build/states/%.mss.lua,$(FRONTIER))
