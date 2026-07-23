@@ -4,17 +4,25 @@
 # explicit expected-fail list. Nonzero exit on any unexpected result.
 #
 # OT6_JOBS=N fans the tests out across N isolated run.sh workers
-# (OT6_WORKER; default 4 = the P-core knee, 1 = serial). Every suite test
-# is a pure savestate load -- the mints (gen_battle_state, gen_battle2)
-# run as Makefile prerequisites BEFORE the suite -- so tests are
-# independent and fan out freely. Tests are composed once up front:
-# composing reads lib/ot6.lua + lib/ot6_field.lua live, and a mid-suite
-# edit must not split the suite across two libs.
+# (OT6_WORKER; 1 = serial). Every suite test is a pure savestate load -- the
+# mints (gen_battle_state, gen_battle2) run as Makefile prerequisites BEFORE
+# the suite -- so tests are independent and fan out freely. Tests are composed
+# once up front: composing reads lib/ot6.lua + lib/ot6_field.lua live, and a
+# mid-suite edit must not split the suite across two libs.
+#
+# The default is the machine's P-core count (perflevel0), not a fixed number.
+# Measured on an M4 Max (10 P-cores, 42-test suite): the LPT makespan is
+# CPU-bound until ~6 workers (113s at 4 -> 83s at 6) and then FLAT -- past that
+# the wall is a single test, battle_class (~78s), which no fan-out can split.
+# So the P-core count auto-sizes to the CPU-bound region and self-caps at the
+# floor; over-provisioning workers is harmless (idle pull-queue slots), the old
+# hardcoded 4 just left P-cores idle on anything bigger than a 4-core part. To
+# push under the floor you must shorten battle_class itself, not add workers.
 set -u
 ROOT="$(cd "$(dirname "$0")/../.." && pwd)"
 RUN="$ROOT/tools/tests/run.sh"
 SHOTS="$ROOT/build/states/shots"
-JOBS="${OT6_JOBS:-4}"
+JOBS="${OT6_JOBS:-$(sysctl -n hw.perflevel0.logicalcpu 2>/dev/null || echo 4)}"
 # -------------------------------------------------------------- test discovery
 # Suite membership is SELF-DECLARED, one marker per test file, so adding a test
 # is a one-line edit to that test's OWN .lua -- never the shared list that every
