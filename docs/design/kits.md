@@ -190,12 +190,21 @@ same reason folded spells are: the points bought the tech, so they must not also
 buy damage. Spend the window cannot use (three points at L1 still buys Fang) is
 spent, not refunded — the deal a mage already takes on a third point on Fire.
 
-**The Bushido menu UI is still the vanilla numeral gauge** — converting it to
-show the four windowed techs by name + MP cost + grey-out is deferred: it is a
-genuine redesign of the bespoke numeral-gauge window in the *stock* btlgfx bank
-(a new window template + rewritten NMI DMA + a battle-bank renderer to keep the
-nomp baseline byte-identical), not a decorator stamp like Blitz/Tools. It lands
-with the loadout follow-up, which shares the same window.
+**The Bushido menu UI is a name + cost submenu** (#8 Layer A). SwdTech no longer
+opens the vanilla numeral gauge; `OpenCmdMenuTbl[7]` is repointed to a tools-shell
+submenu (the same route Blitz took) that lists the four moving-window techs by
+name + MP cost, greyed when the caster can't afford the MP *or* the BP. This
+sidestepped the bespoke numeral-gauge redesign once weighed against it: rather
+than a new window template + NMI DMA rewrite, it reuses the Tools window shell,
+`Ot6CostFor`, and `Ot6AbilityGrey`, with all cost/grey logic gated `.if
+OT6_MP_COSTS` so the nomp baseline is undisturbed. The **cursor row is the boost
+level** (row 0 = boost 0× … row 3 = boost 3×), so picking a stronger tech spends
+more BP — the spend-BP-to-reach-the-stronger-cut tension the numeral gauge had,
+now legible. Confirm banks `$3e9d = r` and reuses `Ot6BushidoTier` to latch the
+base+r tech; a row the caster lacks the BP for is greyed and refuses on confirm.
+`SwdTech`'s names render from `BushidoName` (not `AttackName`, whose $55–$5c slots
+are empty pad). The player-configurable **loadout** menu (#8 Layer B) is the
+follow-up and shares this submenu.
 
 Note the Chip column above is finer-grained than what ships: the class
 table (`ot6_class.asm:185-192`) marks all eight slashing, per
