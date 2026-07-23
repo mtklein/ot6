@@ -451,35 +451,42 @@ local B_SWITCH_LIVE = 0x3EBD          -- $3EB4 + ($4C >> 3); bit4 = $4C
 local function pinParty()
   for e = 0, 3 do H.writeWord(0x3BF4 + e * 2, H.readWord(0x3C1C + e * 2)) end
 end
+-- THREE OT6 corrections make this STEAL land (each measured; without them the
+-- steal misses forever -- 32 attempts, identical frames, $3EBD never moves):
+--  1. STEAL COSTS 2 MP (ot6.asm Ot6AbilityCost @steal, "flat small").  The
+--     charge+refusal is universal, so a char below 2 MP has the command REFUSED
+--     -- the menu confirms but no action queues (TargetEffect_52's $3401 never
+--     fires).  Solo early Locke has too little, so pin battle MP ($3C08) up.
+--  2. STEAL IS A BOOST-TIERED CHANCE VERB (ot6.asm Ot6StealBoostLevel, hooked
+--     at battle_main.asm:9366): 0 bp rolls RAW vanilla odds (~0 for this
+--     underleveled Locke vs the Merchant), 3 bp is CERTAIN.  Force banked+pending
+--     boost ($3e9c/$3e9d, even char offsets 0,2,4,6) to the cap.
+--  3. THE COMMAND CURSOR DOES NOT MOVE on a held d-pad here (measured), so the
+--     old down+A picked FIGHT.  Poke STEAL ($05) into ALL of the actor's command
+--     cells (CMDTBL 0x202E, stride 12/entity, 3/cell -- gen_vargas's Blitz-poke
+--     idiom) so the resting cursor + A = STEAL; a second A takes the lone enemy.
+local CMDTBL = 0x202E
 local function stealDriver(what, maxF)
-  local prog = { { 6, { "down" } }, { 10, {} }, { 6, { "a" } }, { 14, {} },
-                 { 6, { "a" } }, { 14, {} } }
-  local pi, pc, running, tries, idle = 1, 0, false, 0, 0
+  local ph, tries = 0, 0
   return H.driveUntil(function() return not H.battleLoadStarted() end,
     maxF or 20000, {
       H.call(function()
         pinParty()
-        if running then
-          local s = prog[pi]
-          H.setPad(s[2])
-          pc = pc + 1
-          if pc >= s[1] then pi, pc = pi + 1, 0 end
-          if pi > #prog then running = false end
+        for e = 0, 3 do H.writeWord(0x3C08 + e * 2, 99) end          -- (1) MP
+        for i = 0, 6, 2 do H.writeByte(0x3e9c + i, 5); H.writeByte(0x3e9d + i, 3) end  -- (2)
+        ph = (ph + 1) % 6
+        if H.readByte(MENU) ~= 0 then
+          local a = H.readByte(ACTOR)
+          for i = 0, 3 do H.writeByte(CMDTBL + a * 12 + i * 3, 0x05) end  -- (3) STEAL
+          if H.readByte(MSTATE) == ST_CMD and ph == 0 then
+            tries = tries + 1
+            H.log(string.format("%s: STEAL attempt %d f%d actor=%d $3EBD=%02X",
+              what, tries, H.frame, a, H.readByte(B_SWITCH_LIVE)))
+          end
+          H.setPad(ph < 3 and { "a" } or {})
           return
         end
-        if H.readByte(MENU) ~= 0 then
-          if H.readByte(MSTATE) == ST_CMD then
-            tries = tries + 1
-            H.log(string.format("%s: STEAL attempt %d at f%d actor=%d $3EBD=%02X",
-              what, tries, H.frame, H.readByte(ACTOR),
-              H.readByte(B_SWITCH_LIVE)))
-            running, pi, pc = true, 1, 0
-          end
-          H.setPad({})           -- a menu is up but not the command list:
-          return                 -- never mash A into it
-        end
-        idle = (idle + 1) % 8    -- no menu: edge-tap through battle messages
-        H.setPad(idle < 4 and { "a" } or {})
+        H.setPad(ph < 3 and { "a" } or {})   -- no menu: edge-tap through messages
       end),
     }, what .. ": steal the clothes")
 end

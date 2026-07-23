@@ -425,41 +425,40 @@ catwalk maze 233→231→239→232 + `$0355` + a timer → **battle 134 Ultros�
 `$012d`·6·slash|pierce, kill-bit `ultros2_won`) → Setzer + the Blackjack.
 `battle_ultros2.lua` stays skipped until `ultros2_doorstep` exists.
 
-## Beat A — fourth pass: rafter chase DECODED-from-source, blocked upstream (2026-07-23)
+## Beat A — fourth pass: rafter chase decoded, sfigaro STEAL fixed (2026-07-23)
 
-The rafter chase is now fully decoded from the vanilla event disassembly
-(`ff6/src/event/event_main.asm`, `npc_prop.asm`, `event_trigger.asm`), the
+The rafter chase is decoded from the vanilla event disassembly
+(`ff6/src/event/event_main.asm`, `npc_prop.asm`, `event_trigger.asm`); the
 generator + Makefile + probe are wired (`gen_opera6_rafter`, `probe_opera_rafter2`,
-`FRONTIER += ultros2_doorstep`), **but nothing here could be RUN or minted**: the
-prerequisite chain does not build past `sfigaro_town` (below). Everything in this
-section is read-from-source, not measured-in-emulator.
+`FRONTIER += ultros2_doorstep`). A prerequisite blocker (`sfigaro_town`) was
+found and FIXED so the chain to `opera_dance_done` mints again.
 
-### THE UPSTREAM BLOCKER — `sfigaro_town` will not mint (deterministic)
-`make build/states/opera_dance_done.mss.lua` fails at **`sfigaro_town`**
-(`gen_sfigaro`): the cafe cider-runner **STEAL never lands** — 32 attempts,
-identical frames every run, `$3EBD` never moves, timeout. `opera_dance_done` and
-every state after `sfigaro_town` are therefore unreachable in this tree. Measured
-(via a throwaway instrumented `gen_sfigaro`, since reverted):
-- **OT6 steal is a boost-tiered CHANCE verb** (`ot6.asm` `Ot6StealBoostLevel`,
-  hooked at `battle_main.asm:9366`): at **0 bp it rolls RAW vanilla odds**, which
-  for this underleveled solo Locke vs the Merchant (`$13A`, level-gap) is ≈0 —
-  hence 32 clean misses. At **3 bp it is CERTAIN** (`@cap` clamps the level to
-  `$ff` so vanilla's own `adc #$32` overflows → `bcs` guarantee). `gen_sfigaro`
-  never boosts, so it steals at 0 bp forever. Char pending-boost = `$3e9d,x`,
-  banked bp = `$3e9c,x`, x = charEntity (even offsets 0,2,4,6); Locke = 0.
-- **The command cursor does not move on a held d-pad here**: `cur` (`$7B90`) stays
-  on FIGHT through a 6-frame `down`, so `gen_sfigaro`'s `down`+A picked FIGHT
-  (which did nothing lethal and never stole). Locke's cells (`CMDTBL $202E`,
-  stride 12/entity, 3/cell) = `00 05 FF 01` = FIGHT / **STEAL($05)** / — / ITEM.
-- **UNRESOLVED (the real fix needed):** poking STEAL($05) into all four command
-  cells (gen_vargas's Blitz-poke idiom) + forcing 3 bp still does **not** steal —
-  the menu progresses (MSTATE 05→38→…→00) but `$3401` (the steal effect's own
-  entry write, `TargetEffect_52` `battle_main.asm:9357`) **never fires**, i.e.
-  the *queued* action is not a steal. This points at OT6's custom action-queue
-  (`$2bae`/`$2bb0`/`$7b80`, `ot6.asm:3238`) not being fed by a vanilla cell poke.
-  The Merchant IS stealable (`monster_items.asm:1900` GUARDIAN/PLUMED_HAT); slot 1
-  is `$13B` b_day_suit (EMPTY steal) so the target must be slot 0. **Fixing the
-  steal-command queue is the gate for ALL frontier work past `sfigaro_town`.**
+### PREREQUISITE FIX — `gen_sfigaro` cider-runner STEAL (`sfigaro_town`)
+`make …/opera_dance_done` used to fail at **`sfigaro_town`**: the cafe STEAL never
+landed (32 attempts, identical frames, `$3EBD` never moved, timeout), so every
+state after it — including all of Beat A — was unreachable. **THREE OT6
+corrections fix it** (all measured; `gen_sfigaro`'s `stealDriver`):
+1. **STEAL COSTS 2 MP** (`ot6.asm` `Ot6AbilityCost` `@steal`, "flat small"). The
+   charge+refusal is universal, so a char below 2 MP has the command REFUSED —
+   the menu confirms but no action queues (`TargetEffect_52`'s `$3401`
+   `battle_main.asm:9357` never fires). Solo early Locke is under it. **Pin
+   battle MP (`$3C08`).** *(This was the decisive missing piece — it looked like
+   "the queued action isn't a steal"; it was the MP refusal.)*
+2. **STEAL IS A BOOST-TIERED CHANCE VERB** (`ot6.asm` `Ot6StealBoostLevel`, hooked
+   `battle_main.asm:9366`): 0 bp = RAW vanilla odds (≈0 for this underleveled
+   Locke vs the Merchant), 3 bp = CERTAIN (`@cap`). **Force banked+pending boost
+   (`$3e9c`/`$3e9d`, even char offsets 0,2,4,6) to the cap.**
+3. **The command cursor does not move on a held d-pad here**, so the old `down`+A
+   picked FIGHT. **Poke STEAL (`$05`) into all of the actor's command cells**
+   (`CMDTBL $202E`, stride 12/entity, 3/cell — gen_vargas's Blitz-poke idiom).
+   Locke's cells measured `00 05 FF 01` = FIGHT / STEAL / — / ITEM; slot 1 of the
+   formation is `$13B` b_day_suit (EMPTY steal), so the target must be slot 0
+   (the Merchant `$13A`, stealable GUARDIAN/PLUMED_HAT, `monster_items.asm:1900`).
+
+With all three, the steal lands on attempt 1 (`$3401`=1,2,3; `$3EBD` bit4 `$4C`
+set; `$0104`=1 clothes, `$01D0`=1 cider); `gen_sfigaro` PASSes and mints
+`sfigaro_town` + `sfigaro_passage`. **Anyone else's boost-tiered STEAL driver
+needs the same MP-pin + boost + cell-poke trio.**
 
 ### THE RAFTER CHASE — decoded from source (verify each leg with a probe)
 Boot `opera_dance_done` (238 {98,7} `$0111=1`, `$0345=1`):
