@@ -424,3 +424,76 @@ climb+waltz+flowers+balcony-to-(8,9) measured ~1348 frames — comfortable margi
 catwalk maze 233→231→239→232 + `$0355` + a timer → **battle 134 Ultros②**
 `$012d`·6·slash|pierce, kill-bit `ultros2_won`) → Setzer + the Blackjack.
 `battle_ultros2.lua` stays skipped until `ultros2_doorstep` exists.
+
+## Beat A — fourth pass: rafter chase DECODED-from-source, blocked upstream (2026-07-23)
+
+The rafter chase is now fully decoded from the vanilla event disassembly
+(`ff6/src/event/event_main.asm`, `npc_prop.asm`, `event_trigger.asm`), the
+generator + Makefile + probe are wired (`gen_opera6_rafter`, `probe_opera_rafter2`,
+`FRONTIER += ultros2_doorstep`), **but nothing here could be RUN or minted**: the
+prerequisite chain does not build past `sfigaro_town` (below). Everything in this
+section is read-from-source, not measured-in-emulator.
+
+### THE UPSTREAM BLOCKER — `sfigaro_town` will not mint (deterministic)
+`make build/states/opera_dance_done.mss.lua` fails at **`sfigaro_town`**
+(`gen_sfigaro`): the cafe cider-runner **STEAL never lands** — 32 attempts,
+identical frames every run, `$3EBD` never moves, timeout. `opera_dance_done` and
+every state after `sfigaro_town` are therefore unreachable in this tree. Measured
+(via a throwaway instrumented `gen_sfigaro`, since reverted):
+- **OT6 steal is a boost-tiered CHANCE verb** (`ot6.asm` `Ot6StealBoostLevel`,
+  hooked at `battle_main.asm:9366`): at **0 bp it rolls RAW vanilla odds**, which
+  for this underleveled solo Locke vs the Merchant (`$13A`, level-gap) is ≈0 —
+  hence 32 clean misses. At **3 bp it is CERTAIN** (`@cap` clamps the level to
+  `$ff` so vanilla's own `adc #$32` overflows → `bcs` guarantee). `gen_sfigaro`
+  never boosts, so it steals at 0 bp forever. Char pending-boost = `$3e9d,x`,
+  banked bp = `$3e9c,x`, x = charEntity (even offsets 0,2,4,6); Locke = 0.
+- **The command cursor does not move on a held d-pad here**: `cur` (`$7B90`) stays
+  on FIGHT through a 6-frame `down`, so `gen_sfigaro`'s `down`+A picked FIGHT
+  (which did nothing lethal and never stole). Locke's cells (`CMDTBL $202E`,
+  stride 12/entity, 3/cell) = `00 05 FF 01` = FIGHT / **STEAL($05)** / — / ITEM.
+- **UNRESOLVED (the real fix needed):** poking STEAL($05) into all four command
+  cells (gen_vargas's Blitz-poke idiom) + forcing 3 bp still does **not** steal —
+  the menu progresses (MSTATE 05→38→…→00) but `$3401` (the steal effect's own
+  entry write, `TargetEffect_52` `battle_main.asm:9357`) **never fires**, i.e.
+  the *queued* action is not a steal. This points at OT6's custom action-queue
+  (`$2bae`/`$2bb0`/`$7b80`, `ot6.asm:3238`) not being fed by a vanilla cell poke.
+  The Merchant IS stealable (`monster_items.asm:1900` GUARDIAN/PLUMED_HAT); slot 1
+  is `$13B` b_day_suit (EMPTY steal) so the target must be slot 0. **Fixing the
+  steal-command queue is the gate for ALL frontier work past `sfigaro_town`.**
+
+### THE RAFTER CHASE — decoded from source (verify each leg with a probe)
+Boot `opera_dance_done` (238 {98,7} `$0111=1`, `$0345=1`):
+1. **Ultros drops in.** ENVELOPE NPC at **238 {99,20}** (`npc_prop.asm:10427`, vis
+   gate `$0345`, event `_cabf31`), `set_npc_no_react` → fires on CONTACT. Walk
+   into it → `_cabf31` (`:29595`): dlg $04C8/$04C9, `$0345=0`, **`$0058=1`**.
+   (`probe_opera_rafter2` drives exactly this; `gen_opera6_rafter` mints the
+   `ultros_dropped` checkpoint here.)
+2. **Alert the Impresario** (untimed). IMPRESARIO `_cab724` (`:28244`) = NPC
+   `$0300` on **MAP 234 {15,46}** (`npc_prop.asm:10077`). Travel 238→237→234
+   (reverse of gen_opera4 Route A: 238{100,22}↔237{82,32}, 237{72,32}↔234{25,49}).
+   Talk with `$0058=1 & $0110=0` → `_cab744` (`:28266`) → the "5-minutes"
+   cutscene → `_cab99b` (`:28677`) loads the rafters and reaches the briefing
+   (`:28716`, dlg $04D8 "talk to the man in the room to the far right") which sets
+   **`$0110=1`**, `$02BA=1`, `$02BC=1` and **`start_timer 0, 18000, _caba09`**
+   (`:28736`). Expiry (`_caba09` `:28738`) = Ultros wins, dump to loss. Party
+   lands controllable near **map 231 {15,37}** (`:28688`).
+3. **Stage master + framework.** With `$0110=1` the STAGE MASTER (`_cab455`
+   `:27803`) opens the way (`_cab45f`) and hints the "far right switch" (`$0355`)
+   and "the room to the far left of the stage, then the framework above the
+   stage" (`$00A4` gates the hint). Climb into the **catwalk maze 233→231→239→232**
+   — Z-SPLIT catwalk maps; expect `bfsPath` to fail across z-joins → hand-coded
+   corridor tables (gen_zozo4/gen_opera5 precedent).
+4. **The 4-ton weight (map 232).** Four step-triggers at y=27
+   (`event_trigger.asm:1033`): **{118,27} `_cab497`** is the WEIGHT DROP
+   (`:27840`) — `if ($01B0=1 & $01B4=1)` drop → fall anim → load_map 231 →
+   `if_switch $0387=1` → **`_cab6d6` (`:28199`) → `battle 134`** (`:28207`).
+   {120,27}`_cab484` = WRONG switch (`$0355=0`), {117,27}`_cab570` = load 239,
+   {116,27}`_cab6fb` = BG only. **OPEN: what sets `$01B0`/`$01B4`/`$0387` during
+   the chase is not yet decoded** — probe map 232 while walking the switches to
+   learn the Ultros-trap mechanic before authoring this leg.
+5. **Doorstep.** `battle_ultros2` boots `ultros2_doorstep` and A-mashes into the
+   fight, so mint a state whose first uninterrupted advance reaches battle 134 —
+   candidate: on 232 about to step {118,27} with `$01B0=$01B4=$0387=1`, or
+   mid-`_cab497` (the fall→load→`_cab6d6`→battle tail is dialog-free, auto-plays).
+   Post-battle `_cab6d6` tail (`:28208+`): `call _ca5ea9`, `$0332=1`, load 237 →
+   Setzer. Verify the post-battle gate before minting `ultros2_won` (kill-bit).

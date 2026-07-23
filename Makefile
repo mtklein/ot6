@@ -675,6 +675,19 @@ build/states/opera_dance_done.mss.lua: build/states/opera_stage.mss.lua
 	$(call mint,opera_dance_done,gen_opera5_dance)
 FRONTIER += opera_dance_done
 
+# gen_opera6_rafter: opera_dance_done -> the RAFTER CHASE -> ultros2_doorstep,
+# one interaction before battle 134 (Ultros②, $012d, 6 shields, slash|pierce).
+# LEG 1 (bump the ENVELOPE at 238 {99,20} -> _cabf31 -> $0058=1) is authored
+# from source; legs 2-4 (alert the impresario {234,15,46} -> $0110 + the 18000f
+# timer -> the catwalk maze 233->231->239->232 -> the 4-ton-weight switch
+# 232 {118,27} -> battle 134) are documented-but-UNVALIDATED.  This link CANNOT
+# mint today: opera_dance_done is unreachable because sfigaro_town does not mint
+# (the cider-runner STEAL fails deterministically -- OT6's boost-tiered steal +
+# a non-queuing command; see docs/design/wob-route.md "Beat A -- fourth pass").
+build/states/ultros2_doorstep.mss.lua: build/states/opera_dance_done.mss.lua
+	$(call mint,ultros2_doorstep,gen_opera6_rafter)
+FRONTIER += ultros2_doorstep
+
 frontier: rom $(STATE1) $(STATE2) $(STATE3) \
           $(patsubst %,build/states/%.mss.lua,$(FRONTIER))
 	@echo "frontier states up to date: $(FRONTIER)"
