@@ -2724,7 +2724,7 @@ MenuState_7b:
 Ot6LoadoutInitC3:
         ldy     #near Ot6LoadoutCursorProp
         jsr     LoadCursor
-        jsl     Ot6LoadoutOpen          ; F0: reset cursor to slot 0, seed if AUTO
+        jsl     Ot6LoadoutOpen          ; F0: reset the slot cursor to the top slot
         jsr     Ot6LoadoutDrawC3
         ldy     #near Ot6LoadoutCursorPos
         jsr     UpdateCursorPos

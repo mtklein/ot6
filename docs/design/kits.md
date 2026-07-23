@@ -218,11 +218,16 @@ decision (seed-from-auto, per-slot validated tech, assign, revert, write-back) i
 first menu-bank presence; costs price through `Ot6CostFor` (built for menu-bank
 callers), the learned set/ceiling derive from `$1cf7` (not battle-only `$2020`).
 
-Storage is **per-save**: 5 bytes (mode + 4 tech ids) at `$1E1D`, inside FF6's
+Storage is **per-save**: a single 16-bit word at `$1E1D..$1E1E`, inside FF6's
 `$1600–$1FFD` save block that round-trips per slot and sits in the save checksum,
-so a loadout persists per file and validates automatically. **`mode 0 = auto`**, and
-those bytes read 0 on every existing save, so old saves and new games default to
-the auto-window with zero migration. The battle read is a single branch at the top
+so a loadout persists per file and validates automatically. Cyan has exactly 8
+SwdTechs (index 0–7 = 3 bits), so the four boost slots pack into 12 bits — slot 0
+= bits 0–2, slot 1 = bits 3–5, slot 2 = bits 6–8, slot 3 = bits 9–11 (top 4 bits
+unused). **`$0000` = auto**: an all-zero word decodes to "all four slots = tech 0",
+a degenerate config no player sets on purpose, and it reads 0 on every existing
+save — so the word doubles as the auto sentinel and old saves and new games
+default to the auto-window with zero migration (no separate mode flag). Revert-to-auto
+writes `$0000`. The battle read is a single branch at the top
 of `Ot6BushidoTech` — the shared leaf both the list and the confirm/damage path
 call — so manual mode governs display, fire, and damage together; a stored tech
 that is no longer learned (`$1cf7` bit clear) falls back to the auto window for

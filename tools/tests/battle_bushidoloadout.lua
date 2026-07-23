@@ -2,15 +2,18 @@
 -- battle_bushidoloadout.lua -- issue #8 Layer B: the per-save, field-configurable
 -- Bushido loadout, asserted BATTLE-SIDE (the load-bearing correctness).
 --
--- Storage lives at $1e1d (mode) + $1e1e..$1e21 (the four boost slots, tech
--- INDICES 0..7), unused space inside the checksummed working-save block.  The
--- read hook branches at the TOP of Ot6BushidoTech: mode 0 (all existing saves)
--- runs the vanilla moving window untouched; mode nonzero returns the stored
--- tech for THIS boost -- but only if it is still learned ($1cf7 bit set),
--- otherwise it falls back to the auto window for that slot.
+-- Storage is a 16-bit little-endian WORD at $1e1d..$1e1e, unused space inside
+-- the checksummed working-save block.  The four boost slots pack into 12 bits,
+-- 3 bits each: slot0 = bits 0-2, slot1 = bits 3-5, slot2 = bits 6-8, slot3 =
+-- bits 9-11 (top 4 bits unused = 0).  A loadout {7,0,3,5} packs as
+-- 7 | 0<<3 | 3<<6 | 5<<9 = $0ac7.  The read hook branches at the TOP of
+-- Ot6BushidoTech: word 0 (every existing save, AND the all-slot-0 degenerate)
+-- runs the vanilla moving window untouched; word nonzero returns the stored tech
+-- for THIS boost -- but only if it is still learned ($1cf7 bit set), otherwise
+-- it falls back to the auto window for that slot.
 --
 -- What is asserted:
---   1. AUTO (mode 0) is byte-for-byte the Layer A window -- ceiling 4 packs
+--   1. AUTO (word 0) is byte-for-byte the Layer A window -- ceiling 4 packs
 --      {1,2,3,4} into wItemList, exactly as battle_bushido asserts.
 --   2. MANUAL enumerates the STORED techs, in the stored ORDER: a loadout of
 --      {7,0,3,5} makes Ot6BushidoWindow pack $5c,$55,$58,$5a.
@@ -19,12 +22,14 @@
 --      tech.
 --   4. CONFIRM fires the STORED slot: confirming row r banks boost r ($3e9d=r)
 --      and latches the stored tech for boost r into the action queue ($2bb0).
+--   5. SENTINEL: the all-slot-0 word ($0000) is AUTO, not a manual {0,0,0,0} --
+--      the degenerate config is indistinguishable from auto by design.
 local H = dofile("/Users/mtklein/ot6/tools/tests/lib/ot6.lua")
 local STATE = "/Users/mtklein/ot6/build/states/battle_doorstep.mss.lua"
 
 local MENU, ACTOR, MSTATE = 0x7BCA, 0x62CA, 0x7BC2
 local KNOWN, LEARNED, ITEMLIST = 0x2020, 0x1CF7, 0x4005
-local LOADOUT = 0x1E1D                 -- [mode][slot0][slot1][slot2][slot3]
+local LOADOUT = 0x1E1D                 -- packed word (lo, hi): 3 bits per slot
 local ST_TOOLS, ST_BUSHIDO = 0x30, 0x37
 local CMD_SWDTECH = 0x07
 
@@ -42,16 +47,22 @@ local function inNumer() return H.readByte(MSTATE) == ST_BUSHIDO end
 local actor
 local ceiling = 4
 local learnedBits = 0xFF               -- $1cf7 mask (which techs are learned)
-local mode = 0                         -- $1e1d
-local slots = { 0, 0, 0, 0 }           -- $1e1e..$1e21
+local slots = { 0, 0, 0, 0 }           -- boost 0x/1x/2x/3x tech indices (0..7)
 local bpbank = 5
 local sawNumeral = false
+
+-- pack the four 3-bit slot fields into the 16-bit loadout word.  {0,0,0,0} -> 0
+-- (AUTO/sentinel); any nonzero result is MANUAL.
+local function packWord()
+  return slots[1] | (slots[2] << 3) | (slots[3] << 6) | (slots[4] << 9)
+end
 
 local function pinCyan()
   H.writeWord(KNOWN, 0xFF00 | ceiling)
   H.writeByte(LEARNED, learnedBits)
-  H.writeByte(LOADOUT, mode)
-  for i = 1, 4 do H.writeByte(LOADOUT + i, slots[i]) end
+  local w = packWord()
+  H.writeByte(LOADOUT, w & 0xFF)         -- word low
+  H.writeByte(LOADOUT + 1, (w >> 8) & 0xFF)  -- word high
   for _, s in ipairs(PARTY) do
     H.writeByte(0x3ED8 + s * 2, 0x02)                 -- CHAR::CYAN
     local st1 = 0x3EE4 + s * 2
@@ -126,22 +137,38 @@ H.run({ maxFrames = 40000 }, {
     H.log(string.format("cyan installed in slot %d", actor))
   end),
 
-  -- 1. AUTO baseline (mode 0) -- ceiling 4 packs {1,2,3,4}, Layer A unchanged --
-  H.call(function() ceiling, mode = 4, 0 end),
+  -- 1. AUTO baseline (word 0) -- ceiling 4 packs {1,2,3,4}, Layer A unchanged --
+  H.call(function() ceiling, slots = 4, { 0, 0, 0, 0 } end),
   openSub("auto: swdtech opens the tools-shell submenu"),
   H.waitFrames(6),
   H.call(function()
     H.assertEq(inSub(), true, "AUTO opened the tools-shell submenu")
     H.assertEq(sawNumeral, false, "the vanilla numeral gauge never opened")
     assertRows({ 0x56, 0x57, 0x58, 0x59 }, "auto ceiling 4")  -- $55+{1,2,3,4}
-    H.log("AUTO (mode 0) window = {1,2,3,4} -- byte-for-byte Layer A")
+    H.log("AUTO (word 0) window = {1,2,3,4} -- byte-for-byte Layer A")
+  end),
+
+  -- 1b. SENTINEL -- an all-slot-0 loadout packs to word $0000, which the hook
+  -- MUST read as AUTO, not as a manual {0,0,0,0} (which would enumerate four
+  -- copies of tech 0 = $55).  Ceiling 7 discriminates: auto gives {4,5,6,7} =
+  -- $59,$5a,$5b,$5c, whereas a mis-decoded manual would give $55,$55,$55,$55. --
+  closeSub(),
+  H.call(function()
+    ceiling, learnedBits = 7, 0xFF
+    slots = { 0, 0, 0, 0 }                   -- packs $0000 -- the AUTO sentinel
+  end),
+  openSub("sentinel: reopen with the all-slot-0 word"),
+  H.waitFrames(6),
+  H.call(function()
+    assertRows({ 0x59, 0x5a, 0x5b, 0x5c }, "all-slot-0 word decodes to AUTO")
+    H.log("SENTINEL: word $0000 (all slots tech 0) reads as AUTO, not manual {0,0,0,0}")
   end),
 
   -- 2. MANUAL enumeration -- stored order {7,0,3,5} -> $5c,$55,$58,$5a --------
   closeSub(),
   H.call(function()
     ceiling, learnedBits = 7, 0xFF          -- all eight learned, 4 rows
-    mode, slots = 1, { 7, 0, 3, 5 }
+    slots = { 7, 0, 3, 5 }                   -- packs $0ac7 (nonzero => MANUAL)
   end),
   openSub("manual: reopen with a stored loadout"),
   H.waitFrames(6),
@@ -156,7 +183,7 @@ H.run({ maxFrames = 40000 }, {
     -- learned = everything except tech 2 (0b1111_1011); ceiling stays 7 so the
     -- auto fallback for boost 0 is base(4)+0 = tech 4 = id $59.
     ceiling, learnedBits = 7, 0xFB
-    mode, slots = 1, { 2, 0, 3, 5 }
+    slots = { 2, 0, 3, 5 }                   -- packs $0ac2 (nonzero => MANUAL)
   end),
   openSub("manual: reopen with an unlearned stored slot0"),
   H.waitFrames(6),
@@ -172,7 +199,7 @@ H.run({ maxFrames = 40000 }, {
   closeSub(),
   H.call(function()
     ceiling, learnedBits = 7, 0xFF
-    mode, slots = 1, { 7, 0, 3, 5 }
+    slots = { 7, 0, 3, 5 }
     bpbank = 5
   end),
   openSub("manual: reopen to confirm a row"),

@@ -2402,23 +2402,31 @@ Ot6AbilityCostTbl:
 ; ==============================================================================
 ; BUSHIDO LOADOUT (issue #8 Layer B) -- per-save, field-configurable slots
 ;
-; Storage: five unused bytes inside the working-save block ($1600-$1fff) that
-; save.asm's CopyGameDataToSRAM/LoadSaveSlot round-trip per slot and
-; CalcSaveSlotChecksum ($1600-$1ffd) covers -- so the loadout PERSISTS and
-; VALIDATES for free, no checksum work and zero migration (all existing saves
-; read $1e1d = 0 = AUTO):
+; Storage: a 16-bit little-endian WORD in two unused bytes inside the working-
+; save block ($1600-$1fff) that save.asm's CopyGameDataToSRAM/LoadSaveSlot
+; round-trip per slot and CalcSaveSlotChecksum ($1600-$1ffd) covers -- so the
+; loadout PERSISTS and VALIDATES for free, no checksum work and zero migration
+; (every existing save reads $1e1d..$1e1e = $0000 = AUTO):
 ;
-;   $1e1d  mode   0 = AUTO (the moving window), nonzero = MANUAL
-;   $1e1e  slot0 tech index (boost 0x)   ; stored as the 0..7 INDEX that
-;   $1e1f  slot1 tech index (boost 1x)   ;   Ot6BushidoTech returns, so the
-;   $1e20  slot2 tech index (boost 2x)   ;   downstream +$55 / Ot6BushidoOblivion
-;   $1e21  slot3 tech index (boost 3x)   ;   tail stay byte-for-byte unchanged
+;   $1e1d..$1e1e   packed word.  Cyan has exactly 8 SwdTechs (index 0..7 = 3
+;                  bits), so the four boost slots fit in 12 bits:
+;                    slot0 (boost 0x) = bits 0-2    slot2 (boost 2x) = bits 6-8
+;                    slot1 (boost 1x) = bits 3-5    slot3 (boost 3x) = bits 9-11
+;                  (top 4 bits unused, kept 0).  Each field is the same 0..7
+;                  INDEX Ot6BushidoTech returns, so the downstream +$55 /
+;                  Ot6BushidoOblivion tail stays byte-for-byte unchanged.
+;
+; word == 0  -> AUTO (the moving window).  This is ALSO the sentinel: an all-zero
+;   word decodes to "all four slots = tech 0", a degenerate config no player sets
+;   on purpose, and every existing save already has 0 there -> auto with zero
+;   migration (the same property the old mode-flag-0 had).  word != 0 -> MANUAL:
+;   unpack the 3-bit field per slot.  Revert-to-auto writes $0000.
 ;
 ; One physical cell $7e1e1d (DBR = $7e in battle); read long (f:) so the hook
-; is bank-agnostic.  With mode = 0 the battle path is identical to Layer A.
+; is bank-agnostic.  With the word = 0 the battle path is identical to Layer A.
 OT6_LOADOUT     = $7e1e1d
 .assert (OT6_LOADOUT & $ffff) >= $1600, error, "loadout must sit inside the save block"
-.assert (OT6_LOADOUT & $ffff) + 4 <= $1ffd, error, "loadout must sit inside the checksum window"
+.assert (OT6_LOADOUT & $ffff) + 1 <= $1ffd, error, "loadout word must sit inside the checksum window"
 ; ==============================================================================
 
 ; [ Bushido ceiling — techs-known-minus-1, read safe (issue #4) ]
@@ -2450,40 +2458,25 @@ OT6_LOADOUT     = $7e1e1d
                                 ;   reach ($36 btlgfx's, OT6_SCR_BIT the hud
                                 ;   builder's) both have owners; the stack owes
                                 ;   nobody and survives an nmi.
-        ; [ issue #8 Layer B: manual-loadout read hook ]
-        ; mode 0 (all existing saves) -> @auto, the vanilla window untouched.
-        ; mode nonzero -> return the player's stored tech for THIS boost slot,
-        ; but only if it is still learned ($1cf7 bit set); otherwise fall back
-        ; to the auto window for this slot rather than offer an uncastable tech.
-        ; Callers run Ot6BushidoOblivion AFTER us, so a manually-placed Oblivion
-        ; (tech 7) keeps its spent-divine -> Tempest swap.
-        lda     f:OT6_LOADOUT   ; loadout mode
+        ; [ issue #8 Layer B: manual-loadout read hook -- packed 2-byte word ]
+        ; word 0 (all existing saves) -> @auto, the vanilla window untouched.
+        ; word nonzero -> return the player's stored tech for THIS boost slot
+        ; (slot s = the 3-bit field at bit s*3), but only if it is still learned
+        ; ($1cf7 bit set); otherwise fall back to the auto window for this slot
+        ; rather than offer an uncastable tech.  Unpack and learned-test are the
+        ; SAME F0 leaves the menu draw uses (Ot6LoadoutUnpack / Ot6TechLearned),
+        ; so battle and menu can never decode the word differently.  Callers run
+        ; Ot6BushidoOblivion AFTER us, so a manually-placed Oblivion (tech 7)
+        ; keeps its spent-divine -> Tempest swap.
+        longa
+        lda     f:OT6_LOADOUT   ; packed loadout word (0 = AUTO)
+        shorta                  ; plain SEP #$20 -- keeps Z (shorta0's tdc wipes it)
         beq     @auto
-        lda     $01,s           ; boost (0..3)
-        longa
-        and     #$00ff
-        tax
-        shorta0
-        lda     f:OT6_LOADOUT+1,x   ; stored tech index for slot = boost
-        phy                     ; preserve caller Y (Ot6BushidoWindow needs it)
-        longa
-        and     #$00ff
-        tay                     ; Y = tech t, clean 16-bit shift count
-        shorta0
-        lda     f:$7e1cf7       ; learned-swdtech bitmap (bit t = tech t known)
-        iny                     ; shift t+1 times: final carry = bit t
-:       lsr
-        dey
-        bne     :-
-        ply                     ; restore Y (PLY preserves carry)
+        lda     $01,s           ; boost (0..3) = slot
+        jsl     Ot6LoadoutUnpack    ; A = stored tech for this slot (clobbers X)
+        jsl     Ot6TechLearned      ; carry = learned (A and Y preserved)
         bcc     @auto           ; stored tech not learned -> auto fallback
-        lda     $01,s           ; learned: return the stored tech
-        longa
-        and     #$00ff
-        tax
-        shorta0
-        lda     f:OT6_LOADOUT+1,x
-        sta     $01,s           ; overwrite the parked boost with the tech
+        sta     $01,s           ; learned: overwrite the parked boost with tech
         pla                     ; A = tech (mirrors @auto's balanced tail)
         rtl
 @auto:
@@ -3333,6 +3326,36 @@ done:   plp
         rtl
 .endproc
 
+; [ unpack a slot's 3-bit tech field from the packed loadout word ]
+; slot s occupies bits s*3 .. s*3+2 of the $7e1e1d word.  Both the battle read
+; hook (Ot6BushidoTech) and the menu draw route through here, so they can never
+; decode the word differently.  Uses only registers + its own stack cell, no
+; direct-page scratch, so it is safe to call mid-draw (the C3 loop parks its
+; slot index in $e2).
+; in: A = slot (0..3).  out: A = stored tech (0..7).  clobbers X.  preserves Y.
+.proc Ot6LoadoutUnpack
+        .a8
+        .i16
+        pha                         ; park slot ($01,s)
+        asl                         ; slot*2
+        clc
+        adc     $01,s               ; slot*3 -> shift count (0,3,6,9)
+        longa
+        and     #$00ff
+        tax                         ; X = shift count
+        lda     f:OT6_LOADOUT       ; packed word
+@sh:    cpx     #$0000
+        beq     @msk
+        lsr
+        dex
+        bra     @sh
+@msk:   and     #$0007              ; A = this slot's 3-bit field
+        shorta                      ; plain SEP #$20 -- keeps A (shorta0's tdc wipes it)
+        sta     $01,s               ; overwrite the parked slot with the tech
+        pla                         ; A = tech (0..7)
+        rtl
+.endproc
+
 ; [ the tech shown/used for a slot, validated -- the single source of truth ]
 ; Mirrors the battle read hook: MANUAL returns the stored, learned tech, else
 ; falls back to the auto window for that slot.  Used by the C3 draw so the
@@ -3342,14 +3365,12 @@ done:   plp
         .a8
         .i16
         pha                         ; park slot ($01,s)
-        lda     f:OT6_LOADOUT       ; mode
-        beq     @auto
-        lda     $01,s
         longa
-        and     #$00ff
-        tax
-        shorta0
-        lda     f:OT6_LOADOUT+1,x   ; stored tech
+        lda     f:OT6_LOADOUT       ; packed word (0 = AUTO)
+        shorta                      ; plain SEP #$20 -- keeps Z (shorta0's tdc wipes it)
+        beq     @auto
+        lda     $01,s               ; slot
+        jsl     Ot6LoadoutUnpack    ; A = stored tech (clobbers X, preserves Y)
         jsl     Ot6TechLearned      ; carry = learned (A preserved)
         bcc     @auto
         sta     $01,s               ; learned: return stored tech
@@ -3360,27 +3381,73 @@ done:   plp
         rtl
 .endproc
 
-; [ seed all four slots from the auto window ]
-; clobbers A,X.  preserves Y.
-.proc Ot6LoadoutSeed
+; [ pack a new tech into one slot's 3-bit field of the loadout word ]
+; Read-modify-write: clears slot s's field (bits s*3..s*3+2) and ORs in the new
+; tech, leaving the other three slots untouched.  A nonzero result is, by
+; definition, MANUAL.  Uses menu scratch $e0..$e4 (D=0), free during input.
+; in: A = new tech (0..7), X = slot (0..3).  clobbers A,X,Y.
+.proc Ot6LoadoutAssign
+        .a8
+        .i16
+        and     #$07
+        sta     $e0                 ; new tech
+        txa                         ; slot
+        asl                         ; slot*2
+        sta     $e1                 ; temp
+        txa                         ; slot
+        clc
+        adc     $e1                 ; slot*3 -> shift count
+        longa
+        and     #$00ff
+        tay                         ; Y = shift count
+        lda     #$0007
+        sta     $e1                 ; mask, pre-shift ($e1/$e2 word)
+        lda     $e0
+        and     #$0007              ; field = new tech, pre-shift
+@sh:    cpy     #$0000
+        beq     @done
+        asl     a                   ; field <<= 1
+        asl     $e1                 ; mask  <<= 1  (16-bit dp shift, m=0)
+        dey
+        bra     @sh
+@done:  sta     $e3                 ; field, shifted ($e3/$e4 word)
+        lda     $e1                 ; mask, shifted
+        eor     #$ffff              ; ~mask
+        and     f:OT6_LOADOUT       ; clear this slot's field
+        ora     $e3                 ; OR in the new field
+        sta     f:OT6_LOADOUT       ; write the word back
+        shorta0
+        rtl
+.endproc
+
+; [ pack the whole auto window into the word (the first edit out of AUTO) ]
+; So that after the first manual edit the three un-touched slots keep the auto
+; techs they were displaying, not zero.  Result is nonzero = MANUAL (unless the
+; auto window is all tech 0 -- a ceiling-0 degenerate that reads auto either way).
+; clobbers A,X,Y.
+.proc Ot6LoadoutSeedWord
         .a8
         .i16
         ldx     #$0000
 @lp:    phx
-        txa                         ; slot = x
-        jsl     Ot6LoadoutAutoTech  ; A = auto tech (clobbers X)
-        plx
-        sta     f:OT6_LOADOUT+1,x   ; store into slot x
+        txa                         ; slot
+        jsl     Ot6LoadoutAutoTech  ; A = auto tech (clobbers X, preserves Y)
+        plx                         ; X = slot
+        phx
+        jsl     Ot6LoadoutAssign    ; pack A into slot X (clobbers A,X,Y)
+        plx                         ; X = slot
         inx
         cpx     #$0004
         bcc     @lp
         rtl
 .endproc
 
-; [ open the configurator: reset the cursor, seed if still in AUTO ]
-; Leaves mode as-is (AUTO stays AUTO until the first edit), but fills the four
-; display slots from the auto window so the player edits a sensible baseline.
-; clobbers A,X.
+; [ open the configurator: reset the cursor to the top slot ]
+; Leaves the loadout word as-is: AUTO (word 0) stays AUTO until the first edit,
+; MANUAL stays MANUAL.  The display needs no seeding -- Ot6LoadoutSlotTech
+; computes the auto tech per slot on the fly whenever the word is 0, so the
+; player still edits a sensible auto baseline without anything being written.
+; clobbers A.
 .proc Ot6LoadoutOpen
         .a8
         .i16
@@ -3390,42 +3457,36 @@ done:   plp
         stz     $50
         stz     $51
         stz     $52
-        lda     f:OT6_LOADOUT       ; already MANUAL?
-        bne     :+
-        jsl     Ot6LoadoutSeed      ; AUTO: seed the four slots from the window
-:       rtl
+        rtl
 .endproc
 
 ; [ cycle the cursored slot's tech to the prev/next LEARNED tech; go MANUAL ]
-; in: A = step delta ($01 = next, $07 = prev, i.e. +/-1 mod 8).  clobbers A,X.
+; The first edit out of AUTO packs the current auto window into the word first
+; (Ot6LoadoutSeedWord), so the three un-touched slots keep their auto techs;
+; then the cursored slot is cycled and repacked, leaving a nonzero MANUAL word.
+; in: A = step delta ($01 = next, $07 = prev, i.e. +/-1 mod 8).  clobbers A,X,Y.
 .proc Ot6LoadoutCycleCore
         .a8
         .i16
-        sta     $e0                 ; delta (menu scratch, D=0)
-        lda     #$01
-        sta     f:OT6_LOADOUT       ; first edit flips the loadout to MANUAL
-        lda     $4e                 ; cursored slot (0..3)
+        pha                         ; park delta ($01,s)
         longa
-        and     #$00ff
-        tax
-        shorta0
-        lda     f:OT6_LOADOUT+1,x   ; current tech (0..7)
+        lda     f:OT6_LOADOUT       ; still AUTO?
+        shorta                      ; plain SEP #$20 -- keeps Z (shorta0's tdc wipes it)
+        bne     :+
+        jsl     Ot6LoadoutSeedWord  ; first edit: freeze the auto window into the word
+:       lda     $4e                 ; cursored slot (0..3)
+        jsl     Ot6LoadoutUnpack    ; A = the slot's current stored tech
         ldy     #$0008              ; try every residue once
 @hop:   clc
-        adc     $e0
+        adc     $01,s               ; delta
         and     #$07                ; wrap 0..7
         jsl     Ot6TechLearned      ; carry = learned (A preserved)
         bcs     @found
         dey
         bne     @hop
-@found: pha                         ; A = new tech
-        lda     $4e
-        longa
-        and     #$00ff
-        tax
-        shorta0
-        pla
-        sta     f:OT6_LOADOUT+1,x   ; write it into the cursored slot
+@found: ldx     $4e                 ; X = cursored slot ($4f = 0, set by Open)
+        jsl     Ot6LoadoutAssign    ; pack the new tech (A) into slot X
+        pla                         ; drop delta
         rtl
 .endproc
 
@@ -3477,9 +3538,10 @@ Ot6LoadoutPrev:                     ; L shoulder -> previous learned tech
                                     ;   onto the R bit, so it can't be told apart
                                     ;   from the R-shoulder cycle -- Y is clean.)
         beq     @lr
-        lda     #$00
-        sta     f:OT6_LOADOUT       ; mode = AUTO (stz has no abslong form)
-        jsl     Ot6LoadoutSeed      ; reseed the display from the window
+        longa
+        lda     #$0000
+        sta     f:OT6_LOADOUT       ; word = 0 = AUTO (the display recomputes it)
+        shorta0
         lda     #$01
         rtl
 @lr:    lda     $08                 ; A / X / L / R shoulders
