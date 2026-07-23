@@ -16167,7 +16167,9 @@ MenuTextCmd_0d:
         bne     @69ec       ; branch if command slot is empty
         lda     #BattleCmdName::ITEM_SIZE+2     ; ot6: +2 clears stale
         jmp     DrawSpaces                      ;   monster-row columns
-@69ec:  xba
+@69ec:  jsl     Ot6SwdKanji_ext     ; ot6 #8: Cyan's SwdTech -> kanji glyphs;
+        bcs     @clear2             ;   carry set = 7-col field already stamped
+        xba                         ;   (A preserved = command index on clc)
         lda     #BattleCmdName::ITEM_SIZE
         sta     $10
         jsr     MultAB
@@ -16180,6 +16182,7 @@ MenuTextCmd_0d:
         inx
         dec     $10
         bne     @69fe
+@clear2:
         lda     #$02                ; ot6: clear stale monster-row columns
         jmp     DrawSpaces
 

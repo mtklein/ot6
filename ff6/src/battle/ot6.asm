@@ -1294,6 +1294,7 @@ done:   rtl
         lda     #$80
         sta     hVMAINC         ; increment on high byte, +1 word
         jsr     Ot6LoadElemIcons
+        jsr     Ot6LoadKanji            ; issue #8: Bushido kanji cells
         jsr     Ot6LoadBgGlyphsA
         jsr     Ot6LoadBgGlyphsB
         plb
@@ -1339,6 +1340,30 @@ done:   rtl
         tax
         cpx     #$0008
         bcc     @icon
+        shorta
+        rts
+.endproc
+
+; [ re-lay slice: the three Bushido kanji tiles (48 bytes), issue #8 ]
+
+; Same entry contract as Ot6LoadElemIcons (a8/i16, db=$00, vmainc $80,
+; exits a8; clobbers a/x/y). The three kanji cells OT6_KANJI0..2 are
+; CONSECUTIVE, so their VRAM words are contiguous: set the address once
+; and stream 24 words. Folded into the elem-icon relay stage below, so it
+; re-lays on the same cadence and heals the animation-bg junk-fill.
+
+.proc Ot6LoadKanji
+        .a8
+        .i16
+        longa
+        lda     #$5800 + OT6_KANJI0*8   ; first kanji's font-cell word addr
+        sta     hVMADDL
+        ldx     #$0000
+@word:  lda     f:Ot6KanjiIcons,x       ; low=plane0 row, high=plane1 row
+        sta     hVMDATAL
+        inx2
+        cpx     #$0030                  ; 3 tiles * 16 bytes
+        bcc     @word
         shorta
         rts
 .endproc
@@ -1452,6 +1477,55 @@ OT6_SCR_COLS  := $3ed2          ; strip columns drawn so far
         jsr     Ot6DrawChar
         lda     #$ff
         jsr     Ot6DrawChar
+        rtl
+.endproc
+
+; ------------------------------------------------------------------------------
+
+; [ issue #8 PoC: kanji in Cyan's Bushido (SwdTech) command slot ]
+
+; Hooked from MenuTextCmd_0d (btlgfx bank C1) just before its 7-letter
+; command-name loop. Command $07 is SwdTech -- Cyan's unique command -- so
+; gating on the id alone already means "Cyan's Bushido slot". Runs a8/i16
+; with the menu-text buffer set up ($48 = command byte, $4c/$4a/$4e + y =
+; the tilemap cursor, exactly as Ot6AbilityPad_ext expects).
+;
+;   carry SET  -> we stamped the 7-column field; caller skips its loop.
+;   carry CLEAR -> not SwdTech; caller draws the name the vanilla way
+;                  (A is reloaded by the caller, so we needn't preserve it).
+;
+; Stamps [刀][力][火][space][cost][space][space]: the three kanji side by
+; side plus a sample cost digit, so the screenshot shows all three 8x8
+; kanji in the real slot next to a numeral for scale. The cost column is
+; a proof-of-concept placeholder gated on OT6_MP_COSTS -- under the nomp
+; baseline it blanks, changing nothing about the nomp menu.
+.proc Ot6SwdKanji_ext
+        .a8
+        .i16
+        lda     ($48)               ; battle command index
+        cmp     #$07                ; SwdTech / Bushido
+        bne     @pass
+        lda     #OT6_KANJI0         ; 刀 blade
+        jsr     Ot6DrawChar
+        lda     #OT6_KANJI1         ; 力 power
+        jsr     Ot6DrawChar
+        lda     #OT6_KANJI2         ; 火 fire
+        jsr     Ot6DrawChar
+        lda     #$ff                ; blank separator
+        jsr     Ot6DrawChar
+.if ::OT6_MP_COSTS              ; :: -- force the file-scope flag from in-proc
+        lda     #OT6_DIGIT0+5       ; sample cost digit "5" (PoC placeholder)
+.else
+        lda     #$ff                ; nomp baseline: leave the column blank
+.endif
+        jsr     Ot6DrawChar
+        lda     #$ff
+        jsr     Ot6DrawChar
+        lda     #$ff                ; 7 columns = BattleCmdName ITEM_SIZE
+        jsr     Ot6DrawChar
+        sec                         ; handled
+        rtl
+@pass:  clc                         ; not SwdTech; draw the name normally
         rtl
 .endproc
 
@@ -1748,6 +1822,59 @@ Ot6FontIcons:
 ; water ($fd)
         .byte   $00,$00,$30,$30,$4a,$7a,$4c,$4e
         .byte   $c6,$80,$7c,$7e,$7e,$7c,$3c,$00
+
+
+; ------------------------------------------------------------------------------
+
+; [ issue #8 PoC: hand-drawn 8x8 kanji for Cyan's Bushido command slot ]
+
+; Three low-stroke kanji, drawn by hand to stay legible at 8x8. Same tile
+; format as Ot6FontIcons above (16 bytes: 8 rows x 2 bitplanes) but MONO:
+; both bitplanes carry the shape, so every lit pixel is color 3 -- the
+; bright body color the small font already uses for command text, so a
+; kanji reads exactly as bold as the "SwdTech" letters it replaces.
+; Uploaded to font VRAM by Ot6LoadKanji, cell codes OT6_KANJI0..2.
+
+OT6_KANJI0 := $7a               ; 刀 blade  (verified $00/blank in the
+OT6_KANJI1 := $7b               ; 力 power    small font; unreferenced free
+OT6_KANJI2 := $7c               ; 火 fire     cluster per issue-#8 recon)
+OT6_DIGIT0 := $b4               ; '0' cell in the LANG_EN small font
+                                ;   (= btlgfx ZERO_CHAR; PoC cost digit base)
+
+Ot6KanjiIcons:
+; kanji 刀 (blade) -- SwdTech  (cell $7a)
+;   . X X X X X X .
+;   . . . X . . X .
+;   . . X . . . X .
+;   . . X . . . X .
+;   . X . . . X X .
+;   . X . . X X . .
+;   X . . . . . . .
+;   X . . . . . . .
+        .byte   $7e,$7e,$12,$12,$22,$22,$22,$22
+        .byte   $46,$46,$4c,$4c,$80,$80,$80,$80
+; kanji 力 (power)  (cell $7b)
+;   . X X X X X . .
+;   . . . . . X . .
+;   . X . . . X . .
+;   . X . . . X . .
+;   . X . . X X . .
+;   . X . X X . . .
+;   X X . . . . . .
+;   X . . . . . . .
+        .byte   $7c,$7c,$04,$04,$44,$44,$44,$44
+        .byte   $4c,$4c,$58,$58,$c0,$c0,$80,$80
+; kanji 火 (fire)  (cell $7c)
+;   . . . X . . . .
+;   . X . X . X . .
+;   . X . X . X . .
+;   . . . X . . . .
+;   . . X X X . . .
+;   . X X . X X . .
+;   X X . . . X X .
+;   X . . . . . X X
+        .byte   $10,$10,$54,$54,$54,$54,$10,$10
+        .byte   $38,$38,$6c,$6c,$c6,$c6,$83,$83
 
 
 ; ------------------------------------------------------------------------------
@@ -3890,6 +4017,7 @@ OT6_SCRIPTBUSY := $57bf         ; nonzero = a battle animation script
         cmp     #$01
         beq     @s1
         jsr     Ot6LoadElemIcons        ; 2: menu element icons
+        jsr     Ot6LoadKanji            ;    + Bushido kanji (issue #8)
         bra     @nofont
 @s1:    jsr     Ot6LoadBgGlyphsA        ; 1: hud shield glyphs
         bra     @nofont
