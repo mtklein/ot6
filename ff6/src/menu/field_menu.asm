@@ -1163,14 +1163,26 @@ SkillsOption_00:
 
 SkillsOption_02:
 @20ee:  stz     $4a
-        jsr     LoadAbilityCursor
-        jsr     InitAbilityCursor
         ldy     #$0100
         sty     zBG2HScroll
         sty     zBG3HScroll
+.if LANG_EN
+        ; issue #8 Layer B: SwdTech opens the loadout CONFIGURATOR, not the
+        ; vanilla browse list.  The configurator names the learned techs too
+        ; (the pool), so the browse list's only job is subsumed.  All state
+        ; logic is bank-F0; Ot6LoadoutInitC3 does the C3 framework draw.
+        jsr     Ot6LoadoutInitC3
+        lda     #$01
+        sta     $4a                     ; init done (state $7b self-init sentinel)
+        lda     #MENU_STATE_LOADOUT     ; $7b
+        sta     zMenuState
+.else
+        jsr     LoadAbilityCursor
+        jsr     InitAbilityCursor
         jsr     _c352d7
         lda     #$3e
         sta     zMenuState
+.endif
         rts
 
 ; ------------------------------------------------------------------------------
@@ -2658,6 +2670,219 @@ ReloadSkillsMenu:
         sta     $4e
         jsr     InitSkillsCursor
         jmp     _c35807
+
+; ==============================================================================
+; BUSHIDO LOADOUT CONFIGURATOR (issue #8 Layer B) -- thin C3 shim over bank F0
+;
+; Skills -> SwdTech opens this in place of the vanilla browse list: the browse
+; list only NAMED the learned techs, and this names them too (the LEARNED pool)
+; beside the four editable boost slots, so nothing is lost.  Every decision --
+; seed-from-auto, each slot's validated tech, assign/cycle, revert, the write to
+; $1e1d -- is made by the OT6 bank-F0 procs jsl'd below; the code here does only
+; the tilemap / cursor / DMA framework work that MUST run in the menu bank.
+;
+;   Up / Down   move the cursor over the four boost slots (0x..3x)
+;   L / R       cycle the cursored slot through the LEARNED techs (first edit
+;               flips the loadout to MANUAL)
+;   Y           revert to AUTO (reseed the slots from the moving window).  Y and
+;               not Select: FF6's default pad config aliases physical Select onto
+;               the R bit, so it can't be distinguished from the R-shoulder cycle.
+;   B           save-and-exit (writes are already live in the checksummed block)
+;
+; MP cost is priced through Ot6LoadoutCost (returns 0 under nomp, so that build
+; simply draws no number -- the shared menu object links against either battle).
+; ------------------------------------------------------------------------------
+.if LANG_EN
+
+MENU_STATE_LOADOUT = $7b
+
+; menu state $7b: loadout configurator, per frame
+MenuState_7b:
+@ldo:   lda     $4a                     ; self-init sentinel (0 = not yet drawn)
+        bne     @run
+        jsr     Ot6LoadoutInitC3
+        lda     #$01
+        sta     $4a
+        rts
+@run:   lda     #$10
+        trb     z45
+        jsr     InitDMA1BG1ScreenA
+        ldy     #near Ot6LoadoutCursorPos
+        jsr     UpdateCursorPos         ; track the cursor sprite to $4e (slot)
+        jsl     Ot6LoadoutInput         ; F0: 0 = idle, 1 = redraw, 2 = exit
+        cmp     #$02
+        beq     @exit
+        cmp     #$01
+        bne     @done
+        jsr     PlayMoveSfx
+        jsr     Ot6LoadoutDrawSlots     ; labels + pool stay; redraw the slot column
+@done:  rts
+@exit:  stz     $4a                     ; re-arm self-init for the next entry
+        jmp     ReloadSkillsMenu
+
+; ---- init: load the slot cursor, seed + draw, flush both screens ----
+Ot6LoadoutInitC3:
+        ldy     #near Ot6LoadoutCursorProp
+        jsr     LoadCursor
+        jsl     Ot6LoadoutOpen          ; F0: reset cursor to slot 0, seed if AUTO
+        jsr     Ot6LoadoutDrawC3
+        ldy     #near Ot6LoadoutCursorPos
+        jsr     UpdateCursorPos
+        jsr     InitDMA1BG1ScreenA
+        jmp     InitDMA1BG3ScreenB
+
+; ---- draw the whole configurator ----
+Ot6LoadoutDrawC3:
+        jsr     ClearBG1ScreenA
+        jsr     ClearBG3ScreenB         ; wipe the caller's BG3 text (skills list)
+        lda     #BG1_TEXT_COLOR::BLUE
+        sta     zTextColor
+        ldy     #near Ot6LoadoutTitleText
+        jsr     DrawPosText
+        ldy     #near Ot6LoadoutPoolText
+        jsr     DrawPosText
+        lda     #BG1_TEXT_COLOR::DEFAULT
+        sta     zTextColor
+        ldy     #near Ot6LoadoutLbl0Text
+        jsr     DrawPosText
+        ldy     #near Ot6LoadoutLbl1Text
+        jsr     DrawPosText
+        ldy     #near Ot6LoadoutLbl2Text
+        jsr     DrawPosText
+        ldy     #near Ot6LoadoutLbl3Text
+        jsr     DrawPosText
+        jsr     Ot6LoadoutDrawSlots
+        jmp     Ot6LoadoutDrawPool
+
+; ---- draw the four boost-slot rows (tech name + MP cost) ----
+Ot6LoadoutDrawSlots:
+        lda     #BG1_TEXT_COLOR::DEFAULT
+        sta     zTextColor
+        ldx     #$0000
+@lp:    stx     $e2                     ; slot loop var
+        txa
+        jsl     Ot6LoadoutSlotTech      ; F0: A = validated tech for this slot
+        sta     $e5                     ; -> name value
+        lda     $e2
+        asl                             ; row = 4 + slot*2
+        clc
+        adc     #$04
+        sta     $e6
+        ldx     #$0005                  ; name column
+        jsr     Ot6DrawBushName
+        lda     $e5
+        clc
+        adc     #$55                    ; tech index -> attack id
+        jsl     Ot6LoadoutCost          ; F0: A = MP cost (0 under nomp)
+        ldx     #$0012                  ; cost column (18)
+        jsr     Ot6LoadoutDrawCost
+        ldx     $e2
+        inx
+        cpx     #$0004
+        bcc     @lp
+        rts
+
+; ---- draw the LEARNED pool as a 2 x 4 grid ----
+Ot6LoadoutDrawPool:
+        lda     #BG1_TEXT_COLOR::DEFAULT
+        sta     zTextColor
+        stz     $e2                     ; filled-cell counter 0..7
+        ldx     #$0000                  ; tech 0..7
+@lp:    stx     $e3
+        txa
+        jsl     Ot6TechLearned          ; F0: carry = learned (A/X/Y preserved)
+        bcc     @skip
+        lda     $e3
+        sta     $e5                     ; name value
+        lda     $e2
+        cmp     #$04
+        bcc     @left
+        sec
+        sbc     #$04
+        asl
+        clc
+        adc     #$0f                    ; right column, row 15 + (cell-4)*2
+        sta     $e6
+        ldx     #$0011                  ; col 17
+        bra     @draw
+@left:  asl
+        clc
+        adc     #$0f                    ; left column, row 15 + cell*2
+        sta     $e6
+        ldx     #$0002                  ; col 2
+@draw:  jsr     Ot6DrawBushName
+        inc     $e2
+@skip:  ldx     $e3
+        inx
+        cpx     #$0008
+        bcc     @lp
+        rts
+
+; ---- draw one bushido tech name.  in: $e5 = tech value, $e6 = row, X = col ----
+Ot6DrawBushName:
+        lda     $e6
+        jsr     GetBG1TilemapPtr        ; A = row, X = col -> X = tilemap dest
+        longa
+        txa
+        sta     $7e9e89                 ; DrawPosTextBuf position header
+        shorta
+        jsr     _c35328                 ; BushidoName array ptr ($eb/$ef/$f1)
+        lda     $e5
+        jsr     LoadArrayItem           ; stage the 12-tile name into $7e9e8b
+        jmp     DrawPosTextBuf
+
+; ---- a row's MP cost "n MP" (blanks when cost 0).  in: A=cost,$e6=row,X=col ----
+Ot6LoadoutDrawCost:
+        pha                             ; save cost
+        lda     $e6
+        jsr     GetBG1TilemapPtr        ; X = tilemap dest
+        longa
+        txa
+        sta     $7e9e89
+        shorta
+        ldx     #$9e8b
+        stx     hWMADDL
+        pla                             ; cost
+        beq     @blank
+        clc
+        adc     #ZERO_CHAR              ; single-digit cost tile (kit costs 1..8)
+        sta     hWMDATA
+        ldx     #$0000
+@ct:    lda     f:Ot6LoadoutCostTiles,x
+        beq     @term
+        sta     hWMDATA
+        inx
+        bra     @ct
+@term:  stz     hWMDATA
+        jmp     DrawPosTextBuf
+@blank: ldy     #$0005                  ; clear "n MP" width so a revert wipes it
+        lda     #$ff
+@bl:    sta     hWMDATA
+        dey
+        bne     @bl
+        stz     hWMDATA
+        jmp     DrawPosTextBuf
+
+Ot6LoadoutCostTiles:    .byte " MP", 0
+
+; ---- cursor: single column, four rows over the boost slots ----
+Ot6LoadoutCursorProp:
+        cursor_prop {0, 0}, {1, 4}, NO_XY_WRAP
+Ot6LoadoutCursorPos:
+        cursor_pos {8, 30}
+        cursor_pos {8, 46}
+        cursor_pos {8, 62}
+        cursor_pos {8, 78}
+
+; ---- positioned labels ----
+Ot6LoadoutTitleText:    pos_text BG1A, {2, 1},  {"BUSHIDO LOADOUT"}
+Ot6LoadoutPoolText:     pos_text BG1A, {2, 13}, {"LEARNED"}
+Ot6LoadoutLbl0Text:     pos_text BG1A, {2, 4},  {"0x"}
+Ot6LoadoutLbl1Text:     pos_text BG1A, {2, 6},  {"1x"}
+Ot6LoadoutLbl2Text:     pos_text BG1A, {2, 8},  {"2x"}
+Ot6LoadoutLbl3Text:     pos_text BG1A, {2, 10}, {"3x"}
+
+.endif   ; LANG_EN
 
 ; ------------------------------------------------------------------------------
 

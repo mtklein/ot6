@@ -24,6 +24,15 @@ CODE_EXT_INC = 1
 .global Ot6BushidoListOpen       ; v0.5 bushido submenu (#8): swdtech -> tools shell
 .global Ot6BushidoConfirm        ;   confirm shim: row r -> boost r + latch tech
 .global Ot6BushidoWindow         ;   enumerate the <=4 window techs into wItemList
+.global Ot6LoadoutOpen           ; v0.5 loadout (#8 Layer B): F0 state logic the
+.global Ot6LoadoutInput          ;   thin C3 configurator shim jsl's -- seed the
+.global Ot6LoadoutSlotTech       ;   four slots, drive input, resolve each slot's
+.global Ot6TechLearned           ;   $1cf7 learned-bit test (pool draw + validation)
+.global Ot6LoadoutCeil           ;   validated tech, and expose the $1cf7-derived
+                                 ;   ceiling (menu reads $1cf7, never $2020)
+.global Ot6LoadoutCost           ;   ALWAYS-defined price shim (flag-gated body):
+                                 ;   forwards to Ot6CostFor under OT6_MP_COSTS,
+                                 ;   returns 0 under nomp so the shared menu links
 .global Ot6BlitzRowDecorate      ; menu-bank: DrawToolsListText's blitz row shim
                                  ;   (name->$0f swap always; MP cost only under
                                  ;   OT6_MP_COSTS). ALWAYS defined -- the stock C1

@@ -411,7 +411,11 @@ MenuStateTbl:
         .addr   MenuState_78
         .addr   MenuState_79
         .addr   MenuState_7a
+.if LANG_EN
+        .addr   MenuState_7b            ; issue #8 Layer B: Bushido loadout configurator
+.else
         .addr   0
+.endif
         .addr   0
         .addr   MenuState_7d
         .addr   MenuState_7e

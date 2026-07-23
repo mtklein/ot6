@@ -2399,6 +2399,28 @@ Ot6AbilityCostTbl:
 ; would not fire, or firing one the menu never showed. $7b82 is still stamped
 ; (level*32): battle_mpcost's level() reads it, and the dead numeral path can too.
 
+; ==============================================================================
+; BUSHIDO LOADOUT (issue #8 Layer B) -- per-save, field-configurable slots
+;
+; Storage: five unused bytes inside the working-save block ($1600-$1fff) that
+; save.asm's CopyGameDataToSRAM/LoadSaveSlot round-trip per slot and
+; CalcSaveSlotChecksum ($1600-$1ffd) covers -- so the loadout PERSISTS and
+; VALIDATES for free, no checksum work and zero migration (all existing saves
+; read $1e1d = 0 = AUTO):
+;
+;   $1e1d  mode   0 = AUTO (the moving window), nonzero = MANUAL
+;   $1e1e  slot0 tech index (boost 0x)   ; stored as the 0..7 INDEX that
+;   $1e1f  slot1 tech index (boost 1x)   ;   Ot6BushidoTech returns, so the
+;   $1e20  slot2 tech index (boost 2x)   ;   downstream +$55 / Ot6BushidoOblivion
+;   $1e21  slot3 tech index (boost 3x)   ;   tail stay byte-for-byte unchanged
+;
+; One physical cell $7e1e1d (DBR = $7e in battle); read long (f:) so the hook
+; is bank-agnostic.  With mode = 0 the battle path is identical to Layer A.
+OT6_LOADOUT     = $7e1e1d
+.assert (OT6_LOADOUT & $ffff) >= $1600, error, "loadout must sit inside the save block"
+.assert (OT6_LOADOUT & $ffff) + 4 <= $1ffd, error, "loadout must sit inside the checksum window"
+; ==============================================================================
+
 ; [ Bushido ceiling — techs-known-minus-1, read safe (issue #4) ]
 ; InitSkills stores $2020 with a 16-bit `stx` over CountBits's uninitialized
 ; HIGH byte ($ff02 in the Doma solo fight, $ffff before Cyan joins); read as a
@@ -2428,6 +2450,43 @@ Ot6AbilityCostTbl:
                                 ;   reach ($36 btlgfx's, OT6_SCR_BIT the hud
                                 ;   builder's) both have owners; the stack owes
                                 ;   nobody and survives an nmi.
+        ; [ issue #8 Layer B: manual-loadout read hook ]
+        ; mode 0 (all existing saves) -> @auto, the vanilla window untouched.
+        ; mode nonzero -> return the player's stored tech for THIS boost slot,
+        ; but only if it is still learned ($1cf7 bit set); otherwise fall back
+        ; to the auto window for this slot rather than offer an uncastable tech.
+        ; Callers run Ot6BushidoOblivion AFTER us, so a manually-placed Oblivion
+        ; (tech 7) keeps its spent-divine -> Tempest swap.
+        lda     f:OT6_LOADOUT   ; loadout mode
+        beq     @auto
+        lda     $01,s           ; boost (0..3)
+        longa
+        and     #$00ff
+        tax
+        shorta0
+        lda     f:OT6_LOADOUT+1,x   ; stored tech index for slot = boost
+        phy                     ; preserve caller Y (Ot6BushidoWindow needs it)
+        longa
+        and     #$00ff
+        tay                     ; Y = tech t, clean 16-bit shift count
+        shorta0
+        lda     f:$7e1cf7       ; learned-swdtech bitmap (bit t = tech t known)
+        iny                     ; shift t+1 times: final carry = bit t
+:       lsr
+        dey
+        bne     :-
+        ply                     ; restore Y (PLY preserves carry)
+        bcc     @auto           ; stored tech not learned -> auto fallback
+        lda     $01,s           ; learned: return the stored tech
+        longa
+        and     #$00ff
+        tax
+        shorta0
+        lda     f:OT6_LOADOUT+1,x
+        sta     $01,s           ; overwrite the parked boost with the tech
+        pla                     ; A = tech (mirrors @auto's balanced tail)
+        rtl
+@auto:
         jsl     Ot6BushidoCeil  ; A = ceiling (preserves nothing we need)
         pha                     ; park ceiling ($01,s ; boost now $02,s)
         sec
@@ -3189,6 +3248,273 @@ done:   plp
         inc     $7b80               ; commit the queued action
         inc     $7bcb               ; close the menu (state $30 -> $2f)
         rtl
+.endproc
+
+; ==============================================================================
+; BUSHIDO LOADOUT CONFIGURATOR -- OT6-owned bank-F0 logic (issue #8 Layer B)
+;
+; The field-menu configurator's STATE logic lives here in F0; the C3 menu-state
+; handler (field_menu.asm) is a thin shim that jsl's these for every decision
+; and only performs the tilemap/DMA/cursor framework calls that MUST run in the
+; menu bank.  All entries are a8/i16, D = 0 (the menu's direct page, so $08/$09
+; new-press joypad and $4d/$4e cursor position are reachable), rtl.  These read
+; the learned set from $1cf7 (NOT $2020 -- battle-only) and price with the
+; shared Ot6CostFor leaf, exactly as the spec requires.
+; ------------------------------------------------------------------------------
+
+; [ menu-side ceiling: popcount($1cf7) - 1, floored at 0 (0..7) ]
+; The field cannot read $2020 (object-map data there), so derive the ceiling
+; from the learned bitmap the same way InitSkills does at battle start.
+; out: A = ceiling.  clobbers X.  preserves Y.
+.proc Ot6LoadoutCeil
+        .a8
+        .i16
+        ldx     #$0000              ; running popcount in X low
+        lda     f:$7e1cf7
+@lp:    beq     @done               ; no more set bits
+        pha
+        and     #$01
+        beq     @skip
+        inx
+@skip:  pla
+        lsr
+        bra     @lp
+@done:  txa                         ; A = popcount (0..8)
+        beq     @zero               ; nothing learned -> ceiling 0 (only tech 0)
+        dec     a                   ; ceiling = count - 1
+        rtl
+@zero:  lda     #$00
+        rtl
+.endproc
+
+; [ auto-window tech for a slot: base = max(0,ceil-3), tech = min(base+slot,ceil) ]
+; The very math Ot6BushidoTech runs in AUTO mode, replicated menu-side off
+; $1cf7 so the seed baseline matches what battle would pick.
+; in: A = slot (0..3).  out: A = tech (0..ceiling).  clobbers X.  preserves Y.
+.proc Ot6LoadoutAutoTech
+        .a8
+        .i16
+        pha                         ; park slot ($01,s)
+        jsl     Ot6LoadoutCeil      ; A = ceiling
+        pha                         ; park ceiling ($01,s ; slot now $02,s)
+        sec
+        sbc     #$03                ; ceiling - 3
+        bcs     :+
+        lda     #$00                ; base floors at 0
+:       clc
+        adc     $02,s               ; base + slot
+        cmp     $01,s               ; vs ceiling
+        bcc     :+
+        lda     $01,s               ; cap at ceiling
+:       sta     $02,s               ; stash tech over the parked slot
+        pla                         ; drop ceiling
+        pla                         ; A = tech
+        rtl
+.endproc
+
+; [ is a tech learned? test bit t of $1cf7 ]
+; in: A = tech (0..7).  out: carry = learned.  A preserved.  clobbers X,Y-safe.
+.proc Ot6TechLearned
+        .a8
+        .i16
+        phy
+        pha                         ; save A (the tech)
+        longa
+        and     #$00ff
+        tay                         ; Y = t (clean shift count)
+        shorta0
+        lda     f:$7e1cf7
+        iny                         ; shift t+1 times -> carry = bit t
+:       lsr
+        dey
+        bne     :-
+        pla                         ; restore A (PLA preserves carry)
+        ply                         ; restore Y (PLY preserves carry)
+        rtl
+.endproc
+
+; [ the tech shown/used for a slot, validated -- the single source of truth ]
+; Mirrors the battle read hook: MANUAL returns the stored, learned tech, else
+; falls back to the auto window for that slot.  Used by the C3 draw so the
+; screen never names a tech the battle would not fire.
+; in: A = slot (0..3).  out: A = tech (0..7).  clobbers X.  preserves Y.
+.proc Ot6LoadoutSlotTech
+        .a8
+        .i16
+        pha                         ; park slot ($01,s)
+        lda     f:OT6_LOADOUT       ; mode
+        beq     @auto
+        lda     $01,s
+        longa
+        and     #$00ff
+        tax
+        shorta0
+        lda     f:OT6_LOADOUT+1,x   ; stored tech
+        jsl     Ot6TechLearned      ; carry = learned (A preserved)
+        bcc     @auto
+        sta     $01,s               ; learned: return stored tech
+        pla
+        rtl
+@auto:  pla                         ; A = slot
+        jsl     Ot6LoadoutAutoTech  ; A = auto tech for this slot
+        rtl
+.endproc
+
+; [ seed all four slots from the auto window ]
+; clobbers A,X.  preserves Y.
+.proc Ot6LoadoutSeed
+        .a8
+        .i16
+        ldx     #$0000
+@lp:    phx
+        txa                         ; slot = x
+        jsl     Ot6LoadoutAutoTech  ; A = auto tech (clobbers X)
+        plx
+        sta     f:OT6_LOADOUT+1,x   ; store into slot x
+        inx
+        cpx     #$0004
+        bcc     @lp
+        rtl
+.endproc
+
+; [ open the configurator: reset the cursor, seed if still in AUTO ]
+; Leaves mode as-is (AUTO stays AUTO until the first edit), but fills the four
+; display slots from the auto window so the player edits a sensible baseline.
+; clobbers A,X.
+.proc Ot6LoadoutOpen
+        .a8
+        .i16
+        stz     $4d                 ; cursor: single column
+        stz     $4e                 ; ... top slot
+        stz     $4f
+        stz     $50
+        stz     $51
+        stz     $52
+        lda     f:OT6_LOADOUT       ; already MANUAL?
+        bne     :+
+        jsl     Ot6LoadoutSeed      ; AUTO: seed the four slots from the window
+:       rtl
+.endproc
+
+; [ cycle the cursored slot's tech to the prev/next LEARNED tech; go MANUAL ]
+; in: A = step delta ($01 = next, $07 = prev, i.e. +/-1 mod 8).  clobbers A,X.
+.proc Ot6LoadoutCycleCore
+        .a8
+        .i16
+        sta     $e0                 ; delta (menu scratch, D=0)
+        lda     #$01
+        sta     f:OT6_LOADOUT       ; first edit flips the loadout to MANUAL
+        lda     $4e                 ; cursored slot (0..3)
+        longa
+        and     #$00ff
+        tax
+        shorta0
+        lda     f:OT6_LOADOUT+1,x   ; current tech (0..7)
+        ldy     #$0008              ; try every residue once
+@hop:   clc
+        adc     $e0
+        and     #$07                ; wrap 0..7
+        jsl     Ot6TechLearned      ; carry = learned (A preserved)
+        bcs     @found
+        dey
+        bne     @hop
+@found: pha                         ; A = new tech
+        lda     $4e
+        longa
+        and     #$00ff
+        tax
+        shorta0
+        pla
+        sta     f:OT6_LOADOUT+1,x   ; write it into the cursored slot
+        rtl
+.endproc
+
+Ot6LoadoutNext:                     ; R shoulder -> next learned tech
+        lda     #$01
+        jmp     Ot6LoadoutCycleCore
+Ot6LoadoutPrev:                     ; L shoulder -> previous learned tech
+        lda     #$07
+        jmp     Ot6LoadoutCycleCore
+
+; [ per-frame input: mutate loadout state; tell C3 what to do next ]
+; Reads the new-press joypad ($08 low = A/X/L/R, $09 high = B/Y/Sel/Start/dpad).
+;   B      -> exit               (return A = 2)
+;   Up/Dn  -> move slot cursor   (return A = 1: redraw)
+;   L/R    -> cycle slot's tech  (return A = 1)
+;   Select -> revert to AUTO     (return A = 1)
+;   else                          (return A = 0: idle)
+.proc Ot6LoadoutInput
+        .a8
+        .i16
+        lda     $09                 ; dpad / B / Y / Select / Start
+        bit     #$80                ; B -> exit
+        beq     :+
+        lda     #$02
+        rtl
+:       bit     #$08                ; Up
+        beq     @dn
+        lda     $4e
+        bne     :+
+        lda     #$04                ; wrap 0 -> 3 (pre-decrement)
+:       dec     a
+        sta     $4e
+        lda     #$01
+        rtl
+@dn:    lda     $09
+        bit     #$04                ; Down
+        beq     @sel
+        lda     $4e
+        inc     a
+        cmp     #$04
+        bcc     :+
+        lda     #$00                ; wrap 3 -> 0
+:       sta     $4e
+        lda     #$01
+        rtl
+@sel:   lda     $09
+        bit     #$40                ; Y -> revert to AUTO.  (NOT Select: FF6's
+                                    ;   default config aliases physical Select
+                                    ;   onto the R bit, so it can't be told apart
+                                    ;   from the R-shoulder cycle -- Y is clean.)
+        beq     @lr
+        lda     #$00
+        sta     f:OT6_LOADOUT       ; mode = AUTO (stz has no abslong form)
+        jsl     Ot6LoadoutSeed      ; reseed the display from the window
+        lda     #$01
+        rtl
+@lr:    lda     $08                 ; A / X / L / R shoulders
+        bit     #$20                ; L shoulder -> previous learned tech
+        beq     @rsh
+        jsl     Ot6LoadoutPrev
+        lda     #$01
+        rtl
+@rsh:   lda     $08
+        bit     #$10                ; R shoulder -> next learned tech
+        beq     @idle
+        jsl     Ot6LoadoutNext
+        lda     #$01
+        rtl
+@idle:  lda     #$00
+        rtl
+.endproc
+
+; [ price a loadout row -- ALWAYS defined, flag-gated body ]
+; The configurator lives in the SHARED menu object (built once, flag-agnostic),
+; but Ot6CostFor is OT6_MP_COSTS-only.  So the menu prices every row through
+; this always-present shim -- exactly the Ot6BlitzRowDecorate/Ot6ToolRowDecorate
+; pattern.  ON: tail-call Ot6CostFor (its rtl returns to the menu).  nomp: return
+; 0 (no cost table referenced, so the shared menu object links against either
+; battle object, and the row simply draws no number).
+; in: A = attack id.  out: A = MP cost (0 under nomp).  rtl.
+.proc Ot6LoadoutCost
+        .a8
+        .i16
+.if ::OT6_MP_COSTS                  ; :: -- the file-scope flag, from in-proc
+        jmp     Ot6CostFor          ; tail-call: same bank, its rtl returns for us
+.else
+        lda     #$00
+        rtl
+.endif
 .endproc
 
 ; ------------------------------------------------------------------------------
