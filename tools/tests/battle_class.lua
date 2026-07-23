@@ -58,9 +58,14 @@
 --   - GUESS(seed-2): guards still seed 2/2 with the extended 4-byte
 --     records (battle_break asserts the same; if this fails the record
 --     stride is wrong and everything after is noise)
---   - GUESS(swing-cadence): 1500 frames of berserk is assumed >= a few
---     swings for the no-chip phases; if the cadence is slower the
---     negative asserts pass vacuously (phase 2: eyeball the swing count)
+--   - swing-cadence (RESOLVED): the no-chip phases no longer wait a fixed
+--     1500-frame budget. The berserk gauge is accelerated (bumpAtb pokes the
+--     ATB fill constant $3ac8) and each no-chip phase now DRIVES UNTIL it has
+--     watched two probe-class Fights actually resolve ($57b8 write counter),
+--     then asserts nothing chipped -- so a slow cadence fails the driveUntil
+--     loudly instead of passing the negative vacuously. Measured cadence:
+--     ~700 frozen frames of gauge spin-up at each phase entry ($3aa0.3 held),
+--     then swings land every few dozen frames.
 --   - GUESS(dice): poking $3ca8 to dice ids swaps the CLASS lookup but
 --     not the init-time special-effect bytes, so dice phases swing like
 --     normal weapons here; real equipped-dice behavior (the dice damage
@@ -110,9 +115,24 @@ end
 -- 5000 hp: a break window's x2 fights (~100/hit) can't wound a guard
 -- between re-pokes; a wounded guard would never chip again (by design)
 -- and starve the later phases
+-- Bump the berserk party's ATB fill constant ($3ac8,x, 16-bit, stride 2,
+-- normally set by CalcSpeed from Speed) so a gauge that is ALLOWED to run
+-- tops off in ~16 frames instead of ~770. This is engine-native: the engine
+-- still runs the overflow -> queue-action -> reset cycle and a character still
+-- only acts when idle (the swing animation gates the real rate), so every
+-- counted swing is a genuine resolved Fight -- we just stop waiting on a slow
+-- gauge. (Forcibly clearing $3aa0.3, the gauge-stop bit, to skip the ~700f
+-- per-phase spin-up does NOT work: it races the action-commit cycle and no
+-- Fight ever resolves, so that spin-up is left intact.)
+local ATB_FAST = 0x1000
+local function bumpAtb()
+  for slot = 0, 3 do H.writeWord(0x3AC8 + slot * 2, ATB_FAST) end
+end
+
 local function repokeHp()
   H.writeWord(0x3C00, 5000)
   H.writeWord(0x3C02, 5000)
+  bumpAtb()
 end
 
 -- one berserk-driven step: keep the guards alive, let time pass
@@ -128,6 +148,7 @@ local function pinParty()
     local a = 0x3BF4 + c * 2
     if H.readWord(a) < 100 then H.writeWord(a, 300) end
   end
+  bumpAtb()
 end
 
 local s1c, s2c -- shield snapshot for the no-chip phases
@@ -278,12 +299,19 @@ H.run({ maxFrames = 90000 }, {
   armRightHands(0x0A),                     -- MithrilBlade: slashing
   H.call(function() s1c, s2c = shields() end),
   watchClasses(true),
-  H.repeatN(50, driveStep),                -- 1500 berserk-fight frames
+  -- Drive until TWO slashing Fights have actually RESOLVED (not a fixed
+  -- padded budget): the negative "nothing chips" below is only meaningful if
+  -- swings of the probe class landed, so we make that a hard precondition --
+  -- if two do not resolve within the cap this driveUntil FAILS LOUDLY instead
+  -- of the old fixed wait passing vacuously. (Measured swing cadence with the
+  -- accelerated gauge: ~700f cold-start spin-up, then swings land fast.)
+  H.driveUntil(function() return (classWrites[0x01] or 0) >= 2 end,
+    2000, driveStep, "two slashing swings to resolve"),
   watchClasses(false),
   report("slash-phase"),
   H.call(function()
-    H.assertEq((classWrites[0x01] or 0) >= 1, true,
-      "slashing swings actually resolved during the phase")
+    H.assertEq((classWrites[0x01] or 0) >= 2, true,
+      "two slashing swings actually resolved during the phase")
     local s1, s2 = shields()
     H.assertEq(s1, s1c, "slash swings never chip a pierce-weak guard")
     H.assertEq(s2, s2c, "slash swings never chip a pierce-weak guard (2)")
@@ -359,12 +387,15 @@ H.run({ maxFrames = 90000 }, {
   armRightHands(0x52),                     -- Fixed Dice: ¤ + null-break
   H.call(function() s1c, s2c = shields() end),
   watchClasses(true),
-  H.repeatN(50, driveStep),                -- 1500 berserk-fight frames
+  -- Same non-vacuity guard as the slash phase: require two null-break ¤ Fights
+  -- to actually resolve before trusting "nothing chips", or fail loudly.
+  H.driveUntil(function() return (classWrites[0x88] or 0) >= 2 end,
+    2000, driveStep, "two null-break ¤ swings to resolve"),
   watchClasses(false),
   report("nullbreak-phase"),
   H.call(function()                        -- GUESS(dice)
-    H.assertEq((classWrites[0x88] or 0) >= 1, true,
-      "null-break ¤ swings actually resolved during the phase")
+    H.assertEq((classWrites[0x88] or 0) >= 2, true,
+      "two null-break ¤ swings actually resolved during the phase")
     local s1, s2 = shields()
     H.assertEq(s1, s1c, "fixed dice never chip")
     H.assertEq(s2, s2c, "fixed dice never chip (2)")
@@ -408,7 +439,13 @@ H.run({ maxFrames = 90000 }, {
   armRightHands(0x0A),                     -- MithrilBlade: slashing
   H.call(function() s1c, s2c = shields() end),
   watchClasses(true),
-  H.repeatN(1500, {
+  -- Drive until at least one swing has resolved as a HEAL *and* two slashing
+  -- Fights have resolved -- both are hard preconditions for the "no chip"
+  -- negative below, so a too-short window can no longer pass vacuously (it
+  -- times out and fails). Replaces a flat 1500-frame budget.
+  H.driveUntil(function()
+    return H.vars.healSeen and (classWrites[0x01] or 0) >= 2
+  end, 2500, {
     H.call(function()
       pinParty()
       for _, a in ipairs({ 0x3C00, 0x3C02 }) do
@@ -422,12 +459,12 @@ H.run({ maxFrames = 90000 }, {
       end
     end),
     H.waitFrames(1),
-  }),
+  }, "a heal to land and two slashing swings to resolve"),
   watchClasses(false),
   report("heal-reversal"),
   H.call(function()
-    H.assertEq((classWrites[0x01] or 0) >= 1, true,
-      "slashing swings actually resolved during the phase")
+    H.assertEq((classWrites[0x01] or 0) >= 2, true,
+      "two slashing swings actually resolved during the phase")
     H.assertEq(H.vars.healSeen, true,
       "at least one swing resolved as a heal (absorb reversal ran)")
     local s1, s2 = shields()
