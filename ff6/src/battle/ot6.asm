@@ -2390,47 +2390,46 @@ Ot6AbilityCostTbl:
 ; entry: from UpdateMenuState_37 — db=$7e, d=0, a8/i16, y=0 (the bar draw
 ; downstream indexes w7e7a73,y with it). returns a = the chosen level, as
 ; the vanilla block it replaces did. clobbers x.
+;
+; v0.5 SUBMENU (issue #8): SwdTech is now a tools-shell submenu -- one row per
+; boost level, the row IS the boost, weakest at top. The base/ceiling arithmetic
+; and the Oblivion top-rung swap are factored into three leaf helpers below so
+; single-select (this proc, called at the submenu's confirm latch) and the row
+; ENUMERATION (Ot6BushidoWindow) can never diverge -- offering a tech the latch
+; would not fire, or firing one the menu never showed. $7b82 is still stamped
+; (level*32): battle_mpcost's level() reads it, and the dead numeral path can too.
 
-.proc Ot6BushidoTier
+; [ Bushido ceiling — techs-known-minus-1, read safe (issue #4) ]
+; InitSkills stores $2020 with a 16-bit `stx` over CountBits's uninitialized
+; HIGH byte ($ff02 in the Doma solo fight, $ffff before Cyan joins); read as a
+; WORD the junk high byte made even a real 2-tech ceiling `>= 8` and collapse to
+; 0, pinning Cyan to Dispatch. Read a8 the junk is ignored, and a genuinely-
+; unlearned $ff (low byte) still trips >= 8 into the nothing-learned path.
+; a8.  out: A = ceiling (0..7).  preserves X and Y.
+.proc Ot6BushidoCeil
         .a8
-        .i16
-        lda     $62ca           ; active character slot
-        longa
-        and     #$0003
-        asl
-        tax                     ; -> entity offset
-        shorta0
-        lda     $3e9d,x         ; pending boost 0-3
-        cmp     #$04
-        bcc     :+
-        lda     #$03            ; (defensive: Ot6Boost already caps at 3)
-:       pha                     ; park boost. the two scratch bytes in reach are
-                                ;   both somebody's — $36 is btlgfx's (and only
-                                ;   the display call site rewrites it right after
-                                ;   us; the latch site does not), and OT6_SCR_BIT
-                                ;   is the hud builder's. the stack owes nobody
-                                ;   and survives an nmi.
-        lda     $2020           ; techs known - 1 (the ceiling), LOW BYTE ONLY
-                                ;   (issue #4). InitSkills stores it with a 16-bit
-                                ;   `stx $2020` (battle_main.asm:14532) over
-                                ;   CountBits's uninitialized HIGH byte -- $FF02 in
-                                ;   the Doma solo fight, $ffff before cyan joins.
-                                ;   read as a WORD (the old `ldx`) the junk high
-                                ;   byte made even a real 2-tech ceiling `>= 8` and
-                                ;   collapse to 0, pinning Cyan to Dispatch. read
-                                ;   a8 the junk is ignored, and a genuinely-
-                                ;   unlearned $ff (low byte) still trips >= 8 into
-                                ;   the nothing-learned path.
+        lda     $2020           ; techs known - 1, LOW BYTE ONLY (issue #4)
         cmp     #$08
         bcc     :+
         lda     #$00            ; nothing learned: only tech 0 (Dispatch) exists
-:       pha                     ; park ceiling ($01,s ; boost now $02,s)
-        ; --- the moving window of four (issue #5) --------------------------------
-        ; boost 0/1/2/3 selects Cyan's TOP FOUR learned techs, weakest ->
-        ; strongest: base = max(0, ceiling-3), tech = min(base + boost, ceiling).
-        ; while he knows four or fewer, base is 0 and EVERY learned tech is
-        ; reachable (0/1/2/3 land on the four he has); learn a fifth and the
-        ; window slides up one, retiring the weakest. no table -- pure arithmetic.
+:       rtl
+.endproc
+
+; [ Bushido moving window of four (issue #5) — boost -> tech ]
+; boost 0/1/2/3 selects Cyan's TOP FOUR learned techs, weakest -> strongest:
+; base = max(0, ceiling-3), tech = min(base + boost, ceiling). while he knows
+; four or fewer, base is 0 and EVERY learned tech is reachable; learn a fifth and
+; the window slides up one, retiring the weakest. no table -- pure arithmetic.
+; a8/i16.  in: A = boost (0..3).  out: A = tech (0..ceiling).  clobbers X.
+.proc Ot6BushidoTech
+        .a8
+        .i16
+        pha                     ; park boost ($01,s). the two scratch bytes in
+                                ;   reach ($36 btlgfx's, OT6_SCR_BIT the hud
+                                ;   builder's) both have owners; the stack owes
+                                ;   nobody and survives an nmi.
+        jsl     Ot6BushidoCeil  ; A = ceiling (preserves nothing we need)
+        pha                     ; park ceiling ($01,s ; boost now $02,s)
         sec
         sbc     #$03            ; ceiling - 3   (A still = ceiling)
         bcs     :+
@@ -2445,21 +2444,26 @@ Ot6AbilityCostTbl:
         sta     $02,s           ; stash the chosen tech over the parked boost byte
         pla                     ; drop the parked ceiling
         pla                     ; a = chosen tech 0-7 (stack balanced)
-        ; the window's top rung IS Oblivion (tech 7) once Cyan has learned all
-        ; eight: ceiling 7, boost 3 -> base 4 + 3 = 7, by the same base+boost sum
-        ; as any other rung -- the divine falls out of the window for free, no
-        ; special case bolted outside it. it still fires exactly as before:
-        ; SELECTED here only when learned (ceiling 7) and unspent, gated at
-        ; RESOLUTION by Ot6Oblivion (hooked after ChooseTarget in CalcAttackEffect
-        ; -- the target does not exist at this command-latch time, swdtech being
-        ; in RetargetCmdTbl). read the once-per-battle latch here and drop a spent
-        ; Oblivion back to Tempest (6) so BP3 keeps a live top rung -- eclipse/
-        ; tempest are never retired, they are exactly what a spent-or-unlearned
-        ; divine falls to. (a divine is spent only on a broken, killable target;
-        ; an unbroken/boss target folds to tempest at RESOLUTION and leaves the
-        ; latch clear, so the menu keeps offering it.)
+        rtl
+.endproc
+
+; [ Bushido Oblivion top-rung swap ]
+; the window's top rung IS Oblivion (tech 7) once Cyan has learned all eight:
+; ceiling 7, boost 3 -> base 4 + 3 = 7, by the same base+boost sum as any other
+; rung -- the divine falls out of the window for free, no special case bolted
+; outside it. it fires exactly as before: SELECTED here only when learned and
+; unspent, gated at RESOLUTION by Ot6Oblivion (hooked after ChooseTarget in
+; CalcAttackEffect -- the target does not exist at command-latch time, swdtech
+; being in RetargetCmdTbl). read the once-per-battle latch here and drop a spent
+; Oblivion back to Tempest (6) so BP3 keeps a live top rung. (a divine is spent
+; only on a broken, killable target; an unbroken/boss target folds to tempest at
+; RESOLUTION and leaves the latch clear, so the menu keeps offering it.)
+; a8/i16.  in: A = tech (0..7).  out: A = tech (a spent tech-7 -> 6).  clobbers X.
+.proc Ot6BushidoOblivion
+        .a8
+        .i16
         cmp     #$07
-        bne     @level          ; not oblivion: the chosen tech stands
+        bne     @done           ; not oblivion: the chosen tech stands
         lda     $62ca           ; re-derive the active char's entity bit
         and     #$03
         asl                     ; slot * 2 = entity offset
@@ -2471,12 +2475,30 @@ Ot6AbilityCostTbl:
         and     OT6_DIVINE_USED ; already spent the divine this battle?
         beq     @obl            ; no: oblivion stands
         lda     #$06            ; yes: revert to tempest for the rest of it
-        bra     @level
+        rtl
 @obl:   lda     #$07            ; oblivion
-@level: pha
+@done:  rtl
+.endproc
+
+.proc Ot6BushidoTier
+        .a8
+        .i16
+        lda     $62ca           ; active character slot
+        longa
+        and     #$0003
+        asl
+        tax                     ; -> entity offset
+        shorta0
+        lda     $3e9d,x         ; pending boost 0-3
+        cmp     #$04
+        bcc     :+
+        lda     #$03            ; (defensive: Ot6Boost already caps at 3)
+:       jsl     Ot6BushidoTech      ; boost -> tech (shared window math)
+        jsl     Ot6BushidoOblivion  ; spent-divine top rung -> tempest
+        pha
         asl5                    ; level * 32 — the counter value vanilla's
         sta     $7b82           ;   bar drew, so w7e7b82 still feeds the
-        pla                     ;   latch, the fill, and the numerals
+        pla                     ;   latch, the fill, and battle_mpcost's level()
         rtl
 .endproc
 
@@ -2816,6 +2838,8 @@ done:   plp
         ; caster can't afford the row, the twin of magic greying spell+MP as one.
         lda     $4006,y         ; wItemList::Qty,y     (column-1 cost)
         jsl     Ot6AbilityGrey  ; -> $04 grey / $00 white; preserves X and Y
+        jsl     Ot6BushidoRowGrey ; bushido (w7e6168=2): ALSO grey a row whose boost
+                                ;   exceeds current bp; blitz passes A through
         ora     $5758           ; +3   column-1 font palette: $21 -> $21/$25
         sta     $5758
         lda     #$02
@@ -2927,6 +2951,243 @@ done:   plp
         sta     $575e           ; +9: column-2 cost value
 .endif
         plp
+        rtl
+.endproc
+
+; ------------------------------------------------------------------------------
+
+.if OT6_MP_COSTS
+; [ add the Bushido "not enough BP" grey reason to a row's font ]
+;
+; In bushido mode (w7e6168 = 2) the submenu row IS the boost level (Y/6, weakest
+; at top). A row whose boost exceeds the caster's current bp ($3e9c,entity) is
+; unreachable -- Ot6BushidoConfirm refuses to commit it -- so grey it like an
+; unaffordable spell, a SECOND grey reason on top of Ot6AbilityGrey's MP one.
+; Blitz mode (w7e6168 != 2) passes the MP grey through untouched.  Only ever
+; reached from Ot6BlitzRowDecorate's OT6_MP_COSTS block, so it lives behind the
+; same flag.  a8/i16.  in: A = the MP grey ($00/$04), Y = drawn-row*6.
+; out: A = A | ($04 if bushido and boost > bp).  preserves X and Y.
+.proc Ot6BushidoRowGrey
+        .a8
+        .i16
+        pha                     ; [S+1] park the MP grey
+        lda     $6168
+        cmp     #$02
+        bne     @pass           ; not bushido: return the MP grey unchanged
+        phx                     ; [S+2] save caller X (Ot6BlitzRowDecorate's)
+        lda     $62ca           ; entity offset for the bp bank
+        and     #$03
+        asl
+        longa
+        and     #$00ff
+        tax
+        shorta0
+        lda     $3e9c,x         ; current bp
+        pha                     ; [S+1] park bp ($01,s)
+        tya                     ; A = drawn-row*6
+        ldx     #$0000          ; boost r accumulator
+@div:   cmp     #$06            ; r = (row*6) / 6
+        bcc     @haver
+        sbc     #$06
+        inx
+        bra     @div
+@haver: txa                     ; A = r
+        cmp     $01,s           ; r vs bp; C set iff r >= bp
+        beq     @afford         ; r == bp: exactly affordable
+        bcc     @afford         ; r <  bp: affordable
+        pla                     ; r > bp: unreachable -- grey it
+        plx                     ; restore caller X
+        pla                     ; MP grey
+        ora     #$04            ; add magic's disabled bit ($21|$04 = $25)
+        rtl
+@afford:
+        pla                     ; drop bp
+        plx                     ; restore caller X
+@pass:  pla                     ; MP grey (unchanged)
+        rtl
+.endproc
+.endif  ; OT6_MP_COSTS
+
+; ------------------------------------------------------------------------------
+
+; [ open Cyan's SwdTech as a submenu (v0.5 bushido submenu -- issue #8) ]
+;
+; vanilla SwdTech ran a free numeral gauge (UpdateMenuState_35/37, now dead):
+; a bar climbed one unit every 4 frames, the tech was bar>>5, and A latched
+; whatever level it happened to show. This module deletes the gauge and drives
+; SwdTech through the Tools window shell instead -- the twin of Ot6BlitzListOpen.
+; OpenCmdMenuTbl[7] now hits a C1 stub that jsl's here then jmp's OpenToolsWindow.
+;
+; The rows ARE the boost window: row r (weakest at TOP) = boost r = the tech
+; Ot6BushidoTier returns for that boost. Ot6BushidoWindow enumerates the <=4
+; techs into wItemList's LEFT column (cells r*2, so row r reads at wItemList
+; offset r*6 -- what _c18470 computes for column 0); the right column and any
+; unused rows are $ff (empty), so the window renders a clean single column of 4.
+; Confirm (Ot6BushidoConfirm) maps the picked cell back to r, banks $3e9d=r, and
+; latches Ot6BushidoTier's tech -- so single-select and enumeration share the
+; exact same base+boost math and can never diverge.
+;
+; entry: jsl from the C1 stub, db=$7e, a8/i16. clobbers a/x/y (the caller's next
+; act is jmp OpenToolsWindow, which reloads what it needs).
+.proc Ot6BushidoListOpen
+        .a8
+        .i16
+        jsl     Ot6BushidoWindow    ; pack the <=4 window techs (left col) + $ff pad
+.if ::OT6_MP_COSTS                  ; :: -- force the file-scope flag from in-proc
+        ; stamp each cell's MP cost into wItemList::Qty (a $ff empty cell gets 0,
+        ; which cmd $02 renders as two blanks and Ot6AbilityGrey leaves white).
+        ldx     #$0000
+@cost:  lda     $4005,x             ; wItemList::Index
+        cmp     #$ff
+        bne     @price
+        stz     $4006,x             ; empty cell: cost 0
+        bra     @nextc
+@price: jsl     Ot6CostFor          ; id -> MP cost (preserves X and Y)
+        sta     $4006,x             ; wItemList::Qty
+@nextc: inx
+        inx
+        inx
+        cpx     #$0018              ; 8 cells * 3 bytes
+        bcc     @cost
+.endif
+        ; --- honor Config>Cursor exactly like Blitz/Tools: leave the shared
+        ; cursor triple alone (the command-window open already applied Memory/
+        ; Reset), just force a fresh window re-init. A remembered row indexes the
+        ; packed list directly; in-battle the learned set (hence the rows) is
+        ; fixed, so no id-to-row remap is needed.
+        stz     $7ba5               ; force MakeToolsList_04 to re-init the window
+        lda     #$04
+        sta     $7b9e               ; jump the tools state machine to its draw phase
+        lda     #$02
+        sta     $6168               ; w7e6168 = 2 : bushido mode (1 = blitz)
+        rtl
+.endproc
+
+; ------------------------------------------------------------------------------
+
+; [ enumerate the moving-window techs into wItemList (issue #8) ]
+;
+; writes attack id ($55 + tech[r]) for boost r = 0..min(3,ceiling) into
+; wItemList::Index at cell r*2 (the LEFT column of row r), and $ff-fills every
+; other cell through the 8-cell (4x2) window. tech[r] shares Ot6BushidoTech's
+; base+boost math and Ot6BushidoOblivion's top-rung swap with single-select, so
+; the menu can never offer a tech the confirm latch would not fire. When Cyan
+; knows fewer than four techs (ceiling < 3) only the known rows are emitted -- a
+; boost past the ceiling would just cap to a duplicate tech, so its row is left
+; $ff (unselectable) rather than shown.
+;
+; a8/i16.  out: X = number of rows written (1..4).  clobbers A,X,Y.
+.proc Ot6BushidoWindow
+        .a8
+        .i16
+        ; --- $ff-fill all eight window cells first (empty = blank + unselectable) ---
+        ldx     #$0000
+        lda     #$ff
+@pad:   sta     $4005,x             ; wItemList::Index
+        inx
+        inx
+        inx
+        cpx     #$0018
+        bcc     @pad
+        ; --- rowcount-1 = min(3, ceiling): boost past the ceiling is a dup ---
+        jsl     Ot6BushidoCeil      ; A = ceiling (0..7)
+        cmp     #$04
+        bcc     :+
+        lda     #$03                ; cap the window at four rows
+:       pha                         ; maxboost -> $02,s (after the offset push)
+        lda     #$00
+        pha                         ; left-cell write offset -> $01,s
+        ldy     #$0000              ; boost r
+@row:   tya                         ; A = boost r
+        jsl     Ot6BushidoTech      ; A = tech (preserves Y; clobbers X)
+        jsl     Ot6BushidoOblivion  ; A = tech, top-rung swap (preserves Y)
+        clc
+        adc     #$55                ; A = attack id $55 + tech
+        pha                         ; park id ($01,s; offset now $02,s, max $03,s)
+        lda     $02,s               ; A = write offset (r*6)
+        longa
+        and     #$00ff
+        tax                         ; X = write offset
+        shorta0
+        pla                         ; A = id (offset back at $01,s)
+        sta     $4005,x             ; wItemList::Index at row r's left cell
+        lda     $01,s               ; advance offset += 6 (one row)
+        clc
+        adc     #$06
+        sta     $01,s
+        iny                         ; next boost
+        tya
+        cmp     $02,s               ; r vs maxboost
+        bcc     @row                ; r < maxboost: another row
+        beq     @row                ; r == maxboost: the last row
+        pla                         ; drop the write offset
+        pla                         ; A = maxboost
+        inc     a                   ; rowcount = maxboost + 1 (1..4)
+        longa
+        and     #$00ff
+        tax                         ; X = rowcount
+        shorta0
+        rtl
+.endproc
+
+; ------------------------------------------------------------------------------
+
+; [ commit a Bushido submenu row: row r = boost r, fire the base+r tech ]
+;
+; jsl from the C1 tools-confirm (@8809, bushido mode w7e6168=2). The C1 side has
+; already rejected an $ff (empty) cell, so X points at a real left-column tech
+; cell: X = row*6, and row = boost r. Refuse (buzz, stay open) a row the caster
+; lacks the BP for -- r > current bp ($3e9c,entity) -- the confirm twin of the
+; menu's bp-grey. Otherwise bank the boost ($3e9d,entity = r; Ot6ActionEnd then
+; charges r and skips that turn's regen, exactly as an L/R spend would have),
+; latch the tech Ot6BushidoTier returns for boost r into the action queue, and
+; close the menu. FixPlayerAttack's +$55 and Cmd_07's dispatch stay untouched.
+;
+; entry: db=$7e, a8/i16, X = selected cell byte offset (_c18470's). rtl.
+.proc Ot6BushidoConfirm
+        .a8
+        .i16
+        ; --- boost r = cell offset / 6  (X in {0,6,12,18} -> r in {0,1,2,3}) ---
+        txa                         ; A = cell offset (low byte, <= 18)
+        ldx     #$0000              ; r accumulator
+@div:   cmp     #$06
+        bcc     @haver
+        sbc     #$06                ; C set by the cmp, so sbc is exact
+        inx
+        bra     @div
+@haver: txa                         ; A = r (r <= 3)
+        pha                         ; park r ($01,s)
+        ; --- entity offset for $3e9c/$3e9d ---
+        lda     $62ca
+        and     #$03
+        asl                         ; slot * 2 = entity offset
+        longa
+        and     #$00ff
+        tax
+        shorta0
+        ; --- refuse a row the caster cannot pay the BP for ---
+        lda     $3e9c,x             ; current bp
+        cmp     $01,s               ; bp vs r; C set iff bp >= r (affordable)
+        bcs     @ok
+        pla                         ; drop r
+        inc     $95                 ; error buzz -- stay in the menu (like magic)
+        rtl
+@ok:    ; --- bank the boost: $3e9d,entity = r (the spend the row selected) ---
+        lda     $01,s
+        sta     $3e9d,x             ; pending boost = r (Ot6BushidoTier reads it)
+        pla                         ; drop r now (already banked) -- stack balanced
+        jsl     Ot6BushidoTier      ; A = base+r tech (reads the $3e9d we just set)
+        pha                         ; park tech
+        lda     $7b80               ; queue slot y = (w7e7b80 & 3) * 8
+        and     #$03
+        asl3
+        tay
+        pla                         ; A = tech
+        sta     $2bb0,y             ; attack index (FixPlayerAttack adds +$55)
+        lda     $62ca
+        sta     $2bae,y             ; character slot
+        inc     $7b80               ; commit the queued action
+        inc     $7bcb               ; close the menu (state $30 -> $2f)
         rtl
 .endproc
 

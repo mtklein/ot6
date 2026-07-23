@@ -21,6 +21,9 @@ CODE_EXT_INC = 1
 .global Ot6Assassinate           ; divine: Shadow, broken non-boss instant-kill
 .global Ot6StealBoostLevel, Ot6StealSlot   ; boost-tiered steal (chance verb)
 .global Ot6BlitzListOpen         ; v0.3 blitz-as-menu: _c1776b -> tools shell
+.global Ot6BushidoListOpen       ; v0.5 bushido submenu (#8): swdtech -> tools shell
+.global Ot6BushidoConfirm        ;   confirm shim: row r -> boost r + latch tech
+.global Ot6BushidoWindow         ;   enumerate the <=4 window techs into wItemList
 .global Ot6BlitzRowDecorate      ; menu-bank: DrawToolsListText's blitz row shim
                                  ;   (name->$0f swap always; MP cost only under
                                  ;   OT6_MP_COSTS). ALWAYS defined -- the stock C1

@@ -1,54 +1,51 @@
 -- @suite
--- battle_bushido.lua -- BP-Bushido: boost points pick Cyan's tech, and the
--- vanilla charge gauge is gone.
+-- battle_bushido.lua -- v0.5 Bushido submenu (issue #8): SwdTech is a tools-shell
+-- SUBMENU, not the vanilla numeral gauge.
 --
--- Vanilla ran a free-running bar (btlgfx_main.asm UpdateMenuState_37): the
+-- Vanilla SwdTech ran a free bar (btlgfx_main.asm UpdateMenuState_35/37): the
 -- counter w7e7b82 climbed one unit every 4 frames, the tech was counter >> 5,
--- it wrapped past $2020 (techs known - 1), and A latched whatever level it
--- happened to be showing.  OT6 deletes the CLOCK and lets the boost bank pick
--- the tech instead (Ot6BushidoTier, ot6.asm): a MOVING WINDOW OF FOUR (issue
--- #5) where boost 0/1/2/3 selects Cyan's top four LEARNED techs weakest ->
--- strongest, the window bounded by that same $2020.
--- Everything downstream is vanilla: the +$55 in FixPlayerAttack, Cmd_07's
--- dispatch, and Ot6SkillClassTbl's slashing classification of all eight.
+-- and A latched whatever level it happened to show.  OT6 deletes that path
+-- (OpenCmdMenuTbl[7] -> _c1_bushido_open) and drives SwdTech through the Tools
+-- window shell (menu state $30) exactly as Blitz was converted.  Each row IS a
+-- boost level, weakest at TOP: row r shows the tech Ot6BushidoTier returns for
+-- boost r (Ot6BushidoWindow enumerates the <=4 techs into wItemList's LEFT
+-- column), plus its MP cost; the confirm (Ot6BushidoConfirm) maps the picked row
+-- back to boost r, banks $3e9d = r, and latches the base+r tech.  Single-select
+-- and enumeration share Ot6BushidoTech's base/ceiling math and Ot6BushidoOblivion
+-- so the menu can never offer a tech the latch would not fire.
 --
--- Cyan is not recruitable until the v0.3 arc, so he is INSTALLED into the
--- opening guard fight the way the balance labs pin state -- every party slot
--- gets CHAR::CYAN ($3ED8), a Bushido-only command list ($202E, stride 12),
--- the weapon SWDTECH flag ($3BA4/$3BA5 bit 1, without which UpdateCmd_02
--- greys the command out -- battle_main.asm:13690), and a pinned $2020 that
--- stands in for his level.  probe_bushido.lua is the instrument this was
--- built from; it logs the same RAM without asserting on it.
+-- Cyan is not recruitable until v0.3, so he is INSTALLED into the opening guard
+-- fight the way the balance labs pin state -- every party slot gets CHAR::CYAN
+-- ($3ED8), a Bushido-only command list ($202E, stride 12), the weapon SWDTECH
+-- flag ($3BA4/$3BA5 bit 1, without which UpdateCmd_02 greys the command out --
+-- battle_main.asm:13690), and a pinned $2020 that stands in for his level.
 --
 -- What is asserted:
---   1. THE CLOCK IS DEAD.  150 consecutive in-window frames with the boost
---      held still must show ONE bar value.  Vanilla would step ~38 times
---      across that span, so a reverted hook fails here first and loudly.
---   2. THE MOVING WINDOW OF FOUR, over a sweep of (boost spent, techs known):
---      boost 0/1/2/3 lands on the base..base+3 techs of the top-four window
---      (base = max(0, ceiling-3), capped at ceiling).  While four or fewer are
---      known every learned tech is reachable -- 3 techs give Dispatch/Retort/
---      Slash at 0/1/2, so the Retort the OLD band design skipped is asserted
---      back.  Learn a fifth and the window slides up one, retiring the weakest.
---      The sweep walks N = 3,4,5,6,8 and pins EACH tech the four boosts select,
---      so a band-compressor (or a constant) fails on the very first slid row.
---   3. Oblivion (tech 8) is the window's TOP RUNG at full kit: with all eight
---      learned the window is {4,5,6,7} and BP3 lands on 7 = Oblivion, gated at
---      RESOLUTION by Ot6Oblivion (hooked in CalcAttackEffect) and reachable
---      while the once-per-battle latch is clear -- the state this fixture is in.
---      The broken-vs-unbroken gate and spent-reverts-to-Tempest are battle_divines.
---   4. The spend caps at 3 and never exceeds the bank (Ot6Boost's rule,
---      unchanged -- Bushido reads $3E9D, it never writes it).
---   5. The chosen tech RESOLVES: Quadra Slam's id reaches $3410 ("last spell
---      used", InitTarget_02 battle_main.asm:6545), it chips a slashing-weak
---      guard and reveals the slash class, and the boost is consumed with no
---      +1 regen that turn (Ot6ActionEnd).
+--   1. THE NUMERAL GAUGE IS GONE.  Opening SwdTech lands in the tools shell
+--      (state $30), never the numeral state $37.
+--   2. THE MOVING WINDOW OF FOUR, enumerated into wItemList over a sweep of the
+--      ceiling (techs known - 1).  base = max(0, ceiling-3); row r = boost r =
+--      tech min(base+r, ceiling), packed at wItemList cell r*2 as attack id
+--      $55+tech, the right column and unused rows $ff.  N = 3,4,5,6,8 walks the
+--      whole window; the sliding retires the weakest as N grows.  Costs decode
+--      to $55-$5c prices.
+--   3. OBLIVION is the window's top rung at full kit: ceiling 7, row 3 -> tech 7
+--      (Cleave, id $5c), reachable while the once-per-battle latch is clear.
+--   4. THE NAMES RENDER: the window's techs are drawn (from BushidoName, since
+--      AttackName has no $55-$5c entries); a RETIRED tech (Dispatch, off the
+--      bottom at ceiling 4) is never drawn.
+--   5. A ROW BEYOND CURRENT BP CANNOT COMMIT: with 1 bp, confirming row 3
+--      (needs 3 bp) buzzes and leaves the menu open.
+--   6. CONFIRM RESOLVES: picking row 2 at ceiling 4 banks boost 2, latches
+--      Quadra Slam ($58), reaches $3410, chips a slashing-weak guard and reveals
+--      the slash class, and the boost is consumed with no +1 regen that turn.
 local H = dofile("/Users/mtklein/ot6/tools/tests/lib/ot6.lua")
 local STATE = "/Users/mtklein/ot6/build/states/battle_doorstep.mss.lua"
 
 local MENU, ACTOR, MSTATE = 0x7BCA, 0x62CA, 0x7BC2
-local BAR, KNOWN = 0x7B82, 0x2020     -- w7e7b82 (level*32) / techs known - 1
-local ST_BUSHIDO = 0x37               -- UpdateMenuStateTbl entry $37
+local KNOWN, ITEMLIST = 0x2020, 0x4005
+local ST_TOOLS, ST_BUSHIDO = 0x30, 0x37
+local CMD_SWDTECH = 0x07
 
 local PARTY = { 0, 1, 2 }
 local GUARDS = { 2, 3 }               -- monster slots -> entity offset 8+slot*2
@@ -58,123 +55,122 @@ local function WKE(s) return 0x3BE0 + (8 + s * 2) end   -- weak elements
 local function WKC(s) return 0x3E9C + (8 + s * 2) end   -- weak classes
 local function RVC(s) return 0x3E9D + (8 + s * 2) end   -- revealed classes
 local function MHP(s) return 0x3BFC + s * 2 end
--- status 3; bit $10 is stop, which is the bit Ot6Gate reads to skip a turn
 local function ST3(e) return 0x3EF8 + e end
 
 local function bp(s)   return H.readByte(0x3E9C + s * 2) end
 local function pend(s) return H.readByte(0x3E9D + s * 2) end
-local function level() return H.readByte(BAR) // 32 end
-local function inWindow() return H.readByte(MSTATE) == ST_BUSHIDO end
+local function inSub()   return H.readByte(MSTATE) == ST_TOOLS end
+local function inNumer() return H.readByte(MSTATE) == ST_BUSHIDO end
 
--- the ACTUAL in-game tech names (ff6/src/text/bushido_name_en.json), in the
--- order the swdtech window numbers them.  tech 7 (Cleave) is the divine the
--- code calls Oblivion.
+-- the ACTUAL in-game tech names (ff6/src/text/bushido_name_en.json), numbered
+-- the way the window numbers them.  tech 7 (Cleave) is the divine "Oblivion".
 local TECH = { [0] = "Dispatch", "Retort", "Slash", "Quadra Slam",
                "Empowerer", "Stunner", "Quadra Slice", "Cleave" }
 
 local OT6_SLASH = 0x01
-local QSLAM = 3                       -- Quadra Slam: tech index; id $55 + 3 = $58
--- Quadra Slam's four hits measured 81 total on this fixture (intro stats,
--- guards shielded so the 0.5x resistance applies).  A double dip would be
--- Ot6BoostDmg's x4 on top, ~324, so the bound only has to sit between: 240
--- leaves 3x headroom over the roll and still fails a multiplied hit.
-local DMG_CAP = 240
+local QSLAM = 3                       -- Quadra Slam tech index; id $55+3 = $58
+local DMG_CAP = 240                   -- a double-dip (Ot6BoostDmg x4) would exceed
 
-local actor                           -- the party slot whose menu we drive
-local ceiling = 7                     -- pinned $2020: techs known - 1
-local pinPend = nil                   -- when set, pending boost is held here
-local pinBp = true                    -- hold the bank full (off for the end)
-local pinShields = true
-local pinHp = true                    -- off once we want to measure damage
-local spells = {}                     -- every attack id that reached $3410
+-- the moving window packed at each ceiling: WIN[ceiling] = techs at rows 0..n.
+-- A ceiling < 3 emits fewer than four rows (a boost past the ceiling would just
+-- duplicate the top tech, so its row is left $ff).
+local WIN = {
+  [2] = { 0, 1, 2 },                  -- N=3: every learned tech reachable
+  [3] = { 0, 1, 2, 3 },               -- N=4: the full base kit, 1:1
+  [4] = { 1, 2, 3, 4 },               -- N=5: Dispatch retired off the bottom
+  [5] = { 2, 3, 4, 5 },               -- N=6: Retort retired too
+  [7] = { 4, 5, 6, 7 },               -- N=8: his top four; row 3 = Oblivion
+}
+-- a few authored prices (kits.md / Ot6AbilityCostTbl), keyed by attack id.
+local COST = { [0x55] = 1, [0x58] = 4, [0x5c] = 8 }
+
+local actor
+local ceiling = 4
+local pinBp, bpbank = true, 5
+local pinShields, pinHp = true, true
+local spells = {}
+local sawNumeral = false
+local sh0, hp0 = {}, {}
+
+-- battle-font glyphs: 'A'..'Z' = $80.., 'a'..'z' = $9a.. (battle_class.lua's map)
+local function glyphs(s)
+  local t = {}
+  for i = 1, #s do
+    local c = s:sub(i, i)
+    t[i] = (c >= "A" and c <= "Z") and (0x80 + c:byte() - ("A"):byte())
+                                    or  (0x9a + c:byte() - ("a"):byte())
+  end
+  return t
+end
+local function findName(seq)
+  local vr = emu.memType.snesVideoRam
+  for w = 0x6000, 0x7FF0 do
+    local hit = true
+    for i = 1, #seq do
+      if (emu.readWord((w + i - 1) * 2, vr) & 0xFF) ~= seq[i] then hit = false break end
+    end
+    if hit then return w end
+  end
+  return nil
+end
 
 local function pinCyan()
   -- issue #4 regression: pin $2020 with a GARBAGE HIGH BYTE, the way InitSkills
-  -- really leaves it (it stores CountBits's uninitialized high byte via `stx`;
-  -- measured $FF02 in the Doma solo fight). Before the byte-read fix in
-  -- Ot6BushidoTier, this read as $FFxx, tripped `>= 8`, and collapsed EVERY
-  -- ceiling to 0 -- Cyan frozen at Dispatch regardless of techs or boost.
-  -- Pinning a clean word here (the old code) is exactly why the suite missed it.
+  -- really leaves it (a 16-bit `stx` over CountBits's uninitialized high byte).
   H.writeWord(KNOWN, 0xFF00 | ceiling)
   for _, s in ipairs(PARTY) do
     H.writeByte(0x3ED8 + s * 2, 0x02)                 -- CHAR::CYAN
     local st1 = 0x3EE4 + s * 2
     H.writeByte(st1, H.readByte(st1) & 0xF7)          -- clear magitek
-    H.writeByte(0x202E + s * 12, 0x07)                -- Bushido, alone
+    H.writeByte(0x202E + s * 12, CMD_SWDTECH)         -- Bushido, alone
     H.writeByte(0x2031 + s * 12, 0xFF)
     H.writeByte(0x2034 + s * 12, 0xFF)
     H.writeByte(0x2037 + s * 12, 0xFF)
     H.writeByte(0x3BA4 + s * 2, H.readByte(0x3BA4 + s * 2) | 0x02)
     H.writeByte(0x3BA5 + s * 2, H.readByte(0x3BA5 + s * 2) | 0x02)
     H.writeWord(0x3BF4 + s * 2, 999)                  -- nobody dies mid-bench
-    -- v0.5 costs are LIVE: pin MP high so the costed tech never fizzles on an
-    -- empty pool (the intro fixture's installed slots carry little/no MP).
-    -- Scarcity is not this test's subject -- the tier ladder and the chip are.
-    H.writeWord(0x3C08 + s * 2, 99)                   -- current MP
-    H.writeWord(0x3C30 + s * 2, 99)                   -- max MP (nothing clamps it)
+    H.writeWord(0x3C08 + s * 2, 99)                   -- MP high: costs never fizzle
+    H.writeWord(0x3C30 + s * 2, 99)
   end
-  if actor and pinBp then H.writeByte(0x3E9C + actor * 2, 5) end
-  if actor and pinPend then H.writeByte(0x3E9D + actor * 2, pinPend) end
+  if actor and pinBp then H.writeByte(0x3E9C + actor * 2, bpbank) end
 end
 
 local function pinGuards()
   for _, s in ipairs(GUARDS) do
-    H.writeByte(WKE(s), 0)              -- no element weakness: class chips only
-    H.writeByte(WKC(s), OT6_SLASH)      -- slashing-weak, so bushido chips
-    H.writeByte(TM(s), 0)               -- never broken (x2 would muddy damage)
+    H.writeByte(WKE(s), 0)             -- class chips only (no element x2)
+    H.writeByte(WKC(s), OT6_SLASH)     -- slashing-weak -> bushido chips
+    H.writeByte(TM(s), 0)              -- never broken
     local st3 = ST3(8 + s * 2)
     H.writeByte(st3, H.readByte(st3) | 0x10)   -- stopped: nothing contests
-    if pinHp then H.writeWord(MHP(s), 0xF000) end   -- a hit never kills
+    if pinHp then H.writeWord(MHP(s), 0xF000) end
     if pinShields then H.writeByte(SH(s), 8) end
   end
 end
-
 local function pin() pinCyan(); pinGuards() end
 
--- ------------------------------------------------------------------ sweep --
--- {boost spent, techs known - 1 (the ceiling), expected tech index}.  This
--- walks the MOVING WINDOW OF FOUR: base = max(0, ceiling-3), and boost 0/1/2/3
--- selects tech min(base+boost, ceiling).  The window is grouped by N (techs
--- known): each group pins all four boosts, so we assert the exact four techs
--- boost reaches AND that they slide as N grows.  The old band table -- which
--- named each band's TOP tech (0/2/4/7) and clamped it -- fails the very first
--- N=3 group (it gave 0/2/2/2, skipping Retort).
-local SWEEP = {
-  -- N=3 (ceiling 2), window {0,1,2}: every learned tech reachable.  Row 2 is
-  -- issue #5's headline -- boost 1 reaches Retort, which the band design could
-  -- not (it jumped 0-bp Dispatch straight to Slash).  Boost 3 caps at Slash.
-  { 0, 2, 0 },   -- Dispatch
-  { 1, 2, 1 },   -- Retort   <- the fix: a mid-tech the old bands skipped
-  { 2, 2, 2 },   -- Slash
-  { 3, 2, 2 },   -- Slash (boost overruns a 3-tech window -> capped at ceiling)
-
-  -- N=4 (ceiling 3), window {0,1,2,3}: the full base kit, 1:1 across the four
-  -- boosts -- Dispatch/Retort/Slash/Quadra Slam.
-  { 0, 3, 0 }, { 1, 3, 1 }, { 2, 3, 2 }, { 3, 3, 3 },
-
-  -- N=5 (ceiling 4), window {1,2,3,4}: Dispatch has RETIRED off the bottom.
-  { 0, 4, 1 },   -- Retort   (weakest still in the window)
-  { 1, 4, 2 },   -- Slash
-  { 2, 4, 3 },   -- Quadra Slam
-  { 3, 4, 4 },   -- Empowerer
-
-  -- N=6 (ceiling 5), window {2,3,4,5}: Retort has retired too.
-  { 0, 5, 2 },   -- Slash
-  { 1, 5, 3 },   -- Quadra Slam
-  { 2, 5, 4 },   -- Empowerer
-  { 3, 5, 5 },   -- Stunner
-
-  -- N=8 (ceiling 7), window {4,5,6,7}: his top four.  Boost 3 lands on 7 =
-  -- Oblivion (Cleave), the window's conditional top rung; the once-per-battle
-  -- latch is clear in this fixture, so 7 stands.
-  { 0, 7, 4 },   -- Empowerer
-  { 1, 7, 5 },   -- Stunner
-  { 2, 7, 6 },   -- Quadra Slice
-  { 3, 7, 7 },   -- Cleave / Oblivion (the divine top rung)
-}
-local seenLevels, sweepRows = {}, 0
-local barSeen, barFrames = {}, 0
-local sh0, hp0 = {}, {}
+-- open the submenu fresh from the command window, watching for the (now dead)
+-- numeral state on the way.
+local function openSub(tag)
+  return H.driveUntil(inSub, 900, {
+    H.call(function()
+      pin()
+      if inNumer() then sawNumeral = true end
+      H.setPad({ "a" })
+    end),
+    H.waitFrames(2),
+    H.call(function() H.setPad({}) end),
+    H.waitFrames(14),
+  }, tag or "the swdtech submenu opens (tools shell $30)")
+end
+-- close the submenu back to the command window (B).
+local function closeSub()
+  return H.driveUntil(function() return not inSub() end, 400, {
+    H.call(function() pin(); H.setPad({ "b" }) end),
+    H.waitFrames(2),
+    H.call(function() H.setPad({}) end),
+    H.waitFrames(6),
+  }, "the submenu closes back to the command window")
+end
 
 H.run({ maxFrames = 40000 }, {
   H.waitFrames(20),
@@ -185,151 +181,150 @@ H.run({ maxFrames = 40000 }, {
     emu.addMemoryCallback(function(_, v) spells[#spells + 1] = v end,
       emu.callbackType.write, 0x7E3410, 0x7E3410)
   end),
-  -- install Cyan every frame until a menu belongs to somebody
   H.driveUntil(function() return H.readByte(MENU) ~= 0 end, 3000, {
     H.call(pin), H.waitFrames(1),
   }, "a battle menu opens"),
   H.call(function()
     actor = H.readByte(ACTOR)
-    pinPend = 1
     H.log(string.format("cyan installed in slot %d (char id $%02x)",
       actor, H.readByte(0x3ED8 + actor * 2)))
   end),
-  -- open the swdtech window.  Short presses: $04 is the REPEAT-mode button
-  -- word (UpdateCtrl swaps $04/$0a every frame), so a long hold can select the
-  -- command AND latch a tech in one go.
-  H.driveUntil(inWindow, 900, {
-    H.call(function() pin(); H.setPad({ "a" }) end),
-    H.waitFrames(2),
-    H.call(function() H.setPad({}) end),
-    H.waitFrames(14),
-  }, "the swdtech window opens (menu state $37)"),
-  H.call(function() H.screenshot("bushido_window") end),
 
-  -- 1. THE CLOCK IS DEAD.  Boost held at 1 with all eight techs known (window
-  -- {4,5,6,7}), so the window selects Stunner -- tech 5, bar 5*32 = $a0.
-  -- The first in-window frames still carry UpdateMenuState_35's `stz
-  -- w7e7b82`: steps run on startFrame, so the earliest samples are taken
-  -- before Ot6BushidoTier has run even once.  Settle past that, then the
-  -- rest of the span must not move at all.
-  H.repeatN(160, {
-    H.call(function()
-      pin()
-      if inWindow() then
-        barFrames = barFrames + 1
-        if barFrames > 10 then
-          local v = H.readByte(BAR)
-          barSeen[v] = (barSeen[v] or 0) + 1
+  -- 1. THE NUMERAL GAUGE IS GONE --------------------------------------------
+  H.call(function() ceiling = 4 end),
+  openSub("swdtech opens as the tools-shell submenu"),
+  H.waitFrames(6),
+  H.call(function() H.screenshot("bushido_window") end),
+  H.call(function()
+    H.assertEq(inSub(), true, "SwdTech opened the tools-shell submenu (state $30)")
+    H.assertEq(sawNumeral, false, "the vanilla numeral gauge (state $37) never opened")
+  end),
+
+  -- 2/3. THE MOVING WINDOW enumerated into wItemList, ceiling by ceiling ------
+  --   (already open at ceiling 4 -- assert this one, then sweep the rest)
+  H.call(function()
+    for _, ceil in ipairs({ 4, 2, 3, 5, 7 }) do
+      -- (re)open at this ceiling: for the first (4) we are already in; else
+      -- close + reopen below via the driver.  Assertion body is shared.
+    end
+  end),
+  -- inline sweep: each iteration closes, sets ceiling, reopens, asserts.
+  H.call(function() H.log("--- window enumeration sweep ---") end),
+
+  -- ceiling 4 (already open)
+  H.call(function()
+    local function checkWindow(ceil)
+      local techs = WIN[ceil]
+      for r = 0, 3 do
+        local id = H.readByte(ITEMLIST + r * 6)          -- left cell of row r
+        local right = H.readByte(ITEMLIST + r * 6 + 3)   -- right cell (always $ff)
+        H.assertEq(right, 0xFF, string.format("ceil %d row %d: right column empty", ceil, r))
+        if techs[r + 1] then
+          local want = 0x55 + techs[r + 1]
+          H.assertEq(id, want, string.format(
+            "ceil %d row %d (boost %d): %s id $%02x", ceil, r, r, TECH[techs[r + 1]], want))
+          H.assertEq(id >= 0x55 and id <= 0x5c, true,
+            string.format("ceil %d row %d id in the SwdTech range $55-$5c", ceil, r))
+          if COST[id] then
+            H.assertEq(H.readByte(ITEMLIST + r * 6 + 1), COST[id],
+              string.format("ceil %d row %d: %s costs %d", ceil, r, TECH[techs[r + 1]], COST[id]))
+          end
+        else
+          H.assertEq(id, 0xFF, string.format(
+            "ceil %d row %d: no row (fewer than four techs known)", ceil, r))
         end
       end
-    end),
-    H.waitFrames(1),
-  }),
-  H.call(function()
-    local parts, distinct, sampled = {}, 0, 0
-    for v, n in pairs(barSeen) do
-      parts[#parts + 1] = string.format("$%02x x%d", v, n)
-      distinct, sampled = distinct + 1, sampled + n
     end
-    H.log("bar values over " .. sampled .. " settled in-window frames: "
-      .. table.concat(parts, ", "))
-    H.assertEq(sampled >= 140, true, "the window stayed open to be sampled")
-    -- vanilla stepped the counter every 4 frames and would show ~36 values
-    H.assertEq(distinct, 1, "the charge gauge does not tick: one bar value")
-    H.assertEq(barSeen[0xA0], sampled, "and it is the window's Stunner ($a0)")
+    _G.__checkWindow = checkWindow
+    checkWindow(4)
+    H.log("ceiling 4 window {1,2,3,4} packs Retort/Slash/QuadraSlam/Empowerer")
   end),
 
-  -- 2/3. the moving window of four, group by group as N grows
-  H.driveUntil(function() return sweepRows > #SWEEP end, 4000, {
-    H.call(function()
-      local row = SWEEP[math.min(sweepRows + 1, #SWEEP)]
-      pinPend, ceiling = row[1], row[2]
-      pin()
-    end),
-    H.waitFrames(8),
-    H.call(function()
-      local row = SWEEP[math.min(sweepRows + 1, #SWEEP)]
-      if sweepRows < #SWEEP then
-        local got = level()
-        H.log(string.format("  %d bp, %d techs known -> tech %d (%s)",
-          row[1], row[2] + 1, got + 1, TECH[got]))
-        H.assertEq(inWindow(), true, "still in the swdtech window")
-        H.assertEq(got, row[3], string.format(
-          "%d bp with %d techs known selects %s", row[1], row[2] + 1,
-          TECH[row[3]]))
-        seenLevels[got] = true
-      end
-      sweepRows = sweepRows + 1
-    end),
-  }, "the whole tier sweep"),
+  -- 4. NAMES render (from BushidoName); a retired tech is not drawn ----------
   H.call(function()
-    local n = 0
-    for _ in pairs(seenLevels) do n = n + 1 end
-    H.log("distinct techs reached across the sweep: " .. n)
-    -- the window walk reaches EVERY tech 0-7 across the N groups; a band
-    -- compressor skips the middle ones and a constant scores 1
-    H.assertEq(n >= 8, true, "boost + the sliding window reach all eight techs")
+    H.assertEq(findName(glyphs("Retort")) ~= nil, true, "\"Retort\" is drawn")
+    H.assertEq(findName(glyphs("Slash")) ~= nil, true, "\"Slash\" is drawn")
+    H.assertEq(findName(glyphs("Empowerer")) ~= nil, true, "\"Empowerer\" is drawn")
+    H.assertEq(findName(glyphs("Dispatch")), nil,
+      "\"Dispatch\" (retired off the bottom at ceiling 4) is NOT drawn")
   end),
 
-  -- 4. the spend cap, driven by real R presses inside the window
-  H.call(function() pinPend, ceiling = 0, 7; pin() end),
-  H.waitFrames(8),
-  H.repeatN(5, {
-    H.call(function() pinPend = nil; pin(); H.setPad({ "r" }) end),
-    H.waitFrames(6),
-    H.call(function() H.setPad({}) end),
-    H.waitFrames(16),
-  }),
+  -- sweep the remaining ceilings: close, set, reopen, check
+  closeSub(), H.call(function() ceiling = 2 end), openSub("reopen at ceiling 2"),
+  H.waitFrames(4), H.call(function() _G.__checkWindow(2) end),
+  closeSub(), H.call(function() ceiling = 3 end), openSub("reopen at ceiling 3"),
+  H.waitFrames(4), H.call(function() _G.__checkWindow(3) end),
+  closeSub(), H.call(function() ceiling = 5 end), openSub("reopen at ceiling 5"),
+  H.waitFrames(4), H.call(function() _G.__checkWindow(5) end),
+  closeSub(), H.call(function() ceiling = 7 end), openSub("reopen at ceiling 7"),
+  H.waitFrames(4),
   H.call(function()
-    H.log(string.format("after five R presses: pending=%d tech=%d (%s)",
-      pend(actor), level() + 1, TECH[level()]))
-    H.assertEq(pend(actor), 3, "the spend caps at 3 (Ot6Boost, unchanged)")
-    H.assertEq(level(), 7, "and 3 bp now tops out at OBLIVION (divine unspent)")
-    H.screenshot("bushido_boosted")
+    _G.__checkWindow(7)
+    H.assertEq(H.readByte(ITEMLIST + 3 * 6), 0x5c,
+      "ceiling 7 row 3 = tech 7 (Cleave/Oblivion, id $5c) -- the divine top rung")
+    H.log("sweep: window slides weakest-out as techs known grows; Oblivion tops the full kit")
   end),
 
-  -- 5. latch Quadra Slam and follow it to a resolved, slashing chip.  N=5
-  -- (ceiling 4), window {1,2,3,4}: boost 2 -> base 1 + 2 = tech 3, a slid-
-  -- window pick (Dispatch retired).  The OLD band table gave tech 4 here
-  -- (dragon, id $59), so the resolved $58 also proves the mechanic changed.
+  -- 5. A ROW BEYOND CURRENT BP CANNOT COMMIT --------------------------------
+  -- ceiling 4, bp pinned to 1: row 3 (Empowerer, needs boost 3) must buzz.
+  closeSub(),
+  H.call(function() ceiling = 4; bpbank = 1 end),
+  openSub("reopen at ceiling 4, bp 1"),
+  H.waitFrames(4),
   H.call(function()
-    ceiling, pinPend = 4, 2
+    local slot = actor
+    H.writeByte(0x895F + slot, 0)      -- scroll
+    H.writeByte(0x8963 + slot, 0)      -- column 0
+    H.writeByte(0x8967 + slot, 3)      -- row 3 (boost 3, > 1 bp)
+  end),
+  H.waitFrames(2),
+  H.pressButtons({ "a" }, 4), H.waitFrames(10),
+  H.call(function()
+    H.assertEq(inSub(), true,
+      "confirming a row beyond current bp did not commit -- still in the submenu")
+    H.assertEq(pend(actor), 0, "no boost was banked for the refused row")
+  end),
+
+  -- 6. CONFIRM RESOLVES: row 2 at ceiling 4 -> boost 2, Quadra Slam ($58) -----
+  closeSub(),
+  H.call(function()
+    ceiling, bpbank = 4, 5
     pinShields = false
-    pin()
   end),
-  H.waitFrames(8),
+  openSub("reopen at ceiling 4, bp 5"),
+  H.waitFrames(4),
   H.call(function()
-    H.assertEq(level(), QSLAM, "the tech about to be latched is Quadra Slam")
     -- park the other two Cyans so only the boosted tech moves guard HP
     for _, s in ipairs(PARTY) do
-      if s ~= actor then
-        H.writeByte(ST3(s * 2), H.readByte(ST3(s * 2)) | 0x10)
-      end
+      if s ~= actor then H.writeByte(ST3(s * 2), H.readByte(ST3(s * 2)) | 0x10) end
     end
-    pinHp = false                      -- let the damage stand to be measured
+    pinHp = false
     for _, s in ipairs(GUARDS) do
-      H.writeByte(SH(s), 8)
-      H.writeByte(RVC(s), 0)           -- nothing revealed yet
-      sh0[s] = 8
-      hp0[s] = H.readWord(MHP(s))
+      H.writeByte(SH(s), 8); H.writeByte(RVC(s), 0)
+      sh0[s] = 8; hp0[s] = H.readWord(MHP(s))
     end
     H.assertEq(H.readByte(RVC(GUARDS[1])), 0, "no class revealed before the tech")
+    spells = {}
+    local slot = actor
+    H.writeByte(0x895F + slot, 0)      -- scroll
+    H.writeByte(0x8963 + slot, 0)      -- column 0
+    H.writeByte(0x8967 + slot, 2)      -- row 2 -> boost 2 -> Quadra Slam
+    H.screenshot("bushido_boosted")
   end),
-  H.driveUntil(function() return not inWindow() end, 900, {
-    H.call(function() pin(); H.setPad({ "a" }) end),
-    H.waitFrames(2),
-    H.call(function() H.setPad({}) end),
-    H.waitFrames(14),
-  }, "the window closes on a latch"),
-  -- stop pinning the boost so Ot6ActionEnd's arithmetic is observable
-  H.call(function() pinPend, pinBp = nil, false end),
+  H.waitFrames(2),
+  H.pressButtons({ "a" }, 4), H.waitFrames(8),
+  H.call(function()
+    H.assertEq(pend(actor), 2, "row 2 banked boost 2 ($3e9d = 2)")
+    -- stop pinning bp so Ot6ActionEnd's arithmetic is observable
+    pinBp = false
+  end),
   H.driveUntil(function()
     for _, v in ipairs(spells) do if v == 0x55 + QSLAM then return true end end
     return false
   end, 12000, {
     H.call(function()
       pin()
-      if H.readByte(MENU) ~= 0 and not inWindow() then H.setPad({ "a" }) end
+      if H.readByte(MENU) ~= 0 and not inSub() then H.setPad({ "a" }) end
     end),
     H.waitFrames(4),
     H.call(function() H.setPad({}) end),
@@ -344,10 +339,8 @@ H.run({ maxFrames = 40000 }, {
     H.log("attack ids that reached $3410: " .. table.concat(ids, " "))
     local sawQslam = false
     for _, v in ipairs(spells) do if v == 0x55 + QSLAM then sawQslam = true end end
-    H.assertEq(sawQslam, true, "2 bp executed Quadra Slam ($58), not Empowerer ($59)")
+    H.assertEq(sawQslam, true, "boost 2 executed Quadra Slam ($58), not Empowerer ($59)")
 
-    -- the class chip: bushido is slashing (Ot6SkillClassTbl), the guards are
-    -- pinned slashing-weak, so the tech must chip and reveal
     local revealed, chipped = false, false
     for _, s in ipairs(GUARDS) do
       local r, sh = H.readByte(RVC(s)), H.readByte(SH(s))
@@ -359,10 +352,6 @@ H.run({ maxFrames = 40000 }, {
     H.assertEq(chipped, true, "the tech chipped a slashing-weak guard's shields")
     H.assertEq(revealed, true, "and revealed the slash class ($01)")
 
-    -- no double dip: the two points bought Quadra Slam, so they must not also
-    -- buy Ot6BoostDmg's x4.  Same shape as battle_fold's bound on a folded
-    -- Fire 3 -- the gate itself is structural (the $07 test in Ot6BoostDmg),
-    -- so this only has to separate 1x from 4x, not pin the roll.
     local dmg = 0
     for _, s in ipairs(GUARDS) do dmg = dmg + (hp0[s] - H.readWord(MHP(s))) end
     H.log(string.format("Quadra Slam dealt %d across both guards", dmg))
@@ -370,10 +359,10 @@ H.run({ maxFrames = 40000 }, {
     H.assertEq(dmg < DMG_CAP, true,
       "boost bought the tech, not a damage multiplier too")
 
-    -- the economy: 5 banked, 2 spent, and no +1 on a turn that boosted
     H.log(string.format("bp %d -> %d, pending %d", 5, bp(actor), pend(actor)))
     H.assertEq(bp(actor), 3, "boost consumed (5-2) with no regen that turn")
     H.assertEq(pend(actor), 0, "pending cleared after the action")
+    H.log("PASSED: SwdTech submenu enumerates the window, greys/refuses by bp, resolves")
     H.screenshot("bushido_resolved")
   end),
 })

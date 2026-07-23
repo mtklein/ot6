@@ -38,7 +38,13 @@ local STATE = "/Users/mtklein/ot6/build/states/battle_doorstep.mss.lua"
 
 local MENU, ACTOR, MSTATE = 0x7BCA, 0x62CA, 0x7BC2
 local KNOWN, BAR = 0x2020, 0x7B82
-local ST_BUSHIDO = 0x37
+-- v0.5 (#8): SwdTech is a tools-shell submenu ($30), not the numeral gauge.
+-- Each row is a boost level; row 3 (boost 3) at ceiling 7 is the divine top
+-- rung.  Its enumerated tech reflects the once-per-battle latch: Ot6BushidoWindow
+-- applies Ot6BushidoOblivion, so a clear latch packs Oblivion (tech 7, id $5c)
+-- and a set latch packs Tempest (tech 6, id $5b).
+local ST_SUB = 0x30
+local ITEMLIST = 0x4005
 local DIVINE_USED = 0x3ECB
 
 local PARTY = { 0, 1, 2 }
@@ -56,8 +62,9 @@ local function pend(s) return H.readByte(0x3E9D + s * 2) end
 -- the action queue, and a stopped monster at 0 HP lingers "present" (its removal
 -- animation never runs) -- so Death, not removal, is the honest kill witness.
 local function dead(s) return H.readByte(0x3EE4 + (8 + s * 2)) & 0x80 ~= 0 end
-local function level() return H.readByte(BAR) // 32 end
-local function inWindow() return H.readByte(MSTATE) == ST_BUSHIDO end
+local function inWindow() return H.readByte(MSTATE) == ST_SUB end
+-- the attack id the submenu enumerated for a boost row (left column of row r).
+local function rowId(r) return H.readByte(ITEMLIST + r * 6) end
 local function latchSet(slot) return (H.readByte(DIVINE_USED) & (1 << slot)) ~= 0 end
 local function setLatch(slot) H.writeByte(DIVINE_USED, H.readByte(DIVINE_USED) | (1 << slot)) end
 local function clrLatch(slot) H.writeByte(DIVINE_USED, H.readByte(DIVINE_USED) & (~(1 << slot) & 0xFF)) end
@@ -139,7 +146,7 @@ local function bootSteps()
   }
 end
 
--- open the active character's swdtech window (fresh)
+-- open the active character's swdtech submenu (fresh)
 local function openWindow(what)
   return H.driveUntil(inWindow, 1500, {
     H.call(function() pin(); H.setPad({ "a" }) end),
@@ -147,6 +154,21 @@ local function openWindow(what)
     H.call(function() H.setPad({}) end),
     H.waitFrames(14),
   }, what)
+end
+-- close the submenu back to the command window (B)
+local function closeWindow(what)
+  return H.driveUntil(function() return not inWindow() end, 500, {
+    H.call(function() pin(); H.setPad({ "b" }) end),
+    H.waitFrames(2),
+    H.call(function() H.setPad({}) end),
+    H.waitFrames(6),
+  }, what or "the submenu closes")
+end
+-- point the active character's cursor at boost row `r` (column 0)
+local function cursorRow(r)
+  H.writeByte(0x895F + actor, 0)         -- scroll
+  H.writeByte(0x8963 + actor, 0)         -- column 0 (single tech column)
+  H.writeByte(0x8967 + actor, r)         -- row = boost level
 end
 
 local killed, killLatch = false, false
@@ -163,23 +185,30 @@ add({
     H.assertEq(latchSet(actor), false, "divine latch clear at battle start")
   end),
 
-  -- 1. SELECTABLE + latch drives the selection (one live open window)
-  openWindow("swdtech window opens (selection)"),
-  H.waitFrames(8),
+  -- 1. SELECTABLE + latch drives the ENUMERATION.  The submenu enumerates the
+  -- window once at open (Ot6BushidoWindow), applying the Oblivion swap, so the
+  -- latch's effect on row 3 shows by REOPENING: clear latch -> Oblivion ($5c),
+  -- set latch -> Tempest ($5b), clear again -> Oblivion returns.
+  openWindow("swdtech submenu opens (selection)"),
+  H.waitFrames(6),
   H.call(function()
-    H.assertEq(level(), 7, "latch CLEAR: BP3 selects Oblivion (tech 7)")
-    setLatch(actor)
-  end),
-  H.waitFrames(8),
-  H.call(function()
-    H.assertEq(level(), 6, "latch SET: BP3 falls back to Tempest (tech 6)")
-    clrLatch(actor)
-  end),
-  H.waitFrames(8),
-  H.call(function()
-    H.assertEq(level(), 7, "latch cleared: Oblivion (7) returns")
-    H.assertEq(latchSet(actor), false, "latch left clear for the fallback test")
+    H.assertEq(rowId(3), 0x5C, "latch CLEAR: row 3 (boost 3) enumerates Oblivion ($5c)")
     H.screenshot("divine_oblivion_selectable")
+  end),
+  closeWindow("close, then set the latch and reopen"),
+  H.call(function() setLatch(actor) end),
+  openWindow("reopen with the latch SET"),
+  H.waitFrames(6),
+  H.call(function()
+    H.assertEq(rowId(3), 0x5B, "latch SET: row 3 falls back to Tempest ($5b)")
+  end),
+  closeWindow("close, then clear the latch and reopen"),
+  H.call(function() clrLatch(actor) end),
+  openWindow("reopen with the latch CLEAR"),
+  H.waitFrames(6),
+  H.call(function()
+    H.assertEq(rowId(3), 0x5C, "latch cleared: Oblivion ($5c) returns")
+    H.assertEq(latchSet(actor), false, "latch left clear for the fallback test")
   end),
 
   -- 2. UNBROKEN FALLBACK: latch Oblivion at an unbroken guard -> a Tempest hit,
@@ -189,9 +218,10 @@ add({
     guardImmune = { [2] = false, [3] = false }
     pinGuardHp = true
     parkBench(actor); pin()
+    cursorRow(3)                          -- boost 3 -> Oblivion (latch clear)
   end),
   H.driveUntil(function() return not inWindow() end, 900, {
-    H.call(function() pin(); H.setPad({ "a" }) end),
+    H.call(function() pin(); cursorRow(3); H.setPad({ "a" }) end),
     H.waitFrames(2),
     H.call(function() H.setPad({}) end),
     H.waitFrames(14),
@@ -231,13 +261,14 @@ add({
     H.log(string.format("battle 2: cyan in slot %d; latch $%02X", actor, H.readByte(DIVINE_USED)))
     H.assertEq(latchSet(actor), false, "the killing character's latch starts clear")
   end),
-  openWindow("swdtech window opens (broken kill)"),
-  H.waitFrames(8),
+  openWindow("swdtech submenu opens (broken kill)"),
+  H.waitFrames(6),
   H.call(function()
-    H.assertEq(level(), 7, "Oblivion selectable at BP3 (latch clear)")
+    H.assertEq(rowId(3), 0x5C, "Oblivion ($5c) at boost-3 row (latch clear)")
+    cursorRow(3)                          -- boost 3 -> Oblivion
   end),
   H.driveUntil(function() return not inWindow() end, 900, {
-    H.call(function() pin(); H.setPad({ "a" }) end),
+    H.call(function() pin(); cursorRow(3); H.setPad({ "a" }) end),
     H.waitFrames(2),
     H.call(function() H.setPad({}) end),
     H.waitFrames(14),

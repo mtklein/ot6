@@ -15305,6 +15305,30 @@ ListTextCmd_0f:
 .if LANG_EN
         cmp     #$51
         bcc     @65cc
+        tax                     ; ot6 (#8): park the id (X free here, reloaded at
+                                ;   @65bf), test bushido mode without touching A/Y
+        lda     w7e6168
+        cmp     #$02            ; bushido submenu? SwdTech names ($55-$5c) live in
+        bne     @atkname        ;   BushidoName, NOT AttackName (whose $55-$5c slots
+                                ;   are the empty pad after Joker Doom) -- draw them
+                                ;   by tech index there instead.
+        txa                     ; A = id
+        sec
+        sbc     #$55            ; -> tech index 0-7
+        sta     $2c
+        lda     #BushidoName::ITEM_SIZE
+        sta     $2e
+        sta     $40
+        jsr     Mult8NoHW
+        ldx     $30
+@65bn:  lda     f:BushidoName,x
+        jsr     DrawListLetter
+        inx
+        dec     $40
+        bne     @65bn
+        rts
+@atkname:
+        txa                     ; A = id (restored)
         sec
         sbc     #$51
         sta     $2c             ; ot6: index -> Mult8NoHW multiplicand.  the
@@ -18203,6 +18227,14 @@ _c1776b:
         jsl     Ot6BlitzListOpen
         jmp     OpenToolsWindow
 
+; ot6 (bushido submenu, #8): the SwdTech numeral gauge is replaced by a tools-
+; shell submenu the same way Blitz was.  OpenCmdMenuTbl[7] hits this stub, which
+; hands off to bank $f0 (fills wItemList with the moving-window techs + costs and
+; raises bushido mode w7e6168=2), then reuses the Tools window shell to pick one.
+_c1_bushido_open:
+        jsl     Ot6BushidoListOpen
+        jmp     OpenToolsWindow
+
 ; ------------------------------------------------------------------------------
 
 ; [ init target cursor select ]
@@ -18989,7 +19021,9 @@ OpenCmdMenuTbl:
         .addr   _c17795
         .addr   _c17795
         .addr   _c17795
-        .addr   UpdateMenuState_35
+        .addr   _c1_bushido_open        ; ot6 (#8): swdtech numeral gauge ->
+                                        ;   tools-shell submenu (was
+                                        ;   UpdateMenuState_35, now dead)
         .addr   OpenThrowWindow
         .addr   OpenToolsWindow
         .addr   _c1776b
@@ -20605,6 +20639,11 @@ UpdateMenuState_30:
         bra     @8818
 @8809:  lda     w7e6168         ; ot6: blitz mode? queue it, no target select
         beq     :+
+        cmp     #$02            ; ot6 (#8): bushido submenu? row r = boost r,
+        bne     @blitzcommit    ;   latch the base+r tech in bank F0 (X = cell
+        jsl     Ot6BushidoConfirm ;   offset from _c18470; may refuse & stay open)
+        rts
+@blitzcommit:
         jsr     _c16d56         ; y = this character's action-queue slot
         lda     wItemList::Index,x      ; selected row = attack id $5d + blitz index
         sec

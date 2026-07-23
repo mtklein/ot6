@@ -29,7 +29,10 @@ local STATE = "/Users/mtklein/ot6/build/states/battle_doorstep.mss.lua"
 
 local MENU, ACTOR, MSTATE = 0x7BCA, 0x62CA, 0x7BC2
 local KNOWN = 0x2020
-local ST_BUSHIDO = 0x37
+-- v0.5 (#8): SwdTech is now a tools-shell submenu (menu state $30), not the
+-- vanilla numeral gauge ($37).  The submenu row IS the boost level: pick row r
+-- (cursor $8963/$8967) and confirm banks $3e9d=r and latches the base+r tech.
+local ST_SUB = 0x30
 
 local PARTY = { 0, 1, 2 }
 local GUARDS = { 2, 3 }                  -- monster slots -> entity 8+slot*2
@@ -48,8 +51,7 @@ local function WKC(s) return 0x3E9C + (8 + s * 2) end
 local function MHP(s) return 0x3BFC + s * 2 end
 local function ST3(e) return 0x3EF8 + e end
 local function mp(s)  return H.readWord(CURMP(s)) end
-local function level() return H.readByte(0x7B82) // 32 end
-local function inWindow() return H.readByte(MSTATE) == ST_BUSHIDO end
+local function inWindow() return H.readByte(MSTATE) == ST_SUB end
 local function guardHp()
   local t = 0
   for _, s in ipairs(GUARDS) do t = t + H.readWord(MHP(s)) end
@@ -108,10 +110,12 @@ end
 
 local function pin() pinCyan(); pinGuards() end
 
--- open the swdtech window, settle the boost band onto the wanted tech, latch
--- it, run it to $3410. clears the spell log first so each scenario waits for
--- ITS OWN execution. techIdx is the tech the (pend, ceil) window selects
--- (0 = Dispatch at 0 bp / ceiling 3; 3 = Quadra Slam at 2 bp / ceiling 4).
+-- open the swdtech SUBMENU, put the cursor on the wanted boost row, confirm,
+-- run it to $3410. clears the spell log first so each scenario waits for ITS
+-- OWN execution.  techIdx is the tech the (pend, ceil) window selects and the
+-- attack id to watch; the ROW is `pend` itself (row r = boost r), which the
+-- confirm banks into $3e9d and latches base+r from (0 = Dispatch at 0 bp /
+-- ceiling 3; 3 = Quadra Slam at 2 bp / ceiling 4).
 local function latchTech(tag, techIdx, pend, ceil)
   local attackId = 0x55 + techIdx
   return H.repeatN(1, {
@@ -121,16 +125,22 @@ local function latchTech(tag, techIdx, pend, ceil)
       H.waitFrames(2),
       H.call(function() H.setPad({}) end),
       H.waitFrames(14),
-    }, tag .. ": swdtech window opens"),
-    H.driveUntil(function() return inWindow() and level() == techIdx end, 600, {
-      H.call(pin), H.waitFrames(2),
-    }, tag .. ": boost band settles on the tech"),
+    }, tag .. ": swdtech submenu opens (tools shell $30)"),
+    -- the row IS the boost: point the cursor at row `pend`, column 0 (the
+    -- single tech column; the right column is empty).
+    H.call(function()
+      pin()
+      H.writeByte(0x895F + active, 0)          -- scroll
+      H.writeByte(0x8963 + active, 0)          -- column 0 (left / only column)
+      H.writeByte(0x8967 + active, pend)       -- row = boost level
+    end),
+    H.waitFrames(2),
     H.driveUntil(function() return not inWindow() end, 900, {
       H.call(function() pin(); H.setPad({ "a" }) end),
       H.waitFrames(2),
       H.call(function() H.setPad({}) end),
       H.waitFrames(14),
-    }, tag .. ": window closes on a latch"),
+    }, tag .. ": submenu closes on a latch"),
     H.call(function() pinCaster = false end),          -- charge now observable
     H.driveUntil(function()
       for _, v in ipairs(spells) do if v == attackId then return true end end
