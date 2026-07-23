@@ -506,7 +506,24 @@ Vanilla bits are kept (dead or level-gated for this party, live for a
 later party that carries the element); class chips ignore the
 water-absorb.
 
-## Zozo
+## Break coverage — still open (tracked in #6)
+
+Two gaps outlive this authoring pass, recorded here so each reads as a
+decision, not an oversight:
+
+- **The free-roam tail.** `Ot6SeedShields`' `@formula` fallback still
+  *clears* the class-weak mask (`$3e9c`), so an un-authored random-encounter
+  enemy is breakable only by whatever element it happens to carry — and one
+  with no reachable element is not breakable at all. The "floor" layer that
+  would derive a family/type class weakness (armored→pierce, brute→bludg,
+  beast→slash) for every un-authored body is **not built**; authored rows and
+  element adds are the only coverage today. This is the remaining open layer
+  of #6.
+- **Tentacle_2 / Tentacle_3 (`$013D`/`$013E`) — out of WoB scope, by
+  intent.** They trace to the World-of-Ruin Figaro engine room, past this
+  document's World-of-Balance frontier, so they get no row and stay
+  unbreakable for now. Left deliberately; revisit with the WoR break pass,
+  not as a WoB gap.
 
 ### 11. Dadaluma
 
