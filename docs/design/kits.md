@@ -203,8 +203,31 @@ more BP — the spend-BP-to-reach-the-stronger-cut tension the numeral gauge had
 now legible. Confirm banks `$3e9d = r` and reuses `Ot6BushidoTier` to latch the
 base+r tech; a row the caster lacks the BP for is greyed and refuses on confirm.
 `SwdTech`'s names render from `BushidoName` (not `AttackName`, whose $55–$5c slots
-are empty pad). The player-configurable **loadout** menu (#8 Layer B) is the
-follow-up and shares this submenu.
+are empty pad).
+
+**The loadout is player-configurable** (#8 Layer B). By default the four boost
+slots are the auto-window (top-four learned, weakest→strongest — issue #5), but
+the player can choose which learned techs occupy 0×/1×/2×/3× and in what order,
+from a **field-menu configurator**: X-menu → Skills → SwdTech opens it (bank C3),
+showing the four boost slots (name + MP cost) over the learned pool; Up/Down pick
+a slot, L/R cycle its tech, Y reverts to auto, B exits. This turns the scheme from
+"we chose your four and retired the rest" into "you choose your four" — the same
+mechanic, made empowering. The config UI is a **thin C3 shim over bank F0**: every
+decision (seed-from-auto, per-slot validated tech, assign, revert, write-back) is a
+`jsl` into OT6 F0 procs (`Ot6Loadout*`), so OT6 stays nearly-all-F0 despite its
+first menu-bank presence; costs price through `Ot6CostFor` (built for menu-bank
+callers), the learned set/ceiling derive from `$1cf7` (not battle-only `$2020`).
+
+Storage is **per-save**: 5 bytes (mode + 4 tech ids) at `$1E1D`, inside FF6's
+`$1600–$1FFD` save block that round-trips per slot and sits in the save checksum,
+so a loadout persists per file and validates automatically. **`mode 0 = auto`**, and
+those bytes read 0 on every existing save, so old saves and new games default to
+the auto-window with zero migration. The battle read is a single branch at the top
+of `Ot6BushidoTech` — the shared leaf both the list and the confirm/damage path
+call — so manual mode governs display, fire, and damage together; a stored tech
+that is no longer learned (`$1cf7` bit clear) falls back to the auto window for
+that slot. Because the read is that one leaf, the auto path stays behaviorally
+identical to Layer A.
 
 Note the Chip column above is finer-grained than what ships: the class
 table (`ot6_class.asm:185-192`) marks all eight slashing, per
