@@ -13,9 +13,9 @@ OT6_FLOOR_CLASS:
         .byte   OT6_PIERCE  ;   2 Templar -> PIERCE
         .byte   OT6_SLASH   ;   3 Ninja -> SLASH
         .byte   OT6_SLASH   ;   4 Samurai -> SLASH
-        .byte   OT6_SLASH   ;   5 Orog -> SLASH
+        .byte   OT6_BLUDG   ;   5 Orog -> BLUDGEON
         .byte   OT6_SLASH   ;   6 Mag Roader -> SLASH
-        .byte   OT6_SLASH   ;   7 Retainer -> SLASH
+        .byte   OT6_PIERCE  ;   7 Retainer -> PIERCE
         .byte   OT6_SLASH   ;   8 Hazer -> SLASH
         .byte   OT6_SLASH   ;   9 Dahling -> SLASH
         .byte   OT6_SLASH   ;  10 Rain Man -> SLASH
@@ -24,13 +24,13 @@ OT6_FLOOR_CLASS:
         .byte   OT6_SLASH   ;  13 Dark Force -> SLASH
         .byte   OT6_SLASH   ;  14 Whisper -> SLASH
         .byte   OT6_SLASH   ;  15 Over-Mind -> SLASH
-        .byte   OT6_SLASH   ;  16 Osteosaur -> SLASH
+        .byte   OT6_PIERCE  ;  16 Osteosaur -> PIERCE
         .byte   OT6_PIERCE  ;  17 Commander -> PIERCE
         .byte   OT6_SLASH   ;  18 Rhodox -> SLASH
         .byte   OT6_SLASH   ;  19 Were-Rat -> SLASH
         .byte   OT6_SLASH   ;  20 Ursus -> SLASH
         .byte   OT6_SLASH   ;  21 Rhinotaur -> SLASH
-        .byte   OT6_SLASH   ;  22 Steroidite -> SLASH
+        .byte   OT6_BLUDG   ;  22 Steroidite -> BLUDGEON
         .byte   OT6_SLASH   ;  23 Leafer -> SLASH
         .byte   OT6_SLASH   ;  24 Stray Cat -> SLASH
         .byte   OT6_SLASH   ;  25 Lobo -> SLASH
@@ -41,12 +41,12 @@ OT6_FLOOR_CLASS:
         .byte   OT6_SLASH   ;  30 Suriander -> SLASH
         .byte   OT6_SLASH   ;  31 Chimera -> SLASH
         .byte   OT6_SLASH   ;  32 Behemoth -> SLASH
-        .byte   OT6_SLASH   ;  33 Mesosaur -> SLASH
-        .byte   OT6_SLASH   ;  34 Pterodon -> SLASH
-        .byte   OT6_SLASH   ;  35 FossilFang -> SLASH
-        .byte   OT6_SLASH   ;  36 White Drgn -> SLASH
-        .byte   OT6_SLASH   ;  37 Doom Drgn -> SLASH
-        .byte   OT6_SLASH   ;  38 Brachosaur -> SLASH
+        .byte   OT6_PIERCE  ;  33 Mesosaur -> PIERCE
+        .byte   OT6_PIERCE  ;  34 Pterodon -> PIERCE
+        .byte   OT6_PIERCE  ;  35 FossilFang -> PIERCE
+        .byte   OT6_PIERCE  ;  36 White Drgn -> PIERCE
+        .byte   OT6_PIERCE  ;  37 Doom Drgn -> PIERCE
+        .byte   OT6_PIERCE  ;  38 Brachosaur -> PIERCE
         .byte   OT6_PIERCE  ;  39 Tyranosaur -> PIERCE
         .byte   OT6_SLASH   ;  40 Dark Wind -> SLASH
         .byte   OT6_SLASH   ;  41 Beakor -> SLASH
@@ -54,18 +54,18 @@ OT6_FLOOR_CLASS:
         .byte   OT6_SLASH   ;  43 Harpy -> SLASH
         .byte   OT6_PIERCE  ;  44 HermitCrab -> PIERCE
         .byte   OT6_SLASH   ;  45 Trapper -> SLASH
-        .byte   OT6_SLASH   ;  46 Hornet -> SLASH
-        .byte   OT6_SLASH   ;  47 CrassHoppr -> SLASH
-        .byte   OT6_SLASH   ;  48 Delta Bug -> SLASH
+        .byte   OT6_PIERCE  ;  46 Hornet -> PIERCE
+        .byte   OT6_PIERCE  ;  47 CrassHoppr -> PIERCE
+        .byte   OT6_PIERCE  ;  48 Delta Bug -> PIERCE
         .byte   OT6_PIERCE  ;  49 Gilomantis -> PIERCE
         .byte   OT6_SLASH   ;  50 Trilium -> SLASH
         .byte   OT6_SLASH   ;  51 Nightshade -> SLASH
         .byte   OT6_SLASH   ;  52 TumbleWeed -> SLASH
         .byte   OT6_SLASH   ;  53 Bloompire -> SLASH
-        .byte   OT6_SLASH   ;  54 Trilobiter -> SLASH
+        .byte   OT6_PIERCE  ;  54 Trilobiter -> PIERCE
         .byte   OT6_SLASH   ;  55 Siegfried -> SLASH
-        .byte   OT6_SLASH   ;  56 Nautiloid -> SLASH
-        .byte   OT6_SLASH   ;  57 Exocite -> SLASH
+        .byte   OT6_PIERCE  ;  56 Nautiloid -> PIERCE
+        .byte   OT6_PIERCE  ;  57 Exocite -> PIERCE
         .byte   OT6_SLASH   ;  58 Anguiform -> SLASH
         .byte   OT6_SLASH   ;  59 Reach Frog -> SLASH
         .byte   OT6_SLASH   ;  60 Lizard -> SLASH
@@ -76,9 +76,9 @@ OT6_FLOOR_CLASS:
         .byte   OT6_SLASH   ;  65 Pipsqueak -> SLASH
         .byte   OT6_PIERCE  ;  66 M-TekArmor -> PIERCE
         .byte   OT6_PIERCE  ;  67 Sky Armor -> PIERCE
-        .byte   OT6_SLASH   ;  68 Telstar -> SLASH
+        .byte   OT6_PIERCE  ;  68 Telstar -> PIERCE
         .byte   OT6_SLASH   ;  69 Lethal Wpn -> SLASH
-        .byte   OT6_SLASH   ;  70 Vaporite -> SLASH
+        .byte   OT6_BLUDG   ;  70 Vaporite -> BLUDGEON
         .byte   OT6_BLUDG   ;  71 Flan -> BLUDGEON
         .byte   OT6_SLASH   ;  72 Ing -> SLASH
         .byte   OT6_SLASH   ;  73 Humpty -> SLASH
@@ -90,14 +90,14 @@ OT6_FLOOR_CLASS:
         .byte   OT6_SLASH   ;  79 Bomb -> SLASH
         .byte   OT6_SLASH   ;  80 Still Life -> SLASH
         .byte   OT6_SLASH   ;  81 Boxed Set -> SLASH
-        .byte   OT6_SLASH   ;  82 SlamDancer -> SLASH
-        .byte   OT6_SLASH   ;  83 HadesGigas -> SLASH
-        .byte   OT6_SLASH   ;  84 Pug -> SLASH
+        .byte   OT6_BLUDG   ;  82 SlamDancer -> BLUDGEON
+        .byte   OT6_BLUDG   ;  83 HadesGigas -> BLUDGEON
+        .byte   OT6_BLUDG   ;  84 Pug -> BLUDGEON
         .byte   OT6_SLASH   ;  85 Magic Urn -> SLASH
         .byte   OT6_SLASH   ;  86 Mover -> SLASH
         .byte   OT6_SLASH   ;  87 Figaliz -> SLASH
         .byte   OT6_SLASH   ;  88 Buffalax -> SLASH
-        .byte   OT6_SLASH   ;  89 Aspik -> SLASH
+        .byte   OT6_BLUDG   ;  89 Aspik -> BLUDGEON
         .byte   OT6_SLASH   ;  90 Ghost -> SLASH
         .byte   OT6_SLASH   ;  91 Crawler -> SLASH
         .byte   OT6_SLASH   ;  92 Sand Ray -> SLASH
@@ -108,15 +108,15 @@ OT6_FLOOR_CLASS:
         .byte   OT6_SLASH   ;  97 Mad Oscar -> SLASH
         .byte   OT6_SLASH   ;  98 Crawly -> SLASH
         .byte   OT6_SLASH   ;  99 Bleary -> SLASH
-        .byte   OT6_SLASH   ; 100 Marshal -> SLASH
+        .byte   OT6_PIERCE  ; 100 Marshal -> PIERCE
         .byte   OT6_PIERCE  ; 101 Trooper -> PIERCE
-        .byte   OT6_SLASH   ; 102 General -> SLASH
-        .byte   OT6_SLASH   ; 103 Covert -> SLASH
-        .byte   OT6_SLASH   ; 104 Ogor -> SLASH
+        .byte   OT6_PIERCE  ; 102 General -> PIERCE
+        .byte   OT6_PIERCE  ; 103 Covert -> PIERCE
+        .byte   OT6_BLUDG   ; 104 Ogor -> BLUDGEON
         .byte   OT6_SLASH   ; 105 Warlock -> SLASH
         .byte   OT6_SLASH   ; 106 Madam -> SLASH
         .byte   OT6_SLASH   ; 107 Joker -> SLASH
-        .byte   OT6_PIERCE  ; 108 Iron Fist -> PIERCE
+        .byte   OT6_BLUDG   ; 108 Iron Fist -> BLUDGEON
         .byte   OT6_SLASH   ; 109 Goblin -> SLASH
         .byte   OT6_SLASH   ; 110 Apparite -> SLASH
         .byte   OT6_SLASH   ; 111 PowerDemon -> SLASH
@@ -132,7 +132,7 @@ OT6_FLOOR_CLASS:
         .byte   OT6_SLASH   ; 121 Bounty Man -> SLASH
         .byte   OT6_SLASH   ; 122 Tusker -> SLASH
         .byte   OT6_SLASH   ; 123 Ralph -> SLASH
-        .byte   OT6_SLASH   ; 124 Chitonid -> SLASH
+        .byte   OT6_PIERCE  ; 124 Chitonid -> PIERCE
         .byte   OT6_SLASH   ; 125 Wart Puck -> SLASH
         .byte   OT6_SLASH   ; 126 Rhyos -> SLASH
         .byte   OT6_SLASH   ; 127 SrBehemoth -> SLASH
@@ -141,7 +141,7 @@ OT6_FLOOR_CLASS:
         .byte   OT6_BLUDG   ; 130 Zombone -> BLUDGEON
         .byte   OT6_PIERCE  ; 131 Dragon -> PIERCE
         .byte   OT6_SLASH   ; 132 Brontaur -> SLASH
-        .byte   OT6_SLASH   ; 133 Allosaurus -> SLASH
+        .byte   OT6_PIERCE  ; 133 Allosaurus -> PIERCE
         .byte   OT6_SLASH   ; 134 Cirpius -> SLASH
         .byte   OT6_SLASH   ; 135 Sprinter -> SLASH
         .byte   OT6_SLASH   ; 136 Gobbler -> SLASH
@@ -156,7 +156,7 @@ OT6_FLOOR_CLASS:
         .byte   OT6_SLASH   ; 145 Exoray -> SLASH
         .byte   OT6_SLASH   ; 146 Crusher -> SLASH
         .byte   OT6_SLASH   ; 147 Uroburos -> SLASH
-        .byte   OT6_SLASH   ; 148 Primordite -> SLASH
+        .byte   OT6_BLUDG   ; 148 Primordite -> BLUDGEON
         .byte   OT6_SLASH   ; 149 Sky Cap -> SLASH
         .byte   OT6_SLASH   ; 150 Cephaler -> SLASH
         .byte   OT6_SLASH   ; 151 Maliga -> SLASH
@@ -176,23 +176,23 @@ OT6_FLOOR_CLASS:
         .byte   OT6_SLASH   ; 165 Eland -> SLASH
         .byte   OT6_SLASH   ; 166 Enuo -> SLASH
         .byte   OT6_SLASH   ; 167 Deep Eye -> SLASH
-        .byte   OT6_SLASH   ; 168 GreaseMonk -> SLASH
+        .byte   OT6_BLUDG   ; 168 GreaseMonk -> BLUDGEON
         .byte   OT6_SLASH   ; 169 NeckHunter -> SLASH
         .byte   OT6_SLASH   ; 170 Grenade -> SLASH
         .byte   OT6_SLASH   ; 171 Critic -> SLASH
         .byte   OT6_SLASH   ; 172 Pan Dora -> SLASH
         .byte   OT6_SLASH   ; 173 SoulDancer -> SLASH
-        .byte   OT6_SLASH   ; 174 Gigantos -> SLASH
+        .byte   OT6_BLUDG   ; 174 Gigantos -> BLUDGEON
         .byte   OT6_SLASH   ; 175 Mag Roader -> SLASH
         .byte   OT6_SLASH   ; 176 Spek Tor -> SLASH
         .byte   OT6_SLASH   ; 177 Parasite -> SLASH
         .byte   OT6_PIERCE  ; 178 EarthGuard -> PIERCE
-        .byte   OT6_SLASH   ; 179 Coelecite -> SLASH
+        .byte   OT6_BLUDG   ; 179 Coelecite -> BLUDGEON
         .byte   OT6_SLASH   ; 180 Anemone -> SLASH
         .byte   OT6_SLASH   ; 181 Hipocampus -> SLASH
         .byte   OT6_SLASH   ; 182 Spectre -> SLASH
         .byte   OT6_SLASH   ; 183 Evil Oscar -> SLASH
-        .byte   OT6_SLASH   ; 184 Slurm -> SLASH
+        .byte   OT6_BLUDG   ; 184 Slurm -> BLUDGEON
         .byte   OT6_SLASH   ; 185 Latimeria -> SLASH
         .byte   OT6_SLASH   ; 186 StillGoing -> SLASH
         .byte   OT6_SLASH   ; 187 Allo Ver -> SLASH
@@ -202,42 +202,42 @@ OT6_FLOOR_CLASS:
         .byte   OT6_SLASH   ; 191 Parasoul -> SLASH
         .byte   OT6_SLASH   ; 192 Pm Stalker -> SLASH
         .byte   OT6_SLASH   ; 193 Hemophyte -> SLASH
-        .byte   OT6_SLASH   ; 194 Sp Forces -> SLASH
+        .byte   OT6_PIERCE  ; 194 Sp Forces -> PIERCE
         .byte   OT6_SLASH   ; 195 Nohrabbit -> SLASH
         .byte   OT6_SLASH   ; 196 Wizard -> SLASH
         .byte   OT6_SLASH   ; 197 Scrapper -> SLASH
-        .byte   OT6_SLASH   ; 198 Ceritops -> SLASH
-        .byte   OT6_SLASH   ; 199 Commando -> SLASH
+        .byte   OT6_PIERCE  ; 198 Ceritops -> PIERCE
+        .byte   OT6_PIERCE  ; 199 Commando -> PIERCE
         .byte   OT6_SLASH   ; 200 Opinicus -> SLASH
         .byte   OT6_SLASH   ; 201 Poppers -> SLASH
         .byte   OT6_SLASH   ; 202 Lunaris -> SLASH
         .byte   OT6_SLASH   ; 203 Garm -> SLASH
         .byte   OT6_SLASH   ; 204 Vindr -> SLASH
         .byte   OT6_SLASH   ; 205 Kiwok -> SLASH
-        .byte   OT6_SLASH   ; 206 Nastidon -> SLASH
+        .byte   OT6_PIERCE  ; 206 Nastidon -> PIERCE
         .byte   OT6_SLASH   ; 207 Rinn -> SLASH
-        .byte   OT6_SLASH   ; 208 Insecare -> SLASH
+        .byte   OT6_PIERCE  ; 208 Insecare -> PIERCE
         .byte   OT6_SLASH   ; 209 Vermin -> SLASH
-        .byte   OT6_SLASH   ; 210 Mantodea -> SLASH
+        .byte   OT6_PIERCE  ; 210 Mantodea -> PIERCE
         .byte   OT6_SLASH   ; 211 Bogy -> SLASH
-        .byte   OT6_SLASH   ; 212 Prussian -> SLASH
-        .byte   OT6_SLASH   ; 213 Black Drgn -> SLASH
-        .byte   OT6_SLASH   ; 214 Adamanchyt -> SLASH
+        .byte   OT6_PIERCE  ; 212 Prussian -> PIERCE
+        .byte   OT6_PIERCE  ; 213 Black Drgn -> PIERCE
+        .byte   OT6_BLUDG   ; 214 Adamanchyt -> BLUDGEON
         .byte   OT6_SLASH   ; 215 Dante -> SLASH
-        .byte   OT6_SLASH   ; 216 Wirey Drgn -> SLASH
-        .byte   OT6_SLASH   ; 217 Dueller -> SLASH
+        .byte   OT6_PIERCE  ; 216 Wirey Drgn -> PIERCE
+        .byte   OT6_PIERCE  ; 217 Dueller -> PIERCE
         .byte   OT6_SLASH   ; 218 Psychot -> SLASH
         .byte   OT6_SLASH   ; 219 Muus -> SLASH
-        .byte   OT6_SLASH   ; 220 Karkass -> SLASH
+        .byte   OT6_BLUDG   ; 220 Karkass -> BLUDGEON
         .byte   OT6_SLASH   ; 221 Punisher -> SLASH
         .byte   OT6_SLASH   ; 222 Balloon -> SLASH
         .byte   OT6_SLASH   ; 223 Gabbldegak -> SLASH
         .byte   OT6_SLASH   ; 224 GtBehemoth -> SLASH
         .byte   OT6_PIERCE  ; 225 Scorpion -> PIERCE
-        .byte   OT6_SLASH   ; 226 Chaos Drgn -> SLASH
+        .byte   OT6_PIERCE  ; 226 Chaos Drgn -> PIERCE
         .byte   OT6_SLASH   ; 227 Spit Fire -> SLASH
         .byte   OT6_SLASH   ; 228 Vectagoyle -> SLASH
-        .byte   OT6_SLASH   ; 229 Lich -> SLASH
+        .byte   OT6_BLUDG   ; 229 Lich -> BLUDGEON
         .byte   OT6_SLASH   ; 230 Osprey -> SLASH
         .byte   OT6_SLASH   ; 231 Mag Roader -> SLASH
         .byte   OT6_SLASH   ; 232 Bug -> SLASH
@@ -246,8 +246,8 @@ OT6_FLOOR_CLASS:
         .byte   OT6_SLASH   ; 235 Abolisher -> SLASH
         .byte   OT6_SLASH   ; 236 Aquila -> SLASH
         .byte   OT6_SLASH   ; 237 Junk -> SLASH
-        .byte   OT6_PIERCE  ; 238 Mandrake -> PIERCE
-        .byte   OT6_SLASH   ; 239 1st Class -> SLASH
+        .byte   OT6_SLASH   ; 238 Mandrake -> SLASH
+        .byte   OT6_PIERCE  ; 239 1st Class -> PIERCE
         .byte   OT6_SLASH   ; 240 Tap Dancer -> SLASH
         .byte   OT6_SLASH   ; 241 Necromancr -> SLASH
         .byte   OT6_SLASH   ; 242 Borras -> SLASH
@@ -259,16 +259,16 @@ OT6_FLOOR_CLASS:
         .byte   OT6_SLASH   ; 248 Red Wolf -> SLASH
         .byte   OT6_SLASH   ; 249 Didalos -> SLASH
         .byte   OT6_SLASH   ; 250 Woolly -> SLASH
-        .byte   OT6_SLASH   ; 251 Veteran -> SLASH
+        .byte   OT6_PIERCE  ; 251 Veteran -> PIERCE
         .byte   OT6_SLASH   ; 252 Sky Base -> SLASH
         .byte   OT6_PIERCE  ; 253 IronHitman -> PIERCE
         .byte   OT6_SLASH   ; 254 Io -> SLASH
-        .byte   OT6_SLASH   ; 255 Pugs -> SLASH
+        .byte   OT6_BLUDG   ; 255 Pugs -> BLUDGEON
         .byte   OT6_SLASH   ; 256 Whelk -> SLASH
         .byte   OT6_SLASH   ; 257 Presenter -> SLASH
         .byte   OT6_PIERCE  ; 258 Mega Armor -> PIERCE
         .byte   OT6_SLASH   ; 259 Vargas -> SLASH
-        .byte   OT6_SLASH   ; 260 TunnelArmr -> SLASH
+        .byte   OT6_PIERCE  ; 260 TunnelArmr -> PIERCE
         .byte   OT6_SLASH   ; 261 Prometheus -> SLASH
         .byte   OT6_SLASH   ; 262 GhostTrain -> SLASH
         .byte   OT6_SLASH   ; 263 Dadaluma -> SLASH
@@ -279,11 +279,11 @@ OT6_FLOOR_CLASS:
         .byte   OT6_SLASH   ; 268 Inferno -> SLASH
         .byte   OT6_SLASH   ; 269 Crane -> SLASH
         .byte   OT6_SLASH   ; 270 Crane -> SLASH
-        .byte   OT6_SLASH   ; 271 Umaro -> SLASH
-        .byte   OT6_SLASH   ; 272 Umaro -> SLASH
+        .byte   OT6_BLUDG   ; 271 Umaro -> BLUDGEON
+        .byte   OT6_BLUDG   ; 272 Umaro -> BLUDGEON
         .byte   OT6_PIERCE  ; 273 Guardian -> PIERCE
         .byte   OT6_PIERCE  ; 274 Guardian -> PIERCE
-        .byte   OT6_SLASH   ; 275 Air Force -> SLASH
+        .byte   OT6_PIERCE  ; 275 Air Force -> PIERCE
         .byte   OT6_SLASH   ; 276 Tritoch -> SLASH
         .byte   OT6_SLASH   ; 277 Tritoch -> SLASH
         .byte   OT6_SLASH   ; 278 FlameEater -> SLASH
@@ -318,9 +318,9 @@ OT6_FLOOR_CLASS:
         .byte   OT6_SLASH   ; 307 L.50 Magic -> SLASH
         .byte   OT6_SLASH   ; 308 Head -> SLASH
         .byte   OT6_SLASH   ; 309 Whelk Head -> SLASH
-        .byte   OT6_SLASH   ; 310 Colossus -> SLASH
+        .byte   OT6_PIERCE  ; 310 Colossus -> PIERCE
         .byte   OT6_PIERCE  ; 311 CzarDragon -> PIERCE
-        .byte   OT6_SLASH   ; 312 Master Pug -> SLASH
+        .byte   OT6_BLUDG   ; 312 Master Pug -> BLUDGEON
         .byte   OT6_SLASH   ; 313 L.60 Magic -> SLASH
         .byte   OT6_SLASH   ; 314 Merchant -> SLASH
         .byte   OT6_SLASH   ; 315 B.Day Suit -> SLASH
@@ -333,20 +333,20 @@ OT6_FLOOR_CLASS:
         .byte   OT6_SLASH   ; 322 Striker -> SLASH
         .byte   OT6_SLASH   ; 323 L.70 Magic -> SLASH
         .byte   OT6_SLASH   ; 324 Tritoch -> SLASH
-        .byte   OT6_SLASH   ; 325 Laser Gun -> SLASH
+        .byte   OT6_PIERCE  ; 325 Laser Gun -> PIERCE
         .byte   OT6_SLASH   ; 326 Speck -> SLASH
-        .byte   OT6_SLASH   ; 327 MissileBay -> SLASH
+        .byte   OT6_PIERCE  ; 327 MissileBay -> PIERCE
         .byte   OT6_SLASH   ; 328 Chadarnook -> SLASH
         .byte   OT6_PIERCE  ; 329 Ice Dragon -> PIERCE
         .byte   OT6_SLASH   ; 330 Kefka -> SLASH
-        .byte   OT6_SLASH   ; 331 Storm Drgn -> SLASH
-        .byte   OT6_SLASH   ; 332 Dirt Drgn -> SLASH
+        .byte   OT6_PIERCE  ; 331 Storm Drgn -> PIERCE
+        .byte   OT6_PIERCE  ; 332 Dirt Drgn -> PIERCE
         .byte   OT6_SLASH   ; 333 Ipooh -> SLASH
         .byte   OT6_PIERCE  ; 334 Leader -> PIERCE
         .byte   OT6_SLASH   ; 335 Grunt -> SLASH
-        .byte   OT6_SLASH   ; 336 Gold Drgn -> SLASH
-        .byte   OT6_SLASH   ; 337 Skull Drgn -> SLASH
-        .byte   OT6_SLASH   ; 338 Blue Drgn -> SLASH
+        .byte   OT6_PIERCE  ; 336 Gold Drgn -> PIERCE
+        .byte   OT6_PIERCE  ; 337 Skull Drgn -> PIERCE
+        .byte   OT6_PIERCE  ; 338 Blue Drgn -> PIERCE
         .byte   OT6_PIERCE  ; 339 Red Dragon -> PIERCE
         .byte   OT6_SLASH   ; 340 Piranha -> SLASH
         .byte   OT6_SLASH   ; 341 Rizopas -> SLASH

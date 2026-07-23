@@ -51,19 +51,33 @@ CLASS_CONST = {OT6_SLASH: "OT6_SLASH", OT6_PIERCE: "OT6_PIERCE", OT6_BLUDG: "OT6
 CLASS_RULES = [
     # (class byte, [keyword substrings])  -- listed high-precedence first
     (OT6_PIERCE, [
-        # armored / mechanical / imperial / shelled + dragons
+        # armored / mechanical / imperial ranks (a point finds the seam)
         "guard", "soldier", "trooper", "cadet", "officer", "leader",
-        "templar", "rider", "armor", "iron", "steel", "knight", "chaser",
-        "proto", "m-tek", "mtek", "tek", "machine", "commander",
-        "crab", "beetle", "mantis", "scorpion", "snail", "shell", "carapace",
-        "dragon", "wyrm", "wyvern", "drake", "tyrano", "brachio", "dino",
+        "templar", "rider", "armor", "armr", "iron", "steel", "knight",
+        "chaser", "proto", "m-tek", "mtek", "tek", "machine", "commander",
+        "commando", "marshal", "general", "veteran", "prussian", "covert",
+        "forces", "1st class", "retainer", "dueller", "telstar", "hitman",
+        "laser", "missile", "colossus", "guardian", "air force",
+        # carapace / shelled / insects (chitin -> pierce)
+        "crab", "beetle", "mantis", "mantodea", "insecare", "scorpion",
+        "snail", "shell", "carapace", "hornet", "hoppr", "delta", "gilo",
+        "chiton", "nautilo", "trilob", "exocite",
+        # dragons + dinosaurs (between the scales)
+        "dragon", "drgn", "wyrm", "wyvern", "drake", "tyrano", "brach",
+        "saur", "ptero", "fossil", "ceritops", "nastidon", "dino",
     ]),
     (OT6_BLUDG, [
-        # brutes / oozes / rock / skeletal
-        "ogre", "troll", "giant", "brawler", "gorilla", "golem",
-        "stone", "rock", "boulder",
+        # brutes / giants / monks (mass with no seam -> you crush it)
+        "ogre", "ogor", "orog", "troll", "giant", "gigas", "gigant",
+        "brawler", "gorilla", "slamdancer", "umaro", "pug", "monk",
+        # golem / rock
+        "golem", "stone", "rock", "boulder", "adaman", "coelecite",
+        "primordite", "steroidite",
+        # oozes
         "slime", "ooze", "blob", "pudding", "jelly", "amoeba", "flan",
-        "skeleton", "bone", "mummy", "zombie",
+        "aspik", "slurm", "vaporite",
+        # skeletal / undead bodies
+        "skeleton", "bone", "mummy", "zombie", "karkass", "lich",
     ]),
     (OT6_SLASH, [
         # beasts / reptiles / birds / fish / plants
@@ -78,6 +92,13 @@ CLASS_RULES = [
 
 DEFAULT_CLASS = OT6_SLASH  # unmatched -> slash (humanoids, casters, spirits)
 
+# Exact-name overrides (case-insensitive), HIGHEST precedence -- for names a
+# keyword mis-catches. Keep this list tiny and only for genuine collisions.
+OVERRIDES = {
+    "iron fist": OT6_BLUDG,   # a monk, not armor -- "iron" would say pierce
+    "mandrake":  OT6_SLASH,   # a plant, not a dragon -- "drake" would say pierce
+}
+
 # codex width: OT6_CODEX is 384 species wide (ot6.asm:132 "cpx #$0300").
 # The floor table must match that width and species-id indexing.
 CODEX_WIDTH = 384
@@ -90,6 +111,9 @@ def classify(name):
     review dump. Precedence is the order of CLASS_RULES (pierce, bludg, slash).
     """
     low = name.lower()
+    if low in OVERRIDES:
+        cls = OVERRIDES[low]
+        return cls, f"{CLASS_NAME[cls]}:override"
     for class_byte, keywords in CLASS_RULES:
         for kw in keywords:
             if kw in low:
