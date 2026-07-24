@@ -300,112 +300,6 @@ local function westRoomCross()
   })
 end
 
--- THE BRIDGE-ROOM APPROACH (map 221): after the J33 jump the party is at
--- ~(28,33) and must reach the door (31,30)->225.  followPath timed out here
--- too: the route climbs a "/" z-loop beam (tiles $41/$44/$49 at
--- (31,35)->(34,32), the same motif corridorFollow drives for (30,22)->(30,13)),
--- and followPath's all-z BFS mispredicts the live z across the beam.  A single
--- door-walled BFS is z-consistent (probe_bridge.lua, identical route at every
--- seed z), so this is a canStep-gated per-tile table like corridorFollow.
-local BRIDGE = {}
-local function br(x, y, dir) BRIDGE[key(x, y)] = dir end
-br(28, 33, "right"); br(29, 33, "right"); br(30, 33, "down"); br(30, 34, "down")
-br(30, 35, "right")                                    -- into the "/" beam base
-br(31, 35, "upright"); br(32, 34, "upright"); br(33, 33, "upright"); br(34, 32, "up")
-br(34, 31, "left"); br(33, 31, "left"); br(32, 31, "left"); br(31, 31, "up")  -- -> (31,30) door
-local function bridgeCross()
-  local hb = 0
-  return H.cond(function() return true end, {
-    H.driveUntil(function() return map() == 225 end, 12000, {
-      H.call(function()
-        hb = hb + 1
-        if hb % 600 == 0 then
-          H.log(string.format("[bridge] f+%d at (%d,%d) z%d", hb,
-            H.fieldX(), H.fieldY(), H.readByte(0x00b2) & 3))
-        end
-        if H.battleLoadStarted() then
-          killBitAll(); H.setPad(hb % 8 < 4 and { "a" } or {}); return
-        end
-        if H.dialogWaiting() then H.setPad(hb % 8 < 4 and { "a" } or {}); return end
-        if not H.hasControl() then H.setPad({}); return end
-        if not H.tileAligned() then H.setPad({}); return end
-        local x, y = H.fieldX(), H.fieldY()
-        local dir = BRIDGE[key(x, y)]
-        if dir and H.canStep(x, y, dir) then
-          H.setPad({ [PRESS[dir]] = true })
-        else
-          H.setPad({})
-        end
-      end),
-    }, "bridge room approach -> (31,30) exit"),
-    H.waitUntil(settled, 2400, "bridge room settled", 5),
-    H.waitFrames(150),
-    H.logStep(function() return string.format(
-      "bridgeCross: landed map %d (%d,%d)", map(), H.fieldX(), H.fieldY()) end),
-  })
-end
-
--- THE BRIDGE-ROOM CLIMB (map 225): from (30,61) up to the door (30,34)->221
--- (top roof).  The direct x=30 column is z-split; the real route is a 50-step
--- SWITCHBACK LADDER over "/" ($43/$4B) and "\" ($83/$8B) z-loop beams
--- (probe_westroom.lua solve, z-consistent at every seed z).  Like the west
--- room, a "\" tile can fire a scene, so this driver ALSO A-mashes on any
--- control-loss/event; otherwise it walks the measured per-tile table,
--- canStep-gated on the live z.
-local BRIDGE2 = {}
-do
-  local seq = {
-    { 30, 61, "up" }, { 30, 60, "up" }, { 30, 59, "left" }, { 29, 59, "up" },
-    { 29, 58, "up" }, { 29, 57, "right" }, { 30, 57, "upright" }, { 31, 56, "upright" },
-    { 32, 55, "upright" }, { 33, 54, "upright" }, { 34, 53, "upright" }, { 35, 52, "upright" },
-    { 36, 51, "right" }, { 37, 51, "up" }, { 37, 50, "up" }, { 37, 49, "left" },
-    { 36, 49, "upleft" }, { 35, 48, "upleft" }, { 34, 47, "upleft" }, { 33, 46, "upleft" },
-    { 32, 45, "upleft" }, { 31, 44, "upleft" }, { 30, 43, "left" }, { 29, 43, "up" },
-    { 29, 42, "up" }, { 29, 41, "right" }, { 30, 41, "upright" }, { 31, 40, "upright" },
-    { 32, 39, "upright" }, { 33, 38, "upright" }, { 34, 37, "upright" }, { 35, 36, "upright" },
-    { 36, 35, "upright" }, { 37, 34, "upright" }, { 38, 33, "upright" }, { 39, 32, "right" },
-    { 40, 32, "up" }, { 40, 31, "left" }, { 39, 31, "left" }, { 38, 31, "left" },
-    { 37, 31, "left" }, { 36, 31, "left" }, { 35, 31, "left" }, { 34, 31, "left" },
-    { 33, 31, "down" }, { 33, 32, "down" }, { 33, 33, "left" }, { 32, 33, "left" },
-    { 31, 33, "left" }, { 30, 33, "down" },   -- (30,33) -> door (30,34)
-  }
-  for _, s in ipairs(seq) do BRIDGE2[key(s[1], s[2])] = s[3] end
-end
-local function bridgeClimb()
-  local hb = 0
-  return H.cond(function() return true end, {
-    H.driveUntil(function() return map() == 221 end, 15000, {
-      H.call(function()
-        hb = hb + 1
-        if hb % 600 == 0 then
-          H.log(string.format("[bridge2] f+%d at (%d,%d) z%d ctl=%s", hb,
-            H.fieldX(), H.fieldY(), H.readByte(0x00b2) & 3, tostring(H.hasControl())))
-        end
-        if H.battleLoadStarted() then
-          killBitAll(); H.setPad(hb % 8 < 4 and { "a" } or {}); return
-        end
-        if H.dialogWaiting() then H.setPad(hb % 8 < 4 and { "a" } or {}); return end
-        -- ride any scene (a direction press into a "\" scene tile hangs)
-        if not H.hasControl() or H.eventRunning() then
-          H.setPad(hb % 8 < 4 and { "a" } or {}); return
-        end
-        if not H.tileAligned() then H.setPad({}); return end
-        local x, y = H.fieldX(), H.fieldY()
-        local dir = BRIDGE2[key(x, y)]
-        if dir and H.canStep(x, y, dir) then
-          H.setPad({ [PRESS[dir]] = true })
-        else
-          H.setPad({})
-        end
-      end),
-    }, "bridge room climb -> (30,34) exit"),
-    H.waitUntil(settled, 2400, "top roof settled", 5),
-    H.waitFrames(150),
-    H.logStep(function() return string.format(
-      "bridgeClimb: landed map %d (%d,%d)", map(), H.fieldX(), H.fieldY()) end),
-  })
-end
-
 -- the stair-room conveyor: route direction as a pure function of tile
 local function stairDir(x, y)
   if x == 54 and y >= 12 and y <= 14 then
@@ -620,132 +514,70 @@ local function jumpRow(dir, pred, maxFrames, what)
   })
 end
 
-H.run({ maxFrames = 90000 }, {
+-- probe the door(31,30) leg on MAP 221 (live in zozo_arrival): dump the
+-- (28,33)->(31,30) region and check for beams/scenes.  W221 is the door set.
+local function dumpRegion(x0, x1, y0, y1)
+  H.log(string.format("[dump] map=%d region x%d..%d y%d..%d", map(), x0, x1, y0, y1))
+  for y = y0, y1 do
+    local row = {}
+    for x = x0, x1 do
+      row[#row + 1] = string.format("%d,%d:%02X/%02X", x, y, prop1(x, y), prop2(x, y))
+    end
+    H.log("  " .. table.concat(row, " "))
+  end
+end
+-- single-live-z door-walled BFS (map 221), doors as walls except target
+local function solve221(sx, sy, tx, ty, z0)
+  local xm, ym = H.readByte(0x0086), H.readByte(0x0087)
+  local function nk(x, y, z) return (z << 16) | (y << 8) | x end
+  local seen, q, qi = { [nk(sx, sy, z0)] = true }, { { sx, sy, z0, nil } }, 1
+  local parent = {}
+  while qi <= #q do
+    local x, y, z, f = q[qi][1], q[qi][2], q[qi][3], q[qi][4]
+    qi = qi + 1
+    if x == tx and y == ty then
+      local steps, k = {}, nk(x, y, z)
+      while parent[k] do table.insert(steps, 1, parent[k]); k = parent[k].pk end
+      return steps
+    end
+    local zn = zAfter(x, y, z)
+    for _, mv in ipairs(MOVES) do
+      local d = DELTA[mv]; local nx, ny = x + d[1], y + d[2]
+      if nx >= 0 and ny >= 0 and nx <= xm and ny <= ym
+         and (not W221[key(nx, ny)] or (nx == tx and ny == ty))
+         and stepAllowed(x, y, mv, z) then
+        local k = nk(nx, ny, zn)
+        if not seen[k] then seen[k] = true
+          parent[k] = { pk = nk(x, y, z), fx = x, fy = y, dir = mv }
+          q[#q + 1] = { nx, ny, zn, f or mv } end
+      end
+    end
+  end
+  return nil
+end
+
+H.run({ maxFrames = 40000 }, {
   H.loadState("/Users/mtklein/ot6/build/states/zozo_arrival.mss.lua"),
   H.waitFrames(150),
   H.call(function()
-    H.assertEq(map(), 221, "booted on the Zozo street (map 221)")
-    H.assertEq(sw(0x034A), 1, "$034A SET -- the gentleman waits")
-    H.assertEq(sw(0x0053), 0, "$0053 clear -- the Ramuh scene has not run")
-  end),
-
-  -- the climb
-  door(38, 57, 225, "P9a street -> interior"),
-  door(47, 47, 221, "P10b -> roof (35,54)"),
-  door(34, 50, 225, "P11a -> stair room"),
-  followPath(52, 30, { maxFrames = 9000 }),
-  stairFollow(),
-  H.waitUntil(settled, 2400, "U1 settled", 5),
-  H.waitFrames(150),
-  followPath(29, 39, { maxFrames = 9000 }),
-  jumpRow("left", function()
-    return H.fieldX() <= 18 and H.fieldY() == 39
-  end, 4500, "J39 row westbound"),
-  door(15, 39, 225, "P17a -> west room"),
-  -- P18b: cross the west room to (104,27)->221.  followPath mispredicts +
-  -- HANGS on the (111,15) scene-beam here; westRoomCross rides it (see above).
-  westRoomCross(),
-  followPath(18, 33, { maxFrames = 6000 }),
-  jumpRow("right", function()
-    return H.fieldX() >= 28 and H.fieldY() == 33
-  end, 4500, "J33 row eastbound"),
-  -- P14a: the "/" z-loop beam approach to (31,30) -- followPath mispredicts
-  -- the live z here too; bridgeCross drives the measured table (see above).
-  bridgeCross(),
-  -- P15b: the bridge-room switchback ladder up to (30,34)->221.  bridgeClimb
-  -- drives the measured z-loop table correctly from (30,61) up to (29,41) --
-  -- BUT then hits an UNSOLVED blocker: the only model-route to the (30,34) door
-  -- steps onto (30,41), which is an UNMODELED transition that drops the party
-  -- to MAP 5 (measured, probe_climb2.lua); walling (30,41) makes (30,34)
-  -- unreachable (NO PATH).  This gates dadaluma_doorstep -- see wob-route.md
-  -- fifth pass.  Left in place as the measured furthest-reached point.
-  bridgeClimb(),
-  corridorFollow(),
-
-  -- the doorstep: one A-press from battle 69.  The extra beat plus the
-  -- settled assert keep this mint honest: the state is the suite's boot
-  -- point, so a battle-load or event in flight here poisons everything
-  -- downstream (see corridorFollow's arrive note for the measured case).
-  H.waitFrames(60),
-  H.call(function()
-    H.assertEq(map(), 221, "on the roof (map 221)")
-    H.assertEq(H.fieldX() == 30 and H.fieldY() == 13, true,
-      "at (30,13), north of the gentleman")
-    H.assertEq(settled(), true, "doorstep is QUIET -- no battle/event in flight")
-    H.assertEq(sw(0x034A), 1, "$034A still set -- he waits below")
-    H.log(string.format("[dadaluma_doorstep] f%d at (%d,%d)",
-      H.frame, H.fieldX(), H.fieldY()))
-    H.screenshot("dadaluma_doorstep")
-  end),
-  H.saveState("dadaluma_doorstep.mss"),
-
-  -- face him and talk
-  H.hold({ "down" }), H.waitFrames(8), H.release(), H.waitFrames(4),
-  (function()
-    local ph = 0
-    return H.driveUntil(function() return H.dialogWaiting() end, 1200, {
-      H.call(function()
-        ph = (ph + 1) % 24
-        if not H.hasControl() and not H.dialogWaiting() then
-          H.setPad({})
-          return
-        end
-        if ph < 4 then H.setPad({ "down" })
-        elseif (ph >= 8 and ph < 12) or (ph >= 16 and ph < 20) then
-          H.setPad({ "a" })
-        else H.setPad({}) end
-      end),
-    }, "the gentleman answers")
-  end)(),
-  (function()
-    local ph = 0
-    return H.driveUntil(function() return H.battleLoadStarted() end, 3000, {
-      H.call(function()
-        ph = (ph + 1) % 8
-        H.setPad(H.dialogWaiting() and ph < 4 and { "a" } or {})
-      end),
-    }, "battle 69 loads")
-  end)(),
-  H.waitUntil(function() return H.battleActive() end, 3000, "Dadaluma up", 10),
-  H.waitFrames(150),
-  H.call(function()
-    H.assertEq(H.formationHas({ [0x0107] = true }), true,
-      "DADALUMA ($0107) in the formation")
-    local w = H.formationWords()
-    H.log(string.format("[battle] formation %04X %04X %04X %04X %04X %04X",
-      w[1], w[2], w[3], w[4], w[5], w[6]))
-  end),
-  (function()
-    local ph = 0
-    return H.driveUntil(function() return not H.battleLoadStarted() end, 20000, {
-      H.call(function()
-        ph = (ph + 1) % 8
-        if H.monstersPresent() > 0 then killBitAll() end
-        H.setPad(ph < 4 and { "a" } or {})
-      end),
-    }, "Dadaluma down (kill-bit; the $40 scripted win)")
-  end)(),
-
-  -- the win tail: _ca96a9 hides NPC_14, clears $034A, fades back in
-  H.waitUntil(function()
-    return map() == 221 and H.hasControl() and H.tileAligned() and bright() >= 15
-  end, 3000, "control back on the roof", 5),
-  H.waitFrames(60),
-  H.call(function()
-    H.assertEq(sw(0x034A), 0, "$034A CLEAR -- the gentleman is gone")
-    H.assertEq(map(), 221, "still on map 221")
-    H.assertEq(H.fieldX() == 30 and H.fieldY() == 13, true,
-      "control returned at (30,13)")
-    H.assertEq(H.bfsPath(33, 10) ~= nil, true,
-      "the tower porch is OPEN -- (33,10) walkable")
-    H.assertEq(sw(0x0053), 0, "$0053 still clear -- TERRA waits upstairs")
-    H.log(string.format("[dadaluma_won] f%d at (%d,%d)",
-      H.frame, H.fieldX(), H.fieldY()))
-    H.screenshot("dadaluma_won")
-  end),
-  H.saveState("dadaluma_won.mss"),
-  H.logStep(function()
-    return string.format(
-      "dadaluma_won minted at frame %d -- the maze is climbed", H.frame)
+    H.assertEq(map(), 221, "map 221 live")
+    dumpRegion(24, 36, 26, 40)
+    for _, z in ipairs({ 0, 1, 2 }) do
+      local s = solve221(28, 33, 31, 30, z)
+      if s then
+        local parts = {}
+        for _, st in ipairs(s) do parts[#parts + 1] = string.format("(%d,%d)%s", st.fx, st.fy, st.dir) end
+        H.log(string.format("[solve z%d] %d steps: %s", z, #s, table.concat(parts, " ")))
+      else
+        H.log(string.format("[solve z%d] NO PATH (28,33)->(31,30)", z))
+      end
+    end
+    -- flag diagonal/beam tiles in the region
+    for y = 26, 40 do for x = 24, 36 do
+      local p = prop1(x, y)
+      if (p & 0xC0) ~= 0 and p ~= 0xF7 then
+        H.log(string.format("[beam] (%d,%d) p1=%02X", x, y, p))
+      end
+    end end
   end),
 })

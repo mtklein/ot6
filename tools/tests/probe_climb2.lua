@@ -620,132 +620,77 @@ local function jumpRow(dir, pred, maxFrames, what)
   })
 end
 
-H.run({ maxFrames = 90000 }, {
-  H.loadState("/Users/mtklein/ot6/build/states/zozo_arrival.mss.lua"),
-  H.waitFrames(150),
+-- Boot the bridge-room checkpoint (map 225, 30,61) and drive the BRIDGE2 table
+-- with full per-tile logging + scene detection, to learn where/what the scene
+-- is and whether it moves the party.
+H.run({ maxFrames = 40000 }, {
+  H.loadState("/Users/mtklein/ot6/build/states/bridge_checkpoint.mss.lua"),
+  H.waitFrames(120),
   H.call(function()
-    H.assertEq(map(), 221, "booted on the Zozo street (map 221)")
-    H.assertEq(sw(0x034A), 1, "$034A SET -- the gentleman waits")
-    H.assertEq(sw(0x0053), 0, "$0053 clear -- the Ramuh scene has not run")
+    H.log(string.format("[boot] map=%d (%d,%d) z%d", map(), H.fieldX(), H.fieldY(),
+      H.readByte(0x00b2) & 3))
   end),
-
-  -- the climb
-  door(38, 57, 225, "P9a street -> interior"),
-  door(47, 47, 221, "P10b -> roof (35,54)"),
-  door(34, 50, 225, "P11a -> stair room"),
-  followPath(52, 30, { maxFrames = 9000 }),
-  stairFollow(),
-  H.waitUntil(settled, 2400, "U1 settled", 5),
-  H.waitFrames(150),
-  followPath(29, 39, { maxFrames = 9000 }),
-  jumpRow("left", function()
-    return H.fieldX() <= 18 and H.fieldY() == 39
-  end, 4500, "J39 row westbound"),
-  door(15, 39, 225, "P17a -> west room"),
-  -- P18b: cross the west room to (104,27)->221.  followPath mispredicts +
-  -- HANGS on the (111,15) scene-beam here; westRoomCross rides it (see above).
-  westRoomCross(),
-  followPath(18, 33, { maxFrames = 6000 }),
-  jumpRow("right", function()
-    return H.fieldX() >= 28 and H.fieldY() == 33
-  end, 4500, "J33 row eastbound"),
-  -- P14a: the "/" z-loop beam approach to (31,30) -- followPath mispredicts
-  -- the live z here too; bridgeCross drives the measured table (see above).
-  bridgeCross(),
-  -- P15b: the bridge-room switchback ladder up to (30,34)->221.  bridgeClimb
-  -- drives the measured z-loop table correctly from (30,61) up to (29,41) --
-  -- BUT then hits an UNSOLVED blocker: the only model-route to the (30,34) door
-  -- steps onto (30,41), which is an UNMODELED transition that drops the party
-  -- to MAP 5 (measured, probe_climb2.lua); walling (30,41) makes (30,34)
-  -- unreachable (NO PATH).  This gates dadaluma_doorstep -- see wob-route.md
-  -- fifth pass.  Left in place as the measured furthest-reached point.
-  bridgeClimb(),
-  corridorFollow(),
-
-  -- the doorstep: one A-press from battle 69.  The extra beat plus the
-  -- settled assert keep this mint honest: the state is the suite's boot
-  -- point, so a battle-load or event in flight here poisons everything
-  -- downstream (see corridorFollow's arrive note for the measured case).
-  H.waitFrames(60),
+  -- re-solve (30,61)->(30,34) with the measured FALL/DOOR tiles added to the
+  -- wall set, print the alternate route, and drive it with fall-detection.
   H.call(function()
-    H.assertEq(map(), 221, "on the roof (map 221)")
-    H.assertEq(H.fieldX() == 30 and H.fieldY() == 13, true,
-      "at (30,13), north of the gentleman")
-    H.assertEq(settled(), true, "doorstep is QUIET -- no battle/event in flight")
-    H.assertEq(sw(0x034A), 1, "$034A still set -- he waits below")
-    H.log(string.format("[dadaluma_doorstep] f%d at (%d,%d)",
-      H.frame, H.fieldX(), H.fieldY()))
-    H.screenshot("dadaluma_doorstep")
-  end),
-  H.saveState("dadaluma_doorstep.mss"),
-
-  -- face him and talk
-  H.hold({ "down" }), H.waitFrames(8), H.release(), H.waitFrames(4),
-  (function()
-    local ph = 0
-    return H.driveUntil(function() return H.dialogWaiting() end, 1200, {
-      H.call(function()
-        ph = (ph + 1) % 24
-        if not H.hasControl() and not H.dialogWaiting() then
-          H.setPad({})
-          return
+    local BAD = { { 30, 41 } }   -- add tiles here as falls are found
+    local walls = {}
+    for k in pairs(W225) do walls[k] = true end
+    for _, b in ipairs(BAD) do walls[key(b[1], b[2])] = true end
+    local xm, ym = H.readByte(0x0086), H.readByte(0x0087)
+    local function nk(x, y, z) return (z << 16) | (y << 8) | x end
+    local seen, q, qi, parent = { [nk(30, 61, 2)] = true }, { { 30, 61, 2 } }, 1, {}
+    local res
+    while qi <= #q do
+      local x, y, z = q[qi][1], q[qi][2], q[qi][3]; qi = qi + 1
+      if x == 30 and y == 34 then
+        local st, k = {}, nk(x, y, z)
+        while parent[k] do table.insert(st, 1, parent[k]); k = parent[k].pk end
+        res = st; break
+      end
+      local zn = zAfter(x, y, z)
+      for _, mv in ipairs(MOVES) do
+        local d = DELTA[mv]; local nx, ny = x + d[1], y + d[2]
+        if nx >= 0 and ny >= 0 and nx <= xm and ny <= ym
+           and (not walls[key(nx, ny)] or (nx == 30 and ny == 34))
+           and stepAllowed(x, y, mv, z) then
+          local kk = nk(nx, ny, zn)
+          if not seen[kk] then seen[kk] = true
+            parent[kk] = { pk = nk(x, y, z), fx = x, fy = y, dir = mv }
+            q[#q + 1] = { nx, ny, zn } end
         end
-        if ph < 4 then H.setPad({ "down" })
-        elseif (ph >= 8 and ph < 12) or (ph >= 16 and ph < 20) then
-          H.setPad({ "a" })
-        else H.setPad({}) end
-      end),
-    }, "the gentleman answers")
-  end)(),
-  (function()
-    local ph = 0
-    return H.driveUntil(function() return H.battleLoadStarted() end, 3000, {
-      H.call(function()
-        ph = (ph + 1) % 8
-        H.setPad(H.dialogWaiting() and ph < 4 and { "a" } or {})
-      end),
-    }, "battle 69 loads")
-  end)(),
-  H.waitUntil(function() return H.battleActive() end, 3000, "Dadaluma up", 10),
-  H.waitFrames(150),
-  H.call(function()
-    H.assertEq(H.formationHas({ [0x0107] = true }), true,
-      "DADALUMA ($0107) in the formation")
-    local w = H.formationWords()
-    H.log(string.format("[battle] formation %04X %04X %04X %04X %04X %04X",
-      w[1], w[2], w[3], w[4], w[5], w[6]))
+      end
+    end
+    _G.CLIMB2 = {}
+    if res then
+      local parts = {}
+      for _, s in ipairs(res) do parts[#parts + 1] = string.format("(%d,%d)%s", s.fx, s.fy, s.dir)
+        _G.CLIMB2[key(s.fx, s.fy)] = s.dir end
+      H.log(string.format("[resolve] %d steps (BAD-walled): %s", #res, table.concat(parts, " ")))
+    else
+      H.log("[resolve] NO PATH with BAD tiles walled")
+    end
   end),
   (function()
-    local ph = 0
-    return H.driveUntil(function() return not H.battleLoadStarted() end, 20000, {
-      H.call(function()
-        ph = (ph + 1) % 8
-        if H.monstersPresent() > 0 then killBitAll() end
-        H.setPad(ph < 4 and { "a" } or {})
-      end),
-    }, "Dadaluma down (kill-bit; the $40 scripted win)")
+    local hb, lm = 0, -1
+    return H.driveUntil(function() return map() ~= 225 end, 15000, { H.call(function()
+      hb = hb + 1
+      local x, y = H.fieldX(), H.fieldY()
+      local z = H.readByte(0x00b2) & 3
+      local ctl, ev = H.hasControl(), H.eventRunning()
+      if key(x, y) ~= lm then lm = key(x, y)
+        H.log(string.format("[climb2] (%d,%d) z%d dir=%s ctl=%s ev=%s", x, y, z,
+          tostring(_G.CLIMB2[key(x, y)]), tostring(ctl), tostring(ev))) end
+      if H.battleLoadStarted() then killBitAll(); H.setPad(hb % 8 < 4 and { "a" } or {}); return end
+      if H.dialogWaiting() then H.setPad(hb % 8 < 4 and { "a" } or {}); return end
+      if not ctl or ev then H.setPad(hb % 8 < 4 and { "a" } or {}); return end
+      if not H.tileAligned() then H.setPad({}); return end
+      local dir = _G.CLIMB2[key(x, y)]
+      if dir and H.canStep(x, y, dir) then H.setPad({ [PRESS[dir]] = true })
+      else H.setPad({}) end
+    end) }, "climb2 re-solved route")
   end)(),
-
-  -- the win tail: _ca96a9 hides NPC_14, clears $034A, fades back in
-  H.waitUntil(function()
-    return map() == 221 and H.hasControl() and H.tileAligned() and bright() >= 15
-  end, 3000, "control back on the roof", 5),
-  H.waitFrames(60),
   H.call(function()
-    H.assertEq(sw(0x034A), 0, "$034A CLEAR -- the gentleman is gone")
-    H.assertEq(map(), 221, "still on map 221")
-    H.assertEq(H.fieldX() == 30 and H.fieldY() == 13, true,
-      "control returned at (30,13)")
-    H.assertEq(H.bfsPath(33, 10) ~= nil, true,
-      "the tower porch is OPEN -- (33,10) walkable")
-    H.assertEq(sw(0x0053), 0, "$0053 still clear -- TERRA waits upstairs")
-    H.log(string.format("[dadaluma_won] f%d at (%d,%d)",
-      H.frame, H.fieldX(), H.fieldY()))
-    H.screenshot("dadaluma_won")
-  end),
-  H.saveState("dadaluma_won.mss"),
-  H.logStep(function()
-    return string.format(
-      "dadaluma_won minted at frame %d -- the maze is climbed", H.frame)
+    H.log(string.format("[climb-END] map=%d (%d,%d)", map(), H.fieldX(), H.fieldY()))
   end),
 })

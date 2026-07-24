@@ -496,3 +496,61 @@ Boot `opera_dance_done` (238 {98,7} `$0111=1`, `$0345=1`):
    mid-`_cab497` (the fall→load→`_cab6d6`→battle tail is dialog-free, auto-plays).
    Post-battle `_cab6d6` tail (`:28208+`): `call _ca5ea9`, `$0332=1`, load 237 →
    Setzer. Verify the post-battle gate before minting `ultros2_won` (kill-bit).
+
+## Beat A — fifth pass: dadaluma crane-maze z-nav (west room CRACKED, bridge-climb blocked) (2026-07-23)
+
+The frontier no longer re-mints cleanly against the current OT6 ROM: a fresh
+build of `ff6/rom/ff6-en.sfc` differs from the seeded `build/states` (~4000
+bytes), so `sh tools/worktree-setup.sh`'s seed is stale and the whole chain
+re-mints. It re-mints correctly THROUGH `zozo_arrival` (sfigaro's steal fix
+holds), then **`dadaluma_doorstep` is the first hard blocker** — reproduced,
+then partially cracked. Everything below is measured (probes
+`probe_westroom.lua`, `probe_bridge.lua`, `probe_climb2.lua`, all committed).
+
+### The pattern: `followPath` HANGS/mis-drives every z-split crane-maze leg
+`gen_zozo4_dadaluma`'s `followPath` BFS-seeds ALL FOUR z-levels; on the crane
+maze's z-split "beam" tiles the phantom-z first step disagrees with the live
+engine, so it oscillates/times out. Three consecutive legs needed hand-coded,
+canStep-gated (live-z) per-tile tables (the `corridorFollow`/gen_opera5
+precedent). **Two are FIXED; the third is characterised but blocked.**
+
+### FIXED — the WEST ROOM crossing `westRoomCross()` (map 225, (118,26)->(104,27))
+The two chambers of the west room connect ONLY through a "\" diagonal beam
+(111,15)->(110,14)->(109,13)->(108,12) — a cardinal-only door-walled BFS is
+NO-PATH, and (104,27)'s only non-door neighbour (104,26) sits at the beam top.
+The discovery: **stepping onto (111,15) fires a one-shot SCENE** (screen fade,
+the party's z flips 2->3). It MUST be ridden with A — holding or pulsing a
+DIRECTION into it hangs control forever (measured: 6000+ frames frozen, event
+stuck true; A completes it in ~900 frames and returns control at z=3). At z=3
+the beam is traversable up-left; dropping onto the left chamber's flat `02`
+floor restores z=2. Driven as a per-tile table that A-mashes any
+scene/dialog/battle and walks the table otherwise. **Verified end-to-end: mints
+past this leg to 221(12,37).**
+
+### FIXED — the BRIDGE-ROOM approach `bridgeCross()` (map 221, (28,33)->(31,30))
+After the J33 jump the party climbs a "/" z-loop beam ($41/$44/$49) to the
+door (31,30)->225. Door-walled single-z BFS is z-consistent at every seed
+(`probe_bridge.lua`); a straight per-tile table (no scene) drives it. **Verified:
+mints past this leg to 225(30,61).**
+
+### BLOCKED — the BRIDGE-ROOM climb `bridgeClimb()` (map 225, (30,61)->(30,34))
+The direct x=30 column is z-split; the model's only route to the (30,34) door
+is a 50-step SWITCHBACK LADDER over "/" ($43/$4B) and "\" ($83/$8B) beams
+(`probe_westroom.lua` solve, z-consistent). `bridgeClimb` drives it **correctly
+from (30,61) all the way up to (29,41)** — then the blocker: the route's next
+step lands on **(30,41)**, which is an UNMODELED transition that **drops the
+party to MAP 5 at (8,7)** (measured, `probe_climb2.lua`). Neither idiom clears
+it: A-mash -> falls to map 5; neutral -> hangs. And **walling (30,41) makes
+(30,34) NO-PATH** — the door-walled model has no alternate. So either map 5 is
+an intended transitional room whose onward route to 221(30,22) must be mapped,
+or the whole (30,61)->(30,34) leg needs a different door graph. **This gates
+`dadaluma_doorstep`, hence `zozo_done`, all Beat A opera legs,
+`opera_dance_done`, and the rafter chase / `ultros2_doorstep`.**
+
+### Downstream status (all BLOCKED behind dadaluma)
+`opera_dance_done` cannot mint, so `gen_opera6_rafter` stays UNVALIDATED and
+`ultros2_doorstep` is unminted; `battle_ultros2.lua` stays SKIPPED. The rafter
+decode (fourth pass) is unchanged and still awaits a live drive: legs 2-4 and
+the `$01B0/$01B4/$0387` weight-trap mechanic remain to be measured once
+`opera_dance_done` is reachable. `make test` (frontier-independent base suite)
+stays green throughout — the only source change is `gen_zozo4_dadaluma.lua`.
