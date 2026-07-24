@@ -44,6 +44,37 @@ local function settled()
      and not H.dialogWaiting() and not H.battleLoadStarted() and not H.worldMode()
 end
 
+-- Robust world walk to (tx,ty).  worldNavTo's verified-step BLOCKLIST breaks
+-- on the Zozo->Jidoor route: the band around (34,103) is a dense random-battle
+-- zone (world tile prop bit6 $40), and every encounter snapshots+restores the
+-- party to the same tile, so worldNavTo reads "the press never moved us",
+-- condemns all four edges and loops forever (measured, probe_opera_world.lua).
+-- This grinds through instead: re-plan a worldBfs each time the plan runs out,
+-- press the next step, kill-bit any encounter -- no edge is ever condemned, so
+-- a battle-restored tile just gets retried until a step lands.  Arrives at
+-- (tx,ty) or when the party leaves the world (an entrance fired).
+local function worldGrind(tx, ty, what)
+  local plan, idx, ph = nil, 1, 0
+  return H.driveUntil(function()
+    return (not H.worldMode()) or (H.worldX()==tx and H.worldY()==ty
+      and H.worldHasControl() and H.worldAligned())
+  end, 60000, {
+    H.call(function()
+      ph = (ph + 1) % 8
+      if H.battleLoadStarted() then      -- kill-bit AND A-mash the victory/EXP
+        killBitAll(); plan=nil; H.setPad(ph<4 and {"a"} or {}); return
+      end
+      if not H.worldMode() then H.setPad({}); return end
+      if not H.worldHasControl() then plan=nil; H.setPad({}); return end
+      if not H.worldAligned() then return end
+      if not plan or idx > #plan then plan = H.worldBfs(tx, ty); idx = 1 end
+      if not plan then H.setPad({}); return end
+      local dir = plan[idx]; idx = idx + 1
+      H.setPad({ [dir] = true })
+    end),
+  }, what or string.format("worldGrind (%d,%d)", tx, ty))
+end
+
 H.run({ maxFrames = 120000 }, {
   H.loadState("/Users/mtklein/ot6/build/states/zozo_done.mss.lua"),
   H.waitFrames(120),
@@ -72,7 +103,8 @@ H.run({ maxFrames = 120000 }, {
     H.screenshot("opera_world_landing") end),
 
   -- 2. world walk to Jidoor entrance {27,129}, step DOWN -> map 198 {15,61}
-  H.worldNavTo(27, 129, { maxFrames=70000, arrive=function() return not H.worldMode() end }),
+  -- (worldGrind, not worldNavTo -- the (34,103) battle-zone blocklist trap)
+  worldGrind(27, 129, "world walk -> Jidoor approach (27,129)"),
   H.waitUntil(function() return H.worldHasControl() and H.worldAligned() end,
     2000, "at Jidoor approach", 5),
   (function() local hb=0
