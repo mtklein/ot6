@@ -7,7 +7,7 @@ VERSION := 0.4
 # A failed recipe (e.g. the checksum step dying mid-build) leaves a half-built target the next make treats as up-to-date — bit us twice on 2026-07-18.
 .DELETE_ON_ERROR:
 
-.PHONY: all rom patch run test tested verify clean release frontier frontier-test nomp-rom
+.PHONY: all rom patch run test tested verify clean release release-test frontier frontier-test nomp-rom
 
 all: rom
 
@@ -53,13 +53,24 @@ patch: tested
 	$(FLIPS) --create --bps "$(BASE)" build/ot6.sfc build/dist/ot6-from-ff3us10.bps
 	@ls -la build/dist/ot6-from-ff3us10.bps
 
-# release: build the ROM, run the full gate, then emit the distribution
-# patch plus release notes from docs/release-notes-template.md (X.Y in
-# the template becomes $(VERSION); override with `make release VERSION=0.2`).
-release: test tested
+# release: build the ROM, run BOTH gates, then emit the distribution patch.
+# `test` is intentionally the fast development gate and permits frontier tests
+# to skip when their deep fixtures are absent.  A release must also mint the
+# complete advertised story frontier and rerun the suite with those tests live.
+release-test:
+	$(MAKE) frontier
+	$(MAKE) test
+	$(MAKE) frontier-test
+	@echo "release gate green — base + complete frontier"
+
+release: release-test tested
 	@mkdir -p build/release
 	$(FLIPS) --create --bps "$(BASE)" build/ot6.sfc "build/release/ot6-v$(VERSION).bps"
-	sed 's/X\.Y/$(VERSION)/g' docs/release-notes-template.md > build/release/RELEASE_NOTES.md
+	@if [ -f "docs/release-notes-v$(VERSION).md" ]; then \
+		cp "docs/release-notes-v$(VERSION).md" build/release/RELEASE_NOTES.md; \
+	else \
+		sed 's/X\.Y/$(VERSION)/g' docs/release-notes-template.md > build/release/RELEASE_NOTES.md; \
+	fi
 	@ls -la build/release/
 
 # One GUI instance only: battery saves flush on exit, so a second instance
@@ -676,17 +687,22 @@ build/states/opera_dance_done.mss.lua: build/states/opera_stage.mss.lua
 FRONTIER += opera_dance_done
 
 # gen_opera6_rafter: opera_dance_done -> the RAFTER CHASE -> ultros2_doorstep,
-# one interaction before battle 134 (Ultros②, $012d, 6 shields, slash|pierce).
-# LEG 1 (bump the ENVELOPE at 238 {99,20} -> _cabf31 -> $0058=1) is authored
-# from source; legs 2-4 (alert the impresario {234,15,46} -> $0110 + the 18000f
-# timer -> the catwalk maze 233->231->239->232 -> the 4-ton-weight switch
-# 232 {118,27} -> battle 134) are documented-but-UNVALIDATED.  This link CANNOT
-# mint today: opera_dance_done is unreachable because sfigaro_town does not mint
-# (the cider-runner STEAL fails deterministically -- OT6's boost-tiered steal +
-# a non-queuing command; see docs/design/wob-route.md "Beat A -- fourth pass").
+# one interaction before battle 104 (Ultros②, $012d, 6 shields, slash|pierce).
+# The measured route alerts the Impresario, operates the far-right switch, and
+# crosses the left framework.  Five no-story rat gates are cleared before map
+# instantiation so the timed mint is deterministic; battle_ultros2 exercises
+# the boss contract itself.
 build/states/ultros2_doorstep.mss.lua: build/states/opera_dance_done.mss.lua
 	$(call mint,ultros2_doorstep,gen_opera6_rafter)
 FRONTIER += ultros2_doorstep
+
+# gen_opera7_blackjack: ultros2_doorstep -> battle 104 (route kill-bit; the
+# real combat contract lives in battle_ultros2.lua) -> Setzer's coin-toss
+# bargain -> first stable controllable world-map frame after the Blackjack
+# lands outside Vector.  This is the v0.5 terminal fixture.
+build/states/blackjack.mss.lua: build/states/ultros2_doorstep.mss.lua
+	$(call mint,blackjack,gen_opera7_blackjack)
+FRONTIER += blackjack
 
 frontier: rom $(STATE1) $(STATE2) $(STATE3) \
           $(patsubst %,build/states/%.mss.lua,$(FRONTIER))

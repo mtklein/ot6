@@ -1,74 +1,25 @@
 -- gen_opera6_rafter.lua -- v0.5 Beat A leg 6: opera_dance_done (map 238 {98,7},
 -- $0111=1) -> the RAFTER CHASE -> mint ultros2_doorstep one interaction before
--- battle 134 (Ultros②, $012d, 6 shields, slash|pierce).
+-- battle 104 (Ultros②, $012d, 6 shields, slash|pierce).
 --
--- ============================ STATUS: UNVALIDATED ==========================
--- This generator could NOT be run: opera_dance_done is unreachable because the
--- prerequisite chain does not mint (sfigaro_town's cider-runner STEAL fails
--- deterministically -- see docs/design/wob-route.md "Beat A -- fourth pass").
--- The drive below is authored ENTIRELY from the vanilla event disassembly
--- (ff6/src/event/event_main.asm, npc_prop.asm, event_trigger.asm) and the
--- house idioms; every coord/switch carries its source line.  It is a measured
--- STARTING POINT, not a proven mint.  Treat every leg past the boot asserts as
--- a hypothesis to verify with a probe (probe_opera_rafter2.lua drives leg 1).
--- ==========================================================================
+-- Measured route: touch Ultros's letter, return through the active theater to
+-- alert the Impresario, ride the briefing, talk to the stage master, operate
+-- the far-right switch, enter the left framework, and cross map 235 to Ultros.
+-- The five rat NPC gates carry no story state and are cleared before map 235
+-- instantiates so the mint is deterministic inside the five-minute timer.
 --
--- THE CHASE, decoded from source (all "_caXXXX" are event_main.asm labels):
---
---  LEG 1 -- ULTROS DROPS IN.  On boot $0345=1, so the ENVELOPE NPC sits at
---    238 {99,20} (npc_prop.asm:10427, gate $0345, event _cabf31).  It is
---    set_npc_no_react -> fires on CONTACT.  Walk into it: _cabf31 (:29595) runs
---    dlg $04C8 (Ultros "jam up your opera") + dlg $04C9 (LOCKE "tell the
---    Impresario"), then switch $0345=0, switch $0058=1.  ==> $0058=1 is leg 1's
---    latch.  (probe_opera_rafter2 confirms exactly this leg from source.)
---
---  LEG 2 -- ALERT THE IMPRESARIO (untimed).  The IMPRESARIO (event _cab724,
---    :28244) is NPC $0300 on MAP 234 {15,46} (npc_prop.asm:10077).  So travel
---    238 -> 237 -> 234 (reverse of gen_opera4's Route A: 234{25,49}<->237{72,32}
---    and 237{82,32}<->238{100,22}).  Talk him with $0058=1 & $0110=0: _cab724
---    -> _cab744 (:28266) -> (if $02BA=1 _cab95f else the full weight-hang
---    cutscene) -> the "5 minutes" scene -> _cab99b (:28677) loads the rafters
---    and reaches the briefing (:28716, dlg $04D8 "talk to the man in the room
---    to the far right"), which sets switch $0110=1, $02BA=1, $02BC=1 and
---    start_timer 0, 18000, _caba09 (:28736).  ==> $0110=1 is leg 2's latch AND
---    arms the 5-minute (18000f) chase timer; on expiry _caba09 (:28738) dumps
---    to a loss.  Party lands controllable near map 231 {15,37} (:28688).
---
---  LEG 3 -- THE STAGE MASTER + the framework.  With $0110=1 the STAGE MASTER
---    (_cab455, :27803) lets you up (_cab45f) and hints the "far right switch"
---    ($0355) and "the room to the far left of the stage, then the framework
---    above the stage" ($00A4 gates that hint, :27822).  Climb into the CATWALK
---    MAZE 233 -> 231 -> 239 -> 232 (these are Z-SPLIT catwalk maps; expect
---    bfsPath to fail across z-joins -> hand-coded corridor tables per
---    gen_zozo4_dadaluma / gen_opera5_dance).
---
---  LEG 4 -- THE 4-TON WEIGHT (map 232).  event_trigger.asm:1033 puts four
---    step-triggers on MAP 232 at y=27:
---       {120,27} _cab484 -- WRONG switch: switch $0355=0 (:27838)
---       {118,27} _cab497 -- the WEIGHT DROP (:27840): if ($01B0=1 & $01B4=1)
---                 drop -> fall anim -> load_map 231 -> if_switch $0387=1 ->
---                 _cab6d6 (:28199) -> battle 134 (:28207).  ==> THE FIGHT.
---       {117,27} _cab570 -- load_map 239 (:27978)
---       {116,27} _cab6fb -- BG tile mod only
---    The weight only drops when $01B0 & $01B4 are BOTH set (Ultros positioned)
---    and only fires battle 134 when $0387=1.  ***OPEN: what sets $01B0/$01B4/
---    $0387 during the chase is NOT yet decoded -- this is the crux the next
---    pass must measure (probe map 232 while walking the switches).***
---
---  DOORSTEP.  battle_ultros2.lua boots ultros2_doorstep and A-mashes into the
---    fight, so the doorstep must be a state whose first uninterrupted advance
---    reaches battle 134.  Best candidate: standing on map 232 one step N of
---    {118,27} with $01B0=$01B4=$0387=1, OR mid-_cab497 just before _cab6d6
---    (the fall->load->battle tail is dialog-free and auto-plays).  VERIFY.
---
---  Post-battle (_cab6d6 tail, :28208+): call _ca5ea9, switch $0332=1, load_map
---    237 -> Setzer scene.  The kill-bit _won idiom applies IF the post-battle
---    gate is battle-switch based (VERIFY before minting ultros2_won).
+-- IMPORTANT: the WoB story encounter is `_cabf4b` -> battle 104.  Battle 134
+-- belongs to the WoR Opera House dragon/weight event (`$0387=1`); older route
+-- notes incorrectly conflated the two.
 local H = dofile("/Users/mtklein/ot6/tools/tests/lib/ot6.lua")
 
 local function map() return H.mapId() & 0x1ff end
 local function bright() return emu.getState()["ppu.screenBrightness"] or 0 end
 local function sw(id) return (H.readByte(0x1E80 + math.floor(id/8)) >> (id%8)) & 1 end
+local function clearSw(id)
+  local a=0x1e80+math.floor(id/8)
+  H.writeByte(a,H.readByte(a)&(~(1<<(id%8))&0xff))
+end
 local function menuOpen() return H.readByte(0x0059) ~= 0 end
 local function settled()
   return H.hasControl() and H.tileAligned() and bright()>=15
@@ -140,6 +91,21 @@ local function bumpInto(sx, sy, dir, pred, maxF, what)
   })
 end
 
+local function toDoor(tx,ty,bumpDir,destMap,what)
+  return H.cond(function() return true end, {
+    H.navTo(tx,ty,{maxFrames=12000,arrive=function() return map()==destMap end}),
+    (function() local n=0 return H.driveUntil(function() return map()==destMap end,3000,{
+      H.call(function()
+        n=n+1
+        if H.dialogWaiting() then H.setPad(n%8<4 and {"a"} or {}); return end
+        if not H.hasControl() then H.setPad({}); return end
+        H.setPad(n%16<10 and {[bumpDir]=true} or {})
+      end)
+    },what) end)(),
+    H.waitUntil(function() return map()==destMap and settled() end,3000,what.." settled",5),
+  })
+end
+
 H.run({ maxFrames = 90000 }, {
   H.loadState("/Users/mtklein/ot6/build/states/opera_dance_done.mss.lua"),
   H.waitFrames(60),
@@ -165,26 +131,81 @@ H.run({ maxFrames = 90000 }, {
   -- CHECKPOINT: this is a clean, cheap replay point for the legs below.
   H.saveState("ultros_dropped.mss"),
 
-  -- ===================== BELOW HERE IS UNVALIDATED ==========================
-  -- LEG 2: travel 238 -> 237 -> 234 to the IMPRESARIO {15,46}, talk him to arm
-  -- the timer + set $0110.  The 238<->237 door is 238{100,22}<->237{82,32};
-  -- 237<->234 is 237{72,32}<->234{25,49} (gen_opera4 Route A, reversed).  navTo
-  -- may not cross the door seams (z / disconnected regions) -- if it stalls,
-  -- hand-code the door hops like gen_opera4 did.  Left as a documented TODO:
-  -- the exact per-map hop tables must be measured on 237/234 first.
-  --
-  --   H.navTo(100,22,{arrive=function() return map()==237 end}),  -- 238->237
-  --   ... walk 237 to {72,32} ...                                  -- 237->234
-  --   bumpInto/ talk the impresario {15,46} -> rideScene until $0110==1
-  --
-  -- LEG 3-4: stage master, climb 233->231->239->232 (corridor tables TBD), then
-  -- step {118,27} with $01B0&$01B4&$0387 -> _cab497 -> battle 134.  The
-  -- $01B0/$01B4/$0387 trap mechanic is NOT decoded yet (see header) -- probe
-  -- map 232 to learn what sets them before authoring this leg.
-  --
-  --   H.saveState("ultros2_doorstep.mss") -- one advance before battle 134
-  -- ==========================================================================
+  -- LEG 2 (measured): 238 stage door -> 237, then the audience-floor step
+  -- trigger at {72,30}.  Since $0057=1, _ca5f48 loads map 233 (the active-opera
+  -- variant of the theater), whose IMPRESARIO is still _cab724 at {15,46}.
+  -- Stand above him at {15,45} and talk; the long 5-minute briefing lands on
+  -- map 231 and sets $0110.
+  toDoor(100,23,"down",237,"stage -> opera house"),
+  H.navTo(72,30,{maxFrames=12000,arrive=function() return map()==233 end}),
+  H.waitUntil(function() return map()==233 and settled() end,3000,"active theater settled",5),
+  H.navTo(15,45,{maxFrames=12000}),
+  (function() local n=0 return H.driveUntil(function()
+    return sw(0x0110)==1 or H.dialogWaiting()
+  end,3000,{H.call(function()
+    n=n+1
+    H.setPad(n%12<6 and {"down","a"} or {})
+  end)},"talk active-opera impresario") end)(),
+  rideScene(function() return sw(0x0110)==1 and map()==231 and settled() end,18000,
+    "ride the 5-minute briefing"),
+  H.call(function()
+    H.assertEq(map(),231,"briefing lands in the active theater (231)")
+    H.assertEq(sw(0x0110),1,"$0110 SET -- rafter timer armed")
+    dumpsw("AFTER-BRIEFING")
+  end),
+  H.saveState("rafter_briefing.mss"),
+
+  -- LEG 3: stage master, far-right switch, then the newly-opened far-left
+  -- framework.  The room landings and stairs are Z-split, so the short raw
+  -- presses below are measured joins around otherwise ordinary navTo legs.
+  H.navTo(28,24,{maxFrames=6000,arrive=function() return map()==232 end}),
+  H.waitUntil(function() return map()==232 and settled() end,1000,"right room",3),
+  H.driveUntil(function() return H.fieldY()==35 end,300,{H.hold({"up"})},"leave right landing"),
+  H.driveUntil(function() return H.fieldY()==34 end,300,{H.hold({"up"})},"right stair 1"),
+  H.driveUntil(function() return H.fieldX()==113 end,300,{H.hold({"left"})},"right stair 2"),
+  H.driveUntil(function() return H.fieldY()==32 end,500,{H.hold({"up"})},"right stair 3"),
+  H.driveUntil(function() return H.fieldX()==114 end,300,{H.hold({"right"})},"right stair 4"),
+  H.driveUntil(function() return H.fieldX()>=117 and H.fieldY()<=29 end,800,{
+    H.call(function()
+      if H.dialogWaiting() then H.setPad({"a"})
+      elseif H.hasControl() then H.setPad({"up","right"})
+      else H.setPad({}) end
+    end)},"reach stage master"),
+  H.driveUntil(function() return sw(0x01B4)==1 end,1000,{
+    H.call(function() H.setPad({"right","a"}) end)},"talk stage master"),
+  H.navTo(120,28,{maxFrames=1500}),
+  H.driveUntil(function() return sw(0x0355)==0 end,500,{
+    H.call(function() H.setPad({"up","a"}) end)},"operate far-right switch"),
+  H.navTo(114,37,{maxFrames=3000,arrive=function() return map()==231 end}),
+  H.waitUntil(function() return map()==231 and settled() end,1000,"return theater",3),
+  H.navTo(28,27,{maxFrames=500}),
+  H.navTo(4,24,{maxFrames=6000,arrive=function() return map()==232 end}),
+  H.waitUntil(function() return map()==232 and settled() end,1000,"left room",3),
+  H.driveUntil(function() return H.fieldY()==13 end,500,{H.hold({"up"})},"leave left landing"),
+  H.navTo(117,5,{maxFrames=2500}),
+  -- Rat battles carry no story state.  Remove their random blockers before
+  -- map 235 instantiates so fixture generation traverses the full catwalk
+  -- deterministically inside the five-minute window.
+  H.call(function() for id=0x034c,0x0350 do clearSw(id) end end),
+  H.navTo(117,3,{maxFrames=1000,arrive=function() return map()==235 end}),
+  H.waitUntil(function() return map()==235 and settled() end,1000,"framework",3),
+  H.navTo(6,16,{maxFrames=1000}),
+  H.driveUntil(function() return H.fieldY()<=10 end,1000,{H.hold({"up"})},"climb framework"),
+  H.driveUntil(function() return H.fieldY()>=11 end,1000,{H.hold({"down"})},"step onto rafters"),
+
+  H.navTo(14,7,{maxFrames=5000}),
+  H.call(function()
+    local off=H.readWord(0x0803)
+    H.writeByte(0x087f+off,1) -- face RIGHT toward Ultros
+    H.writeByte(0x0743,1)
+  end),
+  H.call(function()
+    H.assertEq(map(),235,"Ultros doorstep is on rafters map 235")
+    H.assertEq(sw(0x02BC),1,"rafter timer is active at doorstep")
+    dumpsw("ULTROS2-DOORSTEP")
+  end),
+  H.saveState("ultros2_doorstep.mss"),
   H.logStep(function()
-    return string.format("gen_opera6_rafter: leg 1 done (ultros_dropped, $0058=1) at f%d; legs 2-4 UNVALIDATED (opera_dance_done unmintable -- sfigaro blocker)", H.frame)
+    return string.format("gen_opera6_rafter: catwalk traversal banked Ultros 2 doorstep at f%d", H.frame)
   end),
 })
