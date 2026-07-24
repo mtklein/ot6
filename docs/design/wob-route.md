@@ -538,15 +538,25 @@ The direct x=30 column is z-split; the model's only route to the (30,34) door
 is a 50-step SWITCHBACK LADDER over "/" ($43/$4B) and "\" ($83/$8B) beams
 (`probe_westroom.lua` solve, z-consistent). `bridgeClimb` drives it **correctly
 from (30,61) all the way up to (29,41)** — then the blocker: the route's next
-step lands on **(30,41)**, which is NOT a nav tile at all but a **scripted
-event trigger**: it fires a multi-map cutscene that A-mashing carries
-225 -> map 5 -> map 18, auto-walking the party under repeated fades
-(measured, `probe_climb2.lua`; neutral input instead just hangs control at
-(29,41) forever). And **walling (30,41) makes (30,34) NO-PATH** — the
-door-walled model has no alternate. So the passability model diverges from the
-OT6 engine here (it over-permits the (30,41) event tile as a "/" beam and has
-no other route to the door); cracking it needs a live map-of-the-cutscene or a
-redesigned door graph, not another per-tile table. **This gates
+step lands on **(30,41)**, which is NOT a nav tile at all but a **corrupting
+warp**. Rode it to completion (`probe_climb2.lua`, `probe_map19.lua`): it
+chains 225 -> map 5 -> map 18 -> **map 19**, auto-walking under fades, and
+control returns on map 19 at (38,49). **Map 19 is the NARSHE INTRO map** — its
+event-trigger column {38,50}/{38,38}/{38,26}/{38,17} runs the Wedge/Vicks/Terra
+opening (`event_main.asm:100788+`, dlg $000C "The Esper's gotta be in here",
+`battle 1`), and those triggers are live here because `$0128` isn't set:
+walking one tile north fires **`battle 1`** (formation `FFFF FFFF 0000 0000`,
+the intro guards — measured). So (30,41) does NOT lead to Dadaluma; it dumps the
+party into the game's opening sequence. And **walling (30,41) makes (30,34)
+NO-PATH** — the door-walled model has no alternate route to the door.
+
+**Verdict on the bridge shaft:** the OT6 map-225 data at (30,41) is a warp the
+gen's route drives straight into, and there is no other path from the bridge
+room (30,61) up to the (30,34) door. This is not a per-tile-table problem and
+not an "intended cutscene" — it needs the OT6 Zozo maze re-mapped from scratch
+(the door graph has diverged from the gen author's `probe_climb` assumptions)
+or the (30,41) map-data regression fixed at the ROM level. **GENUINE BLOCKER:
+`dadaluma_doorstep` cannot be minted via this route.** **This gates
 `dadaluma_doorstep`, hence `zozo_done`, all Beat A opera legs,
 `opera_dance_done`, and the rafter chase / `ultros2_doorstep`.**
 

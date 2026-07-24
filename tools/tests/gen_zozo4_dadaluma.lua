@@ -655,11 +655,12 @@ H.run({ maxFrames = 90000 }, {
   -- P15b: the bridge-room switchback ladder up to (30,34)->221.  bridgeClimb
   -- drives the measured z-loop table correctly from (30,61) up to (29,41) --
   -- BUT then the only model-route to the (30,34) door steps onto (30,41),
-  -- which is NOT a nav tile but a SCRIPTED EVENT TRIGGER: it fires a multi-map
-  -- cutscene (225 -> map 5 -> map 18, auto-walking under fades; measured,
-  -- probe_climb2.lua) and walling it makes (30,34) NO-PATH.  This UNSOLVED
-  -- blocker gates dadaluma_doorstep -- see wob-route.md fifth pass.  Left in
-  -- place as the measured furthest-reached point.
+  -- which is a CORRUPTING WARP: it chains 225 -> map 5 -> map 18 -> map 19 (the
+  -- NARSHE INTRO), where walking north fires `battle 1` / the Wedge-Vicks-Terra
+  -- opening (measured, probe_climb2.lua + probe_map19.lua).  It does NOT lead
+  -- to Dadaluma, and walling (30,41) makes (30,34) NO-PATH.  This is a GENUINE
+  -- BLOCKER (OT6 Zozo map-data divergence) that gates dadaluma_doorstep -- see
+  -- wob-route.md fifth pass.  Left in place as the measured furthest point.
   bridgeClimb(),
   corridorFollow(),
 

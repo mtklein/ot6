@@ -645,26 +645,32 @@ H.run({ maxFrames = 40000 }, {
       else H.setPad({}) end
     end) }, "drive BRIDGE2 to the (30,41) transition")
   end)(),
-  -- MAP 5 characterisation: ride it out, log map/pos/control, and once
-  -- controllable flood-count reachable tiles + list any doors back.
+  -- RIDE THE CUTSCENE: A-mash through the 225->5->18->... chain until control
+  -- returns and STAYS (stable for ~90 frames on a resting map). Big budget.
   (function()
-    local hb, lm = 0, -1
+    local hb, lm, stable = 0, -1, 0
     return H.driveUntil(function()
-      return H.hasControl() and H.tileAligned() and map() ~= 225
-        and (emu.getState()["ppu.screenBrightness"] or 0) >= 15
-    end, 8000, { H.call(function()
+      if H.hasControl() and H.tileAligned() and not H.eventRunning()
+        and (emu.getState()["ppu.screenBrightness"] or 0) >= 15 then
+        stable = stable + 1
+      else stable = 0 end
+      return stable >= 90
+    end, 30000, { H.call(function()
       hb = hb + 1
       local m, x, y = map(), H.fieldX(), H.fieldY()
-      if hb % 60 == 1 or (m * 65536 + key(x, y)) ~= lm then lm = m * 65536 + key(x, y)
-        H.log(string.format("[map5] f%d map=%d (%d,%d) z%d ctl=%s ev=%s bri=%d",
+      if (m * 65536 + key(x, y)) ~= lm or hb % 600 == 0 then lm = m * 65536 + key(x, y)
+        H.log(string.format("[ride] f%d map=%d (%d,%d) z%d ctl=%s ev=%s bri=%d",
           hb, m, x, y, H.readByte(0x00b2) & 3, tostring(H.hasControl()),
           tostring(H.eventRunning()), emu.getState()["ppu.screenBrightness"] or 0)) end
+      if H.battleLoadStarted() then killBitAll(); H.setPad(hb % 8 < 4 and { "a" } or {}); return end
       if H.dialogWaiting() then H.setPad(hb % 8 < 4 and { "a" } or {}); return end
-      H.setPad(hb % 8 < 4 and { "a" } or {})   -- ride any scene to a resting map
-    end) }, "ride to a controllable map after (30,41)")
+      H.setPad(hb % 8 < 4 and { "a" } or {})   -- ride the scene (A-mash)
+    end) }, "ride the (30,41) cutscene to control")
   end)(),
+  H.waitFrames(90),
+  H.saveState("map19_checkpoint.mss"),
   H.call(function()
-    H.log(string.format("[map5-REST] map=%d (%d,%d) z%d ctl=%s", map(),
+    H.log(string.format("[ride-REST] map=%d (%d,%d) z%d ctl=%s", map(),
       H.fieldX(), H.fieldY(), H.readByte(0x00b2) & 3, tostring(H.hasControl())))
     -- reachable flood (cardinal + diag canStep) from here
     local sx, sy = H.fieldX(), H.fieldY()
@@ -683,8 +689,8 @@ H.run({ maxFrames = 40000 }, {
       end
     end
     local n = 0; for _ in pairs(seen) do n = n + 1 end
-    H.log(string.format("[map5] reachable %d tiles, bbox x%d..%d y%d..%d",
+    H.log(string.format("[ride] reachable %d tiles, bbox x%d..%d y%d..%d",
       n, minx, maxx, miny, maxy))
-    H.screenshot("map5_rest")
+    H.screenshot("ride_rest")
   end),
 })
