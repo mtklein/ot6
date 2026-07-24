@@ -44,16 +44,35 @@ links). What each delivers:
   level-up; Cyan's Oblivion divine (Assassinate built dormant behind
   Shadow; RunicBlade deferred pending its design call).
   Per-ability MP cost is built but dormant. Balance-tuned through Zozo.
-- **v0.5 (next)** — through the complete Opera sequence: Ultros ② beaten,
+- **v0.5** — through the complete Opera sequence: Ultros ② beaten,
   Setzer joined, and the Blackjack acquired. "Every ability costs MP" goes
   live with cost display implemented in ca65; Cyan gains a direct
   Bushido submenu and configurable loadout; and the generated break floor
   makes every otherwise-unauthored enemy weapon-breakable. This deliberately
   favors getting a coherent playtest build into players' hands over holding
   those improvements for the much longer rest-of-WoB route.
-- **v0.6** — Vector → Magitek factory → Sealed Gate → Thamasa → Floating
-  Continent. The remaining espers and kits, plus the wide
-  weakness/telegraph authoring pass.
+- **v0.6 — Raid on Vector** — Vector and the Magitek Research Facility
+  through Number 128, the Cranes, the escape, and Terra's return. Deep-polish
+  release: complete redesigns for Ifrit and Shiva, honest Setzer/Factory-era
+  kits, authored encounter coverage, boss contracts, player-facing save
+  cadence, and a durable tested frontier.
+- **v0.7 — The Sealed Gate** — the Narshe mission handoff, Cave to the
+  Sealed Gate, Esper attack, and Imperial banquet, ending at the stable
+  Thamasa mission handoff.
+- **v0.8 — Thamasa** — Thamasa and the burning house through Strago and
+  Relm joining and the post-massacre mission transition. Sketch must be
+  safe before this frontier ships.
+- **v0.9 — End of the World of Balance** — the IAF gauntlet, Floating
+  Continent, AtmaWeapon, timed escape, and transition into the World of Ruin.
+
+These are useful stopping points, not a promise to ship every number
+separately. Adjacent rungs may combine when implementation and playtesting
+make that the better release.
+
+**v0.6 enabling order:** #14 isolated parallel test runners → #12 source
+modules and central memory ABI → #9 battery-save anchor proof → Factory route.
+Issues #11 and #10 are completed to the v0.6 frontier as the route grows.
+Issue #13's policy and inventory begin now; its Sketch fix is a hard v0.8 gate.
 
 **Design canon:** *on damage verbs boost multiplies; on chance verbs
 boost guarantees.* Steal shipped it in v0.4 (3 BP = a guaranteed steal of
@@ -182,8 +201,11 @@ Landing across releases rather than as one block:
   get the bump); the "earn-it-by-carrying" passive version is deferred.
 - Boost spell-folding is source-agnostic, so a borrowed Fire folds to
   Firaga under boost for free.
-- v0.4 authors the Zozo espers (Ramuh + Kirin/Siren/Stray); the rest of
-  the WoB roster follows the post-Opera route in v0.6.
+- v0.4 authors the Zozo espers (Ramuh + Kirin/Siren/Stray). Every esper
+  encountered after that receives its own complete redesign in the release
+  where it becomes available: Ifrit and Shiva in v0.6, then the later WoB
+  roster with its route frontier. The shipped while-equipped spell/stat
+  model remains canon for v0.6; learned passives are not a hidden requirement.
 
 **Exit:** swapping magicite mid-dungeon visibly swaps a character's kit.
 
@@ -201,9 +223,13 @@ authored weaknesses, and only measured against real fixtures:
   the search target, absent).
 - 🔨 **Opera** (v0.5): route and measure Ultros ②; carry the fixture through
   Setzer joining and acquisition of the Blackjack.
-- ⬜ **Vector through the end of the WoB** (v0.6): the wide
-  weakness/telegraph pass; global enemy HP; boss telegraphs. Boss
-  shield/class data already reaches Nerapa.
+- ⬜ **Vector / Magitek Factory** (v0.6): authored encounter coverage,
+  boss contracts, save cadence, and frontier fixtures through the Cranes,
+  escape, and Terra's return.
+- ⬜ **Sealed Gate / banquet** (v0.7), **Thamasa** (v0.8), and **IAF /
+  Floating Continent** (v0.9): extend the same measured authoring discipline
+  to each newly supported route band. Boss shield/class data already reaches
+  Nerapa, but authored rows alone do not make those frontiers release-ready.
 
 **Exit:** the opening third of the game plays as a coherent Octopath-like.
 

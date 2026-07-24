@@ -18,9 +18,10 @@ carry shields and hidden weaknesses, hitting a weakness chips a shield, and
 breaking drops defenses hard; boost banks turns and folds spell tiers
 (Fire → Fira → Firaga).
 
-Work in progress toward v0.5, which extends the playable frontier through the
-complete Opera sequence: Ultros defeated, Setzer joined, and the Blackjack
-acquired. Vector through the end of the World of Balance follows in v0.6.
+**v0.5 is released**, extending the playable frontier through the complete
+Opera sequence: Ultros defeated, Setzer joined, and the Blackjack acquired.
+Work toward v0.6 now follows the Raid on Vector through the Magitek Research
+Facility escape and Terra's return.
 See [docs/ROADMAP.md](docs/ROADMAP.md) for milestones and the "playable
 frontier" metric, and [docs/DESIGN.md](docs/DESIGN.md) for the mechanics
 design. The focused questions for the upcoming build are in the

@@ -4,7 +4,10 @@ Scope: World of Balance espers. Locked ✦. Pillar (DESIGN.md ✦):
 equipping a magicite grants its kit *while equipped* — spells are
 never taught permanently, level-up stat bonuses are deleted, one
 copy of each exists, summon = once per battle as the sub-job's
-divine. One deliberate exception below: **passives are learned**.
+divine. One proposed later exception below is that **passives may be
+learned**. That system is not implemented or committed for v0.6: the shipped
+while-equipped spell/stat model remains canon while Ifrit and Shiva receive
+their own complete redesigns.
 
 ## What one magicite carries
 

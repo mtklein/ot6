@@ -1,4 +1,4 @@
-# OT6 v0.5–v0.6 — World-of-Balance route plan (Opera → Floating Continent)
+# OT6 v0.5–v0.9 — World-of-Balance route plan (Opera → Floating Continent)
 
 Original scope: continue the fixture route chain from the v0.4 endpoint
 (`zozo_done`) to the END of the World of Balance. READ-and-PLAN survey; no
@@ -6,10 +6,12 @@ source touched. All line/address references were read from the repo on
 2026-07-22.
 
 **Release rescope (2026-07-24):** v0.5 ends after Beat A, with Ultros ②
-defeated, Setzer joined, and the Blackjack acquired. Beats B–F are now v0.6.
+defeated, Setzer joined, and the Blackjack acquired. The remaining beats are
+deep-polish releases: B is v0.6, C is v0.7, D is v0.8, and E–F are v0.9.
+Adjacent releases may combine if implementation and playtesting justify it.
 The route research below is retained because its measured findings and
-implementation hazards remain the handoff for that release; references to
-"v0.5" outside the measured Beat A logs describe the original plan.
+implementation hazards remain the handoff; references to "v0.5" outside the
+measured Beat A logs describe the original plan.
 
 ---
 
@@ -48,17 +50,20 @@ order. Boss IDs/shields below are the AUTHORED values from
 |---|---|---|---|---|
 | **v0.5** | **A. Opera House** | Jidoor town, Opera House (stage, rafters, catwalks), the Blackjack | **Ultros ②** `$12d` · 6 · slash\|pierce | **Setzer** joins; airship (Blackjack) acquired |
 | v0.6 | **B. Vector / Magitek Factory** | Vector town, Magitek Research Facility, minecart rails, Blackjack deck | **Ifrit** `$109`·6·pierce + **Shiva** `$108`·6·slash (tag); **Number 024** `$10a`·7·slash\|pierce; **Number 128** `$10b`·7·pierce + blades `$13f/$140`·3·slash; **L/R Cranes** `$10d/$10e`·6·pierce | **Ifrit + Shiva** magicite |
-| v0.6 | **C. Banquet / Sealed Gate** | Vector (Emperor's banquet Q&A), Cave to the Sealed Gate, rope bridge | **Ultros ③** `$12e`·7·slash\|pierce | Terra recovers her will; (Maduin at/after the Gate — magicite.md) |
-| v0.6 | **D. Thamasa** | Thamasa town, the burning house | **FlameEater** `$116`·7·pierce + Balloons `$de`·1 | **Strago, Relm** join; Kefka's massacre scene → magicite |
-| v0.6 | **E. FC approach** | Blackjack deck, IAF shmup gauntlet | **Ultros ④** `$168`·7·slash\|pierce + **Chupon** `$12f`·4·bludg (Sneeze); **AirForce** `$113`·8·pierce + LaserGun/MissileBay `$145/$147`·3 + Speck `$146`·1·any | — |
-| v0.6 | **F. Floating Continent** | the FC surface, the escape | **AtmaWeapon** `$117`·**11**·slash\|pierce; **Nerapa** `$118`·5·slash\|pierce (escape doorman) | Shadow forced; WoB ends → WoR (out of scope) |
+| v0.7 | **C. Sealed Gate / Banquet** | Cave to the Sealed Gate, rope bridge, Vector (Emperor's banquet Q&A) | **Ultros ③** `$12e`·7·slash\|pierce | Terra recovers her will; Maduin at/after the Gate |
+| v0.8 | **D. Thamasa** | Thamasa town, the burning house | **FlameEater** `$116`·7·pierce + Balloons `$de`·1 | **Strago, Relm** join; Kefka's massacre scene → magicite |
+| v0.9 | **E. FC approach** | Blackjack deck, IAF shmup gauntlet | **Ultros ④** `$168`·7·slash\|pierce + **Chupon** `$12f`·4·bludg (Sneeze); **AirForce** `$113`·8·pierce + LaserGun/MissileBay `$145/$147`·3 + Speck `$146`·1·any | — |
+| v0.9 | **F. Floating Continent** | the FC surface, the escape | **AtmaWeapon** `$117`·**11**·slash\|pierce; **Nerapa** `$118`·5·slash\|pierce (escape doorman) | Shadow forced; WoB ends → WoR (out of scope) |
 
 Set-pieces that draw **no gauge** (scripted theater, `Ot6ShieldTbl` `0,$00`):
 **Guardian** (`$0111/$0112`, invincible in Vector), **Tritoch** (`$0114/$0115/$0144`).
 Their silent HUD is the tell.
 
 v0.5 finishes when the post-Opera Blackjack fixture mints. v0.6 finishes
-when the FC-escape fixture mints (post-Nerapa, entering WoR).
+after the Cranes, Factory escape, and Terra's return, at the first stable
+controllable save/world state before the Sealed Gate campaign. v0.7 ends at
+the stable Thamasa mission handoff; v0.8 ends after the Thamasa arc; v0.9
+finishes when the FC-escape fixture mints (post-Nerapa, entering WoR).
 
 ---
 
