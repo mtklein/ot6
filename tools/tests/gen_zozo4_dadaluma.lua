@@ -654,11 +654,12 @@ H.run({ maxFrames = 90000 }, {
   bridgeCross(),
   -- P15b: the bridge-room switchback ladder up to (30,34)->221.  bridgeClimb
   -- drives the measured z-loop table correctly from (30,61) up to (29,41) --
-  -- BUT then hits an UNSOLVED blocker: the only model-route to the (30,34) door
-  -- steps onto (30,41), which is an UNMODELED transition that drops the party
-  -- to MAP 5 (measured, probe_climb2.lua); walling (30,41) makes (30,34)
-  -- unreachable (NO PATH).  This gates dadaluma_doorstep -- see wob-route.md
-  -- fifth pass.  Left in place as the measured furthest-reached point.
+  -- BUT then the only model-route to the (30,34) door steps onto (30,41),
+  -- which is NOT a nav tile but a SCRIPTED EVENT TRIGGER: it fires a multi-map
+  -- cutscene (225 -> map 5 -> map 18, auto-walking under fades; measured,
+  -- probe_climb2.lua) and walling it makes (30,34) NO-PATH.  This UNSOLVED
+  -- blocker gates dadaluma_doorstep -- see wob-route.md fifth pass.  Left in
+  -- place as the measured furthest-reached point.
   bridgeClimb(),
   corridorFollow(),
 

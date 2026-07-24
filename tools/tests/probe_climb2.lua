@@ -630,67 +630,61 @@ H.run({ maxFrames = 40000 }, {
     H.log(string.format("[boot] map=%d (%d,%d) z%d", map(), H.fieldX(), H.fieldY(),
       H.readByte(0x00b2) & 3))
   end),
-  -- re-solve (30,61)->(30,34) with the measured FALL/DOOR tiles added to the
-  -- wall set, print the alternate route, and drive it with fall-detection.
+  -- drive BRIDGE2 (A-mash scenes) until the map flips off 225 at (30,41).
+  (function()
+    local hb = 0
+    return H.driveUntil(function() return map() ~= 225 end, 12000, { H.call(function()
+      hb = hb + 1
+      if H.battleLoadStarted() then killBitAll(); H.setPad(hb % 8 < 4 and { "a" } or {}); return end
+      if H.dialogWaiting() then H.setPad(hb % 8 < 4 and { "a" } or {}); return end
+      if not H.hasControl() or H.eventRunning() then H.setPad(hb % 8 < 4 and { "a" } or {}); return end
+      if not H.tileAligned() then H.setPad({}); return end
+      local x, y = H.fieldX(), H.fieldY()
+      local dir = BRIDGE2[key(x, y)]
+      if dir and H.canStep(x, y, dir) then H.setPad({ [PRESS[dir]] = true })
+      else H.setPad({}) end
+    end) }, "drive BRIDGE2 to the (30,41) transition")
+  end)(),
+  -- MAP 5 characterisation: ride it out, log map/pos/control, and once
+  -- controllable flood-count reachable tiles + list any doors back.
+  (function()
+    local hb, lm = 0, -1
+    return H.driveUntil(function()
+      return H.hasControl() and H.tileAligned() and map() ~= 225
+        and (emu.getState()["ppu.screenBrightness"] or 0) >= 15
+    end, 8000, { H.call(function()
+      hb = hb + 1
+      local m, x, y = map(), H.fieldX(), H.fieldY()
+      if hb % 60 == 1 or (m * 65536 + key(x, y)) ~= lm then lm = m * 65536 + key(x, y)
+        H.log(string.format("[map5] f%d map=%d (%d,%d) z%d ctl=%s ev=%s bri=%d",
+          hb, m, x, y, H.readByte(0x00b2) & 3, tostring(H.hasControl()),
+          tostring(H.eventRunning()), emu.getState()["ppu.screenBrightness"] or 0)) end
+      if H.dialogWaiting() then H.setPad(hb % 8 < 4 and { "a" } or {}); return end
+      H.setPad(hb % 8 < 4 and { "a" } or {})   -- ride any scene to a resting map
+    end) }, "ride to a controllable map after (30,41)")
+  end)(),
   H.call(function()
-    local BAD = { { 30, 41 } }   -- add tiles here as falls are found
-    local walls = {}
-    for k in pairs(W225) do walls[k] = true end
-    for _, b in ipairs(BAD) do walls[key(b[1], b[2])] = true end
-    local xm, ym = H.readByte(0x0086), H.readByte(0x0087)
-    local function nk(x, y, z) return (z << 16) | (y << 8) | x end
-    local seen, q, qi, parent = { [nk(30, 61, 2)] = true }, { { 30, 61, 2 } }, 1, {}
-    local res
+    H.log(string.format("[map5-REST] map=%d (%d,%d) z%d ctl=%s", map(),
+      H.fieldX(), H.fieldY(), H.readByte(0x00b2) & 3, tostring(H.hasControl())))
+    -- reachable flood (cardinal + diag canStep) from here
+    local sx, sy = H.fieldX(), H.fieldY()
+    local seen, q, qi = { [key(sx, sy)] = true }, { { sx, sy } }, 1
+    local minx, maxx, miny, maxy = sx, sx, sy, sy
     while qi <= #q do
-      local x, y, z = q[qi][1], q[qi][2], q[qi][3]; qi = qi + 1
-      if x == 30 and y == 34 then
-        local st, k = {}, nk(x, y, z)
-        while parent[k] do table.insert(st, 1, parent[k]); k = parent[k].pk end
-        res = st; break
-      end
-      local zn = zAfter(x, y, z)
+      local x, y = q[qi][1], q[qi][2]; qi = qi + 1
       for _, mv in ipairs(MOVES) do
-        local d = DELTA[mv]; local nx, ny = x + d[1], y + d[2]
-        if nx >= 0 and ny >= 0 and nx <= xm and ny <= ym
-           and (not walls[key(nx, ny)] or (nx == 30 and ny == 34))
-           and stepAllowed(x, y, mv, z) then
-          local kk = nk(nx, ny, zn)
-          if not seen[kk] then seen[kk] = true
-            parent[kk] = { pk = nk(x, y, z), fx = x, fy = y, dir = mv }
-            q[#q + 1] = { nx, ny, zn } end
+        if H.canStep(x, y, mv) then
+          local d = DELTA[mv]; local nx, ny = x + d[1], y + d[2]
+          if not seen[key(nx, ny)] and qi < 4000 then seen[key(nx, ny)] = true
+            q[#q + 1] = { nx, ny }
+            minx = math.min(minx, nx); maxx = math.max(maxx, nx)
+            miny = math.min(miny, ny); maxy = math.max(maxy, ny) end
         end
       end
     end
-    _G.CLIMB2 = {}
-    if res then
-      local parts = {}
-      for _, s in ipairs(res) do parts[#parts + 1] = string.format("(%d,%d)%s", s.fx, s.fy, s.dir)
-        _G.CLIMB2[key(s.fx, s.fy)] = s.dir end
-      H.log(string.format("[resolve] %d steps (BAD-walled): %s", #res, table.concat(parts, " ")))
-    else
-      H.log("[resolve] NO PATH with BAD tiles walled")
-    end
-  end),
-  (function()
-    local hb, lm = 0, -1
-    return H.driveUntil(function() return map() ~= 225 end, 15000, { H.call(function()
-      hb = hb + 1
-      local x, y = H.fieldX(), H.fieldY()
-      local z = H.readByte(0x00b2) & 3
-      local ctl, ev = H.hasControl(), H.eventRunning()
-      if key(x, y) ~= lm then lm = key(x, y)
-        H.log(string.format("[climb2] (%d,%d) z%d dir=%s ctl=%s ev=%s", x, y, z,
-          tostring(_G.CLIMB2[key(x, y)]), tostring(ctl), tostring(ev))) end
-      if H.battleLoadStarted() then killBitAll(); H.setPad(hb % 8 < 4 and { "a" } or {}); return end
-      if H.dialogWaiting() then H.setPad(hb % 8 < 4 and { "a" } or {}); return end
-      if not ctl or ev then H.setPad(hb % 8 < 4 and { "a" } or {}); return end
-      if not H.tileAligned() then H.setPad({}); return end
-      local dir = _G.CLIMB2[key(x, y)]
-      if dir and H.canStep(x, y, dir) then H.setPad({ [PRESS[dir]] = true })
-      else H.setPad({}) end
-    end) }, "climb2 re-solved route")
-  end)(),
-  H.call(function()
-    H.log(string.format("[climb-END] map=%d (%d,%d)", map(), H.fieldX(), H.fieldY()))
+    local n = 0; for _ in pairs(seen) do n = n + 1 end
+    H.log(string.format("[map5] reachable %d tiles, bbox x%d..%d y%d..%d",
+      n, minx, maxx, miny, maxy))
+    H.screenshot("map5_rest")
   end),
 })

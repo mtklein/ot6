@@ -538,12 +538,15 @@ The direct x=30 column is z-split; the model's only route to the (30,34) door
 is a 50-step SWITCHBACK LADDER over "/" ($43/$4B) and "\" ($83/$8B) beams
 (`probe_westroom.lua` solve, z-consistent). `bridgeClimb` drives it **correctly
 from (30,61) all the way up to (29,41)** — then the blocker: the route's next
-step lands on **(30,41)**, which is an UNMODELED transition that **drops the
-party to MAP 5 at (8,7)** (measured, `probe_climb2.lua`). Neither idiom clears
-it: A-mash -> falls to map 5; neutral -> hangs. And **walling (30,41) makes
-(30,34) NO-PATH** — the door-walled model has no alternate. So either map 5 is
-an intended transitional room whose onward route to 221(30,22) must be mapped,
-or the whole (30,61)->(30,34) leg needs a different door graph. **This gates
+step lands on **(30,41)**, which is NOT a nav tile at all but a **scripted
+event trigger**: it fires a multi-map cutscene that A-mashing carries
+225 -> map 5 -> map 18, auto-walking the party under repeated fades
+(measured, `probe_climb2.lua`; neutral input instead just hangs control at
+(29,41) forever). And **walling (30,41) makes (30,34) NO-PATH** — the
+door-walled model has no alternate. So the passability model diverges from the
+OT6 engine here (it over-permits the (30,41) event tile as a "/" beam and has
+no other route to the door); cracking it needs a live map-of-the-cutscene or a
+redesigned door graph, not another per-tile table. **This gates
 `dadaluma_doorstep`, hence `zozo_done`, all Beat A opera legs,
 `opera_dance_done`, and the rafter chase / `ultros2_doorstep`.**
 
