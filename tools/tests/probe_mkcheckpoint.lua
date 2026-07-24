@@ -1,58 +1,3 @@
--- gen_zozo4_dadaluma.lua -- v0.4 leg 3: zozo_arrival (map 221 street) ->
--- the crane maze -> DADALUMA.  Mints dadaluma_doorstep.mss at (30,13),
--- one A-press from the fight, and dadaluma_won.mss on the same tile after
--- battle 69's scripted win clears him off the tower porch.
---
--- THE MAZE (probe_climb5/9/11/15/16 -- every claim below walked):
---  * The city is a DIRECTED graph once door source tiles are modeled as
---    what they are -- walk-on teleports.  Flooding with doors-as-floor
---    fuses regions only a teleport connects (that error hid the route);
---    with doors as walls the islands and their only bridges appear:
---      street --P9(38,57)--> 225 --P10b(47,47)--> roof (35,54)
---      --P11a(34,50)--> the STAIR ROOM --P12b(46,9)--> U1 crane roof
---      --J39 jumps west--> P17a(15,39) --> WEST ROOM --> P18b(104,27)
---      --> W33 strip --J33 jumps east--> U2 --P14a(31,30)--> BRIDGE ROOM
---      --P15b(30,34)--> TOP roof (30,22) --z-loop corridor--> (30,13).
---  * THE STAIR ROOM is a bandit conveyor: init event _caefb8 keeps seven
---    walkers climbing its one-wide stair column (x=53, y=18..29) and the
---    top "\" beam forever, so a snapshot BFS almost never sees a clear
---    path (probe_climb8 starved on 20 straight no-paths).  The engine
---    itself queues a held direction behind a moving body, so that leg is
---    driven as follow-the-queue: press the route direction for the
---    current tile and wait out whoever is standing in it.
---  * THE JUMPS ($01B0-$01B5 = the live $1EB6 control bits, event_trigger
---    _221 + _ca95c6..): {28,y}/{25,y} high pair, {21,y}/{19,y} low pair,
---    rows y=39 and y=33, each side firing only with the facing bit
---    toward the gap set -- so a jump is "walk onto the tile holding the
---    gap direction".  Measured live (probe_climb13/16): westbound fires
---    at $1EB6=C8 (bit3 = facing left), eastbound at $82 (bit1 = right);
---    the obj_script arcs dip a row (25,40 / 28,34) and settle facing up
---    ($1EB6 bit0), which is why the twin trigger never re-fires on
---    landing.  A held direction CHAINS the whole row -- both jumps of a
---    row fire under one hold, and the row is pure transit.
---  * THE TALK: Dadaluma's tile (30,14) seals the roof from the tower
---    porch, (29,14)/(30,15) are $F7 -- and $F7 is the one prop byte
---    CheckNPCs' talk-across-a-counter extension explicitly rejects
---    (player.asm @478e), so there is no south-side talk.  The authored
---    approach is a Z-LEVEL LOOP (probe_climb15): west along y=16 on the
---    lower level, drop to (30,17), climb the "/" beam at (31,17) (zAfter
---    flips the party to upper), then the SAME tiles again as upright
---    diagonals -- (32,16)/(33,15)/(34,14) carry $44/$49 bridge-diag props
---    that only engage at z=1 -- onto the y=13 strip and west to (30,13),
---    facing DOWN at him.  That loop is the LAST rung of THREE: the whole
---    corridor from the (30,22) landing is a switchback ladder of the same
---    motif (full measured tile dump at corridorDir below), and it is
---    driven SCRIPTED, not pathfound -- the bridge-diag tiles move
---    differently per z, so followPath's all-z-seeded BFS mispredicts the
---    live engine there and oscillates at y=19 forever (measured twice,
---    9000-frame timeouts, x wandering 30..35).  Dadaluma's (30,14) stays
---    object-occupied until the win; the scripted route never aims at it.
---  * THE FIGHT: battle 69 = formation 438 = DADALUMA $0107 + two $006C
---    sidekicks (measured words 0107 006C 006C FFFF FFFF FFFF).  The
---    post-battle event _ca5ea9 gates on battle-switch $40 exactly like
---    Kefka/Vargas, so the harness kill-bit win is clean: no GameOver,
---    hide_obj NPC_14, $034A=0, fade_in, control back on (30,13) -- and
---    the porch opens (towerS (33,10) walked 7 steps after the win).
 local H = dofile("/Users/mtklein/ot6/tools/tests/lib/ot6.lua")
 local function map() return H.mapId() & 0x1ff end
 local function bright() return emu.getState()["ppu.screenBrightness"] or 0 end
@@ -348,31 +293,10 @@ end
 -- THE BRIDGE-ROOM CLIMB (map 225): from (30,61) up to the door (30,34)->221
 -- (top roof).  The direct x=30 column is z-split; the real route is a 50-step
 -- SWITCHBACK LADDER over "/" ($43/$4B) and "\" ($83/$8B) z-loop beams
--- (probe_westroom.lua solve; a single-live-z door-walled BFS gives the same
--- route, verified probe_climb_suppress.lua).  The table below IS correct and
--- reaches (30,34) at z=2 every rung.
---
--- THE REAL BLOCKER WAS A HANGING RANDOM ENCOUNTER, NOT A WARP (sixth pass,
--- probe_climb_dump/live/stall/suppress).  The v0.5 fifth-pass diagnosis --
--- "(30,41) is a corrupting warp that chains 225->5->18->19, the Narshe intro"
--- -- was WRONG.  Measured facts that overturn it:
---   * (30,41) has p1=$43, byte-identical to (30,57) which the party crosses
---     fine one rung below; it is NEITHER a short/long entrance (all 22 map-225
---     records decode to map 221, none at (30,41)) NOR an event trigger (map
---     225 has exactly 3: the clock {98,59} and {125,46}/{103,55}).
---   * Stepping (29,41)->(30,41) rolls a RANDOM ENCOUNTER: the event PC jumps
---     to $CA0029 = inside RandBattle ($CA0018).  On this ambiguous-z beam the
---     party sprite's z oscillates 0/2/3 and the pre-battle scroll_obj never
---     settles, so the encounter HANGS at $CA0029 forever -- battleLoadStarted
---     never latches (so the kill-bit can't fire it) and both A-mash and a
---     neutral pad leave it stuck.  Riding that hang under A is what the fifth
---     pass mis-rode into the intro maps.
--- THE FIX: SUPPRESS random encounters across the shaft -- keep the danger
--- accumulator $1f6e/$1f6f at 0 each frame (battle.asm:380+ overflows it into
--- EventScript_RandBattle) so the broken transition never arms.  With no roll,
--- the party walks the BRIDGE2 ladder clean to (30,34) -> map 221 (30,22),
--- measured 999 frames end-to-end.  A held direction into a beam base still
--- must not outlive its step, so this pulses the pad like corridorFollow.
+-- (probe_westroom.lua solve, z-consistent at every seed z).  Like the west
+-- room, a "\" tile can fire a scene, so this driver ALSO A-mashes on any
+-- control-loss/event; otherwise it walks the measured per-tile table,
+-- canStep-gated on the live z.
 local BRIDGE2 = {}
 do
   local seq = {
@@ -398,24 +322,18 @@ local function bridgeClimb()
     H.driveUntil(function() return map() == 221 end, 15000, {
       H.call(function()
         hb = hb + 1
-        -- suppress the hanging random encounter (see header): zero the danger
-        -- accumulator every frame so battle.asm never overflows it into
-        -- RandBattle's un-settleable, un-kill-bittable z-split transition.
-        H.writeByte(0x1f6e, 0); H.writeByte(0x1f6f, 0)
         if hb % 600 == 0 then
           H.log(string.format("[bridge2] f+%d at (%d,%d) z%d ctl=%s", hb,
             H.fieldX(), H.fieldY(), H.readByte(0x00b2) & 3, tostring(H.hasControl())))
         end
-        -- with encounters suppressed no battle should fire, but keep the
-        -- kill-bit guard in case one is already in flight on entry
         if H.battleLoadStarted() then
           killBitAll(); H.setPad(hb % 8 < 4 and { "a" } or {}); return
         end
         if H.dialogWaiting() then H.setPad(hb % 8 < 4 and { "a" } or {}); return end
-        -- a genuine control loss here is only a map-load fade; wait it out
-        -- (do NOT A-mash -- there is no scene on this beam, only the
-        -- encounter we now suppress)
-        if not H.hasControl() or H.eventRunning() then H.setPad({}); return end
+        -- ride any scene (a direction press into a "\" scene tile hangs)
+        if not H.hasControl() or H.eventRunning() then
+          H.setPad(hb % 8 < 4 and { "a" } or {}); return
+        end
         if not H.tileAligned() then H.setPad({}); return end
         local x, y = H.fieldX(), H.fieldY()
         local dir = BRIDGE2[key(x, y)]
@@ -647,16 +565,14 @@ local function jumpRow(dir, pred, maxFrames, what)
   })
 end
 
+-- CHECKPOINT BUILDER: run the maze from zozo_arrival through bridgeCross(),
+-- then save bridge_checkpoint.mss at the bridge-room bottom (map 225 ~30,61).
 H.run({ maxFrames = 90000 }, {
   H.loadState("/Users/mtklein/ot6/build/states/zozo_arrival.mss.lua"),
   H.waitFrames(150),
   H.call(function()
     H.assertEq(map(), 221, "booted on the Zozo street (map 221)")
-    H.assertEq(sw(0x034A), 1, "$034A SET -- the gentleman waits")
-    H.assertEq(sw(0x0053), 0, "$0053 clear -- the Ramuh scene has not run")
   end),
-
-  -- the climb
   door(38, 57, 225, "P9a street -> interior"),
   door(47, 47, 221, "P10b -> roof (35,54)"),
   door(34, 50, 225, "P11a -> stair room"),
@@ -669,92 +585,23 @@ H.run({ maxFrames = 90000 }, {
     return H.fieldX() <= 18 and H.fieldY() == 39
   end, 4500, "J39 row westbound"),
   door(15, 39, 225, "P17a -> west room"),
-  -- P18b: cross the west room to (104,27)->221.  followPath mispredicts +
-  -- HANGS on the (111,15) scene-beam here; westRoomCross rides it (see above).
   westRoomCross(),
   followPath(18, 33, { maxFrames = 6000 }),
   jumpRow("right", function()
     return H.fieldX() >= 28 and H.fieldY() == 33
   end, 4500, "J33 row eastbound"),
-  -- P14a: the "/" z-loop beam approach to (31,30) -- followPath mispredicts
-  -- the live z here too; bridgeCross drives the measured table (see above).
   bridgeCross(),
-  -- P15b: the bridge-room switchback ladder up to (30,34)->221.  bridgeClimb
-  -- drives the measured z-loop table (correct) with random encounters SUPPRESSED
-  -- -- the fifth pass's "(30,41) corrupting warp" was a mis-rode HANGING random
-  -- encounter, not a warp (see bridgeClimb's header + wob-route sixth pass).
-  bridgeClimb(),
-  corridorFollow(),
-
-  -- the doorstep: one A-press from battle 69.  The extra beat plus the
-  -- settled assert keep this mint honest: the state is the suite's boot
-  -- point, so a battle-load or event in flight here poisons everything
-  -- downstream (see corridorFollow's arrive note for the measured case).
+  H.waitUntil(settled, 2400, "bridge-room bottom settled", 5),
   H.waitFrames(60),
   H.call(function()
-    H.assertEq(map(), 221, "on the roof (map 221)")
-    H.assertEq(H.fieldX() == 30 and H.fieldY() == 13, true,
-      "at (30,13), north of the gentleman")
-    H.assertEq(settled(), true, "doorstep is QUIET -- no battle/event in flight")
-    H.assertEq(sw(0x034A), 1, "$034A still set -- he waits below")
-    H.log(string.format("[dadaluma_doorstep] f%d at (%d,%d)",
-      H.frame, H.fieldX(), H.fieldY()))
-    H.screenshot("dadaluma_doorstep")
+    H.assertEq(map(), 225, "on the bridge room (map 225)")
+    H.log(string.format("[bridge_checkpoint] map=%d (%d,%d) z%d",
+      map(), H.fieldX(), H.fieldY(), H.readByte(0x00b2) & 3))
+    H.screenshot("bridge_checkpoint")
   end),
-  H.saveState("dadaluma_doorstep.mss"),
-
-  -- face him and talk, then ride the fight to the win.  Battle 69 (event
-  -- _ca96a9: dlg $042D -> set_b_switch $4B -> `battle 69`) is a KILL-BIT boss
-  -- -- formation 438 = DADALUMA $0107 + two $006C (verified probe_fight.lua,
-  -- $57C0 words 0107 006C 006C) -- and it RESOLVES in a few hundred frames,
-  -- faster than battleLoadStarted's HP-table signal can be caught, so the old
-  -- observe-the-battle sequence timed out on a fight that had already been won
-  -- (the party was standing on the roof reading the "Got Head Band" reward
-  -- dialog).  So this drives it hands-off, advanceStory-style: kill-bit any
-  -- monster that appears and broadly edge-A (4 on / 4 off) every dialog --
-  -- including the reward and the win-tail text, which do NOT set the
-  -- dialogWaiting latch -- until the win clears $034A (_ca96a9's tail: hide_obj
-  -- NPC_14, clr_b_switch $4B, switch $034A=0, fade_in) and control returns on
-  -- the roof at (30,13).
-  H.hold({ "down" }), H.waitFrames(8), H.release(), H.waitFrames(4),
-  (function()
-    local ph, formLogged = 0, false
-    return H.driveUntil(function()
-      return sw(0x034A) == 0 and map() == 221 and H.hasControl()
-        and H.tileAligned() and bright() >= 15
-    end, 20000, {
-      H.call(function()
-        ph = (ph + 1) % 8
-        if H.monstersPresent() > 0 then
-          if not formLogged then
-            local w = H.formationWords()
-            if w[1] ~= 0xFFFF and w[1] ~= 0 then formLogged = true
-              H.log(string.format("[battle 69] formation %04X %04X %04X %04X %04X %04X",
-                w[1], w[2], w[3], w[4], w[5], w[6]))
-            end
-          end
-          killBitAll()
-        end
-        H.setPad(ph < 4 and { "a" } or {})
-      end),
-    }, "Dadaluma fought + won (kill-bit; the $40 scripted win) -> $034A clear")
-  end)(),
-  H.waitFrames(60),
-  H.call(function()
-    H.assertEq(sw(0x034A), 0, "$034A CLEAR -- the gentleman is gone")
-    H.assertEq(map(), 221, "still on map 221")
-    H.assertEq(H.fieldX() == 30 and H.fieldY() == 13, true,
-      "control returned at (30,13)")
-    H.assertEq(H.bfsPath(33, 10) ~= nil, true,
-      "the tower porch is OPEN -- (33,10) walkable")
-    H.assertEq(sw(0x0053), 0, "$0053 still clear -- TERRA waits upstairs")
-    H.log(string.format("[dadaluma_won] f%d at (%d,%d)",
-      H.frame, H.fieldX(), H.fieldY()))
-    H.screenshot("dadaluma_won")
-  end),
-  H.saveState("dadaluma_won.mss"),
+  H.saveState("bridge_checkpoint.mss"),
   H.logStep(function()
-    return string.format(
-      "dadaluma_won minted at frame %d -- the maze is climbed", H.frame)
+    return string.format("bridge_checkpoint minted at (%d,%d)",
+      H.fieldX(), H.fieldY())
   end),
 })
