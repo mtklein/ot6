@@ -32,6 +32,7 @@ local function wcell(slot, k) return H.readByte(H.shadowLine(slot) + 6 + k * 2) 
 -- One-shot: the instant the seed begins, re-dirty every monster reveal mask.
 -- This is the state the Cmd_20 reload (and uninitialized RAM) hands the seed;
 -- InitBattle's clear has already run, so a correct seed must re-hide these.
+local SEED = H.sym("Ot6SeedShields")
 local seedRef
 local function armSeedDirtier()
   local fired = false
@@ -44,15 +45,18 @@ local function armSeedDirtier()
       emu.write(0x3e90 + slot * 2, 0xFF, emu.memType.snesWorkRam)  -- broken timer
       emu.write(0x3ea4 + slot * 2, 0xFF, emu.memType.snesWorkRam)  -- class-weak mask
     end
-    emu.removeMemoryCallback(seedRef, emu.callbackType.exec, 0xF00000, 0xF00000)
-  end, emu.callbackType.exec, 0xF00000, 0xF00000)
+    emu.removeMemoryCallback(seedRef, emu.callbackType.exec, SEED, SEED)
+  end, emu.callbackType.exec, SEED, SEED)
 end
 
 H.run({ maxFrames = 45000 }, {
   H.waitFrames(20),
   H.loadState(STATE),
   H.waitFrames(10),
-  H.call(function() armSeedDirtier(); H.log("armed seed-entry mask dirtier at $F00000") end),
+  H.call(function()
+    armSeedDirtier()
+    H.log(string.format("armed seed-entry mask dirtier at $%06X", SEED))
+  end),
 
   H.driveUntil(function() return H.battleLoadStarted() end, 8000, {
     H.hold({ "up" }), H.waitFrames(20), H.release(), H.waitFrames(2),

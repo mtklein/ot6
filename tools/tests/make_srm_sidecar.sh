@@ -1,6 +1,6 @@
 #!/bin/sh
 # make_srm_sidecar.sh -- snapshot the live in-game battery save and turn
-# its front 8 KB (the save slots; the upper banks are the OT6 codex) into
+# its front 8 KB (the save slots; bank $31 holds their OT6 codex pages) into
 # an embeddable base64 sidecar the headless harness can inject at boot.
 #
 #   tools/tests/make_srm_sidecar.sh

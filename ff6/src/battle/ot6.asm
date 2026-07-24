@@ -19,6 +19,21 @@
 
 OT6_BREAK_TICKS := $10          ; a bit under vanilla stop duration ($12)
 
+; Per-save weakness codex.  Each save owns a $400-byte page in SRAM bank
+; $31; only $310 bytes are currently used (magic + two 384-species tables).
+; A fourth page is transient knowledge for an unsaved New Game, so it never
+; inherits slot 1. OT6_CODEX_ACTIVE is 0 for transient or 1..3 for a saved
+; game. Vanilla wSaveSlotToLoad ($7e021f) already carries exactly that
+; lifecycle: 0 for New Game, 1..3 after a validated load or first save.
+OT6_CODEX_ROOT   := $316000
+OT6_CODEX_STRIDE := $0400
+OT6_CODEX_MAGIC  := OT6_CODEX_ROOT
+OT6_CODEX        := OT6_CODEX_ROOT+$0010
+OT6_CODEX_CLASS  := OT6_CODEX_ROOT+$0190
+OT6_CODEX_V2     := $384f       ; 'O8': per-save elements + classes
+OT6_CODEX_GLOBAL := $374f       ; 'O7': legacy cartridge-global layout
+OT6_CODEX_TEMP   := $0c00        ; fourth $400-byte page
+
 .segment "ot6_code"
 
 ; width discipline: callers vary (battle init calls some hooks with 8-bit
@@ -31,6 +46,279 @@ OT6_BREAK_TICKS := $10          ; a bit under vanilla stop duration ($12)
 .i16
 
 ; ------------------------------------------------------------------------------
+
+; Return the active codex page offset ($000/$400/$800/$c00) in X and ensure
+; that page is initialized. Invalid values conservatively use transient.
+.proc Ot6CodexActive
+        php
+        longi
+        shorta0
+        lda     f:$7e021f       ; wSaveSlotToLoad: 0=new, 1..3=saved
+        cmp     #$01
+        beq     @one
+        cmp     #$02
+        beq     @two
+        cmp     #$03
+        beq     @three
+        ldx     #OT6_CODEX_TEMP
+        bra     @ensure
+@one:   ldx     #$0000
+        bra     @ensure
+@two:   ldx     #$0400
+        bra     @ensure
+@three: ldx     #$0800
+@ensure:
+        jsr     Ot6CodexEnsure
+        plp
+        rts
+.endproc
+
+; Ensure codex page X is signed 'O8'.  The one-time O7 migration clones the
+; former global knowledge into all three slots: existing players lose nothing,
+; while discoveries made after migration remain isolated.  A genuinely fresh
+; page is zeroed independently.
+.proc Ot6CodexEnsure
+        php
+        longi
+        phx
+        phy
+        longa
+        ; Detect the legacy global signature regardless of which save slot
+        ; the player loads first.  Delaying migration until slot 1 was used
+        ; could otherwise let slot 2 learn something and later overwrite it
+        ; when slot 1 finally triggered the clone.
+        lda     f:OT6_CODEX_MAGIC
+        cmp     #OT6_CODEX_GLOBAL
+        beq     @legacy
+        lda     f:OT6_CODEX_MAGIC,x
+        cmp     #OT6_CODEX_V2
+        bne     :+
+        jmp     @done
+:
+        bra     @fresh
+
+@legacy:
+        ; O7's two tables already occupy page 1.  Clone their contiguous
+        ; $300-byte payload to pages 2/3 before replacing all three magics.
+        shorta0
+        ldx     #$0000
+@migrate:
+        lda     f:OT6_CODEX,x
+        sta     f:OT6_CODEX+$0400,x
+        sta     f:OT6_CODEX+$0800,x
+        inx
+        cpx     #$0300
+        bcc     @migrate
+        longa
+        lda     #OT6_CODEX_V2
+        sta     f:OT6_CODEX_MAGIC
+        sta     f:OT6_CODEX_MAGIC+$0400
+        sta     f:OT6_CODEX_MAGIC+$0800
+        ; The legacy global knowledge belongs to existing saved games, not a
+        ; newly started unsaved game. Initialize its transient page blank.
+        shorta0
+        lda     #$00
+        ldx     #$0000
+@wipet: sta     f:OT6_CODEX+$0c00,x
+        inx
+        cpx     #$0300
+        bcc     @wipet
+        longa
+        lda     #OT6_CODEX_V2
+        sta     f:OT6_CODEX_MAGIC+$0c00
+        bra     @done
+
+@fresh:
+        ; Select one of three fixed loops so no scratch RAM is needed while
+        ; battle initialization is live.
+        shorta0
+        cpx     #$0400
+        beq     @fresh2
+        cpx     #$0800
+        beq     @fresh3
+        cpx     #$0c00
+        beq     @fresht
+        lda     #$00
+        ldx     #$0000
+@wipe1: sta     f:OT6_CODEX,x
+        inx
+        cpx     #$0300
+        bcc     @wipe1
+        longa
+        lda     #OT6_CODEX_V2
+        sta     f:OT6_CODEX_MAGIC
+        bra     @done
+@fresh2:
+        lda     #$00
+        ldx     #$0000
+@wipe2: sta     f:OT6_CODEX+$0400,x
+        inx
+        cpx     #$0300
+        bcc     @wipe2
+        longa
+        lda     #OT6_CODEX_V2
+        sta     f:OT6_CODEX_MAGIC+$0400
+        bra     @done
+@fresh3:
+        lda     #$00
+        ldx     #$0000
+@wipe3: sta     f:OT6_CODEX+$0800,x
+        inx
+        cpx     #$0300
+        bcc     @wipe3
+        longa
+        lda     #OT6_CODEX_V2
+        sta     f:OT6_CODEX_MAGIC+$0800
+        bra     @done
+@fresht:
+        lda     #$00
+        ldx     #$0000
+@wipet2:
+        sta     f:OT6_CODEX+$0c00,x
+        inx
+        cpx     #$0300
+        bcc     @wipet2
+        longa
+        lda     #OT6_CODEX_V2
+        sta     f:OT6_CODEX_MAGIC+$0c00
+@done:  ply
+        plx
+        plp
+        rts
+.endproc
+
+; Begin an unsaved New Game with a freshly blank transient codex page.
+.proc Ot6CodexNewGame
+        php
+        longi
+        shorta0
+        lda     #$00
+        ldx     #$0000
+@wipe:  sta     f:OT6_CODEX+$0c00,x
+        inx
+        cpx     #$0300
+        bcc     @wipe
+        longa
+        lda     #OT6_CODEX_V2
+        sta     f:OT6_CODEX_MAGIC+$0c00
+        plp
+        rtl
+.endproc
+
+; Initialize/migrate the selected persistent page while the load menu owns the
+; machine, before gameplay can enter a battle through a caller with narrower
+; register-width assumptions. A = validated slot 1..3.
+.proc Ot6CodexLoaded
+        php
+        longi
+        shorta0
+        cmp     #$02
+        beq     @two
+        cmp     #$03
+        beq     @three
+        ldx     #$0000
+        bra     @ensure
+@two:   ldx     #$0400
+        bra     @ensure
+@three: ldx     #$0800
+@ensure:
+        jsr     Ot6CodexEnsure
+        plp
+        rtl
+.endproc
+
+; Copy the active game's codex when vanilla saves that game into a different
+; slot.  This makes "Save As" behave like the rest of the slot-local game
+; state, and carries a new game's transient knowledge into whichever slot the
+; player chooses for its first save. A = destination slot (1..3).
+.macro Ot6CopyCodexPage src, dst
+        .local  copy
+        shorta0
+        ldx     #$0000
+copy:   lda     f:OT6_CODEX+(src),x
+        sta     f:OT6_CODEX+(dst),x
+        inx
+        cpx     #$0300
+        bcc     copy
+        longa
+        lda     #OT6_CODEX_V2
+        sta     f:OT6_CODEX_MAGIC+(dst)
+        shorta0
+.endmacro
+
+.proc Ot6CodexSaveAs
+        php
+        phb
+        longi
+        phx
+        phy
+        shorta
+        pha                     ; preserve destination for vanilla's stores
+        jsr     Ot6CodexActive  ; ensure source; X = source page
+        lda     $01,s           ; destination slot
+        cpx     #OT6_CODEX_TEMP
+        bne     :+
+        cmp     #$01
+        beq     temp_to_one
+        cmp     #$02
+        beq     temp_to_two
+        Ot6CopyCodexPage $0c00, $0800
+        jmp     done
+temp_to_one:
+        Ot6CopyCodexPage $0c00, $0000
+        jmp     done
+temp_to_two:
+        Ot6CopyCodexPage $0c00, $0400
+        jmp     done
+:
+        cmp     #$02
+        beq     dest2
+        cmp     #$03
+        bne     :+
+        jmp     dest3
+:
+        ; destination 1
+        cpx     #$0000
+        bne     :+
+        jmp     done
+:
+        cpx     #$0400
+        beq     two_to_one
+        Ot6CopyCodexPage $0800, $0000
+        jmp     done
+two_to_one:
+        Ot6CopyCodexPage $0400, $0000
+        jmp     done
+dest2:
+        cpx     #$0400
+        bne     :+
+        jmp     done
+:
+        cpx     #$0800
+        beq     three_to_two
+        Ot6CopyCodexPage $0000, $0400
+        jmp     done
+three_to_two:
+        Ot6CopyCodexPage $0800, $0400
+        jmp     done
+dest3:
+        cpx     #$0800
+        bne     :+
+        jmp     done
+:
+        cpx     #$0400
+        beq     two_to_three
+        Ot6CopyCodexPage $0000, $0800
+        jmp     done
+two_to_three:
+        Ot6CopyCodexPage $0400, $0800
+done:   pla
+        ply
+        plx
+        plb
+        plp
+        rtl
+.endproc
 
 ; [ seed monster shields at battle init ]
 
@@ -119,28 +407,13 @@ OT6_BREAK_TICKS := $10          ; a bit under vanilla stop duration ($12)
                                 ;   revealed from battle start instead of '?'
                                 ;   (the hud '?'-gate reads $3e89/$3e9d)
         sta     $3e9d,y         ; revealed classes (monster half)
-        ; weakness codex: pre-reveal anything learned in past battles
+        ; weakness codex: pre-reveal anything this save learned in past battles
+        jsr     Ot6CodexActive  ; x = this save's page offset
         longa
-        lda     f:OT6_CODEX_MAGIC
-        cmp     #$374f          ; 'O7' - codex layout v2 initialized?
-        beq     @learned        ;   (v2 = elements + classes; the bump
-        ; first use (or no sram bank): wipe both tables, then sign it.
-        ; without 32k sram the magic never sticks and the codex is a
-        ; harmless no-op: reads return open bus, merges are junk-free
-        ; because we only merge after the magic matches.
-        shorta0                 ;   re-wipes any 'O6'-era bank once)
-        ldx     #$0000
-@wipe:  sta     f:OT6_CODEX,x
-        inx
-        cpx     #$0300          ; 384 species x (elements, classes)
-        bcc     @wipe
-        longa
-        lda     #$374f
-        sta     f:OT6_CODEX_MAGIC
-        cmp     f:OT6_CODEX_MAGIC
-        bne     @nosram         ; write didn't stick: no codex bank
-@learned:
-        ldx     OT6_SPECIES-8,y ; species -> learned weakness bits
+        txa
+        clc
+        adc     OT6_SPECIES-8,y ; page + species
+        tax
         shorta0
         lda     f:OT6_CODEX,x
         ora     $3e89,y
@@ -148,7 +421,6 @@ OT6_BREAK_TICKS := $10          ; a bit under vanilla stop duration ($12)
         lda     f:OT6_CODEX_CLASS,x
         ora     $3e9d,y
         sta     $3e9d,y
-@nosram:
         shorta0
         jsr     Ot6ElemAdd      ; ot6: element adds (m6 weakness data)
         jsr     Ot6HpScale      ; ot6: difficulty transform (trash hp)
@@ -160,8 +432,8 @@ done:   rtl
 
 ; [ element adds: widen a species' weak-element byte at monster seed time ]
 
-; enemy identity stays vanilla in ROM; an element ADD is a runtime
-; transform like Ot6HpScale, applied one hook later than the load: the
+; Element additions are authored OT6 combat properties, implemented as a
+; runtime transform like Ot6HpScale and applied one hook later than the load: the
 ; mask is OR'd into the loaded weak byte $3be0,y (LoadRageProp stores it
 ; from MonsterProp+25 immediately before the seed hook), so the chip
 ; path, vanilla's weak x2 damage, and the hud weakness slots all read
@@ -485,9 +757,10 @@ Ot6ElemAddTbl:
 
 ; [ difficulty transform: scale trash battle hp at monster seed time ]
 
-; enemy IDENTITY (weaknesses, ai, sprites, the rom prop record) is
-; vanilla-sacred; enemy DIFFICULTY numbers are ot6's tuning surface —
-; applied here as a runtime transform, so the rom data never changes.
+; Enemy narrative role, visual identity, and recognizable behavior are
+; useful design anchors, not immutable constraints. OT6 may author combat
+; properties when the break grammar or pacing benefits. This particular
+; broad difficulty pass is applied as a runtime transform —
 ; both battle-ram copies of the loaded hp ($3bf4 current, $3c1c max —
 ; LoadMonsterProp's only hp stores; every monster load funnels through
 ; it) are multiplied by a per-band value in 16ths, clamped at $ffff.
@@ -838,7 +1111,13 @@ merge:  pla                     ; reveal all matched weaknesses
         longi
         phx
         pha
-        ldx     OT6_SPECIES-8,y
+        jsr     Ot6CodexActive
+        longa
+        txa
+        clc
+        adc     OT6_SPECIES-8,y
+        tax
+        shorta0
         pla
         sta     f:OT6_CODEX,x
         plx
@@ -932,7 +1211,13 @@ merge:  lda     OT6_SCR_BIT     ; reveal the matched class
         ; learn it forever, like the elements (join already pinned i16)
         phx
         pha
-        ldx     OT6_SPECIES-8,y
+        jsr     Ot6CodexActive
+        longa
+        txa
+        clc
+        adc     OT6_SPECIES-8,y
+        tax
+        shorta0
         pla
         sta     f:OT6_CODEX_CLASS,x
         plx
@@ -1762,7 +2047,6 @@ Ot6FontIcons:
         .i16
         php
         shorta0
-        jsr     Ot6CSpikeProbe  ; c toolchain spike: publish a witness
         ; consume the random-encounter marker: the field trigger set
         ; OT6_RANDPEND (to the magic value) just before this battle
         ; started; latch a normalized 0/1 as THIS battle's flag and clear
@@ -1807,9 +2091,9 @@ Ot6FontIcons:
         inx
         cpx     #$0004          ; $57b6-$57b9: map base, atkclass, fontdirty
         bcc     @clr2           ;   STOPS at $57ba: the $57ba-$57bf strip
-                                ;   (C witness + random-encounter flags)
+                                ;   (spare word + random-encounter flags)
                                 ;   must survive init (see the strip's
-                                ;   block comment at OT6_CWITNESS)
+                                ;   block comment at OT6_RANDPEND)
         ; (removed: an 84-byte clear loop over OT6_HUDCOPY, a retired
         ;  feature's buffer. $57de is inside vanilla's `ram_res w7e57d5,
         ;  128`, so the loop was zeroing vanilla's name/banner scratch at
@@ -4357,14 +4641,8 @@ OT6_ATKCLASS := $57b8           ; the executing attack's class byte: one of
                                 ;   battle_class write-watcher caught
                                 ;   foreign bytes $84/$85/$ab there.)
 
-; weakness codex: learned weaknesses persist across battles, octopath
-; style. lives in the second 8k sram bank (header sram size $05), which
-; vanilla save files never touch. species stash: one word per monster
-; slot so the chip procs can find the codex entry at reveal time.
-OT6_CODEX_MAGIC := $316000      ; word 'O7' = codex layout v2 initialized
-OT6_CODEX       := $316010      ; one revealed-elements byte per species
-OT6_CODEX_CLASS := $316190      ; one revealed-classes byte per species
-                                ;   (contiguous after OT6_CODEX: one wipe)
+; weakness codex species stash: one word per monster slot so the chip procs
+; can find the active save page's species entry at reveal time.
 OT6_SPECIES     := $57c0        ; per-slot species stash (6 words)
 OT6_PIPCUR      := $57cc        ; live pip cell: menu-map word addr (0=off)
 OT6_PIPPREV     := $57ce        ; last flushed addr (for erase-on-move)
@@ -4397,21 +4675,13 @@ OT6_RELAY_STAGES := 3           ; icons, glyphs x2 (~128b each). was 6:
                                 ;   three arrow-tile stages retired with
                                 ;   the over-character boost marks.
 
-; the spare strip $57ba-$57bf (between OT6_FONTDIRTY and OT6_SPECIES,
+; the strip $57ba-$57bf (between OT6_FONTDIRTY and OT6_SPECIES,
 ; inside the m2 trace-verified free range; probe_57ba_strip write-watch:
 ; only bank-F0 writers). InitBP's @clr loop deliberately stops at $57b9:
-; $57ba is rewritten every init by the spike probe anyway, and clearing
-; $57bc would eat the random-encounter marker the field just set.
-; occupants: $57ba-$57bb CWITNESS, $57bc RANDPEND, $57bd RANDBTL,
+; clearing $57bc would eat the random-encounter marker the field just set.
+; occupants: $57ba-$57bb spare, $57bc RANDPEND, $57bd RANDBTL,
 ; $57be HUDVEIL, $57bf SCRIPTBUSY (HUDVEIL and SCRIPTBUSY init-cleared one
 ; byte at a time in InitBP).
-OT6_CWITNESS := $57ba           ; word: the C toolchain spike's result
-                                ;   (Ot6CSpikeProbe; battle_c.lua asserts
-                                ;   it. RELOCATED from $57dc: that byte
-                                ;   sits inside vanilla's $57d5-$5854
-                                ;   battle name-scratch string, the same
-                                ;   banner-tear collision family that
-                                ;   moved OT6_FONTDIRTY.)
 OT6_RANDPEND := $57bc           ; the NEXT battle is a random encounter:
                                 ;   holds OT6_RANDMAGIC, set by
                                 ;   Ot6MarkRandom from the two field/world
@@ -5551,49 +5821,6 @@ Ot6BgGlyphData:
 ; boost-3: three narrow arrows
         .byte   $00,$00,$00,$00,$92,$92,$db,$db
         .byte   $db,$db,$92,$92,$00,$00,$00,$00
-
-; ------------------------------------------------------------------------------
-
-; [ calypsi-compiled C modules ]
-
-; the c toolchain spike: ff6/src/c/*.c compiled by calypsi (cc65816
-; --target snes, large code/data models), linked by ln65816 against
-; ot6-rom.scm which pins section farcode at $f0f000 — the ot6_c
-; segment below pins the same address on the ld65 side, so both
-; linkers agree by construction. regenerate with tools/cc/build-c.sh;
-; symbol offsets into the blob come from ff6/src/c/ot6c.map.
-;
-; calypsi 65816 abi (learned from -S output): 16-bit native modes,
-; first int-sized arg in A, later args pushed as words (first at 4,s
-; inside the callee), result in A, far functions end in rtl. leaf
-; functions that touch no globals need no direct-page context at all.
-
-.segment "ot6_c"
-
-Ot6CBlob:
-        .incbin "../c/ot6c.raw"
-ot6_c_mix := Ot6CBlob           ; unsigned char ot6_c_mix(uchar a, uchar b)
-
-.segment "ot6_code"
-
-; [ c spike probe: call the compiled leaf, publish a witness ]
-
-; runs once per battle init. the harness asserts the exact value, which
-; proves compile -> link -> blob -> jsl -> abi -> return end to end.
-
-.proc Ot6CSpikeProbe
-        .a8
-        .i16
-        php
-        longa
-        pea     $0004           ; second arg, a word on the stack
-        lda     #$0003          ; first arg in a
-        jsl     ot6_c_mix
-        sta     f:$7e0000+OT6_CWITNESS  ; witness word: 3*2 + 4 + 1 = 11
-        pla                     ; caller pops the stacked arg
-        plp
-        rts
-.endproc
 
 ; ------------------------------------------------------------------------------
 

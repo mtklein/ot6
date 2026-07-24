@@ -1,22 +1,30 @@
 -- @suite slow
--- battle_codex: weakness codex - reveals persist across battles (OT-style).
--- fight 1: reveal a poked fire weakness on a guard, assert the codex (sram
--- bank $31) learned it. then win, walk to fight 2, and assert a codex
--- entry poked from lua pre-reveals WITHOUT any attack. savestates would
--- restore sram, so persistence is proven within one continuous run.
+-- battle_codex: weakness codex is migrated, persistent, and per-save-slot.
+-- Seed an old cartridge-global O7 codex, assert its knowledge migrates into
+-- all three O8 slot pages even when slot 2 is loaded first, then teach slot 2
+-- after migration. Fight 2 runs as slot 1 and must see the migrated knowledge
+-- but not slot 2's new learning.
 local H = dofile("/Users/mtklein/ot6/tools/tests/lib/ot6.lua")
 local STATE = "/Users/mtklein/ot6/build/states/battle_doorstep.mss.lua"
 local function sram(addr) return emu.read(addr, emu.memType.snesMemory) end
 H.run({ maxFrames = 45000 }, {
   H.waitFrames(20),
-  H.call(function()
-    -- self-cleaning: invalidate the codex so this run proves a fresh
-    -- init -> learn -> reapply cycle (the portable srm persists runs)
-    emu.write(0x316000, 0, emu.memType.snesMemory)
-    emu.write(0x316001, 0, emu.memType.snesMemory)
-  end),
   H.loadState(STATE),
   H.waitFrames(10),
+  H.call(function()
+    -- Plant legacy O7 after loadState's deterministic codex invalidation.
+    -- Poison is old global knowledge; O8 migration must preserve it in all
+    -- slots.  Deliberately load slot 2 first: migration must not depend on
+    -- slot 1 being the first page exercised.
+    H.writeByte(0x0224, 2)
+    H.writeByte(0x021f, 2)
+    emu.write(0x316000, 0x4f, emu.memType.snesMemory)
+    emu.write(0x316001, 0x37, emu.memType.snesMemory)
+    for i = 0, 0x17f do
+      emu.write(0x316010+i, 0x08, emu.memType.snesMemory)
+      emu.write(0x316190+i, 0x00, emu.memType.snesMemory)
+    end
+  end),
   H.driveUntil(function() return H.battleLoadStarted() end, 4000, {
     H.hold({ "up" }), H.waitFrames(20), H.release(), H.waitFrames(2),
     H.pressButtons({ "a" }, 4),
@@ -24,10 +32,15 @@ H.run({ maxFrames = 45000 }, {
   H.waitUntil(function() return H.battleActive() end, 900, "battle 1 active", 30),
   H.waitFrames(240),
   H.call(function()
-    H.assertEq(sram(0x316000), 0x4f, "codex magic 'O' written at first seed")
-    H.assertEq(sram(0x316001), 0x37, "codex magic '7' (v2: elements+classes)")
+    for n, base in ipairs({ 0x316000, 0x316400, 0x316800 }) do
+      H.assertEq(sram(base), 0x4f, "slot "..n.." codex magic 'O'")
+      H.assertEq(sram(base+1), 0x38, "slot "..n.." codex magic '8'")
+      H.assertEq(sram(base+0x10) & 0x08, 0x08,
+        "legacy knowledge migrated into slot "..n)
+    end
     local species = H.readWord(0x57c4)   -- guard slot (entity $0c) stash
-    H.log(string.format("guard species=%d codex byte=%02x", species, sram(0x316010+species)))
+    H.log(string.format("guard species=%d slot2 codex byte=%02x",
+      species, sram(0x316410+species)))
     H.writeByte(0x3bec, H.readByte(0x3bec) | 0x01)   -- poke guard 1 fire-weak
     H.writeWord(0x3C00, 500); H.writeWord(0x3C02, 500)
   end),
@@ -39,11 +52,12 @@ H.run({ maxFrames = 45000 }, {
   }, "fire weakness revealed in fight 1"),
   H.call(function()
     local species = H.readWord(0x57c4)
-    local learned = sram(0x316010+species)
-    H.assertEq(learned & 1, 1, "codex learned the guard's fire weakness")
-    -- pre-teach every species poison for the fight-2 seed-merge check
+    local learned = sram(0x316410+species)
+    H.assertEq(learned & 1, 1, "slot 2 codex learned the guard's fire weakness")
+    -- Teach every species FIRE in slot 2 only, after O7 migration.  Slot 1
+    -- must not acquire this knowledge merely because we switch to it.
     for i = 0, 0x17f do
-      emu.write(0x316010+i, sram(0x316010+i) | 0x08, emu.memType.snesMemory)
+      emu.write(0x316410+i, sram(0x316410+i) | 0x01, emu.memType.snesMemory)
     end
     H.writeWord(0x3C00, 1); H.writeWord(0x3C02, 1)   -- guards at 1 hp
   end),
@@ -60,6 +74,12 @@ H.run({ maxFrames = 45000 }, {
     return not H.battleLoadStarted()
   end, 9000, { H.pressButtons({ "a" }, 6), H.waitFrames(24) }, "back to field"),
   H.waitFrames(60),
+  H.call(function()
+    H.writeByte(0x0224, 1)       -- load/switch to save slot 1
+    H.writeByte(0x021f, 1)
+    H.assertEq(sram(0x316410) & 0x01, 0x01, "slot 2 retained new fire knowledge")
+    H.assertEq(sram(0x316010) & 0x01, 0x00, "slot 1 isolated from slot 2")
+  end),
   H.driveUntil(function() return H.battleLoadStarted() end, 8000, {
     H.hold({ "up" }), H.waitFrames(20), H.release(), H.waitFrames(2),
     H.pressButtons({ "a" }, 4),
@@ -67,7 +87,7 @@ H.run({ maxFrames = 45000 }, {
   H.waitUntil(function() return H.battleActive() end, 900, "battle 2 active", 30),
   H.waitFrames(240),
   H.call(function()
-    -- every present monster must open with poison pre-revealed (no attacks!)
+    -- Slot 1 gets migrated poison, but not slot 2's post-migration fire.
     local checked = 0
     for slot = 0, 5 do
       -- presence per the hud builder's criterion ($3aa8 bit 0), not the
@@ -76,7 +96,10 @@ H.run({ maxFrames = 45000 }, {
         local revealed = H.readByte(0x3e91 + slot*2)
         H.log(string.format("slot %d species=%d revealed=%02x",
           slot, H.readWord(0x57c0 + slot*2), revealed))
-        H.assertEq(revealed & 0x08, 0x08, "poison pre-revealed from codex, slot "..slot)
+        H.assertEq(revealed & 0x08, 0x08,
+          "migrated poison pre-revealed, monster slot "..slot)
+        H.assertEq(revealed & 0x01, 0x00,
+          "slot 2 fire remains hidden in save slot 1, monster slot "..slot)
         checked = checked + 1
       end
     end

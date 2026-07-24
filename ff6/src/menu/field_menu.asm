@@ -1982,8 +1982,6 @@ MenuState_14:
         bne     @2580                   ; branch if sram is valid
 
 ; slot is empty, save instantly
-        lda     zSelSaveSlot
-        sta     wSaveSlotToLoad
         jsr     PlaySuccessSfx
         jsr     SaveGame
         lda     $9e                     ; previous menu state
@@ -2022,8 +2020,6 @@ MenuState_1f:
         beq     @25de       ; return if a button is not pressed
         lda     $4b
         bne     @25c7
-        lda     zSelSaveSlot
-        sta     wSaveSlotToLoad
         jsr     PlaySuccessSfx
         jsr     SaveGame
         lda     $9e         ; previous menu state
@@ -2923,6 +2919,7 @@ MenuState_21:
 @2a06:  rts
 @2a07:  jsr     PlaySelectSfx
         jsr     ResetGameTime
+        jsl     Ot6CodexNewGame         ; OT6: blank transient, never slot 1
         lda     #1
         sta     wSelSaveSlot
         stz     wSaveSlotToLoad

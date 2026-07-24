@@ -300,9 +300,16 @@ function M.loadState(sidecarPath)
       M.rearmInputInjection()
       -- determinism: savestates do NOT restore battery sram, so the
       -- weakness codex persists across runs. invalidate it so every
-      -- test starts from a virgin codex (battle_codex re-teaches).
-      emu.write(0x316000, 0, emu.memType.snesMemory)
-      emu.write(0x316001, 0, emu.memType.snesMemory)
+      -- test starts from virgin per-save codices (battle_codex exercises
+      -- legacy migration explicitly). Three saved slots plus one transient
+      -- unsaved-New-Game page each own $400 bytes.
+      for _, base in ipairs({ 0x316000, 0x316400, 0x316800, 0x316c00 }) do
+        for i = 0, 0x2ff do
+          emu.write(base + 0x10 + i, 0, emu.memType.snesMemory)
+        end
+        emu.write(base, 0x4f, emu.memType.snesMemory)
+        emu.write(base + 1, 0x38, emu.memType.snesMemory)
+      end
     end),
   })
 end

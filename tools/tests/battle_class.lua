@@ -13,7 +13,7 @@
 -- party with a different weapon and watches the shield counter:
 --
 --   0. seed: shields 2/2, class-weak $02 (authored), revealed-class 0,
---      codex magic re-signed 'O7' (fresh init after self-clean)
+--      slot codex magic re-signed 'O8' (fresh init after self-clean)
 --   1. slash phase (MithrilBlade $0a): swings land, nothing chips
 --   2. pierce phase (Dirk $00): chip + reveal ($3ea9 bit $02) + class
 --      codex byte learned
@@ -84,6 +84,11 @@ local H = dofile("/Users/mtklein/ot6/tools/tests/lib/ot6.lua")
 local STATE = "/Users/mtklein/ot6/build/states/battle_doorstep.mss.lua"
 
 local function sram(addr) return emu.read(addr, emu.memType.snesMemory) end
+local function codexBase()
+  local slot = H.readByte(0x021f) -- wSaveSlotToLoad: 0 transient, 1..3 saved
+  if slot < 1 or slot > 3 then return 0x316c00 end
+  return 0x316000 + (slot - 1) * 0x400
+end
 local function shields() return H.readByte(0x3E44), H.readByte(0x3E46) end
 local function timers() return H.readByte(0x3E94), H.readByte(0x3E96) end
 local function classWeak() return H.readByte(0x3EA8), H.readByte(0x3EAA) end
@@ -213,12 +218,6 @@ end
 
 H.run({ maxFrames = 90000 }, {
   H.waitFrames(20),
-  H.call(function()
-    -- self-cleaning: invalidate the codex so this run proves the v2
-    -- (elements + classes) init -> learn cycle from scratch
-    emu.write(0x316000, 0, emu.memType.snesMemory)
-    emu.write(0x316001, 0, emu.memType.snesMemory)
-  end),
   H.loadState(STATE),
   H.waitFrames(10),
 
@@ -241,8 +240,9 @@ H.run({ maxFrames = 90000 }, {
     local r1, r2 = classRev()
     H.assertEq(r1, 0, "guard 1 opens with no class revealed")
     H.assertEq(r2, 0, "guard 2 opens with no class revealed")
-    H.assertEq(sram(0x316000), 0x4f, "codex magic 'O' after v2 re-init")
-    H.assertEq(sram(0x316001), 0x37, "codex magic '7' after v2 re-init")
+    local cb = codexBase()
+    H.assertEq(sram(cb), 0x4f, "active codex magic 'O'")
+    H.assertEq(sram(cb + 1), 0x38, "active codex magic '8'")
   end),
   report("seeded"),
 
@@ -331,7 +331,7 @@ H.run({ maxFrames = 90000 }, {
     H.assertEq(s1 < 2 or s2 < 2, true, "the revealing hit also chipped")
     local species = H.readWord(0x57C4)
     H.log(string.format("guard species=%d", species))
-    H.assertEq(sram(0x316190 + species) & 0x02, 0x02,
+    H.assertEq(sram(codexBase() + 0x190 + species) & 0x02, 0x02,
       "class codex learned piercing")
   end),
 
@@ -619,7 +619,7 @@ H.run({ maxFrames = 90000 }, {
     H.assertEq(s1 < 2 or s2 < 2, true,
       "the flags3-$20 skill chipped a pierce-weak guard")
     local species = H.readWord(0x57C4)
-    H.assertEq(sram(0x316190 + species) & 0x02, 0x02,
+    H.assertEq(sram(codexBase() + 0x190 + species) & 0x02, 0x02,
       "class codex holds piercing after the skill chip")
     -- ability list: the drive rendered terra's magitek list on the way
     -- to TekMissile, and rendered rows persist in the menu map (the

@@ -7,10 +7,9 @@
 -- asserts a fresh, never-chipped enemy shows '?'.
 --
 -- suite.sh runs this under OT6_RAM_POWERON=AllOnes (deterministic AND dirty).
--- The codex is WIPED here so it cannot be a reveal source: this isolates the
--- RAM/clear path. (A POPULATED codex legitimately pre-reveals learned
--- weaknesses on any battle including the first -- that persistence is by
--- design, covered by battle_codex; it is NOT what this gate is about.)
+-- Slot 1 is deliberately POPULATED before New Game. The New Game hook must
+-- select and clear the fourth transient page, proving an unsaved game cannot
+-- inherit slot 1's knowledge. This simultaneously isolates the RAM/clear path.
 --
 -- Complements battle_reveal, which pokes the masks at SEED entry (AFTER
 -- InitBattle's clear) to exercise the seed's own zeroing / Cmd_20 reload path.
@@ -27,9 +26,10 @@ local H = dofile("/Users/mtklein/ot6/tools/tests/lib/ot6.lua")
 local function present(slot) return (H.readByte(0x3aa8 + slot * 2) & 1) == 1 end
 local function wcell(slot, k) return H.readByte(H.shadowLine(slot) + 6 + k * 2) end
 
--- Snapshot every monster reveal mask at the FIRST seed entry ($F00000): AFTER
+-- Snapshot every monster reveal mask at the FIRST seed entry: AFTER
 -- InitBattle's clear, BEFORE any seed zeroing. Under the AllOnes fill these
 -- read 0 iff InitBattle's clear actually covers the mask bytes.
+local SEED = H.sym("Ot6SeedShields")
 local seedRef, snap = nil, nil
 local function armSeedSnapshot()
   seedRef = emu.addMemoryCallback(function()
@@ -39,24 +39,35 @@ local function armSeedSnapshot()
       snap.e[slot] = emu.read(0x3e91 + slot * 2, emu.memType.snesWorkRam)
       snap.c[slot] = emu.read(0x3ea5 + slot * 2, emu.memType.snesWorkRam)
     end
-    emu.removeMemoryCallback(seedRef, emu.callbackType.exec, 0xF00000, 0xF00000)
-  end, emu.callbackType.exec, 0xF00000, 0xF00000)
+    emu.removeMemoryCallback(seedRef, emu.callbackType.exec, SEED, SEED)
+  end, emu.callbackType.exec, SEED, SEED)
 end
 
 H.run({ maxFrames = 70000 }, {
   H.call(function()
     armSeedSnapshot()
-    emu.write(0x316000, 0, emu.memType.snesMemory)   -- wipe codex magic:
-    emu.write(0x316001, 0, emu.memType.snesMemory)   --   no learned reveals
+    -- Existing slot 1 knows everything. Transient is invalid/empty, as on a
+    -- genuinely fresh unsaved game; battle seed must initialize that page
+    -- rather than consult slot 1.
+    emu.write(0x316000, 0x4f, emu.memType.snesMemory)
+    emu.write(0x316001, 0x38, emu.memType.snesMemory)
+    for i = 0, 0x2ff do
+      emu.write(0x316010+i, 0xff, emu.memType.snesMemory)
+    end
+    emu.write(0x316c00, 0, emu.memType.snesMemory)
+    emu.write(0x316c01, 0, emu.memType.snesMemory)
   end),
 
   H.waitFrames(355),
   H.repeatN(5, { H.pressButtons({ "start" }, 8), H.waitFrames(25) }),
   H.logStep("title handled; waiting out the opening..."),
   H.waitUntil(function() return H.frame >= 15400 end, 16000, "intro to finish"),
-  H.call(function()   -- re-wipe just before the fight, in case boot touched sram
-    emu.write(0x316000, 0, emu.memType.snesMemory)
-    emu.write(0x316001, 0, emu.memType.snesMemory)
+  H.call(function()
+    H.assertEq(H.readByte(0x021f), 0, "New Game selected transient codex")
+    H.assertEq(emu.read(0x316010, emu.memType.snesMemory), 0xff,
+      "New Game preserved existing slot 1 knowledge")
+    H.assertEq(emu.read(0x316c00, emu.memType.snesMemory), 0,
+      "unsaved New Game transient page starts invalid")
   end),
 
   H.driveUntil(function() return H.battleLoadStarted() end, 24000, {

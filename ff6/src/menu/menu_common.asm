@@ -244,6 +244,7 @@ GameLoadMenu:
 
 ; sram invalid
 @019f:  jsr     ResetGameTime
+        jsl     Ot6CodexNewGame         ; OT6: invalid SRAM starts fresh
         lda     #1
         sta     wSelSaveSlot
         stz     wSaveSlotToLoad         ; don't load a saved game

@@ -22,6 +22,8 @@ LoadSavedGame:
         jsr     CalcSaveSlotChecksum
         jsr     CheckSaveSlotChecksum
         beq     @1514                   ; branch if checksum invalid
+        lda     wSaveSlotToLoad
+        jsl     Ot6CodexLoaded           ; OT6: init/migrate loaded slot codex
         jsr     PopTimers
         clr_a                           ; return 0
         bra     @1518
@@ -42,8 +44,10 @@ CopyGameDataToSRAM:
 .if LANG_EN
         and     #%11
 .endif
+        jsl     Ot6CodexSaveAs           ; OT6: codex follows Save As/new save
         sta     $307ff0                 ; set game slot
         sta     wSelSaveSlot
+        sta     wSaveSlotToLoad         ; OT6: first save leaves transient page
         pha
         ldy     wGameTimeHours
         sty     $1863

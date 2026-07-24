@@ -1,10 +1,10 @@
 -- probe_57ba_strip.lua -- write-watcher for the $7E57BA-$7E57BF strip
--- (OT6_CWITNESS word, OT6_RANDPEND, OT6_RANDBTL, two spare bytes).
+-- (one spare word, OT6_RANDPEND, OT6_RANDBTL, two flag bytes).
 -- Verifies the strip has ONLY bank-$F0 (OT6) and hook-shim writers
 -- across the write-heavy battle paths:
 --   phase 1: mines_chase field pacing -> a RANDOM encounter (exercises
 --            Ot6MarkRandom's $57BC write from the field trigger, the
---            InitBP consume into $57BD, and the spike witness word) ->
+--            InitBP consume into $57BD) ->
 --            fight mashed to victory (exercises Ot6RewardScale reads).
 --   phase 2: whelk_doorstep -> the dialog-opening boss fight, mashed
 --            for ~6000 frames: battle DIALOGS ($0B6E/$0B6F + the
@@ -80,7 +80,6 @@ H.run({ maxFrames = 60000 }, {
   H.call(function()
     H.assertEq(H.readByte(0x57bd), 1, "random-encounter flag latched by InitBP")
     H.assertEq(H.readByte(0x57bc), 0, "pending marker consumed by InitBP")
-    H.assertEq(H.readWord(0x57ba), 11, "C witness word intact at $57BA")
   end),
   mashThrough(12000, "random fight resolved"),
   H.call(function() report("after phase 1 (random encounter)") end),
@@ -103,7 +102,6 @@ H.run({ maxFrames = 60000 }, {
   H.waitUntilSoft(function() return H.battleActive() end, 900, "p2_active", 30),
   H.call(function()
     H.assertEq(H.readByte(0x57bd), 0, "event battle carries NO random flag")
-    H.assertEq(H.readWord(0x57ba), 11, "C witness word intact at $57BA")
   end),
   -- mash beams into the fight long enough for banners, shell dialogs,
   -- and MegaVolt counters; the fight itself need not resolve
