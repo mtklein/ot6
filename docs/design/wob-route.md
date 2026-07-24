@@ -567,3 +567,88 @@ decode (fourth pass) is unchanged and still awaits a live drive: legs 2-4 and
 the `$01B0/$01B4/$0387` weight-trap mechanic remain to be measured once
 `opera_dance_done` is reachable. `make test` (frontier-independent base suite)
 stays green throughout — the only source change is `gen_zozo4_dadaluma.lua`.
+
+## Beat A — sixth pass: the bridge-climb was a HANGING ENCOUNTER; the whole opera chain now mints (2026-07-23)
+
+The fifth pass's "genuine blocker" was a **misdiagnosis**, and the fix is a
+one-liner. The frontier now mints clean all the way from `dadaluma_doorstep`
+through `opera_dance_done` (verified end-to-end on the canonical
+committed-source ROM). `gen_opera6_rafter` legs 2–4 (Ultros②) remain the one
+open frontier.
+
+### CRACKED — the bridge-room climb `bridgeClimb()` (map 225, (30,61)→(30,34))
+Everything the fifth pass measured about `(30,41)` was real; the *conclusion*
+was wrong. `(30,41)` is **not a warp** — it is an ordinary `/` beam tile
+(`p1=$43`, byte-identical to `(30,57)` crossed fine one rung below). Decoded
+(probe_climb_dump/live/stall/suppress):
+- `(30,41)` is NEITHER an entrance (all 22 map-225 short-entrance records
+  decode to map 221; map 225's long-entrance range is empty) NOR an event
+  trigger (map 225 has exactly three: the clock `{98,59}` and
+  `{125,46}`/`{103,55}`).
+- Stepping `(29,41)→(30,41)` rolls a **random encounter** — the event PC jumps
+  into `RandBattle` (`$CA0018`, resume `$CA0029`). On this ambiguous-z beam the
+  party sprite's z oscillates 0/2/3 and the pre-battle `scroll_obj` never
+  settles, so the encounter **hangs forever**: `battleLoadStarted` never
+  latches (the kill-bit can't fire it), and both A-mash and a neutral pad stay
+  stuck. **Riding that hang under A is what the fifth pass mis-rode into the
+  Narshe intro maps** (`225→5→18→19`, `$0128`). `$0128` is a red herring — the
+  party never legitimately reaches map 19.
+- **The fix:** suppress random encounters across the shaft (zero the danger
+  accumulator `$1f6e/$1f6f` each frame; `battle.asm:380+` overflows it into
+  `EventScript_RandBattle`). The existing `BRIDGE2` tile table was already
+  correct; the party then walks it clean to `(30,34)→221 (30,22)`, ~999 frames.
+- **Also fixed the fight tail.** Battle 69 (formation 438 = DADALUMA `$0107` +
+  two `$006C`, verified live) is a kill-bit boss that resolves faster than
+  `battleLoadStarted`'s HP-table signal can be observed, so the old
+  observe-the-battle sequence timed out on an already-won fight (the party was
+  reading the "Got Head Band" reward on the roof). It is now driven hands-off:
+  kill-bit + broad edge-A until the win clears `$034A` and control returns at
+  `(30,13)`. `dadaluma_doorstep` + `dadaluma_won` mint; the tower porch opens.
+
+### FIXED — `gen_opera1` world walk (Zozo→Jidoor) `worldGrind`
+`zozo_done → opera_doorstep`'s world leg timed out: `worldNavTo`'s verified-step
+blocklist condemns all four edges around world `(34,103)`, a dense random-battle
+band (world tile prop bit6 `$40`) where every encounter snapshots+restores the
+party to the same tile, so the press "never moved us" (probe_opera_world.lua).
+Replaced that one call with a local `worldGrind`: re-plan a `worldBfs` when the
+plan runs out, kill-bit **and** A-mash each encounter, never condemn an edge —
+so a battle-restored tile just retries until a step lands. Reaches `(27,129)` in
+~3800 frames. `opera_open`/`opera_backstage`/`opera_stage`/`opera_dance_done`
+needed no further fix (opera2's world route avoids the trap band).
+
+**Result:** `dadaluma_doorstep`, `dadaluma_won`, `zozo_done`, `opera_doorstep`,
+`opera_open`, `opera_backstage`, `opera_stage`, `opera_dance_done` (`$0111=1`)
+all mint and PASS. `make test` green.
+
+### STILL OPEN — `gen_opera6_rafter` legs 2–4 (Ultros②)
+Leg 1 works (`ultros_dropped`, `$0058=1`). Legs 2–4 are a genuine multi-map
+decode, still unfinished:
+- **Leg 2 door topology is ASYMMETRIC.** Getting back to the map-234 impresario
+  is not the simple reverse of `gen_opera4`'s Route A: map 237 has entrances to
+  238/233/511 but **none to 234** (only 234→237 exists, at `{7,49}`/`{25,49}`).
+  The 238→237 hop is `238 (100,23) → 237 (82,34)`. The 237→234 return route
+  must be found another way (a long-entrance or the theater-floor topology) —
+  measure before authoring.
+- **The weight-trap switches are NOT in event scripts.** `_cab497` (`{118,27}`)
+  needs `$01B0 && $01B4` (weight can fall) and `$0387=1` (fall → `battle 134`
+  instead of Ultros escaping to map 237, "Surprise!"). Grepping
+  `event_main.asm`: `$01B0`/`$01B4` are only ever *cleared* (`switch …=0`) or
+  *read* (`if_switch …=1`) — **never set by a `switch` opcode**; `$0387=1`
+  appears only in the WoR/airship init block (line ~11274), unrelated to the
+  opera. So the trap is armed by the puzzle's ASM / object-position logic, not
+  by an event `switch` — it must be measured by driving the catwalk maze
+  (`233→231→239→232`, z-split, needs corridor tables like `gen_opera5`) and
+  watching `$01B0/$01B4/$0387/$0355` change as the switches are flipped. This
+  is the crux the next pass must instrument. `ultros2_doorstep` unminted;
+  `battle_ultros2.lua` stays SKIPPED.
+
+### ROM note (pre-existing, unchanged)
+A fresh `make rom` from committed sources produces a ROM that differs from the
+seeded `build/states/.rom-copy` by ~4000 bytes (the fifth pass hit this too;
+committed `ff6/` trees are identical between branches and the build is
+deterministic, so the seed was minted from a since-diverged source state). The
+seed is self-consistent with the ~55 seeded fixtures. This pass minted the new
+states against BOTH the seed ROM (to resume at the maze) and, as a check, the
+fresh committed-source ROM — the crack and the opera chain mint identically on
+each, so the fix is ROM-independent. `make test` builds and stamps the fresh
+ROM (`4ad09d8…`) and stays green.
