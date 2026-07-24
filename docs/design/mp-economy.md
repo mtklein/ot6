@@ -208,7 +208,7 @@ pass still watches Osmose-cycling next to Facet + Rune Eater.
    The magic menu already renders MP columns; Tools, Blitz,
    Dance, stable, and Slots menus do not. The menu list
    machinery exists (class icons and fold previews already
-   ride it), and the C toolchain points at menu work — scope
+   ride it); scope this ca65 work
    this with M4's curated-kit menus. Noted for later polish,
    M4/M5 era: the pool's on-screen label can read "SP" for a
    character who does not yet know any magic, unifying to "MP"
@@ -268,8 +268,7 @@ pass still watches Osmose-cycling next to Facet + Rune Eater.
     check no MP. A silent charge on a menu that says nothing is a
     hidden tax, and there is no honest subset that can ship
     enabled now (no new verb's menu can show a cost without the
-    menu-bank work, which needs the not-yet-reinstalled Calypsi
-    C toolchain). So the whole mechanic gated on a build-time
+    menu-bank work). So the whole mechanic gated on a build-time
     flag **`OT6_MP_COSTS`**. **v0.5 flipped it: the flag now
     defaults ON, so the shipped ROM charges MP — the headline
     v0.5 combat-economy change, landing alongside the menu-bank
@@ -290,7 +289,7 @@ pass still watches Osmose-cycling next to Facet + Rune Eater.
     Terra's magic is already costed); rung 2–3 fixtures
     re-measure when it lands.
 
-  **The menu work order (for when Calypsi C lands).** To flip
+  **The menu work order.** To flip
   `OT6_MP_COSTS` on honestly, the menu bank must show and enforce
   these costs the way it already does for Magic:
   - The Magic menu's cost column and grey-out are

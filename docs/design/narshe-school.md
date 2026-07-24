@@ -135,11 +135,11 @@ on a boosted turn (Ot6ActionEnd), folds per Ot6FoldTbl with base-tier
 MP (Ot6QueueFold), live list re-fold (Ot6PreviewList_ext).
 
 **The rung-2 seed ($0276) was rewritten under the school's own sanction
-(2026-07-22) to match the v0.6 break-coverage pass.** When $0276 first
+(2026-07-22) to match the v0.5 break-coverage pass.** When $0276 first
 shipped, the "armored machines" it describes could not answer it, so v0.3
 gave the imperial line poison (Bio Blaster's element) and the old seed —
 "shrug off blade and fire alike… every armor fears one right tool" — read
-true. The **v0.6 break-coverage pass retired that framing.** A fixed-party
+true. The **v0.5 break-coverage pass retired that framing.** A fixed-party
 audit found poison is Edgar-only, and the parties that fight the imperial
 line — Cyan solo at Doma, all of Sabin's scenario, Locke solo, two of
 three Narshe squads — carry no Edgar, so "one right tool = poison" would

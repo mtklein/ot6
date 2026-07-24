@@ -75,9 +75,10 @@ is built (it is not yet).
 
 ### Sabin — Monk (bludgeoning: fists; claws buy slashing)
 
-The 8 Blitzes, verbatim ✦ — vanilla level table preserved ✦, button
-inputs stay. Fists are the heart of the **bludgeoning** class
-(fists, staves, rods) — Pummel-as-blade never sat right. Equipping
+The 8 Blitzes, verbatim ✦ — vanilla level table preserved ✦, selected
+from a menu (the fighting-game inputs were retired in v0.4). Fists are
+the heart of the **bludgeoning** class (fists, staves, rods) —
+Pummel-as-blade never sat right. Equipping
 claws switches his *Fight* to slashing ✦, but blitz classes are
 immutable: Pummel with claws on is still bludgeoning. The weapon
 slot is his second class, the ability list is his first.

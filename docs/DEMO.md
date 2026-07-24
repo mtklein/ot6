@@ -59,8 +59,9 @@ BPS-capable patcher, or just:
   reveals persist).
 - **Weakness codex**: reveals persist *across battles*, Octopath
   style — fight a species once and its known weaknesses show from the
-  start forever after (stored in the save SRAM's second bank; the
-  cartridge header grew to 32KB battery RAM for it).
+  start forever after in that save slot (stored in a per-slot page of
+  the save SRAM's second bank; the cartridge header grew to 32KB battery
+  RAM for it).
 
 ## Verification
 

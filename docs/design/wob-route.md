@@ -1,8 +1,15 @@
-# OT6 v0.5 — World-of-Balance route plan (Opera → Floating Continent)
+# OT6 v0.5–v0.6 — World-of-Balance route plan (Opera → Floating Continent)
 
-Scope: continue the fixture route chain from the v0.4 endpoint (`zozo_done`)
-to the END of the World of Balance. READ-and-PLAN survey; no source touched.
-All line/address references were read from the repo on 2026-07-22.
+Original scope: continue the fixture route chain from the v0.4 endpoint
+(`zozo_done`) to the END of the World of Balance. READ-and-PLAN survey; no
+source touched. All line/address references were read from the repo on
+2026-07-22.
+
+**Release rescope (2026-07-24):** v0.5 ends after Beat A, with Ultros ②
+defeated, Setzer joined, and the Blackjack acquired. Beats B–F are now v0.6.
+The route research below is retained because its measured findings and
+implementation hazards remain the handoff for that release; references to
+"v0.5" outside the measured Beat A logs describe the original plan.
 
 ---
 
@@ -37,20 +44,21 @@ already specifies every shield count + weakness row) and the FF6 WoB story
 order. Boss IDs/shields below are the AUTHORED values from
 `ff6/src/battle/ot6.asm` `Ot6ShieldTbl` (all confirmed present).
 
-| beat | maps / place | set-piece fights (id · shields · class) | new chars / espers |
-|---|---|---|---|
-| **A. Opera House** | Jidoor town, Opera House (stage, rafters, catwalks), the Blackjack | **Ultros ②** `$12d` · 6 · slash\|pierce | **Setzer** joins; airship (Blackjack) acquired |
-| **B. Vector / Magitek Factory** | Vector town, Magitek Research Facility, minecart rails, Blackjack deck | **Ifrit** `$109`·6·pierce + **Shiva** `$108`·6·slash (tag); **Number 024** `$10a`·7·slash\|pierce; **Number 128** `$10b`·7·pierce + blades `$13f/$140`·3·slash; **L/R Cranes** `$10d/$10e`·6·pierce | **Ifrit + Shiva** magicite |
-| **C. Banquet / Sealed Gate** | Vector (Emperor's banquet Q&A), Cave to the Sealed Gate, rope bridge | **Ultros ③** `$12e`·7·slash\|pierce | Terra recovers her will; (Maduin at/after the Gate — magicite.md) |
-| **D. Thamasa** | Thamasa town, the burning house | **FlameEater** `$116`·7·pierce + Balloons `$de`·1 | **Strago, Relm** join; Kefka's massacre scene → magicite |
-| **E. FC approach** | Blackjack deck, IAF shmup gauntlet | **Ultros ④** `$168`·7·slash\|pierce + **Chupon** `$12f`·4·bludg (Sneeze); **AirForce** `$113`·8·pierce + LaserGun/MissileBay `$145/$147`·3 + Speck `$146`·1·any | — |
-| **F. Floating Continent** | the FC surface, the escape | **AtmaWeapon** `$117`·**11**·slash\|pierce; **Nerapa** `$118`·5·slash\|pierce (escape doorman) | Shadow forced; WoB ends → WoR (out of scope) |
+| release | beat | maps / place | set-piece fights (id · shields · class) | new chars / espers |
+|---|---|---|---|---|
+| **v0.5** | **A. Opera House** | Jidoor town, Opera House (stage, rafters, catwalks), the Blackjack | **Ultros ②** `$12d` · 6 · slash\|pierce | **Setzer** joins; airship (Blackjack) acquired |
+| v0.6 | **B. Vector / Magitek Factory** | Vector town, Magitek Research Facility, minecart rails, Blackjack deck | **Ifrit** `$109`·6·pierce + **Shiva** `$108`·6·slash (tag); **Number 024** `$10a`·7·slash\|pierce; **Number 128** `$10b`·7·pierce + blades `$13f/$140`·3·slash; **L/R Cranes** `$10d/$10e`·6·pierce | **Ifrit + Shiva** magicite |
+| v0.6 | **C. Banquet / Sealed Gate** | Vector (Emperor's banquet Q&A), Cave to the Sealed Gate, rope bridge | **Ultros ③** `$12e`·7·slash\|pierce | Terra recovers her will; (Maduin at/after the Gate — magicite.md) |
+| v0.6 | **D. Thamasa** | Thamasa town, the burning house | **FlameEater** `$116`·7·pierce + Balloons `$de`·1 | **Strago, Relm** join; Kefka's massacre scene → magicite |
+| v0.6 | **E. FC approach** | Blackjack deck, IAF shmup gauntlet | **Ultros ④** `$168`·7·slash\|pierce + **Chupon** `$12f`·4·bludg (Sneeze); **AirForce** `$113`·8·pierce + LaserGun/MissileBay `$145/$147`·3 + Speck `$146`·1·any | — |
+| v0.6 | **F. Floating Continent** | the FC surface, the escape | **AtmaWeapon** `$117`·**11**·slash\|pierce; **Nerapa** `$118`·5·slash\|pierce (escape doorman) | Shadow forced; WoB ends → WoR (out of scope) |
 
 Set-pieces that draw **no gauge** (scripted theater, `Ot6ShieldTbl` `0,$00`):
 **Guardian** (`$0111/$0112`, invincible in Vector), **Tritoch** (`$0114/$0115/$0144`).
 Their silent HUD is the tell.
 
-v0.5 finishes when the FC-escape fixture mints (post-Nerapa, entering WoR).
+v0.5 finishes when the post-Opera Blackjack fixture mints. v0.6 finishes
+when the FC-escape fixture mints (post-Nerapa, entering WoR).
 
 ---
 
@@ -186,12 +194,14 @@ Confirm each forced member holds a key to each boss's authored class row
 (slash/pierce dominate; Chupon needs bludg, Shiva needs slash, Ifrit needs
 pierce). Cross-check weapon classes in `ff6/src/battle/ot6_class.asm`.
 
-### Open bugs that touch routed parties
-- **Issue #5 (OPEN, bug):** Cyan's boost→SwdTech mapping makes learned techs
-  unreachable — if Cyan is routed into any v0.5 party, his kit is degraded.
-- **Issue #6 (OPEN):** the formula-floor long tail (un-authored trash is
-  *unbreakable*, not just un-weak) — bosses are class-breakable already, so this
-  gates the *tuning/coverage* pass, not the route itself.
+### Bugs from the original survey — resolved for v0.5
+- **Issue #5 (CLOSED):** Cyan's boost→SwdTech mapping once made learned techs
+  unreachable. The direct Bushido submenu and configurable loadout now expose
+  the intended four slots; see `kits.md`.
+- **Issue #6 (CLOSED):** the formula-floor long tail once left un-authored
+  trash *unbreakable*, not merely un-weak. The generated per-species break
+  floor now gives every fallback body a weapon-class weakness; see
+  `bosses-wob.md`.
 
 ---
 
@@ -290,7 +300,7 @@ Before/alongside Beat A:
 - Break data (author here): `ff6/src/battle/ot6.asm` — `Ot6ShieldTbl` (4491),
   `Ot6ElemAddTbl` (384)
 - Master boss design: `docs/design/bosses-wob.md`
-- Esper roster (v0.5: Ifrit/Shiva/Maduin…): `docs/design/magicite.md`
+- Esper roster (v0.6: Ifrit/Shiva/Maduin…): `docs/design/magicite.md`
 - Frontier/mint machinery: `Makefile` (FRONTIER lists; `mint`/`stackseed` macros)
 - Opera event source: `ff6/src/event/event_main.asm` ~22308–28700
 - World/vehicle nav: `docs/research/world-map-nav.md`; `tools/tests/lib/ot6_field.lua`
@@ -652,3 +662,23 @@ states against BOTH the seed ROM (to resume at the maze) and, as a check, the
 fresh committed-source ROM — the crack and the opera chain mint identically on
 each, so the fix is ROM-independent. `make test` builds and stamps the fresh
 ROM (`4ad09d8…`) and stays green.
+
+## Beat A — seventh pass: rafter route measured; battle-number correction (2026-07-24)
+
+The timed route now mints `ultros2_doorstep` on map 235 at `{14,7}`:
+letter → active-theater Impresario → briefing → stage master → far-right
+switch → left framework → catwalk.  The five rat NPC gates carry no story
+state and are cleared before map 235 instantiates so the fixture mint remains
+deterministic inside the timer; the player-facing rat chase remains part of
+the human playtest.
+
+**Correction:** every earlier claim in this document that the WoB Ultros②
+story fight is `battle 134` is wrong.  Source and runtime agree:
+
+- WoB Ultros② is `_cabf4b` → **`battle 104`** (`event_main.asm:29954`).
+- `battle 134` is `_cab6d6`, the **WoR Opera House dragon/weight event**, gated
+  by `$0387=1`; the WoR transition sets that switch and the event clears it.
+
+`battle_ultros2.lua` and the post-fight Blackjack generator must therefore
+enter battle 104 and positively identify species `$012d`.  Manufacturing
+`$0387=1` would test an unrelated WoR event, not the v0.5 route.

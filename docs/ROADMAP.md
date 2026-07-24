@@ -18,7 +18,8 @@ recruited character's kit is honest there.
 | 2 | Figaro → Vargas | shipped in v0.2: fixtures to the Vargas doorstep, the Narshe school, the Bio Blaster as poison key, Vargas's holy add. Band-2 sweep measured (Measurement #6) but *not* tuned — playtest endorsed the shipped resistance at Kolts; break uptime on trash remains ~0% |
 | 3 | scenario split → Kefka at Narshe | shipped in v0.3. ~~Cyan BP-Bushido~~ shipped (M3, `Ot6BushidoTier`; kits.md); remaining: fixtures reaching and crossing the split, the Narshe defense's 3-party machinery, Celes's Runic→BP, and Cyan's MP column (mp-economy.md). Enemy data authored through here (armor line + Kefka poison) |
 | 4 | through Zozo — Dadaluma beaten, sub-jobs in hand | shipped in v0.4: M5 magicite sub-jobs (grant + stat bump), the Zozo balance pass (measured), the crane-maze/Ramuh route, Blitz-as-menu, boost-tiered Steal, full HP/MP restore on level-up, Cyan's Oblivion |
-| **5 (current)** | **end of WoB (Opera → Floating Continent)** | M4 kits + the wide tuning/telegraph pass; "every ability costs MP" goes live with the cost-display menu work (boss data already reaches Nerapa); the remaining espers; RunicBlade (Celes's divine, deferred from v0.4 pending its design call) |
+| **5 (current)** | **end of the Opera sequence — Ultros ② beaten, Setzer joined, Blackjack acquired** | finish and gate the Opera fixture chain; activate the Ultros ② battle gate; ship the incidental systems/polish already accumulated since v0.4, including live ability MP costs, Cyan's Bushido submenu/loadouts, and universal break-floor coverage |
+| 6 | end of WoB (Vector → Floating Continent) | remaining kits and espers; the wide weakness/telegraph pass (boss data already reaches Nerapa); route and tune Vector through the Floating Continent |
 
 ## Releases
 
@@ -41,12 +42,18 @@ links). What each delivers:
   a stat bump; *augment*, not replace, for the born mages); Blitz becomes
   a menu; Steal gains the chance-verb canon; full HP/MP restore on
   level-up; Cyan's Oblivion divine (Assassinate built dormant behind
-  Shadow; RunicBlade deferred to v0.5 pending its design call).
+  Shadow; RunicBlade deferred pending its design call).
   Per-ability MP cost is built but dormant. Balance-tuned through Zozo.
-- **v0.5 (next)** — the rest of the World of Balance (Opera → Vector →
-  Magitek factory → Floating Continent). "Every ability costs MP" goes
-  live with the cost-display menu work (Calypsi C); the remaining espers
-  and kits; the wide weakness/telegraph authoring pass.
+- **v0.5 (next)** — through the complete Opera sequence: Ultros ② beaten,
+  Setzer joined, and the Blackjack acquired. "Every ability costs MP" goes
+  live with cost display implemented in ca65; Cyan gains a direct
+  Bushido submenu and configurable loadout; and the generated break floor
+  makes every otherwise-unauthored enemy weapon-breakable. This deliberately
+  favors getting a coherent playtest build into players' hands over holding
+  those improvements for the much longer rest-of-WoB route.
+- **v0.6** — Vector → Magitek factory → Sealed Gate → Thamasa → Floating
+  Continent. The remaining espers and kits, plus the wide
+  weakness/telegraph authoring pass.
 
 **Design canon:** *on damage verbs boost multiplies; on chance verbs
 boost guarantees.* Steal shipped it in v0.4 (3 BP = a guaranteed steal of
@@ -103,7 +110,10 @@ the next work block.
 - ✅ BP display: Octopath-style pips beside each party name (5 sockets,
   bright = spendable), re-staged every menu open + live during boost.
 - ✅ **Weakness codex** (pulled forward from M3's tracking): reveals
-  persist across battles in the second SRAM bank (`battle_codex.lua`).
+  persist across battles in a per-save-slot page of the second SRAM bank;
+  legacy cartridge-global `O7` knowledge migrates into all three isolated
+  `O8` pages. An unsaved New Game uses a fourth transient page until its
+  first save (`battle_codex.lua`, `codex_saveas.lua`).
 - ✅ Under-monster HUD on the BG3 field map: shield-with-count glyph
   ('B' broken) + per-weakness revealed-icon/'?' cells — the M1
   "weakness strip" is superseded by this.
@@ -113,10 +123,6 @@ the next work block.
   names before the choice is made, and an arrow mark floats beside
   every boosting character on the battlefield until their action
   resolves.
-- ✅ **C toolchain pilot** (2026-07-16): Calypsi 65816 compiles
-  `ff6/src/c/` into blobs pinned at `$f0f000`, exercised in-battle by
-  the gate (battle_c). Menu-heavy M4/M5 modules can be written in C;
-  hooks and NMI code stay ca65. First real port candidate: the codex.
 - ✅ **Attack +1 hit per BP** (2026-07-16): extra swings via the vanilla
   alternating-hands machinery; Genji Glove doubles the bonus.
 - ✅ **Boost-tier spell folding** (2026-07-16): Fire → Fire 2 → Fire 3
@@ -159,12 +165,12 @@ Landing across releases rather than as one block:
   schedules (levels/items/deeds/story — design/kits.md): **likely no JP
   system**; JP returns only if playtesting wants a pacing knob.
 - ⬜ **Curated-kit machinery** for Gau/Strago (learn many, equip ~5 — the
-  Ochette/Hikari model); menu-bank work on the C toolchain.
+  Ochette/Hikari model); menu-bank work remains in ca65.
 - ⬜ **Passives** unlock at 2/4/6/8 skills learned.
 
 **Exit:** fresh save through Zozo with every character on their kit.
 
-## M5 — Magicite as sub-jobs — 🔨 core shipped v0.4, roster continues v0.5
+## M5 — Magicite as sub-jobs — 🔨 core shipped v0.4, roster continues v0.6
 
 - Esper equip grants its spell list live (usable while equipped, gone
   when unequipped); permanent learning and level-up esper bonuses
@@ -177,7 +183,7 @@ Landing across releases rather than as one block:
 - Boost spell-folding is source-agnostic, so a borrowed Fire folds to
   Firaga under boost for free.
 - v0.4 authors the Zozo espers (Ramuh + Kirin/Siren/Stray); the rest of
-  the WoB roster lands in v0.5.
+  the WoB roster follows the post-Opera route in v0.6.
 
 **Exit:** swapping magicite mid-dungeon visibly swaps a character's kit.
 
@@ -193,8 +199,11 @@ authored weaknesses, and only measured against real fixtures:
   corridor's poison/fire absorbers authored around, no-weakness trash
   given a reachable axis. Fire is a coverage hole this stretch (Terra is
   the search target, absent).
-- ⬜ **Rest of the WoB** (v0.5): the wide weakness/telegraph pass; global
-  enemy HP; boss telegraphs. Boss shield/class data already reaches Nerapa.
+- 🔨 **Opera** (v0.5): route and measure Ultros ②; carry the fixture through
+  Setzer joining and acquisition of the Blackjack.
+- ⬜ **Vector through the end of the WoB** (v0.6): the wide
+  weakness/telegraph pass; global enemy HP; boss telegraphs. Boss
+  shield/class data already reaches Nerapa.
 
 **Exit:** the opening third of the game plays as a coherent Octopath-like.
 

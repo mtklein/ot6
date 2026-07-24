@@ -62,19 +62,9 @@ the manual steps at each bullet).
   2026-07-18 reformat died as DllNotFoundException → Abort trap 6.
   [research/toolchain.md](research/toolchain.md)'s Mesen entry said
   "needs `brew install sdl2`" all along; this list omitted it.
-- **Calypsi 65816 C toolchain 5.17** — macOS pkg from
-  github.com/hth313/Calypsi-tool-chains, expanded (not installed) to
-  `tools/calypsi/expanded/...` (git-ignored; x86_64 binaries run under
-  Rosetta). `tools/cc/build-c.sh` compiles `ff6/src/c/*.c`
-  (`--target snes`, large models) and links with `ot6-rom.scm`, which
-  pins section `farcode` at `$f0f000` — the `ot6_c` ld65 segment pins
-  the same address, so both linkers agree by construction. The tiny
-  `.raw` blobs are committed; hooks/NMI code stay ca65. ABI: 16-bit
-  native modes, first arg in A, later args pushed as words (callee
-  sees the first at `4,s`), result in A, `rtl` return. Leaf functions
-  with no globals need no direct-page setup; anything using near data
-  or `_Dp` needs a C context (direct page + data bank) marshalled by
-  its trampoline first.
+- **ca65/ld65 is the sole production compiler/linker path.** OT6 code
+  stays in assembly alongside the vendored disassembly; there is no
+  secondary compiler or committed compiler-generated blob to reproduce.
 - Everything is one flat git repo; only the ROMs, `build/`,
   `tools/Mesen.app`, and `tools/bin` are ignored. Ripped assets are
   tracked. The release artifact is a BPS delta from `make patch`, which

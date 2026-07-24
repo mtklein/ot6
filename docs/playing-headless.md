@@ -33,7 +33,8 @@ Copy from your play save into the testing world on demand:
     tools/tests/make_srm_sidecar.sh   # snapshot the live save -> sidecar
 
 This writes `build/states/playthrough_srm.mss.lua`, the front 8 KB of
-your battery save (the slots; the upper SRAM banks hold the OT6 codex)
+your battery save (the slots; the second SRAM bank holds three isolated
+OT6 codex pages plus one transient unsaved-New-Game page)
 as an embeddable base64 blob. It's under gitignored `build/`, so save
 data is never committed.
 

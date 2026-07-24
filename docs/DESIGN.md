@@ -53,7 +53,7 @@ enemies* — vanilla FF6 was flirting with this system in 1994.
 | Terra | Mage | Sword | Fire | 8 spells; divine: Ultima (see Trance below) |
 | Locke | Thief | Dagger | Wind | Steal grows into a full thief kit: Steal, Mug, armor/attack corrode, BP theft **(TBD)** |
 | Edgar | Machinist | Spear | Lightning | the 8 Tools, verbatim |
-| Sabin | Monk | Claw | Fire/Holy | the 8 Blitzes, verbatim — button inputs stay |
+| Sabin | Monk | Claw | Fire/Holy | the 8 Blitzes, selected from a menu |
 | Cyan | Samurai | Katana | — | the 8 Bushido, priced in BP (see below) |
 | Celes | Rune Knight | Sword | Ice/Holy | Runic from the start (signature) + spells (see below) |
 | Gau | Beast Tamer | Fangs (innate) | Earth | Leap becomes Capture; controlled beast skills replace berserk Rage (see below) |
@@ -224,9 +224,13 @@ lands in M4. Fun mechanics don't wait on menu plumbing.
 
 ## Difficulty transform (ruling 2026-07-17)
 
-Enemy **identity** is vanilla-sacred — weaknesses, AI, sprites, and the
-ROM property record never change. Enemy **difficulty** numbers are
-OT6's tuning surface, applied as a *runtime transform*: at monster
+Enemy narrative role, visual identity, and recognizable behavior are the
+starting point, not immutable constraints. OT6 may author weaknesses,
+AI, shields, and other combat properties when that creates a clearer
+break puzzle or better pacing; changes should stay legible and preserve
+the enemy's broad fantasy unless a deliberate redesign says otherwise.
+Enemy **difficulty** numbers are likewise an OT6 tuning surface. The
+current broad HP pass is applied as a *runtime transform*: at monster
 seed time (the same bank-F0 hook that seeds shields), each
 non-authored species' battle HP — current and max copies — is
 multiplied by a per-species-band value in 16ths (`Ot6HpMulTbl`),

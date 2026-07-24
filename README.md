@@ -18,10 +18,13 @@ carry shields and hidden weaknesses, hitting a weakness chips a shield, and
 breaking drops defenses hard; boost banks turns and folds spell tiers
 (Fire → Fira → Firaga).
 
-Work in progress toward the next rung, the rest of the World of Balance
-(Opera → Vector → the Floating Continent). See [docs/ROADMAP.md](docs/ROADMAP.md) for milestones and the
-"playable frontier" metric, and [docs/DESIGN.md](docs/DESIGN.md) for the
-mechanics design.
+Work in progress toward v0.5, which extends the playable frontier through the
+complete Opera sequence: Ultros defeated, Setzer joined, and the Blackjack
+acquired. Vector through the end of the World of Balance follows in v0.6.
+See [docs/ROADMAP.md](docs/ROADMAP.md) for milestones and the "playable
+frontier" metric, and [docs/DESIGN.md](docs/DESIGN.md) for the mechanics
+design. The focused questions for the upcoming build are in the
+[v0.5 playtest brief](docs/playtest-v0.5.md).
 
 ## Quick start
 

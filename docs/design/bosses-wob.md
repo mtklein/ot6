@@ -320,7 +320,7 @@ dropped vanilla's bolt bit and never mentioned the absorb at all.)
   `$7d` (battle_main.asm:6577) and that spell's element byte is `$08`.
   The Narshe school's rung-2 seed once teased that tool as the answer to
   armored things ("Every armor fears one right tool", narshe-school.md) —
-  a framing the v0.6 break pass retired and the seed's own rewrite has
+  a framing the v0.5 break pass retired and the seed's own rewrite has
   since dropped (see "The imperial soldier line"), but the poison-heal
   trap here is vanilla and stands regardless. Point
   Bio Blaster at this boss and vanilla's absorb branch
@@ -374,7 +374,7 @@ nulled. The 6 shields and the two classes were already in
 `Ot6ShieldTbl`. Kefka himself stays **wide** — poison|fire + piercing,
 slashing — so any squad you route to him can break him. His **waves**
 (Trooper, HeavyArmor, Rider) used to lean on the same poison the school
-sold, which only the Edgar squad could cast; the v0.6 pass gave them
+sold, which only the Edgar squad could cast; the v0.5 pass gave them
 slash\|pierce class rows so every player-assigned squad has a key (see
 "The imperial soldier line" below).
 
@@ -392,7 +392,7 @@ slash\|pierce class rows so every player-assigned squad has a key (see
 ## The imperial soldier line — every party gets a key
 
 Not bosses, but authored here because this is where the weakness data
-lives, and because the **v0.6 break-coverage pass rewrote the whole
+lives, and because the **v0.5 break-coverage pass rewrote the whole
 idea.** (This section replaces the old "one right tool" writeup, kept in
 git history.)
 
@@ -457,7 +457,7 @@ holds to.
 them element-only ("vanilla already agrees, no row needed") because they
 are poison-weak in vanilla. But the Narshe defense is *semi-free* —
 squads are player-assigned, and a Cyan+Sabin or Locke+Gau squad reaches
-neither poison nor any vanilla element on these bodies. So v0.6 gives
+neither poison nor any vanilla element on these bodies. So v0.5 gives
 both a slash\|pierce class row: vanilla poison stays the Edgar squad's
 key, the class is every other squad's. Formation 88 (Trooper+HeavyArmor,
 `battle 23`, event_main.asm:108505) now opens to whatever a squad holds,
