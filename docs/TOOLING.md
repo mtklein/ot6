@@ -12,7 +12,8 @@ in `ff6/vanilla/` (git-ignored) and assets are ripped from it once
 (`make rip`). Verified: the unmodified tree's `make ff6-en` reproduces
 retail FF3us 1.0 **byte-for-byte** (CRC32 A27F1C7A), including retail's
 famously wrong internal SNES checksum. OT6 code lives in
-`ff6/src/battle/ot6.asm` (expanded bank $F0) plus minimal jsl shims in
+the ordered `ff6/src/battle/ot6_*.asm` modules (emitted by `ot6.asm` into
+expanded bank $F0) plus minimal jsl shims in
 vanilla banks.
 
 Top-level `Makefile` targets:

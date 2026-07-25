@@ -56,14 +56,16 @@ and how to write a test.
 
 ```
 ff6/        # full-game source (vendored everything8215/ff6 disassembly,
-            #   GPL-3.0) + OT6 code in ff6/src/battle/ot6.asm (bank F0)
+            #   GPL-3.0) + OT6 modules under ff6/src/battle/ot6_* (bank F0)
 docs/       # design, roadmap, research notes, vendored-history patches
 tools/      # Mesen 2, flips, Lua battle-test harness (tools/tests/)
 build/      # built ROM + distributable .bps patch (git-ignored)
 ```
 
-Nearly all OT6 code lives in expanded bank `$F0`; vanilla banks carry only
-minimal `jsl` hook shims. [docs/TOOLING.md](docs/TOOLING.md) covers the
+Nearly all OT6 code lives in feature-oriented modules emitted in order from
+`ff6/src/battle/ot6.asm` into expanded bank `$F0`; `ot6_memory.inc` is the
+central WRAM/SRAM ownership map. Vanilla banks carry only minimal `jsl` hook
+shims. [docs/TOOLING.md](docs/TOOLING.md) covers the
 toolchain and [docs/research/](docs/research/) holds the reverse-engineering
 notes.
 

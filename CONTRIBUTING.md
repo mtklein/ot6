@@ -27,8 +27,10 @@ under Mesen's testrunner — no window, no clicking.
 
 ## Where the code is
 
-Nearly all OT6 code lives in expanded bank `$F0`
-([ff6/src/battle/ot6.asm](ff6/src/battle/ot6.asm)); vanilla banks carry only
+Nearly all OT6 code lives in feature modules emitted from
+[ff6/src/battle/ot6.asm](ff6/src/battle/ot6.asm) into expanded bank `$F0`;
+[ot6_memory.inc](ff6/src/battle/ot6_memory.inc) owns the shared WRAM/SRAM map.
+Vanilla banks carry only
 minimal `jsl` hook shims, because bank `$C1` is 100% full and `$C2` has a few
 hundred bytes of slack. `ff6/` is a vendored copy of the everything8215/ff6
 disassembly (GPL-3.0) — treat everything under it except our hack files as
