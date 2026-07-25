@@ -14,14 +14,15 @@ corrupted by a test run (it was zeroed twice before this split):
 - **Your manual-play save** lives in Mesen's normal profile
   (`~/Library/Application Support/Mesen2/Saves/ot6.srm`). Tests never
   read or write it directly.
-- **Repeatable-testing saves** live in `build/mesen-test-saves/`. Tests
-  run the shared read-only emulator against a private Mesen config home
-  (`build/mesen-test-home/`, selected with `CFFIXED_USER_HOME`), and
+- **Repeatable-testing saves** live inside each invocation's unique
+  `build/test-runs/<run>/saves/` directory. Tests run the shared read-only
+  emulator against that invocation's private Mesen config home (selected
+  with `CFFIXED_USER_HOME`), and
   `tools/tests/lib/pin_test_saves.py` writes that home's `settings.json`
   with an explicit `SaveDataFolder` override every run — so the two
   directories can't share a file even if your Mesen settings later grow
-  their own override. Worker runs (`OT6_WORKER=<id>`, see the tests
-  README) repeat the same scheme under `build/test-workers/w<id>/`.
+  their own override. `OT6_WORKER=<id>` is only a diagnostic label; it is
+  not an isolation key.
 
 `run.sh` also wipes `<saves>/*.srm` before every launch: the testrunner
 flushes battery on exit and reloads it next boot, so a stale srm is a
@@ -33,10 +34,10 @@ Copy from your play save into the testing world on demand:
     tools/tests/make_srm_sidecar.sh   # snapshot the live save -> sidecar
 
 This writes `build/states/playthrough_srm.mss.lua`, the front 8 KB of
-your battery save (the slots; the second SRAM bank holds three isolated
-OT6 codex pages plus one transient unsaved-New-Game page)
-as an embeddable base64 blob. It's under gitignored `build/`, so save
-data is never committed.
+your battery save (the vanilla slots) as an embeddable base64 blob.
+It does **not** include the second SRAM bank containing OT6's three
+isolated codex pages and transient page. It's under gitignored `build/`,
+so save data is never committed.
 
 ## Booting a save headless
 
@@ -56,6 +57,38 @@ The inject idiom (front 8 KB to cpu `$30:6000`):
     for i = 1, #data do
       emu.write(0x306000 + i - 1, string.byte(data, i), emu.memType.snesMemory)
     end
+
+## Versioned battery anchors
+
+Durable frontier shortcuts use a complete 32 KiB Mesen `.srm`, not the legacy
+8 KiB sidecar. `tools/tests/anchors/post-opera-v1/` contains a small manifest
+and its hashed payload. `sram_anchor.py` rejects unknown schemas, unsafe
+payload names, wrong sizes, and hash mismatches before a run starts:
+
+    python3 tools/tests/lib/sram_anchor.py validate \
+      tools/tests/anchors/post-opera-v1
+
+`run.sh` installs a verified anchor by value into the invocation-private save
+folder when `OT6_SRAM_ANCHOR` is set. Mesen then takes its ordinary cold-load
+path; no Lua writes SRAM. `gen_vector_arrival.lua` drives title Continue,
+validates slot 3's story/codex contract, and steps right into Vector.
+
+The tracked anchor was produced by `gen_post_opera_anchor.lua`: it loads the
+`blackjack` tactical fixture, settles the final arrival, crosses and exits
+Vector to normalize the world-menu state, then uses the real in-game Save UI
+to save slot 3. `OT6_CAPTURE_SRM` captures Mesen's complete battery file only
+after emulator shutdown. Its payload and manifest are included in
+`vector_arrival`'s content freshness stamp.
+
+To regenerate the payload deliberately:
+
+    OT6_CAPTURE_SRM=tools/tests/anchors/post-opera-v1/post-opera.sram \
+      tools/tests/run.sh tools/tests/gen_post_opera_anchor.lua
+
+Then update the manifest SHA-256 and validate it before committing. The
+generator plants a nonzero codex witness which must survive the real Save As
+copy and cold Continue, proving that bank `$31` was preserved rather than
+merely reinitialized.
 
 ## Field navigation
 

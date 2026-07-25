@@ -1,7 +1,9 @@
 #!/bin/sh
 # make_srm_sidecar.sh -- snapshot the live in-game battery save and turn
-# its front 8 KB (the save slots; bank $31 holds their OT6 codex pages) into
-# an embeddable base64 sidecar the headless harness can inject at boot.
+# its front 8 KB (vanilla save-slot data only) into an embeddable base64
+# sidecar the legacy headless probes can inject at boot.  This deliberately
+# DOES NOT include bank $31 or OT6's per-slot codex pages.  New durable route
+# anchors use the complete 32 KiB format under tools/tests/anchors/.
 #
 #   tools/tests/make_srm_sidecar.sh
 #
@@ -23,7 +25,7 @@ OUT="$ROOT/build/states/playthrough_srm.mss.lua"
 mkdir -p "$ROOT/build/states"
 python3 - "$SRM" "$OUT" <<'PY'
 import base64, sys
-front = open(sys.argv[1], 'rb').read()[:8192]        # save slots only
+front = open(sys.argv[1], 'rb').read()[:8192]        # vanilla save slots only
 open(sys.argv[2], 'w').write('return "' + base64.b64encode(front).decode() + '"')
 nz = sum(1 for b in front if b)
 print(f"sidecar -> {sys.argv[2]}  ({nz} nonzero bytes of 8192)")

@@ -35,3 +35,6 @@ grep -oE '\$\(call mint,[A-Za-z0-9_]+,[A-Za-z0-9_]+\)' "$mk" \
 
 grep -oE '\$\(call mint,[A-Za-z0-9_]+,[A-Za-z0-9_]+,[A-Za-z0-9_]*\)' "$mk" \
   | sed -E "s#.*mint,([A-Za-z0-9_]+),([A-Za-z0-9_]+),[A-Za-z0-9_]*\).*#build/states/\1.mss.lua: tools/tests/\2.lua $LIBS#"
+
+grep -oE '\$\(call mint_anchor,[A-Za-z0-9_]+,[A-Za-z0-9_]+\)' "$mk" \
+  | sed -E "s#.*mint_anchor,([A-Za-z0-9_]+),([A-Za-z0-9_]+)\).*#build/states/\1.mss.lua: tools/tests/\2.lua $LIBS#"

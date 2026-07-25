@@ -221,6 +221,13 @@ set -- and never creates `SaveStates/`.)
   `docs/playing-headless.md`).  Kept because probe_slots and the
   balance instruments still consume `make_srm_sidecar.sh` saves;
   requires a pre-Whelk save, which no longer exists locally.
+- `gen_post_opera_anchor.lua` - provenance generator for the tracked 32 KiB
+  post-Opera battery anchor. It settles `blackjack.mss`, uses the real Save UI
+  to write slot 3, and relies on `run.sh`'s explicit `OT6_CAPTURE_SRM` mode to
+  capture Mesen's file after shutdown.
+- `gen_vector_arrival.lua` - cold boots with the verified post-Opera anchor,
+  drives vanilla Continue, checks story state plus the slot-3 OT6 codex page,
+  then steps right into Vector and mints `vector_arrival`.
 - `gen_edgar.lua` - THE WHOLE FIGARO CHAPTER, gate to world map: walks
   `figaro_doorstep.mss` in, buys the BioBlaster + NoiseBlaster from the
   tool merchant (the ONLY window - the merchant refuses once EDGAR or

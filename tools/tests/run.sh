@@ -208,6 +208,11 @@ python3 "$ROOT/tools/tests/lib/pin_test_saves.py" \
 # cross-run coupling channel (and fossilizes into minted savestates).
 # Tests that need a save inject it explicitly (SRM sidecars).
 rm -f "$TEST_SAVES"/*.srm
+if [ -n "${OT6_SRAM_ANCHOR:-}" ]; then
+  python3 "$ROOT/tools/tests/lib/sram_anchor.py" materialize \
+    "$OT6_SRAM_ANCHOR" "$TEST_SAVES/$(basename "$ROM" .sfc).srm" ||
+    { echo "invalid SRAM anchor: $OT6_SRAM_ANCHOR"; exit 2; }
+fi
 # --timeout=600: Mesen's testrunner has a hard DEFAULT 100-second wall-clock
 # cap (exit -1/255 + truncated stdout on expiry) that reaped long runs; keep
 # a cap as the only defense against a genuinely hung emulator, just a roomy one.
@@ -246,6 +251,19 @@ publish_file() {
   tmp="$dest.tmp.$$"
   cp "$src" "$tmp" && mv -f "$tmp" "$dest"
 }
+# Anchor creation is intentionally a separate, explicit operation.  Mesen
+# flushes battery SRAM only while shutting down, so the complete 32 KiB file
+# becomes available here, after the Lua script has exercised the real Save UI.
+if [ "$verdict" -eq 0 ] && [ -n "${OT6_CAPTURE_SRM:-}" ]; then
+  captured="$TEST_SAVES/$(basename "$ROM" .sfc).srm"
+  if [ -f "$captured" ] && [ "$(wc -c < "$captured" | tr -d ' ')" -eq 32768 ]; then
+    mkdir -p "$(dirname "$OT6_CAPTURE_SRM")"
+    publish_file "$captured" "$OT6_CAPTURE_SRM"
+  else
+    echo "Mesen did not flush a complete 32768-byte SRAM image: $captured"
+    verdict=2
+  fi
+fi
 publish_file "$RUN_LOG" "$LOG"
 if [ "$verdict" -eq 0 ]; then
   for src in "$ART"/*; do

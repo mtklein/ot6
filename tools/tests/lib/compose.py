@@ -92,7 +92,7 @@ def digest(b64: str) -> str:
     return hashlib.sha256(b64.encode()).hexdigest()[:12]
 
 
-def mint_sig(gen, root):
+def mint_sig(gen, root, extras=()):
     """The sha256(generator ++ lib/ot6.lua ++ lib/ot6_field.lua), from the
     ONE authority.
 
@@ -107,7 +107,7 @@ def mint_sig(gen, root):
     subprocess cost is negligible next to the emulator run it precedes.
     """
     out = subprocess.run(
-        ["sh", str(FRONTIER_STAMP), "sig", gen],
+        ["sh", str(FRONTIER_STAMP), "sig", gen, *extras],
         env={**os.environ, "OT6_ROOT": str(root)},
         capture_output=True, text=True, check=True,
     ).stdout
@@ -137,13 +137,13 @@ def stamp_check(name, root):
     if not stamp.exists():
         return None
     parts = stamp.read_text().split()
-    if len(parts) != 2:
+    if len(parts) < 2:
         return None
-    recorded, gen = parts
+    recorded, gen, *extras = parts
     gen_lua = root / "tools" / "tests" / (gen + ".lua")
     if not gen_lua.exists():
         return None
-    cur = mint_sig(gen, root)
+    cur = mint_sig(gen, root, extras)
     if cur == recorded[:64]:
         return None
     return (f"fixture {base} is STALE -- minted from {gen}+lib "

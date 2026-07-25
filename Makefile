@@ -137,6 +137,7 @@ nomp-rom: rom
 
 test: rom nomp-rom $(STATE1) $(STATE2) $(STATE3)
 	python3 tools/tests/lib/compose.py --selftest
+	python3 tools/tests/lib/sram_anchor.py selftest
 	sh tools/tests/lib/frontier_stamp_selftest.sh
 	sh tools/tests/lib/runner_isolation_selftest.sh
 	@rm -f $(STAMP)
@@ -241,6 +242,18 @@ define mint
 		echo "[frontier] mint $(1) <- $(2)$(if $(3), (stack $(3)))"; \
 		OT6_WORKER=$(1) OT6_EXPECT_ARTIFACT=$(1).mss$(if $(3), OT6_STACK=$(3)) tools/tests/run.sh tools/tests/$(2).lua && \
 		sh tools/tests/lib/frontier_stamp.sh write $(1) $(2); \
+	fi
+	@touch build/states/$(1).mss.lua
+endef
+
+POST_OPERA_ANCHOR := tools/tests/anchors/post-opera-v1
+POST_OPERA_INPUTS := $(POST_OPERA_ANCHOR)/manifest.json $(POST_OPERA_ANCHOR)/post-opera.sram
+define mint_anchor
+	@if sh tools/tests/lib/frontier_stamp.sh needsmint $(1) $(2) $(POST_OPERA_INPUTS); then \
+		echo "[frontier] mint $(1) <- $(2) (cold battery anchor)"; \
+		OT6_WORKER=$(1) OT6_SRAM_ANCHOR=$(POST_OPERA_ANCHOR) \
+		OT6_EXPECT_ARTIFACT=$(1).mss tools/tests/run.sh tools/tests/$(2).lua && \
+		sh tools/tests/lib/frontier_stamp.sh write $(1) $(2) $(POST_OPERA_INPUTS); \
 	fi
 	@touch build/states/$(1).mss.lua
 endef
@@ -695,6 +708,12 @@ FRONTIER += ultros2_doorstep
 build/states/blackjack.mss.lua: build/states/ultros2_doorstep.mss.lua
 	$(call mint,blackjack,gen_opera7_blackjack)
 FRONTIER += blackjack
+
+# First v0.6 fixture: cold power-on, Mesen loads the tracked 32 KiB battery
+# anchor, vanilla Continue loads slot 3, then one RIGHT step enters Vector.
+build/states/vector_arrival.mss.lua: $(POST_OPERA_INPUTS)
+	$(call mint_anchor,vector_arrival,gen_vector_arrival)
+FRONTIER += vector_arrival
 
 frontier: rom $(STATE1) $(STATE2) $(STATE3) \
           $(patsubst %,build/states/%.mss.lua,$(FRONTIER))

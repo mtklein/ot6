@@ -17,16 +17,15 @@
 # decision is unit-testable without the emulator (frontier_stamp_selftest.sh,
 # run by `make test`) and reads identically for plain and stacked mints.
 #
-#   frontier_stamp.sh needsmint <state> <generator>  # exit 0 = re-mint, 1 = fresh
-#   frontier_stamp.sh write     <state> <generator>  # record the provenance stamp
-#   frontier_stamp.sh sig       <generator>          # print the (gen+lib) signature
+#   frontier_stamp.sh needsmint <state> <generator> [extra ...]
+#   frontier_stamp.sh write     <state> <generator> [extra ...]
+#   frontier_stamp.sh sig       <generator> [extra ...]
 #
-# The signature is `<sha256 of generator ++ lib/ot6.lua ++ lib/ot6_field.lua>
-# <generator-basename>`.  The generator name rides along so a consumer
-# (lib/compose.py) can re-derive and check the same signature at load time --
-# the loud, fail-closed half of the guard for a fixture that reaches a test
-# WITHOUT passing the mint gate first (a worktree-setup seed that a local
-# edit has since drifted).
+# The signature hashes the generator, shared Lua libraries, and any declared
+# extra inputs, then records their paths.  A consumer (lib/compose.py) can
+# re-derive and check that signature at load time -- the loud, fail-closed
+# half of the guard for a fixture that reaches a test WITHOUT passing the
+# mint gate first (a worktree-setup seed that a local edit has since drifted).
 set -u
 
 # OT6_ROOT lets the selftest point the gate at a mock tree; the default is the
@@ -44,30 +43,45 @@ STATES="$ROOT/build/states"
 # whole non-ROM input to a mint.
 sig() {
   gen="$1"
-  printf '%s %s' \
-    "$(cat "$ROOT/tools/tests/$gen.lua" \
-           "$ROOT/tools/tests/lib/ot6.lua" \
-           "$ROOT/tools/tests/lib/ot6_field.lua" \
-        | shasum -a 256 | cut -c1-64)" \
-    "$gen"
+  shift
+  files="$ROOT/tools/tests/$gen.lua
+$ROOT/tools/tests/lib/ot6.lua
+$ROOT/tools/tests/lib/ot6_field.lua"
+  extras=""
+  for extra in "$@"; do
+    case "$extra" in /*|*..*) echo "frontier_stamp: unsafe extra '$extra'" >&2; exit 2 ;; esac
+    [ -f "$ROOT/$extra" ] ||
+      { echo "frontier_stamp: missing extra '$ROOT/$extra'" >&2; exit 2; }
+    files="$files
+$ROOT/$extra"
+    extras="$extras $extra"
+  done
+  digest=$(
+    printf '%s\n' "$files" | while IFS= read -r file; do cat "$file"; done |
+      shasum -a 256 | cut -c1-64
+  )
+  printf '%s %s%s' "$digest" "$gen" "$extras"
 }
 
 cmd="${1:?usage: frontier_stamp.sh needsmint|write|sig ...}"
 case "$cmd" in
   sig)
-    sig "${2:?sig needs a generator}"
+    gen="${2:?sig needs a generator}"; shift 2
+    sig "$gen" "$@"
     ;;
   write)
     state="${2:?write needs a state}"; gen="${3:?write needs a generator}"
-    sig "$gen" > "$STATES/$state.stamp"
+    shift 3
+    sig "$gen" "$@" > "$STATES/$state.stamp"
     ;;
   needsmint)
     state="${2:?needsmint needs a state}"; gen="${3:?needsmint needs a generator}"
+    shift 3
     mss="$STATES/$state.mss"
     stamp="$STATES/$state.stamp"
     [ -f "$mss" ] || exit 0                          # never minted -> mint
     [ "$STATES/.rom-copy" -nt "$mss" ] && exit 0     # ROM bytes changed -> re-mint
-    [ "$(sig "$gen")" = "$(cat "$stamp" 2>/dev/null)" ] || exit 0  # gen/lib changed
+    [ "$(sig "$gen" "$@")" = "$(cat "$stamp" 2>/dev/null)" ] || exit 0
     exit 1                                           # fresh: skip
     ;;
   *)

@@ -1,0 +1,10 @@
+{
+  "schema": "ot6.sram-anchor/v1",
+  "payload": "post-opera.sram",
+  "size": 32768,
+  "sha256": "0201d060043cb5c0f9fc3613df5a0c04d5902d3cac322c1a67d01e2cb05dd1c7",
+  "slot": 3,
+  "milestone": "post-opera",
+  "provenance": "blackjack.mss; real in-game Save UI; Vector west doorstep",
+  "persistent_layout": "ot6-codex-o8-v1"
+}

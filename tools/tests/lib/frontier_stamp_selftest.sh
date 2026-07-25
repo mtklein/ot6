@@ -21,6 +21,8 @@ mkdir -p "$TMP/tools/tests/lib" "$TMP/build/states"
 printf 'gen body v1\n'   > "$TMP/tools/tests/gen_fake.lua"
 printf 'lib body v1\n'   > "$TMP/tools/tests/lib/ot6.lua"
 printf 'field body v1\n' > "$TMP/tools/tests/lib/ot6_field.lua"
+mkdir -p "$TMP/tools/tests/anchors/fake"
+printf 'anchor v1\n' > "$TMP/tools/tests/anchors/fake/payload.srm"
 printf 'rom-bytes\n'     > "$TMP/build/states/.rom-copy"
 export OT6_ROOT="$TMP"
 S="$TMP/build/states"
@@ -83,6 +85,18 @@ sh "$GATE" needsmint other gen_other; check "baseline both fresh (other)" FRESH 
 printf 'fake gen f2\n' > "$TMP/tools/tests/gen_fake.lua"   # edit ONLY gen_fake
 sh "$GATE" needsmint fake  gen_fake;  check "per-gen: edited state trips"  MINT  $?
 sh "$GATE" needsmint other gen_other; check "per-gen: sibling stays fresh" FRESH $?
+
+# 8. Optional content inputs extend the same signature.  Battery-derived
+# fixtures use this for both manifest and full SRAM payload.
+extra=tools/tests/anchors/fake/payload.srm
+sh "$GATE" write fake gen_fake "$extra"
+touch "$TMP/$extra"
+sh "$GATE" needsmint fake gen_fake "$extra"; check "extra mtime-only touch" FRESH $?
+printf 'anchor v2\n' > "$TMP/$extra"
+sh "$GATE" needsmint fake gen_fake "$extra"; check "extra content changed" MINT $?
+sh "$GATE" sig gen_fake tools/tests/anchors/fake/missing.srm >/dev/null 2>&1
+[ "$?" -ne 0 ] && echo "  pass missing extra -> hard error" ||
+  { echo "  FAIL missing extra accepted"; ok=0; }
 
 [ "$ok" -eq 1 ] && { echo "frontier_stamp selftest: ok"; exit 0; }
 echo "frontier_stamp selftest: FAILED"; exit 1
