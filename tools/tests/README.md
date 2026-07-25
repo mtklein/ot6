@@ -103,15 +103,25 @@ watchdog needed.  A bare hang would only happen if a script bypasses
 
 ### Parallel runs
 
-`run.sh` honors `OT6_WORKER=<id>`: Mesen's **config home**, saves dir,
-composed file, default log, and artifact dir all move under
-`build/test-workers/w<id>/`, so runs with distinct ids (and the default
-id-less run) are safe concurrently.  `suite.sh`
-honors `OT6_JOBS=N` (default 4 = the P-core knee; 1 = serial) and fans its
-tests out across workers; every suite test is a pure savestate load (the
-mints run as Makefile prerequisites first), so order doesn't matter.
-Suite logs stay at `build/states/suite_<t>.log` either way, and each test
-line reports its worker and wall time.
+Every `run.sh` invocation creates a unique directory under
+`build/test-runs/`. `OT6_WORKER=<id>` is only a readable label on that
+directory, never an isolation key: calls with the same id and id-less calls
+are safe concurrently. Mesen's **config home**, saves, composed script,
+working log, and decoded artifacts all live in that invocation directory.
+Completed logs and artifacts are then atomically published to their familiar
+paths under `build/states/`; set `OT6_ARTIFACT_DIR` to choose another artifact
+destination. Successful workspaces are removed, failed workspaces are retained
+and reported, and `OT6_KEEP_RUNS=1` retains successful ones for investigation.
+
+`suite.sh` likewise creates unique bookkeeping under `build/test-suites/`, so
+two complete suites may overlap without sharing compositions, claims, or
+results. It honors `OT6_JOBS=N` (1 = serial) and fans tests out across
+scheduling labels; every suite test is a pure savestate load (the mints run as
+Makefile prerequisites first), so order doesn't matter. Suite logs stay at
+`build/states/suite_<t>.log` either way, and each test line reports its worker
+label and wall time. `runner_isolation_selftest.sh`, run by `make test`,
+deliberately overlaps same-label runner calls and complete-suite workspaces as
+the positive control for these guarantees.
 
 **No worker owns a copy of the emulator.**  Every worker on the machine
 execs one shared, read-only bundle at
@@ -119,7 +129,7 @@ execs one shared, read-only bundle at
 once per machine, with its `settings.json` stripped so it is *not* in
 portable mode -- and each is given its own `CFFIXED_USER_HOME`.  That
 sends its settings, its battery saves and its `Debugger/*.cdl` into
-`build/test-workers/w<id>/home/`, so nothing is ever written inside the
+the current `build/test-runs/<label>.<unique>/home/`, so nothing is ever written inside the
 app and there is no per-worker emulator state left to race on.  The
 shared copy is rebuilt automatically when `tools/Mesen.app` changes (a
 size+mtime stamp beside it); `make clean` does not remove it, and it

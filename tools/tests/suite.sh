@@ -23,6 +23,25 @@ ROOT="$(cd "$(dirname "$0")/../.." && pwd)"
 RUN="$ROOT/tools/tests/run.sh"
 SHOTS="$ROOT/build/states/shots"
 JOBS="${OT6_JOBS:-$(sysctl -n hw.perflevel0.logicalcpu 2>/dev/null || echo 4)}"
+
+# Suite bookkeeping is per invocation too.  This matters when two independent
+# `make test` processes overlap: worker numbers are local scheduling labels,
+# not globally unique directory names.
+SROOT_BASE="$ROOT/build/test-suites"
+mkdir -p "$SROOT_BASE"
+SROOT=$(mktemp -d "$SROOT_BASE/suite.XXXXXXXX") || exit 2
+cleanup_suite() {
+  [ "${OT6_KEEP_RUNS:-0}" = 1 ] || rm -rf "$SROOT"
+}
+trap cleanup_suite EXIT INT TERM
+
+# Test-only rendezvous used by runner_isolation_selftest.sh.
+if [ "${1:-}" = "--isolation-probe" ]; then
+  printf '%s\n' "$SROOT" > "${2:?probe output path required}"
+  while [ ! -f "${3:?probe gate path required}" ]; do sleep 1; done
+  [ -d "$SROOT" ] || exit 1
+  exit 0
+fi
 # -------------------------------------------------------------- test discovery
 # Suite membership is SELF-DECLARED, one marker per test file, so adding a test
 # is a one-line edit to that test's OWN .lua -- never the shared list that every
@@ -122,10 +141,9 @@ verdict() {
 }
 
 if [ "$JOBS" -gt 1 ]; then
-  WROOT="$ROOT/build/test-workers"
-  CDIR="$WROOT/suite-composed"; RDIR="$WROOT/suite-results"
-  CLAIMS="$WROOT/suite-claims"
-  rm -rf "$CDIR" "$RDIR" "$CLAIMS"; mkdir -p "$CDIR" "$RDIR" "$CLAIMS"
+  CDIR="$SROOT/composed"; RDIR="$SROOT/results"
+  CLAIMS="$SROOT/claims"; LDIR="$SROOT/logs"
+  mkdir -p "$CDIR" "$RDIR" "$CLAIMS" "$LDIR"
   for t in $TESTS; do
     python3 "$ROOT/tools/tests/lib/compose.py" \
       "$ROOT/tools/tests/$t.lua" "$CDIR/$t.lua" >/dev/null \
@@ -165,8 +183,11 @@ if [ "$JOBS" -gt 1 ]; then
         # already read, so nothing downstream changes.
         mkdir "$CLAIMS/$t" 2>/dev/null || continue
         t0=$(python3 -c 'import time; print(time.time())')
-        env $(ram_env_for "$t") OT6_WORKER="$w" "$RUN" "$CDIR/$t.lua" "$ROOT/build/states/suite_$t.log" >/dev/null 2>&1
+        env $(ram_env_for "$t") OT6_WORKER="$w" "$RUN" "$CDIR/$t.lua" "$LDIR/$t.log" >/dev/null 2>&1
         rc=$?
+        # Preserve the familiar diagnostic path, but publish it atomically.
+        tmp="$ROOT/build/states/suite_$t.log.tmp.$$"
+        cp "$LDIR/$t.log" "$tmp" && mv -f "$tmp" "$ROOT/build/states/suite_$t.log"
         secs=$(python3 -c "import time; print(f'{time.time()-$t0:.1f}')")
         echo "$rc $w $secs" > "$RDIR/$t"
       done
@@ -182,11 +203,6 @@ if [ "$JOBS" -gt 1 ]; then
       result "$t" "FAIL (worker never reported)"; fail=1
     fi
   done
-  # screenshots decode into the artifact dir of the worker that ran the test
-  if [ -f "$RDIR/visual_f1" ]; then
-    read -r rc w secs < "$RDIR/visual_f1"
-    SHOTS="$WROOT/w$w/artifacts/shots"
-  fi
 else
   for t in $TESTS; do
     env $(ram_env_for "$t") "$RUN" "$ROOT/tools/tests/$t.lua" "$ROOT/build/states/suite_$t.log" >/dev/null 2>&1

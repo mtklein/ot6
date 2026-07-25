@@ -138,6 +138,7 @@ nomp-rom: rom
 test: rom nomp-rom $(STATE1) $(STATE2) $(STATE3)
 	python3 tools/tests/lib/compose.py --selftest
 	sh tools/tests/lib/frontier_stamp_selftest.sh
+	sh tools/tests/lib/runner_isolation_selftest.sh
 	@rm -f $(STAMP)
 	tools/tests/suite.sh
 	@echo "-- mpcost A/B: the OFF half (free — the negative control) on the nomp baseline --"
@@ -218,24 +219,17 @@ build/states/frontier-deps.mk: Makefile tools/tests/lib/frontier_deps.sh
 
 # mint <state> from <script> once its (ROM, generator, lib) gate says it is stale.
 #
-# Worker-isolated, so `make -jN frontier` can mint the mutually independent
+# Invocation-isolated, so `make -jN frontier` can mint the mutually independent
 # story branches at once: everything up to scenario_hub is a serial trunk (each
 # link boots the previous doorstep), but FROM the hub the three scenarios --
 # locke_scenario, the rapids/terra_* chain and the sabin_* chain -- share no
 # state, and kolts_pool/kolts_cave hang off the doorstep in parallel with the
-# Vargas rung. A bare run.sh routes EVERYTHING through one default tree
-# (build/mesen-test-home, build/mesen-test-saves, build/states/_composed.lua,
-# one log), so two concurrent bare mints would race on the settings pin, the
-# composed script and the srm wipe. OT6_WORKER gives each its own tree; the id
-# is the STATE NAME, so distinct mints never collide and make hands out no ids.
-#
-# run.sh puts a worker's decoded artifacts under its own dir, so the mint lands
-# in build/test-workers/w<state>/artifacts/, not build/states/. Harvest it back
-# (state + sidecar) so the next link's compose.py finds it in build/states/
-# exactly as before. Determinism is unaffected: a savestate captures emulator
-# state, which the config-home path cannot touch, and pin_test_saves writes the
-# same determinism pins into every worker -- verified byte-identical to a serial
-# mint. `&&` so a failed mint skips the harvest and fails the recipe (.DELETE_ON_ERROR).
+# Vargas rung. A bare run.sh used to route EVERYTHING through one default tree,
+# so two concurrent bare mints raced on the settings pin, the
+# composed script and the srm wipe. run.sh now gives EVERY invocation a unique
+# tree; OT6_WORKER is merely the state-name label visible in diagnostics.
+# Decoded artifacts publish atomically into build/states, so no harvest path or
+# persistent worker directory is part of this contract.
 #
 # An optional THIRD arg makes it a STACKED mint: <state>,<script>,<prefix>
 # adds OT6_STACK=<prefix> to the run, so compose.py replays the generator's
@@ -245,9 +239,7 @@ build/states/frontier-deps.mk: Makefile tools/tests/lib/frontier_deps.sh
 define mint
 	@if sh tools/tests/lib/frontier_stamp.sh needsmint $(1) $(2); then \
 		echo "[frontier] mint $(1) <- $(2)$(if $(3), (stack $(3)))"; \
-		OT6_WORKER=$(1)$(if $(3), OT6_STACK=$(3)) tools/tests/run.sh tools/tests/$(2).lua && \
-		cp "build/test-workers/w$(1)/artifacts/$(1).mss" "build/states/$(1).mss" && \
-		cp "build/test-workers/w$(1)/artifacts/$(1).mss.lua" "build/states/$(1).mss.lua" && \
+		OT6_WORKER=$(1) OT6_EXPECT_ARTIFACT=$(1).mss$(if $(3), OT6_STACK=$(3)) tools/tests/run.sh tools/tests/$(2).lua && \
 		sh tools/tests/lib/frontier_stamp.sh write $(1) $(2); \
 	fi
 	@touch build/states/$(1).mss.lua
