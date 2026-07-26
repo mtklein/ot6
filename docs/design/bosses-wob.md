@@ -656,8 +656,14 @@ fire-weak. Vanilla's shared weakness is water.)
 - **Break story:** the WoB's effective-12 moment: two live gauges,
   two fuses on independent clocks. Tunnel one Crane and the other's
   charge lands. Splash the wrong element and you heal its sibling —
-  vanilla's absorbs, unsoftened. The factory paid out its own boss
-  keys: Ifrit's fire and Ramuh's bolt, acquired two fights ago.
+  vanilla's absorbs, unsoftened. The elemental key here is **water**,
+  the shared vanilla weakness, plus **bolt on the Right Crane only**;
+  the espers the factory just paid out are the exact wrong answer.
+  (An earlier draft of this line called "Ifrit's fire and Ramuh's
+  bolt" the factory's own boss keys. Both heal: `$10E` absorbs fire
+  and `$10D` absorbs bolt — `monster_prop.dat` +23, absorb, verified
+  against +25, weak. That contradicted the decode note 18 lines above
+  in this same section, which had it right.)
 - **Jank:** they climb the hull mid-battle; the wrong-element heal
   stays exactly as rude as 1994 shipped it.
 
