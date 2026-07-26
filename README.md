@@ -7,19 +7,21 @@ turn economy.
 
 ## Status
 
-**v0.4.1 released** ([tag](https://github.com/mtklein/ot6/releases/tag/v0.4.1)) —
-playable from the start through Zozo: the escape from Narshe, the crane
-maze, Dadaluma beaten, and Ramuh's offer on the roof. Magicite are sub-jobs
-now — equip an esper and its spells join your Magic list, with a stat bump,
-while you hold it, augmenting the born mages rather than replacing them.
-Blitz becomes a menu, Steal guarantees the rare at three boost pips, and
-level-ups fully restore HP and MP. Break and boost remain the spine: enemies
-carry shields and hidden weaknesses, hitting a weakness chips a shield, and
-breaking drops defenses hard; boost banks turns and folds spell tiers
-(Fire → Fira → Firaga).
+**v0.5 released** ([tag](https://github.com/mtklein/ot6/releases/tag/v0.5)) —
+playable from the start through the complete Opera sequence: the escape from
+Narshe, the crane maze, Dadaluma beaten, Ramuh's offer on the roof, then
+Jidoor, the Opera, Ultros defeated, Setzer joined, and the Blackjack acquired.
+Every ability costs MP now, Cyan's Bushido is a named submenu with a
+configurable four-slot loadout, and every enemy has some physical break axis.
 
-**v0.5 is released**, extending the playable frontier through the complete
-Opera sequence: Ultros defeated, Setzer joined, and the Blackjack acquired.
+Break and boost are the spine: enemies carry shields and hidden weaknesses,
+hitting a weakness chips a shield, and breaking drops defenses hard; boost
+banks turns and folds spell tiers (Fire → Fira → Firaga). Magicite are
+sub-jobs — equip an esper and its spells join your Magic list, with a stat
+bump, while you hold it, augmenting the born mages rather than replacing
+them. Blitz is a menu, Steal guarantees the rare at three boost pips, and
+level-ups fully restore HP and MP.
+
 Work toward v0.6 now follows the Raid on Vector through the Magitek Research
 Facility escape and Terra's return.
 See [docs/ROADMAP.md](docs/ROADMAP.md) for milestones and the "playable
