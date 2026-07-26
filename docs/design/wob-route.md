@@ -49,8 +49,8 @@ order. Boss IDs/shields below are the AUTHORED values from
 | release | beat | maps / place | set-piece fights (id · shields · class) | new chars / espers |
 |---|---|---|---|---|
 | **v0.5** | **A. Opera House** | Jidoor town, Opera House (stage, rafters, catwalks), the Blackjack | **Ultros ②** `$12d` · 6 · slash\|pierce | **Setzer** joins; airship (Blackjack) acquired |
-| v0.6 | **B. Vector / Magitek Factory** | Vector town, Magitek Research Facility, minecart rails, Blackjack deck | **Ifrit** `$109`·6·pierce + **Shiva** `$108`·6·slash (tag); **Number 024** `$10a`·7·slash\|pierce; **Number 128** `$10b`·7·pierce + blades `$13f/$140`·3·slash; **L/R Cranes** `$10d/$10e`·6·pierce | **Ifrit + Shiva** magicite |
-| v0.7 | **C. Sealed Gate / Banquet** | Cave to the Sealed Gate, rope bridge, Vector (Emperor's banquet Q&A) | **Ultros ③** `$12e`·7·slash\|pierce | Terra recovers her will; Maduin at/after the Gate |
+| v0.6 | **B. Vector / Magitek Factory** | Vector town, Magitek Research Facility, minecart rails, Blackjack deck | **Ifrit** `$109`·6·pierce + **Shiva** `$108`·6·slash (tag); **Number 024** `$10a`·7·slash\|pierce; **Number 128** `$10b`·7·pierce + blades `$13f/$140`·3·slash; **L/R Cranes** `$10d/$10e`·6·pierce | **Ifrit + Shiva** magicite; **Terra** returns (available, not active) at the beat's tail |
+| v0.7 | **C. Sealed Gate / Banquet** | Cave to the Sealed Gate, rope bridge, Vector (Emperor's banquet Q&A) | **Ultros ③** `$12e`·7·slash\|pierce | Maduin at/after the Gate |
 | v0.8 | **D. Thamasa** | Thamasa town, the burning house | **FlameEater** `$116`·7·pierce + Balloons `$de`·1 | **Strago, Relm** join; Kefka's massacre scene → magicite |
 | v0.9 | **E. FC approach** | Blackjack deck, IAF shmup gauntlet | **Ultros ④** `$168`·7·slash\|pierce + **Chupon** `$12f`·4·bludg (Sneeze); **AirForce** `$113`·8·pierce + LaserGun/MissileBay `$145/$147`·3 + Speck `$146`·1·any | — |
 | v0.9 | **F. Floating Continent** | the FC surface, the escape | **AtmaWeapon** `$117`·**11**·slash\|pierce; **Nerapa** `$118`·5·slash\|pierce (escape doorman) | Shadow forced; WoB ends → WoR (out of scope) |
@@ -64,6 +64,28 @@ after the Cranes, Factory escape, and Terra's return, at the first stable
 controllable save/world state before the Sealed Gate campaign. v0.7 ends at
 the stable Thamasa mission handoff; v0.8 ends after the Thamasa arc; v0.9
 finishes when the FC-escape fixture mints (post-Nerapa, entering WoR).
+
+**Terra's return is a v0.6 beat, corrected 2026-07-26.** An earlier version of
+the beat table above put "Terra recovers her will" in Beat C / v0.7, which
+contradicted this paragraph. The table was wrong. Terra becomes selectable at
+`event_main.asm:25542`, `switch $02F0=1`; `$02F0` is bit 0 of `$1EDE`, the
+engine's available-characters word (`EventCmd_e1` = `set_case AVAIL_CHARS` does
+`ldx $1ede` / `stx $1eb4`, `field/event.asm:4443-4448`; cross-checked against
+`$02F9`=Setzer and `$02F6`=Celes). The "recovers her will" dialogue (`$05D4`,
+`:25488`) sits 54 lines earlier in the same uninterruptible tail — it is the
+same beat, not a later one.
+
+**Beat B has no four-character party.** `bosses-wob.md` §15 and §16 both say
+"the factory four"; the event scripts disagree, per fight:
+
+| fight | party | evidence |
+|---|---|---|
+| Ifrit / Shiva, Number 024 | Locke + Celes | roster at the beat head |
+| minecart, **Number 128** | **Locke solo** | `event_main.asm:96148-96158` — `party_chars LOCKE`, `switch $02F6=0`, `remove_equip CELES` |
+| L/R Cranes | Locke + Setzer | Setzer rejoins at `:96982` |
+
+At the v0.6 stop line (map 6, `_cacb95` at `:25669`) Terra is **available but not
+active**. No v0.6 fight may assume her.
 
 ---
 
