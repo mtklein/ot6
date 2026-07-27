@@ -66,11 +66,23 @@ H.run({ maxFrames = 12000 }, {
       tostring(saveArg), H.readByte(ACTIVE), sram(0x307ff0),
       sram(0x316801), sram(0x316800)))
   end),
-  H.driveUntil(function() return H.readByte(ACTIVE) == 3 end, 600, {
+  -- $021f is wSaveSlotToLoad ONLY while the menu module owns that RAM.
+  -- The moment the world module resumes (menu close + ~30 frames), a block
+  -- restore puts the world's own variable back in that cell -- measured
+  -- 2026-07-27: CopyGameDataToSRAM stores 3 from c3:1538, and at world
+  -- resume the cell reads 5 with no CPU write ever firing. The old fixture
+  -- happened to hold 3 there, so reading it post-menu passed by
+  -- coincidence for months. Observe the save through channels that are
+  -- context-stable instead: the SRAM last-saved-slot marker ($307ff0), the
+  -- captured CopyGameDataToSRAM argument, and the codex payload itself.
+  H.driveUntil(function()
+    return sram(0x307ff0) == 3 and sram(0x316800) == 0x4f
+  end, 600, {
     H.pressButtons({ "a" }, 4), H.waitFrames(20),
   }, "first save into slot 3"),
   H.call(function()
-    H.assertEq(H.readByte(ACTIVE), 3, "first save selected persistent slot 3")
+    H.assertEq(saveArg, 3, "CopyGameDataToSRAM ran for persistent slot 3")
+    H.assertEq(sram(0x307ff0), 3, "SRAM last-saved-slot marker is 3")
     H.assertEq(sram(0x316800), 0x4f, "slot 3 codex magic 'O'")
     H.assertEq(sram(0x316801), 0x38, "slot 3 codex magic '8'")
     H.assertEq(sram(SLOT3_ELEM) & 0x01, 0x01,
