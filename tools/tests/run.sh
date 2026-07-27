@@ -265,7 +265,12 @@ if [ "$verdict" -eq 0 ] && [ -n "${OT6_CAPTURE_SRM:-}" ]; then
   fi
 fi
 publish_file "$RUN_LOG" "$LOG"
-if [ "$verdict" -eq 0 ]; then
+# OT6_NO_PUBLISH=1 runs a generator for its VERDICT ONLY, leaving build/states
+# untouched.  `make smoke` uses it to falsify a lib change in minutes without
+# half-updating the chain: a state minted mid-smoke would be fresher than its
+# neighbours and make the tree harder to reason about, for no benefit -- the
+# stamp gate would re-mint it anyway.
+if [ "$verdict" -eq 0 ] && [ -z "${OT6_NO_PUBLISH:-}" ]; then
   for src in "$ART"/*; do
     [ -f "$src" ] || continue
     publish_file "$src" "$PUBLISH/$(basename "$src")"

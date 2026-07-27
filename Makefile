@@ -246,6 +246,59 @@ define mint
 	@touch build/states/$(1).mss.lua
 endef
 
+# ---------------------------------------------------------------- smoke ----
+# The FAST FALSIFICATION LOOP.  `make frontier` is authoritative but serial and
+# costs over an hour, which is what makes a wrong guess expensive -- and a wrong
+# guess is only ever a problem when checking it is slow.
+#
+# For a LIB-ONLY change the existing savestates still boot, because they are tied
+# to ROM contents and the ROM has not moved.  So any generator can be run
+# directly, right now, from the state already on disk.  These are the ones that
+# have historically caught harness regressions, each exercising a DIFFERENT way
+# the harness can be lied to:
+#
+#   gen_moogle           multi-party field scribble in the battle-HP table
+#   gen_narshe_battle    NPC activation that depended on navTo's mid-glide handoff
+#   gen_sabin_gau        a navTo aimed at a tile you step through, never rest on
+#   gen_zozo5_ramuh      the party menu, where a false battle reading A-hammers
+#   gen_opera7_blackjack the world arrival redraw, same lie on the world map
+#   gen_vector_doorstep  worldGrind, an event trigger, and the party-count control
+#   gen_n128             cutscene TRAIN and six scripted battles
+#
+# Run them all at once: `make -j$(shell sysctl -n hw.perflevel0.logicalcpu 2>/dev/null || echo 4) smoke`.
+# Nothing is published (OT6_NO_PUBLISH), so this cannot half-update the chain.
+SMOKE := gen_moogle gen_narshe_battle gen_sabin_gau gen_zozo5_ramuh \
+         gen_opera7_blackjack gen_vector_doorstep gen_n128
+SMOKE_TARGETS := $(addprefix smoke-,$(SMOKE))
+
+# NB: a STATIC pattern rule, not an implicit one.  GNU make does not apply
+# implicit pattern rules to .PHONY targets, so `smoke-%: rom` silently matched
+# nothing and `smoke` reported "all 7 passed" in 0.036s having run nothing at
+# all.  The receipt count below exists because of that: a smoke target that can
+# report success without executing is the exact failure this suite keeps finding.
+.PHONY: smoke $(SMOKE_TARGETS)
+smoke: $(SMOKE_TARGETS)
+	@n=`ls build/states/smoke_*.receipt 2>/dev/null | wc -l | tr -d ' '`; \
+	if [ "$$n" -ne $(words $(SMOKE)) ]; then \
+	  echo "smoke: ONLY $$n of $(words $(SMOKE)) generators actually ran"; exit 1; \
+	fi; \
+	echo "smoke: all $(words $(SMOKE)) generators ran and passed"
+
+# gen_vector_doorstep cold-loads the tracked battery anchor rather than booting a
+# predecessor savestate, so it needs OT6_SRAM_ANCHOR exactly as mint_anchor
+# supplies it.  Without it the run times out waiting for the cold Continue.
+SMOKE_ANCHORED := gen_vector_doorstep
+
+$(SMOKE_TARGETS): smoke-%: rom
+	@rm -f build/states/smoke_$*.receipt
+	@OT6_NO_PUBLISH=1 OT6_WORKER=$* \
+	 $(if $(filter $*,$(SMOKE_ANCHORED)),OT6_SRAM_ANCHOR=$(POST_OPERA_ANCHOR),) \
+	 tools/tests/run.sh tools/tests/$*.lua \
+	   > build/states/smoke_$*.log 2>&1 \
+	  && { touch build/states/smoke_$*.receipt; echo "  $*: pass"; } \
+	  || { echo "  $*: FAIL -- build/states/smoke_$*.log"; \
+	       grep -E 'FAIL|assertEq' build/states/smoke_$*.log | head -3; exit 1; }
+
 POST_OPERA_ANCHOR := tools/tests/anchors/post-opera-v1
 POST_OPERA_INPUTS := $(POST_OPERA_ANCHOR)/manifest.json $(POST_OPERA_ANCHOR)/post-opera.sram
 define mint_anchor
