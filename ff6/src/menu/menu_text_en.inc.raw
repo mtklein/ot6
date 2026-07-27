@@ -103,6 +103,16 @@ MENU_TEXT_INC = 1
 .define GENJU_LEARN_RATE                BG1B, {13, 15}, {$8b,$9e,$9a,$ab,$a7,$c5,$91,$9a,$ad,$9e,$00}  ; Learn.Rate
 .define GENJU_AT_LEVEL_UP               {$80,$ad,$ff,$a5,$9e,$af,$9e,$a5,$ff,$ae,$a9,$c5,$c5,$c5}  ; At level up...
 
+; OT6 (#27): the esper detail page's while-worn stat-mod line.  The stat
+; names are space-padded to exactly 7 characters (+ the terminator = the
+; 8-byte stride Ot6GenjuStatNameTbl indexes by), matching the Vigor/Speed/
+; Stamina/Mag.Pwr labels the status and equip screens use.
+.define OT6_GENJU_WHILE_WORN            {$96,$a1,$a2,$a5,$9e,$ff,$b0,$a8,$ab,$a7,$c5,$c5,$c5}  ; While worn...
+.define OT6_GENJU_STAT_VIGOR            {$95,$a2,$a0,$a8,$ab,$ff,$ff,$00}  ; Vigor  
+.define OT6_GENJU_STAT_SPEED            {$92,$a9,$9e,$9e,$9d,$ff,$ff,$00}  ; Speed  
+.define OT6_GENJU_STAT_STAMINA          {$92,$ad,$9a,$a6,$a2,$a7,$9a,$00}  ; Stamina
+.define OT6_GENJU_STAT_MAGPWR           {$8c,$9a,$a0,$c5,$8f,$b0,$ab,$00}  ; Mag.Pwr
+
 ; ------------------------------------------------------------------------------
 
 ; item menu text strings

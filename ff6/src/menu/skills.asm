@@ -2525,10 +2525,29 @@ GenjuDetailCursorPos:
 DrawEsperDetailMenu:
 @599f:  lda     #$20
         sta     zTextColor
+.if LANG_EN
+; OT6 (#27): M5 made espers while-equipped sub-jobs -- every GenjuProp learn
+; rate is 0 and every level-up bonus byte is $ff (genju_prop.asm), so the
+; vanilla "Learn.Rate"/"Skill" captions would head nothing but dead 0%
+; columns.  Blank both caption fields (cols 13-28 of the header row) instead
+; of drawing them; the rows below become a plain list of the spells the stone
+; grants while worn, and the old bonus line becomes the while-worn stat mod
+; (the tail of this proc).
+        ldy_pos BG1B, {13, 15}
+        jsr     InitTextBuf
+        ldy     #16
+        lda     #$ff
+@59ab:  sta     hWMDATA
+        dey
+        bne     @59ab
+        stz     hWMDATA
+        jsr     DrawPosTextBuf
+.else
         ldy     #near GenjuLearnRateText
         jsr     DrawPosKana
         ldy     #near GenjuLearnPctText
         jsr     DrawPosKana
+.endif
         lda     z99
         jsr     _c35574
 .if LANG_EN
@@ -2583,6 +2602,10 @@ DrawEsperDetailMenu:
         ldx     #$0018
         ldy     $f5
         pla
+.if LANG_EN
+        lda     #$ff                    ; OT6 (#27): nothing is ever learned --
+                                        ; take _c35a84's blank path, never 0%
+.endif
         sta     $e1
         jsr     _c35a84
         plx
@@ -2597,17 +2620,65 @@ DrawEsperDetailMenu:
 .endif
         bne     @59f4
         shorta
+.if LANG_EN
+; OT6 (#27): the level-up bonus byte is $ff for every esper (M5 deleted the
+; vanilla per-level growth, genju_prop.asm), so the vanilla line below this
+; loop could only ever draw blanks -- while the mod the stone DOES carry, the
+; while-equipped stat bump Ot6EsperStatMod applies out of Ot6EsperStatTbl
+; (ot6_progression.asm), had no line at all.  Draw that instead:
+; "While worn...<stat name><+><magnitude>", or a same-width blank line for an
+; esper whose table byte is $00 (no mod), so revisits always overwrite.
+        clr_a
+        lda     z99                     ; displayed esper index (GenjuProp
+        tax                             ;   order -- Ot6EsperStatTbl's order)
+        lda     f:Ot6EsperStatTbl,x     ; packed [selector:4][magnitude:4]
+        sta     $e5
+        ldy_pos BG1B, {5, 27}
+        jsr     InitTextBuf
+        lda     $e5
+        beq     @5a67
+        ldx     z0
+@5a43:  lda     f:Ot6GenjuWhileWornText,x
+        sta     hWMDATA
+        inx
+        cpx     #sizeof_Ot6GenjuWhileWornText
+        bne     @5a43
+        lda     $e5
+        lsr4                            ; stat selector 1..4 (OT6_SM_* order)
+        dec
+        asl3                            ; * 8 = Ot6GenjuStatNameTbl stride
+        tax
+@5a56:  lda     f:Ot6GenjuStatNameTbl,x
+        beq     @5a5f
+        sta     hWMDATA
+        inx
+        bra     @5a56
+@5a5f:  lda     #OT6_PLUS_CHAR
+        sta     hWMDATA
+        lda     $e5
+        and     #$0f
+        jsr     HexToDec3               ; magnitude 1..15; leading zero blanked
+        lda     $f8
+        sta     hWMDATA
+        lda     $f9
+        sta     hWMDATA
+        stz     hWMDATA
+        jmp     DrawPosTextBuf
+@5a67:  ldy     #sizeof_Ot6GenjuWhileWornText + 10  ; name 7 + '+' 1 + digits 2
+        lda     #$ff
+@5a78:  sta     hWMDATA
+        dey
+        bne     @5a78
+        stz     hWMDATA
+        jmp     DrawPosTextBuf
+.else
         lda     f:GenjuProp,x               ; level up bonus
         cmp     #$ff
         beq     @5a67
         sta     hWRMPYA
         lda     #GenjuBonusName::ITEM_SIZE
         sta     hWRMPYB
-.if LANG_EN
-        ldy_pos BG1B, {5, 27}
-.else
         ldy_pos BG1B, {5, 28}
-.endif
         jsr     InitTextBuf
         ldx     z0
 @5a43:  lda     f:GenjuAtLevelUpText,x
@@ -2624,11 +2695,7 @@ DrawEsperDetailMenu:
         bne     @5a56
         stz     hWMDATA
         jmp     DrawPosTextBuf
-.if LANG_EN
-@5a67:  ldy_pos BG1B, {5, 27}
-.else
 @5a67:  ldy_pos BG1B, {5, 28}
-.endif
         jsr     InitTextBuf
         ldy     #sizeof_GenjuAtLevelUpText + GenjuBonusName::ITEM_SIZE
         ldx     #$9e8b
@@ -2639,6 +2706,7 @@ DrawEsperDetailMenu:
         bne     @5a78
         stz     hWMDATA
         jmp     DrawPosTextBuf
+.endif
 
 ; ------------------------------------------------------------------------------
 
@@ -2694,6 +2762,31 @@ DrawGenjuMagicName:
         txa
         sta     $7e9e89
         shorta
+.if LANG_EN
+; OT6 (#27): a granted spell has no learn rate (genju_prop.asm zeroes them
+; all), so the esper page draws the bare name and blanks vanilla's
+; ":  {times}NN" tail -- padded to the empty slot's 15-tile width so any
+; previous row content is always overwritten.  Item detail (item.asm) still
+; falls through DrawItemMagicName below and keeps its rate display.
+        jsr     GetMagicNamePtr
+        lda     $e1
+        cmp     #$ff
+        beq     @5af9
+        jsr     LoadArrayItem           ; icon + name -> 7 tiles at $7e9e8b
+        ldx     #$9e92
+        stx     hWMADDL
+        ldy     #8                      ; blank through the old rate field
+        bra     @5b01
+@5af9:  ldy     #15                     ; empty slot: blank the whole field
+        ldx     #$9e8b
+        stx     hWMADDL
+@5b01:  lda     #$ff
+@5b03:  sta     hWMDATA
+        dey
+        bne     @5b03
+        stz     hWMDATA
+        jmp     DrawPosTextBuf
+.endif
 
 DrawItemMagicName:
 @5aed:  jsr     GetMagicNamePtr
@@ -2947,5 +3040,29 @@ GenjuLearnRateText:             pos_text GENJU_LEARN_RATE
 GenjuAtLevelUpText:
         raw_text GENJU_AT_LEVEL_UP
         calc_size GenjuAtLevelUpText
+
+.if LANG_EN
+
+; OT6 (#27): the esper detail page's while-worn stat-mod line (drawn by
+; DrawEsperDetailMenu's tail in place of the dead vanilla bonus line).
+
+OT6_PLUS_CHAR = $ca                     ; '+' (text_en 0xca)
+
+Ot6GenjuWhileWornText:
+        raw_text OT6_GENJU_WHILE_WORN
+        calc_size Ot6GenjuWhileWornText
+
+; stat names in Ot6EsperStatTbl selector order (ot6_progression.asm OT6_SM_*:
+; vigor, speed, stamina, mag.pwr), each null-terminated and space-padded to a
+; fixed 8-byte stride so the selector indexes with (sel-1)*8.
+Ot6GenjuStatNameTbl:
+        raw_text OT6_GENJU_STAT_VIGOR
+        raw_text OT6_GENJU_STAT_SPEED
+        raw_text OT6_GENJU_STAT_STAMINA
+        raw_text OT6_GENJU_STAT_MAGPWR
+        calc_size Ot6GenjuStatNameTbl
+.assert sizeof_Ot6GenjuStatNameTbl = 32, error, "Ot6GenjuStatNameTbl entries must be 8 bytes each (7 tiles + terminator)"
+
+.endif
 
 ; ------------------------------------------------------------------------------

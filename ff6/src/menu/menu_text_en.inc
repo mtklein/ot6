@@ -103,6 +103,16 @@ MENU_TEXT_INC = 1
 .define GENJU_LEARN_RATE                BG1B, {13, 15}, {"Learn.Rate"}
 .define GENJU_AT_LEVEL_UP               {z"At level up..."}
 
+; OT6 (#27): the esper detail page's while-worn stat-mod line.  The stat
+; names are space-padded to exactly 7 characters (+ the terminator = the
+; 8-byte stride Ot6GenjuStatNameTbl indexes by), matching the Vigor/Speed/
+; Stamina/Mag.Pwr labels the status and equip screens use.
+.define OT6_GENJU_WHILE_WORN            {z"While worn..."}
+.define OT6_GENJU_STAT_VIGOR            {"Vigor  "}
+.define OT6_GENJU_STAT_SPEED            {"Speed  "}
+.define OT6_GENJU_STAT_STAMINA          {"Stamina"}
+.define OT6_GENJU_STAT_MAGPWR           {"Mag.Pwr"}
+
 ; ------------------------------------------------------------------------------
 
 ; item menu text strings
