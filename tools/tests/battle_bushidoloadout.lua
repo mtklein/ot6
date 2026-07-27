@@ -24,8 +24,8 @@
 --      and latches the stored tech for boost r into the action queue ($2bb0).
 --   5. SENTINEL: the all-slot-0 word ($0000) is AUTO, not a manual {0,0,0,0} --
 --      the degenerate config is indistinguishable from auto by design.
-local H = dofile("/Users/mtklein/ot6/tools/tests/lib/ot6.lua")
-local STATE = "/Users/mtklein/ot6/build/states/battle_doorstep.mss.lua"
+local H = dofile("tools/tests/lib/ot6.lua")
+local STATE = "build/states/battle_doorstep.mss.lua"
 
 local MENU, ACTOR, MSTATE = 0x7BCA, 0x62CA, 0x7BC2
 local KNOWN, LEARNED, ITEMLIST = 0x2020, 0x1CF7, 0x4005

@@ -32,8 +32,8 @@
 -- Frontier-gated on moogle_doorstep.mss (make frontier), the battle_vargas
 -- pattern.
 --   tools/tests/run.sh tools/tests/battle_hudclobber.lua   (needs moogle_doorstep.mss)
-local H = dofile("/Users/mtklein/ot6/tools/tests/lib/ot6.lua")
-local STATE = "/Users/mtklein/ot6/build/states/moogle_doorstep.mss.lua"
+local H = dofile("tools/tests/lib/ot6.lua")
+local STATE = "build/states/moogle_doorstep.mss.lua"
 local VR, ROM = emu.memType.snesVideoRam, emu.memType.snesPrgRom
 
 -- OT6 glyph cells + their rom source (glyphCanary's signature scan)

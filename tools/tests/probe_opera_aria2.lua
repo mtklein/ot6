@@ -1,7 +1,7 @@
 -- probe_opera_aria2.lua -- boots opera_backstage (map 234 theater, 16,46) and
 -- tests the LEFT stage door (4,24) -> map 238, then maps the stage side (where
 -- CELES stands at 99,19 and the aria trigger 97,7 live).  Fast: no intro.
-local H = dofile("/Users/mtklein/ot6/tools/tests/lib/ot6.lua")
+local H = dofile("tools/tests/lib/ot6.lua")
 local function map() return H.mapId() & 0x1ff end
 local function bright() return emu.getState()["ppu.screenBrightness"] or 0 end
 local function sw(id) return (H.readByte(0x1E80 + math.floor(id/8)) >> (id%8)) & 1 end
@@ -40,7 +40,7 @@ local function bumpUp(dest, what)
 end
 
 H.run({ maxFrames = 60000 }, {
-  H.loadState("/Users/mtklein/ot6/build/states/opera_backstage.mss.lua"),
+  H.loadState("build/states/opera_backstage.mss.lua"),
   H.waitFrames(60),
   H.call(function() H.assertEq(map(),234,"boot 234"); dumpsw("boot-backstage") end),
 

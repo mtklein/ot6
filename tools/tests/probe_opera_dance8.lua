@@ -3,7 +3,7 @@
 --  ($01F0/1/2); touch flowers (obj#16) -> $0057; then the BALCONY corridor
 --  (12,19 now free) up the z-split stairs to (8,9) -> _cabe6d -> $0111=1.
 -- Validates the whole solve off the fast checkpoint (timer running).
-local H = dofile("/Users/mtklein/ot6/tools/tests/lib/ot6.lua")
+local H = dofile("tools/tests/lib/ot6.lua")
 local function map() return H.mapId() & 0x1ff end
 local function sw(id) return (H.readByte(0x1E80 + math.floor(id/8)) >> (id%8)) & 1 end
 local STRIDE=0x29
@@ -104,7 +104,7 @@ local function rideOpen(pred, maxFrames, what)
 end
 
 H.run({ maxFrames = 30000 }, {
-  H.loadState("/Users/mtklein/ot6/build/states/aria_postfork.mss.lua"),
+  H.loadState("build/states/aria_postfork.mss.lua"),
   H.waitFrames(30),
   H.call(function() H.assertEq(map(),236,"boot 236"); dumpsw("START") end),
   tableDrive(CLIMB, 11,19, 2500, nil, "climb"),

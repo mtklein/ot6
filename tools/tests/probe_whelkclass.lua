@@ -40,8 +40,8 @@
 -- wipe), so the battle seed does a fresh 'O7' codex init and every
 -- reveal below starts cold.
 
-local H = dofile("/Users/mtklein/ot6/tools/tests/lib/ot6.lua")
-local STATE = "/Users/mtklein/ot6/build/states/whelk_doorstep.mss.lua"
+local H = dofile("tools/tests/lib/ot6.lua")
+local STATE = "build/states/whelk_doorstep.mss.lua"
 
 local WHELK = { [0x0134] = true }
 local function whelk()

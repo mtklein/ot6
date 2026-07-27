@@ -44,8 +44,8 @@
 -- whole-run assert (every write across all six lines belongs to the one
 -- phase-3 adoption) additionally pins the disable path's compare-before-
 -- store: empty slots must not rewrite $0000 every frame.
-local H = dofile("/Users/mtklein/ot6/tools/tests/lib/ot6.lua")
-local STATE = "/Users/mtklein/ot6/build/states/battle_doorstep.mss.lua"
+local H = dofile("tools/tests/lib/ot6.lua")
+local STATE = "build/states/battle_doorstep.mss.lua"
 
 local SHADOW = 0xecf1           -- OT6_SHADOW, 6 lines x 14 bytes
 local STRIDE = 14

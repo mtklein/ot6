@@ -2,7 +2,7 @@
 -- control on map 236, MINT aria_postfork.mss, then dump ground truth for the
 -- flower-dance nav: every field object (vis/x/y/face/movetype), and the p1/p2
 -- passability grid over the pocket+stairs+balcony region x[3..18] y[6..27].
-local H = dofile("/Users/mtklein/ot6/tools/tests/lib/ot6.lua")
+local H = dofile("tools/tests/lib/ot6.lua")
 local function map() return H.mapId() & 0x1ff end
 local function sw(id) return (H.readByte(0x1E80 + math.floor(id/8)) >> (id%8)) & 1 end
 local STRIDE=0x29
@@ -62,7 +62,7 @@ local function dumpGrid(x0,x1,y0,y1)
 end
 
 H.run({ maxFrames = 40000 }, {
-  H.loadState("/Users/mtklein/ot6/build/states/opera_stage.mss.lua"),
+  H.loadState("build/states/opera_stage.mss.lua"),
   H.waitFrames(60),
   H.navTo(97, 7, { maxFrames=8000, arrive=function() return map()~=238 end }),
   H.waitUntil(function() return map()==236 end, 6000, "aria 236", 10),

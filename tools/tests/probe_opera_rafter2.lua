@@ -9,7 +9,7 @@
 --    start_timer 0,18000,_caba09 (expiry = Ultros wins).  Reached 238->237->234.
 -- This probe: dump boot, object-scan 238, drive to {99,20}, touch the envelope,
 -- confirm $0058=1; then log where control lands.  Recon only.
-local H = dofile("/Users/mtklein/ot6/tools/tests/lib/ot6.lua")
+local H = dofile("tools/tests/lib/ot6.lua")
 local function map() return H.mapId() & 0x1ff end
 local function sw(id) return (H.readByte(0x1E80 + math.floor(id/8)) >> (id%8)) & 1 end
 local STRIDE=0x29
@@ -32,7 +32,7 @@ local function objscan(tag)
 end
 
 H.run({ maxFrames = 20000 }, {
-  H.loadState("/Users/mtklein/ot6/build/states/opera_dance_done.mss.lua"),
+  H.loadState("build/states/opera_dance_done.mss.lua"),
   H.waitFrames(60),
   H.call(function()
     H.assertEq(map(), 238, "boot on the stage (map 238)")

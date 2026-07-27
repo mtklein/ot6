@@ -19,8 +19,8 @@
 -- (metrics_battle.lua's idiom -- $7bc2, root $05 / spell $0e / target
 -- $38), tap R only once the target cursor is up, and record bp, pending,
 -- the queued+executed spell id, and the damage dealt.
-local H = dofile("/Users/mtklein/ot6/.claude/worktrees/agent-a7ce0f4f38c2c39f7/tools/tests/lib/ot6.lua")
-local STATE = "/Users/mtklein/ot6/.claude/worktrees/agent-a7ce0f4f38c2c39f7/build/states/battle_doorstep.mss.lua"
+local H = dofile("tools/tests/lib/ot6.lua")
+local STATE = "build/states/battle_doorstep.mss.lua"
 
 local ST = { root = 0x05, spell = 0x0e, target = 0x38 }
 local SPELL_FIRE = 0x00

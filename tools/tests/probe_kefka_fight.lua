@@ -9,8 +9,8 @@
 -- gauge is never poked) so the next real hit ends it through the
 -- scripted if_b_switch $40 win.  This body is battle_kefka's core,
 -- proven here before the suite test exists.
-local H = dofile("/Users/mtklein/ot6/tools/tests/lib/ot6.lua")
-local DOOR = "/Users/mtklein/ot6/build/states/spike_doorstep.mss.lua"
+local H = dofile("tools/tests/lib/ot6.lua")
+local DOOR = "build/states/spike_doorstep.mss.lua"
 
 local KEFKA = 0x014A
 

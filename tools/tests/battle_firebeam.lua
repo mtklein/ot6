@@ -18,8 +18,8 @@
 -- Exit codes: 0 = battle came up, input drove the menus, and the action
 -- visibly resolved; 1 = any stage failed (each is asserted loudly).
 
-local H = dofile("/Users/mtklein/ot6/tools/tests/lib/ot6.lua")
-local STATE = "/Users/mtklein/ot6/build/states/battle_doorstep.mss.lua"
+local H = dofile("tools/tests/lib/ot6.lua")
+local STATE = "build/states/battle_doorstep.mss.lua"
 
 local function ramReport(tag)
   return H.call(function()

@@ -32,11 +32,11 @@
 --   fire      unboosted Fire every turn (Fight if MP < 4)
 --   probe1    hit a revealed weakness (Fire) if any alive monster shows
 --             one; else rotate Fire/Fight probes (Fight if MP < 4)
-local H = dofile("/Users/mtklein/ot6/tools/tests/lib/ot6.lua")
+local H = dofile("tools/tests/lib/ot6.lua")
 
 -- ------------------------------------------------------------- knobs --
 local POLICY = "baseline"
-local STATE = "/Users/mtklein/ot6/build/states/mines_chase.mss.lua"
+local STATE = "build/states/mines_chase.mss.lua"
 local NBATTLES = 8
 -- co-tune poke (Measurement #5): if set, write these into the ROM before each
 -- battle so the HP-multiplier x resistance grid sweeps without a rebuild.

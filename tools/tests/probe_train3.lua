@@ -15,8 +15,8 @@
 --     faces-up+A into _cbb9d4 -> $003A=1 -> battle 68.
 -- Stops at battle-up: dumps every monster slot's species/hp/shield/weak/
 -- class rows (battle_vargas's model) and SABIN's entity + level.  No fight.
-local H = dofile("/Users/mtklein/ot6/tools/tests/lib/ot6.lua")
-local DOOR = "/Users/mtklein/ot6/build/states/forest_done.mss.lua"
+local H = dofile("tools/tests/lib/ot6.lua")
+local DOOR = "build/states/forest_done.mss.lua"
 
 local function mapIdx() return H.readWord(0x1f64) & 0x3FF end
 local function bright() return emu.getState()["ppu.screenBrightness"] or 0 end

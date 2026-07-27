@@ -13,8 +13,8 @@
 --   glyph) / zero / other (+ first three "other" samples with addresses),
 --   and a 16-byte canary compare of the fire-icon font cell ($EB) vs ROM.
 -- Screenshots every 8 frames through the effect window.
-local H = dofile("/Users/mtklein/ot6/tools/tests/lib/ot6.lua")
-local STATE = "/Users/mtklein/ot6/build/states/first_battle.mss.lua"
+local H = dofile("tools/tests/lib/ot6.lua")
+local STATE = "build/states/first_battle.mss.lua"
 local VR  = emu.memType.snesVideoRam
 local ROM = emu.memType.snesPrgRom
 

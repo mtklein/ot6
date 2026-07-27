@@ -4,8 +4,8 @@
 -- all three O8 slot pages even when slot 2 is loaded first, then teach slot 2
 -- after migration. Fight 2 runs as slot 1 and must see the migrated knowledge
 -- but not slot 2's new learning.
-local H = dofile("/Users/mtklein/ot6/tools/tests/lib/ot6.lua")
-local STATE = "/Users/mtklein/ot6/build/states/battle_doorstep.mss.lua"
+local H = dofile("tools/tests/lib/ot6.lua")
+local STATE = "build/states/battle_doorstep.mss.lua"
 local function sram(addr) return emu.read(addr, emu.memType.snesMemory) end
 H.run({ maxFrames = 45000 }, {
   H.waitFrames(20),

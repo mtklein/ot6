@@ -25,9 +25,9 @@
 --
 -- PASS iff zero mismatches in either part, at least 6 of 8 part-1 samples
 -- landed, and part 2 saw a real diagonal, a real fallback and a real refusal.
-local H = dofile("/Users/mtklein/ot6/tools/tests/lib/ot6.lua")
-local SRM = "/Users/mtklein/ot6/build/states/playthrough_srm.mss.lua"
-local MATRON = "/Users/mtklein/ot6/build/states/figaro_matron.mss.lua"
+local H = dofile("tools/tests/lib/ot6.lua")
+local SRM = "build/states/playthrough_srm.mss.lua"
+local MATRON = "build/states/figaro_matron.mss.lua"
 
 local OPP = { up = "down", down = "up", left = "right", right = "left" }
 local DEL = { up = { 0, -1 }, right = { 1, 0 }, down = { 0, 1 }, left = { -1, 0 } }

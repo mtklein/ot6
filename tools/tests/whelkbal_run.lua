@@ -44,11 +44,11 @@
 --           head hides.
 --   naive   everyone confirms their first beam at the default target
 --           (A-A-A), always. The mash-through player.
-local H = dofile("/Users/mtklein/ot6/tools/tests/lib/ot6.lua")
+local H = dofile("tools/tests/lib/ot6.lua")
 
 -- ------------------------------------------------------------- knobs --
 local POLICY = "beams"
-local STATE = "/Users/mtklein/ot6/build/states/whelk_doorstep.mss.lua"
+local STATE = "build/states/whelk_doorstep.mss.lua"
 local NBATTLES = 5
 local BATTLE_FRAMES = 20000        -- policy-driven battle budget
 local WHELK = { [0x0134] = true }

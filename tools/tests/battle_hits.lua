@@ -11,8 +11,8 @@
 --   asserts: $3a70 gets the boosted swing count 1 + 2*pending exactly
 --   once (only the subject has pending), never more, and the boost is
 --   consumed with no regen after the swing.
-local H = dofile("/Users/mtklein/ot6/tools/tests/lib/ot6.lua")
-local STATE = "/Users/mtklein/ot6/build/states/battle_doorstep.mss.lua"
+local H = dofile("tools/tests/lib/ot6.lua")
+local STATE = "build/states/battle_doorstep.mss.lua"
 local function pend(slot) return H.readByte(0x3e9d + slot*2) end
 local function bp(slot) return H.readByte(0x3e9c + slot*2) end
 local subject, bp0

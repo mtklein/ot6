@@ -39,11 +39,11 @@
 -- ff6/rom/ff6-en.dbg at compose time via H.sym (`& 0x3FFFFF` for the
 -- snesPrgRom file offset; HiROM bank $F0 -> $30xxxx), so they cannot go
 -- stale by hand and no drift guard is needed.
-local H = dofile("/Users/mtklein/ot6/tools/tests/lib/ot6.lua")
+local H = dofile("tools/tests/lib/ot6.lua")
 
 -- ------------------------------------------------------------- knobs --
 local ARM = "vanilla"
-local STATE = "/Users/mtklein/ot6/build/states/mines_chase.mss.lua"
+local STATE = "build/states/mines_chase.mss.lua"
 local NSAMPLES = 8
 -- All three derive from ff6/rom/ff6-en.dbg at compose time (H.sym), so a
 -- bank-$F0 shift can no longer stale them and no drift guard is needed.

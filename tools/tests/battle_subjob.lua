@@ -28,8 +28,8 @@
 --   D DELETIONS win a level-up with Ramuh: no esper stat bonus (Stamina flat --
 --               vanilla Ramuh's STAMINA_1 would bump it) and no spell learned
 --               (Bolt/Rasp stay unlearned in $1a6e).
-local H = dofile("/Users/mtklein/ot6/tools/tests/lib/ot6.lua")
-local STATE = "/Users/mtklein/ot6/build/states/battle_doorstep.mss.lua"
+local H = dofile("tools/tests/lib/ot6.lua")
+local STATE = "build/states/battle_doorstep.mss.lua"
 
 local BOLT, BOLT3, RASP = 0x02, 0x0b, 0x1a
 local LIST0  = 0x208e           -- slot 0 spell/lore list, 4-byte records

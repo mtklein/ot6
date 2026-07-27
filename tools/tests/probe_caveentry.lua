@@ -7,9 +7,9 @@
 -- across entry + the settle, plus a per-frame note of hud-present vs the gfx
 -- present buffer $2F2F, so a window where the hud is up while the sprites are
 -- not is on the record.
-local H = dofile("/Users/mtklein/ot6/tools/tests/lib/ot6.lua")
+local H = dofile("tools/tests/lib/ot6.lua")
 
-local STATE = "/Users/mtklein/ot6/build/states/kolts_cave.mss.lua"
+local STATE = "build/states/kolts_cave.mss.lua"
 local DANGER = 0x1f6e
 local function map() return H.mapId() & 0x1ff end
 

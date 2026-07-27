@@ -13,8 +13,8 @@
 --     Only this last one is base+offset: @done is an internal label, so its
 --     $128 offset into the routine is found by hand (the `lda f:$7e57bf` =
 --     AF BF 57 7E, the sole such read in the proc); the base auto-derives.
-local H = dofile("/Users/mtklein/ot6/tools/tests/lib/ot6.lua")
-local STATE = "/Users/mtklein/ot6/build/states/battle_doorstep.mss.lua"
+local H = dofile("tools/tests/lib/ot6.lua")
+local STATE = "build/states/battle_doorstep.mss.lua"
 
 local BEGIN_EXT = H.sym("Ot6ScriptBegin_ext")
 local END_EXT   = H.sym("Ot6ScriptEnd_ext")

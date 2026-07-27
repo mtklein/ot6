@@ -5,7 +5,7 @@
 -- PRIMITIVE from everything else. SNES auto-joypad layout for $4218 (JOY1L)
 -- high byte $4219: bit order (byte1=$4219) B Y Sel Sta Up Dn Lt Rt,
 -- (byte0=$4218) A X L R ---- . We assert the injected direction shows up.
-local H = dofile("/Users/mtklein/ot6/tools/tests/lib/ot6.lua")
+local H = dofile("tools/tests/lib/ot6.lua")
 
 local function joyRegs()
   -- read the auto-joypad result registers as the CPU sees them

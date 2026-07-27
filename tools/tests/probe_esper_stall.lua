@@ -29,8 +29,8 @@
 --     event is alive inside the menu call, one commit short of done.
 --
 -- gen_kefka_won drives all three waits deliberately and mints past them.
-local H = dofile("/Users/mtklein/ot6/tools/tests/lib/ot6.lua")
-local DOOR = "/Users/mtklein/ot6/build/states/kefka_doorstep.mss.lua"
+local H = dofile("tools/tests/lib/ot6.lua")
+local DOOR = "build/states/kefka_doorstep.mss.lua"
 
 local function map() return H.mapId() & 0x1ff end
 local function sw(id)

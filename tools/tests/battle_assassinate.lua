@@ -36,8 +36,8 @@
 --   3. ONCE PER BATTLE (loud): Broken non-boss guards, but every Shadow's latch
 --      is pre-SET. His fights land (HP falls) yet inflict NO Death: a spent
 --      divine does not fire again.
-local H = dofile("/Users/mtklein/ot6/tools/tests/lib/ot6.lua")
-local STATE = "/Users/mtklein/ot6/build/states/battle_doorstep.mss.lua"
+local H = dofile("tools/tests/lib/ot6.lua")
+local STATE = "build/states/battle_doorstep.mss.lua"
 
 local MENU, ACTOR = 0x7BCA, 0x62CA
 local DIVINE_USED = 0x3ECB

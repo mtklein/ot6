@@ -34,8 +34,8 @@
 -- charge actually landed. That store fires for both the affordable and the
 -- refused steal (the refusal is downstream, at execution), so it is also the
 -- uniform "the action was created" signal both scenarios wait on.
-local H = dofile("/Users/mtklein/ot6/tools/tests/lib/ot6.lua")
-local STATE = "/Users/mtklein/ot6/build/states/battle_doorstep.mss.lua"
+local H = dofile("tools/tests/lib/ot6.lua")
+local STATE = "build/states/battle_doorstep.mss.lua"
 
 local MENU, ACTOR = 0x7BCA, 0x62CA
 local PARTY = { 0, 1, 2 }

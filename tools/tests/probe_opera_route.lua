@@ -3,7 +3,7 @@
 -- and (25,49)->237(72,32); 237 stage door (82,32)->238(100,22) stage; CELES stands
 -- at 238(99,19) (obj_event _caba44 sets $0056=1); aria trigger 238(97,7).
 -- Route A: 234 -> 237 -> (82,32) -> 238 stage -> talk CELES -> walk (97,7).
-local H = dofile("/Users/mtklein/ot6/tools/tests/lib/ot6.lua")
+local H = dofile("tools/tests/lib/ot6.lua")
 local function map() return H.mapId() & 0x1ff end
 local function bright() return emu.getState()["ppu.screenBrightness"] or 0 end
 local function sw(id) return (H.readByte(0x1E80 + math.floor(id/8)) >> (id%8)) & 1 end
@@ -45,7 +45,7 @@ local function toDoor(tx,ty,bumpDir,destMap,what)
 end
 
 H.run({ maxFrames = 90000 }, {
-  H.loadState("/Users/mtklein/ot6/build/states/opera_backstage.mss.lua"),
+  H.loadState("build/states/opera_backstage.mss.lua"),
   H.waitFrames(60),
   H.call(function() H.assertEq(map(),234,"boot 234"); dumpsw("boot")
     reach("234", {{4,24},{28,24},{7,49},{25,49}}) end),

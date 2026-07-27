@@ -1,7 +1,7 @@
 -- probe_opera_dance5.lua -- boot aria_postfork (fast), dump ALL 16 field objects
 -- unconditionally over time to locate Draco (NPC_4) and the guests, and test
 -- whether the lib's own bfsPath/navTo can reach flowers (12,19) and balcony (8,9).
-local H = dofile("/Users/mtklein/ot6/tools/tests/lib/ot6.lua")
+local H = dofile("tools/tests/lib/ot6.lua")
 local function map() return H.mapId() & 0x1ff end
 local function sw(id) return (H.readByte(0x1E80 + math.floor(id/8)) >> (id%8)) & 1 end
 local STRIDE=0x29
@@ -25,7 +25,7 @@ local function pathlog(tx,ty,label)
 end
 
 H.run({ maxFrames = 6000 }, {
-  H.loadState("/Users/mtklein/ot6/build/states/aria_postfork.mss.lua"),
+  H.loadState("build/states/aria_postfork.mss.lua"),
   H.waitFrames(30),
   H.call(function() H.assertEq(map(),236,"boot 236"); dumpAll("t30") end),
   H.waitFrames(90),

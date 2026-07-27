@@ -2,8 +2,8 @@
 -- around the defense (the model's own view: prop bytes + object map) and
 -- asks bfsPath for routes from the start line.  Pure reads off
 -- spike_defense.mss; no walking.
-local H = dofile("/Users/mtklein/ot6/tools/tests/lib/ot6.lua")
-local DEFENSE = "/Users/mtklein/ot6/build/states/spike_defense.mss.lua"
+local H = dofile("tools/tests/lib/ot6.lua")
+local DEFENSE = "build/states/spike_defense.mss.lua"
 
 H.run({ maxFrames = 2000 }, {
   H.loadState(DEFENSE),

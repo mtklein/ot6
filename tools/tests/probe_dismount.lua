@@ -39,8 +39,8 @@
 -- (102,100), both read out of the WoB's own short-entrance block (map 0 of
 -- trigger/short_entrance.dat: (86,111)/(85,112)/(86,112)/(85,113) -> map 75
 -- (1,28); (102,100) -> map 95 (14,35)).
-local H = dofile("/Users/mtklein/ot6/tools/tests/lib/ot6.lua")
-local CLEARED = "/Users/mtklein/ot6/build/states/figaro_cleared.mss.lua"
+local H = dofile("tools/tests/lib/ot6.lua")
+local CLEARED = "build/states/figaro_cleared.mss.lua"
 
 local function bright() return emu.getState()["ppu.screenBrightness"] or 0 end
 

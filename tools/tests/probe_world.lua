@@ -18,8 +18,8 @@
 --      measure the reload (position/facing survival, frames to control,
 --      $E8 flags)
 --   5. misc flags: $20 world type, $11FA vehicle, $11F3, $E7/$E8/$E9
-local H = dofile("/Users/mtklein/ot6/tools/tests/lib/ot6.lua")
-local STATE = "/Users/mtklein/ot6/build/states/worldmap_narshe.mss.lua"
+local H = dofile("tools/tests/lib/ot6.lua")
+local STATE = "build/states/worldmap_narshe.mss.lua"
 
 local function P(fmt, ...) print("[probe] " .. string.format(fmt, ...)) end
 

@@ -40,8 +40,8 @@
 -- RandA (its clamp overflows first), so those seeds simply never fire -- which
 -- is the whole point: the guarantee is roll-free, provable by pinning the very
 -- seeds that miss or take the common at 0 bp and still getting the rare.
-local H = dofile("/Users/mtklein/ot6/tools/tests/lib/ot6.lua")
-local STATE = "/Users/mtklein/ot6/build/states/battle_doorstep.mss.lua"
+local H = dofile("tools/tests/lib/ot6.lua")
+local STATE = "build/states/battle_doorstep.mss.lua"
 
 local MENU, ACTOR = 0x7BCA, 0x62CA
 local PARTY = { 0, 1, 2 }

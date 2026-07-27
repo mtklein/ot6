@@ -1,7 +1,7 @@
 -- probe_n20c.lua -- model-vs-engine on post-battle map 20: dump the
 -- (49,14) neighborhood's prop bytes, then push raw held directions and see
 -- whether the ENGINE moves where the MODEL says wall.
-local H = dofile("/Users/mtklein/ot6/tools/tests/lib/ot6.lua")
+local H = dofile("tools/tests/lib/ot6.lua")
 
 local function map() return H.mapId() & 0x1ff end
 
@@ -34,7 +34,7 @@ local function push(dir, n)
 end
 
 H.run({ maxFrames = 20000 }, {
-  H.loadState("/Users/mtklein/ot6/build/states/kefka_won.mss.lua"),
+  H.loadState("build/states/kefka_won.mss.lua"),
   H.waitFrames(30),
   H.navTo(55, 35, { arrive = function() return map() == 20 end,
                     maxFrames = 6000 }),

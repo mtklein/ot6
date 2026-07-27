@@ -433,7 +433,7 @@ misread as a crash -- see WORKING NOTES.  Coroutines work.  The step machine
 stays because the whole suite is written in it, not because it has to.)
 
 ```lua
-local H = dofile("/Users/mtklein/ot6/tools/tests/lib/ot6.lua")
+local H = dofile("tools/tests/lib/ot6.lua")
 
 H.run({ maxFrames = 60000 }, {              -- frame budget failsafe -> exit 2
   H.waitFrames(60),
@@ -449,6 +449,15 @@ H.run({ maxFrames = 60000 }, {              -- frame budget failsafe -> exit 2
 ```
 
 `H.log()` goes to stdout (`[ot6]` prefix); plain `print()` also works.
+
+Reference savestates TREE-RELATIVELY -- `H.loadState("build/states/x.mss.lua")`
+-- never by absolute path (issue #26).  compose.py resolves every reference
+against the running tree's own `build/states/` and REFUSES a reference that
+resolves only outside the tree (including into a nested worktree), so a
+worktree can never quietly boot a fixture minted from another tree's ROM.
+The gen_*.lua generators still carry the older absolute-path convention only
+because their bytes are hashed into the frontier freshness stamps; behavior
+is tree-local for them too (see compose.py's resolve_sidecar).
 
 **Registering it in the suite.**  A test opts into `make test` with a
 first-line marker in its own file -- `-- @suite` (plain), `-- @suite slow`

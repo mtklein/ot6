@@ -20,8 +20,8 @@
 --   * borrowed-font canary (tiles $64/$6D/$71/$EB vs ROM, 4 bytes each).
 --   * quadrant uploads ($7B21/$62C9) that would stomp map rows in vram.
 -- Every animation logs its attack number ($626A) -- events name themselves.
-local H = dofile("/Users/mtklein/ot6/tools/tests/lib/ot6.lua")
-local STATE = "/Users/mtklein/ot6/build/states/kolts_cave.mss.lua"
+local H = dofile("tools/tests/lib/ot6.lua")
+local STATE = "build/states/kolts_cave.mss.lua"
 local VR  = emu.memType.snesVideoRam
 local ROM = emu.memType.snesPrgRom
 

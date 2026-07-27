@@ -27,8 +27,8 @@
 -- while the boost is pending.
 -- Positive controls: a boost really was pending, and damage numerals
 -- really did fire, during the sampled window.
-local H = dofile("/Users/mtklein/ot6/.claude/worktrees/agent-a7ce0f4f38c2c39f7/tools/tests/lib/ot6.lua")
-local STATE = "/Users/mtklein/ot6/.claude/worktrees/agent-a7ce0f4f38c2c39f7/build/states/battle_doorstep.mss.lua"
+local H = dofile("tools/tests/lib/ot6.lua")
+local STATE = "build/states/battle_doorstep.mss.lua"
 
 local NUM_LO, NUM_HI = 192, 223       -- vram $2c00-$2dff as obj tile ids
 local actor

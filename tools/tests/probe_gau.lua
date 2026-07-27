@@ -10,8 +10,8 @@
 -- reaction script does ($0d 'gau took the meat' -> end_battle).  Logs the
 -- post-battle party/roster bits.  Non-Gau battles are kill-bitted (veldt
 -- trash, PopDP-safe).
-local H = dofile("/Users/mtklein/ot6/tools/tests/lib/ot6.lua")
-local DOOR = "/Users/mtklein/ot6/build/states/falls_done.mss.lua"
+local H = dofile("tools/tests/lib/ot6.lua")
+local DOOR = "build/states/falls_done.mss.lua"
 
 local function mapIdx() return H.readWord(0x1f64) & 0x3FF end
 local function bright() return emu.getState()["ppu.screenBrightness"] or 0 end

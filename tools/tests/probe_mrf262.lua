@@ -8,7 +8,7 @@
 -- bands, and the object map ($7E2000 bit7 clear = occupied) so a NO-PATH
 -- caused by an NPC standing in a corridor is distinguishable from one
 -- caused by the tilemap.
-local H = dofile("/Users/mtklein/ot6/tools/tests/lib/ot6.lua")
+local H = dofile("tools/tests/lib/ot6.lua")
 
 local function map() return H.mapId() & 0x1ff end
 local function sw(id) return (H.readByte(0x1E80 + (id >> 3)) >> (id & 7)) & 1 end
@@ -48,7 +48,7 @@ local function render(x0, x1, y0, y1, tag)
 end
 
 H.run({ maxFrames = 4000 }, {
-  H.loadState("/Users/mtklein/ot6/build/states/mrf_entry.mss.lua"),
+  H.loadState("build/states/mrf_entry.mss.lua"),
   H.waitFrames(150),
   H.call(function()
     H.log(string.format("map=%d (%d,%d) z=%02X xmask=$%02X ymask=$%02X "

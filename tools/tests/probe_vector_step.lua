@@ -9,7 +9,7 @@
 -- $0803 leader offset), the engine's OWN tile position bytes $af/$b0 (what
 -- CheckEvent / CheckEntrance / the trigger tables compare against), the
 -- movement type $087c, facing $087f, and the z byte $b2.
-local H = dofile("/Users/mtklein/ot6/tools/tests/lib/ot6.lua")
+local H = dofile("tools/tests/lib/ot6.lua")
 
 local function po() return H.readWord(0x0803) end
 local function dump(tag)
@@ -26,7 +26,7 @@ local function dump(tag)
 end
 
 H.run({ maxFrames = 20000 }, {
-  H.loadState("/Users/mtklein/ot6/build/states/vector_doorstep.mss.lua"),
+  H.loadState("build/states/vector_doorstep.mss.lua"),
   H.waitFrames(150),
   H.call(function()
     H.log(string.format("map=%d  xmask=$%02X ymask=$%02X",

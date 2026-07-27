@@ -13,8 +13,8 @@
 --   asserts: $3410 sees the tier-3 id at execution, the damage lands in
 --   tier-3-potency-without-multiplier bounds, mp cost is the base
 --   spell's, and the boost is consumed.
-local H = dofile("/Users/mtklein/ot6/tools/tests/lib/ot6.lua")
-local STATE = "/Users/mtklein/ot6/build/states/battle_doorstep.mss.lua"
+local H = dofile("tools/tests/lib/ot6.lua")
+local STATE = "build/states/battle_doorstep.mss.lua"
 local function pend(slot) return H.readByte(0x3e9d + slot*2) end
 local terra, mp0
 local spells = {}

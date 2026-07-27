@@ -39,8 +39,8 @@
 --   6. CONFIRM RESOLVES: picking row 2 at ceiling 4 banks boost 2, latches
 --      Quadra Slam ($58), reaches $3410, chips a slashing-weak guard and reveals
 --      the slash class, and the boost is consumed with no +1 regen that turn.
-local H = dofile("/Users/mtklein/ot6/tools/tests/lib/ot6.lua")
-local STATE = "/Users/mtklein/ot6/build/states/battle_doorstep.mss.lua"
+local H = dofile("tools/tests/lib/ot6.lua")
+local STATE = "build/states/battle_doorstep.mss.lua"
 
 local MENU, ACTOR, MSTATE = 0x7BCA, 0x62CA, 0x7BC2
 local KNOWN, ITEMLIST = 0x2020, 0x4005

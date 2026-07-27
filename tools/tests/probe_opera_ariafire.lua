@@ -1,7 +1,7 @@
 -- probe_opera_ariafire.lua -- boots opera_stage (238, $0056=1), steps onto the
 -- aria trigger (97,7), and rides the narration to the FIRST lyric fork, logging
 -- the choice-dialog state ($056e cursor / $056f count / $00d3).  TIGHT budgets.
-local H = dofile("/Users/mtklein/ot6/tools/tests/lib/ot6.lua")
+local H = dofile("tools/tests/lib/ot6.lua")
 local function map() return H.mapId() & 0x1ff end
 local function bright() return emu.getState()["ppu.screenBrightness"] or 0 end
 local function sw(id) return (H.readByte(0x1E80 + math.floor(id/8)) >> (id%8)) & 1 end
@@ -14,7 +14,7 @@ local function dumpsw(tag)
 end
 
 H.run({ maxFrames = 40000 }, {
-  H.loadState("/Users/mtklein/ot6/build/states/opera_stage.mss.lua"),
+  H.loadState("build/states/opera_stage.mss.lua"),
   H.waitFrames(60),
   H.call(function() H.assertEq(map(),238,"boot 238"); dumpsw("boot") end),
 

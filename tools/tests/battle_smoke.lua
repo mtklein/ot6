@@ -12,8 +12,8 @@
 --
 -- Exit codes: 0 = battle active with sane values, 1 = any assert failed.
 
-local H = dofile("/Users/mtklein/ot6/tools/tests/lib/ot6.lua")
-local STATE = "/Users/mtklein/ot6/build/states/first_battle.mss.lua"
+local H = dofile("tools/tests/lib/ot6.lua")
+local STATE = "build/states/first_battle.mss.lua"
 
 H.run({ maxFrames = 3600 }, {
   -- Let the machine boot a few frames before loading state on top of it.

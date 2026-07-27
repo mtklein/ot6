@@ -5,8 +5,8 @@
 -- element/class rows actually read after Ot6SeedShields and Ot6ElemAdd have
 -- run, what LEVEL Sabin joins at (AuraBolt is a level-6 Blitz, so the holy
 -- proof stands or falls on it), and what the two candidate win paths do.
-local H = dofile("/Users/mtklein/ot6/tools/tests/lib/ot6.lua")
-local DOOR = "/Users/mtklein/ot6/build/states/vargas_doorstep.mss.lua"
+local H = dofile("tools/tests/lib/ot6.lua")
+local DOOR = "build/states/vargas_doorstep.mss.lua"
 
 local VARGAS_SPECIES = 0x0103
 local IPOOH_SPECIES  = 0x014D

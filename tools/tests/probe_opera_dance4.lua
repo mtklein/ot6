@@ -1,7 +1,7 @@
 -- probe_opera_dance4.lua -- LAST dance attempt + diagnosis.  Climb the x=12
 -- column to Draco (12,14), talk UP to advance _cabd35 ($01F0->1->2), tracking
 -- every object so Draco's movement is visible.  Then flowers -> balcony.
-local H = dofile("/Users/mtklein/ot6/tools/tests/lib/ot6.lua")
+local H = dofile("tools/tests/lib/ot6.lua")
 local function map() return H.mapId() & 0x1ff end
 local function sw(id) return (H.readByte(0x1E80 + math.floor(id/8)) >> (id%8)) & 1 end
 local function facing() return H.readByte(0x087f + H.readWord(0x0803)) end
@@ -49,7 +49,7 @@ local function climbTalk(tx,ty,near,fdir, doneFn,maxF,what)
 end
 
 H.run({ maxFrames = 14000 }, {
-  H.loadState("/Users/mtklein/ot6/build/states/aria_postfork.mss.lua"),
+  H.loadState("build/states/aria_postfork.mss.lua"),
   H.waitFrames(30),
   H.call(function() H.assertEq(map(),236,"boot 236"); dumpsw("start") end),
   -- talk Draco up the column: aim (12,15), talk UP, until $01F2 (waltz done)

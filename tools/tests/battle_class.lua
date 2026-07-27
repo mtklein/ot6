@@ -80,8 +80,8 @@
 -- $316190+species. live attack class byte $57B8 (logged, not asserted:
 -- monster actions legitimately zero it).
 
-local H = dofile("/Users/mtklein/ot6/tools/tests/lib/ot6.lua")
-local STATE = "/Users/mtklein/ot6/build/states/battle_doorstep.mss.lua"
+local H = dofile("tools/tests/lib/ot6.lua")
+local STATE = "build/states/battle_doorstep.mss.lua"
 
 local function sram(addr) return emu.read(addr, emu.memType.snesMemory) end
 local function codexBase()

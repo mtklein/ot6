@@ -2,8 +2,8 @@
 -- ($7E896F): every writer PC and value through one Cirpius battle with a
 -- Terra cast, so the 16x16 flips name their own writers (the instrument
 -- behind battle_hudanim16's file:line citations).
-local H = dofile("/Users/mtklein/ot6/tools/tests/lib/ot6.lua")
-local STATE = "/Users/mtklein/ot6/build/states/kolts_cave.mss.lua"
+local H = dofile("tools/tests/lib/ot6.lua")
+local STATE = "build/states/kolts_cave.mss.lua"
 local DANGER = 0x1f6e
 local MENU, ACTOR, MSTATE = 0x7BCA, 0x62CA, 0x7BC2
 local CHARIX = 0x3ED9

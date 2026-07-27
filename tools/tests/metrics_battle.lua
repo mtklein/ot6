@@ -78,13 +78,13 @@
 --  * "immediate" actions ($340a, battle_main.asm @0033) bypass all
 --    three queues (battle-start scripts, final attacks). rare in wob
 --    trash; uncounted, and they also leave the shadow stale.
-local H = dofile("/Users/mtklein/ot6/tools/tests/lib/ot6.lua")
+local H = dofile("tools/tests/lib/ot6.lua")
 
 -- ------------------------------------------------------------- knobs --
 local POLICY = "boost3"            -- see POLICIES below
 local STATES = {
-  doorstep  = "/Users/mtklein/ot6/build/states/battle_doorstep.mss.lua",
-  doorstep2 = "/Users/mtklein/ot6/build/states/battle2_doorstep.mss.lua",
+  doorstep  = "build/states/battle_doorstep.mss.lua",
+  doorstep2 = "build/states/battle2_doorstep.mss.lua",
 }
 local STATE = STATES.doorstep2
 local ROUNDS = 0                   -- player actions to record; 0 = to the end

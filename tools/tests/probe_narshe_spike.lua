@@ -26,8 +26,8 @@
 -- geometry, commit rule) is what this probe is after; the driver written
 -- from it must therefore be POSITION-AGNOSTIC (state-fed, not a canned
 -- press list) so the 7-char honest run drives the same.
-local H = dofile("/Users/mtklein/ot6/tools/tests/lib/ot6.lua")
-local BOOT = "/Users/mtklein/ot6/build/states/locke_done.mss.lua"
+local H = dofile("tools/tests/lib/ot6.lua")
+local BOOT = "build/states/locke_done.mss.lua"
 
 local function map() return H.mapId() & 0x1ff end
 local function bright() return emu.getState()["ppu.screenBrightness"] or 0 end

@@ -4,8 +4,8 @@
 -- title into Continue, and screenshot where the save puts us. In-game
 -- saves are pure data in vanilla layout — no code dependency — so this
 -- works across ROM rebuilds, unlike savestates.
-local H = dofile("/Users/mtklein/ot6/tools/tests/lib/ot6.lua")
-local SRM = "/Users/mtklein/ot6/build/states/playthrough_srm.mss.lua"
+local H = dofile("tools/tests/lib/ot6.lua")
+local SRM = "build/states/playthrough_srm.mss.lua"
 
 H.run({ maxFrames = 20000 }, {
   -- inject before anything reads SRAM (front 8KB = the save slots at

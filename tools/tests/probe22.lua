@@ -2,8 +2,8 @@
 -- NAME window on screen (press A to enter targeting from the command menu),
 -- screenshotting along the way.  Used to visually verify the break-system
 -- shield digits render after each enemy name.
-local H = dofile("/Users/mtklein/ot6/tools/tests/lib/ot6.lua")
-local STATE = "/Users/mtklein/ot6/build/states/first_battle.mss.lua"
+local H = dofile("tools/tests/lib/ot6.lua")
+local STATE = "build/states/first_battle.mss.lua"
 
 local function glyphs()
   local g = {}

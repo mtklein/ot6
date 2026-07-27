@@ -4,8 +4,8 @@
 -- source), the under-monster hud on the bg3 field map, and bp pips in
 -- the party window. the ability-list icon assert lives in battle_break,
 -- whose drive reliably traverses the list.
-local H = dofile("/Users/mtklein/ot6/tools/tests/lib/ot6.lua")
-local STATE = "/Users/mtklein/ot6/build/states/battle_doorstep.mss.lua"
+local H = dofile("tools/tests/lib/ot6.lua")
+local STATE = "build/states/battle_doorstep.mss.lua"
 H.run({ maxFrames = 20000 }, {
   H.waitFrames(20),
   H.loadState(STATE),

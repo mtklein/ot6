@@ -4,8 +4,8 @@
 -- the already-activated check ($087c low nibble == 4), and the z-level
 -- match ($b8&7 vs the object's $0888).  Read them all off
 -- spike_doorstep.mss, then try the A press while watching them.
-local H = dofile("/Users/mtklein/ot6/tools/tests/lib/ot6.lua")
-local DOOR = "/Users/mtklein/ot6/build/states/spike_doorstep.mss.lua"
+local H = dofile("tools/tests/lib/ot6.lua")
+local DOOR = "build/states/spike_doorstep.mss.lua"
 
 local KO = 16 * 0x29                    -- KEFKA = object 16's record offset
 

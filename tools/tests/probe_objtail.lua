@@ -24,8 +24,8 @@
 -- generic battle does not exercise -- so "never referenced here" is
 -- weaker than "never referenced".  Blankness is the load-bearing signal;
 -- a blank tile has no art to lose no matter who names it.
-local H = dofile("/Users/mtklein/ot6/.claude/worktrees/agent-a7ce0f4f38c2c39f7/tools/tests/lib/ot6.lua")
-local STATE = "/Users/mtklein/ot6/.claude/worktrees/agent-a7ce0f4f38c2c39f7/build/states/battle_doorstep.mss.lua"
+local H = dofile("tools/tests/lib/ot6.lua")
+local STATE = "build/states/battle_doorstep.mss.lua"
 
 local LO, HI = 224, 255
 local blank, refd = {}, {}

@@ -26,8 +26,8 @@
 --   1. AFFORDABLE STAYS WHITE.  Flash and AutoCrossbow render at $21.
 --   2. UNAFFORDABLE GREYS.  Drill and Debilitator render at $25.
 --   3. THE GREY IS THE DISABLED BIT.  grey - white == $04.
-local H = dofile("/Users/mtklein/ot6/tools/tests/lib/ot6.lua")
-local STATE = "/Users/mtklein/ot6/build/states/battle_doorstep.mss.lua"
+local H = dofile("tools/tests/lib/ot6.lua")
+local STATE = "build/states/battle_doorstep.mss.lua"
 
 local MENU, ACTOR, MSTATE = 0x7BCA, 0x62CA, 0x7BC2
 local ST_TOOLS = 0x30

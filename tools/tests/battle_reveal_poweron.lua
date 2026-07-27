@@ -21,7 +21,7 @@
 -- Monster slot s -> entity $08+2s: revealed elems $3e91+2s, revealed classes
 -- $3ea5+2s, broken timer $3e90+2s, class-weak $3ea4+2s. HUD row s at $5762+14s,
 -- weakness cells low byte +6/+8/+10/+12 ('?' = $BF, blank = $FF/$00).
-local H = dofile("/Users/mtklein/ot6/tools/tests/lib/ot6.lua")
+local H = dofile("tools/tests/lib/ot6.lua")
 
 local function present(slot) return (H.readByte(0x3aa8 + slot * 2) & 1) == 1 end
 local function wcell(slot, k) return H.readByte(H.shadowLine(slot) + 6 + k * 2) end

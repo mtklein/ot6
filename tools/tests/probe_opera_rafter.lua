@@ -2,7 +2,7 @@
 -- observe the post-aria state and what triggers the rafter chase.  Dump switches
 -- + position; walk LEFT/around A-mashing to see if Ultros (_cabf31 dlg $04C8,
 -- $0058=1) fires, tracking map/switch changes.
-local H = dofile("/Users/mtklein/ot6/tools/tests/lib/ot6.lua")
+local H = dofile("tools/tests/lib/ot6.lua")
 local function map() return H.mapId() & 0x1ff end
 local function sw(id) return (H.readByte(0x1E80 + math.floor(id/8)) >> (id%8)) & 1 end
 local function dumpsw(tag)
@@ -11,7 +11,7 @@ local function dumpsw(tag)
     sw(0x0057), sw(0x0058), sw(0x0111), sw(0x0345), sw(0x0355), sw(0x0366)))
 end
 H.run({ maxFrames = 8000 }, {
-  H.loadState("/Users/mtklein/ot6/build/states/opera_dance_done.mss.lua"),
+  H.loadState("build/states/opera_dance_done.mss.lua"),
   H.waitFrames(60),
   H.call(function() H.assertEq(map(),238,"boot 238"); dumpsw("BOOT"); H.screenshot("rafter_boot") end),
   -- bfs reachability probe from here

@@ -1,7 +1,7 @@
 -- probe_opera_world.lua -- boot zozo_done, exit to the world, drive toward
 -- the Jidoor approach (27,129), and when movement stalls dump the world tile
 -- props + passability around the party and screenshot. Read-only.
-local H = dofile("/Users/mtklein/ot6/tools/tests/lib/ot6.lua")
+local H = dofile("tools/tests/lib/ot6.lua")
 local function map() return H.mapId() & 0x1ff end
 local function bright() return emu.getState()["ppu.screenBrightness"] or 0 end
 local function killBitAll()
@@ -11,7 +11,7 @@ end
 local DIRS = { "up","right","down","left" }
 
 H.run({ maxFrames = 40000 }, {
-  H.loadState("/Users/mtklein/ot6/build/states/zozo_done.mss.lua"),
+  H.loadState("build/states/zozo_done.mss.lua"),
   H.waitFrames(120),
   H.navTo(62, 45, { maxFrames = 12000 }),
   (function() local hb=0

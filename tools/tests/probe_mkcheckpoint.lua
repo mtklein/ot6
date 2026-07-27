@@ -1,4 +1,4 @@
-local H = dofile("/Users/mtklein/ot6/tools/tests/lib/ot6.lua")
+local H = dofile("tools/tests/lib/ot6.lua")
 local function map() return H.mapId() & 0x1ff end
 local function bright() return emu.getState()["ppu.screenBrightness"] or 0 end
 local function sw(id)
@@ -568,7 +568,7 @@ end
 -- CHECKPOINT BUILDER: run the maze from zozo_arrival through bridgeCross(),
 -- then save bridge_checkpoint.mss at the bridge-room bottom (map 225 ~30,61).
 H.run({ maxFrames = 90000 }, {
-  H.loadState("/Users/mtklein/ot6/build/states/zozo_arrival.mss.lua"),
+  H.loadState("build/states/zozo_arrival.mss.lua"),
   H.waitFrames(150),
   H.call(function()
     H.assertEq(map(), 221, "booted on the Zozo street (map 221)")

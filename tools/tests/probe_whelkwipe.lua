@@ -14,10 +14,10 @@
 -- Run against build/ot6.sfc as-is (TAG "wo"); for the base-ROM ground
 -- truth sed TAG to "wb" and point the runner at
 -- build/states/base_rom_for_comparison.sfc.
-local H = dofile("/Users/mtklein/ot6/tools/tests/lib/ot6.lua")
+local H = dofile("tools/tests/lib/ot6.lua")
 
 local TAG = "wo"
-local STATE = "/Users/mtklein/ot6/build/states/whelk_doorstep.mss.lua"
+local STATE = "build/states/whelk_doorstep.mss.lua"
 local BURST = 150                  -- frames captured per transition
 local SHOT_EVERY = 1               -- screenshot cadence inside a burst
 

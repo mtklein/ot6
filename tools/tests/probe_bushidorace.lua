@@ -22,8 +22,8 @@
 -- the executed attack stays tempest ($5b) while ActionEnd charges the
 -- lowered pending -- tempest for free at the limit.  The per-frame trace
 -- of ($7bca, $7bc2, $7bcb, pending, $32cc) is the evidence either way.
-local H = dofile("/Users/mtklein/ot6/.claude/worktrees/agent-a1ed6959a07898907/tools/tests/lib/ot6.lua")
-local STATE = "/Users/mtklein/ot6/.claude/worktrees/agent-a1ed6959a07898907/build/states/battle_doorstep.mss.lua"
+local H = dofile("tools/tests/lib/ot6.lua")
+local STATE = "build/states/battle_doorstep.mss.lua"
 
 local MENU, ACTOR, MSTATE = 0x7BCA, 0x62CA, 0x7BC2
 local KNOWN = 0x2020

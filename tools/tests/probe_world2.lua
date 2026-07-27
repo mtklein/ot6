@@ -5,8 +5,8 @@
 -- disabled switch move.asm:870 checks), $11DF & 3 (moogle charm / charm
 -- bangle row select -- rows 2/3 of WorldBattleRateTbl are all zeros), and
 -- the $1F6E danger word itself.
-local H = dofile("/Users/mtklein/ot6/tools/tests/lib/ot6.lua")
-local STATE = "/Users/mtklein/ot6/build/states/worldmap_narshe.mss.lua"
+local H = dofile("tools/tests/lib/ot6.lua")
+local STATE = "build/states/worldmap_narshe.mss.lua"
 
 local function P(fmt, ...) print("[probe] " .. string.format(fmt, ...)) end
 local function wx() return H.readByte(0x00e0) end

@@ -1,7 +1,7 @@
 -- probe_stall.lua -- drive the beam climb to (29,41), then instrument that
 -- tile exhaustively: canStep for all 8 moves, object-map bytes around
 -- (30,41), the facing byte, and a 400-frame right-hold trace. Read-only.
-local H = dofile("/Users/mtklein/ot6/tools/tests/lib/ot6.lua")
+local H = dofile("tools/tests/lib/ot6.lua")
 local function map() return H.mapId() & 0x1ff end
 local function key(x, y) return y * 256 + x end
 local function prop1(x, y) return H.readByte(0x7E7600 + H.maptile(x, y)) end
@@ -31,7 +31,7 @@ local PRESS = { up = "up", right = "right", down = "down", left = "left",
                 downleft = "left", upleft = "left" }
 
 H.run({ maxFrames = 8000 }, {
-  H.loadState("/Users/mtklein/ot6/build/states/bridge_checkpoint.mss.lua"),
+  H.loadState("build/states/bridge_checkpoint.mss.lua"),
   H.waitFrames(120),
   -- walk to (29,41)
   (function()

@@ -8,8 +8,8 @@
 -- dialogue font? sprite/monster art?), and log the battle context (dialogue
 -- state, active gfx command) so the clobber can be named.
 
-local H = dofile("/Users/mtklein/ot6/tools/tests/lib/ot6.lua")
-local STATE = "/Users/mtklein/ot6/build/states/moogle_doorstep.mss.lua"
+local H = dofile("tools/tests/lib/ot6.lua")
+local STATE = "build/states/moogle_doorstep.mss.lua"
 local VR  = emu.memType.snesVideoRam
 local ROM = emu.memType.snesPrgRom
 

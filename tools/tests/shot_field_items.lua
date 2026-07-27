@@ -3,8 +3,8 @@
 -- fixture (Terra alone, normal commands), pokes one weapon per break class
 -- (plus classless Heal Rod) into $1869/$1969, opens the menu with start,
 -- enters Items (default cursor entry), and screenshots the list.
-local H = dofile("/Users/mtklein/ot6/tools/tests/lib/ot6.lua")
-local STATE = "/Users/mtklein/ot6/build/states/arvis_wake.mss.lua"
+local H = dofile("tools/tests/lib/ot6.lua")
+local STATE = "build/states/arvis_wake.mss.lua"
 
 local ITEMS = { 0x00, 0x2B, 0x47, 0x51, 0x33 }
 

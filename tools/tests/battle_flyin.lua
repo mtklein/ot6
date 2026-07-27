@@ -30,8 +30,8 @@
 -- a real regression: the window must actually be sampled (>= 12 frames with a
 -- present-but-unshown monster), AND once the birds enter the hud must come
 -- back (fieldHudPresent + glyphCanary).
-local H = dofile("/Users/mtklein/ot6/tools/tests/lib/ot6.lua")
-local STATE = "/Users/mtklein/ot6/build/states/kolts_cave.mss.lua"
+local H = dofile("tools/tests/lib/ot6.lua")
+local STATE = "build/states/kolts_cave.mss.lua"
 local VR  = emu.memType.snesVideoRam
 local ROM = emu.memType.snesPrgRom
 local DANGER = 0x1f6e

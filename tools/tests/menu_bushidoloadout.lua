@@ -18,8 +18,8 @@
 --     cycles tech 4 -> 5, leaving {5,5,6,7} = word $0fad (nonzero = MANUAL).
 --   * REVERT: Y writes $0000 (AUTO) -- no reseed needed, the display recomputes.
 -- A screenshot proves the two-pane screen (4 boost slots + LEARNED pool) renders.
-local H = dofile("/Users/mtklein/ot6/tools/tests/lib/ot6.lua")
-local STATE = "/Users/mtklein/ot6/build/states/arvis_wake.mss.lua"
+local H = dofile("tools/tests/lib/ot6.lua")
+local STATE = "build/states/arvis_wake.mss.lua"
 
 local ZMENUSTATE, SENTINEL = 0x26, 0x4A     -- direct-page menu vars
 local LEARNED, LOADOUT = 0x1CF7, 0x1E1D

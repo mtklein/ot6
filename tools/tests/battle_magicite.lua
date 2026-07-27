@@ -70,8 +70,8 @@
 -- On this mint an ally's Magitek beam resolving inside the caster's action
 -- window overwrites the shared $11a0 property buffer mid-resolution, and every
 -- spell effect measured here reads as "nothing happened".  It is not the spell.
-local H = dofile("/Users/mtklein/ot6/tools/tests/lib/ot6.lua")
-local STATE = "/Users/mtklein/ot6/build/states/battle_doorstep.mss.lua"
+local H = dofile("tools/tests/lib/ot6.lua")
+local STATE = "build/states/battle_doorstep.mss.lua"
 
 -- spell ids (const.inc ATTACK enum)
 local FIRE, ICE, DRAIN, SHELL, OSMOSE = 0x00, 0x01, 0x04, 0x25, 0x29

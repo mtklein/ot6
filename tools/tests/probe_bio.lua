@@ -48,8 +48,8 @@
 -- after the last thing that test looks at.  Confirmed by reverting the fix
 -- and re-running it: all 40 of its assertions pass with $98 dead, which is
 -- what its new liveness check at the bottom exists to stop.
-local H = dofile("/Users/mtklein/ot6/tools/tests/lib/ot6.lua")
-local DOOR = "/Users/mtklein/ot6/build/states/vargas_doorstep.mss.lua"
+local H = dofile("tools/tests/lib/ot6.lua")
+local DOOR = "build/states/vargas_doorstep.mss.lua"
 
 local MENU, ACTOR, MSTATE = 0x7BCA, 0x62CA, 0x7BC2
 local CMDTBL   = 0x202E        -- in-battle commands, slot*12 + i*3

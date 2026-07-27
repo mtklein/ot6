@@ -1,7 +1,7 @@
 -- probe_opera_stage.lua -- mint opera_stage.mss: boot opera_backstage, run
 -- Route A (234 theater -> 237 -> stage door 82,32 -> 238 stage 100,22 -> talk
 -- CELES -> $0056=1), settle, SAVE.  One navTo(97,7) from the aria.  No aria drive.
-local H = dofile("/Users/mtklein/ot6/tools/tests/lib/ot6.lua")
+local H = dofile("tools/tests/lib/ot6.lua")
 local function map() return H.mapId() & 0x1ff end
 local function bright() return emu.getState()["ppu.screenBrightness"] or 0 end
 local function sw(id) return (H.readByte(0x1E80 + math.floor(id/8)) >> (id%8)) & 1 end
@@ -36,7 +36,7 @@ local function toDoor(tx,ty,bumpDir,destMap,what)
 end
 
 H.run({ maxFrames = 60000 }, {
-  H.loadState("/Users/mtklein/ot6/build/states/opera_backstage.mss.lua"),
+  H.loadState("build/states/opera_backstage.mss.lua"),
   H.waitFrames(60),
   H.call(function() H.assertEq(map(),234,"boot 234"); H.assertEq(sw(0x0055),1,"$0055 set"); dumpsw("boot") end),
 

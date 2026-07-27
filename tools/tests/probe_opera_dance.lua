@@ -1,7 +1,7 @@
 -- probe_opera_dance.lua -- opera_stage -> aria -> forks {0,1,0} -> then the
 -- FLOWER DANCE on map 236: dump geometry, reach NPC(12,19)=_cabf27 ($0057=1) and
 -- Draco NPC(12,14)=_cabd35, then the balcony trigger (8,9)=_cabe6d -> $0111=1.
-local H = dofile("/Users/mtklein/ot6/tools/tests/lib/ot6.lua")
+local H = dofile("tools/tests/lib/ot6.lua")
 local function map() return H.mapId() & 0x1ff end
 local function bright() return emu.getState()["ppu.screenBrightness"] or 0 end
 local function sw(id) return (H.readByte(0x1E80 + math.floor(id/8)) >> (id%8)) & 1 end
@@ -49,7 +49,7 @@ local function talkAt(ax,ay, fdir, watchId, what)
 end
 
 H.run({ maxFrames = 60000 }, {
-  H.loadState("/Users/mtklein/ot6/build/states/opera_stage.mss.lua"),
+  H.loadState("build/states/opera_stage.mss.lua"),
   H.waitFrames(60),
   H.navTo(97, 7, { maxFrames=8000, arrive=function() return map()~=238 end }),
   H.waitUntil(function() return map()==236 end, 6000, "aria loaded 236", 10),

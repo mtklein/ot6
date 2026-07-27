@@ -82,8 +82,8 @@
 -- byte and spun forever with the battle NMI dead.  Proof 3 cannot pass
 -- without opening that window on that row, so a regression times out here
 -- rather than shipping a freeze.
-local H = dofile("/Users/mtklein/ot6/tools/tests/lib/ot6.lua")
-local DOOR = "/Users/mtklein/ot6/build/states/vargas_doorstep.mss.lua"
+local H = dofile("tools/tests/lib/ot6.lua")
+local DOOR = "build/states/vargas_doorstep.mss.lua"
 
 local VARGAS, IPOOH = 0x0103, 0x014D
 local OT6_BLUDG, OT6_SLASH = 0x04, 0x01

@@ -22,7 +22,7 @@
 -- let vanilla's own CopyGameDataToSRAM run, then read back what it stored.
 -- The resulting save is deliberately garbage -- only the checksum is under test.
 -- Saving is only legal on the world map, so this runs from worldmap_narshe.
-local H = dofile("/Users/mtklein/ot6/.claude/worktrees/project-setup-dependencies-4933ac/tools/tests/lib/ot6.lua")
+local H = dofile("tools/tests/lib/ot6.lua")
 
 local ZMENUSTATE       = 0x0026
 local SAVE_SELECT_INIT = 0x13
@@ -38,7 +38,7 @@ end
 
 H.run({ maxFrames = 8000 }, {
   H.waitFrames(20),
-  H.loadState("/Users/mtklein/ot6/build/states/worldmap_narshe.mss.lua"),
+  H.loadState("build/states/worldmap_narshe.mss.lua"),
   H.waitFrames(60),
 
   H.pressButtons({ "x" }, 4),

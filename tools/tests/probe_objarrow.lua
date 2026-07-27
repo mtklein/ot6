@@ -30,8 +30,8 @@
 -- Positive control: the run asserts the tiles were correct at least once
 -- (right after battle init), so "never diverged" cannot pass because the
 -- probe was looking at the wrong address the whole time.
-local H = dofile("/Users/mtklein/ot6/.claude/worktrees/agent-a7ce0f4f38c2c39f7/tools/tests/lib/ot6.lua")
-local STATE = "/Users/mtklein/ot6/.claude/worktrees/agent-a7ce0f4f38c2c39f7/build/states/battle_doorstep.mss.lua"
+local H = dofile("tools/tests/lib/ot6.lua")
+local STATE = "build/states/battle_doorstep.mss.lua"
 
 -- vram WORD addresses of the 12 arrow tiles, in Ot6ObjArrowData order
 local ARROW_W = { 0x2c80,0x2c90,0x2d80,0x2d90,

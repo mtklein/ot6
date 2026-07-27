@@ -24,8 +24,8 @@
 -- Also screenshots the reveal moment: "Weak against piercing" in a
 -- fight whose message window renders cleanly.
 
-local H = dofile("/Users/mtklein/ot6/tools/tests/lib/ot6.lua")
-local STATE = "/Users/mtklein/ot6/build/states/battle_doorstep.mss.lua"
+local H = dofile("tools/tests/lib/ot6.lua")
+local STATE = "build/states/battle_doorstep.mss.lua"
 
 local function sram(addr) return emu.read(addr, emu.memType.snesMemory) end
 local function rev1() return H.readByte(0x3E95) end   -- guard revealed elems

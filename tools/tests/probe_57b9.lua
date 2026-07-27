@@ -4,8 +4,8 @@
 -- Fire Beam banner -> resolution.  $7E57D5 rides along as the positive
 -- control: the banner machinery MUST hit it (GfxCmd_01 et al).
 
-local H = dofile("/Users/mtklein/ot6/tools/tests/lib/ot6.lua")
-local STATE = "/Users/mtklein/ot6/build/states/battle_doorstep.mss.lua"
+local H = dofile("tools/tests/lib/ot6.lua")
+local STATE = "build/states/battle_doorstep.mss.lua"
 
 local hits = {}       -- addr -> { count, pcs = {pcstr -> n} }
 local function watch(lo, hi)

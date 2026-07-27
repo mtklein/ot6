@@ -54,8 +54,8 @@
 -- shows absent (Drain, Ice, Osmose, Shell), and their deletions by the two that
 -- are genuinely absent (Fire2, Ice2, Rasp).  Said out loud rather than quietly
 -- omitted, per CONTRIBUTING's quiet-test rule.
-local H = dofile("/Users/mtklein/ot6/tools/tests/lib/ot6.lua")
-local STATE = "/Users/mtklein/ot6/build/states/battle_doorstep.mss.lua"
+local H = dofile("tools/tests/lib/ot6.lua")
+local STATE = "build/states/battle_doorstep.mss.lua"
 
 -- spell ids (const.inc ATTACK enum)
 local BOLT, RASP           = 0x02, 0x1a

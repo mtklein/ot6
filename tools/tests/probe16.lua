@@ -2,7 +2,7 @@
 -- request save -> clobber WRAM -> request load -> confirm restored.
 -- (Savestate create/load go through the exec-callback trampoline; this is
 -- also the regression test for that mechanism.)
-local H = dofile("/Users/mtklein/ot6/tools/tests/lib/ot6.lua")
+local H = dofile("tools/tests/lib/ot6.lua")
 
 local ADDR = 0x7E1000
 local before, blob, req

@@ -7,8 +7,8 @@
 -- menu, save into empty slot 3, and assert both the payload transfer and the
 -- active-page lifecycle marker. This exercises CopyGameDataToSRAM's real
 -- Ot6CodexSaveAs hook rather than calling an OT6 helper directly.
-local H = dofile("/Users/mtklein/ot6/tools/tests/lib/ot6.lua")
-local STATE = "/Users/mtklein/ot6/build/states/worldmap_narshe.mss.lua"
+local H = dofile("tools/tests/lib/ot6.lua")
+local STATE = "build/states/worldmap_narshe.mss.lua"
 
 local ZMENUSTATE = 0x26
 local SAVE_SELECT_INIT = 0x13

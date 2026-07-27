@@ -1,12 +1,12 @@
 -- probe_opera_occ.lua -- boot aria_postfork; dump the OBJECT-COLLISION map
 -- ($7E2000 bit7: '.'=free '#'=occupied) over x[4..15] y[6..27], and test canStep
 -- for the transitions the climb needs, to learn which tiles NPCs block.
-local H = dofile("/Users/mtklein/ot6/tools/tests/lib/ot6.lua")
+local H = dofile("tools/tests/lib/ot6.lua")
 local function map() return H.mapId() & 0x1ff end
 local function occFree(x,y) return (H.readByte(0x7E2000 + (y&0xFF)*256 + (x&0xFF)) & 0x80) ~= 0 end
 local function p1(x,y) return H.readByte(0x7E7600 + H.maptile(x,y)) end
 H.run({ maxFrames = 4000 }, {
-  H.loadState("/Users/mtklein/ot6/build/states/aria_postfork.mss.lua"),
+  H.loadState("build/states/aria_postfork.mss.lua"),
   H.waitFrames(60),
   H.call(function()
     H.assertEq(map(),236,"boot 236")

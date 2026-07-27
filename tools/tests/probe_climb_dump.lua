@@ -2,7 +2,7 @@
 -- the bridge-room shaft prop tables + a door-walled all-z BFS to (30,34),
 -- to resolve: is there a non-warp route to the (30,34) door, or is (30,41)
 -- unavoidable?  Read-only measurement; mints nothing.
-local H = dofile("/Users/mtklein/ot6/tools/tests/lib/ot6.lua")
+local H = dofile("tools/tests/lib/ot6.lua")
 local function map() return H.mapId() & 0x1ff end
 local function key(x, y) return y * 256 + x end
 local function prop1(x, y) return H.readByte(0x7E7600 + H.maptile(x, y)) end
@@ -67,7 +67,7 @@ local DOORS225 = { {12,44},{11,17},{21,15},{52,57},{47,47},{59,35},{46,9},
   {30,62},{30,34},{35,14} }
 
 H.run({ maxFrames = 8000 }, {
-  H.loadState("/Users/mtklein/ot6/build/states/bridge_checkpoint.mss.lua"),
+  H.loadState("build/states/bridge_checkpoint.mss.lua"),
   H.waitFrames(120),
   H.call(function()
     H.log(string.format("[boot] map=%d (%d,%d) z%d xm=%d ym=%d", map(),

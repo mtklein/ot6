@@ -9,7 +9,7 @@
 -- init). Watches WRITES to the monster revealed-elems ($7E3E91-9B), revealed-
 -- classes ($7E3EA5-AF) and weak-elems ($7E3BE8-F2) ranges, logging each
 -- writer's bank:PC and value. Snapshots masks + codex at the seed entry.
-local H = dofile("/Users/mtklein/ot6/tools/tests/lib/ot6.lua")
+local H = dofile("tools/tests/lib/ot6.lua")
 
 local hits = {}
 local watching = false

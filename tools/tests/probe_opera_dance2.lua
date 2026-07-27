@@ -2,7 +2,7 @@
 -- adaptively: chase the nearest play-stage NPC (Draco), A-mash to advance
 -- _cabd35 ($01F0/1/2) and _cabf27 ($0057), then head to balcony (8,9)=_cabe6d
 -- ($0111).  Heavy logging: a failure still reveals the mechanic.
-local H = dofile("/Users/mtklein/ot6/tools/tests/lib/ot6.lua")
+local H = dofile("tools/tests/lib/ot6.lua")
 local function map() return H.mapId() & 0x1ff end
 local function sw(id) return (H.readByte(0x1E80 + math.floor(id/8)) >> (id%8)) & 1 end
 local STRIDE=0x29
@@ -41,7 +41,7 @@ local function greedyStep(tx,ty, jitter)
 end
 
 H.run({ maxFrames = 12000 }, {
-  H.loadState("/Users/mtklein/ot6/build/states/aria_postfork.mss.lua"),
+  H.loadState("build/states/aria_postfork.mss.lua"),
   H.waitFrames(30),
   H.call(function() H.assertEq(map(),236,"boot 236"); dumpsw("start") end),
 

@@ -1,8 +1,8 @@
 -- probe_slots: inject the player's srm and screenshot all three save
 -- slots on the continue screen, to find the furthest-along save (the
 -- one out of the mech suits, for balance measurement).
-local H = dofile("/Users/mtklein/ot6/tools/tests/lib/ot6.lua")
-local SRM = "/Users/mtklein/ot6/build/states/playthrough_srm.mss.lua"
+local H = dofile("tools/tests/lib/ot6.lua")
+local SRM = "build/states/playthrough_srm.mss.lua"
 
 H.run({ maxFrames = 20000 }, {
   H.waitFrames(5),

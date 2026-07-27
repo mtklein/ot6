@@ -5,8 +5,8 @@
 -- selection stay on base Fire.
 --   asserts: with pending=2 the open list shows Fire's name with a '3';
 --   screenshot for the eyeball record.
-local H = dofile("/Users/mtklein/ot6/tools/tests/lib/ot6.lua")
-local STATE = "/Users/mtklein/ot6/build/states/battle_doorstep.mss.lua"
+local H = dofile("tools/tests/lib/ot6.lua")
+local STATE = "build/states/battle_doorstep.mss.lua"
 local function pend(slot) return H.readByte(0x3e9d + slot*2) end
 local terra, sawFold
 

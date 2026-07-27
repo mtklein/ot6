@@ -59,8 +59,8 @@
 --     (btlgfx_main.asm:9514-9516 -> DrawCharNames -> Ot6PipGlyph_ext),
 --     so this is the assert that the absorb is visible to a player and
 --     not just true in RAM.
-local H = dofile("/Users/mtklein/ot6/tools/tests/lib/ot6.lua")
-local STATE = "/Users/mtklein/ot6/build/states/battle_doorstep.mss.lua"
+local H = dofile("tools/tests/lib/ot6.lua")
+local STATE = "build/states/battle_doorstep.mss.lua"
 
 local CELES = 0x06                   -- character id, $3ED8 stride 2
 local CMD_RUNIC, CMD_MAGIC = 0x0b, 0x02

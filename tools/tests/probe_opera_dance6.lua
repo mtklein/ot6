@@ -2,7 +2,7 @@
 -- (5,21)->(12,14) across the z-split stair tiles (canStep-gated, live z, pulsed
 -- pad -- corridorFollow precedent), then chase+mash to observe the Draco waltz:
 -- log all visible objects + switches so we SEE how the waltz fires and moves.
-local H = dofile("/Users/mtklein/ot6/tools/tests/lib/ot6.lua")
+local H = dofile("tools/tests/lib/ot6.lua")
 local function map() return H.mapId() & 0x1ff end
 local function sw(id) return (H.readByte(0x1E80 + math.floor(id/8)) >> (id%8)) & 1 end
 local STRIDE=0x29
@@ -85,7 +85,7 @@ local function chaseMash(maxF, doneFn)
 end
 
 H.run({ maxFrames = 12000 }, {
-  H.loadState("/Users/mtklein/ot6/build/states/aria_postfork.mss.lua"),
+  H.loadState("build/states/aria_postfork.mss.lua"),
   H.waitFrames(30),
   H.call(function() H.assertEq(map(),236,"boot 236"); dumpsw("START") end),
   climbTo(12,14, 4000),

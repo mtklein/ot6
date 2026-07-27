@@ -42,8 +42,8 @@
 --     painted rather than the lines being disabled); the dialogue latch
 --     $64D5 stays 0 the whole run (this is the no-dialogue clause); the
 --     hud is present before and after; glyphCanary at the end.
-local H = dofile("/Users/mtklein/ot6/tools/tests/lib/ot6.lua")
-local STATE = "/Users/mtklein/ot6/build/states/kolts_cave.mss.lua"
+local H = dofile("tools/tests/lib/ot6.lua")
+local STATE = "build/states/kolts_cave.mss.lua"
 local VR  = emu.memType.snesVideoRam
 local ROM = emu.memType.snesPrgRom
 local DANGER = 0x1f6e

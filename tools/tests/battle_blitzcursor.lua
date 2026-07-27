@@ -41,8 +41,8 @@
 -- with an all-Blitz command list); the known-blitz set is written directly.  We
 -- learn FOUR blitzes ($0f) so the list fills a 2x2 grid and a DOWN has a row-1
 -- cell to land on.
-local H = dofile("/Users/mtklein/ot6/tools/tests/lib/ot6.lua")
-local STATE = "/Users/mtklein/ot6/build/states/battle_doorstep.mss.lua"
+local H = dofile("tools/tests/lib/ot6.lua")
+local STATE = "build/states/battle_doorstep.mss.lua"
 
 local MENU, ACTOR, MSTATE = 0x7BCA, 0x62CA, 0x7BC2
 local ST_CMD, ST_TOOLS = 0x05, 0x30

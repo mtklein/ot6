@@ -22,8 +22,8 @@
 -- (A/A/A), which announces via the attack-name banner.  ~40 per-frame
 -- screenshots bracket the confirm press for visual tear inspection.
 
-local H = dofile("/Users/mtklein/ot6/tools/tests/lib/ot6.lua")
-local STATE = "/Users/mtklein/ot6/build/states/battle_doorstep.mss.lua"
+local H = dofile("tools/tests/lib/ot6.lua")
+local STATE = "build/states/battle_doorstep.mss.lua"
 
 local rec = {}          -- per-frame records, appended at NMI entry
 local armed = false

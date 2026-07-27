@@ -38,8 +38,8 @@
 -- FAIL-BEFORE / PASS-AFTER, measured: on the pre-fix library the DOWN leg
 -- reported navTo success at (57,35) with the party at (57,36) sixty frames
 -- later; watchTile catches it 16 frames in.
-local H = dofile("/Users/mtklein/ot6/tools/tests/lib/ot6.lua")
-local STATE = "/Users/mtklein/ot6/build/states/vector_sneak.mss.lua"
+local H = dofile("tools/tests/lib/ot6.lua")
+local STATE = "build/states/vector_sneak.mss.lua"
 
 local function killBitAll()
   for s = 0, 5 do

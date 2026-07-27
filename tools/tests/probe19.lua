@@ -3,8 +3,8 @@
 -- and RAM at several points to see exactly what battle entry does.
 -- Always exits 0 (pure diagnostic).
 
-local H = dofile("/Users/mtklein/ot6/tools/tests/lib/ot6.lua")
-local STATE = "/Users/mtklein/ot6/build/states/battle_doorstep.mss.lua"
+local H = dofile("tools/tests/lib/ot6.lua")
+local STATE = "build/states/battle_doorstep.mss.lua"
 
 local function dumpRam(tag)
   local b = {}

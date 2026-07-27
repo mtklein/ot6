@@ -3,7 +3,7 @@
 -- MINTS opera_backstage.mss (so later iterations skip the intro), then dumps
 -- map-234 geometry + stage-door reachability, and tries to reach map 238 and
 -- the aria trigger (97,7).  Pure measurement.
-local H = dofile("/Users/mtklein/ot6/tools/tests/lib/ot6.lua")
+local H = dofile("tools/tests/lib/ot6.lua")
 local function map() return H.mapId() & 0x1ff end
 local function bright() return emu.getState()["ppu.screenBrightness"] or 0 end
 local function sw(id) return (H.readByte(0x1E80 + math.floor(id/8)) >> (id%8)) & 1 end
@@ -50,7 +50,7 @@ local function rideOpen(pred, maxFrames, what)
 end
 
 H.run({ maxFrames = 260000 }, {
-  H.loadState("/Users/mtklein/ot6/build/states/opera_open.mss.lua"),
+  H.loadState("build/states/opera_open.mss.lua"),
   H.waitFrames(60),
   H.call(function() H.assertEq(map(), 237, "boot map 237"); dumpsw("boot") end),
 

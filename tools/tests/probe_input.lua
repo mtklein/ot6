@@ -6,8 +6,8 @@
 -- fire, so clear them inline (the clearBattle idiom) and keep going. Assert
 -- the party keeps racking up tile transitions -- including in the run's
 -- second half, the exact window where the old hack went dead.
-local H = dofile("/Users/mtklein/ot6/tools/tests/lib/ot6.lua")
-local SRM = "/Users/mtklein/ot6/build/states/playthrough_srm.mss.lua"
+local H = dofile("tools/tests/lib/ot6.lua")
+local SRM = "build/states/playthrough_srm.mss.lua"
 
 local FLIP = 30
 local lastX, lastY, dir, firstHalf, secondHalf, iters, battles =

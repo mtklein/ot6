@@ -13,7 +13,7 @@
 -- worldNavTo then stopped tapping A and pressed directions into it forever.
 --
 -- This test drives a real battle and then forces the table into each shape.
-local H = dofile("/Users/mtklein/ot6/.claude/worktrees/project-setup-dependencies-4933ac/tools/tests/lib/ot6.lua")
+local H = dofile("tools/tests/lib/ot6.lua")
 local STATE = "battle_doorstep.mss.lua"
 local HP = 0x3BF4
 

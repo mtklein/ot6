@@ -14,8 +14,8 @@ local goodFire, goodShield
 -- dialogue flow). This test drives the MECHANISM directly: corrupt the
 -- icon cells in vram, raise the flag, and confirm the NMI restores them
 -- and clears the flag.
-local H = dofile("/Users/mtklein/ot6/tools/tests/lib/ot6.lua")
-local STATE = "/Users/mtklein/ot6/build/states/battle_doorstep.mss.lua"
+local H = dofile("tools/tests/lib/ot6.lua")
+local STATE = "build/states/battle_doorstep.mss.lua"
 local vr = emu.memType.snesVideoRam
 local FONTDIRTY = 0x57b9
 local RELAY_STAGES = 6

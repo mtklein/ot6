@@ -24,8 +24,8 @@
 -- id already in $3a7b. Charge AND refusal are both universal; the menu
 -- grey-out/display that ships alongside (menu bank) is what let the flag turn
 -- on (docs/design/mp-economy.md).
-local H = dofile("/Users/mtklein/ot6/tools/tests/lib/ot6.lua")
-local STATE = "/Users/mtklein/ot6/build/states/battle_doorstep.mss.lua"
+local H = dofile("tools/tests/lib/ot6.lua")
+local STATE = "build/states/battle_doorstep.mss.lua"
 
 local MENU, ACTOR, MSTATE = 0x7BCA, 0x62CA, 0x7BC2
 local KNOWN = 0x2020

@@ -26,8 +26,8 @@
 -- Every $3a70 write is logged with the counterattack flag ($b1.0):
 -- FightAttack stores the vanilla swing count (1), then Ot6FightBoost
 -- stores 1+2*pending -- a [1,7] pair on a $b1.0=1 action is the leak.
-local H = dofile("/Users/mtklein/ot6/.claude/worktrees/agent-a1ed6959a07898907/tools/tests/lib/ot6.lua")
-local STATE = "/Users/mtklein/ot6/.claude/worktrees/agent-a1ed6959a07898907/build/states/battle_doorstep.mss.lua"
+local H = dofile("tools/tests/lib/ot6.lua")
+local STATE = "build/states/battle_doorstep.mss.lua"
 
 local swings = {}           -- {frame=, v=, ctr=} for every $3a70 write
 local results = {}

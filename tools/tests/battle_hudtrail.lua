@@ -41,8 +41,8 @@
 -- window, >= 10 veiled entry frames, >= 20 16x16 frames sampled, the hud
 -- paints after settle, glyphCanary.  Pre-fix: 63+ violations in the first
 -- slide.  Post-fix: zero.
-local H = dofile("/Users/mtklein/ot6/tools/tests/lib/ot6.lua")
-local STATE = "/Users/mtklein/ot6/build/states/rapids_start.mss.lua"
+local H = dofile("tools/tests/lib/ot6.lua")
+local STATE = "build/states/rapids_start.mss.lua"
 local VR  = emu.memType.snesVideoRam
 local ROM = emu.memType.snesPrgRom
 local CH_MAX = 0x056F

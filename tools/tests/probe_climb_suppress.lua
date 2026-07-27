@@ -2,7 +2,7 @@
 -- (30,34) using a SINGLE-LIVE-Z door-walled BFS recomputed each aligned
 -- tile (the proper crack technique), logging EVERY aligned tile with
 -- map/x/y/z/facing and flagging any map change / battle / event.  Read-only.
-local H = dofile("/Users/mtklein/ot6/tools/tests/lib/ot6.lua")
+local H = dofile("tools/tests/lib/ot6.lua")
 local function map() return H.mapId() & 0x1ff end
 local function bright() return emu.getState()["ppu.screenBrightness"] or 0 end
 local function key(x, y) return y * 256 + x end
@@ -105,7 +105,7 @@ local WALLS = {}
 for _, d in ipairs(DOORS225) do WALLS[key(d[1], d[2])] = true end
 
 H.run({ maxFrames = 12000 }, {
-  H.loadState("/Users/mtklein/ot6/build/states/bridge_checkpoint.mss.lua"),
+  H.loadState("build/states/bridge_checkpoint.mss.lua"),
   H.waitFrames(120),
   H.call(function()
     H.log(string.format("[boot] map=%d (%d,%d) z%d face=%d", map(),

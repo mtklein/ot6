@@ -46,7 +46,7 @@
 --   greedy    spend every BP the turn it appears
 --   badboost  bank to 3 then dump it into a plain Fight -- Measurement
 --             #5's negative control, the "boost feels wasted" misplay
-local H = dofile("/Users/mtklein/ot6/tools/tests/lib/ot6.lua")
+local H = dofile("tools/tests/lib/ot6.lua")
 
 -- ------------------------------------------------------------- knobs --
 -- env overrides (2026-07-21 v0.4 Zozo pass): running a policy x fixture x
@@ -72,7 +72,7 @@ local FIXTURES = {
   -- Measurement #6's fixture, kept byte-identical (state, seeds, spawn) so
   -- its numbers stay the continuity baseline for every later sweep.
   worldmap_narshe = {
-    state = "/Users/mtklein/ot6/build/states/worldmap_narshe.mss.lua",
+    state = "build/states/worldmap_narshe.mss.lua",
     mode = "world", spawn = 84,
     seeds = { {fa1=0x37}, {fa1=0x6e}, {fa1=0xa5},
               {fa1=0xdc}, {fa1=0x13}, {fa1=0x4a} },
@@ -89,7 +89,7 @@ local FIXTURES = {
   -- would leave the map on its first step, every sample. Passability cannot
   -- see entrance records, so the safe direction is named, not derived.
   kolts_pool = {
-    state = "/Users/mtklein/ot6/build/states/kolts_pool.mss.lua",
+    state = "build/states/kolts_pool.mss.lua",
     mode = "field", map = 100, lane = "right",
     seeds = { {fa1=0x37,fa2=0x00}, {fa1=0x6e,fa2=0x01}, {fa1=0xa5,fa2=0x02},
               {fa1=0xdc,fa2=0x03}, {fa1=0x13,fa2=0x04}, {fa1=0x4a,fa2=0x05} },
@@ -105,7 +105,7 @@ local FIXTURES = {
   -- fires" tail. Arrival is (16,22); the lane is RIGHT (the mint's own
   -- probe picked it and paced 96 without leaving it).
   kolts_cave = {
-    state = "/Users/mtklein/ot6/build/states/kolts_cave.mss.lua",
+    state = "build/states/kolts_cave.mss.lua",
     mode = "field", map = 96, lane = "right",
     seeds = { {fa1=0x37,fa2=0x00}, {fa1=0x6e,fa2=0x01}, {fa1=0xa5,fa2=0x02},
               {fa1=0xdc,fa2=0x03}, {fa1=0x13,fa2=0x04}, {fa1=0x4a,fa2=0x05} },
@@ -122,13 +122,13 @@ local FIXTURES = {
   -- mechanism did not. Kept as the doorstep gen_kolts_pool.lua crosses
   -- from; measure the mountain on kolts_pool and kolts_cave.
   kolts_doorstep = {
-    state = "/Users/mtklein/ot6/build/states/kolts_doorstep.mss.lua",
+    state = "build/states/kolts_doorstep.mss.lua",
     mode = "field", map = 95,
     seeds = { {fa1=0x37,fa2=0x00}, {fa1=0x6e,fa2=0x01}, {fa1=0xa5,fa2=0x02},
               {fa1=0xdc,fa2=0x03}, {fa1=0x13,fa2=0x04}, {fa1=0x4a,fa2=0x05} },
   },
   south_figaro = {
-    state = "/Users/mtklein/ot6/build/states/south_figaro.mss.lua",
+    state = "build/states/south_figaro.mss.lua",
     mode = "field", map = 75,
     seeds = { {fa1=0x37,fa2=0x00}, {fa1=0x6e,fa2=0x01}, {fa1=0xa5,fa2=0x02},
               {fa1=0xdc,fa2=0x03}, {fa1=0x13,fa2=0x04}, {fa1=0x4a,fa2=0x05} },
@@ -140,7 +140,7 @@ local FIXTURES = {
   -- the town's break key). No lane named: the street's first walkable
   -- neighbour is fine to oscillate on; the pacer scans for it.
   zozo_arrival = {
-    state = "/Users/mtklein/ot6/build/states/zozo_arrival.mss.lua",
+    state = "build/states/zozo_arrival.mss.lua",
     mode = "field", map = 221,
     seeds = { {fa1=0x37,fa2=0x00}, {fa1=0x6e,fa2=0x01}, {fa1=0xa5,fa2=0x02},
               {fa1=0xdc,fa2=0x03}, {fa1=0x13,fa2=0x04}, {fa1=0x4a,fa2=0x05} },
@@ -154,7 +154,7 @@ local FIXTURES = {
   -- by settle jitter -- a distribution of the SAME boss fight, whelkbal's
   -- shape. BOSS_FRAMES is longer: 3270 HP + revives + self-heal is a slog.
   dadaluma_doorstep = {
-    state = "/Users/mtklein/ot6/build/states/dadaluma_doorstep.mss.lua",
+    state = "build/states/dadaluma_doorstep.mss.lua",
     mode = "field", map = 221, trigger = "talk", face = "down",
     nbattles = 4, battleFrames = 24000, runFrames = 240000,
     seeds = { {}, {}, {}, {} },

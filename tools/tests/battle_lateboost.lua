@@ -29,8 +29,8 @@
 -- and the post-commit spend must move neither pending nor bp.  The
 -- second is the negative control -- without it the test would pass just
 -- as well if boosting had been disabled outright.
-local H = dofile("/Users/mtklein/ot6/.claude/worktrees/agent-a7ce0f4f38c2c39f7/tools/tests/lib/ot6.lua")
-local STATE = "/Users/mtklein/ot6/.claude/worktrees/agent-a7ce0f4f38c2c39f7/build/states/battle_doorstep.mss.lua"
+local H = dofile("tools/tests/lib/ot6.lua")
+local STATE = "build/states/battle_doorstep.mss.lua"
 
 local ST = { spell = 0x0e, target = 0x38 }
 local SPELL_FIRE, FIRE3 = 0x00, 0x09

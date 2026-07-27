@@ -1,7 +1,7 @@
 -- @suite
 -- battle_bp.lua v2: BP verification tracking the actual active character
-local H = dofile("/Users/mtklein/ot6/tools/tests/lib/ot6.lua")
-local STATE = "/Users/mtklein/ot6/build/states/battle_doorstep.mss.lua"
+local H = dofile("tools/tests/lib/ot6.lua")
+local STATE = "build/states/battle_doorstep.mss.lua"
 local function bps()
   return { H.readByte(0x3E9C), H.readByte(0x3E9E), H.readByte(0x3EA0), H.readByte(0x3EA2) }
 end

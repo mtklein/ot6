@@ -15,10 +15,10 @@
 --   * per-frame RLE of the BG3 scroll table (logged on change)
 --   * per-frame $2f48 / $201e / $61ab and the anim thread state
 -- plus screenshots every 5th frame (round 1 owns the dense visuals).
-local H = dofile("/Users/mtklein/ot6/tools/tests/lib/ot6.lua")
+local H = dofile("tools/tests/lib/ot6.lua")
 
 local TAG = "wo2"
-local STATE = "/Users/mtklein/ot6/build/states/whelk_doorstep.mss.lua"
+local STATE = "build/states/whelk_doorstep.mss.lua"
 local BURST = 150
 
 local TRIP_PC = 0xC2E668

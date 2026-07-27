@@ -29,8 +29,8 @@
 --      menu stays open, no action commits.  Only the cursor + A selects.
 --   3. SELECTION RESOLVES.  Writing the cursor onto Pummel's row and pressing
 --      A lands attack $5d in $3410 ("last skill used").
-local H = dofile("/Users/mtklein/ot6/tools/tests/lib/ot6.lua")
-local STATE = "/Users/mtklein/ot6/build/states/battle_doorstep.mss.lua"
+local H = dofile("tools/tests/lib/ot6.lua")
+local STATE = "build/states/battle_doorstep.mss.lua"
 
 local MENU, ACTOR, MSTATE = 0x7BCA, 0x62CA, 0x7BC2
 local ST_CMD, ST_TOOLS = 0x05, 0x30

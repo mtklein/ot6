@@ -13,9 +13,9 @@
 -- $7E57D5 rides along as the positive control: banner machinery MUST
 -- hit it. FAIL if any strip write comes from outside bank $F0.
 
-local H = dofile("/Users/mtklein/ot6/tools/tests/lib/ot6.lua")
-local MINES = "/Users/mtklein/ot6/build/states/mines_chase.mss.lua"
-local WHELK = "/Users/mtklein/ot6/build/states/whelk_doorstep.mss.lua"
+local H = dofile("tools/tests/lib/ot6.lua")
+local MINES = "build/states/mines_chase.mss.lua"
+local WHELK = "build/states/whelk_doorstep.mss.lua"
 
 local hits = {}       -- addr -> { count, pcs = {pcstr -> n} }
 local foreign = {}    -- strip writes from outside bank $F0

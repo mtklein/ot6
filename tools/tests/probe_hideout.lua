@@ -16,8 +16,8 @@
 -- is standing, ~200 nodes per frame (a whole flood in one Lua slice is what
 -- gen_kolts warns trips Mesen's script watchdog silently), and prints the
 -- reachable set as a map.  '@' party, '.' reachable, ' ' not.
-local H = dofile("/Users/mtklein/ot6/tools/tests/lib/ot6.lua")
-local DOOR = "/Users/mtklein/ot6/build/states/returner_hideout.mss.lua"
+local H = dofile("tools/tests/lib/ot6.lua")
+local DOOR = "build/states/returner_hideout.mss.lua"
 
 local function map() return H.mapId() & 0x1ff end
 local function bright() return emu.getState()["ppu.screenBrightness"] or 0 end

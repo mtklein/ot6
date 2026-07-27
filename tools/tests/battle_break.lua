@@ -35,8 +35,8 @@
 -- - weak elems $3BEC/$3BEE - HP $3C00/$3C02. party levels $3B18+2i,
 -- mag.pwr $3B41+2i.
 
-local H = dofile("/Users/mtklein/ot6/tools/tests/lib/ot6.lua")
-local STATE = "/Users/mtklein/ot6/build/states/battle_doorstep.mss.lua"
+local H = dofile("tools/tests/lib/ot6.lua")
+local STATE = "build/states/battle_doorstep.mss.lua"
 
 local function shields() return H.readByte(0x3E44), H.readByte(0x3E46) end
 local function timers() return H.readByte(0x3E94), H.readByte(0x3E96) end

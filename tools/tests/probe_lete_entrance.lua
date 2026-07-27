@@ -36,8 +36,8 @@
 --   && OT6_WORKER=duo tools/tests/run.sh build/probe_duo.lua
 -- ("trio" likewise pins the 1/4 roll explicitly.)  The pin seeds
 -- $1fa2/$1fa3 during the ride only; it stops at battle load.
-local H = dofile("/Users/mtklein/ot6/tools/tests/lib/ot6.lua")
-local STATE = "/Users/mtklein/ot6/build/states/rapids_start.mss.lua"
+local H = dofile("tools/tests/lib/ot6.lua")
+local STATE = "build/states/rapids_start.mss.lua"
 local VR  = emu.memType.snesVideoRam
 local ROM = emu.memType.snesPrgRom
 local CH_MAX = 0x056F

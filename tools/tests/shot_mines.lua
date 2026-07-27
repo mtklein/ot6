@@ -1,8 +1,8 @@
 -- shot_mines.lua -- one screenshot of a live mines random-encounter fight at
 -- the shipped constants, for eyeball verification (Measurement #5).
 --   tools/tests/run.sh tools/tests/shot_mines.lua build/states/shot_mines.log
-local H = dofile("/Users/mtklein/ot6/tools/tests/lib/ot6.lua")
-local STATE = "/Users/mtklein/ot6/build/states/mines_chase.mss.lua"
+local H = dofile("tools/tests/lib/ot6.lua")
+local STATE = "build/states/mines_chase.mss.lua"
 
 -- knob offsets for the caption, read live from ROM. Bank-$F0 layout DRIFTS:
 -- these were once $12 low ($300173/$30033C) and read $6A/$88 -- live code

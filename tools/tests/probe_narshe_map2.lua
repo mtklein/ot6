@@ -5,8 +5,8 @@
 -- for the marches to disperse (kill-bitting any collision), then flood
 -- BOTH regions with bfsPath's own z-tracking rules over a WIDE window,
 -- and list every single-step crossing between them.
-local H = dofile("/Users/mtklein/ot6/tools/tests/lib/ot6.lua")
-local DEFENSE = "/Users/mtklein/ot6/build/states/spike_defense.mss.lua"
+local H = dofile("tools/tests/lib/ot6.lua")
+local DEFENSE = "build/states/spike_defense.mss.lua"
 
 local function killBitAll()
   for slot = 0, 5 do

@@ -3,7 +3,7 @@
 -- triggers climbing north {38,50}/{38,38}/{38,26}/{38,17}. Drive UP through
 -- them, ride any events, and log/screenshot where it leads -- is this the
 -- Dadaluma tower, or a corrupt warp?
-local H = dofile("/Users/mtklein/ot6/tools/tests/lib/ot6.lua")
+local H = dofile("tools/tests/lib/ot6.lua")
 local function map() return H.mapId() & 0x1ff end
 local function bright() return emu.getState()["ppu.screenBrightness"] or 0 end
 local function killBitAll()
@@ -15,7 +15,7 @@ local function killBitAll()
 end
 
 H.run({ maxFrames = 40000 }, {
-  H.loadState("/Users/mtklein/ot6/build/states/map19_checkpoint.mss.lua"),
+  H.loadState("build/states/map19_checkpoint.mss.lua"),
   H.waitFrames(120),
   H.call(function()
     H.log(string.format("[boot] map=%d (%d,%d) z%d ctl=%s", map(), H.fieldX(),

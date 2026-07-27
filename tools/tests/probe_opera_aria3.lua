@@ -1,7 +1,7 @@
 -- probe_opera_aria3.lua -- boots opera_stage, fires the aria (step 97,7 -> map
 -- 236), drives the three lyric forks {0,1,0}, then OBSERVES the post-fork state
 -- (the flower dance): CELES pos, $0057/$0111/$01F0-2, NPCs.  Tight budgets.
-local H = dofile("/Users/mtklein/ot6/tools/tests/lib/ot6.lua")
+local H = dofile("tools/tests/lib/ot6.lua")
 local function map() return H.mapId() & 0x1ff end
 local function bright() return emu.getState()["ppu.screenBrightness"] or 0 end
 local function sw(id) return (H.readByte(0x1E80 + math.floor(id/8)) >> (id%8)) & 1 end
@@ -33,7 +33,7 @@ local function ariaFork(idx, what)
 end
 
 H.run({ maxFrames = 50000 }, {
-  H.loadState("/Users/mtklein/ot6/build/states/opera_stage.mss.lua"),
+  H.loadState("build/states/opera_stage.mss.lua"),
   H.waitFrames(60),
   H.call(function() H.assertEq(map(),238,"boot 238"); dumpsw("boot") end),
 

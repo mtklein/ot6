@@ -3,8 +3,8 @@
 --   press A -> screenshot (submenu must OPEN -> differs from baseline)
 --   press B -> screenshot (submenu must CLOSE -> differs from the A shot)
 -- Fails loudly if any press has no visible effect.
-local H = dofile("/Users/mtklein/ot6/tools/tests/lib/ot6.lua")
-local STATE = "/Users/mtklein/ot6/build/states/first_battle.mss.lua"
+local H = dofile("tools/tests/lib/ot6.lua")
+local STATE = "build/states/first_battle.mss.lua"
 
 local shots = {}
 local function snap(name)

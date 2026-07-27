@@ -12,8 +12,8 @@
 -- (TekMissile) and fire. Laps rotate a target nudge (none/down/up) so the
 -- missile finds the HEAD no matter which part the cursor defaults to.
 
-local H = dofile("/Users/mtklein/ot6/tools/tests/lib/ot6.lua")
-local STATE = "/Users/mtklein/ot6/build/states/whelk_doorstep.mss.lua"
+local H = dofile("tools/tests/lib/ot6.lua")
+local STATE = "build/states/whelk_doorstep.mss.lua"
 local WHELK = { [0x0134] = true }
 local function whelk()
   return H.battleLoadStarted() and H.formationHas(WHELK)

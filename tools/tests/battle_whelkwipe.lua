@@ -21,8 +21,8 @@
 -- char in the field map; every live hud line reads $01ee) -> head-gone
 -- hud check -> FADE_UP trip -> same asserts -> hud back + glyphCanary.
 -- Cell asserts only, no pixel compares: mint-independent, deterministic.
-local H = dofile("/Users/mtklein/ot6/tools/tests/lib/ot6.lua")
-local STATE = "/Users/mtklein/ot6/build/states/whelk_doorstep.mss.lua"
+local H = dofile("tools/tests/lib/ot6.lua")
+local STATE = "build/states/whelk_doorstep.mss.lua"
 
 local VR = emu.memType.snesVideoRam
 local ROM = emu.memType.snesPrgRom

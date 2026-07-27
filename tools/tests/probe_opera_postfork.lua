@@ -1,7 +1,7 @@
 -- probe_opera_postfork.lua -- mint aria_postfork (opera_stage -> aria -> forks
 -- {0,1,0} -> control on 236), then GREEDY-climb toward the balcony (8,9) with
 -- A-mashing, logging switches + position to crack the flower-dance stair nav.
-local H = dofile("/Users/mtklein/ot6/tools/tests/lib/ot6.lua")
+local H = dofile("tools/tests/lib/ot6.lua")
 local function map() return H.mapId() & 0x1ff end
 local function sw(id) return (H.readByte(0x1E80 + math.floor(id/8)) >> (id%8)) & 1 end
 local function facing() return H.readByte(0x087f + H.readWord(0x0803)) end
@@ -54,7 +54,7 @@ local function climb(tx,ty, watchDone, maxFrames, what)
 end
 
 H.run({ maxFrames = 60000 }, {
-  H.loadState("/Users/mtklein/ot6/build/states/opera_stage.mss.lua"),
+  H.loadState("build/states/opera_stage.mss.lua"),
   H.waitFrames(60),
   H.navTo(97, 7, { maxFrames=8000, arrive=function() return map()~=238 end }),
   H.waitUntil(function() return map()==236 end, 6000, "aria 236", 10),

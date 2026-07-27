@@ -1,13 +1,13 @@
 -- probe_fight.lua -- boot dadaluma_doorstep, face the gentleman and talk,
 -- logging dialog/event/battle state every 30 frames to learn how battle 69
 -- is actually triggered. Read-only.
-local H = dofile("/Users/mtklein/ot6/tools/tests/lib/ot6.lua")
+local H = dofile("tools/tests/lib/ot6.lua")
 local function map() return H.mapId() & 0x1ff end
 local function bright() return emu.getState()["ppu.screenBrightness"] or 0 end
 local function sw(id) return (H.readByte(0x1E80 + math.floor(id/8)) >> (id%8)) & 1 end
 
 H.run({ maxFrames = 12000 }, {
-  H.loadState("/Users/mtklein/ot6/build/states/dadaluma_doorstep.mss.lua"),
+  H.loadState("build/states/dadaluma_doorstep.mss.lua"),
   H.waitFrames(120),
   H.call(function()
     H.log(string.format("[boot] map=%d (%d,%d) $034A=%d ctl=%s",

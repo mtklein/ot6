@@ -1,8 +1,8 @@
 -- shot_final.lua -- two release-verification screenshots on the current
 -- build: a mines random encounter (settled, hud up) and the Whelk fight.
-local H = dofile("/Users/mtklein/ot6/tools/tests/lib/ot6.lua")
-local MINES = "/Users/mtklein/ot6/build/states/mines_chase.mss.lua"
-local WHELK = "/Users/mtklein/ot6/build/states/whelk_doorstep.mss.lua"
+local H = dofile("tools/tests/lib/ot6.lua")
+local MINES = "build/states/mines_chase.mss.lua"
+local WHELK = "build/states/whelk_doorstep.mss.lua"
 
 local aPhase = 0
 

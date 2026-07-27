@@ -49,7 +49,7 @@
 --   the (12,44) side is the entrance).  A successor continues from
 --   221(49,39): cross (54,35)->225(66,56), flood, follow its onward doors,
 --   and keep hopping toward a rooftop bearing 221(30,43)/(30,22)/(35,16).
-local H = dofile("/Users/mtklein/ot6/tools/tests/lib/ot6.lua")
+local H = dofile("tools/tests/lib/ot6.lua")
 local function map() return H.mapId() & 0x1ff end
 local function bright() return emu.getState()["ppu.screenBrightness"] or 0 end
 local MOVES = { "up","down","left","right","upright","downright","downleft","upleft" }
@@ -73,7 +73,7 @@ local function floodDiag()
 end
 
 H.run({ maxFrames = 40000 }, {
-  H.loadState("/Users/mtklein/ot6/build/states/zozo_arrival.mss.lua"),
+  H.loadState("build/states/zozo_arrival.mss.lua"),
   H.waitFrames(150),
   -- into the building at street door (44,48) -> 225 (12,43)
   H.navTo(44, 48, { arrive = function() return map() == 225 end, maxFrames = 12000 }),

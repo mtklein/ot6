@@ -33,8 +33,8 @@
 --        the acting character's latch -- the engine's own resolution spends the
 --        divine. (Paired with step 2, this is the quiet-test control: the kill
 --        is real, and the gate can also withhold it.)
-local H = dofile("/Users/mtklein/ot6/tools/tests/lib/ot6.lua")
-local STATE = "/Users/mtklein/ot6/build/states/battle_doorstep.mss.lua"
+local H = dofile("tools/tests/lib/ot6.lua")
+local STATE = "build/states/battle_doorstep.mss.lua"
 
 local MENU, ACTOR, MSTATE = 0x7BCA, 0x62CA, 0x7BC2
 local KNOWN, BAR = 0x2020, 0x7B82

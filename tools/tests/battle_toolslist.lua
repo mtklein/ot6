@@ -36,8 +36,8 @@
 --   3. COSTS RENDER, AND ARE RIGHT.  The two tiles just left of each name (past
 --      the tool's leading wrench icon) decode to that tool's Ot6AbilityCostTbl
 --      price -- covering column 1 and column 2, single- and two-digit costs.
-local H = dofile("/Users/mtklein/ot6/tools/tests/lib/ot6.lua")
-local STATE = "/Users/mtklein/ot6/build/states/battle_doorstep.mss.lua"
+local H = dofile("tools/tests/lib/ot6.lua")
+local STATE = "build/states/battle_doorstep.mss.lua"
 
 local MENU, ACTOR, MSTATE = 0x7BCA, 0x62CA, 0x7BC2
 local ST_TOOLS = 0x30

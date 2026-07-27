@@ -1,7 +1,7 @@
 -- probe_opera_dance3.lua -- CORRECTED flower dance.  NPC(12,19)=FLOWERS
 -- (_cabf27 -> $0057).  balcony (8,9)=_cabe6d needs only $0057 -> $0111.
 -- Ignore Draco.  Touch flowers from (12,18) facing DOWN, then climb to (8,9).
-local H = dofile("/Users/mtklein/ot6/tools/tests/lib/ot6.lua")
+local H = dofile("tools/tests/lib/ot6.lua")
 local function map() return H.mapId() & 0x1ff end
 local function sw(id) return (H.readByte(0x1E80 + math.floor(id/8)) >> (id%8)) & 1 end
 local function facing() return H.readByte(0x087f + H.readWord(0x0803)) end
@@ -47,7 +47,7 @@ local function driveTo(tx,ty, near, doneFn, maxF, what)
 end
 
 H.run({ maxFrames = 12000 }, {
-  H.loadState("/Users/mtklein/ot6/build/states/aria_postfork.mss.lua"),
+  H.loadState("build/states/aria_postfork.mss.lua"),
   H.waitFrames(30),
   H.call(function() H.assertEq(map(),236,"boot 236"); dumpsw("start") end),
 

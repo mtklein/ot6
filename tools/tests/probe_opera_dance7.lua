@@ -2,7 +2,7 @@
 -- of the basin, adjacent to the occupied (12,19)]; then TALK toward (12,19) and
 -- observe: scan objects 0..31, log who is at (12,19), who MOVES on touch, and
 -- the $01F0/1/2/$0057 switches.  Learn the real waltz mechanic + Draco slot.
-local H = dofile("/Users/mtklein/ot6/tools/tests/lib/ot6.lua")
+local H = dofile("tools/tests/lib/ot6.lua")
 local function map() return H.mapId() & 0x1ff end
 local function sw(id) return (H.readByte(0x1E80 + math.floor(id/8)) >> (id%8)) & 1 end
 local STRIDE=0x29
@@ -83,7 +83,7 @@ local function waltz(maxF, doneFn)
 end
 
 H.run({ maxFrames = 10000 }, {
-  H.loadState("/Users/mtklein/ot6/build/states/aria_postfork.mss.lua"),
+  H.loadState("build/states/aria_postfork.mss.lua"),
   H.waitFrames(30),
   H.call(function() H.assertEq(map(),236,"boot 236"); dumpsw("START") end),
   climbTo(11,19, 2500),

@@ -1,7 +1,7 @@
 -- probe_n30.lua -- census inside map 30 (Narshe interiors) from
 -- kefka_won's {60,37}: which town doors can BFS reach, and is the front
 -- door's blocker NPC still on duty post-battle?
-local H = dofile("/Users/mtklein/ot6/tools/tests/lib/ot6.lua")
+local H = dofile("tools/tests/lib/ot6.lua")
 
 local TARGETS = {
   { 55, 35, "front door" }, { 55, 36, "front door S" }, { 54, 35, "front W" },
@@ -12,7 +12,7 @@ local TARGETS = {
 }
 
 H.run({ maxFrames = 20000 }, {
-  H.loadState("/Users/mtklein/ot6/build/states/kefka_won.mss.lua"),
+  H.loadState("build/states/kefka_won.mss.lua"),
   H.waitFrames(30),
   H.call(function()
     H.log(string.format("[census30] from (%d,%d)", H.fieldX(), H.fieldY()))

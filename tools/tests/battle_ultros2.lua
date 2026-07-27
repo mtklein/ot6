@@ -27,8 +27,8 @@
 -- kit-specific chip drive is intentionally class-generic (it credits ANY
 -- landed swing whose Ot6-resolved class meets slash|pierce) so it does not
 -- hard-code which of LOCKE's party carries the handhold.
-local H = dofile("/Users/mtklein/ot6/tools/tests/lib/ot6.lua")
-local DOOR = "/Users/mtklein/ot6/build/states/ultros2_doorstep.mss.lua"
+local H = dofile("tools/tests/lib/ot6.lua")
+local DOOR = "build/states/ultros2_doorstep.mss.lua"
 
 local ULTROS2 = 0x012d
 local OT6_SLASH, OT6_PIERCE = 0x01, 0x02

@@ -23,8 +23,8 @@
 --      poked) and the next real hit ends the fight through if_b_switch
 --      $40 -> _ccbcb1: the party is NOT warped to the {25,5} lose-path
 --      save point and the win scene owns the stage.
-local H = dofile("/Users/mtklein/ot6/tools/tests/lib/ot6.lua")
-local DOOR = "/Users/mtklein/ot6/build/states/kefka_doorstep.mss.lua"
+local H = dofile("tools/tests/lib/ot6.lua")
+local DOOR = "build/states/kefka_doorstep.mss.lua"
 
 local KEFKA = 0x014A
 

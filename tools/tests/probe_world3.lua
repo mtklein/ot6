@@ -11,8 +11,8 @@
 --     the gen_figaro route before it is written
 -- Stops at the Figaro trigger WITHOUT stepping on it (target one tile
 -- short), so the probe never leaves the world map.
-local H = dofile("/Users/mtklein/ot6/tools/tests/lib/ot6.lua")
-local STATE = "/Users/mtklein/ot6/build/states/worldmap_narshe.mss.lua"
+local H = dofile("tools/tests/lib/ot6.lua")
+local STATE = "build/states/worldmap_narshe.mss.lua"
 
 local function P(fmt, ...) print("[probe] " .. string.format(fmt, ...)) end
 local function wx() return H.readByte(0x00e0) end

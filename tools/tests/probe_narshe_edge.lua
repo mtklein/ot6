@@ -4,8 +4,8 @@
 -- o25 walked column x=18 straight through the boundary band and vanilla
 -- players descend these cliffs.  Stand at candidate boundary tiles and
 -- PUSH; log what the engine does.  30-second verdict per edge.
-local H = dofile("/Users/mtklein/ot6/tools/tests/lib/ot6.lua")
-local DEFENSE = "/Users/mtklein/ot6/build/states/spike_defense.mss.lua"
+local H = dofile("tools/tests/lib/ot6.lua")
+local DEFENSE = "build/states/spike_defense.mss.lua"
 
 local function tryEdge(x, y, dir, n)
   return H.cond(function() return true end, {

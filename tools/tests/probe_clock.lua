@@ -1,7 +1,7 @@
 -- probe_clock.lua -- instrument the Zozo clock's three chained choice
 -- dialogs: open it, then drive the hour cursor to 2 by watching $056E move
 -- one step per d-pad EDGE ($056D latch), logging the menu bytes throughout.
-local H = dofile("/Users/mtklein/ot6/tools/tests/lib/ot6.lua")
+local H = dofile("tools/tests/lib/ot6.lua")
 local function map() return H.mapId() & 0x1ff end
 local function bright() return emu.getState()["ppu.screenBrightness"] or 0 end
 local function landed(m, n)
@@ -20,7 +20,7 @@ local function bytes()
 end
 
 H.run({ maxFrames = 30000 }, {
-  H.loadState("/Users/mtklein/ot6/build/states/zozo_arrival.mss.lua"),
+  H.loadState("build/states/zozo_arrival.mss.lua"),
   H.waitFrames(150),
   H.navTo(42, 29, { maxFrames = 20000 }),
   H.driveUntil(function() return map() == 225 end, 900, {

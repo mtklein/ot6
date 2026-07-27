@@ -8,8 +8,8 @@
 --   slot 2  $47 Boomerang  BLUDG   {staff} (was {special})
 --   slot 3  $51 Dice       SPECIAL {special} (was {card})
 --   slot 4  $33 Heal Rod   no class - repurposed {card} cell (dash)
-local H = dofile("/Users/mtklein/ot6/tools/tests/lib/ot6.lua")
-local STATE = "/Users/mtklein/ot6/build/states/battle_doorstep.mss.lua"
+local H = dofile("tools/tests/lib/ot6.lua")
+local STATE = "build/states/battle_doorstep.mss.lua"
 
 local ITEMS = { 0x00, 0x2B, 0x47, 0x51, 0x33 }
 

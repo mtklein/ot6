@@ -54,8 +54,8 @@
 --     so require >= 1 write into $7eecf1+ from bank F0.
 -- Both fall out of the write watch this probe already keeps, so there is no
 -- second mechanism to keep in sync.
-local H = dofile("/Users/mtklein/ot6/tools/tests/lib/ot6.lua")
-local STATE = "/Users/mtklein/ot6/build/states/whelk_doorstep.mss.lua"
+local H = dofile("tools/tests/lib/ot6.lua")
+local STATE = "build/states/whelk_doorstep.mss.lua"
 local WHELK = { [0x0134] = true }
 local function whelk()
   return H.battleLoadStarted() and H.formationHas(WHELK)

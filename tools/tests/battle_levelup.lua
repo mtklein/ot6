@@ -30,8 +30,8 @@
 --
 -- Exit codes: 0 = both scenarios pass, 1 = any assert failed / Lua error.
 
-local H = dofile("/Users/mtklein/ot6/tools/tests/lib/ot6.lua")
-local STATE = "/Users/mtklein/ot6/build/states/first_battle.mss.lua"
+local H = dofile("tools/tests/lib/ot6.lua")
+local STATE = "build/states/first_battle.mss.lua"
 
 -- $1600 character record fields (field-ram.txt:885-898); add the slot's record
 -- pointer ($3010,slot*2) to each.  Battle cells ($3bf4/$3c08) index by slot*2.

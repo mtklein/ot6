@@ -19,10 +19,10 @@
 --
 -- OBJ chr base is word $2000 (obsel $61), 4bpp, 32 bytes/tile: tile n
 -- lives at vram word $2000 + n*$10, i.e. byte $4000 + n*$20.
-local H = dofile("/Users/mtklein/ot6/.claude/worktrees/agent-a7ce0f4f38c2c39f7/tools/tests/lib/ot6.lua")
+local H = dofile("tools/tests/lib/ot6.lua")
 
 local STATE = ARG_STATE or
-  "/Users/mtklein/ot6/.claude/worktrees/agent-a7ce0f4f38c2c39f7/build/states/battle_doorstep.mss.lua"
+  "build/states/battle_doorstep.mss.lua"
 
 local NT = 512                      -- tiles reachable at obj base $2000
 local fp, moved, refd, nonblank = {}, {}, {}, {}

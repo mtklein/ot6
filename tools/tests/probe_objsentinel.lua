@@ -19,8 +19,8 @@
 --
 -- OBJ chr base word $2000 (obsel $61) => bytes $4000-$7FFF, tile n at
 -- byte $4000 + n*32.  Both name tables (n = 0..511) are swept.
-local H = dofile("/Users/mtklein/ot6/.claude/worktrees/agent-a7ce0f4f38c2c39f7/tools/tests/lib/ot6.lua")
-local STATE = "/Users/mtklein/ot6/.claude/worktrees/agent-a7ce0f4f38c2c39f7/build/states/battle_doorstep.mss.lua"
+local H = dofile("tools/tests/lib/ot6.lua")
+local STATE = "build/states/battle_doorstep.mss.lua"
 
 local SENT = 0xa5
 local NT = 512

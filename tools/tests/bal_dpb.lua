@@ -31,8 +31,8 @@
 -- The resistance byte is read live from ROM and logged, so this lab reports
 -- the ordering at whatever Ot6ShieldedMulW the ROM (or a poke) carries.
 
-local H = dofile("/Users/mtklein/ot6/tools/tests/lib/ot6.lua")
-local STATE = "/Users/mtklein/ot6/build/states/battle_doorstep.mss.lua"
+local H = dofile("tools/tests/lib/ot6.lua")
+local STATE = "build/states/battle_doorstep.mss.lua"
 
 -- guards live in monster slots 2/3 (entity offsets $0C/$0E)
 local GUARDS = { 2, 3 }

@@ -2,8 +2,8 @@
 
 -- visual canary for fight 2 (second formation): same checks as fight 1,
 -- run again after an attack round since effect art loads mid-fight.
-local H = dofile("/Users/mtklein/ot6/tools/tests/lib/ot6.lua")
-local STATE = "/Users/mtklein/ot6/build/states/battle2_doorstep.mss.lua"
+local H = dofile("tools/tests/lib/ot6.lua")
+local STATE = "build/states/battle2_doorstep.mss.lua"
 H.run({ maxFrames = 20000 }, {
   H.waitFrames(20),
   H.loadState(STATE),
