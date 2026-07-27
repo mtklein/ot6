@@ -608,7 +608,13 @@ wall spins.
 
 ### 15. Number 128 — the minecart
 
-Party: same four, on rails.
+Party: **three**, on rails — Celes is lost partway through the Facility, so this
+fight and the Crane escape run one short of the party that walked in. (Owner
+account; §16's "the factory four" is likewise one too many. Flagged rather than
+silently rewritten — the exact roster here is runtime state and is to be measured
+at the fixture, not read out of the event dump. An attempt to derive it from
+`event_main.asm` opcode adjacency produced a badly wrong answer; see the Beat B
+note in `wob-route.md`.)
 
 | part | shields | weak |
 |---|---|---|
