@@ -24,6 +24,11 @@ level-ups fully restore HP and MP.
 
 Work toward v0.6 now follows the Raid on Vector through the Magitek Research
 Facility escape and Terra's return.
+
+Picking this up cold? [docs/HANDOFF.md](docs/HANDOFF.md) is the state of play —
+what is in flight, what is next, and the handful of traps that cost real time to
+rediscover.
+
 See [docs/ROADMAP.md](docs/ROADMAP.md) for milestones and the "playable
 frontier" metric, and [docs/DESIGN.md](docs/DESIGN.md) for the mechanics
 design. The focused questions for the upcoming build are in the
