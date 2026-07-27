@@ -75,17 +75,31 @@ engine's available-characters word (`EventCmd_e1` = `set_case AVAIL_CHARS` does
 `:25488`) sits 54 lines earlier in the same uninterruptible tail — it is the
 same beat, not a later one.
 
-**Beat B has no four-character party.** `bosses-wob.md` §15 and §16 both say
-"the factory four"; the event scripts disagree, per fight:
+**Beat B party composition is UNRESOLVED — do not author against a guess.**
+An earlier version of this section published a per-fight party table claiming
+Locke+Celes through the facility and Locke *solo* for the minecart and Number
+128. **That table was withdrawn 2026-07-26; it was not established.** It was
+derived by reading `party_chars` / `char_party` opcodes near each other in
+`event_main.asm` and treating file order as execution order. That inference is
+invalid: `event_main.asm` is a dump of separately-addressed event scripts, and
+there are fourteen distinct `_cc....:` script labels between the
+`party_chars LOCKE` at `:96156` and the `cutscene TRAIN` at `:96580`. Adjacency
+in the dump says nothing about what runs before what.
 
-| fight | party | evidence |
-|---|---|---|
-| Ifrit / Shiva, Number 024 | Locke + Celes | roster at the beat head |
-| minecart, **Number 128** | **Locke solo** | `event_main.asm:96148-96158` — `party_chars LOCKE`, `switch $02F6=0`, `remove_equip CELES` |
-| L/R Cranes | Locke + Setzer | Setzer rejoins at `:96982` |
+The owner's account, from play, is that the Magitek Factory is a **four**-character
+party which drops to **three** when Celes leaves. Absent evidence to the contrary,
+that is the working assumption.
+
+**How to actually settle this:** party composition is runtime state and cannot be
+read off the event dump. Probe it — load the fixture at each set-piece doorstep and
+read the live party, the way `wob-route`'s Beat A corrections were measured
+(`$1850` read at the v0.4 tail). Record the measured party per fight here, with the
+fixture it was measured at. Until then, no balance or break-row work may assume a
+party size for Beat B.
 
 At the v0.6 stop line (map 6, `_cacb95` at `:25669`) Terra is **available but not
-active**. No v0.6 fight may assume her.
+active** — this one is a switch read (`$02F0` / `$1EDE`), not a flow inference, and
+stands.
 
 ---
 
