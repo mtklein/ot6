@@ -145,6 +145,7 @@ test: rom nomp-rom $(STATE1) $(STATE2) $(STATE3)
 	@# globs *.lua for a `-- @suite` marker and cannot see a .py file -- same
 	@# reason compose.py and sram_anchor.py sit on these lines.
 	python3 tools/check_boss_rows.py
+	python3 tools/check_break_reach.py
 	sh tools/tests/lib/frontier_stamp_selftest.sh
 	sh tools/tests/lib/runner_isolation_selftest.sh
 	@rm -f $(STAMP)
