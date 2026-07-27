@@ -365,25 +365,28 @@ function M.partyHp()
   return hp
 end
 
--- True once the battle module has begun loading.  In the field ALL FOUR
--- words of the party battle-HP table read $FFFF; in a battle every occupied
--- slot holds a real current HP, and an EMPTY slot -- or a DEAD character --
--- reads 0.  Measured on battle_doorstep: field is FFFF FFFF FFFF FFFF, a
--- live battle is 003F 0044 003D 0000 (slot 3 empty).
+-- True once the battle module has begun loading.  $FFFF is the ONLY
+-- not-loaded sentinel: in the field slot 0 reads $FFFF, and in a battle it
+-- holds a real current HP -- or 0 if that character is dead or the slot is
+-- empty.  Measured on battle_doorstep: field FFFF FFFF FFFF FFFF, live
+-- battle 003F 0044 003D 0000 (slot 3 empty, reading 0).
 --
--- So the gate scans all four and treats "not $FFFF" as loaded.  Reading slot
--- 0 alone and rejecting a 0 conflated three different states -- module not
--- loaded, slot 0 empty, slot 0's character dead -- and reported "no battle"
--- for the last two while the battle was still running.  worldHasControl()
--- hangs off this, so worldNavTo stopped tapping A, decided it had walkable
--- control, and pressed directions into a live battle forever (#24).
+-- This used to also reject a 0, which conflated "not loaded" with "slot 0 is
+-- dead or empty" and reported "no battle" while a battle was still running.
+-- worldHasControl() hangs off this gate, so worldNavTo stopped tapping A,
+-- concluded it had walkable control, and pressed directions into a live
+-- battle forever (#24).
+--
+-- Deliberately still slot 0 only.  Scanning all four slots also passes the
+-- #24 regression but hangs gen_moogle: somewhere in the three-squad defense
+-- a FIELD state leaves slot 0 at $FFFF while a later slot still holds a live
+-- value, so an any-slot rule reads the field as a battle and the walker
+-- freezes.  Measured -- old predicate mints moogle_cleared, any-slot rule
+-- times out at 30000 frames on map 30.
 -- Regression: battle_loadgate.lua.
 function M.battleLoadStarted()
-  for i = 0, 3 do
-    local hp = M.readWord(M.BATTLE_HP + i * 2)
-    if hp ~= 0xFFFF and hp < 10000 then return true end
-  end
-  return false
+  local hp = M.readWord(M.BATTLE_HP)
+  return hp ~= 0xFFFF and hp < 10000
 end
 
 -- Cheap "is anything on screen" check: an all-black 256x224 screenshot
