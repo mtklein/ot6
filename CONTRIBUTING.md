@@ -66,15 +66,27 @@ down as fact and then propagated. So:
   `ff6/rom/ff6-en.map` for space questions, and in Mesen's own source
   (open, and the binary embeds the commit it was built from) for emulator
   questions.
-- **A quiet test is not a passing test.** If a check can come back clean
-  because it never exercised the thing it meant to exercise, it needs a
-  positive control that fails loudly instead. `probe_shadow_overlap.lua` is
-  the worked example — it asserts that a command-list drawer actually ran,
-  because the first version of that probe came back clean for exactly that
-  reason and nearly buried a real bug.
 
 Marking something suspect is a finished piece of work. A confident guess is
 not.
+
+**Your job is not to write correct code. It is to prove the code is correct.**
+
+- **A check that can pass without running is not a check.** "Everything is
+  fine" and "nothing ran" come out the same green, so give every check
+  something that fails when it does not run. Three in the tree:
+  `probe_shadow_overlap.lua` first came back clean because the command-list
+  drawer never ran, and nearly buried a HUD-corruption bug — it now asserts
+  the drawer ran. `gen_vector_arrival` asserted the party's position after
+  driving to a hard-coded map id, so it could only agree with itself; it
+  passed green for a week standing in Albrook. `battle_loadgate.lua` writes
+  an all-`$FFFF` table and requires the gate to still answer no, which is the
+  clause that would catch a gate hardcoded to `true`.
+- **Failing before and passing after does not prove the fix is the right
+  shape.** `battle_loadgate.lua` failed for exactly the right reason before
+  the battle-gate fix, then passed against two different repairs — one of
+  which hung the frontier at `gen_moogle` for 30,000 frames. A regression
+  pins the case you thought of. Run the thing it is a proxy for.
 
 ## Claiming RAM
 
