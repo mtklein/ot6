@@ -426,6 +426,66 @@ Ot6ElemAddTbl:
         .byte   $08, $00        ; red fang: on the task census and the tables
         .word   $007b
         .byte   $08, $00        ; ralph: no weakness, absorbs nothing
+        ; ---- the v0.6 BOSS-ELEMENT pass (issue #23). four sets that
+        ; bosses-wob.md authored in prose and nobody ever wrote into the
+        ; data; check_boss_rows.py found them and carried them as waivers
+        ; until now. every row below was re-decoded from monster_prop.dat
+        ; +$17 (absorb) / +$18 (null) / +$19 (weak) at authoring time, NOT
+        ; recalled -- the Crane pair in that same document was wrong in
+        ; exactly the absorb direction once already, and the GhostTrain rule
+        ; (never put a chip trigger on an absorber, where vanilla reverses
+        ; the damage sign) is what these checks enforce:
+        ;
+        ;   species          absorb  null                    weak   add
+        ;   $117 atmaweapon  $00     $00                     $00    $07
+        ;   $10b number 128  $02 ice $00                     $00    $84
+        ;   $13f rightblade  $02 ice $00                     $00    $04
+        ;   $140 left blade  $02 ice $00                     $00    $04
+        ;   $116 flameeater  $01 fir $6c bolt|poi|holy|earth $02    $80
+        ;   $168 ultros 4    $80 WAT $00                     $09    $04
+        ;
+        ; no add bit intersects that row's absorb or null byte. the last
+        ; line is the one with teeth: $168 ABSORBS WATER, so the water half
+        ; of the family row would HEAL him and only bolt is restorable.
+        ; battle_breaktbl.lua now walks this whole table and asserts the
+        ; add-vs-absorb/null invariant on EVERY row, future ones included.
+        .word   $0117
+        .byte   $07, $00        ; atmaweapon: + fire|ice|bolt. THE capstone
+                                ;   fix -- 11 shields, the biggest gauge in
+                                ;   the arc, and vanilla gives it no element
+                                ;   at all, so before this row a free-pick
+                                ;   party holding neither slash nor pierce
+                                ;   had NO break on the WoB final exam.
+                                ;   absorbs and nulls nothing: all three
+                                ;   bits are free (bosses-wob.md §21)
+        .word   $010b
+        .byte   $84, $00        ; number 128 body: + bolt|water. the espers
+                                ;   zozo just paid out (ramuh) are the key
+                                ;   the fight was written around; absorbs
+                                ;   ICE, which is neither bit (§15)
+        .word   $013f
+        .byte   $04, $00        ; right blade: + bolt (the narrower row the
+                                ;   doc authors for the limbs; same ice
+                                ;   absorb, untouched)
+        .word   $0140
+        .byte   $04, $00        ; left blade: + bolt
+        .word   $0116
+        .byte   $80, $00        ; flameeater: + water. strago's debut fight
+                                ;   and Aqua Breath is the lesson the doc
+                                ;   frames it on; water was NEUTRAL on $116
+                                ;   (not weak, not nulled, not absorbed), so
+                                ;   the Lore read a row it could not use.
+                                ;   it absorbs FIRE and nulls bolt|poison|
+                                ;   holy|earth -- water is in neither (§18)
+        .word   $0168
+        .byte   $04, $00        ; ultros 4: + bolt ONLY. $168 is a different
+                                ;   species from $12c/$12d/$12e and vanilla
+                                ;   gave it fire|POISON, not fire|bolt, so
+                                ;   the running gag's element half was never
+                                ;   true. bolt restores it. water is the rest
+                                ;   of the family row and is NOT added here:
+                                ;   every Ultros record absorbs water (+$17 =
+                                ;   $80), so that bit would heal him (§19)
         .word   $ffff
 
 ; ------------------------------------------------------------------------------

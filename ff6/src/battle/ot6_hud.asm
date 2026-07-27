@@ -1476,11 +1476,32 @@ Ot6ShieldTbl:
                                 ;   civilian with NO vanilla weakness at all,
                                 ;   unbreakable by anyone before this row;
                                 ;   pierce is Locke's dagger, kept simple
-        ; -- Serpent Trench (Sabin + Cyan + Gau: bludg + slash + pierce).
-        ; each aquatic answers to a different member's kit, so the trio's
-        ; three keys map one-to-one onto the three creatures. all three
-        ; absorb water and their vanilla element (bolt/fire) is a dead or
-        ; level-gated key for this party -- class is the reliable break.
+        ; -- Serpent Trench (Sabin + Cyan + Gau). the trio's ring is
+        ; BLUDGEON + SLASH, and that is the whole ring -- corrected in the
+        ; v0.6 pass (issue #23) after the earlier "three keys, three
+        ; creatures" claim turned out to rest on a wielder that does not
+        ; exist. decoded, not recalled: Gau cannot equip Hardened ($28 is a
+        ; katana whose equip mask reads $8008 = Shadow + Merit Award only, at
+        ; item_prop_en.dat[$28*30]+1), his ONLY legal weapon in the entire
+        ; game is the Imp Halberd $24 -- which IS pierce (ot6_class.asm:86)
+        ; but is stocked by ZERO of the 128 shop records and is a WoB-late
+        ; treasure, so it cannot be in the bag on a scenario that runs on
+        ; rails -- and bare-handed his Fight reads item $ff = empty hand =
+        ; OT6_BLUDG (ot6_class.asm:163). Sabin brings fists and Pummel/
+        ; Suplex/Bum Rush (bludg) plus claws (slash), Cyan brings katanas
+        ; and all eight SwdTechs (slash). NOBODY here pierces.
+        ;
+        ; so one key each is arithmetically impossible with two keys, and
+        ; the honest shape is 2 bludg + 1 slash -- which is also the party's
+        ; own shape (two bludgeon wielders, one slash specialist), so every
+        ; member's A button still answers a creature. all three absorb water
+        ; and their vanilla element (bolt/fire) is dead or L15-gated for
+        ; this party, so class is the only reliable break; the vanilla bits
+        ; stay for a later party that carries the element.
+        ; the failure worth remembering is the RATIONALE, not the byte: the
+        ; byte was authored to a wielder claim that was recalled instead of
+        ; decoded. (bosses-wob.md "Serpent Trench"; weapon-classes-six.md
+        ; §4.7.)
         .word   $003a
         .byte   2, OT6_SLASH    ; anguiform: a slippery eel, cut by Cyan's
                                 ;   blade (vanilla bolt is dead here)
@@ -1488,8 +1509,11 @@ Ot6ShieldTbl:
         .byte   2, OT6_BLUDG    ; actaneon: a shelled crustacean, cracked by
                                 ;   Sabin's fists (vanilla fire needs L15)
         .word   $0059
-        .byte   2, OT6_PIERCE   ; aspik: a coiled asp, punctured by Gau's
-                                ;   fanged strike (vanilla fire needs L15)
+        .byte   2, OT6_BLUDG    ; aspik: a constrictor, crushed by a monk's
+                                ;   fists. was PIERCE, authored to a Gau
+                                ;   "fanged strike" that bludgeons -- a dead
+                                ;   row for the only party that fights it
+                                ;   (vanilla fire needs L15)
         ; zozo / opera / the factory
         ; ---- the v0.4 ZOZO TOWN pass: four poison-trash rows, shields only.
         ; the search-for-terra party is LOCKE+CELES+EDGAR+SABIN -- TERRA IS
@@ -1555,6 +1579,139 @@ Ot6ShieldTbl:
         .byte   6, OT6_PIERCE   ; crane (element sides verified at m6 entry)
         .word   $010e
         .byte   6, OT6_PIERCE   ; crane
+        ; ---- the v0.6 VECTOR / MAGITEK FACTORY band (issue #11), the first
+        ; route band authored off the generated floor. survey, arithmetic and
+        ; per-formation reading: docs/design/break-band-vector.md.
+        ;
+        ; THE PROBLEM this replaces: in the deepest third of the facility
+        ; (group 106, maps 271/273) the generated floor answered 100% of
+        ; encounters with SLASH -- Gobbler by outright default, Rhinox by a
+        ; `rhino` keyword that fired on the wrong body -- and the dungeon
+        ; hands the player four swords on the way in. Nothing was unbreakable
+        ; (the floor works); the failure was that "hold A" was the whole game.
+        ;
+        ; THE SHAPE: vanilla already labels six of the ten random-pool bodies
+        ; as machines -- exactly Garm/Commando/ProtoArmor/Pipsqueak/Trapper/
+        ; Chaser carry a `Program NN` special-attack name, 6 of 384 in the
+        ; game -- so "the machines do not care about your sword" is a rule
+        ; the player can guess before probing. bludgeon carries the band,
+        ; pierce is the second key on the imperial line, slash comes off the
+        ; machines, and ¤ sits the beat out (Setzer is flying the getaway, so
+        ; a ¤ row would be a composition lock on the one character the
+        ; climax excludes).
+        ;
+        ; measured, equal-map weight over the seven encounter-bearing maps:
+        ; slash key-share 67.86% -> 19.64%, pierce 45.54% -> 66.96%,
+        ; bludgeon 14.29% -> 80.36%. bodies: slash 59.11% -> 10.86%.
+        ; (recomputed from sub_battle_group/rand_battle_group/battle_monsters
+        ; at authoring time, not copied from the survey.)
+        ;
+        ; REACHABILITY, and the one hard demand: 33.04% of draws become
+        ; bludgeon-only on the class axis, and every one of them except the
+        ; Rhinox pair keeps a reachable vanilla element (ProtoArmor/Trapper
+        ; bolt = Ramuh, owned since Zozo; Flan fire and the Mag Roaders'
+        ; fire/ice = Ifrit and Shiva, both awarded upstream of the ride).
+        ; formation $168 -- Rhinox x2, 8.93% of all draws -- is the one that
+        ; blunt instruments alone answer, because Rhinox has no vanilla
+        ; weakness AND ABSORBS BOLT ($075 +$17 = $04), the element the rest
+        ; of the facility teaches. that is deliberate: Sabin's fists and
+        ; Blitz cost nothing to bring, Gau's fists likewise, and Locke's
+        ; Full Moon / Celes' Flail are on sale in four towns before the walk.
+        ;
+        ; SHIELD COUNTS: all twelve at 2 against a formula value of 4 (L18/19
+        ; both give 2 + level/8 = 4). UNMEASURED and said plainly -- this is
+        ; precedent-following, not a sweep: Mt. Kolts (balance-metrics.md
+        ; :944-972) and Zozo (:1489-1510 above, where a 1200-hp HadesGigas
+        ; went 4 -> 2) both found independently that the formula's count
+        ; lands the break on a corpse. Landing this wants a Vector doorstep
+        ; fixture and a bal_party BAL_BUFF_SHIELDS sweep over 1/2/3, with a
+        ; separate three-character arm (less damage per round means the same
+        ; count breaks later). break-band-vector.md §8.2/§10.3.
+        .word   $00cb
+        .byte   2, OT6_PIERCE|OT6_BLUDG ; garm: a magitek quadruped
+                                ;   (Program 95), not a hound -- pierce the
+                                ;   joints or cave the housing. commonest
+                                ;   body at the entrance, where the band
+                                ;   teaches its rule, so it teaches both
+                                ;   halves. keeps vanilla bolt|water
+        .word   $00c7
+        .byte   2, OT6_PIERCE   ; commando: imperial rank keeps the imperial
+                                ;   answer -- templar $0002 and officer
+                                ;   $0175 are both pierce above. consistency,
+                                ;   not novelty
+        .word   $0165
+        .byte   2, OT6_BLUDG    ; protoarmor: a sealed suit has no seam to
+                                ;   put a point in; you dent it. retires
+                                ;   pierce so the armored MACHINE and the
+                                ;   armored MAN stop having one answer.
+                                ;   vanilla bolt stays the ranged key
+        .word   $0041
+        .byte   2, OT6_PIERCE   ; pipsqueak: the swarm body, up to x5 and
+                                ;   22% of all bodies in the band. pierce so
+                                ;   Edgar's AutoCrossbow -- whole enemy side,
+                                ;   chipping per hit -- is the designed
+                                ;   answer to a five-stack
+        .word   $0047
+        .byte   2, OT6_BLUDG    ; flan: you cannot cut an ooze (keeps the
+                                ;   generator's own read). its element is
+                                ;   fire, which the Flame Sabre two maps
+                                ;   upstream and Ifrit's magicite both
+                                ;   supply -- and this pool is the floor
+                                ;   Ifrit & Shiva are fought on
+        .word   $0066
+        .byte   2, OT6_PIERCE|OT6_BLUDG ; general: an officer in plate.
+                                ;   vanilla poison answers him IF Edgar was
+                                ;   picked (Bio Blaster is his Tool); the
+                                ;   class row is what makes him breakable
+                                ;   when he wasn't
+        .word   $002d
+        .byte   2, OT6_BLUDG    ; trapper: a fixed trap mechanism (Program
+                                ;   18) -- you smash a device, you do not
+                                ;   stab it. comes x3, vanilla bolt|water
+                                ;   backs it up
+        .word   $00a0
+        .byte   2, OT6_PIERCE|OT6_BLUDG ; chaser: 1202 hp, the widest break
+                                ;   window in the band, on the ESCAPE map
+                                ;   where no shop trip is possible mid-
+                                ;   sequence. two keys so whatever three
+                                ;   walked out of the tube room hold one
+        .word   $0088
+        .byte   2, OT6_SLASH|OT6_PIERCE ; gobbler: no vanilla weakness at
+                                ;   all, so this row is its ONLY key. the
+                                ;   one soft body in a dungeon of machines
+                                ;   -- cut it or stick it. deliberately the
+                                ;   band's slash target, placed in the
+                                ;   deepest pool so the blade has work in
+                                ;   the room where the machines stopped
+                                ;   caring about it
+        .word   $0075
+        .byte   2, OT6_BLUDG    ; rhinox: THE FLAGSHIP. no weakness of any
+                                ;   kind AND it absorbs bolt, so the answer
+                                ;   the rest of the facility teaches would
+                                ;   HEAL it. armoured bulk with no seam ->
+                                ;   bludgeon, and bludgeon alone: the one
+                                ;   body in the band that asks the player to
+                                ;   have brought a blunt instrument, and the
+                                ;   reason to bring Sabin
+        .word   $0006
+        .byte   2, OT6_BLUDG    ; mag roader (minecart, 5 forced fights): a
+                                ;   thing on wheels -- you smash the wheel.
+                                ;   its vanilla FIRE stays the reward for
+                                ;   reading the fight (Ifrit, or the Flame
+                                ;   Sabre) and its ICE ABSORB stays a trap
+        .word   $00af
+        .byte   2, OT6_BLUDG    ; mag roader (the other one): same creature,
+                                ;   same class -- the ELEMENT is what
+                                ;   distinguishes the pair ($006 weak fire /
+                                ;   absorbs ice, $0af weak ice), and
+                                ;   formation $075 puts them in one fight so
+                                ;   the wrong splash heals half the screen.
+                                ;   flattening that onto the class axis
+                                ;   would waste the best puzzle in the band.
+                                ;   NB both are named "Mag Roader", so the
+                                ;   name-keyed floor generator could not
+                                ;   have told them apart even if it wanted
+                                ;   to -- 15 names cover 42 species
         ; sealed gate / thamasa / the floating continent
         .word   $012e
         .byte   7, OT6_SLASH|OT6_PIERCE ; ultros 3: the row, third verse

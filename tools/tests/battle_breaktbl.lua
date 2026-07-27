@@ -22,8 +22,14 @@
 
 local PRG = emu.memType.snesPrgRom
 local SLASH, PIERCE, BLUDG = 0x01, 0x02, 0x04
-local FIRE, BOLT, POISON = 0x01, 0x04, 0x08
+local FIRE, ICE, BOLT, POISON, WATER = 0x01, 0x02, 0x04, 0x08, 0x80
 local fails = 0
+
+-- MonsterProp is `.incbin monster_prop.dat` at SNES $CF0000 (link map:
+-- monster_prop CF0000..CF35FF), so PRG offset = $CF0000 - $C00000 = $0F0000.
+-- 32-byte records; +23 absorb, +24 null, +25 weak.
+local MPROP, MREC = 0x0F0000, 32
+local OFF_ABSORB, OFF_NULL, OFF_WEAK = 23, 24, 25
 
 local function rb(off) return emu.read(off, PRG) end
 local function rw(off) return rb(off) + rb(off + 1) * 256 end
@@ -55,7 +61,13 @@ end
 
 local function check(cond, msg)
   if not cond then fails = fails + 1 end
-  emu.log(string.format("breaktbl: %s %s", cond and "OK  " or "FAIL", msg))
+  -- emu.log goes to Mesen's SCRIPT log, which nothing reads headless (run.sh's
+  -- --enableStdout mirrors the EMULATOR log only).  print() is the channel that
+  -- actually reaches the run log, so a failure here names itself instead of
+  -- being a bare exit code.
+  local line = string.format("breaktbl: %s %s", cond and "OK  " or "FAIL", msg)
+  emu.log(line)
+  print(line)
 end
 
 -- anchors: ShieldTbl opens guard/lobo/whelk(shell); ElemAddTbl opens
@@ -93,7 +105,11 @@ local want = {
   [0x013a] = { 2, PIERCE,         "merchant" },
   [0x003a] = { 2, SLASH,          "anguiform (trench)" },
   [0x005e] = { 2, BLUDG,          "actaneon (trench)" },
-  [0x0059] = { 2, PIERCE,         "aspik (trench)" },
+  -- issue #23: was PIERCE, authored to a Gau "fanged strike" that bludgeons.
+  -- The trench trio is Sabin + Cyan + Gau and NOBODY in it pierces: Gau's
+  -- only legal weapon is the Imp Halberd $24 (no shop stocks it) and bare
+  -- hands read $ff -> OT6_BLUDG.  A PIERCE row here is a dead row.
+  [0x0059] = { 2, BLUDG,          "aspik (trench) -- #23, was a dead PIERCE" },
 }
 for id, w in pairs(want) do
   local r = S[id]
@@ -117,6 +133,81 @@ check(E[0x009f] ~= nil and E[0x009f][1] == POISON, "heavyarmor $009F keeps poiso
 check(S[0x0000] ~= nil and S[0x0000][2] == PIERCE, "regression: guard $0000 pierce")
 check(S[0x0134] ~= nil and S[0x0134][2] == PIERCE, "regression: whelk head $0134 pierce")
 check(E[0x0134] ~= nil and E[0x0134][1] == FIRE, "regression: whelk head fire add")
+
+-- ---------------------------------------------------------------- issue #23
+-- The four boss element sets bosses-wob.md authored in prose and nobody ever
+-- wrote into the data.  check_boss_rows.py carried them as WAIVERS for three
+-- releases; these assertions are what keeps them from silently regressing to
+-- prose again.  Each is exact-mask: a missing row reads nil and a wrong row
+-- reads a different byte, so both directions fail.
+local elemWant = {
+  -- id       mask                 why this row exists
+  { 0x0117, FIRE | ICE | BOLT, "atmaweapon: the WoB capstone had ELEVEN "
+    .. "shields behind slash|pierce and no element axis at all" },
+  { 0x010b, BOLT | WATER,      "number 128 body: the minecart's part-break "
+    .. "lesson was single-axis without it" },
+  { 0x013f, BOLT,              "right blade" },
+  { 0x0140, BOLT,              "left blade" },
+  { 0x0116, WATER,             "flameeater: Strago's debut, and Aqua Breath "
+    .. "was AoE-only until this row" },
+  { 0x0168, BOLT,              "ultros 4: restores the family row's bolt half "
+    .. "on a DIFFERENT species ($168, not $12c/$12d/$12e)" },
+}
+for _, w in ipairs(elemWant) do
+  local r = E[w[1]]
+  check(r ~= nil and r[1] == w[2],
+    string.format("elem-add $%04X = $%02X (got %s) -- %s", w[1], w[2],
+      r and string.format("$%02X", r[1]) or "MISSING", w[3]))
+end
+
+-- The trap, asserted in the direction it actually bites: every Ultros record
+-- ABSORBS water, so the family row's water half must never reach $168.  A row
+-- that "completes" the row by adding $84 would HEAL him, and would still pass
+-- a mask-nonzero check.
+check(E[0x0168] ~= nil and (E[0x0168][1] & WATER) == 0,
+  "ultros 4 $0168 elem-add must NOT carry water -- $168 absorbs it")
+
+-- ...and the same rule as a GENERAL invariant, not a spot-check.  The
+-- GhostTrain rule: an element add must never intersect its species' absorb or
+-- null byte, or the chip trigger lands where vanilla reverses the damage sign
+-- (absorb) or zeroes it (null).  Walking the whole table means every FUTURE
+-- row is covered too -- the Crane pair in bosses-wob.md was wrong in exactly
+-- this direction once already.
+local addRows, badAdds = 0, 0
+do
+  local o = elemBase
+  for _ = 1, 400 do
+    local id = rw(o)
+    if id == 0xffff then break end
+    local add = rb(o + 2)
+    local absorb = rb(MPROP + id * MREC + OFF_ABSORB)
+    local null   = rb(MPROP + id * MREC + OFF_NULL)
+    addRows = addRows + 1
+    if (add & absorb) ~= 0 or (add & null) ~= 0 then
+      badAdds = badAdds + 1
+      emu.log(string.format(
+        "breaktbl: FAIL elem-add $%04X adds $%02X but absorb=$%02X null=$%02X"
+        .. " -- feeds an absorber/null", id, add, absorb, null))
+    end
+    o = o + 4
+  end
+end
+check(badAdds == 0, string.format(
+  "GhostTrain rule: all %d Ot6ElemAddTbl rows are absorb-safe and null-safe",
+  addRows))
+-- guard the guard: if the walk found nothing, the loop above proves nothing.
+-- 24 rows as of the issue #23 pass (18 before it, + the 6 boss rows above).
+check(addRows >= 24, string.format(
+  "elem-add walk saw %d rows (expected >= 24; a mislocated base proves nothing)",
+  addRows))
+
+-- and prove the MonsterProp base is really MonsterProp, so the invariant above
+-- is comparing against real absorb bytes rather than an arbitrary window.
+check(rb(MPROP + 0x0168 * MREC + OFF_ABSORB) == WATER,
+  "monster_prop base sane: $168 Ultros absorb byte reads water $80")
+check(rb(MPROP + 0x0117 * MREC + OFF_WEAK) == 0x00,
+  "monster_prop base sane: $117 AtmaWeapon vanilla weak is $00 (the whole "
+  .. "point of its added row)")
 
 if fails == 0 then
   emu.log("breaktbl: all v0.6 break-coverage rows present - PASS")

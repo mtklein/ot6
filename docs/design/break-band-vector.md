@@ -1,14 +1,26 @@
-# Break band — Vector / Magitek Research Facility (survey + proposed rows)
+# Break band — Vector / Magitek Research Facility (survey + authored rows)
 
-Issue #11, v0.6 scope. **Survey and proposal only** — no source was touched.
-`ot6_break_floor.inc`, `gen_break_floor.py` and `Ot6ShieldTbl` are all
-unchanged by this document.
+Issue #11, v0.6 scope. **The twelve rows in §8 are LANDED** — they are in
+`Ot6ShieldTbl` (`ot6_hud.asm`, the block after the Cranes). `ot6_break_floor.inc`
+and `gen_break_floor.py` are still unchanged: authored rows win by construction
+(§10.1), so the band needed no generator change. The generator/tooling items in
+§10.2 remain open.
 
 Everything below was decoded from the vendored data under `ff6/` on
 2026-07-26. Line references are to that tree. Where a claim is an inference
 rather than something read out of the source, it is labelled. Party
 composition is `docs/design/bosses-wob.md`'s to state, not this document's;
 §6 cites it rather than re-deriving it.
+
+**Independently re-verified before authoring** (2026-07-27), because this
+survey had been revised twice: every species' level/HP/weak/null/absorb byte,
+every map→group pointer, every group→formation slot, and every arithmetic
+figure in §2, §5 and §8.3 was recomputed from
+`sub_battle_group.dat` / `rand_battle_group.dat` / `battle_monsters.dat` /
+`monster_prop.dat` rather than read off the page. **All of it reproduced
+exactly** — including the 67.86 / 45.54 / 14.29 → 19.64 / 66.96 / 80.36 key
+shares and the 33.04 % / 8.93 % costs in §9. `tools/tests/battle_breakvector.lua`
+now recomputes the same shares from the shipped ROM on every `make test`.
 
 ---
 
@@ -229,11 +241,13 @@ rows for them touches this band and nothing else.
 
 **Every boss row in the band is already authored and reachable by the party
 that fights it** (§6.3); this pass changes none of them. The one outstanding
-boss item is elemental, not class: `bosses-wob.md` §15 specifies **bolt + water
-on Number 128's body and bolt on both blades**, and vanilla gives all three no
-weakness at all (`monster_prop.dat` +25 = `$00`). Those are `Ot6ElemAddTbl`
-rows and they are not written yet — the same M6 data-entry gap `wob-route.md`
-records for AtmaWeapon.
+boss item was elemental, not class: `bosses-wob.md` §15 specifies **bolt +
+water on Number 128's body and bolt on both blades**, and vanilla gives all
+three no weakness at all (`monster_prop.dat` +25 = `$00`). **Those three
+`Ot6ElemAddTbl` rows landed with this pass** (issue #23), along with
+AtmaWeapon's, FlameEater's and Ultros ④'s — the same M6 data-entry gap
+`wob-route.md` recorded. All three parts absorb **ice**, which is neither
+added bit, so nothing is fed.
 
 ---
 
@@ -707,13 +721,32 @@ is the thing most likely to drift.
 
 ## 11. Status
 
-Proposal. Nothing here is measured and no file was modified.
+**Landed.** The twelve `Ot6ShieldTbl` rows in §8.1 are in `ot6_hud.asm`, and
+`tools/tests/battle_breakvector.lua` is the regression gate: it walks
+`SubBattleGroup → RandBattleGroup → BattleMonsters` out of the shipped ROM,
+asserts every band body is authored rather than floored, enumerates the six
+free four-parties and asserts every formation is answerable by one, pins
+formation `$168` (Rhinox ×2) as bludgeon-only *and* element-less, and
+recomputes the key shares to assert bludgeon now outranks slash.
 
-- The shield counts in §8.2 are a precedent-following guess and need their own
-  sweep, with a separate three-character arm.
-- `bosses-wob.md` §15's element adds for Number 128 and its blades (bolt|water
-  / bolt) are not in `Ot6ElemAddTbl` and remain outstanding M6 data entry.
+Still open, and each is a separate piece of work:
+
+- **The shield counts in §8.2 are UNMEASURED** — a precedent-following 2
+  against a formula 4, following Mt. Kolts and Zozo. They need their own sweep
+  with a Vector doorstep fixture and a separate three-character arm (§8.2,
+  §10.3). This is the single largest unvalidated assumption in the pass.
+- **The §10.3 fixture assertions are not written**, because no Vector doorstep
+  / minecart-boarding / Crane-doorstep fixture is minted yet. The Rhinox row's
+  "a bludgeon key is in the party or the bag" assertion lives there.
+- **The §10.2 generator/tooling items are untouched**: three-way
+  explicit/inferred/defaulted review output, marking authored species and
+  excluding them from the headline counts, and the generalised
+  encounter/party reachability check. `battle_breakvector.lua` implements the
+  third of those for *this band only*; generalising it is the remaining work.
 - Whether maps 265 / 267 / 268 actually roll their group-0 encounters (§1.1)
-  wants one runtime check.
+  still wants one runtime check.
 - The generated floor remains the documented provisional safety net for every
-  band except this one until these rows land.
+  band **except this one**. Retro-authoring Narshe → Blackjack is deferred per
+  the issue.
+- **No human playtesting yet** — issue #11's last acceptance criterion. The
+  distribution is measured; whether it *feels* right is not.

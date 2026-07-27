@@ -138,6 +138,13 @@ nomp-rom: rom
 test: rom nomp-rom $(STATE1) $(STATE2) $(STATE3)
 	python3 tools/tests/lib/compose.py --selftest
 	python3 tools/tests/lib/sram_anchor.py selftest
+	@# bosses-wob.md vs the shipped break data.  It carried four waivers for
+	@# rows the doc authored in prose and nobody wrote into the ROM; issue #23
+	@# landed all of them, the WAIVERS dict is empty, and the script is a plain
+	@# gate now.  It lives here rather than in suite.sh because suite discovery
+	@# globs *.lua for a `-- @suite` marker and cannot see a .py file -- same
+	@# reason compose.py and sram_anchor.py sit on these lines.
+	python3 tools/check_boss_rows.py
 	sh tools/tests/lib/frontier_stamp_selftest.sh
 	sh tools/tests/lib/runner_isolation_selftest.sh
 	@rm -f $(STAMP)

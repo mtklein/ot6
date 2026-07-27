@@ -18,8 +18,8 @@ data, and the file/offset that proves it.
 
 Nothing here writes; it is a read-only linter.  Exit status 0 = clean.
 
-Deliberately NOT wired into `make test` yet -- register it when the frontier
-re-mint that motivated it has landed.
+Wired into `make test` (Makefile's test target, alongside the compose.py and
+sram_anchor.py selftests) as of the issue #23 pass that emptied WAIVERS.
 
 Usage:  python3 tools/check_boss_rows.py [--repo ROOT] [-v]
 """
@@ -308,12 +308,17 @@ ULTROS_ROW_CLASSES = CLASS_BIT["slash"] | CLASS_BIT["pierce"]
 # so an unrelated drift on the same boss still fails.
 
 WAIVERS = {
-    (0x10B, "ELEMENT"): "#20 open decision: Number 128 body, bolt/water "
-                        "authored but no Ot6ElemAddTbl row (bosses-wob.md §15)",
-    (0x13F, "ELEMENT"): "#20 open decision: Number 128 right blade, ditto",
-    (0x140, "ELEMENT"): "#20 open decision: Number 128 left blade, ditto",
-    (0x117, "ELEMENT"): "#20 open decision: AtmaWeapon's whole element row was "
-                        "never added (bosses-wob.md §21)",
+    # EMPTY, and that is the point.  The four entries that lived here --
+    # Number 128's body and both blades, and AtmaWeapon's whole element row --
+    # were all authored into Ot6ElemAddTbl by the v0.6 boss-element pass
+    # (issue #23), along with FlameEater's water and Ultros ④'s bolt.  Every
+    # OPEN DECISION block in bosses-wob.md is now a RESOLVED block.
+    #
+    # With no waivers left this script is a plain gate, and it is registered in
+    # `make test` (the Makefile's test target, next to the compose/sram_anchor
+    # selftests) so doc-vs-data drift fails the suite from here.  Suite.sh's own
+    # discovery globs *.lua for a `-- @suite` marker and cannot see a .py file,
+    # which is why registration is a Makefile line rather than a marker.
 }
 
 

@@ -90,12 +90,20 @@ The owner's account, from play, is that the Magitek Factory is a **four**-charac
 party which drops to **three** when Celes leaves. Absent evidence to the contrary,
 that is the working assumption.
 
-**How to actually settle this:** party composition is runtime state and cannot be
-read off the event dump. Probe it — load the fixture at each set-piece doorstep and
-read the live party, the way `wob-route`'s Beat A corrections were measured
-(`$1850` read at the v0.4 tail). Record the measured party per fight here, with the
-fixture it was measured at. Until then, no balance or break-row work may assume a
-party size for Beat B.
+**SETTLED 2026-07-27 by measurement, not inference.** `$1850` was read at every
+set-piece doorstep during the re-mint that closed #21. The owner's account was
+right: four through the Facility, three once Celes is taken by the tube room.
+
+| doorsteps | measured party |
+|---|---|
+| `vector_doorstep` … `magicite_ifrit_shiva` | LOCKE L14, EDGAR L15, SABIN L15, CELES L14 |
+| `n024_doorstep` … `esper_tubes_doorstep` | LOCKE L15, EDGAR L16, SABIN L15, CELES L15 |
+| `esper_tubes`, `minecart_doorstep` | LOCKE, EDGAR, SABIN — Celes taken by the tube room |
+| `n128_won` | LOCKE L15, EDGAR L16, SABIN L16 |
+
+The canonical fixture party is LOCKE, CELES, SABIN, EDGAR, seated at the Zozo
+`party_menu` (#21). `gen_vector_doorstep` asserts the *count* of nonzero `$1850`
+entries at the anchor is 4, so a chain that silently loses members fails loudly.
 
 At the v0.6 stop line (map 6, `_cacb95` at `:25669`) Terra is **available but not
 active** — this one is a switch read (`$02F0` / `$1EDE`), not a flow inference, and
@@ -257,11 +265,13 @@ pierce). Cross-check weapon classes in `ff6/src/battle/ot6_class.asm`.
   v0.5 boss element weaknesses are mostly **vanilla** (Ultros fire/bolt; Ifrit
   fire-absorb / ice-weak, Shiva fire-weak; Cranes water + bolt; Number 128
   bolt/water; FlameEater ice/water; Nerapa ice/bolt/holy, absorbs fire — all
-  decoded vanilla per bosses-wob). **The one clear authoring gap:
-  AtmaWeapon's `$0117` fire/ice/bolt row is an ADD ("the whole row is added",
-  bosses-wob §21 + open question #4) and is NOT in `Ot6ElemAddTbl` yet.** Author
-  it during Beat F. (Atma is still slash/pierce-breakable without it; the element
-  row is the intended wide capstone.)
+  decoded vanilla per bosses-wob). **RESOLVED (issue #23): AtmaWeapon's
+  `$0117` fire/ice/bolt row is an ADD ("the whole row is added", bosses-wob
+  §21 + open question #4) and was NOT in `Ot6ElemAddTbl`. It is now** — the
+  v0.6 boss-element pass authored it, along with Number 128's bolt/water,
+  FlameEater's water and Ultros ④'s bolt, rather than deferring to Beat F.
+  (Atma was still slash/pierce-breakable without it, but a free-pick party
+  bringing neither had no break at all on the capstone.)
 
 ### Telegraph / vanilla-script work (open question #7, M6 data entry)
 The "one telegraph per boss, break-cancels-the-fuse" contract needs the vanilla

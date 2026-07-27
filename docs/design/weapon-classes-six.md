@@ -439,7 +439,12 @@ more on-brand fix than any class-count change.
 Applying this discipline to the Serpent Trench found an authoring error in the
 *current* scheme, which is itself evidence about where the real risk lives.
 
-`bosses-wob.md:499-503` authors Aspik `$0059` as `2 · pierce`, "punctured by
+*(Finding kept in its original tense; **the byte was fixed in v0.6 by issue
+#23** — Aspik is `2 · bludg` now, and the trench trio is Anguiform slash /
+Actaneon bludg / Aspik bludg, two keys across three creatures. What follows is
+why, and is the part worth remembering.)*
+
+`bosses-wob.md` authored Aspik `$0059` as `2 · pierce`, "punctured by
 Gau's fanged strike". But **Gau cannot equip Hardened** — `$28` has mask
 `$8008` = Shadow (+ Merit Award) only. Gau's entire legal weapon list is the
 Imp Halberd. With no weapon his Fight reads `$ff` = bare fist = **bludgeon**
