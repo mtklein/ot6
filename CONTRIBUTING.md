@@ -82,6 +82,22 @@ not.
   passed green for a week standing in Albrook. `battle_loadgate.lua` writes
   an all-`$FFFF` table and requires the gate to still answer no, which is the
   clause that would catch a gate hardcoded to `true`.
+- **State the citation before the claim, not after someone doubts it.** "Locke
+  fights Number 128 solo" and "the game is wedged" were both asserted from
+  suggestive-looking memory dumps, defended once, and then disproved — the first
+  by a design doc in this repo that said the opposite on four separate lines,
+  the second by a screenshot whose byte count contradicted the very note being
+  cited for it. If a mechanism claim has no `file:line`, it is a hypothesis and
+  must be written as one.
+- **Check what this repo already says before deriving it.** `bosses-wob.md`
+  recorded the correct Magitek Factory party the entire time it was being
+  derived wrongly from `event_main.asm`. One grep beats a clever derivation, and
+  the derivation was clever — it was also invalid, because that file is a dump
+  of separately-addressed scripts and adjacency in it means nothing.
+- **When isolating a variable, diff the interval first.** "It broke after X" is
+  evidence only if X is the only thing that changed. A `navTo` fix was blamed
+  for a hang that two later commits had actually caused, because the isolation
+  run compared against a tree that carried all three.
 - **Failing before and passing after does not prove the fix is the right
   shape.** `battle_loadgate.lua` failed for exactly the right reason before
   the battle-gate fix, then passed against two different repairs — one of
