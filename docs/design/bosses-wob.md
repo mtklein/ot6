@@ -48,7 +48,7 @@ and his shields grow instead. The player learns; Ultros doesn't.
 | # | Boss | Where | Shields |
 |---|---|---|---|
 | 1 | Whelk (head) | Narshe intro | 4 |
-| 2 | Marshal | Narshe escape | 4 (Lobos 2) |
+| 2 | Marshal | Narshe escape | 4 (Lobos 3) |
 | 3 | Vargas | Mt. Kolts | 5 (Ipoohs 2) |
 | 4 | Ultros ① | Lete River | 5 |
 | 5 | TunnelArmor | Locke scenario | 5 |
@@ -114,8 +114,15 @@ demonstration that a silent HUD means theater.
 
 Party: Locke, Mog, and ten moogles in three squads.
 
-**Shields:** 4 · **Weak:** poison + piercing. Lobos: 2 · fire +
+**Shields:** 4 · **Weak:** poison + piercing. Lobos: 3 · fire +
 piercing.
+
+(Lobo's count reads **3**, not the 2 an earlier draft of this row wanted:
+`Ot6ShieldTbl` `$0019` ships `3, OT6_PIERCE` — `ot6_hud.asm:1279` — and
+`tools/tests/visual_f2.lua:23` anchors it as the M1 regression that proves
+the species table beats the level formula. The doc is corrected to the
+shipped number rather than the other way round; whether 2 was the better
+*design* is `m3-impl.md`'s open question 3, not a decode.)
 
 - **Telegraph:** the Marshal levels his blade and whistles the pack
   in → next turn he and both Lobos converge on one target. Break him
@@ -282,7 +289,12 @@ and the silent HUD says so up front — Tritoch's rule, one scenario
 later. If a future pass genuinely wants a breakable clown here, that
 is new machinery and belongs in the roadmap, not in the shield table.
 
-**Telstar:** 4 shields · bolt + bludgeoning (Dobermans 2 · piercing).
+**Telstar:** 4 shields · bolt, water + bludgeoning (Dobermans 2 · fire +
+piercing). (Decoded, not recalled: `$044` weak = **bolt|water** —
+`monster_prop.dat` +25 reads `$84`, the same byte TunnelArmor and the whole
+AirForce assembly carry — and `$01a` Doberman weak = **fire**. An earlier
+draft printed only the bolt bit here and left the Dobermans' element off
+entirely.)
 - **Telegraph:** its antenna sparks and it radios for backup → a
   Doberman wave piles in next turn. Break to jam the call — the
   first *summon-prevention* break; the verb returns at FlameEater.
@@ -488,8 +500,10 @@ the gap.
 
 Sabin + Cyan + Gau ride the trench (`battle 19`/`20`/`21`, UNDERWATER,
 event_main.asm:21194+; the party is placed together at the ride's entry
-`_ca8ae3`). Their melee ring is **bludg** (Sabin), **slash** (Cyan) and
-**pierce** (Gau's Hardened). Every trench aquatic was a formula species
+`_ca8ae3`). Their melee ring is **bludg** (Sabin's fists and Blitz, Gau's
+bare hands) and **slash** (Cyan's katana and SwdTech, Sabin's claws once
+he owns a pair) — **and that is the whole ring**. Every trench aquatic was
+a formula species
 whose vanilla element the party can't reach — Anguiform is bolt-only (no
 bolt in the party) and Actaneon/Aspik are fire-weak but Sabin's Fire
 Dance is L15-gated — and all three **absorb water**, so a careless
@@ -500,11 +514,41 @@ three keys map one-to-one onto the three creatures:
 |---|---|---|---|
 | Anguiform | `$003A` | 2 · slash | a slippery eel, cut by Cyan's blade |
 | Actaneon | `$005E` | 2 · bludg | a shelled crustacean, cracked by Sabin's fists |
-| Aspik | `$0059` | 2 · pierce | a coiled asp, punctured by Gau's fanged strike |
+| Aspik | `$0059` | 2 · pierce | a coiled asp, punctured by Gau's fanged strike (**see below — no wielder**) |
 
 Vanilla bits are kept (dead or level-gated for this party, live for a
 later party that carries the element); class chips ignore the
 water-absorb.
+
+> **OPEN DECISION — Aspik's pierce row has no wielder (issue #20).**
+> The rationale is wrong on two counts, both decoded rather than recalled:
+>
+> 1. **Gau cannot equip Hardened.** `$28` is a *katana*, not a spear — the
+>    `{spear}` glyph in `item_name_en.json` is the dagger/ninja icon, not a
+>    category — and its equippable-by mask is `$8008` = Shadow (+ Merit
+>    Award) only. Read at `item_prop_en.dat[$28*30]+1`, 16-bit LE, which is
+>    the offset `equip.asm:1599` itself indexes; the ambiguity that made an
+>    earlier pass hedge here is pinned for good in
+>    `docs/research/data-formats.md`. **Gau's only legal weapon in the game
+>    is the Imp Halberd `$24`** — the one item with bit 11 set.
+> 2. **Bare-handed Gau bludgeons.** With no weapon his Fight reads item
+>    `$ff` = empty hand = `OT6_BLUDG` (`ot6_class.asm:163`), already flagged
+>    as a known wart in `m3-impl.md`'s open question 5 ("plain Gau punches
+>    bludgeon, not the kit's 'fangs = piercing'").
+>
+> So the trio brings **bludgeon and slash, and no pierce at all**, and
+> Aspik's authored class is dead for the only party that ever fights it.
+> The class byte lives in `Ot6ShieldTbl` (`ot6_hud.asm`, `$0059` row), which
+> is data — recorded here rather than changed. **Recommendation: make Aspik
+> `2 · bludg`** and rewrite the thematic as the constrictor answered by a
+> monk's fists. That keeps the trio's one-key-each shape (Cyan slash →
+> Anguiform, Sabin bludg → Actaneon) only if Actaneon moves too, so the
+> honest alternative is to accept **two** keys for three creatures:
+> Anguiform slash, Actaneon bludg, Aspik bludg. Either way the current row
+> teaches nothing to its audience. The failure mode worth remembering is the
+> *rationale*, not the byte: the byte was authored to a wielder claim that
+> was recalled instead of decoded. (Same finding, longer, in
+> `weapon-classes-six.md` §4.7.)
 
 ## Break coverage — the free-roam floor (#6)
 
@@ -618,8 +662,34 @@ note in `wob-route.md`.)
 
 | part | shields | weak |
 |---|---|---|
-| body | 7 | bolt, water + piercing |
-| Left/Right blades | 3 each | bolt + slashing |
+| body | 7 | bolt, water + piercing (**element unimplemented — see below**) |
+| Left/Right blades | 3 each | bolt + slashing (**element unimplemented — see below**) |
+
+> **OPEN DECISION — Number 128's elemental row does not exist in the data
+> (issue #20).** Decoded: `$010b` body, `$013f` right blade and `$0140`
+> left blade all read `monster_prop.dat` +25 (weak) = **`$00`**, +24 (null)
+> = `$00`, +23 (absorb) = **`$02` ice** — and none of the three has an
+> `Ot6ElemAddTbl` row. The bolt/water above is authorial intent that was
+> never implemented; the shipped fight's only break axis is the authored
+> physical class (`Ot6ShieldTbl`: body 7 · pierce, each blade 3 · slash).
+>
+> **Recommendation: implement it, don't drop it.** Three reasons.
+> (a) The minecart is the first fight the doc builds a *part-break* lesson
+> on, and #19 is asking whether that axis is reachable at all; a
+> single-axis fight makes the lesson thinner exactly where it should be
+> widest. (b) The party here is post-Zozo with four espers just paid out,
+> so bolt (Ramuh) is a key the player has and has been taught to reach for
+> — the same "the espers you just earned are the answer" beat the Cranes
+> deliberately *invert* two fights later. (c) Nothing traps: the three
+> parts absorb **ice**, not bolt or water, so a bolt|water add feeds no
+> absorber — the GhostTrain rule holds.
+>
+> The change is three `Ot6ElemAddTbl` rows in `ot6_break.asm`, `$84`
+> (bolt|water) on `$010b` and, if the blades keep the doc's narrower row,
+> `$04` (bolt) on `$013f` and `$0140`. That is a ROM data change and is
+> **not made here** — file it, or fold it into #11's authoring pass. If it
+> is declined instead, the fix is to strike the element column from both
+> rows above and say plainly that the minecart is a class-only fight.
 
 - Blades regenerate a few turns after dying — vanilla ✦ — and
   regrown blades return at full shields (their row stays revealed;
@@ -696,7 +766,26 @@ Party: Terra + three.
 
 Party: Terra, Locke, Strago (Shadow keeps the dog outside).
 
-**Shields:** 7 (Balloons 1 each) · **Weak:** ice, water + piercing.
+**Shields:** 7 (Balloons 1 each) · **Weak:** ice + piercing. Balloons:
+1 · ice, water.
+
+(Decoded, not recalled: `$116` weak = **ice only** — `monster_prop.dat`
++25 reads `$02` — with +24 `$6c` nulling bolt|poison|holy|earth and +23
+`$01` **absorbing fire**. `$0de` Balloon weak = `$82` = ice|water. An
+earlier draft merged the two rows and gave the FlameEater the Balloons'
+water bit.)
+
+> **OPEN DECISION — Aqua Breath's chip (issue #20).** The break story
+> below leans on water being a FlameEater key. It is not one in the data:
+> water is neutral on `$116` (not weak, not nulled, not absorbed), so
+> Aqua Breath is AoE add-clear only, not a chip on the boss. Implementing
+> the intent is one `Ot6ElemAddTbl` row, `$0116` `.byte $80` — safe, since
+> `$116` absorbs *fire*, not water. **Recommendation: add it.** It is
+> Strago's debut fight and the doc explicitly frames Aqua Breath as the
+> lesson; a Lore that reads the row and then cannot use it is a worse
+> tutorial than no Lore. ROM data, so **not made here** — file it or fold
+> it into #11. If declined, the break story's "Aqua Breath is both the
+> water chip *and* the AoE" needs to lose its first half.
 
 - **Telegraph:** it drinks the room's fire and swells white →
   **Fireball** across the party. Break to swallow the flame with it.
@@ -718,8 +807,32 @@ Party: your chosen three (Shadow is waiting on the continent).
 
 | part | shields | weak |
 |---|---|---|
-| Ultros ④ | 7 | the row, one last time |
-| Chupon | 4 | bludgeoning |
+| Ultros ④ | 7 | fire, **poison** + slashing, piercing — the row, one bit changed |
+| Chupon | 4 | ice, water + bludgeoning |
+
+(Decoded, not recalled: Ultros ④ is a **different species** from the
+first three — `$168`, where the Lete/opera/gate fights are `$12c`/`$12d`/
+`$12e` — and vanilla did not give it the same row. `monster_prop.dat` +25
+reads `$09` = **fire|poison**, not the `$05` = fire|bolt the other three
+carry; +23 still `$80`, water absorbed. So "the row, one last time" was
+true of the classes, which `Ot6ShieldTbl` authors identically at
+slash|pierce, and false of the elements: **bolt is dead here and poison is
+live**. `$12f` Chupon weak = `$82` = ice|water, which the old row omitted
+entirely.
+
+> **OPEN DECISION — should Ultros ④ keep the row (issue #20)?** The arc's
+> stated promise is "revealed at the Lete, remembered forever", and the
+> codex-alias work that would make the four fights read as one Ultros is
+> already `m3-impl.md`'s open question 2. If that alias lands, the element
+> row should be aliased too — one `Ot6ElemAddTbl` row, `$0168` `.byte $04`,
+> restores bolt and makes the promise literally true (poison stays; the
+> vanilla bit is kept per the doc's own rule, and `$168` absorbs water, not
+> poison or bolt, so nothing is fed). If the alias is declined, the row
+> above is already correct as written and the joke changes from "the same
+> row, four times" to "he finally learned one thing". **Recommendation: add
+> the bolt row** — the running gag is load-bearing for the codex lesson,
+> and one bit is cheaper than an explanation. ROM data, so **not made
+> here**.)
 
 - **Telegraph:** Ultros's tentacles, final verse. Chupon doesn't
   telegraph — Chupon *is* the telegraph: when Ultros has had enough,
@@ -741,10 +854,19 @@ Same three, straight from the deck.
 
 | part | shields | weak |
 |---|---|---|
-| AirForce | 8 | bolt + piercing |
-| Laser Gun | 3 | bolt + piercing |
-| MissileBay | 3 | fire + piercing |
-| Speck | 1 | any physical class |
+| AirForce | 8 | bolt, water + piercing |
+| Laser Gun | 3 | bolt, water + piercing |
+| MissileBay | 3 | bolt, water + piercing |
+| Speck | 1 | bolt, water + any physical class |
+
+(Decoded, not recalled: all four parts share one vanilla byte —
+`monster_prop.dat` +25 = **`$84` = bolt|water** on `$113`, `$145`, `$147`
+and `$146` alike, with +23/+24 both `$00`, so the assembly absorbs and
+nulls nothing. An earlier draft dropped the water bit from three rows and
+gave the MissileBay **fire**, which it has never been weak to. The Speck's
+row is the interesting one: it is bolt|water-weak like the rest, but the
+authored answer is still the one shield and any physical class, because
+the Speck exists to eat *spells*.)
 
 - **Telegraph:** the missile bay racks and locks → **Launcher**
   barrage. Breaking the *bay* — not the body — is the cancel:
@@ -765,11 +887,31 @@ Same three, straight from the deck.
 
 Party: three + Shadow (forced).
 
-**Shields:** 11 · **Weak:** fire, ice, bolt + slashing, piercing.
-Vanilla has *no* weaknesses here; the whole row is added, and wide
-on purpose — the FC party is a free pick plus Shadow, and any
-lineup must hold at least two of these five axes. The capstone
-examines rhythm, not roster.
+**Shields:** 11 · **Weak:** fire, ice, bolt + slashing, piercing
+(**element row unimplemented — see below**). Vanilla has *no* weaknesses
+here; the whole row was *meant* to be added, and wide on purpose — the FC
+party is a free pick plus Shadow, and any lineup must hold at least two of
+these five axes. The capstone examines rhythm, not roster.
+
+> **OPEN DECISION — the WoB final exam ships with two axes, not five
+> (issue #20).** Decoded: `$0117` reads `monster_prop.dat` +25 (weak) =
+> `$00`, +24 (null) = `$00`, +23 (absorb) = `$00` — the doc is right that
+> vanilla gives it nothing — **and there is no `Ot6ElemAddTbl` row for
+> `$0117` either**. The sentence "the whole row is added" describes a data
+> pass that was never done. What actually ships is `Ot6ShieldTbl`'s
+> `11, OT6_SLASH|OT6_PIERCE`: eleven shields against two physical classes,
+> and nothing else.
+>
+> **Recommendation: implement it.** This is the one boss where the doc's
+> own argument makes the case — 11 shields is two to three full break
+> cycles, and a free-pick party that happens to bring neither slash nor
+> pierce has *no* break at all on the WoB's capstone. Same failure the v0.6
+> coverage pass closed for trash, on the biggest body in the arc. The
+> change is one row in `ot6_break.asm`, `$0117` `.byte $07` (fire|ice|bolt);
+> `$117` absorbs and nulls nothing, so there is no absorber to feed.
+> ROM data, so **not made here** — file it, or fold it into #11's authoring
+> pass. Declining means striking the element list and saying the capstone
+> is class-only on purpose, which contradicts the paragraph above it.
 
 - **Telegraph:** the speech is the lore; the charge is the law. It
   gathers light for a full cycle → **Flare Star**. Mind Blast stays

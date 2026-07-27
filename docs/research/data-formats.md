@@ -32,7 +32,74 @@ nibble + block/parry anim · +0x1C price.
 
 **No weapon-category (sword/spear/…) field exists.** The only category-ish
 datum is the icon glyph prefixed to names at $D2B300. OT6's 8-class table
-is a new parallel table keyed by item ID.
+is a new parallel table keyed by item ID. Note the glyph is *not* a
+category either: daggers carry `{spear}` in `item_name_en.json`, which is
+how "Hardened `$28`, a spear" has entered two write-ups. `$28` is a katana.
+
+### The equippable-by mask — PINNED (2026-07-26), stop re-deriving it
+
+Ambiguous twice before, because reading the record at the wrong byte
+still yields a plausible-looking mask. Settled from source, not
+inference.
+
+**Offset +$01, 16-bit little-endian, i.e. bytes +$01 and +$02.**
+
+The game's own read, `GetValidWeapons` / `GetValidShields`
+(`ff6/src/menu/equip.asm:1594-1601`, :1629-1636):
+
+```
+        lda     f:ItemProp,x    ; +$00 type
+        and     #$07
+        cmp     #$01            ; 1 = weapon (3 = shield in the sibling)
+        bne     @skip
+        longa                   ; <-- 16-bit A
+        lda     f:ItemProp+1,x  ; <-- the mask, +$01..+$02
+        bit     ze7             ; ze7 = this character's bit
+        beq     @skip           ; not equippable
+```
+
+Same read at `shop.asm:1415` and `battle_main.asm:14071`. The character
+bit comes from `GetCharEquipMask` (`equip.asm:2287`), which indexes
+`CharEquipMaskTbl` — a plain identity table, `.word $0001,$0002,$0004,…`
+— by actor number. **So bit N = actor N**, per `CHAR_FLAG`
+(`ff6/include/const.inc:1416-1430`):
+
+| bit | 0 | 1 | 2 | 3 | 4 | 5 | 6 | 7 | 8 | 9 | 10 | 11 | 12 | 13 | 14 | 15 |
+|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|
+| who | Terra | Locke | Cyan | Shadow | Edgar | Sabin | Celes | Strago | Relm | Setzer | Mog | Gau | Gogo | Umaro | Banon | Leo ✱ |
+
+**✱ bit 15 is doubly booked.** It is actor 15 (Leo) *and* the Merit Award
+override: `GetCharEquipMask` ends with `lda $11d8 / and #$20 / ora
+#$8000` (`equip.asm:2300-2306`), and `$11d8` is the relic-effect byte
+fed from item +$0C (`battle_main.asm:2513`), where Merit Award `$da`
+carries `$20` (Gauntlet `$d0` = `$08`, Genji Glove `$d1` = `$10`).
+Decoding bit 15 as a character therefore reports a phantom Leo on
+almost every weapon. Bit 14 (Banon) is real but appears on exactly four
+items — the imp gear `$24 / $65 / $83 / $9b`, all mask `$dfff`
+(everyone but Umaro).
+
+Pinned against items whose wielders cannot be argued with:
+
+| item | id | mask at +$01 | reading at +$01 (correct) | reading at +$00 (wrong) |
+|---|---|---|---|---|
+| MetalKnuckle…Tiger Fangs (claws) | `$53-$59` | `$8020` | Sabin only — the Blitz signature | `$2001` = Terra + Umaro |
+| Ashura…Murasame (katana) | `$2b-$2f` | `$8004` | Cyan only | `$0411` = Terra + Edgar + Mog |
+| Imperial…Stunner (ninja) | `$25-$2a` | `$8008` | Shadow only | `$0811` = Terra + Edgar + Gau |
+| Mithril Pike…Aura Lance (spear) | `$1d-$23` | `$8410` | Edgar + Mog | `$1011` = Terra + Edgar + Gogo |
+| Imp Halberd | `$24` | `$dfff` | everyone but Umaro | `$ff11` = nonsense |
+| Heavy Shld | `$5b` | `$8257` | Terra/Locke/Cyan/Edgar/Celes/Setzer | `$5703` = seven wrong names |
+
+The +$00 column is what the byte-0 reading produces — `type | mask<<8`,
+low byte shifted out and the type byte shifted in. It always *looks*
+like a mask, it always claims Terra (every weapon's type byte has bit 0
+set), and it is always wrong. `$28` Hardened is the canonical trap:
++$01 says Shadow, which is right for a ninja katana; +$00 says
+Terra/Edgar/Gau, which is a ghost.
+
+Corollary already used downstream: **Gau's only legal weapon in the
+whole game is the Imp Halberd `$24`** — no other item with type 1 has
+bit 11 set. (See `docs/design/weapon-classes-six.md` §3 for the full
+character × category matrix decoded off this offset.)
 
 ## Espers — $D86E00, 11 B × 27
 
