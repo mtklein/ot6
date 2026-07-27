@@ -12475,6 +12475,14 @@ NPCProp::_272:
 
 NPCProp::_273:
 
+        make_npc {26, 53}, $0632
+                set_npc_no_react
+                set_npc_anim FOUR_FRAMES, SPECIAL
+                set_npc_speed NORMAL
+                set_npc_gfx SAVE_POINT, RAINBOW
+                set_npc_sprite_priority HIGH
+                end_npc
+
         make_npc {25, 51}, $0649
                 set_npc_event _cc79ed
                 set_npc_no_react

@@ -1211,6 +1211,7 @@ EventTrigger::_272:
         make_event_trigger {3, 55}, SavePoint
 
 EventTrigger::_273:
+        make_event_trigger {26, 53}, SavePoint
 
 EventTrigger::_274:
         make_event_trigger {10, 9}, _cc7a60
