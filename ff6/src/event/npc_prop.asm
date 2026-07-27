@@ -12475,20 +12475,25 @@ NPCProp::_272:
 
 NPCProp::_273:
 
-        make_npc {26, 53}, $0632
-                set_npc_no_react
-                set_npc_anim FOUR_FRAMES, SPECIAL
-                set_npc_speed NORMAL
-                set_npc_gfx SAVE_POINT, RAINBOW
-                set_npc_sprite_priority HIGH
-                end_npc
-
         make_npc {25, 51}, $0649
                 set_npc_event _cc79ed
                 set_npc_no_react
                 set_npc_anim ONE_FRAME, NONE
                 set_npc_speed SLOW
                 set_npc_gfx NUMBER_024, MOG_UMARO
+                end_npc
+
+        ; OT6 (#10): the pre-024 save sparkle.  APPENDED, never inserted:
+        ; event scripts address NPCs as {map, index in this block}, so a
+        ; record added ahead of NUMBER_024 renumbers it and the post-battle
+        ; cleanup clears the sparkle instead -- the n024_won mint caught
+        ; exactly that on 2026-07-27.
+        make_npc {26, 53}, $0632
+                set_npc_no_react
+                set_npc_anim FOUR_FRAMES, SPECIAL
+                set_npc_speed NORMAL
+                set_npc_gfx SAVE_POINT, RAINBOW
+                set_npc_sprite_priority HIGH
                 end_npc
 
 ; ------------------------------------------------------------------------------

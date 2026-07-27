@@ -53,6 +53,13 @@ known and below-the-bar (`docs/research/vanilla-destructive-bugs.md` §9).
 
 ### The sparkle
 
+**Append the record at the end of the map's block, never insert it.** Event
+scripts address NPCs as {map, index-within-block}, so a record added ahead
+of an existing NPC renumbers everything after it — the first 273 attempt
+put the sparkle first, NUMBER_024 shifted from index 0 to 1, and the
+post-battle cleanup cleared the sparkle instead of the boss (caught by the
+`n024_won` mint, 2026-07-27).
+
 A separate NPC record in `ff6/src/event/npc_prop.asm` at the same tile —
 **9 bytes** (record layout `npc_prop.asm:137-176`). The two in-band examples
 are identical in shape (`npc_prop.asm`, maps 270 and 272 blocks):
