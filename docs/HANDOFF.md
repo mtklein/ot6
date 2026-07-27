@@ -1,7 +1,8 @@
 # Handoff — state of play
 
-Written 2026-07-27. Update this file when you land something that changes the
-picture; it is meant to be the one place that says where things are.
+Written 2026-07-27, rewritten late the same day after the backlog burn-down.
+Update this file when you land something that changes the picture; it is
+meant to be the one place that says where things are.
 
 Start with [README.md](../README.md) for what OT6 is,
 [CONTRIBUTING.md](../CONTRIBUTING.md) for the house rules, and
@@ -10,112 +11,117 @@ true right now and what will cost you a day if you do not know it.
 
 ## Where the project is
 
-**v0.5 is released** (Opera complete, Setzer joined, Blackjack acquired).
-**v0.6 is in progress** — the Vector / Magitek Research Facility frontier mints
-end to end, and the minecart completes. Number 128 was never a balance problem;
-it was three characters' work being done by one, which is now fixed.
+**v0.5 is released** (Opera complete, Setzer joined, Blackjack acquired) and
+**still not human-playtested** — that gate is the owner's, and two releases of
+unvalidated frontier should not stack.
+
+**v0.6 is in progress and the backlog is clean.** In one day the open-issue
+list went from eight standing trackers to four scoped items: the full frontier
+re-minted from power-on through Terra's return (114 states, the Vector band's
+first honest mint in this tree), the Vector-band break floor closed out with an
+encounter/party reachability gate in `make test` (#11), one authored save point
+landed before Number 024 with the rest of the band's cadence deliberately
+declined on recorded reasoning (#10, `design/save-points-vector.md`), the esper
+detail page now shows the while-worn stat mod (#27), the destructive-bug policy
+is written into CONTRIBUTING (#13 → Sketch gate is #28), and tests can no
+longer reference fixtures by absolute path at all (#26).
+
+**The frontier build system is ninja now (#25).** `make frontier` is a thin
+wrapper: `tools/tests/frontier_graph.py` declares the graph as data,
+`tools/tests/lib/frontier_ninja.py` emits `build/build.ninja`, and content
+staleness is ninja `restat` latches — the stamp-plus-`touch` dance, the
+generated deps include, and `frontier_deps.sh` are gone. The failure class
+where "rom content changed" printed while stale-ROM savestates booted anyway
+(observed twice on 2026-07-27) has no mechanism left to occur in. Battery
+anchors are keyed (`tools/tests/anchors/<key>/`), legs declare entry/exit
+contracts as data (`lib/ot6_contract.lua`), an anchor whose
+`persistent_layout` a leg does not declare is refused before the emulator
+boots, and `make anchor-negatives` (in `make test`) proves both refusal paths
+stay loud.
 
 `make test` is the gate and must be green before anything lands.
-`make frontier-test` re-mints the chain and runs the frontier-gated tests too.
-
-## The five things that will cost you a day
-
-**1. `make -j10 smoke` is the fast falsification loop. Use it first.**
-A library change does not need a full re-mint to falsify. Savestates are tied to
-ROM contents, so for a *lib-only* change the existing states still boot and any
-generator can be run directly. `smoke` runs the seven generators that have
-historically caught harness regressions in ~80 seconds, against an hour-plus for
-`make frontier`. Three wrong guesses at one predicate cost three serial re-mints
-before this existed. `make frontier` remains authoritative; smoke is what you run
-between guesses.
-
-**2. `$7E3BF4` is the party battle-HP table only while the battle module owns
-that RAM.** Every other module scribbles those bytes. `battleLoadStarted()` now
-judges the *shape* of the whole table — every word a plausible HP (0, or
-1..9999) and someone alive — because three simpler rules each shipped and each
-cost a full re-mint. The measured shapes and the three dead ends are documented
-at the function in `tools/tests/lib/ot6.lua`. Do not "simplify" it.
-
-**3. `navTo` lands at rest now (#22).** It used to hand the party over
-mid-glide, and several generators silently depended on that. The rule that
-falls out: *a tile that takes the party away is entered with a held press, not
-with a `navTo` whose goal it is.* Three generators were found relying on the old
-behaviour; assume more exist.
-
-**4. `event_main.asm` is a dump of separately-addressed event scripts.**
-Adjacency in that file means nothing about execution order — fourteen script
-labels sat between two lines that were confidently presented as consecutive.
-Party composition in particular is runtime state: read `$1850` at a fixture.
-`bosses-wob.md` is authoritative on party composition and was right the whole
-time it was being derived wrongly from the dump.
-
-**5. `LoadMagicProp` fills one shared buffer.** An ally's action resolving inside
-your caster's window overwrites the record mid-resolution, which reads as "the
-summon charged 0 MP and applied no status" — summons look free. Freeze the rest
-of the party when measuring. Documented at `freezeOthers`.
-
-## Canonical facts you should not re-derive
-
-- **The fixture party is LOCKE, CELES, SABIN, EDGAR**, seated at the Zozo
-  `party_menu`. Four through the Facility, three once the tube room takes Celes.
-  Measured per doorstep in `wob-route.md`. `gen_vector_doorstep` asserts the
-  count of nonzero `$1850` entries is 4, so a chain that silently loses members
-  fails loudly.
-- **Map 323 is Albrook.** Vector is 242 and 253. A fixture called
-  `vector_arrival` minted Albrook and passed green for a week.
-- **The item equip mask is `item_prop_en.dat` offset `+$01`, 16-bit, bit N =
-  actor N.** Byte 0 reads `type | mask<<8`, which always looks like a mask and
-  always claims Terra; that misreading cost two investigations. Recorded in
-  `research/data-formats.md`.
-- **`monster_prop.dat` `+23` is absorb, `+25` is weak.** Check both before
-  authoring an element row — Ultros ④ absorbs water, and adding the water its
-  design story implied would have healed him. `battle_breaktbl` now asserts this
-  for the whole `Ot6ElemAddTbl` automatically.
+`make -j10 smoke` is still the fast falsification loop (~80s).
 
 ## Open work, in the order I would take it
 
-1. **#25 — leg fixtures on battery anchors, plus the ninja migration.** The
-   structural fix for everything above. Today cost four serial re-mints; a ROM
-   byte currently invalidates 100 sequential states. Battery saves survive ROM
-   changes (proven in #9), `mint_anchor` already exists, and `make -jN` already
-   parallelises where the graph allows — the blocker is the serial trunk. Design
-   is in `leg-fixtures.md`. The ninja part is folded in because the Makefile
-   already bypasses make's mtime model and keeps biting us.
-2. **#26 — tests hardcoding absolute `/Users/mtklein/ot6` paths.** Small, and a
-   prerequisite for #25 working across parallel worktrees.
-3. **#10 — save points.** Now safe to add: #18 fixed a bug where saving could
-   silently eat a slot. Also supplies #25's leg boundaries.
-4. **#11 next band · #27 esper menu copy · #13 write down the destructive-bug
-   policy that #18 already applied ahead of · #20 remaining doc/data
-   mismatches.**
+1. **Cut anchors B–F and convert the legs** — the remaining #25 payoff.
+   `design/save-points-vector.md` §5 maps the band onto six boundaries; each
+   needs a gen that drives to the save point, saves through the real UI, and
+   exports the battery payload (the `gen_post_opera_anchor` pattern). In the
+   graph, converting a leg is `prev=` → `anchor=` on one line. Every anchor
+   must be minted through the game's own save routine, never synthesised.
+2. **#29 — the `$021f` context audit.** `Ot6CodexActive` trusts a cell that is
+   `wSaveSlotToLoad` only while the menu owns the `$0200` region. Measurements
+   and scope are in the issue; the codex battle path is the part that matters.
+3. **#15's release-gate residue**: save/reset/load validation at the new 273
+   save point, the v0.6 human playthrough, and release notes.
+4. **#28 — Sketch** is v0.8's hard gate; dormant until Thamasa work starts.
 
-## Outstanding for the owner
+## The things that will cost you a day
 
-**v0.5 has not been playtested.** That was a deliberate owner decision at the
-time, not an oversight. `playtest-v0.5.md` has the focused questions. Two
-releases of unvalidated frontier should not stack.
+**1. Module WRAM overlays lie to you twice now.** `$7E3BF4` is the party
+battle-HP table only while the battle module owns that RAM, and `$021f` is
+`wSaveSlotToLoad` only while the menu module owns the `$0200` region — the
+world module block-restores its own variable there after any menu closes,
+with no CPU write a callback would catch (it is invisible to Mesen write
+callbacks; measure with samples, not watchpoints). Before trusting any
+`$02xx`/`$3xxx` WRAM read, ask which module owns it at that frame. Witness
+persistent facts through SRAM (`$307ff0`, the codex pages) instead.
+
+**2. NPC record order is NPC identity.** Event scripts address NPCs as
+{map, index-within-block}, so a record inserted ahead of an existing NPC
+renumbers everything after it — the first 273 save-sparkle attempt shifted
+NUMBER_024 to index 1 and the post-battle cleanup cleared the sparkle instead.
+Append, never insert. The mint caught it two legs downstream, which is the
+system working.
+
+**3. `navTo` lands at rest (#22); a tile that takes the party away is entered
+with a held press, not a `navTo` whose goal it is.** Generators relying on the
+old mid-glide handoff still surface occasionally.
+
+**4. `event_main.asm` is a dump of separately-addressed scripts.** Adjacency
+means nothing. Party composition is runtime state: read `$1850` at a fixture.
+`bosses-wob.md` is authoritative on party composition.
+
+**5. `LoadMagicProp` fills one shared buffer** — freeze the rest of the party
+when measuring an ability, or an ally's action mid-window reads as "the summon
+was free". Documented at `freezeOthers`.
+
+## Canonical facts you should not re-derive
+
+- **The fixture party is LOCKE, CELES, SABIN, EDGAR** (four through the
+  Facility, three once the tube room takes Celes), measured per doorstep in
+  `wob-route.md`; the post-opera anchor's entry contract counts the `$1850`
+  assignments so a chain that loses members fails loudly (#21).
+- **Map 323 is Albrook; Vector is 242 and 253.**
+- **The item equip mask is `item_prop_en.dat` offset `+$01`, 16-bit, bit N =
+  actor N** (`research/data-formats.md`). Byte 0 always looks like a mask and
+  always claims Terra.
+- **`monster_prop.dat` `+23` is absorb, `+25` is weak** — `check_boss_rows.py`
+  and `check_break_reach.py` now enforce doc/data agreement in `make test`.
+- **The `event_triggers` fixed block has room for 2 more triggers game-wide**
+  (was 3; the 273 save point spent one). The deferred Opera-band save list
+  needs segment relocation first (`design/save-points-vector.md` §1).
 
 ## Working agreements
 
-- Delegated work gets [agent-brief.md](agent-brief.md) included by reference —
-  standing rules do not depend on whoever writes the dispatch remembering them.
+- Delegated work gets [agent-brief.md](agent-brief.md) included by reference.
 - Agents report follow-ups; the dispatcher files issues. `spawn_task` is denied
-  in `.claude/settings.json` so subagents cannot triage at the owner directly.
-- Parallel work goes in separate git worktrees with disjoint file ownership.
-  `make rom` writes one shared `build/ot6.sfc`, so two agents in one tree
-  collide. Worktrees need the base ROM copied in — it is gitignored.
+  in `.claude/settings.json`.
+- Parallel work goes in separate git worktrees with disjoint file ownership;
+  `tools/worktree-setup.sh` seeds the ROM, emulator links, states, and the
+  ninja build log.
 - Commit messages here run long and explain the why, including what was ruled
   out. Match that.
 
 ## The failure mode worth knowing about
 
 Nearly every wrong turn in this project has been the same one: **reasoning
-substituted for looking, when looking was cheap.** A design doc in this repo held
-the right answer while it was being derived wrongly from source. A screenshot's
-byte count contradicted the very note being cited for it. A variable was
-"isolated" against a tree carrying two other changes.
-
-The rules in CONTRIBUTING under *"your job is not to write correct code, it is to
-prove the code is correct"* exist because of specific incidents, not as
-aspiration. `make smoke` exists to make looking cheap enough that it is the
-default.
+substituted for looking, when looking was cheap.** Today's additions to the
+case file: a test that passed for months because a module-overlay variable
+coincidentally held the expected value (`codex_saveas`), and a save-point
+insert whose bug was caught not by review but by the mint two legs
+downstream. The rules in CONTRIBUTING under *"your job is not to write correct
+code, it is to prove the code is correct"* exist because of specific
+incidents. `make smoke` and the ninja graph exist to make looking cheap enough
+that it is the default.
