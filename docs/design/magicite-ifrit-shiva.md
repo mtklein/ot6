@@ -5,6 +5,83 @@ This is a **design pass**: no assembly, no data edits. Every table edit this
 document asks for is listed literally in §10 so the build pass is transcription,
 not interpretation.
 
+---
+
+## BUILD RECORD (2026-07-27) — §10 is shipped
+
+Everything §10 lists is in the ROM. What was built, and what the build learned:
+
+| §10 item | where it landed |
+|---|---|
+| Ifrit's row: Fire + Drain, Fire 2 dropped | `ff6/src/menu/genju_prop.asm:85-100` |
+| Shiva's row: Ice + Osmose + Shell; Ice 2 / Rasp / Cure dropped | `ff6/src/menu/genju_prop.asm:102-116` |
+| Ifrit `OT6_SM_VIGOR \| 5`, Shiva `OT6_SM_MAGPWR \| 4` | `ff6/src/battle/ot6_progression.asm:396-427` |
+| Osmose `$29` +$05: 1 → 8; Diamond Dust `$38` +$06: 52 → 34 and +$0c: `$00` → `$04` | `ff6/src/battle/battle_main.asm:6907-7013` |
+
+§11's test table is built across two files. `tools/tests/battle_esperstats.lua`
+gains IFRIT and SHIVA scenarios (rows 1–4) and now reads a fourth stat, vigor,
+which also strengthens the four Zozo scenarios. `tools/tests/battle_magicite.lua`
+is new and covers the rest (rows 5–9): the published MP prices, the 7-MP Osmose
+boundary, a real menu-driven Osmose cast, a real menu-driven Diamond Dust with
+its immunity control, and the `$3f2e` once-per-battle latch A/B. Row 10 —
+boosted Inferno multiplies, boosted Fire does not — was **not** added: the fold
+half is already covered by `battle_fold.lua`/`battle_subjob.lua` scenario C, and
+the summon half needs a boosted summon on a fixture that grants BP, which is
+Beat B work.
+
+**The three `.dat` bytes are an assembly splice, not an edited binary.**
+`magic_prop_en.dat` stays byte-identical to the FF3us 1.0 base; `MagicProp` is
+now four `.incbin` runs with three named `.byte` overrides between them, each
+carrying the vanilla value it replaces and the argument for replacing it, and a
+`.assert` that the pieces still reassemble to 3584 bytes. A byte changed inside
+the blob would have been invisible in a diff and unattributable in review — and
+the Osmose reprice in particular is an explicit exception to a house rule
+(§12.10), which is the last thing that should be silent. `mp-economy.md` now
+carries the matching amendment beside the rule itself.
+
+**§5.3's UNVERIFIED item is settled, and the design's reading was right.** An
+unblockable (+$04 bit `$20`, hit 0) damage spell *does* apply its status bytes
+without a roll — `CheckHit`'s multi-target arm branches on `bit #$20` straight
+to the carry-clear exit — *and* per-monster immunity is still consulted, because
+`MagicStatusEffect` only stages the rider into `$3de8` and `InitStatusVars` ANDs
+that against `$3330` before anything is set. Both halves are measured, not just
+read: `tools/tests/battle_magicite.lua` fires a real menu-driven Diamond Dust at
+two guards, one with the Slow bit set in `$3330` and one with it cleared, and
+gets Slow on the first and not the second from the same cast. **Siren's
+blockable-rider fallback is not needed.**
+
+**§6's second UNVERIFIED item is only half settled.** Measured on the shipped
+ROM at 30 MP against a 500 MP pool: caster 30 → 22 → 63, target 1000 → 959. The
+credit (41) equals the amount actually removed — but the pool was never the
+limiting factor, so this does *not* answer whether a caster draining a nearly
+empty enemy is credited the computed amount or the smaller real one. Still open;
+still only changes the size of §6's problem, not its existence.
+
+**A harness fact that will bite the next person who measures a spell here.**
+`LoadMagicProp` fills one shared property buffer (`$11a0..$11ad`), so on the
+Magitek intro mint an ally's beam resolving inside your caster's action window
+overwrites the record mid-resolution. Uninstrumented, that reads as "the summon
+charged 0 MP, applied no status, and scratched one guard" — an artifact of the
+interleave, not the spell. Freezing the rest of the party first turns the same
+cast into 27 MP charged, both guards hit, Slow staged on both. The test does
+this deliberately and says why.
+
+**Not built, deliberately: §8.2's esper-menu copy.** The detail screen still
+draws vanilla learn-% and still blanks the while-equipped line, exactly as §8.1
+and §12.9 describe. It is C3 menu-bank work of its own size, it is the one item
+in §10 that is *not* transcription, and it needs visual verification this pass
+could not run. It remains the most player-visible gap in the release: Ifrit's
++5 vigor is currently a secret. §8.2's zero-code fallback (say it in the
+acquisition dialogue) is also not taken — that is a Beat B event-text change
+riding fixtures this pass could not mint.
+
+**Open questions §13 answered by building:** Q1 reprice — **yes, 8 MP**, with
+the house rule amended in `mp-economy.md` rather than bent. Q2 power cut —
+**taken as written**, 52 → 34. Q3 Ifrit's third slot — **two spells**, no Bserk.
+Q4 divine latches — **unchanged**, the summon still rides vanilla's `$3f2e` and
+kit divines still ride `$3ecb`; nothing was fused. Q5–Q8 are untouched: they are
+other issues' work.
+
 **Canon boundary (issue #16).** The shipped **while-equipped** spell/stat model
 is the v0.6 baseline: equip grants the spell list live, the stat mod exists only
 while the stone is worn, nothing is learned, the summon is the once-per-battle

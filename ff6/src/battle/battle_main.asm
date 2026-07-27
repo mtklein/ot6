@@ -6903,9 +6903,114 @@ LoadMagicProp:
 
 .export MagicProp
 
+; ------------------------------------------------------------------------------
+; OT6 v0.6 -- MagicProp is the vanilla blob PLUS three named byte overrides.
+;
+; WHY THE SPLICE AND NOT AN EDITED .dat.  magic_prop_en.dat is 256 fixed 14-byte
+; records with no source form; a byte changed inside it is invisible in a diff,
+; unattributable in review, and indistinguishable from bit-rot.  Every OT6 change
+; to it therefore lives HERE, named, with the vanilla value it replaces and the
+; reason, and the .dat stays byte-identical to the FF3us 1.0 base.  Splitting the
+; incbin costs nothing at runtime -- the linker emits the same 3584 bytes -- and
+; the sum of the pieces is asserted below, so a mis-typed offset is a build
+; error rather than a silently corrupted table.
+;
+; Record layout (14 bytes, loaded to $11a0..$11ad by LoadMagicProp above):
+;   +$00 targeting  +$01 element  +$02..+$04 flags  +$05 MP  +$06 power
+;   +$07 flags      +$08 hit      +$09 special      +$0a..+$0d status 1/2/3/4
+; ------------------------------------------------------------------------------
+
+MAGIC_PROP_REC   = 14
+MAGIC_PROP_COUNT = 256
+
+; ---- override 1: Osmose ($29) MP cost, 1 -> 8 -------------------------------
+; docs/design/magicite-ifrit-shiva.md §6.  Shiva grants Osmose, and Osmose is
+; the party's only MP income at a release where OT6_MP_COSTS made EVERY verb but
+; Fight cost MP.  Vanilla priced it at 1 MP in a game where four characters
+; spent MP at all.  Under OT6 that 1 MP buys a FULL REFILL: Facility boss MP
+; pools run 447-810 (monster_prop.dat +$0a) against party pools of 40-60, and
+; magic damage at these levels computes for several hundred, so one cast is many
+; times the caster's entire bar.  A 1-MP full refill is not a spell, it is an
+; off switch for the currency v0.5 just turned on.
+;
+; THIS IS AN EXPLICIT, ARGUED EXCEPTION to mp-economy.md's house rule "magic
+; keeps its vanilla MP costs".  It is recorded as an exception rather than taken
+; quietly: the rule was written 2026-07-17, BEFORE costs went live and before
+; the "only Fight is free" absolute, and the ground moved under it.  8 MP keeps
+; Osmose strongly net-positive (still a refill), keeps it castable on a nearly
+; empty pool, and stops it from being free.  It applies globally, so ZoneSeek
+; ($12, genju_prop.asm) inherits it -- correctly, it is the same spell.
+; Rejected: dropping Osmose from Shiva (loses her whole identity at the exact
+; release the MP economy went live); gating Ot6BoostDmg off MP-targeting spells
+; (worth doing as well, but it does not touch the unboosted case, which IS the
+; problem); capping the drain at the caster's missing MP (new battle code, and
+; it makes the spell unreadable).
+OSMOSE_MP_OT6      = 8
+OSMOSE_MP_VANILLA  = 1                  ; the byte this replaces
+
+; ---- overrides 2 & 3: Diamond Dust ($38), Shiva's summon --------------------
+; docs/design/magicite-ifrit-shiva.md §5.3.  Vanilla $38 is a straight MIRROR of
+; Ifrit's Inferno ($37): same targeting $6e, same unblockable flag, power 52 vs
+; 51, 27 MP vs 26.  Two apex moments that are the same moment in two colours is
+; the exact failure this pair's redesign exists to avoid, so Diamond Dust is
+; re-authored as the TEMPO divine while Inferno stays the damage divine:
+;   power  52 -> 34   (still a real nuke at a 3-BP x8, just not THE nuke)
+;   status3 $00 -> STATUS3::SLOW
+; Slow is element-independent, which is the point: it is worth something against
+; the machines that shrug off ice, and it buys the party actions inside every
+; telegraph fuse.  Decoded from monster_prop.dat +$16 (STATUS3 immunities):
+; Number 128 $10, both Cranes $10, both blades $00 -> Slow LANDS; Number 024
+; $14 -> Slow is BLOCKED, which is correct, that boss's contract is that classes
+; are the handhold.
+;
+; The application path was READ, not assumed (the design flagged it UNVERIFIED
+; and load-bearing).  $38's +$04 carries $20, so CheckHit's multi-target arm
+; (`bit #$20` at @22a1) branches straight to the carry-clear exit @22e8 -- an
+; unconditional hit, no roll.  The per-target loop at @3440 then calls
+; MagicStatusEffect unconditionally, which stages $11ac into $3de8 ("status 3/4
+; to set"), and InitStatusVars masks THAT against $3330 ("blocked status 3/4",
+; the per-monster immunity) before it is applied.  So an unblockable damage
+; spell does apply its status bytes without a roll, AND per-monster immunity is
+; still consulted -- both halves the design needed.  battle_magicite.lua's
+; DDUST scenario is the behavioural proof.
+;
+; Boost canon is unaffected: Diamond Dust is a damage verb, so Ot6BoostDmg
+; multiplies its damage and does not touch the rider.  Because the record is
+; already unblockable there is no chance axis for boost to guarantee.
+DDUST_POWER_OT6      = 34
+DDUST_POWER_VANILLA  = 52               ; the byte this replaces
+DDUST_STATUS3_OT6    = STATUS3::SLOW
+; ------------------------------------------------------------------------------
+
 ; c4/6ac0
+; byte offsets of the three overridden bytes within the blob
+OSMOSE_MP_AT       = ATTACK::OSMOSE * MAGIC_PROP_REC + 5
+DDUST_POWER_AT     = ATTACK::SHIVA  * MAGIC_PROP_REC + 6
+DDUST_STATUS3_AT   = ATTACK::SHIVA  * MAGIC_PROP_REC + 12
+MAGIC_PROP_END     = MAGIC_PROP_COUNT * MAGIC_PROP_REC
+
+.define magic_prop_dat .sprintf("magic_prop_%s.dat", LANG_SUFFIX)
+
 MagicProp:
-        incbin_lang "magic_prop_%s.dat"
+        .incbin magic_prop_dat, 0, OSMOSE_MP_AT
+        .byte   OSMOSE_MP_OT6                           ; $29 +$05 (was 1)
+        .incbin magic_prop_dat, OSMOSE_MP_AT + 1, DDUST_POWER_AT - OSMOSE_MP_AT - 1
+        .byte   DDUST_POWER_OT6                         ; $38 +$06 (was 52)
+        .incbin magic_prop_dat, DDUST_POWER_AT + 1, DDUST_STATUS3_AT - DDUST_POWER_AT - 1
+        .byte   DDUST_STATUS3_OT6                       ; $38 +$0c (was $00)
+        .incbin magic_prop_dat, DDUST_STATUS3_AT + 1, MAGIC_PROP_END - DDUST_STATUS3_AT - 1
+
+; The splice must reassemble to the vanilla LENGTH.  This catches the dangerous
+; half of a hand-spliced binary -- a wrong .incbin COUNT, which shifts every
+; record past the splice and silently re-points the whole spell table.  It does
+; NOT catch a wrong offset that happens to preserve the total (that only puts a
+; byte in the wrong record); verified by deliberately mis-offsetting one splice
+; point, 2026-07-27.  The three byte POSITIONS are pinned instead by
+; tools/tests/battle_magicite.lua, which reads records $29/$37/$38 back out of
+; the built ROM through the MagicProp symbol -- including $37 unchanged as the
+; control.  Length here, positions there; between them a mis-typed splice is a
+; failure rather than a mystery.
+.assert * - MagicProp = MAGIC_PROP_END, error, "MagicProp splice changed the table length"
 
 .popseg
 

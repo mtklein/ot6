@@ -54,7 +54,30 @@ not used.
 
 Already costed, unchanged: **Magic**, **Lore**, and **summons**
 keep their vanilla MP costs (house rule); summons additionally
-stay once per battle (DESIGN.md). Strago's kit is Lores, so it
+stay once per battle (DESIGN.md).
+
+> **AMENDMENT (v0.6, 2026-07-27) — one named exception to the
+> vanilla-MP-costs house rule: Osmose `$29`, 1 MP → 8 MP.**
+> Recorded here rather than left implicit, because
+> magicite-ifrit-shiva.md §12.10 is right that this rule has to
+> be *amended*, not quietly bent. The rule was written on
+> 2026-07-17, **before** `OT6_MP_COSTS` went live and before the
+> "only Fight is free" absolute of 2026-07-22 — it priced magic
+> for a game in which four characters spent MP at all. Under OT6
+> every verb does, and vanilla's 1 MP Osmose is not a spell but
+> an off switch for the currency v0.5 had just turned on:
+> Magitek Research Facility boss pools run 447–810
+> (`monster_prop.dat` +$0a) against party pools of 40–60, and one
+> cast computes for many times the caster's whole bar. 8 MP keeps
+> it strongly net-positive — measured on the shipped ROM at 30 MP
+> against a 500 MP pool: 30 → 22 → 63, so a +33 net refill for 8
+> — while stopping it being free, and it stays castable on a
+> nearly empty pool. It applies globally, so ZoneSeek inherits it,
+> correctly: it is the same spell. The byte lives in
+> `battle_main.asm`'s `MagicProp` splice with its argument beside
+> it; `tools/tests/battle_magicite.lua` pins both the price and
+> the 7-MP boundary that only 8 can produce. **No other magic
+> price is touched, and the rule otherwise stands.** Strago's kit is Lores, so it
 is already priced — his "free signature" Aqua Breath (kits.md)
 is free at join, and costs MP like any lore. **Divines** cost
 MP in addition to their gates — broken target, the 5-BP bank,
@@ -201,6 +224,10 @@ only a few characters. Osmose (Shiva) and Rasp (Ramuh) sit in
 the esper pool (magicite.md), and reaching one is a deliberate
 perk: this character can manage their own resources. The M6
 pass still watches Osmose-cycling next to Facet + Rune Eater.
+**Superseded in part (v0.6):** that ruling predates live MP
+costs, and Osmose's *price* has since been amended to 8 MP —
+see the amendment box above. The verb itself still stays; what
+changed is that it is no longer nearly free.
 
 ## Open questions for the driver
 

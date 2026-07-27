@@ -384,14 +384,47 @@ OT6_SM_MAGPWR = $40             ; -> $11a0 buffer ($3b41)
 .endproc
 
 ; Ot6EsperStatTbl -- one packed byte per esper index (GenjuProp order), read by
-; Ot6EsperStatMod while that esper is worn.  Only the four Zozo espers (the v0.4
-; playable frontier) are authored; the rest are $00 (no mod), a data-append for
-; v0.5 exactly like their spell lists (genju_prop.asm).  Magnitudes are M6
-; placeholders picked to be felt but not swingy (~10% of an early base stat).
+; Ot6EsperStatMod while that esper is worn.  Authored so far: the four Zozo
+; espers (v0.4) plus Ifrit and Shiva, the two the Magitek Research Facility pays
+; out (v0.6, docs/design/magicite-ifrit-shiva.md).  The rest are $00 (no mod), a
+; data-append exactly like their spell lists (genju_prop.asm).  Magnitudes are
+; picked to be felt but not swingy (~10-16% of an early base stat) on a two-tier
+; ladder the player can read: FIELD stones found on a floor are 2-3, BOSS stones
+; fought for are 4-5.  M6 owns the final numbers.
 Ot6EsperStatTbl:
         .byte   OT6_SM_STAM   | 3       ;  0 ramuh    +3 stamina (canon; vanilla STAMINA_1)
-        .byte   OT6_SM_NONE             ;  1 ifrit
-        .byte   OT6_SM_NONE             ;  2 shiva
+        .byte   OT6_SM_VIGOR  | 5       ;  1 ifrit    +5 vigor -- the ONLY vigor
+                                        ;    stone (nobody else claims the
+                                        ;    selector), and the first BOSS-tier
+                                        ;    magnitude: field stones picked off a
+                                        ;    Zozo floor are 2-3, fought-for stones
+                                        ;    are 4-5.  Base vigor is 31-47 at this
+                                        ;    point and barely moves all game (M5
+                                        ;    deleted the per-level esper bonuses),
+                                        ;    so +5 is ~11-16%.  Vanilla doubles
+                                        ;    vigor into $3b2c, so the effective
+                                        ;    battle bump is +10.  It is the right
+                                        ;    reward for the Magitek Research
+                                        ;    Facility, where every boss is
+                                        ;    class-breakable and neither of this
+                                        ;    pair's elements is a key.
+        .byte   OT6_SM_MAGPWR | 4       ;  2 shiva    +4 mag.pwr -- boss tier, one
+                                        ;    step over Kirin/Stray's +3.  Base
+                                        ;    mag.pwr is 25-39, so ~10-16%.  Two of
+                                        ;    her three spells scale off it.
+                                        ;    COMPROMISE (magicite-ifrit-shiva.md
+                                        ;    §5.2, §12.1): the design wants a
+                                        ;    TWO-SIDED mod -- Ifrit +vigor/-magpwr,
+                                        ;    Shiva +magpwr/-vigor -- so the pair
+                                        ;    reads as opposed specialisations.
+                                        ;    This table cannot say it: one
+                                        ;    selector, one UNSIGNED 4-bit
+                                        ;    magnitude (see the encoding above).
+                                        ;    Widening it to two bytes with a
+                                        ;    signed magnitude is the fix; it is a
+                                        ;    change to shipped machinery and to
+                                        ;    battle_esperstats.lua, so it is not
+                                        ;    made here.
         .byte   OT6_SM_SPEED  | 2       ;  3 siren    +2 speed (tempo/control caster)
         .byte   OT6_SM_NONE             ;  4 terrato
         .byte   OT6_SM_NONE             ;  5 shoat

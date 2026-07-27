@@ -1,4 +1,4 @@
--- @suite
+-- @suite slow
 -- battle_esperstats.lua -- M5 espers-as-sub-jobs, the WHILE-EQUIPPED STAT BOOST
 -- (the owner's fork-4 pick) plus a per-esper kit confirmation for the four Zozo
 -- espers.  Companion to battle_subjob.lua, which proved the additive spell GRANT
@@ -24,14 +24,36 @@
 -- asserts every one of them absent (a clean control); any that a party member
 -- knew innately would fail there loudly instead of masking a broken grant.
 --
--- SCENARIOS (each an independent STATE reload; Ramuh/Siren/Kirin/Stray poke char
+-- v0.6 adds the two magicite the Magitek Research Facility pays out
+-- (docs/design/magicite-ifrit-shiva.md, issue #16).  They are the first BOSS-tier
+-- stat magnitudes (4-5 against the Zozo field stones' 2-3) and Ifrit is the first
+-- esper to claim the VIGOR selector, so this file now reads the fourth stat too:
+-- $3b2c, which vanilla stores as vigor*2 (battle_main.asm:3857 "vigor * 2"), so
+-- Ifrit's authored +5 must show up here as +10.  Adding vigor to the flatness
+-- check also strengthens the four older scenarios: each now proves its selector
+-- left THREE other stats alone rather than two.
+--
+-- SCENARIOS (each an independent STATE reload; every esper scenario pokes char
 -- 0's equipped esper $161e before driving in, exactly as battle_subjob does):
---   BASE  no esper: record Terra's stamina/mag.pwr/speed + the innate union;
---                   assert all grant signatures + CURE_2 absent (controls).
+--   BASE  no esper: record Terra's stamina/mag.pwr/speed/vigor + the innate
+--                   union; assert all grant signatures + CURE_2 absent (controls).
 --   RAMUH esper 0  stamina +3; grants Bolt/Rasp.
 --   SIREN esper 3  speed  +2; grants Sleep/Mute/Slow(base).
 --   KIRIN esper 17 mag.pwr +3; grants Cure(base)/Regen/Antdot, and NOT Cure2.
 --   STRAY esper 8  mag.pwr +3; grants Muddle/Imp/Float (none in a fold family).
+--   IFRIT esper 1  vigor +5 (+10 doubled); grants Fire(base)/Drain, and NOT
+--                  Fire2 -- the dead pre-folded tier the vanilla row carried.
+--   SHIVA esper 2  mag.pwr +4; grants Ice(base)/Osmose/Shell, and NOT Ice2
+--                  (dead pre-folded tier) and NOT Rasp (left to Ramuh).
+--
+-- A NOTE ON WHAT CANNOT BE A CONTROL HERE.  Terra's natural magic is Cure at L1
+-- and Fire at L3 (event.asm NaturalMagic), and this fixture is the Narshe intro,
+-- so she knows both innately.  "Shiva does not grant Cure" and "Ifrit's Fire is
+-- the grant's doing" are therefore NOT assertable on this fixture -- BASE would
+-- see them either way.  Both stones' grants are proved by signatures BASE first
+-- shows absent (Drain, Ice, Osmose, Shell), and their deletions by the two that
+-- are genuinely absent (Fire2, Ice2, Rasp).  Said out loud rather than quietly
+-- omitted, per CONTRIBUTING's quiet-test rule.
 local H = dofile("/Users/mtklein/ot6/tools/tests/lib/ot6.lua")
 local STATE = "/Users/mtklein/ot6/build/states/battle_doorstep.mss.lua"
 
@@ -40,21 +62,35 @@ local BOLT, RASP           = 0x02, 0x1a
 local SLEEP, MUTE, SLOW    = 0x1d, 0x1b, 0x19
 local MUDDLE, IMP, FLOAT   = 0x1e, 0x23, 0x22
 local CURE, CURE2, REGEN, ANTDOT = 0x2d, 0x2e, 0x34, 0x32
+local FIRE, FIRE2, DRAIN   = 0x00, 0x05, 0x04
+local ICE, ICE2, OSMOSE, SHELL = 0x01, 0x06, 0x29, 0x25
 
 -- esper indices (GenjuProp order)
 local RAMUH, SIREN, STRAY, KIRIN = 0x00, 0x03, 0x08, 0x11
+local IFRIT, SHIVA = 0x01, 0x02
 
 local ESPER0 = 0x161e            -- char 0 equipped esper (field record offset 0)
 local LIST0  = 0x208e            -- compacted master Magic list, 4-byte records
 -- battle-side effective stat copies, stride-2 by battle slot (UpdateEquipBattle
--- stores each at base + slot*2; matches battle_subjob's $3c08/$3e9c reads)
-local STAM, MAGPWR, SPEED = 0x3b40, 0x3b41, 0x3b19
+-- stores each at base + slot*2; matches battle_subjob's $3c08/$3e9c reads).
+-- VIGOR is stored DOUBLED ($3b2c, "vigor * 2" -- battle_main.asm:3857), so a
+-- +5 vigor esper reads +10 here.
+local STAM, MAGPWR, SPEED, VIGOR = 0x3b40, 0x3b41, 0x3b19, 0x3b2c
 
 local function terraSlot()
   local t = 0
   for s = 0, 3 do if H.readByte(0x3ed8 + s * 2) == 0 then t = s end end
   return t
 end
+-- CAUTION (the collision battle_subjob names): list record 0 is the ESPER row,
+-- and its id byte holds the ESPER INDEX, not a spell id (ValidateSpellList
+-- writes it there; UpdateEnabledMagic reads its enable flag at +1).  Sweeping
+-- n=0 into the same set therefore injects one bogus "spell id" per scenario --
+-- Ifrit(1) looks like Ice, Shiva(2) like Bolt, Kirin(17) like Quartr.  None of
+-- those collide with a signature asserted below, which is checked, not lucky:
+-- Ifrit asserts Fire/Drain/not-Fire2, Shiva asserts Ice/Osmose/Shell/not-Ice2/
+-- not-Rasp.  A future esper whose index equals a signature id must not use this
+-- helper for that signature.
 local function unionSet()
   local set = {}
   for n = 0, 78 do
@@ -102,10 +138,11 @@ local function driveSteps(tag, esper)
       stam  = H.readByte(STAM + t * 2),
       mag   = H.readByte(MAGPWR + t * 2),
       spd   = H.readByte(SPEED + t * 2),
+      vig   = H.readByte(VIGOR + t * 2),
       union = unionSet(),
     }
-    H.log(string.format("[%s] slot=%d stam=%d mag=%d spd=%d union#=%d",
-      tag, t, R[tag].stam, R[tag].mag, R[tag].spd, setSize(R[tag].union)))
+    H.log(string.format("[%s] slot=%d stam=%d mag=%d spd=%d vig*2=%d union#=%d",
+      tag, t, R[tag].stam, R[tag].mag, R[tag].spd, R[tag].vig, setSize(R[tag].union)))
   end)
   return steps
 end
@@ -121,6 +158,9 @@ local function checkBase()
       { BOLT, "Bolt" }, { RASP, "Rasp" }, { SLEEP, "Sleep" }, { MUTE, "Mute" },
       { SLOW, "Slow" }, { REGEN, "Regen" }, { ANTDOT, "Antidote" },
       { MUDDLE, "Muddle" }, { IMP, "Imp" }, { FLOAT, "Float" }, { CURE2, "Cure2" },
+      -- v0.6: Ifrit/Shiva signatures + the two pre-folded tiers their rows drop
+      { DRAIN, "Drain" }, { ICE, "Ice" }, { OSMOSE, "Osmose" }, { SHELL, "Shell" },
+      { FIRE2, "Fire2" }, { ICE2, "Ice2" },
     }) do
       H.assertEq(has(b.union, s[1]), false, "[base] " .. s[2] .. " innately absent (clean control)")
     end
@@ -129,14 +169,14 @@ end
 local function checkEsper(tag, stat, delta, grants, absents)
   return H.call(function()
     local b, r = R.base, R[tag]
-    -- the selected stat bumps by exactly delta; the other two stay flat, which
+    -- the selected stat bumps by exactly delta; the other THREE stay flat, which
     -- proves the selector decode touched only its target
-    local pairs3 = { stam = r.stam, mag = r.mag, spd = r.spd }
-    local base3  = { stam = b.stam, mag = b.mag, spd = b.spd }
-    for k, v in pairs(pairs3) do
-      local want = base3[k] + (k == stat and delta or 0)
+    local now  = { stam = r.stam, mag = r.mag, spd = r.spd, vig = r.vig }
+    local was  = { stam = b.stam, mag = b.mag, spd = b.spd, vig = b.vig }
+    for k, v in pairs(now) do
+      local want = was[k] + (k == stat and delta or 0)
       H.assertEq(v, want, string.format("[%s] %s %d -> %d (want %+d on %s)",
-        tag, k, base3[k], v, (k == stat and delta or 0), k))
+        tag, k, was[k], v, (k == stat and delta or 0), k))
     end
     for _, g in ipairs(grants) do
       H.assertEq(has(r.union, g[1]), true, "[" .. tag .. "] grants " .. g[2])
@@ -164,6 +204,20 @@ add({ checkEsper("kirin", "mag", 3,
 add(driveSteps("stray", STRAY))
 add({ checkEsper("stray", "mag", 3,
   { { MUDDLE, "Muddle" }, { IMP, "Imp" }, { FLOAT, "Float" } }) })
+-- v0.6 boss stones.  Ifrit is the only vigor esper; the +5 reads as +10 because
+-- $3b2c is the doubled copy.  Drain is the grant proof (Terra learns it at L12,
+-- so BASE has it absent); Fire is asserted present but is innate here, so it is
+-- corroboration, not proof.  Fire2 absent is the fold-correctness deletion.
+add(driveSteps("ifrit", IFRIT))
+add({ checkEsper("ifrit", "vig", 10,
+  { { FIRE, "Fire (base tier)" }, { DRAIN, "Drain" } },
+  { { FIRE2, "Fire2 (pre-folded tier)" } }) })
+-- Shiva: three grants, all three absent at BASE, so all three are proof.  Ice2
+-- is the dead-tier deletion; Rasp absent is the "left to Ramuh" deletion.
+add(driveSteps("shiva", SHIVA))
+add({ checkEsper("shiva", "mag", 4,
+  { { ICE, "Ice (base tier)" }, { OSMOSE, "Osmose" }, { SHELL, "Shell" } },
+  { { ICE2, "Ice2 (pre-folded tier)" }, { RASP, "Rasp (Ramuh's)" } }) })
 add({ H.call(function() H.log("[esperstats] all scenarios passed") end) })
 
-H.run({ maxFrames = 220000 }, all)
+H.run({ maxFrames = 320000 }, all)   -- 7 scenarios, each a full state reload + drive-in

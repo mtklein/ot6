@@ -82,11 +82,38 @@ GenjuProp:
 ; 0: ramuh -- M5 proof esper: base-tier Bolt (folds) + Rasp (MP attack)
 make_genju_prop {BOLT, 0}, {RASP, 0}, {}, {}, {}
 
-; 1: ifrit
-make_genju_prop {FIRE, 0}, {FIRE_2, 0}, {DRAIN, 0}, {}, {}
+; 1: ifrit -- "the Furnace" (v0.6, magicite-ifrit-shiva.md §4).  The FIGHTER's
+;   stone: weight, not an element button.  BASE-TIER Fire (folds to Fire2/Fire3
+;   under boost via Ot6FoldTbl) plus Drain, which is in no fold family and
+;   therefore correctly takes Ot6BoostDmg's x2/x4/x8 multiplier instead.  Drain
+;   is non-elemental (magic_prop_en.dat $04, +$01 = $00) and drain-flagged
+;   (+$04 bit $02), so it is the half of this kit that works on every machine in
+;   the Magitek Research Facility -- where fire is absorbed by the Right Crane
+;   and is right against exactly one trash species (§2.2, §2.5).
+;   The vanilla FIRE_2 grant is DROPPED for the Kirin reason: a pre-folded tier
+;   is a dead, un-foldable row beside the base spell, and it costs 20 MP for
+;   what the 4 MP base spell delivers under one boost.
+;   Two spells is deliberate (the Ramuh precedent) -- Ifrit's third "slot" is
+;   the +5 vigor in Ot6EsperStatTbl (ot6_progression.asm).  Bserk is the
+;   reserved third candidate, held back because it removes player control.
+;   Poison/Bio stays Edgar's authored key; Cure stays Kirin's.
+make_genju_prop {FIRE, 0}, {DRAIN, 0}, {}, {}, {}
 
-; 2: shiva
-make_genju_prop {ICE, 0}, {ICE_2, 0}, {RASP, 0}, {OSMOSE, 0}, {CURE, 0}
+; 2: shiva -- "the Rime" (v0.6, magicite-ifrit-shiva.md §5).  The CASTER's
+;   stone: economy.  Base-tier Ice (folds) + Osmose (the party's only MP income,
+;   repriced to 8 MP -- see the MagicProp override in battle_main.asm) + Shell
+;   (three of the Facility's four remaining boss fights answer to magic
+;   mitigation and nobody in the party has any; Celes's Safe is L22 and is
+;   physical).  ICE_2 dropped for the same dead-pre-folded-tier reason as
+;   Ifrit's FIRE_2.  RASP left to Ramuh so the two MP stones stay distinct
+;   (Ramuh destroys MP, Shiva steals it); CURE left to Kirin -- Shiva prevents
+;   damage, Kirin repairs it.  SLOW is deliberately NOT here: it rides her
+;   re-authored Diamond Dust divine instead (battle_main.asm MagicProp $38), so
+;   the list and the summon do not duplicate each other and Siren keeps a job.
+;   Known wart (§12.6): boosting Shell does nothing -- it is in no fold family
+;   and deals no damage, so Ot6BoostDmg has nothing to multiply.  That is a
+;   general gap in the BP economy, not a Shiva bug.
+make_genju_prop {ICE, 0}, {OSMOSE, 0}, {SHELL, 0}, {}, {}
 
 ; 3: siren
 make_genju_prop {SLEEP, 0}, {MUTE, 0}, {SLOW, 0}, {FIRE, 0}, {}

@@ -51,14 +51,27 @@ passives are the part of the job you keep.
 
 ## The WoB roster
 
+> **Ifrit and Shiva are BUILT as of v0.6 (issue #16).** Their rows below are
+> superseded by `docs/design/magicite-ifrit-shiva.md`, which is the authority,
+> and by the shipped data in `ff6/src/menu/genju_prop.asm` and
+> `Ot6EsperStatTbl` (`ff6/src/battle/ot6_progression.asm`). Three things in
+> this table turned out not to be buildable and were dropped as deliberate
+> design calls rather than omissions: the **named passives** (*Kindling*,
+> *Frostbite*) have no ROM behind them — there is no passive pool, no slots and
+> no learning meter — the **weapon permits** have no equip-side consumer
+> (`ot6_class.asm:17` is a forward-looking comment), and the **stat magnitudes**
+> in this column are placeholders from before the field/boss ladder existed
+> (field stones 2–3, boss stones 4–5). Every other row below still describes the
+> *proposed* system, not the shipped one.
+
 | Esper | Source | Spells (base) | Stat passive | Passive | Permit | Notes |
 |---|---|---|---|---|---|---|
 | Ramuh | Zozo | Bolt, Rasp | +1 magic | *Conductor*: bolt spells chip +1 | piercing | the storm-lancer job |
 | Kirin | Zozo | Cure, Regen | +1 stamina | *Mender*: heals never miss the row | — | the medic job |
 | Stray | Zozo | Muddle, Imp | +1 speed | *Alley Cat*: +5 evade | slashing (claws) | the trickster job |
 | Siren | Zozo | Mute, Sleep | +1 speed | *Lullaby*: sleepers take +50% chip | — | the controller job |
-| Ifrit | Magitek factory | Fire, Drain | +1 vigor | *Kindling*: fire spells chip +1 | slashing (claws) | the brawler-mage |
-| Shiva | Magitek factory | Ice, Osmose | +1 magic | *Frostbite*: ice chip +1 | bludgeoning (rods) | the classic |
+| Ifrit | Magitek factory | Fire, Drain | **+5 vigor (SHIPPED)** | ~~*Kindling*~~ — no passive channel exists | ~~claws~~ — none, deliberately | **"the Furnace": weight. See magicite-ifrit-shiva.md** |
+| Shiva | Magitek factory | Ice, Osmose, **Shell** | **+4 mag.pwr (SHIPPED)** | ~~*Frostbite*~~ — no passive channel exists | ~~rods~~ — none, deliberately | **"the Rime": economy. Divine re-authored to power 34 + Slow** |
 | Unicorn | Zozo (late) | Remedy, Safe | +1 stamina | *Purity*: status durations halved | — | the paladin-adjacent |
 | Maduin | Sealed Gate | Fire, Ice, Bolt | +2 magic | *Trinity*: first spell each battle +1 tier | — | Terra's inheritance: the pure mage job |
 | Shoat | Vector aftermath | Break, Doom | +1 magic | *Gorgon Eye*: Break may (25%) chip 2 | — | the executioner |
