@@ -70,15 +70,20 @@ payload names, wrong sizes, and hash mismatches before a run starts:
 
 `run.sh` installs a verified anchor by value into the invocation-private save
 folder when `OT6_SRAM_ANCHOR` is set. Mesen then takes its ordinary cold-load
-path; no Lua writes SRAM. `gen_vector_arrival.lua` drives title Continue,
-validates slot 3's story/codex contract, and steps right into Vector.
+path; no Lua writes SRAM. `gen_vector_doorstep.lua` drives title Continue,
+validates slot 3's story/codex contract, and then walks the world map to the
+Vector event trigger. (It replaces `gen_vector_arrival.lua`, which stepped
+RIGHT off the anchor into map 323 -- ALBROOK -- and named the fixture Vector;
+issue #17.)
 
 The tracked anchor was produced by `gen_post_opera_anchor.lua`: it loads the
 `blackjack` tactical fixture, settles the final arrival, crosses and exits
-Vector to normalize the world-menu state, then uses the real in-game Save UI
+ALBROOK to normalize the world-menu state (the comment there says "Vector";
+it is the map-323 gate one step east of the anchor tile), then uses the real
+in-game Save UI
 to save slot 3. `OT6_CAPTURE_SRM` captures Mesen's complete battery file only
 after emulator shutdown. Its payload and manifest are included in
-`vector_arrival`'s content freshness stamp.
+`vector_doorstep`'s content freshness stamp.
 
 To regenerate the payload deliberately:
 

@@ -919,3 +919,101 @@ Names are suggestions; the point is the split points.
 | `$02F0`-`$02FD` decode | `notes/field-ram.txt:1114-1116`; `field/event.asm:4443-4448`; `event_main.asm:30939-31010` |
 | event-battle → formation | `field/battle.asm:506-517`; `field/event.asm:1907-1935`; `battle/battle_main.asm:16494-16505` |
 | ROM/vanilla data identity | `ff6/rom/ff6-en.map:200,201,226,289,323,325` |
+
+---
+
+## 11. CORRECTIONS — measured on the minting pass, 2026-07-26
+
+The route above was driven from the post-Opera anchor to the minecart
+platform (map 272) and thirteen fixtures were minted from it.  Everything
+in §1-§5 held except the items below.  Each correction cites the fixture
+whose log measured it; all of them are in `build/states/last_run.log` at
+mint time and in the generators' own assertions.
+
+**§2 — Shiva IS in battle 70's formation (probe 1, answered).**  The recon
+decoded battle 70 as formation 439 = "species `$0109` Ifrit only", said
+"Shiva `$0108` is NOT in the formation ... she is not in *any* formation in
+the game — I swept all 576", and listed her entrance as an open question.
+Read live at the doorstep the instant the fight opens
+(`gen_ifrit_doorstep.lua`'s post-mint verification, re-asserted in
+`gen_ifrit_magicite.lua`), the formation species words `$57C0` are
+
+```
+0109 0108 0109 0108 FFFF FFFF
+```
+
+Shiva is present from the first frame.  No AI-script entrance is involved.
+Whatever the offline `battle_monsters.dat` decode was reading, it was not
+what the engine loads.
+
+**§2 — the alcove is only half sealed.**  "They sit on the two doors:
+Ifrit (3,8) is under `264 (3,5)→270` (the save room), Shiva (9,6) is under
+`264 (9,5)→269`."  Only the second holds.  Shiva at (9,6) is the tile
+directly below the (9,5) door and does make it NO-PATH; Ifrit at (3,8) is
+three tiles below (3,5) and does not — the save room is 9 steps away and
+reachable *before* the fight (`gen_ifrit_doorstep.lua`, `[doors]` log).
+
+**§8 hazard 3 — map 262's upper floor is one region, not 130 tiles.**  The
+offline model said only ~130 tiles were reachable from the factory door and
+that `(4,22)`, `(11,45)`, `(12,60)`, `(22,53)`, `(22,54)` were NO-PATH.
+Measured live from (28,8) (`gen_mrf_entry.lua`'s census), the upper floor is
+a single connected region that contains BOTH chutes and BOTH door-animation
+pairs — `(19,23)` 39 steps, `(19,25)` 41, `(21,25)` 43, `(9,22)` 44,
+`(11,16)` 32, `(5,12)` 34 — while `(11,45)`, `(10,54)`, `(6,31)`, `(21,27)`,
+`(4,22)`, `(22,53)`, `(22,54)`, `(12,60)` and `(15,60)` really are NO-PATH.
+The *conclusion* stands (the lower half is entered only through scripts);
+the tile count did not.
+
+**§8 hazard 4 — the platform hop is not on the route.**  `(4,22)`/`(9,22)`
+never have to be used: the way down is the ungated chute `_cc7771` on
+`{19,25}`, which lands the party at `{10,45}`, and from there `{11,45}`'s
+conveyor `_cc78d0` reaches `{20,45}` and `{22,53}` is 10 steps away.  The
+`$0270`/`$0271` window was measured anyway (probe 3): over 600 frames each
+switch opened **3 times for 12 frames**, i.e. a ~2% duty cycle on a ~200
+frame period.
+
+**§10 probe 4 — the ride is ~6400 frames and its six battles are exactly
+as decoded.**  From `cutscene TRAIN` to the sixth fight: battles at frames
++212, +1381, +2405, +4101, +5477, +6445, in the order Mag Roader / Mag
+Roader ×2 / Mag Roader / ×2 / ×2 / **`010B 0140 292A 013F`** — Number 128
+with both blades.  `train_script.asm`'s course decode is confirmed.
+
+**§10 probe 9 — the sneak scene's exit is exactly (57,34).**  Confirmed
+live (`gen_vector_sneak.lua`), and `(57,2)` goes from NO-PATH to a 38-step
+plan across the scene.
+
+**§10 probe 5 — the kill-bit idiom does latch battles 70 and 72.**
+`$0060`/`$0273` and `$0649` all move.  It does **not** get the party
+through battle 73; see below.
+
+**§10 probe 7 — the post-Opera roster, measured.**  `$1850+0..13` at the
+anchor reads `00 C1 00 00 00 00 49 00 00 00 00 00 00 00` with `$1A6D=1`,
+`$1EDE=$76`, `$1EDF=$88`.  So: LOCKE (`$C1`, order 0) and CELES (`$49`,
+order 1) are the whole active party, and LOCKE, CYAN, EDGAR, SABIN, CELES
+and GAU are available.  Unchanged at every doorstep down to the tube room.
+
+### The thing the recon did not predict: the party is two, not four
+
+`docs/design/bosses-wob.md` §13/§14 say "Locke, Celes + two" and §6e above
+says "Locke + Celes".  **Both are describing a party the fixture chain does
+not have.**  `event_main.asm:26287`, the Zozo departure, is
+
+```
+        char_party LOCKE, 1
+        char_party CELES, 1
+        party_menu 1, NO_RESET, {LOCKE, CELES}
+```
+
+— a four-slot menu with two characters forced and two slots free, and
+`$1EDE`/`$1EDF` say CYAN, EDGAR, SABIN and GAU are all eligible.  The v0.5
+leg that answered that menu confirmed it without adding anyone, so the
+whole v0.6 chain runs two-handed, and after the tube room takes Celes
+(`char_party CELES, 0`, :96154) it runs **one**-handed.
+
+That is what stops the minecart.  Locke enters the ride solo at 501 HP,
+loses ~70 per Mag Roader fight even with every fight kill-bitted three
+frames after `battleLoadStarted()`, reaches Number 128 on 151, and dies.
+`tools/tests/gen_n128.lua` and `tools/tests/probe_train_tail.lua` carry the
+frame-by-frame measurement and the screenshot.  The fix is a v0.5 re-mint
+(and a new post-Opera anchor), not a v0.6 route change and not a balance
+edit.

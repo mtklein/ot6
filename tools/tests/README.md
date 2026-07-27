@@ -225,9 +225,25 @@ set -- and never creates `SaveStates/`.)
   post-Opera battery anchor. It settles `blackjack.mss`, uses the real Save UI
   to write slot 3, and relies on `run.sh`'s explicit `OT6_CAPTURE_SRM` mode to
   capture Mesen's file after shutdown.
-- `gen_vector_arrival.lua` - cold boots with the verified post-Opera anchor,
+- `gen_vector_doorstep.lua` - cold boots with the verified post-Opera anchor,
   drives vanilla Continue, checks story state plus the slot-3 OT6 codex page,
-  then steps right into Vector and mints `vector_arrival`.
+  then WALKS THE WORLD to the Vector event trigger at (121,187) and mints
+  `vector_doorstep` on map 242.  Replaces `gen_vector_arrival`, which held
+  RIGHT off the anchor into map **323 = ALBROOK** and named every artifact
+  Vector (issue #17).  Vector has no entrance record at all; it is
+  `event_trigger.asm:36-37` -> `_ca5ecf` -> `load_map 242 {32,61}`, so the
+  opening leg is an on-foot world walk through a fully battle-enabled band
+  (worldGrind, not worldNavTo).  Its positive control reads the map name the
+  ENGINE would print -- the live title index `$0520`, through `MapTitlePtrs`
+  into `MapTitle` -- and requires "VECTOR"; the same read is exercised on the
+  Albrook gate first and required to say "ALBROOK", so it cannot pass by
+  returning nothing.  The rest of the v0.6 chain (`gen_vector_sneak`,
+  `gen_mrf_entry`, `gen_mrf_chute`, `gen_mrf_263`, `gen_mrf_kefka`,
+  `gen_ifrit_doorstep`, `gen_ifrit_magicite`, `gen_n024_doorstep`,
+  `gen_esper_tubes`, `gen_esper_tubes_done`, `gen_minecart_doorstep`) chains
+  off it; each generator's header documents the mechanism it had to measure.
+  `gen_n128.lua` is written but does NOT mint -- see its header and
+  `probe_train_tail.lua`.
 - `gen_edgar.lua` - THE WHOLE FIGARO CHAPTER, gate to world map: walks
   `figaro_doorstep.mss` in, buys the BioBlaster + NoiseBlaster from the
   tool merchant (the ONLY window - the merchant refuses once EDGAR or

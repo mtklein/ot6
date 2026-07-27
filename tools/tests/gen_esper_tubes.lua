@@ -1,0 +1,365 @@
+-- gen_esper_tubes.lua -- v0.6 leg 10: n024_doorstep -> battle 72 -> the
+-- {25,50} door -> map 274, the esper tube room -> parked at {10,10}
+-- FACING UP, one UP-step-plus-A-hold from the Cid/Kefka set piece.  Mints
+-- n024_won and esper_tubes_doorstep.
+--
+-- BATTLE 72 (_cc79ed, event_main.asm:95385) is `battle 72 / call _ca5ea9 /
+-- hide_obj NPC_1 / sort_obj / switch $0649=0` -- no `if_b_switch` gate at
+-- all, so the route's kill-bit idiom is enough and $0649 going to 0 is the
+-- receipt (recon probe 5).  Measured formation at the doorstep:
+-- `010A FFFF FFFF FFFF FFFF FFFF` -- Number 024 alone, as decoded.
+--
+-- THE TUBE-ROOM TRIGGER IS FACING+BUTTON GATED, and this is the second
+-- place in v0.6 where that is load bearing (the first was the Vector sneak
+-- ledge; see gen_vector_sneak.lua for the $01B0-$01B7 decode).
+--
+--   ff6/src/event/event_trigger.asm:1216   make_event_trigger {10,9}, _cc7a60
+--   ff6/src/event/event_main.asm:95456-95461
+--       _cc7a60: if_any
+--                        switch $01B0=0        ; NOT facing UP
+--                        switch $01B4=0        ; A NOT held
+--                        switch $0068=1        ; already done
+--                        goto EventReturn
+--
+-- $01B0 and $01B4 are $1EB6 bits 0 and 4 -- "party is facing up" and "the
+-- A button is down this frame" -- rewritten every event tick by
+-- UpdateCtrlFlags (field/event.asm:5415-5433).  So the scene fires only
+-- while the party STANDS on {10,9}, faces UP at the BIG_SWITCH NPC on
+-- {10,8} (npc_prop.asm:12631) and HOLDS A.  A navTo can never do that: it
+-- releases the pad between steps and never presses A on the open field
+-- (ot6_field.lua:340-351).
+--
+-- The doorstep is banked ONE TILE SOUTH of the trigger, at {10,10} already
+-- facing UP, and not on {10,9} itself.  Measured reason, sampled in this
+-- run and logged: standing on {10,9} with A released, hasControl() held
+-- for only 68 of 90 frames and eventRunning() for 22 -- _cc7a60 is
+-- re-entered every frame the party stands there, takes its early
+-- `goto EventReturn` because $01B4 is clear, and the event PC bouncing
+-- into bank $CA makes hasControl() flicker forever.  No settle predicate
+-- can hold on that tile.  gen_zozo3_clock hit the same trap on the clock
+-- tile and solved it the same way.
+local H = dofile("/Users/mtklein/ot6/tools/tests/lib/ot6.lua")
+
+local function map() return H.mapId() & 0x1ff end
+local function bright() return emu.getState()["ppu.screenBrightness"] or 0 end
+local function sw(id) return (H.readByte(0x1E80 + (id >> 3)) >> (id & 7)) & 1 end
+local function killBitAll()
+  for s = 0, 5 do
+    if H.readByte(0x3aa8 + s * 2) % 2 == 1 then
+      H.writeByte(0x3eec + s * 2, H.readByte(0x3eec + s * 2) | 0x80)
+    end
+  end
+end
+local function settled()
+  return H.hasControl() and H.tileAligned() and bright() >= 15
+     and not H.dialogWaiting() and not H.battleLoadStarted() and not H.worldMode()
+end
+
+local MAP_TITLE_PTRS, MAP_TITLE = 0x268400, 0x0EF100
+local function mapTitleHere()
+  local p = H.readRomWord(MAP_TITLE_PTRS + H.readByte(0x0520) * 2)
+  local a, s = MAP_TITLE + p, ""
+  for _ = 1, 24 do
+    local c = H.readRomByte(a)
+    if c == 0 then break end
+    if     c >= 0x20 and c <= 0x39 then s = s .. string.char(65 + c - 0x20)
+    elseif c >= 0x3A and c <= 0x53 then s = s .. string.char(97 + c - 0x3A)
+    elseif c >= 0x54 and c <= 0x5D then s = s .. string.char(48 + c - 0x54)
+    elseif c == 0x65 then s = s .. "."
+    elseif c == 0x7F then s = s .. " "
+    else s = s .. string.format("<%02X>", c) end
+    a = a + 1
+  end
+  return s
+end
+
+local CHARS = { "TERRA", "LOCKE", "CYAN", "SHADOW", "EDGAR", "SABIN",
+                "CELES", "STRAGO", "RELM", "SETZER", "MOG", "GAU",
+                "GOGO", "UMARO" }
+local function partyReport(tag)
+  local party, raw = {}, {}
+  local cur = H.readByte(0x1A6D)
+  for c = 0, 13 do
+    local b = H.readByte(0x1850 + c)
+    raw[#raw + 1] = string.format("%s=%02X", CHARS[c + 1], b)
+    if (b & 0x07) == cur and b ~= 0 then
+      local base = 0x1600 + 37 * c
+      party[#party + 1] = string.format("%s(order %d, L%d, weapon %02X)",
+        CHARS[c + 1], (b >> 3) & 3, H.readByte(base + 0x08),
+        H.readByte(base + 0x1F))
+    end
+  end
+  return string.format("[party @ %s] party#%d = %s   | $1850: %s | $1EDE=%02X $1EDF=%02X",
+    tag, cur, table.concat(party, ", "), table.concat(raw, " "),
+    H.readByte(0x1EDE), H.readByte(0x1EDF))
+end
+
+-- Exact single-tile stepping (see gen_vector_sneak.lua for the measurement).
+local DELTA = { up = { 0, -1 }, right = { 1, 0 }, down = { 0, 1 }, left = { -1, 0 } }
+local function tapWalk(tx, ty, maxFrames, what)
+  local phase, dir, n, ph, calm = 0, nil, 0, 0, 0
+  return H.driveUntil(function()
+    calm = (H.fieldX() == tx and H.fieldY() == ty and settled()) and calm + 1 or 0
+    return calm >= 16
+  end, maxFrames or 12000, {
+    H.call(function()
+      ph = (ph + 1) % 8
+      if H.battleLoadStarted() then
+        killBitAll(); H.setPad(ph < 4 and { "a" } or {}); phase = 0; return
+      end
+      if H.dialogWaiting() then
+        H.setPad(ph < 4 and { "a" } or {}); phase = 0; return
+      end
+      if phase == 0 then
+        H.setPad({})
+        if not settled() then return end
+        local p = H.bfsPath(tx, ty)
+        if not p or #p == 0 then return end
+        dir, n, phase = p[1], 0, 1
+        return
+      end
+      if phase == 1 then
+        n = n + 1
+        H.setPad({ [H.movePress(dir)] = true })
+        if n >= 8 then phase, n = 2, 0 end
+        return
+      end
+      H.setPad({})
+      n = n + 1
+      if n >= 24 then phase = 0 end
+    end),
+  }, what or string.format("tapWalk (%d,%d)", tx, ty))
+end
+
+-- Tap `dir` whenever the party has control, hands off while a scene owns
+-- it, edge-A through dialogs.  Used to walk INTO a trigger whose scene then
+-- takes over -- the tap keeps the party from sliding past the tile.
+local function tapInto(dir, pred, maxFrames, what)
+  local phase, n, ph, calm, hb = 0, 0, 0, 0, 0
+  return H.driveUntil(function()
+    calm = (pred() and settled()) and calm + 1 or 0
+    return calm >= 16
+  end, maxFrames or 12000, {
+    H.call(function()
+      ph = (ph + 1) % 8
+      hb = hb + 1
+      if hb % 120 == 0 then
+        H.log(string.format("tapInto f%d (%d,%d) phase=%d ctl=%s algn=%s "
+          .. "dlg=%s ev=%s $01B5=%d face=%d",
+          H.frame, H.fieldX(), H.fieldY(), phase, tostring(H.hasControl()),
+          tostring(H.tileAligned()), tostring(H.dialogWaiting()),
+          tostring(H.eventRunning()), sw(0x01B5),
+          H.readByte(0x087f + H.readWord(0x0803))))
+      end
+      if H.battleLoadStarted() then
+        killBitAll(); H.setPad(ph < 4 and { "a" } or {}); phase = 0; return
+      end
+      if H.dialogWaiting() then
+        H.setPad(ph < 4 and { "a" } or {}); phase = 0; return
+      end
+      if phase == 0 then
+        H.setPad({})
+        -- STOP TAPPING once we are where we were going.  The terminator
+        -- wants 16 consecutive calm frames on the target, and an eager tap
+        -- walks straight off it before the count gets there: the first
+        -- version of this rode the chute correctly to (10,45) and then
+        -- tapped itself to (10,46) and timed out.
+        if pred() then return end
+        if settled() then phase, n = 1, 0 end
+        return
+      end
+      if phase == 1 then
+        n = n + 1
+        H.setPad({ [dir] = true })
+        if n >= 8 then phase, n = 2, 0 end
+        return
+      end
+      H.setPad({})
+      n = n + 1
+      if n >= 24 then phase = 0 end
+    end),
+  }, what)
+end
+
+local function census(tag, targets)
+  local sx, sy = H.fieldX(), H.fieldY()
+  local xm, ym = H.readByte(0x0086), H.readByte(0x0087)
+  local seen, q, qi = { [(sy & ym) * 256 + (sx & xm)] = true }, { { sx, sy } }, 1
+  while qi <= #q and qi <= 3000 do
+    local x, y = q[qi][1], q[qi][2]; qi = qi + 1
+    for d, v in pairs(DELTA) do
+      if H.canStep(x, y, d) then
+        local nx, ny = (x + v[1]) & xm, (y + v[2]) & ym
+        local k = ny * 256 + nx
+        if not seen[k] then seen[k] = true; q[#q + 1] = { nx, ny } end
+      end
+    end
+  end
+  H.log(string.format("[census %s] from (%d,%d) on map %d: %d tiles reachable",
+    tag, sx, sy, map(), #q))
+  for _, t in ipairs(targets or {}) do
+    local p = H.bfsPath(t[1], t[2])
+    H.log(string.format("[census %s] -> (%d,%d) %-34s : %s", tag, t[1], t[2],
+      t[3] or "", p and (#p .. " steps: " .. table.concat(p, " ")) or "NO PATH"))
+  end
+end
+
+
+H.run({ maxFrames = 60000 }, {
+  H.loadState("/Users/mtklein/ot6/build/states/n024_doorstep.mss.lua"),
+  H.waitFrames(150),
+  H.call(function()
+    H.assertEq(map(), 273, "booted on map 273")
+    H.assertEq(H.fieldX(), 25, "boot x")
+    H.assertEq(H.fieldY(), 52, "boot y")
+    H.assertEq(H.readByte(0x087f + H.readWord(0x0803)), 0, "booted facing UP")
+    H.assertEq(sw(0x0649), 1, "$0649 SET at boot")
+    H.log(partyReport("n024_doorstep"))
+  end),
+
+  -- 1. A into NUMBER 024 -> battle 72
+  H.driveUntil(function() return H.battleLoadStarted() end, 6000, {
+    H.hold({ "a", "up" }), H.waitFrames(4), H.hold({ "up" }), H.waitFrames(4),
+  }, "A into NUMBER 024 -> battle 72"),
+  H.waitUntil(function() return H.battleActive() end, 900, "battle 72 active", 30),
+  H.call(function()
+    local w = H.formationWords()
+    H.log(string.format("[battle 72] formation = %04X %04X %04X %04X %04X %04X",
+      w[1], w[2], w[3], w[4], w[5], w[6]))
+    H.assertEq(H.formationHas({ [0x010a] = true }), true,
+      "battle 72 is NUMBER 024 $010A -- kill-bitting the right fight")
+    H.screenshot("n024_battle")
+  end),
+  H.advanceStory(function() return sw(0x0649) == 0 and settled() end, 20000),
+  H.waitFrames(60),
+  H.call(function()
+    H.assertEq(map(), 273, "still on map 273 after battle 72")
+    H.assertEq(sw(0x0649), 0, "$0649 CLEAR -- NUMBER 024 is gone")
+    H.assertEq(H.bfsPath(25, 50) ~= nil, true,
+      "the esper-tube door (25,50) is open now that {25,51} is clear")
+    H.log(string.format("[n024_won] f%d map=%d (%d,%d) door plan=%d steps",
+      H.frame, map(), H.fieldX(), H.fieldY(), #H.bfsPath(25, 50)))
+    H.log(partyReport("n024_won"))
+    H.screenshot("n024_won")
+  end),
+  H.saveState("n024_won.mss"),
+
+  -- 2. {25,50} -> map 274 {10,25}
+  H.navTo(25, 50, { maxFrames = 9000, arrive = function() return map() == 274 end }),
+  H.waitUntil(function() return map() == 274 and settled() end, 6000,
+    "map 274 control", 5),
+  H.waitFrames(60),
+  H.call(function()
+    H.assertEq(map(), 274, "the esper tube room is map 274")
+    H.assertEq(H.fieldX(), 10, "274 landing x")
+    H.assertEq(H.fieldY(), 25, "274 landing y")
+    H.assertEq(sw(0x0068), 0, "$0068 CLEAR -- the Cid scene has not run")
+    census("274", {
+      { 10, 9, "the BIG_SWITCH trigger _cc7a60" },
+      { 20, 13, "the lift trigger _cc7f43 ($0068-gated)" },
+    })
+    H.screenshot("esper_tubes_landing")
+  end),
+
+  -- 3. up to {10,10}, one step below the trigger tile.
+  H.navTo(10, 10, { maxFrames = 12000 }),
+  tapWalk(10, 10, 8000, "tapWalk below the trigger tile (10,10)"),
+
+  -- 3a. WHY THE DOORSTEP IS NOT ON {10,9}.  A first version of this leg
+  --     tried to park ON the trigger tile and timed out: the terminator
+  --     wants consecutive settled frames and settled() never held there.
+  --     Measured below rather than assumed -- step up onto {10,9} with NO
+  --     A held and sample control for 90 frames.  Expected (and this is
+  --     the same trap gen_zozo3_clock hit on the clock tile): _cc7a60 is
+  --     re-entered every frame the party stands on it, takes its early
+  --     `goto EventReturn` because $01B4 is clear, and the event PC
+  --     bouncing into bank $CA is enough to make eventRunning() -- and so
+  --     hasControl() -- flicker forever.  Then step back off and mint from
+  --     {10,10}, one UP-step-plus-A-hold from the scene.
+  H.hold({ "up" }), H.waitFrames(8), H.release(), H.waitFrames(40),
+  (function() local n, ctl, ev = 0, 0, 0
+    return H.driveUntil(function() return n >= 90 end, 300, {
+      H.call(function()
+        n = n + 1
+        if H.hasControl() then ctl = ctl + 1 end
+        if H.eventRunning() then ev = ev + 1 end
+        H.setPad({})
+        if n == 90 then
+          H.log(string.format("[on-trigger sample] at (%d,%d): hasControl %d/90 "
+            .. "frames, eventRunning %d/90 -- this is why the fixture is "
+            .. "banked one tile south", H.fieldX(), H.fieldY(), ctl, ev))
+        end
+      end),
+    }, "sample control while standing on {10,9}")
+  end)(),
+  -- Step back off, then approach {10,10} FROM BELOW so the last step is an
+  -- UP step and the party is already facing UP when it lands.  A separate
+  -- "press up to turn" would not do: this engine turns and moves in the
+  -- same frame when the destination is walkable (measured,
+  -- probe_vector_step -- facing and pixel position both changed on frame 6
+  -- of a held press), and {10,9} is walkable, so a facing press here walks
+  -- straight back onto the trigger tile.  Every earlier face-an-NPC press
+  -- in this chain was safe only because an NPC object occupied the
+  -- destination and the step was refused.
+  tapWalk(10, 11, 6000, "back off the trigger tile to (10,11)"),
+  tapWalk(10, 10, 6000, "up onto the doorstep tile (10,10), facing UP"),
+  (function() local calm = 0
+    return H.driveUntil(function()
+      local ok = H.fieldX() == 10 and H.fieldY() == 10 and settled()
+             and H.readByte(0x087f + H.readWord(0x0803)) == 0
+      calm = ok and calm + 1 or 0
+      if calm >= 20 then H.setPad({}); return true end
+      return false
+    end, 3000, {
+      H.call(function()
+        if H.battleLoadStarted() then killBitAll(); H.setPad({ "a" }); return end
+        H.setPad({})
+      end) }, "twenty settled frames below the BIG_SWITCH tile")
+  end)(),
+
+  H.call(function()
+    H.assertEq(map(), 274, "on map 274")
+    H.assertEq(H.fieldX(), 10, "tube-room doorstep x -- one step below {10,9}")
+    H.assertEq(H.fieldY(), 10, "tube-room doorstep y")
+    H.assertEq(H.readByte(0x087f + H.readWord(0x0803)), 0,
+      "facing UP toward the trigger tile (EVENT_DIR 0 -- this is the $01B0 "
+      .. "the trigger demands, already set)")
+    H.assertEq(settled(), true, "the doorstep is QUIET")
+    H.assertEq(sw(0x0068), 0, "$0068 CLEAR")
+    H.assertEq(H.readByte(0x1A69) & 0x07, 0x07, "still RAMUH + IFRIT + SHIVA")
+    H.log(string.format("[esper_tubes_doorstep] f%d map=%d (%d,%d) face=%d $1A69=%02X",
+      H.frame, map(), H.fieldX(), H.fieldY(),
+      H.readByte(0x087f + H.readWord(0x0803)), H.readByte(0x1A69)))
+    H.log(partyReport("esper_tubes_doorstep"))
+    H.screenshot("esper_tubes_doorstep")
+  end),
+  H.saveState("esper_tubes_doorstep.mss"),
+
+  -- 4. VERIFY, after the mint, that an A-HOLD really fires _cc7a60.  This
+  --    is the assertion that a plain navTo could never satisfy, and it is
+  --    the whole reason the doorstep is a tile-with-a-facing rather than a
+  --    tile: a fixture that merely stands here proves nothing.
+  (function() local n = 0
+    return H.driveUntil(function()
+      return H.fieldY() == 9 and n > 120 and (not H.hasControl() or sw(0x0068) == 1)
+    end, 4000, {
+      H.call(function() n = n + 1
+        H.setPad({ "a", "up" })
+      end) }, "UP + A held steps onto {10,9} and fires _cc7a60")
+  end)(),
+  H.release(),
+  H.call(function()
+    H.assertEq(H.fieldY(), 9, "the verify walked onto the trigger tile")
+    H.assertEq(H.hasControl(), false,
+      "VERIFIED: holding A while facing UP on {10,9} took control -- "
+      .. "_cc7a60 fired")
+    H.log(string.format("[verify] scene running at f%d, map=%d (%d,%d)",
+      H.frame, map(), H.fieldX(), H.fieldY()))
+    H.screenshot("esper_tubes_verify")
+  end),
+  H.logStep(function()
+    return string.format("n024_won and esper_tubes_doorstep minted; "
+      .. "doorstep is map 274 (10,10) facing UP, one UP-step-plus-A-hold "
+      .. "from _cc7a60 (frame %d)", H.frame)
+  end),
+})

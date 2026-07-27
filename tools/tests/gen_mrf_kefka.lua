@@ -1,0 +1,257 @@
+-- gen_mrf_kefka.lua -- v0.6 leg 6: mrf_263 (map 263, {22,18}) -> the
+-- {24,18} ride down to {40,30} -> the {40,32} trigger -> KEFKA'S
+-- ESPER-DRAIN SCENE -> $005F=1.  Mints mrf_kefka.
+--
+-- MEASURED at (22,18) (census in gen_mrf_263's log): 493 tiles reachable,
+-- and of the waypoints this beat needs, only {24,17} (3 steps) and
+-- {24,18} (2 steps) are among them.  {36,44}/{37,44}/{38,44} -- the chute
+-- to map 264 -- and {40,32}/{41,32}/{42,32} -- the Kefka trigger row --
+-- are all NO PATH from the landing.  Map 263 is two disconnected walking
+-- regions joined by a ride, which is the third time this beat has had that
+-- shape (the {19,25} chute, the {11,45} conveyor, and now this).
+--
+-- _cc75c9 (event_main.asm:94694), on {24,18}, is ungated and falls into
+-- _cc75d0 (:94701): `layer 3 / move RIGHT 8 / move RIGHT 7`, then
+-- `hide_obj SLOT_1`, a camera pan, and a hard `pos {40,26}` teleport,
+-- then `move DOWN 3 / jump_low / move DOWN 1` -- so it ends at {40,30}
+-- with `player_ctrl_on`.  ({24,17}'s _cc75bb is the same ride entered one
+-- tile north; it walks DOWN_RIGHT into the same code.)
+--
+-- The trigger row {40,32}/{41,32}/{42,32} (_cc7431/_cc73e1/_cc7409,
+-- :94388/:94340/:94364) is guarded `if_switch $005F=1, EventReturn` and
+-- each walks SLOT_1 a step or two UP_LEFT before falling into _cc7451
+-- (:94409) -- the scene where Kefka drains the espers.  Its tail
+-- (:94620-94622) is `switch $005F=1 / unlock_camera / player_ctrl_on`,
+-- and $005F is what this leg banks.
+local H = dofile("/Users/mtklein/ot6/tools/tests/lib/ot6.lua")
+
+local function map() return H.mapId() & 0x1ff end
+local function bright() return emu.getState()["ppu.screenBrightness"] or 0 end
+local function sw(id) return (H.readByte(0x1E80 + (id >> 3)) >> (id & 7)) & 1 end
+local function killBitAll()
+  for s = 0, 5 do
+    if H.readByte(0x3aa8 + s * 2) % 2 == 1 then
+      H.writeByte(0x3eec + s * 2, H.readByte(0x3eec + s * 2) | 0x80)
+    end
+  end
+end
+local function settled()
+  return H.hasControl() and H.tileAligned() and bright() >= 15
+     and not H.dialogWaiting() and not H.battleLoadStarted() and not H.worldMode()
+end
+
+local MAP_TITLE_PTRS, MAP_TITLE = 0x268400, 0x0EF100
+local function mapTitleHere()
+  local p = H.readRomWord(MAP_TITLE_PTRS + H.readByte(0x0520) * 2)
+  local a, s = MAP_TITLE + p, ""
+  for _ = 1, 24 do
+    local c = H.readRomByte(a)
+    if c == 0 then break end
+    if     c >= 0x20 and c <= 0x39 then s = s .. string.char(65 + c - 0x20)
+    elseif c >= 0x3A and c <= 0x53 then s = s .. string.char(97 + c - 0x3A)
+    elseif c >= 0x54 and c <= 0x5D then s = s .. string.char(48 + c - 0x54)
+    elseif c == 0x65 then s = s .. "."
+    elseif c == 0x7F then s = s .. " "
+    else s = s .. string.format("<%02X>", c) end
+    a = a + 1
+  end
+  return s
+end
+
+local CHARS = { "TERRA", "LOCKE", "CYAN", "SHADOW", "EDGAR", "SABIN",
+                "CELES", "STRAGO", "RELM", "SETZER", "MOG", "GAU",
+                "GOGO", "UMARO" }
+local function partyReport(tag)
+  local party, raw = {}, {}
+  local cur = H.readByte(0x1A6D)
+  for c = 0, 13 do
+    local b = H.readByte(0x1850 + c)
+    raw[#raw + 1] = string.format("%s=%02X", CHARS[c + 1], b)
+    if (b & 0x07) == cur and b ~= 0 then
+      local base = 0x1600 + 37 * c
+      party[#party + 1] = string.format("%s(order %d, L%d, weapon %02X)",
+        CHARS[c + 1], (b >> 3) & 3, H.readByte(base + 0x08),
+        H.readByte(base + 0x1F))
+    end
+  end
+  return string.format("[party @ %s] party#%d = %s   | $1850: %s | $1EDE=%02X $1EDF=%02X",
+    tag, cur, table.concat(party, ", "), table.concat(raw, " "),
+    H.readByte(0x1EDE), H.readByte(0x1EDF))
+end
+
+-- Exact single-tile stepping (see gen_vector_sneak.lua for the measurement).
+local DELTA = { up = { 0, -1 }, right = { 1, 0 }, down = { 0, 1 }, left = { -1, 0 } }
+local function tapWalk(tx, ty, maxFrames, what)
+  local phase, dir, n, ph, calm = 0, nil, 0, 0, 0
+  return H.driveUntil(function()
+    calm = (H.fieldX() == tx and H.fieldY() == ty and settled()) and calm + 1 or 0
+    return calm >= 16
+  end, maxFrames or 12000, {
+    H.call(function()
+      ph = (ph + 1) % 8
+      if H.battleLoadStarted() then
+        killBitAll(); H.setPad(ph < 4 and { "a" } or {}); phase = 0; return
+      end
+      if H.dialogWaiting() then
+        H.setPad(ph < 4 and { "a" } or {}); phase = 0; return
+      end
+      if phase == 0 then
+        H.setPad({})
+        if not settled() then return end
+        local p = H.bfsPath(tx, ty)
+        if not p or #p == 0 then return end
+        dir, n, phase = p[1], 0, 1
+        return
+      end
+      if phase == 1 then
+        n = n + 1
+        H.setPad({ [H.movePress(dir)] = true })
+        if n >= 8 then phase, n = 2, 0 end
+        return
+      end
+      H.setPad({})
+      n = n + 1
+      if n >= 24 then phase = 0 end
+    end),
+  }, what or string.format("tapWalk (%d,%d)", tx, ty))
+end
+
+-- Tap `dir` whenever the party has control, hands off while a scene owns
+-- it, edge-A through dialogs.  Used to walk INTO a trigger whose scene then
+-- takes over -- the tap keeps the party from sliding past the tile.
+local function tapInto(dir, pred, maxFrames, what)
+  local phase, n, ph, calm, hb = 0, 0, 0, 0, 0
+  return H.driveUntil(function()
+    calm = (pred() and settled()) and calm + 1 or 0
+    return calm >= 16
+  end, maxFrames or 12000, {
+    H.call(function()
+      ph = (ph + 1) % 8
+      hb = hb + 1
+      if hb % 120 == 0 then
+        H.log(string.format("tapInto f%d (%d,%d) phase=%d ctl=%s algn=%s "
+          .. "dlg=%s ev=%s $01B5=%d face=%d",
+          H.frame, H.fieldX(), H.fieldY(), phase, tostring(H.hasControl()),
+          tostring(H.tileAligned()), tostring(H.dialogWaiting()),
+          tostring(H.eventRunning()), sw(0x01B5),
+          H.readByte(0x087f + H.readWord(0x0803))))
+      end
+      if H.battleLoadStarted() then
+        killBitAll(); H.setPad(ph < 4 and { "a" } or {}); phase = 0; return
+      end
+      if H.dialogWaiting() then
+        H.setPad(ph < 4 and { "a" } or {}); phase = 0; return
+      end
+      if phase == 0 then
+        H.setPad({})
+        -- STOP TAPPING once we are where we were going.  The terminator
+        -- wants 16 consecutive calm frames on the target, and an eager tap
+        -- walks straight off it before the count gets there: the first
+        -- version of this rode the chute correctly to (10,45) and then
+        -- tapped itself to (10,46) and timed out.
+        if pred() then return end
+        if settled() then phase, n = 1, 0 end
+        return
+      end
+      if phase == 1 then
+        n = n + 1
+        H.setPad({ [dir] = true })
+        if n >= 8 then phase, n = 2, 0 end
+        return
+      end
+      H.setPad({})
+      n = n + 1
+      if n >= 24 then phase = 0 end
+    end),
+  }, what)
+end
+
+local function census(tag, targets)
+  local sx, sy = H.fieldX(), H.fieldY()
+  local xm, ym = H.readByte(0x0086), H.readByte(0x0087)
+  local seen, q, qi = { [(sy & ym) * 256 + (sx & xm)] = true }, { { sx, sy } }, 1
+  while qi <= #q and qi <= 3000 do
+    local x, y = q[qi][1], q[qi][2]; qi = qi + 1
+    for d, v in pairs(DELTA) do
+      if H.canStep(x, y, d) then
+        local nx, ny = (x + v[1]) & xm, (y + v[2]) & ym
+        local k = ny * 256 + nx
+        if not seen[k] then seen[k] = true; q[#q + 1] = { nx, ny } end
+      end
+    end
+  end
+  H.log(string.format("[census %s] from (%d,%d) on map %d: %d tiles reachable",
+    tag, sx, sy, map(), #q))
+  for _, t in ipairs(targets or {}) do
+    local p = H.bfsPath(t[1], t[2])
+    H.log(string.format("[census %s] -> (%d,%d) %-34s : %s", tag, t[1], t[2],
+      t[3] or "", p and (#p .. " steps: " .. table.concat(p, " ")) or "NO PATH"))
+  end
+end
+
+
+H.run({ maxFrames = 60000 }, {
+  H.loadState("/Users/mtklein/ot6/build/states/mrf_263.mss.lua"),
+  H.waitFrames(150),
+  H.call(function()
+    H.assertEq(map(), 263, "booted on map 263")
+    H.assertEq(H.fieldX(), 22, "boot x")
+    H.assertEq(H.fieldY(), 18, "boot y")
+    H.assertEq(sw(0x005F), 0, "$005F CLEAR at boot")
+    H.assertEq(H.bfsPath(40, 32), nil,
+      "CONTROL: the Kefka trigger row (40,32) is NO-PATH on foot from here")
+    H.log(partyReport("mrf_263"))
+  end),
+
+  -- 1. two steps east onto {24,18} -> the ride -> {40,30}
+  H.navTo(23, 18, { maxFrames = 6000 }),
+  tapWalk(23, 18, 6000, "tapWalk beside the {24,18} ride"),
+  tapInto("right", function() return H.fieldX() == 40 and H.fieldY() == 30 end,
+    12000, "RIGHT onto {24,18} -> the ride -> (40,30)"),
+  H.waitFrames(30),
+  H.call(function()
+    H.assertEq(map(), 263, "still on map 263 after the ride")
+    H.assertEq(H.fieldX(), 40, "ride exit x (_cc75d0 pos {40,26} + DOWN 4)")
+    H.assertEq(H.fieldY(), 30, "ride exit y")
+    H.log(string.format("[ride] landed at (%d,%d)", H.fieldX(), H.fieldY()))
+    census("after the ride", {
+      { 40, 32, "the Kefka trigger row _cc7431" },
+      { 37, 44, "the chute to map 264 _cc7581" },
+      { 42, 41, "_cc78e0 lift" },
+      { 49, 48, "_cc7905" },
+      { 24, 18, "back to the ride" },
+    })
+    H.screenshot("mrf_ride")
+  end),
+
+  -- 2. south onto the trigger row -> the esper-drain scene -> $005F=1
+  tapInto("down", function() return sw(0x005F) == 1 end, 20000,
+    "DOWN onto {40,32} -> Kefka drains the espers -> $005F"),
+  H.waitUntil(settled, 6000, "control back after the esper drain", 5),
+  H.waitFrames(90),
+
+  H.call(function()
+    H.assertEq(map(), 263, "still on map 263 after the scene")
+    H.assertEq(sw(0x005F), 1, "$005F SET -- Kefka has drained the espers")
+    H.log(string.format("[mrf_kefka] f%d map=%d (%d,%d)",
+      H.frame, map(), H.fieldX(), H.fieldY()))
+    H.log(partyReport("mrf_kefka"))
+    H.screenshot("mrf_kefka")
+  end),
+  H.saveState("mrf_kefka.mss"),
+
+  H.call(function()
+    census("mrf_kefka", {
+      { 36, 44, "the chute to map 264 _cc7565" },
+      { 37, 44, "_cc7581" },
+      { 38, 44, "_cc7573" },
+      { 42, 41, "_cc78e0 lift" },
+      { 49, 48, "_cc7905" },
+      { 40, 32, "the Kefka row (now inert, $005F=1)" },
+    })
+  end),
+  H.logStep(function()
+    return string.format("mrf_kefka minted at frame %d -- map 263 (%d,%d), $005F=1",
+      H.frame, H.fieldX(), H.fieldY())
+  end),
+})

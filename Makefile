@@ -709,11 +709,73 @@ build/states/blackjack.mss.lua: build/states/ultros2_doorstep.mss.lua
 	$(call mint,blackjack,gen_opera7_blackjack)
 FRONTIER += blackjack
 
-# First v0.6 fixture: cold power-on, Mesen loads the tracked 32 KiB battery
-# anchor, vanilla Continue loads slot 3, then one RIGHT step enters Vector.
-build/states/vector_arrival.mss.lua: $(POST_OPERA_INPUTS)
-	$(call mint_anchor,vector_arrival,gen_vector_arrival)
-FRONTIER += vector_arrival
+# ---- v0.6: the raid on Vector and the Magitek Research Facility ----------
+# The chain hangs off the tracked 32 KiB post-Opera battery anchor rather
+# than off blackjack.mss: gen_vector_doorstep cold-boots, drives vanilla
+# Continue into slot 3, and walks the world from there.  Every later link is
+# an ordinary savestate chain.
+#
+# gen_vector_doorstep: cold power-on -> Continue -> the world walk to the
+# VECTOR event trigger at (121,187) -> map 242 {32,61}.  REPLACES
+# gen_vector_arrival, which held RIGHT off the anchor into map 323 and
+# called it Vector -- 323 is ALBROOK (issue #17).  The generator now checks
+# its landing through the engine's own map-title machinery ($0520 ->
+# MapTitlePtrs -> MapTitle) and exercises that read on the Albrook gate
+# first, so a wrong turn reports the town it is actually standing in.
+build/states/vector_doorstep.mss.lua: $(POST_OPERA_INPUTS)
+	$(call mint_anchor,vector_doorstep,gen_vector_doorstep)
+# gen_vector_sneak: the Returner sympathizer's choice dialog ($01F0) and the
+# FACING-GATED ledge on {43,38} ($01B2 = "facing down", an alias of $1EB6,
+# not a story bit) -> control at {57,34}, north of the gate guards and the
+# forced-battle trap row.
+build/states/vector_sneak.mss.lua: build/states/vector_doorstep.mss.lua
+	$(call mint,vector_sneak,gen_vector_sneak)
+# gen_mrf_entry: the column north to the {57,2} long entrance -> map 262,
+# MAGITEK FACTORY {28,8}.  Also carries the live navigation census of the
+# factory's upper floor.
+build/states/mrf_entry.mss.lua: build/states/vector_sneak.mss.lua
+	$(call mint,mrf_entry,gen_mrf_entry)
+# gen_mrf_chute: the one-way conveyor chute at {19,25} -> {10,45}.
+build/states/mrf_chute.mss.lua: build/states/mrf_entry.mss.lua
+	$(call mint,mrf_chute,gen_mrf_chute)
+# gen_mrf_263: the {11,45} conveyor -> {20,45} -> the scripted {22,53}
+# transition -> map 263 {22,18}.
+build/states/mrf_263.mss.lua: build/states/mrf_chute.mss.lua
+	$(call mint,mrf_263,gen_mrf_263)
+# gen_mrf_kefka: the {24,18} ride to {40,30}, then the {40,32} trigger row
+# and Kefka's esper-drain scene -> $005F.
+build/states/mrf_kefka.mss.lua: build/states/mrf_263.mss.lua
+	$(call mint,mrf_kefka,gen_mrf_kefka)
+# gen_ifrit_doorstep: the {37,44} chute -> map 264 {10,7} -> parked at
+# {3,7} facing IFRIT, one A-press from battle 70 (verified after the mint).
+build/states/ifrit_doorstep.mss.lua: build/states/mrf_kefka.mss.lua
+	$(call mint,ifrit_doorstep,gen_ifrit_doorstep)
+# gen_ifrit_magicite: battle 70 and the four-interaction hand-off -> both
+# magicite, asserted on $1A69's give_genju bits.
+build/states/magicite_ifrit_shiva.mss.lua: build/states/ifrit_doorstep.mss.lua
+	$(call mint,magicite_ifrit_shiva,gen_ifrit_magicite)
+# gen_n024_doorstep: 264 -> 269 -> 271 (MAGITEK RES. FACILITY) -> 273,
+# parked at {25,52} facing NUMBER 024, one A-press from battle 72.
+build/states/n024_doorstep.mss.lua: build/states/magicite_ifrit_shiva.mss.lua
+	$(call mint,n024_doorstep,gen_n024_doorstep)
+# gen_esper_tubes: battle 72, then the {25,50} door into map 274 and the
+# doorstep for the facing+A-gated BIG_SWITCH trigger.  Two mints.
+build/states/n024_won.mss.lua: build/states/n024_doorstep.mss.lua
+	$(call mint,n024_won,gen_esper_tubes)
+build/states/esper_tubes_doorstep.mss.lua: build/states/n024_won.mss.lua
+	$(call mint,esper_tubes_doorstep,gen_esper_tubes)
+# gen_esper_tubes_done: the Cid/Kefka set piece -- six espers, and CELES
+# leaves the roster ($02F6=0).
+build/states/esper_tubes.mss.lua: build/states/esper_tubes_doorstep.mss.lua
+	$(call mint,esper_tubes,gen_esper_tubes_done)
+# gen_minecart_doorstep: the lift -> map 266 -> map 272, parked beside CID,
+# one A-press from `cutscene TRAIN`.  THE v0.6 FRONTIER ENDS HERE -- see
+# gen_n128.lua's header for why the minecart itself does not mint.
+build/states/minecart_doorstep.mss.lua: build/states/esper_tubes.mss.lua
+	$(call mint,minecart_doorstep,gen_minecart_doorstep)
+FRONTIER += vector_doorstep vector_sneak mrf_entry mrf_chute mrf_263 \
+            mrf_kefka ifrit_doorstep magicite_ifrit_shiva n024_doorstep \
+            n024_won esper_tubes_doorstep esper_tubes minecart_doorstep
 
 frontier: rom $(STATE1) $(STATE2) $(STATE3) \
           $(patsubst %,build/states/%.mss.lua,$(FRONTIER))
