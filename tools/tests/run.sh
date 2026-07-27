@@ -209,9 +209,26 @@ python3 "$ROOT/tools/tests/lib/pin_test_saves.py" \
 # Tests that need a save inject it explicitly (SRM sidecars).
 rm -f "$TEST_SAVES"/*.srm
 if [ -n "${OT6_SRAM_ANCHOR:-}" ]; then
+  # THE persistent_layout GATE (issue #25).  A leg declares the persistent-
+  # SRAM layout it understands with a marker comment in its script,
+  #
+  #     [dash][dash] OT6_ANCHOR_LAYOUT: ot6-codex-o8-v1
+  #
+  # (spelled as a real Lua comment at the start of a line; not written out
+  # here so THIS file can never satisfy the grep).  The declaration rides
+  # the script itself rather than an env var, so every consumer -- mint,
+  # smoke, a bare manual run.sh -- gets the same refusal with no caller
+  # wiring, and it survives composition (comments do).  sram_anchor.py
+  # compares it against the anchor manifest's persistent_layout and refuses
+  # a mismatch NAMING BOTH STRINGS, here, before the emulator boots: a
+  # schema-drift stale anchor must be a named refusal, never an in-emulator
+  # timeout.  A leg with no marker declares support for nothing and is
+  # refused too -- fail closed, or the gate only guards legs that opted in.
+  ANCHOR_LAYOUT=$(sed -n 's/^-- OT6_ANCHOR_LAYOUT: *\([^ ]*\).*$/\1/p' "$COMPOSED" | head -n 1)
   python3 "$ROOT/tools/tests/lib/sram_anchor.py" materialize \
-    "$OT6_SRAM_ANCHOR" "$TEST_SAVES/$(basename "$ROM" .sfc).srm" ||
-    { echo "invalid SRAM anchor: $OT6_SRAM_ANCHOR"; exit 2; }
+    "$OT6_SRAM_ANCHOR" "$TEST_SAVES/$(basename "$ROM" .sfc).srm" \
+    "$ANCHOR_LAYOUT" ||
+    { echo "invalid SRAM anchor: $OT6_SRAM_ANCHOR (refused BEFORE boot)"; exit 2; }
 fi
 # --timeout=600: Mesen's testrunner has a hard DEFAULT 100-second wall-clock
 # cap (exit -1/255 + truncated stdout on expiry) that reaped long runs; keep

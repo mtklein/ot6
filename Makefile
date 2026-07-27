@@ -148,6 +148,7 @@ test: rom nomp-rom $(STATE1) $(STATE2) $(STATE3)
 	python3 tools/check_break_reach.py
 	sh tools/tests/lib/frontier_stamp_selftest.sh
 	sh tools/tests/lib/runner_isolation_selftest.sh
+	sh tools/tests/lib/anchor_negatives.sh
 	@rm -f $(STAMP)
 	tools/tests/suite.sh
 	@echo "-- mpcost A/B: the OFF half (free — the negative control) on the nomp baseline --"
@@ -307,17 +308,51 @@ $(SMOKE_TARGETS): smoke-%: rom
 	  || { echo "  $*: FAIL -- build/states/smoke_$*.log"; \
 	       grep -E 'FAIL|assertEq' build/states/smoke_$*.log | head -3; exit 1; }
 
-POST_OPERA_ANCHOR := tools/tests/anchors/post-opera-v1
-POST_OPERA_INPUTS := $(POST_OPERA_ANCHOR)/manifest.json $(POST_OPERA_ANCHOR)/post-opera.sram
+# ---- battery anchors, keyed by milestone (issue #25) ----------------------
+# tools/tests/anchors/<key>/ is one milestone anchor: manifest.json plus a
+# 32 KiB battery payload minted through the game's own Save UI (#9 -- never
+# synthesised).  The key is the milestone name; post-opera-v1 is the only
+# real one today, and save-points-vector.md §5 names the A-F band this
+# convention must hold (mrf-save-room, n024-doorstep-save, ...).  Dirs named
+# negative-* are deliberately wrong fixtures for `make anchor-negatives`
+# below; no mint rule may ever name one.
+#
+# anchor_inputs lists an anchor's stamp inputs explicitly -- manifest first,
+# then payload(s) -- in the exact order POST_OPERA_INPUTS always hashed, so
+# generalising the key changes no existing mint signature.
+anchor_dir    = tools/tests/anchors/$(1)
+anchor_inputs = $(call anchor_dir,$(1))/manifest.json $(sort $(wildcard $(call anchor_dir,$(1))/*.sram))
+POST_OPERA_ANCHOR := $(call anchor_dir,post-opera-v1)
+# $(call mint_anchor,<state>,<generator>): mint <state> by cold-loading the
+# battery anchor named by ANCHOR_KEY_<state>, defined BESIDE the state's rule
+# (see vector_doorstep).  The key rides a variable rather than a third call
+# argument DELIBERATELY: tools/tests/lib/frontier_deps.sh greps the two-field
+# `$(call mint_anchor,<state>,<generator>)` shape out of this file to emit the
+# issue-#2 generator+lib prerequisites, and a third argument would silently
+# stop matching -- the exact class of quiet no-op the smoke receipt count
+# exists for.  The anchor's files ride the stamp signature (needsmint/write
+# extras), so editing a manifest or payload re-mints every state hung off
+# that anchor, and run.sh's persistent_layout gate refuses the load before
+# boot if the generator does not declare the anchor's layout.
 define mint_anchor
-	@if sh tools/tests/lib/frontier_stamp.sh needsmint $(1) $(2) $(POST_OPERA_INPUTS); then \
-		echo "[frontier] mint $(1) <- $(2) (cold battery anchor)"; \
-		OT6_WORKER=$(1) OT6_SRAM_ANCHOR=$(POST_OPERA_ANCHOR) \
+	$(if $(ANCHOR_KEY_$(1)),,$(error mint_anchor $(1): define ANCHOR_KEY_$(1) := <anchor key> beside the rule))
+	@if sh tools/tests/lib/frontier_stamp.sh needsmint $(1) $(2) $(call anchor_inputs,$(ANCHOR_KEY_$(1))); then \
+		echo "[frontier] mint $(1) <- $(2) (cold battery anchor $(ANCHOR_KEY_$(1)))"; \
+		OT6_WORKER=$(1) OT6_SRAM_ANCHOR=$(call anchor_dir,$(ANCHOR_KEY_$(1))) \
 		OT6_EXPECT_ARTIFACT=$(1).mss tools/tests/run.sh tools/tests/$(2).lua && \
-		sh tools/tests/lib/frontier_stamp.sh write $(1) $(2) $(POST_OPERA_INPUTS); \
+		sh tools/tests/lib/frontier_stamp.sh write $(1) $(2) $(call anchor_inputs,$(ANCHOR_KEY_$(1))); \
 	fi
 	@touch build/states/$(1).mss.lua
 endef
+
+# The stale-anchor regression (#25): prove both refusal paths FAIL, loudly,
+# naming what differed -- the pre-boot persistent_layout gate and the
+# in-emulator entry contract.  A gate is only evidence when its negative has
+# been observed failing; a green anchored run alone cannot show that.
+# Costs one short emulator boot (~1 min); not part of smoke.
+.PHONY: anchor-negatives
+anchor-negatives: rom
+	sh tools/tests/lib/anchor_negatives.sh
 
 build/states/arvis_wake.mss.lua: $(STATE3)
 	$(call mint,arvis_wake,gen_arvis)
@@ -783,7 +818,8 @@ FRONTIER += blackjack
 # its landing through the engine's own map-title machinery ($0520 ->
 # MapTitlePtrs -> MapTitle) and exercises that read on the Albrook gate
 # first, so a wrong turn reports the town it is actually standing in.
-build/states/vector_doorstep.mss.lua: $(POST_OPERA_INPUTS)
+ANCHOR_KEY_vector_doorstep := post-opera-v1
+build/states/vector_doorstep.mss.lua: $(call anchor_inputs,$(ANCHOR_KEY_vector_doorstep))
 	$(call mint_anchor,vector_doorstep,gen_vector_doorstep)
 # gen_vector_sneak: the Returner sympathizer's choice dialog ($01F0) and the
 # FACING-GATED ledge on {43,38} ($01B2 = "facing down", an alias of $1EB6,

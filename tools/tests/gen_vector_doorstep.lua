@@ -58,10 +58,16 @@
 -- standing in.  mapTitleHere() is exercised on the Albrook gate FIRST --
 -- the exact step the retired generator took -- so the control cannot pass
 -- by returning "" for everything.
+--
+-- OT6_ANCHOR_LAYOUT: ot6-codex-o8-v1
+-- ^ the persistent-SRAM layout this leg understands (issue #25).  run.sh
+--   reads the marker line above and refuses -- BEFORE the emulator boots,
+--   naming both strings -- any OT6_SRAM_ANCHOR whose manifest.json declares
+--   a different persistent_layout.  An SRAM schema change bumps the layout
+--   string in new anchor manifests, and every leg then refuses the old
+--   anchors until it is deliberately migrated to declare the new string
+--   (leg-fixtures.md, "Costs, named").
 local H = dofile("tools/tests/lib/ot6.lua")
-
-local ACTIVE = 0x021f
-local ULTROS2 = 0x012d
 local function sw(id)
   return (H.readByte(0x1E80 + (id >> 3)) >> (id & 7)) & 1
 end
@@ -142,66 +148,26 @@ H.run({ maxFrames = 80000 }, {
   H.waitUntil(function()
     return (emu.getState()["ppu.screenBrightness"] or 0) >= 15
   end, 900, "cold Continue fade-in", 10),
+  -- THE ENTRY CONTRACT (issue #25).  Everything this leg requires of the
+  -- post-Opera boundary -- save slot, story switches, world tile, the #21
+  -- party count and roster, and the bank-$31 codex witnesses -- is declared
+  -- as DATA in tools/tests/lib/ot6_contract.lua under "post-opera-v1", the
+  -- same table a predecessor leg will someday assert as its EXIT contract.
+  -- A stale or wrong anchor fails here by NAMING WHAT DIFFERED, one
+  -- "CONTRACT DIFF" line per field (expected vs read), never by timing out
+  -- somewhere downstream.  This SUBSUMES the #21 party-count control that
+  -- used to live inline: the contract COUNTS the $1850 assignments and
+  -- requires all four named members -- see the #21 narrative beside the
+  -- contract declaration for why the count, not the roster log, is the
+  -- check that catches a chain silently running two characters.
   H.call(function()
-    H.assertEq(H.readByte(ACTIVE), 3, "Continue loaded save slot 3")
-    H.assertEq(sw(0x034b), 0, "anchor: Ultros 2 cleared")
-    H.assertEq(sw(0x005d), 1, "anchor: Setzer bargain complete")
-    H.assertEq(sw(0x005e), 1, "anchor: Blackjack arrival complete")
-    H.assertEq(sw(0x0246), 0, "anchor: Blackjack is active airship")
-    H.assertEq(sw(0x0079), 0,
-      "anchor: $0079 CLEAR -- the Vector trigger loads map 242, not 253")
-    -- The anchor's own world tile.  It is one step WEST OF THE ALBROOK
-    -- GATE (the short-entrance records at (138,203)/(139,203)), which is
-    -- what the retired generator walked into and called Vector.
-    H.assertEq(H.worldX(), 137, "anchor: world x, west of the Albrook gate")
-    H.assertEq(H.worldY(), 203, "anchor: world y, west of the Albrook gate")
-    H.assertEq(emu.read(0x316800, emu.memType.snesMemory), 0x4f,
-      "anchor: slot 3 codex magic O")
-    H.assertEq(emu.read(0x316801, emu.memType.snesMemory), 0x38,
-      "anchor: slot 3 codex magic 8")
-    H.assertEq(emu.read(0x316810 + ULTROS2, emu.memType.snesMemory), 0x01,
-      "anchor: bank-31 element-codex witness survived cold Continue")
-    H.assertEq(emu.read(0x316990 + ULTROS2, emu.memType.snesMemory), 0x01,
-      "anchor: bank-31 class-codex witness survived cold Continue")
-  end),
-
-  -- POSITIVE CONTROL: THE PARTY, COUNTED (issue #21).
-  --
-  -- $1850+charId is verbbppp (ff6/notes/field-ram.txt:928); the low three
-  -- bits are the party the character belongs to, 0 for nobody's.
-  -- char_party writes it (field/event.asm:563-585) and RemoveChar zeroes it
-  -- (battle_main.asm:11927).
-  --
-  -- This used to be a LOG LINE and nothing else, and that is exactly how
-  -- #21 survived a release and a half: the leave-Zozo `party_menu 1,
-  -- NO_RESET, {LOCKE, CELES}` was answered with START, the two free slots
-  -- were never filled, and the whole v0.5 tail plus every v0.6 leg ran two
-  -- characters -- while every fixture below still passed, because each was
-  -- asserting story switches and map ids, and a switch cannot say how many
-  -- people are walking.  COUNTING the entries is the check that catches a
-  -- chain which silently loses (or never gains) a member; it is asserted
-  -- here, at the anchor, because this is the boundary every v0.6 balance
-  -- number is measured across.
-  --
-  -- The owner's canonical fixture party is LOCKE, CELES, SABIN, EDGAR
-  -- (#21, 2026-07-27): slash, pierce and bludgeon covered with no shop
-  -- trip, SABIN answering the Vector band's deliberate OT6_BLUDG row.
-  H.call(function()
+    -- The roster diagnostic stays a log line -- the CONTRACT is the check.
     local t = {}
     for c = 0, 13 do t[#t + 1] = string.format("%02X", H.readByte(0x1850 + c)) end
     H.log("[roster] $1850+0..13 = " .. table.concat(t, " ")
       .. string.format("  $1EDE=%02X $1EDF=%02X $1A6D=%02X",
         H.readByte(0x1EDE), H.readByte(0x1EDF), H.readByte(0x1A6D)))
-    local function partyOf(c) return H.readByte(0x1850 + c) & 0x07 end
-    local n = 0
-    for c = 0, 15 do if partyOf(c) ~= 0 then n = n + 1 end end
-    H.assertEq(n, 4,
-      "anchor: FOUR characters carry a party assignment (#21 -- the count "
-      .. "is the control; a two-character chain must fail here, loudly)")
-    H.assertEq(partyOf(0x01), 1, "anchor: LOCKE in the party")
-    H.assertEq(partyOf(0x06), 1, "anchor: CELES in the party")
-    H.assertEq(partyOf(0x05), 1, "anchor: SABIN in the party (bludgeon)")
-    H.assertEq(partyOf(0x04), 1, "anchor: EDGAR in the party (pierce+Tools)")
+    H.assertEntryContract("post-opera-v1")
   end),
 
   -- POSITIVE CONTROL, part 1: prove mapTitleHere() actually reads the
