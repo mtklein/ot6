@@ -273,8 +273,33 @@ local function seat(id, name)
     end),
   })
 end
--- ride the leave cutscene UP TO the party menu and stop there.  Dialogs are
--- edge-tapped; nothing else is pressed, so the menu is reached untouched.
+-- A MENU IS NOT A BATTLE.  $0059 is the field's "menu opening" flag, but it
+-- is also plain direct page, and while the MENU MODULE (bank $C3) owns the
+-- CPU it reads $81 -- so "$0059 ~= 0" is the one cheap signal that says "a
+-- menu has the machine, keep your hands off".  It has to be consulted
+-- BEFORE H.battleLoadStarted(), because that predicate LIES INSIDE MENUS.
+--
+-- Measured here (probe on zozo_gather, the leave cutscene): the party
+-- battle-HP word $7E3BF4 reads $FFFF for the whole field cutscene and flips
+-- to $0000 the instant the menu module boots, then stays $0000 for every
+-- frame the menu is up.  Since 62ccab7 (#24) battleLoadStarted() is "slot 0
+-- is not $FFFF", so it answers TRUE for the entire duration of any menu.
+--
+-- With the battle branch on top, that turned this driver into a blind
+-- A-hammer the moment the party menu appeared -- exactly the thing the
+-- comment at the bumpTake call site says must never reach this menu.  The
+-- trace: $26 $2d (interactive) at f3401, A edge, $26 $2e (carrying a
+-- character) at f3407, second A edge on the SAME cell at f3413 --
+-- party.asm MenuState_2e @720c takes that as "show me this character" and
+-- sets zNextMenuState $42 -- and the run parked on CYAN's Status page,
+-- which only B leaves.  The pred wants EIGHT consecutive frames of $26=$2d
+-- and could never get past six, so it burned the 40000-frame budget.  It
+-- read like a hang (no control, no dialog, no event, $59 latched) but the
+-- game was fine: it was rendering a Status screen and waiting for B.
+--
+-- killBitAll() writing $7E3EEC.. under a live menu is the other half of why
+-- the order matters -- those are menu bytes while the menu is up.
+--
 -- The detector is composite for gen_kefka_won's reason: $0059 alone blips
 -- outside real menus.  $0200=4 is the menu mode and $26=$2d the interactive
 -- pick state; all three together only hold on the party menu itself.
@@ -295,10 +320,10 @@ local function ridePartyMenu()
           H.frame, H.fieldX(), H.fieldY(), H.readByte(0x0059), mst(),
           H.readByte(0x0200)))
       end
+      if H.readByte(0x0059) ~= 0 then H.setPad({}); return end  -- hands OFF
       if H.battleLoadStarted() then
         killBitAll(); H.setPad(aPh < 4 and { "a" } or {}); return
       end
-      if H.readByte(0x0059) ~= 0 then H.setPad({}); return end  -- hands OFF
       if H.dialogWaiting() then H.setPad(aPh < 4 and { "a" } or {}); return end
       H.setPad({})
     end),
@@ -485,6 +510,10 @@ H.run({ maxFrames = 120000 }, {
     end, 55000, {
       H.call(function()
         aPh = (aPh + 1) % 8
+        -- same order as ridePartyMenu, and for the same measured reason: a
+        -- menu makes battleLoadStarted() answer true, and this driver must
+        -- never press A (or kill-bit menu RAM) inside one.
+        if H.readByte(0x0059) ~= 0 then H.setPad({}); return end
         if H.battleLoadStarted() then
           killBitAll(); H.setPad(aPh < 4 and { "a" } or {}); return
         end

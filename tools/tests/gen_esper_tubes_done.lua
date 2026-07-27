@@ -237,16 +237,33 @@ H.run({ maxFrames = 90000 }, {
     H.assertEq(sw(0x02F6), 0, "$02F6 CLEAR -- CELES has left the roster")
     H.assertEq(H.readByte(0x1850 + 6) & 0x07, 0,
       "CELES's $1850 party nibble is 0 -- she is out of the active party")
-    -- ...and what is left is Locke, alone.
-    local cur, n = H.readByte(0x1A6D), 0
+    -- ...and what is left is LOCKE, SABIN and EDGAR.
+    --
+    -- THIS USED TO ASSERT ONE, AND THAT ONE WAS THE DEFECT, NOT THE RULE.
+    -- The tube-room scene takes exactly one member, CELES.  It left the
+    -- party at one character only because the chain arrived here with two
+    -- -- the party_menu at the end of the Zozo leave cutscene was answered
+    -- with a bare START, committing just the forced {LOCKE, CELES} and
+    -- leaving SABIN, EDGAR, CYAN and GAU in the pool (#21).  The number 1
+    -- was this generator recording that loss as if it were the story.
+    -- gen_zozo5_ramuh now seats SABIN and EDGAR in the two free slots, so
+    -- four walk in and three walk out, and gen_n128's header note that the
+    -- minecart is fought by one character is superseded from here.
+    --
+    -- Named, not just counted: a count alone would go green again if the
+    -- chain lost EDGAR somewhere and picked up CYAN instead.
+    local cur, n, who = H.readByte(0x1A6D), 0, {}
     for c = 0, 13 do
       local b = H.readByte(0x1850 + c)
-      if b ~= 0 and (b & 0x07) == cur then n = n + 1 end
+      if b ~= 0 and (b & 0x07) == cur then n = n + 1; who[c] = true end
     end
-    H.assertEq(n, 1,
-      "THE ACTIVE PARTY IS ONE CHARACTER -- everything from the minecart "
+    H.assertEq(n, 3,
+      "THE ACTIVE PARTY IS THREE CHARACTERS -- everything from the minecart "
       .. "to the Cranes is fought at this size")
-    H.assertEq(H.readByte(0x1850 + 1) & 0x07, cur, "and that character is LOCKE")
+    H.assertEq(who[0x01] == true, true, "LOCKE is still in the active party")
+    H.assertEq(who[0x05] == true, true, "SABIN is still in the active party")
+    H.assertEq(who[0x04] == true, true, "EDGAR is still in the active party")
+    H.assertEq(who[0x06], nil, "CELES is NOT -- the tube room took her")
     H.log(string.format("[esper_tubes] f%d map=%d (%d,%d) $1A69=%02X %02X %02X %02X",
       H.frame, map(), H.fieldX(), H.fieldY(), e[1], e[2], e[3], e[4]))
     H.log(partyReport("esper_tubes"))

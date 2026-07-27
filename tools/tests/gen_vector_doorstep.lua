@@ -257,19 +257,49 @@ H.run({ maxFrames = 80000 }, {
     H.assertEq(H.worldY(), 203, "back on the world: y")
   end),
 
-  -- LEG 1: the world walk.  31 steps, every tile battle-enabled.
-  worldGrind(122, 187, "world walk -> the Vector trigger approach (122,187)"),
+  -- LEG 1: the world walk.  29 steps, every tile battle-enabled.
+  --
+  -- THE WALK STOPS THREE TILES EAST OF THE TRIGGER, NOT ONE.  It used to
+  -- aim at (122,187), the tile the trigger is stepped onto FROM, and that
+  -- put the walker's own slop right on top of (121,187).  Measured per
+  -- frame on the re-minted anchor:
+  --
+  --   f3508 (122,188) aligned, 1-step plan UP pressed  -> f3510 (121,188)
+  --   f3524 (121,188) aligned, 2-step plan pressed     -> f3526 (121,187)
+  --   f3541 world control drops; the trigger has fired; map 242 loads
+  --
+  -- Two things compose there.  worldGrind holds a direction continuously
+  -- and only chooses the next one on an aligned frame, but the world
+  -- engine latches input at the tile boundary, so a direction issued on
+  -- the arrival frame arrives one poll late and the previous direction
+  -- takes one more step -- the party lands one tile WEST of the goal.  And
+  -- from that overshoot tile (121,188) the shortest path back to (122,187)
+  -- runs (121,188) -> (121,187) -> (122,187), straight through the
+  -- trigger.  So the walker fires the map load itself, worldGrind exits on
+  -- its `not worldMode()` arm, and the wait for world control that follows
+  -- can never be satisfied -- "timeout after 2400 frames waiting for at
+  -- the Vector trigger approach".
+  --
+  -- This is the same lesson 56901e9 recorded for navTo (#22) and is why
+  -- the fix is not a smarter walker: A TILE THAT TAKES THE PARTY AWAY IS
+  -- ENTERED WITH A HELD PRESS, NOT WITH A WALKER AIMED NEXT TO IT.  Row
+  -- 187 is passable for x=116..130 (measured), so aiming at (124,187)
+  -- leaves the whole +-1 slop window on safe tiles and puts no shortest
+  -- path anywhere near x=121; the held-LEFT leg below then covers the last
+  -- three tiles, which is what it already did for the last one.
+  worldGrind(124, 187, "world walk -> the Vector trigger approach (124,187)"),
   H.waitUntil(function()
     return H.worldHasControl() and H.worldAligned()
   end, 2400, "at the Vector trigger approach", 5),
   H.call(function()
-    H.assertEq(H.worldX(), 122, "trigger approach x")
+    H.assertEq(H.worldX(), 124, "trigger approach x")
     H.assertEq(H.worldY(), 187, "trigger approach y")
     H.log(string.format("[world] at the Vector trigger approach (%d,%d)",
       H.worldX(), H.worldY()))
   end),
 
-  -- one LEFT step onto (121,187) fires _ca5ecf -> load_map 242 {32,61}
+  -- hold LEFT along row 187; the step onto (121,187) fires _ca5ecf ->
+  -- load_map 242 {32,61}
   (function() local hb = 0
     return H.driveUntil(function() return not H.worldMode() and map() == 242 end,
       6000, {
@@ -278,7 +308,7 @@ H.run({ maxFrames = 80000 }, {
           killBitAll(); H.setPad(hb % 8 < 4 and { "a" } or {}); return
         end
         H.setPad({ left = true })
-      end) }, "step LEFT onto (121,187) -> the Vector trigger") end)(),
+      end) }, "hold LEFT onto (121,187) -> the Vector trigger") end)(),
   H.waitUntil(function()
     return map() == 242 and H.hasControl() and H.tileAligned()
       and bright() >= 15 and not H.dialogWaiting()

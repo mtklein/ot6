@@ -117,6 +117,38 @@ H.run({ maxFrames = 90000 }, {
   H.release(),
   H.waitFrames(30),
 
+  -- ...and then WAIT FOR IT AGAIN, because a fixed 30-frame pause lands in a
+  -- window where the world map makes the battle gate lie.  Measured here on
+  -- the Blackjack arrival, per frame for 600 frames after the ride:
+  --
+  --   f19494..f19521   $7E3BF4 = $5554   worldHasControl() true
+  --   f19521..f19596   $7E3BF4 = $0000   worldHasControl() FALSE  (75 frames)
+  --   f19596..f20094   $7E3BF4 = $5554   worldHasControl() true
+  --
+  -- $7E3BF4 is the party battle-HP table only while the BATTLE module owns
+  -- that RAM; the world module reuses the same bytes for map data, and it
+  -- zeroes them for 75 frames during the arrival redraw.  Since 62ccab7
+  -- (#24) M.battleLoadStarted() is "slot 0 is not $FFFF", so it reads $0000
+  -- as a live battle, and worldHasControl() -- which is gated on it -- goes
+  -- false.  The old predicate rejected 0 and never saw this.
+  --
+  -- The ride's own terminator already demands 30 consecutive good frames, so
+  -- it exits legitimately; the blind waitFrames(30) then walked straight
+  -- into the dead window and asserted there ("world map is controllable: got
+  -- false, want true").  Nothing here is relaxed: the run still has to reach
+  -- a genuinely controllable, aligned world frame, and now the state is
+  -- MINTED on one too rather than possibly inside the redraw -- which
+  -- matters, because every downstream generator boots this .mss and would
+  -- inherit a first frame the battle gate calls a battle.
+  (function()
+    local calm = 0
+    return H.waitUntil(function()
+      calm = (map() == 0 and H.worldHasControl() and H.worldAligned())
+             and calm + 1 or 0
+      return calm >= 45
+    end, 6000, "a settled, controllable world frame to mint on", 1)
+  end)(),
+
   H.call(function()
     H.assertEq(sw(0x034B), 0, "$034B clear -- Ultros 2 / Opera complete")
     H.assertEq(sw(0x005D), 1, "$005D set -- Setzer accepted the bargain")

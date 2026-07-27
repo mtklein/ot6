@@ -31,7 +31,16 @@
 -- is logged below.
 --
 -- ############################################################################
--- ## THIS GENERATOR DOES NOT MINT.  IT IS THE MEASUREMENT OF WHY.           ##
+-- ## THE BLOCK BELOW IS HISTORY.  IT WAS CLEARED ON 2026-07-27 (#21).       ##
+-- ## Everything from "THIS GENERATOR DOES NOT MINT" to "PARTY: LOCKE ALONE" ##
+-- ## described a ride fought SOLO because the fixture chain walked out of   ##
+-- ## Zozo two-handed.  Its own "WHAT WOULD UNBLOCK THIS" has now happened:  ##
+-- ## gen_zozo5_ramuh seats SABIN and EDGAR at the leave cutscene's          ##
+-- ## party_menu, the whole chain and the tracked post-opera-v1 anchor were  ##
+-- ## re-minted from it, and minecart_doorstep now boots LOCKE + SABIN +     ##
+-- ## EDGAR (measured: $1850 LOCKE=$51 EDGAR=$C1 SABIN=$49, CELES=$00 after  ##
+-- ## the tube room).  The solo measurements below are kept verbatim as the  ##
+-- ## fail-before record; the assertions at the doorstep now require three.  ##
 -- ############################################################################
 --
 -- Run against minecart_doorstep it rides the cutscene correctly and fights
@@ -263,13 +272,18 @@ H.run({ maxFrames = 100000 }, {
     H.assertEq(H.readByte(0x087f + H.readWord(0x0803)), 0, "booted facing CID")
     H.assertEq(sw(0x02BC), 0, "$02BC CLEAR at boot")
     H.assertEq(sw(0x0069), 0, "$0069 CLEAR at boot")
-    local cur, n = H.readByte(0x1A6D), 0
+    -- THREE, not one -- see the history block at the top of this file.
+    -- Named as well as counted: the count alone would stay green if the
+    -- chain swapped EDGAR for CYAN somewhere upstream.
+    local cur, n, who = H.readByte(0x1A6D), 0, {}
     for c = 0, 13 do
       local b = H.readByte(0x1850 + c)
-      if b ~= 0 and (b & 0x07) == cur then n = n + 1 end
+      if b ~= 0 and (b & 0x07) == cur then n = n + 1; who[c] = true end
     end
-    H.assertEq(n, 1, "the minecart is ridden by ONE character")
-    H.assertEq(H.readByte(0x1850 + 1) & 0x07, cur, "and it is LOCKE")
+    H.assertEq(n, 3, "the minecart is ridden by THREE characters")
+    H.assertEq(who[0x01] == true, true, "and they are LOCKE...")
+    H.assertEq(who[0x05] == true, true, "...SABIN (the bludgeon slot)...")
+    H.assertEq(who[0x04] == true, true, "...and EDGAR (pierce + Tools)")
     H.log(partyReport("minecart_doorstep"))
   end),
 

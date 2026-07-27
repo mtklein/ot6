@@ -30,14 +30,24 @@ end
 -- ride a cutscene: edge-A through dialog, START through a menu ($0059), and
 -- when parked flag-less with no field control, alternate A/START (clears the
 -- name_menu too).  Stall gated on hasControl (gen_zozo5's issue-#3 fix).
+--
+-- THE MENU TEST COMES FIRST, and it has to.  Since 62ccab7 (#24)
+-- battleLoadStarted() is "$7E3BF4 is not $FFFF", and the MENU MODULE zeroes
+-- that word: measured on the Zozo leave cutscene, $7E3BF4 reads $FFFF for
+-- every field frame and $0000 for every frame a menu is up.  So the battle
+-- branch answers true throughout the Setzer name_menu, and with it on top
+-- this driver would edge-A the name grid instead of committing it with
+-- START -- and kill-bit $7E3EEC.. while those bytes belong to the menu.
+-- gen_zozo5_ramuh's leave cutscene is the case that measured it: blind A on
+-- a party_menu walks into a character's Status page and never comes out.
 local function rideOpen(pred, maxFrames, what)
   local aPh,sPh,stallN,lx,ly = 0,0,0,-1,-1
   return H.driveUntil(function() local d=pred(); if d then H.setPad({}) end; return d end,
     maxFrames, { H.call(function()
       aPh=(aPh+1)%8; sPh=(sPh+1)%16
       local x,y=H.fieldX(),H.fieldY(); local moving=(x~=lx or y~=ly); lx,ly=x,y
-      if H.battleLoadStarted() then killBitAll(); stallN=0; H.setPad(aPh<4 and {"a"} or {}); return end
       if menuOpen() then stallN=0; H.setPad(sPh<6 and {"start"} or {}); return end
+      if H.battleLoadStarted() then killBitAll(); stallN=0; H.setPad(aPh<4 and {"a"} or {}); return end
       if H.dialogWaiting() then stallN=0; H.setPad(aPh<4 and {"a"} or {}); return end
       if not moving and not H.hasControl() then stallN=stallN+1 else stallN=0 end
       if stallN>=180 then
