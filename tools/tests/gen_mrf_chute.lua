@@ -37,7 +37,7 @@
 -- -- both are `mod_bg_tiles BG1/BG2 {19,24}` door frames guarded by the
 -- once-per-tile latch $01B5 (which is $1EB6 bit 5, cleared by player.asm
 -- :529-531 on every step, NOT a story switch -- see gen_vector_sneak.lua).
-local H = dofile("/Users/mtklein/ot6/tools/tests/lib/ot6.lua")
+local H = dofile("tools/tests/lib/ot6.lua")
 
 local function map() return H.mapId() & 0x1ff end
 local function bright() return emu.getState()["ppu.screenBrightness"] or 0 end
@@ -169,7 +169,7 @@ local function census(tag, targets)
 end
 
 H.run({ maxFrames = 60000 }, {
-  H.loadState("/Users/mtklein/ot6/build/states/mrf_entry.mss.lua"),
+  H.loadState("build/states/mrf_entry.mss.lua"),
   H.waitFrames(150),
   H.call(function()
     H.assertEq(mapTitleHere(), "MAGITEK FACTORY", "booted in the MAGITEK FACTORY")

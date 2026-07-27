@@ -23,7 +23,7 @@
 -- {21,17}, jump_low DOWN_RIGHT -> {22,18}, `player_ctrl_on`.  So the
 -- expected landing is map 263 at {22,18}; the assertion below is the first
 -- live confirmation of that read.
-local H = dofile("/Users/mtklein/ot6/tools/tests/lib/ot6.lua")
+local H = dofile("tools/tests/lib/ot6.lua")
 
 local function map() return H.mapId() & 0x1ff end
 local function bright() return emu.getState()["ppu.screenBrightness"] or 0 end
@@ -156,7 +156,7 @@ end
 
 
 H.run({ maxFrames = 60000 }, {
-  H.loadState("/Users/mtklein/ot6/build/states/mrf_chute.mss.lua"),
+  H.loadState("build/states/mrf_chute.mss.lua"),
   H.waitFrames(150),
   H.call(function()
     H.assertEq(mapTitleHere(), "MAGITEK FACTORY", "booted in the MAGITEK FACTORY")

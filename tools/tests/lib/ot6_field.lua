@@ -11,7 +11,7 @@
 -- argument (the `local M = ...` below).  Test scripts keep their one-line
 -- contract
 --
---   local H = dofile("/Users/mtklein/ot6/tools/tests/lib/ot6.lua")
+--   local H = dofile("tools/tests/lib/ot6.lua")
 --
 -- and see ONE merged H; nothing anywhere references this file's path at
 -- runtime.  Everything here installs onto that shared table through the

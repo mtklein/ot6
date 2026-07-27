@@ -24,7 +24,7 @@
 -- {3,5} -> map 270 (the save room) and {9,5} -> map 269 (the way onward).
 -- So the alcove is sealed until the fight is done, and `$0273` (set by
 -- _cc7937 at :95313) additionally locks _cc75f6, the way back up to 263.
-local H = dofile("/Users/mtklein/ot6/tools/tests/lib/ot6.lua")
+local H = dofile("tools/tests/lib/ot6.lua")
 
 local function map() return H.mapId() & 0x1ff end
 local function bright() return emu.getState()["ppu.screenBrightness"] or 0 end
@@ -157,7 +157,7 @@ end
 
 
 H.run({ maxFrames = 60000 }, {
-  H.loadState("/Users/mtklein/ot6/build/states/mrf_kefka.mss.lua"),
+  H.loadState("build/states/mrf_kefka.mss.lua"),
   H.waitFrames(150),
   H.call(function()
     H.assertEq(map(), 263, "booted on map 263")

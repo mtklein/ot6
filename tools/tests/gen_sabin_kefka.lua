@@ -48,8 +48,8 @@
 -- walking (121 -> 123 -> 124, where trigger (28,36) fires the family scene
 -- _cb1283 at :40863), so it is the next leg's problem and this one stops
 -- on the first controllable frame of map 121.
-local H = dofile("/Users/mtklein/ot6/tools/tests/lib/ot6.lua")
-local DOOR = "/Users/mtklein/ot6/build/states/camp_intro.mss.lua"
+local H = dofile("tools/tests/lib/ot6.lua")
+local DOOR = "build/states/camp_intro.mss.lua"
 
 local function map() return H.mapId() & 0x1ff end
 local function bright() return emu.getState()["ppu.screenBrightness"] or 0 end

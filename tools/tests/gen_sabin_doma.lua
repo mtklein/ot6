@@ -28,8 +28,8 @@
 -- _cba395 (:62307, "Here, too...") -- and neither gates the family scene:
 -- _cb1283 opens `if_switch $007D=1, EventReturn` and nothing else, so the
 -- only thing between CYAN and his house is walking there.  Both are skipped.
-local H = dofile("/Users/mtklein/ot6/tools/tests/lib/ot6.lua")
-local DOOR = "/Users/mtklein/ot6/build/states/kefka_done.mss.lua"
+local H = dofile("tools/tests/lib/ot6.lua")
+local DOOR = "build/states/kefka_done.mss.lua"
 
 local function map() return H.mapId() & 0x1ff end
 local function bright() return emu.getState()["ppu.screenBrightness"] or 0 end

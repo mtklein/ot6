@@ -54,7 +54,7 @@
 -- `switch $01F0=0` and `player_ctrl_on` (event_main.asm:100029-100105).
 -- (57,34) confirmed live below -- it was read off the move list, which is
 -- probe item 9 in docs/design/vector-route-recon.md.
-local H = dofile("/Users/mtklein/ot6/tools/tests/lib/ot6.lua")
+local H = dofile("tools/tests/lib/ot6.lua")
 
 local function map() return H.mapId() & 0x1ff end
 local function bright() return emu.getState()["ppu.screenBrightness"] or 0 end
@@ -151,7 +151,7 @@ local function talkPick(idx, doneId, maxFrames, what)
 end
 
 H.run({ maxFrames = 60000 }, {
-  H.loadState("/Users/mtklein/ot6/build/states/vector_doorstep.mss.lua"),
+  H.loadState("build/states/vector_doorstep.mss.lua"),
   H.waitFrames(150),
   H.call(function()
     H.assertEq(mapTitleHere(), "VECTOR", "booted in VECTOR (live map title)")

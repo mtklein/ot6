@@ -13,8 +13,8 @@
 -- This is a route fixture, not a combat test, so it uses the established
 -- kill-bit idiom after positively identifying Ultros 2 ($012d).  The real
 -- battle contract remains battle_ultros2.lua, which boots the same doorstep.
-local H = dofile("/Users/mtklein/ot6/tools/tests/lib/ot6.lua")
-local DOOR = "/Users/mtklein/ot6/build/states/ultros2_doorstep.mss.lua"
+local H = dofile("tools/tests/lib/ot6.lua")
+local DOOR = "build/states/ultros2_doorstep.mss.lua"
 
 local ULTROS2 = 0x012d
 local aPhase = 0

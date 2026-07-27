@@ -30,8 +30,8 @@
 --   tile*256+fraction; $DF/$E1 low bytes are the sub-tile fractions),
 --   $E3/$E5 velocity, $F6 facing, $E7 bit0 = world event running,
 --   $19 = fade/exit trigger, $E8 bit0 = menu opening.
-local H = dofile("/Users/mtklein/ot6/tools/tests/lib/ot6.lua")
-local CLEARED = "/Users/mtklein/ot6/build/states/moogle_cleared.mss.lua"
+local H = dofile("tools/tests/lib/ot6.lua")
+local CLEARED = "build/states/moogle_cleared.mss.lua"
 
 local function calm(n, extra)
   local cnt = 0

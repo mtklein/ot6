@@ -64,8 +64,8 @@
 -- -> formation 38 (3/4) or 39 (1/4).  The species, hp and OT6 shield counts
 -- are read off battle RAM on each fight's rising edge and logged, because a
 -- balance claim about this leg has to rest on what the ROM actually seeds.
-local H = dofile("/Users/mtklein/ot6/tools/tests/lib/ot6.lua")
-local HUB = "/Users/mtklein/ot6/build/states/scenario_hub.mss.lua"
+local H = dofile("tools/tests/lib/ot6.lua")
+local HUB = "build/states/scenario_hub.mss.lua"
 
 local function map() return H.mapId() & 0x1ff end
 local function bright() return emu.getState()["ppu.screenBrightness"] or 0 end

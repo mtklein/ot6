@@ -29,7 +29,7 @@
 --
 -- ROSTER (measured): active party = LOCKE (leader) + CELES only; the Zozo
 -- leave-cutscene's forced party_menu {LOCKE,CELES} set exactly these two.
-local H = dofile("/Users/mtklein/ot6/tools/tests/lib/ot6.lua")
+local H = dofile("tools/tests/lib/ot6.lua")
 
 local function map() return H.mapId() & 0x1ff end
 local function bright() return emu.getState()["ppu.screenBrightness"] or 0 end
@@ -76,7 +76,7 @@ local function worldGrind(tx, ty, what)
 end
 
 H.run({ maxFrames = 120000 }, {
-  H.loadState("/Users/mtklein/ot6/build/states/zozo_done.mss.lua"),
+  H.loadState("build/states/zozo_done.mss.lua"),
   H.waitFrames(120),
   H.call(function()
     H.assertEq(map(), 221, "booted on Zozo street (map 221)")

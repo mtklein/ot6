@@ -54,8 +54,8 @@
 -- the state gen_narshe_battle boots.  The fork is written from the
 -- measured spike ride; it has not yet had a live all-three run (that
 -- needs Sabin's ending), which is exactly the run that will prove it.
-local H = dofile("/Users/mtklein/ot6/tools/tests/lib/ot6.lua")
-local CLIFF = "/Users/mtklein/ot6/build/states/terra_clifftop.mss.lua"
+local H = dofile("tools/tests/lib/ot6.lua")
+local CLIFF = "build/states/terra_clifftop.mss.lua"
 
 local function map() return H.mapId() & 0x1ff end
 local function bright() return emu.getState()["ppu.screenBrightness"] or 0 end

@@ -11,7 +11,7 @@
 -- IMPORTANT: the WoB story encounter is `_cabf4b` -> battle 104.  Battle 134
 -- belongs to the WoR Opera House dragon/weight event (`$0387=1`); older route
 -- notes incorrectly conflated the two.
-local H = dofile("/Users/mtklein/ot6/tools/tests/lib/ot6.lua")
+local H = dofile("tools/tests/lib/ot6.lua")
 
 local function map() return H.mapId() & 0x1ff end
 local function bright() return emu.getState()["ppu.screenBrightness"] or 0 end
@@ -107,7 +107,7 @@ local function toDoor(tx,ty,bumpDir,destMap,what)
 end
 
 H.run({ maxFrames = 90000 }, {
-  H.loadState("/Users/mtklein/ot6/build/states/opera_dance_done.mss.lua"),
+  H.loadState("build/states/opera_dance_done.mss.lua"),
   H.waitFrames(60),
   H.call(function()
     -- BOOT INVARIANTS (these are the only lines this file can guarantee until

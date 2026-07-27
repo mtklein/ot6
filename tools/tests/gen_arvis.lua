@@ -10,8 +10,8 @@
 -- and Terra wakes alone in Arvis's house (map 30).  advanceStory rides all
 -- of it out.  Emits arvis_wake.mss at the first calm control point, plus
 -- progress screenshots, and logs the roster + command lists the fixture has.
-local H = dofile("/Users/mtklein/ot6/tools/tests/lib/ot6.lua")
-local DOORSTEP = "/Users/mtklein/ot6/build/states/whelk_doorstep.mss.lua"
+local H = dofile("tools/tests/lib/ot6.lua")
+local DOORSTEP = "build/states/whelk_doorstep.mss.lua"
 
 -- goal-fight signature (same as gen_whelk): 0x134 "Head" is the distinctive
 -- word; $57C0 is battle scratch, so gate every read on battleLoadStarted

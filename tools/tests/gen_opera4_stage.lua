@@ -15,7 +15,7 @@
 --    $0055=1 & $0056=0.  Talking her ({99,21} facing UP, A) runs the pre-aria
 --    dialog _caba44->_cabaa8, which sets $0056=1 and hands control back at
 --    {99,20}.  The aria trigger _cabafd {97,7} then fires ($0056=1 & $0057=0).
-local H = dofile("/Users/mtklein/ot6/tools/tests/lib/ot6.lua")
+local H = dofile("tools/tests/lib/ot6.lua")
 local function map() return H.mapId() & 0x1ff end
 local function bright() return emu.getState()["ppu.screenBrightness"] or 0 end
 local function sw(id) return (H.readByte(0x1E80 + math.floor(id/8)) >> (id%8)) & 1 end
@@ -45,7 +45,7 @@ local function toDoor(tx,ty,bumpDir,destMap,what)
 end
 
 H.run({ maxFrames = 60000 }, {
-  H.loadState("/Users/mtklein/ot6/build/states/opera_backstage.mss.lua"),
+  H.loadState("build/states/opera_backstage.mss.lua"),
   H.waitFrames(60),
   H.call(function()
     H.assertEq(map(), 234, "boot backstage (map 234)")

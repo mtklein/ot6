@@ -23,7 +23,7 @@
 --    "Next stop, Kohlingen!", $010C=1 (event_main.asm:15577-15607)
 --  * dialog choices land in $056E (EventCmd_b6, field/event.asm:4784);
 --    index 0 is the default, so a plain A edge picks Kohlingen
-local H = dofile("/Users/mtklein/ot6/tools/tests/lib/ot6.lua")
+local H = dofile("tools/tests/lib/ot6.lua")
 
 local function map() return H.mapId() & 0x1ff end
 local function bright() return emu.getState()["ppu.screenBrightness"] or 0 end
@@ -74,7 +74,7 @@ local function door(nx, ny, dir, m, what)
 end
 
 H.run({ maxFrames = 90000 }, {
-  H.loadState("/Users/mtklein/ot6/build/states/kefka_won.mss.lua"),
+  H.loadState("build/states/kefka_won.mss.lua"),
   H.waitFrames(30),
   H.call(function()
     H.assertEq(map(), 30, "booted in Arvis's house (map 30)")

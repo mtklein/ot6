@@ -22,8 +22,8 @@
 --
 -- Map 112 has no NPCs and no event triggers at all (NPCProp::_112 and
 -- EventTrigger::_112 are both empty), so nothing else here can fire.
-local H = dofile("/Users/mtklein/ot6/tools/tests/lib/ot6.lua")
-local DOOR = "/Users/mtklein/ot6/build/states/banon_joined.mss.lua"
+local H = dofile("tools/tests/lib/ot6.lua")
+local DOOR = "build/states/banon_joined.mss.lua"
 
 local function map() return H.mapId() & 0x1ff end
 local function bright() return emu.getState()["ppu.screenBrightness"] or 0 end

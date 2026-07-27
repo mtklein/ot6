@@ -100,8 +100,8 @@
 --        horizontal -- row y=37, x=0..27 -> world (102,101).  The party
 --        enters at (14,35), two rows above it, and every leg on this map
 --        is asserted to stay off y=37 before it is walked.
-local H = dofile("/Users/mtklein/ot6/tools/tests/lib/ot6.lua")
-local CLEARED = "/Users/mtklein/ot6/build/states/figaro_cleared.mss.lua"
+local H = dofile("tools/tests/lib/ot6.lua")
+local CLEARED = "build/states/figaro_cleared.mss.lua"
 
 -- map compares stay MASKED: loaders ride flag bits in $1F64's high byte
 local function map() return H.mapId() & 0x1ff end

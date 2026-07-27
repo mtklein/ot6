@@ -34,8 +34,8 @@
 --   hub.  (The reunion if_all needs $0021+$001E+$0044 in ONE playthrough;
 --   the honest chain has only $0044, so the hub speaks and hands control
 --   back -- the stacked replays are where the reunion fires.)
-local H = dofile("/Users/mtklein/ot6/tools/tests/lib/ot6.lua")
-local DOOR = "/Users/mtklein/ot6/build/states/gau_joined.mss.lua"
+local H = dofile("tools/tests/lib/ot6.lua")
+local DOOR = "build/states/gau_joined.mss.lua"
 
 local function mapIdx() return H.readWord(0x1f64) & 0x3FF end
 local function bright() return emu.getState()["ppu.screenBrightness"] or 0 end

@@ -23,7 +23,7 @@
 -- (:94409) -- the scene where Kefka drains the espers.  Its tail
 -- (:94620-94622) is `switch $005F=1 / unlock_camera / player_ctrl_on`,
 -- and $005F is what this leg banks.
-local H = dofile("/Users/mtklein/ot6/tools/tests/lib/ot6.lua")
+local H = dofile("tools/tests/lib/ot6.lua")
 
 local function map() return H.mapId() & 0x1ff end
 local function bright() return emu.getState()["ppu.screenBrightness"] or 0 end
@@ -156,7 +156,7 @@ end
 
 
 H.run({ maxFrames = 60000 }, {
-  H.loadState("/Users/mtklein/ot6/build/states/mrf_263.mss.lua"),
+  H.loadState("build/states/mrf_263.mss.lua"),
   H.waitFrames(150),
   H.call(function()
     H.assertEq(map(), 263, "booted on map 263")

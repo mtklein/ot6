@@ -19,8 +19,8 @@
 --        `load_map 145,{26,11}` (event_main.asm:62961), $017C cleared to 0.
 -- No scripted battles/choices/name-menus on the walk; only field random
 -- encounters (kill-bit-safe trash) and the boarding dialogs (tap-A).
-local H = dofile("/Users/mtklein/ot6/tools/tests/lib/ot6.lua")
-local DOOR = "/Users/mtklein/ot6/build/states/camp_escaped.mss.lua"
+local H = dofile("tools/tests/lib/ot6.lua")
+local DOOR = "build/states/camp_escaped.mss.lua"
 
 local function mapIdx() return H.readWord(0x1f64) & 0x3FF end
 local function bright() return emu.getState()["ppu.screenBrightness"] or 0 end

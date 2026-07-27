@@ -42,8 +42,8 @@
 -- interlude and calls _cb0bc4 (:61737) -- the CAMP's own startup event,
 -- which re-creates SABIN and SHADOW and reloads map 117 at (36,2).  So the
 -- interlude is exactly one fight long and the eleven others are skipped.
-local H = dofile("/Users/mtklein/ot6/tools/tests/lib/ot6.lua")
-local DOOR = "/Users/mtklein/ot6/build/states/sabin_camp.mss.lua"
+local H = dofile("tools/tests/lib/ot6.lua")
+local DOOR = "build/states/sabin_camp.mss.lua"
 
 local function map() return H.mapId() & 0x1ff end
 local function bright() return emu.getState()["ppu.screenBrightness"] or 0 end

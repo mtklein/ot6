@@ -63,8 +63,8 @@
 --    The kill-bit ends it through the scripted if_b_switch $40 win
 --    (227 frames) -- battle_kefka fights him for REAL from the doorstep
 --    mint; this chain run only needs the win.
-local H = dofile("/Users/mtklein/ot6/tools/tests/lib/ot6.lua")
-local BOOT = "/Users/mtklein/ot6/build/states/reunion_ready.mss.lua"
+local H = dofile("tools/tests/lib/ot6.lua")
+local BOOT = "build/states/reunion_ready.mss.lua"
 
 local KEFKA = 0x014A
 

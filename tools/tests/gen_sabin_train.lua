@@ -49,8 +49,8 @@
 -- map 137 with a 1200-frame timer -> auto-exit to the world at (178,93),
 -- SHADOW steps out for the graveside beat and rejoins before the exit
 -- (_cbbedd/_cbbee5).
-local H = dofile("/Users/mtklein/ot6/tools/tests/lib/ot6.lua")
-local DOOR = "/Users/mtklein/ot6/build/states/forest_done.mss.lua"
+local H = dofile("tools/tests/lib/ot6.lua")
+local DOOR = "build/states/forest_done.mss.lua"
 
 local function mapIdx() return H.readWord(0x1f64) & 0x3FF end
 local function bright() return emu.getState()["ppu.screenBrightness"] or 0 end

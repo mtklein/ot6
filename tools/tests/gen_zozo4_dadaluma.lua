@@ -53,7 +53,7 @@
 --    Kefka/Vargas, so the harness kill-bit win is clean: no GameOver,
 --    hide_obj NPC_14, $034A=0, fade_in, control back on (30,13) -- and
 --    the porch opens (towerS (33,10) walked 7 steps after the win).
-local H = dofile("/Users/mtklein/ot6/tools/tests/lib/ot6.lua")
+local H = dofile("tools/tests/lib/ot6.lua")
 local function map() return H.mapId() & 0x1ff end
 local function bright() return emu.getState()["ppu.screenBrightness"] or 0 end
 local function sw(id)
@@ -648,7 +648,7 @@ local function jumpRow(dir, pred, maxFrames, what)
 end
 
 H.run({ maxFrames = 90000 }, {
-  H.loadState("/Users/mtklein/ot6/build/states/zozo_arrival.mss.lua"),
+  H.loadState("build/states/zozo_arrival.mss.lua"),
   H.waitFrames(150),
   H.call(function()
     H.assertEq(map(), 221, "booted on the Zozo street (map 221)")

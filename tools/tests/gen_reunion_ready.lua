@@ -15,8 +15,8 @@
 -- instead of the hub.  This file is where the combined claim is ASSERTED
 -- rather than implied by construction; the mint is a re-save of the same
 -- controllable moment under the canonical name, ~0 replay cost.
-local H = dofile("/Users/mtklein/ot6/tools/tests/lib/ot6.lua")
-local STACKED = "/Users/mtklein/ot6/build/states/t3_reunion_ready.mss.lua"
+local H = dofile("tools/tests/lib/ot6.lua")
+local STACKED = "build/states/t3_reunion_ready.mss.lua"
 
 local function map() return H.mapId() & 0x1ff end
 local function sw(id) return (H.readByte(0x1e80 + (id >> 3)) >> (id & 7)) & 1 end

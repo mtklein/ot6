@@ -147,8 +147,8 @@
 -- a dlg is awkward to build on (every consumer would have to dismiss it
 -- first, and the $BA/$D3 dialog state rides in the savestate), and the
 -- controllable frame is the same story beat by any useful definition.
-local H = dofile("/Users/mtklein/ot6/tools/tests/lib/ot6.lua")
-local DOOR = "/Users/mtklein/ot6/build/states/lete_river.mss.lua"
+local H = dofile("tools/tests/lib/ot6.lua")
+local DOOR = "build/states/lete_river.mss.lua"
 
 local function map() return H.mapId() & 0x1ff end
 local function bright() return emu.getState()["ppu.screenBrightness"] or 0 end

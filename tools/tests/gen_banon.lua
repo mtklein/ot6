@@ -106,8 +106,8 @@
 -- Rather than trust even that, the mint asserts $016B -- the flag _cb002b
 -- sets the instant it fires -- is still clear, which catches it by outcome
 -- no matter which tile the navigator chose.
-local H = dofile("/Users/mtklein/ot6/tools/tests/lib/ot6.lua")
-local DOOR = "/Users/mtklein/ot6/build/states/returner_hideout.mss.lua"
+local H = dofile("tools/tests/lib/ot6.lua")
+local DOOR = "build/states/returner_hideout.mss.lua"
 
 local function map() return H.mapId() & 0x1ff end
 local function bright() return emu.getState()["ppu.screenBrightness"] or 0 end

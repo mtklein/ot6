@@ -38,7 +38,7 @@
 -- into bank $CA makes hasControl() flicker forever.  No settle predicate
 -- can hold on that tile.  gen_zozo3_clock hit the same trap on the clock
 -- tile and solved it the same way.
-local H = dofile("/Users/mtklein/ot6/tools/tests/lib/ot6.lua")
+local H = dofile("tools/tests/lib/ot6.lua")
 
 local function map() return H.mapId() & 0x1ff end
 local function bright() return emu.getState()["ppu.screenBrightness"] or 0 end
@@ -171,7 +171,7 @@ end
 
 
 H.run({ maxFrames = 60000 }, {
-  H.loadState("/Users/mtklein/ot6/build/states/n024_doorstep.mss.lua"),
+  H.loadState("build/states/n024_doorstep.mss.lua"),
   H.waitFrames(150),
   H.call(function()
     H.assertEq(map(), 273, "booted on map 273")

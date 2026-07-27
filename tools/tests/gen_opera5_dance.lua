@@ -34,7 +34,7 @@
 --  * THE TIMER: start_timer 0, 2336, _cabd21 arms as control returns on 236
 --    (~2287 grace).  climb+waltz+flowers+balcony to (8,9) measured ~1360 frames,
 --    then stop_timer -- comfortable margin.
-local H = dofile("/Users/mtklein/ot6/tools/tests/lib/ot6.lua")
+local H = dofile("tools/tests/lib/ot6.lua")
 local function map() return H.mapId() & 0x1ff end
 local function bright() return emu.getState()["ppu.screenBrightness"] or 0 end
 local function sw(id) return (H.readByte(0x1E80 + math.floor(id/8)) >> (id%8)) & 1 end
@@ -167,7 +167,7 @@ b(12,14,{"right"}); b(13,14,{"right"}); b(14,14,{"up"}); b(14,13,{"up"}); b(14,1
 b(14,10,{"left"}); b(13,10,{"left"}); b(12,10,{"left"}); b(11,10,{"up"}); b(11,9,{"left"}); b(10,9,{"left"}); b(9,9,{"left"})
 
 H.run({ maxFrames = 60000 }, {
-  H.loadState("/Users/mtklein/ot6/build/states/opera_stage.mss.lua"),
+  H.loadState("build/states/opera_stage.mss.lua"),
   H.waitFrames(60),
   H.call(function()
     H.assertEq(map(), 238, "boot on the stage (map 238)")

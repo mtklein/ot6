@@ -57,7 +57,7 @@
 -- press goes straight to New Game with no save-select -- the same clean boot
 -- gen_battle_state relies on (gen_battle_state.lua:6-10, README "Input
 -- injection").
-local H = dofile("/Users/mtklein/ot6/tools/tests/lib/ot6.lua")
+local H = dofile("tools/tests/lib/ot6.lua")
 
 -- goal-fight signature (verbatim, gen_whelk.lua:20-26): 0x0134 is the
 -- distinctive Whelk species word; both it and 0x0100 are spared from the

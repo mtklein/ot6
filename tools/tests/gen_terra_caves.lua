@@ -43,8 +43,8 @@
 -- so the arrival tile is one step from the way home.  BFS models passability
 -- and knows nothing about entrance triggers, so the walk into the mines is a
 -- single deliberate held step, not a navTo that might wander back through.
-local H = dofile("/Users/mtklein/ot6/tools/tests/lib/ot6.lua")
-local DOOR = "/Users/mtklein/ot6/build/states/terra_narshe.mss.lua"
+local H = dofile("tools/tests/lib/ot6.lua")
+local DOOR = "build/states/terra_narshe.mss.lua"
 
 local function map() return H.mapId() & 0x1ff end
 local function bright() return emu.getState()["ppu.screenBrightness"] or 0 end

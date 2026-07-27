@@ -55,8 +55,8 @@
 -- detector is $0200 == 1 AND $0059 ~= 0: $0200 alone goes stale after the
 -- menu closes, and $0059 alone is true of any menu.  CYAN (:61204) and GAU
 -- (:66618) hit the same menu later in the arc.
-local H = dofile("/Users/mtklein/ot6/tools/tests/lib/ot6.lua")
-local DOOR = "/Users/mtklein/ot6/build/states/scenario_hub.mss.lua"
+local H = dofile("tools/tests/lib/ot6.lua")
+local DOOR = "build/states/scenario_hub.mss.lua"
 
 local function map() return H.mapId() & 0x1ff end
 local function bright() return emu.getState()["ppu.screenBrightness"] or 0 end

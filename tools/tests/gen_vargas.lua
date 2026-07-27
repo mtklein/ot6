@@ -20,8 +20,8 @@
 -- ALSO ends this fight cleanly -- `if_self_dead / boss_death` sits ahead of
 -- the Pummel branch at :4382 and fires -- but the scripted finish is the one
 -- the story means, so it is the one the fixture is minted through.)
-local H = dofile("/Users/mtklein/ot6/tools/tests/lib/ot6.lua")
-local DOOR = "/Users/mtklein/ot6/build/states/vargas_doorstep.mss.lua"
+local H = dofile("tools/tests/lib/ot6.lua")
+local DOOR = "build/states/vargas_doorstep.mss.lua"
 
 local SABIN_E = 3
 local MENU, ACTOR, MSTATE = 0x7BCA, 0x62CA, 0x7BC2

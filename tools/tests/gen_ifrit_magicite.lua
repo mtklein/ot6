@@ -45,7 +45,7 @@
 -- below.  The combat contract for Ifrit and Shiva belongs in a suite test
 -- booted on ifrit_doorstep.mss, the way battle_ultros2 hangs off
 -- ultros2_doorstep.
-local H = dofile("/Users/mtklein/ot6/tools/tests/lib/ot6.lua")
+local H = dofile("tools/tests/lib/ot6.lua")
 
 local function map() return H.mapId() & 0x1ff end
 local function bright() return emu.getState()["ppu.screenBrightness"] or 0 end
@@ -208,7 +208,7 @@ local function talkTo(dir, pred, maxFrames, what)
 end
 
 H.run({ maxFrames = 60000 }, {
-  H.loadState("/Users/mtklein/ot6/build/states/ifrit_doorstep.mss.lua"),
+  H.loadState("build/states/ifrit_doorstep.mss.lua"),
   H.waitFrames(150),
   H.call(function()
     H.assertEq(map(), 264, "booted on map 264")

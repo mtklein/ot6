@@ -18,7 +18,7 @@
 -- with `mod_bg_tiles` (event_main.asm:94962-95060).  The census below is
 -- measured against the LIVE tilemap the engine actually loaded, so the
 -- next leg can be routed off a fact instead of an offline guess.
-local H = dofile("/Users/mtklein/ot6/tools/tests/lib/ot6.lua")
+local H = dofile("tools/tests/lib/ot6.lua")
 
 local function map() return H.mapId() & 0x1ff end
 local function bright() return emu.getState()["ppu.screenBrightness"] or 0 end
@@ -112,7 +112,7 @@ local function census(tag, targets)
 end
 
 H.run({ maxFrames = 60000 }, {
-  H.loadState("/Users/mtklein/ot6/build/states/vector_sneak.mss.lua"),
+  H.loadState("build/states/vector_sneak.mss.lua"),
   H.waitFrames(150),
   H.call(function()
     H.assertEq(mapTitleHere(), "VECTOR", "booted in VECTOR (live map title)")

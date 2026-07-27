@@ -66,8 +66,8 @@
 --    against reading as story state) opens only an internal shortcut on map
 --    84, not a cave exit.  The clock key is taken anyway -- it costs nothing
 --    and leaves the state faithful to a real playthrough.
-local H = dofile("/Users/mtklein/ot6/tools/tests/lib/ot6.lua")
-local DOOR = "/Users/mtklein/ot6/build/states/sfigaro_passage.mss.lua"
+local H = dofile("tools/tests/lib/ot6.lua")
+local DOOR = "build/states/sfigaro_passage.mss.lua"
 
 -- map compares stay MASKED: loaders ride flag bits in $1F64's high byte
 local function map() return H.mapId() & 0x1ff end

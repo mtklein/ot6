@@ -12,7 +12,7 @@
 -- {118,24} with control and $0340=1/$010E=1.  Travel anchors: 209's {118,29}
 -- door -> Jidoor {16,14}; Jidoor's SOUTH edge (long-entrance src{0,63} HORIZ
 -- len31) -> world {27,132}; world -> opera approach {45,153} -> step DOWN.
-local H = dofile("/Users/mtklein/ot6/tools/tests/lib/ot6.lua")
+local H = dofile("tools/tests/lib/ot6.lua")
 local function map() return H.mapId() & 0x1ff end
 local function bright() return emu.getState()["ppu.screenBrightness"] or 0 end
 local function sw(id) return (H.readByte(0x1E80 + math.floor(id/8)) >> (id%8)) & 1 end
@@ -70,7 +70,7 @@ local function pushTo(dir, destMap, maxFrames, what)
 end
 
 H.run({ maxFrames = 120000 }, {
-  H.loadState("/Users/mtklein/ot6/build/states/opera_doorstep.mss.lua"),
+  H.loadState("build/states/opera_doorstep.mss.lua"),
   H.waitFrames(60),
   H.call(function()
     H.assertEq(map(), 209, "boot map 209")

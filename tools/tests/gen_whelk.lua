@@ -11,8 +11,8 @@
 -- screenshot.  Deterministic by construction (the harness pins AllZeros
 -- power-on RAM + no frame skipping + a pre-launch srm wipe): PASS at
 -- frame 2813 with byte-identical artifacts every run, ~8.5 s wall.
-local H = dofile("/Users/mtklein/ot6/tools/tests/lib/ot6.lua")
-local SRM = "/Users/mtklein/ot6/build/states/playthrough_srm.mss.lua"
+local H = dofile("tools/tests/lib/ot6.lua")
+local SRM = "build/states/playthrough_srm.mss.lua"
 
 -- goal-fight signature: during the Whelk fight the six formation species
 -- words at $57C0 read 0x0100 and 0x0134 (NOT 0x135 -- measured, the old

@@ -93,7 +93,7 @@
 -- Number 128 included, is a solo fight.  Asserted at the doorstep so the
 -- balance work has a measurement to stand on rather than
 -- docs/design/bosses-wob.md §15's "three".
-local H = dofile("/Users/mtklein/ot6/tools/tests/lib/ot6.lua")
+local H = dofile("tools/tests/lib/ot6.lua")
 
 local function map() return H.mapId() & 0x1ff end
 local function bright() return emu.getState()["ppu.screenBrightness"] or 0 end
@@ -263,7 +263,7 @@ local function rideDriver(pred, maxFrames, what)
 end
 
 H.run({ maxFrames = 100000 }, {
-  H.loadState("/Users/mtklein/ot6/build/states/minecart_doorstep.mss.lua"),
+  H.loadState("build/states/minecart_doorstep.mss.lua"),
   H.waitFrames(150),
   H.call(function()
     H.assertEq(map(), 272, "booted on map 272")

@@ -62,8 +62,8 @@
 -- `if_switch $0037=1, WorldReturn`, and the escape has set $0037, so
 -- re-stepping it returns instead of re-entering.  The mint is taken on the
 -- first settled world frame, before any walk, so the fixture is unambiguous.
-local H = dofile("/Users/mtklein/ot6/tools/tests/lib/ot6.lua")
-local DOOR = "/Users/mtklein/ot6/build/states/camp_cleared.mss.lua"
+local H = dofile("tools/tests/lib/ot6.lua")
+local DOOR = "build/states/camp_cleared.mss.lua"
 
 local function map() return H.mapId() & 0x1ff end
 local function bright() return emu.getState()["ppu.screenBrightness"] or 0 end

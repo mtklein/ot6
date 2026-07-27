@@ -260,25 +260,26 @@ def stack_rewrite(script: str, prefix: str) -> str:
 def resolve_sidecar(ref, root):
     """Pick the sidecar file a "<path>.mss.lua" reference should embed.
 
-    Consumer tests write tree-relative references ("build/states/x.mss.lua",
-    issue #26); the gen_*.lua generators still carry the MAIN tree's absolute
-    path, because their bytes are hashed into the frontier freshness stamps
-    (lib/frontier_stamp.sh) and rewriting them means re-minting the whole
-    chain -- migrate them when a full remint is scheduled anyway.  Either
-    way THIS TREE'S OWN build/states wins outright over the literal path --
-    the literal is a naming convention, not a claim about which tree's bytes
-    the caller wants.  Composition is already tree-local everywhere else:
-    LIB ignores the script's literal dofile path in exactly the same way.
+    Every test writes tree-relative references ("build/states/x.mss.lua") --
+    the last absolute literals (the gen_*.lua's) migrated in the remint
+    window that followed issue #26, so an ABSOLUTE reference is now refused
+    outright rather than resolved.  That makes the whole #26 class
+    structural: an absolute path is how a test comes to mean "some other
+    tree's bytes", and the eleven stale-worktree literals that motivated
+    the issue could not have been written under this rule.  Composition is
+    already tree-local everywhere else: LIB ignores the script's literal
+    dofile path in exactly the same way.
 
     Precedence, per reference:
+      0. an absolute literal -> raise CrossTree, always -- even one naming
+         this very tree, which would only mean "works until the tree moves"
       1. <root>/build/states/<basename>       -- always wins if present
-      2. the literal path, if it lies inside <root> -- a RELATIVE literal
-         is anchored at <root> (never the composer's cwd, which would make
-         resolution depend on where make/run.sh was invoked from)
-      3. literal exists but points OUT of <root>, or into a NESTED git
-         tree inside <root> (an agent worktree under .claude/worktrees/
-         sits inside the main tree on disk but is a different checkout
-         with a different ROM) -> raise CrossTree
+      2. the literal anchored at <root> (never the composer's cwd, which
+         would make resolution depend on where make/run.sh was invoked)
+      3. the anchored literal escapes <root> (via ..) or crosses into a
+         NESTED git tree inside <root> (an agent worktree under
+         .claude/worktrees/ sits inside the main tree on disk but is a
+         different checkout with a different ROM) -> raise CrossTree
       4. nowhere -> None; embed nothing, the lib raises "sidecar not
          embedded" at loadState, which is already a clear failure
 
@@ -295,19 +296,22 @@ def resolve_sidecar(ref, root):
     ("Refusing the run beats reporting a green that never had the pins") --
     a fixture is no weaker a guarantee than a settings file.
 
-    The MAIN tree cannot reach rule 3 via its own literals: there the
-    literal IS the rule-1 path.  It CAN reach it via a literal naming a
-    nested worktree (issue #26: eleven tests were authored inside
-    .claude/worktrees/agent-a7ce... and kept that tree's absolute paths) --
-    without the nested-tree check, such a literal passes the
-    is_relative_to(root) test and silently borrows the other checkout's
-    fixture whenever this tree lacks the basename.
+    Rule 0 subsumes what the nested-worktree check used to be the last line
+    of defense for (issue #26: eleven tests authored inside
+    .claude/worktrees/agent-a7ce... kept that tree's absolute paths, which
+    passed is_relative_to(root) and silently borrowed the other checkout's
+    fixture).  The nested-.git check stays: a RELATIVE path can still be
+    spelled through a nested checkout, and refusing it must not depend on
+    how the reference was written.
     """
-    local, literal = root / "build" / "states" / Path(ref).name, Path(ref)
+    literal = Path(ref)
+    if literal.is_absolute():
+        raise CrossTree(f"{ref} -- absolute sidecar reference; "
+                        f"write it tree-relative (build/states/...)")
+    local = root / "build" / "states" / literal.name
     if local.exists():
         return local
-    if not literal.is_absolute():
-        literal = root / literal
+    literal = root / literal
     if literal.exists():
         resolved = literal.resolve()
         if not resolved.is_relative_to(root):
@@ -357,52 +361,50 @@ def selftest() -> int:
         w_state = work / "build" / "states" / "s.mss.lua"
         m_state.write_text('return "TUFJTg=="\n')
         w_state.write_text('return "V09SSw=="\n')
-        ref = str(m_state)   # scripts hardcode the MAIN tree's path
 
-        # 1. THE REGRESSION: both trees have it; the composing tree wins.
-        check("worktree copy beats the hardcoded main-tree path",
-              resolve_sidecar(ref, work), w_state)
-        # 2. Main tree composing its own reference is untouched.
-        check("main tree resolves its own literal",
-              resolve_sidecar(ref, main_tree), m_state)
-        # 3. Local copy missing + literal outside the tree -> refuse.
-        w_state.unlink()
-        try:
-            resolve_sidecar(ref, work)
-            check("cross-tree reference refused", "returned a path", "CrossTree")
-        except CrossTree:
-            check("cross-tree reference refused", "CrossTree", "CrossTree")
-        # 4. Missing everywhere -> None (the lib raises at loadState).
-        check("absent everywhere yields None",
-              resolve_sidecar(str(main_tree / "build" / "states" / "nope.mss.lua"),
-                              work), None)
-        # 5. In-tree literal outside build/states still resolves (rule 2).
+        def refused(label, ref, tree):
+            try:
+                got = resolve_sidecar(ref, tree)
+                check(label, f"returned {got}", "CrossTree")
+            except CrossTree:
+                check(label, "CrossTree", "CrossTree")
+
+        # 0. RULE 0: an absolute reference is refused no matter whose tree
+        # it names -- including the composing tree's own path.  The pre-#26
+        # regression (a worktree composing the main tree's hardcoded path)
+        # is now unreachable by construction rather than out-resolved.
+        refused("absolute ref refused even naming the composing tree",
+                str(w_state), work)
+        refused("absolute ref into another tree refused", str(m_state), work)
+        # 1. This tree's build/states wins on basename, wherever the
+        # relative literal points.
+        check("local basename copy beats the literal's location",
+              resolve_sidecar("fixtures/s.mss.lua", work), w_state)
+        # 2. A relative literal anchors at the composing tree's root, never
+        # the composer's cwd (which belongs to whoever invoked make).
         odd = work / "fixtures"
         odd.mkdir()
         (odd / "x.mss.lua").write_text('return "WA=="\n')
-        check("in-tree literal outside build/states still resolves",
-              resolve_sidecar(str(odd / "x.mss.lua"), work), odd / "x.mss.lua")
-        # 6. THE ISSUE #26 HOLE: a literal naming a NESTED worktree passes
-        # is_relative_to(main_tree) -- it must still be refused, because the
-        # nested tree is a different checkout minted from a different ROM.
-        # (A worktree's top carries .git as a FILE; model that exactly.)
+        check("relative literal resolves against the tree root",
+              resolve_sidecar("fixtures/x.mss.lua", work), odd / "x.mss.lua")
+        # 3a. Escaping the tree via .. is refused, not resolved.
+        (tmp / "outside.mss.lua").write_text('return "T1VU"\n')
+        refused("dot-dot escape refused", "../../../../outside.mss.lua", work)
+        # 3b. THE ISSUE #26 HOLE, relative form: a reference spelled
+        # through a NESTED worktree stays inside root but names a different
+        # checkout minted from a different ROM.  (A worktree's top carries
+        # .git as a FILE; model that exactly.)
         nested = main_tree / ".claude" / "worktrees" / "agent-b"
         (nested / "build" / "states").mkdir(parents=True)
         (nested / ".git").write_text("gitdir: /somewhere/else\n")
         n_state = nested / "build" / "states" / "nested_only.mss.lua"
         n_state.write_text('return "TkVTVA=="\n')
-        try:
-            got = resolve_sidecar(str(n_state), main_tree)
-            check("nested-worktree literal refused", f"returned {got}",
-                  "CrossTree")
-        except CrossTree:
-            check("nested-worktree literal refused", "CrossTree", "CrossTree")
-        # 7. A RELATIVE literal is anchored at the composing tree's root,
-        # never the composer's cwd (which belongs to whoever invoked make).
-        rel = work / "fixtures" / "rel.mss.lua"   # outside build/states, so
-        rel.write_text('return "UkVMQQ=="\n')      # rule 1 cannot mask this
-        check("relative literal resolves against the tree root",
-              resolve_sidecar("fixtures/rel.mss.lua", work), rel)
+        refused("nested-worktree reference refused",
+                ".claude/worktrees/agent-b/build/states/nested_only.mss.lua",
+                main_tree)
+        # 4. Missing everywhere -> None (the lib raises at loadState).
+        check("absent everywhere yields None",
+              resolve_sidecar("build/states/nope.mss.lua", work), None)
 
     # -- stack_rewrite: both directions of a route must move together --
     src = ('local HUB = "/Users/x/ot6/build/states/scenario_hub.mss.lua"\n'

@@ -24,8 +24,8 @@
 --  * LOCKE's hub NPC is gone ($0329=0, cleared by his own ending) and so
 --    are BANON/TERRA/EDGAR's ($032B/C/D=0, _ccb3fa:104956-104958); only
 --    SABIN's remains ($032A=1) -- the hub is down to ONE choice.
-local H = dofile("/Users/mtklein/ot6/tools/tests/lib/ot6.lua")
-local STACKED = "/Users/mtklein/ot6/build/states/t2_terra_done.mss.lua"
+local H = dofile("tools/tests/lib/ot6.lua")
+local STACKED = "build/states/t2_terra_done.mss.lua"
 
 local function map() return H.mapId() & 0x1ff end
 local function sw(id) return (H.readByte(0x1e80 + (id >> 3)) >> (id & 7)) & 1 end

@@ -17,7 +17,7 @@
 --    placement is safe, and the Zozo leg heads SW away from them
 --  * Zozo: world {21,92}/{22,92}/{22,93} -> map 221 {61,44}
 --    (short_entrance.dat _0)
-local H = dofile("/Users/mtklein/ot6/tools/tests/lib/ot6.lua")
+local H = dofile("tools/tests/lib/ot6.lua")
 
 local function map() return H.mapId() & 0x1ff end
 local function bright() return emu.getState()["ppu.screenBrightness"] or 0 end
@@ -62,7 +62,7 @@ local function door(nx, ny, dir, m, what)
 end
 
 H.run({ maxFrames = 90000 }, {
-  H.loadState("/Users/mtklein/ot6/build/states/figaro_submerged.mss.lua"),
+  H.loadState("build/states/figaro_submerged.mss.lua"),
   H.waitFrames(30),
   H.call(function()
     H.assertEq(map(), 61, "booted in the engine room (map 61)")

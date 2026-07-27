@@ -37,8 +37,8 @@
 -- clear -- the trigger had fired and the scene was parked on "Hey, lady…".
 -- So the held-UP phase ends the moment the event picks up, and advanceStory
 -- (which taps dialogs) owns everything after that.
-local H = dofile("/Users/mtklein/ot6/tools/tests/lib/ot6.lua")
-local DONE = "/Users/mtklein/ot6/build/states/rapids_done.mss.lua"
+local H = dofile("tools/tests/lib/ot6.lua")
+local DONE = "build/states/rapids_done.mss.lua"
 
 local function map() return H.mapId() & 0x1ff end
 local function bright() return emu.getState()["ppu.screenBrightness"] or 0 end

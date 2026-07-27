@@ -29,9 +29,9 @@
 -- P.  Everything else -- the danger-counter suppression during the walk, the
 -- settle, the "prove an encounter really fires" tail -- is gen_kolts_pool's,
 -- and its header carries the reasoning for all three.
-local H = dofile("/Users/mtklein/ot6/tools/tests/lib/ot6.lua")
+local H = dofile("tools/tests/lib/ot6.lua")
 
-local POOL = "/Users/mtklein/ot6/build/states/kolts_pool.mss.lua"
+local POOL = "build/states/kolts_pool.mss.lua"
 local DANGER = 0x1f6e
 
 local function map() return H.mapId() & 0x1ff end

@@ -2,7 +2,7 @@
 --
 -- Usage pattern (see gen_battle_state.lua / battle_smoke.lua):
 --
---   local H = dofile("/Users/mtklein/ot6/tools/tests/lib/ot6.lua")
+--   local H = dofile("tools/tests/lib/ot6.lua")
 --   H.run({ maxFrames = 60000 }, {
 --     H.waitFrames(60),
 --     H.pressButtons({ "start" }, 8),

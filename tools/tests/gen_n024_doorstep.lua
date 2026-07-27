@@ -20,7 +20,7 @@
 -- shape as Shiva on {9,6} last leg, and the same positive control: the
 -- doorstep asserts {25,50} is NO-PATH now, so "the fight opened it" will
 -- mean something.
-local H = dofile("/Users/mtklein/ot6/tools/tests/lib/ot6.lua")
+local H = dofile("tools/tests/lib/ot6.lua")
 
 local function map() return H.mapId() & 0x1ff end
 local function bright() return emu.getState()["ppu.screenBrightness"] or 0 end
@@ -157,7 +157,7 @@ local function door(fromX, fromY, toMap, what)
 end
 
 H.run({ maxFrames = 90000 }, {
-  H.loadState("/Users/mtklein/ot6/build/states/magicite_ifrit_shiva.mss.lua"),
+  H.loadState("build/states/magicite_ifrit_shiva.mss.lua"),
   H.waitFrames(150),
   H.call(function()
     H.assertEq(map(), 264, "booted on map 264")

@@ -40,8 +40,8 @@
 -- River's landing.  So it now takes its short path -- sfx, flash,
 -- `player_ctrl_on`, return -- rather than the one-time tutorial whose "No"
 -- answer ends in a bare EventReturn and never gives control back.
-local H = dofile("/Users/mtklein/ot6/tools/tests/lib/ot6.lua")
-local DOOR = "/Users/mtklein/ot6/build/states/scenario_hub.mss.lua"
+local H = dofile("tools/tests/lib/ot6.lua")
+local DOOR = "build/states/scenario_hub.mss.lua"
 
 local function map() return H.mapId() & 0x1ff end
 local function bright() return emu.getState()["ppu.screenBrightness"] or 0 end

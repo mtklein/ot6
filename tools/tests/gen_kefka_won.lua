@@ -44,7 +44,7 @@
 -- After the menu: _ccc1b5 reloads map 30 at {60,37} facing DOWN, sets
 -- $0602/$010B/$0048, set_parent_map 0 {84,33}, player_ctrl_on, return
 -- (event_main.asm:107272,107193-107208).  That calm is the mint.
-local H = dofile("/Users/mtklein/ot6/tools/tests/lib/ot6.lua")
+local H = dofile("tools/tests/lib/ot6.lua")
 
 -- the esper-zap species set, same triple gen_arvis spares for the intro twin
 local TRITOCH = { [0x0114] = true, [0x0115] = true, [0x0144] = true }
@@ -150,7 +150,7 @@ local function landed(m, n)
 end
 
 H.run({ maxFrames = 90000 }, {
-  H.loadState("/Users/mtklein/ot6/build/states/kefka_doorstep.mss.lua"),
+  H.loadState("build/states/kefka_doorstep.mss.lua"),
   H.waitFrames(30),
 
   -- the doorstep is one clean edge-A from battle 57 (gen_narshe_battle

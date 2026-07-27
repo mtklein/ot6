@@ -30,9 +30,9 @@
 -- at zero in the saved state, which is also what bal_party.lua writes
 -- before every sample anyway (mines_pace.lua, Measurement #4: a cold
 -- counter is the honest steady-state interval).
-local H = dofile("/Users/mtklein/ot6/tools/tests/lib/ot6.lua")
+local H = dofile("tools/tests/lib/ot6.lua")
 
-local DOORSTEP = "/Users/mtklein/ot6/build/states/kolts_doorstep.mss.lua"
+local DOORSTEP = "build/states/kolts_doorstep.mss.lua"
 local DANGER = 0x1f6e
 
 -- map compares stay MASKED: loaders ride flag bits in $1F64's high byte

@@ -63,8 +63,8 @@
 -- -> 8 -> 18 -> 17 -> 20, snaking the party twice around the level, and the
 -- trigger at (111,12) on the way out (_cce3f4, :112833) resets var 0 to 0
 -- behind it.
-local H = dofile("/Users/mtklein/ot6/tools/tests/lib/ot6.lua")
-local CAVES = "/Users/mtklein/ot6/build/states/terra_caves.mss.lua"
+local H = dofile("tools/tests/lib/ot6.lua")
+local CAVES = "build/states/terra_caves.mss.lua"
 
 local function map() return H.mapId() & 0x1ff end
 local function bright() return emu.getState()["ppu.screenBrightness"] or 0 end

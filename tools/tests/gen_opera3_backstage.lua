@@ -15,7 +15,7 @@
 --  * The two STAGE doors out of 234 sit at its top corners {4,24} (left) and
 --    {28,24} (right); the theater floor exits {7,49}/{25,49} lead to the
 --    opera-house interior (237).  gen_opera4 routes 234 -> 237 -> the stage.
-local H = dofile("/Users/mtklein/ot6/tools/tests/lib/ot6.lua")
+local H = dofile("tools/tests/lib/ot6.lua")
 local function map() return H.mapId() & 0x1ff end
 local function bright() return emu.getState()["ppu.screenBrightness"] or 0 end
 local function sw(id) return (H.readByte(0x1E80 + math.floor(id/8)) >> (id%8)) & 1 end
@@ -49,7 +49,7 @@ local function rideOpen(pred, maxFrames, what)
 end
 
 H.run({ maxFrames = 160000 }, {
-  H.loadState("/Users/mtklein/ot6/build/states/opera_open.mss.lua"),
+  H.loadState("build/states/opera_open.mss.lua"),
   H.waitFrames(60),
   H.call(function()
     H.assertEq(map(), 237, "boot map 237 (opera house)")

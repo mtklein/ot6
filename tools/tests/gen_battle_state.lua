@@ -18,7 +18,7 @@
 -- Exit codes: 0 = in-battle state captured, 1 = battle never became active
 -- (doorstep state still emitted), 2 = frame budget blown.
 
-local H = dofile("/Users/mtklein/ot6/tools/tests/lib/ot6.lua")
+local H = dofile("tools/tests/lib/ot6.lua")
 
 local doorstep, doorstepPrev, saveReq = nil, nil, nil
 

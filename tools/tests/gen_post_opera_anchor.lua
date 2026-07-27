@@ -4,8 +4,8 @@
 -- field menu, enters vanilla's Save selector, chooses slot 3, and lets
 -- CopyGameDataToSRAM write the save.  run.sh captures Mesen's complete 32 KiB
 -- battery file after shutdown.
-local H = dofile("/Users/mtklein/ot6/tools/tests/lib/ot6.lua")
-local STATE = "/Users/mtklein/ot6/build/states/blackjack.mss.lua"
+local H = dofile("tools/tests/lib/ot6.lua")
+local STATE = "build/states/blackjack.mss.lua"
 
 local ZMENUSTATE = 0x26
 local SAVE_SELECT_INIT = 0x13

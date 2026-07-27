@@ -74,7 +74,7 @@
 -- free are properties of the run, not constants.  It asserts the character
 -- it moved and the slot it landed in, so a cursor that wandered fails
 -- instead of committing whoever happened to be under it.
-local H = dofile("/Users/mtklein/ot6/tools/tests/lib/ot6.lua")
+local H = dofile("tools/tests/lib/ot6.lua")
 
 local function map() return H.mapId() & 0x1ff end
 local function bright() return emu.getState()["ppu.screenBrightness"] or 0 end
@@ -377,7 +377,7 @@ local function bumpTake(sx, sy, dir, what)
 end
 
 H.run({ maxFrames = 120000 }, {
-  H.loadState("/Users/mtklein/ot6/build/states/dadaluma_won.mss.lua"),
+  H.loadState("build/states/dadaluma_won.mss.lua"),
   H.waitFrames(150),
   H.call(function()
     H.assertEq(map(), 221, "booted on map 221, the roof clear")

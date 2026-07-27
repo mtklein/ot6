@@ -9,8 +9,8 @@
 -- bridge-collapse -> Kefka flashback -> Moogle-defense chain (a
 -- THREE-PARTY set-piece this harness does not enter).  Mint
 -- moogle_doorstep.mss there, calm, trigger unfired.
-local H = dofile("/Users/mtklein/ot6/tools/tests/lib/ot6.lua")
-local STREETS = "/Users/mtklein/ot6/build/states/narshe_streets.mss.lua"
+local H = dofile("tools/tests/lib/ot6.lua")
+local STREETS = "build/states/narshe_streets.mss.lua"
 
 local function calm(n, extra)
   local cnt = 0

@@ -180,8 +180,8 @@
 --   its tile is ordinary walkable floor, so BFS routes straight over it
 --   and the crossing can happen before the hold ever starts -- crossDoor
 --   treats a map change during its approach as arrival for that reason.
-local H = dofile("/Users/mtklein/ot6/tools/tests/lib/ot6.lua")
-local DOOR = "/Users/mtklein/ot6/build/states/figaro_doorstep.mss.lua"
+local H = dofile("tools/tests/lib/ot6.lua")
+local DOOR = "build/states/figaro_doorstep.mss.lua"
 
 -- event switch id -> live bit (event bitfield base $1E80, bit = id & 7)
 local function sw(id) return (H.readByte(0x1e80 + (id >> 3)) >> (id & 7)) & 1 end

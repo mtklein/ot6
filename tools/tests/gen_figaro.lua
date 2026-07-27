@@ -27,8 +27,8 @@
 --     existed.  worldNavTo targets (64,77) -- one tile SOUTH of the
 --     trigger -- then takes the deliberate step north, the same
 --     doorstep discipline every trigger fixture uses.
-local H = dofile("/Users/mtklein/ot6/tools/tests/lib/ot6.lua")
-local WORLD = "/Users/mtklein/ot6/build/states/worldmap_narshe.mss.lua"
+local H = dofile("tools/tests/lib/ot6.lua")
+local WORLD = "build/states/worldmap_narshe.mss.lua"
 
 local function calm(n, extra)
   local cnt = 0

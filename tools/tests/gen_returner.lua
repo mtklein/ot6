@@ -54,8 +54,8 @@
 --    mountain's north door at (98,93) that is a long stretch of overworld,
 --    and the world leg is planned by worldBfs and asserted to exist before it
 --    is walked rather than discovered by holding a direction.
-local H = dofile("/Users/mtklein/ot6/tools/tests/lib/ot6.lua")
-local WON = "/Users/mtklein/ot6/build/states/vargas_won.mss.lua"
+local H = dofile("tools/tests/lib/ot6.lua")
+local WON = "build/states/vargas_won.mss.lua"
 
 -- map compares stay MASKED: loaders ride flag bits in $1F64's high byte
 local function map() return H.mapId() & 0x1ff end

@@ -58,7 +58,7 @@
 -- standing in.  mapTitleHere() is exercised on the Albrook gate FIRST --
 -- the exact step the retired generator took -- so the control cannot pass
 -- by returning "" for everything.
-local H = dofile("/Users/mtklein/ot6/tools/tests/lib/ot6.lua")
+local H = dofile("tools/tests/lib/ot6.lua")
 
 local ACTIVE = 0x021f
 local ULTROS2 = 0x012d

@@ -54,8 +54,8 @@
 --   $0609..$060F -> $1F41 masks $02,$04..$80    $0610 -> $1F42 mask $01
 --   $012F -> $1EA5 mask $80      $01CC -> $1EB9 mask $10
 --   $0003 -> $1E80 mask $08
-local H = dofile("/Users/mtklein/ot6/tools/tests/lib/ot6.lua")
-local DOORSTEP = "/Users/mtklein/ot6/build/states/moogle_doorstep.mss.lua"
+local H = dofile("tools/tests/lib/ot6.lua")
+local DOORSTEP = "build/states/moogle_doorstep.mss.lua"
 
 local function collapseStarted()        -- $012E: set as the defense goes live
   return (H.readByte(0x1ea5) & 0x40) ~= 0

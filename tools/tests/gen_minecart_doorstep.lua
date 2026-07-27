@@ -19,7 +19,7 @@
 -- (:96579-96586).  This leg banks the doorstep in front of him and dumps
 -- the live object map so the parking tile is measured rather than read off
 -- an obj_script.
-local H = dofile("/Users/mtklein/ot6/tools/tests/lib/ot6.lua")
+local H = dofile("tools/tests/lib/ot6.lua")
 
 local function map() return H.mapId() & 0x1ff end
 local function bright() return emu.getState()["ppu.screenBrightness"] or 0 end
@@ -170,7 +170,7 @@ local function objDump(x0, x1, y0, y1, tag)
 end
 
 H.run({ maxFrames = 60000 }, {
-  H.loadState("/Users/mtklein/ot6/build/states/esper_tubes.mss.lua"),
+  H.loadState("build/states/esper_tubes.mss.lua"),
   H.waitFrames(150),
   H.call(function()
     H.assertEq(map(), 274, "booted on map 274")

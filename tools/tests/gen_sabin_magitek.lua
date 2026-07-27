@@ -48,8 +48,8 @@
 -- finale row and ride the dismount cutscene (tap-A its dialogs) onto the world
 -- map.  NPC_16's touch-battle _cb1985 (battle 17 again, npc_prop.asm:4809) is
 -- optional and off the corridor; if it ever fires, holdCross taps-A it too.
-local H = dofile("/Users/mtklein/ot6/tools/tests/lib/ot6.lua")
-local DOOR = "/Users/mtklein/ot6/build/states/doma_defended.mss.lua"
+local H = dofile("tools/tests/lib/ot6.lua")
+local DOOR = "build/states/doma_defended.mss.lua"
 
 local function map() return H.mapId() & 0x1ff end
 local function bright() return emu.getState()["ppu.screenBrightness"] or 0 end

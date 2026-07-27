@@ -30,8 +30,8 @@
 -- -- the TunnelArmr copy -- from its lobby trigger _ca5ef7, where gen_kolts
 -- with $001A=0 got map 73.  The cave graph is gen_kolts's, walked the other
 -- way: world (75,103) -> map 72 -> ... -> map 71 -> [trigger] -> map 70.
-local H = dofile("/Users/mtklein/ot6/tools/tests/lib/ot6.lua")
-local DOOR = "/Users/mtklein/ot6/build/states/celes_freed.mss.lua"
+local H = dofile("tools/tests/lib/ot6.lua")
+local DOOR = "build/states/celes_freed.mss.lua"
 
 -- map compares stay MASKED: loaders ride flag bits in $1F64's high byte
 local function map() return H.mapId() & 0x1ff end

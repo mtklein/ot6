@@ -30,8 +30,8 @@
 -- lets his RETURN-VISIT script do the join itself: recruit_gau + "I'm Gau!
 -- I'm your friend!" + end_veldt, his own AI, no menus.  A meat is still
 -- bought so the inventory reads like the playthrough that fed him.
-local H = dofile("/Users/mtklein/ot6/tools/tests/lib/ot6.lua")
-local DOOR = "/Users/mtklein/ot6/build/states/falls_done.mss.lua"
+local H = dofile("tools/tests/lib/ot6.lua")
+local DOOR = "build/states/falls_done.mss.lua"
 
 local function mapIdx() return H.readWord(0x1f64) & 0x3FF end
 local function bright() return emu.getState()["ppu.screenBrightness"] or 0 end

@@ -11,8 +11,8 @@
 -- The naming menu is the one story beat advanceStory cannot tap through --
 -- $0059 goes 1 while it opens, so the script splits there and presses
 -- START itself.
-local H = dofile("/Users/mtklein/ot6/tools/tests/lib/ot6.lua")
-local WAKE = "/Users/mtklein/ot6/build/states/arvis_wake.mss.lua"
+local H = dofile("tools/tests/lib/ot6.lua")
+local WAKE = "build/states/arvis_wake.mss.lua"
 
 -- n consecutive calm frames, optionally with an extra condition
 local function calm(n, extra)
