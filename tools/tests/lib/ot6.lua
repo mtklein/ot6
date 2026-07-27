@@ -365,28 +365,47 @@ function M.partyHp()
   return hp
 end
 
--- True once the battle module has begun loading.  $FFFF is the ONLY
--- not-loaded sentinel: in the field slot 0 reads $FFFF, and in a battle it
--- holds a real current HP -- or 0 if that character is dead or the slot is
--- empty.  Measured on battle_doorstep: field FFFF FFFF FFFF FFFF, live
--- battle 003F 0044 003D 0000 (slot 3 empty, reading 0).
+-- True once the battle module has begun loading.
 --
--- This used to also reject a 0, which conflated "not loaded" with "slot 0 is
--- dead or empty" and reported "no battle" while a battle was still running.
--- worldHasControl() hangs off this gate, so worldNavTo stopped tapping A,
--- concluded it had walkable control, and pressed directions into a live
--- battle forever (#24).
+-- $7E3BF4 is the party battle-HP table ONLY while the battle module owns that
+-- RAM.  Every other module scribbles those bytes, so no single slot and no
+-- single sentinel can answer "is a battle up?".  MEASURED shapes:
 --
--- Deliberately still slot 0 only.  Scanning all four slots also passes the
--- #24 regression but hangs gen_moogle: somewhere in the three-squad defense
--- a FIELD state leaves slot 0 at $FFFF while a later slot still holds a live
--- value, so an any-slot rule reads the field as a battle and the walker
--- freezes.  Measured -- old predicate mints moogle_cleared, any-slot rule
--- times out at 30000 frames on map 30.
+--   field                     FFFF FFFF FFFF FFFF
+--   field menu (START)        FFFF FFFF FFFF FFFF
+--   moogle defense, on-map    FF00 0020 FF00 0020   <- field scribble
+--   party menu / world redraw 0000 0000 0000 0000   <- menu owns the bytes
+--   live battle               003F 0044 003D 0000   <- slot 3 EMPTY reads 0
+--   live battle, slot 0 dead  0000 0044 003D 0000
+--
+-- So the test is on the SHAPE of the whole table, not on one slot: every word
+-- must be a plausible current HP -- 0 for an empty or dead slot, else 1..9999 --
+-- and at least one character must actually be alive.  $FFFF and $FF00 are not
+-- HP, and one of them anywhere means these bytes belong to somebody else.
+--
+-- Three earlier versions, each of which shipped and each of which cost a full
+-- frontier re-mint.  Do not reinstate any of them:
+--   * slot 0, rejecting 0 -- said "no battle" the moment the first character
+--     died, so worldNavTo pressed directions into a live battle (#24).
+--   * slot 0, $FFFF only -- said "battle" for every frame a menu was up, and
+--     ridePartyMenu blind-A-hammered onto a Status page.
+--   * any slot 1..9999 -- accepted the moogle scribble's 0020 and hung
+--     gen_moogle for 30,000 frames on map 30.
+-- The `< 10000` bound in the original was load-bearing and easy to mistake for
+-- a sanity check: it is what rejects the FF00 scribble.
+--
+-- Known limit, deliberate: a TOTAL party wipe is all zeros, which is also what
+-- a menu leaves, so this reports false.  Separating those needs a witness
+-- outside this table; a wiped party in a fixture is a failure anyway.
 -- Regression: battle_loadgate.lua.
 function M.battleLoadStarted()
-  local hp = M.readWord(M.BATTLE_HP)
-  return hp ~= 0xFFFF and hp < 10000
+  local anyLive = false
+  for i = 0, 3 do
+    local hp = M.readWord(M.BATTLE_HP + i * 2)
+    if hp >= 10000 then return false end   -- $FFFF, $FF00: not an HP table
+    if hp > 0 then anyLive = true end
+  end
+  return anyLive
 end
 
 -- Cheap "is anything on screen" check: an all-black 256x224 screenshot

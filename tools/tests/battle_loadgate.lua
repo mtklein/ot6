@@ -56,10 +56,28 @@ H.run({ maxFrames = 30000 }, {
     H.assertEq(H.battleLoadStarted(), true,
       "slot 0 at 0 HP (dead/empty) is still a live battle")
 
-    -- 4. whole party down -- a game-over screen is still the battle module
+    -- 4. ALL ZEROS is what a MENU leaves in these bytes -- the party menu and
+    --    the world arrival redraw both do it.  Reading that as a battle turned
+    --    ridePartyMenu into a blind A-hammer over the menu (it drove onto a
+    --    Status page).  So all-zero must read as NO battle.  The cost is that a
+    --    total party wipe is indistinguishable here and also reads false; that
+    --    needs a witness outside this table, and a wiped fixture is a failure
+    --    anyway.
     setTbl(0x0000, 0x0000, 0x0000, 0x0000)
+    H.assertEq(H.battleLoadStarted(), false,
+      "an all-zero table is a menu, not a battle")
+
+    -- 4b. and the #24 case is still open: first character dead, others alive
+    setTbl(0x0000, 0x0000, saved[3], 0x0000)
     H.assertEq(H.battleLoadStarted(), true,
-      "party wiped is still a live battle")
+      "one live slot anywhere is still a live battle")
+
+    -- 4c. the MEASURED moogle-defense field scribble.  $0020 in slots 1 and 3
+    --     is a plausible HP, so an any-slot rule accepts it and hangs
+    --     gen_moogle; $FF00 in slots 0 and 2 is what gives it away.
+    setTbl(0xFF00, 0x0020, 0xFF00, 0x0020)
+    H.assertEq(H.battleLoadStarted(), false,
+      "the moogle field scribble (FF00 0020 FF00 0020) is not a battle")
 
     -- 5. POSITIVE CONTROL: the gate must still be able to say NO.  Without
     --    this the test would pass against a gate hardcoded to true.
