@@ -1,52 +1,65 @@
 #!/bin/sh
-# frontier_stamp.sh -- the freshness gate for a minted frontier savestate.
+# frontier_stamp.sh -- the ONE definition of a minted fixture's provenance
+# signature.
 #
-# ISSUE #2: a minted state is a function of (ROM bytes, its generator .lua,
-# and the shared test library every generator dofile()s -- BOTH halves of it,
-# lib/ot6.lua and lib/ot6_field.lua, since compose.py inlines the pair into
-# every composed script).  The Makefile's .rom-copy content-clock already
-# re-mints on a ROM byte change, but NOTHING watched the others: a gen_*.lua
-# or lib edit that left the ROM alone never refreshed an already-minted
-# fixture, so the savestate silently drifted from the script that would mint
-# it today.  This adds the missing generator+lib axis, in the same "compare a
-# stamp, re-mint on a difference" shape the ROM gate already uses -- but keyed
-# on CONTENT, so a mere mtime bump (a `git checkout`, a worktree cp) re-mints
-# nothing.
+# HISTORY: this script used to also DECIDE mint-or-skip (`needsmint`), and the
+# Makefile's mint macro would `touch` the target afterwards to stop make
+# re-deciding by mtime -- a content gate beside an mtime scheduler, two
+# mechanisms that could disagree (and on 2026-07-27 did: a resumed run
+# printed "rom content changed", then booted an old-ROM savestate against the
+# new ROM).  Scheduling now belongs entirely to the generated ninja graph
+# (tools/tests/lib/frontier_ninja.py): every input is a declared dependency
+# and content-staleness is ninja's own restat mechanism, so `needsmint` is
+# gone with the macros that called it.
 #
-# The gate lives in one small script, not inline in the mint macro, so the
-# decision is unit-testable without the emulator (frontier_stamp_selftest.sh,
-# run by `make test`) and reads identically for plain and stacked mints.
+# What remains is the signature itself, because it is compared on two sides
+# and both must agree byte-for-byte:
+#   * the mint edge `write`s build/states/<state>.stamp after a successful
+#     mint (see the mint rule in build/build.ninja);
+#   * lib/compose.py re-derives it at embed time (via `sig`, shelled to this
+#     script so there is exactly one implementation) and refuses -- loudly,
+#     through the [ot6] channel -- a fixture that reached a test WITHOUT
+#     passing any mint gate: a worktree-setup seed that a local generator or
+#     lib edit has since drifted.  That consume-time guard is why the stamp
+#     still exists at all.
 #
-#   frontier_stamp.sh needsmint <state> <generator> [extra ...]
-#   frontier_stamp.sh write     <state> <generator> [extra ...]
-#   frontier_stamp.sh sig       <generator> [extra ...]
+#   frontier_stamp.sh write <state> <generator> [extra ...]
+#   frontier_stamp.sh sig   <generator> [extra ...]
 #
-# The signature hashes the generator, shared Lua libraries, and any declared
-# extra inputs, then records their paths.  A consumer (lib/compose.py) can
-# re-derive and check that signature at load time -- the loud, fail-closed
-# half of the guard for a fixture that reaches a test WITHOUT passing the
-# mint gate first (a worktree-setup seed that a local edit has since drifted).
+# The signature hashes the generator and ALL THREE lib halves compose.py
+# inlines into every composed script -- lib/ot6.lua, lib/ot6_field.lua and
+# lib/ot6_contract.lua, in inline order -- plus any declared extra inputs
+# (battery anchors hash manifest then payloads).  The contract half joined
+# the digest with the ninja graph (issue #25): an invariant-contract edit
+# re-mints every leg, and the consume-time check has to agree that a
+# pre-edit fixture is stale.  Content-keyed throughout: a mere mtime bump
+# (a `git checkout`, a worktree cp) changes no signature.
 set -u
 
-# OT6_ROOT lets the selftest point the gate at a mock tree; the default is the
-# real tree this script lives in (lib/ -> tests/ -> tools/ -> root).
+# OT6_ROOT lets selftests and compose.py point the sig at another tree; the
+# default is the real tree this script lives in (lib/ -> tests/ -> tools/ ->
+# root).
 ROOT="${OT6_ROOT:-$(cd "$(dirname "$0")/../../.." && pwd)}"
 STATES="$ROOT/build/states"
 
-# sha256(<generator source> ++ <battle core> ++ <nav half>) plus the
-# generator's name.  Order is FIXED -- generator, then lib/ot6.lua, then
-# lib/ot6_field.lua, the same order compose.py inlines them -- so the digest
-# is reproducible from either side.  The two lib files are THE shared
-# dependency: every gen_*.lua dofile()s lib/ot6.lua and nothing else
-# (verified: no generator dofile()s any other helper), and composition
-# textually inlines both halves behind that one line, so this triple is the
-# whole non-ROM input to a mint.
+# sha256(<generator source> ++ <battle core> ++ <nav half> ++ <contract
+# half>) plus the generator's name and the extras' paths.  Order is FIXED --
+# the same order compose.py inlines them -- so the digest is reproducible
+# from either side.
 sig() {
   gen="$1"
   shift
   files="$ROOT/tools/tests/$gen.lua
 $ROOT/tools/tests/lib/ot6.lua
-$ROOT/tools/tests/lib/ot6_field.lua"
+$ROOT/tools/tests/lib/ot6_field.lua
+$ROOT/tools/tests/lib/ot6_contract.lua"
+  # Every fixed input must exist BEFORE hashing: the digest pipeline's `cat`
+  # cannot fail it (a pipeline swallows the status), so a typo'd generator
+  # would otherwise hash the remaining files and call that a signature.
+  printf '%s\n' "$files" | while IFS= read -r f; do
+    [ -f "$f" ] ||
+      { echo "frontier_stamp: missing input '$f'" >&2; exit 2; }
+  done || exit 2
   extras=""
   for extra in "$@"; do
     case "$extra" in /*|*..*) echo "frontier_stamp: unsafe extra '$extra'" >&2; exit 2 ;; esac
@@ -63,7 +76,7 @@ $ROOT/$extra"
   printf '%s %s%s' "$digest" "$gen" "$extras"
 }
 
-cmd="${1:?usage: frontier_stamp.sh needsmint|write|sig ...}"
+cmd="${1:?usage: frontier_stamp.sh write|sig ...}"
 case "$cmd" in
   sig)
     gen="${2:?sig needs a generator}"; shift 2
@@ -73,16 +86,6 @@ case "$cmd" in
     state="${2:?write needs a state}"; gen="${3:?write needs a generator}"
     shift 3
     sig "$gen" "$@" > "$STATES/$state.stamp"
-    ;;
-  needsmint)
-    state="${2:?needsmint needs a state}"; gen="${3:?needsmint needs a generator}"
-    shift 3
-    mss="$STATES/$state.mss"
-    stamp="$STATES/$state.stamp"
-    [ -f "$mss" ] || exit 0                          # never minted -> mint
-    [ "$STATES/.rom-copy" -nt "$mss" ] && exit 0     # ROM bytes changed -> re-mint
-    [ "$(sig "$gen" "$@")" = "$(cat "$stamp" 2>/dev/null)" ] || exit 0
-    exit 1                                           # fresh: skip
     ;;
   *)
     echo "frontier_stamp.sh: unknown command '$cmd'" >&2

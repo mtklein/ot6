@@ -48,6 +48,10 @@ the manual steps at each bullet).
   requirement is any `python3` ≥3.9 — Command Line Tools 3.9.6 suffices.
   numpy imports survive only in the asset re-encoders (`brr.py`,
   `monster_stencil.py`, `shuffle_rng.py`), whose outputs are tracked.
+- **ninja** — via Homebrew. Runs the generated savestate graph
+  (`build/build.ninja`, emitted by `tools/tests/lib/frontier_ninja.py` from
+  `tools/tests/frontier_graph.py`); `make frontier` / `make test` are thin
+  wrappers over it (issue #25).
 - **Flips CLI** — binary at `tools/bin/flips` (git-ignored). Rebuild:
   clone github.com/Alcaro/Flips, `make CFLAGS=-O2`, copy `flips` in.
 - **Mesen 2.1.1** — official macOS ARM64 release zip (77 MB) from

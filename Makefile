@@ -83,36 +83,37 @@ run: rom
 		open -n "$(CURDIR)/tools/Mesen.app" --args "$(CURDIR)/build/ot6.sfc"; \
 	fi
 
-# savestates regenerate only when ROM CONTENT changes (the file's
-# timestamp bumps on every build even when bytes are identical)
-STATE1 := build/states/battle_doorstep.mss.lua
-STATE2 := build/states/battle2_doorstep.mss.lua
-STATE3 := build/states/whelk_doorstep.mss.lua
-build/states/.rom-stamp: ff6/rom/ff6-en.sfc
-	@mkdir -p build/states
-	@cmp -s ff6/rom/ff6-en.sfc build/states/.rom-copy 2>/dev/null || \
-		{ cp ff6/rom/ff6-en.sfc build/states/.rom-copy; echo "rom content changed"; }
-	@touch build/states/.rom-stamp
-$(STATE1): build/states/.rom-stamp
-	@if [ build/states/.rom-copy -nt $(STATE1) ] || [ ! -f $(STATE1) ]; then \
-		tools/tests/run.sh tools/tests/gen_battle_state.lua; \
-	fi
-	@touch $(STATE1)
-$(STATE2): $(STATE1)
-	@if [ build/states/.rom-copy -nt build/states/battle2_doorstep.mss ] || [ ! -f build/states/battle2_doorstep.mss ]; then \
-		tools/tests/run.sh tools/tests/gen_battle2.lua; \
-	fi
-	@touch $(STATE2)
-# whelk doorstep: the dialog-opening boss fight battle_dlgmenu gates.
-# gen_whelk_poweron mints it from COLD POWER-ON -- plays the New Game intro
-# through the Narshe gauntlet to the mines -- so it needs no SRM sidecar and
-# works on a fresh clone (the old gen_whelk booted a git-ignored human-save
-# sidecar, a fresh-clone trap).
-$(STATE3): $(STATE2)
-	@if [ build/states/.rom-copy -nt build/states/whelk_doorstep.mss ] || [ ! -f build/states/whelk_doorstep.mss ]; then \
-		tools/tests/run.sh tools/tests/gen_whelk_poweron.lua; \
-	fi
-	@touch $(STATE3)
+# ------------------------------------------------- the savestate graph -----
+# EVERY minted savestate -- the suite's own three fixtures and the whole
+# story frontier -- lives in ONE generated ninja graph (issue #25):
+#
+#   tools/tests/frontier_graph.py        the graph, as data (one entry/state)
+#   tools/tests/lib/frontier_ninja.py    emits it as build/build.ninja
+#
+# Why ninja and not make macros: this Makefile had already bypassed make's
+# core value proposition -- a content stamp beside a `touch` (two staleness
+# mechanisms that could disagree, and on 2026-07-27 did: "rom content
+# changed" printed, then an old-ROM savestate booted against the new ROM), a
+# grep-generated include whose only job was making make reconsider targets,
+# and a .PHONY pattern rule that silently matched nothing.  In the ninja
+# graph the staleness decision and the execution are one mechanism: every
+# input is a declared dependency, content-vs-mtime is ninja's own `restat`
+# on cheap latch edges, an unknown target is a hard error, and nothing can
+# report success without its command running.  frontier_ninja.py's header
+# holds the full story; frontier_ninja_selftest.sh proves the semantics on
+# a mock tree in seconds, no emulator.
+#
+# The targets here stay thin entry points.  Parallelism is ninja's own
+# (all cores by default); pass NINJAFLAGS=-j2 to throttle it.
+NINJA_FILE := build/build.ninja
+NINJAFLAGS ?=
+SUITE_STATES := battle_doorstep battle2_doorstep whelk_doorstep
+
+.PHONY: graph
+graph:
+	@command -v ninja >/dev/null || \
+		{ echo "ERROR: ninja not installed -- run 'brew bundle'"; exit 1; }
+	@python3 tools/tests/lib/frontier_ninja.py
 
 # compose.py's selftest is pure python and gates the suite: it is the positive
 # control for sidecar resolution, and a wrong resolution silently tests the
@@ -135,7 +136,8 @@ nomp-rom: rom
 		exit 1; fi
 	@echo "OT6_MP_COSTS=0 baseline built and confirmed distinct from the shipped ON ROM"
 
-test: rom nomp-rom $(STATE1) $(STATE2) $(STATE3)
+test: rom nomp-rom graph
+	ninja -f $(NINJA_FILE) $(NINJAFLAGS) $(SUITE_STATES)
 	python3 tools/tests/lib/compose.py --selftest
 	python3 tools/tests/lib/sram_anchor.py selftest
 	@# bosses-wob.md vs the shipped break data.  It carried four waivers for
@@ -146,6 +148,8 @@ test: rom nomp-rom $(STATE1) $(STATE2) $(STATE3)
 	@# reason compose.py and sram_anchor.py sit on these lines.
 	python3 tools/check_boss_rows.py
 	python3 tools/check_break_reach.py
+	python3 tools/tests/lib/frontier_ninja.py --selftest
+	sh tools/tests/lib/frontier_ninja_selftest.sh
 	sh tools/tests/lib/frontier_stamp_selftest.sh
 	sh tools/tests/lib/runner_isolation_selftest.sh
 	sh tools/tests/lib/anchor_negatives.sh
@@ -158,102 +162,19 @@ test: rom nomp-rom $(STATE1) $(STATE2) $(STATE3)
 	@echo "suite green — stamped `cat $(STAMP)`"
 
 # ---------------------------------------------------------------- frontier --
-# The story chain past the whelk, as gated state rules.  `test` deliberately
-# does NOT depend on any of it: every one of these is a multi-minute scripted
-# playthrough, and the suite's remint cost has to stay what it was.  Build it
-# on demand with `make frontier` (or name one state) when you need a fixture
-# deeper in the game than whelk_doorstep.
+# The story chain past the whelk, minted through the generated ninja graph
+# above.  `test` deliberately depends on none of it: every frontier state is
+# a multi-minute scripted playthrough, and the suite's remint cost has to
+# stay what it was.  Build it on demand -- everything with `make frontier`,
+# or one state (and its stale transitive predecessors) by naming it:
 #
-# Each link consumes the previous link's savestate, so the order below is the
-# order the game is played.  A minted state is a function of the ROM bytes,
-# its generator .lua, and the shared test library every generator dofile()s --
-# both halves of it, lib/ot6.lua and lib/ot6_field.lua, since compose.py
-# inlines the pair into every composed script -- and the gate re-mints when
-# ANY of them changed by CONTENT (a build or a checkout bumps timestamps
-# without moving bytes, so mtime alone would re-mint spuriously).  ROM bytes
-# ride the .rom-copy clock as before; the generator+lib half is
-# frontier_stamp.sh, wired in below.  Issue #2: keying on the ROM alone
-# silently kept fixtures a since-edited generator or lib would no longer mint
-# the same way.
+#   ninja -f build/build.ninja vargas_doorstep
 #
-#   whelk_doorstep  -> gen_arvis          -> arvis_wake
-#                   -> gen_narshe_escape  -> narshe_escape_start, narshe_streets
-#                   -> gen_mines_chase    -> mines_chase, moogle_doorstep
-#                   -> gen_moogle         -> moogle_defense, moogle_cleared
-#                   -> gen_worldmap       -> worldmap_narshe
-#                   -> gen_figaro         -> figaro_doorstep
-#                   -> gen_edgar          -> figaro_intro, figaro_matron,
-#                                            figaro_cleared
-#                   -> gen_kolts          -> south_figaro, kolts_doorstep,
-#                                            vargas_doorstep
-#                   -> gen_kolts_pool     -> kolts_pool
-#                   -> gen_vargas         -> vargas_won
-#                   -> gen_returner       -> returner_hideout
-#                   -> gen_banon          -> banon_joined
-#                   -> gen_lete           -> lete_river
-#                   -> gen_scenario       -> scenario_hub
-#                   -> gen_scenario_locke -> locke_scenario
-#   scenario_hub    -> gen_rapids         -> rapids_start, rapids_done
-#                   -> gen_terra_narshe   -> terra_narshe
-#                   -> gen_terra_caves    -> terra_caves
-#                   -> gen_terra_clifftop -> terra_clifftop
-#                   -> gen_terra_done     -> terra_done
-FRONTIER := arvis_wake narshe_streets moogle_doorstep moogle_cleared \
-            worldmap_narshe figaro_doorstep figaro_intro figaro_matron \
-            figaro_cleared south_figaro kolts_doorstep kolts_pool \
-            kolts_cave vargas_doorstep vargas_won returner_hideout \
-            banon_joined lete_river scenario_hub locke_scenario \
-            rapids_start rapids_done terra_narshe terra_caves \
-            terra_clifftop terra_done sabin_world sabin_camp \
-            cyan_defence camp_intro kefka_done camp_cleared \
-            doma_defended sfigaro_town sfigaro_passage celes_freed \
-            sfigaro_escape tunnelarmr_doorstep locke_done \
-            t2_scenario_hub t2_rapids_start t2_rapids_done \
-            t2_terra_narshe t2_terra_caves t2_terra_clifftop \
-            t2_terra_done two_done
-
-# The generator+lib half of the freshness gate (issue #2).  For a generator or
-# lib edit to re-mint, make has to RECONSIDER the state's target, which it only
-# does when a declared prerequisite is newer -- so each state's .mss.lua must
-# depend on the .lua that mints it and on both lib halves.  That state->generator
-# map already lives in the $(call mint,...) lines, so rather than hand-list it a
-# second time (and have it rot as the Zozo route adds links), frontier_deps.sh
-# greps it back out into a generated fragment we -include.  A new link is thus
-# gated the moment it is added.  The prerequisite makes make LOOK; the recipe's
-# frontier_stamp.sh gate is what decides mint-or-skip by CONTENT, so a bumped
-# mtime with identical bytes still re-mints nothing.
-build/states/frontier-deps.mk: Makefile tools/tests/lib/frontier_deps.sh
-	@mkdir -p build/states
-	@sh tools/tests/lib/frontier_deps.sh Makefile > $@
--include build/states/frontier-deps.mk
-
-# mint <state> from <script> once its (ROM, generator, lib) gate says it is stale.
-#
-# Invocation-isolated, so `make -jN frontier` can mint the mutually independent
-# story branches at once: everything up to scenario_hub is a serial trunk (each
-# link boots the previous doorstep), but FROM the hub the three scenarios --
-# locke_scenario, the rapids/terra_* chain and the sabin_* chain -- share no
-# state, and kolts_pool/kolts_cave hang off the doorstep in parallel with the
-# Vargas rung. A bare run.sh used to route EVERYTHING through one default tree,
-# so two concurrent bare mints raced on the settings pin, the
-# composed script and the srm wipe. run.sh now gives EVERY invocation a unique
-# tree; OT6_WORKER is merely the state-name label visible in diagnostics.
-# Decoded artifacts publish atomically into build/states, so no harvest path or
-# persistent worker directory is part of this contract.
-#
-# An optional THIRD arg makes it a STACKED mint: <state>,<script>,<prefix>
-# adds OT6_STACK=<prefix> to the run, so compose.py replays the generator's
-# route logic against prefix_-named fixtures instead of the honest ones --
-# the SCENARIO STACKING section below owns that story.  Empty third arg
-# (every two-arg call) is a plain mint, exactly as before the fold.
-define mint
-	@if sh tools/tests/lib/frontier_stamp.sh needsmint $(1) $(2); then \
-		echo "[frontier] mint $(1) <- $(2)$(if $(3), (stack $(3)))"; \
-		OT6_WORKER=$(1) OT6_EXPECT_ARTIFACT=$(1).mss$(if $(3), OT6_STACK=$(3)) tools/tests/run.sh tools/tests/$(2).lua && \
-		sh tools/tests/lib/frontier_stamp.sh write $(1) $(2); \
-	fi
-	@touch build/states/$(1).mss.lua
-endef
+# The play-order chain, the anchor keys, the per-state route notes and the
+# scenario-stacking story all live with the data: tools/tests/frontier_graph.py.
+frontier: rom graph
+	ninja -f $(NINJA_FILE) $(NINJAFLAGS) frontier
+	@echo "frontier states up to date"
 
 # ---------------------------------------------------------------- smoke ----
 # The FAST FALSIFICATION LOOP.  `make frontier` is authoritative but serial and
@@ -294,8 +215,9 @@ smoke: $(SMOKE_TARGETS)
 	echo "smoke: all $(words $(SMOKE)) generators ran and passed"
 
 # gen_vector_doorstep cold-loads the tracked battery anchor rather than booting a
-# predecessor savestate, so it needs OT6_SRAM_ANCHOR exactly as mint_anchor
-# supplies it.  Without it the run times out waiting for the cold Continue.
+# predecessor savestate, so it needs OT6_SRAM_ANCHOR exactly as the graph's
+# anchored mint edges supply it.  Without it the run times out waiting for
+# the cold Continue.
 SMOKE_ANCHORED := gen_vector_doorstep
 
 $(SMOKE_TARGETS): smoke-%: rom
@@ -315,35 +237,14 @@ $(SMOKE_TARGETS): smoke-%: rom
 # real one today, and save-points-vector.md §5 names the A-F band this
 # convention must hold (mrf-save-room, n024-doorstep-save, ...).  Dirs named
 # negative-* are deliberately wrong fixtures for `make anchor-negatives`
-# below; no mint rule may ever name one.
-#
-# anchor_inputs lists an anchor's stamp inputs explicitly -- manifest first,
-# then payload(s) -- in the exact order POST_OPERA_INPUTS always hashed, so
-# generalising the key changes no existing mint signature.
-anchor_dir    = tools/tests/anchors/$(1)
-anchor_inputs = $(call anchor_dir,$(1))/manifest.json $(sort $(wildcard $(call anchor_dir,$(1))/*.sram))
-POST_OPERA_ANCHOR := $(call anchor_dir,post-opera-v1)
-# $(call mint_anchor,<state>,<generator>): mint <state> by cold-loading the
-# battery anchor named by ANCHOR_KEY_<state>, defined BESIDE the state's rule
-# (see vector_doorstep).  The key rides a variable rather than a third call
-# argument DELIBERATELY: tools/tests/lib/frontier_deps.sh greps the two-field
-# `$(call mint_anchor,<state>,<generator>)` shape out of this file to emit the
-# issue-#2 generator+lib prerequisites, and a third argument would silently
-# stop matching -- the exact class of quiet no-op the smoke receipt count
-# exists for.  The anchor's files ride the stamp signature (needsmint/write
-# extras), so editing a manifest or payload re-mints every state hung off
-# that anchor, and run.sh's persistent_layout gate refuses the load before
-# boot if the generator does not declare the anchor's layout.
-define mint_anchor
-	$(if $(ANCHOR_KEY_$(1)),,$(error mint_anchor $(1): define ANCHOR_KEY_$(1) := <anchor key> beside the rule))
-	@if sh tools/tests/lib/frontier_stamp.sh needsmint $(1) $(2) $(call anchor_inputs,$(ANCHOR_KEY_$(1))); then \
-		echo "[frontier] mint $(1) <- $(2) (cold battery anchor $(ANCHOR_KEY_$(1)))"; \
-		OT6_WORKER=$(1) OT6_SRAM_ANCHOR=$(call anchor_dir,$(ANCHOR_KEY_$(1))) \
-		OT6_EXPECT_ARTIFACT=$(1).mss tools/tests/run.sh tools/tests/$(2).lua && \
-		sh tools/tests/lib/frontier_stamp.sh write $(1) $(2) $(call anchor_inputs,$(ANCHOR_KEY_$(1))); \
-	fi
-	@touch build/states/$(1).mss.lua
-endef
+# below; frontier_ninja.py refuses a graph entry that names one.  Anchored
+# mints live in the ninja graph (anchor="<key>" in frontier_graph.py): the
+# manifest and payload ride the leg's dependency set, so editing either
+# re-mints every state hung off the anchor, and run.sh's persistent_layout
+# gate refuses the load before boot if the generator does not declare the
+# anchor's layout.  This variable remains only for smoke's anchored
+# generator above.
+POST_OPERA_ANCHOR := tools/tests/anchors/post-opera-v1
 
 # The stale-anchor regression (#25): prove both refusal paths FAIL, loudly,
 # naming what differed -- the pre-boot persistent_layout gate and the
@@ -353,530 +254,6 @@ endef
 .PHONY: anchor-negatives
 anchor-negatives: rom
 	sh tools/tests/lib/anchor_negatives.sh
-
-build/states/arvis_wake.mss.lua: $(STATE3)
-	$(call mint,arvis_wake,gen_arvis)
-build/states/narshe_streets.mss.lua: build/states/arvis_wake.mss.lua
-	$(call mint,narshe_streets,gen_narshe_escape)
-build/states/moogle_doorstep.mss.lua: build/states/narshe_streets.mss.lua
-	$(call mint,moogle_doorstep,gen_mines_chase)
-build/states/moogle_cleared.mss.lua: build/states/moogle_doorstep.mss.lua
-	$(call mint,moogle_cleared,gen_moogle)
-build/states/worldmap_narshe.mss.lua: build/states/moogle_cleared.mss.lua
-	$(call mint,worldmap_narshe,gen_worldmap)
-build/states/figaro_doorstep.mss.lua: build/states/worldmap_narshe.mss.lua
-	$(call mint,figaro_doorstep,gen_figaro)
-build/states/figaro_intro.mss.lua: build/states/figaro_doorstep.mss.lua
-	$(call mint,figaro_intro,gen_edgar)
-# same script, later mints; each gates on its own file so a half-run re-runs
-build/states/figaro_matron.mss.lua: build/states/figaro_intro.mss.lua
-	$(call mint,figaro_matron,gen_edgar)
-build/states/figaro_cleared.mss.lua: build/states/figaro_matron.mss.lua
-	$(call mint,figaro_cleared,gen_edgar)
-# gen_kolts: the chocobo dismount, the South Figaro cave, and the mountain
-build/states/south_figaro.mss.lua: build/states/figaro_cleared.mss.lua
-	$(call mint,south_figaro,gen_kolts)
-build/states/kolts_doorstep.mss.lua: build/states/south_figaro.mss.lua
-	$(call mint,kolts_doorstep,gen_kolts)
-build/states/vargas_doorstep.mss.lua: build/states/kolts_doorstep.mss.lua
-	$(call mint,vargas_doorstep,gen_kolts)
-# gen_kolts_pool: one crossing past the doorstep onto map 100 shelf F.  The
-# doorstep map (95) is transit only and carries no encounter group -- 437
-# paced tiles there drew nothing -- so balance runs that want the Mt. Kolts
-# trash pool need this one, not kolts_doorstep.
-build/states/kolts_pool.mss.lua: build/states/kolts_doorstep.mss.lua
-	$(call mint,kolts_pool,gen_kolts_pool)
-# gen_kolts_cave: one more crossing, onto map 96.  Shelf F (map 100) is
-# encounter group 63 -- Brawler/Tusker -- and that is ONE of the mountain's
-# four groups.  Maps 96/97 carry group 61, which is CIRPIUS x3 at 93.75% of
-# draws: the mountain's most common fight, and the one the trash-weakness
-# pass is built around.  kolts_pool cannot draw it, so it needs its own.
-build/states/kolts_cave.mss.lua: build/states/kolts_pool.mss.lua
-	$(call mint,kolts_cave,gen_kolts_cave)
-# gen_vargas: the fight itself, finished by Pummel, and the reunion
-build/states/vargas_won.mss.lua: build/states/vargas_doorstep.mss.lua
-	$(call mint,vargas_won,gen_vargas)
-# ---- rung 3: the road to the scenario split ----
-# gen_returner: off the mountain's north side and across the world map
-build/states/returner_hideout.mss.lua: build/states/vargas_won.mss.lua
-	$(call mint,returner_hideout,gen_returner)
-# gen_banon: the hideout's conversation graph, ending on the raft's doorstep
-build/states/banon_joined.mss.lua: build/states/returner_hideout.mss.lua
-	$(call mint,banon_joined,gen_banon)
-# gen_lete: the short walk to the raft -- kept its own link so that a failed
-# experiment on the river replays 530 frames, not the whole hideout
-build/states/lete_river.mss.lua: build/states/banon_joined.mss.lua
-	$(call mint,lete_river,gen_lete)
-# gen_scenario: the river (steered past its vanilla loop), ULTROS, and the
-# three-way split -- the entry point of the v0.3 arc
-build/states/scenario_hub.mss.lua: build/states/lete_river.mss.lua
-	$(call mint,scenario_hub,gen_scenario)
-# one step PAST the hub: proves the split is dispatchable and hands the v0.3
-# Locke chain its doorstep.  The Sabin and Terra/Banon branches start from
-# scenario_hub the same way; only this one is built.
-build/states/locke_scenario.mss.lua: build/states/scenario_hub.mss.lua
-	$(call mint,locke_scenario,gen_scenario_locke)
-# ---- the TERRA/BANON scenario: the shortest of the three, from the hub ----
-# gen_rapids: talk to Terra at the hub, resume the raft down the lower Lete
-# (the FORCED battle 8 plus two if_rand fights), spill onto the world map.
-# Two mints: rapids_start is the cheap doorstep UPSTREAM of the forced fight;
-# rapids_done is on foot on the World of Balance NE of Narshe.
-build/states/rapids_start.mss.lua: build/states/scenario_hub.mss.lua
-	$(call mint,rapids_start,gen_rapids)
-build/states/rapids_done.mss.lua: build/states/rapids_start.mss.lua
-	$(call mint,rapids_done,gen_rapids)
-# gen_terra_narshe: the world walk into Narshe and the townsfolk's turn-away
-# at the checkpoint (which shoves the party back south, $001F set)
-build/states/terra_narshe.mss.lua: build/states/rapids_done.mss.lua
-	$(call mint,terra_narshe,gen_terra_narshe)
-# gen_terra_caves: open the secret wall Locke used (an EXAMINE facing up on
-# (15,57)) and step into the mines -- the only fixture in this scenario's
-# random-encounter pool
-build/states/terra_caves.mss.lua: build/states/terra_narshe.mss.lua
-	$(call mint,terra_caves,gen_terra_caves)
-# gen_terra_clifftop: the length of the caves -- maps 41/20-pocket/48/49/50 --
-# including map 49's 13-gate ordered block maze, out onto the clifftop
-build/states/terra_clifftop.mss.lua: build/states/terra_caves.mss.lua
-	$(call mint,terra_clifftop,gen_terra_clifftop)
-# gen_terra_done: into Arvis's house, onto the meeting trigger _ccb3fa, and
-# out the far side with $0021 set -- the scenario complete, back at the hub
-build/states/terra_done.mss.lua: build/states/terra_clifftop.mss.lua
-	$(call mint,terra_done,gen_terra_done)
-# ---- SABIN's scenario: the longest of the three v0.3 branches ----
-# gen_sabin_world: the hub dispatch, the overworld landing at (161,36),
-# SHADOW's house (map 115) and the walk to the Imperial Camp.  Two states
-# from one script so an experiment on the house replays 700 frames, not the
-# hub as well.
-build/states/sabin_world.mss.lua: build/states/scenario_hub.mss.lua
-	$(call mint,sabin_world,gen_sabin_world)
-build/states/sabin_camp.mss.lua: build/states/sabin_world.mss.lua
-	$(call mint,sabin_camp,gen_sabin_world)
-# gen_sabin_camp: one step south of the camp gate hands the game to CYAN on
-# map 120 for ~9,000 frames (the Doma defence, name menu and all) before
-# SABIN gets it back.  cyan_defence is minted mid-run so an experiment on
-# the commander fight replays 800 frames instead of 6,000.
-build/states/cyan_defence.mss.lua: build/states/sabin_camp.mss.lua
-	$(call mint,cyan_defence,gen_sabin_camp)
-build/states/camp_intro.mss.lua: build/states/cyan_defence.mss.lua
-	$(call mint,camp_intro,gen_sabin_camp)
-# gen_sabin_kefka: the LEO scene, the poisoning, both KEFKA script-battles,
-# the pursuit, and the handoff back to CYAN on the Doma grounds.
-build/states/kefka_done.mss.lua: build/states/camp_intro.mss.lua
-	$(call mint,kefka_done,gen_sabin_kefka)
-# gen_sabin_doma: CYAN's run home through the Doma Castle room maze, the
-# family scene, and the handoff back to SABIN at the castle gate.
-build/states/camp_cleared.mss.lua: build/states/kefka_done.mss.lua
-	$(call mint,camp_cleared,gen_sabin_doma)
-# gen_sabin_escape: the Doma courtyard defence -- three talk-to-CYAN fights,
-# CYAN joins, everyone mounts Magitek.  Stops at (14,30), the escape's
-# starting line (the escape walk itself is the next leg).
-build/states/doma_defended.mss.lua: build/states/camp_cleared.mss.lua
-	$(call mint,doma_defended,gen_sabin_escape)
-# gen_sabin_magitek: the Imperial Camp escape -- ride the fight/interlude
-# gauntlet out to the World of Balance.  Battles 15/16/17 are each WON BY
-# TAP-A (kill-bit -> GameOver softlock), and each latchless re-firing trigger
-# is left by holding the corridor's walkable direction through the ~25% control
-# flap (navTo drops its plan on the flap; see the generator header).
-build/states/camp_escaped.mss.lua: build/states/doma_defended.mss.lua
-	$(call mint,camp_escaped,gen_sabin_magitek)
-# gen_sabin_forest: the Phantom Forest -- world (178,82) into map 132, the
-# 132->133->134->135->140 chain (map 133's one-way recovery spring is a
-# MANDATORY conveyor past its back-exit; each map's arrival brushes a back-exit
-# so crossings pick interior waypoints), then boarding the Phantom Train at 140
-# (72,11) -> map 145.  Mints forest_done on the train.
-build/states/forest_done.mss.lua: build/states/camp_escaped.mss.lua
-	$(call mint,forest_done,gen_sabin_forest)
-# gen_sabin_train: the Phantom Train, boarding to the Ghost Train's fall --
-# the maze decoded and driven (car interiors are REUSED per physical car
-# with $017E/$0180 as bookkeeping; the chase, the two-pull lever, the strip
-# route, the valves, and battle 68 fought with real Blitz inputs: the
-# 6-shield OT6_BLUDG row chip-proven at runtime).  Ends on the world map
-# at (178,93) with $003A/$003B set.
-build/states/train_done.mss.lua: build/states/forest_done.mss.lua
-	$(call mint,train_done,gen_sabin_train)
-# gen_sabin_falls: Baren Falls -- the jump, battle 18 mid-fall (RIZOPAS
-# surfaces in slot 5 off the piranhas' death script, its authored
-# 5-shield SLASH|BLUDG row read live), SHADOW's exit, GAU named on the
-# Veldt shore.
-build/states/falls_done.mss.lua: build/states/train_done.mss.lua
-	$(call mint,falls_done,gen_sabin_falls)
-# gen_sabin_gau: Mobliz's Dried Meat, the Veldt grind (GAU appears on the
-# 3/8 end-of-battle roll), and his return-visit self-recruit -- the
-# generator header documents the one concession ($3EBD bit 1) and the
-# measured reason the first-visit feed cannot be driven.
-build/states/gau_joined.mss.lua: build/states/falls_done.mss.lua
-	$(call mint,gau_joined,gen_sabin_gau)
-# gen_sabin_trench: Crescent Mountain's helmet chain (GAU-gated), the
-# Serpent Trench ridden as a real VEHICLE script (LEFT held through both
-# arrow windows = the mainline), Nikeah, and the ferry's option-1 prompt --
-# $0044=1 and the hub.  SABIN's scenario closes here.
-build/states/sabin_done.mss.lua: build/states/gau_joined.mss.lua
-	$(call mint,sabin_done,gen_sabin_trench)
-# SABIN's continuation states join the frontier additively (a += line, kept off
-# the base := list so the other scenario agents' FRONTIER edits never collide
-# with this one).  Extended in place as each leg lands.
-FRONTIER += camp_escaped forest_done train_done falls_done gau_joined \
-            sabin_done
-
-# ---- rung 4: LOCKE's scenario, hub -> South Figaro -> TunnelArmr ----
-# gen_sfigaro: the occupied town.  The gate soldier (battle 11), then the
-# cafe's cider runner -- STOLEN from, not killed, because the merchant's
-# clothes come off the steal's reaction script and nothing else -- then the
-# old man's password and the rich man's secret passage.
-build/states/sfigaro_town.mss.lua: build/states/locke_scenario.mss.lua
-	$(call mint,sfigaro_town,gen_sfigaro)
-build/states/sfigaro_passage.mss.lua: build/states/sfigaro_town.mss.lua
-	$(call mint,sfigaro_passage,gen_sfigaro)
-# gen_celes: the passage, the rich man's mansion (a warp maze, entered by a
-# deep door), the basement, the Celes chains cutscene + naming menu, freeing
-# her, and the sleeping soldier's clock key
-build/states/celes_freed.mss.lua: build/states/sfigaro_passage.mss.lua
-	$(call mint,celes_freed,gen_celes)
-# gen_tunnelarmr: the clock's secret passage (the ONLY basement exit), the
-# escape through maps 87/86 to town, the world, the Figaro cave walked in
-# from the south (world (75,102) is an event trigger, not an entrance), and
-# TunnelArmr (battle 67, $0104) -- which ends the Locke scenario ($001E=1,
-# back at the hub).  Three states.
-build/states/sfigaro_escape.mss.lua: build/states/celes_freed.mss.lua
-	$(call mint,sfigaro_escape,gen_tunnelarmr)
-build/states/tunnelarmr_doorstep.mss.lua: build/states/sfigaro_escape.mss.lua
-	$(call mint,tunnelarmr_doorstep,gen_tunnelarmr)
-build/states/locke_done.mss.lua: build/states/tunnelarmr_doorstep.mss.lua
-	$(call mint,locke_done,gen_tunnelarmr)
-
-# ---- SCENARIO STACKING: the road to the reunion --------------------------
-# The reunion _caadb9 (event_main.asm:26683) needs $0021 && $001E && $0044 in
-# ONE playthrough; each honest chain sets one.  compose.py's OT6_STACK prefix
-# replays a whole chain's ROUTE LOGIC from a different boot: a stacked mint
-# ($(call mint,<state>,<script>,<prefix>)) composes the same generator with
-# every .mss basename prefixed, so it boots the prefixed predecessor and
-# mints prefixed artifacts -- the honest states are never touched.  The full
-# stack is LOCKE (honest) -> SABIN (s2_) -> TERRA (t3_); the earlier two_done
-# milestone (LOCKE + TERRA, t2_) proved the mechanism on Terra's chain:
-#  * Terra's is the shortest chain, so that first stacking layer -- the one
-#    that had to prove the mechanism -- replays the least;
-#  * the THIRD chain's hub return fires the reunion instead of reaching the
-#    hub (the if_all at :26654), so whichever chain goes last cannot end on
-#    its own "back at the hub" gate.  That final leg belongs to
-#    gen_narshe_battle.  Terra takes it -- gen_terra_done's all-three fork is
-#    already reunion-aware -- so Sabin's (now-complete) chain goes second and
-#    its clean hub-return ending seeds the Terra layer.
-# Worker-isolated exactly like the plain mints -- the stack mints (a separate
-# `smint` macro before the fold) used to run BARE, and under `make -jN` the
-# s2_/t2_/t3_ stacks become runnable together (all three hang off
-# locke_done), so two bare stack mints raced on the ONE default composed file
-# and settings pin -- the precise hazard the worker-isolation comment above
-# describes.  Measured fallout (2026-07-20 remint): t2_terra_narshe minted
-# with the party on map 3 while its own run reported PASS (it had executed a
-# concurrent stack's composed script), and t2_terra_caves's rule "succeeded"
-# -- touch and all -- without ever writing its state.  The `&&` chain also
-# makes a failed stack mint fail its RULE, which the bare form did not
-# guarantee.  OT6_WORKER and OT6_STACK compose fine: the worker picks the
-# tree, the stack prefix picks the state names inside it.
-
-# stackseed <prefixed hub> <source state> -- a stacked chain's "scenario_hub"
-# IS the previous chain's ending.  cp both halves (state + sidecar) under the
-# same content gate the mints use, so a source re-mint (ROM changed, or the
-# chain below replayed) re-seeds and the stack above replays.  No generator
-# and no worker: seeding is a pure copy, so there is nothing to isolate and
-# frontier_deps.sh correctly finds no .lua to tie it to.
-define stackseed
-	@if [ build/states/.rom-copy -nt build/states/$(1).mss ] || [ ! -f build/states/$(1).mss ] || [ build/states/$(2).mss -nt build/states/$(1).mss ]; then \
-		cp build/states/$(2).mss build/states/$(1).mss; \
-		cp build/states/$(2).mss.lua build/states/$(1).mss.lua; \
-		echo "stack seed: $(1) <- $(2)"; \
-	fi
-	@touch build/states/$(1).mss.lua
-endef
-
-# the seed: the stacked Terra chain's "scenario_hub" IS the Locke ending.
-build/states/t2_scenario_hub.mss.lua: build/states/locke_done.mss.lua
-	$(call stackseed,t2_scenario_hub,locke_done)
-build/states/t2_rapids_start.mss.lua: build/states/t2_scenario_hub.mss.lua
-	$(call mint,t2_rapids_start,gen_rapids,t2_)
-build/states/t2_rapids_done.mss.lua: build/states/t2_rapids_start.mss.lua
-	$(call mint,t2_rapids_done,gen_rapids,t2_)
-build/states/t2_terra_narshe.mss.lua: build/states/t2_rapids_done.mss.lua
-	$(call mint,t2_terra_narshe,gen_terra_narshe,t2_)
-build/states/t2_terra_caves.mss.lua: build/states/t2_terra_narshe.mss.lua
-	$(call mint,t2_terra_caves,gen_terra_caves,t2_)
-build/states/t2_terra_clifftop.mss.lua: build/states/t2_terra_caves.mss.lua
-	$(call mint,t2_terra_clifftop,gen_terra_clifftop,t2_)
-build/states/t2_terra_done.mss.lua: build/states/t2_terra_clifftop.mss.lua
-	$(call mint,t2_terra_done,gen_terra_done,t2_)
-# the acceptance gate: asserts BOTH flags on the stacked ending and re-saves
-# it under the canonical name (gen_two_done.lua's header says why the assert
-# lives outside the mechanically-prefixed chain).
-build/states/two_done.mss.lua: build/states/t2_terra_done.mss.lua
-	$(call mint,two_done,gen_two_done)
-# ---- the FULL stack: SABIN second (s2_), TERRA last (t3_) ----------------
-# ORDER (from the reunion spike): whichever chain returns to the hub THIRD
-# rides the reunion instead of reaching the hub, so the final leg must be
-# reunion-aware -- gen_terra_done is (its all-three fork mints
-# t3_reunion_ready at the map-22 staging).  Sabin's chain replays SECOND on
-# top of locke_done, ending at his hub return ($001E+$0044, no reunion).
-build/states/s2_scenario_hub.mss.lua: build/states/locke_done.mss.lua
-	$(call stackseed,s2_scenario_hub,locke_done)
-build/states/s2_sabin_world.mss.lua: build/states/s2_scenario_hub.mss.lua
-	$(call mint,s2_sabin_world,gen_sabin_world,s2_)
-build/states/s2_sabin_camp.mss.lua: build/states/s2_sabin_world.mss.lua
-	$(call mint,s2_sabin_camp,gen_sabin_world,s2_)
-build/states/s2_cyan_defence.mss.lua: build/states/s2_sabin_camp.mss.lua
-	$(call mint,s2_cyan_defence,gen_sabin_camp,s2_)
-build/states/s2_camp_intro.mss.lua: build/states/s2_cyan_defence.mss.lua
-	$(call mint,s2_camp_intro,gen_sabin_camp,s2_)
-build/states/s2_kefka_done.mss.lua: build/states/s2_camp_intro.mss.lua
-	$(call mint,s2_kefka_done,gen_sabin_kefka,s2_)
-build/states/s2_camp_cleared.mss.lua: build/states/s2_kefka_done.mss.lua
-	$(call mint,s2_camp_cleared,gen_sabin_doma,s2_)
-build/states/s2_doma_defended.mss.lua: build/states/s2_camp_cleared.mss.lua
-	$(call mint,s2_doma_defended,gen_sabin_escape,s2_)
-build/states/s2_camp_escaped.mss.lua: build/states/s2_doma_defended.mss.lua
-	$(call mint,s2_camp_escaped,gen_sabin_magitek,s2_)
-build/states/s2_forest_done.mss.lua: build/states/s2_camp_escaped.mss.lua
-	$(call mint,s2_forest_done,gen_sabin_forest,s2_)
-build/states/s2_train_done.mss.lua: build/states/s2_forest_done.mss.lua
-	$(call mint,s2_train_done,gen_sabin_train,s2_)
-build/states/s2_falls_done.mss.lua: build/states/s2_train_done.mss.lua
-	$(call mint,s2_falls_done,gen_sabin_falls,s2_)
-build/states/s2_gau_joined.mss.lua: build/states/s2_falls_done.mss.lua
-	$(call mint,s2_gau_joined,gen_sabin_gau,s2_)
-build/states/s2_sabin_done.mss.lua: build/states/s2_gau_joined.mss.lua
-	$(call mint,s2_sabin_done,gen_sabin_trench,s2_)
-# TERRA/BANON's chain replays LAST, on top of two completions:
-build/states/t3_scenario_hub.mss.lua: build/states/s2_sabin_done.mss.lua
-	$(call stackseed,t3_scenario_hub,s2_sabin_done)
-build/states/t3_rapids_start.mss.lua: build/states/t3_scenario_hub.mss.lua
-	$(call mint,t3_rapids_start,gen_rapids,t3_)
-build/states/t3_rapids_done.mss.lua: build/states/t3_rapids_start.mss.lua
-	$(call mint,t3_rapids_done,gen_rapids,t3_)
-build/states/t3_terra_narshe.mss.lua: build/states/t3_rapids_done.mss.lua
-	$(call mint,t3_terra_narshe,gen_terra_narshe,t3_)
-build/states/t3_terra_caves.mss.lua: build/states/t3_terra_narshe.mss.lua
-	$(call mint,t3_terra_caves,gen_terra_caves,t3_)
-build/states/t3_terra_clifftop.mss.lua: build/states/t3_terra_caves.mss.lua
-	$(call mint,t3_terra_clifftop,gen_terra_clifftop,t3_)
-# gen_terra_done on the all-three boot takes its REUNION FORK: rides
-# _caadb9's cutscene to the map-22 staging and mints t3_reunion_ready.
-build/states/t3_reunion_ready.mss.lua: build/states/t3_terra_clifftop.mss.lua
-	$(call mint,t3_reunion_ready,gen_terra_done,t3_)
-# the acceptance gate (gen_two_done's shape, one layer up): assert ALL
-# THREE flags + the reunion on the stacked ending and re-save it as the
-# canonical reunion_ready -- the boot gen_narshe_battle consumes.
-build/states/reunion_ready.mss.lua: build/states/t3_reunion_ready.mss.lua
-	$(call mint,reunion_ready,gen_reunion_ready)
-FRONTIER += s2_scenario_hub s2_sabin_world s2_sabin_camp s2_cyan_defence \
-            s2_camp_intro s2_kefka_done s2_camp_cleared s2_doma_defended \
-            s2_camp_escaped s2_forest_done s2_train_done s2_falls_done \
-            s2_gau_joined s2_sabin_done t3_scenario_hub t3_rapids_start \
-            t3_rapids_done t3_terra_narshe t3_terra_caves \
-            t3_terra_clifftop t3_reunion_ready reunion_ready \
-            narshe_battle kefka_doorstep kefka_won
-
-# ---- the Battle for Narshe (waiting on reunion_ready) ---------------------
-# gen_narshe_battle: reunion staging -> BANON -> the three-party assignment
-# menu (P1=TERRA+EDGAR+CELES, P2=CYAN+SABIN, P3=LOCKE+GAU) -> defense live
-# -> the measured cliff descent -> KEFKA'S doorstep -> the scripted win.
-# Validated end-to-end on the poked spike twin (OT6_STACK=spike_); the
-# rules run unchanged the day reunion_ready exists.
-build/states/narshe_battle.mss.lua: build/states/reunion_ready.mss.lua
-	$(call mint,narshe_battle,gen_narshe_battle)
-build/states/kefka_doorstep.mss.lua: build/states/narshe_battle.mss.lua
-	$(call mint,kefka_doorstep,gen_narshe_battle)
-# kefka_won is v0.4's FIRST link and the honest chain's head: the win tail
-# (esper scene, TERRA's flight, the Arvis regroup and its party-select
-# menu) mints the map-30 boot the Zozo arc consumes.  Issue #3 -- the
-# scene stalling every walker -- is closed; the three waits it was made of
-# are decoded in gen_kefka_won's header.
-build/states/kefka_won.mss.lua: build/states/kefka_doorstep.mss.lua
-	$(call mint,kefka_won,gen_kefka_won)
-
-# ---- v0.4: the search for TERRA (kefka_won -> Zozo) -----------------------
-# gen_zozo1_submerge: Arvis's front door (the rung-1 blocker NPC is gone;
-# the corridor exit's clifftop perch is post-battle ISOLATED) -> the south
-# gate -> the EAST castle trigger world {64,76} ($010B, set by kefka_won's
-# tail) -> keep -> the WEST engine-room door -> the attendant's Kohlingen
-# choice (index 0 in $056E) -> the scripted crossing -> castle parked WEST
-# ($010C).  NO underwater battles on this route -- battle 19/20/21 belong
-# to Sabin's Serpent Trench, a survey confusion this chain retires.
-build/states/figaro_submerged.mss.lua: build/states/kefka_won.mss.lua
-	$(call mint,figaro_submerged,gen_zozo1_submerge)
-# gen_zozo2_arrival: out of the west castle (row y=43 exits to the parent
-# the ride re-pinned), the long south-then-north world hook around Zozo's
-# mountain ring (177 steps, verified against the same tile-prop rule the
-# engine walks), onto {22,92} -> map 221's street.
-build/states/zozo_arrival.mss.lua: build/states/figaro_submerged.mss.lua
-	$(call mint,zozo_arrival,gen_zozo2_arrival)
-# gen_zozo3_clock: the street's CAFE door (42,28) -> the clock room (map
-# 225) -> the clock tile {98,59} (an A+facing-up tile interaction, not an
-# NPC) -> 6:10:50 across three CHAINED choice dialogs, each verified by its
-# own $01F* latch -> the hidden staircase opens ($01F0).
-build/states/zozo_clock_solved.mss.lua: build/states/zozo_arrival.mss.lua
-	$(call mint,zozo_clock_solved,gen_zozo3_clock)
-# gen_zozo4_dadaluma: the crane maze.  The city is a DIRECTED island graph
-# once door tiles are modeled as the walk-on teleports they are: five doors
-# (P9/P10b/P11a/P12b/P14a/P15b in probe_climb's pair naming), the stair
-# room's bandit conveyor (seven walkers own its one-wide column forever --
-# followed, not pathed), both jump rows ($1EB6 facing-gated step-on
-# triggers, chained under one held direction), and the z-level loop onto
-# the y=13 strip beside DADALUMA at (30,14).  Doorstep = (30,13), one
-# A-press short; the fight is battle 69 (formation 438, $0107 + 2x $006C),
-# won by the kill-bit like Kefka/Vargas (_ca5ea9 gates on b-switch $40).
-# The win clears $034A and opens the tower porch gen_zozo5 climbs.
-build/states/dadaluma_doorstep.mss.lua: build/states/zozo_arrival.mss.lua
-	$(call mint,dadaluma_doorstep,gen_zozo4_dadaluma)
-build/states/dadaluma_won.mss.lua: build/states/dadaluma_doorstep.mss.lua
-	$(call mint,dadaluma_won,gen_zozo4_dadaluma)
-# gen_zozo5_ramuh: the tower door (33,9) -> map 226 -> TERRA (talked from the
-# WEST, {80,17} facing right: her tile is z-upper and the south tile z-lower,
-# CheckNPCs' z-match rejects it) -> the pure-dialog RAMUH scene -> the four
-# magicite (SIREN/KIRIN/STRAY bumped from {82,13}, collision tiles one row
-# below their prop coords) -> the leave cutscene (its party_menu wants START)
-# -> $0054=1 at {57,45}, v0.4's stop line.  Terra found catatonic, no rejoin.
-build/states/zozo_done.mss.lua: build/states/dadaluma_won.mss.lua
-	$(call mint,zozo_done,gen_zozo5_ramuh)
-FRONTIER += figaro_submerged zozo_arrival zozo_clock_solved \
-            dadaluma_doorstep dadaluma_won zozo_done
-
-# ---- v0.5 Beat A: the Opera (zozo_done -> the Blackjack) ------------------
-# gen_opera1_doorstep: zozo_done -> the world -> JIDOOR (map 198, entered at
-# {15,61}) -> its north BUMP door {16,13}->{16,12} -> map 209 (the opera-plot
-# room) -> parked at {117,20} facing UP, one A-press below the IMPRESARIO
-# ({117,19}, _ca9337).  The survey's "park at the opera-house foyer impresario"
-# is WRONG: the opera house (map 237, world {45,154}) keeps its impresario
-# HIDDEN ($0340) behind a "closed" sign until the opera-open cutscene -- which
-# BEGINS at this map-209 talk ("Maria!?" -> the letter $0331 -> the Setzer
-# name-menu -> $0340=1).  The generator self-verifies (after the mint) that
-# one A-press fires _ca9337, so the banked state is never a dead press short.
-build/states/opera_doorstep.mss.lua: build/states/zozo_done.mss.lua
-	$(call mint,opera_doorstep,gen_opera1_doorstep)
-FRONTIER += opera_doorstep
-# gen_opera2_open: opera_doorstep -> DRIVE the opera-open cutscene chain on map
-# 209 (talk _ca9337 -> the letter $0331 -> the Setzer intro + name_menu ->
-# $0340=1, the opera opens) -> travel 209 -> Jidoor (198, its south edge exits
-# to world {27,132}) -> world -> the OPERA HOUSE (map 237, world {45,154}) ->
-# parked at {60,49} below the now-VISIBLE IMPRESARIO ({60,48}, _caae15).  Mints
-# opera_open, one A-press from the performance (the aria).  The name_menu and
-# every TEXT_ONLY page ride on a hasControl-gated A/START stall fallback.
-build/states/opera_open.mss.lua: build/states/opera_doorstep.mss.lua
-	$(call mint,opera_open,gen_opera2_open)
-FRONTIER += opera_open
-# gen_opera3_backstage: opera_open -> talk the IMPRESARIO (_caae15) -> RIDE the
-# performance intro -> the party lands controllable BACKSTAGE in the theater,
-# map 234 {16,46}, $0055=1 (performance underway).  Mints opera_backstage.
-build/states/opera_backstage.mss.lua: build/states/opera_open.mss.lua
-	$(call mint,opera_backstage,gen_opera3_backstage)
-FRONTIER += opera_backstage
-# gen_opera4_stage: opera_backstage -> ROUTE A onto the STAGE.  The theater's
-# stage doors {4,24}/{28,24} land in a disconnected 238 backstage, so the stage
-# is reached via the opera-house interior: 234 {25,49}->237 {72,32}, walk to
-# 237 {82,32}->238 {100,22}; then talk CELES {99,19} (_caba44) to ARM the aria
-# ($0056=1).  Mints opera_stage, parked {99,20} one navTo from the aria {97,7}.
-build/states/opera_stage.mss.lua: build/states/opera_backstage.mss.lua
-	$(call mint,opera_stage,gen_opera4_stage)
-FRONTIER += opera_stage
-# gen_opera5_dance: opera_stage -> fire the aria trigger {97,7} -> map 236 -> the
-# lyric forks {0,1,0} -> the FLOWER DANCE.  Map 236 is z-split (09 upper / 02
-# lower / 03,0b bridges), which breaks bfsPath, so the two stair legs run on
-# HAND-CODED per-tile tables (corridorFollow).  Waltz DRACO (obj#19 @ {12,19})
-# x3 by greedy-chase in the uniform basin -> flowers (obj#16) -> $0057; then
-# climb the z-split stairs to the balcony {8,9} -> _cabe6d stops the timer and
-# rides the wedding-waltz finale (load 233 rafters -> load 238) -> $0111=1.
-# Mints opera_dance_done on map 238 {98,7} -- the aria solved (blocker cracked).
-build/states/opera_dance_done.mss.lua: build/states/opera_stage.mss.lua
-	$(call mint,opera_dance_done,gen_opera5_dance)
-FRONTIER += opera_dance_done
-
-# gen_opera6_rafter: opera_dance_done -> the RAFTER CHASE -> ultros2_doorstep,
-# one interaction before battle 104 (Ultros②, $012d, 6 shields, slash|pierce).
-# The measured route alerts the Impresario, operates the far-right switch, and
-# crosses the left framework.  Five no-story rat gates are cleared before map
-# instantiation so the timed mint is deterministic; battle_ultros2 exercises
-# the boss contract itself.
-build/states/ultros2_doorstep.mss.lua: build/states/opera_dance_done.mss.lua
-	$(call mint,ultros2_doorstep,gen_opera6_rafter)
-FRONTIER += ultros2_doorstep
-
-# gen_opera7_blackjack: ultros2_doorstep -> battle 104 (route kill-bit; the
-# real combat contract lives in battle_ultros2.lua) -> Setzer's coin-toss
-# bargain -> first stable controllable world-map frame after the Blackjack
-# lands outside Vector.  This is the v0.5 terminal fixture.
-build/states/blackjack.mss.lua: build/states/ultros2_doorstep.mss.lua
-	$(call mint,blackjack,gen_opera7_blackjack)
-FRONTIER += blackjack
-
-# ---- v0.6: the raid on Vector and the Magitek Research Facility ----------
-# The chain hangs off the tracked 32 KiB post-Opera battery anchor rather
-# than off blackjack.mss: gen_vector_doorstep cold-boots, drives vanilla
-# Continue into slot 3, and walks the world from there.  Every later link is
-# an ordinary savestate chain.
-#
-# gen_vector_doorstep: cold power-on -> Continue -> the world walk to the
-# VECTOR event trigger at (121,187) -> map 242 {32,61}.  REPLACES
-# gen_vector_arrival, which held RIGHT off the anchor into map 323 and
-# called it Vector -- 323 is ALBROOK (issue #17).  The generator now checks
-# its landing through the engine's own map-title machinery ($0520 ->
-# MapTitlePtrs -> MapTitle) and exercises that read on the Albrook gate
-# first, so a wrong turn reports the town it is actually standing in.
-ANCHOR_KEY_vector_doorstep := post-opera-v1
-build/states/vector_doorstep.mss.lua: $(call anchor_inputs,$(ANCHOR_KEY_vector_doorstep))
-	$(call mint_anchor,vector_doorstep,gen_vector_doorstep)
-# gen_vector_sneak: the Returner sympathizer's choice dialog ($01F0) and the
-# FACING-GATED ledge on {43,38} ($01B2 = "facing down", an alias of $1EB6,
-# not a story bit) -> control at {57,34}, north of the gate guards and the
-# forced-battle trap row.
-build/states/vector_sneak.mss.lua: build/states/vector_doorstep.mss.lua
-	$(call mint,vector_sneak,gen_vector_sneak)
-# gen_mrf_entry: the column north to the {57,2} long entrance -> map 262,
-# MAGITEK FACTORY {28,8}.  Also carries the live navigation census of the
-# factory's upper floor.
-build/states/mrf_entry.mss.lua: build/states/vector_sneak.mss.lua
-	$(call mint,mrf_entry,gen_mrf_entry)
-# gen_mrf_chute: the one-way conveyor chute at {19,25} -> {10,45}.
-build/states/mrf_chute.mss.lua: build/states/mrf_entry.mss.lua
-	$(call mint,mrf_chute,gen_mrf_chute)
-# gen_mrf_263: the {11,45} conveyor -> {20,45} -> the scripted {22,53}
-# transition -> map 263 {22,18}.
-build/states/mrf_263.mss.lua: build/states/mrf_chute.mss.lua
-	$(call mint,mrf_263,gen_mrf_263)
-# gen_mrf_kefka: the {24,18} ride to {40,30}, then the {40,32} trigger row
-# and Kefka's esper-drain scene -> $005F.
-build/states/mrf_kefka.mss.lua: build/states/mrf_263.mss.lua
-	$(call mint,mrf_kefka,gen_mrf_kefka)
-# gen_ifrit_doorstep: the {37,44} chute -> map 264 {10,7} -> parked at
-# {3,7} facing IFRIT, one A-press from battle 70 (verified after the mint).
-build/states/ifrit_doorstep.mss.lua: build/states/mrf_kefka.mss.lua
-	$(call mint,ifrit_doorstep,gen_ifrit_doorstep)
-# gen_ifrit_magicite: battle 70 and the four-interaction hand-off -> both
-# magicite, asserted on $1A69's give_genju bits.
-build/states/magicite_ifrit_shiva.mss.lua: build/states/ifrit_doorstep.mss.lua
-	$(call mint,magicite_ifrit_shiva,gen_ifrit_magicite)
-# gen_n024_doorstep: 264 -> 269 -> 271 (MAGITEK RES. FACILITY) -> 273,
-# parked at {25,52} facing NUMBER 024, one A-press from battle 72.
-build/states/n024_doorstep.mss.lua: build/states/magicite_ifrit_shiva.mss.lua
-	$(call mint,n024_doorstep,gen_n024_doorstep)
-# gen_esper_tubes: battle 72, then the {25,50} door into map 274 and the
-# doorstep for the facing+A-gated BIG_SWITCH trigger.  Two mints.
-build/states/n024_won.mss.lua: build/states/n024_doorstep.mss.lua
-	$(call mint,n024_won,gen_esper_tubes)
-build/states/esper_tubes_doorstep.mss.lua: build/states/n024_won.mss.lua
-	$(call mint,esper_tubes_doorstep,gen_esper_tubes)
-# gen_esper_tubes_done: the Cid/Kefka set piece -- six espers, and CELES
-# leaves the roster ($02F6=0).
-build/states/esper_tubes.mss.lua: build/states/esper_tubes_doorstep.mss.lua
-	$(call mint,esper_tubes,gen_esper_tubes_done)
-# gen_minecart_doorstep: the lift -> map 266 -> map 272, parked beside CID,
-# one A-press from `cutscene TRAIN`.  THE v0.6 FRONTIER ENDS HERE -- see
-# gen_n128.lua's header for why the minecart itself does not mint.
-build/states/minecart_doorstep.mss.lua: build/states/esper_tubes.mss.lua
-	$(call mint,minecart_doorstep,gen_minecart_doorstep)
-FRONTIER += vector_doorstep vector_sneak mrf_entry mrf_chute mrf_263 \
-            mrf_kefka ifrit_doorstep magicite_ifrit_shiva n024_doorstep \
-            n024_won esper_tubes_doorstep esper_tubes minecart_doorstep
-
-frontier: rom $(STATE1) $(STATE2) $(STATE3) \
-          $(patsubst %,build/states/%.mss.lua,$(FRONTIER))
-	@echo "frontier states up to date: $(FRONTIER)"
 
 # The suite INCLUDING its frontier-gated tests.  battle_vargas asserts on
 # vargas_doorstep, and `test` deliberately does not depend on it: minting it

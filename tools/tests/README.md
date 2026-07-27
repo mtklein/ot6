@@ -19,37 +19,37 @@ Narshe, and on through Kefka to Zozo -- lives behind
 `make frontier`, which
 nothing in the gate depends on: each link is a multi-minute scripted playthrough that
 consumes the previous link's savestate, and the suite's remint cost has
-to stay what it was.  (The Makefile's `FRONTIER` list is the authoritative
-set of minted states.)  A minted link is a function of the ROM bytes, its
-generator `gen_*.lua`, and the shared test library every generator
-`dofile()`s -- both halves of it, `lib/ot6.lua` (battle core) and
-`lib/ot6_field.lua` (field/world navigation), since `lib/compose.py`
-inlines the pair into every composed script -- and its freshness gate
-re-mints when ANY of them changes by CONTENT (a rebuild or a checkout
-bumps timestamps without moving bytes, so a plain mtime would re-mint
-spuriously).  ROM bytes ride
-the `.rom-copy` clock; the generator+lib half is `lib/frontier_stamp.sh`,
-which stamps each state `build/states/<state>.stamp` with
-`sha256(generator ++ ot6.lua ++ ot6_field.lua) <generator>` at mint time
-and re-mints on a
-mismatch.  `lib/frontier_deps.sh` reads the state->generator map out of the
-Makefile's `$(call mint,...)` lines into a generated `-include` so make
-actually reconsiders a state when its generator or lib changes (a new
-frontier link is gated the moment it lands).  Editing one generator
-re-mints only the states it feeds (and their descendants down the chain);
-editing either lib half re-mints the whole frontier, since every route runs
-through them -- an acceptable cost because the lib is stable (it is the rare
-file to change) while generators churn constantly, so the coarse lib axis
-fires seldom and the precise per-generator axis carries the everyday load.
-(Splitting the lib in two narrows even that: a battle-core edit and a
-nav-stack edit no longer churn one shared file's history, though either
-still re-mints the frontier -- the fixture really was minted by walking
-routes through both halves.)
-`lib/compose.py` re-checks the same stamp at CONSUME time and prints a loud
-`[ot6] WARNING` if a fixture a test is about to boot has drifted from its
-generator+lib (the gap where `make test` picks up a frontier fixture
-without ever running the mint gate).  Issue #2: before this, the gate keyed
-on the ROM alone, so a generator or lib edit silently kept a stale fixture.
+to stay what it was.
+
+The graph of minted states is DATA -- `tools/tests/frontier_graph.py`, one
+entry per state -- and `lib/frontier_ninja.py` emits it as
+`build/build.ninja`; `make frontier` / `make test` are thin wrappers over
+`ninja -f build/build.ninja` (issue #25).  A minted link is a function of
+the ROM bytes, its generator `gen_*.lua`, and all THREE lib halves
+`lib/compose.py` inlines into every composed script -- `lib/ot6.lua`
+(battle core), `lib/ot6_field.lua` (field/world navigation) and
+`lib/ot6_contract.lua` (anchor invariant contracts) -- plus, for an
+anchored leg, the anchor's manifest and battery payload.  Every one of
+those is a declared ninja dependency, routed through a content LATCH edge
+(`cmp || cp` with `restat = 1`), so staleness is decided by CONTENT inside
+ninja's own scheduler: a rebuild or checkout that bumps timestamps without
+moving bytes re-mints nothing, a changed input re-runs every transitive
+dependent, and there is no stamp beside the graph to disagree with it.
+Editing one generator re-mints only the states it feeds (and their
+descendants down the chain); editing any lib half re-mints the whole
+frontier, since every route runs through them -- an acceptable cost because
+the lib is stable (it is the rare file to change) while generators churn
+constantly.  `lib/frontier_ninja_selftest.sh` proves those semantics
+against real ninja on a mock tree in seconds, no emulator.
+`lib/frontier_stamp.sh` survives as the PROVENANCE half: each mint edge
+stamps `build/states/<state>.stamp` with
+`sha256(generator ++ ot6.lua ++ ot6_field.lua ++ ot6_contract.lua)
+<generator> [extras]`, and `lib/compose.py` re-derives it at CONSUME time,
+printing a loud `[ot6]` line if a fixture a test is about to boot has
+drifted from its generator+lib (the gap where `make test` picks up a
+worktree-seeded frontier fixture without ever running a mint).  Issue #2:
+before any of this, freshness keyed on the ROM alone, so a generator or
+lib edit silently kept a stale fixture.
 
 Some suite tests are FRONTIER-GATED: each declares
 `-- @suite frontier=<fixture>` and asserts on a state only `make frontier`
@@ -58,7 +58,7 @@ mints -- `battle_vargas` on `vargas_doorstep.mss`, `battle_flyin` on
 present-but-not-shown at battle start), `battle_kefka` on
 `kefka_doorstep.mss` (the Battle for Narshe -- deeper still, since its boot
 needs the REUNION: all three scenarios completed in one playthrough via the
-Makefile's scenario STACK), and others.  `tools/tests/suite.sh --list`
+graph's scenario STACK), and others.  `tools/tests/suite.sh --list`
 prints the current gated set.  suite.sh adds each the moment its fixture
 exists and reports it as `skip` when it does not -- never silently drops it
 -- so `make test` costs what it always did and `make frontier-test` (mint
@@ -71,11 +71,12 @@ playthrough, but each honest chain sets only its own flag, so a *stacked*
 mint replays a chain's route logic from a different boot: `OT6_STACK=<prefix>`
 makes `compose.py` rewrite every `.mss` basename in the script (never the
 lib), so the same generator boots a prefixed predecessor and emits prefixed
-artifacts, leaving the honest states untouched.  The Makefile seeds each
-stacked hub from the previous chain's ending (`stackseed`) and stacks the
-`t2_`/`s2_`/`t3_` layers up to `reunion_ready`.  The full account is the
-Makefile's `SCENARIO STACKING` section and `compose.py`'s `SCENARIO STACKING
-(OT6_STACK)` docstring.
+artifacts, leaving the honest states untouched.  The graph seeds each
+stacked hub from the previous chain's ending (`seed=` entries in
+`frontier_graph.py`) and stacks the `t2_`/`s2_`/`t3_` layers up to
+`reunion_ready`.  The full account is `frontier_graph.py`'s `SCENARIO
+STACKING` section and `compose.py`'s `SCENARIO STACKING (OT6_STACK)`
+docstring.
 
 `run.sh` wraps:
 
@@ -116,8 +117,8 @@ and reported, and `OT6_KEEP_RUNS=1` retains successful ones for investigation.
 `suite.sh` likewise creates unique bookkeeping under `build/test-suites/`, so
 two complete suites may overlap without sharing compositions, claims, or
 results. It honors `OT6_JOBS=N` (1 = serial) and fans tests out across
-scheduling labels; every suite test is a pure savestate load (the mints run as
-Makefile prerequisites first), so order doesn't matter. Suite logs stay at
+scheduling labels; every suite test is a pure savestate load (the mints run
+through the ninja graph first), so order doesn't matter. Suite logs stay at
 `build/states/suite_<t>.log` either way, and each test line reports its worker
 label and wall time. `runner_isolation_selftest.sh`, run by `make test`,
 deliberately overlaps same-label runner calls and complete-suite workspaces as
