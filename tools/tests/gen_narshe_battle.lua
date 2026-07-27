@@ -182,19 +182,39 @@ H.run({ maxFrames = 120000 }, {
   -- 1. BANON {20,7}: stand at (20,8), face up, clean A.  "Prepared?" ->
   --    Yes -> the map-5 info scene -> party_menu 3, RESET.
   -- ==================================================================== --
+  -- The approach and the activation are now SEPARATE, and the activation
+  -- holds no direction at all.  The old driver interleaved a 4-frame UP with
+  -- a 1-frame A in one 8-frame cycle; that only ever worked because navTo
+  -- used to hand the party over MID-GLIDE, so the first UP frames were spent
+  -- finishing the step and the A landed in a genuinely direction-free
+  -- window.  navTo now hands over at rest (issue #22), the UP is pressed
+  -- against BANON's occupied tile from a standstill every cycle, and a held
+  -- direction starves CheckNPCs (player.asm:142 -- this file's own header
+  -- says so for KEFKA).  Measured: 8000 frames at (20,8), face=0 (UP),
+  -- objmap(20,7)=$30 (BANON present), $BA/$D3 flat 0 -- the party stood
+  -- correctly facing him and the A never reached CheckNPCs.  So: face him
+  -- ONCE with a held UP that cannot step, release, then pure edge-A.
   H.navTo(20, 8, { maxFrames = 6000 }),
+  H.hold({ "up" }), H.waitFrames(8), H.release(), H.waitFrames(6),
+  H.call(function()
+    local po = H.readWord(0x0803)
+    H.assertEq(H.fieldX() == 20 and H.fieldY() == 8, true, "on BANON's doorstep")
+    H.assertEq(H.readByte(0x087f + po), 0, "facing UP at BANON (EVENT_DIR 0)")
+    H.assertEq(H.readByte(0x7E2000 + 7 * 256 + 20) & 0x80, 0,
+      "BANON's object occupies {20,7}")
+  end),
   (function()
-    local aPh = 0
+    local aPh, hb = 0, -600
     return H.driveUntil(menuUp, 8000, {
       H.call(function()
         aPh = (aPh + 1) % 8
-        if H.dialogWaiting() then H.setPad(aPh < 4 and { "a" } or {}); return end
-        if not H.hasControl() then H.setPad({}); return end
-        if H.fieldX() == 20 and H.fieldY() == 8 then
-          H.setPad(aPh < 4 and { "up" } or (aPh == 4 and { "a" } or {}))
-          return
+        if H.frame - hb >= 600 then
+          hb = H.frame
+          H.log(string.format("[banon] f%d (%d,%d) ctl=%s dlg=%s $59=%02X",
+            H.frame, H.fieldX(), H.fieldY(), tostring(H.hasControl()),
+            tostring(H.dialogWaiting()), H.readByte(0x0059)))
         end
-        H.setPad({})
+        H.setPad(aPh < 4 and { "a" } or {})   -- pure edge-A, no direction
       end),
     }, "Banon -> Prepared? -> party menu")
   end)(),

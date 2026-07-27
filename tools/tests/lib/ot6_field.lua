@@ -253,8 +253,8 @@ local function resolve(v) return type(v) == "function" and v() or v end
 
 -- Walk to tile (tx,ty) on the current map: BFS a plan over the true
 -- passability model, then execute it ONE VERIFIED STEP at a time.  Each
--- iteration (only when user-controlled and tile-aligned): hold the step's
--- direction until the tile coord changes, release (a begun 16px step
+-- iteration (only when user-controlled and tile-aligned): press the step's
+-- direction until the party is actually MOVING, release (a begun 16px step
 -- always completes), wait for tile-alignment, and check the landing
 -- against the plan.  A press that never moves us proves the model wrong
 -- for that edge: blocklist it (persists across re-plans within this
@@ -267,22 +267,76 @@ local function resolve(v) return type(v) == "function" and v() or v end
 --   opts.arrive    extra terminator predicate (checked before everything)
 --   opts.maxFrames frame budget -> error (default 20000)
 --   opts.spare     list of formation species words never to kill-bit
+--   opts.calmFrames  consecutive settled frames on the goal tile the
+--                  terminator requires (default 16; see ISSUE #22 below)
 --   opts.noPathRetries  BFS-no-path retries, 45 idle frames apart, before
 --                  erroring (default 20).  A no-path is often TRANSIENT:
 --                  an NPC standing in a one-tile corridor blocks the
 --                  object map exactly while its scene runs (the Figaro
 --                  gate guard, measured), and erroring instantly turned
 --                  every such scene into a route failure.
+--
+-- ISSUE #22 -- WHY THE PRESS ENDS ON "MOVING" AND THE TERMINATOR ON "STOPPED".
+-- Both rules used to key on the TILE COORD changing, and both were wrong for
+-- rightward and downward steps.  Measured per frame on map 242 with
+-- probe_step2 (party at {57,34}, 1 px/frame):
+--
+--   f01..f05  py=544  aligned, not moving yet (the press has not latched)
+--   f06..f20  py=545..559          walking; tile coord still 34
+--   f21       py=560  ALIGNED, tile coord flips to 35 -- arrival
+--   f22..f37  py=561..576          a SECOND tile, unasked for
+--
+-- Moving up or left the coord flips ~1px in, so releasing on the change was
+-- always early enough; moving down or right it flips only AT completion --
+-- the same frame the engine re-reads the pad for the next step, and a
+-- setPad only reaches the ROM at the NEXT input poll.  So the release landed
+-- one poll late and the engine latched another step whenever the tile beyond
+-- was passable.  Two consequences, both measured: every rightward/downward
+-- step overshot by one tile, and the terminator ("on the tile, controlled,
+-- tile-aligned") fired on the single aligned frame at f21 -- reporting
+-- success from a tile the party then walked straight off.  End to end on
+-- vector_sneak: navTo(57,35) returned at (57,35) and the party was at
+-- (57,36) sixty frames later.  (The original report's case:
+-- navTo(45,38) returned success with the party at (46,38).)
+--
+-- The fix is the one the v0.6 generators' local tapWalk already proved:
+--   * release as soon as the party is DEMONSTRABLY MOVING -- the first frame
+--     tileAligned() goes false.  That is direction-independent (it does not
+--     care when pixel>>4 happens to flip), speed-independent (map 41 walks
+--     ~1.33 px/frame with jitter, map 242 exactly 1), and it is as early as
+--     a release can possibly be while still proving the step committed.
+--   * require the party to be STOPPED, not merely aligned for one frame:
+--     opts.calmFrames consecutive settled frames on the goal tile.  While
+--     walking, tileAligned() is false for 15 of every 16 frames, so a run of
+--     16 aligned frames on one tile cannot happen mid-step -- which is
+--     exactly why tapWalk's terminator counts them.
+--
+-- WHY "STOPPED" IS NOT SPELLED "hasControl() FOR 16 FRAMES".  Plenty of goal
+-- tiles take the party away the instant it lands: a step-on trigger, a map
+-- edge, a scene.  gen_mines_chase's is the sharpest -- (38,8) on the Narshe
+-- clifftop fires the guard scene and leaves the party STANDING ON the
+-- trigger, which then re-fires every four frames forever, so hasControl()
+-- never holds for more than a frame at a time (that generator's own comment
+-- says so).  A control-gated run of 16 hangs there until the frame budget.
+-- So stillness is counted on ALIGNMENT ALONE -- which is the direct
+-- measurement of "not walking" and needs no control flag -- and control is
+-- only used to decide HOW LONG a run has to be: with control, calmFrames is
+-- arrival; without it, three times that, because something took the party
+-- over while it stood on the goal and the flag cannot corroborate the rest.
+-- Battle and dialog frames are excluded from the run outright: clearing
+-- those is navTo's own job, not something to terminate in the middle of.
 function M.navTo(txIn, tyIn, opts)
   opts = opts or {}
   local maxFrames = opts.maxFrames or 20000
   local arrive = opts.arrive
+  local calmWant = opts.calmFrames or 16
   local spareSet = {}
   for _, w in ipairs(opts.spare or {}) do spareSet[w] = true end
   M.navReset()
   local plan, idx = nil, 1
   local pend = nil          -- the in-flight/unverified step
   local aPhase = 0          -- edge-press phasing for A (4 on / 4 off)
+  local calm = 0            -- consecutive settled frames on the goal tile
   local battN, dlgN, lostN = 0, 0, 0   -- debounce counters (see below)
   local noPathN, pause = 0, 0          -- no-path retry state
   local function drop(why)  -- discard the plan, saying why (once, not per frame)
@@ -298,8 +352,11 @@ function M.navTo(txIn, tyIn, opts)
     if arrive and arrive() then
       done = true
     else
-      done = M.fieldX() == resolve(txIn) and M.fieldY() == resolve(tyIn)
-         and M.hasControl() and M.tileAligned()
+      -- STOPPED on the goal tile, not passing through it (see ISSUE #22).
+      calm = (M.fieldX() == resolve(txIn) and M.fieldY() == resolve(tyIn)
+          and M.tileAligned() and not M.battleLoadStarted()
+          and not M.dialogWaiting()) and calm + 1 or 0
+      done = calm >= calmWant and (M.hasControl() or calm >= calmWant * 3)
     end
     if done then M.setPad({}) end
     return done
@@ -349,10 +406,18 @@ function M.navTo(txIn, tyIn, opts)
         M.setPad({})
         return
       end
-      -- 4. a step is in flight: hold until the tile coord changes
+      -- 4. a step is in flight: hold only until the party is MOVING (the
+      --    first frame it is off tile-alignment), then release -- see the
+      --    ISSUE #22 block above for why "until the tile coord changes" is
+      --    one input poll too late for right/down.
       if pend and pend.holding then
-        if M.fieldX() ~= pend.x or M.fieldY() ~= pend.y then
-          pend.holding = false         -- it'll glide to rest on its own
+        -- the coord test is kept as a BACKSTOP, never as the primary rule:
+        -- it is the only signal left if a map ever moved a full 16px in one
+        -- frame (no unaligned frame to see), and it can only fire later than
+        -- the alignment test, never earlier.
+        if not M.tileAligned()
+           or M.fieldX() ~= pend.x or M.fieldY() ~= pend.y then
+          pend.holding = false         -- committed; it'll glide to rest
           M.setPad({})
           return
         end
@@ -422,8 +487,13 @@ function M.navTo(txIn, tyIn, opts)
         end
         noPathN = 0
         NAV.plan, NAV.idx = #plan, idx
+        -- An EMPTY plan means we are already standing on the goal and are
+        -- only waiting out the terminator's calm frames.  Say nothing and
+        -- idle: logging (and re-BFSing) that every frame buried the real
+        -- plan lines under a screenful of "planned 0 steps" once the
+        -- terminator started insisting the party be stopped.
+        if #plan == 0 then plan = nil; pause = 8; M.setPad({}); return end
         M.log(string.format("nav: planned %d steps from (%d,%d)", #plan, x, y))
-        if #plan == 0 then M.setPad({}); return end  -- pred will notice
       end
       -- 8. launch the next step
       local dir = plan[idx]

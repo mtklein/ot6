@@ -165,17 +165,43 @@ H.run({ maxFrames = 80000 }, {
       "anchor: bank-31 class-codex witness survived cold Continue")
   end),
 
-  -- The measured post-Opera party roster, AT THE ANCHOR, before anything in
-  -- v0.6 touches it.  $1850+charId is the party/availability nibble
-  -- (char_party writes $0867,y and $1850,y, field/event.asm:563-585;
-  -- create_obj sets bit 6, :709-728).  Recorded here because every v0.6
-  -- balance claim inherits this base and it was one measurement old.
-  H.logStep(function()
+  -- POSITIVE CONTROL: THE PARTY, COUNTED (issue #21).
+  --
+  -- $1850+charId is verbbppp (ff6/notes/field-ram.txt:928); the low three
+  -- bits are the party the character belongs to, 0 for nobody's.
+  -- char_party writes it (field/event.asm:563-585) and RemoveChar zeroes it
+  -- (battle_main.asm:11927).
+  --
+  -- This used to be a LOG LINE and nothing else, and that is exactly how
+  -- #21 survived a release and a half: the leave-Zozo `party_menu 1,
+  -- NO_RESET, {LOCKE, CELES}` was answered with START, the two free slots
+  -- were never filled, and the whole v0.5 tail plus every v0.6 leg ran two
+  -- characters -- while every fixture below still passed, because each was
+  -- asserting story switches and map ids, and a switch cannot say how many
+  -- people are walking.  COUNTING the entries is the check that catches a
+  -- chain which silently loses (or never gains) a member; it is asserted
+  -- here, at the anchor, because this is the boundary every v0.6 balance
+  -- number is measured across.
+  --
+  -- The owner's canonical fixture party is LOCKE, CELES, SABIN, EDGAR
+  -- (#21, 2026-07-27): slash, pierce and bludgeon covered with no shop
+  -- trip, SABIN answering the Vector band's deliberate OT6_BLUDG row.
+  H.call(function()
     local t = {}
     for c = 0, 13 do t[#t + 1] = string.format("%02X", H.readByte(0x1850 + c)) end
-    return "[roster] $1850+0..13 = " .. table.concat(t, " ")
+    H.log("[roster] $1850+0..13 = " .. table.concat(t, " ")
       .. string.format("  $1EDE=%02X $1EDF=%02X $1A6D=%02X",
-        H.readByte(0x1EDE), H.readByte(0x1EDF), H.readByte(0x1A6D))
+        H.readByte(0x1EDE), H.readByte(0x1EDF), H.readByte(0x1A6D)))
+    local function partyOf(c) return H.readByte(0x1850 + c) & 0x07 end
+    local n = 0
+    for c = 0, 15 do if partyOf(c) ~= 0 then n = n + 1 end end
+    H.assertEq(n, 4,
+      "anchor: FOUR characters carry a party assignment (#21 -- the count "
+      .. "is the control; a two-character chain must fail here, loudly)")
+    H.assertEq(partyOf(0x01), 1, "anchor: LOCKE in the party")
+    H.assertEq(partyOf(0x06), 1, "anchor: CELES in the party")
+    H.assertEq(partyOf(0x05), 1, "anchor: SABIN in the party (bludgeon)")
+    H.assertEq(partyOf(0x04), 1, "anchor: EDGAR in the party (pierce+Tools)")
   end),
 
   -- POSITIVE CONTROL, part 1: prove mapTitleHere() actually reads the

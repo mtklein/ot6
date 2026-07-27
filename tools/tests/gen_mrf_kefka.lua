@@ -79,42 +79,7 @@ local function partyReport(tag)
     H.readByte(0x1EDE), H.readByte(0x1EDF))
 end
 
--- Exact single-tile stepping (see gen_vector_sneak.lua for the measurement).
 local DELTA = { up = { 0, -1 }, right = { 1, 0 }, down = { 0, 1 }, left = { -1, 0 } }
-local function tapWalk(tx, ty, maxFrames, what)
-  local phase, dir, n, ph, calm = 0, nil, 0, 0, 0
-  return H.driveUntil(function()
-    calm = (H.fieldX() == tx and H.fieldY() == ty and settled()) and calm + 1 or 0
-    return calm >= 16
-  end, maxFrames or 12000, {
-    H.call(function()
-      ph = (ph + 1) % 8
-      if H.battleLoadStarted() then
-        killBitAll(); H.setPad(ph < 4 and { "a" } or {}); phase = 0; return
-      end
-      if H.dialogWaiting() then
-        H.setPad(ph < 4 and { "a" } or {}); phase = 0; return
-      end
-      if phase == 0 then
-        H.setPad({})
-        if not settled() then return end
-        local p = H.bfsPath(tx, ty)
-        if not p or #p == 0 then return end
-        dir, n, phase = p[1], 0, 1
-        return
-      end
-      if phase == 1 then
-        n = n + 1
-        H.setPad({ [H.movePress(dir)] = true })
-        if n >= 8 then phase, n = 2, 0 end
-        return
-      end
-      H.setPad({})
-      n = n + 1
-      if n >= 24 then phase = 0 end
-    end),
-  }, what or string.format("tapWalk (%d,%d)", tx, ty))
-end
 
 -- Tap `dir` whenever the party has control, hands off while a scene owns
 -- it, edge-A through dialogs.  Used to walk INTO a trigger whose scene then
@@ -205,7 +170,6 @@ H.run({ maxFrames = 60000 }, {
 
   -- 1. two steps east onto {24,18} -> the ride -> {40,30}
   H.navTo(23, 18, { maxFrames = 6000 }),
-  tapWalk(23, 18, 6000, "tapWalk beside the {24,18} ride"),
   tapInto("right", function() return H.fieldX() == 40 and H.fieldY() == 30 end,
     12000, "RIGHT onto {24,18} -> the ride -> (40,30)"),
   H.waitFrames(30),

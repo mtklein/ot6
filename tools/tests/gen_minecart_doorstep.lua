@@ -77,45 +77,6 @@ end
 
 -- Exact single-tile stepping (see gen_vector_sneak.lua for the measurement).
 local DELTA = { up = { 0, -1 }, right = { 1, 0 }, down = { 0, 1 }, left = { -1, 0 } }
--- (this copy resolves its target lazily, so a leg can pick the tile at
--- runtime -- here, whichever neighbour of CID's {9,51} the object map
--- actually leaves open)
-local function tapWalk(txIn, tyIn, maxFrames, what)
-  local function tx() return type(txIn) == "function" and txIn() or txIn end
-  local function ty() return type(tyIn) == "function" and tyIn() or tyIn end
-  local phase, dir, n, ph, calm = 0, nil, 0, 0, 0
-  return H.driveUntil(function()
-    calm = (H.fieldX() == tx() and H.fieldY() == ty() and settled()) and calm + 1 or 0
-    return calm >= 16
-  end, maxFrames or 12000, {
-    H.call(function()
-      ph = (ph + 1) % 8
-      if H.battleLoadStarted() then
-        killBitAll(); H.setPad(ph < 4 and { "a" } or {}); phase = 0; return
-      end
-      if H.dialogWaiting() then
-        H.setPad(ph < 4 and { "a" } or {}); phase = 0; return
-      end
-      if phase == 0 then
-        H.setPad({})
-        if not settled() then return end
-        local p = H.bfsPath(tx(), ty())
-        if not p or #p == 0 then return end
-        dir, n, phase = p[1], 0, 1
-        return
-      end
-      if phase == 1 then
-        n = n + 1
-        H.setPad({ [H.movePress(dir)] = true })
-        if n >= 8 then phase, n = 2, 0 end
-        return
-      end
-      H.setPad({})
-      n = n + 1
-      if n >= 24 then phase = 0 end
-    end),
-  }, what or "tapWalk")
-end
 
 -- Tap `dir` whenever the party has control, hands off while a scene owns
 -- it, edge-A through dialogs.  Used to walk INTO a trigger whose scene then
@@ -219,15 +180,15 @@ H.run({ maxFrames = 60000 }, {
   end),
 
   -- 1. onto {20,13} -> the lift -> map 266 -> map 272.
-  --    navTo alone does NOT do this: the route to {20,13} arrives from the
-  --    north, and a downward navTo step overshoots by a tile on this
-  --    engine (1 px/frame walk, the tile coord flips only at the boundary
-  --    where the next step latches -- see gen_vector_sneak.lua).  Measured:
-  --    navTo reported success after 219 frames and the map never changed,
-  --    because the party had carried on to {20,14} without ever resting on
-  --    the trigger.  So: tapWalk to {20,12} and tap DOWN onto it.
+  --    The trigger is stepped onto with an explicit DOWN tap rather than a
+  --    navTo whose goal IS the trigger tile: navTo terminates on the party
+  --    coming to rest, and a tile that loads a map is one it never rests
+  --    on.  (Before #22 this leg had a second reason -- a downward navTo
+  --    step overshot by a tile, so navTo "arrived" at {20,13} from {20,14}
+  --    and the map never changed, measured at 219 frames.  That half is
+  --    fixed in the library now; the doorstep-then-tap shape is not a
+  --    workaround, it is how a trigger tile is entered.)
   H.navTo(20, 12, { maxFrames = 15000, arrive = function() return map() ~= 274 end }),
-  tapWalk(20, 12, 9000, "tapWalk above the lift trigger (20,12)"),
   tapInto("down", function() return map() ~= 274 end, 9000,
     "DOWN onto {20,13} -> the lift"),
   H.waitUntil(function() return map() == 272 end, 20000, "map 272 (the minecart platform)", 5),
@@ -268,8 +229,8 @@ H.run({ maxFrames = 60000 }, {
     H.log(string.format("[cid approach] chose (%d,%d) facing %s",
       cid[1], cid[2], cid[3]))
   end),
-  tapWalk(function() return cid[1] end, function() return cid[2] end, 9000,
-    "tapWalk beside CID"),
+  H.navTo(function() return cid[1] end, function() return cid[2] end,
+    { maxFrames = 9000 }),                 -- beside CID
   (function() local calm = 0
     return H.driveUntil(function()
       local ok = H.fieldX() == cid[1] and H.fieldY() == cid[2] and settled()

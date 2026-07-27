@@ -135,8 +135,29 @@ H.run({ maxFrames = 200000 }, {
   H.navTo(29, 53, { maxFrames = 4000, arrive = function()
     return mapIdx() == 157 end }),
   settle(157, "town again"),
-  H.navTo(18, 41, { maxFrames = 8000, arrive = function()
+  -- (18,41) is Mobliz's south exit ROW, and a row you leave a town by is a
+  -- tile you STEP THROUGH, never one you come to rest on.  navTo used to
+  -- carry a tile past every downward goal (issue #22), so aiming it at
+  -- (18,41) crossed the row by accident; with the library landing exactly,
+  -- it parks there and the town never exits.  navTo to the doorstep and
+  -- press SOUTH through the row -- the same doorstep-then-tap shape every
+  -- other transition on this chain uses.
+  H.navTo(18, 40, { maxFrames = 8000, arrive = function()
     return H.worldMode() end }),
+  (function()
+    local hb = -600
+    return H.driveUntil(function() return H.worldMode() end, 1800, {
+      H.call(function()
+        if H.frame - hb >= 300 then
+          hb = H.frame
+          H.log(string.format("[gau] leaving Mobliz f%d map=%d (%d,%d) ctl=%s",
+            H.frame, mapIdx(), H.fieldX(), H.fieldY(),
+            tostring(H.hasControl())))
+        end
+        H.setPad({ down = true })
+      end),
+    }, "SOUTH out of Mobliz onto the world")
+  end)(),
   H.call(function() H.setPad({}) end),
   H.waitUntil(function()
     return H.worldMode() and H.worldHasControl() and H.worldAligned()

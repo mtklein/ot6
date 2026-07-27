@@ -101,42 +101,7 @@ local function partyReport(tag)
     H.readByte(0x1EDE), H.readByte(0x1EDF))
 end
 
--- Exact single-tile stepping (see gen_vector_sneak.lua for the measurement).
 local DELTA = { up = { 0, -1 }, right = { 1, 0 }, down = { 0, 1 }, left = { -1, 0 } }
-local function tapWalk(tx, ty, maxFrames, what)
-  local phase, dir, n, ph, calm = 0, nil, 0, 0, 0
-  return H.driveUntil(function()
-    calm = (H.fieldX() == tx and H.fieldY() == ty and settled()) and calm + 1 or 0
-    return calm >= 16
-  end, maxFrames or 12000, {
-    H.call(function()
-      ph = (ph + 1) % 8
-      if H.battleLoadStarted() then
-        killBitAll(); H.setPad(ph < 4 and { "a" } or {}); phase = 0; return
-      end
-      if H.dialogWaiting() then
-        H.setPad(ph < 4 and { "a" } or {}); phase = 0; return
-      end
-      if phase == 0 then
-        H.setPad({})
-        if not settled() then return end
-        local p = H.bfsPath(tx, ty)
-        if not p or #p == 0 then return end
-        dir, n, phase = p[1], 0, 1
-        return
-      end
-      if phase == 1 then
-        n = n + 1
-        H.setPad({ [H.movePress(dir)] = true })
-        if n >= 8 then phase, n = 2, 0 end
-        return
-      end
-      H.setPad({})
-      n = n + 1
-      if n >= 24 then phase = 0 end
-    end),
-  }, what or string.format("tapWalk (%d,%d)", tx, ty))
-end
 
 -- Tap `dir` whenever the party has control, hands off while a scene owns
 -- it, edge-A through dialogs.  Used to walk INTO a trigger whose scene then
@@ -289,14 +254,12 @@ H.run({ maxFrames = 60000 }, {
 
   -- 3. SHIVA at {9,6}: stand at {9,7} and face UP.  $0274.
   H.navTo(9, 7, { maxFrames = 9000 }),
-  tapWalk(9, 7, 6000, "tapWalk below SHIVA (9,7)"),
   talkTo("up", function() return sw(0x0274) == 1 end, 12000,
     "talk SHIVA -> $0274"),
 
   -- 4. IFRIT again at {3,8}: $0272, which (with $0274 already set) falls
   --    straight into _cc79a4, the hand-off.
   H.navTo(3, 7, { maxFrames = 9000 }),
-  tapWalk(3, 7, 6000, "tapWalk above IFRIT (3,7)"),
   talkTo("down", function() return sw(0x0647) == 1 and sw(0x0648) == 1 end,
     16000, "talk IFRIT -> $0272 -> the hand-off _cc79a4"),
   H.waitFrames(60),
@@ -314,7 +277,6 @@ H.run({ maxFrames = 60000 }, {
   talkTo("down", function() return (H.readByte(0x1A69) & 0x02) ~= 0 end, 12000,
     "take the IFRIT magicite -> $1A69 bit1"),
   H.navTo(9, 7, { maxFrames = 9000 }),
-  tapWalk(9, 7, 6000, "tapWalk below SHIVA's magicite (9,7)"),
   talkTo("up", function() return (H.readByte(0x1A69) & 0x04) ~= 0 end, 12000,
     "take the SHIVA magicite -> $1A69 bit2"),
   H.waitFrames(60),

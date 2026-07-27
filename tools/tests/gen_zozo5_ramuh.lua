@@ -36,11 +36,44 @@
 --  5. THE LEAVE (_caa890, bumped via CYAN's double {83,33} from {83,34})
 --     is NOT pure dialog: it pins LOCKE (the tracked leader) in place while
 --     the others walk (so rideScene's leader-stall heuristic misfires and
---     wedges it), AND runs a party_menu 1 NO_RESET {LOCKE,CELES} -- a
---     forced-member confirm menu needing START.  It gets its own driver:
---     dialog->A, menu->START, else hands off.  End: the CELES/LOCKE Jidoor
---     dialog -> $0054=1 -> load_map 221 {57,45} RIGHT (:26449-:26452).
---     TERRA does NOT rejoin -- retrieved, catatonic; that is the arc.
+--     wedges it), AND runs a party_menu 1 NO_RESET {LOCKE,CELES}.  End: the
+--     CELES/LOCKE Jidoor dialog -> $0054=1 -> load_map 221 {57,45} RIGHT
+--     (:26449-:26452).  TERRA does NOT rejoin -- retrieved, catatonic; that
+--     is the arc.
+--
+-- ISSUE #21 -- THAT MENU IS NOT A CONFIRM MENU.  It was driven with START
+-- (commit whatever is there) on the reading that {LOCKE, CELES} made it a
+-- forced-member confirmation.  It does not.  event_main.asm:26280-26287
+-- reads
+--
+--     char_party LOCKE, 1     char_party CYAN,  0
+--     char_party EDGAR, 0     char_party SABIN, 0
+--     char_party GAU,   0     char_party CELES, 1
+--     party_menu 1, NO_RESET, {LOCKE, CELES}
+--
+-- -- four slots with LOCKE and CELES FORCED and two FREE, and CYAN, EDGAR,
+-- SABIN and GAU all sitting in the pool the char_party 0 lines just put
+-- them in.  Answering it with START committed a party of TWO, and the whole
+-- v0.5 tail plus every v0.6 leg then ran two characters (one after the tube
+-- room takes CELES).  Nothing counted the party, so it read as normal for a
+-- release and a half; gen_vector_doorstep now asserts the COUNT at the
+-- post-Opera anchor so this cannot go quiet again.
+--
+-- OWNER DECISION (#21, 2026-07-27): the canonical fixture party is LOCKE,
+-- CELES, SABIN, EDGAR.  SABIN fills the free BLUDGEON slot that
+-- docs/design/break-band-vector.md makes the Vector band's one deliberate
+-- class -- the Rhinox row (OT6_BLUDG, no weakness, absorbs bolt, 8.93% of
+-- band draws) exists to ask for it, and bare fists plus Pummel/Suplex/Bum
+-- Rush answer it with no shop trip.  EDGAR brings pierce and Tools.  This
+-- is the baseline every downstream balance number is measured on; changing
+-- it re-mints the chain and invalidates all of them.
+--
+-- The menu driver is gen_kefka_won's state-fed one, but it looks the layout
+-- up LIVE rather than hard-coding cells: NO_RESET opens with the forced two
+-- already seated, so which pool cell holds SABIN and which party slot is
+-- free are properties of the run, not constants.  It asserts the character
+-- it moved and the slot it landed in, so a cursor that wandered fails
+-- instead of committing whoever happened to be under it.
 local H = dofile("/Users/mtklein/ot6/tools/tests/lib/ot6.lua")
 
 local function map() return H.mapId() & 0x1ff end
@@ -137,6 +170,139 @@ local function rideScene(pred, maxFrames, what)
       H.setPad({})
     end),
   }, what)
+end
+
+-- ------------------------------------------------------- the party menu --
+-- gen_kefka_won's state-fed party-menu driver on the 1-party layout: pool
+-- rows 8 wide (cells $00-$0F), party 0's four slots at cells $10-$13, cell
+-- contents mirrored at $7E9D89+cell ($FF = empty), cursor cell = $4b+$4a+
+-- $5a, pick state $26 ($2d = browsing, $2e = carrying a character), START
+-- commits.  What is NOT copied from there is the cell NUMBERS: this menu is
+-- NO_RESET with two forced members already seated, so where SABIN sits in
+-- the pool and which slot is free are run properties.  They are looked up.
+local LOCKE, CYAN, EDGAR, SABIN, CELES, GAU = 0x01, 0x02, 0x04, 0x05, 0x06, 0x0B
+local function mst() return H.readByte(0x0026) end
+local function cell9d(c) return H.readByte(0x7E9D89 + c) end
+local function cursorCell()
+  return H.readByte(0x004b) + H.readByte(0x004a) + H.readByte(0x005a)
+end
+local function poolOf(id)          -- pool cell holding character id, or nil
+  for c = 0x00, 0x0F do if cell9d(c) == id then return c end end
+end
+local function seatOf(id)          -- party slot holding character id, or nil
+  for c = 0x10, 0x13 do if cell9d(c) == id then return c end end
+end
+local function freeSeat()          -- lowest empty party slot, or nil
+  for c = 0x10, 0x13 do if cell9d(c) == 0xFF then return c end end
+end
+local function freeSeats()
+  local n = 0
+  for c = 0x10, 0x13 do if cell9d(c) == 0xFF then n = n + 1 end end
+  return n
+end
+local function cellCensus()
+  local t = {}
+  for c = 0x00, 0x13 do t[#t + 1] = string.format("%02X", cell9d(c)) end
+  return "cells $00-$13 = " .. table.concat(t, " ")
+    .. string.format("  $26=%02X cursor=%02X", mst(), cursorCell())
+end
+local function decode(cell)
+  if cell < 0x10 then
+    return { area = "pool", col = cell % 8, row = cell >= 8 and 1 or 0 }
+  end
+  local b = cell - 0x10
+  return { area = "party", col = b >> 1, row = b & 1 }
+end
+local function stepToward(cur, tgt)
+  local c, t = decode(cur), decode(tgt)
+  if c.area == "pool" and t.area == "party" then return "down"
+  elseif c.area == "party" and t.area == "pool" then return "up"
+  elseif c.area == "pool" then
+    if c.row ~= t.row then return c.row < t.row and "down" or "up" end
+    if c.col ~= t.col then return c.col < t.col and "right" or "left" end
+  else
+    if c.col ~= t.col then return c.col < t.col and "right" or "left" end
+    if c.row ~= t.row then return c.row < t.row and "down" or "up" end
+  end
+  return nil
+end
+-- walk the cursor to `tgt` and press `btn` until the pick state reaches
+-- doneState and settles there
+local function menuAct(tgt, btn, doneState, what)
+  local phase, settled = 0, 0
+  return H.driveUntil(function()
+    return mst() == doneState and cursorCell() == tgt() and settled >= 8
+  end, 4000, {
+    H.call(function()
+      phase = (phase + 1) % 10
+      if mst() == doneState then settled = settled + 1; H.setPad({}); return end
+      settled = 0
+      if mst() == 0x69 then H.setPad({}); return end
+      local cur = cursorCell()
+      if cur ~= tgt() then
+        local b = stepToward(cur, tgt())
+        if not b then H.setPad({}); return end
+        H.setPad(phase < 4 and { [b] = true } or {})
+        return
+      end
+      H.setPad(phase < 4 and { [btn] = true } or {})
+    end),
+  }, what)
+end
+-- take character `id` out of the pool and drop it in the first free slot.
+-- Both cells are resolved at the moment the leg runs (thunks), and both
+-- ends are asserted afterwards: a cursor that wandered onto the wrong cell
+-- would otherwise commit whoever it was standing on, silently.
+local function seat(id, name)
+  local src, dst
+  return H.cond(function() return true end, {
+    H.waitUntil(function() return mst() == 0x2d end, 900,
+      name .. ": menu at $2d", 5),
+    H.call(function()
+      src, dst = poolOf(id), freeSeat()
+      H.assertEq(src ~= nil, true, name .. ": found in the pool")
+      H.assertEq(dst ~= nil, true, name .. ": a free party slot exists")
+      H.log(string.format("[party] %s: pool cell $%02X -> slot $%02X",
+        name, src, dst))
+    end),
+    menuAct(function() return src end, "a", 0x2e, name .. ": pick"),
+    menuAct(function() return dst end, "a", 0x2d, name .. ": drop"),
+    H.call(function()
+      H.assertEq(cell9d(dst), id, name .. " landed in the slot it was aimed at")
+      H.assertEq(cell9d(src), 0xFF, name .. "'s pool cell is now empty")
+    end),
+  })
+end
+-- ride the leave cutscene UP TO the party menu and stop there.  Dialogs are
+-- edge-tapped; nothing else is pressed, so the menu is reached untouched.
+-- The detector is composite for gen_kefka_won's reason: $0059 alone blips
+-- outside real menus.  $0200=4 is the menu mode and $26=$2d the interactive
+-- pick state; all three together only hold on the party menu itself.
+local function ridePartyMenu()
+  local aPh, up, hb = 0, 0, -600
+  return H.driveUntil(function()
+    up = (H.readByte(0x0059) ~= 0 and mst() == 0x2d
+          and H.readByte(0x0200) == 4) and up + 1 or 0
+    local done = up >= 8
+    if done then H.setPad({}) end
+    return done
+  end, 40000, {
+    H.call(function()
+      aPh = (aPh + 1) % 8
+      if H.frame - hb >= 600 then
+        hb = H.frame
+        H.log(string.format("[leave] f%d (%d,%d) $59=%02X $26=%02X $200=%02X",
+          H.frame, H.fieldX(), H.fieldY(), H.readByte(0x0059), mst(),
+          H.readByte(0x0200)))
+      end
+      if H.battleLoadStarted() then
+        killBitAll(); H.setPad(aPh < 4 and { "a" } or {}); return
+      end
+      if H.readByte(0x0059) ~= 0 then H.setPad({}); return end  -- hands OFF
+      if H.dialogWaiting() then H.setPad(aPh < 4 and { "a" } or {}); return end
+      H.setPad({})
+    end),
+  }, "the leave cutscene, up to the party menu")
 end
 
 -- A-press an interactable at (tx,ty) standing on (sx,sy): navTo, face,
@@ -273,30 +439,56 @@ H.run({ maxFrames = 120000 }, {
   --    {83,34}) to fire the leave cutscene _caa890.  That cutscene is NOT
   --    pure dialog: it pins LOCKE (the tracked leader) in place while the
   --    others walk, so rideScene's leader-stall heuristic misfires and
-  --    hammers A (measured: it wedges the scene).  It also runs a
-  --    party_menu 1 NO_RESET {LOCKE,CELES} -- a forced-member confirm menu
-  --    that needs START, not A.  So the leave gets its own driver:
-  --    dialogWaiting -> edge-A (the BOTTOM Jidoor dialogs), menu up -> edge-
-  --    START (commit the fixed party), else hands off (measured clean end
-  --    to $0054=1 at {57,45}, probe_leave).
+  --    hammers A (measured: it wedges the scene).  So the walk-down gets its
+  --    own driver: dialogWaiting -> edge-A (the BOTTOM Jidoor dialogs), else
+  --    hands off -- and it STOPS at the party menu.  Blind A or blind START
+  --    must never reach that menu: START commits a party of two (#21) and A
+  --    parks on a character's Status page, where neither exits (measured on
+  --    the same menu class in gen_kefka_won).
   bumpTake(83, 34, "up", "Everyone here?"),
+  ridePartyMenu(),
+
+  -- THE MENU (#21).  Seat SABIN and EDGAR in the two free slots, then START.
+  -- Every cell is read live and every move is verified; see the header.
+  H.waitFrames(20),
+  H.call(function()
+    H.log("[party] " .. cellCensus())
+    H.assertEq(mst(), 0x2d, "party menu interactive (pick state $2d)")
+    -- the forced two must already be seated (NO_RESET) -- if they are not,
+    -- this is not the menu we think it is and the seats below are guesses
+    H.assertEq(seatOf(LOCKE) ~= nil, true, "LOCKE already seated (forced)")
+    H.assertEq(seatOf(CELES) ~= nil, true, "CELES already seated (forced)")
+    H.assertEq(poolOf(SABIN) ~= nil, true, "SABIN is in the pool to take")
+    H.assertEq(poolOf(EDGAR) ~= nil, true, "EDGAR is in the pool to take")
+    H.assertEq(freeSeats(), 2, "exactly TWO free slots to fill")
+  end),
+  seat(SABIN, "SABIN"),
+  seat(EDGAR, "EDGAR"),
+  H.call(function()
+    H.log("[party] after seating: " .. cellCensus())
+    H.assertEq(freeSeats(), 0, "all four slots filled before committing")
+  end),
+  H.waitUntil(function() return mst() == 0x2d end, 900,
+    "menu at $2d for commit", 5),
+  H.pressButtons({ "start" }, 6),
+  H.waitUntil(function() return H.readByte(0x0059) == 0 end, 1800,
+    "party menu closed", 5),
+  H.logStep("party committed: LOCKE CELES SABIN EDGAR (#21)"),
+
+  -- the rest of the walk-down: the Jidoor dialogs to $0054=1
   (function()
-    local aPh, sPh = 0, 0
+    local aPh = 0
     return H.driveUntil(function()
       local done = sw(0x0054) == 1
       if done then H.setPad({}) end
       return done
     end, 55000, {
       H.call(function()
-        aPh = (aPh + 1) % 8; sPh = (sPh + 1) % 16
+        aPh = (aPh + 1) % 8
         if H.battleLoadStarted() then
           killBitAll(); H.setPad(aPh < 4 and { "a" } or {}); return
         end
         if H.dialogWaiting() then H.setPad(aPh < 4 and { "a" } or {}); return end
-        if H.readByte(0x0059) ~= 0 then
-          H.setPad(sPh < 6 and { "start" } or {})  -- commit the forced party
-          return
-        end
         H.setPad({})
       end),
     }, "the leave-Zozo walk-down")
@@ -324,6 +516,26 @@ H.run({ maxFrames = 120000 }, {
     H.assertEq(sw(0x0320), 0, "SIREN's stone gone")
     H.assertEq(sw(0x0321), 0, "KIRIN's stone gone")
     H.assertEq(sw(0x0322), 0, "STRAY's stone gone")
+    -- THE PARTY (#21).  $1850+charId is verbbppp (ff6/notes/field-ram.txt
+    -- :928); the low three bits are the party the character belongs to, 0
+    -- for nobody's.  COUNT it -- the original defect was invisible precisely
+    -- because nothing did -- then name the four it should be.
+    local function partyOf(c) return H.readByte(0x1850 + c) & 0x07 end
+    local n, who = 0, {}
+    for c = 0, 15 do
+      if partyOf(c) ~= 0 then
+        n = n + 1
+        who[#who + 1] = string.format("$%02X->%d", c, partyOf(c))
+      end
+    end
+    H.log("[party] $1850 assignments: " .. table.concat(who, " "))
+    H.assertEq(n, 4, "FOUR characters carry a party assignment")
+    H.assertEq(partyOf(LOCKE), 1, "LOCKE in party 1")
+    H.assertEq(partyOf(CELES), 1, "CELES in party 1")
+    H.assertEq(partyOf(SABIN), 1, "SABIN in party 1 (the bludgeon slot)")
+    H.assertEq(partyOf(EDGAR), 1, "EDGAR in party 1 (pierce + Tools)")
+    H.assertEq(partyOf(CYAN), 0, "CYAN stays behind")
+    H.assertEq(partyOf(GAU), 0, "GAU stays behind")
     H.log(string.format("[zozo_done] f%d map=%d (%d,%d)",
       H.frame, map(), H.fieldX(), H.fieldY()))
     H.screenshot("zozo_done")

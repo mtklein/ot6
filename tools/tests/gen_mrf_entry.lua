@@ -74,47 +74,7 @@ local function partyReport(tag)
     H.readByte(0x1EDE), H.readByte(0x1EDF))
 end
 
--- EXACT single-tile stepping; see gen_vector_sneak.lua's header for the
--- measurement.  The party walks 1 px/frame and the engine latches the next
--- step at the tile boundary, so navTo's hold-until-the-coord-changes loop
--- overshoots every rightward/downward step by a tile and its terminator can
--- fire on a tile the party is only passing through.  An 8-frame tap commits
--- exactly one 16-pixel step; the terminator wants 16 consecutive calm frames.
 local DELTA = { up = { 0, -1 }, right = { 1, 0 }, down = { 0, 1 }, left = { -1, 0 } }
-local function tapWalk(tx, ty, maxFrames, what)
-  local phase, dir, n, ph, calm = 0, nil, 0, 0, 0
-  return H.driveUntil(function()
-    calm = (H.fieldX() == tx and H.fieldY() == ty and settled()) and calm + 1 or 0
-    return calm >= 16
-  end, maxFrames or 12000, {
-    H.call(function()
-      ph = (ph + 1) % 8
-      if H.battleLoadStarted() then
-        killBitAll(); H.setPad(ph < 4 and { "a" } or {}); phase = 0; return
-      end
-      if H.dialogWaiting() then
-        H.setPad(ph < 4 and { "a" } or {}); phase = 0; return
-      end
-      if phase == 0 then
-        H.setPad({})
-        if not settled() then return end
-        local p = H.bfsPath(tx, ty)
-        if not p or #p == 0 then return end
-        dir, n, phase = p[1], 0, 1
-        return
-      end
-      if phase == 1 then
-        n = n + 1
-        H.setPad({ [H.movePress(dir)] = true })
-        if n >= 8 then phase, n = 2, 0 end
-        return
-      end
-      H.setPad({})
-      n = n + 1
-      if n >= 24 then phase = 0 end
-    end),
-  }, what or string.format("tapWalk (%d,%d)", tx, ty))
-end
 
 -- Flood the live map with H.canStep from the party's tile.  This is the
 -- LIB's own passability model against the tilemap the engine has actually
@@ -165,7 +125,7 @@ H.run({ maxFrames = 60000 }, {
   -- 1. north up the column to {57,3}, one tile short of the door row.
   H.navTo(57, 3, { maxFrames = 20000,
     arrive = function() return map() == 262 end }),
-  tapWalk(57, 3, 9000, "tapWalk to the factory doorstep (57,3)"),
+  H.navTo(57, 3, { maxFrames = 9000 }),    -- the factory doorstep
   H.call(function()
     H.assertEq(map(), 242, "still in VECTOR at the factory doorstep")
     H.assertEq(H.fieldX(), 57, "factory doorstep x")

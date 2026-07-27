@@ -116,73 +116,6 @@ local function partyReport(tag)
     H.readByte(0x1EDE), H.readByte(0x1EDF))
 end
 
--- ---------------------------------------------------------- tapWalk ------
--- EXACT single-tile stepping.  Measured on this map (probe_vector_step):
--- the party walks 1 PIXEL PER FRAME, so a tile takes 16 frames, and the
--- engine re-reads the pad AT the tile boundary.  Moving RIGHT or DOWN the
--- tile coord (pixel>>4) only flips AT completion (ot6.lua:705-708), which
--- is the same frame the engine latches the next step -- and setPad only
--- reaches the ROM at the next input poll.  So navTo, which holds until the
--- coord changes and then releases, lands TWO tiles east of every rightward
--- step it plans:
---
---   nav: step (42,38)->right landed (44,38); re-plan
---
--- navTo survives that (a further slide along the same move leaves the edge
--- proven good, ot6_field.lua:382-395) but it can never come to rest on an
--- odd x reached rightward -- and worse, its driveUntil terminator fires on
--- the single aligned frame at the boundary while the engine carries the
--- party one tile further, so navTo can report success from a tile the
--- party is no longer on.  Measured: navTo(45,38) finished with the party
--- at (46,38).  Every tile this leg cares about -- the sympathizer's
--- doorstep {45,38} and the sneak ledge {43,38}/{43,37} -- is odd-x.
---
--- tapWalk instead presses for 8 frames and releases: long enough to turn
--- and commit one 16-pixel step, far short of the boundary where a second
--- would latch.  One tile per tap, exactly, in any direction.  It re-BFSes
--- before every tap, so a moving NPC or an event nudge just re-plans.
---
--- The terminator counts CONSECUTIVE settled frames on the target tile, not
--- one.  A single-frame check is exactly how navTo mis-reports: the party is
--- tile-aligned for one frame at every boundary it passes through, so
--- "x==45 and tileAligned()" is true while the party is walking straight
--- past x=45.  16 calm frames means the walk really stopped there.
-local function tapWalk(tx, ty, maxFrames, what)
-  local phase, dir, n, ph, calm = 0, nil, 0, 0, 0
-  return H.driveUntil(function()
-    calm = (H.fieldX() == tx and H.fieldY() == ty and settled())
-       and calm + 1 or 0
-    return calm >= 16
-  end, maxFrames or 12000, {
-    H.call(function()
-      ph = (ph + 1) % 8
-      if H.battleLoadStarted() then
-        killBitAll(); H.setPad(ph < 4 and { "a" } or {}); phase = 0; return
-      end
-      if H.dialogWaiting() then
-        H.setPad(ph < 4 and { "a" } or {}); phase = 0; return
-      end
-      if phase == 0 then                       -- pick the next tile
-        H.setPad({})
-        if not settled() then return end
-        local p = H.bfsPath(tx, ty)
-        if not p or #p == 0 then return end    -- transient block: retry
-        dir, n, phase = p[1], 0, 1
-        return
-      end
-      if phase == 1 then                       -- press
-        n = n + 1
-        H.setPad({ [H.movePress(dir)] = true })
-        if n >= 8 then phase, n = 2, 0 end
-        return
-      end
-      H.setPad({})                             -- let the 16px step land
-      n = n + 1
-      if n >= 24 then phase = 0 end
-    end),
-  }, what or string.format("tapWalk (%d,%d)", tx, ty))
-end
-
 -- Drive an NPC conversation that ends in a `choice`, picking index `idx`,
 -- until switch `doneId` latches.  Same shape as gen_zozo3_clock's clockPick:
 -- $056F is the choice count (0 while ordinary text pages are up) and $056E
@@ -229,14 +162,13 @@ H.run({ maxFrames = 60000 }, {
     H.log(partyReport("vector_doorstep"))
   end),
 
-  -- 1. up to {45,38}, directly ABOVE the sympathizer at {45,39}.  navTo
-  --    covers the 36-tile haul (it has the blocklist and the battle
-  --    handling); tapWalk nails the last tiles, because navTo cannot come
-  --    to rest on an odd x reached rightward -- see its header above.
+  -- 1. up to {45,38}, directly ABOVE the sympathizer at {45,39}.  This was
+  --    a navTo haul followed by a local tapWalk for the last tiles, because
+  --    the pre-#22 navTo could not come to rest on an odd x reached
+  --    rightward; the library lands exactly now, so one navTo does it.
   --    A DOWN press on {45,38} cannot step (his object occupies {45,39})
   --    so it only turns the party -- the standard face-an-NPC idiom.
   H.navTo(45, 38, { maxFrames = 20000 }),
-  tapWalk(45, 38, 8000, "tapWalk onto the sympathizer's doorstep (45,38)"),
   H.hold({ "down" }), H.waitFrames(8), H.release(), H.waitFrames(20),
   H.call(function()
     H.assertEq(H.fieldX(), 45, "at the sympathizer's doorstep x")
@@ -264,7 +196,6 @@ H.run({ maxFrames = 60000 }, {
   --    trigger demands.  A navTo straight to {43,38} would be free to
   --    arrive facing LEFT and the trigger would no-op silently.
   H.navTo(43, 37, { maxFrames = 15000 }),
-  tapWalk(43, 37, 8000, "tapWalk onto the ledge approach (43,37)"),
   H.call(function()
     H.assertEq(H.fieldX(), 43, "above the sneak ledge x")
     H.assertEq(H.fieldY(), 37, "above the sneak ledge y")
