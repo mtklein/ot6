@@ -22,7 +22,7 @@
 -- wrecked anchor both come out as a precise list, never a timeout.
 --
 -- What a contract can declare (all fields optional):
---   slot     = 3                          -- $021F wSaveSlotToLoad, 1..3
+--   slot     = 3                          -- SRAM $307ff0 last-saved slot, 1..3
 --   world    = { x = 137, y = 203 }       -- ON THE WORLD MAP at this tile
 --   switches = { { id, 0|1, "what" }, ... }   -- story switches $1E80 bits
 --   party    = { size = N,                -- COUNT of $1850 party assignments
@@ -64,7 +64,7 @@ M.contracts = {}
 -- and bludgeon covered with no shop trip, SABIN answering the Vector band's
 -- deliberate OT6_BLUDG row.
 M.contracts["post-opera-v1"] = {
-  slot = 3,                       -- Continue loaded save slot 3
+  slot = 3,                       -- Continue loaded save slot 3 ($307ff0)
   world = { x = 137, y = 203 },   -- one step WEST of the Albrook gate
   switches = {
     { 0x034b, 0, "Ultros 2 cleared" },
@@ -125,7 +125,14 @@ function M.contractDiffs(c)
   end
 
   if c.slot then
-    field("save slot ($021F)", c.slot, M.readByte(0x021f))
+    -- $307ff0 is the SRAM last-saved-slot marker, stable in every module
+    -- context.  NOT $021f: that cell is wSaveSlotToLoad only while the
+    -- menu module owns the $0200 region -- the world module block-restores
+    -- its own variable there after any menu closes (measured 2026-07-27,
+    -- issue #29), so a contract read through it holds only until the first
+    -- menu open after boot.
+    field("save slot (SRAM $307ff0)", c.slot,
+      emu.read(0x307ff0, emu.memType.snesMemory))
   end
   if c.world then
     field("on the world map (mapId & 0x1ff)", 0, M.mapId() & 0x1ff)
