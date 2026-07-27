@@ -365,11 +365,25 @@ function M.partyHp()
   return hp
 end
 
--- True once the battle module has begun loading: the party battle-HP table
--- fills in (it reads $FFFF while in the field module).
+-- True once the battle module has begun loading.  In the field ALL FOUR
+-- words of the party battle-HP table read $FFFF; in a battle every occupied
+-- slot holds a real current HP, and an EMPTY slot -- or a DEAD character --
+-- reads 0.  Measured on battle_doorstep: field is FFFF FFFF FFFF FFFF, a
+-- live battle is 003F 0044 003D 0000 (slot 3 empty).
+--
+-- So the gate scans all four and treats "not $FFFF" as loaded.  Reading slot
+-- 0 alone and rejecting a 0 conflated three different states -- module not
+-- loaded, slot 0 empty, slot 0's character dead -- and reported "no battle"
+-- for the last two while the battle was still running.  worldHasControl()
+-- hangs off this, so worldNavTo stopped tapping A, decided it had walkable
+-- control, and pressed directions into a live battle forever (#24).
+-- Regression: battle_loadgate.lua.
 function M.battleLoadStarted()
-  local hp = M.readWord(M.BATTLE_HP)
-  return hp ~= 0xFFFF and hp ~= 0 and hp < 10000
+  for i = 0, 3 do
+    local hp = M.readWord(M.BATTLE_HP + i * 2)
+    if hp ~= 0xFFFF and hp < 10000 then return true end
+  end
+  return false
 end
 
 -- Cheap "is anything on screen" check: an all-black 256x224 screenshot
