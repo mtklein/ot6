@@ -6,49 +6,13 @@ unchanged by this document.
 
 Everything below was decoded from the vendored data under `ff6/` on
 2026-07-26. Line references are to that tree. Where a claim is an inference
-rather than something read out of the source, it is labelled.
-
-> **Revision 2, 2026-07-26.** Rev 1 (landed in `cb559af`) reasoned about a free
-> choice of four characters from a roster of seven. That premise was false.
-> `vector-route-recon.md` §6e and `wob-route.md` establish that Beat B has **no
-> four-character party**: it is **Locke + Celes**, then **Locke alone**, then
-> **Locke + Setzer**. Rev 2 rewrites §6 onward against the real parties and
-> corrects three data errors of my own that the recon surfaced. The survey data
-> in §1–§5 is re-derived, not merely re-labelled — the map set shrank by one and
-> the species list grew by two.
->
-> **The conclusion moves against rev 1, not for it.** With two characters and
-> then one, bludgeon is purchase-gated everywhere with no shop in the band, ¤
-> has no wielder outside a single fight, and rev 1's flagship row would have
-> made 11.7 % of band draws unbreakable. Three rows are pulled, three widened,
-> two species added, and a boss fight is flagged as unfittable as authored (§9).
-> Where the honest answer is "this needs a shop change, not a cleverer row",
-> §10 says so.
-
-**Corrections to rev 1's own data, found while revising:**
-
-1. **The NPC-block → map offset was wrong by 2.** Rev 1 calibrated
-   `event/npc_prop.asm` blocks onto `map_prop` at +3 from `sep[6+m]` but then
-   used `sep[m+4]`. Re-calibrated properly (9 of 11 weapon-shop NPC blocks land
-   on a `WEAPON SHOP`/`ARSENAL` map at offset 3, 0 of 11 at every other offset).
-   Consequence: **Ifrit & Shiva are on maps 263 and 264, not 262/263; Number 024
-   is on map 273, not 272; the esper tube room is 274.** All three now agree
-   with `vector-route-recon.md` §2/§4, which derived them independently.
-2. **Map 275 is unreachable and is dropped from the band.** No short or long
-   entrance record anywhere targets it, and `load_map 275` appears nowhere in
-   `ff6/src/`. It carries group 106 and the battle-enable bit but cannot be
-   visited. The random-encounter map set is **7 maps, not 8**, and every §5
-   number is recomputed accordingly.
-3. **Two species were missing entirely.** The minecart is `cutscene TRAIN`, not
-   an event map, and it carries **five forced battles plus Number 128** issued
-   by ASM writing `$0011E0` directly (`world/train_script.asm:829-917`) — which
-   is why rev 1's grep for `battle 73` found nothing. Those five fights are
-   **Mag Roader `$006` and `$0af`**, both defaulted to slash, both fought by
-   **Locke alone**. They are §3.2 and they change the picture.
+rather than something read out of the source, it is labelled. Party
+composition is `docs/design/bosses-wob.md`'s to state, not this document's;
+§6 cites it rather than re-deriving it.
 
 ---
 
-## 0. What this replaces, and how the two tables interact
+## 0. How the two tables interact
 
 `Ot6SeedShields` scans the authored table **first** and only falls through to
 the generated floor on a miss:
@@ -63,7 +27,7 @@ the generated floor on a miss:
 
 The table itself lives at `ff6/src/battle/ot6_hud.asm:1273`. So **authoring a
 band means adding `Ot6ShieldTbl` rows; it needs no generator change at all.**
-The generator work issue #11 asks for is separate, and §11 covers it.
+The generator work issue #11 asks for is separate, and §10 covers it.
 
 One coupling worth restating (documented at `ot6_hud.asm:1380-1392`): an
 `Ot6ShieldTbl` row also exempts its species from `Ot6HpScale`
@@ -93,7 +57,7 @@ into `SubBattleRateTbl` = `$0070, $0040, $0160, $0200`
 (`field/battle.asm:259-262`), then halved by OT6's `Ot6DangerMulW`
 (`ot6_break.asm:585`).
 
-### 1.1 The route, and which maps carry encounters
+### 1.1 The route and the encounter-bearing maps
 
 Map graph and leg order are `vector-route-recon.md` §2/§4/§5; the encounter
 columns are decoded here.
@@ -103,28 +67,47 @@ columns are decoded here.
    ─► 266 (lift) ─► 272 ─► cutscene TRAIN ─► 240 ─► map 6 (Blackjack)
 ```
 
-| map | title | enable | group | rate | pool | party |
-|---|---|---|---|---|---|---|
-| 262 `$106` | MAGITEK FACTORY | **Y** | 80 | `$0040` | Garm, Commando, ProtoArmor, Pipsqueak | Locke + Celes |
-| 263 `$107` | — | **Y** | 81 | `$0040` | ProtoArmor, Garm, Commando, Pipsqueak | Locke + Celes |
-| 264 `$108` | — | **Y** | 104 | `$0040` | Flan | Locke + Celes |
-| 269 `$10d` | — | **Y** | 105 | `$0070` | General, Pipsqueak, Trapper | Locke + Celes |
-| 271 `$10f` | MAGITEK RES. FACILITY | **Y** | 106 | `$0070` | Gobbler, Rhinox | Locke + Celes |
-| 273 `$111` | — | **Y** | 106 | `$0070` | Gobbler, Rhinox | Locke + Celes |
-| 240 `$0f0` | (escape Vector) | **Y** | 108 | `$0070` | Chaser, Commando, Pipsqueak | **Locke alone** |
-| 270 `$10e` | — | n | 105 | — | save-point room; carries a group, cannot draw it | — |
-| 272 `$110` | — | n | 104 | — | minecart boarding + save point; same | — |
-| 274 `$112` | — | n | 106 | — | esper tube room; same | — |
-| 275 `$113` | BASEMENT 3 | Y | 106 | — | **unreachable — no entrance record, no `load_map`** | — |
+Vector town is maps 242 / 253 (title index 49). The facility is the contiguous
+block 262-275, identified three ways that agree: the map titles
+(`MAGITEK FACTORY` on 262, `MAGITEK RES. FACILITY` on 271), the default song
+(`$47` = `SONG::DEVILS_LAB`, `ff6/include/sound/song_script.inc:80`) on every
+map 262-275, and the fact that **battle groups 80, 81, 104, 105, 106 and 108
+are used by no other map in the game**. Map 240 is a second copy of Vector used
+for the escape.
 
-Set-piece rooms, from the corrected NPC-block mapping (offset 3):
+| map | title | enable | group | rate | pool |
+|---|---|---|---|---|---|
+| 262 `$106` | MAGITEK FACTORY | **Y** | 80 | `$0040` | Garm, Commando, ProtoArmor, Pipsqueak |
+| 263 `$107` | — | **Y** | 81 | `$0040` | ProtoArmor, Garm, Commando, Pipsqueak |
+| 264 `$108` | — | **Y** | 104 | `$0040` | Flan |
+| 269 `$10d` | — | **Y** | 105 | `$0070` | General, Pipsqueak, Trapper |
+| 271 `$10f` | MAGITEK RES. FACILITY | **Y** | 106 | `$0070` | Gobbler, Rhinox |
+| 273 `$111` | — | **Y** | 106 | `$0070` | Gobbler, Rhinox |
+| 240 `$0f0` | (escape Vector) | **Y** | 108 | `$0070` | Chaser, Commando, Pipsqueak |
+| 270 `$10e` | — | n | 105 | — | save-point room; carries a group, cannot draw it |
+| 272 `$110` | — | n | 104 | — | minecart boarding + save point; same |
+| 274 `$112` | — | n | 106 | — | esper tube room; same |
+| 275 `$113` | BASEMENT 3 | Y | 106 | — | **unreachable** |
+
+**Map 275 is unreachable and is excluded from the band.** No short or long
+entrance record anywhere in the game targets it, and `load_map 275` appears
+nowhere in `ff6/src/`. It carries group 106 and the battle-enable bit but
+cannot be visited. The random-encounter map set is **seven maps**.
+
+The three enable-bit-clear maps are the same shape as Measurement #8's map
+95/74 finding (`balance-metrics.md:831-840`).
+
+Set-piece rooms, from `event/npc_prop.asm` (its per-map blocks sit at a fixed
++3 offset from `map_prop`; calibrated against the weapon-shop maps, where
+offset 3 lands 9 of 11 blocks on a `WEAPON SHOP`/`ARSENAL` map and every other
+offset lands 0):
 
 | map | contents | fight |
 |---|---|---|
 | 263 | IFRIT, KEFKA, ELEVATOR | Ifrit approach (`_cc7937` → `battle 70`, `event_main.asm:95283`) |
 | 264 | IFRIT, SHIVA, MAGICITE | **the Ifrit & Shiva fight and the Shiva magicite — in the Flan room** |
 | 273 | NUMBER_024 | `_cc79ed` → `battle 72` (`:95386`) |
-| 274 | BIG_SWITCH, CID, KEFKA, BISMARK, CARBUNCL, MADUIN | six espers (`:95777-95782`); `party_chars LOCKE, CELES` (`:95796`); **Celes removed** (`:96148-96158`) |
+| 274 | BIG_SWITCH, CID, KEFKA, BISMARK, CARBUNCL, MADUIN | six espers (`:95777-95782`); Celes is lost here (`:96148-96158`) |
 | 240 | MAGITEK_TRAIN ×4, SAVE_POINT | escape; Setzer reunion → Blackjack → `battle 71` (Cranes) |
 
 **One anomaly, reported as data, mechanism unverified.** Maps 265 `$109`,
@@ -165,7 +148,7 @@ Pipsqueak 31.25 % / 0.6250 · ProtoArmor 31.25 % / 0.3125
 per draw: Pipsqueak 37.50 % / 1.8750 · ProtoArmor 31.25 % / 0.6250 ·
 Garm 31.25 % / 0.6250 · Commando 31.25 % / 0.3125
 
-### Group 104 — map 264 (the Ifrit & Shiva room)
+### Group 104 — map 264, the Ifrit & Shiva room
 
 | p | formation | contents |
 |---|---|---|
@@ -186,7 +169,7 @@ floor the tag boss is fought on.
 per draw: General 62.50 % / 0.9375 · Trapper 37.50 % / 1.1250 ·
 Pipsqueak 31.25 % / 0.6250
 
-### Group 106 — maps 271 and 273 (the deep facility; Number 024's floor)
+### Group 106 — maps 271 and 273, the deep facility (Number 024's floor)
 
 | p | formation | contents |
 |---|---|---|
@@ -196,9 +179,9 @@ Pipsqueak 31.25 % / 0.6250
 
 per draw: Gobbler 68.75 % / 1.0625 · Rhinox 68.75 % / 1.0000.
 Two species, two maps, **100 % of the draws in the deepest third of the
-dungeon** — all of it fought by Locke + Celes.
+dungeon.**
 
-### Group 108 — map 240 (the escape, **Locke alone**)
+### Group 108 — map 240, the escape
 
 | p | formation | contents |
 |---|---|---|
@@ -210,13 +193,14 @@ dungeon** — all of it fought by Locke + Celes.
 per draw: Chaser 62.50 % / 0.6250 · Commando 31.25 % / 1.2500 ·
 Pipsqueak 37.50 % / 1.1875
 
-### The minecart — six forced fights, no draws, Locke alone
+### The minecart — six forced fights, no draws
 
 `cutscene TRAIN` (`event_main.asm:96580`) runs a 52-item script in
 `world/train_script.asm`; items 3 and 14 issue `battle 41`, items 9, 24 and 31
 issue `battle 144`, and item 36 issues `battle 73`
 (`train_script.asm:829/864/899`, each writing `$0011E0` from
-`EventBattleGroup` directly).
+`EventBattleGroup` directly — which is why `battle 73` appears nowhere in the
+event disassembly).
 
 | fight | formations | contents |
 |---|---|---|
@@ -231,17 +215,25 @@ rows for them touches this band and nothing else.
 
 ### The bosses
 
-| species | id | L | HP | vanilla weak / null / absorb | authored row | party |
-|---|---|---|---|---|---|---|
-| Ifrit | `$109` | 21 | 3300 | ice / all but ice / **fire** | 6 · pierce (`ot6_hud.asm:1542`) | Locke + Celes |
-| Shiva | `$108` | 21 | 3000 | fire / all but fire / **ice** | 6 · slash (`:1544`) | Locke + Celes |
-| Number 024 | `$10a` | 24 | 4777 | **none** | 7 · slash\|pierce (`:1546`) | Locke + Celes |
-| Number 128 | `$10b` | 23 | 3276 | none / — / ice | 7 · pierce (`:1549`) | **Locke alone** |
-| RightBlade | `$13f` | 21 | 400 | none / — / ice | 3 · slash (`:1551`) | **Locke alone** |
-| Left Blade | `$140` | 22 | 700 | none / — / ice | 3 · slash (`:1553`) | **Locke alone** |
-| Crane | `$10d` | 23 | 1800 | water / — / bolt | 6 · pierce (`:1555`) | Locke + Setzer |
-| Crane | `$10e` | 24 | 2300 | bolt\|water / — / fire | 6 · pierce (`:1557`) | Locke + Setzer |
-| Guardian | `$111`/`$112` | 71/67 | 50000/60000 | — | 0 · `$00`, gauge-less | — |
+| species | id | L | HP | vanilla weak / null / absorb | authored row |
+|---|---|---|---|---|---|
+| Ifrit | `$109` | 21 | 3300 | ice / all but ice / **fire** | 6 · pierce (`ot6_hud.asm:1542`) |
+| Shiva | `$108` | 21 | 3000 | fire / all but fire / **ice** | 6 · slash (`:1544`) |
+| Number 024 | `$10a` | 24 | 4777 | **none** | 7 · slash\|pierce (`:1546`) |
+| Number 128 | `$10b` | 23 | 3276 | none / — / ice | 7 · pierce (`:1549`) |
+| RightBlade | `$13f` | 21 | 400 | none / — / ice | 3 · slash (`:1551`) |
+| Left Blade | `$140` | 22 | 700 | none / — / ice | 3 · slash (`:1553`) |
+| Crane | `$10d` | 23 | 1800 | water / — / bolt | 6 · pierce (`:1555`) |
+| Crane | `$10e` | 24 | 2300 | bolt\|water / — / fire | 6 · pierce (`:1557`) |
+| Guardian | `$111`/`$112` | 71/67 | 50000/60000 | — | 0 · `$00`, gauge-less |
+
+**Every boss row in the band is already authored and reachable by the party
+that fights it** (§6.3); this pass changes none of them. The one outstanding
+boss item is elemental, not class: `bosses-wob.md` §15 specifies **bolt + water
+on Number 128's body and bolt on both blades**, and vanilla gives all three no
+weakness at all (`monster_prop.dat` +25 = `$00`). Those are `Ot6ElemAddTbl`
+rows and they are not written yet — the same M6 data-entry gap `wob-route.md`
+records for AtmaWeapon.
 
 ---
 
@@ -262,44 +254,41 @@ rows for them touches this band and nothing else.
 | Rhinox | `$075` | 19 | 800 | **none** | — | **bolt** | BaneStrike |
 | Chaser | `$0a0` | 19 | 1202 | bolt\|water | — | — | Program 17 |
 
-**A body-reading gift from vanilla, and it survives rev 2 intact.** Exactly
-**6 of 384** species in the game have a `Program NN` special-attack name
-(`src/text/monster_special_name_en.json`), and they are exactly Garm, Commando,
-ProtoArmor, Pipsqueak, Trapper and Chaser — this band's six machines. Vanilla's
-own data splits the pool into *six things running programs* and *four things
-that are alive* (an ooze, an officer, a maw, a beast). That is still the spine
-of §8; what rev 2 changes is how far the rule can be pushed before it outruns
-the party.
+**A body-reading gift from vanilla.** Exactly **6 of 384** species in the game
+have a `Program NN` special-attack name (`src/text/monster_special_name_en.json`),
+and they are exactly Garm, Commando, ProtoArmor, Pipsqueak, Trapper and
+Chaser — this band's six machines. Vanilla's own data splits the pool into
+*six things running programs* and *four things that are alive* (an ooze, an
+officer, a maw, a beast). That split is the spine of §8, and it is the rule the
+player can guess before probing: **the machines do not care about your sword.**
 
-### 3.2 The two minecart bodies (new in rev 2)
+### 3.2 The two minecart bodies
 
-| species | id | L | HP | vanilla weak | absorb | special | floor |
-|---|---|---|---|---|---|---|---|
-| Mag Roader | `$006` | 19 | 420 | **fire** | **ice** | Wheel | SLASH (**DEFAULT**) |
-| Mag Roader | `$0af` | 18 | 250 | **ice** | — | Rush | SLASH (**DEFAULT**) |
+| species | id | L | HP | vanilla weak | absorb | special |
+|---|---|---|---|---|---|---|
+| Mag Roader | `$006` | 19 | 420 | **fire** | **ice** | Wheel |
+| Mag Roader | `$0af` | 18 | 250 | **ice** | — | Rush |
 
-These two are the sharpest thing in the band and rev 1 missed them entirely.
+These two carry the best elemental puzzle in the band, and it is vanilla's own:
 
-- They are **the same name on two species** — `Mag Roader` covers `$006`,
-  `$0af`, `$0e7` and `$0f3`. See §11.1.
-- **Their elements are opposed and one of them is a trap:** `$006` is weak to
-  fire and **absorbs ice**; `$0af` is weak to ice. Formation `$075` puts them in
-  the same fight.
-- **Both elemental keys are slashing swords found in this dungeon** — Flame
-  Sabre (map 262, chest at (3,25)) and Blizzard (map 263, (55,34)). So the
-  vanilla-supplied decision is already excellent, and the current floor
-  flattens it: both default to slash, so "hold a sword" answers the class axis
-  and the element axis at once.
-- **Locke fights all five of these alone, with one weapon, and no menu.** The
-  last equip opportunity is the save point on map 272 at (3,55)
-  (`event_trigger.asm:1211`); the ride is a cutscene from there to Number 128.
-  *(That the field menu is unavailable during `cutscene TRAIN` is an inference
-  from it being a cutscene — not traced. The save point on 272 being the last
-  certain equip point is not.)*
+- **Their elements are opposed and one is a trap.** `$006` is weak to fire and
+  **absorbs ice**; `$0af` is weak to ice. Formation `$075` puts them in the
+  same fight, so the wrong splash heals half the screen.
+- **The facility hands you both keys on the way in.** Ifrit's magicite grants
+  Fire / Fire 2 / Drain and Shiva's grants Ice / Ice 2 / Rasp / Osmose / Cure
+  (`menu/genju_prop.asm:86,:89`), and under M5 an equipped esper *grants* its
+  spells rather than teaching them over time — the learn rates are all zero and
+  `Ot6EsperSpellKnown` resolves the ids as known while the esper is worn
+  (`genju_prop.asm:58-66`). So Ifrit answers `$006` and Shiva answers `$0af`
+  the moment they are equipped, and the chests add Flame Sabre (map 262,
+  (3,25)) and Blizzard (map 263, (55,34)) for anyone who would rather swing it.
+- **The current floor flattens all of it**: both species default to slash, and
+  both elemental keys arrive on slashing swords, so "hold a sword" answers the
+  class axis and the element axis at once.
 
 ### 3.3 Shield counts as they stand
 
-Every trash species above seeds **4 shields**: levels 18 and 19 both give
+Every species above seeds **4 shields**: levels 18 and 19 both give
 `2 + level/8` = 4 (`ot6_break.asm:52-60`). Both prior authoring passes found
 the formula count is one chip too many and landed on 2
 (`balance-metrics.md:944-972` for Mt. Kolts, `ot6_hud.asm:1489-1510` for Zozo,
@@ -350,9 +339,9 @@ visible is issue #11's first acceptance criterion.
 
 ## 5. Class distribution BY ENCOUNTER FREQUENCY
 
-Over the **seven** encounter-bearing maps (275 dropped, §1.1). Neither
-aggregate weights by *time spent* on a map, which nobody has measured; the
-first weights each map equally, the second by per-step encounter rate.
+Over the seven encounter-bearing maps. Neither aggregate weights by *time
+spent* on a map, which nobody has measured; the first weights each map equally,
+the second by per-step encounter rate.
 
 ### 5.1 Share of draws in which a class is a key (≥ 1 body weak to it)
 
@@ -388,7 +377,7 @@ Per-species contribution (equal-map weight), sorted by bodies per draw:
 | Chaser | 0.0893 | 3.19 % | 6.45 % | PIERCE |
 
 Plus, off the draw table entirely: **five forced Mag Roader fights, both
-species defaulted to slash**, fought solo.
+species defaulted to slash.**
 
 ### 5.3 The finding
 
@@ -398,408 +387,267 @@ species defaulted to slash**, fought solo.
   (Rhinox / `rhino`).
 - Those two are **the only random-pool species in the band with no vanilla
   elemental weakness at all**, so the class row is not one option among
-  several: it is their entire break axis.
+  several: it is their entire break axis. Getting it wrong there costs the
+  whole mechanic in that room.
 - **Rhinox absorbs bolt** (`monster_prop.dat` +23 = `$04`) — the element the
   rest of the band teaches. This is Mt. Kolts' Brawler-absorbs-poison case
   (`ot6_hud.asm:1348-1360`) one band later, on a bigger body.
-- **The minecart's five forced fights are the purest form of the problem**: a
-  genuinely good vanilla elemental puzzle (fire vs ice, with an absorb trap)
-  whose keys are both slashing swords, sitting on two species that both
-  defaulted to slash. Holding one sword currently answers both axes at once.
-- ¤ is at 0 %. §6.3 explains why that is nearly unfixable here and §8.4 gives it
-  the one home it can legitimately have.
+- **The minecart is the purest form of the problem** (§3.2): a genuinely good
+  vanilla puzzle whose two keys are both slashing swords, sitting on two
+  species that both defaulted to slash.
+- ¤ is at 0 %, and §6 explains why it should stay there for this band.
 
 ---
 
-## 6. The parties that walk this band
+## 6. The party that walks this band
 
-### 6.1 There is no four-character party
+### 6.1 Composition
 
-| stretch | party | covers | evidence |
-|---|---|---|---|
-| **A** | **Locke + Celes** | maps 262, 263, 264, 269, 271, 273; Ifrit & Shiva; Number 024 | roster at the beat head; the lock is explicit at `event_main.asm:95796` `party_chars LOCKE, CELES` |
-| **B** | **Locke — solo** | the minecart (5 Mag Roader fights), **Number 128 + both blades**, and map 240 | `event_main.asm:96148-96158`: `char_party CELES, 0` / `party_chars LOCKE` / `switch $02F6=0` / `remove_equip CELES`; again at `:96739` |
-| **C** | **Locke + Setzer** | the Crane fight only | `event_main.asm:96980-96982` `norm_lvl SETZER` / `char_party SETZER, 1` |
+`bosses-wob.md` is the authority here.
 
-Terra is available but **not active** at the v0.6 stop line
-(`vector-route-recon.md` §6d), so no fight in this band may assume her.
+| stretch | party | source |
+|---|---|---|
+| Facility exploration, Ifrit & Shiva, Number 024 | **four** — Locke, Celes + two, player-chosen | `bosses-wob.md` §13, §14 |
+| Minecart, Mag Roaders, Number 128 | **three** — Celes is lost partway through the facility | `bosses-wob.md` §15 |
+| Left & Right Cranes | **three** — the same set; Setzer is flying the getaway | `bosses-wob.md` §16 |
 
-`party_chars` is event command `$3c`; `EventCmd_3c` (`field/event.asm:596`)
-writes the party object pointers directly with `$ff` for an empty slot, so
-`party_chars LOCKE` genuinely reduces the walking party to one.
+Terra is available but **not active** until the tail of the beat
+(`wob-route.md`), so no fight in this band may assume her, and Setzer is flying
+the airship through the escape, so no fight may assume him either.
 
-Two mechanical details that carry weight below:
+The exact roster is runtime state, and `bosses-wob.md` §15 says plainly it is
+to be measured at the fixture rather than read out of the event dump. The one
+mechanism worth recording, because it is what makes an event-dump reading go
+wrong: **`party_chars` does not change party membership.** Event command `$3c`
+(`field/event.asm:596-622`) writes only the four character-object pointers at
+`$07fb`-`$0801` — the on-map sprite train. Membership is `char_party`, command
+`$3f` (`field/event.asm:563-585`), which writes `$1850,y`. In the facility
+chain only Celes gets a `char_party … , 0`; a cutscene that walks one sprite is
+not a party of one.
 
-- **`remove_equip` returns the gear to inventory.** `EventCmd_8d`
-  (`field/event.asm`) walks all six equipment slots at `$161f + char*37`,
-  clears each, and puts the item back into `$1869`/`$1969`. When Celes leaves,
-  her whole kit lands in Locke's inventory — but only items *he* can equip help
-  him, and Flail/Morning Star are not among them (§6.2).
-- **Locke has one weapon slot.** Character data is 37 bytes from `$1600`;
-  weapon = `$161f + char*37` (Locke `$1644`, Celes `$16fd`, Setzer `$176c`).
-  Without a Genji Glove he swings one class at a time. On the minecart that
-  single choice is locked in for **six consecutive fights** (§3.2).
-- **Stretch C has no random encounters at all.** The Crane fight auto-plays
-  from the map-240 trigger onto map 6 with no navigation
-  (`vector-route-recon.md` §5), so Setzer is present for exactly one fight.
+So the free picks come from **Edgar, Sabin, Cyan and Gau**, and the fixed core
+is Locke + Celes until the tube room.
 
-### 6.2 What each stretch can field
+### 6.2 What each class costs the player to field
 
 Classes from `ot6_class.asm:10-13`; weapon bytes from `Ot6WeapClassTbl`
-(`:46`); ability bytes from `Ot6SkillClassTbl` (`:184`); equippability from the
-16-bit character mask at `item_prop_en.dat[item*30]+1` (`menu/equip.asm:1592`).
+(`:46`); ability bytes from `Ot6SkillClassTbl` (`:184-196`); equippability from
+the 16-bit character mask at `item_prop_en.dat[item*30]+1`
+(`menu/equip.asm:1592`).
 
-| member | slash | pierce | bludgeon | special ¤ |
-|---|---|---|---|---|
-| Locke | swords (MithrilBlade, Flame Sabre, Blizzard, ThunderBlade, Break Blade, Falchion …) | **daggers — his default line** | Full Moon `$45`, Boomerang `$47`, Rising Sun `$48`, Sniper `$4b`, Wing Edge `$4c` | **none** |
-| Celes | **the whole sword line** | daggers (Dirk, MithrilKnife, Man Eater, Graedus) | Flail `$44`, Morning Star `$46` | **none** |
-| Setzer | none | Darts `$4e`, Doom Darts | none | **Cards `$4d` — his joining weapon** (`char_prop.asm:253`) |
-
-Locke's `STEAL` and Celes' `RUNIC` carry no class byte (absent from
-`Ot6SkillClassTbl`), so neither chips. Neither character has Tools, Blitz,
-Bushido or Throw. **Every class this band can field comes from an equipped
-weapon.**
-
-| stretch | slash | pierce | bludgeon | special ¤ |
-|---|---|---|---|---|
-| **A** — Locke + Celes | ✅ free, both | ✅ free, both | ⚠️ **purchase only** | ❌ **impossible** |
-| **B** — Locke solo | ✅ but one slot | ✅ but one slot | ⚠️ purchase only, and it costs him his only weapon and its element | ❌ **impossible** |
-| **C** — Locke + Setzer | ✅ Locke | ✅ both | ⚠️ purchase only | ✅ Setzer's Cards |
-
-### 6.3 The two facts that break rev 1's design
-
-**¤ does not exist in this band outside the Crane fight.** Sabin, Gau, Edgar
-and Relm are all absent; Setzer arrives at `:96982`, immediately before
-`battle 71`, on a map with no random encounters. Rev 1's Rhinox row
-(`OT6_BLUDG|OT6_SPECIAL`) would have shown a `?` slot on the HUD that **no
-party in this band can ever fill**, on a body with no elemental weakness, in
-68.75 % of the draws on the two deepest maps. Pulled (§8.1).
-
-**Bludgeon is purchase-gated everywhere and no shop in the band sells one.**
-Rev 1's free-bludgeon answer was Sabin's Blitz and Gau's fists; neither
-character is present. What is left:
-
-| town | shop | blunt / ¤ stock |
+| class | who brings it | cost |
 |---|---|---|
-| Narshe (map 24) | 0 | **Flail** (Celes), **Full Moon** (Locke) |
-| Kohlingen (map 194) | 17 | **Flail**, **Full Moon** |
-| Jidoor (map 204) | 20 | **Full Moon** |
-| Tzen (map 309) | 29 | **Full Moon**, **Boomerang** |
-| Albrook (map 326) | 25 | *none* |
-| **Vector (map 246)** | 27 | *none* — Forged, Poison Claw, Epee, Blossom |
+| **slash** | Celes' whole sword line; Cyan's katanas **and all eight SwdTechs** (`:185-192`); Sabin's claws `$53`-`$59`; Edgar's Chain Saw `$a6`; Locke's swords | **free** — five of the six candidates, and the A button for two of them |
+| **pierce** | Locke's daggers (his joining weapon); Edgar's spears plus AutoCrossbow `$aa`, Drill `$a8`, Air Anchor `$a9`; Celes' daggers | **free** — the A button for Locke |
+| **bludgeon** | **Sabin: bare fists `$ff` and Pummel / Suplex / Bum Rush** (`:193-195`), which bludgeon whatever is on his hands; **Gau: bare fists**; else Locke's Full Moon `$45` / Boomerang `$47` / Rising Sun / Sniper / Wing Edge, or Celes' Flail `$44` / Morning Star `$46` | **free if one of the two open slots is Sabin or Gau**; otherwise a weapon slot plus a shop trip |
+| **special ¤** | Setzer's Cards `$4d` only | **not assumable** — Setzer flies the getaway |
 
-Vector's own weapon shop sells no blunt and no ¤ weapon, and Vector is reached
-by an **on-foot world walk**, not by airship (`vector-route-recon.md` §1a;
-map 323 is Albrook, filed as **issue #17**), so there is no casual hop back to
-Narshe once the walk has started. A player who did not shop in Narshe,
-Kohlingen, Jidoor or Tzen *before* that walk has no bludgeon for the entire
-band, and no way to get one. **Therefore no bludgeon-only row may sit on a body
-that has no reachable element.**
+Blunt weapons are sold at Narshe (shop 0: Flail, Full Moon), Kohlingen
+(shop 17: Flail, Full Moon), Jidoor (shop 20: Full Moon) and Tzen (shop 29:
+Full Moon, Boomerang). Vector's own weapon shop (27) and Albrook's (25) stock
+none — but that only matters to a party that brought neither Sabin nor Gau and
+wants bludgeon anyway.
 
-### 6.4 The element ring, also thinner than rev 1 said
+**Bludgeon is therefore the band's one deliberate class, and it is properly
+reachable**: free for the cost of a party pick, or buyable for the cost of a
+weapon slot. That is exactly the shape `weapon-classes.md:75` already promises
+this stretch — *"Magitek factory: all — armored spread: bludgeon/pierce
+featured."*
 
-- **Bolt is the band's main element** — Ramuh is owned from Zozo
-  (`wob-route.md:30-33`) and seven of the ten random-pool species carry vanilla
-  bolt|water or bolt. But it is *learned* magic, not guaranteed gear; a fixture
-  should check it (§11.3).
-- **Poison is gone.** Rev 1 leaned on Edgar's Bio Blaster for General
-  (`$066`, poison-weak). **Edgar is not in this band.** General's vanilla
-  weakness is unreachable, so its class row is the only key it has.
-- **Ice is Celes' only offensive spell** (natural list Ice 1 / Cure 4 /
-  Antdot 8 / Imp 13 / Scan 18 / Safe 22 / Ice 2 26, `field/event.asm:1266-1281`)
-  — and in the random pools nothing is ice-weak, while Number 128 and both
-  blades **absorb** it. It matters in exactly two places: **Ifrit** (ice-weak)
-  and **Mag Roader `$0af`**.
-- **Fire is a chest.** With Terra out, fire is the **Flame Sabre in map 262's
-  first chest at (3,25)** — a slashing sword either character can equip,
-  upstream of everything that needs it. The facility also gives ThunderBlade
-  (262, (25,44)), **Blizzard** (263, (55,34)) and Break Blade (271, (8,37)).
+**¤ has no place in this band.** Setzer is its only wielder and he is not in
+the fights that close it, so a ¤ row would be a composition lock on the one
+character the climax excludes. `weapon-classes.md:74` earmarks Opera → Vector
+for "the first ¤-weak enemies"; on this beat's roster that has to wait.
+
+### 6.3 The element ring
+
+- **Bolt** — Ramuh, owned from Zozo (`wob-route.md:30-33`), grants Bolt and
+  Rasp on equip (`genju_prop.asm:83`). Seven of the ten random-pool species
+  carry vanilla bolt|water or bolt.
+- **Fire and ice** — Ifrit and Shiva magicite, awarded inside the facility
+  (`genju_prop.asm:86,:89`; granted on equip, §3.2). Fire also comes on the
+  Flame Sabre in map 262's first chest.
+- **Poison** — Edgar's Bio Blaster, if Edgar is one of the two picks. General
+  is the one body weak to it.
 - **Nothing reaches Gobbler or Rhinox**, and Rhinox *absorbs* bolt.
 
-The bosses come out fine on elements, which is worth stating: Celes' Ice
-answers Ifrit (who absorbs fire — so the Flame Sabre *heals* him, the intended
-absorb lesson), the Flame Sabre answers Shiva, and Locke and Celes between them
-hold the pierce and slash the two authored rows ask for. **Ifrit, Shiva and
-Number 024 need no change.**
+The bosses come out clean on both axes, which is worth stating: Celes' natural
+Ice (`field/event.asm:1266`) answers Ifrit — who absorbs fire, so the Flame
+Sabre *heals* him, the intended absorb lesson — the Flame Sabre answers Shiva,
+and Locke and Celes hold the pierce and slash their rows ask for. Number 128's
+pierce and the blades' slash are both covered by any three-character party
+containing Locke plus one of Edgar, Cyan or Sabin.
 
 ---
 
-## 7. What the distribution should be, given two characters and then one
+## 7. What the distribution should be
 
-The goal is unchanged — a real question with an answer the party can supply —
-but the constraints are much tighter than rev 1 assumed:
+Three facts set the shape.
 
-1. **Slash and pierce are both "the A button."** Locke's default line is
-   daggers, Celes' is swords; between them the pair covers half the class ring
-   for free, and the facility's chests add four more swords.
-2. **Bludgeon is the only deliberate class, and it is purchase-gated with no
-   shop in the band and no way back.** It can be *the interesting answer* only
-   where something else is also reachable.
-3. **¤ has exactly one legitimate home**: the Crane fight, where the script
-   guarantees a ¤ wielder.
-4. **Stretch B is solo with one weapon slot**, and on the minecart that slot is
-   frozen across six fights. Its pools must be chippable from whichever of
-   Locke's two lines he happens to be holding.
+1. **Slash is the A button and pierce is nearly free.** Five of the six
+   candidates swing slash, it is the default for Celes and Cyan, and the
+   facility's own chests hand out four more swords (Flame Sabre, ThunderBlade,
+   Blizzard, Break Blade). Pierce is Locke's default line and Edgar's whole
+   Tools menu. Authoring either onto common trash is a freebie.
+2. **Bludgeon is the deliberate class and it is genuinely reachable** (§6.2) —
+   a party pick or a shop trip, never nothing.
+3. **Vanilla already labelled six of the ten bodies as machines** (§3.1), so
+   the rule the player guesses before probing writes itself.
 
-Which yields the conclusion rev 1 talked itself out of:
+So: **bludgeon carries the band, pierce is the second key on the imperial line,
+slash comes off the machines entirely, and ¤ sits this beat out.**
 
-> **On this band there is no weapon class that is simultaneously reachable and
-> not a default swing.** The two characters present cover slash and pierce with
-> their normal weapons; bludgeon has a wielder only after a shop trip in a
-> different town, before a one-way walk; ¤ has no wielder at all until the last
-> fight. This is exactly the structural finding `weapon-classes.md:96-102`
-> recorded for Figaro → Kolts — "every class row here is a freebie or a Repo
-> Man" — recurring one band later for the same reason: a two-character party
-> cannot make a four-class ring interesting.
+Slash does not disappear — **three of the band's six set-pieces are already
+slash rows**: Shiva 6·slash, RightBlade and Left Blade 3·slash each, and
+Number 024 slash|pierce. Cyan's Quadra Slam (four hits, and multi-hit actions
+chip per hit — `weapon-classes.md:124`) and Celes' sword have real work in this
+band. What they lose is the guarantee that holding A chips every random
+encounter.
 
-So the pass is scoped to what class rows can honestly do here:
-
-- **Move the weight off slash and onto bludgeon and pierce** on the stretch-A
-  pools, following the `Program NN` machine split, so the band reads "the
-  machines don't care about your sword" and a player who bought a blunt weapon
-  is rewarded across most of the dungeon.
-- **Never let bludgeon be the only key on a body with no reachable element.**
-- **On the solo stretch, guarantee every fight from either of Locke's lines** —
-  and say plainly that those rows are coverage, not design.
-- **Give ¤ its debut on Crane `$10e`**, the one fight with a guaranteed wielder.
-- **Do not flatten the minecart's vanilla fire/ice puzzle** — put the class row
-  where it complements the element rather than duplicating it.
-
-The measurable target is not an even four-way split. It is: *every fight
-chippable by the party that actually fights it, no fight chippable only by an
-unreachable class, and slash no longer the automatic answer on the common
-bodies.*
+The measurable target is not an even four-way split. It is: *every encounter
+chippable by some buildable party* (`wob-route.md:187`), *no encounter
+chippable only by a class no party can field*, and *slash no longer the
+automatic answer on the common bodies*.
 
 ---
 
-## 8. Proposed `Ot6ShieldTbl` rows (rev 2)
+## 8. Proposed `Ot6ShieldTbl` rows
 
 Format matches the existing table (`ot6_hud.asm:1273`): `.word` species,
-`.byte` shields, `.byte` class mask. Changes from rev 1 are called out.
+`.byte` shields, `.byte` class mask.
 
-### 8.1 Stretch A — the Locke + Celes pools
-
-| species | id | shields | class mask | rationale |
-|---|---|---|---|---|
-| Garm | `$0cb` | 2 | `OT6_PIERCE\|OT6_BLUDG` | A magitek quadruped (`Program 95`): pierce the joints or cave the housing. Keeps vanilla bolt, so bludgeon can be the *better* answer without being the only one. |
-| Commando | `$0c7` | 2 | `OT6_SLASH\|OT6_PIERCE` | **Widened from `PIERCE`.** The only body that appears in both stretch A and the solo escape, so it must be reachable from either of Locke's lines. It is also exactly the existing soldier-line palette — `$0001` soldier, `$0065` trooper and `$003f` rider are all `SLASH\|PIERCE` (`ot6_hud.asm:1433-1487`) — so the widening is consistency, not concession. |
-| ProtoArmor | `$165` | 2 | `OT6_BLUDG` | A sealed suit has no seam for a point; you dent it. Bludgeon-only is permitted **because it keeps vanilla bolt**, which Ramuh reaches. |
-| Pipsqueak | `$041` | 2 | `OT6_PIERCE` | The swarm body (up to ×5), 22 % of all bodies in the band. Pierce, with vanilla bolt\|water as the floor for a sword loadout. |
-| Flan | `$047` | 2 | `OT6_BLUDG` | Keep the generator's read (`gen_break_floor.py:78`): you cannot cut an ooze. Its only element is fire — the Flame Sabre chest two maps upstream. Group 104 is 100 % Flan **and it is the Ifrit & Shiva room**, so this is the most gated pool in the band; see §11.3 for the assertion it needs. |
-| General | `$066` | 2 | `OT6_PIERCE\|OT6_BLUDG` | An officer in plate. **Its vanilla poison is unreachable — Edgar is not in this band** — so unlike rev 1 this row is its only key, and pierce is what makes it reachable. |
-| Trapper | `$02d` | 2 | `OT6_BLUDG` | A fixed trap mechanism (`Program 18`) — you smash a device. Bludgeon-only is permitted because it keeps vanilla bolt\|water. |
-| Gobbler | `$088` | 2 | `OT6_SLASH\|OT6_PIERCE` | No vanilla weakness at all, so this row is its only key. A soft maw: cut it or stick it. Two default-swing classes because it is 68.75 % of the deep pool and its partner (below) is the harder one. |
-| Rhinox | `$075` | 2 | `OT6_PIERCE\|OT6_BLUDG` | **Changed from `BLUDG\|SPECIAL`.** No weakness of any kind *and* it absorbs bolt, so no element substitutes; ¤ has no wielder here; and it is the only body in a group-106 draw 31.25 % of the time. Rev 1's row made that draw unbreakable by any party the band can field. Bludgeon stays as the body-read answer (armoured bulk, no seam); pierce is what makes it reachable at all. **Honest cost: pierce is Locke's default line, so the band's flagship body is a freebie for a dagger Locke.** §10 argues this is the right trade and names the one change that would undo it. |
-
-### 8.2 Stretch B — the solo pools
-
-These rows are **coverage, not design**, and the document says so rather than
-dressing them up. On a solo stretch there is no party composition to reward,
-only a weapon choice made before an unannounced split, with no shop and — on
-the minecart — no menu.
+### 8.1 The rows
 
 | species | id | shields | class mask | rationale |
 |---|---|---|---|---|
-| Chaser | `$0a0` | 2 | `OT6_SLASH\|OT6_PIERCE\|OT6_BLUDG` | **Widened from `PIERCE\|BLUDG`.** 1202 HP, the largest trash body in the band, and it is 62.5 % of the escape draws fought by one character. Without slash, a sword-carrying Locke has no class chip in 62.5 % of map 240. Narrow to `PIERCE\|BLUDG` only if playtest confirms Locke reliably carries Bolt. |
-| Mag Roader | `$006` | 2 | `OT6_SLASH\|OT6_PIERCE` | **New.** The ice-*absorber*: the Blizzard sword that answers its partner actively heals this one, so its class row must not depend on a loadout guess. Both of Locke's lines reach it; the vanilla fire weakness (Flame Sabre) stays the reward for reading the fight. |
-| Mag Roader | `$0af` | 2 | `OT6_PIERCE` | **New.** Weak to ice, and ice comes on the **Blizzard** sword from map 263's chest — so a sword Locke has the element axis and a dagger Locke has the class axis, and every loadout has exactly one key. This is the one place in the band where a single-class row is defensible on a solo stretch, because the alternative axis is a chest inside the same dungeon. |
+| Garm | `$0cb` | 2 | `OT6_PIERCE\|OT6_BLUDG` | A magitek quadruped (`Program 95`), not a hound: pierce the joints or cave the housing. The commonest body at the entrance, where the band teaches its rule, so it teaches both halves of it. |
+| Commando | `$0c7` | 2 | `OT6_PIERCE` | Imperial rank keeps the imperial answer — templar `$0002` and officer `$0175` are both pierce (`ot6_hud.asm:1433-1487`). Consistency, not novelty. |
+| ProtoArmor | `$165` | 2 | `OT6_BLUDG` | A sealed suit has no seam to put a point in; you dent it. Retires pierce so the armored *machine* and the armored *man* stop having the same answer. Vanilla bolt stays as the ranged key. |
+| Pipsqueak | `$041` | 2 | `OT6_PIERCE` | The swarm body, up to ×5 and 22 % of all bodies in the band. Pierce so Edgar's AutoCrossbow — whole enemy side, chipping per hit — is the designed answer to a five-stack. |
+| Flan | `$047` | 2 | `OT6_BLUDG` | Keep the generator's read (`gen_break_floor.py:78`): you cannot cut an ooze. Its element is fire, which the Flame Sabre two maps upstream and Ifrit's magicite both supply — and this pool is the floor Ifrit & Shiva are fought on, so the player will be standing in it. |
+| General | `$066` | 2 | `OT6_PIERCE\|OT6_BLUDG` | An officer in plate. Vanilla poison already answers him **if** Edgar was picked; the class row is what makes him breakable when he wasn't. |
+| Trapper | `$02d` | 2 | `OT6_BLUDG` | A fixed trap mechanism (`Program 18`) — you smash a device, you do not stab it. Comes ×3, and vanilla bolt\|water backs it up. |
+| Chaser | `$0a0` | 2 | `OT6_PIERCE\|OT6_BLUDG` | 1202 HP, the widest break window in the band, on the escape map where no shop trip is possible mid-sequence. Two keys so whatever three walked out of the tube room, they hold one. |
+| Gobbler | `$088` | 2 | `OT6_SLASH\|OT6_PIERCE` | No vanilla weakness at all, so this row is its only key. The one soft body in a dungeon of machines: cut it or stick it. Deliberately the band's slash target, placed in the deepest pool so the blade has work in the room where the machines have stopped caring about it. |
+| Rhinox | `$075` | 2 | `OT6_BLUDG` | **The flagship.** No weakness of any kind *and* it absorbs bolt, so the answer the rest of the facility teaches would heal it. Armoured bulk with no seam → bludgeon, and bludgeon alone: this is the one body in the band that asks the player to have brought a blunt instrument, and it is the reason to bring Sabin. |
+| Mag Roader | `$006` | 2 | `OT6_BLUDG` | A thing on wheels: you smash the wheel. Its vanilla fire weakness (Ifrit's magicite, or the Flame Sabre) stays the reward for reading the fight, and the ice trap stays a trap. |
+| Mag Roader | `$0af` | 2 | `OT6_BLUDG` | Same creature, same class — the *element* is what distinguishes the pair, and flattening that onto the class axis would waste the best puzzle in the band. Shiva's magicite answers this one; Ifrit's answers its sibling. |
 
-Checked: with these rows a **dagger** Locke has a class chip in 100 % of map-240
-draws and all five minecart fights; a **sword** Locke has one in 93.75 % of
-map-240 draws (the 6.25 % gap is the Pipsqueak ×4 formation, which is
-bolt|water-weak) and in every minecart fight except `$197` (Mag Roader `$0af`
-×4), where the Blizzard sword supplies the element instead.
+### 8.2 Shield counts
 
-### 8.3 Shield counts
-
-All twelve are proposed at **2** against a formula value of 4, following the
+All twelve are proposed at **2**, against a formula value of 4, following the
 finding both prior passes reached independently: the formula's count lands the
 break on a corpse (`balance-metrics.md:944-972`; `ot6_hud.asm:1489-1510`).
 
-**Unmeasured, and rev 2 raises the stakes.** A solo Locke's damage output is
-roughly half a two-character party's, so the same shield count produces a much
-later break in stretch B. The sweep must run **stretch B as its own arm** —
-`bal_party.lua` `boost3` with `BAL_BUFF_SHIELDS` over 1/2/3 against group 108
-and the minecart formations with Locke alone, as well as groups 80/104/105/106
-with the pair. It is entirely plausible that the right answer is 2 for stretch A
-and **1** for the solo pools.
+**Unmeasured.** Landing this should mint a Vector doorstep fixture and run
+`bal_party.lua` `boost3` with `BAL_BUFF_SHIELDS` over 1/2/3 against groups 80,
+104, 105 and 106 with a four-character party, and against group 108 and the
+minecart formations with three — exactly as Measurements #8 and #9 did. The
+three-character arm matters on its own: less damage per round means the same
+shield count breaks later.
 
-### 8.4 The ¤ debut — Crane `$10e`
-
-Rev 1 put ¤ on Rhinox (pulled: no wielder) and proposed splitting the Cranes
-pierce / bludgeon (pulled: bludgeon is purchase-gated and the Cranes are
-unskippable). Proposed instead:
-
-- `$10d` Crane — **6 · `OT6_PIERCE`** (unchanged; keeps vanilla water)
-- `$10e` Crane — **6 · `OT6_PIERCE|OT6_SPECIAL`** (keeps vanilla bolt|water)
-
-`char_party SETZER, 1` fires at `:96982`, immediately before `battle 71`, so a
-¤ wielder is **script-guaranteed** in this fight and only this fight — the one
-place in the band where the class can be authored without a composition trap.
-The pierce bit keeps the row reachable if the player swapped Setzer's Cards for
-Darts. The pair then asks two different characters for two different keys,
-which is what rev 1 wanted and could not safely have.
-
----
-
-## 9. Number 128 — a solo boss fight the authored rows do not fit
-
-**Locke, alone, with one weapon he last chose on map 272**, faces Number 128
-`$10b` (7 shields, `OT6_PIERCE`, 3276 HP) plus RightBlade `$13f` (3 shields,
-`OT6_SLASH`, 400 HP) and Left Blade `$140` (3 shields, `OT6_SLASH`, 700 HP).
-**None of the three has any vanilla elemental weakness and all three absorb
-ice** (`monster_prop.dat` +23/+25), and there is no `Ot6ElemAddTbl` row for any
-of them.
-
-The whole fight is therefore decided by one item:
-
-| Locke's loadout | body `$10b` | blades `$13f`/`$140` |
-|---|---|---|
-| a dagger (pierce) | ✅ chips | ❌ no chip at all |
-| a sword (slash) | ❌ no chip at all | ✅ chips both |
-| a boomerang (bludgeon) | ❌ | ❌ |
-
-**As authored, no single loadout can break the whole fight**, and there is no
-element, no second character, no shop and no menu to fix it. `wob-route.md`
-records the blades as "part-breaks as the cancel", so a dagger Locke has no
-access to the cancel mechanic at all and a sword Locke can never break the body
-he is fighting.
-
-**Proposed fix — widen all three so one loadout reaches everything:**
-
-- `$10b` Number 128 — **7 · `OT6_SLASH|OT6_PIERCE`** (was `OT6_PIERCE`)
-- `$13f` RightBlade — **3 · `OT6_SLASH|OT6_PIERCE`** (was `OT6_SLASH`)
-- `$140` Left Blade — **3 · `OT6_SLASH|OT6_PIERCE`** (was `OT6_SLASH`)
-
-This is Number 024's own row (`7 · slash|pierce`, `ot6_hud.asm:1546`), authored
-on exactly this reasoning — "the classes are the handhold." On a solo fight a
-class row can only reward or punish a weapon choice made before an unannounced
-party split; punishing it is a trap, so the rows should be wide and the
-difficulty should live in the shield counts and the script.
-
-If the intent is instead that Number 128 *is* a loadout exam, it needs a
-telegraphed re-equip opportunity after Celes leaves and before the ride, plus a
-statement to that effect in `bosses-wob.md`. That is a design decision above
-this document; it is flagged rather than assumed.
-
----
-
-## 10. What the party genuinely cannot break
-
-Under the **current** floor: nothing. The safety net works.
-
-Under **rev 1's rows**, measured against the real parties: **11.72 % of all
-band draws had no key of any kind** — every Rhinox ×2 draw (formation `$168`,
-31.25 % of group 106), because the row was `bludgeon|¤` and this band can field
-neither for free. That is the row rev 2 pulls, and it is the single concrete
-harm the false party model would have caused.
-
-Under **rev 2**: **no fight in the band lacks a key for the party that fights
-it.** What remains is friction, stated plainly:
-
-- **28.12 % of stretch-A draws have no default-swing class key** — the
-  bludgeon-only bodies ProtoArmor ×2, Flan, and Trapper ×3. Every one keeps a
-  reachable vanilla element (bolt, fire, bolt), which is exactly why they are
-  allowed to be bludgeon-only. If playtest finds players arriving without Bolt
-  learned, ProtoArmor and Trapper should gain pierce.
-- **Group 104 (map 264) is the most gated pool in the band**: 100 % Flan,
-  class = bludgeon (purchase-gated), element = fire (one chest, two maps
-  upstream) — and it is the floor the Ifrit & Shiva fight happens on, so the
-  player will be standing in it for a while.
-- **A sword-carrying solo Locke has no class chip in 6.25 % of map-240 draws**
-  (Pipsqueak ×4, which is bolt|water-weak) and none against Mag Roader `$0af`
-  ×4 (which the Blizzard chest answers on the element axis).
-- **Number 128 as authored today is unfittable by any single loadout** (§9).
-  This is the one hard failure in the band and it is a boss, not trash.
-
-### The change this band actually wants
-
-The cleanest fix for most of the above is **not** a wider row — it is one line
-of shop data. **Add Full Moon `$45` and Flail `$44` to Vector's weapon shop
-(shop 27, map 246).** It is the last shop before a one-way walk into the
-facility, it puts a bludgeon key in reach of *both* stretch-A characters at the
-beat head, it makes the `Program NN` machine rule teachable in the town whose
-factory teaches it, and it costs nothing in balance because both weapons are
-weak. With it:
-
-- ProtoArmor, Trapper and Flan become a genuine choice instead of a reward for
-  having shopped two towns ago;
-- **Rhinox can go back to `OT6_BLUDG` alone** — the design row rev 1 wanted, on
-  the one body in the band that deserves it;
-- and the band gets the "bludgeon is the deliberate class" identity that
-  `weapon-classes.md:75` already promises it ("Magitek factory: armored spread:
-  bludgeon/pierce featured").
-
-**Recommendation: make the shop change, then narrow Rhinox to `OT6_BLUDG`.**
-Absent it, ship Rhinox as `OT6_PIERCE|OT6_BLUDG` and accept that the band's
-flagship body is a freebie for a dagger Locke. The shop change is outside issue
-#11's scope, so it is argued for here rather than assumed.
-
-### Resulting distribution
+### 8.3 Resulting distribution
 
 Species count over the twelve authored bodies:
 
-| class | current floor | rev 1 (10 bodies) | **rev 2 (12 bodies)** |
-|---|---|---|---|
-| slash | 7 | 1 | **4** |
-| pierce | 4 | 6 | **9** |
-| bludgeon | 1 | 6 | **7** |
-| special ¤ | 0 | 1 | **0** (moved to Crane `$10e`) |
-
-(20 class bits over 12 species; eight bodies carry two or more keys. The
-breadth is the price of a two-then-one-character party — rev 1's 14 bits over
-10 species assumed four wielders to spread them across.)
+| class | current floor | proposed |
+|---|---|---|
+| slash | 7 | **1** |
+| pierce | 4 | **6** |
+| bludgeon | 1 | **9** |
+| special ¤ | 0 | **0** |
 
 Share of draws in which a class is a key, over the seven random-pool maps:
 
-| class | current | **rev 2** | current (rate-wt) | **rev 2 (rate-wt)** |
+| class | current | proposed | current (rate-wt) | proposed (rate-wt) |
 |---|---|---|---|---|
-| slash | 67.86 % | **47.32 %** | 70.47 % | **50.47 %** |
-| pierce | 45.54 % | **75.89 %** | 43.59 % | **80.31 %** |
+| slash | 67.86 % | **19.64 %** | 70.47 % | **24.06 %** |
+| pierce | 45.54 % | **66.96 %** | 43.59 % | **69.38 %** |
 | bludgeon | 14.29 % | **80.36 %** | 10.00 % | **78.75 %** |
 
-Share of bodies weak to a class: slash 59.11 % → **27.48 %**, pierce 26.20 % →
-**74.76 %**, bludgeon 14.70 % → **53.67 %**.
+Share of bodies weak to a class: slash 59.11 % → **10.86 %**, pierce 26.20 % →
+**64.54 %**, bludgeon 14.70 % → **53.67 %**.
 
-Split by stretch, which is the number that matters:
+Per-formation reading — the table to argue with:
 
-| | slash | pierce | bludgeon |
+| group | p | contents | keys |
 |---|---|---|---|
-| stretch A (6 maps, Locke + Celes) | 39.58 % | 71.88 % | **83.33 %** |
-| stretch B (map 240, Locke alone) | 93.75 % | 100 % | 62.50 % |
-
-That asymmetry is the design: **bludgeon carries the dungeon, and the solo
-escape is guaranteed from either of Locke's default lines.** Slash falls from
-"the answer to two draws in three" to "the answer to two draws in five", and
-it is no longer the answer on any of the four bodies that defaulted into it.
+| 80 | 31.25 % | Garm ×2, Commando | pierce, bludgeon |
+| 80 | 31.25 % | ProtoArmor, Pipsqueak ×2 | pierce, bludgeon |
+| 80 | 37.50 % | Garm ×2, Commando ×2 | pierce, bludgeon |
+| 81 | 31.25 % | ProtoArmor ×2 | **bludgeon only** (vanilla bolt) |
+| 81 | 31.25 % | Garm ×2, Commando | pierce, bludgeon |
+| 81 | 37.50 % | Pipsqueak ×5 | pierce |
+| 104 | 100 % | Flan ×4 or ×1 | **bludgeon only** (vanilla fire) |
+| 105 | 62.50 % | General ×2, or General + Pipsqueak ×2 | pierce, bludgeon |
+| 105 | 37.50 % | Trapper ×3 | **bludgeon only** (vanilla bolt\|water) |
+| 106 | 31.25 % | Gobbler | slash, pierce |
+| 106 | 31.25 % | Rhinox ×2 | **bludgeon only — and no element at all** |
+| 106 | 37.50 % | Gobbler ×2, Rhinox | slash, pierce, bludgeon |
+| 108 | 62.50 % | Chaser (+ Pipsqueak ×3) | pierce, bludgeon |
+| 108 | 37.50 % | Commando ×4, or Pipsqueak ×4 | pierce |
+| minecart | 5 fights | Mag Roader `$006` and/or `$0af` | **bludgeon only** (vanilla fire / ice, both granted by the facility's own magicite) |
 
 ---
 
-## 11. What this asks of the generator and the tests
+## 9. Reachability, and what the party cannot break
 
-### 11.1 Can substring matching express these rows? Not needed, and not able.
+Under the **current** floor, nothing in the band is unbreakable — the generated
+safety net works. The failure is quality, not coverage: in the deepest third of
+the facility the answer to 100 % of encounters is "hold A with a sword", and
+the dungeon hands you four swords.
 
-**Not needed:** every row above goes in `Ot6ShieldTbl`, which
-`Ot6SeedShields` scans *before* `@formula` (`ot6_break.asm:24-38`). Authored
-rows win by construction; the generator needs no change to accommodate them.
+Under the proposal, **every encounter is chippable by some buildable party**,
+and the honest costs are:
 
-**Not able, in general**, and this band supplies two independent proofs.
-Name-substring classification cannot express per-species intent wherever two
-species share a name, and **15 names in the game cover 42 species**:
+- **33.04 % of draws are bludgeon-only on the class axis**, plus all five
+  minecart fights. Every one of them except the Rhinox pair keeps a reachable
+  vanilla element — ProtoArmor and Trapper bolt (Ramuh, owned since Zozo), Flan
+  fire (Ifrit, or the Flame Sabre chest), the Mag Roaders fire and ice (Ifrit
+  and Shiva, awarded upstream of the ride). A party with no blunt weapon still
+  has a probe in all of them.
+- **8.93 % of draws — formation `$168`, Rhinox ×2, 31.25 % of the draws on the
+  two deepest maps — can be chipped by nothing but a blunt instrument.** Rhinox
+  has no vanilla weakness and absorbs bolt, so no element substitutes. This is
+  the band's one hard demand, and it is deliberate: it is what makes bringing
+  Sabin, or buying a Flail before you go, a decision with a consequence. Sabin's
+  Blitz costs nothing to bring and hits it; so do Gau's fists; so does a Full
+  Moon on Locke.
+- **General `$066` loses its vanilla poison key if Edgar is not picked** — the
+  Bio Blaster is his Tool. Its `PIERCE|BLUDG` row is what covers that party.
 
-- **Both Cranes are named "Crane"** (`$10d`, `$10e`). §8.4's asymmetric rows are
-  unexpressible by any keyword rule.
-- **Both minecart bodies are named "Mag Roader"** (`$006`, `$0af`) — and they
-  are *opposed*: one absorbs the element the other is weak to. A name-keyed
-  classifier must give them the same class, which is precisely the thing that
-  flattens the band's best vanilla puzzle (§3.2).
+**No shop change is needed.** Vector's shop 27 stocks no blunt weapon, but with
+a four-character party that costs nothing: Sabin and Gau bring bludgeon for
+free, and Locke and Celes can buy it in four towns before the walk.
+
+---
+
+## 10. What this asks of the generator and the tests
+
+### 10.1 Can substring matching express these rows? Not needed, and not able.
+
+**Not needed:** every row above goes in `Ot6ShieldTbl`, which `Ot6SeedShields`
+scans *before* `@formula` (`ot6_break.asm:24-38`). Authored rows win by
+construction; the generator needs no change to accommodate them.
+
+**Not able, in general**, and this band supplies two proofs. Name-substring
+classification cannot express per-species intent wherever two species share a
+name, and **15 names in the game cover 42 species**:
+
+- **Both minecart bodies are named "Mag Roader"** (`$006`, `$0af`), and they are
+  *opposed*: one absorbs the element the other is weak to. A name-keyed rule
+  must give them the same class. Here that happens to be what the design wants
+  — but it is a coincidence, not a capability, and the tool could not have
+  chosen otherwise.
+- **Both Cranes are named "Crane"** (`$10d`, `$10e`), and they already carry
+  authored rows over different vanilla element profiles.
 
 The same holds for the four Ultros records (`$12c`/`$12d`/`$12e`/`$168`, which
-already carry four different authored rows), the three Tritochs, the three
-Kefkas and the four Tentacles. If species-level control is ever wanted from the
-tool, the keying has to move from name to species id.
+carry four different authored rows), the three Tritochs, the three Kefkas and
+the four Tentacles. If species-level control is ever wanted from the tool, the
+keying has to move from name to species id.
 
-### 11.2 Three generator/tooling changes this survey argues for
+### 10.2 Three generator/tooling changes this survey argues for
 
 1. **Three-way review output — explicit / inferred / defaulted.** Issue #11's
    first acceptance criterion, and this band shows why two categories are not
@@ -811,77 +659,61 @@ tool, the keying has to move from name to species id.
    counts.** 62 of the 384 rows the review counts never reach `@formula`; the
    corrected floor-live numbers are 245/58/19 over 322 species (§4), and after
    this pass another 12 leave the floor.
-3. **An encounter-*and-party* reachability check, run per stretch.** Rev 1's
-   error was not a data error — every number in §1–§5 was recomputed in rev 2
-   and only the map count and species list moved. It was a **party model**
-   error, and no tooling in the repo could have caught it. The check that
-   would: walk `SubBattleGroup → RandBattleGroup → BattleMonsters` for a named
-   map set *and* the forced-battle lists (`EventBattleGroup`, plus the train
-   script's `$e0`/`$e1`/`$e2` items), take a declared party roster and their
-   equippable class sets, and assert every formation has at least one class key
-   some present member can equip. Per stretch, not per band. That is the
-   concrete form of "tests cover encounter/party reachability, not only nonzero
-   table bytes", and rev 2 exists because it does not yet exist.
+3. **An encounter-and-party reachability check.** The floor's failure here was
+   invisible to every existing test: the bytes are nonzero, every species has a
+   class, and nothing measures whether that class is the *interesting* one or
+   whether the party can field it. The check that would catch it: walk
+   `SubBattleGroup → RandBattleGroup → BattleMonsters` for a named map set
+   **and** the forced-battle lists (`EventBattleGroup`, plus the train script's
+   `$e0`/`$e1`/`$e2` items — the minecart is invisible to any event-script
+   scan), take a declared party and their equippable class sets, and assert
+   every formation has at least one class key some member can bring. That is
+   the concrete form of "tests cover encounter/party reachability, not only
+   nonzero table bytes".
 
-### 11.3 Fixture assertions, concrete, on the `gen_kolts.lua:594` pattern
+### 10.3 Fixture assertions, on the `gen_kolts.lua:594` pattern
 
 Inventory is ids at `$1869 + i` and counts at `$1969 + i` (the helper at
-`gen_kolts.lua:588-593`). Equipped weapon is `$161f + char*37`: **Locke
-`$1644`, Celes `$16fd`, Setzer `$176c`**.
+`gen_kolts.lua:588-593`). Equipped weapon is `$161f + char*37`.
 
-**At the Vector doorstep** (before the world walk, while shops are still
-reachable):
+**At the Vector doorstep**, before the on-foot world walk into town:
 
-- Assert a bludgeon key is carried, and fail with the reason if not:
-  `invCount(0x44) + invCount(0x46) ≥ 1` (Flail / Morning Star — Celes) **or**
-  `invCount(0x45) + invCount(0x47) + invCount(0x48) + invCount(0x4b) +
-  invCount(0x4c) ≥ 1` (Full Moon / Boomerang / Rising Sun / Sniper / Wing Edge
-  — Locke). Direct analogue of "BioBlaster still carried (the poison key)".
-- Assert the active party is exactly Locke + Celes, so the fixture cannot drift
-  back into a four-party assumption.
-- Assert Bolt is learned by at least one of them — three bludgeon-only rows use
-  it as their floor.
+- Assert a bludgeon key exists: Sabin or Gau in the active party (their fists
+  and Blitz need nothing), **or** `invCount(0x44) + invCount(0x46) ≥ 1`
+  (Flail / Morning Star — Celes) **or** `invCount(0x45) + invCount(0x47) +
+  invCount(0x48) + invCount(0x4b) + invCount(0x4c) ≥ 1` (the boomerang family —
+  Locke). Direct analogue of "BioBlaster still carried (the poison key)". This
+  is the assertion the Rhinox row depends on.
+- Assert Ramuh is owned and equippable — three bludgeon-only rows use bolt as
+  their fallback probe.
+- Assert the active party is four with Locke and Celes among them, so the
+  fixture cannot drift off `bosses-wob.md` §13's roster.
 
 **At the Ifrit & Shiva doorstep** (map 264, which is also the Flan pool):
-assert **Flame Sabre `$0d`** is carried or equipped. It is Shiva's element key
-*and* Flan's only element key, and it is a chest two maps back — this is the
-single most load-bearing pickup in the band.
+assert Flame Sabre `$0d` is carried or equipped. It is Shiva's element key and
+Flan's, and it is a chest two maps back.
 
-**At the minecart boarding point** (map 272 save point, the last equip
-opportunity): assert the party is Locke alone, and assert his equipped weapon
-at `$1644` resolves through `Ot6WeapClassTbl` to a class present in **all
-three** Number 128 rows. Under §9's widened rows any slash or pierce weapon
-passes; **under the rows as they ship today, no weapon passes** — which is the
-point of the test.
-
-**At the stretch-B head** (immediately after `event_main.asm:96158`): assert
-both a slash and a pierce weapon are in inventory. `remove_equip CELES` has
-just supplied them, and a regression that changed that would silently strand
-half of Locke's loadouts on map 240.
+**At the minecart boarding point** (map 272's save point at (3,55),
+`event_trigger.asm:1211`, the last controllable state before the ride): assert
+the party is three, and assert **Ifrit and Shiva magicite are owned** — they
+are the five Mag Roader fights' elemental answers and the facility awards both
+upstream.
 
 **At the Crane doorstep** (map 240, one step from (52,39)/(52,40)/(52,41)):
-assert Setzer is in the party and his weapon at `$176c` is Cards `$4d`,
-Trump `$50`, Dice `$51` or Darts `$4e` — i.e. the ¤ row on `$10e` has a wielder.
+assert the party is the three that boarded, since `bosses-wob.md` §16's roster
+is the thing most likely to drift.
 
 ---
 
-## 12. Status
+## 11. Status
 
-Proposal, revision 2. Nothing here is measured and no file was modified.
+Proposal. Nothing here is measured and no file was modified.
 
-- §1–§5 were **re-derived**, not relabelled: the map set is 7 not 8 (275 is
-  unreachable), the boss rooms moved (263/264/273/274), and two forced-battle
-  species were added.
-- §6 onward was rewritten against the real parties: Locke + Celes, then Locke
-  alone, then Locke + Setzer.
-- **Pulled from rev 1:** ¤ on Rhinox; the pierce/bludgeon Crane split; the
-  `PIERCE`-only Commando row; the `PIERCE|BLUDG` Chaser row; and rev 1's claim
-  that "every legal party can field a bludgeon or ¤ carrier for free", which
-  was an artefact of the false roster.
-- **Added in rev 2:** the two Mag Roader rows (§8.2), the Number 128
-  solo-fight finding (§9), the ¤ debut on Crane `$10e` (§8.4), and the Vector
-  shop recommendation (§10).
-- Shield counts (§8.3) remain a precedent-following guess and need their own
-  sweep, now with a separate solo arm.
+- The shield counts in §8.2 are a precedent-following guess and need their own
+  sweep, with a separate three-character arm.
+- `bosses-wob.md` §15's element adds for Number 128 and its blades (bolt|water
+  / bolt) are not in `Ot6ElemAddTbl` and remain outstanding M6 data entry.
+- Whether maps 265 / 267 / 268 actually roll their group-0 encounters (§1.1)
+  wants one runtime check.
 - The generated floor remains the documented provisional safety net for every
   band except this one until these rows land.
