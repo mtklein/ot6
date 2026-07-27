@@ -43,9 +43,32 @@ upstream, and prefer adding to bank `$F0` over editing vanilla banks.
 
 ## House rules
 
-**Vanilla's bugs stay.** Useless stats, the Sketch bug, row jank — the original
-game not being quite right is part of its charm. Only touch vanilla behavior
-where an OT6 mechanic actually requires it.
+**Vanilla's quirks stay; vanilla's destructive failures do not ship in a
+supported frontier.** Useless stats, row jank, animation oddities — the
+original game not being quite right is part of its charm, and none of it
+gets modernized unless an OT6 mechanic actually requires it. That bias is
+deliberate and it is not going away.
+
+But it is a bias against *cleanup*, not against *reliability*. A vanilla
+defect that can crash the game, corrupt or lose a save, corrupt persistent
+state, or soft-lock progression is a different thing from charm, and the
+line between the two is a product decision we have now made: before a
+release advertises a frontier, every known defect of that class reachable
+inside it is fixed, mitigated, or explicitly accepted in the release notes
+— never shipped silently. The two that have cleared this bar so far:
+the save-slot checksum-`$0000` save-loss bug (fixed ahead of this policy,
+issue #18) and the Sketch bug, which is a hard release gate for v0.8, the
+frontier where Relm becomes reachable.
+
+The inventory lives in
+[docs/research/vanilla-destructive-bugs.md](docs/research/vanilla-destructive-bugs.md):
+each entry carries source evidence and the frontier where it becomes
+player-reachable, including the below-the-bar list kept so those defects
+are not rediscovered and re-argued. A defect joins the fix list only with
+a reproduction or instruction-level source basis — this is not a
+folklore-driven bug sweep — and a fix lands the way every OT6 change
+lands: narrowly scoped, with a positive-control regression that fails on
+the unfixed ROM.
 
 **Read the source; don't infer a mechanism.** This is the big one, learned the
 hard way. An audit in July 2026 found a cluster of confidently-worded
