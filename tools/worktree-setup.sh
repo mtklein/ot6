@@ -22,14 +22,19 @@ ROM="Final Fantasy III (USA).sfc"
 [ -e "$HERE/tools/bin" ] || ln -s "$MAIN/tools/bin" "$HERE/tools/bin"
 
 # Seed the main tree's minted savestates so boot-chain fixtures don't replay
-# the whole game. Safe against drift: .rom-copy rides along, and the
-# Makefile's content-compare gate remints anything whose ROM bytes differ.
+# the whole game, PLUS the ninja frontier bookkeeping (build/ninja: the
+# content latches and .ninja_log).  Ninja treats an edge with no build-log
+# entry as never built, so seeded states without the log would honestly --
+# and expensively, hours -- replay the whole frontier.  -p preserves mtimes
+# so the log's recorded times still describe the copied files; any REAL
+# drift (a local edit after seeding) still re-mints through the latch
+# edges' content compare, proven in frontier_ninja_selftest.sh.
 if [ -d "$MAIN/build/states" ] && [ ! -d "$HERE/build/states" ]; then
   mkdir -p "$HERE/build"
-  # -p: preserve mtimes -- without it, copy-order can leave .rom-copy newer
-  # than the states it was minted for, tripping the mtime half of needsmint
-  # into an honest-looking (hours-long) full remint in every fresh worktree.
   cp -Rp "$MAIN/build/states" "$HERE/build/states"
+  if [ -d "$MAIN/build/ninja" ] && [ ! -d "$HERE/build/ninja" ]; then
+    cp -Rp "$MAIN/build/ninja" "$HERE/build/ninja"
+  fi
 fi
 
 echo "worktree ready: ROM copied, Mesen/flips linked"
