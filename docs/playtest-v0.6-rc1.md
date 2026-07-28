@@ -11,7 +11,7 @@ not just bugs.
 | 3 | Moogle defense | No MP visible anywhere in battle for Locke; Steal charges invisibly | #35 — root cause: vanilla has NO battle MP display at all; wallet-in-the-shop design, front of the wave, rc2 candidate |
 | 4 | through Moogle defense | **Combat balance is good so far — tense, even** | positive; first human validation of the break/boost tuning bands (M6's Kolts/Zozo passes were machine-measured only) |
 | 5 | Moogle defense | Locke shows no MP in the FIELD menu either (Terra does) | folded into #35 — CheckMPVisible (menu_common.asm:2311) gates on espers-owned/spell-known; the blackout self-resolves at the first magicite, i.e. exactly the opening stretch is dark |
-| 6 | early WoB | Menus sometimes show another character's spells — e.g. **Tools shows Cure 2** (cross-list contamination) | #36 — owner: predates v0.6, NOT a tag blocker; re-milestoned v0.7; investigation running (blame sweep + severity check decide if it jumps the queue) |
+| 6 | early WoB | Menus sometimes show another character's spells — e.g. **Tools shows Cure 2** (cross-list contamination) | #36 FIXED — OT6 regression (live re-fold, 0c1de19, in every tag); display-only proven (execution used the real tool id); 12-line fix + regression; rc2 cherry-pick |
 | 7 | South Figaro → Mt. Kolts | **No release blockers so far** | positive; rc1 holding through band 2 |
 | 8 | pre-Kolts | Full HP/MP restore on level-up works as expected | positive; v0.4 feature confirmed in natural play |
 | 9 | Vargas | **Blitz updates + the faithfully-kept triple-tutorial: loved.** Owner decision: tutorial stays verbatim, permanently — charm, not redundancy | positive; pinned in bosses-wob.md so no cleanup pass touches it |
