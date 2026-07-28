@@ -54,6 +54,13 @@ STATES = [
     # `make test` needs these three; they ride the same graph and the same
     # staleness mechanism as everything downstream of them.
     S("battle_doorstep", gen="gen_battle_state"),
+    # first_battle: gen_battle_state's second artifact (the in-battle state
+    # battle_levelup/battle_smoke boot). Under the one-edge-one-artifact
+    # publish rule (#30) the battle_doorstep edge no longer republishes it,
+    # so it needs its own edge or a ROM change strands it stale -- which is
+    # exactly how battle_levelup broke during the Slot landing (9229881's
+    # report). after= orders the two identical emulator runs, no data dep.
+    S("first_battle", gen="gen_battle_state", after="battle_doorstep"),
     S("battle2_doorstep", gen="gen_battle2", prev="battle_doorstep"),
     # whelk doorstep: the dialog-opening boss fight battle_dlgmenu gates.
     # gen_whelk_poweron mints it from COLD POWER-ON -- plays the New Game
