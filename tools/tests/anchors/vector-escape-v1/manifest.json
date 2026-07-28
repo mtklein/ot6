@@ -1,0 +1,10 @@
+{
+  "schema": "ot6.sram-anchor/v1",
+  "payload": "vector-escape.sram",
+  "size": 32768,
+  "sha256": "fa4449bd14e79abb51dbddbbd9f661c15d202534f2f22f4dc1261fd31355e9f9",
+  "slot": 3,
+  "milestone": "vector-escape",
+  "provenance": "n128_won.mss; real in-game Save UI at the $06AE-revealed map-240 save point (58,7); party LOCKE SABIN EDGAR; boundary E of save-points-vector.md \u00a75",
+  "persistent_layout": "ot6-codex-o8-v1"
+}

@@ -1,0 +1,10 @@
+{
+  "schema": "ot6.sram-anchor/v1",
+  "payload": "mrf-save-room.sram",
+  "size": 32768,
+  "sha256": "b1598fb3725d865c90a1c278f86d6b425c8ef629340d2914f9516fbf22dcf419",
+  "slot": 3,
+  "milestone": "mrf-save-room",
+  "provenance": "ifrit_doorstep.mss; real in-game Save UI at the map-270 save point (25,10); party LOCKE CELES SABIN EDGAR (#21); boundary B of save-points-vector.md \u00a75",
+  "persistent_layout": "ot6-codex-o8-v1"
+}

@@ -213,6 +213,48 @@ H.run({ maxFrames = 60000 }, {
     H.screenshot("mrf_264_landing")
   end),
 
+  -- 1b. THE BOUNDARY DETOUR (issue #25).  This leg is A->B's terminal, so
+  --     before parking on the fight's doorstep it walks the {3,5} door
+  --     into the map-270 save room, stands on the save point, and asserts
+  --     the mrf-save-room-v1 boundary table -- the same table
+  --     gen_mrf_save_room_anchor saves under and gen_ifrit_magicite's
+  --     anchored boot asserts as its ENTRY contract.  The sram witnesses
+  --     are products of the boundary save itself, so the leg asserts the
+  --     pre-save variant (lib/ot6_contract.lua, assertExitContractPreSave).
+  --     Standing on a save tile re-enters SavePoint every frame and
+  --     hasControl() flickers (the same trap gen_esper_tubes measured on
+  --     {10,9}), so arrival is judged on position + $01BF + alignment.
+  H.navTo(3, 6, { maxFrames = 6000 }),
+  tapInto("up", function() return map() == 270 end, 9000,
+    "door 264 (3,5) -> map 270 (the save room)"),
+  H.waitFrames(60),
+  H.navTo(25, 11, { maxFrames = 6000 }),
+  (function() local calm = 0
+    return H.driveUntil(function()
+      calm = (H.fieldX() == 25 and H.fieldY() == 10 and sw(0x01BF) == 1
+              and H.tileAligned() and not H.dialogWaiting()
+              and not H.battleLoadStarted()) and calm + 1 or 0
+      return calm >= 8
+    end, 9000, {
+      H.call(function()
+        if H.battleLoadStarted() then killBitAll(); H.setPad({ "a" }); return end
+        if H.dialogWaiting() then H.setPad({ "a" }); return end
+        if H.fieldX() == 25 and H.fieldY() == 10 then H.setPad({}); return end
+        H.setPad({ up = true })
+      end),
+    }, "onto the save tile 270 (25,10)")
+  end)(),
+  H.waitFrames(45),
+  H.call(function()
+    H.assertEq(sw(0x01BF), 1, "$01BF SET -- the save-enable flow ran")
+    H.assertEq(sw(0x01B5), 1, "$01B5 SET -- the once-per-tile latch took")
+    H.assertExitContractPreSave("mrf-save-room-v1")
+    H.screenshot("mrf_save_room")
+  end),
+  tapInto("down", function() return map() == 264 end, 12000,
+    "back down through the door -> 264"),
+  H.waitFrames(60),
+
   -- 2. park ON THE DOORSTEP OF THE FIGHT: {3,7}, directly above Ifrit's
   --    {3,8}, facing DOWN.  One A-press from _cc7937 and `battle 70`, the
   --    same shape as opera_doorstep.  A DOWN press here cannot step (his

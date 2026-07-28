@@ -212,6 +212,40 @@ H.run({ maxFrames = 60000 }, {
     H.screenshot("minecart_platform")
   end),
 
+  -- 1b. THE BOUNDARY DETOUR (issue #25).  This leg is C->D's terminal, so
+  --     before parking beside CID it stands on the platform save point at
+  --     {3,55} and asserts the minecart-platform-v1 boundary table -- the
+  --     same table gen_minecart_platform_anchor saves under and gen_n128's
+  --     anchored boot asserts as its ENTRY contract.  The sram witnesses
+  --     are products of the boundary save, so the pre-save variant is
+  --     asserted (lib/ot6_contract.lua).  (3,54) is a wall (measured); the
+  --     tile is entered from the east.  Standing on a save tile re-enters
+  --     SavePoint every frame and hasControl() flickers, so arrival is
+  --     judged on position + $01BF + alignment.
+  H.navTo(4, 55, { maxFrames = 9000 }),
+  (function() local calm = 0
+    return H.driveUntil(function()
+      calm = (H.fieldX() == 3 and H.fieldY() == 55 and sw(0x01BF) == 1
+              and H.tileAligned() and not H.dialogWaiting()
+              and not H.battleLoadStarted()) and calm + 1 or 0
+      return calm >= 8
+    end, 9000, {
+      H.call(function()
+        if H.battleLoadStarted() then killBitAll(); H.setPad({ "a" }); return end
+        if H.dialogWaiting() then H.setPad({ "a" }); return end
+        if H.fieldX() == 3 and H.fieldY() == 55 then H.setPad({}); return end
+        H.setPad({ left = true })
+      end),
+    }, "onto the save tile 272 (3,55)")
+  end)(),
+  H.waitFrames(45),
+  H.call(function()
+    H.assertEq(sw(0x01BF), 1, "$01BF SET -- the save-enable flow ran")
+    H.assertEq(sw(0x01B5), 1, "$01B5 SET -- the once-per-tile latch took")
+    H.assertExitContractPreSave("minecart-platform-v1")
+    H.screenshot("minecart_save_point")
+  end),
+
   -- 2. park beside CID.  His {9,51} is occupied by his own object, so the
   --    doorstep is whichever of its four neighbours the live object map and
   --    tilemap leave open -- resolved here rather than read off an

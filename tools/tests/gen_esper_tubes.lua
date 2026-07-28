@@ -1,7 +1,17 @@
--- gen_esper_tubes.lua -- v0.6 leg 10: n024_doorstep -> battle 72 -> the
--- {25,50} door -> map 274, the esper tube room -> parked at {10,10}
--- FACING UP, one UP-step-plus-A-hold from the Cid/Kefka set piece.  Mints
--- n024_won and esper_tubes_doorstep.
+-- gen_esper_tubes.lua -- v0.6 leg 10, the leg OUT of boundary C (#25):
+-- cold battery Continue from the tracked n024-doorstep-save-v1 anchor (the
+-- NEW #10 save point, map 273 {26,53}, slot 3), the boundary's ENTRY
+-- CONTRACT asserted as the first real act, two steps to the 024 doorstep
+-- -> battle 72 -> the {25,50} door -> map 274, the esper tube room ->
+-- parked at {10,10} FACING UP, one UP-step-plus-A-hold from the Cid/Kefka
+-- set piece.  Mints n024_won and esper_tubes_doorstep.
+--
+-- ANCHORED MINT (frontier_graph.py: anchor="n024-doorstep-save-v1" on
+-- BOTH of this script's states -- one script, one boot, two mints, so the
+-- second state cannot ride a predecessor edge the boot never uses).  The
+-- leg used to boot n024_doorstep.mss; that state stays minted as B->C's
+-- terminal, and the cold Continue replays its last two steps from the
+-- anchor instead (save-points-vector.md §5's "C + 2 steps" hybrid).
 --
 -- BATTLE 72 (_cc79ed, event_main.asm:95385) is `battle 72 / call _ca5ea9 /
 -- hide_obj NPC_1 / sort_obj / switch $0649=0` -- no `if_b_switch` gate at
@@ -28,6 +38,12 @@
 -- {10,8} (npc_prop.asm:12631) and HOLDS A.  A navTo can never do that: it
 -- releases the pad between steps and never presses A on the open field
 -- (ot6_field.lua:340-351).
+--
+-- OT6_ANCHOR_LAYOUT: ot6-codex-o8-v1
+-- ^ the persistent-SRAM layout this leg understands (issue #25).  run.sh
+--   reads the marker line above and refuses -- BEFORE the emulator boots,
+--   naming both strings -- any OT6_SRAM_ANCHOR whose manifest.json declares
+--   a different persistent_layout.
 --
 -- The doorstep is banked ONE TILE SOUTH of the trigger, at {10,10} already
 -- facing UP, and not on {10,9} itself.  Measured reason, sampled in this
@@ -171,15 +187,40 @@ end
 
 
 H.run({ maxFrames = 60000 }, {
-  H.loadState("build/states/n024_doorstep.mss.lua"),
-  H.waitFrames(150),
+  -- COLD BATTERY BOOT (issue #25): title -> Continue -> the sole valid
+  -- slot (3) -> the NEW 273 save point, standing on the tile the anchor
+  -- was saved on.
+  H.waitFrames(350),
+  H.repeatN(5, { H.pressButtons({ "start" }, 8), H.waitFrames(25) }),
+  H.waitFrames(120),
+  H.repeatN(3, { H.pressButtons({ "a" }, 8), H.waitFrames(40) }),
+  H.waitFrames(300),
+  H.repeatN(3, { H.pressButtons({ "a" }, 8), H.waitFrames(60) }),
+  -- SOFT landing wait: a wrong-boundary anchor lands somewhere else, and
+  -- the failure must be the entry contract NAMING the wrong map -- never a
+  -- timeout here (leg-fixtures.md, "fails loudly, naming what differed").
+  H.waitUntilSoft(function()
+    return map() == 273 and H.tileAligned() and bright() >= 15
+  end, 3000, "landed_at_c"),
+  H.waitFrames(60),
   H.call(function()
-    H.assertEq(map(), 273, "booted on map 273")
-    H.assertEq(H.fieldX(), 25, "boot x")
-    H.assertEq(H.fieldY(), 52, "boot y")
-    H.assertEq(H.readByte(0x087f + H.readWord(0x0803)), 0, "booted facing UP")
-    H.assertEq(sw(0x0649), 1, "$0649 SET at boot")
-    H.log(partyReport("n024_doorstep"))
+    -- THE ENTRY CONTRACT (issue #25): declared once in lib/ot6_contract.lua
+    -- under "n024-doorstep-save-v1" -- the same table the leg INTO C
+    -- (gen_n024_doorstep) and the anchor mint (gen_n024_save_anchor)
+    -- assert as their EXIT contract.  A stale or wrong anchor fails HERE
+    -- by naming what differed.
+    H.assertEntryContract("n024-doorstep-save-v1")
+    H.log(partyReport("n024-doorstep-save-v1 entry"))
+  end),
+
+  -- the two steps back onto the 024 doorstep (§5's "C + 2 steps")
+  H.navTo(25, 52, { maxFrames = 6000 }),
+  H.call(function()
+    H.assertEq(map(), 273, "on map 273")
+    H.assertEq(H.fieldX(), 25, "024 doorstep x")
+    H.assertEq(H.fieldY(), 52, "024 doorstep y")
+    H.assertEq(sw(0x0649), 1, "$0649 SET -- 024 has not been fought")
+    H.log(partyReport("024 doorstep (walked from anchor C)"))
   end),
 
   -- 1. A into NUMBER 024 -> battle 72

@@ -398,22 +398,49 @@ STATES = [
     # gen_ifrit_doorstep: the {37,44} chute -> map 264 {10,7} -> parked at
     # {3,7} facing IFRIT, one A-press from battle 70.
     S("ifrit_doorstep", gen="gen_ifrit_doorstep", prev="mrf_kefka"),
-    # gen_ifrit_magicite: battle 70 and the four-interaction hand-off ->
-    # both magicite, asserted on $1A69's give_genju bits.
+    # ---- boundary B: the map-270 save room (save-points-vector.md §5) ----
+    # ifrit_doorstep above is leg A->B's terminal; gen_ifrit_doorstep also
+    # walks the save room and asserts B's exit contract pre-save, and
+    # gen_mrf_save_room_anchor (run by hand, never by this graph) minted
+    # the tracked battery from it.  The leg OUT of B is anchored:
+    # gen_ifrit_magicite cold-Continues the anchor, asserts the entry
+    # contract, walks back to the alcove, then battle 70 and the
+    # four-interaction hand-off -> both magicite ($1A69's give_genju bits).
     S("magicite_ifrit_shiva", gen="gen_ifrit_magicite",
-      prev="ifrit_doorstep"),
-    # gen_n024_doorstep: 264 -> 269 -> 271 -> 273, parked at {25,52} facing
-    # NUMBER 024, one A-press from battle 72.
+      anchor="mrf-save-room-v1"),
+    # gen_n024_doorstep: 264 -> 269 -> 271 -> 273, the NEW #10 save point
+    # at {26,53} (boundary C: exit contract pre-save + sparkle witness),
+    # then parked at {25,52} facing NUMBER 024, one A-press from battle 72.
+    # B->C's terminal.
     S("n024_doorstep", gen="gen_n024_doorstep", prev="magicite_ifrit_shiva"),
-    # gen_esper_tubes: battle 72, then the {25,50} door into map 274 and the
-    # doorstep for the facing+A-gated BIG_SWITCH trigger.  Two mints.
-    S("n024_won", gen="gen_esper_tubes", prev="n024_doorstep"),
-    S("esper_tubes_doorstep", gen="gen_esper_tubes", prev="n024_won"),
+    # ---- boundary C: the NEW 273 save point --------------------------------
+    # The leg OUT of C is anchored on BOTH of gen_esper_tubes' mints: one
+    # script, one cold-Continue boot, two states -- a prev= edge on the
+    # second would claim a predecessor the boot never loads.  battle 72,
+    # then the {25,50} door into map 274 and the doorstep for the
+    # facing+A-gated BIG_SWITCH trigger.
+    S("n024_won", gen="gen_esper_tubes", anchor="n024-doorstep-save-v1"),
+    S("esper_tubes_doorstep", gen="gen_esper_tubes",
+      anchor="n024-doorstep-save-v1"),
     # gen_esper_tubes_done: the Cid/Kefka set piece -- six espers, and CELES
     # leaves the roster ($02F6=0).
     S("esper_tubes", gen="gen_esper_tubes_done", prev="esper_tubes_doorstep"),
-    # gen_minecart_doorstep: the lift -> map 266 -> map 272, parked beside
-    # CID, one A-press from `cutscene TRAIN`.  THE v0.6 FRONTIER ENDS HERE --
-    # see gen_n128.lua's header for why the minecart itself does not mint.
+    # gen_minecart_doorstep: the lift -> map 266 -> map 272, the platform
+    # save point {3,55} (boundary D: exit contract pre-save), then parked
+    # beside CID, one A-press from `cutscene TRAIN`.  C->D's terminal.
     S("minecart_doorstep", gen="gen_minecart_doorstep", prev="esper_tubes"),
+    # ---- boundary D: the minecart platform save point ----------------------
+    # The leg OUT of D (D->E, one whole leg -- Number 128 lives mid-cutscene
+    # and has no doorstep, ever): the ride, the escape, and the park ON
+    # boundary E, the $06AE-revealed save point 240 {58,7}.  gen_n128 is
+    # dual-boot (its header): anchored here, savestate under `make smoke`.
+    S("n128_won", gen="gen_n128", anchor="minecart-platform-v1"),
+    # ---- boundaries E and F ------------------------------------------------
+    # gen_vector_escape_anchor mints E's tracked battery from n128_won.  The
+    # E->F leg (Cranes -> Terra's return -> the Esper-World flashback ->
+    # takeoff -> the grounded-Blackjack world save at (24,121)) lives WHOLE
+    # in gen_terra_returned_anchor -- §5 forbids splitting it (a save inside
+    # the flashback would save as the WEDGE-actor Maduin) -- and mints F's
+    # battery, `terra-returned-v1`: the v0.6 stop line and the anchor
+    # v0.7's first leg will hang from.
 ]

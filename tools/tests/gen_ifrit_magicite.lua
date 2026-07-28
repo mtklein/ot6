@@ -1,6 +1,17 @@
--- gen_ifrit_magicite.lua -- v0.6 leg 8: ifrit_doorstep (map 264, {3,7}
--- facing IFRIT) -> battle 70 -> the four-interaction esper hand-off ->
--- both magicite in the bag.  Mints magicite_ifrit_shiva.
+-- gen_ifrit_magicite.lua -- v0.6 leg 8, the leg OUT of boundary B (#25):
+-- cold battery Continue from the tracked mrf-save-room-v1 anchor (the
+-- map-270 save room, slot 3), the boundary's ENTRY CONTRACT asserted as
+-- the first real act, then down through the {3,5} door to the alcove ->
+-- battle 70 -> the four-interaction esper hand-off -> both magicite in
+-- the bag.  Mints magicite_ifrit_shiva.
+--
+-- ANCHORED MINT (frontier_graph.py: anchor="mrf-save-room-v1").  The leg
+-- used to boot ifrit_doorstep.mss; it now starts from power-on and lets
+-- Mesen load the anchor battery run.sh materialized, so a ROM change
+-- re-runs this leg from its own anchor in parallel with every other leg
+-- instead of behind the whole serial trunk (docs/design/leg-fixtures.md).
+-- ifrit_doorstep stays minted as A->B's terminal; the ~15-step walk from
+-- the save tile to the fight is replayed here from the anchor instead.
 --
 -- THE HAND-OFF IS FOUR SEPARATE NPC INTERACTIONS, not one scene, and the
 -- gates interlock (event_main.asm:95260-95385):
@@ -45,6 +56,12 @@
 -- below.  The combat contract for Ifrit and Shiva belongs in a suite test
 -- booted on ifrit_doorstep.mss, the way battle_ultros2 hangs off
 -- ultros2_doorstep.
+--
+-- OT6_ANCHOR_LAYOUT: ot6-codex-o8-v1
+-- ^ the persistent-SRAM layout this leg understands (issue #25).  run.sh
+--   reads the marker line above and refuses -- BEFORE the emulator boots,
+--   naming both strings -- any OT6_SRAM_ANCHOR whose manifest.json declares
+--   a different persistent_layout.
 local H = dofile("tools/tests/lib/ot6.lua")
 
 local function map() return H.mapId() & 0x1ff end
@@ -208,17 +225,48 @@ local function talkTo(dir, pred, maxFrames, what)
 end
 
 H.run({ maxFrames = 60000 }, {
-  H.loadState("build/states/ifrit_doorstep.mss.lua"),
-  H.waitFrames(150),
+  -- COLD BATTERY BOOT (issue #25): title -> Continue -> the sole valid
+  -- slot (3) -> the map-270 save room, standing on the tile the anchor was
+  -- saved on.  Repeated edge presses tolerate title timing; the entry
+  -- contract below prevents a false landing.
+  H.waitFrames(350),
+  H.repeatN(5, { H.pressButtons({ "start" }, 8), H.waitFrames(25) }),
+  H.waitFrames(120),
+  H.repeatN(3, { H.pressButtons({ "a" }, 8), H.waitFrames(40) }),
+  H.waitFrames(300),
+  H.repeatN(3, { H.pressButtons({ "a" }, 8), H.waitFrames(60) }),
+  -- SOFT landing wait: a wrong-boundary anchor lands somewhere else, and
+  -- the failure must be the entry contract NAMING the wrong map -- never a
+  -- timeout here (leg-fixtures.md, "fails loudly, naming what differed").
+  H.waitUntilSoft(function()
+    return map() == 270 and H.tileAligned() and bright() >= 15
+  end, 3000, "landed_at_b"),
+  H.waitFrames(60),
   H.call(function()
-    H.assertEq(map(), 264, "booted on map 264")
-    H.assertEq(H.fieldX(), 3, "boot x -- Ifrit's doorstep")
-    H.assertEq(H.fieldY(), 7, "boot y")
-    H.assertEq(H.readByte(0x087f + H.readWord(0x0803)), 2, "booted facing DOWN")
-    H.assertEq(sw(0x0060), 0, "$0060 CLEAR at boot")
+    -- THE ENTRY CONTRACT (issue #25): everything this leg requires of
+    -- boundary B -- the save tile, slot, switches, the #21 party count and
+    -- roster, and the bank-$31 codex witnesses -- declared as DATA in
+    -- lib/ot6_contract.lua under "mrf-save-room-v1", the same table the
+    -- leg INTO B (gen_ifrit_doorstep) and the anchor mint
+    -- (gen_mrf_save_room_anchor) assert as their EXIT contract.  A stale
+    -- or wrong anchor fails HERE by naming what differed.
+    H.assertEntryContract("mrf-save-room-v1")
+    H.log(partyReport("mrf-save-room-v1 entry"))
+  end),
+
+  -- down through the save room's door and back to the fight's doorstep
+  tapInto("down", function() return map() == 264 end, 12000,
+    "save room -> door -> map 264"),
+  H.waitFrames(60),
+  H.navTo(3, 7, { maxFrames = 9000 }),
+  H.call(function()
+    H.assertEq(map(), 264, "at the Ifrit/Shiva alcove")
+    H.assertEq(H.fieldX(), 3, "Ifrit doorstep x")
+    H.assertEq(H.fieldY(), 7, "Ifrit doorstep y")
+    H.assertEq(sw(0x0060), 0, "$0060 CLEAR at the doorstep")
     H.assertEq(H.readByte(0x1A69) & 0x06, 0,
-      "neither IFRIT nor SHIVA owned at boot ($1A69 bits 1-2)")
-    H.log(partyReport("ifrit_doorstep"))
+      "neither IFRIT nor SHIVA owned yet ($1A69 bits 1-2)")
+    H.log(partyReport("ifrit doorstep (walked from anchor B)"))
   end),
 
   -- 1. A into IFRIT -> _cc7937 -> battle 70.  Confirm the formation before

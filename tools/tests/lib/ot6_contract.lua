@@ -24,9 +24,14 @@
 -- What a contract can declare (all fields optional):
 --   slot     = 3                          -- SRAM $307ff0 last-saved slot, 1..3
 --   world    = { x = 137, y = 203 }       -- ON THE WORLD MAP at this tile
+--   field    = { map = 270, x = 25, y = 10 }  -- ON this field map at this tile
+--                (a save-point boundary: where a cold Continue of the
+--                boundary's anchor puts the party -- the save tile itself)
 --   switches = { { id, 0|1, "what" }, ... }   -- story switches $1E80 bits
 --   party    = { size = N,                -- COUNT of $1850 party assignments
 --                members = { { charId, "NAME" }, ... } }  -- each in party 1
+--   ram      = { { addr, mask, byte, "what" }, ... }  -- masked WRAM bytes,
+--                for field facts that are not switches (e.g. $1A69 espers)
 --   sram     = { { snesAddr, byte, "what" }, ... }  -- OT6 persistent state,
 --                read via emu.memType.snesMemory (bank $31 = the codex bank)
 --
@@ -93,6 +98,199 @@ M.contracts["post-opera-v1"] = {
   },
 }
 
+-- The Vector-band battery anchors B-E (save-points-vector.md §5, issue #25).
+-- Every value below is MEASURED, not derived: the boot dumps of the
+-- serial-minted boundary states (ifrit_doorstep / n024_doorstep /
+-- minecart_doorstep, probed 2026-07-27) and, for E, the n128_won mint log.
+-- Shared shape notes:
+--  * field = the save tile itself: a cold Continue of the anchor puts the
+--    party exactly there, and the leg INTO the boundary walks onto the same
+--    tile to assert its exit (so both ends compare the same coordinates).
+--  * THE PARTY COUNT stays the #21 control at every boundary.  The band's
+--    canonical four are LOCKE CELES SABIN EDGAR until the tube room takes
+--    CELES ($02F6=0, event_main.asm:96157); D and E count THREE and pin
+--    $02F6=0 so a chain that quietly keeps (or loses) her fails by name.
+--  * ram $1A69 is the give_genju receipt (field/event.asm:3238): magicite
+--    ownership is a byte, not a switch, and §5 names it load-bearing at C.
+--  * sram carries the same four bank-$31 witnesses as post-opera-v1.  The
+--    row witnesses exist only in a REAL battery written by the Save UI
+--    (H.loadState zeroes every codex page each run -- lib/ot6.lua), which
+--    is exactly what makes them anti-synthesis evidence; the pre-save exit
+--    check below (assertExitContractPreSave) is what the leg INTO a
+--    boundary uses because of that.
+
+M.contracts["mrf-save-room-v1"] = {
+  slot = 3,
+  field = { map = 270, x = 25, y = 10 },   -- the vanilla save room off the alcove
+  switches = {
+    { 0x01F0, 0, "the sympathizer's distraction latch is CLEAR (§5 A->B exit)" },
+    { 0x005F, 1, "Kefka's esper-drain scene has run" },
+    { 0x0060, 0, "battle 70 (Ifrit/Shiva) is still ahead" },
+    { 0x0646, 1, "the dying Ifrit/Shiva pair still stands on the doors" },
+    { 0x0273, 0, "the alcove is not locked (post-fight latch clear)" },
+    { 0x0068, 0, "the tube-room set piece is ahead" },
+    { 0x0069, 0, "the factory escape has not happened" },
+  },
+  party = {
+    size = 4,
+    members = {
+      { 0x01, "LOCKE" },
+      { 0x06, "CELES" },
+      { 0x05, "SABIN (bludgeon)" },
+      { 0x04, "EDGAR (pierce+Tools)" },
+    },
+  },
+  ram = {
+    { 0x1A69, 0x07, 0x01, "RAMUH owned, IFRIT+SHIVA not yet ($1A69 & 7)" },
+  },
+  sram = {
+    { 0x316800, 0x4f, "slot 3 codex magic 'O'" },
+    { 0x316801, 0x38, "slot 3 codex magic '8'" },
+    { 0x316810 + 0x012d, 0x01, "bank-31 element-codex witness (ULTROS2)" },
+    { 0x316990 + 0x012d, 0x01, "bank-31 class-codex witness (ULTROS2)" },
+  },
+}
+
+M.contracts["n024-doorstep-save-v1"] = {
+  slot = 3,
+  field = { map = 273, x = 26, y = 53 },   -- the NEW #10 save point before 024
+  switches = {
+    { 0x0649, 1, "NUMBER 024 still stands on {25,51} (§5 B->C exit)" },
+    { 0x0060, 1, "battle 70 won" },
+    { 0x0646, 0, "the dying espers are gone -- the hand-off completed" },
+    { 0x0632, 1, "the standing save-sparkle switch (the 273 sparkle rides it)" },
+    { 0x0068, 0, "the tube-room set piece is ahead" },
+    { 0x02F6, 1, "CELES is still in the roster" },
+  },
+  party = {
+    size = 4,
+    members = {
+      { 0x01, "LOCKE" },
+      { 0x06, "CELES" },
+      { 0x05, "SABIN (bludgeon)" },
+      { 0x04, "EDGAR (pierce+Tools)" },
+    },
+  },
+  ram = {
+    { 0x1A69, 0x07, 0x07, "RAMUH+IFRIT+SHIVA owned -- both magicite (§5)" },
+  },
+  sram = {
+    { 0x316800, 0x4f, "slot 3 codex magic 'O'" },
+    { 0x316801, 0x38, "slot 3 codex magic '8'" },
+    { 0x316810 + 0x012d, 0x01, "bank-31 element-codex witness (ULTROS2)" },
+    { 0x316990 + 0x012d, 0x01, "bank-31 class-codex witness (ULTROS2)" },
+  },
+}
+
+M.contracts["minecart-platform-v1"] = {
+  slot = 3,
+  field = { map = 272, x = 3, y = 55 },    -- the vanilla platform save point
+  switches = {
+    { 0x0068, 1, "the tube-room set piece has run (§5 C->D exit)" },
+    { 0x02F6, 0, "CELES left the roster in the tube room" },
+    { 0x0644, 1, "CID is on the platform" },
+    { 0x02BC, 0, "`cutscene TRAIN` has not run" },
+    { 0x0069, 0, "the escape has not happened" },
+  },
+  party = {
+    size = 3,                              -- the ride is three (#21; gen_n128)
+    members = {
+      { 0x01, "LOCKE" },
+      { 0x05, "SABIN (bludgeon)" },
+      { 0x04, "EDGAR (pierce+Tools)" },
+    },
+  },
+  ram = {
+    { 0x1A69, 0x07, 0x07, "RAMUH+IFRIT+SHIVA still owned" },
+  },
+  sram = {
+    { 0x316800, 0x4f, "slot 3 codex magic 'O'" },
+    { 0x316801, 0x38, "slot 3 codex magic '8'" },
+    { 0x316810 + 0x012d, 0x01, "bank-31 element-codex witness (ULTROS2)" },
+    { 0x316990 + 0x012d, 0x01, "bank-31 class-codex witness (ULTROS2)" },
+  },
+}
+
+M.contracts["vector-escape-v1"] = {
+  slot = 3,
+  field = { map = 240, x = 58, y = 7 },    -- the escape-map save point ($06AE)
+  switches = {
+    { 0x0069, 1, "the escape happened -- 262 (28,9) now exits to 240 (§5 D->E)" },
+    { 0x0666, 1, "escape-scene latch" },
+    { 0x06AE, 1, "the 240 (58,7) save-point sparkle is revealed" },
+    { 0x006B, 0, "the Setzer reunion is still ahead" },
+    { 0x02BC, 0, "`cutscene TRAIN` latch cleared by the escape" },
+  },
+  party = {
+    size = 3,
+    members = {
+      { 0x01, "LOCKE" },
+      { 0x05, "SABIN (bludgeon)" },
+      { 0x04, "EDGAR (pierce+Tools)" },
+    },
+  },
+  ram = {
+    { 0x1A69, 0x07, 0x07, "RAMUH+IFRIT+SHIVA still owned" },
+  },
+  sram = {
+    { 0x316800, 0x4f, "slot 3 codex magic 'O'" },
+    { 0x316801, 0x38, "slot 3 codex magic '8'" },
+    { 0x316810 + 0x012d, 0x01, "bank-31 element-codex witness (ULTROS2)" },
+    { 0x316990 + 0x012d, 0x01, "bank-31 class-codex witness (ULTROS2)" },
+  },
+}
+
+-- terra-returned-v1: boundary F, the v0.6 stop line (§5) -- a world battery
+-- save one takeoff after Terra's return, aboard the GROUNDED Blackjack on
+-- the plain south of Zozo (the ship strafes south from the takeoff hover
+-- until the live tile prop allows landing; measured 2026-07-27).  Saving
+-- from the grounded ship is legal ($0201 bit7 = $80 measured; airborne it
+-- is $00 -- §4.5's caveat resolved).  THE ROSTER IS THE HEADLINE: TERRA is
+-- available again ($02F0=1) and the ACTIVE party is LOCKE EDGAR SABIN
+-- SETZER -- the finale restores everyone who stood at the Cranes and adds
+-- SETZER, so the recon §6d's "Locke and Setzer" (a two-man-chain
+-- measurement) undercounts it.  CELES remains gone ($02F6=0) until her
+-- later WoB beat.
+M.contracts["terra-returned-v1"] = {
+  slot = 3,
+  -- Position is pinned through the MODULE-STABLE save-block cells, not
+  -- worldX/worldY: this boundary's exit is asserted with the save menu
+  -- still open (the grounded-airship world menu does not unwind on B), and
+  -- the menu module overlays $e0/$e2 -- the same #29 class the slot
+  -- witness already dodges.  $1f60/$1f61 are the world-position cells the
+  -- save itself records; $1f65 bit5 is the airship flag of $1f64.
+  ram = {
+    { 0x1f60, 0xFF, 24, "world x (save-block cell $1f60): the grounded Blackjack" },
+    { 0x1f61, 0xFF, 121, "world y (save-block cell $1f61): south of Zozo" },
+    { 0x1f65, 0x20, 0x20, "aboard the airship ($1f64 bit13)" },
+    { 0x1A69, 0x07, 0x07, "RAMUH+IFRIT+SHIVA magicite still owned" },
+  },
+  switches = {
+    { 0x02F0, 1, "TERRA is available again (the v0.6 stop line, §6b)" },
+    { 0x0070, 1, "the Blackjack party-swap room is armed" },
+    { 0x016F, 1, "the tutorial tail ran (event_main.asm:25671)" },
+    { 0x006B, 1, "the Setzer reunion played" },
+    { 0x02F9, 1, "SETZER is available" },
+    { 0x02F6, 0, "CELES is still out of the roster" },
+    { 0x0069, 1, "the factory escape stands" },
+  },
+  party = {
+    size = 4,
+    members = {
+      { 0x01, "LOCKE" },
+      { 0x04, "EDGAR (pierce+Tools)" },
+      { 0x05, "SABIN (bludgeon)" },
+      { 0x09, "SETZER" },
+    },
+  },
+  sram = {
+    { 0x316800, 0x4f, "slot 3 codex magic 'O'" },
+    { 0x316801, 0x38, "slot 3 codex magic '8'" },
+    { 0x316810 + 0x012d, 0x01, "bank-31 element-codex witness (ULTROS2)" },
+    { 0x316990 + 0x012d, 0x01, "bank-31 class-codex witness (ULTROS2)" },
+  },
+}
+
 -- ------------------------------------------------------------- the checker --
 
 local function switchVal(id)
@@ -139,9 +337,20 @@ function M.contractDiffs(c)
     field("world x", c.world.x, M.worldX())
     field("world y", c.world.y, M.worldY())
   end
+  if c.field then
+    field("field map (mapId & 0x1ff)", c.field.map, M.mapId() & 0x1ff)
+    field("field x", c.field.x, M.fieldX())
+    field("field y", c.field.y, M.fieldY())
+  end
   if c.switches then
     for _, s in ipairs(c.switches) do
       field(string.format("switch $%04X (%s)", s[1], s[3]), s[2], switchVal(s[1]))
+    end
+  end
+  if c.ram then
+    for _, r in ipairs(c.ram) do
+      field(string.format("ram $%04X & $%02X (%s)", r[1], r[2], r[4]),
+        r[3], M.readByte(r[1]) & r[2], true)
     end
   end
   if c.party then
@@ -172,12 +381,7 @@ end
 -- says WHICH end of WHICH boundary disagreed.  All diffs are logged as their
 -- own lines first (greppable one per field), then the error line repeats
 -- them, so the [ot6] FAIL verdict itself names what differed.
-function M.assertContract(key, side)
-  local c = M.contracts[key]
-  if not c then
-    error("unknown contract: " .. tostring(key)
-      .. " -- declare it in tools/tests/lib/ot6_contract.lua", 0)
-  end
+local function judge(c, key, side)
   local diffs, held = M.contractDiffs(c)
   if #diffs == 0 then
     M.log(string.format("contract %s (%s): all %d fields hold", key, side, held))
@@ -190,5 +394,37 @@ function M.assertContract(key, side)
     key, side, #diffs, table.concat(diffs, "; ")), 0)
 end
 
+local function lookup(key)
+  local c = M.contracts[key]
+  if not c then
+    error("unknown contract: " .. tostring(key)
+      .. " -- declare it in tools/tests/lib/ot6_contract.lua", 0)
+  end
+  return c
+end
+
+function M.assertContract(key, side) judge(lookup(key), key, side) end
+
 function M.assertEntryContract(key) M.assertContract(key, "entry") end
 function M.assertExitContract(key)  M.assertContract(key, "exit")  end
+
+-- The PRE-SAVE exit check, for the leg INTO a boundary.  That leg walks
+-- onto the save tile and asserts the boundary table BEFORE its final
+-- saveState -- but the `sram` kind declares properties of the boundary
+-- SAVE itself: the bank-$31 codex row witnesses exist only in a battery
+-- the real Save UI has written, and H.loadState zeroes every codex page at
+-- each savestate boot precisely so no run inherits one (lib/ot6.lua).  A
+-- pre-save assertion of those bytes would fail in every savestate-booted
+-- leg BY DESIGN, so the leg INTO a boundary asserts everything else here,
+-- and the FULL table -- sram included -- is asserted at both real boundary
+-- moments: by the anchor gen after its save (assertExitContract), and by
+-- the leg OUT after its cold Continue (assertEntryContract).  `slot` stays
+-- in the pre-save set: $307ff0 rides Mesen savestates (measured
+-- 2026-07-27) and witnesses the chain descends from a slot-3 battery load.
+function M.assertExitContractPreSave(key)
+  local c, pre = lookup(key), {}
+  for k, v in pairs(c) do
+    if k ~= "sram" then pre[k] = v end
+  end
+  judge(pre, key, "exit pre-save; sram witnessed at the boundary save")
+end

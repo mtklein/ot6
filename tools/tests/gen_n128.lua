@@ -1,7 +1,26 @@
--- gen_n128.lua -- v0.6 leg 13: minecart_doorstep (map 272 {9,52} facing
--- CID) -> A -> `cutscene TRAIN` -> the minecart's six forced battles,
--- NUMBER 128 among them -> the Kefka explosion on map 240 -> control with
--- $0069=1.  Mints n128_won.
+-- gen_n128.lua -- v0.6 leg 13, the leg OUT of boundary D (#25): the
+-- minecart platform (map 272, CID at {9,51}) -> A -> `cutscene TRAIN` ->
+-- the minecart's six forced battles, NUMBER 128 among them -> the Kefka
+-- explosion on map 240 -> control with $0069=1 -> parked ON the escape
+-- map's save point {58,7} (boundary E).  Mints n128_won.
+--
+-- TWO BOOTS, chosen at runtime by probing the battery (issue #25):
+--  * ANCHORED (the ninja graph: anchor="minecart-platform-v1"): run.sh
+--    materialized the anchor .srm, so SRAM carries slot 3 + the codex
+--    magic + the seeded ULTROS2 witness.  Cold Continue -> the 272 save
+--    tile {3,55} -> ENTRY CONTRACT -> walk to CID.
+--  * SAVESTATE (`make smoke`, which passes no OT6_SRAM_ANCHOR and whose
+--    job is lib falsification against states already on disk): SRAM is
+--    fresh, the probe reads no battery, and the leg boots
+--    minecart_doorstep.mss exactly as before.
+-- The probe is four SRAM bytes ($307ff0=3 plus codex magic and witness);
+-- a fresh cartridge SRAM can satisfy none of them.
+--
+-- OT6_ANCHOR_LAYOUT: ot6-codex-o8-v1
+-- ^ the persistent-SRAM layout this leg understands (issue #25).  run.sh
+--   reads the marker line above and refuses -- BEFORE the emulator boots,
+--   naming both strings -- any OT6_SRAM_ANCHOR whose manifest.json declares
+--   a different persistent_layout.
 --
 -- WHY THIS LEG IS NOT AN EVENT WALK.  docs/design/vector-route-recon.md §4
 -- and §8 hazard 2 flagged this as the beat most likely to eat the minting
@@ -262,9 +281,45 @@ local function rideDriver(pred, maxFrames, what)
   }, what)
 end
 
+local function batteryAnchored()
+  return emu.read(0x307ff0, emu.memType.snesMemory) == 3
+     and emu.read(0x316800, emu.memType.snesMemory) == 0x4f
+     and emu.read(0x316801, emu.memType.snesMemory) == 0x38
+     and emu.read(0x316810 + 0x012d, emu.memType.snesMemory) == 0x01
+end
+
 H.run({ maxFrames = 100000 }, {
-  H.loadState("build/states/minecart_doorstep.mss.lua"),
-  H.waitFrames(150),
+  H.cond(batteryAnchored, {
+    -- ANCHORED BOOT: cold Continue into the 272 save tile {3,55}, entry
+    -- contract, then walk back beside CID and face him.
+    H.waitFrames(350),
+    H.repeatN(5, { H.pressButtons({ "start" }, 8), H.waitFrames(25) }),
+    H.waitFrames(120),
+    H.repeatN(3, { H.pressButtons({ "a" }, 8), H.waitFrames(40) }),
+    H.waitFrames(300),
+    H.repeatN(3, { H.pressButtons({ "a" }, 8), H.waitFrames(60) }),
+    -- SOFT landing wait: a wrong-boundary anchor must fail via the entry
+    -- contract naming the wrong map, never via a timeout here.
+    H.waitUntilSoft(function()
+      return map() == 272 and H.tileAligned() and bright() >= 15
+    end, 3000, "landed_at_d"),
+    H.waitFrames(60),
+    H.call(function()
+      -- THE ENTRY CONTRACT (issue #25): declared once in
+      -- lib/ot6_contract.lua under "minecart-platform-v1" -- the same
+      -- table gen_minecart_doorstep (the leg INTO D) and the anchor mint
+      -- assert as their EXIT contract.
+      H.assertEntryContract("minecart-platform-v1")
+      H.log(partyReport("minecart-platform-v1 entry"))
+    end),
+    H.navTo(9, 52, { maxFrames = 9000 }),
+    -- face CID: his object occupies (9,51), so an UP press only turns
+    H.hold({ "up" }), H.waitFrames(8), H.release(), H.waitFrames(20),
+  }, {
+    -- SAVESTATE BOOT (`make smoke`): the lib-falsification path.
+    H.loadState("build/states/minecart_doorstep.mss.lua"),
+    H.waitFrames(150),
+  }),
   H.call(function()
     H.assertEq(map(), 272, "booted on map 272")
     H.assertEq(H.fieldX(), 9, "boot x")
@@ -337,7 +392,42 @@ H.run({ maxFrames = 100000 }, {
     H.assertEq(sw(0x0666), 1, "$0666 SET")
     H.assertEq(sw(0x06AE), 1, "$06AE SET -- the save point on 240 (58,7) is revealed")
     H.assertEq(sw(0x006B), 0, "$006B CLEAR -- the Setzer reunion is still ahead")
-    H.log(string.format("[n128_won] f%d map=%d (%d,%d)",
+    H.log(string.format("[after the ride] f%d map=%d (%d,%d)",
+      H.frame, map(), H.fieldX(), H.fieldY()))
+    H.log(partyReport("after the ride"))
+    H.screenshot("n128_after_ride")
+  end),
+
+  -- 3. park ON boundary E: the escape map's save point {58,7}, revealed by
+  --    $06AE.  n128_won IS the D->E terminal, so it is minted standing on
+  --    the boundary tile with the vector-escape-v1 table asserted (the
+  --    same table gen_vector_escape_anchor saves under).  Map 240 is an
+  --    encounter map (rate $0070); navTo kill-bits any draw on the walk.
+  --    The last step is a held RIGHT from (57,7) -- a save tile flickers
+  --    hasControl() (the SavePoint re-entry), so arrival is judged on
+  --    position + $01BF + alignment.
+  H.navTo(57, 7, { maxFrames = 15000 }),
+  (function() local calm = 0
+    return H.driveUntil(function()
+      calm = (H.fieldX() == 58 and H.fieldY() == 7 and sw(0x01BF) == 1
+              and H.tileAligned() and not H.dialogWaiting()
+              and not H.battleLoadStarted()) and calm + 1 or 0
+      return calm >= 8
+    end, 9000, {
+      H.call(function()
+        if H.battleLoadStarted() then killBitAll(); H.setPad({ "a" }); return end
+        if H.dialogWaiting() then H.setPad({ "a" }); return end
+        if H.fieldX() == 58 and H.fieldY() == 7 then H.setPad({}); return end
+        H.setPad({ right = true })
+      end),
+    }, "onto the save tile 240 (58,7)")
+  end)(),
+  H.waitFrames(45),
+  H.call(function()
+    H.assertEq(sw(0x01BF), 1, "$01BF SET -- the $06AE-revealed save point works")
+    H.assertEq(sw(0x01B5), 1, "$01B5 SET -- the once-per-tile latch took")
+    H.assertExitContractPreSave("vector-escape-v1")
+    H.log(string.format("[n128_won] f%d map=%d (%d,%d) -- ON boundary E",
       H.frame, map(), H.fieldX(), H.fieldY()))
     H.log(partyReport("n128_won"))
     H.screenshot("n128_won")

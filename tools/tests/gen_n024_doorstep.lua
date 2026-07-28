@@ -209,6 +209,46 @@ H.run({ maxFrames = 90000 }, {
     })
   end),
 
+  -- THE BOUNDARY DETOUR (issue #25).  This leg is B->C's terminal, so
+  -- before parking on the 024 doorstep it stands on the NEW #10 save point
+  -- at {26,53} and asserts the n024-doorstep-save-v1 boundary table -- the
+  -- same table gen_n024_save_anchor saves under and gen_esper_tubes'
+  -- anchored boot asserts as its ENTRY contract.  The sram witnesses are
+  -- products of the boundary save, so the pre-save variant is asserted
+  -- (lib/ot6_contract.lua).  Standing on a save tile re-enters SavePoint
+  -- every frame and hasControl() flickers, so arrival is judged on
+  -- position + $01BF + alignment.  The approach never faces 024 with A.
+  H.navTo(26, 52, { maxFrames = 9000 }),
+  (function() local calm = 0
+    return H.driveUntil(function()
+      calm = (H.fieldX() == 26 and H.fieldY() == 53 and sw(0x01BF) == 1
+              and H.tileAligned() and not H.dialogWaiting()
+              and not H.battleLoadStarted()) and calm + 1 or 0
+      return calm >= 8
+    end, 9000, {
+      H.call(function()
+        if H.battleLoadStarted() then killBitAll(); H.setPad({ "a" }); return end
+        if H.dialogWaiting() then H.setPad({ "a" }); return end
+        if H.fieldX() == 26 and H.fieldY() == 53 then H.setPad({}); return end
+        H.setPad({ down = true })
+      end),
+    }, "onto the NEW save tile 273 (26,53)")
+  end)(),
+  H.waitFrames(45),
+  H.call(function()
+    H.assertEq(sw(0x01BF), 1,
+      "$01BF SET -- the NEW 273 save point runs the SavePoint script")
+    H.assertEq(sw(0x01B5), 1, "$01B5 SET -- the once-per-tile latch took")
+    -- the sparkle NPC is LIVE at the authored tile: 273's NPCs are object
+    -- $10 (NUMBER 024) and the APPENDED $11 (the sparkle -- order is
+    -- identity, HANDOFF trap 2)
+    local off = 0x29 * 0x11
+    H.assertEq(H.readWord(0x086a + off) >> 4, 26, "sparkle object $11 x")
+    H.assertEq(H.readWord(0x086d + off) >> 4, 53, "sparkle object $11 y")
+    H.assertExitContractPreSave("n024-doorstep-save-v1")
+    H.screenshot("n024_save_point")
+  end),
+
   -- park at {25,52}, facing UP into NUMBER 024 on {25,51}
   H.navTo(25, 52, { maxFrames = 15000 }),
   H.hold({ "up" }), H.waitFrames(8), H.release(), H.waitFrames(20),

@@ -1,0 +1,10 @@
+{
+  "schema": "ot6.sram-anchor/v1",
+  "payload": "minecart-platform.sram",
+  "size": 32768,
+  "sha256": "3da23cb70988bd220444a77f7175fd4d3455e20bb0e878baa895018520cd8ac3",
+  "slot": 3,
+  "milestone": "minecart-platform",
+  "provenance": "minecart_doorstep.mss; real in-game Save UI at the map-272 save point (3,55); party LOCKE SABIN EDGAR (CELES left in the tube room); boundary D of save-points-vector.md \u00a75",
+  "persistent_layout": "ot6-codex-o8-v1"
+}
