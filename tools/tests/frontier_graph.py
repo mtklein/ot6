@@ -485,4 +485,20 @@ STATES = [
     #     OT6_CAPTURE_SRM=tools/tests/anchors/gate-cave-save-v1/gate-cave-save.sram \
     #     tools/tests/run.sh tools/tests/gen_gate_cave_save.lua
     S("gate_cave_save", gen="gen_gate_cave_save", anchor="narshe-mission-v1"),
+    # ---- boundary H -> boundary I ------------------------------------------
+    # Leg H->I, whole in one generator: cold-boot the gate-cave-save-v1
+    # battery, back down to BASEMENT 3, the WEST traverse (two levers --
+    # (71,15) $0174 and the (104,17) $01F5 tap-once TOGGLE -- then the
+    # (121,23)->(4,37) teleport; measured, addenda Addendum 3: the (58,18)
+    # span and the three walk-overs are NOT on the route), the Sealed Gate
+    # scene (battles 121/122 spared, never kill-bitted), the $0079 tail,
+    # the (5,43) shortcut out, the base re-cross (battle 123 spared, the
+    # scripted crash flight), off the wreck via the map-7 hatch (8,36),
+    # and the world battery save at the crash site (83,239) -- boundary I,
+    # `vector-crash-v1`.  Re-cutting the battery is a deliberate by-hand
+    # operation:
+    #     OT6_SRAM_ANCHOR=tools/tests/anchors/gate-cave-save-v1 \
+    #     OT6_CAPTURE_SRM=tools/tests/anchors/vector-crash-v1/vector-crash.sram \
+    #     tools/tests/run.sh tools/tests/gen_vector_crash.lua
+    S("vector_crash", gen="gen_vector_crash", anchor="gate-cave-save-v1"),
 ]
