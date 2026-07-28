@@ -67,6 +67,10 @@ matching HANDOFF's "room for 2 more".
    (`norm_lvl LOCKE/TERRA`, `:99062-99063`). SHADOW joins at the Crescent
    Island landing (`:69154-69160`). The v0.7 stop line is a **three-person
    party: TERRA, LOCKE, SHADOW** on the world map at **(232,150)** — world-
+   [Correction 2026-07-28, thamasa-recon.md: the Thamasa town trigger is at
+   (250,128), NOT adjacent to this anchor tile — v0.8's first leg starts
+   with a real walk; and Crescent Island's trash is terrain-split across
+   three encounter groups, not one.]
    saveable, the natural battery anchor (§2).
 5. **The band needs NO new event triggers.** Every proposed anchor is either a
    world-map battery save (legal everywhere, dlg `$06D4`) or the vanilla cave
@@ -602,9 +606,10 @@ not its authoring.
    boarding includes his departure scene and `$02FB=0`; a chain minted with
    different availability changes the port choreography (`$01AB` branches).
    Entry contracts for J/K should pin `$1EDE/$1EDF`.
-10. **vanilla-destructive-bugs.md has no entries in this band.** The two
-    live items remain global: the checksum-`$0000` bug (release-gate, worth
-    closing before a band this save-happy) and Sketch (v0.8, ships as-is).
+10. **vanilla-destructive-bugs.md has no entries in this band.** The one
+    live global item is Sketch (v0.8, ships as-is by owner decision); the
+    checksum-`$0000` bug was already fixed (#18, 37a0eb5) — this item
+    originally listed it as open, corrected 2026-07-28.
     The Opera comparison (#10's deferred analysis): the banquet is the same
     "long transient choreography" shape but — unlike the Opera — it is
     bounded by the saveable world map on both sides, so it needs no authored

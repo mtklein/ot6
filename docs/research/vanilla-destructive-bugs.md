@@ -972,9 +972,12 @@ Each of these was read and the bound verified. None is a defect.
      matching the milestone already on the issue.
   2. The **save-slot checksum `$0000`** case — frontier **v0.1**, i.e. it is in
      every release already tagged.
-- **The earliest genuine release-gate risk is the checksum bug, not Sketch.**
-  It is live now, it is a save-loss bug, v0.6 explicitly increases save
-  frequency, and the fix is three instructions. Under #13's own acceptance
+- **The earliest genuine release-gate risk was the checksum bug, not Sketch —
+  and it is FIXED** (2026-07-27, issue #18, commit 37a0eb5, with its
+  positive-control regression save_checksum in the suite; this paragraph
+  kept for the reasoning record). It was live in every tagged release, it
+  was a save-loss bug, v0.6 explicitly increases save frequency, and the
+  fix was three instructions. Under #13's own acceptance
   criteria it needs a fix, a mitigation, or a written release-blocking decision
   before the next tag — it cannot wait for v0.8.
 - No confirmed destructive defect is *specific* to **v0.6** or **v0.7**.
@@ -997,7 +1000,7 @@ Each of these was read and the bound verified. None is a defect.
 |---|---|
 | `CONTRIBUTING.md` distinguishes quirks from destructive failures | The bar as applied here, plus the [Explicitly preserved](#explicitly-preserved-the-other-half-of-the-policy) list as the worked boundary. |
 | Destructive bugs tracked with a reproduction/source basis and frontier owner | The two [Frontier map](#frontier-map-summary) rows, each with an instruction-level chain. |
-| No release ships a known crash/corruption/save-loss bug undecided | The checksum bug forces this decision at the next tag. |
+| No release ships a known crash/corruption/save-loss bug undecided | The checksum bug forced this decision and was fixed (#18) ahead of the v0.6 tag; Sketch ships as-is by owner decision (CONTRIBUTING). |
 | Sketch fixed or mitigated before Relm ships | Three costed options, narrowest first. |
 | Narrowly scoped, covered by positive-control regressions | Both fixes name their positive control, and both controls must fail against the current ROM first. |
 | The policy does not demand modernizing every quirk | Eleven confirmed defects are argued *down*, with citations, in this same document. |
