@@ -226,6 +226,15 @@ set -- and never creates `SaveStates/`.)
   post-Opera battery anchor. It settles `blackjack.mss`, uses the real Save UI
   to write slot 3, and relies on `run.sh`'s explicit `OT6_CAPTURE_SRM` mode to
   capture Mesen's file after shutdown.
+
+  **Save-drive rule (2026-07-28): a gen that saves anywhere near live event
+  state drives the Save UI with PAD INPUT ONLY — never by poking
+  `ZMENUSTATE`.** The forced-state shortcut skips the menu entry's own
+  writes, leaving menu tasks running on a corrupted exit; that produced
+  issue #29's phantom `$021f` overlay and, measured during the banquet
+  decode, silently corrupts the live `$1188` event-timer block in WRAM
+  (SRAM is pushed first and stays correct — which is why existing anchors
+  are fine). `probe_banquet_timer_save.lua` is the pad-input template.
 - `gen_vector_doorstep.lua` - cold boots with the verified post-Opera anchor,
   drives vanilla Continue, checks story state plus the slot-3 OT6 codex page,
   then WALKS THE WORLD to the Vector event trigger at (121,187) and mints
