@@ -13,3 +13,4 @@ not just bugs.
 | 5 | Moogle defense | Locke shows no MP in the FIELD menu either (Terra does) | folded into #35 — CheckMPVisible (menu_common.asm:2311) gates on espers-owned/spell-known; the blackout self-resolves at the first magicite, i.e. exactly the opening stretch is dark |
 | 6 | early WoB | Menus sometimes show another character's spells — e.g. **Tools shows Cure 2** (cross-list contamination) | #36 — owner: predates v0.6, NOT a tag blocker; re-milestoned v0.7; investigation running (blame sweep + severity check decide if it jumps the queue) |
 | 7 | South Figaro → Mt. Kolts | **No release blockers so far** | positive; rc1 holding through band 2 |
+| 8 | pre-Kolts | Full HP/MP restore on level-up works as expected | positive; v0.4 feature confirmed in natural play |
