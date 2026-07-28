@@ -462,4 +462,20 @@ STATES = [
     # contract verdict; run.sh only captures a battery when OT6_CAPTURE_SRM
     # is set, so a mint can never quietly rewrite a tracked anchor.
     S("narshe_mission", gen="gen_narshe_mission", anchor="terra-returned-v1"),
+    # ---- boundary G -> boundary H ------------------------------------------
+    # Leg G->H, whole in one generator (gen_narshe_mission's shape): cold-
+    # boot the narshe-mission-v1 battery, seat TERRA / bench SETZER in the
+    # Blackjack swap room (chase-talk the wandering NPC, YES on $0528, the
+    # NO_RESET party menu), fly to the base pass, walk the Imperial Base
+    # ($0172 -- TERRA is the hard gate, _cb25d6), the cave 382 -> 383 ->
+    # the map-385 TIMED FLOOR (M.phaseWalk's union-graph crossing: arm A at
+    # (3,2), window (6,2)->(7,2), arm B at (11,3), three windows down the
+    # east half), 384's south loop to the (62,11) face-UP+A door switch
+    # ($0173), and the map-386 vanilla save point (74,53) -- boundary H,
+    # `gate-cave-save-v1`, the band's only interior save.  Re-cutting the
+    # battery is a deliberate by-hand operation:
+    #     OT6_SRAM_ANCHOR=tools/tests/anchors/narshe-mission-v1 \
+    #     OT6_CAPTURE_SRM=tools/tests/anchors/gate-cave-save-v1/gate-cave-save.sram \
+    #     tools/tests/run.sh tools/tests/gen_gate_cave_save.lua
+    S("gate_cave_save", gen="gen_gate_cave_save", anchor="narshe-mission-v1"),
 ]
