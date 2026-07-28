@@ -82,8 +82,11 @@ the rare); Dance / Sketch / Slot / Rage inherit it when their characters
 arrive.
 
 **Release discipline:** every distributable is built through `make patch`,
-which refuses any ROM the test suite has not stamped green; a human
-playtests each rung before it is tagged.
+which refuses any ROM the test suite has not stamped green. The human bar
+is the owner's ratchet rule (2026-07-28): never release an inferior
+experience — a tag must be at least as good as previous releases as far
+as the owner has played; unplayed frontier ships on the machine gates
+with its gaps documented, and the owner's playthrough trails behind.
 
 ## M0 — Toolchain ✅ (done 2026-07-14)
 
