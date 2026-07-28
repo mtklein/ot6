@@ -896,3 +896,353 @@ function M.route(legs)
   end
   return M.seqStep(steps)
 end
+
+-- --------------------------------------- timed-tilemap (phase) rooms --
+-- Some rooms are TWO complementary tilemaps swapped on an event timer:
+-- BASEMENT 2 of the Sealed Gate cave (map 385) swaps every 158 frames
+-- once armed, and the reachable set inside either phase is a dead end --
+-- the crossing exists only ACROSS the swaps.  navTo cannot drive such a
+-- room (every edge is legitimately dead half the time and would be
+-- condemned), so this walker plans over the UNION graph instead.
+--
+-- The mechanism, measured on map 385 (probe_v07_385win, 2026-07-28; the
+-- room's scripts are event_main.asm:44634-44905):
+--   * every swap callback rewrites the tilemap BEFORE it flips the phase
+--     switches (`call _cb2b24` then `switch $01F5=0/$01F6=1`, and the
+--     same shape in all four callbacks), so there is a ~13-frame WINDOW
+--     (fsf 145..157 of the 158 cycle) where the NEXT phase's floor is
+--     physically in place while the switches -- and the hurt triggers
+--     keyed on them -- still show the OLD phase;
+--   * a held press into a tile the window just opened is taken by the
+--     engine at fsf ~148; the party is MID-STEP when the switches flip,
+--     and mid-step does not fire the stood-on tile's hurt trigger
+--     (arrival on the far side runs the destination's trigger in the NEW
+--     phase, where it EventReturns);
+--   * hurt tiles are ordinary event-trigger tiles, and a stood-on
+--     trigger tile re-enters its script every frame -- hasControl()
+--     flickers there, so every press here is UNCONDITIONAL (the
+--     re-entry-trap escape idiom);
+--   * random encounters are a state RESTORE, not a LoadMap: the phase
+--     switches and timers SURVIVE the battle round-trip (measured,
+--     probe_v07_385door), but the dead cycle's half of the tilemap is
+--     re-based by map-init, so after a battle the walker re-snapshots
+--     and re-plans.
+--
+-- M.phaseWalk(tx, ty, spec) returns a step that walks the party to
+-- (tx,ty) across the swaps.  spec (all fields required unless noted):
+--   switches   = { a = 0x01F5, b = 0x01F6 }  -- the two phase switches;
+--                edges on `b` are the clock (on 385 only the four timer
+--                callbacks touch $01F6, so its edges are exactly the
+--                swap instants -- pick the switch with that property)
+--   period     = 158            -- measured frames between swaps
+--   region     = { w = 17, h = 16 }
+--   hurt       = { a = {{x,y},...},   -- tiles that hurt while switch a
+--                  b = {{x,y},...},   -- ... while switch b is on
+--                  always = {{x,y},...} }
+--   avoid      = { {x,y}, ... } -- optional; tiles BFS must never use
+--                (e.g. the OTHER cycle's arming triggers, which would
+--                re-arm it and freeze the half being crossed)
+--   windowHold = 132            -- optional; fsf to start the window hold
+--   segMargin  = 24             -- optional; frames of slack a k-step
+--                               -- in-phase lane needs beyond 16k
+--   maxFrames, what             -- optional; driveUntil plumbing
+function M.phaseWalk(tx, ty, spec)
+  local swA, swB = spec.switches.a, spec.switches.b
+  local PERIOD = spec.period
+  local WINDOW_HOLD = spec.windowHold or (PERIOD - 26)
+  local SEG_MARGIN = spec.segMargin or 24
+  local W, Hh = spec.region.w, spec.region.h
+  local PDIRS = { "up", "right", "down", "left" }
+  local PDX = { 0, 1, 0, -1 }
+  local PDY = { -1, 0, 1, 0 }
+
+  local function swv(id)
+    return (M.readByte(0x1E80 + (id >> 3)) >> (id & 7)) & 1
+  end
+  local function tkey(x, y) return y * 256 + x end
+  local hurt = { a = {}, b = {} }
+  local hurtAlways = {}
+  for _, t in ipairs(spec.hurt.a or {}) do hurt.a[tkey(t[1], t[2])] = true end
+  for _, t in ipairs(spec.hurt.b or {}) do hurt.b[tkey(t[1], t[2])] = true end
+  for _, t in ipairs(spec.hurt.always or {}) do
+    hurtAlways[tkey(t[1], t[2])] = true
+  end
+  local avoid = {}
+  for _, t in ipairs(spec.avoid or {}) do avoid[tkey(t[1], t[2])] = true end
+
+  local function prop(x, y) return M.readByte(0x7E7600 + M.maptile(x, y)) end
+  local function hpsum()
+    return M.readWord(0x1609) + M.readWord(0x1609 + 37)
+         + M.readWord(0x1609 + 74) + M.readWord(0x1609 + 111)
+  end
+
+  local lastB, lastFlip = nil, nil
+  local grids = {}                -- ["a"|"b"] = { step = {}, walk = {} }
+  local plan, idx = nil, 1
+  local begunSeg = -1
+  local hp0, obsStart = nil, nil
+  local hb = -300
+  local battN, aPhase = 0, 0
+
+  local function curPhase() return swv(swB) == 1 and "b" or "a" end
+  local function otherOf(p) return p == "a" and "b" or "a" end
+  local function fsf() return lastFlip and (M.frame - lastFlip) or -1 end
+  local function skey(x, y, di) return tkey(x, y) * 4 + di end
+
+  local function clockTick()
+    local cur = swv(swB)
+    if lastB ~= nil and cur ~= lastB then lastFlip = M.frame end
+    lastB = cur
+  end
+
+  local function capture(p)
+    local g = { step = {}, walk = {} }
+    for y = 0, Hh - 1 do
+      for x = 0, W - 1 do
+        if (prop(x, y) & 7) ~= 7 then g.walk[tkey(x, y)] = true end
+        for di = 1, 4 do
+          if M.canStep(x, y, PDIRS[di]) then g.step[skey(x, y, di)] = true end
+        end
+      end
+    end
+    grids[p] = g
+    M.log(string.format("[phaseWalk] captured phase-%s grid at f%d (fsf=%d)",
+      p, M.frame, fsf()))
+  end
+
+  local function buildPlan(sx, sy, sp)
+    local function nk(x, y, p)
+      return (p == "b" and 0x10000 or 0) + tkey(x, y)
+    end
+    local start = nk(sx, sy, sp)
+    local seen = { [start] = true }
+    local parent = {}
+    local q, qi = { { sx, sy, sp } }, 1
+    local goal = nil
+    while qi <= #q do
+      local x, y, p = q[qi][1], q[qi][2], q[qi][3]
+      qi = qi + 1
+      if x == tx and y == ty then goal = nk(x, y, p); break end
+      local o = otherOf(p)
+      local function push(nx, ny, np, item)
+        if nx < 0 or nx >= W or ny < 0 or ny >= Hh then return end
+        if avoid[tkey(nx, ny)] then return end
+        local k = nk(nx, ny, np)
+        if seen[k] then return end
+        seen[k] = true
+        item.tox, item.toy = nx, ny
+        parent[k] = { nk(x, y, p), item }
+        q[#q + 1] = { nx, ny, np }
+      end
+      for di = 1, 4 do                                      -- move edges
+        if grids[p].step[skey(x, y, di)] then
+          push(x + PDX[di], y + PDY[di], p,
+            { kind = "move", dir = PDIRS[di], phase = p })
+        end
+      end
+      local k = tkey(x, y)                                  -- flip edge
+      if grids[o].walk[k] and not hurt[o][k] and not hurtAlways[k] then
+        push(x, y, o, { kind = "flip", phase = o })
+      end
+      for di = 1, 4 do                                      -- window edges
+        if grids[o].step[skey(x, y, di)] then
+          push(x + PDX[di], y + PDY[di], o,
+            { kind = "window", dir = PDIRS[di], phase = o })
+        end
+      end
+    end
+    if not goal then
+      error(string.format("phaseWalk: no union-graph path (%d,%d,%s) -> "
+        .. "(%d,%d)", sx, sy, sp, tx, ty), 0)
+    end
+    local items, k2 = {}, goal
+    while parent[k2] do
+      table.insert(items, 1, parent[k2][2])
+      k2 = parent[k2][1]
+    end
+    local i, seg = 1, 0
+    while i <= #items do
+      if items[i].kind == "move" then
+        seg = seg + 1
+        local j = i
+        while j <= #items and items[j].kind == "move"
+              and items[j].phase == items[i].phase do j = j + 1 end
+        for m = i, j - 1 do
+          items[m].seg = seg
+          items[m].segHead = (m == i)
+          items[m].segLen = j - i
+        end
+        i = j
+      else
+        i = i + 1
+      end
+    end
+    local desc = {}
+    for _, it in ipairs(items) do
+      desc[#desc + 1] = string.format("%s%s->(%d,%d)%s", it.kind,
+        it.dir and ("[" .. it.dir .. "]") or "", it.tox, it.toy, it.phase)
+    end
+    M.log(string.format("[phaseWalk] plan (%d items): %s", #items,
+      table.concat(desc, " ")))
+    plan = items
+    idx = 1
+  end
+
+  return M.driveUntil(function()
+    return not M.battleLoadStarted()
+       and M.fieldX() == tx and M.fieldY() == ty and M.tileAligned()
+  end, spec.maxFrames or 30000, {
+    M.call(function()
+      aPhase = (aPhase + 1) % 8
+      battN = M.battleLoadStarted() and battN + 1 or 0
+      if battN >= 3 then
+        if plan or lastFlip then
+          M.log(string.format("[phaseWalk] encounter at f%d -- kill-bit, "
+            .. "then re-observe", M.frame))
+        end
+        plan, grids, lastFlip, lastB = nil, {}, nil, nil
+        begunSeg, hp0, obsStart = -1, nil, nil
+        for s = 0, 5 do
+          if M.readByte(0x3aa8 + s * 2) % 2 == 1 then
+            M.writeByte(0x3eec + s * 2, M.readByte(0x3eec + s * 2) | 0x80)
+          end
+        end
+        M.setPad(aPhase < 4 and { "a" } or {})
+        return
+      end
+      if battN > 0 then M.setPad({}); return end
+      clockTick()
+      if hp0 == nil then hp0 = hpsum(); obsStart = M.frame end
+      if hpsum() < hp0 then
+        error(string.format("phaseWalk: HURT fired at (%d,%d) fsf=%d -- "
+          .. "hp %d -> %d", M.fieldX(), M.fieldY(), fsf(), hp0, hpsum()), 0)
+      end
+      if not plan then
+        -- parked on a hurt-list tile (a battle return can leave the party
+        -- there): step off before observing -- a swap would hurt
+        local hk = tkey(M.fieldX(), M.fieldY())
+        if hurt.a[hk] or hurt.b[hk] or hurtAlways[hk] then
+          local x, y = M.fieldX(), M.fieldY()
+          for pass = 1, 2 do
+            for di = 1, 4 do
+              local nk2 = tkey(x + PDX[di], y + PDY[di])
+              local safe = not hurtAlways[nk2] and not avoid[nk2]
+                and (pass == 2 or (not hurt.a[nk2] and not hurt.b[nk2]))
+              if safe and M.canStep(x, y, PDIRS[di]) then
+                M.setPad({ [PDIRS[di]] = true })
+                return
+              end
+            end
+          end
+        end
+        M.setPad({})
+        if lastFlip and fsf() >= 25 and fsf() <= PERIOD - 38 then
+          local p = curPhase()
+          if not grids[p] then capture(p) end
+          if grids.a and grids.b then
+            buildPlan(M.fieldX(), M.fieldY(), p)
+          end
+        elseif not lastFlip and M.frame - obsStart > 3 * PERIOD + 30 then
+          error("phaseWalk: no clock edge observed -- is a cycle armed?", 0)
+        end
+        return
+      end
+      while plan[idx] and plan[idx].kind ~= "flip"
+            and M.fieldX() == plan[idx].tox
+            and M.fieldY() == plan[idx].toy do
+        idx = idx + 1
+      end
+      local item = plan[idx]
+      if not item then M.setPad({}); return end
+      if M.frame - hb >= 300 then
+        hb = M.frame
+        M.log(string.format("[phaseWalk] f%d (%d,%d) p%s fsf=%d item %d/%d "
+          .. "%s%s", M.frame, M.fieldX(), M.fieldY(), curPhase(), fsf(),
+          idx, #plan, item.kind, item.dir and ("[" .. item.dir .. "]") or ""))
+      end
+      if item.kind == "flip" then
+        if curPhase() == item.phase then idx = idx + 1 end
+        M.setPad({})
+        return
+      end
+      if item.kind == "window" then
+        if fsf() >= WINDOW_HOLD
+           or M.canStep(M.fieldX(), M.fieldY(), item.dir) then
+          M.setPad({ [item.dir] = true })
+        else
+          M.setPad({})
+        end
+        return
+      end
+      if item.segHead and begunSeg ~= item.seg then
+        if curPhase() ~= item.phase or fsf() < 0
+           or fsf() + 16 * item.segLen + SEG_MARGIN > PERIOD then
+          M.setPad({})
+          return
+        end
+        begunSeg = item.seg
+      end
+      M.setPad({ [item.dir] = true })
+    end),
+  }, spec.what or string.format("phaseWalk (%d,%d)", tx, ty))
+end
+
+-- --------------------------------------------------- NPC chase-talk --
+-- Talk to a WANDERING NPC: re-plan the approach every aligned frame
+-- (BFS one step toward any neighbor of the object's live tile), face it,
+-- edge A+direction; plain dialogs advanced with edge-A; STOPS the moment
+-- a CHOICE list is up ($056F >= 2) so a blind A can never answer it.
+-- Written for the Blackjack party-swap room's random-walking TERRA
+-- (probe_v07_g2h, 2026-07-28); nothing in it is specific to her.
+--   objIdx: the NPC's object index ($10 + record order in npc_prop)
+--   opts.done (optional): custom terminator; the default is
+--     "a choice dialog is up and waiting"
+function M.chaseTalk(objIdx, maxFrames, what, opts)
+  opts = opts or {}
+  local ph = 0
+  local done = opts.done or function()
+    return M.readByte(0x056f) >= 2 and M.dialogWaiting()
+  end
+  local function objAt(idx)
+    local off = 0x29 * idx
+    return M.readWord(0x086a + off) >> 4, M.readWord(0x086d + off) >> 4
+  end
+  return M.driveUntil(done, maxFrames or 9000, {
+    M.call(function()
+      ph = (ph + 1) % 8
+      if M.battleLoadStarted() then
+        for s = 0, 5 do
+          if M.readByte(0x3aa8 + s * 2) % 2 == 1 then
+            M.writeByte(0x3eec + s * 2, M.readByte(0x3eec + s * 2) | 0x80)
+          end
+        end
+        M.setPad(ph < 4 and { "a" } or {})
+        return
+      end
+      if M.readByte(0x056f) >= 2 then M.setPad({}); return end
+      if M.dialogWaiting() then M.setPad(ph < 4 and { "a" } or {}); return end
+      if not (M.hasControl() and M.tileAligned()) then M.setPad({}); return end
+      local ox, oy = objAt(objIdx)
+      local px, py = M.fieldX(), M.fieldY()
+      local dx, dy = ox - px, oy - py
+      if math.abs(dx) + math.abs(dy) == 1 then
+        local dir
+        if dx == 1 then dir = "right" elseif dx == -1 then dir = "left"
+        elseif dy == 1 then dir = "down" else dir = "up" end
+        M.setPad(ph < 4 and { "a", [dir] = true } or { [dir] = true })
+        return
+      end
+      local best
+      for _, c in ipairs({ { ox, oy + 1 }, { ox - 1, oy },
+                           { ox + 1, oy }, { ox, oy - 1 } }) do
+        local p = M.bfsPath(c[1], c[2])
+        if p and (not best or #p < #best) then best = p end
+      end
+      if best and #best > 0 then
+        M.setPad({ [M.movePress(best[1])] = true })
+      else
+        M.setPad({})
+      end
+    end),
+  }, what or string.format("chaseTalk obj %02X", objIdx))
+end

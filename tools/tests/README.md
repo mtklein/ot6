@@ -523,6 +523,14 @@ Plain functions (call from `H.call`/predicates):
   `H.worldHasControl`, `H.worldNavTo`, and `H.route` -- the field/world
   handoff driver): see `docs/research/world-map-nav.md` for the RAM
   tables and every measured mechanism claim.
+- `H.phaseWalk(tx, ty, spec)` -- crosses a TIMED-TILEMAP room (two
+  complementary floors swapped on an event timer, e.g. Sealed Gate
+  BASEMENT 2) by planning over the union graph of (x,y,phase) nodes and
+  executing swap-window steps on a measured clock; `H.chaseTalk(objIdx,
+  maxFrames, what)` -- talk to a WANDERING NPC, stopping the moment a
+  choice list is up.  Both are documented at their definitions in
+  `lib/ot6_field.lua`, with the measured mechanism (the rewrite window)
+  in `docs/design/sealed-gate-recon-addenda.md` Addendum 2.
 
 ## Mesen 2.1.1 Lua API facts (all verified empirically on this binary)
 

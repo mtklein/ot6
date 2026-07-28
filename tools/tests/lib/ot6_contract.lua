@@ -358,20 +358,12 @@ M.contracts["narshe-mission-v1"] = {
 }
 
 -- gate-cave-save-v1: boundary H, the vanilla save point on map 386 at
---
--- ############ NOT YET EXERCISED BY ANY LEG (2026-07-28) ####################
--- ## No generator asserts this table and no `gate-cave-save-v1` battery    ##
--- ## exists: leg G->H reaches BASEMENT 2 (map 385) and is blocked at the   ##
--- ## timed floor -- see docs/design/sealed-gate-recon-addenda.md §1.5.     ##
--- ## The table is DECLARED here anyway, from the values measured on the    ##
--- ## live chain up to that point (party, switches, magicite), so the leg   ##
--- ## that finishes the crossing writes a drive and not a contract, and so  ##
--- ## the Terra invariant is written down where the next agent will read it ##
--- ## rather than re-derived.  A contract nothing asserts is inert; a       ##
--- ## contract nobody wrote is the failure mode #25 exists to prevent.      ##
--- ###########################################################################
 -- (74,53) -- the ONLY interior save in the whole v0.7 band (recon §2.1 S3),
--- reached off map 384 (64,10).
+-- reached off map 384 (64,10).  Exercised by gen_gate_cave_save
+-- (2026-07-28): the 385 timed-floor crossing that blocked the first pass
+-- is lib/ot6_field.lua's M.phaseWalk (the rewrite-window mechanism,
+-- addenda §1.5/§1.8), and every value below was asserted at the live
+-- boundary moment through the real anchored mint.
 --
 -- THE TERRA INVARIANT (recon §2.3) IS THIS TABLE'S REASON TO EXIST.  The
 -- Imperial Base entrance refuses passage to any party without TERRA in the
@@ -387,6 +379,7 @@ M.contracts["gate-cave-save-v1"] = {
   switches = {
     { 0x0076, 1, "the Narshe mission meeting still stands (the G->H entry)" },
     { 0x0172, 1, "the base's 'No Imperial soldiers…' beat has played" },
+    { 0x0173, 1, "the (62,11) switch stands -- 384's save-room door is open" },
     { 0x0079, 0, "CLEAR -- the Sealed Gate scene is still ahead" },
     { 0x0242, 0, "CLEAR -- the base entrance has not gone silent" },
     { 0x007A, 0, "CLEAR -- the airship still flies (the crash is leg H->I)" },
