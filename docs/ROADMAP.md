@@ -60,8 +60,9 @@ links). What each delivers:
   Sealed Gate, Esper attack, and Imperial banquet, ending at the stable
   Thamasa mission handoff.
 - **v0.8 — Thamasa** — Thamasa and the burning house through Strago and
-  Relm joining and the post-massacre mission transition. Sketch must be
-  safe before this frontier ships.
+  Relm joining and the post-massacre mission transition. The Sketch bug
+  ships as-is by owner decision, documented in the release notes
+  (CONTRIBUTING has the policy history).
 - **v0.9 — End of the World of Balance** — the IAF gauntlet, Floating
   Continent, AtmaWeapon, timed escape, and transition into the World of Ruin.
 
@@ -72,7 +73,8 @@ make that the better release.
 **v0.6 enabling order:** #14 isolated parallel test runners → #12 source
 modules and central memory ABI → #9 battery-save anchor proof → Factory route.
 Issues #11 and #10 are completed to the v0.6 frontier as the route grows.
-Issue #13's policy and inventory begin now; its Sketch fix is a hard v0.8 gate.
+Issue #13's policy and inventory begin now; Sketch itself stays vanilla by
+owner decision (2026-07-28), shipping documented rather than fixed.
 
 **Design canon:** *on damage verbs boost multiplies; on chance verbs
 boost guarantees.* Steal shipped it in v0.4 (3 BP = a guaranteed steal of

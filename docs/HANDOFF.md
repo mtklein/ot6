@@ -23,7 +23,7 @@ encounter/party reachability gate in `make test` (#11), one authored save point
 landed before Number 024 with the rest of the band's cadence deliberately
 declined on recorded reasoning (#10, `design/save-points-vector.md`), the esper
 detail page now shows the while-worn stat mod (#27), the destructive-bug policy
-is written into CONTRIBUTING (#13 → Sketch gate is #28), and tests can no
+is written into CONTRIBUTING (#13; Sketch itself stays, see below), and tests can no
 longer reference fixtures by absolute path at all (#26).
 
 **The frontier build system is ninja now (#25).** `make frontier` is a thin
@@ -55,7 +55,10 @@ stay loud.
    and scope are in the issue; the codex battle path is the part that matters.
 3. **#15's release-gate residue**: save/reset/load validation at the new 273
    save point, the v0.6 human playthrough, and release notes.
-4. **#28 — Sketch** is v0.8's hard gate; dormant until Thamasa work starts.
+4. **Sketch stays unfixed, by explicit owner decision (2026-07-28).** #28
+   briefly made it a v0.8 gate; that reversed the owner's standing call
+   without sign-off and is itself reversed — see CONTRIBUTING. v0.8 ships
+   it documented in the release notes, not fixed.
 
 ## The things that will cost you a day
 

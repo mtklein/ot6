@@ -51,14 +51,21 @@ deliberate and it is not going away.
 
 But it is a bias against *cleanup*, not against *reliability*. A vanilla
 defect that can crash the game, corrupt or lose a save, corrupt persistent
-state, or soft-lock progression is a different thing from charm, and the
-line between the two is a product decision we have now made: before a
-release advertises a frontier, every known defect of that class reachable
-inside it is fixed, mitigated, or explicitly accepted in the release notes
-— never shipped silently. The two that have cleared this bar so far:
-the save-slot checksum-`$0000` save-loss bug (fixed ahead of this policy,
-issue #18) and the Sketch bug, which is a hard release gate for v0.8, the
-frontier where Relm becomes reachable.
+state, or soft-lock progression is a different thing from charm, and
+before a release advertises a frontier, every known defect of that class
+reachable inside it is fixed, mitigated, or explicitly accepted in the
+release notes — never shipped silently. The save-slot checksum-`$0000`
+save-loss bug cleared this bar and was fixed (issue #18).
+
+**The Sketch bug stays, by explicit owner decision (reaffirmed
+2026-07-28).** It is named here so the question does not get re-litigated:
+an earlier policy revision (issue #13) scoped a Sketch fix as a v0.8
+release gate, which reversed the owner's standing call without their
+sign-off, and was itself reversed (issue #28). Sketch is the canonical
+"charm" example — destructive on paper, beloved in practice — and the
+"explicitly accepted in the release notes" branch of the policy above is
+how v0.8 will ship it: documented, not fixed. If playtesting ever changes
+the owner's mind, that decision is theirs to reopen, not this document's.
 
 The inventory lives in
 [docs/research/vanilla-destructive-bugs.md](docs/research/vanilla-destructive-bugs.md):

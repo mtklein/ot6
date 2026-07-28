@@ -59,7 +59,7 @@ Sketch path.
 
 | # | Defect | Class | Reachable via | Frontier | Verdict |
 |---|---|---|---|---|---|
-| **1** | **Sketch graphics-index escape** | arbitrary WRAM write → save corruption / crash | Relm, `Sketch`, any battle | **v0.8 (Thamasa)** | **Meets the bar. Hard gate.** |
+| **1** | **Sketch graphics-index escape** | arbitrary WRAM write → save corruption / crash | Relm, `Sketch`, any battle | **v0.8 (Thamasa)** | **Meets the bar analytically; ships as-is by owner decision (§1)** |
 | **2** | **Save-slot checksum `$0000` reads as "empty slot"** | save loss: slot unloadable, then silently overwritten | any save, ~1 in 65 536 | **v0.1 (already shipped)** | **Meets the bar. Needs a decision now, not at v0.8.** |
 
 Confirmed in source but **below the bar or not player-reachable** — recorded so
@@ -83,7 +83,15 @@ Everything else that came up is in [REPORTED, UNVERIFIED](#reported-unverified).
 
 ---
 
-## 1. The Sketch bug — v0.8 hard gate
+## 1. The Sketch bug — stays vanilla, by owner decision
+
+> **Owner decision (2026-07-28): Sketch ships unfixed.** #13/#28 briefly
+> made a fix a v0.8 release gate; that reversed the owner's standing
+> "vanilla's bugs stay" call without sign-off and was itself reversed.
+> v0.8 documents the bug in its release notes instead. The analysis below
+> stands as analysis — severity, reachability, and fix options — so the
+> decision stays an informed one, and so nothing here needs re-deriving if
+> playtesting ever reopens it.
 
 This is the one #13 names, and it is real, it is severe, and the whole chain is
 readable in the vendored source. It is also *not* what most write-ups say it
