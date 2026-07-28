@@ -19,3 +19,4 @@ not just bugs.
 | 11 | scenarios (Cyan fresh in mind) | Bushido 0-boost tech "feels a bit too much like better attack" — explore ≥1 BP floor, 3-slot window | #38, v0.7; design endorsed — Bushido becomes pure bank-spending, Fight is the free swing |
 | 12 | scenario split (Cyan LV14) | **Field Skills→SwdTech page is garbled tile soup** (screenshot; frames/LV/HP fine, list body corrupt) | #39, fix dispatched — suite covered the loadout path, not the player's path; ratchet check (v0.5-era?) included |
 | 13 | Phantom Train (Sabin scenario) | **Phantom Train monster-in-a-box also a good challenge** | positive; second ambush-fight data point — the class is tuned right, not just Telstar |
+| 14 | Veldt (Gau pickup) | Owner pause: plan Gau — choose-from-8 rages, MP costs, Octopath model | #40 filed with the full plan; design doc next, build v0.7 |
