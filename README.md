@@ -7,12 +7,14 @@ turn economy.
 
 ## Status
 
-**v0.5 released** ([tag](https://github.com/mtklein/ot6/releases/tag/v0.5)) —
-playable from the start through the complete Opera sequence: the escape from
-Narshe, the crane maze, Dadaluma beaten, Ramuh's offer on the roof, then
-Jidoor, the Opera, Ultros defeated, Setzer joined, and the Blackjack acquired.
-Every ability costs MP now, Cyan's Bushido is a named submenu with a
-configurable four-slot loadout, and every enemy has some physical break axis.
+**v0.6 released** ([tag](https://github.com/mtklein/ot6/releases/tag/v0.6)) —
+playable from the start through the Raid on Vector: the Magitek Research
+Facility, Ifrit and Shiva as complete magicite sub-jobs, Number 024, the
+minecart and Number 128, the Cranes, the escape, and Terra's return. Battle
+MP is universal now — every character brings their save's pool into every
+fight — the esper detail page shows each stone's while-worn bonus, and the
+Vector band carries hand-authored break coverage. The first release
+validated by a full human playtest.
 
 Break and boost are the spine: enemies carry shields and hidden weaknesses,
 hitting a weakness chips a shield, and breaking drops defenses hard; boost
@@ -22,8 +24,8 @@ bump, while you hold it, augmenting the born mages rather than replacing
 them. Blitz is a menu, Steal guarantees the rare at three boost pips, and
 level-ups fully restore HP and MP.
 
-Work toward v0.6 now follows the Raid on Vector through the Magitek Research
-Facility escape and Terra's return.
+Work toward v0.7 now follows the Sealed Gate: the Narshe mission handoff,
+the cave, the Esper attack, the Imperial banquet, and the Thamasa handoff.
 
 Picking this up cold? [docs/HANDOFF.md](docs/HANDOFF.md) is the state of play —
 what is in flight, what is next, and the handful of traps that cost real time to
@@ -31,8 +33,8 @@ rediscover.
 
 See [docs/ROADMAP.md](docs/ROADMAP.md) for milestones and the "playable
 frontier" metric, and [docs/DESIGN.md](docs/DESIGN.md) for the mechanics
-design. The focused questions for the upcoming build are in the
-[v0.5 playtest brief](docs/playtest-v0.5.md).
+design. The v0.6 playtest findings ledger is
+[docs/playtest-v0.6-rc1.md](docs/playtest-v0.6-rc1.md).
 
 ## Quick start
 
