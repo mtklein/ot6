@@ -324,6 +324,12 @@ M.contracts["narshe-mission-v1"] = {
   ram = {
     { 0x1f60, 0xFF, 84, "world x (save-block cell $1f60): the Narshe exit spawn" },
     { 0x1f61, 0xFF, 34, "world y (save-block cell $1f61)" },
+    -- the parked Blackjack rides its own save cells, two south of the
+    -- party (measured, addenda SS2.4); the leg OUT of this boundary
+    -- re-boards from here, so a drifted ship is a contract violation,
+    -- not a mid-leg timeout
+    { 0x1f62, 0xFF, 84, "parked Blackjack x (save-block cell $1f62)" },
+    { 0x1f63, 0xFF, 36, "parked Blackjack y (save-block cell $1f63)" },
     { 0x11FA, 0x03, 0x00, "ON FOOT (not aboard a vehicle)" },
     { 0x11F3, 0xFF, 0x00, "not forced aboard the airship" },
     { 0x1A69, 0x07, 0x07, "RAMUH+IFRIT+SHIVA magicite still owned" },
