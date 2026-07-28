@@ -121,6 +121,33 @@ BANDS = {
             },
         ],
     },
+    # The Cave to the Sealed Gate (issue #31, v0.7).  Map set verified from
+    # data, not the recon: 382/383/384/385 are the only maps in the band
+    # with the enable bit set AND an entrance or load_map reaching them
+    # (379/380/381/387/388 carry enable bits or groups but nothing targets
+    # them -- the map-275 pattern).  The Imperial Base (377/378) has the
+    # enable bit CLEAR, so it contributes no encounters.  Battles 121/122/123
+    # (the gate scene and the esper attack) decode to dummy-only formations
+    # ($17b L1 HP1) and their real contents live in battle-event scripts
+    # being probed by a separate agent -- deliberately NOT declared here;
+    # add them when the probe lands.  Battle 149 is the map-384 (66,11)
+    # trap-switch Ninja ambush (event_main.asm:45177) and is real.
+    "sealed-gate": {
+        "doc": "docs/design/break-band-sealed-gate.md SS1-2, SS5",
+        "min_formations": 13,   # 3 unique per map x4 maps + the Ninja
+        "legs": [
+            {
+                "name": "cave, four (issue #31 dispatcher ruling: Terra "
+                        "seated, Setzer benched)",
+                "party": ["TERRA", "LOCKE", "EDGAR", "SABIN"],
+                "maps": [382, 383, 384, 385],
+                "events": [
+                    (149, (0, 1),
+                     "Ninja trap switch, map 384 (66,11) (event battle 149)"),
+                ],
+            },
+        ],
+    },
 }
 
 # --------------------------------------------------------------------------
