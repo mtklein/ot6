@@ -83,6 +83,10 @@ TESTS="$SUITE"
 ram_env_for() {
   case "$1" in
     battle_reveal_poweron) echo "OT6_RAM_POWERON=AllOnes" ;;
+    # battle_slotsboot cold-Continues the tracked terra-returned battery --
+    # the same anchor hand-off the Makefile's SMOKE_ANCHOR_* map gives
+    # anchored smoke generators (run.sh materializes it before boot).
+    battle_slotsboot) echo "OT6_SRAM_ANCHOR=tools/tests/anchors/terra-returned-v1" ;;
     *) echo "" ;;
   esac
 }

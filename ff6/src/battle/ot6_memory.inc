@@ -54,6 +54,12 @@ OT6_SCR_COLS         := $3ed2
 OT6_MAPBASE          := $57b6
 OT6_ATKCLASS         := $57b8
 OT6_FONTDIRTY        := $57b9
+OT6_SLOTTIER         := $57ba   ; Slot's latched boost tier (#31 backfill):
+                                ;   written at the spin's first A press by
+                                ;   Ot6SlotRig, re-banked into
+                                ;   OT6_BOOST_REVEALED by Ot6SlotCommit so
+                                ;   Ot6ActionEnd charges what the reels
+                                ;   delivered (ot6_kits.asm, the Slot strip)
 OT6_RANDPEND         := $57bc
 OT6_RANDBTL          := $57bd
 OT6_HUDVEIL          := $57be

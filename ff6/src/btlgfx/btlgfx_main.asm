@@ -19324,7 +19324,10 @@ UpdateMenuState_08:
         ora     #$3c
         bra     @7f32
 @7f2f:  jsr     Rand
-@7f32:  sta     w7e6179
+@7f32:  jsl     Ot6SlotRig  ; ot6: was `sta w7e6179` -- latch the spin's tier
+                            ;   (pending boost at this first press) and store
+                            ;   the rig byte, forced benevolent at 2-3 bp.
+                            ;   0 bp stores A untouched: vanilla to the byte
         inc     w7e7b92
         bra     @7f6d
 @7f3a:  lda     w7e7b93
@@ -19343,8 +19346,9 @@ UpdateMenuState_08:
         lda     w7e6179
         and     $36
         bne     @7f65
-        lda     #$04
-        sta     w7e617d
+        jsl     Ot6SlotDrift ; ot6: was `lda #$04 / sta w7e617d` -- the blessed
+                            ;   drift budget: 4 to the byte below 3 bp, the
+                            ;   whole strip at 3 bp (reel 2 seeks the match)
         bra     @7f6a
 @7f65:  lda     #$ff
         sta     w7e617b
@@ -19371,12 +19375,14 @@ UpdateMenuState_08:
         lda     w7e6179
         and     $36
         bne     @7fa6
-        lda     #$04
-        sta     w7e617d
+        jsl     Ot6SlotDrift ; ot6: was `lda #$04 / sta w7e617d` (see reel 2)
         lda     $3a
         bra     @7fae
-@7fa6:  lda     $3a
-        ora     #$80
+@7fa6:  jsl     Ot6SlotMiss ; ot6: was `lda $3a / ora #$80` (same 4 bytes) --
+                            ;   the rigged miss: kept to the byte at 0 bp,
+                            ;   bought off at 1+ bp (the pair is blessed and
+                            ;   reel 3 seeks the triple; a 7-pair under the
+                            ;   $2f49.2 joker gate stays refused at any tier)
         bra     @7fae
 @7fac:  lda     #$ff
 @7fae:  sta     w7e617c
@@ -19400,8 +19406,12 @@ UpdateMenuState_08:
         jsr     _c16d56       ; get pointer to current character slot data (battle menu)
         pla
         sta     $2bb0,y     ; attack
-        lda     w7e62ca
-        sta     $2bae,y     ; character slot
+        jsl     Ot6SlotCommit ; ot6: was `lda w7e62ca / sta $2bae,y` -- the
+                            ;   vanilla actor store, plus the charge fix:
+                            ;   OT6_BOOST_REVEALED = the tier latched at the
+                            ;   first press, so Ot6ActionEnd charges exactly
+                            ;   what the reels were spun with (an L/R edge
+                            ;   mid-spin changes neither delivery nor price)
         inc     w7e7b80       ; increment character slot
         inc     w7e7bcb       ; close menu
         rts

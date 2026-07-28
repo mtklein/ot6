@@ -22,6 +22,9 @@ CODE_EXT_INC = 1
 .global Ot6Oblivion              ; divine: Bushido tech 8, broken-gated in CalcAttackEffect
 .global Ot6Assassinate           ; divine: Shadow, broken non-boss instant-kill
 .global Ot6StealBoostLevel, Ot6StealSlot   ; boost-tiered steal (chance verb)
+.global Ot6SlotRig, Ot6SlotDrift           ; boost-tiered Slot (chance verb):
+.global Ot6SlotMiss, Ot6SlotCommit         ;   rig/drift/miss tiers + the
+                                           ;   latched-tier charge at commit
 .global Ot6BlitzListOpen         ; v0.3 blitz-as-menu: _c1776b -> tools shell
 .global Ot6BushidoListOpen       ; v0.5 bushido submenu (#8): swdtech -> tools shell
 .global Ot6BushidoConfirm        ;   confirm shim: row r -> boost r + latch tech
