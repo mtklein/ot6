@@ -10,3 +10,4 @@ not just bugs.
 | 2 | general | Dance needs to cost MP | #34, design already in mp-economy.md:96 (flat, at dance-start) |
 | 3 | Moogle defense | No MP visible anywhere in battle for Locke; Steal charges invisibly | #35 — root cause: vanilla has NO battle MP display at all; wallet-in-the-shop design, front of the wave, rc2 candidate |
 | 4 | through Moogle defense | **Combat balance is good so far — tense, even** | positive; first human validation of the break/boost tuning bands (M6's Kolts/Zozo passes were machine-measured only) |
+| 5 | Moogle defense | Locke shows no MP in the FIELD menu either (Terra does) | folded into #35 — CheckMPVisible (menu_common.asm:2311) gates on espers-owned/spell-known; the blackout self-resolves at the first magicite, i.e. exactly the opening stretch is dark |
