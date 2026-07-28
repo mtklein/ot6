@@ -444,4 +444,22 @@ STATES = [
     # the flashback would save as the WEDGE-actor Maduin) -- and mints F's
     # battery, `terra-returned-v1`: the v0.6 stop line and the anchor
     # v0.7's first leg will hang from.
+
+    # ---- v0.7: the Sealed Gate band (issue #31) ----------------------------
+    # ---- boundary F -> boundary G ------------------------------------------
+    # The first v0.7 leg, and the second anchored mint in the tree: cold-boot
+    # the terra-returned-v1 battery, board and fly the parked Blackjack to
+    # Narshe, drive the map-30 mission meeting to $0076=1, walk back out, and
+    # save at the Narshe exit spawn, world (84,34) -- boundary G,
+    # `narshe-mission-v1`.  ONE generator does the leg AND cuts the anchor,
+    # gen_terra_returned_anchor's shape, because the boundary is a world
+    # battery save with nothing to author (recon §2.2/§2.4).  Re-cutting the
+    # battery itself is still a deliberate by-hand operation:
+    #     OT6_SRAM_ANCHOR=tools/tests/anchors/terra-returned-v1 \
+    #     OT6_CAPTURE_SRM=tools/tests/anchors/narshe-mission-v1/narshe-mission.sram \
+    #     tools/tests/run.sh tools/tests/gen_narshe_mission.lua
+    # This graph edge runs the same generator for its savestate and its
+    # contract verdict; run.sh only captures a battery when OT6_CAPTURE_SRM
+    # is set, so a mint can never quietly rewrite a tracked anchor.
+    S("narshe_mission", gen="gen_narshe_mission", anchor="terra-returned-v1"),
 ]

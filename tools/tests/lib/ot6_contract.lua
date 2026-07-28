@@ -291,6 +291,128 @@ M.contracts["terra-returned-v1"] = {
   },
 }
 
+-- ===================== the v0.7 Sealed Gate band (issue #31) ==============
+-- docs/design/sealed-gate-recon.md §2.2 proposes anchors G-K; these are the
+-- two the first slice cuts.  Every value below is MEASURED on the live
+-- chain (probe_v07_f2g / probe_v07_g2h / probe_v07_385, 2026-07-28), not
+-- derived from the recon's tables.
+--
+-- POSITION IS PINNED THROUGH $1f60/$1f61, NOT worldX/worldY.  Both v0.7
+-- boundaries are asserted as EXIT contracts with the save menu still open
+-- (the leg saves, then judges), and the menu module overlays $e0/$e2 -- the
+-- same #29 module-overlay class the slot witness already dodges by reading
+-- SRAM $307ff0 instead of $021f.  $1f60/$1f61 are the world-position cells
+-- the save block itself records, stable in every module context, and a cold
+-- Continue seeds $e0/$e2 from them (world/init.asm ReloadMap tail), so both
+-- ends of the boundary compare the same two bytes.
+
+-- narshe-mission-v1: boundary G.  A world battery save at the Narshe exit
+-- spawn, world (84,34), taken ON FOOT with the Blackjack parked one tile
+-- south at (84,36) -- the tile the leg landed on, and the tile the leg OUT
+-- of G walks back onto to re-board.  $0076=1 is the whole point of the leg:
+-- the mission meeting on map 30 has run (event_main.asm:94170) and the ten
+-- Imperial-Base soldier NPCs have been withdrawn ($045E-$0467=0), which is
+-- what opens the base entrance for leg G->H.
+--
+-- THE PARTY IS STILL THE v0.6 FOUR.  Terra is available ($02F0=1) but NOT
+-- active: seating her is leg G->H's first act (the Blackjack swap room),
+-- and the recon's §2.3 "Terra invariant" starts at anchor H, not here.  The
+-- #21 count control therefore reads 4 with TERRA's party nibble ZERO -- a
+-- chain that seated her early fails by name at this boundary.
+M.contracts["narshe-mission-v1"] = {
+  slot = 3,
+  ram = {
+    { 0x1f60, 0xFF, 84, "world x (save-block cell $1f60): the Narshe exit spawn" },
+    { 0x1f61, 0xFF, 34, "world y (save-block cell $1f61)" },
+    { 0x11FA, 0x03, 0x00, "ON FOOT (not aboard a vehicle)" },
+    { 0x11F3, 0xFF, 0x00, "not forced aboard the airship" },
+    { 0x1A69, 0x07, 0x07, "RAMUH+IFRIT+SHIVA magicite still owned" },
+  },
+  switches = {
+    { 0x0076, 1, "the Narshe mission meeting has run (event_main.asm:94170)" },
+    { 0x064E, 1, "the meeting-scene latch" },
+    { 0x045E, 0, "the Imperial-Base soldiers were withdrawn (:94171-94180)" },
+    { 0x0079, 0, "CLEAR -- the Sealed Gate scene is still ahead" },
+    { 0x02F0, 1, "TERRA is available (she is seated in leg G->H, not here)" },
+    { 0x0070, 1, "the Blackjack party-swap room is armed" },
+    { 0x02F9, 1, "SETZER is available" },
+    { 0x02F6, 0, "CELES is still out of the roster" },
+    { 0x007A, 0, "CLEAR -- the airship still flies" },
+    { 0x0242, 0, "CLEAR -- the base entrance has not gone silent" },
+  },
+  party = {
+    size = 4,                     -- the #21 control: still the v0.6 four
+    members = {
+      { 0x01, "LOCKE" },
+      { 0x04, "EDGAR (pierce+Tools)" },
+      { 0x05, "SABIN (bludgeon)" },
+      { 0x09, "SETZER" },
+    },
+  },
+  sram = {
+    { 0x316800, 0x4f, "slot 3 codex magic 'O'" },
+    { 0x316801, 0x38, "slot 3 codex magic '8'" },
+    { 0x316810 + 0x012d, 0x01, "bank-31 element-codex witness (ULTROS2)" },
+    { 0x316990 + 0x012d, 0x01, "bank-31 class-codex witness (ULTROS2)" },
+  },
+}
+
+-- gate-cave-save-v1: boundary H, the vanilla save point on map 386 at
+--
+-- ############ NOT YET EXERCISED BY ANY LEG (2026-07-28) ####################
+-- ## No generator asserts this table and no `gate-cave-save-v1` battery    ##
+-- ## exists: leg G->H reaches BASEMENT 2 (map 385) and is blocked at the   ##
+-- ## timed floor -- see docs/design/sealed-gate-recon-addenda.md §1.5.     ##
+-- ## The table is DECLARED here anyway, from the values measured on the    ##
+-- ## live chain up to that point (party, switches, magicite), so the leg   ##
+-- ## that finishes the crossing writes a drive and not a contract, and so  ##
+-- ## the Terra invariant is written down where the next agent will read it ##
+-- ## rather than re-derived.  A contract nothing asserts is inert; a       ##
+-- ## contract nobody wrote is the failure mode #25 exists to prevent.      ##
+-- ###########################################################################
+-- (74,53) -- the ONLY interior save in the whole v0.7 band (recon §2.1 S3),
+-- reached off map 384 (64,10).
+--
+-- THE TERRA INVARIANT (recon §2.3) IS THIS TABLE'S REASON TO EXIST.  The
+-- Imperial Base entrance refuses passage to any party without TERRA in the
+-- ACTIVE four (_cb25d6, event_main.asm:44004-44016) and bounces it back to
+-- world (164,194); a stale anchor minted with the wrong four would pass
+-- every ordinary check and then bounce off the base on the leg out.  So the
+-- roster is asserted member by member AND counted (#21), and SETZER's
+-- absence is asserted too -- he is the one the swap benched, and a chain
+-- that benched somebody else has a different cave kit.
+M.contracts["gate-cave-save-v1"] = {
+  slot = 3,
+  field = { map = 386, x = 74, y = 53 },   -- the vanilla save point
+  switches = {
+    { 0x0076, 1, "the Narshe mission meeting still stands (the G->H entry)" },
+    { 0x0172, 1, "the base's 'No Imperial soldiers…' beat has played" },
+    { 0x0079, 0, "CLEAR -- the Sealed Gate scene is still ahead" },
+    { 0x0242, 0, "CLEAR -- the base entrance has not gone silent" },
+    { 0x007A, 0, "CLEAR -- the airship still flies (the crash is leg H->I)" },
+    { 0x02F0, 1, "TERRA is available" },
+    { 0x02F6, 0, "CELES is still out of the roster" },
+  },
+  party = {
+    size = 4,
+    members = {
+      { 0x00, "TERRA (the base entrance's hard gate, recon §2.3)" },
+      { 0x01, "LOCKE" },
+      { 0x04, "EDGAR (pierce+Tools)" },
+      { 0x05, "SABIN (bludgeon)" },
+    },
+  },
+  ram = {
+    { 0x1A69, 0x07, 0x07, "RAMUH+IFRIT+SHIVA magicite still owned" },
+  },
+  sram = {
+    { 0x316800, 0x4f, "slot 3 codex magic 'O'" },
+    { 0x316801, 0x38, "slot 3 codex magic '8'" },
+    { 0x316810 + 0x012d, 0x01, "bank-31 element-codex witness (ULTROS2)" },
+    { 0x316990 + 0x012d, 0x01, "bank-31 class-codex witness (ULTROS2)" },
+  },
+}
+
 -- ------------------------------------------------------------- the checker --
 
 local function switchVal(id)
