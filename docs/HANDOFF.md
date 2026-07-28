@@ -117,7 +117,10 @@ was free". Documented at `freezeOthers`.
   in `.claude/settings.json`.
 - Parallel work goes in separate git worktrees with disjoint file ownership;
   `tools/worktree-setup.sh` seeds the ROM, emulator links, states, and the
-  ninja build log.
+  ninja build log. **Worktrees live under `.claude/worktrees/<name>` inside
+  the repo (owner rule, 2026-07-28: never as siblings of `~/ot6` or
+  anywhere else in the home directory)** — compose.py's nested-checkout
+  refusal already models exactly that layout.
 - Commit messages here run long and explain the why, including what was ruled
   out. Match that.
 
