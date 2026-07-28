@@ -18,3 +18,4 @@ not just bugs.
 | 10 | Imperial Camp (Sabin/Shadow scenario) | **Telstar monster-in-a-box nearly wiped the party — "that was exciting!"** | positive; the ambush-fight class delivering intended tension (unprobed enemy, no codex, full price) |
 | 11 | scenarios (Cyan fresh in mind) | Bushido 0-boost tech "feels a bit too much like better attack" — explore ≥1 BP floor, 3-slot window | #38, v0.7; design endorsed — Bushido becomes pure bank-spending, Fight is the free swing |
 | 12 | scenario split (Cyan LV14) | **Field Skills→SwdTech page is garbled tile soup** (screenshot; frames/LV/HP fine, list body corrupt) | #39, fix dispatched — suite covered the loadout path, not the player's path; ratchet check (v0.5-era?) included |
+| 13 | Phantom Train (Sabin scenario) | **Phantom Train monster-in-a-box also a good challenge** | positive; second ambush-fight data point — the class is tuned right, not just Telstar |
