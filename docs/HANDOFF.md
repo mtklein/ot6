@@ -62,14 +62,18 @@ stay loud.
 
 ## The things that will cost you a day
 
-**1. Module WRAM overlays lie to you twice now.** `$7E3BF4` is the party
-battle-HP table only while the battle module owns that RAM, and `$021f` is
-`wSaveSlotToLoad` only while the menu module owns the `$0200` region — the
-world module block-restores its own variable there after any menu closes,
-with no CPU write a callback would catch (it is invisible to Mesen write
-callbacks; measure with samples, not watchpoints). Before trusting any
-`$02xx`/`$3xxx` WRAM read, ask which module owns it at that frame. Witness
-persistent facts through SRAM (`$307ff0`, the codex pages) instead.
+**1. Module WRAM ownership lies to you — and so did this trap's first
+draft.** `$7E3BF4` is the party battle-HP table only while the battle
+module owns that RAM. `$021f` was reported here as overlaid by the world
+module after any menu close; the #29 audit (2026-07-28,
+`research/codex-context-audit.md`) disproved that mechanism — the cell has
+exactly four writers, all menu lifecycle, and the overlaid values came
+from a test forcing `ZMENUSTATE` mid-flow, leaving corrupted menu tasks
+running. Both lessons stand: ask which module owns a `$02xx` cell before
+trusting it, verify the answer by instrumenting (block moves are invisible
+to Mesen write callbacks — sample, don't watchpoint), and witness
+persistent facts through SRAM (`$307ff0`, the codex pages) when a
+context-free channel exists.
 
 **2. NPC record order is NPC identity.** Event scripts address NPCs as
 {map, index-within-block}, so a record inserted ahead of an existing NPC
