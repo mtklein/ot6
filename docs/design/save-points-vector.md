@@ -325,6 +325,13 @@ band supports:
 | **E** `vector-escape` | map 240 (58,7) | vanilla save point |
 | **F** `terra-returned` | world map, post-takeoff | world save, no authoring |
 
+> **F-anchor Continue behavior (measured 2026-07-28, probe_mpu_boot):** a
+> cold Continue of `terra-returned-v1` restores the party **on foot** at
+> the save tile (`$11FA&3=0`, `$11F3=0`) even though the save was taken
+> aboard the grounded Blackjack — `$1f64/$1f65` keep the aboard bit until
+> the next save. Load-bearing for any v0.7 leg hanging off this anchor:
+> the leg starts walking, not flying.
+
 Legs, with the current fixture chain (`Makefile:775-841`) mapped onto them:
 
 - **A→B** — world walk, Vector sneak, 262 floor, Kefka scene, both chutes.

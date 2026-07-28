@@ -13947,6 +13947,13 @@ InitCmdList:
         iny                 ; next command
         cpy     #$04
         bne     @53a5
+.if OT6_MP_COSTS
+        jsl     Ot6MpUniversal  ; ot6 v0.6 (#32): the MP economy prices every
+                                ;   kit, so EVERY character keeps the battle MP
+                                ;   LoadCharProp loaded -- sets the has-mp flag
+                                ;   ($f8 bit 0) unconditionally and the vanilla
+                                ;   spell-less clear below never fires
+.endif
         lsr     $f8         ; branch if $f8 was set (character has mp)
         bcs     @5408
         lda     $02,s       ; pointer to character data

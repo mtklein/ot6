@@ -514,6 +514,43 @@ Ot6AbilityCostTbl:
 
 ; ------------------------------------------------------------------------------
 
+; [ battle mp is universal -- every character keeps their save's pool (#32) ]
+;
+; vanilla's battle init loads every character's MP through LoadCharProp
+; (battle_main.asm:6621-6640) and then CLEARS it again unless a magic/lore
+; command init set the has-mp flag ($f8 bit 0) -- i.e. unless the character
+; knows a spell or has an esper equipped (InitCmdList @53a5..@5408;
+; InitCmd_03/04 reach InitCmd_05's `lda #$01 / tsb $f8` only when
+; ValidateSpellList counted a spell into $f6 or left an esper in $f7).
+; sensible when only magic spent MP; under the live economy above it sent
+; every spell-less character into battle at 0/0 while Ot6AbilityCost priced
+; their whole kit -- Blitz, Tools, Bushido and Steal all fizzled through
+; CalcAttackEffect's universal insufficient-MP gate as silent wasted turns,
+; and the max-0 writeback skip (battle_main.asm:12265-12267) kept field MP
+; full so the field never showed the theft (issue #32's measurements).
+;
+; ruling (issue #32): MP is a universal resource, so its battle init is
+; universal.  this hook sets the has-mp flag for every character, so the
+; vanilla clear never fires and the pool LoadCharProp loaded survives.  the
+; command inits have already run by the hook site: Magic/Lore command
+; REMOVAL for spell-less characters is untouched -- only the pool differs.
+; with max MP now real, vanilla's own end-of-battle writeback (UpdateSRAM)
+; stores cur MP back to the character data, so the field pool tracks battle
+; spend exactly (battle_naturalmp.lua's writeback gate).
+;
+; entry (jsl from InitCmdList, right before its `lsr $f8`, once per
+; character): a8/i8 -- a battle-init 8-bit-index caller, so the body is
+; width-agnostic (no index ops, no pushes; ot6.asm's width discipline).
+; $f8 is the init's direct-page scratch; jsl preserves D, so the dp access
+; lands on the caller's own cell.
+.proc Ot6MpUniversal
+        lda     #$01            ; the "character has mp" bit InitCmd_05 sets
+        tsb     $f8
+        rtl
+.endproc
+
+; ------------------------------------------------------------------------------
+
 ; [ grey a menu row the active caster cannot afford -- magic's grey-out ported ]
 ;
 ; vanilla magic greys an unaffordable spell: UpdateEnabledMagic compares each
