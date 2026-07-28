@@ -19,6 +19,12 @@ Stated once, assumed by every block:
   vanilla AI.
 - **Breaks don't get a boss nerf.** Turn loss and ×2 apply to
   AtmaWeapon exactly as to a Lobo. Shields are the only boss knob.
+- **Owner decision (2026-07-28, rc1 playtest): the Vargas triple-tutorial
+  stays verbatim, permanently.** Menu-Blitz made the in-battle input
+  tutorial mechanically unnecessary, which is exactly why it stays — it
+  is pure charm now ("i always found the original charming and you've
+  kept it exactly, even maybe more so"). No cleanup pass removes it.
+
 - **Scripts beat state.** Scripted beats — Vargas's Pummel finish,
   Chupon's Sneeze, the espers crashing Ultros's bridge party — fire
   regardless of break state. The gauge is a combat system, not a

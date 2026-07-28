@@ -14,3 +14,4 @@ not just bugs.
 | 6 | early WoB | Menus sometimes show another character's spells — e.g. **Tools shows Cure 2** (cross-list contamination) | #36 — owner: predates v0.6, NOT a tag blocker; re-milestoned v0.7; investigation running (blame sweep + severity check decide if it jumps the queue) |
 | 7 | South Figaro → Mt. Kolts | **No release blockers so far** | positive; rc1 holding through band 2 |
 | 8 | pre-Kolts | Full HP/MP restore on level-up works as expected | positive; v0.4 feature confirmed in natural play |
+| 9 | Vargas | **Blitz updates + the faithfully-kept triple-tutorial: loved.** Owner decision: tutorial stays verbatim, permanently — charm, not redundancy | positive; pinned in bosses-wob.md so no cleanup pass touches it |
