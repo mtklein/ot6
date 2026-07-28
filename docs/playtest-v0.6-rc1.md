@@ -15,3 +15,4 @@ not just bugs.
 | 7 | South Figaro → Mt. Kolts | **No release blockers so far** | positive; rc1 holding through band 2 |
 | 8 | pre-Kolts | Full HP/MP restore on level-up works as expected | positive; v0.4 feature confirmed in natural play |
 | 9 | Vargas | **Blitz updates + the faithfully-kept triple-tutorial: loved.** Owner decision: tutorial stays verbatim, permanently — charm, not redundancy | positive; pinned in bosses-wob.md so no cleanup pass touches it |
+| 10 | Imperial Camp (Sabin/Shadow scenario) | **Telstar monster-in-a-box nearly wiped the party — "that was exciting!"** | positive; the ambush-fight class delivering intended tension (unprobed enemy, no codex, full price) |
