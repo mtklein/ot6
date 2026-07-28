@@ -22,7 +22,16 @@
 #   * a failing mint FAILS the build, blocks its dependents, and is retried
 #     on the next run -- no way to record success without executing;
 #   * an unknown target is a hard error (the `smoke-%: rom` silent .PHONY
-#     no-op class make allowed).
+#     no-op class make allowed);
+#   * MULTI-MINT SIBLINGS CONVERGE (issue #30): a script that mints several
+#     states gets one edge per state, every invocation emits EVERY sibling
+#     artifact, and the publish step must not let one edge touch another
+#     edge's outputs -- or an edge that republishes its own sibling INPUT
+#     after its own outputs is input-newer-than-output forever and
+#     consecutive runs re-mint the family and its downstream trunk with
+#     zero content changes.  The stub below emits siblings exactly like a
+#     real multi-mint generator so the quiescence cases prove this class
+#     stays dead.
 set -u
 command -v ninja >/dev/null 2>&1 || {
   echo "frontier_ninja selftest: ninja not installed -- brew bundle"; exit 1; }
@@ -39,28 +48,61 @@ cp "$REAL/tools/tests/lib/frontier_stamp.sh" "$TMP/tools/tests/lib/"
 printf 'lib v1\n'      > "$TMP/tools/tests/lib/ot6.lua"
 printf 'field v1\n'    > "$TMP/tools/tests/lib/ot6_field.lua"
 printf 'contract v1\n' > "$TMP/tools/tests/lib/ot6_contract.lua"
-for g in a b c e; do printf 'gen %s v1\n' "$g" > "$TMP/tools/tests/gen_$g.lua"; done
+for g in a b c e h; do printf 'gen %s v1\n' "$g" > "$TMP/tools/tests/gen_$g.lua"; done
+printf 'gen g v1\nmints: g1 g2\n' > "$TMP/tools/tests/gen_g.lua"
 printf 'rom v1\n' > "$TMP/build/ot6.sfc"
 printf '{}\n'     > "$TMP/tools/tests/anchors/toy-v1/manifest.json"
 printf 'sram v1'  > "$TMP/tools/tests/anchors/toy-v1/toy.sram"
 
 # The stub run.sh: journal the invocation (worker + stack/anchor env), honor
-# an injected failure, then publish both artifact halves like the real one.
+# an injected failure, then behave like the real one where it matters here:
+#  * the SCRIPT half -- a multi-mint generator emits EVERY sibling artifact
+#    on EVERY invocation (gen_edgar plays the whole Figaro chapter and emits
+#    all three figaro states no matter which edge invoked it).  A mock gen
+#    declares its siblings on a `mints:` line; single-mint gens omit it.
+#  * the PUBLISH half -- MIRRORS tools/tests/run.sh's publish step (the
+#    block tagged issue #30); keep the two in lockstep, because this stub is
+#    how the publish policy's scheduling consequences get proven without an
+#    emulator.  Workspace files are iterated in the same "$ART"/* glob order
+#    the real script uses.
 cat > "$TMP/tools/tests/run.sh" <<'EOF'
 #!/bin/sh
 set -u
 ROOT="$(cd "$(dirname "$0")/../.." && pwd)"
+SCRIPT="${1:?usage: stub run.sh <script.lua>}"
 echo "$OT6_WORKER${OT6_STACK:+ stack=$OT6_STACK}${OT6_SRAM_ANCHOR:+ anchor=$OT6_SRAM_ANCHOR}" >> "$ROOT/build/journal"
 [ -e "$ROOT/build/fail.$OT6_WORKER" ] && { echo "stub run.sh: injected failure for $OT6_WORKER"; exit 1; }
 mkdir -p "$ROOT/build/states"
-echo "minted $OT6_WORKER by $$" > "$ROOT/build/states/$OT6_WORKER.mss"
-echo 'return "AA=="'            > "$ROOT/build/states/$OT6_WORKER.mss.lua"
+ART=$(mktemp -d "$ROOT/build/art.XXXXXXXX") || exit 2
+states=$(sed -n 's/^mints: *//p' "$SCRIPT")
+[ -n "$states" ] || states="$OT6_WORKER"
+for s in $states; do
+  echo "minted $s by $$ for $OT6_WORKER" > "$ART/$s.mss"
+  echo 'return "AA=="'                   > "$ART/$s.mss.lua"
+done
+if [ -n "${OT6_EXPECT_ARTIFACT:-}" ]; then
+  for src in $OT6_EXPECT_ARTIFACT; do
+    cp "$ART/$src" "$ROOT/build/states/$src"
+  done
+else
+  for src in "$ART"/*; do
+    [ -f "$src" ] || continue
+    cp "$src" "$ROOT/build/states/$(basename "$src")"
+  done
+fi
+rm -rf "$ART"
 exit 0
 EOF
 chmod +x "$TMP/tools/tests/run.sh"
 
 # The toy graph: a plain power-on mint, a chained mint, an anchored mint, a
-# stack seed, and a stacked mint off the seed -- one of every edge kind.
+# stack seed, a stacked mint off the seed -- one of every edge kind -- plus
+# a MULTI-MINT FAMILY (issue #30): gen_g mints g2 then g1 from one run, one
+# edge each, and h chains off the family's ending.  The sibling names are
+# chosen so the SECOND state sorts BEFORE the first, exactly the real
+# figaro family's shape (figaro_cleared sorts before figaro_matron, its own
+# input): a publish-everything policy writes edge g1's own outputs first and
+# then re-bumps g2 -- g1's INPUT -- so g1 could never be clean again.
 cat > "$TMP/tools/tests/frontier_graph.py" <<'EOF'
 def S(state, **kw):
     e = {"state": state, "gen": None, "prev": None, "anchor": None,
@@ -73,6 +115,9 @@ STATES = [
     S("c", gen="gen_c", anchor="toy-v1"),
     S("d", seed="b"),
     S("e", gen="gen_e", prev="d", stack="t9_"),
+    S("g2", gen="gen_g"),
+    S("g1", gen="gen_g", prev="g2"),
+    S("h", gen="gen_h", prev="g1"),
 ]
 EOF
 
@@ -95,8 +140,15 @@ edit() { printf '%s\n' "$2" > "$TMP/$1"; }
 # 1. fresh tree: every mint runs, the seed lands, env vars arrive intact.
 : > "$TMP/build/journal"
 run
-check "fresh tree mints every leg" "a b c e " "$ran"
+check "fresh tree mints every leg" "a b c e g1 g2 h " "$ran"
 check "fresh tree build succeeds" 0 "$rc"
+# both multi-mint siblings were published by their OWN edges -- restricting
+# what one edge publishes must never leave a sibling's artifact missing.
+[ -f "$TMP/build/states/g1.mss" ] && [ -f "$TMP/build/states/g2.mss" ] &&
+  grep -q "for g1" "$TMP/build/states/g1.mss" &&
+  grep -q "for g2" "$TMP/build/states/g2.mss" &&
+  echo "  pass each multi-mint sibling published by its own edge" ||
+  { echo "  FAIL a multi-mint sibling is missing or published by a sibling's edge"; ok=0; }
 [ -f "$TMP/build/states/d.mss" ] && cmp -s "$TMP/build/states/d.mss" "$TMP/build/states/b.mss" &&
   echo "  pass seed d landed as a copy of b" ||
   { echo "  FAIL seed d missing or not b's bytes"; ok=0; }
@@ -110,11 +162,17 @@ grep -q '^e stack=t9_$' "$TMP/journal.last" &&
   echo "  pass anchored stamp lists manifest+payload" ||
   { echo "  FAIL anchored stamp extras missing"; ok=0; }
 
-# 2. quiescent: nothing re-runs.
+# 2. quiescent: nothing re-runs.  With the multi-mint family in the graph
+#    this is ALSO the issue-#30 sibling regression: before run.sh published
+#    only the invoking edge's own artifacts, edge g1's publish pass re-bumped
+#    g2.mss -- its own input -- after its own outputs, and this run minted
+#    "g1 " (then "g1 h ", then "g1 h " ...) forever on an untouched tree.
 run
-check "untouched tree re-mints nothing" "" "$ran"
+check "untouched tree re-mints nothing (#30: g1 must not re-mint)" "" "$ran"
 grep -q "no work to do" "$NIN" && echo "  pass ninja reports no work" ||
   { echo "  FAIL expected 'no work to do'"; ok=0; }
+run
+check "third run is still quiescent (#30 cascade class)" "" "$ran"
 
 # 3. mtime-only touches (a checkout, a worktree cp): nothing re-runs.
 sleep 1
@@ -132,7 +190,7 @@ check "mtime-only touch re-mints nothing (restat)" "" "$ran"
 sleep 1
 edit build/ot6.sfc "rom v2"
 run
-check "ROM content change re-mints EVERY leg" "a b c e " "$ran"
+check "ROM content change re-mints EVERY leg" "a b c e g1 g2 h " "$ran"
 cmp -s "$TMP/build/states/d.mss" "$TMP/build/states/b.mss" &&
   echo "  pass seed d refreshed with its re-minted source" ||
   { echo "  FAIL seed d stale after source re-mint"; ok=0; }
@@ -144,13 +202,24 @@ edit tools/tests/gen_b.lua "gen b v2"
 run
 check "gen_b edit re-runs b and its dependents only" "b e " "$ran"
 
+# 5a. NO UNDER-MINTING (#30's other half): a genuinely stale multi-mint
+#     family re-mints exactly its own members and their dependents.  The
+#     per-edge publish restriction must not have turned "publish less" into
+#     "mint less".
+sleep 1
+printf 'gen g v2\nmints: g1 g2\n' > "$TMP/tools/tests/gen_g.lua"
+run
+check "gen_g edit re-runs BOTH siblings and their dependent" "g1 g2 h " "$ran"
+run
+check "and the family is quiescent again afterwards" "" "$ran"
+
 # 6. each composed-in lib half re-runs every leg; the contract half is the
 #    issue-#25 addition the old stamp never hashed.
 for half in ot6.lua ot6_field.lua ot6_contract.lua; do
   sleep 1
   edit "tools/tests/lib/$half" "$half EDITED $$"
   run
-  check "lib/$half edit re-runs every leg" "a b c e " "$ran"
+  check "lib/$half edit re-runs every leg" "a b c e g1 g2 h " "$ran"
 done
 
 # 7. anchor payload and manifest edits re-run the anchored leg only.

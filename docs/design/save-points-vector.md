@@ -262,6 +262,16 @@ revisit — the analysis is done and the tile candidates are on the walkable
 column read by the offline BFS ((52,36)-(52,38); **walkability unverified
 live**, and the parked MAGITEK_TRAIN NPCs on map 240 are not in the model).
 
+> **Correction (2026-07-28, from the B–F anchor pass):** the offline-BFS
+> candidates did not survive contact — **(52,36)-(52,38) are NOT walkable
+> live** (`gen_terra_returned_anchor.lua`'s route header records the
+> measurement; the E→F anchor gen had to route around them).  The reunion
+> trigger is entered **from the east along row 40**: (54,40) → held LEFT
+> onto the trigger column x=52.  The recommendation above stands — nothing
+> in it depended on those tiles — but if this placement is ever revisited,
+> the candidate list must be re-derived from live `canStep`, not the static
+> model.
+
 ### 4.5 After the escape and Terra's return — NO new save point
 
 The v0.6 stop line is first control on map 6 (`event_main.asm:25669`) with
@@ -273,6 +283,14 @@ anchor is a world-map battery save, not an authored save point
 (`gen_post_opera_anchor.lua`). **Caveat, unverified:** whether the menu can
 open mid-flight (vs. after landing) was not checked; the anchor procedure in
 §5 assumes land-then-save, which is safe either way.
+
+> **Resolved (2026-07-28, from the B–F anchor pass):** the menu DOES open
+> mid-flight, but the Save command is **disabled while airborne** and
+> enables once the ship grounds — menu-flags `$0201` bit7 measured `$80`
+> from the grounded ship and `$00` airborne
+> (`gen_terra_returned_anchor.lua`, which asserts the grounded value before
+> saving anchor F).  Land-then-save is therefore the *required* order, not
+> merely the safe one; the proposal above is unaffected.
 
 ### 4.6 Considered and not proposed: a factory-entrance save (map 262)
 
@@ -371,7 +389,9 @@ evidence of playability (`leg-fixtures.md:116-118`).
 - `npc_prop` free space "85 bytes": trailing-`$FF` measurement; a legal
   trailing `$FF` data byte would inflate it.
 - Menu availability mid-flight (§4.5): unchecked; the proposal does not
-  depend on it.
+  depend on it.  *Resolved 2026-07-28: opens mid-flight, saving disabled
+  until the ship grounds ($0201=$80 grounded, $00 airborne) — see the §4.5
+  correction.*
 - The Esper-World flashback's internal structure (whether any tile there
   could even legally host a save): unmapped, per the recon; this proposal
   only asserts it *should not* host one.

@@ -214,16 +214,21 @@ smoke: $(SMOKE_TARGETS)
 	fi; \
 	echo "smoke: all $(words $(SMOKE)) generators ran and passed"
 
-# gen_vector_doorstep cold-loads the tracked battery anchor rather than booting a
-# predecessor savestate, so it needs OT6_SRAM_ANCHOR exactly as the graph's
-# anchored mint edges supply it.  Without it the run times out waiting for
-# the cold Continue.
-SMOKE_ANCHORED := gen_vector_doorstep
+# Anchored generators cold-load a tracked battery instead of booting a
+# predecessor savestate, so smoke must hand each one its anchor exactly as
+# the graph's anchored mint edges do (OT6_SRAM_ANCHOR) -- without it the run
+# times out waiting for the cold Continue.  One entry per anchored smoke
+# generator, keyed by gen name; a gen with no entry boots savestates.  This
+# map is what retired gen_n128's dual-boot battery probe: smoke now hands
+# every anchored generator its battery instead of asking the generator to
+# guess its boot from SRAM contents.
+SMOKE_ANCHOR_gen_vector_doorstep := tools/tests/anchors/post-opera-v1
+SMOKE_ANCHOR_gen_n128            := tools/tests/anchors/minecart-platform-v1
 
 $(SMOKE_TARGETS): smoke-%: rom
 	@rm -f build/states/smoke_$*.receipt
 	@OT6_NO_PUBLISH=1 OT6_WORKER=$* \
-	 $(if $(filter $*,$(SMOKE_ANCHORED)),OT6_SRAM_ANCHOR=$(POST_OPERA_ANCHOR),) \
+	 $(if $(SMOKE_ANCHOR_$*),OT6_SRAM_ANCHOR=$(SMOKE_ANCHOR_$*),) \
 	 tools/tests/run.sh tools/tests/$*.lua \
 	   > build/states/smoke_$*.log 2>&1 \
 	  && { touch build/states/smoke_$*.receipt; echo "  $*: pass"; } \
@@ -242,9 +247,8 @@ $(SMOKE_TARGETS): smoke-%: rom
 # manifest and payload ride the leg's dependency set, so editing either
 # re-mints every state hung off the anchor, and run.sh's persistent_layout
 # gate refuses the load before boot if the generator does not declare the
-# anchor's layout.  This variable remains only for smoke's anchored
-# generator above.
-POST_OPERA_ANCHOR := tools/tests/anchors/post-opera-v1
+# anchor's layout.  Smoke's anchored generators get theirs through the
+# SMOKE_ANCHOR_* map above.
 
 # The stale-anchor regression (#25): prove both refusal paths FAIL, loudly,
 # naming what differed -- the pre-boot persistent_layout gate and the

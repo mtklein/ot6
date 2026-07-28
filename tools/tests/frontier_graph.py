@@ -432,8 +432,9 @@ STATES = [
     # ---- boundary D: the minecart platform save point ----------------------
     # The leg OUT of D (D->E, one whole leg -- Number 128 lives mid-cutscene
     # and has no doorstep, ever): the ride, the escape, and the park ON
-    # boundary E, the $06AE-revealed save point 240 {58,7}.  gen_n128 is
-    # dual-boot (its header): anchored here, savestate under `make smoke`.
+    # boundary E, the $06AE-revealed save point 240 {58,7}.  gen_n128 boots
+    # this anchor everywhere: `make smoke` hands it the same battery via
+    # the Makefile's SMOKE_ANCHOR_* map (the dual-boot probe is retired).
     S("n128_won", gen="gen_n128", anchor="minecart-platform-v1"),
     # ---- boundaries E and F ------------------------------------------------
     # gen_vector_escape_anchor mints E's tracked battery from n128_won.  The

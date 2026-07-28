@@ -10,7 +10,6 @@ local STATE = "build/states/blackjack.mss.lua"
 local ZMENUSTATE = 0x26
 local SAVE_SELECT_INIT = 0x13
 local SAVE_SELECT = 0x14
-local ACTIVE = 0x021f
 local ULTROS2 = 0x012d
 local TEMP_ELEM = 0x316c10 + ULTROS2
 local TEMP_CLASS = 0x316d90 + ULTROS2
@@ -82,6 +81,19 @@ H.run({ maxFrames = 5000 }, {
     -- unlike the O8 signature, load-time initialization cannot recreate them.
     emu.write(TEMP_ELEM, 0x01, emu.memType.snesMemory)
     emu.write(TEMP_CLASS, 0x01, emu.memType.snesMemory)
+    -- SENTINEL: zero SRAM's last-saved-slot marker.  CopyGameDataToSRAM
+    -- rewrites it (menu/save.asm:48), and NOTHING else does -- so the
+    -- marker returning to 3 is the loud, context-stable receipt that the
+    -- real save ran to completion.  The receipt used to be WRAM $021f,
+    -- which is wSaveSlotToLoad only while the menu module owns the $0200
+    -- region (issue #29, HANDOFF trap #1): the world module block-restores
+    -- its own variable there after any menu closes, so a WRAM receipt read
+    -- in the wrong frame window can lie.  The B-F anchor gens
+    -- (gen_n024_save_anchor and friends) established this SRAM sentinel as
+    -- the pattern; this file now matches them.
+    emu.write(0x307ff0, 0x00, emu.memType.snesMemory)
+    H.assertEq(emu.read(0x307ff0, emu.memType.snesMemory), 0,
+      "slot marker zeroed -- the 3 below cannot pre-exist this save")
     H.writeByte(ZMENUSTATE, SAVE_SELECT_INIT)
   end),
   H.waitUntil(function() return H.readByte(ZMENUSTATE) == SAVE_SELECT end,
@@ -91,12 +103,15 @@ H.run({ maxFrames = 5000 }, {
     H.writeWord(0x95, 0) -- slot-3 display cache: treat it as empty
   end),
   H.pressButtons({ "a" }, 4),
-  H.driveUntil(function() return H.readByte(ACTIVE) == 3 end, 800, {
+  H.driveUntil(function()
+    return emu.read(0x307ff0, emu.memType.snesMemory) == 3
+  end, 800, {
     H.pressButtons({ "a" }, 4), H.waitFrames(20),
-  }, "save post-Opera game into slot 3"),
+  }, "save confirmed -- CopyGameDataToSRAM rewrote the zeroed slot marker"),
   H.waitFrames(120),
   H.call(function()
-    H.assertEq(H.readByte(ACTIVE), 3, "slot 3 became the active save")
+    H.assertEq(emu.read(0x307ff0, emu.memType.snesMemory), 3,
+      "SRAM $307ff0 records slot 3 (the context-stable witness, #29)")
     H.assertEq(emu.read(0x316800, emu.memType.snesMemory), 0x4f,
       "slot 3 has OT6 codex magic O")
     H.assertEq(emu.read(0x316801, emu.memType.snesMemory), 0x38,

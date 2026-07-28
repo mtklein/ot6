@@ -688,6 +688,16 @@ trace into `ff6/src/menu/party.asm`. **Probe:** at the stop line read
 `$1850+0` (Terra), `$1EDE`/`$1EDF`, and `$1A6D` (active party number); then
 open the party menu and confirm Terra is offered.
 
+> **Correction (2026-07-28, measured on the minted chain during the B–F
+> anchor pass):** the source reading above was derived while the fixture
+> chain still left Zozo two-handed.  With the four-party chain upstream
+> (#21: LOCKE + CELES + SABIN + EDGAR through the Facility), EDGAR and
+> SABIN **were** in the active party at the Cranes, so the `:25410-25427`
+> restore applies to them — the finale restores both.  The measured party
+> at the stop line is **LOCKE, EDGAR, SABIN, SETZER**, with **TERRA
+> available but not active** (as derived above).  The Locke+Setzer-only
+> reading holds only for a chain that reaches the Cranes two-handed.
+
 ### 6e. The load-bearing balance consequence
 
 **v0.6 cannot assume Terra for any of its fights.** She becomes available only
@@ -712,6 +722,17 @@ from `zozo_done`/the Opera, where `docs/design/wob-route.md:317` measured
 post-Opera anchor. The *deltas* above (Celes removed, Setzer added, Terra added)
 are source-proven; the *base* is one measurement old. **Probe:** read `$1850+0..13`
 at the post-Opera anchor before authoring any balance work.
+
+> **Correction (2026-07-28, from the B–F anchor pass):** the table above is
+> the **two-man-chain measurement** — its base roster predates #21's
+> four-party chain.  On the minted four-party chain the Facility fights run
+> four-handed (Locke, Celes, Sabin, Edgar; three once the tube room takes
+> Celes) and **the Cranes were fought by four** (Locke, Edgar, Sabin +
+> Setzer joining at `:96982`), not by Locke + Setzer alone.  The structural
+> claim stands — Terra is available only after the last v0.6 fight — but
+> per-fight party sizing must come from the minted chain's doorstep
+> measurements (`wob-route.md`, and each generator's `partyReport` logs),
+> not from this table.
 
 ---
 

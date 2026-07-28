@@ -4,17 +4,18 @@
 -- explosion on map 240 -> control with $0069=1 -> parked ON the escape
 -- map's save point {58,7} (boundary E).  Mints n128_won.
 --
--- TWO BOOTS, chosen at runtime by probing the battery (issue #25):
---  * ANCHORED (the ninja graph: anchor="minecart-platform-v1"): run.sh
---    materialized the anchor .srm, so SRAM carries slot 3 + the codex
---    magic + the seeded ULTROS2 witness.  Cold Continue -> the 272 save
---    tile {3,55} -> ENTRY CONTRACT -> walk to CID.
---  * SAVESTATE (`make smoke`, which passes no OT6_SRAM_ANCHOR and whose
---    job is lib falsification against states already on disk): SRAM is
---    fresh, the probe reads no battery, and the leg boots
---    minecart_doorstep.mss exactly as before.
--- The probe is four SRAM bytes ($307ff0=3 plus codex magic and witness);
--- a fresh cartridge SRAM can satisfy none of them.
+-- ONE BOOT, ANCHORED (issue #25; the dual-boot probe retired by #30):
+-- every caller -- the ninja graph's mint edge AND `make smoke` (via the
+-- Makefile's SMOKE_ANCHOR_* map) -- supplies OT6_SRAM_ANCHOR=
+-- minecart-platform-v1, so run.sh materializes the anchor .srm and SRAM
+-- carries slot 3 + the codex magic + the seeded ULTROS2 witness.  Cold
+-- Continue -> the 272 save tile {3,55} -> ENTRY CONTRACT -> walk to CID.
+-- This file used to probe four SRAM bytes at runtime and fall back to
+-- booting minecart_doorstep.mss when they were absent (smoke's old
+-- anchorless invocation); with the anchor map there is no anchorless
+-- caller left, and a boot chosen by guessing at SRAM contents was one
+-- more way for a leg to quietly test something other than what its edge
+-- declared.
 --
 -- OT6_ANCHOR_LAYOUT: ot6-codex-o8-v1
 -- ^ the persistent-SRAM layout this leg understands (issue #25).  run.sh
@@ -281,45 +282,32 @@ local function rideDriver(pred, maxFrames, what)
   }, what)
 end
 
-local function batteryAnchored()
-  return emu.read(0x307ff0, emu.memType.snesMemory) == 3
-     and emu.read(0x316800, emu.memType.snesMemory) == 0x4f
-     and emu.read(0x316801, emu.memType.snesMemory) == 0x38
-     and emu.read(0x316810 + 0x012d, emu.memType.snesMemory) == 0x01
-end
-
 H.run({ maxFrames = 100000 }, {
-  H.cond(batteryAnchored, {
-    -- ANCHORED BOOT: cold Continue into the 272 save tile {3,55}, entry
-    -- contract, then walk back beside CID and face him.
-    H.waitFrames(350),
-    H.repeatN(5, { H.pressButtons({ "start" }, 8), H.waitFrames(25) }),
-    H.waitFrames(120),
-    H.repeatN(3, { H.pressButtons({ "a" }, 8), H.waitFrames(40) }),
-    H.waitFrames(300),
-    H.repeatN(3, { H.pressButtons({ "a" }, 8), H.waitFrames(60) }),
-    -- SOFT landing wait: a wrong-boundary anchor must fail via the entry
-    -- contract naming the wrong map, never via a timeout here.
-    H.waitUntilSoft(function()
-      return map() == 272 and H.tileAligned() and bright() >= 15
-    end, 3000, "landed_at_d"),
-    H.waitFrames(60),
-    H.call(function()
-      -- THE ENTRY CONTRACT (issue #25): declared once in
-      -- lib/ot6_contract.lua under "minecart-platform-v1" -- the same
-      -- table gen_minecart_doorstep (the leg INTO D) and the anchor mint
-      -- assert as their EXIT contract.
-      H.assertEntryContract("minecart-platform-v1")
-      H.log(partyReport("minecart-platform-v1 entry"))
-    end),
-    H.navTo(9, 52, { maxFrames = 9000 }),
-    -- face CID: his object occupies (9,51), so an UP press only turns
-    H.hold({ "up" }), H.waitFrames(8), H.release(), H.waitFrames(20),
-  }, {
-    -- SAVESTATE BOOT (`make smoke`): the lib-falsification path.
-    H.loadState("build/states/minecart_doorstep.mss.lua"),
-    H.waitFrames(150),
-  }),
+  -- ANCHORED BOOT: cold Continue into the 272 save tile {3,55}, entry
+  -- contract, then walk back beside CID and face him.
+  H.waitFrames(350),
+  H.repeatN(5, { H.pressButtons({ "start" }, 8), H.waitFrames(25) }),
+  H.waitFrames(120),
+  H.repeatN(3, { H.pressButtons({ "a" }, 8), H.waitFrames(40) }),
+  H.waitFrames(300),
+  H.repeatN(3, { H.pressButtons({ "a" }, 8), H.waitFrames(60) }),
+  -- SOFT landing wait: a wrong-boundary anchor must fail via the entry
+  -- contract naming the wrong map, never via a timeout here.
+  H.waitUntilSoft(function()
+    return map() == 272 and H.tileAligned() and bright() >= 15
+  end, 3000, "landed_at_d"),
+  H.waitFrames(60),
+  H.call(function()
+    -- THE ENTRY CONTRACT (issue #25): declared once in
+    -- lib/ot6_contract.lua under "minecart-platform-v1" -- the same
+    -- table gen_minecart_doorstep (the leg INTO D) and the anchor mint
+    -- assert as their EXIT contract.
+    H.assertEntryContract("minecart-platform-v1")
+    H.log(partyReport("minecart-platform-v1 entry"))
+  end),
+  H.navTo(9, 52, { maxFrames = 9000 }),
+  -- face CID: his object occupies (9,51), so an UP press only turns
+  H.hold({ "up" }), H.waitFrames(8), H.release(), H.waitFrames(20),
   H.call(function()
     H.assertEq(map(), 272, "booted on map 272")
     H.assertEq(H.fieldX(), 9, "boot x")

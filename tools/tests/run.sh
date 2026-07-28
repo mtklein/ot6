@@ -287,11 +287,36 @@ publish_file "$RUN_LOG" "$LOG"
 # half-updating the chain: a state minted mid-smoke would be fresher than its
 # neighbours and make the tree harder to reason about, for no benefit -- the
 # stamp gate would re-mint it anyway.
+#
+# A MINT EDGE PUBLISHES ONLY ITS OWN ARTIFACTS (issue #30).  OT6_EXPECT_ARTIFACT
+# is set exactly by frontier_ninja.py's mint rule, naming the ONE state the
+# invoking ninja edge is for.  A multi-mint script emits EVERY sibling state
+# on every invocation (gen_edgar plays the whole Figaro chapter and emits all
+# three figaro states no matter which edge invoked it), and each sibling is
+# its own ninja edge running this same script -- so publishing the whole
+# workspace let one edge rewrite ANOTHER edge's declared outputs with fresh
+# mtimes.  For gen_edgar's figaro_cleared edge that meant republishing
+# figaro_matron.mss -- its own INPUT -- after its own outputs (the "$ART"/*
+# glob publishes cleared before matron), so ninja saw input-newer-than-output
+# forever and consecutive `make frontier` runs re-minted every multi-mint
+# family and its downstream trunk with zero content changes.  The sibling
+# copies this run just emitted are deliberately DISCARDED, not moved: every
+# sibling has its own edge, so the published copy is always the one whose
+# edge ninja scheduled and whose stamp frontier_stamp.sh wrote.  Screenshots
+# still publish either way -- they are forensic output, not scheduled ninja
+# outputs, and no edge declares them.
+# frontier_ninja_selftest.sh's stub run.sh MIRRORS this block; keep in lockstep.
 if [ "$verdict" -eq 0 ] && [ -z "${OT6_NO_PUBLISH:-}" ]; then
-  for src in "$ART"/*; do
-    [ -f "$src" ] || continue
-    publish_file "$src" "$PUBLISH/$(basename "$src")"
-  done
+  if [ -n "${OT6_EXPECT_ARTIFACT:-}" ]; then
+    for src in $OT6_EXPECT_ARTIFACT; do
+      publish_file "$ART/$src" "$PUBLISH/$src"
+    done
+  else
+    for src in "$ART"/*; do
+      [ -f "$src" ] || continue
+      publish_file "$src" "$PUBLISH/$(basename "$src")"
+    done
+  fi
   for src in "$ART/shots"/*; do
     [ -f "$src" ] || continue
     publish_file "$src" "$PUBLISH/shots/$(basename "$src")"
