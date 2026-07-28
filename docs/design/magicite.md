@@ -63,6 +63,14 @@ passives are the part of the job you keep.
 > in this column are placeholders from before the field/boss ladder existed
 > (field stones 2–3, boss stones 4–5). Every other row below still describes the
 > *proposed* system, not the shipped one.
+>
+> **Source column vs shipped state (decided 2026-07-28,
+> `sealed-gate-recon.md` §4):** the v0.6 tube room grants all six of
+> Maduin/Shoat/Phantom/Carbunkl/Bismark/Unicorn at once — the shipped
+> state. The per-location Source rows below were the redistribution
+> *proposal*; redistributing now would be an event edit and full re-mint
+> buying no player-visible pacing, so v0.7 redesigns the six in place and
+> the Source column is historical.
 
 | Esper | Source | Spells (base) | Stat passive | Passive | Permit | Notes |
 |---|---|---|---|---|---|---|
