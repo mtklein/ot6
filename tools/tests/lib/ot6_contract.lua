@@ -412,6 +412,67 @@ M.contracts["gate-cave-save-v1"] = {
   },
 }
 
+-- vector-crash-v1: boundary I, the crash-site world battery save -- the
+-- recon §2.2's `vector-crash` boundary, cut at its own proposed tile: the
+-- party stands ON the dead Blackjack's world tile (83,238), on foot,
+-- because that is where the map-7 hatch (_caf4b1) drops them after the
+-- crash (measured, probe_v07_gatescene3: $1F60/61 == $1F62/63 == (83,238),
+-- $11FA on-foot).  Exercised by gen_vector_crash (2026-07-28): the 384
+-- west traverse (two levers + the (121,23)->(4,37) teleport, addenda
+-- Addendum 3), the Sealed Gate scene, the (5,43) shortcut, the base
+-- re-cross, battle 123 and the scripted crash flight.
+--
+-- THE HEADLINE IS THE DEAD AIRSHIP.  $007A=1 and $0246=0 are what every
+-- later leg plans around (recon headline 6: everything after the crash is
+-- on foot or by boat), and the wreck's cells $1F62/63 still read (83,238)
+-- -- the ship has a position even though nothing can fly it; a chain that
+-- somehow kept the airship alive fails here by name.  The party is still
+-- the gate four (TERRA LOCKE EDGAR SABIN, SETZER benched by the G->H
+-- swap): battle_event $15 rewrites only the ON-SCREEN roster for the deck
+-- scene and the field party comes back intact (addenda §1.6 verdict 5).
+M.contracts["vector-crash-v1"] = {
+  slot = 3,
+  ram = {
+    { 0x1f60, 0xFF, 83, "world x (save-block cell $1f60): the crash site" },
+    { 0x1f61, 0xFF, 238, "world y (save-block cell $1f61): on the wreck tile" },
+    { 0x1f62, 0xFF, 83, "dead Blackjack x (save-block cell $1f62)" },
+    { 0x1f63, 0xFF, 238, "dead Blackjack y (save-block cell $1f63)" },
+    { 0x11FA, 0x03, 0x00, "ON FOOT (the wreck is scenery, not a vehicle)" },
+    { 0x11F3, 0xFF, 0x00, "not forced aboard the airship" },
+    { 0x1A69, 0x07, 0x07, "RAMUH+IFRIT+SHIVA magicite still owned" },
+  },
+  switches = {
+    { 0x0079, 1, "the Sealed Gate scene ran (event_main.asm:46316)" },
+    { 0x0471, 1, "the gate-scene tail latch (:46313)" },
+    { 0x007A, 1, "THE AIRSHIP IS DEAD (:44451) -- no leg after I may fly" },
+    { 0x007B, 1, "Vector's soldier machinery stands down (:44453)" },
+    { 0x01BA, 1, "the crash latch (:44452)" },
+    { 0x0242, 1, "the base entrance went silent forever (:44351)" },
+    { 0x0246, 0, "no active airship" },
+    { 0x0172, 1, "the base's no-soldiers beat stands" },
+    { 0x0173, 1, "384's save-room door switch (persistent) stands" },
+    { 0x0174, 1, "384's x=76 column switch (persistent) -- the traverse ran" },
+    { 0x0076, 1, "the Narshe mission meeting stands" },
+    { 0x02F0, 1, "TERRA is available" },
+    { 0x02F6, 0, "CELES is still out of the roster" },
+  },
+  party = {
+    size = 4,
+    members = {
+      { 0x00, "TERRA (still the gate four -- the deck scene never leaks)" },
+      { 0x01, "LOCKE" },
+      { 0x04, "EDGAR (pierce+Tools)" },
+      { 0x05, "SABIN (bludgeon)" },
+    },
+  },
+  sram = {
+    { 0x316800, 0x4f, "slot 3 codex magic 'O'" },
+    { 0x316801, 0x38, "slot 3 codex magic '8'" },
+    { 0x316810 + 0x012d, 0x01, "bank-31 element-codex witness (ULTROS2)" },
+    { 0x316990 + 0x012d, 0x01, "bank-31 class-codex witness (ULTROS2)" },
+  },
+}
+
 -- ------------------------------------------------------------- the checker --
 
 local function switchVal(id)

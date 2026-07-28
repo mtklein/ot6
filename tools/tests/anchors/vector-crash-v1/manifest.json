@@ -1,0 +1,10 @@
+{
+  "schema": "ot6.sram-anchor/v1",
+  "payload": "vector-crash.sram",
+  "size": 32768,
+  "sha256": "97a227cd8bf93f6ff2cc04f2f1026322987fe9d23fcffdfbe2d40611f307002a",
+  "slot": 3,
+  "milestone": "vector-crash",
+  "provenance": "gate-cave-save-v1 battery, cold Continue (the boot tile is the 386 (74,53) SavePoint re-entry trigger -- alignment-gated boot, held-press escape); the whole H->I leg (the 384 west traverse: (71,15) $0174 and the (104,17) $01F5 tap-once toggle, then the (121,23)->(4,37) teleport -- the (58,18) span and the three walk-overs are not on the route; the Sealed Gate scene ridden hands-off with battles 121/122 spared, $0079=1; the (5,43) shortcut out; the base re-cross, battle 123, and the scripted crash flight to world (83,239) with airship_pos (83,238); the dead-wheel proof on map 6; off the wreck via the map-7 hatch (8,36)); real in-game Save UI on foot ON the dead Blackjack's world tile (83,238) -- the recon's own proposed anchor-I tile; party TERRA LOCKE EDGAR SABIN, SETZER benched, airship dead ($007A=1, $0246=0); boundary I of docs/design/sealed-gate-recon.md §2.2",
+  "persistent_layout": "ot6-codex-o8-v1"
+}

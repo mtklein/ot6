@@ -457,3 +457,145 @@ contract by name — party count 4→3 and his membership — after an
 unperturbed positive control held all 18); pass-after "all 22 fields
 hold" through the real anchored ninja mint, frame-identical (14090) to
 the by-hand capture run.
+
+## Addendum 3 — 2026-07-28, leg H→I (issue #31): the 384 west traverse, the gate scene ridden, the crash measured
+
+Source: `tools/tests/probe_v07_384west.lua` (+`west2`..`west5`),
+`probe_v07_384toggle.lua`, `probe_v07_gatescene.lua` (+`2`/`3`), and the
+minted leg `tools/tests/gen_vector_crash.lua`.  Same rule as before: every
+claim is a log line or a `file:line` read.
+
+### 3.1 ANSWERED — recon open question 2: the 384 west traverse is TWO levers and a teleport
+
+The recon's expectation ("east across the bridges → toggles → teleport
+back west → (9,27)") was directionally right, and five of the seven
+switch sites are NOT on the route.  Measured, from the 386 exit
+((73,59) → 384 **(64,12)**, short-entrance decode + live):
+
+* **Fresh census from (64,12): 266 tiles** — the south loop again, with
+  the save door held open by persistent `$0173`.  The gate door is not in
+  it; neither teleport is.
+* **(58,18) is a dead end for the traverse.**  It fires (face-UP+A), the
+  event scripts a forced descent — `move DOWN,5` + `jump_low` + `DOWN,1`,
+  the party ends at **(58,24)** and the ledge above rewrites, so the
+  switch tile itself leaves the reachable set — and its `$01F9/$01FA`
+  span (48..50,12) only opens the (46..41,11) west bridge row: census
+  after (still 266 tiles) adds **no** goal tile.  The leg does not press
+  it.
+* **(71,15) (`$0174`, persistent) is the first real key**: the x=76
+  column bridge (76,16..27) takes the census **266 → 587 tiles** — the
+  whole east half, including both walk-over rows, (99,13) and the
+  (104,17) toggle.  The three walk-overs ((89,29) `$0175`,
+  (96,18)/(99,18) `$01F3/$01F4`) serve the treasure-alcove teleport
+  ((94,25) → (90,58)) and the tower's internal ladders; none is needed
+  to go west.
+* **(104,17) (`$01F5`, session TOGGLE) is the second key**: its 5×13
+  tower rewrite takes **587 → 655 tiles** and opens the (120..121,17..23)
+  descent to the teleport pair.
+* **The teleports are one-way single-tile entrance records** (6-byte
+  short-entrance decode, offsets from `short_entrance.inc`’s pointer
+  table): `(4,36)→(121,22)`, `(121,23)→(4,37)`, `(94,25)→(90,58)`,
+  `(90,59)→(94,27)`.  They are LoadMaps: crossing (121,23) **wipes every
+  `$01F0-$01FF` session switch** (`$01F5/$01F9/$01FA` all read 0 on the
+  west side) while `$0173/$0174` re-apply through map-init `_cb2e3d`.
+  Entrances fire under a held walk (only EVENT triggers demand the
+  at-rest frame), so the crossing is a plain `pressWalk`.
+* **The west side is a 64-tile pocket.**  The gate door row —
+  `(9..11,27)`, one long entrance of length 2 → 391 (8,21) — is
+  approached ONLY from the south, up the x=9..11 column; `(12,27)` is not
+  walkable, so the doorstep is **(10,28)**, the same tile the scene later
+  exits onto.  The (5,43) shortcut is NOT reachable before the scene —
+  the recon's "inference, unverified" is now measured fact both ways:
+  after `$0079=1` the `_cb2aa6` retile opens it (post-scene census: 60
+  tiles, (5,43) inside).
+
+### 3.2 NEW — the lever/toggle idiom has a sharp edge the G→H leg never hit
+
+`probe_v07_384toggle`, frame-instrumented on (104,17):
+
+* ONE 8-frame up+A tap fires `_cb33c9`; the event runs ~70 frames and
+  `switch $01F5=1` is its LAST line (event_main.asm:45558) — the switch
+  flips at the END, not on the press.
+* Holding UP on the tile with A released for 900 frames does NOT
+  re-fire.
+* A SECOND tap runs the `_cb3506` reverse branch and toggles BACK.
+
+So the G→H `upA` loop (A edges until the switch reads 1) is the WRONG
+drive for a toggle: iteration 3 of the census probes watched `$01F5` hit
+1 under that loop and read 0 again by the next census — the loop's own
+lingering press had re-armed it.  The H→I generator's `tapLever` (tap
+once, hold up, wait for the flip) is the idiom.  The latched levers
+((62,11)/(71,15)) tolerate the old loop only because their guards
+EventReturn once set.  Both lever tiles are stood-on re-entry triggers
+(§1.7 class): leaving them takes an unconditional held press, and
+DOWN from (71,15) is a wall — the escape must cycle directions.
+
+### 3.3 ANSWERED — the gate scene fires on entry, and its tail is exactly the recon's
+
+* The long entrance lands on the trigger and `_cb39ca` is running by the
+  first observable frame after the map load — **no step needed** (recon
+  §5 hazard 6's "frame-0 or first-step" is settled: frame-0 class).
+* `advanceStory` with `opts.spare={0x017b}` rides the whole thing:
+  exactly two battle loads (121 then 122, live formation `017B` each),
+  never kill-bitted, ~10 270 frames from the door to control.
+* Tail confirmed live: control returns at **384 (10,28)** with
+  `$0079=1 $0471=1 $064D=1 $064C=0`, and the FIELD party is
+  TERRA·LOCKE·EDGAR·SABIN again (`char_party TERRA,0` at :46095 undone
+  at :46202) with SETZER still benched.
+
+### 3.4 ANSWERED — the base re-cross and the crash, end to end
+
+* From the pocket, (166,194) enters the base east door (30,13); the west
+  trigger row fires `_cb280f`.  With SETZER benched (`$01A9=0`) the
+  scene takes the `_cb28ea` NPC-crew branch (`$0459` latch): the deck
+  scene stages a crew NPC where Setzer would stand, battle 123 loads
+  once (`017B`), and the whole stretch — ensemble scene, `$0242=1`,
+  deck scene, battle, crash flight — took **6 304 frames** from the
+  trigger row to control.
+* **Control returns on MAP 6 at (16,6)**, not on the world map: the
+  crash tail is `set_parent_map 0,{83,239}` + `load_map 6,{16,6}` with
+  a startup event (event_main.asm:44520-44531).  Recon leg 4's "control
+  aboard the grounded wreck" means the DECK; the world map is only
+  reached through the hatch.
+* Switches after, measured: `$007A=1 $007B=1 $01BA=1 $0242=1 $0246=0`;
+  the wreck's cells `$1F62/$1F63 = (83,238)` (`airship_pos`, :44494).
+  The field party is intact across `battle_event $15` — the deck-roster
+  rewrite never leaks out (§1.6 verdict 5 re-confirmed on the real
+  route).
+
+### 3.5 NEW — off the wreck: the hatch, the dead wheel, and where the leg actually ends
+
+* The wheel refusal is the airship-dead behavior: with `$007A=1` and
+  `$0176=0`, facing-LEFT+A on (14,6) EventReturns before any dialog
+  (`_caf532`, event_main.asm:36118-36127) — 300 frames of LEFT+A edges
+  open nothing (asserted in the generator).
+* The way out is the map-7 hatch: deck door (20,6) → 7 (40,11), interior
+  stairs (40,18)→(50,51) and (50,62)→(10,30) (short-entrance decode),
+  then the (8,36) trigger `_caf4b1` — its `$007A=1/$009D=0` branch does
+  `load_map 511` ON FOOT.
+* **The hatch drops the party ON the wreck's own world tile (83,238)**,
+  not the parent-map cell (83,239): measured `$E0/$E2=(83,238)`,
+  `$1F60/61=(83,238)`, `$11FA` on-foot.  An A tap standing there
+  RE-ENTERS the wreck interior (worldMode drops) — the wreck is
+  enterable scenery that cannot fly, and the generator never presses A
+  on the world because of it.
+* Anchor I is therefore cut exactly at the recon §2.2 table's own tile,
+  **(83,238)**, standing on the dead Blackjack.
+
+### 3.6 Anchor I stands
+
+`vector-crash-v1` is cut: the whole H→I leg lives in
+`gen_vector_crash.lua` (the gen_gate_cave_save shape), cold-Continues the
+gate-cave-save-v1 battery — whose boot tile is itself a §1.7 re-entry
+trap (the SavePoint trigger re-enters every frame, so the boot gate
+counts alignment, never control, and leaves with a held press — the
+first cold Continue of a FIELD-save battery in the tree), and saves
+through the real Save UI into slot 3 on the world map at (83,238).  Exit
+contract: 30 fields (26 pre-save + the 4 sram witnesses), headlined by
+the dead airship (`$007A=1`, `$0246=0`, the wreck cells) and the intact
+gate four.  Fail-before observed by perturbation
+(`probe_v07_i_negative`: clearing `$007A` on the minted state fails the
+pre-save contract by name after an unperturbed positive control held all
+26); pass-after "all 30 fields hold" through the real anchored ninja
+mint (`vector_crash` from the gate-cave-save-v1 battery),
+frame-identical (29001) to the by-hand capture run.
