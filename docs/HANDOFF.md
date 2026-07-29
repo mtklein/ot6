@@ -138,9 +138,15 @@ was free". Documented at `freezeOthers`.
 ## Working agreements
 
 - Delegated work gets [agent-brief.md](agent-brief.md) included by reference.
+  **Revised 2026-07-29** after `rules-audit.md`: agents commit to their own
+  branches in revertible units, file exclusivity is dropped to "declare your
+  hunks and expect merges", and targeted re-mints are theirs. The owner's
+  framing: occasional rework from an unexpected conflict is an accepted
+  cost as long as it stays unusual, and agents should work how they work
+  best while we adapt the tools to suit.
 - Agents report follow-ups; the dispatcher files issues. `spawn_task` is denied
   in `.claude/settings.json`.
-- Parallel work goes in separate git worktrees with disjoint file ownership;
+- Parallel work goes in separate git worktrees;
   `tools/worktree-setup.sh` seeds the ROM, emulator links, states, and the
   ninja build log. **Worktrees live under `.claude/worktrees/<name>` inside
   the repo (owner rule, 2026-07-28: never as siblings of `~/ot6` or
