@@ -91,6 +91,16 @@ This is a naming rule, not a lore rule: the internal *symbol* names in
 the vendored disassembly are upstream's and stay as they are. It governs
 what we write.
 
+It also governs what we *coin*. A worked example: `kit-gau.md` proposed
+renaming Gau's **Leap** to *Capture* — but FF3-US already prints Capture
+as a battle command (`$06`, the Thief Glove's steal-and-strike). Taking a
+name the game already uses for something else is the same crime as using
+a name the game never uses: it makes the screen and the vocabulary
+disagree. **Leap keeps its name** (ruling, 2026-07-29). Before coining
+any player-facing word, grep the shipped text data — `bushido_name_en`,
+`item_name_en`, `battle_cmd_name_en`, `magic_name_en`, `attack_name_en`
+— and pick something the game is not already saying.
+
 **Read the source; don't infer a mechanism.** This is the big one, learned the
 hard way. An audit in July 2026 found a cluster of confidently-worded
 explanations in this repo that were simply invented — a testrunner timeout
