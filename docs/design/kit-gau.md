@@ -36,7 +36,7 @@ line it was read from, or is labelled **UNVERIFIED**. Line numbers are from the
 | Battle read | one choke point: `InitSkills`' `$257e` list build (`battle_main.asm:14659-14679`) filters through the loadout; the vanilla Rage window, cursor, scroll and confirm are untouched (§3). **AUTO truncates to eight too — the wall is not reachable by inaction (§8.0, 2026-07-28)** |
 | MP | **flat 8 MP at Rage-start**, whole-battle possession, mid-trance turns free — one price rule for both possess-verbs (Rage here, Dance in #34) (§5) |
 | Boost | 0 BP vanilla coin; 1 BP special ¾; 2 BP special 15/16; 3 BP the special **every turn for the whole trance** — latched at `Cmd_10`, the Slot-latch pattern (§6) |
-| Boosted Leap | **not this pass** — Leap's learn step has no roll to convert; rider re-opens if the return-cadence roll is located and playtest wants it (§6.3). Leap prices flat 2 MP |
+| Boosted Leap | **not this pass** — Leap's learn step has no roll to convert; rider re-opens if the return-cadence roll is located and playtest wants it (§6.3). **Leap is free** — the flat 2 was reversed by the owner 2026-07-29 (§5) |
 
 ---
 
@@ -308,11 +308,25 @@ under 8 MP is refused the start, never silently freed, and the mid-trance
 zero-charge is measured across a multi-turn trance exactly as #34 specifies
 for Dance. `.if OT6_MP_COSTS` gates it all; the nomp baseline is undisturbed.
 
-**Leap prices too** — "only the basic Fight command is free" is the owner
+**Leap prices too** — ~~"only the basic Fight command is free" is the owner
 absolute (mp-economy.md:30-34). Leap takes the probe-collect price: **flat
 2 MP**, keyed on command `$11` like Steal's `$05` arm (the very price
 mp-economy.md:97 already assigned this verb's row). Refused under 2 MP; the
-Veldt will still be there next turn.
+Veldt will still be there next turn.~~
+
+> **REVERSED 2026-07-29 (owner): LEAP IS FREE.** *"I don't recall showing a
+> cost for Leap. If it's 2 MP, let's just make it free."* The flat 2 shipped
+> and was retired the same week, for two reasons that are both about surfaces:
+> the price **was never displayed** anywhere (Leap is a top-level command row,
+> and that window draws a name and a disabled-flag colour and nothing else —
+> `command_window_data_set`, `btlgfx_main.asm:10099-10125`; the only way to
+> meet the number was a refusal after the turn was spent, and that path
+> composes no number either), and
+> Leap now **shares the FIGHT row** on the Veldt (kits.md's row-sharing rule),
+> so pricing it would reopen the free-action hole #47 exists to close, in
+> Gau's own territory. `Ot6AbilityCost` has no `cmd $11` arm and `Ot6LeapCost`
+> is deleted; the verb falls out of the chain with vanilla's own 0. Steal's
+> flat 2 stands (issue #52). The amended absolute is in mp-economy.md.
 
 ---
 
@@ -676,7 +690,7 @@ rows; the four-row pool does not).
      compare); bytes set → exactly the stored ids then `$ff`, `$3a9a` = count;
    - charge: Rage-start debits 8 (refusal below 8, standard surface);
      mid-trance turns debit 0 across ≥3 possessed turns; death → re-Rage
-     debits again; Leap debits 2;
+     debits again; Leap debits 0 (free -- §5's 2026-07-29 reversal);
    - tiers: pinned Rand at `$3f`/`$40`/`$0f`/`$10` boundaries per tier;
      0 BP byte-vanilla (fail-before/pass-after recorded both ways);
      3 BP → entry 1 every turn, whole trance;
@@ -768,7 +782,7 @@ claims mean something. Any new arm here that asserts something about
      was locked under the superseded model; the owner's newer words govern.
    - mp-economy.md:97-98 — "(Leap and berserk Rage are retired — kits.md)"
      and the "Beast skills (Gau's stable) flat per beast 3-10" row: replace
-     with Rage flat-8 (Dance-model) and Leap flat-2 rows.
+     with Rage flat-8 (Dance-model) and a Leap FREE row (§5, 2026-07-29).
    - kits.md:438-439 (open question 3, "5 for both Gau and Strago?") —
      Gau is settled at 8 by owner ruling; Strago's count is still open and
      should be re-asked against this precedent.

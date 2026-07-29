@@ -24,17 +24,52 @@ layer. JP returns only if playtesting wants a pacing knob.
 
 **Curated kits (the Ochette/Hikari model).** Two characters learn
 MORE than 8 and equip a curated subset (~5 slots): Gau and Strago.
-> **Row-sharing rule, and the one question it leaves open (2026-07-29).**
-> Leap shares the MAGIC row rather than the FIGHT row, deliberately: the
-> Veldt is where Gau spends the most turns on routine encounters, so it
-> is where losing the free action would hurt most — a Veldt Gau out of MP
-> would be left with Rage (8 MP), Leap (2 MP) and Item, which is exactly
-> the problem #47 existed to solve, in his home territory. Magic is the
-> cheapest row to lose there: under the sub-job model he only has spells
-> if he is holding magicite, and magic costs MP anyway, so it was never
-> the free action. **If play disagrees, swapping which row Leap shares is
-> a one-line change** — the owner raised Fight/Leap sharing as an
-> alternative and it is not a closed question.
+> **Row-sharing rule — SETTLED, and reversed the same day it was written
+> (owner, 2026-07-29). Leap shares the FIGHT row.**
+>
+> > *"On the Veldt, you can always just Leap — Fight and Leap are the free
+> > options there. Outside the Veldt, you might want to Fight or cast Magic
+> > of course."*
+>
+> On the Veldt: **LEAP / RAGE / MAGIC / ITEM**. Everywhere else:
+> **FIGHT / RAGE / MAGIC / ITEM**.
+>
+> Leap is what Gau is on the Veldt *for*, so Fight and Leap are the
+> redundant pair *there* and sharing them costs nothing. Magic is the row
+> you might want in **both** places, so Magic is never the row sacrificed
+> — it is now never lost anywhere, which is strictly better than the first
+> version of this rule.
+>
+> The first version put Leap on the MAGIC row, on the argument that the
+> Veldt is where Gau spends the most turns and so is where losing the free
+> action would hurt most: a Veldt Gau out of MP would be left with Rage
+> (8 MP), Leap (2 MP) and Item. That argument was wrong twice over —
+> Leap fills the free-action role on the Veldt, and **Leap is now free**
+> (same ruling; mp-economy.md), so the 0-MP hole it worried about does not
+> exist. Recorded rather than deleted because the reversal is the
+> interesting part: the dispatch reasoned about the Veldt as a place where
+> Gau needs Fight, and the owner reads it as the place where Gau needs
+> Leap, which is the correct reading of his own map.
+>
+> **What it costs, stated plainly.** Leap is not a *contributing* free
+> action — it removes Gau from the battle and flags the return-to-Veldt
+> event (`TargetEffect_54`, `battle_main.asm:9762-9776`), and vanilla
+> refuses it outright with fewer than two party members present. So on
+> the Veldt an out-of-MP Gau's free options are *leave* and *Item*; the
+> free action that swings a fist is only available off the Veldt. The
+> owner's framing accepts this ("you can always just Leap"), and it is the
+> right trade given that a Veldt encounter is a hunt rather than a fight —
+> but if playtest ever wants a free contributing action on the Veldt, this
+> arrangement does not provide one and the row count is still four.
+>
+> Mechanically this is *simpler*, not merely different: `Ot6VeldtRow`
+> (`battle_main.asm`) now runs in `InitCmdList`'s own row loop instead of
+> hooking `InitCmd_03/04`, because FIGHT (`$00`) has no init function.
+> That means it runs before the relic pass (Dragoon Boots cannot silently
+> replace a Veldt Leap with Jump), the `$11` it writes is picked up by
+> Leap's own vanilla availability test for free, and `InitCmd_03/04` are
+> back to exact vanilla — the has-MP flag `$f8` is no longer involved at
+> all.
 
 > **Gau fights ✦ (2026-07-29, #47).** Vanilla's "the feral kid cannot
 > fight normally" characterization is overridden for economy coherence:
@@ -43,9 +78,10 @@ MORE than 8 and equip a curated subset (~5 slots): Gau and Strago.
 > move* — requires that every character be able to decline to spend. His
 > four slots become **FIGHT / RAGE / MAGIC / ITEM**; there was never a
 > spare one (vanilla's "blank" third row is MAGIC removed at runtime), so
-> **Leap shares the magic row** — Leap only works on the Veldt, so that
-> row is Leap there and Magic everywhere else, and the only thing lost is
-> casting while standing on the Veldt. Bare fists are his probe
+> **Leap shares the FIGHT row** (see the row-sharing rule above) — Leap
+> only works on the Veldt, so that row is Leap there and Fight everywhere
+> else, and nothing is lost: on the Veldt Leap *is* the free action, and
+> it costs no MP. Bare fists are his probe
 > (`Ot6WeapClassTbl[$ff]` = bludgeoning), which also makes
 > `check_break_reach.py`'s "can field" model true of him for the first
 > time.
