@@ -44,23 +44,26 @@ Task-specific scope goes in the dispatch. Everything here is always true.
   the second guess. `make -j10 smoke` falsifies a library change in ~80 seconds
   against the seven generators that have historically caught harness bugs.
 
-## Machine budget
+## Run everything under `nice`
 
-A fast **laptop**: 10 performance cores plus 4 efficiency cores. Mesen is
-effectively single-threaded, so an emulator job costs about one P core
-for its whole run — the P count is the one that governs how many mints
-or suite runs can overlap.
+**Prefix every build, mint, suite run and emulator job with `nice -n 10`.**
 
-Sizing that works with several agents plus the owner playing: build at
-`-j6`, run up to **2 concurrent emulator jobs** per agent. `make -j10
-smoke` is right when you have the machine to yourself and wrong when you
-do not — the dispatch will say which you have.
+    nice -n 10 make -j10 smoke
+    nice -n 10 ninja -f build/build.ninja <state>
+    nice -n 10 tools/tests/run.sh tools/tests/<gen>.lua
 
-The budget is **P cores, not power** (it runs plugged in). Four agents at
-two emulator jobs each is 8 of the 10, plus the owner's game — about
-right. Going past that oversubscribes and everything slows together, so
-the last increment of parallelism buys nothing; and when the owner is
-playtesting, his frame rate is what it would be spent on.
+The machine is a fast laptop (10 performance cores + 4 efficiency, run
+plugged in) and Mesen is effectively single-threaded, so an emulator job
+costs about one P core for its whole run. Rather than hand-tuning job
+counts against however many agents happen to be live and whether the
+owner is playing, hand the problem to the scheduler: niced work yields to
+his game and to anything interactive, and soaks up whatever is idle
+otherwise.
+
+So: **do not do throttle arithmetic.** Use the natural parallelism for
+the job (`-j10` smoke is the documented fast loop), niced. The one thing
+`nice` cannot fix is two agents writing the same `build/` — that is what
+worktrees are for, and it is still binding.
 
 ## Reporting
 
