@@ -9,11 +9,32 @@
 ;
 ;   $1e1d..$1e1e   packed word.  Cyan has exactly 8 SwdTechs (index 0..7 = 3
 ;                  bits), so the four boost slots fit in 12 bits:
-;                    slot0 (boost 0x) = bits 0-2    slot2 (boost 2x) = bits 6-8
+;                    slot0 (RETIRED, #38)           slot2 (boost 2x) = bits 6-8
 ;                    slot1 (boost 1x) = bits 3-5    slot3 (boost 3x) = bits 9-11
 ;                  (top 4 bits unused, kept 0).  Each field is the same 0..7
 ;                  INDEX Ot6BushidoTech returns, so the downstream +$55 /
 ;                  Ot6BushidoOblivion tail stays byte-for-byte unchanged.
+;
+; [ issue #38: every Bushido tech costs at least 1 BP ]
+; Owner ruling from the rc1 playtest: "the 0 boost ability feels a bit too much
+; like better attack."  Cyan's sword-art is SPENDING BANKED TIME, so a 0-pip
+; tech competed with Fight instead of with the bank.  The floor is now 1 BP:
+; the submenu and the field configurator both show exactly THREE rows -- 1x,
+; 2x, 3x -- and his no-pip turn is Fight, as it should be.
+;
+; The STORED FORMAT DID NOT MOVE.  The word is still two bytes at $1e1d with
+; four 3-bit fields, because every tracked battery anchor was minted against
+; persistent_layout ot6-codex-o8-v1 and a schema change invalidates all of
+; them.  What changed is that SLOT 0 IS NEVER READ: rows map i -> boost i+1 ->
+; word slot i+1, and slot 0 is left as whatever Ot6LoadoutSeedWord's mirror
+; wrote (see there).  Old saves keep decoding: a MANUAL word's slots 1..3 mean
+; exactly what they meant before, and word 0 is still AUTO.
+;
+; AUTO re-derived for three rungs: the window is the TOP THREE learned techs,
+; base = max(0, ceiling-2), tech = min(base + boost-1, ceiling).  At the full
+; kit (ceiling 7) that is {5,6,7} at 1x/2x/3x -- the same three techs the old
+; four-rung window put at boosts 1/2/3, so the tuned top of the ladder (and
+; Oblivion on 3x) is unchanged; only the free rung is gone.
 ;
 ; word == 0  -> AUTO (the moving window).  This is ALSO the sentinel: an all-zero
 ;   word decodes to "all four slots = tech 0", a degenerate config no player sets
@@ -41,16 +62,22 @@
 :       rtl
 .endproc
 
-; [ Bushido moving window of four (issue #5) — boost -> tech ]
-; boost 0/1/2/3 selects Cyan's TOP FOUR learned techs, weakest -> strongest:
-; base = max(0, ceiling-3), tech = min(base + boost, ceiling). while he knows
-; four or fewer, base is 0 and EVERY learned tech is reachable; learn a fifth and
-; the window slides up one, retiring the weakest. no table -- pure arithmetic.
+; [ Bushido moving window of three (issue #5, refloored by #38) — boost -> tech ]
+; boost 1/2/3 selects Cyan's TOP THREE learned techs, weakest -> strongest:
+; base = max(0, ceiling-2), tech = min(base + boost-1, ceiling). while he knows
+; three or fewer, base is 0 and EVERY learned tech is reachable; learn a fourth
+; and the window slides up one, retiring the weakest. no table -- pure
+; arithmetic.  boost 0 no longer names a tech (#38's 1-BP floor); it is clamped
+; to 1 rather than allowed to underflow the window, so any caller that reaches
+; here with a cleared pending byte gets the cheapest rung instead of garbage.
 ; a8/i16.  in: A = boost (0..3).  out: A = tech (0..ceiling).  clobbers X.
 .proc Ot6BushidoTech
         .a8
         .i16
-        pha                     ; park boost ($01,s). the two scratch bytes in
+        cmp     #$01            ; #38: the floor is 1 BP -- clamp a stray 0 up
+        bcs     :+              ;   (the menu never offers boost 0 any more)
+        lda     #$01
+:       pha                     ; park boost ($01,s). the two scratch bytes in
                                 ;   reach ($36 btlgfx's, OT6_SCR_BIT the hud
                                 ;   builder's) both have owners; the stack owes
                                 ;   nobody and survives an nmi.
@@ -79,12 +106,16 @@
         jsl     Ot6BushidoCeil  ; A = ceiling (preserves nothing we need)
         pha                     ; park ceiling ($01,s ; boost now $02,s)
         sec
-        sbc     #$03            ; ceiling - 3   (A still = ceiling)
-        bcs     :+
-        lda     #$00            ; ceiling < 3: base floors at 0 (the window is all
-:       ;                       ;   of {0..ceiling}, fewer than four techs)
+        sbc     #$02            ; ceiling - 2   (A still = ceiling) -- #38: the
+        bcs     :+              ;   window is three rungs wide, not four
+        lda     #$00            ; ceiling < 2: base floors at 0 (the window is all
+:       ;                       ;   of {0..ceiling}, fewer than three techs)
         clc
-        adc     $02,s           ; base + boost -> the tentative tech
+        adc     $02,s           ; base + boost
+        dec     a               ;   ... - 1 -> the tentative tech (boost >= 1 is
+                                ;   guaranteed by the clamp at entry, so this
+                                ;   cannot underflow; dec leaves C alone for the
+                                ;   cmp below)
         cmp     $01,s           ; vs the ceiling
         bcc     :+
         lda     $01,s           ; cap at ceiling -- bites only when boost overruns
@@ -675,10 +706,14 @@ done:   plp
 .if OT6_MP_COSTS
 ; [ add the Bushido "not enough BP" grey reason to a row's font ]
 ;
-; In bushido mode (w7e6168 = 2) the submenu row IS the boost level (Y/6, weakest
-; at top). A row whose boost exceeds the caster's current bp (OT6_BP_CLASS,entity) is
-; unreachable -- Ot6BushidoConfirm refuses to commit it -- so grey it like an
-; unaffordable spell, a SECOND grey reason on top of Ot6AbilityGrey's MP one.
+; In bushido mode (w7e6168 = 2) the submenu row IS the boost level (Y/6 + 1
+; since #38's 1-BP floor, weakest at top). A row whose boost exceeds the
+; caster's current bp (OT6_BP_CLASS,entity) is unreachable --
+; Ot6BushidoConfirm refuses to commit it -- so grey it like an unaffordable
+; spell, a SECOND grey reason on top of Ot6AbilityGrey's MP one.  At 0 bp that
+; now greys ALL THREE rows: the list still SHOWS what the bank would buy (the
+; teaching surface), it just refuses every row -- the same presentation an
+; unaffordable spell gets, never a list that changes length with the wallet.
 ; Blitz mode (w7e6168 != 2) passes the MP grey through untouched.  Only ever
 ; reached from Ot6BlitzRowDecorate's OT6_MP_COSTS block, so it lives behind the
 ; same flag.  a8/i16.  in: A = the MP grey ($00/$04), Y = drawn-row*6.
@@ -701,13 +736,15 @@ done:   plp
         lda     OT6_BP_CLASS,x         ; current bp
         pha                     ; [S+1] park bp ($01,s)
         tya                     ; A = drawn-row*6
-        ldx     #$0000          ; boost r accumulator
-@div:   cmp     #$06            ; r = (row*6) / 6
+        ldx     #$0000          ; row i accumulator
+@div:   cmp     #$06            ; i = (row*6) / 6
         bcc     @haver
         sbc     #$06
         inx
         bra     @div
-@haver: txa                     ; A = r
+@haver: txa                     ; A = i
+        inc     a               ; #38: boost r = i + 1 -- with the 1-BP floor a
+                                ;   0-bp Cyan greys EVERY row (see the header)
         cmp     $01,s           ; r vs bp; C set iff r >= bp
         beq     @afford         ; r == bp: exactly affordable
         bcc     @afford         ; r <  bp: affordable
@@ -783,16 +820,18 @@ done:   plp
 
 ; [ enumerate the moving-window techs into wItemList (issue #8) ]
 ;
-; writes attack id ($55 + tech[r]) for boost r = 0..min(3,ceiling) into
-; wItemList::Index at cell r*2 (the LEFT column of row r), and $ff-fills every
-; other cell through the 8-cell (4x2) window. tech[r] shares Ot6BushidoTech's
+; writes attack id ($55 + tech[i]) for ROW i = 0..min(2,ceiling) into
+; wItemList::Index at cell i*2 (the LEFT column of row i), and $ff-fills every
+; other cell through the 8-cell (4x2) window. #38: row i IS boost i+1 -- the
+; 0x rung is retired, so the window is three rows deep and row 3 always stays
+; $ff (blank, and the C1 confirm refuses it). tech[i] shares Ot6BushidoTech's
 ; base+boost math and Ot6BushidoOblivion's top-rung swap with single-select, so
 ; the menu can never offer a tech the confirm latch would not fire. When Cyan
-; knows fewer than four techs (ceiling < 3) only the known rows are emitted -- a
+; knows fewer than three techs (ceiling < 2) only the known rows are emitted -- a
 ; boost past the ceiling would just cap to a duplicate tech, so its row is left
 ; $ff (unselectable) rather than shown.
 ;
-; a8/i16.  out: X = number of rows written (1..4).  clobbers A,X,Y.
+; a8/i16.  out: X = number of rows written (1..3).  clobbers A,X,Y.
 .proc Ot6BushidoWindow
         .a8
         .i16
@@ -805,16 +844,17 @@ done:   plp
         inx
         cpx     #$0018
         bcc     @pad
-        ; --- rowcount-1 = min(3, ceiling): boost past the ceiling is a dup ---
+        ; --- rowcount-1 = min(2, ceiling): boost past the ceiling is a dup ---
         jsl     Ot6BushidoCeil      ; A = ceiling (0..7)
-        cmp     #$04
+        cmp     #$03
         bcc     :+
-        lda     #$03                ; cap the window at four rows
-:       pha                         ; maxboost -> $02,s (after the offset push)
+        lda     #$02                ; #38: cap the window at THREE rows (1x/2x/3x)
+:       pha                         ; maxrow -> $02,s (after the offset push)
         lda     #$00
         pha                         ; left-cell write offset -> $01,s
-        ldy     #$0000              ; boost r
-@row:   tya                         ; A = boost r
+        ldy     #$0000              ; row i
+@row:   tya                         ; A = row i
+        inc     a                   ; #38: row i -> boost i+1 (no 0x rung)
         jsl     Ot6BushidoTech      ; A = tech (preserves Y; clobbers X)
         jsl     Ot6BushidoOblivion  ; A = tech, top-rung swap (preserves Y)
         clc
@@ -831,14 +871,14 @@ done:   plp
         clc
         adc     #$06
         sta     $01,s
-        iny                         ; next boost
+        iny                         ; next row
         tya
-        cmp     $02,s               ; r vs maxboost
-        bcc     @row                ; r < maxboost: another row
-        beq     @row                ; r == maxboost: the last row
+        cmp     $02,s               ; i vs maxrow
+        bcc     @row                ; i < maxrow: another row
+        beq     @row                ; i == maxrow: the last row
         pla                         ; drop the write offset
-        pla                         ; A = maxboost
-        inc     a                   ; rowcount = maxboost + 1 (1..4)
+        pla                         ; A = maxrow
+        inc     a                   ; rowcount = maxrow + 1 (1..3)
         longa
         and     #$00ff
         tax                         ; X = rowcount
@@ -848,7 +888,7 @@ done:   plp
 
 ; ------------------------------------------------------------------------------
 
-; [ commit a Bushido submenu row: row r = boost r, fire the base+r tech ]
+; [ commit a Bushido submenu row: row i = boost i+1, fire that rung's tech ]
 ;
 ; jsl from the C1 tools-confirm (@8809, bushido mode w7e6168=2). The C1 side has
 ; already rejected an $ff (empty) cell, so X points at a real left-column tech
@@ -863,15 +903,16 @@ done:   plp
 .proc Ot6BushidoConfirm
         .a8
         .i16
-        ; --- boost r = cell offset / 6  (X in {0,6,12,18} -> r in {0,1,2,3}) ---
-        txa                         ; A = cell offset (low byte, <= 18)
-        ldx     #$0000              ; r accumulator
+        ; --- row i = cell offset / 6  (X in {0,6,12} -> i in {0,1,2}) ---
+        txa                         ; A = cell offset (low byte, <= 12)
+        ldx     #$0000              ; i accumulator
 @div:   cmp     #$06
         bcc     @haver
         sbc     #$06                ; C set by the cmp, so sbc is exact
         inx
         bra     @div
-@haver: txa                         ; A = r (r <= 3)
+@haver: txa                         ; A = i (i <= 2)
+        inc     a                   ; #38: boost r = i + 1 (the 1-BP floor)
         pha                         ; park r ($01,s)
         ; --- entity offset for OT6_BP_CLASS/OT6_BOOST_REVEALED ---
         lda     $62ca
@@ -944,22 +985,29 @@ done:   plp
         rtl
 .endproc
 
-; [ auto-window tech for a slot: base = max(0,ceil-3), tech = min(base+slot,ceil) ]
+; [ auto-window tech for a slot: base = max(0,ceil-2), tech = min(base+slot-1,ceil) ]
 ; The very math Ot6BushidoTech runs in AUTO mode, replicated menu-side off
-; $1cf7 so the seed baseline matches what battle would pick.
+; $1cf7 so the seed baseline matches what battle would pick.  #38: the slot
+; index IS the boost (1..3) and slot 0 is retired, so a 0 clamps to 1 exactly
+; as the battle leaf does -- Ot6LoadoutSeedWord still walks 0..3 and relies on
+; that clamp to mirror slot 1 into the dead slot 0 (see there).
 ; in: A = slot (0..3).  out: A = tech (0..ceiling).  clobbers X.  preserves Y.
 .proc Ot6LoadoutAutoTech
         .a8
         .i16
-        pha                         ; park slot ($01,s)
+        cmp     #$01                ; #38: 1-BP floor -- clamp the retired slot 0
+        bcs     :+
+        lda     #$01
+:       pha                         ; park slot ($01,s)
         jsl     Ot6LoadoutCeil      ; A = ceiling
         pha                         ; park ceiling ($01,s ; slot now $02,s)
         sec
-        sbc     #$03                ; ceiling - 3
+        sbc     #$02                ; ceiling - 2  (#38: three rungs, not four)
         bcs     :+
         lda     #$00                ; base floors at 0
 :       clc
         adc     $02,s               ; base + slot
+        dec     a                   ;   ... - 1 (slot >= 1 after the clamp)
         cmp     $01,s               ; vs ceiling
         bcc     :+
         lda     $01,s               ; cap at ceiling
@@ -1085,9 +1133,14 @@ done:   plp
 .endproc
 
 ; [ pack the whole auto window into the word (the first edit out of AUTO) ]
-; So that after the first manual edit the three un-touched slots keep the auto
+; So that after the first manual edit the un-touched slots keep the auto
 ; techs they were displaying, not zero.  Result is nonzero = MANUAL (unless the
 ; auto window is all tech 0 -- a ceiling-0 degenerate that reads auto either way).
+; #38: the loop still walks slots 0..3 even though slot 0 is retired.  That is
+; deliberate -- the STORED FORMAT MUST NOT MOVE (persistent_layout
+; ot6-codex-o8-v1), and Ot6LoadoutAutoTech's clamp makes slot 0 a harmless
+; mirror of slot 1, which keeps the word nonzero (= MANUAL) in exactly the
+; cases it did before.  Nothing ever reads slot 0 back.
 ; clobbers A,X,Y.
 .proc Ot6LoadoutSeedWord
         .a8
@@ -1138,7 +1191,8 @@ done:   plp
         shorta                      ; plain SEP #$20 -- keeps Z (shorta0's tdc wipes it)
         bne     :+
         jsl     Ot6LoadoutSeedWord  ; first edit: freeze the auto window into the word
-:       lda     $4e                 ; cursored slot (0..3)
+:       lda     $4e                 ; cursored ROW (0..2)
+        inc     a                   ; #38: row i -> word slot i+1 (slot 0 retired)
         jsl     Ot6LoadoutUnpack    ; A = the slot's current stored tech
         ldy     #$0008              ; try every residue once
 @hop:   clc
@@ -1148,7 +1202,8 @@ done:   plp
         bcs     @found
         dey
         bne     @hop
-@found: ldx     $4e                 ; X = cursored slot ($4f = 0, set by Open)
+@found: ldx     $4e                 ; X = cursored row ($4f = 0, set by Open)
+        inx                         ; -> the same row->slot mapping
         jsl     Ot6LoadoutAssign    ; pack the new tech (A) into slot X
         pla                         ; drop delta
         rtl
@@ -1180,7 +1235,7 @@ Ot6LoadoutPrev:                     ; L shoulder -> previous learned tech
         beq     @dn
         lda     $4e
         bne     :+
-        lda     #$04                ; wrap 0 -> 3 (pre-decrement)
+        lda     #$03                ; wrap 0 -> 2 (pre-decrement) -- #38: 3 rows
 :       dec     a
         sta     $4e
         lda     #$01
@@ -1190,9 +1245,9 @@ Ot6LoadoutPrev:                     ; L shoulder -> previous learned tech
         beq     @sel
         lda     $4e
         inc     a
-        cmp     #$04
+        cmp     #$03                ; #38: three rows (1x/2x/3x), no 0x
         bcc     :+
-        lda     #$00                ; wrap 3 -> 0
+        lda     #$00                ; wrap 2 -> 0
 :       sta     $4e
         lda     #$01
         rtl
@@ -1280,6 +1335,17 @@ Ot6LoadoutPrev:                     ; L shoulder -> previous learned tech
                                 ;   so it must not also buy a multiplier —
                                 ;   the same no-double-dip the tier-family
                                 ;   scan below enforces for folded spells
+        cmp     #$10
+        beq     done            ; $10 rage: a CHANCE verb (#40) -- boost bought
+                                ;   the coin's certainty (Ot6RageCoin's tier
+                                ;   ladder), never a damage multiplier.  This
+                                ;   gate is LOAD-BEARING on the start turn:
+                                ;   Cmd_10 executes the first possessed action
+                                ;   in the same turn (its _c21554 tail) while
+                                ;   the pending boost is still live, so without
+                                ;   it a 3-BP Rage-start would buy the
+                                ;   guaranteed special AND x8 it -- exactly the
+                                ;   double-dip kits.md:405-410 rules out.
         cmp     #$0f
         beq     done            ; $0f slot: a CHANCE verb -- boost bought the
                                 ;   reel's certainty (the Ot6SlotRig tier
@@ -1678,6 +1744,537 @@ done:   plp
         lda     f:$7e0000+OT6_SLOTTIER
         sta     OT6_BOOST_REVEALED,x       ; charge what the reels delivered
         plp
+        rtl
+.endproc
+
+; ==============================================================================
+; GAU -- THE HUNTER'S STABLE (issue #40, docs/design/kit-gau.md)
+;
+; The Ochette model: Veldt learning stays unlimited (LearnRage and the $1d2c
+; bitfield are UNTOUCHED -- the collection game IS Gau), and the battle Rage
+; window is filtered to an 8-slot loadout configured in the field.
+;
+; Storage: OT6_RAGELOAD, eight bytes at $7e1e1f, in the same save-block scrap
+; the Bushido word lives in.  byte = rage id + 1; $00 = unset; all eight zero
+; = AUTO.  No persistent_layout bump -- see ot6_memory.inc for the ruling.
+;
+; The battle read is ONE choke point: the flat list InitSkills builds at $257e.
+; Everything downstream -- the window draw (btlgfx DrawRageListText), the
+; confirm (btlgfx @852a, which refuses an $ff cell), the scroll cap, even
+; RandRage's confused-rager fallback -- reads that list and narrows itself for
+; free.  No cursor table, window template or btlgfx edit at all.
+; ------------------------------------------------------------------------------
+
+; [ is a rage learned?  test bit (id & 7) of $1d2c + (id >> 3) ]
+;
+; The field/battle-shared twin of the bit walk InitSkills does over the 32-byte
+; $1d2c-$1d4b bitfield (battle_main.asm:14684-14691): one bit per species,
+; LSB-first inside each byte, id order.
+; a8/i16.  in: A = rage id (0..254).  out: carry = learned, A preserved.
+;   clobbers X.  preserves Y.
+.proc Ot6RageLearned
+        .a8
+        .i16
+        phy                     ; [$01,s..$02,s] caller Y
+        pha                     ; [$01,s] the id
+        lsr
+        lsr
+        lsr                     ; A = id >> 3 = byte index
+        longa
+        and     #$001f          ; 32 bytes -- ids 0..254 cannot overrun it
+        tax
+        shorta0
+        lda     $01,s           ; the id again
+        and     #$07
+        longa
+        and     #$00ff
+        tay                     ; Y = bit index (clean shift count)
+        shorta0
+        lda     f:$7e1d2c,x     ; the learned-rage bitfield
+        iny                     ; shift bit+1 times -> carry = bit
+:       lsr
+        dey
+        bne     :-
+        pla                     ; A = the id (PLA preserves carry)
+        ply                     ; caller Y  (PLY preserves carry)
+        rtl
+.endproc
+
+; [ a loadout slot's rage, validated -- the single source of truth ]
+;
+; Mirrors the Bushido loadout's Ot6LoadoutSlotTech: the stored byte only counts
+; if the species is still in the bitfield.  It cannot normally go stale
+; (learning is monotonic and nothing ever clears $1d2c), but a corrupt or
+; hand-edited save must not put an id in the list that SetRage would resolve
+; into monster properties the player never hunted.
+; a8/i16.  in: A = slot (0..7).  out: carry set + A = rage id, or carry clear
+;   (unset / no longer learned).  clobbers X.  preserves Y.
+.proc Ot6RageSlot
+        .a8
+        .i16
+        longa
+        and     #$00ff
+        tax
+        shorta0
+        lda     f:OT6_RAGELOAD,x
+        beq     @none           ; $00 = unset
+        dec     a               ; stored byte - 1 = rage id
+        jsl     Ot6RageLearned  ; carry = learned (A preserved)
+        bcc     @none
+        rtl                     ; carry set, A = the id
+@none:  clc
+        rtl
+.endproc
+
+; [ the n-th learned rage in id order (AUTO's definition, menu side) ]
+;
+; AUTO is "the first eight known rages in id order" -- the head of the very
+; list InitSkills builds.  Not "most recently learned" (no storage exists) and
+; not "strongest" (no judgment the machinery can make).  Only the FIELD menu
+; calls this: in battle an all-zero loadout hands the list build straight back
+; to the vanilla walk, so AUTO costs the battle path nothing.
+; a8/i16.  in: A = n (0-based).  out: carry set + A = the id, or carry clear
+;   (fewer than n+1 learned).  clobbers X.  preserves Y.
+.proc Ot6RageNth
+        .a8
+        .i16
+        pha                     ; [$01,s] n (counted down)
+        phy                     ; [$01,s..$02,s] caller Y (n now $03,s)
+        ldy     #$0000          ; candidate id
+@try:   tya
+        jsl     Ot6RageLearned  ; carry = learned; preserves Y, clobbers X
+        bcc     @next
+        lda     $03,s
+        beq     @hit
+        dec     a
+        sta     $03,s
+@next:  iny
+        cpy     #$00ff          ; ids 0..254 (InitSkills' own ceiling)
+        bcc     @try
+        ply
+        pla
+        clc                     ; fewer than n+1 learned
+        rtl
+@hit:   tya                     ; A = the id (a8 reads Y's low byte)
+        sta     $03,s           ; overwrite the parked n with it
+        ply                     ; caller Y
+        pla                     ; A = the id
+        sec
+        rtl
+.endproc
+
+; [ THE CHOKE POINT: build the battle rage list from the loadout ]
+;
+; Called from InitSkills (battle_main.asm) in place of -- not beside -- the
+; vanilla $1d2c walk.  All eight bytes zero (AUTO, and the state every
+; pre-existing save and every tracked anchor is in) returns carry CLEAR and the
+; vanilla walk runs untouched, byte for byte.  Otherwise this writes the stored,
+; still-learned ids in slot order to $257e, sets the count $3a9a, and returns
+; carry SET.
+;
+; Terminator: InitBattle $ff-fills $2000-$341f (battle_main.asm:6096-6102, a
+; 16-bit double-store loop) BEFORE it calls InitSkills, so every cell past the
+; ones we write is already $ff -- which is what both readers stop on (the
+; btlgfx confirm at :20264-20266, RandRage's scan at :992-994).  We write the
+; terminator anyway rather than depend on a fill three hundred lines away.
+;
+; entry: jsl from InitSkills, db=$7e (InitBattle's MVN left it there).  Sets its
+; own widths and restores the caller's.  clobbers A,X,Y.  out: carry set = the
+; list is built, carry clear = run the vanilla walk.
+.proc Ot6RageList
+        php
+        shorta0
+        longi
+        ; --- AUTO?  all eight bytes zero -> hand it back to vanilla ---
+        ldx     #$0000
+@zero:  lda     f:OT6_RAGELOAD,x
+        bne     @manual
+        inx
+        cpx     #OT6_RAGESLOTS
+        bcc     @zero
+        plp
+        clc                     ; AUTO: the vanilla walk builds the list
+        rtl
+@manual:
+        stz     $3a9a           ; number of known rages, rebuilt below
+        ldy     #$0000          ; write cursor into $257e (Ot6RageSlot keeps Y)
+        lda     #$00
+        pha                     ; [$01,s] slot -- NOT X: Ot6RageSlot clobbers it
+@slot:  lda     $01,s
+        jsl     Ot6RageSlot     ; carry set + A = id; preserves Y, kills X
+        bcc     @next
+        sta     $257e,y
+        iny
+        inc     $3a9a
+@next:  lda     $01,s
+        inc     a
+        sta     $01,s
+        cmp     #OT6_RAGESLOTS
+        bcc     @slot
+        pla                     ; drop the slot counter
+        lda     #$ff
+        sta     $257e,y         ; terminate (belt-and-braces; see the header)
+        plp
+        sec                     ; handled
+        rtl
+.endproc
+
+; ------------------------------------------------------------------------------
+; GAU'S FIELD CONFIGURATOR -- bank-F0 state logic (the Ot6Loadout* twin)
+;
+; Same division of labour the Bushido configurator proved: everything that
+; DECIDES lives here in F0 and the C3 handler is a thin tilemap/cursor/DMA
+; shim, so the field page and the battle list can never disagree about what
+; the loadout says.  All entries a8/i16, D = 0 (so the $08/$09 new-press
+; joypad and the $4d/$4e cursor position are reachable), rtl.  The learned set
+; is read from $1d2c through the SAME Ot6RageLearned leaf the battle build
+; uses -- the invariant that kept Bushido's two readers honest.
+;
+; The one shape difference from Bushido: Cyan's "pool" is eight techs and can
+; be drawn as a grid, Gau's is up to 255 species and cannot.  So the L/R cycle
+; IS the browse -- it walks the $1d2c bitfield -- and a LEARNED count stands in
+; for the grid (the collection score, which is the number the hunter cares
+; about anyway).
+; ------------------------------------------------------------------------------
+
+; [ is the loadout AUTO?  all eight bytes zero ]
+; out: carry set = AUTO.  clobbers A,X.  preserves Y.
+.proc Ot6RageIsAuto
+        .a8
+        .i16
+        ldx     #$0000
+@lp:    lda     f:OT6_RAGELOAD,x
+        bne     @manual
+        inx
+        cpx     #OT6_RAGESLOTS
+        bcc     @lp
+        sec
+        rtl
+@manual:
+        clc
+        rtl
+.endproc
+
+; [ the rage a slot SHOWS, validated -- the page's single source of truth ]
+; MANUAL returns the stored, still-learned id; AUTO computes the slot's window
+; entry on the fly, so merely opening the page writes nothing (the Bushido
+; configurator's implicit-seed property, kept).
+; in: A = slot (0..7).  out: carry set + A = rage id, carry clear = blank row.
+;   clobbers X.  preserves Y.
+.proc Ot6RageShow
+        .a8
+        .i16
+        pha
+        jsl     Ot6RageIsAuto       ; carry set = AUTO (clobbers A and X)
+        pla                         ; A = slot (PLA preserves carry)
+        bcs     @auto
+        jmp     Ot6RageSlot         ; tail-call: the stored, validated id
+@auto:  jmp     Ot6RageNth          ; tail-call: the auto window's slot-th id
+.endproc
+
+; [ freeze the AUTO window into the eight bytes (the first edit out of AUTO) ]
+; So the un-touched slots keep the beasts they were displaying rather than
+; emptying.  A slot the auto window cannot fill (fewer than eight learned)
+; stays $00 = unset, which the battle build simply skips.
+; clobbers A,X,Y.
+.proc Ot6RageSeed
+        .a8
+        .i16
+        ldy     #$0000
+@lp:    tya
+        jsl     Ot6RageNth          ; carry set + A = id; preserves Y, kills X
+        bcc     @done               ; fewer than Y+1 learned: the rest stay unset
+        inc     a                   ; stored byte = id + 1
+        phy
+        plx                         ; X = slot (the i16 transfer idiom; Y intact)
+        sta     f:OT6_RAGELOAD,x
+        iny
+        cpy     #OT6_RAGESLOTS
+        bcc     @lp
+@done:  rtl
+.endproc
+
+; [ open the configurator: cursor to the top slot ]
+; Leaves the eight bytes as they are -- AUTO stays AUTO until the first edit,
+; because Ot6RageShow computes the window per slot on the fly.
+; clobbers A.
+.proc Ot6RageOpen
+        .a8
+        .i16
+        stz     $4d                 ; cursor: single column
+        stz     $4e                 ; ... top slot
+        stz     $4f
+        stz     $50
+        stz     $51
+        stz     $52
+        rtl
+.endproc
+
+; [ cycle the cursored slot to the prev/next LEARNED rage; go MANUAL ]
+; The first edit out of AUTO freezes the window first (Ot6RageSeed), then walks
+; the $1d2c bitfield from the slot's current id to the next/previous set bit,
+; wrapping over 0..254 -- vanilla's own id range (InitSkills stops at $fe).
+; A slot showing nothing starts its walk at id 0.  Uses menu scratch $e0 (D=0),
+; free during input, exactly as Ot6LoadoutAssign uses $e0..$e4.
+; in: A = step delta ($01 = next, $ff = previous).  clobbers A,X,Y.
+.proc Ot6RageCycleCore
+        .a8
+        .i16
+        pha                         ; [$01,s] delta
+        jsl     Ot6RageIsAuto
+        bcc     :+
+        jsl     Ot6RageSeed         ; first edit: freeze the window into bytes
+:       lda     $4e                 ; cursored slot (0..7)
+        jsl     Ot6RageShow         ; carry set + A = the id it is showing
+        bcs     :+
+        lda     #$00                ; blank row: start the walk at id 0
+:       sta     $e0
+        ldy     #$00ff              ; try every id once (0..254)
+@hop:   lda     $e0
+        clc
+        adc     $01,s               ; += delta
+        cmp     #$ff                ; $ff is off both ends of 0..$fe
+        bcc     @have
+        lda     $01,s
+        bmi     @low                ; delta $ff (down): 0 - 1 wraps to $fe
+        lda     #$00                ; delta $01 (up):  $fe + 1 wraps to 0
+        bra     @have
+@low:   lda     #$fe
+@have:  sta     $e0
+        jsl     Ot6RageLearned      ; carry = learned (A preserved)
+        bcs     @found
+        dey
+        bne     @hop
+        pla                         ; nothing learned at all: leave it alone
+        rtl
+@found: lda     $e0
+        inc     a                   ; stored byte = id + 1
+        ldx     $4e                 ; X = cursored slot ($4f = 0, set by Open)
+        sta     f:OT6_RAGELOAD,x
+        pla                         ; drop delta
+        rtl
+.endproc
+
+Ot6RageNext:                        ; R shoulder -> next learned rage
+        lda     #$01
+        jmp     Ot6RageCycleCore
+Ot6RagePrev:                        ; L shoulder -> previous learned rage
+        lda     #$ff
+        jmp     Ot6RageCycleCore
+
+; [ per-frame input: mutate loadout state; tell C3 what to do next ]
+; The Ot6LoadoutInput contract, at eight rows:
+;   B      -> exit               (return A = 2)
+;   Up/Dn  -> move slot cursor   (return A = 1: redraw)
+;   L/R    -> cycle the slot     (return A = 1)
+;   Y      -> revert to AUTO     (return A = 1)   (NOT Select -- FF6's default
+;             config aliases physical Select onto the R bit, so it cannot be
+;             told apart from the R-shoulder cycle)
+;   else                          (return A = 0: idle)
+.proc Ot6RageInput
+        .a8
+        .i16
+        lda     $09                 ; dpad / B / Y / Select / Start
+        bit     #$80                ; B -> exit
+        beq     :+
+        lda     #$02
+        rtl
+:       bit     #$08                ; Up
+        beq     @dn
+        lda     $4e
+        bne     :+
+        lda     #OT6_RAGESLOTS      ; wrap 0 -> 7 (pre-decrement)
+:       dec     a
+        sta     $4e
+        lda     #$01
+        rtl
+@dn:    lda     $09
+        bit     #$04                ; Down
+        beq     @sel
+        lda     $4e
+        inc     a
+        cmp     #OT6_RAGESLOTS
+        bcc     :+
+        lda     #$00                ; wrap 7 -> 0
+:       sta     $4e
+        lda     #$01
+        rtl
+@sel:   lda     $09
+        bit     #$40                ; Y -> revert to AUTO (all eight bytes 0)
+        beq     @lr
+        ldx     #$0000
+        lda     #$00
+:       sta     f:OT6_RAGELOAD,x
+        inx
+        cpx     #OT6_RAGESLOTS
+        bcc     :-
+        lda     #$01
+        rtl
+@lr:    lda     $08                 ; A / X / L / R shoulders
+        bit     #$20                ; L shoulder -> previous learned rage
+        beq     @rsh
+        jsl     Ot6RagePrev
+        lda     #$01
+        rtl
+@rsh:   lda     $08
+        bit     #$10                ; R shoulder -> next learned rage
+        beq     @idle
+        jsl     Ot6RageNext
+        lda     #$01
+        rtl
+@idle:  lda     #$00
+        rtl
+.endproc
+
+; [ how many rages are known?  the collection score ]
+; Popcount of the whole $1d2c-$1d4b bitfield.  Stands in for the pool grid
+; Cyan's page draws: with up to 255 candidates the grid is not expressible,
+; and the count is the number the collection game is actually about.
+; out: A = count (0..255).  clobbers A,X,Y and menu scratch $e0/$e1.
+.proc Ot6RageCount
+        .a8
+        .i16
+        ldx     #$0000
+        ldy     #$0000              ; running count
+@byte:  lda     f:$7e1d2c,x
+        beq     @next
+        sta     $e0
+        lda     #$08
+        sta     $e1
+@bit:   lsr     $e0
+        bcc     :+
+        iny
+:       dec     $e1
+        bne     @bit
+@next:  inx
+        cpx     #$0020              ; 32 bytes
+        bcc     @byte
+        tya                         ; a8: the count's low byte (max 255)
+        rtl
+.endproc
+
+; [ price a rage row -- ALWAYS defined, flag-gated body ]
+; The Ot6LoadoutCost shim, for the shared (flag-agnostic) menu object: ON
+; tail-calls the one price authority, nomp returns 0 and the row draws no
+; number.  Every row shows the SAME number by design -- the price is flat, so
+; the column doubles as the rule's teaching surface.
+; out: A = MP cost (0 under nomp).  rtl.
+.proc Ot6RageRowCost
+        .a8
+        .i16
+.if ::OT6_MP_COSTS
+        jmp     Ot6RageCost         ; tail-call: its rtl returns for us
+.else
+        lda     #$00
+        rtl
+.endif
+.endproc
+
+; ------------------------------------------------------------------------------
+
+; [ latch the trance's boost tier (Cmd_10's entry) ]
+;
+; BP is spent once, at the Rage-START action, through the normal Ot6ActionEnd
+; consume -- but the TIER must outlive that action by the whole battle, because
+; every possessed turn after it rolls the same tilted coin.  That is Slot's
+; problem at longer range: Ot6SlotRig latches the spin's tier so the charge and
+; the reels can never disagree; this latches the trance's tier so the charge and
+; the whole possession can never disagree.
+;
+; It fires ONLY on the start turn -- the turn whose RAGE status bit is still
+; clear.  A mid-trance Cmd_10 (every possessed turn re-enters here) finds the
+; bit set and leaves the latch alone; latching there would read the already-
+; consumed pending byte and silently drop the trance to tier 0.
+;
+; entry: jsl from Cmd_10 (battle_main.asm), a8/i8, Y = attacker entity, db=$7e.
+; clobbers A.
+.proc Ot6RageTierLatch
+        .a8
+        lda     $3ef9,y         ; status 4
+        lsr                     ; bit 0 = RAGE: already possessed?
+        bcs     @done           ; mid-trance turn: the latched tier stands
+        lda     OT6_BOOST_REVEALED,y     ; pending boost 0-3
+        cmp     #$04
+        bcc     :+
+        lda     #$03            ; (defensive: Ot6Boost already caps at 3)
+:       sta     f:$7e0000+OT6_RAGETIER
+@done:  rtl
+.endproc
+
+; [ boost tilts Rage's coin -- the chance verb's certainty, Dance-shaped ]
+;
+; DESIGN.md's canon: on damage verbs boost multiplies, on chance verbs boost
+; GUARANTEES, in the verb's own vocabulary.  Rage's vocabulary is one coin per
+; possessed turn -- RandCarry + rol picks entry 0 (always plain Fight) or entry
+; 1 (the beast's special; monster_rage.asm:3-5).  The beast was already chosen
+; from the menu, so the gamble BP buys off is which half of it shows up, and it
+; buys it for the whole trance:
+;
+;   tier 0   the caller's own carry, untouched                       1/2
+;   tier 1   the special unless a fresh draw < $40                    3/4
+;   tier 2   the special unless a fresh draw < $10                  15/16
+;   tier 3   no roll at all -- the special, every turn, all trance    1/1
+;
+; Each point roughly quarters the miss odds (1/2 -> 1/4 -> 1/16 -> 0), the same
+; converging ladder Steal shipped.  The tilt is toward entry 1 because entry 0
+; is always plain Fight -- nobody spends BP to punch more predictably.
+;
+; RNG DISCIPLINE: tier 0 draws NOTHING extra, so a 0-BP trance walks exactly
+; the RNGTbl indices vanilla walks -- that is the byte-identical arm the
+; fixture asserts, and it is why the tier test can be a same-drive A/B.
+;
+; entry: jsl from RandRage (bank C2) immediately after its `jsr RandCarry`,
+; a8, INDEX WIDTH UNKNOWN (the site precedes RandRage's `longai`).  So the
+; caller's P is parked and the index-width bit restored by hand at the end --
+; `plp` would also restore the stale carry this proc exists to replace.
+; in: carry = vanilla's coin, A = the value RandRage is about to `rol`.
+; out: carry = the tier's coin.  A and Y preserved; X clobbered.
+.proc Ot6RageCoin
+        .a8
+        pha                     ; [$01,s] the caller's A (the rol operand)
+        lda     #$00
+        rol                     ; A = vanilla's coin (0/1); carry consumed
+        pha                     ; [$01,s] coin
+        php
+        pla                     ; A = caller P ...
+        pha                     ; [$01,s] ... parked for the width restore
+        rep     #$10            ; i16, so phy has a known width.  an 8-bit Y
+        .i16                    ;   widens to $00yy and sep #$10 truncates it
+        phy                     ;   back -- correct from either caller width
+        ;   stack from here: $01,s Ylo  $02,s Yhi  $03,s P  $04,s coin  $05,s A
+        lda     f:$7e0000+OT6_RAGETIER
+        beq     @done           ; tier 0: vanilla's coin stands, no extra draw
+        cmp     #$03
+        bcc     @tilt
+        lda     #$01            ; tier 3+: the special, unconditionally
+        sta     $04,s           ; overwrite the parked coin
+        bra     @done
+@tilt:  cmp     #$02
+        beq     @t2
+        lda     #$40            ; tier 1: the special unless draw < $40
+        bra     @roll
+@t2:    lda     #$10            ; tier 2: the special unless draw < $10
+@roll:  pha                     ; [$01,s] threshold -- everything else +1
+        sep     #$10            ; ot6_rand indexes $be as a BYTE
+        .i8
+        ot6_rand                ; A = draw 0-255 (the macro saves/restores X)
+        cmp     $01,s           ; carry set iff draw >= threshold
+        lda     #$00
+        rol                     ; A = 1 when the special wins
+        sta     $05,s           ; overwrite the parked coin
+        pla                     ; drop the threshold
+        rep     #$10
+        .i16
+@done:  ply                     ; caller Y
+        pla                     ; A = caller P
+        and     #$10            ; restore the index width by hand: sep/rep
+        beq     @i16            ;   leave C alone, plp would not
+        sep     #$10
+        bra     @coin
+@i16:   rep     #$10
+@coin:  pla                     ; A = the coin (0/1)
+        lsr                     ; -> carry
+        pla                     ; A = the caller's original A (PLA keeps C)
         rtl
 .endproc
 

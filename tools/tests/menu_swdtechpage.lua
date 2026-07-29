@@ -18,9 +18,17 @@
 --     -> A -- so SkillsOption_02 (field_menu.asm), not a forced state, opens
 --     the configurator;
 --   * RENDER: it asserts the BG1A tilemap shadow cell-by-cell: the title,
---     the 0x..3x labels, each slot's tech name, the " MP" cost suffix, the
+--     the 1x..3x labels, each slot's tech name, the " MP" cost suffix, the
 --     LEARNED pool -- and, the class-closer, that the rows BETWEEN them are
 --     still all-zero (a runaway unterminated draw can not leave them blank).
+--
+-- issue #38 refloored the page: every Bushido tech costs at least 1 BP, so the
+-- 0x row is RETIRED and the window is three rows -- 1x/2x/3x at tilemap rows
+-- 4/6/8.  The stored format did NOT move (the same packed word at $1e1d, four
+-- 3-bit fields; word slot 0 is simply never read), so this test's install and
+-- its AUTO word are unchanged.  Row 10 -- where the old 3x row drew -- joins
+-- the blank-canary set: nothing may draw there any more, and a runaway draw
+-- would still carpet it.
 --
 -- Fixture: arvis_wake (same boot as menu_bushidoloadout / menu_esperdetail).
 -- Its lead has no Bushido command, so the SwdTech row is installed the house
@@ -28,9 +36,10 @@
 -- lead's third battle-command byte becomes BUSHIDO, and $1cf7 = $07 -- the
 -- natural learned set of the owner's scenario-band Cyan (Dispatch, Retort,
 -- Slash; the LV14-era set from the #39 report), loadout word $0000 = AUTO.
--- With only 3 of 8 techs learned the page also locks in the short-learned-set
--- auto window: slots draw Dispatch/Retort/Slash/Slash (slot 3 falls back to
--- the ceiling), and the pool holds exactly three names.
+-- With exactly 3 of 8 techs learned the ceiling is 2, so the three-rung auto
+-- window (base = max(0, ceiling-2) = 0) draws Dispatch/Retort/Slash at
+-- 1x/2x/3x -- every learned tech reachable, none duplicated -- and the pool
+-- holds the same three names.
 local H = dofile("tools/tests/lib/ot6.lua")
 local STATE = "build/states/arvis_wake.mss.lua"
 
@@ -132,15 +141,19 @@ H.run({ maxFrames = 30000 }, {
     -- chrome
     assertRun(2, 1, TITLE, "title BUSHIDO LOADOUT")
     assertRun(2, 13, POOL, "LEARNED caption")
-    assertRun(2, 4,  { 0xb4, lo.x }, "label 0x")
-    assertRun(2, 6,  { 0xb5, lo.x }, "label 1x")
-    assertRun(2, 8,  { 0xb6, lo.x }, "label 2x")
-    assertRun(2, 10, { 0xb7, lo.x }, "label 3x")
-    -- the four boost slots: short learned set -> Dispatch/Retort/Slash/Slash
-    assertSlotRow(4,  DISPATCH, "slot 0x Dispatch")
-    assertSlotRow(6,  RETORT,   "slot 1x Retort")
-    assertSlotRow(8,  SLASH,    "slot 2x Slash")
-    assertSlotRow(10, SLASH,    "slot 3x Slash (ceiling fallback)")
+    assertRun(2, 4,  { 0xb5, lo.x }, "label 1x")
+    assertRun(2, 6,  { 0xb6, lo.x }, "label 2x")
+    assertRun(2, 8,  { 0xb7, lo.x }, "label 3x")
+    -- #38: no 0x label anywhere on the page -- the retired rung must not be
+    -- drawn at its old home (row 4) nor anywhere else in the label column.
+    for _, y in ipairs({ 4, 6, 8, 10 }) do
+      H.assertEq(cell(2, y) == 0xb4 and cell(3, y) == lo.x, false,
+        string.format("no 0x label at row %d (#38 retired the free rung)", y))
+    end
+    -- the three boost slots: ceiling 2 -> base 0 -> Dispatch/Retort/Slash
+    assertSlotRow(4, DISPATCH, "slot 1x Dispatch")
+    assertSlotRow(6, RETORT,   "slot 2x Retort")
+    assertSlotRow(8, SLASH,    "slot 3x Slash")
     -- the LEARNED pool: exactly the three learned names, left column
     assertRun(2, 15, DISPATCH, "pool Dispatch")
     assertRun(2, 17, RETORT,   "pool Retort")
@@ -150,6 +163,7 @@ H.run({ maxFrames = 30000 }, {
     -- spray canaries: undrawn rows are still cleared
     assertRowBlank(0,  "row 0")
     assertRowBlank(3,  "row 3 (between labels)")
+    assertRowBlank(10, "row 10 (#38: the retired 4th slot row)")
     assertRowBlank(12, "row 12 (above LEARNED)")
     -- and the title row past the title text
     for x = 17, 31 do

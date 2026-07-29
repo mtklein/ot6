@@ -120,11 +120,18 @@ MENU_TEXT_INC = 1
 ; no $00 terminator), which is exactly issue #39's garbled SwdTech page.
 .define OT6_LOADOUT_TITLE               BG1A, {2, 1},  {"BUSHIDO LOADOUT"}
 .define OT6_LOADOUT_POOL                BG1A, {2, 13}, {"LEARNED"}
-.define OT6_LOADOUT_LBL0                BG1A, {2, 4},  {"0x"}
-.define OT6_LOADOUT_LBL1                BG1A, {2, 6},  {"1x"}
-.define OT6_LOADOUT_LBL2                BG1A, {2, 8},  {"2x"}
-.define OT6_LOADOUT_LBL3                BG1A, {2, 10}, {"3x"}
+; #38: every Bushido tech costs at least 1 BP, so the 0x row is retired and the
+; page is three rows deep -- 1x/2x/3x at tilemap rows 4/6/8.
+.define OT6_LOADOUT_LBL1                BG1A, {2, 4},  {"1x"}
+.define OT6_LOADOUT_LBL2                BG1A, {2, 6},  {"2x"}
+.define OT6_LOADOUT_LBL3                BG1A, {2, 8},  {"3x"}
 .define OT6_LOADOUT_MP_SUFFIX           {" MP"}
+
+; OT6 (#40): Gau's 8-slot rage loadout page.  Same encode-pipeline rule as the
+; Bushido labels above -- a bare literal in field_menu.asm picks up
+; ending_anim.asm's credits charmap and carries no terminator (issue #39).
+.define OT6_RAGE_TITLE                  BG1A, {2, 1},  {"RAGE LOADOUT"}
+.define OT6_RAGE_LEARNED                BG1A, {2, 20}, {"LEARNED"}
 
 ; ------------------------------------------------------------------------------
 

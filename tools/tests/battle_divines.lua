@@ -39,8 +39,9 @@ local STATE = "build/states/battle_doorstep.mss.lua"
 local MENU, ACTOR, MSTATE = 0x7BCA, 0x62CA, 0x7BC2
 local KNOWN, BAR = 0x2020, 0x7B82
 -- v0.5 (#8): SwdTech is a tools-shell submenu ($30), not the numeral gauge.
--- Each row is a boost level; row 3 (boost 3) at ceiling 7 is the divine top
--- rung.  Its enumerated tech reflects the once-per-battle latch: Ot6BushidoWindow
+-- Each row is a boost level.  #38 put a 1-BP floor under Bushido, so the
+-- window is three rows and row i = boost i+1: the divine top rung at ceiling 7
+-- is now ROW 2 (boost 3), which still resolves to tech 7.  Its enumerated tech reflects the once-per-battle latch: Ot6BushidoWindow
 -- applies Ot6BushidoOblivion, so a clear latch packs Oblivion (tech 7, id $5c)
 -- and a set latch packs Tempest (tech 6, id $5b).
 local ST_SUB = 0x30
@@ -192,7 +193,7 @@ add({
   openWindow("swdtech submenu opens (selection)"),
   H.waitFrames(6),
   H.call(function()
-    H.assertEq(rowId(3), 0x5C, "latch CLEAR: row 3 (boost 3) enumerates Oblivion ($5c)")
+    H.assertEq(rowId(2), 0x5C, "latch CLEAR: row 2 (boost 3) enumerates Oblivion ($5c)")
     H.screenshot("divine_oblivion_selectable")
   end),
   closeWindow("close, then set the latch and reopen"),
@@ -200,14 +201,14 @@ add({
   openWindow("reopen with the latch SET"),
   H.waitFrames(6),
   H.call(function()
-    H.assertEq(rowId(3), 0x5B, "latch SET: row 3 falls back to Tempest ($5b)")
+    H.assertEq(rowId(2), 0x5B, "latch SET: row 2 falls back to Tempest ($5b)")
   end),
   closeWindow("close, then clear the latch and reopen"),
   H.call(function() clrLatch(actor) end),
   openWindow("reopen with the latch CLEAR"),
   H.waitFrames(6),
   H.call(function()
-    H.assertEq(rowId(3), 0x5C, "latch cleared: Oblivion ($5c) returns")
+    H.assertEq(rowId(2), 0x5C, "latch cleared: Oblivion ($5c) returns")
     H.assertEq(latchSet(actor), false, "latch left clear for the fallback test")
   end),
 
@@ -218,10 +219,10 @@ add({
     guardImmune = { [2] = false, [3] = false }
     pinGuardHp = true
     parkBench(actor); pin()
-    cursorRow(3)                          -- boost 3 -> Oblivion (latch clear)
+    cursorRow(2)                          -- boost 3 -> Oblivion (latch clear)
   end),
   H.driveUntil(function() return not inWindow() end, 900, {
-    H.call(function() pin(); cursorRow(3); H.setPad({ "a" }) end),
+    H.call(function() pin(); cursorRow(2); H.setPad({ "a" }) end),
     H.waitFrames(2),
     H.call(function() H.setPad({}) end),
     H.waitFrames(14),
@@ -264,11 +265,11 @@ add({
   openWindow("swdtech submenu opens (broken kill)"),
   H.waitFrames(6),
   H.call(function()
-    H.assertEq(rowId(3), 0x5C, "Oblivion ($5c) at boost-3 row (latch clear)")
-    cursorRow(3)                          -- boost 3 -> Oblivion
+    H.assertEq(rowId(2), 0x5C, "Oblivion ($5c) at boost-3 row (latch clear)")
+    cursorRow(2)                          -- boost 3 -> Oblivion
   end),
   H.driveUntil(function() return not inWindow() end, 900, {
-    H.call(function() pin(); cursorRow(3); H.setPad({ "a" }) end),
+    H.call(function() pin(); cursorRow(2); H.setPad({ "a" }) end),
     H.waitFrames(2),
     H.call(function() H.setPad({}) end),
     H.waitFrames(14),

@@ -13,20 +13,32 @@
 -- Ot6BushidoRowGrey OR's the same $04, and Ot6BushidoConfirm refuses to commit
 -- it (battle_bushido asserts the refusal; this asserts the visual).
 --
+-- issue #38 put a 1-BP floor under every tech: the window is three rows and
+-- row i = boost i+1.  The BP-grey rule is unchanged in shape (row's boost > bp
+-- -> grey), but it now bites at 0 bp on EVERY row -- which is the answer to
+-- "greyed or absent" for a 0-pip Cyan.  GREYED, deliberately: the list is a
+-- price surface, so it must keep showing what the bank would buy (and at what
+-- MP), exactly like an unaffordable spell; a list that changed LENGTH with the
+-- wallet would also slide the row->boost identity under the player's cursor
+-- between turns.  Assertion 4 pins that.
+--
 -- Cyan is INSTALLED into the opening guard fight the way battle_bushido pins
 -- him: CHAR::CYAN ($3ED8), a Bushido-only command list ($202E), the weapon
 -- SWDTECH flag ($3BA4/$3BA5 bit 1), and a pinned $2020 (ceiling 4 -> window
--- {Retort,Slash,QuadraSlam,Empowerer} at boosts 0/1/2/3).  Their costs:
---   Retort $56 2   Slash $57 3   Quadra Slam $58 4   Empowerer $59 5
+-- {Slash,QuadraSlam,Empowerer} at boosts 1/2/3).  Their costs:
+--   Slash $57 3   Quadra Slam $58 4   Empowerer $59 5
 --
 -- What is asserted (attribute byte = the odd/high byte of each name tile's
 -- tilemap word, $21 white / $25 grey):
---   1. MP GREY.  bp full (isolating MP), MP pinned to 3: Retort(2)/Slash(3) are
---      white, Empowerer(5) is grey.  grey - white == $04.
---   2. BP GREY.  MP full (isolating BP), bp pinned to 2: row 3 = Empowerer
---      (boost 3 > 2 bp) is grey while Retort/Slash (boosts 0/1) stay white.
+--   1. MP GREY.  bp full (isolating MP), MP pinned to 3: Slash(3) is white,
+--      Empowerer(5) is grey.  grey - white == $04.
+--   2. BP GREY.  MP full (isolating BP), bp pinned to 2: row 2 = Empowerer
+--      (boost 3 > 2 bp) is grey while Slash (boost 1) stays white.
 --   3. BOTH CLEAR.  bp and MP full: Empowerer is white -- the grey tracks both
 --      knobs, it is not unconditional.
+--   4. ZERO BP GREYS EVERYTHING (#38).  MP full, bp 0: Slash -- the cheapest
+--      rung, and white in every pass above -- is grey too, because boost 1 > 0.
+--      The names are still DRAWN: greyed, not absent.
 local H = dofile("tools/tests/lib/ot6.lua")
 local STATE = "build/states/battle_doorstep.mss.lua"
 
@@ -52,9 +64,13 @@ local function glyphs(s)
 end
 -- spaceless techs only, so each glyph run is contiguous in VRAM.
 local NM = {
-  Retort    = glyphs("Retort"),        -- boost 0, cost 2
-  Slash     = glyphs("Slash"),         -- boost 1, cost 3
-  Empowerer = glyphs("Empowerer"),     -- boost 3, cost 5
+  Slash     = glyphs("Slash"),         -- row 0, boost 1, cost 3
+  Empowerer = glyphs("Empowerer"),     -- row 2, boost 3, cost 5
+  -- tech 1, the OLD 0x rung at ceiling 4.  #38 retired it off the bottom of
+  -- the window, so it must not be on this page at all -- and its absence is
+  -- what makes the 0-bp pass below discriminating (a four-row window would
+  -- put Retort at boost 0, i.e. WHITE at 0 bp).
+  Retort    = glyphs("Retort"),
 }
 
 local function findName(seq)
@@ -129,15 +145,13 @@ H.run({ maxFrames = 40000 }, {
   H.waitFrames(6),
   H.call(function() H.screenshot("bushido_grey_mp") end),
   H.call(function()
-    local aR, aS, aE = attrOf(NM.Retort), attrOf(NM.Slash), attrOf(NM.Empowerer)
-    H.log(string.format("MP=3 attr: Retort=%s Slash=%s Empowerer=%s",
-      aR and string.format("$%02x", aR) or "nil",
+    local aS, aE = attrOf(NM.Slash), attrOf(NM.Empowerer)
+    H.log(string.format("MP=3 attr: Slash=%s Empowerer=%s",
       aS and string.format("$%02x", aS) or "nil",
       aE and string.format("$%02x", aE) or "nil"))
-    H.assertEq(aR, WHITE, "Retort (cost 2, MP 3) renders white -- affordable")
     H.assertEq(aS, WHITE, "Slash (cost 3, MP 3) renders white -- affordable")
     H.assertEq(aE, GREY, "Empowerer (cost 5, MP 3) renders grey -- unaffordable MP")
-    H.assertEq(aE - aR, 0x04, "grey - white == $04, magic's own disabled-bit delta")
+    H.assertEq(aE - aS, 0x04, "grey - white == $04, magic's own disabled-bit delta")
   end),
 
   -- 2. BP GREY (MP full, bp = 2) --------------------------------------------
@@ -147,12 +161,10 @@ H.run({ maxFrames = 40000 }, {
   H.waitFrames(6),
   H.call(function() H.screenshot("bushido_grey_bp") end),
   H.call(function()
-    local aR, aS, aE = attrOf(NM.Retort), attrOf(NM.Slash), attrOf(NM.Empowerer)
-    H.log(string.format("bp=2 MP=99 attr: Retort=%s Slash=%s Empowerer=%s",
-      aR and string.format("$%02x", aR) or "nil",
+    local aS, aE = attrOf(NM.Slash), attrOf(NM.Empowerer)
+    H.log(string.format("bp=2 MP=99 attr: Slash=%s Empowerer=%s",
       aS and string.format("$%02x", aS) or "nil",
       aE and string.format("$%02x", aE) or "nil"))
-    H.assertEq(aR, WHITE, "Retort (boost 0, bp 2) white -- reachable")
     H.assertEq(aS, WHITE, "Slash (boost 1, bp 2) white -- reachable")
     H.assertEq(aE, GREY, "Empowerer (boost 3 > 2 bp) grey -- not enough BP (MP full)")
   end),
@@ -167,6 +179,33 @@ H.run({ maxFrames = 40000 }, {
     H.log(string.format("bp=5 MP=99 -> Empowerer attr = %s",
       aE and string.format("$%02x", aE) or "nil"))
     H.assertEq(aE, WHITE, "Empowerer white now -- the grey tracks both BP and MP")
-    H.log("PASSED: the SwdTech submenu greys the MP- and BP-unreachable rows only")
+  end),
+
+  -- 4. ZERO BP GREYS EVERY ROW (#38's 1-BP floor) ---------------------------
+  -- The presentation ruling, pinned: a 0-pip Cyan still SEES his three techs
+  -- and their prices, all greyed and all refused (battle_bushido asserts the
+  -- refusal).  Before #38 row 0 was boost 0 and stayed white at 0 bp.
+  closeSub(),
+  H.call(function() bpbank = 0; mpcur = 99 end),
+  openSub(),
+  H.waitFrames(6),
+  H.call(function() H.screenshot("bushido_grey_bp0") end),
+  H.call(function()
+    local aS, aE = attrOf(NM.Slash), attrOf(NM.Empowerer)
+    H.log(string.format("bp=0 MP=99 attr: Slash=%s Empowerer=%s",
+      aS and string.format("$%02x", aS) or "nil",
+      aE and string.format("$%02x", aE) or "nil"))
+    H.assertEq(aS ~= nil, true,
+      "Slash is still DRAWN at 0 bp -- greyed, not absent (#38's presentation)")
+    H.assertEq(aS, GREY, "Slash (boost 1 > 0 bp) grey -- no free rung any more")
+    H.assertEq(aE, GREY, "Empowerer (boost 3 > 0 bp) grey too")
+    -- the discriminator: the ceiling-4 window's TOP row is Slash at boost 1,
+    -- not Retort at boost 0.  If a free rung still existed it would be here,
+    -- drawn and WHITE, and Cyan would have a Bushido turn on an empty bank.
+    H.assertEq(attrOf(NM.Retort), nil,
+      "no Retort row at all -- the 0x rung is gone, so nothing on this page "
+      .. "is reachable at 0 bp (#38)")
+    H.log("PASSED: the SwdTech submenu greys the MP- and BP-unreachable rows only, "
+      .. "and at 0 bp that is every row")
   end),
 })

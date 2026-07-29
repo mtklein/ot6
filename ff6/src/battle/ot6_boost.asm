@@ -430,6 +430,10 @@ Ot6FoldTbl:
         beq     @steal          ; steal: one verb, one flat price -- no id
         cmp     #$13
         beq     @dance          ; dance: flat, paid at dance-START only (#34)
+        cmp     #$10
+        beq     @rage           ; rage: the same shape as dance (#40)
+        cmp     #$11
+        beq     @leap           ; leap: flat, the probe-collect price (#40)
         cmp     #$07
         beq     @costed         ; bushido
         cmp     #$09
@@ -460,6 +464,32 @@ Ot6FoldTbl:
         plp
         rtl
 :       jsl     Ot6DanceCost    ; dance-start: the flat price, one authority
+        plp
+        rtl
+@rage:  ; #40: rage is the OTHER possess-verb, and issue #40 orders one pricing
+        ; rule for both -- flat, charged once at Rage-START, every possessed
+        ; turn after it free.  The discriminator is the same shape dance uses:
+        ; Cmd_10 sets the actor's RAGE status ($3ef9 bit 0) on the start turn,
+        ; and every later possessed turn re-enters command $10 with the bit
+        ; already set.  X = attacker entity at this hook (the site contract).
+        ; A refused START must not lock the trance for free either -- that is
+        ; Ot6RageStartGate's job in Cmd_10, dance's own #34 lesson re-applied.
+        pla                     ; drop the parked cost (0 for rage)
+        lda     $3ef9,x         ; status 4
+        lsr                     ; bit 0 = already raging (a mid-trance turn)
+        bcc     :+
+        lda     #$00            ; locked-in possessed turn: free
+        plp
+        rtl
+:       jsl     Ot6RageCost     ; rage-start: the flat price, one authority
+        plp
+        rtl
+@leap:  ; #40: "only the basic Fight command is free" (owner absolute,
+        ; mp-economy.md:30-34), so the leap prices too -- flat 2, the
+        ; probe-collect rung Steal already sits on (mp-economy.md:97 assigns
+        ; this very verb that row).  Refused under 2 MP; the Veldt keeps.
+        pla                     ; drop the parked cost (0 for leap)
+        jsl     Ot6LeapCost
         plp
         rtl
 @costed:
@@ -545,6 +575,69 @@ Ot6FoldTbl:
         rtl
 .endproc
 
+; [ the Rage price -- the SAME rule as Dance, for the other possess-verb (#40) ]
+;
+; issue #40 orders "one pricing rule for both possess-verbs", and mp-economy.md:
+; 96's rule is the possession's: one payment starts a whole-battle state, so the
+; price is per battle, not per turn.  A per-rage formula (price by the special's
+; spell cost) was weighed and rejected in kit-gau.md §5 on three counts: it
+; double-charges (the trance's real price is the surrendered control, already
+; paid, and the special is only ROLLED, never chosen); it inverts the
+; collection's joy (the rarest hunts would carry the ugliest prices); and it
+; needs a 255-row price surface where the flat rule needs one number.
+;
+; 8 -- deliberately Dance's own number, not a number near it.  If the Dance
+; figure ever moves inside mp-economy's 4-10 band, RAGE FOLLOWS IT: the rule
+; ("possess-verbs share one flat price") outranks the digit, so this leaf
+; tail-calls Ot6DanceCost rather than repeating the literal, and the two can
+; never drift.  PURE leaf: cost in A, preserves X and Y, rtl.
+.proc Ot6RageCost
+        .a8
+        jmp     Ot6DanceCost    ; tail-call: same bank, its rtl returns for us
+.endproc
+
+; [ the Leap price -- flat 2, the probe-collect rung (#40) ]
+;
+; "only the basic Fight command is free" is the owner absolute
+; (mp-economy.md:30-34), and mp-economy.md:97 already assigned this verb the
+; cheapest-spell row -- the same 2 Steal takes, for the same reason: a probe
+; that COLLECTS rather than resolves.  Leap itself is left vanilla otherwise
+; (kit-gau.md §6.3 evaluated the boosted-Leap rider and recommended against it:
+; the learn step has no roll to convert).  PURE leaf.
+.proc Ot6LeapCost
+        .a8
+        lda     #$02
+        rtl
+.endproc
+
+; [ #40: can the hunter pay the trance?  Cmd_10's lock-out gate ]
+;
+; The exact twin of Ot6DanceStartGate, and it exists for the exact reason #34
+; found: the universal insufficient-MP fizzle refuses the CAST, but it runs
+; after the command body, so a broke Gau would keep the whole-battle RAGE
+; status for free and every possessed turn after it costs 0.  A fizzled Rage
+; must not lock the whole-battle state for nothing.  When the queued cost
+; ($3a4c, staged at action load) exceeds the pool, Cmd_10 skips the status set
+; and the beast latch entirely and runs the plain exec, whose fizzle shows the
+; standard refusal surface.  Mid-trance turns queue at 0 (Ot6AbilityCost's
+; cmd-$10 arm), so this gate never fires on a possessed turn.
+; entry: jsl from Cmd_10, a8/i8 (command context), y = attacker entity, db=$7e.
+; clobbers a.  out: carry set = cannot pay.
+.proc Ot6RageStartGate
+        .a8
+        rep     #$20
+        .a16
+        lda     $3c08,y         ; current MP (16-bit; y indexes fine under i8)
+        cmp     $3a4c           ; carry set = MP >= cost (affordable)
+        sep     #$20
+        .a8
+        bcs     @ok
+        sec                     ; cannot pay: the trance must not lock
+        rtl
+@ok:    clc
+        rtl
+.endproc
+
 ; (key, cost) pairs, $ff terminates. keys are exactly the id already in $3a7b
 ; at queue time, disjoint across the three verbs. numbers are docs/design/
 ; kits.md's per-row columns priced on docs/design/mp-economy.md's rulers:
@@ -566,7 +659,10 @@ Ot6AbilityCostTbl:
         ;    column TBD; PROPOSED here from the BP-tier structure. ruling
         ;    (mp-economy.md): "BP tier + discounted MP 1-8" -- the BP ladder
         ;    is the real price, so MP rides ~1/3 of a comparable blitz/tool.
-        ;    monotonic with the BP band (0->1, 1->2-3, 2->4-5, 3->6-8).
+        ;    monotonic with the tech index; the BP band a tech sits in now
+        ;    depends on the ceiling (#38 refloored the window to 1x/2x/3x, so
+        ;    there is no BP0 rung -- the band notes below are the ORIGINAL
+        ;    four-rung reading, kept because the MP column itself is unchanged).
         .byte   $55,  1         ; Fang     BP0 signature -- the game's cheapest
         .byte   $56,  2         ; Sky      BP1 counter stance
         .byte   $57,  3         ; Tiger    BP1 slash

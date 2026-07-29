@@ -999,6 +999,12 @@ RandRage:
         bra     @0600
 @05fd:  sta     $33a8,y
 @0600:  jsr     RandCarry
+        ; ot6 #40: boost tilts the coin for the whole trance.  Tier 0 hands
+        ; RandCarry's own carry straight back and draws nothing extra, so an
+        ; unboosted rage walks the vanilla RNG stream byte for byte; tiers 1/2
+        ; spend one draw against a threshold, tier 3 forces the special.  See
+        ; Ot6RageCoin (ot6_kits.asm) for the ladder and the width contract.
+        jsl     Ot6RageCoin
         longai
         rol                 ; 1/2 chance first or second attack will be chosen
         tax
@@ -3349,6 +3355,24 @@ _c21554:
 ; [ command $10: rage ]
 
 Cmd_10:
+.if OT6_MP_COSTS
+        ; ot6 #40: an unpayable rage START must not lock the hunter.  Exactly
+        ; #34's dance lesson -- the universal insufficient-MP fizzle refuses the
+        ; CAST but runs after this command body, so a broke Gau would keep the
+        ; whole-battle RAGE status for free and every possessed turn after it is
+        ; priced at 0.  Skip the beast latch AND the status set and run the
+        ; plain exec, whose fizzle is the standard refusal surface.
+        jsl     Ot6RageStartGate        ; carry set = cannot pay the start
+        bcc     @ot6_paid
+        jmp     Cmd_02
+@ot6_paid:
+.endif
+        ; ot6 #40: latch the trance's boost tier before anything else -- and
+        ; only on the START turn (the proc's own RAGE-bit test), because a
+        ; mid-trance re-entry would read the already-consumed pending byte and
+        ; silently drop the possession to tier 0.  Slot's OT6_SLOTTIER pattern
+        ; at whole-battle range.
+        jsl     Ot6RageTierLatch
 @1560:  lda     $33a8,y
         inc
         bne     @1579
@@ -14673,6 +14697,16 @@ InitSkills:
 @582f:  sta     $267e,x     ; set known dances
         dex
         bpl     @5828
+        ; ot6 #40 (kit-gau.md §2.2): the ONE choke point for Gau's 8-slot rage
+        ; loadout.  With any loadout byte set, Ot6RageList writes the stored,
+        ; still-learned ids to $257e and the count to $3a9a, and everything
+        ; downstream narrows itself for free -- the window draw, the confirm
+        ; (which refuses an $ff cell), the scroll cap, and even RandRage's
+        ; confused-rager pick.  An all-zero loadout (AUTO, and the state every
+        ; existing save and every tracked anchor is in) returns carry clear and
+        ; the vanilla walk below runs byte for byte.
+        jsl     Ot6RageList
+        bcs     @ot6_rages
         longa
         lda     #$257e      ; pointer to known rages
         sta     f:hWMADDL
@@ -14693,6 +14727,7 @@ InitSkills:
 @585e:  inc
         cmp     #$ff
         bne     @5847
+@ot6_rages:                 ; ot6 #40: the loadout path lands here
         rts
 
 ; ------------------------------------------------------------------------------
