@@ -178,6 +178,25 @@ MENU_TEXT_INC = 1
 .define OT6_LOADOUT_LBL2                BG1A, {3, 5},  {$b6,$b1,$00}  ; 2x
 .define OT6_LOADOUT_LBL3                BG1A, {3, 7},  {$b7,$b1,$00}  ; 3x
 .define OT6_LOADOUT_MP_SUFFIX           {$ff,$8c,$8f,$00}  ;  MP
+; #49: the mode indicator and the revert control, in the ONE free block this
+; page has -- columns 23-29 of the three slot rows.  Row 3 carries the mode,
+; row 5 the control that changes it; row 7 stays clear so the pair reads as a
+; two-line group rather than a third column of data.
+;
+; COLUMN 24, not 23, and the difference is the whole legibility of the row.
+; The slot's price field is $a7,$ff,$8c,$8f,$00 at columns 19-22, so a block starting at 23  ; n MP
+; abuts it and the row renders as $bb,$ff,$8c,$8f,$8c,$80,$8d,$94,$80,$8b,$00 -- measured, first screenshot of  ; 7 MPMANUAL
+; this change.  Column 23 is spent as the separator and the block runs 24-29,
+; which is exactly as wide as the free run allows: column 30 is the window's own
+; right border.
+;
+; Both halves are drawn by Ot6LoadoutDrawMode (field_menu.asm) AFTER the slot
+; loop rather than by DrawPosText at init, because Ot6LoadoutDrawCost's
+; zero-cost arm blanks five cells from column 19 -- i.e. through column 23 -- on
+; every redraw of the nomp build.  Drawing the block last makes that harmless in
+; either build, and it is what keeps the mode LIVE (the slot loop is the only
+; thing a redraw runs).
+.define OT6_LOADOUT_MODE_HINT           BG1A, {24, 5}, {$98,$d2,$80,$94,$93,$8e,$00}  ; Y=AUTO
 
 ; OT6 (#40): Gau's 8-slot rage loadout page.  Same encode-pipeline rule as the
 ; Bushido labels above -- a bare literal in field_menu.asm picks up
@@ -225,6 +244,50 @@ MENU_TEXT_INC = 1
 ; MonsterName::ITEM_SIZE (10) cells wide so it overwrites a name completely,
 ; keeping the property the old $ff fill had: a revert wipes what was there.
 .define OT6_RAGE_EMPTY                  {$c4,$ff,$84,$8c,$8f,$93,$98,$ff,$c4,$ff,$00}  ; - EMPTY - 
+; #49: the mode indicator and the revert control.  Row 13 was this page's one
+; genuinely spare row (the page draws on 1/3/5/7/9/11/15), and the survey in
+; issue #49 costed it at 27 free columns -- enough to carry both halves side by
+; side.  Columns 3 and 16 are the page's own two slot columns, so the pair
+; lines up with the grid above it instead of floating.
+.define OT6_RAGE_MODE_HINT              BG1A, {16, 13}, {$98,$d2,$80,$94,$93,$8e,$00}  ; Y=AUTO
+
+; ------------------------------------------------------------------------------
+
+; OT6 (#49): AUTO vs MANUAL, the state neither loadout page showed.
+;
+; An all-zero loadout means AUTO -- the game picks, and keeps re-picking as the
+; character learns more (Ot6LoadoutAutoTech's moving window; Ot6RageNth's first
+; eight in id order).  The first L/R edit freezes that window into the save
+; bytes and the page is MANUAL from then on, permanently, until Y clears it.
+; Nothing on either page said which of the two states the player was in, and
+; nothing named Y -- the same discoverability gap #44 closed for L/R.
+;
+; The two words are the SAME WIDTH on purpose: six cells, $80,$94,$93,$8e,$00 space-padded.  ; AUTO
+; The field is redrawn in place on every redraw, so a MANUAL -> AUTO revert has
+; to overwrite all six cells or the tail of $8c,$80,$8d,$94,$80,$8b,$00 survives under "AUTO" --  ; MANUAL
+; the same overwrite property OT6_RAGE_EMPTY is sized for.  Both pages draw
+; from these two, so the vocabulary cannot drift between them.
+.define OT6_MODE_AUTO                   {$80,$94,$93,$8e,$ff,$ff,$00}  ; AUTO  
+.define OT6_MODE_MANUAL                 {$8c,$80,$8d,$94,$80,$8b,$00}  ; MANUAL
+
+; ------------------------------------------------------------------------------
+
+; OT6 (#46): the field Skills->Blitz page.
+;
+; The page shipped drawing vanilla's BUTTON COMBOS -- the left/right/down glyph
+; strings the v0.4 blitz-as-menu change retired when Blitz became a list you
+; pick from (Ot6BlitzListOpen, ot6_kits.asm).  It was teaching an input system
+; the game no longer has, the #27/#39 class of surface.  It shows what a Blitz
+; IS instead: name, break class, MP price.
+;
+; A NOT-YET-LEARNED row says so rather than going blank.  Vanilla drew ten pad
+; cells for an unlearned blitz, which reads as a rendering fault (the owner's
+; own reading of the Rage page's blank slots, issue #44).  Ten cells wide --
+; exactly AttackName::ITEM_SIZE -- so it overwrites a name completely, the
+; property OT6_RAGE_EMPTY is sized for.  $c4,$ff,$8b,$8e,$82,$8a,$84,$83,$ff,$c4,$00 and not "- EMPTY -":  ; - LOCKED -
+; nothing is empty here, the ladder is fixed and this rung is simply not
+; reached yet, and the two words must not be used for two different facts.
+.define OT6_BLITZ_LOCKED                {$c4,$ff,$8b,$8e,$82,$8a,$84,$83,$ff,$c4,$00}  ; - LOCKED -
 
 ; ------------------------------------------------------------------------------
 

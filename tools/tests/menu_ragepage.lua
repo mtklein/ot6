@@ -107,7 +107,7 @@ local function cell(x, y) return H.readByte(BG1A + x * 2 + y * 64) end
 -- '0'=$b4.. ' '=$ff.  ZERO_CHAR and " MP" are menu_text_en.inc.raw:7,:128.
 local T = { A=0x80, C=0x82, D=0x83, E=0x84, G=0x86, H=0x87, L=0x8b, M=0x8c,
             N=0x8d, O=0x8e, P=0x8f, R=0x91, S=0x92, T=0x93, U=0x94, W=0x96,
-            Y=0x98, DASH=0xc4, SLASH=0xc0, SP=0xff }
+            Y=0x98, DASH=0xc4, SLASH=0xc0, EQ=0xd2, SP=0xff }
 local TITLE   = { T.R,T.A,T.G,T.E,T.SP,T.L,T.O,T.A,T.D,T.O,T.U,T.T }  -- RAGE LOADOUT
 local LEARNED = { T.L,T.E,T.A,T.R,T.N,T.E,T.D }
 local EACH_TX = { T.E,T.A,T.C,T.H }
@@ -117,6 +117,19 @@ local EACH_TX = { T.E,T.A,T.C,T.H }
 -- have to re-learn it on the other, so the strings are asserted to be equal by
 -- being written out identically in both tests.
 local HINT    = { T.L,T.SLASH,T.R,T.SP,T.S,T.W,T.A,T.P,T.S }  -- L/R SWAPS
+-- #49: the STATE that L/R changes, which the page never showed.  All eight
+-- bytes zero is AUTO -- the game picks the first eight species in id order and
+-- keeps re-picking as Gau hunts -- and the first cycle calls Ot6RageSeed and
+-- freezes that window into the save, permanently, until Y clears it.  A player
+-- could not see which of the two they were in, nor that Y existed.
+--
+-- Both words are six cells, "AUTO" space-padded, so a MANUAL -> AUTO revert
+-- overwrites the whole field; asserted as an equality below rather than trusted.
+-- Written out character for character in BOTH page tests on purpose, the #44
+-- rule: two pages that teach the same idiom must teach it in the same words.
+local MODE_AUTO   = { T.A,T.U,T.T,T.O,T.SP,T.SP }
+local MODE_MANUAL = { T.M,T.A,T.N,T.U,T.A,T.L }
+local MODE_HINT   = { T.Y,T.EQ,T.A,T.U,T.T,T.O }              -- Y=AUTO
 -- #44: what an UNSET slot draws now, in place of a run of $ff pads.  Exactly
 -- MonsterName::ITEM_SIZE (10) cells, so it still overwrites a name completely
 -- and a revert wipes what was there -- the property the pad fill had.
@@ -194,6 +207,13 @@ local HINT_ROW = 3                      -- #44: row 3 was spare; the hint has it
 local LEFT_COL = 3                      -- the page's left margin (gutter = 1-2)
 local COST_COL, EACH_COL = 17, 22
 local COUNT_COL = 11                    -- just past "LEARNED " at 3..9
+-- #49: row 13 was this page's one spare row (it draws on 1/3/5/7/9/11/15) and
+-- issue #49's survey costed it at 27 free columns.  The mode goes at column 3
+-- and the control that changes it at 16 -- the page's OWN two slot columns, so
+-- the pair lines up under the grid instead of floating.  Row 13 is therefore no
+-- longer in the "undrawn odd row" list below; that assertion became the
+-- positive one in assertModeBlock, deliberately, not by being dropped.
+local MODE_ROW, MODE_COL, MODE_HINT_COL = 13, 3, 16
 local function slotRow(slot) return 5 + (slot & ~1) end
 local function slotCol(slot) return (slot % 2 == 0) and LEFT_COL or 16 end
 
@@ -240,6 +260,28 @@ local function assertCursorGutter(n, what)
       H.assertEq(cell(x, y), 0, string.format(
         "%s: {%d,%d} is left of the cursored row's first glyph (column %d)",
         what, x, y, col + 2))
+    end
+  end
+end
+
+-- #49: row 13, asserted as a whole row -- the mode word, the control, and every
+-- other cell on the row still blank, so neither half can grow into the other or
+-- into the window's border column 30.
+local function assertModeBlock(auto, what)
+  H.assertEq(#MODE_AUTO, #MODE_MANUAL,
+    "the two mode words must be the same width, or a MANUAL -> AUTO revert "
+    .. "leaves the tail of MANUAL on screen")
+  assertRun(MODE_COL, MODE_ROW, auto and MODE_AUTO or MODE_MANUAL,
+    string.format("%s: the page states %s", what, auto and "AUTO" or "MANUAL"))
+  assertRun(MODE_HINT_COL, MODE_ROW, MODE_HINT,
+    what .. ": the revert control is named beside the mode")
+  for x = 0, 31 do
+    local inMode = x >= MODE_COL and x < MODE_COL + #MODE_AUTO
+    local inHint = x >= MODE_HINT_COL and x < MODE_HINT_COL + #MODE_HINT
+    if not inMode and not inHint then
+      H.assertEq(cell(x, MODE_ROW), 0, string.format(
+        "%s: {%d,%d} is neither the mode nor the control and must stay blank",
+        what, x, MODE_ROW))
     end
   end
 end
@@ -361,13 +403,13 @@ H.run({ maxFrames = 30000 }, {
           y > 15 and "outside the window" or "even: 3 scanlines"))
       end
     end
-    -- the odd row the page still deliberately leaves empty.  Row 3 used to be
-    -- here too; #44 spent it on the control hint, which is the whole point of
-    -- the change and so is asserted positively above rather than dropped from
-    -- this list silently.
-    for _, y in ipairs({ 13 }) do
-      assertRowBlank(y, "undrawn odd row " .. y)
-    end
+    -- Every odd row this page has is spoken for now.  Row 3 was the last one
+    -- until #44 spent it on the control hint; #49 has spent row 13 on the mode
+    -- block.  Both were asserted blank here once and both became POSITIVE
+    -- assertions instead (assertRun on the hint above, assertModeBlock below) --
+    -- neither was dropped, and assertModeBlock still pins every cell of row 13
+    -- that is not one of the two words.
+    assertModeBlock(true, "opened untouched")
     -- ... and the hint row's own head and tail, so the hint cannot grow into
     -- the cursor gutter on its left or the window border on its right.  The
     -- hint runs 3..11; everything else on row 3 is blank.
@@ -428,10 +470,49 @@ H.run({ maxFrames = 30000 }, {
     -- The marker must read the same here as it did under AUTO, because it
     -- means the same thing: nothing in this slot, nothing in the battle list.
     for slot = #KNOWN, 7 do assertEmptyRow(slot) end
+    -- #49: and the page must SAY it went manual, on this same redraw and
+    -- without being reopened.  A mode drawn once at page-init would still read
+    -- AUTO here, which is the exact failure this assertion exists for.
+    assertModeBlock(false, "after the first edit")
     H.assertEq(H.readByte(ZMENUSTATE), ST_RAGELOAD, "still on the rage page")
     H.screenshot("rage_page_after_cycle")
     H.log("LIVE: R redrew slot 0 as '" .. nameText(KNOWN[2])
-      .. "' and the first edit froze the AUTO window into the save bytes")
+      .. "' , the first edit froze the AUTO window into the save bytes, and the "
+      .. "mode indicator followed it from AUTO to MANUAL in the same frame")
+  end),
+
+  -- ---- #49: Y reverts, and the indicator comes back with it ----
+  -- The revert is the half a player cannot guess -- which is why the control is
+  -- named on screen -- and it is the half that proves the two mode words are the
+  -- same width: a five-cell "AUTO " would leave MANUAL's trailing L behind.
+  -- Ot6RageInput's Y arm zeroes all eight bytes (ot6_kits.asm), so the window
+  -- goes back to being computed on the fly and the five known species must
+  -- re-appear in id order exactly as they did on entry.
+  H.pressButtons({ "y" }, 3),
+  H.waitFrames(40),
+  H.call(function()
+    for i = 0, 7 do
+      H.assertEq(H.readByte(RAGELOAD + i), 0,
+        string.format("Y cleared OT6_RAGELOAD+%d: the loadout is AUTO again", i))
+    end
+    assertModeBlock(true, "after Y")
+    for i, id in ipairs(KNOWN) do assertFilledRow(i - 1, id) end
+    for slot = #KNOWN, 7 do assertEmptyRow(slot) end
+    H.screenshot("rage_page_reverted")
+    H.log("REVERT: Y put the page back on AUTO -- the eight bytes are zero, the "
+      .. "window is recomputed, and 'MANUAL' left nothing of itself behind in "
+      .. "the six-cell field")
+  end),
+
+  -- put the page back into MANUAL for the phases below, which assert on the
+  -- frozen bytes R wrote.  (Re-cycling slot 0 lands on the same species the
+  -- first edit did: the walk is deterministic from the same starting point.)
+  H.pressButtons({ "r" }, 3),
+  H.waitFrames(40),
+  H.call(function()
+    H.assertEq(H.readByte(RAGELOAD + 0), KNOWN[2] + 1,
+      "back to MANUAL with slot 0 on the second known species, as before Y")
+    assertModeBlock(false, "re-edited after the revert")
   end),
 
   -- ---- the SECOND column is reachable and maps to the right slot ----
@@ -514,6 +595,10 @@ H.run({ maxFrames = 30000 }, {
     -- ten hunted, eight loaded, and the page must say ten.
     assertRun(COUNT_COL, LEARNED_ROW,
       { ZERO_CHAR, ZERO_CHAR + 1, ZERO_CHAR }, "LEARNED count = 010")
+    -- the eight bytes were re-zeroed before this re-entry, so the page is AUTO
+    -- again -- and the indicator must have been redrawn to match on OPEN, not
+    -- only on an in-page edit.
+    assertModeBlock(true, "reopened on AUTO with ten hunted")
     for n = 0, 7 do assertCursorGutter(n, "ten known, page full") end
     H.screenshot("rage_page_full")
     H.log("FULL PAGE: ten species hunted -- all eight slots carry a beast, the "
