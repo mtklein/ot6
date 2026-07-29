@@ -24,6 +24,20 @@ layer. JP returns only if playtesting wants a pacing knob.
 
 **Curated kits (the Ochette/Hikari model).** Two characters learn
 MORE than 8 and equip a curated subset (~5 slots): Gau and Strago.
+> **Gau fights ✦ (2026-07-29, #47).** Vanilla's "the feral kid cannot
+> fight normally" characterization is overridden for economy coherence:
+> once Rage costs 8 MP (#40) a Gau with no Fight has no free action at
+> all, and mp-economy.md's target — *Fight must sometimes be the right
+> move* — requires that every character be able to decline to spend. His
+> four slots become **FIGHT / RAGE / MAGIC / ITEM**; there was never a
+> spare one (vanilla's "blank" third row is MAGIC removed at runtime), so
+> **Leap shares the magic row** — Leap only works on the Veldt, so that
+> row is Leap there and Magic everywhere else, and the only thing lost is
+> casting while standing on the Veldt. Bare fists are his probe
+> (`Ot6WeapClassTbl[$ff]` = bludgeoning), which also makes
+> `check_break_reach.py`'s "can field" model true of him for the first
+> time.
+
 > **Gau superseded (2026-07-28, owner-settled):** his kit is now
 > `kit-gau.md` — the Ochette model, learn many / **equip 8**, possession
 > preserved, Dance-model MP, chance-verb boost. This file's Gau lines
