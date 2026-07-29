@@ -851,6 +851,8 @@ local CMD_LEAP = 0x11
 local LEAP_COST = 0
 local leapCosts = {}
 local leapWatch = false
+local caeHits = 0                    -- CalcAttackEffect entries in the window
+local mpSeen = {}                    -- pool samples taken while the battle LIVES
 
 add({
   H.call(function()
@@ -859,22 +861,57 @@ add({
         leapCosts[#leapCosts + 1] = v
       end
     end, emu.callbackType.write, 0x7E0000 + COSTQ, 0x7E0000 + COSTQ + 0xFE)
+    -- the POSITIVE CONTROL for both arms below.  "the pool did not move" is
+    -- vacuous unless the charge site actually ran, and the charge site is
+    -- CalcAttackEffect: it is the one that reads the staged cost $3a4c,
+    -- subtracts it from $3c08,x and refuses when short (battle_main.asm:
+    -- 8354-8371).  Counting its entries is what makes the no-debit assertion
+    -- mean "it ran and took nothing" rather than "nothing happened".
+    emu.addMemoryCallback(function() caeHits = caeHits + 1 end,
+      emu.callbackType.exec, H.sym("CalcAttackEffect"), H.sym("CalcAttackEffect"))
   end),
 })
 
--- 9a. THE PRICE.  A full pool, so nothing about affordability is in play: the
--- queue is watched directly, and the pool is asserted UNTOUCHED afterwards.
--- The predicate is the queue write, not an MP change -- with the price gone
--- there is no MP change to wait for, and the old "drive until mp ~= 20" would
--- simply time out.  (The leap itself does not resolve here: the trance
--- harness wounds the bench, and vanilla's TargetEffect_54 refuses a Leap with
--- fewer than two party members present.  That is the same window the 2-MP
--- version measured in -- the CHARGE lands at CreateAction, before the leap's
--- own guard runs -- so this is a like-for-like replacement, not a weaker one.)
+-- SAMPLE THE POOL WHILE THE BATTLE IS ALIVE, and stop when it is not.
+--
+-- This replaces a single read taken after the window, which is what the first
+-- draft of these arms did -- and it read $FFFF (measured).  $FFFF is not a
+-- charge: the cost queue was measured at 0 in the same run, and with a 0 cost
+-- CalcAttackEffect never reaches the subtract at all (`lda $3a4c / beq @32ec`,
+-- battle_main.asm:8354-8355), so no debit of any size is on the table
+-- arithmetically.  It is post-battle state -- the leap is REFUSED here anyway
+-- ($3a76 is "number of characters alive", battle_main.asm:4907, and
+-- TargetEffect_54 needs >= 2 while this harness wounds the bench), and reading
+-- battle RAM after the battle stops being active reads nothing meaningful.
+-- So the measurement has to be taken INSIDE the live window, and the minimum
+-- over that window is the honest form of "the pool never moved".
+local function sampleWhileLive(n)
+  return H.repeatN(n, {
+    H.call(function()
+      tick()
+      if H.battleActive() then mpSeen[#mpSeen + 1] = mp(actor) end
+    end),
+    H.waitFrames(3),
+    H.call(function() H.setPad({}) end),
+    H.waitFrames(6),
+  })
+end
+
+local function poolFloor()
+  local lo = nil
+  for _, v in ipairs(mpSeen) do if not lo or v < lo then lo = v end end
+  return lo
+end
+
+-- 9a. THE PRICE, at a full pool, so affordability is not in play.  Two
+-- measurements: what CreateAction STAGES for command $11, and what the pool
+-- does across the whole live window afterwards.
 add(trance("leap", function()
   startMp = 20
   cmd0 = CMD_LEAP
-end, function() leapCosts = {}; leapWatch = true end))
+end, function()
+  leapCosts = {}; mpSeen = {}; caeHits = 0; leapWatch = true
+end))
 add({
   H.pressButtons({ "a" }, 4),          -- the menu's only row is Leap
   H.waitFrames(10),
@@ -883,18 +920,28 @@ add({
     H.call(tick), H.waitFrames(3),
     H.call(function() H.setPad({}) end), H.waitFrames(6),
   }, "leap: CreateAction stages a cost for command $11"),
-  ride(30),
+  sampleWhileLive(30),
   H.call(function()
     leapWatch = false
-    H.log(string.format("leap: MP 20 -> %d, cost queue %s",
-      mp(actor), tostring(leapCosts[1])))
+    H.log(string.format("leap: pool floor %s over %d live samples, cost queue "
+      .. "%s, CalcAttackEffect entries %d (post-window read %d, battle live=%s)",
+      tostring(poolFloor()), #mpSeen, tostring(leapCosts[1]), caeHits,
+      mp(actor), tostring(H.battleActive())))
     H.assertEq(leapCosts[1], LEAP_COST,
       "CreateAction staged 0 for command $11: Ot6AbilityCost has no cmd-$11 "
       .. "arm any more, so the leap falls out of the chain with vanilla's own "
       .. "cost.  Pre-change this read 2 (Ot6LeapCost)")
-    H.assertEq(mp(actor), 20,
-      "and the universal charge took NOTHING -- the pool is exactly where it "
-      .. "started.  Pre-change it read 18")
+    H.assertEq(caeHits > 0, true, string.format(
+      "positive control: CalcAttackEffect actually RAN (%d entries) -- it is "
+      .. "the site that reads the staged cost and debits the pool, so without "
+      .. "this count 'the pool did not move' would pass on a turn that never "
+      .. "resolved", caeHits))
+    H.assertEq(#mpSeen > 0, true,
+      "positive control: the pool was sampled inside a LIVE battle")
+    H.assertEq(poolFloor(), 20,
+      "and the universal charge took NOTHING: across every live sample the "
+      .. "pool never dipped below where it started.  Pre-change its floor was "
+      .. "18 -- the flat 2 Ot6LeapCost handed back")
   end),
 })
 
@@ -908,7 +955,9 @@ add({
 add(trance("leap-zero", function()
   startMp = 0
   cmd0 = CMD_LEAP
-end, function() leapCosts = {}; leapWatch = true end))
+end, function()
+  leapCosts = {}; mpSeen = {}; caeHits = 0; leapWatch = true
+end))
 add({
   H.pressButtons({ "a" }, 4),
   H.waitFrames(10),
@@ -917,19 +966,28 @@ add({
     H.call(tick), H.waitFrames(3),
     H.call(function() H.setPad({}) end), H.waitFrames(6),
   }, "leap-zero: CreateAction stages a cost for command $11 on an empty pool"),
-  ride(60),
+  sampleWhileLive(60),
   H.call(function()
     leapWatch = false
-    H.log(string.format("leap-zero: MP stayed %d, cost queue %s",
-      mp(actor), tostring(leapCosts[1])))
+    H.log(string.format("leap-zero: pool floor %s over %d live samples, cost "
+      .. "queue %s, CalcAttackEffect entries %d (post-window read %d, battle "
+      .. "live=%s)", tostring(poolFloor()), #mpSeen, tostring(leapCosts[1]),
+      caeHits, mp(actor), tostring(H.battleActive())))
     H.assertEq(leapCosts[1], LEAP_COST,
       "an EMPTY pool stages the same 0: the price does not depend on what the "
       .. "caster can afford, so there is nothing left for the insufficient-MP "
-      .. "gate to refuse.  Pre-change this staged 2 and CalcAttackEffect's "
-      .. "'Need MP' arm ate the turn")
-    H.assertEq(mp(actor), 0,
-      "and the pool is still 0 -- nothing spent, nothing driven negative.  A "
-      .. "Gau at zero MP can still take the Veldt's action")
+      .. "gate to refuse.  Pre-change this staged 2, and CalcAttackEffect's "
+      .. "short-pool arm ate the turn")
+    H.assertEq(caeHits > 0, true, string.format(
+      "positive control: CalcAttackEffect actually RAN (%d entries) on the "
+      .. "empty pool -- the gate had its chance and declined to fire, which "
+      .. "is the whole claim", caeHits))
+    H.assertEq(#mpSeen > 0, true,
+      "positive control: the pool was sampled inside a LIVE battle")
+    H.assertEq(poolFloor(), 0,
+      "and the pool is still 0 across every live sample -- nothing spent, "
+      .. "nothing driven negative.  A Gau at zero MP can still take the "
+      .. "Veldt's action, which is what makes sharing the FIGHT row safe")
     H.log("PASSED: list filter + AUTO truncation, trance price, refusal gate, "
       .. "tier latch, the tier-1/tier-2 coin at both boundaries, the width "
       .. "restore, and Leap free at a full pool and at zero")
