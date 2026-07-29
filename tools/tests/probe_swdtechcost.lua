@@ -102,7 +102,7 @@ H.run({ maxFrames = 30000 }, {
   H.waitUntil(function() return st() == ST_LOADOUT end, 300, "reopened", 5),
   H.waitFrames(90),
   H.call(function()
-    dump("8 learned: Stunner 22 / Quadra Slice 30 / Cleave 46")
+    dump("8 learned: Stunner 28 / Quadra Slice 50 / Cleave 99")
     H.screenshot("probe_swdtech_cost_8learned")
     H.log("PROBE DONE")
   end),

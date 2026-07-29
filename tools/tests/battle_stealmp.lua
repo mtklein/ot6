@@ -2,13 +2,17 @@
 -- battle_stealmp.lua -- v0.5 "every ability costs MP": Steal (cmd $05) joins the
 -- cost gate. The SAME self-detecting A/B as battle_mpcost.lua, aimed at the one
 -- costed verb that test does NOT drive -- Locke's Steal -- proving the flat-cost
--- path added to Ot6AbilityCost (cmd $05 -> 2 MP, keyed on the command, NOT an
+-- path added to Ot6AbilityCost (cmd $05 -> 4 MP, keyed on the command, NOT an
 -- id-table row) charges and refuses through the universal machinery, and stays
 -- free on the OFF baseline.
 --
---   * ON  (build/ot6.sfc, the suite default): a Steal is QUEUED at cost 2
---     (Ot6AbilityCost's flat path), DEDUCTS 2 MP when it executes, and a caster
---     with 1 MP (< 2) is REFUSED -- the universal insufficient-mp fizzle
+-- REPRICED BY #52 (2026-07-29): 2 -> 4. The flat path now reads the Ot6StealCost
+-- leaf (the Ot6DanceCost shape) instead of an inline immediate, so this test,
+-- battle_costtable.lua and #55's future row decorator all price one number.
+--
+--   * ON  (build/ot6.sfc, the suite default): a Steal is QUEUED at cost 4
+--     (Ot6AbilityCost's flat path), DEDUCTS 4 MP when it executes, and a caster
+--     with 1 MP (< 4) is REFUSED -- the universal insufficient-mp fizzle
 --     (CalcAttackEffect) skips the steal effect, so no item is taken and MP is
 --     not driven negative.
 --   * OFF (ff6/rom/ff6-en-nomp.sfc, handed in via OT6_ROM): Ot6AbilityCost is
@@ -43,7 +47,7 @@ local MSLOTS = { 0, 1, 2, 3, 4, 5 }
 local LOCKE = 0x01
 local RARE, COMMON = 0xE0, 0xE1          -- distinct sentinel item ids
 local NONE = 0xFF
-local STEAL_COST = 2                     -- mp-economy.md: Steal "flat small | 2"
+local STEAL_COST = 4                     -- #52: 2 -> 4, Ot6StealCost's immediate
 
 local function ENT_C(s) return s * 2 end
 local function ENT_M(s) return 8 + s * 2 end
@@ -134,20 +138,34 @@ H.run({ maxFrames = 120000 }, {
 
   -- ------------------------------------------------ 1. detect the build --
   H.call(function()
-    -- The Blitz cost-table signature (Pummel/AuraBolt/Suplex) present in bank
-    -- F0 IFF OT6_MP_COSTS was on -- the same probe battle_mpcost.lua uses.
-    local sig = { 0x5d, 0x04, 0x5e, 0x0a, 0x5f, 0x0d }
+    -- Ot6AbilityCostTbl is present in bank F0 IFF OT6_MP_COSTS was on, and a
+    -- byte scan is the only way to ask: OT6_SYMS is scraped from the ON build's
+    -- ff6-en.dbg, so H.sym would hand back an address that means nothing in the
+    -- nomp ROM this test also runs against.
+    --
+    -- THE SIGNATURE IS KEYS ONLY, WITH THE COSTS WILDCARDED.  It used to be
+    -- {$5d,4,$5e,10,$5f,13} -- Pummel/AuraBolt/Suplex with their PRICES baked
+    -- in -- which meant every rescale of this column silently flipped the probe
+    -- to "off" and then failed with a message blaming Steal.  #45 was bitten by
+    -- exactly that.  The KEYS ($5d..$64, the Blitz attack ids) are structural:
+    -- they are FixPlayerAttack's +$5d run and cannot move without the verb
+    -- moving, so a signature on them survives any repricing.  Eight anchored
+    -- bytes at a fixed stride is a far tighter match than six contiguous ones.
+    local keys = { 0x5d, 0x5e, 0x5f, 0x60, 0x61, 0x62, 0x63, 0x64 }
     local base
     for a = 0x300000, 0x30FFF0 do
       local ok = true
-      for i, b in ipairs(sig) do
-        if H.readRomByte(a + i - 1) ~= b then ok = false break end
+      for i, k in ipairs(keys) do
+        if H.readRomByte(a + (i - 1) * 2) ~= k then ok = false break end
       end
+      -- the SwdTech run starts immediately after: one more anchor, free
+      if ok and H.readRomByte(a + 16) ~= 0x55 then ok = false end
       if ok then base = a break end
     end
     mode = base and "on" or "off"
     if mode == "on" then
-      H.log("ON build: cost table present -- Steal must charge " .. STEAL_COST .. " MP")
+      H.log(string.format("ON build: cost table at $%06x -- Steal must charge %d MP",
+        base, STEAL_COST))
     else
       H.log("OFF build: cost table absent -- Steal must be FREE (the control)")
     end
@@ -182,9 +200,12 @@ H.run({ maxFrames = 120000 }, {
       tostring(qcost), left, tostring(granted)))
     H.assertEq(granted ~= nil, true, "the steal executed and took an item (both builds)")
     if mode == "on" then
-      H.assertEq(qcost, STEAL_COST, "ON: Ot6AbilityCost priced cmd $05 at 2 (flat path)")
-      H.assertEq(left, 50 - STEAL_COST, "ON: the steal deducted exactly 2 MP")
+      H.assertEq(qcost, STEAL_COST, "ON: Ot6AbilityCost priced cmd $05 at 4 (flat path)")
+      H.assertEq(left, 50 - STEAL_COST, "ON: the steal deducted exactly 4 MP")
     else
+      -- If this trips with a NONZERO qcost, suspect the build probe above
+      -- before you suspect Steal: a nonzero cost means Ot6AbilityCost IS
+      -- assembled and the key scan failed to find its table.
       H.assertEq(qcost, 0, "OFF: cmd $05 keeps vanilla's 0 (Ot6AbilityCost absent)")
       H.assertEq(left, 50, "OFF: the steal is FREE -- vanilla behavior, the control")
     end
@@ -192,7 +213,7 @@ H.run({ maxFrames = 120000 }, {
   end),
 
   -- ------------------------------------------------- 3. REFUSAL (ON only) --
-  -- 1 MP < 2: CalcAttackEffect's universal insufficient-mp branch fizzles the
+  -- 1 MP < 4: CalcAttackEffect's universal insufficient-mp branch fizzles the
   -- action before the steal effect runs, so nothing is taken and MP is not
   -- driven negative. The OFF build charges 0, so there is nothing to refuse --
   -- run this half only under the flag (battle_mpcost.lua does the same).
@@ -202,7 +223,7 @@ H.run({ maxFrames = 120000 }, {
       local left = H.readWord(CURMP(actor))
       H.log(string.format("unaffordable steal: queued cost %s, MP stayed %d, granted %s",
         tostring(qcost), left, tostring(granted)))
-      H.assertEq(qcost, STEAL_COST, "ON: the gate still priced cmd $05 at 2")
+      H.assertEq(qcost, STEAL_COST, "ON: the gate still priced cmd $05 at 4")
       H.assertEq(granted, nil, "ON: too little MP is REFUSED -- no item taken (fizzled)")
       H.assertEq(left, 1, "ON: MP not driven negative -- the 1 MP is untouched")
       H.screenshot("stealmp_on_refused")

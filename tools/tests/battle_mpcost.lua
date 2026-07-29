@@ -197,8 +197,8 @@ H.run({ maxFrames = 40000 }, {
       a = a + 2
     end
     local want = {                        -- kits.md's authored numbers (#45)
-      [0x5d] = 4,  [0x64] = 46,           -- Blitz:   Pummel, Bum Rush
-      [0x55] = 4,  [0x58] = 16, [0x5c] = 46, -- SwdTech: Dispatch, Quadra Slam, Cleave
+      [0x5d] = 4,  [0x64] = 99,           -- Blitz:   Pummel, Bum Rush (#57 anchor)
+      [0x55] = 4,  [0x58] = 16, [0x5c] = 99, -- SwdTech: Dispatch, Quadra Slam, Cleave
       [0xaa] = 4,  [0xa8] = 16, [0xa6] = 18, -- Tools:  AutoCrossbow, Drill, Chain Saw
     }
     for id, c in pairs(want) do

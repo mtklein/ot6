@@ -3046,10 +3046,14 @@ Ot6DrawBushName:
 ; branch, so the `sbc #10` under it is exact without a preceding `sec`.
 ;
 ; Costs above 99 would wrap into the tens loop silently.  Nothing in the game
-; prices one -- the dearest row anywhere is Cleave/Bum Rush at 46
-; (Ot6AbilityCostTbl, ot6_boost.asm:744-794) -- and tools/tests/menu_*page.lua
-; assert every drawn field against that table, so a three-digit price shows up
-; as a red test rather than as a wrong number on screen.
+; prices one, and as of issue #57 that is a DESIGN RULE rather than a lucky
+; margin: the dearest row anywhere is Cleave/Bum Rush at exactly 99 -- each
+; character's genuine ultimate is anchored there, and 99 is the largest number
+; this drawer (and ListText cmd $02, btlgfx_main.asm:15045) can render at all
+; (Ot6AbilityCostTbl, ot6_boost.asm).  tools/tests/menu_*page.lua assert every
+; drawn field against that table and tools/tests/battle_costtable.lua asserts
+; the <= 99 bound directly, so a three-digit price shows up as a red test
+; rather than as a wrong number on screen.
 Ot6LoadoutDrawCost:
         pha                             ; save cost
         lda     $e6

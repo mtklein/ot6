@@ -39,9 +39,10 @@ local CMDTBL, ITEMLIST, KNOWN = 0x202E, 0x4005, 0x1D28
 local PUMMEL, AURABOLT, SUPLEX = 0x5D, 0x5E, 0x5F
 local AIRBLADE, BUMRUSH = 0x62, 0x64
 -- MP costs the row-draw stamps (Ot6AbilityCostTbl, ot6.asm), keyed by attack id.
-local COST = { [PUMMEL] = 4, [SUPLEX] = 13, [AIRBLADE] = 22, [BUMRUSH] = 46 }
+local COST = { [PUMMEL] = 4, [SUPLEX] = 13, [AIRBLADE] = 28, [BUMRUSH] = 99 }
 -- Learn a set spanning 1- AND 2-digit costs so the screenshot shows the cost
--- column's real fit: Pummel(4) Suplex(13) AirBlade(22) Spiraler(30) BumRush(46).
+-- column's real fit: Pummel(4) Suplex(13) AirBlade(28) Spiraler(50) BumRush(99)
+-- -- 99 is the #57 anchor AND the widest a 2-digit cell can ever be.
 -- bit1 (AuraBolt) stays OFF -- the learned-only assertion still holds.
 local LEARNED = 0xE5                   -- bits 0,2,5,6,7
 
@@ -139,10 +140,10 @@ H.run({ maxFrames = 40000 }, {
 
     -- the cost the row-draw stamps: Ot6BlitzListOpen ran each id through
     -- Ot6CostFor and parked the price in Qty (Pummel 2, Suplex 7, and the
-    -- 2-digit Bum Rush 30 -- the worst-case width the screenshot must fit).
+    -- 2-digit Bum Rush 99 -- the worst-case width the screenshot must fit).
     H.assertEq(qty[0], COST[PUMMEL],  "Pummel's stamped cost is 4")
     H.assertEq(qty[1], COST[SUPLEX],  "Suplex's stamped cost is 13 (2-digit)")
-    H.assertEq(qty[4], COST[BUMRUSH], "Bum Rush's stamped cost is 46 (2-digit)")
+    H.assertEq(qty[4], COST[BUMRUSH], "Bum Rush's stamped cost is 99 (2-digit, the #57 anchor)")
   end),
 
   -- 2. THE OLD CODE IS DEAD ---------------------------------------------------

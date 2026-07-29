@@ -475,8 +475,8 @@ Ot6FoldTbl:
         rtl
 @steal:
         pla                     ; drop the parked cost (0 for steal)
-        lda     #$02            ; flat 2 MP -- the probe-collect verb prices
-        plp                     ;   like the cheapest spell (mp-economy.md)
+        jsl     Ot6StealCost    ; the flat price, one authority (#52)
+        plp
         rtl
 @dance: ; dance (cmd $13) is priced at the COMMIT moment only: the mid-dance
         ; turns queue through the same CreateAction (RandDanceAction,
@@ -586,14 +586,53 @@ Ot6FoldTbl:
 ; mp-economy.md:96 rules "flat, paid at start, 4-10: one payment starts a
 ; whole-battle state".  8 -- the top half of the band -- because the single
 ; payment funds every subsequent turn's verb for the rest of the battle
-; (each locked-in step is free), so it prices above the per-use probe verbs
-; (Steal 2, Pummel 4) while staying payable from Mog's natural join pool
+; (each locked-in step is free), so it prices above the per-use signature
+; verbs (Steal 4 since #52, Pummel 4) while staying payable from Mog's pool
 ; (base 16 MP + level gains); playtest tunes.  PURE leaf, the Ot6CostFor
 ; shape: cost in A, preserves X and Y; rtl so the menu decorator (bank F0
 ; via C1) and the charge read one number.
 .proc Ot6DanceCost
         .a8
         lda     #$08
+        rtl
+.endproc
+
+; [ the Steal price -- the flat verb's one authority (#52) ]
+;
+; 4, up from the 2 that shipped in v0.5.  #52's headline was "2 MP is ~2% of
+; Locke's LV14 pool", but that measures at the wrong level and the ruler this
+; column is on measures at the level an ability ARRIVES: Locke joins at Narshe
+; holding 31 MP (LV6, read off worldmap_narshe by probe_mppools.lua), where 2
+; is 6.5% -- under the 8-20% a vanilla spell costs at ITS arrival -- and 4 is
+; 12.9%, between Fire's 10.0% and Cure's 12.5%.  So the honest fix is the same
+; 2x #45 gave the Blitz floor, not a bigger number chosen to look right at LV14.
+; (Every signature dilutes the same way by then: Pummel is 4.3% of Sabin's LV14
+; pool and Dispatch 4.3% of Cyan's.  Pricing against a late pool would mean
+; per-level prices, which the ruler explicitly does not do.)
+;
+; 4 is also exact PARITY with the cheapest row of all three ladder kits --
+; Pummel $5d, Dispatch $55, AutoCrossbow $aa, every one of them 4 -- and Steal
+; is Locke's signature, mp-economy.md's "signatures become the cheapest rows of
+; their kits".  That parity is load-bearing for #55: Steal is a RUNG, not the
+; ceiling (owner, 2026-07-29 -- Locke's 99 is Master's Mark, kits.md:404), so
+; it should read as rung one of an eight-rung ladder, not as its own thing.
+;
+; NOTE WHAT THIS PRICE STILL CANNOT DO: it cannot be SEEN.  Steal is a
+; top-level battle command, and command_window_data_set (btlgfx_main.asm:10099)
+; writes exactly two things per row -- the command byte and a GetTextColor
+; colour off the DISABLED flag (:10704, `and #$80`) -- through MenuText::_4
+; (:45136), four fixed 8-byte records with no number command in them.  There is
+; no numeric field in that window to write a price into, which is why this is a
+; PURE LEAF in the Ot6DanceCost/Ot6CostFor shape rather than an inline
+; immediate: the day #55 gives Locke a submenu, its row decorator reads this
+; and the drawn price and the charged price cannot disagree.  See mp-economy.md
+; "Steal's price is real and invisible" for the ruling and why a numeric field
+; was not built into the command window for one verb.
+;
+; PURE leaf: cost in A, preserves X and Y, rtl.
+.proc Ot6StealCost
+        .a8
+        lda     #$04
         rtl
 .endproc
 
@@ -741,6 +780,46 @@ Ot6FoldTbl:
 ; preamble) and successive rescales are expected, not churn.  The gate that
 ; keeps a future column on the ruler is tools/tests/battle_costtable.lua, which
 ; recomputes these fractions from the ROM's own tables.
+;
+; -------- the 99 ANCHOR (issue #57, 2026-07-29) --------
+;
+; Owner: "it would be cool to scale ability MP costs so that each character's
+; own ultimate ends up costing 99 MP", refined to "99 where it makes sense, not
+; universal".  Two rows in this table qualify -- BUM RUSH ($64) and CLEAVE
+; ($5c), each its kit's divine top rung.  Tools does NOT participate: its
+; capstone is Overclock, which kits.md prices as the SUM of the two tools it
+; fires and which is not built, and Air Anchor ($a9) is explicitly "a findable
+; item mid-kit gag, not the capstone" (kits.md:137) -- so there is no top Tools
+; ROW here to anchor.  Steal, Slot, Rage and Dance are flat verbs with no
+; ladder at all; that is a stated non-answer, not a gap.
+;
+; WHY 99 AND NOT 100.  Owner: "seeing things like 99, 999, and 9999 in Final
+; Fantasy games feels right -- very classic feel."  It is also the number this
+; game already uses: vanilla's dearest SPELL is Quick at exactly 99 MP
+; (magic_prop_en.dat +$05, id $2b), so the anchor is the series' own ceiling
+; rather than an imported one.  And it is a HARD DISPLAY limit: every OT6 price
+; drawer renders TWO digits -- ListText cmd $02 (btlgfx_main.asm:15045-15073)
+; divides by ten exactly once, and Ot6LoadoutDrawCost (field_menu.asm:3053)
+; has one tens loop -- so 100 would print as garbage, not as a big number.
+;
+; WHAT THE ANCHOR CHANGED, AND WHAT IT DELIBERATELY DID NOT.  Rows 6/7/8 of
+; both ladders, and nothing else.  #45 lifted the FLOOR hard (2x) and the
+; ceiling less (1.5x), hedging against an owner worry that "Bum Rush 30 -> 120"
+; would outrun WoB pools -- a worry #45's own measurement then disproved (Bum
+; Rush is L70-gated and Sabin's L70 pool is 760).  The hedge survived the
+; measurement that killed it, which is why the tail still sat at 6.0-6.7% of
+; pool while the middle of the ladder sat at 15-23%.  The anchor is the
+; correction to that hedge: the tail is re-derived UP so that %-of-pool climbs
+; into the anchor instead of falling away from it, and rows 1-5 are untouched
+; because they already measure inside the ruler at the level they arrive.
+;
+;   Blitz    7.1 17.9 23.2 16.3  8.4 10.1 11.1 13.0 %   (tail was 7.9 6.7 6.1)
+;   SwdTech  6.9 17.2 17.1 15.1  8.8  8.4 10.4 13.0 %   (tail was 6.6 6.2 6.0)
+;
+; This is deliberately NOT a proportional scale of the old column (99/46 =
+; 2.15x): that would leave Suplex at 28 MP -- 50% of a LV10 pool -- and push
+; rows 2-4 clean off the top of the ruler.  The old column was right in the
+; middle and wrong at the ends; only the end moves.
 Ot6AbilityCostTbl:
         ; -- Blitz (Sabin), cmd $0a, attack ids $5d-$64.  levels are
         ;    BlitzLevelTbl.  ladder shape kept (Mantra deliberately under Fire
@@ -750,9 +829,11 @@ Ot6AbilityCostTbl:
         .byte   $5f, 13         ; Suplex     L10 bludgeon
         .byte   $60, 17         ; Fire Dance L15 fire, all
         .byte   $61, 16         ; Mantra     L23 party heal (utility, off-ramp)
-        .byte   $62, 22         ; Air Blade  L30 wind, all
-        .byte   $63, 30         ; Spiraler   L42
-        .byte   $64, 46         ; Bum Rush   L70 divine, bludgeon x8 -- the top
+        .byte   $62, 28         ; Air Blade  L30 wind, all      (#57: was 22)
+        .byte   $63, 50         ; Spiraler   L42                (#57: was 30)
+        .byte   $64, 99         ; Bum Rush   L70 divine, bludgeon x8 -- THE
+                                ;   ANCHOR (#57).  13.0% of the L70 pool of
+                                ;   760, inside the ruler; 7 uses from full.
         ; -- SwdTech (Cyan), cmd $07, attack ids $55-$5c.  levels are
         ;    BushidoLevelTbl.  names are BushidoName, the table the SwdTech
         ;    window actually renders from (`Bushido` survives only as the
@@ -772,10 +853,12 @@ Ot6AbilityCostTbl:
         .byte   $57, 13         ; Slash        BP2 slash
         .byte   $58, 16         ; Quadra Slam  BP2 slash x4
         .byte   $59, 18         ; Empowerer    BP3 drain (the parity deviation)
-        .byte   $5a, 22         ; Stunner      BP3 slash, all
-        .byte   $5b, 30         ; Quadra Slice BP3 wind x4
-        .byte   $5c, 46         ; Cleave       BP3+Broken divine -- out of the
-                                ;   ladder until the divine pass; priced ready
+        .byte   $5a, 28         ; Stunner      BP3 slash, all   (#57: was 22)
+        .byte   $5b, 50         ; Quadra Slice BP3 wind x4      (#57: was 30)
+        .byte   $5c, 99         ; Cleave       BP3+Broken divine -- THE ANCHOR
+                                ;   (#57).  13.0% of Cyan's L70 pool of 762,
+                                ;   the same fraction Bum Rush is of Sabin's,
+                                ;   which is the point of anchoring both.
         ; -- Tools (Edgar), cmd $09, tool ITEM ids $a3-$aa.  names are
         ;    item_name_en.json's, i.e. what the Tools window prints.
         ;    UNCHANGED by the #45 rescale -- see "TOOLS ARE DELIBERATELY
@@ -790,7 +873,13 @@ Ot6AbilityCostTbl:
         .byte   $a9, 14         ; Air Anchor   mid-kit gag (harpoon / doom)
         ; Overclock (the divine "use two tools") has no single tool item id:
         ; its price is the SUM of the two tools it fires -- wired the day
-        ; Overclock is built (kits.md: Magitek-factory story unlock).
+        ; Overclock is built (kits.md: Magitek-factory story unlock).  That is
+        ; also why TOOLS DOES NOT TAKE THE 99 ANCHOR (#57): Edgar's ultimate is
+        ; Overclock, not the mid-kit gag Air Anchor, and Sigma of two tools tops
+        ; out at 34 (Chain Saw 18 + Drill 16).  Whether Overclock is 99 or stays
+        ; Sigma is a decision for the issue that BUILDS it -- both rules cannot
+        ; hold, and inventing the answer here would price an ability that has
+        ; no code.
         .byte   $ff
 
 ; ------------------------------------------------------------------------------
@@ -879,7 +968,10 @@ Ot6AbilityCostTbl:
         tax
         shorta                  ; back to 8-bit A (reloaded next, so no clr)
         lda     $3c09,x         ; current MP, high byte
-        bne     @afford         ; >= 256 MP: nothing in a kit costs that much
+        bne     @afford         ; >= 256 MP: nothing in a kit costs that much --
+                                ;   CHECKED since #57, not assumed: the ceiling
+                                ;   is 99 and battle_costtable.lua asserts it on
+                                ;   every row of the live table
         lda     $3c08,x         ; current MP, low byte
         cmp     $01,s           ; MP - cost: C SET iff MP >= cost (affordable)
         bcs     @afford
