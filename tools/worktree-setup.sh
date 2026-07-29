@@ -29,6 +29,15 @@ ROM="Final Fantasy III (USA).sfc"
 # so the log's recorded times still describe the copied files; any REAL
 # drift (a local edit after seeding) still re-mints through the latch
 # edges' content compare, proven in frontier_ninja_selftest.sh.
+MAIN_BRANCH=$(git -C "$MAIN" branch --show-current 2>/dev/null || echo '?')
+HERE_BRANCH=$(git branch --show-current 2>/dev/null || echo '?')
+if [ "$MAIN_BRANCH" != "$HERE_BRANCH" ]; then
+  echo "NOTE: seeding states minted on '$MAIN_BRANCH' into a '$HERE_BRANCH' worktree."
+  echo "      If those branches differ in ROM-affecting source, some suite tests and"
+  echo "      smoke generators will be RED before you touch a file -- that is stale"
+  echo "      seeding, not your change. Confirm with a targeted ninja re-mint before"
+  echo "      you debug it (this cost a full investigation on 2026-07-29)."
+fi
 if [ -d "$MAIN/build/states" ] && [ ! -d "$HERE/build/states" ]; then
   mkdir -p "$HERE/build"
   cp -Rp "$MAIN/build/states" "$HERE/build/states"
