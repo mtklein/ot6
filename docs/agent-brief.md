@@ -9,6 +9,16 @@ deliberately. **The rules that remain are about not fooling ourselves. They
 stayed because they repeatedly caught real things — including mistakes made
 by the dispatcher writing your brief.**
 
+## Read THIS file from your own worktree
+
+Not from `/Users/mtklein/ot6/docs/agent-brief.md`. The owner's checkout
+sits on whatever **release branch** he is playtesting, so docs read there
+can be weeks behind `main`. Every dispatch should name the copy in your
+own worktree; if one points you at the owner's tree, read your own copy
+instead and say so in your report. (This bit every agent on 2026-07-29:
+they all read a brief from two days earlier and correctly followed rules
+that had already been replaced.)
+
 ## Work the way you work best
 
 You are trusted to choose your own method. If a rule below gets in the way

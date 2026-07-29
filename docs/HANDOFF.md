@@ -137,7 +137,11 @@ was free". Documented at `freezeOthers`.
 
 ## Working agreements
 
-- Delegated work gets [agent-brief.md](agent-brief.md) included by reference.
+- Delegated work gets [agent-brief.md](agent-brief.md) included by reference —
+  **cite the copy in the agent's own worktree, never `/Users/mtklein/ot6/docs/`.**
+  The owner's checkout sits on the release branch he is playtesting, so a
+  doc read from it can be weeks stale; on 2026-07-29 every agent that day
+  read a brief from two days earlier and followed rules already replaced.
   **Revised 2026-07-29** after `rules-audit.md`: agents commit to their own
   branches in revertible units, file exclusivity is dropped to "declare your
   hunks and expect merges", and targeted re-mints are theirs. The owner's
