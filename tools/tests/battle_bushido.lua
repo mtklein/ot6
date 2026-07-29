@@ -99,7 +99,7 @@ local WIN = {
   [7] = { 5, 6, 7 },                  -- N=8: his top three; row 2 = Oblivion
 }
 -- a few authored prices (kits.md / Ot6AbilityCostTbl), keyed by attack id.
-local COST = { [0x55] = 1, [0x58] = 4, [0x5c] = 8 }
+local COST = { [0x55] = 4, [0x58] = 16, [0x5c] = 46 }
 
 local actor
 local ceiling = 4

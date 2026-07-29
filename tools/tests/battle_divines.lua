@@ -94,7 +94,7 @@ local function pinCyan()
     H.writeByte(0x3BA4 + s * 2, H.readByte(0x3BA4 + s * 2) | 0x02)
     H.writeByte(0x3BA5 + s * 2, H.readByte(0x3BA5 + s * 2) | 0x02)
     H.writeWord(0x3BF4 + s * 2, 999)
-    -- v0.5 costs are LIVE: pin MP high so Oblivion (8 MP) never fizzles on the
+    -- v0.5 costs are LIVE: pin MP high so Cleave (46 MP after #45) never fizzles on the
     -- intro fixture's empty pool. Scarcity is not this test's subject -- the
     -- Broken-target divine gate and its reduced fallback are.
     H.writeWord(0x3C08 + s * 2, 99)                   -- current MP

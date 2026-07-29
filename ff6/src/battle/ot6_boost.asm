@@ -398,7 +398,7 @@ Ot6FoldTbl:
 
 ; the "one dispatch change" docs/design/mp-economy.md's M4 note predicts.
 ; vanilla's GetMPCost (battle_main.asm) returns a cost only for magic, lore,
-; summon and x-magic; every other command -- blitz, bushido, tools, the free
+; summon and x-magic; every other command -- Blitz, SwdTech, Tools, the free
 ; floor, the free-exception verbs -- falls through it returning 0, so the
 ; universal charge at CalcAttackEffect (the $3a4c subtract, and its
 ; insufficient-mp FIZZLE) never fires for them. this hook runs on the same A
@@ -406,7 +406,7 @@ Ot6FoldTbl:
 ; it swaps the 0 for the kit price, keyed by the resolved id ALREADY sitting
 ; in $3a7b at queue time --
 ;   blitz  ($0a): attack id  $5d-$64   (FixPlayerAttack's +$5d)
-;   bushido($07): attack id  $55-$5c   (FixPlayerAttack's +$55)
+;   swdtech($07): attack id  $55-$5c   (FixPlayerAttack's +$55)
 ;   tools  ($09): tool item id $a3-$aa (Cmd_09 resolves it as $b6-$a2)
 ; those three id ranges are disjoint, so ONE $ff-terminated (key,cost) table
 ; serves all three; the command gate keeps a stray id under any OTHER verb
@@ -423,7 +423,7 @@ Ot6FoldTbl:
 ; probe-collect verb -- and never consults the id table. (routing it through
 ; the table would also have to dodge a coincidence: steal's own special-effect
 ; id $a4, set at execute time in Cmd_05, is already the tool key for
-; BioBlaster.) confirmed absolute (owner, 2026-07-22): only the basic Fight
+; Bio Blaster.) confirmed absolute (owner, 2026-07-22): only the basic Fight
 ; command is free; every other verb costs MP as its kit comes online.
 ;
 ; the charge AND the refusal are BOTH already universal (they act on whatever
@@ -433,7 +433,7 @@ Ot6FoldTbl:
 ; still shows these verbs no number.
 ;
 ; boost never raises the price: blitz and tools keep one id no matter the
-; boost, and a boosted bushido has already queued the tech its BP bought
+; boost, and a boosted SwdTech has already queued the tech its BP bought
 ; (Ot6BushidoTier / Ot6QueueFold leaves $3a7b at that tech), whose own
 ; per-tech price is exactly what should be charged -- BP buys the tier, MP
 ; prices the cast (mp-economy.md).
@@ -459,7 +459,7 @@ Ot6FoldTbl:
         cmp     #$11
         beq     @leap           ; leap: flat, the probe-collect price (#40)
         cmp     #$07
-        beq     @costed         ; bushido
+        beq     @costed         ; swdtech
         cmp     #$09
         beq     @costed         ; tools
         cmp     #$0a
@@ -532,7 +532,7 @@ Ot6FoldTbl:
 ; without paying the command gate. Ot6AbilityCost reads $3a7a/$3a7b at queue
 ; time; a menu row already HOLDS the id it is about to draw, so it needs only
 ; this leaf. PURE: id in A, cost in A ($00 if the id is unpriced), reads no
-; $3a7x. keys are disjoint per verb (blitz $5d-$64, bushido $55-$5c, tools
+; $3a7x. keys are disjoint per verb (blitz $5d-$64, swdtech $55-$5c, tools
 ; $a3-$aa), so the id alone selects the row. preserves X and Y; a8/i16.
 ; rtl (jsl) -- one entry for bank F0 and any cross-bank caller alike.
 .proc Ot6CostFor
@@ -589,7 +589,7 @@ Ot6FoldTbl:
 ; whole-battle state".  8 -- the top half of the band -- because the single
 ; payment funds every subsequent turn's verb for the rest of the battle
 ; (each locked-in step is free), so it prices above the per-use probe verbs
-; (Steal 2, Pummel 2) while staying payable from Mog's natural join pool
+; (Steal 2, Pummel 4) while staying payable from Mog's natural join pool
 ; (base 16 MP + level gains); playtest tunes.  PURE leaf, the Ot6CostFor
 ; shape: cost in A, preserves X and Y; rtl so the menu decorator (bank F0
 ; via C1) and the charge read one number.
@@ -663,45 +663,118 @@ Ot6FoldTbl:
 .endproc
 
 ; (key, cost) pairs, $ff terminates. keys are exactly the id already in $3a7b
-; at queue time, disjoint across the three verbs. numbers are docs/design/
-; kits.md's per-row columns priced on docs/design/mp-economy.md's rulers:
-; the vanilla spell scale (Fire 4, Fire 2 20, Fire 3 51), sabin's ~3-mp base
-; pool sizing the floor of every ladder, and "free-to-learn is not
-; free-to-use" -- a signature is the CHEAPEST row of its kit, never costless.
+; at queue time, disjoint across the three verbs. names below are the ones the
+; SCREEN prints (the FF3-US translation -- CONTRIBUTING's vocabulary rule,
+; owner 2026-07-29); where an internal disassembly label differs it is marked
+; as such, never used as the primary.
+;
+; -------- the ruler these numbers are on (#45 rescale, 2026-07-29) --------
+;
+; mp-economy.md's "one price scale" says kit skills price on the vanilla spell
+; ruler.  That ruler was never MEASURED until #45, so here it is: vanilla
+; natural magic, cost as a fraction of the caster's real pool at the level the
+; spell is LEARNED (pool = char_prop base MP + LevelUpMP running sum, both
+; read out of this ROM, not recalled) --
+;
+;   Antdot 3 @L6 7.5% · Warp 20 @L26 8.3% · Fire 4 @L6 10.0%
+;   Fire 2 20 @L22 10.4% · Cure 5 @L6 12.5% · Drain 15 @L12 17.2%
+;   Life 30 @L18 20.3%
+;
+; (spells learned below Terra's earliest measured level are priced at that
+; level -- L6, pool 40, read off kolts_doorstep -- the same clamp the kit rows
+; use, because a pool the game never presents is not a price anyone pays.)
+; so a vanilla spell costs roughly 8-20% of the pool it is first cast from.
+; The v0.4/v0.5 kit columns did NOT sit on that ruler.  Measured the same way,
+; SwdTech ran 1.0-3.9% and Blitz 3.6-12.5% -- three to eight times under the
+; scale the doc claimed they shared.  The owner's v0.7 playtest found it from
+; the other end: at LV14 Cyan holds a 96 MP pool against techs costing 1/2/3,
+; and BP was not scarce either, so NEITHER currency bound him and Fight had no
+; case (mp-economy.md's stated target: "Fight must sometimes be the right move,
+; without Cyan and Sabin ceasing to feel like ability characters").
+;
+; ONE principled change, not two knobs (owner's decomposition, issue #45):
+;
+;   1. RETIRE SwdTech's ~1/3 discount.  It was justified by "the BP ladder is
+;      the real price, so MP rides ~1/3 of a comparable Blitz/Tool" -- a claim
+;      about the FOUR-rung 0x/1x/2x/3x ladder.  #38 rewrote that ladder to
+;      1x/2x/3x and explicitly deferred the MP column ("MP costs per tech
+;      unchanged"), so the discount kept applying after the premise that earned
+;      it had been rewritten.  SwdTech now prices at PARITY with the Blitz row
+;      of the same index -- which is a level statement, not an index
+;      coincidence: BlitzLevelTbl is 1/6/10/15/23/30/42/70 and BushidoLevelTbl
+;      1/6/12/15/24/34/44/70 (field/event.asm:1236-1240), so row n of either
+;      kit lands in the same band against nearly the same pool.
+;   2. A GENERAL FLOOR LIFT of ~1.5-2x on the Blitz ladder, tapering toward
+;      1.5x at the top -- COMPRESSION, not a flat multiply.  Pools grow far
+;      faster than a fixed cost, so the same ladder scaled flat would price the
+;      late rows above the ruler while leaving the early ones under it.
+;
+; What that lands (cost / real pool at the level the row is reachable; rows 1-2
+; evaluated at L10, the earliest either character is actually IN the party):
+;
+;   Blitz    7.1 17.9 23.2 16.3  8.4  7.9  6.7  6.1 %   (was 3.6 .. 12.5)
+;   SwdTech  6.9 17.2 17.1 15.1  8.8  6.6  6.2  6.0 %   (was 1.0 ..  3.9)
+;
+; Every row stays payable from a full pool at the level it becomes available by
+; a wide margin -- the top rows most of all, because L42/L70 pools are 449/760.
+; The owner's worry that a flat 4x would push "Bum Rush 30 -> 120 past WoB
+; pools" does not survive measurement in the direction he feared: Bum Rush is
+; L70-gated and Sabin's L70 pool is 760.  The squeeze is at the FLOOR and in
+; early WoB, exactly where mp-economy.md already said it was.
+;
+; TOOLS ARE DELIBERATELY UNCHANGED.  Measured against Edgar's real pool at the
+; band each tool is acquired they already run 7-21% -- dead on the vanilla
+; ruler above (AutoCrossbow 11.1% @L7, Drill 18.4% @L13, Chain Saw 20.7% @L13).
+; The general lift was offered to them and the measurement declined it: a 1.5x
+; on Chain Saw would put it at 31%, off the top of the scale.  gil buys the tool
+; once, MP is the per-use cost, and that price was already right.
+;
+; Every number here is a playtest placeholder (mp-economy.md's standing
+; preamble) and successive rescales are expected, not churn.  The gate that
+; keeps a future column on the ruler is tools/tests/battle_costtable.lua, which
+; recomputes these fractions from the ROM's own tables.
 Ot6AbilityCostTbl:
-        ; -- Blitz (Sabin), cmd $0a, attack ids $5d-$64. mp-economy.md:
-        ;    "scaled by tier 2-30: Pummel 2-3, mid-kit 6-15, Bum Rush at top".
-        .byte   $5d,  2         ; Pummel     L1  signature -- cheapest row
-        .byte   $5e,  5         ; AuraBolt   L6  holy chip
-        .byte   $5f,  7         ; Suplex     L10 bludgeon
-        .byte   $60,  9         ; Fire Dance L15 fire, all
-        .byte   $61,  8         ; Mantra     L23 party heal (utility, off-ramp)
-        .byte   $62, 12         ; Air Blade  L30 wind, all
-        .byte   $63, 18         ; Spiraler   L42
-        .byte   $64, 30         ; Bum Rush   L70 divine, bludgeon x8 -- the top
-        ; -- Bushido (Cyan), cmd $07, attack ids $55-$5c. kits.md left this
-        ;    column TBD; PROPOSED here from the BP-tier structure. ruling
-        ;    (mp-economy.md): "BP tier + discounted MP 1-8" -- the BP ladder
-        ;    is the real price, so MP rides ~1/3 of a comparable blitz/tool.
-        ;    monotonic with the tech index; the BP band a tech sits in now
-        ;    depends on the ceiling (#38 refloored the window to 1x/2x/3x, so
-        ;    there is no BP0 rung -- the band notes below are the ORIGINAL
-        ;    four-rung reading, kept because the MP column itself is unchanged).
-        .byte   $55,  1         ; Fang     BP0 signature -- the game's cheapest
-        .byte   $56,  2         ; Sky      BP1 counter stance
-        .byte   $57,  3         ; Tiger    BP1 slash
-        .byte   $58,  4         ; Flurry   BP2 slash x4 (Air Blade 12 -> ~1/3)
-        .byte   $59,  5         ; Dragon   BP2 drain
-        .byte   $5a,  6         ; Eclipse  BP3 slash, all
-        .byte   $5b,  7         ; Tempest  BP3 wind x4
-        .byte   $5c,  8         ; Oblivion BP3+Broken divine -- out of the
+        ; -- Blitz (Sabin), cmd $0a, attack ids $5d-$64.  levels are
+        ;    BlitzLevelTbl.  ladder shape kept (Mantra deliberately under Fire
+        ;    Dance: a utility off-ramp, not a damage rung); level lifted.
+        .byte   $5d,  4         ; Pummel     L1  signature -- cheapest row
+        .byte   $5e, 10         ; AuraBolt   L6  holy chip
+        .byte   $5f, 13         ; Suplex     L10 bludgeon
+        .byte   $60, 17         ; Fire Dance L15 fire, all
+        .byte   $61, 16         ; Mantra     L23 party heal (utility, off-ramp)
+        .byte   $62, 22         ; Air Blade  L30 wind, all
+        .byte   $63, 30         ; Spiraler   L42
+        .byte   $64, 46         ; Bum Rush   L70 divine, bludgeon x8 -- the top
+        ; -- SwdTech (Cyan), cmd $07, attack ids $55-$5c.  levels are
+        ;    BushidoLevelTbl.  names are BushidoName, the table the SwdTech
+        ;    window actually renders from (`Bushido` survives only as the
+        ;    internal label, per the vocabulary rule above).
+        ;    PARITY with the Blitz row of the same index, per (1) above -- the
+        ;    old "~1/3 of a comparable Blitz/Tool" discount is retired here.
+        ;    ONE deviation from parity: Empowerer takes 18 rather than Mantra's
+        ;    16, because this column must stay MONOTONIC with the tech index --
+        ;    the boost window offers techs weakest->strongest and the row
+        ;    IS the boost level (kits.md), so a dearer 2x row than 3x row would
+        ;    read as a bug.  Blitz is a free-choice menu and needs no such rule.
+        ;    Cyan still pays BP on top; if parity plus the 1-BP floor leaves him
+        ;    starved, #38's own ruling names the lever -- BP seed/regen, not
+        ;    the floor, and not this column.
+        .byte   $55,  4         ; Dispatch     BP1 signature
+        .byte   $56, 10         ; Retort       BP1 counter stance
+        .byte   $57, 13         ; Slash        BP2 slash
+        .byte   $58, 16         ; Quadra Slam  BP2 slash x4
+        .byte   $59, 18         ; Empowerer    BP3 drain (the parity deviation)
+        .byte   $5a, 22         ; Stunner      BP3 slash, all
+        .byte   $5b, 30         ; Quadra Slice BP3 wind x4
+        .byte   $5c, 46         ; Cleave       BP3+Broken divine -- out of the
                                 ;   ladder until the divine pass; priced ready
-        ; -- Tools (Edgar), cmd $09, tool ITEM ids $a3-$aa. mp-economy.md:
-        ;    "scaled by tier 3-20: AutoCrossbow 3-4, Drill/Chainsaw 12-20,
-        ;    Debilitator 8-12". gil buys the tool once; MP is the per-use cost.
+        ; -- Tools (Edgar), cmd $09, tool ITEM ids $a3-$aa.  names are
+        ;    item_name_en.json's, i.e. what the Tools window prints.
+        ;    UNCHANGED by the #45 rescale -- see "TOOLS ARE DELIBERATELY
+        ;    UNCHANGED" above: measured, they are already on the ruler.
         .byte   $aa,  4         ; AutoCrossbow signature, piercing x4 shredder
         .byte   $a3,  6         ; NoiseBlaster confuse
-        .byte   $a4,  8         ; BioBlaster   poison, all -- the armor-break key
+        .byte   $a4,  8         ; Bio Blaster  poison, all -- the armor-break key
         .byte   $a5,  6         ; Flash        blind, all
         .byte   $a8, 16         ; Drill        armored-boss answer, pierce
         .byte   $a6, 18         ; Chain Saw    slashing + instant-death chance
@@ -724,7 +797,7 @@ Ot6AbilityCostTbl:
 ; ValidateSpellList counted a spell into $f6 or left an esper in $f7).
 ; sensible when only magic spent MP; under the live economy above it sent
 ; every spell-less character into battle at 0/0 while Ot6AbilityCost priced
-; their whole kit -- Blitz, Tools, Bushido and Steal all fizzled through
+; their whole kit -- Blitz, Tools, SwdTech and Steal all fizzled through
 ; CalcAttackEffect's universal insufficient-MP gate as silent wasted turns,
 ; and the max-0 writeback skip (battle_main.asm:12265-12267) kept field MP
 ; full so the field never showed the theft (issue #32's measurements).
@@ -817,7 +890,7 @@ Ot6AbilityCostTbl:
 .endif   ; OT6_MP_COSTS
 ; ------------------------------------------------------------------------------
 
-; [ boost picks the bushido tech — the charge gauge, deleted ]
+; [ boost picks the SwdTech — the charge gauge, deleted ]
 
 ; replaces UpdateMenuState_37's clock (btlgfx_main.asm @7d5f): the gauge
 ; ceiling `lda $2020 / inc / sta $36`, the every-4-frames `inc w7e7b82`,
@@ -857,7 +930,8 @@ Ot6AbilityCostTbl:
 ; case bolted outside it: at full kit the window is {4,5,6,7} and boost 3 lands
 ; on 7 = oblivion by the same base+boost sum as any other rung -- it falls out
 ; for free. it is SELECTED here only when learned (ceiling 7) and unspent, and
-; still fires exactly as before: gated at RESOLUTION by Ot6Oblivion (hooked
+; still fires exactly as before: gated at RESOLUTION by Ot6Oblivion (the proc
+; name is internal; the screen prints the tech as Cleave) (hooked
 ; after ChooseTarget -- the target does not exist at this command-latch time,
 ; swdtech being in RetargetCmdTbl), and dropped back to tempest (6) here for
 ; the rest of any battle whose once-per-battle latch is already set. cyan
@@ -877,7 +951,7 @@ Ot6AbilityCostTbl:
 ;
 ; v0.5 SUBMENU (issue #8): SwdTech is now a tools-shell submenu -- one row per
 ; boost level, the row IS the boost, weakest at top. The base/ceiling arithmetic
-; and the Oblivion top-rung swap are factored into three leaf helpers below so
+; and the Cleave top-rung swap are factored into three leaf helpers below so
 ; single-select (this proc, called at the submenu's confirm latch) and the row
 ; ENUMERATION (Ot6BushidoWindow) can never diverge -- offering a tech the latch
 ; would not fire, or firing one the menu never showed. $7b82 is still stamped

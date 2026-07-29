@@ -136,7 +136,7 @@ H.run({ maxFrames = 120000 }, {
   H.call(function()
     -- The Blitz cost-table signature (Pummel/AuraBolt/Suplex) present in bank
     -- F0 IFF OT6_MP_COSTS was on -- the same probe battle_mpcost.lua uses.
-    local sig = { 0x5d, 0x02, 0x5e, 0x05, 0x5f, 0x07 }
+    local sig = { 0x5d, 0x04, 0x5e, 0x0a, 0x5f, 0x0d }
     local base
     for a = 0x300000, 0x30FFF0 do
       local ok = true

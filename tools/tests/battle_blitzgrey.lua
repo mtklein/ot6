@@ -63,12 +63,12 @@ local function glyphs(s)
 end
 -- spaceless names only, so the glyph run is contiguous in VRAM.
 local NM = {
-  Pummel   = glyphs("Pummel"),         -- $5d  cost 2  -> affordable
-  Suplex   = glyphs("Suplex"),         -- $5f  cost 7  -> affordable
-  Spiraler = glyphs("Spiraler"),       -- $63  cost 18 -> unaffordable
+  Pummel   = glyphs("Pummel"),         -- $5d  cost 4  -> affordable
+  Suplex   = glyphs("Suplex"),         -- $5f  cost 13 -> affordable
+  Spiraler = glyphs("Spiraler"),       -- $63  cost 30 -> unaffordable
 }
 
-local mp = 8                            -- pinned current MP (mutated for pass 2)
+local mp = 16                           -- pinned current MP (mutated for pass 2)
 
 -- Install a full-Blitz Sabin, with current MP pinned to `mp`, every frame.
 local function pinSabin()
@@ -139,9 +139,9 @@ H.run({ maxFrames = 40000 }, {
       aP and string.format("$%02x", aP) or "nil",
       aS and string.format("$%02x", aS) or "nil",
       aSp and string.format("$%02x", aSp) or "nil", WHITE, GREY))
-    H.assertEq(aP, WHITE, "Pummel (cost 2, MP 8) renders white -- affordable")
-    H.assertEq(aS, WHITE, "Suplex (cost 7, MP 8) renders white -- affordable")
-    H.assertEq(aSp, GREY, "Spiraler (cost 18, MP 8) renders grey -- unaffordable")
+    H.assertEq(aP, WHITE, "Pummel (cost 4, MP 16) renders white -- affordable")
+    H.assertEq(aS, WHITE, "Suplex (cost 13, MP 16) renders white -- affordable")
+    H.assertEq(aSp, GREY, "Spiraler (cost 30, MP 16) renders grey -- unaffordable")
     H.assertEq(aSp - aP, 0x04,
       "grey - white == $04, magic's own disabled-bit delta")
   end),
@@ -161,7 +161,7 @@ H.run({ maxFrames = 40000 }, {
     local aSp = attrOf(NM.Spiraler)
     H.log(string.format("MP now %d -> Spiraler attr = %s", mp,
       aSp and string.format("$%02x", aSp) or "nil"))
-    H.assertEq(aSp, WHITE, "Spiraler (cost 18, MP 99) is white now -- grey tracks MP")
+    H.assertEq(aSp, WHITE, "Spiraler (cost 30, MP 99) is white now -- grey tracks MP")
     H.log("PASSED: Blitz greys the unaffordable rows and only the unaffordable rows")
   end),
 })

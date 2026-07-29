@@ -10,7 +10,7 @@ learns; OT6 keeps each verb and reshapes the lists to exactly 8:
 
 | Verb | Characters | Vanilla precedent |
 |---|---|---|
-| **By level** | Sabin (Blitz), Cyan (Bushido), Terra & Celes (natural magic — the vanilla table, largely verbatim) | preserved |
+| **By level** | Sabin (Blitz), Cyan (SwdTech), Terra & Celes (natural magic — the vanilla table, largely verbatim) | preserved |
 | **By item** | Edgar (Tools are objects you find/buy) | preserved |
 | **By deed** | Mog (dance per terrain), Strago (lore by observation), Gau (rage by capture) | preserved |
 | **By story** | every signature (free at join ✦) and most divines | — |
@@ -53,15 +53,15 @@ The 8 Tools, verbatim ✦ — learned by acquisition.
 |---|---|---|---|---|
 | 1 | AutoCrossbow ✦ | 4 | piercing ×4 | join (signature) |
 | 2 | NoiseBlaster | 6 | — (confuse) | Figaro shop |
-| 3 | BioBlaster | 8 | poison | Figaro shop |
+| 3 | Bio Blaster | 8 | poison | Figaro shop |
 | 4 | Flash | 6 | — (blind) | Figaro shop, restocked South Figaro |
 | 5 | Drill | 16 | piercing | Figaro castle, after the sand dive |
-| 6 | Chainsaw | 18 | slashing | Zozo chest (vanilla) |
+| 6 | Chain Saw | 18 | slashing | Zozo chest (vanilla) |
 | 7 | Debilitator | 10 | adds + reveals a random weakness ✦ | Vector shop |
 | 8 | **Overclock** ✦ (divine) | Σ | — | Magitek factory (story) |
 
 The MP column is mp-economy.md's "scaled by tier 3–20" (AutoCrossbow 3–4,
-Drill/Chainsaw 12–20, Debilitator 8–12): gil buys the tool once, MP is the
+Drill/Chain Saw 12–20, Debilitator 8–12): gil buys the tool once, MP is the
 per-use operating cost. It lives in `Ot6AbilityCostTbl` keyed by **tool item
 id** ($a3–$aa, the same keying ot6_class.asm uses for tool classes), charged
 under `OT6_MP_COSTS`. The mid-kit gag Air Anchor ($a9, the findable harpoon)
@@ -72,7 +72,7 @@ is built (it is not yet).
 - Divine locked ✦: **Overclock** — use two tools in one action. Air
   Anchor stays a findable *item* mid-kit gag, not the capstone.
 - AutoCrossbow ×4 piercing = the first shield shredder; Drill the
-  armored-boss answer; Chainsaw covers slashing so Edgar alone spans
+  armored-boss answer; Chain Saw covers slashing so Edgar alone spans
   two physical classes through tools.
 - Passive candidates: *Tinkerer* (tools ignore blind), *Royal
   Discount* (shops half price), *Overcharge* (+1 AutoCrossbow hit
@@ -94,18 +94,25 @@ while still marked "vanilla preserved ✦".
 
 | # | Blitz | MP | Chip | Level |
 |---|---|---|---|---|
-| 1 | Pummel ✦ | 2 | bludgeoning ×2 | 1 (has it at join) |
-| 2 | AuraBolt | 5 | holy | 6 |
-| 3 | Suplex | 7 | bludgeoning | 10 |
-| 4 | Fire Dance | 9 | fire | 15 |
-| 5 | Mantra | 8 | — (heal) | 23 |
-| 6 | Air Blade | 12 | wind | 30 |
-| 7 | Spiraler | 18 | — | 42 |
-| 8 | **Bum Rush** (divine) | 30 | bludgeoning ×8 | 70 / Duncan |
+| 1 | Pummel ✦ | 4 | bludgeoning ×2 | 1 (has it at join) |
+| 2 | AuraBolt | 10 | holy | 6 |
+| 3 | Suplex | 13 | bludgeoning | 10 |
+| 4 | Fire Dance | 17 | fire | 15 |
+| 5 | Mantra | 16 | — (heal) | 23 |
+| 6 | Air Blade | 22 | wind | 30 |
+| 7 | Spiraler | 30 | — | 42 |
+| 8 | **Bum Rush** (divine) | 46 | bludgeoning ×8 | 70 / Duncan |
 
-The MP column is mp-economy.md's "scaled by tier 2–30" made concrete (Pummel
-the 2-MP signature, mid-kit 5–12, Bum Rush the 30-MP capstone); it lives in
-`Ot6AbilityCostTbl` keyed by attack id $5d–$64, charged under `OT6_MP_COSTS`.
+The MP column lives in `Ot6AbilityCostTbl` keyed by attack id $5d–$64,
+charged under `OT6_MP_COSTS`. **Rescaled by issue #45 (2026-07-29)** from
+2/5/7/9/8/12/18/30: measured against Sabin's real pool at the level each row is
+reachable, the old ladder ran 3.6–12.5% where a vanilla spell costs 8–21% of
+the pool it is first cast from, so the ladder sat *under* the ruler
+mp-economy.md says it shares. The lift is ~2× at the floor tapering to ~1.5× at
+the top — compression, not a flat multiply, because pools grow far faster than
+a fixed cost. Mantra stays deliberately under Fire Dance: it is a utility
+off-ramp, not a damage rung. Full per-row derivation, and the ruler it is
+measured against, in mp-economy.md's "The ruler, finally measured".
 
 - Passive candidates: *Iron Fist* (unarmed counts as a bludgeon
   weapon), *Discipline* (+1 BP when striking a Broken enemy),
@@ -113,38 +120,64 @@ the 2-MP signature, mid-kit 5–12, Bum Rush the 30-MP capstone); it lives in
 
 ### Cyan — Samurai (slashing: katana)
 
-The 8 Bushido priced in BP ✦ (charge gauge deleted ✦). Katana now
+The 8 SwdTechs priced in BP ✦ (charge gauge deleted ✦). Katana now
 lives inside **slashing** with swords — Cyan is a slashing
 *specialist* (multi-hit slash chips nobody else matches), not a
 mandatory key for katana-only locks. Vanilla level schedule kept.
 
+Names below are the ones the game prints (`BushidoName`, the table the SwdTech
+window renders from). The internal disassembly labels — `Bushido*`, `Fang`,
+`Oblivion` — stay as they are: renaming code symbols is churn against upstream
+that a comment already buys (issue #50).
+
 | # | Tech | BP | MP | Chip | Level |
 |---|---|---|---|---|---|
-| 1 | Fang ✦ | 0 | 1 | slashing | join |
-| 2 | Sky | 1 | 2 | — (counter stance) | 6 |
-| 3 | Tiger | 1 | 3 | slashing | 12 |
-| 4 | Flurry | 2 | 4 | slashing ×4 | 15 |
-| 5 | Dragon | 2 | 5 | — (drain) | 24 |
-| 6 | Eclipse | 3 | 6 | slashing, all enemies | 34 |
-| 7 | Tempest | 3 | 7 | wind ×4 | 44 |
-| 8 | **Oblivion** (divine) | 3, target must be Broken | 8 | — | Phantom Train farewell (story) |
+| 1 | Dispatch ✦ | 0 | 4 | slashing | join |
+| 2 | Retort | 1 | 10 | — (counter stance) | 6 |
+| 3 | Slash | 1 | 13 | slashing | 12 |
+| 4 | Quadra Slam | 2 | 16 | slashing ×4 | 15 |
+| 5 | Empowerer | 2 | 18 | — (drain) | 24 |
+| 6 | Stunner | 3 | 22 | slashing, all enemies | 34 |
+| 7 | Quadra Slice | 3 | 30 | wind ×4 | 44 |
+| 8 | **Cleave** (divine) | 3, target must be Broken | 46 | — | Phantom Train farewell (story) |
 
-**The MP column (proposed v0.4, was TBD).** mp-economy.md priced Bushido "BP
-tier + discounted MP 1–8" and deferred the numbers to Cyan's playtest; this is
-that column, proposed from the BP-tier structure so the charge-side groundwork
-had data to carry. It is monotonic with the BP band (0→1, 1→2–3, 2→4–5, 3→6–8)
-and rides ~⅓ of a comparable Blitz/Tool — Flurry's slashing ×4 costs 4 MP where
-Sabin's Air Blade costs 12 and Edgar's Drill 16 — because, per the ruling, the
-**banked-BP requirement is the real price and the MP only prices the cast**.
-Fang is the cheapest row of any kit (1 MP, the "free-to-learn is not
-free-to-use" floor); Oblivion tops the ladder at 8 MP — the window's divine top
-rung once Cyan has learned all eight (the moving window, below). Cyan's ~18-MP L5 pool
-affords the low ladder (Fang/Sky/Tiger/Flurry = 1/2/3/4) and outgrows the rest
-on his level schedule, so a light column keeps him acting while the bank
-builds — the whole point of the one kit where banking BP has intrinsic purpose.
-These numbers live in `Ot6AbilityCostTbl` (ff6/src/battle/ot6.asm), charged
-under the `OT6_MP_COSTS` build flag — which **v0.5 flipped ON by default**, so
-the shipped ROM charges them (see mp-economy.md).
+**The MP column, rescaled (issue #45, 2026-07-29; was 1–8, proposed v0.4).**
+The old column rode **~⅓ of a comparable Blitz/Tool** — Quadra Slam's slashing
+×4 cost 4 MP where Sabin's Air Blade cost 12 — on the ruling that "the banked-BP
+requirement is the real price and the MP only prices the cast". That discount
+was a claim about the *four-rung* 0×/1×/2×/3× ladder; **#38 rewrote the ladder
+to 1×/2×/3× and explicitly deferred the MP column**, and the discount kept
+applying to a premise that had been edited out from under it. The v0.7 playtest
+found the result: at LV14 Cyan holds 96 MP against techs costing 1/2/3, BP is
+not scarce either, so nothing constrains him and Fight is never the right move —
+the exact failure mp-economy.md's target box forbids.
+
+So SwdTech now prices at **parity with the Blitz row of the same index**, which
+is a level claim rather than an index coincidence: `BlitzLevelTbl` is
+1/6/10/15/23/30/42/70 and `BushidoLevelTbl` 1/6/12/15/24/34/44/70
+(`ff6/src/field/event.asm:1236-1240`), so row *n* of either kit lands in the
+same band against nearly the same pool. **Cyan still pays both currencies** —
+the ruling stands, only its magnitude is retired — and if parity plus #38's
+1-BP floor leaves him starved, #38's own ruling names the lever: BP seed/regen,
+not the floor, and not this column.
+
+One deviation from parity: **Empowerer 18, not Mantra's 16**, because this
+column must stay monotonic with the tech index — the boost window offers techs
+weakest→strongest and *the cursor row is the boost level* (below), so a 2× row
+dearer than the 3× row would read as a bug.
+
+Dispatch is still the cheapest row of any kit (the "free-to-learn is not
+free-to-use" floor), now at 4 MP rather than 1 — 6.9% of the pool Cyan actually
+joins with, against the 8–21% a vanilla spell costs at the level it is learned.
+Cleave tops the ladder at 46 — the window's divine top rung once Cyan has
+learned all eight (the moving window, below), and comfortably payable: it is
+L70-gated and his L70 pool is 762. Per-row measurement, and the ruler, in
+mp-economy.md's "The ruler, finally measured"; gated by
+`tools/tests/battle_costtable.lua`.
+
+These numbers live in `Ot6AbilityCostTbl` (ff6/src/battle/ot6_boost.asm),
+charged under the `OT6_MP_COSTS` build flag — which **v0.5 flipped ON by
+default**, so the shipped ROM charges them (see mp-economy.md).
 
 **Shipped (v0.5, issue #5).** `Ot6BushidoTier` (ff6/src/battle/ot6.asm)
 replaces the charge gauge's clock in `UpdateMenuState_37`; the window, its
@@ -158,20 +191,21 @@ the value that used to cap the bar), `base = max(0, ceiling−3)` and boost pick
 | techs known | window (BP 0 / 1 / 2 / 3) | retired |
 |---|---|---|
 | ≤ 4 | all of them, in learn order | — (every learned tech reachable) |
-| 5 (through Dragon) | Sky / Tiger / Flurry / Dragon | Fang |
-| 6 (through Eclipse) | Tiger / Flurry / Dragon / Eclipse | Fang, Sky |
-| 8 (full kit) | Dragon / Eclipse / Tempest / **Oblivion** | Fang…Flurry |
+| 5 (through Empowerer) | Retort / Slash / Quadra Slam / Empowerer | Dispatch |
+| 6 (through Stunner) | Slash / Quadra Slam / Empowerer / Stunner | Dispatch, Retort |
+| 8 (full kit) | Empowerer / Stunner / Quadra Slice / **Cleave** | Dispatch…Quadra Slam |
 
 This **fixes #5**. The old design read the BP column as four *bands* and named
-each band's top tech, clamped to the ceiling — so a 3-tech Cyan (Fang/Sky/Tiger)
-got Fang at 0× and Tiger at every higher boost, and could never cast the Sky he
-had learned: a *learned* tech made uncastable. The window never skips a middle
+each band's top tech, clamped to the ceiling — so a 3-tech Cyan
+(Dispatch/Retort/Slash) got Dispatch at 0× and Slash at every higher boost, and
+could never cast the Retort he had learned: a *learned* tech made uncastable. The window never skips a middle
 tech; only the weakest retire, as Cyan outgrows them.
 
 The three open questions, settled at build time and documented in
 `Ot6BushidoTier`'s header:
 
-- **Utility techs retire with the window.** Sky's counter stance and Dragon's
+- **Utility techs retire with the window.** Retort's counter stance and
+  Empowerer's
   drain go quiet once Cyan out-levels them — a real cost, not just weak damage.
   Ruling: ship the auto-window as-is, no special-casing of utility. The
   player-chosen **loadout** (the #5 sequel) is where a player pins a utility
@@ -179,24 +213,24 @@ The three open questions, settled at build time and documented in
 - **No affordable floor.** The 0× slot is always the cheapest tech *in the
   window*, so it slides up (gets pricier) as Cyan levels — accepted, because his
   MP pool grows on the same schedule.
-- **Oblivion is the window's conditional top rung**, not a case bolted outside
-  it. At full kit the window is Dragon/Eclipse/Tempest/Oblivion and BP3 lands on
-  Oblivion (tech 7) by the same `base+boost` sum as any other rung — it falls out
+- **Cleave is the window's conditional top rung**, not a case bolted outside
+  it. At full kit the window is Empowerer/Stunner/Quadra Slice/Cleave and BP3
+  lands on Cleave (tech 7) by the same `base+boost` sum as any other rung — it falls out
   for free, so it is *cleaner* as the top rung than as a separate invocation. It
   fires exactly as the divine pass built it: selected only when learned and
   unspent, gated at resolution by `Ot6Oblivion` (target must be Broken), and
-  dropped back to Tempest (6) here for the rest of any battle whose once-per-
-  battle latch is set. `battle_divines` gates that shape (BP3 = Oblivion clear,
-  Tempest spent).
+  dropped back to Quadra Slice (6) here for the rest of any battle whose once-
+  per-battle latch is set. `battle_divines` gates that shape (BP3 = Cleave
+  clear, Quadra Slice spent).
 
 **BP is read, never written.** `Ot6ActionEnd` consumes the spend and skips that
 turn's regen exactly as for any other action, and the ≤3 / never-past-bank caps
-stay `Ot6Boost`'s. Bushido is excluded from `Ot6BoostDmg`'s multiplier for the
+stay `Ot6Boost`'s. SwdTech is excluded from `Ot6BoostDmg`'s multiplier for the
 same reason folded spells are: the points bought the tech, so they must not also
-buy damage. Spend the window cannot use (three points at L1 still buys Fang) is
+buy damage. Spend the window cannot use (three points at L1 still buys Dispatch) is
 spent, not refunded — the deal a mage already takes on a third point on Fire.
 
-**The Bushido menu UI is a name + cost submenu** (#8 Layer A). SwdTech no longer
+**The SwdTech menu UI is a name + cost submenu** (#8 Layer A). SwdTech no longer
 opens the vanilla numeral gauge; `OpenCmdMenuTbl[7]` is repointed to a tools-shell
 submenu (the same route Blitz took) that lists the four moving-window techs by
 name + MP cost, greyed when the caster can't afford the MP *or* the BP. This
@@ -242,13 +276,14 @@ identical to Layer A.
 
 Note the Chip column above is finer-grained than what ships: the class
 table (`ot6_class.asm:185-192`) marks all eight slashing, per
-weapon-classes.md's "Cyan is a slashing specialist". Sky's and Dragon's
-"—" and Tempest's wind are unbuilt refinements, not a contradiction.
+weapon-classes.md's "Cyan is a slashing specialist". Retort's and Empowerer's
+"—" and Quadra Slice's wind are unbuilt refinements, not a contradiction.
 
 Gate: `tools/tests/battle_bushido.lua`.
 
 - Passive candidates: *Vengeance* (+1 BP whenever any enemy Breaks),
-  *Retort* (vanilla counter as a passive), *Zanshin* (Sky chips 1
+  *Retort* (the vanilla counter as a passive — deliberately the same name as
+  SwdTech #2, because it is the same effect), *Zanshin* (Retort chips 1
   when it counters).
 
 ---
@@ -277,7 +312,7 @@ lives on Terra, Fenix Downs, and Sraphim, and nowhere else.
   already teaches Terra Ultima at level 99 — a birthright nobody
   ever meets. OT6 makes it real without spending a menu row: after a
   very-late story unlock, Terra casting Fire at 3 BP folds past
-  Firaga into **Ultima**. It never appears in her list until the
+  Fire 3 into **Ultima**. It never appears in her list until the
   moment the fold preview renders it. Everyone else gets Ultima the
   expected way — equip Ragnarok.
 - **Trance keeps the divine slot**: her esper-state apex — usable
@@ -386,9 +421,9 @@ ice/order/tempo. The duality reads clearer than vanilla ever made it.
   and exit tricks; divine **Assassinate** — instant kill a Broken
   non-boss. Interceptor is a passive.
 - **Setzer — Gambler/Merchant (special ¤: dice, cards; darts =
-  piercing)**: Slots ✦ signature; Coin Toss, Hired Help (pay GP for
+  piercing)**: Slot ✦ signature; Coin Toss, Hired Help (pay GP for
   effects) carry the merchant house; divine **Jackpot** — a
-  Fixed-Dice triple payoff, never Slots itself ✦. Ordinary dice and
+  Fixed-Dice triple payoff, never Slot itself ✦. Ordinary dice and
   cards chip ¤; the wildest oddballs (Fixed Dice) are null-break —
   huge numbers, no chip, row ignored (vanilla charm, preserved ✦).
 - **Mog — Dancer (piercing: spear)**: the 8 Dances verbatim ✦,
@@ -425,7 +460,7 @@ prunes the kit all game. Same model, different collection verbs:
   Rage table retires; the stable is curated in M6. Divine: TBD, a
   capstone beast.
 - **Strago — Scholar (bludgeoning: rod)**: Lores by observation ✦
-  (Cyrus/Hikari). Aqua Breath free ✦; **Analyze** cheap and early ✦
+  (Cyrus/Hikari). Aqua Rake free ✦; **Analyze** cheap and early ✦
   (full weakness reveal — the party's scout tool). Learns every lore
   he witnesses, equips 5. Divine: a taught-only capstone lore
   (Grand Train candidate, WoR).
