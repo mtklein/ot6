@@ -198,10 +198,18 @@ end
 -- edges, tracking the z-level a walker would carry along each candidate
 -- path (nodes are (x,y,z) triples).  `blockedEdges` (optional, keys from
 -- edgeKey) prunes edges the executor has PROVEN wrong empirically.
+-- `avoid` (optional) is a set of tile keys ((y<<8)|x) BFS must never route
+-- THROUGH -- for tiles that are walkable but must not be stepped on: a
+-- one-way entrance row sitting inside an otherwise ordinary region is the
+-- motivating case (map 250's (22..24,34) door into 243, which the I->J
+-- circuit crossed by ACCIDENT while walking somewhere else and could not
+-- come back from -- issue #31).  The target tile itself is exempt, so a
+-- route can still deliberately aim AT an avoided tile.
 -- Returns a list of MOVES names (four cardinals plus the four diagonals a
 -- press turns into on a diagonal tile), or nil (unreachable / >4096 nodes).
-function M.bfsPath(tx, ty, blockedEdges)
+function M.bfsPath(tx, ty, blockedEdges, avoid)
   blockedEdges = blockedEdges or {}
+  avoid = avoid or {}
   local sx, sy = M.fieldX(), M.fieldY()
   local sz = M.readByte(0x00b2) & 0x03
   local function nkey(x, y, z) return (z << 16) | ((y & 0xFF) << 8) | (x & 0xFF) end
@@ -224,11 +232,16 @@ function M.bfsPath(tx, ty, blockedEdges)
     for _, dir in ipairs(MOVES) do
       if not blockedEdges[edgeKey(x, y, dir)] and stepAllowed(x, y, dir, z) then
         local d = DELTA[dir]
-        local k = nkey(x + d[1], y + d[2], zn)
-        if not seen[k] then
+        local nx, ny = x + d[1], y + d[2]
+        local k = nkey(nx, ny, zn)
+        if avoid[((ny & 0xFF) << 8) | (nx & 0xFF)]
+           and not (nx == tx and ny == ty) then
+          k = nil                          -- routed through a forbidden tile
+        end
+        if k and not seen[k] then
           seen[k] = true
           parent[k] = { nkey(x, y, z), dir }
-          q[#q + 1] = { x + d[1], y + d[2], zn }
+          q[#q + 1] = { nx, ny, zn }
         end
       end
     end
@@ -264,6 +277,9 @@ local function resolve(v) return type(v) == "function" and v() or v end
 -- idiom UNLESS the formation matches opts.spare (the goal fight: hands
 -- off, let opts.arrive see it).  Dialogs are advanced with EDGE-pressed
 -- A; other control losses (events walking the party) get a neutral pad.
+--   opts.avoid     list of {x,y} the plan must never route THROUGH (a
+--                  one-way entrance inside a walkable region); the goal
+--                  tile itself is exempt
 --   opts.arrive    extra terminator predicate (checked before everything)
 --   opts.maxFrames frame budget -> error (default 20000)
 --   opts.spare     list of formation species words never to kill-bit
@@ -332,6 +348,12 @@ function M.navTo(txIn, tyIn, opts)
   local calmWant = opts.calmFrames or 16
   local spareSet = {}
   for _, w in ipairs(opts.spare or {}) do spareSet[w] = true end
+  -- opts.avoid = { {x,y}, ... }: walkable tiles the plan must never route
+  -- THROUGH (one-way entrances mid-region); see M.bfsPath
+  local avoidSet = {}
+  for _, t in ipairs(opts.avoid or {}) do
+    avoidSet[((t[2] & 0xFF) << 8) | (t[1] & 0xFF)] = true
+  end
   M.navReset()
   local plan, idx = nil, 1
   local pend = nil          -- the in-flight/unverified step
@@ -466,7 +488,7 @@ function M.navTo(txIn, tyIn, opts)
       -- 7. (re)plan when we have no plan or it ran out
       if plan and idx > #plan then plan = nil end
       if not plan then
-        plan = M.bfsPath(resolve(txIn), resolve(tyIn), NAV.blocked)
+        plan = M.bfsPath(resolve(txIn), resolve(tyIn), NAV.blocked, avoidSet)
         idx = 1
         if not plan then
           -- transient blockage patience: idle 45 frames and re-search.
@@ -1200,6 +1222,8 @@ end
 --   objIdx: the NPC's object index ($10 + record order in npc_prop)
 --   opts.done (optional): custom terminator; the default is
 --     "a choice dialog is up and waiting"
+--   opts.avoid (optional): a tile SET (keys ((y<<8)|x)) the approach must
+--     never route through -- one-way entrances near the chase area
 function M.chaseTalk(objIdx, maxFrames, what, opts)
   opts = opts or {}
   local ph = 0
@@ -1238,7 +1262,7 @@ function M.chaseTalk(objIdx, maxFrames, what, opts)
       local best
       for _, c in ipairs({ { ox, oy + 1 }, { ox - 1, oy },
                            { ox + 1, oy }, { ox, oy - 1 } }) do
-        local p = M.bfsPath(c[1], c[2])
+        local p = M.bfsPath(c[1], c[2], nil, opts.avoid)
         if p and (not best or #p < #best) then best = p end
       end
       if best and #best > 0 then

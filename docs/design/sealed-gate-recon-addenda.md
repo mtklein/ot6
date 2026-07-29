@@ -607,9 +607,10 @@ Source: `tools/tests/probe_banquet_stage.lua`,
 in-progress leg `tools/tests/gen_banquet_done.lua`.  Same rule as
 Addenda 1-3: every claim is a log line or a `file:line` read.
 
-**This addendum is partial** — it records what the leg's route work
-measured before the session ended.  The ≥90 circuit was NOT driven end to
-end and anchor J was NOT cut; §4.6 states exactly what remains.
+**This addendum is partial** — it records the leg's route work and the
+score-tier measurement.  The tier is settled (§4.6, and
+`banquet-decode.md` §9); the leg generator was not driven end to end and
+anchor J was NOT cut.  §4.8 states exactly what remains.
 
 ### 4.1 CORRECTION — `worldBfs`'s node cap silently failed the 117-step grind
 
@@ -700,65 +701,66 @@ short periodic A release so the edge re-arms.
 `lib/ot6_field.lua` this pass (pre-approved); this correction is the
 boundary of `tapLever`'s applicability, and belongs with it.
 
-### 4.6 MEASURED — the window budget, and why the ≥90 verdict is still open
+### 4.6 MEASURED — the window budget and the SCORE TIER
 
-The window's own arithmetic, all from `probe_banquet_castle.lua` run 2
-(the log lines are quoted; the timer is `$1189`, counting DOWN from
-14400):
+The window's arithmetic (timer `$1189`, counting DOWN from 14400):
 
 | beat | timer | cost |
 |---|---|---|
-| control returns after the Gestahl/Cid scene | **14302** | the scene tail spends ~98 |
-| after the tower exit (53,35) -> corridor (23,11) | 13817 | **393** |
-| after hall talk 1 -- (25,18), 10-step approach | 13577 | 240 |
-| after hall talk 2 -- (21,18), ~4-step approach | 13400 | 177 |
-| after hall talks 3-4 -- (21,24)/(25,24) | 12981 | 419 for two |
-| **four nearest soldiers, total** | | **836** (209 avg) |
+| control returns after the Gestahl/Cid scene | **14302** | tail ~98 |
+| throne-tower exit (53,35) → corridor (23,11) | 13817 | **393** |
+| four nearest soldiers talked | 12981 | **836** (209 avg) |
 
-Subtracting the approach walks (the field walks at ~16 frames/tile, and
-sample 2's approach was ~4 tiles) puts the **pure talk cost at ~110-130
-frames** and the rest in walking.
+Pure talk cost ≈110-130 frames; the rest is walking (~16 frames/tile,
+and the region traversals from the corridor are 38-62 steps EACH WAY).
 
-**The topology is what makes this expensive**, and it is now measured.
-The window's component from the corridor is **284 tiles** (x8..38,
-y9..34) -- the corridor, the hall, and the four stair/door mouths -- and
-it does NOT contain the lower half, the east half, 243's exit row's far
-side, or the dais.  Measured walk distances from the corridor mouth
-(23,11): the (15,21) and (31,21) stairs are **38 steps** each, the
-(9,14) and (37,14) doors **50**, the (9,9) and (37,9) stairs **62**.
-Every one of the four maps and both castle halves is behind one of
-those, and the circuit must cross them repeatedly.
+**The tier decision, settled by measurement.**  The greedy circuit driver
+(`probe_banquet_greedy.lua`) runs the window to expiry and reads `var0`
+at the frame `$013C` latches.  Best of six runs: **`var0` = 26, 16 of 24
+soldiers**; a second tuned run wedged at 19, so 26 is a floor with real
+variance, not a ceiling.  Since the messenger scores window + Q&A (44) +
+challenge (5), the total is **75** — the **≥67** tier (base weapons),
+clearing its threshold by 8 with a driver that still wastes frames.
+≥77 would need only 2 more window points and ≥90 would need 41 of 44,
+i.e. a near-perfect circuit.  Ruling and full arithmetic are recorded as
+a dated correction in `banquet-decode.md` §9.
 
-**Verdict: NOT ESTABLISHED, and leaning infeasible.**  Stated honestly
-because the dispatch's rule is that a quietly-lower score must not ship:
+Three route facts the driver had to learn the hard way, each now a
+one-line rule:
 
-* A *lower bound* does not settle it.  24 talks x ~110 + 4 battles x
-  ~500 (a floor, not a measurement) + ~7 region traversals x 38 steps x
-  16 frames = ~9300 of 14300 -- under budget, so infeasibility is **not
-  proven**.
-* A *realistic* estimate says it does not fit: the traversals are 38-62
-  steps each WAY, eleven of the 24 soldiers wander (so `chaseTalk` pays
-  a re-plan tax the four static hall samples never paid), and the four
-  battles are unmeasured on the real party.  Scaling the measured 209
-  frames/soldier by the real inter-region distances lands around 20 000
-  frames -- ~1.4x the window.
+* **243 is a one-way pocket** (§4.4 below) — visit it LAST, and route
+  around its (22..24,34) door row until then.  A run that wandered in
+  sat for 11 835 frames.
+* **Never re-plan on the transition frame.**  Right after a map change
+  `fieldX`/`fieldY` still read the old map's tile, so a `bfsPath` taken
+  then finds a route `navTo` cannot, and burns its whole no-path retry
+  budget (~950 frames).  Five of those cost one run 4750 frames.
+* **One strike per NPC.**  A soldier that does not answer promptly is
+  worth 1 point and cost 4400 frames across two retries.
 
-The number that settles it is one run: drive the circuit greedily from
-`banquet_window.mss` and read `var0` at the frame `$013C` latches.  That
-is the "what maximum IS drivable" measurement, and it is the single
-highest-value next step; the generator's per-soldier `$013C` guard
-already fails with exactly that reading.
+### 4.7 NEW — `bfsPath`/`navTo`/`chaseTalk` gained an `avoid` set
 
-### 4.7 What this leg still owes
+A one-way entrance sitting inside an otherwise ordinary walkable region
+is a hazard the navigator had no way to express: the 243 door row is
+three tiles in the middle of 250's corridor, and a plan aimed anywhere
+past it crossed it by accident.  `M.bfsPath(tx, ty, blockedEdges, avoid)`
+now takes a tile set it will not route THROUGH (the goal tile itself is
+exempt), plumbed through `M.navTo`'s `opts.avoid` and `M.chaseTalk`'s
+`opts.avoid`.
 
-Not measured, and explicitly NOT claimed: the 24-soldier circuit was not
-driven, so **the ≥90 window-feasibility verdict is still OPEN** — the
-banquet-decode §8 ledger's first entry stands unanswered.  The
-instrument for it is built (`probe_banquet_castle.lua`: the live
-window-open census plus a per-soldier frame cost), and the leg generator
-`gen_banquet_done.lua` carries the full ≥90 script with a per-soldier
-`$013C` guard that fails loudly with `var0` and the timer reading rather
-than shipping a quietly lower tier.  Anchor J is not cut; its contract
-(`banquet-done-v1`, 39 fields incl. the party-of-TWO count control, the
-three reward switches and both reward items) is written and its graph
-edge declared, both unexercised.
+A note for whoever writes the next guard: the first version of this one
+was written `local p = (into243 and AVOID243()) and nil or bfs(...)`,
+which reads like a guard and is not one — `X and nil` is `nil`, which is
+falsy, so the `or` branch always runs and the guard never fires.  It
+took a full run and a route dump to see it.  Guards get an explicit
+`if`.
+
+### 4.8 What this leg still owes
+
+The tier is settled; the leg is not.  Not done, and explicitly NOT
+claimed: `gen_banquet_done.lua` has not been driven end to end (its
+circuit section still encodes the withdrawn ≥90 route and needs
+rebuilding on the greedy driver plus the 243-last rule), **anchor J is
+not cut**, and its contract `banquet-done-v1` — amended to the ≥67 tier,
+with the two higher rewards asserted ABSENT — has never been evaluated
+against a real state.  No fail-before/pass-after exists for it.
