@@ -82,6 +82,10 @@ OT6_BREAK_TICKS := $10          ; a bit under vanilla stop duration ($12)
                                 ;   revealed from battle start instead of '?'
                                 ;   (the hud '?'-gate reads OT6_REVEALED_ELEM/OT6_BOOST_REVEALED)
         sta     OT6_BOOST_REVEALED,y         ; revealed classes (monster half)
+        sta     OT6_RVPEND_ELEM-8,y  ; #33: pending reveals must not survive a
+        sta     OT6_RVPEND_CLS-8,y   ;   Cmd_20 reload either -- a stale bank
+                                     ;   would commit the prior occupant's
+                                     ;   weakness onto the new species
         ; weakness codex: pre-reveal anything this save learned in past battles
         jsr     Ot6CodexActive  ; x = this save's page offset
         longa
@@ -821,7 +825,8 @@ scale24:
         and     $11a1
         pha                     ; matched weakness bits
         lda     OT6_REVEALED_ELEM,y
-        eor     #$ff
+        ora     OT6_RVPEND_ELEM-8,y     ; #33: bits already banked this action
+        eor     #$ff                    ;   are not "new" either
         and     $01,s
         beq     merge           ; all matched bits already revealed
         pha                     ; newly revealed bits
@@ -832,11 +837,16 @@ scale24:
         bcs     merge           ; message index for the lowest new element
         inc     $3401
         bra     @bit
-merge:  pla                     ; reveal all matched weaknesses
-        ora     OT6_REVEALED_ELEM,y
-        sta     OT6_REVEALED_ELEM,y
-        ; learn it forever: codex entry = everything revealed so far
-        ; (seed merged the old codex bits in, so this is monotonic).
+merge:  pla                     ; bank the matched weaknesses as PENDING (#33):
+        ora     OT6_RVPEND_ELEM-8,y     ;   the on-screen reveal must land on
+        sta     OT6_RVPEND_ELEM-8,y     ;   the DAMAGE frame, and this runs at
+                                ;   damage CALC -- hundreds of frames earlier
+                                ;   (measured: probe_clockwork, calc f704 vs
+                                ;   first numeral f1006).  Ot6RevealCommit
+                                ;   moves pending into OT6_REVEALED_ELEM (and
+                                ;   every same-species slot) at the numeral.
+        ; learn it forever: codex entry = everything known so far, pending
+        ; included (seed merged the old codex bits in, so this is monotonic).
         ; species is a word: pin i16 for the load — under the caller's
         ; i8 the ldx truncated species >= $100 onto the wrong codex
         ; slot (m1 latent bug; guard/lobo were too small to catch it).
@@ -845,6 +855,8 @@ merge:  pla                     ; reveal all matched weaknesses
         php
         longi
         phx
+        lda     OT6_RVPEND_ELEM-8,y
+        ora     OT6_REVEALED_ELEM,y
         pha
         jsr     Ot6CodexActive
         longa
@@ -930,6 +942,7 @@ done:   rtl
                                 ; same byte, and gating on the whole byte
                                 ; silenced every flagged skill's chip
         lda     OT6_BOOST_REVEALED,y
+        ora     OT6_RVPEND_CLS-8,y      ; #33: banked-this-action isn't new
         eor     #$ff
         and     OT6_SCR_BIT
         beq     merge           ; matched class already revealed
@@ -940,11 +953,13 @@ done:   rtl
         bcs     merge           ; message index for the matched class
         inc     $3401
         bra     @bit
-merge:  lda     OT6_SCR_BIT     ; reveal the matched class
-        ora     OT6_BOOST_REVEALED,y
-        sta     OT6_BOOST_REVEALED,y
+merge:  lda     OT6_SCR_BIT     ; bank the matched class as PENDING (#33):
+        ora     OT6_RVPEND_CLS-8,y      ;   committed to the revealed byte on
+        sta     OT6_RVPEND_CLS-8,y      ;   the damage frame, like the elements
         ; learn it forever, like the elements (join already pinned i16)
         phx
+        lda     OT6_RVPEND_CLS-8,y
+        ora     OT6_BOOST_REVEALED,y
         pha
         jsr     Ot6CodexActive
         longa
@@ -964,6 +979,120 @@ merge:  lda     OT6_SCR_BIT     ; reveal the matched class
         lda     #OT6_BREAK_TICKS
         sta     OT6_BROKEN_TICKS,y         ; shields down: BREAK
 done:   rts
+.endproc
+
+; ------------------------------------------------------------------------------
+
+; [ commit pending reveals on the damage frame -- per-species, one frame (#33) ]
+;
+; the chips above run at damage CALC, inside CalcAttackEffect's per-target
+; loop; the damage the player SEES lands when GfxCmd_0b allocates its numeral
+; thread, hundreds of frames later (measured on the shipped ROM,
+; probe_clockwork: hp/reveal writes f704-705, first numeral f1006 -- the '?'
+; flipped ~300 frames before any number appeared).  so the chips bank into
+; OT6_RVPEND_* and THIS walker moves pending into the revealed bytes:
+;   - called from GfxCmd_0b's entry (C1 shim) -- the damage frame proper;
+;   - and from Ot6ActionEnd -- the backstop for numeral-less actions, so
+;     pending never outlives the action that banked it.
+; the codex is per-species, so the commit writes every SAME-SPECIES slot's
+; revealed byte in the same pass -- all siblings' icons appear on one frame
+; (the display agreeing with the knowledge model, issue #33's third demand).
+; absent slots are written too when their species matches: harmless (their
+; hud lines are disabled) and cheaper than a presence test.
+;
+; a8/i16 assumed pinned by the caller (Ot6ActionEnd pins; the _ext wrapper
+; pins for C1).  db=$7e.  preserves x/y.
+.proc Ot6RevealCommit
+        .a8
+        .i16
+        phb                     ; PIN DB=$7e: every cell below is absolute
+        phx                     ;   (battle RAM + the shadow tail), and one
+        phy                     ;   caller is the C1 SCRIPT engine, whose DB
+        lda     #$7e            ;   is not ours to assume.  measured: without
+        pha                     ;   this the walker read junk species and
+        plb                     ;   scribbled outside battle RAM, and the
+                                ;   Vargas fight WEDGED the moment a monster
+                                ;   hit 0 hp -- deaths never completed, no
+                                ;   menu ever reopened (probe_vargasstall:
+                                ;   24000 frames at menu=00 vs 6737 to
+                                ;   ipoohs-down on the pre-change ROM).
+        ldy     #$0000          ; source monster slot offset 0,2..10
+@src:   lda     OT6_RVPEND_ELEM,y
+        ora     OT6_RVPEND_CLS,y
+        beq     @next           ; nothing pending for this slot
+        ldx     #$0000          ; sibling slot offset
+@sib:   longa
+        lda     OT6_SPECIES,x
+        cmp     OT6_SPECIES,y
+        shorta                  ; plain SEP #$20 -- shorta0's `tdc` SETS Z from
+                                ;   D and would wipe the compare.  measured, not
+                                ;   reasoned: with shorta0 here every slot read
+                                ;   as same-species, and a dying Ipooh's pending
+                                ;   SLASH propagated onto VARGAS (his row is
+                                ;   BLUDG) -- battle_vargas's revClass control
+                                ;   caught it.
+        bne     @skip
+        lda     OT6_RVPEND_ELEM,y
+        ora     $3e91,x         ; revealed elements (OT6_REVEALED_ELEM + 8)
+        sta     $3e91,x
+        lda     OT6_RVPEND_CLS,y
+        ora     $3ea5,x         ; revealed classes (OT6_BOOST_REVEALED + 8)
+        sta     $3ea5,x
+@skip:  inx
+        inx
+        cpx     #$000c
+        bcc     @sib
+        lda     #$00
+        sta     OT6_RVPEND_ELEM,y
+        sta     OT6_RVPEND_CLS,y
+@next:  iny
+        iny
+        cpy     #$000c
+        bcc     @src
+        ply
+        plx
+        plb
+        rts
+.endproc
+
+; [ the damage-frame trigger: poll the numeral counter, main loop (#33) ]
+;
+; WHY A POLL AND NOT A HOOK IN GfxCmd_0b.  The obvious site is that command's
+; own entry -- it IS the numeral -- and that is where this first landed.  It
+; wedges the fight: measured with probe_vargasstall on the Vargas formation,
+; the moment any monster reached 0 hp the battle stopped dead (menu=$00,
+; mstate=$00, deaths never completing, 24000 frames and counting) against
+; 6737 frames to ipoohs-down on the pre-change ROM.  Bisected in three builds:
+; the same hook replaced by four NOPs runs clean, the hook with the walker
+; body skipped runs clean, and the walker body (even with its reveal stores
+; removed, leaving only the species walk and the pending clear) wedges.  So
+; the defect is EXECUTING THIS WALK INSIDE THE C1 BATTLE-SCRIPT ENGINE, whose
+; re-entrancy and register/stack contract around its WaitFrame yields we do
+; not own.  Cause not established below that; what IS established is the
+; boundary, so the work moved to our own context and stays out of the engine.
+;
+; The trigger is equivalent and observable: GfxCmd_0b's first act is to
+; advance the numeral thread counter $632e, so a change in that byte since
+; the last main-loop tick means a numeral was allocated -- the damage frame.
+; The hud builder already runs every main-loop frame in bank F0 with DB=$7e,
+; which is exactly the context the walk wants, and battle_clockwork pins the
+; resulting timing (the commit lands on a numeral frame, and after the damage
+; calc that banked it).  Cost: at most one frame later than the hook would
+; have been, against a wedge -- the trade is not close.
+;
+; the shadow byte is not init-cleared (it sits past InitBP's clear); a stale
+; value costs one spurious commit at battle start, which finds pending empty
+; (Ot6SeedShields zeroes it per slot) and does nothing.
+; a8/i16, db=$7e (Ot6BgHud_ext's own context).  preserves x/y.
+.proc Ot6RevealPoll
+        .a8
+        .i16
+        lda     f:$7e0000+$632e         ; damage-numeral thread counter
+        cmp     f:$7e0000+OT6_NUMCTR
+        beq     @done                   ; no numeral since last tick
+        sta     f:$7e0000+OT6_NUMCTR
+        jsr     Ot6RevealCommit
+@done:  rts
 .endproc
 
 ; ------------------------------------------------------------------------------

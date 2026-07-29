@@ -3723,6 +3723,23 @@ _1765:  sta     $3412
 ; [ command $13: dance ]
 
 Cmd_13:
+.if OT6_MP_COSTS
+        ; ot6 #34: an unpayable dance START must not lock the dancer.  the
+        ; universal insufficient-MP fizzle (CalcAttackEffect @32ca) refuses
+        ; the CAST, but it runs after this command body -- measured: a 7-MP
+        ; dancer kept the whole-battle dance state for free while the charge
+        ; was refused (battle_dancemp's refusal phase, first cut).  when the
+        ; queued cost exceeds the pool, skip the status set AND the
+        ; background roll and run the plain exec, whose fizzle shows the
+        ; standard refusal.  mid-dance turns queue at 0 (Ot6AbilityCost's
+        ; cmd-$13 arm), so this gate never fires on a locked-in step.
+        jsl     Ot6DanceStartGate       ; carry set = cannot pay the start
+        bcc     @paid
+        lda     #$ff
+        sta     $b7                     ; no background change either
+        jmp     Cmd_02
+@paid:
+.endif
 @177d:  lda     $3ef8,y     ; set dance status
         ora     #STATUS3::DANCE
         sta     $3ef8,y

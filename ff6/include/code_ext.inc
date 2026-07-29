@@ -60,6 +60,9 @@ CODE_EXT_INC = 1
                                  ;   adds a live +stat to the battle-side stat copy
 .global Ot6EsperStatTbl          ; #27: the packed [sel:4][mag:4] table behind it,
                                  ;   read by the esper detail page (menu/skills.asm)
+.global Ot6DanceRowDecorate      ; #34: DrawDanceListText's per-row MP cost
+                                 ;   (flat Ot6DanceCost; ALWAYS defined, the
+                                 ;   stock C1 object jsl's it in both builds)
 .global Ot6BoostMarksNmi_ext
 .global Ot6RestageGate_ext
 .global Ot6FontRestoreMark_ext

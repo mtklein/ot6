@@ -60,14 +60,21 @@ OT6_SLOTTIER         := $57ba   ; Slot's latched boost tier (#31 backfill):
                                 ;   OT6_BOOST_REVEALED by Ot6SlotCommit so
                                 ;   Ot6ActionEnd charges what the reels
                                 ;   delivered (ot6_kits.asm, the Slot strip)
+OT6_PIPTAIL          := $57bb   ; #33: frames of live pip painting left after
+                                ;   an ActionEnd with the battle menu closed
+                                ;   -- keeps the charge visible on its own
+                                ;   frame.  set by Ot6ActionEnd (characters),
+                                ;   decremented by Ot6PipStage, cleared by
+                                ;   InitBP (init-exempt strip: power-on junk
+                                ;   would paint pips over the intro).
 OT6_RANDPEND         := $57bc
 OT6_RANDBTL          := $57bd
 OT6_HUDVEIL          := $57be
 OT6_SCRIPTBUSY       := $57bf
 OT6_SPECIES          := $57c0
-OT6_PIPCUR           := $57cc
-OT6_PIPPREV          := $57ce
-OT6_PIPCELL          := $57d0
+OT6_PIPCUR           := $57cc   ; live pip cell (0 = off); #33 keeps the
+OT6_PIPPREV          := $57ce   ;   one-cell footprint and moves only WHICH
+OT6_PIPCELL          := $57d0   ;   cell it is (see Ot6PipStage)
 OT6_LASTLR           := $57d2
 OT6_RESTAGE          := $57d4
 
@@ -81,5 +88,40 @@ OT6_RESTAGE          := $57d4
 ; BG HUD line shadow buffer.
 OT6_SHADOW           := $ecf1
 .assert OT6_SHADOW + (14 * 6) - 1 <= $ed44, error, "OT6 HUD shadow exceeds owned range"
+
+; The shadow tail: the same measured-free $7eecf1-$7ef11f range the shadow
+; claims (ot6_hud.asm's four lines of evidence; PushMode7Vars owns $f120+).
+;
+; #33 pending reveals: a chip banks its newly-revealed weakness bits here at
+; damage-CALC time; Ot6RevealCommit moves them into OT6_REVEALED_ELEM /
+; monster OT6_BOOST_REVEALED (and every same-species slot) on the DAMAGE
+; frame (the first numeral display, GfxCmd_0b), with Ot6ActionEnd as the
+; no-numeral backstop.  One byte per monster slot, stride 2 (indexed by the
+; slot offset 0,2..10 like $3e91/$3ea5; odd bytes unused).  Cleared by
+; InitBP's shadow clear and per-slot by Ot6SeedShields (Cmd_20 reloads).
+OT6_RVPEND_ELEM      := $ed45   ; 12 bytes
+OT6_RVPEND_CLS       := $ed51   ; 12 bytes
+; #35 wallet pseudo-line: current-MP display painted into the open costed
+; list window every nmi.  CUR/PREV are the first cell's vram word address
+; (0 = off; prev != cur blanks the old cells one-shot), CELLS the staged
+; glyph|attr words.  CUR/PREV cleared by InitBP's extended shadow clear.
+OT6_WALLETCUR        := $ed5d
+OT6_WALLETPREV       := $ed5f
+OT6_WALLET_W         = 5        ; [M][P][hundreds][tens][ones]
+OT6_WALLETCELLS      := $ed61   ; OT6_WALLET_W words
+OT6_WALLETSIG        := $ed6d   ; staged MP value; the flush repaints only
+OT6_WALLETSIGP       := $ed6f   ;   when CUR or SIG moves (see the flush)
+OT6_PIPSLOT          := $ed6b   ; #33: the character slot the live pip cell
+                                ;   follows while OT6_PIPTAIL runs -- the one
+                                ;   who just spent BP (Ot6ActionEnd sets both)
+OT6_NUMCTR           := $ed71   ; #33: last-seen damage-numeral thread counter
+                                ;   ($632e).  a change means GfxCmd_0b just
+                                ;   allocated a numeral -- the damage frame --
+                                ;   and Ot6RevealPoll commits pending reveals.
+                                ;   past InitBP's clear on purpose: a stale
+                                ;   value costs one no-op commit (see the proc)
+.assert OT6_RVPEND_ELEM = OT6_SHADOW + (14 * 6), error, "reveal-pending must follow the shadow (InitBP clears both in one loop)"
+.assert OT6_WALLETPREV + 1 <= OT6_SHADOW + $70 - 1, error, "wallet cur/prev must sit inside InitBP's $70-byte clear"
+.assert OT6_NUMCTR + 1 <= $ef1f, error, "OT6 shadow tail exceeds the measured-free range ($f120+ is PushMode7Vars')"
 
 .endif

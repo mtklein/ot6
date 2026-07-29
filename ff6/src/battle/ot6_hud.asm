@@ -200,7 +200,10 @@
         iny
         cpy     #$000c
         bcc     @slot
-        jsr     Ot6Boost        ; l/r boost input + live pip cell
+        jsr     Ot6Boost        ; l/r boost input
+        jsr     Ot6RevealPoll   ; #33: a numeral appeared? commit the reveals
+        jsr     Ot6PipStage     ; #33: stage the four live pip-row words
+        jsr     Ot6WalletStage  ; #35: stage the costed-list MP wallet
         plb
         ply
         plx
@@ -503,9 +506,8 @@ Ot6ShownBitTbl:
 ; weakness codex species stash: one word per monster slot so the chip procs
 ; can find the active save page's species entry at reveal time.
                                 ; OT6_SPECIES: per-slot species stash (6 words)
-                                ; OT6_PIPCUR: live pip cell (0=off)
-                                ; OT6_PIPPREV: last flushed cell
-                                ; OT6_PIPCELL: glyph|attribute word
+                                ; OT6_PIPCUR/PIPPREV/PIPCELL: retired
+                                ;   (#33 -- see ot6_memory.inc)
                                 ; OT6_LASTLR: last frame's L/R bits
                                 ; OT6_RESTAGE: open list wants a re-render
                                 ; OT6_FONTDIRTY: font re-lay stages remaining.
@@ -838,23 +840,90 @@ OT6_RANDMAGIC := $a5            ; the marker value (junk is $00/$ff in
         shorta0
         cpx     #$0054          ; 6 monster lines x 14
         jcc     @line           ; (veil branch grew the body past bcc)
-        ; live pip pseudo-line: one cell in the menu map (active char's
-        ; spendable bp during boost select). tiny, runs every nmi.
-        ; the party window is double-buffered: each name row is staged at
-        ; map row 1+2r AND at 9+2r (+$100 words), and the window scroll
-        ; picks a band (the active character's visible copy is the yellow
-        ; one). paint BOTH so the live cell shows no matter which band is
-        ; on screen (writing only the low band made boost feedback
-        ; invisible whenever the high band was up).
-@pip:   longa
+        ; #35 wallet pseudo-line: current MP over the open costed list
+        ; ($7c00 ability-list map, single band -- measured, probe_wallet:
+        ; no +$100 twin renders).  the one-shot close/switch blank uses the
+        ; same defer-when-late cure as the lines (a magic or item list
+        ; opening over a stale wallet would show it); the steady-state cell
+        ; writes rewrite every nmi like everything else here.
+        ;
+        ; the WHOLE wallet+rows pass is v-gated as a unit: it grew the nmi
+        ; tail to ~13 words, and on a late-entry nmi (entry at v=225, flush
+        ; start 256 -- battle_banner caught the one frame) the tail wrapped
+        ; past vblank.  everything here is steady-state or defer-retry, so
+        ; a skipped nmi repaints in full on the next one.
+@pip:
+        ; #35 wallet pseudo-line: current MP over the open costed list
+        ; ($7c00 ability-list map, single band -- measured, probe_wallet).
+        ; PAINTED ONLY WHEN IT CHANGES, never per frame.  The steady-state
+        ; repaint every other cell here uses cost the battle cannot afford:
+        ; with ~13 extra words a frame the engine's own line transfers got
+        ; pushed past vblank and the window state machines that wait on them
+        ; hung -- battle_runic's negative phase sat with a menu open and every
+        ; ATB frozen (2/2 runs; clean with just this block disabled, bisected
+        ; in five builds).  A change-only write costs zero words on a quiet
+        ; frame, and the value only moves on open/close and when the charge
+        ; debits MP -- which is exactly the moment #33 wants it to move.
+        longa
+        lda     f:$7e0000+OT6_WALLETCUR
+        cmp     f:$7e0000+OT6_WALLETPREV
+        bne     @wpaint
+        lda     f:$7e0000+OT6_WALLETSIG
+        cmp     f:$7e0000+OT6_WALLETSIGP
+        beq     @pipline                 ; unchanged: write nothing at all
+@wpaint:
+        shorta0
+        jsr     @late
+        bcs     @pipline        ; late: hold prev/sig, redo next nmi
+        longa
+        lda     f:$7e0000+OT6_WALLETPREV
+        beq     @wcur
+        cmp     f:$7e0000+OT6_WALLETCUR
+        beq     @wcur
+        sta     hVMADDL                  ; closed/moved: blank the old cells
+        lda     #$21ff          ; $21ff: this is a MENU map (no anim flips its
+        sta     hVMDATAL        ;   $2105 sections to 16x16), so the field
+        sta     hVMDATAL        ;   map's $01ee rule does not apply here
+        sta     hVMDATAL
+        sta     hVMDATAL
+        sta     hVMDATAL
+@wcur:  lda     f:$7e0000+OT6_WALLETSIG
+        sta     f:$7e0000+OT6_WALLETSIGP
+        lda     f:$7e0000+OT6_WALLETCUR
+        sta     f:$7e0000+OT6_WALLETPREV
+        beq     @pipline
+        sta     hVMADDL
+        lda     f:$7e0000+OT6_WALLETCELLS+0
+        sta     hVMDATAL
+        lda     f:$7e0000+OT6_WALLETCELLS+2
+        sta     hVMDATAL
+        lda     f:$7e0000+OT6_WALLETCELLS+4
+        sta     hVMDATAL
+        lda     f:$7e0000+OT6_WALLETCELLS+6
+        sta     hVMDATAL
+        lda     f:$7e0000+OT6_WALLETCELLS+8
+        sta     hVMDATAL
+@pipline:
+        ; live pip pseudo-line: ONE cell in the party-window menu map --
+        ; deliberately the same footprint vanilla-era OT6 always had.  #33's
+        ; first cut painted all four rows every nmi and BROKE THE FIGHT: with
+        ; 13 words a frame going into this map, battle_runic's negative phase
+        ; hung with a menu open and every ATB frozen (2/2 runs, against 2/2
+        ; passes on the pre-change ROM and a clean pass with just this block
+        ; disabled -- bisected in four builds).  The map is the menu engine's
+        ; own; we paint one cell in it, as before.  WHICH cell is what #33
+        ; changed: Ot6PipStage points it at the active character while a menu
+        ; is open, and at the character who just spent BP for a few frames
+        ; after (OT6_PIPTAIL), so the drop still lands on the charge frame.
+        ; the party window is double-buffered -- each name row is staged at
+        ; map row 1+2r AND at 9+2r (+$100 words) and the scroll picks a band
+        ; -- so paint BOTH (the M2 lesson: writing only the low band made
+        ; boost feedback invisible whenever the high band was up).
+        longa
         lda     f:$7e0000+OT6_PIPPREV
         beq     @cur
         cmp     f:$7e0000+OT6_PIPCUR
         beq     @cur
-        ; pip moved/closed: the same one-shot blank hazard as the lines
-        ; (this one predates the anchor rework -- every menu-cursor hop
-        ; was an ungated one-shot), same cure: defer when late, redo
-        ; next nmi (@pdone opens with shorta0, a8 entry is fine)
         shorta0
         jsr     @late
         bcs     @pdone
@@ -864,10 +933,10 @@ OT6_RANDMAGIC := $a5            ; the marker value (junk is $00/$ff in
         lda     #$21ff          ; $21ff HERE is correct, on purpose: the pip
                                 ;   lives in the party-window MENU map, whose
                                 ;   hdma $2105 sections ($8973/$8977) no anim
-                                ;   ever flips to 16x16 -- the field-map
-                                ;   blank above had to become $01ee (the
-                                ;   entrance-flash fix), but $01ee is the
-                                ;   FIELD map's fill, not this map's
+                                ;   ever flips to 16x16 -- the field-map blank
+                                ;   above had to become $01ee (the entrance-
+                                ;   flash fix), but $01ee is the FIELD map's
+                                ;   fill, not this map's
         sta     hVMDATAL
         lda     f:$7e0000+OT6_PIPPREV
         clc
@@ -915,21 +984,18 @@ OT6_RANDMAGIC := $a5            ; the marker value (junk is $00/$ff in
 @l1:    rts
 .endproc
 
-; [ bp pip refresh: redraw the name rows when spendable bp changes ]
-
-; called from UpdateCharText every main-loop frame. skips while the
-; battle menu text is not up yet (same gate vanilla uses for hp/mp).
-
-; [ l/r boost input + live pip feedback ]
+; [ l/r boost input ]
 
 ; runs every main-loop frame from the hud builder (db=$7e, a8/i16).
 ; while a battle menu is open AND the actor's action is still being
 ; composed, R raises the active character's pending boost (cap 3, and
-; never past their bp) and L lowers it. the pips by the party names show
-; spendable bp (bp - pending), so feedback is immediate: the flush's
-; one-cell pseudo-line repaints the active row's pip cell straight into
-; the menu tilemap. window_open re-stages every row on the next open,
-; cleaning up any transient state.
+; never past their bp) and L lowers it.  DISPLAY is no longer here: the
+; live cell painter (Ot6PipStage -> the flush's one-cell pseudo-line)
+; points that cell at the active character while composing and at the
+; character who just charged for a few frames after, showing the FULL
+; bank either way -- so the visible drop is Ot6ActionEnd's charge frame
+; (#33). window_open still re-stages every row on the next open
+; (Ot6PipGlyph_ext, same bp reading).
 ;
 ; "still being composed" is $32cc,y = $ff, the actor's pending-action
 ; command-list pointer (battle_main.asm:254 sets it to $ff when nothing
@@ -986,36 +1052,33 @@ OT6_RANDMAGIC := $a5            ; the marker value (junk is $00/$ff in
         ; the action is committed once the actor has a command-list
         ; pointer: the tier is already frozen, so a spend here would be
         ; charged and buy nothing. display only from that point on.
+        ; (the $32cc + $2bae-ring test lives in Ot6CommittedSlot now --
+        ; the live pip painter needs the same answer per row, and the two
+        ; readings must never diverge. history of the ring half: an L/R
+        ; edge between the C1 confirm and C2's ring drain changed the
+        ; CHARGE without changing the tech -- probe_bushidobusy.)
         pha
-        lda     $32cc,y
-        inc     a               ; $ff (nothing pending) -> 0
-        beq     :+
-@cmtd:  pla
-        bra     @show
-        ; ...and committed just the same while the CONFIRMED action still
-        ; sits in the user-action queue ($2bae + 0/8/$10/$18, char slot or
-        ; $ff -- GetPlayerAction's ring, battle_main.asm:12643). the C1
-        ; confirm freezes the payload -- bushido's A latches the tech into
-        ; $2bb0 at that instant -- but $32cc only goes live when C2 drains
-        ; the ring, and C2 drains between actions: 1 frame when idle, more
-        ; when something is executing. an L/R edge inside that window
-        ; changed the CHARGE without changing the tech
-        ; (probe_bushidobusy: tempest latched at 3, one L landed, bp fell
-        ; 2 -- tempest for two). magic never showed it only because its
-        ; consumer, Ot6QueueFold, reads pending at drain time too.
-:       lda     $2bae
-        cmp     $62ca
-        beq     @cmtd
-        lda     $2bb6
-        cmp     $62ca
-        beq     @cmtd
-        lda     $2bbe
-        cmp     $62ca
-        beq     @cmtd
-        lda     $2bc6
-        cmp     $62ca
-        beq     @cmtd
+        lda     $62ca
+        and     #$03
+        jsr     Ot6CommittedSlot
+        bcc     :+
         pla
+        rts                     ; committed: display only
+        ; ...and a LATCHED SLOT SPIN is committed the same way (#33): the
+        ; first reel press latched the spin's tier (Ot6SlotRig ->
+        ; OT6_SLOTTIER) and Ot6SlotCommit re-banks that latch at the queue
+        ; write, so an L/R edge mid-spin changes NOTHING the reels or the
+        ; charge will see -- yet it still chinged/clicked (the slot-tiers
+        ; landing, 9229881, silenced the charge but not the acknowledgment).
+        ; input goes fully inert from the first press: no bank, no sound.
+:       lda     $7bc2           ; menu state $08 = the reel spin
+        cmp     #$08
+        bne     :+
+        lda     $7b92           ; reel-1 press latch: the spin has begun
+        beq     :+
+        pla
+        rts                     ; latched spin: display only, silently
+:       pla
         bit     #$10            ; R: boost up
         beq     @tryl
         lda     OT6_BOOST_REVEALED,y
@@ -1041,15 +1104,110 @@ OT6_RANDMAGIC := $a5            ; the marker value (junk is $00/$ff in
         inc     $94             ; cursor click: boost taken back
         lda     #$80
         sta     OT6_RESTAGE     ; open lists re-fold their names
-@show:  ; live pip cell for the active character's menu row
-        lda     $62ca
+@show:  rts                     ; display is Ot6PipStage's job now (#33)
+@off:   rts
+.endproc
+
+; ------------------------------------------------------------------------------
+
+; [ is a character slot's action committed? -- the one reading (#33) ]
+;
+; committed = the actor has a live command-list pointer ($32cc != $ff: C2
+; holds the action) OR the confirmed action still sits in the user-action
+; ring ($2bae + 0/8/$10/$18, char slot or $ff -- GetPlayerAction's ring,
+; battle_main.asm:12643; the C1 confirm freezes the payload but $32cc only
+; goes live when C2 drains the ring).  Ot6Boost gates input on this (a spend
+; after commit is charged but buys nothing) and Ot6PipStage picks each row's
+; glyph with it (a committed bank displays FULL until the charge lands --
+; the pip drop then IS the Ot6ActionEnd frame).  a8/i16, db=$7e.
+; in: A = character slot (0-3).  out: carry set = committed.  preserves x/y.
+.proc Ot6CommittedSlot
+        .a8
+        .i16
+        phx
+        pha                     ; slot at $01,s
+        asl                     ; slot -> entity offset
+        longa
+        and     #$00ff
+        tax
+        shorta0
+        lda     $32cc,x
+        inc     a               ; $ff (nothing pending) -> 0
+        bne     @yes
+        lda     $2bae
+        cmp     $01,s
+        beq     @yes
+        lda     $2bb6
+        cmp     $01,s
+        beq     @yes
+        lda     $2bbe
+        cmp     $01,s
+        beq     @yes
+        lda     $2bc6
+        cmp     $01,s
+        beq     @yes
+        pla
+        plx
+        clc
+        rts
+@yes:   pla
+        plx
+        sec
+        rts
+.endproc
+
+; ------------------------------------------------------------------------------
+
+; [ stage the live pip cell -- the drop lands on the charge frame (#33) ]
+;
+; ONE cell (the flush paints it into both window bands), pointed at:
+;   - the ACTIVE character while a battle menu is open -- the compose-time
+;     feedback, arrow cluster while a boost is pending and uncommitted;
+;   - the character who just SPENT bp for OT6_PIPTAIL frames after their
+;     action resolved (Ot6ActionEnd arms both), so the drop is visible even
+;     though no menu is open at resolution.
+; The glyph is the FULL bank, not bank-minus-pending: a committed spend keeps
+; showing its pips until Ot6ActionEnd's charge writes bp, which is exactly
+; what makes the visible drop and the mechanical event the same frame.  The
+; measured desync this replaces: the staged party rows painted the spent
+; value at the menu restage, ~570 frames before the charge (probe_clockwork
+; on the pre-change ROM: spent glyph f605, charge f1169).
+; a8/i16, db=$7e (Ot6BgHud_ext's context).  clobbers a; preserves x/y.
+.proc Ot6PipStage
+        .a8
+        .i16
+        ; the CHARGE WINDOW WINS.  While OT6_PIPTAIL runs, the cell follows
+        ; the character who just spent BP even if a menu is open for someone
+        ; else: one cell can only show one row, and the drop landing on the
+        ; resolution frame is the whole point of #33.  The other rows are
+        ; re-staged at the next window open (Ot6PipGlyph_ext), and the tail
+        ; is ~half a second, so a boost being composed elsewhere gets its
+        ; arrow back immediately after.
+        lda     f:$7e0000+OT6_PIPTAIL
+        beq     @nottail
+        dec     a
+        sta     f:$7e0000+OT6_PIPTAIL
+        lda     f:$7e0000+OT6_PIPSLOT    ; the character who just charged
+        bra     @have
+@nottail:
+        lda     $7bca           ; battle menu open?
+        bne     @menu
+        jmp     @off            ; nothing to show
+@menu:  lda     $62ca
+        and     #$03
+@have:  and     #$03
+        sta     OT6_SCR_BIT     ; the slot whose cell we paint
+        phx
+        phy
         ldx     #$0000
 @row:   cmp     $64d6,x         ; find the menu row showing this slot
         beq     @found
         inx
         cpx     #$0004
         bcc     @row
-        bra     @off            ; not on screen: disable the pseudo-line
+        ply
+        plx
+        jmp     @off            ; not on screen: disable the pseudo-line
 @found: ; map word = $7800 + (1 + row*2)*32 + 20
         longa
         txa
@@ -1064,10 +1222,28 @@ OT6_RANDMAGIC := $a5            ; the marker value (junk is $00/$ff in
         adc     #$7814          ; $7800 + 20
         sta     f:$7e0000+OT6_PIPCUR
         shorta0
-        ; glyph: pending boost -> arrow cluster pulsing yellow/white
-        ; (the loud "you are boosting" signal); else spendable pips
+        lda     OT6_SCR_BIT
+        asl                     ; slot -> entity offset
+        longa
+        and     #$00ff
+        tay
+        shorta0                 ; y = entity offset
+        ; arrow iff a menu is open, this row is the ACTIVE character, a boost
+        ; is pending, and the action is not committed yet
+        lda     $7bca
+        beq     @jpips
+        lda     $62ca
+        and     #$03
+        cmp     OT6_SCR_BIT
+        bne     @jpips
         lda     OT6_BOOST_REVEALED,y
-        beq     @pips
+        beq     @jpips
+        lda     OT6_SCR_BIT
+        jsr     Ot6CommittedSlot
+        bcc     @arrow
+@jpips: jmp     @pips
+@arrow:
+        lda     OT6_BOOST_REVEALED,y     ; pending 1-3 -> arrow cell
         longa
         and     #$00ff
         tax
@@ -1078,13 +1254,11 @@ OT6_RANDMAGIC := $a5            ; the marker value (junk is $00/$ff in
         and     #$08            ; palette 2 (yellow) <-> 0 (white)
         ora     #$21
         sta     f:$7e0000+OT6_PIPCELL+1
+        ply
+        plx
         rts
-@pips:  lda     OT6_BP_CLASS,y         ; pip cluster for spendable bp
-        sec
-        sbc     OT6_BOOST_REVEALED,y
-        bcs     :+
-        lda     #$00
-:       cmp     #$06
+@pips:  lda     OT6_BP_CLASS,y  ; the FULL bank (see the block comment)
+        cmp     #$06
         bcc     :+
         lda     #$05
 :       longa
@@ -1095,11 +1269,131 @@ OT6_RANDMAGIC := $a5            ; the marker value (junk is $00/$ff in
         sta     f:$7e0000+OT6_PIPCELL
         lda     #$21
         sta     f:$7e0000+OT6_PIPCELL+1
+        ply
+        plx
         rts
 @off:   longa
         lda     #$0000
         sta     f:$7e0000+OT6_PIPCUR
         shorta0
+        rts
+.endproc
+
+; ------------------------------------------------------------------------------
+
+; [ stage the costed-list MP wallet (#35: current MP where the costs are) ]
+;
+; while a costed ability list is open -- the tools shell (menu state $30:
+; Blitz, Bushido, and real Tools) or the Dance list (#34) -- the actor's
+; CURRENT MP is painted as [M][P][d][d][d] into the list window's top row,
+; right side: map words $7c16-$7c1a, i.e. row 0 cols 22-26 of the $7c00
+; ability-list map (measured live, probe_wallet: the list rows stage at
+; $7c00 rows 1/3/5/7 cols 2-26, row 0 is never staged and renders legibly
+; on the window's top edge).  the value is read from $3c08 -- the very cell
+; CalcAttackEffect's universal charge debits -- so the wallet drops on the
+; exact frame the queued verb's cost is paid (#33's clockwork rule for
+; free).  cells stage here in the main loop; the nmi flush paints them
+; every frame and one-shot-blanks on close/switch, so a follow-up Magic or
+; Item list never inherits a stale wallet.
+; a8/i16, db=$7e.  clobbers a; preserves x/y.
+.proc Ot6WalletStage
+        .a8
+        .i16
+        lda     $7bca           ; battle menu open?
+        beq     @off
+        lda     $7bc2           ; menu state
+        cmp     #$30            ; tools shell browse (blitz/bushido/tools)
+        beq     @on
+        cmp     #$21            ; dance list browse (#34; measured live in
+        beq     @on             ;   battle_dancemp: open $1f -> browse $21)
+@off:   longa
+        clr_a
+        sta     f:$7e0000+OT6_WALLETCUR
+        shorta0
+        rts
+@on:    phx
+        phy
+        lda     $62ca           ; active character slot -> entity offset
+        and     #$03
+        asl
+        longa
+        and     #$00ff
+        tax
+        lda     $3c08,x         ; current MP -- the charge's own cell
+        cmp     #999+1
+        bcc     :+
+        lda     #999            ; display cap (three digits)
+:       sta     OT6_SCR_IDX     ; 16-bit scratch (walkers own the even words)
+        sta     f:$7e0000+OT6_WALLETSIG  ; content signature for the flush's
+                                ;   change-only paint (the digits below are
+                                ;   a pure function of this value)
+        ; letters: 'M' 'P', white ($8c/$8f: the battle list font's M and P)
+        lda     #$218c
+        sta     f:$7e0000+OT6_WALLETCELLS+0
+        lda     #$218f
+        sta     f:$7e0000+OT6_WALLETCELLS+2
+        shorta0
+        lda     #$00
+        sta     OT6_SCR_COLS    ; leading-zero latch (0 = still leading)
+        ; hundreds
+        ldy     #$0000
+        longa
+        lda     OT6_SCR_IDX
+@h:     cmp     #100
+        bcc     :+
+        sbc     #100            ; (carry set by the cmp)
+        iny
+        bra     @h
+:       sta     OT6_SCR_IDX     ; remainder < 100
+        shorta                  ; plain SEP #$20 (shorta0's tdc would eat A)
+        .a8
+        tya                     ; hundreds digit 0-9
+        jsr     @digit
+        sta     f:$7e0000+OT6_WALLETCELLS+4
+        lda     #$21
+        sta     f:$7e0000+OT6_WALLETCELLS+5
+        ; tens
+        ldy     #$0000
+        lda     OT6_SCR_IDX     ; remainder (< 100: the low byte is whole)
+@t:     cmp     #10
+        bcc     :+
+        sbc     #10
+        iny
+        bra     @t
+:       sta     OT6_SCR_IDX     ; ones
+        tya                     ; tens digit 0-9
+        jsr     @digit
+        sta     f:$7e0000+OT6_WALLETCELLS+6
+        lda     #$21
+        sta     f:$7e0000+OT6_WALLETCELLS+7
+        lda     OT6_SCR_IDX     ; ones digit: always drawn
+        clc
+        adc     #$b4            ; small-font digits $b4-$bd
+        sta     f:$7e0000+OT6_WALLETCELLS+8
+        lda     #$21
+        sta     f:$7e0000+OT6_WALLETCELLS+9
+        longa
+        lda     #$7c16          ; row 0 col 22 of the $7c00 list map
+        sta     f:$7e0000+OT6_WALLETCUR
+        shorta0
+        ply
+        plx
+        rts
+; digit 0-9 in A -> glyph byte, blanking leading zeros; latch OT6_SCR_COLS
+@digit: cmp     #$00
+        bne     @dig
+        lda     OT6_SCR_COLS
+        beq     @blank
+        lda     #$b4            ; an interior zero draws
+        rts
+@blank: lda     #$ff            ; a leading zero is a blank cell
+        rts
+@dig:   pha
+        lda     #$01
+        sta     OT6_SCR_COLS
+        pla
+        clc
+        adc     #$b4
         rts
 .endproc
 
@@ -1217,12 +1511,13 @@ OT6_RANDMAGIC := $a5            ; the marker value (junk is $00/$ff in
         and     #$0006
         tax
         shorta0
-        lda     f:$7e3e9c,x     ; bp
-        sec
-        sbc     f:$7e3e9d,x     ; minus pending
-        bcs     :+
-        lda     #$00
-:       cmp     #$06
+        lda     f:$7e3e9c,x     ; bp -- the FULL bank (#33): the staged cell
+                                ;   agrees with the live painter, which shows
+                                ;   a committed spend at full strength until
+                                ;   Ot6ActionEnd's charge lands (the old
+                                ;   bp-minus-pending here put the drop at
+                                ;   menu restage, ~900 frames early)
+        cmp     #$06
         bcc     :+
         lda     #$05
 :       longa

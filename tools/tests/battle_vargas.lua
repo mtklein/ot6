@@ -449,6 +449,17 @@ H.run({ maxFrames = 60000 }, {
     H.call(function() H.setPad({}) end),
     H.waitFrames(24),
   }, "the BioBlaster reaches VARGAS's gauge"),
+  -- #33 moved the on-screen reveal to the DAMAGE frame: the chip banks the
+  -- poison bit as pending at damage CALC (the shield write above) and
+  -- Ot6RevealCommit moves it into OT6_REVEALED_ELEM when the damage numeral
+  -- displays, a few hundred frames later.  wait for the commit before
+  -- asserting it (battle_clockwork pins the commit timing itself).
+  H.driveUntil(function()
+    pinParty()
+    return H.readByte(RVE(vSlot)) & POISON == POISON
+  end, 1800, {
+    H.waitFrames(2),
+  }, "the poison reveal commits on its damage frame"),
   H.call(function()
     snap("after BIOBLASTER")
     for i = 0, 3 do
@@ -504,6 +515,14 @@ H.run({ maxFrames = 60000 }, {
   H.driveUntil(function() return #shWrites > nBefore end, 2400, {
     H.call(tapUnlessSabin),
   }, "AURABOLT reaches the gauge"),
+  -- #33 again: the chip banks holy as pending at damage CALC (the gauge
+  -- write above) and Ot6RevealPoll commits it on the damage-numeral frame
+  H.driveUntil(function()
+    pinParty()
+    return H.readByte(RVE(vSlot)) & HOLY == HOLY
+  end, 1800, {
+    H.waitFrames(2),
+  }, "the holy reveal commits on its damage frame"),
   H.call(function()
     snap("after AURABOLT")
     H.assertEq(H.readByte(0x3410), AURABOLT,
@@ -529,6 +548,13 @@ H.run({ maxFrames = 60000 }, {
   H.driveUntil(function() return #shWrites > nBefore end, 2400, {
     H.call(tapUnlessSabin),
   }, "PUMMEL reaches the gauge"),
+  -- #33: the CLASS chip defers the same way the element chips do
+  H.driveUntil(function()
+    pinParty()
+    return H.readByte(RVC(vSlot)) & OT6_BLUDG == OT6_BLUDG
+  end, 1800, {
+    H.waitFrames(2),
+  }, "the bludgeoning reveal commits on its damage frame"),
   H.call(function()
     snap("after PUMMEL")
     H.assertEq(H.readByte(0x3410), PUMMEL, "the resolved skill was Pummel ($5d)")

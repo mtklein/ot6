@@ -11118,6 +11118,8 @@ DrawDanceListText:
         sta     w7e5755+5
         lda     $267f,y
         sta     w7e5755+11
+        jsl     Ot6DanceRowDecorate     ; ot6 #34: leading MP cost + grey per
+                                        ;   column (no-op layout in nomp)
         jsr     InitListTextTfr
         jsr     DrawListText
         ply
