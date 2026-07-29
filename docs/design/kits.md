@@ -58,9 +58,12 @@ MORE than 8 and equip a curated subset (~5 slots): Gau and Strago.
 > the Veldt an out-of-MP Gau's free options are *leave* and *Item*; the
 > free action that swings a fist is only available off the Veldt. The
 > owner's framing accepts this ("you can always just Leap"), and it is the
-> right trade given that a Veldt encounter is a hunt rather than a fight —
-> but if playtest ever wants a free contributing action on the Veldt, this
-> arrangement does not provide one and the row count is still four.
+> right trade given that a Veldt encounter is a hunt rather than a fight.
+>
+> **Owner, 2026-07-29: not a concern.** *"It also ends the fight, so
+> whether or not it contributes is kind of moot."* Leap is an exit, not an
+> action — asking what it contributes to a battle it terminates is the
+> wrong question. Recorded so nobody re-opens it as a gap.
 >
 > Mechanically this is *simpler*, not merely different: `Ot6VeldtRow`
 > (`battle_main.asm`) now runs in `InitCmdList`'s own row loop instead of
