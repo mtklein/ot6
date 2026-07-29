@@ -32,6 +32,12 @@
 --                members = { { charId, "NAME" }, ... } }  -- each in party 1
 --   ram      = { { addr, mask, byte, "what" }, ... }  -- masked WRAM bytes,
 --                for field facts that are not switches (e.g. $1A69 espers)
+--   items    = { { itemId, "name" }, ... }  -- inventory PRESENCE: the item
+--                id appears in the $1869 list with a nonzero $1969 count.
+--                Presence, not slot position: give_item appends to the
+--                first free slot, so the position is chain-history, not a
+--                boundary fact.  Added for banquet-done-v1 (issue #31),
+--                whose Tintinabar/Charm Bangle are the >=77/>=90 receipts.
 --   sram     = { { snesAddr, byte, "what" }, ... }  -- OT6 persistent state,
 --                read via emu.memType.snesMemory (bank $31 = the codex bank)
 --
@@ -473,6 +479,81 @@ M.contracts["vector-crash-v1"] = {
   },
 }
 
+-- banquet-done-v1: boundary J, the post-banquet world battery save -- the
+-- recon §2.2's own `banquet-done` name, cut at the Vector world exit's
+-- landing tile (120,188): the first world tile after the banquet block,
+-- where the recon's leg-5-to-Albrook walk starts.  Exercised by
+-- gen_banquet_done (2026-07-28): the I->J grind, the whole banquet block
+-- ($007C=1 -> $0238=1) driven to the FULL 93 (banquet-decode.md §5.2's
+-- ≥90 circuit -- all 24 soldiers, four clean fights, the perfect Q&A, the
+-- troopers' challenge), the messenger, and the castle exit.
+--
+-- THE HEADLINE IS THE ROSTER STRIP.  The banquet tail forces the active
+-- party to TERRA+LOCKE and rewrites availability wholesale
+-- (event_main.asm:99058-99067, :99079-99101): the #21 count control reads
+-- TWO here, inverted -- a chain that somehow kept Edgar/Sabin walking
+-- fails by name (recon §2.3).  The ≥90 tier is frontier-wide canon from
+-- this boundary on: all three reward switches, both reward items
+-- (Tintinabar >=77, Charm Bangle >=90 -- the presence asserts are the
+-- score receipt, var0 itself is zeroed by the messenger), and the Doma/
+-- South Figaro world-state flips ride every later leg.
+M.contracts["banquet-done-v1"] = {
+  slot = 3,
+  ram = {
+    { 0x1f60, 0xFF, 120, "world x (save-block cell $1f60): the Vector exit" },
+    { 0x1f61, 0xFF, 188, "world y (save-block cell $1f61)" },
+    { 0x1f62, 0xFF, 83, "dead Blackjack x -- the wreck never moves" },
+    { 0x1f63, 0xFF, 238, "dead Blackjack y" },
+    { 0x11FA, 0x03, 0x00, "ON FOOT" },
+    { 0x11F3, 0xFF, 0x00, "not forced aboard the airship" },
+    { 0x1A69, 0x07, 0x07, "RAMUH+IFRIT+SHIVA magicite still owned" },
+    { 0x1fc2, 0xFF, 0x00, "score var 0 lo zeroed by the messenger (:99261)" },
+    { 0x1fc3, 0xFF, 0x00, "score var 0 hi zeroed" },
+  },
+  switches = {
+    { 0x0238, 1, "the messenger paid -- the banquet block is CLOSED (:99262)" },
+    { 0x007D, 1, "the banquet tail ran -- Albrook's port stands down (:99133)" },
+    { 0x0276, 1, "South Figaro withdrawal (always paid)" },
+    { 0x0277, 1, "Doma withdrawal (>=50 -- the tier receipt starts here)" },
+    { 0x0278, 1, "Imperial-base weapons unlock (>=67)" },
+    { 0x0512, 0, "cleared with the Doma withdrawal (:99228)" },
+    { 0x0079, 1, "the Sealed Gate scene stands" },
+    { 0x007A, 1, "the airship is still dead -- J->K is on foot and by boat" },
+    { 0x007B, 1, "Vector's soldier machinery stands down" },
+    { 0x0242, 1, "the base entrance is silent" },
+    { 0x0246, 0, "no active airship" },
+    -- the forced availability rewrite (:99058-99067), pinned wholesale:
+    -- the strip is THE fact of this boundary
+    { 0x02F0, 1, "TERRA available (forced)" },
+    { 0x02F1, 1, "LOCKE available (forced)" },
+    { 0x02F2, 1, "CYAN available (forced)" },
+    { 0x02F4, 1, "EDGAR available (forced; benched + stripped)" },
+    { 0x02F5, 1, "SABIN available (forced; benched + stripped)" },
+    { 0x02F9, 1, "SETZER available (forced; benched + stripped)" },
+    { 0x02F6, 0, "CELES unavailable until the Albrook pier" },
+    { 0x02F3, 0, "SHADOW unavailable until the Crescent landing" },
+    { 0x02F7, 0, "STRAGO unavailable" },
+    { 0x02F8, 0, "RELM unavailable" },
+  },
+  party = {
+    size = 2,                     -- the #21 control, INVERTED (recon §2.3)
+    members = {
+      { 0x00, "TERRA (the envoy)" },
+      { 0x01, "LOCKE (the escort)" },
+    },
+  },
+  items = {
+    { 0xE5, "Tintinabar (the >=77 receipt)" },
+    { 0xDF, "Charm Bangle (the >=90 receipt)" },
+  },
+  sram = {
+    { 0x316800, 0x4f, "slot 3 codex magic 'O'" },
+    { 0x316801, 0x38, "slot 3 codex magic '8'" },
+    { 0x316810 + 0x012d, 0x01, "bank-31 element-codex witness (ULTROS2)" },
+    { 0x316990 + 0x012d, 0x01, "bank-31 class-codex witness (ULTROS2)" },
+  },
+}
+
 -- ------------------------------------------------------------- the checker --
 
 local function switchVal(id)
@@ -548,6 +629,19 @@ function M.contractDiffs(c)
         field(string.format("%s (char %02X) in party", m[2], m[1]),
           1, partyOf(m[1]))
       end
+    end
+  end
+  if c.items then
+    for _, it in ipairs(c.items) do
+      local have = 0
+      for i = 0, 255 do
+        if M.readByte(0x1869 + i) == it[1] and M.readByte(0x1969 + i) > 0 then
+          have = 1
+          break
+        end
+      end
+      field(string.format("item $%02X (%s) in inventory", it[1], it[2]),
+        1, have)
     end
   end
   if c.sram then

@@ -599,3 +599,166 @@ pre-save contract by name after an unperturbed positive control held all
 26); pass-after "all 30 fields hold" through the real anchored ninja
 mint (`vector_crash` from the gate-cave-save-v1 battery),
 frame-identical (29001) to the by-hand capture run.
+
+## Addendum 4 — 2026-07-28, leg I→J (issue #31): the grind, the castle that opens at the dais, and the window-feasibility measurement
+
+Source: `tools/tests/probe_banquet_stage.lua`,
+`probe_banquet_interior.lua`, `probe_banquet_castle.lua`, and the
+in-progress leg `tools/tests/gen_banquet_done.lua`.  Same rule as
+Addenda 1-3: every claim is a log line or a `file:line` read.
+
+**This addendum is partial** — it records what the leg's route work
+measured before the session ended.  The ≥90 circuit was NOT driven end to
+end and anchor J was NOT cut; §4.6 states exactly what remains.
+
+### 4.1 CORRECTION — `worldBfs`'s node cap silently failed the 117-step grind
+
+`M.worldBfs`'s BFS node cap was **20000**, sized (its own comment) for
+the 63-step Narshe→Figaro leg.  The I→J grind is ~117 steps and its
+search disc overruns that cap, so `worldBfs` returned **nil** — and the
+shared `worldGrind` idiom treats nil as "no plan this frame" and idles.
+Measured (`probe_banquet_stage` run 2): 60000 frames of a neutral pad at
+world (83,238), and **not one log line**, because no caller logged the
+nil.  Raised to 60000 (`lib/ot6_field.lua`, `M.worldBfs`) and every
+copy of `worldGrind` now heartbeats a NO PATH line.
+
+### 4.2 CORRECTION — the shared `worldGrind` desyncs on long paths
+
+The `gen_vector_doorstep` grinder consumes **one plan entry per aligned
+frame**.  The party is aligned for several frames before a press latches,
+so on a straight line the wasted entries agree in direction and nothing
+shows — but every TURN desyncs the plan against the party's real tile and
+forces a full replan.  Measured on this leg (run 4): **~139 frames per
+tile**, a (73,221)↔(73,222) oscillation with the plan length jumping
+86→93, and the emulator dragged to ~40fps by the per-frame BFS.
+
+The fix is navTo's own rule, worldized: consume an entry only when the
+party **lands on that entry's destination tile**, replan on drift, and
+abandon a press that has provably not moved the party in 90 aligned
+frames.  Measured after: **16 frames per tile**, one BFS per leg.  This
+lives in the I→J probes and generator; promoting it over the shared
+idiom is a Follow-up (every world leg in the tree has the same latent
+bug, hidden only by shorter paths).
+
+### 4.3 NEW — the crash-site boot tile, confirmed as a hazard the gate must dodge
+
+`H.worldMode()` reads **true at the title screen** (`$1F64 & $3FF` is
+< 3 there too), so a Continue drive gated on `worldMode` alone stops
+pressing A before the save even loads — run 1 timed out that way.  The
+gate that works is **brightness + position**: press A only while the
+screen is lit and the party is not yet at (83,238), and disarm forever
+once it is.  That is also what keeps the leg off the H→I report's first
+hazard — an A tap on (83,238) re-enters the wreck interior.
+
+### 4.4 NEW — map 250 is severed until the banquet starts, by two NPCs
+
+The recon's §8 ledger flags 250's interior passability as
+"derived from entrances + NPC coordinates only; no live census".  The
+live census contradicts the natural reading of it, and the mechanism is
+worth pinning because it invalidates any route census taken before the
+dais:
+
+* **From the 250 entry (23,33) the reachable set is 131 tiles** — the
+  entrance hall, the corridor, and the four hall soldiers.  The dais is
+  NOT in it (`navTo (23,33)->(54,17)`: no path, 20 retries).
+* The west and east columns are severed at exactly **(16,30)** and
+  **(30,30)** — and those two tiles carry the `$0630` "Emperor Gestahl
+  waits inside" servant NPCs (`npc_prop.asm` map-250 records 11-12,
+  event `_cc83c6`).  They are OBJECT blocks, not tile blocks: the flood
+  also shows the four hall soldiers' own tiles punched out of their rows.
+* **`_cc8490` clears `$0630` one line before it sets `$007C`**
+  (`event_main.asm:97415-97418`).  The castle therefore opens exactly
+  when the window starts, and the circuit runs in a component no
+  pre-banquet census can see.
+
+**The route to the dais is the stairs, not a walk** (measured):
+the `{22,29}` doorway is a door tile the BFS model reads as a wall and
+needs a HELD UP press (the `{14,8}` class); **(23,12) is the messenger
+trigger and WEDGES `navTo`** even gated off (`$007D=0`) because it
+re-enters at every rest frame, so the messenger tile and the (23,9)
+stairs are crossed in ONE held press (held presses skip walk-over
+triggers, Addendum 2.3); (23,9) → (54,34) is a short entrance, and from
+(54,34) the dais is an ordinary 17-step `navTo`.
+
+### 4.5 CORRECTION — the dais is a stand-on face-UP+A trigger, and `tapLever` cannot drive it
+
+`_cc8490`'s gate is `$01B4=0 or $01B0=0 or $007C=1 → EventReturn`
+(`event_main.asm:97243-97247`): `$01B0` = facing up, **`$01B4` = A
+HELD**.  `M.tapLever` — the Addendum 3.2 idiom, correct for 384's
+latches and toggles — releases A after 8 frames and then holds only UP,
+so the gate reads A clear forever: measured, 9000 frames on the tile with
+no latch.
+
+What makes facing-up work without walking off the trigger is the
+**GESTAHL NPC standing at (54,15)** (the `$062E` object, `npc_prop`
+map-250 record 5, cleared by the same `_cc8490` tail at `:97414`): it
+blocks the step exactly the way `gen_sabin_train`'s `upA` holds into a
+wall.  The drive is therefore **stand ON (54,16), hold UP+A** with a
+short periodic A release so the edge re-arms.
+
+`M.tapLever` and `M.stepOff` were promoted from `gen_vector_crash` into
+`lib/ot6_field.lua` this pass (pre-approved); this correction is the
+boundary of `tapLever`'s applicability, and belongs with it.
+
+### 4.6 MEASURED — the window budget, and why the ≥90 verdict is still open
+
+The window's own arithmetic, all from `probe_banquet_castle.lua` run 2
+(the log lines are quoted; the timer is `$1189`, counting DOWN from
+14400):
+
+| beat | timer | cost |
+|---|---|---|
+| control returns after the Gestahl/Cid scene | **14302** | the scene tail spends ~98 |
+| after the tower exit (53,35) -> corridor (23,11) | 13817 | **393** |
+| after hall talk 1 -- (25,18), 10-step approach | 13577 | 240 |
+| after hall talk 2 -- (21,18), ~4-step approach | 13400 | 177 |
+| after hall talks 3-4 -- (21,24)/(25,24) | 12981 | 419 for two |
+| **four nearest soldiers, total** | | **836** (209 avg) |
+
+Subtracting the approach walks (the field walks at ~16 frames/tile, and
+sample 2's approach was ~4 tiles) puts the **pure talk cost at ~110-130
+frames** and the rest in walking.
+
+**The topology is what makes this expensive**, and it is now measured.
+The window's component from the corridor is **284 tiles** (x8..38,
+y9..34) -- the corridor, the hall, and the four stair/door mouths -- and
+it does NOT contain the lower half, the east half, 243's exit row's far
+side, or the dais.  Measured walk distances from the corridor mouth
+(23,11): the (15,21) and (31,21) stairs are **38 steps** each, the
+(9,14) and (37,14) doors **50**, the (9,9) and (37,9) stairs **62**.
+Every one of the four maps and both castle halves is behind one of
+those, and the circuit must cross them repeatedly.
+
+**Verdict: NOT ESTABLISHED, and leaning infeasible.**  Stated honestly
+because the dispatch's rule is that a quietly-lower score must not ship:
+
+* A *lower bound* does not settle it.  24 talks x ~110 + 4 battles x
+  ~500 (a floor, not a measurement) + ~7 region traversals x 38 steps x
+  16 frames = ~9300 of 14300 -- under budget, so infeasibility is **not
+  proven**.
+* A *realistic* estimate says it does not fit: the traversals are 38-62
+  steps each WAY, eleven of the 24 soldiers wander (so `chaseTalk` pays
+  a re-plan tax the four static hall samples never paid), and the four
+  battles are unmeasured on the real party.  Scaling the measured 209
+  frames/soldier by the real inter-region distances lands around 20 000
+  frames -- ~1.4x the window.
+
+The number that settles it is one run: drive the circuit greedily from
+`banquet_window.mss` and read `var0` at the frame `$013C` latches.  That
+is the "what maximum IS drivable" measurement, and it is the single
+highest-value next step; the generator's per-soldier `$013C` guard
+already fails with exactly that reading.
+
+### 4.7 What this leg still owes
+
+Not measured, and explicitly NOT claimed: the 24-soldier circuit was not
+driven, so **the ≥90 window-feasibility verdict is still OPEN** — the
+banquet-decode §8 ledger's first entry stands unanswered.  The
+instrument for it is built (`probe_banquet_castle.lua`: the live
+window-open census plus a per-soldier frame cost), and the leg generator
+`gen_banquet_done.lua` carries the full ≥90 script with a per-soldier
+`$013C` guard that fails loudly with `var0` and the timer reading rather
+than shipping a quietly lower tier.  Anchor J is not cut; its contract
+(`banquet-done-v1`, 39 fields incl. the party-of-TWO count control, the
+three reward switches and both reward items) is written and its graph
+edge declared, both unexercised.

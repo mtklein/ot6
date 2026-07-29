@@ -666,9 +666,12 @@ end
 -- BFS a path from the party's CURRENT world tile to (tx,ty).  The map
 -- wraps at 256 in both axes.  `blockedEdges` (keys from worldEdgeKey)
 -- prunes edges the executor has proven wrong, same contract as the
--- field bfsPath.  The node cap is 20000, not the field's 4096: world
+-- field bfsPath.  The node cap is 60000, not the field's 4096: world
 -- legs run 60+ tiles (Narshe->Figaro BFS'd 63 steps, probe_world3) and
--- the search disc grows with them.
+-- the search disc grows quadratically with them -- the I->J crash-site
+-- grind is ~117 steps and its disc blew straight through the old 20000
+-- cap, which returned nil and left worldGrind idling to its frame
+-- budget (measured, probe_banquet_stage run 2, 2026-07-28).
 function M.worldBfs(tx, ty, blockedEdges)
   blockedEdges = blockedEdges or {}
   local sx, sy = M.worldX(), M.worldY()
@@ -687,7 +690,7 @@ function M.worldBfs(tx, ty, blockedEdges)
       end
       return dirs
     end
-    if qi > 20000 then return nil end
+    if qi > 60000 then return nil end
     for _, dir in ipairs(DIRS) do
       if not blockedEdges[worldEdgeKey(x, y, dir)] then
         local d = DELTA[dir]
@@ -1245,4 +1248,70 @@ function M.chaseTalk(objIdx, maxFrames, what, opts)
       end
     end),
   }, what or string.format("chaseTalk obj %02X", objIdx))
+end
+
+-- ------------------------------------------- levers and re-entry escapes --
+-- Promoted from gen_vector_crash (2026-07-28, pre-approved in the I->J
+-- dispatch) the moment a second leg needed both: the banquet's dais is the
+-- same face-UP+A trigger class as 384's levers, and its boot/exit tiles are
+-- the same stood-on re-entry class as the SavePoint boot.
+
+-- The measured lever idiom (probe_v07_384toggle): ONE 8-frame up+A tap
+-- fires the event and the switch flips at its END (~70 frames); holding UP
+-- with A released never re-fires; a SECOND A press on a TOGGLE tile flips
+-- it back.  So: tap once, hold up, wait for the flip.  Dialogs opened by
+-- the event are advanced with edge-A; a battle that fires on the tile is
+-- kill-bit cleared (no lever on any route so far draws one, but the world
+-- module has surprised this harness before).
+function M.tapLever(swId, maxFrames, what)
+  local n = 0
+  local function swv(id)
+    return (M.readByte(0x1E80 + (id >> 3)) >> (id & 7)) & 1
+  end
+  return M.driveUntil(function() return swv(swId) == 1 end, maxFrames, {
+    M.call(function()
+      n = n + 1
+      if M.battleLoadStarted() then
+        for s = 0, 5 do
+          if M.readByte(0x3aa8 + s * 2) % 2 == 1 then
+            M.writeByte(0x3eec + s * 2, M.readByte(0x3eec + s * 2) | 0x80)
+          end
+        end
+        M.setPad({ "a" }); return
+      end
+      if M.dialogWaiting() then M.setPad(n % 8 < 4 and { "a" } or {}); return end
+      M.setPad(n <= 8 and { up = true, a = true } or { up = true })
+    end),
+  }, what)
+end
+
+-- Escape a stood-on re-entry trigger tile (the addenda SS1.7 class: the
+-- trigger re-enters every frame, hasControl never settles, and only an
+-- UNCONDITIONAL held press leaves).  Cycles dirs 40 frames each until the
+-- party tile changes and settles 10 aligned quiet frames.
+function M.stepOff(dirs, maxFrames, what)
+  local x0, y0, moved, calm, n = nil, nil, false, 0, 0
+  return M.driveUntil(function()
+    if not x0 then return false end
+    if M.fieldX() ~= x0 or M.fieldY() ~= y0 then moved = true end
+    calm = (moved and M.tileAligned() and not M.dialogWaiting()
+            and not M.battleLoadStarted()) and calm + 1 or 0
+    return calm >= 10
+  end, maxFrames, {
+    M.call(function()
+      if not x0 then x0, y0 = M.fieldX(), M.fieldY() end
+      if M.battleLoadStarted() then
+        for s = 0, 5 do
+          if M.readByte(0x3aa8 + s * 2) % 2 == 1 then
+            M.writeByte(0x3eec + s * 2, M.readByte(0x3eec + s * 2) | 0x80)
+          end
+        end
+        M.setPad({ "a" }); return
+      end
+      if M.dialogWaiting() then M.setPad({ "a" }); return end
+      if moved then M.setPad({}); return end
+      n = n + 1
+      M.setPad({ [dirs[((n // 40) % #dirs) + 1]] = true })
+    end),
+  }, what)
 end

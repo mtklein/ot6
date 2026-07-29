@@ -116,45 +116,10 @@ local function pressWalk(dir, pred, maxFrames, what)
   }, what)
 end
 
--- the measured lever idiom (probe_v07_384toggle): ONE 8-frame up+A tap
--- fires the event and the switch flips at its END (~70 frames); holding
--- UP with A released never re-fires; a SECOND A press on a toggle tile
--- flips it back.  So: tap once, hold up, wait for the flip.
-local function tapLever(swId, maxFrames, what)
-  local n = 0
-  return H.driveUntil(function() return sw(swId) == 1 end, maxFrames, {
-    H.call(function()
-      n = n + 1
-      if H.battleLoadStarted() then
-        killBitAll(); H.setPad({ "a" }); return
-      end
-      if H.dialogWaiting() then H.setPad(n % 8 < 4 and { "a" } or {}); return end
-      H.setPad(n <= 8 and { up = true, a = true } or { up = true })
-    end),
-  }, what)
-end
-
--- escape a stood-on re-entry trigger tile: unconditional held presses,
--- cycling dirs 40 frames each, until the party tile changes and settles
-local function stepOff(dirs, maxFrames, what)
-  local x0, y0, moved, calm, n = nil, nil, false, 0, 0
-  return H.driveUntil(function()
-    if not x0 then return false end
-    if H.fieldX() ~= x0 or H.fieldY() ~= y0 then moved = true end
-    calm = (moved and H.tileAligned() and not H.dialogWaiting()
-            and not H.battleLoadStarted()) and calm + 1 or 0
-    return calm >= 10
-  end, maxFrames, {
-    H.call(function()
-      if not x0 then x0, y0 = H.fieldX(), H.fieldY() end
-      if H.battleLoadStarted() then killBitAll(); H.setPad({ "a" }); return end
-      if H.dialogWaiting() then H.setPad({ "a" }); return end
-      if moved then H.setPad({}); return end
-      n = n + 1
-      H.setPad({ [dirs[((n // 40) % #dirs) + 1]] = true })
-    end),
-  }, what)
-end
+-- tapLever / stepOff: the measured lever and re-entry-escape idioms this
+-- generator introduced now live in lib/ot6_field.lua (M.tapLever /
+-- M.stepOff -- promoted 2026-07-28 when the I->J leg needed both again).
+local tapLever, stepOff = H.tapLever, H.stepOff
 
 local function landed(m, n)
   local cnt, hb = 0, -600
