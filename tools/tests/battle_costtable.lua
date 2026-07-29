@@ -27,6 +27,22 @@
 --      level it becomes available -- the "top-tier abilities stay payable at
 --      the level they arrive" property #45 asks for, checked rather than
 --      argued.
+--   3b. STEAL (issue #52).  The one costed verb with no table row: Steal is
+--      flat, priced by the Ot6StealCost leaf, so its immediate is read at the
+--      source and held to the SAME ruler -- measured against the pool Locke
+--      actually joins with (LV6, 31 MP), not the LV14 pool #52's headline
+--      quoted.  Plus signature parity with the cheapest row of all three
+--      ladder kits, because #55 makes Steal rung one of Locke's ladder.
+--   2b. THE 99 ANCHOR (issue #57).  Each ladder's genuine ultimate -- Bum Rush
+--      and Cleave, the divine top rung of the only two priced ladders -- costs
+--      exactly 99, and NO row anywhere costs more than 99.  That ceiling is not
+--      taste: every OT6 price drawer renders two digits (ListText cmd $02,
+--      btlgfx_main.asm:15045-15073, divides by ten exactly once;
+--      Ot6LoadoutDrawCost, field_menu.asm:3053, has one tens loop), so a
+--      three-digit cost prints as punctuation rather than as a number.  Tools
+--      deliberately does NOT participate -- Edgar's capstone is Overclock,
+--      which has no row here -- so this asserts the two rows that qualify and
+--      the <= 99 bound on all 24.
 --   4. THE SERPENT-TRENCH BAND (the knife-edge the owner reported as "barely
 --      made it, intense" and which was never balance-swept).  gau_joined IS
 --      that doorstep -- gen_sabin_trench.lua boots from it -- so the trio's
@@ -40,7 +56,7 @@
 local H = dofile("tools/tests/lib/ot6.lua")
 local STATE = "build/states/gau_joined.mss.lua"
 
-local CHAR = { Cyan = 2, Sabin = 5, Gau = 11 }
+local CHAR = { Locke = 1, Cyan = 2, Sabin = 5, Gau = 11 }
 local CHARPROP_SIZE, CHARPROP_MP = 0x16, 0x01
 local REC, REC_SIZE = 0x1600, 37
 local REC_LEVEL, REC_MAXMP = 0x08, 0x0f
@@ -68,6 +84,11 @@ local SWDTECH = {
 -- flat verbs (Steal/Slot/Rage/Dance) do not participate.
 local ANCHOR = 99
 local ULTIMATE = { [0x64] = "Bum Rush", [0x5c] = "Cleave" }
+-- #52: Steal is a FLAT verb -- no per-ability id, so no row in the table
+-- above.  Its price is the Ot6StealCost leaf's immediate, the same shape
+-- Ot6DanceCost has, read here so the one number the charge uses is pinned.
+local STEAL_COST = 4
+local LOCKE_JOIN_LV = 6             -- measured: worldmap_narshe has Locke LV6
 local TOOLS = {                 -- unchanged by #45; pinned so that stays true
   { 0xaa,  4, "AutoCrossbow" }, { 0xa3,  6, "NoiseBlaster" },
   { 0xa4,  8, "Bio Blaster" },  { 0xa5,  6, "Flash" },
@@ -198,6 +219,58 @@ H.run({ maxFrames = 20000 }, {
       end
     end
     H.log("ruler + payability hold for all 16 kit rows")
+  end),
+
+  ------------------------------------- 3b. Steal, the flat verb (#52) ------
+  -- Steal has no id-table row (FixPlayerAttack omits it from CmdWithAttackTbl,
+  -- so it never earns a per-ability id), so its price is a leaf immediate --
+  -- Ot6StealCost, the shape Ot6DanceCost has.  Read it AT THE SOURCE, the same
+  -- way the Rage price is read below, and hold it to the same ruler.
+  H.call(function()
+    local ofs = romOfs(H.sym("Ot6StealCost"))
+    H.assertEq(H.readRomByte(ofs), 0xa9,
+      "Ot6StealCost still opens with LDA #imm -- the +1 read below is the price")
+    local steal = H.readRomByte(ofs + 1)
+    H.assertEq(steal, STEAL_COST, "Steal costs " .. STEAL_COST .. " MP (#52)")
+
+    -- The ruler, at the level Steal ARRIVES -- Locke joins at Narshe holding
+    -- 31 MP (LV6, probe_mppools.lua off worldmap_narshe), not at the LV14 pool
+    -- #52's headline measured against.  No JOIN clamp here: unlike Sabin's and
+    -- Cyan's row-1 abilities, this level is one the game really presents.
+    local p = pool(CHAR.Locke, LOCKE_JOIN_LV)
+    H.assertEq(p, 31, "pool model: Locke LV" .. LOCKE_JOIN_LV .. " max MP")
+    local pct = 100 * steal / p
+    H.log(string.format("Steal   %2d MP of Locke's LV%d pool %d -> %.1f%%, %d uses",
+      steal, LOCKE_JOIN_LV, p, pct, math.floor(p / steal)))
+    assert(pct >= LO and pct <= HI, string.format(
+      "Steal is %.1f%% of the LV%d pool (%d MP of %d) -- outside the %.0f-%.0f%% "
+      .. "ruler at the level Locke actually joins with it. Under the floor it "
+      .. "is the free-in-practice noise #45 existed to remove; over the ceiling "
+      .. "it rations the only verb Locke has until #55 builds his kit",
+      pct, LOCKE_JOIN_LV, steal, p, LO, HI))
+    assert(math.floor(p / steal) >= MIN_USES, string.format(
+      "Steal affords only %d uses from Locke's full LV%d pool",
+      math.floor(p / steal), LOCKE_JOIN_LV))
+
+    -- SIGNATURE PARITY.  Steal is Locke's signature and #55 makes it rung one
+    -- of a ladder that tops at Master's Mark; it must price like every other
+    -- kit's cheapest row, or "signature" stops meaning a price band.
+    local base = romOfs(H.sym("Ot6AbilityCostTbl"))
+    for _, sig in ipairs({ { 0x5d, "Pummel" }, { 0x55, "Dispatch" },
+                           { 0xaa, "AutoCrossbow" } }) do
+      for i = 0, 63 do
+        local key = H.readRomByte(base + i * 2)
+        if key == 0xff then break end
+        if key == sig[1] then
+          H.assertEq(H.readRomByte(base + i * 2 + 1), steal, string.format(
+            "%s is a kit signature and must cost the same as Steal (%d) -- "
+            .. "mp-economy.md's 'signatures become the cheapest rows of their "
+            .. "kits'", sig[2], steal))
+          break
+        end
+      end
+    end
+    H.log("Steal is at parity with Pummel / Dispatch / AutoCrossbow")
   end),
 
   ------------------------------------------ 4. the Serpent-Trench band -----

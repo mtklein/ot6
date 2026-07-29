@@ -183,24 +183,29 @@ stands with its one named exception (Osmose, below).
   >    **free floor** is what is protected, and on the Veldt that floor
   >    is Leap.
   >
-  > **Steal keeps its flat 2** — it is a verb *beside* Fight, not the
+  > **Steal stays priced** — it is a verb *beside* Fight, not the
   > Fight row — but it shares Leap's invisibility problem exactly
   > (same window, same "Need MP", nothing drawn). That is issue #52's,
-  > and it is a display bug before it is a pricing question.
+  > and #52 ruled on both halves: the price moves 2 → 4, and the
+  > invisibility is accepted until #55 rather than answered with a new
+  > display surface. See "Steal's price is real and invisible" below.
 - **Boost never raises MP cost.** The shipped tier fold queues
   Fire 3 at Fire's cost (DEMO.md): BP is the tier price, MP the
   cast price. That split ports unchanged to every costed verb —
   including the now-shipped **boost-tiered Steal** (kits.md): its
   BP buys the guarantee, and its MP question is unchanged by the
-  boost, riding the M4 costing (the "flat small ~2" row below)
+  boost, riding the M4 costing (the "flat small" row below)
   exactly like every other free-in-vanilla verb. **Steal is
   costed as of v0.5** (this change): cmd $05 takes a flat-cost
-  path in `Ot6AbilityCost` — a single verb with one price, 2 MP,
-  keyed on the command rather than an ability-id table row (Steal
-  has no per-ability id in the disjoint ranges the id table
-  keys on) — and is charged, and refused when the pool is short,
-  by the same universal machinery as Blitz/SwdTech/Tools. With
-  `OT6_MP_COSTS` off it reverts to free, byte-for-byte.
+  path in `Ot6AbilityCost` — a single verb with one price (**4 MP**
+  since #52; 2 in v0.5), keyed on the command rather than an
+  ability-id table row (Steal has no per-ability id in the disjoint
+  ranges the id table keys on) — and is charged, and refused when the
+  pool is short, by the same universal machinery as
+  Blitz/SwdTech/Tools. Since #52 that number lives in the
+  `Ot6StealCost` leaf rather than inline, the same shape
+  `Ot6DanceCost` has, so the charge and any future menu row read one
+  authority. With `OT6_MP_COSTS` off it reverts to free, byte-for-byte.
 - **One price scale.** Kit skills live in the same ability
   records as spells (research/data-formats.md), so they price
   on the vanilla spell ruler: Fire 4, Fire 2 20, Fire 3 51.
@@ -243,7 +248,7 @@ Vanilla-free player verbs, with proposed cost shapes:
 
 | Verb | Shape | MP | Rationale |
 |---|---|---|---|
-| Steal (Locke #1) | flat small | 2 | the probe-collect verb prices like the cheapest spell |
+| Steal (Locke #1) | flat small | **4** | **repriced by #52** (was 2): 12.9% of the 31 MP pool Locke actually joins with, and exact parity with every other kit's signature row (Pummel, Dispatch, AutoCrossbow are all 4) — see "Steal's price is real and invisible" below |
 | New kit skills (Locke #2–7, Analyze, …) | scaled by tier | 3–20 | born costed via M4 kit tables — never free in vanilla; Analyze stays cheap (2–3) because scouting fuels the loop |
 | Tools (Edgar) | scaled by tier | 3–20 | reusable capital bought with gil; MP is the operating cost — AutoCrossbow 3–4, Drill/Chain Saw 12–20, Debilitator 8–12, Overclock costs the sum of the two tools it fires |
 | Blitz (Sabin) | scaled by tier | 4–99 | **rescaled by #45, tail re-derived by #57** (v0.4 was 2–30): Pummel 4, mid-kit 10–17, then 28/50 into **Bum Rush 99, the anchor** |
@@ -262,6 +267,77 @@ Vanilla-free player verbs, with proposed cost shapes:
 | Mimic (Gogo) | free — exception | 0 | vanilla Mimic copies the action, never the price; bonus-character jank preserved |
 | Guest verbs: Health (Banon), Shock (Leo), magitek beams, Possess (Ghost) | free — exception | 0 | guests have no kit tables; their stretches are authored tutorial texture (the Whelk line is balanced on free beams — balance-metrics.md), and Possess already costs the ghost |
 | Relic-morphed commands (Jump, GP Rain, X Magic, …) | inherit | — | assigned at M4 data entry in the same records as everything else |
+
+### Steal's price is real and invisible (ruling, issue #52, 2026-07-29)
+
+**The price: 2 → 4 MP.** #52's headline was "2 MP is ~2.0% of Locke's
+LV14 pool — exactly the noise the rescale removed everywhere else". That
+number is right and the *level* is wrong: this document's ruler measures
+an ability against the pool at the level it **arrives**, and Steal
+arrives at Narshe with Locke at **LV6 holding 31 MP** (measured,
+`probe_mppools.lua` off `worldmap_narshe`). There, 2 MP is 6.5% — under
+the 8–20% band, which is the real defect — and 4 MP is **12.9%**,
+between Fire's 10.0% and Cure's 12.5%. So the fix is the same 2× #45
+gave the Blitz floor, not a larger number chosen to look right at LV14.
+
+Worth stating plainly because it will come up again: **every signature
+dilutes the way Steal does.** Pummel is 4.3% of Sabin's LV14 pool and
+Dispatch 4.3% of Cyan's. Chasing the late-game fraction would mean
+per-level prices, which this ruler explicitly does not do.
+
+4 is also **exact parity with the cheapest row of all three ladder
+kits** — Pummel, Dispatch and AutoCrossbow are each 4 — which is what
+"signatures become the cheapest rows of their kits" means in numbers,
+and it matters for #55: Steal is rung one of Locke's ladder, not a
+one-off, and his 99 is Master's Mark. `battle_costtable.lua` asserts
+that parity, so moving one signature without the others is a red test.
+
+**The display half: it stays invisible, and that is the ruling.** The
+evidence, all read rather than recalled:
+
+- The four-row battle command window has **no numeric field at all**.
+  `command_window_data_set` (`btlgfx_main.asm:10099`) writes exactly two
+  things per row — the command byte, and a colour from `GetTextColor` —
+  and its template `MenuText::_4` (`btlgfx_main.asm:45136`) is four
+  fixed 8-byte records, `$ff $ff $04 $21 $0d $00 $ff $01`: two spaces, a
+  font, a name command and its id, a space, a terminator. No `$02` and
+  no `$16` anywhere in it.
+- `GetTextColor` (`btlgfx_main.asm:10704-10707`) is `and #$80` on the
+  **disabled** flag. The one grey that window has means "command
+  unavailable", never "you cannot afford it".
+- Every *other* costed verb has a submenu that solves this for free —
+  `Ot6BlitzRowDecorate`, `Ot6ToolRowDecorate`, `Ot6DanceRowDecorate`
+  (`ot6_kits.asm:563`, `:615`, `:698`) each stamp a two-digit price and
+  grey by affordability through `Ot6AbilityGrey`. **Steal is the only
+  costed verb with no list to put a number in.**
+
+Building a numeric field into that window would mean re-laying out three
+templates (short mode, window mode, and `MenuText::_4`) plus a
+command-keyed cost lookup, for **one verb**, weeks before #55 gives that
+verb a submenu that makes all of it dead code. That is the argument, and
+it is why the answer is not "build the surface".
+
+Nor is it Leap's answer. Leap's invisible price was retired by making
+Leap **free**, but that ruling rested on a second reason Steal does not
+have — Leap occupies the *Fight row* on the Veldt, and the free floor
+has to survive the substitution. Steal is a verb beside Fight. Making it
+free would contradict the owner's absolute (only the Fight row is free)
+and undo #52 itself.
+
+So: **the price is charged and not drawn, deliberately, until #55.** The
+mitigation is that it is now a *leaf* — `Ot6StealCost`
+(`ot6_boost.asm`), the `Ot6DanceCost` shape — so the day Locke gets a
+submenu its row decorator reads the same byte the charge does and the
+two cannot disagree. And the exposure is small at 4 MP: Locke affords 7
+steals from the pool he joins with, so the refusal path is somewhere a
+player has to work to reach.
+
+**The probe-collect pairing is retired.** Steal and Leap were priced
+together as "the probe-collect pair"; the owner ruled Leap free on
+2026-07-29, leaving a pair with one member. The rule that replaces it is
+the one above — Steal prices as a **kit signature**, at parity with
+Pummel/Dispatch/AutoCrossbow — which is a rule with three other members
+and a gate behind it.
 
 ### Cyan pays in both (ruling 2026-07-17)
 
@@ -398,6 +474,11 @@ the table below is transcribed from that run's log, not derived by hand.
 | Stunner | L34 | 334 | 6 | 22 | 6.6% | **28** | **8.4%** | 11 |
 | Quadra Slice | L44 | 483 | 7 | 30 | 6.2% | **50** | **10.4%** | 9 |
 | Cleave | L70 | 762 | 8 | 46 | 6.0% | **99** | **13.0%** | 7 |
+
+| flat verb | arrives | pool | was | was % | **now** | **now %** | uses |
+|---|---|---|---|---|---|---|---|
+| Steal (Locke) | L6, Narshe | 31 | 2 | 6.5% | **4** | **12.9%** | 7 |
+| Rage / Dance | — | — | 8 | — | **8** | — | — |
 
 **How the tail was re-derived — not by scaling.** Multiplying the whole
 column by 99/46 (2.15×) would put Suplex at 28 MP, *half* a LV10 pool,

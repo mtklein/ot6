@@ -475,8 +475,8 @@ Ot6FoldTbl:
         rtl
 @steal:
         pla                     ; drop the parked cost (0 for steal)
-        lda     #$02            ; flat 2 MP -- the probe-collect verb prices
-        plp                     ;   like the cheapest spell (mp-economy.md)
+        jsl     Ot6StealCost    ; the flat price, one authority (#52)
+        plp
         rtl
 @dance: ; dance (cmd $13) is priced at the COMMIT moment only: the mid-dance
         ; turns queue through the same CreateAction (RandDanceAction,
@@ -594,6 +594,45 @@ Ot6FoldTbl:
 .proc Ot6DanceCost
         .a8
         lda     #$08
+        rtl
+.endproc
+
+; [ the Steal price -- the flat verb's one authority (#52) ]
+;
+; 4, up from the 2 that shipped in v0.5.  #52's headline was "2 MP is ~2% of
+; Locke's LV14 pool", but that measures at the wrong level and the ruler this
+; column is on measures at the level an ability ARRIVES: Locke joins at Narshe
+; holding 31 MP (LV6, read off worldmap_narshe by probe_mppools.lua), where 2
+; is 6.5% -- under the 8-20% a vanilla spell costs at ITS arrival -- and 4 is
+; 12.9%, between Fire's 10.0% and Cure's 12.5%.  So the honest fix is the same
+; 2x #45 gave the Blitz floor, not a bigger number chosen to look right at LV14.
+; (Every signature dilutes the same way by then: Pummel is 4.3% of Sabin's LV14
+; pool and Dispatch 4.3% of Cyan's.  Pricing against a late pool would mean
+; per-level prices, which the ruler explicitly does not do.)
+;
+; 4 is also exact PARITY with the cheapest row of all three ladder kits --
+; Pummel $5d, Dispatch $55, AutoCrossbow $aa, every one of them 4 -- and Steal
+; is Locke's signature, mp-economy.md's "signatures become the cheapest rows of
+; their kits".  That parity is load-bearing for #55: Steal is a RUNG, not the
+; ceiling (owner, 2026-07-29 -- Locke's 99 is Master's Mark, kits.md:404), so
+; it should read as rung one of an eight-rung ladder, not as its own thing.
+;
+; NOTE WHAT THIS PRICE STILL CANNOT DO: it cannot be SEEN.  Steal is a
+; top-level battle command, and command_window_data_set (btlgfx_main.asm:10099)
+; writes exactly two things per row -- the command byte and a GetTextColor
+; colour off the DISABLED flag (:10704, `and #$80`) -- through MenuText::_4
+; (:45136), four fixed 8-byte records with no number command in them.  There is
+; no numeric field in that window to write a price into, which is why this is a
+; PURE LEAF in the Ot6DanceCost/Ot6CostFor shape rather than an inline
+; immediate: the day #55 gives Locke a submenu, its row decorator reads this
+; and the drawn price and the charged price cannot disagree.  See mp-economy.md
+; "Steal's price is real and invisible" for the ruling and why a numeric field
+; was not built into the command window for one verb.
+;
+; PURE leaf: cost in A, preserves X and Y, rtl.
+.proc Ot6StealCost
+        .a8
+        lda     #$04
         rtl
 .endproc
 

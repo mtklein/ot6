@@ -404,7 +404,7 @@ corrode — and a little merchant blood (he'd say TREASURE HUNTER).
 
 | # | Skill | Effect | Source |
 |---|---|---|---|
-| 1 | Steal ✦ | vanilla steal | join |
+| 1 | Steal ✦ (4 MP) | vanilla steal | join |
 | 2 | Mug | steal + piercing damage | South Figaro escape |
 | 3 | Trickshot | piercing chip at range (thrown coin) | Lete River |
 | 4 | Filch | steal 1 BP from the target | Opera house |
