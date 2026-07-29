@@ -48,6 +48,20 @@ It is also the **hard display ceiling**: the loadout pages render two
 digits (#56), so 99 is the largest cost that can be shown at all. Treat
 that as a constraint, not a coincidence — no cost anywhere may exceed it.
 
+**And it is the right number for reasons that are not arithmetic.** The
+owner: *"seeing things like 99, 999, and 9999 in Final Fantasy games
+feels right. Very classic feel."* Those caps are texture, not just
+limits — a player who has met 9999 damage and a 99-item stack reads 99 MP
+as *the top* without being told. This is the same instinct as keeping the
+FF3-US names (CONTRIBUTING) and the Vargas tutorial (bosses-wob.md):
+fidelity to what the original felt like, even where a cleaner number
+exists.
+
+**General rule that falls out:** where OT6 needs a cap, a ceiling or a
+round maximum, prefer the series' own — 99, 999, 9999 — over an
+arbitrary one. If a design wants 100 or 50, it should say why the classic
+number is wrong rather than defaulting past it.
+
 Open: what counts as an ultimate for characters whose top verb is not a
 priced ladder (Slot is free, Rage and Dance are flat), and whether Magic
 participates. See #57.
