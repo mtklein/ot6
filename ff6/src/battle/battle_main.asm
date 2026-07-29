@@ -2928,6 +2928,8 @@ SetCoverTarget:
         sta     $b8
         plp
         .a8
+        jsl     Ot6CoverBP  ; ot6 (#37): the cover has COMMITTED onto x --
+                            ;   a true knight blocker banks +1 bp, once a round
 @12bf:  rts
 
 ; ------------------------------------------------------------------------------
