@@ -44,6 +44,15 @@ Task-specific scope goes in the dispatch. Everything here is always true.
   the second guess. `make -j10 smoke` falsifies a library change in ~80 seconds
   against the seven generators that have historically caught harness bugs.
 
+## Machine budget
+
+This machine has **10 performance cores**, and Mesen is effectively
+single-threaded, so an emulator job costs about one core for its whole
+run. Sizing that actually works with several agents plus the owner
+playing: build at `-j6`, run up to **2 concurrent emulator jobs** per
+agent. `make -j10 smoke` is right when you have the machine to yourself
+and wrong when you do not — the dispatch will say which you have.
+
 ## Reporting
 
 State what you did, what you measured, and what you could not establish. A
