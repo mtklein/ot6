@@ -84,6 +84,33 @@
 -- title-row gap assertion gained a job it did not have before (it now pins the
 -- separation between three chrome words instead of one empty run).
 --
+-- issue #56 -- THE PRICE FIELD, and why this file's cost check moved from a
+-- shape to a value.  What shipped here asserted only that column 19 held SOME
+-- digit and that " MP" followed it.  That shape was true of a page drawing the
+-- WRONG NUMBER for seven of eight techniques: Ot6LoadoutDrawCost added the cost
+-- straight onto ZERO_CHAR ("kit costs 1..8", its own comment), and #45's
+-- rescale to 4/10/13/16/18/22/30/46 pushed six of those sums past '9' into
+-- punctuation -- Retort's 10 drew $be, Quadra Slice's 30 drew '='.  The shape
+-- check caught it only because $be is not in the digit range; a cost of, say,
+-- 20 would have drawn a legal-looking glyph and passed.
+--
+-- So the check reads the PRICE out of Ot6AbilityCostTbl -- the same table
+-- Ot6CostFor charges the player from -- and asserts all five cells of the
+-- field: tens (BLANK, not '0', under ten), ones, then " MP".  It is strictly
+-- stronger than what it replaces, not looser: it now fails if the page and the
+-- cost authority ever disagree, while a balance retune moves both together and
+-- reddens nothing.  This is menu_blitzpage.lua's own idiom (#46), which is the
+-- point -- the two pages draw their prices with ONE proc now.
+--
+-- ... and the row's COLUMNS moved with it.  A two-digit price is five cells,
+-- not four, and columns 3..29 held exactly 27 with 28 wanted.  The tech name
+-- starts at 5 instead of 6 -- the blank that used to sit between "1x" and the
+-- name is the donor, and it is the only one of the row's three gaps whose two
+-- sides cannot be misread as one token.  The other two are asserted here and
+-- stay: column 17 keeps "Quadra Slice" (the one twelve-cell BushidoName) off
+-- "30 MP", and column 23 keeps "30 MP" off "MANUAL" -- the failure #49 shipped
+-- a screenshot of.  Full derivation over Ot6LoadoutDrawSlots, field_menu.asm.
+--
 -- Fixture: arvis_wake (same boot as menu_bushidoloadout / menu_esperdetail).
 -- Its lead has no Bushido command, so the SwdTech row is installed the house
 -- "install state" way (menu_esperdetail pins esper bits the same way): the
@@ -149,8 +176,28 @@ local lo = { a=0x9a,c=0x9c,e=0x9e,h=0xa1,i=0xa2,l=0xa5,o=0xa8,p=0xa9,r=0xab,
 local DISPATCH = { T.D,lo.i,lo.s,lo.p,lo.a,lo.t,lo.c,lo.h }
 local RETORT   = { T.R,lo.e,lo.t,lo.o,lo.r,lo.t }
 local SLASH    = { T.S,lo.l,lo.a,lo.s,lo.h }
-local DIGIT0, DIGIT9 = 0xb4, 0xbd
+local ZERO_CHAR = 0xb4                  -- '0'; '9' is 0xbd
 local PAD = 0xff                        -- fixed_length_en.json: 0xFF = {pad}
+local MP_SUFFIX = { T.SP, T.M, T.P }    -- OT6_LOADOUT_MP_SUFFIX, " MP"
+
+-- #56: the price the page must print, read from the table the game CHARGES
+-- from.  Ot6AbilityCostTbl is (key, cost) pairs, $ff-terminated
+-- (ot6_boost.asm:744-794); SwdTech's keys are attack ids $55..$5c, i.e.
+-- $55 + tech index -- the same `adc #$55` Ot6LoadoutDrawSlots does before it
+-- calls Ot6LoadoutCost.  An id absent from the table is free (Ot6CostFor's
+-- @free arm), which for a SwdTech row would mean the page had no price to show
+-- at all, so the assertion below demands a nonzero one.
+local COSTTBL = H.sym("Ot6AbilityCostTbl") & 0x3FFFFF
+local SWDTECH_ATK0 = 0x55
+local function costOfTech(techIndex)
+  local id, x = SWDTECH_ATK0 + techIndex, 0
+  while true do
+    local key = H.readRomByte(COSTTBL + x)
+    if key == 0xff then return 0 end
+    if key == id then return H.readRomByte(COSTTBL + x + 1) end
+    x = x + 2
+  end
+end
 
 -- BushidoName, verbatim, out of the ROM Ot6DrawBushName itself reads (via
 -- _c35328 -> LoadArrayItem, skills.asm:1408-1416).  An 8-entry, 12-byte fixed
@@ -187,7 +234,9 @@ local TITLE_ROW = 1
 local LEFT_COL = 3                      -- the page's left margin (gutter = 1-2)
 local HINT_COL = 11                     -- #44: title 3-9, hint 11-19, pool 22-28
 local POOL_CAPTION_COL = 22             -- the caption rides the title row
-local NAME_COL, COST_COL = 6, 19        -- "1x" 3-4, blank 5, name 6..17, cost 19
+-- #56: "1x" 3-4, name 5..16, blank 17, "nn MP" 18..22, blank 23, mode 24..29.
+local NAME_COL, COST_COL = 5, 18
+local NAME_COST_SEP_COL = 17            -- the gap "Quadra Slice" would eat
 local BOOST_ROWS = { 3, 5, 7 }
 -- #49: the mode block, in the page's one free run -- columns 23-29 of the three
 -- slot rows (the survey in issue #49).  Mode on row 3, the control that changes
@@ -264,13 +313,36 @@ local function assertCursorGutter(n, leading, what)
   end
 end
 
--- One slot row: name at col 6, then a 1-digit MP cost at col 19 + " MP".
-local function assertSlotRow(y, name, techname)
+-- #56: the price field, all five cells of it, against Ot6AbilityCostTbl.
+-- Right-aligned with a LEADING BLANK and never a leading zero -- vanilla's own
+-- rule for a menu number (HexToDec3 overwrites each leading '0' with $ff,
+-- menu_common.asm:906-918, and DrawNum2 prints the low two,
+-- menu_common.asm:856-860) -- so the three rungs read as a column.  Asserting
+-- PAD rather than "anything" for a one-digit price is the half that catches a
+-- drawer which right-pads instead ("4  MP") or zero-fills ("04 MP").
+local function assertCostField(y, techIndex, what)
+  local cost = costOfTech(techIndex)
+  H.assertEq(cost > 0, true, string.format(
+    "%s: tech %d is priced in Ot6AbilityCostTbl -- a 0 here would mean the "
+    .. "page has no price to draw", what, techIndex))
+  local tens = cost // 10
+  H.assertEq(cell(COST_COL, y), tens > 0 and (ZERO_CHAR + tens) or PAD,
+    string.format("%s: cost %d tens cell {%d,%d} (blank, not '0', under ten)",
+      what, cost, COST_COL, y))
+  H.assertEq(cell(COST_COL + 1, y), ZERO_CHAR + (cost % 10),
+    string.format("%s: cost %d ones cell {%d,%d}", what, cost, COST_COL + 1, y))
+  assertRun(COST_COL + 2, y, MP_SUFFIX, what .. " ' MP'")
+  -- the gap the widened field ate into: without it the widest name and the
+  -- widest price render as "Quadra Slice30 MP".
+  H.assertEq(cell(NAME_COST_SEP_COL, y), 0, string.format(
+    "%s: {%d,%d} separates the tech name from its price", what,
+    NAME_COST_SEP_COL, y))
+end
+
+-- One slot row: the tech's 12-cell name at col 5, then its price at col 18.
+local function assertSlotRow(y, name, techIndex, techname)
   assertRun(NAME_COL, y, name, techname)
-  local d = cell(COST_COL, y)
-  H.assertEq(d >= DIGIT0 and d <= DIGIT9, true,
-    string.format("%s: cost digit at {%d,%d} (got %02x)", techname, COST_COL, y, d))
-  assertRun(COST_COL + 1, y, { T.SP, T.M, T.P }, techname .. " ' MP'")
+  assertCostField(y, techIndex, techname)
 end
 
 -- #49: the mode block, asserted as a block -- the word, the control under it,
@@ -383,9 +455,11 @@ H.run({ maxFrames = 30000 }, {
         string.format("no 0x label at row %d (#38 retired the free rung)", y))
     end
     -- the three boost slots: ceiling 2 -> base 0 -> Dispatch/Retort/Slash
-    assertSlotRow(BOOST_ROWS[1], DISPATCH, "slot 1x Dispatch")
-    assertSlotRow(BOOST_ROWS[2], RETORT,   "slot 2x Retort")
-    assertSlotRow(BOOST_ROWS[3], SLASH,    "slot 3x Slash")
+    -- #56: costs 4 / 10 / 13 -- deliberately spanning the one- to two-digit
+    -- boundary, so this arm alone proves both alignments on one page.
+    assertSlotRow(BOOST_ROWS[1], DISPATCH, 0, "slot 1x Dispatch")
+    assertSlotRow(BOOST_ROWS[2], RETORT,   1, "slot 2x Retort")
+    assertSlotRow(BOOST_ROWS[3], SLASH,    2, "slot 3x Slash")
     -- the LEARNED pool: exactly the three learned names, left column, on the
     -- window's odd rows.  Cross-check the hardcoded literals against the ROM
     -- records the drawing code actually reads.
@@ -458,12 +532,15 @@ H.run({ maxFrames = 30000 }, {
     end
     -- the three boost rows are still full-height rows with a priced tech on
     -- them (ceiling 7 -> base 5 -> Stunner / Quadra Slice / Cleave).
+    -- #56: this is the STRONGEST arm for the price field -- tech 6 is
+    -- "Quadra Slice", the only BushidoName that fills all twelve of its cells,
+    -- and its price is 30, so the widest name and a two-digit number sit either
+    -- side of the single blank at column 17.  That pairing is exactly what the
+    -- old four-cell field could not hold.
     for i, y in ipairs(BOOST_ROWS) do
       assertRun(NAME_COL, y, bushBytes(4 + i), "boost row " .. i .. " tech")
-      local d = cell(COST_COL, y)
-      H.assertEq(d >= DIGIT0 and d <= DIGIT9, true,
-        string.format("boost row %d cost digit at {%d,%d} (got %02x)",
-          i, COST_COL, y, d))
+      assertCostField(y, 4 + i, string.format("boost row %d '%s'",
+        i, bushText(4 + i)))
     end
     assertModeBlock(true, "8 learned, untouched")
     assertGeometry("8 learned")
