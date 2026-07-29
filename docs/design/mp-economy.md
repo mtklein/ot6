@@ -62,9 +62,20 @@ round maximum, prefer the series' own — 99, 999, 9999 — over an
 arbitrary one. If a design wants 100 or 50, it should say why the classic
 number is wrong rather than defaulting past it.
 
-Open: what counts as an ultimate for characters whose top verb is not a
-priced ladder (Slot is free, Rage and Dance are flat), and whether Magic
-participates. See #57.
+**Scope (owner, 2026-07-29): 99 where it makes sense, not universal.**
+Where a character has a genuine ultimate, that ultimate costs 99. Where
+the top verb is flat or free — Slot, Rage, Dance — the character simply
+does not participate, and that is a stated non-answer rather than a gap
+to fill with an invented capstone.
+
+Locke is the case worth naming: Steal is flat *for now*, but his kit
+(`kits.md`) already designs **Master's Mark** — steal from all enemies
+and reveal everything — which is exactly a 99's shape: it fires once and
+ends the probing phase outright. That is his anchor when #55 builds the
+kit, which also means repricing Steal is not wasted work: Steal is a
+rung, not the ceiling.
+
+Open: whether Magic participates. See #57.
 
 ## Principles
 
