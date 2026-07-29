@@ -32,12 +32,14 @@
 --                members = { { charId, "NAME" }, ... } }  -- each in party 1
 --   ram      = { { addr, mask, byte, "what" }, ... }  -- masked WRAM bytes,
 --                for field facts that are not switches (e.g. $1A69 espers)
---   items    = { { itemId, "name" }, ... }  -- inventory PRESENCE: the item
---                id appears in the $1869 list with a nonzero $1969 count.
---                Presence, not slot position: give_item appends to the
---                first free slot, so the position is chain-history, not a
---                boundary fact.  Added for banquet-done-v1 (issue #31),
---                whose Tintinabar/Charm Bangle are the >=77/>=90 receipts.
+--   items    = { { itemId, 0|1, "name" }, ... }  -- inventory presence
+--                (1) or ABSENCE (0): the item id appears in the $1869 list
+--                with a nonzero $1969 count.  Presence, not slot position:
+--                give_item appends to the first free slot, so the position
+--                is chain-history, not a boundary fact.  Added for
+--                banquet-done-v1 (issue #31): the banquet's reward ladder
+--                pays by score tier, so the tier is witnessed BOTH ways --
+--                what it earned and what it did not.
 --   sram     = { { snesAddr, byte, "what" }, ... }  -- OT6 persistent state,
 --                read via emu.memType.snesMemory (bank $31 = the codex bank)
 --
@@ -484,19 +486,20 @@ M.contracts["vector-crash-v1"] = {
 -- landing tile (120,188): the first world tile after the banquet block,
 -- where the recon's leg-5-to-Albrook walk starts.  Exercised by
 -- gen_banquet_done (2026-07-28): the I->J grind, the whole banquet block
--- ($007C=1 -> $0238=1) driven to the FULL 93 (banquet-decode.md §5.2's
--- ≥90 circuit -- all 24 soldiers, four clean fights, the perfect Q&A, the
--- troopers' challenge), the messenger, and the castle exit.
+-- ($007C=1 -> $0238=1) driven to the >=67 tier (banquet-decode.md §9.3:
+-- the window is worth at most 44 and measured 26, the Q&A 44 and the
+-- troopers' challenge 5, so the total lands at 75), the messenger, and
+-- the castle exit.
 --
 -- THE HEADLINE IS THE ROSTER STRIP.  The banquet tail forces the active
 -- party to TERRA+LOCKE and rewrites availability wholesale
 -- (event_main.asm:99058-99067, :99079-99101): the #21 count control reads
 -- TWO here, inverted -- a chain that somehow kept Edgar/Sabin walking
--- fails by name (recon §2.3).  The ≥90 tier is frontier-wide canon from
--- this boundary on: all three reward switches, both reward items
--- (Tintinabar >=77, Charm Bangle >=90 -- the presence asserts are the
--- score receipt, var0 itself is zeroed by the messenger), and the Doma/
--- South Figaro world-state flips ride every later leg.
+-- fails by name (recon §2.3).  The >=67 tier is frontier-wide canon from
+-- this boundary on: all three reward switches pay and NEITHER reward
+-- item does (the item asserts are the score receipt in BOTH directions,
+-- since var0 itself is zeroed by the messenger), and the Doma / South
+-- Figaro world-state flips ride every later leg.
 M.contracts["banquet-done-v1"] = {
   slot = 3,
   ram = {
@@ -542,9 +545,14 @@ M.contracts["banquet-done-v1"] = {
       { 0x01, "LOCKE (the escort)" },
     },
   },
+  -- THE TIER IS WITNESSED BOTH WAYS (banquet-decode.md §9.3): the leg
+  -- ships the >=67 tier -- measured best window score 26 of 44, total
+  -- 26+44+5 = 75 -- so the base-weapons unlock pays and the two higher
+  -- rewards do NOT.  Asserting their ABSENCE is what stops a future
+  -- route change from silently moving the tier in either direction.
   items = {
-    { 0xE5, "Tintinabar (the >=77 receipt)" },
-    { 0xDF, "Charm Bangle (the >=90 receipt)" },
+    { 0xE5, 0, "Tintinabar -- the >=77 reward, NOT earned at this tier" },
+    { 0xDF, 0, "Charm Bangle -- the >=90 reward, NOT earned at this tier" },
   },
   sram = {
     { 0x316800, 0x4f, "slot 3 codex magic 'O'" },
@@ -640,8 +648,8 @@ function M.contractDiffs(c)
           break
         end
       end
-      field(string.format("item $%02X (%s) in inventory", it[1], it[2]),
-        1, have)
+      field(string.format("item $%02X (%s) %s inventory", it[1], it[3],
+        it[2] == 1 and "in" or "NOT in"), it[2], have)
     end
   end
   if c.sram then

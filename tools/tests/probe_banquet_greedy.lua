@@ -1,0 +1,305 @@
+-- probe_banquet_greedy.lua -- THE SCORE-TIER MEASUREMENT (issue #31).
+--
+-- Boots a live banquet window (banquet_window.mss, minted by
+-- probe_banquet_stage.lua) and drives the soldier circuit GREEDILY until
+-- the 14400-frame timer expires and `$013C` latches, then reports the
+-- var0 the window actually earned.  That number -- not an estimate --
+-- decides which reward tier the frontier chain ships (banquet-decode.md
+-- §5.1: >=50 Doma, >=67 base weapons, >=77 Tintinabar, >=90 Charm
+-- Bangle).
+--
+-- WHY GREEDY AND NOT A FIXED ROUTE: map 250's interior is several
+-- disjoint regions joined by stair/door entrances, and which region the
+-- party can reach is a function of banquet state (addenda §4.4: the
+-- $0630 servants at (16,30)/(30,30) sever the castle until _cc8490
+-- clears them).  A hand-written route would encode one guess about that
+-- topology; the greedy driver discovers it at runtime -- talk every
+-- reachable un-latched soldier on this map nearest-first, and when none
+-- is reachable, take the least-used reachable crossing.
+--
+-- The number this produces is a LOWER BOUND on the achievable maximum
+-- (a smarter route can only do better), which is the safe direction for
+-- a tier decision: a tier this driver clears is a tier the leg can ship.
+--
+--   tools/tests/run.sh tools/tests/probe_banquet_greedy.lua
+local H = dofile("tools/tests/lib/ot6.lua")
+
+local function map() return H.mapId() & 0x1ff end
+local function bright() return emu.getState()["ppu.screenBrightness"] or 0 end
+local function sw(id) return (H.readByte(0x1E80 + (id >> 3)) >> (id & 7)) & 1 end
+local function timerCount() return H.readWord(0x1189) end
+local function var0() return H.readWord(0x1fc2) end
+local function objAt(idx)
+  local off = 0x29 * idx
+  return H.readWord(0x086a + off) >> 4, H.readWord(0x086d + off) >> 4
+end
+
+-- the 24 scoring soldiers (banquet-decode §3 census; object indices
+-- extracted from npc_prop.asm's map blocks, 0x10 + record position)
+local SOLDIERS = {
+  { map = 250, obj = 0x10, latch = 0x0217, name = "250 (21,24)" },
+  { map = 250, obj = 0x11, latch = 0x0218, name = "250 (25,24)" },
+  { map = 250, obj = 0x12, latch = 0x0219, name = "250 (21,18)" },
+  { map = 250, obj = 0x13, latch = 0x021A, name = "250 (25,18)" },
+  { map = 250, obj = 0x19, latch = 0x021F, name = "250 (98,51)" },
+  { map = 250, obj = 0x1E, latch = 0x0226, name = "250 (51,50) B27", fight = 0x0c7 },
+  { map = 250, obj = 0x1F, latch = 0x0227, name = "250 (9,49)" },
+  { map = 250, obj = 0x20, latch = 0x0228, name = "250 (110,51) B27", fight = 0x0c7 },
+  { map = 250, obj = 0x21, latch = 0x0229, name = "250 (120,13)" },
+  { map = 250, obj = 0x22, latch = 0x022A, name = "250 (115,16)" },
+  { map = 243, obj = 0x16, latch = 0x0224, name = "243 (8,18)" },
+  { map = 243, obj = 0x17, latch = 0x022B, name = "243 (12,14) B26", fight = 0x102 },
+  { map = 243, obj = 0x18, latch = 0x022C, name = "243 (18,14)" },
+  { map = 244, obj = 0x24, latch = 0x0220, name = "244 (11,23)" },
+  { map = 244, obj = 0x25, latch = 0x0221, name = "244 (25,23)" },
+  { map = 244, obj = 0x26, latch = 0x0222, name = "244 (16,14)" },
+  { map = 244, obj = 0x27, latch = 0x0223, name = "244 (20,14)" },
+  { map = 244, obj = 0x28, latch = 0x0225, name = "244 (10,17)" },
+  { map = 252, obj = 0x10, latch = 0x021B, name = "252 (40,56)" },
+  { map = 252, obj = 0x11, latch = 0x021C, name = "252 (42,52)" },
+  { map = 252, obj = 0x12, latch = 0x021D, name = "252 (42,56)" },
+  { map = 252, obj = 0x13, latch = 0x021E, name = "252 (37,57)" },
+  { map = 252, obj = 0x14, latch = 0x022D, name = "252 (42,57) B27", fight = 0x0c7 },
+  { map = 252, obj = 0x15, latch = 0x022E, name = "252 (40,54)" },
+}
+
+-- every crossing out of every circuit map (short + long entrance tables,
+-- decoded from field/trigger/*.dat with the .inc per-map offsets).  The
+-- dais (54,16) and the 251 doors (53,9)/(55,9) are deliberately ABSENT:
+-- 251 is the dinner hall and holds no window score.
+local CROSS = {
+  [250] = {
+    { 15, 21 }, { 31, 21 }, { 9, 14 }, { 37, 14 }, { 9, 9 }, { 37, 9 },
+    { 101, 10 }, { 115, 22 }, { 97, 47 }, { 51, 53 }, { 9, 52 }, { 65, 53 },
+    { 24, 53 }, { 81, 60 }, { 101, 17 }, { 14, 61 }, { 60, 62 }, { 120, 24 },
+    { 22, 34 }, { 111, 62 }, { 23, 9 }, { 53, 35 },
+  },
+  [243] = { { 15, 8 } },
+  [244] = { { 13, 19 }, { 23, 19 }, { 18, 11 } },
+  [252] = { { 35, 48 }, { 35, 60 } },
+}
+
+-- The 243 door row (22..24,34) is a 3-tile LONG entrance sitting inside
+-- an ordinary walkable stretch of 250's corridor.  Run 2 crossed it BY
+-- ACCIDENT while walking to a different crossing and was stranded (the
+-- door back is closed -- see nonTerminalRemains below), so every plan
+-- made while 243 is still off-limits must route AROUND it.
+local DOOR243 = { { 22, 34 }, { 23, 34 }, { 24, 34 } }
+
+local latched, crossUse = {}, {}
+-- soldier latch -> failed chase attempts.  ONE strike: run 5 spent 4400
+-- frames (30% of the window) on two failed chases of the same soldier,
+-- 252 (40,54), which is worth 1 point.  A soldier that does not answer
+-- promptly is never worth a retry inside a fixed window.
+local failCount = {}
+local log = {}
+
+-- MEASURED (run 4): right after a map transition fieldX/fieldY still read
+-- the OLD map's tile for a frame or two, so a bfsPath taken then finds a
+-- path that navTo -- running a frame later, on the new map -- cannot,
+-- and burns its full 20-retry no-path budget (~950 frames).  Five of
+-- those cost run 4 about 4750 frames of a 14400-frame window.  Every
+-- pick now waits for a settled field state first.
+local function settled()
+  return H.hasControl() and H.tileAligned() and bright() >= 15
+     and not H.dialogWaiting() and not H.battleLoadStarted()
+end
+
+local function done(s) return sw(s.latch) == 1 end
+
+-- true while anything OUTSIDE the 243 pocket is still scoreable
+function AVOID243()
+  for _, s in ipairs(SOLDIERS) do
+    if s.map ~= 243 and not done(s) then return true end
+  end
+  return false
+end
+
+-- nearest reachable un-latched soldier on this map: BFS to each of the
+-- object's four current neighbours (the object stands on its own tile)
+local function avoidNow()
+  -- forward-declared use of nonTerminalRemains via the upvalue below
+  if map() == 250 and AVOID243() then
+    local a = {}
+    for _, t in ipairs(DOOR243) do a[((t[2] & 0xFF) << 8) | (t[1] & 0xFF)] = true end
+    return a
+  end
+  return nil
+end
+
+local function nearestSoldier()
+  local best, bestLen
+  local av = avoidNow()
+  for _, s in ipairs(SOLDIERS) do
+    if s.map == map() and not done(s) and (failCount[s.latch] or 0) < 1 then
+      local ox, oy = objAt(s.obj)
+      for _, d in ipairs({ { 0, 1 }, { 0, -1 }, { 1, 0 }, { -1, 0 } }) do
+        local p = H.bfsPath(ox + d[1], oy + d[2], nil, av)
+        if p and (not bestLen or #p < bestLen) then best, bestLen = s, #p end
+      end
+    end
+  end
+  return best, bestLen
+end
+
+-- MEASURED (run 1): map 243 is a ONE-WAY POCKET during the window.
+-- The (15,8) door into 250 was opened by the escort's transient
+-- `mod_bg_tiles` (_cc835c, event_main.asm:97070); 243's map-init is
+-- EventReturn (map_init_event.asm:262) and _cc835c is $013A-latched
+-- dead, so a RE-ENTRY of 243 shows the static CLOSED door.  Run 1 walked
+-- into 243, scored its three soldiers, and then sat still for 11 835
+-- frames -- the whole rest of the window -- because no crossing was
+-- reachable.  The recon §8's "presumed impassable ... untested" is now
+-- measured, and it is a route constraint, not a curiosity: 243 must be
+-- visited LAST.
+local function leastUsedCrossing()
+  local best, bestKey, bestScore
+  for _, c in ipairs(CROSS[map()] or {}) do
+    local key = string.format("%d:%d,%d", map(), c[1], c[2])
+    -- never enter the 243 pocket while anything else is still scoreable
+    local into243 = (map() == 250 and c[1] == 22 and c[2] == 34)
+    -- NB: written as an explicit if.  `(cond and nil) or bfs(...)` reads
+    -- like a guard and is not one -- `X and nil` is nil, which is falsy,
+    -- so the `or` branch always runs.  That exact line let run 3 walk
+    -- into the 243 pocket with the guard "in place" (var0 12, stuck at
+    -- f1616), which is why the driver now says what it picked.
+    local p
+    if not (into243 and AVOID243()) then
+      p = H.bfsPath(c[1], c[2], nil, avoidNow())
+    end
+    if p then
+      -- least-used first, then nearest
+      local score = (crossUse[key] or 0) * 10000 + #p
+      if not bestScore or score < bestScore then
+        best, bestKey, bestScore = c, key, score
+      end
+    end
+  end
+  return best, bestKey
+end
+
+-- run a sub-step to completion inside our own tick; a raising sub-step
+-- (navTo no-path, a timeout) is caught and simply re-picks
+local function runner()
+  local cur, curWhat, curLatch = nil, nil, nil
+  local expiredAt, expiredVar = nil, nil
+  local lastMap, sinceProgress = nil, 0
+  return {
+    tick = function(self)
+      -- THE MEASUREMENT: sample the frame $013C first reads 1
+      if sw(0x013C) == 1 then
+        if not expiredAt then
+          expiredAt, expiredVar = H.frame, var0()
+          H.log(string.format(
+            "== WINDOW EXPIRED: var0=%d at frame %d ==", expiredVar, expiredAt))
+          for _, l in ipairs(log) do H.log("[route] " .. l) end
+          H.setPad({})
+        end
+        return "done"
+      end
+      if cur then
+        local ok, r = pcall(function() return cur:tick() end)
+        if ok and r == "frame" then return "frame" end
+        if not ok then
+          log[#log + 1] = string.format("f%-6d ABORT  %s", H.frame, curWhat)
+          if curLatch then
+            failCount[curLatch] = (failCount[curLatch] or 0) + 1
+          end
+        end
+        cur, curWhat, curLatch = nil, nil, nil
+        return "frame"
+      end
+      if not settled() then H.setPad({}); return "frame" end
+      local s, len = nearestSoldier()
+      if s then
+        curWhat, curLatch = s.name, s.latch
+        log[#log + 1] = string.format("f%-6d t=%-5d talk   %s (%d steps)",
+          H.frame, timerCount(), s.name, len or -1)
+        cur = H.chaseTalk(s.obj, 1500, s.name, {
+          done = function() return done(s) or sw(0x013C) == 1 end,
+          avoid = avoidNow(),
+        })
+        return "frame"
+      end
+      local c, key = leastUsedCrossing()
+      if c then
+        crossUse[key] = (crossUse[key] or 0) + 1
+        curWhat, curLatch = "cross " .. key, nil
+        log[#log + 1] = string.format("f%-6d t=%-5d cross  %s (use %d)",
+          H.frame, timerCount(), key, crossUse[key])
+        local fromMap, fx, fy = map(), H.fieldX(), H.fieldY()
+        cur = H.navTo(c[1], c[2], {
+          maxFrames = 3000,
+          noPathRetries = 3,
+          avoid = (map() == 250 and AVOID243()) and DOOR243 or nil,
+          arrive = function()
+            return map() ~= fromMap
+              or (map() == fromMap and (H.fieldX() ~= fx or H.fieldY() ~= fy)
+                  and H.fieldX() == c[1] and H.fieldY() == c[2])
+          end,
+        })
+        return "frame"
+      end
+      -- nothing reachable at all: say so ONCE, then sit still
+      if not self.stuckAt then
+        self.stuckAt = H.frame
+        H.log(string.format(
+          "== STUCK at f%d: map %d (%d,%d) timer=%d var0=%d -- no reachable "
+          .. "un-latched soldier and no reachable crossing ==",
+          H.frame, map(), H.fieldX(), H.fieldY(), timerCount(), var0()))
+        for _, c in ipairs(CROSS[map()] or {}) do
+          H.log(string.format("   crossing (%d,%d): %s", c[1], c[2],
+            H.bfsPath(c[1], c[2]) and "reachable" or "NO PATH"))
+        end
+        for _, l in ipairs(log) do H.log("[route] " .. l) end
+      end
+      H.setPad({})
+      return "frame"
+    end,
+    reset = function(self) end,
+  }
+end
+
+H.run({ maxFrames = 40000 }, {
+  H.loadState("build/states/banquet_window.mss.lua"),
+  H.waitFrames(90),
+  H.call(function()
+    H.assertEq(sw(0x007C), 1, "boot: window live")
+    H.assertEq(sw(0x013C), 0, "boot: dinner has not fired")
+    H.log(string.format("[boot] map=%d (%d,%d) timer=%d var0=%d",
+      map(), H.fieldX(), H.fieldY(), timerCount(), var0()))
+  end),
+
+  -- leave the throne tower first: control returns inside it (addenda
+  -- §4.6) and its only circuit-side exit is the (53,35) long entrance
+  H.navTo(53, 34, { maxFrames = 9000 }),
+  (function() local ph = 0
+    return H.driveUntil(function() return H.fieldX() < 40 end, 1200, {
+      H.call(function()
+        ph = (ph + 1) % 8
+        if H.dialogWaiting() then H.setPad(ph < 4 and { "a" } or {}); return end
+        H.setPad({ down = true })
+      end),
+    }, "held DOWN onto (53,35) -> the corridor (23,11)")
+  end)(),
+  H.release(),
+  H.waitFrames(45),
+  H.call(function()
+    H.log(string.format("[tower-exit] (%d,%d) timer=%d",
+      H.fieldX(), H.fieldY(), timerCount()))
+  end),
+
+  -- the circuit, greedily, until the window dies
+  runner(),
+
+  H.call(function()
+    H.log(string.format(
+      "== TIER MEASUREMENT: var0=%d of a theoretical 44, timer=%d, "
+      .. "frame %d ==", var0(), timerCount(), H.frame))
+    local n = 0
+    for _, s in ipairs(SOLDIERS) do if done(s) then n = n + 1 end end
+    H.log(string.format("== soldiers latched: %d of 24 ==", n))
+    H.screenshot("bq_greedy_expiry")
+  end),
+  H.saveState("banquet_greedy_dinner.mss"),
+})

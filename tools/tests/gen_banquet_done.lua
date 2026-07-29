@@ -1,6 +1,24 @@
 -- gen_banquet_done.lua -- v0.7 LEG I->J (issue #31), and the generator
 -- that cuts battery anchor J, `banquet-done-v1`.
 --
+-- !! NOT CURRENT -- DO NOT DRIVE AS WRITTEN (2026-07-28) !!
+-- The circuit section below encodes the ≥90 route of banquet-decode.md
+-- §5.2, which has been WITHDRAWN: §9 of that doc records the measured
+-- correction.  Three of §5.2's premises are false in the live window --
+-- control returns inside the throne tower (not at the dais), map 250 is
+-- severed until `_cc8490` clears $0630, and map 243 is a ONE-WAY POCKET
+-- that strands anyone who enters it early -- and the ≥90 tier needs 41
+-- of the window's 44 points against a measured best of 26.
+--
+-- CANON IS THE >=67 TIER (banquet-decode.md §9.3): window 26 + Q&A 44 +
+-- challenge 5 = 75.  Rebuilding this generator means replacing the fixed
+-- soldier order below with probe_banquet_greedy.lua's driver (nearest
+-- reachable un-latched soldier, least-used reachable crossing, 243 last,
+-- one strike per NPC, never re-plan on a map-transition frame) and
+-- driving the Q&A exactly as written -- that half is unchanged and still
+-- worth 44.  The exit contract `banquet-done-v1` is already amended to
+-- the >=67 tier and asserts the Tintinabar and Charm Bangle ABSENT.
+--
 -- The leg (banquet-decode.md is the script; sealed-gate-recon.md §1 legs
 -- 5-6 the route): cold-Continue the tracked `vector-crash-v1` battery
 -- (boundary I -- world (83,238), standing ON the dead Blackjack; NO A

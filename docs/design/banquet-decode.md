@@ -455,3 +455,86 @@ route state. None is a suite test; none is frontier input.
   top menu (A2); the selector screens also call `DecTimersMenuBattle`
   (same loop) and the observed SRAM-vs-stage deltas are consistent with
   continuous ticking, but no per-screen breakdown was taken.
+
+---
+
+## 9. Correction to §5.2 — 2026-07-28, the circuit measured live (issue #31)
+
+§5.2 was written from source and entrance tables, before any run reached
+the window.  Three of its premises do not survive contact, and the
+score-tier policy it implied ("take all 93 and assert ≥90") is not
+drivable.  Measured with `tools/tests/probe_banquet_greedy.lua` against
+`banquet_window.mss` (the live window minted by
+`probe_banquet_stage.lua`); full route logs in each run's log.
+
+### 9.1 Where the party actually starts, and what is reachable
+
+**§5.2 step 1's "control returns at the dais" is right but misleading.**
+Control returns INSIDE the throne tower -- a **199-tile pocket**
+(x48..60, y9..35) whose only exits are the (53,9)/(55,9) doors to 251 and
+the **(53,35) long entrance back to the corridor at (23,11)**.  The
+circuit's first act is leaving it (measured cost: 393 frames).
+
+**The castle is severed until the window opens.**  Before `_cc8490`, map
+250's entry is a 131-tile pocket: the west and east columns are blocked
+at **(16,30)** and **(30,30)** by the `$0630` "Gestahl waits inside"
+servants.  `_cc8490` clears `$0630` at `event_main.asm:97415`, one line
+before `$007C=1` -- so the castle opens exactly when the timer starts,
+and any route census taken earlier is invalid.
+
+**Map 243 is a ONE-WAY POCKET.**  Its (15,8) door into 250 was opened by
+the escort's transient `mod_bg_tiles` (`_cc835c`, `:97070`); 243's
+map-init is `EventReturn` (`map_init_event.asm:262`) and `_cc835c` is
+`$013A`-latched dead, so a **re-entry of 243 shows the closed door**.
+Measured: a run that walked into 243 mid-window scored its three
+soldiers and then sat for **11 835 frames** with no reachable exit.  The
+recon §8's "presumed impassable … untested" is now measured, and it is a
+hard route constraint: **243 must be visited LAST**, and the (22..24,34)
+door row must be routed around until then.
+
+### 9.2 The measured circuit, and the tier arithmetic
+
+Per-unit costs (timer `$1189`, counting down from 14400):
+
+| item | measured |
+|---|---|
+| window at first controlled frame | **14302** |
+| throne-tower exit | 393 |
+| a talk, including its approach | ~210 avg (4 nearest: 836) |
+| a talk's dialog alone | ~110-130 |
+| field walking | ~16 frames/tile |
+| region traversals from the corridor | 38-62 **steps each way** |
+
+**Best measured window score: `var0` = 26, 16 of 24 soldiers**
+(`greedy5.log`; a second run wedged at 19, so 26 is a floor with
+variance, not a ceiling).  The score that reaches the messenger is the
+window plus the dinner, and the dinner is the bigger half:
+
+```
+total = window + Q&A (44) + troopers' challenge (5)
+      = 26 + 49 = 75
+```
+
+So the tier thresholds translate into **window** requirements:
+
+| tier | reward | needs window ≥ |
+|---|---|---|
+| ≥50 | Doma withdrawal | 1 |
+| **≥67** | **Imperial-base weapons** | **18** |
+| ≥77 | Tintinabar | 28 |
+| ≥90 | Charm Bangle | 41 |
+
+### 9.3 The ruling
+
+**Canon is the ≥67 tier**: measured total **75**, clearing the threshold
+by 8 points with a driver that demonstrably wastes frames.  `$0276`,
+`$0277` and `$0278` all pay; **Tintinabar and the Charm Bangle do NOT**,
+and `banquet-done-v1` must assert their ABSENCE rather than their
+presence.
+
+§5.2's "take all 93 and assert ≥90" is withdrawn: ≥90 needs 41 of the
+window's 44 points, i.e. essentially a perfect circuit, and the measured
+best is 26.  ≥77 needs only 2 more window points than measured and is
+the obvious target for a tuned route -- but it is **not demonstrated**,
+and the release ratchet says canon is what has been driven, not what
+looks close.  Re-open this section when a tuned circuit clears 28.
