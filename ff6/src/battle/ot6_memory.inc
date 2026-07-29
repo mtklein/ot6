@@ -55,6 +55,16 @@ OT6_LOADOUT          := $7e1e1d
 ; saves are genuinely in.  Remaining scrap after this: $1e27-$1e3f.
 OT6_RAGELOAD         := $7e1e1f
 OT6_RAGESLOTS        = 8
+; The configurator's page GEOMETRY, shared by the C3 draw and the F0 cursor
+; walk so they can never disagree about which slot a row is.  Two columns of
+; four, because the EN field-menu window fits exactly EIGHT text rows (the
+; 12px cadence -- see field_menu.asm's Ot6RageDrawSlots header) and a single
+; column of eight would leave no row for the title or the LEARNED count.  It
+; is also vanilla's own shape for this very window: the rage browse is
+; `cursor_prop {0,0}, {2,8}` at 12px pitch (skills.asm:281-299).
+OT6_RAGECOLS         = 2
+OT6_RAGEROWS         = 4
+.assert OT6_RAGECOLS * OT6_RAGEROWS = OT6_RAGESLOTS, error, "rage page geometry must cover every slot exactly once"
 .assert (OT6_RAGELOAD & $ffff) >= $1600, error, "rage loadout must sit inside the save block"
 .assert (OT6_RAGELOAD & $ffff) + OT6_RAGESLOTS - 1 <= $1ffd, error, "rage loadout must sit inside the checksum window"
 .assert (OT6_RAGELOAD & $ffff) = (OT6_LOADOUT & $ffff) + 2, error, "rage loadout must follow the bushido word without a gap"

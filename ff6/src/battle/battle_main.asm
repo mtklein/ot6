@@ -12933,6 +12933,18 @@ FixPlayerAttack:
         pha
         xba
         sta     $33a8,y
+        ; ot6 #40: THE START TURN'S COIN IS ROLLED HERE, not in Cmd_10.  The
+        ; menu's beast lands in $33a8,y and vanilla rolls the attack right
+        ; away -- so this RandRage runs BEFORE Cmd_10 (and before its
+        ; Ot6RageTierLatch).  Measured (battle_rage.lua): with 1 BP pending,
+        ; roll 1 saw tier 0 and took no extra draw while rolls 2..5 saw tier 1
+        ; -- the very turn the BP was spent on was the one turn it did not buy.
+        ; Latching here as well fixes it: the proc only latches while the RAGE
+        ; status is still clear, so this is the start turn by construction and
+        ; Cmd_10's own latch (which re-reads the not-yet-consumed pending byte)
+        ; is idempotent.  A = the beast id here, and the latch is a8 so it
+        ; touches only A's low half, which RandRage overwrites with its result.
+        jsl     Ot6RageTierLatch
         jsr     RandRage
         xba
         pla
@@ -14698,13 +14710,18 @@ InitSkills:
         dex
         bpl     @5828
         ; ot6 #40 (kit-gau.md §2.2): the ONE choke point for Gau's 8-slot rage
-        ; loadout.  With any loadout byte set, Ot6RageList writes the stored,
-        ; still-learned ids to $257e and the count to $3a9a, and everything
-        ; downstream narrows itself for free -- the window draw, the confirm
-        ; (which refuses an $ff cell), the scroll cap, and even RandRage's
-        ; confused-rager pick.  An all-zero loadout (AUTO, and the state every
-        ; existing save and every tracked anchor is in) returns carry clear and
-        ; the vanilla walk below runs byte for byte.
+        ; loadout.  Ot6RageList writes at most eight ids to $257e and the count
+        ; to $3a9a, and everything downstream narrows itself for free -- the
+        ; window draw, the confirm (which refuses an $ff cell), the scroll cap,
+        ; and even RandRage's confused-rager pick.
+        ;
+        ; 2026-07-28 ruling: an all-zero loadout (AUTO -- the state every
+        ; existing save and every tracked anchor is in) no longer hands back to
+        ; the vanilla walk.  AUTO is the FIRST EIGHT known rages, so the
+        ; 200-entry wall is not reachable through inaction.  Ot6RageList
+        ; therefore always returns carry set and the walk below is unreachable
+        ; from here; it stays as the reference the AUTO arm of battle_rage.lua
+        ; measures against (and as vanilla's own documentation of the list).
         jsl     Ot6RageList
         bcs     @ot6_rages
         longa

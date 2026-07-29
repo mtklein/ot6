@@ -130,8 +130,12 @@ MENU_TEXT_INC = 1
 ; OT6 (#40): Gau's 8-slot rage loadout page.  Same encode-pipeline rule as the
 ; Bushido labels above -- a bare literal in field_menu.asm picks up
 ; ending_anim.asm's credits charmap and carries no terminator (issue #39).
+; Rows must be ODD and <= 15: the EN window shows a tilemap row PAIR in twelve
+; scanlines and stops after row 15 (Ot6RageDrawSlots' cadence note).  {2,20}
+; put LEARNED off the bottom of the window entirely.
 .define OT6_RAGE_TITLE                  BG1A, {2, 1},  {"RAGE LOADOUT"}
-.define OT6_RAGE_LEARNED                BG1A, {2, 20}, {"LEARNED"}
+.define OT6_RAGE_EACH                   BG1A, {22, 1}, {"EACH"}
+.define OT6_RAGE_LEARNED                BG1A, {2, 15}, {"LEARNED"}
 
 ; ------------------------------------------------------------------------------
 
