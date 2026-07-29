@@ -50,7 +50,7 @@ local PARTY = { 0, 1, 2 }
 
 local ceiling = 4
 local bpbank = 5                       -- current BP bank (mutated per pass)
-local mpcur = 3                        -- current MP (mutated per pass)
+local mpcur = 14                       -- current MP (mutated per pass)
 local actor
 
 local function glyphs(s)
@@ -64,8 +64,8 @@ local function glyphs(s)
 end
 -- spaceless techs only, so each glyph run is contiguous in VRAM.
 local NM = {
-  Slash     = glyphs("Slash"),         -- row 0, boost 1, cost 3
-  Empowerer = glyphs("Empowerer"),     -- row 2, boost 3, cost 5
+  Slash     = glyphs("Slash"),         -- row 0, boost 1, cost 13
+  Empowerer = glyphs("Empowerer"),     -- row 2, boost 3, cost 18
   -- tech 1, the OLD 0x rung at ceiling 4.  #38 retired it off the bottom of
   -- the window, so it must not be on this page at all -- and its absence is
   -- what makes the 0-bp pass below discriminating (a four-row window would
@@ -139,18 +139,18 @@ H.run({ maxFrames = 40000 }, {
     H.log(string.format("cyan installed in slot %d, ceiling %d", actor, ceiling))
   end),
 
-  -- 1. MP GREY (bp full, MP = 3) --------------------------------------------
-  H.call(function() bpbank = 5; mpcur = 3 end),
+  -- 1. MP GREY (bp full, MP = 14) -------------------------------------------
+  H.call(function() bpbank = 5; mpcur = 14 end),
   openSub(),
   H.waitFrames(6),
   H.call(function() H.screenshot("bushido_grey_mp") end),
   H.call(function()
     local aS, aE = attrOf(NM.Slash), attrOf(NM.Empowerer)
-    H.log(string.format("MP=3 attr: Slash=%s Empowerer=%s",
+    H.log(string.format("MP=14 attr: Slash=%s Empowerer=%s",
       aS and string.format("$%02x", aS) or "nil",
       aE and string.format("$%02x", aE) or "nil"))
-    H.assertEq(aS, WHITE, "Slash (cost 3, MP 3) renders white -- affordable")
-    H.assertEq(aE, GREY, "Empowerer (cost 5, MP 3) renders grey -- unaffordable MP")
+    H.assertEq(aS, WHITE, "Slash (cost 13, MP 14) renders white -- affordable")
+    H.assertEq(aE, GREY, "Empowerer (cost 18, MP 14) renders grey -- unaffordable MP")
     H.assertEq(aE - aS, 0x04, "grey - white == $04, magic's own disabled-bit delta")
   end),
 

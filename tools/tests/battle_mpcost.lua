@@ -39,7 +39,7 @@ local PARTY = { 0, 1, 2 }
 local GUARDS = { 2, 3 }                  -- monster slots -> entity 8+slot*2
 local OT6_SLASH = 0x01
 local QSLAM = 3                           -- Quadra Slam: tech index; id $55+3 = $58
-local QSLAM_COST = 4                      -- Ot6AbilityCostTbl: $58 -> 4
+local QSLAM_COST = 16                     -- Ot6AbilityCostTbl: $58 -> 16 (#45)
 local GUARD_HP = 0xF000                   -- pinned high so a hit never kills
 
 local function CURMP(s) return 0x3C08 + s * 2 end
@@ -176,7 +176,7 @@ H.run({ maxFrames = 40000 }, {
   H.call(function()
     -- snesPrgRom is indexed by ROM FILE offset (HiROM: SNES $F0xxxx = file
     -- $30xxxx), the convention glyphCanary scans on.
-    local sig = { 0x5d, 0x02, 0x5e, 0x05, 0x5f, 0x07 }   -- Pummel/AuraBolt/Suplex
+    local sig = { 0x5d, 0x04, 0x5e, 0x0a, 0x5f, 0x0d }   -- Pummel/AuraBolt/Suplex
     local base
     for a = 0x300000, 0x30FFF0 do
       local ok = true
@@ -196,15 +196,15 @@ H.run({ maxFrames = 40000 }, {
       cost[H.readRomByte(a)] = H.readRomByte(a + 1)
       a = a + 2
     end
-    local want = {                        -- kits.md's authored numbers
-      [0x5d] = 2,  [0x64] = 30,           -- Blitz:   Pummel, Bum Rush
-      [0x55] = 1,  [0x58] = 4, [0x5c] = 8, -- Bushido: Dispatch, Quadra Slam, Cleave
+    local want = {                        -- kits.md's authored numbers (#45)
+      [0x5d] = 4,  [0x64] = 46,           -- Blitz:   Pummel, Bum Rush
+      [0x55] = 4,  [0x58] = 16, [0x5c] = 46, -- SwdTech: Dispatch, Quadra Slam, Cleave
       [0xaa] = 4,  [0xa8] = 16, [0xa6] = 18, -- Tools:  AutoCrossbow, Drill, Chain Saw
     }
     for id, c in pairs(want) do
       H.assertEq(cost[id], c, string.format("cost table: id $%02x costs %d", id, c))
     end
-    H.log("ON build: cost table verified for Blitz + Bushido + Tools")
+    H.log("ON build: cost table verified for Blitz + SwdTech + Tools")
   end),
 
   -- ------------------------------------ 2. CHARGE (ON) / FREE (OFF, control) --
@@ -224,7 +224,7 @@ H.run({ maxFrames = 40000 }, {
     H.log(string.format("affordable Quadra Slam: MP 50 -> %d, guard damage %d", left, dmg))
     H.assertEq(dmg > 0, true, "the tech landed its hit (both builds)")
     if mode == "on" then
-      H.assertEq(left, 50 - QSLAM_COST, "ON: Quadra Slam charged exactly its table cost (4)")
+      H.assertEq(left, 50 - QSLAM_COST, "ON: Quadra Slam charged exactly its table cost (16)")
     else
       H.assertEq(left, 50, "OFF: Quadra Slam is free -- vanilla behavior, the negative control")
     end
@@ -235,8 +235,8 @@ H.run({ maxFrames = 40000 }, {
   -- The insufficient-mp path is vanilla's own; on the OFF build the tech is
   -- free so there is nothing to refuse -- run this half only under the flag.
   -- The refusal actor is the NEXT of the opening wave (a different, still-full
-  -- slot); Dispatch (tech 0, cost 1) sits at row 0 of the ceiling-2 window
-  -- {0,1,2}, and MP 0 < 1 fizzles.
+  -- slot); Dispatch (tech 0, cost 4) sits at row 0 of the ceiling-2 window
+  -- {0,1,2}, and MP 0 < 4 fizzles.
   H.cond(function() return mode == "on" end, {
     H.driveUntil(function()
       return H.readByte(MENU) ~= 0 and H.readByte(ACTOR) ~= chargeSlot

@@ -22,7 +22,7 @@
 --      drop the frame a queued verb's cost is paid).
 --   3. CASTER: the same window under an installed TERRA (knows spells)
 --      shows her pool the same way -- the wallet is universal.
---   4. DROP: after Sabin's Pummel (cost 2) resolves, reopening Blitz shows
+--   4. DROP: after Sabin's Pummel (cost 4) resolves, reopening Blitz shows
 --      exactly two less.
 --   5. CLEANUP: the vanilla Magic list, opened after, does NOT carry the
 --      wallet cells (the one-shot blank on switch).
@@ -175,8 +175,8 @@ H.run({ maxFrames = 40000 }, {
     H.waitFrames(2),                            -- hands off: wait mode
   }, "the Pummel resolves (MP charged)"),
   H.call(function()
-    H.assertEq(H.readWord(0x3C08 + actor * 2), mpPre - 2,
-      "Pummel charged its 2 MP")
+    H.assertEq(H.readWord(0x3C08 + actor * 2), mpPre - 4,
+      "Pummel charged its 4 MP")
   end),
   H.driveUntil(function() return H.readByte(MENU) ~= 0 end, 6000, {
     H.waitFrames(4),
