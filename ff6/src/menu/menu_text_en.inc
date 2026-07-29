@@ -118,13 +118,23 @@ MENU_TEXT_INC = 1
 ; field_menu.asm assembles under the ending-credits .charmap that
 ; ending_anim.asm installs earlier in menu_main.asm's include order (and gets
 ; no $00 terminator), which is exactly issue #39's garbled SwdTech page.
+; #43: rows must be ODD and <= 15 -- the EN window shows a tilemap row PAIR in
+; twelve scanlines (odd eight, even four) and stops after row 15.  These labels
+; shipped on rows 4/6/8 and the LEARNED caption on 13 with its grid running to
+; 21, so every slot rendered as a four-scanline sliver and most of the pool was
+; off the bottom.  See Ot6LoadoutDrawSlots' cadence note in field_menu.asm.
 .define OT6_LOADOUT_TITLE               BG1A, {2, 1},  {"BUSHIDO LOADOUT"}
-.define OT6_LOADOUT_POOL                BG1A, {2, 13}, {"LEARNED"}
+; The caption rides the TITLE row (the Rage page's own resolution for its price
+; line): the window holds eight text rows and the page needs nine -- title,
+; three boost slots, the caption, and four rows of a two-column pool that must
+; hold all eight techs.  Something had to double up, and the title row is the
+; only row where a second blue chrome caption cannot be misread as data.
+.define OT6_LOADOUT_POOL                BG1A, {22, 1}, {"LEARNED"}
 ; #38: every Bushido tech costs at least 1 BP, so the 0x row is retired and the
-; page is three rows deep -- 1x/2x/3x at tilemap rows 4/6/8.
-.define OT6_LOADOUT_LBL1                BG1A, {2, 4},  {"1x"}
-.define OT6_LOADOUT_LBL2                BG1A, {2, 6},  {"2x"}
-.define OT6_LOADOUT_LBL3                BG1A, {2, 8},  {"3x"}
+; page is three rows deep -- 1x/2x/3x at tilemap rows 3/5/7 (#43).
+.define OT6_LOADOUT_LBL1                BG1A, {2, 3},  {"1x"}
+.define OT6_LOADOUT_LBL2                BG1A, {2, 5},  {"2x"}
+.define OT6_LOADOUT_LBL3                BG1A, {2, 7},  {"3x"}
 .define OT6_LOADOUT_MP_SUFFIX           {" MP"}
 
 ; OT6 (#40): Gau's 8-slot rage loadout page.  Same encode-pipeline rule as the

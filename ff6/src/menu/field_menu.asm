@@ -2763,6 +2763,39 @@ Ot6LoadoutDrawC3:
 ; issue #38: every Bushido tech costs at least 1 BP, so the page shows 1x/2x/3x
 ; and the 0x row is gone.  Row i (0..2) draws WORD SLOT i+1 -- the stored format
 ; is untouched (four 3-bit fields at $1e1d), slot 0 is simply never read.
+;
+; THE 12-PIXEL CADENCE (issue #43), and why every row on this page is ODD.
+; The EN field-menu window does NOT show BG1 ScreenA one tile row per eight
+; scanlines: a tilemap row PAIR is displayed in twelve scanlines, the odd row
+; getting eight of them and the even row four, and nothing past row 15 is
+; inside the window at all.  Measured with a per-row glyph ruler poked into the
+; shadow (tools/tests/probe_ragegeom.lua): odd rows 1,3,5,..,15 render whole at
+; screen y = 116 + 6*(row-1); even rows show only their bottom three scanlines.
+; Vanilla says the same from the other side -- every EN cursor list for this
+; window is `cursor_pos {x, 116 + n*12}` (skills.asm:124-125, :247-250,
+; :292-298) and DrawRageName biases its row `.if LANG_EN` (skills.asm:1518).
+;
+; This page shipped with its slots on EVEN rows 4/6/8 and its LEARNED grid on
+; 15/17/19/21, so every tech name was a four-scanline sliver beside a
+; full-height title and three of the pool's four rows were off the bottom of
+; the window.  #39 fixed the page's GLYPHS; this is its geometry.  The layout
+; is now vanilla's own shape for this window -- eight usable text rows:
+;
+;   row  1   BUSHIDO LOADOUT            LEARNED     (col 2 / col 22)
+;   row  3   1x  <tech, 12 cells @5>   n MP @18
+;   row  5   2x  ...
+;   row  7   3x  ...
+;   row  9   pool cell 0 (col 2)   pool cell 4 (col 16)
+;   row 11   pool cell 1           pool cell 5
+;   row 13   pool cell 2           pool cell 6
+;   row 15   pool cell 3           pool cell 7
+;
+; The page needs NINE rows and the window has eight, so the pool's caption
+; rides the title row -- the same resolution the Rage page used for its price
+; line, and the title row is the one row where a second blue chrome word
+; cannot be misread as a slot's data.  Columns: a 12-cell BushidoName at col 16
+; ends at 27 and the window's own right border is column 30, so both pool
+; columns and the "n MP" field (18..21) are inside the frame.
 Ot6LoadoutDrawSlots:
         lda     #BG1_TEXT_COLOR::DEFAULT
         sta     zTextColor
@@ -2773,9 +2806,9 @@ Ot6LoadoutDrawSlots:
         jsl     Ot6LoadoutSlotTech      ; F0: A = validated tech for this slot
         sta     $e5                     ; -> name value
         lda     $e2
-        asl                             ; row = 4 + i*2  (tilemap rows 4/6/8)
+        asl                             ; row = 3 + i*2 -- ODD rows 3/5/7 (#43)
         clc
-        adc     #$04
+        adc     #$03
         sta     $e6
         ldx     #$0005                  ; name column
         jsr     Ot6DrawBushName
@@ -2791,7 +2824,11 @@ Ot6LoadoutDrawSlots:
         bcc     @lp
         rts
 
-; ---- draw the LEARNED pool as a 2 x 4 grid ----
+; ---- draw the LEARNED pool as a 2 x 4 grid on the window's ODD rows (#43) ----
+; Column-major: filled cells 0..3 go down the left column (col 2), 4..7 down the
+; right (col 16), both on rows 9/11/13/15.  All eight Bushido techs therefore
+; fit INSIDE the window -- the old {15,17,19,21} grid put three of its four rows
+; past row 15, where this window shows nothing (see the cadence note above).
 Ot6LoadoutDrawPool:
         lda     #BG1_TEXT_COLOR::DEFAULT
         sta     zTextColor
@@ -2810,13 +2847,13 @@ Ot6LoadoutDrawPool:
         sbc     #$04
         asl
         clc
-        adc     #$0f                    ; right column, row 15 + (cell-4)*2
+        adc     #$09                    ; right column, row 9 + (cell-4)*2
         sta     $e6
-        ldx     #$0011                  ; col 17
+        ldx     #$0010                  ; col 16 (12-cell name -> 16..27 < 30)
         bra     @draw
 @left:  asl
         clc
-        adc     #$0f                    ; left column, row 15 + cell*2
+        adc     #$09                    ; left column, row 9 + cell*2
         sta     $e6
         ldx     #$0002                  ; col 2
 @draw:  jsr     Ot6DrawBushName
@@ -2877,12 +2914,16 @@ Ot6LoadoutCostTiles:    raw_text OT6_LOADOUT_MP_SUFFIX  ; " MP" + $00 (issue #39
                         ; picks up ending_anim.asm's credits charmap)
 
 ; ---- cursor: single column, three rows over the boost slots (#38) ----
+; y = 116 + n*12 is the EN field menu's text pitch for THIS window, copied from
+; vanilla's own magic/esper/rage cursor tables (skills.asm:124-125, :247-250,
+; :292-298).  Tilemap row = 2n + 1, so rows 3/5/7 are n = 1/2/3.  The old
+; {30,46,62} was an 8px-per-row assumption and put the cursor above the window.
 Ot6LoadoutCursorProp:
         cursor_prop {0, 0}, {1, 3}, NO_XY_WRAP
 Ot6LoadoutCursorPos:
-        cursor_pos {8, 30}
-        cursor_pos {8, 46}
-        cursor_pos {8, 62}
+        cursor_pos {8, 116 + 1 * 12}    ; row 3  (1x)
+        cursor_pos {8, 116 + 2 * 12}    ; row 5  (2x)
+        cursor_pos {8, 116 + 3 * 12}    ; row 7  (3x)
 
 ; ---- positioned labels (issue #39: the strings live in menu_text_en.inc so
 ; the encode pipeline maps them to menu-font tiles and null-terminates them;

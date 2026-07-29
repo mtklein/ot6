@@ -23,12 +23,29 @@
 --     still all-zero (a runaway unterminated draw can not leave them blank).
 --
 -- issue #38 refloored the page: every Bushido tech costs at least 1 BP, so the
--- 0x row is RETIRED and the window is three rows -- 1x/2x/3x at tilemap rows
--- 4/6/8.  The stored format did NOT move (the same packed word at $1e1d, four
--- 3-bit fields; word slot 0 is simply never read), so this test's install and
--- its AUTO word are unchanged.  Row 10 -- where the old 3x row drew -- joins
--- the blank-canary set: nothing may draw there any more, and a runaway draw
--- would still carpet it.
+-- 0x row is RETIRED and the window is three rows -- 1x/2x/3x.  The stored
+-- format did NOT move (the same packed word at $1e1d, four 3-bit fields; word
+-- slot 0 is simply never read), so this test's install and its AUTO word are
+-- unchanged.
+--
+-- issue #43 -- THE GEOMETRY, and why this test shipped a broken page green.
+-- Everything above asserts WHAT is drawn; nothing asserted WHERE, and the
+-- where was wrong from v0.5.  The EN field-menu window does not show BG1
+-- ScreenA one tile row per eight scanlines: a row PAIR occupies twelve
+-- scanlines, the ODD row getting eight and the even row four, and nothing past
+-- row 15 is inside the window at all (measured with a per-row glyph ruler,
+-- tools/tests/probe_ragegeom.lua; vanilla says it from the other side -- every
+-- EN cursor list for this window is `cursor_pos {x, 116 + n*12}`,
+-- skills.asm:124-125, and DrawRageName biases its row `.if LANG_EN`,
+-- skills.asm:1518-1521).  The page drew its slots on EVEN rows 4/6/8 and its
+-- LEARNED grid on 15/17/19/21, so every tech name rendered as a four-scanline
+-- sliver and THREE of the pool's four rows were off the bottom of the window.
+-- It now draws on odd rows only, all of it inside row 15, with the pool as two
+-- columns of four (field_menu.asm Ot6LoadoutDrawSlots' cadence note).
+--
+-- Hence the EVEN-ROW / ROW>15 / BORDER-COLUMN CANARY at the bottom of this
+-- file -- the same assertion class menu_ragepage.lua carries.  It is not
+-- decoration; it is the regression, and it is the thing this test was missing.
 --
 -- Fixture: arvis_wake (same boot as menu_bushidoloadout / menu_esperdetail).
 -- Its lead has no Bushido command, so the SwdTech row is installed the house
@@ -69,6 +86,44 @@ local DISPATCH = { T.D,lo.i,lo.s,lo.p,lo.a,lo.t,lo.c,lo.h }
 local RETORT   = { T.R,lo.e,lo.t,lo.o,lo.r,lo.t }
 local SLASH    = { T.S,lo.l,lo.a,lo.s,lo.h }
 local DIGIT0, DIGIT9 = 0xb4, 0xbd
+local PAD = 0xff                        -- fixed_length_en.json: 0xFF = {pad}
+
+-- BushidoName, verbatim, out of the ROM Ot6DrawBushName itself reads (via
+-- _c35328 -> LoadArrayItem, skills.asm:1408-1416).  An 8-entry, 12-byte fixed
+-- record table (include/text/bushido_name_en.inc); LoadArrayItem copies all
+-- twelve bytes including the $ff pad tail, so a name's FULL 12-cell field is
+-- asserted, pads and all.  Reading the ROM rather than hardcoding means a text
+-- re-encode cannot silently invalidate the all-eight pool arm below -- the
+-- literals above stay as the positive control on the encode pipeline itself.
+local BUSHNAME = H.sym("BushidoName") & 0x3FFFFF
+local BUSH_SIZE = 12                    -- BushidoName::ITEM_SIZE
+local function bushBytes(id)
+  local t = {}
+  for i = 0, BUSH_SIZE - 1 do t[i + 1] = H.readRomByte(BUSHNAME + id * BUSH_SIZE + i) end
+  return t
+end
+local function bushText(id)             -- for the log only
+  local s = ""
+  for _, b in ipairs(bushBytes(id)) do
+    if b == PAD then s = s .. "."
+    elseif b >= 0x80 and b <= 0x99 then s = s .. string.char(65 + b - 0x80)
+    elseif b >= 0x9a and b <= 0xb3 then s = s .. string.char(97 + b - 0x9a)
+    else s = s .. "?" end
+  end
+  return s
+end
+
+-- #43 geometry, mirroring field_menu.asm's Ot6LoadoutDraw{Slots,Pool}: ODD
+-- tilemap rows only, nothing past row 15, nothing in the window's own border
+-- column 30.  Boost row i (0..2) = tilemap row 3 + i*2; pool cell n (0..7) is
+-- column-major -- left column (col 2) rows 9/11/13/15, right column (col 16)
+-- rows 9/11/13/15.  A 12-cell name at col 16 ends at 27, inside the border.
+local TITLE_ROW = 1
+local POOL_CAPTION_COL = 22             -- the caption rides the title row
+local NAME_COL, COST_COL = 5, 18
+local BOOST_ROWS = { 3, 5, 7 }
+local function poolRow(n) return 9 + (n % 4) * 2 end
+local function poolCol(n) return (n < 4) and 2 or 16 end
 
 local function assertRun(x0, y, bytes, what)
   for i, b in ipairs(bytes) do
@@ -88,11 +143,36 @@ end
 
 -- One slot row: name at col 5, then a 1-digit MP cost at col 18 + " MP".
 local function assertSlotRow(y, name, techname)
-  assertRun(5, y, name, techname)
-  local d = cell(18, y)
+  assertRun(NAME_COL, y, name, techname)
+  local d = cell(COST_COL, y)
   H.assertEq(d >= DIGIT0 and d <= DIGIT9, true,
-    string.format("%s: cost digit at {18,%d} (got %02x)", techname, y, d))
-  assertRun(19, y, { T.SP, T.M, T.P }, techname .. " ' MP'")
+    string.format("%s: cost digit at {%d,%d} (got %02x)", techname, COST_COL, y, d))
+  assertRun(COST_COL + 1, y, { T.SP, T.M, T.P }, techname .. " ' MP'")
+end
+
+-- THE GEOMETRY CANARY (#43) -- the assertion class this test was missing, and
+-- the reason a page whose every slot was a four-scanline sliver shipped green.
+-- An EVEN tilemap row is shown as four scanlines in this window, and rows past
+-- 15 are outside it entirely, so NOTHING the page draws may land on either.
+-- Column 30 is the window's own right border, so nothing may run into it.
+-- Both row rules were violated before the fix (slots on 4/6/8, pool on
+-- 15/17/19/21), and no cell-content assertion can see that -- only this can.
+local function assertGeometry(what)
+  for y = 0, 27 do
+    if y % 2 == 0 or y > 15 then
+      for x = 0, 31 do
+        H.assertEq(cell(x, y), 0, string.format(
+          "%s: {%d,%d} must stay blank -- row %d is %s", what, x, y, y,
+          y > 15 and "outside the window" or "even: four scanlines"))
+      end
+    end
+  end
+  for y = 1, 15, 2 do
+    for _, x in ipairs({ 30, 31 }) do
+      H.assertEq(cell(x, y), 0, string.format(
+        "%s: {%d,%d} is the border column or past it", what, x, y))
+    end
+  end
 end
 
 H.run({ maxFrames = 30000 }, {
@@ -138,39 +218,95 @@ H.run({ maxFrames = 30000 }, {
   H.waitFrames(90),                         -- draws + DMA settle
 
   H.call(function()
-    -- chrome
-    assertRun(2, 1, TITLE, "title BUSHIDO LOADOUT")
-    assertRun(2, 13, POOL, "LEARNED caption")
-    assertRun(2, 4,  { 0xb5, lo.x }, "label 1x")
-    assertRun(2, 6,  { 0xb6, lo.x }, "label 2x")
-    assertRun(2, 8,  { 0xb7, lo.x }, "label 3x")
+    -- chrome.  The LEARNED caption rides the TITLE row (#43): the window has
+    -- eight text rows and the page needs nine, and the pool's four rows are
+    -- not negotiable if all eight techs are to be inside the frame.
+    assertRun(2, TITLE_ROW, TITLE, "title BUSHIDO LOADOUT")
+    assertRun(POOL_CAPTION_COL, TITLE_ROW, POOL, "LEARNED caption")
+    assertRun(2, BOOST_ROWS[1], { 0xb5, lo.x }, "label 1x")
+    assertRun(2, BOOST_ROWS[2], { 0xb6, lo.x }, "label 2x")
+    assertRun(2, BOOST_ROWS[3], { 0xb7, lo.x }, "label 3x")
     -- #38: no 0x label anywhere on the page -- the retired rung must not be
-    -- drawn at its old home (row 4) nor anywhere else in the label column.
-    for _, y in ipairs({ 4, 6, 8, 10 }) do
+    -- drawn at its old home nor anywhere else in the label column.
+    for y = 0, 15 do
       H.assertEq(cell(2, y) == 0xb4 and cell(3, y) == lo.x, false,
         string.format("no 0x label at row %d (#38 retired the free rung)", y))
     end
     -- the three boost slots: ceiling 2 -> base 0 -> Dispatch/Retort/Slash
-    assertSlotRow(4, DISPATCH, "slot 1x Dispatch")
-    assertSlotRow(6, RETORT,   "slot 2x Retort")
-    assertSlotRow(8, SLASH,    "slot 3x Slash")
-    -- the LEARNED pool: exactly the three learned names, left column
-    assertRun(2, 15, DISPATCH, "pool Dispatch")
-    assertRun(2, 17, RETORT,   "pool Retort")
-    assertRun(2, 19, SLASH,    "pool Slash")
-    H.assertEq(cell(2, 21), 0, "no 4th pool row (only 3 learned)")
-    H.assertEq(cell(17, 15), 0, "right pool column empty (only 3 learned)")
-    -- spray canaries: undrawn rows are still cleared
-    assertRowBlank(0,  "row 0")
-    assertRowBlank(3,  "row 3 (between labels)")
-    assertRowBlank(10, "row 10 (#38: the retired 4th slot row)")
-    assertRowBlank(12, "row 12 (above LEARNED)")
-    -- and the title row past the title text
-    for x = 17, 31 do
-      H.assertEq(cell(x, 1), 0, string.format("title row tail blank {%d,1}", x))
+    assertSlotRow(BOOST_ROWS[1], DISPATCH, "slot 1x Dispatch")
+    assertSlotRow(BOOST_ROWS[2], RETORT,   "slot 2x Retort")
+    assertSlotRow(BOOST_ROWS[3], SLASH,    "slot 3x Slash")
+    -- the LEARNED pool: exactly the three learned names, left column, on the
+    -- window's odd rows.  Cross-check the hardcoded literals against the ROM
+    -- records the drawing code actually reads.
+    for n, name in ipairs({ DISPATCH, RETORT, SLASH }) do
+      assertRun(poolCol(n - 1), poolRow(n - 1), name, "pool cell " .. (n - 1))
+      assertRun(poolCol(n - 1), poolRow(n - 1), bushBytes(n - 1),
+        "pool cell " .. (n - 1) .. " vs BushidoName record")
     end
+    H.assertEq(cell(2, poolRow(3)), 0, "no 4th pool cell (only 3 learned)")
+    H.assertEq(cell(16, poolRow(0)), 0, "right pool column empty (3 learned)")
+    -- spray canaries: undrawn odd rows are still cleared
+    assertRowBlank(9 + 3 * 2, "row 15 (no 4th learned tech)")
+    -- the title row's gaps and tail: nothing may run into the window's own
+    -- right border, which lives in column 30.
+    for x = 17, 21 do
+      H.assertEq(cell(x, TITLE_ROW), 0,
+        string.format("title row gap blank {%d,1}", x))
+    end
+    for x = 29, 31 do
+      H.assertEq(cell(x, TITLE_ROW), 0,
+        string.format("title row tail blank {%d,1}", x))
+    end
+    assertGeometry("3 learned")
     H.screenshot("swdtech_page_player_path")
     H.log("PASSED: Skills->SwdTech via the player's path renders -- title, "
-      .. "labels, slots, costs, pool correct; undrawn rows still blank")
+      .. "labels, slots, costs, pool correct; every drawn cell on an ODD row "
+      .. "inside row 15 and clear of the border column")
+  end),
+
+  -- ---- #43: the WHOLE learned pool is inside the window ----
+  -- Three learned techs only ever exercised the left column's top three cells,
+  -- which is why a grid whose rows ran to 21 looked fine.  Back out to the
+  -- skills submenu, teach all eight, and re-enter: the pool now fills both
+  -- columns of all four rows, and every one of those cells must still be on an
+  -- odd row <= 15.  This is the acceptance criterion the old layout could not
+  -- meet at any learned count above three.
+  H.pressButtons({ "b" }, 3),
+  H.waitUntil(function() return st() == ST_SKILLS end, 300,
+    "back out of the configurator", 5),
+  H.call(function()
+    H.writeByte(LEARNED, 0xff)            -- all eight Bushido techs
+    H.writeByte(LOADOUT, 0)
+    H.writeByte(LOADOUT + 1, 0)           -- AUTO again
+  end),
+  H.pressButtons({ "a" }, 2),
+  H.waitUntil(function() return st() == ST_LOADOUT end, 300,
+    "configurator reopened with all eight learned", 5),
+  H.waitFrames(90),
+
+  H.call(function()
+    assertRun(2, TITLE_ROW, TITLE, "title still on row 1")
+    assertRun(POOL_CAPTION_COL, TITLE_ROW, POOL, "LEARNED caption still on row 1")
+    -- all eight, column-major: cells 0-3 down col 2, cells 4-7 down col 16.
+    for n = 0, 7 do
+      assertRun(poolCol(n), poolRow(n), bushBytes(n),
+        string.format("pool cell %d '%s' at {%d,%d}",
+          n, bushText(n), poolCol(n), poolRow(n)))
+    end
+    -- the three boost rows are still full-height rows with a priced tech on
+    -- them (ceiling 7 -> base 5 -> Stunner / Quadra Slice / Cleave).
+    for i, y in ipairs(BOOST_ROWS) do
+      assertRun(NAME_COL, y, bushBytes(4 + i), "boost row " .. i .. " tech")
+      local d = cell(COST_COL, y)
+      H.assertEq(d >= DIGIT0 and d <= DIGIT9, true,
+        string.format("boost row %d cost digit at {%d,%d} (got %02x)",
+          i, COST_COL, y, d))
+    end
+    assertGeometry("8 learned")
+    H.screenshot("swdtech_page_full_pool")
+    H.log("FULL POOL: all eight Bushido techs drawn in two columns of four on "
+      .. "rows 9/11/13/15 -- every cell inside the window, none on an even "
+      .. "row, none past row 15, none in column 30")
   end),
 })

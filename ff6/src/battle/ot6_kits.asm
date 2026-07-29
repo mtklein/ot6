@@ -2505,14 +2505,19 @@ Ot6RagePrev:                        ; L shoulder -> previous learned rage
 ;     capped-away earn at 5 bp costs nothing (the two are indistinguishable
 ;     inside a round: nothing else can raise a held character's bank).
 ;
-; THE PIP LANDS ON THE BLOCK FRAME (#33's clockwork rule, the one place this
-; deviates from Ot6RunicBP -- which banks silently and shows at the next
-; window open).  OT6_PIPSLOT / OT6_PIPTAIL are #33's own machinery: they point
-; the live pip cell at one character for ~half a second even with no battle
-; menu open, and Ot6PipStage paints the FULL bank.  Arming them on the same
-; instruction stream that writes OT6_BP_CLASS makes the visual event and the
-; mechanical event the same frame by construction, which is what the rule
-; asks for.
+; THE PIP LANDS ON THE DAMAGE FRAME, NOT THIS ONE (#42).  #37 armed
+; OT6_PIPSLOT/OT6_PIPTAIL right here, on the same instruction stream that
+; writes OT6_BP_CLASS -- visual event and mechanical event identical by
+; construction.  That satisfied #33 as written and not what #33 is for: this
+; commit precedes the damage numeral by 83-147 frames (measured,
+; battle_trueknight) while the tail is 32, so the pip flashed and faded about
+; two seconds before the blow visibly landed on the knight, and what a player
+; perceives as "the block" is the hit landing on the blocker.  So the earn
+; BANKS here, unchanged, and only the PAINT defers: the blocker's slot goes
+; into OT6_PIPPEND and Ot6PipPending (ot6_hud.asm) moves it into the live cell
+; off the numeral-counter edge -- #33's own Ot6RvPend*/Ot6RevealCommit shape,
+; on #33's own trigger.  A missed cover still paints, on the "Miss" frame; see
+; that proc for the ruling and for the Ot6ActionEnd backstop.
 ;
 ; entry (jsl from SetCoverTarget's commit): a16 (CoverEffect's own width, its
 ; `php/longa/.../plp` restores the caller's), index width EITHER -- the site
@@ -2541,11 +2546,10 @@ Ot6RagePrev:                        ; L shoulder -> previous learned rage
         lda     $3018,x
         ora     f:$7e0000+OT6_COVERPAID
         sta     f:$7e0000+OT6_COVERPAID  ; latch: paid this round
-        txa                     ; #33: the live pip cell follows the blocker
-        lsr                     ;   entity offset -> character slot
-        sta     f:$7e0000+OT6_PIPSLOT
-        lda     #32             ;   for ~half a second, so the gain lands on
-        sta     f:$7e0000+OT6_PIPTAIL    ;   screen with no menu open
+        txa                     ; #42: DEFER the pip.  the live cell is armed
+        lsr                     ;   on the damage-numeral frame, not here --
+        inc                     ;   slot + 1, 0 = nothing pending
+        sta     f:$7e0000+OT6_PIPPEND
 done:   plp
         rtl
 .endproc

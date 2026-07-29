@@ -33,6 +33,10 @@
                                 ;   it sits past the shadow clear below, and a
                                 ;   stale bit would eat the first cover of the
                                 ;   battle instead of costing a no-op
+        sta     f:$7e0000+OT6_PIPPEND   ; nor a deferred pip paint (#42): it
+                                ;   also sits past the clear, and a stale slot
+                                ;   would paint a phantom pip on the first
+                                ;   damage numeral of the NEXT battle
         lda     #$01
         sta     OT6_BP_CLASS           ; characters open with 1 bp, octopath-style
         sta     $3e9e
@@ -140,7 +144,16 @@
         bcs     done            ; capped at 5
         inc
         sta     OT6_BP_CLASS,x
-done:   plp
+        ; #42: the BACKSTOP for a deferred cover pip.  Reached by every actor,
+        ; monsters included (they are the ones whose swings a knight covers),
+        ; and placed AFTER the charge arm above so a pending cover wins the one
+        ; live cell -- the actor's own bank restages at the next window open,
+        ; a cover earn has no other moment.  Normally a no-op: the numeral
+        ; frame already consumed the pending value.  It fires when the action
+        ; issued no numeral at all, or a $ffff "hide numerals" one -- the same
+        ; hole Ot6RevealCommit is called at the top of this proc to plug.
+done:   jsr     Ot6PipPending
+        plp
         rtl
 .endproc
 
