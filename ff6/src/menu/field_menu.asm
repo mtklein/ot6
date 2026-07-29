@@ -2746,6 +2746,8 @@ Ot6LoadoutDrawC3:
         sta     zTextColor
         ldy     #near Ot6LoadoutTitleText
         jsr     DrawPosText
+        ldy     #near Ot6LoadoutHintText        ; #44: "L/R SWAPS", blue chrome
+        jsr     DrawPosText
         ldy     #near Ot6LoadoutPoolText
         jsr     DrawPosText
         lda     #BG1_TEXT_COLOR::DEFAULT
@@ -2781,7 +2783,7 @@ Ot6LoadoutDrawC3:
 ; the window.  #39 fixed the page's GLYPHS; this is its geometry.  The layout
 ; is now vanilla's own shape for this window -- eight usable text rows:
 ;
-;   row  1   BUSHIDO LOADOUT            LEARNED     (col 3 / col 22)
+;   row  1   SWDTECH  L/R SWAPS  LEARNED  (cols 3 / 11 / 22)
 ;   row  3   1x  <tech, 12 cells @6>   n MP @19
 ;   row  5   2x  ...
 ;   row  7   3x  ...
@@ -2794,6 +2796,14 @@ Ot6LoadoutDrawC3:
 ; rides the title row -- the same resolution the Rage page used for its price
 ; line, and the title row is the one row where a second blue chrome word
 ; cannot be misread as a slot's data.
+;
+; #44: and a THIRD word rides it, the L/R control hint.  With all eight rows
+; spoken for, the room came out of the title -- "BUSHIDO LOADOUT" (cols 3-17)
+; became "SWDTECH" (3-9), which is also the name every other EN string uses for
+; this skill and the name of the row the player picked to get here.  The only
+; other free run on the page is columns 23-29 of the three slot rows, seven
+; cells wide and split across three rows; nothing legible fits there.  See
+; OT6_LOADOUT_HINT in menu_text_en.inc.
 ;
 ; THE CURSOR GUTTER (#43, third round), and why every column above is one
 ; further right than it shipped.  `cursor_pos {x,y}` is the top-left of a 16x16
@@ -2952,6 +2962,7 @@ Ot6LoadoutCursorPos:
 ; without a terminator DrawPosText streams the data/code that follows into
 ; the tilemap -- the garbled-page bug) ----
 Ot6LoadoutTitleText:    pos_text OT6_LOADOUT_TITLE
+Ot6LoadoutHintText:     pos_text OT6_LOADOUT_HINT
 Ot6LoadoutPoolText:     pos_text OT6_LOADOUT_POOL
 Ot6LoadoutLbl1Text:     pos_text OT6_LOADOUT_LBL1
 Ot6LoadoutLbl2Text:     pos_text OT6_LOADOUT_LBL2
@@ -3011,6 +3022,8 @@ Ot6RageDrawC3:
         sta     zTextColor
         ldy     #near Ot6RageTitleText
         jsr     DrawPosText
+        ldy     #near Ot6RageHintText           ; #44: "L/R SWAPS" on row 3
+        jsr     DrawPosText
         ldy     #near Ot6RageLearnedText
         jsr     DrawPosText
         lda     #BG1_TEXT_COLOR::DEFAULT
@@ -3056,6 +3069,7 @@ Ot6RagePrice:
 ; `cursor_prop {0,0}, {2,8}`, skills.asm:281-299):
 ;
 ;   row  1   RAGE LOADOUT                    8 MP EACH
+;   row  3   L/R SWAPS       (#44: the control hint -- row 3 was spare)
 ;   row  5   slot 0 (col 3)  slot 1 (col 16)
 ;   row  7   slot 2          slot 3
 ;   row  9   slot 4          slot 5
@@ -3105,12 +3119,25 @@ Ot6RageDrawSlots:
 :       ldx     #$0003                  ; even slot -> left column (3: the
                                         ;   cursor at x=8 owns columns 1-2)
 :       phx                             ; Ot6RageShow kills X
-        ; --- the beast ---
+        ; --- the beast, or #44's empty marker ---
+        ; An unset slot draws "- EMPTY -" in BLUE, the page's chrome colour, so
+        ; it cannot be mistaken for a beast (every MonsterName is Mixed Case in
+        ; the DEFAULT colour).  The colour has to be chosen per row rather than
+        ; once for the loop, because which rows are empty changes with the
+        ; loadout -- and with the collection, since AUTO's window is only as
+        ; long as the number of species hunted.
         lda     $e2
         jsl     Ot6RageShow             ; F0: carry set + A = the id to draw
-        bcs     :+
-        lda     #$ff                    ; blank row
-:       sta     $e5                     ; -> name value
+        bcs     @beast
+        lda     #BG1_TEXT_COLOR::BLUE
+        sta     zTextColor
+        lda     #$ff                    ; the blank sentinel
+        bra     @name
+@beast: pha                             ; park the id across the colour store
+        lda     #BG1_TEXT_COLOR::DEFAULT
+        sta     zTextColor
+        pla
+@name:  sta     $e5                     ; -> name value
         plx                             ; X = the name column again
         jsr     Ot6DrawRageName
         ldx     $e2
@@ -3119,8 +3146,18 @@ Ot6RageDrawSlots:
         bcc     @lp
         rts
 
-; ---- draw one monster (rage) name.  in: $e5 = rage id ($ff = blank),
+; ---- draw one monster (rage) name.  in: $e5 = rage id ($ff = unset),
 ;      $e6 = row, X = col.  The Ot6DrawBushName shape over MonsterName. ----
+;
+; #44: an unset slot used to be a run of $ff pads -- correct (it overwrote the
+; whole name field, so a revert wiped what was there) and unreadable.  The
+; owner's playtest read the blank rows as a bug rather than as "you have not
+; hunted eight species yet".  It now spells "- EMPTY -", which is the honest
+; word in BOTH of the states that produce a blank row: an AUTO window shorter
+; than eight, and a MANUAL slot whose byte is $00.  Ot6RageList skips exactly
+; these slots when it builds the battle menu, so an empty row here is an empty
+; slot there.  See OT6_RAGE_EMPTY in menu_text_en.inc for the full derivation
+; and for why "-default-" would have been a lie.
 Ot6DrawRageName:
         lda     $e6
         jsr     GetBG1TilemapPtr        ; A = row, X = col -> X = tilemap dest
@@ -3135,18 +3172,29 @@ Ot6DrawRageName:
         lda     $e5
         jsr     LoadArrayItem           ; stage the name into $7e9e8b
         jmp     DrawPosTextBuf
-@blank: ldy     #MonsterName::ITEM_SIZE ; blank the full name width, so a
-        ldx     #$9e8b                  ;   revert wipes what was there
-        stx     hWMADDL
-        lda     #$ff
-:       sta     hWMDATA
-        dey
-        bne     :-
-        stz     hWMDATA
+@blank: ldx     #$9e8b                  ; the marker is MonsterName::ITEM_SIZE
+        stx     hWMADDL                 ;   cells wide, so it still overwrites
+        ldx     #$0000                  ;   the full field a name left behind
+:       lda     f:Ot6RageEmptyTiles,x   ; (long,X -- there is no long,Y mode)
+        beq     :+
+        sta     hWMDATA
+        inx
+        bra     :-
+:       stz     hWMDATA
         jmp     DrawPosTextBuf
 
+Ot6RageEmptyTiles:      raw_text OT6_RAGE_EMPTY ; "- EMPTY - " + $00 (issue #39:
+                        ; encoded via menu_text_en.inc -- a bare literal here
+                        ; picks up ending_anim.asm's credits charmap)
+
 ; ---- draw the LEARNED count (three digits, col 11 of the caption row) ----
+; #44: the colour is set HERE rather than inherited.  Ot6RageDrawSlots now
+; picks DEFAULT or BLUE per row (the empty marker is chrome), so whatever the
+; last slot happened to be would otherwise decide what colour the collection
+; score came out in.  The count is data: DEFAULT, always.
 Ot6RageDrawCount:
+        lda     #BG1_TEXT_COLOR::DEFAULT
+        sta     zTextColor
         jsl     Ot6RageCount            ; F0: A = rages known (0..255)
         pha
         lda     #$0f                    ; row 15 -- the LAST row the window
@@ -3213,6 +3261,7 @@ Ot6RageCursorPos:
         cursor_pos {112, 116 + 5 * 12}
 
 Ot6RageTitleText:       pos_text OT6_RAGE_TITLE
+Ot6RageHintText:        pos_text OT6_RAGE_HINT
 Ot6RageEachText:        pos_text OT6_RAGE_EACH
 Ot6RageLearnedText:     pos_text OT6_RAGE_LEARNED
 

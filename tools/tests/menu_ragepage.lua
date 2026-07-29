@@ -65,6 +65,17 @@
 -- all ten bytes including the $ff pad tail (item.asm:1255-1276), so a name's
 -- full 10-cell field is asserted, pads and all.
 --
+-- issue #44 -- THE CONTROL HINT and THE EMPTY MARKER.  Two owner-playtest
+-- findings on a page that already rendered correctly.  L/R cycling the
+-- cursored slot is the page's only real interaction and nothing named it; and
+-- an unset slot was a run of $ff pads, which reads as a rendering bug rather
+-- than as "you have not hunted eight species yet".  Row 3 was spare (the page
+-- draws on 1/5/7/9/11/15), so the hint cost nothing but that row; the marker
+-- replaces the pad fill over exactly the same ten cells.  The EXPECTED cells
+-- below were rewritten to that layout deliberately -- assertRowBlank(3) became
+-- a positive assertion on the hint plus head/tail guards, and assertEmptyRow
+-- checks the marker's bytes instead of ten pads.  Neither was loosened.
+--
 -- Fixture: arvis_wake (the menu_swdtechpage / menu_bushidoloadout boot).  Its
 -- lead has no Rage command, so it is installed the house "install state" way:
 -- the lead's third battle-command byte becomes BATTLE_CMD::RAGE ($10) and five
@@ -95,10 +106,21 @@ local function cell(x, y) return H.readByte(BG1A + x * 2 + y * 64) end
 -- menu text codec (ff6/tools/char_table/text_en.json): 'A'=$80.. 'a'=$9a..
 -- '0'=$b4.. ' '=$ff.  ZERO_CHAR and " MP" are menu_text_en.inc.raw:7,:128.
 local T = { A=0x80, C=0x82, D=0x83, E=0x84, G=0x86, H=0x87, L=0x8b, M=0x8c,
-            N=0x8d, O=0x8e, P=0x8f, R=0x91, T=0x93, U=0x94, SP=0xff }
+            N=0x8d, O=0x8e, P=0x8f, R=0x91, S=0x92, T=0x93, U=0x94, W=0x96,
+            Y=0x98, DASH=0xc4, SLASH=0xc0, SP=0xff }
 local TITLE   = { T.R,T.A,T.G,T.E,T.SP,T.L,T.O,T.A,T.D,T.O,T.U,T.T }  -- RAGE LOADOUT
 local LEARNED = { T.L,T.E,T.A,T.R,T.N,T.E,T.D }
 local EACH_TX = { T.E,T.A,T.C,T.H }
+-- #44: the control hint, character for character the same string the Bushido
+-- loadout page draws.  Both pages cycle the cursored entry with L/R and both
+-- shipped without saying so; a player who learns the idiom on one must not
+-- have to re-learn it on the other, so the strings are asserted to be equal by
+-- being written out identically in both tests.
+local HINT    = { T.L,T.SLASH,T.R,T.SP,T.S,T.W,T.A,T.P,T.S }  -- L/R SWAPS
+-- #44: what an UNSET slot draws now, in place of a run of $ff pads.  Exactly
+-- MonsterName::ITEM_SIZE (10) cells, so it still overwrites a name completely
+-- and a revert wipes what was there -- the property the pad fill had.
+local EMPTY_TX = { T.DASH,T.SP,T.E,T.M,T.P,T.T,T.Y,T.SP,T.DASH,T.SP }
 local ZERO_CHAR = 0xb4
 local MP_SUFFIX = { T.SP, T.M, T.P }
 local PAD = 0xff                        -- fixed_length_en.json: 0xFF = {pad}
@@ -127,6 +149,13 @@ end
 -- cross byte boundaries the way a real Gau's does, and short of eight so the
 -- same page shows filled AND empty rows.
 local KNOWN = { 3, 20, 41, 90, 130 }    -- Ninja Ursus Beakor Ghost Zombone
+-- #44: ten species -- more than the eight slots -- so the last phase of this
+-- test can show the page with NO empty row on it.  The empty marker is only
+-- honest if it disappears the moment a slot has something in it, and the only
+-- way to see that is a state where the AUTO window fills every slot.  AUTO is
+-- "the first eight known in id order" (Ot6RageNth), so the eight drawn are the
+-- eight lowest ids here and 150/200 stay out of the loadout.
+local KNOWN_FULL = { 3, 5, 20, 41, 60, 77, 90, 130, 150, 200 }
 
 local function teach(ids)
   for i = 0, 31 do H.writeByte(RAGES + i, 0) end
@@ -161,6 +190,7 @@ end
 -- columns and the window's right border is column 30 (measured at screen
 -- x = 245).  The price is flat by design, so one copy teaches the same rule.
 local TITLE_ROW, LEARNED_ROW = 1, 15
+local HINT_ROW = 3                      -- #44: row 3 was spare; the hint has it
 local LEFT_COL = 3                      -- the page's left margin (gutter = 1-2)
 local COST_COL, EACH_COL = 17, 22
 local COUNT_COL = 11                    -- just past "LEARNED " at 3..9
@@ -218,13 +248,30 @@ local function assertFilledRow(slot, id)
   local y, c = slotRow(slot), slotCol(slot)
   assertRun(c, y, nameBytes(id), string.format("slot %d name %s", slot, nameText(id)))
 end
--- An empty slot: the name field is $ff-blanked across its full width, so a
--- revert wipes what was there.  NOT $00 -- these cells ARE drawn, blank.
+-- An UNSET slot (#44).  It used to be $ff pads across the full name width --
+-- correct (a revert wiped what was there) and unreadable: the owner's playtest
+-- read the blank rows as a bug.  It now spells "- EMPTY - " over exactly the
+-- same ten cells, so the overwrite property is unchanged and the row says what
+-- it means.
+--
+-- WHY "EMPTY" AND NOT "DEFAULT".  A blank row has two causes and both mean the
+-- slot contributes NOTHING to the battle list, so neither is a default:
+--   * AUTO (all eight bytes $00) with fewer than eight species hunted --
+--     Ot6RageNth returns carry clear past the end of the window
+--     (ot6_kits.asm:1856-1858), and Ot6RageList's AUTO arm writes no id for it;
+--   * MANUAL with a $00 byte -- Ot6RageSlot returns carry clear (:1820) and
+--     Ot6RageList's @manual arm SKIPS the slot (:1993-2002).
+-- This test exercises the first (five species known, slots 5-7 unset) and the
+-- second (after the first edit, Ot6RageSeed leaves the tail at $00).
 local function assertEmptyRow(slot)
   local y, c = slotRow(slot), slotCol(slot)
-  for i = 0, NAME_SIZE - 1 do
-    H.assertEq(cell(c + i, y), PAD,
-      string.format("empty slot %d: name cell {%d,%d} blanked", slot, c + i, y))
+  H.assertEq(#EMPTY_TX, NAME_SIZE,
+    "the empty marker must be exactly a name field wide, or a revert leaves "
+    .. "the tail of the old name on screen")
+  for i, b in ipairs(EMPTY_TX) do
+    H.assertEq(cell(c + i - 1, y), b,
+      string.format("empty slot %d: '- EMPTY -' cell {%d,%d}",
+        slot, c + i - 1, y))
   end
 end
 
@@ -278,6 +325,8 @@ H.run({ maxFrames = 30000 }, {
       "the trance price on the title row is 8 (Dance's number, one authority)")
     assertRun(COST_COL + 1, TITLE_ROW, MP_SUFFIX, "' MP' after the price")
     assertRun(EACH_COL, TITLE_ROW, EACH_TX, "'EACH' -- the price is per trance")
+    -- #44: the control hint, on the one spare row above the slots
+    assertRun(LEFT_COL, HINT_ROW, HINT, "L/R SWAPS control hint")
     assertRun(LEFT_COL, LEARNED_ROW, LEARNED, "LEARNED caption")
     -- the collection score: three digits at col 11 of the caption row
     assertRun(COUNT_COL, LEARNED_ROW, { ZERO_CHAR, ZERO_CHAR, ZERO_CHAR + #KNOWN },
@@ -312,9 +361,24 @@ H.run({ maxFrames = 30000 }, {
           y > 15 and "outside the window" or "even: 3 scanlines"))
       end
     end
-    -- the odd rows the page deliberately leaves empty
-    for _, y in ipairs({ 3, 13 }) do
+    -- the odd row the page still deliberately leaves empty.  Row 3 used to be
+    -- here too; #44 spent it on the control hint, which is the whole point of
+    -- the change and so is asserted positively above rather than dropped from
+    -- this list silently.
+    for _, y in ipairs({ 13 }) do
       assertRowBlank(y, "undrawn odd row " .. y)
+    end
+    -- ... and the hint row's own head and tail, so the hint cannot grow into
+    -- the cursor gutter on its left or the window border on its right.  The
+    -- hint runs 3..11; everything else on row 3 is blank.
+    for x = 0, 2 do
+      H.assertEq(cell(x, HINT_ROW), 0, string.format(
+        "{%d,%d} is the cursor gutter -- the hint starts at column %d",
+        x, HINT_ROW, LEFT_COL))
+    end
+    for x = LEFT_COL + #HINT, 31 do
+      H.assertEq(cell(x, HINT_ROW), 0,
+        string.format("hint row tail blank {%d,%d}", x, HINT_ROW))
     end
     -- the gaps on the title row, its head and its tail: nothing may sit left
     -- of the page's margin (columns 0-2, the cursor's own gutter) and nothing
@@ -359,6 +423,11 @@ H.run({ maxFrames = 30000 }, {
         string.format("slot %d had no window entry to freeze, stays unset", i))
     end
     assertFilledRow(0, KNOWN[2])
+    -- #44: the page is MANUAL now and the tail slots are stored $00 -- a
+    -- genuinely empty slot that Ot6RageList skips, not an "unfilled default".
+    -- The marker must read the same here as it did under AUTO, because it
+    -- means the same thing: nothing in this slot, nothing in the battle list.
+    for slot = #KNOWN, 7 do assertEmptyRow(slot) end
     H.assertEq(H.readByte(ZMENUSTATE), ST_RAGELOAD, "still on the rage page")
     H.screenshot("rage_page_after_cycle")
     H.log("LIVE: R redrew slot 0 as '" .. nameText(KNOWN[2])
@@ -407,5 +476,48 @@ H.run({ maxFrames = 30000 }, {
     H.log("CURSOR WALK: the sprite is on slot 4 -- a lower LEFT row with a "
       .. "name in it -- and columns 1-2 are still empty on every slot row; the "
       .. "gutter is a property of the page, not of which slot is selected")
+  end),
+
+  -- ---- #44: a FULL page -- the empty marker must not survive a filled slot --
+  -- Every state above has empty rows in it, so on its own it cannot tell
+  -- "- EMPTY -" drawn for an unset slot from "- EMPTY -" leaking over a real
+  -- one.  Back out, hunt ten species, revert to AUTO, and re-enter: the window
+  -- now fills all eight slots, and the marker must appear NOWHERE on the page.
+  H.pressButtons({ "b" }, 3),
+  H.waitUntil(function() return st() == ST_SKILLS end, 300,
+    "back out of the rage configurator", 5),
+  H.call(function()
+    teach(KNOWN_FULL)
+    for i = 0, 7 do H.writeByte(RAGELOAD + i, 0) end   -- AUTO again
+  end),
+  H.pressButtons({ "a" }, 2),
+  H.waitUntil(function() return st() == ST_RAGELOAD end, 300,
+    "rage configurator reopened with ten species hunted", 5),
+  H.waitFrames(90),
+
+  H.call(function()
+    assertRun(LEFT_COL, TITLE_ROW, TITLE, "title still on row 1")
+    assertRun(LEFT_COL, HINT_ROW, HINT, "control hint still on row 3")
+    -- eight filled slots: AUTO's window is the eight LOWEST known ids
+    for slot = 0, 7 do
+      assertFilledRow(slot, KNOWN_FULL[slot + 1])
+    end
+    -- ... and the marker is gone from the page entirely.  Scan every slot
+    -- row's first cell: a filled slot starts with a name's first letter, never
+    -- with the marker's leading dash.
+    for slot = 0, 7 do
+      H.assertEq(cell(slotCol(slot), slotRow(slot)) ~= T.DASH, true,
+        string.format("slot %d is filled, so it must not draw the empty "
+          .. "marker at {%d,%d}", slot, slotCol(slot), slotRow(slot)))
+    end
+    -- the collection score counts the WHOLE bitfield, not the eight slots:
+    -- ten hunted, eight loaded, and the page must say ten.
+    assertRun(COUNT_COL, LEARNED_ROW,
+      { ZERO_CHAR, ZERO_CHAR + 1, ZERO_CHAR }, "LEARNED count = 010")
+    for n = 0, 7 do assertCursorGutter(n, "ten known, page full") end
+    H.screenshot("rage_page_full")
+    H.log("FULL PAGE: ten species hunted -- all eight slots carry a beast, the "
+      .. "'- EMPTY -' marker appears nowhere, and LEARNED still reports the "
+      .. "whole collection (010), not the eight that fit")
   end),
 })
