@@ -187,6 +187,58 @@ OT6_PIPPEND          := $ed74   ; #42: a DEFERRED pip paint -- character slot
                                 ;   for weakness reveals.  A stale value would
                                 ;   paint a spurious pip on the first numeral
                                 ;   of the next battle, so InitBP clears it.
+; #48: the break flash.  ONE byte per monster slot, stride 2 and indexed by
+; the slot offset 0,2..10 exactly like OT6_RVPEND_* (so a chip holding the
+; ENTITY offset in y writes OT6_BRKTICK-8,y and the walkers read
+; OT6_BRKTICK,y); odd bytes unused.  The byte is a small state machine:
+;   $00        idle
+;   $ff        PENDING -- the shields emptied at damage CALC and the flash is
+;              waiting for the damage frame (Ot6BreakArm, off Ot6RevealPoll's
+;              numeral edge / Ot6ActionEnd's backstop, the OT6_PIPPEND shape)
+;   1..$18     a live flash, counting down one per main-loop frame
+; OT6_BRKPAL banks the monster's own sprite-palette bits (w7e80db & $0e) for
+; the frame the flash hands the sprite back.
+; Both live PAST InitBP's shadow clear, so power-on junk is possible; every
+; reader is gated on the monster being present ($3aa8) and Ot6SeedShields
+; zeroes both per slot at every seed (fresh battle AND Cmd_20 reload), which
+; is the same clearing contract OT6_RVPEND_* already runs on.
+; OT6_BRKLIVE gates the per-frame painter, and it is not an optimisation --
+; it is the fix for a measured regression, and the measurement is worth more
+; than the feature.  Ot6BreakFlash first walked all six monster slots every
+; main-loop frame.  That stretched the True Knight fixture's fight by 10%:
+; battle_trueknight's "two more covers in the same round" went 1635 -> 1798
+; frames for an IDENTICAL outcome (3 covers, bank 2, one bank write), which
+; flipped its 6a assertion from the numeral frame to Ot6ActionEnd's backstop.
+;
+; Eight builds to pin it, and the first four conclusions were all wrong:
+;   painter disabled ................................. 1635  (pass)
+;   painter walks, sprite writes suppressed .......... 1798
+;   painter walks, EVERY store suppressed ............ 1798   -> not the writes
+;   painter early-outs on this flag, `jsr` retained .. 1798   -> not the walk
+;   CONTROL: 12 bare NOPs here, no OT6 feature ....... 1635  (pass)
+;   CONTROL: 80 bare NOPs here, no OT6 feature ....... 1798   -> not the feature
+;   inline gate at the call site, 8 cycles idle ...... 1635  (pass)
+; So the cause is neither writes, nor memory, nor this feature: WHAT COSTS IS
+; CYCLES SPENT IN Ot6BgHud_ext, AND THE MARGIN IS BETWEEN 12 AND 80 OF THEM.
+; That site runs from WaitFrame, after WaitVblank returns, once per battle
+; frame (btlgfx_main.asm:432-445), and the battle loop's per-iteration budget
+; is close enough to full that a hair over it makes WaitVblank miss and the
+; whole iteration costs an extra hardware frame.  The penalty saturates --
+; 20 cycles and 110 cycles both cost exactly 163 frames -- which is what a
+; near-zero-slack set of frames looks like.  #33's NMI lesson said the same
+; thing about vblank TRANSFERS; this says it about plain CPU time.
+;
+; Hence the gate is INLINE at the call site (ot6_hud.asm): even a `jsr` into
+; a proc that early-outs was over the line.  Nonzero = at least one slot has
+; a live countdown; the painter recomputes it as it walks, so a stale value
+; costs exactly one walk and the byte needs no init clear.
+OT6_BRKLIVE          := $ed75
+OT6_BRKTICK          := $ed76   ; 12 bytes
+OT6_BRKPAL           := $ed82   ; 12 bytes
+OT6_BREAK_FLASH      = $18      ; 24 frames: three 4-frame pulses (see
+                                ;   Ot6BreakFlash's `and #$04` cadence)
+OT6_BREAK_SFX        = $be      ; vanilla's Odin/Raiden cleave sfx
+                                ;   (btlgfx_main.asm:26054) -- see Ot6BreakArm
 .assert OT6_RVPEND_ELEM = OT6_SHADOW + (14 * 6), error, "reveal-pending must follow the shadow (InitBP clears both in one loop)"
 .assert OT6_WALLETPREV + 1 <= OT6_SHADOW + $70 - 1, error, "wallet cur/prev must sit inside InitBP's $70-byte clear"
 .assert OT6_COVERPAID = OT6_NUMCTR + 1, error, "cover-earn latch must follow the numeral counter (both live past InitBP's shadow clear)"
@@ -203,6 +255,11 @@ OT6_PIPPEND          := $ed74   ; #42: a DEFERRED pip paint -- character slot
 .assert OT6_PIPPEND > OT6_RAGETIER, error, "deferred-pip cell must not collide with the rage tier"
 .assert OT6_PIPPEND > OT6_SHADOW + $70 - 1, error, "deferred-pip cell must sit PAST InitBP's shadow clear (InitBP zeroes it explicitly)"
 .assert OT6_PIPPEND <= $ef1f, error, "OT6 shadow tail exceeds the measured-free range ($f120+ is PushMode7Vars')"
+.assert OT6_BRKLIVE > OT6_PIPPEND, error, "break-flash live flag must not collide with the deferred-pip cell"
+.assert OT6_BRKTICK > OT6_BRKLIVE, error, "break-flash state must not collide with its own live flag"
+.assert OT6_BRKPAL = OT6_BRKTICK + 12, error, "break-flash palette bank must follow the tick array without overlap"
+.assert OT6_BRKTICK > OT6_SHADOW + $70 - 1, error, "break-flash state sits PAST InitBP's shadow clear (Ot6SeedShields zeroes it per slot)"
+.assert OT6_BRKPAL + 12 - 1 <= $ef1f, error, "OT6 shadow tail exceeds the measured-free range ($f120+ is PushMode7Vars')"
 
 
 .endif

@@ -206,6 +206,22 @@
         jsr     Ot6PipPending   ;   a deferred cover pip paints on it too
 :       jsr     Ot6PipStage     ; #33: stage the four live pip-row words
         jsr     Ot6WalletStage  ; #35: stage the costed-list MP wallet
+        ; #48: drive any live break flash.  AFTER the poll above on purpose --
+        ; a break armed by this tick's numeral gets its first white frame on
+        ; that same frame, not the next one.  The gate is INLINE and not a
+        ; `jsr` into a proc that early-outs, because THIS SITE IS INSIDE THE
+        ; BATTLE LOOP'S FRAME BUDGET AND IT IS FULL: WaitFrame calls
+        ; UpdateCharText -> Ot6BgHud_ext once per battle frame
+        ; (btlgfx_main.asm:432-445), and battle_trueknight measures the
+        ; margin at somewhere between 12 and 80 cycles -- 40 bare NOPs added
+        ; right here, with no OT6 feature at all, stretch that fixture's fight
+        ; by 10% (1635 -> 1798 frames to the same three covers) and flip its
+        ; 6a numeral-frame assertion.  8 cycles is what this costs when no
+        ; monster is flashing, which is nearly always.
+        lda     OT6_BRKLIVE     ; db=$7e is pinned at the top of this proc
+        beq     :+
+        jsr     Ot6BreakFlash
+:
         plb
         ply
         plx
