@@ -817,16 +817,38 @@ add({
   end),
 })
 
--- ========================= 9. LEAP COSTS 2 MP ===============================
--- "only the basic Fight command is free" is the owner absolute
--- (mp-economy.md:30-34), and kit-gau.md §5 prices the leap at the
--- probe-collect rung -- flat 2, the same as Steal, for the same reason: it
--- COLLECTS rather than resolves.  Implemented (Ot6AbilityCost's cmd-$11 arm ->
--- Ot6LeapCost) and, until now, never exercised.  Gau is installed with LEAP
--- alone so the battle menu's first row IS the verb under test.
+-- ========================= 9. LEAP IS FREE ==================================
+-- REVERSED 2026-07-29 (owner): "I don't recall showing a cost for Leap.  If
+-- it's 2 MP, let's just make it free."  #40 had priced it at a flat 2 from
+-- "only the basic Fight command is free" (mp-economy.md:30-34) plus
+-- mp-economy.md:97's probe-collect rung.  Two things retired that:
+--
+--   * THE PRICE WAS NEVER DISPLAYED.  Leap is a top-level command ROW, not a
+--     list entry, and the four-row battle command window draws names only.
+--     command_window_data_set (btlgfx_main.asm:10099-10125) stores exactly
+--     two things per row -- the command byte and a GetTextColor colour -- and
+--     its template MenuText::_4 (:45137) is four fixed 8-byte records with no
+--     numeric field.  GetTextColor (:10704-10707) is `and #$80` on the
+--     DISABLED flag, so that window's only grey is "unavailable", not
+--     "unaffordable".  Compare Ot6BlitzRowDecorate (ot6_kits.asm:563-585),
+--     where a LIST row explicitly stamps a two-digit cost and greys through
+--     Ot6AbilityGrey.  So the only way to meet Leap's 2 MP was a refusal
+--     after the turn was spent, and that path (battle_main.asm:8354-8371 ->
+--     _setattackmes, :8720) composes no number either.  A price that is
+--     invisible until it refuses is a lying surface.
+--   * LEAP NOW *IS* THE FIGHT ROW ON THE VELDT (Ot6VeldtRow, battle_main.asm;
+--     battle_gaufight.lua).  #47 exists to guarantee Gau a free action; a
+--     priced Leap in the Fight row would have reopened that hole in the one
+--     territory Gau lives in.
+--
+-- So Ot6AbilityCost has no cmd-$11 arm any more and Leap falls out of the
+-- chain with vanilla's own cost, which is 0.  Steal keeps its flat 2 -- it is
+-- a verb BESIDE Fight, not the Fight row, and issue #52 owns its repricing.
+-- Gau is installed with LEAP alone so the battle menu's first row IS the verb
+-- under test.
 local COSTQ = 0x3620                 -- the queued-cost cell CreateAction writes
 local CMD_LEAP = 0x11
-local LEAP_COST = 2
+local LEAP_COST = 0
 local leapCosts = {}
 local leapWatch = false
 
@@ -840,7 +862,15 @@ add({
   end),
 })
 
--- 9a. the charge
+-- 9a. THE PRICE.  A full pool, so nothing about affordability is in play: the
+-- queue is watched directly, and the pool is asserted UNTOUCHED afterwards.
+-- The predicate is the queue write, not an MP change -- with the price gone
+-- there is no MP change to wait for, and the old "drive until mp ~= 20" would
+-- simply time out.  (The leap itself does not resolve here: the trance
+-- harness wounds the bench, and vanilla's TargetEffect_54 refuses a Leap with
+-- fewer than two party members present.  That is the same window the 2-MP
+-- version measured in -- the CHARGE lands at CreateAction, before the leap's
+-- own guard runs -- so this is a like-for-like replacement, not a weaker one.)
 add(trance("leap", function()
   startMp = 20
   cmd0 = CMD_LEAP
@@ -849,44 +879,60 @@ add({
   H.pressButtons({ "a" }, 4),          -- the menu's only row is Leap
   H.waitFrames(10),
   H.call(function() pinMp = false; pinPend = nil end),
-  H.driveUntil(function() return mp(actor) ~= 20 end, 8000, {
+  H.driveUntil(function() return #leapCosts > 0 end, 8000, {
     H.call(tick), H.waitFrames(3),
     H.call(function() H.setPad({}) end), H.waitFrames(6),
-  }, "leap: the charge lands"),
+  }, "leap: CreateAction stages a cost for command $11"),
+  ride(30),
   H.call(function()
     leapWatch = false
     H.log(string.format("leap: MP 20 -> %d, cost queue %s",
       mp(actor), tostring(leapCosts[1])))
     H.assertEq(leapCosts[1], LEAP_COST,
-      "Ot6AbilityCost's cmd-$11 arm priced the leap at the flat 2")
-    H.assertEq(mp(actor), 20 - LEAP_COST,
-      "and the universal charge took exactly 2 -- the probe-collect rung")
+      "CreateAction staged 0 for command $11: Ot6AbilityCost has no cmd-$11 "
+      .. "arm any more, so the leap falls out of the chain with vanilla's own "
+      .. "cost.  Pre-change this read 2 (Ot6LeapCost)")
+    H.assertEq(mp(actor), 20,
+      "and the universal charge took NOTHING -- the pool is exactly where it "
+      .. "started.  Pre-change it read 18")
   end),
 })
 
--- 9b. the refusal: under 2 MP the leap is refused, not silently freed
-add(trance("leap-refuse", function()
-  startMp = 1
+-- 9b. THE FREE FLOOR, AT ZERO.  The arm this replaces asserted the opposite:
+-- that a Gau under 2 MP was refused.  That refusal is exactly what the owner
+-- retired, and it is the whole point of the reversal -- with Leap sharing the
+-- FIGHT row on the Veldt (battle_gaufight.lua), a Gau at 0 MP standing on the
+-- Veldt would otherwise have had Leap (2), Rage (8), Magic and Item and no
+-- free action at all, in his own territory.  Zero, not one: 0 MP is the state
+-- the hole was about, and it is the strictly harder case.
+add(trance("leap-zero", function()
+  startMp = 0
   cmd0 = CMD_LEAP
 end, function() leapCosts = {}; leapWatch = true end))
 add({
   H.pressButtons({ "a" }, 4),
   H.waitFrames(10),
   H.call(function() pinMp = false; pinPend = nil end),
+  H.driveUntil(function() return #leapCosts > 0 end, 8000, {
+    H.call(tick), H.waitFrames(3),
+    H.call(function() H.setPad({}) end), H.waitFrames(6),
+  }, "leap-zero: CreateAction stages a cost for command $11 on an empty pool"),
   ride(60),
   H.call(function()
     leapWatch = false
-    H.log(string.format("leap-refuse: MP stayed %d, cost queue %s",
+    H.log(string.format("leap-zero: MP stayed %d, cost queue %s",
       mp(actor), tostring(leapCosts[1])))
     H.assertEq(leapCosts[1], LEAP_COST,
-      "the queue still PRICES the leap at 2 (the refusal is the pool's, not "
-      .. "the price's)")
-    H.assertEq(mp(actor), 1,
-      "and a Gau with 1 MP is refused: nothing spent, nothing driven negative "
-      .. "-- the standard insufficient-MP surface, no leap-shaped exception")
+      "an EMPTY pool stages the same 0: the price does not depend on what the "
+      .. "caster can afford, so there is nothing left for the insufficient-MP "
+      .. "gate to refuse.  Pre-change this staged 2 and CalcAttackEffect's "
+      .. "'Need MP' arm ate the turn")
+    H.assertEq(mp(actor), 0,
+      "and the pool is still 0 -- nothing spent, nothing driven negative.  A "
+      .. "Gau at zero MP can still take the Veldt's action")
     H.log("PASSED: list filter + AUTO truncation, trance price, refusal gate, "
       .. "tier latch, the tier-1/tier-2 coin at both boundaries, the width "
-      .. "restore, and Leap's 2 MP")
+      .. "restore, and Leap free at a full pool and at zero")
   end),
 })
 

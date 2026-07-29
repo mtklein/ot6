@@ -456,8 +456,14 @@ Ot6FoldTbl:
         beq     @dance          ; dance: flat, paid at dance-START only (#34)
         cmp     #$10
         beq     @rage           ; rage: the same shape as dance (#40)
-        cmp     #$11
-        beq     @leap           ; leap: flat, the probe-collect price (#40)
+        ; NO cmd-$11 arm: LEAP IS FREE (owner, 2026-07-29).  It had a flat 2
+        ; here from #40, reasoned from "only the basic Fight command is free"
+        ; -- but that price was never rendered on any surface, so the only way
+        ; a player met it was a Leap that silently refused.  And Leap now
+        ; SHARES the Fight row on the Veldt (Ot6VeldtRow, battle_main.asm):
+        ; it is not a verb beside Fight there, it IS the Fight row, and the
+        ; free floor has to survive the substitution.  Falling out of this
+        ; chain hands back vanilla's own cost for cmd $11, which is 0.
         cmp     #$07
         beq     @costed         ; swdtech
         cmp     #$09
@@ -506,14 +512,6 @@ Ot6FoldTbl:
         plp
         rtl
 :       jsl     Ot6RageCost     ; rage-start: the flat price, one authority
-        plp
-        rtl
-@leap:  ; #40: "only the basic Fight command is free" (owner absolute,
-        ; mp-economy.md:30-34), so the leap prices too -- flat 2, the
-        ; probe-collect rung Steal already sits on (mp-economy.md:97 assigns
-        ; this very verb that row).  Refused under 2 MP; the Veldt keeps.
-        pla                     ; drop the parked cost (0 for leap)
-        jsl     Ot6LeapCost
         plp
         rtl
 @costed:
@@ -620,19 +618,29 @@ Ot6FoldTbl:
         jmp     Ot6DanceCost    ; tail-call: same bank, its rtl returns for us
 .endproc
 
-; [ the Leap price -- flat 2, the probe-collect rung (#40) ]
+; [ the Leap price -- RETIRED.  Leap is free (owner, 2026-07-29) ]
 ;
-; "only the basic Fight command is free" is the owner absolute
-; (mp-economy.md:30-34), and mp-economy.md:97 already assigned this verb the
-; cheapest-spell row -- the same 2 Steal takes, for the same reason: a probe
-; that COLLECTS rather than resolves.  Leap itself is left vanilla otherwise
-; (kit-gau.md §6.3 evaluated the boosted-Leap rider and recommended against it:
-; the learn step has no roll to convert).  PURE leaf.
-.proc Ot6LeapCost
-        .a8
-        lda     #$02
-        rtl
-.endproc
+; #40 gave Leap a flat 2 (Ot6LeapCost, deleted here), reasoned from "only the
+; basic Fight command is free" (mp-economy.md:30-34) and mp-economy.md:97's
+; probe-collect rung, the same row Steal sits on.  Two things retired it:
+;
+;   1. the price was NEVER DISPLAYED.  Leap is a top-level command row, not a
+;      list entry, so nothing ever drew "2 MP" beside it -- the id-keyed
+;      pricing surfaces (Ot6CostFor -> ot6_kits.asm / skills.asm) only reach
+;      verbs that open a window.  The command window itself
+;      (command_window_data_set, btlgfx_main.asm:10099-10125) stores only the
+;      command byte and a GetTextColor colour per row, and that colour is
+;      `and #$80` on the DISABLED flag (:10704-10707), not affordability.  A
+;      player's only encounter with the number was a Leap that refused for
+;      reasons the screen never gave.
+;   2. Leap now IS the Fight row on the Veldt (Ot6VeldtRow, battle_main.asm).
+;      #47 exists to guarantee Gau a free action; a priced Leap sitting in the
+;      Fight row would have re-opened that hole in the one place -- the Veldt
+;      -- where Gau spends the most turns.
+;
+; Steal keeps its flat 2: it is a verb BESIDE Fight, not the Fight row, and
+; its repricing is issue #52's business, not this change's.  Leap is otherwise
+; still vanilla (kit-gau.md §6.3 recommended against the boosted-Leap rider).
 
 ; [ #40: can the hunter pay the trance?  Cmd_10's lock-out gate ]
 ;

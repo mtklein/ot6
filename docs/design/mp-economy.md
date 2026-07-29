@@ -61,6 +61,47 @@ expected and are not churn.
   2026-07-22): only the basic Fight command is free — every
   other verb costs MP as its character's kit comes online. (Item
   is inventory-gated, not an MP verb.)**
+
+  > **AMENDMENT (2026-07-29, owner) — the absolute is about the FIGHT
+  > ROW, not about the word "Fight". Leap is free.** Owner's words:
+  > *"I don't recall showing a cost for Leap. If it's 2 MP, let's just
+  > make it free."* Two things force it, and both are about surfaces
+  > rather than balance:
+  >
+  > 1. **The price was never displayed.** Leap is a top-level command
+  >    *row*, not a list entry, and the four-row battle command window
+  >    draws names only. `command_window_data_set`
+  >    (`btlgfx_main.asm:10099-10125`) writes exactly two things per
+  >    row — the command byte, and a colour from `GetTextColor` — on a
+  >    9-byte stride over four rows, and its template `MenuText::_4`
+  >    (`btlgfx_main.asm:45137`) is four fixed 8-byte records with no
+  >    numeric field. `GetTextColor` (`btlgfx_main.asm:10704-10707`) is
+  >    `and #$80` on the *disabled* flag, so the one grey that window has
+  >    is "command unavailable", **not** "you cannot afford it". Contrast
+  >    `Ot6BlitzRowDecorate` (`ot6_kits.asm:563-585`), where a list row
+  >    explicitly stamps a two-digit cost and greys by affordability
+  >    through `Ot6AbilityGrey`. So there was no surface that could show
+  >    Leap's 2 MP, and the only way to meet it was a refusal *after* the
+  >    turn was spent — the refusal path (`battle_main.asm:8354-8371`)
+  >    queues a generic attack message through `_setattackmes`
+  >    (`:8720`) and composes no number anywhere. *(The exact refusal
+  >    string is **unverified** — I did not trace `$3a71/$3a72` to its
+  >    text. What is verified is that no number reaches the player.)* A
+  >    price that is invisible until it refuses is a lying surface, and
+  >    this document's own economy depends on the player being able to
+  >    see what things cost.
+  > 2. **Leap now occupies the Fight row** on the Veldt (kits.md's
+  >    row-sharing rule, `Ot6VeldtRow`). The absolute exists so that
+  >    every character can always decline to spend; a priced verb
+  >    *in the Fight row* breaks exactly that, in the one territory Gau
+  >    lives in. So the honest reading of the absolute is that the
+  >    **free floor** is what is protected, and on the Veldt that floor
+  >    is Leap.
+  >
+  > **Steal keeps its flat 2** — it is a verb *beside* Fight, not the
+  > Fight row — but it shares Leap's invisibility problem exactly
+  > (same window, same "Need MP", nothing drawn). That is issue #52's,
+  > and it is a display bug before it is a pricing question.
 - **Boost never raises MP cost.** The shipped tier fold queues
   Fire 3 at Fire's cost (DEMO.md): BP is the tier price, MP the
   cast price. That split ports unchanged to every costed verb —
@@ -123,7 +164,9 @@ Vanilla-free player verbs, with proposed cost shapes:
 | Blitz (Sabin) | scaled by tier | 4–46 | **rescaled by #45** (was 2–30): the ladder must fit the game's smallest pool (base 3 MP), but the floor was under the vanilla ruler — Pummel 4, mid-kit 10–22, Bum Rush 46 at the top |
 | SwdTech (Cyan) | BP tier + MP at Blitz parity | 4–46 | **rescaled by #45** (was 1–8, "discounted"): he still pays both currencies (ruling 2026-07-17, below), but the ~⅓ discount is retired — see the amendment box under "Cyan pays in both" |
 | Dance (Mog) | flat, paid at start | 4–10 | one payment starts a whole-battle state — vanilla's can't-stop-dancing lock is preserved, so the price is per battle, not per step |
-| Capture (Gau) | flat small | 2 | the other probe-collect verb, priced with Steal (Leap and berserk Rage are retired — kits.md) |
+| ~~Capture (Gau)~~ | ~~flat small~~ | ~~2~~ | superseded — the Capture/controllable-stable model was replaced by kit-gau.md's Ochette model, so this row never shipped. The two Gau verbs that did are below |
+| Rage (Gau) | flat, paid at start | 8 | one payment starts a whole-battle possession, every possessed turn after it free — the same rule Dance takes, and `Ot6RageCost` tail-calls `Ot6DanceCost` so the two can never drift (#40) |
+| Leap (Gau) | free — exception | 0 | **the free floor, not an exemption**: Leap shares Gau's FIGHT row on the Veldt (kits.md), so on the Veldt it *is* the Fight command. It also had no surface that could ever show a price — see the amendment above (owner, 2026-07-29; was flat 2 under #40) |
 | Beast skills (Gau's stable) | flat per beast | 3–10 | authored alongside the stable curation pass (M6) |
 | Sketch (Relm) | flat small | 2–4 | pay to roll; the Sketch bug stays (house rule) and does not refund |
 | Control (Relm, kit TBD) | flat moderate | 8–12 | vanilla's strongest free verb — full command of a monster; priced when her kit lands |

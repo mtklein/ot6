@@ -68,9 +68,11 @@ ally — once per round, and the pip lands as the blow does. *(Thanks to
 **Gau becomes a hunter with a loadout.** Keep hunting the Veldt for
 every rage you can find — that part is unchanged — but battle offers a
 chosen **eight**, configured under Skills → Rage, instead of a wall of
-two hundred. Rage costs 8 MP at the start of the trance, Leap costs 2,
+two hundred. Rage costs 8 MP at the start of the trance, Leap is free,
 and boost buys certainty: at 3 BP the special comes out every turn
-instead of on a coin flip.
+instead of on a coin flip. **Gau can also just attack now** — his menu
+is Fight / Rage / Magic / Item, and on the Veldt that first row becomes
+Leap, which is the thing you were going to do there anyway.
 
 **Six magicite become real sub-jobs.** Maduin, Shoat, Phantom, Carbunkl,
 Bismark and Unicorn each get a designed identity — Maduin the pure mage
