@@ -80,6 +80,20 @@ local function RVE(s) return 0x3E89 + (8 + s * 2) end
 local function WKE(s) return 0x3BE0 + (8 + s * 2) end
 local function WKC(s) return 0x3E9C + (8 + s * 2) end
 local function RVC(s) return 0x3E9D + (8 + s * 2) end
+-- #33 split a reveal into two moments: the chip BANKS it into the pending
+-- cells at damage calc, and Ot6RevealCommit moves it into the live
+-- REVEALED bytes on the damage-numeral frame (hundreds of frames later,
+-- so the icon appears when the hit lands).  chip() below exits on the
+-- SHIELD write, which is the calc moment -- so a reveal assertion taken
+-- straight after it reads the pending cell, not the committed one.  Both
+-- are asserted here: banked immediately, committed by the numeral.
+-- NB the stride: the pending cells are indexed by the same ENTITY offset
+-- (8 + s*2) the live bytes use -- ot6_break.asm stores through
+-- `OT6_RVPEND_ELEM-8,y`, so slot s sits at base + s*2, and the table is
+-- 12 bytes for six monster slots.  A stride of 1 reads the wrong byte for
+-- every slot but the first.
+local function RVPE(s) return 0xED45 + s * 2 end
+local function RVPC(s) return 0xED51 + s * 2 end
 local function MHP(s) return 0x3BFC + s * 2 end
 local function pinParty()
   for e = 0, 3 do
@@ -91,6 +105,17 @@ local function pinParty()
 end
 
 local gSlot, sabinE = nil, nil          -- found at battle-up, asserted
+
+-- Wait for a #33 reveal to COMMIT.  Two subtleties, both of which cost a
+-- mint to learn: the address must be resolved inside the predicate (gSlot
+-- is discovered during the run, so resolving it while the step list is
+-- built is arithmetic on nil -- a load-time error that registers no
+-- callbacks and reads as a bare timeout with no [ot6] output at all), and
+-- this must be declared AFTER gSlot or the closure captures a global that
+-- is nil forever.
+local function revealed(addrOf, bits)
+  return function() return H.readByte(addrOf(gSlot)) & bits == bits end
+end
 local sabinCmds = {}                     -- SABIN's real command cells, restored
                                          --   between chips (so a stray tap on his
                                          --   menu queues FIGHT, not an $ff blitz)
@@ -521,6 +546,12 @@ H.run({ maxFrames = 200000 }, {
     H.assertEq(H.readByte(0x3410), AURABOLT,
       "the resolved skill was AuraBolt ($5e)")
     H.assertEq(H.readByte(SH(gSlot)), 5, "AURABOLT took a shield: 6 -> 5")
+    H.assertEq(H.readByte(RVPE(gSlot)) & HOLY, HOLY,
+      "holy BANKED at damage calc (#33 pending cell)")
+  end),
+  H.driveUntil(revealed(RVE, HOLY), 1200, {},
+    "holy reveal commits on the numeral frame"),
+  H.call(function()
     H.assertEq(H.readByte(RVE(gSlot)) & HOLY, HOLY, "holy revealed")
     H.log(string.format("[b68] after AURABOLT shields=%d revE=$%02X revC=$%02X",
       H.readByte(SH(gSlot)), H.readByte(RVE(gSlot)), H.readByte(RVC(gSlot))))
@@ -532,6 +563,12 @@ H.run({ maxFrames = 200000 }, {
     H.assertEq(H.readByte(0x3410), PUMMEL,
       "the resolved skill was Pummel ($5d)")
     H.assertEq(H.readByte(SH(gSlot)), 4, "PUMMEL took a shield: 5 -> 4")
+    H.assertEq(H.readByte(RVPC(gSlot)) & OT6_BLUDG, OT6_BLUDG,
+      "bludgeon BANKED at damage calc (#33 pending cell)")
+  end),
+  H.driveUntil(revealed(RVC, OT6_BLUDG), 1200, {},
+    "bludgeon reveal commits on the numeral frame"),
+  H.call(function()
     H.assertEq(H.readByte(RVC(gSlot)) & OT6_BLUDG, OT6_BLUDG,
       "the bludgeon class revealed")
     H.log(string.format("[b68] after PUMMEL shields=%d revE=$%02X revC=$%02X",
