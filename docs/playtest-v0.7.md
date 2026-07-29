@@ -8,3 +8,5 @@ whether anything got *worse* than v0.6 in territory already played.
 |---|---|---|---|
 | 1 | Skills → SwdTech | **The page works.** Four rounds of fixes (garble, geometry, cursor gutter) confirmed good by the owner | positive; #39/#43 verified in play |
 | 2 | Skills → SwdTech | L/R being the swap control is not discoverable — "that part was not obvious" | #44, fix in flight; applies to Gau's Rage page too |
+| 3 | Skills → Rage | **The Rage page looks good too.** Wants the same L/R note, plus `-default-` placeholders where a slot is unset rather than blanks | #44 scope extended; the placeholder wording depends on real semantics (page-wide AUTO vs a genuinely empty slot in a manual loadout) — honesty over the literal string |
+| 4 | battle | **Everyone has MP now** | positive; #32's universal battle-MP fix confirmed in natural play, and the #35 wallet is what makes it legible |
