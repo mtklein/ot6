@@ -36,6 +36,41 @@ does not sit where the old UI sat. When a choice is between elegant and
 familiar, familiar wins unless elegance buys something a player would
 actually notice.
 
+### Why the SNES ROM, and not a GBA port or a Pixel Remaster mod
+
+> *"I want it to feel like this game could have always been this way, and
+> one way to do that is to prove it using the exact tools available to
+> the original."* — owner, 2026-07-29
+
+The platform choice is part of the argument, not a nostalgic constraint
+we tolerate. Anyone can claim FF6 could have shipped with a break-and-
+boost system; building it in 65816 on the 1994 hardware, inside the
+machine's own budgets, is the demonstration.
+
+**So the limits are the proof, and they are not obstacles to route
+around.** Every one we have hit is load-bearing evidence:
+
+- The battle HUD tick has under **80 cycles** of slack per frame — go
+  over and the game runs 10% slower (HANDOFF trap 2).
+- Extra per-frame VRAM traffic pushes the engine's own transfers past
+  vblank and freezes menus; ~13 words a frame was enough.
+- Bank C4 has room for **two more event triggers** game-wide, which is
+  what makes the save-point cadence a design problem rather than a
+  spreadsheet.
+- WRAM is allocated a byte at a time out of a measured-free shadow tail,
+  with asserts pinning the property that made each byte free.
+- Costs cap at 99 partly because the field renders two digits.
+
+Wanting to bypass one of these is a signal to redesign, not to expand.
+(ROM *space* is a different thing: bank `$F0` is expansion, and larger
+carts existed — that is period-legitimate. The SNES's cycles, vblank,
+WRAM and PPU are the ones that carry the claim.)
+
+The corollary for the harness: everything is proven **in the emulator, on
+the real ROM** — no unit tests against a model of the game. That is why
+the fixture chain exists at all, and why "it assembles" has never once
+counted as evidence here.
+
 Sections marked **TBD** are open design questions, not commitments.
 
 Deep dives (2026-07-16, WoB scope): [character kits & learn
