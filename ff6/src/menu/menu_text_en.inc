@@ -141,7 +141,29 @@ MENU_TEXT_INC = 1
 ; over the leading glyph -- the "1" of "1x".  The page's left margin is column 3
 ; now and everything right of it moved with it; the CURSOR table did not move,
 ; because it was already vanilla's.
-.define OT6_LOADOUT_TITLE               BG1A, {3, 1},  {"BUSHIDO LOADOUT"}
+; #44: THE TITLE PAYS FOR THE CONTROL HINT.  L/R cycling the cursored rung is
+; this page's only real interaction and nothing on screen said so ("that part
+; was not obvious" -- owner playtest, v0.7).  All eight of the window's text
+; rows are already spoken for, so the hint needed FOUND space, and the title
+; was the cheapest source: "BUSHIDO LOADOUT" spanned columns 3-17 to say what
+; the 1x/2x/3x rungs and the LEARNED pool below it already show.
+;
+; Shortening it to "SWDTECH" is also a NAMING FIX that was owed anyway.  Every
+; other player-facing string in the EN build calls this skill SwdTech --
+; SKILLS_LIST_BUSHIDO (:81), SKILLS_BUSHIDO_TITLE (:93), ITEM_BUSHIDO (:204) --
+; and "Bushido" is the internal/JP name.  This page was the one place the EN
+; player was shown it, and it is the page reached by picking the row LABELLED
+; "SwdTech", so the shorter title also matches the way in.
+;
+; The row is now three blue chrome words with one- and two-column gaps:
+;   SWDTECH   3-9 | L/R SWAPS  11-19 | LEARNED  22-28
+.define OT6_LOADOUT_TITLE               BG1A, {3, 1},  {"SWDTECH"}
+; #44: the control hint.  Same wording, character for character, as the Rage
+; page's OT6_RAGE_HINT below -- both pages teach the same idiom and a player who
+; learns it on one must not have to re-learn it on the other.  "SWAPS" is the
+; owner's own verb for what L/R does (issue #44's title).  Drawn BLUE, with the
+; title and the pool caption, so it reads as chrome and not as a slot's data.
+.define OT6_LOADOUT_HINT                BG1A, {11, 1}, {"L/R SWAPS"}
 ; The caption rides the TITLE row (the Rage page's own resolution for its price
 ; line): the window holds eight text rows and the page needs nine -- title,
 ; three boost slots, the caption, and four rows of a two-column pool that must
@@ -173,6 +195,36 @@ MENU_TEXT_INC = 1
 .define OT6_RAGE_TITLE                  BG1A, {3, 1},  {"RAGE LOADOUT"}
 .define OT6_RAGE_EACH                   BG1A, {22, 1}, {"EACH"}
 .define OT6_RAGE_LEARNED                BG1A, {3, 15}, {"LEARNED"}
+; #44: the control hint, on row 3.  This page uses six of the window's eight
+; text rows (1 title, 5/7/9/11 slots, 15 LEARNED); rows 3 and 13 are its
+; deliberate breathing space, so unlike the Bushido page nothing had to be
+; shortened to make room -- row 3 sits directly under the title and directly
+; above the first slot, which is where a first-timer's eye lands next.
+;
+; NOTE for anyone re-deriving the budget: row 1 is NOT free on this page.  The
+; flat trance price occupies it -- "8 MP" at columns 17-20 and "EACH" at 22-25
+; (Ot6RagePrice, field_menu.asm) -- so the title row's only spare runs are
+; 15-16, 21 and 26-29.  None of them fits a legible hint.
+;
+; Identical wording to OT6_LOADOUT_HINT above, on purpose: the L/R idiom is the
+; same on both loadout pages and is worth teaching once.
+.define OT6_RAGE_HINT                   BG1A, {3, 3},  {"L/R SWAPS"}
+; #44: what an UNSET slot says.  It is NOT "-default-": nothing defaults into
+; an unset slot.  A blank row on this page has exactly two causes and both mean
+; the same thing -- the slot is EMPTY and contributes nothing to the battle
+; list:
+;   * AUTO (all eight bytes zero) with fewer than eight rages hunted:
+;     Ot6RageNth returns carry clear past the end of the window
+;     (ot6_kits.asm:1856-1858) and Ot6RageList's AUTO arm writes nothing for it;
+;   * MANUAL with a $00 byte: Ot6RageSlot returns carry clear (:1820) and
+;     Ot6RageList's @manual arm SKIPS the slot outright (:1993-2002).  Reachable
+;     because Ot6RageSeed stops as soon as the window runs out (:2075), so
+;     editing a loadout while fewer than eight are known leaves the tail unset.
+; Calling either state "default" would be the #27/#32 class of lie -- the page
+; would name something the battle menu does not contain.  The marker is exactly
+; MonsterName::ITEM_SIZE (10) cells wide so it overwrites a name completely,
+; keeping the property the old $ff fill had: a revert wipes what was there.
+.define OT6_RAGE_EMPTY                  {"- EMPTY - "}
 
 ; ------------------------------------------------------------------------------
 

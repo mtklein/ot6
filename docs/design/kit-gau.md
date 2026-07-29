@@ -549,8 +549,25 @@ window** (the rage browse is `cursor_prop {0,0}, {2,8}`, `skills.asm:281-299`):
 | tilemap row | content |
 |---|---|
 | 1 | `RAGE LOADOUT` + the flat price, stated once (`8 MP EACH`) |
+| 3 | `L/R SWAPS` — the control hint (#44) |
 | 5 / 7 / 9 / 11 | slots 0-1 / 2-3 / 4-5 / 6-7 — name at col 3 (left) or col 16 (right) |
 | 15 | `LEARNED nnn` |
+
+**#44, the control hint and the empty marker.** The owner played v0.7 and could
+not find the one control the page has: "L/R being the control that swaps a
+slot's tech is not discoverable." Row 3 was spare, so the hint cost nothing but
+that row, and the Bushido page carries the same string (it had to shorten its
+title to `SWDTECH` to find room — see `OT6_LOADOUT_HINT`).
+
+An unset slot used to draw a run of `$ff` pads and now draws `- EMPTY -`, in
+the page's BLUE chrome colour so it cannot be read as a beast. It is **not**
+`-default-`: nothing defaults into an unset slot. A blank row has exactly two
+causes and both mean the slot contributes nothing to the battle list — an AUTO
+window shorter than eight (`Ot6RageNth` runs out; §2.2's truncation), and a
+MANUAL slot whose byte is `$00` (`Ot6RageList`'s `@manual` arm skips it).
+`Ot6RageSeed` stops at the end of the window, so a player who edits while
+fewer than eight are hunted keeps genuinely empty tail slots — reachable, and
+fillable again with L/R, which starts an empty row's walk at id 0.
 
 Slot order is the menu framework's own index, `$4b = cols*row + col`
 (`CalcShortListIndex`, `menu_common.asm:1205-1224`), so slot even = left,

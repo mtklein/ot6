@@ -72,6 +72,18 @@
 -- files ARE the frontier mint signature (lib/frontier_stamp.sh:49-55), so a
 -- helper added there would mark every minted fixture drifted.
 --
+-- issue #44 -- THE CONTROL HINT, and why the title row's expectations moved.
+-- The page rendered correctly and the owner still could not use it: L/R
+-- cycling the cursored rung is its only real interaction and nothing on screen
+-- said so.  All eight of the window's text rows were already spoken for, so
+-- the hint had to come out of found space, and the title was the cheapest
+-- source -- "BUSHIDO LOADOUT" spent columns 3-17 saying what the 1x/2x/3x
+-- rungs and the LEARNED pool already show.  It is "SWDTECH" now (3-9), the
+-- hint sits at 11-19, LEARNED is unmoved at 22-28.  The EXPECTED cells below
+-- were rewritten to that layout deliberately; nothing was loosened, and the
+-- title-row gap assertion gained a job it did not have before (it now pins the
+-- separation between three chrome words instead of one empty run).
+--
 -- Fixture: arvis_wake (same boot as menu_bushidoloadout / menu_esperdetail).
 -- Its lead has no Bushido command, so the SwdTech row is installed the house
 -- "install state" way (menu_esperdetail pins esper bits the same way): the
@@ -102,8 +114,21 @@ local function cell(x, y) return H.readByte(BG1A + x * 2 + y * 64) end
 -- menu text codec (ff6/tools/char_table/text_en.json): 'A'=$80.. 'a'=$9a..
 -- '0'=$b4.. ' '=$ff.
 local T = { B=0x81, U=0x94, S=0x92, H=0x87, I=0x88, D=0x83, O=0x8e, L=0x8b,
-            A=0x80, T=0x93, E=0x84, R=0x91, N=0x8d, M=0x8c, P=0x8f, SP=0xff }
-local TITLE = { T.B,T.U,T.S,T.H,T.I,T.D,T.O,T.SP,T.L,T.O,T.A,T.D,T.O,T.U,T.T }
+            A=0x80, T=0x93, E=0x84, R=0x91, N=0x8d, M=0x8c, P=0x8f, W=0x96,
+            C=0x82, SLASH=0xc0, SP=0xff }
+-- #44: the title is "SWDTECH", not "BUSHIDO LOADOUT".  Two reasons, and this
+-- test asserts the result of both: the fifteen-column title was the only place
+-- on the page with room to spend on a control hint, and "SwdTech" is what
+-- every other player-facing EN string calls this skill (SKILLS_LIST_BUSHIDO,
+-- SKILLS_BUSHIDO_TITLE, ITEM_BUSHIDO in menu_text_en.inc) -- including the row
+-- the player picks to reach this page.
+local TITLE = { T.S,T.W,T.D,T.T,T.E,T.C,T.H }
+-- #44: the control hint the page shipped without.  L/R cycling the cursored
+-- rung is this page's only real interaction and nothing named it ("that part
+-- was not obvious", owner playtest v0.7).  Character for character the same
+-- string the Rage page draws -- the two loadout pages share the idiom and must
+-- teach it with the same words.
+local HINT  = { T.L,T.SLASH,T.R,T.SP,T.S,T.W,T.A,T.P,T.S }
 local POOL  = { T.L,T.E,T.A,T.R,T.N,T.E,T.D }
 local lo = { a=0x9a,c=0x9c,e=0x9e,h=0xa1,i=0xa2,l=0xa5,o=0xa8,p=0xa9,r=0xab,
              s=0xac,t=0xad,x=0xb1 }
@@ -146,6 +171,7 @@ end
 -- 12-cell name at col 17 ends at 28, inside the border.
 local TITLE_ROW = 1
 local LEFT_COL = 3                      -- the page's left margin (gutter = 1-2)
+local HINT_COL = 11                     -- #44: title 3-9, hint 11-19, pool 22-28
 local POOL_CAPTION_COL = 22             -- the caption rides the title row
 local NAME_COL, COST_COL = 6, 19        -- "1x" 3-4, blank 5, name 6..17, cost 19
 local BOOST_ROWS = { 3, 5, 7 }
@@ -291,7 +317,8 @@ H.run({ maxFrames = 30000 }, {
     -- chrome.  The LEARNED caption rides the TITLE row (#43): the window has
     -- eight text rows and the page needs nine, and the pool's four rows are
     -- not negotiable if all eight techs are to be inside the frame.
-    assertRun(LEFT_COL, TITLE_ROW, TITLE, "title BUSHIDO LOADOUT")
+    assertRun(LEFT_COL, TITLE_ROW, TITLE, "title SWDTECH")
+    assertRun(HINT_COL, TITLE_ROW, HINT, "L/R SWAPS control hint")
     assertRun(POOL_CAPTION_COL, TITLE_ROW, POOL, "LEARNED caption")
     assertRun(LEFT_COL, BOOST_ROWS[1], { 0xb5, lo.x }, "label 1x")
     assertRun(LEFT_COL, BOOST_ROWS[2], { 0xb6, lo.x }, "label 2x")
@@ -318,10 +345,13 @@ H.run({ maxFrames = 30000 }, {
     H.assertEq(cell(poolCol(4), poolRow(0)), 0, "right pool column empty (3 learned)")
     -- spray canaries: undrawn odd rows are still cleared
     assertRowBlank(9 + 3 * 2, "row 15 (no 4th learned tech)")
-    -- the title row's gaps and tail: the title ends at 17 and the caption runs
-    -- 22..28, and nothing may run into the window's own right border in
-    -- column 30.
-    for x = 18, 21 do
+    -- the title row's gaps and tail (#44).  Three chrome words now share it:
+    -- SWDTECH 3..9, the hint 11..19, LEARNED 22..28.  The gaps are what keeps
+    -- them from reading as one string, so they are asserted, not tolerated --
+    -- a wording change that eats column 10 or 20 fails here rather than
+    -- shipping as "SWDTECHL/R SWAPS".  Nothing may run into the window's own
+    -- right border in column 30.
+    for _, x in ipairs({ 10, 20, 21 }) do
       H.assertEq(cell(x, TITLE_ROW), 0,
         string.format("title row gap blank {%d,1}", x))
     end
@@ -361,6 +391,7 @@ H.run({ maxFrames = 30000 }, {
 
   H.call(function()
     assertRun(LEFT_COL, TITLE_ROW, TITLE, "title still on row 1")
+    assertRun(HINT_COL, TITLE_ROW, HINT, "control hint still on row 1")
     assertRun(POOL_CAPTION_COL, TITLE_ROW, POOL, "LEARNED caption still on row 1")
     -- all eight, column-major: cells 0-3 down col 3, cells 4-7 down col 17.
     for n = 0, 7 do
