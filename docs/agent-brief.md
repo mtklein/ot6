@@ -46,12 +46,20 @@ Task-specific scope goes in the dispatch. Everything here is always true.
 
 ## Machine budget
 
-This machine has **10 performance cores**, and Mesen is effectively
-single-threaded, so an emulator job costs about one core for its whole
-run. Sizing that actually works with several agents plus the owner
-playing: build at `-j6`, run up to **2 concurrent emulator jobs** per
-agent. `make -j10 smoke` is right when you have the machine to yourself
-and wrong when you do not — the dispatch will say which you have.
+A fast **laptop**: 10 performance cores plus 4 efficiency cores. Mesen is
+effectively single-threaded, so an emulator job costs about one P core
+for its whole run — the P count is the one that governs how many mints
+or suite runs can overlap.
+
+Sizing that works with several agents plus the owner playing: build at
+`-j6`, run up to **2 concurrent emulator jobs** per agent. `make -j10
+smoke` is right when you have the machine to yourself and wrong when you
+do not — the dispatch will say which you have.
+
+Leave headroom deliberately. It is a laptop: pinning every core
+sustained thermally throttles the whole box, so the last increment of
+parallelism can cost more wall time than it buys — and if the owner is
+playtesting, his frame rate is the thing you are actually spending.
 
 ## Reporting
 
