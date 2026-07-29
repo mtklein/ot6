@@ -56,10 +56,11 @@ Sizing that works with several agents plus the owner playing: build at
 smoke` is right when you have the machine to yourself and wrong when you
 do not — the dispatch will say which you have.
 
-Leave headroom deliberately. It is a laptop: pinning every core
-sustained thermally throttles the whole box, so the last increment of
-parallelism can cost more wall time than it buys — and if the owner is
-playtesting, his frame rate is the thing you are actually spending.
+The budget is **P cores, not power** (it runs plugged in). Four agents at
+two emulator jobs each is 8 of the 10, plus the owner's game — about
+right. Going past that oversubscribes and everything slows together, so
+the last increment of parallelism buys nothing; and when the owner is
+playtesting, his frame rate is what it would be spent on.
 
 ## Reporting
 
