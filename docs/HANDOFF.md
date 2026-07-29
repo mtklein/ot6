@@ -87,22 +87,35 @@ to Mesen write callbacks — sample, don't watchpoint), and witness
 persistent facts through SRAM (`$307ff0`, the codex pages) when a
 context-free channel exists.
 
-**2. NPC record order is NPC identity.** Event scripts address NPCs as
+**2. `Ot6BgHud_ext` has under 80 cycles of slack per battle frame, and
+possibly under 20.** It runs from `WaitFrame` immediately after
+`WaitVblank` returns, so work added there can make the iteration miss
+vblank and cost a whole extra hardware frame. Measured 2026-07-29 with
+BARE-NOP CONTROLS carrying no feature at all: 12 NOPs pass, 80 NOPs fail,
+and the penalty saturates (20 and 110 cycles cost the same 163 frames).
+The symptom is not a crash or a wrong result — it is everything running
+~10% slower, which flips timing-sensitive tests elsewhere and looks like
+their bug. If you must add work there, gate it INLINE at the call site;
+a `jsr` into a proc that early-outs is already ~20 cycles and over the
+line. (Distinct from the vblank-TRANSFER budget in trap 6, which is about
+VRAM words, not cycles.)
+
+**3. NPC record order is NPC identity.** Event scripts address NPCs as
 {map, index-within-block}, so a record inserted ahead of an existing NPC
 renumbers everything after it — the first 273 save-sparkle attempt shifted
 NUMBER_024 to index 1 and the post-battle cleanup cleared the sparkle instead.
 Append, never insert. The mint caught it two legs downstream, which is the
 system working.
 
-**3. `navTo` lands at rest (#22); a tile that takes the party away is entered
+**4. `navTo` lands at rest (#22); a tile that takes the party away is entered
 with a held press, not a `navTo` whose goal it is.** Generators relying on the
 old mid-glide handoff still surface occasionally.
 
-**4. `event_main.asm` is a dump of separately-addressed scripts.** Adjacency
+**5. `event_main.asm` is a dump of separately-addressed scripts.** Adjacency
 means nothing. Party composition is runtime state: read `$1850` at a fixture.
 `bosses-wob.md` is authoritative on party composition.
 
-**5. `LoadMagicProp` fills one shared buffer** — freeze the rest of the party
+**6. `LoadMagicProp` fills one shared buffer** — freeze the rest of the party
 when measuring an ability, or an ally's action mid-window reads as "the summon
 was free". Documented at `freezeOthers`.
 
