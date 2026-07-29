@@ -101,6 +101,17 @@ any player-facing word, grep the shipped text data — `bushido_name_en`,
 `item_name_en`, `battle_cmd_name_en`, `magic_name_en`, `attack_name_en`
 — and pick something the game is not already saying.
 
+**Before 1.0, saves are not forward-compatible.** Owner ruling,
+2026-07-29: supporting saves from older pre-1.0 builds is not worth
+engineering for. Where new content only reaches a fresh game — character
+command slots are the known case, since `CharProp` is copied into the save
+record at join time and never re-read — **say so in the release notes and
+move on.** Do not build migration machinery for it.
+
+This expires at 1.0, when a player's save becomes something they are
+entitled to keep. (The codex's O7→O8 migration shows we *can* do this
+when it matters; the point is that before 1.0 it does not.)
+
 **Don't change the past.** Records stay as they were: shipped release
 notes, playtest ledgers, dated design decisions, and git history. When
 something in a *living* document turns out to be wrong, append a dated
