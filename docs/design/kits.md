@@ -24,6 +24,18 @@ layer. JP returns only if playtesting wants a pacing knob.
 
 **Curated kits (the Ochette/Hikari model).** Two characters learn
 MORE than 8 and equip a curated subset (~5 slots): Gau and Strago.
+> **Row-sharing rule, and the one question it leaves open (2026-07-29).**
+> Leap shares the MAGIC row rather than the FIGHT row, deliberately: the
+> Veldt is where Gau spends the most turns on routine encounters, so it
+> is where losing the free action would hurt most — a Veldt Gau out of MP
+> would be left with Rage (8 MP), Leap (2 MP) and Item, which is exactly
+> the problem #47 existed to solve, in his home territory. Magic is the
+> cheapest row to lose there: under the sub-job model he only has spells
+> if he is holding magicite, and magic costs MP anyway, so it was never
+> the free action. **If play disagrees, swapping which row Leap shares is
+> a one-line change** — the owner raised Fight/Leap sharing as an
+> alternative and it is not a closed question.
+
 > **Gau fights ✦ (2026-07-29, #47).** Vanilla's "the feral kid cannot
 > fight normally" characterization is overridden for economy coherence:
 > once Rage costs 8 MP (#40) a Gau with no Fight has no free action at
