@@ -121,14 +121,35 @@ make_genju_prop {SLEEP, 0}, {MUTE, 0}, {SLOW, 0}, {FIRE, 0}, {}
 ; 4: terrato
 make_genju_prop {QUAKE, 0}, {QUARTR, 0}, {W_WIND, 0}, {}, {}
 
-; 5: shoat
-make_genju_prop {BIO, 0}, {BREAK, 0}, {DOOM, 0}, {}, {}
+; 5: shoat -- "the Gorgon Eye" (v0.7, magicite-tube-six.md §5).  The
+;   executioner: Break + Doom, the two deletion verbs.  BIO is DROPPED twice
+;   over: it is the pre-folded CAP of the poison family (Ot6FoldTbl row 3,
+;   ot6_boost.asm:344 -- a 26 MP dead tier beside a 3 MP fold) and poison is
+;   Edgar's authored key (BioBlaster, kits.md:56).  It is also poison into a
+;   cave band where four of
+;   five species ABSORB poison (magicite-tube-six.md §2.2) -- a 26 MP self-heal
+;   button for the enemy.  Both spells are power-0 hit-rolled death-class:
+;   outside BOTH boost axes (no damage to multiply, no fold row, and no
+;   chance-verb certainty mechanism exists for magic) -- ledger item (§13.4),
+;   not a bug here.
+make_genju_prop {BREAK, 0}, {DOOM, 0}, {}, {}, {}
 
-; 6: maduin
-make_genju_prop {FIRE_2, 0}, {ICE_2, 0}, {BOLT_2, 0}, {}, {}
+; 6: maduin -- "the Trinity" (v0.7, magicite-tube-six.md §4).  Terra's
+;   inheritance: the pure mage job.  ALL THREE grants are base tiers of fold
+;   families (Ot6FoldTbl rows 0-2, ot6_boost.asm:341-343); the vanilla
+;   FIRE_2/ICE_2/BOLT_2 row was three dead pre-folded tiers at once -- the
+;   Kirin reason (row 17 below), three times over.
+make_genju_prop {FIRE, 0}, {ICE, 0}, {BOLT, 0}, {}, {}
 
-; 7: bismark
-make_genju_prop {FIRE, 0}, {ICE, 0}, {BOLT, 0}, {LIFE, 0}, {}
+; 7: bismark -- "the Tide" (v0.7, magicite-tube-six.md §8).  The tempo mage:
+;   Haste and Slow BOTH fold party-/field-wide at 1 BP (Ot6FoldTbl rows 6-7,
+;   ot6_boost.asm:347-348).  Water lives in his summon (Sea Song $3d, the
+;   game's only water verb) because no water-element player spell exists to
+;   grant (§13.5).  LIFE is DROPPED: revival lives on Terra, Fenix Downs and
+;   Sraphim only (docs/design/kits.md:262-263) -- the vanilla row put revival
+;   on a stone anyone can wear, violating that rule.  FIRE/ICE/BOLT dropped:
+;   Maduin's job.
+make_genju_prop {HASTE, 0}, {SLOW, 0}, {}, {}, {}
 
 ; 8: stray
 make_genju_prop {MUDDLE, 0}, {IMP, 0}, {FLOAT, 0}, {}, {}
@@ -168,11 +189,18 @@ make_genju_prop {CURE, 0}, {REGEN, 0}, {ANTDOT, 0}, {SCAN, 0}, {}
 ; 18: zoneseek
 make_genju_prop {RASP, 0}, {OSMOSE, 0}, {SHELL, 0}, {}, {}
 
-; 19: carbunkl
-make_genju_prop {RFLECT, 0}, {HASTE, 0}, {SHELL, 0}, {SAFE, 0}, {WARP, 0}
+; 19: carbunkl -- "the Facet" (v0.7, magicite-tube-six.md §7).  The mirror:
+;   Rflect (nobody else grants it) + Safe (the physical wall -- Celes and
+;   Golem are both absent all band).  HASTE moved to Bismark (identity, not
+;   fifth wheel); SHELL stays Shiva's; WARP is field furniture, dropped.
+make_genju_prop {RFLECT, 0}, {SAFE, 0}, {}, {}, {}
 
-; 20: phantom
-make_genju_prop {BSERK, 0}, {VANISH, 0}, {DEMI, 0}, {}, {}
+; 20: phantom -- "the Ghostwalk" (v0.7, magicite-tube-six.md §6).  The
+;   assassin's second: Vanish (both directions -- the dodge, and the old
+;   trick) + Demi (halve what you cannot yet kill).  BSERK dropped: it removes
+;   player control (the recorded Ifrit reason).  The divine, Fader $4a, IS the
+;   unbuildable Ghostwalk passive made party-wide.
+make_genju_prop {VANISH, 0}, {DEMI, 0}, {}, {}, {}
 
 ; 21: sraphim
 make_genju_prop {LIFE, 0}, {CURE_2, 0}, {CURE, 0}, {REGEN, 0}, {REMEDY, 0}
@@ -180,8 +208,16 @@ make_genju_prop {LIFE, 0}, {CURE_2, 0}, {CURE, 0}, {REGEN, 0}, {REMEDY, 0}
 ; 22: golem
 make_genju_prop {SAFE, 0}, {STOP, 0}, {CURE_2, 0}, {}, {}
 
-; 23: unicorn
-make_genju_prop {CURE_2, 0}, {REMEDY, 0}, {DISPEL, 0}, {SAFE, 0}, {SHELL, 0}
+; 23: unicorn -- "the Purity" (v0.7, magicite-tube-six.md §9).  The paladin:
+;   smite + cleanse.  PEARL is BRANCH A of the cross-doc holy decision, DECIDED
+;   by the dispatcher 2026-07-28 (§9 decision box): the band's pearl
+;   REACHABILITY stands on Sabin's AuraBolt plus the survey's authored class
+;   rows (break-band-sealed-gate.md), never on this stone -- Unicorn grants
+;   Pearl as the paladin identity and the big-hit option, its vanilla 40 MP
+;   keeping it a decision rather than the default swing.  CURE_2 dropped (dead
+;   pre-folded tier, the Kirin reason); SAFE -> Carbunkl; SHELL stays Shiva's;
+;   DISPEL dropped (branch B's second row).
+make_genju_prop {PEARL, 0}, {REMEDY, 0}, {}, {}, {}
 
 ; 24: fenrir
 make_genju_prop {WARP, 0}, {X_ZONE, 0}, {STOP, 0}, {}, {}
