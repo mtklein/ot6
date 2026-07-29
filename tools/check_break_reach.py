@@ -21,12 +21,21 @@ declared bands (docs/design/break-band-vector.md SS10.2 item 3):
     (Ot6ShieldTbl row's class byte, else the generated floor) that some
     member can field.
 
-"Can field" is game-wide equippability plus command ownership (SwdTech=Cyan,
-Blitz=Sabin, Tools=Edgar), plus bare fists -- Ot6WeapClassTbl[$ff] is
-OT6_BLUDG, so an empty hand is a bludgeoning probe for anyone.  It is NOT
-inventory: whether the item is in the bag is a runtime fixture assertion
-(break-band-vector.md SS10.3), not a static one.  Weapons carrying
-OT6_NULLBRK chip nothing (ot6_class.asm:14-17) and grant no class here.
+"Can field" is game-wide equippability plus command ownership, and BOTH halves
+are read out of the same place the game reads them: the four battle-command
+slots in ff6/src/field/char_prop.asm.  A weapon (and an empty hand) only
+probes anything if its holder owns a command that SWINGS it, so the weapon
+mask and the bare-fist bludgeon are credited to FIGHT owners only; SwdTech,
+Blitz and Tools classes are credited to whoever the table gives those commands
+to, rather than to hardcoded names.  This was a real lie until issue #47: GAU
+had no Fight in vanilla (RAGE/LEAP/MAGIC/ITEM), so "bare fists are a
+bludgeoning probe for anyone" credited him two classes he could not swing, and
+GOGO and UMARO were credited the same way.  Giving Gau Fight made the model
+true for him; the two exceptions that remain are named in AUTO_SWINGERS and
+MIMIC_ONLY below.  It is NOT inventory: whether the item is in the bag is a
+runtime fixture assertion (break-band-vector.md SS10.3), not a static one.
+Weapons carrying OT6_NULLBRK chip nothing (ot6_class.asm:14-17) and grant no
+class here.
 
 Bands are declared in BANDS below; add a band by adding an entry, nothing
 else changes.  The vector-factory band's map set and forced list are the
@@ -73,17 +82,36 @@ ACTORS = ["TERRA", "LOCKE", "CYAN", "SHADOW", "EDGAR", "SABIN", "CELES",
           "STRAGO", "RELM", "SETZER", "MOG", "GAU", "GOGO", "UMARO"]
 ACTOR_ID = {n: i for i, n in enumerate(ACTORS)}
 
-# command ownership: who can use an ability id from Ot6SkillClassTbl.
-# SwdTech $55-$5c = Cyan, Blitz $5d/$5f/$64 = Sabin (ot6_class.asm:185-195).
-# TekMissile $8a is Magitek-armor only -- no walking party owns it.
-ABILITY_OWNER = {sid: "CYAN" for sid in range(0x55, 0x5D)}
-ABILITY_OWNER.update({0x5D: "SABIN", 0x5F: "SABIN", 0x64: "SABIN"})
+# command ownership: which BATTLE COMMAND resolves each classed ability id in
+# Ot6SkillClassTbl (ot6_class.asm:185-195).  Who owns that command is read
+# from char_prop.asm, not written down here.
+# TekMissile $8a is Magitek-armor only -- no walking party owns it, so it
+# appears in no row below and is credited to nobody.
+COMMAND_ABILITIES = {
+    "BUSHIDO": tuple(range(0x55, 0x5D)),        # swdtech
+    "BLITZ": (0x5D, 0x5F, 0x64),
+}
 
-# Tools are type-0 items resolved through the Tools command (Edgar's); their
-# class bytes live in Ot6WeapClassTbl at the item id (ot6_class.asm:149-158).
-# Gogo can mimic/equip Tools too, but no declared band relies on that.
+# Tools are type-0 items resolved through the Tools command; their class bytes
+# live in Ot6WeapClassTbl at the item id (ot6_class.asm:149-158).
 TOOLS_RANGE = range(0xA3, 0xAB)
-TOOLS_OWNER = "EDGAR"
+
+# the command that swings an equipped weapon (and an empty hand).  JUMP is
+# Fight under Dragoon Boots (RelicCmdTbl1/2, battle_main.asm:14095-14102) and
+# needs no row of its own: the relic only rewrites a slot that already held
+# Fight.
+SWING_COMMAND = "FIGHT"
+
+# actors who swing without owning the command.  UMARO never opens a battle
+# menu at all (CheckPlayerAction returns early on CHAR::UMARO,
+# battle_main.asm:1465-1467) and attacks through his own character AI every
+# turn, so his weapon and his fists are genuinely fieldable.
+AUTO_SWINGERS = {"UMARO"}
+
+# actors whose only verb is derivative.  GOGO can equip weapons but owns only
+# MIMIC, so every class he "fields" is one somebody else fielded first; he is
+# credited nothing of his own.  No declared band seats him.
+MIMIC_ONLY = {"GOGO"}
 
 # --------------------------------------------------------------------------
 # band declarations.  A band is a list of legs; a leg is a party plus the
@@ -163,6 +191,7 @@ MONSTER_NAMES = "ff6/src/text/monster_name_en.json"
 CLASS_ASM = "ff6/src/battle/ot6_class.asm"
 HUD_ASM = "ff6/src/battle/ot6_hud.asm"
 FLOOR_INC = "ff6/src/battle/ot6_break_floor.inc"
+CHAR_PROP = "ff6/src/field/char_prop.asm"          # 22 B/actor; +2..+5 cmds
 
 MAP_REC = 33
 ITEM_REC = 30
@@ -195,6 +224,7 @@ class Data:
         self.skill_class = self._parse_skill_tbl()
         self.shield_tbl = self._parse_shield_tbl()
         self.floor = self._parse_floor()
+        self.commands = self._parse_commands()
 
     def _read(self, rel):
         with open(os.path.join(self.root, rel), "rb") as f:
@@ -309,6 +339,43 @@ class Data:
                              "want %d (%s)" % (len(vals), N_SPECIES, FLOOR_INC))
         return vals
 
+    def _parse_commands(self):
+        """char_prop.asm -> {ACTOR: frozenset of battle command names}.
+
+        Records are emitted in actor order, one `; N: name` header and one
+        optional `set_char_prop_cmds` per record.  An actor with no
+        set_char_prop_cmds line (UMARO) owns no commands at all -- that is
+        real data, not a parse miss, so it is recorded as the empty set.
+        """
+        out = {}
+        who = None
+        for i, line in enumerate(self._text(CHAR_PROP).splitlines()):
+            code = line.split(";", 1)[0].strip()
+            m = re.match(r";\s*(\d+):\s*(\S+)", line.strip())
+            if m:
+                idx, name = int(m.group(1)), m.group(2).upper()
+                if idx < len(ACTORS):
+                    if ACTORS[idx] != name:
+                        raise SystemExit(
+                            "check_break_reach: %s:%d actor %d is %r, the "
+                            "checker's ACTORS says %r -- table drift"
+                            % (CHAR_PROP, i + 1, idx, name, ACTORS[idx]))
+                    who = name
+                    out.setdefault(who, frozenset())
+                else:
+                    who = None       # ghosts, esper terra and the rest
+                continue
+            m = re.match(r"set_char_prop_cmds\s+(.*)$", code)
+            if m and who is not None:
+                cmds = {c.strip().upper() for c in m.group(1).split(",")
+                        if c.strip() and c.strip().upper() != "NONE"}
+                out[who] = frozenset(cmds)
+        missing = [n for n in ACTORS if n not in out]
+        if missing:
+            raise SystemExit("check_break_reach: %s named no record for %s "
+                             "-- parser drift" % (CHAR_PROP, ",".join(missing)))
+        return out
+
     # -- decode ------------------------------------------------------------
     def map_random_enabled(self, m):
         return bool(self.map_prop[m * MAP_REC + 5] & 0x80)
@@ -345,27 +412,35 @@ class Data:
 
     # -- party -------------------------------------------------------------
     def actor_classes(self, name):
-        """Classes actor NAME can field: equippable weapons + owned abilities
-        + bare fists.  NULLBRK weapons chip nothing and grant nothing."""
+        """Classes actor NAME can field: equippable weapons + bare fists IF he
+        owns a command that swings them, plus the classes of the abilities his
+        commands resolve.  NULLBRK weapons chip nothing and grant nothing."""
         a = ACTOR_ID[name]
+        cmds = self.commands[name]
         mask = 0
-        for it in range(256):
-            rec = self.items[it * ITEM_REC:(it + 1) * ITEM_REC]
-            if rec[0] & 0x07 != 1:          # not a weapon
+        if name in MIMIC_ONLY:
+            return 0
+        if SWING_COMMAND in cmds or name in AUTO_SWINGERS:
+            for it in range(256):
+                rec = self.items[it * ITEM_REC:(it + 1) * ITEM_REC]
+                if rec[0] & 0x07 != 1:          # not a weapon
+                    continue
+                if not (int.from_bytes(rec[1:3], "little") >> a) & 1:
+                    continue
+                cls = self.weap_class[it]
+                if cls & NULLBRK:
+                    continue
+                mask |= cls & 0x0F
+            mask |= self.weap_class[0xFF] & 0x0F   # bare fists (empty hand $ff)
+        for cmd, sids in COMMAND_ABILITIES.items():
+            if cmd not in cmds:
                 continue
-            if not (int.from_bytes(rec[1:3], "little") >> a) & 1:
-                continue
-            cls = self.weap_class[it]
-            if cls & NULLBRK:
-                continue
-            mask |= cls & 0x0F
-        for sid, owner in ABILITY_OWNER.items():
-            if owner == name and sid in self.skill_class:
-                mask |= self.skill_class[sid] & 0x0F
-        if name == TOOLS_OWNER:
+            for sid in sids:
+                if sid in self.skill_class:
+                    mask |= self.skill_class[sid] & 0x0F
+        if "TOOLS" in cmds:
             for it in TOOLS_RANGE:
                 mask |= self.weap_class[it] & 0x0F
-        mask |= self.weap_class[0xFF] & 0x0F   # bare fists (empty hand $ff)
         return mask
 
 

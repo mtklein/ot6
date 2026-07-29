@@ -13920,23 +13920,21 @@ InitCmdList:
         lda     $3ebb
         lsr
         bcc     @539d       ; branch if not magic only (fanatic's tower)
-@5354:  lda     $3ed8,x     ; b = actor number
-        xba
-        ldx     #$03
+@5354:  ldx     #$03
 @535a:  lda     $fc,x       ; a = battle command
         cmp     #$01
         beq     @539a       ; branch if item
         cmp     #$12
         beq     @539a       ; branch if mimic
-        xba
-        cmp     #$0b
-        bne     @5371       ; branch if not gau
-        xba
-        cmp     #$10
-        bne     @5370       ; branch if not rage
-        lda     #$00        ; change command to fight
-@5370:  xba
-@5371:  xba
+        ; ot6 #47: vanilla read the actor number into B here and converted a
+        ;   GAU slot holding RAGE into FIGHT, so that the rewrite below would
+        ;   hand him SOMETHING in magitek armour or the Fanatics' Tower -- he
+        ;   owned no Fight of his own.  He owns one now (char_prop.asm), so
+        ;   the conversion is not only redundant, it is wrong: it would turn
+        ;   BOTH his Fight row and his Rage row into Magitek (or, magic-only,
+        ;   both into Magic) and draw the same command on two rows.  Rage is
+        ;   neither a magitek nor a magic-only command, so it now drops out
+        ;   below exactly like every other kit verb.
         cmp     #$00
         bne     @537a       ; branch if command is not fight
         lda     #$1d        ; change command to magitek
@@ -14044,13 +14042,57 @@ InitCmd_00:
 
 ; [ init magic/x-magic command ]
 
+; ot6 #47: GAU'S THIRD ROW IS SHARED -- Leap on the Veldt, Magic everywhere
+; else.  Gau now carries FIGHT/RAGE/MAGIC/ITEM (char_prop.asm) and the four
+; slots are full, so Leap has no row of its own.  It does not need one: Leap
+; is refused anywhere but the Veldt by its own vanilla availability test
+; (InitCmd_01, right below), so off the Veldt its row would be blank and on
+; the Veldt Magic's row is the one nobody misses.  The substitution happens
+; here rather than in InitCmd_01 so the relic pass upstream still sees $02 and
+; a Gem Box still upgrades the row to X-Magic (both ids land here).  The
+; vanilla magic test runs FIRST on both arms, so the has-mp flag $f8 is set
+; exactly when vanilla would set it -- a Veldt-standing Gau who knows a spell
+; keeps his pool even though the row shows Leap.  Every other actor takes the
+; vanilla path with no extra branch beyond the Veldt-flag test.
+
 InitCmd_03:
 InitCmd_04:
 @5429:  lda     $f6
-        bne     InitCmd_05
+        bne     @ot6magic   ; branch if any spells are known
         lda     $f7
         inc
-        bne     InitCmd_05
+        bne     @ot6magic   ; branch if an esper is equipped
+        jsr     Ot6VeldtRow
+        bcs     _5438       ; the row became leap: keep it
+        bra     _5434       ; no magic and no leap: remove command
+@ot6magic:
+        jsr     InitCmd_05  ; character has mp (vanilla's own side effect)
+        jsr     Ot6VeldtRow
+        bra     _5438
+
+; carry set = this row belongs to Gau's Veldt Leap and has been rewritten to
+; command $11; carry clear = untouched.  a/x clobbered (the dispatcher reloads
+; both after the init function returns).  Stack, one jsr below an init
+; function: $05,s is the command byte the init functions write through $03,s,
+; and $07,s is the character-data pointer they read through $05,s
+; (InitCmd_00's own "pointer to character data" comment names that slot).
+
+Ot6VeldtRow:
+        lda     $11e4       ; on the veldt flag
+        bit     #$02
+        beq     @norow      ; not on the veldt: leave the row to magic
+        lda     $07,s       ; pointer to character data
+        tax
+        lda     $3ed8,x     ; actor number
+        cmp     #CHAR::GAU
+        bne     @norow
+        lda     #$11        ; the row becomes leap
+        sta     $05,s
+        sec
+        rts
+@norow: clc
+        rts
+
 _5432:  bne     _5438
 _5434:  lda     #$ff
         sta     $03,s       ; remove command
