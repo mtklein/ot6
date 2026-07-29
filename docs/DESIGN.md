@@ -4,6 +4,38 @@ FF6 content, Octopath combat grammar. Mechanics-first: vanilla story, maps,
 and encounters stay untouched at first; systems land, then encounters get
 retuned around them.
 
+## The north star (owner, 2026-07-29)
+
+> *"We definitely want it to feel like FF6 just always had this improved
+> Octopath-style battle system. It's FF6 first, that happens to have
+> always had — wink wink — this really modern refined system."*
+
+**Not a mod of FF6. FF6 as if it had always been this way.** That is the
+test every decision answers to, and it is why so many of them look
+conservative from outside:
+
+- The FF3-US translation is our vocabulary — SwdTech, Dispatch, Cleave —
+  because that is what the player remembers (CONTRIBUTING).
+- Caps are the series' own: 99, 999, 9999 (`mp-economy.md`).
+- Vanilla's quirks stay; only genuinely destructive failures are fixed,
+  and the Sketch bug ships as-is by owner decision.
+- The Vargas triple-tutorial stays verbatim even though menu-Blitz made
+  it mechanically unnecessary — it is charm now, and charm is the point
+  (`bosses-wob.md`).
+- Scripted set pieces draw no break gauge at all, so a silent HUD still
+  reads as "this one is theater" the way it always did.
+- New systems reuse the engine's own machinery wherever it exists: the
+  break flash rides vanilla's monster-palette slot, the sound rides its
+  own sfx path, the loadout pages obey vanilla's window geometry down to
+  the cursor gutter.
+
+The failure mode this rules out is the one that makes hacks feel like
+hacks: a system that is *correct* but announces itself — new fonts, new
+vocabulary, numbers that do not look like Final Fantasy numbers, UI that
+does not sit where the old UI sat. When a choice is between elegant and
+familiar, familiar wins unless elegance buys something a player would
+actually notice.
+
 Sections marked **TBD** are open design questions, not commitments.
 
 Deep dives (2026-07-16, WoB scope): [character kits & learn
