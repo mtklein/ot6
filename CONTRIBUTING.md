@@ -101,6 +101,21 @@ any player-facing word, grep the shipped text data — `bushido_name_en`,
 `item_name_en`, `battle_cmd_name_en`, `magic_name_en`, `attack_name_en`
 — and pick something the game is not already saying.
 
+**Don't change the past.** Records stay as they were: shipped release
+notes, playtest ledgers, dated design decisions, and git history. When
+something in a *living* document turns out to be wrong, append a dated
+correction rather than silently rewriting the claim — `bosses-wob.md`'s
+Ultros ③ block and `banquet-decode.md`'s withdrawn §5.2 are the pattern.
+A reader should be able to see both what we believed and what we learned;
+a doc that has been quietly fixed teaches nothing about how it went
+wrong, and this project's worst failures have all been someone trusting a
+confident-looking statement.
+
+Concretely: **never rebase or force-push a shared branch**, never edit a
+released `release-notes-vX.Y.md`, and never restate history to match a
+later decision. New rules apply going forward. (Owner ruling,
+2026-07-29.)
+
 **Read the source; don't infer a mechanism.** This is the big one, learned the
 hard way. An audit in July 2026 found a cluster of confidently-worded
 explanations in this repo that were simply invented — a testrunner timeout
