@@ -28,6 +28,7 @@
         sta     f:$7e0000+OT6_RANDPEND
         sta     f:$7e0000+OT6_HUDVEIL   ; a stale veil never survives init
         sta     f:$7e0000+OT6_SCRIPTBUSY ; nor a stuck anchor-adopt gate
+        sta     f:$7e0000+OT6_PIPTAIL   ; nor a stale pip-paint tail (#33)
         lda     #$01
         sta     OT6_BP_CLASS           ; characters open with 1 bp, octopath-style
         sta     $3e9e
@@ -42,7 +43,12 @@
 @clr:   sta     f:$7e0000+OT6_SHADOW,x
         inx
         inx
-        cpx     #$0054          ; 84 = the six shadow lines
+        cpx     #$0070          ; $54 = the six shadow lines, then the tail:
+                                ;   +$18 reveal-pending (#33: stale pending
+                                ;   would commit last battle's reveals onto
+                                ;   this battle's species) and +$04 wallet
+                                ;   cur/prev (#35: stale words would blank/
+                                ;   paint random menu-map cells)
         bcc     @clr
                                 ; the shadow now lives at $ecf1, so it is no
                                 ; longer contiguous with MAPBASE/ATKCLASS/
@@ -61,8 +67,11 @@
         ;  feature's buffer. $57de is inside vanilla's `ram_res w7e57d5,
         ;  128`, so the loop was zeroing vanilla's name/banner scratch at
         ;  every battle init for nothing. Nothing reads OT6_HUDCOPY.)
-        sta     f:$7e0000+OT6_PIPCUR    ; live pip cell off, no stale erase
-        sta     f:$7e0000+OT6_PIPPREV
+                                ; (the old single-cell pip pseudo-line's
+                                ;  PIPCUR/PIPPREV clears are gone with it --
+                                ;  #33 moved the live pips to OT6_PIPROWS,
+                                ;  gated by OT6_PIPTAIL/$7bca, and the wallet
+                                ;  cur/prev ride the @clr loop above)
         sta     f:$7e0000+OT6_LASTLR
         sta     f:$7e0000+OT6_RESTAGE   ; word store: the high byte lands on
                                         ;   vanilla's $57d5 name scratch —
@@ -90,9 +99,19 @@
         shorta0
         .a8
         .i16
+        jsr     Ot6RevealCommit ; #33: any reveal this action banked and no
+                                ;   numeral displayed (a 0-damage or
+                                ;   numeral-less script) commits no later
+                                ;   than the action's own end
         txa                     ; width-neutral character test
         cmp     #$08
         bcs     done            ; monsters have no bp
+        txa                     ; #33: the live pip cell follows THIS actor
+        lsr                     ;   entity offset -> character slot
+        sta     f:$7e0000+OT6_PIPSLOT
+        lda     #32             ;   for ~half a second past this charge, so
+        sta     f:$7e0000+OT6_PIPTAIL   ;   the drop lands on screen even
+                                ;   when no battle menu is open at resolution
         lda     OT6_BOOST_REVEALED,x         ; pending boost spent this action?
         beq     @gain
         sta     OT6_SCR_BIT     ; consume it: bp -= pending
@@ -409,6 +428,8 @@ Ot6FoldTbl:
         lda     $3a7a           ; command
         cmp     #$05
         beq     @steal          ; steal: one verb, one flat price -- no id
+        cmp     #$13
+        beq     @dance          ; dance: flat, paid at dance-START only (#34)
         cmp     #$07
         beq     @costed         ; bushido
         cmp     #$09
@@ -422,6 +443,24 @@ Ot6FoldTbl:
         pla                     ; drop the parked cost (0 for steal)
         lda     #$02            ; flat 2 MP -- the probe-collect verb prices
         plp                     ;   like the cheapest spell (mp-economy.md)
+        rtl
+@dance: ; dance (cmd $13) is priced at the COMMIT moment only: the mid-dance
+        ; turns queue through the same CreateAction (RandDanceAction,
+        ; battle_main.asm:617), but by then Cmd_13 has set the actor's DANCE
+        ; status ($3ef8 bit 0) -- one payment starts the whole-battle state,
+        ; and every locked-in step is free (mp-economy.md:96).  a stumbled
+        ; start (Cmd_13's 50% @17af arm) clears the bit, so retrying the
+        ; commit pays again -- the payment moment IS the commit moment.
+        ; X = attacker entity at this hook (the site contract above).
+        pla                     ; drop the parked cost (0 for dance)
+        lda     $3ef8,x         ; status 3
+        lsr                     ; bit 0 = already dancing (a mid-dance turn)
+        bcc     :+
+        lda     #$00            ; locked-in step: free
+        plp
+        rtl
+:       jsl     Ot6DanceCost    ; dance-start: the flat price, one authority
+        plp
         rtl
 @costed:
         pla                     ; drop the parked cost (it is 0 for these)
@@ -462,6 +501,47 @@ Ot6FoldTbl:
 @done:  sta     $01,s           ; overwrite the parked id with its cost
         pla                     ; A = cost
         plx
+        rtl
+.endproc
+
+; [ #34: can the dancer pay the start?  Cmd_13's lock-out gate ]
+;
+; carry set = the queued cost ($3a4c, staged from the cost queue at action
+; load, battle_main.asm:425) exceeds the attacker's current MP.  Cmd_13
+; consults this BEFORE setting the DANCE status: the universal fizzle
+; refuses only the cast, and the status set in the command body would
+; otherwise start the whole-battle state unpaid.  entry: jsl from Cmd_13,
+; a8/i8 (command context), y = attacker entity, db=$7e.  clobbers a.
+.proc Ot6DanceStartGate
+        .a8
+        rep     #$20
+        .a16
+        lda     $3c08,y         ; current MP (16-bit; y indexes fine under i8)
+        cmp     $3a4c           ; carry set = MP >= cost (affordable)
+        sep     #$20
+        .a8
+        bcs     @ok
+        sec                     ; cannot pay: the start must not lock
+        rtl
+@ok:    clc
+        rtl
+.endproc
+
+; ------------------------------------------------------------------------------
+
+; [ the Dance price -- one authority for the charge and the menu (#34) ]
+;
+; mp-economy.md:96 rules "flat, paid at start, 4-10: one payment starts a
+; whole-battle state".  8 -- the top half of the band -- because the single
+; payment funds every subsequent turn's verb for the rest of the battle
+; (each locked-in step is free), so it prices above the per-use probe verbs
+; (Steal 2, Pummel 2) while staying payable from Mog's natural join pool
+; (base 16 MP + level gains); playtest tunes.  PURE leaf, the Ot6CostFor
+; shape: cost in A, preserves X and Y; rtl so the menu decorator (bank F0
+; via C1) and the charge read one number.
+.proc Ot6DanceCost
+        .a8
+        lda     #$08
         rtl
 .endproc
 

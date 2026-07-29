@@ -604,6 +604,74 @@ done:   plp
 
 ; ------------------------------------------------------------------------------
 
+; [ draw one Dance menu row -- a leading 2-digit price per name, greyed if
+;   the caster can't afford it (#34: the #35 display pattern's second consumer) ]
+;
+; DrawDanceListText (btlgfx, bank C1) jsl's here after copying the template
+; and storing the two row ids -- the exact shape of Ot6ToolRowDecorate, on the
+; dance window.  Dance's price is FLAT (Ot6DanceCost, the same authority the
+; charge reads), so both columns stamp the same number; an empty ($ff) cell
+; draws a 0, which cmd $02 renders as two blanks.  Each column re-lays to
+; [font][cost][name] so one font command colors price and name as a unit --
+; the tools transform verbatim: column 1's "$05,$04 draw-4-spaces" (+0/+1)
+; and its "$04,$21 font" (+2/+3) become [font][cost], column 2's "$05,$02
+; gap" (+6/+7) and font (+8/+9) likewise; the name commands (+4,+10) and ids
+; (+5,+11) stay put.  Row width 2+12+2+12 = 28 tiles, narrower than vanilla's
+; 30.  In the nomp build the body is empty and the vanilla layout is
+; byte-identical -- ALWAYS assembled, the flag gating lives here.
+;
+; entry from a jsl: db=$7e, a8 on return, i16 (Ot6AbilityGrey needs it).
+; w7e5755 = $5755 near; literals below are its offsets.  clobbers A only.
+.proc Ot6DanceRowDecorate
+        php
+        sep     #$20
+        .a8
+        .i16
+.if ::OT6_MP_COSTS              ; :: -- force the file-scope flag from in-proc
+        lda     $575a           ; +5 = column-1 dance id (caller wrote it)
+        jsl     Ot6DanceRowCost ;   id -> cost (0 for an $ff empty cell)
+        pha                     ; park column-1 cost
+        jsl     Ot6AbilityGrey  ;   cost -> $04 grey / $00 white
+        ora     #$21
+        sta     $5756           ; +1: font palette (colors cost + name)
+        lda     #$04
+        sta     $5755           ; +0: font command
+        lda     #$02
+        sta     $5757           ; +2: number command
+        pla
+        sta     $5758           ; +3: column-1 cost value
+        lda     $5760           ; +11 = column-2 dance id
+        jsl     Ot6DanceRowCost
+        pha                     ; park column-2 cost
+        jsl     Ot6AbilityGrey
+        ora     #$21
+        sta     $575c           ; +7: font palette
+        lda     #$04
+        sta     $575b           ; +6: font command
+        lda     #$02
+        sta     $575d           ; +8: number command
+        pla
+        sta     $575e           ; +9: column-2 cost value
+.endif
+        plp
+        rtl
+.endproc
+
+.if OT6_MP_COSTS
+; [ a dance row's price: the flat Ot6DanceCost, 0 for an empty cell ]
+; in: A = the row's dance id ($ff = empty).  out: A = cost.  preserves X,Y.
+.proc Ot6DanceRowCost
+        .a8
+        cmp     #$ff
+        bne     :+
+        lda     #$00            ; empty cell: no price, stays white
+        rtl
+:       jml     Ot6DanceCost    ; the one authority (its rtl returns for us)
+.endproc
+.endif  ; OT6_MP_COSTS
+
+; ------------------------------------------------------------------------------
+
 .if OT6_MP_COSTS
 ; [ add the Bushido "not enough BP" grey reason to a row's font ]
 ;
