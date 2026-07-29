@@ -121,6 +121,18 @@ character with the esper can learn, Bum Rush is one character's once-per-
 kit divine. Nothing needs changing, and the vanilla-MP-costs house rule
 stands with its one named exception (Osmose, below).
 
+## Unresolved numbers are not blockers (owner, 2026-07-29)
+
+Where two documents disagree about a *value* — Overclock priced as the sum
+of its tools (`kits.md`) versus the 99 anchor above (#57) — that is not a
+contradiction to resolve on paper. The owner's ruling: *"doesn't matter
+what we start with, playtesting will help make it clear."*
+
+So: pick the defensible default, ship it where it can be played, note the
+alternative in a comment, and let the playthrough decide. Blocking a build
+on a number nobody can evaluate without playing it is the expensive
+mistake, not shipping the wrong number once.
+
 ## Principles
 
 - **FF6's MP pool does Octopath's job.** Every character
