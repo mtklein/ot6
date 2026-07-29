@@ -36,8 +36,8 @@
 -- row 15 is inside the window at all (measured with a per-row glyph ruler,
 -- tools/tests/probe_ragegeom.lua; vanilla says it from the other side -- every
 -- EN cursor list for this window is `cursor_pos {x, 116 + n*12}`,
--- skills.asm:124-125, and DrawRageName biases its row `.if LANG_EN`,
--- skills.asm:1518-1521).  The page drew its slots on EVEN rows 4/6/8 and its
+-- skills.asm:125-126, and DrawRageName biases its row `.if LANG_EN`,
+-- skills.asm:1571-1574).  The page drew its slots on EVEN rows 4/6/8 and its
 -- LEARNED grid on 15/17/19/21, so every tech name rendered as a four-scanline
 -- sliver and THREE of the pool's four rows were off the bottom of the window.
 -- It now draws on odd rows only, all of it inside row 15, with the pool as two
@@ -46,6 +46,31 @@
 -- Hence the EVEN-ROW / ROW>15 / BORDER-COLUMN CANARY at the bottom of this
 -- file -- the same assertion class menu_ragepage.lua carries.  It is not
 -- decoration; it is the regression, and it is the thing this test was missing.
+--
+-- issue #43, ROUND THREE -- THE CURSOR GUTTER, the other half of "where".
+-- The rows landed on the right SCANLINES and still looked wrong, because the
+-- cursor is a 16x16 SPRITE and `cursor_pos {x,y}` is its top-left corner: at
+-- x = 8 it covers tilemap columns 1 AND 2, and this page drew its "1x" label
+-- at column 2 -- so the sprite sat on the leading glyph.  Vanilla's own
+-- arithmetic is cursor_x = 8*col - 16, with no exception anywhere in this
+-- window: magic draws at cols 3/16 under cursors 8/112 (skills.asm:831, :836
+-- vs :125-126), espers at 3/17 under 8/120 (:1733, :1737 vs :249-250), rage at
+-- 5/19 under 24/136 (:1544, :1548 vs :292-293), and the config menu's value
+-- column 14 under 96 (config.asm:50).  Measured the same on the shipped ROM:
+-- the magic list's `cursor_pos {8, 116}` lights screen x 8..23, y 116..131
+-- (tools/tests/probe_menucols.lua).  The fix moved the page's left margin from
+-- column 2 to column 3 and everything right of it by one; the cursor table did
+-- not move, because it was already vanilla's.
+--
+-- THE CURSOR GUTTER CANARY below is what keeps that true.  It reads the page's
+-- OWN Ot6LoadoutCursorPos table out of the ROM and, for each entry, asserts the
+-- two columns the sprite covers are blank and the row's content starts in the
+-- very next one.  Neither side is hardcoded -- the cursor comes from the ROM,
+-- the text is read out of the tilemap -- so moving either half alone fails
+-- here.  It is duplicated in menu_ragepage.lua rather than shared: the only
+-- lua the runner inlines is lib/ot6{,_field,_contract}.lua, and those three
+-- files ARE the frontier mint signature (lib/frontier_stamp.sh:49-55), so a
+-- helper added there would mark every minted fixture drifted.
 --
 -- Fixture: arvis_wake (same boot as menu_bushidoloadout / menu_esperdetail).
 -- Its lead has no Bushido command, so the SwdTech row is installed the house
@@ -115,15 +140,17 @@ end
 
 -- #43 geometry, mirroring field_menu.asm's Ot6LoadoutDraw{Slots,Pool}: ODD
 -- tilemap rows only, nothing past row 15, nothing in the window's own border
--- column 30.  Boost row i (0..2) = tilemap row 3 + i*2; pool cell n (0..7) is
--- column-major -- left column (col 2) rows 9/11/13/15, right column (col 16)
--- rows 9/11/13/15.  A 12-cell name at col 16 ends at 27, inside the border.
+-- column 30, and nothing in the cursor's gutter (columns 1-2).  Boost row i
+-- (0..2) = tilemap row 3 + i*2; pool cell n (0..7) is column-major -- left
+-- column (col 3) rows 9/11/13/15, right column (col 17) rows 9/11/13/15.  A
+-- 12-cell name at col 17 ends at 28, inside the border.
 local TITLE_ROW = 1
+local LEFT_COL = 3                      -- the page's left margin (gutter = 1-2)
 local POOL_CAPTION_COL = 22             -- the caption rides the title row
-local NAME_COL, COST_COL = 5, 18
+local NAME_COL, COST_COL = 6, 19        -- "1x" 3-4, blank 5, name 6..17, cost 19
 local BOOST_ROWS = { 3, 5, 7 }
 local function poolRow(n) return 9 + (n % 4) * 2 end
-local function poolCol(n) return (n < 4) and 2 or 16 end
+local function poolCol(n) return (n < 4) and LEFT_COL or 17 end
 
 local function assertRun(x0, y, bytes, what)
   for i, b in ipairs(bytes) do
@@ -141,7 +168,50 @@ local function assertRowBlank(y, what)
   end
 end
 
--- One slot row: name at col 5, then a 1-digit MP cost at col 18 + " MP".
+-- THE CURSOR GUTTER CANARY (#43 round 3).  Both sides are read, not written:
+-- the cursor table comes out of the ROM the menu itself indexes, and the text
+-- comes out of the tilemap the menu itself drew.
+--
+-- `cursor_pos {x, y}` assembles to `.byte x, y` (menu_ram.inc:582-584), two
+-- bytes per entry, and is the TOP-LEFT of a 16x16 sprite -- so entry x owns
+-- tilemap columns x/8 and x/8+1, and vanilla starts the row it points at in
+-- x/8+2 (cursor_x = 8*col - 16; see the header).  y is 116 + n*12 and tilemap
+-- row = 2n+1, so the row a given entry points at is (y-116)/6 + 1.
+local CURSOR_POS = H.sym("Ot6LoadoutCursorPos") & 0x3FFFFF
+local function cursorEntry(n)
+  return H.readRomByte(CURSOR_POS + n * 2), H.readRomByte(CURSOR_POS + n * 2 + 1)
+end
+
+local function assertCursorGutter(n, leading, what)
+  local cx, cy = cursorEntry(n)
+  local col, y = cx // 8, (cy - 116) // 6 + 1
+  H.assertEq(y % 2 == 1 and y >= 1 and y <= 15, true, string.format(
+    "%s: cursor entry %d (y=%d) points at tilemap row %d, which this window "
+    .. "does not show whole", what, n, cy, y))
+  -- the two columns UNDER the sprite must carry no glyph at all
+  H.assertEq(cell(col, y), 0, string.format(
+    "%s: cursor entry %d sits at x=%d, so tilemap {%d,%d} is under the sprite "
+    .. "and must be blank", what, n, cx, col, y))
+  H.assertEq(cell(col + 1, y), 0, string.format(
+    "%s: cursor entry %d sits at x=%d, so tilemap {%d,%d} is under the sprite "
+    .. "and must be blank", what, n, cx, col + 1, y))
+  -- ... and the row's content must begin in the very next column, so the
+  -- cursor abuts its row exactly the way every vanilla list in this window does
+  H.assertEq(cell(col + 2, y) ~= 0, true, string.format(
+    "%s: cursor entry %d at x=%d reserves columns %d-%d, so the row must start "
+    .. "at column %d (vanilla: cursor_x = 8*col - 16)",
+    what, n, cx, col, col + 1, col + 2))
+  -- for a leading (left-most) cursor, nothing at all may precede it on the row
+  if leading then
+    for x = 0, col + 1 do
+      H.assertEq(cell(x, y), 0, string.format(
+        "%s: {%d,%d} is left of the cursored row's first glyph (column %d)",
+        what, x, y, col + 2))
+    end
+  end
+end
+
+-- One slot row: name at col 6, then a 1-digit MP cost at col 19 + " MP".
 local function assertSlotRow(y, name, techname)
   assertRun(NAME_COL, y, name, techname)
   local d = cell(COST_COL, y)
@@ -221,15 +291,15 @@ H.run({ maxFrames = 30000 }, {
     -- chrome.  The LEARNED caption rides the TITLE row (#43): the window has
     -- eight text rows and the page needs nine, and the pool's four rows are
     -- not negotiable if all eight techs are to be inside the frame.
-    assertRun(2, TITLE_ROW, TITLE, "title BUSHIDO LOADOUT")
+    assertRun(LEFT_COL, TITLE_ROW, TITLE, "title BUSHIDO LOADOUT")
     assertRun(POOL_CAPTION_COL, TITLE_ROW, POOL, "LEARNED caption")
-    assertRun(2, BOOST_ROWS[1], { 0xb5, lo.x }, "label 1x")
-    assertRun(2, BOOST_ROWS[2], { 0xb6, lo.x }, "label 2x")
-    assertRun(2, BOOST_ROWS[3], { 0xb7, lo.x }, "label 3x")
+    assertRun(LEFT_COL, BOOST_ROWS[1], { 0xb5, lo.x }, "label 1x")
+    assertRun(LEFT_COL, BOOST_ROWS[2], { 0xb6, lo.x }, "label 2x")
+    assertRun(LEFT_COL, BOOST_ROWS[3], { 0xb7, lo.x }, "label 3x")
     -- #38: no 0x label anywhere on the page -- the retired rung must not be
     -- drawn at its old home nor anywhere else in the label column.
     for y = 0, 15 do
-      H.assertEq(cell(2, y) == 0xb4 and cell(3, y) == lo.x, false,
+      H.assertEq(cell(LEFT_COL, y) == 0xb4 and cell(LEFT_COL + 1, y) == lo.x, false,
         string.format("no 0x label at row %d (#38 retired the free rung)", y))
     end
     -- the three boost slots: ceiling 2 -> base 0 -> Dispatch/Retort/Slash
@@ -244,13 +314,14 @@ H.run({ maxFrames = 30000 }, {
       assertRun(poolCol(n - 1), poolRow(n - 1), bushBytes(n - 1),
         "pool cell " .. (n - 1) .. " vs BushidoName record")
     end
-    H.assertEq(cell(2, poolRow(3)), 0, "no 4th pool cell (only 3 learned)")
-    H.assertEq(cell(16, poolRow(0)), 0, "right pool column empty (3 learned)")
+    H.assertEq(cell(poolCol(3), poolRow(3)), 0, "no 4th pool cell (only 3 learned)")
+    H.assertEq(cell(poolCol(4), poolRow(0)), 0, "right pool column empty (3 learned)")
     -- spray canaries: undrawn odd rows are still cleared
     assertRowBlank(9 + 3 * 2, "row 15 (no 4th learned tech)")
-    -- the title row's gaps and tail: nothing may run into the window's own
-    -- right border, which lives in column 30.
-    for x = 17, 21 do
+    -- the title row's gaps and tail: the title ends at 17 and the caption runs
+    -- 22..28, and nothing may run into the window's own right border in
+    -- column 30.
+    for x = 18, 21 do
       H.assertEq(cell(x, TITLE_ROW), 0,
         string.format("title row gap blank {%d,1}", x))
     end
@@ -259,6 +330,9 @@ H.run({ maxFrames = 30000 }, {
         string.format("title row tail blank {%d,1}", x))
     end
     assertGeometry("3 learned")
+    -- the cursor gutter, on every one of the three boost rows: nothing under
+    -- the sprite, content starting in the column right after it.
+    for n = 0, 2 do assertCursorGutter(n, true, "3 learned") end
     H.screenshot("swdtech_page_player_path")
     H.log("PASSED: Skills->SwdTech via the player's path renders -- title, "
       .. "labels, slots, costs, pool correct; every drawn cell on an ODD row "
@@ -286,9 +360,9 @@ H.run({ maxFrames = 30000 }, {
   H.waitFrames(90),
 
   H.call(function()
-    assertRun(2, TITLE_ROW, TITLE, "title still on row 1")
+    assertRun(LEFT_COL, TITLE_ROW, TITLE, "title still on row 1")
     assertRun(POOL_CAPTION_COL, TITLE_ROW, POOL, "LEARNED caption still on row 1")
-    -- all eight, column-major: cells 0-3 down col 2, cells 4-7 down col 16.
+    -- all eight, column-major: cells 0-3 down col 3, cells 4-7 down col 17.
     for n = 0, 7 do
       assertRun(poolCol(n), poolRow(n), bushBytes(n),
         string.format("pool cell %d '%s' at {%d,%d}",
@@ -304,9 +378,31 @@ H.run({ maxFrames = 30000 }, {
           i, COST_COL, y, d))
     end
     assertGeometry("8 learned")
+    -- the full pool is the case that puts a glyph in EVERY cursored row and in
+    -- both pool columns, so it is the strongest state to check the gutter in.
+    for n = 0, 2 do assertCursorGutter(n, true, "8 learned") end
     H.screenshot("swdtech_page_full_pool")
     H.log("FULL POOL: all eight Bushido techs drawn in two columns of four on "
       .. "rows 9/11/13/15 -- every cell inside the window, none on an even "
-      .. "row, none past row 15, none in column 30")
+      .. "row, none past row 15, none in column 30, none under the cursor")
+  end),
+
+  -- ---- the cursor MOVES, and the gutter holds on every row it reaches ----
+  -- The canary above reads the whole cursor table, but only the row the sprite
+  -- is actually parked on is visible in a screenshot.  Walk it down to the
+  -- bottom slot and shoot that too, so the owner's own check -- "open it and
+  -- look" -- is covered on more than the first row.
+  H.pressButtons({ "down" }, 2),
+  H.waitFrames(20),
+  H.pressButtons({ "down" }, 2),
+  H.waitFrames(40),
+  H.call(function()
+    H.assertEq(H.readByte(ZMENUSTATE), ST_LOADOUT, "still on the loadout page")
+    for n = 0, 2 do assertCursorGutter(n, true, "cursor on the 3x row") end
+    assertGeometry("cursor on the 3x row")
+    H.screenshot("swdtech_page_cursor_bottom")
+    H.log("CURSOR WALK: the sprite is on the 3x row and columns 1-2 are still "
+      .. "empty on all three -- the gutter is a property of the page, not of "
+      .. "which row happens to be selected")
   end),
 })

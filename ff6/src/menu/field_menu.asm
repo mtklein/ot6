@@ -2772,8 +2772,8 @@ Ot6LoadoutDrawC3:
 ; shadow (tools/tests/probe_ragegeom.lua): odd rows 1,3,5,..,15 render whole at
 ; screen y = 116 + 6*(row-1); even rows show only their bottom three scanlines.
 ; Vanilla says the same from the other side -- every EN cursor list for this
-; window is `cursor_pos {x, 116 + n*12}` (skills.asm:124-125, :247-250,
-; :292-298) and DrawRageName biases its row `.if LANG_EN` (skills.asm:1518).
+; window is `cursor_pos {x, 116 + n*12}` (skills.asm:125-126, :249-250,
+; :292-293) and DrawRageName biases its row `.if LANG_EN` (skills.asm:1571-1574).
 ;
 ; This page shipped with its slots on EVEN rows 4/6/8 and its LEARNED grid on
 ; 15/17/19/21, so every tech name was a four-scanline sliver beside a
@@ -2781,11 +2781,11 @@ Ot6LoadoutDrawC3:
 ; the window.  #39 fixed the page's GLYPHS; this is its geometry.  The layout
 ; is now vanilla's own shape for this window -- eight usable text rows:
 ;
-;   row  1   BUSHIDO LOADOUT            LEARNED     (col 2 / col 22)
-;   row  3   1x  <tech, 12 cells @5>   n MP @18
+;   row  1   BUSHIDO LOADOUT            LEARNED     (col 3 / col 22)
+;   row  3   1x  <tech, 12 cells @6>   n MP @19
 ;   row  5   2x  ...
 ;   row  7   3x  ...
-;   row  9   pool cell 0 (col 2)   pool cell 4 (col 16)
+;   row  9   pool cell 0 (col 3)   pool cell 4 (col 17)
 ;   row 11   pool cell 1           pool cell 5
 ;   row 13   pool cell 2           pool cell 6
 ;   row 15   pool cell 3           pool cell 7
@@ -2793,9 +2793,22 @@ Ot6LoadoutDrawC3:
 ; The page needs NINE rows and the window has eight, so the pool's caption
 ; rides the title row -- the same resolution the Rage page used for its price
 ; line, and the title row is the one row where a second blue chrome word
-; cannot be misread as a slot's data.  Columns: a 12-cell BushidoName at col 16
-; ends at 27 and the window's own right border is column 30, so both pool
-; columns and the "n MP" field (18..21) are inside the frame.
+; cannot be misread as a slot's data.
+;
+; THE CURSOR GUTTER (#43, third round), and why every column above is one
+; further right than it shipped.  `cursor_pos {x,y}` is the top-left of a 16x16
+; sprite, so the cursor at x=8 owns tilemap columns 1 AND 2 -- it drew straight
+; over the "1" of "1x" at column 2.  Vanilla's rule is exactly
+; cursor_x = 8*col - 16, without exception: magic 3/16 under 8/112
+; (skills.asm:831,:836 vs :125-126), espers 3/17 under 8/120 (:1733,:1737 vs
+; :249-250), rage 5/19 under 24/136 (:1544,:1548 vs :292-293), config col 14
+; under 96 (config.asm:50).  The cursor table below was already vanilla's;
+; the TEXT was one column too far left.  Everything shifts by one and the
+; existing gaps are preserved: "1x" at 3-4, blank 5, name 6..17, blank 18,
+; "n MP" 19..22, and the window's own right border is still column 30.  The
+; pool's right column moves 16 -> 17 with it, keeping the two-column gutter
+; between two full-width names ("Quadra Slice" fills all twelve cells); a
+; 12-cell name at 17 ends at 28, still inside the frame.
 Ot6LoadoutDrawSlots:
         lda     #BG1_TEXT_COLOR::DEFAULT
         sta     zTextColor
@@ -2810,13 +2823,13 @@ Ot6LoadoutDrawSlots:
         clc
         adc     #$03
         sta     $e6
-        ldx     #$0005                  ; name column
+        ldx     #$0006                  ; name column (6: past "1x" at 3-4)
         jsr     Ot6DrawBushName
         lda     $e5
         clc
         adc     #$55                    ; tech index -> attack id
         jsl     Ot6LoadoutCost          ; F0: A = MP cost (0 under nomp)
-        ldx     #$0012                  ; cost column (18)
+        ldx     #$0013                  ; cost column (19)
         jsr     Ot6LoadoutDrawCost
         ldx     $e2
         inx
@@ -2825,8 +2838,8 @@ Ot6LoadoutDrawSlots:
         rts
 
 ; ---- draw the LEARNED pool as a 2 x 4 grid on the window's ODD rows (#43) ----
-; Column-major: filled cells 0..3 go down the left column (col 2), 4..7 down the
-; right (col 16), both on rows 9/11/13/15.  All eight Bushido techs therefore
+; Column-major: filled cells 0..3 go down the left column (col 3), 4..7 down the
+; right (col 17), both on rows 9/11/13/15.  All eight Bushido techs therefore
 ; fit INSIDE the window -- the old {15,17,19,21} grid put three of its four rows
 ; past row 15, where this window shows nothing (see the cadence note above).
 Ot6LoadoutDrawPool:
@@ -2849,13 +2862,13 @@ Ot6LoadoutDrawPool:
         clc
         adc     #$09                    ; right column, row 9 + (cell-4)*2
         sta     $e6
-        ldx     #$0010                  ; col 16 (12-cell name -> 16..27 < 30)
+        ldx     #$0011                  ; col 17 (12-cell name -> 17..28 < 30)
         bra     @draw
 @left:  asl
         clc
         adc     #$09                    ; left column, row 9 + cell*2
         sta     $e6
-        ldx     #$0002                  ; col 2
+        ldx     #$0003                  ; col 3 (the cursor gutter is 1-2)
 @draw:  jsr     Ot6DrawBushName
         inc     $e2
 @skip:  ldx     $e3
@@ -2915,15 +2928,23 @@ Ot6LoadoutCostTiles:    raw_text OT6_LOADOUT_MP_SUFFIX  ; " MP" + $00 (issue #39
 
 ; ---- cursor: single column, three rows over the boost slots (#38) ----
 ; y = 116 + n*12 is the EN field menu's text pitch for THIS window, copied from
-; vanilla's own magic/esper/rage cursor tables (skills.asm:124-125, :247-250,
-; :292-298).  Tilemap row = 2n + 1, so rows 3/5/7 are n = 1/2/3.  The old
+; vanilla's own magic/esper/rage cursor tables (skills.asm:125-126, :249-250,
+; :292-293).  Tilemap row = 2n + 1, so rows 3/5/7 are n = 1/2/3.  The old
 ; {30,46,62} was an 8px-per-row assumption and put the cursor above the window.
+;
+; x = 8 is vanilla's magic/esper left-column x, and it PAIRS WITH TEXT AT COLUMN
+; 3 -- the sprite is 16x16 with cursor_pos as its top-left, so it covers columns
+; 1-2 (measured: `cursor_pos {8,116}` lights screen x 8..23, y 116..131, from
+; the shipped ROM's own magic list -- tools/tests/probe_menucols.lua).  Do not
+; move this table to fix an overlap: move the TEXT.  The rule is
+; cursor_x = 8*col - 16 and it holds for every list vanilla draws in this
+; window.  menu_swdtechpage.lua's cursor canary asserts the pairing.
 Ot6LoadoutCursorProp:
         cursor_prop {0, 0}, {1, 3}, NO_XY_WRAP
 Ot6LoadoutCursorPos:
-        cursor_pos {8, 116 + 1 * 12}    ; row 3  (1x)
-        cursor_pos {8, 116 + 2 * 12}    ; row 5  (2x)
-        cursor_pos {8, 116 + 3 * 12}    ; row 7  (3x)
+        cursor_pos {8, 116 + 1 * 12}    ; row 3  (1x at col 3)
+        cursor_pos {8, 116 + 2 * 12}    ; row 5  (2x at col 3)
+        cursor_pos {8, 116 + 3 * 12}    ; row 7  (3x at col 3)
 
 ; ---- positioned labels (issue #39: the strings live in menu_text_en.inc so
 ; the encode pipeline maps them to menu-font tiles and null-terminates them;
@@ -3025,8 +3046,8 @@ Ot6RagePrice:
 ; 116 + 6*(row-1); even rows show only their bottom three scanlines; nothing
 ; past row 15 is inside the window at all.  Vanilla's own tables say the same
 ; thing from the other side -- every EN cursor list for this window is
-; `cursor_pos {x, 116 + n*12}` (skills.asm:124-125, :247-250, :292-298), and
-; DrawRageName biases its row by one under `.if LANG_EN` (skills.asm:1518-1521)
+; `cursor_pos {x, 116 + n*12}` (skills.asm:125-126, :249-250, :292-293), and
+; DrawRageName biases its row by one under `.if LANG_EN` (skills.asm:1571-1574)
 ; for exactly this reason.
 ;
 ; So the window holds EIGHT usable text rows, and the page needs ten (title,
@@ -3035,11 +3056,23 @@ Ot6RagePrice:
 ; `cursor_prop {0,0}, {2,8}`, skills.asm:281-299):
 ;
 ;   row  1   RAGE LOADOUT                    8 MP EACH
-;   row  5   slot 0 (col 2)  slot 1 (col 16)
+;   row  5   slot 0 (col 3)  slot 1 (col 16)
 ;   row  7   slot 2          slot 3
 ;   row  9   slot 4          slot 5
 ;   row 11   slot 6          slot 7
 ;   row 15   LEARNED nnn
+;
+; THE CURSOR GUTTER (#43, third round).  Columns 3 and 16 are not free choices:
+; `cursor_pos {x,y}` is the top-left of a 16x16 sprite, so a cursor at x owns
+; tilemap columns x/8 and x/8+1 and the text it points at must start at
+; x/8 + 2 -- cursor_x = 8*col - 16, vanilla's rule in every list it draws in
+; this window (magic cols 3/16 under 8/112, skills.asm:831,:836 vs :125-126;
+; espers 3/17 under 8/120, :1733,:1737 vs :249-250; rage 5/19 under 24/136,
+; :1544,:1548 vs :292-293).  This page's RIGHT column was already correct --
+; col 16 under `cursor_pos {112,...}` is vanilla's magic pair verbatim -- but
+; the LEFT column shipped at col 2 under a cursor at x=8, so the sprite drew
+; over the first letter of every left-hand beast name.  Only the left column
+; moved; {3, 16} under {8, 112} is now magic's geometry exactly.
 ;
 ; THE PRICE IS STATED ONCE, on the title row, not once per row.  Not a
 ; simplification: two ten-cell monster names plus two cursor columns plus two
@@ -3069,7 +3102,8 @@ Ot6RageDrawSlots:
         beq     :+
         ldx     #$0010                  ; odd slot  -> right column (16)
         bra     :++
-:       ldx     #$0002                  ; even slot -> left column (2)
+:       ldx     #$0003                  ; even slot -> left column (3: the
+                                        ;   cursor at x=8 owns columns 1-2)
 :       phx                             ; Ot6RageShow kills X
         ; --- the beast ---
         lda     $e2
@@ -3111,15 +3145,15 @@ Ot6DrawRageName:
         stz     hWMDATA
         jmp     DrawPosTextBuf
 
-; ---- draw the LEARNED count (three digits, col 10 of the caption row) ----
+; ---- draw the LEARNED count (three digits, col 11 of the caption row) ----
 Ot6RageDrawCount:
         jsl     Ot6RageCount            ; F0: A = rages known (0..255)
         pha
         lda     #$0f                    ; row 15 -- the LAST row the window
                                         ;   shows, and odd (see the cadence
                                         ;   note on Ot6RageDrawSlots).  Must
-                                        ;   track OT6_RAGE_LEARNED's own {2,15}
-        ldx     #$000a                  ; col 10, just past "LEARNED "
+                                        ;   track OT6_RAGE_LEARNED's own {3,15}
+        ldx     #$000b                  ; col 11, just past "LEARNED " (3..9 + 1)
         jsr     GetBG1TilemapPtr
         longa
         txa
@@ -3162,7 +3196,10 @@ Ot6RageDrawCount:
 ; Entries are in the framework's own index order ($4b = 2*row + col), i.e.
 ; reading order.  y = 116 + n*12 is the EN field menu's text pitch for this
 ; window, copied from vanilla's own rage/magic/esper cursor tables
-; (skills.asm:124-125, :247-250, :292-298); rows 5/7/9/11 are n = 2/3/4/5.
+; (skills.asm:125-126, :249-250, :292-293); rows 5/7/9/11 are n = 2/3/4/5.
+; x = {8, 112} pairs with text columns {3, 16} -- cursor_x = 8*col - 16, see the
+; cursor-gutter note on Ot6RageDrawSlots.  Do not move this table to fix an
+; overlap: move the TEXT.  menu_ragepage.lua's cursor canary asserts the pair.
 Ot6RageCursorProp:
         cursor_prop {0, 0}, {2, 4}, NO_XY_WRAP   ; OT6_RAGECOLS x OT6_RAGEROWS
 Ot6RageCursorPos:

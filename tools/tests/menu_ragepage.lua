@@ -26,13 +26,33 @@
 -- row 15 is inside the window at all (measured with a per-row glyph ruler,
 -- probe_ragegeom.lua; vanilla's own cursor tables say it from the other side --
 -- every EN list for this window is `cursor_pos {x, 116 + n*12}`,
--- skills.asm:124-125, and DrawRageName biases its row `.if LANG_EN`,
--- skills.asm:1518-1521).  The page shipped with eight slots on EVEN rows
+-- skills.asm:125-126, and DrawRageName biases its row `.if LANG_EN`,
+-- skills.asm:1571-1574).  The page shipped with eight slots on EVEN rows
 -- 4..18 and LEARNED on row 20, so through the player's path every beast name
 -- rendered as a three-scanline sliver and the collection counter was off the
 -- bottom of the window.  It now draws two columns of four on odd rows 5/7/9/11
 -- with LEARNED on 15 -- vanilla's own shape for this very window.  Hence the
 -- EVEN-ROW CANARY below: it is not decoration, it is the regression.
+--
+-- THE CURSOR GUTTER (#43 round 3) -- the same cadence story, in x.  The cursor
+-- is a 16x16 SPRITE and `cursor_pos {x,y}` is its top-left corner, so an entry
+-- at x owns tilemap columns x/8 and x/8+1 and the row it points at must start
+-- at x/8+2.  Vanilla's arithmetic is cursor_x = 8*col - 16 everywhere in this
+-- window: magic draws at cols 3/16 under cursors 8/112 (skills.asm:831, :836 vs
+-- :125-126), espers at 3/17 under 8/120 (:1733, :1737 vs :249-250), rage at
+-- 5/19 under 24/136 (:1544, :1548 vs :292-293), config's value column 14 under
+-- 96 (config.asm:50); measured the same way on the shipped ROM, where the magic
+-- list's `cursor_pos {8, 116}` lights screen x 8..23, y 116..131
+-- (tools/tests/probe_menucols.lua).  This page's RIGHT column was already
+-- right -- col 16 under x=112 is vanilla's magic pair verbatim -- but its LEFT
+-- column drew at col 2 under x=8, so the sprite covered the first letter of
+-- every left-hand beast name.  The left column is 3 now; the cursor table did
+-- not move.  THE CURSOR GUTTER CANARY below reads Ot6RageCursorPos out of the
+-- ROM and checks both halves against the tilemap, so neither can move alone.
+-- It is duplicated from menu_swdtechpage.lua rather than shared: the only lua
+-- the runner inlines is lib/ot6{,_field,_contract}.lua, and those three files
+-- ARE the frontier mint signature (lib/frontier_stamp.sh:49-55), so a helper
+-- added there would mark every minted fixture drifted.
 --
 -- THE NAME SOURCE, and why it is not the SwdTech one.  Ot6DrawRageName
 -- (field_menu.asm:2992-3016) calls GetMonsterNamePtr (skills.asm:1557-1565),
@@ -133,16 +153,66 @@ local function assertRowBlank(y, what)
 end
 
 -- Page geometry, mirroring field_menu.asm's Ot6RageDrawSlots: two columns of
--- four on ODD rows.  slot even = left column (name col 2), slot odd = right
--- (col 16); row = 5 + (slot & ~1).  The price is stated ONCE on the title row
--- ("8 MP EACH") rather than per row: two 10-cell names plus two cursor columns
--- plus two 4-cell cost fields is 30 columns and the window's right border is
--- column 30 (measured at screen x = 245).  The price is flat by design, so one
--- copy teaches the same rule.
+-- four on ODD rows.  slot even = left column (name col 3), slot odd = right
+-- (col 16); row = 5 + (slot & ~1).  {3, 16} under cursors {8, 112} is vanilla's
+-- magic list verbatim -- see the cursor-gutter note in the header.  The price
+-- is stated ONCE on the title row ("8 MP EACH") rather than per row: two
+-- 10-cell names plus two cursor gutters plus two 4-cell cost fields is 30
+-- columns and the window's right border is column 30 (measured at screen
+-- x = 245).  The price is flat by design, so one copy teaches the same rule.
 local TITLE_ROW, LEARNED_ROW = 1, 15
+local LEFT_COL = 3                      -- the page's left margin (gutter = 1-2)
 local COST_COL, EACH_COL = 17, 22
+local COUNT_COL = 11                    -- just past "LEARNED " at 3..9
 local function slotRow(slot) return 5 + (slot & ~1) end
-local function slotCol(slot) return (slot % 2 == 0) and 2 or 16 end
+local function slotCol(slot) return (slot % 2 == 0) and LEFT_COL or 16 end
+
+-- THE CURSOR GUTTER CANARY (#43 round 3).  Both sides are read, not written:
+-- the cursor table comes out of the ROM the menu itself indexes, and the text
+-- comes out of the tilemap the menu itself drew.
+--
+-- `cursor_pos {x, y}` assembles to `.byte x, y` (menu_ram.inc:582-584), two
+-- bytes per entry, in the framework's index order ($4b = 2*row + col).  It is
+-- the TOP-LEFT of a 16x16 sprite, so entry x owns tilemap columns x/8 and
+-- x/8+1 and the slot it points at must start at x/8+2.  y is 116 + n*12 and
+-- tilemap row = 2n+1, so the row an entry points at is (y-116)/6 + 1.
+local CURSOR_POS = H.sym("Ot6RageCursorPos") & 0x3FFFFF
+local function cursorEntry(n)
+  return H.readRomByte(CURSOR_POS + n * 2), H.readRomByte(CURSOR_POS + n * 2 + 1)
+end
+
+local function assertCursorGutter(n, what)
+  local cx, cy = cursorEntry(n)
+  local col, y = cx // 8, (cy - 116) // 6 + 1
+  H.assertEq(y % 2 == 1 and y >= 1 and y <= 15, true, string.format(
+    "%s: cursor entry %d (y=%d) points at tilemap row %d, which this window "
+    .. "does not show whole", what, n, cy, y))
+  H.assertEq(y, slotRow(n), string.format(
+    "%s: cursor entry %d must point at slot %d's row", what, n, n))
+  -- the two columns UNDER the sprite carry no glyph ...
+  for _, x in ipairs({ col, col + 1 }) do
+    H.assertEq(cell(x, y), 0, string.format(
+      "%s: cursor entry %d sits at x=%d, so tilemap {%d,%d} is under the "
+      .. "sprite and must be blank", what, n, cx, x, y))
+  end
+  -- ... and the slot it points at begins in the very next one.  An UNFILLED
+  -- slot is $ff-blanked across its width, which is still a drawn cell, so this
+  -- holds at any known-rage count.
+  H.assertEq(cell(col + 2, y) ~= 0, true, string.format(
+    "%s: cursor entry %d at x=%d reserves columns %d-%d, so slot %d must start "
+    .. "at column %d (vanilla: cursor_x = 8*col - 16)",
+    what, n, cx, col, col + 1, n, col + 2))
+  H.assertEq(col + 2, slotCol(n), string.format(
+    "%s: cursor entry %d and slot %d's draw column must agree", what, n, n))
+  -- for a left-column entry, nothing at all may precede it on the row
+  if slotCol(n) == LEFT_COL then
+    for x = 0, col + 1 do
+      H.assertEq(cell(x, y), 0, string.format(
+        "%s: {%d,%d} is left of the cursored row's first glyph (column %d)",
+        what, x, y, col + 2))
+    end
+  end
+end
 
 local function assertFilledRow(slot, id)
   local y, c = slotRow(slot), slotCol(slot)
@@ -202,15 +272,15 @@ H.run({ maxFrames = 30000 }, {
 
   H.call(function()
     -- chrome
-    assertRun(2, TITLE_ROW,   TITLE,   "title RAGE LOADOUT")
+    assertRun(LEFT_COL, TITLE_ROW, TITLE, "title RAGE LOADOUT")
     -- the flat price, stated once: "8 MP EACH" on the title row
     H.assertEq(cell(COST_COL, TITLE_ROW), ZERO_CHAR + 8,
       "the trance price on the title row is 8 (Dance's number, one authority)")
     assertRun(COST_COL + 1, TITLE_ROW, MP_SUFFIX, "' MP' after the price")
     assertRun(EACH_COL, TITLE_ROW, EACH_TX, "'EACH' -- the price is per trance")
-    assertRun(2, LEARNED_ROW, LEARNED, "LEARNED caption")
-    -- the collection score: three digits at col 10 of the caption row
-    assertRun(10, LEARNED_ROW, { ZERO_CHAR, ZERO_CHAR, ZERO_CHAR + #KNOWN },
+    assertRun(LEFT_COL, LEARNED_ROW, LEARNED, "LEARNED caption")
+    -- the collection score: three digits at col 11 of the caption row
+    assertRun(COUNT_COL, LEARNED_ROW, { ZERO_CHAR, ZERO_CHAR, ZERO_CHAR + #KNOWN },
       "LEARNED count = 00" .. #KNOWN)
 
     -- AUTO's window: the first eight known rages in id order.  Five are known,
@@ -246,17 +316,29 @@ H.run({ maxFrames = 30000 }, {
     for _, y in ipairs({ 3, 13 }) do
       assertRowBlank(y, "undrawn odd row " .. y)
     end
-    -- the gaps on the title row, and its tail: nothing may run into the
-    -- window's own right border, which lives in column 30.
-    for _, x in ipairs({ 14, 15, 16, 21, 26, 27, 28, 29, 30, 31 }) do
+    -- the gaps on the title row, its head and its tail: nothing may sit left
+    -- of the page's margin (columns 0-2, the cursor's own gutter) and nothing
+    -- may run into the window's right border, which lives in column 30.
+    -- "RAGE LOADOUT" now occupies 3..14, the price 17..20, EACH 22..25.
+    for _, x in ipairs({ 0, 1, 2, 15, 16, 21, 26, 27, 28, 29, 30, 31 }) do
       H.assertEq(cell(x, TITLE_ROW), 0,
         string.format("title row gap/tail blank {%d,%d}", x, TITLE_ROW))
     end
+    -- and the same for the LEARNED row: caption 3..9, count 11..13.
+    for _, x in ipairs({ 0, 1, 2, 10, 14, 15, 29, 30, 31 }) do
+      H.assertEq(cell(x, LEARNED_ROW), 0,
+        string.format("LEARNED row gap/tail blank {%d,%d}", x, LEARNED_ROW))
+    end
+    -- THE CURSOR GUTTER CANARY, every slot: nothing under the sprite, the slot
+    -- starting in the column right after it -- on BOTH columns.  Five species
+    -- are known, so this covers filled rows and $ff-blanked ones in one pass.
+    for n = 0, 7 do assertCursorGutter(n, "5 known") end
     H.screenshot("rage_page_player_path")
     H.log("RENDER OK: Skills->Rage via the player's path -- title, eight slots "
       .. "in two columns on the window's odd rows, names against MonsterName "
       .. "verbatim, the flat 8 MP stated once, LEARNED count; nothing on an "
-      .. "even row, nothing past row 15, nothing in the border column")
+      .. "even row, nothing past row 15, nothing in the border column, nothing "
+      .. "in either cursor's gutter")
   end),
 
   -- ---- the page is LIVE, not a one-shot draw: R cycles the cursored slot ----
@@ -299,8 +381,31 @@ H.run({ maxFrames = 30000 }, {
       "and slot 1 -- the row-5 RIGHT cell -- cycled instead (was rage "
       .. tostring(_G.__before - 1) .. ")")
     assertFilledRow(1, KNOWN[3])
+    for n = 0, 7 do assertCursorGutter(n, "cursor on the right column") end
     H.screenshot("rage_page_second_column")
     H.log("TWO COLUMNS: the cursor reaches slot 1 with dpad-Right and the "
-      .. "cycle edits exactly that slot -- $4b = 2*row + col, on both sides")
+      .. "cycle edits exactly that slot -- $4b = 2*row + col, on both sides; "
+      .. "the right cursor's gutter (columns 14-15) is clear too")
+  end),
+
+  -- ---- and a LOWER row, so the shipped screenshots cover more than row 5 ----
+  -- The canary above reads the whole cursor table, but only the row the sprite
+  -- is parked on shows up in a picture.  Walk back to the LEFT column -- the
+  -- half that moved -- and down to slot 4, the last FILLED left-hand row, so
+  -- the shot shows the cursor abutting a name and not empty space.
+  H.pressButtons({ "left" }, 3),
+  H.waitFrames(20),
+  H.pressButtons({ "down" }, 3),
+  H.waitFrames(20),
+  H.pressButtons({ "down" }, 3),
+  H.waitFrames(40),
+  H.call(function()
+    H.assertEq(H.readByte(ZMENUSTATE), ST_RAGELOAD, "still on the rage page")
+    H.assertEq(H.readByte(ZCURSOR), 4, "cursor walked to slot 4 (row 9, left)")
+    for n = 0, 7 do assertCursorGutter(n, "cursor on slot 4") end
+    H.screenshot("rage_page_cursor_bottom")
+    H.log("CURSOR WALK: the sprite is on slot 4 -- a lower LEFT row with a "
+      .. "name in it -- and columns 1-2 are still empty on every slot row; the "
+      .. "gutter is a property of the page, not of which slot is selected")
   end),
 })

@@ -535,9 +535,9 @@ row gets eight of them, the even row four — and nothing past row 15 is inside
 the window at all. Measured: odd rows 1,3,…,15 render whole at screen
 `y = 116 + 6*(row-1)`; even rows show only their bottom three scanlines.
 Vanilla says the same thing from the other side: every EN cursor table for
-this window is `cursor_pos {x, 116 + n*12}` (`skills.asm:124-125`, `:247-250`,
-`:292-298`), and `DrawRageName` biases its row by one under `.if LANG_EN`
-(`skills.asm:1518-1521`) for exactly this reason.
+this window is `cursor_pos {x, 116 + n*12}` (`skills.asm:125-126`, `:249-250`,
+`:292-293`), and `DrawRageName` biases its row by one under `.if LANG_EN`
+(`skills.asm:1571-1574`) for exactly this reason.
 
 So the page as shipped drew all eight beast names, all eight prices and the
 LEARNED counter where they could not be read: eight three-scanline slivers,
@@ -548,8 +548,8 @@ window** (the rage browse is `cursor_prop {0,0}, {2,8}`, `skills.asm:281-299`):
 
 | tilemap row | content |
 |---|---|
-| 1 | `RAGE LOADOUT` |
-| 5 / 7 / 9 / 11 | slots 0-1 / 2-3 / 4-5 / 6-7 — name at col 2 (left) or 17 (right), the flat price immediately after the 10-cell name field |
+| 1 | `RAGE LOADOUT` + the flat price, stated once (`8 MP EACH`) |
+| 5 / 7 / 9 / 11 | slots 0-1 / 2-3 / 4-5 / 6-7 — name at col 3 (left) or col 16 (right) |
 | 15 | `LEARNED nnn` |
 
 Slot order is the menu framework's own index, `$4b = cols*row + col`
@@ -559,8 +559,38 @@ slot odd = right, and `row = 5 + (slot & ~1)`. `Ot6RageCurSlot`
 Right — previously unused — move between the columns; the L/R shoulders still
 cycle. `OT6_RAGECOLS`/`OT6_RAGEROWS` (`ot6_memory.inc`) carry the geometry with
 an assert that they cover every slot exactly once. The per-row price column
-survives the reshape, so §2.2's "the column doubles as the price's teaching
-surface" still holds — twice over, once per column.
+does *not* survive the reshape — two 10-cell names plus two cursor gutters plus
+two 4-cell `n MP` fields is 30 columns and the window's right border is column
+30 — so §2.2's "the column doubles as the price's teaching surface" is served
+by one copy on the title row instead. The price is flat by design (§5), so one
+copy teaches the same rule.
+
+### 8.0c CORRECTION, 2026-07-29 — the cursor gutter (found by looking at it)
+
+§8.0b fixed *which rows*; it left both pages' text one column too far left.
+The menu cursor is a **16×16 sprite** and `cursor_pos {x, y}` is its **top-left
+corner**, so an entry at `x` covers tilemap columns `x/8` and `x/8+1` and the
+row it points at must begin at `x/8 + 2`:
+
+> **`cursor_x = 8 × text_col − 16`**
+
+Vanilla obeys it without exception in this window: magic draws at cols 3/16
+under cursors 8/112 (`skills.asm:831`, `:836` vs `:125-126`), espers at 3/17
+under 8/120 (`:1733`, `:1737` vs `:249-250`), rage at 5/19 under 24/136
+(`:1544`, `:1548` vs `:292-293`), and the Config menu's value column 14 under
+96 (`config.asm:50`). Measured on the shipped ROM as well — the untouched
+magic list's `cursor_pos {8, 116}` lights screen `x 8..23, y 116..131`
+(`tools/tests/probe_menucols.lua`, two-frame diff).
+
+Both configurators drew their left column at **col 2** under a cursor at
+`x = 8`, so the sprite sat on the leading glyph — the `1` of `1x` on the
+Bushido page, the first letter of every left-hand beast name on this one. The
+cursor tables were already vanilla's; the **text** moved. The Rage page's right
+column was already correct (col 16 under `x = 112` is vanilla's magic pair
+verbatim), so only its left half moved; the Bushido page shifted by one
+throughout. `tools/tests/probe_cursorgutter.lua` is the isolated instrument,
+and both page tests now carry the rule as a canary that reads the cursor table
+out of the ROM rather than restating it.
 
 **This defect is not Gau's alone.** The shipped Bushido configurator (#8 Layer
 B / #38) draws its three slot rows on even rows 4/6/8 and its pool on rows

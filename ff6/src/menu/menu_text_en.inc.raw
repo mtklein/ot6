@@ -123,7 +123,25 @@ MENU_TEXT_INC = 1
 ; shipped on rows 4/6/8 and the LEARNED caption on 13 with its grid running to
 ; 21, so every slot rendered as a four-scanline sliver and most of the pool was
 ; off the bottom.  See Ot6LoadoutDrawSlots' cadence note in field_menu.asm.
-.define OT6_LOADOUT_TITLE               BG1A, {2, 1},  {$81,$94,$92,$87,$88,$83,$8e,$ff,$8b,$8e,$80,$83,$8e,$94,$93,$00}  ; BUSHIDO LOADOUT
+;
+; THE CURSOR GUTTER (#43, third round).  Columns 1-2 belong to the cursor
+; SPRITE, not to text.  The menu cursor is 16x16 and `cursor_pos {x,y}` is its
+; top-left corner -- measured on the shipped ROM's own magic list, whose
+; `cursor_pos {8, 116}` puts the sprite at screen x 8..23, y 116..131
+; (tools/tests/probe_menucols.lua).  So a cursor at x=8 covers tilemap columns
+; 1 and 2, and the row it points at must begin at column 3.  Vanilla is
+; unanimous on the arithmetic -- cursor_x = 8*col - 16:
+;
+;   magic   text cols 3 / 16  (skills.asm:831, :836)   cursors 8 / 112  (:125-126)
+;   espers  text cols 3 / 17  (skills.asm:1733, :1737) cursors 8 / 120  (:249-250)
+;   rage    text cols 5 / 19  (skills.asm:1544, :1548) cursors 24 / 136 (:292-293)
+;   config  value col 14      (this file, :379)        cursor  96       (config.asm:50)
+;
+; These labels shipped at column 2 under a cursor at x=8, so the sprite drew
+; over the leading glyph -- the $b5,$00 of "1x".  The page's left margin is column 3  ; 1
+; now and everything right of it moved with it; the CURSOR table did not move,
+; because it was already vanilla's.
+.define OT6_LOADOUT_TITLE               BG1A, {3, 1},  {$81,$94,$92,$87,$88,$83,$8e,$ff,$8b,$8e,$80,$83,$8e,$94,$93,$00}  ; BUSHIDO LOADOUT
 ; The caption rides the TITLE row (the Rage page's own resolution for its price
 ; line): the window holds eight text rows and the page needs nine -- title,
 ; three boost slots, the caption, and four rows of a two-column pool that must
@@ -131,10 +149,12 @@ MENU_TEXT_INC = 1
 ; only row where a second blue chrome caption cannot be misread as data.
 .define OT6_LOADOUT_POOL                BG1A, {22, 1}, {$8b,$84,$80,$91,$8d,$84,$83,$00}  ; LEARNED
 ; #38: every Bushido tech costs at least 1 BP, so the 0x row is retired and the
-; page is three rows deep -- 1x/2x/3x at tilemap rows 3/5/7 (#43).
-.define OT6_LOADOUT_LBL1                BG1A, {2, 3},  {$b5,$b1,$00}  ; 1x
-.define OT6_LOADOUT_LBL2                BG1A, {2, 5},  {$b6,$b1,$00}  ; 2x
-.define OT6_LOADOUT_LBL3                BG1A, {2, 7},  {$b7,$b1,$00}  ; 3x
+; page is three rows deep -- 1x/2x/3x at tilemap rows 3/5/7 (#43).  These three
+; ARE the cursored rows, so column 3 is not cosmetic here: it is the gutter rule
+; above, and the overlap the owner saw was on this exact glyph.
+.define OT6_LOADOUT_LBL1                BG1A, {3, 3},  {$b5,$b1,$00}  ; 1x
+.define OT6_LOADOUT_LBL2                BG1A, {3, 5},  {$b6,$b1,$00}  ; 2x
+.define OT6_LOADOUT_LBL3                BG1A, {3, 7},  {$b7,$b1,$00}  ; 3x
 .define OT6_LOADOUT_MP_SUFFIX           {$ff,$8c,$8f,$00}  ;  MP
 
 ; OT6 (#40): Gau's 8-slot rage loadout page.  Same encode-pipeline rule as the
@@ -143,9 +163,16 @@ MENU_TEXT_INC = 1
 ; Rows must be ODD and <= 15: the EN window shows a tilemap row PAIR in twelve
 ; scanlines and stops after row 15 (Ot6RageDrawSlots' cadence note).  {2,20}
 ; put LEARNED off the bottom of the window entirely.
-.define OT6_RAGE_TITLE                  BG1A, {2, 1},  {$91,$80,$86,$84,$ff,$8b,$8e,$80,$83,$8e,$94,$93,$00}  ; RAGE LOADOUT
+;
+; Column 3 for the left margin, for the cursor-gutter reason spelled out over
+; OT6_LOADOUT_TITLE above: this page's LEFT slot column is cursored at x=8, so
+; nothing of its rows may sit in columns 1-2.  The page's RIGHT slot column was
+; already right -- col 16 under `cursor_pos {112, ...}` is vanilla's magic-list
+; pair verbatim -- which is why only the left half moves.  The title and the
+; LEARNED caption follow it so the page has ONE left margin.
+.define OT6_RAGE_TITLE                  BG1A, {3, 1},  {$91,$80,$86,$84,$ff,$8b,$8e,$80,$83,$8e,$94,$93,$00}  ; RAGE LOADOUT
 .define OT6_RAGE_EACH                   BG1A, {22, 1}, {$84,$80,$82,$87,$00}  ; EACH
-.define OT6_RAGE_LEARNED                BG1A, {2, 15}, {$8b,$84,$80,$91,$8d,$84,$83,$00}  ; LEARNED
+.define OT6_RAGE_LEARNED                BG1A, {3, 15}, {$8b,$84,$80,$91,$8d,$84,$83,$00}  ; LEARNED
 
 ; ------------------------------------------------------------------------------
 
