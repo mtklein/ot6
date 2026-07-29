@@ -2797,7 +2797,7 @@ Ot6LoadoutDrawC3:
 ; is now vanilla's own shape for this window -- eight usable text rows:
 ;
 ;   row  1   SWDTECH  L/R SWAPS  LEARNED  (cols 3 / 11 / 22)
-;   row  3   1x  <tech, 12 cells @6>   n MP @19
+;   row  3   1x<tech, 12 cells @5>  nn MP @18
 ;   row  5   2x  ...
 ;   row  7   3x  ...
 ;   row  9   pool cell 0 (col 3)   pool cell 4 (col 17)
@@ -2827,11 +2827,35 @@ Ot6LoadoutDrawC3:
 ; :249-250), rage 5/19 under 24/136 (:1544,:1548 vs :292-293), config col 14
 ; under 96 (config.asm:50).  The cursor table below was already vanilla's;
 ; the TEXT was one column too far left.  Everything shifts by one and the
-; existing gaps are preserved: "1x" at 3-4, blank 5, name 6..17, blank 18,
-; "n MP" 19..22, and the window's own right border is still column 30.  The
-; pool's right column moves 16 -> 17 with it, keeping the two-column gutter
-; between two full-width names ("Quadra Slice" fills all twelve cells); a
-; 12-cell name at 17 ends at 28, still inside the frame.
+; window's own right border is still column 30.  The pool's right column moves
+; 16 -> 17 with it, keeping the two-column gutter between two full-width names
+; ("Quadra Slice" fills all twelve cells); a 12-cell name at 17 ends at 28,
+; still inside the frame.
+;
+; THE COLUMN BUDGET (issue #56), and where the price field's second digit came
+; from.  #45's rescale made seven of eight SwdTech prices two digits, so the
+; price field had to grow from four cells to five, and this row had none spare.
+; Columns 3..29 is 27 cells and the row wanted 28:
+;
+;   label 2 + gap 1 + name 12 + gap 1 + price 5 + gap 1 + mode 6  =  28
+;
+; Four of those six terms are fixed by something outside this page and cannot
+; be the donor: the left margin is column 3 because the cursor sprite owns 1-2
+; (above); the name is a 12-byte BushidoName record drawn whole, pads and all,
+; and "Quadra Slice" uses every cell of it; the mode words are six cells and
+; already end on 29, the last column before the border; and the price is five
+; because "nn MP" is five.  Of the two GAPS, the one at 23 is load-bearing --
+; #49 measured "7 MPMANUAL" on screen without it -- and so is the one before
+; the price, which is the only thing keeping "Quadra Slice" off "30 MP".
+;
+; So the donor is the gap between the rung LABEL and the name: names start at
+; column 5 now, directly after "1x".  That gap is the one on the row whose two
+; sides cannot be confused for each other -- a digit and a lowercase 'x' against
+; a capitalised tech name -- where both of the others separate things that read
+; as the same kind of token.  Screenshots of both a one-digit and a two-digit
+; price are in the #56 report.
+;
+;   3-4 "1x" | 5..16 name | 17 gap | 18..22 "nn MP" | 23 gap | 24..29 mode
 Ot6LoadoutDrawSlots:
         lda     #BG1_TEXT_COLOR::DEFAULT
         sta     zTextColor
@@ -2846,14 +2870,14 @@ Ot6LoadoutDrawSlots:
         clc
         adc     #$03
         sta     $e6
-        ldx     #$0006                  ; name column (6: past "1x" at 3-4)
-        jsr     Ot6DrawBushName
+        ldx     #$0005                  ; name column (5: right after "1x" at
+        jsr     Ot6DrawBushName         ;   3-4 -- the budget note above)
         lda     $e5
         clc
         adc     #$55                    ; tech index -> attack id
         jsl     Ot6LoadoutCost          ; F0: A = MP cost (0 under nomp)
-        ldx     #$0013                  ; cost column (19)
-        jsr     Ot6LoadoutDrawCost
+        ldx     #$0012                  ; cost column (18: "nn MP" is 18..22,
+        jsr     Ot6LoadoutDrawCost      ;   right-aligned; 17 is the gap)
         ldx     $e2
         inx
         cpx     #$0003
@@ -2864,9 +2888,14 @@ Ot6LoadoutDrawSlots:
 ; The page's ONE free block is columns 23-29 of the three slot rows (surveyed in
 ; issue #49); the mode takes row 3 and the control that changes it row 5, so the
 ; two read as a pair.  Column 23 is spent as a SEPARATOR -- the slot's price
-; field is "n MP" at 19-22 and a block starting at 23 renders the row as
-; "7 MPMANUAL" (measured, the first screenshot of this change) -- so the six
-; cells run 24-29, up to but not into the window's border column 30.
+; field abuts it and a block starting at 23 renders the row as "7 MPMANUAL"
+; (measured, the first screenshot of that change) -- so the six cells run 24-29,
+; up to but not into the window's border column 30.
+;
+; #56 widened the price field to "nn MP" and moved it LEFT to 18-22 rather than
+; letting it grow rightwards into 23, so this block and its separator are
+; untouched by that change; the donor column came off the label/name gap on the
+; other side of the row (the budget note over Ot6LoadoutDrawSlots).
 ;
 ; Drawn from HERE, at the tail of the slot redraw, rather than from
 ; Ot6LoadoutDrawC3 with the other chrome.  Two reasons and both matter:
@@ -2874,10 +2903,11 @@ Ot6LoadoutDrawSlots:
 ;     back, and Ot6LoadoutDrawSlots is the only thing that runs on a redraw
 ;     (MenuState_7b @run), so a mode drawn at init would state the state the page
 ;     was OPENED in for as long as the player stayed on it;
-;   * Ot6LoadoutDrawCost's zero-cost arm blanks FIVE cells from column 19 --
-;     through column 23 -- which under nomp (every row prices 0) would eat the
-;     first cell of a block drawn earlier in the frame.  Drawing after the slot
-;     loop makes the overlap harmless in both builds.
+;   * Ot6LoadoutDrawCost's zero-cost arm blanks the FULL five-cell price field,
+;     which under nomp (every row prices 0) is drawn on every redraw.  It now
+;     stops at column 22 -- before #56 it started at 19 and ran through 23, i.e.
+;     into the first cell of a block drawn earlier in the frame -- but drawing
+;     after the slot loop is still what makes the ordering unconditionally safe.
 ; The hint is redrawn every time too; six cells is not worth a second code path
 ; to skip, and it removes the ordering hazard for good.
 Ot6LoadoutDrawMode:
@@ -2986,7 +3016,40 @@ Ot6DrawBushName:
         jsr     LoadArrayItem           ; stage the 12-tile name into $7e9e8b
         jmp     DrawPosTextBuf
 
-; ---- a row's MP cost "n MP" (blanks when cost 0).  in: A=cost,$e6=row,X=col ----
+; ---- a row's MP cost, "nn MP" (blanks when cost 0).  in: A=cost,$e6=row,X=col --
+;
+; THE ONE MP-PRICE DRAWER FOR THE WHOLE FIELD MENU (issue #56).  This proc drew
+; a SINGLE digit until v0.7 and said so in its own comment -- "kit costs 1..8",
+; true when it was written.  #45 rescaled SwdTech to 4/10/13/16/18/22/30/46, so
+; seven of the eight rungs printed `cost + ZERO_CHAR` past '9' ($bd) and came
+; out as punctuation: Retort's 10 rendered as $be and Quadra Slice's 30 as '='
+; (measured on the pre-change ROM, tools/tests/probe_swdtechcost.lua).  #46 had
+; already hit the same wall on the Blitz ladder and answered it with a private
+; copy, Ot6BlitzDrawCost in skills.asm, whose own report flagged the duplicate
+; as the trap to remove; the copy is gone and its body is here, so there is one
+; price drawer and a third page cannot inherit the single-digit version again.
+;
+; RIGHT-ALIGNED, with a LEADING BLANK and never a leading zero -- " 4 MP" sits
+; under "30 MP" so a column of prices reads as a column.  That is vanilla's own
+; rule for a menu number and not a new invention: HexToDec3 converts to three
+; digits and then overwrites each leading '0' with $ff, the blank tile
+; (menu_common.asm:906-918), and DrawNum2 prints the low two of those three
+; (menu_common.asm:856-860) -- which is exactly how the esper/magic detail
+; window prints a spell's MP (skills.asm:2615-2621).  A cost of 0 blanks all
+; five cells: that is the nomp build (Ot6LoadoutCost returns 0 with no cost
+; table linked) and the Blitz page's locked rows, and blanking the FULL width is
+; what keeps the redraw-overwrites-what-was-there property every field on these
+; pages has (the Ot6RageEmptyTiles rule).
+;
+; The arithmetic is a repeated subtract rather than a divide because 65816 has
+; no divide and the values are two digits: `cmp #10` leaves C set on the taken
+; branch, so the `sbc #10` under it is exact without a preceding `sec`.
+;
+; Costs above 99 would wrap into the tens loop silently.  Nothing in the game
+; prices one -- the dearest row anywhere is Cleave/Bum Rush at 46
+; (Ot6AbilityCostTbl, ot6_boost.asm:744-794) -- and tools/tests/menu_*page.lua
+; assert every drawn field against that table, so a three-digit price shows up
+; as a red test rather than as a wrong number on screen.
 Ot6LoadoutDrawCost:
         pha                             ; save cost
         lda     $e6
@@ -2999,8 +3062,25 @@ Ot6LoadoutDrawCost:
         stx     hWMADDL
         pla                             ; cost
         beq     @blank
+        ldx     #$0000                  ; X = tens
+@t:     cmp     #10
+        bcc     @t2
+        sbc     #10                     ; C set by the cmp, so sbc is exact
+        inx
+        bra     @t
+@t2:    pha                             ; park the ones
+        txa
+        beq     @notens
         clc
-        adc     #ZERO_CHAR              ; single-digit cost tile (kit costs 1..8)
+        adc     #ZERO_CHAR
+        bra     @puttens
+@notens:
+        lda     #$ff                    ; leading BLANK, not a leading zero
+@puttens:
+        sta     hWMDATA
+        pla
+        clc
+        adc     #ZERO_CHAR              ; ones
         sta     hWMDATA
         ldx     #$0000
 @ct:    lda     f:Ot6LoadoutCostTiles,x
@@ -3010,8 +3090,8 @@ Ot6LoadoutDrawCost:
         bra     @ct
 @term:  stz     hWMDATA
         jmp     DrawPosTextBuf
-@blank: ldy     #$0005                  ; clear "n MP" width so a revert wipes it
-        lda     #$ff
+@blank: ldy     #$0005                  ; the full "nn MP" width, so a revert
+        lda     #$ff                    ;   wipes whatever was there
 @bl:    sta     hWMDATA
         dey
         bne     @bl
@@ -3122,15 +3202,24 @@ Ot6RageDrawC3:
 ; ---- the flat trance price, stated ONCE on the title row: "8 MP EACH" ----
 ; Blank under nomp -- the LABEL rides the number, so a zero price prints
 ; nothing rather than a bare "EACH".
+;
+; #56: the price field is five cells wide now, not four, and it starts at column
+; 16 rather than 17 so that "EACH" (a fixed pos_text at 22) keeps its gap at 21.
+; Growing rightwards instead would have rendered "10 MPEACH".  This page's price
+; is 8 today and CAN reach two digits without anyone editing this file: it is a
+; tail-call to Ot6DanceCost (ot6_boost.asm:600-619) -- deliberately Dance's own
+; number and not a copy of it -- and mp-economy.md's band for a flat
+; possess-verb price is 4-10.  The title row still fits: "RAGE LOADOUT" ends at
+; 14, so 15 is the gap, the price is 16-20, 21 is the gap, "EACH" is 22-25.
 Ot6RagePrice:
         jsl     Ot6RageRowCost          ; F0: A = MP cost (0 under nomp)
         beq     @none                   ; (rtl preserves the lda's Z)
         pha
         lda     #$01                    ; the title row
         sta     $e6
-        ldx     #$0011                  ; col 17: "n MP"
+        ldx     #$0010                  ; col 16: "nn MP" is 16..20
         pla
-        jsr     Ot6LoadoutDrawCost      ; the Bushido page's own "n MP" drawer
+        jsr     Ot6LoadoutDrawCost      ; the one field-menu price drawer (#56)
         ldy     #near Ot6RageEachText   ; ... and "EACH" at col 22
         jmp     DrawPosText
 @none:  rts

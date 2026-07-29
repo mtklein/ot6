@@ -199,13 +199,20 @@ end
 -- (col 16); row = 5 + (slot & ~1).  {3, 16} under cursors {8, 112} is vanilla's
 -- magic list verbatim -- see the cursor-gutter note in the header.  The price
 -- is stated ONCE on the title row ("8 MP EACH") rather than per row: two
--- 10-cell names plus two cursor gutters plus two 4-cell cost fields is 30
--- columns and the window's right border is column 30 (measured at screen
+-- 10-cell names plus two cursor gutters plus two cost fields does not fit
+-- inside the window's right border, which is column 30 (measured at screen
 -- x = 245).  The price is flat by design, so one copy teaches the same rule.
 local TITLE_ROW, LEARNED_ROW = 1, 15
 local HINT_ROW = 3                      -- #44: row 3 was spare; the hint has it
 local LEFT_COL = 3                      -- the page's left margin (gutter = 1-2)
-local COST_COL, EACH_COL = 17, 22
+-- #56: the price field is FIVE cells, "nn MP", not four -- Ot6LoadoutDrawCost
+-- is the one price drawer in the field menu now and it carries a tens place.
+-- It moved LEFT (17 -> 16) rather than growing rightwards, because "EACH" is a
+-- fixed pos_text at 22 and a five-cell field starting at 17 would have rendered
+-- "8 MPEACH".  This page's number is 8 today and can reach two digits without
+-- anyone editing it: Ot6RageCost tail-calls Ot6DanceCost (ot6_boost.asm:600-619)
+-- deliberately, and mp-economy.md's band for a flat possess-verb price is 4-10.
+local COST_COL, EACH_COL = 16, 22
 local COUNT_COL = 11                    -- just past "LEARNED " at 3..9
 -- #49: row 13 was this page's one spare row (it draws on 1/3/5/7/9/11/15) and
 -- issue #49's survey costed it at 27 free columns.  The mode goes at column 3
@@ -362,10 +369,18 @@ H.run({ maxFrames = 30000 }, {
   H.call(function()
     -- chrome
     assertRun(LEFT_COL, TITLE_ROW, TITLE, "title RAGE LOADOUT")
-    -- the flat price, stated once: "8 MP EACH" on the title row
-    H.assertEq(cell(COST_COL, TITLE_ROW), ZERO_CHAR + 8,
+    -- the flat price, stated once: "8 MP EACH" on the title row.  #56: five
+    -- cells, right-aligned -- the tens cell is BLANK for a one-digit price and
+    -- must not be '0' (vanilla's own rule: HexToDec3 overwrites leading zeroes
+    -- with $ff, menu_common.asm:906-918).
+    H.assertEq(cell(COST_COL, TITLE_ROW), PAD,
+      "the trance price is one digit, so its tens cell is blank, not '0'")
+    H.assertEq(cell(COST_COL + 1, TITLE_ROW), ZERO_CHAR + 8,
       "the trance price on the title row is 8 (Dance's number, one authority)")
-    assertRun(COST_COL + 1, TITLE_ROW, MP_SUFFIX, "' MP' after the price")
+    assertRun(COST_COL + 2, TITLE_ROW, MP_SUFFIX, "' MP' after the price")
+    H.assertEq(cell(EACH_COL - 1, TITLE_ROW), 0,
+      "a gap separates the price field from 'EACH' -- without it the title row "
+      .. "reads '8 MPEACH' (the #49 failure, on this page's row)")
     assertRun(EACH_COL, TITLE_ROW, EACH_TX, "'EACH' -- the price is per trance")
     -- #44: the control hint, on the one spare row above the slots
     assertRun(LEFT_COL, HINT_ROW, HINT, "L/R SWAPS control hint")
@@ -425,8 +440,11 @@ H.run({ maxFrames = 30000 }, {
     -- the gaps on the title row, its head and its tail: nothing may sit left
     -- of the page's margin (columns 0-2, the cursor's own gutter) and nothing
     -- may run into the window's right border, which lives in column 30.
-    -- "RAGE LOADOUT" now occupies 3..14, the price 17..20, EACH 22..25.
-    for _, x in ipairs({ 0, 1, 2, 15, 16, 21, 26, 27, 28, 29, 30, 31 }) do
+    -- "RAGE LOADOUT" occupies 3..14, the price 16..20 (#56: five cells, its
+    -- leading one blank at this price), EACH 22..25.  Column 16 is therefore
+    -- no longer in this list -- it holds the price field's blank tile ($ff),
+    -- which is asserted above as a value rather than dropped from here.
+    for _, x in ipairs({ 0, 1, 2, 15, 21, 26, 27, 28, 29, 30, 31 }) do
       H.assertEq(cell(x, TITLE_ROW), 0,
         string.format("title row gap/tail blank {%d,%d}", x, TITLE_ROW))
     end

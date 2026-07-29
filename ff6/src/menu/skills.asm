@@ -1988,7 +1988,7 @@ Ot6BlitzPageDraw:
         adc     #OT6_BLITZ_ATK0
         jsl     Ot6LoadoutCost          ; F0: A = MP cost (0 under nomp)
         ldx     #OT6_BLITZ_COST_COL
-        jsr     Ot6BlitzDrawCost
+        jsr     Ot6LoadoutDrawCost      ; #56: the one field-menu price drawer
         bra     @next
         ; ---- not learned yet: say so, and blank the two data fields ----
 @locked:
@@ -2001,7 +2001,7 @@ Ot6BlitzPageDraw:
         jsr     Ot6BlitzDrawIcon        ; $ff = the blank tile, still drawn
         lda     #$00
         ldx     #OT6_BLITZ_COST_COL
-        jsr     Ot6BlitzDrawCost        ; cost 0 -> five blanks
+        jsr     Ot6LoadoutDrawCost      ; cost 0 -> five blanks
 @next:  ldx     $e2
         inx
         cpx     #$0008
@@ -2067,61 +2067,16 @@ Ot6BlitzDrawIcon:
         stz     hWMDATA
         jmp     DrawPosTextBuf
 
-; ---- a row's price, "nn MP".  in: A = cost, $e6 = row, X = col ----
-; The SwdTech page's Ot6LoadoutDrawCost draws ONE digit ("kit costs 1..8"); the
-; Blitz ladder runs 2..30 (Ot6AbilityCostTbl, ot6_boost.asm:674-681), so this
-; one carries a tens place.  Right-aligned -- a one-digit cost gets a leading
-; blank, not a leading zero -- so the eight prices read as a column.  A zero cost
-; blanks all five cells: that is the nomp build (Ot6LoadoutCost returns 0 with no
-; cost table linked) and the locked rows, and blanking the full width keeps the
-; redraw-wipes-what-was-there property every field on this page has.
-Ot6BlitzDrawCost:
-        pha                             ; save cost
-        lda     $e6
-        jsr     GetBG1TilemapPtr
-        longa
-        txa
-        sta     $7e9e89
-        shorta
-        ldx     #$9e8b
-        stx     hWMADDL
-        pla                             ; cost
-        beq     @blank
-        ldx     #$0000
-@t:     cmp     #10                     ; tens
-        bcc     @t2
-        sbc     #10                     ; C set by the cmp, so sbc is exact
-        inx
-        bra     @t
-@t2:    pha                             ; park the ones
-        txa
-        beq     @notens
-        clc
-        adc     #ZERO_CHAR
-        bra     @puttens
-@notens:
-        lda     #$ff                    ; leading blank: " 2 MP" under "30 MP"
-@puttens:
-        sta     hWMDATA
-        pla
-        clc
-        adc     #ZERO_CHAR              ; ones
-        sta     hWMDATA
-        ldx     #$0000
-@ct:    lda     f:Ot6LoadoutCostTiles,x ; " MP" + $00, the SwdTech page's own
-        beq     @term
-        sta     hWMDATA
-        inx
-        bra     @ct
-@term:  stz     hWMDATA
-        jmp     DrawPosTextBuf
-@blank: ldy     #$0005                  ; the full "nn MP" width
-        lda     #$ff
-@bl:    sta     hWMDATA
-        dey
-        bne     @bl
-        stz     hWMDATA
-        jmp     DrawPosTextBuf
+; ---- a row's price, "nn MP" ----
+; RETIRED as a separate proc (issue #56).  #46 wrote Ot6BlitzDrawCost here
+; because field_menu.asm's Ot6LoadoutDrawCost drew a single digit -- true when
+; that one was written for costs of 1..8 -- and its report flagged the duplicate
+; as a trap: #45 had by then rescaled SwdTech to 4..46 and the OTHER page was
+; already rendering punctuation where its tens digit belonged.  There is one
+; drawer now, this file's body moved into field_menu.asm under the older name,
+; so no third page can pick up the single-digit version.  See the derivation
+; over Ot6LoadoutDrawCost (field_menu.asm), including why the alignment is
+; right with a leading blank.
 
 ; ---- the page's own cursor: one column, eight rows ----
 ; NOT AbilityCursorProp: that {2,4} table is shared with Dance (SkillsOption_06,

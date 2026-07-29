@@ -174,9 +174,20 @@ MENU_TEXT_INC = 1
 ; page is three rows deep -- 1x/2x/3x at tilemap rows 3/5/7 (#43).  These three
 ; ARE the cursored rows, so column 3 is not cosmetic here: it is the gutter rule
 ; above, and the overlap the owner saw was on this exact glyph.
+;
+; #56: the tech name now starts at column 5, immediately after these two cells,
+; with no blank between.  #45's rescale made the price field five cells wide
+; instead of four and this row had exactly one cell of slack in it; the full
+; derivation of which of the row's three gaps could be the donor is over
+; Ot6LoadoutDrawSlots (field_menu.asm).  Do not re-introduce a blank at column 5
+; without taking the cell back from somewhere -- the price field would go back
+; to overwriting the mode block's separator.
 .define OT6_LOADOUT_LBL1                BG1A, {3, 3},  {$b5,$b1,$00}  ; 1x
 .define OT6_LOADOUT_LBL2                BG1A, {3, 5},  {$b6,$b1,$00}  ; 2x
 .define OT6_LOADOUT_LBL3                BG1A, {3, 7},  {$b7,$b1,$00}  ; 3x
+; The suffix both loadout pages and the Blitz page hang on a price.  Two digits
+; ride in front of it (Ot6LoadoutDrawCost), so the field is five cells: a tens
+; digit or a blank, a ones digit, then this.
 .define OT6_LOADOUT_MP_SUFFIX           {$ff,$8c,$8f,$00}  ;  MP
 ; #49: the mode indicator and the revert control, in the ONE free block this
 ; page has -- columns 23-29 of the three slot rows.  Row 3 carries the mode,
@@ -184,18 +195,20 @@ MENU_TEXT_INC = 1
 ; two-line group rather than a third column of data.
 ;
 ; COLUMN 24, not 23, and the difference is the whole legibility of the row.
-; The slot's price field is $a7,$ff,$8c,$8f,$00 at columns 19-22, so a block starting at 23  ; n MP
-; abuts it and the row renders as $bb,$ff,$8c,$8f,$8c,$80,$8d,$94,$80,$8b,$00 -- measured, first screenshot of  ; 7 MPMANUAL
-; this change.  Column 23 is spent as the separator and the block runs 24-29,
-; which is exactly as wide as the free run allows: column 30 is the window's own
-; right border.
+; The slot's price field abuts column 23, so a block starting there renders the
+; row as $bb,$ff,$8c,$8f,$8c,$80,$8d,$94,$80,$8b,$00 -- measured, first screenshot of that change.  Column 23  ; 7 MPMANUAL
+; is spent as the separator and the block runs 24-29, which is exactly as wide
+; as the free run allows: column 30 is the window's own right border.
+;
+; #56 widened the price from four cells at 19-22 to five at 18-22, and took the
+; extra cell off the OTHER side of the row rather than out of column 23, so
+; this block is where it was.
 ;
 ; Both halves are drawn by Ot6LoadoutDrawMode (field_menu.asm) AFTER the slot
 ; loop rather than by DrawPosText at init, because Ot6LoadoutDrawCost's
-; zero-cost arm blanks five cells from column 19 -- i.e. through column 23 -- on
-; every redraw of the nomp build.  Drawing the block last makes that harmless in
-; either build, and it is what keeps the mode LIVE (the slot loop is the only
-; thing a redraw runs).
+; zero-cost arm blanks the whole five-cell price field on every redraw of the
+; nomp build -- which before #56 ran through column 23 -- and because that is
+; what keeps the mode LIVE (the slot loop is the only thing a redraw runs).
 .define OT6_LOADOUT_MODE_HINT           BG1A, {24, 5}, {$98,$d2,$80,$94,$93,$8e,$00}  ; Y=AUTO
 
 ; OT6 (#40): Gau's 8-slot rage loadout page.  Same encode-pipeline rule as the
@@ -221,9 +234,11 @@ MENU_TEXT_INC = 1
 ; above the first slot, which is where a first-timer's eye lands next.
 ;
 ; NOTE for anyone re-deriving the budget: row 1 is NOT free on this page.  The
-; flat trance price occupies it -- $bc,$ff,$8c,$8f,$00 at columns 17-20 and "EACH" at 22-25  ; 8 MP
-; (Ot6RagePrice, field_menu.asm) -- so the title row's only spare runs are
-; 15-16, 21 and 26-29.  None of them fits a legible hint.
+; flat trance price occupies it -- a five-cell price field at columns 16-20
+; (#56: five, not four, and one column further left so the EACH label below
+; keeps its gap) and OT6_RAGE_EACH at 22-25 (Ot6RagePrice, field_menu.asm) --
+; so the title row's only spare runs are 15, 21 and 26-29.  None of them fits a
+; legible hint.
 ;
 ; Identical wording to OT6_LOADOUT_HINT above, on purpose: the L/R idiom is the
 ; same on both loadout pages and is worth teaching once.
