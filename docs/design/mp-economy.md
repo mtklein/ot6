@@ -36,6 +36,22 @@ not a derivation — so a pass that improves the shape and gets played is
 worth more than one that waits to be correct. Successive rescales are
 expected and are not churn.
 
+## The ceiling: 99 (proposed 2026-07-29, issue #57)
+
+The owner's shape for the top of every ladder: **each character's own
+ultimate costs 99 MP.** It agrees with the ruler below — 99 against a
+L70 pool of ~760 is 13%, inside the 8-20% band — so it anchors the table
+rather than recalibrating it, and it makes ladders comparable across
+characters, which they are not today.
+
+It is also the **hard display ceiling**: the loadout pages render two
+digits (#56), so 99 is the largest cost that can be shown at all. Treat
+that as a constraint, not a coincidence — no cost anywhere may exceed it.
+
+Open: what counts as an ultimate for characters whose top verb is not a
+priced ladder (Slot is free, Rage and Dance are flat), and whether Magic
+participates. See #57.
+
 ## Principles
 
 - **FF6's MP pool does Octopath's job.** Every character
