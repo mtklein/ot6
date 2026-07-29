@@ -113,6 +113,19 @@ MENU_TEXT_INC = 1
 .define OT6_GENJU_STAT_STAMINA          {"Stamina"}
 .define OT6_GENJU_STAT_MAGPWR           {"Mag.Pwr"}
 
+; OT6 (#8 Layer B / #39): the Bushido loadout configurator's labels.  These
+; MUST come through this file's encode pipeline: a bare string literal in
+; field_menu.asm assembles under the ending-credits .charmap that
+; ending_anim.asm installs earlier in menu_main.asm's include order (and gets
+; no $00 terminator), which is exactly issue #39's garbled SwdTech page.
+.define OT6_LOADOUT_TITLE               BG1A, {2, 1},  {"BUSHIDO LOADOUT"}
+.define OT6_LOADOUT_POOL                BG1A, {2, 13}, {"LEARNED"}
+.define OT6_LOADOUT_LBL0                BG1A, {2, 4},  {"0x"}
+.define OT6_LOADOUT_LBL1                BG1A, {2, 6},  {"1x"}
+.define OT6_LOADOUT_LBL2                BG1A, {2, 8},  {"2x"}
+.define OT6_LOADOUT_LBL3                BG1A, {2, 10}, {"3x"}
+.define OT6_LOADOUT_MP_SUFFIX           {" MP"}
+
 ; ------------------------------------------------------------------------------
 
 ; item menu text strings
