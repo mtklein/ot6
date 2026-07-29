@@ -7,7 +7,15 @@ turn economy.
 
 ## Status
 
-**v0.6 released** ([tag](https://github.com/mtklein/ot6/releases/tag/v0.6)) —
+**v0.7 released** ([tag](https://github.com/mtklein/ot6/releases/tag/v0.7)) —
+the playtest release: MP is visible everywhere it is spent, boost pips and
+weakness reveals now land on the frame of the action they belong to, Cyan's
+Bushido costs at least one Boost Point, Setzer's Slot answers to boost, True
+Knight banks a pip when it covers, and Gau becomes a hunter with a chosen
+loadout of eight rages instead of a wall of two hundred. Six more magicite
+are real sub-jobs. Same playable frontier as v0.6.
+
+**v0.6** ([tag](https://github.com/mtklein/ot6/releases/tag/v0.6)) —
 playable from the start through the Raid on Vector: the Magitek Research
 Facility, Ifrit and Shiva as complete magicite sub-jobs, Number 024, the
 minecart and Number 128, the Cranes, the escape, and Terra's return. Battle

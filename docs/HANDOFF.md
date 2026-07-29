@@ -11,7 +11,13 @@ true right now and what will cost you a day if you do not know it.
 
 ## Where the project is
 
-**v0.6 is released** (Raid on Vector complete through Terra's return) — and
+**v0.7 is released** — the playtest release: every non-blocker the v0.6
+playthrough turned up, plus Gau's Ochette kit and the six tube-room
+espers. The frontier is unchanged; the Sealed Gate route is minted as far
+as the airship crash (anchors F–I) as groundwork for v0.8. The owner
+resumes playing from the Veldt on this build.
+
+**v0.6 was released** (Raid on Vector complete through Terra's return) — and
 it is the project's first HUMAN-VALIDATED release: the owner played rc1 from
 the start past the old v0.5 stop line, filed findings in
 `playtest-v0.6-rc1.md`, and promoted the rc unchanged. The release bar is the
