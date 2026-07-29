@@ -414,10 +414,11 @@ MenuStateTbl:
         .addr   MenuState_7a
 .if LANG_EN
         .addr   MenuState_7b            ; issue #8 Layer B: Bushido loadout configurator
+        .addr   MenuState_7c            ; issue #40: Gau's rage loadout configurator
 .else
         .addr   0
-.endif
         .addr   0
+.endif
         .addr   MenuState_7d
         .addr   MenuState_7e
         .addr   MenuState_7f

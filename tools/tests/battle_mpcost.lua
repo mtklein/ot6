@@ -30,8 +30,9 @@ local STATE = "build/states/battle_doorstep.mss.lua"
 local MENU, ACTOR, MSTATE = 0x7BCA, 0x62CA, 0x7BC2
 local KNOWN = 0x2020
 -- v0.5 (#8): SwdTech is now a tools-shell submenu (menu state $30), not the
--- vanilla numeral gauge ($37).  The submenu row IS the boost level: pick row r
--- (cursor $8963/$8967) and confirm banks $3e9d=r and latches the base+r tech.
+-- vanilla numeral gauge ($37).  The submenu row IS the boost level: pick row i
+-- (cursor $8963/$8967) and confirm banks $3e9d = i+1 and latches that rung's
+-- tech (#38's 1-BP floor -- there is no 0x row).
 local ST_SUB = 0x30
 
 local PARTY = { 0, 1, 2 }
@@ -66,8 +67,8 @@ local mode                               -- "on" (charges) | "off" (free)
 -- un-driven character just waits at its menu, it never auto-acts, so leaving
 -- the others un-driven is enough isolation. `active` is the slot being pinned.
 local active, chargeSlot, refuseSlot
-local ceiling = 4                         -- techs known-1: window {1,2,3,4}
-local pinPend = 2                         -- 2 bp -> Quadra Slam (tech 3, base 1 + 2)
+local ceiling = 4                         -- techs known-1: window {2,3,4}
+local pinPend = 1                         -- row 1 = 2 bp -> Quadra Slam (tech 3)
 local casterMp = 50                       -- re-pinned each frame until a latch
 local pinCaster = true
 local spells = {}                         -- attack ids seen at $3410 (cleared per scenario)
@@ -112,10 +113,12 @@ local function pin() pinCyan(); pinGuards() end
 
 -- open the swdtech SUBMENU, put the cursor on the wanted boost row, confirm,
 -- run it to $3410. clears the spell log first so each scenario waits for ITS
--- OWN execution.  techIdx is the tech the (pend, ceil) window selects and the
--- attack id to watch; the ROW is `pend` itself (row r = boost r), which the
--- confirm banks into $3e9d and latches base+r from (0 = Dispatch at 0 bp /
--- ceiling 3; 3 = Quadra Slam at 2 bp / ceiling 4).
+-- OWN execution.  techIdx is the tech the (row, ceil) window selects and the
+-- attack id to watch.  #38 put a 1-BP floor under Bushido: the window is three
+-- rows and row i = boost i+1, tech = min(max(0,ceil-2)+i, ceil).  So
+-- (row 1, ceiling 4) = Quadra Slam (tech 3) and (row 0, ceiling 2) = Dispatch
+-- (tech 0).  The caster's bp bank is pinned to 5 throughout, so the BP gate
+-- never fires and the MP refusal stays the only variable under test.
 local function latchTech(tag, techIdx, pend, ceil)
   local attackId = 0x55 + techIdx
   return H.repeatN(1, {
@@ -215,7 +218,7 @@ H.run({ maxFrames = 40000 }, {
     pin()
     H.log("charge actor = slot " .. chargeSlot)
   end),
-  latchTech("affordable", QSLAM, 2, 4),   -- Quadra Slam: 2 bp, window {1,2,3,4}
+  latchTech("affordable", QSLAM, 1, 4),   -- Quadra Slam: row 1 = 2 bp, window {2,3,4}
   H.call(function()
     local left, dmg = mp(chargeSlot), (GUARD_HP * #GUARDS) - guardHp()
     H.log(string.format("affordable Quadra Slam: MP 50 -> %d, guard damage %d", left, dmg))
@@ -232,7 +235,8 @@ H.run({ maxFrames = 40000 }, {
   -- The insufficient-mp path is vanilla's own; on the OFF build the tech is
   -- free so there is nothing to refuse -- run this half only under the flag.
   -- The refusal actor is the NEXT of the opening wave (a different, still-full
-  -- slot); Dispatch (tech 0, cost 1, no boost, window {0,1,2,3}), MP 0 < 1 fizzles.
+  -- slot); Dispatch (tech 0, cost 1) sits at row 0 of the ceiling-2 window
+  -- {0,1,2}, and MP 0 < 1 fizzles.
   H.cond(function() return mode == "on" end, {
     H.driveUntil(function()
       return H.readByte(MENU) ~= 0 and H.readByte(ACTOR) ~= chargeSlot
@@ -244,7 +248,7 @@ H.run({ maxFrames = 40000 }, {
       pin()
       H.log("refuse actor = slot " .. refuseSlot)
     end),
-    latchTech("unaffordable", 0, 0, 3),
+    latchTech("unaffordable", 0, 0, 2),
     H.call(function()
       local left, dmg = mp(refuseSlot), (GUARD_HP * #GUARDS) - guardHp()
       H.log(string.format("unaffordable Dispatch: MP stayed %d, guard damage %d", left, dmg))

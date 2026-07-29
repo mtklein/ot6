@@ -15,6 +15,10 @@
 inc_lang "text/char_title_%s.inc"
 .endif
 inc_lang "text/item_name_%s.inc"
+; issue #40: the rage loadout page blanks a slot row to MonsterName::ITEM_SIZE
+; tiles.  skills.asm includes this too (the .inc is .ifndef-guarded), but it is
+; assembled AFTER this file, so the scope has to be pulled in here as well.
+inc_lang "text/monster_name_%s.inc"
 
 .import GenjuName, MagicProp
 
@@ -1322,20 +1326,27 @@ SkillsOption_04:
 
 SkillsOption_05:
 @21a6:  stz     $4a
+.if LANG_EN
+        ; issue #40: Rage opens the 8-slot LOADOUT CONFIGURATOR, not the
+        ; vanilla browse list -- the SkillsOption_02 repoint, re-applied.  The
+        ; browse list's only job was naming what Gau knows; the configurator
+        ; names it too (and prices it, and lets him carry eight of it into the
+        ; fight).  All state logic is bank-F0; Ot6RageInitC3 does the C3
+        ; framework draw.  The vanilla browse (InitRageList / ExpandRageList /
+        ; menu state $1d) stays assembled for the non-EN branch, exactly as the
+        ; SwdTech browse did.
+        ldy     #$0100
+        sty     zBG2HScroll
+        sty     zBG3HScroll
+        jsr     Ot6RageInitC3
+        lda     #$01
+        sta     $4a                     ; init done (state $7c self-init sentinel)
+        lda     #MENU_STATE_RAGELOAD    ; $7c
+        sta     zMenuState
+        rts
+.else
         jsr     CreateScrollArrowTask1
         longa
-.if LANG_EN
-        lda     #$00cc
-        sta     wTaskSpeedY,x
-        lda     #$0068
-        sta     wTaskSpeedX,x
-        shorta
-        jsr     LoadRageCursor
-        jsr     InitRageCursor
-        lda     #$78
-        sta     $5c
-        lda     #$08
-.else
         lda     #$00ce
         sta     wTaskSpeedY,x
         lda     #$0060
@@ -1346,7 +1357,6 @@ SkillsOption_05:
         lda     #$77
         sta     $5c
         lda     #$09
-.endif
         sta     $5a
         lda     #$02
         sta     $5b
@@ -1357,6 +1367,7 @@ SkillsOption_05:
         lda     #$1d
         sta     zMenuState
         rts
+.endif
 
 ; ------------------------------------------------------------------------------
 
@@ -2739,8 +2750,6 @@ Ot6LoadoutDrawC3:
         jsr     DrawPosText
         lda     #BG1_TEXT_COLOR::DEFAULT
         sta     zTextColor
-        ldy     #near Ot6LoadoutLbl0Text
-        jsr     DrawPosText
         ldy     #near Ot6LoadoutLbl1Text
         jsr     DrawPosText
         ldy     #near Ot6LoadoutLbl2Text
@@ -2750,17 +2759,21 @@ Ot6LoadoutDrawC3:
         jsr     Ot6LoadoutDrawSlots
         jmp     Ot6LoadoutDrawPool
 
-; ---- draw the four boost-slot rows (tech name + MP cost) ----
+; ---- draw the three boost-slot rows (tech name + MP cost) ----
+; issue #38: every Bushido tech costs at least 1 BP, so the page shows 1x/2x/3x
+; and the 0x row is gone.  Row i (0..2) draws WORD SLOT i+1 -- the stored format
+; is untouched (four 3-bit fields at $1e1d), slot 0 is simply never read.
 Ot6LoadoutDrawSlots:
         lda     #BG1_TEXT_COLOR::DEFAULT
         sta     zTextColor
         ldx     #$0000
-@lp:    stx     $e2                     ; slot loop var
+@lp:    stx     $e2                     ; row loop var (0..2)
         txa
+        inc     a                       ; row i -> word slot i+1 (#38)
         jsl     Ot6LoadoutSlotTech      ; F0: A = validated tech for this slot
         sta     $e5                     ; -> name value
         lda     $e2
-        asl                             ; row = 4 + slot*2
+        asl                             ; row = 4 + i*2  (tilemap rows 4/6/8)
         clc
         adc     #$04
         sta     $e6
@@ -2774,7 +2787,7 @@ Ot6LoadoutDrawSlots:
         jsr     Ot6LoadoutDrawCost
         ldx     $e2
         inx
-        cpx     #$0004
+        cpx     #$0003
         bcc     @lp
         rts
 
@@ -2863,14 +2876,13 @@ Ot6LoadoutCostTiles:    raw_text OT6_LOADOUT_MP_SUFFIX  ; " MP" + $00 (issue #39
                         ; encoded via menu_text_en.inc -- a bare literal here
                         ; picks up ending_anim.asm's credits charmap)
 
-; ---- cursor: single column, four rows over the boost slots ----
+; ---- cursor: single column, three rows over the boost slots (#38) ----
 Ot6LoadoutCursorProp:
-        cursor_prop {0, 0}, {1, 4}, NO_XY_WRAP
+        cursor_prop {0, 0}, {1, 3}, NO_XY_WRAP
 Ot6LoadoutCursorPos:
         cursor_pos {8, 30}
         cursor_pos {8, 46}
         cursor_pos {8, 62}
-        cursor_pos {8, 78}
 
 ; ---- positioned labels (issue #39: the strings live in menu_text_en.inc so
 ; the encode pipeline maps them to menu-font tiles and null-terminates them;
@@ -2879,10 +2891,188 @@ Ot6LoadoutCursorPos:
 ; the tilemap -- the garbled-page bug) ----
 Ot6LoadoutTitleText:    pos_text OT6_LOADOUT_TITLE
 Ot6LoadoutPoolText:     pos_text OT6_LOADOUT_POOL
-Ot6LoadoutLbl0Text:     pos_text OT6_LOADOUT_LBL0
 Ot6LoadoutLbl1Text:     pos_text OT6_LOADOUT_LBL1
 Ot6LoadoutLbl2Text:     pos_text OT6_LOADOUT_LBL2
 Ot6LoadoutLbl3Text:     pos_text OT6_LOADOUT_LBL3
+
+; ------------------------------------------------------------------------------
+; GAU'S RAGE LOADOUT PAGE (issue #40) -- the MenuState_7b shim, at eight rows
+;
+; Every decision is bank-F0 (Ot6Rage* in ot6_kits.asm); this is tilemap, cursor
+; and DMA only, exactly as the Bushido page's shim is.  Two shape differences,
+; both forced by Gau's numbers: names come from MonsterName (255 candidates)
+; instead of BushidoName (8), and there is no drawn "pool" grid -- the L/R
+; cycle IS the browse, and a LEARNED count stands in for the grid.
+
+MENU_STATE_RAGELOAD = $7c
+
+; menu state $7c: rage loadout configurator, per frame
+MenuState_7c:
+@rgl:   lda     $4a                     ; self-init sentinel (0 = not yet drawn)
+        bne     @run
+        jsr     Ot6RageInitC3
+        lda     #$01
+        sta     $4a
+        rts
+@run:   lda     #$10
+        trb     z45
+        jsr     InitDMA1BG1ScreenA
+        ldy     #near Ot6RageCursorPos
+        jsr     UpdateCursorPos         ; track the cursor sprite to $4e (slot)
+        jsl     Ot6RageInput            ; F0: 0 = idle, 1 = redraw, 2 = exit
+        cmp     #$02
+        beq     @exit
+        cmp     #$01
+        bne     @done
+        jsr     PlayMoveSfx
+        jsr     Ot6RageDrawSlots        ; chrome + count stay; redraw the slots
+@done:  rts
+@exit:  stz     $4a                     ; re-arm self-init for the next entry
+        jmp     ReloadSkillsMenu
+
+; ---- init: load the slot cursor, draw, flush both screens ----
+Ot6RageInitC3:
+        ldy     #near Ot6RageCursorProp
+        jsr     LoadCursor
+        jsl     Ot6RageOpen             ; F0: cursor to the top slot
+        jsr     Ot6RageDrawC3
+        ldy     #near Ot6RageCursorPos
+        jsr     UpdateCursorPos
+        jsr     InitDMA1BG1ScreenA
+        jmp     InitDMA1BG3ScreenB
+
+; ---- draw the whole configurator ----
+Ot6RageDrawC3:
+        jsr     ClearBG1ScreenA
+        jsr     ClearBG3ScreenB         ; wipe the caller's BG3 text (skills list)
+        lda     #BG1_TEXT_COLOR::BLUE
+        sta     zTextColor
+        ldy     #near Ot6RageTitleText
+        jsr     DrawPosText
+        ldy     #near Ot6RageLearnedText
+        jsr     DrawPosText
+        lda     #BG1_TEXT_COLOR::DEFAULT
+        sta     zTextColor
+        jsr     Ot6RageDrawSlots
+        jmp     Ot6RageDrawCount
+
+; ---- draw the eight loadout rows (beast name + the flat trance cost) ----
+Ot6RageDrawSlots:
+        lda     #BG1_TEXT_COLOR::DEFAULT
+        sta     zTextColor
+        ldx     #$0000
+@lp:    stx     $e2                     ; slot loop var
+        txa
+        jsl     Ot6RageShow             ; F0: carry set + A = the id to draw
+        bcs     :+
+        lda     #$ff                    ; blank row
+:       sta     $e5                     ; -> name value
+        lda     $e2
+        asl                             ; row = 4 + slot*2 (16px cursor pitch)
+        clc
+        adc     #$04
+        sta     $e6
+        ldx     #$0005                  ; name column
+        jsr     Ot6DrawRageName
+        lda     $e5
+        cmp     #$ff
+        beq     @blank
+        jsl     Ot6RageRowCost          ; F0: A = MP cost (0 under nomp)
+        bra     @cost
+@blank: lda     #$00                    ; an empty slot is priced at nothing
+@cost:  ldx     #$0012                  ; cost column (18)
+        jsr     Ot6LoadoutDrawCost      ; the Bushido page's own "n MP" drawer
+        ldx     $e2
+        inx
+        cpx     #$0008                  ; OT6_RAGESLOTS (ot6_memory.inc)
+        bcc     @lp
+        rts
+
+; ---- draw one monster (rage) name.  in: $e5 = rage id ($ff = blank),
+;      $e6 = row, X = col.  The Ot6DrawBushName shape over MonsterName. ----
+Ot6DrawRageName:
+        lda     $e6
+        jsr     GetBG1TilemapPtr        ; A = row, X = col -> X = tilemap dest
+        longa
+        txa
+        sta     $7e9e89                 ; DrawPosTextBuf position header
+        shorta
+        lda     $e5
+        cmp     #$ff
+        beq     @blank
+        jsr     GetMonsterNamePtr       ; MonsterName array ptr ($eb/$ef/$f1)
+        lda     $e5
+        jsr     LoadArrayItem           ; stage the name into $7e9e8b
+        jmp     DrawPosTextBuf
+@blank: ldy     #MonsterName::ITEM_SIZE ; blank the full name width, so a
+        ldx     #$9e8b                  ;   revert wipes what was there
+        stx     hWMADDL
+        lda     #$ff
+:       sta     hWMDATA
+        dey
+        bne     :-
+        stz     hWMDATA
+        jmp     DrawPosTextBuf
+
+; ---- draw the LEARNED count (three digits, col 10 of the caption row) ----
+Ot6RageDrawCount:
+        jsl     Ot6RageCount            ; F0: A = rages known (0..255)
+        pha
+        lda     #$14                    ; row 20 (the LEARNED caption's row)
+        ldx     #$000a                  ; col 10, just past "LEARNED "
+        jsr     GetBG1TilemapPtr
+        longa
+        txa
+        sta     $7e9e89
+        shorta
+        ldx     #$9e8b
+        stx     hWMADDL
+        pla                             ; the count
+        ldx     #$0000
+@h:     cmp     #100                    ; hundreds
+        bcc     @h2
+        sbc     #100                    ; C set by the cmp, so sbc is exact
+        inx
+        bra     @h
+@h2:    pha
+        txa
+        clc
+        adc     #ZERO_CHAR
+        sta     hWMDATA
+        pla
+        ldx     #$0000
+@t:     cmp     #10                     ; tens
+        bcc     @t2
+        sbc     #10
+        inx
+        bra     @t
+@t2:    pha
+        txa
+        clc
+        adc     #ZERO_CHAR
+        sta     hWMDATA
+        pla
+        clc
+        adc     #ZERO_CHAR              ; ones
+        sta     hWMDATA
+        stz     hWMDATA
+        jmp     DrawPosTextBuf
+
+; ---- cursor: single column, eight rows over the loadout slots ----
+Ot6RageCursorProp:
+        cursor_prop {0, 0}, {1, 8}, NO_XY_WRAP   ; OT6_RAGESLOTS
+Ot6RageCursorPos:
+        cursor_pos {8, 30}
+        cursor_pos {8, 46}
+        cursor_pos {8, 62}
+        cursor_pos {8, 78}
+        cursor_pos {8, 94}
+        cursor_pos {8, 110}
+        cursor_pos {8, 126}
+        cursor_pos {8, 142}
+
+Ot6RageTitleText:       pos_text OT6_RAGE_TITLE
+Ot6RageLearnedText:     pos_text OT6_RAGE_LEARNED
 
 .endif   ; LANG_EN
 

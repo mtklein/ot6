@@ -35,6 +35,13 @@ CODE_EXT_INC = 1
 .global Ot6TechLearned           ;   $1cf7 learned-bit test (pool draw + validation)
 .global Ot6LoadoutCeil           ;   validated tech, and expose the $1cf7-derived
                                  ;   ceiling (menu reads $1cf7, never $2020)
+.global Ot6RageOpen              ; #40 Gau's rage loadout: the same split -- F0
+.global Ot6RageInput             ;   owns every decision, the C3 page is tilemap
+.global Ot6RageShow              ;   and cursor only.  Show resolves a slot to
+.global Ot6RageCount             ;   the id it draws (stored+validated, or the
+                                 ;   AUTO window), Count is the LEARNED score
+.global Ot6RageRowCost           ;   ALWAYS-defined price shim, Ot6LoadoutCost's
+                                 ;   twin (flat trance price / 0 under nomp)
 .global Ot6LoadoutCost           ;   ALWAYS-defined price shim (flag-gated body):
                                  ;   forwards to Ot6CostFor under OT6_MP_COSTS,
                                  ;   returns 0 under nomp so the shared menu links

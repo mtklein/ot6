@@ -39,6 +39,26 @@ OT6_LOADOUT          := $7e1e1d
 .assert (OT6_LOADOUT & $ffff) >= $1600, error, "loadout must sit inside the save block"
 .assert (OT6_LOADOUT & $ffff) + 1 <= $1ffd, error, "loadout word must sit inside the checksum window"
 
+; #40 (kit-gau.md §4): Gau's 8-slot rage loadout, one byte per slot, in the
+; NEXT eight bytes of the same save-block scrap the Bushido word lives in.
+; byte = rage id + 1; $00 = unset; all eight zero = AUTO (the first eight
+; known rages in id order -- the head of the vanilla list).  Rage ids run
+; 0..254 (InitSkills stops at $fe, LearnRage skips monster index > 255), so
+; +1 fits a byte with nothing real outside it.
+;
+; NO persistent_layout BUMP, and that is a ruling, not an oversight: the
+; string ot6-codex-o8-v1 was coined for a world that already contained the
+; Bushido word, whose own precedent is exactly this -- a zero-sentinel
+; addition to save-block scraps changes no existing byte's meaning, so no
+; tracked anchor can be misread.  All 11 tracked anchors hold zeros here
+; (kit-gau.md §4.2, measured), and zeros decode as AUTO, the state those
+; saves are genuinely in.  Remaining scrap after this: $1e27-$1e3f.
+OT6_RAGELOAD         := $7e1e1f
+OT6_RAGESLOTS        = 8
+.assert (OT6_RAGELOAD & $ffff) >= $1600, error, "rage loadout must sit inside the save block"
+.assert (OT6_RAGELOAD & $ffff) + OT6_RAGESLOTS - 1 <= $1ffd, error, "rage loadout must sit inside the checksum window"
+.assert (OT6_RAGELOAD & $ffff) = (OT6_LOADOUT & $ffff) + 2, error, "rage loadout must follow the bushido word without a gap"
+
 ; Battle-only scratch. InitBattle clears through $3ed3. OT6_DIVINE_USED is
 ; one per-character bitmask; the walkers use the interleaved even words.
 OT6_DIVINE_USED      := $3ecb
@@ -114,6 +134,20 @@ OT6_WALLETSIGP       := $ed6f   ;   when CUR or SIG moves (see the flush)
 OT6_PIPSLOT          := $ed6b   ; #33: the character slot the live pip cell
                                 ;   follows while OT6_PIPTAIL runs -- the one
                                 ;   who just spent BP (Ot6ActionEnd sets both)
+OT6_RAGETIER         := $ed73   ; #40: the boost tier latched at Cmd_10 for the
+                                ;   whole trance (Slot's OT6_SLOTTIER pattern at
+                                ;   longer range -- BP is spent once at the
+                                ;   Rage-start action but the tier must outlive
+                                ;   it).  kit-gau.md §6.1 proposed $57bb, but
+                                ;   #33 took that for OT6_PIPTAIL and $57d5+ is
+                                ;   vanilla's own name scratch (btlgfx_ram.inc:
+                                ;   ram_res w7e57d5,128), so the strip is full;
+                                ;   this lives in the measured-free shadow tail
+                                ;   instead, past InitBP's $70-byte clear.
+                                ;   Staleness is harmless by Slot's argument:
+                                ;   read only while a RAGE status is set, and
+                                ;   the only writer of that status (Cmd_10)
+                                ;   always rewrites the latch first.
 OT6_NUMCTR           := $ed71   ; #33: last-seen damage-numeral thread counter
                                 ;   ($632e).  a change means GfxCmd_0b just
                                 ;   allocated a numeral -- the damage frame --
@@ -122,6 +156,8 @@ OT6_NUMCTR           := $ed71   ; #33: last-seen damage-numeral thread counter
                                 ;   value costs one no-op commit (see the proc)
 .assert OT6_RVPEND_ELEM = OT6_SHADOW + (14 * 6), error, "reveal-pending must follow the shadow (InitBP clears both in one loop)"
 .assert OT6_WALLETPREV + 1 <= OT6_SHADOW + $70 - 1, error, "wallet cur/prev must sit inside InitBP's $70-byte clear"
-.assert OT6_NUMCTR + 1 <= $ef1f, error, "OT6 shadow tail exceeds the measured-free range ($f120+ is PushMode7Vars')"
+.assert OT6_NUMCTR + 1 < OT6_RAGETIER, error, "OT6 rage tier overlaps the numeral counter"
+.assert OT6_RAGETIER >= OT6_SHADOW + $70, error, "OT6 rage tier must sit PAST InitBP's shadow clear (it is latched per trance, not per battle)"
+.assert OT6_RAGETIER <= $ef1f, error, "OT6 shadow tail exceeds the measured-free range ($f120+ is PushMode7Vars')"
 
 .endif

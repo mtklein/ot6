@@ -166,7 +166,7 @@ H.run({ maxFrames = 40000 }, {
     emu.addEventCallback(function() sample() end, emu.eventType.startFrame)
   end),
 
-  -- open the swdtech submenu, latch row 3 (= the pinned boost 3)
+  -- open the swdtech submenu, latch row 2 (= the pinned boost 3, #38's top rung)
   H.driveUntil(inWindow, 1500, {
     H.call(function() pinField(); H.setPad({ "a" }) end),
     H.waitFrames(2),
@@ -177,7 +177,10 @@ H.run({ maxFrames = 40000 }, {
     pinField()
     H.writeByte(0x895F + actor, 0)
     H.writeByte(0x8963 + actor, 0)
-    H.writeByte(0x8967 + actor, 3)          -- row 3 = boost 3 -> Dragon
+    H.writeByte(0x8967 + actor, 2)          -- row 2 = boost 3 -> Dragon
+                                            -- (#38: the 1-BP floor made the
+                                            --  window three rows, so boost 3
+                                            --  is the LAST row, not the 4th)
   end),
   H.waitFrames(2),
   H.driveUntil(function() return not inWindow() end, 900, {
