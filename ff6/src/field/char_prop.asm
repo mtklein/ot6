@@ -270,7 +270,19 @@ CharProp:
 ; 11: gau
         make_char_prop
         set_char_prop_hp_mp 45, 10
-        set_char_prop_cmds RAGE, LEAP, MAGIC, ITEM
+        ; ot6 #47: GAU GETS FIGHT.  Vanilla's four slots were RAGE/LEAP/
+        ;   MAGIC/ITEM -- no Fight at all -- which was survivable while Rage
+        ;   was free and is not now that it costs 8 MP (#40): an out-of-MP Gau
+        ;   had literally no action, and mp-economy.md's target ("Fight must
+        ;   sometimes be the right move") requires every character be able to
+        ;   decline to spend.  There is no spare slot -- vanilla's "blank"
+        ;   third row is MAGIC removed by InitCmd_03 for a Gau who knows no
+        ;   spells -- so LEAP moves in with MAGIC and shares its row: Leap
+        ;   only works on the Veldt (its own vanilla availability test), so
+        ;   InitCmd_03 hands the row to Leap there and to Magic everywhere
+        ;   else (battle_main.asm, InitCmd_03/04).  Nothing is lost except
+        ;   casting WHILE standing on the Veldt.
+        set_char_prop_cmds FIGHT, RAGE, MAGIC, ITEM
         set_char_prop_stats 44, 38, 36, 34, 99, 44, 34, 21, 18
         set_char_prop_run_factor HIGH
         set_char_prop_level_mod HIGH
