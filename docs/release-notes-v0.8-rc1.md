@@ -75,6 +75,11 @@ afternoon.
   big balance pass, not this one.
 - **Locke still has only Steal.** Five of his eight designed skills are
   already past in the story and none are built. He's next.
+- **Gau needs a fresh recruitment to gain Fight.** Command slots are
+  copied into your save at the moment a character joins, so a Gau
+  recruited on v0.7 or earlier keeps the old Rage / Leap / Magic / Item
+  menu permanently. Everything else in this build carries into an existing
+  save normally. A migration is planned (#61).
 
 ## What we'd like to know
 
