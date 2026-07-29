@@ -86,6 +86,13 @@ OT6_BREAK_TICKS := $10          ; a bit under vanilla stop duration ($12)
         sta     OT6_RVPEND_CLS-8,y   ;   Cmd_20 reload either -- a stale bank
                                      ;   would commit the prior occupant's
                                      ;   weakness onto the new species
+        sta     OT6_BRKTICK-8,y      ; #48: nor a pending or live break flash.
+        sta     OT6_BRKPAL-8,y       ;   these two sit past InitBP's shadow
+                                     ;   clear, so this is ALSO their only
+                                     ;   power-on clear: junk here would flash
+                                     ;   a monster white on the first frames of
+                                     ;   the first battle after a cold boot,
+                                     ;   and hand it back a junk palette
         ; weakness codex: pre-reveal anything this save learned in past battles
         jsr     Ot6CodexActive  ; x = this save's page offset
         longa
@@ -876,6 +883,11 @@ merge:  pla                     ; bank the matched weaknesses as PENDING (#33):
         bne     done
         lda     #OT6_BREAK_TICKS
         sta     OT6_BROKEN_TICKS,y         ; shields down: BREAK
+        lda     #$ff                       ; #48: and bank the FLASH as pending
+        sta     OT6_BRKTICK-8,y            ;   -- see Ot6BreakArm.  width-
+                                           ;   agnostic (abs,y in both index
+                                           ;   widths), like every other store
+                                           ;   in this proc but the codex one
 done:   rtl
 .endproc
 
@@ -978,6 +990,8 @@ merge:  lda     OT6_SCR_BIT     ; bank the matched class as PENDING (#33):
         bne     done
         lda     #OT6_BREAK_TICKS
         sta     OT6_BROKEN_TICKS,y         ; shields down: BREAK
+        lda     #$ff                       ; #48: flash pending (see Ot6BreakArm)
+        sta     OT6_BRKTICK-8,y
 done:   rts
 .endproc
 
@@ -1049,9 +1063,259 @@ done:   rts
         iny
         cpy     #$000c
         bcc     @src
+        jsr     Ot6BreakArm     ; #48: the break flash rides the SAME edge, and
+                                ;   rides it from here rather than from a second
+                                ;   call site so it inherits both of this proc's
+                                ;   callers for free -- Ot6RevealPoll's numeral
+                                ;   frame, and Ot6ActionEnd's numeral-less
+                                ;   backstop -- without touching ot6_boost.asm
         ply
         plx
         plb
+        rts
+.endproc
+
+; ------------------------------------------------------------------------------
+
+; [ the break moment: arm every pending monster's flash, and sound it once (#48)]
+;
+; WHY IT IS DEFERRED AT ALL.  The chips above empty the gauge inside
+; CalcAttackEffect's per-target loop, at damage CALC -- measured hundreds of
+; frames before the player sees anything (probe_clockwork, #33: calc f704 vs
+; first numeral f1006).  Flashing there would fire the signature moment while
+; the attacker was still winding up.  So the chips bank $ff in OT6_BRKTICK and
+; this proc converts pending into a live flash on the DAMAGE frame, which is
+; exactly the OT6_PIPPEND / Ot6RvPend* shape #33 and #42 already established.
+;
+; THE SOUND IS ONCE PER PASS, NOT ONCE PER SLOT.  Two monsters broken by the
+; same action arm on the same numeral and share one cleave; a multi-hit action
+; cannot double it either, because a chip only banks pending when
+; OT6_BROKEN_TICKS is still zero, so hits 2..n of a combo find the target
+; already broken and bank nothing.
+;
+; THE SFX ID IS A DELIBERATE BORROW, NOT AN AUDITION.  $be is vanilla's
+; Odin/Raiden cleave (btlgfx_main.asm:26049-26055 -- the only site that plays
+; it), which makes it the heaviest single-impact sound in the battle bank that
+; is not ALREADY spoken for by something a player hears every fight: $a0 is
+; every connecting swing (BlockSfxTbl, :27078), $2d is a monster dying (:22295)
+; and would read as a kill, $0d is the whiff.  Odin is not obtainable until the
+; WoR Ancient Castle, so through the whole supported frontier this sound has no
+; prior meaning to overwrite.  It is one constant (OT6_BREAK_SFX) if the owner
+; wants a different one after hearing it.
+;
+; It is queued by writing PlayAnimSfx's own four bytes (btlgfx_main.asm:3175-
+; 3182) rather than by jsl-ing that routine, because PlayAnimSfx takes its pan
+; in direct-page $10 and we do not own $10 in either of this proc's contexts.
+; The pan is the BROKEN MONSTER'S SCREEN X, which is vanilla's own idiom for a
+; monster-local sound (the death animation pans to w7e80c3 the same way,
+; :22287-22294) -- so the cleave comes from where the enemy is standing.
+;
+; a8/i16, db=$7e (Ot6RevealCommit pins it).  clobbers a/y.
+.proc Ot6BreakArm
+        .a8
+        .i16
+        lda     #$80
+        pha                     ; $02,s: pan, centre until a slot actually arms
+        lda     #$00
+        pha                     ; $01,s: did anything arm this pass?
+        ldy     #$0000          ; monster slot offset 0,2..10
+@slot:  lda     OT6_BRKTICK,y
+        cmp     #$ff
+        bne     @next           ; idle, or already a live countdown
+        jsr     Ot6BreakStart   ; y = slot offset; carry set = flash armed
+        bcc     @next
+        lda     $01,s
+        bne     @next           ; the first armed slot owns the pan
+        inc     a
+        sta     $01,s
+        lda     $80c3,y         ; w7e80c3: monster screen x (btlgfx_ram.inc:720,
+        sta     $02,s           ;   used as a pan the same way at :22288)
+@next:  iny
+        iny
+        cpy     #$000c
+        bcc     @slot
+        pla                     ; anything armed?
+        beq     @quiet
+        pla                     ; pan -- write it only when we really sound,
+        sta     $e9ea           ;   so a silent pass cannot stomp a pan the
+                                ;   animation engine queued this same frame
+        lda     #OT6_BREAK_SFX
+        sta     $e9e9           ; w7ee9e9: sound effect number
+        lda     #$18
+        sta     $e9e8           ; w7ee9e8: spc command $18 (play game sfx)
+        lda     #$01
+        sta     $e9ec           ; w7ee9ec: enable animation sound effect
+        rts
+@quiet: pla                     ; discard the unused pan
+        rts
+.endproc
+
+; ------------------------------------------------------------------------------
+
+; [ start one monster's break flash -- y = monster slot offset (#48) ]
+;
+; The pending byte is consumed on EVERY path, armed or not: a pending flash
+; must never outlive the action that banked it (Ot6PipPending's rule).
+;
+; Four refusals, all of them "this sprite is not ours to drive":
+;   - the slot is empty ($3aa8 bit 0, the hud's own presence gate);
+;   - the monster is wound/petrified ($3eec & $c2, the hud's own dead test);
+;   - the breaking blow ALSO killed it (hp is already zero by the numeral
+;     frame -- damage lands at calc).  Death has its own 32-frame animation
+;     that takes this very palette slot and this very byte for itself
+;     (btlgfx_main.asm:22262-22299), and a kill is the enemy's moment anyway;
+;   - the engine has already repointed the monster at palette 3 for an
+;     animation of its own (AnimCmd_80_3b, :31329).  Fighting it would leave
+;     the sprite on whichever of us wrote last.
+;
+; a8/i16, db=$7e.  preserves y; clobbers a.  out: carry set = armed.
+.proc Ot6BreakStart
+        .a8
+        .i16
+        lda     #$00
+        sta     OT6_BRKTICK,y   ; pending consumed either way
+        lda     $3aa8,y         ; monster present flags
+        lsr
+        bcc     @no
+        lda     $3eec,y         ; monster status 1
+        bit     #$c2
+        bne     @no
+        lda     $3bfc,y         ; monster hp (lo/hi)
+        ora     $3bfd,y
+        beq     @no
+        lda     $80db,y         ; w7e80db: monster sprite data; bits 1-3 are the
+        and     #$0e            ;   obj palette number, and vanilla only ever
+        cmp     #$06            ;   assigns 0/1/2 to a monster (:4917-4921), so
+        beq     @no             ;   3 here means an animation owns the sprite
+        sta     OT6_BRKPAL,y    ; bank the real palette bits for the hand-back
+        lda     #OT6_BREAK_FLASH
+        sta     OT6_BRKTICK,y
+        sta     OT6_BRKLIVE     ; wake the painter (any nonzero will do; it
+                                ;   recomputes the count as it walks)
+        jsr     Ot6BreakPal
+        sec
+        rts
+@no:    clc
+        rts
+.endproc
+
+; ------------------------------------------------------------------------------
+
+; [ fill the engine's flash palette slot with white (#48) ]
+;
+; Obj palette 3 == w7e7e00::_11 == $7e7f60 (btlgfx_ram.inc:672 declares the
+; array as 16 palettes of 32 bytes; the sprite drawer resolves a monster's
+; palette number to w7e7e00::_8 + n*32 at btlgfx_main.asm:4294-4296).  It is
+; the engine's own scratch for exactly this: flash_color_set writes it for the
+; attacker flash (:23440) and MonsterDeathPal is loaded into it for the death
+; fade (:22264).  Nothing else can be pointing at it, because monsters are only
+; ever assigned palettes 0/1/2 (:4917-4921).
+;
+; ZERO EXTRA VBLANK TRAFFIC, which is the #33 constraint this had to clear.
+; The PPU update DMAs sprite palettes as one unconditional fixed $100-byte
+; block from w7e7e00::_8 every frame (btlgfx_main.asm:1512-1518), so the whole
+; effect -- palette and the w7e80db repoint the OAM builder reads -- is WRAM
+; writes that ride transfers the engine was making anyway.  Measured, not
+; assumed: see battle_breakflash's nmi budget phase.
+;
+; $7fff is white in BGR555; colour 0 stays transparent by the PPU's own rule,
+; so the monster reads as a solid white cut-out -- the critical flash's colour,
+; scoped to one enemy, which is the owner's direction for #48.
+;
+; a8/i16, db=$7e.  preserves y; clobbers a.
+.proc Ot6BreakPal
+        .a8
+        .i16
+        phy
+        longa
+        lda     #$7fff
+        ldy     #$0000
+@fill:  sta     $7f60,y
+        iny
+        iny
+        cpy     #$0020
+        bcc     @fill
+        shorta0
+        ply
+        rts
+.endproc
+
+; ------------------------------------------------------------------------------
+
+; [ drive every live break flash, one main-loop frame (#48) ]
+;
+; Called from Ot6BgHud_ext, the frame ticker #33 established for exactly this
+; kind of work: our own context in bank F0 with db=$7e, OUTSIDE the C1 battle
+; script engine whose re-entrancy around WaitFrame wedged the fight the last
+; time OT6 ran a walk inside it (see Ot6RevealPoll's header).
+;
+; Cadence: countdown 24..0, sprite on the flash palette while bit 2 of the
+; counter is set -- 4 frames white, 4 frames normal, three times, ~0.4s.  That
+; is vanilla's own flash rhythm (set_one_mon_pal waits 4 frames a phase,
+; :23400-23410) with a third pulse, because a break is a bigger event than a
+; monster taking its turn and has to be distinguishable from it.
+;
+; The hand-back is guarded: it only rewrites w7e80db if the palette bits are
+; still the 3 WE wrote.  If the engine took the sprite over mid-flash we leave
+; it entirely alone rather than restoring stale bits over its work.
+;
+; IT IS NOT EVEN CALLED WHEN NOTHING IS FLASHING, and the gate lives INLINE at
+; the call site rather than at the top of this proc, because `jsr` + one load
+; here (20 cycles) was already over the line while 12 bare NOPs were not.  The
+; margin is that thin; the whole measurement is written up at OT6_BRKLIVE in
+; ot6_memory.inc.  The walk recomputes OT6_BRKLIVE from what survives each
+; tick, so a stale flag costs exactly one walk and the byte needs no init
+; clear.
+;
+; a8/i16, db=$7e (Ot6BgHud_ext's context).  clobbers a; preserves x/y.
+.proc Ot6BreakFlash
+        .a8
+        .i16
+        phy
+        lda     #$00
+        sta     OT6_BRKLIVE
+        ldy     #$0000
+@slot:  lda     OT6_BRKTICK,y
+        beq     @next           ; idle
+        cmp     #$ff
+        beq     @next           ; pending: still waiting for the damage frame
+        pha
+        lda     $3aa8,y
+        lsr
+        bcc     @drop           ; slot emptied under us
+        lda     $3eec,y
+        bit     #$c2
+        bne     @drop           ; died / petrified under us
+        pla
+        dec     a
+        sta     OT6_BRKTICK,y
+        beq     @off            ; the flash is over: hand the sprite back
+        sta     OT6_BRKLIVE     ; still counting -- keep the painter awake
+                                ;   (nonzero, and it leaves n/z alone for the
+                                ;   phase test below)
+        and     #$04
+        beq     @off
+        lda     $80db,y         ; ON: point the monster at the white palette
+        and     #$f1
+        ora     #$06
+        sta     $80db,y
+        bra     @next
+@drop:  pla                     ; discard the counter and stop driving
+        lda     #$00
+        sta     OT6_BRKTICK,y
+@off:   lda     $80db,y
+        and     #$0e
+        cmp     #$06
+        bne     @next           ; not ours any more: do not touch it
+        lda     $80db,y
+        and     #$f1
+        ora     OT6_BRKPAL,y
+        sta     $80db,y
+@next:  iny
+        iny
+        cpy     #$000c
+        bcc     @slot
+        ply
         rts
 .endproc
 
