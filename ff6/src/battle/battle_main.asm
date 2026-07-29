@@ -13962,6 +13962,7 @@ InitCmdList:
         sta     f:hWMADDH     ; clear wram bank
         tay
 @53a5:  lda     $00fc,y
+        jsr     Ot6VeldtRow ; ot6: gau's FIGHT row shows LEAP on the veldt
         ldx     #$04        ; 5 commands with possible relic updates
         pha
         lda     #$04        ; relic command update flag
@@ -14021,6 +14022,60 @@ InitCmdList:
 
 ; ------------------------------------------------------------------------------
 
+; [ ot6 #47/#51: gau's FIGHT row is shared -- LEAP on the veldt ]
+;
+; Gau carries FIGHT / RAGE / MAGIC / ITEM (char_prop.asm) and all four slots
+; are full, so Leap has no row of its own.  It shares the FIGHT row, not the
+; magic row (which is where #47 first put it -- the owner reversed that on
+; 2026-07-29, and he is right): ON the Veldt, Fight and Leap are redundant,
+; because Leap is the free thing you can always do there and is the reason Gau
+; is standing on the Veldt at all.  Magic is the row you might want in BOTH
+; places, so Magic is never the row that gets sacrificed.  Off the Veldt the
+; row is Fight; on it, Leap -- and Leap costs nothing (Ot6AbilityCost no longer
+; has a cmd-$11 arm), so the Veldt's free action is Leap and the free floor
+; holds in both territories.
+;
+; SITED IN THE ROW LOOP, not in an init function, because Fight ($00) has no
+; init function at all -- InitCmdIDTbl lists only morph/leap/dance/magic/
+; x-magic/lore.  Running here has three consequences worth naming:
+;
+;   * it runs BEFORE the relic pass, so a Gau in Dragoon Boots keeps Leap on
+;     the Veldt instead of having it silently replaced by Jump ($00 -> $16,
+;     RelicCmdTbl1/2).  Off the Veldt the boots still work normally.
+;   * the rewritten row is $11, which IS in InitCmdIDTbl, so the dispatcher
+;     below runs Leap's own vanilla availability test (InitCmd_01) on it for
+;     free -- no duplicated Veldt check, no carry protocol.
+;   * the magitek / Fanatics' Tower rewrite above has already run and leaves
+;     no $00 in the list on either path, so this never fires there.  A Gau in
+;     magitek armour cannot leap out of it, which is correct.
+;
+; And unlike the magic-row version this touches $f8 not at all: the has-mp
+; flag is InitCmd_03/04's business and they are back to exact vanilla.
+;
+; in:  a = the row's command byte, y = row index, $04,s = character-data
+;      pointer (the phx at InitCmdList's entry, one jsr deeper).
+; out: a = the command byte, rewritten to $11 for gau-on-the-veldt's fight row.
+;      x clobbered (the caller reloads it on the next instruction); y and the
+;      stack preserved.
+
+Ot6VeldtRow:
+        cmp     #$00        ; only the fight row is ever shared
+        bne     @norow
+        lda     $11e4       ; on the veldt flag
+        bit     #$02
+        beq     @fight      ; not on the veldt: the row stays fight
+        lda     $04,s       ; pointer to character data
+        tax
+        lda     $3ed8,x     ; actor number
+        cmp     #CHAR::GAU
+        bne     @fight
+        lda     #$11        ; the row becomes leap
+        rts
+@fight: lda     #$00        ; restore the fight command byte
+@norow: rts
+
+; ------------------------------------------------------------------------------
+
 ; [ init morph command ]
 
 InitCmd_00:
@@ -14042,57 +14097,13 @@ InitCmd_00:
 
 ; [ init magic/x-magic command ]
 
-; ot6 #47: GAU'S THIRD ROW IS SHARED -- Leap on the Veldt, Magic everywhere
-; else.  Gau now carries FIGHT/RAGE/MAGIC/ITEM (char_prop.asm) and the four
-; slots are full, so Leap has no row of its own.  It does not need one: Leap
-; is refused anywhere but the Veldt by its own vanilla availability test
-; (InitCmd_01, right below), so off the Veldt its row would be blank and on
-; the Veldt Magic's row is the one nobody misses.  The substitution happens
-; here rather than in InitCmd_01 so the relic pass upstream still sees $02 and
-; a Gem Box still upgrades the row to X-Magic (both ids land here).  The
-; vanilla magic test runs FIRST on both arms, so the has-mp flag $f8 is set
-; exactly when vanilla would set it -- a Veldt-standing Gau who knows a spell
-; keeps his pool even though the row shows Leap.  Every other actor takes the
-; vanilla path with no extra branch beyond the Veldt-flag test.
-
 InitCmd_03:
 InitCmd_04:
 @5429:  lda     $f6
-        bne     @ot6magic   ; branch if any spells are known
+        bne     InitCmd_05  ; branch if any spells are known
         lda     $f7
         inc
-        bne     @ot6magic   ; branch if an esper is equipped
-        jsr     Ot6VeldtRow
-        bcs     _5438       ; the row became leap: keep it
-        bra     _5434       ; no magic and no leap: remove command
-@ot6magic:
-        jsr     InitCmd_05  ; character has mp (vanilla's own side effect)
-        jsr     Ot6VeldtRow
-        bra     _5438
-
-; carry set = this row belongs to Gau's Veldt Leap and has been rewritten to
-; command $11; carry clear = untouched.  a/x clobbered (the dispatcher reloads
-; both after the init function returns).  Stack, one jsr below an init
-; function: $05,s is the command byte the init functions write through $03,s,
-; and $07,s is the character-data pointer they read through $05,s
-; (InitCmd_00's own "pointer to character data" comment names that slot).
-
-Ot6VeldtRow:
-        lda     $11e4       ; on the veldt flag
-        bit     #$02
-        beq     @norow      ; not on the veldt: leave the row to magic
-        lda     $07,s       ; pointer to character data
-        tax
-        lda     $3ed8,x     ; actor number
-        cmp     #CHAR::GAU
-        bne     @norow
-        lda     #$11        ; the row becomes leap
-        sta     $05,s
-        sec
-        rts
-@norow: clc
-        rts
-
+        bne     InitCmd_05  ; branch if an esper is equipped
 _5432:  bne     _5438
 _5434:  lda     #$ff
         sta     $03,s       ; remove command

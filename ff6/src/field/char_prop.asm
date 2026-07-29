@@ -277,11 +277,15 @@ CharProp:
         ;   sometimes be the right move") requires every character be able to
         ;   decline to spend.  There is no spare slot -- vanilla's "blank"
         ;   third row is MAGIC removed by InitCmd_03 for a Gau who knows no
-        ;   spells -- so LEAP moves in with MAGIC and shares its row: Leap
-        ;   only works on the Veldt (its own vanilla availability test), so
-        ;   InitCmd_03 hands the row to Leap there and to Magic everywhere
-        ;   else (battle_main.asm, InitCmd_03/04).  Nothing is lost except
-        ;   casting WHILE standing on the Veldt.
+        ;   spells -- so LEAP shares the FIGHT row: Leap only works on the
+        ;   Veldt (its own vanilla availability test), and on the Veldt Leap
+        ;   IS the free action, so Fight and Leap are the redundant pair
+        ;   there and nothing is lost.  Ot6VeldtRow (battle_main.asm) does
+        ;   the substitution in InitCmdList's own row loop.  MAGIC is never
+        ;   sacrificed anywhere -- the first pass shared the magic row and
+        ;   the owner reversed it on 2026-07-29 (kits.md's row-sharing rule).
+        ;   THIS RECORD IS THE OFF-VELDT LAYOUT and does not change; the
+        ;   sharing is a runtime verdict, never a rewrite of the save.
         set_char_prop_cmds FIGHT, RAGE, MAGIC, ITEM
         set_char_prop_stats 44, 38, 36, 34, 99, 44, 34, 21, 18
         set_char_prop_run_factor HIGH
