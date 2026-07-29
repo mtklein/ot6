@@ -4,7 +4,8 @@
 -- world encounter on the Albrook doorstep band, and walks each character's
 -- battle surface in turn:
 --   * LOCKE: command menu screenshot; a real Steal, MP read around it
---     (the flat 2 MP charge has no on-screen price -- this measures it);
+--     (the flat 4 MP charge has no on-screen price and, per #52's ruling,
+--      will not have one until #55 gives Locke a submenu -- this measures it);
 --   * CELES: command menu screenshot; the Magic list (MP column) shot;
 --   * SABIN: command menu + the Blitz submenu (price column);
 --   * EDGAR: command menu + the Tools submenu (price column).

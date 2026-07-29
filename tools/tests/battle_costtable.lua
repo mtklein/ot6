@@ -23,16 +23,6 @@
 --      where the 4%/25% brackets come from -- generous on both sides, so this
 --      gate catches a column that has fallen OFF the scale, not one that is
 --      merely tuned differently.
---   3. PAYABILITY.  Every row affords at least 4 uses from a full pool at the
---      level it becomes available -- the "top-tier abilities stay payable at
---      the level they arrive" property #45 asks for, checked rather than
---      argued.
---   3b. STEAL (issue #52).  The one costed verb with no table row: Steal is
---      flat, priced by the Ot6StealCost leaf, so its immediate is read at the
---      source and held to the SAME ruler -- measured against the pool Locke
---      actually joins with (LV6, 31 MP), not the LV14 pool #52's headline
---      quoted.  Plus signature parity with the cheapest row of all three
---      ladder kits, because #55 makes Steal rung one of Locke's ladder.
 --   2b. THE 99 ANCHOR (issue #57).  Each ladder's genuine ultimate -- Bum Rush
 --      and Cleave, the divine top rung of the only two priced ladders -- costs
 --      exactly 99, and NO row anywhere costs more than 99.  That ceiling is not
@@ -43,6 +33,16 @@
 --      deliberately does NOT participate -- Edgar's capstone is Overclock,
 --      which has no row here -- so this asserts the two rows that qualify and
 --      the <= 99 bound on all 24.
+--   3. PAYABILITY.  Every row affords at least 4 uses from a full pool at the
+--      level it becomes available -- the "top-tier abilities stay payable at
+--      the level they arrive" property #45 asks for, checked rather than
+--      argued.
+--   3b. STEAL (issue #52).  The one costed verb with no table row: Steal is
+--      flat, priced by the Ot6StealCost leaf, so its immediate is read at the
+--      source and held to the SAME ruler -- measured against the pool Locke
+--      actually joins with (LV6, 31 MP), not the LV14 pool #52's headline
+--      quoted.  Plus signature parity with the cheapest row of all three
+--      ladder kits, because #55 makes Steal rung one of Locke's ladder.
 --   4. THE SERPENT-TRENCH BAND (the knife-edge the owner reported as "barely
 --      made it, intense" and which was never balance-swept).  gau_joined IS
 --      that doorstep -- gen_sabin_trench.lua boots from it -- so the trio's
@@ -89,6 +89,7 @@ local ULTIMATE = { [0x64] = "Bum Rush", [0x5c] = "Cleave" }
 -- Ot6DanceCost has, read here so the one number the charge uses is pinned.
 local STEAL_COST = 4
 local LOCKE_JOIN_LV = 6             -- measured: worldmap_narshe has Locke LV6
+
 local TOOLS = {                 -- unchanged by #45; pinned so that stays true
   { 0xaa,  4, "AutoCrossbow" }, { 0xa3,  6, "NoiseBlaster" },
   { 0xa4,  8, "Bio Blaster" },  { 0xa5,  6, "Flash" },

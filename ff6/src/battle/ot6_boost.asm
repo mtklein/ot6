@@ -586,8 +586,8 @@ Ot6FoldTbl:
 ; mp-economy.md:96 rules "flat, paid at start, 4-10: one payment starts a
 ; whole-battle state".  8 -- the top half of the band -- because the single
 ; payment funds every subsequent turn's verb for the rest of the battle
-; (each locked-in step is free), so it prices above the per-use probe verbs
-; (Steal 2, Pummel 4) while staying payable from Mog's natural join pool
+; (each locked-in step is free), so it prices above the per-use signature
+; verbs (Steal 4 since #52, Pummel 4) while staying payable from Mog's pool
 ; (base 16 MP + level gains); playtest tunes.  PURE leaf, the Ot6CostFor
 ; shape: cost in A, preserves X and Y; rtl so the menu decorator (bank F0
 ; via C1) and the charge read one number.
@@ -786,12 +786,12 @@ Ot6FoldTbl:
 ; Owner: "it would be cool to scale ability MP costs so that each character's
 ; own ultimate ends up costing 99 MP", refined to "99 where it makes sense, not
 ; universal".  Two rows in this table qualify -- BUM RUSH ($64) and CLEAVE
-; ($5c), the divine top rung of the only two priced LADDERS Edgar aside.  Tools
-; does NOT participate: its capstone is Overclock, which kits.md prices as the
-; SUM of the two tools it fires and which is not built, and Air Anchor ($a9) is
-; explicitly "a findable item mid-kit gag, not the capstone" (kits.md:137) --
-; so there is no top Tools ROW here to anchor.  Steal, Slot, Rage and Dance are
-; flat verbs with no ladder at all; that is a stated non-answer, not a gap.
+; ($5c), each its kit's divine top rung.  Tools does NOT participate: its
+; capstone is Overclock, which kits.md prices as the SUM of the two tools it
+; fires and which is not built, and Air Anchor ($a9) is explicitly "a findable
+; item mid-kit gag, not the capstone" (kits.md:137) -- so there is no top Tools
+; ROW here to anchor.  Steal, Slot, Rage and Dance are flat verbs with no
+; ladder at all; that is a stated non-answer, not a gap.
 ;
 ; WHY 99 AND NOT 100.  Owner: "seeing things like 99, 999, and 9999 in Final
 ; Fantasy games feels right -- very classic feel."  It is also the number this
@@ -968,7 +968,10 @@ Ot6AbilityCostTbl:
         tax
         shorta                  ; back to 8-bit A (reloaded next, so no clr)
         lda     $3c09,x         ; current MP, high byte
-        bne     @afford         ; >= 256 MP: nothing in a kit costs that much
+        bne     @afford         ; >= 256 MP: nothing in a kit costs that much --
+                                ;   CHECKED since #57, not assumed: the ceiling
+                                ;   is 99 and battle_costtable.lua asserts it on
+                                ;   every row of the live table
         lda     $3c08,x         ; current MP, low byte
         cmp     $01,s           ; MP - cost: C SET iff MP >= cost (affordable)
         bcs     @afford

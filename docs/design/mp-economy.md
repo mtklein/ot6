@@ -307,7 +307,7 @@ evidence, all read rather than recalled:
   unavailable", never "you cannot afford it".
 - Every *other* costed verb has a submenu that solves this for free —
   `Ot6BlitzRowDecorate`, `Ot6ToolRowDecorate`, `Ot6DanceRowDecorate`
-  (`ot6_kits.asm:563`, `:615`, `:698`) each stamp a two-digit price and
+  (`ot6_kits.asm:563`, `:651`, `:716`) each stamp a two-digit price and
   grey by affordability through `Ot6AbilityGrey`. **Steal is the only
   costed verb with no list to put a number in.**
 
