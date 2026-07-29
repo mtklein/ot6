@@ -2953,35 +2953,91 @@ Ot6RageDrawC3:
         jsr     DrawPosText
         lda     #BG1_TEXT_COLOR::DEFAULT
         sta     zTextColor
+        jsr     Ot6RagePrice
         jsr     Ot6RageDrawSlots
         jmp     Ot6RageDrawCount
 
-; ---- draw the eight loadout rows (beast name + the flat trance cost) ----
+; ---- the flat trance price, stated ONCE on the title row: "8 MP EACH" ----
+; Blank under nomp -- the LABEL rides the number, so a zero price prints
+; nothing rather than a bare "EACH".
+Ot6RagePrice:
+        jsl     Ot6RageRowCost          ; F0: A = MP cost (0 under nomp)
+        beq     @none                   ; (rtl preserves the lda's Z)
+        pha
+        lda     #$01                    ; the title row
+        sta     $e6
+        ldx     #$0011                  ; col 17: "n MP"
+        pla
+        jsr     Ot6LoadoutDrawCost      ; the Bushido page's own "n MP" drawer
+        ldy     #near Ot6RageEachText   ; ... and "EACH" at col 22
+        jmp     DrawPosText
+@none:  rts
+
+; ---- draw the eight loadout rows (beast name; the price is on the title) ----
+;
+; THE 12-PIXEL CADENCE, and why the slots sit on ODD tilemap rows in two
+; columns.  The EN field-menu window this page lives in does NOT show BG1
+; ScreenA one tile row per eight scanlines: a tilemap row PAIR is displayed in
+; twelve scanlines, the odd row getting eight of them and the even row four.
+; Measured with a per-row glyph ruler poked straight into the shadow
+; (probe_ragegeom.lua): odd rows 1,3,5,..,15 render whole at screen y =
+; 116 + 6*(row-1); even rows show only their bottom three scanlines; nothing
+; past row 15 is inside the window at all.  Vanilla's own tables say the same
+; thing from the other side -- every EN cursor list for this window is
+; `cursor_pos {x, 116 + n*12}` (skills.asm:124-125, :247-250, :292-298), and
+; DrawRageName biases its row by one under `.if LANG_EN` (skills.asm:1518-1521)
+; for exactly this reason.
+;
+; So the window holds EIGHT usable text rows, and the page needs ten (title,
+; eight slots, LEARNED).  Two columns of four is the resolution, and it is
+; also vanilla's shape for this very window (the rage browse is
+; `cursor_prop {0,0}, {2,8}`, skills.asm:281-299):
+;
+;   row  1   RAGE LOADOUT                    8 MP EACH
+;   row  5   slot 0 (col 2)  slot 1 (col 16)
+;   row  7   slot 2          slot 3
+;   row  9   slot 4          slot 5
+;   row 11   slot 6          slot 7
+;   row 15   LEARNED nnn
+;
+; THE PRICE IS STATED ONCE, on the title row, not once per row.  Not a
+; simplification: two ten-cell monster names plus two cursor columns plus two
+; four-cell "n MP" fields is 30 columns, and the window's own right border
+; lives in column 30 (measured: the border rule is at screen x = 245).  The
+; price is flat by design (kit-gau.md §5) -- eight identical copies of the same
+; number was what did not fit, and one copy teaches the same rule.  Under nomp
+; the cost is 0 and the whole "8 MP EACH" group is skipped, label included.
+;
+; Slot order is the cursor framework's own index -- $4b = cols*row + col
+; (CalcShortListIndex) -- so slot even = left column, slot odd = right, and
+; row = 5 + (slot & ~1).  Ot6RageCurSlot (ot6_kits.asm) computes the same
+; number on the F0 side; the two must not drift.
 Ot6RageDrawSlots:
         lda     #BG1_TEXT_COLOR::DEFAULT
         sta     zTextColor
         ldx     #$0000
-@lp:    stx     $e2                     ; slot loop var
-        txa
+@lp:    stx     $e2                     ; slot loop var (word: $e2/$e3)
+        ; --- geometry from the slot: odd row, left or right column ---
+        lda     $e2
+        and     #$fe                    ; (slot & ~1) = the row pair
+        clc
+        adc     #$05                    ; row = 5 + (slot & ~1): 5/7/9/11
+        sta     $e6
+        lda     $e2
+        and     #$01
+        beq     :+
+        ldx     #$0010                  ; odd slot  -> right column (16)
+        bra     :++
+:       ldx     #$0002                  ; even slot -> left column (2)
+:       phx                             ; Ot6RageShow kills X
+        ; --- the beast ---
+        lda     $e2
         jsl     Ot6RageShow             ; F0: carry set + A = the id to draw
         bcs     :+
         lda     #$ff                    ; blank row
 :       sta     $e5                     ; -> name value
-        lda     $e2
-        asl                             ; row = 4 + slot*2 (16px cursor pitch)
-        clc
-        adc     #$04
-        sta     $e6
-        ldx     #$0005                  ; name column
+        plx                             ; X = the name column again
         jsr     Ot6DrawRageName
-        lda     $e5
-        cmp     #$ff
-        beq     @blank
-        jsl     Ot6RageRowCost          ; F0: A = MP cost (0 under nomp)
-        bra     @cost
-@blank: lda     #$00                    ; an empty slot is priced at nothing
-@cost:  ldx     #$0012                  ; cost column (18)
-        jsr     Ot6LoadoutDrawCost      ; the Bushido page's own "n MP" drawer
         ldx     $e2
         inx
         cpx     #$0008                  ; OT6_RAGESLOTS (ot6_memory.inc)
@@ -3018,7 +3074,10 @@ Ot6DrawRageName:
 Ot6RageDrawCount:
         jsl     Ot6RageCount            ; F0: A = rages known (0..255)
         pha
-        lda     #$14                    ; row 20 (the LEARNED caption's row)
+        lda     #$0f                    ; row 15 -- the LAST row the window
+                                        ;   shows, and odd (see the cadence
+                                        ;   note on Ot6RageDrawSlots).  Must
+                                        ;   track OT6_RAGE_LEARNED's own {2,15}
         ldx     #$000a                  ; col 10, just past "LEARNED "
         jsr     GetBG1TilemapPtr
         longa
@@ -3058,20 +3117,25 @@ Ot6RageDrawCount:
         stz     hWMDATA
         jmp     DrawPosTextBuf
 
-; ---- cursor: single column, eight rows over the loadout slots ----
+; ---- cursor: two columns of four, on vanilla's 12px cadence ----
+; Entries are in the framework's own index order ($4b = 2*row + col), i.e.
+; reading order.  y = 116 + n*12 is the EN field menu's text pitch for this
+; window, copied from vanilla's own rage/magic/esper cursor tables
+; (skills.asm:124-125, :247-250, :292-298); rows 5/7/9/11 are n = 2/3/4/5.
 Ot6RageCursorProp:
-        cursor_prop {0, 0}, {1, 8}, NO_XY_WRAP   ; OT6_RAGESLOTS
+        cursor_prop {0, 0}, {2, 4}, NO_XY_WRAP   ; OT6_RAGECOLS x OT6_RAGEROWS
 Ot6RageCursorPos:
-        cursor_pos {8, 30}
-        cursor_pos {8, 46}
-        cursor_pos {8, 62}
-        cursor_pos {8, 78}
-        cursor_pos {8, 94}
-        cursor_pos {8, 110}
-        cursor_pos {8, 126}
-        cursor_pos {8, 142}
+        cursor_pos {8,   116 + 2 * 12}   ; row 5:  slot 0, slot 1
+        cursor_pos {112, 116 + 2 * 12}
+        cursor_pos {8,   116 + 3 * 12}   ; row 7:  slot 2, slot 3
+        cursor_pos {112, 116 + 3 * 12}
+        cursor_pos {8,   116 + 4 * 12}   ; row 9:  slot 4, slot 5
+        cursor_pos {112, 116 + 4 * 12}
+        cursor_pos {8,   116 + 5 * 12}   ; row 11: slot 6, slot 7
+        cursor_pos {112, 116 + 5 * 12}
 
 Ot6RageTitleText:       pos_text OT6_RAGE_TITLE
+Ot6RageEachText:        pos_text OT6_RAGE_EACH
 Ot6RageLearnedText:     pos_text OT6_RAGE_LEARNED
 
 .endif   ; LANG_EN

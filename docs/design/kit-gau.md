@@ -33,7 +33,7 @@ line it was read from, or is labelled **UNVERIFIED**. Line numbers are from the
 | Collection | unlimited, untouched — `LearnRage` keeps filling the `$1d2c` bitfield (`battle_main.asm:12334-12348`) |
 | Equip | **8 slots**, one byte per slot, configured in the field under Skills → Rage (the Bushido-configurator pattern at 8 rows) |
 | SRAM | **8 bytes at `$1e1f-$1e26`** — the same save-block scrap the Bushido word lives in; zero-sentinel = AUTO; **no `persistent_layout` bump, zero anchors regenerated** (§4, the tradeoff table) |
-| Battle read | one choke point: `InitSkills`' `$257e` list build (`battle_main.asm:14659-14679`) filters through the loadout; the vanilla Rage window, cursor, scroll and confirm are untouched (§3) |
+| Battle read | one choke point: `InitSkills`' `$257e` list build (`battle_main.asm:14659-14679`) filters through the loadout; the vanilla Rage window, cursor, scroll and confirm are untouched (§3). **AUTO truncates to eight too — the wall is not reachable by inaction (§8.0, 2026-07-28)** |
 | MP | **flat 8 MP at Rage-start**, whole-battle possession, mid-trance turns free — one price rule for both possess-verbs (Rage here, Dance in #34) (§5) |
 | Boost | 0 BP vanilla coin; 1 BP special ¾; 2 BP special 15/16; 3 BP the special **every turn for the whole trance** — latched at `Cmd_10`, the Slot-latch pattern (§6) |
 | Boosted Leap | **not this pass** — Leap's learn step has no roll to convert; rider re-opens if the return-cadence roll is located and playtest wants it (§6.3). Leap prices flat 2 MP |
@@ -129,8 +129,9 @@ Per machinery layer:
   list at `$257e` that `InitSkills` builds once per battle from `$1d2c`
   (`battle_main.asm:14659-14679`; draw `btlgfx_main.asm:11084-11102`; confirm
   `:20261-20272`, which takes `$257e,x` and refuses `$ff`). **That build loop
-  is the single choke point**: when any loadout byte is nonzero, write only
-  the stored, still-learned ids (at most 8), set the count `$3a9a`
+  is the single choke point**: write only the eight the hunter carries — the
+  stored, still-learned ids when any loadout byte is nonzero, otherwise AUTO's
+  first-eight window (§8.0, the 2026-07-28 correction) — set the count `$3a9a`
   (`:14674`), and `$ff`-fill the rest of the `$257e-$267d` region (256 cells;
   the dance list starts at `$267e`, `:14656`). Everything downstream is
   untouched and self-consistently narrowed: the window draws ≤8 names and
@@ -144,9 +145,12 @@ Per machinery layer:
 - **Field configurator**: `SkillsOption_05` (the vanilla Skills → Rage browse,
   `field_menu.asm:1323-1359`, menu state `$1d` over `InitRageList`,
   `skills.asm:1477`) is repointed exactly the way `SkillsOption_02` was. The
-  new screen is `MenuState_7b`'s twin: cursor prop `{1, 8}`, eight
+  new screen is `MenuState_7b`'s twin: ~~cursor prop `{1, 8}`, eight
   `cursor_pos` rows (16px pitch: y = 30..142 — fits the frame the Bushido
-  screen already proved), one name+cost row per slot. Two deltas from
+  screen already proved)~~ **— superseded by §8.0b: cursor prop `{2, 4}`, two
+  columns of four on odd rows at vanilla's 12px pitch. The frame the Bushido
+  screen "already proved" had never been rendered through the player's path** —
+  one name+cost row per slot. Two deltas from
   Bushido: names come from `MonsterName` via the rage browse's own plumbing
   (`GetMonsterNamePtr`, `skills.asm:1557-1565`) instead of `BushidoName`;
   and the "pool" cannot be a drawn grid (255 candidates vs Cyan's 8), so
@@ -170,7 +174,9 @@ Per machinery layer:
 known rages in id order — i.e. the head of the vanilla list `InitSkills`
 already builds. Not "most recently learned" (needs storage that doesn't
 exist), not "strongest" (needs a judgment call the machinery can't make).
-A fresh Gau with ≤8 rages is byte-for-byte vanilla under AUTO.
+A fresh Gau with ≤8 rages is byte-for-byte vanilla under AUTO; past eight AUTO
+truncates, deliberately (§8.0 — this paragraph is the one §8.2 originally
+contradicted, and it is the one that won).
 
 ---
 
@@ -351,6 +357,18 @@ the widen-to-per-character moment (§10.7).
 The roll hook replaces `RandRage`'s `jsr RandCarry / rol` pick
 (`battle_main.asm:1001-1003`): tier 0 runs vanilla's own coin, byte-identical.
 
+**CORRECTION, 2026-07-28 — one latch was not enough.** This paragraph said the
+latch at `Cmd_10` lands "before the `_c21554` tail fires the first possessed
+action", and inferred that the start turn is therefore tiered. It is not:
+`RandRage` has **two** callers, and the start turn's attack is rolled by the
+*other* one — `FixPlayerAttack`'s cmd-`$10` arm (`battle_main.asm` @4dec), at
+action LOAD, before `Cmd_10` exists. Measured (`battle_rage.lua`, 1 BP
+pending): roll 1 saw tier 0 and took no extra draw, rolls 2-5 saw tier 1 and
+took one each — so the very turn the BP was spent on was the one turn it did
+not buy, and a 3-BP Rage was a coin flip on its headline turn. `Cmd_10` now
+shares the latch with that load site; both are idempotent on the start turn
+because the pending byte is not consumed until `Ot6ActionEnd`.
+
 ### 6.2 The no-double-dip gates
 
 - **`Ot6BoostDmg` gains a `$10` gate** beside Steal's `$05` and Slot's `$0f`
@@ -426,6 +444,136 @@ in §11 for the kits.md amendment.
 
 No design thought required below; citations are the work order.
 
+### 8.0 CORRECTION, 2026-07-28 — AUTO truncates to eight
+
+**This section contradicted §2.2 and §2.2 wins.** As first written, §8.2's
+`Ot6RageList` bullet said an all-zero loadout "return[s] carry 'use vanilla
+walk'", and the build pass implemented exactly that. §2.2's *AUTO's definition*
+paragraph had always said the opposite: "the first eight known rages in id
+order". The shipped behaviour was therefore the vanilla 200-entry wall for
+anybody who never opened the configurator — the precise thing the owner asked
+to be rid of ("keep the number of his rages within reasonable limits", #40).
+A default that reinstates the problem the feature exists to solve is not a
+default; the wall must not be reachable through inaction.
+
+**Ruling (dispatcher): AUTO = the first eight known rages in id order, in
+battle as well as in the field menu.** `Ot6RageList` builds the list on both
+arms and always returns carry set; the vanilla `$1d2c` walk below the
+`InitSkills` call site is now unreachable from that site and stays only as the
+reference `battle_rage.lua`'s explicitly-labelled equivalence arm measures
+against.
+
+What this does **not** change:
+
+- **The collection is untouched.** `LearnRage` and the `$1d2c-$1d4b` bitfield
+  are exactly as vanilla left them; the field page still cycles every species
+  hunted, and the LEARNED counter still shows the whole album. Only the eight
+  the hunter *carries* are capped.
+- **Migration.** All-zero still means AUTO, so no save, anchor, or
+  `persistent_layout` string moves (§4 stands whole).
+- **The equivalence claim, narrowed honestly.** §2.2's "a fresh Gau with ≤8
+  rages is byte-for-byte vanilla under AUTO" survives *within the window* and
+  is now measured as its own arm; past eight, AUTO deliberately diverges from
+  vanilla, which is the point.
+
+One knock-on flagged rather than fixed: the `InitSkills` hook is not
+`LANG_EN`-gated, so a `ff6-jp` build (not produced by `make rom` or `make
+test`) would also truncate to eight with no configurator to widen it. §11
+carries it as a follow-up.
+
+**And one the ruling exposed: this hook now runs in EVERY battle, so its COST
+is part of its contract.** While AUTO handed back to the vanilla walk, the
+proc's own body only ran for a configured loadout — i.e. never, since nobody
+has one. The moment AUTO stopped handing back, it ran once per battle for
+every party in the game, and three unrelated suite tests went red:
+`battle_dlgmenu` ("font region corrupt: 1836 bytes differ at vram
+`$B000+001`"), `battle_magicite` (a divine's positive-control hit) and
+`visual_f2` (pips surviving an attack round). All three are green on the
+pre-change ROM and red on the changed one — measured both ways, by stashing
+the diff, rebuilding, re-minting the four suite states and re-running them.
+
+The cause was the AUTO arm's shape. It was first written as eight calls to
+`Ot6RageNth`, and `Ot6RageNth` walks ids 0..254 from scratch every call — so
+the common party, the one with **no rages at all**, still paid ~255 jsl'd bit
+tests before the first call returned "nothing". That is on the order of twenty
+thousand cycles added to `InitSkills`, and battle init is coupled to the
+frame: the OT6 font re-lay is staged one slice per NMI and admission-gated on
+the live V counter (`ot6_hud.asm:644-673`), which is exactly the machinery
+`battle_dlgmenu` exists to guard. Rewritten as ONE pass over the 32-byte
+bitfield that skips empty bytes whole (~32 loads for a rage-less party, less
+than vanilla's own 255-iteration walk), all three go green again.
+
+Two riders, stated honestly: the timing was not instrumented directly — the
+cost is measured from the instruction sequence and the fix is what proves it,
+so "battle init is frame-coupled" is the leading mechanism, not a witnessed
+one. And the same pass now also re-establishes `hWMADDH = 0` by writing the
+list through the WRAM data port the way the vanilla walk does
+(`battle_main.asm` @5840); that bank byte being 0 is a global invariant every
+`ldx #$9e8b / stx hWMADDL` writer depends on (`LoadArrayItem`,
+`item.asm:1256`; `Ot6LoadoutDrawCost`; `Ot6DrawRageName`'s blank arm). Doing
+that did **not** fix the three tests on its own — it is kept because a hook
+that replaces vanilla code should inherit vanilla's side effects, not because
+it was the bug.
+
+The general rule this earns: **a hook that stops handing back to vanilla is a
+new hot path.** Cost it, and re-run the whole suite, not just the feature's
+own test — the three tests that caught this have nothing to do with Gau.
+
+### 8.0b CORRECTION, 2026-07-28 — the page's geometry (found by rendering it)
+
+§2.2 specified the configurator as "cursor prop `{1, 8}`, eight `cursor_pos`
+rows (16px pitch: y = 30..142)", i.e. a single column of eight on tilemap rows
+4-18 with the LEARNED caption at row 20. That was derived from the Bushido
+page's numbers, and it is wrong for both pages. `menu_ragepage.lua` — the
+first test ever to *render* either configurator through the player's own path
+— photographed it, and a per-row glyph ruler poked straight into the BG1A
+shadow (`tools/tests/probe_ragegeom.lua`) measured why:
+
+**The EN field-menu window does not show BG1 ScreenA at one tile row per eight
+scanlines.** A tilemap row *pair* is displayed in twelve scanlines — the ODD
+row gets eight of them, the even row four — and nothing past row 15 is inside
+the window at all. Measured: odd rows 1,3,…,15 render whole at screen
+`y = 116 + 6*(row-1)`; even rows show only their bottom three scanlines.
+Vanilla says the same thing from the other side: every EN cursor table for
+this window is `cursor_pos {x, 116 + n*12}` (`skills.asm:124-125`, `:247-250`,
+`:292-298`), and `DrawRageName` biases its row by one under `.if LANG_EN`
+(`skills.asm:1518-1521`) for exactly this reason.
+
+So the page as shipped drew all eight beast names, all eight prices and the
+LEARNED counter where they could not be read: eight three-scanline slivers,
+and a counter below the window's bottom edge.
+
+**Ruling: two columns of four on odd rows, vanilla's own shape for this
+window** (the rage browse is `cursor_prop {0,0}, {2,8}`, `skills.asm:281-299`):
+
+| tilemap row | content |
+|---|---|
+| 1 | `RAGE LOADOUT` |
+| 5 / 7 / 9 / 11 | slots 0-1 / 2-3 / 4-5 / 6-7 — name at col 2 (left) or 17 (right), the flat price immediately after the 10-cell name field |
+| 15 | `LEARNED nnn` |
+
+Slot order is the menu framework's own index, `$4b = cols*row + col`
+(`CalcShortListIndex`, `menu_common.asm:1205-1224`), so slot even = left,
+slot odd = right, and `row = 5 + (slot & ~1)`. `Ot6RageCurSlot`
+(`ot6_kits.asm`) computes the same number on the F0 side. The dpad's Left and
+Right — previously unused — move between the columns; the L/R shoulders still
+cycle. `OT6_RAGECOLS`/`OT6_RAGEROWS` (`ot6_memory.inc`) carry the geometry with
+an assert that they cover every slot exactly once. The per-row price column
+survives the reshape, so §2.2's "the column doubles as the price's teaching
+surface" still holds — twice over, once per column.
+
+**This defect is not Gau's alone.** The shipped Bushido configurator (#8 Layer
+B / #38) draws its three slot rows on even rows 4/6/8 and its pool on rows
+15/17/19, so through Skills → SwdTech its tech names render as slivers and two
+of its four pool rows are outside the window. `menu_swdtechpage.lua`'s own
+committed screenshot shows it; the test asserts the tilemap, which was always
+correct, and nothing about where the window can display it.
+`menu_bushidoloadout.lua` force-jumps `zMenuState` from the *main* menu, where
+the cadence is different, and that is why the page looked right in
+`bushido_loadout_field.png`. §11 carries the fix as a follow-up — it is #8's
+page, not #40's, and it needs its own layout decision (three slots fit the odd
+rows; the four-row pool does not).
+
 1. **`ot6_memory.inc`**: `OT6_RAGELOAD := $7e1e1f` (8 bytes) + asserts
    `>= $1600` and `+7 <= $1ffd` (the `OT6_LOADOUT` assert pair,
    `ot6_memory.inc:38-40`, widened). `OT6_RAGETIER := $57bb` beside
@@ -436,9 +584,11 @@ No design thought required below; citations are the work order.
    - `Ot6RageSlot` — slot → stored byte; `$00`/unlearned → `$ff` (empty);
      else id (byte−1). The `Ot6LoadoutSlotTech` shape (`:960-978`) minus the
      auto-window math (AUTO is resolved at the list build, not per slot).
-   - `Ot6RageList` — the battle build: if all 8 bytes zero → return carry
-     "use vanilla walk"; else emit ≤8 validated ids + count. Called from the
-     `InitSkills` hook.
+   - `Ot6RageList` — the battle build: **all 8 bytes zero (AUTO) → emit the
+     first eight known rages in id order** (the same `Ot6RageNth` window the
+     field page draws); else emit ≤8 validated ids + count. Either arm returns
+     carry set. Called from the `InitSkills` hook. **[CORRECTED 2026-07-28 —
+     see §8.0.]**
    - Menu procs: open/input/cycle (next/prev set bit of `$1d2c`, wrapping,
      max 255 hops)/revert (zero all 8)/assign — the `Ot6Loadout*` family
      (`:1024-1157`) with slot count 8 and byte stores.
@@ -505,6 +655,18 @@ poked-in Gau (the battle_steal install pattern), monsters stopped and
 HP-pinned so every roll is attributable, RNG pinned at tier boundaries, and
 write-callbacks recording who wrote `$257e`, `$33a8`, `OT6_RAGETIER`, and the
 MP cell — bank `$f0` for the hooks, `$c1/$c2` for vanilla.
+
+**Correction, 2026-07-28 — the bench must be WOUNDED, not stopped.** The first
+build's fixture parked the non-actor party slots with the stop status, and
+`battle_slots.lua:114-118` had already written down what that costs: "a stopped
+character's pending menu stays open forever and starves the actor's next turn".
+It did exactly that here — measured, `cmd10 = 1` over 2700 frames with the
+battle parked on an open list — so *every* multi-turn claim in the fixture
+("mid-trance turns are free", "the latch survived several possessed turns") was
+vacuously true against a battle that had taken one turn. A dead row raises no
+menu; with that one change the same drive takes five possessed turns and the
+claims mean something. Any new arm here that asserts something about
+"several turns" must also assert the turn COUNT, or it is asserting nothing.
 
 ---
 
@@ -577,3 +739,14 @@ MP cell — bank `$f0` for the hooks, `$c1/$c2` for vanilla.
    does not change either way.
 6. **Gau's divine** (§10.9): a design pass of its own, after the loadout
    ships and playtest shows which beast the player misses most.
+7. **The Bushido configurator's geometry** (§8.0b): Skills → SwdTech draws its
+   slot rows on even tilemap rows and two of its four pool rows outside the
+   window. Shipped in v0.5/#38, visible in `menu_swdtechpage.lua`'s own
+   screenshot, invisible to every assertion in the suite. Needs a layout pass
+   of its own plus a screen-geometry canary in `menu_swdtechpage.lua` (the
+   even-row/row>15 rule `menu_ragepage.lua` now carries).
+8. **The `LANG_EN` gate on the `InitSkills` hook** (§8.0's knock-on): the
+   choke point is unconditional, so a `ff6-jp` link would truncate to eight
+   with no configurator to widen it. `make rom` and `make test` build only
+   `ff6-en`/`ff6-en-nomp`, so nothing shipped is affected; gate it (or decide
+   jp is out of scope in writing) before anyone links jp again.

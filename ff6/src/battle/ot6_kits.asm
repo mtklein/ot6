@@ -1826,13 +1826,14 @@ done:   plp
         rtl
 .endproc
 
-; [ the n-th learned rage in id order (AUTO's definition, menu side) ]
+; [ the n-th learned rage in id order (AUTO's definition) ]
 ;
 ; AUTO is "the first eight known rages in id order" -- the head of the very
 ; list InitSkills builds.  Not "most recently learned" (no storage exists) and
-; not "strongest" (no judgment the machinery can make).  Only the FIELD menu
-; calls this: in battle an all-zero loadout hands the list build straight back
-; to the vanilla walk, so AUTO costs the battle path nothing.
+; not "strongest" (no judgment the machinery can make).  BOTH readers call this
+; (the field page through Ot6RageShow, the battle build through Ot6RageList's
+; AUTO arm), which is what makes the untouched page and the untouched battle
+; menu show the same eight beasts by construction rather than by agreement.
 ; a8/i16.  in: A = n (0-based).  out: carry set + A = the id, or carry clear
 ;   (fewer than n+1 learned).  clobbers X.  preserves Y.
 .proc Ot6RageNth
@@ -1866,11 +1867,26 @@ done:   plp
 ; [ THE CHOKE POINT: build the battle rage list from the loadout ]
 ;
 ; Called from InitSkills (battle_main.asm) in place of -- not beside -- the
-; vanilla $1d2c walk.  All eight bytes zero (AUTO, and the state every
-; pre-existing save and every tracked anchor is in) returns carry CLEAR and the
-; vanilla walk runs untouched, byte for byte.  Otherwise this writes the stored,
-; still-learned ids in slot order to $257e, sets the count $3a9a, and returns
-; carry SET.
+; vanilla $1d2c walk.  EITHER arm builds the list and returns carry SET; the
+; vanilla walk below the call site is now unreachable from here and stays only
+; as the reference the AUTO arm is measured against (battle_rage.lua's
+; explicitly-labelled equivalence arm).
+;
+;   MANUAL (any loadout byte nonzero): the stored, still-learned ids in SLOT
+;     order -- the player's own arrangement, at most eight.
+;   AUTO (all eight bytes zero, the state every pre-existing save and every
+;     tracked anchor is in): the FIRST EIGHT known rages in id order, via the
+;     same Ot6RageNth window the field page draws.
+;
+; THE AUTO RULING, 2026-07-28 (dispatcher; kit-gau.md §2.2 vs the original
+; §8.2).  §2.2 always defined AUTO as "the first eight known rages"; the first
+; build pass shipped §8.2's "all-zero hands back to the vanilla walk" instead,
+; which meant a player who never opened the configurator still met the vanilla
+; 200-entry wall -- the exact thing the owner asked to be rid of ("keep the
+; number of his rages within reasonable limits").  The wall must not be
+; reachable through inaction, so AUTO truncates.  The collection is untouched:
+; $1d2c still holds every species hunted, and the field page still cycles the
+; whole bitfield.  Only the BATTLE menu is eight long, always.
 ;
 ; Terminator: InitBattle $ff-fills $2000-$341f (battle_main.asm:6096-6102, a
 ; 16-bit double-store loop) BEFORE it calls InitSkills, so every cell past the
@@ -1879,41 +1895,114 @@ done:   plp
 ; terminator anyway rather than depend on a fill three hundred lines away.
 ;
 ; entry: jsl from InitSkills, db=$7e (InitBattle's MVN left it there).  Sets its
-; own widths and restores the caller's.  clobbers A,X,Y.  out: carry set = the
-; list is built, carry clear = run the vanilla walk.
+; own widths and restores the caller's.  clobbers A,X,Y.  out: carry ALWAYS set
+; (the list is built here); the carry-clear "run the vanilla walk" contract is
+; kept in the call site for shape, not because this can still return it.
 .proc Ot6RageList
         php
         shorta0
         longi
-        ; --- AUTO?  all eight bytes zero -> hand it back to vanilla ---
+        stz     $3a9a           ; number of known rages, rebuilt below
+        ; --- THE WRAM DATA PORT, set exactly the way the vanilla walk sets it.
+        ; Vanilla streams the ids through $2180 and, on the way in, writes
+        ; hWMADDH = 0 -- and the rest of the game leans on that bank byte being
+        ; 0, because dozens of later writers set only the low word
+        ; (`ldx #$9e8b / stx hWMADDL` in LoadArrayItem, item.asm:1256;
+        ; Ot6LoadoutDrawCost; Ot6DrawRageName's blank arm; ...).  This proc
+        ; first used plain `sta $257e,y` stores and so never touched it.  That
+        ; was NOT the bug that took battle_dlgmenu/battle_magicite/visual_f2
+        ; red (see the AUTO arm below for the one that was, and note it did not
+        ; go green until that was fixed) -- the port is kept because a hook
+        ; that replaces vanilla code should inherit vanilla's side effects,
+        ; not just its output.
+        longa
+        lda     #$257e          ; pointer to known rages
+        sta     f:hWMADDL
+        shorta0
+        lda     #$00
+        sta     f:hWMADDH       ; ... bank 0 -- the load-bearing half
+        ; --- AUTO?  all eight bytes zero -> the auto WINDOW, not the wall ---
         ldx     #$0000
 @zero:  lda     f:OT6_RAGELOAD,x
         bne     @manual
         inx
         cpx     #OT6_RAGESLOTS
         bcc     @zero
+        ; AUTO -- the first eight known rages, in ONE pass over the 32-byte
+        ; bitfield, skipping empty bytes whole.
+        ;
+        ; NOT eight calls to Ot6RageNth.  Ot6RageNth walks ids 0..254 from
+        ; scratch every time, so the obvious loop costs ~255 jsl'd bit tests
+        ; PER SLOT -- and for the overwhelmingly common party, the one with no
+        ; rages at all, it still walks the full 255 before returning "nothing".
+        ; That is on the order of twenty thousand cycles added to EVERY
+        ; battle's InitSkills, for every party in the game -- and battle init
+        ; is frame-coupled: the OT6 font re-lay is staged one slice per nmi and
+        ; admission-gated on the live v counter (ot6_hud.asm:644-673).  It took
+        ; battle_dlgmenu ("font region corrupt: 1836 bytes differ at vram
+        ; $B000+001"), battle_magicite and visual_f2 red -- three tests with
+        ; nothing to do with Gau, all green on the pre-change ROM, all green
+        ; again with the single pass below.  The field page can afford
+        ; Ot6RageNth (one call per drawn row, once per keypress); this cannot.
+        ; A = scratch, B = the byte being shifted, X = byte index, Y = ids
+        ; emitted, $01,s = bit position.
+        ldx     #$0000          ; bitfield byte index
+        ldy     #$0000          ; ids emitted so far
+@abyte: lda     f:$7e1d2c,x
+        beq     @anext          ; empty byte: skip its eight ids outright
+        xba                     ; park it in B
+        lda     #$00
+        pha                     ; [$01,s] bit position 0..7
+@abit:  xba                     ; A = the remaining bits
+        lsr                     ; carry = this id's bit
+        xba                     ; park the rest back (xba does not touch carry)
+        bcc     @abitn
+        txa                     ; id = byte index * 8 + bit
+        asl
+        asl
+        asl
+        clc
+        adc     $01,s
+        cmp     #$ff            ; id 255 is unlearnable; vanilla's walk stops
+        beq     @abitn          ;   at $fe, so neither may emit it
+        sta     f:hWMDATA
+        inc     $3a9a
+        iny
+        cpy     #OT6_RAGESLOTS
+        bcs     @adone          ; eight carried: the rest of the album stays
+@abitn: lda     $01,s
+        inc     a
+        sta     $01,s
+        cmp     #$08
+        bcc     @abit
+        pla                     ; drop the bit position
+@anext: inx
+        cpx     #$0020          ; 32 bytes
+        bcc     @abyte
+        bra     @endauto
+@adone: pla                     ; drop the bit position
+@endauto:
+        lda     #$ff
+        sta     f:hWMDATA       ; terminate (belt-and-braces; see the header)
         plp
-        clc                     ; AUTO: the vanilla walk builds the list
+        sec                     ; handled
         rtl
 @manual:
-        stz     $3a9a           ; number of known rages, rebuilt below
-        ldy     #$0000          ; write cursor into $257e (Ot6RageSlot keeps Y)
         lda     #$00
         pha                     ; [$01,s] slot -- NOT X: Ot6RageSlot clobbers it
 @slot:  lda     $01,s
-        jsl     Ot6RageSlot     ; carry set + A = id; preserves Y, kills X
+        jsl     Ot6RageSlot     ; carry set + A = id; kills X
         bcc     @next
-        sta     $257e,y
-        iny
+        sta     f:hWMDATA
         inc     $3a9a
 @next:  lda     $01,s
         inc     a
         sta     $01,s
         cmp     #OT6_RAGESLOTS
         bcc     @slot
-        pla                     ; drop the slot counter
+@term:  pla                     ; drop the slot / window counter
         lda     #$ff
-        sta     $257e,y         ; terminate (belt-and-braces; see the header)
+        sta     f:hWMDATA       ; terminate (belt-and-braces; see the header)
         plp
         sec                     ; handled
         rtl
@@ -2010,6 +2099,25 @@ done:   plp
         rtl
 .endproc
 
+; [ which slot is the cursor on?  the page is two columns of four ]
+;
+; The menu framework's own index for a {cols, rows} cursor is
+; `$4b = $53 * $4e + $4d` (CalcShortListIndex, menu_common.asm:1205-1224) --
+; row-major, so reading order left-to-right, top-to-bottom.  We recompute it
+; here rather than read $4b because $4b is only refreshed by C3's
+; UpdateCursorPos at the TOP of the frame: a cycle in the same frame as a move
+; would otherwise edit the slot the cursor just left.
+; a8/i16.  out: A = slot (0..7).  clobbers nothing else.
+.proc Ot6RageCurSlot
+        .a8
+        .i16
+        lda     $4e                 ; cursor row (0..OT6_RAGEROWS-1)
+        asl                         ; * OT6_RAGECOLS (2)
+        clc
+        adc     $4d                 ; + cursor column (0..1)
+        rtl
+.endproc
+
 ; [ cycle the cursored slot to the prev/next LEARNED rage; go MANUAL ]
 ; The first edit out of AUTO freezes the window first (Ot6RageSeed), then walks
 ; the $1d2c bitfield from the slot's current id to the next/previous set bit,
@@ -2024,7 +2132,7 @@ done:   plp
         jsl     Ot6RageIsAuto
         bcc     :+
         jsl     Ot6RageSeed         ; first edit: freeze the window into bytes
-:       lda     $4e                 ; cursored slot (0..7)
+:       jsl     Ot6RageCurSlot      ; cursored slot (0..7), from column+row
         jsl     Ot6RageShow         ; carry set + A = the id it is showing
         bcs     :+
         lda     #$00                ; blank row: start the walk at id 0
@@ -2047,9 +2155,13 @@ done:   plp
         bne     @hop
         pla                         ; nothing learned at all: leave it alone
         rtl
-@found: lda     $e0
+@found: jsl     Ot6RageCurSlot      ; A = the cursored slot
+        longa
+        and     #$00ff
+        tax                         ; X = slot
+        shorta0
+        lda     $e0
         inc     a                   ; stored byte = id + 1
-        ldx     $4e                 ; X = cursored slot ($4f = 0, set by Open)
         sta     f:OT6_RAGELOAD,x
         pla                         ; drop delta
         rtl
@@ -2063,10 +2175,12 @@ Ot6RagePrev:                        ; L shoulder -> previous learned rage
         jmp     Ot6RageCycleCore
 
 ; [ per-frame input: mutate loadout state; tell C3 what to do next ]
-; The Ot6LoadoutInput contract, at eight rows:
+; The Ot6LoadoutInput contract, over the two-column, four-row page:
 ;   B      -> exit               (return A = 2)
-;   Up/Dn  -> move slot cursor   (return A = 1: redraw)
-;   L/R    -> cycle the slot     (return A = 1)
+;   Up/Dn  -> move the row       (return A = 1: redraw)
+;   Lt/Rt  -> the other column   (return A = 1)   (dpad; only two columns, so
+;             either direction is the same toggle)
+;   L/R    -> cycle the slot     (return A = 1)   (shoulders)
 ;   Y      -> revert to AUTO     (return A = 1)   (NOT Select -- FF6's default
 ;             config aliases physical Select onto the R bit, so it cannot be
 ;             told apart from the R-shoulder cycle)
@@ -2083,20 +2197,28 @@ Ot6RagePrev:                        ; L shoulder -> previous learned rage
         beq     @dn
         lda     $4e
         bne     :+
-        lda     #OT6_RAGESLOTS      ; wrap 0 -> 7 (pre-decrement)
+        lda     #OT6_RAGEROWS       ; wrap 0 -> last row (pre-decrement)
 :       dec     a
         sta     $4e
         lda     #$01
         rtl
 @dn:    lda     $09
         bit     #$04                ; Down
-        beq     @sel
+        beq     @side
         lda     $4e
         inc     a
-        cmp     #OT6_RAGESLOTS
+        cmp     #OT6_RAGEROWS
         bcc     :+
-        lda     #$00                ; wrap 7 -> 0
+        lda     #$00                ; wrap last -> 0
 :       sta     $4e
+        lda     #$01
+        rtl
+@side:  lda     $09
+        bit     #$03                ; dpad Left/Right -> the other column
+        beq     @sel
+        lda     $4d
+        eor     #$01                ; exactly two columns: either way toggles
+        sta     $4d
         lda     #$01
         rtl
 @sel:   lda     $09
@@ -2186,8 +2308,20 @@ Ot6RagePrev:                        ; L shoulder -> previous learned rage
 ; bit set and leaves the latch alone; latching there would read the already-
 ; consumed pending byte and silently drop the trance to tier 0.
 ;
-; entry: jsl from Cmd_10 (battle_main.asm), a8/i8, Y = attacker entity, db=$7e.
-; clobbers A.
+; TWO CALL SITES, and the second one is why the ladder works on the start turn:
+;   * FixPlayerAttack's cmd-$10 arm (battle_main.asm @4dec) -- where vanilla
+;     rolls the START turn's attack, at action LOAD, before Cmd_10 exists.
+;     Measured: without this site, roll 1 of a 1-BP trance saw tier 0 and rolls
+;     2..5 saw tier 1 -- the turn the BP was spent on was the one turn it did
+;     not buy (battle_rage.lua's tier arms assert the fix).
+;   * Cmd_10 itself -- for the auto-queued possessed turns, and as the
+;     belt-and-braces latch if the load path is ever reached differently.
+; Both are idempotent on the start turn: the pending byte is not consumed until
+; Ot6ActionEnd, so the second latch stores the same value the first did.
+;
+; entry: jsl from either site, a8, Y = attacker entity, db=$7e.  Index width is
+; not assumed -- Y only ever indexes two absolute tables with an entity index.
+; clobbers A's low half only (a8), preserving B for FixPlayerAttack's xba.
 .proc Ot6RageTierLatch
         .a8
         lda     $3ef9,y         ; status 4
