@@ -99,7 +99,7 @@ local WIN = {
   [7] = { 5, 6, 7 },                  -- N=8: his top three; row 2 = Oblivion
 }
 -- a few authored prices (kits.md / Ot6AbilityCostTbl), keyed by attack id.
-local COST = { [0x55] = 4, [0x58] = 16, [0x5c] = 46 }
+local COST = { [0x55] = 4, [0x58] = 16, [0x5c] = 99 }   -- $5c: the #57 anchor
 
 local actor
 local ceiling = 4
@@ -146,8 +146,10 @@ local function pinCyan()
     H.writeByte(0x3BA4 + s * 2, H.readByte(0x3BA4 + s * 2) | 0x02)
     H.writeByte(0x3BA5 + s * 2, H.readByte(0x3BA5 + s * 2) | 0x02)
     H.writeWord(0x3BF4 + s * 2, 999)                  -- nobody dies mid-bench
-    H.writeWord(0x3C08 + s * 2, 99)                   -- MP high: costs never fizzle
-    H.writeWord(0x3C30 + s * 2, 99)
+    H.writeWord(0x3C08 + s * 2, 999)                  -- MP high: costs never fizzle
+    H.writeWord(0x3C30 + s * 2, 999)                  --   (99 is the dearest row
+                                                      --   there can ever be, #57;
+                                                      --   sit clear of the edge)
   end
   if actor and pinBp then H.writeByte(0x3E9C + actor * 2, bpbank) end
 end

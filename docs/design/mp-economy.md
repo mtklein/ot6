@@ -36,7 +36,7 @@ not a derivation — so a pass that improves the shape and gets played is
 worth more than one that waits to be correct. Successive rescales are
 expected and are not churn.
 
-## The ceiling: 99 (proposed 2026-07-29, issue #57)
+## The ceiling: 99 (SHIPPED 2026-07-29, issue #57)
 
 The owner's shape for the top of every ladder: **each character's own
 ultimate costs 99 MP.** It agrees with the ruler below — 99 against a
@@ -44,9 +44,29 @@ L70 pool of ~760 is 13%, inside the 8-20% band — so it anchors the table
 rather than recalibrating it, and it makes ladders comparable across
 characters, which they are not today.
 
-It is also the **hard display ceiling**: the loadout pages render two
-digits (#56), so 99 is the largest cost that can be shown at all. Treat
-that as a constraint, not a coincidence — no cost anywhere may exceed it.
+It is also the **hard display ceiling**, and that is now measured rather
+than asserted. Every OT6 price drawer renders exactly two digits:
+`ListText` command `$02` (`btlgfx_main.asm:15045-15073`) divides by ten
+exactly *once* and emits a tens cell and a ones cell, and
+`Ot6LoadoutDrawCost` (`field_menu.asm:3053`) has one tens loop. A cost of
+100 does not print as a big number; it prints as punctuation. So 99 is
+the largest cost that can be shown at all, and no cost anywhere may
+exceed it. `battle_costtable.lua` now asserts that bound on every row of
+the live table, not just the rows it pins by name.
+
+**Vanilla already agrees.** Measured off `magic_prop_en.dat` +$05: the
+dearest *spell* in the game is **Quick at exactly 99**, then Merton 85
+and Ultima 80. So the anchor is not an imported number — it is the
+ceiling FF6's own spell table already sits under, which is why a 99 kit
+ultimate reads as "the top" instead of as an outlier.
+
+The single value above 99 anywhere in that table is **Phoenix at 110**,
+an esper. It is untouched and needs no exemption argument: summons draw
+their price through `ListText` command `$16`
+(`btlgfx_main.asm:15000-15043`), which is the **three**-digit routine —
+hundreds, tens, ones — wired into `SummonMagicListText` and fed from
+`$2091` (`btlgfx_main.asm:11368`). Vanilla's summon window has always
+been able to render it; none of OT6's two-digit drawers ever sees it.
 
 **And it is the right number for reasons that are not arithmetic.** The
 owner: *"seeing things like 99, 999, and 9999 in Final Fantasy games
@@ -68,14 +88,38 @@ the top verb is flat or free — Slot, Rage, Dance — the character simply
 does not participate, and that is a stated non-answer rather than a gap
 to fill with an invented capstone.
 
-Locke is the case worth naming: Steal is flat *for now*, but his kit
-(`kits.md`) already designs **Master's Mark** — steal from all enemies
-and reveal everything — which is exactly a 99's shape: it fires once and
-ends the probing phase outright. That is his anchor when #55 builds the
-kit, which also means repricing Steal is not wasted work: Steal is a
-rung, not the ceiling.
+**Who actually qualifies, established from the ladders rather than
+assumed:**
 
-Open: whether Magic participates. See #57.
+| kit | top row | 99? | why |
+|---|---|---|---|
+| Blitz | **Bum Rush** `$64` | **yes** | divine, L70, the ladder's stated top |
+| SwdTech | **Cleave** `$5c` | **yes** | divine, the window's conditional top rung |
+| Tools | **Overclock** | **no — not yet** | Edgar's divine, and it is *not built*. It has no tool item id and therefore no row in `Ot6AbilityCostTbl`; kits.md prices it as the **sum** of the two tools it fires (max 34). |
+| Steal / Slot / Rage / Dance | — | **no** | flat verbs, no ladder |
+
+**Air Anchor is not the Tools capstone**, and #57's issue text was wrong
+to name it. kits.md:137 is explicit: "Air Anchor stays a findable *item*
+mid-kit gag, not the capstone." So Tools has no top row to anchor today,
+and when Overclock is built the Σ rule and the 99 anchor collide —
+**that decision belongs to the issue that builds Overclock**, because
+either answer prices an ability that currently has no code.
+
+Locke is the other case worth naming: Steal is flat *for now*, but his
+kit (`kits.md:404`) already designs **Master's Mark** — steal from all
+enemies and reveal everything — which is exactly a 99's shape: it fires
+once and ends the probing phase outright. That is his anchor when #55
+builds the kit, which also means repricing Steal is not wasted work:
+Steal is a rung, not the ceiling.
+
+**Does Magic participate? No — and measurement says it should not.** The
+comparison #57 asked for, run against `magic_prop_en.dat` +$05: Ultima
+80, Merton 85, W Wind 75, Meteor 62; the dearest spell of any kind is
+Quick at 99. Ultima at 80 sits *below* a 99 kit ultimate rather than
+oddly beside it, which is the right order — Ultima is a spell any
+character with the esper can learn, Bum Rush is one character's once-per-
+kit divine. Nothing needs changing, and the vanilla-MP-costs house rule
+stands with its one named exception (Osmose, below).
 
 ## Principles
 
@@ -202,8 +246,8 @@ Vanilla-free player verbs, with proposed cost shapes:
 | Steal (Locke #1) | flat small | 2 | the probe-collect verb prices like the cheapest spell |
 | New kit skills (Locke #2–7, Analyze, …) | scaled by tier | 3–20 | born costed via M4 kit tables — never free in vanilla; Analyze stays cheap (2–3) because scouting fuels the loop |
 | Tools (Edgar) | scaled by tier | 3–20 | reusable capital bought with gil; MP is the operating cost — AutoCrossbow 3–4, Drill/Chain Saw 12–20, Debilitator 8–12, Overclock costs the sum of the two tools it fires |
-| Blitz (Sabin) | scaled by tier | 4–46 | **rescaled by #45** (was 2–30): the ladder must fit the game's smallest pool (base 3 MP), but the floor was under the vanilla ruler — Pummel 4, mid-kit 10–22, Bum Rush 46 at the top |
-| SwdTech (Cyan) | BP tier + MP at Blitz parity | 4–46 | **rescaled by #45** (was 1–8, "discounted"): he still pays both currencies (ruling 2026-07-17, below), but the ~⅓ discount is retired — see the amendment box under "Cyan pays in both" |
+| Blitz (Sabin) | scaled by tier | 4–99 | **rescaled by #45, tail re-derived by #57** (v0.4 was 2–30): Pummel 4, mid-kit 10–17, then 28/50 into **Bum Rush 99, the anchor** |
+| SwdTech (Cyan) | BP tier + MP at Blitz parity | 4–99 | **rescaled by #45, tail re-derived by #57** (v0.4 was 1–8, "discounted"): he still pays both currencies (ruling 2026-07-17, below), the ~⅓ discount is retired, and **Cleave anchors at 99** |
 | Dance (Mog) | flat, paid at start | 4–10 | one payment starts a whole-battle state — vanilla's can't-stop-dancing lock is preserved, so the price is per battle, not per step |
 | ~~Capture (Gau)~~ | ~~flat small~~ | ~~2~~ | superseded — the Capture/controllable-stable model was replaced by kit-gau.md's Ochette model, so this row never shipped. The two Gau verbs that did are below |
 | Rage (Gau) | flat, paid at start | 8 | one payment starts a whole-battle possession, every possessed turn after it free — the same rule Dance takes, and `Ot6RageCost` tail-calls `Ot6DanceCost` so the two can never drift (#40) |
@@ -327,27 +371,64 @@ columns actually were and what #45 makes them. Rows 1–2 are
 priced at L10, the earliest either character is in the party at
 all (measured: `gau_joined` has Cyan and Sabin both at LV11):
 
-| Blitz | learned | pool | was | was % | now | now % |
-|---|---|---|---|---|---|---|
-| Pummel | L1 | 56 | 2 | 3.6% | **4** | 7.1% |
-| AuraBolt | L6 | 56 | 5 | 8.9% | **10** | 17.9% |
-| Suplex | L10 | 56 | 7 | 12.5% | **13** | 23.2% |
-| Fire Dance | L15 | 104 | 9 | 8.7% | **17** | 16.3% |
-| Mantra | L23 | 191 | 8 | 4.2% | **16** | 8.4% |
-| Air Blade | L30 | 278 | 12 | 4.3% | **22** | 7.9% |
-| Spiraler | L42 | 449 | 18 | 4.0% | **30** | 6.7% |
-| Bum Rush | L70 | 760 | 30 | 3.9% | **46** | 6.1% |
+**Regenerated for the 99 anchor (#57, 2026-07-29).** `v0.4` is what
+shipped before #45; `#45` is what that pass landed; `now` is the shipped
+column with the anchor in it. Every figure is recomputed by
+`battle_costtable.lua` from the ROM's own tables on each `make test` —
+the table below is transcribed from that run's log, not derived by hand.
 
-| SwdTech | learned | pool | was | was % | now | now % |
-|---|---|---|---|---|---|---|
-| Dispatch | L1 | 58 | 1 | 1.7% | **4** | 6.9% |
-| Retort | L6 | 58 | 2 | 3.4% | **10** | 17.2% |
-| Slash | L12 | 76 | 3 | 3.9% | **13** | 17.1% |
-| Quadra Slam | L15 | 106 | 4 | 3.8% | **16** | 15.1% |
-| Empowerer | L24 | 205 | 5 | 2.4% | **18** | 8.8% |
-| Stunner | L34 | 334 | 6 | 1.8% | **22** | 6.6% |
-| Quadra Slice | L44 | 483 | 7 | 1.4% | **30** | 6.2% |
-| Cleave | L70 | 762 | 8 | 1.0% | **46** | 6.0% |
+| Blitz | learned | pool | v0.4 | #45 | #45 % | **now** | **now %** | uses |
+|---|---|---|---|---|---|---|---|---|
+| Pummel | L1 | 56 | 2 | 4 | 7.1% | **4** | **7.1%** | 14 |
+| AuraBolt | L6 | 56 | 5 | 10 | 17.9% | **10** | **17.9%** | 5 |
+| Suplex | L10 | 56 | 7 | 13 | 23.2% | **13** | **23.2%** | 4 |
+| Fire Dance | L15 | 104 | 9 | 17 | 16.3% | **17** | **16.3%** | 6 |
+| Mantra | L23 | 191 | 8 | 16 | 8.4% | **16** | **8.4%** | 11 |
+| Air Blade | L30 | 278 | 12 | 22 | 7.9% | **28** | **10.1%** | 9 |
+| Spiraler | L42 | 449 | 18 | 30 | 6.7% | **50** | **11.1%** | 8 |
+| Bum Rush | L70 | 760 | 30 | 46 | 6.1% | **99** | **13.0%** | 7 |
+
+| SwdTech | learned | pool | v0.4 | #45 | #45 % | **now** | **now %** | uses |
+|---|---|---|---|---|---|---|---|---|
+| Dispatch | L1 | 58 | 1 | 4 | 6.9% | **4** | **6.9%** | 14 |
+| Retort | L6 | 58 | 2 | 10 | 17.2% | **10** | **17.2%** | 5 |
+| Slash | L12 | 76 | 3 | 13 | 17.1% | **13** | **17.1%** | 5 |
+| Quadra Slam | L15 | 106 | 4 | 16 | 15.1% | **16** | **15.1%** | 6 |
+| Empowerer | L24 | 205 | 5 | 18 | 8.8% | **18** | **8.8%** | 11 |
+| Stunner | L34 | 334 | 6 | 22 | 6.6% | **28** | **8.4%** | 11 |
+| Quadra Slice | L44 | 483 | 7 | 30 | 6.2% | **50** | **10.4%** | 9 |
+| Cleave | L70 | 762 | 8 | 46 | 6.0% | **99** | **13.0%** | 7 |
+
+**How the tail was re-derived — not by scaling.** Multiplying the whole
+column by 99/46 (2.15×) would put Suplex at 28 MP, *half* a LV10 pool,
+and shove rows 2–4 clean off the top of the ruler. The column was not
+uniformly wrong: rows 1–5 already measured inside the band at the level
+they arrive, and only the tail was under it. So only rows 6–8 move.
+
+Why the tail was under it is worth recording, because it is the same
+mistake twice. #45 lifted the floor 2× and the ceiling only 1.5×, hedging
+against an owner worry that "Bum Rush 30 → 120" would outrun WoB pools —
+a worry #45's *own measurement* then disproved (Bum Rush is L70-gated and
+Sabin's L70 pool is 760). **The hedge outlived the premise that justified
+it**, exactly as the SwdTech ⅓ discount had outlived #38's ladder
+rewrite. The anchor is the correction: the tail is re-derived upward so
+%-of-pool *climbs into* the anchor's 13.0% (8.4 → 10.1 → 11.1 → 13.0 for
+Blitz) instead of falling away from it (7.9 → 6.7 → 6.1).
+
+Two deliberate non-uniformities survive untouched, both of them #45's:
+
+- **Mantra stays at 16, under Fire Dance's 17.** It is a utility
+  off-ramp, not a damage rung, and Blitz is a free-choice menu where all
+  learned rows are visible at once — a heal that costs more than the
+  fire-all rung reads as a bug. At 8.4% of the L23 pool it is still on
+  the ruler; the dip is in the *shape*, not off the scale. Empowerer
+  keeps its +2 over Mantra for SwdTech's monotonicity rule.
+- **The signature rows stay at 4** (7.1% / 6.9%), just under the 8%
+  vanilla floor, and **Suplex stays at 23.2%**, just over the 20% top.
+  Those are the two ends #45 argued for explicitly — the "cheapest row"
+  floor and the thinnest row in the table — and both sit inside the 4–25%
+  bracket `battle_costtable.lua` enforces. Reopening them would be
+  re-litigating #45, not implementing #57.
 
 Three things fall out of the measurement that were not visible
 from the numbers alone:

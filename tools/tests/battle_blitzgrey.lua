@@ -23,12 +23,13 @@
 -- twist here: current MP ($3C08) is pinned LOW so the learned kit straddles the
 -- affordability line.
 --
--- Learned kit (LEARNED $E5) and its Ot6AbilityCostTbl prices:
---   Pummel   $5d  2      Air Blade $62 12
---   Suplex   $5f  7      Spiraler  $63 18
---                        Bum Rush  $64 30
--- With MP pinned to 8, Pummel(2) and Suplex(7) are affordable (white); Air
--- Blade(12), Spiraler(18) and Bum Rush(30) are not (grey) -- a mix of both on
+-- Learned kit (LEARNED $E5) and its Ot6AbilityCostTbl prices (#45 rescale, #57
+-- anchor -- this block was stale at 2/7/12/18/30 until #57 swept it):
+--   Pummel   $5d  4      Air Blade $62 28
+--   Suplex   $5f 13      Spiraler  $63 50
+--                        Bum Rush  $64 99
+-- With MP pinned to 16, Pummel(4) and Suplex(13) are affordable (white); Air
+-- Blade(28), Spiraler(50) and Bum Rush(99) are not (grey) -- a mix of both on
 -- one screen.
 --
 -- What is asserted (attribute byte = the odd/high byte of each name tile's
@@ -65,7 +66,7 @@ end
 local NM = {
   Pummel   = glyphs("Pummel"),         -- $5d  cost 4  -> affordable
   Suplex   = glyphs("Suplex"),         -- $5f  cost 13 -> affordable
-  Spiraler = glyphs("Spiraler"),       -- $63  cost 30 -> unaffordable
+  Spiraler = glyphs("Spiraler"),       -- $63  cost 50 -> unaffordable
 }
 
 local mp = 16                           -- pinned current MP (mutated for pass 2)
@@ -141,7 +142,7 @@ H.run({ maxFrames = 40000 }, {
       aSp and string.format("$%02x", aSp) or "nil", WHITE, GREY))
     H.assertEq(aP, WHITE, "Pummel (cost 4, MP 16) renders white -- affordable")
     H.assertEq(aS, WHITE, "Suplex (cost 13, MP 16) renders white -- affordable")
-    H.assertEq(aSp, GREY, "Spiraler (cost 30, MP 16) renders grey -- unaffordable")
+    H.assertEq(aSp, GREY, "Spiraler (cost 50, MP 16) renders grey -- unaffordable")
     H.assertEq(aSp - aP, 0x04,
       "grey - white == $04, magic's own disabled-bit delta")
   end),
@@ -161,7 +162,7 @@ H.run({ maxFrames = 40000 }, {
     local aSp = attrOf(NM.Spiraler)
     H.log(string.format("MP now %d -> Spiraler attr = %s", mp,
       aSp and string.format("$%02x", aSp) or "nil"))
-    H.assertEq(aSp, WHITE, "Spiraler (cost 30, MP 99) is white now -- grey tracks MP")
+    H.assertEq(aSp, WHITE, "Spiraler (cost 50, MP 99) is white now -- grey tracks MP")
     H.log("PASSED: Blitz greys the unaffordable rows and only the unaffordable rows")
   end),
 })

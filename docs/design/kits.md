@@ -164,13 +164,18 @@ while still marked "vanilla preserved ✦".
 | 3 | Suplex | 13 | bludgeoning | 10 |
 | 4 | Fire Dance | 17 | fire | 15 |
 | 5 | Mantra | 16 | — (heal) | 23 |
-| 6 | Air Blade | 22 | wind | 30 |
-| 7 | Spiraler | 30 | — | 42 |
-| 8 | **Bum Rush** (divine) | 46 | bludgeoning ×8 | 70 / Duncan |
+| 6 | Air Blade | 28 | wind | 30 |
+| 7 | Spiraler | 50 | — | 42 |
+| 8 | **Bum Rush** (divine) | **99** | bludgeoning ×8 | 70 / Duncan |
 
 The MP column lives in `Ot6AbilityCostTbl` keyed by attack id $5d–$64,
-charged under `OT6_MP_COSTS`. **Rescaled by issue #45 (2026-07-29)** from
-2/5/7/9/8/12/18/30: measured against Sabin's real pool at the level each row is
+charged under `OT6_MP_COSTS`. **Tail re-derived by issue #57 (2026-07-29):**
+Bum Rush is Sabin's genuine ultimate and anchors at **99** — 13.0% of his L70
+pool of 760, the same fraction Cleave is of Cyan's, which is the point of
+anchoring both — and Air Blade/Spiraler were lifted with it (22→28, 30→50) so
+%-of-pool climbs into the anchor instead of falling away from it. Rows 1–5 did
+not move: they already measured inside the ruler. **Rescaled by issue #45
+(2026-07-29)** from 2/5/7/9/8/12/18/30: measured against Sabin's real pool at the level each row is
 reachable, the old ladder ran 3.6–12.5% where a vanilla spell costs 8–21% of
 the pool it is first cast from, so the ladder sat *under* the ruler
 mp-economy.md says it shares. The lift is ~2× at the floor tapering to ~1.5× at
@@ -202,9 +207,9 @@ that a comment already buys (issue #50).
 | 3 | Slash | 1 | 13 | slashing | 12 |
 | 4 | Quadra Slam | 2 | 16 | slashing ×4 | 15 |
 | 5 | Empowerer | 2 | 18 | — (drain) | 24 |
-| 6 | Stunner | 3 | 22 | slashing, all enemies | 34 |
-| 7 | Quadra Slice | 3 | 30 | wind ×4 | 44 |
-| 8 | **Cleave** (divine) | 3, target must be Broken | 46 | — | Phantom Train farewell (story) |
+| 6 | Stunner | 3 | 28 | slashing, all enemies | 34 |
+| 7 | Quadra Slice | 3 | 50 | wind ×4 | 44 |
+| 8 | **Cleave** (divine) | 3, target must be Broken | **99** | — | Phantom Train farewell (story) |
 
 **The MP column, rescaled (issue #45, 2026-07-29; was 1–8, proposed v0.4).**
 The old column rode **~⅓ of a comparable Blitz/Tool** — Quadra Slam's slashing
@@ -234,9 +239,14 @@ dearer than the 3× row would read as a bug.
 Dispatch is still the cheapest row of any kit (the "free-to-learn is not
 free-to-use" floor), now at 4 MP rather than 1 — 6.9% of the pool Cyan actually
 joins with, against the 8–21% a vanilla spell costs at the level it is learned.
-Cleave tops the ladder at 46 — the window's divine top rung once Cyan has
-learned all eight (the moving window, below), and comfortably payable: it is
-L70-gated and his L70 pool is 762. Per-row measurement, and the ruler, in
+Cleave tops the ladder at **99 — the anchor (issue #57)**: each character with
+a genuine ultimate pays 99 for it, which is 13.0% of the L70 pool Cleave is
+gated behind (762), inside the ruler and comfortably payable at 7 casts from
+full. 99 is also the largest number any OT6 price cell can render, so it is the
+literal top of the table and not merely its current maximum. Rows 6–7 were
+re-derived up with it (22→28, 30→50) so the ladder climbs *into* the anchor
+rather than falling away from it; rows 1–5 were already on the ruler and did
+not move. Per-row measurement, and the ruler, in
 mp-economy.md's "The ruler, finally measured"; gated by
 `tools/tests/battle_costtable.lua`.
 

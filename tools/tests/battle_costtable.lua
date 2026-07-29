@@ -53,15 +53,21 @@ local MIN_USES = 4              -- payability floor, uses from a full pool
 local BLITZ = {
   { 0x5d,  4, "Pummel" },      { 0x5e, 10, "AuraBolt" },
   { 0x5f, 13, "Suplex" },      { 0x60, 17, "Fire Dance" },
-  { 0x61, 16, "Mantra" },      { 0x62, 22, "Air Blade" },
-  { 0x63, 30, "Spiraler" },    { 0x64, 46, "Bum Rush" },
+  { 0x61, 16, "Mantra" },      { 0x62, 28, "Air Blade" },
+  { 0x63, 50, "Spiraler" },    { 0x64, 99, "Bum Rush" },
 }
 local SWDTECH = {
   { 0x55,  4, "Dispatch" },    { 0x56, 10, "Retort" },
   { 0x57, 13, "Slash" },       { 0x58, 16, "Quadra Slam" },
-  { 0x59, 18, "Empowerer" },   { 0x5a, 22, "Stunner" },
-  { 0x5b, 30, "Quadra Slice" },{ 0x5c, 46, "Cleave" },
+  { 0x59, 18, "Empowerer" },   { 0x5a, 28, "Stunner" },
+  { 0x5b, 50, "Quadra Slice" },{ 0x5c, 99, "Cleave" },
 }
+
+-- #57: the designated ultimates, by table key.  Bum Rush and Cleave only --
+-- see the header for why Tools (Overclock, unbuilt, priced as a sum) and the
+-- flat verbs (Steal/Slot/Rage/Dance) do not participate.
+local ANCHOR = 99
+local ULTIMATE = { [0x64] = "Bum Rush", [0x5c] = "Cleave" }
 local TOOLS = {                 -- unchanged by #45; pinned so that stays true
   { 0xaa,  4, "AutoCrossbow" }, { 0xa3,  6, "NoiseBlaster" },
   { 0xa4,  8, "Bio Blaster" },  { 0xa5,  6, "Flash" },
@@ -106,6 +112,46 @@ H.run({ maxFrames = 20000 }, {
     end
     H.assertEq(H.readRomByte(base + #want * 2), 0xff,
       "the column is $ff-terminated right after the last Tools row")
+  end),
+
+  --------------------------------------------- 2b. the 99 anchor (#57) -----
+  H.call(function()
+    local base = romOfs(H.sym("Ot6AbilityCostTbl"))
+    -- Walk the LIVE table rather than the pinned literals above: the ceiling
+    -- has to hold for whatever is actually in the ROM, including any row a
+    -- future pass adds that the pin block does not yet know about.
+    local seen, rows = {}, 0
+    for i = 0, 63 do
+      local key = H.readRomByte(base + i * 2)
+      if key == 0xff then break end
+      local cost = H.readRomByte(base + i * 2 + 1)
+      rows, seen[key] = rows + 1, cost
+      assert(cost <= ANCHOR, string.format(
+        "row %d (key $%02x) costs %d -- above the %d ceiling. That is a "
+        .. "DISPLAY break, not a taste question: every OT6 price drawer "
+        .. "renders two digits (ListText cmd $02, btlgfx_main.asm:15045; "
+        .. "Ot6LoadoutDrawCost, field_menu.asm:3053), so this prints as "
+        .. "punctuation on the menu, not as a big number", i + 1, key, cost,
+        ANCHOR))
+    end
+    H.assertEq(rows, 24, "the live table still has 24 rows")
+    for key, name in pairs(ULTIMATE) do
+      H.assertEq(seen[key], ANCHOR, string.format(
+        "%s ($%02x) is a designated ultimate and must cost exactly %d (#57)",
+        name, key, ANCHOR))
+    end
+    -- The anchor is the TOP: no non-ultimate row may tie it, or "99 means
+    -- ultimate" stops being readable off the menu.
+    for key, cost in pairs(seen) do
+      if not ULTIMATE[key] then
+        assert(cost < ANCHOR, string.format(
+          "row $%02x costs %d, tying the anchor -- 99 is meant to say "
+          .. "'this is the ultimate', which it cannot if a mid-kit row "
+          .. "wears it too", key, cost))
+      end
+    end
+    H.log(string.format("anchor: Bum Rush and Cleave at %d; %d rows all <= %d",
+      ANCHOR, rows, ANCHOR))
   end),
 
   ------------------------------------------- 2/3. the ruler + payability ---
