@@ -7,6 +7,35 @@ the pool keeps its vanilla name MP — the name existing players
 already know — enemy break counters are "shields", and SP is
 not used.
 
+## The target, stated by the owner (2026-07-29)
+
+The economy exists to buy back a choice vanilla never offered.
+
+> *"In that game there really wasn't ever any reason for Cyan or Sabin to
+> just attack instead of using one of their abilities."*
+
+That is the honest diagnosis of FF6: for the ability characters, the
+ability strictly dominates Fight, so the "choice" each turn is not one.
+Octopath's answer is resources — you bank by *not* spending, and a plain
+attack is what banking looks like. So the target for every number in this
+document is:
+
+**Fight must sometimes be the right move, without Cyan and Sabin ceasing
+to feel like ability characters.**
+
+Both halves bind. An economy so tight that Bushido is rationed makes Cyan
+a worse Locke; one so loose that Fight is never correct leaves vanilla's
+non-choice intact with extra bookkeeping. The v0.7 playtest found the
+loose failure: at LV14 Cyan's available techs cost 1-3 MP against a 96
+pool while BP was not scarce either, so neither currency bound him and
+Fight had no case.
+
+**And the owner's standing expectation: this will take a while.** Getting
+a number that is Octopath-right and FF6-right at once is a playtest loop,
+not a derivation — so a pass that improves the shape and gets played is
+worth more than one that waits to be correct. Successive rescales are
+expected and are not churn.
+
 ## Principles
 
 - **FF6's MP pool does Octopath's job.** Every character
