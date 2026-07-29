@@ -1872,13 +1872,290 @@ _c3559a:
 
 DrawBlitzMenu:
 @55d4:  jsr     ClearBG1ScreenA
+.if LANG_EN
+        jsr     Ot6BlitzPageDraw        ; issue #46: names, break class, MP price
+.else
         jsr     DrawBlitzList
+.endif
         lda     #$2c
         sta     zTextColor
         ldy     #near SkillsBlitzTitleText
         jsr     DrawPosKana
         jsr     CreateSubPortraitTask
         jmp     InitDMA1BG3ScreenB
+
+; ==============================================================================
+; THE FIELD BLITZ PAGE (issue #46) -- what a Blitz IS, not how to input one
+;
+; v0.4 retired Blitz's button combos: the command opens a MENU now
+; (Ot6BlitzListOpen, ot6_kits.asm, replacing _c1776b's 64-frame pad-edge buffer
+; and UpdateMenuState_3d's button matcher).  This page went on drawing the
+; combos anyway -- eight ten-tile strings of arrow and shoulder glyphs
+; (DrawBlitzInput / GetBlitzInputTiles / BlitzInputTileTbl below, all still
+; assembled for the JP build, which keeps vanilla Blitz).  It was instructions
+; for a system the player cannot use, the same class of surface as #27's dead
+; 0%-learn columns and #39's garbled configurator.
+;
+; It shows the three facts a player actually chooses on now, the same three the
+; BATTLE Blitz submenu already shows (Ot6BlitzRowDecorate: name + MP cost, greyed
+; when unaffordable):
+;
+;   col  3..12   the Blitz's name, from AttackName -- the very table the battle
+;                list renders from (ListTextCmd_0f), so the two cannot drift
+;   col  14      its BREAK CLASS glyph, or blank.  Ot6SkillClassGlyph (F0) reads
+;                the same Ot6SkillClassTbl the chip itself consults, so the page
+;                cannot promise a class the hit does not land.  Five of the eight
+;                Blitzes have no class at all and draw nothing there -- they
+;                probe by element.
+;   col  16..20  "nn MP", from Ot6LoadoutCost -> Ot6CostFor, the same leaf the
+;                charge and the battle row read (blank under nomp, which prices
+;                nothing)
+;
+; THE GEOMETRY (#43's rules, which this window taught us three times over).  The
+; EN field-menu window shows a tilemap row PAIR in twelve scanlines -- the odd
+; row getting eight and the even row four -- and nothing past row 15 is inside it
+; at all (measured with a per-row glyph ruler, tools/tests/probe_ragegeom.lua;
+; vanilla says it from the other side, every EN cursor list here being
+; `cursor_pos {x, 116 + n*12}`).  So: eight usable text rows, and eight Blitzes,
+; one per row, on 1/3/5/7/9/11/13/15.
+;
+; Vanilla drew four rows of two because a combo string is ten tiles wide and two
+; of them fit; a name plus a class glyph plus a price does not fit twice across.
+; One column per row buys the width -- and it also gives every row a full-height
+; cell instead of the half-height even rows a 2x4 grid on 1/5/9/13 leaves unused.
+;
+; THE CURSOR GUTTER (#43 round 3).  `cursor_pos {x,y}` is the TOP-LEFT of a
+; 16x16 sprite, so a cursor at x=8 owns tilemap columns 1 AND 2 and the row it
+; points at must begin at column 3 -- cursor_x = 8*col - 16, vanilla's rule
+; everywhere in this window (magic cols 3/16 under 8/112, skills.asm:831,:836 vs
+; :125-126; espers 3/17 under 8/120; rage 5/19 under 24/136).  Vanilla's own
+; blitz page drew at column 4 under a cursor at x=8, i.e. one column of dead
+; space; the names start at 3 now, flush against the sprite the way every other
+; list in this window is.  Ot6BlitzCursorPos below is the pairing's other half
+; and menu_blitzpage.lua's canary asserts the two together.
+;
+; WHAT AN UNLEARNED BLITZ SAYS.  Vanilla blanked the row ($ff pads).  Blank rows
+; on a page that has some filled ones read as a rendering fault -- that is the
+; owner's own report on the Rage page's unset slots (#44) -- so an unlearned rung
+; spells "- LOCKED -" in the page's chrome colour, ten cells wide, with its class
+; and price fields blanked.  It is NOT "- EMPTY -": a Rage slot with nothing in
+; it contributes nothing to the battle list, whereas this rung exists and is
+; simply not reached yet, and one word must not carry both facts.
+;
+; The learned set still comes from GetBlitzList, which stages the blitz index (or
+; $ff) per row at $7e9d89 -- unchanged, because LoadBigText reads that same array
+; at $4b to pick the row's description (skills.asm LoadBigText:2118-2120).  With
+; one column $4b IS the blitz index, so the descriptions keep working.
+.if LANG_EN
+
+OT6_BLITZ_ATK0   = $5d                  ; Pummel; Bum Rush is $64
+OT6_ATTACKNAME_0 = $51                  ; AttackName record 0 is attack id $51
+OT6_BLITZ_NAME_COL  = 3
+OT6_BLITZ_CLASS_COL = 14
+OT6_BLITZ_COST_COL  = 16
+
+; ---- draw the eight rows ----
+Ot6BlitzPageDraw:
+        jsr     GetBlitzList            ; $7e9d89[i] = i (learned) or $ff
+        ldx     #$0000
+@lp:    stx     $e2                     ; blitz index 0..7 (word: $e2/$e3)
+        lda     $e2
+        asl
+        clc
+        adc     #$01                    ; row = 1 + i*2 -- ODD rows 1..15 (#43)
+        sta     $e6
+        ldx     $e2
+        lda     $7e9d89,x               ; the learned-set row GetBlitzList staged
+        cmp     #$ff
+        beq     @locked
+        ; ---- learned: name, break class, price ----
+        lda     #BG1_TEXT_COLOR::DEFAULT
+        sta     zTextColor
+        lda     $e2
+        clc
+        adc     #OT6_BLITZ_ATK0 - OT6_ATTACKNAME_0
+        sta     $e5                     ; AttackName record index
+        ldx     #OT6_BLITZ_NAME_COL
+        jsr     Ot6BlitzDrawName
+        lda     $e2
+        clc
+        adc     #OT6_BLITZ_ATK0         ; attack id
+        jsl     Ot6SkillClassGlyph      ; F0: A = class glyph, or $ff for none
+        ldx     #OT6_BLITZ_CLASS_COL
+        jsr     Ot6BlitzDrawIcon
+        lda     $e2
+        clc
+        adc     #OT6_BLITZ_ATK0
+        jsl     Ot6LoadoutCost          ; F0: A = MP cost (0 under nomp)
+        ldx     #OT6_BLITZ_COST_COL
+        jsr     Ot6BlitzDrawCost
+        bra     @next
+        ; ---- not learned yet: say so, and blank the two data fields ----
+@locked:
+        lda     #BG1_TEXT_COLOR::BLUE   ; chrome, so it cannot read as a Blitz
+        sta     zTextColor
+        ldx     #OT6_BLITZ_NAME_COL
+        jsr     Ot6BlitzDrawLocked
+        lda     #$ff
+        ldx     #OT6_BLITZ_CLASS_COL
+        jsr     Ot6BlitzDrawIcon        ; $ff = the blank tile, still drawn
+        lda     #$00
+        ldx     #OT6_BLITZ_COST_COL
+        jsr     Ot6BlitzDrawCost        ; cost 0 -> five blanks
+@next:  ldx     $e2
+        inx
+        cpx     #$0008
+        bcc     @lp
+        rts
+
+; ---- one Blitz name.  in: $e5 = AttackName index, $e6 = row, X = col ----
+; The Ot6DrawBushName shape (field_menu.asm) over AttackName: a 10-byte fixed
+; record, pads and all, so the field is overwritten whole on every redraw.
+Ot6BlitzDrawName:
+        lda     $e6
+        jsr     GetBG1TilemapPtr        ; A = row, X = col -> X = tilemap dest
+        longa
+        txa
+        sta     $7e9e89                 ; DrawPosTextBuf position header
+        shorta
+        ldy     #AttackName::ITEM_SIZE
+        sty     $eb
+        ldy     #near AttackName
+        sty     $ef
+        lda     #^AttackName
+        sta     $f1
+        lda     $e5
+        jsr     LoadArrayItem           ; stage the 10-tile name into $7e9e8b
+        jmp     DrawPosTextBuf
+
+; ---- the not-yet-learned marker.  in: $e6 = row, X = col ----
+Ot6BlitzDrawLocked:
+        lda     $e6
+        jsr     GetBG1TilemapPtr
+        longa
+        txa
+        sta     $7e9e89
+        shorta
+        ldx     #$9e8b
+        stx     hWMADDL
+        ldx     #$0000                  ; (long,X -- there is no long,Y mode)
+:       lda     f:Ot6BlitzLockedTiles,x
+        beq     :+
+        sta     hWMDATA
+        inx
+        bra     :-
+:       stz     hWMDATA
+        jmp     DrawPosTextBuf
+
+Ot6BlitzLockedTiles:    raw_text OT6_BLITZ_LOCKED  ; "- LOCKED -" + $00 (issue
+                        ; #39: encoded via menu_text_en.inc -- a bare literal
+                        ; here picks up ending_anim.asm's credits charmap)
+
+; ---- one class glyph.  in: A = tile ($ff = blank), $e6 = row, X = col ----
+Ot6BlitzDrawIcon:
+        pha
+        lda     $e6
+        jsr     GetBG1TilemapPtr
+        longa
+        txa
+        sta     $7e9e89
+        shorta
+        ldx     #$9e8b
+        stx     hWMADDL
+        pla
+        sta     hWMDATA
+        stz     hWMDATA
+        jmp     DrawPosTextBuf
+
+; ---- a row's price, "nn MP".  in: A = cost, $e6 = row, X = col ----
+; The SwdTech page's Ot6LoadoutDrawCost draws ONE digit ("kit costs 1..8"); the
+; Blitz ladder runs 2..30 (Ot6AbilityCostTbl, ot6_boost.asm:674-681), so this
+; one carries a tens place.  Right-aligned -- a one-digit cost gets a leading
+; blank, not a leading zero -- so the eight prices read as a column.  A zero cost
+; blanks all five cells: that is the nomp build (Ot6LoadoutCost returns 0 with no
+; cost table linked) and the locked rows, and blanking the full width keeps the
+; redraw-wipes-what-was-there property every field on this page has.
+Ot6BlitzDrawCost:
+        pha                             ; save cost
+        lda     $e6
+        jsr     GetBG1TilemapPtr
+        longa
+        txa
+        sta     $7e9e89
+        shorta
+        ldx     #$9e8b
+        stx     hWMADDL
+        pla                             ; cost
+        beq     @blank
+        ldx     #$0000
+@t:     cmp     #10                     ; tens
+        bcc     @t2
+        sbc     #10                     ; C set by the cmp, so sbc is exact
+        inx
+        bra     @t
+@t2:    pha                             ; park the ones
+        txa
+        beq     @notens
+        clc
+        adc     #ZERO_CHAR
+        bra     @puttens
+@notens:
+        lda     #$ff                    ; leading blank: " 2 MP" under "30 MP"
+@puttens:
+        sta     hWMDATA
+        pla
+        clc
+        adc     #ZERO_CHAR              ; ones
+        sta     hWMDATA
+        ldx     #$0000
+@ct:    lda     f:Ot6LoadoutCostTiles,x ; " MP" + $00, the SwdTech page's own
+        beq     @term
+        sta     hWMDATA
+        inx
+        bra     @ct
+@term:  stz     hWMDATA
+        jmp     DrawPosTextBuf
+@blank: ldy     #$0005                  ; the full "nn MP" width
+        lda     #$ff
+@bl:    sta     hWMDATA
+        dey
+        bne     @bl
+        stz     hWMDATA
+        jmp     DrawPosTextBuf
+
+; ---- the page's own cursor: one column, eight rows ----
+; NOT AbilityCursorProp: that {2,4} table is shared with Dance (SkillsOption_06,
+; DrawDanceList), which still draws two columns of four, so this page needed its
+; own rather than moving Dance's out from under it.
+;
+; y = 116 + n*12 is the EN field menu's text pitch for this window, copied from
+; vanilla's own magic/esper/lore tables (:125-126, :249-250, :205); tilemap row
+; = 2n+1, so rows 1..15 are n = 0..7.  x = 8 pairs with text at column 3 --
+; cursor_x = 8*col - 16.  Do not move this table to fix an overlap: move the
+; TEXT.  menu_blitzpage.lua's cursor canary asserts the pairing from both sides.
+;
+; Wrap is left ON (no flags), as vanilla's AbilityCursorProp had it: this is a
+; browse list and stepping off the bottom onto the top is what the page did
+; before.
+LoadBlitzCursor:
+        ldy     #near Ot6BlitzCursorProp
+        jmp     LoadCursor
+
+UpdateBlitzCursor:
+        jsr     MoveCursor
+
+InitBlitzCursor:
+        ldy     #near Ot6BlitzCursorPos
+        jmp     UpdateCursorPos
+
+Ot6BlitzCursorProp:
+        cursor_prop {0, 0}, {1, 8}
+Ot6BlitzCursorPos:
+        .repeat 8, yy
+        cursor_pos {8, 116 + yy * 12}
+        .endrep
+
+.endif   ; LANG_EN
 
 ; ------------------------------------------------------------------------------
 

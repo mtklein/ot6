@@ -479,6 +479,66 @@ done:   plp
 
 ; ------------------------------------------------------------------------------
 
+; [ #46: an ability's BREAK CLASS glyph, for a field-menu list ]
+;
+; The field Skills->Blitz page needs the same "what does this chip with" cue the
+; battle surfaces already carry, and it must be a CLASS glyph specifically:
+; Ot6ClassGlyphTbl's four cells ($d9 sword / $da spear / $dc staff / $df
+; sparkle) ship IN the vanilla font, which is why the tools list can stamp them
+; in battle (Ot6ToolListIcon_ext) and why the item names in the field menu can
+; carry them as their leading character (item_name_en.json's {sword}/{spear}/
+; {staff}/{special} escapes, small_symbols_en.json:0xD9-0xDF).  The ELEMENT
+; icons beside them in Ot6ElemGlyphTbl do NOT: they are uploaded into the battle
+; small font by Ot6LoadFontIcons_ext from LoadMenuGfx (btlgfx_main.asm:8911) and
+; nothing uploads them for the field menu, so a field page that asked for one
+; would draw whatever vanilla glyph happens to live in that cell.  Hence class
+; only, and hence this proc rather than a jsl to Ot6ElemGlyphFor -- which
+; deliberately prefers the element and is an rts leaf besides.
+;
+; A class-less ability draws nothing.  That is the same answer Ot6ToolListIcon_ext
+; gives a classless tool (:374) and it is honest: five of the eight Blitzes
+; (AuraBolt, Fire Dance, Mantra, Air Blade, Spiraler) carry no entry in
+; Ot6SkillClassTbl at all -- they probe by element, not by class, so a class
+; glyph on their row would advertise a chip they never land.
+;
+; in: A = attack id.  out: A = class glyph tile, or $ff when the ability
+; teaches no class.  preserves X and Y.  rtl.
+.proc Ot6SkillClassGlyph
+        .a8
+        .i16
+        phx
+        pha                     ; park the id to match against each table key
+        ldx     #$0000
+@scan:  lda     f:Ot6SkillClassTbl,x
+        cmp     #$ff
+        beq     @none           ; end of table: the ability is classless
+        cmp     $01,s           ; table key vs the parked id
+        beq     @found
+        inx
+        inx                     ; 2-byte records: id, class
+        bra     @scan
+@found: lda     f:Ot6SkillClassTbl+1,x
+        beq     @none           ; no class bit set
+        bmi     @none           ; null-break: teaches nothing, shows nothing
+        ldx     #$0000
+@bit:   lsr                     ; first set bit wins, as everywhere else
+        bcs     @glyph
+        inx
+        bra     @bit
+@glyph: lda     f:Ot6ClassGlyphTbl,x
+        sta     $01,s           ; overwrite the parked id with its glyph
+        pla
+        plx
+        rtl
+@none:  lda     #$ff            ; the blank tile: still DRAWN, so a redraw wipes
+        sta     $01,s
+        pla
+        plx
+        rtl
+.endproc
+
+; ------------------------------------------------------------------------------
+
 ; [ draw one Blitz menu row -- the names, and (priced build) their MP cost ]
 ;
 ; DrawToolsListText (btlgfx, bank C1 -- FULL) jsl's here for a blitz-mode row,
@@ -1065,6 +1125,27 @@ done:   plp
         shorta                      ; plain SEP #$20 -- keeps A (shorta0's tdc wipes it)
         sta     $01,s               ; overwrite the parked slot with the tech
         pla                         ; A = tech (0..7)
+        rtl
+.endproc
+
+; [ #49: is the SwdTech loadout AUTO?  the packed word is zero ]
+; The exact twin of Ot6RageIsAuto below, and it decodes AUTO the same way every
+; other reader of this word already does -- Ot6LoadoutSlotTech branches @auto on
+; a zero word (:1081-1083) and Ot6LoadoutCycleCore seeds on one (:1190-1193).
+; It exists so the PAGE can state the mode without re-deriving it: a second
+; `lda OT6_LOADOUT / beq` in the C3 shim would be a second definition of AUTO,
+; and the two could drift the day the stored format changes.
+; out: carry set = AUTO.  clobbers A.  preserves X and Y.
+.proc Ot6LoadoutIsAuto
+        .a8
+        .i16
+        longa
+        lda     f:OT6_LOADOUT       ; packed word (0 = AUTO)
+        shorta                      ; plain SEP #$20 -- keeps Z (shorta0 wipes it)
+        beq     @auto
+        clc
+        rtl
+@auto:  sec
         rtl
 .endproc
 

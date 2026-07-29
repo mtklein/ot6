@@ -115,7 +115,7 @@ local function cell(x, y) return H.readByte(BG1A + x * 2 + y * 64) end
 -- '0'=$b4.. ' '=$ff.
 local T = { B=0x81, U=0x94, S=0x92, H=0x87, I=0x88, D=0x83, O=0x8e, L=0x8b,
             A=0x80, T=0x93, E=0x84, R=0x91, N=0x8d, M=0x8c, P=0x8f, W=0x96,
-            C=0x82, SLASH=0xc0, SP=0xff }
+            C=0x82, Y=0x98, SLASH=0xc0, EQ=0xd2, SP=0xff }
 -- #44: the title is "SWDTECH", not "BUSHIDO LOADOUT".  Two reasons, and this
 -- test asserts the result of both: the fifteen-column title was the only place
 -- on the page with room to spend on a control hint, and "SwdTech" is what
@@ -130,6 +130,20 @@ local TITLE = { T.S,T.W,T.D,T.T,T.E,T.C,T.H }
 -- teach it with the same words.
 local HINT  = { T.L,T.SLASH,T.R,T.SP,T.S,T.W,T.A,T.P,T.S }
 local POOL  = { T.L,T.E,T.A,T.R,T.N,T.E,T.D }
+-- issue #44 gave this page a control hint; issue #49 gives it the STATE that
+-- control changes.  An all-zero $1e1d is AUTO -- the game picks each rung from
+-- the moving window, and keeps re-picking as Cyan learns -- and the first L/R
+-- edit freezes that window into the word, permanently, until Y clears it.  The
+-- page said nothing about which of the two it was in, and nothing named Y.
+--
+-- Same six cells carry both words, "AUTO" space-padded to "MANUAL"'s width, so
+-- a revert overwrites the whole field: a five-cell "AUTO " would leave MANUAL's
+-- trailing L on screen.  #EXPECTED is asserted below for exactly that reason.
+local MODE_AUTO   = { T.A,T.U,T.T,T.O,T.SP,T.SP }
+local MODE_MANUAL = { T.M,T.A,T.N,T.U,T.A,T.L }
+-- ... and the control, worded identically to the Rage page's (the #44 rule:
+-- one idiom, one wording, or a player has to learn it twice).
+local MODE_HINT   = { T.Y,T.EQ,T.A,T.U,T.T,T.O }
 local lo = { a=0x9a,c=0x9c,e=0x9e,h=0xa1,i=0xa2,l=0xa5,o=0xa8,p=0xa9,r=0xab,
              s=0xac,t=0xad,x=0xb1 }
 local DISPATCH = { T.D,lo.i,lo.s,lo.p,lo.a,lo.t,lo.c,lo.h }
@@ -175,6 +189,19 @@ local HINT_COL = 11                     -- #44: title 3-9, hint 11-19, pool 22-2
 local POOL_CAPTION_COL = 22             -- the caption rides the title row
 local NAME_COL, COST_COL = 6, 19        -- "1x" 3-4, blank 5, name 6..17, cost 19
 local BOOST_ROWS = { 3, 5, 7 }
+-- #49: the mode block, in the page's one free run -- columns 23-29 of the three
+-- slot rows (the survey in issue #49).  Mode on row 3, the control that changes
+-- it on row 5, row 7 left clear so the two read as a pair and not as a third
+-- column of per-rung data.
+--
+-- The block starts at 24, not 23, and MODE_SEP_COL below is why: the slot's
+-- price field is "n MP" at columns 19-22, and the first cut of this change put
+-- the block at 23, where the row rendered as "7 MPMANUAL" (screenshot).  Column
+-- 23 is the separator and is asserted BLANK, so a later widening of either the
+-- price field or the mode word fails here rather than shipping as one word.
+local MODE_COL, MODE_ROW, MODE_HINT_ROW = 24, 3, 5
+local MODE_SEP_COL = 23                 -- the gap that keeps "7 MP" off "MANUAL"
+local MODE_FREE_ROW = 7                 -- the third slot row's block stays blank
 local function poolRow(n) return 9 + (n % 4) * 2 end
 local function poolCol(n) return (n < 4) and LEFT_COL or 17 end
 
@@ -244,6 +271,32 @@ local function assertSlotRow(y, name, techname)
   H.assertEq(d >= DIGIT0 and d <= DIGIT9, true,
     string.format("%s: cost digit at {%d,%d} (got %02x)", techname, COST_COL, y, d))
   assertRun(COST_COL + 1, y, { T.SP, T.M, T.P }, techname .. " ' MP'")
+end
+
+-- #49: the mode block, asserted as a block -- the word, the control under it,
+-- and the three cells (29 on both rows, and the whole of row 7's run) that must
+-- stay clear so it cannot creep into the window's border.
+local function assertModeBlock(auto, what)
+  assertRun(MODE_COL, MODE_ROW, auto and MODE_AUTO or MODE_MANUAL,
+    string.format("%s: the page states %s", what, auto and "AUTO" or "MANUAL"))
+  assertRun(MODE_COL, MODE_HINT_ROW, MODE_HINT,
+    what .. ": the revert control is named under the mode")
+  H.assertEq(#MODE_AUTO, #MODE_MANUAL,
+    "the two mode words must be the same width, or a MANUAL -> AUTO revert "
+    .. "leaves the tail of MANUAL on screen")
+  for _, y in ipairs({ MODE_ROW, MODE_HINT_ROW }) do
+    H.assertEq(cell(MODE_SEP_COL, y), 0, string.format(
+      "%s: {%d,%d} separates the row's price field from the mode block -- "
+      .. "without it the row reads '7 MPMANUAL'", what, MODE_SEP_COL, y))
+    H.assertEq(MODE_COL + #MODE_AUTO, 30, string.format(
+      "%s: the mode block runs to the last usable column, 29 -- column 30 is "
+      .. "the window's own border", what))
+  end
+  for x = MODE_SEP_COL, 29 do
+    H.assertEq(cell(x, MODE_FREE_ROW), 0, string.format(
+      "%s: {%d,%d} -- the 3x row's block is deliberately empty", what, x,
+      MODE_FREE_ROW))
+  end
 end
 
 -- THE GEOMETRY CANARY (#43) -- the assertion class this test was missing, and
@@ -359,6 +412,10 @@ H.run({ maxFrames = 30000 }, {
       H.assertEq(cell(x, TITLE_ROW), 0,
         string.format("title row tail blank {%d,1}", x))
     end
+    -- #49: the loadout word is $0000 here, so the page must say AUTO
+    assertModeBlock(true, "3 learned, untouched")
+    H.assertEq(H.readByte(LOADOUT), 0, "the loadout word is still AUTO ...")
+    H.assertEq(H.readByte(LOADOUT + 1), 0, "... in both its bytes")
     assertGeometry("3 learned")
     -- the cursor gutter, on every one of the three boost rows: nothing under
     -- the sprite, content starting in the column right after it.
@@ -408,6 +465,7 @@ H.run({ maxFrames = 30000 }, {
         string.format("boost row %d cost digit at {%d,%d} (got %02x)",
           i, COST_COL, y, d))
     end
+    assertModeBlock(true, "8 learned, untouched")
     assertGeometry("8 learned")
     -- the full pool is the case that puts a glyph in EVERY cursored row and in
     -- both pool columns, so it is the strongest state to check the gutter in.
@@ -416,6 +474,46 @@ H.run({ maxFrames = 30000 }, {
     H.log("FULL POOL: all eight Bushido techs drawn in two columns of four on "
       .. "rows 9/11/13/15 -- every cell inside the window, none on an even "
       .. "row, none past row 15, none in column 30, none under the cursor")
+  end),
+
+  -- ---- #49: the mode is LIVE, in both directions ----
+  -- Everything above is AUTO.  A mode indicator that only ever renders one of
+  -- its two words proves nothing, and one drawn at page-init would keep saying
+  -- AUTO for as long as the player stayed on the page -- which is exactly the
+  -- failure this block exists to catch.  R cycles the cursored rung, which calls
+  -- Ot6LoadoutSeedWord and makes $1e1d nonzero = MANUAL; the page must say so on
+  -- the very next redraw, without leaving the page.
+  H.pressButtons({ "r" }, 3),
+  H.waitFrames(40),
+  H.call(function()
+    H.assertEq(H.readByte(ZMENUSTATE), ST_LOADOUT, "still on the loadout page")
+    local w = H.readByte(LOADOUT) + H.readByte(LOADOUT + 1) * 256
+    H.assertEq(w ~= 0, true,
+      "R froze the auto window into $1e1d, so the loadout is MANUAL now")
+    assertModeBlock(false, "after the first edit")
+    assertGeometry("after the first edit")
+    H.screenshot("swdtech_page_manual")
+    H.log("LIVE MODE: the first L/R edit flipped the page from AUTO to MANUAL "
+      .. "and the page said so on the same redraw, without being reopened")
+  end),
+
+  -- ... and Y reverts.  The revert is the half a player cannot guess, which is
+  -- why the control is named on screen; it is also the half that proves the two
+  -- words are the same width -- a short "AUTO" would leave MANUAL's L behind.
+  H.pressButtons({ "y" }, 3),
+  H.waitFrames(40),
+  H.call(function()
+    H.assertEq(H.readByte(LOADOUT), 0, "Y cleared the loadout word ...")
+    H.assertEq(H.readByte(LOADOUT + 1), 0, "... in both its bytes: AUTO again")
+    assertModeBlock(true, "after Y")
+    assertGeometry("after Y")
+    -- the boost rows still name techs (AUTO recomputes them on the fly)
+    for i, y in ipairs(BOOST_ROWS) do
+      assertRun(NAME_COL, y, bushBytes(4 + i), "boost row " .. i .. " back on auto")
+    end
+    H.screenshot("swdtech_page_reverted")
+    H.log("REVERT: Y put the page back on AUTO, the indicator followed, and "
+      .. "'MANUAL' left nothing of itself behind in the six-cell field")
   end),
 
   -- ---- the cursor MOVES, and the gutter holds on every row it reaches ----

@@ -40,6 +40,10 @@ CODE_EXT_INC = 1
 .global Ot6RageShow              ;   and cursor only.  Show resolves a slot to
 .global Ot6RageCount             ;   the id it draws (stored+validated, or the
                                  ;   AUTO window), Count is the LEARNED score
+.global Ot6LoadoutIsAuto         ; #49: is the loadout AUTO (all-zero) or MANUAL?
+.global Ot6RageIsAuto            ;   one per page -- the pages STATE the mode now,
+                                 ;   and must not re-derive it from the save bytes
+.global Ot6SkillClassGlyph       ; #46: attack id -> break-class glyph (or $ff)
 .global Ot6RageRowCost           ;   ALWAYS-defined price shim, Ot6LoadoutCost's
                                  ;   twin (flat trance price / 0 under nomp)
 .global Ot6LoadoutCost           ;   ALWAYS-defined price shim (flag-gated body):

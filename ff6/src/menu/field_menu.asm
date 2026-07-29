@@ -1195,8 +1195,17 @@ SkillsOption_02:
 
 SkillsOption_03:
 @2105:  stz     $4a
+.if LANG_EN
+        ; issue #46: the page is ONE column of eight rows now (name, break class,
+        ; MP price), not vanilla's 2x4 grid of button-combo glyphs, so it wants
+        ; its own cursor.  LoadAbilityCursor's {2,4} table is still Dance's
+        ; (SkillsOption_06) and must not move with this page.
+        jsr     LoadBlitzCursor
+        jsr     InitBlitzCursor
+.else
         jsr     LoadAbilityCursor
         jsr     InitAbilityCursor
+.endif
         ldy     #$0100
         sty     zBG2HScroll
         sty     zBG3HScroll
@@ -2602,7 +2611,11 @@ MenuState_33:
 @2977:  lda     #$10
         trb     z45
         jsr     InitDMA1BG1ScreenA
+.if LANG_EN
+        jsr     UpdateBlitzCursor       ; #46: one column of eight, not Dance's 2x4
+.else
         jsr     UpdateAbilityCursor
+.endif
         jsr     LoadBlitzDesc
         lda     z08+1
         bit     #>JOY_B
@@ -2845,7 +2858,80 @@ Ot6LoadoutDrawSlots:
         inx
         cpx     #$0003
         bcc     @lp
-        rts
+        ; fallthrough -- #49: the mode block is drawn LAST on purpose, see below
+
+; ---- #49: AUTO / MANUAL, and the control that gets back to AUTO ----
+; The page's ONE free block is columns 23-29 of the three slot rows (surveyed in
+; issue #49); the mode takes row 3 and the control that changes it row 5, so the
+; two read as a pair.  Column 23 is spent as a SEPARATOR -- the slot's price
+; field is "n MP" at 19-22 and a block starting at 23 renders the row as
+; "7 MPMANUAL" (measured, the first screenshot of this change) -- so the six
+; cells run 24-29, up to but not into the window's border column 30.
+;
+; Drawn from HERE, at the tail of the slot redraw, rather than from
+; Ot6LoadoutDrawC3 with the other chrome.  Two reasons and both matter:
+;   * the mode is LIVE -- the first L/R cycle flips AUTO -> MANUAL and Y flips it
+;     back, and Ot6LoadoutDrawSlots is the only thing that runs on a redraw
+;     (MenuState_7b @run), so a mode drawn at init would state the state the page
+;     was OPENED in for as long as the player stayed on it;
+;   * Ot6LoadoutDrawCost's zero-cost arm blanks FIVE cells from column 19 --
+;     through column 23 -- which under nomp (every row prices 0) would eat the
+;     first cell of a block drawn earlier in the frame.  Drawing after the slot
+;     loop makes the overlap harmless in both builds.
+; The hint is redrawn every time too; six cells is not worth a second code path
+; to skip, and it removes the ordering hazard for good.
+Ot6LoadoutDrawMode:
+        jsl     Ot6LoadoutIsAuto        ; F0: carry set = AUTO (the packed word)
+        lda     #$00
+        bcs     :+
+        lda     #$01                    ; MANUAL
+:       sta     $e5                     ; -> Ot6DrawModeWord's selector
+        lda     #BG1_TEXT_COLOR::DEFAULT
+        sta     zTextColor              ; the mode is DATA, not chrome
+        lda     #$03                    ; row 3
+        sta     $e6
+        ldx     #$0018                  ; col 24 (23 is the separator, see above)
+        jsr     Ot6DrawModeWord
+        lda     #BG1_TEXT_COLOR::BLUE
+        sta     zTextColor              ; ... the control that changes it is chrome
+        ldy     #near Ot6LoadoutModeHintText
+        jmp     DrawPosText
+
+; ---- draw the mode word.  in: $e5 = 0 AUTO / 1 MANUAL, $e6 = row, X = col ----
+; Shared by both loadout pages (the Rage page's Ot6RageDrawMode calls it), so the
+; two can never come to disagree about what the words are or how wide the field
+; is.  OT6_MODE_AUTO is space-padded to OT6_MODE_MANUAL's six cells, so a
+; MANUAL -> AUTO revert overwrites the whole field -- the Ot6RageEmptyTiles rule.
+Ot6DrawModeWord:
+        lda     $e6
+        jsr     GetBG1TilemapPtr        ; A = row, X = col -> X = tilemap dest
+        longa
+        txa
+        sta     $7e9e89                 ; DrawPosTextBuf position header
+        shorta
+        ldx     #$9e8b
+        stx     hWMADDL
+        ldx     #$0000                  ; (long,X -- there is no long,Y mode)
+        lda     $e5
+        bne     @man
+@auto:  lda     f:Ot6ModeAutoTiles,x
+        beq     @term
+        sta     hWMDATA
+        inx
+        bra     @auto
+@man:   lda     f:Ot6ModeManualTiles,x
+        beq     @term
+        sta     hWMDATA
+        inx
+        bra     @man
+@term:  stz     hWMDATA
+        jmp     DrawPosTextBuf
+
+Ot6ModeAutoTiles:       raw_text OT6_MODE_AUTO   ; "AUTO  " + $00 (issue #39:
+Ot6ModeManualTiles:     raw_text OT6_MODE_MANUAL ; "MANUAL" + $00 -- encoded via
+                        ; menu_text_en.inc; a bare literal here picks up
+                        ; ending_anim.asm's credits charmap and carries no
+                        ; terminator, which is what garbled the page in #39)
 
 ; ---- draw the LEARNED pool as a 2 x 4 grid on the window's ODD rows (#43) ----
 ; Column-major: filled cells 0..3 go down the left column (col 3), 4..7 down the
@@ -2963,6 +3049,7 @@ Ot6LoadoutCursorPos:
 ; the tilemap -- the garbled-page bug) ----
 Ot6LoadoutTitleText:    pos_text OT6_LOADOUT_TITLE
 Ot6LoadoutHintText:     pos_text OT6_LOADOUT_HINT
+Ot6LoadoutModeHintText: pos_text OT6_LOADOUT_MODE_HINT  ; #49: "Y=AUTO" at {23,5}
 Ot6LoadoutPoolText:     pos_text OT6_LOADOUT_POOL
 Ot6LoadoutLbl1Text:     pos_text OT6_LOADOUT_LBL1
 Ot6LoadoutLbl2Text:     pos_text OT6_LOADOUT_LBL2
@@ -3144,7 +3231,36 @@ Ot6RageDrawSlots:
         inx
         cpx     #$0008                  ; OT6_RAGESLOTS (ot6_memory.inc)
         bcc     @lp
-        rts
+        ; fallthrough -- #49, exactly as the SwdTech page's slot loop does
+
+; ---- #49: AUTO / MANUAL, and the control that gets back to AUTO ----
+; Row 13 -- the one row this page never drew on (it uses 1/3/5/7/9/11/15), which
+; issue #49's survey costed at 27 free columns.  The mode sits at column 3 and
+; the control at column 16: the page's OWN two slot columns, so the pair lines up
+; under the grid instead of floating in the middle of the row.
+;
+; Drawn from the tail of the slot redraw for the same reason the SwdTech page
+; draws its block there: Ot6RageDrawSlots is the only proc a redraw runs
+; (MenuState_7c @run), and the mode is live -- the first L/R cycle calls
+; Ot6RageSeed and the page is MANUAL from that frame on, Y clears it back.  A
+; mode drawn once in Ot6RageDrawC3 would freeze at whatever it was on entry,
+; which is precisely the state the page failed to report before.
+Ot6RageDrawMode:
+        jsl     Ot6RageIsAuto           ; F0: carry set = AUTO (all eight bytes 0)
+        lda     #$00
+        bcs     :+
+        lda     #$01                    ; MANUAL
+:       sta     $e5                     ; -> Ot6DrawModeWord's selector
+        lda     #BG1_TEXT_COLOR::DEFAULT
+        sta     zTextColor              ; the mode is DATA, not chrome
+        lda     #$0d                    ; row 13
+        sta     $e6
+        ldx     #$0003                  ; col 3 (the left slot column)
+        jsr     Ot6DrawModeWord         ; the SwdTech page's own mode drawer
+        lda     #BG1_TEXT_COLOR::BLUE
+        sta     zTextColor              ; ... the control that changes it is chrome
+        ldy     #near Ot6RageModeHintText
+        jmp     DrawPosText
 
 ; ---- draw one monster (rage) name.  in: $e5 = rage id ($ff = unset),
 ;      $e6 = row, X = col.  The Ot6DrawBushName shape over MonsterName. ----
@@ -3262,6 +3378,7 @@ Ot6RageCursorPos:
 
 Ot6RageTitleText:       pos_text OT6_RAGE_TITLE
 Ot6RageHintText:        pos_text OT6_RAGE_HINT
+Ot6RageModeHintText:    pos_text OT6_RAGE_MODE_HINT     ; #49: "Y=AUTO" at {16,13}
 Ot6RageEachText:        pos_text OT6_RAGE_EACH
 Ot6RageLearnedText:     pos_text OT6_RAGE_LEARNED
 
