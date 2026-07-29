@@ -120,8 +120,19 @@ OT6_NUMCTR           := $ed71   ; #33: last-seen damage-numeral thread counter
                                 ;   and Ot6RevealPoll commits pending reveals.
                                 ;   past InitBP's clear on purpose: a stale
                                 ;   value costs one no-op commit (see the proc)
+OT6_COVERPAID        := $ed72   ; #37: per-character bitmask (----1234, the
+                                ;   OT6_DIVINE_USED / $3f2f shape) -- bit set =
+                                ;   that character's True Knight cover has
+                                ;   already banked its BP this ROUND.  set by
+                                ;   Ot6CoverBP, cleared per character by
+                                ;   Ot6ActionEnd (the round boundary) and
+                                ;   wholesale by InitBP.  unlike NUMCTR a stale
+                                ;   value here would SUPPRESS a real earn, so
+                                ;   it is init-cleared explicitly.
 .assert OT6_RVPEND_ELEM = OT6_SHADOW + (14 * 6), error, "reveal-pending must follow the shadow (InitBP clears both in one loop)"
 .assert OT6_WALLETPREV + 1 <= OT6_SHADOW + $70 - 1, error, "wallet cur/prev must sit inside InitBP's $70-byte clear"
-.assert OT6_NUMCTR + 1 <= $ef1f, error, "OT6 shadow tail exceeds the measured-free range ($f120+ is PushMode7Vars')"
+.assert OT6_COVERPAID = OT6_NUMCTR + 1, error, "cover-earn latch must follow the numeral counter (both live past InitBP's shadow clear)"
+.assert OT6_COVERPAID > OT6_SHADOW + $70 - 1, error, "cover-earn latch must sit PAST InitBP's shadow clear (it is cleared by its own store)"
+.assert OT6_COVERPAID + 1 <= $ef1f, error, "OT6 shadow tail exceeds the measured-free range ($f120+ is PushMode7Vars')"
 
 .endif

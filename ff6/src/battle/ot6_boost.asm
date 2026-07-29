@@ -29,6 +29,10 @@
         sta     f:$7e0000+OT6_HUDVEIL   ; a stale veil never survives init
         sta     f:$7e0000+OT6_SCRIPTBUSY ; nor a stuck anchor-adopt gate
         sta     f:$7e0000+OT6_PIPTAIL   ; nor a stale pip-paint tail (#33)
+        sta     f:$7e0000+OT6_COVERPAID ; nor a stale cover-earn latch (#37):
+                                ;   it sits past the shadow clear below, and a
+                                ;   stale bit would eat the first cover of the
+                                ;   battle instead of costing a no-op
         lda     #$01
         sta     OT6_BP_CLASS           ; characters open with 1 bp, octopath-style
         sta     $3e9e
@@ -112,6 +116,13 @@
         lda     #32             ;   for ~half a second past this charge, so
         sta     f:$7e0000+OT6_PIPTAIL   ;   the drop lands on screen even
                                 ;   when no battle menu is open at resolution
+        lda     $3018,x         ; #37: THE ROUND BOUNDARY for the True Knight
+        eor     #$ff            ;   cover earn.  this actor's turn is ending,
+        and     f:$7e0000+OT6_COVERPAID  ;   so his next cover pays again --
+        sta     f:$7e0000+OT6_COVERPAID  ;   the same tick that decides his
+                                ;   regen also re-arms his reaction (the
+                                ;   boundary Runic's own machinery implies;
+                                ;   see Ot6CoverBP, ot6_kits.asm)
         lda     OT6_BOOST_REVEALED,x         ; pending boost spent this action?
         beq     @gain
         sta     OT6_SCR_BIT     ; consume it: bp -= pending
