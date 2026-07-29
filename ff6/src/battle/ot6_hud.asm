@@ -1462,7 +1462,18 @@ OT6_RANDMAGIC := $a5            ; the marker value (junk is $00/$ff in
         rtl
 @wait:  lda     f:$7e0000+OT6_RESTAGE
         bmi     @no             ; fresh request: keep it until browsable
-@drop:  lda     #$00            ; cycle complete (or abandoned mid-way)
+@drop:  lda     f:$7e0000+OT6_RESTAGE
+        bmi     :+              ; $80 = cycle never started: $7ba5 not ours
+        ; a started cycle (flag 1-3) ends here, complete or abandoned.  the
+        ; staging byte $7ba5 is SHARED: every window-open state trusts
+        ; `lda $7ba5 / bmi` to mean "my own init already ran" (OpenMagicWindow
+        ; @57c4, MakeToolsList_04 @58be, ...).  an abandoned cycle strands it
+        ; at $81-$83, so the NEXT list to open skips its init and draws only
+        ; the cycle's remaining 4-n lines over n of OUR stale magic rows --
+        ; issue #36's "Tools shows Cure 2".  hand the byte back CLOSED; a
+        ; complete cycle already left it 0 and the stz is a no-op.
+        stz     $7ba5
+:       lda     #$00            ; cycle complete (or abandoned mid-way)
         sta     f:$7e0000+OT6_RESTAGE
 @no:    rtl
 @draw:  lda     $7ba6           ; stage one row-pair and arm its

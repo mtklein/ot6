@@ -11,9 +11,15 @@ true right now and what will cost you a day if you do not know it.
 
 ## Where the project is
 
-**v0.5 is released** (Opera complete, Setzer joined, Blackjack acquired) and
-**still not human-playtested** — that gate is the owner's, and two releases of
-unvalidated frontier should not stack.
+**v0.6 is released** (Raid on Vector complete through Terra's return) — and
+it is the project's first HUMAN-VALIDATED release: the owner played rc1 from
+the start past the old v0.5 stop line, filed findings in
+`playtest-v0.6-rc1.md`, and promoted the rc unchanged. The release bar is the
+owner's RATCHET RULE (2026-07-28): never release an inferior experience —
+anything at least as good as previous releases, as far as the owner has
+played, may ship. Regressions in played territory block a tag; unplayed
+frontier ships on the machine gates with its gaps documented, and the
+owner's playthrough trails behind, feeding fixes forward.
 
 **v0.6 is in progress and the backlog is clean.** In one day the open-issue
 list went from eight standing trackers to four scoped items: the full frontier

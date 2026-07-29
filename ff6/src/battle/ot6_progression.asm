@@ -386,16 +386,25 @@ OT6_SM_MAGPWR = $40             ; -> $11a0 buffer ($3b41)
 ; Ot6EsperStatTbl -- one packed byte per esper index (GenjuProp order), read by
 ; Ot6EsperStatMod while that esper is worn.  Authored so far: the four Zozo
 ; espers (v0.4) plus Ifrit and Shiva, the two the Magitek Research Facility pays
-; out (v0.6, docs/design/magicite-ifrit-shiva.md).  The rest are $00 (no mod), a
-; data-append exactly like their spell lists (genju_prop.asm).  Magnitudes are
-; picked to be felt but not swingy (~10-16% of an early base stat) on a two-tier
-; ladder the player can read: FIELD stones found on a floor are 2-3, BOSS stones
-; fought for are 4-5.  M6 owns the final numbers.
+; out (v0.6, docs/design/magicite-ifrit-shiva.md), plus the six the v0.7 tube
+; room pays out (docs/design/magicite-tube-six.md §11).  The rest are $00 (no
+; mod), a data-append exactly like their spell lists (genju_prop.asm).
+; Magnitudes are picked to be felt but not swingy (~10-16% of an early base
+; stat) on a THREE-rung ladder the player can read:
+;   FIELD  2-3  stones found lying on a floor (the Zozo four)
+;   STORY  3-4  stones handed over in a scene (the tube six -- not fought for,
+;               so they sit under the boss rung)
+;   BOSS   4-5  stones fought for (Ifrit, Shiva)
+; with ONE deliberate exception: Maduin at 5 (magicite-tube-six.md §3).  v0.7
+; has no conventional boss (sealed-gate-recon.md §0), Maduin is Terra's
+; inheritance, and the crown stat IS the band's reward.  M6 owns the final
+; numbers; if measurement shows Maduin locked into a slot all band, the lever
+; is his magnitude (5->4), never his spell list (§14.5).
 Ot6EsperStatTbl:
         .byte   OT6_SM_STAM   | 3       ;  0 ramuh    +3 stamina (canon; vanilla STAMINA_1)
-        .byte   OT6_SM_VIGOR  | 5       ;  1 ifrit    +5 vigor -- the ONLY vigor
-                                        ;    stone (nobody else claims the
-                                        ;    selector), and the first BOSS-tier
+        .byte   OT6_SM_VIGOR  | 5       ;  1 ifrit    +5 vigor -- the FIRST vigor
+                                        ;    stone (Bismark joins the selector
+                                        ;    at v0.7), and the first BOSS-tier
                                         ;    magnitude: field stones picked off a
                                         ;    Zozo floor are 2-3, fought-for stones
                                         ;    are 4-5.  Base vigor is 31-47 at this
@@ -427,9 +436,19 @@ Ot6EsperStatTbl:
                                         ;    made here.
         .byte   OT6_SM_SPEED  | 2       ;  3 siren    +2 speed (tempo/control caster)
         .byte   OT6_SM_NONE             ;  4 terrato
-        .byte   OT6_SM_NONE             ;  5 shoat
-        .byte   OT6_SM_NONE             ;  6 maduin
-        .byte   OT6_SM_NONE             ;  7 bismark
+        .byte   OT6_SM_SPEED  | 3       ;  5 shoat    +3 speed (the executioner
+                                        ;    acts first; Break and Doom scale
+                                        ;    off nothing at all, so tempo is
+                                        ;    the only honest selector for him)
+        .byte   OT6_SM_MAGPWR | 5       ;  6 maduin   +5 mag.pwr -- THE CROWN,
+                                        ;    the one deliberate exception to the
+                                        ;    story rung above.  All three of his
+                                        ;    grants scale off it.
+        .byte   OT6_SM_VIGOR  | 4       ;  7 bismark  +4 vigor (the leviathan).
+                                        ;    Second vigor stone -- see Ifrit's
+                                        ;    row: he is no longer the only one.
+                                        ;    Vanilla doubles vigor into $3b2c,
+                                        ;    so this reads as +8 in battle.
         .byte   OT6_SM_MAGPWR | 3       ;  8 stray    +3 mag.pwr (vanilla MAGPWR_1)
         .byte   OT6_SM_NONE             ;  9 palidor
         .byte   OT6_SM_NONE             ; 10 tritoch
@@ -441,11 +460,17 @@ Ot6EsperStatTbl:
         .byte   OT6_SM_NONE             ; 16 ragnarok
         .byte   OT6_SM_MAGPWR | 3       ; 17 kirin    +3 mag.pwr (healer; heal potency)
         .byte   OT6_SM_NONE             ; 18 zoneseek
-        .byte   OT6_SM_NONE             ; 19 carbunkl
-        .byte   OT6_SM_NONE             ; 20 phantom
+        .byte   OT6_SM_STAM   | 4       ; 19 carbunkl +4 stamina (the gem endures
+                                        ;    -- the wall stone's stat is the
+                                        ;    wall stat)
+        .byte   OT6_SM_SPEED  | 4       ; 20 phantom  +4 speed (the ghost moves
+                                        ;    first; designed as Shadow's stone
+                                        ;    at the stop line)
         .byte   OT6_SM_NONE             ; 21 sraphim
         .byte   OT6_SM_NONE             ; 22 golem
-        .byte   OT6_SM_NONE             ; 23 unicorn
+        .byte   OT6_SM_STAM   | 3       ; 23 unicorn  +3 stamina (the protector,
+                                        ;    kept at the low story rung -- the
+                                        ;    Pearl grant is where his power is)
         .byte   OT6_SM_NONE             ; 24 fenrir
         .byte   OT6_SM_NONE             ; 25 starlet
         .byte   OT6_SM_NONE             ; 26 phoenix

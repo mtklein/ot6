@@ -24,6 +24,11 @@ layer. JP returns only if playtesting wants a pacing knob.
 
 **Curated kits (the Ochette/Hikari model).** Two characters learn
 MORE than 8 and equip a curated subset (~5 slots): Gau and Strago.
+> **Gau superseded (2026-07-28, owner-settled):** his kit is now
+> `kit-gau.md` — the Ochette model, learn many / **equip 8**, possession
+> preserved, Dance-model MP, chance-verb boost. This file's Gau lines
+> below stand as history; kit-gau.md §11 lists the exact amendments,
+> which land with the build.
 Everyone else's 8 are fixed. Curating IS their identity — same verb
 family, different collection method.
 

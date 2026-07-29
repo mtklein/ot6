@@ -107,7 +107,13 @@ run: rom
 # (all cores by default); pass NINJAFLAGS=-j2 to throttle it.
 NINJA_FILE := build/build.ninja
 NINJAFLAGS ?=
-SUITE_STATES := battle_doorstep battle2_doorstep whelk_doorstep
+# first_battle is gen_battle_state's SECOND artifact (battle_levelup and
+# battle_smoke boot it).  It has its own graph edge since #30's
+# one-edge-one-artifact publish rule, but it was missing here -- so
+# `make test` never freshened it and every ROM change left it stale,
+# red-herringing battle_levelup (issue #41, found twice: the Slot landing
+# and the tube-six build).
+SUITE_STATES := battle_doorstep first_battle battle2_doorstep whelk_doorstep
 
 .PHONY: graph
 graph:

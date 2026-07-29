@@ -32,6 +32,14 @@
 --                members = { { charId, "NAME" }, ... } }  -- each in party 1
 --   ram      = { { addr, mask, byte, "what" }, ... }  -- masked WRAM bytes,
 --                for field facts that are not switches (e.g. $1A69 espers)
+--   items    = { { itemId, 0|1, "name" }, ... }  -- inventory presence
+--                (1) or ABSENCE (0): the item id appears in the $1869 list
+--                with a nonzero $1969 count.  Presence, not slot position:
+--                give_item appends to the first free slot, so the position
+--                is chain-history, not a boundary fact.  Added for
+--                banquet-done-v1 (issue #31): the banquet's reward ladder
+--                pays by score tier, so the tier is witnessed BOTH ways --
+--                what it earned and what it did not.
 --   sram     = { { snesAddr, byte, "what" }, ... }  -- OT6 persistent state,
 --                read via emu.memType.snesMemory (bank $31 = the codex bank)
 --
@@ -324,6 +332,12 @@ M.contracts["narshe-mission-v1"] = {
   ram = {
     { 0x1f60, 0xFF, 84, "world x (save-block cell $1f60): the Narshe exit spawn" },
     { 0x1f61, 0xFF, 34, "world y (save-block cell $1f61)" },
+    -- the parked Blackjack rides its own save cells, two south of the
+    -- party (measured, addenda SS2.4); the leg OUT of this boundary
+    -- re-boards from here, so a drifted ship is a contract violation,
+    -- not a mid-leg timeout
+    { 0x1f62, 0xFF, 84, "parked Blackjack x (save-block cell $1f62)" },
+    { 0x1f63, 0xFF, 36, "parked Blackjack y (save-block cell $1f63)" },
     { 0x11FA, 0x03, 0x00, "ON FOOT (not aboard a vehicle)" },
     { 0x11F3, 0xFF, 0x00, "not forced aboard the airship" },
     { 0x1A69, 0x07, 0x07, "RAMUH+IFRIT+SHIVA magicite still owned" },
@@ -358,20 +372,12 @@ M.contracts["narshe-mission-v1"] = {
 }
 
 -- gate-cave-save-v1: boundary H, the vanilla save point on map 386 at
---
--- ############ NOT YET EXERCISED BY ANY LEG (2026-07-28) ####################
--- ## No generator asserts this table and no `gate-cave-save-v1` battery    ##
--- ## exists: leg G->H reaches BASEMENT 2 (map 385) and is blocked at the   ##
--- ## timed floor -- see docs/design/sealed-gate-recon-addenda.md §1.5.     ##
--- ## The table is DECLARED here anyway, from the values measured on the    ##
--- ## live chain up to that point (party, switches, magicite), so the leg   ##
--- ## that finishes the crossing writes a drive and not a contract, and so  ##
--- ## the Terra invariant is written down where the next agent will read it ##
--- ## rather than re-derived.  A contract nothing asserts is inert; a       ##
--- ## contract nobody wrote is the failure mode #25 exists to prevent.      ##
--- ###########################################################################
 -- (74,53) -- the ONLY interior save in the whole v0.7 band (recon §2.1 S3),
--- reached off map 384 (64,10).
+-- reached off map 384 (64,10).  Exercised by gen_gate_cave_save
+-- (2026-07-28): the 385 timed-floor crossing that blocked the first pass
+-- is lib/ot6_field.lua's M.phaseWalk (the rewrite-window mechanism,
+-- addenda §1.5/§1.8), and every value below was asserted at the live
+-- boundary moment through the real anchored mint.
 --
 -- THE TERRA INVARIANT (recon §2.3) IS THIS TABLE'S REASON TO EXIST.  The
 -- Imperial Base entrance refuses passage to any party without TERRA in the
@@ -387,6 +393,7 @@ M.contracts["gate-cave-save-v1"] = {
   switches = {
     { 0x0076, 1, "the Narshe mission meeting still stands (the G->H entry)" },
     { 0x0172, 1, "the base's 'No Imperial soldiers…' beat has played" },
+    { 0x0173, 1, "the (62,11) switch stands -- 384's save-room door is open" },
     { 0x0079, 0, "CLEAR -- the Sealed Gate scene is still ahead" },
     { 0x0242, 0, "CLEAR -- the base entrance has not gone silent" },
     { 0x007A, 0, "CLEAR -- the airship still flies (the crash is leg H->I)" },
@@ -404,6 +411,148 @@ M.contracts["gate-cave-save-v1"] = {
   },
   ram = {
     { 0x1A69, 0x07, 0x07, "RAMUH+IFRIT+SHIVA magicite still owned" },
+  },
+  sram = {
+    { 0x316800, 0x4f, "slot 3 codex magic 'O'" },
+    { 0x316801, 0x38, "slot 3 codex magic '8'" },
+    { 0x316810 + 0x012d, 0x01, "bank-31 element-codex witness (ULTROS2)" },
+    { 0x316990 + 0x012d, 0x01, "bank-31 class-codex witness (ULTROS2)" },
+  },
+}
+
+-- vector-crash-v1: boundary I, the crash-site world battery save -- the
+-- recon §2.2's `vector-crash` boundary, cut at its own proposed tile: the
+-- party stands ON the dead Blackjack's world tile (83,238), on foot,
+-- because that is where the map-7 hatch (_caf4b1) drops them after the
+-- crash (measured, probe_v07_gatescene3: $1F60/61 == $1F62/63 == (83,238),
+-- $11FA on-foot).  Exercised by gen_vector_crash (2026-07-28): the 384
+-- west traverse (two levers + the (121,23)->(4,37) teleport, addenda
+-- Addendum 3), the Sealed Gate scene, the (5,43) shortcut, the base
+-- re-cross, battle 123 and the scripted crash flight.
+--
+-- THE HEADLINE IS THE DEAD AIRSHIP.  $007A=1 and $0246=0 are what every
+-- later leg plans around (recon headline 6: everything after the crash is
+-- on foot or by boat), and the wreck's cells $1F62/63 still read (83,238)
+-- -- the ship has a position even though nothing can fly it; a chain that
+-- somehow kept the airship alive fails here by name.  The party is still
+-- the gate four (TERRA LOCKE EDGAR SABIN, SETZER benched by the G->H
+-- swap): battle_event $15 rewrites only the ON-SCREEN roster for the deck
+-- scene and the field party comes back intact (addenda §1.6 verdict 5).
+M.contracts["vector-crash-v1"] = {
+  slot = 3,
+  ram = {
+    { 0x1f60, 0xFF, 83, "world x (save-block cell $1f60): the crash site" },
+    { 0x1f61, 0xFF, 238, "world y (save-block cell $1f61): on the wreck tile" },
+    { 0x1f62, 0xFF, 83, "dead Blackjack x (save-block cell $1f62)" },
+    { 0x1f63, 0xFF, 238, "dead Blackjack y (save-block cell $1f63)" },
+    { 0x11FA, 0x03, 0x00, "ON FOOT (the wreck is scenery, not a vehicle)" },
+    { 0x11F3, 0xFF, 0x00, "not forced aboard the airship" },
+    { 0x1A69, 0x07, 0x07, "RAMUH+IFRIT+SHIVA magicite still owned" },
+  },
+  switches = {
+    { 0x0079, 1, "the Sealed Gate scene ran (event_main.asm:46316)" },
+    { 0x0471, 1, "the gate-scene tail latch (:46313)" },
+    { 0x007A, 1, "THE AIRSHIP IS DEAD (:44451) -- no leg after I may fly" },
+    { 0x007B, 1, "Vector's soldier machinery stands down (:44453)" },
+    { 0x01BA, 1, "the crash latch (:44452)" },
+    { 0x0242, 1, "the base entrance went silent forever (:44351)" },
+    { 0x0246, 0, "no active airship" },
+    { 0x0172, 1, "the base's no-soldiers beat stands" },
+    { 0x0173, 1, "384's save-room door switch (persistent) stands" },
+    { 0x0174, 1, "384's x=76 column switch (persistent) -- the traverse ran" },
+    { 0x0076, 1, "the Narshe mission meeting stands" },
+    { 0x02F0, 1, "TERRA is available" },
+    { 0x02F6, 0, "CELES is still out of the roster" },
+  },
+  party = {
+    size = 4,
+    members = {
+      { 0x00, "TERRA (still the gate four -- the deck scene never leaks)" },
+      { 0x01, "LOCKE" },
+      { 0x04, "EDGAR (pierce+Tools)" },
+      { 0x05, "SABIN (bludgeon)" },
+    },
+  },
+  sram = {
+    { 0x316800, 0x4f, "slot 3 codex magic 'O'" },
+    { 0x316801, 0x38, "slot 3 codex magic '8'" },
+    { 0x316810 + 0x012d, 0x01, "bank-31 element-codex witness (ULTROS2)" },
+    { 0x316990 + 0x012d, 0x01, "bank-31 class-codex witness (ULTROS2)" },
+  },
+}
+
+-- banquet-done-v1: boundary J, the post-banquet world battery save -- the
+-- recon §2.2's own `banquet-done` name, cut at the Vector world exit's
+-- landing tile (120,188): the first world tile after the banquet block,
+-- where the recon's leg-5-to-Albrook walk starts.  Exercised by
+-- gen_banquet_done (2026-07-28): the I->J grind, the whole banquet block
+-- ($007C=1 -> $0238=1) driven to the >=67 tier (banquet-decode.md §9.3:
+-- the window is worth at most 44 and measured 26, the Q&A 44 and the
+-- troopers' challenge 5, so the total lands at 75), the messenger, and
+-- the castle exit.
+--
+-- THE HEADLINE IS THE ROSTER STRIP.  The banquet tail forces the active
+-- party to TERRA+LOCKE and rewrites availability wholesale
+-- (event_main.asm:99058-99067, :99079-99101): the #21 count control reads
+-- TWO here, inverted -- a chain that somehow kept Edgar/Sabin walking
+-- fails by name (recon §2.3).  The >=67 tier is frontier-wide canon from
+-- this boundary on: all three reward switches pay and NEITHER reward
+-- item does (the item asserts are the score receipt in BOTH directions,
+-- since var0 itself is zeroed by the messenger), and the Doma / South
+-- Figaro world-state flips ride every later leg.
+M.contracts["banquet-done-v1"] = {
+  slot = 3,
+  ram = {
+    { 0x1f60, 0xFF, 120, "world x (save-block cell $1f60): the Vector exit" },
+    { 0x1f61, 0xFF, 188, "world y (save-block cell $1f61)" },
+    { 0x1f62, 0xFF, 83, "dead Blackjack x -- the wreck never moves" },
+    { 0x1f63, 0xFF, 238, "dead Blackjack y" },
+    { 0x11FA, 0x03, 0x00, "ON FOOT" },
+    { 0x11F3, 0xFF, 0x00, "not forced aboard the airship" },
+    { 0x1A69, 0x07, 0x07, "RAMUH+IFRIT+SHIVA magicite still owned" },
+    { 0x1fc2, 0xFF, 0x00, "score var 0 lo zeroed by the messenger (:99261)" },
+    { 0x1fc3, 0xFF, 0x00, "score var 0 hi zeroed" },
+  },
+  switches = {
+    { 0x0238, 1, "the messenger paid -- the banquet block is CLOSED (:99262)" },
+    { 0x007D, 1, "the banquet tail ran -- Albrook's port stands down (:99133)" },
+    { 0x0276, 1, "South Figaro withdrawal (always paid)" },
+    { 0x0277, 1, "Doma withdrawal (>=50 -- the tier receipt starts here)" },
+    { 0x0278, 1, "Imperial-base weapons unlock (>=67)" },
+    { 0x0512, 0, "cleared with the Doma withdrawal (:99228)" },
+    { 0x0079, 1, "the Sealed Gate scene stands" },
+    { 0x007A, 1, "the airship is still dead -- J->K is on foot and by boat" },
+    { 0x007B, 1, "Vector's soldier machinery stands down" },
+    { 0x0242, 1, "the base entrance is silent" },
+    { 0x0246, 0, "no active airship" },
+    -- the forced availability rewrite (:99058-99067), pinned wholesale:
+    -- the strip is THE fact of this boundary
+    { 0x02F0, 1, "TERRA available (forced)" },
+    { 0x02F1, 1, "LOCKE available (forced)" },
+    { 0x02F2, 1, "CYAN available (forced)" },
+    { 0x02F4, 1, "EDGAR available (forced; benched + stripped)" },
+    { 0x02F5, 1, "SABIN available (forced; benched + stripped)" },
+    { 0x02F9, 1, "SETZER available (forced; benched + stripped)" },
+    { 0x02F6, 0, "CELES unavailable until the Albrook pier" },
+    { 0x02F3, 0, "SHADOW unavailable until the Crescent landing" },
+    { 0x02F7, 0, "STRAGO unavailable" },
+    { 0x02F8, 0, "RELM unavailable" },
+  },
+  party = {
+    size = 2,                     -- the #21 control, INVERTED (recon §2.3)
+    members = {
+      { 0x00, "TERRA (the envoy)" },
+      { 0x01, "LOCKE (the escort)" },
+    },
+  },
+  -- THE TIER IS WITNESSED BOTH WAYS (banquet-decode.md §9.3): the leg
+  -- ships the >=67 tier -- measured best window score 26 of 44, total
+  -- 26+44+5 = 75 -- so the base-weapons unlock pays and the two higher
+  -- rewards do NOT.  Asserting their ABSENCE is what stops a future
+  -- route change from silently moving the tier in either direction.
+  items = {
+    { 0xE5, 0, "Tintinabar -- the >=77 reward, NOT earned at this tier" },
+    { 0xDF, 0, "Charm Bangle -- the >=90 reward, NOT earned at this tier" },
   },
   sram = {
     { 0x316800, 0x4f, "slot 3 codex magic 'O'" },
@@ -488,6 +637,19 @@ function M.contractDiffs(c)
         field(string.format("%s (char %02X) in party", m[2], m[1]),
           1, partyOf(m[1]))
       end
+    end
+  end
+  if c.items then
+    for _, it in ipairs(c.items) do
+      local have = 0
+      for i = 0, 255 do
+        if M.readByte(0x1869 + i) == it[1] and M.readByte(0x1969 + i) > 0 then
+          have = 1
+          break
+        end
+      end
+      field(string.format("item $%02X (%s) %s inventory", it[1], it[3],
+        it[2] == 1 and "in" or "NOT in"), it[2], have)
     end
   end
   if c.sram then

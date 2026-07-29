@@ -13,6 +13,7 @@
 -- CELES SABIN EDGAR on the world map at (137,203); the field menu opens from
 -- the world map exactly as from a field map.  The esper inventory is pinned
 -- to exactly IFRIT (+5 vigor) and TERRATO (no mod) as in the suite test.
+-- OT6_ANCHOR_LAYOUT: ot6-codex-o8-v1
 local H = dofile("tools/tests/lib/ot6.lua")
 
 local ZMENUSTATE = 0x26

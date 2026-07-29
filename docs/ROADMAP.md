@@ -56,9 +56,14 @@ links). What each delivers:
   release: complete redesigns for Ifrit and Shiva, honest Setzer/Factory-era
   kits, authored encounter coverage, boss contracts, player-facing save
   cadence, and a durable tested frontier.
-- **v0.7 — The Sealed Gate** — the Narshe mission handoff, Cave to the
-  Sealed Gate, Esper attack, and Imperial banquet, ending at the stable
-  Thamasa mission handoff.
+- **v0.7 — the playtest release** (re-scoped 2026-07-28, owner call): folds
+  in the v0.6 playtest's non-blockers — the clockwork HUD sync, the MP
+  wallet display, Dance's MP cost, the Bushido ≥1-BP floor, the SwdTech
+  page fix — plus Gau's Ochette kit (learn many, equip 8). The frontier
+  need not move: Sealed Gate route work ships as far as it has landed
+  (legs through the crash are already minted with anchors). The owner
+  resumes playtesting from the Veldt on this release; any Sealed Gate
+  tail rides with Thamasa.
 - **v0.8 — Thamasa** — Thamasa and the burning house through Strago and
   Relm joining and the post-massacre mission transition. The Sketch bug
   ships as-is by owner decision, documented in the release notes
@@ -82,8 +87,11 @@ the rare); Dance / Sketch / Slot / Rage inherit it when their characters
 arrive.
 
 **Release discipline:** every distributable is built through `make patch`,
-which refuses any ROM the test suite has not stamped green; a human
-playtests each rung before it is tagged.
+which refuses any ROM the test suite has not stamped green. The human bar
+is the owner's ratchet rule (2026-07-28): never release an inferior
+experience — a tag must be at least as good as previous releases as far
+as the owner has played; unplayed frontier ships on the machine gates
+with its gaps documented, and the owner's playthrough trails behind.
 
 ## M0 — Toolchain ✅ (done 2026-07-14)
 

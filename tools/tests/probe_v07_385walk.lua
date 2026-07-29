@@ -1,152 +1,88 @@
 -- probe_v07_385walk.lua -- THE PHASE-AWARE CROSSING of BASEMENT 2 (map
 -- 385), the v0.7 band's first genuinely new driving idiom (issue #31,
--- recon §5 hazard 2).  NOT a suite test.
+-- recon §5 hazard 2).  NOT a suite test.  Drives the room entry (1,2) ->
+-- exit (13,13) -> BASEMENT 3 (map 384) and mints v07q_384_entry.mss.
 --
--- WHY navTo CANNOT DRIVE THIS ROOM, measured (probe_v07_385, 2026-07-28):
--- the floor is TWO INTERLEAVED TILEMAPS that swap every 158 frames once a
--- cycle is armed (event_main.asm:44634-44758; `wait 144` + `start_timer
--- ...,144,...` -- the extra ~14 frames are the timer callback's own
--- mod_bg_tiles/wait_bg), and each swap REWRITES the live BG1 tilemap.  So:
---   * from the entry (1,2), the reachable set in the unarmed state is 17
---     tiles and does NOT contain the (13,13) exit, the (10,2) cycle-A
---     trigger, or either cycle-B trigger -- a single BFS can never find a
---     path, in EITHER phase (measured: 17 tiles in $01F5, 12 in $01F6);
---   * the crossing only exists ACROSS TIME: walk as far as the current
---     phase allows, stand still while the floor swaps, walk on.  Measured
---     row 2 as the tilemap flips:
---         $01F5:  x=3..6 walkable (0A), x=7 WALL, x=8 walkable, x=9 WALL
---         $01F6:  x=3 walkable,  x=4..6 WALL,   x=7..9 walkable (02)
---     -- i.e. exactly complementary, and the party crosses by being at the
---     boundary tile when the swap happens.
---   * navTo's contract is "BFS a plan, execute it, condemn an edge that
---     never moved us".  Here every edge is legitimately dead half the time,
---     so navTo would blocklist the whole room and then error "no path".
+-- HISTORY.  Draft 1's walker moved correctly inside a phase and could
+-- never cross between phases (it waited, hasControl-gated, on the
+-- boundary tile and ate the swap).  probe_v07_385win.lua measured the
+-- actual mechanism -- the REWRITE WINDOW (each swap callback rewrites the
+-- tilemap ~13 frames before it flips the phase switches), unconditional
+-- holds (hurt tiles are re-entering trigger tiles that kill hasControl),
+-- and mid-step immunity to the stood-on hurt trigger -- and draft 2
+-- implemented union-graph planning over (x,y,phase) nodes with move /
+-- flip / window edges.  That walker is now lib/ot6_field.lua's
+-- M.phaseWalk (promoted 2026-07-28); this probe carries the map-385 spec
+-- and is the crossing's regression instrument.
 --
--- THE IDIOM (`phaseWalk` below): each aligned frame, take the legal step
--- that most reduces distance to the waypoint, but ONLY if the destination
--- is safe in the CURRENT phase; otherwise hold still and let the floor
--- swap.  Safety is the STATIC hurt-trigger lists from
--- event_trigger.asm:1844-1885 (_cb2dbb hurts while $01F5, _cb2dd2 while
--- $01F6, (15,10) always) -- a belt-and-braces layer over the live model,
--- because the tilemap and the triggers do not have to agree and a mistake
--- costs the whole party HP/8 plus a teleport back to (2,6) and a full
--- $01F0-$01FF wipe (_cb2dae/_cb2e1b, :44858/:44905).
+-- THE ROOM, as measured (probe_v07_385, probe_v07_385win, probe_v07_385door,
+-- addenda §1.5):
+--   * two complementary tilemaps swapping every 158 frames once a cycle
+--     is armed: `wait 144` / `start_timer ..,144,..` chains plus ~14
+--     frames of ASYNC mod_bg_tiles + wait_bg in each callback, which
+--     flips $01F5/$01F6 only AFTER the rewrite (_cb2bb2
+--     event_main.asm:44700, _cb2c57 :44735, _cb2d1e :44812, _cb2d97
+--     :44853);
+--   * reachable sets inside a phase are dead ends (17 tiles in $01F5, 12
+--     in $01F6, from the entry);
+--   * hurt tiles (_cb2dbb while $01F5 / _cb2dd2 while $01F6 / (15,10)
+--     always; event_trigger.asm:1849-1883) cost HP/8 to all four,
+--     teleport SLOT_1 to (2,6) and wipe $01F0-$01FF;
+--   * (3,2)/(10,2) arm cycle A (west half swaps); (11,3)/(13,11) arm
+--     cycle B (east half swaps, west half FREEZES and $01F0 drops --
+--     _cb2c6e stops every timer first).  With $01F0=0 the A triggers
+--     would RE-ARM A and freeze the east half, so the post-B leg lists
+--     them in `avoid`;
+--   * random encounters fire here (a Zombone on the door step, run 3)
+--     and the battle round-trip PRESERVES the cycle switches and timers
+--     (probe_v07_385door) -- M.phaseWalk kill-bits and re-plans.
 -- OT6_ANCHOR_LAYOUT: ot6-codex-o8-v1
 local H = dofile("tools/tests/lib/ot6.lua")
 
 local function map() return H.mapId() & 0x1ff end
 local function sw(id) return (H.readByte(0x1E80 + (id >> 3)) >> (id & 7)) & 1 end
 
--- event_trigger.asm:1848-1884, transcribed
-local HURT_F5 = { {7,2},{9,2},{9,4},{5,5},{6,5},{9,5},{13,5},{13,6},{5,7},
-                  {11,7},{13,7},{14,7},{5,8},{12,9},{6,10},{14,10},{10,11} }
-local HURT_F6 = { {4,2},{5,2},{6,2},{5,3},{7,3},{8,3},{9,3},{11,4},{11,5},
-                  {3,7},{10,8},{11,8},{12,8},{13,8},{14,8},{7,9},{10,9},{9,11} }
-local HURT_ALWAYS = { {15,10} }
-local function keyOf(x, y) return y * 64 + x end
-local hurt5, hurt6, hurtA = {}, {}, {}
-for _, t in ipairs(HURT_F5) do hurt5[keyOf(t[1], t[2])] = true end
-for _, t in ipairs(HURT_F6) do hurt6[keyOf(t[1], t[2])] = true end
-for _, t in ipairs(HURT_ALWAYS) do hurtA[keyOf(t[1], t[2])] = true end
-
-local function unsafe(x, y)
-  local k = keyOf(x, y)
-  if hurtA[k] then return true end
-  if sw(0x01F5) == 1 and hurt5[k] then return true end
-  if sw(0x01F6) == 1 and hurt6[k] then return true end
-  return false
+-- the map-385 phaseWalk spec: hurt lists transcribed from
+-- event_trigger.asm:1849-1884 (verified against source 2026-07-28)
+local function spec385(over)
+  local s = {
+    switches = { a = 0x01F5, b = 0x01F6 },
+    period = 158,
+    region = { w = 17, h = 16 },
+    hurt = {
+      a = { {7,2},{9,2},{9,4},{5,5},{6,5},{9,5},{13,5},{13,6},{5,7},
+            {11,7},{13,7},{14,7},{5,8},{12,9},{6,10},{14,10},{10,11} },
+      b = { {4,2},{5,2},{6,2},{5,3},{7,3},{8,3},{9,3},{11,4},{11,5},
+            {3,7},{10,8},{11,8},{12,8},{13,8},{14,8},{7,9},{10,9},{9,11} },
+      always = { {15,10} },
+    },
+  }
+  for k, v in pairs(over or {}) do s[k] = v end
+  return s
 end
 
-local DIRS = { "up", "right", "down", "left" }
-local DELTA = { up = { 0, -1 }, right = { 1, 0 },
-                down = { 0, 1 }, left = { -1, 0 } }
-
--- Walk toward (tx,ty) across the phase swaps.  Preference order per aligned
--- frame: (1) a full BFS plan's first step, when one exists and is safe --
--- BFS handles the corridors correctly; (2) otherwise the greedy legal step
--- that most reduces Manhattan distance and is safe; (3) otherwise WAIT.
--- `noRegress` forbids a step that increases the distance, so the walker can
--- never oscillate across a swapping boundary.
-local function phaseWalk(tx, ty, maxFrames, what)
-  local hb, waited, steps = -240, 0, 0
-  local pend = nil
-  return H.driveUntil(function()
-    return H.fieldX() == tx and H.fieldY() == ty and H.tileAligned()
-       and H.hasControl()
-  end, maxFrames, {
+-- unconditional held walk with arrival-release (trigger tiles fire a few
+-- frames AFTER entry; releasing on arrival keeps the hold from carrying
+-- the party onto the next -- possibly hurt -- tile during the arming
+-- event); random encounters kill-bitted through
+local function holdWalk(dir, pred, maxFrames, what)
+  local ph = 0
+  return H.driveUntil(pred, maxFrames, {
     H.call(function()
-      if H.dialogWaiting() then H.setPad({}); return end
-      if not (H.hasControl() and H.tileAligned()) then H.setPad({}); return end
-      local x, y = H.fieldX(), H.fieldY()
-      if H.frame - hb >= 240 then
-        hb = H.frame
-        H.log(string.format("[385walk] f%d (%d,%d) -> (%d,%d) $01F5=%d "
-          .. "$01F6=%d steps=%d waited=%d", H.frame, x, y, tx, ty,
-          sw(0x01F5), sw(0x01F6), steps, waited))
-      end
-      if pend then
-        if x ~= pend[1] or y ~= pend[2] then steps = steps + 1 end
-        pend = nil
-      end
-      local function dist(ax, ay) return math.abs(tx - ax) + math.abs(ty - ay) end
-      local d0 = dist(x, y)
-      -- (1) a real BFS plan, if the room currently admits one.  NO-REGRESS
-      -- applies to the BFS step too: measured run 1, from (6,2) in the
-      -- phase where (7,2) is closed, BFS found a long way round and walked
-      -- the party back WEST to (3,2), where the next phase walked it east
-      -- again -- a 6000-frame oscillation.  The room's waypoints are
-      -- straight lines; a step that increases the distance is always the
-      -- walker giving up on the swap it should be waiting for.
-      local plan = H.bfsPath(tx, ty)
-      if plan and #plan > 0 then
-        local d = DELTA[plan[1]]
-        if d then
-          local nx, ny = x + d[1], y + d[2]
-          if not unsafe(nx, ny) and dist(nx, ny) <= d0 then
-            pend = { x, y }
-            H.setPad({ [H.movePress(plan[1])] = true })
-            return
+      ph = (ph + 1) % 8
+      if H.battleLoadStarted() then
+        for s = 0, 5 do
+          if H.readByte(0x3aa8 + s * 2) % 2 == 1 then
+            H.writeByte(0x3eec + s * 2, H.readByte(0x3eec + s * 2) | 0x80)
           end
         end
-      end
-      -- (2) greedy: the safe legal step that most reduces distance
-      local best, bestd = nil, d0
-      for _, dir in ipairs(DIRS) do
-        if H.canStep(x, y, dir) then
-          local d = DELTA[dir]
-          local nx, ny = x + d[1], y + d[2]
-          if not unsafe(nx, ny) and dist(nx, ny) < bestd then
-            best, bestd = dir, dist(nx, ny)
-          end
-        end
-      end
-      if best then
-        pend = { x, y }
-        H.setPad({ [best] = true })
+        H.setPad(ph < 4 and { "a" } or {})
         return
       end
-      -- (3) wait for the floor to swap
-      waited = waited + 1
-      if waited % 120 == 0 then
-        local diag = {}
-        for _, dir in ipairs(DIRS) do
-          local d = DELTA[dir]
-          local nx, ny = x + d[1], y + d[2]
-          diag[#diag + 1] = string.format("%s:%s%s p1dst=%02X",
-            dir, H.canStep(x, y, dir) and "step" or "----",
-            unsafe(nx, ny) and "/HURT" or "",
-            H.readByte(0x7E7600 + H.maptile(nx, ny)))
-        end
-        H.log(string.format("[385walk WAIT] (%d,%d) p1cur=%02X p2cur=%02X "
-          .. "z=%d $01F5=%d $01F6=%d | %s", x, y,
-          H.readByte(0x7E7600 + H.maptile(x, y)),
-          H.readByte(0x7E7700 + H.maptile(x, y)),
-          H.readByte(0x00b2) & 3, sw(0x01F5), sw(0x01F6),
-          table.concat(diag, "  ")))
-      end
-      H.setPad({})
+      if H.dialogWaiting() then H.setPad(ph < 4 and { "a" } or {}); return end
+      H.setPad({ [dir] = true })
     end),
-  }, what or string.format("phaseWalk (%d,%d)", tx, ty))
+  }, what)
 end
 
 H.run({ maxFrames = 60000 }, {
@@ -158,55 +94,49 @@ H.run({ maxFrames = 60000 }, {
     H.assertEq(H.fieldY(), 2, "boot y")
   end),
 
-  -- arm cycle A: the (3,2) trigger (_cb2aca, event_main.asm:44634)
-  phaseWalk(3, 2, 6000, "to the cycle-A arming trigger (3,2)"),
-  H.waitUntil(function() return sw(0x01F0) == 1 end, 1800,
-    "cycle A armed ($01F0)", 5),
+  -- arm cycle A: the (3,2) trigger (_cb2aca, event_main.asm:44634).
+  -- Release on ARRIVAL: $01F0 sets a few frames later, and a hold still up
+  -- would walk the party onto (4,2) -- hurt-$01F6 -- right as timer 0
+  -- fires the first swap callback.
+  holdWalk("right", function() return H.fieldX() >= 3 end, 1800,
+    "held RIGHT onto the cycle-A arming trigger (3,2)"),
+  H.waitUntil(function() return sw(0x01F0) == 1 end, 900,
+    "cycle A armed ($01F0)", 2),
   H.call(function()
-    H.log(string.format("[385] cycle A armed at (%d,%d)", H.fieldX(), H.fieldY()))
-    H.screenshot("v07_385_armedA")
+    H.log(string.format("[385] cycle A armed at (%d,%d)",
+      H.fieldX(), H.fieldY()))
   end),
 
-  -- east along row 2, riding the swaps
-  phaseWalk(6, 2, 6000, "east to (6,2) -- the $01F5 half of row 2"),
-  phaseWalk(9, 2, 6000, "across the swap to (9,2) -- the $01F6 half"),
-  phaseWalk(11, 2, 6000, "to (11,2), the solid east column"),
-  -- arm cycle B: the (11,3) trigger (_cb2c6e, :44746)
-  phaseWalk(11, 3, 6000, "to the cycle-B arming trigger (11,3)"),
-  H.waitUntil(function() return sw(0x01F1) == 1 end, 1800,
-    "cycle B armed ($01F1)", 5),
+  -- west half: (3,2) -> the (6,2)->(7,2) window -> row 2 east -> (11,3),
+  -- whose arrival arms cycle B (and freezes the west in its live phase)
+  H.phaseWalk(11, 3, spec385({ maxFrames = 20000,
+    what = "phaseWalk across row 2 to the cycle-B trigger (11,3)" })),
+  H.waitUntil(function() return sw(0x01F1) == 1 end, 900,
+    "cycle B armed ($01F1)", 2),
   H.call(function()
-    H.log(string.format("[385] cycle B armed at (%d,%d) $01F1=%d",
-      H.fieldX(), H.fieldY(), sw(0x01F1)))
+    H.assertEq(sw(0x01F0), 0,
+      "$01F0 dropped -- arming B stopped cycle A (_cb2c6e -> _cb2b06)")
+    H.log(string.format("[385] cycle B armed at (%d,%d)",
+      H.fieldX(), H.fieldY()))
     H.screenshot("v07_385_armedB")
-    -- the east half's live picture, both halves now cycling
-    for y = 0, 15 do
-      local r = {}
-      for x = 0, 16 do
-        r[#r + 1] = string.format("%02X", H.readByte(0x7E7600 + H.maptile(x, y)))
-      end
-      H.log(string.format("[385B p1 y=%02d] %s", y, table.concat(r, " ")))
-    end
   end),
 
-  -- down the east half to the 384 door at (13,13)
-  phaseWalk(11, 6, 9000, "down the x=11 column to (11,6)"),
-  phaseWalk(13, 11, 12000, "to the cycle-B trigger / east floor (13,11)"),
-  phaseWalk(13, 12, 6000, "to (13,12)"),
+  -- east half: measured plan is (11,3) -> (11,6) in $01F5, then THREE
+  -- window steps -- (11,6)->(11,7), (11,7)->(11,8), (12,8)->(12,9) --
+  -- then $01F6 moves to (13,12)
+  H.phaseWalk(13, 12, spec385({ maxFrames = 30000,
+    avoid = { { 3, 2 }, { 10, 2 } },
+    what = "phaseWalk down the east half to (13,12)" })),
   H.call(function()
     H.log(string.format("[385] at (%d,%d) -- one step above the 384 door",
       H.fieldX(), H.fieldY()))
     H.screenshot("v07_385_door")
   end),
-  (function() local ph = 0
-    return H.driveUntil(function() return map() == 384 end, 2400, {
-      H.call(function()
-        ph = (ph + 1) % 8
-        if H.dialogWaiting() then H.setPad(ph < 4 and { "a" } or {}); return end
-        H.setPad({ down = true })
-      end),
-    }, "held DOWN onto (13,13) -> BASEMENT 3 (map 384)")
-  end)(),
+  H.saveState("v07q_385_door.mss"),
+
+  -- the exit door (13,13) -> BASEMENT 3 (map 384) (26,8)
+  holdWalk("down", function() return map() == 384 end, 2400,
+    "held DOWN onto (13,13) -> BASEMENT 3 (map 384)"),
   H.waitUntil(function()
     return map() == 384 and H.hasControl() and H.tileAligned()
       and (emu.getState()["ppu.screenBrightness"] or 0) >= 15
@@ -219,5 +149,8 @@ H.run({ maxFrames = 60000 }, {
     H.screenshot("v07_384_entry")
   end),
   H.saveState("v07q_384_entry.mss"),
-  H.logStep("385 crossed; parked at the 384 entry"),
+  H.logStep(function()
+    return string.format("385 crossed at frame %d; parked at the 384 entry",
+      H.frame)
+  end),
 })

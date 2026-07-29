@@ -54,6 +54,13 @@ STATES = [
     # `make test` needs these three; they ride the same graph and the same
     # staleness mechanism as everything downstream of them.
     S("battle_doorstep", gen="gen_battle_state"),
+    # first_battle: gen_battle_state's second artifact (the in-battle state
+    # battle_levelup/battle_smoke boot). Under the one-edge-one-artifact
+    # publish rule (#30) the battle_doorstep edge no longer republishes it,
+    # so it needs its own edge or a ROM change strands it stale -- which is
+    # exactly how battle_levelup broke during the Slot landing (9229881's
+    # report). after= orders the two identical emulator runs, no data dep.
+    S("first_battle", gen="gen_battle_state", after="battle_doorstep"),
     S("battle2_doorstep", gen="gen_battle2", prev="battle_doorstep"),
     # whelk doorstep: the dialog-opening boss fight battle_dlgmenu gates.
     # gen_whelk_poweron mints it from COLD POWER-ON -- plays the New Game
@@ -462,4 +469,61 @@ STATES = [
     # contract verdict; run.sh only captures a battery when OT6_CAPTURE_SRM
     # is set, so a mint can never quietly rewrite a tracked anchor.
     S("narshe_mission", gen="gen_narshe_mission", anchor="terra-returned-v1"),
+    # ---- boundary G -> boundary H ------------------------------------------
+    # Leg G->H, whole in one generator (gen_narshe_mission's shape): cold-
+    # boot the narshe-mission-v1 battery, seat TERRA / bench SETZER in the
+    # Blackjack swap room (chase-talk the wandering NPC, YES on $0528, the
+    # NO_RESET party menu), fly to the base pass, walk the Imperial Base
+    # ($0172 -- TERRA is the hard gate, _cb25d6), the cave 382 -> 383 ->
+    # the map-385 TIMED FLOOR (M.phaseWalk's union-graph crossing: arm A at
+    # (3,2), window (6,2)->(7,2), arm B at (11,3), three windows down the
+    # east half), 384's south loop to the (62,11) face-UP+A door switch
+    # ($0173), and the map-386 vanilla save point (74,53) -- boundary H,
+    # `gate-cave-save-v1`, the band's only interior save.  Re-cutting the
+    # battery is a deliberate by-hand operation:
+    #     OT6_SRAM_ANCHOR=tools/tests/anchors/narshe-mission-v1 \
+    #     OT6_CAPTURE_SRM=tools/tests/anchors/gate-cave-save-v1/gate-cave-save.sram \
+    #     tools/tests/run.sh tools/tests/gen_gate_cave_save.lua
+    S("gate_cave_save", gen="gen_gate_cave_save", anchor="narshe-mission-v1"),
+    # ---- boundary H -> boundary I ------------------------------------------
+    # Leg H->I, whole in one generator: cold-boot the gate-cave-save-v1
+    # battery, back down to BASEMENT 3, the WEST traverse (two levers --
+    # (71,15) $0174 and the (104,17) $01F5 tap-once TOGGLE -- then the
+    # (121,23)->(4,37) teleport; measured, addenda Addendum 3: the (58,18)
+    # span and the three walk-overs are NOT on the route), the Sealed Gate
+    # scene (battles 121/122 spared, never kill-bitted), the $0079 tail,
+    # the (5,43) shortcut out, the base re-cross (battle 123 spared, the
+    # scripted crash flight), off the wreck via the map-7 hatch (8,36),
+    # and the world battery save at the crash site (83,239) -- boundary I,
+    # `vector-crash-v1`.  Re-cutting the battery is a deliberate by-hand
+    # operation:
+    #     OT6_SRAM_ANCHOR=tools/tests/anchors/gate-cave-save-v1 \
+    #     OT6_CAPTURE_SRM=tools/tests/anchors/vector-crash-v1/vector-crash.sram \
+    #     tools/tests/run.sh tools/tests/gen_vector_crash.lua
+    S("vector_crash", gen="gen_vector_crash", anchor="gate-cave-save-v1"),
+    # ---- boundary I -> boundary J ------------------------------------------
+    # Leg I->J, whole in one generator (banquet-decode.md is the script;
+    # #10 forbids any boundary inside the banquet block, so the leg is
+    # atomic): cold-boot the vector-crash-v1 battery (the boot tile IS the
+    # wreck -- no A press until the grind), the ~117-step world grind to
+    # Vector 253, the castle escort, the dais face-UP+A, the 14400-frame
+    # window driven to var0==44 (24 soldiers, battles 26/27x3 kill-bit
+    # clean -- $1dd1 & $31 == 0 asserted per fight), the timer expiry, the
+    # dinner Q&A driven to the full 93 (toast/kefka/doma/celes 2-0-1-1,
+    # the question submenu asked exactly once each, espers, recall, the
+    # rest-break challenge battle 30, wish, accompany), the roster strip
+    # to TERRA+LOCKE, the (23,12) messenger (all four reward tiers -- the
+    # >=90 Charm Bangle is frontier canon), the castle exit, and the
+    # world battery save at (120,188) -- boundary J, `banquet-done-v1`.
+    # Re-cutting the battery is a deliberate by-hand operation:
+    #     OT6_SRAM_ANCHOR=tools/tests/anchors/vector-crash-v1 \
+    #     OT6_CAPTURE_SRM=tools/tests/anchors/banquet-done-v1/banquet-done.sram \
+    #     tools/tests/run.sh tools/tests/gen_banquet_done.lua
+    # NOT YET IN THE GRAPH (dispatcher, 2026-07-28): gen_banquet_done is
+    # written but has never driven the >=90 circuit end to end, and anchor
+    # banquet-done-v1 has never been cut -- the window-feasibility question
+    # is open (see the addenda's budget arithmetic). An edge here would fail
+    # every `make frontier`. Restore this line with the anchor when the
+    # circuit run settles the score tier:
+    #     S("banquet_done", gen="gen_banquet_done", anchor="vector-crash-v1"),
 ]

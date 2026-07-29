@@ -316,3 +316,451 @@ Route facts the recon states and this pass drove without surprise:
   **does not unwind on B** — 900 frames of edge-pressed B left `$0059`
   nonzero. Any world-save generator must mint its savestate *before*
   opening the menu.
+
+## Addendum 2 — 2026-07-28, the crossing and anchor H (issue #31, leg G→H finished)
+
+Source: `tools/tests/probe_v07_385win.lua`, `probe_v07_385door.lua`,
+`probe_v07_385walk.lua` (draft 2), `probe_v07_384.lua`,
+`probe_v07_386tile.lua`, `probe_v07_g_boot.lua`, and the minted leg
+`tools/tests/gen_gate_cave_save.lua`.  Same rule as Addendum 1: every claim
+is a log line or a `file:line` read.
+
+### 2.1 RESOLVED — §1.5's blocker: the crossing is the REWRITE WINDOW
+
+The missing "phase-aware timing rule" is three measured facts:
+
+1. **Every swap callback rewrites the tilemap BEFORE it flips the phase
+   switches** — `_cb2bb2` (`event_main.asm:44700`) is `call _cb2b24` (the
+   ASYNC `mod_bg_tiles` + `wait_bg` block) and only THEN
+   `switch $01F5=0 / $01F6=1`; `_cb2c57` (`:44735`), `_cb2d1e` (`:44812`)
+   and `_cb2d97` (`:44853`) all have the same shape.  Measured on the live
+   floor: the whole rewrite lands in ONE frame at **fsf 145** of the
+   158-frame cycle (fsf = frames since the last `$01F6` edge), the switches
+   flip at fsf 158.  For ~13 frames the NEXT phase's floor is physically in
+   place while the hurt triggers — keyed on `$01F5`/`$01F6` — still answer
+   for the OLD phase.
+2. **A held press into a tile the window just opened is taken at fsf ~148**,
+   even though `hasControl()` is false throughout (the timer callback is an
+   event; `player_ctrl_on` stands).  Every hurt tile is an event-trigger
+   tile that re-enters its script each frame when stood on (§1.7's re-entry
+   class), so a `hasControl`-gated walker goes PASSIVE exactly on the
+   boundary tiles — that, precisely, was draft 1's failure at (6,2), and
+   why it then ate the swap standing still.  Unconditional holds are not
+   optional here.
+3. **Mid-step is immune.**  The party left (6,2) at fsf 148, was unaligned
+   through the fsf-158 flip, and took no hurt even though (6,2) is on the
+   `$01F6` hurt list; arrival on (7,2) at fsf 4 of the new phase ran
+   `_cb2dbb`, which `EventReturn`ed (`$01F5` now 0).  `CheckEventTriggers`
+   (`ff6/src/field/event.asm:5740`) demands exact sub-pixel alignment,
+   which a party mid-step never has.
+
+Walls also turned out to be walkable-off: an F7 tile's p2 byte reads $FF
+(all four exit bits), so the engine lets the party step OFF a tile that
+just closed under it — the model's `stepAllowed` agrees once given the
+new-phase snapshot.
+
+`phaseWalk` (now `lib/ot6_field.lua M.phaseWalk`, promoted with
+`M.chaseTalk`) implements the full rule: snapshot the `canStep` grid once
+per phase, BFS the UNION graph over (x,y,phase) nodes with three edge
+kinds — `move` (inside a phase), `flip` (stand through a swap on a tile
+walkable in both phases and on neither hurt list), `window` (the timed
+boundary step, held from fsf ≥ 132) — and execute clocked on observed
+`$01F6` edges (only the four timer callbacks touch `$01F6`; the arming
+scripts' trailing `wait 144 / switch $01F5=1` touches `$01F5` alone).  An
+in-phase lane of k steps is only STARTED when `fsf + 16k + 24 ≤ 158`.
+
+The measured route (deterministic, byte-identical across two runs, and a
+third inside the minted leg): arm A at (3,2) → moves to (6,2) in `$01F5` →
+window → (7,2)..(11,2) in `$01F6` → (11,3) arms B → moves to (11,6) in
+`$01F5` → window (11,7) → window (11,8) → (12,8) → window (12,9) → moves
+to (13,12) in `$01F6` → door (13,13) → 384 (26,8).  Four window steps
+total; the (11,7)→(11,8) pair is two windows back to back, which the
+union BFS found on its own — the hand plan had a longer x=13/x=14 route.
+
+Two more floor facts the crossing depends on:
+
+* **Arming B kills cycle A** — `_cb2c6e` (`:44746`) runs `_cb2b06` = stop
+  every timer + wipe all `$01F0-$01FF`, then re-arms only B, so `$01F0`
+  reads 0 afterward and the WEST half freezes in whatever phase it was.
+  Stepping back onto (3,2)/(10,2) then would RE-arm A and freeze the east
+  half mid-crossing; the post-B `phaseWalk` lists both in `avoid`.
+* **A random encounter does NOT reset the room.**  Map 385 carries an
+  encounter group (a Zombone fired on the door step, walk run 3 — the
+  first draft of the door hold read its battle module as "a menu opened,
+  $59=52").  Measured (`probe_v07_385door`): the battle round-trip is a
+  state restore, not a `LoadMap` — `$01F1`/`$01F3` survive, the timers
+  keep flipping (156-frame gap across the return), and the door works
+  after.  The map-init does re-base the DEAD cycle's region ($01F0=0 →
+  `_cb2bc9`'s static layout), so `phaseWalk` re-snapshots and re-plans
+  after any battle, stepping off a hurt-list tile first if the battle
+  parked it there.
+
+### 2.2 NEW — BASEMENT 3 (384) and the save room, the live census
+
+From the (26,8) entry, fresh map (all `$01Fx` zero — the 385 door's
+`LoadMap` wiped them):
+
+* The reachable set is **263 tiles — the SOUTH loop**: (40,11), (58,18),
+  (62,11) and (66,11) are inside; **(46,11), the save-room door (64,10),
+  the gate door (9,27) and the (5,43) shortcut are NOT**.  The
+  (41..45,11) span of the recon's west bridge is OUT on entry, so the
+  (46,11) retract scene cannot fire on this route at all.
+* **The save-room door is the (62,11) switch.**  `_cb3062`
+  (`event_main.asm:45148`) is face-UP+A gated ($01B0/$01B4); its
+  `_cb303e` patch rewrites {62,10} and {63,9}×{3,3} — which IS the (64,10)
+  doorway (prop F7 → 02, measured) — and latches **persistent `$0173`**,
+  now pinned in the gate-cave-save-v1 contract.  The lever idiom
+  (gen_sabin_train's `upA`: stand ON the trigger, hold UP into the wall,
+  edge-A) fires it in 45 frames.
+* The (66,11) Ninja trap switch is two tiles east of the door and is
+  face+A gated too — plain walk-over `EventReturn`s (`_cb307e:45156`
+  checks `$01B5` and the $01B0/$01B4 pair first).  The route never
+  presses it.
+* 384 (64,10) → **386 (73,58)**, and the save point is the recon's
+  (74,53) (`event_trigger.asm:1888`).  No phase floor anywhere on this
+  route; `navTo` drives everything but the switch and the two doors.
+
+### 2.3 NEW — a HELD press walks THROUGH a save point without firing it
+
+Measured (`probe_v07_386tile`): held UP from (74,54) carried the party
+straight over (74,53) to (74,51) with `$01BF` still 0 — the SavePoint
+trigger never ran.  `CheckEventTriggers` (`field/event.asm:5740`) requires
+the party at exact sub-pixel rest, and a held-press step chain never
+rests.  This is the inverse of the §1.7 re-entry trap: held presses ESCAPE
+trigger tiles, and they also SKIP them.  The idiom that stops ON the tile
+is gen_n024_save_anchor's `tapInto` (tap 8 frames, release, settle) — 26
+frames to `$01BF=1` in the minted leg.  Any future leg that must FIRE a
+walk-over trigger should tap, not hold.
+
+### 2.4 CORRECTION — word($34)/($38) are NOT "the ship" on foot
+
+§1.3 said the ship's tile is `word($34)>>4, word($38)>>4`.  That held in
+flight and aboard; ON FOOT on the world map those cells track the PARTY
+(measured, `probe_v07_g_boot`: both pairs read the party's tile through a
+walk).  The parked ship's true position is the save-block pair
+**`$1F62`/`$1F63`**, and a cold Continue of narshe-mission-v1 restores the
+ship exactly there — (84,36), two south of the party's (84,34) boot tile.
+On anchor F the two coincided because that save was taken aboard.  The
+G→H leg walks to (84,36) first; one A tap there boards and lifts off as
+§1.3 says.
+
+### 2.5 Anchor H stands
+
+`gate-cave-save-v1` is cut: the whole G→H leg lives in
+`gen_gate_cave_save.lua` (gen_narshe_mission's one-generator shape), ends
+on the 386 (74,53) save tile through the real Save UI into slot 3, and
+the graph edge `gate_cave_save` mints from the narshe-mission-v1 battery.
+Exit contract: 22 fields (18 pre-save + the 4 sram witnesses), including
+the Terra invariant party-by-name and `$0173`.  Fail-before observed by
+perturbation (benching SABIN on the minted state fails the pre-save
+contract by name — party count 4→3 and his membership — after an
+unperturbed positive control held all 18); pass-after "all 22 fields
+hold" through the real anchored ninja mint, frame-identical (14090) to
+the by-hand capture run.
+
+## Addendum 3 — 2026-07-28, leg H→I (issue #31): the 384 west traverse, the gate scene ridden, the crash measured
+
+Source: `tools/tests/probe_v07_384west.lua` (+`west2`..`west5`),
+`probe_v07_384toggle.lua`, `probe_v07_gatescene.lua` (+`2`/`3`), and the
+minted leg `tools/tests/gen_vector_crash.lua`.  Same rule as before: every
+claim is a log line or a `file:line` read.
+
+### 3.1 ANSWERED — recon open question 2: the 384 west traverse is TWO levers and a teleport
+
+The recon's expectation ("east across the bridges → toggles → teleport
+back west → (9,27)") was directionally right, and five of the seven
+switch sites are NOT on the route.  Measured, from the 386 exit
+((73,59) → 384 **(64,12)**, short-entrance decode + live):
+
+* **Fresh census from (64,12): 266 tiles** — the south loop again, with
+  the save door held open by persistent `$0173`.  The gate door is not in
+  it; neither teleport is.
+* **(58,18) is a dead end for the traverse.**  It fires (face-UP+A), the
+  event scripts a forced descent — `move DOWN,5` + `jump_low` + `DOWN,1`,
+  the party ends at **(58,24)** and the ledge above rewrites, so the
+  switch tile itself leaves the reachable set — and its `$01F9/$01FA`
+  span (48..50,12) only opens the (46..41,11) west bridge row: census
+  after (still 266 tiles) adds **no** goal tile.  The leg does not press
+  it.
+* **(71,15) (`$0174`, persistent) is the first real key**: the x=76
+  column bridge (76,16..27) takes the census **266 → 587 tiles** — the
+  whole east half, including both walk-over rows, (99,13) and the
+  (104,17) toggle.  The three walk-overs ((89,29) `$0175`,
+  (96,18)/(99,18) `$01F3/$01F4`) serve the treasure-alcove teleport
+  ((94,25) → (90,58)) and the tower's internal ladders; none is needed
+  to go west.
+* **(104,17) (`$01F5`, session TOGGLE) is the second key**: its 5×13
+  tower rewrite takes **587 → 655 tiles** and opens the (120..121,17..23)
+  descent to the teleport pair.
+* **The teleports are one-way single-tile entrance records** (6-byte
+  short-entrance decode, offsets from `short_entrance.inc`’s pointer
+  table): `(4,36)→(121,22)`, `(121,23)→(4,37)`, `(94,25)→(90,58)`,
+  `(90,59)→(94,27)`.  They are LoadMaps: crossing (121,23) **wipes every
+  `$01F0-$01FF` session switch** (`$01F5/$01F9/$01FA` all read 0 on the
+  west side) while `$0173/$0174` re-apply through map-init `_cb2e3d`.
+  Entrances fire under a held walk (only EVENT triggers demand the
+  at-rest frame), so the crossing is a plain `pressWalk`.
+* **The west side is a 64-tile pocket.**  The gate door row —
+  `(9..11,27)`, one long entrance of length 2 → 391 (8,21) — is
+  approached ONLY from the south, up the x=9..11 column; `(12,27)` is not
+  walkable, so the doorstep is **(10,28)**, the same tile the scene later
+  exits onto.  The (5,43) shortcut is NOT reachable before the scene —
+  the recon's "inference, unverified" is now measured fact both ways:
+  after `$0079=1` the `_cb2aa6` retile opens it (post-scene census: 60
+  tiles, (5,43) inside).
+
+### 3.2 NEW — the lever/toggle idiom has a sharp edge the G→H leg never hit
+
+`probe_v07_384toggle`, frame-instrumented on (104,17):
+
+* ONE 8-frame up+A tap fires `_cb33c9`; the event runs ~70 frames and
+  `switch $01F5=1` is its LAST line (event_main.asm:45558) — the switch
+  flips at the END, not on the press.
+* Holding UP on the tile with A released for 900 frames does NOT
+  re-fire.
+* A SECOND tap runs the `_cb3506` reverse branch and toggles BACK.
+
+So the G→H `upA` loop (A edges until the switch reads 1) is the WRONG
+drive for a toggle: iteration 3 of the census probes watched `$01F5` hit
+1 under that loop and read 0 again by the next census — the loop's own
+lingering press had re-armed it.  The H→I generator's `tapLever` (tap
+once, hold up, wait for the flip) is the idiom.  The latched levers
+((62,11)/(71,15)) tolerate the old loop only because their guards
+EventReturn once set.  Both lever tiles are stood-on re-entry triggers
+(§1.7 class): leaving them takes an unconditional held press, and
+DOWN from (71,15) is a wall — the escape must cycle directions.
+
+### 3.3 ANSWERED — the gate scene fires on entry, and its tail is exactly the recon's
+
+* The long entrance lands on the trigger and `_cb39ca` is running by the
+  first observable frame after the map load — **no step needed** (recon
+  §5 hazard 6's "frame-0 or first-step" is settled: frame-0 class).
+* `advanceStory` with `opts.spare={0x017b}` rides the whole thing:
+  exactly two battle loads (121 then 122, live formation `017B` each),
+  never kill-bitted, ~10 270 frames from the door to control.
+* Tail confirmed live: control returns at **384 (10,28)** with
+  `$0079=1 $0471=1 $064D=1 $064C=0`, and the FIELD party is
+  TERRA·LOCKE·EDGAR·SABIN again (`char_party TERRA,0` at :46095 undone
+  at :46202) with SETZER still benched.
+
+### 3.4 ANSWERED — the base re-cross and the crash, end to end
+
+* From the pocket, (166,194) enters the base east door (30,13); the west
+  trigger row fires `_cb280f`.  With SETZER benched (`$01A9=0`) the
+  scene takes the `_cb28ea` NPC-crew branch (`$0459` latch): the deck
+  scene stages a crew NPC where Setzer would stand, battle 123 loads
+  once (`017B`), and the whole stretch — ensemble scene, `$0242=1`,
+  deck scene, battle, crash flight — took **6 304 frames** from the
+  trigger row to control.
+* **Control returns on MAP 6 at (16,6)**, not on the world map: the
+  crash tail is `set_parent_map 0,{83,239}` + `load_map 6,{16,6}` with
+  a startup event (event_main.asm:44520-44531).  Recon leg 4's "control
+  aboard the grounded wreck" means the DECK; the world map is only
+  reached through the hatch.
+* Switches after, measured: `$007A=1 $007B=1 $01BA=1 $0242=1 $0246=0`;
+  the wreck's cells `$1F62/$1F63 = (83,238)` (`airship_pos`, :44494).
+  The field party is intact across `battle_event $15` — the deck-roster
+  rewrite never leaks out (§1.6 verdict 5 re-confirmed on the real
+  route).
+
+### 3.5 NEW — off the wreck: the hatch, the dead wheel, and where the leg actually ends
+
+* The wheel refusal is the airship-dead behavior: with `$007A=1` and
+  `$0176=0`, facing-LEFT+A on (14,6) EventReturns before any dialog
+  (`_caf532`, event_main.asm:36118-36127) — 300 frames of LEFT+A edges
+  open nothing (asserted in the generator).
+* The way out is the map-7 hatch: deck door (20,6) → 7 (40,11), interior
+  stairs (40,18)→(50,51) and (50,62)→(10,30) (short-entrance decode),
+  then the (8,36) trigger `_caf4b1` — its `$007A=1/$009D=0` branch does
+  `load_map 511` ON FOOT.
+* **The hatch drops the party ON the wreck's own world tile (83,238)**,
+  not the parent-map cell (83,239): measured `$E0/$E2=(83,238)`,
+  `$1F60/61=(83,238)`, `$11FA` on-foot.  An A tap standing there
+  RE-ENTERS the wreck interior (worldMode drops) — the wreck is
+  enterable scenery that cannot fly, and the generator never presses A
+  on the world because of it.
+* Anchor I is therefore cut exactly at the recon §2.2 table's own tile,
+  **(83,238)**, standing on the dead Blackjack.
+
+### 3.6 Anchor I stands
+
+`vector-crash-v1` is cut: the whole H→I leg lives in
+`gen_vector_crash.lua` (the gen_gate_cave_save shape), cold-Continues the
+gate-cave-save-v1 battery — whose boot tile is itself a §1.7 re-entry
+trap (the SavePoint trigger re-enters every frame, so the boot gate
+counts alignment, never control, and leaves with a held press — the
+first cold Continue of a FIELD-save battery in the tree), and saves
+through the real Save UI into slot 3 on the world map at (83,238).  Exit
+contract: 30 fields (26 pre-save + the 4 sram witnesses), headlined by
+the dead airship (`$007A=1`, `$0246=0`, the wreck cells) and the intact
+gate four.  Fail-before observed by perturbation
+(`probe_v07_i_negative`: clearing `$007A` on the minted state fails the
+pre-save contract by name after an unperturbed positive control held all
+26); pass-after "all 30 fields hold" through the real anchored ninja
+mint (`vector_crash` from the gate-cave-save-v1 battery),
+frame-identical (29001) to the by-hand capture run.
+
+## Addendum 4 — 2026-07-28, leg I→J (issue #31): the grind, the castle that opens at the dais, and the window-feasibility measurement
+
+Source: `tools/tests/probe_banquet_stage.lua`,
+`probe_banquet_interior.lua`, `probe_banquet_castle.lua`, and the
+in-progress leg `tools/tests/gen_banquet_done.lua`.  Same rule as
+Addenda 1-3: every claim is a log line or a `file:line` read.
+
+**This addendum is partial** — it records the leg's route work and the
+score-tier measurement.  The tier is settled (§4.6, and
+`banquet-decode.md` §9); the leg generator was not driven end to end and
+anchor J was NOT cut.  §4.8 states exactly what remains.
+
+### 4.1 CORRECTION — `worldBfs`'s node cap silently failed the 117-step grind
+
+`M.worldBfs`'s BFS node cap was **20000**, sized (its own comment) for
+the 63-step Narshe→Figaro leg.  The I→J grind is ~117 steps and its
+search disc overruns that cap, so `worldBfs` returned **nil** — and the
+shared `worldGrind` idiom treats nil as "no plan this frame" and idles.
+Measured (`probe_banquet_stage` run 2): 60000 frames of a neutral pad at
+world (83,238), and **not one log line**, because no caller logged the
+nil.  Raised to 60000 (`lib/ot6_field.lua`, `M.worldBfs`) and every
+copy of `worldGrind` now heartbeats a NO PATH line.
+
+### 4.2 CORRECTION — the shared `worldGrind` desyncs on long paths
+
+The `gen_vector_doorstep` grinder consumes **one plan entry per aligned
+frame**.  The party is aligned for several frames before a press latches,
+so on a straight line the wasted entries agree in direction and nothing
+shows — but every TURN desyncs the plan against the party's real tile and
+forces a full replan.  Measured on this leg (run 4): **~139 frames per
+tile**, a (73,221)↔(73,222) oscillation with the plan length jumping
+86→93, and the emulator dragged to ~40fps by the per-frame BFS.
+
+The fix is navTo's own rule, worldized: consume an entry only when the
+party **lands on that entry's destination tile**, replan on drift, and
+abandon a press that has provably not moved the party in 90 aligned
+frames.  Measured after: **16 frames per tile**, one BFS per leg.  This
+lives in the I→J probes and generator; promoting it over the shared
+idiom is a Follow-up (every world leg in the tree has the same latent
+bug, hidden only by shorter paths).
+
+### 4.3 NEW — the crash-site boot tile, confirmed as a hazard the gate must dodge
+
+`H.worldMode()` reads **true at the title screen** (`$1F64 & $3FF` is
+< 3 there too), so a Continue drive gated on `worldMode` alone stops
+pressing A before the save even loads — run 1 timed out that way.  The
+gate that works is **brightness + position**: press A only while the
+screen is lit and the party is not yet at (83,238), and disarm forever
+once it is.  That is also what keeps the leg off the H→I report's first
+hazard — an A tap on (83,238) re-enters the wreck interior.
+
+### 4.4 NEW — map 250 is severed until the banquet starts, by two NPCs
+
+The recon's §8 ledger flags 250's interior passability as
+"derived from entrances + NPC coordinates only; no live census".  The
+live census contradicts the natural reading of it, and the mechanism is
+worth pinning because it invalidates any route census taken before the
+dais:
+
+* **From the 250 entry (23,33) the reachable set is 131 tiles** — the
+  entrance hall, the corridor, and the four hall soldiers.  The dais is
+  NOT in it (`navTo (23,33)->(54,17)`: no path, 20 retries).
+* The west and east columns are severed at exactly **(16,30)** and
+  **(30,30)** — and those two tiles carry the `$0630` "Emperor Gestahl
+  waits inside" servant NPCs (`npc_prop.asm` map-250 records 11-12,
+  event `_cc83c6`).  They are OBJECT blocks, not tile blocks: the flood
+  also shows the four hall soldiers' own tiles punched out of their rows.
+* **`_cc8490` clears `$0630` one line before it sets `$007C`**
+  (`event_main.asm:97415-97418`).  The castle therefore opens exactly
+  when the window starts, and the circuit runs in a component no
+  pre-banquet census can see.
+
+**The route to the dais is the stairs, not a walk** (measured):
+the `{22,29}` doorway is a door tile the BFS model reads as a wall and
+needs a HELD UP press (the `{14,8}` class); **(23,12) is the messenger
+trigger and WEDGES `navTo`** even gated off (`$007D=0`) because it
+re-enters at every rest frame, so the messenger tile and the (23,9)
+stairs are crossed in ONE held press (held presses skip walk-over
+triggers, Addendum 2.3); (23,9) → (54,34) is a short entrance, and from
+(54,34) the dais is an ordinary 17-step `navTo`.
+
+### 4.5 CORRECTION — the dais is a stand-on face-UP+A trigger, and `tapLever` cannot drive it
+
+`_cc8490`'s gate is `$01B4=0 or $01B0=0 or $007C=1 → EventReturn`
+(`event_main.asm:97243-97247`): `$01B0` = facing up, **`$01B4` = A
+HELD**.  `M.tapLever` — the Addendum 3.2 idiom, correct for 384's
+latches and toggles — releases A after 8 frames and then holds only UP,
+so the gate reads A clear forever: measured, 9000 frames on the tile with
+no latch.
+
+What makes facing-up work without walking off the trigger is the
+**GESTAHL NPC standing at (54,15)** (the `$062E` object, `npc_prop`
+map-250 record 5, cleared by the same `_cc8490` tail at `:97414`): it
+blocks the step exactly the way `gen_sabin_train`'s `upA` holds into a
+wall.  The drive is therefore **stand ON (54,16), hold UP+A** with a
+short periodic A release so the edge re-arms.
+
+`M.tapLever` and `M.stepOff` were promoted from `gen_vector_crash` into
+`lib/ot6_field.lua` this pass (pre-approved); this correction is the
+boundary of `tapLever`'s applicability, and belongs with it.
+
+### 4.6 MEASURED — the window budget and the SCORE TIER
+
+The window's arithmetic (timer `$1189`, counting DOWN from 14400):
+
+| beat | timer | cost |
+|---|---|---|
+| control returns after the Gestahl/Cid scene | **14302** | tail ~98 |
+| throne-tower exit (53,35) → corridor (23,11) | 13817 | **393** |
+| four nearest soldiers talked | 12981 | **836** (209 avg) |
+
+Pure talk cost ≈110-130 frames; the rest is walking (~16 frames/tile,
+and the region traversals from the corridor are 38-62 steps EACH WAY).
+
+**The tier decision, settled by measurement.**  The greedy circuit driver
+(`probe_banquet_greedy.lua`) runs the window to expiry and reads `var0`
+at the frame `$013C` latches.  Best of six runs: **`var0` = 26, 16 of 24
+soldiers**; a second tuned run wedged at 19, so 26 is a floor with real
+variance, not a ceiling.  Since the messenger scores window + Q&A (44) +
+challenge (5), the total is **75** — the **≥67** tier (base weapons),
+clearing its threshold by 8 with a driver that still wastes frames.
+≥77 would need only 2 more window points and ≥90 would need 41 of 44,
+i.e. a near-perfect circuit.  Ruling and full arithmetic are recorded as
+a dated correction in `banquet-decode.md` §9.
+
+Three route facts the driver had to learn the hard way, each now a
+one-line rule:
+
+* **243 is a one-way pocket** (§4.4 below) — visit it LAST, and route
+  around its (22..24,34) door row until then.  A run that wandered in
+  sat for 11 835 frames.
+* **Never re-plan on the transition frame.**  Right after a map change
+  `fieldX`/`fieldY` still read the old map's tile, so a `bfsPath` taken
+  then finds a route `navTo` cannot, and burns its whole no-path retry
+  budget (~950 frames).  Five of those cost one run 4750 frames.
+* **One strike per NPC.**  A soldier that does not answer promptly is
+  worth 1 point and cost 4400 frames across two retries.
+
+### 4.7 NEW — `bfsPath`/`navTo`/`chaseTalk` gained an `avoid` set
+
+A one-way entrance sitting inside an otherwise ordinary walkable region
+is a hazard the navigator had no way to express: the 243 door row is
+three tiles in the middle of 250's corridor, and a plan aimed anywhere
+past it crossed it by accident.  `M.bfsPath(tx, ty, blockedEdges, avoid)`
+now takes a tile set it will not route THROUGH (the goal tile itself is
+exempt), plumbed through `M.navTo`'s `opts.avoid` and `M.chaseTalk`'s
+`opts.avoid`.
+
+A note for whoever writes the next guard: the first version of this one
+was written `local p = (into243 and AVOID243()) and nil or bfs(...)`,
+which reads like a guard and is not one — `X and nil` is `nil`, which is
+falsy, so the `or` branch always runs and the guard never fires.  It
+took a full run and a route dump to see it.  Guards get an explicit
+`if`.
+
+### 4.8 What this leg still owes
+
+The tier is settled; the leg is not.  Not done, and explicitly NOT
+claimed: `gen_banquet_done.lua` has not been driven end to end (its
+circuit section still encodes the withdrawn ≥90 route and needs
+rebuilding on the greedy driver plus the 243-last rule), **anchor J is
+not cut**, and its contract `banquet-done-v1` — amended to the ≥67 tier,
+with the two higher rewards asserted ABSENT — has never been evaluated
+against a real state.  No fail-before/pass-after exists for it.

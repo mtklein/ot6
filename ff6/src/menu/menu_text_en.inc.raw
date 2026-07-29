@@ -113,6 +113,19 @@ MENU_TEXT_INC = 1
 .define OT6_GENJU_STAT_STAMINA          {$92,$ad,$9a,$a6,$a2,$a7,$9a,$00}  ; Stamina
 .define OT6_GENJU_STAT_MAGPWR           {$8c,$9a,$a0,$c5,$8f,$b0,$ab,$00}  ; Mag.Pwr
 
+; OT6 (#8 Layer B / #39): the Bushido loadout configurator's labels.  These
+; MUST come through this file's encode pipeline: a bare string literal in
+; field_menu.asm assembles under the ending-credits .charmap that
+; ending_anim.asm installs earlier in menu_main.asm's include order (and gets
+; no $00 terminator), which is exactly issue #39's garbled SwdTech page.
+.define OT6_LOADOUT_TITLE               BG1A, {2, 1},  {$81,$94,$92,$87,$88,$83,$8e,$ff,$8b,$8e,$80,$83,$8e,$94,$93,$00}  ; BUSHIDO LOADOUT
+.define OT6_LOADOUT_POOL                BG1A, {2, 13}, {$8b,$84,$80,$91,$8d,$84,$83,$00}  ; LEARNED
+.define OT6_LOADOUT_LBL0                BG1A, {2, 4},  {$b4,$b1,$00}  ; 0x
+.define OT6_LOADOUT_LBL1                BG1A, {2, 6},  {$b5,$b1,$00}  ; 1x
+.define OT6_LOADOUT_LBL2                BG1A, {2, 8},  {$b6,$b1,$00}  ; 2x
+.define OT6_LOADOUT_LBL3                BG1A, {2, 10}, {$b7,$b1,$00}  ; 3x
+.define OT6_LOADOUT_MP_SUFFIX           {$ff,$8c,$8f,$00}  ;  MP
+
 ; ------------------------------------------------------------------------------
 
 ; item menu text strings

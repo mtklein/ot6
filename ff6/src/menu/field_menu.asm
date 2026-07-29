@@ -2859,7 +2859,9 @@ Ot6LoadoutDrawCost:
         stz     hWMDATA
         jmp     DrawPosTextBuf
 
-Ot6LoadoutCostTiles:    .byte " MP", 0
+Ot6LoadoutCostTiles:    raw_text OT6_LOADOUT_MP_SUFFIX  ; " MP" + $00 (issue #39:
+                        ; encoded via menu_text_en.inc -- a bare literal here
+                        ; picks up ending_anim.asm's credits charmap)
 
 ; ---- cursor: single column, four rows over the boost slots ----
 Ot6LoadoutCursorProp:
@@ -2870,13 +2872,17 @@ Ot6LoadoutCursorPos:
         cursor_pos {8, 62}
         cursor_pos {8, 78}
 
-; ---- positioned labels ----
-Ot6LoadoutTitleText:    pos_text BG1A, {2, 1},  {"BUSHIDO LOADOUT"}
-Ot6LoadoutPoolText:     pos_text BG1A, {2, 13}, {"LEARNED"}
-Ot6LoadoutLbl0Text:     pos_text BG1A, {2, 4},  {"0x"}
-Ot6LoadoutLbl1Text:     pos_text BG1A, {2, 6},  {"1x"}
-Ot6LoadoutLbl2Text:     pos_text BG1A, {2, 8},  {"2x"}
-Ot6LoadoutLbl3Text:     pos_text BG1A, {2, 10}, {"3x"}
+; ---- positioned labels (issue #39: the strings live in menu_text_en.inc so
+; the encode pipeline maps them to menu-font tiles and null-terminates them;
+; bare literals here assemble under ending_anim.asm's credits charmap, and
+; without a terminator DrawPosText streams the data/code that follows into
+; the tilemap -- the garbled-page bug) ----
+Ot6LoadoutTitleText:    pos_text OT6_LOADOUT_TITLE
+Ot6LoadoutPoolText:     pos_text OT6_LOADOUT_POOL
+Ot6LoadoutLbl0Text:     pos_text OT6_LOADOUT_LBL0
+Ot6LoadoutLbl1Text:     pos_text OT6_LOADOUT_LBL1
+Ot6LoadoutLbl2Text:     pos_text OT6_LOADOUT_LBL2
+Ot6LoadoutLbl3Text:     pos_text OT6_LOADOUT_LBL3
 
 .endif   ; LANG_EN
 
