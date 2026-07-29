@@ -202,7 +202,9 @@
         bcc     @slot
         jsr     Ot6Boost        ; l/r boost input
         jsr     Ot6RevealPoll   ; #33: a numeral appeared? commit the reveals
-        jsr     Ot6PipStage     ; #33: stage the four live pip-row words
+        bcc     :+              ; #42: carry = THIS tick saw the numeral, so
+        jsr     Ot6PipPending   ;   a deferred cover pip paints on it too
+:       jsr     Ot6PipStage     ; #33: stage the four live pip-row words
         jsr     Ot6WalletStage  ; #35: stage the costed-list MP wallet
         plb
         ply
@@ -1154,6 +1156,58 @@ OT6_RANDMAGIC := $a5            ; the marker value (junk is $00/$ff in
         plx
         sec
         rts
+.endproc
+
+; ------------------------------------------------------------------------------
+
+; [ commit a DEFERRED pip paint onto the live cell (#42) ]
+;
+; WHY THE PAINT DEFERS AND THE BANK DOES NOT.  #37 banks the True Knight's BP
+; at SetCoverTarget's commit, which is correct and stays: that instruction IS
+; the block as the engine understands it, and Runic's template governs the
+; mechanic.  But the engine's decision to retarget precedes the DAMAGE NUMERAL
+; by 83-147 frames (measured, battle_trueknight's frame table), and OT6_PIPTAIL
+; is 32 -- so arming the cell at the commit made the pip flash and fade about
+; two seconds before the blow visibly landed on the knight.  #33's rule is that
+; a pip moves when the thing it represents happens, and what a player perceives
+; as "the block" is the hit landing on the blocker, not the retarget.
+;
+; So Ot6CoverBP banks the blocker's slot into OT6_PIPPEND and this proc moves
+; it into OT6_PIPSLOT/OT6_PIPTAIL -- the same bank-then-commit shape
+; Ot6RvPend*/Ot6RevealCommit already use for weakness reveals, driven off the
+; same trigger (Ot6RevealPoll's numeral-counter change, ot6_break.asm).
+;
+; A MISS PAINTS TOO, and lands on the right frame for free.  FF6 draws "Miss"
+; through GfxCmd_0b -- the miss arm branches into the very tail that increments
+; the numeral counter (btlgfx_main.asm:24725-24735 -> :24799) -- so the numeral
+; frame for a missed attack is the frame the word "Miss" appears over the
+; knight.  That is the ruling #42 asked for: the earn pays whether or not the
+; blow connects (he stepped in front of his ally either way), and suppressing
+; the pip would leave a silent +1 BP -- a worse desync than the early one this
+; fixes, and invisible rather than merely mistimed.
+;
+; TWO CALLERS, the second a backstop.  GfxCmd_0b returns without touching the
+; counter when the numeral value is $ffff ("hide numerals", :24707-24710), and
+; some scripts issue no numeral at all -- so Ot6ActionEnd calls this at the end
+; of every action for exactly the reason it already calls Ot6RevealCommit: a
+; pending paint must never outlive the action that banked it.  It runs there
+; AFTER that proc's own charge arm, so the rarer out-of-turn cover wins the one
+; live cell; the actor's own bank is restaged at the next window open anyway
+; (Ot6PipGlyph_ext), while a cover earn has no other moment.
+;
+; a8/i16, db=$7e.  clobbers a; preserves x/y.
+.proc Ot6PipPending
+        .a8
+        .i16
+        lda     f:$7e0000+OT6_PIPPEND
+        beq     @none                   ; 0 = nothing deferred
+        dec     a                       ; stored as slot + 1
+        sta     f:$7e0000+OT6_PIPSLOT
+        lda     #32                     ; OT6_PIPTAIL: ~half a second of live
+        sta     f:$7e0000+OT6_PIPTAIL   ;   painting, Ot6ActionEnd's own value
+        lda     #$00
+        sta     f:$7e0000+OT6_PIPPEND   ; consumed (stz has no long mode)
+@none:  rts
 .endproc
 
 ; ------------------------------------------------------------------------------

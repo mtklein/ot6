@@ -50,14 +50,22 @@
 -- Asserted, in order, so a fixture failure never masquerades as a product one:
 --   1. the cover really commits, onto OUR knight;
 --   2. the bank rises by exactly 1, in the SAME FRAME as the commit;
---   3. the party-window pip cell shows the new bank within a few frames --
---      #33's clockwork rule, through the OT6_PIPTAIL / OT6_PIPSLOT machinery
---      Ot6ActionEnd already uses;
+--   3. the PIP is deferred to the damage frame (issue #42): NOT armed on the
+--      commit frame any more, banked into OT6_PIPPEND there and committed onto
+--      the live cell on the numeral-counter edge -- with the measured gap
+--      between the two named in the log's frame table;
 --   4. ONCE PER ROUND: further covers in the same round still redirect the hit
 --      but bank nothing;
 --   5. and the round boundary is REAL -- after the blocker takes his own turn
 --      (Ot6ActionEnd), the next cover pays again.  Without 5, "once per round"
---      and "once per battle" would both pass 4.
+--      and "once per battle" would both pass 4;
+--   6. a scheduled pip is always DELIVERED -- the property that makes #42's
+--      miss ruling safe (a covered attack that misses still pays, so it must
+--      still paint; see that arm for the ruling and its ROM grounding).
+--
+-- #42 measured the pre-change timing with this same instrument: the commit
+-- preceded the numeral by 83-147 frames while OT6_PIPTAIL is 32, so the pip
+-- flashed and faded about two seconds before the block visibly landed.
 local H = dofile("tools/tests/lib/ot6.lua")
 local STATE = "build/states/battle_doorstep.mss.lua"
 
@@ -143,6 +151,71 @@ local function armBank()
   end, emu.callbackType.write, 0x7E3E9C + knight * 2, 0x7E3E9C + knight * 2)
 end
 
+-- ------------------------------------------------------- #42 instruments --
+-- The three OT6 cells the deferral moves through (ot6_memory.inc):
+--   OT6_PIPTAIL $57bb   frames of live pip painting left; a write of 32 IS an
+--                       arm (Ot6ActionEnd and Ot6PipPending are its only ones)
+--   OT6_PIPSLOT $ed6b   the slot that cell follows -- written just BEFORE the
+--                       tail by both armers, so reading it in the tail's
+--                       callback names who was armed
+--   OT6_PIPPEND $ed74   #42's own deferral cell: blocker slot + 1 at the cover
+--                       commit, back to 0 when the paint is delivered
+local PIPTAIL, PIPSLOT, PIPPEND = 0x57BB, 0xED6B, 0xED74
+local NUMCTR_SRC = 0x632E         -- the damage-numeral thread counter itself
+
+local pipArms = {}    -- { f = frame, slot = who } per OT6_PIPTAIL arm
+local pendWrites = {} -- { f = frame, v = value } per OT6_PIPPEND write
+local numerals = {}   -- frames on which $632e changed -- the damage frames
+
+-- THE NUMERAL SUPPRESSOR (arm 6b).  Ot6RevealPoll fires on a CHANGE in $632e
+-- against its last-seen copy OT6_NUMCTR ($ed71); mirroring every write to
+-- $632e straight into that copy means the poll never sees an edge, so the
+-- numeral path is switched off deterministically and only Ot6ActionEnd's
+-- backstop can deliver a pending pip.  This is how the numeral-LESS action --
+-- the one real hole in "a scheduled pip is always delivered" -- gets exercised
+-- without needing a script that happens not to draw a number.
+local NUMCTR_SHADOW = 0xED71
+local numSuppress = false
+
+local function armPip()
+  emu.addMemoryCallback(function(_, v)
+    if numSuppress then H.writeByte(NUMCTR_SHADOW, v) end
+  end, emu.callbackType.write, 0x7E0000 + NUMCTR_SRC, 0x7E0000 + NUMCTR_SRC)
+  emu.addMemoryCallback(function(_, v)
+    if v == 32 then
+      pipArms[#pipArms + 1] = { f = H.frame, slot = H.readByte(PIPSLOT) }
+    end
+  end, emu.callbackType.write, 0x7E0000 + PIPTAIL, 0x7E0000 + PIPTAIL)
+  emu.addMemoryCallback(function(_, v)
+    pendWrites[#pendWrites + 1] = { f = H.frame, v = v }
+  end, emu.callbackType.write, 0x7E0000 + PIPPEND, 0x7E0000 + PIPPEND)
+end
+
+-- The numeral EDGE, sampled the way Ot6RevealPoll sees it: once per frame,
+-- from the main loop.  GfxCmd_0b's last act is `inc w7e632e`
+-- (btlgfx_main.asm:24799) -- and the MISS arm reaches that same tail
+-- (:24725-24735 `bra @a589`), so a missed attack raises this counter exactly
+-- like a damaging one.  That is why #42's ruling is that a missed cover still
+-- paints its pip, and why it needs no separate path to do so.
+local lastNum = nil
+local function sampleNumeral()
+  local n = H.readByte(NUMCTR_SRC)
+  if lastNum ~= nil and n ~= lastNum then numerals[#numerals + 1] = H.frame end
+  lastNum = n
+end
+
+local function firstAtOrAfter(list, f)
+  for _, x in ipairs(list) do if x >= f then return x end end
+  return nil
+end
+local function armsFor(slot, f0, f1)
+  local t = {}
+  for _, a in ipairs(pipArms) do
+    if a.slot == slot and a.f >= f0 and a.f <= f1 then t[#t + 1] = a.f end
+  end
+  return t
+end
+
 -- the blocker's party-window pip cell (both bands), battle_clockwork's reader
 local function pipCells()
   local reg = H.readByte(0x897F)
@@ -154,14 +227,20 @@ local function pipCells()
          emu.readWord(base + (9 + row * 2) * 0x40 + 40, emu.memType.snesVideoRam)
 end
 
-local watchGlyph, glyphFirstF = nil, nil
+local watchGlyph, glyphFirstF, glyphMenu = nil, nil, nil
 local function sample()
   pinField()
+  sampleNumeral()
   if knight then lastBp = bp(knight) end
   if watchGlyph and not glyphFirstF then
     local lo, hi = pipCells()
     if lo and ((lo & 0xFF) == watchGlyph or (hi & 0xFF) == watchGlyph) then
       glyphFirstF = H.frame
+      -- WHOSE paint was it?  With a battle menu open the party window stages
+      -- every row's TRUE bank (Ot6PipGlyph_ext), which is correct and is not
+      -- the live cell #42 governs -- so the glyph is corroboration, and the
+      -- deferral is asserted on OT6_PIPPEND / OT6_PIPTAIL instead.
+      glyphMenu = H.readByte(MENU) ~= 0
     end
   end
 end
@@ -208,6 +287,7 @@ H.run({ maxFrames = 60000 }, {
     pinField()
     armCover()
     armBank()
+    armPip()
     emu.addEventCallback(function() sample() end, emu.eventType.startFrame)
   end),
   H.waitFrames(120),
@@ -221,15 +301,24 @@ H.run({ maxFrames = 60000 }, {
       "and is NOT stopped (CheckCoverTarget would drop him)")
     H.assertEq(H.readByte(0x3C58 + attacker * 2) & TRUE_KNIGHT, 0,
       "and he is the ONLY True Knight on the field")
+    H.assertEq(H.readByte(PIPPEND), 0,
+      "no deferred pip is pending before the first cover (InitBP cleared it)")
     H.writeByte(0x3E9C + knight * 2, 1)          -- a bank with room to grow
     H.writeByte(0x3E9D + knight * 2, 0)
     covers, bpWrites = {}, {}
+    pipArms, pendWrites, numerals = {}, {}, {}
     watchGlyph = PIP[2]                          -- the glyph a +1 must produce
   end),
 
   -- ------------------------------------ 1/2/3. the first cover of a round --
   H.driveUntil(function() return #covers > 0 end, 24000, DRIVE,
     "a True Knight cover commits"),
+  -- #42: the damage numeral for that hit is 83-147 frames further on, so the
+  -- old flat 60-frame settle would now sample before the pip paints.  Drive to
+  -- the numeral edge itself and then let the vram flush land.
+  H.call(function() H.vars.cf = covers[1].f end),
+  H.driveUntil(function() return firstAtOrAfter(numerals, H.vars.cf) ~= nil end,
+    1200, DRIVE, "the damage numeral that follows the covered hit"),
   H.waitFrames(60),                              -- let the vram flush land
   H.call(function()
     local c = covers[1]
@@ -246,14 +335,65 @@ H.run({ maxFrames = 60000 }, {
     H.assertEq(#bpWrites, 1, "exactly one bank write")
     H.assertEq(bpWrites[1].f, c.f,
       "and it lands on the COMMIT frame -- the block frame, not near it")
-    -- 3. the pip
+    -- 3. THE PIP, DEFERRED TO THE DAMAGE FRAME (#42).
+    --
+    -- #37 armed OT6_PIPSLOT/OT6_PIPTAIL inside Ot6CoverBP, on the commit
+    -- instruction itself.  Measured here, that commit precedes the damage
+    -- numeral by 83-147 frames while the tail is 32 -- so the pip flashed and
+    -- faded roughly two seconds BEFORE the block visibly landed.  The bank
+    -- stays on the commit (asserted just above, unchanged); only the PAINT
+    -- moves, banked into OT6_PIPPEND and committed off the numeral-counter
+    -- edge by Ot6PipPending, the same shape Ot6RevealCommit/Ot6RevealPoll use.
+    --
+    -- The measurement is on the MECHANISM cells, not on the screen glyph: with
+    -- a battle menu open the party window paints every row's true bank anyway
+    -- (Ot6PipGlyph_ext), which is correct behaviour and not the live cell this
+    -- issue governs.  So the glyph is logged as corroboration and the frames
+    -- are asserted on OT6_PIPPEND / OT6_PIPTAIL.
+    local nf = firstAtOrAfter(numerals, c.f)
+    H.assertEq(nf ~= nil, true, "a damage numeral followed the covered hit")
+    H.log(string.format(
+      "FRAME TABLE: commit f%d | numeral f%d (+%d) | knight pip arms %s | "
+      .. "glyph f%s | PIPPEND writes %s",
+      c.f, nf, nf - c.f,
+      "{" .. table.concat(armsFor(knight, c.f, nf + 30), ",") .. "}",
+      tostring(glyphFirstF),
+      (function() local t = {} for _, w in ipairs(pendWrites) do
+        t[#t + 1] = string.format("f%d=%d", w.f, w.v) end
+        return "{" .. table.concat(t, ",") .. "}" end)()))
+
+    -- the deferral cell: armed on the COMMIT frame, consumed on the NUMERAL
+    -- frame.  Both halves named, so a regression in either direction shows.
+    H.assertEq(pendWrites[1] ~= nil and pendWrites[1].f == c.f, true,
+      "OT6_PIPPEND is banked on the commit frame")
+    H.assertEq(pendWrites[1].v, knight + 1,
+      "and it holds the BLOCKER's slot + 1 (0 means nothing pending)")
+    local cleared = nil
+    for _, w in ipairs(pendWrites) do
+      if w.v == 0 and w.f >= c.f then cleared = w.f; break end
+    end
+    H.assertEq(cleared, nf,
+      "and it is consumed on the numeral frame, not before")
+
+    -- THE REGRESSION #42 EXISTS FOR: no live-cell arm for the knight on the
+    -- commit frame.  Before the fix there was exactly one, right there.
+    H.assertEq(#armsFor(knight, c.f, c.f), 0,
+      "the pip is NOT armed on the commit frame any more (it was, and faded "
+      .. "83-147 frames before the hit landed)")
+    H.assertEq(#armsFor(knight, nf, nf) >= 1, true,
+      string.format("it is armed on the numeral frame f%d -- the frame the "
+        .. "player sees the blow land on the blocker", nf))
+    H.assertEq(nf - c.f > 32, true,
+      string.format("and the gap the deferral closes is real: %d frames, "
+        .. "against an OT6_PIPTAIL of 32", nf - c.f))
+
     H.assertEq(glyphFirstF ~= nil, true,
-      "the party-window pip cell showed the new bank (OT6_PIPTAIL armed it)")
-    H.assertEq(glyphFirstF >= c.f and glyphFirstF - c.f <= 12, true,
-      string.format("and within the flush latency of that frame (commit %d, pip %s)",
-        c.f, tostring(glyphFirstF)))
-    H.log(string.format("pip glyph $%02x first seen at f%s (commit f%d)",
-      watchGlyph, tostring(glyphFirstF), c.f))
+      "the party-window pip cell showed the new bank")
+    H.log(string.format("pip glyph $%02x first seen at f%s (commit f%d, "
+      .. "numeral f%d), battle menu %s at that frame -- an OPEN menu stages "
+      .. "the true bank on every row and is not the live cell #42 defers",
+      watchGlyph, tostring(glyphFirstF), c.f, nf,
+      glyphMenu and "OPEN" or "closed"))
     H.screenshot("trueknight_covered")
   end),
 
@@ -313,6 +453,93 @@ H.run({ maxFrames = 60000 }, {
       "and it is exactly +1 on that frame")
     H.screenshot("trueknight_next_round")
   end),
+
+  -- ------------------------ 6. A SCHEDULED PIP IS ALWAYS DELIVERED (#42) --
+  -- THE MISS RULING.  A cover whose attack then MISSES still pays the BP --
+  -- the earn is banked at SetCoverTarget's commit, which is upstream of any
+  -- hit roll, and that is deliberate: the knight stepped in front of his ally
+  -- whether or not the blow connected.  So the pip must paint too; suppressing
+  -- it would leave a silent +1 BP, which is a worse desync than the early pip
+  -- #42 removes -- invisible rather than merely mistimed.
+  --
+  -- It needs no separate path.  FF6 draws "Miss" through GfxCmd_0b: the miss
+  -- arm copies the glyph and branches into the very tail that increments the
+  -- numeral counter (btlgfx_main.asm:24725-24735 -> :24799).  So a missed
+  -- attack raises the counter exactly like a damaging one, and the deferred
+  -- pip lands on the frame the word "Miss" appears over the blocker.
+  --
+  -- What CAN strand a pending paint is an action that issues no numeral at all
+  -- (or a $ffff "hide numerals" one, :24707-24710), so Ot6ActionEnd flushes it
+  -- for the same reason it flushes pending reveals.  This arm asserts the
+  -- resulting property directly, on a hand-staged pending value: whatever the
+  -- attack did, a scheduled pip is DELIVERED -- OT6_PIPPEND returns to 0 and
+  -- the live cell is armed on the blocker.  The log names which path paid it.
+  -- First let the round-5 cover's OWN deferred pip land -- which is itself the
+  -- assertion that a real cover's pending value never stalls: arm 5 checked
+  -- the bank 30 frames after the commit, and the numeral is ~85 frames out.
+  H.driveUntil(function() return H.readByte(PIPPEND) == 0 end, 6000, DRIVE,
+    "the next-round cover's deferred pip is delivered too"),
+  H.call(function()
+    H.vars.pipMark = #pipArms
+    H.vars.stagedF = H.frame
+    H.writeByte(PIPTAIL, 0)                      -- no live tail to confuse it
+    H.writeByte(PIPPEND, knight + 1)             -- a paint owed to the knight
+    H.log("staged a pending pip for the knight with no live tail")
+  end),
+  H.driveUntil(function() return H.readByte(PIPPEND) == 0 end, 6000, DRIVE,
+    "the pending pip is delivered (numeral frame, or Ot6ActionEnd's backstop)"),
+  H.call(function()
+    local arms = armsFor(knight, H.vars.stagedF, H.frame)
+    H.assertEq(#arms >= 1, true,
+      "delivering the pending paint ARMED the live cell on the blocker -- a "
+      .. "scheduled pip is never dropped, hit or miss")
+    local at = arms[#arms]
+    local viaNumeral = false
+    for _, n in ipairs(numerals) do if n == at then viaNumeral = true end end
+    H.assertEq(H.readByte(PIPSLOT), knight,
+      "and the live cell points at the blocker")
+    H.assertEq(H.readByte(PIPPEND), 0, "with nothing left pending")
+    H.log(string.format("6a: delivered at f%d (staged f%d, +%d) via %s",
+      at, H.vars.stagedF, at - H.vars.stagedF,
+      viaNumeral and "the numeral frame (the damage/'Miss' path)"
+                  or "Ot6ActionEnd's backstop (a numeral-less action)"))
+    H.assertEq(viaNumeral, true,
+      "6a: with numerals running, the paint lands on the numeral frame -- the "
+      .. "frame the player sees the damage (or the word 'Miss') on the blocker")
+  end),
+
+  -- 6b. THE BACKSTOP, ISOLATED.  Switch the numeral trigger off (see the
+  -- suppressor above) and stage another pending paint: now nothing but
+  -- Ot6ActionEnd can deliver it, which is the numeral-less action -- the only
+  -- way a scheduled pip could otherwise be stranded past the action that
+  -- banked it.  Without this arm the backstop is code nothing ever runs.
+  H.call(function()
+    numSuppress = true
+    H.writeByte(NUMCTR_SHADOW, H.readByte(NUMCTR_SRC))
+    H.vars.pipMark2 = #pipArms
+    H.vars.stagedF2 = H.frame
+    H.writeByte(PIPTAIL, 0)
+    H.writeByte(PIPPEND, knight + 1)
+    H.log("numeral trigger suppressed; staged a second pending pip")
+  end),
+  H.driveUntil(function() return H.readByte(PIPPEND) == 0 end, 6000, DRIVE,
+    "the pending pip is delivered with the numeral path switched off"),
+  H.call(function()
+    local at = H.frame
+    local arms = armsFor(knight, H.vars.stagedF2, at)
+    H.assertEq(#arms >= 1, true,
+      "6b: Ot6ActionEnd's backstop armed the live cell on the blocker")
+    for _, n in ipairs(numerals) do
+      H.assertEq(n >= H.vars.stagedF2 and n <= at, false,
+        "6b: no numeral edge reached the poll while it was suppressed")
+    end
+    H.assertEq(H.readByte(PIPSLOT), knight, "6b: pointing at the blocker")
+    H.log(string.format("6b: backstop delivered at f%d (staged f%d, +%d) -- a "
+      .. "pending paint never outlives the action that banked it",
+      arms[#arms], H.vars.stagedF2, arms[#arms] - H.vars.stagedF2))
+    numSuppress = false
+  end),
+
   H.logStep(function()
     return string.format("battle_trueknight complete (%d committed covers)", #covers)
   end),

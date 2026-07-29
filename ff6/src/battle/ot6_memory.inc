@@ -173,6 +173,20 @@ OT6_COVERPAID        := $ed72   ; #37: per-character bitmask (----1234, the
                                 ;   wholesale by InitBP.  unlike NUMCTR a stale
                                 ;   value here would SUPPRESS a real earn, so
                                 ;   it is init-cleared explicitly.
+OT6_PIPPEND          := $ed74   ; #42: a DEFERRED pip paint -- character slot
+                                ;   + 1 (0 = nothing pending).  Ot6CoverBP
+                                ;   banks the blocker here at the cover commit
+                                ;   instead of arming OT6_PIPSLOT/OT6_PIPTAIL
+                                ;   directly, because that commit precedes the
+                                ;   damage numeral by 83-147 frames while the
+                                ;   tail is 32 -- the pip flashed and faded
+                                ;   two seconds BEFORE the block visibly
+                                ;   landed.  Ot6PipPending (ot6_hud.asm) moves
+                                ;   it into the live cell on the numeral frame,
+                                ;   exactly as Ot6RevealCommit/Ot6RevealPoll do
+                                ;   for weakness reveals.  A stale value would
+                                ;   paint a spurious pip on the first numeral
+                                ;   of the next battle, so InitBP clears it.
 .assert OT6_RVPEND_ELEM = OT6_SHADOW + (14 * 6), error, "reveal-pending must follow the shadow (InitBP clears both in one loop)"
 .assert OT6_WALLETPREV + 1 <= OT6_SHADOW + $70 - 1, error, "wallet cur/prev must sit inside InitBP's $70-byte clear"
 .assert OT6_COVERPAID = OT6_NUMCTR + 1, error, "cover-earn latch must follow the numeral counter (both live past InitBP's shadow clear)"
@@ -186,6 +200,9 @@ OT6_COVERPAID        := $ed72   ; #37: per-character bitmask (----1234, the
 ; and disjoint -- but nothing said so until this assert, which is exactly
 ; the check a concurrent allocation needs.
 .assert OT6_COVERPAID <> OT6_RAGETIER, error, "cover-earn latch and rage tier collide"
+.assert OT6_PIPPEND > OT6_RAGETIER, error, "deferred-pip cell must not collide with the rage tier"
+.assert OT6_PIPPEND > OT6_SHADOW + $70 - 1, error, "deferred-pip cell must sit PAST InitBP's shadow clear (InitBP zeroes it explicitly)"
+.assert OT6_PIPPEND <= $ef1f, error, "OT6 shadow tail exceeds the measured-free range ($f120+ is PushMode7Vars')"
 
 
 .endif

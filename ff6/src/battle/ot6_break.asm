@@ -1084,6 +1084,10 @@ done:   rts
 ; value costs one spurious commit at battle start, which finds pending empty
 ; (Ot6SeedShields zeroes it per slot) and does nothing.
 ; a8/i16, db=$7e (Ot6BgHud_ext's own context).  preserves x/y.
+; out: CARRY SET if this tick saw a numeral (#42).  The counter can only be
+; consumed once, and #42 needs the same edge to commit a deferred cover pip, so
+; the edge is REPORTED rather than duplicated into a second last-seen byte --
+; the one caller (Ot6BgHud) fans it out.
 .proc Ot6RevealPoll
         .a8
         .i16
@@ -1092,7 +1096,10 @@ done:   rts
         beq     @done                   ; no numeral since last tick
         sta     f:$7e0000+OT6_NUMCTR
         jsr     Ot6RevealCommit
-@done:  rts
+        sec                             ; #42: the numeral frame, reported
+        rts
+@done:  clc
+        rts
 .endproc
 
 ; ------------------------------------------------------------------------------
