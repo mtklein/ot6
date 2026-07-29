@@ -77,6 +77,20 @@ folklore-driven bug sweep — and a fix lands the way every OT6 change
 lands: narrowly scoped, with a positive-control regression that fails on
 the unfixed ROM.
 
+**The FF3-US translation is our vocabulary — on screen and in prose.**
+Owner decision, 2026-07-29: the Woolsey-era names are part of what makes
+this feel like the game people remember, so they stay, quirks included.
+**SwdTech**, not Bushido. **Dispatch / Retort / Slash / Quadra Slam /
+Empowerer / Stunner / Quadra Slice / Cleave**, not Fang / Sky / Tiger /
+Flurry / Dragon / Eclipse / Tempest / Oblivion. Where a design document
+or a code comment reaches for the Japanese or retranslated name, it is
+creating a second vocabulary a reader has to convert against the screen
+— write the name the player sees.
+
+This is a naming rule, not a lore rule: the internal *symbol* names in
+the vendored disassembly are upstream's and stay as they are. It governs
+what we write.
+
 **Read the source; don't infer a mechanism.** This is the big one, learned the
 hard way. An audit in July 2026 found a cluster of confidently-worded
 explanations in this repo that were simply invented — a testrunner timeout
