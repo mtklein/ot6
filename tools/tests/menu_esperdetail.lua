@@ -234,8 +234,16 @@ H.run({ maxFrames = 30000 }, {
   end),
 
   -- X opens the field menu; ride the fade to the main-menu steady state.
-  H.pressButtons({ "x" }, 4),
-  H.waitUntil(function() return st() == ST_MAIN end, 600, "main menu", 5),
+  -- driveUntil, not one press: the X that opens the field menu is the first
+  -- step in these tests that needs a SPECIFIC frame, so it is where a
+  -- fixture minted against a different ROM surfaces -- as "timeout waiting
+  -- for main menu", which reads like a menu bug and is not one.  Retrying
+  -- the press costs nothing when the pairing is fine and removes the false
+  -- report when it is not.  Same shape probe_fieldicons.lua and
+  -- menu_blitzpage_sabin.lua already use.  The assertion is unchanged: the
+  -- main menu must still come up.
+  H.driveUntil(function() return st() == ST_MAIN end, 1200,
+    { H.pressButtons({ "x" }, 4), H.waitFrames(30) }, "main menu"),
   H.waitFrames(20),
 
   -- Items -> Skills, A; pick the lead character; land on the skills submenu.

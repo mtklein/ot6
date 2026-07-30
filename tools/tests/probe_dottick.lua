@@ -28,12 +28,19 @@
 --
 -- (An earlier version bracketed the window with an exec callback on
 -- ExecCmd, the CmdTbl dispatcher.  It never fired: `ExecCmd` is defined
--- TWICE in ff6-en.dbg -- $C09B1B in one scope and the battle one at
--- $C213E6 -- and lib/compose.py's parse_dbg_syms takes the FIRST `val`
--- for a name, so H.sym("ExecCmd") silently hands back the wrong module's
+-- TWICE in ff6-en.dbg -- field code at $C09B1B and the battle one at
+-- $C213EA -- and lib/compose.py's parse_dbg_syms took the FIRST `val`
+-- for a name, so H.sym("ExecCmd") silently handed back the wrong module's
 -- address.  The window then never closed and every later chip read
--- inDot=true.  Any H.sym name that is not unique across scopes has this
--- failure mode, and it is SILENT -- see the report/follow-ups.)
+-- inDot=true.  3838 of this ROM's 98483 label names are non-unique, so
+-- that failure mode was general, and it was SILENT.
+--
+-- FIXED: compose.py now refuses to guess.  A duplicated name is a
+-- compose-time error naming both candidates, and the caller says which it
+-- means by segment -- H.sym("ExecCmd@battle_code").  The `H.sym("ExecCmd")`
+-- spelled out in this paragraph is exactly the case that must stay
+-- harmless, and does: the ambiguity check is fatal only for a name reached
+-- from code, never one that appears solely in prose.)
 --
 -- LABORATORY (battle_break's, plus battle_hits's berserk driver so battle
 -- time keeps running with no menu holding wait-mode):

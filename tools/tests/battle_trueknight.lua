@@ -56,6 +56,12 @@
 --      between the two named in the log's frame table;
 --   4. ONCE PER ROUND: further covers in the same round still redirect the hit
 --      but bank nothing;
+--   4b. and -- unrelated to True Knight, deliberately -- THE FRAME BUDGET.
+--      That phase's span is this fixture's most sensitive probe of the battle
+--      main loop's per-frame budget, and it used to be asserted only by
+--      accident, through phase 6a's delivery path.  It is stated outright
+--      now, in its own words, so a performance regression stops being
+--      reported as a True Knight failure (issue #67);
 --   5. and the round boundary is REAL -- after the blocker takes his own turn
 --      (Ot6ActionEnd), the next cover pays again.  Without 5, "once per round"
 --      and "once per battle" would both pass 4;
@@ -398,7 +404,7 @@ H.run({ maxFrames = 60000 }, {
   end),
 
   -- --------------------------------------------- 4. the once-per-round cap --
-  H.call(function() H.vars.mark = #covers end),
+  H.call(function() H.vars.mark = #covers; H.vars.coversF0 = H.frame end),
   H.driveUntil(function() return coversSince(H.vars.mark) >= 2 end, 30000, DRIVE,
     "two more covers in the same round (the knight never acted)"),
   H.call(function()
@@ -408,6 +414,70 @@ H.run({ maxFrames = 60000 }, {
       "further covers in the SAME round protect but bank nothing (the cap)")
     H.assertEq(#bpWrites, 1,
       "and the bank was written exactly once across the whole round")
+
+    -- 4b. THE FRAME-BUDGET CANARY, now asserted in its own words (#67).
+    --
+    -- This span is the fixture's most sensitive frame-budget probe, and it
+    -- used to be measured only BY ACCIDENT: nothing asserted it, but a shift
+    -- moved where phase 6a's hand-staged pip landed, so 6a failed instead --
+    -- reporting a True Knight regression for what was a performance
+    -- regression somewhere else entirely.  That made 6a a veto on bank $C2
+    -- and cost a reverted feature (8d8a570) plus the investigation behind
+    -- issue #67.  The measurement was always worth keeping; only the thing
+    -- it was attached to was wrong.
+    --
+    -- WHAT MOVES IT: the battle main loop's per-iteration budget is close
+    -- enough to full that a hair over makes WaitVblank miss and the whole
+    -- iteration costs an extra hardware frame (ot6_memory.inc:206-230).  The
+    -- penalty SATURATES -- 20 cycles and 110 cycles both cost exactly 163
+    -- frames -- so this quantity is bimodal, not continuous:
+    --
+    --     budget intact ............................ 1635   (measured, four
+    --                                                        separate builds)
+    --     any overrun, however small ............... 1798   (= 1635 + 163)
+    --
+    -- The threshold therefore sits in an EMPTY region 163 frames wide, which
+    -- is why it is a threshold and not a fudge factor.  1715 leaves 80 frames
+    -- of headroom for legitimate drift below and still lands 83 frames clear
+    -- of the cliff.  It is deliberately NOT an equality on 1635: this must
+    -- survive a few bytes of honest growth off the per-battle-frame path (the
+    -- v0.9 merge added ~49 bytes of $C2 at four per-action sites and this span
+    -- did not move at all), and it must NOT survive a real overrun.
+    --
+    -- WATCHED TO FAIL, 2026-07-30, on the v0.9 ROM:
+    --   80 bare NOPs before the OT6_BRKLIVE gate in Ot6BgHud_ext
+    --   (ot6_hud.asm:221, the once-per-battle-frame site) -> 1798, and the
+    --   hand-staged pip in 6a then lands at f4512 via the backstop -- the
+    --   exact frame issue #67 records for every failing build.  So the
+    --   mechanism here is the same one, caught by the right assertion now.
+    --
+    -- WHAT NO LONGER REPRODUCES, which matters for whoever reads #67 next:
+    --   five bare NOPs in the $C2 ACTION path (immediately before
+    --   `jsr CheckRetal` in _dispatcher, battle_main.asm:3146) -- #67's
+    --   headline control -- came back 1635, PASS, with every frame number in
+    --   the run byte-identical to the unmodified build.  That control was
+    --   real when it was taken (8d8a570), but it does not reproduce on v0.9.
+    --   It is the same direction as the correction comment on #67: the ~49
+    --   bytes v0.9 added at per-action sites were free too.  Per-ACTION
+    --   cycles are no longer near the cliff; per-battle-FRAME cycles still
+    --   are.  Which is the rule this canary now states outright.
+    H.vars.coversSpan = H.frame - H.vars.coversF0
+    H.log(string.format("frame-budget canary: the covers phase took %d frames "
+      .. "(intact 1635, missed-vblank cliff 1798, threshold 1715)",
+      H.vars.coversSpan))
+    H.assertEq(H.vars.coversSpan < 1715, true, string.format(
+      "FRAME BUDGET: this phase took %d frames against ~1635 for an intact "
+      .. "budget.  1798 = 1635 + 163 is the exact saturating cost of ONE "
+      .. "missed vblank per battle-loop iteration (ot6_memory.inc:206-230), "
+      .. "so cycles were added to a path that runs once per battle frame. "
+      .. "This is NOT a True Knight failure -- nothing about covers, banks or "
+      .. "pips has changed.  Look at what your change costs ONCE PER BATTLE "
+      .. "FRAME (WaitFrame -> UpdateCharText -> Ot6BgHud_ext, "
+      .. "btlgfx_main.asm:432-445), not at this test.  Per-action and "
+      .. "per-menu-redraw cost does not move this number; measured on v0.9, "
+      .. "80 NOPs in the per-frame path do and 5 NOPs in the $C2 action path "
+      .. "do not (issue #67).",
+      H.vars.coversSpan))
   end),
 
   -- ------------------------------------------ 5. the round boundary is real --
@@ -503,9 +573,41 @@ H.run({ maxFrames = 60000 }, {
       at, H.vars.stagedF, at - H.vars.stagedF,
       viaNumeral and "the numeral frame (the damage/'Miss' path)"
                   or "Ot6ActionEnd's backstop (a numeral-less action)"))
-    H.assertEq(viaNumeral, true,
-      "6a: with numerals running, the paint lands on the numeral frame -- the "
-      .. "frame the player sees the damage (or the word 'Miss') on the blocker")
+    -- WHICH of the two paths pays a HAND-STAGED pip is not a property of the
+    -- feature (#67).  This pip is written straight into OT6_PIPPEND at an
+    -- arbitrary moment in the action cycle, so whether the next numeral edge
+    -- or Ot6ActionEnd reaches it first depends on where in that cycle the
+    -- staging happened -- which any shift in battle timing moves.  Asserting
+    -- `viaNumeral` here therefore asserted the frame budget, in the wrong
+    -- words: it failed as "the pip landed via the backstop" for changes that
+    -- had nothing to do with pips, and vetoed a whole bank (8d8a570).
+    --
+    -- The property it was meant to protect -- the paint lands on the frame
+    -- the player sees the blow -- is asserted where it is actually a
+    -- property, on a REAL cover in phase 3 above: OT6_PIPPEND is consumed on
+    -- the numeral frame (`cleared == nf`) and the live cell is armed on it
+    -- (`#armsFor(knight, nf, nf) >= 1`).  Both are computed against the
+    -- OBSERVED numeral frame rather than an absolute one, so they hold
+    -- whatever the battle's frame count is.  Nothing is lost by dropping the
+    -- duplicate here, and the frame-budget canary it was standing in for now
+    -- lives in phase 4b, where it says what it means.
+    --
+    -- In its place, the path-INDEPENDENT half of what viaNumeral was reaching
+    -- for, which is the half with teeth: whichever path pays the pip, the
+    -- pending byte must be cleared ON the very frame the live cell is armed.
+    -- The clear and the paint are one event or they are a bug -- a clear
+    -- without an arm is exactly the "silent +1 BP" this phase's header calls
+    -- a worse desync than a mistimed pip, because it is invisible rather than
+    -- merely early.  Nothing here refers to an absolute frame, so a shift in
+    -- battle timing moves both sides together and the assertion stands.
+    local clearedAt = nil
+    for _, w in ipairs(pendWrites) do
+      if w.v == 0 and w.f >= H.vars.stagedF then clearedAt = w.f; break end
+    end
+    H.assertEq(clearedAt, at,
+      "6a: OT6_PIPPEND is consumed on the very frame the live cell is armed "
+      .. "-- the paint spent it, nothing else cleared it (a clear with no arm "
+      .. "is a BP that was earned and never shown)")
   end),
 
   -- 6b. THE BACKSTOP, ISOLATED.  Switch the numeral trigger off (see the

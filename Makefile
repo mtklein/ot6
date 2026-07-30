@@ -158,6 +158,11 @@ test: rom nomp-rom graph
 	sh tools/tests/lib/frontier_ninja_selftest.sh
 	sh tools/tests/lib/frontier_stamp_selftest.sh
 	sh tools/tests/lib/runner_isolation_selftest.sh
+	@# suite.sh's own bookkeeping: the tally line below, and the guard that
+	@# fails the run if a discovered test never reports.  Runs against a
+	@# miniature fake tree with a stub runner, so it costs milliseconds and
+	@# reaches the FAIL/xfail/dead-worker branches a green suite never does.
+	sh tools/tests/lib/suite_tally_selftest.sh
 	sh tools/tests/lib/anchor_negatives.sh
 	@rm -f $(STAMP)
 	tools/tests/suite.sh
@@ -178,8 +183,24 @@ test: rom nomp-rom graph
 #
 # The play-order chain, the anchor keys, the per-state route notes and the
 # scenario-stacking story all live with the data: tools/tests/frontier_graph.py.
+# FRONTIER_JOBS bounds the frontier -- and ONLY the frontier -- by default.
+# Every other ninja target here is cheap and stays on ninja's own default.
+#
+# WHY A BOUND AT ALL.  Each mint is a Mesen process racing a WALL-CLOCK cap
+# (run.sh --timeout=600).  nice(1) does not slow the wall, and every mint is
+# equally niced, so they starve EACH OTHER: unbounded, `frontier` fans out to
+# cores+2 emulators, each gets well under a core, and the longest legs cross
+# 600s and are reaped -- the frontier is the one target that reliably
+# provokes this, because it is the one that parallelises hard on its own.
+# "Green" then depends on how loaded the machine happened to be.
+#
+# WHY 4.  It is the number that has been measured, not derived: 109 mints in
+# ~60 min with ZERO reaps (2026-07-29, M4 Max, other agents live).  Raise it
+# on an idle machine -- NINJAFLAGS still overrides everything, and
+# `make frontier FRONTIER_JOBS=8` overrides just this.
+FRONTIER_JOBS ?= 4
 frontier: rom graph
-	ninja -f $(NINJA_FILE) $(NINJAFLAGS) frontier
+	ninja -f $(NINJA_FILE) $(if $(NINJAFLAGS),$(NINJAFLAGS),-j$(FRONTIER_JOBS)) frontier
 	@echo "frontier states up to date"
 
 # ---------------------------------------------------------------- smoke ----

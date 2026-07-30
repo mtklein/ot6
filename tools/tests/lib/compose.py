@@ -152,6 +152,76 @@ def stamp_check(name, root):
             f"re-run `make frontier` to refresh it (issue #2)")
 
 
+def check_states(root):
+    """`compose.py --check-states`: the same freshness question, asked of the
+    WHOLE fixture set at once instead of one sidecar at a time.
+
+    stamp_check() answers "is this fixture stale?" only when something is
+    about to embed it, and answers it into a composed file that nobody reads
+    until a test has already gone red.  The question an agent actually has --
+    "is anything in this tree stale before I start?" -- had no way to be
+    asked, so it got answered by re-running tests against unmodified `main`
+    to see if they were red anyway.  Four agents did exactly that on
+    2026-07-29, independently, for the same ~10 tests.
+
+    Deliberately the SAME code path as the consume-time check: one definition
+    of fresh, so a tree that reports clean here cannot warn during a run.
+
+    Exit 0 = every stamped fixture matches its sources; 1 = some do not.
+    """
+    states = root / "build" / "states"
+    stamps = sorted(states.glob("*.stamp"))
+    if not stamps:
+        print("no minted fixtures in this tree (build/states is unseeded); "
+              "frontier-gated tests will report SKIPPED, not fail")
+        return 0
+    stale = []
+    for s in stamps:
+        msg = stamp_check(s.stem, root)
+        if msg:
+            stale.append((s.stem, msg))
+    if not stale:
+        print(f"fixtures: {len(stamps)}/{len(stamps)} fresh "
+              f"(generator + all three lib halves match every stamp)")
+        return 0
+    print(f"fixtures: {len(stale)} of {len(stamps)} are STALE -- minted from "
+          f"sources this tree no longer has.")
+
+    # WHICH shared input moved, when it is a shared input.  ninja keeps a
+    # byte-copy of every mint input under build/ninja/src (the `latch` edges
+    # -- see frontier_ninja.py's header), so "what did the last mint actually
+    # see?" is answerable without guessing.  Every generator inlines all
+    # three lib halves, so one edited half stales the entire frontier at
+    # once, which is exactly the case that looks alarming and is not.
+    moved = [p for p in (LIB.name, FIELD.name, CONTRACT.name)
+             if (root / "build" / "ninja" / "src" / "tools" / "tests" / "lib"
+                 / p).exists()
+             and (root / "build" / "ninja" / "src" / "tools" / "tests" / "lib"
+                  / p).read_bytes() != (root / "tools" / "tests" / "lib"
+                                        / p).read_bytes()]
+    if moved:
+        print(f"CAUSE: {', '.join('lib/' + m for m in moved)} changed since "
+              f"the last mint.  Every generator inlines all three lib halves, "
+              f"so one edited half stales the whole frontier at once -- that "
+              f"is what {len(stale)} of {len(stamps)} looks like, and it is "
+              f"not {len(stale)} separate problems.")
+
+    show = 6
+    for _, msg in stale[:show]:
+        print(f"  {msg}")
+    if len(stale) > show:
+        print(f"  ... and {len(stale) - show} more, same shape")
+
+    # Name the smallest sufficient action, not just `make frontier`.  A stale
+    # fixture only matters for the tests that embed it, and re-minting one leg
+    # is minutes where the full chain is hours.
+    print("\nA test that boots one of these can be red for a reason that has "
+          "nothing to do with your change.\nRe-mint just what you need:  "
+          "nice -n 10 ninja -f build/build.ninja <state>\nor the whole chain: "
+          " nice -n 10 make frontier NINJAFLAGS=-j4")
+    return 1
+
+
 class CrossTree(Exception):
     """A referenced sidecar exists ONLY outside the composing tree."""
 
@@ -209,45 +279,118 @@ def inline_libs(script: str, lib: str, field: str, contract: str):
 _MSS_LIT = re.compile(r'"((?:[^"]*/)?)([A-Za-z0-9_]+\.mss(?:\.lua)?)"')
 
 # Any H.sym("Name") / M.sym('Name') / sym("Name") reference: group 1 is the
-# ca65 symbol name to resolve out of ff6-en.dbg.  Matches only `sym(` at a
-# word boundary, so `foo.symbolic(...)` is not a false positive.  Names found
-# in comments over-collect harmlessly (an extra OT6_SYMS entry is inert).
-_SYM_REF = re.compile(r'\bsym\s*\(\s*["\']([A-Za-z_][A-Za-z0-9_]*)["\']')
+# ca65 symbol REFERENCE to resolve out of ff6-en.dbg -- either a bare name
+# ("RandA") or a name qualified by the ca65 SEGMENT that defines it
+# ("ExecCmd@battle_code"), which is how a caller disambiguates a name the
+# linker emits more than once.  Matches only `sym(` at a word boundary, so
+# `foo.symbolic(...)` is not a false positive.  Names found in comments
+# over-collect harmlessly (an extra OT6_SYMS entry is inert) -- see
+# comment_only_refs(), which is what keeps the ambiguity check below from
+# failing a compose over a name that only appears in prose.
+_SYM_REF = re.compile(
+    r'\bsym\s*\(\s*["\']([A-Za-z_][A-Za-z0-9_]*(?:@[A-Za-z0-9_.]+)?)["\']')
+
+
+def comment_only_refs(script, refs):
+    """Of `refs`, the subset whose every `sym("...")` occurrence is commented.
+
+    Lua's `--` runs to end of line, so "is this match inside a comment?" is
+    answered by whether `--` appears earlier on its own line.  (A `--` inside
+    a string literal would fool this; no test here writes one, and the cost
+    of being fooled is a warning instead of an error, never the reverse.)
+
+    This exists so the ambiguity check can be FATAL for a real call while
+    staying inert for prose -- probe_dottick.lua's header documents the
+    ExecCmd hazard by naming `H.sym("ExecCmd")`, and a doc comment must not
+    be able to fail a build.
+    """
+    live = set()
+    for line in script.splitlines():
+        cut = line.find("--")
+        code = line if cut < 0 else line[:cut]
+        live |= set(_SYM_REF.findall(code))
+    return [r for r in refs if r not in live]
 
 
 def parse_dbg_syms(dbg, wanted):
-    """name -> integer address for each `wanted` ca65 symbol found in `dbg`.
+    """Resolve `wanted` ca65 symbol references against `dbg`.
 
-    The .dbg carries one record per line; a `.proc`/label emits several with
-    the same name (a `scope`, an `imp` import, and the `lab` definition), but
-    only the `type=lab` record carries `val=0x...` -- the address we want.  So
-    we consider label lines only and take the first `val` for each name; a
-    name with no label record simply does not appear in the result, and
-    H.sym() raises for it at runtime (the same loud failure as a missing
-    savestate sidecar).  Returns {} when nothing is wanted or the .dbg is
-    absent (an unbuilt ROM) -- again deferring the loud failure to H.sym.
+    Returns (resolved, ambiguous):
+      resolved   ref -> integer address, for refs that name exactly one place
+      ambiguous  ref -> [(segment, address), ...] sorted, for refs that name
+                 SEVERAL -- the caller must disambiguate, and until it does
+                 the ref is deliberately absent from `resolved`
+
+    A ref is either a bare ca65 name ("RandA") or `Name@segment`
+    ("ExecCmd@battle_code").  The .dbg carries one record per line; a
+    `.proc`/label emits several with the same name (a `scope`, an `imp`
+    import, and the `lab` definition), but only the `type=lab` record carries
+    `val=0x...` -- the address we want -- so only label lines are considered.
+
+    WHY THIS IS NOT "take the first val", which is what it used to be: ca65
+    scopes names per module, so a name can be defined in two modules and the
+    linker records both.  `ExecCmd` is field code at $C09B1B AND the battle
+    command dispatcher at $C213EA; 3838 of this ROM's 98483 label names are
+    non-unique.  Taking the first val meant H.sym("ExecCmd") handed back the
+    field one, an exec callback on it never fired in battle, and every
+    measurement downstream of that window read a confidently wrong value with
+    nothing anywhere saying so.  Duplicate records that agree on the address
+    are NOT ambiguous -- only genuinely distinct addresses are.
+
+    A name with no label record simply appears in neither dict, and H.sym()
+    raises for it at runtime (the same loud failure as a missing savestate
+    sidecar).  Same for an empty `wanted` or an absent .dbg (an unbuilt ROM).
     """
-    out = {}
-    wanted = list(dict.fromkeys(wanted))
     if not wanted or not dbg.exists():
-        return out
-    markers = {'name="%s"' % w: w for w in wanted}
-    val_re = re.compile(r'\bval=0x([0-9A-Fa-f]+)')
+        return {}, {}
+    wanted = list(dict.fromkeys(wanted))
+    # ref -> (bare name, required segment or None)
+    parts = {w: (w.split("@", 1) + [None])[:2] for w in wanted}
+    bases = {b for b, _ in parts.values()}
+    markers = {'name="%s"' % b: b for b in bases}
+    val_re = re.compile(r"\bval=0x([0-9A-Fa-f]+)")
+    seg_re = re.compile(r"\bseg=(\d+)")
+
+    # ONE pass, collecting both kinds of record: base name -> {seg id ->
+    # {addresses}}, plus the seg-id -> seg-name table needed to label them.
+    # Segment names ("field_code", "battle_code") come from cfg/ff6-en.cfg and
+    # survive the bank-layout shifts that move addresses -- which is why a
+    # segment, not an address, is what a caller disambiguates with.
+    #
+    # Unlike the old scan this cannot exit early: deciding "is this name
+    # unique?" is only answerable at end of file.  A 55 MB .dbg scans in
+    # ~0.1 s here, against the multi-second emulator run it precedes.
+    found, segs = {}, {}
     with dbg.open() as f:
         for line in f:
-            if "type=lab" not in line:
-                continue
-            for mk, name in markers.items():
-                if name in out:
-                    continue
-                if mk in line:
-                    m = val_re.search(line)
-                    if m:
-                        out[name] = int(m.group(1), 16)
+            if "type=lab" in line:
+                for mk, base in markers.items():
+                    if mk not in line:
+                        continue
+                    v, s = val_re.search(line), seg_re.search(line)
+                    if v:
+                        found.setdefault(base, {}).setdefault(
+                            s.group(1) if s else "?", set()).add(
+                                int(v.group(1), 16))
                     break
-            if len(out) == len(wanted):
-                break
-    return out
+            elif line.startswith("seg\t"):
+                i = re.search(r"\bid=(\d+)", line)
+                n = re.search(r'\bname="([^"]*)"', line)
+                if i and n:
+                    segs[i.group(1)] = n.group(1)
+
+    resolved, ambiguous = {}, {}
+    for ref, (base, want_seg) in parts.items():
+        by_seg = {segs.get(i, "seg" + i): v
+                  for i, v in found.get(base, {}).items()}
+        if want_seg is not None:
+            by_seg = {s: v for s, v in by_seg.items() if s == want_seg}
+        cands = sorted((s, a) for s, addrs in by_seg.items() for a in addrs)
+        if len({a for _, a in cands}) == 1:
+            resolved[ref] = cands[0][1]
+        elif cands:
+            ambiguous[ref] = cands
+    return resolved, ambiguous
 
 
 def stack_rewrite(script: str, prefix: str) -> str:
@@ -475,33 +618,88 @@ def selftest() -> int:
         "local S = M.sym('Ot6ShieldTbl')\n"
         'local R2 = H.sym("RandA")\n'          # a repeat: dedup is the caller's
         '-- a name in a comment: sym("InComment")\n'
+        'local Q = H.sym("ExecCmd@battle_code")\n'
         'foo.symbolic("NotASym"); local t = symtab["NotASym"]\n')
     check("sym refs collect real calls (with the comment name, harmlessly)",
-          refs, ["RandA", "Ot6ShieldTbl", "RandA", "InComment"])
+          refs, ["RandA", "Ot6ShieldTbl", "RandA", "InComment",
+                 "ExecCmd@battle_code"])
     check("sym refs ignore symbolic()/symtab[] look-alikes",
           "NotASym" not in refs, True)
 
+    # -- comment_only_refs: what makes the ambiguity check fatal for a CALL
+    #    and inert for prose.  Both halves matter: a doc comment naming a
+    #    duplicated symbol must not fail a build (probe_dottick.lua's header
+    #    does exactly that), and a real call must not be excused by an
+    #    unrelated comment elsewhere in the file that happens to name it.
+    src = ('-- doc: H.sym("OnlyInProse") is the hazard\n'
+           'local A = H.sym("Called")\n'
+           '-- and H.sym("Called") is discussed here too\n'
+           'local B = H.sym("Tail")  -- trailing comment after real code\n')
+    got = comment_only_refs(src, ["OnlyInProse", "Called", "Tail", "Absent"])
+    check("comment-only ref is reported inert", "OnlyInProse" in got, True)
+    check("a called name is NOT excused by a comment that also names it",
+          "Called" in got, False)
+    check("a call with a trailing comment on the same line still counts",
+          "Tail" in got, False)
+    check("a ref that appears nowhere counts as inert (nothing calls it)",
+          "Absent" in got, True)
+
     # -- parse_dbg_syms: the type=lab record's val wins; scope/imp are skipped;
-    #    an unknown name is simply absent (H.sym raises for it at runtime) --
+    #    an unknown name is simply absent (H.sym raises for it at runtime);
+    #    and a DUPLICATED name is ambiguous rather than silently first-wins --
     with tempfile.TemporaryDirectory() as tmp:
         dbg = Path(tmp) / "ff6-en.dbg"
         dbg.write_text(
+            'seg\tid=6,name="field_code",start=0xC00000,size=0xD61F\n'
+            'seg\tid=52,name="battle_code",start=0xC20000,size=0x6523\n'
+            'seg\tid=67,name="ot6_data",start=0xF00000,size=0x1000\n'
             'scope\tid=1,name="RandA",mod=2,type=scope,size=4\n'
             'sym\tid=2,name="RandA",addrsize=absolute,def=9,type=imp,exp=2\n'
             'sym\tid=3,name="RandA",scope=1700,def=9,val=0xC24B98,seg=52,type=lab\n'
             'sym\tid=4,name="Ot6ShieldTbl",scope=1700,val=0xF01050,seg=67,type=lab\n'
-            'sym\tid=5,name="Decoy",scope=0,val=0xDEAD00,seg=1,type=equ\n')
-        got = parse_dbg_syms(dbg, ["RandA", "Ot6ShieldTbl", "Missing", "Decoy"])
+            'sym\tid=5,name="Decoy",scope=0,val=0xDEAD00,seg=1,type=equ\n'
+            # THE REGRESSION, verbatim in shape: one name, two modules, two
+            # addresses.  The old code returned 0xC09B1B here and said nothing.
+            'sym\tid=6,name="ExecCmd",scope=228,val=0xC09B1B,seg=6,type=lab\n'
+            'sym\tid=7,name="ExecCmd",scope=1700,val=0xC213EA,seg=52,type=lab\n'
+            # A name recorded twice at the SAME address is not ambiguous;
+            # only genuinely different addresses are.
+            'sym\tid=8,name="Twice",scope=1700,val=0xC22000,seg=52,type=lab\n'
+            'sym\tid=9,name="Twice",scope=1701,val=0xC22000,seg=52,type=lab\n')
+        got, amb = parse_dbg_syms(
+            dbg, ["RandA", "Ot6ShieldTbl", "Missing", "Decoy", "Twice",
+                  "ExecCmd", "ExecCmd@battle_code", "ExecCmd@field_code",
+                  "ExecCmd@no_such_seg"])
         check("parse picks the type=lab val over scope/imp",
               got.get("RandA"), 0xC24B98)
         check("parse resolves a second wanted label",
               got.get("Ot6ShieldTbl"), 0xF01050)
         check("parse omits an unknown name", "Missing" in got, False)
         check("parse omits a non-lab (type=equ) record", "Decoy" in got, False)
+        check("a duplicated name at ONE address resolves (not ambiguous)",
+              (got.get("Twice"), "Twice" in amb), (0xC22000, False))
+        check("a name at TWO addresses does NOT resolve", "ExecCmd" in got,
+              False)
+        check("...it is reported ambiguous, with both segments and addresses",
+              amb.get("ExecCmd"),
+              [("battle_code", 0xC213EA), ("field_code", 0xC09B1B)])
+        check("@segment picks the battle one", got.get("ExecCmd@battle_code"),
+              0xC213EA)
+        check("@segment picks the field one", got.get("ExecCmd@field_code"),
+              0xC09B1B)
+        check("@segment that matches nothing resolves to nothing",
+              ("ExecCmd@no_such_seg" in got, "ExecCmd@no_such_seg" in amb),
+              (False, False))
         check("parse of an absent .dbg is empty (defers to H.sym)",
-              parse_dbg_syms(Path(tmp) / "nope.dbg", ["RandA"]), {})
+              parse_dbg_syms(Path(tmp) / "nope.dbg", ["RandA"]), ({}, {}))
         check("parse of no wanted names is empty (inert injection)",
-              parse_dbg_syms(dbg, []), {})
+              parse_dbg_syms(dbg, []), ({}, {}))
+
+    # -- ot6.lua's accessor must know about the ambiguity table compose emits;
+    #    otherwise a comment-only duplicate would fall through to the plain
+    #    "not in ff6-en.dbg" message and send the reader after a rebuild.
+    check("lib/ot6.lua M.sym consults OT6_SYMS_AMBIG",
+          "OT6_SYMS_AMBIG" in LIB.read_text(), True)
 
     print("selftest: " + ("ok" if ok else "FAILED"))
     return 0 if ok else 1
@@ -510,6 +708,11 @@ def selftest() -> int:
 def main() -> int:
     if len(sys.argv) == 2 and sys.argv[1] == "--selftest":
         return selftest()
+    # --check-states: is anything in this tree's build/states stale?  Asked
+    # by tools/worktree-setup.sh right after seeding, and by hand any time a
+    # red test might not be yours.
+    if len(sys.argv) == 2 and sys.argv[1] == "--check-states":
+        return check_states(ROOT)
     # --sha <sidecar>: the same fingerprint the provenance lines carry, so a
     # hash seen in a run log can be checked against a state on disk.
     if len(sys.argv) == 3 and sys.argv[1] == "--sha":
@@ -542,9 +745,12 @@ def main() -> int:
     for ref in dict.fromkeys(re.findall(r'"([^"]+\.mss\.lua)"', script)):
         try:
             p = resolve_sidecar(ref, ROOT)
-        except CrossTree:
-            print(f"error: {script_path} references {ref}, which exists only "
-                  f"OUTSIDE this tree ({ROOT}).  Refusing to compose another "
+        except CrossTree as why:
+            # Print the exception's own text too: resolve_sidecar distinguishes
+            # several refusals (absolute literal, .. escape, nested checkout)
+            # and only it knows which one fired.
+            print(f"error: {script_path} references {ref} [{why}], which "
+                  f"exists only OUTSIDE this tree ({ROOT}).  Refusing to compose another "
                   f"tree's savestate: it was minted from a different ROM, so "
                   f"a run against it proves nothing.  Mint it here (make, or "
                   f"the generator that emits it), or seed this tree with "
@@ -578,12 +784,26 @@ def main() -> int:
         # generator+lib it was minted from (a drift the mint gate refreshes only
         # under `make frontier`, which `make test` never runs).  Non-fatal: the
         # print lands in the [ot6] log run.sh and suite.sh both surface.
+        # ...and record it in a table the LIB can read, so a wait that times
+        # out can name the fixture it booted and say that fixture was already
+        # known-stale.  A warning printed at frame 0 and a failure at frame 600
+        # are 600 frames of unrelated log apart, and the failure is the line
+        # someone reads: "timeout waiting for main menu" has already sent an
+        # agent looking for a menu bug that did not exist.  See M.timeoutContext
+        # in lib/ot6.lua.
+        flagged = {}
         for name in states:
             stale = stamp_check(name, ROOT)
             if stale:
+                flagged[name] = stale
                 preamble.append(f"-- WARNING (issue #2): {stale}\n")
                 preamble.append(f'print("[ot6] WARNING: {stale}")\n')
                 print(f"WARNING: {stale}")
+        if flagged:
+            preamble.append("OT6_STALE = {\n")
+            for name, stale in flagged.items():
+                preamble.append(f'  ["{name}"] = "{stale}",\n')
+            preamble.append("}\n")
 
     # OT6 symbol addresses: derive them from THIS TREE's ff6-en.dbg the same
     # way OT6_STATES embeds sidecars.  Only symbols the SCRIPT names via
@@ -592,7 +812,7 @@ def main() -> int:
     # M.sym for the accessor and the loud error on a missing symbol.
     sym_names = list(dict.fromkeys(_SYM_REF.findall(script)))
     if sym_names:
-        syms = parse_dbg_syms(DBG, sym_names)
+        syms, ambig = parse_dbg_syms(DBG, sym_names)
         preamble.append(f"-- OT6 symbols from {DBG} (via lib/compose.py)\n")
         preamble.append("OT6_SYMS = {\n")
         for name in sym_names:
@@ -603,11 +823,44 @@ def main() -> int:
         # actual failure is H.sym raising at runtime (an unbuilt ROM, or a
         # typo'd name).  Matches how a missing sidecar defers to loadState.
         for name in sym_names:
-            if name not in syms:
+            if name not in syms and name not in ambig:
                 msg = (f"symbol {name} not found in ff6/rom/ff6-en.dbg "
                        f"-- rebuild the ROM, or check the name")
                 preamble.append(f'print("[ot6] WARNING: {msg}")\n')
                 print(f"WARNING: {msg}")
+        # An AMBIGUOUS name is the opposite case, and it is fatal rather than
+        # deferred: the old behaviour (first val wins) produced a plausible
+        # address that simply never executed, so nothing failed and every
+        # downstream number was quietly wrong.  There is no reading of a
+        # duplicated name that is safe to guess at, so composition stops and
+        # names the choices.
+        #
+        # ...unless every occurrence of the name is inside a COMMENT.  The
+        # ref collector deliberately over-collects from prose (see _SYM_REF),
+        # and probe_dottick.lua's header documents this very hazard by
+        # spelling out `H.sym("ExecCmd")`.  A doc comment must not fail a
+        # build -- so a comment-only ambiguity records itself in
+        # OT6_SYMS_AMBIG instead, and H.sym raises the same message if the
+        # name is ever actually called.
+        if ambig:
+            inert = set(comment_only_refs(script, ambig))
+            for name, cands in sorted(ambig.items()):
+                where = ", ".join(f"{s}=0x{a:06X}" for s, a in cands)
+                msg = (f"symbol {name} is AMBIGUOUS in ff6/rom/ff6-en.dbg "
+                       f"({where}) -- name the segment you mean, e.g. "
+                       f'H.sym("{name.split("@")[0]}@{cands[0][0]}")')
+                if name in inert:
+                    preamble.append(f'  -- ambiguous: {msg}\n')
+                else:
+                    print(f"error: {script_path}: {msg}")
+            live = {n: c for n, c in ambig.items() if n not in inert}
+            if live:
+                return 1
+            preamble.append("OT6_SYMS_AMBIG = {\n")
+            for name, cands in sorted(ambig.items()):
+                where = ", ".join(f"{s}=0x{a:06X}" for s, a in cands)
+                preamble.append(f'  ["{name}"] = "{where}",\n')
+            preamble.append("}\n")
 
     composed, replaced = inline_libs(script, lib, FIELD.read_text(),
                                      CONTRACT.read_text())
