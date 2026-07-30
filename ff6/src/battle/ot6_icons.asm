@@ -135,6 +135,199 @@ Ot6ElemGlyphTbl:
 
 OT6_QMARK := $bf                ; '?' glyph (unrevealed weakness slot)
 
+; ------------------------------------------------------------------------------
+
+; [ #53: the same eight element tiles, in the FIELD MENU's font ]
+
+; Until now these tiles existed only in the BATTLE font.  Ot6LoadFontIcons_ext
+; above uploads them to vram word $5800 from LoadMenuGfx (btlgfx_main.asm:8911),
+; which is the battle graphics path and runs nowhere else -- so a field page
+; asking for an element glyph drew whatever occupied that cell of the menu's own
+; font, and #46 could only give the Blitz page CLASS glyphs, which ship in the
+; vanilla font art itself (the Ot6ClassGlyphTbl note below).  Five of the eight
+; Blitzes therefore showed nothing, three of them elemental probes.
+;
+; WHERE THE MENU'S FONT IS -- and it is TWO copies, neither at $5800:
+;   * LoadFontGfx2bpp (menu_gfx.asm:120) lays 256 2bpp tiles at word $6000,
+;     BG2/BG3's char base (hBG34NBA = $66, menu_init_2.asm:435);
+;   * LoadFontGfx4bpp (:139) expands the SAME source art into 4bpp tiles at
+;     word $5000, BG1's char base (hBG12NBA = $65, :433), with the upper two
+;     bitplanes zeroed.
+; Every field ability page draws through GetBG1TilemapPtr, i.e. BG1, so the
+; $5000 copy is the one the Blitz page reads.  The $6000 copy is patched too
+; because BG3A carries menu text as well (config.asm:2044, colosseum.asm:328).
+;
+; FREE SPACE, measured rather than assumed: gfx/small_font_en.2bpp is 4096
+; bytes / 256 tiles, and cells $00-$7f, $d0-$d1, $eb-$ef and $fb-$ff are
+; sixteen zero bytes each.  So all eight cells Ot6ElemGlyphTbl names above
+; ($eb $ec $ed $64 $ef $fb $fc $fd) are blank in the field font exactly as
+; they are in the battle one, and the menu text codec cannot even spell them
+; (small_symbols_en.json stops at $ea and resumes at $f0; text_en.json's
+; letters start at $80).  NOTHING had to move to make room, and both loops
+; below write strictly inside the range the vanilla loader just blanked --
+; they cannot step outside the font.
+;
+; WHAT IT COSTS, per menu OPEN: eight tiles.  The 4bpp pass writes 8 data
+; words + 8 zero words each = 128 word writes; the 2bpp pass 8 each = 64.
+; The loads they hook write 4096 and 3072 words respectively, so this is
+; +3.1% and +2.1% of an upload that already happens, in the same forced-blank
+; menu init (InitMenu -> InitMenuGfx, menu_common.asm:133), before a frame is
+; shown.  No re-lay machinery is needed: unlike the battle font -- which a
+; dialogue window re-uploads mid-fight, the whole reason Ot6FontRestoreMark
+; and OT6_FONTDIRTY exist above -- nothing rewrites the menu font while a menu
+; is open.  Hence two plain entry points and no nmi slicing.
+;
+; TWO entry points rather than one that does both, deliberately: menu types 1
+; and 6 (name change, SwdTech rename) call LoadFontGfx4bpp WITHOUT
+; LoadFontGfx2bpp (menu_gfx.asm:52,108), so a single proc writing $6000 as
+; well would scribble into whatever else those types put there.  Each entry
+; patches only the copy the loader it hangs off has just laid down.
+;
+; ------------------------------------------------------------------------------
+; WHICH FIELD SURFACES USE THEM, and why the ones that do not, do not.
+;
+; #53 asked for the Blitz page and then for every sibling to be CHECKED rather
+; than left inconsistent -- this window family has already cost four rounds of
+; fixes that way.  All of them were.  The Blitz page draws the icon
+; (Ot6BlitzPageDraw, skills.asm); the rest are rulings, each with the
+; measurement that produced it, so the next agent re-reads the number instead
+; of re-deriving the question:
+;
+;   SwdTech (Skills -> SwdTech, the loadout page, field_menu.asm).  NO, and
+;   the issue's premise for it is false.  "Several SwdTech are elemental" is
+;   not true of this ROM: magic_prop_en.dat's element byte (record +1) is $00
+;   for ALL EIGHT of $55-$5c, and Ot6SkillClassTbl gives all eight OT6_SLASH
+;   (ot6_class.asm:185-192).  An icon column there would therefore print the
+;   identical sword glyph on all eight rows -- eight copies of one fact, which
+;   is the definition of chrome.  It also has nowhere to print it: the three
+;   slot rows are the one page in this window whose columns are fully spent
+;   (the #56 budget note over Ot6LoadoutDrawSlots costs the row at 28 cells
+;   wanted against 27 available and pays for it by deleting a gap).  If a
+;   SwdTech ever gains an element, the pool grid -- not the slot rows -- has
+;   the free cells: 15 for the left column, 29 for the right.
+;
+;   Rage (Skills -> Rage, the loadout page).  NO, and this one has no
+;   authority to read at all, which is the decisive form of no.  A Rage row
+;   names a MONSTER (MonsterName, 10 cells), and the actions it grants are
+;   that monster's own two attacks -- so "the element of a Rage" is not one
+;   value, and nothing in the tree defines it.  An assertion here could not
+;   read the icon out of the ROM the way #53 requires, because there is no
+;   such row in any table.  (Geometry was not the blocker: columns 13-15 and
+;   26-29 are free on that page.)
+;
+;   Magic / Lore (Skills -> Magic, the vanilla two-column list).  NOT DONE,
+;   and the only one of these that is a genuine gap rather than a ruling --
+;   spells DO carry elements, and the BATTLE Magic list already shows them
+;   (Ot6AbilityPad_ext).  Three reasons it is filed and not done here: it is
+;   vanilla's shared row drawer (_c34fc4, skills.asm:867) with several
+;   callers, not an OT6 page; the field magic page has no render test to fail
+;   first against; and every MagicName record ALREADY opens with a school
+;   glyph ({black}/{white}/{effect}, magic_name_en.json), so a second icon per
+;   row is a design question about two glyphs, not a mechanical copy of the
+;   Blitz page.  Room exists when it is answered: the row is a 7-cell name +
+;   blank + 2 digits at columns 3 and 16, leaving 13-15 and 26-29.
+;
+;   Esper detail (Skills -> Espers -> a stone).  NOT DONE, same shape as
+;   Magic: the spells a stone grants have elements, the names are drawn at
+;   column 5, and #62 has just taken columns 17-27 for the while-worn stat
+;   block.  Filed with Magic -- they are one decision, and both are cheap now
+;   that the tiles are in the font, which is what "available to" meant.
+
+; ---- the 4bpp copy at word $5000 (BG1: every ability page) ----
+.proc Ot6MenuIcons4bpp_ext
+        .a8
+        .i16
+        php
+        phb
+        clr_a
+        pha
+        plb                     ; db = $00 for hardware registers
+        longi
+        shorta
+        lda     #$80
+        sta     hVMAINC         ; increment on high byte, +1 word
+        ldx     #$0000          ; icon index 0..7
+@icon:  longa
+        jsr     Ot6MenuIconCell ; a = the font cell this icon claims
+        asl4                    ; * 16 words = the 4bpp tile stride
+        clc
+        adc     #$5000
+        sta     hVMADDL
+        jsr     Ot6MenuIconArt  ; the tile's eight art words (exits a16)
+        ldy     #$0008
+:       stz     hVMDATAL        ; bitplanes 2/3: the art is 2bpp, exactly as
+        dey                     ;   vanilla's own expansion leaves them
+        bne     :-              ;   (menu_gfx.asm:164)
+        shorta
+        inx
+        cpx     #$0008
+        bcc     @icon
+        plb
+        plp
+        rtl
+.endproc
+
+; ---- the 2bpp copy at word $6000 (BG2/BG3) ----
+.proc Ot6MenuIcons2bpp_ext
+        .a8
+        .i16
+        php
+        phb
+        clr_a
+        pha
+        plb
+        longi
+        shorta
+        lda     #$80
+        sta     hVMAINC
+        ldx     #$0000
+@icon:  longa
+        jsr     Ot6MenuIconCell
+        asl3                    ; * 8 words = the 2bpp tile stride
+        clc
+        adc     #$6000
+        sta     hVMADDL
+        jsr     Ot6MenuIconArt
+        shorta
+        inx
+        cpx     #$0008
+        bcc     @icon
+        plb
+        plp
+        rtl
+.endproc
+
+; the two halves both passes share, so the pair differs ONLY in the vram base
+; and the tile stride -- the one thing that genuinely differs between a 4bpp
+; and a 2bpp copy of the same art.  Both read the SAME two tables the battle
+; upload reads, so no third opinion about which cell an element owns can appear.
+
+; x = icon index -> a = its font cell code.  a16 throughout (the high byte of
+; the word read is the NEXT table entry, and is masked off); x preserved.
+Ot6MenuIconCell:
+        .a16
+        .i16
+        lda     f:Ot6ElemGlyphTbl,x
+        and     #$00ff
+        rts
+
+; x = icon index -> the icon's eight art words to hVMDATAL.  a16, x preserved.
+Ot6MenuIconArt:
+        .a16
+        .i16
+        phx
+        txa                     ; a16 + i16: the whole index, 0..7
+        asl4                    ; icon * 16 = byte offset into Ot6FontIcons
+        tax
+        ldy     #$0008
+:       lda     f:Ot6FontIcons,x
+        sta     hVMDATAL
+        inx2
+        dey
+        bne     :-
+        plx
+        rts
+
 ; battle-only scratch (unused vanilla ram $3ecb-$3ed3, ours since m1)
                                 ; OT6_DIVINE_USED is the per-character
                                 ; once-per-battle divine latch
@@ -483,6 +676,54 @@ Ot6ElemPalTbl:
         lda     #$ff
         plx
         rts
+.endproc
+
+; ------------------------------------------------------------------------------
+
+; [ #53: the same element-or-class glyph, callable from the MENU bank ]
+
+; The field pages want exactly what Ot6ElemGlyphFor decides -- element first,
+; the ability's break class when it has none, blank when it has neither -- and
+; they must not get a second opinion about it.  #46 could not call it and wrote
+; Ot6SkillClassGlyph (ot6_kits.asm) instead for two reasons, both now gone: the
+; element glyphs did not exist in the field font (the upload above), and
+; Ot6ElemGlyphFor is an rts leaf.  This is the rtl wrapper; the CLASS-only leaf
+; is retired, so there is one glyph authority for both halves of the game.
+;
+; WHY IT SAVES A BYTE OF RAM.  Ot6ElemGlyphFor reports its palette index by
+; storing OT6_SCR_COLS ($3ed2) -- battle-only scratch, and in the FIELD MENU
+; that address is inside wBG1Tiles::ScreenA ($7e3849 + $0800, menu_ram.inc:458):
+; $3ed2 is the attribute byte of row 26, column 4 of the tilemap shadow.  A
+; stray write there would be invisible on screen (row 26 is outside this
+; window and its char byte stays $00, the blank tile) and, being an ATTRIBUTE
+; byte, invisible to menu_blitzpage.lua's row canary too, which reads char
+; bytes only.  That is precisely the kind of silent write this project does not
+; leave lying around, so the byte is saved and put back.  The menu needs no
+; palette index at all: a field icon draws in its row's text colour, exactly as
+; #46's class glyphs already did.
+;
+; db is forced to $7e so that store lands where the battle path puts it rather
+; than in bank $00 open bus -- menu-bank callers run with db = $00.
+;
+; in: A = ability id.  out: A = the glyph, or $ff for neither.  preserves X/Y.
+.proc Ot6SkillIconGlyph
+        .a8
+        .i16
+        phb
+        pha                     ; [S+2] the ability id
+        lda     #$7e
+        pha
+        plb                     ; db = $7e (Ot6ElemGlyphFor's scratch bank)
+        lda     OT6_SCR_COLS
+        pha                     ; [S+1] the tilemap byte we are about to clobber
+        lda     $02,s           ; the ability id again
+        jsr     Ot6ElemGlyphFor
+        sta     $02,s           ; the answer replaces the parked id
+        pla
+        sta     OT6_SCR_COLS    ; ... and the tilemap byte goes back
+        pla                     ; the glyph
+        plb
+        rtl
 .endproc
 
 ; class bit index (slash 0 .. special 3) -> small font glyph. these four

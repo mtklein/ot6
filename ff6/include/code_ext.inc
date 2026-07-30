@@ -43,7 +43,19 @@ CODE_EXT_INC = 1
 .global Ot6LoadoutIsAuto         ; #49: is the loadout AUTO (all-zero) or MANUAL?
 .global Ot6RageIsAuto            ;   one per page -- the pages STATE the mode now,
                                  ;   and must not re-derive it from the save bytes
-.global Ot6SkillClassGlyph       ; #46: attack id -> break-class glyph (or $ff)
+.global Ot6SkillIconGlyph        ; #53: attack id -> ELEMENT glyph, else its
+                                 ;   break-class glyph, else $ff.  The rtl
+                                 ;   wrapper over Ot6ElemGlyphFor, so the field
+                                 ;   pages and the battle lists decide an
+                                 ;   ability's icon in ONE place.  Replaced #46's
+                                 ;   class-only Ot6SkillClassGlyph, which existed
+                                 ;   only because the field font had no element
+                                 ;   tiles to draw.
+.global Ot6MenuIcons4bpp_ext     ; #53: put the eight element tiles into the
+.global Ot6MenuIcons2bpp_ext     ;   FIELD MENU font -- one entry per vram copy
+                                 ;   (BG1's 4bpp at $5000, BG2/BG3's 2bpp at
+                                 ;   $6000), each hooked at the tail of the
+                                 ;   vanilla loader that lays that copy down
 .global Ot6RageRowCost           ;   ALWAYS-defined price shim, Ot6LoadoutCost's
                                  ;   twin (flat trance price / 0 under nomp)
 .global Ot6LoadoutCost           ;   ALWAYS-defined price shim (flag-gated body):

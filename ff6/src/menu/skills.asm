@@ -1902,11 +1902,23 @@ DrawBlitzMenu:
 ;
 ;   col  3..12   the Blitz's name, from AttackName -- the very table the battle
 ;                list renders from (ListTextCmd_0f), so the two cannot drift
-;   col  14      its BREAK CLASS glyph, or blank.  Ot6SkillClassGlyph (F0) reads
-;                the same Ot6SkillClassTbl the chip itself consults, so the page
-;                cannot promise a class the hit does not land.  Five of the eight
-;                Blitzes have no class at all and draw nothing there -- they
-;                probe by element.
+;   col  14      its PROBE ICON: the element it strikes with, or -- when it has
+;                no element -- its BREAK CLASS glyph, or blank when it has
+;                neither.  Ot6SkillIconGlyph (F0) is a wrapper over
+;                Ot6ElemGlyphFor, the very leaf the BATTLE ability lists decide
+;                their icon with, which in turn reads MagicProp's element byte
+;                and Ot6SkillClassTbl -- the table the chip itself consults.  So
+;                the page cannot promise a probe the hit does not land, and it
+;                cannot come to a different conclusion than the battle list for
+;                the same Blitz.
+;
+;                #46 shipped this column CLASS-ONLY, and not by choice: the
+;                element tiles existed only in the battle font, so five of the
+;                eight rows -- three of them elemental probes -- drew nothing.
+;                #53 uploads them into the menu font too (Ot6MenuIcons4bpp_ext,
+;                ot6_icons.asm), and the column says what it was always meant to.
+;                Two rows still draw blank and that is the honest answer:
+;                Mantra and Spiraler carry neither an element nor a class.
 ;   col  16..20  "nn MP", from Ot6LoadoutCost -> Ot6CostFor, the same leaf the
 ;                charge and the battle row read (blank under nomp, which prices
 ;                nothing)
@@ -1951,7 +1963,7 @@ DrawBlitzMenu:
 OT6_BLITZ_ATK0   = $5d                  ; Pummel; Bum Rush is $64
 OT6_ATTACKNAME_0 = $51                  ; AttackName record 0 is attack id $51
 OT6_BLITZ_NAME_COL  = 3
-OT6_BLITZ_CLASS_COL = 14
+OT6_BLITZ_ICON_COL  = 14
 OT6_BLITZ_COST_COL  = 16
 
 ; ---- draw the eight rows ----
@@ -1980,8 +1992,9 @@ Ot6BlitzPageDraw:
         lda     $e2
         clc
         adc     #OT6_BLITZ_ATK0         ; attack id
-        jsl     Ot6SkillClassGlyph      ; F0: A = class glyph, or $ff for none
-        ldx     #OT6_BLITZ_CLASS_COL
+        jsl     Ot6SkillIconGlyph       ; F0 (#53): A = element glyph, else the
+                                        ;   break-class glyph, else $ff
+        ldx     #OT6_BLITZ_ICON_COL
         jsr     Ot6BlitzDrawIcon
         lda     $e2
         clc
@@ -1997,7 +2010,7 @@ Ot6BlitzPageDraw:
         ldx     #OT6_BLITZ_NAME_COL
         jsr     Ot6BlitzDrawLocked
         lda     #$ff
-        ldx     #OT6_BLITZ_CLASS_COL
+        ldx     #OT6_BLITZ_ICON_COL
         jsr     Ot6BlitzDrawIcon        ; $ff = the blank tile, still drawn
         lda     #$00
         ldx     #OT6_BLITZ_COST_COL
@@ -2051,7 +2064,11 @@ Ot6BlitzLockedTiles:    raw_text OT6_BLITZ_LOCKED  ; "- LOCKED -" + $00 (issue
                         ; #39: encoded via menu_text_en.inc -- a bare literal
                         ; here picks up ending_anim.asm's credits charmap)
 
-; ---- one class glyph.  in: A = tile ($ff = blank), $e6 = row, X = col ----
+; ---- one probe icon.  in: A = tile ($ff = blank), $e6 = row, X = col ----
+; A raw font cell, not text, so it does not go through the encode pipeline (#39
+; governs STRINGS: a literal run of letters here would pick up the credits
+; charmap).  The cell code itself comes out of Ot6ElemGlyphTbl /
+; Ot6ClassGlyphTbl by way of Ot6SkillIconGlyph, never written down here.
 Ot6BlitzDrawIcon:
         pha
         lda     $e6
