@@ -25,6 +25,8 @@ CODE_EXT_INC = 1
 .global Ot6SlotRig, Ot6SlotDrift           ; boost-tiered Slot (chance verb):
 .global Ot6SlotMiss, Ot6SlotCommit         ;   rig/drift/miss tiers + the
                                            ;   latched-tier charge at commit
+.global Ot6ThiefListOpen         ; #55 locke's kit: steal -> tools-shell submenu
+.global Ot6ThiefExec             ;   Cmd_05's execute-side dispatch (filch/bestow)
 .global Ot6BlitzListOpen         ; v0.3 blitz-as-menu: _c1776b -> tools shell
 .global Ot6BushidoListOpen       ; v0.5 bushido submenu (#8): swdtech -> tools shell
 .global Ot6BushidoConfirm        ;   confirm shim: row r -> boost r + latch tech

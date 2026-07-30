@@ -473,8 +473,22 @@ Ot6FoldTbl:
         pla                     ; some other verb: hand back vanilla's cost
         plp
         rtl
-@steal:
+@steal: ; #55: steal is no longer ONE ability -- it is the first row of Locke's
+        ; thief submenu, and the row the player picked is in $3a7b (see
+        ; Ot6ThiefListOpen's header for why that byte is free under this command
+        ; and why the $11a9/$a4 collision the old note warned about does not
+        ; reach here).  Filch and Bestow price from Ot6ThiefCostTbl, keyed on
+        ; that byte; EVERYTHING ELSE -- the Steal row itself, the $ff a Confused
+        ; or AI-issued Steal queues, a Gogo mimic -- falls through to
+        ; Ot6StealCost, so #52's single authority for Steal's 4 still holds.
         pla                     ; drop the parked cost (0 for steal)
+        lda     $3a7b           ; the row the submenu queued
+        jsl     Ot6ThiefIsNew   ; carry set = filch/bestow (A preserved)
+        bcc     @plainsteal
+        jsl     Ot6ThiefCostFor
+        plp
+        rtl
+@plainsteal:
         jsl     Ot6StealCost    ; the flat price, one authority (#52)
         plp
         rtl
@@ -553,6 +567,86 @@ Ot6FoldTbl:
 @done:  sta     $01,s           ; overwrite the parked id with its cost
         pla                     ; A = cost
         plx
+        rtl
+.endproc
+
+; ------------------------------------------------------------------------------
+
+; [ #55: the SECOND keyed table -- Locke's thief submenu ]
+;
+; WHY A SECOND TABLE RATHER THAN ROWS IN Ot6AbilityCostTbl.  That table's header
+; earns its single-scan design on one property: "those three id ranges are
+; disjoint, so ONE $ff-terminated (key,cost) table serves all three; the command
+; gate keeps a stray id under any OTHER verb from ever matching a row".  The
+; thief rows are $56-$58, which sit INSIDE SwdTech's $55-$5c key range -- they
+; are AttackName pad slots, and SwdTech's ids are attack ids in the same space
+; (SwdTech draws its names from BushidoName, which is exactly why the pad was
+; free; see Ot6ThiefListOpen).  Putting them in the shared table would break the
+; disjointness the scan relies on and would price a boosted SwdTech row as a
+; Filch.  Keeping them here keeps the invariant literally true: two tables, each
+; reached from its own arm of Ot6AbilityCost's command gate, and the gate is what
+; makes the key spaces disjoint.
+;
+; THE RULER (the same one Ot6AbilityCostTbl is on: 8-20% of the real pool at the
+; level the ability arrives).  Locke joins at Narshe holding 31 MP at LV6 -- the
+; figure Ot6StealCost measured off probe_mppools.lua -- and these are granted at
+; join with Steal (the story-gating ruling; kits.md).  So:
+;
+;   Steal   4  12.9%   (Ot6StealCost, unchanged -- rung one, the signature)
+;   Bestow  5  16.1%   between Cure's 12.5% and Drain's 17.2%
+;   Filch   6  19.4%   just under Life's 20.3%, the top of the ruler
+;
+; NOT MONOTONIC WITH THE RUNG ORDER, deliberately: kits.md numbers Filch rung 4
+; and Bestow rung 5, so a monotonic column would want Filch cheaper.  SwdTech is
+; the one kit that must stay monotonic and its table says why -- "the row IS the
+; boost level, so a dearer 2x row than 3x row would read as a bug".  The thief
+; submenu is a FREE-CHOICE menu like Blitz, which the same header exempts from
+; the rule ("Blitz is a free-choice menu and needs no such rule"), and Blitz
+; already ships Mantra 16 beneath Fire Dance 17 for the same reason.  Price by
+; what the ability does, not by where kits.md happened to list it.
+;
+; Filch sits at the TOP of the ruler on purpose: it is the only class-blind and
+; element-blind shield remover in the game and the only way to gain two BP in a
+; turn (see Ot6Filch), and at 6 a full LV6 pool buys five of them.  Bestow is
+; dearer than Steal because it is a party-wide tempo move rather than a probe,
+; and cheaper than Filch because it moves a pip Locke already paid for.
+; Placeholders like every number in this file; battle_costtable.lua recomputes
+; the fractions from the ROM.
+Ot6ThiefCostTbl:
+        .byte   OT6_THIEF_FILCH,  6     ; Filch  -- shield -> boost point
+        .byte   OT6_THIEF_BESTOW, 5     ; Bestow -- hand a boost point to an ally
+        .byte   $ff
+        ; NO Steal row: Ot6StealCost is its authority (#52) and the @steal arm
+        ; routes the Steal row -- and every Steal this menu did not issue -- to
+        ; that leaf.  A row here would make two numbers for one price.
+
+; [ #55: price one thief row by its id -- Ot6CostFor's twin on the second table ]
+; PURE: id in A, cost in A ($00 if the id is unpriced -- an unpriced id is FREE,
+; never a garbage charge, the same ruling Ot6CostFor makes).  preserves X and Y;
+; a8/i16.  rtl.
+.proc Ot6ThiefCostFor
+        .a8
+        .i16
+        php
+        longi
+        phx
+        pha                     ; park the id to match against each table key
+        ldx     #$0000
+@scan:  lda     f:Ot6ThiefCostTbl,x
+        cmp     #$ff
+        beq     @free           ; ran off the table: unpriced id is free
+        cmp     $01,s           ; table key vs the parked id
+        beq     @hit
+        inx
+        inx                     ; 2-byte records: key, cost
+        bra     @scan
+@hit:   lda     f:Ot6ThiefCostTbl+1,x
+        bra     @done
+@free:  lda     #$00
+@done:  sta     $01,s           ; overwrite the parked id with its cost
+        pla                     ; A = cost
+        plx
+        plp
         rtl
 .endproc
 
