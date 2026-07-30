@@ -56,6 +56,12 @@
 --      between the two named in the log's frame table;
 --   4. ONCE PER ROUND: further covers in the same round still redirect the hit
 --      but bank nothing;
+--   4b. and -- unrelated to True Knight, deliberately -- THE FRAME BUDGET.
+--      That phase's span is this fixture's most sensitive probe of the battle
+--      main loop's per-frame budget, and it used to be asserted only by
+--      accident, through phase 6a's delivery path.  It is stated outright
+--      now, in its own words, so a performance regression stops being
+--      reported as a True Knight failure (issue #67);
 --   5. and the round boundary is REAL -- after the blocker takes his own turn
 --      (Ot6ActionEnd), the next cover pays again.  Without 5, "once per round"
 --      and "once per battle" would both pass 4;
