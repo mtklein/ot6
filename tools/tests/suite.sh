@@ -157,15 +157,46 @@ verdict() {
   fi
 }
 
+# Fixture freshness, stated BEFORE the run rather than discovered after it.
+# A stale frontier fixture makes a test red for a reason that is not the
+# reader's change, and the only notice of it used to be a print() buried in
+# build/states/suite_<t>.log -- which nobody opens for a test they did not
+# expect to fail.  ~2s for ~105 fixtures, against a multi-minute suite.
+if [ -d "$ROOT/build/states" ]; then
+  python3 "$ROOT/tools/tests/lib/compose.py" --check-states || {
+    echo "^^ read that before you debug a red test below."
+    echo
+  }
+fi
+
 if [ "$JOBS" -gt 1 ]; then
   CDIR="$SROOT/composed"; RDIR="$SROOT/results"
   CLAIMS="$SROOT/claims"; LDIR="$SROOT/logs"
   mkdir -p "$CDIR" "$RDIR" "$CLAIMS" "$LDIR"
   for t in $TESTS; do
-    python3 "$ROOT/tools/tests/lib/compose.py" \
-      "$ROOT/tools/tests/$t.lua" "$CDIR/$t.lua" >/dev/null \
-      || { echo "compose failed: $t"; exit 1; }
+    # Keep the whole compose log.  `>/dev/null` used to eat it -- including,
+    # on failure, the only line saying WHY, leaving "compose failed: <test>"
+    # and nothing else.  That is the exact shape of the mistake the brief
+    # warns about ("do not let a pipe eat your failure"), and it got worse
+    # when an ambiguous symbol became a fatal compose error: the message
+    # naming both candidate addresses would have gone straight to /dev/null.
+    if ! python3 "$ROOT/tools/tests/lib/compose.py" \
+         "$ROOT/tools/tests/$t.lua" "$CDIR/$t.lua" > "$SROOT/compose.$t" 2>&1
+    then
+      echo "compose failed: $t"
+      cat "$SROOT/compose.$t"
+      exit 1
+    fi
+    # Warnings that are NOT the fixture staleness already reported above --
+    # an unresolvable symbol, say.  Deduped across tests: ~100 tests share
+    # ~30 fixtures, so an undeduped list is the same line a hundred times.
+    grep '^WARNING' "$SROOT/compose.$t" | grep -v 'is STALE' >> "$SROOT/warn" || :
   done
+  if [ -s "$SROOT/warn" ]; then
+    echo "compose warnings:"
+    sort -u "$SROOT/warn" | sed 's/^/  /'
+    echo
+  fi
   # Execution order for the pull queue below: front-load the known long
   # runners. Workers used to get a STATIC i%JOBS slice, and that was the whole
   # problem -- it pinned battle_class (~156s) AND battle_vargas (~64s) AND four

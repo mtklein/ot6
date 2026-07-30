@@ -152,6 +152,76 @@ def stamp_check(name, root):
             f"re-run `make frontier` to refresh it (issue #2)")
 
 
+def check_states(root):
+    """`compose.py --check-states`: the same freshness question, asked of the
+    WHOLE fixture set at once instead of one sidecar at a time.
+
+    stamp_check() answers "is this fixture stale?" only when something is
+    about to embed it, and answers it into a composed file that nobody reads
+    until a test has already gone red.  The question an agent actually has --
+    "is anything in this tree stale before I start?" -- had no way to be
+    asked, so it got answered by re-running tests against unmodified `main`
+    to see if they were red anyway.  Four agents did exactly that on
+    2026-07-29, independently, for the same ~10 tests.
+
+    Deliberately the SAME code path as the consume-time check: one definition
+    of fresh, so a tree that reports clean here cannot warn during a run.
+
+    Exit 0 = every stamped fixture matches its sources; 1 = some do not.
+    """
+    states = root / "build" / "states"
+    stamps = sorted(states.glob("*.stamp"))
+    if not stamps:
+        print("no minted fixtures in this tree (build/states is unseeded); "
+              "frontier-gated tests will report SKIPPED, not fail")
+        return 0
+    stale = []
+    for s in stamps:
+        msg = stamp_check(s.stem, root)
+        if msg:
+            stale.append((s.stem, msg))
+    if not stale:
+        print(f"fixtures: {len(stamps)}/{len(stamps)} fresh "
+              f"(generator + all three lib halves match every stamp)")
+        return 0
+    print(f"fixtures: {len(stale)} of {len(stamps)} are STALE -- minted from "
+          f"sources this tree no longer has.")
+
+    # WHICH shared input moved, when it is a shared input.  ninja keeps a
+    # byte-copy of every mint input under build/ninja/src (the `latch` edges
+    # -- see frontier_ninja.py's header), so "what did the last mint actually
+    # see?" is answerable without guessing.  Every generator inlines all
+    # three lib halves, so one edited half stales the entire frontier at
+    # once, which is exactly the case that looks alarming and is not.
+    moved = [p for p in (LIB.name, FIELD.name, CONTRACT.name)
+             if (root / "build" / "ninja" / "src" / "tools" / "tests" / "lib"
+                 / p).exists()
+             and (root / "build" / "ninja" / "src" / "tools" / "tests" / "lib"
+                  / p).read_bytes() != (root / "tools" / "tests" / "lib"
+                                        / p).read_bytes()]
+    if moved:
+        print(f"CAUSE: {', '.join('lib/' + m for m in moved)} changed since "
+              f"the last mint.  Every generator inlines all three lib halves, "
+              f"so one edited half stales the whole frontier at once -- that "
+              f"is what {len(stale)} of {len(stamps)} looks like, and it is "
+              f"not {len(stale)} separate problems.")
+
+    show = 6
+    for _, msg in stale[:show]:
+        print(f"  {msg}")
+    if len(stale) > show:
+        print(f"  ... and {len(stale) - show} more, same shape")
+
+    # Name the smallest sufficient action, not just `make frontier`.  A stale
+    # fixture only matters for the tests that embed it, and re-minting one leg
+    # is minutes where the full chain is hours.
+    print("\nA test that boots one of these can be red for a reason that has "
+          "nothing to do with your change.\nRe-mint just what you need:  "
+          "nice -n 10 ninja -f build/build.ninja <state>\nor the whole chain: "
+          " nice -n 10 make frontier NINJAFLAGS=-j4")
+    return 1
+
+
 class CrossTree(Exception):
     """A referenced sidecar exists ONLY outside the composing tree."""
 
@@ -638,6 +708,11 @@ def selftest() -> int:
 def main() -> int:
     if len(sys.argv) == 2 and sys.argv[1] == "--selftest":
         return selftest()
+    # --check-states: is anything in this tree's build/states stale?  Asked
+    # by tools/worktree-setup.sh right after seeding, and by hand any time a
+    # red test might not be yours.
+    if len(sys.argv) == 2 and sys.argv[1] == "--check-states":
+        return check_states(ROOT)
     # --sha <sidecar>: the same fingerprint the provenance lines carry, so a
     # hash seen in a run log can be checked against a state on disk.
     if len(sys.argv) == 3 and sys.argv[1] == "--sha":
@@ -670,9 +745,12 @@ def main() -> int:
     for ref in dict.fromkeys(re.findall(r'"([^"]+\.mss\.lua)"', script)):
         try:
             p = resolve_sidecar(ref, ROOT)
-        except CrossTree:
-            print(f"error: {script_path} references {ref}, which exists only "
-                  f"OUTSIDE this tree ({ROOT}).  Refusing to compose another "
+        except CrossTree as why:
+            # Print the exception's own text too: resolve_sidecar distinguishes
+            # several refusals (absolute literal, .. escape, nested checkout)
+            # and only it knows which one fired.
+            print(f"error: {script_path} references {ref} [{why}], which "
+                  f"exists only OUTSIDE this tree ({ROOT}).  Refusing to compose another "
                   f"tree's savestate: it was minted from a different ROM, so "
                   f"a run against it proves nothing.  Mint it here (make, or "
                   f"the generator that emits it), or seed this tree with "

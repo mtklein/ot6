@@ -23,10 +23,12 @@ trap 'rm -rf "$TMP"' EXIT INT TERM
 mkdir -p "$TMP/tools/tests" "$TMP/build/states"
 cp "$ROOT/tools/tests/suite.sh" "$TMP/tools/tests/suite.sh"
 chmod +x "$TMP/tools/tests/suite.sh"
-# The OT6_JOBS>1 path composes each test up front, so the fake tree needs a
-# lib/.  Symlinked, not copied: composing a stub that never dofiles the lib is
-# a pass-through, so which tree's compose.py runs is immaterial here.
-ln -s "$ROOT/tools/tests/lib" "$TMP/tools/tests/lib"
+# The OT6_JOBS>1 path composes each test up front, and suite.sh now opens with
+# a fixture-freshness check, so the fake tree needs a lib/.  COPIED, not
+# symlinked: compose.py finds its tree root with Path(__file__).resolve(),
+# which follows a symlink straight back to the real checkout -- a symlinked
+# lib would have this selftest reporting on the REAL tree's fixtures.
+cp -R "$ROOT/tools/tests/lib" "$TMP/tools/tests/lib"
 
 # Stub runner: `pass_*` exits 0, `fail_*` exits 1.  It also writes the log
 # file suite.sh names, because the parallel path copies it unconditionally.
@@ -69,6 +71,44 @@ done
 # scrolled terminal sees which one it was without scrolling back.
 check "green run says GREEN" \
   "$(grep -c '^OT6 suite: GREEN' "$TMP/out.3")" "1"
+
+# ---- 1b. fixture freshness is stated up front, not left in a per-test log --
+# An unstamped tree says so and stays quiet; a tree holding a fixture whose
+# recorded signature does not match its sources says THAT, before any test
+# runs.  The stale case is built by hand: a stamp naming a real generator,
+# carrying a signature that is simply not the one those bytes hash to.
+check "an unstamped tree says so and does not cry stale" \
+  "$(grep -c 'no minted fixtures in this tree' "$TMP/out.3")" "1"
+echo '-- a generator' > "$TMP/tools/tests/gen_fake.lua"
+echo "0000000000000000000000000000000000000000000000000000000000000000 gen_fake" \
+  > "$TMP/build/states/fake_leg.stamp"
+OT6_JOBS=3 "$TMP/tools/tests/suite.sh" > "$TMP/out.stale" 2>&1
+check "a stale fixture is named before the first test runs" \
+  "$(grep -c 'fixture fake_leg is STALE' "$TMP/out.stale")" "1"
+check "...above the per-test list, where it will actually be read" \
+  "$(awk '/fixture fake_leg is STALE/{s=NR} /^OT6 suite:/{if(!p){p=NR}}
+          END{print !s ? "no stale line at all" : \
+                     !p ? "no suite output at all" : \
+                     (s<p) ? "before" : "after"}' "$TMP/out.stale")" "before"
+check "...and does NOT by itself fail the suite" \
+  "$(tally "$TMP/out.stale")" \
+  "3 ran: 3 pass, 0 fail; 1 skipped (need \`make frontier\`)"
+rm "$TMP/build/states/fake_leg.stamp" "$TMP/tools/tests/gen_fake.lua"
+
+# ---- 1c. a compose failure must print WHY.  suite.sh used to send compose's
+#          stdout to /dev/null and report a bare "compose failed: <test>",
+#          which is the whole diagnosis thrown away one line before it is
+#          printed.  An absolute sidecar literal is a compose error with a
+#          long, specific message; assert the message survives.
+printf -- '-- @suite\nlocal S = "/elsewhere/build/states/x.mss.lua"\n' \
+  > "$TMP/tools/tests/pass_badref.lua"
+OT6_JOBS=3 "$TMP/tools/tests/suite.sh" > "$TMP/out.compose" 2>&1
+rc=$?
+check "a compose failure exits nonzero" "$rc" "1"
+check "...names the test" "$(grep -c 'compose failed: pass_badref' "$TMP/out.compose")" "1"
+check "...and keeps compose's own explanation" \
+  "$(grep -c 'absolute sidecar reference' "$TMP/out.compose")" "1"
+rm "$TMP/tools/tests/pass_badref.lua"
 
 # ---- 2. a skipped frontier test joins the count once its fixture exists --
 : > "$TMP/build/states/deep_fixture.mss"
