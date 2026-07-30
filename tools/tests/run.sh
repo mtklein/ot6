@@ -272,21 +272,27 @@ else
   # four reaped, all four green when re-run alone.
   # "Lived to the cap" with 5s of slack for rounding -- not a fixed 30s
   # margin, which goes negative and always fires under a small OT6_TIMEOUT.
+  #
+  # It goes into $RUN_LOG with the [ot6] prefix rather than straight to
+  # stdout, because stdout is not where it would be read: suite.sh runs every
+  # test as `"$RUN" ... >/dev/null 2>&1` and keeps only the log.  Written
+  # here it reaches BOTH readers -- the `grep '^\[ot6\]'` at the end of this
+  # script prints it for a direct invocation, and it is inside
+  # build/states/suite_<test>.log for a suite one.  decode_b64 has already
+  # read the log, so appending now is safe.
+  reap() { printf '[ot6] %s\n' "$@" >> "$RUN_LOG"; }
   if [ $(( elapsed + 5 )) -ge "$CAP" ]; then
-    echo "REAPED: no [ot6] verdict, and the run lasted ${elapsed}s against a" \
-         "${CAP}s wall-clock cap (--timeout).  Mesen killed it; it did not crash."
-    echo "  Load right now: $(uptime | sed 's/.*load average/load average/')"
-    echo "  On a busy machine this is CONTENTION, not your change.  The cap is"
-    echo "  wall clock, so nice(1) does not protect it -- concurrent jobs are"
-    echo "  all equally niced and starve each other.  The signature is several"
-    echo "  runs failing at once that each pass alone."
-    echo "  Before debugging: lower parallelism (make frontier NINJAFLAGS=-j2)"
-    echo "  and retry, or raise the cap for this run with OT6_TIMEOUT=1200."
+    reap "REAPED: no verdict, and the run lasted ${elapsed}s against a ${CAP}s wall-clock cap (--timeout).  Mesen killed it; it did not crash." \
+         "  Load right now: $(uptime | sed 's/.*load average/load average/')" \
+         "  On a busy machine this is CONTENTION, not your change.  The cap is" \
+         "  wall clock, so nice(1) does not protect it -- concurrent jobs are" \
+         "  all equally niced and starve each other.  The signature is several" \
+         "  runs failing at once that each pass alone." \
+         "  Before debugging: lower parallelism (make frontier NINJAFLAGS=-j2)" \
+         "  and retry, or raise the cap for this run with OT6_TIMEOUT=1200."
   elif [ "$verdict" -ne 0 ]; then
-    echo "no [ot6] verdict after ${elapsed}s (cap ${CAP}s): the script died" \
-         "before reaching PASS or FAIL."
-    echo "  Well short of the cap, so this is NOT the reap -- look at" \
-         "$RUN_LOG for a Lua load error."
+    reap "no verdict after ${elapsed}s (cap ${CAP}s): the script died before reaching PASS or FAIL." \
+         "  Well short of the cap, so this is NOT the reap -- read this log for a Lua load error."
   fi
 fi
 if [ "$verdict" -eq 0 ] && [ -n "${OT6_EXPECT_ARTIFACT:-}" ]; then
