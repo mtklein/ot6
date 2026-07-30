@@ -1,4 +1,4 @@
--- @suite slow
+-- @suite frontier=ifrit_doorstep slow
 -- battle_brokendeath.lua -- THE GUARD on where the Broken turn gate may sit.
 --
 -- Ot6MayAct (ot6_break.asm) refuses a Broken monster's turn at execution
