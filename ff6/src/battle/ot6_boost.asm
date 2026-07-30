@@ -254,7 +254,12 @@ done:   jsr     Ot6PipPending
 ; bounds the STOCK but not the FLOW: she spends three and they come
 ; straight back, which makes boosting free for the rest of the fight in
 ; exactly the fights the ability is for.  Measured A/B in
-; battle_runic.lua's "milked" phase.
+; battle_runic.lua's "milked" phase: four absorbable casts into one round
+; of a standing 3-turn stance bank +1 with this latch and +2 on a control
+; build with it nop'd out.  +2 and not +4 because that fixture has ONE
+; caster and the count is of casts resolved rather than absorb events --
+; the direction is the finding, and the direction is that uncapped the
+; earn scales with absorbs and capped it does not scale at all.
 ;
 ; The third option #59 lists -- per absorb, unscaled, justified by
 ; casters being rare -- is the one the measurement kills: it is not rare

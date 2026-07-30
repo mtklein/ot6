@@ -73,8 +73,13 @@
 --      was itself mirrored from Runic's own machinery.  The same phase
 --      proves the other half of duration: an absorb no longer ENDS the
 --      stance, so the stance is still standing after all of them.
---      Both halves fail loudly on a build without the cap: measured, a
---      control ROM with the latch removed banks one point per absorb.
+--      MEASURED A/B, same fixture and same casts: +1 with the latch, +2 on
+--      a control ROM with the latch nop'd out.  (+2 rather than +4 because
+--      the counter below is of absorbable casts that RESOLVED, an upper
+--      bound on absorb events rather than an exact count -- and because
+--      this fixture has exactly ONE caster.  The direction is what the
+--      ruling turns on: uncapped, the earn scales with absorbs and with
+--      how many things are casting; capped, it does not scale at all.)
 --
 --   8. AND IT EXPIRES.  She takes turns; the counter ticks down at each
 --      QueueAction (Ot6RunicHold, which also puts back the bit vanilla's

@@ -1136,6 +1136,17 @@ OT6_RANDMAGIC := $a5            ; the marker value (junk is $00/$ff in
         ; rest of the menu (battle_preview.lua's ladder is the gate).
         ; Ot6ActionEnd still uses the request bit, because there the timing
         ; is right: an action has just ended, so AfterAction2 is next.
+        ;
+        ; ON THE FRAME BUDGET (#48's lesson, whose evidence is 60 lines below
+        ; this one): this site is inside Ot6BgHud_ext and the battle loop's
+        ; per-frame budget is close enough to full that ~80 idle cycles cost
+        ; a whole extra hardware frame.  UpdateEnabledMagic's 78-row walk is
+        ; far more than 80 cycles -- but it is a BURST ON AN L/R EDGE, not a
+        ; per-frame cost, and #48's regression was per-frame.  The worst case
+        ; is one dropped frame on the frame the player presses R, which is
+        ; not something a player can perceive and is not something a fixture
+        ; can accumulate.  If that ever stops being true, the move is to
+        ; defer the walk to the next frame, not to re-derive the grey here.
         tya                     ; the boosting character's entity offset
         jsl     Ot6RecheckMagic
 @show:  rts                     ; display is Ot6PipStage's job now (#33)

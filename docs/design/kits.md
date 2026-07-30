@@ -503,10 +503,11 @@ ice/order/tempo. The duality reads clearer than vanilla ever made it.
     assumed:** with the cap, four absorbable casts inside one round of
     Celes's bank exactly +1 and a 3-BP Runic comes out BP-neutral against
     three ordinary turns, costing one action. On a control build with the
-    latch removed the same four casts bank +2 — and that is with a *single*
-    caster; the loop scales with how many things are casting and how long
-    the stance stands, which is exactly the fight the stance is bought for.
-    (`battle_runic.lua`, the "milked" phase.)
+    latch removed the same four casts bank **+2** — and that is with a
+    *single* caster, and counting casts resolved rather than absorb events,
+    so it is a floor. The direction is the finding: uncapped, the earn
+    scales with absorbs and with how many things are casting; capped, it
+    does not scale at all. (`battle_runic.lua`, the "milked" phase.)
   - **The MP half stays per absorb and uncapped.** Only the BP earn is
     rationed. Vanilla's restore is the reason a rune knight wants a caster
     boss, and rationing it would delete the ability's own reward.
