@@ -511,6 +511,9 @@ QueueAction:
         lda     $3e4c,x     ; clear runic and retort ($3e4c.0 and $3e4c.2)
         and     #$fa
         sta     $3e4c,x
+        jsl     Ot6RunicHold    ; ot6 #59: ...unless boost bought this Runic a
+                                ;   DURATION, in which case the stance outlives
+                                ;   her turn and one turn of it is spent here
         cpx     #$08
         bcc     @0344       ; branch if a character
 
@@ -4146,6 +4149,8 @@ Cmd_0b:
         lda     $3e4c,x     ; set $3e4c.2 (runic)
         ora     #$04
         sta     $3e4c,x
+        jsl     Ot6RunicRaise   ; ot6 #59: and boost buys the stance a duration
+                                ;   -- on reactive verbs, boost buys duration
         jsr     _c2298a
         jmp     ExecSelfAttack
 
@@ -14644,6 +14649,10 @@ UpdateEnabledMagic:
         .i8
 @5763:  cpx     #$08
         bcs     @57a9       ; return if a monster
+        jsl     Ot6FoldPrices   ; ot6 #64: a boosted caster's tiered rows carry
+                                ;   the FOLDED tier's price, so the grey below
+                                ;   (and the number, and the confirm) tell the
+                                ;   truth about what the cast will cost
         phx
         phy
         php
@@ -14676,6 +14685,62 @@ UpdateEnabledMagic:
         ply
         plx
 @57a9:  rts
+
+; ------------------------------------------------------------------------------
+
+; ot6 #64: an rtl DOOR onto UpdateEnabledMagic, for bank F0.
+;
+; Ot6Boost must re-derive an open magic list's prices AND its enabled bits on
+; the L/R edge.  Vanilla consumes its own $3204 bit-7 recheck request only in
+; AfterAction2 (:1367-1369) -- "update targets after each command" -- which is
+; far too late for a list the player is looking at RIGHT NOW.  Measured: with
+; the request set from Ot6Boost and nothing else, an L press refolded the
+; name and left the price at the base spell's for the rest of the menu.
+;
+; Calling vanilla's own routine rather than re-deriving the enabled bit in
+; bank F0 is the point: the imp filter and the empty-slot rule
+; (CheckMagicEnabled, below) stay in one place, so the grey the player sees
+; and the grey the A button obeys can never come from two different rules.
+;
+; $3a4c and $ef are UpdateEnabledMagic's scratch and BOTH are live elsewhere
+; -- $3a4c is the in-flight action's staged MP cost (:425) -- and this runs
+; mid-frame from the HUD path, with another character's action possibly
+; resolving.  So they are saved across the call rather than trusted.
+;
+; entry: jsl from bank F0.  A = the caster's entity offset, a8, index width
+; either.  preserves A's caller value? no -- A is the input and is clobbered;
+; X, Y and P are preserved.
+.a8
+.i16
+Ot6RecheckMagic:
+        php
+        phx
+        phy
+        sep     #$10        ; UpdateEnabledMagic is .i8
+        .i8
+        tax                 ; the caster's entity offset
+        sep     #$20
+        .a8
+        lda     $3a4c       ; the in-flight action's staged MP cost
+        pha
+        lda     $ef         ; ...and the enable loop's own dp scratch
+        pha
+        jsr     UpdateEnabledMagic
+        pla
+        sta     $ef
+        pla
+        sta     $3a4c
+        rep     #$10
+        .i16
+        ply
+        plx
+        plp
+        rtl
+.a8
+.i8                     ; hand the file back the width assumptions it had:
+                        ;   CheckMagicEnabled below assembles under .i8, and
+                        ;   these directives are assembly-time only -- the plp
+                        ;   above is what restores the real widths at runtime
 
 ; ------------------------------------------------------------------------------
 

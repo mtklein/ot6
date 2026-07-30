@@ -23,8 +23,23 @@
 --   B GRANT     Ramuh: Bolt AND Rasp appear; the list is A's list PLUS exactly
 --               {summon, Bolt, Rasp} -- additive, innate untouched; Bolt is priced
 --               at vanilla MP (no double-charge); the summon slot is registered.
---   C FOLD      a granted Bolt cast with 2 BP executes as Bolt3 ($0b) via the fold
---               and is charged base-Bolt MP -- which also proves it is CASTABLE.
+--   C FOLD      a granted Bolt cast with 2 BP executes as Bolt3 ($0b) via the
+--               fold, and since #64 is charged BOLT3's own MP (53), not base
+--               Bolt's -- which also proves it is CASTABLE.
+--
+--               This phase is the sharp end of #64's "bigger question": the
+--               fold is SOURCE-AGNOSTIC, so a borrowed Bolt reaches a Bolt3
+--               the caster has never learned and could not learn.  That
+--               access is KEPT -- it is what lets every spell list stay at 8
+--               -- but it is a purchase now rather than a freebie, and this
+--               is where that is asserted.  The assertion here was inverted
+--               by #64 (it read `cost < 15`, "charged base-Bolt MP, not
+--               Bolt3's") because the correct behaviour changed; see
+--               battle_fold.lua's header for the reasoning.  Terra is also
+--               made solvent for it: 53 MP is far past this fixture's pool,
+--               so under real pricing the cast would simply fizzle on the
+--               universal insufficient-MP gate and the phase would observe
+--               nothing.
 --   D DELETIONS win a level-up with Ramuh: no esper stat bonus (Stamina AND
 --               Mag.Pwr both flat in the persistent record -- vanilla Ramuh's
 --               STAMINA_1 would bump stamina) and no spell learned (Bolt/Rasp
@@ -208,6 +223,10 @@ H.run({ maxFrames = 120000 }, {
   end, 30000, {
     H.call(function()
       if H.readByte(0x3e9d + terra * 2) == 0 then
+        -- #64: a folded Bolt3 costs 53 MP.  Max first -- vanilla clamps
+        -- current to max wherever it writes MP back.
+        H.writeWord(0x3c30 + terra * 2, 300)
+        H.writeWord(0x3c08 + terra * 2, 300)
         mp0 = H.readWord(0x3c08 + terra * 2)
         H.writeByte(0x3e9c + terra * 2, 3)        -- bp
         H.writeByte(0x3e9d + terra * 2, 2)        -- pending boost
@@ -231,10 +250,15 @@ H.run({ maxFrames = 120000 }, {
     local mp1 = H.readWord(0x3c08 + terra * 2)
     local cost = mp0 - mp1
     H.log(string.format("[C] mp %d -> %d (cost %d)", mp0, mp1, cost))
-    -- charged at base Bolt (~5), never Bolt3's (~20).  bound is generous for a
-    -- possible trailing muddle cast but still separates base from the tier-3 price.
-    H.assertEq(cost >= 1 and cost < 15, true,
-      "boosted cast charged base-Bolt MP, not Bolt3's")
+    -- #64: charged BOLT3's own 53 (MagicProp+5 for $0b; battle_foldcost.lua
+    -- pins the whole table), not base Bolt's 6.  A lower bound rather than an
+    -- equality because a trailing muddle cast can add to the delta -- and the
+    -- two numbers are nine times apart, so the bound separates them cleanly.
+    -- This also settles the untaught-tier question in the affirmative: an
+    -- esper-GRANTED Bolt still reaches Bolt3, and pays Bolt3's price for it.
+    H.assertEq(cost >= 53, true,
+      "the folded Bolt3 was charged Bolt3's own 53 MP -- an untaught tier is "
+      .. "still reachable by folding, and is now a purchase (#64)")
   end),
 
   ---------------------------------------------------------------- D: DELETIONS --

@@ -209,6 +209,33 @@ potency, and keeping the two axes disjoint is what keeps the rule legible.
 Steal's tier table and the full ruling live in design/kits.md; Dance's approved
 shape (built when Mog's rung lands) is there too.
 
+**The third category: on reactive verbs, boost buys duration.** A verb that
+does not act but *waits* — Runic, and every reactive verb after it — has
+neither a potency to tier nor a die to load. What it has is a window, so BP
+buys window. This is less a new rule than the reactive reading of one already
+above: *buffs/debuffs get duration per BP*, and a stance is a buff you cast on
+the situation. **Runic is the shipped example** (v0.9, #59): 1/2/3 BP buys 1/2/3
+of Celes's own turns during which the stance stands and **she acts normally**.
+
+Those two halves are one lever and not two rungs, which is worth stating
+because it is not obvious from outside the code: vanilla ends the stance the
+moment she takes a turn, so "she still acts" is *only* achievable by making the
+stance outlive her action — which is duration. There is no 1-BP option that
+buys the free turns without the window.
+
+**Duration is counted in turns, not absorbs.** A turn count is legible to the
+player ("three turns of shield"); an absorb count is legible only to the fight.
+It also bounds the economy: the BP an absorb pays is capped at **one per
+round**, the same cap #37 put on the True Knight cover — which was itself
+mirrored from Runic's own machinery, so this is that ruling coming home. With
+it, a 3-BP Runic is BP-neutral against three ordinary turns and costs exactly
+one action. Without it the earn scales with absorbs — and therefore with how
+many things are casting and how long the stance stands, which is to say it
+grows in precisely the fights the stance is bought for. Measured rather than
+argued (`battle_runic.lua`): four absorbable casts into one round of a
+standing stance bank **+1** with the cap and **+2** on a control build without
+it, on a fixture with a single caster.
+
 **Cyan is the BP showcase.** The charge gauge — the most disliked mechanic in
 vanilla — is deleted. The 8 techniques are priced in BP:
 
@@ -233,7 +260,14 @@ Candidate passive: *Vengeance* — Cyan gains +1 BP whenever any enemy breaks.
 
 **Celes converts defense into economy.** Runic still swallows the next spell;
 instead of (just) negating it, it grants her +1 BP. A Rune Knight literally
-eats magic and turns it into tempo.
+eats magic and turns it into tempo. **Boosted** (v0.9, #59) it stops being a
+spent turn and becomes a standing magic shield: 1/2/3 BP holds the stance for
+that many of her turns, and she fights through them. Against a caster boss
+that is a different fight, and it is the one job nobody else has. The earn
+stays capped at one BP per round so the shield cannot pay for itself, and
+vanilla's quirk that Runic eats *ally* spells is kept — with the stance
+standing for three turns it will eat a lot of Terra's Cures, which is both the
+charm and the price.
 
 **Terra's Trance** **(TBD)**: candidate — usable only while an enemy is
 Broken, or costs a full 5-BP bank. Either way it's her divine-tier state.

@@ -41,14 +41,19 @@ BPS-capable patcher, or just:
 - **Fight**: +1 real hit per BP (a Genji Glove pair swings both hands
   again, doubling the bonus, the same way it doubles everything else).
 - **Tiered spells fold**: Fire boosted once casts as Fire 2, twice as
-  Fire 3 — the higher tier's name, animation, and power, while MP is
-  charged for the base spell. BP is the price, not MP. Fire/Ice/Bolt/
-  Poison/Cure/Life/Slow/Haste lines all fold.
+  Fire 3 — the higher tier's name, animation, power **and MP cost**.
+  BP buys the tempo, MP buys the power (#64): one Fire 3 instead of
+  three Fires still saves you two turns, and you pay 51 rather than
+  4 for the magnitude. Fire/Ice/Bolt/Poison/Cure/Life/Slow/Haste lines
+  all fold.
 - **Everything else**: damage ×2/×4/×8.
 - **The list tells you first, live**: spell lists show tiered spells
   under their folded names, and they re-fold in place as you tap R
-  and L — "Cure — Fire" becomes "Cure 2 — Fire 2" mid-browse, with
-  the MP cost still the base spell's. What you see is what will cast.
+  and L — "Cure — Fire" becomes "Cure 2 — Fire 2" mid-browse, **and
+  the MP cost and the grey-out follow** (#64): a tier you cannot afford
+  goes grey the moment you boost into it, and un-greys when you tap L
+  back. What you see is what will cast, and what it says it costs is
+  what it costs.
 
 ## Systems live under the hood
 

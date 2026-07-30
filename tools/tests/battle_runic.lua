@@ -49,6 +49,46 @@
 -- and the negative phase fails loudly.  An Ot6RunicBP that unconditally
 -- incremented, or one hooked before RunicEffect's gates, dies there.
 --
+-- ---- #59: BOOST BUYS THE STANCE A DURATION ----
+--
+-- The v0.9 half.  Runic was the last shipped kit verb with no boost
+-- behaviour at all, and the canon it lands is a third category: ON REACTIVE
+-- VERBS, BOOST BUYS DURATION (DESIGN.md).  Boost N = N of Celes's OWN turns
+-- during which the stance stands and she acts normally.
+--
+-- Three phases at the end of this file, and the middle one is the reason the
+-- issue asked for care:
+--
+--   6. THE RAISE LATCHES A DURATION, per tier.  Cmd_0b -> Ot6RunicRaise
+--      banks the pending boost into OT6_RUNICTURNS.  Three arms at 1/2/3 in
+--      battle_slots.lua's discipline -- the same drive each time, one
+--      pending byte different, the latched duration the only thing that
+--      moves.  Unboosted stays 0, which is phases 1-5 above: those are the
+--      regression proof that vanilla Runic is untouched to the byte.
+--
+--   7. THE MILKING TEST -- the BP loop, measured rather than assumed.  Runic
+--      already banks +1 per absorb (v0.3), so an extended stance is not just
+--      more absorbs, it is more BP earned from an ability BP paid for.  Here
+--      the stance is held up while the caster lands SEVERAL absorbable
+--      spells inside one round of Celes's, and the bank must move by exactly
+--      +1 -- the once-per-round cap #37 put on the True Knight cover, which
+--      was itself mirrored from Runic's own machinery.  The same phase
+--      proves the other half of duration: an absorb no longer ENDS the
+--      stance, so the stance is still standing after all of them.
+--      MEASURED A/B, same fixture and same casts: +1 with the latch, +2 on
+--      a control ROM with the latch nop'd out.  (+2 rather than +4 because
+--      the counter below is of absorbable casts that RESOLVED, an upper
+--      bound on absorb events rather than an exact count -- and because
+--      this fixture has exactly ONE caster.  The direction is what the
+--      ruling turns on: uncapped, the earn scales with absorbs and with
+--      how many things are casting; capped, it does not scale at all.)
+--
+--   8. AND IT EXPIRES.  She takes turns; the counter ticks down at each
+--      QueueAction (Ot6RunicHold, which also puts back the bit vanilla's
+--      :511 clear just took); on the turn after the last one the stance
+--      finally drops.  This is the assertion that the duration is a
+--      duration and not "forever".
+--
 -- Also asserted:
 --   - the BANK CAP: an absorb at 5 BP stays 5.  It must not wrap to 0
 --     (a plain inc) and must not mint a 6th pip Ot6Boost would let her
@@ -70,7 +110,12 @@ local MUDDLE, MAGITEK, STOP = 0x20, 0x08, 0x10
 -- Ot6PipCellTbl (ot6.asm): pip cluster cell per spendable bp 0-5
 local PIP = { [0] = 0x72, 0x73, 0x75, 0x76, 0x77, 0x79 }
 
+-- #59: OT6_RUNICTURNS / OT6_RUNICPAID (ot6_memory.inc), in the shadow tail
+local RUNICTURNS, RUNICPAID = 0xed8e, 0xed96
+local CMD_FIGHT = 0x00
+
 local function bp(s)     return H.readByte(0x3e9c + s * 2) end
+local function turns(s)  return H.readByte(RUNICTURNS + s * 2) end
 local function pend(s)   return H.readByte(0x3e9d + s * 2) end
 local function mp(s)     return H.readWord(0x3c08 + s * 2) end
 local function hp(s)     return H.readWord(0x3bf4 + s * 2) end
@@ -103,6 +148,19 @@ end
 local terra, celes = nil, nil
 local spells, mark, cycles = {}, 0, 0
 local holdCeles = false   -- see pin(): keeps her in the stance, off the queue
+-- #59: while nonzero, pin() keeps this many BP pending on Celes so that
+-- whatever turn she next takes is a BOOSTED one.  The fold's own tests learned
+-- this idiom (battle_fold): the boost is read at the action, not at the menu,
+-- and stray stale actions eat an armed pending, so it is re-armed every frame
+-- until the thing under test has happened.  Cleared the moment it has, or she
+-- would boost every subsequent turn too.
+local armBoost = 0
+-- the single command pin() keeps in Celes's list.  Runic for every phase that
+-- needs her to raise the stance; Fight for #59's expiry walk, where she has to
+-- take ORDINARY turns -- a Runic-only list would re-raise the stance on each
+-- one and the duration could never be observed running out.
+local celesCmd = CMD_RUNIC
+local droppedEarly = false
 
 -- Frames on which Celes's stance bit went from set to clear.  Exactly two
 -- sites in the ROM clear $3E4C.2 -- QueueAction (battle_main.asm:496-498,
@@ -123,6 +181,14 @@ local function sawClass(want)
     if runicable(spells[i]) == want then return spells[i] end
   end
   return nil
+end
+
+local function countClass(want, from)
+  local n = 0
+  for i = from + 1, #spells do
+    if runicable(spells[i]) == want then n = n + 1 end
+  end
+  return n
 end
 
 local function idList(from)
@@ -161,6 +227,10 @@ local function pin()
   -- opens a menu, and that open menu parks the whole action queue -- the
   -- caster then never casts (measured: 24000 frames, nobody acting).
   if holdCeles and celes then H.writeByte(0x3219 + celes * 2, 0x60) end
+  if armBoost > 0 and celes then
+    H.writeByte(0x3e9c + celes * 2, 5)          -- a bank she can spend from
+    H.writeByte(0x3e9d + celes * 2, armBoost)   -- ...and the pending spend
+  end
   if celes then
     -- give her a POOL to absorb into.  The slot Celes is installed over
     -- belongs to a Narshe-raid trooper whose max MP ($3C30,X -- "max mp",
@@ -171,7 +241,7 @@ local function pin()
     H.writeWord(0x3c30 + celes * 2, 99)
     H.writeByte(0x3ed8 + celes * 2, CELES)
     H.writeByte(st1(celes), H.readByte(st1(celes)) & ~MAGITEK & 0xff)
-    H.writeByte(0x202e + celes * 12, CMD_RUNIC)
+    H.writeByte(0x202e + celes * 12, celesCmd)
     H.writeByte(0x2031 + celes * 12, 0xff)
     H.writeByte(0x2034 + celes * 12, 0xff)
     H.writeByte(0x2037 + celes * 12, 0xff)
@@ -344,6 +414,89 @@ local function castPhase(want, label, maxFrames)
   })
 end
 
+-- #59: raise the stance with N boost points pending, so Ot6RunicRaise latches
+-- N turns of duration.  Wraps enterRunic rather than copying it: every one of
+-- that function's five scaffolding facts (absorb-proof window, drained caster
+-- queue, foreign-menu servicing, the muddle idiom, the un-muddle) applies
+-- unchanged, and the ONLY difference is that a pending is armed across the
+-- raise.  armBoost is cleared the instant the stance is up -- leave it set and
+-- every turn she takes afterwards is a boosted one, which would corrupt the
+-- expiry walk and the bank measurement alike.
+--
+-- Between A/B arms the stance is RESET to the state a fresh battle starts in
+-- (InitBP zeroes OT6_RUNICTURNS; the bit would go on her next unshielded
+-- turn anyway).  Not cosmetic: without it the next arm's driveUntil(stance)
+-- is satisfied instantly by the PREVIOUS arm's still-standing stance, she
+-- never takes the turn under test, and the latch assertion below reads the
+-- old tier -- a check that passes or fails for reasons unrelated to the raise.
+local function resetStance()
+  H.writeByte(RUNICTURNS + celes * 2, 0)
+  H.writeByte(0x3e4c + celes * 2,
+    H.readByte(0x3e4c + celes * 2) & ~RUNIC_BIT & 0xff)
+end
+
+local function enterRunicBoosted(n, label)
+  return H.repeatN(1, {
+    H.call(function() resetStance(); armBoost = n end),
+    enterRunic(label),
+    H.call(function()
+      armBoost = 0
+      H.log(string.format("%s: runic up with %d pending -> OT6_RUNICTURNS=%d",
+        label, n, turns(celes)))
+      H.assertEq(turns(celes), n, string.format(
+        "Ot6RunicRaise latched %d turns of stance from a %d-BP raise", n, n))
+    end),
+  })
+end
+
+-- let the caster land N absorbable spells into a standing stance.  castPhase's
+-- twin, but it waits for a COUNT rather than for one -- the whole point of the
+-- milking phase is what several absorbs do to one bank.
+local function milkPhase(n, label, maxFrames)
+  return H.repeatN(1, {
+    H.call(function()
+      mark = #spells
+      armTerra(true)
+    end),
+    H.driveUntil(function() return countClass(true, mark) >= n end, maxFrames, {
+      H.call(function()
+        pin(); benchOthers(); muddle(terra, true)
+        if H.readByte(0x7bca) ~= 0 and H.readByte(0x62ca) ~= celes then
+          H.setPad({ "a" })
+        end
+        cycles = cycles + 1
+        if cycles % 50 == 0 then
+          H.log(string.format("  %s waiting: %d/%d absorbed so far, "
+            .. "celes[bp=%d mp=%d stance=%s turns=%d] ids=%s",
+            label, countClass(true, mark), n, bp(celes), mp(celes),
+            tostring(stance(celes)), turns(celes), idList(mark)))
+        end
+      end),
+      H.waitFrames(4),
+      H.call(function() H.setPad({}) end),
+      H.waitFrames(16),
+    }, label .. ": " .. n .. " absorbable spells resolve into the stance"),
+    H.call(function() muddle(terra, false) end),
+    serviceWait(8),
+  })
+end
+
+-- drive Celes through ordinary turns, watching that the shield holds
+local function turnWalk(untilFn, label, maxFrames)
+  return H.driveUntil(untilFn, maxFrames, {
+    H.call(function()
+      pin(); benchOthers(); muddle(celes, true)
+      if not stance(celes) then droppedEarly = true end
+      if H.readByte(0x7bca) ~= 0 and H.readByte(0x62ca) ~= celes then
+        H.setPad({ "a" })
+      end
+    end),
+    H.waitFrames(4),
+    H.call(function() H.setPad({}) end),
+    H.waitFrames(16),
+  }, label)
+end
+
 local before = {}
 local function snapshot()
   before = { bp = bp(celes), mp = mp(celes), stance = stance(celes) }
@@ -404,7 +557,7 @@ local function baseline(value)
   })
 end
 
-H.run({ maxFrames = 60000 }, {
+H.run({ maxFrames = 200000 }, {
   H.waitFrames(20),
   H.loadState(STATE),
   H.waitFrames(10),
@@ -532,5 +685,116 @@ H.run({ maxFrames = 60000 }, {
     H.assertEq(mp(celes) > before.mp, true, "mp still restored at a full bank")
     -- a bare `inc` would read 6 here; a wrapped byte would read 0
     H.assertEq(bp(celes), 5, "an absorb at 5 bp stays 5 -- capped, not wrapped")
+    -- and the REGRESSION PROOF for #59: everything above was an UNBOOSTED
+    -- Runic, and it behaved exactly as it did before boost bought a duration.
+    -- That is not incidental -- Ot6RunicRaise latches 0, Ot6RunicHold reads 0
+    -- and does nothing, and Ot6RunicBP's stance restore is gated on the same
+    -- 0.  Vanilla Runic is untouched to the byte, and this is where that is
+    -- established before anything below leans on the new machinery.
+    H.assertEq(turns(celes), 0,
+      "an UNBOOSTED Runic latches no duration (phases 1-5 were vanilla)")
+  end),
+
+  -- ============================== #59: boost buys the stance a duration ==
+  --
+  -- ------------------------------------ 6. the raise latches a duration --
+  -- PER TIER, in battle_slots.lua's discipline: the same drive three times,
+  -- with one pending byte different, and the latched duration is the only
+  -- thing that moves.  On the pre-change ROM every arm reads 0 -- there was
+  -- no cell to latch into -- so all three fail and none can pass by accident.
+  enterRunicBoosted(1, "boost1"),
+  enterRunicBoosted(2, "boost2"),
+  enterRunicBoosted(3, "boosted"),
+
+  -- --------------------------- 7. THE MILKING TEST: the BP loop, measured --
+  -- Runic already banked +1 per absorb before any of this (v0.3), so a stance
+  -- that survives its absorb is a stance that can be MILKED: BP paid once,
+  -- refunded once per spell the enemy casts.  #59 names three possible
+  -- rulings and says to measure rather than assume; this is the measurement.
+  --
+  -- Celes is held OFF the turn order throughout (enterRunic leaves holdCeles
+  -- set), so no ActionEnd of hers fires and the whole phase is ONE round.
+  -- Several absorbs, one round: the bank must move by exactly +1.
+  baseline(2),
+  milkPhase(3, "milked", 40000),
+  H.call(function()
+    local absorbs = countClass(true, mark)
+    H.log(string.format("milked phase ids: %s  | %d absorbs, bp %d -> %d, "
+      .. "mp %d -> %d, stance %s, turns %d", idList(mark), absorbs,
+      before.bp, bp(celes), before.mp, mp(celes),
+      tostring(stance(celes)), turns(celes)))
+    -- non-vacuity first: a phase that absorbed once would pass the +1 below
+    -- for entirely the wrong reason, and a phase that absorbed none would
+    -- pass the stance assert too
+    H.assertEq(absorbs >= 3, true,
+      "several absorbable casts really landed on the standing stance")
+    -- DURATION, half one: an absorb no longer ends the stance.  Before #59
+    -- RunicEffect's clear at :8671 was final and the second spell would have
+    -- found nothing to eat.
+    H.assertEq(stance(celes), true,
+      "the stance is STILL standing after all of them (absorbs no longer "
+      .. "end it -- that is what the duration bought)")
+    -- THE RULING.  Once per round, #37's cap coming home to the verb it was
+    -- copied from.  On a control build with the OT6_RUNICPAID latch removed
+    -- this reads before.bp + absorbs instead, which is the self-funding loop
+    -- #59 was worried about: three points spent, three or more refunded.
+    -- (the count is of absorbable casts that RESOLVED, which is an upper
+    -- bound on absorb events rather than an exact count -- the point is the
+    -- A/B, and the A/B is unambiguous: same fixture, same casts, +1 with the
+    -- latch and +2 without it.  One caster is the floor; the loop scales with
+    -- how many things are casting and how long the stance stands.)
+    H.assertEq(bp(celes), before.bp + 1, string.format(
+      "%d absorbable casts inside one round bank exactly ONE bp -- the earn "
+      .. "is capped per round, so an extended stance cannot refund the boost "
+      .. "that bought it", absorbs))
+    -- ...and the cap is on the BP only.  The MP half is per absorb, untouched
+    -- and uncapped: that is vanilla's own restore and it is the reason a rune
+    -- knight wants a caster boss in the first place.
+    H.assertEq(mp(celes) > before.mp, true,
+      "while every absorb still paid its MP -- only the BP earn is capped")
+    H.screenshot("runic_milked")
+  end),
+
+  -- ------------------------------------------- 8. ...and it runs out --
+  -- The duration is spent by CELES TAKING TURNS, one per QueueAction
+  -- (Ot6RunicHold), which is also the only place the stance can survive her
+  -- acting at all.  So she is put back on the queue with a Fight-only list --
+  -- Runic-only would re-raise the stance every turn and the counter could
+  -- never be watched running out.
+  --
+  -- The caster is disarmed to beams for the whole walk: with nothing
+  -- absorbable in flight, RunicEffect never runs, so the ONLY thing that can
+  -- touch $3E4C.2 here is her own QueueAction.  That is what makes "the
+  -- stance survived her turn" a statement about Ot6RunicHold and not about
+  -- luck.
+  H.call(function()
+    armTerra(false)               -- beams: nothing absorbable can interfere
+    celesCmd = CMD_FIGHT          -- ordinary turns, not re-raises
+    H.writeByte(0x202e + celes * 12, CMD_FIGHT)
+    droppedEarly = false
+    holdCeles = false             -- ...and let her onto the queue at last
+    H.log(string.format("expiry walk begins: turns=%d stance=%s",
+      turns(celes), tostring(stance(celes))))
+  end),
+  turnWalk(function() return turns(celes) == 0 end,
+    "Celes spends all three shielded turns", 40000),
+  H.call(function()
+    H.log(string.format("counter ran out: turns=%d stance=%s bp=%d",
+      turns(celes), tostring(stance(celes)), bp(celes)))
+    H.assertEq(droppedEarly, false,
+      "the stance stood through every one of the turns it paid for")
+    H.assertEq(stance(celes), true,
+      "and is still standing on the last of them -- she ACTED under it, "
+      .. "which vanilla's QueueAction clear (:511) never allowed")
+  end),
+  turnWalk(function() return not stance(celes) end,
+    "the turn AFTER the last one drops it", 40000),
+  H.call(function()
+    H.log(string.format("expired: turns=%d stance=%s", turns(celes),
+      tostring(stance(celes))))
+    H.assertEq(stance(celes), false,
+      "3 BP bought three turns of shield, not a permanent one")
+    H.assertEq(turns(celes), 0, "and the counter stays spent")
+    H.screenshot("runic_expired")
   end),
 })
