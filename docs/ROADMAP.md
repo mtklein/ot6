@@ -56,6 +56,22 @@ links). What each delivers:
   release: complete redesigns for Ifrit and Shiva, honest Setzer/Factory-era
   kits, authored encounter coverage, boss contracts, player-facing save
   cadence, and a durable tested frontier.
+**Releases decoupled from the frontier (2026-07-29).** v0.7 and v0.8 both
+shipped without moving the playable frontier at all, and that turned out to
+be the better cadence: the owner plays, files findings, and a themed
+release folds them in within a day or two. So milestones are named for
+their *theme* now, not their rung. The frontier push to the end of the
+World of Balance is v1.0's job, and 1.0 is also where saves start being
+forward-compatible.
+
+- **v0.8 — the economy bites** (released): every kit price recalibrated to
+  vanilla's own ruler (8-20% of the pool at the level an ability arrives),
+  ultimates anchored at 99, the break flash and sound, Gau's Fight and free
+  Leap, magicite as gear packages in FF6's own stat encoding, and three
+  menu pages that had been lying to the player.
+- **v0.9 — Locke, and the break economy** (next): multi-hit as the
+  break-rate dial (#54), Locke's kit at last (#55), boosted Runic (#59),
+  and the balance work the v0.8 playtest opens.
 - **v0.7 — the playtest release** (re-scoped 2026-07-28, owner call): folds
   in the v0.6 playtest's non-blockers — the clockwork HUD sync, the MP
   wallet display, Dance's MP cost, the Bushido ≥1-BP floor, the SwdTech

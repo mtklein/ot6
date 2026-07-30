@@ -7,7 +7,14 @@ turn economy.
 
 ## Status
 
-**v0.7 released** ([tag](https://github.com/mtklein/ot6/releases/tag/v0.7)) —
+**v0.8 released** ([tag](https://github.com/mtklein/ot6/releases/tag/v0.8)) —
+the economy bites: every ability price recalibrated against what vanilla's
+own spells cost, each kit's ultimate anchored at 99 MP, breaking an enemy
+now flashes it white and lands a sound, Gau can fight, and magicite grant
+real stat packages in the same format FF6 uses for armour. Same playable
+frontier as v0.6.
+
+**v0.7** ([tag](https://github.com/mtklein/ot6/releases/tag/v0.7)) —
 the playtest release: MP is visible everywhere it is spent, boost pips and
 weakness reveals now land on the frame of the action they belong to, Cyan's
 Bushido costs at least one Boost Point, Setzer's Slot answers to boost, True
