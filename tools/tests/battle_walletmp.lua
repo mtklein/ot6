@@ -22,8 +22,11 @@
 --      drop the frame a queued verb's cost is paid).
 --   3. CASTER: the same window under an installed TERRA (knows spells)
 --      shows her pool the same way -- the wallet is universal.
---   4. DROP: after Sabin's Pummel (cost 4) resolves, reopening Blitz shows
---      exactly two less.
+--   4. DROP: after Sabin's Pummel resolves, reopening Blitz -- THE PAYING
+--      CHARACTER'S OWN Blitz -- shows exactly its 4 MP less.  ("two less"
+--      here until 2026-07-30: #45 repriced Pummel 2 -> 4 and this half of
+--      the file was never updated, because it was never running.  See the
+--      note above the phase.)
 --   5. CLEANUP: the vanilla Magic list, opened after, does NOT carry the
 --      wallet cells (the one-shot blank on switch).
 local H = dofile("tools/tests/lib/ot6.lua")
@@ -36,6 +39,12 @@ local ZERO = 0xB4
 
 local msPresent = {}
 local mode = "sabin"
+
+-- When set to a party slot, every OTHER party slot is STOPped so only that
+-- slot's gauge can fill and only that slot can own the next command window.
+-- Phase 4 needs it: the wallet paints the OPEN LIST OWNER's pool, so the drop
+-- can only be read from the window of the character who actually paid.
+local benchTo = nil
 
 local function pinField()
   for s = 0, 3 do
@@ -59,6 +68,18 @@ local function pinField()
         H.writeByte(0x202E + s * 12 + 3 * 3, 0xFF)
       end
       H.writeWord(0x3BF4 + s * 2, 999)
+    end
+  end
+  if benchTo then
+    for s = 0, 3 do
+      if H.readByte(0x3ED8 + s * 2) ~= 0xFF then
+        local st3 = 0x3EF8 + s * 2
+        if s == benchTo then
+          H.writeByte(st3, H.readByte(st3) & 0xEF)
+        else
+          H.writeByte(st3, H.readByte(st3) | 0x10)      -- stopped
+        end
+      end
     end
   end
   H.writeByte(0x1D28, 0x01)                             -- known: Pummel
@@ -178,19 +199,44 @@ H.run({ maxFrames = 40000 }, {
     H.assertEq(H.readWord(0x3C08 + actor * 2), mpPre - 4,
       "Pummel charged its 4 MP")
   end),
-  H.driveUntil(function() return H.readByte(MENU) ~= 0 end, 6000, {
-    H.waitFrames(4),
-  }, "the next menu comes up"),
+  -- THE REOPEN MUST BE THE PAYER'S OWN WINDOW.  The wallet paints the pool of
+  -- whoever owns the open list, so a reopen owned by a bystander carries that
+  -- bystander's untouched MP and says nothing about the drop.  This is exactly
+  -- how the assertion below spent its life dead: it was guarded by
+  -- `if who == actor`, and `who` was never `actor` (measured 2026-07-30:
+  -- who=1, actor=2), so the whole of item 4 never ran -- with a stale `- 2`
+  -- inside it that #45 had already repriced to 4, i.e. it would have failed
+  -- the moment it did run.
+  --
+  -- Bench the other three so only the payer's gauge fills.  Benching does NOT
+  -- close a window a bystander is ALREADY holding, and this fixture runs in
+  -- Wait mode where an open window freezes the battle clock (battle_thief.lua:
+  -- 388-404 measured the same hazard), so pending windows are walked out with
+  -- A first -- each bystander takes row 0 and hands the clock back.
+  H.call(function() benchTo = actor end),
+  H.driveUntil(function()
+    return H.readByte(MENU) ~= 0 and H.readByte(ACTOR) == actor
+  end, 12000, {
+    H.call(function()
+      pinField()
+      if H.readByte(MENU) ~= 0 and H.readByte(ACTOR) ~= actor then
+        H.setPad({ "a" })
+      end
+    end),
+    H.waitFrames(2),
+    H.call(function() H.setPad({}) end),
+    H.waitFrames(10),
+  }, "the paying actor owns the reopened command window"),
   openList("blitz reopens after the charge"),
   H.waitFrames(20),
   H.call(function()
     local who = H.readByte(ACTOR)
+    H.assertEq(who, actor, "the reopened list belongs to the character who paid")
     assertWallet("post-charge reopen", H.readWord(0x3C08 + who * 2))
-    if who == actor then
-      H.assertEq(H.readWord(0x3C08 + who * 2), mpPre - 2,
-        "the reopened wallet shows the drop")
-    end
+    H.assertEq(H.readWord(0x3C08 + who * 2), mpPre - 4,
+      "the reopened wallet shows the drop -- Pummel's 4 MP, the price #45 set")
   end),
+  H.call(function() benchTo = nil end),
   closeList("blitz closes"),
 
   -- 3 + 5. caster wallet, then the Magic list stays wallet-free ------------

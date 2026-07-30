@@ -196,8 +196,6 @@ set -- and never creates `SaveStates/`.)
   (validates the exec-callback trampoline and the base64 codec).
 - `probe19.lua` - diagnostic: doorstep -> battle with screenshots + RAM
   dumps at +0/+60/+180/+420/+900/+1500/+2400 frames.
-- `probe22.lua` - diagnostic: resume `first_battle.mss`, press A/A/B to
-  poke the battle menus, screenshot each step (for UI iteration).
 - `gen_whelk_poweron.lua` - the suite's whelk mint: COLD POWER-ON ->
   intro -> Narshe streets -> mines -> BFS to (42,6); emits
   `build/states/whelk_doorstep.mss` (field, one tile short of the

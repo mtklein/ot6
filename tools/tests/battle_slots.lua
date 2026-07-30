@@ -251,11 +251,19 @@ H.run({ maxFrames = 250000 }, {
     -- are needed: a naive bank filter records 100k+ innocents.)
     local BOOSTDMG = H.sym("Ot6BoostDmg")
     emu.addMemoryCallback(function(_, v)
+      -- CHEAP GUARDS FIRST.  Same conjunction as before -- `v > 0`, the
+      -- command gate, and the pc range -- reordered, nothing dropped: the
+      -- two byte tests are exact and order-free, so the recorded set is
+      -- identical.  It matters because $3ece is shared OT6 scratch written
+      -- tens of thousands of times a run (the comment above measured "100k+
+      -- innocents"), and emu.getState() serialises the whole machine into a
+      -- fresh Lua table on EVERY call.  Paying that before the one-byte
+      -- tests was most of this test's wall clock.
+      if not (v > 0 and H.readByte(0xB5) == 0x0F) then return end
       pcall(function()
         local s = emu.getState()
         local pc = (s["cpu.k"] << 16) | s["cpu.pc"]
-        if pc >= BOOSTDMG and pc < BOOSTDMG + 0xA0
-           and v > 0 and H.readByte(0xB5) == 0x0F then
+        if pc >= BOOSTDMG and pc < BOOSTDMG + 0xA0 then
           mulHits[#mulHits + 1] = v
         end
       end)

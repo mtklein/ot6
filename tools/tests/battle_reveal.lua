@@ -139,6 +139,34 @@ H.run({ maxFrames = 45000 }, {
     local drewFire = false
     for k = 0, 3 do if wcell(guard, k) == 0xEB then drewFire = true end end
     H.assertEq(drewFire, true, "chipped guard's HUD row shows the fire glyph, not '?'")
+
+    -- ...AND ONLY FIRE.  Everything above this line was satisfiable by a ROM
+    -- that reveals the WHOLE weakness strip on the first matched chip, which
+    -- is the same shape as the bug this file was written for -- the assert at
+    -- :137 is literally the driveUntil predicate at :125-127, so it is
+    -- guaranteed by construction, and `drewFire` only asks that ONE cell
+    -- turned over.  A reveal that leaked every element would satisfy both.
+    --
+    -- The fixture already contains the control: the guards carry an AUTHORED
+    -- second element weakness in bit 3 (measured $3BEC/$3BEE = $09 -- $01 is
+    -- the fire bit this test pokes in at :114, $08 is the species' own), and
+    -- a fire chip must not disclose it.  Asserted as the pair: the second
+    -- weakness is really there, and it is really still hidden.  Measured
+    -- three times, frame-identical (PASS at frame 1028, revElem $01 against
+    -- weakElem $09).
+    local OTHER = 0x08
+    local w = ((r2 & 1) == 1) and H.readByte(0x3BEC) or H.readByte(0x3BEE)
+    local r = ((r2 & 1) == 1) and r2 or r3
+    H.assertEq(w & OTHER, OTHER,
+      "control: the chipped guard really has a SECOND authored weakness to "
+      .. "keep hidden (without this the next assertion tests nothing)")
+    H.assertEq(r & OTHER, 0,
+      "one chip reveals ONE element -- the guard's other authored weakness is "
+      .. "still hidden, not disclosed by the first hit")
+    local stillUnknown = 0
+    for k = 0, 3 do if wcell(guard, k) == 0xBF then stillUnknown = stillUnknown + 1 end end
+    H.assertEq(stillUnknown > 0, true,
+      "and the HUD row still carries a '?' -- the strip was not blanket-revealed")
     H.screenshot("reveal_gate_chipped")
   end),
 })

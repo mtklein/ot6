@@ -41,6 +41,24 @@ H.run({ maxFrames = 8000 }, {
       H.log(string.format("party battle hp: %d %d %d %d", hp[1], hp[2], hp[3], hp[4]))
       H.log(string.format("guard shields $7E3E44,$7E3E46 = %d,%d",
         H.readByte(0x3E44), H.readByte(0x3E46)))
+      -- ASSERT the break system, do not merely print it.  Until 2026-07-30
+      -- these three were H.log lines and nothing else, which made every
+      -- reachable check in this file true of a break-system-free ROM:
+      -- measured by deleting `jsl Ot6SeedShields` (battle_main.asm:7710) and
+      -- rebuilding -- shields read 0,0 and this test reported PASS on a ROM
+      -- where nothing in the game is breakable.  That is the exact opposite
+      -- of what the header promises ("the quick iteration loop for battle/
+      -- break-system changes").
+      --
+      -- The values are Ot6SeedShields' own output on THIS fixture's opening
+      -- guard pair, and are the same ones battle_class.lua:234-240 asserts on
+      -- the same battle -- 2 shields each, class row PIERCE ($02).  Kept to
+      -- what the seed writes, so this stays a 2-second entry check and not a
+      -- second copy of battle_class.
+      H.assertEq(H.readByte(0x3E44), 2, "guard 1 shields seeded (Ot6SeedShields ran)")
+      H.assertEq(H.readByte(0x3E46), 2, "guard 2 shields seeded (Ot6SeedShields ran)")
+      H.assertEq(H.readByte(0x3EA8), 0x02, "guard 1 authored piercing-weak")
+      H.assertEq(H.readByte(0x3EAA), 0x02, "guard 2 authored piercing-weak")
     end),
   }, {
     H.call(function()
