@@ -61,8 +61,13 @@ shipped without moving the playable frontier at all, and that turned out to
 be the better cadence: the owner plays, files findings, and a themed
 release folds them in within a day or two. So milestones are named for
 their *theme* now, not their rung. The frontier push to the end of the
-World of Balance is v1.0's job, and 1.0 is also where saves start being
-forward-compatible.
+World of Balance is **v0.10**'s job.
+
+**On versions:** 0.9 is followed by **0.10**, not 1.0 — these are ordinary
+increments, not a countdown. 1.0 is a long way off: the end of the World of
+Balance is roughly the game's halfway point, and the World of Ruin is
+entirely unstarted. (1.0 is still the line where saves become
+forward-compatible — see CONTRIBUTING — it is just nowhere near next.)
 
 - **v0.8 — the economy bites** (released): every kit price recalibrated to
   vanilla's own ruler (8-20% of the pool at the level an ability arrives),

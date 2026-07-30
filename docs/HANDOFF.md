@@ -15,8 +15,10 @@ true right now and what will cost you a day if you do not know it.
 days, and none of the last two moved the playable frontier: the loop is now
 *owner plays → files findings → themed release folds them in*, which is
 recorded in ROADMAP as the deliberate cadence. Milestones are named for
-their theme; the frontier push to the end of the World of Balance is v1.0's
-job, and 1.0 is where saves start being forward-compatible.
+their theme; the frontier push to the end of the World of Balance is
+**v0.10**'s job. Note 0.9 is followed by 0.10, not 1.0 — the end of WoB is
+about halfway through the game and the World of Ruin has not been started,
+so 1.0 (where saves become forward-compatible) is far off.
 
 What v0.8 shipped: every kit price recalibrated to vanilla's own ruler
 (a spell costs 8-20% of the pool at the level it arrives — the number this
