@@ -1077,7 +1077,7 @@ done:   rts
 
 ; ------------------------------------------------------------------------------
 
-; [ the break moment: arm every pending monster's flash, and sound it once (#48)]
+; [ the break moment: fire every pending monster's break, sound it once (#48) ]
 ;
 ; WHY IT IS DEFERRED AT ALL.  The chips above empty the gauge inside
 ; CalcAttackEffect's per-target loop, at damage CALC -- measured hundreds of
@@ -1086,6 +1086,13 @@ done:   rts
 ; the attacker was still winding up.  So the chips bank $ff in OT6_BRKTICK and
 ; this proc converts pending into a live flash on the DAMAGE frame, which is
 ; exactly the OT6_PIPPEND / Ot6RvPend* shape #33 and #42 already established.
+;
+; THE CLEAVE IS NOT CONDITIONAL ON THE FLASH (#63).  Ot6BreakStart returns
+; carry for "a break happened at this monster", which is a WEAKER condition
+; than "the flash armed" -- it decides on its own whether it may drive the
+; sprite, and on a break that also killed the monster it may not.  This pass
+; sounds and pans off the weaker condition, so the break is never silent
+; merely because the death animation owns the palette.  See there.
 ;
 ; THE SOUND IS ONCE PER PASS, NOT ONCE PER SLOT.  Two monsters broken by the
 ; same action arm on the same numeral and share one cleave; a multi-hit action
@@ -1115,17 +1122,19 @@ done:   rts
         .a8
         .i16
         lda     #$80
-        pha                     ; $02,s: pan, centre until a slot actually arms
+        pha                     ; $02,s: pan, centre until a slot really broke
         lda     #$00
-        pha                     ; $01,s: did anything arm this pass?
+        pha                     ; $01,s: did anything break this pass?
         ldy     #$0000          ; monster slot offset 0,2..10
 @slot:  lda     OT6_BRKTICK,y
         cmp     #$ff
         bne     @next           ; idle, or already a live countdown
-        jsr     Ot6BreakStart   ; y = slot offset; carry set = flash armed
-        bcc     @next
+        jsr     Ot6BreakStart   ; y = slot offset; carry set = a break happened
+        bcc     @next           ;   here (#63: the flash may still have been
+                                ;   refused on its own -- the CLEAVE is not
+                                ;   conditional on owning the sprite)
         lda     $01,s
-        bne     @next           ; the first armed slot owns the pan
+        bne     @next           ; the first broken slot owns the pan
         inc     a
         sta     $01,s
         lda     $80c3,y         ; w7e80c3: monster screen x (btlgfx_ram.inc:720,
@@ -1134,7 +1143,7 @@ done:   rts
         iny
         cpy     #$000c
         bcc     @slot
-        pla                     ; anything armed?
+        pla                     ; did anything break this pass?
         beq     @quiet
         pla                     ; pan -- write it only when we really sound,
         sta     $e9ea           ;   so a silent pass cannot stomp a pan the
@@ -1152,23 +1161,59 @@ done:   rts
 
 ; ------------------------------------------------------------------------------
 
-; [ start one monster's break flash -- y = monster slot offset (#48) ]
+; [ start one monster's break moment -- y = monster slot offset (#48, #63) ]
 ;
 ; The pending byte is consumed on EVERY path, armed or not: a pending flash
 ; must never outlive the action that banked it (Ot6PipPending's rule).
 ;
-; Four refusals, all of them "this sprite is not ours to drive":
-;   - the slot is empty ($3aa8 bit 0, the hud's own presence gate);
+; TWO TIERS, and #63 is what forced the split.  A break is an EVENT, and it
+; happened at a place on the screen; the CLEAVE is sounded from here whatever
+; the sprite is doing.  The white FLASH additionally has to OWN the sprite, and
+; is refused -- silently, on its own -- when it cannot.
+;
+; SOUNDED, FLASH REFUSED ("this sprite is not ours to drive"):
 ;   - the monster is wound/petrified ($3eec & $c2, the hud's own dead test);
 ;   - the breaking blow ALSO killed it (hp is already zero by the numeral
 ;     frame -- damage lands at calc).  Death has its own 32-frame animation
-;     that takes this very palette slot and this very byte for itself
-;     (btlgfx_main.asm:22262-22299), and a kill is the enemy's moment anyway;
+;     which loads MonsterDeathPal into THIS palette slot and repoints
+;     w7e80db at it for the whole fade (btlgfx_main.asm:22259-22266 and
+;     :22452-22458), so flashing here would paint the death fade WHITE and
+;     leave the sprite on whichever of us wrote last;
 ;   - the engine has already repointed the monster at palette 3 for an
-;     animation of its own (AnimCmd_80_3b, :31329).  Fighting it would leave
-;     the sprite on whichever of us wrote last.
+;     animation of its own (AnimCmd_80_3b, :31329).  Same reason.
 ;
-; a8/i16, db=$7e.  preserves y; clobbers a.  out: carry set = armed.
+; REFUSED OUTRIGHT: the slot is not on the field ($3aa8 bit 0, the hud's own
+; presence gate).  There is no monster and no screen position for a
+; monster-local sound to come from, so nothing happens at all.
+;
+; WHY THE SPLIT, measured (#63).  v0.8-rc1 shipped all four of these as one
+; refusal, so a break whose blow also killed produced NOTHING -- no flash and
+; no sound.  That is the common case in play, not a corner: the breaking hit
+; collects vanilla's elemental x2 and then Ot6BrokenDmg's x2, 4x base, and
+; this file's own trash-pass note already recorded that nothing on Mt. Kolts
+; except tusker has the hp to survive its own break.  probe_breakplay drove
+; the same doorstep laboratory battle_breakflash uses with hp left unpinned
+; and caught the refusal directly (hp=0000, status $80, Ot6BreakStart refused
+; at the hp gate, zero cleaves queued), while the two cells that kept the
+; monster alive both armed and both queued their $be.  The flash is STILL
+; correctly refused on a kill; what was wrong is that the event went silent
+; with it, which is what the owner reported as "no effect happening when i
+; break enemies".
+;
+; NOT the cause, and ruled out by the same probe rather than by argument:
+;   - "the arm only runs when a reveal is pending".  Ot6RevealPoll calls
+;     Ot6RevealCommit on EVERY damage-numeral edge (:Ot6RevealPoll below,
+;     ot6_hud.asm:204) and Ot6BreakArm rides its tail unconditionally --
+;     measured at 5 to 9 passes per staged break, including passes with
+;     nothing pending at entry.  Breaks landing on a hit that revealed
+;     nothing new armed normally.
+;   - palette-3 contention with vanilla's own turn flash.  A cell with
+;     vanilla's per-monster turn-flash latch (w7e618b) deliberately left
+;     UNPINNED -- battle_breakflash pins it as a lab control -- armed and
+;     flashed normally.
+;
+; a8/i16, db=$7e.  preserves y; clobbers a.
+; out: CARRY SET = a break happened here; sound it, panned to this monster.
 .proc Ot6BreakStart
         .a8
         .i16
@@ -1176,26 +1221,27 @@ done:   rts
         sta     OT6_BRKTICK,y   ; pending consumed either way
         lda     $3aa8,y         ; monster present flags
         lsr
-        bcc     @no
+        bcc     @none           ; not on the field: no event to sound at all
         lda     $3eec,y         ; monster status 1
         bit     #$c2
-        bne     @no
+        bne     @sound          ; wound/petrified
         lda     $3bfc,y         ; monster hp (lo/hi)
         ora     $3bfd,y
-        beq     @no
+        beq     @sound          ; the breaking blow killed it: death owns the
+                                ;   palette slot and the sprite byte
         lda     $80db,y         ; w7e80db: monster sprite data; bits 1-3 are the
         and     #$0e            ;   obj palette number, and vanilla only ever
         cmp     #$06            ;   assigns 0/1/2 to a monster (:4917-4921), so
-        beq     @no             ;   3 here means an animation owns the sprite
+        beq     @sound          ;   3 here means an animation owns the sprite
         sta     OT6_BRKPAL,y    ; bank the real palette bits for the hand-back
         lda     #OT6_BREAK_FLASH
         sta     OT6_BRKTICK,y
         sta     OT6_BRKLIVE     ; wake the painter (any nonzero will do; it
                                 ;   recomputes the count as it walks)
         jsr     Ot6BreakPal
-        sec
+@sound: sec
         rts
-@no:    clc
+@none:  clc
         rts
 .endproc
 
