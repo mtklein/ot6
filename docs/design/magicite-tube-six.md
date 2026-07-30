@@ -33,14 +33,28 @@ line it was read from, or is labelled **UNVERIFIED**. Numbers taken out of
 
 ## Summary table
 
-| esper (idx) | nickname | grants | stat byte | divine (vanilla record, all kept) | the swap reason |
+**Stat rows superseded 2026-07-29 by #62** (`docs/design/esper-stat-ruler.md`).
+`Ot6EsperStatTbl` is no longer one selector plus an unsigned magnitude; it is two
+bytes per esper in vanilla's own equipment layout — four *signed* nibbles, −7..+7
+each — so every stone below moves two or three stats and five of the six now
+carry a **downside**. The identities in this document did not change; they are
+what the new rows were authored from. `ot6_progression.asm`'s table carries the
+per-esper reasoning.
+
+| esper (idx) | nickname | grants | stat vig/spd/stm/mag | divine (vanilla record, all kept) | the swap reason |
 |---|---|---|---|---|---|
-| Maduin (6) | **the Trinity** | Fire, Ice, Bolt | `OT6_SM_MAGPWR\|5` | **Chaos Wing** `$3c`: non-elem 55, all enemies, 44 MP | one caster, three fold families — the right element on demand |
-| Shoat (5) | **the Gorgon Eye** | Break, Doom | `OT6_SM_SPEED\|3` | **Demon Eye** `$3b`: petrify all, hit 96, 45 MP | delete one body per turn, where deletion is legal |
-| Phantom (20) | **the Ghostwalk** | Vanish, Demi | `OT6_SM_SPEED\|4` | **Fader** `$4a`: Clear on the party, 38 MP | the party stops being hit by physicals |
-| Carbunkl (19) | **the Facet** | Rflect, Safe | `OT6_SM_STAM\|4` | **Ruby Power** `$49`: Rflect on the party, 36 MP | the fight's spellfire turns around |
-| Bismark (7) | **the Tide** | Haste, Slow | `OT6_SM_VIGOR\|4` | **Sea Song** `$3d`: WATER 58, all enemies, 50 MP | tempo both ways — and the game's only water verb |
-| Unicorn (23) | **the Purity** | **Pearl** (§9, cross-doc), Remedy | `OT6_SM_STAM\|3` | **Heal Horn** `$4d`: Remedy on the party, 30 MP | the undead band's master key, and the cleanse |
+| Maduin (6) | **the Trinity** | Fire, Ice, Bolt | **−3 / 0 / +3 / +7** | **Chaos Wing** `$3c`: non-elem 55, all enemies, 44 MP | one caster, three fold families — the right element on demand |
+| Shoat (5) | **the Gorgon Eye** | Break, Doom | **−2 / +6 / +2 / 0** | **Demon Eye** `$3b`: petrify all, hit 96, 45 MP | delete one body per turn, where deletion is legal |
+| Phantom (20) | **the Ghostwalk** | Vanish, Demi | **0 / +6 / −2 / +2** | **Fader** `$4a`: Clear on the party, 38 MP | the party stops being hit by physicals |
+| Carbunkl (19) | **the Facet** | Rflect, Safe | **0 / −2 / +6 / +2** | **Ruby Power** `$49`: Rflect on the party, 36 MP | the fight's spellfire turns around |
+| Bismark (7) | **the Tide** | Haste, Slow | **+5 / −2 / +3 / 0** | **Sea Song** `$3d`: WATER 58, all enemies, 50 MP | tempo both ways — and the game's only water verb |
+| Unicorn (23) | **the Purity** | **Pearl** (§9, cross-doc), Remedy | **0 / 0 / +5 / +2** | **Heal Horn** `$4d`: Remedy on the party, 30 MP | the undead band's master key, and the cleanse |
+
+Six stones, six *shapes*: Maduin is a caster who cannot punch, Shoat a striker's
+speed without the strike, Phantom fast and bodiless, Carbunkl a wall that does
+not move, Bismark mass that is slow, and Unicorn the only one that asks for
+nothing back. That last is deliberate — the Pearl grant is where his power is
+(§9), so his stat package is the smallest and the only one with no downside.
 
 **Headline finding: no summon re-author is needed.** Unlike Inferno/Diamond
 Dust — a mirrored pair that had to be split apart — vanilla already authored
@@ -56,14 +70,17 @@ MagicProp splice gains **zero new overrides** this pass.
 
 magicite-ifrit-shiva.md §1 is the authority on what the machinery can express:
 ≤5 spell ids per stone (`ot6_progression.asm:142-181` `Ot6EsperSpellKnown`,
-`:203-252` `Ot6UnionEspers`), exactly one unsigned stat mod
-`[selector:4][magnitude:4]` from Vigor/Speed/Stamina/Mag.Pwr
-(`ot6_progression.asm:314-384`), the once-per-battle summon on vanilla's
+`:203-252` `Ot6UnionEspers`), ~~exactly one unsigned stat mod
+`[selector:4][magnitude:4]`~~ **— superseded 2026-07-29 by #62: four *signed*
+nibbles, −7..+7 each, in vanilla's own `ItemProp+16/+17` layout —** from
+Vigor/Speed/Stamina/Mag.Pwr
+(`ot6_progression.asm`, `Ot6EsperStatMod`), the once-per-battle summon on vanilla's
 `$3f2e` latch (`battle_main.asm:12852` sets it, `:14550` greys the menu row),
 boost folding for 8 families only (`Ot6FoldTbl`, `ot6_boost.asm:340-348`), and
 the ×2/×4/×8 multiplier on non-folding damage (`Ot6BoostDmg`,
 `ot6_kits.asm:1190-1256`; summons are not exempt, `:1206-1224`). No passives,
-no permits, no two-sided or multi-stat mods, no learn rates.
+no permits, ~~no two-sided or multi-stat mods~~ (**both built by #62**), no learn
+rates.
 
 Two things changed since that section was written:
 
@@ -194,6 +211,14 @@ re-expressed through the three real channels (list, stat, divine):
 | Bismark *Tidal* — "water chip +1" | no water spell exists to grant (§13); **Sea Song is the game's only water verb**, and the kit becomes the tide itself: Haste/Slow |
 | Unicorn *Purity* — "status durations halved" | cure-after-the-fact instead of shorten: Remedy in the kit, party-Remedy as the divine — plus the horn's light (Pearl, §9) |
 
+Stat ladder: **superseded 2026-07-29 by #62**, which re-cut the rungs against a
+measurement of vanilla's own equipment ladder rather than against a percentage of
+a base stat (`docs/design/esper-stat-ruler.md` §4). They are now FIELD upside +6
+across 2 stats / STORY upside +8 across 3 with a −2 / BOSS upside +10 across 3
+with a −3, and Maduin sits on the BOSS rung. The *reasoning* below — story-granted
+stones sit under fought-for ones, and Maduin is the one exception because v0.7 has
+no boss — is unchanged and is exactly why he is on the top rung. Original text:
+
 Stat ladder: the shipped tiers are FIELD 2-3 / BOSS 4-5
 (`ot6_progression.asm:386-393`). The tube six are story-granted, not fought
 for, so they sit at **3-4** — with one deliberate exception: **Maduin at 5**.
@@ -210,7 +235,7 @@ pays. M6 owns the final numbers.
 | channel | value |
 |---|---|
 | Grants | **Fire**, **Ice**, **Bolt** |
-| Stat (while worn) | **+5 mag.pwr** (`OT6_SM_MAGPWR\|5` = `$45`) |
+| Stat (while worn) | **vig −3 / stm +3 / mag +7** (#62; was `+5 mag.pwr`) |
 | Divine | **Chaos Wing** `$3c` — non-elemental, all enemies, power 55, 44 MP, unblockable (+0x04 `$20`, hit 0). Vanilla, unchanged. |
 
 **The kit is three fold families on one stone.** Fire `$00` (4 MP), Ice `$01`
@@ -254,7 +279,7 @@ so what is lost is flavor, not function.
 | channel | value |
 |---|---|
 | Grants | **Break**, **Doom** |
-| Stat (while worn) | **+3 speed** (`OT6_SM_SPEED\|3` = `$23`) |
+| Stat (while worn) | **vig −2 / spd +6 / stm +2** (#62; was `+3 speed`) |
 | Divine | **Demon Eye** `$3b` — petrify, all enemies, hit 96, blockable death-class (+0x04 `$10`), 45 MP. Vanilla, unchanged. |
 
 **The executioner's two verbs.** Break `$0c` (25 MP, hit 120, sets PETRIFY)
@@ -306,7 +331,7 @@ the same idea, not a second copy of it.
 | channel | value |
 |---|---|
 | Grants | **Vanish**, **Demi** |
-| Stat (while worn) | **+4 speed** (`OT6_SM_SPEED\|4` = `$24`) |
+| Stat (while worn) | **spd +6 / stm −2 / mag +2** (#62; was `+4 speed`) |
 | Divine | **Fader** `$4a` — Clear (INVISIBLE) on the whole party, 38 MP. Vanilla, unchanged. |
 
 **The divine IS the unbuildable passive.** magicite.md's *Ghostwalk* — "first
@@ -357,7 +382,7 @@ key (magic ignores Clear), which keeps Carbunkl's job separate next door.
 | channel | value |
 |---|---|
 | Grants | **Rflect**, **Safe** |
-| Stat (while worn) | **+4 stamina** (`OT6_SM_STAM\|4` = `$34`) |
+| Stat (while worn) | **spd −2 / stm +6 / mag +2** (#62; was `+4 stamina`) |
 | Divine | **Ruby Power** `$49` — Reflect on the whole party, 36 MP. Vanilla, unchanged. |
 
 **The mirror stone.** Rflect `$24` (22 MP, single) and Safe `$1c` (12 MP,
@@ -398,7 +423,7 @@ step over Ramuh's +3. The gem endures.
 | channel | value |
 |---|---|
 | Grants | **Haste**, **Slow** |
-| Stat (while worn) | **+4 vigor** (`OT6_SM_VIGOR\|4` = `$14`) |
+| Stat (while worn) | **vig +5 / spd −2 / stm +3** (#62; was `+4 vigor`) |
 | Divine | **Sea Song** `$3d` — WATER (element `$80`), all enemies, power 58, 50 MP, unblockable. Vanilla, unchanged. |
 
 **The kit is tempo in both directions, and both halves fold.** Haste `$1f`
@@ -453,7 +478,7 @@ water-weak. He is the tempo mage the roster has never had.
 | channel | value |
 |---|---|
 | Grants | **Pearl** *(branch A — the recommendation; see the decision box)*, **Remedy** |
-| Stat (while worn) | **+3 stamina** (`OT6_SM_STAM\|3` = `$33`) |
+| Stat (while worn) | **stm +5 / mag +2** (#62; was `+3 stamina`) |
 | Divine | **Heal Horn** `$4d` — Remedy's full status-clear set on the whole party (status bytes `45/e8/14`, identical to record `$33`; cleanse flag +0x04 `$04`), 30 MP. Vanilla, unchanged. |
 
 **The paladin: smite and cleanse.** Remedy `$33` (15 MP, single-target full
@@ -624,7 +649,24 @@ make_genju_prop {PEARL, 0}, {REMEDY, 0}, {}, {}, {}
 ```
 
 **`ff6/src/battle/ot6_progression.asm`**, `Ot6EsperStatTbl` — six rows leave
-`OT6_SM_NONE`:
+`OT6_SM_NONE`.
+
+**SHIPPED, then superseded 2026-07-29 by #62.** The six rows below were built as
+written; #62 then replaced the whole encoding with vanilla's four-signed-nibble
+equipment layout and re-cut every magnitude against the measured ladder in
+`docs/design/esper-stat-ruler.md`. The shipped rows are now:
+
+```
+        esper_stat   -2,  +6,  +2,   0   ;  5 shoat
+        esper_stat   -3,   0,  +3,  +7   ;  6 maduin
+        esper_stat   +5,  -2,  +3,   0   ;  7 bismark
+        esper_stat    0,  -2,  +6,  +2   ; 19 carbunkl
+        esper_stat    0,  +6,  -2,  +2   ; 20 phantom
+        esper_stat    0,   0,  +5,  +2   ; 23 unicorn
+```
+
+The v0.7 originals, kept because the identity each was chosen from is unchanged
+and each new row leads on the same stat:
 
 ```
         .byte   OT6_SM_SPEED  | 3       ;  5 shoat    +3 speed (the executioner
@@ -656,9 +698,10 @@ the `$3ecb` kit-divine latch stay separate (the Ifrit §4.4 ruling carries —
 fusing them would punish wearing a stone).
 
 **Menu copy: zero work required.** The detail page renders granted spell
-names and the "While worn...&lt;Stat&gt;+N" line directly from these two tables
-(`skills.asm:2528-2544`, `:2624-2673`); authoring the bytes above is the
-whole player-facing job.
+names and the while-worn stat mod directly from these two tables
+(`skills.asm`); authoring the bytes above is the whole player-facing job. That
+claim survived #62: the page grew from one line to a multi-term block, and the
+six rows above became player-visible with no further copy work.
 
 ---
 
@@ -675,7 +718,7 @@ band-dependent rows ride v0.7 fixtures (`@suite frontier=<name>`) and report
 | 2 | Maduin worn → Fire, Ice, Bolt; **Fire 2, Ice 2, Bolt 2 absent** | the three dead tiers are the row's whole point |
 | 3 | Bismark worn → Haste, Slow; **Life, Fire, Ice, Bolt absent** | the Life absence is the kits.md revival rule, asserted |
 | 4 | Carbunkl worn → Rflect, Safe; Warp/Haste/Shell absent. Phantom worn → Vanish, Demi; Bserk absent. Unicorn worn → per shipped branch | |
-| 5 | each stone worn → its one stat at its magnitude, and only that stat | `battle_esperstats.lua`'s existing comparison |
+| 5 | each stone worn → its stat package exactly, and no other stat moved | `battle_esperstats.lua`'s comparison — a table of all four expected deltas since #62, so a downside that failed to apply now fails here |
 | 6 | Haste at 1 BP queues `$27` and charges **10** MP; Slow at 1 BP queues `$28` and charges **5** | the fold rows under test; the §10.3-1 risk's mechanical half |
 | 7 | each summon fires once per battle per character and greys after (`$3f2e`); positive control that the row was offered | six stones, one latch test each — the Demon Eye row doubles as the petrify-immunity control (blocked on Apparite, lands on Coelecite) |
 | 8 | Chaos Wing and Sea Song take the boost multiplier; Fader/Ruby Power/Heal Horn/Demon Eye unchanged by boost | the damage-verb vs no-damage boundary of `Ot6BoostDmg` |

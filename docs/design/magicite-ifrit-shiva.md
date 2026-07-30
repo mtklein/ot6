@@ -103,7 +103,7 @@ table implies.
 | Channel | Shipped? | Shape | Evidence |
 |---|---|---|---|
 | Spell grant | ✅ | **≤ 5 spell ids** per esper, from the vanilla esper record | `ot6_progression.asm:142-181` (`Ot6EsperSpellKnown`, scans `GenjuProp+1,+3,+5,+7,+9`) and `:203-252` (`Ot6UnionEspers`, seeds the union so a spell nobody knows still gets a list slot) |
-| Stat mod | ✅ | **exactly one** stat, **unsigned**, magnitude **1–15** (low nibble); selector is one of vigor / speed / stamina / mag.pwr | `ot6_progression.asm:314-384` + `Ot6EsperStatTbl` `:391-419`. Packed byte = `[sel:4][mag:4]`; `$00` = no mod |
+| Stat mod | ✅ | ~~**exactly one** stat, **unsigned**, magnitude **1–15**~~ — **superseded 2026-07-29 (#62): up to FOUR stats, SIGNED, −7..+7 each**, in vanilla's own equipment layout | `ot6_progression.asm` `Ot6EsperStatMod` + `Ot6EsperStatTbl`: two bytes per esper, `byte0 = [speed:4][vigor:4]`, `byte1 = [magpwr:4][stamina:4]`, each nibble `[sign:1][mag:3]`; `$0000` = no mod. Mirrors `CalcEquipEffect`, `battle_main.asm:2521-2539`. Ruler: `esper-stat-ruler.md` |
 | Summon | ✅ (vanilla) | one attack record per esper, `id = esper + $36`; once per battle **per character** | `FixPlayerAttack` sets the character's bit in `$3f2e` (`battle_main.asm:12739-12747`); the Magic menu's esper row is disabled when that bit is set (`battle_main.asm:14436-14439`) |
 | Boost-tier folding | ✅ | **8 families only**: fire, ice, bolt, poison→bio, cure, life, slow, haste | `Ot6FoldTbl`, `ot6_boost.asm:340-348`; scanned with a hard `cpx #$0018` bound at `:255`, `:317` |
 | Boost on non-folding actions | ✅ | ×2/×4/×8 on base damage; exempted commands are fight `$00`, capture `$06`, bushido `$07`, steal `$05` — **summons (`$19`) are not exempt** | `Ot6BoostDmg`, `ot6_kits.asm:1190-1256` |
@@ -114,8 +114,9 @@ table implies.
 
 **Two consequences that shape everything below.**
 
-1. **A magicite's identity has to live in its spell list, its one stat, and its
-   summon.** There is no passive channel and no permit channel to gesture with.
+1. **A magicite's identity has to live in its spell list, its stat package, and
+   its summon.** (Written when the package was *one* stat; #62 made it up to
+   four, signed, which is where the downsides live now.) There is no passive channel and no permit channel to gesture with.
    magicite.md's *Kindling* / *Frostbite* passives and its claw/rod permits are
    design sketches with no ROM behind them; this document does not depend on
    them.
@@ -394,6 +395,15 @@ is a worse fit for a stone meant to make a fighter *better*, not automatic.
 
 ### 4.2 The stat: +5 vigor
 
+> **SUPERSEDED 2026-07-29 (#62).** Ifrit's row is now **+6 vigor / +4 stamina /
+> −3 mag.pwr** and Shiva's **+6 mag.pwr / +4 speed / −3 vigor**, on a rung
+> measured against vanilla's own equipment ladder rather than against a
+> percentage of a base stat. The reasoning below — why *vigor* is Ifrit's stat
+> and *mag.pwr* is Shiva's, and why the pair should read as opposites — is what
+> #62 built; only the magnitudes and the two-sidedness changed. See
+> `docs/design/esper-stat-ruler.md` §4 for the rungs and
+> `ot6_progression.asm`'s `Ot6EsperStatTbl` for the per-esper reasoning.
+
 `Ot6EsperStatTbl` byte: `OT6_SM_VIGOR | 5`.
 
 - **Nobody else grants vigor.** The four shipped rows are Ramuh +3 stamina,
@@ -509,12 +519,18 @@ Locke 28, Sabin 28), so +4 is ~10–16%. It is one step above Kirin's and Stray'
 is the honest selector: her list is three spells, two of which scale off
 mag.pwr.
 
-**This is the one place the machinery forced a compromise.** What the design
-wants is a *two-sided* mod — Ifrit +vigor / −mag.pwr, Shiva +mag.pwr / −vigor —
-so that the two stones read as opposite specialisations rather than as "a big
-number for fighters" and "a big number for mages". `Ot6EsperStatTbl` cannot
-express it: one selector, one unsigned 4-bit magnitude
-(`ot6_progression.asm:314-320`). See §12.
+**This was the one place the machinery forced a compromise — and it has since
+been built.** What the design wanted is a *two-sided* mod — Ifrit +vigor /
+−mag.pwr, Shiva +mag.pwr / −vigor — so that the two stones read as opposite
+specialisations rather than as "a big number for fighters" and "a big number for
+mages". `Ot6EsperStatTbl` could not express it: one selector, one unsigned 4-bit
+magnitude.
+
+**#62 (2026-07-29) shipped it verbatim.** Ifrit is **+6 vigor / +4 stamina / −3
+mag.pwr**; Shiva is **+6 mag.pwr / +4 speed / −3 vigor**. Shiva's second stat is
+*speed* rather than a mirror of Ifrit's stamina, so the pair are opposites
+without being the same shape twice — Ice / Osmose / Shell is a kit about acting
+first and acting often. See §12 item 1 and `docs/design/esper-stat-ruler.md`.
 
 ### 5.3 The divine: Diamond Dust, re-authored
 
@@ -883,15 +899,26 @@ they report "skipped" until the Vector/MRF chain mints — the house pattern.
 The important section. Every item here is a design intent this document wanted
 and had to give up, drop, or route around.
 
-1. **A two-sided stat mod.** `Ot6EsperStatTbl` is one selector, one *unsigned*
-   4-bit magnitude (`ot6_progression.asm:314-320`, `:335-380`). There is no way
-   to say "+5 vigor, −3 mag.pwr". The pair's identities would be sharper as
-   opposed specialisations than as two positive numbers, and that is the single
-   biggest expressiveness gap. Fixing it is small — widen the table to two bytes
-   and make the magnitude signed, with a floor clamp beside the existing `$ff`
-   cap — but it is a change to shipped machinery and to `battle_esperstats.lua`.
-2. **More than one stat per stone.** Same table, same limit. "+vigor and
-   +stamina" is not sayable.
+**Struck-through items have since been built.** Items 1, 2 and 9 were closed on
+2026-07-29 by #62 (`docs/design/esper-stat-ruler.md`); the rest still stand. The
+original text is kept rather than deleted, because the reason a gap existed is
+the reason the fix took the shape it did.
+
+1. ~~**A two-sided stat mod.**~~ **CLOSED 2026-07-29 by #62.** This section's
+   prescription turned out to be exactly right, including the floor clamp:
+   `Ot6EsperStatTbl` is now two bytes per esper carrying four *signed* nibbles,
+   and `Ot6EsperStatMod` clamps at 0 as well as at `$ff`. What the fix pass
+   added was the *layout*: rather than inventing a signed encoding, it adopted
+   **vanilla's own** — `ItemProp+16/+17`, the four signed nibbles every piece of
+   equipment in the game carries, decoded by `CalcEquipEffect`
+   (`battle_main.asm:2521-2539`). Ifrit is now **+6 vigor / +4 stamina / −3
+   mag.pwr** and Shiva **+6 mag.pwr / +4 speed / −3 vigor** — the opposed
+   specialisations §5.2 asked for, in the words it asked for them.
+   `battle_esperstats.lua`'s `checkEsper` took a table of four expected deltas
+   instead of one (stat, delta) pair. Measurement and rungs:
+   `docs/design/esper-stat-ruler.md`.
+2. ~~**More than one stat per stone.**~~ **CLOSED 2026-07-29 by #62** — same
+   change. Every authored stone now moves two or three stats.
 3. **HP% / MP% mods.** Structurally deferred: the selector has no encoding for
    them (`ot6_progression.asm:299-303`). *Max MP up* is one of mp-economy.md's
    named MP-relief candidates and cannot be authored on either stone.
@@ -916,10 +943,10 @@ and had to give up, drop, or route around.
    vanilla's `$3f2e` and is per-character, party-wide-uniform. There is no way
    to say "this summon is twice per battle" or "this summon requires a Broken
    target" the way `Ot6Oblivion` can for a kit divine.
-9. **Esper menu copy.** §8.1 — the detail screen shows misleading learn-% and
-   hides the stat mod entirely. This is menu-bank (C3) work that has not been
-   started, and it is the difference between "Ifrit makes you hit harder" being
-   a mechanic and being a secret.
+9. ~~**Esper menu copy.**~~ **CLOSED** — by #27 for the single-stat line, and
+   rebuilt by #62 into a multi-term stat block (caption on the title row, one
+   term per nonzero delta packed down the right-hand column, a `-` sign where the
+   delta is negative, and nothing at all for a stone with no mod).
 10. **Re-pricing magic without breaking a house rule.** Magic prices through
     vanilla `GetMPCost` off the spell record; `Ot6AbilityCostTbl` keys only
     blitz/bushido/tool id ranges (`ot6_boost.asm:352-400`). Repricing Osmose is

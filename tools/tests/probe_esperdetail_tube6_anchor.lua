@@ -15,7 +15,7 @@
 -- probe_esperdetail_anchor.lua.  The party is LOCKE CELES SABIN EDGAR on the
 -- world map at (137,203); the field menu opens from the world map exactly as
 -- from a field map.  The esper inventory is pinned to exactly MADUIN (+5
--- mag.pwr, the crown), TERRATO (Ot6EsperStatTbl $00 -- still the no-mod
+-- mag.pwr, the crown), TERRATO (Ot6EsperStatTbl $0000 -- still the no-mod
 -- control after this pass) and UNICORN (the Pearl grant, branch A).
 --
 -- Name tiles and stat-line geometry: see menu_esperdetail_tube6.lua's header.
@@ -44,8 +44,10 @@ local BG1B = 0x4049
 local function cell(x, y) return H.readByte(BG1B + x * 2 + y * 64) end
 
 local BLANK   = 0xff
-local CH_W    = 0x96
-local CH_PLUS = 0xca
+local CH_W     = 0x96
+local CH_DOT   = 0xc5
+local CH_PLUS  = 0xca
+local CH_MINUS = 0xc4                   -- #62: a delta can be negative
 local function digit(n) return 0xb4 + n end
 
 local NAME = {
@@ -59,7 +61,10 @@ local NAME = {
   -- "W Wind": tile 2 is $fe, the narrow-space glyph, not the $ff blank.
   W_WIND = { 0xe9, 0x96, 0xfe, 0x96, 0xa2, 0xa7, 0x9d },
 }
+-- All four now: #62's block can draw any of them, and Maduin's leads on VIGOR.
 local STAT = {
+  VIGOR   = { 0x95, 0xa2, 0xa0, 0xa8, 0xab, 0xff, 0xff },
+  SPEED   = { 0x92, 0xa9, 0x9e, 0x9e, 0x9d, 0xff, 0xff },
   STAMINA = { 0x92, 0xad, 0x9a, 0xa6, 0xa2, 0xa7, 0x9a },
   MAGPWR  = { 0x8c, 0x9a, 0xa0, 0xc5, 0x8f, 0xb0, 0xab },
 }
@@ -115,23 +120,63 @@ local function assertRowEmpty(tag, slot)
       string.format("%s: row %d empty at {%d,%d}", tag, slot + 1, x, y))
   end
 end
-local function assertStatLine(tag, statTiles, magnitude)
-  H.assertEq(cell(5, 27), CH_W, tag .. ": 'While worn...' starts at {5,27}")
-  for k = 0, 6 do
-    H.assertEq(cell(18 + k, 27), statTiles[k + 1],
-      string.format("%s: stat name tile %d at {%d,27}", tag, k, 18 + k))
+-- #62's stat block: caption on the title row, one term per nonzero delta packed
+-- down from row 17 (name cols 17-23, spacer 24, sign 25, magnitude 26-27).
+local function assertCaption(tag, present)
+  if present then
+    H.assertEq(cell(13, 15), BLANK, tag .. ": caption pad blank at {13,15}")
+    H.assertEq(cell(14, 15), BLANK, tag .. ": caption pad blank at {14,15}")
+    H.assertEq(cell(15, 15), CH_W, tag .. ": 'While worn...' starts at {15,15}")
+    H.assertEq(cell(27, 15), CH_DOT, tag .. ": caption ends at {27,15}")
+  else
+    for x = 13, 28 do
+      H.assertEq(cell(x, 15), BLANK,
+        string.format("%s: no caption at all -- {%d,15} blank", tag, x))
+    end
   end
-  H.assertEq(cell(25, 27), CH_PLUS, tag .. ": '+' at {25,27}")
-  H.assertEq(cell(26, 27), BLANK, tag .. ": leading zero blanked at {26,27}")
-  H.assertEq(cell(27, 27), digit(magnitude),
-    string.format("%s: magnitude %d at {27,27}", tag, magnitude))
+end
+local function assertTerm(tag, slot, statTiles, statName, sign, magnitude)
+  local y = 17 + slot * 2
+  for k = 0, 6 do
+    H.assertEq(cell(17 + k, y), statTiles[k + 1],
+      string.format("%s: term %d '%s' tile %d at {%d,%d}",
+        tag, slot, statName, k, 17 + k, y))
+  end
+  -- The col-24 spacer.  It exists because "Stamina" and "Mag.Pwr" fill all
+  -- seven name cells, so without it the sign sits flush against the label.
+  H.assertEq(cell(24, y), BLANK,
+    string.format("%s: term %d spacer blank at {24,%d}", tag, slot, y))
+  H.assertEq(cell(25, y), sign,
+    string.format("%s: term %d sign at {25,%d}", tag, slot, y))
+  H.assertEq(cell(26, y), BLANK,
+    string.format("%s: term %d leading zero blanked at {26,%d}", tag, slot, y))
+  H.assertEq(cell(27, y), digit(magnitude),
+    string.format("%s: term %d magnitude %d at {27,%d}", tag, slot, magnitude, y))
+end
+local function assertTermRowBlank(tag, slot)
+  local y = 17 + slot * 2
+  for x = 17, 27 do
+    H.assertEq(cell(x, y), BLANK,
+      string.format("%s: unused term row %d blank at {%d,%d}", tag, slot, x, y))
+  end
+end
+local function assertOldLineGone(tag)
+  for x = 5, 27 do
+    H.assertEq(cell(x, 27), BLANK,
+      string.format("%s: #27's old row-27 line cleared at {%d,27}", tag, x))
+  end
 end
 local function logPage(tag)
   H.log(string.format("[%s] esper=%d rows: 1=%s 2=%s 3=%s 4=%s 5=%s",
     tag, H.readByte(Z99), rowHex(0), rowHex(1), rowHex(2), rowHex(3), rowHex(4)))
-  local s = {}
-  for x = 5, 27 do s[#s + 1] = string.format("%02x", cell(x, 27)) end
-  H.log(string.format("[%s] while-worn line: %s", tag, table.concat(s, " ")))
+  local cap = {}
+  for x = 13, 28 do cap[#cap + 1] = string.format("%02x", cell(x, 15)) end
+  H.log(string.format("[%s] caption field: %s", tag, table.concat(cap, " ")))
+  for slot = 0, 4 do
+    local t = {}
+    for x = 17, 27 do t[#t + 1] = string.format("%02x", cell(x, 17 + slot * 2)) end
+    H.log(string.format("[%s] term row %d: %s", tag, slot, table.concat(t, " ")))
+  end
 end
 
 local function page(idx, name)
@@ -212,9 +257,15 @@ add({ H.call(function()
   assertRow("maduin", 2, NAME.BOLT, "Bolt (base tier, not Bolt 2)")
   assertRowEmpty("maduin", 3)
   assertRowEmpty("maduin", 4)
-  assertStatLine("maduin", STAT.MAGPWR, 5)
+  assertCaption("maduin", true)
+  assertTerm("maduin", 0, STAT.VIGOR,   "Vigor",   CH_MINUS, 3)
+  assertTerm("maduin", 1, STAT.STAMINA, "Stamina", CH_PLUS,  3)
+  assertTerm("maduin", 2, STAT.MAGPWR,  "Mag.Pwr", CH_PLUS,  7)
+  assertTermRowBlank("maduin", 3)
+  assertTermRowBlank("maduin", 4)
+  assertOldLineGone("maduin")
   H.screenshot("esper_detail_maduin_anchor")
-  H.log("MADUIN: three base tiers drawn, 'While worn...Mag.Pwr + 5'")
+  H.log("MADUIN: three base tiers drawn; Vigor -3 / Stamina +3 / Mag.Pwr +7")
 end) })
 add(backToList())
 
@@ -227,12 +278,11 @@ add({ H.call(function()
   assertRow("terrato", 2, NAME.W_WIND, "W Wind (untouched vanilla row)")
   assertRowEmpty("terrato", 3)
   assertRowEmpty("terrato", 4)
-  for x = 5, 27 do
-    H.assertEq(cell(x, 27), BLANK,
-      string.format("terrato: while-worn line blank at {%d,27}", x))
-  end
+  assertCaption("terrato", false)
+  for slot = 0, 4 do assertTermRowBlank("terrato", slot) end
+  assertOldLineGone("terrato")
   H.screenshot("esper_detail_terrato_tube6_anchor")
-  H.log("TERRATO: still the no-mod control after the v0.7 pass; line blank")
+  H.log("TERRATO: still the no-mod control after #62; no caption, no terms")
 end) })
 add(backToList())
 
@@ -245,9 +295,15 @@ add({ H.call(function()
   assertRowEmpty("unicorn", 2)
   assertRowEmpty("unicorn", 3)
   assertRowEmpty("unicorn", 4)
-  assertStatLine("unicorn", STAT.STAMINA, 3)
+  assertCaption("unicorn", true)
+  assertTerm("unicorn", 0, STAT.STAMINA, "Stamina", CH_PLUS, 5)
+  assertTerm("unicorn", 1, STAT.MAGPWR,  "Mag.Pwr", CH_PLUS, 2)
+  assertTermRowBlank("unicorn", 2)
+  assertTermRowBlank("unicorn", 3)
+  assertTermRowBlank("unicorn", 4)
+  assertOldLineGone("unicorn")
   H.screenshot("esper_detail_unicorn_anchor")
-  H.log("UNICORN: Pearl + Remedy only, 'While worn...Stamina + 3'")
+  H.log("UNICORN: Pearl + Remedy only; Stamina +5 / Mag.Pwr +2")
 end) })
 
 add({ H.call(function()

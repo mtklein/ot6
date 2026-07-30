@@ -3,11 +3,22 @@
 -- page (docs/design/magicite-tube-six.md §11, issue #31).
 --
 -- The design doc's closing claim is "menu copy: zero work required" -- the
--- detail page renders the granted spell names and the "While worn...<Stat>+N"
--- line straight out of GenjuProp and Ot6EsperStatTbl, so authoring those two
--- tables IS the whole player-facing job.  That claim is only worth anything if
+-- detail page renders the granted spell names and the while-worn stat mod
+-- straight out of GenjuProp and Ot6EsperStatTbl, so authoring those two tables
+-- IS the whole player-facing job.  That claim is only worth anything if
 -- something checks it, which is this file: it drives the real menu UI to three
 -- detail pages and asserts the rendered TILES, not the tables.
+--
+-- #62 CHANGED WHAT "the stat mod" LOOKS LIKE.  Ot6EsperStatTbl is now two bytes
+-- per esper in vanilla's own equipment layout (four SIGNED nibbles, -7..+7
+-- each), so a stone carries up to four deltas and any of them can be negative.
+-- The page's single "While worn...<Stat> + N" line at row 27 is gone; in its
+-- place the caption rides the TITLE row and one term per nonzero delta packs
+-- downward from row 17, in the columns vanilla used for its dead learn-rate
+-- data.  Every stat-line assertion below was rewritten to that layout, and the
+-- three pages now assert MORE than before, not less: each checks the exact
+-- tiles of every term it should have, that the rows it should NOT have are
+-- blank, and (Maduin) that a MINUS sign renders.
 --
 -- Same drive and same instrument as menu_esperdetail.lua (issue #27): X ->
 -- Skills -> character -> Espers -> list -> detail from the arvis_wake fixture,
@@ -17,19 +28,23 @@
 -- and no-mod both correct) and this one is #31's gate on the page's CONTENT.
 --
 -- THE THREE PAGES:
---   MADUIN  (6)  the marquee.  +5 mag.pwr, the crown and the one exception to
---                the story rung, and three spell rows that must now read Fire /
---                Ice / Bolt where the shipped ROM drew Fire 2 / Ice 2 / Bolt 2
---                and a BLANK stat line.
---   TERRATO (4)  the surviving no-mod control.  Its Ot6EsperStatTbl byte is
---                still $00 after this change (only rows 5/6/7/19/20/23 moved),
---                so the blank-line path is still exercised -- and, revisited
---                after Maduin, it proves the page overwrites rather than
---                leaving the previous stone's line behind.
+--   MADUIN  (6)  the marquee, twice over.  Three spell rows that must read Fire
+--                / Ice / Bolt where the shipped ROM drew Fire 2 / Ice 2 / Bolt
+--                2, and after #62 a THREE-TERM stat block whose first term is
+--                NEGATIVE: vigor -3, stamina +3, mag.pwr +7 (the encoding's
+--                ceiling and vanilla's own per-stat ceiling).  Speed is zero, so
+--                it must cost no line -- which is what proves the walk packs.
+--   TERRATO (4)  the surviving no-mod control.  Its Ot6EsperStatTbl row is
+--                still $0000 after #62 (deliberately -- ot6_progression.asm
+--                says so on the row), so the honest-empty path is still
+--                exercised: NO caption and no term anywhere.  Revisited after
+--                Maduin, it proves the page overwrites rather than leaving the
+--                previous stone's block behind.
 --   UNICORN (23) the Pearl grant -- branch A of the cross-doc holy decision
 --                (§9's DECIDED box).  Two spell rows where the shipped ROM
 --                drew five, so rows 3-5 must be blank: the deletions are
---                asserted on screen, not just in the table.
+--                asserted on screen, not just in the table.  Its stat block is
+--                the two-term shape (stamina +5, mag.pwr +2) with no downside.
 --
 -- HOW NAMES ARE ASSERTED.  DrawGenjuMagicName (skills.asm:2759) blits a
 -- 7-tile MagicName record -- icon byte then up to 6 name tiles, $ff-padded
@@ -41,9 +56,21 @@
 -- `e9 85 a2 ab 9e fe b6`, which differ only in the last two tiles -- exactly
 -- the tiles this file compares.
 --
--- The while-worn line (skills.asm:2624-2673): "While worn..." at cols 5-17,
--- the 7-tile stat name at 18-24 (Ot6GenjuStatNameTbl, space-padded), '+' at
--- 25, and two digit tiles at 26-27 with the leading zero blanked.
+-- THE STAT BLOCK (#62, skills.asm's DrawEsperDetailMenu tail):
+--   caption "While worn..." right-aligned in the 16-cell field at {13,15} --
+--     cols 13-14 blank, cols 15-27 the 13 caption tiles;
+--   one term per nonzero delta, packed downward over rows 17/19/21/23/25:
+--     7-tile stat name at cols 17-23 (Ot6GenjuStatNameTbl, space-padded), a
+--     spacer at col 24, sign at col 25 ('+' $ca / '-' $c4), magnitude at cols
+--     26-27 with the leading zero blanked;
+--   unused term rows: cols 17-27 blank.  Row 27, the old line's home: blank.
+--
+-- NOTE ON assertRowEmpty BELOW.  It asserts cols 5-19 of an unused SPELL row,
+-- and cols 18-19 of that range are now inside the stat block's field.  That is
+-- still correct and is not a coincidence: the block writes all eleven cells
+-- 17-27 of every row it touches, and blanks all eleven on rows it does not.  The
+-- two ranges therefore agree, and a term landing on a row this file expects
+-- empty would fail here loudly.
 local H = dofile("tools/tests/lib/ot6.lua")
 local STATE = "build/states/arvis_wake.mss.lua"
 
@@ -61,9 +88,11 @@ local MADUIN, TERRATO, UNICORN = 6, 4, 23
 local BG1B = 0x4049
 local function cell(x, y) return H.readByte(BG1B + x * 2 + y * 64) end
 
-local BLANK   = 0xff
-local CH_W    = 0x96                    -- 'W' of "While worn..."
-local CH_PLUS = 0xca
+local BLANK    = 0xff
+local CH_W     = 0x96                   -- 'W' of "While worn..."
+local CH_DOT   = 0xc5                   -- '.' -- the caption's ellipsis
+local CH_PLUS  = 0xca
+local CH_MINUS = 0xc4                   -- #62: a delta can be negative
 -- digit tiles: '0' = $b4 .. '9' = $bd (text_en.json)
 local function digit(n) return 0xb4 + n end
 
@@ -152,24 +181,72 @@ local function assertRowEmpty(tag, slot)
   end
 end
 
-local function assertStatLine(tag, statTiles, magnitude)
-  H.assertEq(cell(5, 27), CH_W, tag .. ": 'While worn...' starts at {5,27}")
-  for k = 0, 6 do
-    H.assertEq(cell(18 + k, 27), statTiles[k + 1],
-      string.format("%s: stat name tile %d at {%d,27}", tag, k, 18 + k))
+-- #62's stat block.  assertCaption / assertTerm / assertTermRowBlank /
+-- assertOldLineGone replace the single assertStatLine this file used to call.
+local function assertCaption(tag, present)
+  if present then
+    H.assertEq(cell(13, 15), BLANK, tag .. ": caption pad blank at {13,15}")
+    H.assertEq(cell(14, 15), BLANK, tag .. ": caption pad blank at {14,15}")
+    H.assertEq(cell(15, 15), CH_W, tag .. ": 'While worn...' starts at {15,15}")
+    H.assertEq(cell(25, 15), CH_DOT, tag .. ": caption ellipsis at {25,15}")
+    H.assertEq(cell(26, 15), CH_DOT, tag .. ": caption ellipsis at {26,15}")
+    H.assertEq(cell(27, 15), CH_DOT, tag .. ": caption ends at {27,15}")
+  else
+    for x = 13, 28 do
+      H.assertEq(cell(x, 15), BLANK,
+        string.format("%s: no caption at all -- {%d,15} blank", tag, x))
+    end
   end
-  H.assertEq(cell(25, 27), CH_PLUS, tag .. ": '+' at {25,27}")
-  H.assertEq(cell(26, 27), BLANK, tag .. ": leading zero blanked at {26,27}")
-  H.assertEq(cell(27, 27), digit(magnitude),
-    string.format("%s: magnitude %d at {27,27}", tag, magnitude))
+end
+
+local function assertTerm(tag, slot, statTiles, statName, sign, magnitude)
+  local y = 17 + slot * 2
+  for k = 0, 6 do
+    H.assertEq(cell(17 + k, y), statTiles[k + 1],
+      string.format("%s: term %d '%s' tile %d at {%d,%d}",
+        tag, slot, statName, k, 17 + k, y))
+  end
+  -- The col-24 spacer.  It exists because "Stamina" and "Mag.Pwr" fill all
+  -- seven name cells, so without it the sign sits flush against the label.
+  H.assertEq(cell(24, y), BLANK,
+    string.format("%s: term %d spacer blank at {24,%d}", tag, slot, y))
+  H.assertEq(cell(25, y), sign,
+    string.format("%s: term %d sign %s at {25,%d}", tag, slot,
+      sign == CH_MINUS and "'-'" or "'+'", y))
+  H.assertEq(cell(26, y), BLANK,
+    string.format("%s: term %d leading zero blanked at {26,%d}", tag, slot, y))
+  H.assertEq(cell(27, y), digit(magnitude),
+    string.format("%s: term %d magnitude %d at {27,%d}", tag, slot, magnitude, y))
+end
+
+local function assertTermRowBlank(tag, slot)
+  local y = 17 + slot * 2
+  for x = 17, 27 do
+    H.assertEq(cell(x, y), BLANK,
+      string.format("%s: unused term row %d blank at {%d,%d}", tag, slot, x, y))
+  end
+end
+
+-- Row 27 was #27's single-line home; #62 draws nothing there, so the page must
+-- clear it -- asserted for a stone WITH a block as well as without.
+local function assertOldLineGone(tag)
+  for x = 5, 27 do
+    H.assertEq(cell(x, 27), BLANK,
+      string.format("%s: #27's old row-27 line cleared at {%d,27}", tag, x))
+  end
 end
 
 local function logPage(tag)
   H.log(string.format("[%s] esper=%d rows: 1=%s 2=%s 3=%s 4=%s 5=%s",
     tag, H.readByte(Z99), rowHex(0), rowHex(1), rowHex(2), rowHex(3), rowHex(4)))
-  local s = {}
-  for x = 5, 27 do s[#s + 1] = string.format("%02x", cell(x, 27)) end
-  H.log(string.format("[%s] while-worn line: %s", tag, table.concat(s, " ")))
+  local cap = {}
+  for x = 13, 28 do cap[#cap + 1] = string.format("%02x", cell(x, 15)) end
+  H.log(string.format("[%s] caption field: %s", tag, table.concat(cap, " ")))
+  for slot = 0, 4 do
+    local t = {}
+    for x = 17, 27 do t[#t + 1] = string.format("%02x", cell(x, 17 + slot * 2)) end
+    H.log(string.format("[%s] term row %d: %s", tag, slot, table.concat(t, " ")))
+  end
 end
 
 -- The menu drive up to the esper list, shared by every page below.
@@ -239,7 +316,7 @@ local function backToList()
   }
 end
 
--- ---- MADUIN: the crown.  Fire/Ice/Bolt + "While worn...Mag.Pwr + 5" -------
+-- ---- MADUIN: the crown.  Fire/Ice/Bolt + a three-term block with a minus ---
 add(page(MADUIN, "Maduin"))
 add({ H.call(function()
   H.assertEq(H.readByte(Z99), MADUIN, "detail page is MADUIN's")
@@ -249,9 +326,17 @@ add({ H.call(function()
   assertRow("maduin", 2, NAME.BOLT, "Bolt (base tier, not Bolt 2)")
   assertRowEmpty("maduin", 3)
   assertRowEmpty("maduin", 4)
-  assertStatLine("maduin", STAT.MAGPWR, 5)
+  -- Maduin's row is vig -3 / spd 0 / stm +3 / mag +7, so three terms pack onto
+  -- rows 17/19/21 with SPEED SKIPPED, and the first of them carries a MINUS.
+  assertCaption("maduin", true)
+  assertTerm("maduin", 0, STAT.VIGOR,   "Vigor",   CH_MINUS, 3)
+  assertTerm("maduin", 1, STAT.STAMINA, "Stamina", CH_PLUS,  3)
+  assertTerm("maduin", 2, STAT.MAGPWR,  "Mag.Pwr", CH_PLUS,  7)
+  assertTermRowBlank("maduin", 3)
+  assertTermRowBlank("maduin", 4)
+  assertOldLineGone("maduin")
   H.screenshot("esper_detail_maduin")
-  H.log("MADUIN: three base tiers drawn, 'While worn...Mag.Pwr + 5'")
+  H.log("MADUIN: three base tiers drawn; Vigor -3 / Stamina +3 / Mag.Pwr +7")
 end) })
 add(backToList())
 
@@ -265,14 +350,13 @@ add({ H.call(function()
   assertRow("terrato", 2, NAME.W_WIND, "W Wind (untouched vanilla row)")
   assertRowEmpty("terrato", 3)
   assertRowEmpty("terrato", 4)
-  -- No mod: the whole while-worn line is blank -- INCLUDING the cells Maduin's
-  -- page just filled, which is what proves the revisit overwrote them.
-  for x = 5, 27 do
-    H.assertEq(cell(x, 27), BLANK,
-      string.format("terrato: while-worn line blank at {%d,27}", x))
-  end
+  -- No mod ($0000): NO caption and no term anywhere -- INCLUDING the cells
+  -- Maduin's page just filled, which is what proves the revisit overwrote them.
+  assertCaption("terrato", false)
+  for slot = 0, 4 do assertTermRowBlank("terrato", slot) end
+  assertOldLineGone("terrato")
   H.screenshot("esper_detail_terrato_tube6")
-  H.log("TERRATO: still the no-mod control after the v0.7 pass; line blank")
+  H.log("TERRATO: still the no-mod control after #62; no caption, no terms")
 end) })
 add(backToList())
 
@@ -288,9 +372,17 @@ add({ H.call(function()
   assertRowEmpty("unicorn", 2)
   assertRowEmpty("unicorn", 3)
   assertRowEmpty("unicorn", 4)
-  assertStatLine("unicorn", STAT.STAMINA, 3)
+  -- Unicorn is vig 0 / spd 0 / stm +5 / mag +2: the two-term shape, no downside,
+  -- and the two leading zeros must cost no line.
+  assertCaption("unicorn", true)
+  assertTerm("unicorn", 0, STAT.STAMINA, "Stamina", CH_PLUS, 5)
+  assertTerm("unicorn", 1, STAT.MAGPWR,  "Mag.Pwr", CH_PLUS, 2)
+  assertTermRowBlank("unicorn", 2)
+  assertTermRowBlank("unicorn", 3)
+  assertTermRowBlank("unicorn", 4)
+  assertOldLineGone("unicorn")
   H.screenshot("esper_detail_unicorn")
-  H.log("UNICORN: Pearl + Remedy only, 'While worn...Stamina + 3'")
+  H.log("UNICORN: Pearl + Remedy only; Stamina +5 / Mag.Pwr +2")
 end) })
 
 add({ H.call(function()

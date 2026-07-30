@@ -25,26 +25,46 @@
 -- knew innately would fail there loudly instead of masking a broken grant.
 --
 -- v0.6 adds the two magicite the Magitek Research Facility pays out
--- (docs/design/magicite-ifrit-shiva.md, issue #16).  They are the first BOSS-tier
--- stat magnitudes (4-5 against the Zozo field stones' 2-3) and Ifrit is the first
--- esper to claim the VIGOR selector, so this file now reads the fourth stat too:
--- $3b2c, which vanilla stores as vigor*2 (battle_main.asm:3857 "vigor * 2"), so
--- Ifrit's authored +5 must show up here as +10.  Adding vigor to the flatness
--- check also strengthens the four older scenarios: each now proves its selector
--- left THREE other stats alone rather than two.
+-- (docs/design/magicite-ifrit-shiva.md, issue #16).  Ifrit is the first esper to
+-- claim VIGOR, so this file reads the fourth stat too: $3b2c, which vanilla
+-- stores as vigor*2 (battle_main.asm:3857 "vigor * 2"), so an authored +6 shows
+-- up here as +12.
+--
+-- #62 REBUILT THE TABLE AND THIS FILE'S ASSERTION SHAPE.  Ot6EsperStatTbl used to
+-- be one byte per esper, [selector:4][magnitude:4] -- exactly ONE stat, unsigned.
+-- It is now TWO bytes in vanilla's own equipment layout (ItemProp+16/+17): four
+-- SIGNED nibbles, -7..+7 each, so a stone can move several stats and can move one
+-- DOWN.  The old checkEsper() therefore could not express what to assert: it took
+-- a single (stat, delta) pair and asserted the other three FLAT.  It now takes a
+-- table of all four expected deltas and asserts every one of them, defaulting to
+-- 0 -- which is STRICTLY STRONGER than the old form (the old flatness check is
+-- the same assertion with three zeros) and is the only way a two-sided mod can be
+-- checked at all.  A stone whose downside silently failed to apply would have
+-- passed the old shape trivially, because a downside was unrepresentable.
+--
+-- The clamps are also new and worth stating: the encoding is signed, so
+-- Ot6EsperStatMod floors each stat at 0 as well as capping it at 255.  None of
+-- the scenarios below is near either bound on this fixture (Terra's base stats
+-- are 31/33/28/39, char_prop.asm:151), so these numbers exercise the arithmetic,
+-- not the clamps.
 --
 -- SCENARIOS (each an independent STATE reload; every esper scenario pokes char
 -- 0's equipped esper $161e before driving in, exactly as battle_subjob does):
 --   BASE  no esper: record Terra's stamina/mag.pwr/speed/vigor + the innate
 --                   union; assert all grant signatures + CURE_2 absent (controls).
---   RAMUH esper 0  stamina +3; grants Bolt/Rasp.
---   SIREN esper 3  speed  +2; grants Sleep/Mute/Slow(base).
---   KIRIN esper 17 mag.pwr +3; grants Cure(base)/Regen/Antdot, and NOT Cure2.
---   STRAY esper 8  mag.pwr +3; grants Muddle/Imp/Float (none in a fold family).
---   IFRIT esper 1  vigor +5 (+10 doubled); grants Fire(base)/Drain, and NOT
---                  Fire2 -- the dead pre-folded tier the vanilla row carried.
---   SHIVA esper 2  mag.pwr +4; grants Ice(base)/Osmose/Shell, and NOT Ice2
---                  (dead pre-folded tier) and NOT Rasp (left to Ramuh).
+--   RAMUH esper 0  stamina +4, mag.pwr +2; grants Bolt/Rasp.
+--   SIREN esper 3  speed +4, mag.pwr +2; grants Sleep/Mute/Slow(base).
+--   KIRIN esper 17 mag.pwr +4, stamina +2; grants Cure(base)/Regen/Antdot, and
+--                  NOT Cure2.
+--   STRAY esper 8  mag.pwr +4, speed +2; grants Muddle/Imp/Float (none folds).
+--   IFRIT esper 1  vigor +6 (+12 doubled), stamina +4, MAG.PWR -3; grants
+--                  Fire(base)/Drain, and NOT Fire2 -- the dead pre-folded tier
+--                  the vanilla row carried.  The -3 is the marquee: it is the
+--                  two-sided mod magicite-ifrit-shiva.md §12.1 recorded as
+--                  unbuildable, and it is unrepresentable in the old encoding.
+--   SHIVA esper 2  mag.pwr +6, speed +4, VIGOR -3 (-6 doubled); grants
+--                  Ice(base)/Osmose/Shell, and NOT Ice2 (dead pre-folded tier)
+--                  and NOT Rasp (left to Ramuh).  Ifrit's mirror, as §5.2 asked.
 --
 -- A NOTE ON WHAT CANNOT BE A CONTROL HERE.  Terra's natural magic is Cure at L1
 -- and Fire at L3 (event.asm NaturalMagic), and this fixture is the Narshe intro,
@@ -166,17 +186,28 @@ local function checkBase()
     end
   end)
 end
-local function checkEsper(tag, stat, delta, grants, absents)
+-- `deltas` is a table keyed stam/mag/spd/vig; a key left out means "expected
+-- FLAT", so every scenario still asserts all four stats and an unauthored stat
+-- moving is still a failure.  vig deltas are given DOUBLED, as $3b2c stores them.
+local function checkEsper(tag, deltas, grants, absents)
   return H.call(function()
     local b, r = R.base, R[tag]
-    -- the selected stat bumps by exactly delta; the other THREE stay flat, which
-    -- proves the selector decode touched only its target
     local now  = { stam = r.stam, mag = r.mag, spd = r.spd, vig = r.vig }
     local was  = { stam = b.stam, mag = b.mag, spd = b.spd, vig = b.vig }
-    for k, v in pairs(now) do
-      local want = was[k] + (k == stat and delta or 0)
-      H.assertEq(v, want, string.format("[%s] %s %d -> %d (want %+d on %s)",
-        tag, k, was[k], v, (k == stat and delta or 0), k))
+    for _, k in ipairs({ "stam", "mag", "spd", "vig" }) do
+      local d = deltas[k] or 0
+      H.assertEq(now[k], was[k] + d, string.format("[%s] %s %d -> %d (want %+d)",
+        tag, k, was[k], now[k], d))
+    end
+    -- Positive control on the table shape itself: a scenario that expects a
+    -- NEGATIVE delta must actually see the stat go DOWN.  Without this, a build
+    -- where the sign nibble decoded as zero would look like a passing "flat".
+    for k, d in pairs(deltas) do
+      if d < 0 then
+        H.assertEq(now[k] < was[k], true,
+          string.format("[%s] %s really DROPPED (%d -> %d), the signed nibble "
+            .. "decoded as negative", tag, k, was[k], now[k]))
+      end
     end
     for _, g in ipairs(grants) do
       H.assertEq(has(r.union, g[1]), true, "[" .. tag .. "] grants " .. g[2])
@@ -193,29 +224,32 @@ local function add(list) for _, s in ipairs(list) do all[#all + 1] = s end end
 
 add(driveSteps("base", nil));  add({ checkBase() })
 add(driveSteps("ramuh", RAMUH))
-add({ checkEsper("ramuh", "stam", 3, { { BOLT, "Bolt" }, { RASP, "Rasp" } }) })
+add({ checkEsper("ramuh", { stam = 4, mag = 2 },
+  { { BOLT, "Bolt" }, { RASP, "Rasp" } }) })
 add(driveSteps("siren", SIREN))
-add({ checkEsper("siren", "spd", 2,
+add({ checkEsper("siren", { spd = 4, mag = 2 },
   { { SLEEP, "Sleep" }, { MUTE, "Mute" }, { SLOW, "Slow (base tier)" } }) })
 add(driveSteps("kirin", KIRIN))
-add({ checkEsper("kirin", "mag", 3,
+add({ checkEsper("kirin", { mag = 4, stam = 2 },
   { { CURE, "Cure (base tier)" }, { REGEN, "Regen" }, { ANTDOT, "Antidote" } },
   { { CURE2, "Cure2 (pre-folded tier)" } }) })
 add(driveSteps("stray", STRAY))
-add({ checkEsper("stray", "mag", 3,
+add({ checkEsper("stray", { mag = 4, spd = 2 },
   { { MUDDLE, "Muddle" }, { IMP, "Imp" }, { FLOAT, "Float" } }) })
--- v0.6 boss stones.  Ifrit is the only vigor esper; the +5 reads as +10 because
--- $3b2c is the doubled copy.  Drain is the grant proof (Terra learns it at L12,
+-- v0.6 boss stones, on #62's BOSS rung: upside +10 across three stats bought
+-- with a -3.  Ifrit's +6 vigor reads as +12 because $3b2c is the doubled copy,
+-- and his mag.pwr -3 is the two-sided mod the old encoding could not say.
+-- Drain is the grant proof (Terra learns it at L12,
 -- so BASE has it absent); Fire is asserted present but is innate here, so it is
 -- corroboration, not proof.  Fire2 absent is the fold-correctness deletion.
 add(driveSteps("ifrit", IFRIT))
-add({ checkEsper("ifrit", "vig", 10,
+add({ checkEsper("ifrit", { vig = 12, stam = 4, mag = -3 },
   { { FIRE, "Fire (base tier)" }, { DRAIN, "Drain" } },
   { { FIRE2, "Fire2 (pre-folded tier)" } }) })
 -- Shiva: three grants, all three absent at BASE, so all three are proof.  Ice2
 -- is the dead-tier deletion; Rasp absent is the "left to Ramuh" deletion.
 add(driveSteps("shiva", SHIVA))
-add({ checkEsper("shiva", "mag", 4,
+add({ checkEsper("shiva", { mag = 6, spd = 4, vig = -6 },
   { { ICE, "Ice (base tier)" }, { OSMOSE, "Osmose" }, { SHELL, "Shell" } },
   { { ICE2, "Ice2 (pre-folded tier)" }, { RASP, "Rasp (Ramuh's)" } }) })
 add({ H.call(function() H.log("[esperstats] all scenarios passed") end) })

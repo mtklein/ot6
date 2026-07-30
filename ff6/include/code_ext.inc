@@ -69,8 +69,23 @@ CODE_EXT_INC = 1
                                  ;   espers' spells so the compacted list has slots
 .global Ot6EsperStatMod          ; M5: while-equipped stat mod -- an equipped esper
                                  ;   adds a live +stat to the battle-side stat copy
-.global Ot6EsperStatTbl          ; #27: the packed [sel:4][mag:4] table behind it,
-                                 ;   read by the esper detail page (menu/skills.asm)
+.global Ot6EsperStatTbl          ; #62: TWO bytes per esper in VANILLA'S OWN
+                                 ;   equipment layout (ItemProp+16/+17):
+                                 ;     byte 0 = [speed:4][vigor:4]
+                                 ;     byte 1 = [magpwr:4][stamina:4]
+                                 ;   each nibble [sign:1][magnitude:3], so -7..+7;
+                                 ;   $0000 = no mod.  Was one byte of
+                                 ;   [sel:4][mag:4] until #62.  BOTH readers move
+                                 ;   together: Ot6EsperStatMod (battle) and
+                                 ;   DrawEsperDetailMenu's stat block (menu/
+                                 ;   skills.asm).  Derivation and the vanilla
+                                 ;   decoder it mirrors: ot6_progression.asm.
+
+; #62: the nibble sign flag, shared by both readers of Ot6EsperStatTbl above.
+; Set = the magnitude is subtracted.  $8 alone (flag, zero magnitude) decodes to
+; zero, which is vanilla's own dead code and is why the encoding is -7..+7 and
+; not -8..+7.
+OT6_SM_NEG = $8
 .global Ot6DanceRowDecorate      ; #34: DrawDanceListText's per-row MP cost
                                  ;   (flat Ot6DanceCost; ALWAYS defined, the
                                  ;   stock C1 object jsl's it in both builds)
