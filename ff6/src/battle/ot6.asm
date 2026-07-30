@@ -18,6 +18,7 @@
 ; ------------------------------------------------------------------------------
 
         .include "ot6_memory.inc"
+        .include "ot6_rand.inc"     ; macro only -- emits nothing, segment-agnostic
 
 .segment "ot6_code"
 

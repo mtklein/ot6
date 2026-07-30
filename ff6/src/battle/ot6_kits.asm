@@ -1508,19 +1508,6 @@ done:   plp
 
 ; ------------------------------------------------------------------------------
 
-; battle Rand, inlined: this bank ($f0) can't `jsr Rand` (that routine lives in
-; $c2 and a near jsr would land in $f0 garbage) and Rand ends `rts`, not `rtl`,
-; so it can't be jsl'd either. Reproduce its three lines here -- `inc $be; ldx
-; $be; lda f:RNGTbl,x` -- the same rolling index into the same table Rand walks.
-; a8/i8; A = the draw (0-255); x saved/restored, y untouched.
-.macro ot6_rand
-        phx
-        inc     $be
-        ldx     $be
-        lda     f:RNGTbl,x
-        plx
-.endmacro
-
 ; [ boost tilts the steal SUCCESS roll — the chance verb's certainty ]
 
 ; DESIGN.md's canon rule: on damage verbs boost multiplies; on chance verbs
@@ -2518,48 +2505,6 @@ Ot6RagePrev:                        ; L shoulder -> previous learned rage
         pla                     ; A = the caller's original A (PLA keeps C)
         rtl
 .endproc
-
-; ------------------------------------------------------------------------------
-
-; [ upload the bg hud glyphs into free font cells ]
-
-; 16 2bpp tiles (shield-with-count 1-6/B, pip clusters 0-5, boost cells)
-; written to the battle font at vram $5800 + cell*8, as two 8-tile
-; slices (~128 bytes each — one fits a vblank-tail re-lay stage).
-; a8/i16, db = $00, vmainc $80. exits a8. clobbers a/x/y.
-
-.macro ot6_glyph_slice first, last
-        ldx     #first          ; glyph index
-@tile:  phx
-        lda     f:Ot6BgGlyphCellTbl,x
-        longa
-        and     #$00ff
-        asl
-        asl
-        asl
-        clc
-        adc     #$5800
-        sta     hVMADDL
-        txa                     ; data offset = index * 16
-        asl
-        asl
-        asl
-        asl
-        tax
-        ldy     #$0008          ; 8 words per 2bpp tile
-@word:  lda     f:Ot6BgGlyphData,x
-        sta     hVMDATAL
-        inx
-        inx
-        dey
-        bne     @word
-        shorta
-        plx
-        inx
-        cpx     #last
-        bcc     @tile
-        rts
-.endmacro
 
 ; ------------------------------------------------------------------------------
 
