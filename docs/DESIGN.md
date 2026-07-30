@@ -299,7 +299,7 @@ Mapping, consequences, and the reasoning: design/kits.md.
 > - **"Cleave sits outside the ladder until divine gating exists" — it is
 >   in the ladder and the gate exists**, shipped v0.4.
 >   `Ot6BushidoOblivion` (`ot6_kits.asm:141`) places tech 7 at boost 3 and
->   drops a *spent* divine back to Tempest for the rest of the battle; the
+>   drops a *spent* divine back to Quadra Slice for the rest of the battle; the
 >   resolution-time Broken gate is `Ot6Oblivion` (`ot6_kits.asm:250`),
 >   hooked after `ChooseTarget` in `CalcAttackEffect`, because the target
 >   does not exist at command-latch time.

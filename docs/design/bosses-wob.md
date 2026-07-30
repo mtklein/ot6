@@ -644,7 +644,7 @@ Party: Locke, Celes + two.
 > `tag out` / `swap` / `hide` across `ff6/src/battle/ot6_*.asm` and
 > `ff6/src/battle/ot6_memory.inc` returns only
 > unrelated hits (a direct-page swap in `ot6_codex.asm`, HUD veiling in
-> `ot6_hud.asm`, the Oblivion→Tempest rung swap in `ot6_kits.asm`).
+> `ot6_hud.asm`, the spent-divine rung swap in `ot6_kits.asm`).
 > Whatever "can't tag out" describes was only ever emergent from
 > `Ot6Gate` (`ot6_break.asm:1655`, consulted at `battle_main.asm:1419`)
 > refusing to queue a broken monster's turn.
