@@ -118,6 +118,19 @@ local function armDetectors()
     note("EXECCMD", emu.getState()["cpu.x"] & 0xff,
       string.format("cmd=%02X", H.readByte(0x00b5)))
   end, emu.callbackType.exec, c, c)
+  -- Is the monster's AI SCRIPT itself running?  ExecAction's $1f arm
+  -- (battle_main.asm:226-239) calls ExecMonsterAction, which is what turns a
+  -- queued monster turn into a real attack / a tag.  Without this, a drained
+  -- queue entry that dispatched CmdNoEffect ($b5 stays #$12 from :213 when
+  -- the command list is empty) is indistinguishable from a real turn.
+  local m = H.sym("ExecMonsterAction")
+  emu.addMemoryCallback(function()
+    note("AISCRIPT", emu.getState()["cpu.x"] & 0xff, "ExecMonsterAction")
+  end, emu.callbackType.exec, m, m)
+  local mr = H.sym("ExecAIRetal")
+  emu.addMemoryCallback(function()
+    note("AIRETAL", emu.getState()["cpu.x"] & 0xff, "ExecAIRetal")
+  end, emu.callbackType.exec, mr, mr)
   -- The GATE's own control: prove Ot6Gate is consulted and does refuse
   -- broken entities at its one site, so anything that still acts is
   -- leakage DOWNSTREAM of the gate, not a gate that failed to fire.
