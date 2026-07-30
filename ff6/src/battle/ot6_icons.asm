@@ -169,8 +169,10 @@ OT6_QMARK := $bf                ; '?' glyph (unrevealed weakness slot)
 ;
 ; WHAT IT COSTS, per menu OPEN: eight tiles.  The 4bpp pass writes 8 data
 ; words + 8 zero words each = 128 word writes; the 2bpp pass 8 each = 64.
-; The loads they hook write 4096 and 3072 words respectively, so this is
-; +3.1% and +2.1% of an upload that already happens, in the same forced-blank
+; The font expansions they hang off write 4096 and 3072 words respectively
+; (and LoadFontGfx4bpp then streams 2048 more for WindowGfx before our hook
+; runs at all), so this is +3.1% and +2.1% of an upload already happening --
+; +2.1% of LoadFontGfx4bpp end to end.  All of it in the same forced-blank
 ; menu init (InitMenu -> InitMenuGfx, menu_common.asm:133), before a frame is
 ; shown.  No re-lay machinery is needed: unlike the battle font -- which a
 ; dialogue window re-uploads mid-fight, the whole reason Ot6FontRestoreMark
