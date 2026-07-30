@@ -2184,25 +2184,31 @@ Ot6BgGlyphData:
 ; shield-6
         .byte   $7e,$00,$99,$7e,$a1,$7e,$b9,$7e
         .byte   $6a,$3c,$3c,$38,$18,$00,$00,$00
-; shield-broken -- a fractured shield: the top-right corner chipped away
-; and a bright fault running diagonally down through the body.
+; shield-broken -- the plain grey shield, no numeral, with a big white X
+; struck corner to corner across the whole cell. owner's call,
+; 2026-07-30: "a big white X that just crosses the whole shield sprite
+; area".
 ;
-; it was a shield with a 'B' in it, which the owner could not tell from
-; shield-3 at HUD size (2026-07-30). the reason is structural, not a
-; matter of drawing a better letter: all six count glyphs share one
-; silhouette -- full-width top bar, full-width body, taper to a point --
-; and differ only in three interior rows, so ANY symbol-inside-a-shield
-; competes with the digits on interior detail alone. shield-B and
-; shield-3 were byte-identical on rows 0, 1 and 5.
+; it was a shield with a 'B' in it, which reads as a 3 at HUD size. the
+; reason is structural, not a matter of drawing a better letter: all six
+; count glyphs share one silhouette -- full-width top bar, full-width
+; body, taper to a point -- and differ only in three interior rows, so
+; ANY symbol-inside-a-shield competes with the digits on interior detail
+; alone, inside a 6x6 interior. shield-B and shield-3 were byte-identical
+; on rows 0, 1 and 5.
 ;
-; so this one breaks the outline instead: row 0 is three cells wide
-; where every count is six, and the fault is DIAGONAL -- a direction
-; that appears nowhere in the count family, all of which is
-; axis-aligned. it stays one connected piece on purpose; a detached
-; fragment was drawn and rejected, because a floating 2x2 block on this
-; HUD reads as tile corruption, which we have actually shipped before.
-        .byte   $70,$00,$8c,$78,$92,$7c,$a2,$7c
-        .byte   $64,$38,$38,$30,$18,$00,$00,$00
+; the X sidesteps that competition rather than trying to win it. it is
+; not a symbol placed INSIDE the shield -- it is drawn OVER the whole
+; tile, so its arms leave the silhouette at all four corners and land on
+; the background. nothing else in the strip has ink out there, so the
+; cell reads as struck-through before the eye resolves any detail.
+;
+; the arms run the full 8x8 on purpose. a 7x7 X with a true single-pixel
+; centre was drawn first, and it is the better X in isolation -- but odd
+; against this even-width shield it sits a half-pixel off centre and
+; reads as scatter rather than a cross.
+        .byte   $ff,$81,$c3,$7e,$a5,$7e,$99,$7e
+        .byte   $5a,$3c,$24,$3c,$5a,$42,$81,$81
 ; pips-0
         .byte   $00,$00,$db,$00,$db,$00,$00,$00
         .byte   $6c,$00,$6c,$00,$00,$00,$00,$00
