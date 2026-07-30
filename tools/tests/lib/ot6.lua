@@ -179,9 +179,26 @@ function M.readRomWord(addr) return emu.readWord(addr, emu.memType.snesPrgRom) e
 -- run raw instead of through run.sh (which composes OT6_SYMS in).  This is the
 -- always-correct-by-derivation replacement for hand-maintained address
 -- literals that went stale on every bank-$F0/$C2/$C0 shift.
+--
+-- DUPLICATED NAMES.  ca65 scopes names per module, so a name can be defined
+-- in two of them (`ExecCmd` is field code AND the battle command dispatcher;
+-- 3838 of this ROM's 98483 label names are non-unique).  compose.py refuses
+-- to guess: such a name is a compose-time error, and if it reached here at
+-- all -- only possible when every occurrence was inside a comment -- it
+-- raises below rather than returning either candidate.  Disambiguate by the
+-- ca65 SEGMENT that defines it: H.sym("ExecCmd@battle_code").  Segment names
+-- come from cfg/ff6-en.cfg and survive the bank shifts that move addresses,
+-- so a qualified name is no more fragile than a bare one.
 function M.sym(name)
   if type(OT6_SYMS) == "table" and OT6_SYMS[name] then
     return OT6_SYMS[name]
+  end
+  if type(OT6_SYMS_AMBIG) == "table" and OT6_SYMS_AMBIG[name] then
+    local bare = name:match("^[^@]*")
+    local firstSeg = OT6_SYMS_AMBIG[name]:match("^([^=]*)=")
+    error("symbol " .. tostring(name) .. " is AMBIGUOUS in ff6-en.dbg ("
+      .. OT6_SYMS_AMBIG[name] .. ") -- name the segment you mean, e.g. "
+      .. 'H.sym("' .. bare .. "@" .. tostring(firstSeg) .. '")', 2)
   end
   error("symbol " .. tostring(name) .. " not in ff6-en.dbg -- rebuild the ROM "
     .. "(compose.py derives OT6_SYMS from ff6/rom/ff6-en.dbg; run via run.sh)", 2)

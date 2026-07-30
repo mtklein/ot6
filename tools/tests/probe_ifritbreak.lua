@@ -89,10 +89,13 @@ local function note(kind, ent, extra)
 end
 
 local function armDetectors()
-  -- `ExecCmd` is AMBIGUOUS in ff6-en.dbg: there are two (a field one at
-  -- $C09B1B and the battle dispatcher at $C213E6), and H.sym returns the
-  -- first, which never runs in battle.  `_dispatcher` (battle_main.asm:3115)
-  -- is the unique alias for the battle one.
+  -- `ExecCmd` is AMBIGUOUS in ff6-en.dbg: there are two (field code at
+  -- $C09B1B and the battle dispatcher at $C213EA).  H.sym used to return the
+  -- first, which never runs in battle, so this hook was written against
+  -- `_dispatcher` (battle_main.asm:3115), the unique alias for the battle
+  -- one.  It still is -- but the workaround is no longer load-bearing:
+  -- H.sym refuses a duplicated name outright now, and
+  -- H.sym("ExecCmd@battle_code") resolves to this same address.
   local a, r, c = H.sym("ExecAction"), H.sym("ExecRetal"), H.sym("_dispatcher")
   local g = H.sym("Ot6Gate")
   emu.addMemoryCallback(function()

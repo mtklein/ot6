@@ -50,9 +50,12 @@
 -- lands on the SAME emulated frame as the Cmd_22 exec callback.  Every
 -- recorded chip must satisfy BOTH that and the DOT record's own signature
 -- ($11a2 = $68, $11a6 = 2 -- Cmd_22's literal stores), which no ordinary
--- action carries.  (Do NOT bracket this with an exec callback on ExecCmd:
--- that name is defined twice in ff6-en.dbg and H.sym silently returns the
--- wrong module's address.  probe_dottick.lua's header has the forensics.)
+-- action carries.  (Bracketing this with a bare exec callback on ExecCmd is
+-- what an earlier version did, and it never fired: that name is defined
+-- twice in ff6-en.dbg.  H.sym used to return the wrong module's address in
+-- silence; it now refuses a duplicated name and tells you to write
+-- H.sym("ExecCmd@battle_code").  probe_dottick.lua's header has the
+-- forensics.)
 --
 -- Asserts:
 --   1. seed: A poison-weak only, class-weak 0, 2/2 shields, poison set

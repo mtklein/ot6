@@ -66,8 +66,12 @@ local function gutter(base, n, page)
 end
 
 -- NB: H.sym must be called with a STRING LITERAL -- compose.py scans the
--- source for `H.sym("Name")` to decide which symbols to bake into OT6_SYMS,
--- so a variable argument resolves to nothing at runtime.
+-- source for H.sym calls to decide which symbols to bake into OT6_SYMS, so a
+-- variable argument resolves to nothing at runtime.  (This note used to spell
+-- the call out with a placeholder name in it, which the scanner dutifully
+-- collected and then warned about as a missing symbol on every compose of
+-- this file.  Prose that names a symbol is harmless; prose that names a
+-- symbol which does not exist is a warning nobody can act on.)
 local BUSH_CURSOR = H.sym("Ot6LoadoutCursorPos") & 0x3FFFFF
 local RAGE_CURSOR = H.sym("Ot6RageCursorPos") & 0x3FFFFF
 
