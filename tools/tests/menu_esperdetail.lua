@@ -54,10 +54,12 @@
 --     cols 13-14 blank, cols 15-27 the 13 caption tiles, col 28 blank
 --   one term per nonzero delta, packed downward from tilemap row 17 over the
 --   odd rows 17/19/21/23/25 (one window row = two tilemap rows):
---     stat name cols 18-24 (7 tiles, Ot6GenjuStatNameTbl, space-padded)
+--     stat name cols 17-23 (7 tiles, Ot6GenjuStatNameTbl, space-padded)
+--     a SPACER at col 24 -- "Stamina" and "Mag.Pwr" fill all seven name cells,
+--       so without it the sign sits flush against the label
 --     sign col 25: '+' $ca or '-' $c4
 --     magnitude cols 26-27, leading zero blanked
---   every term row the walk does not reach: cols 18-27 blank
+--   every term row the walk does not reach: cols 17-27 blank
 --   row 27, where #27's single line used to be: cols 5-27 blank
 local H = dofile("tools/tests/lib/ot6.lua")
 local STATE = "build/states/arvis_wake.mss.lua"
@@ -135,7 +137,7 @@ local function listSeek(idx, what)
 end
 
 -- The shared page shape: vanilla's dead learn-rate machinery is gone.  #62 took
--- over cols 18-27 of the spell rows and cols 13-28 of the title row, so the
+-- over cols 17-27 of the spell rows and cols 13-28 of the title row, so the
 -- three cells the old version of this check used there have been replaced with
 -- checks of the same class that survive the new layout:
 --   * col 12 of a spell row is where vanilla's rate colon sat, and NOTHING in
@@ -179,10 +181,14 @@ end
 local function assertTerm(tag, slot, statTiles, statName, sign, magnitude)
   local y = 17 + slot * 2
   for k = 0, 6 do
-    H.assertEq(cell(18 + k, y), statTiles[k + 1],
+    H.assertEq(cell(17 + k, y), statTiles[k + 1],
       string.format("%s: term %d '%s' tile %d at {%d,%d}",
-        tag, slot, statName, k, 18 + k, y))
+        tag, slot, statName, k, 17 + k, y))
   end
+  -- The col-24 spacer.  It exists because "Stamina" and "Mag.Pwr" fill all
+  -- seven name cells, so without it the sign sits flush against the label.
+  H.assertEq(cell(24, y), BLANK,
+    string.format("%s: term %d spacer blank at {24,%d}", tag, slot, y))
   H.assertEq(cell(25, y), sign,
     string.format("%s: term %d sign %s at {25,%d}", tag, slot,
       sign == CH_MINUS and "'-'" or "'+'", y))
@@ -195,7 +201,7 @@ end
 -- A term row the walk did not reach: the whole 10-cell field is blank.
 local function assertTermRowBlank(tag, slot)
   local y = 17 + slot * 2
-  for x = 18, 27 do
+  for x = 17, 27 do
     H.assertEq(cell(x, y), BLANK,
       string.format("%s: unused term row %d blank at {%d,%d}", tag, slot, x, y))
   end
@@ -284,7 +290,7 @@ H.run({ maxFrames = 30000 }, {
     -- Ifrit's speed delta is zero.  Without this, a walk that drew all four
     -- stats with a "+ 0" would still satisfy every assertion above.
     for y = 17, 25, 2 do
-      H.assertEq(cell(18, y) ~= STAT.SPEED[1] or cell(19, y) ~= STAT.SPEED[2],
+      H.assertEq(cell(17, y) ~= STAT.SPEED[1] or cell(18, y) ~= STAT.SPEED[2],
         true, string.format("ifrit: no Speed term drawn (row %d) -- zero deltas "
           .. "cost no line", y))
     end

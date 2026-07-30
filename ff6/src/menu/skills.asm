@@ -2865,9 +2865,9 @@ DrawEsperDetailMenu:
 ; terms do not fit on one line, so the block is a right-hand COLUMN:
 ;
 ;   row 15   <esper name>          While worn...     <- caption on the title row
-;   row 17     Fire              Vigor    + 6
-;   row 19     Drain             Stamina  + 4
-;   row 21                       Mag.Pwr  - 3
+;   row 17     Fire             Vigor   + 6
+;   row 19     Drain            Stamina + 4
+;   row 21                      Mag.Pwr - 3
 ;   row 23
 ;   row 25
 ;   row 27
@@ -2881,8 +2881,9 @@ DrawEsperDetailMenu:
 ;    menu_esperdetail: the dead learn-rate / percent columns #27 emptied.  The
 ;    window's last row is 27 (GenjuDetailCursorPos below: seven rows, 12px
 ;    pitch), so nothing here needs a row that has never been drawn to;
-;  * the term geometry is #27's unchanged -- stat name cols 18-24, sign col 25,
-;    two digits cols 26-27 -- so only the ROW moved.
+;  * the term geometry keeps #27's sign and digit columns (25, 26-27) and moves
+;    the stat name one cell left to 17-23 so col 24 can be a spacer -- see
+;    Ot6GenjuTermPos for why that cell has to exist.
 ;
 ; Terms PACK UPWARD from row 17: a stat with a zero delta costs no line.  Every
 ; row the terms do not reach is blanked to the same 10-cell width, and #27's old
@@ -2948,7 +2949,9 @@ DrawEsperDetailMenu:
         sta     hWMDATA
         inx
         bra     @lbl
-@sign:  jsr     Ot6GenjuNibble
+@sign:  lda     #$ff                    ; the col-24 spacer (see Ot6GenjuTermPos)
+        sta     hWMDATA
+        jsr     Ot6GenjuNibble
         pha                             ; bit #imm leaves A alone, but the sign
         bit     #OT6_SM_NEG             ;   write below does not
         beq     @signpos
@@ -2987,7 +2990,7 @@ DrawEsperDetailMenu:
         bcs     @blankold
         jsr     Ot6GenjuTermPos
         jsr     InitTextBuf
-        ldy     #10                     ; name 7 + sign 1 + digits 2
+        ldy     #11                     ; name 7 + spacer 1 + sign 1 + digits 2
         lda     #$ff
 @blankb:
         sta     hWMDATA
@@ -3435,15 +3438,19 @@ Ot6GenjuAnyStatMod:
         ora     f:Ot6EsperStatTbl+1,x
         rts
 
-; Y := the BG1 screen-B tilemap cell for column 18 of tilemap row $f6, which is
-; where a term's stat name starts (sign col 25, digits cols 26-27 follow).
+; Y := the BG1 screen-B tilemap cell for column 17 of tilemap row $f6, which is
+; where a term's stat name starts.  The field is 11 cells: name 17-23, a SPACER
+; at 24, sign 25, magnitude 26-27.  The spacer is not decoration -- "Stamina"
+; and "Mag.Pwr" fill all seven name cells, so without it the sign sits flush
+; against the label and the column reads "Mag.Pwr- 3" while "Vigor" (padded to
+; seven) reads "Vigor   + 6".  Verified on a screenshot before it was added.
 Ot6GenjuTermPos:
         longa
         lda     $f6
         and     #$00ff
         asl6                            ; 64 bytes per tilemap row
         clc
-        adc_pos BG1B, {18, 0}
+        adc_pos BG1B, {17, 0}
         tay
         shorta
         rts

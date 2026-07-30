@@ -88,7 +88,7 @@ local function listSeek(idx, what)
   }, what)
 end
 
--- #62 took over cols 18-27 of the spell rows and cols 13-28 of the title row,
+-- #62 took over cols 17-27 of the spell rows and cols 13-28 of the title row,
 -- so the cells the old form of this check used there are replaced by a stronger
 -- statement of the same class: neither the percent glyph nor the learn-rate
 -- colon may appear ANYWHERE in the window's rows.
@@ -121,10 +121,14 @@ end
 local function assertTerm(tag, slot, statTiles, statName, sign, magnitude)
   local y = 17 + slot * 2
   for k = 0, 6 do
-    H.assertEq(cell(18 + k, y), statTiles[k + 1],
+    H.assertEq(cell(17 + k, y), statTiles[k + 1],
       string.format("%s: term %d '%s' tile %d at {%d,%d}",
-        tag, slot, statName, k, 18 + k, y))
+        tag, slot, statName, k, 17 + k, y))
   end
+  -- The col-24 spacer.  It exists because "Stamina" and "Mag.Pwr" fill all
+  -- seven name cells, so without it the sign sits flush against the label.
+  H.assertEq(cell(24, y), BLANK,
+    string.format("%s: term %d spacer blank at {24,%d}", tag, slot, y))
   H.assertEq(cell(25, y), sign,
     string.format("%s: term %d sign at {25,%d}", tag, slot, y))
   H.assertEq(cell(26, y), BLANK,
@@ -135,7 +139,7 @@ end
 
 local function assertTermRowBlank(tag, slot)
   local y = 17 + slot * 2
-  for x = 18, 27 do
+  for x = 17, 27 do
     H.assertEq(cell(x, y), BLANK,
       string.format("%s: unused term row %d blank at {%d,%d}", tag, slot, x, y))
   end

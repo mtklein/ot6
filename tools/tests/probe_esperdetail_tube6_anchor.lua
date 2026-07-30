@@ -118,7 +118,7 @@ local function assertRowEmpty(tag, slot)
   end
 end
 -- #62's stat block: caption on the title row, one term per nonzero delta packed
--- down from row 17 (stat name cols 18-24, sign col 25, magnitude cols 26-27).
+-- down from row 17 (name cols 17-23, spacer 24, sign 25, magnitude 26-27).
 local function assertCaption(tag, present)
   if present then
     H.assertEq(cell(13, 15), BLANK, tag .. ": caption pad blank at {13,15}")
@@ -135,10 +135,14 @@ end
 local function assertTerm(tag, slot, statTiles, statName, sign, magnitude)
   local y = 17 + slot * 2
   for k = 0, 6 do
-    H.assertEq(cell(18 + k, y), statTiles[k + 1],
+    H.assertEq(cell(17 + k, y), statTiles[k + 1],
       string.format("%s: term %d '%s' tile %d at {%d,%d}",
-        tag, slot, statName, k, 18 + k, y))
+        tag, slot, statName, k, 17 + k, y))
   end
+  -- The col-24 spacer.  It exists because "Stamina" and "Mag.Pwr" fill all
+  -- seven name cells, so without it the sign sits flush against the label.
+  H.assertEq(cell(24, y), BLANK,
+    string.format("%s: term %d spacer blank at {24,%d}", tag, slot, y))
   H.assertEq(cell(25, y), sign,
     string.format("%s: term %d sign at {25,%d}", tag, slot, y))
   H.assertEq(cell(26, y), BLANK,
@@ -148,7 +152,7 @@ local function assertTerm(tag, slot, statTiles, statName, sign, magnitude)
 end
 local function assertTermRowBlank(tag, slot)
   local y = 17 + slot * 2
-  for x = 18, 27 do
+  for x = 17, 27 do
     H.assertEq(cell(x, y), BLANK,
       string.format("%s: unused term row %d blank at {%d,%d}", tag, slot, x, y))
   end
@@ -167,7 +171,7 @@ local function logPage(tag)
   H.log(string.format("[%s] caption field: %s", tag, table.concat(cap, " ")))
   for slot = 0, 4 do
     local t = {}
-    for x = 18, 27 do t[#t + 1] = string.format("%02x", cell(x, 17 + slot * 2)) end
+    for x = 17, 27 do t[#t + 1] = string.format("%02x", cell(x, 17 + slot * 2)) end
     H.log(string.format("[%s] term row %d: %s", tag, slot, table.concat(t, " ")))
   end
 end

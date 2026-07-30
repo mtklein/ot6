@@ -60,15 +60,15 @@
 --   caption "While worn..." right-aligned in the 16-cell field at {13,15} --
 --     cols 13-14 blank, cols 15-27 the 13 caption tiles;
 --   one term per nonzero delta, packed downward over rows 17/19/21/23/25:
---     7-tile stat name at cols 18-24 (Ot6GenjuStatNameTbl, space-padded),
---     sign at col 25 ('+' $ca / '-' $c4), magnitude at cols 26-27 with the
---     leading zero blanked;
---   unused term rows: cols 18-27 blank.  Row 27, the old line's home: blank.
+--     7-tile stat name at cols 17-23 (Ot6GenjuStatNameTbl, space-padded), a
+--     spacer at col 24, sign at col 25 ('+' $ca / '-' $c4), magnitude at cols
+--     26-27 with the leading zero blanked;
+--   unused term rows: cols 17-27 blank.  Row 27, the old line's home: blank.
 --
 -- NOTE ON assertRowEmpty BELOW.  It asserts cols 5-19 of an unused SPELL row,
 -- and cols 18-19 of that range are now inside the stat block's field.  That is
--- still correct and is not a coincidence: the block writes all ten cells 18-27
--- of every row it touches, and blanks all ten on every row it does not.  The
+-- still correct and is not a coincidence: the block writes all eleven cells
+-- 17-27 of every row it touches, and blanks all eleven on rows it does not.  The
 -- two ranges therefore agree, and a term landing on a row this file expects
 -- empty would fail here loudly.
 local H = dofile("tools/tests/lib/ot6.lua")
@@ -202,10 +202,14 @@ end
 local function assertTerm(tag, slot, statTiles, statName, sign, magnitude)
   local y = 17 + slot * 2
   for k = 0, 6 do
-    H.assertEq(cell(18 + k, y), statTiles[k + 1],
+    H.assertEq(cell(17 + k, y), statTiles[k + 1],
       string.format("%s: term %d '%s' tile %d at {%d,%d}",
-        tag, slot, statName, k, 18 + k, y))
+        tag, slot, statName, k, 17 + k, y))
   end
+  -- The col-24 spacer.  It exists because "Stamina" and "Mag.Pwr" fill all
+  -- seven name cells, so without it the sign sits flush against the label.
+  H.assertEq(cell(24, y), BLANK,
+    string.format("%s: term %d spacer blank at {24,%d}", tag, slot, y))
   H.assertEq(cell(25, y), sign,
     string.format("%s: term %d sign %s at {25,%d}", tag, slot,
       sign == CH_MINUS and "'-'" or "'+'", y))
@@ -217,7 +221,7 @@ end
 
 local function assertTermRowBlank(tag, slot)
   local y = 17 + slot * 2
-  for x = 18, 27 do
+  for x = 17, 27 do
     H.assertEq(cell(x, y), BLANK,
       string.format("%s: unused term row %d blank at {%d,%d}", tag, slot, x, y))
   end
@@ -240,7 +244,7 @@ local function logPage(tag)
   H.log(string.format("[%s] caption field: %s", tag, table.concat(cap, " ")))
   for slot = 0, 4 do
     local t = {}
-    for x = 18, 27 do t[#t + 1] = string.format("%02x", cell(x, 17 + slot * 2)) end
+    for x = 17, 27 do t[#t + 1] = string.format("%02x", cell(x, 17 + slot * 2)) end
     H.log(string.format("[%s] term row %d: %s", tag, slot, table.concat(t, " ")))
   end
 end
