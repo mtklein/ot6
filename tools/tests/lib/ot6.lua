@@ -55,7 +55,19 @@ function M.log(msg)
   -- print goes to the testrunner's stdout.  Deliberately NOT emu.log():
   -- it is invisible under --testrunner and calling it from callbacks is a
   -- crash suspect (see README WORKING NOTES).
-  print("[ot6] " .. tostring(msg))
+  --
+  -- EVERY line carries the prefix, not just the first.  run.sh's terminal
+  -- output is `grep '^\[ot6\]' "$RUN_LOG"` (run.sh:326), so an unprefixed
+  -- continuation line reaches the log file and nothing else -- which is
+  -- precisely backwards for the messages that have continuation lines, all
+  -- of which are failures explaining themselves.  Measured 2026-07-30: a
+  -- timeout's "the fixture you booted is stale" detail sat in the log while
+  -- the terminal showed only "timeout after 120 frames waiting for main
+  -- menu", the misleading half.
+  msg = tostring(msg)
+  for line in (msg .. "\n"):gmatch("([^\n]*)\n") do
+    print("[ot6] " .. line)
+  end
 end
 
 -- ----------------------------------------------------------------- base64 --
@@ -302,7 +314,8 @@ function M.loadState(sidecarPath)
     M.call(function()
       local blob = M.b64decode(M.resolveStateB64(sidecarPath))
       assert(#blob > 0, "empty savestate blob for " .. sidecarPath)
-      M.log("loading savestate " .. sidecarPath:match("[^/]+$") ..
+      M.lastState = sidecarPath:match("[^/]+$")
+      M.log("loading savestate " .. M.lastState ..
         " (" .. #blob .. " bytes)")
       req = M.requestLoadState(blob)
     end),
@@ -585,6 +598,43 @@ function M.pressButtons(buttons, frames)
   })
 end
 
+-- ---------------------------------------------------------- timeout blame --
+-- A wait that runs out says "timeout after 600 frames waiting for main menu",
+-- and that sentence is a lie of omission often enough to matter.  The usual
+-- cause is not the menu: it is that the savestate was minted against a
+-- DIFFERENT ROM than the one running, so the first step needing a specific
+-- frame -- typically the field X press -- lands on a frame the fixture's
+-- timing no longer has.  Read literally the message sends you into the menu
+-- code, and it has: at least one agent went looking for a product bug there.
+--
+-- So every timeout appends what the run actually knows: which fixture it
+-- booted, and whether composition already flagged that fixture as minted from
+-- sources this tree no longer has (OT6_STALE, emitted by lib/compose.py).
+-- This adds context; it never suppresses the failure.
+M.lastState = nil
+
+function M.timeoutContext()
+  if not M.lastState then
+    return ""   -- power-on boot: no fixture to blame, say nothing
+  end
+  local out = "\n  fixture booted by this run: " .. M.lastState
+  local stale = type(OT6_STALE) == "table" and OT6_STALE[M.lastState]
+  if stale then
+    out = out .. "\n  and it is STALE: " .. stale
+    out = out .. "\n  A savestate minted against a different ROM resumes at a"
+      .. " PC and a frame parity that\n  have since moved, so the first input"
+      .. " needing a specific frame is where it surfaces --\n  usually as a"
+      .. " timeout on something innocent, like this one."
+  else
+    out = out .. "\n  (composition did not flag it stale, so a ROM/fixture"
+      .. " mismatch is less likely here --\n  but rule it out before you"
+      .. " suspect the feature: a timeout on an input step is what a\n"
+      .. "  mismatched pairing looks like.)"
+  end
+  return out .. "\n  Confirm: python3 tools/tests/lib/compose.py"
+    .. " --check-states\n  Re-mint:  nice -n 10 ninja -f build/build.ninja <state>"
+end
+
 -- Wait until pred() is truthy, polling every pollEvery frames (default 1).
 -- Raises (-> FAIL, exit 1) after maxFrames.
 function M.waitUntil(pred, maxFrames, what, pollEvery)
@@ -599,7 +649,8 @@ function M.waitUntil(pred, maxFrames, what, pollEvery)
       end
       waited = waited + 1
       if waited > maxFrames then
-        error("timeout after " .. maxFrames .. " frames waiting for " .. what, 0)
+        error("timeout after " .. maxFrames .. " frames waiting for " .. what
+          .. M.timeoutContext(), 0)
       end
       return "frame"
     end,
@@ -683,7 +734,8 @@ function M.driveUntil(pred, maxFrames, steps, what)
       end
       waited = waited + 1
       if waited > maxFrames then
-        error("timeout after " .. maxFrames .. " frames driving toward " .. what, 0)
+        error("timeout after " .. maxFrames .. " frames driving toward " .. what
+          .. M.timeoutContext(), 0)
       end
       local r = body:tick()
       if r == "done" then body:reset() end

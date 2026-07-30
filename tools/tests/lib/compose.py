@@ -784,12 +784,26 @@ def main() -> int:
         # generator+lib it was minted from (a drift the mint gate refreshes only
         # under `make frontier`, which `make test` never runs).  Non-fatal: the
         # print lands in the [ot6] log run.sh and suite.sh both surface.
+        # ...and record it in a table the LIB can read, so a wait that times
+        # out can name the fixture it booted and say that fixture was already
+        # known-stale.  A warning printed at frame 0 and a failure at frame 600
+        # are 600 frames of unrelated log apart, and the failure is the line
+        # someone reads: "timeout waiting for main menu" has already sent an
+        # agent looking for a menu bug that did not exist.  See M.timeoutContext
+        # in lib/ot6.lua.
+        flagged = {}
         for name in states:
             stale = stamp_check(name, ROOT)
             if stale:
+                flagged[name] = stale
                 preamble.append(f"-- WARNING (issue #2): {stale}\n")
                 preamble.append(f'print("[ot6] WARNING: {stale}")\n')
                 print(f"WARNING: {stale}")
+        if flagged:
+            preamble.append("OT6_STALE = {\n")
+            for name, stale in flagged.items():
+                preamble.append(f'  ["{name}"] = "{stale}",\n')
+            preamble.append("}\n")
 
     # OT6 symbol addresses: derive them from THIS TREE's ff6-en.dbg the same
     # way OT6_STATES embeds sidecars.  Only symbols the SCRIPT names via
