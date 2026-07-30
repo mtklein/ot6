@@ -90,7 +90,7 @@ it.
    (the 8th is a divine-tier finisher) plus up to 4 passives. No universal
    magic pool — nobody learns everything. **Signatures are birthrights:**
    each character's vanilla icon (Slots, Steal, Runic, Sketch, Capture, the
-   first Tool/Blitz/Bushido/Dance…) is skill #1, free, from the moment they
+   first Tool/Blitz/SwdTech/Dance…) is skill #1, free, from the moment they
    join. The divine slot holds a *new* apex expression of the character —
    never the identity itself.
 2. **Break or be broken.** Every enemy has shields and a hidden weakness
@@ -107,7 +107,7 @@ it.
 
 The fit is almost suspicious. Vanilla FF6 already ships **four perfect
 8-skill jobs**: Edgar has exactly 8 Tools, Sabin exactly 8 Blitzes, Cyan
-exactly 8 Bushido techniques, Mog exactly 8 Dances. Summons are already
+exactly 8 SwdTech techniques, Mog exactly 8 Dances. Summons are already
 once-per-battle (Octopath's divine-skill cadence). Espers already carry small
 spell lists — we just change "teaches permanently" to "grants while
 equipped." And Edgar's Debilitator already *sets elemental weaknesses on
@@ -121,7 +121,7 @@ enemies* — vanilla FF6 was flirting with this system in 1994.
 | Locke | Thief | Dagger | Wind | Steal grows into a full thief kit: Steal, Mug, armor/attack corrode, BP theft **(TBD)** |
 | Edgar | Machinist | Spear | Lightning | the 8 Tools, verbatim |
 | Sabin | Monk | Claw | Fire/Holy | the 8 Blitzes, selected from a menu |
-| Cyan | Samurai | Katana | — | the 8 Bushido, priced in BP (see below) |
+| Cyan | Samurai | Katana | — | the 8 SwdTech, priced in BP (see below) |
 | Celes | Rune Knight | Sword | Ice/Holy | Runic from the start (signature) + spells (see below) |
 | Gau | Beast Tamer | Fangs (innate) | Earth | Leap becomes Capture; controlled beast skills replace berserk Rage (see below) |
 | Setzer | Gambler/Merchant | Cards & dice | — | Slots from the start (signature); Coin Toss, Hired Help (pay GP for effects); divine is a new apex — Fixed Dice jackpot? **(TBD)** — never Slots itself |
@@ -144,7 +144,7 @@ two weakness bytes — one elemental (enemy records already store elemental
 weakness bits in vanilla), one weapon-class (new side table in expanded ROM).
 
 **Chip.** Any damaging hit that matches a weakness removes 1 shield.
-Multi-hit actions chip per hit — Edgar's AutoCrossbow and Cyan's Flurry
+Multi-hit actions chip per hit — Edgar's AutoCrossbow and Cyan's Quadra Slam
 become shield shredders, exactly the role multi-hits play in Octopath.
 
 **Break.** At 0 shields: the enemy's ATB resets and it's inflicted with a Broken
@@ -214,19 +214,19 @@ vanilla — is deleted. The 8 techniques are priced in BP:
 
 | # | Tech | BP |
 |---|---|---|
-| 1 | Fang | 0 |
-| 2 | Sky (counter stance) | 1 |
-| 3 | Tiger | 1 |
-| 4 | Flurry (4 hits — shield shredder) | 2 |
-| 5 | Dragon | 2 |
-| 6 | Eclipse | 3 |
-| 7 | Tempest | 3 |
-| 8 | Oblivion | 3, usable only on a Broken enemy (divine) |
+| 1 | Dispatch | 0 |
+| 2 | Retort (counter stance) | 1 |
+| 3 | Slash | 1 |
+| 4 | Quadra Slam (4 hits — shield shredder) | 2 |
+| 5 | Empowerer | 2 |
+| 6 | Stunner | 3 |
+| 7 | Quadra Slice | 3 |
+| 8 | Cleave | 3, usable only on a Broken enemy (divine) |
 
 Shipped (M3): there is no submenu. Boost *selects* the tech, the way it
 folds a mage's spell tier — the BP column above reads as a band, and
 vanilla's own count of techs known clamps each band to the best one Cyan
-has learned. Oblivion sits outside the ladder until divine gating exists.
+has learned. Cleave sits outside the ladder until divine gating exists.
 Mapping, consequences, and the reasoning: design/kits.md.
 
 Candidate passive: *Vengeance* — Cyan gains +1 BP whenever any enemy breaks.

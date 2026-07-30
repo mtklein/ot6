@@ -14,7 +14,7 @@
 --
 -- Sabin is INSTALLED into the opening guard fight the way battle_bushido pins
 -- Cyan -- every party slot gets CHAR::SABIN ($3ED8) and an all-Blitz command
--- list ($202E, stride 12).  Blitz needs no weapon flag (unlike Bushido: it is
+-- list ($202E, stride 12).  Blitz needs no weapon flag (unlike SwdTech: it is
 -- absent from UpdateCmdIDTbl, so it is never greyed).  The known-blitz set
 -- $1D28 is written DIRECTLY, so the test controls exactly which blitzes are
 -- learned -- the same byte the menu populates from and FixPlayerAttack reads.

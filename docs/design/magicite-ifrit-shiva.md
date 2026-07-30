@@ -186,7 +186,7 @@ What that party already brings:
 | bolt | **Ramuh** (Bolt + Rasp, `genju_prop.asm:82-83`) |
 | heal | **Kirin** (Cure/Regen/Antdot/Scan, `genju_prop.asm:138`) |
 | pierce chip | Locke, Edgar (AutoCrossbow ×4) |
-| slash chip | Celes, Cyan (Flurry ×4), Sabin-with-claws |
+| slash chip | Celes, Cyan (Quadra Slam ×4), Sabin-with-claws |
 | **MP sustain** | **nobody** |
 | **magic mitigation** | **nobody** (Celes's Safe is L22 and is physical mitigation) |
 
@@ -455,7 +455,7 @@ separate.** The summon rides vanilla's `$3f2e`; kit divines ride OT6's
 
 Reason: they are different resources. The summon lives on a transferable stone
 and costs MP; the divine is a permanent property of the character. Fusing them
-would mean **handing Cyan a magicite disables Oblivion**, which punishes the
+would mean **handing Cyan a magicite disables Cleave**, which punishes the
 sub-job system for being used — the opposite of what a sub-job should do. Two
 apex actions in one battle is a real power spike, so M6 measures it; if it is
 too much, the lever is the summon's MP cost, not the latch.
@@ -683,7 +683,7 @@ columns, and a blank line where the reason to equip him should be.
 
 ### 8.2 What to change
 
-Two edits, both C3 menu-bank work of the same shape as the Bushido submenu
+Two edits, both C3 menu-bank work of the same shape as the SwdTech submenu
 (kits.md, #8 Layer A) — i.e. real work, priced honestly:
 
 1. **Replace the learn-% column with the spell's MP cost.** The number a player

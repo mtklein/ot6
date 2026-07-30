@@ -19,11 +19,26 @@
 --     ListTextCmd_0f renders the battle Blitz list from), read here with
 --     H.sym + readRomByte rather than hardcoded, so a text re-encode cannot
 --     silently invalidate the expectation;
---   * the CLASS glyph is checked against Ot6ClassGlyphTbl read out of the ROM,
---     indexed by the class byte read out of Ot6SkillClassTbl -- the very table
---     the chip consults (ot6_break.asm:1266).  Pummel/Suplex/Bum Rush are the
---     only three classed Blitzes; the other five are asserted BLANK, because a
---     glyph there would advertise a chip they never land;
+--   * the PROBE ICON is checked against the same three ROM tables
+--     Ot6ElemGlyphFor walks -- MagicProp's element byte, then Ot6SkillClassTbl
+--     (the very table the chip consults, ot6_break.asm:1266) into
+--     Ot6ClassGlyphTbl.  Element first, class second, blank when neither.
+--
+--     #53 IS WHY THIS IS THREE TABLES AND NOT ONE.  Until it landed the column
+--     was CLASS-ONLY, and this test asserted five of the eight rows BLANK --
+--     correct for what the page could then draw, and wrong about the game:
+--     AuraBolt is holy, Fire Dance fire, Air Blade wind, and those three
+--     carried a real elemental probe the page could not show, because the
+--     element tiles were uploaded into the BATTLE font only.  The expectation
+--     changed here because the correct BEHAVIOUR changed, not to get green:
+--     the three rows are now asserted to carry their element, and only Mantra
+--     and Spiraler stay blank (neither element nor class -- honest).  Measured
+--     before and after on purpose-built ROMs, tools/tests/probe_fieldicons.lua.
+--
+--     Each named cell is ALSO checked to have art in the menu font's own vram
+--     copy, which is the half a tilemap assertion cannot see: a page can name
+--     $eb all day and $eb can be sixteen zero bytes, which is exactly the
+--     state the field font was in before #53;
 --   * the PRICE is checked against Ot6AbilityCostTbl, the table Ot6CostFor
 --     scans for the charge and for the battle row.  The numbers are read, not
 --     written down: a balance retune must not turn this test red, but a page
@@ -106,12 +121,33 @@ local function nameText(id)             -- for the log only
   return s
 end
 
--- Ot6SkillClassTbl: (id, class) pairs, $ff-terminated (ot6_class.asm:184).  The
--- class byte is a BIT mask and the first set bit indexes Ot6ClassGlyphTbl, which
--- is the same walk Ot6ToolListIcon_ext and the hud's weakness strip do.
+-- THE PROBE ICON (#53), derived here exactly as Ot6ElemGlyphFor derives it in
+-- the ROM: the ability's ELEMENT if it has one, else its BREAK CLASS, else
+-- blank.  Three tables, all read out of the ROM so a data edit cannot leave a
+-- stale expectation behind:
+--   * MagicProp record +1 is the element byte (battle_main.asm:7037, 14-byte
+--     records).  First set bit indexes Ot6ElemGlyphTbl.
+--   * Ot6SkillClassTbl: (id, class) pairs, $ff-terminated (ot6_class.asm:184).
+--     The class byte is a BIT mask and the first set bit indexes
+--     Ot6ClassGlyphTbl -- the same walk Ot6ToolListIcon_ext and the hud's
+--     weakness strip do.  Bit 7 is null-break: teaches nothing, shows nothing.
+-- Element BEFORE class is the design ("consult the class when the ability has
+-- no element"), and asserting it in that order here is what stops the page
+-- quietly reverting to #46's class-only answer: three Blitzes have an element
+-- AND no class, so a class-only page draws PAD on all three.
 local SKILLCLASS = H.sym("Ot6SkillClassTbl") & 0x3FFFFF
 local CLASSGLYPH = H.sym("Ot6ClassGlyphTbl") & 0x3FFFFF
-local function classGlyph(id)           -- -> glyph tile, or PAD for classless
+local ELEMGLYPH = H.sym("Ot6ElemGlyphTbl") & 0x3FFFFF
+local MAGICPROP = H.sym("MagicProp") & 0x3FFFFF
+local MAGICPROP_REC = 14
+local function firstBit(m)              -- bit mask -> index of its lowest set bit
+  local i = 0
+  while m & 1 == 0 do m = m >> 1; i = i + 1 end
+  return i
+end
+local function iconGlyph(id)            -- -> glyph tile, or PAD for neither
+  local e = H.readRomByte(MAGICPROP + id * MAGICPROP_REC + 1)
+  if e ~= 0 then return H.readRomByte(ELEMGLYPH + firstBit(e)) end
   local x = 0
   while true do
     local key = H.readRomByte(SKILLCLASS + x)
@@ -119,12 +155,25 @@ local function classGlyph(id)           -- -> glyph tile, or PAD for classless
     if key == id then
       local cls = H.readRomByte(SKILLCLASS + x + 1)
       if cls == 0 or cls >= 0x80 then return PAD end
-      local i = 0
-      while cls & 1 == 0 do cls = cls >> 1; i = i + 1 end
-      return H.readRomByte(CLASSGLYPH + i)
+      return H.readRomByte(CLASSGLYPH + firstBit(cls))
     end
     x = x + 2
   end
+end
+-- ... and the icon must be a cell the menu font actually HAS art in.  Before
+-- #53 the element tiles were uploaded for BATTLE only, so a field page asking
+-- for one drew a blank cell; this is the guard that the page and the font
+-- agree, checked against vram rather than against the source art.
+local ELEM_CELLS = {}
+for i = 0, 7 do ELEM_CELLS[H.readRomByte(ELEMGLYPH + i)] = i end
+local function fontCellHasArt(cellCode)
+  -- BG1's char base is word $5000 (hBG12NBA = $65, menu_init_2.asm:433) and the
+  -- menu's copy of the font is 4bpp there: 32 bytes per tile.
+  local base = 0x5000 * 2 + cellCode * 32
+  for i = 0, 31 do
+    if emu.read(base + i, emu.memType.snesVideoRam) ~= 0 then return true end
+  end
+  return false
 end
 
 -- Ot6AbilityCostTbl: (key, cost) pairs, $ff-terminated (ot6_boost.asm:671).
@@ -140,7 +189,7 @@ local function costOf(id)
 end
 
 -- ---- page geometry, mirroring skills.asm's Ot6BlitzPageDraw ----
-local NAME_COL, CLASS_COL, COST_COL = 3, 14, 16
+local NAME_COL, ICON_COL, COST_COL = 3, 14, 16
 local function blitzRow(i) return 1 + i * 2 end   -- ODD rows 1/3/5/../15 (#43)
 
 local function assertRun(x0, y, bytes, what)
@@ -223,9 +272,21 @@ end
 local function assertLearnedRow(i)
   local id, y = BLITZ_ATK0 + i, blitzRow(i)
   assertRun(NAME_COL, y, nameBytes(id), string.format("blitz %d name %s", i, nameText(id)))
-  H.assertEq(cell(CLASS_COL, y), classGlyph(id), string.format(
-    "blitz %d (%s) draws the break-class glyph Ot6SkillClassTbl + "
-    .. "Ot6ClassGlyphTbl give it, at {%d,%d}", i, nameText(id), CLASS_COL, y))
+  local want = iconGlyph(id)
+  H.assertEq(cell(ICON_COL, y), want, string.format(
+    "blitz %d (%s) draws the probe icon its own data gives it -- MagicProp's "
+    .. "element byte first, Ot6SkillClassTbl's break class second -- at {%d,%d}",
+    i, nameText(id), ICON_COL, y))
+  -- and the cell it named is one the FIELD font has art in (#53).  An element
+  -- icon is only a cue if the tile arrived: before #53 the page could name
+  -- $eb and the menu font's $eb was sixteen zero bytes.
+  if want ~= PAD then
+    H.assertEq(fontCellHasArt(want), true, string.format(
+      "blitz %d (%s) names font cell $%02x, so the MENU font must carry art "
+      .. "there -- %s", i, nameText(id), want,
+      ELEM_CELLS[want] and "an ELEMENT tile, uploaded by Ot6MenuIcons4bpp_ext"
+        or "a class glyph, which ships in the vanilla art"))
+  end
   -- the price, right-aligned two digits + " MP", against Ot6AbilityCostTbl
   local cost = costOf(id)
   H.assertEq(cost > 0, true, string.format(
@@ -252,8 +313,8 @@ local function assertLockedRow(i)
     "the locked marker must be exactly a name field wide, or learning a Blitz "
     .. "leaves the tail of the marker on screen")
   assertRun(NAME_COL, y, LOCKED, string.format("blitz %d '- LOCKED -'", i))
-  H.assertEq(cell(CLASS_COL, y), PAD, string.format(
-    "blitz %d is not learned, so it teaches no class at {%d,%d}", i, CLASS_COL, y))
+  H.assertEq(cell(ICON_COL, y), PAD, string.format(
+    "blitz %d is not learned, so it advertises no probe at {%d,%d}", i, ICON_COL, y))
   for x = COST_COL, COST_COL + 4 do
     H.assertEq(cell(x, y), PAD, string.format(
       "blitz %d is not learned, so it carries no price at {%d,%d}", i, x, y))
@@ -300,12 +361,30 @@ H.run({ maxFrames = 30000 }, {
       local c = costOf(BLITZ_ATK0 + i)
       if c > 0 and c < 10 then lo = lo + 1 end
       if c >= 10 then hi = hi + 1 end
-      H.log(string.format("blitz %d %s costs %d MP, class glyph $%02x",
-        i, nameText(BLITZ_ATK0 + i), c, classGlyph(BLITZ_ATK0 + i)))
+      H.log(string.format("blitz %d %s costs %d MP, probe icon $%02x",
+        i, nameText(BLITZ_ATK0 + i), c, iconGlyph(BLITZ_ATK0 + i)))
     end
     H.assertEq(lo > 0 and hi > 0, true,
       "the Blitz ladder spans one- and two-digit prices, so this page's "
       .. "right-aligned two-digit field is doing real work")
+    -- #53's shape check, so the icon assertions above cannot all be vacuous.
+    -- The ladder must contain at least one ELEMENT row, one CLASS row and one
+    -- BLANK row, or the column is only ever exercised on one of its three
+    -- answers.  Counted from the ROM, so a data retune moves the numbers and
+    -- not the property.
+    local nElem, nClass, nBlank = 0, 0, 0
+    for i = 0, 7 do
+      local g = iconGlyph(BLITZ_ATK0 + i)
+      if g == PAD then nBlank = nBlank + 1
+      elseif ELEM_CELLS[g] then nElem = nElem + 1
+      else nClass = nClass + 1 end
+    end
+    H.log(string.format("ladder icons: %d element, %d class, %d blank",
+      nElem, nClass, nBlank))
+    H.assertEq(nElem > 0 and nClass > 0 and nBlank > 0, true,
+      "the Blitz ladder must exercise all three answers of the icon column -- "
+      .. "element, break class, and honestly nothing -- or the assertions "
+      .. "below only ever test one of them")
   end),
 
   -- the player's path: X -> main menu -> Skills -> lead character -> submenu

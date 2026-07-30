@@ -34,7 +34,7 @@ axes: Octopath's exact count.
   of non-elemental magic. A per-weapon/per-skill flag: the wildest
   oddballs (Fixed Dice…) roll huge and teach nothing, while ordinary
   ¤ weapons chip Special-weak enemies.
-- Cyan is a slashing *specialist* (Flurry ×4 is the best slash chip
+- Cyan is a slashing *specialist* (Quadra Slam ×4 is the best slash chip
   in the game), never the only slashing key — Terra/Celes swords
   cover the class when he's absent. Class-coverage balance stays a
   standing question we re-ask every milestone ✦.
@@ -122,7 +122,7 @@ A weapon chips **its class, plus its element if it has one** ✦ — a
 Flame Knife is a piercing probe and a fire probe in one swing. In
 vanilla, elemental weapons rotate in and out on raw stats; here every
 chest and shop upgrade is a tactical acquisition. Multi-hit actions
-chip per hit ✦ (AutoCrossbow, Flurry, boosted Fight).
+chip per hit ✦ (AutoCrossbow, Quadra Slam, boosted Fight).
 
 ## Skills carry their own class ✦
 

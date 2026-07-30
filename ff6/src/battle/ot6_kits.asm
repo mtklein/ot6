@@ -479,63 +479,26 @@ done:   plp
 
 ; ------------------------------------------------------------------------------
 
-; [ #46: an ability's BREAK CLASS glyph, for a field-menu list ]
+; [ #46, RETIRED by #53: an ability's BREAK CLASS glyph, for a field-menu list ]
 ;
-; The field Skills->Blitz page needs the same "what does this chip with" cue the
-; battle surfaces already carry, and it must be a CLASS glyph specifically:
-; Ot6ClassGlyphTbl's four cells ($d9 sword / $da spear / $dc staff / $df
-; sparkle) ship IN the vanilla font, which is why the tools list can stamp them
-; in battle (Ot6ToolListIcon_ext) and why the item names in the field menu can
-; carry them as their leading character (item_name_en.json's {sword}/{spear}/
-; {staff}/{special} escapes, small_symbols_en.json:0xD9-0xDF).  The ELEMENT
-; icons beside them in Ot6ElemGlyphTbl do NOT: they are uploaded into the battle
-; small font by Ot6LoadFontIcons_ext from LoadMenuGfx (btlgfx_main.asm:8911) and
-; nothing uploads them for the field menu, so a field page that asked for one
-; would draw whatever vanilla glyph happens to live in that cell.  Hence class
-; only, and hence this proc rather than a jsl to Ot6ElemGlyphFor -- which
-; deliberately prefers the element and is an rts leaf besides.
+; This proc gave the field Skills->Blitz page a class glyph and NOTHING ELSE,
+; for one reason: the ELEMENT icons in Ot6ElemGlyphTbl lived only in the battle
+; small font (uploaded by Ot6LoadFontIcons_ext from LoadMenuGfx,
+; btlgfx_main.asm:8911), while the four CLASS cells ($d9 sword / $da spear /
+; $dc staff / $df sparkle) ship in the vanilla font art itself -- which is also
+; how item names in the field menu wear them as a leading character
+; (item_name_en.json's {sword}/{spear}/{staff}/{special}, small_symbols_en
+; .json:0xD9-0xDF).  So a field page asking for an element drew whatever
+; occupied that cell, and #46 deliberately did not ask.
 ;
-; A class-less ability draws nothing.  That is the same answer Ot6ToolListIcon_ext
-; gives a classless tool (:374) and it is honest: five of the eight Blitzes
-; (AuraBolt, Fire Dance, Mantra, Air Blade, Spiraler) carry no entry in
-; Ot6SkillClassTbl at all -- they probe by element, not by class, so a class
-; glyph on their row would advertise a chip they never land.
-;
-; in: A = attack id.  out: A = class glyph tile, or $ff when the ability
-; teaches no class.  preserves X and Y.  rtl.
-.proc Ot6SkillClassGlyph
-        .a8
-        .i16
-        phx
-        pha                     ; park the id to match against each table key
-        ldx     #$0000
-@scan:  lda     f:Ot6SkillClassTbl,x
-        cmp     #$ff
-        beq     @none           ; end of table: the ability is classless
-        cmp     $01,s           ; table key vs the parked id
-        beq     @found
-        inx
-        inx                     ; 2-byte records: id, class
-        bra     @scan
-@found: lda     f:Ot6SkillClassTbl+1,x
-        beq     @none           ; no class bit set
-        bmi     @none           ; null-break: teaches nothing, shows nothing
-        ldx     #$0000
-@bit:   lsr                     ; first set bit wins, as everywhere else
-        bcs     @glyph
-        inx
-        bra     @bit
-@glyph: lda     f:Ot6ClassGlyphTbl,x
-        sta     $01,s           ; overwrite the parked id with its glyph
-        pla
-        plx
-        rtl
-@none:  lda     #$ff            ; the blank tile: still DRAWN, so a redraw wipes
-        sta     $01,s
-        pla
-        plx
-        rtl
-.endproc
+; #53 uploads the eight element tiles into the menu font as well
+; (Ot6MenuIcons4bpp_ext / Ot6MenuIcons2bpp_ext, ot6_icons.asm), which removes
+; the only reason this existed.  The page calls Ot6SkillIconGlyph now -- the
+; rtl wrapper over Ot6ElemGlyphFor, i.e. the SAME leaf the battle ability lists
+; decide their icon with.  This body is gone rather than left unreferenced on
+; purpose: a second glyph leaf that disagreed with the first is exactly the
+; trap #56 had to clean up after two MP-price drawers drifted apart, and
+; keeping a class-only copy around invites a third page to pick it up.
 
 ; ------------------------------------------------------------------------------
 
