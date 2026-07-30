@@ -6,11 +6,11 @@
 ;
 ; WHY THAT READ IS SAFE FROM BATTLE CONTEXT (issue #29, audited 2026-07-28).
 ; $021f is a menu-module variable, and Ot6CodexActive's callers all run in
-; battle (ot6_break.asm:86/:849/:949) -- so the guarantee is not "the menu
+; battle (ot6_break.asm:155/:884/:992) -- so the guarantee is not "the menu
 ; owns it", it is "nothing else ever writes it":
 ;   * it has exactly four writers, all lifecycle moments: New Game
-;     (menu/menu_common.asm:250, menu/field_menu.asm:2925), validated load
-;     confirm (menu/field_menu.asm:2963), and save (menu/save.asm:50, the
+;     (menu/menu_common.asm:250, menu/field_menu.asm:2756), validated load
+;     confirm (menu/field_menu.asm:2794), and save (menu/save.asm:50, the
 ;     OT6 line that makes a first save leave the transient page);
 ;   * the world module's direct-page swap covers $0000-$00FF only
 ;     (world/init.asm:1446-1516 PushDP/PopDP) and its mode-7 var block is
@@ -18,7 +18,7 @@
 ;     the world->battle path (world/move.asm:860-940) restores DP before
 ;     Battle_ext without touching it;
 ;   * the menu's own live clock stops one byte short: wGameTimeHours..
-;     Frames are $021b-$021e, ticked 8-bit (menu/menu_common.asm:3493-3522
+;     Frames are $021b-$021e, ticked 8-bit (IncGameTime, menu_common.asm:3522-3546
 ;     under .a8), so the tick never carries into $021f.
 ; Measured per module (probe drives, 2026-07-28): the cell held the
 ; lifecycle value at every consumer read across field/world/battle/menu,

@@ -1325,7 +1325,7 @@ Ot6ThiefCostTbl:
 ; (magic_prop_en.dat +$05, id $2b), so the anchor is the series' own ceiling
 ; rather than an imported one.  And it is a HARD DISPLAY limit: every OT6 price
 ; drawer renders TWO digits -- ListText cmd $02 (btlgfx_main.asm:15045-15073)
-; divides by ten exactly once, and Ot6LoadoutDrawCost (field_menu.asm:3053)
+; divides by ten exactly once, and Ot6LoadoutDrawCost (ot6_loadout_page.asm:375)
 ; has one tens loop -- so 100 would print as garbage, not as a big number.
 ;
 ; WHAT THE ANCHOR CHANGED, AND WHAT IT DELIBERATELY DID NOT.  Rows 6/7/8 of
