@@ -12,7 +12,14 @@
 -- The Continue sequence is gen_vector_doorstep.lua's.  The party is LOCKE
 -- CELES SABIN EDGAR on the world map at (137,203); the field menu opens from
 -- the world map exactly as from a field map.  The esper inventory is pinned
--- to exactly IFRIT (+5 vigor) and TERRATO (no mod) as in the suite test.
+-- to exactly IFRIT and TERRATO (no mod) as in the suite test.
+--
+-- #62 rebuilt what this asserts: Ot6EsperStatTbl is now two bytes per esper in
+-- vanilla's equipment layout (four SIGNED nibbles), so the single
+-- "While worn...<Stat> + N" line at row 27 became a caption on the title row
+-- plus one term per nonzero delta packed down from row 17.  Ifrit's row is
+-- +6 vigor / +4 stamina / -3 mag.pwr -- three terms and a minus sign.  The
+-- assertions here track menu_esperdetail.lua's cell for cell.
 -- OT6_ANCHOR_LAYOUT: ot6-codex-o8-v1
 local H = dofile("tools/tests/lib/ot6.lua")
 
@@ -30,8 +37,18 @@ local IFRIT, TERRATO = 1, 4
 local BG1B = 0x4049
 local function cell(x, y) return H.readByte(BG1B + x * 2 + y * 64) end
 
-local CH_W, CH_PLUS, CH_5 = 0x96, 0xca, 0xb9
+local CH_W, CH_PLUS, CH_MINUS, CH_DOT, CH_PCT, CH_COLON =
+  0x96, 0xca, 0xc4, 0xc5, 0xcd, 0xc1
 local BLANK = 0xff
+local function digit(n) return 0xb4 + n end      -- '0' = $b4 .. '9' = $bd
+
+-- Stat name tiles, verbatim from menu_text_en.inc.raw:111-114 (7 tiles each).
+local STAT = {
+  VIGOR   = { 0x95, 0xa2, 0xa0, 0xa8, 0xab, 0xff, 0xff },
+  SPEED   = { 0x92, 0xa9, 0x9e, 0x9e, 0x9d, 0xff, 0xff },
+  STAMINA = { 0x92, 0xad, 0x9a, 0xa6, 0xa2, 0xa7, 0x9a },
+  MAGPWR  = { 0x8c, 0x9a, 0xa0, 0xc5, 0x8f, 0xb0, 0xab },
+}
 
 local function st() return H.readByte(ZMENUSTATE) end
 
@@ -71,13 +88,64 @@ local function listSeek(idx, what)
   }, what)
 end
 
+-- #62 took over cols 18-27 of the spell rows and cols 13-28 of the title row,
+-- so the cells the old form of this check used there are replaced by a stronger
+-- statement of the same class: neither the percent glyph nor the learn-rate
+-- colon may appear ANYWHERE in the window's rows.
 local function assertDeadColumnsGone(tag)
-  H.assertEq(cell(13, 15), BLANK, tag .. ": no Learn.Rate caption at {13,15}")
-  H.assertEq(cell(24, 15), BLANK, tag .. ": no Skill caption at {24,15}")
   H.assertEq(cell(12, 17), BLANK, tag .. ": no rate colon after spell 1's name")
-  H.assertEq(cell(16, 17), BLANK, tag .. ": no {times}NN rate after spell 1")
-  H.assertEq(cell(26, 17), BLANK, tag .. ": no Skill%% digits at {26,17}")
-  H.assertEq(cell(27, 17), BLANK, tag .. ": no percent sign at {27,17}")
+  for y = 15, 27, 2 do
+    for x = 0, 31 do
+      H.assertEq(cell(x, y) ~= CH_PCT, true,
+        string.format("%s: no percent glyph in the window {%d,%d}", tag, x, y))
+      H.assertEq(cell(x, y) ~= CH_COLON, true,
+        string.format("%s: no learn-rate colon in the window {%d,%d}", tag, x, y))
+    end
+  end
+end
+
+local function assertCaption(tag, present)
+  if present then
+    H.assertEq(cell(13, 15), BLANK, tag .. ": caption pad blank at {13,15}")
+    H.assertEq(cell(14, 15), BLANK, tag .. ": caption pad blank at {14,15}")
+    H.assertEq(cell(15, 15), CH_W, tag .. ": 'While worn...' starts at {15,15}")
+    H.assertEq(cell(27, 15), CH_DOT, tag .. ": caption ends at {27,15}")
+  else
+    for x = 13, 28 do
+      H.assertEq(cell(x, 15), BLANK,
+        string.format("%s: no caption at all -- {%d,15} blank", tag, x))
+    end
+  end
+end
+
+local function assertTerm(tag, slot, statTiles, statName, sign, magnitude)
+  local y = 17 + slot * 2
+  for k = 0, 6 do
+    H.assertEq(cell(18 + k, y), statTiles[k + 1],
+      string.format("%s: term %d '%s' tile %d at {%d,%d}",
+        tag, slot, statName, k, 18 + k, y))
+  end
+  H.assertEq(cell(25, y), sign,
+    string.format("%s: term %d sign at {25,%d}", tag, slot, y))
+  H.assertEq(cell(26, y), BLANK,
+    string.format("%s: term %d leading zero blanked at {26,%d}", tag, slot, y))
+  H.assertEq(cell(27, y), digit(magnitude),
+    string.format("%s: term %d magnitude %d at {27,%d}", tag, slot, magnitude, y))
+end
+
+local function assertTermRowBlank(tag, slot)
+  local y = 17 + slot * 2
+  for x = 18, 27 do
+    H.assertEq(cell(x, y), BLANK,
+      string.format("%s: unused term row %d blank at {%d,%d}", tag, slot, x, y))
+  end
+end
+
+local function assertOldLineGone(tag)
+  for x = 5, 27 do
+    H.assertEq(cell(x, 27), BLANK,
+      string.format("%s: #27's old row-27 line cleared at {%d,27}", tag, x))
+  end
 end
 
 H.run({ maxFrames = 80000 }, {
@@ -144,11 +212,15 @@ H.run({ maxFrames = 80000 }, {
     H.assertEq(H.readByte(Z99), IFRIT, "detail page is IFRIT's")
     assertDeadColumnsGone("ifrit")
     H.assertEq(cell(5, 17) ~= BLANK, true, "ifrit: spell 1 name drawn at {5,17}")
-    H.assertEq(cell(5, 27), CH_W, "ifrit: While worn... starts at {5,27}")
-    H.assertEq(cell(25, 27), CH_PLUS, "ifrit: '+' at {25,27}")
-    H.assertEq(cell(27, 27), CH_5, "ifrit: magnitude 5 at {27,27}")
+    assertCaption("ifrit", true)
+    assertTerm("ifrit", 0, STAT.VIGOR,   "Vigor",   CH_PLUS,  6)
+    assertTerm("ifrit", 1, STAT.STAMINA, "Stamina", CH_PLUS,  4)
+    assertTerm("ifrit", 2, STAT.MAGPWR,  "Mag.Pwr", CH_MINUS, 3)
+    assertTermRowBlank("ifrit", 3)
+    assertTermRowBlank("ifrit", 4)
+    assertOldLineGone("ifrit")
     H.screenshot("esper_detail_ifrit_anchor")
-    H.log("IFRIT: dead columns gone, 'While worn...Vigor + 5' drawn")
+    H.log("IFRIT: dead columns gone; Vigor +6 / Stamina +4 / Mag.Pwr -3 drawn")
   end),
 
   H.pressButtons({ "b" }, 2),
@@ -166,12 +238,11 @@ H.run({ maxFrames = 80000 }, {
     H.assertEq(H.readByte(Z99), TERRATO, "detail page is TERRATO's")
     assertDeadColumnsGone("terrato")
     H.assertEq(cell(5, 17) ~= BLANK, true, "terrato: spell 1 name drawn at {5,17}")
-    for x = 5, 27 do
-      H.assertEq(cell(x, 27), BLANK,
-        string.format("terrato: while-worn line blank at {%d,27}", x))
-    end
+    assertCaption("terrato", false)
+    for slot = 0, 4 do assertTermRowBlank("terrato", slot) end
+    assertOldLineGone("terrato")
     H.screenshot("esper_detail_terrato_anchor")
-    H.log("TERRATO: page clean in the no-mod state, stat line fully blank")
+    H.log("TERRATO: page clean in the no-mod state -- no caption, no terms")
   end),
 
   H.call(function()

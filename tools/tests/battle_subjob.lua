@@ -25,9 +25,18 @@
 --               at vanilla MP (no double-charge); the summon slot is registered.
 --   C FOLD      a granted Bolt cast with 2 BP executes as Bolt3 ($0b) via the fold
 --               and is charged base-Bolt MP -- which also proves it is CASTABLE.
---   D DELETIONS win a level-up with Ramuh: no esper stat bonus (Stamina flat --
---               vanilla Ramuh's STAMINA_1 would bump it) and no spell learned
---               (Bolt/Rasp stay unlearned in $1a6e).
+--   D DELETIONS win a level-up with Ramuh: no esper stat bonus (Stamina AND
+--               Mag.Pwr both flat in the persistent record -- vanilla Ramuh's
+--               STAMINA_1 would bump stamina) and no spell learned (Bolt/Rasp
+--               stay unlearned in $1a6e).
+--
+-- #62 strengthened D's stat half.  Ramuh's Ot6EsperStatTbl row used to move ONE
+-- stat (+3 stamina) while worn; it now moves TWO (+4 stamina, +2 mag.pwr), and
+-- the table is two signed bytes per esper in vanilla's equipment layout.  The
+-- while-worn model says NEITHER may ever reach the $16xx record, so D now reads
+-- both $161c and $161d.  That is two independent windows onto the same rule
+-- instead of one: a regression that wrote the mod through to the record would
+-- have to fail both to slip past.
 local H = dofile("tools/tests/lib/ot6.lua")
 local STATE = "build/states/battle_doorstep.mss.lua"
 
@@ -36,6 +45,8 @@ local LIST0  = 0x208e           -- slot 0 spell/lore list, 4-byte records
 local ESPER0 = 0x161e           -- char 0 equipped esper (field record offset 0)
 local KNOWN0 = 0x1a6e           -- char 0 learned table ($ff = learned)
 local STAM0  = 0x161c           -- char 0 stamina (record offset 0)
+local MAGP0  = 0x161d           -- char 0 mag.pwr  (#62: Ramuh moves this too,
+                                --   while worn -- so it must ALSO stay flat)
 local LEVEL0, XP0 = 0x1608, 0x1611
 
 local function listSet()
@@ -77,7 +88,7 @@ end
 
 local baseSet                    -- scenario A's list, carried into B
 local spells = {}                -- attack ids that reached $3410 (last spell used)
-local terra, mp0, hp0, stam0, lvl0
+local terra, mp0, hp0, stam0, magp0, lvl0
 
 H.run({ maxFrames = 120000 }, {
   ----------------------------------------------------------------- A: NEGATIVE --
@@ -238,24 +249,32 @@ H.run({ maxFrames = 120000 }, {
   H.waitFrames(120),
   H.call(function()
     stam0 = H.readByte(STAM0)
+    magp0 = H.readByte(MAGP0)
     lvl0 = H.readByte(LEVEL0)
     -- precondition: Terra does not innately know Bolt/Rasp, so "still unlearned"
     -- after the win is meaningful.
     H.assertEq(H.readByte(KNOWN0 + BOLT) ~= 0xff, true, "Bolt unlearned before win (control)")
     H.assertEq(H.readByte(KNOWN0 + RASP) ~= 0xff, true, "Rasp unlearned before win (control)")
     setXp(neededXp(lvl0) + 4)                     -- one threshold over -> a level
-    H.log(string.format("[D] L=%d stamina=%d, xp pinned one level over", lvl0, stam0))
+    H.log(string.format("[D] L=%d stamina=%d mag.pwr=%d, xp pinned one level over",
+      lvl0, stam0, magp0))
   end),
   H.clearBattle(20000),
   H.waitFrames(40),
   H.call(function()
     local lvl1 = H.readByte(LEVEL0)
     local stam1 = H.readByte(STAM0)
-    H.log(string.format("[D] after win: L %d->%d  stamina %d->%d", lvl0, lvl1, stam0, stam1))
+    local magp1 = H.readByte(MAGP0)
+    H.log(string.format("[D] after win: L %d->%d  stamina %d->%d  mag.pwr %d->%d",
+      lvl0, lvl1, stam0, stam1, magp0, magp1))
     H.assertEq(lvl1 > lvl0, true, "leveled up (the mechanism ran)")
     -- deletion #3: vanilla Ramuh's STAMINA_1 would raise stamina on the level; the
     -- stripped ($ff) bonus is bmi-skipped, so stamina is flat.
     H.assertEq(stam1, stam0, "no esper level-up stat bonus (Stamina flat)")
+    -- #62: and the while-worn mod's SECOND stat is equally absent from the
+    -- record.  Ramuh grants +2 mag.pwr while worn; if the mod ever leaked into
+    -- $161d this is where it would show.
+    H.assertEq(magp1, magp0, "the while-worn mod never reaches the record (Mag.Pwr flat)")
     -- deletion #2: rate-0 learning means the win teaches nothing (IncLearnMagic
     -- returns on 0%); Bolt/Rasp are still granted-only, not written to $1a6e.
     H.assertEq(H.readByte(KNOWN0 + BOLT) ~= 0xff, true, "Bolt not permanently learned")

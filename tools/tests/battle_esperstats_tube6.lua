@@ -193,20 +193,33 @@ local function checkBase()
   end)
 end
 
-local function checkEsper(tag, esper, stat, delta, grants, absents)
+-- #62: `deltas` is a table keyed stam/mag/spd/vig, replacing the old single
+-- (stat, delta) pair, because Ot6EsperStatTbl now carries four SIGNED nibbles per
+-- esper instead of one unsigned selector+magnitude.  A key left out means
+-- "expected FLAT", so all four stats are still asserted on every scenario -- the
+-- old flatness check is this same assertion with three zeros, and this form can
+-- additionally say "this stat must go DOWN", which the old one could not express
+-- at all.  vig deltas are given DOUBLED, as $3b2c stores them.
+local function checkEsper(tag, esper, deltas, grants, absents)
   return H.call(function()
     local b, r = R.base, R[tag]
     -- Positive control: list record 0 really is the esper row (its id byte is
     -- the esper INDEX).  This is what licenses the union starting at record 1.
     H.assertEq(r.row0, esper, "[" .. tag .. "] list record 0 holds the esper index")
-    -- The selected stat bumps by exactly delta; the other THREE stay flat,
-    -- which proves the selector decode touched only its target.
     local now = { stam = r.stam, mag = r.mag, spd = r.spd, vig = r.vig }
     local was = { stam = b.stam, mag = b.mag, spd = b.spd, vig = b.vig }
-    for k, v in pairs(now) do
-      local want = was[k] + (k == stat and delta or 0)
-      H.assertEq(v, want, string.format("[%s] %s %d -> %d (want %+d on %s)",
-        tag, k, was[k], v, (k == stat and delta or 0), k))
+    for _, k in ipairs({ "stam", "mag", "spd", "vig" }) do
+      local d = deltas[k] or 0
+      H.assertEq(now[k], was[k] + d, string.format("[%s] %s %d -> %d (want %+d)",
+        tag, k, was[k], now[k], d))
+    end
+    -- A scenario expecting a NEGATIVE delta must see the stat actually drop: a
+    -- build whose sign nibble decoded as zero would otherwise pass as "flat".
+    for k, d in pairs(deltas) do
+      if d < 0 then
+        H.assertEq(now[k] < was[k], true,
+          string.format("[%s] %s really DROPPED (%d -> %d)", tag, k, was[k], now[k]))
+      end
     end
     for _, g in ipairs(grants) do
       H.assertEq(has(r.union, g[1]), true, "[" .. tag .. "] grants " .. g[2])
@@ -223,52 +236,64 @@ local function add(list) for _, s in ipairs(list) do all[#all + 1] = s end end
 
 add(driveSteps("base", nil));  add({ checkBase() })
 
--- MADUIN -- "the Trinity", +5 mag.pwr (THE CROWN, the story ladder's one
--- exception).  All three grants are fold BASE tiers; the three pre-folded
--- tiers the vanilla row carried are the broken-row fix.  Fire is present but
--- innate here, so Ice and Bolt are the proof.
+-- MADUIN -- "the Trinity", THE CROWN, on #62's BOSS rung: +7 mag.pwr (the
+-- encoding's ceiling AND vanilla's own per-stat ceiling), +3 stamina, -3 vigor
+-- (-6 doubled) because Terra's inheritance is a mage's.  All three grants are
+-- fold BASE tiers; the three pre-folded tiers the vanilla row carried are the
+-- broken-row fix.  Fire is present but innate here, so Ice and Bolt are proof.
 add(driveSteps("maduin", MADUIN))
-add({ checkEsper("maduin", MADUIN, "mag", 5,
+add({ checkEsper("maduin", MADUIN, { mag = 7, stam = 3, vig = -6 },
   { { FIRE, "Fire (base tier; innate here, corroboration)" },
     { ICE, "Ice (base tier)" }, { BOLT, "Bolt (base tier)" } },
   { { FIRE2, "Fire2 (dead pre-folded tier -- BROKEN ROW FIX)" },
     { ICE2, "Ice2 (dead pre-folded tier -- BROKEN ROW FIX)" },
     { BOLT2, "Bolt2 (dead pre-folded tier -- BROKEN ROW FIX)" } }) })
 
--- SHOAT -- "the Gorgon Eye", +3 speed.  Bio absent is the broken-row fix.
+-- SHOAT -- "the Gorgon Eye", STORY rung: +6 speed, +2 stamina, -2 vigor
+-- (-4 doubled) -- the Eye is a stare, not a strike.  Bio absent is the
+-- broken-row fix.
 add(driveSteps("shoat", SHOAT))
-add({ checkEsper("shoat", SHOAT, "spd", 3,
+add({ checkEsper("shoat", SHOAT, { spd = 6, stam = 2, vig = -4 },
   { { BREAK, "Break" }, { DOOM, "Doom" } },
   { { BIO, "Bio (pre-folded poison cap -- BROKEN ROW FIX)" } }) })
 
--- BISMARK -- "the Tide", +4 vigor, read doubled as +8 at $3b2c.  Life absent
--- is the kits.md:262-263 revival rule, asserted.  Fire is NOT in the absent
--- list -- see the header; Ice and Bolt carry the "Maduin's job" deletion.
+-- BISMARK -- "the Tide", STORY rung: +5 vigor (+10 doubled), +3 stamina, and
+-- -2 SPEED -- the leviathan is mass, and -2 speed on a heavy thing is Iron
+-- Armor's own shape (the only non-curse negative in all 256 vanilla item
+-- records).  Life absent is the kits.md:262-263 revival rule, asserted.  Fire
+-- is NOT in the absent list -- see the header; Ice and Bolt carry the "Maduin's
+-- job" deletion.
 add(driveSteps("bismark", BISMARK))
-add({ checkEsper("bismark", BISMARK, "vig", 8,
+add({ checkEsper("bismark", BISMARK, { vig = 10, stam = 3, spd = -2 },
   { { HASTE, "Haste (fold base)" }, { SLOW, "Slow (fold base)" } },
   { { LIFE, "Life (kits.md revival rule -- BROKEN ROW FIX)" },
     { ICE, "Ice (Maduin's job)" }, { BOLT, "Bolt (Maduin's job)" } }) })
 
--- CARBUNKL -- "the Facet", +4 stamina.
+-- CARBUNKL -- "the Facet", STORY rung: +6 stamina (the wall stone's stat),
+-- +2 mag.pwr, -2 speed because a gem is inert.
 add(driveSteps("carbunkl", CARBUNKL))
-add({ checkEsper("carbunkl", CARBUNKL, "stam", 4,
+add({ checkEsper("carbunkl", CARBUNKL, { stam = 6, mag = 2, spd = -2 },
   { { RFLECT, "Rflect" }, { SAFE, "Safe" } },
   { { WARP, "Warp (field furniture)" }, { SHELL, "Shell (Shiva's)" },
     { HASTE, "Haste (moved to Bismark)" } }) })
 
--- PHANTOM -- "the Ghostwalk", +4 speed.
+-- PHANTOM -- "the Ghostwalk", STORY rung: +6 speed, +2 mag.pwr, -2 stamina
+-- because a ghost has no body.  Shares Shoat's +6 speed LEAD deliberately and
+-- separates on the second stat and the downside -- six stones need six reasons
+-- to swap, not six distinct leads (magicite-tube-six.md §3).
 add(driveSteps("phantom", PHANTOM))
-add({ checkEsper("phantom", PHANTOM, "spd", 4,
+add({ checkEsper("phantom", PHANTOM, { spd = 6, mag = 2, stam = -2 },
   { { VANISH, "Vanish" }, { DEMI, "Demi" } },
   { { BSERK, "Bserk (removes player control -- the Ifrit reason)" } }) })
 
--- UNICORN -- "the Purity", +3 stamina.  Pearl is BRANCH A of the cross-doc
+-- UNICORN -- "the Purity", STORY rung and deliberately its SMALLEST package
+-- with NO downside: +5 stamina, +2 mag.pwr.  The Pearl grant is where his power
+-- is, and the protector does not ask for a sacrifice.  Pearl is BRANCH A of the cross-doc
 -- holy decision, DECIDED by the dispatcher (magicite-tube-six.md §9): if this
 -- row is ever reverted to branch B, this assertion is the thing that has to be
 -- consciously edited.
 add(driveSteps("unicorn", UNICORN))
-add({ checkEsper("unicorn", UNICORN, "stam", 3,
+add({ checkEsper("unicorn", UNICORN, { stam = 5, mag = 2 },
   { { PEARL, "Pearl (branch A -- the paladin's smite)" }, { REMEDY, "Remedy" } },
   { { CURE2, "Cure2 (dead pre-folded tier)" }, { SAFE, "Safe (-> Carbunkl)" },
     { SHELL, "Shell (Shiva's)" }, { DISPEL, "Dispel (branch B's row)" } }) })
