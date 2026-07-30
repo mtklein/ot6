@@ -89,7 +89,7 @@ OT6_SLOTTIER         := $57ba   ; Slot's latched boost tier (#31 backfill):
                                 ;   Ot6SlotRig, re-banked into
                                 ;   OT6_BOOST_REVEALED by Ot6SlotCommit so
                                 ;   Ot6ActionEnd charges what the reels
-                                ;   delivered (ot6_kits.asm, the Slot strip)
+                                ;   delivered (ot6_slot.asm, the Slot strip)
 OT6_PIPTAIL          := $57bb   ; #33: frames of live pip painting left after
                                 ;   an ActionEnd with the battle menu closed
                                 ;   -- keeps the charge visible on its own
@@ -144,6 +144,14 @@ OT6_WALLETSIGP       := $ed6f   ;   when CUR or SIG moves (see the flush)
 OT6_PIPSLOT          := $ed6b   ; #33: the character slot the live pip cell
                                 ;   follows while OT6_PIPTAIL runs -- the one
                                 ;   who just spent BP (Ot6ActionEnd sets both)
+; The wallet's five glyph|attr words are written UNROLLED (OT6_WALLETCELLS+0
+; through +9, ot6_hud.asm:1474-1516), so nothing in the code ever mentions the
+; width -- which is exactly how OT6_WALLET_W ended up a comment-only symbol,
+; and how a sixth cell could be added there without anyone noticing that the
+; run ends flush against OT6_PIPSLOT with zero slack.  This is the check that
+; would have said so.  Equality is the current, intended fit ($ed61 + 10 =
+; $ed6b), so the bound is <=, not <.
+.assert OT6_WALLETCELLS + OT6_WALLET_W * 2 <= OT6_PIPSLOT, error, "OT6 wallet cells run into OT6_PIPSLOT"
 OT6_RAGETIER         := $ed73   ; #40: the boost tier latched at Cmd_10 for the
                                 ;   whole trance (Slot's OT6_SLOTTIER pattern at
                                 ;   longer range -- BP is spent once at the

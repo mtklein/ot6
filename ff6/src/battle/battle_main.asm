@@ -1006,7 +1006,7 @@ RandRage:
         ; RandCarry's own carry straight back and draws nothing extra, so an
         ; unboosted rage walks the vanilla RNG stream byte for byte; tiers 1/2
         ; spend one draw against a threshold, tier 3 forces the special.  See
-        ; Ot6RageCoin (ot6_kits.asm) for the ladder and the width contract.
+        ; Ot6RageCoin (ot6_rage.asm) for the ladder and the width contract.
         jsl     Ot6RageCoin
         longai
         rol                 ; 1/2 chance first or second attack will be chosen

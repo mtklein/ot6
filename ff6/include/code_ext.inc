@@ -103,7 +103,6 @@ OT6_SM_NEG = $8
 .global Ot6DanceRowDecorate      ; #34: DrawDanceListText's per-row MP cost
                                  ;   (flat Ot6DanceCost; ALWAYS defined, the
                                  ;   stock C1 object jsl's it in both builds)
-.global Ot6BoostMarksNmi_ext
 .global Ot6RestageGate_ext
 .global Ot6FontRestoreMark_ext
 .global Ot6DangerStep, Ot6MarkRandom

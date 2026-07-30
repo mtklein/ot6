@@ -1888,7 +1888,7 @@ DrawBlitzMenu:
 ; THE FIELD BLITZ PAGE (issue #46) -- what a Blitz IS, not how to input one
 ;
 ; v0.4 retired Blitz's button combos: the command opens a MENU now
-; (Ot6BlitzListOpen, ot6_kits.asm, replacing _c1776b's 64-frame pad-edge buffer
+; (Ot6BlitzListOpen, ot6_cmdmenu.asm, replacing _c1776b's 64-frame pad-edge buffer
 ; and UpdateMenuState_3d's button matcher).  This page went on drawing the
 ; combos anyway -- eight ten-tile strings of arrow and shoulder glyphs
 ; (DrawBlitzInput / GetBlitzInputTiles / BlitzInputTileTbl below, all still

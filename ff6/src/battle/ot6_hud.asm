@@ -1,3 +1,48 @@
+; [ upload the bg hud glyphs into free font cells ]
+
+; 16 2bpp tiles (shield-with-count 1-6/B, pip clusters 0-5, boost cells)
+; written to the battle font at vram $5800 + cell*8, as two 8-tile
+; slices (~128 bytes each — one fits a vblank-tail re-lay stage).
+; a8/i16, db = $00, vmainc $80. exits a8. clobbers a/x/y.
+;
+; The macro lived in ot6_kits.asm (its only two uses are the two procs right
+; below) until the kits split; a macro definition emits nothing, so moving it
+; next to its callers is address-neutral by construction -- proven, the ROM
+; CRC32 is unchanged at 0x2E9B5A7F.
+
+.macro ot6_glyph_slice first, last
+        ldx     #first          ; glyph index
+@tile:  phx
+        lda     f:Ot6BgGlyphCellTbl,x
+        longa
+        and     #$00ff
+        asl
+        asl
+        asl
+        clc
+        adc     #$5800
+        sta     hVMADDL
+        txa                     ; data offset = index * 16
+        asl
+        asl
+        asl
+        asl
+        tax
+        ldy     #$0008          ; 8 words per 2bpp tile
+@word:  lda     f:Ot6BgGlyphData,x
+        sta     hVMDATAL
+        inx
+        inx
+        dey
+        bne     @word
+        shorta
+        plx
+        inx
+        cpx     #last
+        bcc     @tile
+        rts
+.endmacro
+
 .proc Ot6LoadBgGlyphsA
         .a8
         .i16
@@ -353,7 +398,7 @@
         lda     $3ed3
         sta     f:$7e0000+OT6_SHADOW+4,x
         bra     @next
-@q:     lda     #$bf            ; '?', default attr already in place
+@q:     lda     #OT6_QMARK      ; '?', default attr already in place
         sta     f:$7e0000+OT6_SHADOW+4,x
 @next:  asl     OT6_SCR_BIT
         inc     OT6_SCR_IDX
@@ -393,7 +438,7 @@
         plx
         sta     f:$7e0000+OT6_SHADOW+4,x
         bra     @cnext
-@cq:    lda     #$bf            ; '?', default attr already in place
+@cq:    lda     #OT6_QMARK      ; '?', default attr already in place
         sta     f:$7e0000+OT6_SHADOW+4,x
 @cnext: asl     OT6_SCR_BIT
         inc     OT6_SCR_IDX
