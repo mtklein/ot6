@@ -3403,9 +3403,16 @@ Cmd_10:
 Cmd_05:
 @1591:  tyx
         jsr     _c2298a
+        jsl     Ot6ThiefExec ; ot6 (#55): steal is the first ROW of Locke's thief
+                             ;   submenu now, and the row the player picked rode
+                             ;   into $b6 as this action's attack byte.  carry
+                             ;   set = it was Filch or Bestow and bank F0 has
+                             ;   already run it; skip the steal special effect so
+                             ;   the action resolves with no theft and no damage.
+        bcs     @1599
         lda     #$a4        ; special effect $52 (steal)
         sta     $11a9
-        jmp     ExecAttack
+@1599:  jmp     ExecAttack
 
 ; ------------------------------------------------------------------------------
 

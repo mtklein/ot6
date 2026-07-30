@@ -18237,6 +18237,16 @@ _c1_bushido_open:
         jsl     Ot6BushidoListOpen
         jmp     OpenToolsWindow
 
+; ot6 (#55, locke's kit): Steal is the FIRST ROW of a thief submenu, not a bare
+; command.  OpenCmdMenuTbl[5] hits this stub instead of the target-select state
+; it used to; bank $f0 fills wItemList with Steal/Filch/Bestow (+ costs and each
+; row's own targeting byte) and raises thief mode w7e6168=3, then the Tools
+; window shell picks one and its NON-blitz confirm arm carries the picked row
+; through target select exactly as a real tool does.
+_c1_thief_open:
+        jsl     Ot6ThiefListOpen
+        jmp     OpenToolsWindow
+
 ; ------------------------------------------------------------------------------
 
 ; [ init target cursor select ]
@@ -19021,7 +19031,13 @@ OpenCmdMenuTbl:
         .addr   OpenMagicWindow
         .addr   _c17795
         .addr   _c17795
-        .addr   _c17795
+        .addr   _c1_thief_open          ; ot6 (#55): $05 steal -- was _c17795
+                                        ;   (straight to target select); now
+                                        ;   opens the thief submenu whose first
+                                        ;   row IS Steal.  Locke has no spare
+                                        ;   command slot (his third row is MAGIC,
+                                        ;   removed by InitCmd_03), so the ladder
+                                        ;   lives behind the row he already has.
         .addr   _c17795
         .addr   _c1_bushido_open        ; ot6 (#8): swdtech numeral gauge ->
                                         ;   tools-shell submenu (was
@@ -20651,6 +20667,15 @@ UpdateMenuState_30:
         bra     @8818
 @8809:  lda     w7e6168         ; ot6: blitz mode? queue it, no target select
         beq     :+
+        cmp     #$03            ; ot6 (#55): thief submenu? take the SAME arm a
+        beq     :+              ;   real tool takes -- the row id goes to
+                                ;   w7e7a85 and the row's own targeting byte to
+                                ;   w7e7a84, then target select, and
+                                ;   set_target_data lands the id in $2bb0,y as
+                                ;   the queued attack byte under command $05.
+                                ;   No new commit code: the whole point of
+                                ;   putting the ladder behind Steal is that this
+                                ;   path already carries a per-row id.
         cmp     #$02            ; ot6 (#8): bushido submenu? row r = boost r,
         bne     @blitzcommit    ;   latch the base+r tech in bank F0 (X = cell
         jsl     Ot6BushidoConfirm ;   offset from _c18470; may refuse & stay open)
