@@ -7,7 +7,17 @@ turn economy.
 
 ## Status
 
-**v0.8 released** ([tag](https://github.com/mtklein/ot6/releases/tag/v0.8)) —
+**v0.9 released** ([tag](https://github.com/mtklein/ot6/releases/tag/v0.9)) —
+Locke, and the break economy: Locke gets a kit at last (a thief submenu
+holding Steal, Filch and Bestow, with Steal's price finally on screen),
+boosting a spell into a higher tier now charges what that tier actually
+costs, boosting Runic buys turns of a standing rune stance that Celes can
+fight through, the broken-shield glyph reads as broken, a monster that tags
+out mid-break recovers on schedule, ability pages show their element, and
+poison damage over time is confirmed to chip shields. Same playable
+frontier as v0.6.
+
+**v0.8** ([tag](https://github.com/mtklein/ot6/releases/tag/v0.8)) —
 the economy bites: every ability price recalibrated against what vanilla's
 own spells cost, each kit's ultimate anchored at 99 MP, breaking an enemy
 now flashes it white and lands a sound, Gau can fight, and magicite grant
@@ -39,8 +49,11 @@ bump, while you hold it, augmenting the born mages rather than replacing
 them. Blitz is a menu, Steal guarantees the rare at three boost pips, and
 level-ups fully restore HP and MP.
 
-Work toward v0.7 now follows the Sealed Gate: the Narshe mission handoff,
-the cave, the Esper attack, the Imperial banquet, and the Thamasa handoff.
+Route work now follows the Sealed Gate: the Narshe mission handoff, the
+cave, the Esper attack, the Imperial banquet, and the Thamasa handoff. The
+playable frontier itself has not moved since v0.6 — v0.7, v0.8 and v0.9 were
+all deliberately about how the game feels where you already are. Pushing it
+to the end of the World of Balance is v0.10's job.
 
 Picking this up cold? [docs/HANDOFF.md](docs/HANDOFF.md) is the state of play —
 what is in flight, what is next, and the handful of traps that cost real time to
@@ -48,8 +61,10 @@ rediscover.
 
 See [docs/ROADMAP.md](docs/ROADMAP.md) for milestones and the "playable
 frontier" metric, and [docs/DESIGN.md](docs/DESIGN.md) for the mechanics
-design. The v0.6 playtest findings ledger is
-[docs/playtest-v0.6-rc1.md](docs/playtest-v0.6-rc1.md).
+design. The playtest findings ledgers are
+[docs/playtest-v0.7.md](docs/playtest-v0.7.md) (newest),
+[docs/playtest-v0.6-rc1.md](docs/playtest-v0.6-rc1.md) and
+[docs/playtest-v0.5.md](docs/playtest-v0.5.md).
 
 ## Quick start
 

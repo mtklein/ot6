@@ -131,6 +131,11 @@ enemies* — vanilla FF6 was flirting with this system in 1994.
 | Mog | Dancer | Spear | varies by dance | the 8 Dances, verbatim |
 | Umaro / Gogo | Berserker / Mime | — | — | bonus characters; Gogo = "every job, mastered none" |
 
+*(**2026-07-30:** Gau's row — "Leap becomes Capture; controlled beast skills
+replace berserk Rage" — and the "Capture" in Pillar 1's signature list are
+both retired. Rage is kept, Leap keeps its name and is free. Full correction
+under "Gau, controlled" below; canonical kit in `design/kit-gau.md`.)*
+
 **Weapon classes (8):** sword, dagger, spear, katana, claw, rod, ranged
 (cards/dice/boomerangs/thrown), brush.
 **Elements (8):** FF6's native fire, ice, lightning, wind, earth, water,
@@ -147,15 +152,41 @@ weakness bits in vanilla), one weapon-class (new side table in expanded ROM).
 Multi-hit actions chip per hit — Edgar's AutoCrossbow and Cyan's Quadra Slam
 become shield shredders, exactly the role multi-hits play in Octopath.
 
+> **CORRECTION — 2026-07-30 (issue #54).** *"Chip is per hit"* is now
+> **measured**, not asserted: one boosted Fight chipped four shields off one
+> guard (`multi-hit.md` §1, `probe_multihit.lua`). The rest of the sentence
+> is wrong on the shipped ROM. **AutoCrossbow is not multi-hit** — it is
+> *whole-side*: `ItemProp $aa` sets no extra-attack effect, so it lands one
+> hit per body and exactly **one** chip against a solo boss. Breadth, not
+> rate. Quadra Slam is genuinely ×4 (`MagicProp $58` effect `$32`,
+> `AttackerEffect_32` at `battle_main.asm:10794-10796`). An audit of all 256
+> `MagicProp` + 256 `ItemProp` records (`tools/audit_multihit.py`, which
+> exits nonzero if it goes stale) found **exactly three** multi-hit
+> abilities in the whole game: Quadra Slam ×4, Quadra Slice ×4, Empowerer
+> ×2. Read "shield shredders" as the design target; `design/multi-hit.md`
+> §10 is the build list that would make it true.
+
 **Break.** At 0 shields: the enemy's ATB resets and it's inflicted with a Broken
 state (Stop-like) for roughly one full turn cycle; all damage it takes is
 ×2; its weakness list is locked revealed for the rest of the battle. On
 recovery, shields reset to `shield_max`.
 
+> **CORRECTION — 2026-07-30.** Two things in that paragraph do not describe
+> the shipped ROM. (a) **It is not Stop.** OT6 runs a private broken timer
+> at `$3e88,y` gated by `Ot6Gate` (`ot6_break.asm:1655`); vanilla Stop is
+> not used — `break-impl.md` step 3 already carries this correction. (b)
+> **"roughly one full turn cycle" is not what ships.** `OT6_BREAK_TICKS` is
+> `$10` (`ot6_break.asm:1`) and the window was measured at **2159 frames**
+> — ~36 s of battle time — for an on-stage monster in the v0.9 Ifrit/Shiva
+> work (merge `9f6971c`, `probe_ifritbreak.lua`). See `break-impl.md`'s
+> 2026-07-30 correction section for the full discrepancy; the constant is
+> deliberately left alone pending a balance call, and the v0.9 release
+> notes already name it as a known gap.
+
 **Shielded resistance.** While an enemy still has shields and is not broken it
 takes reduced damage (×0.5), so the swing from shielded to broken is ×4 —
 and ×4 on-weakness too, not ×2: vanilla's weakness ×2 (`asl $f0` at
-`battle_main.asm:1874`) lands BEFORE `Ot6HitJoin` applies the shielded/broken
+`battle_main.asm:1899`) lands BEFORE `Ot6HitJoin` (`:1901`) applies the shielded/broken
 factor, so the two stack. The full ladder against an unbroken-unweak
 baseline is 8 (broken+weak) : 4 (broken) : 2 (shielded+weak) : 1. The
 published 4:2:1 damage-per-BP measurement samples broken-and-UNWEAK, so it
@@ -256,6 +287,38 @@ vanilla's own count of techs known clamps each band to the best one Cyan
 has learned. Cleave sits outside the ladder until divine gating exists.
 Mapping, consequences, and the reasoning: design/kits.md.
 
+> **CORRECTION — 2026-07-30. That paragraph describes M3, and two of its
+> sentences have been false since v0.4/v0.5.**
+>
+> - **"There is no submenu" — there is.** A direct SwdTech submenu shipped
+>   in v0.5 (issue #8): `Ot6BushidoListOpen` (`ot6_kits.asm:842`),
+>   dispatched from `btlgfx_main.asm:18237`, with per-row greying by
+>   `Ot6BushidoRowGrey` and a field-configurable loadout word at `$1e1d`.
+>   Boost still selects the tech when the loadout is on AUTO; the submenu is
+>   an additional surface, not a replacement.
+> - **"Cleave sits outside the ladder until divine gating exists" — it is
+>   in the ladder and the gate exists**, shipped v0.4.
+>   `Ot6BushidoOblivion` (`ot6_kits.asm:141`) places tech 7 at boost 3 and
+>   drops a *spent* divine back to Quadra Slice for the rest of the battle; the
+>   resolution-time Broken gate is `Ot6Oblivion` (`ot6_kits.asm:250`),
+>   hooked after `ChooseTarget` in `CalcAttackEffect`, because the target
+>   does not exist at command-latch time.
+
+> **CORRECTION — 2026-07-30 (issue #38, shipped v0.7). The table's Dispatch
+> row is stale: there is no 0-BP rung any more.** #38 put a **1-BP floor**
+> under every SwdTech and narrowed the window from four rungs to three.
+> `Ot6BushidoTech` (`ff6/src/battle/ot6_kits.asm:74-79`) opens with
+> `cmp #$01 / bcs :+ / lda #$01` — a stray 0 is clamped *up* to the cheapest
+> rung rather than allowed to name a tech, and the menu never offers boost 0
+> at all. The shipped mapping is `base = max(0, ceiling-2)`,
+> `tech = min(base + boost-1, ceiling)` (`ot6_kits.asm:65-70`), so boost
+> 1/2/3 selects Cyan's **top three learned** techs, weakest to strongest —
+> which also means the per-tech BP prices in the table are not fixed prices
+> at all: what a given rung costs slides as he learns more. Read the column
+> as the *relative* ordering it was drawn for. The v0.7 playtest that
+> motivated the follow-on MP rescale is in `playtest-v0.7.md` row 6; the
+> pricing consequences are in `design/kits.md` and `design/mp-economy.md`.
+
 Candidate passive: *Vengeance* — Cyan gains +1 BP whenever any enemy breaks.
 
 **Celes converts defense into economy.** Runic still swallows the next spell;
@@ -276,6 +339,29 @@ Broken, or costs a full 5-BP bank. Either way it's her divine-tier state.
 always secretly was). Captured beasts go in a stable; Gau equips up to 8 and
 uses their signature moves as normal controlled skills. The 250-entry
 berserk-roulette Rage table is retired.
+
+> **CORRECTION — 2026-07-30. None of that shipped, and two of its clauses
+> were overturned by owner decisions in July.** What ships is the Ochette
+> model in `design/kit-gau.md`: **learn many, equip 8**, with Rage *kept*
+> as the verb.
+>
+> - **Rage is not retired.** `Ot6RageCost` (`ot6_boost.asm:1181`),
+>   `Ot6RageLearned` / `Slot` / `Nth` / `List` / `Show` (`ot6_kits.asm:1882`
+>   onward). The header at `ot6_kits.asm:1860` states the model outright:
+>   Veldt learning stays unlimited, and the 8 slots are the equip layer.
+> - **Leap is not renamed, and is now free.** CONTRIBUTING's vocabulary
+>   ruling (2026-07-29) killed *Capture* specifically: FF3-US already prints
+>   Capture as a battle command (`$06`, the Thief Glove). **Leap keeps its
+>   name.** #47 then gave Gau a free action — Leap shares the Fight row on
+>   the Veldt (`Ot6VeldtRow`, called from `battle_main.asm:13977`) and its
+>   price is retired (`ot6_boost.asm:1186`, "Leap is free").
+> - **No stable exists.** No `Capture` proc exists in OT6 source; the only
+>   `Capture` in the tree is vanilla's Thief-Glove relic path, deliberately
+>   untouched.
+>
+> `mp-economy.md` already records that this model "never shipped".
+> `design/kit-gau.md` is the canonical Gau document; `design/kits.md`'s Gau
+> lines carry their own supersession note.
 
 ## Turn structure: ATB stays (for now)
 
@@ -316,6 +402,12 @@ lands in M4. Fun mechanics don't wait on menu plumbing.
 
 - **Shields lengthen fights** → global enemy HP cut ~25–35% so the pace ends
   up "same length, more decisions."
+  *(**Answered differently, 2026-07-17 — see "The HP dial is not the
+  difficulty lever" below.** No HP cut ships: `Ot6HpMulTbl` is `$10` — 1× —
+  in every band, `ff6/src/battle/ot6_break.asm:636-642`. Shielded
+  resistance carries the lengthening instead, because it is selective where
+  a flat HP bump is not. Listed here as the problem's *original* proposed
+  answer.)*
 - **Boss design** → bosses get telegraphs before big actions (Octopath's
   "gathering power…"), making break-timing the core boss puzzle.
 - **Boosted damage vs the 9999 cap** → tune multipliers under the cap first;

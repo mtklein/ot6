@@ -69,15 +69,36 @@ Balance is roughly the game's halfway point, and the World of Ruin is
 entirely unstarted. (1.0 is still the line where saves become
 forward-compatible — see CONTRIBUTING — it is just nowhere near next.)
 
+> **CORRECTION — 2026-07-30. The list below contains TWO version manifests
+> and they contradict each other.** The first three bullets are the
+> theme-named plan that took effect with the "decoupled from the frontier"
+> ruling above; the last three are the older frontier-named plan it replaced
+> (v0.7 = Sealed Gate playtest, v0.8 = Thamasa, v0.9 = End of WoB). Both are
+> live text, so a reader hitting `v0.8` or `v0.9` gets whichever they scroll
+> to first. **The old bullets are kept as the record of what was planned;
+> the theme-named ones are what shipped.** What actually happened:
+>
+> | version | what shipped | frontier |
+> |---|---|---|
+> | v0.7 | clockwork HUD sync, MP wallet, Dance MP, SwdTech's ≥1-BP floor (#38), Gau's Ochette kit | unchanged |
+> | v0.8 — "the economy bites" | every kit price on vanilla's ruler, ultimates at 99, break flash + sound, Gau's Fight/free Leap, magicite as gear, Steal at 4 | unchanged |
+> | v0.9 — "Locke, and the break economy" | Locke's thief submenu (#55), folded spells at the tier's real MP (#64), boosted Runic buying duration (#59), the broken-shield X, the tagged-out break-timer fix, field element icons (#53), the DOT chip pinned (#60) | unchanged |
+>
+> **Thamasa and the End of the World of Balance did not ship in v0.8/v0.9
+> and are now v0.10's job.** Multi-hit (#54) shipped as an *audit* in v0.9,
+> not as the dial — the answer was that only three multi-hit abilities exist
+> and none of the design is built.
+
 - **v0.8 — the economy bites** (released): every kit price recalibrated to
   vanilla's own ruler (8-20% of the pool at the level an ability arrives),
   ultimates anchored at 99, the break flash and sound, Gau's Fight and free
   Leap, magicite as gear packages in FF6's own stat encoding, and three
   menu pages that had been lying to the player.
-- **v0.9 — Locke, and the break economy** (next): multi-hit as the
+- **v0.9 — Locke, and the break economy** (**released 2026-07-30**; this
+  bullet said "next"): multi-hit as the
   break-rate dial (#54), Locke's kit at last (#55), boosted Runic (#59),
   and the balance work the v0.8 playtest opens.
-- **v0.7 — the playtest release** (re-scoped 2026-07-28, owner call): folds
+- **v0.7 — the playtest release** (**shipped**; re-scoped 2026-07-28, owner call): folds
   in the v0.6 playtest's non-blockers — the clockwork HUD sync, the MP
   wallet display, Dance's MP cost, the SwdTech ≥1-BP floor and its
   page fix — plus Gau's Ochette kit (learn many, equip 8). The frontier
@@ -85,11 +106,13 @@ forward-compatible — see CONTRIBUTING — it is just nowhere near next.)
   (legs through the crash are already minted with anchors). The owner
   resumes playtesting from the Veldt on this release; any Sealed Gate
   tail rides with Thamasa.
-- **v0.8 — Thamasa** — Thamasa and the burning house through Strago and
+- ~~**v0.8**~~ **— Thamasa** *(superseded plan; the frontier work, not the
+  released v0.8)* — Thamasa and the burning house through Strago and
   Relm joining and the post-massacre mission transition. The Sketch bug
   ships as-is by owner decision, documented in the release notes
   (CONTRIBUTING has the policy history).
-- **v0.9 — End of the World of Balance** — the IAF gauntlet, Floating
+- ~~**v0.9**~~ **— End of the World of Balance** *(superseded plan; now
+  **v0.10**)* — the IAF gauntlet, Floating
   Continent, AtmaWeapon, timed escape, and transition into the World of Ruin.
 
 These are useful stopping points, not a promise to ship every number

@@ -58,7 +58,7 @@ The game's own read, `GetValidWeapons` / `GetValidShields`
         beq     @skip           ; not equippable
 ```
 
-Same read at `shop.asm:1415` and `battle_main.asm:14071`. The character
+Same read at `shop.asm:1415` and `battle_main.asm:14303`. The character
 bit comes from `GetCharEquipMask` (`equip.asm:2287`), which indexes
 `CharEquipMaskTbl` — a plain identity table, `.word $0001,$0002,$0004,…`
 — by actor number. **So bit N = actor N**, per `CHAR_FLAG`
@@ -71,7 +71,7 @@ bit comes from `GetCharEquipMask` (`equip.asm:2287`), which indexes
 **✱ bit 15 is doubly booked.** It is actor 15 (Leo) *and* the Merit Award
 override: `GetCharEquipMask` ends with `lda $11d8 / and #$20 / ora
 #$8000` (`equip.asm:2300-2306`), and `$11d8` is the relic-effect byte
-fed from item +$0C (`battle_main.asm:2513`), where Merit Award `$da`
+fed from item +$0C (`battle_main.asm:2522-2523`), where Merit Award `$da`
 carries `$20` (Gauntlet `$d0` = `$08`, Genji Glove `$d1` = `$10`).
 Decoding bit 15 as a character therefore reports a phantom Leo on
 almost every weapon. Bit 14 (Banon) is real but appears on exactly four

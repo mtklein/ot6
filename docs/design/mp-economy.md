@@ -48,7 +48,7 @@ It is also the **hard display ceiling**, and that is now measured rather
 than asserted. Every OT6 price drawer renders exactly two digits:
 `ListText` command `$02` (`btlgfx_main.asm:15045-15073`) divides by ten
 exactly *once* and emits a tens cell and a ones cell, and
-`Ot6LoadoutDrawCost` (`field_menu.asm:3053`) has one tens loop. A cost of
+`Ot6LoadoutDrawCost` (`field_menu.asm:3057`) has one tens loop. A cost of
 100 does not print as a big number; it prints as punctuation. So 99 is
 the largest cost that can be shown at all, and no cost anywhere may
 exceed it. `battle_costtable.lua` now asserts that bound on every row of
@@ -171,17 +171,17 @@ mistake, not shipping the wrong number once.
   >    (`btlgfx_main.asm:10099-10125`) writes exactly two things per
   >    row — the command byte, and a colour from `GetTextColor` — on a
   >    9-byte stride over four rows, and its template `MenuText::_4`
-  >    (`btlgfx_main.asm:45137`) is four fixed 8-byte records with no
+  >    (`btlgfx_main.asm:45162`) is four fixed 8-byte records with no
   >    numeric field. `GetTextColor` (`btlgfx_main.asm:10704-10707`) is
   >    `and #$80` on the *disabled* flag, so the one grey that window has
   >    is "command unavailable", **not** "you cannot afford it". Contrast
-  >    `Ot6BlitzRowDecorate` (`ot6_kits.asm:563-585`), where a list row
+  >    `Ot6BlitzRowDecorate` (`ot6_kits.asm:526-613`), where a list row
   >    explicitly stamps a two-digit cost and greys by affordability
   >    through `Ot6AbilityGrey`. So there was no surface that could show
   >    Leap's 2 MP, and the only way to meet it was a refusal *after* the
   >    turn was spent — the refusal path (`battle_main.asm:8354-8371`)
   >    queues a generic attack message through `_setattackmes`
-  >    (`:8720`) and composes no number anywhere. *(The exact refusal
+  >    (`:8733`) and composes no number anywhere. *(The exact refusal
   >    string is **unverified** — I did not trace `$3a71/$3a72` to its
   >    text. What is verified is that no number reaches the player.)* A
   >    price that is invisible until it refuses is a lying surface, and
@@ -352,7 +352,7 @@ evidence, all read rather than recalled:
 - The four-row battle command window has **no numeric field at all**.
   `command_window_data_set` (`btlgfx_main.asm:10099`) writes exactly two
   things per row — the command byte, and a colour from `GetTextColor` —
-  and its template `MenuText::_4` (`btlgfx_main.asm:45136`) is four
+  and its template `MenuText::_4` (`btlgfx_main.asm:45162`) is four
   fixed 8-byte records, `$ff $ff $04 $21 $0d $00 $ff $01`: two spaces, a
   font, a name command and its id, a space, a terminator. No `$02` and
   no `$16` anywhere in it.
@@ -361,7 +361,7 @@ evidence, all read rather than recalled:
   unavailable", never "you cannot afford it".
 - Every *other* costed verb has a submenu that solves this for free —
   `Ot6BlitzRowDecorate`, `Ot6ToolRowDecorate`, `Ot6DanceRowDecorate`
-  (`ot6_kits.asm:563`, `:651`, `:716`) each stamp a two-digit price and
+  (`ot6_kits.asm:526`, `:614`, `:679`) each stamp a two-digit price and
   grey by affordability through `Ot6AbilityGrey`. **Steal is the only
   costed verb with no list to put a number in.**
 
@@ -417,6 +417,27 @@ costs 0 MP in the shipped ROM and its priced column
 (kits.md, proposed there) charges only under `OT6_MP_COSTS`
 (see "Where it lands / M4" below). Two clauses of the
 ruling above did not survive contact:
+
+> **CORRECTION — 2026-07-30. Two things in this section are stale, and both
+> read as descriptions of the shipped ROM.**
+>
+> - **"SwdTech costs 0 MP in the shipped ROM" and "dormant" have not been
+>   true since v0.5.** `OT6_MP_COSTS` **defaults to 1** — `ff6/Makefile:266`
+>   says so in as many words, and the `=0` build is a separate `ff6-en-nomp`
+>   *control* target (`ff6/Makefile:285`), not the shipping one. SwdTech
+>   ships at **4/10/13/16/18/28/50/99** (`Ot6AbilityCostTbl`,
+>   `ot6_boost.asm:1377-1384`) after #45's rescale and #57's 99 anchor. This
+>   file already says the flag is on further down (see "Where it lands"),
+>   so this is an internal contradiction, not a disputed fact.
+> - **"SwdTech keeps kits.md's BP ladder — Dispatch 0" (above) is stale
+>   since #38.** There is no 0-BP rung: `Ot6BushidoTech`
+>   (`ot6_kits.asm:74-79`) clamps a stray 0 up to 1, and the window is three
+>   rungs over Cyan's top three *learned* techs (`ot6_kits.asm:65-70`), not
+>   four fixed prices. The #45 amendment later in this file already leans on
+>   "#38's 1-BP floor", so the file half-knows.
+>
+> The ruling's *intent* — Cyan pays in both currencies — stands; only its
+> magnitudes and the "dormant" framing are retired.
 
 - "BP spent beyond a tech's tier requirement boosts it with the
   same scaling logic as any other action" is not what shipped.
@@ -678,6 +699,11 @@ Further candidates, one line each:
 - **Chip rebate** — a weakness chip restores 1 MP; multi-hit
   shredders (AutoCrossbow, Quadra Slam) make this strong, so it
   likely needs a per-action cap.
+  *(**2026-07-30:** AutoCrossbow is **not** multi-hit — it is whole-side,
+  one hit per body, `ItemProp $aa` carries no extra-attack effect
+  (`tools/audit_multihit.py`). Quadra Slam is genuinely ×4. The rebate
+  would still want a cap, but for breadth against a wave, not rate against
+  a boss — see `design/multi-hit.md`.)*
 - kits.md's *Afterglow* (first cast each battle free) is the
   same family on the character-passive side.
 
@@ -744,7 +770,7 @@ changed is that it is no longer nearly free.
   falls through it returning 0, so the universal charge at
   `CalcAttackEffect` (the `$3a4c` subtract, and its
   insufficient-MP fizzle) never fires for them. `Ot6AbilityCost`
-  (ff6/src/battle/ot6.asm) is the single hook, right after that
+  (`ff6/src/battle/ot6_boost.asm:878`) is the single hook, right after that
   `GetMPCost`: for the three costed verbs it swaps the 0 for the
   kit price. Charge AND the insufficient-MP **refusal** are both
   already universal — they act on whatever `$3620`→`$3a4c` holds

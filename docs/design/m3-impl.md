@@ -43,14 +43,35 @@ payoff is the break window.
   the element table — single $0300 wipe). Magic bumped 'O6'→'O7'
   ($364f→$374f) so stale banks re-init once.
 
+> **CORRECTION — 2026-07-30.** The header already warns that this body is
+> phase-1 vintage. Four specific things in it now read as false statements
+> about the shipped ROM, so they are named rather than left to the warning:
+>
+> - **The codex magic is `'O8'` = `$384f`**, not `'O7'`
+>   (`ff6/src/battle/ot6_codex.asm:33`). `'O7'`/`$374f` survives only as the
+>   *legacy* cartridge-global layout that M2's migration reads from
+>   (`ot6_codex.asm:34`). The later line saying `battle_codex.lua`'s magic
+>   byte was "updated for `'O7'`" is stale the same way — the test asserts
+>   `$4f`/`$38`.
+> - **`Ot6ShieldTbl` holds 74 authored records**, not "~45"
+>   (`ot6_hud.asm:1676-2155`, `$ffff` terminator).
+> - **The table is in `ot6_hud.asm`, not `ot6_class.asm`** — the bullet
+>   above files it under the `ot6_class.asm` heading.
+> - **Open question 1 is answered, the other way.** "Camp/Narshe Kefka
+>   share species `$14a`" is wrong: the camp has its own id `$16f`
+>   (`MONSTER::KEFKA_IMP_CAMP`, `const.inc:1259`) and never loads a monster
+>   record at all. The source says so at `ot6_hud.asm:1671-1675`, which
+>   notes the comment *used* to make this same mistake. So no per-formation
+>   override machinery is needed for that case.
+
 ## Hooks (ff6/src/battle/battle_main.asm)
 
 | line | site | change |
 |---|---|---|
-| 6864 | `LoadMagicProp` C2/2966 | +`jsl Ot6SkillClass` — every spell-record attack (magic, skills, enemy attacks, the $ee "battle" record, DoT ticks) |
-| 6955 | `_magicpunch` C2/299F, after the weapon-element store | +`jsl Ot6WeaponClass` — x = entity+hand, `$3ca8,x` = the swinging item, per hand per swing (genji/offering honest for free). Monsters store 0 (their $3ca8 is a graphics code) |
-| 7002 | `CalcItemEffect` C2/2A37 | +`jsl Ot6ItemClass` — items/Tools/Throw chip their item's class (AutoCrossbow pierces, Chain Saw slashes, thrown Ashura slashes) |
-| 1877 | elemental join `@0c1e` C2/0C1E | `jsl Ot6BrokenDmg` → `jsl Ot6HitJoin` (class chip, then broken ×2) — 0 net C2 bytes |
+| 6938 | `LoadMagicProp` C2/2966 | +`jsl Ot6SkillClass` — every spell-record attack (magic, skills, enemy attacks, the $ee "battle" record, DoT ticks) |
+| 7134 | `_magicpunch` C2/299F, after the weapon-element store | +`jsl Ot6WeaponClass` — x = entity+hand, `$3ca8,x` = the swinging item, per hand per swing (genji/offering honest for free). Monsters store 0 (their $3ca8 is a graphics code) |
+| 7181 | `CalcItemEffect` C2/2A37 | +`jsl Ot6ItemClass` — items/Tools/Throw chip their item's class (AutoCrossbow pierces, Chain Saw slashes, thrown Ashura slashes) |
+| 1901 | elemental join `@0c1e` C2/0C1E | `jsl Ot6BrokenDmg` → `jsl Ot6HitJoin` (class chip, then broken ×2) — 0 net C2 bytes |
 
 Net C2 growth: +12 bytes (three jsl). All three loaders **store always**
 (0 when classless) so a stale class can never leak between attacks —
@@ -64,6 +85,32 @@ element was absorbed/nulled/forcefielded — the blade still lands
 monster, not broken, not wound/petrified, not a heal ($f2), class bit
 present (bmi rejects null-break), mask match. One chip per axis per hit:
 a Flame Knife on a fire+pierce-weak monster chips 2.
+
+> **CONFIRMED — 2026-07-30 (issue #60, commit `3b8313e`). The DoT path's
+> "stores 0" claim above is now MEASURED, not assumed.** It had never been
+> checked. `probe_dottick.lua` instrumented a poison DOT in a lab where
+> nothing else could chip and found `OT6_ATKCLASS` = `$00` during **every**
+> tick, so a tick chips exactly **one** axis — the elemental one. The
+> element is the tick's own: `Cmd_22` stores it itself (`lda #$08 / sta
+> $11a1`, `battle_main.asm:13403-13404`, poison branch of `$b6` only) and
+> tail-jumps `ExecSelfAttack` (`:13418`), so the weak-element branch at
+> `:1893-1896` treats a poison tick as a poison hit with no attacker.
+> Nothing special-cases it.
+>
+> Two consequences worth knowing, both measured in the same run: a poison
+> tick **can break a monster on its own** (2 of 2 ticks walked a poison-weak
+> guard's shields 2 → 1 → 0 with no action spent after the application),
+> and **Sap/Seize does not chip at all** — its ticks carry `$11a1 = 0`, so 4
+> ticks produced 0 chips while `Ot6ClassChip` still fired inside each one.
+> The negative control is not vacuous. Pinned deliberately by
+> `tools/tests/battle_dotchip.lua` (fail-before observed), as charm with no
+> mechanical excuse.
+>
+> Harness hazard found along the way, worth repeating: `ExecCmd` is defined
+> **twice** in `ff6-en.dbg` (`$C09B1B` and the battle one at `$C213E6`) and
+> `compose.py`'s `parse_dbg_syms` takes the first value for a name, so
+> `H.sym` silently returned the wrong module's address. Any non-unique
+> symbol name has this problem.
 
 ## Width safety
 

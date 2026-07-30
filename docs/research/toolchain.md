@@ -76,6 +76,12 @@ Reference disassemblies (read-only aids):
 
 - Mesen `--testrunner` on macOS specifically (verified in source/docs, not
   yet executed here — M0 exit criterion).
+  **RESOLVED at M0 (noted 2026-07-30): it works and the whole project runs
+  on it.** `make test` gates every change on the full self-registering
+  suite — 82 tests as of today — executed headlessly under `--testrunner`
+  on this machine, and `tools/tests/run.sh` is the wrapper. Left in place
+  as the record of what was unverified at the time, but it is no longer a
+  watch-out.
 - No exhaustive public diff list of US 1.0 vs 1.1 exists; Sketch fix is the
   headline.
 - BNW's own build uses xkas 0.06; treat its asm as reference, not drop-in.

@@ -228,6 +228,33 @@ OT6_PIPPEND          := $ed74   ; #42: a DEFERRED pip paint -- character slot
 ; near-zero-slack set of frames looks like.  #33's NMI lesson said the same
 ; thing about vblank TRANSFERS; this says it about plain CPU time.
 ;
+; [ 2026-07-30, issue #67: the scoping above is too narrow, and the wider
+;   rule is a HYPOTHESIS nobody has instrumented. ]
+; The paragraph above scopes the cliff to Ot6BgHud_ext and records 12 NOPs
+; there as safe.  Both halves survive; the implied "12 cycles is safe
+; anywhere" does not.  #67 ran the same bare-NOP control in bank $C2's
+; ACTION path (the reverted Ot6MayAct hooks in ExecAction/CheckRetal) and
+; FIVE bare NOPs reproduced 1635 -> 1798 byte for byte, delivery at f4512 in
+; every failing case.  So that path's margin is under 10 cycles, not under
+; 80, and the two sites do not share a budget.
+;
+; But $C2 growth per se is NOT the trigger.  The v0.9 merge added four new
+; $C2 call sites -- battle_main.asm:514 (Ot6RunicHold, QueueAction), :3409
+; (Ot6ThiefExec, Cmd_05), :4152 (Ot6RunicRaise, Cmd_0b), :14652
+; (Ot6FoldPrices, UpdateEnabledMagic) plus Ot6RecheckMagic at :14715, ~49
+; bytes by a static count off the diff -- and battle_trueknight 6a stayed at
+; 1635 with no partial degradation.
+;
+; HYPOTHESIS, UNVERIFIED: what costs is per-battle-FRAME code, not per-ACTION
+; or per-menu-redraw code.  Every v0.9 hook above runs once per action or per
+; redraw; Ot6BgHud_ext and the reverted Ot6MayAct hooks sat on the main-loop
+; path.  That is consistent with everything measured and with the WaitFrame
+; mechanism above, and it is still only consistent-with: NOBODY has run the
+; NOP control at the four v0.9 sites, which is the experiment that would
+; settle it.  Until someone does, do not read this note as a licence to add
+; cycles to a $C2 action path -- read it as "the safe budget is per-site and
+; the only site with a measured number is this one."
+;
 ; Hence the gate is INLINE at the call site (ot6_hud.asm): even a `jsr` into
 ; a proc that early-outs was over the line.  Nonzero = at least one slot has
 ; a live countdown; the painter recomputes it as it walks, so a stale value

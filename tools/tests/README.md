@@ -395,10 +395,13 @@ set -- and never creates `SaveStates/`.)
   pinned $2020 standing in for his level.  Asserts the clock is dead
   (150 settled in-window frames, one bar value -- vanilla stepped every
   4 frames), the whole tier ladder including its learn-clamped rows,
-  that Oblivion stays out of reach, the 3-BP spend cap, and that the
-  chosen tech resolves: Flurry's $58 reaches $3410, chips a
-  slashing-weak guard, reveals the slash class, and consumes the boost
-  with no regen.
+  that Cleave (the `Oblivion` symbol) stays out of reach, the 3-BP spend
+  cap, and that the chosen tech resolves: Quadra Slam's $58 reaches
+  $3410, chips a slashing-weak guard, reveals the slash class, and
+  consumes the boost with no regen.  (Names per CONTRIBUTING's FF3-US
+  vocabulary rule, 2026-07-30; the test's own filename and the upstream
+  `Bushido*`/`Oblivion` symbols stay as they are -- renaming symbols is
+  churn against upstream that naming them here already buys.)
 - `probe_bushido.lua` - the measurement instrument behind it: logs the
   menu state, w7e7b82, pending boost and $3410 across the same install,
   and answers the questions the source alone does not (does one A press

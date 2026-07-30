@@ -53,7 +53,7 @@ MORE than 8 and equip a curated subset (~5 slots): Gau and Strago.
 >
 > **What it costs, stated plainly.** Leap is not a *contributing* free
 > action — it removes Gau from the battle and flags the return-to-Veldt
-> event (`TargetEffect_54`, `battle_main.asm:9762-9776`), and vanilla
+> event (`TargetEffect_54`, `battle_main.asm:9774, guard at :9778-9780`), and vanilla
 > refuses it outright with fewer than two party members present. So on
 > the Veldt an out-of-MP Gau's free options are *leave* and *Item*; the
 > free action that swings a fist is only available off the Veldt. The
@@ -106,6 +106,49 @@ class while abilities carry their own, and some attacks are
 deliberately **null-break** — big dumb damage that chips nothing,
 the physical cousin of non-elemental magic.
 
+> **CORRECTION — 2026-07-30 (issues #54, #69): every `×N` in the Chip
+> columns below is DESIGN INTENT THAT WAS NEVER BUILT, except Quadra
+> Slam's and Quadra Slice's.** The tables read as descriptions of the
+> shipped ROM. Three rows are not.
+>
+> An audit of all 256 `MagicProp` and all 256 `ItemProp` records
+> (`tools/audit_multihit.py` — it re-derives from the ROM sources on every
+> run and exits nonzero if this list goes stale) found **exactly three**
+> multi-hit abilities in the entire game:
+>
+> | ability | hits | how |
+> |---|---|---|
+> | Quadra Slam `$58` | 4 | `MagicProp` effect `$32`, `AttackerEffect_32` sets `$3a70 = 3` (`battle_main.asm:10794-10796`) |
+> | Quadra Slice `$5b` | 4 | same effect `$32` |
+> | Empowerer `$59` | 2 | `MagicProp` effect `$36` (+1, quarter power) |
+>
+> The engine has exactly one multi-hit mechanism — `$3a70`, *"number of
+> attacks (0 = 1 attack)"* (`battle_main.asm:6416`), consumed by the loop
+> at `:8335-8339` — and the audit enumerates all ten of its upward writers.
+> So, against the tables below:
+>
+> - **Pummel `$5d` "bludgeoning ×2" — is ×1 today.** No extra-attack effect
+>   on its record.
+> - **Bum Rush `$64` "bludgeoning ×8" — is ×1 today.** Same.
+> - **Drill `$a8` — is ×1** (it is not marked ×N below, but `multi-hit.md`
+>   §10 proposes ×2, so note it is not one now).
+> - **AutoCrossbow `$aa` "piercing ×4" is a category ERROR, not just a
+>   stale number.** It is *whole-side*, not multi-hit: target byte `$6a`
+>   (one-side, L/R-multi) with no extra-attack effect. It lands one hit per
+>   body, so it is four chips across four monsters and **exactly one chip
+>   against a solo boss**. Breadth and rate are different levers with
+>   different prices, and the "first shield shredder" line under Edgar's
+>   table inherits the error. The *Overcharge* passive candidate
+>   ("+1 AutoCrossbow hit per 2 BP") is proposing to convert it from one
+>   lever to the other, which is a real design decision and not a tuning
+>   knob.
+>
+> What IS measured: chip is per hit (one boosted Fight chipped four shields
+> off one guard), and excess hits after a break convert to the broken ×2
+> rather than being wasted. `design/multi-hit.md` is the full survey; its
+> §10 is the build list that would make the `×N`s above true. **Until that
+> lands, read the Chip column's `×N` as a target, not as the fight.**
+
 ---
 
 ## The constrained three
@@ -139,6 +182,9 @@ is built (it is not yet).
 - AutoCrossbow ×4 piercing = the first shield shredder; Drill the
   armored-boss answer; Chain Saw covers slashing so Edgar alone spans
   two physical classes through tools.
+  *(The "×4" and "shield shredder" here are the category error corrected
+  above, 2026-07-30: AutoCrossbow is whole-side, one chip per body, one
+  chip against a boss.)*
 - Passive candidates: *Tinkerer* (tools ignore blind), *Royal
   Discount* (shops half price), *Overcharge* (+1 AutoCrossbow hit
   per 2 BP).
@@ -167,6 +213,9 @@ while still marked "vanilla preserved ✦".
 | 6 | Air Blade | 28 | wind | 30 |
 | 7 | Spiraler | 50 | — | 42 |
 | 8 | **Bum Rush** (divine) | **99** | bludgeoning ×8 | 70 / Duncan |
+
+*(Pummel's ×2 and Bum Rush's ×8 are both **×1 on the shipped ROM** — see
+the 2026-07-30 correction at the top of this section.)*
 
 The MP column lives in `Ot6AbilityCostTbl` keyed by attack id $5d–$64,
 charged under `OT6_MP_COSTS`. **Tail re-derived by issue #57 (2026-07-29):**
@@ -423,9 +472,9 @@ corrode — and a little merchant blood (he'd say TREASURE HUNTER).
 a verb of its own, so the ladder lives BEHIND the Steal row:
 `OpenCmdMenuTbl[$05]` opens the Tools-window shell with Steal / Filch / Bestow
 in it (`Ot6ThiefListOpen`), priced, with unaffordable rows greyed. That is
-forced, not chosen — **Locke has no spare command slot.** `char_prop.asm:157`
+forced, not chosen — **Locke has no spare command slot.** `char_prop.asm:160`
 records FIGHT, STEAL, MAGIC, ITEM; the apparently blank third row is MAGIC
-removed at runtime by `InitCmd_03` (`battle_main.asm:14100`) for a character who
+removed at runtime by `InitCmd_03` (`battle_main.asm:14112`) for a character who
 knows no spell and holds no esper, exactly as #47 found for Gau, and the battle
 menu is still hard-wired to four rows. The moment Locke equips an esper the row
 comes back as Magic, which this doc's row-sharing rule says is never the row to
@@ -439,7 +488,7 @@ authored class-weakness mask**, seeded at battle init by `Ot6SeedShields`
 take, and decrementing that byte would corrupt what the break system thinks the
 monster is weak to. The alternative reading — Filch simply *mints* Locke a pip —
 is dead on arrival: `Ot6ActionEnd` already pays +1 BP for any turn a character
-did not boost through (`ot6_boost.asm:142`), so an ability whose whole effect is
+did not boost through (`ot6_boost.asm:171-175`), so an ability whose whole effect is
 +1 BP is strictly worse than Fight.
 
 So Filch takes the resource the enemy *does* have: **one shield, and Locke keeps

@@ -112,6 +112,15 @@ the manual steps at each bullet).
   nothing schedules the `%.lz: %` rule. The first build dies in ca65 on
   the missing includes. Regeneration is mechanical: enumerate the sources
   and make each `.lz` target by name — the pattern rule works when asked.
+  **FIXED — this gotcha no longer bites (noted 2026-07-30).** OT6 added an
+  **order-only** prerequisite on the module object rule —
+  `$(OBJ_DIR)/$1_%.o: … | $(LZ_FILES)` at `ff6/Makefile:142`, with the
+  reasoning at `:136-139` — which guarantees every `.lz` exists and is
+  fresh before assembly *without* making every object stale when any one
+  `.lz` changes. The nomp object carries the same guard (`ff6/Makefile:283`)
+  and there is an explicit `lz:` target (`:133`). A plain `make` on a fresh
+  clone now builds. Kept above as the record of what the bug was, since the
+  order-only trick is the non-obvious part of the fix.
 - A failed recipe used to leave a half-built, unchecksummed
   `rom/ff6-en.sfc` that the next `make` treated as up-to-date. Both
   Makefiles now set `.DELETE_ON_ERROR:` (added 2026-07-18), so a failed
