@@ -224,11 +224,15 @@ H.run({ maxFrames = 400000 }, {
     -- ($3ece is shared OT6 scratch, so the pc range is load-bearing)
     local BOOSTDMG = H.sym("Ot6BoostDmg")
     emu.addMemoryCallback(function(_, v)
+      -- CHEAP GUARDS FIRST -- same conjunction, reordered.  See the twin
+      -- watch in battle_slots.lua for the measurement: emu.getState()
+      -- serialises the machine on every call, and $3ece is shared OT6
+      -- scratch written tens of thousands of times a run.
+      if not (v > 0 and H.readByte(0xB5) == 0x0F) then return end
       pcall(function()
         local s = emu.getState()
         local pc = (s["cpu.k"] << 16) | s["cpu.pc"]
-        if pc >= BOOSTDMG and pc < BOOSTDMG + 0xA0
-           and v > 0 and H.readByte(0xB5) == 0x0F then
+        if pc >= BOOSTDMG and pc < BOOSTDMG + 0xA0 then
           mulHits[#mulHits + 1] = v
         end
       end)
