@@ -511,6 +511,9 @@ QueueAction:
         lda     $3e4c,x     ; clear runic and retort ($3e4c.0 and $3e4c.2)
         and     #$fa
         sta     $3e4c,x
+        jsl     Ot6RunicHold    ; ot6 #59: ...unless boost bought this Runic a
+                                ;   DURATION, in which case the stance outlives
+                                ;   her turn and one turn of it is spent here
         cpx     #$08
         bcc     @0344       ; branch if a character
 
@@ -4139,6 +4142,8 @@ Cmd_0b:
         lda     $3e4c,x     ; set $3e4c.2 (runic)
         ora     #$04
         sta     $3e4c,x
+        jsl     Ot6RunicRaise   ; ot6 #59: and boost buys the stance a duration
+                                ;   -- on reactive verbs, boost buys duration
         jsr     _c2298a
         jmp     ExecSelfAttack
 

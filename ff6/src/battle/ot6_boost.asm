@@ -37,6 +37,16 @@
                                 ;   also sits past the clear, and a stale slot
                                 ;   would paint a phantom pip on the first
                                 ;   damage numeral of the NEXT battle
+        sta     f:$7e0000+OT6_RUNICPAID ; nor a stale runic-earn latch (#59):
+                                ;   like #37's, a stale bit here SUPPRESSES a
+                                ;   real earn rather than costing a no-op
+        sta     f:$7e0000+OT6_RUNICTURNS      ; #59: nor a phantom standing
+        sta     f:$7e0000+OT6_RUNICTURNS+2    ;   Runic.  four explicit stores
+        sta     f:$7e0000+OT6_RUNICTURNS+4    ;   rather than a loop -- only
+        sta     f:$7e0000+OT6_RUNICTURNS+6    ;   the character offsets
+                                ;   (0/2/4/6) are ever read, and a stale byte
+                                ;   would give the next battle's Celes a
+                                ;   standing magic shield she never paid for
         lda     #$01
         sta     OT6_BP_CLASS           ; characters open with 1 bp, octopath-style
         sta     $3e9e
@@ -127,6 +137,17 @@
                                 ;   regen also re-arms his reaction (the
                                 ;   boundary Runic's own machinery implies;
                                 ;   see Ot6CoverBP, ot6_kits.asm)
+        lda     $3018,x         ; #59: and the SAME boundary for Runic's own
+        eor     #$ff            ;   absorb earn, which needed one the moment
+        and     f:$7e0000+OT6_RUNICPAID  ;   boost gave the stance a duration.
+        sta     f:$7e0000+OT6_RUNICPAID  ;   Until v0.9 the cap was implicit --
+                                ;   RunicEffect ate the stance on the first
+                                ;   absorb, so one raise could only ever pay
+                                ;   once.  An extended stance absorbs many
+                                ;   times, and #37 (which was itself mirrored
+                                ;   FROM Runic) already settled what to do.
+                                ;   Separate ledger from COVERPAID on purpose:
+                                ;   see OT6_RUNICPAID in ot6_memory.inc.
         lda     OT6_BOOST_REVEALED,x         ; pending boost spent this action?
         beq     @gain
         sta     OT6_SCR_BIT     ; consume it: bp -= pending
@@ -189,7 +210,7 @@ done:   jsr     Ot6PipPending
 ; here therefore means this entity ate the spell as a raging monster
 ; rather than as a rune knight, and it banks nothing.
 ;
-; two economy rulings, both deliberate:
+; three economy rulings, all deliberate:
 ;   - the bank cap is Ot6ActionEnd's, untouched: an absorb at 5 bp is
 ;     simply capped. it never wraps, and it never mints a sixth pip that
 ;     Ot6Boost's `cmp OT6_BP_CLASS` would then happily let her spend.
@@ -201,6 +222,44 @@ done:   jsr     Ot6PipPending
 ;     turn she raised Runic is still paid for what she catches -- the
 ;     stance costs her the turn either way, and taxing it twice would
 ;     make boosting into Runic strictly worse than not boosting.
+;   - ONCE PER ROUND (#59), added when boost gave the stance a duration.
+;     See below; it is #37's ruling, coming home.
+;
+; ---- #59: WHAT AN EXTENDED STANCE DOES TO THE ECONOMY ----
+;
+; Until v0.9 this proc needed no cap because RunicEffect's own machinery
+; was one: it clears $3e4c.2 at :8671 on the first absorbable spell, so a
+; single raise could only ever pay once.  #37 read that as a rule and
+; mirrored it into the True Knight cover as an explicit once-per-round
+; latch.  Boost-as-duration now removes the implicit version, and #37's
+; explicit one comes home to the verb it was copied from.
+;
+; MEASURED, per Celes turn, with the earn capped at one per round:
+;
+;   raise turn   -3 bp (the spend), +0 regen (no-regen-after-boost), +1
+;                if anything absorbable lands before her next turn
+;   each of the 3 stance turns   +1 regen, +1 absorb  = +2
+;   ----------------------------------------------------------------
+;   4 turns, 3 actions taken:  -3 +1 +2 +2 +2  =  +4 bp
+;   4 turns of anything else, 4 actions taken:      +4 bp
+;
+; So a 3-BP Runic is BP-NEUTRAL by construction, and what it actually
+; costs is one action.  That is the whole ruling: boost buys three turns
+; of standing magic shield for a turn of tempo, not for free BP.
+;
+; WITHOUT the cap it is a self-funding loop and not a close call.  The
+; earn is per ABSORB, and RunicEffect pays every absorbing entity on
+; every absorbable cast -- so three enemy casters against a three-turn
+; stance is up to nine earns against a three-point spend.  Bank cap 5
+; bounds the STOCK but not the FLOW: she spends three and they come
+; straight back, which makes boosting free for the rest of the fight in
+; exactly the fights the ability is for.  Measured A/B in
+; battle_runic.lua's "milked" phase.
+;
+; The third option #59 lists -- per absorb, unscaled, justified by
+; casters being rare -- is the one the measurement kills: it is not rare
+; in the fights this stance is bought for, which is the same as saying
+; the ability tunes itself off.
 ;
 ; a8 (vanilla's `shorta` is the instruction immediately before), index
 ; width either -- no index immediates and no pushes, per this file's
@@ -211,15 +270,122 @@ done:   jsr     Ot6PipPending
         .a8
         tya                     ; width-neutral character test
         cmp     #$08
-        bcs     done            ; monsters bank no bp
+        bcs     done            ; monsters bank no bp and hold no duration
         lda     $3e4c,y
         and     #$02            ; survived as enemy runic: a raging gau
         bne     done            ;   ate it, not a rune knight
+        ; #59: THE STANCE OUTLIVES THE ABSORB while its duration runs.
+        ; RunicEffect cleared $3e4c.2 four instructions after it decided
+        ; this entity was absorbing (:8670-8671) and before the status gate
+        ; that let it through; putting the bit back HERE -- past every gate,
+        ; on the far side of the enrolment -- extends the stance without
+        ; re-deriving one byte of vanilla's eligibility.
+        ;
+        ; db-relative rather than long here because the 65816 has no `lda
+        ; long,y` -- only long,x.  That is safe at this site and not a
+        ; guess: the two instructions above are vanilla's own `lda $3e4c,y`
+        ; and this proc has always depended on db = $7e for them.
+        lda     OT6_RUNICTURNS,y
+        beq     @earn           ; 0 = vanilla Runic: one absorb, then gone
+        lda     $3e4c,y
+        ora     #$04
+        sta     $3e4c,y
+@earn:  lda     $3018,y         ; this character's bit ($01/$02/$04/$08)
+        and     f:$7e0000+OT6_RUNICPAID
+        bne     done            ; already banked an absorb this round (#59)
         lda     OT6_BP_CLASS,y
         cmp     #$05
         bcs     done            ; the bank cap holds; an absorb never wraps
         inc
         sta     OT6_BP_CLASS,y
+        lda     $3018,y         ; latch: paid this round.  set only when a pip
+        ora     f:$7e0000+OT6_RUNICPAID  ;   was really banked, so a capped-away
+        sta     f:$7e0000+OT6_RUNICPAID  ;   earn at 5 bp costs nothing -- #37's
+                                ;   own argument, and it still holds: inside one
+                                ;   round nothing but her own action can lower
+                                ;   a held character's bank, and that action IS
+                                ;   the boundary that clears this latch
+done:   rtl
+.endproc
+
+; ------------------------------------------------------------------------------
+
+; [ #59: boost buys Runic a DURATION -- the raise ]
+;
+; The canon rule this ships: ON REACTIVE VERBS, BOOST BUYS DURATION.
+; Damage verbs multiply and chance verbs buy certainty (DESIGN.md); Runic
+; is neither, which is why it sat outside the canon from v0.3 until now.
+; It is also not a new category so much as the reactive reading of one
+; DESIGN.md already had -- "Buffs/debuffs: duration per BP".
+;
+; Boost N (1-3) = the stance stands for N of CELES'S OWN TURNS beyond the
+; one that raised it, and she acts freely on every one of them.
+;
+; "SHE STILL ACTS" AND "IT LASTS LONGER" ARE THE SAME LEVER, which is the
+; one place #59's proposal does not survive contact with the code.  The
+; issue offers them as separable rungs -- 1 BP buys the free turns, 2-3
+; buy duration.  They cannot be separated: vanilla ends the stance in
+; QueueAction (battle_main.asm:511) precisely BECAUSE she acted, so the
+; only way she can act without dropping it is for the stance to outlive
+; her action -- and that IS duration.  So the ladder is 1/2/3 turns of
+; shield-you-can-act-through, and there is no rung that buys only one of
+; the two.
+;
+; entry (jsl from Cmd_0b, immediately after its `ora #$04 / sta $3e4c,x`
+; sets the stance): a8/i8 (command context), x = the actor's entity
+; offset, db=$7e.  width-agnostic body -- no index immediates, no pushes.
+; a clobbered (dead: Cmd_0b falls into `jsr _c2298a`).
+.proc Ot6RunicRaise
+        .a8
+        txa                     ; width-neutral character test (Cmd_0b's own
+        cmp     #$08            ;   `tyx` put the actor here)
+        bcs     done            ; monsters hold no duration
+        lda     OT6_BOOST_REVEALED,x   ; pending boost = turns of stance
+        cmp     #$04
+        bcc     :+
+        lda     #$03            ; (defensive: Ot6Boost already caps at 3)
+:       sta     f:$7e0000+OT6_RUNICTURNS,x
+done:   rtl
+.endproc
+
+; ------------------------------------------------------------------------------
+
+; [ #59: boost buys Runic a DURATION -- surviving her own turn ]
+;
+; QueueAction clears the runic and retort bits on every action ANY entity
+; queues (battle_main.asm:511-513, `and #$fa`), which is what makes vanilla
+; Runic cost the turn it protects: raise it, and your next turn ends it.
+; This hook runs immediately after that clear and puts the runic bit back
+; while the duration lasts, spending one turn of it each time.
+;
+; AFTER vanilla's clear rather than replacing it, deliberately: the retort
+; bit ($3e4c.0) is cleared by the same instruction and has nothing to do
+; with #59, so leaving vanilla's three instructions alone and re-setting
+; one bit is both smaller (4 bytes vs 8) and impossible to get wrong.
+;
+; The decrement happens HERE -- at the moment she takes a turn -- so the
+; counter measures exactly what the player is promised: turns she gets to
+; act under the shield.  With N latched, her Nth post-raise turn still
+; restores the stance (the store goes to 0 but the bit goes back), and her
+; N+1th finds 0 and lets vanilla's clear stand.  A monster's QueueAction
+; falls out at the character test, and an unboosted Runic reads 0 and is
+; untouched -- vanilla to the byte.
+;
+; entry (jsl from QueueAction, right after its `sta $3e4c,x`): x = the
+; queueing entity's offset, db=$7e.  a8 and width-agnostic; a clobbered
+; (QueueAction reloads at :514).
+.proc Ot6RunicHold
+        .a8
+        txa                     ; width-neutral character test
+        cmp     #$08
+        bcs     done            ; monsters hold no duration
+        lda     f:$7e0000+OT6_RUNICTURNS,x
+        beq     done            ; no extended stance: vanilla's clear stands
+        dec
+        sta     f:$7e0000+OT6_RUNICTURNS,x   ; one turn of shield spent
+        lda     $3e4c,x
+        ora     #$04            ; ...and the stance survives her acting
+        sta     $3e4c,x
 done:   rtl
 .endproc
 

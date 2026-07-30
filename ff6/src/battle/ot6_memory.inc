@@ -235,6 +235,34 @@ OT6_PIPPEND          := $ed74   ; #42: a DEFERRED pip paint -- character slot
 OT6_BRKLIVE          := $ed75
 OT6_BRKTICK          := $ed76   ; 12 bytes
 OT6_BRKPAL           := $ed82   ; 12 bytes
+; #59: boosted Runic.  ON REACTIVE VERBS, BOOST BUYS DURATION (DESIGN.md), and
+; Runic is the first instance -- so the stance needs a lifetime, which vanilla
+; never gave it (its stance is one bit that dies on the first absorb or on
+; Celes's next action, battle_main.asm:8671 and :511).
+;
+; TURNS, one byte per character, stride 2 and indexed by the ENTITY offset
+; (0/2/4/6) like OT6_BP_CLASS -- Ot6RunicRaise latches the pending boost here
+; at Cmd_0b, Ot6RunicHold decrements it at each of her QueueActions and puts
+; the stance bit back, and 0 means "vanilla Runic": one absorb, then gone.
+; The odd bytes are unused.  It is a TURN count and not an absorb count
+; deliberately: a turn count is legible to the player ("three turns of
+; shield") and it also BOUNDS the BP earn by construction, since the earn is
+; capped at one per round.  Cleared per character by InitBP -- it sits past
+; the shadow clear, and a stale value would hand the next battle a phantom
+; standing stance, which is a mechanic and not a cosmetic.
+OT6_RUNICTURNS       := $ed8e   ; 8 bytes (4 characters, stride 2)
+; #59: the once-per-round absorb-earn latch -- a per-character bitmask
+; (----1234, the OT6_COVERPAID / $3f2f shape).  Bit set = that character's
+; Runic has already banked its BP this ROUND.
+;
+; A SEPARATE BYTE FROM OT6_COVERPAID, deliberately.  #37's cover latch has the
+; identical shape and four spare high bits, and sharing them was weighed: the
+; two are different verbs with different prices -- Runic costs a turn, a True
+; Knight cover costs a relic slot and nothing else -- so one shared latch
+; would make equipping True Knight silently tax Celes's Runic earn, an
+; interaction nobody asked for and nobody would find.  One rule ("a reactive
+; earn is once per round"), two ledgers.
+OT6_RUNICPAID        := $ed96
 OT6_BREAK_FLASH      = $18      ; 24 frames: three 4-frame pulses (see
                                 ;   Ot6BreakFlash's `and #$04` cadence)
 OT6_BREAK_SFX        = $be      ; vanilla's Odin/Raiden cleave sfx
@@ -260,6 +288,11 @@ OT6_BREAK_SFX        = $be      ; vanilla's Odin/Raiden cleave sfx
 .assert OT6_BRKPAL = OT6_BRKTICK + 12, error, "break-flash palette bank must follow the tick array without overlap"
 .assert OT6_BRKTICK > OT6_SHADOW + $70 - 1, error, "break-flash state sits PAST InitBP's shadow clear (Ot6SeedShields zeroes it per slot)"
 .assert OT6_BRKPAL + 12 - 1 <= $ef1f, error, "OT6 shadow tail exceeds the measured-free range ($f120+ is PushMode7Vars')"
+.assert OT6_RUNICTURNS >= OT6_BRKPAL + 12, error, "runic duration must not collide with the break-flash palette bank"
+.assert OT6_RUNICPAID = OT6_RUNICTURNS + 8, error, "the runic earn latch must follow its duration array without overlap"
+.assert OT6_RUNICTURNS > OT6_SHADOW + $70 - 1, error, "runic duration sits PAST InitBP's shadow clear (InitBP zeroes it per character)"
+.assert OT6_RUNICPAID <= $ef1f, error, "OT6 shadow tail exceeds the measured-free range ($f120+ is PushMode7Vars')"
+.assert OT6_RUNICPAID <> OT6_COVERPAID, error, "the runic and cover earn latches must stay separate ledgers (see OT6_RUNICPAID)"
 
 
 .endif

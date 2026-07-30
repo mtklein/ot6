@@ -176,9 +176,11 @@ the next work block.
 - ✅ **Attack +1 hit per BP** (2026-07-16): extra swings via the vanilla
   alternating-hands machinery; Genji Glove doubles the bonus.
 - ✅ **Boost-tier spell folding** (2026-07-16): Fire → Fire 2 → Fire 3
-  at 1/2 BP, queued as the higher tier (name, animation, power) with
-  the base spell's MP cost; tier-family spells never take the generic
-  multiplier. Fire/Ice/Bolt/Poison/Cure/Life/Slow/Haste lines.
+  at 1/2 BP, queued as the higher tier (name, animation, power);
+  tier-family spells never take the generic multiplier.
+  Fire/Ice/Bolt/Poison/Cure/Life/Slow/Haste lines. Shipped charging the
+  BASE spell's MP; **#64 (v0.9) made it charge the tier's own**, and made
+  the list's price and grey-out follow.
 - ⬜ Cyan converted (charge gauge → BP Bushido): post-demo, he is not
   reachable in the demo stretch.
 
@@ -231,7 +233,9 @@ Landing across releases rather than as one block:
 - **Stat mods are the simple while-equipped kind** for v0.4 (hold it,
   get the bump); the "earn-it-by-carrying" passive version is deferred.
 - Boost spell-folding is source-agnostic, so a borrowed Fire folds to
-  Firaga under boost for free.
+  Firaga under boost. **Not for free since #64** — the fold reaches
+  untaught tiers (kept, deliberately: it is what lets every spell list
+  stay at 8) but pays that tier's real MP for them.
 - v0.4 authors the Zozo espers (Ramuh + Kirin/Siren/Stray). Every esper
   encountered after that receives its own complete redesign in the release
   where it becomes available: Ifrit and Shiva in v0.6, then the later WoB

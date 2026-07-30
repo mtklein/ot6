@@ -201,9 +201,51 @@ mistake, not shipping the wrong number once.
   > and #52 ruled on both halves: the price moves 2 → 4, and the
   > invisibility is accepted until #55 rather than answered with a new
   > display surface. See "Steal's price is real and invisible" below.
-- **Boost never raises MP cost.** The shipped tier fold queues
-  Fire 3 at Fire's cost (DEMO.md): BP is the tier price, MP the
-  cast price. That split ports unchanged to every costed verb —
+- **Boost never raises MP cost** — *superseded for magic by #64
+  (v0.9); still true of every other verb.* The original wording was
+  "the shipped tier fold queues Fire 3 at Fire's cost (DEMO.md): BP is
+  the tier price, MP the cast price."
+
+  > **What #64 changed, and why the rest of the rule survives it.**
+  > @vanorasc pointed out that on the magic list this made boost a
+  > *discount engine*: the folded cast beat three separate casts on
+  > **both** axes, fewer turns and less MP. The split the rule was
+  > reaching for is real, but it is drawn one step over:
+  >
+  > **BP buys tempo. MP buys power.**
+  >
+  > One Fire 3 instead of three Fires still saves two turns — that is
+  > what the boost bought — and the magnitude is paid for at the
+  > tier's own price. Measured out of `magic_prop_en.dat` rather than
+  > guessed (the issue expected ~3×/10×): the real spread is **2.0×**
+  > (Life → Life 2, 30 → 60) to **8.7×** (Poison → Bio, 3 → 26), with
+  > Fire 4 → 20 → 51. Dearest folded tier is Life 2 at 60, well under
+  > the 99 ceiling (#57). `tools/tests/battle_foldcost.lua` recomputes
+  > the whole table from the ROM and holds it to the ceiling, to
+  > monotonicity, and to a two-sided check that the fold still buys
+  > something without buying it too cheaply.
+  >
+  > As %-of-pool those tiers run **8–11% at the level they are
+  > naturally learned** — dead on #45's 8–20% vanilla ruler, which is
+  > unsurprising since they *are* vanilla prices — but **40–133% at
+  > the level folding reaches them**. That gap is the purchase: at L6
+  > a folded Fire 3 costs more than Terra's entire bar, so it is
+  > simply not castable until L8 and empties her when it is. The one
+  > soft spot is **Haste2 at 12.0%**, because Haste itself is not
+  > learned until Celes is L32 with a 316 pool — the one family where
+  > #64 barely bites.
+  >
+  > The other half of #64 is that the list stopped lying: the price,
+  > the grey-out and the A-button's refusal all follow the folded tier
+  > now, because they and `GetMPCost` read one cell and OT6 moves that
+  > cell (`Ot6FoldPrices`). And **untaught-tier access is now a
+  > decision rather than an inheritance**: folding still reaches tiers
+  > the caster never learned — that is the trick that keeps every
+  > spell list at 8 — but it is a purchase at the tier's real price
+  > instead of a freebie.
+
+  The BP-buys-the-tier/MP-prices-the-cast split ports unchanged to every
+  costed verb —
   including the now-shipped **boost-tiered Steal** (kits.md): its
   BP buys the guarantee, and its MP question is unchanged by the
   boost, riding the M4 costing (the "flat small" row below)

@@ -461,7 +461,7 @@ ice/order/tempo. The duality reads clearer than vanilla ever made it.
 
 | # | Spell/Skill | Level |
 |---|---|---|
-| 1 | Runic ✦ (absorbs next spell → **+1 BP** ✦) | join |
+| 1 | Runic ✦ (absorbs next spell → **+1 BP** ✦; **boost buys turns** ✦) | join |
 | 2 | Ice | join (vanilla 1) |
 | 3 | Cure | 4 (vanilla) |
 | 4 | Imp | 13 (vanilla) |
@@ -482,8 +482,51 @@ ice/order/tempo. The duality reads clearer than vanilla ever made it.
   Vanilla's own gate is untouched — what Runic can eat is still the
   spell's `MagicProp` absorb flag, which excludes every esper and every
   MagiTek beam. The Narshe school's $026F now names the BP.
+- **Boosted Runic (#59, v0.9): on reactive verbs, boost buys duration.**
+  The third canon category, stated in DESIGN.md because future reactive
+  verbs inherit it. 1/2/3 BP = **1/2/3 of Celes's own turns** during which
+  the stance stands and **she acts normally**. Rulings:
+  - **The two halves of the owner's proposal are one lever, not two rungs.**
+    He suggested separating "she still acts" from "it lasts longer" — 1 BP
+    for the free turns, 2-3 for duration. The code says no: vanilla ends
+    the stance in `QueueAction` (battle_main.asm:511) *because* she acted,
+    so the only way she can act without dropping it is for the stance to
+    outlive her action, which is duration. There is no rung that buys one
+    without the other.
+  - **Turns, not absorbs.** A turn count is what the player can read off
+    the fight ("three turns of shield"); an absorb count is legible only
+    to the enemy's script. It also bounds the economy for free.
+  - **The BP earn is once per round** (`OT6_RUNICPAID`), which is #37's
+    True Knight cap coming home to the verb it was copied from. Before
+    #59 the cap was implicit — `RunicEffect` ate the stance on the first
+    absorb, so one raise could only ever pay once. **Measured, not
+    assumed:** with the cap, four absorbable casts inside one round of
+    Celes's bank exactly +1 and a 3-BP Runic comes out BP-neutral against
+    three ordinary turns, costing one action. On a control build with the
+    latch removed the same four casts bank +2 — and that is with a *single*
+    caster; the loop scales with how many things are casting and how long
+    the stance stands, which is exactly the fight the stance is bought for.
+    (`battle_runic.lua`, the "milked" phase.)
+  - **The MP half stays per absorb and uncapped.** Only the BP earn is
+    rationed. Vanilla's restore is the reason a rune knight wants a caster
+    boss, and rationing it would delete the ability's own reward.
+  - **Vanilla's ally-spell quirk is KEPT, and it now bites far more often.**
+    Runic eats a *friendly* cast as happily as a hostile one, and a stance
+    that stands for three turns will eat a lot of Terra's Cures. That is
+    charm and it is also the real constraint that stops a standing shield
+    from being strictly good — say so on the tin rather than patching it.
+  - Known edge: a spell that arrives while Celes is stopped/asleep clears
+    the stance bit at `RunicEffect`:8671 without absorbing (vanilla's own
+    `CheckStatus` gate), and the bit only comes back at her next turn. The
+    duration survives; the coverage gap does not. Left as vanilla.
 - Divine leaning ✦-ward: **RunicBlade** — a Runic stance that also
   *reflects* what it eats (absorb the MP as BP, bounce the spell).
+  **It is a separate ability, not what a boosted Runic becomes** (#59
+  asked). Boost buys *duration* on reactive verbs; if row 8 were simply
+  "Runic at 3 BP" the canon would have an exception at its own top rung,
+  and the divine would be unreachable for anyone out of BP. RunicBlade
+  changes the *kind* of the reaction (reflect, not just absorb) and can
+  then take duration from boost like any other reactive verb.
   Absolute Zero stays the listed alternate until playtest.
 - Passive candidates: *Rune Eater* (Runic feeds 2 BP), *Cold Blood*
   (ice chips +1), *Aegis* (magic taken at 0 pending −20%).
