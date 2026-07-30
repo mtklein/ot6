@@ -10,7 +10,27 @@ make rom                                        # build build/ot6.sfc
 tools/tests/run.sh tools/tests/gen_battle_state.lua   # power-on -> first battle -> savestate
 tools/tests/run.sh tools/tests/battle_smoke.lua       # load savestate -> assert battle state
 make frontier                                   # mint the deep story states (slow)
+
+python3 tools/tests/lib/compose.py --check-states      # IS A RED TEST MINE?
 ```
+
+**Ask `--check-states` first when something is red and you did not expect
+it.**  A frontier fixture that was minted from sources this tree no longer
+has boots into a ROM whose timing it does not match, and the result is a
+red test that has nothing to do with your change -- usually a *timeout on
+some innocent step*, which reads exactly like a product bug.  This is the
+common case in a fresh worktree, not an exotic one: `tools/worktree-setup.sh`
+seeds from whatever the main checkout last minted, and on 2026-07-30 that was
+105 of 105 fixtures stale on arrival.
+
+`--check-states` answers it in ~2s, names the shared input that moved when
+there is one, and gives you the targeted re-mint
+(`nice -n 10 ninja -f build/build.ninja <state>`) rather than the hours-long
+full chain.  `suite.sh` and `worktree-setup.sh` both run it for you, and a
+timeout that happens on a fixture it flagged says so in the failure itself.
+The alternative -- re-running the same tests against unmodified `main` to
+see whether they were red there too -- is what four agents each did
+independently on 2026-07-29, for the same ten tests.
 
 `make test` mints only the three states the suite asserts on.  The
 STORY CHAIN past the whelk -- the Narshe escape, the Figaro chapter,
@@ -497,6 +517,18 @@ Plain functions (call from `H.call`/predicates):
 - `H.readByte/readWord(addr)` - WRAM; accepts `$7E`-prefixed or plain offsets.
   `H.writeByte/writeWord`, `H.readRomByte/readRomWord` (PRG ROM file offsets).
 - `H.assertEq(got, want, what)` - logs and raises on mismatch (exit 1).
+- `H.sym("Name")` - the ca65 symbol's 24-bit SNES CPU address, derived from
+  `ff6/rom/ff6-en.dbg` at COMPOSE time (so the argument must be a string
+  LITERAL; a variable resolves to nothing).  Mask `& 0x3FFFFF` for a
+  `readRomByte/Word` file offset.  Use this instead of an address literal:
+  literals go stale on every bank-`$F0`/`$C2`/`$C0` shift, and that was the
+  single most recurring source of harness breakage.
+  **A name the linker emits more than once is a compose-time ERROR**, not a
+  guess -- 3838 of this ROM's 98483 label names are non-unique, and `ExecCmd`
+  is both field code and the battle command dispatcher.  Say which by naming
+  the ca65 SEGMENT: `H.sym("ExecCmd@battle_code")`.  Segment names come from
+  `ff6/cfg/ff6-en.cfg` and survive the bank shifts that move addresses, so a
+  qualified reference is no more fragile than a bare one.
 - `H.saveState(name)` / `H.loadState(sidecarPath)` - see savestate notes.
 - `H.screenshot(tag)` - emits PNG via stdout; run.sh writes the file.
 - `H.setPad(buttons)` - immediate raw input set (steps use this internally).
