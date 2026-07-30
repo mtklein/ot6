@@ -3142,7 +3142,7 @@ Ot6LoadoutLbl3Text:     pos_text OT6_LOADOUT_LBL3
 ; ------------------------------------------------------------------------------
 ; GAU'S RAGE LOADOUT PAGE (issue #40) -- the MenuState_7b shim, at eight rows
 ;
-; Every decision is bank-F0 (Ot6Rage* in ot6_kits.asm); this is tilemap, cursor
+; Every decision is bank-F0 (Ot6Rage* in ot6_rage.asm); this is tilemap, cursor
 ; and DMA only, exactly as the Bushido page's shim is.  Two shape differences,
 ; both forced by Gau's numbers: names come from MonsterName (255 candidates)
 ; instead of BushidoName (8), and there is no drawn "pool" grid -- the L/R
@@ -3278,7 +3278,7 @@ Ot6RagePrice:
 ;
 ; Slot order is the cursor framework's own index -- $4b = cols*row + col
 ; (CalcShortListIndex) -- so slot even = left column, slot odd = right, and
-; row = 5 + (slot & ~1).  Ot6RageCurSlot (ot6_kits.asm) computes the same
+; row = 5 + (slot & ~1).  Ot6RageCurSlot (ot6_rage.asm) computes the same
 ; number on the F0 side; the two must not drift.
 Ot6RageDrawSlots:
         lda     #BG1_TEXT_COLOR::DEFAULT

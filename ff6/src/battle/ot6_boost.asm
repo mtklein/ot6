@@ -136,7 +136,7 @@
         sta     f:$7e0000+OT6_COVERPAID  ;   the same tick that decides his
                                 ;   regen also re-arms his reaction (the
                                 ;   boundary Runic's own machinery implies;
-                                ;   see Ot6CoverBP, ot6_kits.asm)
+                                ;   see Ot6CoverBP, ot6_cover.asm)
         lda     $3018,x         ; #59: and the SAME boundary for Runic's own
         eor     #$ff            ;   absorb earn, which needed one the moment
         and     f:$7e0000+OT6_RUNICPAID  ;   boost gave the stance a duration.
@@ -1191,7 +1191,7 @@ Ot6ThiefCostTbl:
 ;
 ;   1. the price was NEVER DISPLAYED.  Leap is a top-level command row, not a
 ;      list entry, so nothing ever drew "2 MP" beside it -- the id-keyed
-;      pricing surfaces (Ot6CostFor -> ot6_kits.asm / skills.asm) only reach
+;      pricing surfaces (Ot6CostFor -> ot6_loadout.asm / skills.asm) only reach
 ;      verbs that open a window.  The command window itself
 ;      (command_window_data_set, btlgfx_main.asm:10099-10125) stores only the
 ;      command byte and a GetTextColor colour per row, and that colour is

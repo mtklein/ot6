@@ -89,7 +89,7 @@ OT6_SLOTTIER         := $57ba   ; Slot's latched boost tier (#31 backfill):
                                 ;   Ot6SlotRig, re-banked into
                                 ;   OT6_BOOST_REVEALED by Ot6SlotCommit so
                                 ;   Ot6ActionEnd charges what the reels
-                                ;   delivered (ot6_kits.asm, the Slot strip)
+                                ;   delivered (ot6_slot.asm, the Slot strip)
 OT6_PIPTAIL          := $57bb   ; #33: frames of live pip painting left after
                                 ;   an ActionEnd with the battle menu closed
                                 ;   -- keeps the charge visible on its own

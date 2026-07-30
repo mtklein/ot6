@@ -687,7 +687,7 @@ Ot6ElemPalTbl:
 ; The field pages want exactly what Ot6ElemGlyphFor decides -- element first,
 ; the ability's break class when it has none, blank when it has neither -- and
 ; they must not get a second opinion about it.  #46 could not call it and wrote
-; Ot6SkillClassGlyph (ot6_kits.asm) instead for two reasons, both now gone: the
+; Ot6SkillClassGlyph (then in ot6_kits.asm, deleted in v0.9) instead for two reasons, both now gone: the
 ; element glyphs did not exist in the field font (the upload above), and
 ; Ot6ElemGlyphFor is an rts leaf.  This is the rtl wrapper; the CLASS-only leaf
 ; is retired, so there is one glyph authority for both halves of the game.
