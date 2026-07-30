@@ -1108,9 +1108,7 @@ OT6_RANDMAGIC := $a5            ; the marker value (junk is $00/$ff in
         bcs     @deny
 @store: sta     OT6_BOOST_REVEALED,y
         inc     $6281           ; ching (spc $2c): boost committed
-        lda     #$80
-        sta     OT6_RESTAGE     ; open lists re-fold their names
-        bra     @show
+        bra     @refold
 @deny:  inc     $95             ; error buzz: at cap or out of bp
         bra     @show
 @tryl:  bit     #$20            ; L: boost down
@@ -1120,8 +1118,26 @@ OT6_RANDMAGIC := $a5            ; the marker value (junk is $00/$ff in
         dec     a
         sta     OT6_BOOST_REVEALED,y
         inc     $94             ; cursor click: boost taken back
+@refold:
         lda     #$80
         sta     OT6_RESTAGE     ; open lists re-fold their names
+        ; ...and re-PRICE them (#64).  The folded name was only ever half the
+        ; row: the MP number, the grey and the A-button's refusal all read
+        ; spell-list byte 3, which Ot6FoldPrices rewrites off this same
+        ; pending value -- and the enabled bits are then re-derived from it by
+        ; vanilla's own UpdateEnabledMagic, which Ot6FoldPrices hangs off.
+        ;
+        ; DIRECTLY, not through vanilla's $3204 bit-7 request.  That request
+        ; is the obvious move and it is wrong here: the main loop consumes it
+        ; in AfterAction2, "update targets after each command", so the list
+        ; would re-price at the end of the NEXT action rather than under the
+        ; player's cursor.  Measured on exactly that version -- an L press
+        ; refolded Fire 3 to Fire 2 and left the row priced at 4 MP for the
+        ; rest of the menu (battle_preview.lua's ladder is the gate).
+        ; Ot6ActionEnd still uses the request bit, because there the timing
+        ; is right: an action has just ended, so AfterAction2 is next.
+        tya                     ; the boosting character's entity offset
+        jsl     Ot6RecheckMagic
 @show:  rts                     ; display is Ot6PipStage's job now (#33)
 @off:   rts
 .endproc
