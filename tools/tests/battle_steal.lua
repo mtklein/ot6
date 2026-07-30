@@ -17,19 +17,23 @@
 --     rare slot, certain at 3 bp.
 --   Ot6BoostDmg's $05 gate -- steal never gets a damage multiplier.
 --
--- HOW THE RESOLUTION IS EXERCISED. The doorstep is the Magitek opening; its
--- target-select confines Steal to the party group, so the installed Locke's
--- steal resolves against a PARTY entity. That is deliberate and sound:
--- TargetEffect_52's path is target-type-agnostic -- it reads $3308+y/$3309+y
--- and grants $32f4+x for ANY target y -- so a party-entity target runs the
--- identical success-roll + slot-pick + boost-tier code a monster target would.
--- We poke every party entity's two steal slots (the RAM the notes call
--- "$3308 Steal Item 1 (12.5%)" / "$3309 Steal Item 2 (87.5%)", stride 2), the
--- way battle_bushido installs Cyan by poke. One actor acts per scenario
--- (others + enemies stopped), so every steal is attributable.
+-- HOW THE RESOLUTION IS EXERCISED. TargetEffect_52's path is
+-- target-type-agnostic -- it reads $3308+y/$3309+y and grants $32f4+x for ANY
+-- target y -- so the identical success-roll + slot-pick + boost-tier code runs
+-- whether the cursor lands on a monster or on a party entity. EVERY entity on
+-- BOTH SIDES therefore gets this scenario's two sentinel steal slots (the RAM
+-- the notes call "$3308 Steal Item 1 (12.5%)" / "$3309 Steal Item 2 (87.5%)",
+-- stride 2) and level 50, the way battle_bushido installs Cyan by poke. Until
+-- #55 only the party side was poked, because the fixture's forged command byte
+-- ($202e without the $2030 targeting byte beside it) left the cursor opening on
+-- the party; #55's submenu gives the Steal row its own correct
+-- MANUAL|ONE_SIDE|ENEMY byte, so it opens on the enemy the way a real Steal
+-- always has. Pinning both sides makes the test indifferent to that, which is
+-- where it should have been all along. One actor acts per scenario (others +
+-- enemies stopped), so every steal is attributable.
 --
--- THE RNG IS DRIVEN DETERMINISTICALLY. With attacker and target in the party
--- group, level cancels: chance = level+50-targetLevel = 50, a coin flip. We pin
+-- THE RNG IS DRIVEN DETERMINISTICALLY. With attacker and target both at level
+-- 50, level cancels: chance = level+50-targetLevel = 50, a coin flip. We pin
 -- the battle RNG index $be the instant the roll runs -- an exec callback at
 -- RandA (a $be write made anywhere earlier does not survive the intervening
 -- draws) -- keyed to a value derived from the live RNGTbl so the success RandA
@@ -76,6 +80,26 @@ local function pinEnemies()
     H.writeByte(0x3EF8 + ENT_M(s), H.readByte(0x3EF8 + ENT_M(s)) | 0x10) -- stopped:
     -- no enemy acts, so nothing attacks the actor (the no-damage assert is
     -- clean) and the RNG stays ours between drives.
+    --
+    -- #55: THE ENEMY SIDE IS PINNED IDENTICALLY TO THE PARTY SIDE NOW.  This
+    -- fixture used to rely on the steal landing on a PARTY entity, which it did
+    -- for a reason that was never the game's intent: pinParty forges a command
+    -- BYTE at $202e without the TARGETING byte at $2030 beside it, so the row
+    -- kept the original command's targeting and the cursor opened on the party.
+    -- Locke's Steal has always been MANUAL|ONE_SIDE|ENEMY (battle_cmd_prop.asm:53)
+    -- and #55's submenu supplies exactly that byte per row, so the cursor now
+    -- opens where a real Steal always opened -- on the enemy -- and the steal
+    -- resolved against a monster holding vanilla loot instead of this
+    -- scenario's sentinels.  Rather than re-forge the party-side quirk, both
+    -- sides are pinned: the same two sentinel slots and the same level 50, so
+    -- `chance = level + 50 - targetLevel = 50` and every seeded outcome below
+    -- holds WHICHEVER side the cursor lands on.  TargetEffect_52 is
+    -- target-type-agnostic (it reads $3308+y/$3309+y and grants $32f4+x for any
+    -- target y), which is what made the old party-side run sound and makes this
+    -- one sound too -- the test no longer depends on the answer either way.
+    H.writeByte(0x3B18 + ENT_M(s), 50)
+    H.writeByte(stealRare(ENT_M(s)), cfg.rare)
+    H.writeByte(stealCommon(ENT_M(s)), cfg.common)
   end
 end
 

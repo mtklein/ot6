@@ -2869,15 +2869,21 @@ OT6_THIEF_BESTOW = $58
 ; AttackName pad slots this menu already named.  Steal is left alone: no banner,
 ; byte-for-byte as it ships.
 ;
-; The store is width-pinned here rather than in C2 on purpose: a 16-bit `stz`
-; would also zero $3413, which ExecAttack reads three instructions later
-; (`lda $3413 / bmi`) and expects to still be the $ff the fill left.
+; The widths are PINNED here rather than assumed from the command context, this
+; file's standing discipline: a 16-bit A would make `lda $b6` a two-byte load and
+; the row compare a two-byte compare, and -- worse -- a 16-bit `stz $3412` would
+; also zero $3413, which ExecAttack reads three instructions later (`lda $3413 /
+; bmi`) and expects to still be the $ff ExecAction's fill left there.  The carry
+; is set AFTER the plp so the answer survives the restore.
 ;
-; entry: jsl from Cmd_05 after its `tyx` and `jsr _c2298a`, db=$7e, a8/i8.
-; x = y = attacker entity offset, $b6 = the queued row id, $b8/$b9 = the target
-; mask the menu chose.  out: carry SET = handled (skip the steal effect), carry
-; CLEAR = plain Steal, run vanilla.  preserves x and y; clobbers a.
+; entry: jsl from Cmd_05 after its `tyx` and `jsr _c2298a`, db=$7e (the command
+; context's; $b6 is direct page and jsl preserves D).  x = y = attacker entity
+; offset, $b6 = the queued row id, $b8/$b9 = the target mask the menu chose.
+; out: carry SET = handled (skip the steal effect), carry CLEAR = plain Steal,
+; run vanilla.  preserves x and y; clobbers a.
 .proc Ot6ThiefExec
+        php
+        shortai
         .a8
         .i8
         lda     $b6
@@ -2889,14 +2895,12 @@ OT6_THIEF_BESTOW = $58
         bra     @named
 @bestow:
         jsl     Ot6Bestow
-@named: php
-        sep     #$20                    ; 8-bit: $3413 is not ours to clear
-        .a8
-        stz     $3412                   ; attack name type 0 -> AttackName[$b6-$51]
+@named: stz     $3412                   ; attack name type 0 -> AttackName[$b6-$51]
         plp
         sec                             ; handled: no steal special effect
         rtl
-@plain: clc
+@plain: plp
+        clc
         rtl
 .endproc
 
