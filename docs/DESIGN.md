@@ -131,6 +131,11 @@ enemies* — vanilla FF6 was flirting with this system in 1994.
 | Mog | Dancer | Spear | varies by dance | the 8 Dances, verbatim |
 | Umaro / Gogo | Berserker / Mime | — | — | bonus characters; Gogo = "every job, mastered none" |
 
+*(**2026-07-30:** Gau's row — "Leap becomes Capture; controlled beast skills
+replace berserk Rage" — and the "Capture" in Pillar 1's signature list are
+both retired. Rage is kept, Leap keeps its name and is free. Full correction
+under "Gau, controlled" below; canonical kit in `design/kit-gau.md`.)*
+
 **Weapon classes (8):** sword, dagger, spear, katana, claw, rod, ranged
 (cards/dice/boomerangs/thrown), brush.
 **Elements (8):** FF6's native fire, ice, lightning, wind, earth, water,
@@ -154,7 +159,7 @@ become shield shredders, exactly the role multi-hits play in Octopath.
 > *whole-side*: `ItemProp $aa` sets no extra-attack effect, so it lands one
 > hit per body and exactly **one** chip against a solo boss. Breadth, not
 > rate. Quadra Slam is genuinely ×4 (`MagicProp $58` effect `$32`,
-> `AttackerEffect_32` at `battle_main.asm:10782-10796`). An audit of all 256
+> `AttackerEffect_32` at `battle_main.asm:10794-10796`). An audit of all 256
 > `MagicProp` + 256 `ItemProp` records (`tools/audit_multihit.py`, which
 > exits nonzero if it goes stale) found **exactly three** multi-hit
 > abilities in the whole game: Quadra Slam ×4, Quadra Slice ×4, Empowerer

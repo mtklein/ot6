@@ -118,7 +118,7 @@ the physical cousin of non-elemental magic.
 >
 > | ability | hits | how |
 > |---|---|---|
-> | Quadra Slam `$58` | 4 | `MagicProp` effect `$32`, `AttackerEffect_32` sets `$3a70 = 3` (`battle_main.asm:10782-10796`) |
+> | Quadra Slam `$58` | 4 | `MagicProp` effect `$32`, `AttackerEffect_32` sets `$3a70 = 3` (`battle_main.asm:10794-10796`) |
 > | Quadra Slice `$5b` | 4 | same effect `$32` |
 > | Empowerer `$59` | 2 | `MagicProp` effect `$36` (+1, quarter power) |
 >
