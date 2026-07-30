@@ -76,3 +76,59 @@ monsters don't overlap needs, so tables can be shared if space gets tight.
   restored to max and flag cleared.
 - Screenshot checks for the display work once the harness confirms
   screenshot support.
+
+---
+
+## Correction — 2026-07-30: the break window is ~36 seconds, not ~1.5 turn-cycles
+
+This is the M1 spec, and it is mostly still legible as one. Two of its
+statements are now measurably wrong about the shipped ROM, and both are
+recorded here rather than edited away.
+
+### 1. Step 3's "~1.5 turn-cycles" is off by roughly an order of magnitude
+
+Step 3 sets the break window at *"~1.5 turn-cycles (tune: Stop's vanilla
+`#$12` ticks ≈ our baseline)"*. What shipped is `OT6_BREAK_TICKS := $10`
+(`ff6/src/battle/ot6_break.asm:1`, armed at `:884` and `:991`, and by
+`ot6_kits.asm:2946`) — the intended "a bit under vanilla stop duration",
+so the *constant* matches the spec's intent exactly. **The wall-clock it
+buys does not.**
+
+Measured on Ifrit & Shiva during the v0.9 work (merge `9f6971c`,
+`tools/tests/probe_ifritbreak.lua`): an on-stage broken monster recovered
+in **2159 frames**. At ~60 fps that is **~36 seconds** of battle time. The
+independent `#60` DOT run measured the same window at ~2170 frames (commit
+`3b8313e`), so the number is not a one-off.
+
+For scale, that run also measured a poison DOT tick landing once per ~1048
+frames per entity, so a single break window spans about **two full DOT tick
+periods**. **UNVERIFIED:** nobody has measured a boss's *turn* cadence
+against this window, so "many boss turns" is an inference from the frame
+count, not a count of turns. What is measured is 2159 frames, and a "turn
+cycle" that long is not what step 3 meant.
+
+**The constant is deliberately NOT changed here.** Whether 36 s is too
+generous is a balance question for playtest, and it interacts with the
+punish ×2, with Cleave's Broken-only gate, and with the DOT cadence above.
+This entry exists so the next person to read step 3 does not budget 1.5
+turns' worth of anything.
+
+### 2. Step 2's multi-hit sentence describes a rule with almost nothing behind it
+
+Step 2's *"Multi-hit attacks pass through damage calc per hit → chip per
+hit"* is **correct as a rule and now measured** — one boosted Fight chipped
+four shields off one guard (`design/multi-hit.md` §1). But the population it
+applies to is tiny: an audit of all 256 `MagicProp` and 256 `ItemProp`
+records (`tools/audit_multihit.py`) finds **exactly three** multi-hit
+abilities in the game — Quadra Slam ×4, Quadra Slice ×4, Empowerer ×2. See
+`design/multi-hit.md` for the survey and §10 for the build list that would
+widen it.
+
+### Still accurate, for the avoidance of doubt
+
+Step 3's own inline *SUPERSEDED* note (that OT6 does not use vanilla Stop
+and runs a private timer at `$3e88,y` gated by `Ot6Gate`) stands, and
+`Ot6Gate` is at `ff6/src/battle/ot6_break.asm:1655`, consulted from
+`battle_main.asm:1419`. Note that gate is known to leak — a Broken monster
+still takes counterattacks and pre-queued turns (issue #66) — so step 3's
+"gives us for free: no turns" is the intent, not the shipped behaviour.

@@ -65,6 +65,32 @@ monster, not broken, not wound/petrified, not a heal ($f2), class bit
 present (bmi rejects null-break), mask match. One chip per axis per hit:
 a Flame Knife on a fire+pierce-weak monster chips 2.
 
+> **CONFIRMED — 2026-07-30 (issue #60, commit `3b8313e`). The DoT path's
+> "stores 0" claim above is now MEASURED, not assumed.** It had never been
+> checked. `probe_dottick.lua` instrumented a poison DOT in a lab where
+> nothing else could chip and found `OT6_ATKCLASS` = `$00` during **every**
+> tick, so a tick chips exactly **one** axis — the elemental one. The
+> element is the tick's own: `Cmd_22` stores it itself (`lda #$08 / sta
+> $11a1`, `battle_main.asm:13390-13393`, poison branch of `$b6` only) and
+> tail-jumps `ExecSelfAttack` (`:13429`), so the weak-element branch at
+> `:1891-1893` treats a poison tick as a poison hit with no attacker.
+> Nothing special-cases it.
+>
+> Two consequences worth knowing, both measured in the same run: a poison
+> tick **can break a monster on its own** (2 of 2 ticks walked a poison-weak
+> guard's shields 2 → 1 → 0 with no action spent after the application),
+> and **Sap/Seize does not chip at all** — its ticks carry `$11a1 = 0`, so 4
+> ticks produced 0 chips while `Ot6ClassChip` still fired inside each one.
+> The negative control is not vacuous. Pinned deliberately by
+> `tools/tests/battle_dotchip.lua` (fail-before observed), as charm with no
+> mechanical excuse.
+>
+> Harness hazard found along the way, worth repeating: `ExecCmd` is defined
+> **twice** in `ff6-en.dbg` (`$C09B1B` and the battle one at `$C213E6`) and
+> `compose.py`'s `parse_dbg_syms` takes the first value for a name, so
+> `H.sym` silently returned the wrong module's address. Any non-unique
+> symbol name has this problem.
+
 ## Width safety
 
 The action executor runs **i8** (`ExecSelfAttack`/`CalcAttackEffect` are

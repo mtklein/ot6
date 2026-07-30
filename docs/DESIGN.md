@@ -147,10 +147,35 @@ weakness bits in vanilla), one weapon-class (new side table in expanded ROM).
 Multi-hit actions chip per hit — Edgar's AutoCrossbow and Cyan's Quadra Slam
 become shield shredders, exactly the role multi-hits play in Octopath.
 
+> **CORRECTION — 2026-07-30 (issue #54).** *"Chip is per hit"* is now
+> **measured**, not asserted: one boosted Fight chipped four shields off one
+> guard (`multi-hit.md` §1, `probe_multihit.lua`). The rest of the sentence
+> is wrong on the shipped ROM. **AutoCrossbow is not multi-hit** — it is
+> *whole-side*: `ItemProp $aa` sets no extra-attack effect, so it lands one
+> hit per body and exactly **one** chip against a solo boss. Breadth, not
+> rate. Quadra Slam is genuinely ×4 (`MagicProp $58` effect `$32`,
+> `AttackerEffect_32` at `battle_main.asm:10782-10796`). An audit of all 256
+> `MagicProp` + 256 `ItemProp` records (`tools/audit_multihit.py`, which
+> exits nonzero if it goes stale) found **exactly three** multi-hit
+> abilities in the whole game: Quadra Slam ×4, Quadra Slice ×4, Empowerer
+> ×2. Read "shield shredders" as the design target; `design/multi-hit.md`
+> §10 is the build list that would make it true.
+
 **Break.** At 0 shields: the enemy's ATB resets and it's inflicted with a Broken
 state (Stop-like) for roughly one full turn cycle; all damage it takes is
 ×2; its weakness list is locked revealed for the rest of the battle. On
 recovery, shields reset to `shield_max`.
+
+> **CORRECTION — 2026-07-30.** Two things in that paragraph do not describe
+> the shipped ROM. (a) **It is not Stop.** OT6 runs a private broken timer
+> at `$3e88,y` gated by `Ot6Gate` (`ot6_break.asm:1655`); vanilla Stop is
+> not used — `break-impl.md` step 3 already carries this correction. (b)
+> **"roughly one full turn cycle" is not what ships.** `OT6_BREAK_TICKS` is
+> `$10` (`ot6_break.asm:1`) and the window was measured at **2159 frames**
+> — ~36 s of battle time — for an on-stage monster in the v0.9 Ifrit/Shiva
+> work (merge `9f6971c`, `probe_ifritbreak.lua`). See `break-impl.md`'s
+> §"The break window, measured" for the full discrepancy; the constant is
+> deliberately left alone pending a balance call.
 
 **Shielded resistance.** While an enemy still has shields and is not broken it
 takes reduced damage (×0.5), so the swing from shielded to broken is ×4 —
@@ -255,6 +280,21 @@ folds a mage's spell tier — the BP column above reads as a band, and
 vanilla's own count of techs known clamps each band to the best one Cyan
 has learned. Cleave sits outside the ladder until divine gating exists.
 Mapping, consequences, and the reasoning: design/kits.md.
+
+> **CORRECTION — 2026-07-30 (issue #38, shipped v0.7). The table's Dispatch
+> row is stale: there is no 0-BP rung any more.** #38 put a **1-BP floor**
+> under every SwdTech and narrowed the window from four rungs to three.
+> `Ot6BushidoTech` (`ff6/src/battle/ot6_kits.asm:74-79`) opens with
+> `cmp #$01 / bcs :+ / lda #$01` — a stray 0 is clamped *up* to the cheapest
+> rung rather than allowed to name a tech, and the menu never offers boost 0
+> at all. The shipped mapping is `base = max(0, ceiling-2)`,
+> `tech = min(base + boost-1, ceiling)` (`ot6_kits.asm:65-70`), so boost
+> 1/2/3 selects Cyan's **top three learned** techs, weakest to strongest —
+> which also means the per-tech BP prices in the table are not fixed prices
+> at all: what a given rung costs slides as he learns more. Read the column
+> as the *relative* ordering it was drawn for. The v0.7 playtest that
+> motivated the follow-on MP rescale is in `playtest-v0.7.md` row 6; the
+> pricing consequences are in `design/kits.md` and `design/mp-economy.md`.
 
 Candidate passive: *Vengeance* — Cyan gains +1 BP whenever any enemy breaks.
 
