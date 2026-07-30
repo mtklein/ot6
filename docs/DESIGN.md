@@ -229,9 +229,12 @@ It also bounds the economy: the BP an absorb pays is capped at **one per
 round**, the same cap #37 put on the True Knight cover — which was itself
 mirrored from Runic's own machinery, so this is that ruling coming home. With
 it, a 3-BP Runic is BP-neutral against three ordinary turns and costs exactly
-one action; without it, three enemy casters against a three-turn stance refund
-the spend three times over and boosting becomes free in precisely the fights
-the stance is bought for. Measured, not argued: `battle_runic.lua`.
+one action. Without it the earn scales with absorbs — and therefore with how
+many things are casting and how long the stance stands, which is to say it
+grows in precisely the fights the stance is bought for. Measured rather than
+argued (`battle_runic.lua`): four absorbable casts into one round of a
+standing stance bank **+1** with the cap and **+2** on a control build without
+it, on a fixture with a single caster.
 
 **Cyan is the BP showcase.** The charge gauge — the most disliked mechanic in
 vanilla — is deleted. The 8 techniques are priced in BP:

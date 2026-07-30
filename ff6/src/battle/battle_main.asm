@@ -14729,6 +14729,11 @@ Ot6RecheckMagic:
         plx
         plp
         rtl
+.a8
+.i8                     ; hand the file back the width assumptions it had:
+                        ;   CheckMagicEnabled below assembles under .i8, and
+                        ;   these directives are assembly-time only -- the plp
+                        ;   above is what restores the real widths at runtime
 
 ; ------------------------------------------------------------------------------
 

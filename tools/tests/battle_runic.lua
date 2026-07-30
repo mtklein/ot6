@@ -59,10 +59,12 @@
 -- Three phases at the end of this file, and the middle one is the reason the
 -- issue asked for care:
 --
---   6. THE RAISE LATCHES A DURATION.  Cmd_0b -> Ot6RunicRaise banks the
---      pending boost into OT6_RUNICTURNS.  Unboosted stays 0, which is
---      phases 1-5 above: those are the regression proof that vanilla Runic
---      is untouched to the byte.
+--   6. THE RAISE LATCHES A DURATION, per tier.  Cmd_0b -> Ot6RunicRaise
+--      banks the pending boost into OT6_RUNICTURNS.  Three arms at 1/2/3 in
+--      battle_slots.lua's discipline -- the same drive each time, one
+--      pending byte different, the latched duration the only thing that
+--      moves.  Unboosted stays 0, which is phases 1-5 above: those are the
+--      regression proof that vanilla Runic is untouched to the byte.
 --
 --   7. THE MILKING TEST -- the BP loop, measured rather than assumed.  Runic
 --      already banks +1 per absorb (v0.3), so an extended stance is not just
@@ -420,9 +422,22 @@ end
 -- raise.  armBoost is cleared the instant the stance is up -- leave it set and
 -- every turn she takes afterwards is a boosted one, which would corrupt the
 -- expiry walk and the bank measurement alike.
+--
+-- Between A/B arms the stance is RESET to the state a fresh battle starts in
+-- (InitBP zeroes OT6_RUNICTURNS; the bit would go on her next unshielded
+-- turn anyway).  Not cosmetic: without it the next arm's driveUntil(stance)
+-- is satisfied instantly by the PREVIOUS arm's still-standing stance, she
+-- never takes the turn under test, and the latch assertion below reads the
+-- old tier -- a check that passes or fails for reasons unrelated to the raise.
+local function resetStance()
+  H.writeByte(RUNICTURNS + celes * 2, 0)
+  H.writeByte(0x3e4c + celes * 2,
+    H.readByte(0x3e4c + celes * 2) & ~RUNIC_BIT & 0xff)
+end
+
 local function enterRunicBoosted(n, label)
   return H.repeatN(1, {
-    H.call(function() armBoost = n end),
+    H.call(function() resetStance(); armBoost = n end),
     enterRunic(label),
     H.call(function()
       armBoost = 0
@@ -683,6 +698,12 @@ H.run({ maxFrames = 200000 }, {
   -- ============================== #59: boost buys the stance a duration ==
   --
   -- ------------------------------------ 6. the raise latches a duration --
+  -- PER TIER, in battle_slots.lua's discipline: the same drive three times,
+  -- with one pending byte different, and the latched duration is the only
+  -- thing that moves.  On the pre-change ROM every arm reads 0 -- there was
+  -- no cell to latch into -- so all three fail and none can pass by accident.
+  enterRunicBoosted(1, "boost1"),
+  enterRunicBoosted(2, "boost2"),
   enterRunicBoosted(3, "boosted"),
 
   -- --------------------------- 7. THE MILKING TEST: the BP loop, measured --
