@@ -407,17 +407,89 @@ corrode — and a little merchant blood (he'd say TREASURE HUNTER).
 | 1 | Steal ✦ (4 MP) | vanilla steal | join |
 | 2 | Mug | steal + piercing damage | South Figaro escape |
 | 3 | Trickshot | piercing chip at range (thrown coin) | Lete River |
-| 4 | Filch | steal 1 BP from the target | Opera house |
-| 5 | Bestow | give an ally 1 BP | Vector (merchant beat) |
+| 4 | Filch ✦ (6 MP) | take one shield, class-blind, and bank it as 1 BP | Opera house |
+| 5 | Bestow ✦ (5 MP) | give an ally 1 BP | Vector (merchant beat) |
 | 6 | Dismantle | armor corrode: −defense, piercing chip | Sealed Gate |
 | 7 | Appraise | reveal one enemy's full weakness row | Thamasa |
 | 8 | **Master's Mark** (divine) | steal from all enemies + reveal everything | Floating Continent |
 
-- Filch/Bestow make him the economy's hands: take BP from enemies,
-  hand it to allies. Tactically he's tempo, not just loot.
+- Filch/Bestow make him the economy's hands: take from enemies,
+  hand to allies. Tactically he's tempo, not just loot.
 - Passive candidates: *Sticky Fingers* (failed steal keeps the
   turn's BP gain), *First Strike* (battle opens +1 BP for Locke),
   *Fence* (steals sell for more).
+
+**The thief submenu (shipped #55, v0.9).** Steal is rung one of this ladder, not
+a verb of its own, so the ladder lives BEHIND the Steal row:
+`OpenCmdMenuTbl[$05]` opens the Tools-window shell with Steal / Filch / Bestow
+in it (`Ot6ThiefListOpen`), priced, with unaffordable rows greyed. That is
+forced, not chosen — **Locke has no spare command slot.** `char_prop.asm:157`
+records FIGHT, STEAL, MAGIC, ITEM; the apparently blank third row is MAGIC
+removed at runtime by `InitCmd_03` (`battle_main.asm:14100`) for a character who
+knows no spell and holds no esper, exactly as #47 found for Gau, and the battle
+menu is still hard-wired to four rows. The moment Locke equips an esper the row
+comes back as Magic, which this doc's row-sharing rule says is never the row to
+sacrifice.
+
+**Filch is not a BP steal, and cannot be — an enemy has no BP.** The line above
+used to read "steal 1 BP from the target". `OT6_BP_CLASS` (`$3e9c`) is a *split*
+table: character rows hold boost points, **monster rows hold the species'
+authored class-weakness mask**, seeded at battle init by `Ot6SeedShields`
+(`ot6_break.asm:36` authored, `:51` generated floor). There is no monster BP to
+take, and decrementing that byte would corrupt what the break system thinks the
+monster is weak to. The alternative reading — Filch simply *mints* Locke a pip —
+is dead on arrival: `Ot6ActionEnd` already pays +1 BP for any turn a character
+did not boost through (`ot6_boost.asm:142`), so an ability whose whole effect is
++1 BP is strictly worse than Fight.
+
+So Filch takes the resource the enemy *does* have: **one shield, and Locke keeps
+it as a boost point.** A real transfer, on the axis the milestone is named for,
+and it answers #54's probe question with a yes — the chip is **class-blind and
+element-blind**, where `Ot6ClassChip` only fires when the attack's class matches
+the target's weakness row, so Locke's piercing dagger is silent against anything
+not weak to piercing. Filch is the party's only weakness-independent shield
+remover. It reveals nothing (it takes the shield without teaching the row, so it
+complements Debilitator rather than replacing it) and deals no damage. A landed
+Filch nets Locke **+2 BP on the turn** — the filched pip plus his own unboosted
+regen — which nothing else in the game does. Against an already-Broken or
+shieldless target it is an honest no-op.
+
+Bestow is the sketch verbatim. Its debit rides `OT6_BOOST_REVEALED` so
+`Ot6ActionEnd` does the subtraction — the only BP charge path in the game — which
+is what stops it being free: charged inline, Ot6ActionEnd would still pay Locke
+his regen and Bestow would print a pip a turn for 5 MP. It refuses at 0 BP (and
+the row greys), on a self-target, and against an ally already at the 5 cap.
+
+**Break class: none of the three takes one.** Steal and Bestow deal no damage;
+Filch deals none either, and a class glyph on its row would *lie* about the one
+thing that makes it interesting — it chips whatever the row says.
+
+**Story gating: GRANT AT JOIN, i.e. no gate.** The rows are Steal's rows and
+Steal is granted at join, so they arrive with him. Reasons, in order of weight:
+(1) Locke has no learned-set byte — Blitz has `$1d28` and SwdTech `$1cf7`, and
+inventing a per-ability set for him is a change that should ride the issue that
+needs *eight* rungs, not the one that ships two; (2) both source beats (Opera,
+Vector) are **already past the owner's frontier**, so a story gate would show
+the player nothing a grant-at-join does not, on every save that exists; (3) it
+is the only option that structurally cannot leave a past-the-beat save without
+the skill, which is the failure mode #55 names. The standing pre-1.0 policy
+(saves are not forward-compatible) is not even needed here: no save is left
+behind by this ruling. When rungs 2/3/6/7 arrive and a learned set becomes
+unavoidable, the gate can be added then and grant-at-join becomes its
+already-satisfied floor for these two.
+
+**Prices** are on v0.8's ruler (8-20% of the real pool at the level the ability
+arrives) against Locke's 31 MP at LV6: Steal 4 (12.9%, unchanged from #52),
+Bestow 5 (16.1%), Filch 6 (19.4%). Deliberately **not** monotonic with the rung
+numbering above: only SwdTech must be monotonic, because there the row *is* the
+boost level; this is a free-choice menu like Blitz, which already ships Mantra
+under Fire Dance. Filch sits at the top of the ruler because it is the strongest
+thing in the slice and five casts from a full LV6 pool is the scarcity
+`mp-economy.md` asks for. `Ot6ThiefCostTbl` is a **second** keyed table, not new
+rows in `Ot6AbilityCostTbl`: the row ids are AttackName pad slots `$56-$58`,
+which sit inside SwdTech's `$55-$5c` key range, and that shared table's single
+scan is built on its three key ranges being disjoint. The command gate is what
+keeps the two tables apart. Gate: `tools/tests/battle_thief.lua`.
 
 **Boost-tiered Steal (shipped M3).** Steal is the party's first *chance verb*:
 it rolls dice, so BP buys certainty, not potency (DESIGN.md's canon rule — "on
