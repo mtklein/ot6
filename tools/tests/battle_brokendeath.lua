@@ -16,12 +16,27 @@
 -- the ending and soft-locks the boss.  This test kills a Broken Ifrit and
 -- requires the fight to end anyway.
 --
--- FAIL-BEFORE OBSERVED: built once with the `jsl Ot6MayAct` at CheckRetal's
--- top instead (replacing `lda $3aa0,x / lsr`, which is the size-neutral and
--- therefore tempting placement).  The kill landed, the death script never
--- ran, and this test failed on its battle-ends assertion.  With the gate
--- below the died-branch it passes.  Both states were run; neither is
--- inferred.
+-- STATUS ON THIS BRANCH: the Broken turn gate is NOT currently applied --
+-- it was written, measured, and then reverted because battle_trueknight's
+-- 6a assertion cannot survive any growth of bank $C2's battle path (five
+-- bare NOPs reproduce that failure exactly; see the revert commit).  So
+-- today this test passes without exercising any gate.  It is kept because
+-- it is the guard the gate needs the moment it lands, and because the
+-- placement mistake it catches is one that was actually made.
+--
+-- FAIL-BEFORE OBSERVED, on a build that had the gate: with `jsl Ot6MayAct`
+-- at CheckRetal's TOP (replacing `lda $3aa0,x / lsr` -- the size-neutral
+-- and therefore tempting placement), the kill landed at f888 with the timer
+-- at 14, ZERO post-kill AI-retal entries were recorded, and the fight ended
+-- 676 frames early as an ordinary victory with the recognition scene simply
+-- gone.  PASS-AFTER OBSERVED with the gate below the died-branch: one
+-- post-kill ExecAIRetal for entity $08, battle ends at f1822.  Both builds
+-- were run; neither result is inferred.
+--
+-- The FIRST version of this test asserted only "the battle ended", and that
+-- passed in both placements -- killing the only on-stage monster is an
+-- ordinary victory. That is why the assertion below is about ExecAIRetal
+-- and not about the battle ending.
 --
 -- It also asserts the kill really happened while Broken -- otherwise the
 -- whole test degrades into "the boss dies", which passes with no gate at
