@@ -1141,7 +1141,7 @@ Five things read off those two tables.
   breaks in the loop arm. The row still buys the reveal, the chips and —
   when mashed, where Edgar swings every turn — a real break (3.7 chips,
   1.7 breaks). What would close it is a slashing carrier whose per-hit
-  damage is small enough to chip twice cheaply: Cyan's Flurry, Edgar's
+  damage is small enough to chip twice cheaply: Cyan's Quadra Slam, Edgar's
   Chainsaw. Neither exists at Mt. Kolts. **This is outside the data
   tables and I did not invent a weapon to fix it.**
 - **Tusker on the shelf pool gets breaks but almost no window** (2.0

@@ -14,11 +14,11 @@
 --     ff6-en-nomp`, handed here via OT6_ROM) the cost table is ABSENT from
 --     bank F0 -- none of the machinery is assembled, the ROM is byte-identical
 --     to the pre-feature vanilla-OT6 baseline -- so the test asserts the verb
---     is FREE. This is the negative control: the identical Bushido tech
+--     is FREE. This is the negative control: the identical SwdTech tech
 --     charges nothing.
 --
 -- The mechanism under test: vanilla's GetMPCost prices only magic/lore/summon/
--- x-magic; Blitz/Bushido/Tools fall through it at 0, so the universal charge
+-- x-magic; Blitz/SwdTech/Tools fall through it at 0, so the universal charge
 -- at CalcAttackEffect ($3a4c subtract, insufficient-mp fizzle) never fires for
 -- them. Ot6AbilityCost (ot6.asm) swaps that 0 for the kit price keyed by the
 -- id already in $3a7b. Charge AND refusal are both universal; the menu
@@ -79,7 +79,7 @@ local function pinCyan()
     H.writeByte(0x3ED8 + s * 2, 0x02)                 -- CHAR::CYAN
     local st1 = 0x3EE4 + s * 2
     H.writeByte(st1, H.readByte(st1) & 0xF7)          -- clear magitek (fixture is Magitek)
-    H.writeByte(0x202E + s * 12, 0x07)                -- Bushido, alone
+    H.writeByte(0x202E + s * 12, 0x07)                -- SwdTech, alone
     H.writeByte(0x2031 + s * 12, 0xFF)
     H.writeByte(0x2034 + s * 12, 0xFF)
     H.writeByte(0x2037 + s * 12, 0xFF)
@@ -114,7 +114,7 @@ local function pin() pinCyan(); pinGuards() end
 -- open the swdtech SUBMENU, put the cursor on the wanted boost row, confirm,
 -- run it to $3410. clears the spell log first so each scenario waits for ITS
 -- OWN execution.  techIdx is the tech the (row, ceil) window selects and the
--- attack id to watch.  #38 put a 1-BP floor under Bushido: the window is three
+-- attack id to watch.  #38 put a 1-BP floor under SwdTech: the window is three
 -- rows and row i = boost i+1, tech = min(max(0,ceil-2)+i, ceil).  So
 -- (row 1, ceiling 4) = Quadra Slam (tech 3) and (row 0, ceiling 2) = Dispatch
 -- (tech 0).  The caster's bp bank is pinned to 5 throughout, so the BP gate

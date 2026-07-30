@@ -324,8 +324,8 @@ dropped vanilla's bolt bit and never mentioned the absorb at all.)
   (item `$ab` → spell `$51`) and Bolt Edge is bolt (`$ad` → `$53`),
   both legal chips once vanilla's bolt bit is back in the row where it
   belongs. Cyan can't chip his own scenario's capstone, and
-  that's deliberate: the Phantom Train farewell is where **Oblivion**
-  unlocks (kits.md), and Oblivion wants Broken targets — the train
+  that's deliberate: the Phantom Train farewell is where **Cleave**
+  unlocks (kits.md), and Cleave wants Broken targets — the train
   is his divine's first legal kill. Break it FOR him.
 - **Jank ✦: Suplexable, forever.** The most famous jank in the game
   is now also mechanically *correct* — Suplex is bludgeoning, the
@@ -368,8 +368,8 @@ dropped vanilla's bolt bit and never mentioned the absorb at all.)
   party.
 - **Break story:** the poster child of the coverage rule. Bolt is
   vanilla's fish bit and *neither man can cast it* — so the weapon
-  byte carries the fight: Pummel and Fang/Tiger chip regardless, and
-  Flurry (if the scenario got Cyan to 15) shreds 4 at a time. When
+  byte carries the fight: Pummel and Dispatch/Slash chip regardless, and
+  Quadra Slam (if the scenario got Cyan to 15) shreds 4 at a time. When
   the story strands you without an element, the classes are the
   floor under your feet.
 - **Jank:** the Piranha chum-wave stays a wave — they nibble, they

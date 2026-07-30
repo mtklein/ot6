@@ -254,7 +254,7 @@ These numbers live in `Ot6AbilityCostTbl` (ff6/src/battle/ot6_boost.asm),
 charged under the `OT6_MP_COSTS` build flag — which **v0.5 flipped ON by
 default**, so the shipped ROM charges them (see mp-economy.md).
 
-**Shipped (v0.5, issue #5).** `Ot6BushidoTier` (ff6/src/battle/ot6.asm)
+**Shipped (v0.5, issue #5).** `Ot6BushidoTier` (ff6/src/battle/ot6_kits.asm)
 replaces the charge gauge's clock in `UpdateMenuState_37`; the window, its
 numerals, the grey-out of unlearned techs, the A-button latch,
 `FixPlayerAttack`'s `+$55` and `Cmd_07` are all vanilla and untouched. Boost
@@ -470,7 +470,7 @@ ice/order/tempo. The duality reads clearer than vanilla ever made it.
 | 7 | Haste | 32 (vanilla) |
 | 8 | **RunicBlade** (divine, leaning) | Opera / Magitek factory (story) |
 
-- **Row 1 is code now, not only design** (`Ot6RunicBP`, ot6.asm, hooked
+- **Row 1 is code now, not only design** (`Ot6RunicBP`, ot6_boost.asm, hooked
   into vanilla's `RunicEffect`): the absorb still becomes MP and now
   also banks 1 BP. Rulings, all covered by `battle_runic.lua` — an
   absorb at a full bank is **capped, never wrapped**; the

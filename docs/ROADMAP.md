@@ -16,9 +16,9 @@ recruited character's kit is honest there.
 |---|---|---|
 | 1 | the Moogle defense (~1 hour: mines → Whelk → escape) | shipped in v0.1: difficulty transform, encounter/XP/gil conservation, Whelk fire-add |
 | 2 | Figaro → Vargas | shipped in v0.2: fixtures to the Vargas doorstep, the Narshe school, the Bio Blaster as poison key, Vargas's holy add. Band-2 sweep measured (Measurement #6) but *not* tuned — playtest endorsed the shipped resistance at Kolts; break uptime on trash remains ~0% |
-| 3 | scenario split → Kefka at Narshe | shipped in v0.3. ~~Cyan BP-Bushido~~ shipped (M3, `Ot6BushidoTier`; kits.md); remaining: fixtures reaching and crossing the split, the Narshe defense's 3-party machinery, Celes's Runic→BP, and Cyan's MP column (mp-economy.md). Enemy data authored through here (armor line + Kefka poison) |
-| 4 | through Zozo — Dadaluma beaten, sub-jobs in hand | shipped in v0.4: M5 magicite sub-jobs (grant + stat bump), the Zozo balance pass (measured), the crane-maze/Ramuh route, Blitz-as-menu, boost-tiered Steal, full HP/MP restore on level-up, Cyan's Oblivion |
-| **5 (current)** | **end of the Opera sequence — Ultros ② beaten, Setzer joined, Blackjack acquired** | finish and gate the Opera fixture chain; activate the Ultros ② battle gate; ship the incidental systems/polish already accumulated since v0.4, including live ability MP costs, Cyan's Bushido submenu/loadouts, and universal break-floor coverage |
+| 3 | scenario split → Kefka at Narshe | shipped in v0.3. ~~Cyan BP-SwdTech~~ shipped (M3, `Ot6BushidoTier`; kits.md); remaining: fixtures reaching and crossing the split, the Narshe defense's 3-party machinery, Celes's Runic→BP, and Cyan's MP column (mp-economy.md). Enemy data authored through here (armor line + Kefka poison) |
+| 4 | through Zozo — Dadaluma beaten, sub-jobs in hand | shipped in v0.4: M5 magicite sub-jobs (grant + stat bump), the Zozo balance pass (measured), the crane-maze/Ramuh route, Blitz-as-menu, boost-tiered Steal, full HP/MP restore on level-up, Cyan's Cleave |
+| **5 (current)** | **end of the Opera sequence — Ultros ② beaten, Setzer joined, Blackjack acquired** | finish and gate the Opera fixture chain; activate the Ultros ② battle gate; ship the incidental systems/polish already accumulated since v0.4, including live ability MP costs, Cyan's SwdTech submenu/loadouts, and universal break-floor coverage |
 | 6 | end of WoB (Vector → Floating Continent) | remaining kits and espers; the wide weakness/telegraph pass (boss data already reaches Nerapa); route and tune Vector through the Floating Continent |
 
 ## Releases
@@ -37,17 +37,17 @@ links). What each delivers:
   fix.)
 - **v0.3** — through Kefka at Narshe. All three scenario-split routes,
   the reunion, and the three-party Battle for Narshe. Cyan joins with
-  Bushido rebuilt on Boost Points; Celes with Runic that banks a BP.
+  SwdTech rebuilt on Boost Points; Celes with Runic that banks a BP.
 - **v0.4** — through Zozo. Espers become sub-jobs (equip grants spells +
   a stat bump; *augment*, not replace, for the born mages); Blitz becomes
   a menu; Steal gains the chance-verb canon; full HP/MP restore on
-  level-up; Cyan's Oblivion divine (Assassinate built dormant behind
+  level-up; Cyan's Cleave divine (Assassinate built dormant behind
   Shadow; RunicBlade deferred pending its design call).
   Per-ability MP cost is built but dormant. Balance-tuned through Zozo.
 - **v0.5** — through the complete Opera sequence: Ultros ② beaten,
   Setzer joined, and the Blackjack acquired. "Every ability costs MP" goes
   live with cost display implemented in ca65; Cyan gains a direct
-  Bushido submenu and configurable loadout; and the generated break floor
+  SwdTech submenu and configurable loadout; and the generated break floor
   makes every otherwise-unauthored enemy weapon-breakable. This deliberately
   favors getting a coherent playtest build into players' hands over holding
   those improvements for the much longer rest-of-WoB route.
@@ -79,7 +79,7 @@ forward-compatible — see CONTRIBUTING — it is just nowhere near next.)
   and the balance work the v0.8 playtest opens.
 - **v0.7 — the playtest release** (re-scoped 2026-07-28, owner call): folds
   in the v0.6 playtest's non-blockers — the clockwork HUD sync, the MP
-  wallet display, Dance's MP cost, the Bushido ≥1-BP floor, the SwdTech
+  wallet display, Dance's MP cost, the SwdTech ≥1-BP floor and its
   page fix — plus Gau's Ochette kit (learn many, equip 8). The frontier
   need not move: Sealed Gate route work ships as far as it has landed
   (legs through the crash are already minted with anchors). The owner
@@ -179,7 +179,7 @@ the next work block.
   at 1/2 BP, queued as the higher tier (name, animation, power) with
   the base spell's MP cost; tier-family spells never take the generic
   multiplier. Fire/Ice/Bolt/Poison/Cure/Life/Slow/Haste lines.
-- ⬜ Cyan converted (charge gauge → BP Bushido): post-demo, he is not
+- ⬜ Cyan converted (charge gauge → BP SwdTech): post-demo, he is not
   reachable in the demo stretch.
 
 **Exit met** for the demo scope: the full probe → chip → break → boost →
@@ -205,12 +205,12 @@ chip, break, nuke — on both element and class axes.
 ## M4 — Skill lists on the native verbs — 🔨 shipping piecemeal
 
 Landing across releases rather than as one block:
-- ✅ **Boost-tier spell folding** (v0.1). ✅ **Cyan's Bushido rebuilt on
+- ✅ **Boost-tier spell folding** (v0.1). ✅ **Cyan's SwdTech rebuilt on
   BP** (v0.3, charge gauge deleted). ✅ **Celes's Runic banks a BP**
   (v0.3). ✅ **Blitz becomes a menu** (v0.4, the fighting-game input
   retired the same way Cyan's gauge was). ✅ **Boost-tiered Steal** +
   the chance-verb canon (v0.4). ✅ **Full HP/MP restore on level-up**
-  (v0.4). ✅ **Divine capstones** — Oblivion/RunicBlade/Assassinate (v0.4).
+  (v0.4). ✅ **Divine capstones** — Cleave/RunicBlade/Assassinate (v0.4).
 - ⬜ **Per-character 8-skill kits enforced** with scripted learn
   schedules (levels/items/deeds/story — design/kits.md): **likely no JP
   system**; JP returns only if playtesting wants a pacing knob.
