@@ -108,6 +108,19 @@ use whatever parallelism suits the job (`-j10` for smoke is the documented
 fast loop). Niced work yields to the owner's game and soaks up idle cores,
 so no throttle arithmetic is needed from you.
 
+**The one thing `nice` does not fix: the 600-second reap.** Mesen's
+testrunner kills a run on wall-clock, and every competing job is equally
+niced — so agents can starve *each other* past that deadline even though
+none of them starves the owner. The signature is several mints failing
+`code=255` at once while the same mints pass in isolation (observed
+2026-07-29: nine states minted fine, four reaped, all four green when
+re-run alone). If you see that, it is contention, not your change —
+lower `-j` and retry rather than debugging the generator.
+
+A **full** `make frontier` is the case that provokes it, because it
+parallelises hard on its own. Bound it (`NINJAFLAGS=-j4`) when other
+agents are live.
+
 ## Reporting
 
 State what you did, what you measured, and what you could not establish. A
