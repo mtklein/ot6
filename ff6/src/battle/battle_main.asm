@@ -12751,7 +12751,7 @@ CheckRetal:
                             ;   this same path, and a break's x2 makes dying
                             ;   WHILE broken the common case -- gating at the
                             ;   top of CheckRetal would have stranded Ifrit &
-                            ;   Shiva's end_battle (ai_script.asm:4551-4562)
+                            ;   Shiva's end_battle (ai_script.asm:4595-4606)
                             ;   and soft-locked the fight.
         lda     $b8
         ora     $b9

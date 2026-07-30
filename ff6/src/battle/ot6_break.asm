@@ -1670,22 +1670,22 @@ done:   rtl
 ; and that is exactly the hole.  Nothing between a queue entry and the turn
 ; re-checks anything: the action queue drains straight into ExecAction
 ; (battle_main.asm:150-159) and the counterattack queue straight into
-; ExecRetal (:103-112), and only QuetzEffect (:1809-1817) ever purges an
+; ExecRetal (:103-112), and only QuetzEffect (:1811-1819) ever purges an
 ; entry.  Measured on battle 70 (probe_ifritbreak): 51 retaliations and a
 ; drained main-queue turn executed with the actor's broken timer up, Ifrit
-; casting Fire (Cmd_02) out of his `if_hit` script (ai_script.asm:4657-4660)
+; casting Fire (Cmd_02) out of his `if_hit` script (ai_script.asm:4613-4616)
 ; while wearing the broken shield.  The gate was not failing -- it was
 ; consulted 360 times and refused 53 -- the turns were leaking past it.
 ;
 ; So this is the same question asked at EXECUTION time, folded together with
 ; the presence test both call sites were already doing, which is what keeps
 ; it size-neutral in the full bank $C1/$C2 neighbourhood:
-;   * CheckRetal (battle_main.asm:12745) -- a Broken monster creates no
+;   * CheckRetal (battle_main.asm:12748) -- a Broken monster creates no
 ;     counterattack, which is the design's own rule: "the swap is a turn,
 ;     and Broken have none" (docs/design/bosses-wob.md:634-636).  +6 bytes,
 ;     and the PLACEMENT is load-bearing: it sits BELOW the `bit $3a56`
-;     died-branch (:12740), because `if_self_dead` scripts -- Ifrit &
-;     Shiva's whole ending, ai_script.asm:4551-4562 -- come through
+;     died-branch (:12742), because `if_self_dead` scripts -- Ifrit &
+;     Shiva's whole ending, ai_script.asm:4595-4606 -- come through
 ;     CheckRetal too, and a break's x2 makes dying while Broken the common
 ;     case.  Gating at the top of the routine assembles and looks tidy and
 ;     soft-locks the boss.
@@ -1707,7 +1707,7 @@ done:   rtl
 ; them (probe_ifritbreak), i.e. the turn is consumed and thrown away -- but
 ; probe_ifrittag still catches one ExecMonsterAction per run with the actor's
 ; timer up.  Closing that needs the queue entry PURGED at break time
-; (QuetzEffect's walk, battle_main.asm:1809-1817) rather than refused at
+; (QuetzEffect's walk, battle_main.asm:1811-1819) rather than refused at
 ; execution; gating earlier inside ExecAction is NOT the answer, because
 ; @01a6's `lda $32cc,x / inc / bne @01d5` would re-enter ExecAction forever
 ; on a command list that never got consumed.
@@ -1724,8 +1724,8 @@ done:   rtl
 ; would read as "broken".  Both sites are a8 and it is checked, not assumed:
 ; ExecAction is 8-bit from `lda #$12 / sta $b5` (battle_main.asm:213) with the
 ; only `longa` on the jump branch closed by `shorta` before @014e (:242-246),
-; and CheckRetal opens 8-bit (`stz $b8 / stz $b9`, :12724) with its own
-; longa/shorta pair around the target words (:12733-12741).
+; and CheckRetal opens 8-bit (`stz $b8 / stz $b9`, :12726) with its own
+; longa/shorta pair around the target words (:12735-12743).
 ;
 ; x = entity.  clobbers a; preserves x/y.
 ; out: CARRY SET = may act (present and not broken); CLEAR = skip.
