@@ -1467,8 +1467,9 @@ Ot6AbilityCostTbl:
 ;
 ; SCOPE: this ports the VISUAL half of magic's affordance (grey the row).  The
 ; other half -- magic's `lda $2093,x / bmi` at the A-button that no-ops the
-; confirm on a disabled spell (btlgfx UpdateMenuState_3b @81ae) -- would live in
-; the tools/blitz confirm (UpdateMenuState_3c @8809).  That is btlgfx (bank C1),
+; confirm on a disabled spell (btlgfx UpdateMenuState_0e @81ae,
+; btlgfx_main.asm:19675) -- would live in the tools/blitz confirm
+; (UpdateMenuState_30 @8809, btlgfx_main.asm:20668).  That is btlgfx (bank C1),
 ; a STOCK object linked into BOTH the shipped and the nomp ROM (only the battle
 ; object is rebuilt per-flag), so a confirm gate there would shift the nomp
 ; baseline byte-for-byte -- the one thing this flag must never do.  So the block
@@ -1476,7 +1477,10 @@ Ot6AbilityCostTbl:
 ; insufficient-MP fizzle refuses the cast at execution (MP is never overspent,
 ; battle_mpcost.lua's REFUSAL half), and the unmistakable grey tells the player
 ; before they get there.  If the block ever moves menu-side, it belongs beside
-; @8809 gated on this same Ot6AbilityGrey answer.
+; @8809 gated on this same Ot6AbilityGrey answer.  (The two states were named
+; _3b/_3c here until v0.9+; those are real but unrelated four-instruction
+; routines at btlgfx_main.asm:12972 and :12982.  The @-addresses were always
+; right -- it was the names that were wrong.)
 ;
 ; a8/i16, db=$7e (the decorators' bank; $3c08/$62ca are $7e battle RAM).  in:
 ; A = MP cost.  out: A = $00 (white) | $04 (grey).  preserves X and Y -- the
