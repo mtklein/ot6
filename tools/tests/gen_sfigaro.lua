@@ -263,7 +263,17 @@ local function go(sx, sy, dm, dx, dy, what)
         H.call(function()
           aPhase = (aPhase + 1) % 8
           if H.dialogWaiting() then H.setPad(aPhase < 4 and { "a" } or {}); return end
-          H.setPad({ [stage()[3]] = true })
+          -- stage() RE-PICKS every call, so the H.cond above (which admitted
+          -- us because the pick had a hold direction) does not guarantee the
+          -- pick still has one now: a nav outcome can switch this to the
+          -- walk-straight-onto-the-entrance variant mid-drive, and
+          -- `{ [nil] = true }` is a "table index is nil" abort.  Observed
+          -- 2026-07-29 -- the pick flipped at f2072 after the nav library
+          -- gained its avoid-set, which changed which staging tile it
+          -- reached first.  A directionless pick means walk straight, so
+          -- hold nothing.
+          local hold = stage()[3]
+          H.setPad(hold and { [hold] = true } or {})
         end),
       }, what .. ": hold into the door"),
     }, {}),
