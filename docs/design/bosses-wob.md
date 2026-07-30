@@ -634,6 +634,51 @@ Party: Locke, Celes + two.
 - Vanilla's tag fight: they swap in and out; each keeps its own
   gauge across swaps. **A Broken sibling can't tag out** — the swap
   is a turn, and Broken have none. Breaking pins them on stage.
+
+> **CORRECTION — 2026-07-30 (issues #66, #67): "can't tag out" is an
+> aspiration, not a mechanism. Nothing implements it, and today it is
+> false.**
+>
+> The bullet above reads as design. It is not: no OT6 source references
+> the tag, the swap, or hiding at all — a case-insensitive grep for
+> `tag out` / `swap` / `hide` across `ff6/src/battle/ot6_*.asm` and
+> `ff6/src/battle/ot6_memory.inc` returns only
+> unrelated hits (a direct-page swap in `ot6_codex.asm`, HUD veiling in
+> `ot6_hud.asm`, the Oblivion→Tempest rung swap in `ot6_kits.asm`).
+> Whatever "can't tag out" describes was only ever emergent from
+> `Ot6Gate` (`ot6_break.asm:1655`, consulted at `battle_main.asm:1419`)
+> refusing to queue a broken monster's turn.
+>
+> **And the swap is exactly one of the turns that leaks past that gate.**
+> The tag is the first branch of Ifrit's own main AI script —
+> `if_battle_var_greater 3, 5 / kill_monsters_wait MONSTER_1 /
+> show_monsters MONSTER_2` (`ff6/src/battle/ai_script.asm:4566-4571`) —
+> so it needs a main-script turn, and #66 measured main-script turns
+> running while Broken: 103 executions with the broken timer up in one
+> battle-70 run, including **7 casts of Fire by a Broken Ifrit**, which
+> come from `attack BATTLE, FIRE, FIRE` (`ai_script.asm:4577`) in the
+> same script the tag branch heads. Worse, the counter the tag reads is
+> advanced by `add_battle_var 3, 1` in the `if_hit` retaliation block
+> (`ai_script.asm:4613`), and retaliation was 50 of those 103. So chipping
+> a Broken sibling still winds its swap timer.
+>
+> **UNVERIFIED:** nobody has watched a Broken sibling actually complete a
+> tag-out. The reachability above is read from the script and from #66's
+> execution counts, not observed as a swap. What *is* observed is that the
+> script which contains the swap runs while Broken.
+>
+> `Ot6MayAct` (preserved on `wt/ifritbreak`, commit `945b9ed`) drops 103 →
+> 2 and would make the bullet true, but it cannot land while
+> `battle_trueknight` 6a stands — see #67. **Treat the bullet as the
+> intent to implement, not as the fight as shipped.**
+>
+> One adjacent thing that *was* fixed in v0.9 (merge `9f6971c`): a
+> tagged-out sibling's break timer used to be frozen behind the `$3aa0.0`
+> presence gate, so a broken monster that tagged out stayed broken. The
+> on-stage control recovered in 2159 frames; the tagged-out one sat at
+> timer 16 with 0 shields for 2541 more. That half is shipped; the
+> "can't tag out" half is not.
+
 - **Telegraph:** Ifrit inhales, the air shimmering → **Fire 2**;
   Shiva mirrors with **Ice 2**. Whoever's out runs their own fuse.
 - **Break story:** the first hard absorb lesson — feed Ifrit fire
