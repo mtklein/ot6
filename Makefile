@@ -158,6 +158,11 @@ test: rom nomp-rom graph
 	sh tools/tests/lib/frontier_ninja_selftest.sh
 	sh tools/tests/lib/frontier_stamp_selftest.sh
 	sh tools/tests/lib/runner_isolation_selftest.sh
+	@# suite.sh's own bookkeeping: the tally line below, and the guard that
+	@# fails the run if a discovered test never reports.  Runs against a
+	@# miniature fake tree with a stub runner, so it costs milliseconds and
+	@# reaches the FAIL/xfail/dead-worker branches a green suite never does.
+	sh tools/tests/lib/suite_tally_selftest.sh
 	sh tools/tests/lib/anchor_negatives.sh
 	@rm -f $(STAMP)
 	tools/tests/suite.sh

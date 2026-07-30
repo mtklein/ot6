@@ -126,6 +126,16 @@ fi
 
 XFAIL=""   # keep empty; XPASS fails the suite to force cleanup
 fail=0; summary=""
+# Tally, printed as one line under the per-test list.  Establishing "82 pass,
+# 0 fail" used to mean grepping the output for '": pass ["' and counting, and
+# an agent who does that from a scrolled terminal is doing arithmetic on a
+# window rather than on the run.  Same reasoning as the $(STAMP) machinery in
+# the Makefile ("nothing here is allowed to depend on remembering to look"),
+# one level down: the exit status is still the gate, but the number is now
+# stated rather than reconstructed.  Counted in verdict()/result() so no
+# category can be added later and quietly stay out of the total -- the
+# breakdown is summed at print time and cross-checked against it.
+n_pass=0; n_fail=0; n_xfail=0; n_xpass=0; n_skip=0
 
 result() { summary="$summary\n  $1: $2"; }
 
@@ -133,13 +143,16 @@ result() { summary="$summary\n  $1: $2"; }
 verdict() {
   if [ "$2" -eq 0 ]; then
     case " $XFAIL " in
-      *" $1 "*) result "$1" "XPASS (unexpected pass - remove from XFAIL)$3"; fail=1 ;;
-      *) result "$1" "pass$3" ;;
+      *" $1 "*) result "$1" "XPASS (unexpected pass - remove from XFAIL)$3"
+                n_xpass=$((n_xpass + 1)); fail=1 ;;
+      *) result "$1" "pass$3"; n_pass=$((n_pass + 1)) ;;
     esac
   else
     case " $XFAIL " in
-      *" $1 "*) result "$1" "xfail (known: formation VRAM clobber)$3" ;;
-      *) result "$1" "FAIL (see build/states/suite_$1.log)$3"; fail=1 ;;
+      *" $1 "*) result "$1" "xfail (known: formation VRAM clobber)$3"
+                n_xfail=$((n_xfail + 1)) ;;
+      *) result "$1" "FAIL (see build/states/suite_$1.log)$3"
+         n_fail=$((n_fail + 1)); fail=1 ;;
     esac
   fi
 }
@@ -204,7 +217,8 @@ if [ "$JOBS" -gt 1 ]; then
       read -r rc w secs < "$RDIR/$t"
       verdict "$t" "$rc" " [w$w ${secs}s]"
     else
-      result "$t" "FAIL (worker never reported)"; fail=1
+      result "$t" "FAIL (worker never reported)"
+      n_fail=$((n_fail + 1)); fail=1
     fi
   done
 else
@@ -216,7 +230,29 @@ fi
 
 for t in $skipped; do
   result "$t" "skip (needs \`make frontier\`: $(frontier_fixture "$t") absent)"
+  n_skip=$((n_skip + 1))
 done
 
 printf "OT6 suite:%b\n" "$summary"
+
+# The tally.  `ran` is summed from the categories rather than counted
+# separately, and then checked against the discovered TESTS list: if the two
+# disagree, a test was discovered and never accounted for, which is the one
+# failure mode a summary line can have that is worse than no summary line at
+# all.  Say so and fail rather than print a number that is quietly short.
+set -- $TESTS; discovered=$#
+ran=$((n_pass + n_fail + n_xfail + n_xpass))
+line="$ran ran: $n_pass pass, $n_fail fail"
+[ "$n_xfail" -gt 0 ] && line="$line, $n_xfail xfail"
+[ "$n_xpass" -gt 0 ] && line="$line, $n_xpass XPASS"
+[ "$n_skip"  -gt 0 ] && line="$line; $n_skip skipped (need \`make frontier\`)"
+if [ "$ran" -ne "$discovered" ]; then
+  line="$line -- BUG: $discovered tests were discovered but $ran reported"
+  fail=1
+fi
+if [ "$fail" -eq 0 ]; then
+  echo "OT6 suite: GREEN -- $line"
+else
+  echo "OT6 suite: RED -- $line"
+fi
 exit $fail
