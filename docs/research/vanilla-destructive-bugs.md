@@ -102,7 +102,7 @@ Square fixed it in rev 1 with a two-instruction guard.
 
 **(a) `$b7` is seeded with `$ff` and only corrected on success.**
 
-`ff6/src/battle/battle_main.asm:3314-3323`:
+`ff6/src/battle/battle_main.asm:3327-3333`:
 
 ```
 Cmd_0d:                          ; command $0d: sketch
@@ -179,7 +179,7 @@ AnimType_2f:
 
 The rev-1 guard is `bpl` — it rejects exactly the case where byte 3 has bit 7
 set, which is exactly `$ff`. That is conclusive: the value Square guarded
-against is the `lda #$ff / sta $b7` at `battle_main.asm:3319-3320`.
+against is the `lda #$ff / sta $b7` at `battle_main.asm:3330-3331`.
 
 In US 1.0, `$ff` is doubled to `$fe` and used as an index into a **six-entry**
 array. `tax` here runs with 8-bit A and 16-bit X, so `X = (B << 8) | $fe`
@@ -323,7 +323,7 @@ prop 8, `ff6/src/field/char_prop.asm:236-244`:
 ```
 
 No monster AI path can produce command `$0d` — `GetCmdForAI`
-(`ff6/src/battle/battle_main.asm:5024-5045`) can only return the eleven values
+(`ff6/src/battle/battle_main.asm:5079`) can only return the eleven values
 in `CmdForAITbl`, and `$0d` is not among them. `AnimType_2f` is reached only
 from `CmdAnim_0d`, which is reached only from the Sketch command. So the
 frontier is precisely **Relm joining at Thamasa — v0.8**
@@ -365,9 +365,9 @@ selected by whatever record the index lands on.
   sweep does not reach directly.
 - **Two design docs currently say the opposite of #13** and must be reconciled
   before v0.8:
-  - `docs/design/kits.md:428-429` — "Sketch ✦ signature (bug preserved ✦ — it
+  - `docs/design/kits.md:708` — "Sketch ✦ signature (bug preserved ✦ — it
     eats a save now and then, and that's canon)".
-  - `docs/design/mp-economy.md:76` — "the Sketch bug stays (house rule) and
+  - `docs/design/mp-economy.md:315` — "the Sketch bug stays (house rule) and
     does not refund".
   - `CONTRIBUTING.md` "House rules" names the Sketch bug as charm.
 
@@ -384,7 +384,7 @@ a hook OT6 already knows how to place (bank `$f0` shim off `Cmd_0d` /
 Caveat to verify first: `$b7` is also the second message parameter in the
 queued script command, so a changed value must be checked against the
 "couldn't be sketched" / miss message rendering
-(`ff6/src/battle/battle_main.asm:9598-9601` sets `$3401 = $1f`).
+(`ff6/src/battle/battle_main.asm:9757-9758` sets `$3401 = $1f`).
 
 **Option B — backport Square's rev-1 guard.** Semantically the safest, because
 it is the vendor's own fix and rev 1 shipped with it. The obstacle is space:
@@ -397,12 +397,12 @@ returns `$ffff` for a bad index; `LoadEsperGfxProp` then needs its own
 `cmp #$ffff` guard, which is a second small shim.
 
 **Option C — redesign Sketch as an OT6 ability.** Relm's kit is explicitly TBD
-(`docs/design/kits.md:428-430`), and OT6 has already retired far more
+(`docs/design/kits.md:708`), and OT6 has already retired far more
 entrenched vanilla verbs — Cyan's charge gauge, Sabin's fighting-game Blitz
 input, Gau's Leap and berserk Rage
 (`docs/ROADMAP.md` M4, `docs/design/kits.md`). If Relm's Sketch is going to be
 rebuilt in bank `$f0` for the chance-verb boost canon anyway
-(`docs/design/kits.md:405-410`: "Sketch (Relm), Slot (Setzer), and Rage (Gau)
+(`docs/design/kits.md:686`: "Sketch (Relm), Slot (Setzer), and Rage (Gau)
 answer to the SAME rule"), then the vanilla path stops being reachable and the
 bug is fixed as a side effect of work already planned.
 
@@ -839,7 +839,7 @@ bug gets modernized. Named examples, so the boundary is on record:
   balance oddities" as preserved.
 - **Useless / mis-wired stats.** `CONTRIBUTING.md` already names these.
   Note: the common claim that Evade is *never* read is not what the code shows
-  — `ff6/src/battle/battle_main.asm:5961-5963` reads `$3b54` (evade) or
+  — `ff6/src/battle/battle_main.asm:6016` reads `$3b54` (evade) or
   `$3b55` (mblock) depending on carry. Whatever the truth is, it is benign and
   out of #13's scope; recorded here only so the folklore version doesn't get
   written down as fact.
@@ -849,7 +849,7 @@ bug gets modernized. Named examples, so the boundary is on record:
   `should be ShakeFreqTbl`), the WoR cutscene off-by-one at
   `ff6/src/cutscene/ruin.asm:703`.
 - **Dance's can't-stop-dancing lock** — already an explicit OT6 design
-  decision, priced into the MP economy (`docs/design/mp-economy.md:75`). It is
+  decision, priced into the MP economy (`docs/design/mp-economy.md:315`). It is
   a within-battle state, not a soft lock.
 - **Leap removing Gau.** Not a defect; and vanilla already guards the
   degenerate case — `TargetEffect_54` refuses Leap when fewer than two party
@@ -880,7 +880,7 @@ things turned up that are OT6's, not Square's, and belong in the record.
    about, and it is ours.
 
 2. **The codex commits to SRAM outside the save transaction.**
-   `ff6/src/battle/ot6_break.asm:797` and `:897` write `f:OT6_CODEX` /
+   `ff6/src/battle/ot6_break.asm:876` and `:984` write `f:OT6_CODEX` /
    `f:OT6_CODEX_CLASS` the instant a weakness is learned, mid-battle. Weakness
    knowledge therefore survives a reset-without-saving and survives a party
    wipe, diverging from the checksummed block it nominally belongs to. That may
@@ -890,7 +890,7 @@ things turned up that are OT6's, not Square's, and belong in the record.
 3. **`ClearSRAM` does not reach bank `$31`.** `ff6/src/menu/menu_sram.asm:30-45`
    zeroes `$306000-$307fff` only, so a cartridge-level SRAM wipe leaves the
    codex pages intact. Recovery then rests entirely on the per-page `'O8'`
-   magic (`ff6/src/battle/ot6_codex.asm:50-56`). Not reachable in practice —
+   magic (`ff6/src/battle/ot6_codex.asm:33 (constant), :62-101 (ensure)`). Not reachable in practice —
    bank `$30` is wiped, so no slot can be loaded — but the two banks have no
    shared validity story, and adding one is cheap while the codex is young.
 
@@ -912,8 +912,8 @@ None of these should be treated as facts, cited, or fixed on this basis.
 | The v1.0 raster-wait causes real hangs | `ff6/src/btlgfx/btlgfx_main.asm:32866-32893` | The rev-1 code difference is confirmed; the failure mode is not. Instrument the loop in Mesen across `$f7`-using animations. |
 | "Psycho Cyan" / SwdTech charge-gauge lockup | `ff6/src/battle/ot6_boost.asm:583`, `ff6/src/btlgfx/btlgfx_main.asm:19095-19100`, `RandBushido` at `ff6/src/battle/battle_main.asm:881-891` | **Cannot be audited in this tree — OT6 deleted the vanilla charge gauge in v0.3.** What survives is safe: `RandBushido` turns `$2020 = $ff` into `$00` via `inc` and `RandA` returns 0 for A = 0. Settling the vanilla claim needs the pre-OT6 `UpdateMenuState_37` body out of git history. Moot for OT6 either way. |
 | Sketch "requires Vanish" / a specific setup | `ff6/src/battle/battle_main.asm:9566-9601` | The code shows *any* non-success exit leaves `$b7 = $ff`. The folklore setups are probably ways to *guarantee* failure, not preconditions. A forced-miss trace settles it. |
-| `stx $2020` in `InitSkills` clobbers `$2021` as a 16-bit store | `ff6/src/battle/ot6_kits.asm:28-33` asserts it does; `InitBattle`'s `shortai` at `ff6/src/battle/battle_main.asm:6099` and the `php`/`plp` pairs in `LoadBattleProp`, `InitParty`, `InitInventory` suggest i8 is restored | Unresolved statically. `UpdateEquipBattle` (`ff6/src/battle/battle_main.asm:6752`) has no `php`/`plp` and is the likeliest leak. Needs an emulator watch on `$2020`/`$2021` right after `c2/5828`. |
-| "Evade is never used" | `ff6/src/battle/battle_main.asm:5961-5963` | Contradicted at first reading — `$3b54` (evade) *is* loaded, conditionally on carry. Benign either way; recorded so the folklore version does not get written down as fact. |
+| `stx $2020` in `InitSkills` clobbers `$2021` as a 16-bit store | `ff6/src/battle/ot6_kits.asm:28-33` asserts it does; `InitBattle`'s `shortai` at `ff6/src/battle/battle_main.asm:6099` and the `php`/`plp` pairs in `LoadBattleProp`, `InitParty`, `InitInventory` suggest i8 is restored | Unresolved statically. `UpdateEquipBattle` (`ff6/src/battle/battle_main.asm:6807`) has no `php`/`plp` and is the likeliest leak. Needs an emulator watch on `$2020`/`$2021` right after `c2/5828`. |
+| "Evade is never used" | `ff6/src/battle/battle_main.asm:6016` | Contradicted at first reading — `$3b54` (evade) *is* loaded, conditionally on carry. Benign either way; recorded so the folklore version does not get written down as fact. |
 
 ### Folklore checked and found **absent** (negative results worth keeping)
 
@@ -923,12 +923,12 @@ Each of these was read and the bound verified. None is a defect.
   path (`ff6/src/battle/battle_main.asm:941-946`, `14537-14546`, `12780-12781`);
   `DanceBG` has 10 entries, `DanceProp` 32 bytes, `BattleBGDance` 64 entries.
 - **Sketch/Control/Rage "random command" wild jump.** All three funnel through
-  `_c21554` → `GetCmdForAI` (`ff6/src/battle/battle_main.asm:5024-5038`), which
+  `_c21554` → `GetCmdForAI` (`ff6/src/battle/battle_main.asm:5079`), which
   can only return a byte from an 11-entry table (max `$1d`) or the default
   `$02`. `CmdTbl` has 51 entries.
 - **Rage-list / `MonsterRage` overrun.** `RandRage`'s scan is bounded by 8-bit X
   wrap; `MonsterRage` is exactly 256 × 2 bytes; `LearnRage`
-  (`ff6/src/battle/battle_main.asm:12229-12238`) rejects monster IDs ≥ 256, so
+  (`ff6/src/battle/battle_main.asm:12389`) rejects monster IDs ≥ 256, so
   the `$1d2c` bitfield cannot spill into the known-dances field at `$1d4c`.
 - **Control / Sketch monster-index overrun.** `MonsterControl` is 384 × 4,
   `MonsterSketch` 384 × 2, `MonsterSpecialAnim` 384 bytes; max monster ID
@@ -992,7 +992,7 @@ Each of these was read and the bound verified. None is a defect.
   inherits the previous game's Bushido loadout.
 - Three project documents currently assert the opposite of #13 about Sketch and
   need reconciling as part of closing it: `CONTRIBUTING.md` (House rules),
-  `docs/design/kits.md:428-429`, `docs/design/mp-economy.md:76`.
+  `docs/design/kits.md:708`, `docs/design/mp-economy.md:315`.
 
 ### Suggested acceptance-criteria mapping
 

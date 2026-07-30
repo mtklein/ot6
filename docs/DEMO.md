@@ -85,12 +85,41 @@ skipped until those fixtures exist rather than dragging the whole story
 chain into the gate. `make frontier-test` mints the chain and runs the
 same suite with them included (39 tests).
 
+> **CORRECTION — 2026-07-30. This is a v0.1-era demo note; every count in
+> the two paragraphs above is stale, and the A/B is described backwards.**
+> The paragraph's own advice — *`tools/tests/suite.sh` is the list of
+> record* — is the right answer, and this doc drifted again exactly as it
+> warned it would.
+>
+> - **35 / 39 tests → 59 non-frontier, 23 frontier-gated, 82 total**
+>   (`grep -h '^-- @suite' tools/tests/*.lua`, 2026-07-30). The
+>   frontier-gated set is no longer six: it now also includes
+>   `battle_brokendeath`, `battle_costtable`, `battle_gaufight`,
+>   `battle_naturalmp`, `battle_ultros2`, `codex_ctx`, `codex_saveas`,
+>   `field_mpvisible`, `field_navstep`, `save_checksum` and the six
+>   `menu_*` pages.
+> - **The mp-cost A/B runs the other way round.** `OT6_MP_COSTS` defaults
+>   to **1**, so `battle_mpcost.lua` runs its **ON** half (charge +
+>   insufficient-MP refusal) on the **shipped** ROM as an ordinary suite
+>   member; the `test` recipe then re-runs the same self-detecting script
+>   with `OT6_ROM=ff6/rom/ff6-en-nomp.sfc` for the **OFF** negative
+>   control (`Makefile:127-137`, `:164-166`). The variant ROM is the
+>   *baseline*, not the flagged build. `docs/TOOLING.md` states this
+>   correctly.
+> - **"the 21st test"** was already inconsistent with "35 tests" two lines
+>   above it when written. `probe_shadow_overlap` and commit `6275f02` are
+>   both real; only the ordinal is dead.
+
 ## Known limits (by design, for now)
 
 - (M3 shipped: weapon classes chip shields alongside elements.)
 - Cyan's BP-priced Bushido menu is implemented-after-demo (he isn't
   reachable in the demo stretch).
+  *(**Shipped in v0.5** — the direct SwdTech submenu and configurable
+  loadout, `Ot6BushidoListOpen` at `ot6_kits.asm:842`.)*
 - Enemy shield counts come from an authored per-species table where one
   exists (`Ot6ShieldTbl`, 43 species today, checked before the level
   formula); everything else still falls back to the level formula
   (2 + level/8, cap 6). Broad M6 authoring is the remaining work.
+  *(**2026-07-30:** 43 → **74** authored species, `ot6_hud.asm:1676-2155`.
+  The formula fallback and its bounds are unchanged.)*

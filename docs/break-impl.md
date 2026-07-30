@@ -79,6 +79,22 @@ monsters don't overlap needs, so tables can be shared if space gets tight.
 
 ---
 
+## Correction — 2026-07-30: what this spec calls things, and where they live
+
+Before the substantive corrections below: this is the M1 spec and it names
+things that no longer exist under those names. None of these are design
+errors — a reader just cannot grep for any of them.
+
+| this doc says | the shipped tree |
+|---|---|
+| "Code lives in `ff6/src/battle/ot6.asm`" (:4) | `ot6.asm` is a **43-line include manifest**. Break code is `ff6/src/battle/ot6_break.asm`. |
+| `ot6ShieldCur` / `ot6ShieldMax` / `ot6BrokenFlag` / `ot6Revealed` (:16-19) | `OT6_SHIELD_CUR` / `OT6_SHIELD_MAX` / `OT6_BROKEN_TICKS` / `OT6_REVEALED_ELEM` (`ot6_memory.inc:10-13`). **The addresses in the table are all correct.** |
+| `$3E88,X` is a `$00`/`$01` flag (:18) | It is a **countdown**, not a flag: `OT6_BROKEN_TICKS`, loaded with `$10` (`ot6_break.asm:884`) and decremented in `Ot6Gate` (`:1677`). |
+| "BP (M2) will claim two of the `$3ECB` bytes" (:21) | BP landed at `$3e9c` (`OT6_BP_CLASS`, `ot6_memory.inc:14`). `$3ecb` became `OT6_DIVINE_USED` plus scratch. |
+| `shieldMax = clamp(2 + level/8, 1, 6)` (:27) | The **authored table is consulted first** (`ot6_break.asm:24-38`); the formula is the `@formula` fallback at `:39`, and its floor is 2, not 1. Cap 6 is right. |
+| step 5 "hook Stop wear-off" (:47) | No Stop hook. Recovery rides the private timer via `Ot6Tick`. Step 3's inline *SUPERSEDED* note covers step 3 but not this one. |
+| test plan `break_chip.lua` / `break_full.lua` / `break_recover.lua` (:69-76) | **None of the three were ever written.** The shipped gate is `tools/tests/battle_break.lua`, plus `battle_breakflash`, `battle_breakfloor`, `battle_breaktbl`, `battle_breakvector` and `battle_brokendeath`. |
+
 ## Correction — 2026-07-30: the break window is ~36 seconds, not ~1.5 turn-cycles
 
 This is the M1 spec, and it is mostly still legible as one. Two of its

@@ -208,7 +208,7 @@ I still do not recommend it.
 
 Equip permission is **per item**, not per character: a 16-bit character mask at
 `item_prop_en.dat[item*30]+1..+2` (`ff6/src/menu/equip.asm:1599`,
-`shop.asm:1415`, `battle_main.asm:13977`), stride 30 (`item.asm:1001-1012`),
+`shop.asm:1415`, `battle_main.asm:14303`), stride 30 (`item.asm:1001-1012`),
 bit→character per `CHAR_FLAG` (`ff6/include/const.inc:1416-1431`). Bit 15 is
 Leo **and** the Merit Award override (`equip.asm:2300-2306`), so decoding it as
 a fourteenth character reports phantom wielders on almost every weapon.

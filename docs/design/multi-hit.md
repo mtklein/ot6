@@ -16,6 +16,13 @@ can lean on for breaking, and a couple have more."*
 and line it was read from, or is labelled **UNVERIFIED**. Numbers taken out
 of `.dat` files name the record and byte offset. Line numbers are from the
 `wt/breakrate` worktree on 2026-07-30, off `main` at `4ab93c2`.
+**Re-pointed to `main` at `7b77f60` later the same day**: the v0.9 merges
+inserted four `jsl` hooks into `battle_main.asm` and shifted every citation
+below by 3–72 lines. Each was remapped mechanically (diff the two revisions,
+carry each cited line to its `equal`-block image) and **every one landed on
+the identical source line** — no claim in this document changed, only the
+addresses. The `4ab93c2` baseline is kept above as the record of when the
+measurements were taken.
 
 **Two instruments back this document**, and both are committed:
 `tools/tests/probe_multihit.lua` (the live rule and the break-window cap) and
@@ -53,20 +60,20 @@ on every run — it exits nonzero if the enumeration below has gone stale).
 ### 1.1 Per hit, and the mechanism is singular
 
 The engine has exactly **one** multi-hit mechanism: `$3a70`, *"number of
-attacks (0 = 1 attack)"* (`battle_main.asm:6404`), and one loop that consumes
+attacks (0 = 1 attack)"* (`battle_main.asm:6416`), and one loop that consumes
 it:
 
 ```
 @3288:  plx
         dec  $3a70
         bmi  @3291
-        pea  ExecAttack-1        ; battle_main.asm:8322-8328
+        pea  ExecAttack-1        ; battle_main.asm:8334-8340
 @3291:  rts
 ```
 
 Every extra count is a whole extra `ExecAttack` → `CalcTargetDmg` pass, and
 therefore a whole extra chip opportunity. Quadra Slam reaches that loop by
-setting `$3a70 = 3` (`AttackerEffect_32`, `battle_main.asm:10782-10784`); a
+setting `$3a70 = 3` (`AttackerEffect_32`, `battle_main.asm:10794-10796`); a
 boosted Fight reaches the **same** loop by setting `$3a70 = 1 + 2·BP`
 (`Ot6FightBoost`, `ot6_boost.asm:240-248`). So a boosted Fight measures the
 rule for both, and it can be driven in the opening guard fight where a Quadra
@@ -115,7 +122,7 @@ hit count and the damage ladder are one budget, not two.
 ### 1.3 What a hit costs in damage
 
 FF6 subtracts the target's defence **per hit** (`CalcDmg`,
-`battle_main.asm:7392` onward), and OT6 attenuates ×0.5 per hit while shields
+`battle_main.asm:7404` onward), and OT6 attenuates ×0.5 per hit while shields
 hold (`Ot6ShieldedDmg`, called from `Ot6HitJoin`). So *N* hits at power `P/N`
 deal strictly **less** than one hit at power `P` against anything with
 defence. Multi-hit therefore is not free: it is a real trade of damage for
@@ -136,13 +143,13 @@ hiding inside the first, and the distinction is load-bearing.
 ### 2.2 Breadth — one hit on every body, paid per action
 Targeting, not hit count. `ChooseTarget` collapses the target mask to one
 random body unless the targeting byte's `INIT` field is non-single
-(`battle_main.asm:14879-14889`; `INIT_MASK` values at `const.inc:1298-1302`),
+(`battle_main.asm:14951-14961`; `INIT_MASK` values at `const.inc:1298-1302`),
 and a multi-target action runs `CalcTargetDmg` once per surviving target
-through the loop at `battle_main.asm:8538-8567` — **one chip per body**.
+through the loop at `battle_main.asm:8550-8579` — **one chip per body**.
 
 AutoCrossbow is the case that has been misfiled: targeting byte `$6a`
 (`INIT` = one-side), `ToolsEffect_07` setting *don't split damage*
-(`battle_main.asm:7340-7343`). Against a four-stack it is four chips on four
+(`battle_main.asm:7352-7355`). Against a four-stack it is four chips on four
 gauges; against a boss it is **one**. `kits.md`'s "piercing ×4" reads as rate
 and is breadth. `break-band-vector.md:540` and `break-band-sealed-gate.md:377`
 already use it correctly as the swarm answer — those two are right and
@@ -176,20 +183,20 @@ and Pummel becomes his second axis for free. That asymmetry is his design.
 
 ### 2.4 Duration — hits per turn thereafter, paid once
 Established by #60 and measured there: a **poison status tick chips**. Cmd_22
-stores element `$08` itself (`battle_main.asm:13390-13393`) and tail-jumps
+stores element `$08` itself (`battle_main.asm:13402-13405`) and tail-jumps
 `ExecSelfAttack`, so a tick is an ordinary poison hit with no attacker, and it
-reaches `Ot6Chip` through the weak branch at `battle_main.asm:1891-1893`.
+reaches `Ot6Chip` through the weak branch at `battle_main.asm:1894-1896`.
 Measured: two ticks broke a 2-shield poison-weak guard **with no action spent
 after the application**, one chip per tick, ~1048 frames (~17.5 s of battle
 time) apart. Sap does not chip (no element). A broken monster receives no
-ticks at all (`Ot6Gate`, `ot6_break.asm:1655-1665` → `battle_main.asm:1410-
+ticks at all (`Ot6Gate`, `ot6_break.asm:1655-1665` → `battle_main.asm:1413-
 1417` → Cmd_22's `bit #$10` at `:13368-13371`), so the break window caps
 duration exactly as it caps rate.
 
 Edgar already owns this curve, and it is the sharpest thing about him: **he
 does not hit a weakness, he installs one.** Bio Blaster (item `$a4`) is
 rewritten to spell `$7d` Bio Blast by `InitTarget_03`
-(`battle_main.asm:6551-6558`) — one-side targeting, POISON element, power 20,
+(`battle_main.asm:6563-6570`) — one-side targeting, POISON element, power 20,
 status1 `$04` = POISON. One cast is one poison chip on every body **plus** a
 free chip per body per ~17 s thereafter. That, and not any multi-hit, is the
 whole explanation of the owner's Zozo sighting.
@@ -204,9 +211,9 @@ exhaustive enumeration.** Ten upward writers exist
 
 | writer | effect |
 |---|---|
-| `FightAttack` `battle_main.asm:3495` | `= 1` (two hands), `= 7` with Offering |
+| `FightAttack` `battle_main.asm:3505` | `= 1` (two hands), `= 7` with Offering |
 | `Ot6FightBoost` `ot6_boost.asm:247-248` | `+= 2` per pending BP |
-| Jump + Dragon Horn `battle_main.asm:3943-3949` | `+= 1..3`, random |
+| Jump + Dragon Horn `battle_main.asm:3953-3959` | `+= 1..3`, random |
 | `CheckWeaponMagic` `:8870` | `+= 1` (random weapon spellcast — a spell, not a swing) |
 | `AttackerEffect_49` `:10547` | `+= 1` (magicite / random summon) |
 | **`AttackerEffect_32`** `:10782-10784` | **`= 3` → four attacks, random target** |
@@ -267,7 +274,7 @@ boss-fight value, which is the one that matters.
 | AutoCrossbow | `$aa` | **1/body** | `$6a` one-side | pierce | 125 | 4 | 4.0 (boss) |
 
 **Targeting-byte caveat.** The `INIT` decode above is read from
-`const.inc:1298-1302` plus `ChooseTarget` (`battle_main.asm:14879-14889`), not
+`const.inc:1298-1302` plus `ChooseTarget` (`battle_main.asm:14951-14961`), not
 observed in play. Suplex's `$7e` decodes as "all monsters", which disagrees
 with how Suplex is generally understood to behave; the difference is likely
 the menu cursor's default versus what a player confirms, since these commands
@@ -324,7 +331,7 @@ Identity: **cheapest chips in the game, on one axis** (two if he wears claws).
 | ability | count | reason |
 |---|---|---|
 | **AutoCrossbow** | **×1 per body**, unchanged | It is *breadth* (§2.2) and it is already the designed swarm answer in two band docs. Making it ×4 per body would be 16 chips against a four-stack. `kits.md`'s "×4" is corrected to "whole side, one chip each". |
-| **Drill** | **×2** piercing | The owner said "Tools too", and this is the one that should change: Drill is the armoured-boss answer (it ignores defence, `ToolsEffect_05`, `battle_main.asm:7318-7321`), so two chips into *one* gauge is precisely the boss-facing complement to AutoCrossbow's swarm-facing breadth. 16 MP → 8.0 MP/chip: rate priced above breadth, which is the correct relationship. Power 191 → ~105 per hit (P4). |
+| **Drill** | **×2** piercing | The owner said "Tools too", and this is the one that should change: Drill is the armoured-boss answer (it ignores defence, `ToolsEffect_05`, `battle_main.asm:7330-7333`), so two chips into *one* gauge is precisely the boss-facing complement to AutoCrossbow's swarm-facing breadth. 16 MP → 8.0 MP/chip: rate priced above breadth, which is the correct relationship. Power 191 → ~105 per hit (P4). |
 | **Bio Blaster** | ×1 per body **+ the DOT** | Duration (§2.4), and #60 rules it stays. No hit count. |
 | **Chain Saw** | ×1 | The slash committer, 252 power. P3. |
 | Air Anchor / NoiseBlaster / Flash / Debilitator | ×1 | Gag, and three non-damaging utilities. |
@@ -340,7 +347,7 @@ owner's "×4" instruction. **No data moves for Cyan.** Two things worth writing
 down rather than changing:
 
 - Both are `AttackerEffect_32`, which sets the *random target* flag
-  (`tsb $ba, #$40`, `battle_main.asm:10785-10786`). Against a boss all four hits
+  (`tsb $ba, #$40`, `battle_main.asm:10797-10798`). Against a boss all four hits
   land on the boss; against a four-stack they scatter. So Quadra Slam is
   **the boss-gauge shredder** and is deliberately unreliable against groups —
   the mirror image of AutoCrossbow. That is a good accident and should be kept.
@@ -384,7 +391,7 @@ correct answer, because those three are the physical-kit characters.
 
 **`$11a9` is one byte and one effect.** `LoadMagicProp` copies the record's
 `+$09` byte and doubles it into a jump-table index
-(`battle_main.asm:6937`), and `DoAttackerEffect` dispatches exactly one
+(`battle_main.asm:6949`), and `DoAttackerEffect` dispatches exactly one
 routine (`:10310-10317`). Five of the abilities above already carry a special
 effect (Suplex `$30`, Retort `$3c`, Stunner `$3f`, Cleave `$23`, Empowerer
 `$36`), so **hit counts cannot be data-authored into that slot** for anything
@@ -401,10 +408,10 @@ The OT6-shaped answer is a small table, not a special effect:
 The hook must fire **once per action, not once per swing**, or it re-arms
 itself forever. `AttackerEffect_32` shows the vanilla precedent for that
 problem and its fix: it `stz $11a9`s itself immediately after setting the
-count (`battle_main.asm:10787`, inside `:10782-10788`). The build issue must pick the site and
+count (`battle_main.asm:10799`, inside `:10782-10788`). The build issue must pick the site and
 **prove the once-per-action property with a probe** before trusting it —
-`Ot6SkillClass`'s site inside `LoadMagicProp` (`battle_main.asm:6926`) and
-`Ot6ItemClass`'s inside `CalcItemEffect` (`battle_main.asm:7169`) are the two candidates,
+`Ot6SkillClass`'s site inside `LoadMagicProp` (`battle_main.asm:6938`) and
+`Ot6ItemClass`'s inside `CalcItemEffect` (`battle_main.asm:7181`) are the two candidates,
 and neither has been checked for re-entry. Not decided here.
 
 Cost estimate: one table (~24 bytes), one `jsl`, one proc. No `MagicProp`
@@ -548,7 +555,7 @@ For the issue that moves data. Nothing here is done yet.
 3. `MagicProp` power overrides for `$5d` and `$64`, and an `ItemProp` power
    override for `$a8`, to the numbers §9's damage measurement produces. Use
    `magic_prop_en.dat`'s existing named-override mechanism
-   (`battle_main.asm:6948-7010`) so the `.dat` stays byte-identical.
+   (`battle_main.asm:6960-7022`) so the `.dat` stays byte-identical.
 4. A suite test in `probe_multihit.lua`'s shape, driving a real Pummel and a
    real Drill and asserting two chips per action. Promote the probe.
 5. Re-run `tools/audit_multihit.py` — it should then report five multi-hit

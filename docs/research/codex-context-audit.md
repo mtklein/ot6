@@ -2,7 +2,7 @@
 
 2026-07-28.  `Ot6CodexActive` (ff6/src/battle/ot6_codex.asm) selects the
 per-save codex page by reading `$7e021f` (wSaveSlotToLoad), and all three of
-its callers run in battle context (ot6_break.asm:86/:849/:949).  Issue #29
+its callers run in battle context (ot6_break.asm:97/:868/:976).  Issue #29
 asked, with a measurement behind it, whether any module overlays that cell
 between the menu's lifecycle write and the battle's read.  Answer, measured:
 **no player-reachable flow overlays it; the overlay in the issue's evidence
@@ -60,8 +60,8 @@ mid-battle moment sees the seed's value — not by direct observation.
 ## Why the cell is stable (mechanism, all read)
 
 * `$021f` has exactly four writers, all menu lifecycle moments:
-  menu/menu_common.asm:250 and menu/field_menu.asm:2925 (New Game, `stz`),
-  menu/field_menu.asm:2963 (load confirm), menu/save.asm:50 (save — the OT6
+  menu/menu_common.asm:250 and menu/field_menu.asm:3522 (New Game, `stz`),
+  menu/field_menu.asm:3560 (load confirm), menu/save.asm:50 (save — the OT6
   line).  No other reference to the cell exists in the source tree.
 * The world module's supposed "block restore over $0200" (the issue's
   hypothesis) does not exist: its direct-page swap covers $0000–$00FF only
@@ -70,14 +70,16 @@ mid-battle moment sees the seed's value — not by direct observation.
   The world→battle path (world/move.asm:882–922: PushDP,
   CheckBattleWorld_ext, PopDP, `jsl Battle_ext` at :908) never touches it.
 * The menu's live clock is the nearest neighbor — wGameTimeHours..Frames at
-  $021b–$021e — and ticks 8-bit (menu/menu_common.asm:3493–3522, under the
+  $021b–$021e — and ticks 8-bit (menu/menu_common.asm, the NMI clock — the exact lines were re-checked
+  2026-07-30 and 3493/3480 land on `sty zWaitCounter` / `lda #$00`, not on
+  `IncGameTime`; the mechanism holds, the anchors do not — under the
   `.a8` at :3480), so the tick cannot carry into $021f.
 
 ## What the issue actually measured
 
 codex_saveas.lua enters save select by writing ZMENUSTATE=$13 directly,
 skipping `SelectMainMenuOption_06`'s companion writes
-(field_menu.asm:3641–3651: fade via state 0, `$9e=$13`, `$9f=$04`).  Driving
+(field_menu.asm:4238: fade via state 0, `$9e=$13`, `$9f=$04`).  Driving
 that same shortcut reproduced the issue's evidence exactly: `$021f` read 5
 ~24 frames after the save **while still in the menu**, and the corrupted B
 exit path then wandered (one run re-fired the world entrance under the
@@ -117,7 +119,7 @@ unsabotaged run passes.
 
 * The issue's fourth acceptance box — the #25 entry-contract slot witness
   off `$021f` — was already done before this audit:
-  tools/tests/lib/ot6_contract.lua:327–335 reads `$307ff0`.
+  tools/tests/lib/ot6_contract.lua:603–604 reads `$307ff0`.
 * HANDOFF.md "trap #1" attributes the overlay to a world-module block
   restore; per the above that mechanism claim is wrong (the trap's
   *practical* advice — witness persistent facts through SRAM — remains

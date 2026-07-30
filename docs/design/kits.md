@@ -53,7 +53,7 @@ MORE than 8 and equip a curated subset (~5 slots): Gau and Strago.
 >
 > **What it costs, stated plainly.** Leap is not a *contributing* free
 > action — it removes Gau from the battle and flags the return-to-Veldt
-> event (`TargetEffect_54`, `battle_main.asm:9762-9776`), and vanilla
+> event (`TargetEffect_54`, `battle_main.asm:9774, guard at :9778-9780`), and vanilla
 > refuses it outright with fewer than two party members present. So on
 > the Veldt an out-of-MP Gau's free options are *leave* and *Item*; the
 > free action that swings a fist is only available off the Veldt. The
@@ -123,8 +123,8 @@ the physical cousin of non-elemental magic.
 > | Empowerer `$59` | 2 | `MagicProp` effect `$36` (+1, quarter power) |
 >
 > The engine has exactly one multi-hit mechanism — `$3a70`, *"number of
-> attacks (0 = 1 attack)"* (`battle_main.asm:6404`), consumed by the loop
-> at `:8322-8328` — and the audit enumerates all ten of its upward writers.
+> attacks (0 = 1 attack)"* (`battle_main.asm:6416`), consumed by the loop
+> at `:8335-8339` — and the audit enumerates all ten of its upward writers.
 > So, against the tables below:
 >
 > - **Pummel `$5d` "bludgeoning ×2" — is ×1 today.** No extra-attack effect
@@ -472,9 +472,9 @@ corrode — and a little merchant blood (he'd say TREASURE HUNTER).
 a verb of its own, so the ladder lives BEHIND the Steal row:
 `OpenCmdMenuTbl[$05]` opens the Tools-window shell with Steal / Filch / Bestow
 in it (`Ot6ThiefListOpen`), priced, with unaffordable rows greyed. That is
-forced, not chosen — **Locke has no spare command slot.** `char_prop.asm:157`
+forced, not chosen — **Locke has no spare command slot.** `char_prop.asm:160`
 records FIGHT, STEAL, MAGIC, ITEM; the apparently blank third row is MAGIC
-removed at runtime by `InitCmd_03` (`battle_main.asm:14100`) for a character who
+removed at runtime by `InitCmd_03` (`battle_main.asm:14112`) for a character who
 knows no spell and holds no esper, exactly as #47 found for Gau, and the battle
 menu is still hard-wired to four rows. The moment Locke equips an esper the row
 comes back as Magic, which this doc's row-sharing rule says is never the row to
@@ -488,7 +488,7 @@ authored class-weakness mask**, seeded at battle init by `Ot6SeedShields`
 take, and decrementing that byte would corrupt what the break system thinks the
 monster is weak to. The alternative reading — Filch simply *mints* Locke a pip —
 is dead on arrival: `Ot6ActionEnd` already pays +1 BP for any turn a character
-did not boost through (`ot6_boost.asm:142`), so an ability whose whole effect is
+did not boost through (`ot6_boost.asm:171-175`), so an ability whose whole effect is
 +1 BP is strictly worse than Fight.
 
 So Filch takes the resource the enemy *does* have: **one shield, and Locke keeps
