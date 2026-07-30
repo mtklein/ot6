@@ -1,5 +1,63 @@
 OT6_BREAK_TICKS := $10          ; a bit under vanilla stop duration ($12)
 
+; ------------------------------------------------------------------------------
+; [ the shared 16ths multiply: a16 A *= (mult/16), clamped to $ffff ]
+;
+; OT6 scales three different 16-bit quantities by a byte "in 16ths" ($10 = 1x,
+; $28 = 2.5x): monster HP (hpmul, off Ot6ShieldTbl), the per-step danger rate
+; (Ot6DangerStep, off Ot6DangerMulW) and shielded damage (Ot6ShieldedDmg, off
+; Ot6ShieldedMulW).  All three ran the SAME twenty-two instructions inline --
+; byte-for-byte the same, only the final branch's label spelling differed
+; (@fits at two sites, :+ at the third; both target the very next
+; instruction, so the emitted branch is identical).  This is that code, once.
+;
+; A MACRO AND NOT A PROC, deliberately.  Ot6ShieldedDmg runs inside the
+; per-target damage loop and Ot6DangerStep runs on every field step; a jsr
+; here would add ~12 cycles to both for nothing, and this codebase has
+; measured that a jsr into a hot path is already over the line.  A macro
+; expands to the identical bytes at the identical addresses -- which is also
+; how this refactor is verified, by a byte-identical ROM rather than by a
+; passing suite.
+;
+; in:  a16/i16.  A = the multiplicand's low word, ALREADY also stored to
+;      OT6_SCR_SLOT2; OT6_SCR_BIT = mult << 8 (an msb-first bit walker);
+;      OT6_SCR_COLS = 0 (product bits 16-23).  Setting all three up is the
+;      caller's job -- each of the three sites loads its multiplier from a
+;      different place, and Ot6DangerStep folds an unrelated store into the
+;      same run, so only the loop below is genuinely common.
+; out: A = clamp16(product / 16).  The /16 comes AFTER the multiply on
+;      purpose: (hp/16)*mult would zero the 15-hp intro trash.  The product
+;      really does need bits 16+ (8000 hp x 2.5 fits in 16 bits; the product
+;      does not), which is why OT6_SCR_COLS carries the top byte.
+; clobbers X and the three scratch cells; preserves Y.  Exits with X = the
+; overflow word (0 unless clamped) -- no caller reads it.
+; ------------------------------------------------------------------------------
+.macro ot6_mul16ths
+        ldx     #$0008
+@bit:   asl                     ; product <<= 1 (24-bit)
+        rol     OT6_SCR_COLS
+        asl     OT6_SCR_BIT     ; next multiplier bit into carry
+        bcc     @next
+        clc
+        adc     OT6_SCR_SLOT2   ; product += multiplicand
+        bcc     @next
+        inc     OT6_SCR_COLS
+@next:  dex
+        bne     @bit
+        lsr     OT6_SCR_COLS    ; /16 (24-bit shift right x4)
+        ror
+        lsr     OT6_SCR_COLS
+        ror
+        lsr     OT6_SCR_COLS
+        ror
+        lsr     OT6_SCR_COLS
+        ror
+        ldx     OT6_SCR_COLS
+        beq     @fits
+        lda     #$ffff          ; clamp: 16-bit cells, 16-bit truth
+@fits:
+.endmacro
+
 .proc Ot6SeedShields
         .a8
         .i16
@@ -576,10 +634,10 @@ Ot6ElemAddTbl:
 done:   rts
 
 ; [ a = clamp16(a * mult / 16), mult byte in OT6_SCR_IDX ]
-; a16/i16. shift-add through a 24-bit product — the /16 must come
-; AFTER the multiply ((hp/16)*mult zeroes 15-hp intro trash), and the
-; product genuinely needs bit 16+ (8000 hp x 2.5 = 20000 fits, but
-; its product doesn't). clobbers x + scratch; preserves y.
+; a16/i16. the multiplicand is monster HP, so the product genuinely needs
+; bit 16+ (8000 hp x 2.5 = 20000 fits, but its product doesn't) — see
+; ot6_mul16ths at the top of this file for the shift-add and for why the
+; /16 comes after the multiply. clobbers x + scratch; preserves y.
 hpmul:  .a16
         sta     OT6_SCR_SLOT2   ; multiplicand
         lda     OT6_SCR_IDX
@@ -587,29 +645,8 @@ hpmul:  .a16
         sta     OT6_SCR_BIT     ; mult << 8: msb-first bit walker
         clr_a
         sta     OT6_SCR_COLS    ; product bits 16-23
-        ldx     #$0008
-@bit:   asl                     ; product <<= 1 (24-bit)
-        rol     OT6_SCR_COLS
-        asl     OT6_SCR_BIT     ; next multiplier bit into carry
-        bcc     @next
-        clc
-        adc     OT6_SCR_SLOT2   ; product += multiplicand
-        bcc     @next
-        inc     OT6_SCR_COLS
-@next:  dex
-        bne     @bit
-        lsr     OT6_SCR_COLS    ; /16 (24-bit shift right x4)
-        ror
-        lsr     OT6_SCR_COLS
-        ror
-        lsr     OT6_SCR_COLS
-        ror
-        lsr     OT6_SCR_COLS
-        ror
-        ldx     OT6_SCR_COLS
-        beq     @fits
-        lda     #$ffff          ; clamp: 16-bit cells, 16-bit truth
-@fits:  rts
+        ot6_mul16ths
+        rts
 .endproc
 
 ; hp multiplier per species-id band, in 16ths ($10 = 1x, $28 = 2.5x).
@@ -692,29 +729,8 @@ Ot6RewardMulW:
                                 ;   pre-first-battle ram junk the moment
                                 ;   the player takes a danger-checked
                                 ;   step (see the OT6_RANDBTL comment)
-        ldx     #$0008
-@bit:   asl                     ; product low <<= 1
-        rol     OT6_SCR_COLS
-        asl     OT6_SCR_BIT     ; next multiplier bit into carry
-        bcc     @next
+        ot6_mul16ths            ; saturates; the caller clamps the sum anyway
         clc
-        adc     OT6_SCR_SLOT2
-        bcc     @next
-        inc     OT6_SCR_COLS
-@next:  dex
-        bne     @bit
-        lsr     OT6_SCR_COLS    ; /16 (24-bit shift right x4)
-        ror
-        lsr     OT6_SCR_COLS
-        ror
-        lsr     OT6_SCR_COLS
-        ror
-        lsr     OT6_SCR_COLS
-        ror
-        ldx     OT6_SCR_COLS
-        beq     :+
-        lda     #$ffff          ; saturate; the caller clamps the sum anyway
-:       clc
         adc     a:$1f6e         ; the danger counter (same cell the callers
         plx                     ;   see: db=$7e is wram, db=$00 mirrors it)
         plb
@@ -1520,29 +1536,9 @@ Ot6ShieldedMulW:
         sta     OT6_SCR_BIT     ; mult << 8: msb-first bit walker
         clr_a
         sta     OT6_SCR_COLS    ; product bits 16-23
-        ldx     #$0008
-@bit:   asl                     ; product <<= 1 (24-bit)
-        rol     OT6_SCR_COLS
-        asl     OT6_SCR_BIT     ; next multiplier bit into carry
-        bcc     @next
-        clc
-        adc     OT6_SCR_SLOT2   ; product += multiplicand
-        bcc     @next
-        inc     OT6_SCR_COLS
-@next:  dex
-        bne     @bit
-        lsr     OT6_SCR_COLS    ; /16 (24-bit shift right x4)
-        ror
-        lsr     OT6_SCR_COLS
-        ror
-        lsr     OT6_SCR_COLS
-        ror
-        lsr     OT6_SCR_COLS
-        ror
-        ldx     OT6_SCR_COLS
-        beq     @fits
-        lda     #$ffff          ; clamp: a mult past $10 could overflow
-@fits:  sta     $f0
+        ot6_mul16ths            ; the clamp bites here: a mult past $10 can
+                                ;   carry 16-bit damage out of 16 bits
+        sta     $f0
         shorta0
         plx
 done:   rts
