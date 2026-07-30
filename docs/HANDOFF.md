@@ -11,48 +11,31 @@ true right now and what will cost you a day if you do not know it.
 
 ## Where the project is
 
-**v0.7 is released** — the playtest release: every non-blocker the v0.6
-playthrough turned up, plus Gau's Ochette kit and the six tube-room
-espers. The frontier is unchanged; the Sealed Gate route is minted as far
-as the airship crash (anchors F–I) as groundwork for v0.8. The owner
-resumes playing from the Veldt on this build.
+**v0.8 is released** — "the economy bites". Three releases shipped in three
+days, and none of the last two moved the playable frontier: the loop is now
+*owner plays → files findings → themed release folds them in*, which is
+recorded in ROADMAP as the deliberate cadence. Milestones are named for
+their theme; the frontier push to the end of the World of Balance is v1.0's
+job, and 1.0 is where saves start being forward-compatible.
 
-**v0.6 was released** (Raid on Vector complete through Terra's return) — and
-it is the project's first HUMAN-VALIDATED release: the owner played rc1 from
-the start past the old v0.5 stop line, filed findings in
-`playtest-v0.6-rc1.md`, and promoted the rc unchanged. The release bar is the
-owner's RATCHET RULE (2026-07-28): never release an inferior experience —
-anything at least as good as previous releases, as far as the owner has
-played, may ship. Regressions in played territory block a tag; unplayed
-frontier ships on the machine gates with its gaps documented, and the
-owner's playthrough trails behind, feeding fixes forward.
+What v0.8 shipped: every kit price recalibrated to vanilla's own ruler
+(a spell costs 8-20% of the pool at the level it arrives — the number this
+design had never measured), ultimates anchored at 99 (which turns out to be
+vanilla's own dearest spell, Quick), the break flash and sound, Gau's Fight
+with Leap sharing the Fight row on the Veldt, magicite as gear packages in
+FF6's own two-byte stat encoding, Steal at 4, and three menu pages that had
+been lying to the player since v0.5.
 
-**v0.6 is in progress and the backlog is clean.** In one day the open-issue
-list went from eight standing trackers to four scoped items: the full frontier
-re-minted from power-on through Terra's return (114 states, the Vector band's
-first honest mint in this tree), the Vector-band break floor closed out with an
-encounter/party reachability gate in `make test` (#11), one authored save point
-landed before Number 024 with the rest of the band's cadence deliberately
-declined on recorded reasoning (#10, `design/save-points-vector.md`), the esper
-detail page now shows the while-worn stat mod (#27), the destructive-bug policy
-is written into CONTRIBUTING (#13; Sketch itself stays, see below), and tests can no
-longer reference fixtures by absolute path at all (#26).
+**The frontier stands at Terra's return (v0.6's line).** The Sealed Gate
+route is minted through the airship crash — anchors F through I with
+measured entry/exit contracts — and the banquet is fully decoded with its
+score tier settled at >=67. Legs J-K are what remain, and they are v1.0's.
 
-**The frontier build system is ninja now (#25).** `make frontier` is a thin
-wrapper: `tools/tests/frontier_graph.py` declares the graph as data,
-`tools/tests/lib/frontier_ninja.py` emits `build/build.ninja`, and content
-staleness is ninja `restat` latches — the stamp-plus-`touch` dance, the
-generated deps include, and `frontier_deps.sh` are gone. The failure class
-where "rom content changed" printed while stale-ROM savestates booted anyway
-(observed twice on 2026-07-27) has no mechanism left to occur in. Battery
-anchors are keyed (`tools/tests/anchors/<key>/`), legs declare entry/exit
-contracts as data (`lib/ot6_contract.lua`), an anchor whose
-`persistent_layout` a leg does not declare is refused before the emulator
-boots, and `make anchor-negatives` (in `make test`) proves both refusal paths
-stay loud.
-
-`make test` is the gate and must be green before anything lands.
-`make -j10 smoke` is still the fast falsification loop (~80s).
+**The rules were audited and loosened** (`rules-audit.md`, at the owner's
+request). Agents commit to their own branches now, file exclusivity is
+down to "declare your hunks, expect merges", and targeted re-mints are
+theirs. The four that stayed are all about not fooling ourselves, and they
+each caught something real the day they were reaffirmed.
 
 ## Open work, in the order I would take it
 
