@@ -23,6 +23,21 @@
 --   6. TWO AT ONCE.  Both guards armed for the same damage frame flash
 --      together and share ONE cleave -- the multi-break case a single-target
 --      beam on a two-monster formation cannot stage naturally.
+--   6b. NO REVEAL TO RIDE (#63).  A break landing on a hit that reveals
+--      NOTHING NEW still flashes and still cleaves -- asserted with both
+--      revealed bytes byte-identical across the phase.  The arm hangs off
+--      Ot6RevealCommit's tail, and #63 was filed on the theory that this made
+--      it reveal-dependent; it does not, because Ot6RevealPoll calls that proc
+--      on every damage-numeral edge whether anything is pending or not.  This
+--      phase is a PIN on that, not a witness -- it passes pre-fix too.
+--   6c. THE BREAK THAT ALSO KILLS (#63, THE REGRESSION).  A breaking hit takes
+--      elemental x2 AND broken x2, so in real play the break usually IS the
+--      kill -- and pinLab's HP pin made that case unreachable here, which is
+--      how v0.8-rc1 shipped answering it with nothing at all.  With the HP pin
+--      LIFTED on the target: the white flash is correctly refused (the death
+--      fade owns obj palette 3 and w7e80db) but the cleave still fires, on the
+--      damage frame, panned to the monster, and is dispatched to the APU
+--      before the death sound replaces it.  FAILS on the pre-fix ROM.
 --   7. NMI BUDGET (#33's hard lesson).  Extra per-frame battle traffic once
 --      pushed the engine's line transfers past vblank and froze every ATB
 --      with menus wedged shut.  This effect adds no transfer at all (palette
@@ -58,6 +73,11 @@ local ATB       = 0x3218        -- per-character atb gauge (battle-ram.txt:691)
 local BREAK_SFX = 0xBE
 local FLASH_LEN = 0x18
 
+local SHIELD    = 0x3E40        -- OT6_SHIELD_CUR at the monster half
+local REVE      = 0x3E91        -- OT6_REVEALED_ELEM at the monster half
+local REVC      = 0x3EA5        -- OT6_BOOST_REVEALED at the monster half
+local STATUS1   = 0x3EEC        -- monster status 1 (wound $80 / petrify $02)
+
 local G = { [1] = 4, [2] = 6 }  -- guard 1/2 -> monster slot offsets
 local function tick(g)    return H.readByte(BRKTICK + G[g]) end
 local function live(g)    local t = tick(g); return t ~= 0 and t ~= 0xFF end
@@ -65,8 +85,14 @@ local function palBits(g) return H.readByte(SPRDATA + G[g]) & 0x0E end
 
 -- ---------------------------------------------------------------- watchers
 local sfx = {}                  -- one entry per queued animation sfx
+local ecWrites = {}             -- EVERY write to the enable byte, zeroes too:
+                                --   a zero means the engine consumed the queue,
+                                --   which is how we can tell a queued cleave was
+                                --   dispatched rather than overwritten by the
+                                --   next sound (#63; we cannot hear it)
 local hpWrites = {}             -- damage-CALC frames
 local pendF, armF, offF = {}, {}, {}
+local prevTick, eatenF = {}, {}          -- the frame a PENDING byte was consumed
 local white   = { [1] = {}, [2] = {} }   -- our-flash frames on palette 3
 local foreign = { [1] = 0, [2] = 0 }     -- palette 3 with no flash of ours
 local palWhiteF, cgWhiteF = nil, nil
@@ -104,6 +130,10 @@ local function sample()
   for g = 1, 2 do
     local t = tick(g)
     if t == 0xFF and not pendF[g] then pendF[g] = H.frame end
+    if prevTick[g] == 0xFF and t ~= 0xFF and not eatenF[g] then
+      eatenF[g] = H.frame          -- Ot6BreakStart looked at this slot HERE,
+    end                            --   armed or refused
+    prevTick[g] = t
     if live(g) then
       if not armF[g] then armF[g] = H.frame end
       anyLive = true
@@ -138,8 +168,9 @@ local function sample()
 end
 
 local function resetWatch()
-  sfx, hpWrites = {}, {}
+  sfx, hpWrites, ecWrites = {}, {}, {}
   pendF, armF, offF = {}, {}, {}
+  prevTick, eatenF = {}, {}
   white = { [1] = {}, [2] = {} }
   foreign = { [1] = 0, [2] = 0 }
   palWhiteF, cgWhiteF, numeralF, lastCtr = nil, nil, {}, nil
@@ -170,17 +201,31 @@ local function breakSfx()
   return hits
 end
 
--- the lab pin, re-applied every drive tick
-local function pinLab()
+-- the lab pin, re-applied every drive tick.
+--
+-- #63: BOTH of these pins hide a candidate cause of "the flash never fires in
+-- real play", which is how that bug shipped green.  The HP pin means a break
+-- can never coincide with a kill -- and a breaking hit collects elemental x2
+-- AND broken x2, so in real play it usually IS the kill.  Phase 5 below is
+-- deliberately run with the HP pin LIFTED on the target for exactly that
+-- reason; nothing else in this file may quietly assume it applies.
+local function pinLab(skip)
   for g = 1, 2 do
     H.writeByte(MONFLASH + (G[g] >> 1), 1)     -- vanilla turn-flash: spent
-    if H.readWord(MONHP + G[g]) < 2500 then
+    if g ~= skip and H.readWord(MONHP + G[g]) < 2500 then
       H.writeWord(MONHP + G[g], 6000)          -- nobody dies mid-flash
     end
   end
 end
 
-H.run({ maxFrames = 40000 }, {
+-- put a guard back on the field with a full gauge, for another natural break
+local function regauge(g)
+  H.writeByte(BROKEN + G[g], 0)
+  H.writeByte(BRKTICK + G[g], 0)
+  H.writeByte(SHIELD + G[g], 2)
+end
+
+H.run({ maxFrames = 60000 }, {
   H.waitFrames(20),
   H.loadState(STATE),
   H.waitFrames(10),
@@ -222,6 +267,7 @@ H.run({ maxFrames = 40000 }, {
       hpWrites[#hpWrites + 1] = H.frame
     end, emu.callbackType.write, 0x7E3BFC, 0x7E3C07)
     emu.addMemoryCallback(function(_, v)
+      ecWrites[#ecWrites + 1] = { f = H.frame, v = v, id = H.readByte(0xE9E9) }
       if v == 0 then return end
       sfx[#sfx + 1] = { f = H.frame, id = H.readByte(0xE9E9),
                         cmd = H.readByte(0xE9E8), pan = H.readByte(0xE9EA) }
@@ -328,6 +374,8 @@ H.run({ maxFrames = 40000 }, {
     H.assertEq(hits[1].pan, H.readByte(MONX + G[b]),
       "panned to the broken monster's screen x (a monster-local sound)")
     H.vars.oamOne = oamP3live
+    H.vars.tgt = b               -- the guard the beam actually lands on;
+    H.vars.sib = o               --   phases 4 and 5 restage on the same one
     emitShot("breakflash_white")
     H.screenshot("breakflash_handback")
   end),
@@ -413,8 +461,193 @@ H.run({ maxFrames = 40000 }, {
       .. "gauge frozen, menus wedged shut) does not reproduce")
   end),
   H.driveUntil(function() return H.readByte(0x7bca) ~= 0 end, 6000, {
-    H.call(pinLab), H.waitFrames(4),
+    H.call(function() pinLab() end), H.waitFrames(4),
   }, "a battle menu still opens after the flash window"),
+
+  -- ---------------- phase 4: a break that reveals NOTHING NEW -------------
+  -- Phase 1 breaks a 2-shield guard, so its reveal already lands on chip ONE
+  -- and its break on chip TWO -- but nothing here ever ASSERTED that, and a
+  -- reader (and #63's filed hypothesis) could reasonably believe the effect
+  -- rode the reveal.  This phase pins it: the guard goes in with its fire
+  -- weakness already known, breaks, and the revealed bytes are asserted
+  -- BYTE-IDENTICAL across the whole phase.  So the break moment cannot be
+  -- riding a reveal -- there is none to ride.
+  --
+  -- HONEST ABOUT FAIL-BEFORE: this phase passes on the pre-#63 ROM too.  It is
+  -- a pin on a property that was already true, not the witness for the bug --
+  -- phase 5 is.
+  H.call(function()
+    resetWatch()
+    local b = H.vars.tgt
+    regauge(1)
+    regauge(2)
+    pinLab()
+    H.vars.rev0 = {}
+    for g = 1, 2 do
+      H.vars.rev0[g] = { e = H.readByte(REVE + G[g]), c = H.readByte(REVC + G[g]) }
+    end
+    H.log(string.format("phase 4: revealed going in E/C = %02X/%02X and "
+      .. "%02X/%02X; target is guard %d",
+      H.vars.rev0[1].e, H.vars.rev0[1].c, H.vars.rev0[2].e, H.vars.rev0[2].c, b))
+    H.assertEq(H.vars.rev0[b].e & 0x01, 0x01,
+      "the target guard's FIRE weakness is already revealed before this break "
+      .. "-- so the breaking chip reveals nothing new")
+    watch = true
+  end),
+  H.driveUntil(function()
+    pinLab()
+    return armF[1] ~= nil or armF[2] ~= nil
+  end, 14000, {
+    H.call(function() if H.readByte(0x7bca) ~= 0 then H.setPad({ "a" }) end end),
+    H.waitFrames(4),
+    H.call(function() H.setPad({}) end),
+    H.waitFrames(26),
+  }, "a break landing on a hit that reveals nothing new"),
+  H.release(),
+  H.waitFrames(40),
+  H.call(function()
+    watch = false
+    local b = armF[1] and 1 or 2
+    local hits = breakSfx()
+    H.log(string.format("phase 4: guard %d pend f%s -> arm f%s, white %d, "
+      .. "cleaves %d, revealed now E/C = %02X/%02X and %02X/%02X",
+      b, tostring(pendF[b]), tostring(armF[b]), #white[b], #hits,
+      H.readByte(REVE + G[1]), H.readByte(REVC + G[1]),
+      H.readByte(REVE + G[2]), H.readByte(REVC + G[2])))
+    for g = 1, 2 do
+      H.assertEq(H.readByte(REVE + G[g]), H.vars.rev0[g].e,
+        string.format("guard %d's revealed ELEMENTS did not change across this "
+          .. "break -- nothing new was revealed by it", g))
+      H.assertEq(H.readByte(REVC + G[g]), H.vars.rev0[g].c,
+        string.format("guard %d's revealed CLASSES did not change either", g))
+    end
+    H.assertEq(#white[b] > 0, true,
+      "the break still flashed even though no reveal accompanied it")
+    H.assertEq(#hits, 1,
+      string.format("and still cleaved exactly once (%d)", #hits))
+  end),
+
+  -- ---------------- phase 5: the breaking blow that also KILLS ------------
+  -- THE CASE THE OWNER PLAYS, and the case pinLab's HP pin made unreachable.
+  -- A breaking hit takes vanilla's elemental x2 and then Ot6BrokenDmg's x2 --
+  -- 4x base -- so on ordinary bodies the break IS the kill.  v0.8-rc1 answered
+  -- that with NOTHING: Ot6BreakStart's hp-already-zero refusal skipped the
+  -- flash AND the cleave (probe_breakplay measured hp=0000, status $80, zero
+  -- $BE queued).  The flash is still correctly refused -- the death animation
+  -- loads MonsterDeathPal into this very palette slot and repoints w7e80db at
+  -- it, btlgfx_main.asm:22259-22266 -- but the CLEAVE must fire.
+  --
+  -- FAIL-BEFORE OBSERVED: on the pre-fix ROM this phase fails at the cleave
+  -- count with 0.
+  H.call(function()
+    resetWatch()
+    local b, o = H.vars.tgt, H.vars.sib
+    regauge(b)
+    regauge(o)
+    -- once the target dies the beam retargets to the sibling, and a SECOND
+    -- break inside the assertion window would inflate the cleave count.  Six
+    -- shields on the sibling puts that out of reach of the tail frames.
+    H.writeByte(SHIELD + G[o], 6)
+    pinLab()
+    -- 450 hp: chip one (elemental x2 then shielded x0.5 ~ 1x base, measured
+    -- ~134 in battle_break) leaves it alive; the breaking chip (x2 and x2
+    -- unattenuated, ~536) kills it.  The SIBLING stays pinned so the battle
+    -- does not end under the assertions.
+    H.writeWord(MONHP + G[b], 450)
+    H.vars.tgtX = H.readByte(MONX + G[b])
+    H.log(string.format("phase 5: guard %d hp -> 450, hp pin LIFTED on it "
+      .. "(screen x %02X); sibling %d stays pinned", b, H.vars.tgtX, o))
+    watch = true
+  end),
+  H.driveUntil(function()
+    pinLab(H.vars.tgt)                       -- pin the sibling ONLY
+    local b = H.vars.tgt
+    return H.readWord(MONHP + G[b]) == 0 and eatenF[b] ~= nil
+  end, 14000, {
+    H.call(function() if H.readByte(0x7bca) ~= 0 then H.setPad({ "a" }) end end),
+    H.waitFrames(4),
+    H.call(function() H.setPad({}) end),
+    H.waitFrames(26),
+  }, "a break whose blow also kills the monster"),
+  H.release(),
+  H.waitFrames(30),
+  H.call(function()
+    watch = false
+    local b = H.vars.tgt
+    local hits = breakSfx()
+    H.log(string.format("phase 5: guard %d hp=%04X status1=%02X brokenTimer=%02X "
+      .. "pend f%s -> consumed f%s; tick now %02X, white frames %d, cleaves %d",
+      b, H.readWord(MONHP + G[b]), H.readByte(STATUS1 + G[b]),
+      H.readByte(BROKEN + G[b]), tostring(pendF[b]), tostring(eatenF[b]),
+      tick(b), #white[b], #hits))
+    for i, s in ipairs(sfx) do
+      H.log(string.format("  sfx #%d f%d id=%02X cmd=%02X pan=%02X",
+        i, s.f, s.id, s.cmd, s.pan))
+    end
+    do
+      local t = {}
+      for _, w in ipairs(ecWrites) do
+        t[#t + 1] = string.format("f%d:%02X(id %02X)", w.f, w.v, w.id)
+      end
+      H.log("  enable-byte writes: " .. table.concat(t, " "))
+    end
+
+    -- the coincidence really happened
+    H.assertEq(pendF[b] ~= nil, true, "the gauge emptied: a flash was banked")
+    H.assertEq(H.readWord(MONHP + G[b]), 0,
+      "and the breaking blow left the monster at zero hp")
+    H.assertEq(H.readByte(BROKEN + G[b]) ~= 0, true,
+      "it really was a BREAK, not just a kill (the broken timer is up)")
+
+    -- the flash is refused, deliberately: the death animation owns palette 3
+    H.assertEq(#white[b], 0,
+      string.format("the white flash is REFUSED on a kill -- the death fade "
+        .. "owns obj palette 3 and w7e80db (%d white frames)", #white[b]))
+    H.assertEq(tick(b), 0,
+      "and the pending byte is consumed rather than left to outlive the action")
+
+    -- ...but the break is still AUDIBLE.  This is the assertion #48 could not
+    -- have made and the one that fails on the shipped ROM.
+    H.assertEq(#hits, 1,
+      string.format("the break still CLEAVES when its blow also kills -- one "
+        .. "$%02X queued (%d)", BREAK_SFX, #hits))
+    H.assertEq(hits[1].cmd, 0x18, "queued as spc command $18 (play game sfx)")
+    H.assertEq(math.abs(hits[1].f - eatenF[b]) <= 4, true,
+      string.format("on the frame the pending byte was consumed -- still the "
+        .. "damage frame, not damage calc (sfx f%d, consumed f%s)",
+        hits[1].f, tostring(eatenF[b])))
+    H.assertEq(hits[1].pan, H.vars.tgtX,
+      "panned to the broken monster's screen x, as on the surviving path")
+
+    -- ...and it was DISPATCHED, not overwritten.  This is the one thing about
+    -- the sound that can be established without hearing it, and it is worth
+    -- establishing here specifically: the death animation queues its own $2D
+    -- into these same four bytes a few frames later (btlgfx_main.asm:22292-
+    -- 22296), so on the kill path a cleave that sat in the queue would be
+    -- silently replaced by the death sound.  UpdateSfx runs from NMI, copies
+    -- the three bytes to the APU ports and ZEROES the enable byte
+    -- (btlgfx_main.asm:3189-3200) -- so a zero write following ours, before any
+    -- other sound is queued, is proof the cleave reached hAPUIO0-2.
+    local mine, consumed, stomped = nil, nil, false
+    for _, w in ipairs(ecWrites) do
+      if mine == nil and w.v ~= 0 and w.id == BREAK_SFX then
+        mine = w.f
+      elseif mine ~= nil and consumed == nil then
+        if w.v == 0 then consumed = w.f else stomped = true end
+      end
+    end
+    H.log(string.format("cleave queued f%s, enable byte zeroed f%s, "
+      .. "stomped-before-dispatch=%s",
+      tostring(mine), tostring(consumed), tostring(stomped)))
+    H.assertEq(stomped, false,
+      "nothing else queued a sound into those four bytes before the cleave was "
+      .. "dispatched")
+    H.assertEq(consumed ~= nil, true,
+      "UpdateSfx consumed the cleave and wrote it out to the APU ports")
+    -- what remains unverifiable, and is labelled rather than claimed: whether
+    -- $BE SOUNDS like a break.  #48 chose it by grep and never auditioned it;
+    -- neither can this test.  It is one constant, OT6_BREAK_SFX.
+  end),
 
   H.logStep(function() return "battle_breakflash complete" end),
 })
