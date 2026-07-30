@@ -28,12 +28,15 @@
 -- 3 BP / 3 pending, so its next auto-Fight swings 1+2*3 = 7 times.
 --
 -- Swings alternate hands and an empty hand swings nothing (ot6_boost.asm:
--- 220-224), so with one weapon equipped ~half of those 8 swings land.  The
--- probe does not predict the exact number -- it records $3a70 at each chip
--- and groups shield writes by the frame they land on, which is the whole
--- point: the multi-attack loop is SYNCHRONOUS inside one ExecCmd, so an
--- action's chips all land on one emulated frame and "chips per action" is
--- directly readable.
+-- 220-224), so with one weapon equipped half of those 8 swings land.  The
+-- probe does not predict the number -- it records $3a70 at every chip and
+-- groups shield writes BY ACTION, keyed on $3a70 counting down inside one
+-- volley.  Not by frame: a volley spans three of them, and the frame key
+-- undercounted this probe's own headline 4 -> 2 before it was fixed.
+--
+-- Phase 2 then runs the identical volley into a TWO-shield enemy, which is
+-- the question the design needs next: what do a volley's remaining hits do
+-- once their own earlier hits have broken the target?
 
 local H = dofile("tools/tests/lib/ot6.lua")
 local STATE = "build/states/battle_doorstep.mss.lua"
@@ -59,6 +62,10 @@ end
 -- ------------------------------------------------------------- recording --
 local chips, shieldWrites, swingCounts = {}, {}, {}
 local refs = {}
+local phase1best = 0
+local controlHeld = nil
+
+local function resetLog() chips, shieldWrites, swingCounts = {}, {}, {} end
 
 local function arm()
   refs.cchip = emu.addMemoryCallback(function()
@@ -102,7 +109,7 @@ local function disarm()
 end
 
 -- ------------------------------------------------------------------- lab --
-local subject, bp0
+local subject
 
 local function setupLab()
   keepAlive()
@@ -136,6 +143,64 @@ local function setupLab()
   for _, a in ipairs({ 0x3CA8, 0x3CAA, 0x3CAC }) do H.writeByte(a, WEAPON) end
 end
 
+
+-- one dump of everything recorded since the last resetLog()
+local function report(tag)
+  H.log("== " .. tag .. " ==")
+  H.log("-- $3a70 writes (action volleys)")
+  for i, s in ipairs(swingCounts) do
+    if i <= 60 then
+      H.log(string.format("  swing %2d f%-6d $3a70 <- %02X", i, s.frame, s.v))
+    end
+  end
+  H.log("-- chip hook entries")
+  for i, c in ipairs(chips) do
+    if i <= 60 then
+      H.log(string.format("  chip %2d f%-6d %-9s y=%02X $3a70=%02X " ..
+        "atkclass=%02X shields=%d,%d", i, c.frame,
+        c.y == 0xEE and "(element)" or "(class)", c.y, c.n, c.cls, c.sa, c.sb))
+    end
+  end
+  -- group shield writes BY ACTION, not by frame.  $3a70 counts DOWN within
+  -- one action's volley (dec at battle_main.asm:8324) and is set afresh at
+  -- the next action, so a write whose remaining-count is HIGHER than the
+  -- previous write's begins a new action.  Frames are the wrong key: the
+  -- 8-swing volley spans three of them, and keying on frames undercounted
+  -- it 4 -> 2 in this probe's first version.
+  H.log("-- shield writes, grouped by ACTION")
+  local actions, cur, prevN = {}, nil, nil
+  for _, w in ipairs(shieldWrites) do
+    if cur == nil or prevN == nil or w.n > prevN or w.e ~= cur.e then
+      cur = { e = w.e, frame = w.frame, w = {} }
+      actions[#actions + 1] = cur
+    end
+    table.insert(cur.w, w)
+    prevN = w.n
+  end
+  local best, bestKey = 0, nil
+  for i, a in ipairs(actions) do
+    local vals = {}
+    for _, w in ipairs(a.w) do
+      vals[#vals + 1] = string.format("%d($3a70=%02X)", w.v, w.n)
+    end
+    H.log(string.format("  action %d (entity %02X, from f%d): %d chip(s): %s",
+      i, a.e, a.frame, #a.w, table.concat(vals, " -> ")))
+    if #a.w > best then best, bestKey = #a.w, i end
+  end
+  H.log(string.format("  MOST CHIPS IN ONE ACTION: %d (action %s)", best,
+    tostring(bestKey)))
+  H.log(string.format("  final: A shields=%d timer=%02X | B shields=%d " ..
+    "timer=%02X", shieldA(), H.readByte(0x3E88 + A), shieldB(),
+    H.readByte(0x3E88 + B)))
+  H.screenshot("multihit_p" .. (phase1best > 0 and 2 or 1))
+  if best > phase1best then phase1best = best end
+  -- the probe must not report "measured" having measured nothing
+  local boosted = false
+  for _, s in ipairs(swingCounts) do if s.v == 0x07 then boosted = true end end
+  H.assertEq(boosted, true, "a boosted volley (1+2*3 = 7) ran in " .. tag)
+  return best
+end
+
 H.run({ maxFrames = 40000 }, {
   H.waitFrames(20),
   H.loadState(STATE),
@@ -145,7 +210,6 @@ H.run({ maxFrames = 40000 }, {
   H.call(function()
     local menuHolder = H.readByte(0x62ca)
     subject = (menuHolder + 1) % 3
-    bp0 = H.readByte(0x3e9c + subject * 2)
     setupLab()
     arm()
     H.log(string.format("lab: subject slot %d (menu holder %d), A cweak=%02X " ..
@@ -163,62 +227,94 @@ H.run({ maxFrames = 40000 }, {
   H.repeatN(40, { H.call(keepAlive), H.waitFrames(20) }),
 
   H.call(function()
+    report("phase 1: six shields, room for the whole volley")
+    -- the control is judged HERE, at the end of the phase it belongs to:
+    -- phase 2 deliberately makes B chippable so the volley cannot miss the
+    -- experiment by picking the wrong berserk target.
+    controlHeld = (shieldB() == 6)
+  end),
+
+  -- PHASE 2: THE SAME VOLLEY INTO A 2-SHIELD ENEMY.  Does the break stop
+  -- the rest of the volley chipping, and does the volley continue?
+  -- Ot6Chip / Ot6ClassChip both bail on `lda OT6_BROKEN_TICKS,y / bne done`
+  -- (ot6_break.asm:829-830, :927-929), so the prediction is: two chips,
+  -- then break, then the remaining hits land damage and chip nothing.
+  H.call(function()
+    resetLog()
+    -- BOTH guards, because a berserk Fight picks its target at random and
+    -- the first run of this phase spent its whole volley on the guard that
+    -- could not chip -- measuring nothing while looking fine.
+    for _, e in ipairs({ A, B }) do
+      H.writeByte(0x3E9C + e, WCLASS)
+      H.writeByte(0x3E38 + e, 2)
+      H.writeByte(0x3E39 + e, 6)
+      H.writeByte(0x3E88 + e, 0)
+    end
+    H.writeByte(0x3e9c + subject * 2, 3)
+    H.writeByte(0x3e9d + subject * 2, 3)
+    keepAlive()
+    H.log("phase 2: both guards 2 shields and class-weak, subject re-boosted")
+  end),
+  -- re-arm the boost every cycle until a 7-swing volley is actually seen:
+  -- Ot6ActionEnd consumes the pending charge and skips that turn's regen,
+  -- so a single poke only survives until the subject's next action, and a
+  -- fixed wait let phase 2 finish having measured nothing (observed).
+  -- Wait for a chip that landed with >= 3 attacks still queued -- i.e. one
+  -- that happened INSIDE a boosted volley.  Waiting on "a guard broke" is
+  -- not enough (two ordinary Fights broke one first, and the phase exited
+  -- having measured nothing), and waiting on "$3a70 was 7" is not enough
+  -- either (the volley can spend itself on a guard that cannot chip).
+  -- Guards are re-armed to two live shields whenever they are broken or
+  -- empty, so a 2-shield target is standing when the volley arrives.
+  H.driveUntil(function()
+    for _, w in ipairs(shieldWrites) do if w.n >= 3 then return true end end
+    return false
+  end, 8000, {
+    H.call(function()
+      keepAlive()
+      for _, e in ipairs({ A, B }) do
+        if H.readByte(0x3E88 + e) ~= 0 or H.readByte(0x3E38 + e) == 0 then
+          H.writeByte(0x3E88 + e, 0)
+          H.writeByte(0x3E38 + e, 2)
+        end
+      end
+      H.writeByte(0x3e9c + subject * 2, 3)
+      H.writeByte(0x3e9d + subject * 2, 3)
+    end),
+    H.waitFrames(20),
+  }, "a boosted volley lands on a 2-shield guard"),
+  H.waitFrames(120),
+  H.call(function()
     disarm()
-    H.log("== $3a70 writes (action volleys) ==")
-    for i, s in ipairs(swingCounts) do
-      if i <= 60 then
-        H.log(string.format("  swing %2d f%-6d $3a70 <- %02X", i, s.frame, s.v))
+    report("phase 2: two shields, the volley breaks it mid-way")
+    H.assertEq(phase1best >= 2, true, "one action chipped more than one shield")
+    H.assertEq(controlHeld, true,
+      "phase 1's class-weak-to-nothing control never chipped")
+
+    -- PHASE 2'S OWN FINDING, pinned so the probe cannot report it without
+    -- having seen it: the breaking volley entered the chip hook four times
+    -- on its target, and the last hits found it already at zero shields --
+    -- so a volley that breaks its target mid-way stops CHIPPING while its
+    -- remaining hits keep LANDING (and collect Ot6BrokenDmg's x2 instead).
+    local run, target = {}, nil
+    for _, c in ipairs(chips) do
+      if c.n == 0x07 then
+        run, target = { c }, c.y
+      elseif #run > 0 and c.y == target and c.n < run[#run].n then
+        run[#run + 1] = c
       end
     end
-    H.log("== chip hook entries ==")
-    for i, c in ipairs(chips) do
-      if i <= 60 then
-        H.log(string.format("  chip %2d f%-6d %-9s y=%02X $3a70=%02X " ..
-          "atkclass=%02X shields=%d,%d", i, c.frame,
-          c.y == 0xEE and "(element)" or "(class)", c.y, c.n, c.cls,
-          c.sa, c.sb))
-      end
+    local zeroed = 0
+    for _, c in ipairs(run) do
+      local sh = (target == A) and c.sa or c.sb
+      if sh == 0 then zeroed = zeroed + 1 end
     end
-    -- group shield writes BY ACTION, not by frame.  $3a70 counts DOWN
-    -- within one action's volley (dec at battle_main.asm:8324) and is set
-    -- afresh at the next action, so a write whose remaining-count is
-    -- higher than the previous write's begins a new action.  Frames are
-    -- the wrong key: the 8-swing volley below spans three of them.
-    H.log("== shield writes, grouped by ACTION ==")
-    local actions, cur, prevN = {}, nil, nil
-    for _, w in ipairs(shieldWrites) do
-      if cur == nil or prevN == nil or w.n > prevN or w.e ~= cur.e then
-        cur = { e = w.e, frame = w.frame, w = {} }
-        actions[#actions + 1] = cur
-      end
-      table.insert(cur.w, w)
-      prevN = w.n
-    end
-    local best, bestKey = 0, nil
-    for i, a in ipairs(actions) do
-      local vals = {}
-      for _, w in ipairs(a.w) do
-        vals[#vals + 1] = string.format("%d($3a70=%02X)", w.v, w.n)
-      end
-      H.log(string.format("  action %d (entity %02X, from f%d): %d chip(s): %s",
-        i, a.e, a.frame, #a.w, table.concat(vals, " -> ")))
-      if #a.w > best then best, bestKey = #a.w, i end
-    end
-    H.log(string.format("MOST CHIPS IN ONE ACTION: %d (action %s)", best,
-      tostring(bestKey)))
-    H.log(string.format("final: A shields=%d timer=%02X | B shields=%d " ..
-      "timer=%02X", shieldA(), H.readByte(0x3E88 + A), shieldB(),
-      H.readByte(0x3E88 + B)))
-    H.screenshot("multihit_volley")
-    -- the probe's own gate, so it cannot report "measured" having measured
-    -- nothing: a boosted volley must have run, it must have chipped MORE
-    -- THAN ONCE inside one action, and the class-weak-to-nothing control
-    -- must have come through untouched.
-    H.assertEq(#swingCounts > 0, true, "some action set a swing count")
-    local boosted = false
-    for _, s in ipairs(swingCounts) do if s.v == 0x07 then boosted = true end end
-    H.assertEq(boosted, true, "the boosted volley queued 1+2*3 = 7")
-    H.assertEq(best >= 2, true, "one action chipped more than one shield")
-    H.assertEq(shieldB(), 6, "the class-weak-to-nothing control never chipped")
+    H.log(string.format("phase 2 volley: %d hook entries on entity %02X, " ..
+      "%d of them with the target already at zero shields",
+      #run, target or 0xFF, zeroed))
+    H.assertEq(#run >= 4, true, "the breaking volley hit its target 4+ times")
+    H.assertEq(zeroed >= 1, true,
+      "later hits of the breaking volley found the target already broken " ..
+      "and chipped nothing")
   end),
 })
