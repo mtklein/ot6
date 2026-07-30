@@ -82,7 +82,7 @@ remains:
 - **Attribution is action-granular, not hit-granular**, and one frame of
   slack sits at each action boundary. There is no WRAM address carrying
   the attacker at damage-apply time: `ApplyDmg` reads it off the stack
-  (`lda $02,s`, `battle_main.asm:2960`), `$32E0,y` is a retaliation
+  (`lda $02,s`, `ApplyDmg` at `battle_main.asm:2975`), `$32E0,y` is a retaliation
   blacklist written only on death (`:8662`), and `$3406` reads negative
   across the damage frames because `ExecAction`'s `sec / ror $3406`
   (`:194`) invalidates it on entry. The drivers publish a `_residual` per
@@ -243,7 +243,7 @@ values, story-chain fixtures re-minted, Whelk head untouched at
 **Superseded — do not read the line above as current.** Measurement
 #5 retired the HP dial entirely; the table ships $10/$10/$10/$10
 (all 1x) and shielded resistance carries difficulty instead. See
-Measurement #5 below and `Ot6HpMulTbl` in ot6.asm for the live
+Measurement #5 below and `Ot6HpMulTbl` (`ff6/src/battle/ot6_break.asm:636-642`) for the live
 values.
 
 ## Measurement #4 — encounter-rate and reward parity (2026-07-17)
@@ -823,9 +823,9 @@ The chain is `SubBattleGroup[map]` → `RandBattleGroup[group*8]` (four
 formation words, drawn at 31.25/31.25/31.25/6.25%) →
 `BattleMonsters[formation*15]` → `MonsterProp[species*32]`, all read
 straight out of `ff6/src/field/battle.asm:391-406` and
-`battle_main.asm:8005` / `:7316`. Levels and HP from `+16` and `+8`;
-weak/null/absorb re-derived at `+25`/`+24`/`+23` (`battle_main.asm:7517`
-and `:7564`, the latter a 16-bit load, so `+23` is absorb and `+24` is
+`RandBattleGroup` (`ff6/src/field/battle.asm:511`, read at `:197`/`:408`). Levels and HP from `+16` and `+8`;
+weak/null/absorb re-derived at `+25`/`+24`/`+23` (`battle_main.asm:7696`
+and `:7743`, the latter a 16-bit load, so `+23` is absorb and `+24` is
 null).
 
 **Two map-property corrections fall straight out of it, and one of them
@@ -1006,7 +1006,7 @@ rather than an obvious failure.
 
 1. **The poison rung read the wrong element bit.** Edgar's Bio Blaster
    rung gated on `anyRevealed(0x20)` — that is **pearl**. Poison is
-   `$08` (`Ot6Chip` walks the mask from bit 0, ot6.asm:627; the armor
+   `$08` (`Ot6Chip` walks the mask from bit 0, `ot6_break.asm:824`; the armor
    line's own rows read `$08`). The rung had never been driven, so the
    wrong bit had never cost a measurement. It would have cost this one.
 2. **The probe rungs were circular.** `bio` waited for poison to be
@@ -1017,7 +1017,7 @@ rather than an obvious failure.
    all is known", because he can do nothing with a revealed *fire* and
    the board-wide gate let Terra's probe stop his before he opened Tools.
 3. **`H.battleLoadStarted()` reads party slot 0's HP** (`M.BATTLE_HP =
-   $3BF4`, lib/ot6.lua:301,:336) and calls a zero there "no battle". On
+   $3BF4`, `tools/tests/lib/ot6.lua:336`) and calls a zero there "no battle". On
    `kolts_pool` slot 0 is **EDGAR**, and a Tusker pair kills him in four
    enemy actions — so the driver declared `torn_down` and abandoned
    battles that were still being fought: **9 of 48 samples in the first
@@ -1026,7 +1026,8 @@ rather than an obvious failure.
    now scans all four slots. Left local to the driver: 24 gate tests call
    the shared helper and none of them has a slot-0 death.
 4. **`break_uptime_frames` was counting corpses.** The broken timer is
-   `$10` ticks decremented on the monster's own turn (ot6.asm:20, :1140),
+   `$10` ticks (`OT6_BREAK_TICKS`, `ot6_break.asm:1`) decremented on the
+   monster's own turn (`dec OT6_BROKEN_TICKS,x` in `Ot6Gate`, `ot6_break.asm:1677`),
    so a monster that breaks and *dies to the breaking hit* never ticks it
    down — the body stays "broken" for the rest of the fight and every
    frame was counted as uptime. It reported **58% uptime on a Brawler
@@ -1142,7 +1143,10 @@ Five things read off those two tables.
   when mashed, where Edgar swings every turn — a real break (3.7 chips,
   1.7 breaks). What would close it is a slashing carrier whose per-hit
   damage is small enough to chip twice cheaply: Cyan's Quadra Slam, Edgar's
-  Chainsaw. Neither exists at Mt. Kolts. **This is outside the data
+  Chainsaw. *(**2026-07-30:** only Quadra Slam qualifies. Chain Saw `$a6` is
+  **×1** and the highest-power tool in the kit — `tools/audit_multihit.py`.
+  There are exactly three multi-hit abilities in the game and no tool is one
+  of them.)* Neither exists at Mt. Kolts. **This is outside the data
   tables and I did not invent a weapon to fix it.**
 - **Tusker on the shelf pool gets breaks but almost no window** (2.0
   breaks, 4.7% uptime, 0 actions broken) while the *same species* in the

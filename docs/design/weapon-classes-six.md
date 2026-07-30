@@ -23,6 +23,27 @@ current scheme is provably lockout-free and six is not (§4.2, §4.4).
 > after 1548 are **+13** versus HEAD. All citations below are to the working
 > tree as of writing, and the tallies in §5.4 are working-tree tallies.
 
+> **CORRECTION — 2026-07-30. That "+13" note is now badly understated, and
+> the `file:line` citations below have been re-pointed at today's tree.**
+> Bank `$F0` grew a great deal between v0.6 and v0.9, so the drift is
+> hundreds of lines, not thirteen. Ten citations in this survey resolved to
+> unrelated code and were **fixed in place** (a stale line number is a
+> typo, not a claim about the game): the null-break `bmi` tests, the shadow
+> buffer's `.assert`, `Ot6ClassGlyphTbl`, `Ot6ElemPalTbl`, the class-message
+> walk, `SortItemsByIcon` / `ItemIconTbl`, Number 024's shield row, the
+> equip-mask read, and the pending-boost write. **The mechanism claims they
+> support were each re-read and all of them still hold** — only the
+> addresses had moved.
+>
+> **One count claim did NOT survive and is left standing as a record.**
+> §5.4 says `Ot6ShieldTbl` "currently holds **62 records**". It now holds
+> **74** (`ot6_hud.asm:1676-2155`, `$ffff` terminator at `:2155`, counted
+> 2026-07-30). The mask/count breakdown §5.4 derives from that 62 has
+> **not** been re-derived here, so treat every number in it as a v0.6-era
+> tally, not a current one. Re-running it is a follow-up, not a typo fix —
+> and the survey's *conclusion* (four classes stay, six does not fit) rests
+> on the palette-bit argument in §4, not on this tally.
+
 ---
 
 ## 1. The bit and space budget, measured
@@ -43,7 +64,7 @@ OT6_NULLBRK := $80              ; property, not a class
 
 Bits `$10`, `$20`, `$40` are unallocated. Six classes occupy `$01`–`$20`,
 leaving `$40` free and `$80` still reserved for null-break. The null-break
-tests are `bmi` on bit 7 (`ot6_break.asm:858`, `ot6_icons.asm:375`, `:468`) and
+tests are `bmi` on bit 7 (`ot6_break.asm:942`, `ot6_icons.asm:570`, `:663`) and
 stay correct unchanged. **Six fits; seven would fit; eight would collide.**
 
 ### 1.2 The battle RAM bytes are whole bytes, already
@@ -55,7 +76,7 @@ stay correct unchanged. **Six fits; seven would fit; eight would collide.**
   `y < $08`).
 - `OT6_BOOST_REVEALED := $3e9d` (`ot6_memory.inc:15`) — same split: monster
   half = revealed-class mask (`$3ea5,y`, `ot6_hud.asm:363`), character half =
-  pending boost 0–3 (`ot6_kits.asm:140`).
+  pending boost 0–3 (`OT6_BOOST_REVEALED`, written at `ot6_kits.asm:991`).
 
 Both monster halves are full 8-bit masks with four bits in use. Six classes
 need no new storage.
@@ -84,7 +105,7 @@ the under-monster line is **five cells** — cell 0 is the shield count, cells 1
 are weakness slots **shared between elements and classes**, and a fifth
 weakness truncates. The cap is enforced by `cmp #$09 / bcs @edone` in both
 walks. The shadow buffer is 14 bytes per line × 6 lines
-(`ot6_memory.inc:76-77`), so widening the row means moving the `$57c0+`
+(`ot6_memory.inc:119-120`), so widening the row means moving the `$57c0+`
 occupants.
 
 How much does 2-of-6 cost here? Measured from `monster_prop.dat` `+25` across
@@ -125,9 +146,9 @@ The six-class change costs **zero bytes in `$C1`, `$C2` and `$C3`**: every edit
 is either an in-place constant, a two-byte table extension in bank `$F0`, or a
 data/JSON change. Specifically:
 
-- `ot6_hud.asm:351` `cmp #$10` → `cmp #$40` — same size.
-- `Ot6ClassGlyphTbl` (`ot6_icons.asm:493-497`) 4 → 6 bytes — **+2 bytes, `$F0`**.
-- `Ot6ElemPalTbl` (`ot6_icons.asm:284-296`) 12 → 14 bytes — **+2 bytes, `$F0`**.
+- the `cmp #$10` in the class walk → `cmp #$40` — same size.
+- `Ot6ClassGlyphTbl` (`ot6_icons.asm:736`) 4 → 6 bytes — **+2 bytes, `$F0`**.
+- `Ot6ElemPalTbl` (`ot6_icons.asm:479`) 12 → 14 bytes — **+2 bytes, `$F0`**.
 - `Ot6WeapClassTbl` is 256 fixed bytes indexed by item id — reclassification is
   free.
 - `Ot6ShieldTbl` records are 4 bytes with a one-byte mask (`ot6_break.asm:32`)
@@ -187,7 +208,7 @@ I still do not recommend it.
 
 Equip permission is **per item**, not per character: a 16-bit character mask at
 `item_prop_en.dat[item*30]+1..+2` (`ff6/src/menu/equip.asm:1599`,
-`shop.asm:1415`, `battle_main.asm:14071`), stride 30 (`item.asm:1001-1012`),
+`shop.asm:1415`, `battle_main.asm:13977`), stride 30 (`item.asm:1001-1012`),
 bit→character per `CHAR_FLAG` (`ff6/include/const.inc:1416-1431`). Bit 15 is
 Leo **and** the Merit Award override (`equip.asm:2300-2306`), so decoding it as
 a fourteenth character reports phantom wielders on almost every weapon.
@@ -422,7 +443,7 @@ DAGGER or BLADE, one at a time — is locked out of the body just as hard. The
 row was wrong because it was authored for a four-character party that
 `wob-route.md:78-85` proves does not exist, not because there were four classes
 to choose from. Widening it to `SLASH|PIERCE` — which is what the working tree
-now does, matching Number 024 in the row directly above at `ot6_hud.asm:1545` —
+now does, matching Number 024 in the row directly above at `ot6_hud.asm:1973` —
 costs one byte and fixes it completely.
 
 Worth flagging while here: `bosses-wob.md:613-617` states Number 128's body is
@@ -472,7 +493,7 @@ icon block is untouched vanilla art that vanilla itself rendered.
 
 | status | codes | notes |
 |---|---|---|
-| **(a) exists and already wired as a class glyph** | `$d9` sword, `$da` spear, `$dc` staff, `$df` sparkle | `Ot6ClassGlyphTbl`, `ot6_icons.asm:493-497`. The comment at `:488-492` says these ship in the vanilla small font and need no upload — true of the whole block. |
+| **(a) exists and already wired as a class glyph** | `$d9` sword, `$da` spear, `$dc` staff, `$df` sparkle | `Ot6ClassGlyphTbl`, `ot6_icons.asm:736`. Its header comment says these ship in the vanilla small font and need no upload — true of the whole block. |
 | **(b) exists in the shipping font, needs only a pointer + a type word** | `$d8` dagger, `$db` katana, `$dd` brush, `$de` star, `$e1` claw | Vanilla used all five (dagger 16 weapons, katana 8, brush 4, star 3, claw 7). Five available; six classes need two. |
 | **(c) genuinely needs drawing** | **none** | For any six drawn from vanilla's ten. |
 
@@ -491,8 +512,8 @@ answer to the objection.
   fixed-width 7-byte slots. All six proposed words fit: `BLADE`, `DAGGER`,
   `SPEAR`, `BLUNT`, `CLAW`, `RANGED`. **Zero bytes, JSON only.**
 - **Inventory Arrange is already class-grouped for free and needs no change at
-  all.** `SortItemsByIcon` (`ff6/src/menu/field_menu.asm:2207-2216`) walks
-  `ItemIconTbl` (`:2221`) = `$ff, $d8..$e7` — the *entire* icon block, 17
+  all.** `SortItemsByIcon` (`ff6/src/menu/field_menu.asm:2227`) walks
+  `ItemIconTbl` (`:2241`) = `$ff, $d8..$e7` — the *entire* icon block, 17
   entries. Adding classes on `$d8`/`$e1` groups correctly with no edit.
 - **No menu-bank `$C3` work at all.** Grepping `ff6/src/menu/*.asm` finds no
   class-bit logic anywhere; the only OT6 hooks there are codex save/load and the
@@ -501,7 +522,7 @@ answer to the objection.
 
 ### 5.3 Messages
 
-`ot6_break.asm:876-882` sets `$3401 = $45` and walks the class bit with
+`ot6_break.asm:961-967` sets `$3401 = $45` and walks the class bit with
 `lsr`/`inc`. `attack_msg_en.json` slots `$45-$48` hold the four class messages
 and **`$49` and `$4a` are empty** — exactly two free, contiguous, immediately
 after. Two new strings in a text bank; the walk needs no code change.
@@ -510,6 +531,11 @@ after. Two new strings in a text bank; the walk needs no code change.
 
 `Ot6ShieldTbl` (`ot6_hud.asm:1273-1608`, 4-byte records) currently holds **62
 records**:
+
+*(**2026-07-30:** stale on both counts — the table is now at
+`ot6_hud.asm:1676-2155` and holds **74** records. The tally below is a
+v0.6-era snapshot and has not been re-derived; see the correction at the top
+of this file.)*
 
 | mask | count |
 |---|---|
