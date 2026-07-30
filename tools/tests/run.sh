@@ -230,18 +230,24 @@ if [ -n "${OT6_SRAM_ANCHOR:-}" ]; then
     "$ANCHOR_LAYOUT" ||
     { echo "invalid SRAM anchor: $OT6_SRAM_ANCHOR (refused BEFORE boot)"; exit 2; }
 fi
-# --timeout=600: Mesen's testrunner has a hard DEFAULT 100-second wall-clock
+# --timeout: Mesen's testrunner has a hard DEFAULT 100-second wall-clock
 # cap (exit -1/255 + truncated stdout on expiry) that reaped long runs; keep
 # a cap as the only defense against a genuinely hung emulator, just a roomy one.
+# OT6_TIMEOUT raises it for a run you already know is competing for cores --
+# the cap is WALL clock, so `nice` does not protect it (see the reap
+# diagnosis below).
 # --enableStdout mirrors the EMULATOR message log to stdout.  It does NOT
 # carry Lua errors or watchdog kills -- those go to the script log, which
 # nothing reads headless.  A script that goes quiet has told you nothing;
 # print() is the only channel out.  Kept for the ROM-info banner.
 # CFFIXED_USER_HOME is the isolation boundary measured above.
+CAP="${OT6_TIMEOUT:-600}"
+t0=$(date +%s)
 env CFFIXED_USER_HOME="$MESEN_HOME" \
-  "$SHARED_APP/Contents/MacOS/Mesen" --testrunner --timeout=600 --enableStdout \
+  "$SHARED_APP/Contents/MacOS/Mesen" --testrunner --timeout="$CAP" --enableStdout \
   "$ROM" "$COMPOSED" > "$RUN_LOG" 2>&1
 code=$?
+elapsed=$(( $(date +%s) - t0 ))
 
 python3 "$ROOT/tools/tests/lib/decode_b64.py" "$RUN_LOG" "$ART"
 
@@ -251,6 +257,37 @@ elif grep -q '^\[ot6\] FAIL' "$RUN_LOG"; then
   verdict=1
 else
   verdict=$code
+  # NO VERDICT IN THE LOG.  The script never reached PASS or FAIL, so the
+  # emulator was killed rather than finishing -- and if it lived roughly to
+  # the cap, the killer was the cap.  Say so, because the raw signature is
+  # "exit 255, truncated stdout" and that reads exactly like a crash: the
+  # brief has to keep re-teaching agents that it is not one, and it is the
+  # documented top cause of a mint failing for reasons that are not the mint.
+  #
+  # WHY THIS IS USUALLY CONTENTION AND NOT THE TEST: the cap is WALL clock,
+  # and `nice` does not slow the wall.  Niced work yields to the owner's
+  # game, but every agent's jobs are equally niced, so they starve EACH
+  # OTHER -- a mint that takes 400s alone can cross 600s when a dozen of
+  # them share ten cores.  Observed 2026-07-29: nine states minted fine,
+  # four reaped, all four green when re-run alone.
+  # "Lived to the cap" with 5s of slack for rounding -- not a fixed 30s
+  # margin, which goes negative and always fires under a small OT6_TIMEOUT.
+  if [ $(( elapsed + 5 )) -ge "$CAP" ]; then
+    echo "REAPED: no [ot6] verdict, and the run lasted ${elapsed}s against a" \
+         "${CAP}s wall-clock cap (--timeout).  Mesen killed it; it did not crash."
+    echo "  Load right now: $(uptime | sed 's/.*load average/load average/')"
+    echo "  On a busy machine this is CONTENTION, not your change.  The cap is"
+    echo "  wall clock, so nice(1) does not protect it -- concurrent jobs are"
+    echo "  all equally niced and starve each other.  The signature is several"
+    echo "  runs failing at once that each pass alone."
+    echo "  Before debugging: lower parallelism (make frontier NINJAFLAGS=-j2)"
+    echo "  and retry, or raise the cap for this run with OT6_TIMEOUT=1200."
+  elif [ "$verdict" -ne 0 ]; then
+    echo "no [ot6] verdict after ${elapsed}s (cap ${CAP}s): the script died" \
+         "before reaching PASS or FAIL."
+    echo "  Well short of the cap, so this is NOT the reap -- look at" \
+         "$RUN_LOG for a Lua load error."
+  fi
 fi
 if [ "$verdict" -eq 0 ] && [ -n "${OT6_EXPECT_ARTIFACT:-}" ]; then
   for expected in $OT6_EXPECT_ARTIFACT; do
