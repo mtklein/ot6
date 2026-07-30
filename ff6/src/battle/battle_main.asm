@@ -271,8 +271,10 @@ ExecAction:
         and     #$d7        ; clear $3aa0.3 and $3aa0.5
         ora     #$40        ; set $3aa0.6
         sta     $3aa0,x
-        lsr
-        bcc     @01a6       ; branch if target is not present
+        jsl     Ot6MayAct   ; ot6: was `lsr` on the byte just stored -- now
+                            ;   also refuses a BROKEN actor, which is the only
+                            ;   re-check between the queue and the turn
+        bcc     @01a6       ; branch if target is not present (or broken)
         lda     $3204,x
         ora     #$04
         sta     $3204,x
@@ -12743,6 +12745,14 @@ CheckRetal:
         lda     $b1         ; counterattack flag
         lsr
         bcs     @4cbe       ; skip if a counterattack (can't counter a counter)
+        jsl     Ot6MayAct   ; ot6: nor does a BROKEN monster counter -- Broken
+        bcc     @4cbe       ;   have no turns.  DELIBERATELY BELOW the $3a56
+                            ;   died-branch above: `if_self_dead` scripts ride
+                            ;   this same path, and a break's x2 makes dying
+                            ;   WHILE broken the common case -- gating at the
+                            ;   top of CheckRetal would have stranded Ifrit &
+                            ;   Shiva's end_battle (ai_script.asm:4551-4562)
+                            ;   and soft-locked the fight.
         lda     $b8
         ora     $b9
         beq     @4cbe       ; branch if there are no retaliation targets
@@ -15137,15 +15147,28 @@ DecCounters:
 ; frame 0-9 (status counters for each character/monster)
         asl
         tax                             ; otherwise, use it as a character/monster index
-        lda     $3aa0,x
-        lsr
-        bcc     _5ae9                   ; return if $3aa0.0 is clear (target is not present)
+; ot6: THE SPEED ACCUMULATOR AND THE BROKEN TICK RUN AHEAD OF THE PRESENCE
+; GATE.  Vanilla ordered it presence-then-accumulator; this is the same
+; instructions in the other order, same byte count, and every vanilla
+; consumer below (stop, condemn, run-away, dot) still sits behind the
+; presence test exactly as before.  What changes is that Ot6Tick now reaches
+; a monster that is OFF STAGE.  Tag fights clear $3aa0.0 on the sibling that
+; leaves (battle 70's swap is an AI turn, ai_script.asm:4523-4529), and a
+; Broken one used to freeze there: measured with a paired control in
+; probe_ifrittag, the on-stage timer ran 16 -> 0 in 2159 frames while the
+; tagged-out one sat at 16 for the same 2159 and came back still wearing 0
+; shields.  The break is a real-time window; being off screen should not
+; bank it.  Letting $3adc accumulate while absent is the only vanilla-side
+; effect, and it changes nothing but that counter's phase on re-entry.
         clc
         lda     $3adc,x                 ; slow/normal/haste counter
         adc     $3add,x                 ; add constant (+32/+64/+84)
         sta     $3adc,x
         bcc     _5ae9                   ; return if it didn't overflow
         jsl     Ot6Tick                 ; ot6: tick broken timer
+        lda     $3aa0,x
+        lsr
+        bcc     _5ae9                   ; return if $3aa0.0 is clear (target is not present)
         lda     $3af1,x
         beq     @5ab1                   ; branch if stop counter is 0
         dec     $3af1,x                 ; decrement stop counter
