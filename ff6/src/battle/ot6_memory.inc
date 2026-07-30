@@ -228,6 +228,20 @@ OT6_PIPPEND          := $ed74   ; #42: a DEFERRED pip paint -- character slot
 ; near-zero-slack set of frames looks like.  #33's NMI lesson said the same
 ; thing about vblank TRANSFERS; this says it about plain CPU time.
 ;
+; SCOPE, re-measured 2026-07-30 on v0.9 (issue #67).  8d8a570 concluded from
+; five NOPs before `jsr CheckRetal` (battle_main.asm:3146) that the $C2 ACTION
+; path was over the line too, and therefore that bank $C2 could not grow at
+; all.  That is no longer true, and may never have been the general rule:
+;   five NOPs in the $C2 action path, v0.9 ....... 1635  (pass) -- every frame
+;                                                        number in the run
+;                                                        byte-identical
+;   80 NOPs in Ot6BgHud_ext, v0.9 ................ 1798   -> still over
+; The v0.9 merge itself added ~49 bytes of $C2 at four per-ACTION sites with
+; this fixture unmoved, which points the same way.  So the standing rule is
+; "no growth in the ONCE-PER-BATTLE-FRAME path", not "no growth in $C2" --
+; and battle_trueknight asserts it in those words now (phase 4b), instead of
+; through a pip-delivery assertion that could not tell the two apart.
+;
 ; Hence the gate is INLINE at the call site (ot6_hud.asm): even a `jsr` into
 ; a proc that early-outs was over the line.  Nonzero = at least one slot has
 ; a live countdown; the painter recomputes it as it walks, so a stale value
