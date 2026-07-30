@@ -259,9 +259,9 @@ pierce). Cross-check weapon classes in `ff6/src/battle/ot6_class.asm`.
 ### Break DATA status: shields/classes DONE, one element gap
 - **`Ot6ShieldTbl` is authored end-to-end through Nerapa.** Every v0.5 boss AND
   its parts already have a shield+class row (table verified,
-  `ot6.asm:4491–4813`). The class rows make every boss **class-breakable today**;
+  `Ot6ShieldTbl`, `ff6/src/battle/ot6_hud.asm:1676–2155`). The class rows make every boss **class-breakable today**;
   the data is *inert*, waiting on fixtures to measure.
-- **`Ot6ElemAddTbl` stops at v0.4's search corridor (`ot6.asm:384–479`).** The
+- **`Ot6ElemAddTbl` stops at v0.4's search corridor (`ff6/src/battle/ot6_break.asm:345–500`).** The
   v0.5 boss element weaknesses are mostly **vanilla** (Ultros fire/bolt; Ifrit
   fire-absorb / ice-weak, Shiva fire-weak; Cranes water + bolt; Number 128
   bolt/water; FlameEater ice/water; Nerapa ice/bolt/holy, absorbs fire — all
@@ -363,7 +363,7 @@ Corrections to the scoping assumptions, measured while authoring the Opera:
 - **Roster at `zozo_done` is LOCKE + CELES only** (measured `$1850`: LOCKE=$C1, CELES=$51, rest $00) — the Zozo leave-cutscene forces `party_menu {LOCKE,CELES}`, not the six the scoping guessed. Gates every "who can break this" call for Beats A–B.
 - **The opera OPENS via a Jidoor cutscene, not the opera house.** Talk impresario `_ca9337` on **map 209**, reached from **Jidoor (map 198) north bump-door (16,13→16,12)**: Maria/Celes resemblance → letter (`$0331`) → Setzer intro + `name_menu` → `$0340=1`. The opera-house impresario (map 237, `_caae15`) is hidden behind `$0340` until then.
 - **The aria is a choice puzzle (clockPick-class), not a timed walk.** Stage trigger `_cabafd` (map 238, 97,7), three lyric forks; correct sequence **{0,1,0}** → `$0111=1`.
-- **Ultros ② = battle 134, `$012d`, 6 shields, slash|pierce** (`Ot6ShieldTbl`, ot6.asm:4757).
+- **Ultros ② = battle 134, `$012d`, 6 shields, slash|pierce** (`Ot6ShieldTbl`, `ff6/src/battle/ot6_hud.asm:1966–1967`).
 - **Geography:** Zozo exit column x=63 → world (23,92); Jidoor = world (27,130)→map 198; opera house = world (45,154)→map 237.
 
 **Fixtures banked (gated):** `opera_doorstep` (map 209 Jidoor impresario), `opera_open` (map 237, `$0340=1`).

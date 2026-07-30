@@ -282,7 +282,7 @@ VICKS, DEAD` / `max_hp VICKS` (event_main.asm:40739). No `MonsterProp`
 record is ever read for him: no weak byte, no absorb byte, no shield
 seed — `Ot6SeedShields` is reached only from the monster/rage load and
 returns immediately for character entity offsets in any case
-(ot6.asm:43).
+(`ff6/src/battle/ot6_break.asm:6-9`).
 
 **An earlier draft gave these fights 3 shields · poison + slashing.
 That is unimplementable as written** — there is no monster entity to

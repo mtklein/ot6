@@ -100,8 +100,9 @@ C2/C1 addresses (names, not pins — linking is symbolic).
   whatever the previous occupant left is still there. An earlier version of
   this doc summarized the clear as "auto-inits our RAM", and that
   assumption cost two bugs: a stale nonzero broken timer starting a monster
-  pre-broken (`ot6.asm:108`) and stale reveal bits being OR'd into a fresh
-  seed (`ot6.asm:114`), fixed in `ec31638` / `65d031a`. Anything OT6 parks
+  pre-broken and stale reveal bits being OR'd into a fresh
+  seed (both now in `ff6/src/battle/ot6_break.asm`; see the correction at the
+  top of this file), fixed in `ec31638` / `65d031a`. Anything OT6 parks
   here must clear itself at seed time.
 - Battle logic uses bare hex addresses (no RAM label file); only btlgfx has
   `src/btlgfx/btlgfx_ram.inc` ($7E4000+).
@@ -165,7 +166,7 @@ brokenTimer · `$3E89,X` flags/revealed · `$3E9C/$3E9D,X` spare (M2 BP) ·
   $FB–$FD.** NOT $EE: it is blank, but vanilla uses `$01ee` as the battle
   BG tile-buffer clear fill (`btlgfx_main.asm:4479`), so an icon placed
   there paints itself over the screen borders. OT6 hit this and moved
-  poison to `$64` (`ot6.asm:1060`, "$ee is vanilla's border junk fill!").
+  poison to `$64` (`ff6/src/battle/ot6_icons.asm:130`, "$ee is vanilla's border junk fill!").
   The 128 blank low cells `$00-$7F` are the other supply OT6 actually
   draws on (`Ot6BgGlyphCellTbl`).
 

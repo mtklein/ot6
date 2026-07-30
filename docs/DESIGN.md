@@ -174,8 +174,9 @@ recovery, shields reset to `shield_max`.
 > `$10` (`ot6_break.asm:1`) and the window was measured at **2159 frames**
 > — ~36 s of battle time — for an on-stage monster in the v0.9 Ifrit/Shiva
 > work (merge `9f6971c`, `probe_ifritbreak.lua`). See `break-impl.md`'s
-> §"The break window, measured" for the full discrepancy; the constant is
-> deliberately left alone pending a balance call.
+> 2026-07-30 correction section for the full discrepancy; the constant is
+> deliberately left alone pending a balance call, and the v0.9 release
+> notes already name it as a known gap.
 
 **Shielded resistance.** While an enemy still has shields and is not broken it
 takes reduced damage (×0.5), so the swing from shielded to broken is ×4 —
