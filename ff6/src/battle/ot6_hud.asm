@@ -398,7 +398,7 @@
         lda     $3ed3
         sta     f:$7e0000+OT6_SHADOW+4,x
         bra     @next
-@q:     lda     #$bf            ; '?', default attr already in place
+@q:     lda     #OT6_QMARK      ; '?', default attr already in place
         sta     f:$7e0000+OT6_SHADOW+4,x
 @next:  asl     OT6_SCR_BIT
         inc     OT6_SCR_IDX
@@ -438,7 +438,7 @@
         plx
         sta     f:$7e0000+OT6_SHADOW+4,x
         bra     @cnext
-@cq:    lda     #$bf            ; '?', default attr already in place
+@cq:    lda     #OT6_QMARK      ; '?', default attr already in place
         sta     f:$7e0000+OT6_SHADOW+4,x
 @cnext: asl     OT6_SCR_BIT
         inc     OT6_SCR_IDX
