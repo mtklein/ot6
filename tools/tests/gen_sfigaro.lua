@@ -680,11 +680,36 @@ H.run({ maxFrames = 350000 }, {
             w[1], w[2], w[3], w[4], w[5], w[6], H.readByte(B_SWITCH_LIVE)))
         end),
         stealDriver("the cider runner"),
-        rideOut("ride the steal's aftermath out", 20000, 78),
+        -- SOFT aftermath ride: on the steal the scene settles back on map
+        -- 78; on a surprise loss the game-over screen never settles, and a
+        -- hard timeout here would abort the whole mint instead of letting
+        -- the ladder reload and retry -- so this ride gives up quietly
+        -- after its budget and lets the $1DD2 check below decide.
+        (function()
+          local ph, calm, waited = 0, 0, 0
+          return H.driveUntil(function()
+            local ok = H.hasControl() and H.tileAligned() and bright() >= 15
+                   and not H.battleLoadStarted() and not H.dialogWaiting()
+                   and map() == 78
+            calm = ok and calm + 1 or 0
+            waited = waited + 1
+            return calm >= 20 or waited >= 20000
+          end, 20500, {
+            H.call(function()
+              ph = (ph + 1) % 8
+              if H.hasControl() then H.setPad({}); return end
+              H.setPad(ph < 4 and { "a" } or {})
+            end),
+          }, "ride the steal's aftermath out (soft)")
+        end)(),
+        H.release(),
+        H.waitFrames(30),
         H.call(function()
           stolen = (H.readByte(0x1dd2) >> 4) & 1 == 1
-          H.log(string.format("cider attempt %d: $1DD2=%02X -> %s", n,
-            H.readByte(0x1dd2), stolen and "STOLEN" or "no steal; retrying"))
+            and map() == 78 and H.hasControl()
+          H.log(string.format("cider attempt %d: $1DD2=%02X map=%d -> %s", n,
+            H.readByte(0x1dd2), map(),
+            stolen and "STOLEN" or "no steal; retrying"))
         end),
       })
     end
