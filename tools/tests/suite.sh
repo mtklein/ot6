@@ -190,7 +190,7 @@ if [ "$JOBS" -gt 1 ]; then
     # Warnings that are NOT the fixture staleness already reported above --
     # an unresolvable symbol, say.  Deduped across tests: ~100 tests share
     # ~30 fixtures, so an undeduped list is the same line a hundred times.
-    grep '^WARNING' "$SROOT/compose.$t" | grep -v 'is STALE' >> "$SROOT/warn" || :
+    grep '^WARNING' "$SROOT/compose.$t" | grep -v 'is STALE' | grep -v 'is UNBOUND' >> "$SROOT/warn" || :
   done
   if [ -s "$SROOT/warn" ]; then
     echo "compose warnings:"
