@@ -228,6 +228,30 @@ H.run({ maxFrames = 200000 }, {
   H.worldNavTo(205, 153, { maxFrames = 8000 }),
   H.worldNavTo(207, 151, { maxFrames = 8000 }),
   H.worldNavTo(214, 149, { maxFrames = 10000 }),
+  -- The landing step itself can WIN the encounter roll: $E8 bit5 goes up the
+  -- INSTANT the roll wins (move.asm's `ora #$20` before BattleZoom), which is
+  -- after worldNavTo's arrival check has already been satisfied by the tile
+  -- landing.  A state captured with that bit set boots INTO a battle --
+  -- measured 2026-08-03 landing the honest-root pilot: this mint parked at
+  -- (214,149) with $E8=$28, and every battle_gaufight boot loaded a battle
+  -- while 'world control at Crescent Mountain's doorstep' timed out.  So:
+  -- require REAL control before minting, and if a battle did fire, flee it
+  -- honestly (hold L+R, the engine's own run mechanic -- issue #75's
+  -- zero-write path; Veldt randoms are runnable).  The post-battle reload
+  -- puts the party back on this exact tile with the danger counter zeroed
+  -- (move.asm:916-921 / world_start.asm:465-482), so the position asserts
+  -- below still hold.
+  H.driveUntil(function()
+    return H.worldMode() and H.worldHasControl() and H.worldAligned()
+  end, 20000, {
+    H.call(function()
+      if H.battleLoadStarted() then
+        H.setPad({ l = true, r = true })   -- flee, honestly
+      else
+        H.setPad({})
+      end
+    end),
+  }, "calm, controllable doorstep (flee any landing-roll battle)"),
   H.waitFrames(30),
   H.call(function()
     H.assertEq(H.worldMode(), true, "on the world")
