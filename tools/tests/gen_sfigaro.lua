@@ -541,12 +541,12 @@ local MENU, ACTOR, MSTATE = 0x7BCA, 0x62CA, 0x7BC2
 local ST_CMD = 0x05
 local B_SWITCH_LIVE = 0x3EBD          -- $3EB4 + ($4C >> 3); bit4 = $4C
 local function stealDriver(what, maxF)
-  local mStreak, mSeq, mIdx, mNoMenu, tries = 0, nil, 1, 0, 0
+  local mStreak, mSeq, mIdx, mSub, mNoMenu, tries = 0, nil, 1, 0, 0, 0
   return H.driveUntil(function() return not H.battleLoadStarted() end,
     maxF or 30000, {
       H.call(function()
         if H.readByte(MENU) == 0 then
-          mStreak, mSeq, mIdx = 0, nil, 1
+          mStreak, mSeq, mIdx, mSub = 0, nil, 1, 0
           mNoMenu = mNoMenu + 1
           H.setPad(mNoMenu % 2 == 0 and { "a" } or {})
           return
@@ -568,7 +568,7 @@ local function stealDriver(what, maxF)
           else
             mSeq = { "down", "a", "a", "a" }                 -- vanilla odds; bank grows
           end
-          mIdx = 1
+          mIdx, mSub = 1, 0
           H.log(string.format(
             "%s: STEAL attempt %d f%d actor=%d bank=%d mp=%d %s $3EBD=%02X",
             what, tries, H.frame, actor, bank, mp,
@@ -576,11 +576,16 @@ local function stealDriver(what, maxF)
             H.readByte(B_SWITCH_LIVE)))
         end
         if mIdx <= #mSeq then
-          -- one button per 8-pulse window: 4 held, 4 released (an edge)
-          local sub = mStreak % 8
-          H.setPad(sub < 4 and { mSeq[mIdx] } or {})
-          if sub == 7 then mIdx = mIdx + 1 end
-          if mIdx > #mSeq then mSeq, mStreak = nil, 0 end
+          -- one button per 16-frame window: 6 held, 10 released -- the
+          -- edge cadence the old driver's measured prog used (a held
+          -- d-pad does not move this cursor; a 6-frame edge does)
+          H.setPad(mSub < 6 and { mSeq[mIdx] } or {})
+          mSub = mSub + 1
+          if mSub >= 16 then
+            mSub = 0
+            mIdx = mIdx + 1
+            if mIdx > #mSeq then mSeq = nil end
+          end
           return
         end
       end),
