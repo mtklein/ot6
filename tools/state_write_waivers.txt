@@ -138,15 +138,12 @@ tools/tests/gen_celes.lua	.writeByte(
 tools/tests/gen_celes.lua	.writeWord(
 tools/tests/gen_esper_tubes.lua	.writeByte(
 tools/tests/gen_esper_tubes_done.lua	.writeByte(
-tools/tests/gen_figaro.lua	.writeByte(
 tools/tests/gen_gate_cave_save.lua	.writeByte(
 tools/tests/gen_gate_cave_save.lua	.writeWord(
 tools/tests/gen_gate_cave_save.lua	emu.write
 tools/tests/gen_ifrit_doorstep.lua	.writeByte(
 tools/tests/gen_ifrit_magicite.lua	.writeByte(
 tools/tests/gen_kefka_won.lua	.writeByte(
-tools/tests/gen_kolts_cave.lua	.writeWord(
-tools/tests/gen_kolts_pool.lua	.writeWord(
 tools/tests/gen_minecart_doorstep.lua	.writeByte(
 tools/tests/gen_minecart_platform_anchor.lua	.writeByte(
 tools/tests/gen_minecart_platform_anchor.lua	.writeWord(
@@ -200,8 +197,6 @@ tools/tests/gen_terra_returned_anchor.lua	.writeWord(
 tools/tests/gen_terra_returned_anchor.lua	emu.write
 tools/tests/gen_tunnelarmr.lua	.writeByte(
 tools/tests/gen_tunnelarmr.lua	.writeWord(
-tools/tests/gen_vargas.lua	.writeByte(
-tools/tests/gen_vargas.lua	.writeWord(
 tools/tests/gen_vector_crash.lua	.writeByte(
 tools/tests/gen_vector_crash.lua	.writeWord(
 tools/tests/gen_vector_crash.lua	emu.write
