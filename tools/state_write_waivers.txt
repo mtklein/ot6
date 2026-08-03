@@ -172,7 +172,6 @@ tools/tests/gen_post_opera_anchor.lua	.writeWord(
 tools/tests/gen_post_opera_anchor.lua	emu.write
 tools/tests/gen_sabin_falls.lua	.writeByte(
 tools/tests/gen_sabin_falls.lua	.writeWord(
-tools/tests/gen_sabin_forest.lua	.writeByte(
 tools/tests/gen_sabin_gau.lua	.writeByte(
 tools/tests/gen_sabin_gau.lua	.writeWord(
 tools/tests/gen_sabin_train.lua	.writeByte(
