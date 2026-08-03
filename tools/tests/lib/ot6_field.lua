@@ -778,6 +778,15 @@ end
 --   opts.arrive    extra terminator (checked first, every frame)
 --   opts.maxFrames frame budget -> error (default 20000)
 --   opts.spare     formation species words never to kill-bit
+--   opts.honest    clear mid-route battles by REAL PLAY instead of the
+--                  kill-bit (issue #75) -- the same edge-tapped A the
+--                  field navTo's honest mode uses: A opens the active
+--                  character's command list, A confirms its first entry,
+--                  A takes the default target, and the world reload after
+--                  the win puts the party back on its tile.  ZERO state
+--                  writes on this navigator with the flag up.  Costs real
+--                  ATB rounds per encounter, so honest legs budget more
+--                  frames.
 function M.worldNavTo(txIn, tyIn, opts)
   opts = opts or {}
   local maxFrames = opts.maxFrames or 20000
@@ -819,7 +828,7 @@ function M.worldNavTo(txIn, tyIn, opts)
           M.setPad({})
           return
         end
-        if M.monstersPresent() > 0 then
+        if M.monstersPresent() > 0 and not opts.honest then
           for slot = 0, 5 do
             if M.readByte(0x3aa8 + slot * 2) % 2 == 1 then
               M.writeByte(0x3eec + slot * 2, M.readByte(0x3eec + slot * 2) | 0x80)
