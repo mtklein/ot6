@@ -902,6 +902,57 @@ function M.clearBattle(maxFrames, spare)
   }, "clear battle")
 end
 
+-- ------------------------------------------------- honest battle endings --
+-- Issue #75: a script may inject INPUT and READ memory; it may never WRITE
+-- emulated game state.  These two end a battle the way a player can, with
+-- zero writes -- the opt-in replacements for clearBattle's kill-bit.  The
+-- kill-bit path above stays only while unconverted generators depend on it;
+-- new scripts and converted legs use these.
+--
+-- fightBattle: WIN by edge-tapped A (4 on / 4 off).  A blind A masher is a
+-- real strategy on the legs this is for: A on the top command opens the
+-- actor's command list, A confirms its first entry, A accepts the default
+-- target, and the early-game magitek beams one-shot their trash.  The proof
+-- predates the helper: gen_sabin_magitek wins battles 15/16/17 by exactly
+-- these taps because kill-bitting them softlocks the win-bit check, and the
+-- vanilla-faithful intro guards die to one beam each.  The same edge taps
+-- page through battle dialogs, level-ups, and the victory text.  `spare`
+-- keeps clearBattle's goal-formation contract: if the battle we're asked to
+-- fight IS the goal set-piece, that's a script bug -- fail loudly.
+-- Budget note: an honest win costs real ATB rounds -- budget thousands of
+-- frames where clearBattle needed hundreds.
+function M.fightBattle(maxFrames, spare)
+  local spareSet = {}
+  for _, w in ipairs(spare or {}) do spareSet[w] = true end
+  local aPhase = 0
+  return M.driveUntil(function()
+    return not M.battleLoadStarted()
+  end, maxFrames or 20000, {
+    M.call(function()
+      aPhase = (aPhase + 1) % 8
+      if M.battleLoadStarted() and next(spareSet) and M.formationHas(spareSet) then
+        error("fightBattle: asked to auto-fight a spared formation " ..
+          string.format("(%04X %04X %04X %04X %04X %04X)",
+            table.unpack(M.formationWords())), 0)
+      end
+      M.setPad(aPhase < 4 and { "a" } or {})
+    end),
+  }, "fight battle honestly (tap-A)")
+end
+
+-- fleeBattle: hold L+R -- the engine's own run mechanic (see the pad map
+-- above; vanilla's run timer counts held L or R).  Shifts fewer frames than
+-- fighting when it works, but FAILS (times out) on unrunnable formations
+-- and on every event battle whose win-bit the story checks -- callers pick
+-- fight vs flee per leg and say why.  Zero writes.
+function M.fleeBattle(maxFrames)
+  return M.driveUntil(function()
+    return not M.battleLoadStarted()
+  end, maxFrames or 9000, {
+    M.call(function() M.setPad({ l = true, r = true }) end),
+  }, "flee battle (hold L+R)")
+end
+
 -- The runner.  steps: list of step objects.  opts.maxFrames: global budget.
 local runnerStarted = false
 

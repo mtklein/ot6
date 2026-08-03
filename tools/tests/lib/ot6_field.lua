@@ -283,6 +283,14 @@ local function resolve(v) return type(v) == "function" and v() or v end
 --   opts.arrive    extra terminator predicate (checked before everything)
 --   opts.maxFrames frame budget -> error (default 20000)
 --   opts.spare     list of formation species words never to kill-bit
+--   opts.honest    clear mid-route battles by REAL PLAY (the edge-tapped A
+--                  already driving the victory text doubles as an
+--                  auto-fighter: A opens the command list, A confirms its
+--                  first entry, A takes the default target) instead of the
+--                  kill-bit -- ZERO state writes on this navigator (issue
+--                  #75).  Opt-in while unconverted generators still lean on
+--                  the kill-bit; costs real ATB rounds per encounter, so
+--                  honest legs budget more frames.
 --   opts.calmFrames  consecutive settled frames on the goal tile the
 --                  terminator requires (default 16; see ISSUE #22 below)
 --   opts.noPathRetries  BFS-no-path retries, 45 idle frames apart, before
@@ -404,7 +412,7 @@ function M.navTo(txIn, tyIn, opts)
           M.setPad({})                 -- goal fight: hands off, arrive() sees it
           return
         end
-        if M.monstersPresent() > 0 then
+        if M.monstersPresent() > 0 and not opts.honest then
           for slot = 0, 5 do
             if M.readByte(0x3aa8 + slot * 2) % 2 == 1 then
               M.writeByte(0x3eec + slot * 2, M.readByte(0x3eec + slot * 2) | 0x80)
@@ -536,7 +544,10 @@ end
 -- maxFrames).  Frames are classified with navTo's 3-frame debounce (the
 -- battle/dialog signal bytes live in RAM the field module also scribbles
 -- on; acting on a one-frame ghost would tap A on the open field):
---   battle  -> kill-bit everything present + edge-tap A through the text.
+--   battle  -> kill-bit everything present + edge-tap A through the text
+--              (with opts.honest, NO kill-bit: the same edge-tapped A
+--              auto-fights the encounter for real -- zero state writes,
+--              issue #75 -- at the price of real ATB rounds).
 --              A formation matching opts.spare is a scripted set-piece:
 --              never kill-bitted, and hands OFF for its first 300 frames,
 --              THEN edge-tapped.  Both halves are load-bearing (measured,
@@ -585,7 +596,7 @@ function M.advanceStory(pred, maxFrames, opts)
           M.setPad(battN > 300 and aPhase < 4 and { "a" } or {})
           return
         end
-        if M.monstersPresent() > 0 then
+        if M.monstersPresent() > 0 and not opts.honest then
           for slot = 0, 5 do
             if M.readByte(0x3aa8 + slot * 2) % 2 == 1 then
               M.writeByte(0x3eec + slot * 2, M.readByte(0x3eec + slot * 2) | 0x80)
