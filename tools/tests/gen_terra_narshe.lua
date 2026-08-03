@@ -103,10 +103,13 @@ H.run({ maxFrames = 60000 }, {
   -- ===================================================================== --
   -- THE WORLD LEG: (93,41) -> (84,33) -> map 20 (38,61).
   -- ===================================================================== --
-  H.worldNavTo(84, 33, { maxFrames = 40000,
+  -- issue #75: honest=true -- an encounter on the WoB band is FOUGHT by
+  -- real input (TERRA/EDGAR attack, BANON's first command is his Health
+  -- heal), never kill-bitted; the budget carries the ATB rounds.
+  H.worldNavTo(84, 33, { maxFrames = 60000, honest = true,
     arrive = function() return not H.worldMode() end }),
   H.release(),
-  H.advanceStory(settleArrival, 20000),
+  H.advanceStory(settleArrival, 20000, { honest = true }),
   H.waitFrames(30),
   H.call(function()
     H.assertEq(map(), 20, "on map 20, the Narshe streets")
@@ -121,7 +124,7 @@ H.run({ maxFrames = 60000 }, {
   -- fires on OUR held step rather than in the middle of a plan, then the
   -- scene is handed to advanceStory the instant it picks up.
   -- ===================================================================== --
-  H.navTo(38, 51, { maxFrames = 12000 }),
+  H.navTo(38, 51, { maxFrames = 12000, honest = true }),
   H.release(),
   H.call(function() where("checkpoint doorstep") end),
   H.driveUntil(function()
@@ -133,7 +136,7 @@ H.run({ maxFrames = 60000 }, {
   H.call(function() where("_ccb230 running") end),
   H.advanceStory(function()
     return sw(0x001F) == 1 and settleScene()
-  end, 30000),
+  end, 30000, { honest = true }),
   H.waitFrames(30),
 
   H.call(function()

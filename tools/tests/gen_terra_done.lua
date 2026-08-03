@@ -147,10 +147,14 @@ H.run({ maxFrames = 60000 }, {
   --    a first cut aimed at (53,10) and BFS answered "no path").  So navTo
   --    walks onto (53,9) directly and terminates on the map change it fires.
   -- ===================================================================== --
-  H.navTo(53, 9, { maxFrames = 20000,
+  -- issue #75: honest=true on every navigator and story ride -- this leg's
+  -- maps draw no encounters, so nothing changes on the happy path, but a
+  -- battle that ever did fire would be fought by real input, never
+  -- kill-bitted.
+  H.navTo(53, 9, { maxFrames = 20000, honest = true,
     arrive = function() return map() ~= 20 end }),
   H.release(),
-  H.advanceStory(settleHouse, 20000),
+  H.advanceStory(settleHouse, 20000, { honest = true }),
   H.waitFrames(30),
   H.call(function()
     H.assertEq(map(), 30, "on map 30, ARVIS'S HOUSE")
@@ -166,7 +170,7 @@ H.run({ maxFrames = 60000 }, {
   --    by the reciprocal door back to the ledge at (67,26), planned clear.
   -- ===================================================================== --
   planAvoids(66, 35, { { 67, 26 } }, "Arvis's house: (67,28) -> (66,35)"),
-  H.navTo(66, 35, { maxFrames = 20000, arrive = function()
+  H.navTo(66, 35, { maxFrames = 20000, honest = true, arrive = function()
     return sw(0x0021) == 1 or H.eventRunning() or H.dialogWaiting()
   end }),
   H.release(),
@@ -181,7 +185,7 @@ H.run({ maxFrames = 60000 }, {
     -- ------------------------------------------------------------------ --
     H.advanceStory(function()
       return sw(0x0021) == 1 and settleStaging()
-    end, 60000),
+    end, 60000, { honest = true }),
     H.waitFrames(30),
     H.call(function()
       H.assertEq(map(), 22, "the reunion ends on map 22, the battlefield staging")
@@ -204,7 +208,7 @@ H.run({ maxFrames = 60000 }, {
     -- ------------------------------------------------------------------ --
     H.advanceStory(function()
       return sw(0x0021) == 1 and settleHub()
-    end, 60000),
+    end, 60000, { honest = true }),
     H.waitFrames(30),
     H.call(function()
       H.assertEq(map(), 9, "back on map 9, the SCENARIO HUB")
