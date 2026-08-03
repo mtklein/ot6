@@ -319,6 +319,47 @@ if [ "$verdict" -eq 0 ] && [ -n "${OT6_CAPTURE_SRM:-}" ]; then
   if [ -f "$captured" ] && [ "$(wc -c < "$captured" | tr -d ' ')" -eq 32768 ]; then
     mkdir -p "$(dirname "$OT6_CAPTURE_SRM")"
     publish_file "$captured" "$OT6_CAPTURE_SRM"
+    # Provenance sidecar (issue #75 step 5): record MECHANICALLY what cut
+    # this battery -- the capturing generator's mint sig (from the one
+    # authority, frontier_stamp.sh), plus the hash of everything the run
+    # booted FROM: the stamp of each savestate compose embedded (read off
+    # the composed file's own `-- state` provenance lines) and, when the
+    # run Continued from a prior anchor, that anchor's manifest.  The
+    # sidecar lands beside the payload; `sram_anchor.py seal` folds it
+    # into manifest.json.  A capture that cannot state its provenance is
+    # refused outright -- an anchor is a frontier root, and an unprovable
+    # root is the exact thing this program exists to stop minting.
+    gen=$(basename "$SCRIPT" .lua)
+    anchor_extras=""
+    adir=""
+    if [ -n "${OT6_SRAM_ANCHOR:-}" ]; then
+      adir="$OT6_SRAM_ANCHOR"
+      case "$adir" in "$ROOT"/*) adir="${adir#"$ROOT"/}" ;; esac
+      anchor_extras="$adir/manifest.json"
+      for p in "$ROOT/$adir"/*.sram; do
+        [ -f "$p" ] && anchor_extras="$anchor_extras $adir/$(basename "$p")"
+      done
+    fi
+    # shellcheck disable=SC2086 -- extras/ancestors are space-separated lists
+    if mint_sig=$(sh "$ROOT/tools/tests/lib/frontier_stamp.sh" sig "$gen" $anchor_extras); then
+      ancestors=$(
+        sed -n 's/^-- state \([A-Za-z0-9_]*\)\.mss\.lua .*/\1/p' "$COMPOSED" |
+          while IFS= read -r s; do
+            [ -f "$ROOT/build/states/$s.stamp" ] && echo "build/states/$s.stamp"
+          done
+      )
+      [ -z "$adir" ] || ancestors="$adir/manifest.json
+$ancestors"
+      # shellcheck disable=SC2086
+      python3 "$ROOT/tools/tests/lib/sram_anchor.py" capture "$ROOT" \
+        "$OT6_CAPTURE_SRM.provenance.json" "$OT6_CAPTURE_SRM" \
+        "$mint_sig" $ancestors ||
+        { echo "capture provenance sidecar failed for $OT6_CAPTURE_SRM"; verdict=2; }
+    else
+      echo "capture refused: cannot derive a mint sig for $SCRIPT" \
+           "(a capture must run a tools/tests generator; issue #75)"
+      verdict=2
+    fi
   else
     echo "Mesen did not flush a complete 32768-byte SRAM image: $captured"
     verdict=2

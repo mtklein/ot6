@@ -62,14 +62,28 @@ the lib is stable (it is the rare file to change) while generators churn
 constantly.  `lib/frontier_ninja_selftest.sh` proves those semantics
 against real ninja on a mock tree in seconds, no emulator.
 `lib/frontier_stamp.sh` survives as the PROVENANCE half: each mint edge
-stamps `build/states/<state>.stamp` with
-`sha256(generator ++ ot6.lua ++ ot6_field.lua ++ ot6_contract.lua)
-<generator> [extras]`, and `lib/compose.py` re-derives it at CONSUME time,
-printing a loud `[ot6]` line if a fixture a test is about to boot has
-drifted from its generator+lib (the gap where `make test` picks up a
-worktree-seeded frontier fixture without ever running a mint).  Issue #2:
+stamps `build/states/<state>.stamp` with three claims (issue #75 step 5) --
+
+    sha256(GATE_CONTRACT ++ generator ++ ot6.lua ++ ot6_field.lua ++
+           ot6_contract.lua ++ extras) <generator> [extras]
+    artifact <sha256 of build/states/<state>.mss>
+    ancestor <path> <sha256 of that file>     (prev= edges bind their
+                                               predecessor's stamp; anchor=
+                                               edges their manifest.json;
+                                               power-on roots have no line)
+
+-- and `lib/compose.py` re-verifies ALL of them at CONSUME time, printing a
+loud `[ot6]` line if a fixture a test is about to boot has drifted from its
+generator+lib, had its `.mss` replaced without a mint, or sits on a chain
+whose ancestor stamp moved (the artifact and ancestor bindings make the
+whole chain verifiable transitively from files on disk).  `GATE_CONTRACT`
+(`ot6-provenance/v1`, one constant in `frontier_stamp.sh`) is a fixed sig
+input: bumping it deliberately stales every stamp and forces a full
+re-mint under new rules.  `compose.py --check-states` asks the same
+question of the whole tree and is a hard `make test` gate.  Issue #2:
 before any of this, freshness keyed on the ROM alone, so a generator or
-lib edit silently kept a stale fixture.
+lib edit silently kept a stale fixture; before #75, nothing bound the
+stamp to the bytes beside it.
 
 Some suite tests are FRONTIER-GATED: each declares
 `-- @suite frontier=<fixture>` and asserts on a state only `make frontier`
