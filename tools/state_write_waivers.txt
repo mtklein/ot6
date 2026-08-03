@@ -170,8 +170,6 @@ tools/tests/gen_opera7_blackjack.lua	.writeByte(
 tools/tests/gen_post_opera_anchor.lua	.writeByte(
 tools/tests/gen_post_opera_anchor.lua	.writeWord(
 tools/tests/gen_post_opera_anchor.lua	emu.write
-tools/tests/gen_sabin_falls.lua	.writeByte(
-tools/tests/gen_sabin_falls.lua	.writeWord(
 tools/tests/gen_sabin_gau.lua	.writeByte(
 tools/tests/gen_sabin_gau.lua	.writeWord(
 tools/tests/gen_sabin_trench.lua	.writeByte(
