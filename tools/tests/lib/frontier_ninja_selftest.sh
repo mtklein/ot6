@@ -253,12 +253,33 @@ check "retry build succeeds" 0 "$rc"
   echo "  pass unknown target is a hard error" ||
   { echo "  FAIL unknown target did not error"; ok=0; }
 
-# 10. provenance: the stamp a mint edge writes is byte-identical to the sig
-#     compose.py will re-derive (the two sides of the consume-time guard).
+# 10. provenance: the stamp a mint edge writes opens with the exact sig
+#     compose.py will re-derive (the two sides of the consume-time guard),
+#     and carries the #75 bindings -- its own artifact's hash, and the hash
+#     of the stamp it grew from -- so the chain verifies transitively from
+#     files on disk alone.
 want=$(cd "$TMP" && OT6_ROOT="$TMP" sh tools/tests/lib/frontier_stamp.sh sig gen_b)
-[ "$(cat "$TMP/build/states/b.stamp")" = "$want" ] &&
+[ "$(head -n 1 "$TMP/build/states/b.stamp")" = "$want" ] &&
   echo "  pass mint edge stamp matches sig" ||
   { echo "  FAIL stamp/sig disagree"; ok=0; }
+[ "$(sed -n 2p "$TMP/build/states/b.stamp")" = \
+  "artifact $(shasum -a 256 "$TMP/build/states/b.mss" | cut -c1-64)" ] &&
+  echo "  pass mint edge stamp binds its artifact (#75)" ||
+  { echo "  FAIL artifact binding wrong or missing"; ok=0; }
+[ "$(sed -n 3p "$TMP/build/states/b.stamp")" = \
+  "ancestor build/states/a.stamp $(shasum -a 256 "$TMP/build/states/a.stamp" | cut -c1-64)" ] &&
+  echo "  pass chained stamp binds its predecessor's stamp (#75)" ||
+  { echo "  FAIL ancestor binding wrong or missing"; ok=0; }
+[ "$(wc -l < "$TMP/build/states/a.stamp" | tr -d ' ')" = 2 ] &&
+  echo "  pass root stamp carries no ancestor line" ||
+  { echo "  FAIL root stamp shape wrong"; ok=0; }
+grep -q '^ancestor tools/tests/anchors/toy-v1/manifest.json ' \
+  "$TMP/build/states/c.stamp" &&
+  echo "  pass anchored stamp binds the anchor manifest (#75)" ||
+  { echo "  FAIL anchored stamp has no manifest ancestor"; ok=0; }
+cmp -s "$TMP/build/states/d.stamp" "$TMP/build/states/b.stamp" &&
+  echo "  pass seed d carries a verbatim copy of b's stamp (#75)" ||
+  { echo "  FAIL seed stamp missing or not the source's"; ok=0; }
 
 [ "$ok" -eq 1 ] && { echo "frontier_ninja selftest: ok"; exit 0; }
 echo "frontier_ninja selftest: FAILED"; exit 1

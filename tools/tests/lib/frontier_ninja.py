@@ -199,22 +199,31 @@ def emit(states, root):
     w("# Mesen, and publishes $state.mss + $state.mss.lua atomically into")
     w("# build/states -- OT6_EXPECT_ARTIFACT makes a run that passes without")
     w("# emitting BOTH a hard failure.  The stamp write is provenance for")
-    w("# compose.py's consume-time drift check, not scheduling.")
+    w("# compose.py's consume-time drift check, not scheduling: it records")
+    w("# the mint sig, the artifact's hash, and (via $ancestor -- the")
+    w("# predecessor's stamp for prev= edges, the anchor manifest for")
+    w("# anchor= edges, '-' for a power-on root) the hash of the stamp this")
+    w("# state grew from, so the whole chain verifies transitively (#75).")
     w("# NB: $env and $extras are optional per-edge splices; ninja strips a")
     w("# value's leading whitespace, so the separating spaces live HERE in")
     w("# the template (an empty splice leaves a harmless double space).")
     w("rule mint")
     w("  command = OT6_WORKER=$state OT6_EXPECT_ARTIFACT='$state.mss "
       "$state.mss.lua' $env tools/tests/run.sh tools/tests/$gen.lua && "
-      "sh tools/tests/lib/frontier_stamp.sh write $state $gen $extras")
+      "sh tools/tests/lib/frontier_stamp.sh write $state $gen $ancestor "
+      "$extras")
     w("  description = mint $state <- $gen")
     w("")
     w("# A stacked chain's boot is a finished chain's ending: a pure copy of")
-    w("# both halves.  No generator, no emulator, no stamp (compose.py's")
-    w("# drift check correctly has nothing to say about a copy).")
+    w("# both halves AND the stamp.  No generator, no emulator.  The stamp")
+    w("# copy is honest by construction: the seed's bytes ARE the source's")
+    w("# bytes, so the source's stamp -- its sig, its artifact hash, its")
+    w("# ancestor -- vouches for the copy verbatim, and the copied stamp is")
+    w("# what lets a stacked mint bind ITS ancestor line to a real file (#75).")
     w("rule seed")
     w("  command = cp build/states/$src.mss build/states/$state.mss && "
-      "cp build/states/$src.mss.lua build/states/$state.mss.lua")
+      "cp build/states/$src.mss.lua build/states/$state.mss.lua && "
+      "cp build/states/$src.stamp build/states/$state.stamp")
     w("  description = stack seed $state <- $src")
     w("")
     w(f"build {OUT}: regen {SELF} {GRAPH}")
@@ -239,8 +248,9 @@ def emit(states, root):
         outs = (f"build/states/{s}.mss.lua build/states/{s}.mss")
         if e.get("seed"):
             src = e["seed"]
-            w(f"build {outs}: seed build/states/{src}.mss.lua "
-              f"build/states/{src}.mss")
+            w(f"build {outs} build/states/{s}.stamp: seed "
+              f"build/states/{src}.mss.lua build/states/{src}.mss "
+              f"build/states/{src}.stamp")
             w(f"  state = {s}")
             w(f"  src = {src}")
             continue
@@ -251,15 +261,23 @@ def emit(states, root):
         extras = ""
         explicit = ""
         order = ""
+        # The provenance ancestor (issue #75): what frontier_stamp.sh write
+        # hashes into the stamp's `ancestor` line.  Exactly one of prev= /
+        # anchor= can be set (validate() enforces it); a mint with neither
+        # is a power-on root and records no ancestor.
+        ancestor = "-"
         if e.get("prev"):
             p = e["prev"]
-            explicit = f" build/states/{p}.mss.lua build/states/{p}.mss"
+            explicit = (f" build/states/{p}.mss.lua build/states/{p}.mss"
+                        f" build/states/{p}.stamp")
+            ancestor = f"build/states/{p}.stamp"
         if e.get("anchor"):
             key = e["anchor"]
             ins = anchor_inputs(root, key)
             deps += [latch(a) for a in ins]
             env.append(f"OT6_SRAM_ANCHOR=tools/tests/anchors/{key}")
             extras = " ".join(ins)
+            ancestor = f"tools/tests/anchors/{key}/manifest.json"
         if e.get("stack"):
             env.append(f"OT6_STACK={e['stack']}")
         if e.get("after"):
@@ -268,6 +286,7 @@ def emit(states, root):
           f"{' '.join(deps)}{order}")
         w(f"  state = {s}")
         w(f"  gen = {gen}")
+        w(f"  ancestor = {ancestor}")
         if env:
             w(f"  env = {' '.join(env)}")
         if extras:
@@ -397,8 +416,26 @@ def selftest():
         check("anchored mint exports OT6_SRAM_ANCHOR",
               "OT6_SRAM_ANCHOR=tools/tests/anchors/good-v1" in text)
         check("stacked mint exports OT6_STACK", "OT6_STACK=t9_" in text)
-        check("seed consumes both halves of its source",
-              "seed build/states/b.mss.lua build/states/b.mss" in text)
+        check("seed consumes both halves of its source AND its stamp (#75)",
+              "seed build/states/b.mss.lua build/states/b.mss "
+              "build/states/b.stamp" in text)
+        check("seed copies the stamp with the state (#75)",
+              "cp build/states/$src.stamp build/states/$state.stamp" in text)
+        # provenance ancestors (#75): what each edge tells the stamp gate to
+        # hash into its `ancestor` line.
+        check("mint rule threads $ancestor to the stamp gate",
+              "frontier_stamp.sh write $state $gen $ancestor" in text)
+        check("root mint records no ancestor", "ancestor = -" in text)
+        check("chained mint binds its predecessor's stamp",
+              "ancestor = build/states/a.stamp" in text)
+        check("chained mint consumes its predecessor's stamp",
+              any("build/states/a.stamp" in line
+                  for line in text.splitlines()
+                  if line.startswith("build build/states/b.")))
+        check("anchored mint binds the anchor manifest",
+              "ancestor = tools/tests/anchors/good-v1/manifest.json" in text)
+        check("stacked mint binds the seed copy's stamp",
+              "ancestor = build/states/d.stamp" in text)
     print("frontier_ninja selftest:", "ok" if ok else "FAILED")
     return 0 if ok else 1
 
