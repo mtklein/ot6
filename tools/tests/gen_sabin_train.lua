@@ -473,6 +473,12 @@ local function makePlan(actor)
   -- a medic
   if shields > 0 then
     local tgt, miss = neediest()
+    if tgt == nil then
+      -- nobody down 50 HP yet: an idle-safe turn is still a heal (a Tonic
+      -- on the actor), never a Fight -- pre-break damage is the one thing
+      -- a medic must not deal
+      tgt, miss = actor, 0
+    end
     local item = nil
     if tgt then
       if miss >= 150 and invCount(POTION) > 0 then item = POTION
