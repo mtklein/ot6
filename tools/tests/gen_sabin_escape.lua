@@ -62,6 +62,20 @@
 -- `if_switch $0037=1, WorldReturn`, and the escape has set $0037, so
 -- re-stepping it returns instead of re-entering.  The mint is taken on the
 -- first settled world frame, before any walk, so the fixture is unambiguous.
+--
+-- ISSUE #75 -- THE WAVES ARE FOUGHT, NOT KILL-BITTED.  Zero state writes
+-- in this generator.  Battles 13/13/14 (Imperial troops; SABIN solo for
+-- waves 1-2, wave 3 is where CYAN joins) run the house menu-episode
+-- machine: bank boost to 2, dump it on Fight (R..R A A on a settled menu,
+-- one button per 30-frame pulse), edge-tapped A for every dialog and
+-- victory page.  A loss (90 straight frames of every real party slot at
+-- 0 HP) sets `lost` and the three-attempt retry ladder reloads the
+-- boot-moment checkpoint -- the mint-script spelling of a player
+-- reloading their save -- with the fighter escalated (tier 2+ dumps at
+-- 1 BP) and a 17-frame reload stagger; three losses fail the mint with
+-- every attempt's numbers on the record.  SHADOW's leave roll does not
+-- run here: battle switch $4B is story-SET until the magitek escape's
+-- exit clears it (event_main.asm:42251).
 local H = dofile("tools/tests/lib/ot6.lua")
 local DOOR = "build/states/camp_cleared.mss.lua"
 
@@ -196,6 +210,95 @@ local CHOICES = {}   -- this leg reaches no `choice` at all
 local ci, inChoice = 0, false
 local nameMenus, battles = 0, {}
 
+-- ---------------------------------------------------------- the fighter --
+-- The honest battle driver (issue #75; gen_sabin_camp's copy of
+-- gen_scenario's menu-episode machine).  fightFrame() is the one entry
+-- point every battle-seeing site calls each frame: it opens the per-fight
+-- bookkeeping on a rising edge (a >10-frame gap in sightings), runs the
+-- loss watch, and drives the menu machine (boost prefix + Fight).
+local MENU, ACTOR = 0x7BCA, 0x62CA
+local BP = 0x3E9C
+local fightTier = 1
+local mStreak, mSeq, mIdx, mTick, mStall = 0, nil, 1, 0, 0
+local lost = nil
+local bt = nil
+local lastFightF = -100
+local function partyLine()
+  local p = {}
+  for e = 0, 3 do
+    p[#p + 1] = string.format("%d/%d", H.readWord(0x3bf4 + e * 2),
+      H.readWord(0x3c1c + e * 2))
+  end
+  return table.concat(p, " ")
+end
+local function fightPulse(phase)
+  if H.readByte(MENU) == 0 then
+    mStreak, mSeq = 0, nil
+    H.setPad(phase < 4 and { "a" } or {})
+    return
+  end
+  mStreak = mStreak + 1
+  if mStreak < 4 then H.setPad({}); return end
+  if mSeq == nil then
+    local slot = H.readByte(ACTOR) & 3
+    local bp = H.readByte(BP + slot * 2)
+    local boostMin = fightTier >= 2 and 1 or 2
+    local boost = bp >= boostMin and math.min(bp, 3) or 0
+    mSeq, mIdx, mTick, mStall = {}, 1, 0, 0
+    for _ = 1, boost do mSeq[#mSeq + 1] = "r" end
+    mSeq[#mSeq + 1] = "a"; mSeq[#mSeq + 1] = "a"
+    H.log(string.format("escape: cast f%d slot=%d bp=%d tier=%d seq=%s | [%s]",
+      H.frame, slot, bp, fightTier, table.concat(mSeq, ","), partyLine()))
+  end
+  mTick = mTick + 1
+  local ph = mTick % 30
+  local btn
+  if mIdx <= #mSeq then
+    btn = mSeq[mIdx]
+  elseif mStall < 2 then
+    btn = "a"
+  elseif mStall < 4 then
+    btn = "b"
+  else
+    mSeq = nil
+    H.setPad({})
+    return
+  end
+  if ph < 6 then H.setPad({ [btn] = true }) else H.setPad({}) end
+  if ph == 29 then
+    if mIdx <= #mSeq then mIdx = mIdx + 1 else mStall = mStall + 1 end
+  end
+end
+local function fightFrame(phase, tag)
+  if H.frame - lastFightF > 10 then
+    bt = { f0 = H.frame, dead = 0 }
+    local w = H.formationWords()
+    battles[#battles + 1] = string.format("map%d:%04X", map(), w[1])
+    H.log(string.format("escape: battle up f%d (%04X %04X %04X %04X %04X " ..
+      "%04X) [%s]", H.frame, w[1], w[2], w[3], w[4], w[5], w[6], partyLine()))
+  end
+  lastFightF = H.frame
+  if monCount() == 0 then                -- a script battle: hands off + tap
+    H.setPad(H.frame - bt.f0 > 300 and phase < 4 and { "a" } or {})
+    return
+  end
+  local wiped = true
+  for e = 0, 3 do
+    if H.readWord(0x3c1c + e * 2) > 0 and H.readWord(0x3bf4 + e * 2) > 0 then
+      wiped = false
+    end
+  end
+  bt.dead = wiped and bt.dead + 1 or 0
+  if bt.dead >= 90 and not lost then
+    lost = string.format("%s: party down at f%d (fight up f%d, tier %d) [%s]",
+      tag, H.frame, bt.f0, fightTier, partyLine())
+    H.log("escape: LOST -- " .. lost)
+    H.screenshot("escape_lost")
+  end
+  if lost then H.setPad({}); return end
+  fightPulse(phase)
+end
+
 local function rideUntil(pred, what, budget)
   local phase, battN, dlgN, quiet, hb = 0, 0, 0, 0, -900
   return H.driveUntil(pred, budget or 40000, {
@@ -244,37 +347,12 @@ local function rideUntil(pred, what, budget)
         inChoice = false
       end
 
+      -- battle: hand the frame to the honest fighter (issue #75) -- it
+      -- opens the bookkeeping, runs the loss watch, and drives the
+      -- boost-and-Fight episode machine (script battles just ride).
       if battN >= 3 then
         quiet = 0
-        if battN == 3 then
-          local w = H.formationWords()
-          battles[#battles + 1] = string.format("map%d:%04X/%d",
-            map(), w[1], monCount())
-          H.log(string.format("escape: battle up f%d map=%d present=%d " ..
-            "(%04X %04X %04X %04X %04X %04X) php=%04X %04X %04X %04X",
-            H.frame, map(), monCount(), w[1], w[2], w[3], w[4], w[5], w[6],
-            H.readWord(0x3bf4), H.readWord(0x3bf6), H.readWord(0x3bf8),
-            H.readWord(0x3bfa)))
-          for i = 0, 5 do
-            if monPresent(i) then
-              H.log(string.format("   slot %d species $%04X hp=%d shields=%d",
-                i, monSpecies(i), monHp(i), monShields(i)))
-            end
-          end
-        end
-        -- A SCRIPT BATTLE (zero monsters present) has nothing to kill-bit
-        -- and ends on its character-AI script's own schedule.  Hands off
-        -- for 300 frames, then edge-tap A to advance its text.
-        if monCount() == 0 then
-          H.setPad(battN > 300 and phase < 4 and { "a" } or {})
-          return
-        end
-        for slot = 0, 5 do
-          if monPresent(slot) then
-            H.writeByte(0x3eec + slot * 2, H.readByte(0x3eec + slot * 2) | 0x80)
-          end
-        end
-        H.setPad(phase < 4 and { "a" } or {})
+        fightFrame(phase, what)
         return
       end
 
@@ -388,12 +466,8 @@ local function talkForFight(cx, cy, wantSw, what, budget)
   -- trigger, the magitek leg's fix.  Kill-bit any wave that fires mid-walk.
   local function approachStep(phase)
     if inBattle() then
-      for s = 0, 5 do
-        if H.readByte(0x3aa8 + s * 2) % 2 == 1 then
-          H.writeByte(0x3eec + s * 2, H.readByte(0x3eec + s * 2) | 0x80)
-        end
-      end
-      H.setPad(phase < 4 and { "a" } or {}); return
+      fightFrame(phase, what)              -- a wave caught mid-walk: play it
+      return
     end
     if H.dialogWaiting() then H.setPad(phase < 4 and { "a" } or {}); return end
     local mv = stepToward()
@@ -411,18 +485,15 @@ local function talkForFight(cx, cy, wantSw, what, budget)
       return string.format("escape: talk CYAN(%d,%d) from (%d,%d) for %s",
         cxr(), cyr(), H.fieldX(), H.fieldY(), what)
     end),
-    H.driveUntil(function() return sw(wantSw) == 1 end, budget or 14000, {
+    H.driveUntil(function() return lost ~= nil or sw(wantSw) == 1 end,
+      budget or 30000, {
       H.call(function()
         phase = (phase + 1) % 8
         if not adjacentToCyan() then approachStep(phase); return end
         -- adjacent: face + dense A (see the cadence note below)
         if inBattle() then
-          for s = 0, 5 do
-            if H.readByte(0x3aa8 + s * 2) % 2 == 1 then
-              H.writeByte(0x3eec + s * 2, H.readByte(0x3eec + s * 2) | 0x80)
-            end
-          end
-          H.setPad(phase < 4 and { "a" } or {}); return
+          fightFrame(phase, what)          -- the wave fight: play it
+          return
         end
         if H.dialogWaiting() then H.setPad(phase < 4 and { "a" } or {}); return end
         local dx, dy = cxr() - H.fieldX(), cyr() - H.fieldY()
@@ -442,7 +513,9 @@ local function talkForFight(cx, cy, wantSw, what, budget)
       end),
     }, what),
     H.call(function()
-      H.assertEq(sw(wantSw), 1, what .. " -- switch set")
+      if lost == nil then
+        H.assertEq(sw(wantSw), 1, what .. " -- switch set")
+      end
     end),
   }
   return H.cond(function() return true end, steps)
@@ -453,7 +526,48 @@ end
 local function cyanX() return objX(18) end
 local function cyanY() return objY(18) end
 
-H.run({ maxFrames = 90000 }, {
+-- ------------------------------------------------------ the retry ladder --
+-- One waves attempt: (attempt 2+) reload the boot-moment checkpoint with a
+-- small stagger and the fighter escalated, then take the three talks in
+-- order; a `lost` mid-run short-circuits the remaining waves so the next
+-- attempt starts promptly.
+local wavesBlob, wavesWon = nil, false
+local function wavesAttempt(n)
+  local ldReq
+  return H.cond(function() return not wavesWon end, {
+    H.cond(function() return n > 1 end, {
+      H.logStep(function()
+        return string.format("escape: ATTEMPT %d -- reloading the boot " ..
+          "checkpoint after a loss (%s)", n, tostring(lost))
+      end),
+      H.call(function() ldReq = H.requestLoadState(wavesBlob) end),
+      H.waitFrames(2),
+      H.call(function() H.checkReq(ldReq, "attempt " .. n .. ": reload") end),
+      H.waitFrames(60 + (n - 1) * 17),
+    }, {}),
+    H.call(function() lost, fightTier = nil, n end),
+    talkForFight(cyanX, cyanY, 0x0034,
+      "wave 1 (battle 13, $0034), attempt " .. n, 30000),
+    H.cond(function() return lost == nil end, {
+      talkForFight(cyanX, cyanY, 0x0035,
+        "wave 2 (battle 13, $0035), attempt " .. n, 30000),
+    }, {}),
+    H.cond(function() return lost == nil end, {
+      talkForFight(cyanX, cyanY, 0x0036,
+        "wave 3 (battle 14, CYAN joins, $0036), attempt " .. n, 30000),
+    }, {}),
+    H.release(),
+    H.waitFrames(30),
+    H.call(function()
+      if lost == nil then
+        wavesWon = true
+        H.log(string.format("escape: attempt %d WON all three waves", n))
+      end
+    end),
+  }, {})
+end
+
+H.run({ maxFrames = 250000 }, {
   H.loadState(DOOR),
   H.waitFrames(30),
   H.call(function()
@@ -465,11 +579,32 @@ H.run({ maxFrames = 90000 }, {
       H.frame, H.fieldX(), H.fieldY(), cyanX(), cyanY()))
   end),
 
-  -- 1. the three waves.  CYAN moves between them, so his tile is a thunk.
-  talkForFight(cyanX, cyanY, 0x0034, "wave 1 (battle 13, $0034)", 14000),
-  talkForFight(cyanX, cyanY, 0x0035, "wave 2 (battle 13, $0035)", 14000),
-  talkForFight(cyanX, cyanY, 0x0036, "wave 3 (battle 14, CYAN joins, $0036)",
-    14000),
+  -- 1. the three waves, honestly, behind the ladder.  CYAN moves between
+  -- them, so his tile is a thunk.
+  (function()
+    local ckReq
+    return seq({
+      H.call(function() ckReq = H.requestSaveState() end),
+      H.waitFrames(2),
+      H.call(function()
+        H.checkReq(ckReq, "waves checkpoint")
+        wavesBlob = ckReq.blob
+        H.log(string.format("escape: waves checkpoint captured (%d bytes) " ..
+          "at f%d", #wavesBlob, H.frame))
+      end),
+    })
+  end)(),
+  wavesAttempt(1),
+  wavesAttempt(2),
+  wavesAttempt(3),
+  H.call(function()
+    if not wavesWon then
+      error(string.format("escape: the courtyard waves were lost on all 3 " ..
+        "honest attempts -- last loss: %s -- the per-attempt numbers above " ..
+        "are the balance finding (#74-style); do not rig this leg",
+        tostring(lost)), 0)
+    end
+  end),
   H.call(function()
     H.assertEq(sw(0x0036), 1, "$0036 set -- all three waves fought")
     H.assertEq(inParty(2), true, "CYAN has joined the party")
