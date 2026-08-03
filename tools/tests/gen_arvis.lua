@@ -1,15 +1,30 @@
 -- gen_arvis.lua -- WIN the Whelk and ride the esper scene to Terra's wake-up
 -- in Arvis's house.  From whelk_doorstep.mss (party calm at (42,6), map 41):
 -- step onto the trigger at (42,5), edge-tap the guard dialogs $0B6E/$0B6F,
--- then clearBattle the Whelk (formation words 0x0100/0x0134 -- NO spare list
--- this time, the win is the point).  The event epilogue sets switch $0135
--- ($1EA6 bit $20, asserted).  North of the fight, tiles (41..43, y=4) exit
--- to map 0x2A at (86,28), the Tritoch chamber; the single event trigger at
--- (87,12) starts the long automatic esper scene: the party is zapped
--- (scripted battle 77 -- Tritoch, spared so it plays itself out), flashback,
--- and Terra wakes alone in Arvis's house (map 30).  advanceStory rides all
--- of it out.  Emits arvis_wake.mss at the first calm control point, plus
--- progress screenshots, and logs the roster + command lists the fixture has.
+-- then BEAT the Whelk BY PLAYING IT (issue #75: zero state writes -- the
+-- kill-bit clearBattle this used to call is gone).  The strategy is the
+-- measured "tutorial" policy from whelkbal_run.lua, the designed line the
+-- head's fire-weak add exists for (balance-metrics.md Measurement #2 + the
+-- resistance re-check: 3/3 honest wins, ~6 beams + 1-2 teks):
+--   * head up: everyone fires their first beam at the default target (the
+--     head -- chips land, measured); when exactly ONE shield remains and
+--     the head is not yet broken, TERRA's turn walks the 2x4 magitek grid
+--     to TekMissile (3,1) for the 4th chip -> break -> the x2 window
+--     finishes the fight.
+--   * head hidden (the shell's retract cycle): spend the turn on Heal
+--     Force (2,0) -- ANY attack would default into the shell and draw the
+--     MegaVolt counter, the fight's whole danger budget (Terra KO is a
+--     scripted game over; whelkbal's mixed-naive policy lost 5/5 to
+--     exactly this).
+-- The event epilogue sets switch $0135 ($1EA6 bit $20, asserted).  North
+-- of the fight, tiles (41..43, y=4) exit to map 0x2A at (86,28), the
+-- Tritoch chamber; the single event trigger at (87,12) starts the long
+-- automatic esper scene: the party is zapped (scripted battle 77 --
+-- Tritoch, spared so it plays itself out), flashback, and Terra wakes
+-- alone in Arvis's house (map 30).  advanceStory rides all of it out
+-- (honest=true -- no route battle is kill-bitted anywhere in this gen).
+-- Emits arvis_wake.mss at the first calm control point, plus progress
+-- screenshots, and logs the roster + command lists the fixture has.
 local H = dofile("tools/tests/lib/ot6.lua")
 local DOORSTEP = "build/states/whelk_doorstep.mss.lua"
 
@@ -104,7 +119,110 @@ end
 
 local aPhase = 0
 
-H.run({ maxFrames = 60000 }, {
+-- ------------------------------------------------ the honest Whelk win --
+-- Addresses and menu-episode discipline lifted from whelkbal_run.lua (the
+-- instrument that measured this exact fight 3/3 winnable on this policy).
+local MENU  = 0x7bca               -- battle menu open flag
+local ACTOR = 0x62ca               -- whose menu it is (char slot)
+local MHP   = 0x3bfc               -- monster cur hp, +slot*2
+local SHLD  = 0x3e40               -- monster cur shields, +slot*2
+local TIMER = 0x3e90               -- monster broken timer, +slot*2
+local ALIVE = 0x3aa8               -- monster presence bit0, +slot*2
+local MSTAT = 0x3eec               -- monster status-1, +slot*2 (READ-only
+                                   -- here: $c2 = gone/hidden; the kill-bit
+                                   -- WROTE bit7 -- this gen never does)
+local SPEC  = 0x57c0               -- formation species words
+local CHID  = 0x3ed8               -- char id, +slot*2 (0 = terra)
+
+local hs, terra                    -- head slot, terra's char slot
+local function broken() return H.readByte(TIMER + hs * 2) > 0 end
+local function shields() return H.readByte(SHLD + hs * 2) end
+local function headAlive()
+  return (H.readByte(ALIVE + hs * 2) & 1) == 1
+     and (H.readByte(MSTAT + hs * 2) & 0xc2) == 0
+end
+
+-- Sequences run from the settled top command menu (cursor on MagiTek);
+-- cell coordinates measured by whelkbal_run (the soldiers' 4-cell list
+-- stages sparse, so Heal Force is (2,0) for everyone; (1,1) is a blank
+-- cell the cursor can wedge on -- do not walk through it):
+--   beam at default target        A A A
+--   heal force (2,0)              A dn dn A A     (self-target default)
+--   tekmissile, terra only (3,1)  A dn dn dn rt A A
+local function seqFor(actor)
+  if not headAlive() then
+    return { "a", "down", "down", "a", "a" }          -- Heal Force
+  end
+  if actor == terra and not broken() and shields() == 1 then
+    return { "a", "down", "down", "down", "right", "a", "a" }  -- TekMissile
+  end
+  return { "a", "a", "a" }                            -- first beam, head
+end
+
+-- The menu-episode machine (bal_mines settle discipline, via whelkbal_run):
+-- battle menus eat input during their open animation EVERY turn, so presses
+-- only start after the menu flag holds 4 consecutive pulses; when no menu is
+-- up, A is edge-tapped every other pulse (the opening battle dialog and the
+-- shell's "Gruuu……" dialogs need it; on a running battle a stray A is inert).
+local mStreak, mSeq, mIdx, mStall, mNoMenu = 0, nil, 1, 0, 0
+local function policyPulse()
+  if H.readByte(MENU) == 0 then
+    mStreak, mSeq, mIdx, mStall = 0, nil, 1, 0
+    mNoMenu = mNoMenu + 1
+    return mNoMenu % 2 == 0 and { "a" } or {}
+  end
+  mNoMenu = 0
+  mStreak = mStreak + 1
+  if mStreak < 4 then return {} end
+  if mSeq == nil then
+    mSeq, mIdx = seqFor(H.readByte(ACTOR)), 1
+  end
+  if mIdx <= #mSeq then
+    local b = mSeq[mIdx]
+    mIdx = mIdx + 1
+    return { b }
+  end
+  mStall = mStall + 1
+  if mStall > 2 then
+    mSeq, mStall = nil, 0              -- back out; rebuild from scratch
+    return { "b" }
+  end
+  return { "a" }
+end
+
+-- STEP: play the Whelk to the win.  Slots are found on the first open menu
+-- (the formation words and char ids are battle scratch -- they are only
+-- read once the battle module demonstrably owns them); until then the
+-- pulse machine's no-menu branch pages the opening dialog.  Terminates on
+-- battle teardown; the caller asserts the whelk-done switch, which is what
+-- separates a WIN from a game-over teardown.
+local function winWhelk()
+  return H.driveUntil(function()
+    return hs ~= nil and not H.battleLoadStarted()
+  end, 25000, {
+    H.call(function()
+      if hs == nil and H.readByte(MENU) ~= 0 then
+        for slot = 0, 5 do
+          if H.readWord(SPEC + slot * 2) == 0x0134 then hs = slot end
+        end
+        for c = 0, 3 do
+          if H.readByte(CHID + c * 2) == 0 then terra = c end
+        end
+        H.assertEq(hs ~= nil and terra ~= nil, true,
+          "whelk head + terra found at the first menu")
+        H.log(string.format(
+          "whelk armed: head slot %d (hp=%d sh=%d), terra char slot %d",
+          hs, H.readWord(MHP + hs * 2), shields(), terra))
+      end
+      H.setPad(policyPulse())
+    end),
+    H.waitFrames(6),
+    H.call(function() H.setPad({}) end),
+    H.waitFrames(24),
+  }, "whelk beaten honestly (tutorial policy)")
+end
+
+H.run({ maxFrames = 90000 }, {
   H.loadState(DOORSTEP),
   H.waitFrames(10),
   H.waitUntil(function() return H.hasControl() end, 300, "doorstep control", 5),
@@ -115,20 +233,15 @@ H.run({ maxFrames = 60000 }, {
   end),
 
   -- the deliberate step onto (42,5); the event force-walks us to (42,7) and
-  -- opens the guard dialogs; a random encounter on the step is cleared
-  -- inline, the goal fight is not (whelk() stops the loop; clearBattle wins it)
-  H.driveUntil(function() return whelk() end, 2200, {
+  -- opens the guard dialogs.  A random encounter on the step is FOUGHT
+  -- inline by the same edge-tapped A (honest; nothing on this one-step
+  -- route should draw one); the goal fight is hands-off (whelk() stops the
+  -- loop; winWhelk plays it).
+  H.driveUntil(function() return whelk() end, 8000, {
     H.call(function()
       aPhase = (aPhase + 1) % 8
       if H.battleLoadStarted() then
         if whelk() then H.setPad({}); return end       -- pred fires next frame
-        if H.monstersPresent() > 0 then
-          for slot = 0, 5 do
-            if H.readByte(0x3aa8 + slot * 2) % 2 == 1 then
-              H.writeByte(0x3eec + slot * 2, H.readByte(0x3eec + slot * 2) | 0x80)
-            end
-          end
-        end
         H.setPad(aPhase < 4 and { "a" } or {})
         return
       end
@@ -142,12 +255,18 @@ H.run({ maxFrames = 60000 }, {
     end),
   }, "whelk event fires"),
 
-  -- WIN the fight: no spare list, kill-bits take the Whelk and its Head
-  H.logStep("whelk battle up; winning it"),
-  H.clearBattle(6000),
+  -- WIN the fight for real: the first honest boss kill in the mint chain's
+  -- history.  Real menus, real target defaults, real turns; the retract
+  -- cycle is the fight's clock and Heal Force spends the hidden phases.
+  H.logStep("whelk battle up; playing it (tutorial policy)"),
+  winWhelk(),
+  H.call(function()
+    H.setPad({})
+    H.log(string.format("whelk fight torn down at frame %d", H.frame))
+  end),
 
   -- event epilogue: fade back in, switch $0135 set, control returns
-  H.advanceStory(calm(30), 3000),
+  H.advanceStory(calm(30), 3000, { honest = true }),
   H.call(function()
     H.assertEq(H.readByte(0x1ea6) & 0x20, 0x20, "whelk-done switch $0135 set")
     H.log(string.format("whelk won; back on field at (%d,%d) map=%d",
@@ -157,7 +276,7 @@ H.run({ maxFrames = 60000 }, {
 
   -- north through the y=4 exit line into the Tritoch chamber
   H.navTo(42, 4, { arrive = function() return H.mapId() == 0x2A end,
-                   maxFrames = 3000 }),
+                   maxFrames = 6000, honest = true }),
   H.waitUntil(calm(30), 900, "tritoch chamber control"),
   H.call(function()
     H.assertEq(H.mapId(), 0x2A, "in the tritoch chamber (map 0x2A)")
@@ -166,14 +285,14 @@ H.run({ maxFrames = 60000 }, {
   end),
 
   -- approach the esper: the single trigger at (87,12) starts the scene
-  H.navTo(87, 12, { arrive = eventFor(30), maxFrames = 9000 }),
+  H.navTo(87, 12, { arrive = eventFor(30), maxFrames = 12000, honest = true }),
   H.logStep("tritoch scene fired; hands off"),
 
   -- the long automatic stretch: zap battle (spared), flashback, wake-up.
   -- done = calm on a map that is neither mines (41) nor chamber (42)
   H.advanceStory(calm(60, function()
     return H.mapId() ~= 41 and H.mapId() ~= 42
-  end), 45000, { spare = TRITOCH }),
+  end), 45000, { spare = TRITOCH, honest = true }),
 
   H.call(function()
     H.log(string.format("awake: map=%d (0x%X) at (%d,%d)",
