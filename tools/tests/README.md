@@ -456,6 +456,37 @@ the two images.
 
 ## Writing a test
 
+**THE HONESTY RULE (issue #75, owner directive 2026-08-03).**  A test or
+generator may inject controller input and READ emulated memory to assert
+things.  It may NEVER WRITE emulated game state -- no HP/MP pins, no
+kill-bits, no boss clamps, no cursor or menu-state pokes, no event-flag or
+RNG writes.  When we test "can a person play this game," the script gets
+only the capabilities a person has: buttons and eyes.  Determinism comes
+from fixed, honestly-minted fixtures plus frame-exact input (the TAS way),
+never from rigging.  Fixture honesty is transitive: a savestate or anchor
+minted by a poking script is contaminated, and so is everything derived
+from it.
+
+Enforcement is mechanical, not honor-system: `tools/check_state_writes.py`
+scans every `.lua` here and fails `make test` on any write token not in
+`tools/state_write_waivers.txt` -- a burn-down list of pre-directive sins
+that may only SHRINK (a stale waiver is itself a failure; prune it in the
+same change that earns it).  Do not add waivers to new code.  Ever.
+
+The one sanctioned exception: **quarantined mechanism tests** -- fault
+injection whose inputs the game can only produce rarely or never on cue
+(deliberate VRAM corruption for the font-restore path, the 1/65536
+zero-checksum save, legacy-format codex migration).  These are unit tests
+of mechanisms, not claims about gameplay; they keep their waivers, say so
+loudly in their header comment, and may never produce fixtures.
+
+House patterns for playing honestly: `gen_arvis.lua` (real boss kill),
+`gen_moogle.lua` (multi-party set-piece, boosted fights, retry ladder),
+`gen_scenario.lua`/`gen_rapids.lua` (menu-episode fighter, bank-and-dump
+boost doctrine), `gen_sabin_gau.lua` (self-consuming capture verification:
+reload your own capture and verify calm before publishing -- capture-calm
+does not imply reload-calm).
+
 A test is a LIST OF STEPS handed to `H.run`; a `startFrame` callback consumes
 them, one frame at a time (zero-frame steps like `H.call` chain within a
 frame).  The step style below is the house pattern.  (An older note here
