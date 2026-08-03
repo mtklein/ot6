@@ -241,7 +241,12 @@ local function grindStep()
       return nil
     end
     if plan == nil or planActor ~= actor then
-      if st ~= ST_CMD then return nil end
+      if st ~= ST_CMD then
+        if st == ST_TOOLS or st == ST_ITEM or st == ST_TGT then
+          return { "b" }        -- parked list state: back out (measured
+        end                     -- in the b68 engine)
+        return nil
+      end
       plan = (gauOn() and not fed and battInvIdx(DRIED_MEAT)) and
         feedPlan(actor) or makePlan(actor)
       planActor = actor

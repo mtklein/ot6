@@ -515,7 +515,16 @@ local function b68Button()
   local actor = H.readByte(ACTOR)
   local plan = b68.plan
   if plan == nil or b68.planActor ~= actor then
-    if st ~= ST_CMD then return nil end       -- wait for a settled cmd list
+    if st ~= ST_CMD then
+      -- a menu parked in a LIST state with no plan (measured: SABIN's
+      -- second command menu reopened straight into the blitz shell $30
+      -- after his first cast, and the engine waited 145000 frames for an
+      -- ST_CMD that never came) -- back out to the command list
+      if st == ST_TOOLS or st == ST_ITEM or st == ST_TGT then
+        return { "b" }
+      end
+      return nil
+    end
     b68.plan = makePlan(actor)
     b68.planActor = actor
     b68.plan.boostLeft = b68.plan.boost or 0
@@ -833,6 +842,14 @@ local function b68Attempt(n)
           end
           b68.mstreak = b68.mstreak + 1
           if b68.mstreak < 4 then H.setPad({}); return end
+          if H.frame - (b68.hb or -300) >= 300 then
+            b68.hb = H.frame
+            local a = H.readByte(ACTOR)
+            b68Log(string.format(
+              "fmenu f%d st=%02X actor=%d row=%d sh=%d hp=%d [%s]",
+              H.frame, H.readByte(MSTATE), a, H.readByte(CMDROW + a) & 3,
+              H.readByte(SH(gSlot)), H.readWord(MHP(gSlot)), partyLine()))
+          end
           if ph == 0 then b68.btn = b68Button() end
           H.setPad(ph < 6 and b68.btn or {})
         end),

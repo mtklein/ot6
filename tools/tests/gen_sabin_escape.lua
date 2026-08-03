@@ -303,7 +303,14 @@ local function fightButton()
   local st = H.readByte(MSTATE)
   local actor = H.readByte(ACTOR)
   if fPlan == nil or fPlanActor ~= actor then
-    if st ~= ST_CMD then return nil end
+    if st ~= ST_CMD then
+      -- planless in a parked LIST state: back out to the command list
+      -- (the b68 engine measured a menu reopening straight into a list)
+      if st == ST_TOOLS or st == ST_ITEM or st == ST_TGT then
+        return { "b" }
+      end
+      return nil
+    end
     fPlan, fPlanActor = makeFightPlan(actor), actor
     return nil
   end
