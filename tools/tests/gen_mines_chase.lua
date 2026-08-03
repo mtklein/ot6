@@ -9,6 +9,15 @@
 -- bridge-collapse -> Kefka flashback -> Moogle-defense chain (a
 -- THREE-PARTY set-piece this harness does not enter).  Mint
 -- moogle_doorstep.mss there, calm, trigger unfired.
+--
+-- Issue #75: every navigator leg passes honest=true -- the map-50 random
+-- pool is FOUGHT (tap-A = Fight, confirm at default target), never
+-- kill-bitted.  That is bal_mines.lua's measured 'baseline' policy:
+-- 8/8 wins, 0 deaths, ~2 real turns / ~744 frames per battle for solo
+-- L5 Terra against the full pool (balance-metrics.md Measurement #1),
+-- so the honest cost is roughly +1-2k frames per encounter drawn and
+-- the leg budgets below carry it.  This gen has no write idiom of its
+-- own.
 local H = dofile("tools/tests/lib/ot6.lua")
 local STREETS = "build/states/narshe_streets.mss.lua"
 
@@ -47,7 +56,7 @@ local function logBattles()
   return false
 end
 
-H.run({ maxFrames = 30000 }, {
+H.run({ maxFrames = 50000 }, {
   H.loadState(STREETS),
   H.waitFrames(10),
   H.call(function()
@@ -62,10 +71,10 @@ H.run({ maxFrames = 30000 }, {
   -- cycle, so hasControl never holds).  Walk OFF with a raw held
   -- direction -- the field module latches the pad in the 1-frame control
   -- windows -- and only then expect calm.
-  H.navTo(38, 8, { arrive = eventFor(30), maxFrames = 5000 }),
+  H.navTo(38, 8, { arrive = eventFor(30), maxFrames = 8000, honest = true }),
   H.advanceStory(function()
     return (H.readByte(0x1ea5) & 0x20) ~= 0    -- switch $012D
-  end, 8000),
+  end, 8000, { honest = true }),
   H.driveUntil(function()
     return H.fieldX() < 38 and H.tileAligned() and H.hasControl()
   end, 600, { H.hold({ "left" }) }, "off the chase trigger"),
@@ -80,7 +89,7 @@ H.run({ maxFrames = 30000 }, {
   H.navTo(26, 8, { arrive = function()
     logBattles()
     return H.mapId() == 50
-  end, maxFrames = 5000 }),
+  end, maxFrames = 9000, honest = true }),
   H.waitUntil(calm(30), 900, "mines control"),
   H.waitFrames(90),                     -- fade-in
   H.call(function()
@@ -93,12 +102,12 @@ H.run({ maxFrames = 30000 }, {
   -- north to one tile short of the collapse trigger at (55,11).  Guards
   -- CHASE through this map (vanilla: mobile NPCs whose touch fires a
   -- catch event with a battle inside); navTo rides those like anything
-  -- else -- control loss, dialogs, kill-bit the fight -- and re-plans, so
+  -- else -- control loss, dialogs, FIGHT the battle honestly -- and re-plans, so
   -- the only terminator is standing calm on the doorstep tile.  BFS never
   -- detours through (55,11): the approach is from the south and the
   -- trigger sits beyond the target.  arrive here is a pure logging hook.
   H.navTo(55, 12, { arrive = function() logBattles(); return false end,
-                    maxFrames = 15000 }),
+                    maxFrames = 24000, honest = true }),
   H.call(function()
     H.assertEq(H.mapId(), 50, "still on map 50")
     H.assertEq(H.fieldX() == 55 and H.fieldY() == 12, true,
