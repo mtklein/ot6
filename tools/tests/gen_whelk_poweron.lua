@@ -17,7 +17,13 @@
 --     hands-off pad loops the attract forever (both measured, see Phase 2a)
 --   -> map 19 (Narshe approach): scripted fights fire at the x=38 column
 --     triggers {38,38} {38,26} {38,17} (event_trigger.asm map 19); blind
---     held-UP + kill-bit clears climbs y=38 -> 1 into map 39 (measured)
+--     held-UP climbs y=38 -> 1 into map 39, and every fight on the way is
+--     WON HONESTLY by edge-tapped A (issue #75: this mint makes zero state
+--     writes).  Tap-A is a real strategy here, not a shortcut: A opens the
+--     magitek command, A confirms the first beam, A takes the default
+--     target, and the vanilla-faithful intro guards die to one beam each
+--     -- fleeing (L+R) is NOT used on this leg because these are event
+--     `battle` fights whose win the script chain expects.
 --   -> map 39 (Narshe town): blind-UP stalls at (26,42) (measured), so BFS
 --     to (31,23), one south of the mines-approach trigger line {30..32,22}
 --     (_cc9db2).  En route the {30,37} trigger (_cc9d0d) springs the 4-guard
@@ -47,7 +53,7 @@
 --     ($135&7)=5 -> mask $20 (event bitfield base $1E80, src/world/event.asm).
 --   * during the fight the six formation species words at $57C0 read 0x0100
 --     and 0x0134 (0x0134 is the distinctive one); both are spared so the
---     kill-bit clears never touch the goal fight.  $57C0 is battle scratch
+--     auto-fight clears never blind-mash the goal fight.  $57C0 is battle scratch
 --     (garbage before the first fight, stale after), so gate every read on
 --     battleLoadStarted() -- see gen_whelk.lua:16-26 and ot6.lua:670-681.
 --
@@ -61,7 +67,7 @@ local H = dofile("tools/tests/lib/ot6.lua")
 
 -- goal-fight signature (verbatim, gen_whelk.lua:20-26): 0x0134 is the
 -- distinctive Whelk species word; both it and 0x0100 are spared from the
--- kill-bit clears so the goal fight is never instakilled.
+-- auto-fight clears so the goal fight is never blind-mashed into.
 local WHELK = { [0x0134] = true }
 local SPARE = { 0x0134, 0x0100 }
 local function whelk()
@@ -97,20 +103,17 @@ end, emu.eventType.startFrame)
 -- (docs/playing-headless.md; ot6.lua clearBattle/advanceStory use the same).
 local aPhase = 0
 
--- clear the current random encounter in place: kill-bit every present monster
--- (present bit $3aa8 bit0 -> dead bit $3eec bit7) and edge-tap A through the
--- victory text.  This is the ot6.lua kill-bit idiom (clearBattle, ot6.lua
--- 692-716; navTo's inline clear, 905-920) lifted out so both the climb and the
--- post-mint positive control use it identically.  NEVER call it on the whelk:
--- callers gate on `whelk()` first and hand off instead.
-local function clearRandomStep()
-  if H.monstersPresent() > 0 then
-    for slot = 0, 5 do
-      if H.readByte(0x3aa8 + slot * 2) % 2 == 1 then
-        H.writeByte(0x3eec + slot * 2, H.readByte(0x3eec + slot * 2) | 0x80)
-      end
-    end
-  end
+-- FIGHT the current battle in place, honestly: edge-tap A (4 on / 4 off).
+-- This replaced the kill-bit clear (issue #75 -- a mint may inject input
+-- and read memory, never write game state).  The taps are the whole
+-- strategy: A opens the top command (magitek for this party), A confirms
+-- the first beam, A accepts the default target, and the intro guards die
+-- to one beam; the same edge taps page the pre-fight dialogs and the
+-- victory text.  Cost: a real fight runs ~1-3 ATB rounds (thousands of
+-- frames) where the kill-bit cleared in hundreds -- the drive budgets
+-- below carry the difference.  NEVER call it on the whelk: callers gate
+-- on `whelk()` first and hand off instead.
+local function fightRandomStep()
   H.setPad(aPhase < 4 and { "a" } or {})
 end
 
@@ -136,9 +139,9 @@ local STALL_LIMIT = 240
 -- builds a fresh zero-frame step; state (aPhase, debounces, stall tracker)
 -- lives in the shared upvalues above.  Frames are classified with the
 -- navTo/advanceStory 3-frame debounce (the battle/dialog signal bytes live in
--- RAM the field module also scribbles on; kill-bitting a 1-frame ghost would
--- poke battle addresses while the FIELD module owns them):
---   battle -> kill-bit + edge-tap A (never the whelk); dialog -> edge-tap A;
+-- RAM the field module also scribbles on; acting on a 1-frame ghost would
+-- tap A on the open field):
+--   battle -> fight it honestly by tap-A (never the whelk); dialog -> edge-tap A;
 --   other control loss (scenes walking the party, fades) -> neutral pad;
 --   control -> stall-watch, then hold UP.
 local function climbStep()
@@ -155,12 +158,12 @@ local function climbStep()
     battN = H.battleLoadStarted() and battN + 1 or 0
     dlgN  = H.dialogWaiting() and dlgN + 1 or 0
 
-    -- battle: clear randoms/forced fights.  The whelk cannot appear on the
-    -- climb legs (it lives past the map-41 door), but gate defensively anyway
-    -- so a surprise never gets kill-bitted.
+    -- battle: fight randoms/forced fights for real.  The whelk cannot appear
+    -- on the climb legs (it lives past the map-41 door), but gate defensively
+    -- anyway so a surprise never gets blind-mashed.
     if battN >= 3 then
       if whelk() then H.setPad({}); return end
-      clearRandomStep()
+      fightRandomStep()
       return
     end
     -- dialog waiting for a keypress: edge-tap A.
@@ -214,7 +217,7 @@ local function stepOntoTrigger()
     aPhase = (aPhase + 1) % 8
     if H.battleLoadStarted() then
       if whelk() then H.setPad({}); return end     -- pred fires next frame
-      clearRandomStep()
+      fightRandomStep()
       return
     end
     if H.dialogWaiting() then                       -- $0B6E then $0B6F
@@ -317,12 +320,12 @@ local steps = {
 
   -- ===================================================================== --
   -- Phase 2b: clear the map-19 gauntlet.  From the first fight on, the world
-  -- is the real game: the climb body kill-bits the x=38-column scripted
-  -- fights ({38,38} {38,26} {38,17}, all measured clearing fine) and holds
+  -- is the real game: the climb body WINS the x=38-column scripted
+  -- fights ({38,38} {38,26} {38,17}) by tap-A and holds
   -- UP the cliff corridor (measured UP-navigable, y=38 -> 1) until the town
   -- map loads.
   -- ===================================================================== --
-  H.driveUntil(function() return H.mapId() == 39 end, 22000,
+  H.driveUntil(function() return H.mapId() == 39 end, 30000,
     { climbStep() }, "reach Narshe town (map 39)"),
   H.logStep(function()
     return string.format("entered town (map 39) at (%d,%d), frame %d",
@@ -351,7 +354,7 @@ local steps = {
   -- self-gating on $0131) springs en route if BFS crosses it; navTo clears
   -- it like any fight.
   -- ===================================================================== --
-  H.navTo(31, 23, { maxFrames = 9000 }),
+  H.navTo(31, 23, { maxFrames = 14000, honest = true }),
   H.logStep(function()
     return string.format("at the mines approach (31,23), frame %d", H.frame)
   end),
@@ -396,7 +399,7 @@ local steps = {
   -- ===================================================================== --
   H.navTo(42, 9, {
     arrive = function() return blastDone() or whelk() end,
-    maxFrames = 12000, spare = SPARE,
+    maxFrames = 16000, spare = SPARE, honest = true,
   }),
   -- navTo can complete in the 1-frame window between landing on (42,9) and
   -- the event engine starting the scene (measured: run 4 arrived in exactly
@@ -404,7 +407,8 @@ local steps = {
   -- "no path").  So ride the scene explicitly: advanceStory taps its dialog
   -- ($0011), stays hands-off through the choreography, and returns the
   -- moment switch $012C lands.  Instant no-op if the scene already ran.
-  H.advanceStory(function() return blastDone() end, 4000, { spare = SPARE }),
+  H.advanceStory(function() return blastDone() end, 4000,
+    { spare = SPARE, honest = true }),
   H.logStep(function()
     return string.format("door blasted (switch $012C set); at (%d,%d), frame %d",
       H.fieldX(), H.fieldY(), H.frame)
@@ -415,7 +419,8 @@ local steps = {
   -- from (42,8) that is two steps up the now-open door column, never
   -- touching (42,5).  Identical contract to gen_whelk.lua:54.
   -- ===================================================================== --
-  H.navTo(42, 6, { arrive = whelk, maxFrames = 4000, spare = SPARE }),
+  H.navTo(42, 6, { arrive = whelk, maxFrames = 8000, spare = SPARE,
+                   honest = true }),
 
   -- ===================================================================== --
   -- Phase 4: assert + mint + prove.  Mirrors gen_whelk.lua:56-112 so the two
@@ -467,10 +472,15 @@ for _, k in ipairs(SWEEP) do
     H.waitFrames(2),
     H.call(function()
       H.checkReq(loadReq, tag .. ": doorstep reload")
-      -- same two writes H.loadState makes: savestates do not restore battery
-      -- sram, so invalidate the weakness codex the way every consumer does
-      emu.write(0x316000, 0, emu.memType.snesMemory)
-      emu.write(0x316001, 0, emu.memType.snesMemory)
+      -- DOCUMENTED GAP (issue #75): this sweep used to zero the codex
+      -- signature bytes at $316000/1 to imitate H.loadState's consumer-side
+      -- wipe.  Those were the mint's last two state writes, so they are
+      -- gone: the replays now run on the honest run's OWN battery -- the
+      -- codex holds whatever the gauntlet fights genuinely taught.  That is
+      -- a fidelity difference from consumers (which still wipe at load),
+      -- but nothing the sweep asserts -- whelk fires, a menu opens, a list
+      -- draws -- reads the codex, so the roll-dependence detector it exists
+      -- to be is unchanged.
       listWrites = 0
     end),
     H.waitFrames(k),        -- the phase itself: k more ticks of $021E
@@ -544,4 +554,9 @@ steps[#steps + 1] = H.call(function()
   H.log("doorstep minted")
 end)
 
-H.run({ maxFrames = 60000 }, steps)
+-- Budget: the kill-bit route reached the doorstep at ~24.3k frames and the
+-- whole run (sweep included) fit 60k.  Honest fights spend real ATB rounds
+-- on the gauntlet, the ambush, and any random draw, so the ceiling carries
+-- headroom for the difference; the mint log's "doorstep captured at" line
+-- is the per-run measurement.
+H.run({ maxFrames = 90000 }, steps)
