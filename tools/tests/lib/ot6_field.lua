@@ -28,6 +28,13 @@ assert(type(M) == "table",
   "ot6_field.lua is inlined by lib/compose.py after lib/ot6.lua and " ..
   "receives the core module table; it cannot be loaded on its own")
 
+-- honest="flee" run budget, in consecutive battle frames: how long a
+-- navigator holds L+R before conceding the formation will not release the
+-- party and falling back to the tap-A fight.  A successful run takes a few
+-- hundred frames (the vanilla run timer counts held L/R); one full minute
+-- of refusing is the engine saying no, not bad luck.
+M.FLEE_CAP = 3600
+
 -- Field navigation, so routes are coordinate-aware instead of blind
 -- timed holds (which desync on any map).  Movement is grid-oriented, one
 -- tile per step: up=-Y down=+Y left=-X right=+X, PLUS the four diagonals
@@ -283,14 +290,26 @@ local function resolve(v) return type(v) == "function" and v() or v end
 --   opts.arrive    extra terminator predicate (checked before everything)
 --   opts.maxFrames frame budget -> error (default 20000)
 --   opts.spare     list of formation species words never to kill-bit
---   opts.honest    clear mid-route battles by REAL PLAY (the edge-tapped A
---                  already driving the victory text doubles as an
---                  auto-fighter: A opens the command list, A confirms its
---                  first entry, A takes the default target) instead of the
+--   opts.honest    clear mid-route battles by REAL PLAY instead of the
 --                  kill-bit -- ZERO state writes on this navigator (issue
---                  #75).  Opt-in while unconverted generators still lean on
---                  the kill-bit; costs real ATB rounds per encounter, so
---                  honest legs budget more frames.
+--                  #75).  Two honest modes:
+--                    true    -- FIGHT: the edge-tapped A already driving the
+--                               victory text doubles as an auto-fighter (A
+--                               opens the command list, A confirms its first
+--                               entry, A takes the default target)
+--                    "flee"  -- RUN: hold L+R, the engine's own run mechanic
+--                               (fleeBattle's pad line).  Keeps the party's
+--                               HP/MP/XP near-pristine, which is what the
+--                               balance fixtures want.  A formation that
+--                               will not release the party (unrunnable, or
+--                               a run-lock stretch) falls back to the tap-A
+--                               fight after FLEE_CAP consecutive battle
+--                               frames -- a real player gives up running
+--                               too, and a timeout here would otherwise eat
+--                               the whole leg budget.
+--                  Opt-in while unconverted generators still lean on the
+--                  kill-bit; costs real ATB rounds per encounter, so honest
+--                  legs budget more frames.
 --   opts.calmFrames  consecutive settled frames on the goal tile the
 --                  terminator requires (default 16; see ISSUE #22 below)
 --   opts.noPathRetries  BFS-no-path retries, 45 idle frames apart, before
@@ -410,6 +429,10 @@ function M.navTo(txIn, tyIn, opts)
         drop("battle")
         if next(spareSet) and M.formationHas(spareSet) then
           M.setPad({})                 -- goal fight: hands off, arrive() sees it
+          return
+        end
+        if opts.honest == "flee" and battN <= M.FLEE_CAP then
+          M.setPad({ l = true, r = true })   -- run, honestly (zero writes)
           return
         end
         if M.monstersPresent() > 0 and not opts.honest then
@@ -547,7 +570,9 @@ end
 --   battle  -> kill-bit everything present + edge-tap A through the text
 --              (with opts.honest, NO kill-bit: the same edge-tapped A
 --              auto-fights the encounter for real -- zero state writes,
---              issue #75 -- at the price of real ATB rounds).
+--              issue #75 -- at the price of real ATB rounds; with
+--              opts.honest == "flee", hold L+R instead, falling back to
+--              the tap-A fight after M.FLEE_CAP battle frames).
 --              A formation matching opts.spare is a scripted set-piece:
 --              never kill-bitted, and hands OFF for its first 300 frames,
 --              THEN edge-tapped.  Both halves are load-bearing (measured,
@@ -594,6 +619,10 @@ function M.advanceStory(pred, maxFrames, opts)
         end
         if next(spareSet) and M.formationHas(spareSet) then
           M.setPad(battN > 300 and aPhase < 4 and { "a" } or {})
+          return
+        end
+        if opts.honest == "flee" and battN <= M.FLEE_CAP then
+          M.setPad({ l = true, r = true })   -- run, honestly (zero writes)
           return
         end
         if M.monstersPresent() > 0 and not opts.honest then
@@ -778,6 +807,13 @@ end
 --   opts.arrive    extra terminator (checked first, every frame)
 --   opts.maxFrames frame budget -> error (default 20000)
 --   opts.spare     formation species words never to kill-bit
+--   opts.honest    same contract as navTo's: true = clear encounters by the
+--                  edge-tapped-A auto-fight, "flee" = hold L+R (falling back
+--                  to the fight after M.FLEE_CAP battle frames) -- either
+--                  way ZERO state writes (issue #75).  The post-battle
+--                  world reload runs exactly as in the kill-bit path: the
+--                  tile comes back from $1F60/$1F61 and the danger counter
+--                  is zeroed, so the walker's re-plan logic is unchanged.
 function M.worldNavTo(txIn, tyIn, opts)
   opts = opts or {}
   local maxFrames = opts.maxFrames or 20000
@@ -819,7 +855,11 @@ function M.worldNavTo(txIn, tyIn, opts)
           M.setPad({})
           return
         end
-        if M.monstersPresent() > 0 then
+        if opts.honest == "flee" and battN <= M.FLEE_CAP then
+          M.setPad({ l = true, r = true })   -- run, honestly (zero writes)
+          return
+        end
+        if M.monstersPresent() > 0 and not opts.honest then
           for slot = 0, 5 do
             if M.readByte(0x3aa8 + slot * 2) % 2 == 1 then
               M.writeByte(0x3eec + slot * 2, M.readByte(0x3eec + slot * 2) | 0x80)
