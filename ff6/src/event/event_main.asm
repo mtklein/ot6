@@ -103307,6 +103307,15 @@ _ccaaba:
         obj_script SLOT_1
                 action 40
                 end
+        ; OT6 (#74): every wave's WIN branch fades the field back in after
+        ; the collision battle (_ccaaec and its five siblings, and the
+        ; Marshal win at _ccadbf) -- but this shared LOSS subroutine never
+        ; did, so after the player pressed through the Annihilated screen
+        ; the field stayed black while the defense played on invisibly
+        ; (guards marching, parked squads auto-fighting) until the real
+        ; GameOver.  Mirror the winners: fade_in + wait_fade.
+        fade_in
+        wait_fade
         restore_default_party
         return
 _ccaadf:
