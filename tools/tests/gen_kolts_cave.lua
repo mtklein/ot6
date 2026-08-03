@@ -26,13 +26,14 @@
 -- needs a fixture to be a measurement rather than arithmetic, and this is it.
 --
 -- THE CROSSING is gen_kolts' K2, verbatim: shelf F (19,17) -> map 96 region
--- P.  Everything else -- the danger-counter suppression during the walk, the
--- settle, the "prove an encounter really fires" tail -- is gen_kolts_pool's,
--- and its header carries the reasoning for all three.
+-- P.  Everything else -- the honest flee policy during the walk (issue #75:
+-- encounters are RUN FROM with held L+R, zero state writes; the old
+-- danger-counter suppression is gone), the settle, the "prove an encounter
+-- really fires" tail -- is gen_kolts_pool's, and its header carries the
+-- reasoning for all three.
 local H = dofile("tools/tests/lib/ot6.lua")
 
 local POOL = "build/states/kolts_pool.mss.lua"
-local DANGER = 0x1f6e
 
 local function map() return H.mapId() & 0x1ff end
 
@@ -42,16 +43,17 @@ local function where(tag)
     tostring(H.hasControl()), tostring(H.tileAligned())))
 end
 
+-- gen_kolts_pool's settle: advanceStory (honest="flee") so an arrival-tile
+-- encounter is fled instead of stalling a passive wait to timeout.
 local function settleField(what, dstMap, maxF)
   local held = 0
-  return H.driveUntil(function()
-    H.writeWord(DANGER, 0)
+  return H.advanceStory(function()
     local ok = H.hasControl() and H.tileAligned()
+      and not H.battleLoadStarted() and not H.dialogWaiting()
       and (dstMap == nil or map() == dstMap)
     held = ok and held + 1 or 0
     return held >= 30
-  end, maxF or 12000, { H.call(function() H.setPad({}) end), H.waitFrames(1) },
-  "settle " .. what)
+  end, maxF or 12000, { honest = "flee" })
 end
 
 local function mapChanged()
@@ -71,13 +73,12 @@ H.run({ maxFrames = 60000 }, {
     where("shelf F")
   end),
 
-  H.call(function() H.writeWord(DANGER, 0) end),
-  H.navTo(19, 17, { maxFrames = 20000, arrive = mapChanged() }),
+  H.navTo(19, 17, { maxFrames = 20000, arrive = mapChanged(),
+           honest = "flee" }),
   H.release(),
   settleField("cave 96 P", 96),
   H.call(function()
     H.assertEq(map(), 96, "crossed onto map 96, the Mt. Kolts cave")
-    H.writeWord(DANGER, 0)
     where("cave arrival")
   end),
 
@@ -91,8 +92,7 @@ H.run({ maxFrames = 60000 }, {
   -- waiting for field control" before a single encounter.  Measured
   -- exactly that on the first mint.  Two tiles east is clear of both
   -- triggers ((16,22) and (14,12)) and still inside region P.
-  H.call(function() H.writeWord(DANGER, 0) end),
-  H.navTo(18, 22, { maxFrames = 8000 }),
+  H.navTo(18, 22, { maxFrames = 8000, honest = "flee" }),
   H.release(),
   settleField("cave 96 P, off-trigger", 96),
   H.call(function()
@@ -101,7 +101,8 @@ H.run({ maxFrames = 60000 }, {
     H.assertEq(H.fieldY(), 22, "spawn tile is (18,22), not the trigger")
     H.assertEq(H.hasControl(), true, "controllable")
     H.assertEq(H.tileAligned(), true, "tile-aligned")
-    H.writeWord(DANGER, 0)
+    H.log(string.format("[kolts_cave] danger counter at mint: %04X (honest -- "
+      .. "whatever the walk accumulated)", H.readWord(0x1f6e)))
     where("cave spawn")
     H.screenshot("kolts_cave")
   end),
