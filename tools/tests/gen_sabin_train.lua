@@ -730,6 +730,97 @@ local function b68Observe()
   b68.lastSH, b68.lastHP = shields, hp
 end
 
+-- ----------------------------------------------- the save-point rest stop --
+-- The engineer's room (map 146) carries a SAVE POINT at {20,10}
+-- (NPCProp::_146), and the ghost merchant sells SLEEPING BAGS -- the
+-- game's own answer to walking into a boss at 3/231, which is exactly
+-- where the strip's fled encounters delivered SABIN (measured: b68 entry
+-- [3/231, 150/197, 56/254] across every ladder attempt, because the
+-- checkpoint bakes the entry HP).  So the party does what a player does:
+-- stand on the save point, open the real field menu (X), and use one bag
+-- per member -- full HP AND MP, by the game's own rules (UseItem gates
+-- the bag on w0201 bit7, item.asm:@84e2).  All closed-loop: main-menu
+-- cursor and character select steer MoveCursor's row cell (DP $4E), the
+-- item list steers UseItem's own selection index (DP $4B), and every use
+-- is verified against the character blocks before the next.
+local function charHP(c)
+  return H.readWord(0x1609 + 37 * c), H.readWord(0x160b + 37 * c) & 0x3fff
+end
+local SLEEPING_BAG = 0xF6
+local function menuHeal()
+  local phase = 0
+  local partyChars = { 5, 2, 3 }          -- SABIN, CYAN, SHADOW
+  local function allFull()
+    for _, c in ipairs(partyChars) do
+      local hp, mx = charHP(c)
+      if hp < mx then return false end
+    end
+    return true
+  end
+  local usedRow = 0                       -- next character row to bag
+  local seen70 = false
+  return H.driveUntil(function()
+    return allFull() and H.hasControl()
+  end, 30000, {
+    H.call(function()
+      phase = (phase + 1) % 8
+      local st = mstateMenu()
+      if H.hasControl() then
+        if allFull() then H.setPad({}); return end
+        if invCount(SLEEPING_BAG) == 0 then
+          local h5, m5 = charHP(5)
+          local h2, m2 = charHP(2)
+          local h3, m3 = charHP(3)
+          error(string.format("rest stop: out of Sleeping Bags with the " ..
+            "party not full -- HP %d/%d %d/%d %d/%d", h5, m5, h2, m2,
+            h3, m3), 0)
+        end
+        H.setPad(phase < 4 and { "x" } or {})   -- open the field menu
+        return
+      end
+      if st == 0x05 then                        -- main menu: Item is row 0
+        local cur = H.readByte(0x004E)
+        local btn = cur > 0 and "up" or "a"
+        H.setPad(phase < 2 and { [btn] = true } or {})
+      elseif st == 0x08 then                    -- item list: steer $4B
+        local want = nil
+        for i = 0, 255 do
+          if H.readByte(0x1869 + i) == SLEEPING_BAG
+             and H.readByte(0x1969 + i) > 0 then want = i; break end
+        end
+        if want == nil then
+          H.setPad(phase < 2 and { "b" } or {})  -- gone: close and error above
+          return
+        end
+        local cur = H.readByte(0x004B)
+        local btn = cur < want and "down" or cur > want and "up" or "a"
+        H.setPad(phase < 2 and { [btn] = true } or {})
+      elseif st == 0x70 then                    -- character select
+        seen70 = true
+        -- rows follow party order; heal the first member still hurt
+        local wantRow = nil
+        for r, c in ipairs(partyChars) do
+          local hp, mx = charHP(c)
+          if hp < mx then wantRow = r - 1; break end
+        end
+        if wantRow == nil then
+          H.setPad(phase < 2 and { "b" } or {})
+          return
+        end
+        local cur = H.readByte(0x004E)
+        local btn = cur < wantRow and "down" or cur > wantRow and "up" or "a"
+        H.setPad(phase < 2 and { [btn] = true } or {})
+      elseif st == 0x04 or st == 0x07 or st == 0x6F then
+        H.setPad({})                            -- inits: hands off
+      else
+        -- sleep animation / transitions: hands off; when the menu parks
+        -- anywhere unexpected, B walks it back out
+        H.setPad(phase == 0 and { "b" } or {})
+      end
+    end),
+  }, "save-point rest: Sleeping Bags until the party is full")
+end
+
 -- ------------------------------------------------- the battle-47 ladder --
 -- Checkpoint before the trap-ghost talk; an attempt is talk -> fight ->
 -- mob scene -> settled back on 142.  A wipe (GameOver park) or a
@@ -1038,6 +1129,8 @@ H.run({ maxFrames = 400000 }, {
   buyItem(TONIC, 0, function() return 20 - invCount(TONIC) end, "TONIC to 20"),
   buyItem(POTION, 1, function() return 15 - invCount(POTION) end,
     "POTION to 15"),
+  buyItem(SLEEPING_BAG, 5, function() return 4 - invCount(SLEEPING_BAG) end,
+    "SLEEPING BAG to 4"),
   closeShop(),
   H.call(function()
     H.log(string.format("[shop] done: gil=%d tonics=%d potions=%d",
@@ -1167,6 +1260,21 @@ H.run({ maxFrames = 400000 }, {
     H.assertEq(sw(0x184), 1, "$0184 -- valve 1 shut")
     H.assertEq(sw(0x185), 0, "$0185 -- valve 2 open")
     H.assertEq(sw(0x186), 1, "$0186 -- valve 3 shut")
+  end),
+  -- the rest stop (see the section comment): save point {20,10}, one
+  -- Sleeping Bag per member, full HP+MP walking into the smokestack
+  nav(20, 10, { maxFrames = 6000 }),
+  H.call(function()
+    H.assertEq((H.readByte(0x0201) & 0x80) ~= 0, true,
+      "standing on the save point (w0201 bit7 -- the bag's own gate)")
+    H.log(string.format("[rest] on the save point; bags=%d [%s]",
+      invCount(SLEEPING_BAG), partyLine()))
+  end),
+  menuHeal(),
+  H.call(function()
+    H.log(string.format("[rest] party full: bags left=%d", 
+      invCount(SLEEPING_BAG)))
+    H.screenshot("train_rested")
   end),
   nav(8, 13, { maxFrames = 5000, arrive = function()
     return mapIdx() == 141 end }),
