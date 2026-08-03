@@ -14,7 +14,8 @@
 --   * bridge collapse choreography; TERRA falls (map 51 mosaic scene)
 --   * Kefka slave-crown flashback (map 250), then the scripted Magitek
 --     flashback fight `battle 115` (map 5, event_main.asm:102351) --
---     monsters are plain soldiers, kill-bit clears it like any wave
+--     plain soldiers, WON honestly by tap-A (TERRA's beams one-shot them,
+--     the same arithmetic as the intro gauntlet)
 --   * Gestahl rally (map 244), TERRA wakes in the caves (map 51)
 --   * Arvis recruits LOCKE (map 30): dialogs, then `name_menu LOCKE`
 --     (event_main.asm:102678) -- the ONE beat advanceStory cannot tap
@@ -27,27 +28,60 @@
 --     map 51 loads with STARTUP_EVENT (its map-init _ccab6f starts the
 --     six guard marches), fade in, player_ctrl_on (:103280-103283)
 --
--- THE DEFENSE (why the assault below is shaped the way it is):
---   * guards NPC_4..NPC_9 spawn at (15,34)..(15,39) (npc_prop.asm map 51)
---     and march scripted paths toward TERRA at (14,12); each march tail
---     `exec _cccb82` = GAME OVER (event_main.asm:108630), so time matters
+-- THE DEFENSE, PLAYED THE WAY IT WAS DESIGNED (issue #75, the honest
+-- conversion; every number below measured by probe_moogle_geom /
+-- _switch / _rotation / _stations / _marshal on a fresh fixture):
+--   * guards NPC_4..NPC_9 spawn at (15,34)..(15,39) (npc_prop.asm map
+--     51) and march scripted paths (map-init _ccab6f) that converge on
+--     the single-file tail (15,17)->(15,16)->(14,16)->(14,15)->(14,14)
+--     ->(14,13); a guard COMPLETING the tail execs _cccb82 = GAME OVER
+--     (event_main.asm:108640), so the choke (14,14) stays manned
+--   * the marches split by arm: NPC_4/NPC_9 climb the EAST loop through
+--     (20,19..23), NPC_7/NPC_8 the WEST loop through (10,19..23),
+--     NPC_5/NPC_6 the middle column (15,16..23).  Wave 1 needs ~2100
+--     field-frames to reach anything, so there is time to deploy:
+--     P3 -> (20,20) east (passed ~f1400), P2 -> (10,21) west (~f1800),
+--     P1 keeps the choke.  (15,15) and the mound tiles are off-path.
 --   * touching a marching guard fires `battle 5, DEFAULT, COLLISION`
---     (their npc events _ccaadf.._ccab57 via collision_on); the kill-bit
---     idiom wins it and the win path despawns that guard ($060A..$060F=0)
---   * the Marshal (NPC_3) STANDS STILL at (15,40) facing UP with npc
---     event _ccada8 -> `battle 6` (event_main.asm:103759-103762); no
---     collision_on, so the activation is walking into him / A facing him
---   * winning battle 6 runs _ccadbf: guards despawn, switch $0631=0 (the
---     defense-won marker, :103782 -- its ONLY clear), "Thanks, Moogles!",
---     the mine switch scene, TERRA's amnesia dialogs, the secret-entrance
---     reveal on map 20, force-walk DOWN 2 + RIGHT 23 from {15,56}, then
---     max_hp/and_status on TERRA+LOCKE+MOG, player_ctrl_on, $01CC=1
---     (:103769-104188).  First calm control: map 20, LOCKE + TERRA.
+--     (npc events _ccaadf.._ccab57): Vomammoth + Lobo, and the battle
+--     AUTO-ENGAGES THE COLLIDED PARTY (measured: a parked, inactive
+--     squad fought with its own exact HP table).  So once deployed, the
+--     storm needs no choreography: hands off, tap-A each fight, two
+--     waves per squad (~90-190 HP each), win path despawns the guard
+--     ($060A..$060F=0).  Mid-defense goalie swaps do NOT work: waves
+--     1-3 queue nose-to-tail and the aside walk eats wave 3's collision
+--     (probe_moogle_rotation measured exactly that).
+--   * the Marshal (NPC_3) stands at (15,40) facing UP, npc event
+--     _ccada8 -> `battle 6` = Marshal (420 HP) + 2 Lobos.  Plain tap-A
+--     LOSES this fight from a two-wave-worn pool (~330/543, measured
+--     twice); the winning honest tactic is OT6's own boost -- R raises
+--     the active character's pending boost (1 bp at battle start,
+--     Ot6InitBP), A-A-A confirms the boosted Fight -- which won with
+--     MOG alone standing at 89 HP (probe_moogle_marshal).  The margin
+--     is thin, so a LOSS is handled the way a player handles it: the
+--     loss path _ccada8->_ccaaba revives the squad at 1 HP on (14,11)
+--     (NOT game over -- battle 6 and battle 5 both continue on defeat),
+--     and the next squad walks in and pokes him again: P2 (MOG, 543
+--     pool), then P1 (LOCKE, ~281 left), then P3 (~149 left).
+--   * a lost battle parks on the "Annihilated" screen until a keypress
+--     (the battle-HP table zeroes, which battleLoadStarted reads as
+--     no-battle -- the pilot's 38k-frame "softlock" was this screen
+--     unattended), so every post-fight settle keeps tapping A.
+--   * winning battle 6 runs _ccadbf: guards despawn, switch $0631=0
+--     (the defense-won marker, :103782 -- its ONLY clear), "Thanks,
+--     Moogles!", the mine switch scene, TERRA's amnesia dialogs, the
+--     secret-entrance reveal on map 20, force-walk DOWN 2 + RIGHT 23
+--     from {15,56}, then max_hp/and_status on TERRA+LOCKE+MOG,
+--     player_ctrl_on, $01CC=1 (:103769-104188).  First calm control:
+--     map 20, LOCKE + TERRA.
 --
--- Every battle in this unit dies to the kill-bit -- the waves are chaff
--- and killing the Marshal IS winning battle 6 -- so unlike gen_arvis
--- there is NO spare list anywhere; the fight logger below still names
--- every formation for the record.
+-- Issue #75: every battle in this unit is PLAYED -- zero state writes.
+-- Battle 115 is beam one-shots, the six waves are won by whichever
+-- squad each march collides with, and the Marshal falls to boosted
+-- Fights; beating him IS winning battle 6, so unlike gen_arvis there is
+-- NO spare list anywhere; the fight logger below still names every
+-- formation for the record.  Honest fights cost real ATB rounds, so
+-- every budget in this file grew against its kill-bit ancestor.
 --
 -- Switch -> RAM derivations (event bitfield base $1E80, bit = switch&7):
 --   $012E -> $1EA5 mask $40      $0631 -> $1F46 mask $02
@@ -82,46 +116,61 @@ local function eventFor(n)
   end
 end
 
--- name every fight once on its 3rd consecutive loading frame (the
--- gen_whelk_poweron pattern: registered outside the step machine so
--- whichever phase is driving, the formation gets logged; read-only)
+-- name every fight once on its 3rd consecutive loading frame, with the
+-- party number that is fighting it (collision battles auto-engage the
+-- collided squad; $1A6D says which).  Registered outside the step
+-- machine so whichever phase is driving, the formation gets logged;
+-- read-only.
 local fightN = 0
 emu.addEventCallback(function()
   fightN = H.battleLoadStarted() and fightN + 1 or 0
   if fightN == 3 then
     local w = H.formationWords()
-    H.log(string.format("fight up f%d map=%d (%04X %04X %04X %04X %04X %04X)",
-      H.frame, H.mapId(), w[1], w[2], w[3], w[4], w[5], w[6]))
+    H.log(string.format("fight up f%d map=%d party=%d (%04X %04X %04X %04X %04X %04X)",
+      H.frame, H.mapId(), H.readByte(0x1a6d), w[1], w[2], w[3], w[4], w[5], w[6]))
   end
 end, emu.eventType.startFrame)
 
 local aPhase = 0
 
--- the Marshal's post: npc_prop.asm map 51 NPC_3, {15,40}, static (no
--- obj_script in _ccab6f moves him)
-local MX, MY = 15, 40
+-- ---------------------------------------------------------- the squads --
+-- rosters as character ids (char block $1600 + 37*c: +$09 cur HP, +$0B
+-- max), and each squad leader's object offset ($0803 after a Y-switch):
+-- P1 = LOCKE(1) KUPEK(2) KUPOP(3) KUMAMA(4), leader obj 1
+-- P2 = MOG(10) KUKU(5) KUTAN(6) KUPAN(7),    leader obj 10
+-- P3 = KUSHU(8) KURIN(9) KURU(11) KAMOG(12), leader obj 8
+local PARTY = { [1] = { 1, 2, 3, 4 }, [2] = { 10, 5, 6, 7 },
+                [3] = { 8, 9, 11, 12 } }
+local LEADER_OFF = { [1] = 0x0029, [2] = 0x019A, [3] = 0x0148 }
 
--- first tile adjacent to the Marshal that BFS can currently reach; the
--- candidate list prefers the head-on northern approach.  Re-resolved at
--- every navTo (re)plan, so a marching guard parking on a candidate for a
--- while just shifts us to the next one.  Memoized per frame: navTo
--- resolves tx and ty separately and BFS x8 is not a per-frame price.
-local approach = { { MX, MY - 1 }, { MX - 1, MY }, { MX + 1, MY },
-                   { MX, MY + 1 }, { MX - 1, MY - 1 }, { MX + 1, MY - 1 } }
-local apFrame, apPick = -1000, nil
-local function marshalApproach()
-  -- refreshed at most every 30 frames: navTo resolves the target thunks in
-  -- its every-frame done-pred, and 6 BFS probes per frame would drag the
-  -- emulator for no routing benefit (guards shift on a seconds scale)
-  if H.frame - apFrame >= 30 then
-    apFrame = H.frame
-    apPick = approach[1]
-    for _, c in ipairs(approach) do
-      if H.bfsPath(c[1], c[2], NAV.blocked) then apPick = c; break end
-    end
-  end
-  return apPick
+local function poolOf(p)
+  local cur = 0
+  for _, c in ipairs(PARTY[p]) do cur = cur + H.readWord(0x1609 + 37 * c) end
+  return cur
 end
+
+local function logPools(tag)
+  return H.logStep(function()
+    return string.format("%s f%d pools P1=%d P2=%d P3=%d $1F41=%02X", tag,
+      H.frame, poolOf(1), poolOf(2), poolOf(3), H.readByte(0x1f41))
+  end)
+end
+
+-- tap Y until the leader offset says squad p is active.  CheckChangeParty
+-- (field/obj.asm:3207) needs Y seen UP then DOWN, control, alignment; the
+-- press-release cycle below satisfies the latch, and a press eaten by the
+-- switch fade just gets retried.
+local function ySwitchTo(p)
+  return H.driveUntil(function()
+    return H.readWord(0x0803) == LEADER_OFF[p]
+  end, 1800, {
+    H.pressButtons({ "y" }, 6),
+    H.waitFrames(40),
+  }, "Y-switch to party " .. p)
+end
+
+-- the Marshal's post: npc_prop.asm map 51 NPC_3, {15,40}, static
+local MX, MY = 15, 40
 
 local function marshalAdjacent()
   local dx, dy = MX - H.fieldX(), MY - H.fieldY()
@@ -137,11 +186,6 @@ local function pokeStep(round)
   return H.driveUntil(function()
     battN = (H.battleLoadStarted() and H.monstersPresent() > 0)
         and battN + 1 or 0
-    if battN == 3 then
-      local w = H.formationWords()
-      H.log(string.format("poke %d engaged: %04X %04X %04X %04X %04X %04X",
-        round, w[1], w[2], w[3], w[4], w[5], w[6]))
-    end
     return defenseWon() or battN >= 3
   end, 900, {
     H.call(function()
@@ -154,19 +198,80 @@ local function pokeStep(round)
       elseif aPhase < 6 then H.setPad({ "a" })
       else H.setPad({}) end
     end),
-  }, "battle 6 (or a wave) engages [round " .. round .. "]")
+  }, "battle 6 engages [attempt " .. round .. "]")
 end
 
--- post-battle settle: hands off until either the won switch lands (battle
--- 6's win path fades in and clears $0631 before the epilogue walks) or
--- control returns (a wave was cleared; the fight is still on)
+-- the honest battle-6 driver: R raises the active character's pending
+-- boost (characters open with 1 bp, regen 1 per unboosted turn --
+-- Ot6InitBP/Ot6ActionEnd), then three edge-tapped A's confirm the
+-- boosted Fight and page victory text.  Once the battle module reads
+-- gone (a WIN's teardown -- or a WIPE, which zeroes the HP table), keep
+-- tapping A: a loss parks on the Annihilated screen until a keypress.
+-- Ends on the won-switch or on 240 settled no-battle frames.
+local function marshalFight(maxFrames)
+  local phase, calmN = 0, 0
+  return H.driveUntil(function()
+    calmN = (not H.battleLoadStarted()) and calmN + 1 or 0
+    return defenseWon() or calmN >= 240
+  end, maxFrames, {
+    H.call(function()
+      phase = (phase + 1) % 32
+      if not H.battleLoadStarted() then
+        H.setPad(phase % 8 < 4 and { "a" } or {})
+        return
+      end
+      if phase < 4 then H.setPad({ "r" })
+      elseif phase < 6 then H.setPad({})
+      elseif phase < 10 then H.setPad({ "a" })
+      elseif phase < 12 then H.setPad({})
+      elseif phase < 16 then H.setPad({ "a" })
+      elseif phase < 18 then H.setPad({})
+      elseif phase < 22 then H.setPad({ "a" })
+      else H.setPad({}) end
+    end),
+  }, "Marshal fight (boosted Fights)")
+end
+
+-- post-attempt settle: on a WIN $0631 clears early in _ccadbf; on a LOSS
+-- the squad is revived at 1 HP on (14,11) and control returns.  A-taps
+-- ride the Annihilated screen and any dialog either way.
 local function settleStep()
+  local dlgN = 0
   return H.driveUntil(function()
     return defenseWon() or (H.hasControl() and H.tileAligned())
-  end, 1200, { H.call(function() H.setPad({}) end) }, "post-battle settle")
+  end, 2400, {
+    H.call(function()
+      aPhase = (aPhase + 1) % 8
+      dlgN = H.dialogWaiting() and dlgN + 1 or 0
+      if not H.hasControl() then H.setPad(aPhase < 4 and { "a" } or {})
+      else H.setPad({}) end
+    end),
+  }, "post-attempt settle")
 end
 
-H.run({ maxFrames = 90000 }, {
+-- one full Marshal attempt by squad p: activate it, walk beside the
+-- Marshal, poke, fight boosted, settle.  Written flat (cond/driveUntil/
+-- navTo steps carry no reset(), so repeated bodies replay latched
+-- state -- the same reason the kill-bit ancestor wrote its two poke
+-- rounds out flat).
+local function attempt(p, round)
+  return H.cond(function() return defenseWon() end, {}, {
+    logPools("attempt " .. round .. " (P" .. p .. ")"),
+    ySwitchTo(p),
+    H.navTo(MX, MY - 1, {
+      arrive = function()
+        return defenseWon()
+            or (marshalAdjacent() and H.hasControl() and H.tileAligned())
+      end,
+      maxFrames = 15000, honest = true,
+    }),
+    pokeStep(round),
+    marshalFight(30000),
+    settleStep(),
+  })
+end
+
+H.run({ maxFrames = 200000 }, {
   H.loadState(DOORSTEP),
   H.waitFrames(10),
   H.waitUntil(function() return H.hasControl() end, 300, "doorstep control", 5),
@@ -179,20 +284,14 @@ H.run({ maxFrames = 90000 }, {
 
   -- ===================================================================== --
   -- Phase 1: the deliberate step onto (55,11).  A random encounter on the
-  -- step is cleared inline (kill-bit + edge-A); the trigger fires the
+  -- step is FOUGHT inline by the same edge-tapped A (honest -- bal_mines'
+  -- baseline policy beats this map's whole pool); the trigger fires the
   -- moment we stand on the tile, so the terminator is a sustained event.
   -- ===================================================================== --
-  H.driveUntil(eventFor(30), 1200, {
+  H.driveUntil(eventFor(30), 4000, {
     H.call(function()
       aPhase = (aPhase + 1) % 8
       if H.battleLoadStarted() then
-        if H.monstersPresent() > 0 then
-          for slot = 0, 5 do
-            if H.readByte(0x3aa8 + slot * 2) % 2 == 1 then
-              H.writeByte(0x3eec + slot * 2, H.readByte(0x3eec + slot * 2) | 0x80)
-            end
-          end
-        end
         H.setPad(aPhase < 4 and { "a" } or {})
         return
       end
@@ -208,18 +307,19 @@ H.run({ maxFrames = 90000 }, {
 
   -- ===================================================================== --
   -- Phase 2: everything up to the LOCKE naming menu.  advanceStory taps
-  -- dialogs, kill-bits battle 115's soldiers, and stays hands-off through
-  -- the choreography.  The menu detector is NOT the $0059 idiom
-  -- gen_narshe_escape used: $59 is also battle-module scratch, and run 1
-  -- measured it flipping nonzero DURING battle 115 -- the pred fired
-  -- mid-fight and the real menu later sat unattended forever.  The
-  -- reliable signature is the menu itself: it SUSPENDS the field module,
-  -- so control, the event PC, dialogs and battle all read dead at once --
-  -- a combination no scene shows for long (event waits hold the PC in
-  -- CA-range; ambient ev=false pulses last a frame or two) -- sustained
-  -- for 120 consecutive frames on map 30 (run 1 measured the stall
-  -- holding for 20k+ frames; nothing else on map 30 goes quiet at all:
-  -- the walk-in choreography and the four Arvis dialogs keep ev/dlg live).
+  -- dialogs, FIGHTS battle 115's soldiers (honest tap-A), and stays
+  -- hands-off through the choreography.  The menu detector is NOT the
+  -- $0059 idiom gen_narshe_escape used: $59 is also battle-module
+  -- scratch, and run 1 measured it flipping nonzero DURING battle 115 --
+  -- the pred fired mid-fight and the real menu later sat unattended
+  -- forever.  The reliable signature is the menu itself: it SUSPENDS the
+  -- field module, so control, the event PC, dialogs and battle all read
+  -- dead at once -- a combination no scene shows for long (event waits
+  -- hold the PC in CA-range; ambient ev=false pulses last a frame or
+  -- two) -- sustained for 120 consecutive frames on map 30 (run 1
+  -- measured the stall holding for 20k+ frames; nothing else on map 30
+  -- goes quiet at all: the walk-in choreography and the four Arvis
+  -- dialogs keep ev/dlg live).
   -- ===================================================================== --
   H.advanceStory((function()
     local cnt = 0
@@ -230,7 +330,7 @@ H.run({ maxFrames = 90000 }, {
       cnt = quiet and cnt + 1 or 0
       return cnt >= 120
     end
-  end)(), 30000),
+  end)(), 35000, { honest = true }),
   H.logStep("naming menu open (field module suspended); committing LOCKE"),
   H.call(function() H.screenshot("moogle_naming") end),
   -- START commits the default name (name_change.asm exits on START unless
@@ -250,7 +350,7 @@ H.run({ maxFrames = 90000 }, {
   -- ===================================================================== --
   H.advanceStory(calm(30, function()
     return H.mapId() == 51 and collapseStarted()
-  end), 25000),
+  end), 25000, { honest = true }),
   H.call(function()
     H.assertEq(H.mapId(), 51, "on the defense map (51)")
     H.assertEq(collapseStarted(), true, "defense-live switch $012E set")
@@ -272,72 +372,51 @@ H.run({ maxFrames = 90000 }, {
   H.saveState("moogle_defense.mss"),
 
   -- ===================================================================== --
-  -- Phase 4a: let the defense fight itself.  The corridor south is the
-  -- guards' own single-file column -- at defense-live all six marchers
-  -- plug (15,35)..(15,39) wall to wall and BFS correctly finds NO path to
-  -- the Marshal (run 3 measured exactly that failure).  No walking is
-  -- needed: the parked parties 2/3 ring TERRA, every march path collides
-  -- with one of them, each collision is a `battle 5` the kill-bit wins,
-  -- and the win path despawns that guard -- $060A..$060F clear one by one
-  -- (run 2 measured all six dead ~7600 frames in, game-over never fired,
-  -- and the map stayed quiet for 11k frames after).  advanceStory rides
-  -- the storm hands-off; the cleared switches say the column is gone.
+  -- Phase 4a: deployment, in march order.  Wave 1 (NPC_4) passes the east
+  -- station ~1400 field-frames after control, the west arm's first guard
+  -- ~1800, the choke ~2100 -- so P1 sidesteps to the off-path (15,15) to
+  -- unbox the mound, P3 walks east, P2 west, and P1 re-mans the choke
+  -- with ~800 frames to spare (probe_moogle_stations measured f1515
+  -- deployed against the f1630 first collision).
+  -- ===================================================================== --
+  H.navTo(15, 15, { maxFrames = 2500, honest = true }),
+  ySwitchTo(3),
+  H.navTo(20, 20, { maxFrames = 4000, honest = true }),
+  ySwitchTo(2),
+  H.navTo(10, 21, { maxFrames = 4000, honest = true }),
+  ySwitchTo(1),
+  H.navTo(14, 14, { maxFrames = 2500, honest = true }),
+  logPools("deployed"),
+
+  -- ===================================================================== --
+  -- Phase 4b: the storm.  Hands off: each march collides with its arm's
+  -- squad, the collision auto-engages that squad, tap-A wins the wave
+  -- (Vomammoth + Lobo), and the win path despawns the guard --
+  -- $060A..$060F clear one by one, two waves per squad at ~90-190 HP
+  -- each.  advanceStory's honest mode is exactly this driver.
   -- ===================================================================== --
   H.advanceStory(function()
     return (H.readByte(0x1f41) & 0xFC) == 0
-  end, 15000),
+  end, 60000, { honest = true }),
   H.logStep(function()
-    return string.format(
-      "all six wave guards down at frame %d; corridor open", H.frame)
+    return string.format("all six wave guards down at frame %d; corridor open",
+      H.frame)
   end),
-  H.waitUntil(calm(30), 1200, "post-storm calm"),
+  logPools("waves complete"),
+  H.waitUntil(calm(30), 1800, "post-storm calm"),
 
   -- ===================================================================== --
-  -- Phase 4b: the assault.  BFS to whichever tile beside the Marshal is
-  -- reachable (he stands alone at (15,40) now).  arrive also accepts
-  -- defenseWon in case a straggler collision with the MARSHAL starts
-  -- battle 6 early -- the kill-bit wins that one too, which IS the goal,
-  -- not a fight to protect.
+  -- Phase 4c: the Marshal, up to three honest attempts.  P2 first (MOG's
+  -- squad, the biggest pool -- it won at 330/543 with MOG alone standing
+  -- at 89 HP, probe_moogle_marshal), then P1, then P3 if a wipe lands:
+  -- battle 6's loss path revives the loser at 1 HP on (14,11) and the
+  -- Marshal still stands, so retrying with the next squad is the same
+  -- move a human player makes.  Attempts 2 and 3 are no-ops (cond on the
+  -- won-switch) when an earlier one already cleared it.
   -- ===================================================================== --
-  H.navTo(function() return marshalApproach()[1] end,
-          function() return marshalApproach()[2] end, {
-    arrive = function()
-      return defenseWon() or (marshalAdjacent() and H.hasControl() and H.tileAligned())
-    end,
-    maxFrames = 15000,
-  }),
-  H.logStep(function()
-    return string.format("beside the Marshal at (%d,%d), frame %d",
-      H.fieldX(), H.fieldY(), H.frame)
-  end),
-
-  -- activate him: hold the facing direction (a blocked step both turns us
-  -- and registers a push) and edge-tap A; whichever mechanism his npc
-  -- event uses, battle 6 comes up.  A wave guard reaching us here instead
-  -- just gets kill-bitted like the rest; the second round below walks back
-  -- in and pokes again.  Two rounds are written out FLAT rather than via
-  -- repeatN: cond/driveUntil/navTo steps carry no reset(), so a repeated
-  -- body replays the first pass's latched branch choice and spent budgets
-  -- instead of running fresh -- distinct step objects sidestep that.
-  pokeStep(1),
-  H.cond(function() return H.battleLoadStarted() end, {
-    H.clearBattle(9000),
-    settleStep(),
-  }, {}),
-  H.cond(function() return defenseWon() end, {}, {
-    H.navTo(function() return marshalApproach()[1] end,
-            function() return marshalApproach()[2] end, {
-      arrive = function()
-        return defenseWon() or (marshalAdjacent() and H.hasControl() and H.tileAligned())
-      end,
-      maxFrames = 8000,
-    }),
-    pokeStep(2),
-    H.cond(function() return H.battleLoadStarted() end, {
-      H.clearBattle(9000),
-      settleStep(),
-    }, {}),
-  }),
+  attempt(2, 1),
+  attempt(1, 2),
+  attempt(3, 3),
   H.call(function()
     H.assertEq(defenseWon(), true, "defense won (switch $0631 cleared)")
     H.log(string.format("Marshal down at frame %d; riding the epilogue", H.frame))
@@ -351,7 +430,7 @@ H.run({ maxFrames = 90000 }, {
   -- ===================================================================== --
   H.advanceStory(calm(60, function()
     return H.mapId() == 20 and (H.readByte(0x1eb9) & 0x10) ~= 0
-  end), 30000),
+  end), 30000, { honest = true }),
 
   -- ===================================================================== --
   -- Phase 6: assert the far side and mint.  Roster: char_party TERRA,1 /
