@@ -13,10 +13,14 @@
 -- This probe loses wave 1 for real: hands off through the collision and
 -- the wipe, then A-mash like a stuck player until the loss teleport lands
 -- (field module back, party at the (14,11) bench), then hands off and
--- ASSERTS the screen comes up: ppu.screenBrightness must reach full
--- within a generous window after the loss path has run.  Red on the
--- unfixed ROM (brightness pinned at 0 forever), green once _ccaaba fades
--- in like its winning siblings.  Zero writes: pad input and reads only.
+-- ASSERTS the loss event lights the field BEFORE handing control back:
+-- at the first frame the event engine goes idle after the bench,
+-- ppu.screenBrightness must already be full.  Unfixed, the event returns
+-- in the dark and the player gets control on a black field (the field
+-- engine's own end-of-event fade trickles in ~50 frames later on this
+-- route, and nothing guarantees it on the others -- see
+-- probe_moogle_fadewatch's transition log).  Green once _ccaaba fades in
+-- like its winning siblings.  Zero writes: pad input and reads only.
 local H = dofile("tools/tests/lib/ot6.lua")
 local DEFENSE = "build/states/moogle_defense.mss.lua"
 
@@ -31,7 +35,7 @@ local function snap(tag)
 end
 
 local battN, aPhase = 0, 0
-local maxBright = 0
+local handoffBright = nil
 
 H.run({ maxFrames = 45000 }, {
   H.loadState(DEFENSE),
@@ -74,20 +78,30 @@ H.run({ maxFrames = 45000 }, {
     H.setPad({})
     snap("benched")
   end),
-  -- hands off: the loss path's own fade must light the field.  600 frames
-  -- is ~10x the fade's need and still well inside the marches' slack.
-  -- Soft wait so the unfixed ROM still reaches the screenshot: the
-  -- evidence of a black field must survive the failure that reports it.
+  -- hands off: the loss EVENT ITSELF must light the field before it hands
+  -- control back.  The discriminating instant is the first frame the event
+  -- engine goes idle after the bench: with the fix, fade_in + wait_fade
+  -- run inside _ccaaba, so brightness is already full there; unfixed, the
+  -- event returns in the dark (measured bright=4, mid-ramp of the field
+  -- engine's incidental end-of-event fade -- the player got control on a
+  -- black field and the loss pantomime played invisibly).  Soft wait so
+  -- the unfixed ROM still reaches the screenshot: the evidence must
+  -- survive the failure that reports it.
   H.waitUntilSoft(function()
-    maxBright = math.max(maxBright, bright())
-    return maxBright >= 15
-  end, 600, "fade_back_in", 1),
+    if not H.eventRunning() then
+      handoffBright = bright()
+      return true
+    end
+    return false
+  end, 600, "event handed control back", 1),
   H.call(function()
     snap("after")
     H.screenshot("blackout_field")
-    H.assertEq(maxBright >= 15, true,
-      "screen lit after the wave loss (fade_in ran on the loss path)")
+    H.assertEq(H.vars["event handed control back"], true,
+      "loss event ended within the watch window")
+    H.assertEq((handoffBright or 0) >= 15, true,
+      "field already lit when the loss event handed control back")
     H.log(string.format(
-      "VERDICT: field visible after wave loss, maxBright=%d", maxBright))
+      "VERDICT: control returned with brightness %d", handoffBright or -1))
   end),
 })
