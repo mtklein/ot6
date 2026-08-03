@@ -22,6 +22,11 @@
 --
 -- Map 112 has no NPCs and no event triggers at all (NPCProp::_112 and
 -- EventTrigger::_112 are both empty), so nothing else here can fire.
+--
+-- ISSUE #75 -- ZERO-WRITE: both navigators run with opts.honest.  Map 112
+-- rolls no encounters, so the battle branch should never fire -- honest
+-- mode makes that a property of the code path, not a hope: a battle here
+-- would be fought with real input, never kill-bitted.
 local H = dofile("tools/tests/lib/ot6.lua")
 local DOOR = "build/states/banon_joined.mss.lua"
 
@@ -45,7 +50,7 @@ local function settleField(dstMap, maxF)
       return not H.worldMode() and H.tileAligned()
          and not H.battleLoadStarted() and not H.dialogWaiting()
          and (dstMap == nil or map() == dstMap)
-    end), maxF or 12000),
+    end), maxF or 12000, { honest = true }),
     H.waitFrames(30),
   })
 end
@@ -87,7 +92,7 @@ H.run({ maxFrames = 40000 }, {
     return string.format("cross: (%d,%d) -> (8,60) -> map 113 (30,50)",
       H.fieldX(), H.fieldY())
   end),
-  H.navTo(8, 60, { maxFrames = 20000, arrive = function()
+  H.navTo(8, 60, { maxFrames = 20000, honest = true, arrive = function()
     return map() ~= 112
   end }),
   H.release(),

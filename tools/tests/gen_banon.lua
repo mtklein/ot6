@@ -106,6 +106,11 @@
 -- Rather than trust even that, the mint asserts $016B -- the flag _cb002b
 -- sets the instant it fires -- is still clear, which catches it by outcome
 -- no matter which tile the navigator chose.
+-- ISSUE #75 -- ZERO-WRITE: every navigator here runs with opts.honest.
+-- The hideout has no random encounters (its maps carry no encounter
+-- territory) so nothing SHOULD ever reach the battle branch -- honest mode
+-- makes that a property of the code path rather than a hope: if a battle
+-- ever did fire, it would be fought with real input, never kill-bitted.
 local H = dofile("tools/tests/lib/ot6.lua")
 local DOOR = "build/states/returner_hideout.mss.lua"
 
@@ -148,7 +153,7 @@ local function settleField(dstMap, maxF)
       return not H.worldMode() and H.tileAligned()
          and not H.battleLoadStarted() and not H.dialogWaiting()
          and (dstMap == nil or map() == dstMap)
-    end), maxF or 12000),
+    end), maxF or 12000, { honest = true }),
     H.waitFrames(30),
   })
 end
@@ -168,7 +173,8 @@ local function crossTo(tx, ty, dstMap, what)
       return string.format("cross %s: (%d,%d) -> (%d,%d) -> map %d",
         what, H.fieldX(), H.fieldY(), tx, ty, dstMap)
     end),
-    H.navTo(tx, ty, { maxFrames = 20000, arrive = mapChanged() }),
+    H.navTo(tx, ty, { maxFrames = 20000, arrive = mapChanged(),
+      honest = true }),
     H.release(),
     settleField(dstMap),
     H.call(function()
@@ -187,7 +193,8 @@ local function crossDoorHold(sx, sy, dir, dstMap, what)
       return string.format("cross %s: stage (%d,%d) hold %s -> map %d",
         what, sx, sy, dir, dstMap)
     end),
-    H.navTo(sx, sy, { maxFrames = 20000, arrive = mapChanged() }),
+    H.navTo(sx, sy, { maxFrames = 20000, arrive = mapChanged(),
+      honest = true }),
     H.release(),
     H.driveUntil(function() return map() ~= 109 and map() ~= 110
                             or map() == dstMap end, 1800, {
@@ -251,6 +258,7 @@ local function talkToObj(obj, what, maxF)
     return H.navTo(function() return approach()[1] end,
                    function() return approach()[2] end, {
       maxFrames = maxF or 20000,
+      honest = true,
       arrive = function()
         return engaged or (adjacent() and H.hasControl() and H.tileAligned())
       end,
@@ -308,7 +316,7 @@ local function rideTo(pred, what, maxF)
     H.advanceStory(function()
       return pred() and H.hasControl() and H.tileAligned() and bright() >= 15
          and not H.battleLoadStarted()
-    end, maxF or 25000),
+    end, maxF or 25000, { honest = true }),
     H.waitFrames(20),
     H.call(function() where(what) end),
   })
@@ -454,7 +462,7 @@ H.run({ maxFrames = 200000 }, {
   H.advanceStory(function()
     return map() == 112 and sw(0x0018) == 1 and H.hasControl()
        and H.tileAligned() and bright() >= 15 and not H.battleLoadStarted()
-  end, 50000),
+  end, 50000, { honest = true }),
   H.waitFrames(30),
   H.call(function()
     H.assertEq(map(), 112, "on map 112 -- the passage to the Lete River")
