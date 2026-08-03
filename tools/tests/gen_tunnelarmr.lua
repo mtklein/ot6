@@ -30,6 +30,26 @@
 -- -- the TunnelArmr copy -- from its lobby trigger _ca5ef7, where gen_kolts
 -- with $001A=0 got map 73.  The cave graph is gen_kolts's, walked the other
 -- way: world (75,103) -> map 72 -> ... -> map 71 -> [trigger] -> map 70.
+--
+-- ISSUE #75 (the honesty conversion): ZERO state writes, and the first
+-- honest TunnelArmr in the mint chain's history.  The fight is PLAYED the
+-- way it was designed: CELES re-raises RUNIC every turn -- the boss's AI
+-- (AIScript::_260) is `attack BATTLE, BOLT, FIRE / wait / attack POISON,
+-- SPECIAL, FIRE`, so most of its script rolls a runic-able spell, and the
+-- stance eats it, refunds her MP and banks her a BP per absorb -- while
+-- LOCKE chips the 5 OT6_PIERCE shields with boosted Fights (R raises his
+-- pending boost from the 1 bp every character opens with, A-A-A confirms
+-- the boosted Fight; the same drive that beat the Marshal in gen_moogle).
+-- Break the shields and the damage window finishes the 1300 HP.  A loss
+-- on an event battle is GAME OVER, so the fight rides a retry ladder: the
+-- doorstep blob is captured beside the doorstep mint, and each attempt
+-- reloads it and waits a different number of frames before stepping onto
+-- the trigger -- the battle RNG seed is the frame phase at battle init
+-- (gen_whelk_poweron's finding), so each retry genuinely replays a
+-- different fight.  This file also carried gen_sfigaro's whole battle
+-- toolkit (rideOut's HP pin + kill-bit, clearGateSoldier, stealDriver's
+-- command-table pokes) without ever calling any of it -- dead code,
+-- deleted in the same pass.
 local H = dofile("tools/tests/lib/ot6.lua")
 local DOOR = "build/states/celes_freed.mss.lua"
 
@@ -38,9 +58,6 @@ local function map() return H.mapId() & 0x1ff end
 local function bright() return emu.getState()["ppu.screenBrightness"] or 0 end
 -- event switch id -> live bit (event bitfield base $1E80, bit = id & 7)
 local function sw(id) return (H.readByte(0x1e80 + (id >> 3)) >> (id & 7)) & 1 end
--- field object i's live tile (pixel coords >> 4, block stride $29)
-local function objX(i) return H.readWord(0x086a + 0x29 * i) >> 4 end
-local function objY(i) return H.readWord(0x086d + 0x29 * i) >> 4 end
 -- party facing, through the party-object offset ($0803)
 local function facing() return H.readByte(0x087f + H.readWord(0x0803)) end
 -- a bare step list cannot be spliced into a step list (Lua truncates a
@@ -49,9 +66,6 @@ local function facing() return H.readByte(0x087f + H.readWord(0x0803)) end
 local function seq(steps) return H.cond(function() return true end, steps) end
 
 local FACE = { up = 0, right = 1, down = 2, left = 3 }
-local NEIGHBOURS = {
-  { 0, 1, "up" }, { 0, -1, "down" }, { -1, 0, "right" }, { 1, 0, "left" },
-}
 -- all EIGHT for door staging: a door at the head of a stair can only be
 -- entered diagonally (gen_edgar's finding), and a diagonal candidate has to
 -- clear one extra test -- the engine must actually produce that move there
@@ -93,73 +107,12 @@ local function settleField(dstMap, maxF)
       return not H.worldMode() and H.tileAligned()
          and not H.battleLoadStarted() and not H.dialogWaiting()
          and (dstMap == nil or map() == dstMap)
-    end), maxF or 12000),
+    end), maxF or 12000, { honest = true }),
     H.waitFrames(30),
   })
 end
 
 local aPhase = 0
-
--- Ride a scene out to a settled, controllable field, edge-tapping A on EVERY
--- frame the party is not in control and kill-bitting anything that comes up.
---
--- WHY NOT advanceStory HERE.  advanceStory taps A only while a battle is up
--- or H.dialogWaiting() is true, and holds the pad empty otherwise.  The tail
--- of `battle 11` has a window state that satisfies NEITHER: measured at the
--- third gate-soldier fight, $0059 = $52 (a menu module owns the CPU) with
--- $BA/$D3 both clear, so dialogWaiting() is false, the battle flag is
--- already down, and advanceStory sat with the pad empty for 20000 frames
--- while the event PC stayed parked at $CA85B9.  Tapping A on "no control"
--- rather than on "a signal I recognise" clears it, and it cannot misfire on
--- the open field because the tap is gated on NOT having control.
--- (Choice prompts are the one thing this must never meet -- an A press
--- always takes option 0 -- so every prompt on the route is answered by
--- rideUntil below, which steers the cursor explicitly.)
-local function rideOut(what, budget, dstMap)
-  local phase, calm = 0, 0
-  return seq({
-    H.driveUntil(function()
-      local ok = H.hasControl() and H.tileAligned() and bright() >= 15
-             and not H.battleLoadStarted() and not H.dialogWaiting()
-             and (dstMap == nil or map() == dstMap)
-      calm = ok and calm + 1 or 0
-      return calm >= 20
-    end, budget or 20000, {
-      H.call(function()
-        phase = (phase + 1) % 8
-        if H.battleLoadStarted() then
-          -- LOSING battle 11 IS A ROUTE FAILURE, not a retry.  `if_b_switch
-          -- $40` jumps to the win branch when the bit is CLEAR; with it set
-          -- the soldier's event falls through to `call _ca85ba`
-          -- (event_main.asm:20300), which is `load_map 75, {47,43}` + "Ouch!!
-          -- I gotta steal me some new clothes, fast!!" + `switch $0104=0` +
-          -- `switch $0103=0` -- the scenario reset.  Measured: the THIRD
-          -- gate-soldier fight killed LOCKE (194 hp against a HeavyArmor
-          -- that had already been fought twice), the ride came back 230
-          -- frames longer than usual, and the party was standing on the
-          -- opening tile with both disguises gone.  So the party's hp is
-          -- pinned to max for the duration, the same way gen_vargas pins
-          -- it through a fight it only wants the SCRIPT's outcome from.
-          for e = 0, 3 do
-            H.writeWord(0x3BF4 + e * 2, H.readWord(0x3C1C + e * 2))
-          end
-          if H.monstersPresent() > 0 then
-            for slot = 0, 5 do
-              if H.readByte(0x3aa8 + slot * 2) % 2 == 1 then
-                H.writeByte(0x3eec + slot * 2,
-                  H.readByte(0x3eec + slot * 2) | 0x80)
-              end
-            end
-          end
-        end
-        if H.hasControl() then H.setPad({}); return end
-        H.setPad(phase < 4 and { "a" } or {})
-      end),
-    }, what),
-    H.release(),
-    H.waitFrames(30),
-  })
-end
 
 -- One SHORT leg to a waypoint on the current map.  See note 4: long BFS
 -- queries on map 75 run the 4096-node cap dry and answer "no path" for
@@ -167,7 +120,7 @@ end
 -- these rather than one query.
 local function hop(tx, ty, what)
   return seq({
-    H.navTo(tx, ty, { maxFrames = 12000 }),
+    H.navTo(tx, ty, { maxFrames = 12000, honest = true }),
     H.release(),
     H.call(function()
       H.assertEq(H.fieldX(), tx, what .. ": at x=" .. tx)
@@ -230,7 +183,7 @@ local function go(sx, sy, dm, dx, dy, what)
   return seq({
     H.call(function() pick, startMap = nil, map() end),
     H.navTo(function() return stage()[1] end, function() return stage()[2] end,
-      { maxFrames = 20000, arrive = arrived }),
+      { maxFrames = 20000, arrive = arrived, honest = true }),
     H.cond(function() return stage()[3] ~= nil end, {
       H.driveUntil(arrived, 1800, {
         H.call(function()
@@ -249,214 +202,6 @@ local function go(sx, sy, dm, dx, dy, what)
     end),
   })
 end
-
--- gen_banon's talkToObj, unchanged in shape: approach re-resolved from live
--- object coords (NPCs wander), facing computed from the live delta, soft
--- rounds before a hard one.  CheckNPCs activates whatever the object map
--- holds ONE TILE IN THE PARTY'S FACING DIRECTION while A is held, and a
--- two-frame turn press does not set the facing byte -- so the direction is
--- HELD until it reads back, and only then is A edge-tapped.
-local function talkToObj(obj, what, maxF)
-  local engaged = false
-  local function objAt() return objX(obj), objY(obj) end
-  local function adjacent()
-    local ox, oy = objAt()
-    return math.abs(ox - H.fieldX()) + math.abs(oy - H.fieldY()) == 1
-  end
-  local apFrame, apPick = -1000, nil
-  local function approach()
-    if H.frame - apFrame >= 30 then
-      apFrame = H.frame
-      local ox, oy = objAt()
-      apPick = { ox, oy + 1 }
-      for _, c in ipairs(NEIGHBOURS) do
-        local cx, cy = ox + c[1], oy + c[2]
-        if H.bfsPath(cx, cy) then apPick = { cx, cy }; break end
-      end
-    end
-    return apPick
-  end
-  local function walkStep()
-    return H.navTo(function() return approach()[1] end,
-                   function() return approach()[2] end, {
-      maxFrames = maxF or 20000,
-      arrive = function()
-        return engaged or (adjacent() and H.hasControl() and H.tileAligned())
-      end,
-    })
-  end
-  local function pokeStep(round, budget, hard)
-    local started, waited, aPh = 0, 0, 0
-    return H.driveUntil(function()
-      started = (H.eventRunning() or H.dialogWaiting()) and started + 1 or 0
-      if started >= 6 then engaged = true; return true end
-      waited = waited + 1
-      return not hard and waited > budget
-    end, budget + 120, {
-      H.call(function()
-        aPh = (aPh + 1) % 8
-        if not (H.hasControl() and H.tileAligned() and adjacent()) then
-          H.setPad({}); return
-        end
-        local ox, oy = objAt()
-        local dx, dy = ox - H.fieldX(), oy - H.fieldY()
-        local dir = dx == 1 and "right" or dx == -1 and "left"
-                 or dy == 1 and "down" or "up"
-        if facing() ~= FACE[dir] then H.setPad({ [dir] = true }); return end
-        H.setPad(aPh < 4 and { "a" } or {})
-      end),
-    }, string.format("%s: activation round %d", what, round))
-  end
-  return seq({
-    H.call(function() engaged, apFrame, apPick = false, -1000, nil end),
-    walkStep(), pokeStep(1, 600, false),
-    -- flat, not repeatN: it cannot replay navTo/driveUntil bodies
-    H.cond(function() return not engaged end,
-      { walkStep(), pokeStep(2, 900, true) }, {}),
-    H.release(),
-  })
-end
-
--- gen_scenario.lua's choice-steering idiom, unchanged in shape.  $056F is
--- the option count and is only final once dialogWaiting() is true (it is
--- built up as the text types out, and it is meaningless during a battle);
--- $056E is the 0-based selection; the steering presses are EDGES because
--- $056D latches a held direction to exactly one row (field/text.asm:368-425).
-local CH_SEL, CH_MAX = 0x056E, 0x056F
-local function rideUntil(pred, what, budget, choices)
-  local phase, dlgN, ci, inChoice = 0, 0, 0, false
-  return H.driveUntil(pred, budget or 20000, {
-    H.call(function()
-      phase = (phase + 1) % 8
-      dlgN = H.dialogWaiting() and dlgN + 1 or 0
-      local chMax = (not H.battleLoadStarted()) and H.readByte(CH_MAX) or 0
-      if chMax >= 2 then
-        if not H.dialogWaiting() then H.setPad({}); return end
-        if not inChoice then
-          inChoice = true; ci = ci + 1
-          local c = (choices or {})[ci]
-          if not c then
-            error(string.format("%s: unexpected choice prompt #%d (%d options)",
-              what, ci, chMax), 0)
-          end
-          H.assertEq(chMax, c.max,
-            string.format("%s choice #%d option count (%s)", what, ci, c.what))
-          H.log(string.format("%s: CHOICE #%d up (%d options) -- taking %d :: %s",
-            what, ci, chMax, c.want, c.what))
-        end
-        local c, sel = choices[ci], H.readByte(CH_SEL)
-        if sel < c.want then H.setPad(phase < 4 and { "down" } or {})
-        elseif sel > c.want then H.setPad(phase < 4 and { "up" } or {})
-        else H.setPad(phase < 4 and { "a" } or {}) end
-        return
-      elseif inChoice then
-        inChoice = false
-        H.log(string.format("%s: choice #%d resolved at f%d", what, ci, H.frame))
-      end
-      if dlgN >= 3 then H.setPad(phase < 4 and { "a" } or {}); return end
-      H.setPad({})
-    end),
-  }, what)
-end
-
--- talk to `obj`, then ride what it says (steering `choices`) back to a
--- settled, controllable field
-local function talkThrough(obj, what, choices, budget)
-  local calm = 0
-  return seq({
-    talkToObj(obj, what),
-    rideUntil(function()
-      local ok = H.hasControl() and H.tileAligned() and bright() >= 15
-             and not H.dialogWaiting() and not H.eventRunning()
-             and not H.battleLoadStarted()
-      calm = ok and calm + 1 or 0
-      return calm >= 30
-    end, what, budget or 20000, choices),
-    H.release(),
-  })
-end
-
--- THE GATE SOLDIER COMES BACK EVERY TIME MAP 75 RELOADS.  `hide_obj NPC_11`
--- (_ca856a, event_main.asm:20313) is a RUNTIME bit, not story state: leaving
--- town for an interior and coming back re-runs InitNPCs (field/init.asm:469
--- only skips it when reloading the SAME map) and re-creates every npc whose
--- spawn switch still holds.  His is $030C and nothing in the scenario clears
--- it.  So (30,42) -- the ONE tile joining the SE quarter to the rest of town
--- -- is plugged again on every return, and this route crosses that boundary
--- three times.  The soldier's uniform is no answer: `if_switch $0103=1` only
--- swaps his fight for a bare "Halt!" (:20296); it does not move him.
--- Gated on the SYMPTOM (a BFS probe to a tile on the far side) rather than
--- assumed, so the day the respawn stops happening this says so instead of
--- walking into a fight that is not there.
-local function clearGateSoldier(probeX, probeY, tag)
-  return H.cond(function() return H.bfsPath(probeX, probeY) == nil end, {
-    H.logStep(function()
-      return string.format("%s: (%d,%d) unreachable at f%d -- the gate " ..
-        "soldier is back at (%d,%d); fighting him again",
-        tag, probeX, probeY, H.frame, objX(26), objY(26))
-    end),
-    talkToObj(26, tag .. ": the gate soldier again"),
-    rideOut(tag .. ": ride battle 11 out", 20000, 75),
-    H.call(function()
-      -- the reset's signature is the opening tile plus a bare LOCKE; if the
-      -- fight went that way, say THAT rather than "no path"
-      H.assertEq(H.fieldX() == 47 and H.fieldY() == 43, false,
-        tag .. ": not dumped back on the scenario's opening tile")
-      H.assertEq(H.bfsPath(probeX, probeY) ~= nil, true,
-        tag .. ": the lane is open again")
-      H.log(string.format("%s: done at (%d,%d) f%d, $0104=%d",
-        tag, H.fieldX(), H.fieldY(), H.frame, sw(0x0104)))
-    end),
-  }, {
-    H.logStep(function() return tag .. ": the lane is already open" end),
-  })
-end
-
--- ------------------------------------------------------------- the steal --
--- Locke's command window is `FIGHT, STEAL, MAGIC, ITEM`
--- (field/char_prop.asm:160), two columns by two rows, so STEAL is one DOWN
--- from the resting cursor.  A confirms it, and A again takes the single
--- enemy the target cursor already sits on.  Driven as discrete pad EDGES
--- into the command window, the same way gen_vargas enters Pummel.
-local MENU, ACTOR, MSTATE = 0x7BCA, 0x62CA, 0x7BC2
-local ST_CMD = 0x05
-local B_SWITCH_LIVE = 0x3EBD          -- $3EB4 + ($4C >> 3); bit4 = $4C
-local function pinParty()
-  for e = 0, 3 do H.writeWord(0x3BF4 + e * 2, H.readWord(0x3C1C + e * 2)) end
-end
-local function stealDriver(what, maxF)
-  local prog = { { 6, { "down" } }, { 10, {} }, { 6, { "a" } }, { 14, {} },
-                 { 6, { "a" } }, { 14, {} } }
-  local pi, pc, running, tries, idle = 1, 0, false, 0, 0
-  return H.driveUntil(function() return not H.battleLoadStarted() end,
-    maxF or 20000, {
-      H.call(function()
-        pinParty()
-        if running then
-          local s = prog[pi]
-          H.setPad(s[2])
-          pc = pc + 1
-          if pc >= s[1] then pi, pc = pi + 1, 0 end
-          if pi > #prog then running = false end
-          return
-        end
-        if H.readByte(MENU) ~= 0 then
-          if H.readByte(MSTATE) == ST_CMD then
-            tries = tries + 1
-            H.log(string.format("%s: STEAL attempt %d at f%d actor=%d $3EBD=%02X",
-              what, tries, H.frame, H.readByte(ACTOR),
-              H.readByte(B_SWITCH_LIVE)))
-            running, pi, pc = true, 1, 0
-          end
-          H.setPad({})           -- a menu is up but not the command list:
-          return                 -- never mash A into it
-        end
-        idle = (idle + 1) % 8    -- no menu: edge-tap through battle messages
-        H.setPad(idle < 4 and { "a" } or {})
-      end),
-    }, what .. ": steal the clothes")
-end
-
 
 -- Wind the South Figaro clock: stand ON (18,49) facing UP, edge-tap A until
 -- the "Wind the clock?" prompt confirms ($010D=1).  See the header.
@@ -494,7 +239,7 @@ local function warpTo(sx, sy, dx, dy, dmap, what)
     H.logStep(function()
       return string.format("%s: from (%d,%d)", what, H.fieldX(), H.fieldY())
     end),
-    H.navTo(sx, sy, { maxFrames = 20000, arrive = function()
+    H.navTo(sx, sy, { maxFrames = 20000, honest = true, arrive = function()
       return H.fieldX() == dx and H.fieldY() == dy
     end }),
     H.release(),
@@ -541,7 +286,179 @@ local function settleWorld(n)
   end
 end
 
-H.run({ maxFrames = 200000 }, {
+-- --------------------------------------------- the honest TunnelArmr win --
+-- Battle 67, formation 436: TunnelArmr $0104, 1300 HP behind 5 OT6_PIERCE
+-- shields, and an event battle -- a loss is GAME OVER, not a revive.  The
+-- policy is the fight's own design (issue #75; the kill-bit that used to
+-- end it is gone):
+--   * CELES re-raises RUNIC every turn she gets ("down","a": Runic is one
+--     row below the resting cursor, and the stance queues with no target
+--     select).  The boss's script -- `attack BATTLE, BOLT, FIRE / wait /
+--     attack POISON, SPECIAL, FIRE` (AIScript::_260) -- rolls a
+--     runic-able spell on most turns, and every absorb refunds her MP
+--     and banks her a BP (Ot6RunicBP).  This is the tutorial vanilla
+--     wrote for this exact fight, with OT6's economy on top.
+--   * LOCKE spends his turns on boosted Fights ("r","a","a","a"): R
+--     raises pending boost out of the 1 bp every character opens with
+--     (Ot6InitBP; +1 regen per unboosted turn), the A's confirm Fight on
+--     the default target.  The R buzzes harmlessly on an empty bank, so
+--     the same sequence alternates boosted and plain hits, chips the
+--     pierce shields, and the break window multiplies the finish -- the
+--     drive that beat the Marshal in gen_moogle.
+-- The menu-episode machine is gen_arvis's: presses start only after the
+-- menu flag holds 4 consecutive pulses, one button per ~31-frame pulse,
+-- and an exhausted sequence backs out with B and rebuilds.
+--
+-- THE RETRY LADDER.  The fight's RNG seed is the frame phase at battle
+-- init (`lda $021e / asl2 / sta $be`, gen_whelk_poweron's measurement),
+-- so a lost fight is retried by reloading the doorstep blob captured
+-- beside the tunnelarmr_doorstep mint and waiting a different number of
+-- frames before stepping onto the trigger -- each attempt genuinely
+-- plays a different fight.  Three attempts, then fail loudly.
+local MENU, ACTOR, CHID = 0x7BCA, 0x62CA, 0x3ED8
+local CHAR_CELES = 0x06
+local armrBlob, armrWon = nil, false
+
+local function armrSlot()               -- the boss's monster slot, live
+  for i = 0, 5 do
+    if H.readByte(0x3aa8 + i * 2) % 2 == 1
+       and H.readWord(0x57c0 + i * 2) == 0x0104 then return i end
+  end
+  return nil
+end
+
+local function armrPulse()              -- fresh menu machine per attempt
+  local mStreak, mSeq, mIdx, mStall, mNoMenu = 0, nil, 1, 0, 0
+  return function()
+    if H.readByte(MENU) == 0 then
+      mStreak, mSeq, mIdx, mStall = 0, nil, 1, 0
+      mNoMenu = mNoMenu + 1
+      return mNoMenu % 2 == 0 and { "a" } or {}
+    end
+    mNoMenu = 0
+    mStreak = mStreak + 1
+    if mStreak < 4 then return {} end
+    if mSeq == nil then
+      local actor = H.readByte(ACTOR)
+      local chid = H.readByte(CHID + actor * 2)
+      mSeq = chid == CHAR_CELES and { "down", "a" }      -- Runic
+                                 or { "r", "a", "a", "a" } -- boosted Fight
+      mIdx = 1
+      local s = armrSlot()
+      H.log(string.format(
+        "armr turn f%d actor=%d chid=%02X seq=%s | armr hp=%d sh=%d | " ..
+        "party hp %d/%d bp %d/%d",
+        H.frame, actor, chid, table.concat(mSeq, ","),
+        s and H.readWord(0x3bfc + s * 2) or -1,
+        s and H.readByte(0x3e40 + s * 2) or -1,
+        H.readWord(0x3bf4), H.readWord(0x3bf6),
+        H.readByte(0x3e9c), H.readByte(0x3e9e)))
+    end
+    if mIdx <= #mSeq then
+      local b = mSeq[mIdx]
+      mIdx = mIdx + 1
+      return { b }
+    end
+    mStall = mStall + 1
+    if mStall > 2 then
+      mSeq, mStall = nil, 0             -- back out; rebuild from scratch
+      return { "b" }
+    end
+    return { "a" }
+  end
+end
+
+-- One attempt, flat (driveUntil bodies replay latched state, so every
+-- attempt builds fresh closures).  Reloads the doorstep blob (attempt 1
+-- runs in place -- the live timeline IS the blob's timeline), offsets the
+-- phase, steps onto the trigger, plays the fight, and decides the outcome
+-- on $001E: the win tail sets it on map 70 within ~2000 frames of the
+-- teardown, while a loss rides the Annihilated screen into GAME OVER and
+-- never sets it.
+local function armrAttempt(n)
+  local pulse = armrPulse()
+  local aPh, giveUp = 0, 0
+  local loadReq
+  return H.cond(function() return armrWon end, {}, {
+    H.logStep(function()
+      return string.format("TunnelArmr attempt %d (phase offset %d) at f%d",
+        n, (n - 1) * 37, H.frame)
+    end),
+    n > 1 and seq({
+      H.call(function() loadReq = H.requestLoadState(armrBlob) end),
+      H.waitFrames(2),
+      H.call(function() H.checkReq(loadReq, "doorstep reload") end),
+      H.waitFrames(90),
+      H.call(function()
+        H.assertEq(map(), 70, "reloaded onto map 70")
+        H.assertEq(H.fieldX() == 47 and H.fieldY() == 37, true,
+          "reloaded at the (47,37) doorstep")
+      end),
+    }) or seq({}),
+    H.waitFrames((n - 1) * 37),         -- vary the battle RNG seed
+    H.driveUntil(function() return H.battleLoadStarted() end, 6000, {
+      H.call(function()
+        aPh = (aPh + 1) % 8
+        if H.dialogWaiting() then H.setPad(aPh < 4 and { "a" } or {}); return end
+        if not H.hasControl() then H.setPad({}); return end
+        if H.fieldX() == 47 and H.fieldY() == 37 then
+          H.setPad({ down = true }); return
+        end
+        H.setPad({})
+      end),
+    }, "step onto (47,38) -> battle 67"),
+    H.release(),
+    H.waitUntil(function() return H.battleActive() end, 6000,
+      "TunnelArmr up", 10),
+    H.waitFrames(120),
+    H.call(function()
+      H.assertEq(H.formationHas({ [0x0104] = true }), true,
+        "battle 67 is TunnelArmr $0104")
+      local s = armrSlot()
+      H.log(string.format(
+        "TunnelArmr up: hp=%d shields=%d/%d (table authors 5, OT6_PIERCE)",
+        H.readWord(0x3bfc + (s or 0) * 2), H.readByte(0x3e40 + (s or 0) * 2),
+        H.readByte(0x3e41 + (s or 0) * 2)))
+      H.assertEq(H.readByte(0x3e40 + (s or 0) * 2), 5,
+        "5 shields seeded, per Ot6ShieldTbl $0104")
+    end),
+    H.driveUntil(function() return not H.battleLoadStarted() end, 60000, {
+      H.call(function() H.setPad(pulse()) end),
+      H.waitFrames(6),
+      H.call(function() H.setPad({}) end),
+      H.waitFrames(24),
+    }, "TunnelArmr fight (Runic + boosted Fights)"),
+    H.logStep(function()
+      return string.format("battle 67 torn down at f%d; deciding", H.frame)
+    end),
+    -- won or lost?  Tap A while control is away (pages the win tail's
+    -- "Whew!" and, on a loss, the Annihilated screen); give the tail 3000
+    -- frames to flip $001E before calling the attempt lost.
+    H.driveUntil(function()
+      giveUp = giveUp + 1
+      return sw(0x001E) == 1 or giveUp >= 3000
+    end, 3200, {
+      H.call(function()
+        aPh = (aPh + 1) % 8
+        if not H.hasControl() then H.setPad(aPh < 4 and { "a" } or {})
+        else H.setPad({}) end
+      end),
+    }, "the win tail flips $001E (or the loss shows itself)"),
+    H.call(function()
+      H.setPad({})
+      if sw(0x001E) == 1 then
+        armrWon = true
+        H.log(string.format("TunnelArmr BEATEN HONESTLY on attempt %d, f%d",
+          n, H.frame))
+      else
+        H.log(string.format("attempt %d LOST (no $001E after teardown), f%d",
+          n, H.frame))
+      end
+    end),
+  })
+end
+
+H.run({ maxFrames = 300000 }, {
   H.loadState(DOOR),
   H.waitFrames(60),
   H.call(function()
@@ -573,7 +490,8 @@ H.run({ maxFrames = 200000 }, {
   go(52, 27, 75, 48, 36, "map 86 (52,27) -> town (map 75) (48,36)"),
   H.call(function() where("back in occupied town") end),
   -- exit via the x=56 column -> world (87,112)
-  H.navTo(56, 34, { maxFrames = 12000, arrive = function() return H.worldMode() end }),
+  H.navTo(56, 34, { maxFrames = 12000, honest = true,
+    arrive = function() return H.worldMode() end }),
   H.release(),
   (function()
     local cnt = 0
@@ -581,7 +499,7 @@ H.run({ maxFrames = 200000 }, {
       local ok = H.worldMode() and H.worldHasControl() and H.worldAligned()
         and bright() >= 15
       cnt = ok and cnt + 1 or 0; return cnt >= 20
-    end, 12000)
+    end, 12000, { honest = true })
   end)(),
   H.waitFrames(30),
   H.call(function()
@@ -603,7 +521,10 @@ H.run({ maxFrames = 200000 }, {
   -- would load map 72.  From map 69, (10,2)/(4,4) -> map 70, and (47,38) on
   -- map 70 is the TunnelArmr trigger _ca89af.
   -- ===================================================================== --
-  H.worldNavTo(75, 102, { maxFrames = 30000,
+  -- issue #75: honest=true -- a world encounter on the band south of the
+  -- range is FOUGHT by real input (LOCKE and CELES both attack under
+  -- tap-A), never kill-bitted; the budget carries the ATB rounds.
+  H.worldNavTo(75, 102, { maxFrames = 45000, honest = true,
     arrive = function() return not H.worldMode() end }),
   H.release(),
   settleField(69),
@@ -661,59 +582,43 @@ H.run({ maxFrames = 200000 }, {
   H.logStep(function()
     return string.format("tunnelarmr_doorstep minted at frame %d", H.frame)
   end),
+  -- capture the same doorstep as the retry ladder's reload blob
+  (function()
+    local req
+    return seq({
+      H.call(function() req = H.requestSaveState() end),
+      H.waitFrames(2),
+      H.call(function()
+        H.checkReq(req, "doorstep retry blob")
+        armrBlob = req.blob
+        H.log(string.format("retry blob captured: %d bytes", #armrBlob))
+      end),
+    })
+  end)(),
 
   -- ===================================================================== --
-  -- PHASE 5: TUNNELARMR.  Step DOWN onto (47,38) -> _ca89af -> battle 67
-  -- (formation 436, TunnelArmr $0104: hp 1300, 5/5 shields OT6_PIERCE, plus
-  -- the OT6 ice element-add on vanilla's bolt|water).  Win it with the
-  -- kill-bit idiom -- measured to end this fight cleanly, exactly as it ends
-  -- Vargas -- then ride _ca89af's tail ("Whew!" / switch $001E=1 / fade /
-  -- call _caad4c) back to the hub (map 9).  $001E=1 IS the Locke scenario
-  -- complete.  The shields do not chip under kill-bit (it sets the death bit
-  -- and never routes damage through Ot6ShieldedDmg); the fixture only needs
-  -- the win, and the scripted finish is identical either way.
+  -- PHASE 5: TUNNELARMR, PLAYED.  Step DOWN onto (47,38) -> _ca89af ->
+  -- battle 67 (formation 436, TunnelArmr $0104: hp 1300, 5/5 shields
+  -- OT6_PIERCE, plus the OT6 ice element-add on vanilla's bolt|water).
+  -- CELES holds RUNIC up, LOCKE breaks the shields with boosted Fights --
+  -- see the armrPulse header above -- with the phase-spread retry ladder
+  -- around it.  Then ride _ca89af's tail ("Whew!" / switch $001E=1 / fade
+  -- / call _caad4c) back to the hub (map 9).  $001E=1 IS the Locke
+  -- scenario complete.  Unlike the kill-bit ancestor, an honest win
+  -- routes every hit through Ot6ShieldedDmg -- the first minted state in
+  -- the chain whose TunnelArmr actually had his shields broken.
   -- ===================================================================== --
-  H.driveUntil(function() return H.battleLoadStarted() end, 6000, {
-    H.call(function()
-      aPhase = (aPhase + 1) % 8
-      if H.dialogWaiting() then H.setPad(aPhase < 4 and { "a" } or {}); return end
-      if not H.hasControl() then H.setPad({}); return end
-      if H.fieldX() == 47 and H.fieldY() == 37 then H.setPad({ down = true }); return end
-      H.setPad({})
-    end),
-  }, "step onto (47,38) -> battle 67"),
-  H.release(),
-  H.waitUntil(function() return H.battleActive() end, 6000, "TunnelArmr up", 10),
-  H.waitFrames(120),
+  armrAttempt(1),
+  armrAttempt(2),
+  armrAttempt(3),
   H.call(function()
-    H.assertEq(H.formationHas({ [0x0104] = true }), true,
-      "battle 67 is TunnelArmr $0104")
-    local sh = -1
-    for i = 0, 5 do
-      if H.readByte(0x3aa8 + i * 2) % 2 == 1 and H.readWord(0x57c0 + i * 2) == 0x0104 then
-        sh = H.readByte(0x3e40 + i * 2)
-      end
-    end
-    H.log(string.format("TunnelArmr up: hp=%d shields=%d/%d (table authors 5, OT6_PIERCE)",
-      H.readWord(0x3bfc), sh, H.readByte(0x3e41)))
-    H.assertEq(sh, 5, "5 shields seeded, per Ot6ShieldTbl $0104")
+    H.assertEq(armrWon, true,
+      "TunnelArmr beaten honestly within 3 attempts (Runic + boosted Fights)")
   end),
-  H.driveUntil(function() return not H.battleLoadStarted() end, 20000, {
-    H.call(function()
-      aPhase = (aPhase + 1) % 8
-      if H.monstersPresent() > 0 then
-        for slot = 0, 5 do
-          if H.readByte(0x3aa8 + slot * 2) % 2 == 1 then
-            H.writeByte(0x3eec + slot * 2, H.readByte(0x3eec + slot * 2) | 0x80)
-          end
-        end
-      end
-      H.setPad(aPhase < 4 and { "a" } or {})
-    end),
-  }, "TunnelArmr down (kill-bit)"),
-  H.logStep(function() return string.format("TunnelArmr down at f%d", H.frame) end),
 
-  -- ride the tail to the hub; $001E flips on map 70, then _caad4c warps home
+  -- ride the tail to the hub; $001E already flipped on map 70 (the attempt
+  -- decided on it), _caad4c warps home.  Honest: nothing on the scripted
+  -- warp can draw a battle, and if one ever did, the A-taps would fight it.
   (function()
     local calm = 0
     return H.driveUntil(function()
@@ -724,13 +629,6 @@ H.run({ maxFrames = 200000 }, {
     end, 30000, {
       H.call(function()
         aPhase = (aPhase + 1) % 8
-        if H.battleLoadStarted() and H.monstersPresent() > 0 then
-          for slot = 0, 5 do
-            if H.readByte(0x3aa8 + slot * 2) % 2 == 1 then
-              H.writeByte(0x3eec + slot * 2, H.readByte(0x3eec + slot * 2) | 0x80)
-            end
-          end
-        end
         if not H.hasControl() then H.setPad(aPhase < 4 and { "a" } or {}); return end
         H.setPad({})
       end),
