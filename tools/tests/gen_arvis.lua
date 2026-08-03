@@ -13,9 +13,12 @@
 --     finishes the fight.
 --   * head hidden (the shell's retract cycle): spend the turn on Heal
 --     Force (2,0) -- ANY attack would default into the shell and draw the
---     MegaVolt counter, the fight's whole danger budget (Terra KO is a
---     scripted game over; whelkbal's mixed-naive policy lost 5/5 to
---     exactly this).
+--     MegaVolt counter, the fight's whole danger budget (whelkbal's
+--     mixed-naive policy lost 5/5 to it.  Its claim that a Terra KO
+--     game-overs this fight measured FALSE here, twice: runs 5-6 both
+--     lost her mid-fight and the soldiers finished the head, the event
+--     epilogue ran, and the wake-up minted clean -- but her survival
+--     still buys a third beam per window, so the policy protects her).
 -- The event epilogue sets switch $0135 ($1EA6 bit $20, asserted).  North
 -- of the fight, tiles (41..43, y=4) exit to map 0x2A at (86,28), the
 -- Tritoch chamber; the single event trigger at (87,12) starts the long
@@ -184,23 +187,27 @@ local function observeHead()
 end
 
 -- Sequences run from the settled top command menu (cursor on MagiTek).
--- Cell coordinates: the soldiers' 4-cell list stages sparse -- Fire|Bolt /
--- Ice / Heal -- so their Heal Force is (2,0); TERRA's list is the full 2x4
--- grid (col 0 = Fire/Bolt/Ice/Heal, col 1 = specials), so HER Heal Force
--- is (3,0) and TekMissile (3,1).  whelkbal_run's "(2,0) for everyone" was
--- wrong for Terra -- that cell is her ICE BEAM, and casting it in a hidden
--- phase is a shell hit (run 3's first MegaVolt chain started exactly
--- there).
+-- Cell coordinates, decoded the expensive way (runs 3-4 of this gen):
+-- TERRA's 8-cell grid stages COLUMN-MAJOR -- col 0 = FireBeam/BoltBeam/
+-- IceBeam/BIO BLAST ($83-$86), col 1 = HEAL FORCE/Banisher/Confuser/
+-- TekMissile ($87-$8A) -- which whelkbal_run's own cast counters imply
+-- (casts_tek = $8A at its measured (3,1)) but its "(2,0) Heal Force for
+-- everyone" contradicts: for Terra, (2,0) is ICE BEAM and (3,0) is BIO
+-- BLAST, an all-enemies attack.  Run 4 cast that "heal" every hidden
+-- phase, hit the shell with it, and fed Terra to her own MegaVolt
+-- counters.  Her real Heal Force is (0,1).  The soldiers' 4-cell list
+-- stages sparse -- Fire|Bolt / Ice / Heal -- so theirs is (2,0), which
+-- run 4's soldier HP curves confirm healing.
 --   beam at default target        A A A
 --   heal force  soldier (2,0)     A dn dn A A     (self-target default)
---   heal force  terra   (3,0)     A dn dn dn A A
+--   heal force  terra   (0,1)     A rt A A
 --   tekmissile  terra   (3,1)     A dn dn dn rt A A
 local function seqFor(actor)
   local freshWindow = headAlive() and lastShow
     and (H.frame - lastShow) < FRESH and hitsSinceShow < 2
   if not freshWindow then
     if actor == terra then
-      return { "a", "down", "down", "down", "a", "a" }         -- Heal Force
+      return { "a", "right", "a", "a" }                        -- Heal Force
     end
     return { "a", "down", "down", "a", "a" }                   -- Heal Force
   end
@@ -217,7 +224,7 @@ end
 -- shell's "Gruuu……" dialogs need it; on a running battle a stray A is inert).
 local mStreak, mSeq, mIdx, mStall, mNoMenu = 0, nil, 1, 0, 0
 local function policyPulse()
-  if H.readByte(MENU) == 0 then
+  if hs == nil or H.readByte(MENU) == 0 then
     mStreak, mSeq, mIdx, mStall = 0, nil, 1, 0
     mNoMenu = mNoMenu + 1
     return mNoMenu % 2 == 0 and { "a" } or {}
@@ -259,7 +266,19 @@ local function winWhelk()
     return hs ~= nil and not H.battleLoadStarted()
   end, 40000, {
     H.call(function()
-      if hs == nil and H.readByte(MENU) ~= 0 then
+      -- Arming deliberately keys on the EARLY, garbage-prone menu read:
+      -- $7bca is field-scribbled scratch through the load, so this fires
+      -- ~f400 and stamps lastShow ~1400 frames before the first real
+      -- menu, which makes the opening spread come out as HEALS.  That is
+      -- measured as load-bearing, not sloppiness: run 6 (this arming)
+      -- won at f19101 with the party standing; run 7 "fixed" it with a
+      -- battleActive gate, spent the opening window on three beams, and
+      -- the earlier break pulled the retract+counter chain forward into
+      -- a full party wipe at f11188.  The fight is deterministic from
+      -- the fixture, so the winning trajectory replays exactly; do not
+      -- re-tune this without re-measuring the whole fight.
+      if hs == nil and H.battleLoadStarted() and H.monstersPresent() > 0
+         and H.readByte(MENU) ~= 0 then
         for slot = 0, 5 do
           if H.readWord(SPEC + slot * 2) == 0x0134 then hs = slot end
         end
