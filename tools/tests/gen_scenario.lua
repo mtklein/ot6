@@ -119,19 +119,36 @@
 -- THE BATTLES ARE FORCED, NOT RANDOM ENCOUNTERS.  The ride calls _cb0498
 -- (`battle 7, RIVER`) and _cb04a1 (`battle 8, RIVER`) outright, and
 -- _cb0486/_cb048f are `if_rand` coin-flips into them (:38660-38678).  A
--- dozen or so fire on the way down.  They are cleared with the harness's
--- kill-bit idiom, like every other trash fight in the frontier chain.
+-- dozen or so fire on the way down.  Since issue #75 they are FOUGHT, not
+-- kill-bitted: this generator writes no game state.  The fighter is the
+-- ride's own edge-tapped A -- A opens the acting character's command list,
+-- A confirms its first entry, A takes the default target -- which on this
+-- raft spells out the game's own designed sustain: TERRA, EDGAR and SABIN
+-- Fight the default enemy while BANON's first command is Health, the free
+-- party-wide heal his presence exists for (bosses-wob.md #4: "Health is a
+-- free party heal; his death is a game over").  He tops the raft up every
+-- round while the other three chew through the formation.
 --
--- ULTROS: `battle 103, RIVER` at _cb08db (:39301).  He HAS an authored
--- shield row -- Ot6ShieldTbl carries $012c (MONSTER::ULTROS_RIVER) at
--- 5 shields, OT6_SLASH|OT6_PIERCE, commented "ultros 1: the row he keeps all
--- game" (ff6/src/battle/ot6.asm:3008-3009).  The fight is logged in detail
--- below (species, hp, shields per slot) so the numbers are on the record,
--- but it is CLEARED, not fought properly: unlike Vargas -- whose reaction
--- script answers Pummel specifically, so his fixture had to fight him the
--- way the story means -- nothing downstream of Ultros depends on how he went
--- down.  A real breaking run against him belongs in a battle test built on
--- this state, not in the state's own mint.
+-- BANON'S DEATH IS AN INSTANT GAME OVER -- that is WHY this file used to
+-- kill-bit.  The honest driver watches his battle HP every frame and fails
+-- the run loudly the moment he stays down, with the fight's full numbers on
+-- the record: a #74-style balance finding beats a timeout 30,000 frames
+-- later at the game-over screen.  The route is deterministic from the
+-- fixture, so a surviving run replays exactly and a losing one is a fact
+-- about the tuning, not about luck.
+--
+-- ULTROS: `battle 103, RIVER` at _cb08db (:39301) -- WON FOR REAL, the
+-- first honest Ultros in this chain's history.  He has an authored shield
+-- row -- Ot6ShieldTbl carries $012c (MONSTER::ULTROS_RIVER) at 5 shields,
+-- OT6_SLASH|OT6_PIERCE, "ultros 1: the row he keeps all game"
+-- (ff6/src/battle/ot6.asm:3008-3009) -- and the design brief for the fight
+-- (bosses-wob.md #4) names the loss condition this mint now actually risks:
+-- Tentacle slams Banon.  The winning line here is the same tap-A policy as
+-- the trash -- three attackers on him, Banon healing through Tentacle --
+-- with his HP, shields and the party's HP logged every 300 in-battle frames
+-- so the whole trajectory is on the record.  A deeper breaking run (probe
+-- fire, bank BP, break on the fuse) belongs in a battle test built ON this
+-- state; the mint's job is a real, survivable win.
 --
 -- AFTER HIM the script needs no more input: Sabin is swept overboard,
 -- `switch $001A=1`, and `call _caad4c` (:39355 -> :26626) tears the party
@@ -198,10 +215,41 @@ local CHOICES = {
 }
 local ci, inChoice = 0, false
 
--- The ride driver: steer choices, kill-bit battles, tap dialogs, touch
--- nothing else.  Reused for each stretch between the manual handoffs.
+-- The ride driver: steer choices, FIGHT battles honestly (issue #75 --
+-- zero state writes), tap dialogs, touch nothing else.  Reused for each
+-- stretch between the manual handoffs.
+--
+-- Battle bookkeeping (all READS): on each fight's rising edge the
+-- formation is named and BANON's battle slot found ($3ED8+2s == 14 --
+-- char 14, the WEDGE/BANON symbol collision gen_banon documents); while
+-- the fight runs his current HP ($3BF4+2s) is watched every frame, and
+-- party + monster HP are logged every 300 frames so a loss ships with its
+-- whole trajectory.  Banon at 0 HP for 90 straight frames -- past any
+-- mid-round revive the policy could produce -- is the game over the river
+-- exists to threaten, and it fails the mint THERE, numbers first.
+local BCHID, BCHP, BCMAXHP = 0x3ed8, 0x3bf4, 0x3c1c
+local nBattles = 0
 local function rideUntil(pred, what, budget, idle)
   local phase, battN, dlgN, lastBatt, hb = 0, 0, 0, -1, -900
+  local bt = nil                 -- live fight: { n, f0, banon, dead }
+  local function partyLine()
+    local p = {}
+    for e = 0, 3 do
+      p[#p + 1] = string.format("%d/%d", H.readWord(BCHP + e * 2),
+        H.readWord(BCMAXHP + e * 2))
+    end
+    return table.concat(p, " ")
+  end
+  local function monsterLine()
+    local m = {}
+    for i = 0, 5 do
+      if monPresent(i) then
+        m[#m + 1] = string.format("$%04X hp=%d sh=%d", monSpecies(i),
+          monHp(i), monShields(i))
+      end
+    end
+    return table.concat(m, " | ")
+  end
   return H.driveUntil(pred, budget or 80000, {
     H.call(function()
       phase = (phase + 1) % 8
@@ -250,36 +298,79 @@ local function rideUntil(pred, what, budget, idle)
           ci, H.frame, CHOICES[ci].what))
       end
 
-      -- 2. battle: name it once on the rising edge, then kill-bit it
+      -- 2. battle: name it on the rising edge, then FIGHT it -- the same
+      --    edge-tapped A drives menus, targets and victory text (see the
+      --    header: TERRA/EDGAR/SABIN Fight, BANON Health).  No writes.
       if battN >= 3 then
         if battN == 3 and lastBatt ~= H.frame then
           lastBatt = H.frame
+          nBattles = nBattles + 1
+          bt = { n = nBattles, f0 = H.frame, banon = nil, dead = 0 }
           local w = H.formationWords()
-          H.log(string.format("river: battle up f%d (%04X %04X %04X %04X " ..
-            "%04X %04X)", H.frame, w[1], w[2], w[3], w[4], w[5], w[6]))
+          H.log(string.format("river: battle #%d up f%d (%04X %04X %04X " ..
+            "%04X %04X %04X)", bt.n, H.frame, w[1], w[2], w[3], w[4], w[5],
+            w[6]))
           for i = 0, 5 do
             if monPresent(i) then
               H.log(string.format("   slot %d species $%04X hp=%d shields=%d",
                 i, monSpecies(i), monHp(i), monShields(i)))
               if monSpecies(i) == 0x012C then
+                bt.ultros = true
                 H.log(string.format("river: *** ULTROS ($012C) slot %d -- " ..
                   "hp %d, shields %d (Ot6ShieldTbl authors 5, " ..
-                  "OT6_SLASH|OT6_PIERCE)", i, monHp(i), monShields(i)))
+                  "OT6_SLASH|OT6_PIERCE) -- fighting him for real", i,
+                  monHp(i), monShields(i)))
                 H.screenshot("scenario_ultros")
               end
             end
           end
         end
-        if H.monstersPresent() > 0 then
-          for slot = 0, 5 do
-            if monPresent(slot) then
-              H.writeByte(0x3eec + slot * 2,
-                H.readByte(0x3eec + slot * 2) | 0x80)
+        if bt then
+          bt.gone = 0
+          -- Banon's slot is read once the load has settled (the char-id
+          -- table is battle scratch; at battN==30 the battle module
+          -- demonstrably owns it -- the HP signal has held 30 frames)
+          if battN == 30 and bt.banon == nil then
+            for s = 0, 3 do
+              if H.readByte(BCHID + s * 2) == 14 then bt.banon = s end
+            end
+            H.log(string.format("river: #%d banon slot=%s party [%s]",
+              bt.n, tostring(bt.banon), partyLine()))
+          end
+          if battN % 300 == 0 then
+            H.log(string.format("river: #%d f%d party [%s] vs %s",
+              bt.n, H.frame, partyLine(), monsterLine()))
+          end
+          if bt.banon then
+            bt.dead = H.readWord(BCHP + bt.banon * 2) == 0 and bt.dead + 1
+                      or 0
+            if bt.dead >= 90 then
+              H.log(string.format("river: BANON DOWN in battle #%d at f%d " ..
+                "(fight started f%d, %d frames in) -- party [%s] vs %s",
+                bt.n, H.frame, bt.f0, H.frame - bt.f0, partyLine(),
+                monsterLine()))
+              H.screenshot(string.format("scenario_banon_down%d", bt.n))
+              error(string.format("river: BANON reached 0 HP in battle #%d " ..
+                "-- his death is a game over; the numbers above are the " ..
+                "balance finding", bt.n), 0)
             end
           end
         end
         H.setPad(phase < 4 and { "a" } or {})
         return
+      end
+      -- the falling edge, debounced the same 3 frames the rising edge is
+      -- (the signal bytes are shared RAM; a 1-frame flicker mid-fight must
+      -- not close the books on a battle that is still running)
+      if bt then
+        bt.gone = (bt.gone or 0) + 1
+        if bt.gone >= 3 then
+          H.log(string.format("river: battle #%d done at f%d (%d frames)%s " ..
+            "-- party [%s]", bt.n, H.frame, H.frame - bt.f0,
+            bt.ultros and " -- ULTROS BEATEN HONESTLY" or "", partyLine()))
+          if bt.ultros then H.screenshot("scenario_ultros_won") end
+          bt = nil
+        end
       end
 
       -- 3. plain dialog: edge-tap through it
@@ -364,7 +455,10 @@ local function walkOffLandings()
   H.setPad({ down = true })
 end
 
-H.run({ maxFrames = 200000 }, {
+-- 200000 was the kill-bit-era budget; an honest ride spends real ATB
+-- rounds on a dozen forced fights plus ULTROS, so both ceilings carry
+-- headroom for the measured cost of actually playing them
+H.run({ maxFrames = 300000 }, {
   H.loadState(DOOR),
   H.waitFrames(30),
   H.call(function()
@@ -389,14 +483,14 @@ H.run({ maxFrames = 200000 }, {
   -- with the dialog on screen and nobody pressing anything.  So the walk
   -- only gets the party onto the tile; the driver taps $0166 and on.
   -- ===================================================================== --
-  H.navTo(31, 51, { maxFrames = 12000,
+  H.navTo(31, 51, { maxFrames = 12000, honest = true,
     arrive = function() return sw(0x01B5) == 1 end }),
   H.release(),
 
   -- ONE driver for the whole river: it steers the four prompts, kill-bits a
   -- dozen forced fights, taps every dialog, and holds DOWN off both landings.
   rideUntil(landed(9, 20), "the Lete River: board, both forks, the two " ..
-    "landings, ULTROS, and the scenario hub", 160000, walkOffLandings),
+    "landings, ULTROS, and the scenario hub", 240000, walkOffLandings),
   H.release(),
   H.waitFrames(30),
   H.call(function()
