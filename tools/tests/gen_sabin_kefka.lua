@@ -39,7 +39,19 @@
 -- present" as a set-piece: hands off for 300 frames, then edge-tap A.
 --
 -- THE PURSUIT IS A REAL FIGHT: group 44 = formation 410, present mask $0f,
--- two $002 and two $001 -- four ordinary Imperial troops, kill-bitted.
+-- two $002 and two $001 -- four ordinary Imperial troops -- and since
+-- issue #75 it is FOUGHT, not kill-bitted: zero state writes in this
+-- generator.  SABIN + SHADOW run the house menu-episode machine (bank
+-- boost to 2, dump it on Fight -- R..R A A on a settled menu, one button
+-- per 30-frame pulse); the same edge-tapped A pages dialogs and victory
+-- text, and the two zero-monster KEFKA gags keep their hands-off branch
+-- (nothing there ever needed a write).  A loss sets `lost` via the
+-- 90-frame party-down watch and a three-attempt retry ladder reloads a
+-- checkpoint taken just before the pursuit walk, with the fighter
+-- escalated (tier 2+ dumps at 1 BP) and a 17-frame reload stagger.
+-- SHADOW's 1/16 post-battle leave roll does NOT run here: battle switch
+-- $4B ("won't leave") is story-SET through the camp -- the escape's exit
+-- is what clears it (event_main.asm:42251, gen_sabin_forest's header).
 --
 -- WHERE THIS LEG ENDS, AND WHY NOT AT DOMA.  _cba0ec (:61858) does not
 -- hand SABIN to map 119.  It takes CYAN back to Doma -- `load_map 121,
@@ -182,6 +194,79 @@ local CHOICES = {}   -- this leg reaches no `choice` at all
 local ci, inChoice = 0, false
 local nameMenus, battles = 0, {}
 
+-- ---------------------------------------------------------- the fighter --
+-- The honest battle driver (issue #75; gen_sabin_camp's copy of
+-- gen_scenario's menu-episode machine): from a settled battle menu, one
+-- button per 30-frame pulse -- boost prefix, then A A = Fight on the
+-- default target.  Outside a settled menu, edge-tap A.
+local MENU, ACTOR = 0x7BCA, 0x62CA
+local BP = 0x3E9C
+local fightTier = 1
+local mStreak, mSeq, mIdx, mTick, mStall = 0, nil, 1, 0, 0
+local lost = nil
+local bt = nil
+local function partyLine()
+  local p = {}
+  for e = 0, 3 do
+    p[#p + 1] = string.format("%d/%d", H.readWord(0x3bf4 + e * 2),
+      H.readWord(0x3c1c + e * 2))
+  end
+  return table.concat(p, " ")
+end
+local function fightPulse(phase)
+  if H.readByte(MENU) == 0 then
+    mStreak, mSeq = 0, nil
+    H.setPad(phase < 4 and { "a" } or {})
+    return
+  end
+  mStreak = mStreak + 1
+  if mStreak < 4 then H.setPad({}); return end
+  if mSeq == nil then
+    local slot = H.readByte(ACTOR) & 3
+    local bp = H.readByte(BP + slot * 2)
+    local boostMin = fightTier >= 2 and 1 or 2
+    local boost = bp >= boostMin and math.min(bp, 3) or 0
+    mSeq, mIdx, mTick, mStall = {}, 1, 0, 0
+    for _ = 1, boost do mSeq[#mSeq + 1] = "r" end
+    mSeq[#mSeq + 1] = "a"; mSeq[#mSeq + 1] = "a"
+    H.log(string.format("kefka: cast f%d slot=%d bp=%d tier=%d seq=%s | [%s]",
+      H.frame, slot, bp, fightTier, table.concat(mSeq, ","), partyLine()))
+  end
+  mTick = mTick + 1
+  local ph = mTick % 30
+  local btn
+  if mIdx <= #mSeq then
+    btn = mSeq[mIdx]
+  elseif mStall < 2 then
+    btn = "a"
+  elseif mStall < 4 then
+    btn = "b"
+  else
+    mSeq = nil
+    H.setPad({})
+    return
+  end
+  if ph < 6 then H.setPad({ [btn] = true }) else H.setPad({}) end
+  if ph == 29 then
+    if mIdx <= #mSeq then mIdx = mIdx + 1 else mStall = mStall + 1 end
+  end
+end
+local function lossWatch(tag)
+  local wiped = true
+  for e = 0, 3 do
+    if H.readWord(0x3c1c + e * 2) > 0 and H.readWord(0x3bf4 + e * 2) > 0 then
+      wiped = false
+    end
+  end
+  bt.dead = wiped and bt.dead + 1 or 0
+  if bt.dead >= 90 and not lost then
+    lost = string.format("%s: party down at f%d (fight up f%d, tier %d) [%s]",
+      tag, H.frame, bt.f0, fightTier, partyLine())
+    H.log("kefka: LOST -- " .. lost)
+    H.screenshot("kefka_lost")
+  end
+end
+
 local function rideUntil(pred, what, budget)
   local phase, battN, dlgN, quiet, hb = 0, 0, 0, 0, -900
   return H.driveUntil(pred, budget or 40000, {
@@ -236,6 +321,7 @@ local function rideUntil(pred, what, budget)
           local w = H.formationWords()
           battles[#battles + 1] = string.format("map%d:%04X/%d",
             map(), w[1], monCount())
+          bt = { f0 = H.frame, dead = 0 }
           H.log(string.format("kefka: battle up f%d map=%d present=%d " ..
             "(%04X %04X %04X %04X %04X %04X) php=%04X %04X %04X %04X",
             H.frame, map(), monCount(), w[1], w[2], w[3], w[4], w[5], w[6],
@@ -248,21 +334,26 @@ local function rideUntil(pred, what, budget)
             end
           end
         end
-        -- A SCRIPT BATTLE (zero monsters present) has nothing to kill-bit
+        -- A SCRIPT BATTLE (zero monsters present) has nothing to fight
         -- and ends on its character-AI script's own schedule.  Hands off
         -- for 300 frames, then edge-tap A to advance its text.
         if monCount() == 0 then
           H.setPad(battN > 300 and phase < 4 and { "a" } or {})
           return
         end
-        for slot = 0, 5 do
-          if monPresent(slot) then
-            H.writeByte(0x3eec + slot * 2, H.readByte(0x3eec + slot * 2) | 0x80)
+        -- a REAL fight (the pursuit): play it and watch for the loss
+        if bt then
+          if battN % 300 == 0 then
+            H.log(string.format("kefka: fight f%d party [%s] mon=%d",
+              H.frame, partyLine(), monCount()))
           end
+          lossWatch(what)
+          if lost then H.setPad({}); return end
         end
-        H.setPad(phase < 4 and { "a" } or {})
+        fightPulse(phase)
         return
       end
+      if bt then bt = nil end
 
       if dlgN >= 3 then quiet = 0; H.setPad(phase < 4 and { "a" } or {}); return end
 
@@ -348,13 +439,54 @@ local function stepOnto(x, y, untilPred, what, budget)
     end),
     H.navTo(x, y, {
       maxFrames = budget or 12000,
-      arrive = function() return untilPred() end,
+      honest = true,
+      -- hand any battle straight to rideUntil below: its fighter carries
+      -- the boost doctrine and the loss watch, navTo's plain tap-A doesn't
+      arrive = function() return untilPred() or inBattle() end,
     }),
     rideUntil(untilPred, what, budget or 12000),
   })
 end
 
-H.run({ maxFrames = 90000 }, {
+-- ------------------------------------------------------ the retry ladder --
+-- One pursuit attempt: (attempt 2+) reload the checkpoint with a small
+-- stagger, escalate the fighter, walk onto the trigger, fight battle 44,
+-- and ride the whole tail to CYAN's control on map 121.  `lost` short-
+-- circuits both drivers so the next attempt starts promptly.
+local pursuitBlob, pursuitWon = nil, false
+local function pursuitAttempt(n)
+  local ldReq
+  return H.cond(function() return not pursuitWon end, {
+    H.cond(function() return n > 1 end, {
+      H.logStep(function()
+        return string.format("kefka: ATTEMPT %d -- reloading the pursuit " ..
+          "checkpoint after a loss (%s)", n, tostring(lost))
+      end),
+      H.call(function() ldReq = H.requestLoadState(pursuitBlob) end),
+      H.waitFrames(2),
+      H.call(function() H.checkReq(ldReq, "attempt " .. n .. ": reload") end),
+      H.waitFrames(60 + (n - 1) * 17),
+    }, {}),
+    H.call(function() lost, fightTier = nil, n end),
+    stepOnto(17, 31, function() return lost ~= nil or sw(0x0155) == 1 end,
+      "the pursuit (_cb11da -> _cb1209, battle 44), attempt " .. n, 25000),
+    (function()
+      local landedPred = landedField(121, 10)
+      return rideUntil(function() return lost ~= nil or landedPred() end,
+        "CYAN back at DOMA (map 121), attempt " .. n, 40000)
+    end)(),
+    H.release(),
+    H.waitFrames(30),
+    H.call(function()
+      if lost == nil then
+        pursuitWon = true
+        H.log(string.format("kefka: attempt %d WON the pursuit", n))
+      end
+    end),
+  }, {})
+end
+
+H.run({ maxFrames = 150000 }, {
   H.loadState(DOOR),
   H.waitFrames(30),
   H.call(function()
@@ -408,10 +540,32 @@ H.run({ maxFrames = 90000 }, {
       H.frame, H.fieldX(), H.fieldY(), objX(21), objY(21)))
   end),
 
-  -- 3. west to the pursuit, then ride all the way to CYAN's control on 121
-  stepOnto(17, 31, function() return sw(0x0155) == 1 end,
-    "the pursuit (_cb11da -> _cb1209, battle 44)", 25000),
-  rideUntil(landedField(121, 10), "CYAN back at DOMA (map 121)", 40000),
+  -- 3. west to the pursuit -- battle 44 fought for REAL behind the retry
+  -- ladder (see the header) -- then ride to CYAN's control on 121
+  (function()
+    local ckReq
+    return seq({
+      H.call(function() ckReq = H.requestSaveState() end),
+      H.waitFrames(2),
+      H.call(function()
+        H.checkReq(ckReq, "pursuit checkpoint")
+        pursuitBlob = ckReq.blob
+        H.log(string.format("kefka: pursuit checkpoint captured (%d bytes) " ..
+          "at f%d", #pursuitBlob, H.frame))
+      end),
+    })
+  end)(),
+  pursuitAttempt(1),
+  pursuitAttempt(2),
+  pursuitAttempt(3),
+  H.call(function()
+    if not pursuitWon then
+      error(string.format("kefka: the pursuit (battle 44) was lost on all " ..
+        "3 honest attempts -- last loss: %s -- the per-attempt numbers " ..
+        "above are the balance finding (#74-style); do not rig this leg",
+        tostring(lost)), 0)
+    end
+  end),
   H.waitFrames(30),
   H.call(function()
     H.assertEq(map(), 121, "map 121 -- the DOMA CASTLE grounds")
