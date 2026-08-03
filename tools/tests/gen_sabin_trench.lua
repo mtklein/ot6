@@ -22,9 +22,13 @@
 --   where $01B7 ($1EB6 bit 7) picks the branch: LEFT sets it (mainline),
 --   RIGHT clears it (detour through the mid-cave 175).  There is no
 --   neutral default, so LEFT is held through the whole ride.  Battles
---   19/20/21 fire mid-script with no _ca5ea9 tail -- kill-bit is safe (the
---   vehicle script resumes via PopDP).  $ed climbs monotonically per
---   segment (logged as the progress signal).
+--   19/20/21 fire mid-script with no _ca5ea9 tail, and since issue #75
+--   they are ended by PLAY, zero writes: FLEE first (hold L+R -- no win
+--   needed, the vehicle script resumes via PopDP either way), and if a
+--   formation refuses the run for ~900 frames, fall back to the blind
+--   tap-A fighter (SABIN/CYAN/GAU all Fight from row 0; SHADOW is long
+--   gone, and GAU has no leave roll, so a win costs nothing).  $ed climbs
+--   monotonically per segment (logged as the progress signal).
 --
 --   Arrival _ca8be3 (:21288): world walk-on, then Nikeah 187 (24,11).
 --   The ferry clerk is NPC (17,15); dlg $032A's OPTION 1 ("Hop aboard?")
@@ -73,9 +77,10 @@ local function settle(toMap, what, budget)
   }, {})
 end
 
--- ride driver with choice steering and trench battle handling
+-- ride driver with choice steering and trench battle handling: flee
+-- first, tap-A fight after ~900 stubborn frames (see the header)
 local function ride(dir, pred, what, budget, choiceWant)
-  local phase, hb = 0, -900
+  local phase, hb, battN = 0, -900, 0
   return H.driveUntil(pred, budget or 30000, {
     H.call(function()
       phase = (phase + 1) % 8
@@ -91,16 +96,19 @@ local function ride(dir, pred, what, budget, choiceWant)
           sw(0x44)))
       end
       if inBattle() or H.battleLoadStarted() then
-        if H.monstersPresent() > 0 then
-          for s = 0, 5 do
-            if monPresent(s) then
-              H.writeByte(0x3eec + s * 2, H.readByte(0x3eec + s * 2) | 0x80)
-            end
+        battN = battN + 1
+        if battN < 900 and H.monstersPresent() > 0 then
+          H.setPad({ l = true, r = true })   -- flee, honestly
+        else
+          if battN == 900 then
+            H.log(string.format("[trench:%s] formation would not run for " ..
+              "900 frames -- fighting it (tap-A)", what))
           end
+          H.setPad(phase < 4 and { "a" } or {})
         end
-        H.setPad(phase < 4 and { "a" } or {})
         return
       end
+      battN = 0
       if H.readByte(CH_MAX) >= 2 and H.dialogWaiting() then
         local sel, want = H.readByte(CH_SEL), choiceWant or 0
         if sel < want then H.setPad(phase < 4 and { "down" } or {})
@@ -124,7 +132,7 @@ H.run({ maxFrames = 200000 }, {
   end),
 
   -- step into Crescent Mountain
-  H.worldNavTo(214, 148, { maxFrames = 4000,
+  H.worldNavTo(214, 148, { maxFrames = 4000, honest = "flee",
     arrive = function() return not H.worldMode() end }),
   settle(167, "Crescent 167"),
 
@@ -163,7 +171,7 @@ H.run({ maxFrames = 200000 }, {
         table.concat(rows[y], ",")))
     end
   end),
-  H.navTo(12, 23, { maxFrames = 8000 }),
+  H.navTo(12, 23, { maxFrames = 8000, honest = "flee" }),
   -- (12,22) runs a PRELIMINARY beat (GAU scampers ahead; the party is
   -- re-parked at (12,17)); the $0041 helmet scene proper is _cbc5fb's
   -- tail, triggered at (25,17)
@@ -175,7 +183,7 @@ H.run({ maxFrames = 200000 }, {
          and mapIdx() == 167
     end, "the (12,22) beat", 15000)
   end)(),
-  H.navTo(25, 18, { maxFrames = 12000, arrive = function()
+  H.navTo(25, 18, { maxFrames = 12000, honest = "flee", arrive = function()
     return sw(0x41) == 1 or (H.fieldX() == 25 and H.fieldY() == 18
        and H.hasControl() and H.tileAligned()) end }),
   ride("up", function()
@@ -202,7 +210,7 @@ H.run({ maxFrames = 200000 }, {
   end),
 
   -- the ferry clerk at (17,15): option 1 boards
-  H.navTo(17, 16, { maxFrames = 8000 }),
+  H.navTo(17, 16, { maxFrames = 8000, honest = "flee" }),
   (function()
     local phase = 0
     return H.driveUntil(function()
