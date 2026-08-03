@@ -79,11 +79,54 @@ sh "$GATE" sig gen_fake /etc/passwd >/dev/null 2>&1
 [ "$?" -ne 0 ] && echo "  pass absolute extra -> hard error" ||
   { echo "  FAIL absolute extra accepted"; ok=0; }
 
-# 6. write records exactly the current signature where compose.py will look.
-sh "$GATE" write fake gen_fake "$extra"
-[ "$(cat "$TMP/build/states/fake.stamp")" = "$(sh "$GATE" sig gen_fake "$extra")" ] &&
+# 6. the gate-contract version is a real input: the digest is NOT the bare
+#    hash of the concatenated files, so bumping the constant moves every
+#    signature (issue #75 step 5 -- the deliberate invalidate-the-world knob).
+bare=$(cat "$TMP/tools/tests/gen_fake.lua" "$TMP/tools/tests/lib/ot6.lua" \
+           "$TMP/tools/tests/lib/ot6_field.lua" \
+           "$TMP/tools/tests/lib/ot6_contract.lua" | shasum -a 256 | cut -c1-64)
+check "gate-contract version participates in the sig" DIFF \
+  "${base%% *}" "$bare"
+
+# 7. write records the signature AND the provenance bindings (issue #75
+#    step 5): line 1 is byte-identical to `sig` (the side compose.py
+#    re-derives), line 2 binds the artifact, line 3 binds the ancestor.
+printf 'minted state bytes v1\n' > "$TMP/build/states/fake.mss"
+sh "$GATE" write fake gen_fake - "$extra"
+[ "$(head -n 1 "$TMP/build/states/fake.stamp")" = "$(sh "$GATE" sig gen_fake "$extra")" ] &&
   echo "  pass write records the sig" ||
   { echo "  FAIL write/sig disagree"; ok=0; }
+want_art="artifact $(shasum -a 256 "$TMP/build/states/fake.mss" | cut -c1-64)"
+[ "$(sed -n 2p "$TMP/build/states/fake.stamp")" = "$want_art" ] &&
+  echo "  pass write binds the minted artifact's hash" ||
+  { echo "  FAIL artifact binding wrong or missing"; ok=0; }
+[ "$(wc -l < "$TMP/build/states/fake.stamp" | tr -d ' ')" = 2 ] &&
+  echo "  pass a root mint (ancestor -) carries no ancestor line" ||
+  { echo "  FAIL unexpected ancestor line on a root mint"; ok=0; }
+
+# 8. a chained mint binds its predecessor's STAMP FILE -- transitivity on
+#    disk: child stamp -> parent stamp -> parent artifact, down to the root.
+printf 'child state bytes v1\n' > "$TMP/build/states/child.mss"
+sh "$GATE" write child gen_fake build/states/fake.stamp
+want_anc="ancestor build/states/fake.stamp $(shasum -a 256 "$TMP/build/states/fake.stamp" | cut -c1-64)"
+[ "$(sed -n 3p "$TMP/build/states/child.stamp")" = "$want_anc" ] &&
+  echo "  pass chained write binds the ancestor stamp's hash" ||
+  { echo "  FAIL ancestor binding wrong or missing"; ok=0; }
+
+# 9. refusals: a write may never produce a stamp it cannot back.
+sh "$GATE" write ghost gen_fake - >/dev/null 2>&1
+[ "$?" -ne 0 ] && [ ! -f "$TMP/build/states/ghost.stamp" ] &&
+  echo "  pass write without a minted .mss -> hard error, no stamp" ||
+  { echo "  FAIL write accepted a missing artifact"; ok=0; }
+sh "$GATE" write child gen_fake build/states/nope.stamp >/dev/null 2>&1
+[ "$?" -ne 0 ] && echo "  pass missing ancestor -> hard error" ||
+  { echo "  FAIL missing ancestor accepted"; ok=0; }
+sh "$GATE" write child gen_fake /etc/passwd >/dev/null 2>&1
+[ "$?" -ne 0 ] && echo "  pass absolute ancestor -> hard error" ||
+  { echo "  FAIL absolute ancestor accepted"; ok=0; }
+sh "$GATE" write child gen_fake >/dev/null 2>&1
+[ "$?" -ne 0 ] && echo "  pass ancestor-less write form -> hard error" ||
+  { echo "  FAIL old 3-arg write form accepted"; ok=0; }
 
 [ "$ok" -eq 1 ] && { echo "frontier_stamp selftest: ok"; exit 0; }
 echo "frontier_stamp selftest: FAILED"; exit 1

@@ -23,7 +23,7 @@
 #     lib edit has since drifted.  That consume-time guard is why the stamp
 #     still exists at all.
 #
-#   frontier_stamp.sh write <state> <generator> [extra ...]
+#   frontier_stamp.sh write <state> <generator> <ancestor|-> [extra ...]
 #   frontier_stamp.sh sig   <generator> [extra ...]
 #
 # The signature hashes the generator and ALL THREE lib halves compose.py
@@ -34,7 +34,37 @@
 # re-mints every leg, and the consume-time check has to agree that a
 # pre-edit fixture is stale.  Content-keyed throughout: a mere mtime bump
 # (a `git checkout`, a worktree cp) changes no signature.
+#
+# PROVENANCE BINDINGS (issue #75 step 5).  The signature above answers "were
+# these SOURCES the ones that minted?"  It never bound the ARTIFACT: a
+# hand-crafted .mss dropped beside a matching stamp read as fresh, and a
+# fixture chained off a poked predecessor carried no trace of that ancestry.
+# So `write` now records three things, one per line:
+#
+#     <sha256(GATE_CONTRACT ++ gen ++ ot6.lua ++ ot6_field.lua ++
+#             ot6_contract.lua ++ extras...)> <gen> [extras...]
+#     artifact <sha256(build/states/<state>.mss)>
+#     ancestor <path> <sha256(<path> file bytes)>        (non-root mints only)
+#
+# The artifact line binds stamp -> minted bytes, so replacing the .mss
+# without a mint is detected.  The ancestor line binds stamp -> the
+# predecessor's stamp file (prev= edges) or the anchor's manifest.json
+# (anchor= edges), so the WHOLE chain is verifiable transitively on disk:
+# each stamp vouches for its artifact and names the exact stamp it grew
+# from, all the way down to a power-on root.  compose.py's stamp_check
+# verifies every line; `compose.py --check-states` asks it of the whole
+# tree and is a hard `make test` gate.
 set -u
+
+# THE GATE-CONTRACT VERSION -- a fixed input to every signature.  Bumping it
+# deliberately stales every stamp in existence, forcing a full re-mint under
+# the new rules; that is the point, not a side effect.  v1 is the provenance
+# format above (issue #75 step 5).  The runtime write-gate (issue #75 step 4)
+# bumps this to v2 when it lands, so no fixture minted without the gate can
+# survive into the gated era.  Keep it a single obvious constant: both sides
+# of the comparison (the mint edge and compose.py) shell into THIS file, so
+# there is exactly one definition to bump.
+GATE_CONTRACT='ot6-provenance/v1'
 
 # OT6_ROOT lets selftests and compose.py point the sig at another tree; the
 # default is the real tree this script lives in (lib/ -> tests/ -> tools/ ->
@@ -69,11 +99,19 @@ $ROOT/tools/tests/lib/ot6_contract.lua"
 $ROOT/$extra"
     extras="$extras $extra"
   done
+  # The gate-contract version leads the byte stream, so bumping the constant
+  # above moves every signature at once (see its comment).
   digest=$(
-    printf '%s\n' "$files" | while IFS= read -r file; do cat "$file"; done |
-      shasum -a 256 | cut -c1-64
+    { printf '%s\n' "$GATE_CONTRACT"
+      printf '%s\n' "$files" | while IFS= read -r file; do cat "$file"; done
+    } | shasum -a 256 | cut -c1-64
   )
   printf '%s %s%s' "$digest" "$gen" "$extras"
+}
+
+# sha256 of one file, bare.  Used for the artifact and ancestor bindings.
+filehash() {
+  shasum -a 256 "$1" | cut -c1-64
 }
 
 cmd="${1:?usage: frontier_stamp.sh write|sig ...}"
@@ -84,8 +122,32 @@ case "$cmd" in
     ;;
   write)
     state="${2:?write needs a state}"; gen="${3:?write needs a generator}"
-    shift 3
-    sig "$gen" "$@" > "$STATES/$state.stamp"
+    ancestor="${4:?write needs an ancestor (a .stamp/manifest.json path relative to the tree root, or - for a power-on root)}"
+    shift 4
+    # Bind the artifact FIRST: a stamp that cannot name the exact bytes it
+    # vouches for must never exist at all.  The .mss was published by the
+    # same mint command a moment ago, so a miss here is a real wiring bug.
+    mss="$STATES/$state.mss"
+    [ -f "$mss" ] ||
+      { echo "frontier_stamp: no minted artifact '$mss' to bind" >&2; exit 2; }
+    artifact=$(filehash "$mss")
+    anc_hash=""
+    if [ "$ancestor" != "-" ]; then
+      case "$ancestor" in /*|*..*)
+        echo "frontier_stamp: unsafe ancestor '$ancestor'" >&2; exit 2 ;;
+      esac
+      [ -f "$ROOT/$ancestor" ] ||
+        { echo "frontier_stamp: missing ancestor '$ROOT/$ancestor'" >&2; exit 2; }
+      anc_hash=$(filehash "$ROOT/$ancestor")
+    fi
+    # Everything is computed; only now may the old stamp be replaced.
+    sigline=$(sig "$gen" "$@") || exit 2
+    {
+      printf '%s\n' "$sigline"
+      printf 'artifact %s\n' "$artifact"
+      [ "$ancestor" = "-" ] ||
+        printf 'ancestor %s %s\n' "$ancestor" "$anc_hash"
+    } > "$STATES/$state.stamp"
     ;;
   *)
     echo "frontier_stamp.sh: unknown command '$cmd'" >&2
