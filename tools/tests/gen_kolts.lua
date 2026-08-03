@@ -100,6 +100,17 @@
 --        horizontal -- row y=37, x=0..27 -> world (102,101).  The party
 --        enters at (14,35), two rows above it, and every leg on this map
 --        is asserted to stay off y=37 before it is walked.
+--
+-- ENCOUNTER POLICY (issue #75, the honesty program): every navigator and
+-- settle on this route runs honest="flee" -- random encounters are RUN
+-- FROM by holding L+R, the engine's own mechanic, with zero state writes.
+-- The old kill-bit is gone from this script's whole route.  Fleeing (not
+-- fighting) is deliberate: three fixtures mint on this route and the
+-- balance runs that consume them want the party a real *walking* player
+-- has -- near-full HP/MP, no grind XP -- and a player who is crossing the
+-- mountain rather than farming it runs from Cirpius packs.  A formation
+-- that refuses to release the party is fought by the lib's tap-A fallback
+-- after M.FLEE_CAP frames, and whatever scar that leaves is a real scar.
 local H = dofile("tools/tests/lib/ot6.lua")
 local CLEARED = "build/states/figaro_cleared.mss.lua"
 
@@ -188,7 +199,7 @@ local function settleField(what, dstMap, maxF)
       return not H.worldMode() and H.tileAligned()
          and not H.battleLoadStarted() and not H.dialogWaiting()
          and (dstMap == nil or map() == dstMap)
-    end), maxF or 12000),
+    end), maxF or 12000, { honest = "flee" }),
     H.waitFrames(30),
   })
 end
@@ -197,7 +208,7 @@ local function settleWorld(what, maxF)
   return seq({
     H.advanceStory(settled(20, function()
       return H.worldHasControl() and H.worldAligned()
-    end), maxF or 12000),
+    end), maxF or 12000, { honest = "flee" }),
     H.waitFrames(30),
   })
 end
@@ -215,7 +226,8 @@ local function crossTo(tx, ty, dstMap, what, maxF)
       return string.format("cross %s: (%d,%d) -> (%d,%d) -> map %d",
         what, H.fieldX(), H.fieldY(), tx, ty, dstMap)
     end),
-    H.navTo(tx, ty, { maxFrames = maxF or 20000, arrive = mapChanged() }),
+    H.navTo(tx, ty, { maxFrames = maxF or 20000, arrive = mapChanged(),
+             honest = "flee" }),
     H.release(),
     settleField(what, dstMap),
     H.call(function()
@@ -242,7 +254,7 @@ local FACE = { up = 0, right = 1, down = 2, left = 3 }
 local function talkAt(sx, sy, dir, what, maxF)
   local aPh, started = 0, 0
   return seq({
-    H.navTo(sx, sy, { maxFrames = 20000 }),
+    H.navTo(sx, sy, { maxFrames = 20000, honest = "flee" }),
     H.release(),
     H.driveUntil(function()
       started = (H.eventRunning() or H.dialogWaiting()) and started + 1 or 0
@@ -272,7 +284,8 @@ local function warpTo(sx, sy, dx, dy, what, maxF)
       return string.format("warp %s: (%d,%d) -> (%d,%d) -> (%d,%d)",
         what, H.fieldX(), H.fieldY(), sx, sy, dx, dy)
     end),
-    H.navTo(sx, sy, { maxFrames = maxF or 20000, arrive = function()
+    H.navTo(sx, sy, { maxFrames = maxF or 20000, honest = "flee",
+                      arrive = function()
       return H.fieldX() == dx and H.fieldY() == dy
     end }),
     H.release(),
@@ -309,7 +322,7 @@ local function planAvoidsRow(tx, ty, badY, what)
   end)
 end
 
-H.run({ maxFrames = 150000 }, {
+H.run({ maxFrames = 220000 }, {
   H.loadState(CLEARED),
   H.waitFrames(20),
   H.call(function()
@@ -349,7 +362,7 @@ H.run({ maxFrames = 150000 }, {
       "$001A clear -> the cave's map-73/72 copy (event_main.asm:14219)")
   end),
   settleWorld("desert"),
-  H.worldNavTo(73, 93, { maxFrames = 30000,
+  H.worldNavTo(73, 93, { maxFrames = 30000, honest = "flee",
     arrive = function() return not H.worldMode() end }),
   H.release(),
   settleField("cave mouth", 71),
@@ -372,7 +385,7 @@ H.run({ maxFrames = 150000 }, {
   H.advanceStory(function()
     return H.hasControl() and H.tileAligned() and sw(0x0312) == 0
        and map() == 71
-  end, 20000),
+  end, 20000, { honest = "flee" }),
   H.call(function()
     H.assertEq(sw(0x0312), 0, "the guards are gone ($0312 cleared)")
     where("cave opened")
@@ -381,7 +394,8 @@ H.run({ maxFrames = 150000 }, {
 
   -- map 71's event trigger at (10,48)/(11,48) is what actually opens the
   -- cave (_ca5ef7); the lobby has no short entrance onward at all.
-  H.navTo(11, 48, { maxFrames = 20000, arrive = mapChanged() }),
+  H.navTo(11, 48, { maxFrames = 20000, arrive = mapChanged(),
+           honest = "flee" }),
   H.release(),
   settleField("cave body"),
   H.call(function()
@@ -416,7 +430,7 @@ H.run({ maxFrames = 150000 }, {
     return string.format("cave exit: (%d,%d) -> (16,43) -> world (75,103)",
       H.fieldX(), H.fieldY())
   end),
-  H.navTo(16, 43, { maxFrames = 20000,
+  H.navTo(16, 43, { maxFrames = 20000, honest = "flee",
     arrive = function() return H.worldMode() end }),
   H.release(),
   settleWorld("south region"),
@@ -437,7 +451,7 @@ H.run({ maxFrames = 150000 }, {
   -- ((86,111)/(85,112)/(86,112)/(85,113) -> map 75 (1,28)); mint on
   -- arrival, then leave by the x=0 column the party is already beside.
   -- ===================================================================== --
-  H.worldNavTo(86, 111, { maxFrames = 30000,
+  H.worldNavTo(86, 111, { maxFrames = 30000, honest = "flee",
     arrive = function() return not H.worldMode() end }),
   H.release(),
   settleField("south figaro", 75),
@@ -469,7 +483,7 @@ H.run({ maxFrames = 150000 }, {
   -- exit row y=37 is two tiles south of the spawn, so every leg here is
   -- pre-checked against it.
   -- ===================================================================== --
-  H.worldNavTo(102, 100, { maxFrames = 40000,
+  H.worldNavTo(102, 100, { maxFrames = 40000, honest = "flee",
     arrive = function() return not H.worldMode() end }),
   H.release(),
   settleField("mt kolts", 95),
@@ -541,13 +555,13 @@ H.run({ maxFrames = 150000 }, {
     H.assertEq(sw(0x010A), 0, "$010A still clear -- Vargas has not appeared")
     where("map 98 arrival")
   end),
-  H.navTo(11, 32, { maxFrames = 20000,
+  H.navTo(11, 32, { maxFrames = 20000, honest = "flee",
     arrive = function() return sw(0x010A) == 1 end }),
   H.release(),
   H.advanceStory(function()
     return H.hasControl() and H.tileAligned() and sw(0x010A) == 1
        and objX(16) == 23 and objY(16) == 32
-  end, 20000),
+  end, 20000, { honest = "flee" }),
   H.call(function()
     H.assertEq(sw(0x010A), 1, "the approach trigger ran ($010A set)")
     H.assertEq(sw(0x031C), 1, "$031C set (Vargas NPC armed)")
@@ -556,7 +570,7 @@ H.run({ maxFrames = 150000 }, {
     H.screenshot("vargas_spawn")
   end),
 
-  H.navTo(22, 32, { maxFrames = 20000 }),
+  H.navTo(22, 32, { maxFrames = 20000, honest = "flee" }),
   H.release(),
   -- Face him.  NPC activation is decided by the party FACING byte ($087F
   -- through the $0803 party-object offset; 0 up 1 right 2 down 3 left, from
