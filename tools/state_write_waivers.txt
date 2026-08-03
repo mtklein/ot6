@@ -39,8 +39,6 @@ tools/tests/battle_break.lua	.writeByte(
 tools/tests/battle_break.lua	.writeWord(
 tools/tests/battle_breakflash.lua	.writeByte(
 tools/tests/battle_breakflash.lua	.writeWord(
-tools/tests/battle_brokendeath.lua	.writeByte(
-tools/tests/battle_brokendeath.lua	.writeWord(
 tools/tests/battle_bushido.lua	.writeByte(
 tools/tests/battle_bushido.lua	.writeWord(
 tools/tests/battle_bushidogrey.lua	.writeByte(
@@ -65,8 +63,6 @@ tools/tests/battle_dmgnum.lua	.writeByte(
 tools/tests/battle_dmgnum.lua	.writeWord(
 tools/tests/battle_dotchip.lua	.writeByte(
 tools/tests/battle_dotchip.lua	.writeWord(
-tools/tests/battle_esperstats.lua	.writeByte(
-tools/tests/battle_esperstats_tube6.lua	.writeByte(
 tools/tests/battle_flyin.lua	.writeWord(
 tools/tests/battle_fold.lua	.writeByte(
 tools/tests/battle_fold.lua	.writeWord(
