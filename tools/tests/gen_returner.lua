@@ -54,6 +54,22 @@
 --    mountain's north door at (98,93) that is a long stretch of overworld,
 --    and the world leg is planned by worldBfs and asserted to exist before it
 --    is walked rather than discovered by holding a direction.
+--
+-- ISSUE #75 -- THIS MINT IS ZERO-WRITE.  Every field navigator runs with
+-- opts.honest (mid-route encounters on Mt. Kolts are FOUGHT by the
+-- edge-tapped A auto-fighter, not kill-bitted), and the world leg never
+-- lets worldNavTo's own battle branch -- which still carries the kill-bit
+-- and has no honest option -- see a battle at all: worldWalkHonest below
+-- stops the walk on the world engine's battle-pending bit ($E8 bit5, set
+-- the INSTANT the encounter roll wins, move.asm's `ora #$20` -- frames
+-- before worldNavTo's 3-frame debounce could act), fights the encounter
+-- with H.fightBattle, rides out the post-battle world reload (position
+-- restored, danger counter zeroed -- move.asm:916-921 /
+-- world_start.asm:465-482), and resumes.  Fighting rather than fleeing is
+-- deliberate: L+R can fail on unrunnable/back-attack formations and this
+-- post-Vargas four (TERRA/LOCKE/EDGAR/SABIN) one-rounds the northern
+-- plains' trash, so the fight always terminates and the walk stays
+-- deterministic from the fixture.
 local H = dofile("tools/tests/lib/ot6.lua")
 local WON = "build/states/vargas_won.mss.lua"
 
@@ -99,9 +115,9 @@ end
 
 -- The settle DRIVES rather than waits, for the reason gen_kolts measured on
 -- map 96: this is encounter territory, and a battle rolled on the arrival
--- tile stalls a passive waitUntil forever.  advanceStory kill-bits whatever
--- came up and edge-taps the victory text; on a quiet field it holds the pad
--- empty.  It also deliberately does NOT require player control -- $087C&$0F
+-- tile stalls a passive waitUntil forever.  advanceStory (honest mode --
+-- issue #75) FIGHTS whatever came up with the same edge-tapped A that pages
+-- the victory text; on a quiet field it holds the pad empty.  It also deliberately does NOT require player control -- $087C&$0F
 -- flickers 2<->4 while any async object script is live -- and leaves "can I
 -- step THIS frame" to navTo, which debounces control itself.
 local function settleField(dstMap, maxF)
@@ -111,7 +127,7 @@ local function settleField(dstMap, maxF)
       return not H.worldMode() and H.tileAligned()
          and not H.battleLoadStarted() and not H.dialogWaiting()
          and (dstMap == nil or map() == dstMap)
-    end), maxF or 12000),
+    end), maxF or 12000, { honest = true }),
     H.waitFrames(30),
   })
 end
@@ -120,7 +136,7 @@ local function settleWorld(maxF)
   return seq({
     H.advanceStory(settled(20, function()
       return H.worldHasControl() and H.worldAligned()
-    end), maxF or 12000),
+    end), maxF or 12000, { honest = true }),
     H.waitFrames(30),
   })
 end
@@ -135,7 +151,8 @@ local function crossTo(tx, ty, dstMap, what, maxF)
       return string.format("cross %s: (%d,%d) -> (%d,%d) -> map %d",
         what, H.fieldX(), H.fieldY(), tx, ty, dstMap)
     end),
-    H.navTo(tx, ty, { maxFrames = maxF or 20000, arrive = mapChanged() }),
+    H.navTo(tx, ty, { maxFrames = maxF or 20000, arrive = mapChanged(),
+      honest = true }),
     H.release(),
     settleField(dstMap),
     H.call(function()
@@ -143,6 +160,42 @@ local function crossTo(tx, ty, dstMap, what, maxF)
       where(what)
     end),
   })
+end
+
+-- ISSUE #75: the honest world walk (the header's point on zero writes).
+-- One round = walk toward the hideout until either the entrance fires (off
+-- the world map) or the encounter roll wins -- $E8 bit5, set the instant
+-- the roll wins and checked here as the navigator's arrive() EVERY frame,
+-- so worldNavTo's own 3-frame-debounced kill-bit branch can never run --
+-- then FIGHT the encounter for real and ride out the post-battle world
+-- reload before the next round re-plans.  Rounds are written out flat:
+-- navigator and driveUntil bodies latch state and cannot be replayed
+-- (gen_banon's talkTo rounds, same reason).
+local function battlePending()
+  return (H.readByte(0x00e8) & 0x20) ~= 0 or H.battleLoadStarted()
+end
+local function worldRound(n, tx, ty)
+  return H.cond(function() return H.worldMode() end, {
+    H.worldNavTo(tx, ty, { maxFrames = 40000,
+      arrive = function() return battlePending() or not H.worldMode() end }),
+    H.cond(battlePending, {
+      H.logStep(function()
+        return string.format("world leg round %d: encounter roll won at " ..
+          "(%d,%d) f%d -- fighting it honestly", n, H.worldX(), H.worldY(),
+          H.frame)
+      end),
+      H.waitUntil(function() return H.battleLoadStarted() end, 1800,
+        "the rolled encounter loads", 5),
+      H.fightBattle(20000),
+      H.driveUntil(function()
+        return H.worldMode() and H.worldHasControl() and H.worldAligned()
+      end, 8000, { H.release() }, "world reload after the honest fight"),
+      H.call(function()
+        H.log(string.format("world leg round %d: fight done, reloaded at " ..
+          "(%d,%d) f%d", n, H.worldX(), H.worldY(), H.frame))
+      end),
+    }, {}),
+  }, {})
 end
 
 -- Assert the BFS plan to (tx,ty) exists and never steps on any tile in
@@ -176,7 +229,9 @@ local function planAvoids(tx, ty, bad, what)
   end)
 end
 
-H.run({ maxFrames = 120000 }, {
+-- 120000 was the kill-bit budget; honest fights spend real ATB rounds, so
+-- the ceiling carries headroom for every encounter the route can roll
+H.run({ maxFrames = 220000 }, {
   H.loadState(WON),
   H.waitFrames(30),
   H.call(function()
@@ -220,7 +275,7 @@ H.run({ maxFrames = 120000 }, {
     return string.format("cross M3: (%d,%d) -> (10,57) -> world (98,93)",
       H.fieldX(), H.fieldY())
   end),
-  H.navTo(10, 57, { maxFrames = 20000,
+  H.navTo(10, 57, { maxFrames = 20000, honest = true,
     arrive = function() return H.worldMode() end }),
   H.release(),
   settleWorld(),
@@ -242,8 +297,14 @@ H.run({ maxFrames = 120000 }, {
     H.log(string.format("world leg: (%d,%d) -> (104,64), %d steps",
       H.worldX(), H.worldY(), #p))
   end),
-  H.worldNavTo(104, 64, { maxFrames = 40000,
-    arrive = function() return not H.worldMode() end }),
+  -- Twelve honest rounds: ~45 tiles of encounter territory has never
+  -- rolled more than a handful of fights, and a spent round costs nothing
+  -- (its cond sees the world already left).  A 13th battle would surface
+  -- as the settle below timing out on map 108.
+  worldRound(1, 104, 64), worldRound(2, 104, 64), worldRound(3, 104, 64),
+  worldRound(4, 104, 64), worldRound(5, 104, 64), worldRound(6, 104, 64),
+  worldRound(7, 104, 64), worldRound(8, 104, 64), worldRound(9, 104, 64),
+  worldRound(10, 104, 64), worldRound(11, 104, 64), worldRound(12, 104, 64),
   H.release(),
   settleField(108),
   H.call(function()
