@@ -283,14 +283,23 @@ local function resolve(v) return type(v) == "function" and v() or v end
 --   opts.arrive    extra terminator predicate (checked before everything)
 --   opts.maxFrames frame budget -> error (default 20000)
 --   opts.spare     list of formation species words never to kill-bit
---   opts.honest    clear mid-route battles by REAL PLAY (the edge-tapped A
---                  already driving the victory text doubles as an
---                  auto-fighter: A opens the command list, A confirms its
---                  first entry, A takes the default target) instead of the
+--   opts.honest    clear mid-route battles by REAL PLAY instead of the
 --                  kill-bit -- ZERO state writes on this navigator (issue
 --                  #75).  Opt-in while unconverted generators still lean on
 --                  the kill-bit; costs real ATB rounds per encounter, so
---                  honest legs budget more frames.
+--                  honest legs budget more frames.  Two spellings, the
+--                  same contract worldNavTo carries:
+--                  true    auto-fight by edge-tapped A (the taps already
+--                          driving the victory text double as a fighter:
+--                          A opens the command list, A confirms its first
+--                          entry, A takes the default target);
+--                  "flee"  hold L+R, the engine's own run mechanic.  A
+--                          fled battle is not a WIN, so win-only rolls
+--                          (SHADOW's 1/16 post-battle leave,
+--                          battle_main.asm:11976) never happen -- the
+--                          Sabin chain's whole reason to run.  Times out
+--                          on unrunnable formations; callers pick fight
+--                          vs flee per leg and say why.
 --   opts.calmFrames  consecutive settled frames on the goal tile the
 --                  terminator requires (default 16; see ISSUE #22 below)
 --   opts.noPathRetries  BFS-no-path retries, 45 idle frames apart, before
@@ -410,6 +419,10 @@ function M.navTo(txIn, tyIn, opts)
         drop("battle")
         if next(spareSet) and M.formationHas(spareSet) then
           M.setPad({})                 -- goal fight: hands off, arrive() sees it
+          return
+        end
+        if opts.honest == "flee" then
+          M.setPad({ l = true, r = true })
           return
         end
         if M.monstersPresent() > 0 and not opts.honest then
