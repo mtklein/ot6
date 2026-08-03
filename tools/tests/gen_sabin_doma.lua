@@ -118,6 +118,7 @@ local function talkToObj(obj, what, maxF)
     return H.navTo(function() return approach()[1] end,
                    function() return approach()[2] end, {
       maxFrames = maxF or 20000,
+      honest = true,
       arrive = function()
         return engaged or (adjacent() and H.hasControl() and H.tileAligned())
       end,
@@ -228,18 +229,19 @@ local function rideUntil(pred, what, budget)
             end
           end
         end
-        -- A SCRIPT BATTLE (zero monsters present) has nothing to kill-bit
+        -- A SCRIPT BATTLE (zero monsters present) has nothing to fight
         -- and ends on its character-AI script's own schedule.  Hands off
         -- for 300 frames, then edge-tap A to advance its text.
         if monCount() == 0 then
           H.setPad(battN > 300 and phase < 4 and { "a" } or {})
           return
         end
-        for slot = 0, 5 do
-          if monPresent(slot) then
-            H.writeByte(0x3eec + slot * 2, H.readByte(0x3eec + slot * 2) | 0x80)
-          end
-        end
+        -- Issue #75: no route on this leg has an encounter pool (the Doma
+        -- interiors are event maps), so a monster table here would be a
+        -- surprise -- and the honest answer to a surprise is to PLAY it:
+        -- the edge-tapped A below is the lib's own blind auto-fighter (A
+        -- opens the command list, A confirms Fight, A takes the default
+        -- target).  The kill-bit that used to sit here is gone.
         H.setPad(phase < 4 and { "a" } or {})
         return
       end
@@ -373,6 +375,7 @@ local function crawl123(gx, gy, dest)
       end),
       H.navTo(function() return target[1] end, function() return target[2] end, {
         maxFrames = 9000,
+        honest = true,
         -- A DOOR FIRES THE MOMENT THE PARTY STEPS ON IT, WHISKING IT AWAY --
         -- so navTo never rests on the door tile and its own terminator
         -- (on the tile, with control) can never fire.  For an inner door
@@ -419,6 +422,7 @@ end
 local function fieldLeg(tx, ty, from, want, what, budget)
   return H.navTo(tx, ty, {
     maxFrames = budget or 15000,
+    honest = true,
     arrive = function()
       local m = map()
       if m == from then return false end            -- still walking
