@@ -3,15 +3,18 @@
 -- real in-game save into the chosen slot.
 --
 -- The world-map fixture supplies a legitimate Save menu. We stage transient
--- knowledge, force the save-select state after opening the ordinary field
--- menu, save into empty slot 3, and assert both the payload transfer and the
--- active-page lifecycle marker. This exercises CopyGameDataToSRAM's real
--- Ot6CodexSaveAs hook rather than calling an OT6 helper directly.
+-- knowledge, drive the ordinary field menu's Save command with PAD INPUT
+-- ONLY (save-drive rule, tools/tests/README; probe_banquet_timer_save is the
+-- template -- the old forced-ZMENUSTATE shortcut skipped the menu entry's own
+-- writes and left menu tasks running on a corrupted exit), save into empty
+-- slot 3, and assert both the payload transfer and the active-page lifecycle
+-- marker. This exercises CopyGameDataToSRAM's real Ot6CodexSaveAs hook rather
+-- than calling an OT6 helper directly.
 local H = dofile("tools/tests/lib/ot6.lua")
 local STATE = "build/states/worldmap_narshe.mss.lua"
 
 local ZMENUSTATE = 0x26
-local SAVE_SELECT_INIT = 0x13
+local MAIN_MENU = 0x05
 local SAVE_SELECT = 0x14
 local ACTIVE = 0x021f
 local TEMP_ELEM, SLOT3_ELEM = 0x316c10, 0x316810
@@ -48,16 +51,30 @@ H.run({ maxFrames = 12000 }, {
 
   H.pressButtons({ "x" }, 4),
   H.waitFrames(120),
-  H.call(function()
-    -- Enter vanilla's save-select initializer; world-map saving is legal.
-    H.writeByte(ZMENUSTATE, SAVE_SELECT_INIT)
-  end),
+  H.waitUntil(function() return H.readByte(ZMENUSTATE) == MAIN_MENU end,
+    300, "main menu", 5),
+  -- UP wraps the main-menu cursor from Items straight down to Save (row 6);
+  -- A then runs SelectMainMenuOption_06 itself (field_menu.asm), so the
+  -- $9e/$9f exit bookkeeping and the save-enabled check are the real code
+  -- path, not an imitation.  World-map saving is legal, so it lets us in.
+  H.driveUntil(function()
+    return H.readByte(ZMENUSTATE) == MAIN_MENU and H.readByte(0x4b) == 6
+  end, 600, {
+    H.pressButtons({ "up" }, 4), H.waitFrames(16),
+  }, "main-menu cursor on Save"),
+  H.pressButtons({ "a" }, 4),
   H.waitUntil(function() return H.readByte(ZMENUSTATE) == SAVE_SELECT end,
-    300, "save-slot selection", 5),
-  H.call(function()
-    H.writeByte(0x4b, 2) -- zero-based cursor: slot 3
-    H.writeWord(0x95, 0) -- save-menu checksum cache: make slot 3 empty
-  end),
+    600, "save-slot selection", 5),
+  -- Walk the slot cursor to slot 3 (zero-based 2) by pad, confirming by
+  -- READING the cursor back each frame -- no cursor pokes, no checksum-cache
+  -- pokes.  This run's SRAM is fresh so slot 3 saves instantly; were it
+  -- occupied, the driveUntil below presses A on through the overwrite
+  -- confirm, same as probe_banquet_timer_save.
+  H.driveUntil(function()
+    return H.readByte(ZMENUSTATE) == SAVE_SELECT and H.readByte(0x4b) == 2
+  end, 600, {
+    H.pressButtons({ "down" }, 4), H.waitFrames(16),
+  }, "save cursor on slot 3"),
   H.pressButtons({ "a" }, 4),
   H.waitFrames(40),
   H.call(function()
