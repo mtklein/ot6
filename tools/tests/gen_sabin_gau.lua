@@ -121,7 +121,8 @@ local function cmdRowOf(actor, cmdId)
 end
 local function battInvIdx(id)
   for i = 0, 251 do
-    if H.readByte(BATTINV + i * 5) == id then return i end
+    if H.readByte(BATTINV + i * 5) == id
+       and H.readByte(BATTINV + i * 5 + 3) > 0 then return i end
   end
   return nil
 end
@@ -305,8 +306,17 @@ local function grindStep()
     if st == ST_TOOLS then return { "b" } end   -- not a menu we ever want
     return nil
   end
-  return H.driveUntil(function() return lost ~= nil or inParty(11) end,
-    250000, {
+  local frames = 0
+  return H.driveUntil(function()
+    frames = frames + 1
+    if frames > 245000 and lost == nil then
+      lost = string.format("grind deadline (245000 frames): fights=%d " ..
+        "appearances=%d fed=%s [%s]", grind.fights, grind.appearances,
+        tostring(fed), partyLine())
+      H.log("[gau] LOST -- " .. lost)
+    end
+    return lost ~= nil or inParty(11)
+  end, 250000, {
     H.call(function()
       phase = (phase + 1) % 8
       if H.frame - hb >= 1800 then

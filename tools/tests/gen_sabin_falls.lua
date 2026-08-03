@@ -79,43 +79,116 @@ local function partyLine()
   end
   return table.concat(p, " ")
 end
-local function fightPulse(phase)
+-- CLOSED-LOOP (2nd pass): the seq machine assumed full-HP parties, and
+-- the first honest mint of the chain proved fights now carry damage
+-- forward between legs (SABIN entered the courtyard at 46/231).  So the
+-- fighter reads the engine's own cursor state ($890F/$8947 + actor, the
+-- $7BC2 menu state) and steers by pad: boost-and-Fight as before, plus a
+-- SELF-HEAL branch under 50% HP funded from the real bag (Potion when
+-- >=150 HP is missing, else Tonic; battle inventory $2686 stride 5,
+-- count at +3 -- a zero-count row is never picked).  Item targets
+-- default to self, so no target steering is needed here.
+local MSTATE = 0x7BC2
+local ST_CMD, ST_ITEM, ST_TGT, ST_TOOLS = 0x05, 0x0A, 0x38, 0x30
+local CMD_ITEM = 0x01
+local CMDTBL, CMDROW, ITEMIDX = 0x202E, 0x890F, 0x8947
+local BATTINV = 0x2686
+local TONIC, POTION = 0xE8, 0xE9
+local function pHPf(e) return H.readWord(0x3BF4 + e * 2) end
+local function pMaxHPf(e) return H.readWord(0x3C1C + e * 2) end
+local function battItemIdx(id)
+  for i = 0, 251 do
+    if H.readByte(BATTINV + i * 5) == id
+       and H.readByte(BATTINV + i * 5 + 3) > 0 then return i end
+  end
+  return nil
+end
+local function cmdRowOf(actor, cmdId)
+  for i = 0, 3 do
+    if H.readByte(CMDTBL + actor * 12 + i * 3) == cmdId then return i end
+  end
+  return nil
+end
+local fPlan, fPlanActor, fBtn = nil, nil, nil
+local fTick, fStreak = 0, 0
+local function makeFightPlan(actor)
+  local hp, mx = pHPf(actor), pMaxHPf(actor)
+  local itemRow = cmdRowOf(actor, CMD_ITEM)
+  if mx > 0 and hp > 0 and hp * 2 < mx and itemRow then
+    local id = nil
+    if mx - hp >= 150 and battItemIdx(POTION) then id = POTION
+    elseif battItemIdx(TONIC) then id = TONIC
+    elseif battItemIdx(POTION) then id = POTION end
+    if id then
+      H.log(string.format("[falls] heal f%d e%d %s (hp %d/%d) [%s]",
+        H.frame, actor, id == TONIC and "TONIC" or "POTION", hp, mx,
+        partyLine()))
+      return { kind = "item", item = id, row = itemRow }
+    end
+  end
+  local bp = H.readByte(BP + actor * 2)
+  local boostMin = fightTier >= 2 and 1 or 2
+  local boost = bp >= boostMin and math.min(bp, 3) or 0
+  H.log(string.format("[falls] cast f%d e%d boost=%d tier=%d [%s]",
+    H.frame, actor, boost, fightTier, partyLine()))
+  return { kind = "fight", boostLeft = boost }
+end
+local function fightButton()
+  local st = H.readByte(MSTATE)
+  local actor = H.readByte(ACTOR)
+  if fPlan == nil or fPlanActor ~= actor then
+    if st ~= ST_CMD then return nil end
+    fPlan, fPlanActor = makeFightPlan(actor), actor
+    return nil
+  end
+  local plan = fPlan
+  if st == ST_CMD then
+    if plan.kind == "fight" then
+      if plan.boostLeft > 0 then
+        plan.boostLeft = plan.boostLeft - 1
+        return { "r" }
+      end
+      local cur = H.readByte(CMDROW + actor) & 3
+      if cur ~= 0 then return { "up" } end
+      return { "a" }
+    end
+    local cur = H.readByte(CMDROW + actor) & 3
+    if cur == plan.row then return { "a" } end
+    if plan.rowStall and plan.rowStall > 2 then
+      plan.rowStall = 0
+      return { ({ [0]="up", [1]="left", [2]="right", [3]="down" })[plan.row] }
+    end
+    plan.rowStall = (plan.rowStall or 0) + 1
+    return { cur < plan.row and "down" or "up" }
+  end
+  if st == ST_ITEM and plan.kind == "item" then
+    local want = battItemIdx(plan.item)
+    if want == nil then return { "b" } end
+    local cur = H.readByte(ITEMIDX + actor)
+    if cur < want then return { "down" } end
+    if cur > want then return { "up" } end
+    return { "a" }
+  end
+  if st == ST_TGT then
+    fPlan, fPlanActor = nil, nil
+    return { "a" }          -- item: default self; Fight: default enemy
+  end
+  if st == ST_TOOLS then return { "b" } end
+  return nil
+end
+local function fightPulse(_)
   if H.readByte(MENU) == 0 then
-    mStreak, mSeq = 0, nil
-    H.setPad(phase < 4 and { "a" } or {})
+    fPlan, fPlanActor, fStreak = nil, nil, 0
+    fTick = fTick + 1
+    H.setPad(fTick % 8 < 4 and { "a" } or {})
     return
   end
-  mStreak = mStreak + 1
-  if mStreak < 4 then H.setPad({}); return end
-  if mSeq == nil then
-    local slot = H.readByte(ACTOR) & 3
-    local bp = H.readByte(BP + slot * 2)
-    local boostMin = fightTier >= 2 and 1 or 2
-    local boost = bp >= boostMin and math.min(bp, 3) or 0
-    mSeq, mIdx, mTick, mStall = {}, 1, 0, 0
-    for _ = 1, boost do mSeq[#mSeq + 1] = "r" end
-    mSeq[#mSeq + 1] = "a"; mSeq[#mSeq + 1] = "a"
-    H.log(string.format("[falls] cast f%d slot=%d bp=%d tier=%d seq=%s | [%s]",
-      H.frame, slot, bp, fightTier, table.concat(mSeq, ","), partyLine()))
-  end
-  mTick = mTick + 1
-  local ph = mTick % 30
-  local btn
-  if mIdx <= #mSeq then
-    btn = mSeq[mIdx]
-  elseif mStall < 2 then
-    btn = "a"
-  elseif mStall < 4 then
-    btn = "b"
-  else
-    mSeq = nil
-    H.setPad({})
-    return
-  end
-  if ph < 6 then H.setPad({ [btn] = true }) else H.setPad({}) end
-  if ph == 29 then
-    if mIdx <= #mSeq then mIdx = mIdx + 1 else mStall = mStall + 1 end
-  end
+  fStreak = fStreak + 1
+  if fStreak < 4 then H.setPad({}); return end
+  fTick = fTick + 1
+  local ph = fTick % 30
+  if ph == 0 then fBtn = fightButton() end
+  H.setPad(ph < 6 and fBtn or {})
 end
 local function wipeWatch(tag)
   local wiped = true
@@ -265,12 +338,21 @@ local function jumpAttempt(n)
       rizo.seen, rizo.mask0 = false, nil
     end),
     H.navTo(13, 11, { maxFrames = 5000, honest = "flee" }),
-    ride("up", function()
-      return lost ~= nil
-          or (mapIdx() == 159 and sw(0x3F) == 1 and H.hasControl()
-              and H.tileAligned() and bright() >= 15)
-    end, "jump + battle 18 + the shore (attempt " .. n .. ")", 40000,
-      "real", 0),
+    (function()
+      local frames = 0
+      return ride("up", function()
+        frames = frames + 1
+        if frames > 39000 and lost == nil then
+          lost = string.format("attempt %d deadline (39000 frames) -- " ..
+            "assumed wiped or wedged [%s]", n, partyLine())
+          H.log("[falls] LOST -- " .. lost)
+        end
+        return lost ~= nil
+            or (mapIdx() == 159 and sw(0x3F) == 1 and H.hasControl()
+                and H.tileAligned() and bright() >= 15)
+      end, "jump + battle 18 + the shore (attempt " .. n .. ")", 40000,
+        "real", 0)
+    end)(),
     H.release(),
     H.waitFrames(30),
     H.call(function()

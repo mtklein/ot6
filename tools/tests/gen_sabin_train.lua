@@ -424,7 +424,8 @@ local function cmdRowOf(actor, cmdId)
 end
 local function battInvIdx(id)
   for i = 0, 251 do
-    if H.readByte(BATTINV + i * 5) == id then return i end
+    if H.readByte(BATTINV + i * 5) == id
+       and H.readByte(BATTINV + i * 5 + 3) > 0 then return i end
   end
   return nil
 end
@@ -660,11 +661,20 @@ local function b47Attempt(n)
         end),
       }, "talk to the trap ghost")
     end)(),
-    holdDrive("down", function()
-      return lost ~= nil
-          or (mapIdx() == 142 and H.hasControl() and H.tileAligned()
-              and not inBattle() and bright() >= 15)
-    end, "battle 47 + mob scene (attempt " .. n .. ")", 30000, "fight"),
+    (function()
+      local frames = 0
+      return holdDrive("down", function()
+        frames = frames + 1
+        if frames > 29000 and lost == nil then
+          lost = string.format("b47 attempt %d deadline (29000 frames) -- " ..
+            "assumed wiped or wedged [%s]", n, partyLine())
+          H.log("[train] LOST -- " .. lost)
+        end
+        return lost ~= nil
+            or (mapIdx() == 142 and H.hasControl() and H.tileAligned()
+                and not inBattle() and bright() >= 15)
+      end, "battle 47 + mob scene (attempt " .. n .. ")", 30000, "fight")
+    end)(),
     H.waitFrames(30),
     H.call(function()
       if lost == nil and not inParty(3) then
@@ -776,7 +786,14 @@ local function b68Attempt(n)
     -- the fight itself: the closed-loop pacifist engine
     (function()
       local tick = 0
+      local frames = 0
       return H.driveUntil(function()
+        frames = frames + 1
+        if frames > 145000 and lost == nil then
+          lost = string.format("b68 attempt %d deadline (145000 frames) " ..
+            "[%s]", n, partyLine())
+          H.log("[b68] LOST -- " .. lost)
+        end
         return lost ~= nil or b68.impossible ~= nil or b68.tornDown >= 3
       end, 150000, {
         H.call(function()
