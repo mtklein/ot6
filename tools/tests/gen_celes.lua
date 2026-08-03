@@ -66,6 +66,17 @@
 --    against reading as story state) opens only an internal shortcut on map
 --    84, not a cave exit.  The clock key is taken anyway -- it costs nothing
 --    and leaves the state faithful to a real playthrough.
+--
+-- ISSUE #75 (the honesty conversion): this generator now performs ZERO
+-- state writes.  Its route never draws a battle at all -- the mansion,
+-- basement and warp maze carry no encounter groups, and every beat on it
+-- is dialog and cutscene -- so the conversion was removing the gate-
+-- soldier/steal battle helpers this file inherited from gen_sfigaro and
+-- never called (rideOut's HP pin + kill-bit, clearGateSoldier, the
+-- stealDriver's command-table pokes: all dead code here, confirmed by
+-- grep before deletion) and flagging every navigator honest so a battle
+-- that DID somehow fire would be played by real input rather than
+-- kill-bitted by the library.
 local H = dofile("tools/tests/lib/ot6.lua")
 local DOOR = "build/states/sfigaro_passage.mss.lua"
 
@@ -129,73 +140,12 @@ local function settleField(dstMap, maxF)
       return not H.worldMode() and H.tileAligned()
          and not H.battleLoadStarted() and not H.dialogWaiting()
          and (dstMap == nil or map() == dstMap)
-    end), maxF or 12000),
+    end), maxF or 12000, { honest = true }),
     H.waitFrames(30),
   })
 end
 
 local aPhase = 0
-
--- Ride a scene out to a settled, controllable field, edge-tapping A on EVERY
--- frame the party is not in control and kill-bitting anything that comes up.
---
--- WHY NOT advanceStory HERE.  advanceStory taps A only while a battle is up
--- or H.dialogWaiting() is true, and holds the pad empty otherwise.  The tail
--- of `battle 11` has a window state that satisfies NEITHER: measured at the
--- third gate-soldier fight, $0059 = $52 (a menu module owns the CPU) with
--- $BA/$D3 both clear, so dialogWaiting() is false, the battle flag is
--- already down, and advanceStory sat with the pad empty for 20000 frames
--- while the event PC stayed parked at $CA85B9.  Tapping A on "no control"
--- rather than on "a signal I recognise" clears it, and it cannot misfire on
--- the open field because the tap is gated on NOT having control.
--- (Choice prompts are the one thing this must never meet -- an A press
--- always takes option 0 -- so every prompt on the route is answered by
--- rideUntil below, which steers the cursor explicitly.)
-local function rideOut(what, budget, dstMap)
-  local phase, calm = 0, 0
-  return seq({
-    H.driveUntil(function()
-      local ok = H.hasControl() and H.tileAligned() and bright() >= 15
-             and not H.battleLoadStarted() and not H.dialogWaiting()
-             and (dstMap == nil or map() == dstMap)
-      calm = ok and calm + 1 or 0
-      return calm >= 20
-    end, budget or 20000, {
-      H.call(function()
-        phase = (phase + 1) % 8
-        if H.battleLoadStarted() then
-          -- LOSING battle 11 IS A ROUTE FAILURE, not a retry.  `if_b_switch
-          -- $40` jumps to the win branch when the bit is CLEAR; with it set
-          -- the soldier's event falls through to `call _ca85ba`
-          -- (event_main.asm:20300), which is `load_map 75, {47,43}` + "Ouch!!
-          -- I gotta steal me some new clothes, fast!!" + `switch $0104=0` +
-          -- `switch $0103=0` -- the scenario reset.  Measured: the THIRD
-          -- gate-soldier fight killed LOCKE (194 hp against a HeavyArmor
-          -- that had already been fought twice), the ride came back 230
-          -- frames longer than usual, and the party was standing on the
-          -- opening tile with both disguises gone.  So the party's hp is
-          -- pinned to max for the duration, the same way gen_vargas pins
-          -- it through a fight it only wants the SCRIPT's outcome from.
-          for e = 0, 3 do
-            H.writeWord(0x3BF4 + e * 2, H.readWord(0x3C1C + e * 2))
-          end
-          if H.monstersPresent() > 0 then
-            for slot = 0, 5 do
-              if H.readByte(0x3aa8 + slot * 2) % 2 == 1 then
-                H.writeByte(0x3eec + slot * 2,
-                  H.readByte(0x3eec + slot * 2) | 0x80)
-              end
-            end
-          end
-        end
-        if H.hasControl() then H.setPad({}); return end
-        H.setPad(phase < 4 and { "a" } or {})
-      end),
-    }, what),
-    H.release(),
-    H.waitFrames(30),
-  })
-end
 
 -- One SHORT leg to a waypoint on the current map.  See note 4: long BFS
 -- queries on map 75 run the 4096-node cap dry and answer "no path" for
@@ -203,7 +153,7 @@ end
 -- these rather than one query.
 local function hop(tx, ty, what)
   return seq({
-    H.navTo(tx, ty, { maxFrames = 12000 }),
+    H.navTo(tx, ty, { maxFrames = 12000, honest = true }),
     H.release(),
     H.call(function()
       H.assertEq(H.fieldX(), tx, what .. ": at x=" .. tx)
@@ -266,7 +216,7 @@ local function go(sx, sy, dm, dx, dy, what)
   return seq({
     H.call(function() pick, startMap = nil, map() end),
     H.navTo(function() return stage()[1] end, function() return stage()[2] end,
-      { maxFrames = 20000, arrive = arrived }),
+      { maxFrames = 20000, arrive = arrived, honest = true }),
     H.cond(function() return stage()[3] ~= nil end, {
       H.driveUntil(arrived, 1800, {
         H.call(function()
@@ -315,7 +265,7 @@ local function talkToObj(obj, what, maxF)
   local function walkStep()
     return H.navTo(function() return approach()[1] end,
                    function() return approach()[2] end, {
-      maxFrames = maxF or 20000,
+      maxFrames = maxF or 20000, honest = true,
       arrive = function()
         return engaged or (adjacent() and H.hasControl() and H.tileAligned())
       end,
@@ -412,88 +362,6 @@ local function talkThrough(obj, what, choices, budget)
   })
 end
 
--- THE GATE SOLDIER COMES BACK EVERY TIME MAP 75 RELOADS.  `hide_obj NPC_11`
--- (_ca856a, event_main.asm:20313) is a RUNTIME bit, not story state: leaving
--- town for an interior and coming back re-runs InitNPCs (field/init.asm:469
--- only skips it when reloading the SAME map) and re-creates every npc whose
--- spawn switch still holds.  His is $030C and nothing in the scenario clears
--- it.  So (30,42) -- the ONE tile joining the SE quarter to the rest of town
--- -- is plugged again on every return, and this route crosses that boundary
--- three times.  The soldier's uniform is no answer: `if_switch $0103=1` only
--- swaps his fight for a bare "Halt!" (:20296); it does not move him.
--- Gated on the SYMPTOM (a BFS probe to a tile on the far side) rather than
--- assumed, so the day the respawn stops happening this says so instead of
--- walking into a fight that is not there.
-local function clearGateSoldier(probeX, probeY, tag)
-  return H.cond(function() return H.bfsPath(probeX, probeY) == nil end, {
-    H.logStep(function()
-      return string.format("%s: (%d,%d) unreachable at f%d -- the gate " ..
-        "soldier is back at (%d,%d); fighting him again",
-        tag, probeX, probeY, H.frame, objX(26), objY(26))
-    end),
-    talkToObj(26, tag .. ": the gate soldier again"),
-    rideOut(tag .. ": ride battle 11 out", 20000, 75),
-    H.call(function()
-      -- the reset's signature is the opening tile plus a bare LOCKE; if the
-      -- fight went that way, say THAT rather than "no path"
-      H.assertEq(H.fieldX() == 47 and H.fieldY() == 43, false,
-        tag .. ": not dumped back on the scenario's opening tile")
-      H.assertEq(H.bfsPath(probeX, probeY) ~= nil, true,
-        tag .. ": the lane is open again")
-      H.log(string.format("%s: done at (%d,%d) f%d, $0104=%d",
-        tag, H.fieldX(), H.fieldY(), H.frame, sw(0x0104)))
-    end),
-  }, {
-    H.logStep(function() return tag .. ": the lane is already open" end),
-  })
-end
-
--- ------------------------------------------------------------- the steal --
--- Locke's command window is `FIGHT, STEAL, MAGIC, ITEM`
--- (field/char_prop.asm:160), two columns by two rows, so STEAL is one DOWN
--- from the resting cursor.  A confirms it, and A again takes the single
--- enemy the target cursor already sits on.  Driven as discrete pad EDGES
--- into the command window, the same way gen_vargas enters Pummel.
-local MENU, ACTOR, MSTATE = 0x7BCA, 0x62CA, 0x7BC2
-local ST_CMD = 0x05
-local B_SWITCH_LIVE = 0x3EBD          -- $3EB4 + ($4C >> 3); bit4 = $4C
-local function pinParty()
-  for e = 0, 3 do H.writeWord(0x3BF4 + e * 2, H.readWord(0x3C1C + e * 2)) end
-end
-local function stealDriver(what, maxF)
-  local prog = { { 6, { "down" } }, { 10, {} }, { 6, { "a" } }, { 14, {} },
-                 { 6, { "a" } }, { 14, {} } }
-  local pi, pc, running, tries, idle = 1, 0, false, 0, 0
-  return H.driveUntil(function() return not H.battleLoadStarted() end,
-    maxF or 20000, {
-      H.call(function()
-        pinParty()
-        if running then
-          local s = prog[pi]
-          H.setPad(s[2])
-          pc = pc + 1
-          if pc >= s[1] then pi, pc = pi + 1, 0 end
-          if pi > #prog then running = false end
-          return
-        end
-        if H.readByte(MENU) ~= 0 then
-          if H.readByte(MSTATE) == ST_CMD then
-            tries = tries + 1
-            H.log(string.format("%s: STEAL attempt %d at f%d actor=%d $3EBD=%02X",
-              what, tries, H.frame, H.readByte(ACTOR),
-              H.readByte(B_SWITCH_LIVE)))
-            running, pi, pc = true, 1, 0
-          end
-          H.setPad({})           -- a menu is up but not the command list:
-          return                 -- never mash A into it
-        end
-        idle = (idle + 1) % 8    -- no menu: edge-tap through battle messages
-        H.setPad(idle < 4 and { "a" } or {})
-      end),
-    }, what .. ": steal the clothes")
-end
-
-
 -- A DEEP DOOR (see header note 2): the entrance source sits one tile beyond
 -- a CheckDoor door, so no staging neighbour is standable.  Stand on (fx,fy)
 -- and hold `dir`; one continuous press opens the door and carries the party
@@ -532,10 +400,11 @@ local function reachCelesCutscene()
   return seq({
     (function()
       local lost = 0
-      return H.navTo(35, 15, { maxFrames = 16000, arrive = function()
-        lost = (not H.hasControl()) and lost + 1 or 0
-        return lost >= 90 or H.fieldX() >= 50
-      end })
+      return H.navTo(35, 15, { maxFrames = 16000, honest = true,
+        arrive = function()
+          lost = (not H.hasControl()) and lost + 1 or 0
+          return lost >= 90 or H.fieldX() >= 50
+        end })
     end)(),
     H.release(),
     H.logStep(function()
