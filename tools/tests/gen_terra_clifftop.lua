@@ -56,6 +56,20 @@
 -- Event variables themselves live at $1FC2 + 2n (EventCmd_e8, :4458-4464),
 -- so var 0 is the word at $1FC2 and every gate below asserts it.
 --
+-- ISSUE #75 (the honesty conversion): ZERO state writes.  The caves are
+-- this scenario's only random-encounter pool, and every encounter is now
+-- FOUGHT by real input instead of kill-bitted: the same edge-tapped A
+-- that used to page the victory text doubles as the auto-fighter (A opens
+-- the active character's command list, A confirms its first entry, A
+-- takes the default target), which for this party is TERRA and EDGAR
+-- attacking while BANON's first command is his Health heal -- the pool's
+-- Repo Men and Vaporites die to it and the heal keeps the party topped
+-- between waves.  That is the lib's own opts.honest doctrine, applied to
+-- the two local drivers (mazeWalk/gateStep) that carry their own battle
+-- branches, and opts.honest passed to every lib navigator.  Honest
+-- fights cost real ATB rounds, so the per-crossing budgets grew against
+-- their kill-bit ancestors.
+--
 -- The order is fixed and one-way; it is seeded by the trigger on (111,26),
 -- _ccd9c4 (:111026), which is the maze's own intro cutscene and ends
 -- `switch $01F0=1 / set_var 0, 0 / set_var 1, 0` (:111068-111070).  The
@@ -140,7 +154,8 @@ local STEP = { up = { 0, -1 }, right = { 1, 0 }, down = { 0, 1 }, left = { -1, 0
 -- the intro cutscene (_ccd9c4, walked onto at (111,26)) shows dlg $01AC
 -- (EDGAR/TERRA explaining the light, :111093) and moves the party with
 -- obj_scripts, and a direction held into it jams it.  So this one taps
--- dialogs, kill-bits battles, and otherwise releases and waits.
+-- dialogs, FIGHTS battles honestly by the same edge-tapped A (issue #75 --
+-- no kill-bit), and otherwise releases and waits.
 local function mazeWalk(gx, gy, what, budget)
   local plan, idx, tx, ty, startMap = nil, 1, nil, nil, nil
   local aPh, battN, dlgN = 0, 0, 0
@@ -149,7 +164,7 @@ local function mazeWalk(gx, gy, what, budget)
               or (startMap ~= nil and (H.mapId() & 0x1ff) ~= startMap)
     if done then H.setPad({}) end
     return done
-  end, budget or 12000, {
+  end, budget or 30000, {
     H.call(function()
       if startMap == nil then startMap = H.mapId() & 0x1ff end
       aPh = (aPh + 1) % 8
@@ -158,13 +173,6 @@ local function mazeWalk(gx, gy, what, budget)
       if battN >= 3 then
         plan, tx, ty = nil, nil, nil
         seeBattles()
-        if H.monstersPresent() > 0 then
-          for slot = 0, 5 do
-            if H.readByte(0x3aa8 + slot * 2) % 2 == 1 then
-              H.writeByte(0x3eec + slot * 2, H.readByte(0x3eec + slot * 2) | 0x80)
-            end
-          end
-        end
         H.setPad(aPh < 4 and { "a" } or {})
         return
       end
@@ -212,7 +220,8 @@ end
 -- the re-fire resolves (a plain held UP was measured blowing through gates 10
 -- and 11 without stopping), so this driver NEVER releases for an event -- it
 -- keeps pressing toward the target, only pausing the press to tap a dialog or
--- kill-bit a battle.  It stops one tile short of overshoot by ending the frame
+-- fight a battle honestly (issue #75 -- the same edge-tapped A, no kill-bit).
+-- It stops one tile short of overshoot by ending the frame
 -- the tile coordinate first reads the target (which, moving up/left, is ~1px
 -- into the final step -- exactly enough to have triggered the gate).
 local function gateStep(gx, gy, what, budget)
@@ -221,19 +230,12 @@ local function gateStep(gx, gy, what, budget)
     local done = H.fieldX() == gx and H.fieldY() == gy
     if done then H.setPad({}) end
     return done
-  end, budget or 4000, {
+  end, budget or 15000, {
     H.call(function()
       aPh = (aPh + 1) % 8
       battN = H.battleLoadStarted() and battN + 1 or 0
       if battN >= 3 then
         seeBattles()
-        if H.monstersPresent() > 0 then
-          for slot = 0, 5 do
-            if H.readByte(0x3aa8 + slot * 2) % 2 == 1 then
-              H.writeByte(0x3eec + slot * 2, H.readByte(0x3eec + slot * 2) | 0x80)
-            end
-          end
-        end
         H.setPad(aPh < 4 and { "a" } or {})
         return
       end
@@ -293,12 +295,13 @@ local function cross(tx, ty, dstMap, ax, ay, bad, what, budget)
   local settle = landed(dstMap)
   return seq({
     planAvoids(tx, ty, bad, what),
-    H.navTo(tx, ty, { maxFrames = budget or 40000, arrive = function()
-      seeBattles()
-      return map() == dstMap
-    end }),
+    H.navTo(tx, ty, { maxFrames = budget or 60000, honest = true,
+      arrive = function()
+        seeBattles()
+        return map() == dstMap
+      end }),
     H.release(),
-    H.advanceStory(settle, 20000),
+    H.advanceStory(settle, 20000, { honest = true }),
     H.waitFrames(30),
     H.call(function()
       H.assertEq(map(), dstMap, what .. ": landed on map " .. dstMap)
@@ -405,7 +408,7 @@ H.run({ maxFrames = 250000 }, {
   planAvoids(111, 24, ALL_GATES, "map 49: onto the maze floor (111,24)"),
   mazeWalk(111, 24, "map 49: onto the maze floor (111,24)"),
   H.release(),
-  H.advanceStory(landed(49), 20000),
+  H.advanceStory(landed(49), 20000, { honest = true }),
   H.waitFrames(30),
   H.call(function()
     H.assertEq(sw(0x01F0), 1, "$01F0 set -- _ccd9c4, the maze intro, ran")
@@ -422,9 +425,9 @@ H.run({ maxFrames = 250000 }, {
   gateStep(111, 13, "map 49: off gate 13 to (111,13)"),
   H.release(),
   planAvoids(111, 10, ALL_GATES, "map 49: the maze exit (111,10)"),
-  mazeWalk(111, 10, "map 49: to the exit (111,10)", 20000),
+  mazeWalk(111, 10, "map 49: to the exit (111,10)", 30000),
   H.release(),
-  H.advanceStory(landed(50), 20000),
+  H.advanceStory(landed(50), 20000, { honest = true }),
   H.waitFrames(30),
   H.call(function()
     H.assertEq(map(), 50, "map 49 -> map 50")
