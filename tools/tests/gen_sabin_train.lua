@@ -424,51 +424,49 @@ local function openShop()
   }, "the ghost merchant's shop opens")
 end
 
--- buy `qtyFn()` MORE of shop row `row` in ONE lap: options -> list row ->
--- quantity -> confirm.  The widget (shop.asm MenuState_27, z0a bits):
--- RIGHT=+1, UP=+10, DOWN=-10, LEFT=-1, opens at 1, gil-clamped by the
--- handler itself.  Purchases are verified AFTER the shop closes -- the
--- menu module rearranges inventory RAM while open, and a mid-menu
--- invCount pred measurably fired phantom-true in 82 frames.
+-- buy `qtyFn()` MORE of shop row `row`, fully CLOSED-LOOP: the list
+-- cursor row is MoveCursor's own cell (DP $4E, menu_common.asm:1318) and
+-- the quantity is zSelIndex (DP $28, menu_ram.inc) -- both read and
+-- steered, never press-counted (menu direction holds auto-repeat: a
+-- counted 4-frame hold measurably bought 25 Tonics instead of 14 and
+-- parked the potion lap on the wrong row).  Widget deltas (shop.asm
+-- MenuState_27): RIGHT +1, LEFT -1, UP +10, DOWN -10, gil-clamped by the
+-- handler.  Purchases are verified AFTER the shop closes; mid-menu
+-- inventory reads measurably lie.
 local function buyItem(id, row, qtyFn, name)
-  local phase, downs, tens, ones = 0, 0, 0, 0
+  local phase = 0
   local seen27, bought = false, false
-  local wantTens, wantOnes = nil, nil
+  local want = nil
   return H.driveUntil(function() return bought end, 20000, {
     H.call(function()
       phase = (phase + 1) % 8
       local st = mstateMenu()
-      if wantTens == nil then
-        local t = qtyFn() - 1              -- the widget opens at 1
-        if t < 0 then t = 0 end
-        wantTens, wantOnes = t // 10, t % 10
-        H.log(string.format("[shop] %s: +%d (tens=%d ones=%d)", name,
-          t + 1, wantTens, wantOnes))
+      if want == nil then
+        want = qtyFn()
+        if want < 1 then want = 1 end
+        H.log(string.format("[shop] %s: buying %d", name, want))
       end
       if st == 0x27 then
         seen27 = true
-        if tens < wantTens then
-          if phase == 0 then tens = tens + 1 end
-          H.setPad(phase < 4 and { "up" } or {})
-        elseif ones < wantOnes then
-          if phase == 0 then ones = ones + 1 end
-          H.setPad(phase < 4 and { "right" } or {})
+        local qty = H.readByte(0x0028)
+        local btn = nil
+        if qty < want then
+          btn = (want - qty >= 10) and "up" or "right"
+        elseif qty > want then
+          btn = (qty - want >= 10) and "down" or "left"
         else
-          H.setPad(phase < 4 and { "a" } or {})
+          btn = "a"
         end
+        H.setPad(phase < 2 and { [btn] = true } or {})
       elseif seen27 then
         bought = true
         H.setPad({})
       elseif st == 0x25 then
-        downs = 0
-        H.setPad(phase < 4 and { "a" } or {})
+        H.setPad(phase < 2 and { "a" } or {})
       elseif st == 0x26 then
-        if downs < row then
-          if phase == 0 then downs = downs + 1 end
-          H.setPad(phase < 4 and { "down" } or {})
-        else
-          H.setPad(phase < 4 and { "a" } or {})
-        end
+        local cur = H.readByte(0x004E)
+        local btn = cur < row and "down" or cur > row and "up" or "a"
+        H.setPad(phase < 2 and { [btn] = true } or {})
       else
         H.setPad({})
       end
