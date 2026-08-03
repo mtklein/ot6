@@ -39,7 +39,7 @@ local function calm(n, extra)
   end
 end
 
-H.run({ maxFrames = 30000 }, {
+H.run({ maxFrames = 90000 }, {
   H.loadState(WORLD),
   H.waitFrames(10),
   H.call(function()
@@ -53,10 +53,13 @@ H.run({ maxFrames = 30000 }, {
 
   -- ===================================================================== --
   -- The world leg: (84,34) -> (64,77), one south of the gate trigger.
-  -- Random encounters are cleared inline by worldNavTo (kill-bit; the
-  -- world reloads itself afterwards -- position survives, measured).
+  -- Random encounters are FOUGHT inline by worldNavTo (honest tap-A play,
+  -- issue #75 -- the plains trash dies to a swing or two and the XP is the
+  -- XP a walking player banks; the world reloads itself after each fight
+  -- and position survives, measured).  An honest fight costs real ATB
+  -- rounds, so the leg budget triples over the kill-bit era's.
   -- ===================================================================== --
-  H.worldNavTo(64, 77, { maxFrames = 15000 }),
+  H.worldNavTo(64, 77, { maxFrames = 45000, honest = true }),
   H.logStep(function()
     return string.format("at the Figaro doorstep (%d,%d), frame %d, danger=%04X",
       H.worldX(), H.worldY(), H.frame, H.readWord(0x1f6e))
@@ -65,19 +68,14 @@ H.run({ maxFrames = 30000 }, {
   -- ===================================================================== --
   -- The deliberate step onto (64,76): the world event takes over ($E7
   -- bit0), fades, and loads map 55.  A last-tile random encounter is
-  -- handled by stepping again after the reload (the driveUntil body
-  -- re-presses; worldNavTo already proved battles clear fine here).
+  -- FOUGHT inline by the same edge-tapped A that pages the victory text
+  -- (honest play, zero writes -- issue #75); the world reload then puts
+  -- the party back on the tile and the step re-presses.  Budget covers a
+  -- full honest fight plus the entry event.
   -- ===================================================================== --
-  H.driveUntil(function() return not H.worldMode() end, 1800, {
+  H.driveUntil(function() return not H.worldMode() end, 9000, {
     H.call(function()
       if H.battleLoadStarted() then
-        if H.monstersPresent() > 0 then
-          for slot = 0, 5 do
-            if H.readByte(0x3aa8 + slot * 2) % 2 == 1 then
-              H.writeByte(0x3eec + slot * 2, H.readByte(0x3eec + slot * 2) | 0x80)
-            end
-          end
-        end
         H.setPad(H.frame % 8 < 4 and { "a" } or {})
         return
       end
