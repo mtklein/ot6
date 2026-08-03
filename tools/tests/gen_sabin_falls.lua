@@ -176,9 +176,10 @@ local function fightButton()
   if st == ST_TOOLS then return { "b" } end
   return nil
 end
+local fHeld, fHb = 0, -300
 local function fightPulse(_)
   if H.readByte(MENU) == 0 then
-    fPlan, fPlanActor, fStreak = nil, nil, 0
+    fPlan, fPlanActor, fStreak, fHeld = nil, nil, 0, 0
     fTick = fTick + 1
     H.setPad(fTick % 8 < 4 and { "a" } or {})
     return
@@ -186,8 +187,36 @@ local function fightPulse(_)
   fStreak = fStreak + 1
   if fStreak < 4 then H.setPad({}); return end
   fTick = fTick + 1
+  -- the fighter's own heartbeat: menu state, cursor cells, plan -- the
+  -- numbers a wedge diagnosis needs (300-frame cadence)
+  if H.frame - fHb >= 300 then
+    fHb = H.frame
+    local a = H.readByte(ACTOR)
+    H.log(string.format("[falls] fmenu f%d st=%02X actor=%d row=%d itm=%d " ..
+      "plan=%s held=%d [%s]", H.frame, H.readByte(MSTATE), a,
+      H.readByte(CMDROW + a) & 3, H.readByte(ITEMIDX + a),
+      fPlan and fPlan.kind or "-", fHeld, partyLine()))
+  end
+  -- stall recovery: a plan that cannot finish in 40 pulses is backed out
+  -- (B) and rebuilt from whatever the cursor shows -- progress over
+  -- elegance, the house idiom
   local ph = fTick % 30
-  if ph == 0 then fBtn = fightButton() end
+  if ph == 0 then
+    if fPlan ~= nil then
+      fHeld = fHeld + 1
+      if fHeld > 40 then
+        H.log(string.format("[falls] plan stalled 40 pulses (st=%02X) -- " ..
+          "backing out", H.frame and H.readByte(MSTATE) or 0))
+        fPlan, fPlanActor, fHeld = nil, nil, 0
+        fBtn = { "b" }
+        H.setPad(fBtn)
+        return
+      end
+    else
+      fHeld = 0
+    end
+    fBtn = fightButton()
+  end
   H.setPad(ph < 6 and fBtn or {})
 end
 local function wipeWatch(tag)
