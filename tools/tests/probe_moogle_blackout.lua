@@ -79,16 +79,21 @@ H.run({ maxFrames = 45000 }, {
     snap("benched")
   end),
   -- hands off: the loss EVENT ITSELF must light the field before it hands
-  -- control back.  The discriminating instant is the first frame the event
-  -- engine goes idle after the bench: with the fix, fade_in + wait_fade
-  -- run inside _ccaaba, so brightness is already full there; unfixed, the
-  -- event returns in the dark (measured bright=4, mid-ramp of the field
-  -- engine's incidental end-of-event fade -- the player got control on a
-  -- black field and the loss pantomime played invisibly).  Soft wait so
-  -- the unfixed ROM still reaches the screenshot: the evidence must
-  -- survive the failure that reports it.
+  -- control back.  The discriminating instant is the first frame after the
+  -- bench where the event PC {$e5,$e6,$e7} sits on its idle parking value
+  -- $CA/0000 (lib/ot6.lua's eventRunning doc) -- NOT eventRunning()
+  -- itself, whose bank test reads the interpreter's one-frame $80xxxx
+  -- WRAM-mirror excursions as "no event" while a command is mid-execute
+  -- (probe_moogle_evpc measured exactly that on the fixed ROM: PC=80/AADD
+  -- the frame fade_in ran).  With the fix, wait_fade holds the event until
+  -- brightness is full, so the idle park arrives lit; unfixed, the event
+  -- parks in the dark (bright=4, mid-ramp of the field engine's
+  -- incidental end-of-event fade) and the player gets control on a black
+  -- field.  Soft wait so the unfixed ROM still reaches the screenshot:
+  -- the evidence must survive the failure that reports it.
   H.waitUntilSoft(function()
-    if not H.eventRunning() then
+    if H.readByte(0x00e7) == 0xCA and H.readByte(0x00e5) == 0
+       and H.readByte(0x00e6) == 0 then
       handoffBright = bright()
       return true
     end
