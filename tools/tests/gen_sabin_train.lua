@@ -166,51 +166,121 @@ local function swDump(tag)
     tostring(inParty(3)), H.readByte(0x1dd2), H.readByte(0x1ede), gil()))
 end
 
--- ------------------------------------------------ the boost-Fight fighter --
--- gen_sabin_camp's menu-episode machine, for battle 47 (and any surprise
--- that cannot be fled): bank boost to 2, dump on Fight; one button per
--- 30-frame pulse from a settled menu; edge-tap A everywhere else.
+-- ------------------------------------------------ the b47 fighter (+topup) --
+-- The closed-loop engine (the leg fighters' second-pass machine), with one
+-- b47-specific doctrine: THE FIGHT IS ALSO THE INFIRMARY.  The party walks
+-- into battle 68 with whatever HP it leaves the maze carrying, and the
+-- first honest run measured that entry at ~25% -- the pacifist line then
+-- lost the attrition war before the 6th chip (SABIN down at chip 3, both
+-- wipes inside 4000 frames).  A player heals before a boss; the only
+-- healing surface this leg owns is a battle menu, so battle 47 does it:
+-- any member under 95% gets a Tonic/Potion INSTEAD of a Fight, and the
+-- trap ghosts only die once everyone is topped.  Capped at 24 heal turns
+-- so a bad interleaving cannot prolong the fight forever.
 local fightTier = 1
 local lost = nil
-local mStreak, mSeq, mIdx, mTick, mStall = 0, nil, 1, 0, 0
 local wipeN = 0
-local function fightPulse(phase)
+local b47Heals = 0
+local fPlan, fPlanActor, fBtn = nil, nil, nil
+local fTick, fStreak = 0, 0
+local fHb = -300
+local function makeB47Plan(actor)
+  local hp, mx = pHP(actor), pMaxHP(actor)
+  local itemRow = nil
+  for i = 0, 3 do
+    if H.readByte(CMDTBL + actor * 12 + i * 3) == CMD_ITEM then itemRow = i end
+  end
+  -- top up the neediest LIVING member (self-target only heals the actor,
+  -- so each actor tops itself; the rotation covers everyone)
+  if mx > 0 and hp > 0 and hp * 20 < mx * 19 and itemRow
+     and b47Heals < 24 then
+    local miss = mx - hp
+    local id = nil
+    if miss >= 100 and battInvIdx(POTION) then id = POTION
+    elseif battInvIdx(TONIC) then id = TONIC
+    elseif battInvIdx(POTION) then id = POTION end
+    if id then
+      b47Heals = b47Heals + 1
+      H.log(string.format("[b47] topup %d: e%d %s (hp %d/%d) [%s]",
+        b47Heals, actor, id == TONIC and "TONIC" or "POTION", hp, mx,
+        partyLine()))
+      return { kind = "item", item = id, row = itemRow }
+    end
+  end
+  local bp = H.readByte(BP + actor * 2)
+  local boost = bp >= 1 and math.min(bp, 3) or 0
+  H.log(string.format("[b47] cast f%d e%d boost=%d tier=%d [%s]",
+    H.frame, actor, boost, fightTier, partyLine()))
+  return { kind = "fight", boostLeft = boost }
+end
+local function b47Button()
+  local st = H.readByte(MSTATE)
+  local actor = H.readByte(ACTOR)
+  if fPlan == nil or fPlanActor ~= actor then
+    if st ~= ST_CMD then
+      if st == ST_TOOLS or st == ST_ITEM or st == ST_TGT then
+        return { "b" }
+      end
+      return nil
+    end
+    fPlan, fPlanActor = makeB47Plan(actor), actor
+    return nil
+  end
+  local plan = fPlan
+  if st == ST_CMD then
+    if plan.kind == "fight" then
+      if plan.boostLeft > 0 then
+        plan.boostLeft = plan.boostLeft - 1
+        return { "r" }
+      end
+      local cur = H.readByte(CMDROW + actor) & 3
+      if cur ~= 0 then return { "up" } end
+      return { "a" }
+    end
+    local cur = H.readByte(CMDROW + actor) & 3
+    if cur == plan.row then return { "a" } end
+    if plan.rowStall and plan.rowStall > 2 then
+      plan.rowStall = 0
+      return { ({ [0]="up", [1]="left", [2]="right", [3]="down" })[plan.row] }
+    end
+    plan.rowStall = (plan.rowStall or 0) + 1
+    return { cur < plan.row and "down" or "up" }
+  end
+  if st == ST_ITEM and plan.kind == "item" then
+    local want = battInvIdx(plan.item)
+    if want == nil then return { "b" } end
+    local cur = H.readByte(ITEMSCR + actor) + H.readByte(ITEMROW + actor)
+    if cur < want then return { "down" } end
+    if cur > want then return { "up" } end
+    return { "a" }
+  end
+  if st == ST_TGT then
+    fPlan, fPlanActor = nil, nil
+    return { "a" }          -- item: default self; Fight: default enemy
+  end
+  if st == ST_TOOLS then return { "b" } end
+  return nil
+end
+local function fightPulse(_)
   if H.readByte(MENU) == 0 then
-    mStreak, mSeq = 0, nil
-    H.setPad(phase < 4 and { "a" } or {})
+    fPlan, fPlanActor, fStreak = nil, nil, 0
+    fTick = fTick + 1
+    H.setPad(fTick % 8 < 4 and { "a" } or {})
     return
   end
-  mStreak = mStreak + 1
-  if mStreak < 4 then H.setPad({}); return end
-  if mSeq == nil then
-    local slot = H.readByte(ACTOR) & 3
-    local bp = H.readByte(BP + slot * 2)
-    local boostMin = fightTier >= 2 and 1 or 2
-    local boost = bp >= boostMin and math.min(bp, 3) or 0
-    mSeq, mIdx, mTick, mStall = {}, 1, 0, 0
-    for _ = 1, boost do mSeq[#mSeq + 1] = "r" end
-    mSeq[#mSeq + 1] = "a"; mSeq[#mSeq + 1] = "a"
-    H.log(string.format("[b47] cast f%d slot=%d bp=%d tier=%d seq=%s | [%s]",
-      H.frame, slot, bp, fightTier, table.concat(mSeq, ","), partyLine()))
+  fStreak = fStreak + 1
+  if fStreak < 4 then H.setPad({}); return end
+  fTick = fTick + 1
+  if H.frame - fHb >= 300 then
+    fHb = H.frame
+    local a = H.readByte(ACTOR)
+    H.log(string.format("[b47] fmenu f%d st=%02X actor=%d row=%d plan=%s [%s]",
+      H.frame, H.readByte(MSTATE), a, H.readByte(CMDROW + a) & 3,
+      fPlan and fPlan.kind or "-", partyLine()))
   end
-  mTick = mTick + 1
-  local ph = mTick % 30
-  local btn
-  if mIdx <= #mSeq then
-    btn = mSeq[mIdx]
-  elseif mStall < 2 then
-    btn = "a"
-  elseif mStall < 4 then
-    btn = "b"
-  else
-    mSeq = nil
-    H.setPad({})
-    return
-  end
-  if ph < 6 then H.setPad({ [btn] = true }) else H.setPad({}) end
-  if ph == 29 then
-    if mIdx <= #mSeq then mIdx = mIdx + 1 else mStall = mStall + 1 end
-  end
+  local ph = fTick % 30
+  if ph == 0 then fBtn = b47Button() end
+  H.setPad(ph < 6 and fBtn or {})
 end
 local function wipeWatch(tag)
   local wiped = true
@@ -432,12 +502,22 @@ local function battInvIdx(id)
   end
   return nil
 end
+-- neediest by FRACTION (the first honest fight measured SHADOW at 56/197
+-- dying unhealed while absolute-missing ranking pointed both medics at
+-- bigger pools), with SABIN jumping the queue under 60% -- he is the win
+-- condition and no Fenix Down exists on this line
 local function neediest()
-  local best, miss = nil, 49
+  local best, miss, worst = nil, 0, 21
+  if sabinE and pHP(sabinE) > 0 and pMaxHP(sabinE) > 0
+     and pHP(sabinE) * 10 < pMaxHP(sabinE) * 6 then
+    return sabinE, pMaxHP(sabinE) - pHP(sabinE)
+  end
   for _, e in ipairs({ sabinE, cyanE, shadowE }) do
-    if e and pHP(e) > 0 then
-      local m = pMaxHP(e) - pHP(e)
-      if m > miss then best, miss = e, m end
+    if e and pHP(e) > 0 and pMaxHP(e) > 0 then
+      local frac20 = pHP(e) * 20 // pMaxHP(e)   -- 0..20
+      if frac20 < worst and frac20 < 15 then    -- only under 75%
+        best, worst, miss = e, frac20, pMaxHP(e) - pHP(e)
+      end
     end
   end
   return best, miss
@@ -485,7 +565,7 @@ local function makePlan(actor)
     end
     local item = nil
     if tgt then
-      if miss >= 150 and invCount(POTION) > 0 then item = POTION
+      if miss >= 100 and invCount(POTION) > 0 then item = POTION
       elseif invCount(TONIC) > 0 then item = TONIC
       elseif invCount(POTION) > 0 then item = POTION end
     end
@@ -662,7 +742,10 @@ local function b47Attempt(n)
       H.call(function() H.checkReq(ldReq, "b47 attempt " .. n) end),
       H.waitFrames(60 + (n - 1) * 17),
     }, {}),
-    H.call(function() lost, fightTier, wipeN = nil, n, 0 end),
+    H.call(function()
+      lost, fightTier, wipeN = nil, n, 0
+      b47Heals, fPlan, fPlanActor = 0, nil, nil
+    end),
     nav(26, 9, { maxFrames = 3000 }),
     (function()
       local phase = 0
@@ -931,14 +1014,16 @@ H.run({ maxFrames = 400000 }, {
   -- Tonics fund the round-by-round chip damage, Potions the Wheel spikes.
   -- 15/6 covers ~10 medic turns each with margin; the gil floors keep a
   -- short purse from zeroing out (log tells the story either way).
-  buyItem(TONIC, 0, 15, 60, "TONIC x15"),
-  buyItem(POTION, 1, 6, 400, "POTION x6"),
+  buyItem(TONIC, 0, 20, 60, "TONIC x20"),
+  buyItem(POTION, 1, 15, 400, "POTION x15"),
   closeShop(),
   H.call(function()
     H.log(string.format("[shop] done: gil=%d tonics=%d potions=%d",
       gil(), invCount(TONIC), invCount(POTION)))
-    H.assertEq(invCount(TONIC) >= 8, true,
-      "at least 8 Tonics for the medic line (bought honestly)")
+    H.assertEq(invCount(TONIC) >= 12, true,
+      "at least 12 Tonics for the medic line (bought honestly)")
+    H.assertEq(invCount(POTION) >= 8, true,
+      "at least 8 Potions for the medic line (bought honestly)")
   end),
 
   -- Car B's aisle first gets a plain HELD walk, and only then bfs: on the
