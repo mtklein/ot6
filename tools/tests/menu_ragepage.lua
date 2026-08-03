@@ -51,7 +51,7 @@
 -- ROM and checks both halves against the tilemap, so neither can move alone.
 -- It is duplicated from menu_swdtechpage.lua rather than shared: the only lua
 -- the runner inlines is lib/ot6{,_field,_contract}.lua, and those three files
--- ARE the frontier mint signature (lib/frontier_stamp.sh:49-55), so a helper
+-- ARE the frontier mint signature (lib/frontier_stamp.sh:82-85), so a helper
 -- added there would mark every minted fixture drifted.
 --
 -- THE NAME SOURCE, and why it is not the SwdTech one.  Ot6DrawRageName

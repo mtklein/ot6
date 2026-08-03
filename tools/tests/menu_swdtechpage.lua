@@ -69,7 +69,7 @@
 -- the text is read out of the tilemap -- so moving either half alone fails
 -- here.  It is duplicated in menu_ragepage.lua rather than shared: the only
 -- lua the runner inlines is lib/ot6{,_field,_contract}.lua, and those three
--- files ARE the frontier mint signature (lib/frontier_stamp.sh:49-55), so a
+-- files ARE the frontier mint signature (lib/frontier_stamp.sh:82-85), so a
 -- helper added there would mark every minted fixture drifted.
 --
 -- issue #44 -- THE CONTROL HINT, and why the title row's expectations moved.

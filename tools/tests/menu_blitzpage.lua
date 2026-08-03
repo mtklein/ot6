@@ -62,7 +62,7 @@
 -- neither can move alone.  It is duplicated from menu_ragepage.lua rather than
 -- shared: the only lua the runner inlines is lib/ot6{,_field,_contract}.lua,
 -- and those three files ARE the frontier mint signature
--- (lib/frontier_stamp.sh:49-55), so a helper added there would mark every
+-- (lib/frontier_stamp.sh:82-85), so a helper added there would mark every
 -- minted fixture drifted.
 --
 -- Fixture: arvis_wake (the menu_swdtechpage / menu_ragepage boot).  Its lead has
