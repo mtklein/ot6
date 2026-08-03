@@ -1262,8 +1262,23 @@ H.run({ maxFrames = 400000 }, {
     H.assertEq(sw(0x186), 1, "$0186 -- valve 3 shut")
   end),
   -- the rest stop (see the section comment): save point {20,10}, one
-  -- Sleeping Bag per member, full HP+MP walking into the smokestack
-  nav(20, 10, { maxFrames = 6000 }),
+  -- Sleeping Bag per member, full HP+MP walking into the smokestack.
+  -- The save point is drawn by an NPC object, so the BFS's object map
+  -- reads its tile as SOLID (measured: no path (9,7)->(20,10)); the
+  -- engine walks onto it fine -- nav beside it, then hold the last step.
+  nav(20, 11, { maxFrames = 6000 }),
+  (function()
+    local phase = 0
+    return H.driveUntil(function()
+      return H.fieldX() == 20 and H.fieldY() == 10 and H.tileAligned()
+    end, 1800, {
+      H.call(function()
+        phase = (phase + 1) % 8
+        if not H.hasControl() then H.setPad({}); return end
+        H.setPad({ up = true })
+      end),
+    }, "step onto the save point")
+  end)(),
   H.call(function()
     H.assertEq((H.readByte(0x0201) & 0x80) ~= 0, true,
       "standing on the save point (w0201 bit7 -- the bag's own gate)")
