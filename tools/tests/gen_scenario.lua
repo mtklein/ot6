@@ -253,14 +253,39 @@ local ci, inChoice = 0, false
 -- rides again with the escalated tier.
 local BCHID, BCHP, BCMAXHP = 0x3ed8, 0x3bf4, 0x3c1c
 local MENU, ACTOR = 0x7bca, 0x62ca -- battle menu open flag / whose menu
+local BP = 0x3e9c                  -- banked boost points, +slot*2
 local nBattles = 0
 local lost = nil                   -- set by the in-battle loss guards
-local function seqFor(id, tier)
-  if id == 14 then return { "down", "a", "a" } end            -- Health
-  if id == 4 and tier >= 2 then
-    return { "down", "a", "a", "a" }                          -- AutoCrossbow
+-- The per-turn action, built LIVE (the boost prefix depends on the actor's
+-- banked BP this instant).  BOOST IS THE SYSTEM'S OWN LEVER (battle_boost:
+-- R raises pending, cap 3, never past bp; a boosted action spends the
+-- points and skips that turn's regen) and run 1 of the v2 fighter proved
+-- the fights are lost without it -- so everyone banks to 2 and dumps:
+-- boosted Fights chip and hit harder, boosted Health heals bigger, which
+-- is exactly bosses-wob.md's "sit at 2-3 BP" line for this river.
+-- Tiers only escalate what a turn is SPENT on:
+--   tier 1  everyone Fight (BANON Health)
+--   tier 2  + EDGAR Tools->AutoCrossbow, the whole-side opener
+--   tier 3  + SABIN Blitz->AuraBolt (OT6 blitzes are MENU-picked -- the
+--            tools-shell list, battle_vargas.lua:263 -- AuraBolt is cell 1
+--            of the 2-column grid: right of Pummel)
+local function seqFor(id, tier, slot)
+  local bp = H.readByte(BP + slot * 2)
+  local boost = bp >= 2 and math.min(bp, 3) or 0
+  local seq = {}
+  for _ = 1, boost do seq[#seq + 1] = "r" end
+  local function push(...)
+    for _, b in ipairs({ ... }) do seq[#seq + 1] = b end
+    return seq
   end
-  return { "a", "a" }                                         -- Fight
+  if id == 14 then return push("down", "a", "a") end          -- Health
+  if id == 4 and tier >= 2 then
+    return push("down", "a", "a", "a")                        -- AutoCrossbow
+  end
+  if id == 5 and tier >= 3 then
+    return push("down", "a", "right", "a", "a")               -- AuraBolt
+  end
+  return push("a", "a")                                       -- Fight
 end
 local function rideUntil(pred, what, budget, idle, tier)
   tier = tier or 1
@@ -362,6 +387,7 @@ local function rideUntil(pred, what, budget, idle, tier)
         end
         if bt then
           bt.gone = 0
+          bt.lastParty = partyLine()
           -- Banon's slot is read once the load has settled (the char-id
           -- table is battle scratch; at battN==30 the battle module
           -- demonstrably owns it -- the HP signal has held 30 frames)
@@ -407,10 +433,11 @@ local function rideUntil(pred, what, budget, idle, tier)
         if mSeq == nil then
           local slot = H.readByte(ACTOR) & 3
           local id = H.readByte(BCHID + slot * 2)
-          mSeq, mIdx, mTick, mStall = seqFor(id, tier), 1, 0, 0
-          H.log(string.format("river: #%d cast f%d slot=%d char=%d " ..
+          mSeq, mIdx, mTick, mStall = seqFor(id, tier, slot), 1, 0, 0
+          H.log(string.format("river: #%d cast f%d slot=%d char=%d bp=%d " ..
             "seq=%s | party [%s] vs %s", bt.n, H.frame, slot, id,
-            table.concat(mSeq, ","), partyLine(), monsterLine()))
+            H.readByte(BP + slot * 2), table.concat(mSeq, ","), partyLine(),
+            monsterLine()))
         end
         mTick = mTick + 1
         local ph = mTick % 30
@@ -440,7 +467,8 @@ local function rideUntil(pred, what, budget, idle, tier)
         if bt.gone >= 3 then
           H.log(string.format("river: battle #%d done at f%d (%d frames)%s " ..
             "-- party [%s]", bt.n, H.frame, H.frame - bt.f0,
-            bt.ultros and " -- ULTROS BEATEN HONESTLY" or "", partyLine()))
+            bt.ultros and " -- ULTROS BEATEN HONESTLY" or "",
+            bt.lastParty or "?"))
           if bt.ultros then H.screenshot("scenario_ultros_won") end
           bt = nil
         end

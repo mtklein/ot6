@@ -199,14 +199,31 @@ end
 -- attempt's numbers on the record.
 local BCHID, BCHP = 0x3ed8, 0x3bf4
 local MENU, ACTOR = 0x7bca, 0x62ca
+local BP = 0x3e9c                  -- banked boost points, +slot*2
 local fights = {}
 local lost = nil
-local function seqFor(id, tier)
-  if id == 14 then return { "down", "a", "a" } end            -- Health
-  if id == 4 and tier >= 2 then
-    return { "down", "a", "a", "a" }                          -- AutoCrossbow
+-- The per-turn action, built LIVE (the boost prefix reads the actor's
+-- banked BP this instant) -- gen_scenario's seqFor, minus SABIN (this
+-- raft is TERRA + EDGAR + BANON).  Boost is the system's own lever: bank
+-- to the threshold, dump it on the action (R raises pending, cap 3).
+-- This party has no third attacker to escalate to, so tier 3 varies the
+-- BANKING instead -- dump at 1 BP rather than 2 -- which changes every
+-- input from the first turn on and reshuffles the whole ride.
+local function seqFor(id, tier, slot)
+  local bp = H.readByte(BP + slot * 2)
+  local boostMin = tier >= 3 and 1 or 2
+  local boost = bp >= boostMin and math.min(bp, 3) or 0
+  local seq = {}
+  for _ = 1, boost do seq[#seq + 1] = "r" end
+  local function push(...)
+    for _, b in ipairs({ ... }) do seq[#seq + 1] = b end
+    return seq
   end
-  return { "a", "a" }                                         -- Fight
+  if id == 14 then return push("down", "a", "a") end          -- Health
+  if id == 4 and tier >= 2 then
+    return push("down", "a", "a", "a")                        -- AutoCrossbow
+  end
+  return push("a", "a")                                       -- Fight
 end
 local function rideUntil(pred, what, budget, tier)
   tier = tier or 1
@@ -286,6 +303,7 @@ local function rideUntil(pred, what, budget, tier)
         end
         if bt then
           bt.gone = 0
+          bt.lastParty = partyLine()
           -- Banon's slot once the load has settled (the char-id table is
           -- battle scratch; 30 straight frames of the HP signal prove the
           -- battle module owns it)
@@ -331,10 +349,11 @@ local function rideUntil(pred, what, budget, tier)
         if mSeq == nil then
           local slot = H.readByte(ACTOR) & 3
           local id = H.readByte(BCHID + slot * 2)
-          mSeq, mIdx, mTick, mStall = seqFor(id, tier), 1, 0, 0
-          H.log(string.format("rapids: #%d cast f%d slot=%d char=%d " ..
+          mSeq, mIdx, mTick, mStall = seqFor(id, tier, slot), 1, 0, 0
+          H.log(string.format("rapids: #%d cast f%d slot=%d char=%d bp=%d " ..
             "seq=%s | party [%s] vs %s", #fights, H.frame, slot, id,
-            table.concat(mSeq, ","), partyLine(), monsterLine()))
+            H.readByte(BP + slot * 2), table.concat(mSeq, ","), partyLine(),
+            monsterLine()))
         end
         mTick = mTick + 1
         local ph = mTick % 30
@@ -361,7 +380,8 @@ local function rideUntil(pred, what, budget, tier)
         bt.gone = (bt.gone or 0) + 1
         if bt.gone >= 3 then
           H.log(string.format("rapids: battle #%d done at f%d (%d frames) " ..
-            "-- party [%s]", #fights, H.frame, H.frame - bt.f0, partyLine()))
+            "-- party [%s]", #fights, H.frame, H.frame - bt.f0,
+            bt.lastParty or "?"))
           bt = nil
         end
       end
