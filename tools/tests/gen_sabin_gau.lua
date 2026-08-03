@@ -81,6 +81,79 @@ local function tapUntil(btn, pred, what, budget)
   }, what)
 end
 
+-- THE MINT IS VERIFIED BY RELOAD, because calm-at-capture provably does not
+-- imply calm-at-boot.  Measured landing the honest-root pilot (2026-08-03):
+-- a capture taken at (214,149) with full world control -- $E8 gate clear,
+-- aligned, the doorstep guard below satisfied in 0 frames -- REPRODUCIBLY
+-- boots into a battle: every reload read $E8=$28 (bit5, battle pending)
+-- within a frame and battle_gaufight's 'world control' wait timed out at
+-- 4000 frames, while the live mint timeline sailed on calm past the same
+-- capture point.  Two independent mints of that route produced the SAME
+-- byte-identical poisoned state (compose fingerprint 830b64c06f50), so this
+-- is deterministic divergence between the live timeline and the reload
+-- timeline, not a flaky roll.  The only test that matters for a fixture is
+-- the consumer's-eye one: reload what you captured and require the calm you
+-- promised.  gen_whelk_poweron's sweep is the same idea for its doorstep.
+--
+-- So: capture, reload the capture (becoming the consumer timeline), and
+-- give it 300 frames.  Calm and parked -> that blob is the mint.  A battle
+-- instead -> flee it honestly (hold L+R, the engine's own run mechanic --
+-- issue #75's zero-write path; Veldt randoms are runnable), let the
+-- post-battle world reload restore this exact tile with the danger counter
+-- ZEROED (move.asm:916-921 / world_start.asm:465-482), walk back if the
+-- reload parked us a tile off, and capture again.  A danger-zero capture
+-- has no roll left to lose, and the next reload proves it.  Three attempts,
+-- then fail the mint loudly rather than emit a state nobody can boot.
+local mintBlob, mintDone = nil, false
+local function mintAttempt(n)
+  local tag = string.format("[gau_joined] mint attempt %d", n)
+  local saveReq, loadReq
+  return H.cond(function() return not mintDone end, {
+    H.call(function() saveReq = H.requestSaveState() end),
+    H.waitFrames(2),
+    H.call(function()
+      H.checkReq(saveReq, tag .. ": capture")
+      mintBlob = saveReq.blob
+      H.log(string.format("%s: captured %d bytes at (%d,%d) f%d -- " ..
+        "reloading to verify the consumer's boot", tag, #mintBlob,
+        H.worldX(), H.worldY(), H.frame))
+      loadReq = H.requestLoadState(mintBlob)
+    end),
+    H.waitFrames(2),
+    H.call(function() H.checkReq(loadReq, tag .. ": verify reload") end),
+    H.waitFrames(300),
+    H.cond(function()
+      return H.worldMode() and H.worldHasControl() and H.worldAligned()
+         and H.worldX() == 214 and H.worldY() == 149
+    end, {
+      H.call(function()
+        mintDone = true
+        H.log(tag .. ": reload stayed calm at the doorstep -- verified")
+      end),
+    }, {
+      H.logStep(function()
+        return string.format("%s: reload NOT calm ($E8=%02X bls=%s at " ..
+          "%d,%d) -- flee, re-park, recapture", tag, H.readByte(0x00e8),
+          tostring(H.battleLoadStarted()), H.worldX(), H.worldY())
+      end),
+      H.driveUntil(function()
+        return H.worldMode() and H.worldHasControl() and H.worldAligned()
+      end, 20000, {
+        H.call(function()
+          if H.battleLoadStarted() then
+            H.setPad({ l = true, r = true })   -- flee, honestly
+          else
+            H.setPad({})
+          end
+        end),
+      }, tag .. ": flee the boot battle, ride out the world reload"),
+      H.call(function() H.setPad({}) end),
+      H.worldNavTo(214, 149, { maxFrames = 8000 }),
+      H.waitFrames(30),
+    }),
+  }, {})
+end
+
 H.run({ maxFrames = 200000 }, {
   H.loadState(DOOR),
   H.waitFrames(30),
@@ -266,7 +339,14 @@ H.run({ maxFrames = 200000 }, {
       H.worldX(), H.worldY()))
     H.screenshot("gau_joined")
   end),
-  H.saveState("gau_joined.mss"),
+  mintAttempt(1),
+  mintAttempt(2),
+  mintAttempt(3),
+  H.call(function()
+    H.assertEq(mintDone, true,
+      "a reload-verified calm doorstep capture within 3 attempts")
+    H.emitBlob("gau_joined.mss", mintBlob)
+  end),
   H.logStep(function()
     return string.format("gau_joined minted at frame %d world (%d,%d)",
       H.frame, H.worldX(), H.worldY())
