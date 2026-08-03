@@ -163,25 +163,33 @@ end
 -- buy `want` of shop row `row` holding item `id`, one confirm per lap,
 -- verified against the field inventory (gen_sabin_train's idiom)
 local function buyItem(id, row, want, floor, name)
-  local phase, downs = 0, 0
+  local phase, downs, ups = 0, 0, 0
   return H.driveUntil(function()
     return invCount(id) >= want or gil() < floor
-  end, 30000, {
+  end, 60000, {
     H.call(function()
       phase = (phase + 1) % 8
       local st = mstateMenu()
       if st == 0x25 then
-        downs = 0
+        downs, ups = 0, 0
         H.setPad(phase < 4 and { "a" } or {})
       elseif st == 0x26 then
+        ups = 0
         if downs < row then
           if phase == 0 then downs = downs + 1 end
           H.setPad(phase < 4 and { "down" } or {})
         else
           H.setPad(phase < 4 and { "a" } or {})
         end
-      elseif st == 0x27 then
-        H.setPad(phase < 4 and { "a" } or {})
+      elseif st == 0x27 then                  -- quantity: up to 10 per lap
+        local need = want - invCount(id) - 1
+        if need > 9 then need = 9 end
+        if ups < need then
+          if phase == 0 then ups = ups + 1 end
+          H.setPad(phase < 4 and { "up" } or {})
+        else
+          H.setPad(phase < 4 and { "a" } or {})
+        end
       else
         H.setPad({})
       end
