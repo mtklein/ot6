@@ -54,8 +54,31 @@
 --       :39428  call _cb048f   ->  if_rand ; battle 8, RIVER   (:38659-38666)
 --       :39446  call _cb0486   ->  if_rand ; battle 7, RIVER   (:38653-38658)
 -- are both real, both on this leg's critical path, and each fires about half
--- the time.  So the driver names and logs EVERY battle it clears, and the
+-- the time.  So the driver names and logs EVERY battle it meets, and the
 -- run's battle count is reported rather than assumed.
+--
+-- ISSUE #75 -- THE FIGHTS ARE PLAYED, NOT KILL-BITTED.  Zero state writes
+-- in this generator.  The driver's edge-tapped A is the fighter (A opens
+-- the acting character's command list, A confirms its first entry, A takes
+-- the default target): TERRA and EDGAR Fight the default enemy while
+-- BANON's first command is Health, the free party heal his presence exists
+-- for -- and BANON'S DEATH IS AN INSTANT GAME OVER, which is why the
+-- kill-bit was here at all.  The driver watches his battle HP every frame
+-- (slot found via $3ED8+2s == 14 on each fight's rising edge) and fails
+-- the run loudly with the fight's numbers if he ever stays at 0 -- the
+-- #74-style balance finding, at the moment of loss, instead of a timeout
+-- at the game-over screen.  gen_scenario's river fights the same way and
+-- carries the fuller rationale.
+--
+-- AND rapids_done IS VERIFIED BY RELOAD.  Calm-at-capture provably does
+-- not imply calm-at-boot on the world map: gen_sabin_gau measured a
+-- reproducible boot-into-battle from a capture whose live timeline sailed
+-- on calm (2026-08-03, the honest-root pilot).  So the world-map mint here
+-- is captured in memory, reloaded (becoming the consumer's timeline), and
+-- only emitted once the reload sits calm at (93,41) for 300 frames; a boot
+-- battle is FLED honestly (hold L+R -- WoB randoms are runnable) and the
+-- post-battle world reload restores this exact tile with the danger
+-- counter zeroed, where the next attempt recaptures.
 --
 -- WHAT `battle N` RESOLVES TO (field/event.asm EventBattle, :1910-1922): the
 -- group index is scaled by FOUR -- two formation words per group -- and
@@ -118,6 +141,7 @@ local function talkToObj(obj, what, maxF)
     return H.navTo(function() return approach()[1] end,
                    function() return approach()[2] end, {
       maxFrames = maxF or 20000,
+      honest = true,
       arrive = function()
         return engaged or (adjacent() and H.hasControl() and H.tileAligned())
       end,
@@ -156,12 +180,33 @@ local function talkToObj(obj, what, maxF)
 end
 
 -- ------------------------------------------------------------ the driver --
--- Kill-bit every battle, tap every dialog, refuse every choice, touch
--- nothing else.  `fights` accumulates one row per fight so the run can
--- report what it actually met instead of what the route expected.
+-- FIGHT every battle honestly (issue #75 -- see the header), tap every
+-- dialog, refuse every choice, touch nothing else.  `fights` accumulates
+-- one row per fight so the run can report what it actually met instead of
+-- what the route expected.
+local BCHID, BCHP = 0x3ed8, 0x3bf4
 local fights = {}
 local function rideUntil(pred, what, budget)
   local phase, battN, dlgN, hb = 0, 0, 0, -900
+  local bt = nil                 -- live fight: { row, banon, dead }
+  local function partyLine()
+    local p = {}
+    for e = 0, 3 do
+      p[#p + 1] = string.format("%d/%d", H.readWord(BCHP + e * 2),
+        H.readWord(0x3c1c + e * 2))
+    end
+    return table.concat(p, " ")
+  end
+  local function monsterLine()
+    local m = {}
+    for i = 0, 5 do
+      if monPresent(i) then
+        m[#m + 1] = string.format("$%04X hp=%d sh=%d", monSpecies(i),
+          monHp(i), monShields(i))
+      end
+    end
+    return table.concat(m, " | ")
+  end
   return H.driveUntil(pred, budget or 40000, {
     H.call(function()
       phase = (phase + 1) % 8
@@ -193,7 +238,9 @@ local function rideUntil(pred, what, budget)
           H.readByte(CH_MAX), map(), H.frame), 0)
       end
 
-      -- 2. battle: name it once on the rising edge, then kill-bit it
+      -- 2. battle: name it once on the rising edge, then FIGHT it -- the
+      --    same edge-tapped A drives menus, targets and victory text
+      --    (TERRA/EDGAR Fight, BANON Health -- see the header).  No writes.
       if battN >= 3 then
         if battN == 3 then
           local w = H.formationWords()
@@ -210,18 +257,50 @@ local function rideUntil(pred, what, budget)
             end
           end
           fights[#fights + 1] = row
+          bt = { row = row, banon = nil, dead = 0, f0 = H.frame }
           H.screenshot(string.format("rapids_battle%d", #fights))
         end
-        if H.monstersPresent() > 0 then
-          for slot = 0, 5 do
-            if monPresent(slot) then
-              H.writeByte(0x3eec + slot * 2,
-                H.readByte(0x3eec + slot * 2) | 0x80)
+        if bt then
+          bt.gone = 0
+          -- Banon's slot once the load has settled (the char-id table is
+          -- battle scratch; 30 straight frames of the HP signal prove the
+          -- battle module owns it)
+          if battN == 30 and bt.banon == nil then
+            for s = 0, 3 do
+              if H.readByte(BCHID + s * 2) == 14 then bt.banon = s end
+            end
+            H.log(string.format("rapids: #%d banon slot=%s party [%s]",
+              #fights, tostring(bt.banon), partyLine()))
+          end
+          if battN % 300 == 0 then
+            H.log(string.format("rapids: #%d f%d party [%s] vs %s",
+              #fights, H.frame, partyLine(), monsterLine()))
+          end
+          if bt.banon then
+            bt.dead = H.readWord(BCHP + bt.banon * 2) == 0 and bt.dead + 1
+                      or 0
+            if bt.dead >= 90 then
+              H.log(string.format("rapids: BANON DOWN in battle #%d at " ..
+                "f%d (started f%d) -- party [%s] vs %s", #fights, H.frame,
+                bt.f0, partyLine(), monsterLine()))
+              H.screenshot(string.format("rapids_banon_down%d", #fights))
+              error(string.format("rapids: BANON reached 0 HP in battle " ..
+                "#%d -- his death is a game over; the numbers above are " ..
+                "the balance finding", #fights), 0)
             end
           end
         end
         H.setPad(phase < 4 and { "a" } or {})
         return
+      end
+      -- falling edge, debounced like the rising one (shared signal RAM)
+      if bt then
+        bt.gone = (bt.gone or 0) + 1
+        if bt.gone >= 3 then
+          H.log(string.format("rapids: battle #%d done at f%d (%d frames) " ..
+            "-- party [%s]", #fights, H.frame, H.frame - bt.f0, partyLine()))
+          bt = nil
+        end
       end
 
       -- 3. plain dialog: edge-tap through it ($0168's "…ride the rapids
@@ -285,7 +364,73 @@ local function logParty(tag)
   end
 end
 
-H.run({ maxFrames = 120000 }, {
+-- 120000 was the kill-bit-era budget; honest fights spend real ATB
+-- rounds, and the reload-verified mint replays its own boot
+-- THE RELOAD-VERIFIED WORLD MINT (gen_sabin_gau's pattern, see the
+-- header).  Capture in memory, reload the capture -- becoming the
+-- consumer's timeline -- and give it 300 frames.  Calm and parked at
+-- (93,41) -> that blob is the mint.  A battle instead -> FLEE it honestly
+-- (hold L+R; risking a couple of rounds of chip on BANON beats fighting a
+-- fight the fixture's consumers will never see) and recapture: the party
+-- never stepped, so the post-battle world reload restores this exact tile
+-- with the danger counter zeroed.  Three attempts, then fail the mint
+-- loudly rather than emit a state nobody can boot.
+local mintBlob, mintDone = nil, false
+local function mintAttempt(n)
+  local tag = string.format("[rapids_done] mint attempt %d", n)
+  local saveReq, loadReq
+  return H.cond(function() return not mintDone end, {
+    H.call(function() saveReq = H.requestSaveState() end),
+    H.waitFrames(2),
+    H.call(function()
+      H.checkReq(saveReq, tag .. ": capture")
+      mintBlob = saveReq.blob
+      H.log(string.format("%s: captured %d bytes at world (%d,%d) f%d -- " ..
+        "reloading to verify the consumer's boot", tag, #mintBlob,
+        H.worldX(), H.worldY(), H.frame))
+      loadReq = H.requestLoadState(mintBlob)
+    end),
+    H.waitFrames(2),
+    H.call(function() H.checkReq(loadReq, tag .. ": verify reload") end),
+    H.waitFrames(300),
+    H.cond(function()
+      return H.worldMode() and H.worldHasControl() and H.worldAligned()
+         and H.worldX() == 93 and H.worldY() == 41
+    end, {
+      H.call(function()
+        mintDone = true
+        H.log(tag .. ": reload stayed calm at (93,41) -- verified")
+      end),
+    }, {
+      H.logStep(function()
+        return string.format("%s: reload NOT calm ($E8=%02X bls=%s at " ..
+          "%d,%d) -- flee, re-settle, recapture", tag, H.readByte(0x00e8),
+          tostring(H.battleLoadStarted()), H.worldX(), H.worldY())
+      end),
+      H.driveUntil(function()
+        return H.worldMode() and H.worldHasControl() and H.worldAligned()
+      end, 20000, {
+        H.call(function()
+          if H.battleLoadStarted() then
+            H.setPad({ l = true, r = true })   -- flee, honestly
+          else
+            H.setPad({})
+          end
+        end),
+      }, tag .. ": flee the boot battle, ride out the world reload"),
+      H.release(),
+      H.waitFrames(30),
+      H.call(function()
+        -- the party never STEPPED, so the post-battle reload restores this
+        -- exact tile (move.asm:916-921); drift here is a harness bug
+        H.assertEq(H.worldX() == 93 and H.worldY() == 41, true,
+          tag .. ": still parked on (93,41) after the flee")
+      end),
+    }),
+  }, {})
+end
+
+H.run({ maxFrames = 200000 }, {
   H.loadState(HUB),
   H.waitFrames(30),
   H.call(function()
@@ -346,7 +491,7 @@ H.run({ maxFrames = 120000 }, {
   -- spill onto the World of Balance at (93,41) (:39455-39459).
   -- ===================================================================== --
   rideUntil(onWorld(20), "the rest of the rapids, out onto the world map",
-    70000),
+    110000),
   H.release(),
   H.waitFrames(30),
   H.call(function()
@@ -375,9 +520,16 @@ H.run({ maxFrames = 120000 }, {
       H.frame, H.worldX(), H.worldY(), H.readWord(0x1f64)))
     H.screenshot("rapids_done")
   end),
-  H.saveState("rapids_done.mss"),
+  mintAttempt(1),
+  mintAttempt(2),
+  mintAttempt(3),
+  H.call(function()
+    H.assertEq(mintDone, true,
+      "a reload-verified calm world capture within 3 attempts")
+    H.emitBlob("rapids_done.mss", mintBlob)
+  end),
   H.logStep(function()
-    return string.format("rapids_done minted at frame %d, %d fights cleared",
-      H.frame, #fights)
+    return string.format("rapids_done minted at frame %d, %d fights won " ..
+      "honestly", H.frame, #fights)
   end),
 })
