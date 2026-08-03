@@ -15,13 +15,16 @@
 -- module's DP swap covers only $0000-$00FF (world/init.asm:1446-1516), and
 -- the menu's own clock tick stops at $021e (menu_common.asm:3494-3522, .a8).
 -- The overlay measured in issue #29 (value 5, then a 36/37 oscillation) was
--- reproduced ONLY under codex_saveas's forced-ZMENUSTATE save drive, whose
--- corrupted exit path leaves menu tasks running -- not in any real flow.
+-- reproduced ONLY under codex_saveas's then-forced-ZMENUSTATE save drive
+-- (since converted to pad input), whose corrupted exit path left menu tasks
+-- running -- not in any real flow.
 --
 -- THE DRIVE.  worldmap_narshe (fresh chain, never saved: lifecycle 0) ->
 -- walk to (64,77) by Figaro -> open the menu and save into empty slot 3
--- through the REAL Save command entry (SelectMainMenuOption_06's writes,
--- field_menu.asm:3641-3651; bare ZMENUSTATE=$13 corrupts the exit path) ->
+-- through the REAL Save command, driven by PAD INPUT ONLY (save-drive rule,
+-- tools/tests/README: UP wraps the main-menu cursor to Save, A runs
+-- SelectMainMenuOption_06 itself, field_menu.asm:3641-3651; bare
+-- ZMENUSTATE=$13 corrupts the exit path) ->
 -- stage DISTINGUISHABLE knowledge directly in SRAM: every species knows
 -- FIRE in the slot-3 page and ICE in the transient page -> close the menu
 -- back to the world -> walk into a desert encounter -> at battle entry,
@@ -33,7 +36,7 @@ local H = dofile("tools/tests/lib/ot6.lua")
 local STATE = "build/states/worldmap_narshe.mss.lua"
 
 local ZMENUSTATE = 0x26
-local SAVE_SELECT_INIT = 0x13
+local MAIN_MENU = 0x05
 local SAVE_SELECT = 0x14
 local SLOT3_ELEM, TEMP_ELEM = 0x316810, 0x316c10
 local N_SPECIES = 384
@@ -64,24 +67,34 @@ H.run({ maxFrames = 60000 }, {
   -- (measured: closing on the fixture tile dropped the party into a town).
   H.worldNavTo(64, 77, { maxFrames = 15000 }),
 
-  -- Open the menu and enter save select the way the real Save command does.
+  -- Open the menu and enter save select the way a player does: pad input
+  -- only, per the save-drive rule (tools/tests/README;
+  -- probe_banquet_timer_save is the template).  The old drive imitated
+  -- SelectMainMenuOption_06's writes by hand; pressing A on the Save row
+  -- runs the routine itself, which is strictly more honest about the very
+  -- thing this test pins (menu lifecycle vs. $021f).
   H.pressButtons({ "x" }, 4),
   H.waitFrames(120),
-  H.call(function()
-    H.assertEq(H.readByte(ZMENUSTATE), 0x05, "main menu is up")
-    -- SelectMainMenuOption_06 (field_menu.asm:3641-3651): fade to the
-    -- save-select initializer with $9e/$9f set so the B exit path works.
-    H.writeByte(ZMENUSTATE, 0x00)
-    H.writeByte(0x27, SAVE_SELECT_INIT)
-    H.writeByte(0x9e, SAVE_SELECT_INIT)
-    H.writeByte(0x9f, 0x04)
-  end),
+  H.waitUntil(function() return H.readByte(ZMENUSTATE) == MAIN_MENU end,
+    300, "main menu", 5),
+  -- UP wraps the main-menu cursor from Items straight to Save (row 6).
+  H.driveUntil(function()
+    return H.readByte(ZMENUSTATE) == MAIN_MENU and H.readByte(0x4b) == 6
+  end, 600, {
+    H.pressButtons({ "up" }, 4), H.waitFrames(16),
+  }, "main-menu cursor on Save"),
+  H.pressButtons({ "a" }, 4),
   H.waitUntil(function() return H.readByte(ZMENUSTATE) == SAVE_SELECT end,
-    300, "save-slot selection", 5),
-  H.call(function()
-    H.writeByte(0x4b, 2) -- zero-based cursor: slot 3
-    H.writeWord(0x95, 0) -- save-menu checksum cache: slot 3 shows empty
-  end),
+    600, "save-slot selection", 5),
+  -- Walk the slot cursor to slot 3 by pad, gating on a read-back of the
+  -- cursor -- no cursor pokes, no checksum-cache pokes.  Slot 3 is empty in
+  -- this fresh run so it saves instantly; the press-A driveUntil would carry
+  -- through an overwrite confirm all the same.
+  H.driveUntil(function()
+    return H.readByte(ZMENUSTATE) == SAVE_SELECT and H.readByte(0x4b) == 2
+  end, 600, {
+    H.pressButtons({ "down" }, 4), H.waitFrames(16),
+  }, "save cursor on slot 3"),
   H.pressButtons({ "a" }, 4),
   H.driveUntil(function() return sram(0x307ff0) == 3 end, 900, {
     H.pressButtons({ "a" }, 4), H.waitFrames(20),
