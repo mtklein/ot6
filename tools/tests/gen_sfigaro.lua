@@ -57,6 +57,31 @@
 --    the walk to the exit "arrived" twenty tiles early on the wrong map and
 --    the settle then waited 12000 frames for a map id that was never
 --    coming.  Only a SAME-MAP warp has no map change to watch.
+--
+-- ISSUE #75 (the honesty conversion): ZERO state writes.  The two fights
+-- on this route are PLAYED now:
+--   * battle 11 (the gate soldier's HeavyArmor, up to three times -- he
+--     respawns on every map-75 reload) is won by solo LOCKE on boosted
+--     Fights: R raises pending boost out of the 1 bp Ot6InitBP grants,
+--     A-A-A confirms the boosted Fight -- gen_moogle's Marshal drive.
+--     The old HP pin is gone, so a loss is REAL (the _ca85ba scenario
+--     reset: dumped on (47,43), disguises cleared) and is handled the
+--     way a TAS handles it -- every engagement rides a phase-spread
+--     retry ladder (a blob captured before the talk, reloaded with a
+--     different frame offset; the battle RNG seed is the frame phase at
+--     init, gen_whelk_poweron's measurement).
+--   * the cider runner's Merchant is STOLEN from by real menu input
+--     through the #55 thief submenu, with the boost banked honestly:
+--     LOCKE opens with 1 bp and regens +1 per unboosted action
+--     (Ot6ActionEnd), and a steal ATTEMPT is itself an action -- so the
+--     driver steals unboosted while the bank grows (each attempt rolls
+--     vanilla odds and may simply land), and from 3 bp on it presses
+--     R-R-R first, which Ot6StealBoostLevel converts to a GUARANTEED
+--     steal (kits.md's tier table).  Steal costs 4 MP (Ot6StealCost),
+--     paid from LOCKE's own pool -- the driver logs bank/MP per attempt
+--     so an empty wallet is visible in the mint log, not pinned over.
+-- The stealDriver that poked STEAL into every command cell and forced
+-- banked+pending boost to the cap, and the pinParty HP writes, are gone.
 local H = dofile("tools/tests/lib/ot6.lua")
 local DOOR = "build/states/locke_scenario.mss.lua"
 
@@ -120,7 +145,7 @@ local function settleField(dstMap, maxF)
       return not H.worldMode() and H.tileAligned()
          and not H.battleLoadStarted() and not H.dialogWaiting()
          and (dstMap == nil or map() == dstMap)
-    end), maxF or 12000),
+    end), maxF or 12000, { honest = true }),
     H.waitFrames(30),
   })
 end
@@ -128,7 +153,15 @@ end
 local aPhase = 0
 
 -- Ride a scene out to a settled, controllable field, edge-tapping A on EVERY
--- frame the party is not in control and kill-bitting anything that comes up.
+-- frame the party is not in control and FIGHTING anything that comes up --
+-- honestly (issue #75; the HP pin + kill-bit this branch used to carry are
+-- gone).  Battle frames drive gen_moogle's Marshal cycle: R raises the
+-- active character's pending boost (1 bp at battle start, Ot6InitBP; the R
+-- buzzes harmlessly on an empty bank), then three edge-tapped A's confirm
+-- the boosted Fight and page victory text -- so solo LOCKE alternates
+-- boosted and plain Fights against battle 11's HeavyArmor.  A LOSS is real
+-- now (the _ca85ba scenario reset); the callers below wrap every
+-- engagement in a phase-spread retry ladder rather than pinning it away.
 --
 -- WHY NOT advanceStory HERE.  advanceStory taps A only while a battle is up
 -- or H.dialogWaiting() is true, and holds the pad empty otherwise.  The tail
@@ -143,7 +176,7 @@ local aPhase = 0
 -- always takes option 0 -- so every prompt on the route is answered by
 -- rideUntil below, which steers the cursor explicitly.)
 local function rideOut(what, budget, dstMap)
-  local phase, calm = 0, 0
+  local phase, bphase, calm = 0, 0, 0
   return seq({
     H.driveUntil(function()
       local ok = H.hasControl() and H.tileAligned() and bright() >= 15
@@ -151,34 +184,22 @@ local function rideOut(what, budget, dstMap)
              and (dstMap == nil or map() == dstMap)
       calm = ok and calm + 1 or 0
       return calm >= 20
-    end, budget or 20000, {
+    end, budget or 30000, {
       H.call(function()
         phase = (phase + 1) % 8
         if H.battleLoadStarted() then
-          -- LOSING battle 11 IS A ROUTE FAILURE, not a retry.  `if_b_switch
-          -- $40` jumps to the win branch when the bit is CLEAR; with it set
-          -- the soldier's event falls through to `call _ca85ba`
-          -- (event_main.asm:20300), which is `load_map 75, {47,43}` + "Ouch!!
-          -- I gotta steal me some new clothes, fast!!" + `switch $0104=0` +
-          -- `switch $0103=0` -- the scenario reset.  Measured: the THIRD
-          -- gate-soldier fight killed LOCKE (194 hp against a HeavyArmor
-          -- that had already been fought twice), the ride came back 230
-          -- frames longer than usual, and the party was standing on the
-          -- opening tile with both disguises gone.  So the party's hp is
-          -- pinned to max for the duration, the same way gen_vargas pins
-          -- it through a fight it only wants the SCRIPT's outcome from.
-          for e = 0, 3 do
-            H.writeWord(0x3BF4 + e * 2, H.readWord(0x3C1C + e * 2))
-          end
-          if H.monstersPresent() > 0 then
-            for slot = 0, 5 do
-              if H.readByte(0x3aa8 + slot * 2) % 2 == 1 then
-                H.writeByte(0x3eec + slot * 2,
-                  H.readByte(0x3eec + slot * 2) | 0x80)
-              end
-            end
-          end
+          bphase = (bphase + 1) % 32
+          if bphase < 4 then H.setPad({ "r" })
+          elseif bphase < 6 then H.setPad({})
+          elseif bphase < 10 then H.setPad({ "a" })
+          elseif bphase < 12 then H.setPad({})
+          elseif bphase < 16 then H.setPad({ "a" })
+          elseif bphase < 18 then H.setPad({})
+          elseif bphase < 22 then H.setPad({ "a" })
+          else H.setPad({}) end
+          return
         end
+        bphase = 0
         if H.hasControl() then H.setPad({}); return end
         H.setPad(phase < 4 and { "a" } or {})
       end),
@@ -194,7 +215,7 @@ end
 -- these rather than one query.
 local function hop(tx, ty, what)
   return seq({
-    H.navTo(tx, ty, { maxFrames = 12000 }),
+    H.navTo(tx, ty, { maxFrames = 12000, honest = true }),
     H.release(),
     H.call(function()
       H.assertEq(H.fieldX(), tx, what .. ": at x=" .. tx)
@@ -257,7 +278,7 @@ local function go(sx, sy, dm, dx, dy, what)
   return seq({
     H.call(function() pick, startMap = nil, map() end),
     H.navTo(function() return stage()[1] end, function() return stage()[2] end,
-      { maxFrames = 20000, arrive = arrived }),
+      { maxFrames = 20000, arrive = arrived, honest = true }),
     H.cond(function() return stage()[3] ~= nil end, {
       H.driveUntil(arrived, 1800, {
         H.call(function()
@@ -316,7 +337,7 @@ local function talkToObj(obj, what, maxF)
   local function walkStep()
     return H.navTo(function() return approach()[1] end,
                    function() return approach()[2] end, {
-      maxFrames = maxF or 20000,
+      maxFrames = maxF or 20000, honest = true,
       arrive = function()
         return engaged or (adjacent() and H.hasControl() and H.tileAligned())
       end,
@@ -425,24 +446,64 @@ end
 -- Gated on the SYMPTOM (a BFS probe to a tile on the far side) rather than
 -- assumed, so the day the respawn stops happening this says so instead of
 -- walking into a fight that is not there.
+--
+-- EVERY ENGAGEMENT IS A RETRY LADDER NOW (issue #75).  With the HP pin
+-- gone a lost battle 11 runs _ca85ba -- LOCKE revived on (47,43), both
+-- disguise switches cleared -- so each fight captures a blob first, and a
+-- loss reloads it and re-engages with a different frame offset (the
+-- battle RNG seed is the frame phase at init, so each retry plays a
+-- genuinely different fight).  Success = not dumped on the opening tile
+-- AND the probe tile reachable; three losses fail the mint loudly.
 local function clearGateSoldier(probeX, probeY, tag)
+  local blob, won = nil, false
+  local function fightOnce(n)
+    local loadReq
+    return H.cond(function() return won end, {}, {
+      H.logStep(function()
+        return string.format("%s: battle 11 attempt %d (offset %d) at f%d",
+          tag, n, (n - 1) * 37, H.frame)
+      end),
+      n > 1 and seq({
+        H.call(function() loadReq = H.requestLoadState(blob) end),
+        H.waitFrames(2),
+        H.call(function() H.checkReq(loadReq, tag .. ": pre-fight reload") end),
+        H.waitFrames(90),
+        H.waitFrames((n - 1) * 37),      -- vary the battle RNG seed
+      }) or seq({}),
+      talkToObj(26, tag .. ": the gate soldier (battle 11)"),
+      rideOut(tag .. ": ride battle 11 out", 30000, 75),
+      H.call(function()
+        won = not (H.fieldX() == 47 and H.fieldY() == 43)
+          and H.bfsPath(probeX, probeY) ~= nil
+        H.log(string.format("%s: attempt %d %s at (%d,%d) f%d, $0104=%d",
+          tag, n, won and "WON" or "LOST (scenario reset)",
+          H.fieldX(), H.fieldY(), H.frame, sw(0x0104)))
+      end),
+    })
+  end
   return H.cond(function() return H.bfsPath(probeX, probeY) == nil end, {
     H.logStep(function()
       return string.format("%s: (%d,%d) unreachable at f%d -- the gate " ..
-        "soldier is back at (%d,%d); fighting him again",
+        "soldier bars the way at (%d,%d); fighting him",
         tag, probeX, probeY, H.frame, objX(26), objY(26))
     end),
-    talkToObj(26, tag .. ": the gate soldier again"),
-    rideOut(tag .. ": ride battle 11 out", 20000, 75),
+    (function()
+      local req
+      return seq({
+        H.call(function() req = H.requestSaveState() end),
+        H.waitFrames(2),
+        H.call(function()
+          H.checkReq(req, tag .. ": retry blob")
+          blob = req.blob
+        end),
+      })
+    end)(),
+    fightOnce(1), fightOnce(2), fightOnce(3),
     H.call(function()
-      -- the reset's signature is the opening tile plus a bare LOCKE; if the
-      -- fight went that way, say THAT rather than "no path"
-      H.assertEq(H.fieldX() == 47 and H.fieldY() == 43, false,
-        tag .. ": not dumped back on the scenario's opening tile")
+      H.assertEq(won, true,
+        tag .. ": battle 11 won honestly within 3 attempts (boosted Fights)")
       H.assertEq(H.bfsPath(probeX, probeY) ~= nil, true,
         tag .. ": the lane is open again")
-      H.log(string.format("%s: done at (%d,%d) f%d, $0104=%d",
-        tag, H.fieldX(), H.fieldY(), H.frame, sw(0x0104)))
     end),
   }, {
     H.logStep(function() return tag .. ": the lane is already open" end),
@@ -450,59 +511,87 @@ local function clearGateSoldier(probeX, probeY, tag)
 end
 
 -- ------------------------------------------------------------- the steal --
--- Locke's command window is `FIGHT, STEAL, MAGIC, ITEM`
--- (field/char_prop.asm:160), two columns by two rows, so STEAL is one DOWN
--- from the resting cursor.  A confirms it, and A again takes the single
--- enemy the target cursor already sits on.  Driven as discrete pad EDGES
--- into the command window, the same way gen_vargas enters Pummel.
+-- THE HONEST STEAL (issue #75).  Locke's command window is `FIGHT, STEAL,
+-- MAGIC, ITEM` (char_prop.asm:157); MAGIC is removed at runtime for a
+-- spell-less Locke (InitCmd_03), the rows stay four, and STEAL is one DOWN
+-- from the resting cursor.  Since #55 the Steal row opens the THIEF
+-- SUBMENU (tools shell, state $30) with Steal on row 0, so one attempt is
+-- the edge sequence  down, A (submenu opens), A (row 0 = Steal), A (the
+-- target cursor opens MANUAL|ONE_SIDE|ENEMY on the lone Merchant).
+--
+-- THE BOOST IS BANKED FOR REAL.  Steal is the shipped boost-tiered chance
+-- verb (Ot6StealBoostLevel): 0 bp rolls raw vanilla odds, 3 bp clamps the
+-- level term so vanilla's own `bcs` GUARANTEES the steal.  LOCKE opens
+-- the fight with 1 bp (Ot6InitBP) and regens +1 per unboosted action
+-- (Ot6ActionEnd) -- and a steal ATTEMPT is itself an action -- so the
+-- driver simply steals unboosted while the bank grows (attempts 1-2 may
+-- land on their own dice; each pays Ot6StealCost's 4 MP), and once the
+-- bank reads >= 3 it presses R-R-R first and takes the guaranteed steal.
+-- Worst case is three attempts, 12 MP, against the pool the fixture logs.
+-- The merchant's reaction script (`if_cmd STEAL`, AIScript::_314) sets
+-- b_switch $4C and ends the fight; the caller asserts $1DD2 bit 4.
+--
+-- The menu machine is armr-style: presses start only after the menu flag
+-- holds 4 consecutive pulses, a NEW sequence is only built while the menu
+-- is the COMMAND WINDOW (state $05 -- a stray A from any other state
+-- could queue FIGHT and kill the merchant, the one outcome this fight
+-- must never produce), and any other state without a running sequence is
+-- backed out with B.
 local MENU, ACTOR, MSTATE = 0x7BCA, 0x62CA, 0x7BC2
 local ST_CMD = 0x05
 local B_SWITCH_LIVE = 0x3EBD          -- $3EB4 + ($4C >> 3); bit4 = $4C
-local function pinParty()
-  for e = 0, 3 do H.writeWord(0x3BF4 + e * 2, H.readWord(0x3C1C + e * 2)) end
-end
--- THREE OT6 corrections make this STEAL land (each measured; without them the
--- steal misses forever -- 32 attempts, identical frames, $3EBD never moves):
---  1. STEAL COSTS 2 MP (ot6.asm Ot6AbilityCost @steal, "flat small").  The
---     charge+refusal is universal, so a char below 2 MP has the command REFUSED
---     -- the menu confirms but no action queues (TargetEffect_52's $3401 never
---     fires).  Solo early Locke has too little, so pin battle MP ($3C08) up.
---  2. STEAL IS A BOOST-TIERED CHANCE VERB (ot6.asm Ot6StealBoostLevel, hooked
---     at battle_main.asm:9366): 0 bp rolls RAW vanilla odds (~0 for this
---     underleveled Locke vs the Merchant), 3 bp is CERTAIN.  Force banked+pending
---     boost ($3e9c/$3e9d, even char offsets 0,2,4,6) to the cap.
---  3. THE COMMAND CURSOR DOES NOT MOVE on a held d-pad here (measured), so the
---     old down+A picked FIGHT.  Poke STEAL ($05) into ALL of the actor's command
---     cells (CMDTBL 0x202E, stride 12/entity, 3/cell -- gen_vargas's Blitz-poke
---     idiom) so the resting cursor + A = STEAL; a second A takes the lone enemy.
-local CMDTBL = 0x202E
 local function stealDriver(what, maxF)
-  local ph, tries = 0, 0
+  local mStreak, mSeq, mIdx, mNoMenu, tries = 0, nil, 1, 0, 0
   return H.driveUntil(function() return not H.battleLoadStarted() end,
-    maxF or 20000, {
+    maxF or 30000, {
       H.call(function()
-        pinParty()
-        for e = 0, 3 do H.writeWord(0x3C08 + e * 2, 99) end          -- (1) MP
-        for i = 0, 6, 2 do H.writeByte(0x3e9c + i, 5); H.writeByte(0x3e9d + i, 3) end  -- (2)
-        ph = (ph + 1) % 6
-        if H.readByte(MENU) ~= 0 then
-          local a = H.readByte(ACTOR)
-          for i = 0, 3 do H.writeByte(CMDTBL + a * 12 + i * 3, 0x05) end  -- (3) STEAL
-          if H.readByte(MSTATE) == ST_CMD and ph == 0 then
-            tries = tries + 1
-            H.log(string.format("%s: STEAL attempt %d f%d actor=%d $3EBD=%02X",
-              what, tries, H.frame, a, H.readByte(B_SWITCH_LIVE)))
-          end
-          H.setPad(ph < 3 and { "a" } or {})
+        if H.readByte(MENU) == 0 then
+          mStreak, mSeq, mIdx = 0, nil, 1
+          mNoMenu = mNoMenu + 1
+          H.setPad(mNoMenu % 2 == 0 and { "a" } or {})
           return
         end
-        H.setPad(ph < 3 and { "a" } or {})   -- no menu: edge-tap through messages
+        mNoMenu = 0
+        mStreak = mStreak + 1
+        if mStreak < 4 then H.setPad({}); return end
+        if mSeq == nil then
+          if H.readByte(MSTATE) ~= ST_CMD then
+            H.setPad(mStreak % 8 < 4 and { "b" } or {})  -- unwind to the window
+            return
+          end
+          local actor = H.readByte(ACTOR)
+          local bank = H.readByte(0x3E9C + actor * 2)
+          local mp = H.readWord(0x3C08 + actor * 2)
+          tries = tries + 1
+          if bank >= 3 then
+            mSeq = { "r", "r", "r", "down", "a", "a", "a" }  -- guaranteed tier
+          else
+            mSeq = { "down", "a", "a", "a" }                 -- vanilla odds; bank grows
+          end
+          mIdx = 1
+          H.log(string.format(
+            "%s: STEAL attempt %d f%d actor=%d bank=%d mp=%d %s $3EBD=%02X",
+            what, tries, H.frame, actor, bank, mp,
+            bank >= 3 and "(boost 3 -- guaranteed)" or "(unboosted)",
+            H.readByte(B_SWITCH_LIVE)))
+        end
+        if mIdx <= #mSeq then
+          -- one button per 8-pulse window: 4 held, 4 released (an edge)
+          local sub = mStreak % 8
+          H.setPad(sub < 4 and { mSeq[mIdx] } or {})
+          if sub == 7 then mIdx = mIdx + 1 end
+          if mIdx > #mSeq then mSeq, mStreak = nil, 0 end
+          return
+        end
       end),
     }, what .. ": steal the clothes")
 end
 
 -- ========================================================================= --
-H.run({ maxFrames = 150000 }, {
+-- Budget note (issue #75): honest fights cost real ATB rounds, and the
+-- retry ladders can replay them -- the ceiling covers the worst case of
+-- three three-attempt ladders plus the steal's.
+H.run({ maxFrames = 350000 }, {
   H.loadState(DOOR),
   H.waitFrames(60),
   H.call(function()
@@ -520,10 +609,11 @@ H.run({ maxFrames = 150000 }, {
   -- HeavyArmor $09F.  He is a PLUG, not scenery: (30,42) is the only tile
   -- joining the starting pocket to the rest of town, and BFS reaches
   -- exactly 107 tiles until he is gone.  Won any way at all -- the clothes
-  -- branches are a different fight -- so the kill-bit idiom is correct here.
+  -- branches are a different fight -- but "any way" is HONEST now: solo
+  -- LOCKE on boosted Fights, with the retry ladder around the engagement.
+  -- The probe tile is the cafe doorstep the win must open.
   -- ===================================================================== --
-  talkToObj(26, "the gate soldier (battle 11 -> HeavyArmor $09F)"),
-  rideOut("ride battle 11 out", 20000, 75),
+  clearGateSoldier(22, 43, "B1 (open the town)"),
   H.call(function()
     H.assertEq(map(), 75, "still in town after battle 11")
     H.assertEq(H.bfsPath(22, 43) ~= nil, true,
@@ -539,27 +629,79 @@ H.run({ maxFrames = 150000 }, {
   -- ===================================================================== --
   go(22, 42, 78, 26, 52, "C1 town (22,42) -> map 78 (26,52) [CAFE]"),
   go(33, 46, 78, 74, 43, "C2 map 78 (33,46) -> (74,43) [annex warp]"),
-  talkToObj(22, "the cider runner"),
-  -- ride the two dialogs into the fight BY HAND: advanceStory would
-  -- kill-bit the merchant, and the clothes only come off a steal
-  H.driveUntil(function() return H.battleLoadStarted() end, 9000, {
-    H.call(function()
-      aPhase = (aPhase + 1) % 8
-      H.setPad(aPhase < 4 and { "a" } or {})
-    end),
-  }, "the cider scene reaches battle 10"),
-  H.release(),
-  H.waitUntil(function() return H.battleActive() end, 6000, "battle 10 up", 10),
-  H.waitFrames(90),
-  H.call(function()
-    H.assertEq(H.formationHas({ [0x013A] = true }), true,
-      "battle 10 is formation 43 -- Merchant $13A")
-    local w = H.formationWords()
-    H.log(string.format("battle 10: %04X %04X %04X %04X %04X %04X  $3EBD=%02X",
-      w[1], w[2], w[3], w[4], w[5], w[6], H.readByte(B_SWITCH_LIVE)))
-  end),
-  stealDriver("the cider runner"),
-  rideOut("ride the steal's aftermath out", 20000, 78),
+  -- THE STEAL, on its own retry ladder: an attempt that ends the fight
+  -- without b_switch $4C (LOCKE down, or the fight somehow won another
+  -- way) reloads the pre-talk blob and re-engages at a different frame
+  -- phase.  The formation assert stays HARD on every attempt.
+  (function()
+    local blob, stolen = nil, false
+    local function stealAttempt(n)
+      local loadReq
+      return H.cond(function() return stolen end, {}, {
+        H.logStep(function()
+          return string.format("cider steal attempt %d (offset %d) at f%d",
+            n, (n - 1) * 37, H.frame)
+        end),
+        n > 1 and seq({
+          H.call(function() loadReq = H.requestLoadState(blob) end),
+          H.waitFrames(2),
+          H.call(function() H.checkReq(loadReq, "cider: pre-talk reload") end),
+          H.waitFrames(90),
+          H.waitFrames((n - 1) * 37),    -- vary the battle RNG seed
+        }) or seq({}),
+        talkToObj(22, "the cider runner"),
+        -- ride the two dialogs into the fight BY HAND: advanceStory's
+        -- honest mode would blind-tap A in the fight, and A on the resting
+        -- cursor is FIGHT -- the merchant must never be killed
+        (function()
+          local ph = 0
+          return H.driveUntil(function() return H.battleLoadStarted() end, 9000, {
+            H.call(function()
+              ph = (ph + 1) % 8
+              H.setPad(ph < 4 and { "a" } or {})
+            end),
+          }, "the cider scene reaches battle 10")
+        end)(),
+        H.release(),
+        H.waitUntil(function() return H.battleActive() end, 6000,
+          "battle 10 up", 10),
+        H.waitFrames(90),
+        H.call(function()
+          H.assertEq(H.formationHas({ [0x013A] = true }), true,
+            "battle 10 is formation 43 -- Merchant $13A")
+          local w = H.formationWords()
+          H.log(string.format(
+            "battle 10: %04X %04X %04X %04X %04X %04X  $3EBD=%02X",
+            w[1], w[2], w[3], w[4], w[5], w[6], H.readByte(B_SWITCH_LIVE)))
+        end),
+        stealDriver("the cider runner"),
+        rideOut("ride the steal's aftermath out", 20000, 78),
+        H.call(function()
+          stolen = (H.readByte(0x1dd2) >> 4) & 1 == 1
+          H.log(string.format("cider attempt %d: $1DD2=%02X -> %s", n,
+            H.readByte(0x1dd2), stolen and "STOLEN" or "no steal; retrying"))
+        end),
+      })
+    end
+    return seq({
+      (function()
+        local req
+        return seq({
+          H.call(function() req = H.requestSaveState() end),
+          H.waitFrames(2),
+          H.call(function()
+            H.checkReq(req, "cider: retry blob")
+            blob = req.blob
+          end),
+        })
+      end)(),
+      stealAttempt(1), stealAttempt(2), stealAttempt(3),
+      H.call(function()
+        H.assertEq(stolen, true,
+          "the clothes were STOLEN honestly within 3 attempts")
+      end),
+    })
+  end)(),
   H.call(function()
     where("after the steal")
     H.log(string.format("post-fight $1DD2=%02X (b_switch $4C=%d $4D=%d)",
