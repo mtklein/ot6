@@ -120,13 +120,16 @@ H.run({ maxFrames = 140000 }, {
   -- P1 vacates the choke so P2/P3 can leave the mound (its (13,13)/(15,13)
   -- parks have no other exit), then everyone walks to station and P1
   -- returns to the choke.  ~35 steps total against a ~2000-frame window.
+  -- P3 first: its east station is the earliest one a march reaches
+  -- (NPC_4 passes (20,20) around field-frame ~1400; the west arm's first
+  -- guard needs ~1800; the choke ~2100 -- probe_moogle_switch timings)
   H.navTo(15, 15, { maxFrames = 2500, honest = true }),
-  ySwitchTo(2),
-  H.navTo(10, 21, { maxFrames = 4000, honest = true }),
-  logGuards("P2 at west station"),
   ySwitchTo(3),
   H.navTo(20, 20, { maxFrames = 4000, honest = true }),
   logGuards("P3 at east station"),
+  ySwitchTo(2),
+  H.navTo(10, 21, { maxFrames = 4000, honest = true }),
+  logGuards("P2 at west station"),
   ySwitchTo(1),
   H.navTo(14, 14, { maxFrames = 2500, honest = true }),
   logGuards("deployed"),
