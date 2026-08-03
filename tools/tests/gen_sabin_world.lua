@@ -55,6 +55,17 @@
 -- detector is $0200 == 1 AND $0059 ~= 0: $0200 alone goes stale after the
 -- menu closes, and $0059 alone is true of any menu.  CYAN (:61204) and GAU
 -- (:66618) hit the same menu later in the arc.
+--
+-- ISSUE #75 -- ZERO STATE WRITES.  This leg's only battles are random
+-- encounters on the two overworld walks (the hub, the house and the camp
+-- have none), and every one of them is FLED -- hold L+R, the engine's own
+-- run mechanic (worldNavTo's honest="flee"; the same hold in the leg
+-- driver's own battle branch).  Fleeing is chosen over fighting on
+-- purpose: WoB overworld trash is runnable, a fled battle earns no WIN,
+-- and SHADOW's 1/16 post-battle leave roll (battle_main.asm:11976) runs
+-- only at a win -- so from the moment he joins mid-leg, this route never
+-- rolls it at all.  The field walks pass honest=true besides; their maps
+-- have no encounter pools, so the flag is documentation, not behavior.
 local H = dofile("tools/tests/lib/ot6.lua")
 local DOOR = "build/states/scenario_hub.mss.lua"
 
@@ -106,6 +117,7 @@ local function talkToObj(obj, what, maxF)
     return H.navTo(function() return approach()[1] end,
                    function() return approach()[2] end, {
       maxFrames = maxF or 20000,
+      honest = true,
       arrive = function()
         return engaged or (adjacent() and H.hasControl() and H.tileAligned())
       end,
@@ -153,9 +165,10 @@ local CHOICES = {
 local ci, inChoice = 0, false
 local nameMenusSeen = 0
 
--- The leg driver.  Steers choices, kill-bits battles, taps dialogs, and
--- dismisses the name menu.  Everything the arc's later legs need is here so
--- they can copy one function rather than five special cases.
+-- The leg driver.  Steers choices, FLEES battles (see the header -- no win,
+-- no leave roll, no writes), taps dialogs, and dismisses the name menu.
+-- Everything the arc's later legs need is here so they can copy one
+-- function rather than five special cases.
 local function rideUntil(pred, what, budget)
   local phase, battN, dlgN, quiet, hb = 0, 0, 0, 0, -900
   return H.driveUntil(pred, budget or 40000, {
@@ -204,20 +217,23 @@ local function rideUntil(pred, what, budget)
         H.log(string.format("sabin: choice #%d resolved at f%d", ci, H.frame))
       end
 
-      -- 2. battle: kill-bit everything present and tap through the text
+      -- 2. battle: FLEE it honestly (hold L+R) -- WoB overworld trash is
+      --    runnable, and a fled battle earns no win for SHADOW's leave
+      --    roll to run at.  A zero-monster table (shouldn't happen on this
+      --    leg) just gets its text paged.
       if battN >= 3 then
         quiet = 0
         if battN == 3 then
           local w = H.formationWords()
           H.log(string.format("sabin: battle up f%d (%04X %04X %04X %04X " ..
-            "%04X %04X)", H.frame, w[1], w[2], w[3], w[4], w[5], w[6]))
+            "%04X %04X) -- fleeing", H.frame, w[1], w[2], w[3], w[4], w[5],
+            w[6]))
         end
-        for slot = 0, 5 do
-          if H.readByte(0x3aa8 + slot * 2) % 2 == 1 then
-            H.writeByte(0x3eec + slot * 2, H.readByte(0x3eec + slot * 2) | 0x80)
-          end
+        if H.monstersPresent() > 0 then
+          H.setPad({ l = true, r = true })
+        else
+          H.setPad(phase < 4 and { "a" } or {})
         end
-        H.setPad(phase < 4 and { "a" } or {})
         return
       end
 
@@ -297,6 +313,7 @@ end
 local function worldLeg(tx, ty, want, what, budget)
   return H.worldNavTo(tx, ty, {
     maxFrames = budget or 30000,
+    honest = "flee",
     arrive = function()
       if H.worldMode() then return false end          -- let the coord check run
       if want and map() == want then return true end
@@ -393,6 +410,7 @@ H.run({ maxFrames = 90000 }, {
   -- ==================================================================== --
   H.navTo(7, 15, {
     maxFrames = 8000,
+    honest = true,
     arrive = function() return H.worldMode() end,
   }),
   rideUntil(landedWorld(10), "back on the overworld", 8000),
