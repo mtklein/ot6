@@ -778,6 +778,26 @@ end
 --   opts.arrive    extra terminator (checked first, every frame)
 --   opts.maxFrames frame budget -> error (default 20000)
 --   opts.spare     formation species words never to kill-bit
+--   opts.honest    end mid-walk battles by REAL PLAY instead of the
+--                  kill-bit -- ZERO state writes on this navigator (issue
+--                  #75), the same opt-in contract navTo/advanceStory carry.
+--                  true    = auto-fight by edge-tapped A (A opens the acting
+--                            character's command list, A confirms its first
+--                            entry, A takes the default target; the same
+--                            taps page the victory text);
+--                  "flee"  = hold L+R, the engine's own run mechanic.  On a
+--                            fixture chain this is often the RIGHT honest
+--                            ending for world trash: it earns no win, so
+--                            win-only rolls (SHADOW's 1/16 post-battle
+--                            leave, battle_main.asm:11976) never happen --
+--                            but it FAILS (times out) on unrunnable
+--                            formations, so callers pick fight vs flee per
+--                            leg and say why.  Either way the post-battle
+--                            world reload restores the pre-battle tile with
+--                            the danger counter zeroed (move.asm:916-921 /
+--                            world_start.asm:465-482), and the walker
+--                            re-plans from it.  Honest endings cost real ATB
+--                            rounds; budget frames accordingly.
 function M.worldNavTo(txIn, tyIn, opts)
   opts = opts or {}
   local maxFrames = opts.maxFrames or 20000
@@ -819,7 +839,11 @@ function M.worldNavTo(txIn, tyIn, opts)
           M.setPad({})
           return
         end
-        if M.monstersPresent() > 0 then
+        if opts.honest == "flee" then
+          M.setPad({ l = true, r = true })
+          return
+        end
+        if M.monstersPresent() > 0 and not opts.honest then
           for slot = 0, 5 do
             if M.readByte(0x3aa8 + slot * 2) % 2 == 1 then
               M.writeByte(0x3eec + slot * 2, M.readByte(0x3eec + slot * 2) | 0x80)
