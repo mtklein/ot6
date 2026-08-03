@@ -184,11 +184,35 @@ end
 -- dialog, refuse every choice, touch nothing else.  `fights` accumulates
 -- one row per fight so the run can report what it actually met instead of
 -- what the route expected.
+--
+-- THE FIGHTER is gen_scenario's menu-episode machine (its header carries
+-- the full story): tap-A alone never heals, because BANON's first command
+-- is FIGHT and his Health is ROW 1 (char_prop.asm:321).  From a settled
+-- battle menu (flag held 4 straight frames), one button per 30-frame
+-- pulse, 6 held + 24 released:
+--     BANON (14)          down A A     Health
+--     EDGAR (4), tier 2+  down A A A   Tools -> AutoCrossbow (escalation)
+--     everyone else       A A          Fight, default target
+-- A loss (Banon down 90 straight frames, or a wipe) sets `lost` for the
+-- retry ladder instead of erroring: reload the rapids_start checkpoint,
+-- escalate the tier, ride again.  Three attempts, then fail with every
+-- attempt's numbers on the record.
 local BCHID, BCHP = 0x3ed8, 0x3bf4
+local MENU, ACTOR = 0x7bca, 0x62ca
 local fights = {}
-local function rideUntil(pred, what, budget)
+local lost = nil
+local function seqFor(id, tier)
+  if id == 14 then return { "down", "a", "a" } end            -- Health
+  if id == 4 and tier >= 2 then
+    return { "down", "a", "a", "a" }                          -- AutoCrossbow
+  end
+  return { "a", "a" }                                         -- Fight
+end
+local function rideUntil(pred, what, budget, tier)
+  tier = tier or 1
   local phase, battN, dlgN, hb = 0, 0, 0, -900
   local bt = nil                 -- live fight: { row, banon, dead }
+  local mStreak, mSeq, mIdx, mTick, mStall = 0, nil, 1, 0, 0
   local function partyLine()
     local p = {}
     for e = 0, 3 do
@@ -279,18 +303,57 @@ local function rideUntil(pred, what, budget)
           if bt.banon then
             bt.dead = H.readWord(BCHP + bt.banon * 2) == 0 and bt.dead + 1
                       or 0
-            if bt.dead >= 90 then
-              H.log(string.format("rapids: BANON DOWN in battle #%d at " ..
-                "f%d (started f%d) -- party [%s] vs %s", #fights, H.frame,
-                bt.f0, partyLine(), monsterLine()))
-              H.screenshot(string.format("rapids_banon_down%d", #fights))
-              error(string.format("rapids: BANON reached 0 HP in battle " ..
-                "#%d -- his death is a game over; the numbers above are " ..
-                "the balance finding", #fights), 0)
+            local wiped = true
+            for e = 0, 3 do
+              if H.readWord(0x3c1c + e * 2) > 0
+                 and H.readWord(BCHP + e * 2) > 0 then wiped = false end
+            end
+            if bt.dead >= 90 or wiped then
+              lost = string.format("%s in battle #%d at f%d (started f%d, " ..
+                "tier %d) -- party [%s] vs %s",
+                wiped and "PARTY WIPED" or "BANON DOWN", #fights, H.frame,
+                bt.f0, tier, partyLine(), monsterLine())
+              H.log("rapids: " .. lost)
+              H.screenshot(string.format("rapids_lost%d", #fights))
+              return            -- the attempt's pred sees `lost` and ends
             end
           end
         end
-        H.setPad(phase < 4 and { "a" } or {})
+        -- act: outside a settled menu, edge-tap A; inside one, run the
+        -- episode machine (see the header)
+        if bt == nil or bt.banon == nil or H.readByte(MENU) == 0 then
+          mStreak, mSeq = 0, nil
+          H.setPad(phase < 4 and { "a" } or {})
+          return
+        end
+        mStreak = mStreak + 1
+        if mStreak < 4 then H.setPad({}); return end
+        if mSeq == nil then
+          local slot = H.readByte(ACTOR) & 3
+          local id = H.readByte(BCHID + slot * 2)
+          mSeq, mIdx, mTick, mStall = seqFor(id, tier), 1, 0, 0
+          H.log(string.format("rapids: #%d cast f%d slot=%d char=%d " ..
+            "seq=%s | party [%s] vs %s", #fights, H.frame, slot, id,
+            table.concat(mSeq, ","), partyLine(), monsterLine()))
+        end
+        mTick = mTick + 1
+        local ph = mTick % 30
+        local btn
+        if mIdx <= #mSeq then
+          btn = mSeq[mIdx]
+        elseif mStall < 2 then
+          btn = "a"               -- a prompt the sequence did not know
+        elseif mStall < 4 then
+          btn = "b"               -- back out (an MP refusal, a dead end)
+        else
+          mSeq = nil              -- rebuild from wherever the cursor is
+          H.setPad({})
+          return
+        end
+        if ph < 6 then H.setPad({ [btn] = true }) else H.setPad({}) end
+        if ph == 29 then
+          if mIdx <= #mSeq then mIdx = mIdx + 1 else mStall = mStall + 1 end
+        end
         return
       end
       -- falling edge, debounced like the rising one (shared signal RAM)
@@ -366,6 +429,46 @@ end
 
 -- 120000 was the kill-bit-era budget; honest fights spend real ATB
 -- rounds, and the reload-verified mint replays its own boot
+-- ------------------------------------------------------ the retry ladder --
+-- gen_scenario's ladder, on this leg's own checkpoint: a lost ride 2 is
+-- accepted, the rapids_start-moment capture is reloaded (a player
+-- reloading their save), and the ride is taken again with the fighter
+-- escalated (tier 2+ spends EDGAR's turns on AutoCrossbow), which
+-- reshuffles every subsequent interleaving and roll.  Three attempts,
+-- then fail with every attempt's numbers already logged.
+local rideBlob, rideWon = nil, false
+local function ride2Attempt(n)
+  local ldReq
+  return H.cond(function() return not rideWon end, {
+    H.cond(function() return n > 1 end, {
+      H.logStep(function()
+        return string.format("rapids: ATTEMPT %d -- reloading the " ..
+          "rapids_start checkpoint after a loss (%s)", n, tostring(lost))
+      end),
+      H.call(function() ldReq = H.requestLoadState(rideBlob) end),
+      H.waitFrames(2),
+      H.call(function() H.checkReq(ldReq, "attempt " .. n .. ": reload") end),
+      H.waitFrames(60),
+    }, {}),
+    H.call(function() lost = nil end),
+    (function()
+      local worldPred = onWorld(20)
+      return rideUntil(function() return lost ~= nil or worldPred() end,
+        string.format("the rest of the rapids, attempt %d: out onto the " ..
+          "world map", n), 110000, n)
+    end)(),
+    H.release(),
+    H.waitFrames(30),
+    H.call(function()
+      if lost == nil then
+        rideWon = true
+        H.log(string.format("rapids: attempt %d WON the ride (%d fights " ..
+          "logged so far, lost attempts included)", n, #fights))
+      end
+    end),
+  }, {})
+end
+
 -- THE RELOAD-VERIFIED WORLD MINT (gen_sabin_gau's pattern, see the
 -- header).  Capture in memory, reload the capture -- becoming the
 -- consumer's timeline -- and give it 300 frames.  Calm and parked at
@@ -485,15 +588,37 @@ H.run({ maxFrames = 200000 }, {
   H.logStep(function()
     return string.format("rapids_start minted at frame %d", H.frame)
   end),
+  -- the ladder's checkpoint: the same moment rapids_start captures
+  (function()
+    local ckReq
+    return seq({
+      H.call(function() ckReq = H.requestSaveState() end),
+      H.waitFrames(2),
+      H.call(function()
+        H.checkReq(ckReq, "rapids_start checkpoint")
+        rideBlob = ckReq.blob
+        H.log(string.format("rapids: ride-2 checkpoint captured (%d bytes) " ..
+          "at f%d", #rideBlob, H.frame))
+      end),
+    })
+  end)(),
 
   -- ===================================================================== --
   -- THE RIDE, PART 2: `battle 8, RIVER`, the two if_rand fights, and the
-  -- spill onto the World of Balance at (93,41) (:39455-39459).
+  -- spill onto the World of Balance at (93,41) (:39455-39459).  Up to
+  -- three honest attempts (see the ladder above).
   -- ===================================================================== --
-  rideUntil(onWorld(20), "the rest of the rapids, out onto the world map",
-    110000),
-  H.release(),
-  H.waitFrames(30),
+  ride2Attempt(1),
+  ride2Attempt(2),
+  ride2Attempt(3),
+  H.call(function()
+    if not rideWon then
+      error(string.format("rapids: BANON did not survive any of 3 honest " ..
+        "attempts -- last loss: %s -- the per-attempt numbers above are " ..
+        "the balance finding (#74-style); do not rig this leg",
+        tostring(lost)), 0)
+    end
+  end),
   H.call(function()
     H.assertEq(H.worldMode(), true, "on the world map (set_script_mode WORLD)")
     H.assertEq(H.readWord(0x1f64) & 0x3FF, 0, "on the World of Balance")

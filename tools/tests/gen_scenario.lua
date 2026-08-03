@@ -217,7 +217,27 @@ local ci, inChoice = 0, false
 
 -- The ride driver: steer choices, FIGHT battles honestly (issue #75 --
 -- zero state writes), tap dialogs, touch nothing else.  Reused for each
--- stretch between the manual handoffs.
+-- ladder attempt.
+--
+-- THE FIGHTER.  This river outpaces a blind A-masher: run 1 of the honest
+-- conversion lost BANON in fight #3 (the 3-monster roll) with the party
+-- never healed once, because tap-A confirms each actor's FIRST command and
+-- Banon's first command is FIGHT -- his famous Health is ROW 1 of his list
+-- (char_prop.asm:321: set_char_prop_cmds FIGHT, HEALTH, NONE, ITEM), so
+-- the "free party heal" never fired.  Battles therefore run a menu-episode
+-- machine (gen_arvis's cadence: presses start only once the battle-menu
+-- flag has held 4 straight frames, then ONE button per 30-frame pulse,
+-- 6 held + 24 released -- battle menus eat input during their open
+-- animation every turn):
+--     BANON (char 14)      down A A    Health, the designed sustain
+--     EDGAR (4), tier 2+   down A A A  Tools -> AutoCrossbow, his kit's
+--                                      whole-side opener (kits.md) --
+--                                      escalation after a lost attempt
+--     everyone else        A A         Fight, default target
+-- A sequence that leaves the menu open (a target prompt the route did not
+-- know about, an MP refusal) taps A two more pulses, backs out with B and
+-- rebuilds from wherever the cursor is -- progress over elegance -- and
+-- every episode is logged with its actor and buttons.
 --
 -- Battle bookkeeping (all READS): on each fight's rising edge the
 -- formation is named and BANON's battle slot found ($3ED8+2s == 14 --
@@ -226,12 +246,27 @@ local ci, inChoice = 0, false
 -- party + monster HP are logged every 300 frames so a loss ships with its
 -- whole trajectory.  Banon at 0 HP for 90 straight frames -- past any
 -- mid-round revive the policy could produce -- is the game over the river
--- exists to threaten, and it fails the mint THERE, numbers first.
+-- exists to threaten; a full party wipe is the same fact the long way.
+-- Neither errors out of the run any more: they set `lost`, the attempt's
+-- pred fires, and the RETRY LADDER below reloads the pre-board checkpoint
+-- -- the mint-script spelling of a player reloading their save -- and
+-- rides again with the escalated tier.
 local BCHID, BCHP, BCMAXHP = 0x3ed8, 0x3bf4, 0x3c1c
+local MENU, ACTOR = 0x7bca, 0x62ca -- battle menu open flag / whose menu
 local nBattles = 0
-local function rideUntil(pred, what, budget, idle)
+local lost = nil                   -- set by the in-battle loss guards
+local function seqFor(id, tier)
+  if id == 14 then return { "down", "a", "a" } end            -- Health
+  if id == 4 and tier >= 2 then
+    return { "down", "a", "a", "a" }                          -- AutoCrossbow
+  end
+  return { "a", "a" }                                         -- Fight
+end
+local function rideUntil(pred, what, budget, idle, tier)
+  tier = tier or 1
   local phase, battN, dlgN, lastBatt, hb = 0, 0, 0, -1, -900
   local bt = nil                 -- live fight: { n, f0, banon, dead }
+  local mStreak, mSeq, mIdx, mTick, mStall = 0, nil, 1, 0, 0
   local function partyLine()
     local p = {}
     for e = 0, 3 do
@@ -344,19 +379,57 @@ local function rideUntil(pred, what, budget, idle)
           if bt.banon then
             bt.dead = H.readWord(BCHP + bt.banon * 2) == 0 and bt.dead + 1
                       or 0
-            if bt.dead >= 90 then
-              H.log(string.format("river: BANON DOWN in battle #%d at f%d " ..
-                "(fight started f%d, %d frames in) -- party [%s] vs %s",
-                bt.n, H.frame, bt.f0, H.frame - bt.f0, partyLine(),
-                monsterLine()))
-              H.screenshot(string.format("scenario_banon_down%d", bt.n))
-              error(string.format("river: BANON reached 0 HP in battle #%d " ..
-                "-- his death is a game over; the numbers above are the " ..
-                "balance finding", bt.n), 0)
+            local wiped = true
+            for e = 0, 3 do
+              if H.readWord(BCMAXHP + e * 2) > 0
+                 and H.readWord(BCHP + e * 2) > 0 then wiped = false end
+            end
+            if bt.dead >= 90 or wiped then
+              lost = string.format("%s in battle #%d at f%d (started f%d, " ..
+                "%d frames in, tier %d) -- party [%s] vs %s",
+                wiped and "PARTY WIPED" or "BANON DOWN", bt.n, H.frame,
+                bt.f0, H.frame - bt.f0, tier, partyLine(), monsterLine())
+              H.log("river: " .. lost)
+              H.screenshot(string.format("scenario_lost%d", bt.n))
+              return              -- the attempt's pred sees `lost` and ends
             end
           end
         end
-        H.setPad(phase < 4 and { "a" } or {})
+        -- act: outside a settled menu, edge-tap A (opening dialogs, the
+        -- shell text, victory pages); inside one, run the episode machine
+        if bt == nil or bt.banon == nil or H.readByte(MENU) == 0 then
+          mStreak, mSeq = 0, nil
+          H.setPad(phase < 4 and { "a" } or {})
+          return
+        end
+        mStreak = mStreak + 1
+        if mStreak < 4 then H.setPad({}); return end
+        if mSeq == nil then
+          local slot = H.readByte(ACTOR) & 3
+          local id = H.readByte(BCHID + slot * 2)
+          mSeq, mIdx, mTick, mStall = seqFor(id, tier), 1, 0, 0
+          H.log(string.format("river: #%d cast f%d slot=%d char=%d " ..
+            "seq=%s | party [%s] vs %s", bt.n, H.frame, slot, id,
+            table.concat(mSeq, ","), partyLine(), monsterLine()))
+        end
+        mTick = mTick + 1
+        local ph = mTick % 30
+        local btn
+        if mIdx <= #mSeq then
+          btn = mSeq[mIdx]
+        elseif mStall < 2 then
+          btn = "a"               -- a prompt the sequence did not know
+        elseif mStall < 4 then
+          btn = "b"               -- back out (an MP refusal, a dead end)
+        else
+          mSeq = nil              -- rebuild from wherever the cursor is
+          H.setPad({})
+          return
+        end
+        if ph < 6 then H.setPad({ [btn] = true }) else H.setPad({}) end
+        if ph == 29 then
+          if mIdx <= #mSeq then mIdx = mIdx + 1 else mStall = mStall + 1 end
+        end
         return
       end
       -- the falling edge, debounced the same 3 frames the rising edge is
@@ -455,10 +528,63 @@ local function walkOffLandings()
   H.setPad({ down = true })
 end
 
+-- ------------------------------------------------------ the retry ladder --
+-- A lost river run is ACCEPTED, not rigged around: the checkpoint captured
+-- at the doorstep (before the boarding trigger) is reloaded -- the
+-- mint-script spelling of a player reloading their save -- and the ride is
+-- taken again.  The reload replays byte-identically until the INPUT
+-- differs, so each attempt escalates the fighter's tier (attempt 2+ spends
+-- Edgar's turns on AutoCrossbow, the whole-side opener), which reshuffles
+-- every subsequent ATB interleaving and roll as a side effect.  Three
+-- attempts; a third loss fails the mint with every attempt's numbers
+-- already on the record -- an honest partial beats a fudged whole.
+local rideBlob, rideWon = nil, false
+local function rideAttempt(n)
+  local ldReq
+  return H.cond(function() return not rideWon end, {
+    H.cond(function() return n > 1 end, {
+      H.logStep(function()
+        return string.format("river: ATTEMPT %d -- reloading the pre-board " ..
+          "checkpoint after a loss (%s)", n, tostring(lost))
+      end),
+      H.call(function() ldReq = H.requestLoadState(rideBlob) end),
+      H.waitFrames(2),
+      H.call(function() H.checkReq(ldReq, "attempt " .. n .. ": reload") end),
+      H.waitFrames(60),
+    }, {}),
+    H.call(function()               -- fresh per-attempt driver state
+      ci, inChoice, lost, nBattles = 0, false, nil, 0
+      announced = {}
+    end),
+    H.navTo(31, 51, { maxFrames = 12000, honest = true,
+      arrive = function() return sw(0x01B5) == 1 end }),
+    H.release(),
+    -- ONE driver for the whole river: it steers the four prompts, fights
+    -- every battle, taps every dialog, and holds DOWN off both landings.
+    (function()
+      local landedPred = landed(9, 20)
+      return rideUntil(function() return lost ~= nil or landedPred() end,
+        string.format("the Lete River, attempt %d: board, both forks, the " ..
+          "two landings, ULTROS, and the scenario hub", n),
+        200000, walkOffLandings, n)
+    end)(),
+    H.release(),
+    H.waitFrames(30),
+    H.call(function()
+      if lost == nil then
+        rideWon = true
+        H.log(string.format("river: attempt %d WON the ride -- %d battles " ..
+          "fought honestly", n, nBattles))
+      end
+    end),
+  }, {})
+end
+
 -- 200000 was the kill-bit-era budget; an honest ride spends real ATB
--- rounds on a dozen forced fights plus ULTROS, so both ceilings carry
--- headroom for the measured cost of actually playing them
-H.run({ maxFrames = 300000 }, {
+-- rounds on a dozen forced fights plus ULTROS, the ladder may ride the
+-- river up to three times, and each ceiling carries headroom for the
+-- measured cost of actually playing it
+H.run({ maxFrames = 700000 }, {
   H.loadState(DOOR),
   H.waitFrames(30),
   H.call(function()
@@ -474,25 +600,43 @@ H.run({ maxFrames = 300000 }, {
   end),
 
   -- ===================================================================== --
-  -- BOARD.  Step onto (31,51) -> _cb059f (event_trigger.asm:462).
-  -- NB $01B5 is NOT set the moment the trigger fires: _cb059f runs
-  -- clr_status/max_hp for the party and then `dlg $0166` ("Here we go!",
-  -- :38826) -- a dialog that WAITS FOR A KEYPRESS -- and only reaches
-  -- `switch $01B5=1` at _cb05e4 (:38834) once that is dismissed.  A first
-  -- cut asserted $01B5 straight after the walk and failed on exactly that,
-  -- with the dialog on screen and nobody pressing anything.  So the walk
-  -- only gets the party onto the tile; the driver taps $0166 and on.
+  -- THE CHECKPOINT, then BOARD.  The pre-board capture is the ladder's
+  -- reload point: it holds the doorstep BEFORE (31,51) fires _cb059f
+  -- (event_trigger.asm:462), so a reloaded attempt replays the boarding
+  -- exactly.  NB $01B5 is NOT set the moment the trigger fires: _cb059f
+  -- runs clr_status/max_hp for the party (the raft leaves FULLY HEALED,
+  -- every attempt) and then `dlg $0166` ("Here we go!", :38826) -- a
+  -- dialog that WAITS FOR A KEYPRESS -- and only reaches `switch $01B5=1`
+  -- at _cb05e4 (:38834) once that is dismissed.  A first cut asserted
+  -- $01B5 straight after the walk and failed on exactly that.  So the
+  -- walk only gets the party onto the tile; the driver taps $0166 and on.
   -- ===================================================================== --
-  H.navTo(31, 51, { maxFrames = 12000, honest = true,
-    arrive = function() return sw(0x01B5) == 1 end }),
-  H.release(),
+  (function()
+    local ckReq
+    return seq({
+      H.call(function() ckReq = H.requestSaveState() end),
+      H.waitFrames(2),
+      H.call(function()
+        H.checkReq(ckReq, "pre-board checkpoint")
+        rideBlob = ckReq.blob
+        H.log(string.format("river: pre-board checkpoint captured " ..
+          "(%d bytes) at (%d,%d) f%d", #rideBlob, H.fieldX(), H.fieldY(),
+          H.frame))
+      end),
+    })
+  end)(),
 
-  -- ONE driver for the whole river: it steers the four prompts, kill-bits a
-  -- dozen forced fights, taps every dialog, and holds DOWN off both landings.
-  rideUntil(landed(9, 20), "the Lete River: board, both forks, the two " ..
-    "landings, ULTROS, and the scenario hub", 240000, walkOffLandings),
-  H.release(),
-  H.waitFrames(30),
+  rideAttempt(1),
+  rideAttempt(2),
+  rideAttempt(3),
+  H.call(function()
+    if not rideWon then
+      error(string.format("river: BANON did not survive any of 3 honest " ..
+        "attempts -- last loss: %s -- the per-attempt numbers above are " ..
+        "the balance finding (#74-style); do not rig this leg",
+        tostring(lost)), 0)
+    end
+  end),
   H.call(function()
     H.assertEq(ci, 4,
       "all four prompts answered: board, fork 1, fork 2, save-point tutorial")
