@@ -258,9 +258,11 @@ local fTick, fStreak = 0, 0
 local function makeFightPlan(actor)
   local hp, mx = pHPf(actor), pMaxHPf(actor)
   local itemRow = cmdRowOf(actor, CMD_ITEM)
-  if mx > 0 and hp > 0 and hp * 2 < mx and itemRow then
+  -- heal under 60%, and reach for the Potion once 100+ HP is missing: the
+  -- pursuit measured 4 attackers out-damaging a 50-HP Tonic line
+  if mx > 0 and hp > 0 and hp * 10 < mx * 6 and itemRow then
     local id = nil
-    if mx - hp >= 150 and battItemIdx(POTION) then id = POTION
+    if mx - hp >= 100 and battItemIdx(POTION) then id = POTION
     elseif battItemIdx(TONIC) then id = TONIC
     elseif battItemIdx(POTION) then id = POTION end
     if id then
@@ -271,8 +273,10 @@ local function makeFightPlan(actor)
     end
   end
   local bp = H.readByte(BP + actor * 2)
-  local boostMin = fightTier >= 2 and 1 or 2
-  local boost = bp >= boostMin and math.min(bp, 3) or 0
+  -- dump banked boost EVERY turn: these are 1-2 member legs where a dead
+  -- enemy is the only mitigation, and the pursuit measured bank-to-2
+  -- losing the tempo war against four attackers
+  local boost = bp >= 1 and math.min(bp, 3) or 0
   H.log(string.format("kefka: cast f%d e%d boost=%d tier=%d [%s]",
     H.frame, actor, boost, fightTier, partyLine()))
   return { kind = "fight", boostLeft = boost }
@@ -580,8 +584,22 @@ local function pursuitAttempt(n)
       H.waitFrames(60 + (n - 1) * 17),
     }, {}),
     H.call(function() lost, fightTier = nil, n end),
-    stepOnto(17, 31, function() return lost ~= nil or sw(0x0155) == 1 end,
-      "the pursuit (_cb11da -> _cb1209, battle 44), attempt " .. n, 25000),
+    -- the deadline lives INSIDE the pred so a lost fight retries instead
+    -- of raising out of stepOnto (attempt 1 of the first honest run died
+    -- exactly there: SABIN down, SHADOW grinding alone, timeout at 25000)
+    (function()
+      local frames = 0
+      return stepOnto(17, 31, function()
+        frames = frames + 1
+        if frames > 23000 and lost == nil then
+          lost = string.format("pursuit attempt %d deadline (23000 " ..
+            "frames) -- assumed wiped or wedged [%s]", n, partyLine())
+          H.log("kefka: LOST -- " .. lost)
+        end
+        return lost ~= nil or sw(0x0155) == 1
+      end, "the pursuit (_cb11da -> _cb1209, battle 44), attempt " .. n,
+        25000)
+    end)(),
     (function()
       local landedPred = landedField(121, 10)
       local frames = 0

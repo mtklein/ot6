@@ -276,9 +276,11 @@ local fTick, fStreak = 0, 0
 local function makeFightPlan(actor)
   local hp, mx = pHPf(actor), pMaxHPf(actor)
   local itemRow = cmdRowOf(actor, CMD_ITEM)
-  if mx > 0 and hp > 0 and hp * 2 < mx and itemRow then
+  -- heal under 60%, and reach for the Potion once 100+ HP is missing: the
+  -- pursuit measured 4 attackers out-damaging a 50-HP Tonic line
+  if mx > 0 and hp > 0 and hp * 10 < mx * 6 and itemRow then
     local id = nil
-    if mx - hp >= 150 and battItemIdx(POTION) then id = POTION
+    if mx - hp >= 100 and battItemIdx(POTION) then id = POTION
     elseif battItemIdx(TONIC) then id = TONIC
     elseif battItemIdx(POTION) then id = POTION end
     if id then
@@ -289,8 +291,10 @@ local function makeFightPlan(actor)
     end
   end
   local bp = H.readByte(BP + actor * 2)
-  local boostMin = fightTier >= 2 and 1 or 2
-  local boost = bp >= boostMin and math.min(bp, 3) or 0
+  -- dump banked boost EVERY turn: these are 1-2 member legs where a dead
+  -- enemy is the only mitigation, and the pursuit measured bank-to-2
+  -- losing the tempo war against four attackers
+  local boost = bp >= 1 and math.min(bp, 3) or 0
   H.log(string.format("escape: cast f%d e%d boost=%d tier=%d [%s]",
     H.frame, actor, boost, fightTier, partyLine()))
   return { kind = "fight", boostLeft = boost }
