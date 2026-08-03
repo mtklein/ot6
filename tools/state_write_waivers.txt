@@ -177,7 +177,6 @@ tools/tests/gen_sabin_falls.lua	.writeWord(
 tools/tests/gen_sabin_forest.lua	.writeByte(
 tools/tests/gen_sabin_gau.lua	.writeByte(
 tools/tests/gen_sabin_gau.lua	.writeWord(
-tools/tests/gen_sabin_kefka.lua	.writeByte(
 tools/tests/gen_sabin_train.lua	.writeByte(
 tools/tests/gen_sabin_train.lua	.writeWord(
 tools/tests/gen_sabin_trench.lua	.writeByte(
