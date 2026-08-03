@@ -25,7 +25,7 @@
 local H = dofile("tools/tests/lib/ot6.lua")
 
 local ZMENUSTATE       = 0x0026
-local SAVE_SELECT_INIT = 0x13
+local MAIN_MENU        = 0x05
 local SAVE_SELECT      = 0x14
 local ACTIVE           = 0x021f
 
@@ -43,12 +43,26 @@ H.run({ maxFrames = 8000 }, {
 
   H.pressButtons({ "x" }, 4),
   H.waitFrames(120),
-  H.call(function() H.writeByte(ZMENUSTATE, SAVE_SELECT_INIT) end),
+  H.waitUntil(function() return H.readByte(ZMENUSTATE) == MAIN_MENU end,
+    300, "main menu", 5),
+  -- Reach save select by pad (save-drive rule, tools/tests/README): UP wraps
+  -- the main-menu cursor from Items to Save, A runs SelectMainMenuOption_06's
+  -- real entry, DOWN walks the slot cursor to slot 3.  The drives poll the
+  -- state and cursor by READING them, so no frame count is load-bearing.
+  H.driveUntil(function()
+    return H.readByte(ZMENUSTATE) == MAIN_MENU and H.readByte(0x4b) == 6
+  end, 600, {
+    H.pressButtons({ "up" }, 4), H.waitFrames(16),
+  }, "main-menu cursor on Save"),
+  H.pressButtons({ "a" }, 4),
   H.waitUntil(function() return H.readByte(ZMENUSTATE) == SAVE_SELECT end,
-    300, "save-slot selection", 5),
+    600, "save-slot selection", 5),
+  H.driveUntil(function()
+    return H.readByte(ZMENUSTATE) == SAVE_SELECT and H.readByte(0x4b) == 2
+  end, 600, {
+    H.pressButtons({ "down" }, 4), H.waitFrames(16),
+  }, "save cursor on slot 3"),
   H.call(function()
-    H.writeByte(0x4b, 2)   -- cursor: slot 3
-    H.writeWord(0x95, 0)   -- save-menu checksum cache: slot 3 reads empty
     -- The game repacks $1600..$1ffd from live state during the save, so zeroing
     -- it from a step is too early -- it gets overwritten before the sum runs.
     -- Hook the checksum routine itself and zero the range on entry, so the sum
