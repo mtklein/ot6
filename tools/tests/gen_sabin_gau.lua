@@ -160,33 +160,48 @@ local function tapUntil(btn, pred, what, budget)
   }, what)
 end
 
--- buy `want` of shop row `row` holding item `id`, one confirm per lap,
--- verified against the field inventory (gen_sabin_train's idiom)
-local function buyItem(id, row, want, floor, name)
-  local phase, downs, ups = 0, 0, 0
-  return H.driveUntil(function()
-    return invCount(id) >= want or gil() < floor
-  end, 60000, {
+-- buy `qtyFn()` MORE of shop row `row` in ONE lap: options -> list row ->
+-- quantity -> confirm.  The widget (shop.asm MenuState_27, z0a bits):
+-- RIGHT=+1, UP=+10, DOWN=-10, LEFT=-1, opens at 1, gil-clamped by the
+-- handler itself.  Purchases are verified AFTER the shop closes -- the
+-- menu module rearranges inventory RAM while open, and a mid-menu
+-- invCount pred measurably fired phantom-true in 82 frames.
+local function buyItem(id, row, qtyFn, name)
+  local phase, downs, tens, ones = 0, 0, 0, 0
+  local seen27, bought = false, false
+  local wantTens, wantOnes = nil, nil
+  return H.driveUntil(function() return bought end, 20000, {
     H.call(function()
       phase = (phase + 1) % 8
       local st = mstateMenu()
-      if st == 0x25 then
-        downs, ups = 0, 0
-        H.setPad(phase < 4 and { "a" } or {})
-      elseif st == 0x26 then
-        ups = 0
-        if downs < row then
-          if phase == 0 then downs = downs + 1 end
-          H.setPad(phase < 4 and { "down" } or {})
+      if wantTens == nil then
+        local t = qtyFn() - 1              -- the widget opens at 1
+        if t < 0 then t = 0 end
+        wantTens, wantOnes = t // 10, t % 10
+        H.log(string.format("[shop] %s: +%d (tens=%d ones=%d)", name,
+          t + 1, wantTens, wantOnes))
+      end
+      if st == 0x27 then
+        seen27 = true
+        if tens < wantTens then
+          if phase == 0 then tens = tens + 1 end
+          H.setPad(phase < 4 and { "up" } or {})
+        elseif ones < wantOnes then
+          if phase == 0 then ones = ones + 1 end
+          H.setPad(phase < 4 and { "right" } or {})
         else
           H.setPad(phase < 4 and { "a" } or {})
         end
-      elseif st == 0x27 then                  -- quantity: up to 10 per lap
-        local need = want - invCount(id) - 1
-        if need > 9 then need = 9 end
-        if ups < need then
-          if phase == 0 then ups = ups + 1 end
-          H.setPad(phase < 4 and { "up" } or {})
+      elseif seen27 then
+        bought = true
+        H.setPad({})
+      elseif st == 0x25 then
+        downs = 0
+        H.setPad(phase < 4 and { "a" } or {})
+      elseif st == 0x26 then
+        if downs < row then
+          if phase == 0 then downs = downs + 1 end
+          H.setPad(phase < 4 and { "down" } or {})
         else
           H.setPad(phase < 4 and { "a" } or {})
         end
@@ -520,7 +535,7 @@ H.run({ maxFrames = 500000 }, {
     return invSlot(DRIED_MEAT) ~= nil and mstateMenu() == 0x26
   end, "bought", 2400),
   -- the grind's medicine: Tonics from row 1, bought the verified-loop way
-  buyItem(TONIC, 1, 10, 60, "TONIC x10"),
+  buyItem(TONIC, 1, function() return 10 - invCount(TONIC) end, "TONIC to 10"),
   tapUntil("b", inState(0x25), "options again"),
   tapUntil("b", function() return H.hasControl() end, "shop closed", 2400),
   H.call(function()
