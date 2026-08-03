@@ -142,16 +142,67 @@ local function headAlive()
      and (H.readByte(MSTAT + hs * 2) & 0xc2) == 0
 end
 
--- Sequences run from the settled top command menu (cursor on MagiTek);
--- cell coordinates measured by whelkbal_run (the soldiers' 4-cell list
--- stages sparse, so Heal Force is (2,0) for everyone; (1,1) is a blank
--- cell the cursor can wedge on -- do not walk through it):
+-- RETRACT-CYCLE DISCIPLINE (measured the expensive way, run 3 of this
+-- gen): an attack queued while the head is up can still EXECUTE after the
+-- retract -- the turn engine retargets it into the shell, and every shell
+-- hit draws the MegaVolt counter.  whelkbal_run knew this ("queued attacks
+-- retarget into the shell and eat counters") but its policy only keyed on
+-- head-up-right-now; from a gauntlet-worn party that lost Terra at f5085
+-- and ended in an unwinnable one-soldier loop: the survivor's beams
+-- queued in each up-window, executed into the next hidden phase, and the
+-- head sat at 63 HP for ten thousand frames while counters ground the
+-- party down.  So attacks are gated on a FRESH window instead:
+--   * lastShow marks the hidden->up edge; attacks only queue within
+--     FRESH frames of it (a window runs ~1600 frames; queue latency is a
+--     few hundred, so early casts land while the head is still out);
+--   * hitsSinceShow counts observed head hp/shield drops since the edge;
+--     the head retracts ON the 3rd hit (ai_script.asm _309: var>2 ->
+--     hide), so from 2 on nothing more is queued -- the 3rd is already
+--     in flight somewhere.
+--   * everything else (head hidden, stale window, hit budget spent) is a
+--     Heal Force turn: MegaVolt sweeps ~30-50 across the party and Heal
+--     Force outheals it, but only while all three keep casting it.
+local lastShow, lastUp = nil, nil
+local hitsSinceShow = 0
+local lastHp, lastSh = nil, nil
+local FRESH = 1400
+local function observeHead()
+  if hs == nil then return end
+  local up = headAlive()
+  if up and lastUp == false then
+    lastShow, hitsSinceShow = H.frame, 0
+    lastHp, lastSh = nil, nil
+  end
+  lastUp = up
+  if up then
+    local hp, sh = H.readWord(MHP + hs * 2), shields()
+    if (lastHp and hp < lastHp) or (lastSh and sh < lastSh) then
+      hitsSinceShow = hitsSinceShow + 1
+    end
+    lastHp, lastSh = hp, sh
+  end
+end
+
+-- Sequences run from the settled top command menu (cursor on MagiTek).
+-- Cell coordinates: the soldiers' 4-cell list stages sparse -- Fire|Bolt /
+-- Ice / Heal -- so their Heal Force is (2,0); TERRA's list is the full 2x4
+-- grid (col 0 = Fire/Bolt/Ice/Heal, col 1 = specials), so HER Heal Force
+-- is (3,0) and TekMissile (3,1).  whelkbal_run's "(2,0) for everyone" was
+-- wrong for Terra -- that cell is her ICE BEAM, and casting it in a hidden
+-- phase is a shell hit (run 3's first MegaVolt chain started exactly
+-- there).
 --   beam at default target        A A A
---   heal force (2,0)              A dn dn A A     (self-target default)
---   tekmissile, terra only (3,1)  A dn dn dn rt A A
+--   heal force  soldier (2,0)     A dn dn A A     (self-target default)
+--   heal force  terra   (3,0)     A dn dn dn A A
+--   tekmissile  terra   (3,1)     A dn dn dn rt A A
 local function seqFor(actor)
-  if not headAlive() then
-    return { "a", "down", "down", "a", "a" }          -- Heal Force
+  local freshWindow = headAlive() and lastShow
+    and (H.frame - lastShow) < FRESH and hitsSinceShow < 2
+  if not freshWindow then
+    if actor == terra then
+      return { "a", "down", "down", "down", "a", "a" }         -- Heal Force
+    end
+    return { "a", "down", "down", "a", "a" }                   -- Heal Force
   end
   if actor == terra and not broken() and shields() == 1 then
     return { "a", "down", "down", "down", "right", "a", "a" }  -- TekMissile
@@ -175,7 +226,14 @@ local function policyPulse()
   mStreak = mStreak + 1
   if mStreak < 4 then return {} end
   if mSeq == nil then
-    mSeq, mIdx = seqFor(H.readByte(ACTOR)), 1
+    local actor = H.readByte(ACTOR)
+    mSeq, mIdx = seqFor(actor), 1
+    H.log(string.format(
+      "whelk cast f%d actor=%d seq=%s | head hp=%d sh=%d tmr=%d up=%s | party %d/%d/%d",
+      H.frame, actor, table.concat(mSeq, ","),
+      H.readWord(MHP + hs * 2), shields(), H.readByte(TIMER + hs * 2),
+      tostring(headAlive()),
+      H.readWord(0x3bf4), H.readWord(0x3bf6), H.readWord(0x3bf8)))
   end
   if mIdx <= #mSeq then
     local b = mSeq[mIdx]
@@ -199,7 +257,7 @@ end
 local function winWhelk()
   return H.driveUntil(function()
     return hs ~= nil and not H.battleLoadStarted()
-  end, 25000, {
+  end, 40000, {
     H.call(function()
       if hs == nil and H.readByte(MENU) ~= 0 then
         for slot = 0, 5 do
@@ -213,7 +271,11 @@ local function winWhelk()
         H.log(string.format(
           "whelk armed: head slot %d (hp=%d sh=%d), terra char slot %d",
           hs, H.readWord(MHP + hs * 2), shields(), terra))
+        -- the boot state of the window tracker: the head is UP at battle
+        -- start, and that opening spread counts as a fresh window
+        lastUp, lastShow, hitsSinceShow = true, H.frame, 0
       end
+      observeHead()
       H.setPad(policyPulse())
     end),
     H.waitFrames(6),
@@ -222,7 +284,7 @@ local function winWhelk()
   }, "whelk beaten honestly (tutorial policy)")
 end
 
-H.run({ maxFrames = 90000 }, {
+H.run({ maxFrames = 120000 }, {
   H.loadState(DOORSTEP),
   H.waitFrames(10),
   H.waitUntil(function() return H.hasControl() end, 300, "doorstep control", 5),
