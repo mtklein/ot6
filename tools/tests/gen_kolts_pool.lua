@@ -21,19 +21,20 @@
 -- poison CLASS chips, the only class-chip carrier the stretch has) had
 -- never been driven against a live pool.
 --
--- ENCOUNTER SUPPRESSION during the crossing, not battle-clearing.  An
--- encounter fired on the way would leave the fixture with spent MP, spent
--- HP and banked XP -- a party that is no longer the stretch's party, which
--- is the one thing this fixture is for.  $1F6E (the per-step danger
--- accumulator both trigger paths compare against) is held at zero across
--- the walk and the settle, so no step can reach the threshold; it is left
--- at zero in the saved state, which is also what bal_party.lua writes
--- before every sample anyway (mines_pace.lua, Measurement #4: a cold
--- counter is the honest steady-state interval).
+-- ENCOUNTERS ON THE CROSSING ARE FLED, honestly (issue #75).  The old
+-- mint held the danger accumulator $1F6E at zero so no encounter could
+-- fire at all -- a state write, and a party no player ever walks in with.
+-- Now the crossing runs the lib's honest="flee" mode: an encounter that
+-- rolls is RUN FROM with held L+R (the engine's own mechanic, zero
+-- writes), which is exactly what a player protecting a fresh party does,
+-- and what it costs is what it costs a player -- a few battle frames and
+-- whatever hits land before the run succeeds.  The fixture's party is
+-- therefore a real player's near-pristine party, not a lab-pure one, and
+-- the mint log below records exactly what it carried.  (An unrunnable
+-- formation falls back to the lib's tap-A fight after FLEE_CAP frames.)
 local H = dofile("tools/tests/lib/ot6.lua")
 
 local DOORSTEP = "build/states/kolts_doorstep.mss.lua"
-local DANGER = 0x1f6e
 
 -- map compares stay MASKED: loaders ride flag bits in $1F64's high byte
 local function map() return H.mapId() & 0x1ff end
@@ -46,16 +47,18 @@ end
 
 -- gen_kolts' settleField, minus the story-chain scaffolding it does not
 -- need here: control + alignment + the expected map, held for 30 frames.
+-- advanceStory (honest="flee") drives it rather than a passive wait, so an
+-- encounter that rolled on the arrival tile is fled instead of stalling
+-- the settle to its timeout.
 local function settleField(what, dstMap, maxF)
   local held = 0
-  return H.driveUntil(function()
-    H.writeWord(DANGER, 0)              -- see header: no encounter mid-settle
+  return H.advanceStory(function()
     local ok = H.hasControl() and H.tileAligned()
+      and not H.battleLoadStarted() and not H.dialogWaiting()
       and (dstMap == nil or map() == dstMap)
     held = ok and held + 1 or 0
     return held >= 30
-  end, maxF or 12000, { H.call(function() H.setPad({}) end), H.waitFrames(1) },
-  "settle " .. what)
+  end, maxF or 12000, { honest = "flee" })
 end
 
 local function mapChanged()
@@ -79,9 +82,11 @@ H.run({ maxFrames = 60000 }, {
       local id = H.readByte(0x1a6d + i)          -- party slot -> char index
       if id ~= 0xff then
         local blk = 0x1600 + id * 37
-        H.log(string.format("[kolts_pool] slot%d char=%02X level=%d hp=%d/%d",
+        H.log(string.format(
+          "[kolts_pool] slot%d char=%02X level=%d hp=%d/%d mp=%d/%d",
           i, id, H.readByte(blk + 8),
-          H.readWord(blk + 9), H.readWord(blk + 11)))
+          H.readWord(blk + 9), H.readWord(blk + 11),
+          H.readWord(blk + 13), H.readWord(blk + 15)))
       end
     end
   end),
@@ -108,14 +113,16 @@ H.run({ maxFrames = 60000 }, {
       #p, tostring(hit)))
     H.assertEq(hit, false, "plan stays off map 95's world-exit row 37")
   end),
-  H.navTo(11, 26, { maxFrames = 20000, arrive = mapChanged() }),
+  H.navTo(11, 26, { maxFrames = 20000, arrive = mapChanged(),
+           honest = "flee" }),
   H.release(),
   settleField("shelf F", 100),
   H.call(function()
     H.assertEq(map(), 100, "crossed onto map 100, MT. KOLTS shelf F")
     H.assertEq(H.hasControl(), true, "controllable")
     H.assertEq(H.tileAligned(), true, "tile-aligned")
-    H.writeWord(DANGER, 0)
+    H.log(string.format("[kolts_pool] danger counter at mint: %04X (honest -- "
+      .. "whatever the walk accumulated)", H.readWord(0x1f6e)))
     where("shelf F")
     H.screenshot("kolts_pool")
   end),
@@ -137,7 +144,6 @@ H.run({ maxFrames = 60000 }, {
   -- 95 -- which reads exactly like "shelf F has no pool" and is not.
   -- H.canStep models terrain and objects; it cannot see entrance records,
   -- so the safe direction is named here and the map is guarded below.
-  H.call(function() H.writeWord(DANGER, 0) end),
   (function()
     local battN, waited, lane, lastXY, steps = 0, 0, nil, nil, 0
     local BACK = { left = "right", right = "left", up = "down", down = "up" }
