@@ -107,7 +107,10 @@ local CMDTBL, ITEMLIST = 0x202E, 0x4005 -- command cells; wItemList rows
 local BATTINV = 0x2686                  -- battle inventory, 5 bytes/entry
 local CMDROW = 0x890F                   -- +actor: command-list cursor row
 local BLSCROLL, BLCOL, BLROW = 0x895F, 0x8963, 0x8967  -- +actor: 2-col grids
-local ITEMIDX = 0x8947                  -- +actor: item-list absolute index
+-- the item-list cursor is TWO cells per actor: scroll ($8947) + row-on-
+-- screen ($894F); get_item_poi (_c189be) sums them (measured the hard
+-- way -- probe_itemuse)
+local ITEMSCR, ITEMROW = 0x8947, 0x894F
 local TGTCHARS, TGTMONS = 0x7B7D, 0x7B7E -- live target-cursor masks
 local BP = 0x3E9C                       -- banked boost points, +slot*2
 local TONIC, POTION, FENIX_DOWN = 0xE8, 0xE9, 0xF0
@@ -556,7 +559,7 @@ local function b68Button()
   if st == ST_ITEM and plan.kind == "item" then
     local want = battInvIdx(plan.item)
     if want == nil then return { "b" } end    -- ran out mid-menu: back out
-    local cur = H.readByte(ITEMIDX + actor)
+    local cur = H.readByte(ITEMSCR + actor) + H.readByte(ITEMROW + actor)
     if cur < want then return { "down" } end
     if cur > want then return { "up" } end
     return { "a" }

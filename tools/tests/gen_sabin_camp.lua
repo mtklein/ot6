@@ -228,7 +228,17 @@ end
 local MSTATE = 0x7BC2
 local ST_CMD, ST_ITEM, ST_TGT, ST_TOOLS = 0x05, 0x0A, 0x38, 0x30
 local CMD_ITEM = 0x01
-local CMDTBL, CMDROW, ITEMIDX = 0x202E, 0x890F, 0x8947
+local CMDTBL, CMDROW = 0x202E, 0x890F
+-- the item-list cursor is TWO cells per actor -- scroll ($8947) plus
+-- row-on-screen ($894F) -- and the engine's own get_item_poi
+-- (btlgfx_main.asm:_c189be) sums them before the *5; reading the scroll
+-- alone selected inventory index 4 while the display said 1 (measured,
+-- probe_itemuse: the select/deselect toggle that wedged the first
+-- honest courtyard mint)
+local ITEMSCR, ITEMROW = 0x8947, 0x894F
+local function itemIdxOf(a)
+  return H.readByte(ITEMSCR + a) + H.readByte(ITEMROW + a)
+end
 local BATTINV = 0x2686
 local TONIC, POTION = 0xE8, 0xE9
 local function pHPf(e) return H.readWord(0x3BF4 + e * 2) end
@@ -301,7 +311,7 @@ local function fightButton()
   if st == ST_ITEM and plan.kind == "item" then
     local want = battItemIdx(plan.item)
     if want == nil then return { "b" } end
-    local cur = H.readByte(ITEMIDX + actor)
+    local cur = itemIdxOf(actor)
     if cur < want then return { "down" } end
     if cur > want then return { "up" } end
     return { "a" }
@@ -331,7 +341,7 @@ local function fightPulse(_)
     local a = H.readByte(ACTOR)
     H.log(string.format("camp: fmenu f%d st=%02X actor=%d row=%d itm=%d " ..
       "plan=%s held=%d [%s]", H.frame, H.readByte(MSTATE), a,
-      H.readByte(CMDROW + a) & 3, H.readByte(ITEMIDX + a),
+      H.readByte(CMDROW + a) & 3, itemIdxOf(a),
       fPlan and fPlan.kind or "-", fHeld, partyLine()))
   end
   -- stall recovery: a plan that cannot finish in 40 pulses is backed out

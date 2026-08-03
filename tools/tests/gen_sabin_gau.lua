@@ -100,7 +100,10 @@ end
 local MENU, ACTOR, MSTATE = 0x7BCA, 0x62CA, 0x7BC2
 local ST_CMD, ST_ITEM, ST_TGT = 0x05, 0x0A, 0x38
 local CMD_ITEM = 0x01
-local CMDTBL, CMDROW, ITEMIDX = 0x202E, 0x890F, 0x8947
+local CMDTBL, CMDROW = 0x202E, 0x890F
+-- item cursor = scroll ($8947) + row-on-screen ($894F), get_item_poi's
+-- own sum (measured, probe_itemuse)
+local ITEMSCR, ITEMROW = 0x8947, 0x894F
 local BATTINV = 0x2686
 local TGTCHARS, TGTMONS = 0x7B7D, 0x7B7E
 local BP = 0x3E9C
@@ -266,7 +269,7 @@ local function grindStep()
     if st == ST_ITEM and (plan.kind == "item" or plan.kind == "feed") then
       local want = battInvIdx(plan.item)
       if want == nil then return { "b" } end
-      local cur = H.readByte(ITEMIDX + actor)
+      local cur = H.readByte(ITEMSCR + actor) + H.readByte(ITEMROW + actor)
       if cur < want then return { "down" } end
       if cur > want then return { "up" } end
       return { "a" }
