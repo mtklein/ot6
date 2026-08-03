@@ -154,6 +154,12 @@ test: rom nomp-rom graph
 	@# reason compose.py and sram_anchor.py sit on these lines.
 	python3 tools/check_boss_rows.py
 	python3 tools/check_break_reach.py
+	@# No test may WRITE emulated game state (input injection and memory
+	@# reads only).  Pre-rule violations are grandfathered in
+	@# tools/state_write_waivers.txt, a burn-down list that only shrinks;
+	@# any NEW write anywhere in tools/tests/**/*.lua fails here.
+	python3 tools/check_state_writes.py --selftest
+	python3 tools/check_state_writes.py
 	python3 tools/tests/lib/frontier_ninja.py --selftest
 	sh tools/tests/lib/frontier_ninja_selftest.sh
 	sh tools/tests/lib/frontier_stamp_selftest.sh
@@ -200,6 +206,10 @@ test: rom nomp-rom graph
 # `make frontier FRONTIER_JOBS=8` overrides just this.
 FRONTIER_JOBS ?= 4
 frontier: rom graph
+	@# Gate the mint the same way `test` is gated: a generator that pokes
+	@# game state mints a fixture nobody played, and frontier can be run
+	@# with `make test` skipped -- so the no-state-write check runs here too.
+	python3 tools/check_state_writes.py
 	ninja -f $(NINJA_FILE) $(if $(NINJAFLAGS),$(NINJAFLAGS),-j$(FRONTIER_JOBS)) frontier
 	@echo "frontier states up to date"
 
