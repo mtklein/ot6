@@ -148,6 +148,20 @@ end
 
 local gSlot, sabinE, cyanE, shadowE = nil, nil, nil, nil
 
+local function cmdRowOf(actor, cmdId)
+  for i = 0, 3 do
+    if H.readByte(CMDTBL + actor * 12 + i * 3) == cmdId then return i end
+  end
+  return nil
+end
+local function battInvIdx(id)
+  for i = 0, 251 do
+    if H.readByte(BATTINV + i * 5) == id
+       and H.readByte(BATTINV + i * 5 + 3) > 0 then return i end
+  end
+  return nil
+end
+
 -- navTo, always fleeing (the corridor discipline -- see the header)
 local function nav(x, y, o)
   o = o or {}
@@ -509,19 +523,6 @@ local b68 = {
   lastSH, lastHP,
 }
 local function b68Log(msg) H.log("[b68] " .. msg) end
-local function cmdRowOf(actor, cmdId)
-  for i = 0, 3 do
-    if H.readByte(CMDTBL + actor * 12 + i * 3) == cmdId then return i end
-  end
-  return nil
-end
-local function battInvIdx(id)
-  for i = 0, 251 do
-    if H.readByte(BATTINV + i * 5) == id
-       and H.readByte(BATTINV + i * 5 + 3) > 0 then return i end
-  end
-  return nil
-end
 -- neediest by FRACTION (the first honest fight measured SHADOW at 56/197
 -- dying unhealed while absolute-missing ranking pointed both medics at
 -- bigger pools), with SABIN jumping the queue under 60% -- he is the win
