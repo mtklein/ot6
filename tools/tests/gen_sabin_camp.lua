@@ -42,6 +42,25 @@
 -- interlude and calls _cb0bc4 (:61737) -- the CAMP's own startup event,
 -- which re-creates SABIN and SHADOW and reloads map 117 at (36,2).  So the
 -- interlude is exactly one fight long and the eleven others are skipped.
+--
+-- ISSUE #75 -- BATTLE 46 IS FOUGHT, NOT KILL-BITTED.  Zero state writes in
+-- this generator.  The fight is CYAN alone (battle slot ONE -- see the
+-- inBattle note) against event battle group 46 = formation 409 = one $14E,
+-- and its loss is unrecoverable in-timeline: `battle 46` is followed by
+-- `call _ca5ea9` (:61522-61523), the GameOver gate, so a lost fight parks
+-- the event PC at $CB9EBB forever.  The fighter is the house menu-episode
+-- machine (gen_scenario's cadence: presses start only once the battle-menu
+-- flag has held 4 straight pulses, then ONE button per 30-frame pulse):
+-- CYAN banks boost to 2 and dumps it on Fight -- R raises pending boost,
+-- A A confirms the boosted Fight on the default target -- the same
+-- bank-and-dump doctrine the river fighters proved.  A loss (CYAN at 0 HP
+-- for 90 straight frames) does not error: it sets `lost` and the RETRY
+-- LADDER reloads the cyan_defence-moment checkpoint -- the mint-script
+-- spelling of a player reloading their save -- and pokes the commander
+-- again with the fighter escalated (attempt 2+ dumps at 1 BP, which
+-- changes every input from the first turn and reshuffles the whole
+-- interleaving).  Three attempts, then fail with every attempt's numbers
+-- on the record.
 local H = dofile("tools/tests/lib/ot6.lua")
 local DOOR = "build/states/sabin_camp.mss.lua"
 
@@ -176,6 +195,84 @@ local CHOICES = {}
 local ci, inChoice = 0, false
 local nameMenus, battles = 0, {}
 
+-- ---------------------------------------------------------- the fighter --
+-- The honest battle driver (issue #75; gen_scenario's menu-episode machine,
+-- reduced to the one policy this leg needs): from a settled battle menu
+-- (flag $7BCA held 4 straight pulses), one button per 30-frame pulse --
+-- boost prefix (R per banked point, dumped at the tier's threshold), then
+-- A A = Fight on the default target.  Outside a settled menu, edge-tap A
+-- (battle dialogs, victory text).  `tier` >= 2 dumps at 1 BP instead of 2.
+local MENU, ACTOR = 0x7BCA, 0x62CA
+local BP = 0x3E9C                       -- banked boost points, +slot*2
+local fightTier = 1
+local mStreak, mSeq, mIdx, mTick, mStall = 0, nil, 1, 0, 0
+local lost = nil                        -- set by the loss watch
+local bt = nil                          -- live-fight bookkeeping
+local function partyLine()
+  local p = {}
+  for e = 0, 3 do
+    p[#p + 1] = string.format("%d/%d", H.readWord(0x3bf4 + e * 2),
+      H.readWord(0x3c1c + e * 2))
+  end
+  return table.concat(p, " ")
+end
+local function fightPulse(phase)
+  if H.readByte(MENU) == 0 then
+    mStreak, mSeq = 0, nil
+    H.setPad(phase < 4 and { "a" } or {})
+    return
+  end
+  mStreak = mStreak + 1
+  if mStreak < 4 then H.setPad({}); return end
+  if mSeq == nil then
+    local slot = H.readByte(ACTOR) & 3
+    local bp = H.readByte(BP + slot * 2)
+    local boostMin = fightTier >= 2 and 1 or 2
+    local boost = bp >= boostMin and math.min(bp, 3) or 0
+    mSeq, mIdx, mTick, mStall = {}, 1, 0, 0
+    for _ = 1, boost do mSeq[#mSeq + 1] = "r" end
+    mSeq[#mSeq + 1] = "a"; mSeq[#mSeq + 1] = "a"
+    H.log(string.format("camp: cast f%d slot=%d bp=%d tier=%d seq=%s | [%s]",
+      H.frame, slot, bp, fightTier, table.concat(mSeq, ","), partyLine()))
+  end
+  mTick = mTick + 1
+  local ph = mTick % 30
+  local btn
+  if mIdx <= #mSeq then
+    btn = mSeq[mIdx]
+  elseif mStall < 2 then
+    btn = "a"                          -- a prompt the sequence did not know
+  elseif mStall < 4 then
+    btn = "b"                          -- back out; rebuild from the cursor
+  else
+    mSeq = nil
+    H.setPad({})
+    return
+  end
+  if ph < 6 then H.setPad({ [btn] = true }) else H.setPad({}) end
+  if ph == 29 then
+    if mIdx <= #mSeq then mIdx = mIdx + 1 else mStall = mStall + 1 end
+  end
+end
+-- the loss watch: every party slot with a real max HP sitting at 0 -- for
+-- CYAN's solo defence that is just him -- held 90 straight frames (past any
+-- mid-round revive).  Sets `lost` for the ladder; never raises mid-fight.
+local function lossWatch(tag)
+  local wiped = true
+  for e = 0, 3 do
+    if H.readWord(0x3c1c + e * 2) > 0 and H.readWord(0x3bf4 + e * 2) > 0 then
+      wiped = false
+    end
+  end
+  bt.dead = wiped and bt.dead + 1 or 0
+  if bt.dead >= 90 and not lost then
+    lost = string.format("%s: party down at f%d (fight up f%d, tier %d) [%s]",
+      tag, H.frame, bt.f0, fightTier, partyLine())
+    H.log("camp: LOST -- " .. lost)
+    H.screenshot("camp_lost")
+  end
+end
+
 local function rideUntil(pred, what, budget)
   local phase, battN, dlgN, quiet, hb = 0, 0, 0, 0, -900
   return H.driveUntil(pred, budget or 40000, {
@@ -230,6 +327,7 @@ local function rideUntil(pred, what, budget)
           local w = H.formationWords()
           battles[#battles + 1] = string.format("map%d:%04X/%d",
             map(), w[1], monCount())
+          bt = { f0 = H.frame, dead = 0 }
           H.log(string.format("camp: battle up f%d map=%d present=%d " ..
             "(%04X %04X %04X %04X %04X %04X) php=%04X %04X %04X %04X",
             H.frame, map(), monCount(), w[1], w[2], w[3], w[4], w[5], w[6],
@@ -242,21 +340,26 @@ local function rideUntil(pred, what, budget)
             end
           end
         end
-        -- A SCRIPT BATTLE (zero monsters present) has nothing to kill-bit
+        -- A SCRIPT BATTLE (zero monsters present) has nothing to fight
         -- and ends on its character-AI script's own schedule.  Hands off
         -- for 300 frames, then edge-tap A to advance its text.
         if monCount() == 0 then
           H.setPad(battN > 300 and phase < 4 and { "a" } or {})
           return
         end
-        for slot = 0, 5 do
-          if monPresent(slot) then
-            H.writeByte(0x3eec + slot * 2, H.readByte(0x3eec + slot * 2) | 0x80)
+        -- a REAL fight: play it (boosted Fights) and watch for the loss
+        if bt then
+          if battN % 300 == 0 then
+            H.log(string.format("camp: fight f%d party [%s] vs $%04X hp=%d",
+              H.frame, partyLine(), monSpecies(0), monHp(0)))
           end
+          lossWatch(what)
+          if lost then H.setPad({}); return end
         end
-        H.setPad(phase < 4 and { "a" } or {})
+        fightPulse(phase)
         return
       end
+      if bt then bt = nil end
 
       if dlgN >= 3 then quiet = 0; H.setPad(phase < 4 and { "a" } or {}); return end
 
@@ -307,7 +410,48 @@ local function landedField(m, n)
   end
 end
 
-H.run({ maxFrames = 60000 }, {
+-- ------------------------------------------------------ the retry ladder --
+-- One commander attempt: (attempt 2+) reload the checkpoint with a small
+-- stagger, reset the fighter to the escalated tier, poke the commander, and
+-- ride the fight + interlude tail back to the camp.  `lost` short-circuits
+-- the ride so the next attempt starts promptly instead of timing out at the
+-- parked event PC.
+local cmdBlob, cmdWon = nil, false
+local function cmdAttempt(n)
+  local ldReq
+  return H.cond(function() return not cmdWon end, {
+    H.cond(function() return n > 1 end, {
+      H.logStep(function()
+        return string.format("camp: ATTEMPT %d -- reloading the commander " ..
+          "checkpoint after a loss (%s)", n, tostring(lost))
+      end),
+      H.call(function() ldReq = H.requestLoadState(cmdBlob) end),
+      H.waitFrames(2),
+      H.call(function() H.checkReq(ldReq, "attempt " .. n .. ": reload") end),
+      H.waitFrames(60 + (n - 1) * 17),  -- the stagger shifts every later roll
+    }, {}),
+    H.call(function() lost, fightTier = nil, n end),
+    talkToObj(16, "the Imperial commander (_cb9eb5, battle 46)", 20000),
+    (function()
+      local landedPred = function()
+        return map() == 117 and sw(0x02E2) == 1 and H.hasControl()
+           and H.tileAligned() and bright() >= 15
+      end
+      return rideUntil(function() return lost ~= nil or landedPred() end,
+        "back in the camp as SABIN (attempt " .. n .. ")", 30000)
+    end)(),
+    H.release(),
+    H.waitFrames(30),
+    H.call(function()
+      if lost == nil then
+        cmdWon = true
+        H.log(string.format("camp: attempt %d WON battle 46", n))
+      end
+    end),
+  }, {})
+end
+
+H.run({ maxFrames = 120000 }, {
   H.loadState(DOOR),
   H.waitFrames(30),
   H.call(function()
@@ -346,13 +490,36 @@ H.run({ maxFrames = 60000 }, {
   -- ==================================================================== --
   -- 2. THE COMMANDER.  obj 16, parked on (33,54) by :61266-61269.  Its
   -- `battle 46` is event battle GROUP 46 = formation 409 = one $14e
-  -- (event_battle_group.dat, 4 bytes/group).
+  -- (event_battle_group.dat, 4 bytes/group).  Fought for REAL (see the
+  -- header), behind a three-attempt retry ladder on the cyan_defence-
+  -- moment checkpoint: a loss reloads and re-pokes with the fighter
+  -- escalated (tier 2+ dumps boost at 1 BP) plus a small reload stagger,
+  -- which reshuffles every subsequent interleaving and roll.
   -- ==================================================================== --
-  talkToObj(16, "the Imperial commander (_cb9eb5, battle 46)", 20000),
-  rideUntil(function()
-    return map() == 117 and sw(0x02E2) == 1 and H.hasControl()
-       and H.tileAligned() and bright() >= 15
-  end, "back in the camp as SABIN", 30000),
+  (function()
+    local ckReq
+    return seq({
+      H.call(function() ckReq = H.requestSaveState() end),
+      H.waitFrames(2),
+      H.call(function()
+        H.checkReq(ckReq, "commander checkpoint")
+        cmdBlob = ckReq.blob
+        H.log(string.format("camp: commander checkpoint captured (%d bytes) " ..
+          "at f%d", #cmdBlob, H.frame))
+      end),
+    })
+  end)(),
+  cmdAttempt(1),
+  cmdAttempt(2),
+  cmdAttempt(3),
+  H.call(function()
+    if not cmdWon then
+      error(string.format("camp: CYAN lost battle 46 on all 3 honest " ..
+        "attempts -- last loss: %s -- the per-attempt numbers above are " ..
+        "the balance finding (#74-style); do not rig this leg",
+        tostring(lost)), 0)
+    end
+  end),
   -- STEP OFF THE TRIGGER BEFORE MINTING.  _cb0bc4 puts the party back on
   -- (36,2) and walks it DOWN 1, so it comes to rest on (36,3) -- which is
   -- _cb0c2f's own trigger tile.  CheckEventTriggers (field/event.asm:5740)
