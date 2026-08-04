@@ -1,8 +1,12 @@
 -- gen_kefka_won.lua -- v0.4's FIRST link: boot kefka_doorstep, win battle 57
--- again (kill-bit; the $40 scripted win), ride the whole win tail -- the
--- esper cliff on map 23, TERRA's morph, the flight across the world, the
--- regroup in Arvis's house -- through the party-select menu to the first
--- controllable frame, and mint kefka_won.mss on map 30 at (60,37).
+-- again -- FOR REAL (issue #75: this file writes no emulated game state;
+-- the fight is played with gen_narshe_battle's menu-episode fighter and a
+-- three-attempt retry ladder off the booted doorstep, exactly the honest
+-- win that file just proved from the same state) -- then ride the whole
+-- win tail -- the esper cliff on map 23, TERRA's morph, the flight across
+-- the world, the regroup in Arvis's house -- through the party-select menu
+-- to the first controllable frame, and mint kefka_won.mss on map 30 at
+-- (60,37).
 --
 -- THE WIN TAIL IS THREE DIFFERENT WAITS, none of them a field dialog with
 -- missing flags (issue #3's original theory).  Each one measured
@@ -54,12 +58,132 @@ local function sw(id)
   return (H.readByte(0x1E80 + math.floor(id / 8)) >> (id % 8)) & 1
 end
 local function bright() return emu.getState()["ppu.screenBrightness"] or 0 end
-local function killBitAll()
-  for s = 0, 5 do
-    if H.readByte(0x3aa8 + s * 2) % 2 == 1 then
-      H.writeByte(0x3eec + s * 2, H.readByte(0x3eec + s * 2) | 0x80)
+
+-- ----------------------------------------------------- the honest fighter --
+-- gen_narshe_battle's menu-episode machine (gen_scenario's cadence), cut to
+-- what this file fights: KEFKA, with P1 = TERRA+EDGAR+CELES.  Boost banked
+-- to 2 and dumped; EDGAR on Tools -> AutoCrossbow from tier 2, CELES on
+-- Runic (eats the Ice 2 telegraph) from tier 3, everyone else on Fight.
+local KEFKA = 0x014A
+local BCHID, BCHP, BCMAXHP = 0x3ed8, 0x3bf4, 0x3c1c
+local MENU, ACTOR = 0x7bca, 0x62ca
+local BP = 0x3e9c
+local function monSpecies(i) return H.readWord(0x57c0 + i * 2) end
+local function monHp(i) return H.readWord(0x3bfc + i * 2) end
+local function monShields(i) return H.readByte(0x3e40 + i * 2) end
+local function monPresent(i) return H.readByte(0x3aa8 + i * 2) % 2 == 1 end
+local function partyLine()
+  local p = {}
+  for e = 0, 3 do
+    p[#p + 1] = string.format("%d/%d", H.readWord(BCHP + e * 2),
+      H.readWord(BCMAXHP + e * 2))
+  end
+  return table.concat(p, " ")
+end
+local function monsterLine()
+  local m = {}
+  for i = 0, 5 do
+    if monPresent(i) then
+      m[#m + 1] = string.format("$%04X hp=%d sh=%d", monSpecies(i),
+        monHp(i), monShields(i))
     end
   end
+  return table.concat(m, " | ")
+end
+local function seqFor(id, tier, slot)
+  local bp = H.readByte(BP + slot * 2)
+  local boost = bp >= 2 and math.min(bp, 3) or 0
+  local seq = {}
+  for _ = 1, boost do seq[#seq + 1] = "r" end
+  local function push(...)
+    for _, b in ipairs({ ... }) do seq[#seq + 1] = b end
+    return seq
+  end
+  if id == 4 and tier >= 2 then
+    return push("down", "a", "a", "a")                        -- AutoCrossbow
+  end
+  if id == 6 and tier >= 3 then
+    return push("down", "a", "a")                             -- Runic
+  end
+  return push("a", "a")                                       -- Fight
+end
+local function mkFighter(tier, tag)
+  local F = { lost = nil }
+  local bt = nil
+  local mStreak, mSeq, mIdx, mTick, mStall = 0, nil, 1, 0, 0
+  local phase = 0
+  function F.frame(battN)
+    phase = (phase + 1) % 8
+    if battN == 3 then
+      bt = { f0 = H.frame, wiped = 0 }
+      local w = H.formationWords()
+      H.log(string.format("[%s] battle up f%d (%04X %04X %04X %04X %04X %04X)",
+        tag, H.frame, w[1], w[2], w[3], w[4], w[5], w[6]))
+    end
+    if bt then
+      bt.lastParty = partyLine()
+      if battN % 300 == 0 then
+        H.log(string.format("[%s] f%d party [%s] vs %s",
+          tag, H.frame, partyLine(), monsterLine()))
+      end
+      local wiped, any = true, false
+      for e = 0, 3 do
+        if H.readWord(BCMAXHP + e * 2) > 0 then
+          any = true
+          if H.readWord(BCHP + e * 2) > 0 then wiped = false end
+        end
+      end
+      bt.wiped = (any and wiped) and bt.wiped + 1 or 0
+      if bt.wiped >= 90 and not F.lost then
+        F.lost = string.format("PARTY WIPED at f%d (started f%d, %d frames " ..
+          "in, tier %d) -- party [%s] vs %s", H.frame, bt.f0,
+          H.frame - bt.f0, tier, partyLine(), monsterLine())
+        H.log("[" .. tag .. "] " .. F.lost)
+      end
+    end
+    if bt == nil or H.readByte(MENU) == 0 then
+      mStreak, mSeq = 0, nil
+      H.setPad(phase < 4 and { "a" } or {})
+      return
+    end
+    mStreak = mStreak + 1
+    if mStreak < 4 then H.setPad({}); return end
+    if mSeq == nil then
+      local slot = H.readByte(ACTOR) & 3
+      local id = H.readByte(BCHID + slot * 2)
+      mSeq, mIdx, mTick, mStall = seqFor(id, tier, slot), 1, 0, 0
+      H.log(string.format("[%s] cast f%d slot=%d char=%d bp=%d seq=%s",
+        tag, H.frame, slot, id, H.readByte(BP + slot * 2),
+        table.concat(mSeq, ",")))
+    end
+    mTick = mTick + 1
+    local ph = mTick % 30
+    local btn
+    if mIdx <= #mSeq then
+      btn = mSeq[mIdx]
+    elseif mStall < 2 then
+      btn = "a"
+    elseif mStall < 4 then
+      btn = "b"
+    else
+      mSeq = nil
+      H.setPad({})
+      return
+    end
+    if ph < 6 then H.setPad({ [btn] = true }) else H.setPad({}) end
+    if ph == 29 then
+      if mIdx <= #mSeq then mIdx = mIdx + 1 else mStall = mStall + 1 end
+    end
+  end
+  function F.idle()
+    if bt then
+      H.log(string.format("[%s] battle done at f%d (%d frames) -- party [%s]",
+        tag, H.frame, H.frame - bt.f0, bt.lastParty or "?"))
+      bt = nil
+    end
+    mStreak, mSeq = 0, nil
+  end
+  return F
 end
 
 -- ---------------------------------------------------------- menu driving --
@@ -149,30 +273,111 @@ local function landed(m, n)
   end
 end
 
-H.run({ maxFrames = 90000 }, {
+-- ------------------------------------------------------ the KEFKA ladder --
+-- gen_narshe_battle's honest-attempt shape: activation by clean edge-A,
+-- the fight PLAYED, the verdict read off the scripted branch (the win
+-- scene owning the stage vs the {25,5} lose-path save point), and a loss
+-- reloading the booted doorstep -- the mint-script spelling of a player
+-- reloading their save -- with the fighter's tier escalated.
+local kefkaBlob, kefkaWon = nil, false
+local kefkaLost = nil
+local function kefkaBody(tier)
+  local F = mkFighter(tier, "kefka")
+  local battN, postN, evN = 0, 0, 0
+  return H.driveUntil(function()
+    if battN > 0 or H.battleLoadStarted() then return false end
+    if H.fieldX() == 25 and H.fieldY() == 5 then
+      kefkaLost = kefkaLost or F.lost or string.format(
+        "battle 57 LOST at f%d (tier %d): the lose path parked the party " ..
+        "at the {25,5} save point", H.frame, tier)
+      return true
+    end
+    postN = postN + 1
+    evN = (H.eventRunning() or H.dialogWaiting()) and evN + 1 or evN
+    if postN >= 600 and evN >= 60 then
+      if F.lost then kefkaLost = F.lost end
+      return true
+    end
+    return false
+  end, 90000, {
+    H.call(function()
+      battN = H.battleLoadStarted() and battN + 1 or 0
+      if battN >= 3 then
+        postN, evN = 0, 0
+        F.frame(battN)
+        return
+      end
+      F.idle()
+      if H.dialogWaiting() then
+        H.setPad(H.frame % 8 < 4 and { "a" } or {})
+        return
+      end
+      H.setPad({})
+    end),
+  }, "the KEFKA fight, played (tier " .. tier .. ")")
+end
+local function kefkaAttempt(n)
+  local ldReq
+  return H.cond(function() return not kefkaWon end, {
+    H.cond(function() return n > 1 end, {
+      H.logStep(function()
+        return string.format("[kefka] ATTEMPT %d -- reloading the doorstep " ..
+          "after a loss (%s)", n, tostring(kefkaLost))
+      end),
+      H.call(function() ldReq = H.requestLoadState(kefkaBlob) end),
+      H.waitFrames(2),
+      H.call(function() H.checkReq(ldReq, "kefka attempt " .. n) end),
+      H.waitFrames(60),
+    }, {}),
+    H.call(function() kefkaLost = nil end),
+    H.driveUntil(function() return H.battleLoadStarted() end, 2000, {
+      H.cond(function() return true end, {
+        H.hold({ "a" }), H.waitFrames(8), H.release(), H.waitFrames(8),
+      }),
+    }, "clean A into KEFKA -> battle 57"),
+    H.waitUntil(function() return H.battleActive() end, 3000, "Kefka up", 10),
+    kefkaBody(n),
+    H.call(function()
+      if kefkaLost == nil then
+        kefkaWon = true
+        H.log(string.format("[kefka] attempt %d WON battle 57 honestly " ..
+          "at f%d", n, H.frame))
+      end
+    end),
+  }, {})
+end
+
+-- Budget: the kill-bit era ran this file in ~90k frames; the honest fight
+-- costs real ATB rounds and the ladder may replay it three times.
+H.run({ maxFrames = 400000 }, {
   H.loadState("build/states/kefka_doorstep.mss.lua"),
   H.waitFrames(30),
 
-  -- the doorstep is one clean edge-A from battle 57 (gen_narshe_battle
-  -- minted it there and proved the activation)
-  H.driveUntil(function() return H.battleLoadStarted() end, 2000, {
-    H.cond(function() return true end, {
-      H.hold({ "a" }), H.waitFrames(8), H.release(), H.waitFrames(8),
-    }),
-  }, "clean A into KEFKA -> battle 57"),
-  H.waitUntil(function() return H.battleActive() end, 3000, "Kefka up", 10),
-  H.waitFrames(150),
+  -- the ladder's checkpoint IS the booted doorstep (gen_narshe_battle
+  -- minted it one clean edge-A from battle 57 and proved the activation)
   (function()
-    local aPh = 0
-    return H.driveUntil(function() return not H.battleLoadStarted() end,
-      20000, {
+    local ckReq
+    return H.cond(function() return true end, {
+      H.call(function() ckReq = H.requestSaveState() end),
+      H.waitFrames(2),
       H.call(function()
-        aPh = (aPh + 1) % 8
-        if H.monstersPresent() > 0 then killBitAll() end
-        H.setPad(aPh < 4 and { "a" } or {})
+        H.checkReq(ckReq, "doorstep checkpoint")
+        kefkaBlob = ckReq.blob
+        H.log(string.format("[kefka] doorstep checkpoint captured " ..
+          "(%d bytes) f%d", #kefkaBlob, H.frame))
       end),
-    }, "Kefka down (kill-bit; the $40 win)")
+    })
   end)(),
+  kefkaAttempt(1),
+  kefkaAttempt(2),
+  kefkaAttempt(3),
+  H.call(function()
+    if not kefkaWon then
+      error(string.format("[kefka] battle 57 not won in 3 honest attempts " ..
+        "-- last loss: %s -- the per-attempt numbers above are the balance " ..
+        "finding (#74-style); do not rig this fight", tostring(kefkaLost)), 0)
+    end
+  end),
 
   -- THE WIN TAIL, wait by wait (see the header): dialog-gated taps for the
   -- field dialogs, the zap recipe for battle 78, hands off otherwise, and
@@ -206,8 +411,8 @@ H.run({ maxFrames = 90000 }, {
           return
         end
         if battN >= 3 then
-          -- no other battle exists on this route; kill-bit a stray anyway
-          if H.monstersPresent() > 0 then killBitAll() end
+          -- no other battle exists on this route; a stray would be FOUGHT
+          -- honestly by the same edge-tapped A (issue #75 -- no kill-bit)
           H.setPad(aPh < 4 and { "a" } or {})
           return
         end
@@ -243,7 +448,7 @@ H.run({ maxFrames = 90000 }, {
   H.logStep("party committed; riding _ccc1b5's reload to control"),
 
   -- the remainder: NPC creates, load_map 30 {60,37}, fade_in, ctrl on
-  H.advanceStory(landed(30, 60), 8000),
+  H.advanceStory(landed(30, 60), 8000, { honest = true }),
   H.waitFrames(30),
   H.call(function()
     H.assertEq(map(), 30, "landed in Arvis's house (map 30)")
