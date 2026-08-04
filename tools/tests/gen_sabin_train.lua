@@ -1319,7 +1319,7 @@ H.run({ maxFrames = 400000 }, {
   H.saveState("train_done.mss"),
   H.logStep(function()
     return string.format("train_done minted at frame %d world (%d,%d) -- " ..
-      "battle 68 won on the pacifist line, break before kill",
+      "battle 68 won honestly (chips + Shurikens + Suplex, no writes)",
       H.frame, H.worldX(), H.worldY())
   end),
 })
