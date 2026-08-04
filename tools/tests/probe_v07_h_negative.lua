@@ -8,12 +8,12 @@
 -- OT6_ANCHOR_LAYOUT: ot6-codex-o8-v1
 local H = dofile("tools/tests/lib/ot6.lua")
 
--- The PRE-SAVE form is the right one here: a savestate boot zeroes every
--- codex page (lib/ot6.lua, by design), so the full form's sram witnesses
--- would diff even UNPERTURBED and muddy the control.  PreSave asserts
--- everything else; the positive control below proves it HOLDS on the
--- unperturbed state, so the only cause of the failure that follows is the
--- perturbation itself.
+-- The PRE-SAVE form is the right one here: a savestate boot carries the
+-- FIXTURE's codex bytes, not the boundary battery's (lib/ot6.lua), so the
+-- full form's sram witnesses could diff even UNPERTURBED and muddy the
+-- control.  PreSave asserts everything else; the positive control below
+-- proves it HOLDS on the unperturbed state, so the only cause of the
+-- failure that follows is the perturbation itself.
 H.run({ maxFrames = 4000 }, {
   H.loadState("build/states/gate_cave_save.mss.lua"),
   H.waitFrames(120),

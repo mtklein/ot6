@@ -19,7 +19,7 @@
 -- The approach never presses A while facing NUMBER 024 -- the first move
 -- is a plain RIGHT step off the contact line ({25,52} -> {26,52}), then
 -- DOWN onto the save tile.  See gen_mrf_save_room_anchor.lua for the two
--- measured traps (save-tile control flicker; codex-page invalidation) this
+-- measured traps (save-tile control flicker; codex witness seeding) this
 -- file's shape inherits.
 local H = dofile("tools/tests/lib/ot6.lua")
 

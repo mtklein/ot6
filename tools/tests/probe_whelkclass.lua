@@ -36,9 +36,9 @@
 -- to $83+rand(4) -- so ability-class evidence lives in
 -- probe_tekmissile.lua, in the dialog-free guard fight.)
 --
--- The savestate restores the mint-time SRAM (zeroed by the harness srm
--- wipe), so the battle seed does a fresh 'O7' codex init and every
--- reveal below starts cold.
+-- The savestate restores the mint-time SRAM (a fresh battery -- run.sh
+-- deletes <saves>/*.srm before every boot), so the battle seed does a
+-- fresh codex page init and every reveal below starts cold.
 
 local H = dofile("tools/tests/lib/ot6.lua")
 local STATE = "build/states/whelk_doorstep.mss.lua"

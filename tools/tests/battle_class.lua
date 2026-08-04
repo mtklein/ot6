@@ -247,7 +247,8 @@ H.run({ maxFrames = 90000 }, {
   report("seeded"),
 
   -- hud: guards carry no element weakness, so each line's first slot is
-  -- the CLASS slot -- '?' until a probe reveals it (codex was wiped)
+  -- the CLASS slot -- '?' until a probe reveals it (the doorstep fixture
+  -- is a cold-boot mint, codex-virgin by construction)
   H.waitUntil(function() return #hudSlotWords() >= 2 end, 300,
     "both guard hud lines up", 10),
   H.call(function()

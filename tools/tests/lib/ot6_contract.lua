@@ -121,9 +121,11 @@ M.contracts["post-opera-v1"] = {
 --  * ram $1A69 is the give_genju receipt (field/event.asm:3238): magicite
 --    ownership is a byte, not a switch, and §5 names it load-bearing at C.
 --  * sram carries the same four bank-$31 witnesses as post-opera-v1.  The
---    row witnesses exist only in a REAL battery written by the Save UI
---    (H.loadState zeroes every codex page each run -- lib/ot6.lua), which
---    is exactly what makes them anti-synthesis evidence; the pre-save exit
+--    row witnesses are properties of the boundary BATTERY, seeded by the
+--    anchor gens before their real Save UI drive; a leg that boots from a
+--    savestate instead sees whatever codex its fixture embeds (battery
+--    SRAM rides Mesen savestates -- lib/ot6.lua's loadState note), which
+--    is generally NOT the boundary battery's content.  The pre-save exit
 --    check below (assertExitContractPreSave) is what the leg INTO a
 --    boundary uses because of that.
 
@@ -695,16 +697,17 @@ function M.assertExitContract(key)  M.assertContract(key, "exit")  end
 -- The PRE-SAVE exit check, for the leg INTO a boundary.  That leg walks
 -- onto the save tile and asserts the boundary table BEFORE its final
 -- saveState -- but the `sram` kind declares properties of the boundary
--- SAVE itself: the bank-$31 codex row witnesses exist only in a battery
--- the real Save UI has written, and H.loadState zeroes every codex page at
--- each savestate boot precisely so no run inherits one (lib/ot6.lua).  A
--- pre-save assertion of those bytes would fail in every savestate-booted
--- leg BY DESIGN, so the leg INTO a boundary asserts everything else here,
--- and the FULL table -- sram included -- is asserted at both real boundary
--- moments: by the anchor gen after its save (assertExitContract), and by
--- the leg OUT after its cold Continue (assertEntryContract).  `slot` stays
--- in the pre-save set: $307ff0 rides Mesen savestates (measured
--- 2026-07-27) and witnesses the chain descends from a slot-3 battery load.
+-- SAVE itself: the bank-$31 codex row witnesses are what the anchor gen
+-- seeds and the real Save UI then writes into the battery.  A
+-- savestate-booted leg carries its FIXTURE's codex bytes instead (battery
+-- SRAM rides Mesen savestates; lib/ot6.lua's loadState note), which need
+-- not match the boundary battery, so the leg INTO a boundary asserts
+-- everything else here, and the FULL table -- sram included -- is asserted
+-- at both real boundary moments: by the anchor gen after its save
+-- (assertExitContract), and by the leg OUT after its cold Continue
+-- (assertEntryContract).  `slot` stays in the pre-save set: $307ff0 rides
+-- Mesen savestates (measured 2026-07-27, re-confirmed 2026-08-04) and
+-- witnesses the chain descends from a slot-3 battery load.
 function M.assertExitContractPreSave(key)
   local c, pre = lookup(key), {}
   for k, v in pairs(c) do

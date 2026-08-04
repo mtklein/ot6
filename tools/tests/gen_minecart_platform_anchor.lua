@@ -11,7 +11,7 @@
 -- navTo (4,55) then one LEFT tap.  The approach stays clear of CID at
 -- {9,51}: the first navTo step leaves his contact line without an A press.
 -- See gen_mrf_save_room_anchor.lua for the two measured traps (save-tile
--- control flicker; codex-page invalidation) this file's shape inherits.
+-- control flicker; codex witness seeding) this file's shape inherits.
 local H = dofile("tools/tests/lib/ot6.lua")
 
 local ZMENUSTATE = 0x26

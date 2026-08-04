@@ -10,9 +10,13 @@
 --      dropped row fails here first.
 --   2. THE CODEX CARRIES the recurring-Ultros weakness row.  bosses-wob's
 --      contract is "Ultros keeps one weakness row, revealed at the Lete,
---      remembered forever."  On a fresh v0.5 chain the codex is virgin
---      (loadState wipes battery sram, ot6.lua), so nothing is revealed at
---      seed -- asserted -- and the first class-matching chip reveals it.
+--      remembered forever."  The codex seen here is the FIXTURE's own
+--      battery bytes (SRAM rides Mesen savestates; lib/ot6.lua): on the
+--      minted chain no upstream leg has chipped $012d's row, so nothing is
+--      revealed at seed -- asserted -- and the first class-matching chip
+--      reveals it.  If a future honest chain reveals Ultros at the Lete
+--      and the row genuinely recurs, this assertion is the place that
+--      finds out, by failing with the fixture's true state.
 --
 -- WHY THIS FIXTURE.  Ultros 2 ends the Opera performance -- "same fight,
 -- honest difficulty, no Banon healer" (bosses-wob).  The chosen party is

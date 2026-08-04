@@ -302,9 +302,10 @@ H.run({ maxFrames = 40000 }, {
   H.call(function()
     H.assertEq((H.readByte(0x0201) & 0x80) ~= 0, true,
       "menu-flags $0201 bit7 SET -- world save legal here")
-    -- the codex witnesses the boundary contract demands; a cold Continue
-    -- must recover these from the battery, which load-time initialization
-    -- cannot fake (H.loadState zeroes every codex page each run)
+    -- the codex witnesses the boundary contract demands (an issue-#75
+    -- waived poke, burn-down pending an honest chain that reveals them by
+    -- play); a cold Continue must recover these from the battery, which
+    -- the ROM's own fresh-page formatting cannot fake
     emu.write(TEMP_ELEM, 0x01, emu.memType.snesMemory)
     emu.write(TEMP_CLASS, 0x01, emu.memType.snesMemory)
     emu.write(0x316810 + ULTROS2, 0x01, emu.memType.snesMemory)
