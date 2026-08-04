@@ -101,11 +101,13 @@ end
 -- battle model (battle_vargas's map; every address is READ-only here)
 local GHOSTTRAIN = 0x0106
 local OT6_BLUDG, HOLY = 0x04, 0x20
-local PUMMEL, AURABOLT = 0x5D, 0x5E
+local PUMMEL, AURABOLT, SUPLEX = 0x5D, 0x5E, 0x5F
+local SHURIKEN = 0x41                   -- the ghost merchant's row 6
 local MENU, ACTOR, MSTATE = 0x7BCA, 0x62CA, 0x7BC2
 local ST_CMD, ST_TOOLS = 0x05, 0x30     -- command list; tools-shell blitz list
 local ST_ITEM, ST_TGT = 0x0A, 0x38      -- item select; target select
-local CMD_BLITZ, CMD_ITEM = 0x0A, 0x01
+local ST_THROW = 0x2D                   -- throw select (UpdateMenuState_2d)
+local CMD_BLITZ, CMD_ITEM, CMD_THROW = 0x0A, 0x01, 0x08
 local CMDTBL, ITEMLIST = 0x202E, 0x4005 -- command cells; wItemList rows
 local BATTINV = 0x2686                  -- battle inventory, 5 bytes/entry
 local CMDROW = 0x890F                   -- +actor: command-list cursor row
@@ -258,7 +260,8 @@ local function b47Button()
   local actor = H.readByte(ACTOR)
   if fPlan == nil or fPlanActor ~= actor then
     if st ~= ST_CMD then
-      if st == ST_TOOLS or st == ST_ITEM or st == ST_TGT then
+      if st == ST_TOOLS or st == ST_ITEM or st == ST_TGT
+         or st == ST_THROW then
         return { "b" }
       end
       return nil
@@ -628,6 +631,21 @@ local function makePlan(actor)
                row = cmdRowOf(actor, CMD_BLITZ) }
     end
   end
+  -- the damage kit, per the owner's line: SHADOW throws Shurikens (the
+  -- throw list confirms onto the default ENEMY target), SABIN spends
+  -- leftover MP on Suplex (L10, 13 MP, bludgeon -- it even chips)
+  if actor == shadowE and battInvIdx(SHURIKEN) then
+    b68Log(string.format("throw: SHADOW Shuriken (%d left) trainHP=%d [%s]",
+      invCount(SHURIKEN), H.readWord(MHP(gSlot)), partyLine()))
+    return { kind = "throw", item = SHURIKEN,
+             row = cmdRowOf(actor, CMD_THROW) }
+  end
+  if actor == sabinE and pMP(sabinE) >= 13 then
+    b68Log(string.format("cast: SABIN Suplex (mp %d) trainHP=%d [%s]",
+      pMP(sabinE), H.readWord(MHP(gSlot)), partyLine()))
+    return { kind = "blitz", skill = SUPLEX,
+             row = cmdRowOf(actor, CMD_BLITZ) }
+  end
   local bp = math.min(H.readByte(BP + actor * 2), 3)
   b68Log(string.format("cast e%d: Fight boost=%d trainHP=%d sh=%d [%s]",
     actor, bp, H.readWord(MHP(gSlot)), shields, partyLine()))
@@ -645,7 +663,8 @@ local function b68Button()
       -- second command menu reopened straight into the blitz shell $30
       -- after his first cast, and the engine waited 145000 frames for an
       -- ST_CMD that never came) -- back out to the command list
-      if st == ST_TOOLS or st == ST_ITEM or st == ST_TGT then
+      if st == ST_TOOLS or st == ST_ITEM or st == ST_TGT
+         or st == ST_THROW then
         return { "b" }
       end
       return nil
@@ -697,6 +716,19 @@ local function b68Button()
     if cur < want then return { "down" } end
     if cur > want then return { "up" } end
     return { "a" }
+  end
+  if st == ST_THROW and plan.kind == "throw" then
+    -- the throw list is a wItemList shell (UpdateMenuState_2d confirms
+    -- through wItemList::Index); cursor = scroll $8953 + row $895B
+    local want = nil
+    for i = 0, 15 do
+      if H.readByte(ITEMLIST + i * 3) == plan.item then want = i end
+    end
+    if want == nil then return { "b" } end
+    local cur = H.readByte(0x8953 + actor) + H.readByte(0x895B + actor)
+    if cur < want then return { "down" } end
+    if cur > want then return { "up" } end
+    return { "a" }                            -- -> target select (enemy)
   end
   if st == ST_TGT then
     if plan.kind ~= "item" then
@@ -1094,6 +1126,11 @@ H.run({ maxFrames = 400000 }, {
   -- undead-cheese throw stays closed by construction
   buyItem(FENIX_DOWN, 4, function() return 4 - invCount(FENIX_DOWN) end,
     "FENIX DOWN to 4"),
+  -- SHADOW's Throw key: the merchant's row 6 IS Shurikens ($41 decoded
+  -- against const.inc) -- his kit damage, bought in-scenario, which is
+  -- the #74 thread's own suggestion made real
+  buyItem(SHURIKEN, 6, function() return 10 - invCount(SHURIKEN) end,
+    "SHURIKEN to 10"),
   closeShop(),
   H.call(function()
     H.log(string.format("[shop] done: gil=%d tonics=%d potions=%d",
