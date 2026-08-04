@@ -584,7 +584,7 @@ local function grindStep()
       -- battleLoadStarted() flickers FALSE and the feed block below is
       -- skipped exactly when the feed must happen (measured: apps counted,
       -- then 2f4e=FF frozen with sw13 toggling and the feed never run).
-      if gauOn() and monPresent(5) then
+      if gauOn() and grind.appeared then
         if not fed and invCount(DRIED_MEAT) > 0 then
           feedDrive()          -- steer the meat ONTO GAU (mons=$20); the
           return               -- confirm there recruits + ends the battle
@@ -604,6 +604,7 @@ local function grindStep()
         end
         if gauOn() and grind.lastApp ~= grind.fights then
           grind.lastApp = grind.fights
+          grind.appeared = true          -- latch: feed runs at top level
           grind.appearances = grind.appearances + 1
           H.log(string.format(
             "[gau] *** APPEARANCE #%d at fight #%d f%d (2f4e=%02X, " ..
