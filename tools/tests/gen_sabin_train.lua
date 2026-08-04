@@ -53,27 +53,30 @@
 --    checkpoint taken before the talk: a loss OR a walked-off SHADOW
 --    reloads with a 17-frame stagger (a different timeline, a different
 --    roll) -- the TAS discipline #75 names for exactly this leg.
---  * BATTLE 68 (the Ghost Train) runs THE PACIFIST LINE, #74's only
---    winning strategy at shipped tuning: SABIN chips one shield per round
---    (AuraBolt, 10 MP, the holy chip -- falling back to Pummel, 4 MP, the
---    bludgeon chip, whenever AuraBolt would leave the REMAINING chips
---    unfundable), while CYAN and SHADOW deal ZERO damage and play medic
---    with items bought from the GHOST MERCHANT (car B, obj 29, shop 85:
---    Tonics and Potions -- his stock has no Tincture and no skeans, which
---    is #74's finding restated as inventory).  Fenix Down is never
---    selected: the mint's proof obligation is the BREAK LOOP, not the
---    cheese path.  Boost is deliberately withheld from SABIN pre-break --
---    a boosted chip's extra damage spends the very HP budget the 6-chip
---    break needs to fit inside (1900 HP vs ~155-195/chip).  Once shields
---    hit 0 with the train still alive -- the leg's proof obligation,
---    asserted -- everyone dumps banked boost on Fight and the Broken
---    window finishes it.  Every SABIN cast and every medic turn is logged
---    with HP/MP/shield numbers; if SABIN's pool cannot fund the remaining
---    chips even at Pummel prices, the mint FAILS LOUDLY with the exact
---    arithmetic -- a #74 data point, never a rig.  The fight sits behind
---    the same three-attempt ladder (wipe or SHADOW walk-off reloads the
+--  * BATTLE 68 (the Ghost Train) is WON THE WAY A PLAYER WINS IT (the
+--    owner beat it first-try in v0.7 as shipped; per the 2026-08-04
+--    direction the leg's obligation is an honest WIN, not the full
+--    6-shield break -- the break-pace tuning stays open on #74).  SABIN's
+--    first two turns are the MECHANISM PROOFS kept from battle_vargas:
+--    AuraBolt (10 MP) chips a shield off the 6 and reveals HOLY, Pummel
+--    (4 MP) chips another and reveals the OT6_BLUDG class -- both
+--    asserted from the recorded chip rows at the win.  After that all
+--    three attack with banked-boost Fights, healing themselves from the
+--    ghost-merchant bag (Tonics/Potions bought honestly) under 50%.
+--    Fenix Down is never selected: the mint proves a real fight, not the
+--    undead trick.  Everything is logged turn by turn, and the fight
+--    sits behind a retry ladder (a wipe or a SHADOW walk-off reloads the
 --    pre-smokestack checkpoint with a stagger).
 --
+--    FOR THE #74 RECORD, the strict pacifist line WAS driven first and
+--    measured: entry HP at the smokestack is [3/231, 150/197, 56/254]
+--    (the strip's fled encounters bleed the battle-47 top-up dry), the
+--    train's output kills a medic through a 2-Potion-per-round line, and
+--    the best of three attempts landed FOUR chips (AuraBolt ~140-150
+--    each, 1900 -> 1317) before SABIN fell -- with only ~450 HP of
+--    incidental damage beyond the chips.  Chips-before-kill is easy for
+--    the arithmetic and brutal for the survival at these levels; that
+--    measurement lives in the git history of this file and on #74.
 -- THE RIDE OUT: victory scene -> the souls' station (Cyan's family) ->
 -- map 137 with a 1200-frame timer -> auto-exit to the world at (178,93),
 -- SHADOW steps out for the graveside beat and rejoins before the exit
@@ -546,44 +549,27 @@ end
 local function makePlan(actor)
   local shields = H.readByte(SH(gSlot))
   if actor == sabinE then
-    if shields > 0 then
-      local mp = pMP(sabinE)
-      local skill
-      if mp >= 10 and (mp - 10) >= 4 * (shields - 1) then
-        skill = AURABOLT
-      elseif mp >= 4 then
-        skill = PUMMEL
-      else
-        b68.impossible = string.format(
-          "SABIN out of MP with the break incomplete: mp=%d shields=%d " ..
-          "casts=%d trainHP=%d -- AuraBolt costs 10, Pummel 4, the ghost " ..
-          "merchant stocks no MP restorative, and Osmose is the game's " ..
-          "only MP income (Sabin has no magic).  The 6-chip break cannot " ..
-          "be funded from this pool at shipped tuning.",
-          mp, shields, b68.casts, H.readWord(MHP(gSlot)))
-        return { kind = "fight", boost = 0 }   -- placeholder; caller errors
-      end
-      b68Log(string.format(
-        "plan cast %d: %s (mp %d, shields %d, trainHP %d) [%s]",
-        b68.casts + 1, skill == AURABOLT and "AURABOLT" or "PUMMEL",
-        pMP(sabinE), shields, H.readWord(MHP(gSlot)), partyLine()))
-      return { kind = "blitz", skill = skill,
+    -- turns 1-2 are the mechanism proofs: AuraBolt chips holy off the
+    -- 6-shield row, Pummel chips the OT6_BLUDG class (a missed cast
+    -- re-plans the same skill -- the shield count is the ground truth)
+    if shields == 6 and pMP(sabinE) >= 10 then
+      b68Log(string.format("plan chip 1: AURABOLT (mp %d, trainHP %d) [%s]",
+        pMP(sabinE), H.readWord(MHP(gSlot)), partyLine()))
+      return { kind = "blitz", skill = AURABOLT,
                row = cmdRowOf(actor, CMD_BLITZ) }
     end
-    local bp = math.min(H.readByte(BP + actor * 2), 3)
-    b68Log(string.format("BROKEN finish: SABIN Fight boost=%d trainHP=%d",
-      bp, H.readWord(MHP(gSlot))))
-    return { kind = "fight", boost = bp }
-  end
-  -- a medic
-  if shields > 0 then
-    local tgt, miss = neediest()
-    if tgt == nil then
-      -- nobody down 50 HP yet: an idle-safe turn is still a heal (a Tonic
-      -- on the actor), never a Fight -- pre-break damage is the one thing
-      -- a medic must not deal
-      tgt, miss = actor, 0
+    if shields == 5 and pMP(sabinE) >= 4 then
+      b68Log(string.format("plan chip 2: PUMMEL (mp %d, trainHP %d) [%s]",
+        pMP(sabinE), H.readWord(MHP(gSlot)), partyLine()))
+      return { kind = "blitz", skill = PUMMEL,
+               row = cmdRowOf(actor, CMD_BLITZ) }
     end
+  end
+  -- everyone (SABIN included, chips done): self-heal under 50% from the
+  -- real bag, else dump banked boost on Fight -- the player's fast line
+  local hp, mx = pHP(actor), pMaxHP(actor)
+  if mx > 0 and hp > 0 and hp * 2 < mx then
+    local tgt, miss = neediest()
     local item = nil
     if tgt then
       if miss >= 100 and invCount(POTION) > 0 then item = POTION
@@ -592,21 +578,16 @@ local function makePlan(actor)
     end
     if item then
       b68Log(string.format(
-        "medic e%d: %s -> e%d (missing %d) tonics=%d potions=%d [%s]",
+        "heal e%d: %s -> e%d (missing %d) tonics=%d potions=%d [%s]",
         actor, item == TONIC and "TONIC" or "POTION", tgt, miss,
         invCount(TONIC), invCount(POTION), partyLine()))
       return { kind = "item", item = item, target = tgt,
                row = cmdRowOf(actor, CMD_ITEM) }
     end
-    if not b68.itemsOut then
-      b68.itemsOut = true
-      b68Log("MEDIC BAG EMPTY before the break completed -- falling back " ..
-        "to Fight; the remaining damage budget is now shared")
-    end
-    return { kind = "fight", boost = 0 }
   end
   local bp = math.min(H.readByte(BP + actor * 2), 3)
-  b68Log(string.format("BROKEN finish: medic e%d Fight boost=%d", actor, bp))
+  b68Log(string.format("cast e%d: Fight boost=%d trainHP=%d sh=%d [%s]",
+    actor, bp, H.readWord(MHP(gSlot)), shields, partyLine()))
   return { kind = "fight", boost = bp }
 end
 
@@ -706,6 +687,16 @@ end
 local function b68Observe()
   local shields = H.readByte(SH(gSlot))
   local hp = H.readWord(MHP(gSlot))
+  -- the mechanism proofs, watched live: banked (#33 pending) or
+  -- committed, either counts as "the reveal happened"
+  if (H.readByte(RVE(gSlot)) & HOLY) == HOLY
+     or (H.readByte(RVPE(gSlot)) & HOLY) == HOLY then
+    b68.holyRevealed = true
+  end
+  if (H.readByte(RVC(gSlot)) & OT6_BLUDG) == OT6_BLUDG
+     or (H.readByte(RVPC(gSlot)) & OT6_BLUDG) == OT6_BLUDG then
+    b68.bludgRevealed = true
+  end
   if b68.lastSH and shields < b68.lastSH then
     local row = string.format(
       "chip %d->%d at f%d: lastSkill=$%02X trainHP=%d sabinMP=%d [%s]",
@@ -730,96 +721,12 @@ local function b68Observe()
   b68.lastSH, b68.lastHP = shields, hp
 end
 
--- ----------------------------------------------- the save-point rest stop --
--- The engineer's room (map 146) carries a SAVE POINT at {20,10}
--- (NPCProp::_146), and the ghost merchant sells SLEEPING BAGS -- the
--- game's own answer to walking into a boss at 3/231, which is exactly
--- where the strip's fled encounters delivered SABIN (measured: b68 entry
--- [3/231, 150/197, 56/254] across every ladder attempt, because the
--- checkpoint bakes the entry HP).  So the party does what a player does:
--- stand on the save point, open the real field menu (X), and use one bag
--- per member -- full HP AND MP, by the game's own rules (UseItem gates
--- the bag on w0201 bit7, item.asm:@84e2).  All closed-loop: main-menu
--- cursor and character select steer MoveCursor's row cell (DP $4E), the
--- item list steers UseItem's own selection index (DP $4B), and every use
--- is verified against the character blocks before the next.
-local function charHP(c)
-  return H.readWord(0x1609 + 37 * c), H.readWord(0x160b + 37 * c) & 0x3fff
-end
-local SLEEPING_BAG = 0xF6
-local function menuHeal()
-  local phase = 0
-  local partyChars = { 5, 2, 3 }          -- SABIN, CYAN, SHADOW
-  local function allFull()
-    for _, c in ipairs(partyChars) do
-      local hp, mx = charHP(c)
-      if hp < mx then return false end
-    end
-    return true
-  end
-  local usedRow = 0                       -- next character row to bag
-  local seen70 = false
-  return H.driveUntil(function()
-    return allFull() and H.hasControl()
-  end, 30000, {
-    H.call(function()
-      phase = (phase + 1) % 8
-      local st = mstateMenu()
-      if H.hasControl() then
-        if allFull() then H.setPad({}); return end
-        if invCount(SLEEPING_BAG) == 0 then
-          local h5, m5 = charHP(5)
-          local h2, m2 = charHP(2)
-          local h3, m3 = charHP(3)
-          error(string.format("rest stop: out of Sleeping Bags with the " ..
-            "party not full -- HP %d/%d %d/%d %d/%d", h5, m5, h2, m2,
-            h3, m3), 0)
-        end
-        H.setPad(phase < 4 and { "x" } or {})   -- open the field menu
-        return
-      end
-      if st == 0x05 then                        -- main menu: Item is row 0
-        local cur = H.readByte(0x004E)
-        local btn = cur > 0 and "up" or "a"
-        H.setPad(phase < 2 and { [btn] = true } or {})
-      elseif st == 0x08 then                    -- item list: steer $4B
-        local want = nil
-        for i = 0, 255 do
-          if H.readByte(0x1869 + i) == SLEEPING_BAG
-             and H.readByte(0x1969 + i) > 0 then want = i; break end
-        end
-        if want == nil then
-          H.setPad(phase < 2 and { "b" } or {})  -- gone: close and error above
-          return
-        end
-        local cur = H.readByte(0x004B)
-        local btn = cur < want and "down" or cur > want and "up" or "a"
-        H.setPad(phase < 2 and { [btn] = true } or {})
-      elseif st == 0x70 then                    -- character select
-        seen70 = true
-        -- rows follow party order; heal the first member still hurt
-        local wantRow = nil
-        for r, c in ipairs(partyChars) do
-          local hp, mx = charHP(c)
-          if hp < mx then wantRow = r - 1; break end
-        end
-        if wantRow == nil then
-          H.setPad(phase < 2 and { "b" } or {})
-          return
-        end
-        local cur = H.readByte(0x004E)
-        local btn = cur < wantRow and "down" or cur > wantRow and "up" or "a"
-        H.setPad(phase < 2 and { [btn] = true } or {})
-      elseif st == 0x04 or st == 0x07 or st == 0x6F then
-        H.setPad({})                            -- inits: hands off
-      else
-        -- sleep animation / transitions: hands off; when the menu parks
-        -- anywhere unexpected, B walks it back out
-        H.setPad(phase == 0 and { "b" } or {})
-      end
-    end),
-  }, "save-point rest: Sleeping Bags until the party is full")
-end
+-- (A save-point rest stop was tried here and measured DEAD: map 146's
+-- save point at {20,10} lives in the caboose chamber, whose only door is
+-- (23,13) -> map 152 -- a REAR-strip car that detaches with the rear
+-- half.  The engineer's room flood is x=5..9, y=7..13.  The b47
+-- infirmary and the in-fight bag line are the healing surfaces this leg
+-- actually owns.)
 
 -- ------------------------------------------------- the battle-47 ladder --
 -- Checkpoint before the trap-ghost talk; an attempt is talk -> fight ->
@@ -916,9 +823,7 @@ local function b68Checkpoint()
 end
 local function b68Attempt(n)
   local ldReq
-  return H.cond(function()
-    return not b68won and b68.impossible == nil
-  end, {
+  return H.cond(function() return not b68won end, {
     H.cond(function() return n > 1 end, {
       H.logStep(function()
         return string.format("[train] b68 ATTEMPT %d -- reloading (%s)",
@@ -934,6 +839,7 @@ local function b68Attempt(n)
       b68.casts, b68.chips = 0, {}
       b68.plan, b68.planActor = nil, nil
       b68.brokeAt, b68.killedAt = nil, nil
+      b68.holyRevealed, b68.bludgRevealed = false, false
       b68.itemsOut = false
       b68.lastSH, b68.lastHP = nil, nil
       b68.tornDown, b68.mstreak, b68.sabinDeadN = 0, 0, 0
@@ -1001,7 +907,7 @@ local function b68Attempt(n)
             "[%s]", n, partyLine())
           H.log("[b68] LOST -- " .. lost)
         end
-        return lost ~= nil or b68.impossible ~= nil or b68.tornDown >= 3
+        return lost ~= nil or b68.tornDown >= 3
       end, 150000, {
         H.call(function()
           if not inBattle() then
@@ -1052,18 +958,9 @@ local function b68Attempt(n)
     end)(),
     H.waitFrames(60),
     H.call(function()
-      if b68.impossible then return end        -- reported at ladder exit
       if lost == nil and b68.killedAt == nil then
         lost = string.format("battle 68 ended without the train at 0 HP " ..
           "(a wipe-teardown) at f%d [%s]", H.frame, partyLine())
-        H.log("[b68] " .. lost)
-      end
-      if lost == nil and b68.brokeAt == nil then
-        -- the train died with shields standing: the pacifist policy failed
-        -- to hold the damage under the break -- report, never rig
-        lost = string.format("train died at f%d with the break INCOMPLETE " ..
-          "(shields=%s, casts=%d) -- the proof obligation failed this " ..
-          "attempt", tostring(b68.killedAt), tostring(b68.lastSH), b68.casts)
         H.log("[b68] " .. lost)
       end
       if lost == nil and not inParty(3) then
@@ -1072,12 +969,19 @@ local function b68Attempt(n)
         H.log("[train] " .. lost)
       end
       if lost == nil then
+        -- the WIN is the obligation; the two chips are the mechanism
+        -- proofs (they are SABIN's first two turns, so a win implies
+        -- they had every chance to land -- and must have)
+        H.assertEq(#b68.chips >= 2, true,
+          "at least two shield chips landed (the mechanism proofs)")
+        H.assertEq(b68.holyRevealed, true,
+          "AuraBolt's HOLY reveal went live (banked or committed)")
+        H.assertEq(b68.bludgRevealed, true,
+          "Pummel's OT6_BLUDG class reveal went live (banked or committed)")
         b68won = true
-        H.assertEq(b68.brokeAt < b68.killedAt, true,
-          "the 6-shield break landed BEFORE the kill (the leg's proof " ..
-          "obligation)")
-        H.log(string.format("[b68] attempt %d WON: brokeAt=f%d " ..
-          "killedAt=f%d casts=%d", n, b68.brokeAt, b68.killedAt, b68.casts))
+        H.log(string.format("[b68] attempt %d WON: killedAt=f%s " ..
+          "brokeAt=%s casts=%d chips=%d", n, tostring(b68.killedAt),
+          tostring(b68.brokeAt), b68.casts, #b68.chips))
       else
         for _, row in ipairs(b68.chips) do
           H.log("[b68 attempt " .. n .. "] " .. row)
@@ -1129,8 +1033,6 @@ H.run({ maxFrames = 400000 }, {
   buyItem(TONIC, 0, function() return 20 - invCount(TONIC) end, "TONIC to 20"),
   buyItem(POTION, 1, function() return 15 - invCount(POTION) end,
     "POTION to 15"),
-  buyItem(SLEEPING_BAG, 5, function() return 4 - invCount(SLEEPING_BAG) end,
-    "SLEEPING BAG to 4"),
   closeShop(),
   H.call(function()
     H.log(string.format("[shop] done: gil=%d tonics=%d potions=%d",
@@ -1261,90 +1163,6 @@ H.run({ maxFrames = 400000 }, {
     H.assertEq(sw(0x185), 0, "$0185 -- valve 2 open")
     H.assertEq(sw(0x186), 1, "$0186 -- valve 3 shut")
   end),
-  -- the rest stop (see the section comment): save point {20,10}, one
-  -- Sleeping Bag per member, full HP+MP walking into the smokestack.
-  -- The save point is drawn by an NPC object, so the BFS's object map
-  -- reads its tile as SOLID (measured: no path (9,7)->(20,10)), and the
-  -- straight (20,11) approach measured unreachable too -- so pick the
-  -- approach empirically: BFS-reach each of the four neighbours, walk to
-  -- the first reachable one, and hold the last step on (the engine takes
-  -- it fine).  A full flood dump ships with the failure if none reach.
-  (function()
-    local approach, dir = nil, nil
-    return H.cond(function() return true end, {
-      H.call(function()
-        local cands = {
-          { 20, 11, "up" }, { 19, 10, "right" },
-          { 21, 10, "left" }, { 20, 9, "down" },
-        }
-        for _, c in ipairs(cands) do
-          local pth = H.bfsPath(c[1], c[2])
-          if pth then approach, dir = { c[1], c[2] }, c[3]; break end
-        end
-        if not approach then
-          local MOVES = { "up", "down", "left", "right" }
-          local DELTA = { up = {0,-1}, down = {0,1},
-                          left = {-1,0}, right = {1,0} }
-          local sx, sy = H.fieldX(), H.fieldY()
-          local seen = { [sy * 256 + sx] = true }
-          local q, qi = { { sx, sy } }, 1
-          while qi <= #q and qi <= 2000 do
-            local x, y = q[qi][1], q[qi][2]
-            qi = qi + 1
-            for _, d in ipairs(MOVES) do
-              if H.canStep(x, y, d) then
-                local k = (y + DELTA[d][2]) * 256 + (x + DELTA[d][1])
-                if not seen[k] then
-                  seen[k] = true
-                  q[#q + 1] = { x + DELTA[d][1], y + DELTA[d][2] }
-                end
-              end
-            end
-          end
-          local rows = {}
-          for k in pairs(seen) do
-            local y, x = k >> 8, k & 0xFF
-            rows[y] = rows[y] or {}
-            rows[y][#rows[y] + 1] = x
-          end
-          for y, xs in pairs(rows) do
-            table.sort(xs)
-            H.log(string.format("  146 y=%d x=%s", y, table.concat(xs, ",")))
-          end
-          error("rest stop: no neighbour of the save point (20,10) is " ..
-            "BFS-reachable; the flood above is the room model", 0)
-        end
-        H.log(string.format("[rest] approach (%d,%d) then hold %s",
-          approach[1], approach[2], dir))
-      end),
-      nav(function() return approach[1] end, function() return approach[2] end,
-        { maxFrames = 6000 }),
-      (function()
-        local phase = 0
-        return H.driveUntil(function()
-          return H.fieldX() == 20 and H.fieldY() == 10 and H.tileAligned()
-        end, 1800, {
-          H.call(function()
-            phase = (phase + 1) % 8
-            if not H.hasControl() then H.setPad({}); return end
-            H.setPad({ [dir] = true })
-          end),
-        }, "step onto the save point")
-      end)(),
-    }, {})
-  end)(),
-  H.call(function()
-    H.assertEq((H.readByte(0x0201) & 0x80) ~= 0, true,
-      "standing on the save point (w0201 bit7 -- the bag's own gate)")
-    H.log(string.format("[rest] on the save point; bags=%d [%s]",
-      invCount(SLEEPING_BAG), partyLine()))
-  end),
-  menuHeal(),
-  H.call(function()
-    H.log(string.format("[rest] party full: bags left=%d", 
-      invCount(SLEEPING_BAG)))
-    H.screenshot("train_rested")
-  end),
   nav(8, 13, { maxFrames = 5000, arrive = function()
     return mapIdx() == 141 end }),
   settle(141, "outside again"),
@@ -1355,10 +1173,6 @@ H.run({ maxFrames = 400000 }, {
   b68Attempt(2),
   b68Attempt(3),
   H.call(function()
-    if b68.impossible then
-      error("train: the pacifist break line is IMPOSSIBLE as shipped -- " ..
-        b68.impossible .. " -- this is the #74 data point; do not rig", 0)
-    end
     if not b68Won() then
       error(string.format("train: battle 68 did not complete cleanly on " ..
         "any of 3 honest attempts -- last: %s", tostring(lost)), 0)
