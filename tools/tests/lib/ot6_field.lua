@@ -770,14 +770,21 @@ end
 --    $1F60/$1F61 before Battle_ext and world_start.asm:465-482 reruns
 --    ReloadMap after -- measured: kill-bit clear, then ~95 frames of
 --    fade/init, position and facing back exactly, danger counter zeroed.
---    The walker clears non-spared battles inline (kill-bit + edge-A) and
---    stalls until the reload finishes (aligned + full brightness) before
---    planning again
+--    The walker clears non-spared battles inline (kill-bit + edge-A, or
+--    real tap-A play under opts.honest) and stalls until the reload
+--    finishes (aligned + full brightness) before planning again
 --  * no dialog branch: world triggers run world event scripts, not the
 --    field dialog engine; $BA/$D3 are stale field RAM here
 --   opts.arrive    extra terminator (checked first, every frame)
 --   opts.maxFrames frame budget -> error (default 20000)
 --   opts.spare     formation species words never to kill-bit
+--   opts.honest    clear mid-route battles by REAL PLAY instead of the
+--                  kill-bit -- navTo's issue-#75 option, mirrored here
+--                  (the edge-tapped A already paging the victory text
+--                  doubles as the auto-fighter: A opens the command
+--                  list, A confirms its first entry, A takes the default
+--                  target).  Costs real ATB rounds per encounter, so
+--                  honest world legs budget more frames.
 function M.worldNavTo(txIn, tyIn, opts)
   opts = opts or {}
   local maxFrames = opts.maxFrames or 20000
@@ -819,7 +826,7 @@ function M.worldNavTo(txIn, tyIn, opts)
           M.setPad({})
           return
         end
-        if M.monstersPresent() > 0 then
+        if M.monstersPresent() > 0 and not opts.honest then
           for slot = 0, 5 do
             if M.readByte(0x3aa8 + slot * 2) % 2 == 1 then
               M.writeByte(0x3eec + slot * 2, M.readByte(0x3eec + slot * 2) | 0x80)
