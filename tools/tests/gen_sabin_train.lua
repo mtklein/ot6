@@ -208,6 +208,19 @@ local function makeB47Plan(actor)
   for i = 0, 3 do
     if H.readByte(CMDTBL + actor * 12 + i * 3) == CMD_ITEM then itemRow = i end
   end
+  -- revive first: the prolonged infirmary fight gives the ghosts more
+  -- turns, and a member who dies here walks into the boss dead
+  -- (measured: SHADOW at 0/197 s80 at every b68 entry).  A Fenix Down's
+  -- target select initializes on the fallen ally, so the default
+  -- confirm revives without steering.
+  for e = 0, 3 do
+    if pMaxHP(e) > 0 and pHP(e) == 0 and itemRow
+       and battInvIdx(FENIX_DOWN) then
+      H.log(string.format("[b47] revive: e%d is down -- FENIX DOWN [%s]",
+        e, partyLine()))
+      return { kind = "item", item = FENIX_DOWN, row = itemRow }
+    end
+  end
   -- POISON is the strip's real HP tax (see the section note): cure your
   -- own before anything else -- the status walks out of the battle and
   -- drains per field step all the way to the smokestack
@@ -558,32 +571,27 @@ local function neediest()
 end
 local function makePlan(actor)
   local shields = H.readByte(SH(gSlot))
-  if actor == sabinE then
-    -- turns 1-2 are the mechanism proofs: AuraBolt chips holy off the
-    -- 6-shield row, Pummel chips the OT6_BLUDG class (a missed cast
-    -- re-plans the same skill -- the shield count is the ground truth)
-    if shields == 6 and pMP(sabinE) >= 10 then
-      b68Log(string.format("plan chip 1: AURABOLT (mp %d, trainHP %d) [%s]",
-        pMP(sabinE), H.readWord(MHP(gSlot)), partyLine()))
-      return { kind = "blitz", skill = AURABOLT,
-               row = cmdRowOf(actor, CMD_BLITZ) }
-    end
-    if shields == 5 and pMP(sabinE) >= 4 then
-      b68Log(string.format("plan chip 2: PUMMEL (mp %d, trainHP %d) [%s]",
-        pMP(sabinE), H.readWord(MHP(gSlot)), partyLine()))
-      return { kind = "blitz", skill = PUMMEL,
-               row = cmdRowOf(actor, CMD_BLITZ) }
+  local itemRow = cmdRowOf(actor, CMD_ITEM)
+  -- SURVIVAL FIRST, for everyone including SABIN (he died mid-chip at
+  -- 80/231 three attempts straight): revive the fallen (Fenix Down's
+  -- target select initializes on the dead ally; the steer never
+  -- confirms on the monster side, so the undead throw cannot happen),
+  -- cure own poison, heal under 50%.
+  for e = 0, 3 do
+    if pMaxHP(e) > 0 and pHP(e) == 0 and itemRow
+       and battInvIdx(FENIX_DOWN) then
+      b68Log(string.format("revive: e%d is down -- FENIX DOWN [%s]",
+        e, partyLine()))
+      return { kind = "item", item = FENIX_DOWN, target = e,
+               row = itemRow }
     end
   end
-  -- everyone (SABIN included, chips done): cure own poison, self-heal
-  -- under 50% from the real bag, else dump banked boost on Fight
   local st1 = H.readByte(0x3EE4 + actor * 2)
-  if (st1 & 0x04) ~= 0 and cmdRowOf(actor, CMD_ITEM)
-     and battInvIdx(ANTIDOTE) then
+  if (st1 & 0x04) ~= 0 and itemRow and battInvIdx(ANTIDOTE) then
     b68Log(string.format("cure e%d: ANTIDOTE (status=%02X) [%s]",
       actor, st1, partyLine()))
     return { kind = "item", item = ANTIDOTE, target = actor,
-             row = cmdRowOf(actor, CMD_ITEM) }
+             row = itemRow }
   end
   local hp, mx = pHP(actor), pMaxHP(actor)
   if mx > 0 and hp > 0 and hp * 2 < mx then
@@ -601,6 +609,23 @@ local function makePlan(actor)
         invCount(TONIC), invCount(POTION), partyLine()))
       return { kind = "item", item = item, target = tgt,
                row = cmdRowOf(actor, CMD_ITEM) }
+    end
+  end
+  -- healthy: SABIN's next two turns are the mechanism proofs -- AuraBolt
+  -- chips holy off the 6-shield row, Pummel chips the OT6_BLUDG class (a
+  -- missed cast re-plans the same skill; the shield count is the truth)
+  if actor == sabinE then
+    if shields == 6 and pMP(sabinE) >= 10 then
+      b68Log(string.format("plan chip 1: AURABOLT (mp %d, trainHP %d) [%s]",
+        pMP(sabinE), H.readWord(MHP(gSlot)), partyLine()))
+      return { kind = "blitz", skill = AURABOLT,
+               row = cmdRowOf(actor, CMD_BLITZ) }
+    end
+    if shields == 5 and pMP(sabinE) >= 4 then
+      b68Log(string.format("plan chip 2: PUMMEL (mp %d, trainHP %d) [%s]",
+        pMP(sabinE), H.readWord(MHP(gSlot)), partyLine()))
+      return { kind = "blitz", skill = PUMMEL,
+               row = cmdRowOf(actor, CMD_BLITZ) }
     end
   end
   local bp = math.min(H.readByte(BP + actor * 2), 3)
@@ -1063,6 +1088,12 @@ H.run({ maxFrames = 400000 }, {
     "POTION to 15"),
   buyItem(ANTIDOTE, 2, function() return 6 - invCount(ANTIDOTE) end,
     "ANTIDOTE to 6"),
+  -- Fenix Downs are for REVIVING ALLIES (battle 47's prolonged tail
+  -- measurably killed SHADOW, and he walked into the boss dead); the
+  -- item target steer never confirms on the monster side, so the
+  -- undead-cheese throw stays closed by construction
+  buyItem(FENIX_DOWN, 4, function() return 4 - invCount(FENIX_DOWN) end,
+    "FENIX DOWN to 4"),
   closeShop(),
   H.call(function()
     H.log(string.format("[shop] done: gil=%d tonics=%d potions=%d",
