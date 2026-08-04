@@ -68,6 +68,12 @@
 -- is the baseline every downstream balance number is measured on; changing
 -- it re-mints the chain and invalidates all of them.
 --
+-- Issue #75: this file writes NO emulated game state.  The porch/tower
+-- random encounters the old file kill-bit are FOUGHT -- the same
+-- edge-tapped A that pages dialogs opens the command list, confirms
+-- Fight and takes the default target -- and every walk runs under
+-- navTo's honest mode.  Budgets grew where a fight can now interrupt.
+--
 -- The menu driver is gen_kefka_won's state-fed one, but it looks the layout
 -- up LIVE rather than hard-coding cells: NO_RESET opens with the forced two
 -- already seated, so which pool cell holds SABIN and which party slot is
@@ -105,13 +111,8 @@ end
 -- while a battle-blind hold-up drive pressed into the transition for 900
 -- frames).  Every drive here that runs under player control clears a
 -- stray battle with the kill-bit idiom before doing its own work.
-local function killBitAll()
-  for s = 0, 5 do
-    if H.readByte(0x3aa8 + s * 2) % 2 == 1 then
-      H.writeByte(0x3eec + s * 2, H.readByte(0x3eec + s * 2) | 0x80)
-    end
-  end
-end
+-- (the kill-bit helper that lived here is gone -- issue #75: strays are
+-- fought by the drivers' own edge-tapped A)
 
 -- advanceStory + the TEXT_ONLY stall fallback.  pred as usual; when the
 -- scene holds the stage with no dialog flags and no party motion, edge-tap
@@ -141,9 +142,8 @@ local function rideScene(pred, maxFrames, what)
       local moving = (x ~= lx or y ~= ly)
       lx, ly = x, y
       if H.battleLoadStarted() then
-        killBitAll()
         stallN = 0
-        H.setPad(aPh < 4 and { "a" } or {})
+        H.setPad(aPh < 4 and { "a" } or {})   -- fought, not kill-bit
         return
       end
       if H.dialogWaiting() then
@@ -297,8 +297,9 @@ end
 -- read like a hang (no control, no dialog, no event, $59 latched) but the
 -- game was fine: it was rendering a Status screen and waiting for B.
 --
--- killBitAll() writing $7E3EEC.. under a live menu is the other half of why
--- the order matters -- those are menu bytes while the menu is up.
+-- (When this driver still kill-bit strays, writing $7E3EEC.. under a live
+-- menu was the other half of why the order matters -- those are menu bytes
+-- while the menu is up.  The taps-only driver keeps the same order.)
 --
 -- The detector is composite for gen_kefka_won's reason: $0059 alone blips
 -- outside real menus.  $0200=4 is the menu mode and $26=$2d the interactive
@@ -322,7 +323,7 @@ local function ridePartyMenu()
       end
       if H.readByte(0x0059) ~= 0 then H.setPad({}); return end  -- hands OFF
       if H.battleLoadStarted() then
-        killBitAll(); H.setPad(aPh < 4 and { "a" } or {}); return
+        H.setPad(aPh < 4 and { "a" } or {}); return   -- fought, not kill-bit
       end
       if H.dialogWaiting() then H.setPad(aPh < 4 and { "a" } or {}); return end
       H.setPad({})
@@ -336,16 +337,13 @@ end
 local function talk(sx, sy, dir, what)
   local aPh = 0
   return H.cond(function() return true end, {
-    H.navTo(sx, sy, { maxFrames = 12000 }),
+    H.navTo(sx, sy, { maxFrames = 12000, honest = true }),
     H.hold({ dir }), H.waitFrames(8), H.release(), H.waitFrames(4),
-    H.driveUntil(function() return H.dialogWaiting() end, 1800, {
+    -- a porch/tower encounter that interrupts the approach is FOUGHT by
+    -- the same taps; the budget covers a real fight's ATB rounds
+    H.driveUntil(function() return H.dialogWaiting() end, 9000, {
       H.call(function()
         aPh = (aPh + 1) % 12
-        if H.battleLoadStarted() then
-          killBitAll()
-          H.setPad(aPh < 4 and { "a" } or {})
-          return
-        end
         H.setPad(aPh < 4 and { "a" } or {})
       end),
     }, what .. ": answered"),
@@ -363,11 +361,15 @@ end
 local function bumpTake(sx, sy, dir, what)
   local ph = 0
   return H.cond(function() return true end, {
-    H.navTo(sx, sy, { maxFrames = 12000 }),
-    H.driveUntil(function() return H.dialogWaiting() end, 1800, {
+    H.navTo(sx, sy, { maxFrames = 12000, honest = true }),
+    H.driveUntil(function() return H.dialogWaiting() end, 9000, {
       H.call(function()
         ph = (ph + 1) % 16
-        if H.battleLoadStarted() then killBitAll() end
+        if H.battleLoadStarted() then
+          -- a stray encounter here is fought: edge-A only, no bump holds
+          H.setPad(ph % 8 < 4 and { "a" } or {})
+          return
+        end
         if ph < 8 then H.setPad({ [dir] = true })
         elseif ph < 12 then H.setPad({ "a" })
         else H.setPad({}) end
@@ -376,7 +378,7 @@ local function bumpTake(sx, sy, dir, what)
   })
 end
 
-H.run({ maxFrames = 120000 }, {
+H.run({ maxFrames = 200000 }, {
   H.loadState("build/states/dadaluma_won.mss.lua"),
   H.waitFrames(150),
   H.call(function()
@@ -385,17 +387,16 @@ H.run({ maxFrames = 120000 }, {
   end),
 
   -- 1. the top door (33,9) -> 226 {82,37}, then up the tower to TERRA.
-  --    Battle-aware: the porch encounter (see killBitAll's note) fired
+  --    Battle-aware: the porch encounter (see the header) fired
   --    exactly here on the first run.
-  H.navTo(33, 10, { maxFrames = 12000 }),
+  H.navTo(33, 10, { maxFrames = 12000, honest = true }),
   (function()
     local ph = 0
-    return H.driveUntil(function() return map() == 226 end, 3000, {
+    return H.driveUntil(function() return map() == 226 end, 9000, {
       H.call(function()
         ph = (ph + 1) % 8
         if H.battleLoadStarted() then
-          killBitAll()
-          H.setPad(ph < 4 and { "a" } or {})
+          H.setPad(ph < 4 and { "a" } or {})   -- fought, not kill-bit
           return
         end
         if not H.hasControl() then H.setPad({}); return end
@@ -515,7 +516,7 @@ H.run({ maxFrames = 120000 }, {
         -- never press A (or kill-bit menu RAM) inside one.
         if H.readByte(0x0059) ~= 0 then H.setPad({}); return end
         if H.battleLoadStarted() then
-          killBitAll(); H.setPad(aPh < 4 and { "a" } or {}); return
+          H.setPad(aPh < 4 and { "a" } or {}); return   -- fought, not kill-bit
         end
         if H.dialogWaiting() then H.setPad(aPh < 4 and { "a" } or {}); return end
         H.setPad({})
