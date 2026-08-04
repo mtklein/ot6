@@ -138,7 +138,6 @@ tools/tests/gen_gate_cave_save.lua	.writeWord(
 tools/tests/gen_gate_cave_save.lua	emu.write
 tools/tests/gen_ifrit_doorstep.lua	.writeByte(
 tools/tests/gen_ifrit_magicite.lua	.writeByte(
-tools/tests/gen_kefka_won.lua	.writeByte(
 tools/tests/gen_kolts_cave.lua	.writeWord(
 tools/tests/gen_kolts_pool.lua	.writeWord(
 tools/tests/gen_minecart_doorstep.lua	.writeByte(
@@ -157,16 +156,9 @@ tools/tests/gen_n024_save_anchor.lua	.writeByte(
 tools/tests/gen_n024_save_anchor.lua	.writeWord(
 tools/tests/gen_n024_save_anchor.lua	emu.write
 tools/tests/gen_n128.lua	.writeByte(
-tools/tests/gen_narshe_battle.lua	.writeByte(
 tools/tests/gen_narshe_mission.lua	.writeByte(
 tools/tests/gen_narshe_mission.lua	.writeWord(
 tools/tests/gen_narshe_mission.lua	emu.write
-tools/tests/gen_opera1_doorstep.lua	.writeByte(
-tools/tests/gen_opera2_open.lua	.writeByte(
-tools/tests/gen_opera3_backstage.lua	.writeByte(
-tools/tests/gen_opera4_stage.lua	.writeByte(
-tools/tests/gen_opera6_rafter.lua	.writeByte(
-tools/tests/gen_opera7_blackjack.lua	.writeByte(
 tools/tests/gen_post_opera_anchor.lua	.writeByte(
 tools/tests/gen_post_opera_anchor.lua	.writeWord(
 tools/tests/gen_post_opera_anchor.lua	emu.write
@@ -203,8 +195,6 @@ tools/tests/gen_vector_escape_anchor.lua	emu.write
 tools/tests/gen_vector_sneak.lua	.writeByte(
 tools/tests/gen_whelk.lua	.writeByte(
 tools/tests/gen_whelk.lua	emu.write
-tools/tests/gen_zozo4_dadaluma.lua	.writeByte(
-tools/tests/gen_zozo5_ramuh.lua	.writeByte(
 tools/tests/hud_stability.lua	.writeByte(
 tools/tests/hud_stability.lua	.writeWord(
 tools/tests/lib/ot6.lua	.writeByte(
