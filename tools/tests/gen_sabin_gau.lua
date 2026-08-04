@@ -490,6 +490,57 @@ local function grindStep()
     if st == ST_TOOLS then return { "b" } end   -- not a menu we ever want
     return nil
   end
+  -- per-frame feed driver (see the call site).  Holds directions for the
+  -- engine's cursor auto-repeat; every branch reads live state.
+  local function feedDrive()
+    local st = H.readByte(MSTATE)
+    local actor = H.readByte(ACTOR)
+    if H.readByte(MENU) == 0 then
+      -- no character menu up in this instant of the appearance: keep one
+      -- coming with a light A tap (the victory/ää dialog also advances)
+      H.setPad(H.frame % 4 < 2 and { "a" } or {})
+      return
+    end
+    if st == ST_CMD then
+      -- steer the command cursor to ITEM (row known from feedPlan) and A
+      local row = cmdRowOf(actor, CMD_ITEM) or 0
+      local cur = H.readByte(CMDROW + actor) & 3
+      if cur == row then H.setPad({ "a" })
+      else H.setPad({ [cur < row and "down" or "up"] = true }) end
+      return
+    end
+    if st == ST_ITEM then
+      local want = battInvIdx(DRIED_MEAT)
+      if want == nil then H.setPad({ "b" }); return end
+      local cur = H.readByte(ITEMSCR + actor) + H.readByte(ITEMROW + actor)
+      if cur == want then H.setPad({ "a" })            -- confirm the meat
+      else H.setPad({ [cur < want and "down" or "up"] = true }) end  -- HOLD
+      return
+    end
+    if st == ST_TGT then
+      local mons = H.readByte(TGTMONS)
+      if mons == 0x20 then
+        fed = true
+        H.log(string.format("[gau feed] cursor ON GAU (mons=$20) f%d -- " ..
+          "confirming the meat [%s]", H.frame, partyLine()))
+        H.setPad({ "a" })
+      elseif mons ~= 0 then
+        H.setPad({ "left" })          -- some other monster mask: keep going
+      else
+        -- on the party side: LEFT switches to the monster column (GAU)
+        if H.frame % 20 == 0 then
+          H.log(string.format("[gau feed] tgt f%d chars=%02X mons=%02X " ..
+            "$92=%02X 2f4e=%02X", H.frame, H.readByte(TGTCHARS),
+            H.readByte(TGTMONS), H.readByte(0x0092), H.readByte(0x2f4e)))
+        end
+        H.setPad(H.frame % 4 < 2 and { "left" } or {})
+      end
+      return
+    end
+    if st == ST_TOOLS or st == 0x2D then H.setPad({ "b" }); return end
+    H.setPad({})
+  end
+
   local frames = 0
   return H.driveUntil(function()
     frames = frames + 1
@@ -550,17 +601,17 @@ local function grindStep()
         end
         mstreak = mstreak + 1
         if mstreak < 4 then H.setPad({}); return end
-        -- FEED CADENCE: GAU's appearance window is only a few hundred
-        -- frames, and the meat sits ~17 rows down the battle item list --
-        -- the normal 30-frame-per-press pulse could not steer there in
-        -- time (measured: seven appearances, a menu open with the meat at
-        -- battInv slot 17, and not one feed completed).  So while GAU is
-        -- up and unfed, recompute the button EVERY 3 frames (hold 2): ~50
-        -- frames for the whole item steer, well inside the window.
+        -- THE FEED, on its own per-frame driver: GAU's appearance window
+        -- is short and the meat sits ~17 rows down the battle item list,
+        -- so discrete 3-frame presses could not steer there in time
+        -- (measured: a menu open with the meat at battInv 17, the FEED
+        -- plan firing, and the item steer never reaching target select).
+        -- This driver HOLDS the steering direction so the engine's own
+        -- cursor auto-repeat carries the list, checking the live cursor
+        -- every frame and confirming the instant it lands -- then LEFT
+        -- onto the monster column ($7B7E == $20 = GAU) and A.
         if gauOn() and not fed and invCount(DRIED_MEAT) > 0 then
-          local fph = tick % 3
-          if fph == 0 then grind.btn = button() end
-          H.setPad(fph < 2 and grind.btn or {})
+          feedDrive()
           return
         end
         if ph == 0 then grind.btn = button() end
