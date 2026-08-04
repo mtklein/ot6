@@ -577,11 +577,29 @@ local function grindStep()
           feedDrive()
           return
         end
-        -- fed (or no meat): hands OFF -- let GAU's exit resolve on its
-        -- own; the earlier A-mashing here re-entered menus and pinned him
-        -- on stage (2f4e stuck $FF).  A very occasional A clears a waiting
-        -- dialog without opening a menu.
-        H.setPad(H.frame % 120 < 4 and { "a" } or {})
+        -- fed: the reaction switch 13 is SET (the return-visit recruit
+        -- gate), but GAU will not leave the stage on his own in this
+        -- build (measured: 2f4e stuck $FF, hands-off did not resolve it).
+        -- With the switch already set, ATTACKING him is the honest way to
+        -- END the battle -- the header's "attacking drives GAU off"
+        -- warning is a PRE-feed concern; post-feed, driving him off just
+        -- concludes the fight, and the next veldt appearance runs
+        -- recruit_gau (branching on switch 13).  Steer to Fight and swing.
+        local st = H.readByte(MSTATE)
+        local actor = H.readByte(ACTOR)
+        if H.readByte(MENU) == 0 then
+          H.setPad(H.frame % 8 < 4 and { "a" } or {})
+        elseif st == 0x05 then
+          local cur = H.readByte(CMDROW + actor) & 3
+          if cur ~= 0 then H.setPad({ up = true })
+          else H.setPad({ "a" }) end
+        elseif st == 0x38 then
+          H.setPad({ "a" })                 -- default target = GAU (lone foe)
+        elseif st == 0x30 or st == 0x0A or st == 0x2D then
+          H.setPad({ "b" })                 -- back out of any submenu
+        else
+          H.setPad({})
+        end
         return
       end
       if H.battleLoadStarted() then
