@@ -721,6 +721,16 @@ parallel.  Three harness pins make it so:
   hidden cross-run coupling channel; tests that need a save inject it
   explicitly (SRM sidecars).
 
+Battery SRAM (the OT6 weakness codex included) RIDES Mesen savestates
+(measured 2026-08-04: markers in banks $30 and $31 both restored by
+`emu.loadSavestate`), so post-load SRAM is a pure function of the fixture's
+own minted bytes.  `H.loadState` therefore performs no codex normalization
+of its own -- an earlier version re-formatted all four codex pages after
+every load, which was both an issue-#75 state write and an overwrite of
+fixture content.  Runs that boot fresh instead of loading get their codex
+pages formatted lazily by the ROM itself (`Ot6CodexEnsure` and friends,
+`ff6/src/battle/ot6_codex.asm`).
+
 Scripts still key off RAM *signals* rather than absolute frame numbers --
 not because frames drift at runtime anymore, but because every ROM or
 route edit shifts them.

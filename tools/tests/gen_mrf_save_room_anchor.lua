@@ -20,11 +20,11 @@
 --    settle predicate can hold on the tile; arrival is judged on position +
 --    $01BF + tile alignment only, and the menu is opened through repeated
 --    edge presses.
---  * H.loadState zeroes every bank-$31 codex page (lib/ot6.lua), so the
---    ULTROS2 row witnesses the boundary contract demands are re-seeded in
---    the ACTIVE transient page right before the save, exactly as the
+--  * The ULTROS2 row witnesses the boundary contract demands are seeded
+--    (an issue-#75 waived poke, burn-down pending an honest chain that
+--    reveals them by play) right before the save, exactly as the
 --    post-opera anchor does -- a cold Continue must then recover them from
---    the battery, which load-time initialization cannot fake.
+--    the battery, which the ROM's own fresh-page formatting cannot fake.
 local H = dofile("tools/tests/lib/ot6.lua")
 
 local ZMENUSTATE = 0x26

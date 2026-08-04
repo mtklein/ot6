@@ -7,8 +7,8 @@
 --
 -- See gen_mrf_save_room_anchor.lua for the traps this file's shape
 -- inherits: the save-tile control flicker (arrival/idle judged without
--- hasControl), the codex-page invalidation (witnesses re-seeded before
--- the save), and the $307ff0 sentinel as the only context-stable receipt
+-- hasControl), the codex witness seeding (a waived #75 poke before the
+-- save), and the $307ff0 sentinel as the only context-stable receipt
 -- that CopyGameDataToSRAM actually ran (#29).
 local H = dofile("tools/tests/lib/ot6.lua")
 
