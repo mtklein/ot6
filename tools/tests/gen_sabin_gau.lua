@@ -496,9 +496,12 @@ local function grindStep()
     local st = H.readByte(MSTATE)
     local actor = H.readByte(ACTOR)
     if H.readByte(MENU) == 0 then
-      -- no character menu up in this instant of the appearance: keep one
-      -- coming with a light A tap (the victory/ää dialog also advances)
-      H.setPad(H.frame % 4 < 2 and { "a" } or {})
+      -- no character menu up in this instant: press NOTHING.  Mashing A
+      -- through the menu-less appearance windows corrupted 2f4e to $FF
+      -- (measured: GAU then would not leave even after switch 13 set).
+      -- Wait for a real menu; the feed completes on the first appearance
+      -- that opens one, cleanly, and GAU exits on his own after.
+      H.setPad({})
       return
     end
     if st == ST_CMD then
@@ -577,29 +580,11 @@ local function grindStep()
           feedDrive()
           return
         end
-        -- fed: the reaction switch 13 is SET (the return-visit recruit
-        -- gate), but GAU will not leave the stage on his own in this
-        -- build (measured: 2f4e stuck $FF, hands-off did not resolve it).
-        -- With the switch already set, ATTACKING him is the honest way to
-        -- END the battle -- the header's "attacking drives GAU off"
-        -- warning is a PRE-feed concern; post-feed, driving him off just
-        -- concludes the fight, and the next veldt appearance runs
-        -- recruit_gau (branching on switch 13).  Steer to Fight and swing.
-        local st = H.readByte(MSTATE)
-        local actor = H.readByte(ACTOR)
-        if H.readByte(MENU) == 0 then
-          H.setPad(H.frame % 8 < 4 and { "a" } or {})
-        elseif st == 0x05 then
-          local cur = H.readByte(CMDROW + actor) & 3
-          if cur ~= 0 then H.setPad({ up = true })
-          else H.setPad({ "a" }) end
-        elseif st == 0x38 then
-          H.setPad({ "a" })                 -- default target = GAU (lone foe)
-        elseif st == 0x30 or st == 0x0A or st == 0x2D then
-          H.setPad({ "b" })                 -- back out of any submenu
-        else
-          H.setPad({})
-        end
+        -- fed cleanly: hands OFF.  GAU runs off with the meat on his
+        -- own (a rare A only to clear a waiting "thanks" dialog), the
+        -- battle ends, and the next veldt appearance runs recruit_gau
+        -- (branching on the switch-13 the real feed set).
+        H.setPad(H.frame % 120 < 4 and { "a" } or {})
         return
       end
       if H.battleLoadStarted() then
