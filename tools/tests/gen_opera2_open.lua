@@ -12,16 +12,14 @@
 -- {118,24} with control and $0340=1/$010E=1.  Travel anchors: 209's {118,29}
 -- door -> Jidoor {16,14}; Jidoor's SOUTH edge (long-entrance src{0,63} HORIZ
 -- len31) -> world {27,132}; world -> opera approach {45,153} -> step DOWN.
+-- Issue #75: no state writes -- strays are fought by the drivers' own
+-- edge-tapped A, and walks run under the honest nav modes.
 local H = dofile("tools/tests/lib/ot6.lua")
 local function map() return H.mapId() & 0x1ff end
 local function bright() return emu.getState()["ppu.screenBrightness"] or 0 end
 local function sw(id) return (H.readByte(0x1E80 + math.floor(id/8)) >> (id%8)) & 1 end
 local function facing() return H.readByte(0x087f + H.readWord(0x0803)) end
 local function menuOpen() return H.readByte(0x0059) ~= 0 end
-local function killBitAll()
-  for s=0,5 do if H.readByte(0x3aa8+s*2)%2==1 then
-    H.writeByte(0x3eec+s*2, H.readByte(0x3eec+s*2)|0x80) end end
-end
 local function settled()
   return H.hasControl() and H.tileAligned() and bright()>=15
      and not H.dialogWaiting() and not H.battleLoadStarted() and not H.worldMode()
@@ -37,7 +35,8 @@ end
 -- every field frame and $0000 for every frame a menu is up.  So the battle
 -- branch answers true throughout the Setzer name_menu, and with it on top
 -- this driver would edge-A the name grid instead of committing it with
--- START -- and kill-bit $7E3EEC.. while those bytes belong to the menu.
+-- START (and, in the kill-bit era, scribble $7E3EEC.. while those bytes
+-- belonged to the menu -- the writes are gone, the ordering lesson stays).
 -- gen_zozo5_ramuh's leave cutscene is the case that measured it: blind A on
 -- a party_menu walks into a character's Status page and never comes out.
 local function rideOpen(pred, maxFrames, what)
@@ -47,7 +46,7 @@ local function rideOpen(pred, maxFrames, what)
       aPh=(aPh+1)%8; sPh=(sPh+1)%16
       local x,y=H.fieldX(),H.fieldY(); local moving=(x~=lx or y~=ly); lx,ly=x,y
       if menuOpen() then stallN=0; H.setPad(sPh<6 and {"start"} or {}); return end
-      if H.battleLoadStarted() then killBitAll(); stallN=0; H.setPad(aPh<4 and {"a"} or {}); return end
+      if H.battleLoadStarted() then stallN=0; H.setPad(aPh<4 and {"a"} or {}); return end
       if H.dialogWaiting() then stallN=0; H.setPad(aPh<4 and {"a"} or {}); return end
       if not moving and not H.hasControl() then stallN=stallN+1 else stallN=0 end
       if stallN>=180 then
@@ -63,13 +62,13 @@ local function pushTo(dir, destMap, maxFrames, what)
   local hb=0
   return H.driveUntil(function() return map()==destMap end, maxFrames, {
     H.call(function() hb=hb+1
-      if H.battleLoadStarted() then killBitAll(); H.setPad(hb%8<4 and {"a"} or {}); return end
+      if H.battleLoadStarted() then H.setPad(hb%8<4 and {"a"} or {}); return end
       if H.dialogWaiting() then H.setPad(hb%8<4 and {"a"} or {}); return end
       if not H.hasControl() then H.setPad({}); return end
       H.setPad({ [dir]=true }) end) }, what)
 end
 
-H.run({ maxFrames = 120000 }, {
+H.run({ maxFrames = 250000 }, {
   H.loadState("build/states/opera_doorstep.mss.lua"),
   H.waitFrames(60),
   H.call(function()
@@ -84,7 +83,7 @@ H.run({ maxFrames = 120000 }, {
   rideOpen(function() return sw(0x0331)==1 end, 12000, "impresario scene -> letter"),
   H.waitUntil(function() return map()==209 and H.hasControl() and H.tileAligned() end, 3000, "control after impresario", 5),
   -- read the letter NPC at {118,25}
-  H.navTo(118, 26, { maxFrames=9000 }),
+  H.navTo(118, 26, { maxFrames=9000, honest=true }),
   H.hold({"up"}), H.waitFrames(8), H.release(), H.waitFrames(6),
   (function() local aPh=0
     return H.driveUntil(function() return H.dialogWaiting() or sw(0x01CC)==1 or map()~=209 end, 2400, {
@@ -99,18 +98,18 @@ H.run({ maxFrames = 120000 }, {
   end),
 
   -- 2. travel: 209 -> its {118,29} door -> Jidoor (198) {16,14}
-  H.navTo(118, 28, { maxFrames=9000 }),
-  pushTo("down", 198, 4000, "209 -> Jidoor (map 198)"),
+  H.navTo(118, 28, { maxFrames=9000, honest=true }),
+  pushTo("down", 198, 9000, "209 -> Jidoor (map 198)"),
   H.waitUntil(function() return map()==198 and settled() end, 2400, "Jidoor control", 5),
   H.waitFrames(150),
   H.call(function() H.log(string.format("[jidoor] at (%d,%d)", H.fieldX(), H.fieldY())) end),
 
   -- 3. Jidoor -> the SOUTH edge -> world {27,132}: navTo above the edge, push down
-  H.navTo(16, 61, { maxFrames=15000 }),
+  H.navTo(16, 61, { maxFrames=24000, honest=true }),
   (function() local hb=0
     return H.driveUntil(function() return H.worldMode() end, 6000, {
       H.call(function() hb=hb+1
-        if H.battleLoadStarted() then killBitAll(); H.setPad(hb%8<4 and {"a"} or {}); return end
+        if H.battleLoadStarted() then H.setPad(hb%8<4 and {"a"} or {}); return end
         if H.dialogWaiting() then H.setPad(hb%8<4 and {"a"} or {}); return end
         if not H.hasControl() then H.setPad({}); return end
         H.setPad({ down=true }) end) }, "off Jidoor's south edge to the world") end)(),
@@ -119,12 +118,12 @@ H.run({ maxFrames = 120000 }, {
   H.call(function() H.log(string.format("[world] Jidoor exit at (%d,%d)", H.worldX(), H.worldY())) end),
 
   -- 4. world -> the opera-house approach {45,153}, step DOWN -> map 237
-  H.worldNavTo(45, 153, { maxFrames=60000, arrive=function() return not H.worldMode() end }),
+  H.worldNavTo(45, 153, { maxFrames=60000, honest=true, arrive=function() return not H.worldMode() end }),
   H.waitUntil(function() return H.worldHasControl() and H.worldAligned() end, 2000, "opera approach", 5),
   (function() local hb=0
     return H.driveUntil(function() return not H.worldMode() and map()==237 end, 4000, {
       H.call(function() hb=hb+1
-        if H.battleLoadStarted() then killBitAll(); H.setPad(hb%8<4 and {"a"} or {}); return end
+        if H.battleLoadStarted() then H.setPad(hb%8<4 and {"a"} or {}); return end
         H.setPad({ down=true }) end) }, "into the opera house (map 237)") end)(),
   H.waitUntil(function() return map()==237 and settled() end, 2400, "opera foyer control", 5),
   H.waitFrames(150),
@@ -134,14 +133,14 @@ H.run({ maxFrames = 120000 }, {
   end),
 
   -- 5. up to {60,49}, below the now-VISIBLE IMPRESARIO ({60,48}); face UP
-  H.navTo(60, 49, { maxFrames=9000 }),
+  H.navTo(60, 49, { maxFrames=9000, honest=true }),
   H.hold({"up"}), H.waitFrames(8), H.release(), H.waitFrames(6),
   (function() local calm=0
     return H.driveUntil(function()
       local ok=H.fieldX()==60 and H.fieldY()==49 and settled() and facing()==0
       calm=ok and calm+1 or 0; if calm>=20 then H.setPad({}); return true end; return false
     end, 3000, { H.call(function()
-      if H.battleLoadStarted() then killBitAll(); H.setPad({"a"}); return end
+      if H.battleLoadStarted() then H.setPad({"a"}); return end
       H.setPad({}) end) }, "settled below the opera-house IMPRESARIO") end)(),
   H.call(function()
     H.assertEq(map(), 237, "map 237")

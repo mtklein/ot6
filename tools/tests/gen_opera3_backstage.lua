@@ -25,18 +25,17 @@ local function settled()
   return H.hasControl() and H.tileAligned() and bright()>=15
      and not H.dialogWaiting() and not H.battleLoadStarted() and not H.worldMode()
 end
-local function killBitAll()
-  for s=0,5 do if H.readByte(0x3aa8+s*2)%2==1 then
-    H.writeByte(0x3eec+s*2, H.readByte(0x3eec+s*2)|0x80) end end
-end
--- the generic "advance everything" ride (gen_opera2's rideOpen idiom)
+-- the generic "advance everything" ride (gen_opera2's rideOpen idiom).
+-- Issue #75: the kill-bit helper this file DEFINED but whose branch never
+-- fired on the measured intro (no battle exists on this ride) is stripped;
+-- a stray battle would now be fought by the same edge-tapped A.
 local function rideOpen(pred, maxFrames, what)
   local aPh,sPh,stallN,lx,ly = 0,0,0,-1,-1
   return H.driveUntil(function() local d=pred(); if d then H.setPad({}) end; return d end,
     maxFrames, { H.call(function()
       aPh=(aPh+1)%8; sPh=(sPh+1)%16
       local x,y=H.fieldX(),H.fieldY(); local moving=(x~=lx or y~=ly); lx,ly=x,y
-      if H.battleLoadStarted() then killBitAll(); stallN=0; H.setPad(aPh<4 and {"a"} or {}); return end
+      if H.battleLoadStarted() then stallN=0; H.setPad(aPh<4 and {"a"} or {}); return end
       if menuOpen() then stallN=0; H.setPad(sPh<6 and {"start"} or {}); return end
       if H.dialogWaiting() then stallN=0; H.setPad(aPh<4 and {"a"} or {}); return end
       if not moving and not H.hasControl() then stallN=stallN+1 else stallN=0 end

@@ -23,18 +23,15 @@ local function settled()
   return H.hasControl() and H.tileAligned() and bright()>=15
      and not H.dialogWaiting() and not H.battleLoadStarted() and not H.worldMode()
 end
-local function killBitAll()
-  for s=0,5 do if H.readByte(0x3aa8+s*2)%2==1 then
-    H.writeByte(0x3eec+s*2, H.readByte(0x3eec+s*2)|0x80) end end
-end
--- navTo a walk-on door src, bump fallback, settle on the destination map
+-- navTo a walk-on door src, bump fallback, settle on the destination map.
+-- Issue #75: no state writes -- a stray battle is fought by the taps.
 local function toDoor(tx,ty,bumpDir,destMap,what)
   return H.cond(function() return true end, {
-    H.navTo(tx, ty, { maxFrames=15000, arrive=function() return map()==destMap end }),
+    H.navTo(tx, ty, { maxFrames=24000, honest=true, arrive=function() return map()==destMap end }),
     (function() local hb=0
       return H.driveUntil(function() return map()==destMap end, 4000, {
         H.call(function() hb=hb+1
-          if H.battleLoadStarted() then killBitAll(); H.setPad(hb%8<4 and {"a"} or {}); return end
+          if H.battleLoadStarted() then H.setPad(hb%8<4 and {"a"} or {}); return end
           if H.dialogWaiting() then H.setPad(hb%8<4 and {"a"} or {}); return end
           if not H.hasControl() then H.setPad({}); return end
           if hb%16<10 then H.setPad({[bumpDir]=true}) elseif hb%16<13 then H.setPad({"a"}) else H.setPad({}) end
@@ -44,7 +41,7 @@ local function toDoor(tx,ty,bumpDir,destMap,what)
   })
 end
 
-H.run({ maxFrames = 60000 }, {
+H.run({ maxFrames = 120000 }, {
   H.loadState("build/states/opera_backstage.mss.lua"),
   H.waitFrames(60),
   H.call(function()
@@ -63,7 +60,7 @@ H.run({ maxFrames = 60000 }, {
     H.log(string.format("[238] at (%d,%d)", H.fieldX(), H.fieldY())) end),
 
   -- talk CELES ({99,19}) from below -> _caba44/_cabaa8 -> $0056=1
-  H.navTo(99, 21, { maxFrames=12000 }),
+  H.navTo(99, 21, { maxFrames=12000, honest=true }),
   (function() local hb=0
     return H.driveUntil(function() return sw(0x0056)==1 or H.dialogWaiting() end, 4000, {
       H.call(function() hb=hb+1
