@@ -584,14 +584,22 @@ local function grindStep()
       -- battleLoadStarted() flickers FALSE and the feed block below is
       -- skipped exactly when the feed must happen (measured: apps counted,
       -- then 2f4e=FF frozen with sw13 toggling and the feed never run).
+      -- Once battle switch 13 is set, AIScript::_370 recruits GAU on HIS
+      -- OWN TURN (its main script runs recruit_gau + end_veldt) -- but
+      -- only if we stop interfering: pressing anything kept re-entering
+      -- menus and pinned him (2f4e=FF).  So the instant the switch reads
+      -- set, press NOTHING and let his turn recruit.
+      if fedSwitch() then
+        if not fed then
+          fed = true
+          H.log(string.format("[gau feed] switch 13 SET at f%d -- hands " ..
+            "off; AIScript::_370 recruits GAU on his turn", H.frame))
+        end
+        H.setPad({})
+        return
+      end
       if gauOn() and grind.appeared then
-        if not fed and invCount(DRIED_MEAT) > 0 then
-          feedDrive()          -- steer the meat ONTO GAU (mons=$20); the
-          return               -- confirm there recruits + ends the battle
-        end                    -- (AIScript::_370, switch 13 clear)
-        -- meat confirmed on GAU (fed) or gone: hands off; recruit_gau +
-        -- end_battle run on the confirm, so GAU joins and the battle ends
-        H.setPad(H.frame % 120 < 4 and { "a" } or {})
+        if invCount(DRIED_MEAT) > 0 then feedDrive() else H.setPad({}) end
         return
       end
       if H.battleLoadStarted() then
