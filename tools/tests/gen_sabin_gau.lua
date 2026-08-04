@@ -224,6 +224,125 @@ local grind = { fights = 0, appearances = 0 }
 local function gauOn() return H.readByte(0x2f4e) ~= 0 end
 local function fedSwitch() return (H.readByte(0x3EBD) & 0x02) ~= 0 end
 
+-- ------------------------------------- world walk that FIGHTS its randoms --
+-- The stretch from the falls shore to Mobliz crosses a VELDT band whose
+-- packs are UNRUNNABLE (measured, probe_gaustuck: L+R never ended the
+-- (203,116) encounter across 37000 frames) and too stiff for blind tap-A
+-- (a SABIN+CYAN party whose row-0 commands are submenus stalls the pack
+-- at mon=5).  So transit uses the SAME closed-loop boost-Fight machine
+-- the grind does: BFS-step toward (tx,ty), and on any battle steer each
+-- actor to Fight (command row 0), dump banked boost, self-Tonic under 40%,
+-- until the battle tears down.  No GAU on stage here, so no feed branch.
+local function worldWalkFight(tx, ty, budget, what)
+  local tick, dirFlip, hb = 0, false, -1800
+  local plan, planActor, btn, mstreak = nil, nil, nil, 0
+  local function makePlan(actor)
+    local row = cmdRowOf(actor, CMD_ITEM)
+    if pHP(actor) > 0 and pMaxHP(actor) > 0
+       and pHP(actor) * 10 < pMaxHP(actor) * 4
+       and invCount(TONIC) > 0 and row then
+      return { kind = "item", item = TONIC, row = row }
+    end
+    local bp = H.readByte(BP + actor * 2)
+    local boost = bp >= 1 and math.min(bp, 3) or 0
+    return { kind = "fight", boostLeft = boost }
+  end
+  local function button()
+    local st = H.readByte(MSTATE)
+    local actor = H.readByte(ACTOR)
+    if plan == nil or planActor ~= actor then
+      if st ~= ST_CMD then
+        if st == ST_TOOLS or st == ST_ITEM or st == ST_TGT then
+          return { "b" }
+        end
+        return nil
+      end
+      plan, planActor = makePlan(actor), actor
+      return nil
+    end
+    if st == ST_CMD then
+      if plan.kind == "fight" then
+        if plan.boostLeft > 0 then
+          plan.boostLeft = plan.boostLeft - 1
+          return { "r" }
+        end
+        local cur = H.readByte(CMDROW + actor) & 3
+        if cur ~= 0 then return { "up" } end
+        return { "a" }
+      end
+      local cur = H.readByte(CMDROW + actor) & 3
+      if cur == plan.row then return { "a" } end
+      return { cur < plan.row and "down" or "up" }
+    end
+    if st == ST_ITEM and plan.kind == "item" then
+      local want = battInvIdx(plan.item)
+      if want == nil then return { "b" } end
+      local cur = H.readByte(ITEMSCR + actor) + H.readByte(ITEMROW + actor)
+      if cur < want then return { "down" } end
+      if cur > want then return { "up" } end
+      return { "a" }
+    end
+    if st == ST_TGT then
+      plan, planActor = nil, nil
+      return { "a" }                       -- item: self; Fight: default enemy
+    end
+    if st == ST_TOOLS then return { "b" } end
+    return nil
+  end
+  return H.driveUntil(function()
+    return lost ~= nil or not H.worldMode()
+        or (H.worldX() == tx and H.worldY() == ty and H.worldHasControl())
+  end, budget or 40000, {
+    H.call(function()
+      if H.frame - hb >= 1800 then
+        hb = H.frame
+        H.log(string.format("[gau] walk[%s] f%d (%d,%d) b=%s [%s]", what,
+          H.frame, H.worldX(), H.worldY(),
+          tostring(H.battleLoadStarted()), partyLine()))
+      end
+      if H.battleLoadStarted() then
+        local wiped = true
+        for e = 0, 3 do
+          if pMaxHP(e) > 0 and pHP(e) > 0 then wiped = false end
+        end
+        if wiped then
+          if not lost then
+            lost = string.format("wiped walking %s at f%d [%s]", what,
+              H.frame, partyLine())
+            H.log("[gau] LOST -- " .. lost)
+          end
+          H.setPad({})
+          return
+        end
+        tick = tick + 1
+        local ph = tick % 30
+        if H.readByte(MENU) == 0 then
+          plan, planActor, mstreak = nil, nil, 0
+          H.setPad(ph < 4 and { "a" } or {})
+          return
+        end
+        mstreak = mstreak + 1
+        if mstreak < 4 then H.setPad({}); return end
+        if ph == 0 then btn = button() end
+        H.setPad(ph < 6 and btn or {})
+        return
+      end
+      plan, planActor = nil, nil
+      if not H.worldHasControl() then H.setPad({}); return end
+      if not H.worldAligned() then return end
+      if bright() < 15 then H.setPad({}); return end
+      local p = H.worldBfs(tx, ty)
+      if p and #p > 0 then
+        H.setPad({ [p[1]] = true })
+      else
+        -- no path (a fresh danger reload can transiently block): wander
+        dirFlip = not dirFlip
+        H.setPad({ [dirFlip and "left" or "right"] = true })
+      end
+    end),
+  }, "walk fighting -> " .. what)
+end
+
 local function grindStep()
   local phase, tick = 0, 0
   local plan, planActor = nil, nil
@@ -502,8 +621,13 @@ H.run({ maxFrames = 500000 }, {
     return H.worldMode() end }),
   H.waitUntil(function() return H.worldMode() and H.worldHasControl() end,
     3000, "on the world", 5),
-  H.worldNavTo(220, 115, { maxFrames = 40000, honest = true,
-    arrive = function() return not H.worldMode() end }),
+  worldWalkFight(220, 115, 60000, "shore -> Mobliz"),
+  H.call(function()
+    if lost ~= nil then
+      error("gau: the Veldt transit to Mobliz was lost -- " .. tostring(lost)
+        .. " (a #74-style balance finding; do not rig)", 0)
+    end
+  end),
   settle(157, "Mobliz"),
   H.navTo(26, 22, { maxFrames = 10000, honest = "flee", arrive = function()
     return mapIdx() == 164 end }),
@@ -570,7 +694,13 @@ H.run({ maxFrames = 500000 }, {
   H.waitUntil(function()
     return H.worldMode() and H.worldHasControl() and H.worldAligned()
   end, 3000, "world live again", 5),
-  H.worldNavTo(215, 119, { maxFrames = 20000, honest = true }),
+  worldWalkFight(215, 119, 40000, "Mobliz -> Veldt staging"),
+  H.call(function()
+    if lost ~= nil then
+      error("gau: the walk to the Veldt staging was lost -- " ..
+        tostring(lost), 0)
+    end
+  end),
 
   -- the grind, honestly, behind the ladder (see the header)
   (function()
