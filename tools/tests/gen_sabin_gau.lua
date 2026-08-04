@@ -571,19 +571,12 @@ local function grindStep()
       -- skipped exactly when the feed must happen (measured: apps counted,
       -- then 2f4e=FF frozen with sw13 toggling and the feed never run).
       if gauOn() and monPresent(5) then
-        if fedSwitch() and not fed then
-          fed = true
-          H.log(string.format("[gau feed] reaction switch 13 SET at f%d " ..
-            "-- GAU fed; letting the battle resolve", H.frame))
-        end
         if not fed and invCount(DRIED_MEAT) > 0 then
-          feedDrive()
-          return
-        end
-        -- fed cleanly: hands OFF.  GAU runs off with the meat on his
-        -- own (a rare A only to clear a waiting "thanks" dialog), the
-        -- battle ends, and the next veldt appearance runs recruit_gau
-        -- (branching on the switch-13 the real feed set).
+          feedDrive()          -- steer the meat ONTO GAU (mons=$20); the
+          return               -- confirm there recruits + ends the battle
+        end                    -- (AIScript::_370, switch 13 clear)
+        -- meat confirmed on GAU (fed) or gone: hands off; recruit_gau +
+        -- end_battle run on the confirm, so GAU joins and the battle ends
         H.setPad(H.frame % 120 < 4 and { "a" } or {})
         return
       end
