@@ -402,30 +402,45 @@ local function grindToAppearance()
   }, "grind to GAU's first appearance")
 end
 
--- hands-off observation: does a command menu open while GAU is on stage?
-local menuOpenedAt, windowEndedAt = nil, nil
-local function observeHandsOff()
+-- observation: does a command menu open while GAU is on stage?  Stage 1 is
+-- PURE hands-off (12000 frames).  If no menu opens, stage 2 taps A gently
+-- (a human dismissing GAU's "Ooh_I'm hungry!" turn dialogs) -- this
+-- distinguishes "menu blocked behind an un-dismissed battle dialog" from
+-- "the engine never reopens menus post-appearance".
+local menuOpenedAt, windowEndedAt, menuStage = nil, nil, nil
+local function observeStage(stage, tapA, budget)
   local last, lastLog = "", -100
-  return H.driveUntil(function()
-    if H.readByte(MENU) ~= 0 and H.readByte(MSTATE) == ST_CMD then
-      menuOpenedAt = menuOpenedAt or H.frame
-      return true
-    end
-    if not gauOn() then
-      windowEndedAt = windowEndedAt or H.frame
-      return true
-    end
-    return false
-  end, 12000, {
-    H.call(function()
-      H.setPad({})
-      local line = engineLine()
-      if line ~= last or H.frame - lastLog >= 120 then
-        last, lastLog = line, H.frame
-        H.log(string.format("[observe] f%d %s", H.frame, line))
+  local spent = 0
+  return H.cond(function()
+    return menuOpenedAt == nil and windowEndedAt == nil
+  end, {
+    H.driveUntil(function()
+      spent = spent + 1
+      if spent >= budget - 10 then return true end   -- stage over, no throw
+      if H.readByte(MENU) ~= 0 then
+        menuOpenedAt, menuStage = menuOpenedAt or H.frame, stage
+        return true
       end
-    end),
-  }, "hands-off: menu opens or GAU leaves")
+      if not gauOn() and not monPresent(5) then
+        windowEndedAt = windowEndedAt or H.frame
+        return true
+      end
+      return false
+    end, budget, {
+      H.call(function()
+        if tapA then
+          H.setPad(H.frame % 30 < 4 and { "a" } or {})
+        else
+          H.setPad({})
+        end
+        local line = engineLine()
+        if line ~= last or H.frame - lastLog >= 120 then
+          last, lastLog = line, H.frame
+          H.log(string.format("[observe%s] f%d %s", stage, H.frame, line))
+        end
+      end),
+    }, "observe stage " .. stage .. ": menu opens or GAU leaves"),
+  }, {})
 end
 
 -- the feed itself, driven closed-loop off the engine's cursor cells
@@ -588,18 +603,20 @@ H.run({ maxFrames = 700000 }, {
     }, {})
   end)(),
 
-  observeHandsOff(),
+  observeStage("1-handsoff", false, 12000),
+  observeStage("2-tapA", true, 8000),
   H.call(function()
     if menuOpenedAt then
       H.log(string.format("[gaufeed] MEASUREMENT: command menu OPEN at f%d " ..
-        "with GAU on stage -- %s", menuOpenedAt, engineLine()))
+        "(stage %s) with GAU on stage -- %s", menuOpenedAt,
+        tostring(menuStage), engineLine()))
       H.screenshot("gaufeed_menu_open")
     else
-      H.log(string.format("[gaufeed] MEASUREMENT: NO menu before window end " ..
-        "(ended f%s) -- %s", tostring(windowEndedAt), engineLine()))
+      H.log(string.format("[gaufeed] MEASUREMENT: NO menu opened " ..
+        "(window ended f%s) -- %s", tostring(windowEndedAt), engineLine()))
       H.screenshot("gaufeed_no_menu")
-      error("hands-off: GAU left before any command menu opened -- see the " ..
-        "[observe] rows above for the engine state timeline", 0)
+      error("no command menu opened while GAU was on stage (hands-off AND " ..
+        "A-taps) -- see the [observe*] rows for the engine state timeline", 0)
     end
   end),
 
