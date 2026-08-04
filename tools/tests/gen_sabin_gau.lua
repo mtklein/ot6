@@ -567,6 +567,25 @@ local function grindStep()
         tostring(fed), partyLine())
       H.log("[gau] LOST -- " .. lost)
     end
+    if grind.appearances >= 6 and not inParty(11) and lost == nil then
+      lost = string.format(
+        "GAU FEED CAPABILITY GAP: %d appearances, none recruited.  " ..
+        "MEASURED HONESTLY (this run + probe_itemuse): the Dried Meat IS " ..
+        "in the battle item list (battInv slot 17, selectable) and the " ..
+        "feed reaction (AIScript::_370: if_item DRIED_MEAT / " ..
+        "if_battle_switch_clr 13 / recruit_gau / end_battle) is real -- " ..
+        "so the old 'measured undrivable' claim is RETIRED.  What cannot " ..
+        "be driven is COMPLETING the meat-onto-GAU confirm inside his " ..
+        "appearance window: feedDrive's CMD/ITEM/TGT branches never " ..
+        "execute because a character command menu is not open on the " ..
+        "frames GAU is targetable (MENU==0 throughout; the one menu-open " ..
+        "instant had monPresent(5) FALSE).  The targetable-GAU frames and " ..
+        "the menu-open frames do not coincide in any RAM signal, and the " ..
+        "residual 2f4e=$82 lingers post-appearance.  This is a real " ..
+        "harness/timing gap, NOT a licence to poke $3EBD.  fights=%d",
+        grind.appearances, grind.fights)
+      H.log("[gau] " .. lost)
+    end
     return lost ~= nil or inParty(11)
   end, 250000, {
     H.call(function()
@@ -579,26 +598,15 @@ local function grindStep()
           H.readByte(0x2f4e), tostring(fed), tostring(fedSwitch()),
           invCount(TONIC), partyLine()))
       end
-      -- GAU ON STAGE, handled INDEPENDENT of the battle detector: the
-      -- party HP table reads $FFFF during his appearance, so
-      -- battleLoadStarted() flickers FALSE and the feed block below is
-      -- skipped exactly when the feed must happen (measured: apps counted,
-      -- then 2f4e=FF frozen with sw13 toggling and the feed never run).
-      -- Once battle switch 13 is set, AIScript::_370 recruits GAU on HIS
-      -- OWN TURN (its main script runs recruit_gau + end_veldt) -- but
-      -- only if we stop interfering: pressing anything kept re-entering
-      -- menus and pinned him (2f4e=FF).  So the instant the switch reads
-      -- set, press NOTHING and let his turn recruit.
-      if fedSwitch() then
-        if not fed then
-          fed = true
-          H.log(string.format("[gau feed] switch 13 SET at f%d -- hands " ..
-            "off; AIScript::_370 recruits GAU on his turn", H.frame))
-        end
-        H.setPad({})
-        return
-      end
-      if gauOn() and grind.appeared then
+      -- GAU ON STAGE (targetable monster slot 5), handled INDEPENDENT of
+      -- the battle detector: the party HP table reads $FFFF during his
+      -- appearance so battleLoadStarted() flickers FALSE.  We ATTEMPT the
+      -- honest menu feed here (feedDrive), and the finding below records
+      -- why it does not complete.  monPresent(5) is the gate that lets the
+      -- grind CONTINUE past a failed feed (the appearance-latch variant
+      -- froze on the residual 2f4e=$82 armed state; monPresent(5) clears
+      -- when GAU actually leaves, so the walk resumes to the next fight).
+      if gauOn() and monPresent(5) then
         if invCount(DRIED_MEAT) > 0 then feedDrive() else H.setPad({}) end
         return
       end
