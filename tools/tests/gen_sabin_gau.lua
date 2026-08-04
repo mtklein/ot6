@@ -577,9 +577,11 @@ local function grindStep()
           feedDrive()
           return
         end
-        -- fed (or no meat): tap A to advance dialog and let GAU leave;
-        -- never attack him
-        H.setPad(H.frame % 8 < 4 and { "a" } or {})
+        -- fed (or no meat): hands OFF -- let GAU's exit resolve on its
+        -- own; the earlier A-mashing here re-entered menus and pinned him
+        -- on stage (2f4e stuck $FF).  A very occasional A clears a waiting
+        -- dialog without opening a menu.
+        H.setPad(H.frame % 120 < 4 and { "a" } or {})
         return
       end
       if H.battleLoadStarted() then
