@@ -567,7 +567,7 @@ local function grindStep()
       -- battleLoadStarted() flickers FALSE and the feed block below is
       -- skipped exactly when the feed must happen (measured: apps counted,
       -- then 2f4e=FF frozen with sw13 toggling and the feed never run).
-      if gauOn() then
+      if gauOn() and monPresent(5) then
         if fedSwitch() and not fed then
           fed = true
           H.log(string.format("[gau feed] reaction switch 13 SET at f%d " ..
