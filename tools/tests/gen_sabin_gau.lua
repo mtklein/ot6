@@ -562,6 +562,26 @@ local function grindStep()
           H.readByte(0x2f4e), tostring(fed), tostring(fedSwitch()),
           invCount(TONIC), partyLine()))
       end
+      -- GAU ON STAGE, handled INDEPENDENT of the battle detector: the
+      -- party HP table reads $FFFF during his appearance, so
+      -- battleLoadStarted() flickers FALSE and the feed block below is
+      -- skipped exactly when the feed must happen (measured: apps counted,
+      -- then 2f4e=FF frozen with sw13 toggling and the feed never run).
+      if gauOn() then
+        if fedSwitch() and not fed then
+          fed = true
+          H.log(string.format("[gau feed] reaction switch 13 SET at f%d " ..
+            "-- GAU fed; letting the battle resolve", H.frame))
+        end
+        if not fed and invCount(DRIED_MEAT) > 0 then
+          feedDrive()
+          return
+        end
+        -- fed (or no meat): tap A to advance dialog and let GAU leave;
+        -- never attack him
+        H.setPad(H.frame % 8 < 4 and { "a" } or {})
+        return
+      end
       if H.battleLoadStarted() then
         if not decided then
           decided = true
@@ -597,25 +617,6 @@ local function grindStep()
         -- flickers the character menu, so gating the feed on a settled
         -- menu (mstreak>=4) missed it every time (seven appearances, zero
         -- feeds).  feedDrive handles every state itself, MENU==0 included.
-        -- latch `fed` on the game's OWN reaction switch ($3EBD bit1,
-        -- battle switch 13 -- GauAppears branches on it): the throw's
-        -- default target auto-hits GAU as the lone enemy, so the switch
-        -- can set before the manual $7B7E sighting.  Once set, stop
-        -- feeding and let GAU run off / the battle resolve.
-        if fedSwitch() and not fed then
-          fed = true
-          H.log(string.format("[gau feed] reaction switch 13 SET at f%d -- " ..
-            "GAU fed; letting the battle resolve [%s]", H.frame, partyLine()))
-        end
-        if gauOn() and not fed and invCount(DRIED_MEAT) > 0 then
-          feedDrive()
-          return
-        end
-        if gauOn() and fed then
-          -- fed: advance any dialog and let GAU leave (do NOT attack him)
-          H.setPad(H.frame % 8 < 4 and { "a" } or {})
-          return
-        end
         tick = tick + 1
         local ph = tick % 30
         if H.readByte(MENU) == 0 then
