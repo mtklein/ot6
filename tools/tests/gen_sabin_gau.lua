@@ -592,6 +592,15 @@ local function grindStep()
           H.setPad({})
           return
         end
+        -- THE FEED runs UNCONDITIONALLY the instant GAU is up and unfed --
+        -- BEFORE the menu/mstreak gates below.  GAU's appearance window
+        -- flickers the character menu, so gating the feed on a settled
+        -- menu (mstreak>=4) missed it every time (seven appearances, zero
+        -- feeds).  feedDrive handles every state itself, MENU==0 included.
+        if gauOn() and not fed and invCount(DRIED_MEAT) > 0 then
+          feedDrive()
+          return
+        end
         tick = tick + 1
         local ph = tick % 30
         if H.readByte(MENU) == 0 then
@@ -601,19 +610,6 @@ local function grindStep()
         end
         mstreak = mstreak + 1
         if mstreak < 4 then H.setPad({}); return end
-        -- THE FEED, on its own per-frame driver: GAU's appearance window
-        -- is short and the meat sits ~17 rows down the battle item list,
-        -- so discrete 3-frame presses could not steer there in time
-        -- (measured: a menu open with the meat at battInv 17, the FEED
-        -- plan firing, and the item steer never reaching target select).
-        -- This driver HOLDS the steering direction so the engine's own
-        -- cursor auto-repeat carries the list, checking the live cursor
-        -- every frame and confirming the instant it lands -- then LEFT
-        -- onto the monster column ($7B7E == $20 = GAU) and A.
-        if gauOn() and not fed and invCount(DRIED_MEAT) > 0 then
-          feedDrive()
-          return
-        end
         if ph == 0 then grind.btn = button() end
         H.setPad(ph < 6 and grind.btn or {})
         return
