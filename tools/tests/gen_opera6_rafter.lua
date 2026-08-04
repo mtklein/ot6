@@ -5,8 +5,25 @@
 -- Measured route: touch Ultros's letter, return through the active theater to
 -- alert the Impresario, ride the briefing, talk to the stage master, operate
 -- the far-right switch, enter the left framework, and cross map 235 to Ultros.
--- The five rat NPC gates carry no story state and are cleared before map 235
--- instantiates so the mint is deterministic inside the five-minute timer.
+--
+-- THE RAT GATES ARE PLAYED (issue #75).  The five rat NPCs ({8,11} {11,15}
+-- {18,14} {21,7} {13,12}, switches $034C-$0350, npc_prop.asm _235) used to
+-- be switched off before map 235 instantiated; now they wander live.  Each
+-- is a no_react collision NPC whose event is `battle 25` -> win despawns it
+-- and clears its switch, loss restarts the chase (_caba0b).  The catwalk
+-- crossing simply FIGHTS whichever rats collide -- navTo's honest mode taps
+-- the fight like any encounter -- inside the same 5-minute timer
+-- (start_timer 0, 18000, event_main.asm:28736; it ticks through battles,
+-- so the route stays lean and un-collided rats are left alone).  Before
+-- the doorstep mint the script WAITS until no live rat stands within 4
+-- tiles of (14,7), so the banked state cannot boot into a rat collision
+-- under battle_ultros2's immediate A-taps.
+--
+-- THE FACING IS EARNED, NOT POKED: the old mint wrote the object facing
+-- byte and $0743 to point the party at Ultros; now the last act at the
+-- doorstep is a short RIGHT press against his occupied tile {15,7} -- a
+-- blocked press turns the party in place -- and the facing is asserted
+-- from RAM afterwards.  This file writes no emulated game state.
 --
 -- IMPORTANT: the WoB story encounter is `_cabf4b` -> battle 104.  Battle 134
 -- belongs to the WoR Opera House dragon/weight event (`$0387=1`); older route
@@ -16,10 +33,6 @@ local H = dofile("tools/tests/lib/ot6.lua")
 local function map() return H.mapId() & 0x1ff end
 local function bright() return emu.getState()["ppu.screenBrightness"] or 0 end
 local function sw(id) return (H.readByte(0x1E80 + math.floor(id/8)) >> (id%8)) & 1 end
-local function clearSw(id)
-  local a=0x1e80+math.floor(id/8)
-  H.writeByte(a,H.readByte(a)&(~(1<<(id%8))&0xff))
-end
 local function menuOpen() return H.readByte(0x0059) ~= 0 end
 local function settled()
   return H.hasControl() and H.tileAligned() and bright()>=15
@@ -34,12 +47,30 @@ local function dumpsw(tag)
     sw(0x0387), sw(0x01B0), sw(0x01B4), sw(0x00A4), sw(0x02BA)))
 end
 
-local function killBitAll()
-  for s = 0, 5 do
-    if H.readByte(0x3aa8 + s * 2) % 2 == 1 then
-      H.writeByte(0x3eec + s * 2, H.readByte(0x3eec + s * 2) | 0x80)
+-- rat bookkeeping: NPC_9..NPC_13 ride objects 24..28 (NPC_n = object
+-- n+15, gen_moogle's measured map), gates $034C..$0350 in list order.
+-- A rat is LIVE while its gate switch is still set.
+local function ratLine()
+  local t = {}
+  for k = 0, 4 do
+    local obj = 24 + k
+    local ox = H.readWord(0x086a + 0x29 * obj) >> 4
+    local oy = H.readWord(0x086d + 0x29 * obj) >> 4
+    t[#t + 1] = string.format("%d%s@(%d,%d)", k,
+      sw(0x034C + k) == 1 and "+" or "-", ox, oy)
+  end
+  return table.concat(t, " ")
+end
+local function ratNear(x, y, r)
+  for k = 0, 4 do
+    if sw(0x034C + k) == 1 then
+      local obj = 24 + k
+      local ox = H.readWord(0x086a + 0x29 * obj) >> 4
+      local oy = H.readWord(0x086d + 0x29 * obj) >> 4
+      if math.abs(ox - x) + math.abs(oy - y) < r then return true end
     end
   end
+  return false
 end
 
 -- rideScene: the gen_zozo5_ramuh stall-safe cutscene rider (stall counter gated
@@ -50,7 +81,7 @@ local function rideScene(pred, maxFrames, what)
     maxFrames, { H.call(function()
       aPh=(aPh+1)%8
       local x,y=H.fieldX(),H.fieldY(); local moving=(x~=lx or y~=ly); lx,ly=x,y
-      if H.battleLoadStarted() then killBitAll(); stallN=0; H.setPad(aPh<4 and {"a"} or {}); return end
+      if H.battleLoadStarted() then stallN=0; H.setPad(aPh<4 and {"a"} or {}); return end
       if H.dialogWaiting() then stallN=0; H.setPad(aPh<4 and {"a"} or {}); return end
       if not moving and not H.hasControl() then stallN=stallN+1 else stallN=0 end
       if stallN>=180 then H.setPad(aPh<4 and {"a"} or {}); return end
@@ -67,7 +98,7 @@ local function corridor(TBL, tx, ty, maxF, doneFn, what)
     return H.fieldX()==tx and H.fieldY()==ty and H.hasControl() and H.tileAligned()
   end, maxF, { H.call(function() hb=hb+1
     if hb%120==0 then dumpsw("["..what.."]") end
-    if H.battleLoadStarted() then killBitAll(); H.setPad(hb%8<4 and {"a"} or {}); return end
+    if H.battleLoadStarted() then H.setPad(hb%8<4 and {"a"} or {}); return end
     if H.dialogWaiting() then H.setPad(hb%8<4 and {"a"} or {}); return end
     if not H.hasControl() then H.setPad({}); return end
     if not H.tileAligned() then H.setPad({}); return end
@@ -83,9 +114,12 @@ end
 local function bumpInto(sx, sy, dir, pred, maxF, what)
   local ph=0
   return H.cond(function() return true end, {
-    H.navTo(sx, sy, { maxFrames=8000 }),
+    H.navTo(sx, sy, { maxFrames=12000, honest=true }),
     H.driveUntil(pred, maxF, { H.call(function() ph=(ph+1)%16
-      if H.battleLoadStarted() then killBitAll() end
+      if H.battleLoadStarted() then
+        H.setPad(ph % 8 < 4 and { "a" } or {})   -- fought, not kill-bit
+        return
+      end
       if ph<8 then H.setPad({[dir]=true}) elseif ph<12 then H.setPad({"a"}) else H.setPad({}) end
     end) }, what),
   })
@@ -93,7 +127,7 @@ end
 
 local function toDoor(tx,ty,bumpDir,destMap,what)
   return H.cond(function() return true end, {
-    H.navTo(tx,ty,{maxFrames=12000,arrive=function() return map()==destMap end}),
+    H.navTo(tx,ty,{maxFrames=18000,honest=true,arrive=function() return map()==destMap end}),
     (function() local n=0 return H.driveUntil(function() return map()==destMap end,3000,{
       H.call(function()
         n=n+1
@@ -106,7 +140,7 @@ local function toDoor(tx,ty,bumpDir,destMap,what)
   })
 end
 
-H.run({ maxFrames = 90000 }, {
+H.run({ maxFrames = 250000 }, {
   H.loadState("build/states/opera_dance_done.mss.lua"),
   H.waitFrames(60),
   H.call(function()
@@ -183,25 +217,53 @@ H.run({ maxFrames = 90000 }, {
   H.waitUntil(function() return map()==232 and settled() end,1000,"left room",3),
   H.driveUntil(function() return H.fieldY()==13 end,500,{H.hold({"up"})},"leave left landing"),
   H.navTo(117,5,{maxFrames=2500}),
-  -- Rat battles carry no story state.  Remove their random blockers before
-  -- map 235 instantiates so fixture generation traverses the full catwalk
-  -- deterministically inside the five-minute window.
-  H.call(function() for id=0x034c,0x0350 do clearSw(id) end end),
-  H.navTo(117,3,{maxFrames=1000,arrive=function() return map()==235 end}),
-  H.waitUntil(function() return map()==235 and settled() end,1000,"framework",3),
-  H.navTo(6,16,{maxFrames=1000}),
-  H.driveUntil(function() return H.fieldY()<=10 end,1000,{H.hold({"up"})},"climb framework"),
-  H.driveUntil(function() return H.fieldY()>=11 end,1000,{H.hold({"down"})},"step onto rafters"),
+  -- The five rat gates stay LIVE (see the header): the catwalk is crossed
+  -- with navTo's honest mode, and a rat that collides fires battle 25 --
+  -- fought by the same taps; a win despawns it and clears its gate.
+  H.navTo(117,3,{maxFrames=6000,honest=true,arrive=function() return map()==235 end}),
+  H.waitUntil(function() return map()==235 and settled() end,1500,"framework",3),
+  H.call(function() H.log("[rats] on 235: " .. ratLine()) end),
+  H.navTo(6,16,{maxFrames=30000,honest=true}),
+  (function() local hb=0
+    return H.driveUntil(function() return H.fieldY()<=10 end,12000,{
+      H.call(function() hb=hb+1
+        if H.battleLoadStarted() then H.setPad(hb%8<4 and {"a"} or {}); return end
+        if H.dialogWaiting() then H.setPad(hb%8<4 and {"a"} or {}); return end
+        if not H.hasControl() then H.setPad({}); return end
+        H.setPad({up=true}) end) }, "climb framework") end)(),
+  (function() local hb=0
+    return H.driveUntil(function() return H.fieldY()>=11 end,12000,{
+      H.call(function() hb=hb+1
+        if H.battleLoadStarted() then H.setPad(hb%8<4 and {"a"} or {}); return end
+        if H.dialogWaiting() then H.setPad(hb%8<4 and {"a"} or {}); return end
+        if not H.hasControl() then H.setPad({}); return end
+        H.setPad({down=true}) end) }, "step onto rafters") end)(),
 
-  H.navTo(14,7,{maxFrames=5000}),
+  H.navTo(14,7,{maxFrames=30000,honest=true}),
+  -- face Ultros by INPUT: his NPC occupies {15,7}, so a short RIGHT press
+  -- is a blocked step that turns the party in place
+  H.hold({ "right" }), H.waitFrames(6), H.release(), H.waitFrames(6),
   H.call(function()
-    local off=H.readWord(0x0803)
-    H.writeByte(0x087f+off,1) -- face RIGHT toward Ultros
-    H.writeByte(0x0743,1)
+    H.assertEq(H.fieldX()==14 and H.fieldY()==7, true,
+      "still at (14,7) -- the blocked press did not step")
+    H.assertEq(H.readByte(0x087f + H.readWord(0x0803)), 1,
+      "facing RIGHT at Ultros (EVENT_DIR 1), earned by the blocked press")
   end),
+  -- the banked state must not boot into a rat collision: wait until no
+  -- LIVE rat stands within 4 tiles of the doorstep (they wander off; the
+  -- timer has headroom for this wait, and the log shows the field)
+  (function() local calm=0
+    return H.driveUntil(function()
+      calm = (settled() and not ratNear(14,7,4)) and calm+1 or 0
+      return calm >= 20
+    end, 9000, { H.call(function()
+      if H.battleLoadStarted() then H.setPad(H.frame%8<4 and {"a"} or {}); return end
+      H.setPad({}) end) }, "a rat-free, settled doorstep") end)(),
   H.call(function()
     H.assertEq(map(),235,"Ultros doorstep is on rafters map 235")
     H.assertEq(sw(0x02BC),1,"rafter timer is active at doorstep")
+    H.assertEq(H.readByte(0x087f + H.readWord(0x0803)), 1, "facing RIGHT")
+    H.log("[rats] at mint: " .. ratLine())
     dumpsw("ULTROS2-DOORSTEP")
   end),
   H.saveState("ultros2_doorstep.mss"),
