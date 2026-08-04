@@ -550,6 +550,19 @@ local function grindStep()
         end
         mstreak = mstreak + 1
         if mstreak < 4 then H.setPad({}); return end
+        -- FEED CADENCE: GAU's appearance window is only a few hundred
+        -- frames, and the meat sits ~17 rows down the battle item list --
+        -- the normal 30-frame-per-press pulse could not steer there in
+        -- time (measured: seven appearances, a menu open with the meat at
+        -- battInv slot 17, and not one feed completed).  So while GAU is
+        -- up and unfed, recompute the button EVERY 3 frames (hold 2): ~50
+        -- frames for the whole item steer, well inside the window.
+        if gauOn() and not fed and invCount(DRIED_MEAT) > 0 then
+          local fph = tick % 3
+          if fph == 0 then grind.btn = button() end
+          H.setPad(fph < 2 and grind.btn or {})
+          return
+        end
         if ph == 0 then grind.btn = button() end
         H.setPad(ph < 6 and grind.btn or {})
         return
