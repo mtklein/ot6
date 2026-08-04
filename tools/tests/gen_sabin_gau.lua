@@ -505,17 +505,31 @@ local function grindStep()
       return
     end
     if st == ST_CMD then
-      -- steer the command cursor to ITEM (row known from feedPlan) and A
       local row = cmdRowOf(actor, CMD_ITEM) or 0
       local cur = H.readByte(CMDROW + actor) & 3
+      if H.frame % 30 == 0 then
+        H.log(string.format("[gau feed] CMD f%d actor=%d cur=%d itemRow=%d",
+          H.frame, actor, cur, row))
+      end
       if cur == row then H.setPad({ "a" })
       else H.setPad({ [cur < row and "down" or "up"] = true }) end
       return
     end
     if st == ST_ITEM then
       local want = battInvIdx(DRIED_MEAT)
-      if want == nil then H.setPad({ "b" }); return end
+      -- also find the meat in the RENDERED list (wItemList $4005), in case
+      -- the cursor indexes that packed list rather than raw battle inv
+      local wlrow = nil
+      for i = 0, 31 do
+        if H.readByte(ITEMLIST + i * 3) == DRIED_MEAT then wlrow = i; break end
+      end
       local cur = H.readByte(ITEMSCR + actor) + H.readByte(ITEMROW + actor)
+      if H.frame % 20 == 0 then
+        H.log(string.format("[gau feed] ITEM f%d cur=%d battInv=%s wList=%s " ..
+          "scroll=%d row=%d", H.frame, cur, tostring(want), tostring(wlrow),
+          H.readByte(ITEMSCR + actor), H.readByte(ITEMROW + actor)))
+      end
+      if want == nil then H.setPad({ "b" }); return end
       if cur == want then H.setPad({ "a" })            -- confirm the meat
       else H.setPad({ [cur < want and "down" or "up"] = true }) end  -- HOLD
       return
