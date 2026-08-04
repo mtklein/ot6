@@ -1264,20 +1264,74 @@ H.run({ maxFrames = 400000 }, {
   -- the rest stop (see the section comment): save point {20,10}, one
   -- Sleeping Bag per member, full HP+MP walking into the smokestack.
   -- The save point is drawn by an NPC object, so the BFS's object map
-  -- reads its tile as SOLID (measured: no path (9,7)->(20,10)); the
-  -- engine walks onto it fine -- nav beside it, then hold the last step.
-  nav(20, 11, { maxFrames = 6000 }),
+  -- reads its tile as SOLID (measured: no path (9,7)->(20,10)), and the
+  -- straight (20,11) approach measured unreachable too -- so pick the
+  -- approach empirically: BFS-reach each of the four neighbours, walk to
+  -- the first reachable one, and hold the last step on (the engine takes
+  -- it fine).  A full flood dump ships with the failure if none reach.
   (function()
-    local phase = 0
-    return H.driveUntil(function()
-      return H.fieldX() == 20 and H.fieldY() == 10 and H.tileAligned()
-    end, 1800, {
+    local approach, dir = nil, nil
+    return H.cond(function() return true end, {
       H.call(function()
-        phase = (phase + 1) % 8
-        if not H.hasControl() then H.setPad({}); return end
-        H.setPad({ up = true })
+        local cands = {
+          { 20, 11, "up" }, { 19, 10, "right" },
+          { 21, 10, "left" }, { 20, 9, "down" },
+        }
+        for _, c in ipairs(cands) do
+          local pth = H.bfsPath(c[1], c[2])
+          if pth then approach, dir = { c[1], c[2] }, c[3]; break end
+        end
+        if not approach then
+          local MOVES = { "up", "down", "left", "right" }
+          local DELTA = { up = {0,-1}, down = {0,1},
+                          left = {-1,0}, right = {1,0} }
+          local sx, sy = H.fieldX(), H.fieldY()
+          local seen = { [sy * 256 + sx] = true }
+          local q, qi = { { sx, sy } }, 1
+          while qi <= #q and qi <= 2000 do
+            local x, y = q[qi][1], q[qi][2]
+            qi = qi + 1
+            for _, d in ipairs(MOVES) do
+              if H.canStep(x, y, d) then
+                local k = (y + DELTA[d][2]) * 256 + (x + DELTA[d][1])
+                if not seen[k] then
+                  seen[k] = true
+                  q[#q + 1] = { x + DELTA[d][1], y + DELTA[d][2] }
+                end
+              end
+            end
+          end
+          local rows = {}
+          for k in pairs(seen) do
+            local y, x = k >> 8, k & 0xFF
+            rows[y] = rows[y] or {}
+            rows[y][#rows[y] + 1] = x
+          end
+          for y, xs in pairs(rows) do
+            table.sort(xs)
+            H.log(string.format("  146 y=%d x=%s", y, table.concat(xs, ",")))
+          end
+          error("rest stop: no neighbour of the save point (20,10) is " ..
+            "BFS-reachable; the flood above is the room model", 0)
+        end
+        H.log(string.format("[rest] approach (%d,%d) then hold %s",
+          approach[1], approach[2], dir))
       end),
-    }, "step onto the save point")
+      nav(function() return approach[1] end, function() return approach[2] end,
+        { maxFrames = 6000 }),
+      (function()
+        local phase = 0
+        return H.driveUntil(function()
+          return H.fieldX() == 20 and H.fieldY() == 10 and H.tileAligned()
+        end, 1800, {
+          H.call(function()
+            phase = (phase + 1) % 8
+            if not H.hasControl() then H.setPad({}); return end
+            H.setPad({ [dir] = true })
+          end),
+        }, "step onto the save point")
+      end)(),
+    }, {})
   end)(),
   H.call(function()
     H.assertEq((H.readByte(0x0201) & 0x80) ~= 0, true,
