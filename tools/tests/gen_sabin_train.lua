@@ -116,7 +116,7 @@ local BLSCROLL, BLCOL, BLROW = 0x895F, 0x8963, 0x8967  -- +actor: 2-col grids
 local ITEMSCR, ITEMROW = 0x8947, 0x894F
 local TGTCHARS, TGTMONS = 0x7B7D, 0x7B7E -- live target-cursor masks
 local BP = 0x3E9C                       -- banked boost points, +slot*2
-local TONIC, POTION, FENIX_DOWN = 0xE8, 0xE9, 0xF0
+local TONIC, POTION, ANTIDOTE, FENIX_DOWN = 0xE8, 0xE9, 0xF2, 0xF0
 local function SH(s)  return 0x3E38 + (8 + s * 2) end
 local function SMX(s) return 0x3E39 + (8 + s * 2) end
 local function RVE(s) return 0x3E89 + (8 + s * 2) end
@@ -144,7 +144,8 @@ end
 local function partyLine()
   local p = {}
   for e = 0, 3 do
-    p[#p + 1] = string.format("%d/%d(%dmp)", pHP(e), pMaxHP(e), pMP(e))
+    p[#p + 1] = string.format("%d/%d(%dmp,s%02X)", pHP(e), pMaxHP(e),
+      pMP(e), H.readByte(0x3EE4 + e * 2))
   end
   return table.concat(p, " ")
 end
@@ -206,6 +207,15 @@ local function makeB47Plan(actor)
   local itemRow = nil
   for i = 0, 3 do
     if H.readByte(CMDTBL + actor * 12 + i * 3) == CMD_ITEM then itemRow = i end
+  end
+  -- POISON is the strip's real HP tax (see the section note): cure your
+  -- own before anything else -- the status walks out of the battle and
+  -- drains per field step all the way to the smokestack
+  local st1 = H.readByte(0x3EE4 + actor * 2)
+  if (st1 & 0x04) ~= 0 and itemRow and battInvIdx(ANTIDOTE) then
+    H.log(string.format("[b47] cure e%d: ANTIDOTE (status=%02X) [%s]",
+      actor, st1, partyLine()))
+    return { kind = "item", item = ANTIDOTE, row = itemRow }
   end
   -- top up the neediest LIVING member (self-target only heals the actor,
   -- so each actor tops itself; the rotation covers everyone)
@@ -565,8 +575,16 @@ local function makePlan(actor)
                row = cmdRowOf(actor, CMD_BLITZ) }
     end
   end
-  -- everyone (SABIN included, chips done): self-heal under 50% from the
-  -- real bag, else dump banked boost on Fight -- the player's fast line
+  -- everyone (SABIN included, chips done): cure own poison, self-heal
+  -- under 50% from the real bag, else dump banked boost on Fight
+  local st1 = H.readByte(0x3EE4 + actor * 2)
+  if (st1 & 0x04) ~= 0 and cmdRowOf(actor, CMD_ITEM)
+     and battInvIdx(ANTIDOTE) then
+    b68Log(string.format("cure e%d: ANTIDOTE (status=%02X) [%s]",
+      actor, st1, partyLine()))
+    return { kind = "item", item = ANTIDOTE, target = actor,
+             row = cmdRowOf(actor, CMD_ITEM) }
+  end
   local hp, mx = pHP(actor), pMaxHP(actor)
   if mx > 0 and hp > 0 and hp * 2 < mx then
     local tgt, miss = neediest()
@@ -805,91 +823,13 @@ local function b47Attempt(n)
   }, {})
 end
 
--- --------------------------------------- the pre-smokestack top-up grind --
--- The b68 entry HP is the fight's real difficulty at these levels
--- (measured across six attempts: entry [3/231, 150/197, 56/254]; the
--- longest run drove the train to 624/1900 before the one-attacker
--- collapse).  The route owns no save point past the detach, so the
--- top-up is the player's other move: DRAW one strip encounter on
--- purpose and let the b47 infirmary policy fight it -- heal under 95%
--- from the bag, kill the ghosts once everyone is topped, exit full.
--- Wins roll SHADOW's 1/16 walk-off, which is why this lives INSIDE the
--- b68 ladder: the post-battle check turns a walk-off into `lost` and
--- the reload re-rolls it on a shifted timeline.
-local function topUpGrind(n)
-  local phase, dirFlip, hb = 0, false, -900
-  local function allTopped()
-    for _, c in ipairs({ 5, 2, 3 }) do
-      local hp = H.readWord(0x1609 + 37 * c)
-      local mx = H.readWord(0x160b + 37 * c) & 0x3fff
-      if hp * 20 < mx * 19 then return false end
-    end
-    return true
-  end
-  return H.cond(function() return lost == nil end, {
-    H.call(function()
-      b47Heals, fPlan, fPlanActor = 0, nil, nil
-      H.log(string.format("[topup] attempt %d: grind for a top-up fight " ..
-        "(topped=%s) [%s]", n, tostring(allTopped()), partyLine()))
-    end),
-    (function()
-      local frames = 0
-      return H.driveUntil(function()
-        frames = frames + 1
-        if frames > 38000 and lost == nil then
-          lost = string.format("top-up grind deadline (38000 frames, " ..
-            "topped never held) [%s]", partyLine())
-          H.log("[topup] LOST -- " .. lost)
-        end
-        if lost ~= nil then return true end
-        return allTopped() and not inBattle() and not H.battleLoadStarted()
-           and H.hasControl() and H.tileAligned()
-      end, 40000, {
-      H.call(function()
-        phase = (phase + 1) % 8
-        if H.frame - hb >= 900 then
-          hb = H.frame
-          H.log(string.format("[topup] f%d (%d,%d) b=%s topped=%s [%s]",
-            H.frame, H.fieldX(), H.fieldY(), tostring(inBattle()),
-            tostring(allTopped()), partyLine()))
-        end
-        if inBattle() or H.battleLoadStarted() then
-          wipeWatch("topup grind")
-          if lost then H.setPad({}); return end
-          fightPulse(phase)
-          return
-        end
-        -- between fights: a fresh fight's heal budget, and the walk-off
-        -- check on the win just ended
-        if b47Heals > 0 then b47Heals = 0 end
-        if not inParty(3) and not lost then
-          lost = string.format("SHADOW walked off after a top-up win (the " ..
-            "1/16 roll) at f%d -- a shifted retry re-rolls it", H.frame)
-          H.log("[train] " .. lost)
-          H.setPad({})
-          return
-        end
-        if H.dialogWaiting() then H.setPad(phase < 4 and { "a" } or {}); return end
-        if not H.hasControl() then H.setPad({}); return end
-        if allTopped() then H.setPad({}); return end
-        -- wander the y=9 lane between x=33 and x=36 to draw an encounter
-        if H.fieldY() < 9 and H.tileAligned() then
-          H.setPad({ down = true }); return
-        end
-        if H.fieldX() <= 33 then dirFlip = false end
-        if H.fieldX() >= 36 then dirFlip = true end
-        H.setPad({ [dirFlip and "left" or "right"] = true })
-      end),
-    }, "top-up grind (attempt " .. n .. ")")
-    end)(),
-    H.call(function()
-      if lost == nil then
-        H.log(string.format("[topup] done, party topped [%s] shadow=%s",
-          partyLine(), tostring(inParty(3))))
-      end
-    end),
-  }, {})
-end
+-- (A wander-for-an-encounter top-up was tried here and measured dead:
+-- the post-b47 strip has NO random pool at all -- b=true never showed
+-- outside battle 47 across every run.  The entry-HP bleed is the field
+-- POISON the trap ghosts inflict, draining per step for the whole strip
+-- walk -- which is what "SABIN at 3/231, the drain floor" was saying.
+-- The counter is bought two cars back: Antidotes, cured inside battle
+-- 47 before the ghosts are put down.)
 
 -- ------------------------------------------------- the battle-68 ladder --
 local b68Blob, b68won = nil, false
@@ -931,7 +871,6 @@ local function b68Attempt(n)
       b68.tornDown, b68.mstreak, b68.sabinDeadN = 0, 0, 0
       gSlot, sabinE, cyanE, shadowE = nil, nil, nil, nil
     end),
-    topUpGrind(n),
     H.cond(function() return lost ~= nil end, { H.waitFrames(1) }, {
     nav(32, 7, { maxFrames = 8000 }),
     upA(function() return sw(0x3A) == 1 end, "smokestack switch", 4000),
@@ -1122,6 +1061,8 @@ H.run({ maxFrames = 400000 }, {
   buyItem(TONIC, 0, function() return 20 - invCount(TONIC) end, "TONIC to 20"),
   buyItem(POTION, 1, function() return 15 - invCount(POTION) end,
     "POTION to 15"),
+  buyItem(ANTIDOTE, 2, function() return 6 - invCount(ANTIDOTE) end,
+    "ANTIDOTE to 6"),
   closeShop(),
   H.call(function()
     H.log(string.format("[shop] done: gil=%d tonics=%d potions=%d",
