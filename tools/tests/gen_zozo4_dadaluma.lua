@@ -50,25 +50,153 @@
 --  * THE FIGHT: battle 69 = formation 438 = DADALUMA $0107 + two $006C
 --    sidekicks (measured words 0107 006C 006C FFFF FFFF FFFF).  The
 --    post-battle event _ca5ea9 gates on battle-switch $40 exactly like
---    Kefka/Vargas, so the harness kill-bit win is clean: no GameOver,
---    hide_obj NPC_14, $034A=0, fade_in, control back on (30,13) -- and
---    the porch opens (towerS (33,10) walked 7 steps after the win).
+--    Kefka/Vargas: a real win despawns him (hide_obj NPC_14, $034A=0,
+--    fade_in, control back on (30,13) -- the porch opens); a loss is
+--    `call GameOver`.  Since issue #75 the fight is PLAYED -- see the
+--    fighter + retry ladder at the fight site; this file writes no
+--    emulated game state anywhere, and every mid-route encounter on the
+--    climb is fought by the same edge-tapped A that pages dialogs.
 local H = dofile("tools/tests/lib/ot6.lua")
 local function map() return H.mapId() & 0x1ff end
 local function bright() return emu.getState()["ppu.screenBrightness"] or 0 end
 local function sw(id)
   return (H.readByte(0x1E80 + math.floor(id / 8)) >> (id % 8)) & 1
 end
-local function killBitAll()
-  for s = 0, 5 do
-    if H.readByte(0x3aa8 + s * 2) % 2 == 1 then
-      H.writeByte(0x3eec + s * 2, H.readByte(0x3eec + s * 2) | 0x80)
-    end
-  end
-end
 local function settled()
   return H.hasControl() and H.tileAligned() and bright() >= 15
      and not H.dialogWaiting() and not H.battleLoadStarted()
+end
+
+-- ----------------------------------------------------- the honest fighter --
+-- gen_narshe_battle's menu-episode machine (gen_scenario's cadence) for the
+-- DADALUMA fight.  Party here is LOCKE+CELES+SABIN+EDGAR (#21's canonical
+-- four); his authored row (Ot6ShieldTbl: 6 shields, PIERCE|BLUDG; ElemAdd:
+-- poison-weak; 3270 HP) is exactly what they carry -- LOCKE's dagger and
+-- EDGAR's spear are pierce, SABIN's fists are bludgeon, and EDGAR's Tools
+-- add poison/pierce volume.  Boost banked to 2 and dumped every turn:
+--     EDGAR (4), tier 2+   down A A A   Tools -> AutoCrossbow
+--     SABIN (5), tier 3+   down A A A   Blitz -> Pummel (menu-picked,
+--                                       battle_vargas's tools-shell list)
+--     everyone else        A A          Fight, default target
+local BCHID, BCHP, BCMAXHP = 0x3ed8, 0x3bf4, 0x3c1c
+local MENU, ACTOR = 0x7bca, 0x62ca
+local BP = 0x3e9c
+local function monSpecies(i) return H.readWord(0x57c0 + i * 2) end
+local function monHp(i) return H.readWord(0x3bfc + i * 2) end
+local function monShields(i) return H.readByte(0x3e40 + i * 2) end
+local function monPresent(i) return H.readByte(0x3aa8 + i * 2) % 2 == 1 end
+local function partyLine()
+  local p = {}
+  for e = 0, 3 do
+    p[#p + 1] = string.format("%d/%d", H.readWord(BCHP + e * 2),
+      H.readWord(BCMAXHP + e * 2))
+  end
+  return table.concat(p, " ")
+end
+local function monsterLine()
+  local m = {}
+  for i = 0, 5 do
+    if monPresent(i) then
+      m[#m + 1] = string.format("$%04X hp=%d sh=%d", monSpecies(i),
+        monHp(i), monShields(i))
+    end
+  end
+  return table.concat(m, " | ")
+end
+local function seqFor(id, tier, slot)
+  local bp = H.readByte(BP + slot * 2)
+  local boost = bp >= 2 and math.min(bp, 3) or 0
+  local seq = {}
+  for _ = 1, boost do seq[#seq + 1] = "r" end
+  local function push(...)
+    for _, b in ipairs({ ... }) do seq[#seq + 1] = b end
+    return seq
+  end
+  if id == 4 and tier >= 2 then
+    return push("down", "a", "a", "a")                        -- AutoCrossbow
+  end
+  if id == 5 and tier >= 3 then
+    return push("down", "a", "a", "a")                        -- Pummel
+  end
+  return push("a", "a")                                       -- Fight
+end
+local function mkFighter(tier, tag)
+  local F = { lost = nil }
+  local bt = nil
+  local mStreak, mSeq, mIdx, mTick, mStall = 0, nil, 1, 0, 0
+  local phase = 0
+  function F.frame(battN)
+    phase = (phase + 1) % 8
+    if battN == 3 then
+      bt = { f0 = H.frame, wiped = 0 }
+      local w = H.formationWords()
+      H.log(string.format("[%s] battle up f%d (%04X %04X %04X %04X %04X %04X)",
+        tag, H.frame, w[1], w[2], w[3], w[4], w[5], w[6]))
+    end
+    if bt then
+      bt.lastParty = partyLine()
+      if battN % 300 == 0 then
+        H.log(string.format("[%s] f%d party [%s] vs %s",
+          tag, H.frame, partyLine(), monsterLine()))
+      end
+      local wiped, any = true, false
+      for e = 0, 3 do
+        if H.readWord(BCMAXHP + e * 2) > 0 then
+          any = true
+          if H.readWord(BCHP + e * 2) > 0 then wiped = false end
+        end
+      end
+      bt.wiped = (any and wiped) and bt.wiped + 1 or 0
+      if bt.wiped >= 90 and not F.lost then
+        F.lost = string.format("PARTY WIPED at f%d (started f%d, %d frames " ..
+          "in, tier %d) -- party [%s] vs %s", H.frame, bt.f0,
+          H.frame - bt.f0, tier, partyLine(), monsterLine())
+        H.log("[" .. tag .. "] " .. F.lost)
+      end
+    end
+    if bt == nil or H.readByte(MENU) == 0 then
+      mStreak, mSeq = 0, nil
+      H.setPad(phase < 4 and { "a" } or {})
+      return
+    end
+    mStreak = mStreak + 1
+    if mStreak < 4 then H.setPad({}); return end
+    if mSeq == nil then
+      local slot = H.readByte(ACTOR) & 3
+      local id = H.readByte(BCHID + slot * 2)
+      mSeq, mIdx, mTick, mStall = seqFor(id, tier, slot), 1, 0, 0
+      H.log(string.format("[%s] cast f%d slot=%d char=%d bp=%d seq=%s",
+        tag, H.frame, slot, id, H.readByte(BP + slot * 2),
+        table.concat(mSeq, ",")))
+    end
+    mTick = mTick + 1
+    local ph = mTick % 30
+    local btn
+    if mIdx <= #mSeq then
+      btn = mSeq[mIdx]
+    elseif mStall < 2 then
+      btn = "a"
+    elseif mStall < 4 then
+      btn = "b"
+    else
+      mSeq = nil
+      H.setPad({})
+      return
+    end
+    if ph < 6 then H.setPad({ [btn] = true }) else H.setPad({}) end
+    if ph == 29 then
+      if mIdx <= #mSeq then mIdx = mIdx + 1 else mStall = mStall + 1 end
+    end
+  end
+  function F.idle()
+    if bt then
+      H.log(string.format("[%s] battle done at f%d (%d frames) -- party [%s]",
+        tag, H.frame, H.frame - bt.f0, bt.lastParty or "?"))
+      bt = nil
+    end
+    mStreak, mSeq = 0, nil
+  end
+  return F
 end
 
 -- ---- door-walled step model (the lib's own rules + door tiles as walls;
@@ -194,7 +322,7 @@ local function followPath(tx, ty, opts)
       return true
     end
     return false
-  end, opts.maxFrames or 9000, {
+  end, opts.maxFrames or 20000, {
     H.call(function()
       hb = hb + 1
       if hb % 600 == 0 then
@@ -202,7 +330,9 @@ local function followPath(tx, ty, opts)
           H.fieldX(), H.fieldY()))
       end
       if H.battleLoadStarted() then
-        killBitAll()
+        -- an encounter mid-route is FOUGHT (issue #75): the edge-tapped A
+        -- opens the command list, confirms Fight, takes the default target
+        -- and pages the victory text
         H.setPad(hb % 8 < 4 and { "a" } or {})
         return
       end
@@ -228,7 +358,7 @@ end
 
 local function door(sx, sy, destMap, what)
   return H.cond(function() return true end, {
-    followPath(sx, sy, { arriveMap = destMap, maxFrames = 15000 }),
+    followPath(sx, sy, { arriveMap = destMap, maxFrames = 30000 }),
     H.waitUntil(settled, 2400, what .. " settled", 5),
     -- door loads finalize the decompressed prop table LATE (gen_zozo2's
     -- measured rule); settle before any pathfinding reads it
@@ -268,7 +398,7 @@ for yy = 17, 26 do wr(104, yy, "down") end             -- (104,26) -> door (104,
 local function westRoomCross()
   local hb = 0
   return H.cond(function() return true end, {
-    H.driveUntil(function() return map() == 221 end, 15000, {
+    H.driveUntil(function() return map() == 221 end, 30000, {
       H.call(function()
         hb = hb + 1
         if hb % 600 == 0 then
@@ -276,7 +406,7 @@ local function westRoomCross()
             H.fieldX(), H.fieldY(), H.readByte(0x00b2) & 3))
         end
         if H.battleLoadStarted() then
-          killBitAll(); H.setPad(hb % 8 < 4 and { "a" } or {}); return
+          H.setPad(hb % 8 < 4 and { "a" } or {}); return   -- fought, not kill-bit
         end
         if H.dialogWaiting() then H.setPad(hb % 8 < 4 and { "a" } or {}); return end
         -- the (111,15) scene: RIDE it with A -- a direction press here hangs
@@ -316,7 +446,7 @@ br(34, 31, "left"); br(33, 31, "left"); br(32, 31, "left"); br(31, 31, "up")  --
 local function bridgeCross()
   local hb = 0
   return H.cond(function() return true end, {
-    H.driveUntil(function() return map() == 225 end, 12000, {
+    H.driveUntil(function() return map() == 225 end, 24000, {
       H.call(function()
         hb = hb + 1
         if hb % 600 == 0 then
@@ -324,7 +454,7 @@ local function bridgeCross()
             H.fieldX(), H.fieldY(), H.readByte(0x00b2) & 3))
         end
         if H.battleLoadStarted() then
-          killBitAll(); H.setPad(hb % 8 < 4 and { "a" } or {}); return
+          H.setPad(hb % 8 < 4 and { "a" } or {}); return   -- fought, not kill-bit
         end
         if H.dialogWaiting() then H.setPad(hb % 8 < 4 and { "a" } or {}); return end
         if not H.hasControl() then H.setPad({}); return end
@@ -367,12 +497,30 @@ end
 --     never latches (so the kill-bit can't fire it) and both A-mash and a
 --     neutral pad leave it stuck.  Riding that hang under A is what the fifth
 --     pass mis-rode into the intro maps.
--- THE FIX: SUPPRESS random encounters across the shaft -- keep the danger
--- accumulator $1f6e/$1f6f at 0 each frame (battle.asm:380+ overflows it into
--- EventScript_RandBattle) so the broken transition never arms.  With no roll,
--- the party walks the BRIDGE2 ladder clean to (30,34) -> map 221 (30,22),
--- measured 999 frames end-to-end.  A held direction into a beam base still
--- must not outlive its step, so this pulses the pad like corridorFollow.
+-- THE HONEST CROSSING (issue #75 -- the old fix wrote $1f6e/$1f6f to 0
+-- every frame, suppressing the roll; a mint script may never write game
+-- state, so that is gone).  What replaced it is what a cautious PLAYER
+-- can actually do, informed by the same mechanism (battle.asm:350-388):
+-- every step adds the map's rate to the 16-bit accumulator $1f6e, a
+-- battle-RNG byte is compared against its HIGH byte $1f6f, and a win
+-- ZEROES the counter -- so the roll probability right after any fight is
+-- as low as it ever gets.  So each climb attempt:
+--   1. BURNS the pending encounter at the BASE, on flat ground: pace
+--      (30,61)<->(30,60) until the roll fires on a safe tile, then FIGHT
+--      it honestly (tap-A).  The counter is now zero.
+--   2. climbs the BRIDGE2 ladder immediately, watching for the hang
+--      signature (control lost, no battle latch, position frozen, the
+--      event PC inside RandBattle) -- a roll that lands on one of the
+--      ambiguous-z beams anyway.
+--   3. a hang or an in-climb loss RELOADS the pre-climb checkpoint (the
+--      mint-script spelling of a player reloading a save) and goes
+--      again; the burn pacing itself reshuffles every subsequent roll.
+-- Five attempts; if all five hang, the mint FAILS with the full
+-- characterization on the record -- that outcome is the product bug the
+-- header describes (a human player crossing this shaft can hit the same
+-- un-settleable encounter and softlock), and it must be fixed game-side,
+-- not scripted around.  A held direction into a beam base still must not
+-- outlive its step, so the walker pulses the pad like corridorFollow.
 local BRIDGE2 = {}
 do
   local seq = {
@@ -392,44 +540,156 @@ do
   }
   for _, s in ipairs(seq) do BRIDGE2[key(s[1], s[2])] = s[3] end
 end
-local function bridgeClimb()
-  local hb = 0
-  return H.cond(function() return true end, {
-    H.driveUntil(function() return map() == 221 end, 15000, {
-      H.call(function()
-        hb = hb + 1
-        -- suppress the hanging random encounter (see header): zero the danger
-        -- accumulator every frame so battle.asm never overflows it into
-        -- RandBattle's un-settleable, un-kill-bittable z-split transition.
-        H.writeByte(0x1f6e, 0); H.writeByte(0x1f6f, 0)
-        if hb % 600 == 0 then
-          H.log(string.format("[bridge2] f+%d at (%d,%d) z%d ctl=%s", hb,
-            H.fieldX(), H.fieldY(), H.readByte(0x00b2) & 3, tostring(H.hasControl())))
+local climbBlob, climbDone = nil, false
+local climbFail = nil
+local function hangLine(tag)
+  return string.format("%s at f%d: map=%d tile=(%d,%d) z=%d danger=$%04X " ..
+    "ctl=%s batt=%s dlg=%s ev=%s evPC=%02X:%02X%02X", tag, H.frame, map(),
+    H.fieldX(), H.fieldY(), H.readByte(0x00b2) & 3, H.readWord(0x1f6e),
+    tostring(H.hasControl()), tostring(H.battleLoadStarted()),
+    tostring(H.dialogWaiting()), tostring(H.eventRunning()),
+    H.readByte(0x00e7), H.readByte(0x00e6), H.readByte(0x00e5))
+end
+-- one pace-burn: walk (30,61)<->(30,60) until a battle fires ON FLAT
+-- GROUND, fight it honestly, and settle.  Bounded; a base that never
+-- rolls within the budget just proceeds with whatever the counter holds.
+local function burnStep()
+  local hb, fought, battN = 0, false, 0
+  return H.driveUntil(function()
+    return (fought and settled()) or (not fought and hb > 6000 and settled())
+  end, 12000, {
+    H.call(function()
+      hb = hb + 1
+      battN = H.battleLoadStarted() and battN + 1 or 0
+      if battN >= 3 then
+        fought = true
+        H.setPad(hb % 8 < 4 and { "a" } or {})   -- fight it, honestly
+        return
+      end
+      if H.dialogWaiting() then H.setPad(hb % 8 < 4 and { "a" } or {}); return end
+      if not H.hasControl() then H.setPad({}); return end
+      if not H.tileAligned() then H.setPad({}); return end
+      if fought then H.setPad({}); return end
+      H.setPad({ [H.fieldY() >= 61 and "up" or "down"] = true })
+    end),
+  }, "burn the pending encounter on flat ground")
+end
+local function climbBody(n)
+  local hb, stuckN, lx, ly = 0, 0, -1, -1
+  local battN = 0
+  return H.driveUntil(function()
+    return map() == 221 or climbFail ~= nil
+  end, 40000, {
+    H.call(function()
+      hb = hb + 1
+      battN = H.battleLoadStarted() and battN + 1 or 0
+      if hb % 600 == 0 then
+        H.log(string.format("[bridge2] f+%d at (%d,%d) z%d ctl=%s danger=$%04X",
+          hb, H.fieldX(), H.fieldY(), H.readByte(0x00b2) & 3,
+          tostring(H.hasControl()), H.readWord(0x1f6e)))
+      end
+      if hb > 30000 then
+        climbFail = hangLine("[bridge2] attempt " .. n .. " TIMED OUT")
+        H.log(climbFail)
+        return
+      end
+      -- the hang signature: no control, no battle latch, no dialog, the
+      -- party frozen in place for 900 straight frames.  A real battle
+      -- entry latches battleLoadStarted within dozens of frames and a
+      -- post-battle fade returns control within ~150; nothing legitimate
+      -- on this ladder goes quiet for 900.
+      local x, y = H.fieldX(), H.fieldY()
+      local frozen = (x == lx and y == ly and not H.hasControl()
+        and not H.battleLoadStarted() and not H.dialogWaiting())
+      lx, ly = x, y
+      stuckN = frozen and stuckN + 1 or 0
+      if stuckN >= 900 then
+        climbFail = hangLine("[bridge2] attempt " .. n ..
+          " HUNG (the un-settleable beam encounter)")
+        H.log(climbFail)
+        H.screenshot("bridge2_hang" .. n)
+        return
+      end
+      if battN >= 3 then
+        if battN == 3 then
+          local w = H.formationWords()
+          H.log(string.format("[bridge2] in-climb battle at (%d,%d) f%d " ..
+            "(%04X %04X %04X %04X %04X %04X) -- fighting", x, y, H.frame,
+            w[1], w[2], w[3], w[4], w[5], w[6]))
         end
-        -- with encounters suppressed no battle should fire, but keep the
-        -- kill-bit guard in case one is already in flight on entry
-        if H.battleLoadStarted() then
-          killBitAll(); H.setPad(hb % 8 < 4 and { "a" } or {}); return
-        end
-        if H.dialogWaiting() then H.setPad(hb % 8 < 4 and { "a" } or {}); return end
-        -- a genuine control loss here is only a map-load fade; wait it out
-        -- (do NOT A-mash -- there is no scene on this beam, only the
-        -- encounter we now suppress)
-        if not H.hasControl() or H.eventRunning() then H.setPad({}); return end
-        if not H.tileAligned() then H.setPad({}); return end
-        local x, y = H.fieldX(), H.fieldY()
-        local dir = BRIDGE2[key(x, y)]
-        if dir and H.canStep(x, y, dir) then
-          H.setPad({ [PRESS[dir]] = true })
-        else
-          H.setPad({})
-        end
+        H.setPad(hb % 8 < 4 and { "a" } or {})
+        return
+      end
+      if H.dialogWaiting() then H.setPad(hb % 8 < 4 and { "a" } or {}); return end
+      if not H.hasControl() or H.eventRunning() then H.setPad({}); return end
+      if not H.tileAligned() then H.setPad({}); return end
+      local dir = BRIDGE2[key(x, y)]
+      if dir and H.canStep(x, y, dir) then
+        H.setPad({ [PRESS[dir]] = true })
+      else
+        H.setPad({})
+      end
+    end),
+  }, "bridge room climb -> (30,34) exit, attempt " .. n)
+end
+local function climbAttempt(n)
+  local ldReq
+  return H.cond(function() return not climbDone end, {
+    H.cond(function() return n > 1 end, {
+      H.logStep(function()
+        return string.format("[bridge2] ATTEMPT %d -- reloading the " ..
+          "pre-climb checkpoint (%s)", n, tostring(climbFail))
       end),
-    }, "bridge room climb -> (30,34) exit"),
-    H.waitUntil(settled, 2400, "top roof settled", 5),
-    H.waitFrames(150),
-    H.logStep(function() return string.format(
-      "bridgeClimb: landed map %d (%d,%d)", map(), H.fieldX(), H.fieldY()) end),
+      H.call(function() ldReq = H.requestLoadState(climbBlob) end),
+      H.waitFrames(2),
+      H.call(function() H.checkReq(ldReq, "climb attempt " .. n) end),
+      H.waitFrames(60),
+    }, {}),
+    H.call(function() climbFail = nil end),
+    burnStep(),
+    H.logStep(function()
+      return string.format("[bridge2] burned; danger=$%04X -- climbing " ..
+        "(attempt %d)", H.readWord(0x1f6e), n)
+    end),
+    climbBody(n),
+    H.cond(function() return climbFail == nil end, {
+      H.waitUntil(settled, 2400, "top roof settled", 5),
+      H.waitFrames(150),
+      H.call(function()
+        climbDone = true
+        H.log(string.format("[bridge2] attempt %d landed map %d (%d,%d)",
+          n, map(), H.fieldX(), H.fieldY()))
+      end),
+    }, {}),
+  }, {})
+end
+local function bridgeClimb()
+  local ckReq
+  return H.cond(function() return true end, {
+    H.call(function() ckReq = H.requestSaveState() end),
+    H.waitFrames(2),
+    H.call(function()
+      H.checkReq(ckReq, "pre-climb checkpoint")
+      climbBlob = ckReq.blob
+      H.log(string.format("[bridge2] pre-climb checkpoint captured " ..
+        "(%d bytes) at (%d,%d) danger=$%04X", #climbBlob, H.fieldX(),
+        H.fieldY(), H.readWord(0x1f6e)))
+    end),
+    climbAttempt(1),
+    climbAttempt(2),
+    climbAttempt(3),
+    climbAttempt(4),
+    climbAttempt(5),
+    H.call(function()
+      if not climbDone then
+        error("[bridge2] the shaft could not be crossed honestly in 5 " ..
+          "attempts -- last: " .. tostring(climbFail) .. " -- this is the " ..
+          "PRODUCT BUG the header describes (a random encounter rolled on " ..
+          "the ambiguous-z beams of map 225's shaft never settles and " ..
+          "never latches battleLoadStarted; a human player softlocks the " ..
+          "same way).  Fix it game-side; do not suppress it here.", 0)
+      end
+    end),
   })
 end
 
@@ -454,14 +714,16 @@ local function stairDir(x, y)
 end
 local function stairFollow()
   local hb = 0
-  return H.driveUntil(function() return map() == 221 end, 12000, {
+  return H.driveUntil(function() return map() == 221 end, 24000, {
     H.call(function()
       hb = hb + 1
       if hb % 600 == 0 then
         H.log(string.format("[stair] f+%d at (%d,%d)", hb, H.fieldX(), H.fieldY()))
       end
       if H.battleLoadStarted() then
-        killBitAll()
+        -- an encounter mid-route is FOUGHT (issue #75): the edge-tapped A
+        -- opens the command list, confirms Fight, takes the default target
+        -- and pages the victory text
         H.setPad(hb % 8 < 4 and { "a" } or {})
         return
       end
@@ -568,7 +830,7 @@ corr(31, 13, { "left" })
 -- talk that follows (hasControl never true; measured via probe replay of
 -- the contaminated state).  So the pred demands twenty straight settled()
 -- frames at (30,13) -- jumpRow's calm-counter, aimed at a tile -- and a
--- last-step roll is kill-bitted by the same interrupt every other leg
+-- last-step roll is FOUGHT by the same battle interrupt every other leg
 -- carries, BEFORE the mint instead of inside it.
 local function corridorFollow()
   local hb, calm = 0, 0
@@ -580,7 +842,7 @@ local function corridorFollow()
       return true
     end
     return false
-  end, 9000, {
+  end, 18000, {
     H.call(function()
       hb = hb + 1
       if hb % 300 == 0 then
@@ -588,7 +850,9 @@ local function corridorFollow()
           H.fieldX(), H.fieldY()))
       end
       if H.battleLoadStarted() then
-        killBitAll()
+        -- an encounter mid-route is FOUGHT (issue #75): the edge-tapped A
+        -- opens the command list, confirms Fight, takes the default target
+        -- and pages the victory text
         H.setPad(hb % 8 < 4 and { "a" } or {})
         return
       end
@@ -632,8 +896,7 @@ local function jumpRow(dir, pred, maxFrames, what)
         end
         evWas = ev
         if H.battleLoadStarted() then
-          killBitAll()
-          H.setPad(hb % 8 < 4 and { "a" } or {})
+          H.setPad(hb % 8 < 4 and { "a" } or {})   -- fought, not kill-bit
           return
         end
         if ev or not H.hasControl() then
@@ -647,7 +910,7 @@ local function jumpRow(dir, pred, maxFrames, what)
   })
 end
 
-H.run({ maxFrames = 90000 }, {
+H.run({ maxFrames = 400000 }, {
   H.loadState("build/states/zozo_arrival.mss.lua"),
   H.waitFrames(150),
   H.call(function()
@@ -660,22 +923,22 @@ H.run({ maxFrames = 90000 }, {
   door(38, 57, 225, "P9a street -> interior"),
   door(47, 47, 221, "P10b -> roof (35,54)"),
   door(34, 50, 225, "P11a -> stair room"),
-  followPath(52, 30, { maxFrames = 9000 }),
+  followPath(52, 30, { maxFrames = 18000 }),
   stairFollow(),
   H.waitUntil(settled, 2400, "U1 settled", 5),
   H.waitFrames(150),
-  followPath(29, 39, { maxFrames = 9000 }),
+  followPath(29, 39, { maxFrames = 18000 }),
   jumpRow("left", function()
     return H.fieldX() <= 18 and H.fieldY() == 39
-  end, 4500, "J39 row westbound"),
+  end, 9000, "J39 row westbound"),
   door(15, 39, 225, "P17a -> west room"),
   -- P18b: cross the west room to (104,27)->221.  followPath mispredicts +
   -- HANGS on the (111,15) scene-beam here; westRoomCross rides it (see above).
   westRoomCross(),
-  followPath(18, 33, { maxFrames = 6000 }),
+  followPath(18, 33, { maxFrames = 12000 }),
   jumpRow("right", function()
     return H.fieldX() >= 28 and H.fieldY() == 33
-  end, 4500, "J33 row eastbound"),
+  end, 9000, "J33 row eastbound"),
   -- P14a: the "/" z-loop beam approach to (31,30) -- followPath mispredicts
   -- the live z here too; bridgeCross drives the measured table (see above).
   bridgeCross(),
@@ -703,41 +966,90 @@ H.run({ maxFrames = 90000 }, {
   end),
   H.saveState("dadaluma_doorstep.mss"),
 
-  -- face him and talk, then ride the fight to the win.  Battle 69 (event
-  -- _ca96a9: dlg $042D -> set_b_switch $4B -> `battle 69`) is a KILL-BIT boss
-  -- -- formation 438 = DADALUMA $0107 + two $006C (verified probe_fight.lua,
-  -- $57C0 words 0107 006C 006C) -- and it RESOLVES in a few hundred frames,
-  -- faster than battleLoadStarted's HP-table signal can be caught, so the old
-  -- observe-the-battle sequence timed out on a fight that had already been won
-  -- (the party was standing on the roof reading the "Got Head Band" reward
-  -- dialog).  So this drives it hands-off, advanceStory-style: kill-bit any
-  -- monster that appears and broadly edge-A (4 on / 4 off) every dialog --
-  -- including the reward and the win-tail text, which do NOT set the
-  -- dialogWaiting latch -- until the win clears $034A (_ca96a9's tail: hide_obj
-  -- NPC_14, clr_b_switch $4B, switch $034A=0, fade_in) and control returns on
-  -- the roof at (30,13).
-  H.hold({ "down" }), H.waitFrames(8), H.release(), H.waitFrames(4),
+  -- face him and talk, then FIGHT battle 69 -- honestly (issue #75).
+  -- _ca96a9: dlg $042D -> set_b_switch $4B -> `battle 69` -> _ca5ea9,
+  -- which gates on battle-switch $40: a WIN despawns him ($034A=0, control
+  -- back at (30,13)); a LOSS is `call GameOver`.  Formation 438 = DADALUMA
+  -- $0107 + two $006C (verified probe_fight.lua).  The drive is the menu-
+  -- episode fighter above, wrapped in a three-attempt retry ladder off the
+  -- doorstep just minted: a wipe reloads the doorstep -- the mint-script
+  -- spelling of a player reloading a save, caught BEFORE the GameOver
+  -- fade -- and escalates the tier (2 adds EDGAR's AutoCrossbow, 3 adds
+  -- SABIN's Pummel), which reshuffles every subsequent roll.  Outside the
+  -- battle the driver still edge-A's broadly: the talk dialog, the reward
+  -- and the win-tail text do NOT set the dialogWaiting latch.
   (function()
-    local ph, formLogged = 0, false
-    return H.driveUntil(function()
-      return sw(0x034A) == 0 and map() == 221 and H.hasControl()
-        and H.tileAligned() and bright() >= 15
-    end, 20000, {
-      H.call(function()
-        ph = (ph + 1) % 8
-        if H.monstersPresent() > 0 then
-          if not formLogged then
-            local w = H.formationWords()
-            if w[1] ~= 0xFFFF and w[1] ~= 0 then formLogged = true
-              H.log(string.format("[battle 69] formation %04X %04X %04X %04X %04X %04X",
-                w[1], w[2], w[3], w[4], w[5], w[6]))
-            end
-          end
-          killBitAll()
+    local dadaBlob, dadaWon = nil, false
+    local dadaLost = nil
+    local function fightBody(tier)
+      local F = mkFighter(tier, "dadaluma")
+      local battN = 0
+      return H.driveUntil(function()
+        if F.lost then
+          dadaLost = F.lost
+          return true                 -- reload beats riding the GameOver
         end
-        H.setPad(ph < 4 and { "a" } or {})
+        return sw(0x034A) == 0 and map() == 221 and H.hasControl()
+          and H.tileAligned() and bright() >= 15
+      end, 40000, {
+        H.call(function()
+          battN = H.battleLoadStarted() and battN + 1 or 0
+          if battN >= 3 then
+            F.frame(battN)
+            return
+          end
+          F.idle()
+          H.setPad(H.frame % 8 < 4 and { "a" } or {})
+        end),
+      }, "Dadaluma fought honestly (tier " .. tier .. ") -> $034A clear")
+    end
+    local function attempt(n)
+      local ldReq
+      return H.cond(function() return not dadaWon end, {
+        H.cond(function() return n > 1 end, {
+          H.logStep(function()
+            return string.format("[dadaluma] ATTEMPT %d -- reloading the " ..
+              "doorstep after a loss (%s)", n, tostring(dadaLost))
+          end),
+          H.call(function() ldReq = H.requestLoadState(dadaBlob) end),
+          H.waitFrames(2),
+          H.call(function() H.checkReq(ldReq, "dadaluma attempt " .. n) end),
+          H.waitFrames(60),
+        }, {}),
+        H.call(function() dadaLost = nil end),
+        H.hold({ "down" }), H.waitFrames(8), H.release(), H.waitFrames(4),
+        fightBody(n),
+        H.call(function()
+          if dadaLost == nil then
+            dadaWon = true
+            H.log(string.format("[dadaluma] attempt %d WON battle 69 " ..
+              "honestly at f%d", n, H.frame))
+          end
+        end),
+      }, {})
+    end
+    local ckReq
+    return H.cond(function() return true end, {
+      H.call(function() ckReq = H.requestSaveState() end),
+      H.waitFrames(2),
+      H.call(function()
+        H.checkReq(ckReq, "doorstep checkpoint")
+        dadaBlob = ckReq.blob
+        H.log(string.format("[dadaluma] doorstep checkpoint captured " ..
+          "(%d bytes) f%d", #dadaBlob, H.frame))
       end),
-    }, "Dadaluma fought + won (kill-bit; the $40 scripted win) -> $034A clear")
+      attempt(1),
+      attempt(2),
+      attempt(3),
+      H.call(function()
+        if not dadaWon then
+          error(string.format("[dadaluma] battle 69 not won in 3 honest " ..
+            "attempts -- last loss: %s -- the per-attempt numbers above " ..
+            "are the balance finding (#74-style); do not rig this fight",
+            tostring(dadaLost)), 0)
+        end
+      end),
+    })
   end)(),
   H.waitFrames(60),
   H.call(function()
