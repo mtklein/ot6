@@ -52,6 +52,87 @@ What shipped since the last handoff, in one line each:
   on the field ability pages (#53), and the poison-DOT chip measured and
   pinned (#60).
 
+## The honesty program (#75) — the current all-hands effort
+
+**Dated 2026-08-04.** The owner's 2026-08-03 directive supersedes normal
+open-work ordering until done: tests and fixture mints may press buttons and
+read memory, NEVER write emulated game state ("if you are not playing actual
+game states that have been reached through actual game choices, you are just
+wasting time pretending"). The bar is PLAYABILITY — a player's inputs could
+do this, TAS-style margins fine — with balance observations logged as data
+for the post-1.0 balancing era, never treated as blockers. Fault-injection
+mechanism tests survive as a loudly-labeled quarantine (owner ruling). The
+running record is issue #75; the rule itself leads tools/tests/README.md's
+"Writing a test".
+
+**Landed on main (each through a green gate, in landing order):**
+`23367ba` static checker + shrink-only waivers (374 pairs at birth, 360 on
+main now); `eb3c318` honest lib (`H.fightBattle`/`H.fleeBattle`/
+`opts.honest`) + honest roots incl. the first honest Whelk kill; `8c09f35`
+the honest Moogle defense (three-squad stations + boosted Marshal);
+`c7e0e13` the river arc incl. the first honest Ultros and the reusable
+menu-episode fighter (bank-2-BP-and-dump doctrine, retry ladders);
+`470a19b` four save-menu tests off ZMENUSTATE pokes; `3b4269f` three lab
+tests earning their scenarios (suite grew 78→82); `70b76f6` the policy in
+the README; `8c5a079` a 2-byte ROM fix for the black-screen-on-loss bug in
+the Moogle defense that honest play found; `ad1c346` provenance stamp v2 —
+every fixture bound by sha256 to its artifact and its ancestor's stamp,
+`compose.py --check-states` a hard `make test` gate. Main's gate:
+82/82, zero skips, `fixtures: 112/112 fresh (sources, artifact and
+ancestor bindings all verify)`.
+
+**Pushed branches awaiting landing or completion** (all on origin;
+`worktree-agent-<id>` names; commits are checkpoints, integrate by
+cherry-pick + waiver ratchet + full gate):
+- `worktree-agent-aa7dca65c3e05d410` — GREEN, ready: all 11 Sabin gens
+  zero-write (58 commits; waivers 360→347), honest Phantom Train win with
+  real ghost-merchant shopping; held only because its honest `gen_sabin_gau`
+  can't yet complete the Dried-Meat feed, which blocks `gau_joined` →
+  trench → the `s2_`/`t3_` stacks → `kefka_doorstep`, turning
+  battle_gaufight/battle_kefka into skips. Land it with the Gau fix
+  together if possible.
+- `worktree-agent-ade26b73fa59c08a2` — the Gau-feed specialist (based on
+  the Sabin branch). Established so far: the feed mechanism is REAL
+  (battInv slot 17; `AIScript::_370` recruits on meat-onto-GAU with
+  battle switch 13 clear; the old "undrivable" claim is retired); the
+  open question is purely drive timing (no command menu open during
+  GAU-targetable frames in ~15 deterministic attempts — suspect OT6's
+  menu-freeze interacts with his appearance; if a human on OT6 genuinely
+  cannot feed him, that is a real game bug to surface).
+- `worktree-agent-aaa205d820d7f0f0f` — Figaro→Kolts→Vargas conversions
+  (honest Vargas fight in progress).
+- `worktree-agent-afa759a471f8a0c2e` — Locke (honest 3-BP steal banking,
+  TunnelArmr via Runic) + Terra legs, in progress.
+- `worktree-agent-af03cb95cd14dee89` — Narshe battle/Kefka + Zozo +
+  Opera legs, in progress (first honest Kefka; the Zozo bridge encounter
+  may be a product bug — suppressing it by write stays forbidden).
+- `worktree-agent-a53262d5f990e39d5` — removing `H.loadState`'s codex
+  SRAM wipe (the biggest write funnel: rides into ~74 tests), replacing
+  it with pre-boot battery injection; re-mint was in flight.
+
+**Remaining after those:** the v0.6 chain legs (vector→factory→minecart;
+owner's route call: bring EDGAR and SABIN to the Number 128 fight — do not
+attempt it solo-Locke), the eight battery-anchor re-cuts through the real
+Save UI (pad-drive template exists; provenance grandfathers them as
+legacy-v0 until re-cut), the banquet leg, the ~20 remaining rigged lab
+tests (census in #75; the install-character labs convert via the
+battle_slotsboot / menu_blitzpage_sabin twin pattern), and the ENDGAME in
+strict order: delete the kill-bit from the seven `lib/ot6_field.lua` nav
+helpers + `H.clearBattle` once every consumer gen is honest → land the
+compose.py runtime write-gate (strips `emu.write*`/`setState`/cheats/
+`reset` before user code; bumps `GATE_CONTRACT` to `ot6-write-gate/v2`,
+final full re-mint) → burn the waiver list down to only the quarantined
+mechanism tests.
+
+**Traps this program has already paid for (don't rediscover):**
+capture-calm does NOT imply reload-calm — every mint should reload its own
+capture and verify (`gen_sabin_gau`'s pattern, three gens use it);
+a stale seeded fixture reads exactly like a product bug (`--check-states`
+first — the Marshal "impossible geometry" was a corrupt fixture); the
+battle item cursor is a SUM (`$8947` scroll + `$894F` row); Banon's first
+command is Fight, his Health is row 1; concurrent worktree suites can
+SIGTERM each other's Mesen runs (stagger heavy gates).
+
 ## Open work, in the order I would take it
 
 1. **#67 — de-fragilise `battle_trueknight` phase 6a.** This is the top of
