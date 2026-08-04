@@ -482,7 +482,7 @@ local function mintAttempt(n)
         end),
       }, tag .. ": flee the boot battle, ride out the world reload"),
       H.call(function() H.setPad({}) end),
-      H.worldNavTo(214, 149, { maxFrames = 8000, honest = "flee" }),
+      H.worldNavTo(214, 149, { maxFrames = 8000, honest = true }),
       H.waitFrames(30),
     }),
   }, {})
@@ -502,7 +502,7 @@ H.run({ maxFrames = 500000 }, {
     return H.worldMode() end }),
   H.waitUntil(function() return H.worldMode() and H.worldHasControl() end,
     3000, "on the world", 5),
-  H.worldNavTo(220, 115, { maxFrames = 40000, honest = "flee",
+  H.worldNavTo(220, 115, { maxFrames = 40000, honest = true,
     arrive = function() return not H.worldMode() end }),
   settle(157, "Mobliz"),
   H.navTo(26, 22, { maxFrames = 10000, honest = "flee", arrive = function()
@@ -570,7 +570,7 @@ H.run({ maxFrames = 500000 }, {
   H.waitUntil(function()
     return H.worldMode() and H.worldHasControl() and H.worldAligned()
   end, 3000, "world live again", 5),
-  H.worldNavTo(215, 119, { maxFrames = 20000, honest = "flee" }),
+  H.worldNavTo(215, 119, { maxFrames = 20000, honest = true }),
 
   -- the grind, honestly, behind the ladder (see the header)
   (function()
@@ -607,15 +607,15 @@ H.run({ maxFrames = 500000 }, {
   -- park on Crescent Mountain's doorstep (one short of the (214,148)
   -- entrance) and mint; waypoints keep each BFS disc small (the fence
   -- S-curve -- see the route notes in the git history of this file)
-  H.worldNavTo(216, 128, { maxFrames = 20000, honest = "flee" }),
-  H.worldNavTo(218, 140, { maxFrames = 15000, honest = "flee" }),
-  H.worldNavTo(220, 149, { maxFrames = 15000, honest = "flee" }),
-  H.worldNavTo(219, 153, { maxFrames = 8000, honest = "flee" }),
-  H.worldNavTo(217, 155, { maxFrames = 8000, honest = "flee" }),
-  H.worldNavTo(212, 156, { maxFrames = 8000, honest = "flee" }),
-  H.worldNavTo(205, 153, { maxFrames = 8000, honest = "flee" }),
-  H.worldNavTo(207, 151, { maxFrames = 8000, honest = "flee" }),
-  H.worldNavTo(214, 149, { maxFrames = 10000, honest = "flee" }),
+  H.worldNavTo(216, 128, { maxFrames = 20000, honest = true }),
+  H.worldNavTo(218, 140, { maxFrames = 15000, honest = true }),
+  H.worldNavTo(220, 149, { maxFrames = 15000, honest = true }),
+  H.worldNavTo(219, 153, { maxFrames = 8000, honest = true }),
+  H.worldNavTo(217, 155, { maxFrames = 8000, honest = true }),
+  H.worldNavTo(212, 156, { maxFrames = 8000, honest = true }),
+  H.worldNavTo(205, 153, { maxFrames = 8000, honest = true }),
+  H.worldNavTo(207, 151, { maxFrames = 8000, honest = true }),
+  H.worldNavTo(214, 149, { maxFrames = 10000, honest = true }),
   -- The landing step itself can WIN the encounter roll ($E8 bit5 the
   -- instant it wins); require REAL control before minting, fleeing any
   -- landing-roll battle -- the post-battle reload restores this tile.
