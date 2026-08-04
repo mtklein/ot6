@@ -287,7 +287,7 @@ H.run({ maxFrames = 400000 }, {
   H.driveUntil(function()
     return map()==7 and H.hasControl() and H.tileAligned()
   end,12000,{H.call(pulseAdvance)},"ride Opera finale to Blackjack interior"),
-  H.navTo(12,9,{maxFrames=1000}),
+  H.navTo(12,9,{maxFrames=1000,honest=true}),
   H.driveUntil(function() return sw(0x005D)==1 end,6000,{
     H.call(function()
       aPhase=(aPhase+1)%8

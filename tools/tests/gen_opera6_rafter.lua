@@ -171,9 +171,9 @@ H.run({ maxFrames = 250000 }, {
   -- Stand above him at {15,45} and talk; the long 5-minute briefing lands on
   -- map 231 and sets $0110.
   toDoor(100,23,"down",237,"stage -> opera house"),
-  H.navTo(72,30,{maxFrames=12000,arrive=function() return map()==233 end}),
+  H.navTo(72,30,{maxFrames=12000,honest=true,arrive=function() return map()==233 end}),
   H.waitUntil(function() return map()==233 and settled() end,3000,"active theater settled",5),
-  H.navTo(15,45,{maxFrames=12000}),
+  H.navTo(15,45,{maxFrames=12000,honest=true}),
   (function() local n=0 return H.driveUntil(function()
     return sw(0x0110)==1 or H.dialogWaiting()
   end,3000,{H.call(function()
@@ -192,7 +192,7 @@ H.run({ maxFrames = 250000 }, {
   -- LEG 3: stage master, far-right switch, then the newly-opened far-left
   -- framework.  The room landings and stairs are Z-split, so the short raw
   -- presses below are measured joins around otherwise ordinary navTo legs.
-  H.navTo(28,24,{maxFrames=6000,arrive=function() return map()==232 end}),
+  H.navTo(28,24,{maxFrames=6000,honest=true,arrive=function() return map()==232 end}),
   H.waitUntil(function() return map()==232 and settled() end,1000,"right room",3),
   H.driveUntil(function() return H.fieldY()==35 end,300,{H.hold({"up"})},"leave right landing"),
   H.driveUntil(function() return H.fieldY()==34 end,300,{H.hold({"up"})},"right stair 1"),
@@ -207,16 +207,16 @@ H.run({ maxFrames = 250000 }, {
     end)},"reach stage master"),
   H.driveUntil(function() return sw(0x01B4)==1 end,1000,{
     H.call(function() H.setPad({"right","a"}) end)},"talk stage master"),
-  H.navTo(120,28,{maxFrames=1500}),
+  H.navTo(120,28,{maxFrames=1500,honest=true}),
   H.driveUntil(function() return sw(0x0355)==0 end,500,{
     H.call(function() H.setPad({"up","a"}) end)},"operate far-right switch"),
-  H.navTo(114,37,{maxFrames=3000,arrive=function() return map()==231 end}),
+  H.navTo(114,37,{maxFrames=3000,honest=true,arrive=function() return map()==231 end}),
   H.waitUntil(function() return map()==231 and settled() end,1000,"return theater",3),
-  H.navTo(28,27,{maxFrames=500}),
-  H.navTo(4,24,{maxFrames=6000,arrive=function() return map()==232 end}),
+  H.navTo(28,27,{maxFrames=500,honest=true}),
+  H.navTo(4,24,{maxFrames=6000,honest=true,arrive=function() return map()==232 end}),
   H.waitUntil(function() return map()==232 and settled() end,1000,"left room",3),
   H.driveUntil(function() return H.fieldY()==13 end,500,{H.hold({"up"})},"leave left landing"),
-  H.navTo(117,5,{maxFrames=2500}),
+  H.navTo(117,5,{maxFrames=2500,honest=true}),
   -- The five rat gates stay LIVE (see the header): the catwalk is crossed
   -- with navTo's honest mode, and a rat that collides fires battle 25 --
   -- fought by the same taps; a win despawns it and clears its gate.

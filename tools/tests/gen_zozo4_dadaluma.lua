@@ -632,6 +632,31 @@ local function climbBody(n)
     end),
   }, "bridge room climb -> (30,34) exit, attempt " .. n)
 end
+-- Reloading a savestate and replaying identical input replays the
+-- identical outcome -- the emulator is deterministic -- so each ladder
+-- attempt VARIES ITS INPUT: (n-1)*2 extra pace steps between the burn and
+-- the climb.  The battle RNG advances once per step (UpdateBattleRng,
+-- battle.asm:385), so the extra steps reshuffle every subsequent roll
+-- along the ladder at the cost of a whisper of danger.
+local function jitterStep(k)
+  local moves, lx, ly = 0, nil, nil
+  return H.cond(function() return k > 0 end, {
+    H.driveUntil(function() return moves >= k end, 3000, {
+      H.call(function()
+        if H.battleLoadStarted() then
+          H.setPad(H.frame % 8 < 4 and { "a" } or {})   -- fought if rolled
+          return
+        end
+        if not (H.hasControl() and H.tileAligned()) then H.setPad({}); return end
+        local x, y = H.fieldX(), H.fieldY()
+        if lx ~= nil and (x ~= lx or y ~= ly) then moves = moves + 1 end
+        lx, ly = x, y
+        H.setPad({ [y >= 61 and "up" or "down"] = true })
+      end),
+    }, "jitter " .. k .. " steps"),
+    H.call(function() H.setPad({}) end),
+  }, {})
+end
 local function climbAttempt(n)
   local ldReq
   return H.cond(function() return not climbDone end, {
@@ -647,6 +672,7 @@ local function climbAttempt(n)
     }, {}),
     H.call(function() climbFail = nil end),
     burnStep(),
+    jitterStep((n - 1) * 2),
     H.logStep(function()
       return string.format("[bridge2] burned; danger=$%04X -- climbing " ..
         "(attempt %d)", H.readWord(0x1f6e), n)
