@@ -219,6 +219,7 @@ local lost = nil
 local fightTier = 1
 local wipeN = 0
 local fed = false                        -- the feed's confirm was pressed
+local fedDump = false                    -- one-time battle-inv evidence dump
 local feedFrames = {}                    -- target-select evidence rows
 local grind = { fights = 0, appearances = 0 }
 local function gauOn() return H.readByte(0x2f4e) ~= 0 end
@@ -373,12 +374,30 @@ local function grindStep()
   local function button()
     local st = H.readByte(MSTATE)
     local actor = H.readByte(ACTOR)
-    -- while GAU is on stage and the feed is done (or the meat is gone),
-    -- NOBODY acts: a queued Fight can only target him -- attacking an
-    -- appeared GAU drives him off -- and his own script ends the battle.
-    if gauOn() and (fed or not battInvIdx(DRIED_MEAT)) then
+    -- while GAU is on stage and the feed is done (or the meat is gone
+    -- from the FIELD bag), NOBODY acts: a queued Fight can only target
+    -- him -- attacking an appeared GAU drives him off.  The gate is the
+    -- FIELD bag ($1869), not the battle inv: measured, $2686 reads no
+    -- Dried Meat during the appearance window even though the bag holds
+    -- it, so gating on battInvIdx skipped the feed every time.
+    if gauOn() and (fed or invCount(DRIED_MEAT) == 0) then
       plan, planActor = nil, nil
       return nil
+    end
+    if gauOn() and not fed and not fedDump then
+      fedDump = true
+      local inv = {}
+      for i = 0, 15 do
+        local id = H.readByte(BATTINV + i * 5)
+        if id ~= 0xFF then
+          inv[#inv + 1] = string.format("%d:$%02X x%d(f%02X)", i, id,
+            H.readByte(BATTINV + i * 5 + 3), H.readByte(BATTINV + i * 5 + 1))
+        end
+      end
+      H.log(string.format("[gau feed] APPEARANCE menu: st=%02X MENU=%02X " ..
+        "battInv(meat)=%s fieldbag(meat)=%d | %s", st, H.readByte(MENU),
+        tostring(battInvIdx(DRIED_MEAT)), invCount(DRIED_MEAT),
+        table.concat(inv, " ")))
     end
     if plan == nil or planActor ~= actor then
       if st ~= ST_CMD then
@@ -387,7 +406,7 @@ local function grindStep()
         end                     -- in the b68 engine)
         return nil
       end
-      plan = (gauOn() and not fed and battInvIdx(DRIED_MEAT)) and
+      plan = (gauOn() and not fed and invCount(DRIED_MEAT) > 0) and
         feedPlan(actor) or makePlan(actor)
       planActor = actor
       return nil
@@ -413,7 +432,24 @@ local function grindStep()
     end
     if st == ST_ITEM and (plan.kind == "item" or plan.kind == "feed") then
       local want = battInvIdx(plan.item)
-      if want == nil then return { "b" } end
+      if want == nil then
+        if plan.kind == "feed" then
+          -- the meat is in the field bag but not the battle item list:
+          -- a real capability finding, reported with the list dump
+          local inv = {}
+          for i = 0, 15 do
+            local id = H.readByte(BATTINV + i * 5)
+            if id ~= 0xFF then
+              inv[#inv + 1] = string.format("%d:$%02X x%d", i, id,
+                H.readByte(BATTINV + i * 5 + 3))
+            end
+          end
+          error("gau feed: Dried Meat ($FE) is in the field bag but NOT " ..
+            "the battle item list at feed time -- " ..
+            table.concat(inv, " "), 0)
+        end
+        return { "b" }
+      end
       local cur = H.readByte(ITEMSCR + actor) + H.readByte(ITEMROW + actor)
       if cur < want then return { "down" } end
       if cur > want then return { "up" } end
