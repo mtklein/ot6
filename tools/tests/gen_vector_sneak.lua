@@ -60,13 +60,8 @@ local function map() return H.mapId() & 0x1ff end
 local function bright() return emu.getState()["ppu.screenBrightness"] or 0 end
 local function sw(id) return (H.readByte(0x1E80 + (id >> 3)) >> (id & 7)) & 1 end
 local function facing() return H.readByte(0x087f + H.readWord(0x0803)) end
-local function killBitAll()
-  for s = 0, 5 do
-    if H.readByte(0x3aa8 + s * 2) % 2 == 1 then
-      H.writeByte(0x3eec + s * 2, H.readByte(0x3eec + s * 2) | 0x80)
-    end
-  end
-end
+local fighter = H.newFightDriver("vector_sneak",
+  { tactical = true, boost = true })
 local function settled()
   return H.hasControl() and H.tileAligned() and bright() >= 15
      and not H.dialogWaiting() and not H.battleLoadStarted() and not H.worldMode()
@@ -128,8 +123,9 @@ local function talkPick(idx, doneId, maxFrames, what)
       ph = (ph + 1) % 8
       if sw(doneId) == 1 then H.setPad({}); return end
       if H.battleLoadStarted() then
-        killBitAll(); H.setPad(ph < 4 and { "a" } or {}); return
+        fighter.frame(); return
       end
+      fighter.idle()
       local d3, maxc, cur =
         H.readByte(0x00d3), H.readByte(0x056f), H.readByte(0x056e)
       if maxc >= 2 then                        -- the choice list is up
@@ -168,7 +164,7 @@ H.run({ maxFrames = 60000 }, {
   --    rightward; the library lands exactly now, so one navTo does it.
   --    A DOWN press on {45,38} cannot step (his object occupies {45,39})
   --    so it only turns the party -- the standard face-an-NPC idiom.
-  H.navTo(45, 38, { maxFrames = 20000 }),
+  H.navTo(45, 38, { maxFrames = 40000, honest = "tactical" }),
   H.hold({ "down" }), H.waitFrames(8), H.release(), H.waitFrames(20),
   H.call(function()
     H.assertEq(H.fieldX(), 45, "at the sympathizer's doorstep x")
@@ -195,7 +191,7 @@ H.run({ maxFrames = 60000 }, {
   --    onto {43,38} leaves the party facing DOWN, which is the $01B2 the
   --    trigger demands.  A navTo straight to {43,38} would be free to
   --    arrive facing LEFT and the trigger would no-op silently.
-  H.navTo(43, 37, { maxFrames = 15000 }),
+  H.navTo(43, 37, { maxFrames = 30000, honest = "tactical" }),
   H.call(function()
     H.assertEq(H.fieldX(), 43, "above the sneak ledge x")
     H.assertEq(H.fieldY(), 37, "above the sneak ledge y")
@@ -209,8 +205,9 @@ H.run({ maxFrames = 60000 }, {
       H.call(function()
         ph = (ph + 1) % 8
         if H.battleLoadStarted() then
-          killBitAll(); H.setPad(ph < 4 and { "a" } or {}); return
+          fighter.frame(); return
         end
+        fighter.idle()
         if H.dialogWaiting() then
           H.setPad(ph < 4 and { "a" } or {}); return
         end

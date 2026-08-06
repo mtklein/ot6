@@ -287,12 +287,14 @@ local function resolve(v) return type(v) == "function" and v() or v end
 --                  kill-bit -- ZERO state writes on this navigator (issue
 --                  #75).  Opt-in while unconverted generators still lean on
 --                  the kill-bit; costs real ATB rounds per encounter, so
---                  honest legs budget more frames.  Two spellings, the
+--                  honest legs budget more frames.  Three spellings, the
 --                  same contract worldNavTo carries:
 --                  true    auto-fight by edge-tapped A (the taps already
 --                          driving the victory text double as a fighter:
 --                          A opens the command list, A confirms its first
 --                          entry, A takes the default target);
+--                  "tactical"  read the live command table and use Edgar's
+--                          Tools, Sabin's Blitz, and Fight for everyone else;
 --                  "flee"  hold L+R, the engine's own run mechanic.  A
 --                          fled battle is not a WIN, so win-only rolls
 --                          (SHADOW's 1/16 post-battle leave,
@@ -378,6 +380,8 @@ function M.navTo(txIn, tyIn, opts)
   local calm = 0            -- consecutive settled frames on the goal tile
   local battN, dlgN, lostN = 0, 0, 0   -- debounce counters (see below)
   local noPathN, pause = 0, 0          -- no-path retry state
+  local tactical = opts.honest == "tactical"
+      and M.newFightDriver("navTo", { tactical = true, boost = true }) or nil
   local function drop(why)  -- discard the plan, saying why (once, not per frame)
     if plan or pend then
       M.log(string.format("nav: %s at (%d,%d); plan dropped", why,
@@ -414,6 +418,7 @@ function M.navTo(txIn, tyIn, opts)
       battN = M.battleLoadStarted() and battN + 1 or 0
       dlgN  = M.dialogWaiting() and dlgN + 1 or 0
       lostN = M.hasControl() and 0 or lostN + 1
+      if tactical and battN == 0 then tactical.idle() end
       -- 1. battle: clear it, but NEVER the goal formation
       if battN >= 3 then
         drop("battle")
@@ -425,6 +430,7 @@ function M.navTo(txIn, tyIn, opts)
           M.setPad({ l = true, r = true })
           return
         end
+        if tactical then tactical.frame(); return end
         if M.monstersPresent() > 0 and not opts.honest then
           for slot = 0, 5 do
             if M.readByte(0x3aa8 + slot * 2) % 2 == 1 then
@@ -580,6 +586,8 @@ function M.advanceStory(pred, maxFrames, opts)
   for _, w in ipairs(opts.spare or {}) do spareSet[w] = true end
   local aPhase = 0
   local battN, dlgN = 0, 0
+  local tactical = opts.honest == "tactical"
+      and M.newFightDriver("advanceStory", { tactical = true, boost = true }) or nil
   local hb = -600                      -- heartbeat: log immediately, then every 600
   return M.driveUntil(function()
     local done = pred()
@@ -599,6 +607,7 @@ function M.advanceStory(pred, maxFrames, opts)
       end
       battN = M.battleLoadStarted() and battN + 1 or 0
       dlgN  = M.dialogWaiting() and dlgN + 1 or 0
+      if tactical and battN == 0 then tactical.idle() end
       if battN >= 3 then
         if battN == 3 then             -- rising edge: name the fight once
           local w = M.formationWords()
@@ -609,6 +618,7 @@ function M.advanceStory(pred, maxFrames, opts)
           M.setPad(battN > 300 and aPhase < 4 and { "a" } or {})
           return
         end
+        if tactical then tactical.frame(); return end
         if M.monstersPresent() > 0 and not opts.honest then
           for slot = 0, 5 do
             if M.readByte(0x3aa8 + slot * 2) % 2 == 1 then
@@ -798,6 +808,8 @@ end
 --                            character's command list, A confirms its first
 --                            entry, A takes the default target; the same
 --                            taps page the victory text);
+--                  "tactical" = read the live command table and use Edgar's
+--                            Tools, Sabin's Blitz, and Fight for everyone else;
 --                  "flee"  = hold L+R, the engine's own run mechanic.  On a
 --                            fixture chain this is often the RIGHT honest
 --                            ending for world trash: it earns no win, so
@@ -822,6 +834,8 @@ function M.worldNavTo(txIn, tyIn, opts)
   local pend = nil
   local aPhase = 0
   local battN = 0
+  local tactical = opts.honest == "tactical"
+      and M.newFightDriver("worldNavTo", { tactical = true, boost = true }) or nil
   local hb = -600
   local function resolveT(v) return type(v) == "function" and v() or v end
   return M.driveUntil(function()
@@ -844,6 +858,7 @@ function M.worldNavTo(txIn, tyIn, opts)
           plan and tostring(#plan) or "-", idx, nblocked))
       end
       battN = M.battleLoadStarted() and battN + 1 or 0
+      if tactical and battN == 0 then tactical.idle() end
       -- 1. battle: clear it (never a spared formation), then let the
       --    world reload run out before touching the plan again
       if battN >= 3 then
@@ -856,6 +871,7 @@ function M.worldNavTo(txIn, tyIn, opts)
           M.setPad({ l = true, r = true })
           return
         end
+        if tactical then tactical.frame(); return end
         if M.monstersPresent() > 0 and not opts.honest then
           for slot = 0, 5 do
             if M.readByte(0x3aa8 + slot * 2) % 2 == 1 then
