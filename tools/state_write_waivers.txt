@@ -133,7 +133,6 @@ tools/tests/gen_esper_tubes_done.lua	.writeByte(
 tools/tests/gen_gate_cave_save.lua	.writeByte(
 tools/tests/gen_gate_cave_save.lua	.writeWord(
 tools/tests/gen_gate_cave_save.lua	emu.write
-tools/tests/gen_ifrit_doorstep.lua	.writeByte(
 tools/tests/gen_ifrit_magicite.lua	.writeByte(
 tools/tests/gen_minecart_doorstep.lua	.writeByte(
 tools/tests/gen_minecart_platform_anchor.lua	.writeByte(
