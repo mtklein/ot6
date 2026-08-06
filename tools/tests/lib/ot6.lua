@@ -939,10 +939,15 @@ function M.newFightDriver(tag, opts)
   opts = opts or {}
   local MENU, ACTOR, MSTATE = 0x7BCA, 0x62CA, 0x7BC2
   local CMDTBL, CMDROW, BCHID, BP = 0x202E, 0x890F, 0x3ED8, 0x3E9C
-  local CMD_FIGHT, CMD_TOOLS, CMD_BLITZ = 0x00, 0x09, 0x0A
+  local CMD_FIGHT, CMD_ITEM, CMD_TOOLS, CMD_BLITZ = 0x00, 0x01, 0x09, 0x0A
+  local ST_CMD, ST_ITEM, ST_TGT, ST_TOOLS = 0x05, 0x0A, 0x38, 0x30
+  local ITEMSCR, ITEMROW, BATTINV = 0x8947, 0x894F, 0x2686
+  local TGTCHARS, TGTMONS = 0x7B7D, 0x7B7E
+  local TONIC, POTION, FENIX_DOWN = 0xE8, 0xE9, 0xF0
   local F = {}
   local menuStreak, tick, battleTick = 0, 0, 0
   local seq, seqIdx, stall, seqActor = nil, 1, 0, nil
+  local itemPlan, itemActor, held = nil, nil, {}
 
   local function cmdRow(actor, cmd)
     for row = 0, 3 do
@@ -950,6 +955,82 @@ function M.newFightDriver(tag, opts)
         return row
       end
     end
+    return nil
+  end
+
+  local function battInvIdx(id)
+    for i = 0, 251 do
+      if M.readByte(BATTINV + i * 5) == id
+         and M.readByte(BATTINV + i * 5 + 3) > 0 then return i end
+    end
+    return nil
+  end
+
+  local function makeItemPlan(actor)
+    local row = opts.items and cmdRow(actor, CMD_ITEM) or nil
+    if row == nil then return nil end
+    for e = 0, 3 do
+      if M.readWord(0x3C1C + e * 2) > 0 and M.readWord(0x3BF4 + e * 2) == 0
+         and battInvIdx(FENIX_DOWN) then
+        M.log(string.format("[%s] actor=%d revive entity %d with Fenix Down",
+          tag or "fight", actor, e))
+        return { item = FENIX_DOWN, target = e, row = row }
+      end
+    end
+    local target, worst = nil, 101
+    local threshold = opts.healPercent or 60
+    for e = 0, 3 do
+      local hp, maxhp = M.readWord(0x3BF4 + e * 2), M.readWord(0x3C1C + e * 2)
+      if hp > 0 and maxhp > 0 then
+        local pct = hp * 100 // maxhp
+        if pct < threshold and pct < worst then target, worst = e, pct end
+      end
+    end
+    if target ~= nil then
+      local hp, maxhp = M.readWord(0x3BF4 + target * 2),
+                        M.readWord(0x3C1C + target * 2)
+      local item = (maxhp - hp >= 80 and battInvIdx(POTION)) and POTION
+                or battInvIdx(TONIC) and TONIC
+                or battInvIdx(POTION) and POTION or nil
+      if item then
+        M.log(string.format("[%s] actor=%d heal entity %d (%d/%d) with $%02X",
+          tag or "fight", actor, target, hp, maxhp, item))
+        return { item = item, target = target, row = row }
+      end
+    end
+    return nil
+  end
+
+  local function itemButton(actor)
+    local st = M.readByte(MSTATE)
+    if st == ST_CMD then
+      local cur = M.readByte(CMDROW + actor) & 3
+      if cur == itemPlan.row then return { "a" } end
+      return { cur < itemPlan.row and "down" or "up" }
+    end
+    if st == ST_ITEM then
+      local want = battInvIdx(itemPlan.item)
+      if want == nil then itemPlan, itemActor = nil, nil; return { "b" } end
+      local cur = M.readByte(ITEMSCR + actor) + M.readByte(ITEMROW + actor)
+      if cur < want then return { "down" } end
+      if cur > want then return { "up" } end
+      return { "a" }
+    end
+    if st == ST_TGT then
+      local chars, mons = M.readByte(TGTCHARS), M.readByte(TGTMONS)
+      if mons ~= 0 then return { "right" } end
+      local wantMask = 1 << itemPlan.target
+      if chars == wantMask then
+        itemPlan, itemActor = nil, nil
+        return { "a" }
+      end
+      local cur = 0
+      for e = 0, 3 do
+        if chars & (1 << e) ~= 0 then cur = e; break end
+      end
+      return { cur < itemPlan.target and "down" or "up" }
+    end
+    if st == ST_ITEM or st == ST_TOOLS or st == ST_TGT then return { "b" } end
     return nil
   end
 
@@ -980,6 +1061,7 @@ function M.newFightDriver(tag, opts)
   function F.idle()
     menuStreak, tick, battleTick = 0, 0, 0
     seq, seqIdx, stall, seqActor = nil, 1, 0, nil
+    itemPlan, itemActor, held = nil, nil, {}
   end
 
   function F.frame()
@@ -1005,6 +1087,7 @@ function M.newFightDriver(tag, opts)
       -- no interactive menu to steer.
       menuStreak, tick = 0, 0
       seq, seqIdx, stall, seqActor = nil, 1, 0, nil
+      itemPlan, itemActor, held = nil, nil, {}
       M.setPad((M.frame % 8 < 4) and { "a" } or {})
       return
     end
@@ -1014,20 +1097,34 @@ function M.newFightDriver(tag, opts)
     tick = tick + 1
     local ph = tick % 30
     local actor = M.readByte(ACTOR) & 3
-    if seq == nil or seqActor ~= actor then
-      seq, seqIdx, stall, seqActor = makeSeq(actor), 1, 0, actor
-    end
-    local btn
-    if seqIdx <= #seq then btn = seq[seqIdx]
-    elseif stall < 2 then btn = "a"       -- unknown target/confirmation layer
-    elseif stall < 4 then btn = "b"       -- back out of an MP refusal/dead end
-    else
+    if (itemPlan and itemActor ~= actor) or (seq and seqActor ~= actor) then
+      itemPlan, itemActor = nil, nil
       seq, seqIdx, stall, seqActor = nil, 1, 0, nil
-      M.setPad({})
-      return
     end
-    M.setPad(ph < 6 and { [btn] = true } or {})
-    if ph == 29 then
+    if itemPlan == nil and seq == nil then
+      if M.readByte(MSTATE) ~= ST_CMD then M.setPad({}); return end
+      itemPlan, itemActor = makeItemPlan(actor), actor
+      if itemPlan == nil then
+        itemActor = nil
+        seq, seqIdx, stall, seqActor = makeSeq(actor), 1, 0, actor
+      end
+    end
+    if ph == 0 then
+      if itemPlan then
+        held = itemButton(actor) or {}
+      else
+        local btn
+        if seqIdx <= #seq then btn = seq[seqIdx]
+        elseif stall < 2 then btn = "a"   -- unknown confirmation layer
+        elseif stall < 4 then btn = "b"   -- MP refusal/dead end
+        else
+          seq, seqIdx, stall, seqActor = nil, 1, 0, nil
+        end
+        held = btn and { [btn] = true } or {}
+      end
+    end
+    M.setPad(ph < 6 and held or {})
+    if ph == 29 and seq then
       if seqIdx <= #seq then seqIdx = seqIdx + 1 else stall = stall + 1 end
     end
   end

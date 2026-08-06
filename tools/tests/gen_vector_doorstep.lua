@@ -73,7 +73,8 @@ local function sw(id)
 end
 local function map() return H.mapId() & 0x1ff end
 local function bright() return emu.getState()["ppu.screenBrightness"] or 0 end
-local fighter = H.newFightDriver("vector", { tactical = true, boost = true })
+local fighter = H.newFightDriver("vector",
+  { tactical = true, boost = true, items = true, healPercent = 65 })
 
 -- The map name the ENGINE would print for the map it is standing on.
 -- $0520 is map_prop byte 0, copied by LoadMapProp (field/map.asm:143-157);
@@ -292,6 +293,14 @@ H.run({ maxFrames = 160000 }, {
     H.assertEq(sw(0x062B), 1, "$062B SET -- the three gate guards are present")
     H.assertEq(sw(0x063B), 1, "$063B SET -- the Returner sympathizer is present")
     H.assertEq(sw(0x006B), 0, "$006B CLEAR -- the factory escape has not happened")
+    local cur = H.readByte(0x1A6D)
+    for c = 0, 13 do
+      local p = H.readByte(0x1850 + c)
+      if p ~= 0 and (p & 0x07) == cur then
+        H.assertEq(H.readWord(0x1609 + 37 * c) > 0, true,
+          string.format("active character %d is standing at the Vector mint", c))
+      end
+    end
     H.log(string.format("[vector_doorstep] f%d map=%d title=%q (%d,%d)",
       H.frame, map(), mapTitleHere(), H.fieldX(), H.fieldY()))
     H.screenshot("vector_doorstep")
