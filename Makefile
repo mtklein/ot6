@@ -170,6 +170,13 @@ test: rom nomp-rom graph
 	@# reaches the FAIL/xfail/dead-worker branches a green suite never does.
 	sh tools/tests/lib/suite_tally_selftest.sh
 	sh tools/tests/lib/anchor_negatives.sh
+	@# Fixture provenance is a GATE (issue #75 step 5), not a warning: every
+	@# stamped fixture must hash back to the sources, the artifact bytes, and
+	@# the ancestor stamp it claims -- transitively, chain by chain.  A stale
+	@# or unbound fixture fails HERE, with the full list and the smallest
+	@# sufficient re-mint command, instead of warning from inside a composed
+	@# file nobody reads until some downstream test goes red for it.
+	python3 tools/tests/lib/compose.py --check-states
 	@rm -f $(STAMP)
 	tools/tests/suite.sh
 	@echo "-- mpcost A/B: the OFF half (free — the negative control) on the nomp baseline --"

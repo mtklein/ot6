@@ -465,6 +465,7 @@ STATES = [
     #     OT6_SRAM_ANCHOR=tools/tests/anchors/terra-returned-v1 \
     #     OT6_CAPTURE_SRM=tools/tests/anchors/narshe-mission-v1/narshe-mission.sram \
     #     tools/tests/run.sh tools/tests/gen_narshe_mission.lua
+    #     python3 tools/tests/lib/sram_anchor.py seal tools/tests/anchors/narshe-mission-v1
     # This graph edge runs the same generator for its savestate and its
     # contract verdict; run.sh only captures a battery when OT6_CAPTURE_SRM
     # is set, so a mint can never quietly rewrite a tracked anchor.
@@ -484,6 +485,7 @@ STATES = [
     #     OT6_SRAM_ANCHOR=tools/tests/anchors/narshe-mission-v1 \
     #     OT6_CAPTURE_SRM=tools/tests/anchors/gate-cave-save-v1/gate-cave-save.sram \
     #     tools/tests/run.sh tools/tests/gen_gate_cave_save.lua
+    #     python3 tools/tests/lib/sram_anchor.py seal tools/tests/anchors/gate-cave-save-v1
     S("gate_cave_save", gen="gen_gate_cave_save", anchor="narshe-mission-v1"),
     # ---- boundary H -> boundary I ------------------------------------------
     # Leg H->I, whole in one generator: cold-boot the gate-cave-save-v1
@@ -500,6 +502,7 @@ STATES = [
     #     OT6_SRAM_ANCHOR=tools/tests/anchors/gate-cave-save-v1 \
     #     OT6_CAPTURE_SRM=tools/tests/anchors/vector-crash-v1/vector-crash.sram \
     #     tools/tests/run.sh tools/tests/gen_vector_crash.lua
+    #     python3 tools/tests/lib/sram_anchor.py seal tools/tests/anchors/vector-crash-v1
     S("vector_crash", gen="gen_vector_crash", anchor="gate-cave-save-v1"),
     # ---- boundary I -> boundary J ------------------------------------------
     # Leg I->J, whole in one generator (banquet-decode.md is the script;
@@ -519,6 +522,7 @@ STATES = [
     #     OT6_SRAM_ANCHOR=tools/tests/anchors/vector-crash-v1 \
     #     OT6_CAPTURE_SRM=tools/tests/anchors/banquet-done-v1/banquet-done.sram \
     #     tools/tests/run.sh tools/tests/gen_banquet_done.lua
+    #     python3 tools/tests/lib/sram_anchor.py seal tools/tests/anchors/banquet-done-v1
     # NOT YET IN THE GRAPH (dispatcher, 2026-07-28): gen_banquet_done is
     # written but has never driven the >=90 circuit end to end, and anchor
     # banquet-done-v1 has never been cut -- the window-feasibility question

@@ -62,14 +62,28 @@ the lib is stable (it is the rare file to change) while generators churn
 constantly.  `lib/frontier_ninja_selftest.sh` proves those semantics
 against real ninja on a mock tree in seconds, no emulator.
 `lib/frontier_stamp.sh` survives as the PROVENANCE half: each mint edge
-stamps `build/states/<state>.stamp` with
-`sha256(generator ++ ot6.lua ++ ot6_field.lua ++ ot6_contract.lua)
-<generator> [extras]`, and `lib/compose.py` re-derives it at CONSUME time,
-printing a loud `[ot6]` line if a fixture a test is about to boot has
-drifted from its generator+lib (the gap where `make test` picks up a
-worktree-seeded frontier fixture without ever running a mint).  Issue #2:
+stamps `build/states/<state>.stamp` with three claims (issue #75 step 5) --
+
+    sha256(GATE_CONTRACT ++ generator ++ ot6.lua ++ ot6_field.lua ++
+           ot6_contract.lua ++ extras) <generator> [extras]
+    artifact <sha256 of build/states/<state>.mss>
+    ancestor <path> <sha256 of that file>     (prev= edges bind their
+                                               predecessor's stamp; anchor=
+                                               edges their manifest.json;
+                                               power-on roots have no line)
+
+-- and `lib/compose.py` re-verifies ALL of them at CONSUME time, printing a
+loud `[ot6]` line if a fixture a test is about to boot has drifted from its
+generator+lib, had its `.mss` replaced without a mint, or sits on a chain
+whose ancestor stamp moved (the artifact and ancestor bindings make the
+whole chain verifiable transitively from files on disk).  `GATE_CONTRACT`
+(`ot6-provenance/v1`, one constant in `frontier_stamp.sh`) is a fixed sig
+input: bumping it deliberately stales every stamp and forces a full
+re-mint under new rules.  `compose.py --check-states` asks the same
+question of the whole tree and is a hard `make test` gate.  Issue #2:
 before any of this, freshness keyed on the ROM alone, so a generator or
-lib edit silently kept a stale fixture.
+lib edit silently kept a stale fixture; before #75, nothing bound the
+stamp to the bytes beside it.
 
 Some suite tests are FRONTIER-GATED: each declares
 `-- @suite frontier=<fixture>` and asserts on a state only `make frontier`
@@ -455,6 +469,37 @@ running any test against it instead of `build/ot6.sfc` gives an instant
 the two images.
 
 ## Writing a test
+
+**THE HONESTY RULE (issue #75, owner directive 2026-08-03).**  A test or
+generator may inject controller input and READ emulated memory to assert
+things.  It may NEVER WRITE emulated game state -- no HP/MP pins, no
+kill-bits, no boss clamps, no cursor or menu-state pokes, no event-flag or
+RNG writes.  When we test "can a person play this game," the script gets
+only the capabilities a person has: buttons and eyes.  Determinism comes
+from fixed, honestly-minted fixtures plus frame-exact input (the TAS way),
+never from rigging.  Fixture honesty is transitive: a savestate or anchor
+minted by a poking script is contaminated, and so is everything derived
+from it.
+
+Enforcement is mechanical, not honor-system: `tools/check_state_writes.py`
+scans every `.lua` here and fails `make test` on any write token not in
+`tools/state_write_waivers.txt` -- a burn-down list of pre-directive sins
+that may only SHRINK (a stale waiver is itself a failure; prune it in the
+same change that earns it).  Do not add waivers to new code.  Ever.
+
+The one sanctioned exception: **quarantined mechanism tests** -- fault
+injection whose inputs the game can only produce rarely or never on cue
+(deliberate VRAM corruption for the font-restore path, the 1/65536
+zero-checksum save, legacy-format codex migration).  These are unit tests
+of mechanisms, not claims about gameplay; they keep their waivers, say so
+loudly in their header comment, and may never produce fixtures.
+
+House patterns for playing honestly: `gen_arvis.lua` (real boss kill),
+`gen_moogle.lua` (multi-party set-piece, boosted fights, retry ladder),
+`gen_scenario.lua`/`gen_rapids.lua` (menu-episode fighter, bank-and-dump
+boost doctrine), `gen_sabin_gau.lua` (self-consuming capture verification:
+reload your own capture and verify calm before publishing -- capture-calm
+does not imply reload-calm).
 
 A test is a LIST OF STEPS handed to `H.run`; a `startFrame` callback consumes
 them, one frame at a time (zero-frame steps like `H.call` chain within a

@@ -116,40 +116,99 @@ def mint_sig(gen, root, extras=()):
 
 
 def stamp_check(name, root):
-    """Consume-time half of the issue #2 freshness gate.
+    """Consume-time half of the issue #2 freshness gate, and of the issue #75
+    provenance bindings.
 
-    The mint-time gate (Makefile + lib/frontier_stamp.sh) re-mints a frontier
-    fixture when its generator or either lib half changes -- but only when
-    `make frontier` runs.  A fixture can still reach a test WITHOUT that: the
-    suite adds a frontier-gated test the moment its .mss exists, and
-    `make test` never builds the frontier, so a state that worktree-setup
-    seeded from another tree (and a local generator edit has since drifted)
-    would be embedded and asserted on silently.  The mint records
-    `<sha256(generator++lib)> <generator>` in build/states/<base>.stamp; here we
-    recompute it for the fixture we are about to embed and, on a mismatch,
-    return a loud line the composed file prints through the [ot6] channel.
+    The mint-time gate (the ninja graph + lib/frontier_stamp.sh) re-mints a
+    frontier fixture when its generator or any lib half changes -- but only
+    when `make frontier` runs.  A fixture can still reach a test WITHOUT
+    that: the suite adds a frontier-gated test the moment its .mss exists,
+    and `make test` never builds the frontier, so a state that
+    worktree-setup seeded from another tree (and a local generator edit has
+    since drifted) would be embedded and asserted on silently.
 
-    Returns None when there is nothing to check -- no stamp (the suite's own
-    states, the stack seeds, or a fixture minted before this gate existed) or a
-    generator that has since been removed -- so it never invents a warning.
+    The stamp carries three claims (frontier_stamp.sh's header is the format
+    authority), and each is re-verified here, in escalating specificity:
+
+      1. `<sig> <gen> [extras]` -- the SOURCES: recompute the sig via the
+         one authority and compare.  A mismatch is the classic issue-#2
+         stale fixture.
+      2. `artifact <sha256>` -- the OUTPUT: hash the .mss beside the stamp.
+         A mismatch means the artifact was replaced without a mint -- the
+         hand-crafted-fixture hole issue #75 exists to close.  A stamp with
+         no artifact line predates the provenance format and is reported
+         unbound rather than trusted.
+      3. `ancestor <path> <sha256>` -- the CHAIN: hash the named ancestor
+         stamp (or anchor manifest) as it sits on disk.  Every stamp
+         vouching for its own artifact plus naming its ancestor's stamp
+         hash makes the whole chain verifiable transitively, one local
+         check at a time.
+
+    Returns None when there is nothing to check -- no stamp at all (the
+    suite's own states), or a generator that has since been removed -- so it
+    never invents a warning; otherwise the loud line the composed file
+    prints through the [ot6] channel (and `--check-states` fails on).
     """
     base = name[:-len(".mss.lua")] if name.endswith(".mss.lua") else name
     stamp = root / "build" / "states" / (base + ".stamp")
     if not stamp.exists():
         return None
-    parts = stamp.read_text().split()
-    if len(parts) < 2:
+    lines = stamp.read_text().splitlines()
+    head = lines[0].split() if lines else []
+    if len(head) < 2:
         return None
-    recorded, gen, *extras = parts
+    recorded, gen, *extras = head
     gen_lua = root / "tools" / "tests" / (gen + ".lua")
     if not gen_lua.exists():
         return None
     cur = mint_sig(gen, root, extras)
-    if cur == recorded[:64]:
-        return None
-    return (f"fixture {base} is STALE -- minted from {gen}+lib "
-            f"sha {recorded[:12]}, current script hashes {cur[:12]}; "
-            f"re-run `make frontier` to refresh it (issue #2)")
+    if cur != recorded[:64]:
+        return (f"fixture {base} is STALE -- minted from {gen}+lib "
+                f"sha {recorded[:12]}, current script hashes {cur[:12]}; "
+                f"re-run `make frontier` to refresh it (issue #2)")
+
+    fields = {}
+    for line in lines[1:]:
+        parts = line.split()
+        if parts:
+            fields[parts[0]] = parts[1:]
+
+    art = fields.get("artifact")
+    if not art:
+        return (f"fixture {base} is UNBOUND -- its stamp predates the "
+                f"provenance format (no artifact line) so nothing ties the "
+                f".mss bytes to the mint that claims them; re-run "
+                f"`make frontier` to re-mint it (issue #75)")
+    mss = root / "build" / "states" / (base + ".mss")
+    if not mss.exists():
+        return (f"fixture {base} is UNBOUND -- its stamp exists but "
+                f"build/states/{base}.mss does not; re-run `make frontier` "
+                f"to re-mint it (issue #75)")
+    actual = hashlib.sha256(mss.read_bytes()).hexdigest()
+    if actual != art[0]:
+        return (f"fixture {base} is UNBOUND -- build/states/{base}.mss "
+                f"(sha {actual[:12]}) is not the artifact its stamp vouches "
+                f"for (sha {art[0][:12]}): the state was replaced without a "
+                f"mint; re-run `make frontier` to re-mint it (issue #75)")
+
+    anc = fields.get("ancestor")
+    if anc:
+        if len(anc) < 2:
+            return (f"fixture {base} is UNBOUND -- its stamp's ancestor "
+                    f"line is malformed; re-run `make frontier` (issue #75)")
+        path, digest_ = anc[0], anc[1]
+        anc_file = root / path
+        if not anc_file.exists():
+            return (f"fixture {base} is UNBOUND -- its ancestor {path} is "
+                    f"gone, so the chain it was minted from cannot be "
+                    f"verified; re-run `make frontier` (issue #75)")
+        anc_actual = hashlib.sha256(anc_file.read_bytes()).hexdigest()
+        if anc_actual != digest_:
+            return (f"fixture {base} is STALE -- its ancestor {path} "
+                    f"(sha {anc_actual[:12]}) is not the one it was minted "
+                    f"from (sha {digest_[:12]}); the chain below it moved; "
+                    f"re-run `make frontier` to re-mint it (issue #75)")
+    return None
 
 
 def check_states(root):
@@ -182,10 +241,11 @@ def check_states(root):
             stale.append((s.stem, msg))
     if not stale:
         print(f"fixtures: {len(stamps)}/{len(stamps)} fresh "
-              f"(generator + all three lib halves match every stamp)")
+              f"(sources, artifact and ancestor bindings all verify)")
         return 0
-    print(f"fixtures: {len(stale)} of {len(stamps)} are STALE -- minted from "
-          f"sources this tree no longer has.")
+    print(f"fixtures: {len(stale)} of {len(stamps)} are STALE or UNBOUND -- "
+          f"minted from sources this tree no longer has, or carrying bytes "
+          f"their stamps do not vouch for.")
 
     # WHICH shared input moved, when it is a shared input.  ninja keeps a
     # byte-copy of every mint input under build/ninja/src (the `latch` edges
@@ -700,6 +760,70 @@ def selftest() -> int:
     #    "not in ff6-en.dbg" message and send the reader after a rebuild.
     check("lib/ot6.lua M.sym consults OT6_SYMS_AMBIG",
           "OT6_SYMS_AMBIG" in LIB.read_text(), True)
+
+    # -- stamp_check: the issue-#75 provenance bindings, against the REAL
+    #    stamp gate (frontier_stamp.sh, pointed at a mock tree via OT6_ROOT
+    #    exactly the way mint_sig points it).  The bug class is a fixture
+    #    that LOOKS minted -- stamp present, sig fresh -- while the bytes
+    #    beside it were never produced by that mint, so each case pins the
+    #    binding that catches the forgery, not just "a message appeared".
+    with tempfile.TemporaryDirectory() as tmp:
+        root = Path(tmp)
+        (root / "tools" / "tests" / "lib").mkdir(parents=True)
+        st = root / "build" / "states"
+        st.mkdir(parents=True)
+        (root / "tools" / "tests" / "gen_fake.lua").write_text("gen v1\n")
+        for h in ("ot6.lua", "ot6_field.lua", "ot6_contract.lua"):
+            (root / "tools" / "tests" / "lib" / h).write_text(h + " v1\n")
+        env = {**os.environ, "OT6_ROOT": str(root)}
+
+        def gate(*args):
+            return subprocess.run(
+                ["sh", str(FRONTIER_STAMP), *args], env=env,
+                capture_output=True, text=True, check=True).stdout
+
+        def has(label, msg, needle):
+            check(label, needle in (msg or ""), True)
+
+        (st / "fake.mss").write_bytes(b"minted bytes v1")
+        gate("write", "fake", "gen_fake", "-")
+        check("a fresh stamp verifies clean (both name forms)",
+              (stamp_check("fake", root), stamp_check("fake.mss.lua", root)),
+              (None, None))
+        # THE HAND-CRAFTED FIXTURE: same stamp, replaced bytes.
+        (st / "fake.mss").write_bytes(b"HAND-CRAFTED bytes")
+        has("a tampered .mss is UNBOUND, naming the artifact mismatch",
+            stamp_check("fake", root), "was replaced without a mint")
+        (st / "fake.mss").write_bytes(b"minted bytes v1")
+        check("restoring the minted bytes restores the verdict",
+              stamp_check("fake", root), None)
+        # THE CHAIN: a child bound to its ancestor's stamp file.
+        (st / "child.mss").write_bytes(b"child bytes v1")
+        gate("write", "child", "gen_fake", "build/states/fake.stamp")
+        check("a chained stamp verifies clean", stamp_check("child", root),
+              None)
+        kept = (st / "fake.stamp").read_bytes()
+        (st / "fake.stamp").write_bytes(kept + b"tampered\n")
+        has("a tampered ancestor stamp fails the CHILD",
+            stamp_check("child", root), "is not the one it was minted from")
+        (st / "fake.stamp").write_bytes(kept)
+        check("restoring the ancestor stamp restores the child",
+              stamp_check("child", root), None)
+        (st / "fake.stamp").unlink()
+        has("a missing ancestor stamp fails the child",
+            stamp_check("child", root), "is gone")
+        (st / "fake.stamp").write_bytes(kept)
+        # PRE-PROVENANCE STAMPS: a bare sig line (the old format) must read
+        # as unbound even though its sig is current -- nothing ties the
+        # bytes to the mint, which is the #75 hole itself.
+        (st / "old.mss").write_bytes(b"who knows")
+        (st / "old.stamp").write_text(gate("sig", "gen_fake"))
+        has("a sig-only (pre-provenance) stamp is UNBOUND",
+            stamp_check("old", root), "predates the provenance format")
+        # A stamp whose artifact vanished has nothing to verify against.
+        (st / "child.mss").unlink()
+        has("a stamp whose .mss is gone is UNBOUND",
+            stamp_check("child", root), "child.mss does not")
 
     print("selftest: " + ("ok" if ok else "FAILED"))
     return 0 if ok else 1
