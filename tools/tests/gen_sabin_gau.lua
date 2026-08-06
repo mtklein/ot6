@@ -93,7 +93,8 @@ end
 -- battle-menu model (battle_vargas / gen_sabin_train's map; all READS)
 local MENU, ACTOR, MSTATE = 0x7BCA, 0x62CA, 0x7BC2
 local ST_CMD, ST_ITEM, ST_TGT, ST_TOOLS = 0x05, 0x0A, 0x38, 0x30
-local CMD_ITEM, CMD_SWDTECH, CMD_BLITZ = 0x01, 0x07, 0x0A
+local CMD_FIGHT, CMD_ITEM, CMD_SWDTECH, CMD_BLITZ, CMD_LEAP =
+  0x00, 0x01, 0x07, 0x0A, 0x11
 local RETORT, PUMMEL, SUPLEX = 0x56, 0x5D, 0x5F
 local CMDTBL, CMDROW, ITEMLIST = 0x202E, 0x890F, 0x4005
 -- item cursor = scroll ($8947) + row-on-screen ($894F), get_item_poi's
@@ -346,10 +347,11 @@ local function worldWalkFight(tx, ty, budget, what, arriveOffWorld)
   local tick, dirFlip, hb = 0, false, -1800
   local plan, planActor, btn, mstreak = nil, nil, nil, 0
   local calm = 0
-  -- Snapshot this on the world.  The field party byte is repurposed while a
-  -- battle is live and cannot reliably answer whether Gau is the third entity.
-  local partyEntities = inParty(11) and 3 or 2
   local function makePlan(actor)
+    -- `worldWalkFight()` episodes are constructed before H.run starts, so
+    -- resolve this at execution time.  The field party byte is repurposed in
+    -- battle; the observed completed feed is the durable third-member fact.
+    local partyEntities = fed and 3 or 2
     local row = cmdRowOf(actor, CMD_ITEM)
     if row then
       for e = 0, partyEntities - 1 do
@@ -363,7 +365,8 @@ local function worldWalkFight(tx, ty, budget, what, arriveOffWorld)
       for e = 0, partyEntities - 1 do
         if pHP(e) > 0 and pMaxHP(e) > 0 then
           local frac = pHP(e) * 10 // pMaxHP(e)
-          if frac < worst and frac < 5 then target, worst = e, frac end
+          local healBelow = fed and 7 or 5
+          if frac < worst and frac < healBelow then target, worst = e, frac end
         end
       end
       if target then
@@ -377,6 +380,22 @@ local function worldWalkFight(tx, ty, budget, what, arriveOffWorld)
           return { kind = "item", item = item, target = target, row = row }
         end
       end
+    end
+    -- Gau's shared row is terrain-dependent: LEAP on the Veldt, FIGHT off it.
+    -- Read the built list.  Never select Leap on this fixture-mint route (it
+    -- deliberately removes Gau); switch to another ready actor instead.  If
+    -- this same driver reaches an off-Veldt fight, use the real Fight row.
+    if fed and actor == 2 then
+      local row0 = H.readByte(CMDTBL + actor * 12)
+      if row0 == CMD_FIGHT then return { kind = "fight", boostLeft = 0 } end
+      if row0 == CMD_LEAP then return { kind = "switch" } end
+      return { kind = "switch" }
+    end
+    local blitzRow = cmdRowOf(actor, CMD_BLITZ)
+    if fed and actor == 0 and pMP(actor) >= 4 and blitzRow then
+      return { kind = "blitz",
+               skill = pMP(actor) >= 13 and SUPLEX or PUMMEL,
+               row = blitzRow }
     end
     local bp = H.readByte(BP + actor * 2)
     local boost = bp >= 1 and math.min(bp, 3) or 0
@@ -396,6 +415,7 @@ local function worldWalkFight(tx, ty, budget, what, arriveOffWorld)
       return nil
     end
     if st == ST_CMD then
+      if plan.kind == "switch" then return { "x" } end
       if plan.kind == "fight" then
         if plan.boostLeft > 0 then
           plan.boostLeft = plan.boostLeft - 1
@@ -435,6 +455,21 @@ local function worldWalkFight(tx, ty, budget, what, arriveOffWorld)
       plan, planActor = nil, nil
       return { "a" }                       -- Fight: default enemy
     end
+    if st == ST_TOOLS and plan.kind == "blitz" then
+      local want
+      for i = 0, 7 do
+        if H.readByte(ITEMLIST + i * 3) == plan.skill then want = i end
+      end
+      if want == nil then
+        plan, planActor = nil, nil
+        return { "b" }
+      end
+      local wc, wr = want % 2, want // 2
+      local cc, cr = H.readByte(BLCOL + actor), H.readByte(BLROW + actor)
+      if cc ~= wc then return { wc > cc and "right" or "left" } end
+      if cr ~= wr then return { wr > cr and "down" or "up" } end
+      return { "a" }
+    end
     if st == ST_TOOLS then return { "b" } end
     return nil
   end
@@ -453,6 +488,7 @@ local function worldWalkFight(tx, ty, budget, what, arriveOffWorld)
           tostring(H.battleLoadStarted()), partyLine()))
       end
       if H.battleLoadStarted() then
+        local partyEntities = fed and 3 or 2
         local wiped = true
         for e = 0, partyEntities - 1 do
           if pMaxHP(e) > 0 and pHP(e) > 0 then wiped = false end
@@ -961,7 +997,7 @@ H.run({ maxFrames = 500000 }, {
     return invSlot(DRIED_MEAT) ~= nil and mstateMenu() == 0x26
   end, "bought", 2400),
   -- the grind's medicine: Tonics from row 1, bought the verified-loop way
-  buyItem(TONIC, 1, function() return 45 - invCount(TONIC) end, "TONIC to 45"),
+  buyItem(TONIC, 1, function() return 99 - invCount(TONIC) end, "TONIC to 99"),
   tapUntil("b", inState(0x25), "options again"),
   tapUntil("b", function() return H.hasControl() end, "shop closed", 2400),
   H.call(function()
