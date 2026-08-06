@@ -28,13 +28,6 @@ local H = dofile("tools/tests/lib/ot6.lua")
 local function map() return H.mapId() & 0x1ff end
 local function bright() return emu.getState()["ppu.screenBrightness"] or 0 end
 local function sw(id) return (H.readByte(0x1E80 + (id >> 3)) >> (id & 7)) & 1 end
-local function killBitAll()
-  for s = 0, 5 do
-    if H.readByte(0x3aa8 + s * 2) % 2 == 1 then
-      H.writeByte(0x3eec + s * 2, H.readByte(0x3eec + s * 2) | 0x80)
-    end
-  end
-end
 local function settled()
   return H.hasControl() and H.tileAligned() and bright() >= 15
      and not H.dialogWaiting() and not H.battleLoadStarted() and not H.worldMode()
@@ -102,7 +95,7 @@ local function tapInto(dir, pred, maxFrames, what)
           H.readByte(0x087f + H.readWord(0x0803))))
       end
       if H.battleLoadStarted() then
-        killBitAll(); H.setPad(ph < 4 and { "a" } or {}); phase = 0; return
+        H.setPad({ l = true, r = true }); phase = 0; return
       end
       if H.dialogWaiting() then
         H.setPad(ph < 4 and { "a" } or {}); phase = 0; return
@@ -195,9 +188,9 @@ H.run({ maxFrames = 60000 }, {
   end),
 
   -- 2. across to {22,52} and one tapped DOWN onto {22,53} -> map 263
-  H.navTo(22, 52, { maxFrames = 20000,
+  H.navTo(22, 52, { maxFrames = 40000, honest = "flee",
     arrive = function() return map() == 263 end }),
-  H.navTo(22, 52, { maxFrames = 9000 }),   -- above the 263 transition
+  H.navTo(22, 52, { maxFrames = 18000, honest = "flee" }), -- transition
   tapInto("down", function() return map() == 263 end, 12000,
     "DOWN onto {22,53} -> the scripted transition to map 263"),
   H.waitUntil(function() return map() == 263 and settled() end,

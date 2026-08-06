@@ -73,8 +73,6 @@ local function sw(id)
 end
 local function map() return H.mapId() & 0x1ff end
 local function bright() return emu.getState()["ppu.screenBrightness"] or 0 end
-local fighter = H.newFightDriver("vector",
-  { tactical = true, boost = true, items = true, healPercent = 65 })
 
 -- The map name the ENGINE would print for the map it is standing on.
 -- $0520 is map_prop byte 0, copied by LoadMapProp (field/map.asm:143-157);
@@ -101,8 +99,8 @@ local function mapTitleHere()
 end
 
 -- Robust world walk to (tx,ty): re-plan a worldBfs each time the plan runs
--- out, press the next step, and fight any encounter through the live command
--- rows (Tools / Blitz / Fight).  No edge is ever
+-- out, press the next step, and flee any random encounter with the game's
+-- L+R run mechanic.  No edge is ever
 -- condemned, so a battle-restored tile is simply retried until a step
 -- lands.  Arrives at (tx,ty) or when the party leaves the world map.
 local function worldGrind(tx, ty, what)
@@ -113,9 +111,8 @@ local function worldGrind(tx, ty, what)
   end, 60000, {
     H.call(function()
       if H.battleLoadStarted() then
-        plan = nil; fighter.frame(); return
+        plan = nil; H.setPad({ l = true, r = true }); return
       end
-      fighter.idle()
       if not H.worldMode() then H.setPad({}); return end
       if not H.worldHasControl() then plan = nil; H.setPad({}); return end
       if not H.worldAligned() then return end
@@ -197,9 +194,8 @@ H.run({ maxFrames = 160000 }, {
     return H.driveUntil(function() return H.worldMode() end, 8000, {
       H.call(function() hb = hb + 1
         if H.battleLoadStarted() then
-          fighter.frame(); return
+          H.setPad({ l = true, r = true }); return
         end
-        fighter.idle()
         if H.dialogWaiting() then
           H.setPad(hb % 8 < 4 and { "a" } or {}); return
         end
@@ -268,9 +264,8 @@ H.run({ maxFrames = 160000 }, {
       6000, {
       H.call(function() hb = hb + 1
         if H.battleLoadStarted() then
-          fighter.frame(); return
+          H.setPad({ l = true, r = true }); return
         end
-        fighter.idle()
         H.setPad({ left = true })
       end) }, "hold LEFT onto (121,187) -> the Vector trigger") end)(),
   H.waitUntil(function()

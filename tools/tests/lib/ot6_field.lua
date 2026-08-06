@@ -382,7 +382,7 @@ function M.navTo(txIn, tyIn, opts)
   local noPathN, pause = 0, 0          -- no-path retry state
   local tactical = opts.honest == "tactical"
       and M.newFightDriver("navTo",
-        { tactical = true, boost = true, items = true, healPercent = 65 }) or nil
+        { tactical = true, boost = true, items = true, healPercent = 35 }) or nil
   local function drop(why)  -- discard the plan, saying why (once, not per frame)
     if plan or pend then
       M.log(string.format("nav: %s at (%d,%d); plan dropped", why,
@@ -589,7 +589,7 @@ function M.advanceStory(pred, maxFrames, opts)
   local battN, dlgN = 0, 0
   local tactical = opts.honest == "tactical"
       and M.newFightDriver("advanceStory",
-        { tactical = true, boost = true, items = true, healPercent = 65 }) or nil
+        { tactical = true, boost = true, items = true, healPercent = 35 }) or nil
   local hb = -600                      -- heartbeat: log immediately, then every 600
   return M.driveUntil(function()
     local done = pred()
@@ -838,7 +838,7 @@ function M.worldNavTo(txIn, tyIn, opts)
   local battN = 0
   local tactical = opts.honest == "tactical"
       and M.newFightDriver("worldNavTo",
-        { tactical = true, boost = true, items = true, healPercent = 65 }) or nil
+        { tactical = true, boost = true, items = true, healPercent = 35 }) or nil
   local hb = -600
   local function resolveT(v) return type(v) == "function" and v() or v end
   return M.driveUntil(function()

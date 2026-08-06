@@ -938,16 +938,18 @@ end
 function M.newFightDriver(tag, opts)
   opts = opts or {}
   local MENU, ACTOR, MSTATE = 0x7BCA, 0x62CA, 0x7BC2
-  local CMDTBL, CMDROW, BCHID, BP = 0x202E, 0x890F, 0x3ED8, 0x3E9C
+  local CMDTBL, CMDROW, BCHID, BP, CURMP =
+    0x202E, 0x890F, 0x3ED8, 0x3E9C, 0x3C08
   local CMD_FIGHT, CMD_ITEM, CMD_TOOLS, CMD_BLITZ = 0x00, 0x01, 0x09, 0x0A
   local ST_CMD, ST_ITEM, ST_TGT, ST_TOOLS = 0x05, 0x0A, 0x38, 0x30
-  local ITEMSCR, ITEMROW, BATTINV = 0x8947, 0x894F, 0x2686
+  local ITEMSCR, ITEMROW, BATTINV, ITEMLIST = 0x8947, 0x894F, 0x2686, 0x4005
+  local BLCOL, BLROW = 0x8963, 0x8967
   local TGTCHARS, TGTMONS = 0x7B7D, 0x7B7E
   local TONIC, POTION, FENIX_DOWN = 0xE8, 0xE9, 0xF0
+  local AUTOCROSSBOW, PUMMEL = 0xAA, 0x5D
   local F = {}
   local menuStreak, tick, battleTick = 0, 0, 0
-  local seq, seqIdx, stall, seqActor = nil, 1, 0, nil
-  local itemPlan, itemActor, held = nil, nil, {}
+  local plan, planActor, held = nil, nil, {}
 
   local function cmdRow(actor, cmd)
     for row = 0, 3 do
@@ -966,102 +968,121 @@ function M.newFightDriver(tag, opts)
     return nil
   end
 
-  local function makeItemPlan(actor)
+  local function makePlan(actor)
     local row = opts.items and cmdRow(actor, CMD_ITEM) or nil
-    if row == nil then return nil end
-    for e = 0, 3 do
-      if M.readWord(0x3C1C + e * 2) > 0 and M.readWord(0x3BF4 + e * 2) == 0
-         and battInvIdx(FENIX_DOWN) then
-        M.log(string.format("[%s] actor=%d revive entity %d with Fenix Down",
-          tag or "fight", actor, e))
-        return { item = FENIX_DOWN, target = e, row = row }
+    if row ~= nil then
+      for e = 0, 3 do
+        if M.readWord(0x3C1C + e * 2) > 0 and M.readWord(0x3BF4 + e * 2) == 0
+           and battInvIdx(FENIX_DOWN) then
+          M.log(string.format("[%s] actor=%d revive entity %d with Fenix Down",
+            tag or "fight", actor, e))
+          return { kind = "item", item = FENIX_DOWN, target = e, row = row }
+        end
+      end
+      local target, worst = nil, 101
+      local threshold = opts.healPercent or 60
+      for e = 0, 3 do
+        local hp, maxhp = M.readWord(0x3BF4 + e * 2), M.readWord(0x3C1C + e * 2)
+        if hp > 0 and maxhp > 0 then
+          local pct = hp * 100 // maxhp
+          if pct < threshold and pct < worst then target, worst = e, pct end
+        end
+      end
+      if target ~= nil then
+        local hp, maxhp = M.readWord(0x3BF4 + target * 2),
+                          M.readWord(0x3C1C + target * 2)
+        local item = (maxhp - hp >= 80 and battInvIdx(POTION)) and POTION
+                  or battInvIdx(TONIC) and TONIC
+                  or battInvIdx(POTION) and POTION or nil
+        if item then
+          M.log(string.format("[%s] actor=%d heal entity %d (%d/%d) with $%02X",
+            tag or "fight", actor, target, hp, maxhp, item))
+          return { kind = "item", item = item, target = target, row = row }
+        end
       end
     end
-    local target, worst = nil, 101
-    local threshold = opts.healPercent or 60
-    for e = 0, 3 do
-      local hp, maxhp = M.readWord(0x3BF4 + e * 2), M.readWord(0x3C1C + e * 2)
-      if hp > 0 and maxhp > 0 then
-        local pct = hp * 100 // maxhp
-        if pct < threshold and pct < worst then target, worst = e, pct end
-      end
+    local id = M.readByte(BCHID + actor * 2)
+    local boost = opts.boost and math.min(M.readByte(BP + actor * 2), 3) or 0
+    if opts.tactical and id == 4 and M.readWord(CURMP + actor * 2) >= 4
+       and cmdRow(actor, CMD_TOOLS) then
+      return { kind = "skill", cmd = CMD_TOOLS, skill = AUTOCROSSBOW,
+               row = cmdRow(actor, CMD_TOOLS), boostLeft = boost }
     end
-    if target ~= nil then
-      local hp, maxhp = M.readWord(0x3BF4 + target * 2),
-                        M.readWord(0x3C1C + target * 2)
-      local item = (maxhp - hp >= 80 and battInvIdx(POTION)) and POTION
-                or battInvIdx(TONIC) and TONIC
-                or battInvIdx(POTION) and POTION or nil
-      if item then
-        M.log(string.format("[%s] actor=%d heal entity %d (%d/%d) with $%02X",
-          tag or "fight", actor, target, hp, maxhp, item))
-        return { item = item, target = target, row = row }
-      end
+    if opts.tactical and id == 5 and M.readWord(CURMP + actor * 2) >= 4
+       and cmdRow(actor, CMD_BLITZ) then
+      return { kind = "skill", cmd = CMD_BLITZ, skill = PUMMEL,
+               row = cmdRow(actor, CMD_BLITZ), boostLeft = boost }
     end
-    return nil
+    local fight = cmdRow(actor, CMD_FIGHT)
+    if fight == nil then return { kind = "switch" } end
+    return { kind = "fight", row = fight, boostLeft = boost }
   end
 
-  local function itemButton(actor)
+  local function button(actor)
     local st = M.readByte(MSTATE)
-    if st == ST_CMD then
-      local cur = M.readByte(CMDROW + actor) & 3
-      if cur == itemPlan.row then return { "a" } end
-      return { cur < itemPlan.row and "down" or "up" }
+    if plan == nil or planActor ~= actor then
+      if st ~= ST_CMD then return nil end
+      plan, planActor = makePlan(actor), actor
+      M.log(string.format("[%s] actor=%d char=%d plan=%s",
+        tag or "fight", actor, M.readByte(BCHID + actor * 2), plan.kind))
+      return nil
     end
-    if st == ST_ITEM then
-      local want = battInvIdx(itemPlan.item)
-      if want == nil then itemPlan, itemActor = nil, nil; return { "b" } end
+    if st == ST_CMD then
+      if plan.kind == "switch" then return { "x" } end
+      if plan.boostLeft and plan.boostLeft > 0 then
+        plan.boostLeft = plan.boostLeft - 1
+        return { "r" }
+      end
+      local cur = M.readByte(CMDROW + actor) & 3
+      if cur == plan.row then return { "a" } end
+      return { cur < plan.row and "down" or "up" }
+    end
+    if st == ST_ITEM and plan.kind == "item" then
+      local want = battInvIdx(plan.item)
+      if want == nil then plan, planActor = nil, nil; return { "b" } end
       local cur = M.readByte(ITEMSCR + actor) + M.readByte(ITEMROW + actor)
       if cur < want then return { "down" } end
       if cur > want then return { "up" } end
       return { "a" }
     end
+    if st == ST_TOOLS and plan.kind == "skill" then
+      local want
+      for i = 0, 7 do
+        if M.readByte(ITEMLIST + i * 3) == plan.skill then want = i; break end
+      end
+      if want == nil then plan, planActor = nil, nil; return { "b" } end
+      local wc, wr = want % 2, want // 2
+      local cc, cr = M.readByte(BLCOL + actor), M.readByte(BLROW + actor)
+      if cc ~= wc then return { wc > cc and "right" or "left" } end
+      if cr ~= wr then return { wr > cr and "down" or "up" } end
+      return { "a" }
+    end
     if st == ST_TGT then
-      local chars, mons = M.readByte(TGTCHARS), M.readByte(TGTMONS)
-      if mons ~= 0 then return { "right" } end
-      local wantMask = 1 << itemPlan.target
-      if chars == wantMask then
-        itemPlan, itemActor = nil, nil
-        return { "a" }
+      if plan.kind == "item" then
+        local chars, mons = M.readByte(TGTCHARS), M.readByte(TGTMONS)
+        if mons ~= 0 then return { "right" } end
+        local wantMask = 1 << plan.target
+        if chars ~= wantMask then
+          local cur = 0
+          for e = 0, 3 do
+            if chars & (1 << e) ~= 0 then cur = e; break end
+          end
+          return { cur < plan.target and "down" or "up" }
+        end
       end
-      local cur = 0
-      for e = 0, 3 do
-        if chars & (1 << e) ~= 0 then cur = e; break end
-      end
-      return { cur < itemPlan.target and "down" or "up" }
+      plan, planActor = nil, nil
+      return { "a" }
     end
-    if st == ST_ITEM or st == ST_TOOLS or st == ST_TGT then return { "b" } end
+    if st == ST_ITEM or st == ST_TOOLS then
+      plan, planActor = nil, nil
+      return { "b" }
+    end
     return nil
-  end
-
-  local function makeSeq(actor)
-    local id = M.readByte(BCHID + actor * 2)
-    local cmd, tail = CMD_FIGHT, 2
-    if opts.tactical and id == 4 and cmdRow(actor, CMD_TOOLS) then
-      cmd, tail = CMD_TOOLS, 3               -- Tools -> AutoCrossbow -> target
-    elseif opts.tactical and id == 5 and cmdRow(actor, CMD_BLITZ) then
-      cmd, tail = CMD_BLITZ, 3               -- Blitz -> Pummel -> target
-    end
-    local want = cmdRow(actor, cmd) or cmdRow(actor, CMD_FIGHT)
-    if want == nil then return { "x" } end   -- e.g. Gau's Veldt-only Leap row
-    local s = {}
-    if opts.boost then
-      local bp = M.readByte(BP + actor * 2)
-      for _ = 1, math.min(bp, 3) do s[#s + 1] = "r" end
-    end
-    local cur = M.readByte(CMDROW + actor) & 3
-    while cur < want do s[#s + 1], cur = "down", cur + 1 end
-    while cur > want do s[#s + 1], cur = "up", cur - 1 end
-    for _ = 1, tail do s[#s + 1] = "a" end
-    M.log(string.format("[%s] actor=%d char=%d command=$%02X seq=%s",
-      tag or "fight", actor, id, cmd, table.concat(s, ",")))
-    return s
   end
 
   function F.idle()
     menuStreak, tick, battleTick = 0, 0, 0
-    seq, seqIdx, stall, seqActor = nil, 1, 0, nil
-    itemPlan, itemActor, held = nil, nil, {}
+    plan, planActor, held = nil, nil, {}
   end
 
   function F.frame()
@@ -1086,8 +1107,7 @@ function M.newFightDriver(tag, opts)
       -- A eventually.  Preserve the old edge-A behavior only while there is
       -- no interactive menu to steer.
       menuStreak, tick = 0, 0
-      seq, seqIdx, stall, seqActor = nil, 1, 0, nil
-      itemPlan, itemActor, held = nil, nil, {}
+      plan, planActor, held = nil, nil, {}
       M.setPad((M.frame % 8 < 4) and { "a" } or {})
       return
     end
@@ -1097,36 +1117,9 @@ function M.newFightDriver(tag, opts)
     tick = tick + 1
     local ph = tick % 30
     local actor = M.readByte(ACTOR) & 3
-    if (itemPlan and itemActor ~= actor) or (seq and seqActor ~= actor) then
-      itemPlan, itemActor = nil, nil
-      seq, seqIdx, stall, seqActor = nil, 1, 0, nil
-    end
-    if itemPlan == nil and seq == nil then
-      if M.readByte(MSTATE) ~= ST_CMD then M.setPad({}); return end
-      itemPlan, itemActor = makeItemPlan(actor), actor
-      if itemPlan == nil then
-        itemActor = nil
-        seq, seqIdx, stall, seqActor = makeSeq(actor), 1, 0, actor
-      end
-    end
-    if ph == 0 then
-      if itemPlan then
-        held = itemButton(actor) or {}
-      else
-        local btn
-        if seqIdx <= #seq then btn = seq[seqIdx]
-        elseif stall < 2 then btn = "a"   -- unknown confirmation layer
-        elseif stall < 4 then btn = "b"   -- MP refusal/dead end
-        else
-          seq, seqIdx, stall, seqActor = nil, 1, 0, nil
-        end
-        held = btn and { [btn] = true } or {}
-      end
-    end
+    if plan and planActor ~= actor then plan, planActor = nil, nil end
+    if ph == 0 then held = button(actor) or {} end
     M.setPad(ph < 6 and held or {})
-    if ph == 29 and seq then
-      if seqIdx <= #seq then seqIdx = seqIdx + 1 else stall = stall + 1 end
-    end
   end
 
   return F

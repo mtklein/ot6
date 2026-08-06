@@ -23,13 +23,6 @@ local H = dofile("tools/tests/lib/ot6.lua")
 local function map() return H.mapId() & 0x1ff end
 local function bright() return emu.getState()["ppu.screenBrightness"] or 0 end
 local function sw(id) return (H.readByte(0x1E80 + (id >> 3)) >> (id & 7)) & 1 end
-local function killBitAll()
-  for s = 0, 5 do
-    if H.readByte(0x3aa8 + s * 2) % 2 == 1 then
-      H.writeByte(0x3eec + s * 2, H.readByte(0x3eec + s * 2) | 0x80)
-    end
-  end
-end
 local function settled()
   return H.hasControl() and H.tileAligned() and bright() >= 15
      and not H.dialogWaiting() and not H.battleLoadStarted() and not H.worldMode()
@@ -123,9 +116,9 @@ H.run({ maxFrames = 60000 }, {
   end),
 
   -- 1. north up the column to {57,3}, one tile short of the door row.
-  H.navTo(57, 3, { maxFrames = 20000,
+  H.navTo(57, 3, { maxFrames = 40000, honest = "flee",
     arrive = function() return map() == 262 end }),
-  H.navTo(57, 3, { maxFrames = 9000 }),    -- the factory doorstep
+  H.navTo(57, 3, { maxFrames = 18000, honest = "flee" }), -- doorstep
   H.call(function()
     H.assertEq(map(), 242, "still in VECTOR at the factory doorstep")
     H.assertEq(H.fieldX(), 57, "factory doorstep x")
@@ -138,7 +131,7 @@ H.run({ maxFrames = 60000 }, {
     return H.driveUntil(function() return map() == 262 end, 4000, {
       H.call(function() hb = hb + 1
         if H.battleLoadStarted() then
-          killBitAll(); H.setPad(hb % 8 < 4 and { "a" } or {}); return
+          H.setPad({ l = true, r = true }); return
         end
         if H.dialogWaiting() then
           H.setPad(hb % 8 < 4 and { "a" } or {}); return
