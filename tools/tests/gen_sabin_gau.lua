@@ -18,39 +18,21 @@
 -- nonzero is the appearance itself.
 --
 -- ================ THE DRIED-MEAT FEED, DRIVEN FOR REAL (#75) ================
--- The old header claimed the first-visit feed "could not be driven
--- honestly, on the vanilla base image too" -- the target cursor "cycles
--- $01<->$02 and can never land on his $04 because the target-group cells
--- ($7B79..$7B7C) were built before GauAppears and are never rebuilt" --
--- and poked $3EBD bit 1 (the switch the feed's reaction would have set)
--- instead.  Humans feed GAU in vanilla, so the probe had to have missed
--- something, and a source pass found it (btlgfx_main.asm):
+-- A controller-only probe found the engine's two-stage target model.  Gau's
+-- appearance first exposes him through the one-shot $2F4E mask, before
+-- UpdateDead has installed him in $3A42.  An item submitted in that state has
+-- no valid recipient, but completing the action normalizes Gau into an
+-- ordinary present enemy-character and opens a fresh party menu.
 --
---   * cur_poi_set (_c10659, :1036) is called from the battle gfx update
---     EVERY FRAME (:1742).  Its tail tests `$201d AND w7e61ac AND $2f47`
---     -- monsters-shown AND gau-appearance armed -- and while GAU is on
---     stage it assigns him the SIXTH monster slot's position/size entries
---     (the `+10` stores) and ORs $20 into BOTH the group-0 target cell
---     $7B79 (:1163) and the live targetable-monster mask $0092 (:791).
---     The cells are NOT frozen at battle init; GAU is in them, live, as
---     monster slot 5, every frame he is shown.
---   * What the probe watched cycle "$01<->$02" is $7B7D -- the CHARACTER
---     cursor mask -- because it only ever pressed up/down, which move the
---     cursor WITHIN the party column.  His "$04" expectation was the
---     wrong mask on the wrong side: GAU is monster slot 5, mask $20, in
---     $7B7E.  The input the probe never sent is LEFT -- the side switch
---     onto the monster column, whose only targetable occupant is GAU.
---
--- So the feed here is real play, closed-loop on the engine's own cursor
--- state: on a party menu while $2f4e holds, steer the command cursor
--- ($890F+actor) to ITEM, the item-list index ($8947+actor) to DRIED MEAT,
--- then in target select press LEFT until the monster mask $7B7E reads $20
--- and confirm.  The reaction script sets battle switch 13 itself (the bit
--- the old file poked -- read back and asserted here), GAU runs off with
--- the meat, and his RETURN VISIT (the same 3/8 roll, now branching at
--- :11957) recruits him with no menus at all.  Every target-select pulse
--- logs $7B79..$7B7E/$0092/$2F4E, so if the steer ever fails the run dies
--- WITH the frame evidence the capability-gap report would need.
+-- The generator therefore selects Active battle mode through Config, arms
+-- Cyan's delayed Retort, and parks a Tonic target cursor while Retort kills
+-- the last monster.  When Gau appears, that already-selected Tonic is sent
+-- left to his $20 monster target and submitted as the harmless normalizing
+-- action.  The fresh menu then selects Dried Meat from inventory slot zero,
+-- targets the now-normalized Gau the same way, and submits it.  AIScript::_370
+-- consumes the meat, sets battle switch 13, and recruits Gau in that same
+-- encounter.  Every gameplay change is controller input; all addresses here
+-- are observations used to close the loop.
 --
 -- THE GRIND IS FOUGHT, NOT KILL-BITTED (#75): the appearance rolls only
 -- at a WIN, so wins are earned by the house menu-episode machine (bank
@@ -72,13 +54,25 @@
 -- promised.
 local H = dofile("tools/tests/lib/ot6.lua")
 local DOOR = "build/states/falls_done.mss.lua"
+local ZMENUSTATE, MAIN_MENU, CONFIG_MENU = 0x26, 0x05, 0x0E
 
 local function mapIdx() return H.readWord(0x1f64) & 0x3FF end
 local function bright() return emu.getState()["ppu.screenBrightness"] or 0 end
 local function sw(id) return (H.readByte(0x1e80 + (id >> 3)) >> (id & 7)) & 1 end
 local function inParty(c) return (H.readByte(0x1850 + c) & 0x07) ~= 0 end
 local function monPresent(i) return H.readByte(0x3aa8 + i * 2) % 2 == 1 end
-local DRIED_MEAT, TONIC = 0xFE, 0xE8
+local function monHP(i) return H.readWord(0x3BFC + i * 2) end
+local function liveMonsters()
+  local n, hp = 0, 0
+  for i = 0, 5 do
+    if monPresent(i) and monHP(i) > 0 then
+      n, hp = n + 1, hp + monHP(i)
+    end
+  end
+  return n, hp
+end
+local DRIED_MEAT, TONIC, POTION, TINCTURE, ETHER, FENIX_DOWN =
+  0xFE, 0xE8, 0xE9, 0xEB, 0xEC, 0xF0
 local function mstateMenu() return H.readByte(0x0026) end
 local function inState(s) return function() return mstateMenu() == s end end
 local function invSlot(id)
@@ -98,17 +92,20 @@ end
 
 -- battle-menu model (battle_vargas / gen_sabin_train's map; all READS)
 local MENU, ACTOR, MSTATE = 0x7BCA, 0x62CA, 0x7BC2
-local ST_CMD, ST_ITEM, ST_TGT = 0x05, 0x0A, 0x38
-local CMD_ITEM = 0x01
-local CMDTBL, CMDROW = 0x202E, 0x890F
+local ST_CMD, ST_ITEM, ST_TGT, ST_TOOLS = 0x05, 0x0A, 0x38, 0x30
+local CMD_ITEM, CMD_SWDTECH, CMD_BLITZ = 0x01, 0x07, 0x0A
+local RETORT, PUMMEL, SUPLEX = 0x56, 0x5D, 0x5F
+local CMDTBL, CMDROW, ITEMLIST = 0x202E, 0x890F, 0x4005
 -- item cursor = scroll ($8947) + row-on-screen ($894F), get_item_poi's
 -- own sum (measured, probe_itemuse)
 local ITEMSCR, ITEMROW = 0x8947, 0x894F
+local BLCOL, BLROW = 0x8963, 0x8967
 local BATTINV = 0x2686
 local TGTCHARS, TGTMONS = 0x7B7D, 0x7B7E
 local BP = 0x3E9C
 local function pHP(e) return H.readWord(0x3BF4 + e * 2) end
 local function pMaxHP(e) return H.readWord(0x3C1C + e * 2) end
+local function pMP(e) return H.readWord(0x3C08 + e * 2) end
 local function partyLine()
   local p = {}
   for e = 0, 3 do
@@ -158,6 +155,107 @@ local function tapUntil(btn, pred, what, budget)
       H.setPad(phase < 4 and { btn } or {})
     end),
   }, what)
+end
+
+-- Put Dried Meat first through the ordinary field Item/Use move UI.  Battle
+-- inventory preserves this order, making the live post-normalization select a
+-- short, deterministic controller path.
+local function moveMeatToFront(keepMenu)
+  local phase = 0
+  local function driveCursor(state, target, what)
+    return H.driveUntil(function()
+      return H.readByte(ZMENUSTATE) == state and H.readByte(0x4B) == target
+    end, 2400, {
+      H.call(function()
+        phase = (phase + 1) % 8
+        local cur = H.readByte(0x4B)
+        H.setPad(phase < 4 and
+          { [cur < target and "down" or "up"] = true } or {})
+      end),
+    }, what)
+  end
+  return H.cond(function() return invSlot(DRIED_MEAT) ~= 0 end, {
+    H.pressButtons({ "x" }, 4),
+    H.waitUntil(function() return H.readByte(ZMENUSTATE) == MAIN_MENU end,
+      600, "main menu for inventory move", 5),
+    driveCursor(MAIN_MENU, 0, "main-menu cursor on Item"),
+    H.pressButtons({ "a" }, 1),
+    H.waitUntil(function() return H.readByte(ZMENUSTATE) == 0x08 end,
+      1200, "field item list", 5),
+    H.driveUntil(function()
+      return H.readByte(ZMENUSTATE) == 0x08
+         and H.readByte(0x4B) == invSlot(DRIED_MEAT)
+    end, 4000, {
+      H.call(function()
+        phase = (phase + 1) % 8
+        local cur, want = H.readByte(0x4B), invSlot(DRIED_MEAT)
+        H.setPad(phase < 4 and
+          { [cur < want and "down" or "up"] = true } or {})
+      end),
+    }, "field cursor on Dried Meat"),
+    H.release(), H.waitFrames(30), H.pressButtons({ "a" }, 4),
+    H.waitUntil(function() return H.readByte(ZMENUSTATE) == 0x19 end,
+      600, "field item move mode", 5),
+    driveCursor(0x19, 0, "move Dried Meat to slot 0"),
+    H.release(), H.waitFrames(30), H.pressButtons({ "a" }, 4),
+    H.waitUntil(function() return H.readByte(ZMENUSTATE) == 0x08 end,
+      600, "field item swap committed", 5),
+    H.call(function()
+      H.assertEq(invSlot(DRIED_MEAT), 0,
+        "Dried Meat moved to inventory slot 0 through Item UI")
+    end),
+    H.pressButtons({ "b" }, 4),
+    H.waitUntil(function() return H.readByte(ZMENUSTATE) == 0x17 end,
+      600, "Item options after move", 5),
+    H.pressButtons({ "b" }, 4),
+    H.waitUntil(function() return H.readByte(ZMENUSTATE) == MAIN_MENU end,
+      900, "main menu after inventory move", 5),
+    H.cond(function() return not keepMenu end, {
+      H.pressButtons({ "b" }, 4),
+      H.waitUntil(function()
+        return H.worldMode() and H.worldHasControl() and H.worldAligned()
+            or not H.worldMode() and H.hasControl() and H.tileAligned()
+      end, 1800, "field after inventory move", 5),
+    }, {}),
+  }, {})
+end
+
+local function prepareFeed()
+  return H.cond(function() return true end, {
+    H.release(),
+    H.waitFrames(30),
+    moveMeatToFront(true),
+    H.release(),
+    H.waitFrames(30),
+    H.driveUntil(function()
+      return H.readByte(ZMENUSTATE) == MAIN_MENU and H.readByte(0x4B) == 5
+    end, 800, {
+      H.pressButtons({ "down" }, 4), H.waitFrames(12),
+    }, "main-menu cursor on Config"),
+    H.pressButtons({ "a" }, 4),
+    H.waitUntil(function() return H.readByte(ZMENUSTATE) == CONFIG_MENU end,
+      900, "Config menu", 5),
+    H.driveUntil(function()
+      return H.readByte(ZMENUSTATE) == CONFIG_MENU and H.readByte(0x4B) == 0
+    end, 600, {
+      H.pressButtons({ "up" }, 4), H.waitFrames(12),
+    }, "Config cursor on Battle Mode"),
+    H.driveUntil(function() return (H.readByte(0x1D4D) & 0x08) == 0 end,
+      300, {
+        H.pressButtons({ "left" }, 4), H.waitFrames(12),
+      }, "Battle Mode = Active"),
+    H.call(function()
+      H.assertEq(H.readByte(0x1D4D) & 0x08, 0,
+        "Config Battle Mode is Active via UI")
+    end),
+    H.pressButtons({ "b" }, 4),
+    H.waitUntil(function() return H.readByte(ZMENUSTATE) == MAIN_MENU end,
+      600, "back to main menu", 5),
+    H.pressButtons({ "b" }, 4),
+    H.waitUntil(function()
+      return H.hasControl() and H.tileAligned()
+    end, 1800, "field after Config", 5),
+  }, {})
 end
 
 -- buy `qtyFn()` MORE of shop row `row`, fully CLOSED-LOOP: the list
@@ -218,11 +316,21 @@ end
 local lost = nil
 local fightTier = 1
 local wipeN = 0
-local fed = false                        -- the feed's confirm was pressed
-local fedDump = false                    -- one-time battle-inv evidence dump
-local feedFrames = {}                    -- target-select evidence rows
+local fed = false                        -- observed feed reaction completed
 local grind = { fights = 0, appearances = 0 }
-local function gauOn() return H.readByte(0x2f4e) ~= 0 end
+local function gauOn()
+  local targettable = H.readByte(0x2f4e)
+  local enemyChar = H.readByte(0x3a40)
+  return targettable ~= 0xff and enemyChar ~= 0xff
+     and (targettable & enemyChar) ~= 0
+end
+local function gauPresent()
+  local slot = H.readByte(0x300b)
+  if slot == 0xff or slot > 6 then return false end
+  local mask = H.readByte(0x3018 + slot)
+  return (H.readByte(0x3aa0 + slot) & 1) ~= 0
+     and (H.readByte(0x3a40) & mask) ~= 0
+end
 local function fedSwitch() return (H.readByte(0x3EBD) & 0x02) ~= 0 end
 
 -- ------------------------------------- world walk that FIGHTS its randoms --
@@ -234,15 +342,41 @@ local function fedSwitch() return (H.readByte(0x3EBD) & 0x02) ~= 0 end
 -- the grind does: BFS-step toward (tx,ty), and on any battle steer each
 -- actor to Fight (command row 0), dump banked boost, self-Tonic under 40%,
 -- until the battle tears down.  No GAU on stage here, so no feed branch.
-local function worldWalkFight(tx, ty, budget, what)
+local function worldWalkFight(tx, ty, budget, what, arriveOffWorld)
   local tick, dirFlip, hb = 0, false, -1800
   local plan, planActor, btn, mstreak = nil, nil, nil, 0
+  local calm = 0
+  -- Snapshot this on the world.  The field party byte is repurposed while a
+  -- battle is live and cannot reliably answer whether Gau is the third entity.
+  local partyEntities = inParty(11) and 3 or 2
   local function makePlan(actor)
     local row = cmdRowOf(actor, CMD_ITEM)
-    if pHP(actor) > 0 and pMaxHP(actor) > 0
-       and pHP(actor) * 10 < pMaxHP(actor) * 4
-       and invCount(TONIC) > 0 and row then
-      return { kind = "item", item = TONIC, row = row }
+    if row then
+      for e = 0, partyEntities - 1 do
+        if pMaxHP(e) > 0 and pHP(e) == 0 and battInvIdx(FENIX_DOWN) then
+          H.log(string.format("[gau] walk revive e%d with Fenix Down [%s]",
+            e, partyLine()))
+          return { kind = "item", item = FENIX_DOWN, target = e, row = row }
+        end
+      end
+      local target, worst = nil, 8
+      for e = 0, partyEntities - 1 do
+        if pHP(e) > 0 and pMaxHP(e) > 0 then
+          local frac = pHP(e) * 10 // pMaxHP(e)
+          if frac < worst and frac < 5 then target, worst = e, frac end
+        end
+      end
+      if target then
+        local missing = pMaxHP(target) - pHP(target)
+        local item = missing >= 80 and battInvIdx(POTION) and POTION
+                  or battInvIdx(TONIC) and TONIC
+                  or battInvIdx(POTION) and POTION or nil
+        if item then
+          H.log(string.format("[gau] walk heal e%d with $%02X [%s]", target,
+            item, partyLine()))
+          return { kind = "item", item = item, target = target, row = row }
+        end
+      end
     end
     local bp = H.readByte(BP + actor * 2)
     local boost = bp >= 1 and math.min(bp, 3) or 0
@@ -284,15 +418,32 @@ local function worldWalkFight(tx, ty, budget, what)
       return { "a" }
     end
     if st == ST_TGT then
+      if plan.kind == "item" and plan.target ~= nil then
+        local chars, mons = H.readByte(TGTCHARS), H.readByte(TGTMONS)
+        if mons ~= 0 then return { "right" } end
+        local wantMask = 1 << plan.target
+        if chars == wantMask then
+          plan, planActor = nil, nil
+          return { "a" }
+        end
+        local cur = 0
+        for e = 0, 3 do
+          if chars & (1 << e) ~= 0 then cur = e; break end
+        end
+        return { cur < plan.target and "down" or "up" }
+      end
       plan, planActor = nil, nil
-      return { "a" }                       -- item: self; Fight: default enemy
+      return { "a" }                       -- Fight: default enemy
     end
     if st == ST_TOOLS then return { "b" } end
     return nil
   end
   return H.driveUntil(function()
-    return lost ~= nil or not H.worldMode()
-        or (H.worldX() == tx and H.worldY() == ty and H.worldHasControl())
+    local parked = H.worldMode() and H.worldX() == tx and H.worldY() == ty
+       and H.worldHasControl() and H.worldAligned()
+       and not H.battleLoadStarted() and (H.readByte(0x00E8) & 0x20) == 0
+    calm = parked and calm + 1 or 0
+    return lost ~= nil or (arriveOffWorld and not H.worldMode()) or calm >= 30
   end, budget or 40000, {
     H.call(function()
       if H.frame - hb >= 1800 then
@@ -303,7 +454,7 @@ local function worldWalkFight(tx, ty, budget, what)
       end
       if H.battleLoadStarted() then
         local wiped = true
-        for e = 0, 3 do
+        for e = 0, partyEntities - 1 do
           if pMaxHP(e) > 0 and pHP(e) > 0 then wiped = false end
         end
         if wiped then
@@ -351,63 +502,98 @@ local function grindStep()
   local decided = false
   local hb = -1800
   local mstreak = 0
+  local meatPrimed = {}
+  local retortArmed, retortUnavailable = false, false
+  local feeding, targetBankLogged = false, false
+  local feedConfirmUntil, feedSubmissions = nil, 0
   local function makePlan(actor)
     local row = cmdRowOf(actor, CMD_ITEM)
-    if pHP(actor) > 0 and pMaxHP(actor) > 0
-       and pHP(actor) * 10 < pMaxHP(actor) * 4
-       and invCount(TONIC) > 0 and row then
-      H.log(string.format("[gau] e%d self-heal (TONIC, %d left) [%s]",
-        actor, invCount(TONIC), partyLine()))
-      return { kind = "item", item = TONIC, row = row }
+    local nmon = liveMonsters()
+    if row then
+      for e = 0, 1 do
+        if pMaxHP(e) > 0 and pHP(e) == 0 and battInvIdx(FENIX_DOWN) then
+          H.log(string.format("[gau] revive e%d with Fenix Down [%s]",
+            e, partyLine()))
+          return { kind = "item", item = FENIX_DOWN, target = e, row = row }
+        end
+      end
+      local target, worst = nil, 8
+      for e = 0, 1 do
+        if pHP(e) > 0 and pMaxHP(e) > 0 then
+          local frac = pHP(e) * 10 // pMaxHP(e)
+          if frac < worst and frac < 5 then target, worst = e, frac end
+        end
+      end
+      if target then
+        local missing = pMaxHP(target) - pHP(target)
+        local item = missing >= 80 and battInvIdx(POTION) and POTION
+                  or battInvIdx(TONIC) and TONIC
+                  or battInvIdx(POTION) and POTION or nil
+        if item then
+          H.log(string.format("[gau] heal e%d with $%02X [%s]", target,
+            item, partyLine()))
+          return { kind = "item", item = item, target = target, row = row }
+        end
+      end
+    end
+    local bushidoRow = cmdRowOf(actor, CMD_SWDTECH)
+    if actor == 1 and nmon == 1 and not retortArmed
+       and H.readByte(BP + actor * 2) < 2 and row then
+      local safeItem = battInvIdx(TONIC) and TONIC
+                    or battInvIdx(POTION) and POTION or nil
+      if safeItem then
+        H.log(string.format("[gau] Cyan banks BP with $%02X (bp=%d)",
+          safeItem, H.readByte(BP + actor * 2)))
+        return { kind = "item", item = safeItem, target = actor, row = row }
+      end
+    end
+    if actor == 1 and nmon == 1 and not retortArmed
+       and not retortUnavailable and bushidoRow then
+      H.log(string.format("[gau] Cyan plans Retort: row=%d bp=%d mp=%d",
+        bushidoRow, H.readByte(BP + actor * 2), pMP(actor)))
+      return { kind = "retort", skill = RETORT, row = bushidoRow }
+    end
+    if nmon == 1 and retortArmed and row and not meatPrimed[actor]
+       and battInvIdx(TONIC) then
+      H.log(string.format("[gau] park actor %d in Tonic targeting", actor))
+      return { kind = "prime", item = TONIC, row = row }
+    end
+    if actor == 0 and nmon == 1 and not retortArmed and row then
+      local safeItem = battInvIdx(TONIC) and TONIC
+                    or battInvIdx(POTION) and POTION or nil
+      if safeItem then
+        return { kind = "item", item = safeItem, target = 1, row = row }
+      end
+    end
+    if actor == 0 and nmon == 1 and pMP(actor) < 13 and row then
+      local mpItem = battInvIdx(ETHER) and ETHER
+                  or battInvIdx(TINCTURE) and TINCTURE or nil
+      if mpItem then
+        return { kind = "item", item = mpItem, target = actor, row = row }
+      end
+    end
+    local blitzRow = cmdRowOf(actor, CMD_BLITZ)
+    if actor == 0 and nmon == 1 and pMP(actor) >= 4 and blitzRow then
+      return { kind = "blitz",
+               skill = pMP(actor) >= 13 and SUPLEX or PUMMEL,
+               row = blitzRow }
     end
     local bp = H.readByte(BP + actor * 2)
     local boostMin = fightTier >= 2 and 1 or 2
     local boost = bp >= boostMin and math.min(bp, 3) or 0
     return { kind = "fight", boostLeft = boost }
   end
-  local function feedPlan(actor)
-    local row = cmdRowOf(actor, CMD_ITEM)
-    H.log(string.format("[gau] FEED plan: e%d ITEM row=%s meat idx=%s",
-      actor, tostring(row), tostring(battInvIdx(DRIED_MEAT))))
-    return { kind = "feed", item = DRIED_MEAT, row = row }
-  end
   local function button()
     local st = H.readByte(MSTATE)
     local actor = H.readByte(ACTOR)
-    -- while GAU is on stage and the feed is done (or the meat is gone
-    -- from the FIELD bag), NOBODY acts: a queued Fight can only target
-    -- him -- attacking an appeared GAU drives him off.  The gate is the
-    -- FIELD bag ($1869), not the battle inv: measured, $2686 reads no
-    -- Dried Meat during the appearance window even though the bag holds
-    -- it, so gating on battInvIdx skipped the feed every time.
-    if gauOn() and (fed or invCount(DRIED_MEAT) == 0) then
-      plan, planActor = nil, nil
-      return nil
-    end
-    if gauOn() and not fed and not fedDump then
-      fedDump = true
-      local inv = {}
-      for i = 0, 15 do
-        local id = H.readByte(BATTINV + i * 5)
-        if id ~= 0xFF then
-          inv[#inv + 1] = string.format("%d:$%02X x%d(f%02X)", i, id,
-            H.readByte(BATTINV + i * 5 + 3), H.readByte(BATTINV + i * 5 + 1))
-        end
-      end
-      H.log(string.format("[gau feed] APPEARANCE menu: st=%02X MENU=%02X " ..
-        "battInv(meat)=%s fieldbag(meat)=%d | %s", st, H.readByte(MENU),
-        tostring(battInvIdx(DRIED_MEAT)), invCount(DRIED_MEAT),
-        table.concat(inv, " ")))
-    end
     if plan == nil or planActor ~= actor then
       if st ~= ST_CMD then
         if st == ST_TOOLS or st == ST_ITEM or st == ST_TGT then
-          return { "b" }        -- parked list state: back out (measured
-        end                     -- in the b68 engine)
+          return { "b" }
+        end
         return nil
       end
-      plan = (gauOn() and not fed and invCount(DRIED_MEAT) > 0) and
-        feedPlan(actor) or makePlan(actor)
+      plan = makePlan(actor)
       planActor = actor
       return nil
     end
@@ -423,71 +609,60 @@ local function grindStep()
       end
       local cur = H.readByte(CMDROW + actor) & 3
       if cur == plan.row then return { "a" } end
-      if plan.rowStall and plan.rowStall > 2 then
-        plan.rowStall = 0
-        return { ({ [0]="up", [1]="left", [2]="right", [3]="down" })[plan.row] }
-      end
-      plan.rowStall = (plan.rowStall or 0) + 1
       return { cur < plan.row and "down" or "up" }
     end
-    if st == ST_ITEM and (plan.kind == "item" or plan.kind == "feed") then
+    if st == ST_ITEM and (plan.kind == "item" or plan.kind == "prime") then
       local want = battInvIdx(plan.item)
-      if want == nil then
-        if plan.kind == "feed" then
-          -- the meat is in the field bag but not the battle item list:
-          -- a real capability finding, reported with the list dump
-          local inv = {}
-          for i = 0, 15 do
-            local id = H.readByte(BATTINV + i * 5)
-            if id ~= 0xFF then
-              inv[#inv + 1] = string.format("%d:$%02X x%d", i, id,
-                H.readByte(BATTINV + i * 5 + 3))
-            end
-          end
-          error("gau feed: Dried Meat ($FE) is in the field bag but NOT " ..
-            "the battle item list at feed time -- " ..
-            table.concat(inv, " "), 0)
-        end
-        return { "b" }
-      end
+      if want == nil then return { "b" } end
       local cur = H.readByte(ITEMSCR + actor) + H.readByte(ITEMROW + actor)
       if cur < want then return { "down" } end
       if cur > want then return { "up" } end
       return { "a" }
     end
+    if st == ST_TOOLS and (plan.kind == "blitz" or plan.kind == "retort") then
+      local want
+      for i = 0, 7 do
+        if H.readByte(ITEMLIST + i * 3) == plan.skill then want = i end
+      end
+      if want == nil then
+        if plan.kind == "retort" then retortUnavailable = true end
+        plan, planActor = nil, nil
+        return { "b" }
+      end
+      local wc, wr = want % 2, want // 2
+      local cc, cr = H.readByte(BLCOL + actor), H.readByte(BLROW + actor)
+      if cc ~= wc then return { wc > cc and "right" or "left" } end
+      if cr ~= wr then return { wr > cr and "down" or "up" } end
+      if plan.kind == "retort" then
+        retortArmed = true
+        H.log(string.format("[gau] Retort armed at f%d with monster HP=%d",
+          H.frame, select(2, liveMonsters())))
+        plan, planActor = nil, nil
+      end
+      return { "a" }
+    end
     if st == ST_TGT then
-      if plan.kind == "feed" then
-        local row = string.format(
-          "f%d tgt: 7B79=%02X 7B7A=%02X 7B7B=%02X 7B7C=%02X chars=%02X " ..
-          "mons=%02X $92=%02X 2f4e=%02X",
-          H.frame, H.readByte(0x7B79), H.readByte(0x7B7A),
-          H.readByte(0x7B7B), H.readByte(0x7B7C), H.readByte(TGTCHARS),
-          H.readByte(TGTMONS), H.readByte(0x0092), H.readByte(0x2f4e))
-        feedFrames[#feedFrames + 1] = row
-        H.log("[gau feed] " .. row)
-        local mons = H.readByte(TGTMONS)
-        if mons == 0x20 then
-          fed = true                     -- the confirm goes to GAU
-          plan, planActor = nil, nil
-          H.log("[gau feed] cursor ON GAU (mons=$20) -- confirming the meat")
-          return { "a" }
-        end
-        plan.tgtStall = (plan.tgtStall or 0) + 1
-        if plan.tgtStall > 40 then
-          error("gau feed: 40 target pulses never put the cursor on the " ..
-            "monster side -- the frame evidence above is the " ..
-            "harness-capability report (see the header)", 0)
-        end
-        return { "left" }               -- the input the old probe never sent
+      if plan.kind == "prime" then
+        meatPrimed[actor] = true
+        return nil
       end
       if plan.kind == "item" then
-        plan, planActor = nil, nil
-        return { "a" }                   -- default target = self
+        local chars, mons = H.readByte(TGTCHARS), H.readByte(TGTMONS)
+        if mons ~= 0 then return { "right" } end
+        local wantMask = 1 << plan.target
+        if chars == wantMask then
+          plan, planActor = nil, nil
+          return { "a" }
+        end
+        local cur = 0
+        for e = 0, 3 do
+          if chars & (1 << e) ~= 0 then cur = e; break end
+        end
+        return { cur < plan.target and "down" or "up" }
       end
       plan, planActor = nil, nil
-      return { "a" }                     -- Fight: default enemy
+      return { "a" }
     end
-    if st == ST_TOOLS then return { "b" } end   -- not a menu we ever want
     return nil
   end
   -- per-frame feed driver (see the call site).  Holds directions for the
@@ -495,66 +670,53 @@ local function grindStep()
   local function feedDrive()
     local st = H.readByte(MSTATE)
     local actor = H.readByte(ACTOR)
-    if H.readByte(MENU) == 0 then
-      -- no character menu up in this instant: press NOTHING.  Mashing A
-      -- through the menu-less appearance windows corrupted 2f4e to $FF
-      -- (measured: GAU then would not leave even after switch 13 set).
-      -- Wait for a real menu; the feed completes on the first appearance
-      -- that opens one, cleanly, and GAU exits on his own after.
+    phase = (phase + 1) % 8
+    fed = fedSwitch() or invCount(DRIED_MEAT) == 0
+    if fed or feedSubmissions >= 2 then
       H.setPad({})
       return
     end
+    if H.readByte(MENU) == 0 then
+      -- Dismiss Gau's hungry turn so the already-selected normalizing item
+      -- can execute.  This is safe only while no party menu owns input.
+      H.setPad(H.frame % 30 < 4 and { "a" } or {})
+      return
+    end
+    if st ~= ST_TGT then feedConfirmUntil = nil end
     if st == ST_CMD then
       local row = cmdRowOf(actor, CMD_ITEM) or 0
       local cur = H.readByte(CMDROW + actor) & 3
-      if H.frame % 30 == 0 then
-        H.log(string.format("[gau feed] CMD f%d actor=%d cur=%d itemRow=%d",
-          H.frame, actor, cur, row))
-      end
-      if cur == row then H.setPad({ "a" })
-      else H.setPad({ [cur < row and "down" or "up"] = true }) end
+      if cur == row then H.setPad(phase < 2 and { "a" } or {})
+      else H.setPad(phase < 2 and
+        { [cur < row and "down" or "up"] = true } or {}) end
       return
     end
     if st == ST_ITEM then
       local want = battInvIdx(DRIED_MEAT)
-      -- also find the meat in the RENDERED list (wItemList $4005), in case
-      -- the cursor indexes that packed list rather than raw battle inv
-      local wlrow = nil
-      for i = 0, 31 do
-        if H.readByte(ITEMLIST + i * 3) == DRIED_MEAT then wlrow = i; break end
-      end
+      if want == nil then H.setPad({}); return end
       local cur = H.readByte(ITEMSCR + actor) + H.readByte(ITEMROW + actor)
-      if H.frame % 20 == 0 then
-        H.log(string.format("[gau feed] ITEM f%d cur=%d battInv=%s wList=%s " ..
-          "scroll=%d row=%d", H.frame, cur, tostring(want), tostring(wlrow),
-          H.readByte(ITEMSCR + actor), H.readByte(ITEMROW + actor)))
-      end
-      if want == nil then H.setPad({ "b" }); return end
-      if cur == want then H.setPad({ "a" })            -- confirm the meat
-      else H.setPad({ [cur < want and "down" or "up"] = true }) end  -- HOLD
+      if cur == want then H.setPad(phase < 2 and { "a" } or {})
+      else H.setPad(phase < 2 and
+        { [cur < want and "down" or "up"] = true } or {}) end
       return
     end
     if st == ST_TGT then
       local mons = H.readByte(TGTMONS)
       if mons == 0x20 then
-        fed = true
-        H.log(string.format("[gau feed] cursor ON GAU (mons=$20) f%d -- " ..
-          "confirming the meat [%s]", H.frame, partyLine()))
-        H.setPad({ "a" })
-      elseif mons ~= 0 then
-        H.setPad({ "left" })          -- some other monster mask: keep going
-      else
-        -- on the party side: LEFT switches to the monster column (GAU)
-        if H.frame % 20 == 0 then
-          H.log(string.format("[gau feed] tgt f%d chars=%02X mons=%02X " ..
-            "$92=%02X 2f4e=%02X", H.frame, H.readByte(TGTCHARS),
-            H.readByte(TGTMONS), H.readByte(0x0092), H.readByte(0x2f4e)))
+        if feedConfirmUntil == nil then
+          feedSubmissions = feedSubmissions + 1
+          feedConfirmUntil = H.frame + 3
+          H.log(string.format("[gau feed] confirm item $%02X submission #%d " ..
+            "on Gau (%s target model)", H.readByte(0x7a85), feedSubmissions,
+            gauOn() and "appearance" or gauPresent() and "normalized"
+              or "unknown"))
         end
+        H.setPad(H.frame <= feedConfirmUntil and { "a" } or {})
+      else
         H.setPad(H.frame % 4 < 2 and { "left" } or {})
       end
       return
     end
-    if st == ST_TOOLS or st == 0x2D then H.setPad({ "b" }); return end
     H.setPad({})
   end
 
@@ -566,25 +728,6 @@ local function grindStep()
         "appearances=%d fed=%s [%s]", grind.fights, grind.appearances,
         tostring(fed), partyLine())
       H.log("[gau] LOST -- " .. lost)
-    end
-    if grind.appearances >= 6 and not inParty(11) and lost == nil then
-      lost = string.format(
-        "GAU FEED CAPABILITY GAP: %d appearances, none recruited.  " ..
-        "MEASURED HONESTLY (this run + probe_itemuse): the Dried Meat IS " ..
-        "in the battle item list (battInv slot 17, selectable) and the " ..
-        "feed reaction (AIScript::_370: if_item DRIED_MEAT / " ..
-        "if_battle_switch_clr 13 / recruit_gau / end_battle) is real -- " ..
-        "so the old 'measured undrivable' claim is RETIRED.  What cannot " ..
-        "be driven is COMPLETING the meat-onto-GAU confirm inside his " ..
-        "appearance window: feedDrive's CMD/ITEM/TGT branches never " ..
-        "execute because a character command menu is not open on the " ..
-        "frames GAU is targetable (MENU==0 throughout; the one menu-open " ..
-        "instant had monPresent(5) FALSE).  The targetable-GAU frames and " ..
-        "the menu-open frames do not coincide in any RAM signal, and the " ..
-        "residual 2f4e=$82 lingers post-appearance.  This is a real " ..
-        "harness/timing gap, NOT a licence to poke $3EBD.  fights=%d",
-        grind.appearances, grind.fights)
-      H.log("[gau] " .. lost)
     end
     return lost ~= nil or inParty(11)
   end, 250000, {
@@ -598,41 +741,39 @@ local function grindStep()
           H.readByte(0x2f4e), tostring(fed), tostring(fedSwitch()),
           invCount(TONIC), partyLine()))
       end
-      -- GAU ON STAGE (targetable monster slot 5), handled INDEPENDENT of
-      -- the battle detector: the party HP table reads $FFFF during his
-      -- appearance so battleLoadStarted() flickers FALSE.  We ATTEMPT the
-      -- honest menu feed here (feedDrive), and the finding below records
-      -- why it does not complete.  monPresent(5) is the gate that lets the
-      -- grind CONTINUE past a failed feed (the appearance-latch variant
-      -- froze on the residual 2f4e=$82 armed state; monPresent(5) clears
-      -- when GAU actually leaves, so the walk resumes to the next fight).
-      if gauOn() and monPresent(5) then
-        if invCount(DRIED_MEAT) > 0 then feedDrive() else H.setPad({}) end
+      -- Gau's special appearance can flicker battleLoadStarted() false, so
+      -- latch it before the ordinary battle gate.  Retort has delivered the
+      -- final blow while a Tonic target screen remained open.
+      if not feeding and gauOn() then
+        feeding = true
+        grind.appeared = true
+        grind.appearances = grind.appearances + 1
+        H.log(string.format("[gau] *** APPEARANCE #%d at fight #%d f%d",
+          grind.appearances, grind.fights, H.frame))
+        H.screenshot(string.format("gau_appear%d", grind.appearances))
+      end
+      if feeding then
+        feedDrive()
         return
       end
       if H.battleLoadStarted() then
         if not decided then
           decided = true
+          meatPrimed = {}
+          retortArmed = false
+          targetBankLogged = false
+          plan, planActor = nil, nil
           grind.fights = grind.fights + 1
           local w = H.formationWords()
           H.log(string.format("[gau] fight #%d up f%d (%04X %04X %04X %04X)",
             grind.fights, H.frame, w[1], w[2], w[3], w[4]))
         end
-        if gauOn() and grind.lastApp ~= grind.fights then
-          grind.lastApp = grind.fights
-          grind.appeared = true          -- latch: feed runs at top level
-          grind.appearances = grind.appearances + 1
-          H.log(string.format(
-            "[gau] *** APPEARANCE #%d at fight #%d f%d (2f4e=%02X, " ..
-            "fed-switch=%s)", grind.appearances, grind.fights, H.frame,
-            H.readByte(0x2f4e), tostring(fedSwitch())))
-          H.screenshot(string.format("gau_appear%d", grind.appearances))
-        end
         -- wipe watch (a random-encounter wipe is a Game Over)
-        local wiped = true
-        for e = 0, 3 do
-          if pMaxHP(e) > 0 and pHP(e) > 0 then wiped = false end
-        end
+        -- This leg's live party is exactly Sabin+Cyan.  Unused battle slots
+        -- retain stale nonzero HP words, so counting all four masks a real
+        -- two-character wipe and leaves the driver wandering through Game
+        -- Over memory.
+        local wiped = pHP(0) == 0 and pHP(1) == 0
         wipeN = wiped and wipeN + 1 or 0
         if wipeN >= 90 and not lost then
           lost = string.format("wiped in fight #%d at f%d (tier %d) [%s]",
@@ -641,13 +782,19 @@ local function grindStep()
           H.setPad({})
           return
         end
-        -- THE FEED runs UNCONDITIONALLY the instant GAU is up and unfed --
-        -- BEFORE the menu/mstreak gates below.  GAU's appearance window
-        -- flickers the character menu, so gating the feed on a settled
-        -- menu (mstreak>=4) missed it every time (seven appearances, zero
-        -- feeds).  feedDrive handles every state itself, MENU==0 included.
         tick = tick + 1
         local ph = tick % 30
+        local activeActor = H.readByte(ACTOR)
+        if (H.readByte(MSTATE) == ST_ITEM or H.readByte(MSTATE) == ST_TGT)
+           and meatPrimed[activeActor] then
+          if not targetBankLogged then
+            targetBankLogged = true
+            H.log(string.format("[gau] RETORT TONIC BANK READY f%d hp=%d",
+              H.frame, select(2, liveMonsters())))
+          end
+          H.setPad({})
+          return
+        end
         if H.readByte(MENU) == 0 then
           plan, planActor, mstreak = nil, nil, 0
           H.setPad(ph < 4 and { "a" } or {})
@@ -684,10 +831,26 @@ local function grindAttempt(n)
       H.call(function() H.checkReq(ldReq, "attempt " .. n .. ": reload") end),
       H.waitFrames(60 + (n - 1) * 17),
     }, {}),
-    H.call(function() lost, fightTier, wipeN = nil, n, 0 end),
-    grindStep(),
     H.call(function()
-      if lost == nil and inParty(11) then
+      lost, fightTier, wipeN, fed = nil, n, 0, false
+    end),
+    grindStep(),
+    (function()
+      local phase = 0
+      return H.cond(function() return lost == nil and inParty(11) end, {
+        H.driveUntil(function()
+          return H.worldMode() and H.worldHasControl() and H.worldAligned()
+        end, 20000, {
+          H.call(function()
+            phase = (phase + 1) % 12
+            H.setPad(phase < 4 and { "a" } or {})
+          end),
+        }, "advance Gau's join event to the world"),
+      }, {})
+    end)(),
+    H.call(function()
+      fed = fedSwitch() or invCount(DRIED_MEAT) == 0
+      if lost == nil and inParty(11) and fed then
         grindWon = true
         H.log(string.format("[gau] attempt %d: GAU JOINED after %d fights, " ..
           "%d appearances, fed=%s", n, grind.fights, grind.appearances,
@@ -762,7 +925,7 @@ H.run({ maxFrames = 500000 }, {
     return H.worldMode() end }),
   H.waitUntil(function() return H.worldMode() and H.worldHasControl() end,
     3000, "on the world", 5),
-  worldWalkFight(220, 115, 60000, "shore -> Mobliz"),
+  worldWalkFight(220, 115, 60000, "shore -> Mobliz", true),
   H.call(function()
     if lost ~= nil then
       error("gau: the Veldt transit to Mobliz was lost -- " .. tostring(lost)
@@ -798,7 +961,7 @@ H.run({ maxFrames = 500000 }, {
     return invSlot(DRIED_MEAT) ~= nil and mstateMenu() == 0x26
   end, "bought", 2400),
   -- the grind's medicine: Tonics from row 1, bought the verified-loop way
-  buyItem(TONIC, 1, function() return 10 - invCount(TONIC) end, "TONIC to 10"),
+  buyItem(TONIC, 1, function() return 45 - invCount(TONIC) end, "TONIC to 45"),
   tapUntil("b", inState(0x25), "options again"),
   tapUntil("b", function() return H.hasControl() end, "shop closed", 2400),
   H.call(function()
@@ -806,6 +969,9 @@ H.run({ maxFrames = 500000 }, {
     H.log(string.format("[gau] leaving the shop: gil=%d tonics=%d",
       gil(), invCount(TONIC)))
   end),
+  -- Prepare the feed while Mobliz is reliably menu-capable.  The Veldt
+  -- staging tile can remain field-menu hostile briefly after a random battle.
+  prepareFeed(),
 
   -- out of town; settle the world fully (a stray press during the init
   -- transient walks back in -- measured), then clear of the entrance
@@ -869,6 +1035,8 @@ H.run({ maxFrames = 500000 }, {
       "the Dried Meat was fed to GAU through the real battle Item menu " ..
       "(the old 'measured undrivable' claim is retired -- see the header)")
     H.assertEq(invCount(DRIED_MEAT), 0, "the meat left the bag with GAU")
+    H.assertEq(fedSwitch(), true,
+      "the Dried-Meat reaction set Gau's battle switch")
   end),
   H.waitUntil(function()
     return H.worldMode() and H.worldHasControl() and H.worldAligned()
@@ -877,16 +1045,24 @@ H.run({ maxFrames = 500000 }, {
 
   -- park on Crescent Mountain's doorstep (one short of the (214,148)
   -- entrance) and mint; waypoints keep each BFS disc small (the fence
-  -- S-curve -- see the route notes in the git history of this file)
-  H.worldNavTo(216, 128, { maxFrames = 20000, honest = true }),
-  H.worldNavTo(218, 140, { maxFrames = 15000, honest = true }),
-  H.worldNavTo(220, 149, { maxFrames = 15000, honest = true }),
-  H.worldNavTo(219, 153, { maxFrames = 8000, honest = true }),
-  H.worldNavTo(217, 155, { maxFrames = 8000, honest = true }),
-  H.worldNavTo(212, 156, { maxFrames = 8000, honest = true }),
-  H.worldNavTo(205, 153, { maxFrames = 8000, honest = true }),
-  H.worldNavTo(207, 151, { maxFrames = 8000, honest = true }),
-  H.worldNavTo(214, 149, { maxFrames = 10000, honest = true }),
+  -- S-curve -- see the route notes in the git history of this file).  The
+  -- Veldt's encounters are unrunable, so use the same honest menu fighter as
+  -- transit rather than an L+R flee policy.
+  worldWalkFight(216, 128, 30000, "join -> fence north"),
+  worldWalkFight(218, 140, 30000, "fence north -> east bend"),
+  worldWalkFight(220, 149, 30000, "east bend -> south bend"),
+  worldWalkFight(219, 153, 20000, "south bend 1"),
+  worldWalkFight(217, 155, 20000, "south bend 2"),
+  worldWalkFight(212, 156, 20000, "south run"),
+  worldWalkFight(205, 153, 40000, "west bend"),
+  worldWalkFight(207, 151, 20000, "northwest bend"),
+  worldWalkFight(214, 149, 30000, "Crescent doorstep"),
+  H.call(function()
+    if lost ~= nil then
+      error("gau: post-join walk to Crescent Mountain was lost -- " ..
+        tostring(lost), 0)
+    end
+  end),
   -- The landing step itself can WIN the encounter roll ($E8 bit5 the
   -- instant it wins); require REAL control before minting, fleeing any
   -- landing-roll battle -- the post-battle reload restores this tile.
