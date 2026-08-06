@@ -73,13 +73,7 @@ local function sw(id)
 end
 local function map() return H.mapId() & 0x1ff end
 local function bright() return emu.getState()["ppu.screenBrightness"] or 0 end
-local function killBitAll()
-  for s = 0, 5 do
-    if H.readByte(0x3aa8 + s * 2) % 2 == 1 then
-      H.writeByte(0x3eec + s * 2, H.readByte(0x3eec + s * 2) | 0x80)
-    end
-  end
-end
+local fighter = H.newFightDriver("vector", { tactical = true, boost = true })
 
 -- The map name the ENGINE would print for the map it is standing on.
 -- $0520 is map_prop byte 0, copied by LoadMapProp (field/map.asm:143-157);
@@ -106,20 +100,21 @@ local function mapTitleHere()
 end
 
 -- Robust world walk to (tx,ty): re-plan a worldBfs each time the plan runs
--- out, press the next step, kill-bit any encounter.  No edge is ever
+-- out, press the next step, and fight any encounter through the live command
+-- rows (Tools / Blitz / Fight).  No edge is ever
 -- condemned, so a battle-restored tile is simply retried until a step
 -- lands.  Arrives at (tx,ty) or when the party leaves the world map.
 local function worldGrind(tx, ty, what)
-  local plan, idx, ph = nil, 1, 0
+  local plan, idx = nil, 1
   return H.driveUntil(function()
     return (not H.worldMode()) or (H.worldX() == tx and H.worldY() == ty
       and H.worldHasControl() and H.worldAligned())
   end, 60000, {
     H.call(function()
-      ph = (ph + 1) % 8
       if H.battleLoadStarted() then
-        killBitAll(); plan = nil; H.setPad(ph < 4 and { "a" } or {}); return
+        plan = nil; fighter.frame(); return
       end
+      fighter.idle()
       if not H.worldMode() then H.setPad({}); return end
       if not H.worldHasControl() then plan = nil; H.setPad({}); return end
       if not H.worldAligned() then return end
@@ -131,7 +126,7 @@ local function worldGrind(tx, ty, what)
   }, what or string.format("worldGrind (%d,%d)", tx, ty))
 end
 
-H.run({ maxFrames = 80000 }, {
+H.run({ maxFrames = 160000 }, {
   H.waitFrames(350),
   -- Title -> New Game/Continue -> Continue -> the sole valid slot (3) ->
   -- "This data?" -> field.  Repeated edge presses tolerate title animation
@@ -201,8 +196,9 @@ H.run({ maxFrames = 80000 }, {
     return H.driveUntil(function() return H.worldMode() end, 8000, {
       H.call(function() hb = hb + 1
         if H.battleLoadStarted() then
-          killBitAll(); H.setPad(hb % 8 < 4 and { "a" } or {}); return
+          fighter.frame(); return
         end
+        fighter.idle()
         if H.dialogWaiting() then
           H.setPad(hb % 8 < 4 and { "a" } or {}); return
         end
@@ -271,8 +267,9 @@ H.run({ maxFrames = 80000 }, {
       6000, {
       H.call(function() hb = hb + 1
         if H.battleLoadStarted() then
-          killBitAll(); H.setPad(hb % 8 < 4 and { "a" } or {}); return
+          fighter.frame(); return
         end
+        fighter.idle()
         H.setPad({ left = true })
       end) }, "hold LEFT onto (121,187) -> the Vector trigger") end)(),
   H.waitUntil(function()

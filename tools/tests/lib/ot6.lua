@@ -923,6 +923,118 @@ end
 -- fight IS the goal set-piece, that's a script bug -- fail loudly.
 -- Budget note: an honest win costs real ATB rounds -- budget thousands of
 -- frames where clearBattle needed hundreds.
+
+-- A stateful controller for parties whose useful command is not necessarily
+-- on row 0.  It reads the engine's live command table and cursor and builds a
+-- paced controller episode from those observations.  The baseline policy is
+-- Fight.  opts.tactical additionally lets Edgar use AutoCrossbow and Sabin use
+-- Pummel -- their real early-game whole-side / boss tools -- while everyone
+-- else Fights.  It writes nothing.  Button episodes use the menu-proven
+-- 6-on/24-off cadence because inputs presented while a battle window is
+-- opening are discarded.
+--
+-- Call frame() on every frame battleLoadStarted() is true and idle() on the
+-- falling edge.  frame() sets the controller pad itself.
+function M.newFightDriver(tag, opts)
+  opts = opts or {}
+  local MENU, ACTOR, MSTATE = 0x7BCA, 0x62CA, 0x7BC2
+  local CMDTBL, CMDROW, BCHID, BP = 0x202E, 0x890F, 0x3ED8, 0x3E9C
+  local CMD_FIGHT, CMD_TOOLS, CMD_BLITZ = 0x00, 0x09, 0x0A
+  local F = {}
+  local menuStreak, tick, battleTick = 0, 0, 0
+  local seq, seqIdx, stall, seqActor = nil, 1, 0, nil
+
+  local function cmdRow(actor, cmd)
+    for row = 0, 3 do
+      if M.readByte(CMDTBL + actor * 12 + row * 3) == cmd then
+        return row
+      end
+    end
+    return nil
+  end
+
+  local function makeSeq(actor)
+    local id = M.readByte(BCHID + actor * 2)
+    local cmd, tail = CMD_FIGHT, 2
+    if opts.tactical and id == 4 and cmdRow(actor, CMD_TOOLS) then
+      cmd, tail = CMD_TOOLS, 3               -- Tools -> AutoCrossbow -> target
+    elseif opts.tactical and id == 5 and cmdRow(actor, CMD_BLITZ) then
+      cmd, tail = CMD_BLITZ, 3               -- Blitz -> Pummel -> target
+    end
+    local want = cmdRow(actor, cmd) or cmdRow(actor, CMD_FIGHT)
+    if want == nil then return { "x" } end   -- e.g. Gau's Veldt-only Leap row
+    local s = {}
+    if opts.boost then
+      local bp = M.readByte(BP + actor * 2)
+      for _ = 1, math.min(bp, 3) do s[#s + 1] = "r" end
+    end
+    local cur = M.readByte(CMDROW + actor) & 3
+    while cur < want do s[#s + 1], cur = "down", cur + 1 end
+    while cur > want do s[#s + 1], cur = "up", cur - 1 end
+    for _ = 1, tail do s[#s + 1] = "a" end
+    M.log(string.format("[%s] actor=%d char=%d command=$%02X seq=%s",
+      tag or "fight", actor, id, cmd, table.concat(s, ",")))
+    return s
+  end
+
+  function F.idle()
+    menuStreak, tick, battleTick = 0, 0, 0
+    seq, seqIdx, stall, seqActor = nil, 1, 0, nil
+  end
+
+  function F.frame()
+    battleTick = battleTick + 1
+    local menu = M.readByte(MENU)
+    if battleTick == 1 or battleTick % 600 == 0 then
+      local actor, state = M.readByte(ACTOR) & 3, M.readByte(MSTATE)
+      local rows = {}
+      for row = 0, 3 do
+        rows[#rows + 1] = string.format("%02X",
+          M.readByte(CMDTBL + actor * 12 + row * 3))
+      end
+      local hp = {}
+      for e = 0, 3 do hp[#hp + 1] = tostring(M.readWord(0x3BF4 + e * 2)) end
+      M.log(string.format("[%s] battle f+%d menu=%02X state=%02X actor=%d " ..
+        "cursor=%d cmds=%s partyhp=%s monsters=%d", tag or "fight",
+        battleTick, menu, state, actor, M.readByte(CMDROW + actor) & 3,
+        table.concat(rows, ","), table.concat(hp, ","), M.monstersPresent()))
+    end
+    if menu == 0 then
+      -- Text pages, victory screens, and the command-window handoff all need
+      -- A eventually.  Preserve the old edge-A behavior only while there is
+      -- no interactive menu to steer.
+      menuStreak, tick = 0, 0
+      seq, seqIdx, stall, seqActor = nil, 1, 0, nil
+      M.setPad((M.frame % 8 < 4) and { "a" } or {})
+      return
+    end
+
+    menuStreak = menuStreak + 1
+    if menuStreak < 4 then M.setPad({}); return end
+    tick = tick + 1
+    local ph = tick % 30
+    local actor = M.readByte(ACTOR) & 3
+    if seq == nil or seqActor ~= actor then
+      seq, seqIdx, stall, seqActor = makeSeq(actor), 1, 0, actor
+    end
+    local btn
+    if seqIdx <= #seq then btn = seq[seqIdx]
+    elseif stall < 2 then btn = "a"       -- unknown target/confirmation layer
+    elseif stall < 4 then btn = "b"       -- back out of an MP refusal/dead end
+    else
+      seq, seqIdx, stall, seqActor = nil, 1, 0, nil
+      M.setPad({})
+      return
+    end
+    M.setPad(ph < 6 and { [btn] = true } or {})
+    if ph == 29 then
+      if seqIdx <= #seq then seqIdx = seqIdx + 1 else stall = stall + 1 end
+    end
+  end
+
+  return F
+end
+
 function M.fightBattle(maxFrames, spare)
   local spareSet = {}
   for _, w in ipairs(spare or {}) do spareSet[w] = true end
@@ -940,6 +1052,26 @@ function M.fightBattle(maxFrames, spare)
       M.setPad(aPhase < 4 and { "a" } or {})
     end),
   }, "fight battle honestly (tap-A)")
+end
+
+-- The command-table-aware counterpart to fightBattle().  Prefer this for a
+-- mixed party or any route where command row 0 is not proven to be Fight.
+function M.fightBattleByMenu(maxFrames, spare)
+  local spareSet = {}
+  for _, w in ipairs(spare or {}) do spareSet[w] = true end
+  local F = M.newFightDriver("fightBattleByMenu")
+  return M.driveUntil(function()
+    return not M.battleLoadStarted()
+  end, maxFrames or 30000, {
+    M.call(function()
+      if M.battleLoadStarted() and next(spareSet) and M.formationHas(spareSet) then
+        error("fightBattleByMenu: asked to auto-fight a spared formation " ..
+          string.format("(%04X %04X %04X %04X %04X %04X)",
+            table.unpack(M.formationWords())), 0)
+      end
+      F.frame()
+    end),
+  }, "fight battle honestly through the Fight menu")
 end
 
 -- fleeBattle: hold L+R -- the engine's own run mechanic (see the pad map

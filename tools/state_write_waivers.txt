@@ -163,7 +163,6 @@ tools/tests/gen_terra_returned_anchor.lua	emu.write
 tools/tests/gen_vector_crash.lua	.writeByte(
 tools/tests/gen_vector_crash.lua	.writeWord(
 tools/tests/gen_vector_crash.lua	emu.write
-tools/tests/gen_vector_doorstep.lua	.writeByte(
 tools/tests/gen_vector_escape_anchor.lua	.writeByte(
 tools/tests/gen_vector_escape_anchor.lua	.writeWord(
 tools/tests/gen_vector_escape_anchor.lua	emu.write
