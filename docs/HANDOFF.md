@@ -66,8 +66,9 @@ mechanism tests survive as a loudly-labeled quarantine (owner ruling). The
 running record is issue #75; the rule itself leads tools/tests/README.md's
 "Writing a test".
 
-**The active integration branch is `origin/feed-gau`, clean and pushed at
-`d506075`.** It is based on main `7770428` and now contains the formerly
+**The 2026-08-06 integration is landed directly on `main`; the old remote
+safety ref is `origin/feed-gau` at `2e4cabc`.** It was based on main `7770428`
+and contains the formerly
 queued Sabin, Gau, Figaro/Kolts/Vargas, Locke/Terra, Narshe/Kefka, Zozo and
 Opera conversions, plus the v0.6 route through the Ifrit doorstep. Do not
 restart those branch integrations. The static ratchet currently reports
@@ -96,7 +97,24 @@ The important newly-proven route facts are:
   A press opens battle 70 containing Ifrit and Shiva. Commit `d506075` is
   that terminal checkpoint.
 
-**Resume exactly at `tools/tests/gen_ifrit_magicite.lua`.** It still contains
+**Wrap checkpoint, 2026-08-06:** a clean
+`make frontier FRONTIER_JOBS=4` passed the state-write ratchet and the first
+101 of 178 frontier edges, then failed while minting `vargas_won` from the
+freshly regenerated `vargas_doorstep`. That honest doorstep has EDGAR at
+1/145 HP, LOCKE at 122/122, TERRA down at 0/94, and seven Potions but no
+Fenix Down; all four real Vargas attempts wiped before Sabin's phase. The
+retained evidence is
+`build/test-runs/vargas_won.JaO70HVC/run.log`. A scratch Item-cursor fix
+(`$8947+actor` scroll + `$894F+actor` row) did select and spend a Potion, but
+could not make the doomed party viable and was intentionally not retained.
+Start by adding an honest layer of care before Vargas—preferably keeping the
+party alive during the Mt. Kolts flee route or buying/using recovery supplies
+through real menus—then replay `gen_kolts.lua` -> `gen_vargas.lua` and resume
+the full frontier gate. This known frontier regression was documented before
+the integration was landed on `main`; it is the first restart task.
+
+**After that regression is green, resume at
+`tools/tests/gen_ifrit_magicite.lua`.** It still contains
 its kill-bit helper and uses the old cheating `H.advanceStory` path for the
 forced Ifrit/Shiva win. No new implementation was started after `d506075`.
 The known honest strategy already exists in `battle_brokendeath.lua`: equip
