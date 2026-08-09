@@ -198,7 +198,7 @@ end
 -- spend down to three of them and leans on Tonics for small holes.
 local POTION = 0xE9
 local function care(tag, threshold)
-  return H.fieldCare({ tag = "care " .. tag, threshold = threshold or 0.75,
+  return H.fieldCare({ tag = "care " .. tag, threshold = threshold or 0.85,
                        reserve = { [POTION] = 3 } })
 end
 
@@ -541,8 +541,21 @@ local function shopTrip()
       for r = 0, 7 do rows[#rows + 1] = string.format("%02X", rowItem(r)) end
       H.log("[shop] stock: " .. table.concat(rows, " "))
     end),
-    buyTo(0xF0, 5, 3, 500, "FENIX DOWN to 3"),
-    buyTo(0xE8, 0, 15, 50, "TONIC to 15"),
+    -- FIVE, not three.  Measured 2026-08-09: with three, the mountain's own
+    -- fights spent every one of them before the summit and the party stood
+    -- on VARGAS's ledge with no answer to a death -- and gen_vargas needs
+    -- one AFTER the fight to raise TERRA.  The wallet can carry it; the
+    -- mountain pays the gil back twice over on the way up.
+    -- The mix is measured, not guessed.  A death costs a Fenix Down (500
+    -- gil); NOT dying costs a Tonic (50).  The first pass bought three
+    -- revives and spent all three; the second bought five and spent all
+    -- five, every one of them on map 98.  So the wallet goes mostly on
+    -- Tonics and the driver heals earlier (M.setRows' sibling change:
+    -- honest="tactical" now heals at 55%, not 35%), with five revives as
+    -- the floor because gen_vargas needs one AFTER the fight to raise
+    -- TERRA and the doorstep contract below refuses to mint without it.
+    buyTo(0xF0, 5, 5, 500, "FENIX DOWN to 5"),
+    buyTo(0xE8, 0, 25, 50, "TONIC to 25"),
     tapUntil("b", inState(0x25), "shop: back to the options window"),
     tapUntil("b", function() return H.hasControl() and map() == 85 end,
       "shop: closed"),
@@ -550,7 +563,7 @@ local function shopTrip()
     H.call(function()
       H.log(string.format("[shop] done: gil=%d tonic=%d potion=%d fenix=%d",
         gil(), invCount(0xE8), invCount(0xE9), invCount(0xF0)))
-      H.assertEq(invCount(0xF0) >= 2, true,
+      H.assertEq(invCount(0xF0) >= 3, true,
         "the party leaves with Fenix Downs -- a death is answerable now")
       H.assertEq(invCount(0xE8) >= 10, true, "Tonics restocked for the climb")
     end),
@@ -748,6 +761,20 @@ H.run({ maxFrames = 400000 }, {
   --     this whole detour is walked, not fought.
   shopTrip(),
 
+  -- THE ROWS, once, here -- and they ride the save from here to the end of
+  -- the chain (the bit is $1850+c bit $20, party state, not battle state).
+  -- Owner note, 2026-08-09: "a lot of ranged attackers can just sit in the
+  -- back row forever at no cost."  In this ROM the exemption is even wider
+  -- than that: ExecCmd sets $B3 = $FF for every command and only the weapon
+  -- swing clears the "ignore attacker row" bit, so Tools, Magic, Blitz,
+  -- SwdTech, Throw and Steal are ALL exempt (battle_main.asm:3131-3133,
+  -- :7127-7133).  EDGAR fights this whole arc with Tools and TERRA with
+  -- Magic, so the back row halves the physical damage they take and costs
+  -- them exactly nothing.  LOCKE stays in FRONT on purpose: Steal deals no
+  -- damage at all, so Fight is the only damage he has, and the Dirk carries
+  -- no BACK_ROW flag.  docs/research/row-menu.md has the citations.
+  H.setRows({ [0] = true, [1] = false, [4] = true }, { tag = "rows" }),
+
   -- Out the way we came: x=0 is the vertical long entrance -> world
   -- (84,112).  One press, not a navTo: the target tile IS the trigger.
   H.navTo(1, 28, { maxFrames = 20000, honest = "flee", avoid = M75_AVOID }),
@@ -939,6 +966,17 @@ H.run({ maxFrames = 400000 }, {
         string.format("char %d is at or above half hp (%d/%d)",
           c, H.charHp(c), H.charMaxHp(c)))
     end
+    -- and it still has something to answer a death with.  gen_vargas
+    -- raises TERRA after the fight; a doorstep with an empty bag makes
+    -- that impossible and the failure would surface an edge later.
+    H.assertEq(invCount(0xF0) >= 1, true,
+      string.format("a Fenix Down is still in reserve for the fight (%d)",
+        invCount(0xF0)))
+    -- the rows the shop stop set are still set (nothing on this mountain
+    -- rearranges the party, and if something did we want to know here)
+    H.assertEq((H.readByte(0x1850 + 0) & 0x20) ~= 0, true, "TERRA back row")
+    H.assertEq((H.readByte(0x1854 + 0) & 0x20) ~= 0, true, "EDGAR back row")
+    H.assertEq((H.readByte(0x1851 + 0) & 0x20) == 0, true, "LOCKE front row")
     where("vargas doorstep")
     H.screenshot("vargas_doorstep")
   end),

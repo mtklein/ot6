@@ -308,7 +308,14 @@ local function resolve(v) return type(v) == "function" and v() or v end
 --                          A opens the command list, A confirms its first
 --                          entry, A takes the default target);
 --                  "tactical"  read the live command table and use Edgar's
---                          Tools, Sabin's Blitz, and Fight for everyone else;
+--                          Tools, Sabin's Blitz, and Fight for everyone else,
+--                          with the driver's own item medic line.  It heals
+--                          at opts.healPercent (default 55).  That default
+--                          was 35 and 35 was too late: measured on map 98
+--                          (Trilium + Tusker + two Cirpius), a party healing
+--                          only below a third spent FIVE Fenix Downs on one
+--                          leg -- reviving is what healing late costs, and a
+--                          Tonic is fifty gil against five hundred;
 --                  "flee"  hold L+R, the engine's own run mechanic.  A
 --                          fled battle is not a WIN, so win-only rolls
 --                          (SHADOW's 1/16 post-battle leave,
@@ -402,7 +409,8 @@ function M.navTo(txIn, tyIn, opts)
   -- once M.FLEE_CAP says this formation is not letting go
   local tactical = (opts.honest == "tactical" or opts.honest == "flee")
       and M.newFightDriver("navTo",
-        { tactical = true, boost = true, items = true, healPercent = 35 }) or nil
+        { tactical = true, boost = true, items = true,
+          healPercent = opts.healPercent or 55 }) or nil
   local function drop(why)  -- discard the plan, saying why (once, not per frame)
     if plan or pend then
       M.log(string.format("nav: %s at (%d,%d); plan dropped", why,
@@ -623,7 +631,8 @@ function M.advanceStory(pred, maxFrames, opts)
   local battN, dlgN = 0, 0
   local tactical = (opts.honest == "tactical" or opts.honest == "flee")
       and M.newFightDriver("advanceStory",
-        { tactical = true, boost = true, items = true, healPercent = 35 }) or nil
+        { tactical = true, boost = true, items = true,
+          healPercent = opts.healPercent or 55 }) or nil
   local hb = -600                      -- heartbeat: log immediately, then every 600
   return M.driveUntil(function()
     local done = pred()
@@ -891,7 +900,8 @@ function M.worldNavTo(txIn, tyIn, opts)
   local battN = 0
   local tactical = (opts.honest == "tactical" or opts.honest == "flee")
       and M.newFightDriver("worldNavTo",
-        { tactical = true, boost = true, items = true, healPercent = 35 }) or nil
+        { tactical = true, boost = true, items = true,
+          healPercent = opts.healPercent or 55 }) or nil
   local hb = -600
   local function resolveT(v) return type(v) == "function" and v() or v end
   return M.driveUntil(function()
@@ -1525,6 +1535,15 @@ end
 --
 -- It is a no-op -- not even a menu open -- when nobody needs anything, so a
 -- route can call it after every leg and pay only where it matters.
+-- Both M.fieldCare and M.setRows can be called on a field map or on the
+-- overworld, and "the menu is closed and the party has control again" is a
+-- different question on each: the world module has its own position and
+-- control registers and every field predicate is meaningless there.
+local function careBackOnMap()
+  if M.worldMode() then return M.worldHasControl() and M.worldAligned() end
+  return M.hasControl() and M.tileAligned()
+end
+
 local CARE_ZM, CARE_CUR, CARE_REFUSE = 0x26, 0x4b, 0xb5
 local CARE_TONIC, CARE_POTION, CARE_FENIX = 0xE8, 0xE9, 0xF0
 
@@ -1738,7 +1757,7 @@ function M.fieldCare(opts)
     }, tag .. ": heal/revive through the item menu"),
     M.release(),
     M.driveUntil(function()
-      return M.hasControl() and M.tileAligned()
+      return careBackOnMap()
          and M.readByte(CARE_ZM) ~= 0x05 and M.readByte(CARE_ZM) ~= 0x08
     end, 2400, {
       M.call(function()
@@ -1772,6 +1791,185 @@ function M.fieldCare(opts)
       return string.format("[%s] nothing to do: %s | tonic=%d potion=%d " ..
         "fenix=%d", tag, table.concat(out, " "), M.invCountOf(CARE_TONIC),
         M.invCountOf(CARE_POTION), M.invCountOf(CARE_FENIX))
+    end),
+  })
+end
+
+-- ---------------------------------------------------------------- rows --
+-- M.setRows: put characters in the FRONT or BACK row through the real Order
+-- screen.  Reads and pad presses only (issue #75).
+--
+-- WHY.  Owner note, 2026-08-09: "a lot of ranged attackers can just sit in
+-- the back row forever at no cost."  He is right, and no fixture in this
+-- chain had ever set a row -- every honest route walked its whole party
+-- into the front rank and paid full physical damage for it.
+--
+-- THE EXEMPTION IS REAL IN THIS ROM, not inherited lore.  ExecCmd sets
+-- $B3 = $FF at the top of EVERY command (battle_main.asm:3131-3133), and
+-- bit $20 there means "ignore attacker row" -- so no row penalty is the
+-- DEFAULT.  Exactly one routine clears it: the weapon-swing setup
+-- _c2299f (battle_main.asm:7127-7133), and only when the main-hand weapon
+-- lacks WEAPON_FLAG::BACK_ROW.  So a back-row character loses damage only
+-- on a Fight; EDGAR's Tools and TERRA's Magic and SABIN's Blitz never
+-- reach that code and cost nothing.  Damage TAKEN is halved for physical
+-- either way.  LOCKE is the one who genuinely trades -- Steal deals no
+-- damage, so Fight is all he has -- and this route leaves him in front.
+-- Full citation trail: docs/research/row-menu.md.
+--
+-- THE UI, and the two things that make it not-obvious:
+--   * the Order screen has NO main-menu row.  It is reached by pressing
+--     LEFT on the main menu ($05), a handler beside the A handler that
+--     never goes through SelectMainMenuOption (field_menu.asm:571-576,
+--     :3491-3508); the menu SCROLLS sideways ($65) to reveal the word
+--     "Order", which is drawn off the visible edge.
+--   * the toggle is A TWICE ON THE SAME SLOT.  MenuState_10 compares
+--     zSelIndex ($28) to the cursor ($4B); a second A on a DIFFERENT slot
+--     is a party REORDER, not a row flip (field_menu.asm:1845-1870).  So
+--     the cursor must not move between the two presses, and this driver
+--     verifies $28 before the second press and treats state $11 (the
+--     swap) as a hard error rather than something to recover from.
+--   * the row bit is at $1850 + charIdx, bit $20 -- the party/order byte,
+--     NOT the $1600 stat block.  The menu's working copy is $75 + slot.
+--
+-- spec: { [charIdx] = true (back row) | false (front row) }
+-- A no-op, menu never opened, when every listed character is already right.
+function M.setRows(spec, opts)
+  opts = opts or {}
+  local tag = opts.tag or "rows"
+  local ZM, CUR, SEL, ROWBIT = 0x26, 0x4b, 0x28, 0x20
+
+  local function inParty(c) return (M.readByte(0x1850 + c) & 0x07) ~= 0 end
+  local function isBack(c) return (M.readByte(0x1850 + c) & ROWBIT) ~= 0 end
+  local function slotOf(c)
+    for s = 0, 3 do
+      if M.readByte(0x69 + s) == c then return s end
+    end
+    return nil
+  end
+
+  local skip = {}
+  local function pick()
+    for c, back in pairs(spec) do
+      if inParty(c) and isBack(c) ~= back and not skip[c] then return c end
+    end
+    return nil
+  end
+  local function anyNeed() return pick() ~= nil end
+
+  local function rowLine()
+    local out = {}
+    for _, c in ipairs(M.partyMembers()) do
+      out[#out + 1] = string.format("c%d=%s", c, isBack(c) and "back" or "front")
+    end
+    return table.concat(out, " ")
+  end
+
+  local phase, done, want, before, tries = 0, false, nil, nil, 0
+
+  local function serveFrame()
+    phase = (phase + 1) % 12
+    local st = M.readByte(ZM)
+
+    if st == 0x11 then
+      error(string.format("setRows: state $11 -- the second A landed on a " ..
+        "DIFFERENT slot and reordered the party instead of flipping a row " ..
+        "(%s)", rowLine()), 0)
+    end
+
+    if want ~= nil and isBack(want) ~= before then
+      M.log(string.format("[%s] char %d -> %s row", tag, want,
+        isBack(want) and "back" or "front"))
+      want = nil
+    end
+
+    if want == nil then
+      want = pick()
+      if want == nil then done = true; M.setPad({}); return end
+      tries = tries + 1
+      if tries > 8 then
+        M.log(string.format("[%s] giving up after %d toggles", tag, tries))
+        done = true; M.setPad({}); return
+      end
+      before = isBack(want)
+    end
+
+    local slot = slotOf(want)
+    if slot == nil then
+      M.log(string.format("[%s] char %d has no order-screen slot " ..
+        "(slots %d,%d,%d,%d) -- skipping", tag, want, M.readByte(0x69),
+        M.readByte(0x6a), M.readByte(0x6b), M.readByte(0x6c)))
+      skip[want] = true; want = nil; M.setPad({}); return
+    end
+
+    local held
+    if st == 0x0f then
+      local cur = M.readByte(CUR)
+      held = (cur == slot) and { "a" }
+          or { [cur < slot and "down" or "up"] = true }
+    elseif st == 0x10 then
+      -- the pick-up landed on the slot we aimed at?  if not, back out --
+      -- pressing A here would reorder the party
+      held = (M.readByte(SEL) == slot) and { "a" } or { "b" }
+    else
+      M.setPad({}); return              -- $65 scroll, $12 portrait slide
+    end
+    M.setPad(phase < 4 and held or {})
+  end
+
+  return M.cond(anyNeed, {
+    M.logStep(function()
+      return string.format("[%s] opening the Order screen: %s", tag, rowLine())
+    end),
+    M.driveUntil(function() return M.readByte(ZM) == 0x05 end, 1800, {
+      M.call(function()
+        phase = (phase + 1) % 12
+        M.setPad(phase < 4 and { "x" } or {})
+      end),
+    }, tag .. ": field menu open"),
+    M.release(), M.waitFrames(10),
+    M.driveUntil(function() return M.readByte(ZM) == 0x0f end, 1800, {
+      M.call(function()
+        phase = (phase + 1) % 12
+        M.setPad(phase < 4 and { "left" } or {})
+      end),
+    }, tag .. ": LEFT scrolls to the Order screen"),
+    M.release(), M.waitFrames(10),
+    M.driveUntil(function() return done end, opts.maxFrames or 12000, {
+      M.call(serveFrame),
+    }, tag .. ": flip the rows that need flipping"),
+    M.release(),
+    M.driveUntil(function()
+      return M.readByte(ZM) == 0x05 or careBackOnMap()
+    end, 2400, {
+      M.call(function()
+        phase = (phase + 1) % 12
+        M.setPad(phase < 4 and { "b" } or {})
+      end),
+    }, tag .. ": back to the main menu"),
+    M.release(),
+    M.driveUntil(function()
+      return careBackOnMap() and M.readByte(ZM) ~= 0x05
+    end, 2400, {
+      M.call(function()
+        phase = (phase + 1) % 12
+        M.setPad(phase < 4 and { "b" } or {})
+      end),
+    }, tag .. ": back to the field"),
+    M.release(), M.waitFrames(30),
+    M.logStep(function()
+      return string.format("[%s] done: %s", tag, rowLine())
+    end),
+    M.call(function()
+      for c, back in pairs(spec) do
+        if inParty(c) then
+          M.assertEq(isBack(c), back, string.format(
+            "char %d is in the %s row", c, back and "back" or "front"))
+        end
+      end
+    end),
+  }, {
+    M.logStep(function()
+      return string.format("[%s] already set: %s", tag, rowLine())
     end),
   })
 end
