@@ -40,6 +40,16 @@ assert(type(M) == "table",
 -- leg's budget finally expired.  1800 frames is 30 seconds, several rounds,
 -- long enough for a run that is going to work and short enough that the
 -- fallback still has a party to fight with.
+-- Navigators accept opts.fleeCap to SHORTEN the cap per route.  Measured
+-- 2026-08-09 on the Figaro-cave escape leg (LOCKE + CELES, 113+150 hp): a
+-- PINCER formation (Trilobiter + Primordites, party surrounded) cannot be
+-- fled at all -- FF6's own rule, no escape until one side is cleared -- so
+-- every held frame is free damage, and the full 1800 killed the party
+-- BEFORE the tactical fallback ever engaged.  Worse, a wipe inside the
+-- cap leaves no "flee: no release" line and no fallback log: the battle
+-- ends, RandBattle's GameOver holds the event PC, and the leg reads as a
+-- parked navigator.  A small party on a meaty map wants a cap of a few
+-- hundred frames (two or three failed run rolls), not ninety seconds.
 M.FLEE_CAP = 1800
 
 -- A PARTY WIPE MUST SAY SO.  Twice now a wipe has presented as something
@@ -501,13 +511,13 @@ function M.navTo(txIn, tyIn, opts)
           -- is the TACTICAL driver, not a blind A-tap: a party that has
           -- already spent M.FLEE_CAP frames being hit needs its own item
           -- menu more than it needs a first command row.
-          if battN <= M.FLEE_CAP then
+          if battN <= (opts.fleeCap or M.FLEE_CAP) then
             M.setPad({ l = true, r = true })
             return
           end
-          if battN == M.FLEE_CAP + 1 then
+          if battN == (opts.fleeCap or M.FLEE_CAP) + 1 then
             M.log(string.format("flee: no release after %d frames; " ..
-              "fighting this formation out", M.FLEE_CAP))
+              "fighting this formation out", opts.fleeCap or M.FLEE_CAP))
           end
           tactical.frame()
           return
@@ -713,13 +723,13 @@ function M.advanceStory(pred, maxFrames, opts)
         -- which is how the party reached VARGAS with TERRA dead and EDGAR on
         -- 1 hp.  Same contract as navTo's, cap included.
         if opts.honest == "flee" then
-          if battN <= M.FLEE_CAP then
+          if battN <= (opts.fleeCap or M.FLEE_CAP) then
             M.setPad({ l = true, r = true })
             return
           end
-          if battN == M.FLEE_CAP + 1 then
+          if battN == (opts.fleeCap or M.FLEE_CAP) + 1 then
             M.log(string.format("flee: no release after %d frames; " ..
-              "fighting this formation out", M.FLEE_CAP))
+              "fighting this formation out", opts.fleeCap or M.FLEE_CAP))
           end
           tactical.frame()
           return
@@ -985,13 +995,13 @@ function M.worldNavTo(txIn, tyIn, opts)
           -- is the TACTICAL driver, not a blind A-tap: a party that has
           -- already spent M.FLEE_CAP frames being hit needs its own item
           -- menu more than it needs a first command row.
-          if battN <= M.FLEE_CAP then
+          if battN <= (opts.fleeCap or M.FLEE_CAP) then
             M.setPad({ l = true, r = true })
             return
           end
-          if battN == M.FLEE_CAP + 1 then
+          if battN == (opts.fleeCap or M.FLEE_CAP) + 1 then
             M.log(string.format("flee: no release after %d frames; " ..
-              "fighting this formation out", M.FLEE_CAP))
+              "fighting this formation out", opts.fleeCap or M.FLEE_CAP))
           end
           tactical.frame()
           return

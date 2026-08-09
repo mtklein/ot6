@@ -99,6 +99,20 @@ local function facing() return H.readByte(0x087f + H.readWord(0x0803)) end
 -- predicate is the library's public way to wrap a list into ONE step
 local function seq(steps) return H.cond(function() return true end, steps) end
 
+-- THE FLEE CAP IS SHORT ON THIS ROUTE, and that is a measurement, not a
+-- taste (2026-08-09).  The Figaro cave rolls PINCER formations (Trilobiter
+-- + Primordites, party surrounded) which FF6 refuses to release until one
+-- side is cleared -- so a held L+R is nothing but free enemy rounds, and
+-- the library's default 1800-frame cap killed LOCKE + CELES (113+150 hp)
+-- outright before the tactical fallback ever engaged.  420 frames is two
+-- or three failed run rolls: a releasable formation lets go inside it, a
+-- pincer flips to the fight driver while the party still has the hp to
+-- win.  bank = 3 rides along for the fallback: boosted Fights break
+-- shields and a broken monster takes 4x (Ot6ShieldedMulW), which is what
+-- turned the first honest tunnel fight from an 8000-frame bag-draining
+-- slog into a fight the party can afford.
+local FLEE_CAP = 420
+
 local FACE = { up = 0, right = 1, down = 2, left = 3 }
 -- all EIGHT for door staging: a door at the head of a stair can only be
 -- entered diagonally (gen_edgar's finding), and a diagonal candidate has to
@@ -145,7 +159,7 @@ local function settleField(dstMap, maxF)
       return not H.worldMode() and H.tileAligned()
          and not H.battleLoadStarted() and not H.dialogWaiting()
          and (dstMap == nil or map() == dstMap)
-    end), maxF or 12000, { honest = "flee" }),
+    end), maxF or 12000, { honest = "flee", fleeCap = FLEE_CAP, bank = 3 }),
     H.waitFrames(30),
   })
 end
@@ -158,7 +172,7 @@ local aPhase = 0
 -- these rather than one query.
 local function hop(tx, ty, what)
   return seq({
-    H.navTo(tx, ty, { maxFrames = 12000, honest = "flee" }),
+    H.navTo(tx, ty, { maxFrames = 12000, honest = "flee", fleeCap = FLEE_CAP, bank = 3 }),
     H.release(),
     H.call(function()
       H.assertEq(H.fieldX(), tx, what .. ": at x=" .. tx)
@@ -221,7 +235,7 @@ local function go(sx, sy, dm, dx, dy, what)
   return seq({
     H.call(function() pick, startMap = nil, map() end),
     H.navTo(function() return stage()[1] end, function() return stage()[2] end,
-      { maxFrames = 20000, arrive = arrived, honest = "flee" }),
+      { maxFrames = 20000, arrive = arrived, honest = "flee", fleeCap = FLEE_CAP, bank = 3 }),
     H.cond(function() return stage()[3] ~= nil end, {
       H.driveUntil(arrived, 1800, {
         H.call(function()
@@ -258,7 +272,7 @@ local function safeWalk(tx, ty, what, budget)
   -- budget died (the same failure the header describes on map 87).  Same
   -- flee-then-tactical-fallback shape as navTo's honest="flee" branch.
   local F = H.newFightDriver(what or "safeWalk",
-    { tactical = true, boost = true, items = true, healPercent = 55 })
+    { tactical = true, boost = true, bank = 3, items = true, healPercent = 55 })
   local battN = 0
   return seq({
     H.driveUntil(function()
@@ -268,7 +282,7 @@ local function safeWalk(tx, ty, what, budget)
         ph = (ph + 1) % 8
         if H.battleLoadStarted() then
           battN = battN + 1
-          if battN <= H.FLEE_CAP then H.setPad({ l = true, r = true })
+          if battN <= FLEE_CAP then H.setPad({ l = true, r = true })
           else F.frame() end
           return
         end
@@ -292,7 +306,7 @@ local function warpTo(sx, sy, dx, dy, dmap, what)
     H.logStep(function()
       return string.format("%s: from (%d,%d)", what, H.fieldX(), H.fieldY())
     end),
-    H.navTo(sx, sy, { maxFrames = 20000, honest = "flee", arrive = function()
+    H.navTo(sx, sy, { maxFrames = 20000, honest = "flee", fleeCap = FLEE_CAP, bank = 3, arrive = function()
       return H.fieldX() == dx and H.fieldY() == dy
     end }),
     H.release(),
@@ -575,7 +589,7 @@ H.run({ maxFrames = 300000 }, {
       H.bfsPath(56, 34) and "reachable" or "NOT reachable this instant"))
   end),
   -- exit via the x=56 column -> world (87,112)
-  H.navTo(56, 34, { maxFrames = 12000, honest = "flee",
+  H.navTo(56, 34, { maxFrames = 12000, honest = "flee", fleeCap = FLEE_CAP, bank = 3,
     arrive = function() return H.worldMode() end }),
   H.release(),
   (function()
@@ -584,7 +598,7 @@ H.run({ maxFrames = 300000 }, {
       local ok = H.worldMode() and H.worldHasControl() and H.worldAligned()
         and bright() >= 15
       cnt = ok and cnt + 1 or 0; return cnt >= 20
-    end, 12000, { honest = "flee" })
+    end, 12000, { honest = "flee", fleeCap = FLEE_CAP, bank = 3 })
   end)(),
   H.waitFrames(30),
   H.call(function()
@@ -611,7 +625,7 @@ H.run({ maxFrames = 300000 }, {
   -- FLEE_CAP), never kill-bitted; the budget carries the flee rounds.
   -- Top up first: the tunnel crossing arrives here as real HP.
   H.fieldCare({ tag = "care before the world crossing" }),
-  H.worldNavTo(75, 102, { maxFrames = 45000, honest = "flee",
+  H.worldNavTo(75, 102, { maxFrames = 45000, honest = "flee", fleeCap = FLEE_CAP, bank = 3,
     arrive = function() return not H.worldMode() end }),
   H.release(),
   settleField(69),
