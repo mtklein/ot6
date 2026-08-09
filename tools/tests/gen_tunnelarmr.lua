@@ -548,6 +548,19 @@ H.run({ maxFrames = 300000 }, {
   -- tools/equipment_waivers.txt because THIS stop is the very next leg.
   H.equipOptimum({ tag = "celes kit" }),
 
+  -- ROWS, RE-DEALT FOR A PAIR.  gen_sfigaro put LOCKE in the back row and
+  -- that was right for SOLO battle 11 (survive long enough to break one
+  -- armour); rows persist in $1850, so he arrived here still hiding -- and
+  -- measured on the cave packs (2026-08-09), a back-row LOCKE is this
+  -- party's whole offense taxed to nothing: 24 damage dealt across 6000
+  -- frames of one fight while front-row CELES died twice.  The row rule
+  -- (research/row-menu.md): only a FIGHT pays the back-row tax, and
+  -- LOCKE's Fight is all the damage this pair has -- while CELES's job
+  -- here is Runic and the item medic line, both row-exempt, so the back
+  -- row costs her nothing and halves the physicals that keep dropping
+  -- her.  Front LOCKE, back CELES.
+  H.setRows({ [1] = false, [6] = true }, { tag = "escape rows" }),
+
   -- ===================================================================== --
   -- PHASE 1: THE CLOCK.  Down to map 84, wind it, and take the passage it
   -- opens: (15,51) -> map 87 -> (57,48) -> map 86.
@@ -592,7 +605,7 @@ H.run({ maxFrames = 300000 }, {
   -- battle-tested -- the tunnel crossing arrives here as real spent HP,
   -- and the world half of the route (where care measured broken, note
   -- above) then needs none
-  H.fieldCare({ tag = "care before leaving town" }),
+  H.fieldCare({ tag = "care before leaving town", threshold = 0.95 }),
   -- exit via the x=56 column -> world (87,112)
   H.navTo(56, 34, { maxFrames = 12000, honest = "flee", fleeCap = FLEE_CAP, bank = 3,
     arrive = function() return H.worldMode() end }),
