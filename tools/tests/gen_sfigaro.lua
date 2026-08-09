@@ -485,10 +485,19 @@ local function clearGateSoldier(probeX, probeY, tag)
       talkToObj(26, tag .. ": the gate soldier (battle 11)"),
       rideOut(tag .. ": ride battle 11 out", 30000, 75),
       H.call(function()
-        -- same reasoning as the branch above: $0104 is the gate scene's
-        -- own record that the soldier is beaten.  A lost attempt runs the
-        -- scenario reset (_ca85ba) and leaves it clear.
-        won = sw(0x0104) == 1
+        -- a LOST attempt runs the scenario reset (_ca85ba) and dumps the
+        -- party back on (47,43); being anywhere else with the lane open is
+        -- the win.  ($0104 is NOT this signal -- see the branch above.)
+        -- ...but the SAME test does not work AFTER the fight: a beaten
+        -- soldier keeps his coordinates -- the scene hides the object, it
+        -- does not move it -- so obj 26 still reads {30,42} on a win.
+        -- Each question in the place it is valid: his TILE decides whether
+        -- to fight (stable at leg start, when the object map may not be
+        -- populated), and REACHABILITY decides whether we won (stable
+        -- afterwards, when he is gone from the map even though his record
+        -- is not).  A loss dumps the party back on (47,43).
+        won = not (H.fieldX() == 47 and H.fieldY() == 43)
+          and H.bfsPath(probeX, probeY) ~= nil
         H.log(string.format("%s: attempt %d %s at (%d,%d) f%d, $0104=%d",
           tag, n, won and "WON" or "LOST (scenario reset)",
           H.fieldX(), H.fieldY(), H.frame, sw(0x0104)))
@@ -514,12 +523,39 @@ local function clearGateSoldier(probeX, probeY, tag)
   -- single menu visit ahead of this cond was enough to flip it.  $0104 is
   -- the switch the gate scene itself sets, it does not wander, and the
   -- loss path below already reads it.
-  return H.cond(function() return sw(0x0104) == 0 end, {
+  -- BACK TO THE ORIGINAL REACHABILITY PROBE.  I swapped this to $0104 on
+  -- the theory that the soldier wanders and the probe is a coin flip.  Both
+  -- halves of that were wrong: he does NOT wander (polled every 60 frames
+  -- for 7200 frames, the lane never opened once), and $0104 is not the
+  -- switch the gate sets -- keyed on it, this reported a LOSS on a fight
+  -- LOCKE had just won outright, HeavyArmor at 0 hp and the party standing
+  -- clear of the reset tile.  The symptom probe was right all along.
+  -- THE BRANCH IS THE SOLDIER'S OWN TILE, not a path query.  Three
+  -- readings of this have now been wrong.  $0104 is not the switch the
+  -- gate sets (it called a won fight a loss).  And the BFS probe -- right
+  -- when this leg opened with a walk -- reads "open" every time now that
+  -- the leg opens two MENUS first, so the party skips the fight, walks to
+  -- (31,42) and dies of "no path" twenty retries later.
+  --
+  -- He is a PLUG on exactly one tile: npc 10 / obj 26 sits at {30,42},
+  -- spawn switch $030C, and (30,42) is the only tile joining the starting
+  -- pocket to the rest of town.  So ask where he is.  Beaten, the object
+  -- is gone and this reads anything but his post; on his feet it reads
+  -- {30,42} whatever the object map happens to be doing that frame.
+  return H.cond(function() return objX(26) == 30 and objY(26) == 42 end, {
     H.logStep(function()
-      return string.format("%s: $0104 clear at f%d -- the gate soldier is " ..
-        "still on duty at (%d,%d); fighting him",
-        tag, H.frame, objX(26), objY(26))
+      return string.format("%s: the gate soldier is on his post (%d,%d) " ..
+        "at f%d; fighting him", tag, objX(26), objY(26), H.frame)
     end),
+    -- TOP UP FIRST.  He respawns on every map-75 reload, so this route
+    -- fights him THREE times, and LOCKE arrives at the third one carrying
+    -- whatever the first two left him.  Measured: B1 won, R1 won on its
+    -- second attempt, R2 lost all three -- not because that fight is
+    -- different but because he walked into it worn down.  A player heals
+    -- between rounds with a soldier; so does this.  A no-op when he is
+    -- already full, and it never spends below the Potion floor the later
+    -- beats need.
+    H.fieldCare({ tag = "care before " .. tag, threshold = 0.95 }),
     (function()
       local req
       return seq({
@@ -547,7 +583,8 @@ local function clearGateSoldier(probeX, probeY, tag)
       -- the attempt ladder until it gets lucky; that is the #74 mistake.
       H.assertEq(won, true,
         tag .. ": battle 11 won honestly within 3 attempts (boosted Fights)")
-      H.assertEq(sw(0x0104), 1, tag .. ": the gate scene recorded the win")
+      H.assertEq(H.bfsPath(probeX, probeY) ~= nil, true,
+        tag .. ": the lane is open again")
     end),
   }, {
     H.logStep(function() return tag .. ": the lane is already open" end),
@@ -665,6 +702,20 @@ H.run({ maxFrames = 350000 }, {
   -- (EventCmd_8d) and the mint chain never put it back on.  A player opens
   -- the Equip menu before walking into an occupied town; so does this.
   H.equipOptimum({ tag = "locke kit" }),
+
+  -- AND THE BACK ROW, which is what wins battle 11.  The note that used to
+  -- sit here said front row on a comparison that was never run: "front and
+  -- back measure identically" came from two BARE-HANDED runs where LOCKE
+  -- did eight damage either way because he was punching.
+  --
+  -- Armed and in the back: the HeavyArmor's ~110 a hit becomes ~53, so
+  -- instead of one hit leaving him where the next one kills -- healing
+  -- every turn, never swinging -- he survives three and attacks two turns
+  -- in three.  His Fight halves too, and it does not matter: the fight is
+  -- decided by BREAKING (one chip per boosted Fight, measured) and a broken
+  -- HeavyArmor takes 4x.  Measured end to end: shields 3 -> 0 three times
+  -- over, 495 hp -> 0, LOCKE never below 112.
+  H.setRows({ [1] = true }, { tag = "locke solo rows" }),
   H.call(function()
     where("boot")
   end),
