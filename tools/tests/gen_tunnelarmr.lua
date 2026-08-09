@@ -31,6 +31,27 @@
 -- with $001A=0 got map 73.  The cave graph is gen_kolts's, walked the other
 -- way: world (75,103) -> map 72 -> ... -> map 71 -> [trigger] -> map 70.
 --
+-- THE TUNNEL FIGHTS BACK (measured 2026-08-09, the sfigaro_escape park).
+-- Map 87 -- the clock passage -- HAS RANDOM ENCOUNTERS (Vector Pups),
+-- which no earlier leg of the basement route does (gen_celes measured its
+-- own maps encounter-free, and this file inherited that assumption).  The
+-- 2026-08-09 frontier run parked at (41,43) "with no plan" for 20000
+-- frames, and the handoff called it the map-75 gate soldier; both halves
+-- of that were wrong.  probe_sfigaro_escape_stall measured the park: it is
+-- map 87, not 75, the event PC sits at $CA0029 -- inside EventScript's
+-- RandBattle stub (ca/0018), i.e. an ordinary random encounter -- and the
+-- "missing plan" is navTo's honest=true battle branch, which answers a
+-- battle with blind edge-A.  Blind A against a Vector Pup pair left LOCKE
+-- at 0 hp with the fight still up after 2000+ frames; navigation never
+-- got the field back.  So every leg of this route that can draw an
+-- encounter now runs honest="tactical" -- the real fight driver, boosted
+-- Fights, its own item medic line (gen_kolts's mountain doctrine, for the
+-- same reason: a two-member low-level party cannot afford to stand still)
+-- -- and safeWalk grew the same battle branch.  The gate soldier needed
+-- nothing here: the escape re-enters town at (48,36) and leaves by the
+-- x=56 column, both east of his (30,42) choke (the re-entry H.call logs
+-- his post and the exit reachability so a route change would say so).
+--
 -- ISSUE #75 (the honesty conversion): ZERO state writes, and the first
 -- honest TunnelArmr in the mint chain's history.  The fight is PLAYED the
 -- way it was designed: CELES re-raises RUNIC every turn -- the boss's AI
@@ -100,6 +121,9 @@ local function settled(n, extra)
     return cnt >= n
   end
 end
+-- honest="tactical", not honest=true: a settle that rolls an encounter
+-- (map 87 and the caves both can) fights it with the real driver instead
+-- of blind-tapping A through it -- see the header.
 local function settleField(dstMap, maxF)
   return seq({
     H.waitFrames(60),
@@ -107,7 +131,7 @@ local function settleField(dstMap, maxF)
       return not H.worldMode() and H.tileAligned()
          and not H.battleLoadStarted() and not H.dialogWaiting()
          and (dstMap == nil or map() == dstMap)
-    end), maxF or 12000, { honest = true }),
+    end), maxF or 12000, { honest = "tactical" }),
     H.waitFrames(30),
   })
 end
@@ -120,7 +144,7 @@ local aPhase = 0
 -- these rather than one query.
 local function hop(tx, ty, what)
   return seq({
-    H.navTo(tx, ty, { maxFrames = 12000, honest = true }),
+    H.navTo(tx, ty, { maxFrames = 12000, honest = "tactical" }),
     H.release(),
     H.call(function()
       H.assertEq(H.fieldX(), tx, what .. ": at x=" .. tx)
@@ -183,7 +207,7 @@ local function go(sx, sy, dm, dx, dy, what)
   return seq({
     H.call(function() pick, startMap = nil, map() end),
     H.navTo(function() return stage()[1] end, function() return stage()[2] end,
-      { maxFrames = 20000, arrive = arrived, honest = true }),
+      { maxFrames = 20000, arrive = arrived, honest = "tactical" }),
     H.cond(function() return stage()[3] ~= nil end, {
       H.driveUntil(arrived, 1800, {
         H.call(function()
@@ -215,12 +239,19 @@ local function safeWalk(tx, ty, what, budget)
   local ph = 0
   local DP = { up = "up", down = "down", left = "left", right = "right",
     upleft = "left", upright = "right", downleft = "left", downright = "right" }
+  -- map 70 draws random encounters like the rest of the cave; without this
+  -- branch a battle mid-walk left the drive holding an empty pad until the
+  -- budget died (the same failure the header describes on map 87)
+  local F = H.newFightDriver(what or "safeWalk",
+    { tactical = true, boost = true, items = true, healPercent = 55 })
   return seq({
     H.driveUntil(function()
       return H.fieldX() == tx and H.fieldY() == ty and H.hasControl()
     end, budget or 8000, {
       H.call(function()
         ph = (ph + 1) % 8
+        if H.battleLoadStarted() then F.frame(); return end
+        F.idle()
         if H.dialogWaiting() then H.setPad(ph < 4 and { "a" } or {}); return end
         if not (H.hasControl() and H.tileAligned()) then H.setPad({}); return end
         local p = H.bfsPath(tx, ty)
@@ -239,7 +270,7 @@ local function warpTo(sx, sy, dx, dy, dmap, what)
     H.logStep(function()
       return string.format("%s: from (%d,%d)", what, H.fieldX(), H.fieldY())
     end),
-    H.navTo(sx, sy, { maxFrames = 20000, honest = true, arrive = function()
+    H.navTo(sx, sy, { maxFrames = 20000, honest = "tactical", arrive = function()
       return H.fieldX() == dx and H.fieldY() == dy
     end }),
     H.release(),
@@ -488,9 +519,29 @@ H.run({ maxFrames = 300000 }, {
   -- passes right by it; go's driveUntil taps A through whatever it says.
   -- Not required, so not asserted.
   go(52, 27, 75, 48, 36, "map 86 (52,27) -> town (map 75) (48,36)"),
-  H.call(function() where("back in occupied town") end),
+  H.call(function()
+    where("back in occupied town")
+    -- THE GATE SOLDIER IS NOT ON THIS ROUTE, and this is the measurement
+    -- that says so (the 2026-08-09 handoff blamed him for the escape park;
+    -- the park was a map-87 encounter, see the header).  He does respawn
+    -- on every map-75 load (spawn switch $030C, nothing clears it), but
+    -- his (30,42) choke joins the SW starting pocket to the rest of town,
+    -- and this crossing runs (48,36) -> (56,34), all east side.  Log his
+    -- post and the exit reachability so a future route change that DOES
+    -- cross his lane shows up here instead of as a navTo timeout;
+    -- H.clearGateSoldier is in the library the day that happens.
+    local post = "gone"
+    for i = 16, 31 do
+      if H.objX(i) == 30 and H.objY(i) == 42 then
+        post = string.format("obj %d at (30,42)", i); break
+      end
+    end
+    H.log(string.format("gate soldier: %s; $030C=%d; exit (56,34) %s",
+      post, sw(0x030C),
+      H.bfsPath(56, 34) and "reachable" or "NOT reachable this instant"))
+  end),
   -- exit via the x=56 column -> world (87,112)
-  H.navTo(56, 34, { maxFrames = 12000, honest = true,
+  H.navTo(56, 34, { maxFrames = 12000, honest = "tactical",
     arrive = function() return H.worldMode() end }),
   H.release(),
   (function()
@@ -499,7 +550,7 @@ H.run({ maxFrames = 300000 }, {
       local ok = H.worldMode() and H.worldHasControl() and H.worldAligned()
         and bright() >= 15
       cnt = ok and cnt + 1 or 0; return cnt >= 20
-    end, 12000, { honest = true })
+    end, 12000, { honest = "tactical" })
   end)(),
   H.waitFrames(30),
   H.call(function()
@@ -521,10 +572,12 @@ H.run({ maxFrames = 300000 }, {
   -- would load map 72.  From map 69, (10,2)/(4,4) -> map 70, and (47,38) on
   -- map 70 is the TunnelArmr trigger _ca89af.
   -- ===================================================================== --
-  -- issue #75: honest=true -- a world encounter on the band south of the
-  -- range is FOUGHT by real input (LOCKE and CELES both attack under
-  -- tap-A), never kill-bitted; the budget carries the ATB rounds.
-  H.worldNavTo(75, 102, { maxFrames = 45000, honest = true,
+  -- issue #75: honest="tactical" -- a world encounter on the band south of
+  -- the range is FOUGHT with the real fight driver (boosted Fights, the
+  -- item medic line), never kill-bitted; the budget carries the ATB
+  -- rounds.  Top up first: the tunnel fights arrive here as real HP.
+  H.fieldCare({ tag = "care before the world crossing" }),
+  H.worldNavTo(75, 102, { maxFrames = 45000, honest = "tactical",
     arrive = function() return not H.worldMode() end }),
   H.release(),
   settleField(69),
@@ -561,6 +614,12 @@ H.run({ maxFrames = 300000 }, {
   -- through it.  (47,37) is the last tile before the trigger on that path.
   safeWalk(47, 37, "approach the TunnelArmr trigger", 10000),
   H.waitFrames(30),
+  -- TOP UP BEFORE THE MINT, not after: the doorstep fixture and the retry
+  -- blob are captured from this exact state, so care taken here is care
+  -- every TunnelArmr attempt inherits.  0.95 because a loss down there is
+  -- GAME OVER (the gen_sfigaro pre-engagement pattern).  The menu visit
+  -- does not move the party; the position assert below still holds.
+  H.fieldCare({ tag = "care at the TunnelArmr doorstep", threshold = 0.95 }),
   H.call(function()
     H.assertEq(map(), 70, "still on map 70")
     H.assertEq(H.fieldX() == 47 and H.fieldY() == 37, true,
