@@ -97,21 +97,60 @@ The important newly-proven route facts are:
   A press opens battle 70 containing Ifrit and Shiva. Commit `d506075` is
   that terminal checkpoint.
 
-**Wrap checkpoint, 2026-08-06:** a clean
-`make frontier FRONTIER_JOBS=4` passed the state-write ratchet and the first
-101 of 178 frontier edges, then failed while minting `vargas_won` from the
-freshly regenerated `vargas_doorstep`. That honest doorstep has EDGAR at
-1/145 HP, LOCKE at 122/122, TERRA down at 0/94, and seven Potions but no
-Fenix Down; all four real Vargas attempts wiped before Sabin's phase. The
-retained evidence is
-`build/test-runs/vargas_won.JaO70HVC/run.log`. A scratch Item-cursor fix
-(`$8947+actor` scroll + `$894F+actor` row) did select and spend a Potion, but
-could not make the doomed party viable and was intentionally not retained.
-Start by adding an honest layer of care before Vargas—preferably keeping the
-party alive during the Mt. Kolts flee route or buying/using recovery supplies
-through real menus—then replay `gen_kolts.lua` -> `gen_vargas.lua` and resume
-the full frontier gate. This known frontier regression was documented before
-the integration was landed on `main`; it is the first restart task.
+**The 2026-08-06 frontier regression is FIXED (2026-08-09).** That run
+failed minting `vargas_won` from a freshly regenerated `vargas_doorstep`
+whose party was EDGAR 1/145, LOCKE 122/122, TERRA dead, seven Potions, no
+Fenix Down -- and four honest VARGAS attempts wiped. It was never the
+fight. Instrumenting `gen_kolts` leg by leg (a roster line now rides every
+`where`) found three separate things, all fixed on `main`:
+
+- **`advanceStory` accepted `honest="flee"` and ignored it.** Every other
+  navigator had a flee branch; that one fell through to the blind A-tap, so
+  every map settle that rolled an encounter fought a whole battle by
+  mashing A while its caller's header said the route runs from them.
+- **No route ever opened the item menu.** `H.fieldCare` (lib/ot6_field.lua)
+  drives the real field Item -> use -> target windows, zero writes, closed
+  loop on the game's own cells, and reads the engine's refusal flag ($B5)
+  instead of mashing A at a window that will never accept the pick. The UI
+  was MEASURED, not assumed: A on the item list PICKS A SLOT UP ($19), and
+  only a second A on the SAME slot uses it -- a first pass quietly
+  rearranged the bag instead of healing anyone. Citations:
+  `research/field-care-menu.md`, probes `probe_fieldheal` /
+  `probe_fieldcells` / `probe_fieldcare`.
+- **Mt. Kolts and map 98 are FOUGHT now, not fled** (`honest="tactical"`).
+  Fleeing is not free -- it is standing still while the formation takes
+  free rounds. Three measured runs: fled -> TERRA dead at the doorstep;
+  fled with care -> LOCKE dead on the last 53 steps; fought -> everyone
+  alive, two levels up, at 136/168/169.
+- **The party shops.** It walked through South Figaro and back out with no
+  revive item; it now buys three Fenix Downs and tops Tonics to fifteen
+  through the real shop UI. Route and stock in
+  `research/south-figaro-shop-route.md` -- the shop is **8**, not 15, and
+  it does **not** sell Potions at this point in the story.
+
+Result: `gen_vargas` wins on **attempt 1** (the retry ladder never fires),
+SABIN joins, `vargas_won` mints reload-verified, and the post-fight care
+stop raises TERRA so everything downstream inherits a whole party.
+
+**`M.FLEE_CAP` is written in blood.** At 5400 frames a cave-97 formation
+refused to release a FULL-HEALTH party, the flee held for all ninety
+seconds, the party wiped inside its own escape attempt, and the drive
+tapped A through the Game Over into a brand-new game -- eleven maps of
+intro before the budget expired. The cap is **1800** and the fallback is
+the tactical fighter, not a blind A.
+
+**Owner note, 2026-08-09 -- FRONT ROW / BACK ROW is an open gap.** "A lot
+of ranged attackers can just sit in the back row forever at no cost."
+EDGAR's damage here is Tools and TERRA's is magic; neither cares about row,
+and no fixture in the chain has ever set one. Research is in
+`research/row-menu.md`. Rows are persistent per-character state, so setting
+them once early propagates to every downstream fixture -- do it before a
+full re-mint, not after.
+
+**Still no full-frontier result.** `make test` stops at its own
+`--check-states` gate because the lib edits staled all 109 fixtures, which
+is the gate working. The frontier re-mint is the next step and it is the
+long pole.
 
 **After that regression is green, resume at
 `tools/tests/gen_ifrit_magicite.lua`.** It still contains
