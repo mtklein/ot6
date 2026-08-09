@@ -90,20 +90,11 @@ local function map() return H.mapId() & 0x1ff end
 local function bright() return emu.getState()["ppu.screenBrightness"] or 0 end
 -- event switch id -> live bit (event bitfield base $1E80, bit = id & 7)
 local function sw(id) return (H.readByte(0x1e80 + (id >> 3)) >> (id & 7)) & 1 end
--- field object i's live tile (pixel coords >> 4, block stride $29)
-local function objX(i) return H.readWord(0x086a + 0x29 * i) >> 4 end
-local function objY(i) return H.readWord(0x086d + 0x29 * i) >> 4 end
--- party facing, through the party-object offset ($0803)
-local function facing() return H.readByte(0x087f + H.readWord(0x0803)) end
 -- a bare step list cannot be spliced into a step list (Lua truncates a
 -- non-final table.unpack to one value); H.cond with an always-true
 -- predicate is the library's public way to wrap a list into ONE step
 local function seq(steps) return H.cond(function() return true end, steps) end
 
-local FACE = { up = 0, right = 1, down = 2, left = 3 }
-local NEIGHBOURS = {
-  { 0, 1, "up" }, { 0, -1, "down" }, { -1, 0, "right" }, { 1, 0, "left" },
-}
 -- all EIGHT for door staging: a door at the head of a stair can only be
 -- entered diagonally (gen_edgar's finding), and a diagonal candidate has to
 -- clear one extra test -- the engine must actually produce that move there
@@ -152,74 +143,9 @@ end
 
 local aPhase = 0
 
--- Ride a scene out to a settled, controllable field, edge-tapping A on EVERY
--- frame the party is not in control and FIGHTING anything that comes up --
--- honestly (issue #75; the HP pin + kill-bit this branch used to carry are
--- gone).  Battle frames drive gen_moogle's Marshal cycle: R raises the
--- active character's pending boost (1 bp at battle start, Ot6InitBP; the R
--- buzzes harmlessly on an empty bank), then three edge-tapped A's confirm
--- the boosted Fight and page victory text -- so solo LOCKE alternates
--- boosted and plain Fights against battle 11's HeavyArmor.  A LOSS is real
--- now (the _ca85ba scenario reset); the callers below wrap every
--- engagement in a phase-spread retry ladder rather than pinning it away.
---
--- WHY NOT advanceStory HERE.  advanceStory taps A only while a battle is up
--- or H.dialogWaiting() is true, and holds the pad empty otherwise.  The tail
--- of `battle 11` has a window state that satisfies NEITHER: measured at the
--- third gate-soldier fight, $0059 = $52 (a menu module owns the CPU) with
--- $BA/$D3 both clear, so dialogWaiting() is false, the battle flag is
--- already down, and advanceStory sat with the pad empty for 20000 frames
--- while the event PC stayed parked at $CA85B9.  Tapping A on "no control"
--- rather than on "a signal I recognise" clears it, and it cannot misfire on
--- the open field because the tap is gated on NOT having control.
--- (Choice prompts are the one thing this must never meet -- an A press
--- always takes option 0 -- so every prompt on the route is answered by
--- rideUntil below, which steers the cursor explicitly.)
--- ...AND WHY THE FIGHT ITSELF IS NOT A BUTTON PATTERN ANY MORE.  The first
--- honest version of this drove every battle with a fixed 32-frame cycle --
--- R to boost, then three edge-tapped A's -- which is a fine way to page
--- victory text and a poor way to survive.  Measured 2026-08-09 on the first
--- full-frontier run that ever reached this edge: solo LOCKE, level 8 with
--- 168 hp, LOST the gate soldier's HeavyArmor three attempts running, while
--- sixteen Tonics sat in the bag.  He never pressed a single one, because
--- the pattern has no idea what a menu is.  H.newFightDriver does: it reads
--- the live command table, boosts, and runs its own item medic line -- so
--- LOCKE now drinks a Tonic when he is under 60%, which is what a player
--- fighting a soldier alone in an occupied town would obviously do.
--- (The FIELD half of this routine is unchanged and still hand-rolled; see
--- the note above on why advanceStory cannot own the tail of battle 11.)
-local function rideOut(what, budget, dstMap)
-  local phase, calm = 0, 0
-  local F = H.newFightDriver(what or "rideOut",
-    -- bank = 3: unboosted Fights until LOCKE has three BP, then unload.
-    -- Shielded damage is HALVED and a broken monster takes 4x
-    -- (Ot6ShieldedMulW, ot6_break.asm:1487-1497), so the fight is won by
-    -- breaking, not by chipping -- and a boosted Fight is what chips.
-    { tactical = true, boost = true, bank = 3, items = true,
-      healPercent = 60, cadence = 12 })
-  return seq({
-    H.driveUntil(function()
-      local ok = H.hasControl() and H.tileAligned() and bright() >= 15
-             and not H.battleLoadStarted() and not H.dialogWaiting()
-             and (dstMap == nil or map() == dstMap)
-      calm = ok and calm + 1 or 0
-      return calm >= 20
-    end, budget or 30000, {
-      H.call(function()
-        phase = (phase + 1) % 8
-        if H.battleLoadStarted() then
-          F.frame()
-          return
-        end
-        F.idle()
-        if H.hasControl() then H.setPad({}); return end
-        H.setPad(phase < 4 and { "a" } or {})
-      end),
-    }, what),
-    H.release(),
-    H.waitFrames(30),
-  })
-end
+-- rideOut -- ride a scene out to a settled, controllable field, fighting
+-- anything that comes up honestly -- is H.rideOut now (promoted to
+-- lib/ot6_field.lua with its full measured history, 2026-08-09).
 
 -- One SHORT leg to a waypoint on the current map.  See note 4: long BFS
 -- queries on map 75 run the 4096-node cap dry and answer "no path" for
@@ -320,72 +246,8 @@ local function go(sx, sy, dm, dx, dy, what)
   })
 end
 
--- gen_banon's talkToObj, unchanged in shape: approach re-resolved from live
--- object coords (NPCs wander), facing computed from the live delta, soft
--- rounds before a hard one.  CheckNPCs activates whatever the object map
--- holds ONE TILE IN THE PARTY'S FACING DIRECTION while A is held, and a
--- two-frame turn press does not set the facing byte -- so the direction is
--- HELD until it reads back, and only then is A edge-tapped.
-local function talkToObj(obj, what, maxF)
-  local engaged = false
-  local function objAt() return objX(obj), objY(obj) end
-  local function adjacent()
-    local ox, oy = objAt()
-    return math.abs(ox - H.fieldX()) + math.abs(oy - H.fieldY()) == 1
-  end
-  local apFrame, apPick = -1000, nil
-  local function approach()
-    if H.frame - apFrame >= 30 then
-      apFrame = H.frame
-      local ox, oy = objAt()
-      apPick = { ox, oy + 1 }
-      for _, c in ipairs(NEIGHBOURS) do
-        local cx, cy = ox + c[1], oy + c[2]
-        if H.bfsPath(cx, cy) then apPick = { cx, cy }; break end
-      end
-    end
-    return apPick
-  end
-  local function walkStep()
-    return H.navTo(function() return approach()[1] end,
-                   function() return approach()[2] end, {
-      maxFrames = maxF or 20000, honest = true,
-      arrive = function()
-        return engaged or (adjacent() and H.hasControl() and H.tileAligned())
-      end,
-    })
-  end
-  local function pokeStep(round, budget, hard)
-    local started, waited, aPh = 0, 0, 0
-    return H.driveUntil(function()
-      started = (H.eventRunning() or H.dialogWaiting()) and started + 1 or 0
-      if started >= 6 then engaged = true; return true end
-      waited = waited + 1
-      return not hard and waited > budget
-    end, budget + 120, {
-      H.call(function()
-        aPh = (aPh + 1) % 8
-        if not (H.hasControl() and H.tileAligned() and adjacent()) then
-          H.setPad({}); return
-        end
-        local ox, oy = objAt()
-        local dx, dy = ox - H.fieldX(), oy - H.fieldY()
-        local dir = dx == 1 and "right" or dx == -1 and "left"
-                 or dy == 1 and "down" or "up"
-        if facing() ~= FACE[dir] then H.setPad({ [dir] = true }); return end
-        H.setPad(aPh < 4 and { "a" } or {})
-      end),
-    }, string.format("%s: activation round %d", what, round))
-  end
-  return seq({
-    H.call(function() engaged, apFrame, apPick = false, -1000, nil end),
-    walkStep(), pokeStep(1, 600, false),
-    -- flat, not repeatN: it cannot replay navTo/driveUntil bodies
-    H.cond(function() return not engaged end,
-      { walkStep(), pokeStep(2, 900, true) }, {}),
-    H.release(),
-  })
-end
+-- talkToObj -- approach a posted NPC and activate it -- is H.talkToObj
+-- now (promoted to lib/ot6_field.lua, 2026-08-09).
 
 -- gen_scenario.lua's choice-steering idiom, unchanged in shape.  $056F is
 -- the option count and is only final once dialogWaiting() is true (it is
@@ -434,7 +296,7 @@ end
 local function talkThrough(obj, what, choices, budget)
   local calm = 0
   return seq({
-    talkToObj(obj, what),
+    H.talkToObj(obj, what),
     rideUntil(function()
       local ok = H.hasControl() and H.tileAligned() and bright() >= 15
              and not H.dialogWaiting() and not H.eventRunning()
@@ -446,150 +308,10 @@ local function talkThrough(obj, what, choices, budget)
   })
 end
 
--- THE GATE SOLDIER COMES BACK EVERY TIME MAP 75 RELOADS.  `hide_obj NPC_11`
--- (_ca856a, event_main.asm:20313) is a RUNTIME bit, not story state: leaving
--- town for an interior and coming back re-runs InitNPCs (field/init.asm:469
--- only skips it when reloading the SAME map) and re-creates every npc whose
--- spawn switch still holds.  His is $030C and nothing in the scenario clears
--- it.  So (30,42) -- the ONE tile joining the SE quarter to the rest of town
--- -- is plugged again on every return, and this route crosses that boundary
--- three times.  The soldier's uniform is no answer: `if_switch $0103=1` only
--- swaps his fight for a bare "Halt!" (:20296); it does not move him.
--- Gated on the SYMPTOM (a BFS probe to a tile on the far side) rather than
--- assumed, so the day the respawn stops happening this says so instead of
--- walking into a fight that is not there.
---
--- EVERY ENGAGEMENT IS A RETRY LADDER NOW (issue #75).  With the HP pin
--- gone a lost battle 11 runs _ca85ba -- LOCKE revived on (47,43), both
--- disguise switches cleared -- so each fight captures a blob first, and a
--- loss reloads it and re-engages with a different frame offset (the
--- battle RNG seed is the frame phase at init, so each retry plays a
--- genuinely different fight).  Success = not dumped on the opening tile
--- AND the probe tile reachable; three losses fail the mint loudly.
-local function clearGateSoldier(probeX, probeY, tag)
-  local blob, won = nil, false
-  local function fightOnce(n)
-    local loadReq
-    return H.cond(function() return won end, {}, {
-      H.logStep(function()
-        return string.format("%s: battle 11 attempt %d (offset %d) at f%d",
-          tag, n, (n - 1) * 37, H.frame)
-      end),
-      n > 1 and seq({
-        H.call(function() loadReq = H.requestLoadState(blob) end),
-        H.waitFrames(2),
-        H.call(function() H.checkReq(loadReq, tag .. ": pre-fight reload") end),
-        H.waitFrames(90),
-        H.waitFrames((n - 1) * 37),      -- vary the battle RNG seed
-      }) or seq({}),
-      talkToObj(26, tag .. ": the gate soldier (battle 11)"),
-      rideOut(tag .. ": ride battle 11 out", 30000, 75),
-      H.call(function()
-        -- a LOST attempt runs the scenario reset (_ca85ba) and dumps the
-        -- party back on (47,43); being anywhere else with the lane open is
-        -- the win.  ($0104 is NOT this signal -- see the branch above.)
-        -- ...but the SAME test does not work AFTER the fight: a beaten
-        -- soldier keeps his coordinates -- the scene hides the object, it
-        -- does not move it -- so obj 26 still reads {30,42} on a win.
-        -- Each question in the place it is valid: his TILE decides whether
-        -- to fight (stable at leg start, when the object map may not be
-        -- populated), and REACHABILITY decides whether we won (stable
-        -- afterwards, when he is gone from the map even though his record
-        -- is not).  A loss dumps the party back on (47,43).
-        won = not (H.fieldX() == 47 and H.fieldY() == 43)
-          and H.bfsPath(probeX, probeY) ~= nil
-        H.log(string.format("%s: attempt %d %s at (%d,%d) f%d, $0104=%d",
-          tag, n, won and "WON" or "LOST (scenario reset)",
-          H.fieldX(), H.fieldY(), H.frame, sw(0x0104)))
-      end),
-    })
-  end
-  -- CAN HE JUST WALK PAST HIM?  No, and that is measured, not assumed.
-  -- South Figaro is a stealth chapter and the gate soldier looked like he
-  -- wandered -- the old reachability probe answered "lane open" often
-  -- enough to flip this branch by accident -- so the obvious move is to
-  -- wait him out.  Measured 2026-08-09: polling H.bfsPath(22,43) every 60
-  -- frames for 7200 frames (two minutes of game time) NEVER once found a
-  -- path.  He does not step off the choke.  The fight is mandatory, which
-  -- is what makes the balance finding below a real one and not a routing
-  -- failure.
-  --
-  -- WHICH BRANCH, decided on the STORY SWITCH and not on a BFS probe.
-  -- This used to ask "is (22,43) reachable this instant?", and the answer
-  -- depends on where the gate soldier happens to be standing: he WANDERS,
-  -- and when he steps off the choke the probe says "lane already open",
-  -- the fight is skipped, and the next navTo walks into him and dies of
-  -- "no path" twenty retries later.  Measured 2026-08-09 -- inserting a
-  -- single menu visit ahead of this cond was enough to flip it.  $0104 is
-  -- the switch the gate scene itself sets, it does not wander, and the
-  -- loss path below already reads it.
-  -- BACK TO THE ORIGINAL REACHABILITY PROBE.  I swapped this to $0104 on
-  -- the theory that the soldier wanders and the probe is a coin flip.  Both
-  -- halves of that were wrong: he does NOT wander (polled every 60 frames
-  -- for 7200 frames, the lane never opened once), and $0104 is not the
-  -- switch the gate sets -- keyed on it, this reported a LOSS on a fight
-  -- LOCKE had just won outright, HeavyArmor at 0 hp and the party standing
-  -- clear of the reset tile.  The symptom probe was right all along.
-  -- THE BRANCH IS THE SOLDIER'S OWN TILE, not a path query.  Three
-  -- readings of this have now been wrong.  $0104 is not the switch the
-  -- gate sets (it called a won fight a loss).  And the BFS probe -- right
-  -- when this leg opened with a walk -- reads "open" every time now that
-  -- the leg opens two MENUS first, so the party skips the fight, walks to
-  -- (31,42) and dies of "no path" twenty retries later.
-  --
-  -- He is a PLUG on exactly one tile: npc 10 / obj 26 sits at {30,42},
-  -- spawn switch $030C, and (30,42) is the only tile joining the starting
-  -- pocket to the rest of town.  So ask where he is.  Beaten, the object
-  -- is gone and this reads anything but his post; on his feet it reads
-  -- {30,42} whatever the object map happens to be doing that frame.
-  return H.cond(function() return objX(26) == 30 and objY(26) == 42 end, {
-    H.logStep(function()
-      return string.format("%s: the gate soldier is on his post (%d,%d) " ..
-        "at f%d; fighting him", tag, objX(26), objY(26), H.frame)
-    end),
-    -- TOP UP FIRST.  He respawns on every map-75 reload, so this route
-    -- fights him THREE times, and LOCKE arrives at the third one carrying
-    -- whatever the first two left him.  Measured: B1 won, R1 won on its
-    -- second attempt, R2 lost all three -- not because that fight is
-    -- different but because he walked into it worn down.  A player heals
-    -- between rounds with a soldier; so does this.  A no-op when he is
-    -- already full, and it never spends below the Potion floor the later
-    -- beats need.
-    H.fieldCare({ tag = "care before " .. tag, threshold = 0.95 }),
-    (function()
-      local req
-      return seq({
-        H.call(function() req = H.requestSaveState() end),
-        H.waitFrames(2),
-        H.call(function()
-          H.checkReq(req, tag .. ": retry blob")
-          blob = req.blob
-        end),
-      })
-    end)(),
-    fightOnce(1), fightOnce(2), fightOnce(3),
-    H.call(function()
-      -- THIS IS THE WALL, and it is left standing on purpose (issue #75).
-      -- Solo LOCKE, level 8, 168 hp, correctly equipped through the real
-      -- Equip -> Optimum walk, healing himself with Tonics, deals ~21
-      -- damage per 300 frames to a level-13 HeavyArmor with 495 hp and
-      -- takes ~117 back.  He needs ~7200 frames of swings and survives
-      -- ~2500.  Front row and back row measure identically.  Its
-      -- weaknesses are bolt and water (monster_prop +25 = $84) and solo
-      -- LOCKE can reach neither, so the break economy has no answer here
-      -- either.  Bare-handed -- which is how the chain delivered him until
-      -- H.equipOptimum landed -- it was eight damage a swing.
-      -- This wants a balance call, not a cleverer drive.  Do not widen
-      -- the attempt ladder until it gets lucky; that is the #74 mistake.
-      H.assertEq(won, true,
-        tag .. ": battle 11 won honestly within 3 attempts (boosted Fights)")
-      H.assertEq(H.bfsPath(probeX, probeY) ~= nil, true,
-        tag .. ": the lane is open again")
-    end),
-  }, {
-    H.logStep(function() return tag .. ": the lane is already open" end),
-  })
-end
+-- THE GATE SOLDIER -- his respawn-on-reload mechanism, the retry ladder,
+-- and the his-own-tile branch, with their full measured history -- is
+-- H.clearGateSoldier now (promoted to lib/ot6_field.lua, 2026-08-09;
+-- gen_tunnelarmr re-enters the same town and needed the same answer).
 
 -- ------------------------------------------------------------- the steal --
 -- THE HONEST STEAL (issue #75).  Locke's command window is `FIGHT, STEAL,
@@ -731,7 +453,7 @@ H.run({ maxFrames = 350000 }, {
   -- LOCKE on boosted Fights, with the retry ladder around the engagement.
   -- The probe tile is the cafe doorstep the win must open.
   -- ===================================================================== --
-  clearGateSoldier(22, 43, "B1 (open the town)"),
+  H.clearGateSoldier(22, 43, "B1 (open the town)"),
   H.call(function()
     H.assertEq(map(), 75, "still in town after battle 11")
     H.assertEq(H.bfsPath(22, 43) ~= nil, true,
@@ -767,7 +489,7 @@ H.run({ maxFrames = 350000 }, {
           H.waitFrames(90),
           H.waitFrames((n - 1) * 37),    -- vary the battle RNG seed
         }) or seq({}),
-        talkToObj(22, "the cider runner"),
+        H.talkToObj(22, "the cider runner"),
         -- ride the two dialogs into the fight BY HAND: advanceStory's
         -- honest mode would blind-tap A in the fight, and A on the resting
         -- cursor is FIGHT -- the merchant must never be killed
@@ -893,7 +615,7 @@ H.run({ maxFrames = 350000 }, {
   hop(24, 34, "W3 east along the main street"),
   hop(30, 36, "W4 to the top of the SE lane"),
 
-  clearGateSoldier(30, 43, "R1 (into the SE quarter)"),
+  H.clearGateSoldier(30, 43, "R1 (into the SE quarter)"),
   hop(30, 43, "W5 down the SE lane"),
   hop(34, 43, "W6 east"),
   hop(34, 46, "W7 south"),
@@ -915,7 +637,7 @@ H.run({ maxFrames = 350000 }, {
   go(36, 23, 75, 37, 42, "E2 map 86 (36,23) -> town (37,42)"),
   hop(34, 43, "W9 back west across the SE quarter"),
   -- and back OUT of the SE quarter, so the same plug is in the way again
-  clearGateSoldier(34, 35, "R2 (out of the SE quarter)"),
+  H.clearGateSoldier(34, 35, "R2 (out of the SE quarter)"),
   go(34, 35, 86, 4, 6, "E3 town (34,35) -> map 86 (4,6)"),
   talkThrough(20, "the grandson (the password)", {
     { want = 1, max = 3, what = 'dlg $00E0 "The password is..." -- 1 = ' ..
