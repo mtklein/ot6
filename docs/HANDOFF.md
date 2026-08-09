@@ -173,14 +173,38 @@ killed to get there; do not re-test them:**
 | sneaking past the soldier | polled `bfsPath` every 60 frames for 7200 frames -- he NEVER steps off the choke. No |
 | Active battle mode punishing menu time | `$1D4D` already reads Wait, speed 2. No |
 
-The arithmetic that remains: **~21 damage a swing into 495 hp behind 3
-shields, against ~110 damage per enemy turn, at about one action per 300
-frames.** Shielded damage is halved and its weaknesses are bolt and water
-(`monster_prop` +25 = `$84`), neither of which solo LOCKE can reach, so
-the break economy has no answer either. This needs a product decision --
-retune battle 11 for a solo level-8 thief, give LOCKE a reachable answer
-to a machine, or make the gate passable without the fight. **Do not widen
-the retry ladder until it gets lucky; that is the #74 mistake.**
+**CORRECTION, and it reverses the conclusion above.** I called this a
+balance finding twice. It is not one. The arithmetic, done properly:
+
+```
+effective HP pool   168 + 4 Potions*250 + 12 Tonics*50 = 1768
+enemy hits absorbed 1768 / 110                         = 16
+actions in that time  16 * (600/300)                   = 32
+  spent healing                                        = 16
+  left to attack                                       = 16
+
+never breaking the shields:  16 * 21          =  339  vs 495  LOSE
+breaking first (3 chips, 1 per hit, measured):
+  3*21 + 13*84                                = 1167  vs 495  WIN
+```
+
+Shielded damage is HALVED and the ladder is broken:weak:unweak = 4:2:1
+(`Ot6ShieldedMulW`, `ot6_break.asm:1487-1497`), so a broken HeavyArmor
+takes **84 a swing, not 21** -- and LOCKE chips one shield per boosted
+Fight, measured (495/sh3 -> 484/sh2). Three chips and the fight is over
+with more than double the margin. **The fight is winnable and the whole
+thing turns on the break economy, which is what this game is about.**
+
+So the real blocker is the ONE remaining harness bug: **LOCKE's heals do
+not land**, so he never survives the sixteen actions the win needs. The
+trace shows the confirm at `$38` followed by `$40 -> $01 -> $0A` -- the
+item window RE-OPENING, which is what a REJECTED confirm looks like.
+Leading hypothesis, unmeasured: **cursor memory** (`$1D4E & $40`) starts
+the battle item cursor somewhere other than row 0, so the single `down`
+the driver presses lands on an empty slot. Run `gen_sfigaro` with
+`trace = true` on its `rideOut` driver -- the item-window dump prints
+scroll/row/sum beside the live `$2686` contents, which settles it in one
+run. Do NOT retune anything until that is chased.
 
 **The first full-frontier run of the honest chain got to 117 of 187 edges**
 (2026-08-09) and stopped at `sfigaro_town`. Everything through the Terra
