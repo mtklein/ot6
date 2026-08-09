@@ -1089,20 +1089,25 @@ H.run({ maxFrames = 400000 }, {
     -- a walked-off SHADOW as a loss and reload with a stagger.
   end),
 
-  -- THE BACK ROW HERE IS UNPROVEN, AND THAT IS WHY IT IS NOT HERE.
-  -- Owner note, 2026-08-09: ranged attackers sit in the back row at no
-  -- cost, and on paper this is the purest case in the game -- SABIN's
-  -- Blitz, SHADOW's Throw and CYAN's SwdTech are all row-exempt
-  -- (battle_main.asm:3131-3133, :7127-7133), so all three should take half
-  -- physical damage for nothing, against a fight whose failure mode is
-  -- literally "SABIN down pre-break".  Both of them stand in the FRONT
-  -- rank today (measured at camp_intro and camp_cleared).
+  -- THE BACK ROW LOSES THIS FIGHT, MEASURED TWICE.  It is the lever that
+  -- won the South Figaro gate outright (solo LOCKE: unwinnable from the
+  -- front rank, attempt 1 from the back), and on paper this party is the
+  -- purer case -- SABIN's Blitz, SHADOW's Throw and CYAN's SwdTech are all
+  -- row-exempt (battle_main.asm:3131-3133, :7127-7133), so all three
+  -- should halve what they take for nothing.
   --
-  -- It was tried and the run came back WORSE -- shields 6 chipped to 6,
-  -- casts 0, SABIN down at f19108 against 6->3 and f34707 in front row --
-  -- but that run booted a STALE forest_done, so it is not evidence of
-  -- anything and was not kept.  Re-mint the Sabin chain first, then try
-  -- H.setRows({[2]=true,[3]=true,[5]=true}) here and compare honestly.
+  -- They do not.  Front row: shields 6 -> 3, SABIN down at f34707.  Back
+  -- row: shields 6 -> 6, casts 0, SABIN down at f19108 -- worse, and
+  -- reproduced on a freshly minted chain after the first attempt was
+  -- thrown out for booting a stale ancestor.  Whatever chips this boss is
+  -- paying the row penalty, so halving it costs more than the halved
+  -- damage taken buys.
+  --
+  -- Do not re-derive this from the exemption rule.  The rule is right and
+  -- the outcome still went the other way; that is worth more than the
+  -- theory.  If you want to know WHY, log which action lands each chip
+  -- (newFightDriver's heartbeat prints shields beside monster hp now).
+
 
 
   -- ---- rear half ----
