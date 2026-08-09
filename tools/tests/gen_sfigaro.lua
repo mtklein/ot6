@@ -491,6 +491,16 @@ local function clearGateSoldier(probeX, probeY, tag)
       end),
     })
   end
+  -- CAN HE JUST WALK PAST HIM?  No, and that is measured, not assumed.
+  -- South Figaro is a stealth chapter and the gate soldier looked like he
+  -- wandered -- the old reachability probe answered "lane open" often
+  -- enough to flip this branch by accident -- so the obvious move is to
+  -- wait him out.  Measured 2026-08-09: polling H.bfsPath(22,43) every 60
+  -- frames for 7200 frames (two minutes of game time) NEVER once found a
+  -- path.  He does not step off the choke.  The fight is mandatory, which
+  -- is what makes the balance finding below a real one and not a routing
+  -- failure.
+  --
   -- WHICH BRANCH, decided on the STORY SWITCH and not on a BFS probe.
   -- This used to ask "is (22,43) reachable this instant?", and the answer
   -- depends on where the gate soldier happens to be standing: he WANDERS,
@@ -519,6 +529,18 @@ local function clearGateSoldier(probeX, probeY, tag)
     end)(),
     fightOnce(1), fightOnce(2), fightOnce(3),
     H.call(function()
+      -- THIS IS THE WALL, and it is left standing on purpose (issue #75).
+      -- Solo LOCKE, level 8, 168 hp, correctly equipped through the real
+      -- Equip -> Optimum walk, healing himself with Tonics, deals ~21
+      -- damage per 300 frames to a level-13 HeavyArmor with 495 hp and
+      -- takes ~117 back.  He needs ~7200 frames of swings and survives
+      -- ~2500.  Front row and back row measure identically.  Its
+      -- weaknesses are bolt and water (monster_prop +25 = $84) and solo
+      -- LOCKE can reach neither, so the break economy has no answer here
+      -- either.  Bare-handed -- which is how the chain delivered him until
+      -- H.equipOptimum landed -- it was eight damage a swing.
+      -- This wants a balance call, not a cleverer drive.  Do not widen
+      -- the attempt ladder until it gets lucky; that is the #74 mistake.
       H.assertEq(won, true,
         tag .. ": battle 11 won honestly within 3 attempts (boosted Fights)")
       H.assertEq(sw(0x0104), 1, tag .. ": the gate scene recorded the win")
