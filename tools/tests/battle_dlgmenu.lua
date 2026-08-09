@@ -161,14 +161,12 @@ H.run({ maxFrames = 12000 }, {
       aPhase = (aPhase + 1) % 8
       if H.battleLoadStarted() then
         if whelk() then H.setPad({}); return end
-        if H.monstersPresent() > 0 then
-          for slot = 0, 5 do
-            if H.readByte(0x3aa8 + slot * 2) % 2 == 1 then
-              H.writeByte(0x3eec + slot * 2, H.readByte(0x3eec + slot * 2) | 0x80)
-            end
-          end
-        end
-        H.setPad(aPhase < 4 and { "a" } or {})
+        -- an incidental encounter on the way to the trigger is FLED, not
+        -- kill-bitted (issue #75): L+R is the engine's own run mechanic,
+        -- the same idiom every converted traversal leg uses.  If the
+        -- formation refuses to release, the driveUntil budget fails this
+        -- loudly rather than a poke papering over it.
+        H.setPad({ l = true, r = true })
         return
       end
       if H.dialogWaiting() then
