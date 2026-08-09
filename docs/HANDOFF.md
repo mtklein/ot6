@@ -147,6 +147,31 @@ and no fixture in the chain has ever set one. Research is in
 them once early propagates to every downstream fixture -- do it before a
 full re-mint, not after.
 
+**Frontier status, end of 2026-08-09: THREE blockers found, ONE fixed.**
+Running `make frontier NINJAFLAGS="-k 0"` (continue past failures) is how
+to enumerate them in one pass instead of one per multi-hour run -- do that
+first, always. The list:
+
+| leg | looked like | actually was | now |
+|---|---|---|---|
+| `terra_clifftop` | "navTo timeout, 60000 frames" | the party WIPED; the leg walked BANON's escort on `honest=true` (blind A) and never opened the item menu | **FIXED** -- `honest="tactical"` + `H.fieldCare` per crossing, green at f12782 |
+| `sfigaro_town` | balance wall | LOCKE unarmed, then out of supplies, then in-battle heals not landing | **OPEN**, see below |
+| `train_done` | — | the #74 Phantom Train, thin margin | **OPEN**, attempt 1 got it to 744 hp / 3 shields of 6 |
+
+**`sfigaro_town` -- what has been ruled OUT, so nobody re-runs it:**
+equipment (fixed: 8 -> 21 damage a swing), supplies (fixed: he inherits 12
+Tonics + 4 Potions now, was 2 Tonics), the boost bank (`opts.bank`
+implemented), rows (front and back measure identically), sneaking past
+(polled `bfsPath` every 60 frames for 7200 frames -- the gate soldier
+NEVER steps off the choke), and Wait mode (`$1D4D` already reads Wait,
+speed 2). **What is left is a real harness bug:** the fight driver plans
+`heal entity 0 with $E9`, and the battle menu is in **MSTATE `$01`**,
+which `newFightDriver` does not handle at all -- so it presses nothing,
+the turn is wasted, and the plan is re-made next turn. Solo LOCKE gets
+about one action per 300 frames and takes ~110 damage in the same window.
+Probe the solo-party battle-menu state machine and teach the driver `$01`
+before touching any tuning.
+
 **The first full-frontier run of the honest chain got to 117 of 187 edges**
 (2026-08-09) and stopped at `sfigaro_town`. Everything through the Terra
 scenario, the Sabin line, the rapids and the scenario split re-minted
@@ -185,8 +210,29 @@ then died of "no path"; it reads `$0104` now. And `newFightDriver`'s press
 cadence is an option (at the historical 30, a boosted Fight costs two
 seconds of wall clock just to TYPE).
 
-**The equip audit is the open follow-up, and it is probably bigger than
-the leg that surfaced it.** `event_main.asm` has **58 `remove_equip` sites
+**THE EQUIP AUDIT IS DONE AND IT WAS BIGGER THAN THE LEG THAT SURFACED
+IT.** `tools/audit_equipment.py` (wired into `make test`) reads the
+savestates directly -- no emulator, 118 fixtures in about a second -- and
+found **LOCKE bare-handed in 42 fixtures and CELES in 29**. Two of the
+four World-of-Balance characters have fought every honest battle this
+chain has ever measured with their fists. `H.equipOptimum` stops are in
+at the two chokepoints (`gen_celes` at the passage, `gen_narshe_battle`
+at the reunion) plus `gen_sfigaro`; UMARO is excluded because the equip
+mask says he can hold exactly one weapon record, which is derived rather
+than assumed. Any leg still red after a re-mint should be checked against
+this audit BEFORE it is called a balance finding.
+
+**Two library traps worth knowing, both found the expensive way:**
+`newFightDriver` re-read the battle inventory while the item window was
+open, got nil, dropped the plan and pressed B -- forever ("mid-menu
+inventory reads measurably lie" was already written down for the FIELD
+inventory in gen_sabin_train's shop drive; the battle side had the same
+trap). And a party wipe used to impersonate a stuck navigator: the three
+navigators now carry a debounced `M.partyWiped()` canary that names it,
+because neither of the two wipes so far produced a log containing the
+word "died".
+
+**The older follow-up note, kept for the numbers:** `event_main.asm` has **58 `remove_equip` sites
 in 15 clusters** (the Vector infiltration strips all thirteen at
 `:11979-11991`; `:26328-26352` and the two `:84472`/`:84534` blocks are the
 other big ones), and the mint chain has never re-equipped after ANY of
