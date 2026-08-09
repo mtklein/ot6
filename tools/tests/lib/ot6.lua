@@ -1164,6 +1164,24 @@ function M.newFightDriver(tag, opts)
 
     menuStreak = menuStreak + 1
     if menuStreak < 4 then M.setPad({}); return end
+    local traceActor = M.readByte(ACTOR) & 3
+    if opts.trace and M.readByte(MSTATE) == ST_ITEM then
+      -- the ITEM WINDOW, in full: the cursor SUM the driver steers ($8947
+      -- scroll + $894F row) beside the raw battle inventory it computes
+      -- its target index from ($2686, 5 bytes/entry: id at +0, qty at +3).
+      -- If those two disagree about what row 3 is, every heal confirms the
+      -- wrong item -- which is exactly the symptom.
+      local inv = {}
+      for i = 0, 11 do
+        local id, qty = M.readByte(BATTINV + i * 5), M.readByte(BATTINV + i * 5 + 3)
+        inv[#inv + 1] = string.format("%d:%02X x%d", i, id, qty)
+      end
+      M.log(string.format("  [%s ITEM] scroll=%d row=%d sum=%d want=%s | %s",
+        tag or "fight", M.readByte(ITEMSCR + traceActor),
+        M.readByte(ITEMROW + traceActor),
+        M.readByte(ITEMSCR + traceActor) + M.readByte(ITEMROW + traceActor),
+        plan and tostring(plan.idx) or "-", table.concat(inv, " ")))
+    end
     if opts.trace and battleTick % 2 == 0 then
       M.log(string.format("  [%s trace] f+%d menu=%02X st=%02X actor=%d " ..
         "cur=%d plan=%s held=%s", tag or "fight", battleTick, menu,
