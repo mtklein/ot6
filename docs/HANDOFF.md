@@ -164,13 +164,35 @@ f19108. Blitz/Throw/SwdTech really are row-exempt and the fight still went
 the other way, so something that CHIPS that boss pays the penalty. Do not
 re-derive it from the exemption rule.
 
-**NEW BLOCKER, `sfigaro_escape` (gen_tunnelarmr):** navTo timeout, party
-parked at map 75 (41,43) with no plan for 20000 frames, NOT a wipe (the
-canary stays quiet). Almost certainly the gate soldier again -- he
-respawns on every map-75 reload, nothing clears `$030C`, and (30,42) is
-the only tile joining the quarters. `gen_sfigaro` has `clearGateSoldier`
-for exactly this and `gen_tunnelarmr` has nothing; that helper wants
-promoting into the library rather than copying.
+**The `sfigaro_escape` blocker is FIXED (2026-08-09, wt/sfigaro-escape),
+and the paragraph that used to sit here was wrong twice.** It read "parked
+at map 75 (41,43), almost certainly the gate soldier."  Measured
+(`probe_sfigaro_escape_stall.lua`): the park is **map 87** -- (41,43)
+exists on both maps and the nav heartbeat prints no map id -- and map 87
+has no triggers and no npcs but DOES have **random encounters**; the
+event PC sits at $CA0029, inside `RandBattle` (ca/0018).  The stall was
+navTo's `honest=true` battle branch blind-tapping A at a Vector Pup pair.
+The gate soldier is irrelevant to the escape: it re-enters town at
+(48,36) and leaves by the x=56 column, both east of his (30,42) choke
+(the re-entry now logs his post -- he IS standing there -- and the exit
+reachability).  `clearGateSoldier` was promoted into `lib/ot6_field.lua`
+anyway, with `talkToObj` and `rideOut`, and `gen_sfigaro` calls the
+library versions.
+
+Two more findings rode along: **traversal on a shopless escape route must
+FLEE** -- the tactical driver won the first tunnel fight honestly (real
+Fenix Down revival mid-battle) and the win emptied the bag, so the next
+encounter wiped a party that had nothing left to drink; gen_kolts's cave
+doctrine (run from trash, fight where the levels are needed) now governs
+every leg of this route.  And **the wipe canary missed that wipe** --
+`M.partyWiped()` reads $1600, which still carries pre-battle HP when the
+party dies inside a battle, so `RandBattle`'s GameOver held the event PC
+forever while the canary stayed quiet.  Third wipe to impersonate a stuck
+navigator, first with the canary deployed; it needs a battle-module
+witness ($3BF4 while `battleLoadStarted()`).  Also landed: CELES is
+ARMED at gen_tunnelarmr's boot (she was relic-only through the whole
+downstream chain -- audit_equipment's defect class exactly), with the
+celes_freed waiver line making that fixture legitimately story-bare.
 
 **Frontier status, end of 2026-08-09: FOUR blockers found, TWO fixed.**
 Running `make frontier NINJAFLAGS="-k 0"` (continue past failures) is how
