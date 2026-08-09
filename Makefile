@@ -160,6 +160,14 @@ test: rom nomp-rom graph
 	@# any NEW write anywhere in tools/tests/**/*.lua fails here.
 	python3 tools/check_state_writes.py --selftest
 	python3 tools/check_state_writes.py
+	@# Nobody fights bare-handed.  The game strips characters at story beats
+	@# and returns their gear to inventory; no leg ever put it back, so LOCKE
+	@# was unarmed in 42 fixtures and CELES in 29, and solo LOCKE punching a
+	@# 495-hp HeavyArmor read as a balance wall for three runs.  Reads the
+	@# savestates directly -- no emulator, ~1s for the whole tree -- so the
+	@# check is cheap enough to be unconditional.  Silent on an empty
+	@# build/states, because `make test` must not require a minted frontier.
+	python3 tools/audit_equipment.py
 	python3 tools/tests/lib/frontier_ninja.py --selftest
 	sh tools/tests/lib/frontier_ninja_selftest.sh
 	sh tools/tests/lib/frontier_stamp_selftest.sh
