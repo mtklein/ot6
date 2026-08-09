@@ -22,8 +22,9 @@
 -- Beam banner and resolution:
 --   1. the battle NMI's OT6 tail work and the following INIDISP write stay
 --      inside vblank (scanline 225..261) on EVERY frame;
---   2. a real banner event happened in the window ($57D5 went nonzero --
---      the positive control that we exercised the vanilla writer);
+--   2. a real banner event happened in the window ($57D5 CHANGED from its
+--      armed baseline -- the positive control that we exercised the
+--      vanilla writer; issue #75 made this a read, not a poke-then-poll);
 --   3. OT6_FONTDIRTY ($57B9) stayed 0 throughout (no spurious re-lay);
 --   4. right after the banner the under-monster HUD cells are still
 --      painted in VRAM (shadow line vs tilemap word compare).
@@ -47,6 +48,14 @@ local maxFd = 0
 local sawBanner = false         -- latched at NMI entry: the pre-relocation
                                 -- flush cleared $57D5 every NMI, so a
                                 -- main-thread poll can never see it
+local base57D5 = nil            -- $57D5 as the window opened (issue #75:
+                                -- this used to be POKED to 0 so nonzero
+                                -- meant "banner"; the fixture arrives with
+                                -- $82 already there, so "banner happened"
+                                -- is now a CHANGE from the armed baseline.
+                                -- A new banner whose first char equals the
+                                -- stale one would fail the positive
+                                -- control LOUDLY, not pass silently.)
 
 local function sl() return emu.getState()["ppu.scanline"] end
 
@@ -56,7 +65,7 @@ emu.addMemoryCallback(function()
   local fd = H.readByte(FONTDIRTY)
   if fd > maxFd then maxFd = fd end
   cur.fd = fd
-  if H.readByte(0x57D5) ~= 0 then sawBanner = true end
+  if H.readByte(0x57D5) ~= base57D5 then sawBanner = true end
   rec[#rec + 1] = cur
 end, emu.callbackType.exec, 0xC10BA7, 0xC10BA7)
 
@@ -90,10 +99,14 @@ H.run({ maxFrames = 12000 }, {
     "battle to become active (screen rendering)", 30),
   H.waitFrames(240),
 
-  -- arm the instrument, and zero vanilla's name-scratch byte so "a banner
-  -- happened" is detectable (vanilla always writes it before reading)
+  -- arm the instrument.  This used to ZERO vanilla's name-scratch byte so
+  -- "nonzero = a banner happened"; issue #75 made it a READ: latch the
+  -- byte as it is (measured $82 from this fixture+drive -- the poke WAS
+  -- load-bearing, a clean-slate assert failed here) and detect the banner
+  -- as a CHANGE from that baseline in the NMI watcher.
   H.call(function()
-    H.writeByte(0x57D5, 0)
+    base57D5 = H.readByte(0x57D5)
+    H.log(string.format("armed: $57D5 baseline %02X", base57D5))
     armed = true
   end),
 
