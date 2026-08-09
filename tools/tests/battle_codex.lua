@@ -4,6 +4,15 @@
 -- all three O8 slot pages even when slot 2 is loaded first, then teach slot 2
 -- after migration. Fight 2 runs as slot 1 and must see the migrated knowledge
 -- but not slot 2's new learning.
+--
+-- *** QUARANTINED MECHANISM TEST (issue #75) -- state writes SANCTIONED ***
+-- Owner-named on the #75 policy list: legacy-format codex migration.  The
+-- input under test is a CARTRIDGE from the O7 era -- a layout no current
+-- build can produce by play, only inherit -- so seeding it is the only
+-- way the migration path can run at all.  (The post-migration teaching
+-- half writes knowledge a real fight could learn; it converts if this
+-- test ever splits.)  It keeps its waivers, and it MAY NEVER PRODUCE
+-- FIXTURES.
 local H = dofile("tools/tests/lib/ot6.lua")
 local STATE = "build/states/battle_doorstep.mss.lua"
 local function sram(addr) return emu.read(addr, emu.memType.snesMemory) end

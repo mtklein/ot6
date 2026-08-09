@@ -22,6 +22,13 @@
 -- let vanilla's own CopyGameDataToSRAM run, then read back what it stored.
 -- The resulting save is deliberately garbage -- only the checksum is under test.
 -- Saving is only legal on the world map, so this runs from worldmap_narshe.
+--
+-- *** QUARANTINED MECHANISM TEST (issue #75) -- state writes SANCTIONED ***
+-- Owner-named on the #75 policy list: the 1/65536 zero-checksum save.  A
+-- real game state whose 2558-byte sum lands exactly on $0000 exists but
+-- cannot be reached on cue by play; the zeroed range is the only way to
+-- put the fold under test.  It keeps its waiver, and it MAY NEVER
+-- PRODUCE FIXTURES.
 local H = dofile("tools/tests/lib/ot6.lua")
 
 local ZMENUSTATE       = 0x0026

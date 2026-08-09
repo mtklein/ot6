@@ -14,6 +14,14 @@ local goodFire, goodShield
 -- dialogue flow). This test drives the MECHANISM directly: corrupt the
 -- icon cells in vram, raise the flag, and confirm the NMI restores them
 -- and clears the flag.
+--
+-- *** QUARANTINED MECHANISM TEST (issue #75) -- state writes SANCTIONED ***
+-- Owner-named on the #75 policy list: deliberate VRAM corruption for the
+-- font-restore path.  The input under test (our font cells overwritten in
+-- vram) is produced in real play only by a battle dialogue's own upload,
+-- which battle_dlgmenu drives for real; THIS test isolates the restore
+-- machinery itself and needs the corruption on cue.  It keeps its
+-- waivers, and it MAY NEVER PRODUCE FIXTURES.
 local H = dofile("tools/tests/lib/ot6.lua")
 local STATE = "build/states/battle_doorstep.mss.lua"
 local vr = emu.memType.snesVideoRam
