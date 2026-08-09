@@ -185,6 +185,16 @@ then died of "no path"; it reads `$0104` now. And `newFightDriver`'s press
 cadence is an option (at the historical 30, a boosted Fight costs two
 seconds of wall clock just to TYPE).
 
+**The equip audit is the open follow-up, and it is probably bigger than
+the leg that surfaced it.** `event_main.asm` has **58 `remove_equip` sites
+in 15 clusters** (the Vector infiltration strips all thirteen at
+`:11979-11991`; `:26328-26352` and the two `:84472`/`:84534` blocks are the
+other big ones), and the mint chain has never re-equipped after ANY of
+them. Every fixture downstream of one should be checked with
+`probe_lockekit`'s read (`$1600+37c+$1F..$23`, `$FF` = empty) and given an
+`H.equipOptimum` stop if it comes back bare. Expect more walls that look
+like balance and are not.
+
 **`make test` stops at its own `--check-states` gate** while the frontier
 is mid-re-mint, which is that gate working, not a failure.
 
