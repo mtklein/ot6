@@ -453,6 +453,15 @@ H.run({ maxFrames = 150000 }, {
     where("boot (sfigaro_passage)")
   end),
 
+  -- ARM HIM.  tools/audit_equipment.py reads every fixture in the tree and
+  -- finds LOCKE bare-handed in 42 of them and CELES in 29 -- from the
+  -- moment each is stripped, right through Zozo, the Opera and Vector.
+  -- The story's remove_equip returns gear to inventory (EventCmd_8d) and
+  -- nothing in the chain has ever put it back on, so every "measured"
+  -- fight down this whole arc was measured with a character punching.
+  -- A no-op when everyone is already holding something.
+  H.equipOptimum({ tag = "passage kit" }),
+
   -- ===================================================================== --
   -- PHASE 1: the passage -> the rich man's house -> town.  The passage
   -- (3,53) fires _ca798e, a scripted walk that lands on the rich man's

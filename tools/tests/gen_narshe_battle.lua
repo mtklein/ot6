@@ -550,6 +550,15 @@ H.run({ maxFrames = 600000 }, {
       H.fieldX(), H.fieldY(), sw(0x001E), sw(0x0021), sw(0x0044)))
   end),
 
+  -- ARM THE REUNITED PARTY.  This is the chokepoint: everything after it --
+  -- the Narshe defense, Kefka, Zozo, the Opera, Vector -- inherits whatever
+  -- the party is holding here, and tools/audit_equipment.py says that has
+  -- been NOTHING for LOCKE in 42 fixtures and CELES in 29.  The story's
+  -- remove_equip returns gear to inventory and no leg has ever put it back.
+  -- A no-op when everyone is already armed, so it costs nothing once the
+  -- upstream legs are fixed too.
+  H.equipOptimum({ tag = "reunion kit" }),
+
   -- ==================================================================== --
   -- 1. BANON {20,7}: stand at (20,8), face up, clean A.  "Prepared?" ->
   --    Yes -> the map-5 info scene -> party_menu 3, RESET.
