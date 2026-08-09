@@ -457,6 +457,18 @@ H.run({ maxFrames = 700000 }, {
   H.waitFrames(30),
 
   -- ===================================================================== --
+  -- PICK THE PARTY UP.  TERRA falls to a Gale Cut burst in most winning
+  -- runs -- a real scar, and this generator has always kept it -- but
+  -- "keep the scar" was only ever forced by an empty bag: until gen_kolts
+  -- started shopping there was no Fenix Down within three chapters of
+  -- here, so the party walked into the Returner caves carrying a corpse
+  -- because nothing could raise her, not because a player would.  A player
+  -- raises her on the spot.  H.fieldCare does it through the real Item
+  -- windows, threshold 0.9, and it is a no-op that does not even open the
+  -- menu if the fight happened to end clean.
+  H.fieldCare({ tag = "post-vargas care", threshold = 0.9 }),
+
+  -- ===================================================================== --
   -- Assert the reunion's outcome and mint, reload-verified.
   -- ===================================================================== --
   H.call(function()
@@ -466,6 +478,11 @@ H.run({ maxFrames = 700000 }, {
     H.assertEq(H.battleLoadStarted(), false, "no battle")
     H.assertEq((H.readByte(0x1855) & 0x07) ~= 0, true,
       "SABIN is in the party ($1855)")
+    -- and the whole party walks out of here on its feet
+    for _, c in ipairs(H.partyMembers()) do
+      H.assertEq(H.charHp(c) > 0, true,
+        string.format("char %d leaves Mt. Kolts alive", c))
+    end
     for c = 0, 15 do
       if (H.readByte(0x1850 + c) & 0x07) ~= 0 then
         local base = 0x1600 + 37 * c
