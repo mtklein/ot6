@@ -1164,6 +1164,13 @@ function M.newFightDriver(tag, opts)
 
     menuStreak = menuStreak + 1
     if menuStreak < 4 then M.setPad({}); return end
+    if opts.trace and battleTick % 2 == 0 then
+      M.log(string.format("  [%s trace] f+%d menu=%02X st=%02X actor=%d " ..
+        "cur=%d plan=%s held=%s", tag or "fight", battleTick, menu,
+        M.readByte(MSTATE), M.readByte(ACTOR) & 3, M.readByte(CMDROW +
+        (M.readByte(ACTOR) & 3)) & 3, plan and plan.kind or "-",
+        held and next(held) and table.concat(held, "+") or "."))
+    end
     tick = tick + 1
     -- ONE PRESS PER `cadence` FRAMES, and the number is a real handicap, not
     -- a detail.  At the historical 30 a single boosted Fight costs four
