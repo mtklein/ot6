@@ -1973,3 +1973,152 @@ function M.setRows(spec, opts)
     end),
   })
 end
+
+-- --------------------------------------------------------------- equip --
+-- M.equipOptimum: put the party's gear back ON, through the real field
+-- Equip -> Optimum walk.  Reads and pad presses only (issue #75).
+--
+-- WHY THIS IS A LIBRARY FUNCTION AND NOT A ONE-OFF.  The game strips
+-- characters and returns their gear TO INVENTORY at story beats --
+-- `remove_equip` / EventCmd_8d -- and the mint chain has never once put it
+-- back.  battle_brokendeath found this at the Vector infiltration and
+-- drove Equip -> Optimum by hand to fix its own fixture.  It is not one
+-- fixture's problem: measured 2026-08-09, solo LOCKE starts his whole
+-- South Figaro scenario with $1600+37*1+$1F..$23 all reading $FF -- no
+-- weapon, no armor, no relics, his own Dirk sitting in the bag -- and
+-- proceeded to punch a level-13, 495-hp HeavyArmor BAREHANDED for EIGHT
+-- damage a swing across three lost attempts.  That reads exactly like a
+-- balance finding and is nothing of the sort.  A player opens the Equip
+-- menu; so does this.
+--
+-- Menu path (battle_brokendeath.lua:118-152, verified live there):
+--   $05 main, cursor row 2 = Equip -A-> $06 character select -A-> $36 the
+--   option row, which is HORIZONTAL: Equip / Optimum / Rmove / Empty, so
+--   Optimum is cursor 1, one RIGHT.  A runs EquipOptimum in place.
+--
+-- No-op -- the menu is never opened -- when everyone already holds a
+-- weapon, so a route can call it after any story beat and pay only where
+-- something was actually taken away.
+function M.equipOptimum(opts)
+  opts = opts or {}
+  local tag = opts.tag or "equip"
+  local ZM, CUR = 0x26, 0x4b
+  local ST_MAIN, ST_CHAR, ST_OPT = 0x05, 0x06, 0x36
+
+  local function weapon(c) return M.readByte(0x1600 + 37 * c + 0x1f) end
+  local function bare(c) return weapon(c) == 0xFF end
+  local function anyBare()
+    for _, c in ipairs(M.partyMembers()) do
+      if bare(c) then return true end
+    end
+    return false
+  end
+  local function kitLine()
+    local out = {}
+    for _, c in ipairs(M.partyMembers()) do
+      out[#out + 1] = string.format("c%d=%02X", c, weapon(c))
+    end
+    return table.concat(out, " ")
+  end
+
+  local phase = 0
+  local function tap(btn)
+    phase = (phase + 1) % 12
+    M.setPad(phase < 4 and { btn } or {})
+  end
+
+  -- one slot, start to finish; slots are the menu's 0..3, and every party
+  -- member gets one whether or not that member is the bare one -- Optimum
+  -- on an already-equipped character is a no-op the game handles itself
+  local function oneSlot(slot)
+    -- Guard on the PARTY, not on zCharID: $69+slot is the menu's own copy
+    -- and it is stale on the field, so a solo scenario read "slot 1 = char
+    -- 255" as occupied and then hung trying to walk a cursor onto a slot
+    -- that is not there.  #M.partyMembers() is answered by $1850 and is
+    -- true whether or not a menu has ever been open.
+    return M.cond(function() return #M.partyMembers() > slot end, {
+      M.driveUntil(function() return M.readByte(ZM) == ST_MAIN end, 1800, {
+        M.call(function() tap("x") end),
+      }, tag .. ": main menu"),
+      M.release(), M.waitFrames(10),
+      M.driveUntil(function()
+        return M.readByte(ZM) == ST_MAIN and M.readByte(CUR) == 2
+      end, 1200, {
+        M.call(function()
+          local cur = M.readByte(CUR)
+          phase = (phase + 1) % 12
+          M.setPad(phase < 4 and { [cur < 2 and "down" or "up"] = true } or {})
+        end),
+      }, tag .. ": main cursor on Equip"),
+      M.release(), M.waitFrames(10),
+      M.driveUntil(function() return M.readByte(ZM) == ST_CHAR end, 1200, {
+        M.call(function() tap("a") end),
+      }, tag .. ": character select"),
+      M.release(), M.waitFrames(10),
+      M.driveUntil(function()
+        return M.readByte(ZM) == ST_CHAR and M.readByte(CUR) == slot
+      end, 1200, {
+        M.call(function()
+          local cur = M.readByte(CUR)
+          phase = (phase + 1) % 12
+          M.setPad(phase < 4
+            and { [cur < slot and "down" or "up"] = true } or {})
+        end),
+      }, tag .. ": cursor on slot " .. slot),
+      M.release(), M.waitFrames(10),
+      M.driveUntil(function() return M.readByte(ZM) == ST_OPT end, 1200, {
+        M.call(function() tap("a") end),
+      }, tag .. ": equip options"),
+      M.release(), M.waitFrames(10),
+      M.driveUntil(function()
+        return M.readByte(ZM) == ST_OPT and M.readByte(CUR) == 1
+      end, 1200, {
+        M.call(function()
+          local cur = M.readByte(CUR)
+          phase = (phase + 1) % 12
+          M.setPad(phase < 4 and { [cur < 1 and "right" or "left"] = true } or {})
+        end),
+      }, tag .. ": cursor on Optimum"),
+      M.release(), M.waitFrames(10),
+      -- EquipOptimum runs IN PLACE: the state does not change, so there is
+      -- nothing to drive toward -- one edge press and let it work.
+      M.pressButtons({ "a" }, 4),
+      M.release(), M.waitFrames(60),
+      M.logStep(function()
+        return string.format("[%s] slot %d (char %d): %s", tag, slot,
+          M.readByte(0x69 + slot), kitLine())
+      end),
+      -- back to the field before the next slot, so every pass starts from
+      -- the same place rather than from wherever the last one stopped
+      M.driveUntil(function()
+        return careBackOnMap() and M.readByte(ZM) ~= ST_MAIN
+           and M.readByte(ZM) ~= ST_CHAR and M.readByte(ZM) ~= ST_OPT
+      end, 2400, {
+        M.call(function() tap("b") end),
+      }, tag .. ": back to the field"),
+      M.release(), M.waitFrames(20),
+    }, {})
+  end
+
+  return M.cond(anyBare, {
+    M.logStep(function()
+      return string.format("[%s] someone is bare-handed (%s) -- opening " ..
+        "Equip", tag, kitLine())
+    end),
+    oneSlot(0), oneSlot(1), oneSlot(2), oneSlot(3),
+    M.logStep(function()
+      return string.format("[%s] done: %s", tag, kitLine())
+    end),
+    M.call(function()
+      for _, c in ipairs(M.partyMembers()) do
+        M.assertEq(bare(c), false, string.format(
+          "char %d is holding a weapon after Optimum", c))
+      end
+    end),
+  }, {
+    M.logStep(function()
+      return string.format("[%s] everyone is already armed: %s", tag,
+        kitLine())
+    end),
+  })
+end

@@ -1088,7 +1088,7 @@ function M.newFightDriver(tag, opts)
   function F.frame()
     battleTick = battleTick + 1
     local menu = M.readByte(MENU)
-    if battleTick == 1 or battleTick % 600 == 0 then
+    if battleTick == 1 or battleTick % 300 == 0 then
       local actor, state = M.readByte(ACTOR) & 3, M.readByte(MSTATE)
       local rows = {}
       for row = 0, 3 do
@@ -1097,10 +1097,22 @@ function M.newFightDriver(tag, opts)
       end
       local hp = {}
       for e = 0, 3 do hp[#hp + 1] = tostring(M.readWord(0x3BF4 + e * 2)) end
+      -- monsters live in entity slots 4..9, so their HP is the same table
+      -- eight bytes along ($3BF4 + (4+s)*2).  Logging it is what turns "we
+      -- lost" into "we lost AND the boss never dropped below 400", which is
+      -- the difference between a harness bug and a balance finding.
+      local mhp = {}
+      for s2 = 0, 5 do
+        local id = M.readWord(M.MONSTER_IDS + s2 * 2)
+        if id ~= 0xFFFF and id ~= 0 then
+          mhp[#mhp + 1] = tostring(M.readWord(0x3BFC + s2 * 2))
+        end
+      end
       M.log(string.format("[%s] battle f+%d menu=%02X state=%02X actor=%d " ..
-        "cursor=%d cmds=%s partyhp=%s monsters=%d", tag or "fight",
+        "cursor=%d cmds=%s partyhp=%s monhp=%s monsters=%d", tag or "fight",
         battleTick, menu, state, actor, M.readByte(CMDROW + actor) & 3,
-        table.concat(rows, ","), table.concat(hp, ","), M.monstersPresent()))
+        table.concat(rows, ","), table.concat(hp, ","),
+        table.concat(mhp, ","), M.monstersPresent()))
     end
     if menu == 0 then
       -- Text pages, victory screens, and the command-window handoff all need
@@ -1115,7 +1127,17 @@ function M.newFightDriver(tag, opts)
     menuStreak = menuStreak + 1
     if menuStreak < 4 then M.setPad({}); return end
     tick = tick + 1
-    local ph = tick % 30
+    -- ONE PRESS PER `cadence` FRAMES, and the number is a real handicap, not
+    -- a detail.  At the historical 30 a single boosted Fight costs four
+    -- press cycles -- three R's and an A -- which is TWO SECONDS of wall
+    -- clock to type one command.  Measured 2026-08-09 on battle 11 (solo
+    -- LOCKE, level 8, versus a 495-hp HeavyArmor): he got about three
+    -- decisions per fight and lost three attempts running, while a player
+    -- typing at any ordinary speed gets ten.  That is the harness losing
+    -- the fight, not the party.  6-on/6-off is still comfortably slower
+    -- than a human mashing, and it stays clear of the menu's auto-repeat
+    -- threshold; callers that have a reason to be slow can ask for it.
+    local ph = tick % (opts.cadence or 30)
     local actor = M.readByte(ACTOR) & 3
     if plan and planActor ~= actor then plan, planActor = nil, nil end
     if ph == 0 then held = button(actor) or {} end

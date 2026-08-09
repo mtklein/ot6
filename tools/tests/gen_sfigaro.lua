@@ -175,8 +175,24 @@ local aPhase = 0
 -- (Choice prompts are the one thing this must never meet -- an A press
 -- always takes option 0 -- so every prompt on the route is answered by
 -- rideUntil below, which steers the cursor explicitly.)
+-- ...AND WHY THE FIGHT ITSELF IS NOT A BUTTON PATTERN ANY MORE.  The first
+-- honest version of this drove every battle with a fixed 32-frame cycle --
+-- R to boost, then three edge-tapped A's -- which is a fine way to page
+-- victory text and a poor way to survive.  Measured 2026-08-09 on the first
+-- full-frontier run that ever reached this edge: solo LOCKE, level 8 with
+-- 168 hp, LOST the gate soldier's HeavyArmor three attempts running, while
+-- sixteen Tonics sat in the bag.  He never pressed a single one, because
+-- the pattern has no idea what a menu is.  H.newFightDriver does: it reads
+-- the live command table, boosts, and runs its own item medic line -- so
+-- LOCKE now drinks a Tonic when he is under 60%, which is what a player
+-- fighting a soldier alone in an occupied town would obviously do.
+-- (The FIELD half of this routine is unchanged and still hand-rolled; see
+-- the note above on why advanceStory cannot own the tail of battle 11.)
 local function rideOut(what, budget, dstMap)
-  local phase, bphase, calm = 0, 0, 0
+  local phase, calm = 0, 0
+  local F = H.newFightDriver(what or "rideOut",
+    { tactical = true, boost = true, items = true, healPercent = 60,
+      cadence = 12 })
   return seq({
     H.driveUntil(function()
       local ok = H.hasControl() and H.tileAligned() and bright() >= 15
@@ -188,18 +204,10 @@ local function rideOut(what, budget, dstMap)
       H.call(function()
         phase = (phase + 1) % 8
         if H.battleLoadStarted() then
-          bphase = (bphase + 1) % 32
-          if bphase < 4 then H.setPad({ "r" })
-          elseif bphase < 6 then H.setPad({})
-          elseif bphase < 10 then H.setPad({ "a" })
-          elseif bphase < 12 then H.setPad({})
-          elseif bphase < 16 then H.setPad({ "a" })
-          elseif bphase < 18 then H.setPad({})
-          elseif bphase < 22 then H.setPad({ "a" })
-          else H.setPad({}) end
+          F.frame()
           return
         end
-        bphase = 0
+        F.idle()
         if H.hasControl() then H.setPad({}); return end
         H.setPad(phase < 4 and { "a" } or {})
       end),
@@ -473,19 +481,30 @@ local function clearGateSoldier(probeX, probeY, tag)
       talkToObj(26, tag .. ": the gate soldier (battle 11)"),
       rideOut(tag .. ": ride battle 11 out", 30000, 75),
       H.call(function()
-        won = not (H.fieldX() == 47 and H.fieldY() == 43)
-          and H.bfsPath(probeX, probeY) ~= nil
+        -- same reasoning as the branch above: $0104 is the gate scene's
+        -- own record that the soldier is beaten.  A lost attempt runs the
+        -- scenario reset (_ca85ba) and leaves it clear.
+        won = sw(0x0104) == 1
         H.log(string.format("%s: attempt %d %s at (%d,%d) f%d, $0104=%d",
           tag, n, won and "WON" or "LOST (scenario reset)",
           H.fieldX(), H.fieldY(), H.frame, sw(0x0104)))
       end),
     })
   end
-  return H.cond(function() return H.bfsPath(probeX, probeY) == nil end, {
+  -- WHICH BRANCH, decided on the STORY SWITCH and not on a BFS probe.
+  -- This used to ask "is (22,43) reachable this instant?", and the answer
+  -- depends on where the gate soldier happens to be standing: he WANDERS,
+  -- and when he steps off the choke the probe says "lane already open",
+  -- the fight is skipped, and the next navTo walks into him and dies of
+  -- "no path" twenty retries later.  Measured 2026-08-09 -- inserting a
+  -- single menu visit ahead of this cond was enough to flip it.  $0104 is
+  -- the switch the gate scene itself sets, it does not wander, and the
+  -- loss path below already reads it.
+  return H.cond(function() return sw(0x0104) == 0 end, {
     H.logStep(function()
-      return string.format("%s: (%d,%d) unreachable at f%d -- the gate " ..
-        "soldier bars the way at (%d,%d); fighting him",
-        tag, probeX, probeY, H.frame, objX(26), objY(26))
+      return string.format("%s: $0104 clear at f%d -- the gate soldier is " ..
+        "still on duty at (%d,%d); fighting him",
+        tag, H.frame, objX(26), objY(26))
     end),
     (function()
       local req
@@ -502,8 +521,7 @@ local function clearGateSoldier(probeX, probeY, tag)
     H.call(function()
       H.assertEq(won, true,
         tag .. ": battle 11 won honestly within 3 attempts (boosted Fights)")
-      H.assertEq(H.bfsPath(probeX, probeY) ~= nil, true,
-        tag .. ": the lane is open again")
+      H.assertEq(sw(0x0104), 1, tag .. ": the gate scene recorded the win")
     end),
   }, {
     H.logStep(function() return tag .. ": the lane is already open" end),
@@ -604,6 +622,24 @@ H.run({ maxFrames = 350000 }, {
     H.assertEq(H.hasControl(), true, "controllable")
     H.assertEq(sw(0x0105), 1, "$0105 -- LOCKE's scenario is live")
     H.assertEq(sw(0x001E), 0, "$001E clear -- the scenario is not done")
+  end),
+  -- LOCKE IS ALONE HERE, and alone is exactly when the back row is worth
+  -- the trade.  He fights a level-13 HeavyArmor with 495 hp on 168 of his
+  -- own; halving the physical damage he takes buys the turns his Tonics
+  -- need to matter.  He gives up half his Fight for it -- Steal deals no
+  -- damage, so Fight is all he has -- and this is the one stretch of the
+  -- game where that is clearly the right side of the trade.
+  -- LOCKE ARRIVES BARE-HANDED and nobody had ever noticed, because nobody
+  -- had ever looked: measured 2026-08-09, $1600+37*1+$1F..$23 all read $FF
+  -- at this fixture -- no weapon, no armor, no relics -- with his own Dirk
+  -- sitting in the bag.  He then punched the gate soldier's level-13,
+  -- 495-hp HeavyArmor for EIGHT damage a swing and lost three attempts
+  -- running, which reads exactly like a balance finding and is nothing of
+  -- the sort.  The story's own remove_equip returns gear to inventory
+  -- (EventCmd_8d) and the mint chain never put it back on.  A player opens
+  -- the Equip menu before walking into an occupied town; so does this.
+  H.equipOptimum({ tag = "locke kit" }),
+  H.call(function()
     where("boot")
   end),
 
