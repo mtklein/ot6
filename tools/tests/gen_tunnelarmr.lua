@@ -588,6 +588,11 @@ H.run({ maxFrames = 300000 }, {
       post, sw(0x030C),
       H.bfsPath(56, 34) and "reachable" or "NOT reachable this instant"))
   end),
+  -- top up BEFORE leaving town, on a plain field map where fieldCare is
+  -- battle-tested -- the tunnel crossing arrives here as real spent HP,
+  -- and the world half of the route (where care measured broken, note
+  -- above) then needs none
+  H.fieldCare({ tag = "care before leaving town" }),
   -- exit via the x=56 column -> world (87,112)
   H.navTo(56, 34, { maxFrames = 12000, honest = "flee", fleeCap = FLEE_CAP, bank = 3,
     arrive = function() return H.worldMode() end }),
@@ -623,8 +628,12 @@ H.run({ maxFrames = 300000 }, {
   -- issue #75: honest="flee" -- a world encounter on the band south of
   -- the range is RUN FROM by the engine's own L+R (tactical driver past
   -- FLEE_CAP), never kill-bitted; the budget carries the flee rounds.
-  -- Top up first: the tunnel crossing arrives here as real HP.
-  H.fieldCare({ tag = "care before the world crossing" }),
+  -- (The care stop used to sit HERE, on the world map, and measured
+  -- broken: after fieldCare's menu visit the world DP cells $E0/$E2 read
+  -- (175,0) garbage and the world engine never resumed -- trap 1's module
+  -- WRAM ownership, inside fieldCare's world-exit path, which this route
+  -- was likely the first mint to exercise.  Care happens on the field
+  -- before leaving town instead; follow-up filed for the library.)
   H.worldNavTo(75, 102, { maxFrames = 45000, honest = "flee", fleeCap = FLEE_CAP, bank = 3,
     arrive = function() return not H.worldMode() end }),
   H.release(),
