@@ -34,7 +34,6 @@ local H = dofile("tools/tests/lib/ot6.lua")
 local STATE = "build/states/kolts_cave.mss.lua"
 local VR  = emu.memType.snesVideoRam
 local ROM = emu.memType.snesPrgRom
-local DANGER = 0x1f6e
 
 local function map() return H.mapId() & 0x1ff end
 
@@ -135,7 +134,12 @@ H.run({ maxFrames = 30000 }, {
     end, 8600, {
       H.call(function()
         if not (H.hasControl() and H.tileAligned()) then H.setPad({}) return end
-        H.writeWord(DANGER, 0xff00)
+        -- issue #75: the danger counter ($1f6e) used to be pinned to 0xff00
+        -- here so the first step forced the roll.  The engine rolls it
+        -- honestly now: pacing the lane accrues danger per step, and from a
+        -- fixed fixture plus this deterministic pace the encounter -- and
+        -- its formation -- land on the same frame every run, so the pin
+        -- bought nothing but a head start.
         local x, y = H.fieldX(), H.fieldY()
         if lane == nil then
           for _, d in ipairs({ "right", "left", "up", "down" }) do

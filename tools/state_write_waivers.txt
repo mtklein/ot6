@@ -63,7 +63,6 @@ tools/tests/battle_dmgnum.lua	.writeByte(
 tools/tests/battle_dmgnum.lua	.writeWord(
 tools/tests/battle_dotchip.lua	.writeByte(
 tools/tests/battle_dotchip.lua	.writeWord(
-tools/tests/battle_flyin.lua	.writeWord(
 tools/tests/battle_fold.lua	.writeByte(
 tools/tests/battle_fold.lua	.writeWord(
 tools/tests/battle_fontrestore.lua	.writeByte(
@@ -72,7 +71,6 @@ tools/tests/battle_gaufight.lua	.writeByte(
 tools/tests/battle_gaufight.lua	.writeWord(
 tools/tests/battle_hits.lua	.writeByte(
 tools/tests/battle_hits.lua	.writeWord(
-tools/tests/battle_hudanim16.lua	.writeWord(
 tools/tests/battle_hudtrack.lua	.writeByte(
 tools/tests/battle_hudtrack.lua	.writeWord(
 tools/tests/battle_kefka.lua	.writeWord(

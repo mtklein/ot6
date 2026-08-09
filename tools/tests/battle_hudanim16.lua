@@ -46,7 +46,6 @@ local H = dofile("tools/tests/lib/ot6.lua")
 local STATE = "build/states/kolts_cave.mss.lua"
 local VR  = emu.memType.snesVideoRam
 local ROM = emu.memType.snesPrgRom
-local DANGER = 0x1f6e
 local MENU, ACTOR, MSTATE = 0x7BCA, 0x62CA, 0x7BC2
 local CHARIX = 0x3ED9
 local CMDTBL = 0x202E
@@ -162,7 +161,9 @@ H.run({ maxFrames = 40000 }, {
     end, 8600, {
       H.call(function()
         if not (H.hasControl() and H.tileAligned()) then H.setPad({}) return end
-        H.writeWord(DANGER, 0xff00)
+        -- issue #75: the $1f6e danger pin is gone -- the pace rolls the
+        -- encounter honestly (deterministic from the fixture; see
+        -- battle_flyin's note at the same loop).
         local x, y = H.fieldX(), H.fieldY()
         if lane == nil then
           for _, d in ipairs({ "right", "left", "up", "down" }) do
