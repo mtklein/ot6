@@ -158,19 +158,29 @@ first, always. The list:
 | `sfigaro_town` | balance wall | LOCKE unarmed, then out of supplies, then in-battle heals not landing | **OPEN**, see below |
 | `train_done` | — | the #74 Phantom Train, thin margin | **OPEN**, attempt 1 got it to 744 hp / 3 shields of 6 |
 
-**`sfigaro_town` -- what has been ruled OUT, so nobody re-runs it:**
-equipment (fixed: 8 -> 21 damage a swing), supplies (fixed: he inherits 12
-Tonics + 4 Potions now, was 2 Tonics), the boost bank (`opts.bank`
-implemented), rows (front and back measure identically), sneaking past
-(polled `bfsPath` every 60 frames for 7200 frames -- the gate soldier
-NEVER steps off the choke), and Wait mode (`$1D4D` already reads Wait,
-speed 2). **What is left is a real harness bug:** the fight driver plans
-`heal entity 0 with $E9`, and the battle menu is in **MSTATE `$01`**,
-which `newFightDriver` does not handle at all -- so it presses nothing,
-the turn is wasted, and the plan is re-made next turn. Solo LOCKE gets
-about one action per 300 frames and takes ~110 damage in the same window.
-Probe the solo-party battle-menu state machine and teach the driver `$01`
-before touching any tuning.
+**`sfigaro_town` IS A BALANCE FINDING. Nine hypotheses were tested and
+killed to get there; do not re-test them:**
+
+| hypothesis | verdict |
+|---|---|
+| blind button pattern, no menu awareness | replaced with `newFightDriver` -- no |
+| LOCKE unarmed | REAL, fixed: 8 -> 21 damage a swing. Not enough |
+| out of supplies | REAL, fixed: 12 Tonics + 4 Potions inherited, was 2 Tonics. Not enough |
+| item cursor index != `$2686` index | MEASURED CORRECT (`probe_battleitem`): cursor sum 1 consumed index 1. No |
+| solo-party target-cursor deadlock | real latent bug, fixed, no change here. No |
+| boost bank never reaching 3 | `opts.bank` implemented. No |
+| back row halving what he takes | front and back measure IDENTICALLY. No |
+| sneaking past the soldier | polled `bfsPath` every 60 frames for 7200 frames -- he NEVER steps off the choke. No |
+| Active battle mode punishing menu time | `$1D4D` already reads Wait, speed 2. No |
+
+The arithmetic that remains: **~21 damage a swing into 495 hp behind 3
+shields, against ~110 damage per enemy turn, at about one action per 300
+frames.** Shielded damage is halved and its weaknesses are bolt and water
+(`monster_prop` +25 = `$84`), neither of which solo LOCKE can reach, so
+the break economy has no answer either. This needs a product decision --
+retune battle 11 for a solo level-8 thief, give LOCKE a reachable answer
+to a machine, or make the gate passable without the fight. **Do not widen
+the retry ladder until it gets lucky; that is the #74 mistake.**
 
 **The first full-frontier run of the honest chain got to 117 of 187 edges**
 (2026-08-09) and stopped at `sfigaro_town`. Everything through the Terra
