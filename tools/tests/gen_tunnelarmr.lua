@@ -500,6 +500,18 @@ H.run({ maxFrames = 300000 }, {
     where("boot (celes_freed)")
   end),
 
+  -- CELES ARRIVES BARE-HANDED, and this is the same defect class the equip
+  -- audit was built on: the capture scene stripped her (remove_equip
+  -- returns gear to inventory, EventCmd_8d), gen_celes frees her without a
+  -- wardrobe stop, and nothing downstream ever armed her -- so she fought
+  -- TunnelArmr and walked the whole chain to the reunion with nothing on
+  -- (tools/audit_equipment.py, 2026-08-09: celes_freed gear FF FF 6A FF FF,
+  -- relic only).  Runic needs no weapon, which is why the fight was ever
+  -- winnable, but a player opens Equip before walking into a boss tunnel;
+  -- so does this.  celes_freed keeps its waiver in
+  -- tools/equipment_waivers.txt because THIS stop is the very next leg.
+  H.equipOptimum({ tag = "celes kit" }),
+
   -- ===================================================================== --
   -- PHASE 1: THE CLOCK.  Down to map 84, wind it, and take the passage it
   -- opens: (15,51) -> map 87 -> (57,48) -> map 86.

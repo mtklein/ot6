@@ -21,3 +21,4 @@
 locke_scenario	LOCKE	the scenario opens with him stripped and captured; gen_sfigaro's H.equipOptimum arms him before the gate soldier
 gau_joined	GAU	GAU joins off the Veldt wearing nothing, which is the character
 s2_gau_joined	GAU	same join, second-scenario variant
+celes_freed	CELES	the capture scene stripped her and gen_celes frees her still bare; gen_tunnelarmr's H.equipOptimum arms her at boot, the very next leg
