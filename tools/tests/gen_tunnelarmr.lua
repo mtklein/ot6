@@ -43,11 +43,24 @@
 -- "missing plan" is navTo's honest=true battle branch, which answers a
 -- battle with blind edge-A.  Blind A against a Vector Pup pair left LOCKE
 -- at 0 hp with the fight still up after 2000+ frames; navigation never
--- got the field back.  So every leg of this route that can draw an
--- encounter now runs honest="tactical" -- the real fight driver, boosted
--- Fights, its own item medic line (gen_kolts's mountain doctrine, for the
--- same reason: a two-member low-level party cannot afford to stand still)
--- -- and safeWalk grew the same battle branch.  The gate soldier needed
+-- got the field back.
+--
+-- AND THE ANSWER IS FLEE, NOT FIGHT -- the tactical version was tried
+-- first and measured (2026-08-09, one full run): the driver WON the first
+-- tunnel encounter honestly -- 8000+ frames, two Tonic heals, a real
+-- Fenix Down revival of CELES mid-fight -- and the win emptied the bag.
+-- The very next cave encounter opened with CELES on 1 hp, no Fenix Down
+-- left to raise her, LOCKE's medic line finding nothing to drink
+-- (plan=fight at 6/194 hp is what an empty bag looks like in the log),
+-- and the party WIPED; RandBattle's GameOver then held the event PC
+-- forever, which the wipe canary missed because $1600 still carries
+-- pre-battle HP (follow-up filed).  An escape route has no shop, so
+-- supplies spent on trash are unrecoverable -- and this is gen_kolts's
+-- own cave doctrine anyway ("the cave legs RUN; the cave cost the party
+-- ten hit points end to end").  So every traversal leg here runs
+-- honest="flee" -- L+R, the engine's own mechanic, with the tactical
+-- fight driver as the M.FLEE_CAP fallback -- and safeWalk grew the same
+-- branch.  The gate soldier needed
 -- nothing here: the escape re-enters town at (48,36) and leaves by the
 -- x=56 column, both east of his (30,42) choke (the re-entry H.call logs
 -- his post and the exit reachability so a route change would say so).
@@ -121,9 +134,10 @@ local function settled(n, extra)
     return cnt >= n
   end
 end
--- honest="tactical", not honest=true: a settle that rolls an encounter
--- (map 87 and the caves both can) fights it with the real driver instead
--- of blind-tapping A through it -- see the header.
+-- honest="flee", not honest=true: a settle that rolls an encounter
+-- (map 87 and the caves both can) runs from it -- with the tactical
+-- driver as the FLEE_CAP fallback -- instead of blind-tapping A through
+-- it.  See the header for the measured why.
 local function settleField(dstMap, maxF)
   return seq({
     H.waitFrames(60),
@@ -131,7 +145,7 @@ local function settleField(dstMap, maxF)
       return not H.worldMode() and H.tileAligned()
          and not H.battleLoadStarted() and not H.dialogWaiting()
          and (dstMap == nil or map() == dstMap)
-    end), maxF or 12000, { honest = "tactical" }),
+    end), maxF or 12000, { honest = "flee" }),
     H.waitFrames(30),
   })
 end
@@ -144,7 +158,7 @@ local aPhase = 0
 -- these rather than one query.
 local function hop(tx, ty, what)
   return seq({
-    H.navTo(tx, ty, { maxFrames = 12000, honest = "tactical" }),
+    H.navTo(tx, ty, { maxFrames = 12000, honest = "flee" }),
     H.release(),
     H.call(function()
       H.assertEq(H.fieldX(), tx, what .. ": at x=" .. tx)
@@ -207,7 +221,7 @@ local function go(sx, sy, dm, dx, dy, what)
   return seq({
     H.call(function() pick, startMap = nil, map() end),
     H.navTo(function() return stage()[1] end, function() return stage()[2] end,
-      { maxFrames = 20000, arrive = arrived, honest = "tactical" }),
+      { maxFrames = 20000, arrive = arrived, honest = "flee" }),
     H.cond(function() return stage()[3] ~= nil end, {
       H.driveUntil(arrived, 1800, {
         H.call(function()
@@ -241,16 +255,24 @@ local function safeWalk(tx, ty, what, budget)
     upleft = "left", upright = "right", downleft = "left", downright = "right" }
   -- map 70 draws random encounters like the rest of the cave; without this
   -- branch a battle mid-walk left the drive holding an empty pad until the
-  -- budget died (the same failure the header describes on map 87)
+  -- budget died (the same failure the header describes on map 87).  Same
+  -- flee-then-tactical-fallback shape as navTo's honest="flee" branch.
   local F = H.newFightDriver(what or "safeWalk",
     { tactical = true, boost = true, items = true, healPercent = 55 })
+  local battN = 0
   return seq({
     H.driveUntil(function()
       return H.fieldX() == tx and H.fieldY() == ty and H.hasControl()
     end, budget or 8000, {
       H.call(function()
         ph = (ph + 1) % 8
-        if H.battleLoadStarted() then F.frame(); return end
+        if H.battleLoadStarted() then
+          battN = battN + 1
+          if battN <= H.FLEE_CAP then H.setPad({ l = true, r = true })
+          else F.frame() end
+          return
+        end
+        battN = 0
         F.idle()
         if H.dialogWaiting() then H.setPad(ph < 4 and { "a" } or {}); return end
         if not (H.hasControl() and H.tileAligned()) then H.setPad({}); return end
@@ -270,7 +292,7 @@ local function warpTo(sx, sy, dx, dy, dmap, what)
     H.logStep(function()
       return string.format("%s: from (%d,%d)", what, H.fieldX(), H.fieldY())
     end),
-    H.navTo(sx, sy, { maxFrames = 20000, honest = "tactical", arrive = function()
+    H.navTo(sx, sy, { maxFrames = 20000, honest = "flee", arrive = function()
       return H.fieldX() == dx and H.fieldY() == dy
     end }),
     H.release(),
@@ -553,7 +575,7 @@ H.run({ maxFrames = 300000 }, {
       H.bfsPath(56, 34) and "reachable" or "NOT reachable this instant"))
   end),
   -- exit via the x=56 column -> world (87,112)
-  H.navTo(56, 34, { maxFrames = 12000, honest = "tactical",
+  H.navTo(56, 34, { maxFrames = 12000, honest = "flee",
     arrive = function() return H.worldMode() end }),
   H.release(),
   (function()
@@ -562,7 +584,7 @@ H.run({ maxFrames = 300000 }, {
       local ok = H.worldMode() and H.worldHasControl() and H.worldAligned()
         and bright() >= 15
       cnt = ok and cnt + 1 or 0; return cnt >= 20
-    end, 12000, { honest = "tactical" })
+    end, 12000, { honest = "flee" })
   end)(),
   H.waitFrames(30),
   H.call(function()
@@ -584,12 +606,12 @@ H.run({ maxFrames = 300000 }, {
   -- would load map 72.  From map 69, (10,2)/(4,4) -> map 70, and (47,38) on
   -- map 70 is the TunnelArmr trigger _ca89af.
   -- ===================================================================== --
-  -- issue #75: honest="tactical" -- a world encounter on the band south of
-  -- the range is FOUGHT with the real fight driver (boosted Fights, the
-  -- item medic line), never kill-bitted; the budget carries the ATB
-  -- rounds.  Top up first: the tunnel fights arrive here as real HP.
+  -- issue #75: honest="flee" -- a world encounter on the band south of
+  -- the range is RUN FROM by the engine's own L+R (tactical driver past
+  -- FLEE_CAP), never kill-bitted; the budget carries the flee rounds.
+  -- Top up first: the tunnel crossing arrives here as real HP.
   H.fieldCare({ tag = "care before the world crossing" }),
-  H.worldNavTo(75, 102, { maxFrames = 45000, honest = "tactical",
+  H.worldNavTo(75, 102, { maxFrames = 45000, honest = "flee",
     arrive = function() return not H.worldMode() end }),
   H.release(),
   settleField(69),
