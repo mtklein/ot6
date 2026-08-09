@@ -13,6 +13,17 @@
 -- worldNavTo then stopped tapping A and pressed directions into it forever.
 --
 -- This test drives a real battle and then forces the table into each shape.
+--
+-- *** QUARANTINED MECHANISM TEST (issue #75) -- state writes SANCTIONED ***
+-- This is a unit test of the HARNESS's own gate predicate, not a claim
+-- about gameplay: it forces the party-HP table into the three measured
+-- shapes ($FFFF / 0000-empty / 0000-dead) that the gate must distinguish,
+-- because the question is "does battleLoadStarted() decode these bytes
+-- correctly", not "can a player reach them".  Reaching slot-0-dead
+-- honestly means killing the lead character on cue every run -- a
+-- performance that would test nothing this test does not already pin.
+-- Per the owner-ratified policy on #75, it keeps its waiver, says so
+-- loudly here, and MAY NEVER PRODUCE FIXTURES.
 local H = dofile("tools/tests/lib/ot6.lua")
 local STATE = "battle_doorstep.mss.lua"
 local HP = 0x3BF4
