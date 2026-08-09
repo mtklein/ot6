@@ -984,7 +984,8 @@ function M.newFightDriver(tag, opts)
            and battInvIdx(FENIX_DOWN) then
           M.log(string.format("[%s] actor=%d revive entity %d with Fenix Down",
             tag or "fight", actor, e))
-          return { kind = "item", item = FENIX_DOWN, target = e, row = row }
+          return { kind = "item", item = FENIX_DOWN, target = e, row = row,
+                   idx = battInvIdx(FENIX_DOWN) }
         end
       end
       local target, worst = nil, 101
@@ -1005,7 +1006,8 @@ function M.newFightDriver(tag, opts)
         if item then
           M.log(string.format("[%s] actor=%d heal entity %d (%d/%d) with $%02X",
             tag or "fight", actor, target, hp, maxhp, item))
-          return { kind = "item", item = item, target = target, row = row }
+          return { kind = "item", item = item, target = target, row = row,
+                   idx = battInvIdx(item) }
         end
       end
     end
@@ -1060,7 +1062,15 @@ function M.newFightDriver(tag, opts)
       return { cur < plan.row and "down" or "up" }
     end
     if st == ST_ITEM and plan.kind == "item" then
-      local want = battInvIdx(plan.item)
+      -- Use the index RESOLVED WHEN THE PLAN WAS MADE, not a fresh read.
+      -- Mid-menu inventory reads measurably lie (gen_sabin_train's shop
+      -- drive learned the same thing and verifies purchases only after the
+      -- window closes), and a lying read here returns nil, drops the plan,
+      -- presses B, and re-plans -- forever.  Measured at battle 11: solo
+      -- LOCKE logged "heal entity 0 (58/168) with $E9" twice in three
+      -- hundred frames with his HP never moving, and died holding four
+      -- Potions.
+      local want = plan.idx or battInvIdx(plan.item)
       if want == nil then plan, planActor = nil, nil; return { "b" } end
       local cur = M.readByte(ITEMSCR + actor) + M.readByte(ITEMROW + actor)
       if cur < want then return { "down" } end
