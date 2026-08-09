@@ -147,10 +147,46 @@ and no fixture in the chain has ever set one. Research is in
 them once early propagates to every downstream fixture -- do it before a
 full re-mint, not after.
 
-**Still no full-frontier result.** `make test` stops at its own
-`--check-states` gate because the lib edits staled all 109 fixtures, which
-is the gate working. The frontier re-mint is the next step and it is the
-long pole.
+**The first full-frontier run of the honest chain got to 117 of 187 edges**
+(2026-08-09) and stopped at `sfigaro_town`. Everything through the Terra
+scenario, the Sabin line, the rapids and the scenario split re-minted
+green under the new lib.
+
+**THE RESUME POINT IS `gen_sfigaro`, and the blocker is a balance finding,
+not a harness bug.** Solo LOCKE loses `battle 11`, the South Figaro gate
+soldier, on every attempt. Chased all the way down, in this order:
+
+1. The drive was a 32-frame button pattern with no idea what a menu is --
+   sixteen Tonics sat in the bag through three losses. It is
+   `H.newFightDriver` now.
+2. Still lost, so the driver's heartbeat learned to log ENEMY hp (monsters
+   are entity slots 4..9, the same table eight bytes along). Answer:
+   **495 -> 487 and stop. Eight damage a swing.**
+3. Eight is low enough that "he is unarmed" was still live, so look:
+   `probe_lockekit` reads `$1600+37*1+$1F..$23` as **`FF FF FF FF FF`**.
+   **LOCKE starts his whole scenario with nothing equipped and his own
+   Dirk in the bag.** `remove_equip` returns gear to inventory
+   (`EventCmd_8d`) and the mint chain has never put it back on -- the same
+   bug `battle_brokendeath` found at the Vector infiltration and fixed
+   only for itself. **`H.equipOptimum` is now in the library.** Assume
+   every post-`remove_equip` fixture in the chain is bare until checked.
+
+Armed, his swing goes 8 -> 21 and he still loses: **~21 damage dealt per
+300 frames against ~117 taken**, into 495 hp at level 13 whose weaknesses
+(bolt, water) solo LOCKE cannot reach. He needs ~7200 frames of swings and
+survives ~2500. Front row and back row measure the same. **That is a
+#74-class finding and it is left FAILING on purpose.** It needs an owner
+call: retune battle 11, or make the gate passable another way.
+
+Two smaller fixes landed with it: `gen_sfigaro`'s B1 decided whether to
+fight by asking "is this tile reachable this instant", and the gate
+soldier WANDERS -- one inserted menu visit flipped the branch and the leg
+then died of "no path"; it reads `$0104` now. And `newFightDriver`'s press
+cadence is an option (at the historical 30, a boosted Fight costs two
+seconds of wall clock just to TYPE).
+
+**`make test` stops at its own `--check-states` gate** while the frontier
+is mid-re-mint, which is that gate working, not a failure.
 
 **After that regression is green, resume at
 `tools/tests/gen_ifrit_magicite.lua`.** It still contains
