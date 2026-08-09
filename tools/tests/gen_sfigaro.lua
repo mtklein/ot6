@@ -191,8 +191,12 @@ local aPhase = 0
 local function rideOut(what, budget, dstMap)
   local phase, calm = 0, 0
   local F = H.newFightDriver(what or "rideOut",
-    { tactical = true, boost = true, items = true, healPercent = 60,
-      cadence = 12 })
+    -- bank = 3: unboosted Fights until LOCKE has three BP, then unload.
+    -- Shielded damage is HALVED and a broken monster takes 4x
+    -- (Ot6ShieldedMulW, ot6_break.asm:1487-1497), so the fight is won by
+    -- breaking, not by chipping -- and a boosted Fight is what chips.
+    { tactical = true, boost = true, bank = 3, items = true,
+      healPercent = 60, cadence = 12 })
   return seq({
     H.driveUntil(function()
       local ok = H.hasControl() and H.tileAligned() and bright() >= 15

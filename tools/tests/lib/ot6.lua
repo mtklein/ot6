@@ -960,10 +960,18 @@ function M.newFightDriver(tag, opts)
     return nil
   end
 
+  -- opts.reserve = { [itemId] = n } -- never spend the last n.  THE BAG IS
+  -- SHARED ACROSS SCENARIOS, which is a thing this chain learned the hard
+  -- way: the Terra party burned its way through every Potion crossing Mt.
+  -- Kolts, and solo LOCKE then started his own scenario with two Tonics
+  -- and nothing else against a soldier who hits for 115.  A party that
+  -- drinks the last Potion because the hole was big enough is not playing
+  -- the same game a player is.
   local function battInvIdx(id)
+    local floor = (opts.reserve or {})[id] or 0
     for i = 0, 251 do
       if M.readByte(BATTINV + i * 5) == id
-         and M.readByte(BATTINV + i * 5 + 3) > 0 then return i end
+         and M.readByte(BATTINV + i * 5 + 3) > floor then return i end
     end
     return nil
   end
@@ -1002,7 +1010,21 @@ function M.newFightDriver(tag, opts)
       end
     end
     local id = M.readByte(BCHID + actor * 2)
-    local boost = opts.boost and math.min(M.readByte(BP + actor * 2), 3) or 0
+    -- THE BOOST BANK.  Spending one BP the moment you have one is the worst
+    -- way to play OT6's economy: Ot6ShieldedMulW halves damage while a
+    -- monster still has shields, and the ladder is broken:weak:unweak =
+    -- 4:2:1 (ot6_break.asm:1487-1497), so the whole game is "boost to break,
+    -- THEN hit".  A boosted Fight chips shields per hit; a 1-BP dribble
+    -- chips slowly and never gets there.  opts.bank says "act unboosted --
+    -- which is itself what regenerates BP, Ot6ActionEnd -- until the bank
+    -- reads at least this, then unload."  gen_sfigaro's own steal drive has
+    -- always done exactly this and nobody had applied it to Fights.
+    local have = M.readByte(BP + actor * 2)
+    local boost = 0
+    if opts.boost then
+      if opts.bank and have < opts.bank then boost = 0
+      else boost = math.min(have, 3) end
+    end
     if opts.tactical and id == 4 and M.readWord(CURMP + actor * 2) >= 4
        and cmdRow(actor, CMD_TOOLS) then
       return { kind = "skill", cmd = CMD_TOOLS, skill = AUTOCROSSBOW,
@@ -1105,7 +1127,13 @@ function M.newFightDriver(tag, opts)
       for s2 = 0, 5 do
         local id = M.readWord(M.MONSTER_IDS + s2 * 2)
         if id ~= 0xFFFF and id ~= 0 then
-          mhp[#mhp + 1] = tostring(M.readWord(0x3BFC + s2 * 2))
+          -- hp, and the SHIELD count beside it: shields live at
+          -- $3E38 + entity*2 and monsters are entities 4..9, so slot s is
+          -- $3E40 + s*2 (battle_break.lua:34).  Without this the log says
+          -- "we are barely scratching it" and cannot say WHY -- shielded
+          -- damage is halved and a broken monster takes 4x.
+          mhp[#mhp + 1] = string.format("%d/sh%d",
+            M.readWord(0x3BFC + s2 * 2), M.readByte(0x3E40 + s2 * 2))
         end
       end
       M.log(string.format("[%s] battle f+%d menu=%02X state=%02X actor=%d " ..

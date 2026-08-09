@@ -199,7 +199,7 @@ end
 local POTION = 0xE9
 local function care(tag, threshold)
   return H.fieldCare({ tag = "care " .. tag, threshold = threshold or 0.85,
-                       reserve = { [POTION] = 3 } })
+                       reserve = { [POTION] = 5 } })
 end
 
 -- crossDoor/seq: a bare step list cannot be spliced into a step list (Lua
@@ -299,7 +299,7 @@ local function crossTo(tx, ty, dstMap, what, mode, maxF)
         what, H.fieldX(), H.fieldY(), tx, ty, dstMap, mode or "flee")
     end),
     H.navTo(tx, ty, { maxFrames = maxF or 40000, arrive = mapChanged(),
-             honest = mode or "flee" }),
+             honest = mode or "flee", reserve = { [POTION] = 5 } }),
     H.release(),
     settleField(what, dstMap, nil, mode),
     H.call(function()
@@ -880,12 +880,13 @@ H.run({ maxFrames = 400000 }, {
   -- driver's own Potion medic line at 35% -- and the party arrives having
   -- actually played the mountain instead of absorbing it.
   H.navTo(11, 32, { maxFrames = 40000, honest = "tactical",
+    reserve = { [POTION] = 5 },
     arrive = function() return sw(0x010A) == 1 end }),
   H.release(),
   H.advanceStory(function()
     return H.hasControl() and H.tileAligned() and sw(0x010A) == 1
        and objX(16) == 23 and objY(16) == 32
-  end, 20000, { honest = "tactical" }),
+  end, 20000, { honest = "tactical", reserve = { [POTION] = 5 } }),
   H.call(function()
     H.assertEq(sw(0x010A), 1, "the approach trigger ran ($010A set)")
     H.assertEq(sw(0x031C), 1, "$031C set (Vargas NPC armed)")
@@ -895,7 +896,8 @@ H.run({ maxFrames = 400000 }, {
   end),
   care("vargas spawned"),
 
-  H.navTo(22, 32, { maxFrames = 40000, honest = "tactical" }),
+  H.navTo(22, 32, { maxFrames = 40000, honest = "tactical",
+                    reserve = { [POTION] = 5 } }),
   H.release(),
   -- Face him.  NPC activation is decided by the party FACING byte ($087F
   -- through the $0803 party-object offset; 0 up 1 right 2 down 3 left, from
