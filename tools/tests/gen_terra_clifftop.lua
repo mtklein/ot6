@@ -295,14 +295,26 @@ local function cross(tx, ty, dstMap, ax, ay, bad, what, budget)
   local settle = landed(dstMap)
   return seq({
     planAvoids(tx, ty, bad, what),
-    H.navTo(tx, ty, { maxFrames = budget or 60000, honest = true,
+    -- honest="tactical", not honest=true.  Plain `true` is the blind
+    -- edge-tapped A: it opens the command list, confirms whatever is on
+    -- row 0 and takes the default target, with no idea what a command
+    -- table or an item is.  This leg escorts BANON, where any death is a
+    -- Game Over, and it walked the whole thing without once opening the
+    -- item menu -- measured 2026-08-09, the party WIPED and the navigator
+    -- then spent sixty thousand frames planning routes from field position
+    -- (44,1888), which is what a wipe looks like when nothing is watching
+    -- for one.  Same fix Mt. Kolts needed: real menus, real boost, and the
+    -- driver's own medic line.
+    H.navTo(tx, ty, { maxFrames = budget or 60000, honest = "tactical",
       arrive = function()
         seeBattles()
         return map() == dstMap
       end }),
     H.release(),
-    H.advanceStory(settle, 20000, { honest = true }),
+    H.advanceStory(settle, 20000, { honest = "tactical" }),
     H.waitFrames(30),
+    -- and the layer of care, every crossing, exactly as gen_kolts does it
+    H.fieldCare({ tag = "care " .. what, threshold = 0.8 }),
     H.call(function()
       H.assertEq(map(), dstMap, what .. ": landed on map " .. dstMap)
       H.assertEq(H.fieldX(), ax, what .. ": arrival x")
@@ -408,7 +420,7 @@ H.run({ maxFrames = 250000 }, {
   planAvoids(111, 24, ALL_GATES, "map 49: onto the maze floor (111,24)"),
   mazeWalk(111, 24, "map 49: onto the maze floor (111,24)"),
   H.release(),
-  H.advanceStory(landed(49), 20000, { honest = true }),
+  H.advanceStory(landed(49), 20000, { honest = "tactical" }),
   H.waitFrames(30),
   H.call(function()
     H.assertEq(sw(0x01F0), 1, "$01F0 set -- _ccd9c4, the maze intro, ran")
@@ -427,7 +439,7 @@ H.run({ maxFrames = 250000 }, {
   planAvoids(111, 10, ALL_GATES, "map 49: the maze exit (111,10)"),
   mazeWalk(111, 10, "map 49: to the exit (111,10)", 30000),
   H.release(),
-  H.advanceStory(landed(50), 20000, { honest = true }),
+  H.advanceStory(landed(50), 20000, { honest = "tactical" }),
   H.waitFrames(30),
   H.call(function()
     H.assertEq(map(), 50, "map 49 -> map 50")
