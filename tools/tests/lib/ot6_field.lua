@@ -42,6 +42,42 @@ assert(type(M) == "table",
 -- fallback still has a party to fight with.
 M.FLEE_CAP = 1800
 
+-- A PARTY WIPE MUST SAY SO.  Twice now a wipe has presented as something
+-- else entirely: at Mt. Kolts cave 97 the drive tapped A through the Game
+-- Over into a brand-new game and reported eleven maps of intro, and at
+-- terra_clifftop a navigator spent SIXTY THOUSAND FRAMES planning routes
+-- from field position (44,1888) -- a coordinate that only exists because
+-- the field module no longer owned that RAM -- and failed as "navTo
+-- timeout".  Neither log contained the word "died".
+--
+-- The character table at $1600 is the right witness: it is save state, not
+-- module-owned scratch, so it survives the battle module, the menu module
+-- and the Game Over screen alike.  Debounced hard (300 frames) because a
+-- module handoff can blank things for a moment and a false wipe would be
+-- worse than the timeout it replaces.
+function M.partyWiped()
+  local any = false
+  for _, c in ipairs(M.partyMembers()) do
+    any = true
+    if M.charHp(c) > 0 then return false end
+  end
+  return any
+end
+
+local function wipeCanary(tag)
+  local n = 0
+  return function()
+    n = M.partyWiped() and n + 1 or 0
+    if n == 300 then
+      error(string.format("%s: THE PARTY IS WIPED -- every member of the " ..
+        "party has read 0 hp for 300 consecutive frames.  This is a lost " ..
+        "fight, not a stuck navigator; the frames after a wipe are the " ..
+        "Game Over screen and whatever the drive presses into it.", tag), 0)
+    end
+  end
+end
+
+
 -- Field navigation, so routes are coordinate-aware instead of blind
 -- timed holds (which desync on any map).  Movement is grid-oriented, one
 -- tile per step: up=-Y down=+Y left=-X right=+X, PLUS the four diagonals
@@ -407,6 +443,7 @@ function M.navTo(txIn, tyIn, opts)
   local noPathN, pause = 0, 0          -- no-path retry state
   -- built for "tactical" AND for "flee": the flee branch falls back to it
   -- once M.FLEE_CAP says this formation is not letting go
+  local wipeCheck = wipeCanary("navTo")
   local tactical = (opts.honest == "tactical" or opts.honest == "flee")
       and M.newFightDriver("navTo",
         { tactical = true, boost = true, items = true,
@@ -445,6 +482,7 @@ function M.navTo(txIn, tyIn, opts)
       -- RAM the field module also scribbles on, so require 3 consecutive
       -- frames before acting -- a real battle/dialog persists for hundreds.
       -- Acting on a 1-frame ghost would tap A on the open field.
+      wipeCheck()
       battN = M.battleLoadStarted() and battN + 1 or 0
       dlgN  = M.dialogWaiting() and dlgN + 1 or 0
       lostN = M.hasControl() and 0 or lostN + 1
@@ -630,6 +668,7 @@ function M.advanceStory(pred, maxFrames, opts)
   for _, w in ipairs(opts.spare or {}) do spareSet[w] = true end
   local aPhase = 0
   local battN, dlgN = 0, 0
+  local wipeCheck = wipeCanary("advanceStory")
   local tactical = (opts.honest == "tactical" or opts.honest == "flee")
       and M.newFightDriver("advanceStory",
         { tactical = true, boost = true, items = true,
@@ -652,6 +691,7 @@ function M.advanceStory(pred, maxFrames, opts)
           tostring(M.dialogWaiting()), tostring(M.battleLoadStarted()),
           tostring(M.eventRunning())))
       end
+      wipeCheck()
       battN = M.battleLoadStarted() and battN + 1 or 0
       dlgN  = M.dialogWaiting() and dlgN + 1 or 0
       if tactical and battN == 0 then tactical.idle() end
@@ -900,6 +940,7 @@ function M.worldNavTo(txIn, tyIn, opts)
   local pend = nil
   local aPhase = 0
   local battN = 0
+  local wipeCheck = wipeCanary("worldNavTo")
   local tactical = (opts.honest == "tactical" or opts.honest == "flee")
       and M.newFightDriver("worldNavTo",
         { tactical = true, boost = true, items = true,
@@ -926,6 +967,7 @@ function M.worldNavTo(txIn, tyIn, opts)
           M.frame, M.worldX(), M.worldY(),
           plan and tostring(#plan) or "-", idx, nblocked))
       end
+      wipeCheck()
       battN = M.battleLoadStarted() and battN + 1 or 0
       if tactical and battN == 0 then tactical.idle() end
       -- 1. battle: clear it (never a spared formation), then let the
