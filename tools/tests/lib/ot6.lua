@@ -950,6 +950,7 @@ function M.newFightDriver(tag, opts)
   local F = {}
   local menuStreak, tick, battleTick = 0, 0, 0
   local plan, planActor, held = nil, nil, {}
+  local tgtSpin = 0                    -- frames spent undecided in ST_TGT
 
   local function cmdRow(actor, cmd)
     for row = 0, 3 do
@@ -1046,7 +1047,7 @@ function M.newFightDriver(tag, opts)
     local st = M.readByte(MSTATE)
     if plan == nil or planActor ~= actor then
       if st ~= ST_CMD then return nil end
-      plan, planActor = makePlan(actor), actor
+      plan, planActor, tgtSpin = makePlan(actor), actor, 0
       M.log(string.format("[%s] actor=%d char=%d plan=%s",
         tag or "fight", actor, M.readByte(BCHID + actor * 2), plan.kind))
       return nil
@@ -1093,16 +1094,33 @@ function M.newFightDriver(tag, opts)
       if plan.kind == "item" then
         local chars, mons = M.readByte(TGTCHARS), M.readByte(TGTMONS)
         if mons ~= 0 then return { "right" } end
+        -- NEITHER SIDE SELECTED.  The old code fell straight into the
+        -- steer below with chars = 0, which sets cur = 0, compares
+        -- `0 < plan.target` -- false for target 0 -- and presses UP
+        -- forever.  A solo party's only valid target IS 0, so this is a
+        -- deadlock that can only happen to a party of one, which is
+        -- exactly the shape of battle 11.
+        if chars == 0 then return { "right" } end
         local wantMask = 1 << plan.target
         if chars ~= wantMask then
           local cur = 0
           for e = 0, 3 do
             if chars & (1 << e) ~= 0 then cur = e; break end
           end
-          return { cur < plan.target and "down" or "up" }
+          -- ...and even with a live mask, an unreachable target would spin
+          -- here.  tgtSpin is the backstop: after enough undecided frames,
+          -- take whoever is highlighted rather than hold the turn open
+          -- until the fight is lost.
+          tgtSpin = tgtSpin + 1
+          if tgtSpin < 40 then
+            return { cur < plan.target and "down" or "up" }
+          end
+          M.log(string.format("[%s] target steer gave up (chars=%02X " ..
+            "want=%02X) -- confirming on whoever is highlighted",
+            tag or "fight", chars, wantMask))
         end
       end
-      plan, planActor = nil, nil
+      plan, planActor, tgtSpin = nil, nil, 0
       return { "a" }
     end
     if st == ST_ITEM or st == ST_TOOLS then
