@@ -20,18 +20,20 @@
 -- shape as Shiva on {9,6} last leg, and the same positive control: the
 -- doorstep asserts {25,50} is NO-PATH now, so "the fight opened it" will
 -- mean something.
+--
+-- ISSUE #75 (the honesty conversion): ZERO state writes.  The kill-bit
+-- helper is gone; any encounter on the walk is FLED with the real L+R run
+-- (honest="flee" on every navTo, the same branch in the two inline
+-- drives).  No route battle has ever actually fired on maps 264/269/271/
+-- 273 -- the branch exists so the day one does, it is played, not rigged.
+-- This pass also deleted two helpers this file DEFINED and never called
+-- (tapInto and a stub `door`) -- the same dead-toolkit pattern
+-- gen_tunnelarmr's conversion cleaned out of its own file.
 local H = dofile("tools/tests/lib/ot6.lua")
 
 local function map() return H.mapId() & 0x1ff end
 local function bright() return emu.getState()["ppu.screenBrightness"] or 0 end
 local function sw(id) return (H.readByte(0x1E80 + (id >> 3)) >> (id & 7)) & 1 end
-local function killBitAll()
-  for s = 0, 5 do
-    if H.readByte(0x3aa8 + s * 2) % 2 == 1 then
-      H.writeByte(0x3eec + s * 2, H.readByte(0x3eec + s * 2) | 0x80)
-    end
-  end
-end
 local function settled()
   return H.hasControl() and H.tileAligned() and bright() >= 15
      and not H.dialogWaiting() and not H.battleLoadStarted() and not H.worldMode()
@@ -78,56 +80,6 @@ end
 
 local DELTA = { up = { 0, -1 }, right = { 1, 0 }, down = { 0, 1 }, left = { -1, 0 } }
 
--- Tap `dir` whenever the party has control, hands off while a scene owns
--- it, edge-A through dialogs.  Used to walk INTO a trigger whose scene then
--- takes over -- the tap keeps the party from sliding past the tile.
-local function tapInto(dir, pred, maxFrames, what)
-  local phase, n, ph, calm, hb = 0, 0, 0, 0, 0
-  return H.driveUntil(function()
-    calm = (pred() and settled()) and calm + 1 or 0
-    return calm >= 16
-  end, maxFrames or 12000, {
-    H.call(function()
-      ph = (ph + 1) % 8
-      hb = hb + 1
-      if hb % 120 == 0 then
-        H.log(string.format("tapInto f%d (%d,%d) phase=%d ctl=%s algn=%s "
-          .. "dlg=%s ev=%s $01B5=%d face=%d",
-          H.frame, H.fieldX(), H.fieldY(), phase, tostring(H.hasControl()),
-          tostring(H.tileAligned()), tostring(H.dialogWaiting()),
-          tostring(H.eventRunning()), sw(0x01B5),
-          H.readByte(0x087f + H.readWord(0x0803))))
-      end
-      if H.battleLoadStarted() then
-        killBitAll(); H.setPad(ph < 4 and { "a" } or {}); phase = 0; return
-      end
-      if H.dialogWaiting() then
-        H.setPad(ph < 4 and { "a" } or {}); phase = 0; return
-      end
-      if phase == 0 then
-        H.setPad({})
-        -- STOP TAPPING once we are where we were going.  The terminator
-        -- wants 16 consecutive calm frames on the target, and an eager tap
-        -- walks straight off it before the count gets there: the first
-        -- version of this rode the chute correctly to (10,45) and then
-        -- tapped itself to (10,46) and timed out.
-        if pred() then return end
-        if settled() then phase, n = 1, 0 end
-        return
-      end
-      if phase == 1 then
-        n = n + 1
-        H.setPad({ [dir] = true })
-        if n >= 8 then phase, n = 2, 0 end
-        return
-      end
-      H.setPad({})
-      n = n + 1
-      if n >= 24 then phase = 0 end
-    end),
-  }, what)
-end
-
 local function census(tag, targets)
   local sx, sy = H.fieldX(), H.fieldY()
   local xm, ym = H.readByte(0x0086), H.readByte(0x0087)
@@ -152,10 +104,6 @@ local function census(tag, targets)
 end
 
 
-local function door(fromX, fromY, toMap, what)
-  return H.seqStep and nil or nil
-end
-
 H.run({ maxFrames = 90000 }, {
   H.loadState("build/states/magicite_ifrit_shiva.mss.lua"),
   H.waitFrames(150),
@@ -167,7 +115,7 @@ H.run({ maxFrames = 90000 }, {
   end),
 
   -- 264 {9,5} -> 269 {44,53}
-  H.navTo(9, 5, { maxFrames = 9000, arrive = function() return map() == 269 end }),
+  H.navTo(9, 5, { maxFrames = 9000, honest = "flee", arrive = function() return map() == 269 end }),
   H.waitUntil(function() return map() == 269 and settled() end, 6000,
     "map 269 control", 5),
   H.waitFrames(60),
@@ -179,7 +127,7 @@ H.run({ maxFrames = 90000 }, {
   end),
 
   -- 269 {42,12} -> 271 {31,28}
-  H.navTo(42, 12, { maxFrames = 25000, arrive = function() return map() == 271 end }),
+  H.navTo(42, 12, { maxFrames = 25000, honest = "flee", arrive = function() return map() == 271 end }),
   H.waitUntil(function() return map() == 271 and settled() end, 6000,
     "map 271 control", 5),
   H.waitFrames(60),
@@ -194,7 +142,7 @@ H.run({ maxFrames = 90000 }, {
   end),
 
   -- 271 {3,27} -> 273 {30,60}
-  H.navTo(3, 27, { maxFrames = 25000, arrive = function() return map() == 273 end }),
+  H.navTo(3, 27, { maxFrames = 25000, honest = "flee", arrive = function() return map() == 273 end }),
   H.waitUntil(function() return map() == 273 and settled() end, 6000,
     "map 273 control", 5),
   H.waitFrames(60),
@@ -218,7 +166,7 @@ H.run({ maxFrames = 90000 }, {
   -- (lib/ot6_contract.lua).  Standing on a save tile re-enters SavePoint
   -- every frame and hasControl() flickers, so arrival is judged on
   -- position + $01BF + alignment.  The approach never faces 024 with A.
-  H.navTo(26, 52, { maxFrames = 9000 }),
+  H.navTo(26, 52, { maxFrames = 9000, honest = "flee" }),
   (function() local calm = 0
     return H.driveUntil(function()
       calm = (H.fieldX() == 26 and H.fieldY() == 53 and sw(0x01BF) == 1
@@ -227,7 +175,7 @@ H.run({ maxFrames = 90000 }, {
       return calm >= 8
     end, 9000, {
       H.call(function()
-        if H.battleLoadStarted() then killBitAll(); H.setPad({ "a" }); return end
+        if H.battleLoadStarted() then H.setPad({ l = true, r = true }); return end
         if H.dialogWaiting() then H.setPad({ "a" }); return end
         if H.fieldX() == 26 and H.fieldY() == 53 then H.setPad({}); return end
         H.setPad({ down = true })
@@ -250,7 +198,7 @@ H.run({ maxFrames = 90000 }, {
   end),
 
   -- park at {25,52}, facing UP into NUMBER 024 on {25,51}
-  H.navTo(25, 52, { maxFrames = 15000 }),
+  H.navTo(25, 52, { maxFrames = 15000, honest = "flee" }),
   H.hold({ "up" }), H.waitFrames(8), H.release(), H.waitFrames(20),
   (function() local calm = 0
     return H.driveUntil(function()
@@ -261,7 +209,7 @@ H.run({ maxFrames = 90000 }, {
       return false
     end, 3000, {
       H.call(function()
-        if H.battleLoadStarted() then killBitAll(); H.setPad({ "a" }); return end
+        if H.battleLoadStarted() then H.setPad({ l = true, r = true }); return end
         H.setPad({})
       end) }, "twenty settled frames below NUMBER 024")
   end)(),

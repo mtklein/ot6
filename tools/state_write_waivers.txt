@@ -127,7 +127,6 @@ tools/tests/gen_esper_tubes_done.lua	.writeByte(
 tools/tests/gen_gate_cave_save.lua	.writeByte(
 tools/tests/gen_gate_cave_save.lua	.writeWord(
 tools/tests/gen_gate_cave_save.lua	emu.write
-tools/tests/gen_ifrit_magicite.lua	.writeByte(
 tools/tests/gen_minecart_doorstep.lua	.writeByte(
 tools/tests/gen_minecart_platform_anchor.lua	.writeByte(
 tools/tests/gen_minecart_platform_anchor.lua	.writeWord(
@@ -135,7 +134,6 @@ tools/tests/gen_minecart_platform_anchor.lua	emu.write
 tools/tests/gen_mrf_save_room_anchor.lua	.writeByte(
 tools/tests/gen_mrf_save_room_anchor.lua	.writeWord(
 tools/tests/gen_mrf_save_room_anchor.lua	emu.write
-tools/tests/gen_n024_doorstep.lua	.writeByte(
 tools/tests/gen_n024_save_anchor.lua	.writeByte(
 tools/tests/gen_n024_save_anchor.lua	.writeWord(
 tools/tests/gen_n024_save_anchor.lua	emu.write
