@@ -57,7 +57,30 @@ NAMES = {0: "TERRA", 1: "LOCKE", 2: "CYAN", 3: "SHADOW", 4: "EDGAR",
          5: "SABIN", 6: "CELES", 7: "STRAGO", 8: "RELM", 9: "SETZER",
          10: "MOG", 11: "GAU", 12: "GOGO", 13: "UMARO"}
 
+WAIVERS = "tools/equipment_waivers.txt"
 ITEM_PROP = "ff6/src/menu/item_prop_en.dat"
+
+
+def load_waivers(repo: str) -> dict[tuple[str, str], str]:
+    """(fixture, CHARACTER) pairs where bare-handed is the story itself.
+
+    A burn-down, exactly like the state-write list: a line that matches
+    nothing is an error, so a fixture that gets armed upstream cannot keep
+    a stale exemption.
+    """
+    out = {}
+    try:
+        for line in open(os.path.join(repo, WAIVERS)):
+            line = line.rstrip("\n")
+            if not line.strip() or line.lstrip().startswith("#"):
+                continue
+            parts = line.split("\t")
+            if len(parts) < 3:
+                continue
+            out[(parts[0].strip(), parts[1].strip())] = parts[2].strip()
+    except OSError:
+        pass
+    return out
 WEAPON_IDS = range(0x00, 0x60)
 
 
@@ -170,6 +193,8 @@ def main() -> int:
     ap.add_argument("-v", "--verbose", action="store_true")
     args = ap.parse_args()
 
+    waivers = load_waivers(args.repo)
+    used = set()
     canhold = equippable_weapons(args.repo)
     cannot = sorted(c for c, n in canhold.items()
                     if n <= 1 and c in NAMES)
@@ -186,8 +211,16 @@ def main() -> int:
             skipped.append((os.path.basename(p), err))
             continue
         scanned += 1
-        naked = [m for m in party if m["weapon"] == EMPTY
-                 and canhold.get(m["char"], 99) > 1]
+        stem = os.path.basename(p)[:-4] if p.endswith(".mss") else p
+        naked = []
+        for m in party:
+            if m["weapon"] != EMPTY or canhold.get(m["char"], 99) <= 1:
+                continue
+            key = (stem, m["name"])
+            if key in waivers:
+                used.add(key)
+                continue
+            naked.append(m)
         if naked:
             bad.append((os.path.basename(p), party, naked))
         elif args.verbose:
@@ -212,6 +245,14 @@ def main() -> int:
         for m in party:
             gear = " ".join(f"{g:02X}" for g in m["gear"])
             print(f"         {m['name']:7s} gear {gear}")
+
+    stale = sorted(set(waivers) - used)
+    if stale:
+        print(f"\n{len(stale)} waiver(s) match nothing any more -- delete "
+              f"them; the burn-down only shrinks:")
+        for fix, who in stale:
+            print(f"  {fix}: {who}")
+        return 1
 
     if bad:
         print(f"\n{len(bad)} fixture(s) hand a party member NOTHING TO FIGHT "

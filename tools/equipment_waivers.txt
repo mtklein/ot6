@@ -1,0 +1,24 @@
+# Fixtures where a party member holding nothing is the STORY, not a bug.
+#
+# Format:  <fixture>\t<CHARACTER>\t<why, and which leg arms them>
+#
+# The rule this waives is tools/audit_equipment.py: nobody walks the story
+# bare-handed, because a wrong fixture reads exactly like a balance wall
+# (solo LOCKE punched a 495-hp HeavyArmor for eight damage a swing for
+# three runs before anyone read his equipment block).
+#
+# A waiver is only legitimate when the fixture captures the exact moment
+# the game itself took the gear away and the very next leg puts it back.
+# "This leg is hard" is never a reason.  Like the state-write list, this is
+# a BURN-DOWN: a line that matches nothing fails the run, so a fixture that
+# gets armed upstream cannot quietly keep its exemption.
+#
+# UMARO is not listed and never needs to be: the equip mask
+# (item_prop_en.dat +$01, bit N = actor N) says he can hold exactly one
+# weapon record in this ROM, so audit_equipment excludes him from the data
+# rather than from a list.
+
+locke_scenario	LOCKE	the scenario opens with him stripped and captured; gen_sfigaro's H.equipOptimum arms him before the gate soldier
+sfigaro_passage	LOCKE	same strip, one leg earlier; gen_celes arms him at the passage
+gau_joined	GAU	GAU joins off the Veldt wearing nothing, which is the character
+s2_gau_joined	GAU	same join, second-scenario variant
