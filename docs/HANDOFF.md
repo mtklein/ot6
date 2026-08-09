@@ -147,7 +147,32 @@ and no fixture in the chain has ever set one. Research is in
 them once early propagates to every downstream fixture -- do it before a
 full re-mint, not after.
 
-**Frontier status, end of 2026-08-09: THREE blockers found, ONE fixed.**
+**`sfigaro_town` IS GREEN (2026-08-09).** It was never balance -- it was
+FOUR defects stacked, and fixing any one alone still lost, which is why it
+read as tuning for three runs: LOCKE bare-handed (8 damage a swing), the
+bag drained by the Terra party upstream, the wrong ROW, and needing a top
+up before the third rematch. All three gate engagements now win on
+attempt 1. **The row is the load-bearing one** -- at ~110 a hit against
+168 hp he must heal every turn from the front and can never swing; halved
+he survives three, attacks two in three, and BREAKS the armour (495 -> 0,
+shields 3 -> 0 three times, never below 112 hp).
+
+**But the row lever does NOT generalise.** On the Phantom Train the same
+change measures WORSE, twice, on a fresh chain: front row shields 6 -> 3
+and SABIN down at f34707; back row shields 6 -> 6, casts 0, down at
+f19108. Blitz/Throw/SwdTech really are row-exempt and the fight still went
+the other way, so something that CHIPS that boss pays the penalty. Do not
+re-derive it from the exemption rule.
+
+**NEW BLOCKER, `sfigaro_escape` (gen_tunnelarmr):** navTo timeout, party
+parked at map 75 (41,43) with no plan for 20000 frames, NOT a wipe (the
+canary stays quiet). Almost certainly the gate soldier again -- he
+respawns on every map-75 reload, nothing clears `$030C`, and (30,42) is
+the only tile joining the quarters. `gen_sfigaro` has `clearGateSoldier`
+for exactly this and `gen_tunnelarmr` has nothing; that helper wants
+promoting into the library rather than copying.
+
+**Frontier status, end of 2026-08-09: FOUR blockers found, TWO fixed.**
 Running `make frontier NINJAFLAGS="-k 0"` (continue past failures) is how
 to enumerate them in one pass instead of one per multi-hour run -- do that
 first, always. The list:

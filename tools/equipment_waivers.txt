@@ -19,6 +19,5 @@
 # rather than from a list.
 
 locke_scenario	LOCKE	the scenario opens with him stripped and captured; gen_sfigaro's H.equipOptimum arms him before the gate soldier
-sfigaro_passage	LOCKE	same strip, one leg earlier; gen_celes arms him at the passage
 gau_joined	GAU	GAU joins off the Veldt wearing nothing, which is the character
 s2_gau_joined	GAU	same join, second-scenario variant
