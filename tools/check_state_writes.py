@@ -86,6 +86,12 @@ TOKENS = [
     ".writeWord(",
     "H.write",
     "M.write",
+    # The runtime write gate's confined raw-emu handle (lib/compose.py
+    # injects it at compose time; no checked-in .lua may name it).  A test
+    # that reaches for it is reaching AROUND the gate, and since this token
+    # was born forbidden it can never legitimately appear in the burn-down
+    # list -- the static side closes the runtime side's one escape hatch.
+    "__OT6_EMU_RAW",
 ]
 
 _IDENT = "A-Za-z0-9_"
@@ -335,6 +341,7 @@ M.writeByte(0x14, 3)
 M.write(0x16)
 emu.reset()
 local s = "benign" ; H.write(0x18)
+local sneak = __OT6_EMU_RAW.write(0x1a, 4)
 """
     got = scan_text("n.lua", noisy)
     want = [
@@ -344,6 +351,7 @@ local s = "benign" ; H.write(0x18)
         ("n.lua", 6, "M.write"),
         ("n.lua", 7, "emu.reset"),
         ("n.lua", 8, "H.write"),
+        ("n.lua", 9, "__OT6_EMU_RAW"),
     ]
     expect(got == want, "detection drift: want %r got %r" % (want, got))
 

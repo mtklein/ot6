@@ -322,10 +322,15 @@ the owner, selected through the real upstream party menu — never solo Locke.
 **Still required before #75 may close:** finish the v0.6 chain and banquet;
 re-cut all legacy battery anchors through the real Save UI; convert the
 remaining gameplay/lab consumers; delete the shared kill-bit paths from
-`lib/ot6_field.lua` and `H.clearBattle`; land the compose-time runtime write
-gate; re-mint every fixture under the final gate/provenance contract; reduce
-the waiver file to only the explicitly quarantined mechanism tests; run the
-complete test and frontier gates. The branch has targeted green replays, but
+`lib/ot6_field.lua` and `H.clearBattle`; re-mint every fixture under the
+final gate/provenance contract; reduce the waiver file to only the
+explicitly quarantined mechanism tests; run the complete test and frontier
+gates.  (The compose-time runtime write gate LANDED 2026-08-09,
+waiver-aware: zero-waiver scripts compose with the global `emu` proxied and
+the write surface refused at the call; the lib keeps the confined raw
+handle only while its own waivers survive, so the kill-bit deletion flips
+the gate strict with no further compose change.  `__OT6_EMU_RAW` is a
+forbidden static token, closing the reach-around.) The branch has targeted green replays, but
 no post-integration full-suite/full-frontier result yet — do not represent
 the program as complete.
 

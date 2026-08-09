@@ -487,6 +487,16 @@ scans every `.lua` here and fails `make test` on any write token not in
 that may only SHRINK (a stale waiver is itself a failure; prune it in the
 same change that earns it).  Do not add waivers to new code.  Ever.
 
+And it is enforced twice: for a file with NO waivers, `lib/compose.py`
+arms a RUNTIME write gate in the composed script -- the global `emu`
+becomes a proxy whose write surface raises `[ot6] runtime write gate` at
+the call, closing what a static scan cannot see (computed names,
+loadstring).  The lib keeps a confined raw handle (`H.loadState` and the
+retry-blob path) for as long as the lib's own waivers survive; deleting
+the last lib waiver flips every composed script to strict automatically.
+The handle's name is itself a forbidden token, so reaching around the
+proxy fails the static check instead.
+
 The one sanctioned exception: **quarantined mechanism tests** -- fault
 injection whose inputs the game can only produce rarely or never on cue
 (deliberate VRAM corruption for the font-restore path, the 1/65536
