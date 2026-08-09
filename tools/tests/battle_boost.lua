@@ -38,12 +38,72 @@ H.run({ maxFrames = 30000 }, {
   H.waitFrames(10),
   H.enterEncounter(),
   H.waitFrames(240),
+  -- issue #75: the actor used to be HANDED 3 bp and two party HP words
+  -- pinned to 500.  The bank is EARNED now: every character opens with 1
+  -- bp (Ot6InitBP) and an unboosted action regens +1 (Ot6ActionEnd), so
+  -- the first slot whose menu opens takes two real actions and arrives at
+  -- this test's window holding 3.  The action is HEAL FORCE (list row 3,
+  -- shared by all three riders' magitek lists) picked through the live
+  -- menu: it deals no damage -- the fight cannot end under the bank --
+  -- and it heals, so the party needs no pin to survive the extra rounds.
+  -- The submit is driven BY MENU STATE ($7BC2), not by a blind button
+  -- sequence -- measured: a fixed sequence lands its downs in whatever
+  -- window holds the cursor.  Three dead ends taught this shape its
+  -- choices: Heal Force (list row 3) leaves A refused forever -- the v0.8
+  -- wallet prices it out of the opening MP -- so the bank action is the
+  -- ROW-2 BEAM, the pick a plain A-mash was measured to land; the item
+  -- window is a trap twice over (the intro bag is EMPTY, and Wait mode
+  -- stops time while a list is open, so "A forever in $0a" freezes the
+  -- whole fight); and nobody else may act, so any OTHER ready character
+  -- defers focus with X, vanilla's own turn-cycling key.  Two beams into
+  -- shielded guards cannot end the fight (shielded damage is halved), and
+  -- each is an ordinary unboosted action: +1 bp (Ot6ActionEnd), twice,
+  -- on top of the 1 bp the actor opened with (Ot6InitBP).  $01 is
+  -- transitional (hands off); anything unknown gets B to back out.
+  (function()
+    local mf, downs = 0, 0
+    return H.driveUntil(function()
+      if H.readByte(0x7bca) == 0 then return false end
+      local act = H.readByte(0x62ca)
+      if actor == nil then
+        actor = act
+        H.log("banking bp on the first active slot: " .. actor)
+      end
+      return act == actor and bp(actor) >= 3
+    end, 12000, {
+      H.call(function()
+        if H.readByte(0x7bca) == 0 then mf, downs = 0, 0; H.setPad({}); return end
+        local act = H.readByte(0x62ca)
+        if actor ~= nil and act == actor and bp(actor) >= 3 then
+          H.setPad({}); return
+        end
+        mf = mf + 1
+        if (mf - 1) % 8 >= 4 then H.setPad({}); return end
+        local st = H.readByte(0x7bc2)
+        local btn
+        if actor ~= nil and act ~= actor then
+          btn = st == 0x05 and "x" or "b"   -- defer focus; back out first
+        elseif st == 0x05 then btn = "a"    -- open the magitek list
+        elseif st == 0x2a then
+          if downs < 2 then
+            if (mf - 1) % 8 == 0 then downs = downs + 1 end
+            btn = "down"
+          else btn = "a" end                -- the row-2 beam
+        elseif st == 0x38 then btn = "a"    -- confirm the default target
+        elseif st == 0x01 then H.setPad({}); return
+        else btn = "b" end
+        if (mf - 1) % 8 == 0 then
+          H.log(string.format("bank: f%d st=%02x press %s (act=%d bp=%d)",
+            H.frame, st, btn, act, bp(act)))
+        end
+        H.setPad({ [btn] = true })
+      end),
+    }, "bank 3 bp by real beam turns")
+  end)(),
   H.call(function()
-    actor = H.readByte(0x62ca)
-    H.log("active char slot: " .. actor)
-    -- give the actor 3 bp so the cap is reachable
-    H.writeByte(0x3e9c + actor*2, 3)
-    H.writeWord(0x3C00, 500); H.writeWord(0x3C02, 500)
+    H.assertEq(bp(actor), 3, "3 bp banked by real turns (1 open + 2 regen)")
+    H.log(string.format("banked: slot %d bp=%d hp %d %d %d", actor, bp(actor),
+      H.readWord(0x3BF4), H.readWord(0x3BF6), H.readWord(0x3BF8)))
     sfxWatch()
   end),
   H.pressButtons({ "r" }, 6), H.waitFrames(20),

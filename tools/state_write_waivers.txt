@@ -30,8 +30,6 @@ tools/tests/battle_blitzgrey.lua	.writeByte(
 tools/tests/battle_blitzgrey.lua	.writeWord(
 tools/tests/battle_blitzlist.lua	.writeByte(
 tools/tests/battle_blitzlist.lua	.writeWord(
-tools/tests/battle_boost.lua	.writeByte(
-tools/tests/battle_boost.lua	.writeWord(
 tools/tests/battle_bp.lua	.writeByte(
 tools/tests/battle_bp.lua	.writeWord(
 tools/tests/battle_break.lua	.writeByte(
