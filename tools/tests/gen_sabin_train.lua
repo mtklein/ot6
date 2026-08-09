@@ -556,16 +556,17 @@ local function b68Log(msg) H.log("[b68] " .. msg) end
 -- dying unhealed while absolute-missing ranking pointed both medics at
 -- bigger pools), with SABIN jumping the queue under 60% -- he is the win
 -- condition and no Fenix Down exists on this line
-local function neediest()
+local function neediest(limit20)
+  limit20 = limit20 or 15                       -- default: under 75%
   local best, miss, worst = nil, 0, 21
   if sabinE and pHP(sabinE) > 0 and pMaxHP(sabinE) > 0
-     and pHP(sabinE) * 10 < pMaxHP(sabinE) * 6 then
+     and pHP(sabinE) * 20 < pMaxHP(sabinE) * math.min(12, limit20) then
     return sabinE, pMaxHP(sabinE) - pHP(sabinE)
   end
   for _, e in ipairs({ sabinE, cyanE, shadowE }) do
     if e and pHP(e) > 0 and pMaxHP(e) > 0 then
       local frac20 = pHP(e) * 20 // pMaxHP(e)   -- 0..20
-      if frac20 < worst and frac20 < 15 then    -- only under 75%
+      if frac20 < worst and frac20 < limit20 then
         best, worst, miss = e, frac20, pMaxHP(e) - pHP(e)
       end
     end
@@ -596,23 +597,59 @@ local function makePlan(actor)
     return { kind = "item", item = ANTIDOTE, target = actor,
              row = itemRow }
   end
+  -- THE MEDIC DOCTRINE (2026-08-09, rewritten after three measured losses
+  -- on the fresh chain).  The old rule -- an actor heals only when the
+  -- ACTOR ITSELF is under 50% -- read like a medic line and was not one:
+  -- SABIN died twice from 137/231 (the train spikes for ~150) while CYAN
+  -- stood at full HP throwing boosted Fights.  Damage was never the
+  -- bottleneck (ten Shurikens alone carry 1500 of the 1900; SABIN's chips
+  -- and Suplexes cover the rest twice over); survival was the whole
+  -- fight.  Roles, in falling urgency:
+  --   CYAN    full-time medic -- heals the neediest whenever anyone is
+  --           under 75%; his Fight damage is the cheapest to give up.
+  --   SABIN   keeps HIMSELF above 65% (he is the chip engine, and the
+  --           spike one-shots him from anywhere under ~150), otherwise
+  --           chips and Suplexes.
+  --   SHADOW  emergency backup -- heals when someone is under 45%, else
+  --           throws.  Availability is read from the BATTLE inventory
+  --           ($2686), not the field bag: mid-battle field reads
+  --           measurably lie (the b47 machine's own trap note).
   local hp, mx = pHP(actor), pMaxHP(actor)
-  if mx > 0 and hp > 0 and hp * 2 < mx then
-    local tgt, miss = neediest()
+  local function healPlan(tgt, miss)
     local item = nil
+    if miss >= 100 and battInvIdx(POTION) then item = POTION
+    elseif battInvIdx(TONIC) then item = TONIC
+    elseif battInvIdx(POTION) then item = POTION end
+    if item == nil then return nil end
+    b68Log(string.format(
+      "heal e%d: %s -> e%d (missing %d) [%s]",
+      actor, item == TONIC and "TONIC" or "POTION", tgt, miss, partyLine()))
+    return { kind = "item", item = item, target = tgt,
+             row = cmdRowOf(actor, CMD_ITEM) }
+  end
+  if actor == sabinE and mx > 0 and hp > 0 and hp * 20 < mx * 13 then
+    local p = healPlan(actor, mx - hp)
+    if p then return p end
+  end
+  if actor == cyanE then
+    local tgt, miss = neediest(15)              -- anyone under 75%
     if tgt then
-      if miss >= 100 and invCount(POTION) > 0 then item = POTION
-      elseif invCount(TONIC) > 0 then item = TONIC
-      elseif invCount(POTION) > 0 then item = POTION end
+      local p = healPlan(tgt, miss)
+      if p then return p end
     end
-    if item then
-      b68Log(string.format(
-        "heal e%d: %s -> e%d (missing %d) tonics=%d potions=%d [%s]",
-        actor, item == TONIC and "TONIC" or "POTION", tgt, miss,
-        invCount(TONIC), invCount(POTION), partyLine()))
-      return { kind = "item", item = item, target = tgt,
-               row = cmdRowOf(actor, CMD_ITEM) }
+  end
+  if actor == shadowE then
+    local tgt, miss = neediest(9)               -- someone under 45%
+    if tgt then
+      local p = healPlan(tgt, miss)
+      if p then return p end
     end
+  end
+  if mx > 0 and hp > 0 and hp * 2 < mx then     -- fallback: stay alive
+    local tgt, miss = neediest(15)
+    if tgt == nil then tgt, miss = actor, mx - hp end
+    local p = healPlan(tgt, miss)
+    if p then return p end
   end
   -- healthy: SABIN's next two turns are the mechanism proofs -- AuraBolt
   -- chips holy off the 6-shield row, Pummel chips the OT6_BLUDG class (a
@@ -1136,9 +1173,14 @@ H.run({ maxFrames = 400000 }, {
   -- Tonics fund the round-by-round chip damage, Potions the Wheel spikes.
   -- 15/6 covers ~10 medic turns each with margin; the gil floors keep a
   -- short purse from zeroing out (log tells the story either way).
+  -- Buy ORDER is deliberate: Potions moved LAST and raised to 20 (the
+  -- 2026-08-09 medic line wants the depth, and the fresh purse -- 7484
+  -- gil, 9000 poorer than the July lineage that first won here -- covers
+  -- the whole list at 7350 with 134 to spare).  The shop widget is
+  -- gil-clamped, so if a future upstream arrives poorer still, the item
+  -- that gets shorted is the marginal Potion, never the Fenix Downs or
+  -- SHADOW's Shurikens.
   buyItem(TONIC, 0, function() return 20 - invCount(TONIC) end, "TONIC to 20"),
-  buyItem(POTION, 1, function() return 15 - invCount(POTION) end,
-    "POTION to 15"),
   buyItem(ANTIDOTE, 2, function() return 6 - invCount(ANTIDOTE) end,
     "ANTIDOTE to 6"),
   -- Fenix Downs are for REVIVING ALLIES (battle 47's prolonged tail
@@ -1152,6 +1194,8 @@ H.run({ maxFrames = 400000 }, {
   -- the #74 thread's own suggestion made real
   buyItem(SHURIKEN, 6, function() return 10 - invCount(SHURIKEN) end,
     "SHURIKEN to 10"),
+  buyItem(POTION, 1, function() return 20 - invCount(POTION) end,
+    "POTION to 20"),
   closeShop(),
   H.call(function()
     H.log(string.format("[shop] done: gil=%d tonics=%d potions=%d",
@@ -1285,6 +1329,18 @@ H.run({ maxFrames = 400000 }, {
   nav(8, 13, { maxFrames = 5000, arrive = function()
     return mapIdx() == 141 end }),
   settle(141, "outside again"),
+
+  -- ENTRY HP IS HALF THIS FIGHT (2026-08-09).  Battle 47's infirmary tops
+  -- everyone -- and the strip walk bleeds a member back down anyway: the
+  -- 2026-08-09 run entered battle 68 with CYAN at 2/254 on attempt 1 (45
+  -- and 25 on the staggered reloads), one medic effectively absent for
+  -- the opening rounds, and every attempt lost.  The old section comment
+  -- claimed "the only healing surface this leg owns is a battle menu";
+  -- that was true when it was written and is not any more -- H.fieldCare
+  -- (lib/ot6_field.lua, the gen_kolts fix) drives the real field Item
+  -- menu with zero writes.  One care stop HERE, before the checkpoint,
+  -- puts a full party into every attempt's starting state.
+  H.fieldCare({ tag = "pre-smokestack care", threshold = 0.95 }),
 
   -- ---- BATTLE 68: the Ghost Train, the pacifist line, the ladder ----
   b68Checkpoint(),
