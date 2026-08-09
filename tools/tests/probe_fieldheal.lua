@@ -1,0 +1,149 @@
+-- probe_fieldheal.lua -- LEARN the field Item/Use/target UI by driving it and
+-- watching, so the honest routes can heal the party between legs with real
+-- presses (issue #75: inputs in, observations out; this probe writes nothing).
+--
+-- It boots vargas_doorstep.mss, which the honest Mt. Kolts route currently
+-- delivers with TERRA dead (0/94) and EDGAR on 1/145 and seven Potions and
+-- five Tonics unspent -- exactly the state a player would open the menu on.
+--
+-- WHAT THE FIRST TWO PASSES ESTABLISHED (and where they went wrong):
+--   * ZMENUSTATE is DP $26, the shared cursor row is DP $4B.
+--   * main menu is $05 with Item on row 0; ONE A lands on $08, which is the
+--     item list itself -- there is no options window in front of it.
+--   * pass 1 tapped A repeatedly toward $08 and then pressed A again, which
+--     entered $19 and would have SWAPPED two items (gen_sabin_gau uses that
+--     same state as move mode).  Pass 2 pressed one edge at a time and saw
+--     $08 -> A -> $19 -> A -> $70, with EDGAR healed exactly +50 -- a Tonic,
+--     the row the cursor happened to be on -- so one of $19/$70 is the
+--     target cursor and the other is something pass 2 could not name.
+-- This pass isolates that: it parks on a KNOWN row (Potion), presses A once,
+-- screenshots, presses A once more, screenshots, and prints the inventory
+-- counts and the roster around every press.
+--
+-- Not a suite test: no `-- @suite` marker.  Run it directly, keeping the
+-- artifacts so the windows can actually be looked at:
+--   OT6_KEEP_RUNS=1 OT6_NO_PUBLISH=1 tools/tests/run.sh tools/tests/probe_fieldheal.lua
+local H = dofile("tools/tests/lib/ot6.lua")
+local STATE = "build/states/vargas_doorstep.mss.lua"
+
+local ZMENUSTATE, CURSOR = 0x26, 0x4B
+local POTION, TONIC = 0xE9, 0xE8
+
+local function invSlot(id)
+  for i = 0, 255 do
+    if H.readByte(0x1869 + i) == id and H.readByte(0x1969 + i) > 0 then
+      return i
+    end
+  end
+  return nil
+end
+local function invCount(id)
+  local s = invSlot(id)
+  return s and H.readByte(0x1969 + s) or 0
+end
+
+local function roster()
+  local out = {}
+  for c = 0, 15 do
+    if (H.readByte(0x1850 + c) & 0x07) ~= 0 then
+      local b = 0x1600 + 37 * c
+      out[#out + 1] = string.format("c%d %d/%d", c,
+        H.readWord(b + 9), H.readWord(b + 11))
+    end
+  end
+  return table.concat(out, " ")
+end
+
+local function snap(tag)
+  return H.call(function()
+    H.log(string.format("[%s] ZMENUSTATE=%02X cursor=%02X | %s | tonic=%d " ..
+      "potion=%d", tag, H.readByte(ZMENUSTATE), H.readByte(CURSOR), roster(),
+      invCount(TONIC), invCount(POTION)))
+    H.screenshot("probe_" .. tag)
+  end)
+end
+
+local last = { st = -1, cur = -1 }
+local function traceFrame(tag)
+  local st, cur = H.readByte(ZMENUSTATE), H.readByte(CURSOR)
+  if st ~= last.st or cur ~= last.cur then
+    last.st, last.cur = st, cur
+    H.log(string.format("  [%s] f%d state=%02X cursor=%02X",
+      tag, H.frame, st, cur))
+  end
+end
+
+local function traceFor(n, tag)
+  local i = 0
+  return H.driveUntil(function() i = i + 1; return i > n end, n + 120, {
+    H.call(function() H.setPad({}); traceFrame(tag) end),
+  }, "trace " .. tag)
+end
+
+local function press(btn, n, tag)
+  return H.cond(function() return true end, {
+    H.pressButtons({ btn }, 4),
+    H.release(),
+    traceFor(n or 120, tag),
+  })
+end
+
+local function toRow(want, tag)
+  return H.driveUntil(function() return H.readByte(CURSOR) == want end, 2400, {
+    H.call(function()
+      traceFrame(tag)
+      local cur = H.readByte(CURSOR)
+      H.setPad((H.frame % 10 < 4)
+        and { [cur < want and "down" or "up"] = true } or {})
+    end),
+  }, tag)
+end
+
+H.run({ maxFrames = 60000 }, {
+  H.loadState(STATE),
+  H.waitFrames(30),
+  H.waitUntil(function() return H.hasControl() end, 600, "field control", 5),
+  H.call(function()
+    H.log("roster at boot: " .. roster())
+    H.log(string.format("tonic slot=%s potion slot=%s",
+      tostring(invSlot(TONIC)), tostring(invSlot(POTION))))
+  end),
+
+  press("x", 150, "menu open"),
+  snap("main"),
+  toRow(0, "main cursor -> Item"),
+  H.release(), H.waitFrames(20),
+  press("a", 150, "enter Item"),
+  snap("list"),
+
+  -- park on the POTION row: a heal of +250 (Potion) vs +50 (Tonic) is how
+  -- the roster tells us WHICH row was actually consumed
+  toRow(invSlot(POTION) or 0, "list cursor -> Potion"),
+  H.release(), H.waitFrames(20),
+  snap("list_on_potion"),
+
+  press("a", 200, "A#1 on Potion"),
+  snap("after_a1"),
+
+  press("a", 200, "A#2"),
+  snap("after_a2"),
+
+  -- whichever of those windows is the target cursor, walk it and watch
+  H.repeatN(3, {
+    H.pressButtons({ "down" }, 4),
+    H.release(),
+    traceFor(45, "down"),
+  }),
+  snap("after_downs"),
+
+  press("a", 250, "A#3 (confirm)"),
+  snap("after_a3"),
+
+  -- back out to the field so the probe ends somewhere legible
+  H.repeatN(4, {
+    H.pressButtons({ "b" }, 4),
+    H.release(),
+    traceFor(60, "back"),
+  }),
+  snap("backed_out"),
+})

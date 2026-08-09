@@ -101,16 +101,31 @@
 --        enters at (14,35), two rows above it, and every leg on this map
 --        is asserted to stay off y=37 before it is walked.
 --
--- ENCOUNTER POLICY (issue #75, the honesty program): every navigator and
--- settle on this route runs honest="flee" -- random encounters are RUN
--- FROM by holding L+R, the engine's own mechanic, with zero state writes.
--- The old kill-bit is gone from this script's whole route.  Fleeing (not
--- fighting) is deliberate: three fixtures mint on this route and the
--- balance runs that consume them want the party a real *walking* player
--- has -- near-full HP/MP, no grind XP -- and a player who is crossing the
--- mountain rather than farming it runs from Cirpius packs.  A formation
--- that refuses to release the party is fought by the lib's tap-A fallback
--- after M.FLEE_CAP frames, and whatever scar that leaves is a real scar.
+-- ENCOUNTER POLICY (issue #75, the honesty program).  Zero state writes on
+-- this whole route: the kill-bit is gone, and every encounter is answered
+-- by the pad.  WHICH answer is per-region, and each half is measured:
+--
+--   * the CAVE, the TOWN and the WORLD legs RUN, honest="flee" -- L+R, the
+--     engine's own mechanic.  They are cheap; the cave cost the party ten
+--     hit points end to end.
+--   * MT. KOLTS AND MAP 98 ARE FOUGHT, honest="tactical" -- the real
+--     command menus, EDGAR's Tools, boosted Fights, and the fight driver's
+--     own Potion medic line.  The first honest version of this route fled
+--     the mountain too, and fleeing is not free: it is standing still while
+--     the formation takes free rounds.  Measured 2026-08-09, three runs:
+--     fled, the party reached VARGAS with TERRA dead and EDGAR on 1 hp (and
+--     lost the fight four times); fled with a healing layer, it reached him
+--     with LOCKE dead on the final fifty-three steps; fought, everyone
+--     arrived alive and two levels up.  A player crossing Mt. Kolts kills
+--     Triliums -- that is where the levels for VARGAS come from -- so the
+--     fought version is both the honest one and the one that works.
+--
+-- A formation that will not release the party inside M.FLEE_CAP frames is
+-- fought out by the same tactical driver rather than held against; the cap
+-- exists because a 90-second hold WIPED a full-health party here once.
+--
+-- THE LAYER OF CARE that goes with it is below: every crossing ends with a
+-- look at the party, and the shop in South Figaro is no longer walked past.
 local H = dofile("tools/tests/lib/ot6.lua")
 local CLEARED = "build/states/figaro_cleared.mss.lua"
 
@@ -123,11 +138,68 @@ local function sw(id) return (H.readByte(0x1e80 + (id >> 3)) >> (id & 7)) & 1 en
 local function objX(i) return H.readWord(0x086a + 0x29 * i) >> 4 end
 local function objY(i) return H.readWord(0x086d + 0x29 * i) >> 4 end
 
+-- field inventory: ids at $1869+i, counts at $1969+i (256 slots)
+local function invCount(id)
+  for i = 0, 255 do
+    if H.readByte(0x1869 + i) == id then return H.readByte(0x1969 + i) end
+  end
+  return 0
+end
+local function gil()
+  return H.readByte(0x1860) + (H.readByte(0x1861) << 8)
+       + (H.readByte(0x1862) << 16)
+end
+
+-- Roster line, printed by EVERY `where` so the damage profile of the route
+-- is legible leg by leg rather than only at the mint.  This route's whole
+-- risk is arriving at VARGAS with a party that cannot fight -- the honest
+-- 2026-08-06 chain reached his ledge with TERRA dead and EDGAR on 1 hp and
+-- lost four straight attempts (issue #75) -- so "who is hurt, and where did
+-- it happen" is the measurement this generator most needs to emit.
+-- $1600 + 37*c: +8 level, +9/+11 cur/max hp, +13/+15 cur/max mp; a
+-- character is in the party when $1850+c has a low nibble bit set.
+local function rosterLine()
+  local out = {}
+  for c = 0, 15 do
+    if (H.readByte(0x1850 + c) & 0x07) ~= 0 then
+      local b = 0x1600 + 37 * c
+      out[#out + 1] = string.format("c%d L%d %d/%d hp %d/%d mp", c,
+        H.readByte(b + 8), H.readWord(b + 9), H.readWord(b + 11),
+        H.readWord(b + 13), H.readWord(b + 15))
+    end
+  end
+  return string.format("%s | gil=%d tonic=%d potion=%d fenix=%d",
+    table.concat(out, " | "), gil(),
+    invCount(0xE8), invCount(0xE9), invCount(0xF0))
+end
+
 local function where(tag)
   H.log(string.format("[%s] f%d map=%d field=(%d,%d) world=(%d,%d) " ..
     "$11FA=%02X $010A=%d bright=%d",
     tag, H.frame, map(), H.fieldX(), H.fieldY(), H.worldX(), H.worldY(),
     H.readByte(0x11fa), sw(0x010A), bright()))
+  H.log(string.format("[%s] %s", tag, rosterLine()))
+end
+
+-- THE LAYER OF CARE (issue #75, 2026-08-09).  Running from encounters is
+-- not free -- the party eats a round or two every time the run roll says no
+-- -- and this route used to walk the whole mountain without ever opening the
+-- item menu.  Measured: TERRA left the cave at 84/94, reached the mountain
+-- at 65/94, arrived on map 98 at 39/94 and was DEAD by the doorstep, with
+-- EDGAR on 1/145 beside her, while seven Potions and five Tonics sat unused
+-- in the bag; the four honest VARGAS attempts that followed all wiped.  So
+-- every crossing now ends the way a player's would: check the party, and if
+-- anyone is meaningfully hurt, heal them through the real Item windows
+-- (H.fieldCare -- no state writes, and a no-op that does not even open the
+-- menu when nobody needs it).
+--
+-- The Potion RESERVE is the other half of the contract: gen_vargas's medic
+-- line spends Potions inside the fight, so the walk is only allowed to
+-- spend down to three of them and leans on Tonics for small holes.
+local POTION = 0xE9
+local function care(tag, threshold)
+  return H.fieldCare({ tag = "care " .. tag, threshold = threshold or 0.75,
+                       reserve = { [POTION] = 3 } })
 end
 
 -- crossDoor/seq: a bare step list cannot be spliced into a step list (Lua
@@ -192,14 +264,14 @@ end
 -- the screen is up -- and leaves "can I step THIS frame" to navTo, which
 -- already debounces control and re-plans.  The three MINTS below still
 -- demand real control, explicitly, at the moment they save.
-local function settleField(what, dstMap, maxF)
+local function settleField(what, dstMap, maxF, mode)
   return seq({
     H.waitFrames(90),
     H.advanceStory(settled(20, function()
       return not H.worldMode() and H.tileAligned()
          and not H.battleLoadStarted() and not H.dialogWaiting()
          and (dstMap == nil or map() == dstMap)
-    end), maxF or 12000, { honest = "flee" }),
+    end), maxF or 24000, { honest = mode or "flee" }),
     H.waitFrames(30),
   })
 end
@@ -220,20 +292,21 @@ end
 -- are walls until CheckDoor -- so BFS can route straight onto them and the
 -- crossing is one navTo, not a staging tile plus a hold.  Asserted after,
 -- by map id, so a silently-missed crossing cannot pass for one.
-local function crossTo(tx, ty, dstMap, what, maxF)
+local function crossTo(tx, ty, dstMap, what, mode, maxF)
   return seq({
     H.logStep(function()
-      return string.format("cross %s: (%d,%d) -> (%d,%d) -> map %d",
-        what, H.fieldX(), H.fieldY(), tx, ty, dstMap)
+      return string.format("cross %s: (%d,%d) -> (%d,%d) -> map %d [%s]",
+        what, H.fieldX(), H.fieldY(), tx, ty, dstMap, mode or "flee")
     end),
-    H.navTo(tx, ty, { maxFrames = maxF or 20000, arrive = mapChanged(),
-             honest = "flee" }),
+    H.navTo(tx, ty, { maxFrames = maxF or 40000, arrive = mapChanged(),
+             honest = mode or "flee" }),
     H.release(),
-    settleField(what, dstMap),
+    settleField(what, dstMap, nil, mode),
     H.call(function()
       H.assertEq(map(), dstMap, what .. ": landed on map " .. dstMap)
       where(what)
     end),
+    care(what),
   })
 end
 
@@ -295,6 +368,7 @@ local function warpTo(sx, sy, dx, dy, what, maxF)
       H.assertEq(H.fieldY(), dy, what .. ": landed at y=" .. dy)
       where(what)
     end),
+    care(what),
   })
 end
 
@@ -322,7 +396,176 @@ local function planAvoidsRow(tx, ty, badY, what)
   end)
 end
 
-H.run({ maxFrames = 220000 }, {
+-- ------------------------------------------------------------- the shop --
+-- Menu states (src/menu/shop.asm, and gen_edgar's already-proven drive of
+-- them): $25 options, $26 buy list, $27 quantity, $28 post-buy wait -> $26.
+-- The list row is $4B; row r's item id is $7E9D89+r.  The quantity widget
+-- is zSelIndex, DP $28 -- RIGHT +1, LEFT -1, UP +10, DOWN -10, gil-clamped
+-- by the handler.  Both cells are READ and steered toward a target, never
+-- press-counted: menu auto-repeat overshoots, measurably (gen_sabin_train
+-- bought 25 Tonics on a counted hold that asked for 14).
+--
+-- The five map-75 short entrances a BFS would happily route through.  Four
+-- of them are far from this walk; (8..10,32) is not -- it is sixteen steps
+-- from the spawn, in the quadrant the shop walk crosses.
+local M75_AVOID = {
+  { 8, 32 }, { 9, 32 }, { 10, 32 },        -- -> map 80
+  { 18, 55 }, { 19, 55 }, { 20, 55 },      -- -> map 91
+  { 48, 37 }, { 34, 35 }, { 22, 14 },
+}
+
+local function mstate() return H.readByte(0x0026) end
+local function shopRow() return H.readByte(0x004b) end
+local function shopQty() return H.readByte(0x0028) end
+local function rowItem(r) return H.readByte(0x9d89 + r) end
+local function inState(v) return function() return mstate() == v end end
+
+local function tapUntil(btn, pred, what, maxF)
+  return H.driveUntil(pred, maxF or 1800, {
+    H.call(function() H.setPad((H.frame % 10 < 4) and { btn } or {}) end),
+  }, what)
+end
+
+-- Walk off the current map by holding each direction in turn until the map
+-- id changes.  Deliberately NOT H.stepOff, whose battle branch still sets
+-- the kill bit -- nothing on this route may write game state (issue #75),
+-- and maps 75/85 have no encounters for it to answer anyway.
+local function leaveTo(dstMap, dirs, what, maxF)
+  local n = 0
+  return seq({
+    H.driveUntil(function() return map() == dstMap end, maxF or 3000, {
+      H.call(function()
+        n = n + 1
+        H.setPad({ [dirs[((n // 40) % #dirs) + 1]] = true })
+      end),
+    }, what),
+    H.release(),
+  })
+end
+
+-- Buy up to `target` of item `id`, sitting on buy-list row `row`.  Closed
+-- loop at every step: the row is verified to hold the item we think it does
+-- BEFORE any money moves, the quantity is steered to the number we want and
+-- read back, and the purchase is confirmed by gil actually falling by
+-- quantity x price.  A short purse buys what it can and says so.
+local function buyTo(id, row, target, unit, name)
+  local want, before = 0, 0
+  return seq({
+    H.driveUntil(function() return shopRow() == row end, 3000, {
+      H.call(function()
+        local cur = shopRow()
+        H.setPad((H.frame % 10 < 4)
+          and { [cur < row and "down" or "up"] = true } or {})
+      end),
+    }, "shop: cursor -> row " .. row),
+    H.release(), H.waitFrames(20),
+    H.call(function()
+      H.assertEq(rowItem(row), id,
+        string.format("shop row %d really is item $%02X", row, id))
+      before = gil()
+      want = target - invCount(id)
+      local afford = before // unit
+      if want > afford then want = afford end
+      H.log(string.format("[shop] %s: have %d, buying %d at %d gp (gil %d)",
+        name, invCount(id), want, unit, before))
+    end),
+    H.cond(function() return want >= 1 end, {
+      tapUntil("a", inState(0x27), "shop: quantity window"),
+      H.driveUntil(function() return shopQty() == want end, 3000, {
+        H.call(function()
+          local q = shopQty()
+          local btn = (q < want) and ((want - q >= 10) and "up" or "right")
+                                 or ((q - want >= 10) and "down" or "left")
+          H.setPad((H.frame % 8 < 3) and { [btn] = true } or {})
+        end),
+      }, "shop: quantity steered to the wanted count"),
+      H.release(), H.waitFrames(20),
+      tapUntil("a", function() return gil() < before end,
+        "shop: purchase goes through"),
+      H.release(),
+      H.waitUntil(inState(0x26), 2400, "shop: back to the buy list", 2),
+      H.call(function()
+        H.assertEq(before - gil(), want * unit,
+          string.format("%s cost %d x %d gp", name, want, unit))
+      end),
+    }, {}),
+  })
+end
+
+local function shopTrip()
+  return seq({
+    H.logStep(function()
+      return string.format("[shop] heading in: gil=%d tonic=%d potion=%d " ..
+        "fenix=%d", gil(), invCount(0xE8), invCount(0xE9), invCount(0xF0))
+    end),
+    H.navTo(44, 32, { maxFrames = 30000, honest = "flee", avoid = M75_AVOID }),
+    H.release(), H.waitFrames(20),
+    H.call(function()
+      H.assertEq(H.fieldX(), 44, "on the shop's door mat, x=44")
+      H.assertEq(H.fieldY(), 32, "on the shop's door mat, y=32")
+    end),
+    -- (44,30) is a bump door: a wall until CheckDoor runs, so this is a
+    -- held press, never a navTo whose goal it is
+    H.driveUntil(function() return map() == 85 end, 1200, {
+      H.hold({ "up" }), H.waitFrames(8),
+    }, "into the item shop (the bump door at (44,30))"),
+    H.release(),
+    settleField("item shop", 85),
+    H.call(function()
+      H.assertEq(map(), 85, "inside the item shop, map 85")
+      where("item shop")
+    end),
+    H.navTo(106, 54, { maxFrames = 20000, honest = "flee" }),
+    H.release(), H.waitFrames(20),
+    -- COUNTER TALK: the merchant is at (106,52) with the counter tile
+    -- (106,53) between him and the party, and CheckNPCs reaches through it
+    -- (player.asm:188-200).  UP is held until the facing byte reads back --
+    -- a two-frame turn press does not set it -- and (106,53) is impassable,
+    -- so the hold cannot walk anyone into the counter.
+    H.driveUntil(inState(0x25), 6000, {
+      H.call(function()
+        if not (H.hasControl() and H.tileAligned()) then H.setPad({}); return end
+        if H.fieldX() ~= 106 or H.fieldY() ~= 54 then H.setPad({}); return end
+        if H.readByte(0x087f + H.readWord(0x0803)) ~= FACE.up then
+          H.setPad({ up = true }); return
+        end
+        H.setPad((H.frame % 8 < 4) and { "a" } or {})
+      end),
+    }, "open the item shop (counter talk -> shop_menu 8)"),
+    H.release(),
+    H.call(function() H.screenshot("sfigaro_shop") end),
+    tapUntil("a", inState(0x26), "shop: the buy list opens"),
+    H.release(), H.waitFrames(20),
+    H.call(function()
+      local rows = {}
+      for r = 0, 7 do rows[#rows + 1] = string.format("%02X", rowItem(r)) end
+      H.log("[shop] stock: " .. table.concat(rows, " "))
+    end),
+    buyTo(0xF0, 5, 3, 500, "FENIX DOWN to 3"),
+    buyTo(0xE8, 0, 15, 50, "TONIC to 15"),
+    tapUntil("b", inState(0x25), "shop: back to the options window"),
+    tapUntil("b", function() return H.hasControl() and map() == 85 end,
+      "shop: closed"),
+    H.release(), H.waitFrames(30),
+    H.call(function()
+      H.log(string.format("[shop] done: gil=%d tonic=%d potion=%d fenix=%d",
+        gil(), invCount(0xE8), invCount(0xE9), invCount(0xF0)))
+      H.assertEq(invCount(0xF0) >= 2, true,
+        "the party leaves with Fenix Downs -- a death is answerable now")
+      H.assertEq(invCount(0xE8) >= 10, true, "Tonics restocked for the climb")
+    end),
+    H.navTo(104, 57, { maxFrames = 20000, honest = "flee" }),
+    H.release(), H.waitFrames(20),
+    leaveTo(75, { "down", "left", "right", "up" }, "out of the item shop"),
+    settleField("back in town", 75),
+    H.call(function()
+      H.assertEq(map(), 75, "back on map 75 with the shopping done")
+      where("shop done")
+    end),
+  })
+end
+
+H.run({ maxFrames = 400000 }, {
   H.loadState(CLEARED),
   H.waitFrames(20),
   H.call(function()
@@ -370,6 +613,7 @@ H.run({ maxFrames = 220000 }, {
     H.assertEq(map(), 71, "world (73,93) -> map 71, the cave lobby")
     where("cave lobby")
   end),
+  care("cave lobby"),
 
   -- The guards first: they stand ON the only two tiles that reach the
   -- trigger.  Stage at (10,50), directly under the one with the event, face
@@ -403,6 +647,7 @@ H.run({ maxFrames = 220000 }, {
       "map 71's trigger loaded the cave body (73 or 70), got " .. map())
     where("cave body")
   end),
+  care("cave body"),
 
   -- Map 73 offers three exits and the spawn only reaches one.  Landing at
   -- (47,39) the model reaches 50 tiles: (55,32) -> map 72 (10,3) and
@@ -462,15 +707,52 @@ H.run({ maxFrames = 220000 }, {
     H.assertEq(H.hasControl(), true, "controllable")
     H.assertEq(H.tileAligned(), true, "tile-aligned")
     where("south figaro")
-    H.screenshot("south_figaro")
   end),
+  care("south figaro"),
+  H.call(function() H.screenshot("south_figaro") end),
   H.saveState("south_figaro.mss"),
   H.logStep(function()
     return string.format("south_figaro minted at frame %d", H.frame)
   end),
 
+  -- ===================================================================== --
+  -- PHASE 3b: THE ITEM SHOP.  The party walks THROUGH a town on the way to
+  -- a boss with a bag that cannot answer a death, and until now it walked
+  -- straight back out again.  Measured 2026-08-09: with the care layer in
+  -- and map 98 fought rather than fled, everyone reached VARGAS alive --
+  -- but the Tonics were gone and the Potions were down to the reserve, and
+  -- the run before that lost LOCKE outright with no Fenix Down to raise
+  -- him.  Running out of supplies is a real finding, and the answer a
+  -- player has is the shop that is thirty seconds off the path.
+  --
+  -- The route is derived in docs/research/south-figaro-shop-route.md and
+  -- the traps it names are honoured here:
+  --   * SHOP 8 (event_main.asm:18308), NOT 15 -- the shop ids at :21595
+  --     belong to another town entirely.  Its stock is Tonic / Antidote /
+  --     Soft / Eyedrop / Echo Screen / FENIX DOWN / Sleeping Bag / Tent,
+  --     rows 0..7, and it does NOT sell Potions: shop 63, the $00A4
+  --     alternate, is the only South Figaro record that ever does, and
+  --     $00A4 is set inside the Locke/Celes escape, chapters from here.
+  --     So Tonics are the refill and Fenix Downs are the insurance.
+  --   * map 75 hides FIVE short entrances a BFS would happily route
+  --     through, and (8..10,32) sits sixteen steps from the spawn in the
+  --     quadrant this walk crosses.  They are passed to navTo as `avoid`.
+  --   * (44,30) is a BUMP DOOR ($F7): a wall until CheckDoor opens it, so
+  --     BFS cannot plan onto it and the crossing is navTo(44,32) plus one
+  --     held UP -- the same shape gen_edgar's crossDoor uses for Figaro.
+  --   * the merchant is a COUNTER talk.  He stands at (106,52); the party
+  --     stands at (106,54) and faces UP, and CheckNPCs reaches the tile
+  --     BEYOND the counter at (106,53) (player.asm:188-200).  Standing
+  --     next to him is not possible; there is a counter in the way.
+  --   * maps 75 and 85 have no encounters at all (map_prop byte 5 = 0), so
+  --     this whole detour is walked, not fought.
+  shopTrip(),
+
   -- Out the way we came: x=0 is the vertical long entrance -> world
   -- (84,112).  One press, not a navTo: the target tile IS the trigger.
+  H.navTo(1, 28, { maxFrames = 20000, honest = "flee", avoid = M75_AVOID }),
+  H.release(),
+  H.waitFrames(30),
   H.driveUntil(function() return H.worldMode() end, 900, {
     H.hold({ "left" }), H.waitFrames(8),
   }, "leave South Figaro (x=0 column)"),
@@ -492,8 +774,9 @@ H.run({ maxFrames = 220000 }, {
     H.assertEq(H.hasControl(), true, "controllable")
     H.assertEq(H.tileAligned(), true, "tile-aligned")
     where("kolts doorstep")
-    H.screenshot("kolts_doorstep")
   end),
+  care("kolts doorstep"),
+  H.call(function() H.screenshot("kolts_doorstep") end),
   H.saveState("kolts_doorstep.mss"),
   H.logStep(function()
     return string.format("kolts_doorstep minted at frame %d", H.frame)
@@ -524,15 +807,15 @@ H.run({ maxFrames = 220000 }, {
   -- 1 -> map 102 (51,46).  From 102 the bridge drops back onto shelf B, and
   -- B carries the summit chain 97 -> 103 -> 98.
   planAvoidsRow(11, 26, 37, "map 95 -> (11,26)"),
-  crossTo(11, 26, 100, "K1 entrance -> shelf F"),
-  crossTo(19, 17, 96, "K2 shelf F -> cave 96 P"),
-  crossTo(22, 21, 100, "K3 cave 96 P -> shelf D"),
-  crossTo(34, 7, 96, "K4 shelf D -> cave 96 R"),
-  crossTo(12, 8, 102, "K5 cave 96 R -> the bridge (LONG entrance)"),
-  crossTo(35, 50, 100, "K6 bridge -> shelf B"),
-  crossTo(58, 45, 97, "K7 shelf B -> cave 97"),
-  crossTo(55, 10, 103, "K8 cave 97 -> the summit"),
-  crossTo(60, 9, 98, "K9 summit -> VARGAS's ledge"),
+  crossTo(11, 26, 100, "K1 entrance -> shelf F", "tactical"),
+  crossTo(19, 17, 96, "K2 shelf F -> cave 96 P", "tactical"),
+  crossTo(22, 21, 100, "K3 cave 96 P -> shelf D", "tactical"),
+  crossTo(34, 7, 96, "K4 shelf D -> cave 96 R", "tactical"),
+  crossTo(12, 8, 102, "K5 cave 96 R -> the bridge (LONG entrance)", "tactical"),
+  crossTo(35, 50, 100, "K6 bridge -> shelf B", "tactical"),
+  crossTo(58, 45, 97, "K7 shelf B -> cave 97", "tactical"),
+  crossTo(55, 10, 103, "K8 cave 97 -> the summit", "tactical"),
+  crossTo(60, 9, 98, "K9 summit -> VARGAS's ledge", "tactical"),
 
   -- ===================================================================== --
   -- PHASE 5: THE VARGAS DOORSTEP.  The party lands on map 98 at (11,10);
@@ -555,13 +838,27 @@ H.run({ maxFrames = 220000 }, {
     H.assertEq(sw(0x010A), 0, "$010A still clear -- Vargas has not appeared")
     where("map 98 arrival")
   end),
-  H.navTo(11, 32, { maxFrames = 20000, honest = "flee",
+  care("map 98 arrival"),
+  -- MAP 98 IS FOUGHT, NOT FLED, and that is a measured decision rather than
+  -- a mood.  Its encounter group is 62 -- Trilium pairs and Trilium + Tusker
+  -- + two Cirpius -- and the approach is 96 steps followed by another 53,
+  -- the longest unbroken walk on the route.  Running from those packs means
+  -- standing still and being hit for as many rounds as the run roll takes:
+  -- measured 2026-08-09, the party crossed the whole mountain at full HP
+  -- under the care layer and then lost LOCKE outright (122 -> 0) on the
+  -- final 53 steps, and with no Fenix Down in the bag no amount of care can
+  -- answer that.  A player walking this ledge kills Triliums; they are trash
+  -- with two shields.  So these three legs run honest="tactical" -- the
+  -- real command menus, EDGAR's Tools, boosted Fights, and the fight
+  -- driver's own Potion medic line at 35% -- and the party arrives having
+  -- actually played the mountain instead of absorbing it.
+  H.navTo(11, 32, { maxFrames = 40000, honest = "tactical",
     arrive = function() return sw(0x010A) == 1 end }),
   H.release(),
   H.advanceStory(function()
     return H.hasControl() and H.tileAligned() and sw(0x010A) == 1
        and objX(16) == 23 and objY(16) == 32
-  end, 20000, { honest = "flee" }),
+  end, 20000, { honest = "tactical" }),
   H.call(function()
     H.assertEq(sw(0x010A), 1, "the approach trigger ran ($010A set)")
     H.assertEq(sw(0x031C), 1, "$031C set (Vargas NPC armed)")
@@ -569,8 +866,9 @@ H.run({ maxFrames = 220000 }, {
     where("vargas spawned")
     H.screenshot("vargas_spawn")
   end),
+  care("vargas spawned"),
 
-  H.navTo(22, 32, { maxFrames = 20000, honest = "flee" }),
+  H.navTo(22, 32, { maxFrames = 40000, honest = "tactical" }),
   H.release(),
   -- Face him.  NPC activation is decided by the party FACING byte ($087F
   -- through the $0803 party-object offset; 0 up 1 right 2 down 3 left, from
@@ -588,6 +886,22 @@ H.run({ maxFrames = 220000 }, {
   }, "face VARGAS (facing byte = 1)"),
   H.release(),
   H.waitFrames(30),
+
+  -- The LAST care stop, and the one the fight actually depends on: the walk
+  -- from the approach trigger to his tile is 53 steps of Trilium/Tusker
+  -- country and is where TERRA died outright on the 2026-08-06 chain.  Heal
+  -- here, then re-establish the facing the menu visit cannot have changed
+  -- but which the fixture's contract will not take on trust.
+  care("vargas doorstep", 0.95),
+  H.driveUntil(function()
+    return H.readByte(0x087f + H.readWord(0x0803)) == 1
+       and H.hasControl() and H.tileAligned()
+       and H.fieldX() == 22 and H.fieldY() == 32
+  end, 900, {
+    H.hold({ "right" }), H.waitFrames(4),
+  }, "face VARGAS again after the care stop"),
+  H.release(),
+  H.waitFrames(30),
   H.call(function()
     H.assertEq(map(), 98, "on map 98")
     H.assertEq(H.fieldX(), 22, "party at x=22")
@@ -599,12 +913,6 @@ H.run({ maxFrames = 220000 }, {
     H.assertEq(H.readByte(0x087f + H.readWord(0x0803)), 1, "facing RIGHT, at him")
     H.assertEq(H.battleLoadStarted(), false, "not in a battle")
     -- the tools this whole route exists to carry
-    local function invCount(id)
-      for i = 0, 255 do
-        if H.readByte(0x1869 + i) == id then return H.readByte(0x1969 + i) end
-      end
-      return 0
-    end
     H.assertEq(invCount(0xA4), 1, "BioBlaster still carried (the poison key)")
     H.assertEq(invCount(0xA3), 1, "NoiseBlaster still carried")
     H.assertEq(invCount(0xAA), 1, "AutoCrossbow still carried")
@@ -615,6 +923,21 @@ H.run({ maxFrames = 220000 }, {
           c, H.readByte(base), H.readByte(base + 8),
           H.readWord(base + 9), H.readWord(base + 11)))
       end
+    end
+    -- THE DOORSTEP CONTRACT (issue #75).  A fixture that hands gen_vargas a
+    -- corpse and a one-hit-point EDGAR is not a doorstep, it is a loss
+    -- already recorded, and the 2026-08-06 chain shipped exactly that and
+    -- then blamed the fight for losing four times.  So the walk has to
+    -- deliver a party that can fight, and say so here rather than three
+    -- edges downstream: everyone standing, and nobody below half.  If this
+    -- ever fails the finding is "the route ran out of supplies", which is a
+    -- real thing to know and not something to widen the bound around.
+    for _, c in ipairs(H.partyMembers()) do
+      H.assertEq(H.charHp(c) > 0, true,
+        string.format("char %d reached VARGAS alive", c))
+      H.assertEq(H.charHp(c) * 2 >= H.charMaxHp(c), true,
+        string.format("char %d is at or above half hp (%d/%d)",
+          c, H.charHp(c), H.charMaxHp(c)))
     end
     where("vargas doorstep")
     H.screenshot("vargas_doorstep")

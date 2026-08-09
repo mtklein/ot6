@@ -28,6 +28,20 @@ assert(type(M) == "table",
   "ot6_field.lua is inlined by lib/compose.py after lib/ot6.lua and " ..
   "receives the core module table; it cannot be loaded on its own")
 
+-- How long honest="flee" holds L+R before it accepts that this formation is
+-- not going to release the party and fights the battle out instead.  The run
+-- mechanic is a per-round roll against level/speed, so a short tail is
+-- normal -- but holding L+R is not a neutral act, it is standing still while
+-- the formation takes free rounds.  MEASURED 2026-08-09 with this cap at
+-- 5400 (90 seconds): a Mt. Kolts cave-97 formation refused to release a
+-- FULL-HEALTH party, the flee held for all 5400 frames, the party WIPED
+-- inside its own escape attempt, and the drive then tapped A through the
+-- Game Over and into a brand-new game -- eleven maps of intro before the
+-- leg's budget finally expired.  1800 frames is 30 seconds, several rounds,
+-- long enough for a run that is going to work and short enough that the
+-- fallback still has a party to fight with.
+M.FLEE_CAP = 1800
+
 -- Field navigation, so routes are coordinate-aware instead of blind
 -- timed holds (which desync on any map).  Movement is grid-oriented, one
 -- tile per step: up=-Y down=+Y left=-X right=+X, PLUS the four diagonals
@@ -299,9 +313,13 @@ local function resolve(v) return type(v) == "function" and v() or v end
 --                          fled battle is not a WIN, so win-only rolls
 --                          (SHADOW's 1/16 post-battle leave,
 --                          battle_main.asm:11976) never happen -- the
---                          Sabin chain's whole reason to run.  Times out
---                          on unrunnable formations; callers pick fight
---                          vs flee per leg and say why.
+--                          Sabin chain's whole reason to run.  A formation
+--                          that has not released the party after
+--                          M.FLEE_CAP consecutive battle frames is fought
+--                          out by edge-tapped A instead of hanging the leg
+--                          (unrunnable formations exist and a run that
+--                          cannot end is not "honest", it is a timeout);
+--                          callers pick fight vs flee per leg and say why.
 --   opts.calmFrames  consecutive settled frames on the goal tile the
 --                  terminator requires (default 16; see ISSUE #22 below)
 --   opts.noPathRetries  BFS-no-path retries, 45 idle frames apart, before
@@ -380,7 +398,9 @@ function M.navTo(txIn, tyIn, opts)
   local calm = 0            -- consecutive settled frames on the goal tile
   local battN, dlgN, lostN = 0, 0, 0   -- debounce counters (see below)
   local noPathN, pause = 0, 0          -- no-path retry state
-  local tactical = opts.honest == "tactical"
+  -- built for "tactical" AND for "flee": the flee branch falls back to it
+  -- once M.FLEE_CAP says this formation is not letting go
+  local tactical = (opts.honest == "tactical" or opts.honest == "flee")
       and M.newFightDriver("navTo",
         { tactical = true, boost = true, items = true, healPercent = 35 }) or nil
   local function drop(why)  -- discard the plan, saying why (once, not per frame)
@@ -428,7 +448,21 @@ function M.navTo(txIn, tyIn, opts)
           return
         end
         if opts.honest == "flee" then
-          M.setPad({ l = true, r = true })
+          -- L+R is the engine's own run mechanic; M.FLEE_CAP is the point
+          -- at which "still holding" stops being a run and starts being a
+          -- slow death, and the battle is fought out instead.  The fallback
+          -- is the TACTICAL driver, not a blind A-tap: a party that has
+          -- already spent M.FLEE_CAP frames being hit needs its own item
+          -- menu more than it needs a first command row.
+          if battN <= M.FLEE_CAP then
+            M.setPad({ l = true, r = true })
+            return
+          end
+          if battN == M.FLEE_CAP + 1 then
+            M.log(string.format("flee: no release after %d frames; " ..
+              "fighting this formation out", M.FLEE_CAP))
+          end
+          tactical.frame()
           return
         end
         if tactical then tactical.frame(); return end
@@ -587,7 +621,7 @@ function M.advanceStory(pred, maxFrames, opts)
   for _, w in ipairs(opts.spare or {}) do spareSet[w] = true end
   local aPhase = 0
   local battN, dlgN = 0, 0
-  local tactical = opts.honest == "tactical"
+  local tactical = (opts.honest == "tactical" or opts.honest == "flee")
       and M.newFightDriver("advanceStory",
         { tactical = true, boost = true, items = true, healPercent = 35 }) or nil
   local hb = -600                      -- heartbeat: log immediately, then every 600
@@ -618,6 +652,25 @@ function M.advanceStory(pred, maxFrames, opts)
         end
         if next(spareSet) and M.formationHas(spareSet) then
           M.setPad(battN > 300 and aPhase < 4 and { "a" } or {})
+          return
+        end
+        -- honest="flee" was accepted here and then IGNORED: every navigator
+        -- had a flee branch and this one did not, so a settle that rolled an
+        -- encounter blind-tapped A through a whole fight while its caller's
+        -- header said the route runs from them.  Measured on gen_kolts
+        -- (2026-08-09): the mountain settles fought Cirpius packs by tap-A,
+        -- which is how the party reached VARGAS with TERRA dead and EDGAR on
+        -- 1 hp.  Same contract as navTo's, cap included.
+        if opts.honest == "flee" then
+          if battN <= M.FLEE_CAP then
+            M.setPad({ l = true, r = true })
+            return
+          end
+          if battN == M.FLEE_CAP + 1 then
+            M.log(string.format("flee: no release after %d frames; " ..
+              "fighting this formation out", M.FLEE_CAP))
+          end
+          tactical.frame()
           return
         end
         if tactical then tactical.frame(); return end
@@ -836,7 +889,7 @@ function M.worldNavTo(txIn, tyIn, opts)
   local pend = nil
   local aPhase = 0
   local battN = 0
-  local tactical = opts.honest == "tactical"
+  local tactical = (opts.honest == "tactical" or opts.honest == "flee")
       and M.newFightDriver("worldNavTo",
         { tactical = true, boost = true, items = true, healPercent = 35 }) or nil
   local hb = -600
@@ -871,7 +924,21 @@ function M.worldNavTo(txIn, tyIn, opts)
           return
         end
         if opts.honest == "flee" then
-          M.setPad({ l = true, r = true })
+          -- L+R is the engine's own run mechanic; M.FLEE_CAP is the point
+          -- at which "still holding" stops being a run and starts being a
+          -- slow death, and the battle is fought out instead.  The fallback
+          -- is the TACTICAL driver, not a blind A-tap: a party that has
+          -- already spent M.FLEE_CAP frames being hit needs its own item
+          -- menu more than it needs a first command row.
+          if battN <= M.FLEE_CAP then
+            M.setPad({ l = true, r = true })
+            return
+          end
+          if battN == M.FLEE_CAP + 1 then
+            M.log(string.format("flee: no release after %d frames; " ..
+              "fighting this formation out", M.FLEE_CAP))
+          end
+          tactical.frame()
           return
         end
         if tactical then tactical.frame(); return end
@@ -1405,4 +1472,306 @@ function M.stepOff(dirs, maxFrames, what)
       M.setPad({ [dirs[((n // 40) % #dirs) + 1]] = true })
     end),
   }, what)
+end
+
+-- --------------------------------------------------------- field care --
+-- M.fieldCare: open the FIELD MENU and heal or revive the party with real
+-- presses, then close it again.  Zero state writes (issue #75) -- every
+-- point of HP this restores is restored by the game's own item code,
+-- driven the way a player drives it.
+--
+-- WHY THIS EXISTS.  The honest routes run from random encounters, and a run
+-- is not free: the party takes a round or two of hits every time the dice
+-- say no.  Measured on gen_kolts (2026-08-09), the mountain crossing spent
+-- TERRA from 94 to 39 and then the map-98 approach took her to 1 and EDGAR
+-- from 106 to 1, at which point four straight honest VARGAS attempts wiped
+-- -- while SEVEN POTIONS AND FIVE TONICS sat unused in the bag the whole
+-- way.  The route was not too hard; nobody was playing the item menu.
+--
+-- THE UI, measured by probe_fieldheal.lua / probe_fieldcells.lua against a
+-- real vargas_doorstep and cross-read against src/menu (the full citation
+-- trail is docs/research/field-care-menu.md):
+--
+--   ZMENUSTATE = DP $26, and the shared list cursor is DP $4B.
+--   $05 main menu, Item on row 0
+--     -A-> $08 the item list itself -- there is NO options window in front
+--          of it, and $4B here IS the inventory slot (one column)
+--     -A-> $19 "slot picked up".  A on a DIFFERENT slot SWAPS the two; A on
+--          the SAME slot is what calls UseItem (field_menu.asm:2331-2336).
+--          A first pass tapped A toward $08 and then pressed A again with a
+--          moved cursor, and quietly rearranged the bag instead of using
+--          anything.
+--     -A-> $70 target select: $4B is the MENU slot 0..3 (battle order, not
+--          party order), moved by up/down only; $69+slot holds that slot's
+--          character id, which is how a character maps to a cursor row.
+--     -A-> the item is applied and the window STAYS on $70, so serving a
+--          second character with a different item has to back out ($77 ->
+--          $08) rather than press on.
+--   B from $08 lands on the item options window $17, then $04, then out.
+--
+--   REFUSALS ARE READABLE.  CheckCanUseItem (item.asm:2243-2330) allows only
+--   a Fenix Down on a KO'd target and allows Tonic/Potion only on a living
+--   character below full HP; an invalid pick sets DP $B5 (zMosaic) nonzero
+--   for about eight frames.  This driver watches that cell and gives up on
+--   that (character, item) pair instead of mashing A at a window that will
+--   never accept it.
+--
+-- opts.threshold  heal a living member below this fraction of max HP
+--                 (default 0.55)
+-- opts.reserve    { [itemId] = n } -- keep n of that item unspent, so a leg
+--                 can hold Potions back for the fight it is walking toward
+-- opts.maxFrames  budget for the whole visit (default 24000)
+-- opts.tag        log prefix
+--
+-- It is a no-op -- not even a menu open -- when nobody needs anything, so a
+-- route can call it after every leg and pay only where it matters.
+local CARE_ZM, CARE_CUR, CARE_REFUSE = 0x26, 0x4b, 0xb5
+local CARE_TONIC, CARE_POTION, CARE_FENIX = 0xE8, 0xE9, 0xF0
+
+function M.charHp(c) return M.readWord(0x1600 + 37 * c + 9) end
+
+-- Max HP is NOT a plain word: the top two bits carry an HP-boost code and
+-- the effective maximum is the base plus a percentage of it, clamped to
+-- 9999 (menu_common.asm:2377-2436).  Nothing in the World of Balance chain
+-- has a boost set yet -- every roster dump so far reads a bare base -- so
+-- the percentages below are transcribed from the source, not measured, and
+-- are marked as such deliberately.
+function M.charMaxHp(c)
+  local w = M.readWord(0x1600 + 37 * c + 11)
+  local base, code = w & 0x3fff, w >> 14
+  local add = ({ [0] = 0, [1] = base // 4, [2] = base // 8,
+                 [3] = base // 2 })[code]
+  local v = base + add
+  return v > 9999 and 9999 or v
+end
+
+function M.partyMembers()
+  local out = {}
+  for c = 0, 15 do
+    if (M.readByte(0x1850 + c) & 0x07) ~= 0 then out[#out + 1] = c end
+  end
+  return out
+end
+
+function M.invSlotOf(id)
+  for i = 0, 255 do
+    if M.readByte(0x1869 + i) == id and M.readByte(0x1969 + i) > 0 then
+      return i
+    end
+  end
+  return nil
+end
+
+function M.invCountOf(id)
+  local s = M.invSlotOf(id)
+  return s and M.readByte(0x1969 + s) or 0
+end
+
+function M.fieldCare(opts)
+  opts = opts or {}
+  local tag = opts.tag or "care"
+  local thresh = opts.threshold or 0.55
+  local reserve = opts.reserve or {}
+  local budget = opts.maxFrames or 24000
+
+  local function avail(id)
+    return math.max(0, M.invCountOf(id) - (reserve[id] or 0))
+  end
+
+  local failed = {}                    -- "char:item" pairs the game refused
+  local function key(w) return w.char .. ":" .. w.item end
+
+  -- What a player would do, in the order they would do it: raise the dead
+  -- first, then top up whoever is worst off, spending the cheap item when
+  -- the cheap item covers the hole.
+  local function pick()
+    for _, c in ipairs(M.partyMembers()) do
+      if M.charHp(c) == 0 and avail(CARE_FENIX) > 0
+         and not failed[c .. ":" .. CARE_FENIX] then
+        return { char = c, item = CARE_FENIX, why = "revive" }
+      end
+    end
+    local best, bestR = nil, 1.0
+    for _, c in ipairs(M.partyMembers()) do
+      local hp, mx = M.charHp(c), M.charMaxHp(c)
+      if hp > 0 and mx > 0 and hp < mx then
+        local r = hp / mx
+        if r < thresh and r < bestR then best, bestR = c, r end
+      end
+    end
+    if best == nil then return nil end
+    local hole = M.charMaxHp(best) - M.charHp(best)
+    local order = hole >= 120
+      and { CARE_POTION, CARE_TONIC } or { CARE_TONIC, CARE_POTION }
+    for _, id in ipairs(order) do
+      if avail(id) > 0 and not failed[best .. ":" .. id] then
+        return { char = best, item = id, why = "heal" }
+      end
+    end
+    return nil
+  end
+
+  local function anyNeed() return pick() ~= nil end
+
+  -- menu slot (the $70 cursor row) for a character id
+  local function slotOf(c)
+    for s = 0, 3 do
+      if M.readByte(0x69 + s) == c then return s end
+    end
+    return nil
+  end
+
+  local phase, served, want, pending, rewind, tries = 0, false, nil, nil, false, 0
+
+  local function steer(cur, wantRow)
+    if cur == wantRow then return { "a" } end
+    return { [cur < wantRow and "down" or "up"] = true }
+  end
+
+  local function serveFrame()
+    phase = (phase + 1) % 12
+    local st = M.readByte(CARE_ZM)
+
+    -- a refusal is the game telling us this pair is illegal; believe it
+    if want and M.readByte(CARE_REFUSE) ~= 0 then
+      M.log(string.format("[%s] REFUSED: char %d / item $%02X (zMosaic set)",
+        tag, want.char, want.item))
+      failed[key(want)] = true
+      want, pending, rewind = nil, nil, true
+      M.setPad({})
+      return
+    end
+
+    -- did the last confirm land?
+    if pending then
+      if M.charHp(pending.char) ~= pending.hp
+         or M.invCountOf(pending.item) < pending.qty then
+        M.log(string.format("[%s] used $%02X on char %d: %d -> %d hp, %d left",
+          tag, pending.item, pending.char, pending.hp,
+          M.charHp(pending.char), M.invCountOf(pending.item)))
+        want, pending, rewind = nil, nil, true
+      end
+    end
+
+    if want == nil then
+      want = pick()
+      if want == nil then served = true; M.setPad({}); return end
+      tries = tries + 1
+      if tries > 16 then
+        M.log(string.format("[%s] giving up after %d attempts", tag, tries))
+        served = true; M.setPad({}); return
+      end
+      M.log(string.format("[%s] plan: %s char %d with $%02X (%d/%d hp)",
+        tag, want.why, want.char, want.item,
+        M.charHp(want.char), M.charMaxHp(want.char)))
+    end
+
+    local held = nil
+    if rewind then
+      -- back out to the item list before selecting a different item
+      if st == 0x08 then rewind = false else held = { "b" } end
+    end
+    if held == nil then
+      if st == 0x05 then
+        held = steer(M.readByte(CARE_CUR), 0)
+      elseif st == 0x08 then
+        local slot = M.invSlotOf(want.item)
+        if slot == nil then
+          failed[key(want)] = true; want = nil; M.setPad({}); return
+        end
+        held = steer(M.readByte(CARE_CUR), slot)
+      elseif st == 0x19 then
+        -- A here only USES the item if the cursor is still on the slot it
+        -- was picked up from; anywhere else it swaps two items instead
+        local slot = M.invSlotOf(want.item)
+        held = (slot and M.readByte(CARE_CUR) == slot) and { "a" } or { "b" }
+      elseif st == 0x70 then
+        local slot = slotOf(want.char)
+        if slot == nil then
+          M.log(string.format("[%s] char %d is not on the target window " ..
+            "(slots %d,%d,%d,%d)", tag, want.char, M.readByte(0x69),
+            M.readByte(0x6a), M.readByte(0x6b), M.readByte(0x6c)))
+          failed[key(want)] = true; want = nil; M.setPad({}); return
+        end
+        local cur = M.readByte(CARE_CUR)
+        if cur == slot then
+          pending = { char = want.char, item = want.item,
+                      hp = M.charHp(want.char),
+                      qty = M.invCountOf(want.item) }
+          held = { "a" }
+        else
+          held = steer(cur, slot)
+        end
+      elseif st == 0x17 or st == 0x77 then
+        held = { "b" }
+      else
+        M.setPad({}); return            -- fades and transients: hands off
+      end
+    end
+    -- 4-on / 8-off edges, so auto-repeat never runs the cursor past its row
+    -- and the handler's one-frame cursor lag is always settled before the
+    -- next read (menu_common.asm:273-283)
+    M.setPad(phase < 4 and held or {})
+  end
+
+  return M.cond(anyNeed, {
+    M.logStep(function()
+      local out = {}
+      for _, c in ipairs(M.partyMembers()) do
+        out[#out + 1] = string.format("c%d %d/%d", c, M.charHp(c),
+          M.charMaxHp(c))
+      end
+      return string.format("[%s] opening the menu: %s | tonic=%d potion=%d " ..
+        "fenix=%d", tag, table.concat(out, " "), M.invCountOf(CARE_TONIC),
+        M.invCountOf(CARE_POTION), M.invCountOf(CARE_FENIX))
+    end),
+    M.driveUntil(function() return M.readByte(CARE_ZM) == 0x05 end, 1800, {
+      M.call(function()
+        phase = (phase + 1) % 12
+        M.setPad(phase < 4 and { "x" } or {})
+      end),
+    }, tag .. ": field menu open"),
+    M.release(),
+    M.waitFrames(10),
+    M.driveUntil(function() return served end, budget, {
+      M.call(serveFrame),
+    }, tag .. ": heal/revive through the item menu"),
+    M.release(),
+    M.driveUntil(function()
+      return M.hasControl() and M.tileAligned()
+         and M.readByte(CARE_ZM) ~= 0x05 and M.readByte(CARE_ZM) ~= 0x08
+    end, 2400, {
+      M.call(function()
+        phase = (phase + 1) % 12
+        M.setPad(phase < 4 and { "b" } or {})
+      end),
+    }, tag .. ": back to the field"),
+    M.release(),
+    M.waitFrames(30),
+    M.logStep(function()
+      local out = {}
+      for _, c in ipairs(M.partyMembers()) do
+        out[#out + 1] = string.format("c%d %d/%d", c, M.charHp(c),
+          M.charMaxHp(c))
+      end
+      return string.format("[%s] done: %s | tonic=%d potion=%d fenix=%d",
+        tag, table.concat(out, " "), M.invCountOf(CARE_TONIC),
+        M.invCountOf(CARE_POTION), M.invCountOf(CARE_FENIX))
+    end),
+  }, {
+    -- A care stop that does nothing must still SAY so.  The first run with
+    -- this driver silently skipped its most important stop and the roster
+    -- three lines later was the only evidence; "no log" and "nothing needed"
+    -- are not allowed to look the same.
+    M.logStep(function()
+      local out = {}
+      for _, c in ipairs(M.partyMembers()) do
+        out[#out + 1] = string.format("c%d %d/%d", c, M.charHp(c),
+          M.charMaxHp(c))
+      end
+      return string.format("[%s] nothing to do: %s | tonic=%d potion=%d " ..
+        "fenix=%d", tag, table.concat(out, " "), M.invCountOf(CARE_TONIC),
+        M.invCountOf(CARE_POTION), M.invCountOf(CARE_FENIX))
+    end),
+  })
 end
