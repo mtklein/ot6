@@ -1,15 +1,21 @@
--- @suite frontier=arvis_wake
+-- @suite frontier=cyan_defence
 -- menu_bushidoloadout.lua -- issue #8 Layer B FIELD configurator (Skills->SwdTech).
 --
--- Reaching Skills->SwdTech for a real Cyan headlessly needs a party+field fixture
--- we do not mint, so this stages the one data byte that gates the door -- the
--- party leader's battle-command list gets BATTLE_CMD::BUSHIDO ($07), which is
--- what enables the SwdTech row (skills.asm _c34d3d matches command bytes at
--- char+$16..$19 against the enable table) -- and then drives the menu with PAD
--- INPUT ONLY: X -> Skills -> character -> SwdTech row -> A.  That runs
--- SkillsOption_02's real entry (field_menu.asm: Ot6LoadoutInitC3, the $4a
--- self-init sentinel, state $7b) instead of forcing zMenuState and re-arming
--- the sentinel by hand, which skipped the entry's own writes.
+-- ISSUE #75 CONVERSION -- a REAL CYAN, zero state writes.  This file's header
+-- used to open "reaching Skills->SwdTech for a real Cyan headlessly needs a
+-- party+field fixture we do not mint"; that is STALE -- the honest chain
+-- mints cyan_defence (gen_sabin_camp: Doma castle interior, map 120, CYAN
+-- alone in the party with field control).  So the two data stagings this file
+-- carried are gone:
+--   * the BUSHIDO command is not granted to the leader's record -- CYAN's own
+--     record carries it, and that is ASSERTED (the same realness check
+--     menu_blitzpage_sabin.lua makes for Sabin's Blitz);
+--   * the learned set $1cf7 and the loadout word $1e1d are READ, not written.
+--     The word must be $0000 -- no reachable save has ever configured a
+--     loadout, so AUTO is the state every real Cyan arrives in -- and the
+--     ASSIGN expectations below are DERIVED from the learned set as read, so
+--     a fixture whose Cyan joins at a different level moves the numbers
+--     without touching this file.
 --
 -- Storage is a 16-bit little-endian WORD at $1e1d..$1e1e: slot s occupies
 -- bits s*3..s*3+2, and word 0 = AUTO.
@@ -25,15 +31,21 @@
 --     Ot6LoadoutSlotTech.  We assert the word is still 0 after Open.
 --   * CURSOR: three rows, not four -- three Downs wrap back to the top row.
 --   * ASSIGN: the FIRST edit (R shoulder) first FREEZES the whole auto window
---     into the word (so the un-touched slots keep their auto techs), then cycles
---     the cursored slot.  $1cf7 = 0xFF -> ceiling 7 -> three-rung auto window
---     {5,6,7} at 1x/2x/3x (slot 0 mirrors slot 1 at 5), i.e. the seed is
---     {5,5,6,7} = $0fad; R on row 0 then cycles WORD SLOT 1 from tech 5 to 6,
---     leaving {5,6,6,7} = word $0fb5 (nonzero = MANUAL).
+--     into the word (so the un-touched slots keep their auto techs), then
+--     cycles the cursored slot.  The window per Ot6LoadoutAutoTech
+--     (ot6_loadout.asm:60): ceiling c = highest learned tech, base
+--     b = max(0, c-2), slot s (1..3) shows min(c, b+s-1), retired slot 0
+--     mirrors slot 1.  Cyan's real set here is $03 -- TWO techs, Dispatch and
+--     Retort (the plan doc's "$07 scenario-band set" describes a later Cyan)
+--     -- so c=1, the window is {0,1,1} with the 3x rung CLAMPED to the
+--     ceiling, the seed is {0,0,1,1}, and R on row 0 cycles WORD SLOT 1 from
+--     0 to 1, leaving {0,1,1,1} = $0248, nonzero = MANUAL.  All of it is
+--     DERIVED from $1cf7 as read, so a fixture whose Cyan joins knowing more
+--     techs moves the numbers without touching this file.
 --   * REVERT: Y writes $0000 (AUTO) -- no reseed needed, the display recomputes.
 -- A screenshot proves the two-pane screen (3 boost slots + LEARNED pool) renders.
 local H = dofile("tools/tests/lib/ot6.lua")
-local STATE = "build/states/arvis_wake.mss.lua"
+local STATE = "build/states/cyan_defence.mss.lua"
 
 local ZMENUSTATE = 0x26                     -- direct-page menu vars
 local ZCURSOR = 0x4B                        -- generic menu selection cursor
@@ -42,10 +54,17 @@ local LEARNED, LOADOUT = 0x1CF7, 0x1E1D
 local ST_MAIN, ST_CHARSEL, ST_SKILLS = 0x05, 0x06, 0x0A
 local ST_LOADOUT = 0x7B
 local ZCHARID = 0x69                        -- zCharID::Slot1 (menu_ram.inc)
+local CHAR_CYAN = 0x02                      -- CHAR::CYAN (const.inc)
 local CMD_BUSHIDO = 0x07                    -- BATTLE_CMD::BUSHIDO (const.inc)
 
 local function word()      return H.readByte(LOADOUT) | (H.readByte(LOADOUT + 1) << 8) end
 local function slot(s)     return (word() >> (s * 3)) & 0x07 end   -- s = 0..3
+
+-- Derived from the learned set as READ (never written): the auto window per
+-- Ot6LoadoutAutoTech and the packed word the first R edit must leave behind.
+local t1, t2, t3 = nil, nil, nil            -- window techs for rows 1x/2x/3x
+local wantWord = nil                        -- {t1, t1+1, t2, t3} packed
+local cyanSlot = nil                        -- CYAN's menu slot, found not assumed
 
 H.run({ maxFrames = 20000 }, {
   H.waitFrames(20),
@@ -53,12 +72,30 @@ H.run({ maxFrames = 20000 }, {
   H.waitFrames(10),
   H.waitUntil(function() return H.hasControl() end, 400, "field control", 5),
 
-  -- Cyan's learned set + a clean AUTO word ($0000).  (No display bytes to seed
-  -- any more -- the word IS the storage, and 0 = AUTO.)
+  -- The save's own state, read: Cyan's level-derived learned set (contiguous
+  -- from tech 0 -- vanilla teaches Bushido by level, so a real $1cf7 is always
+  -- (1<<n)-1) and a never-configured loadout word.
   H.call(function()
-    H.writeByte(LEARNED, 0xFF)              -- all eight techs learned
-    H.writeByte(LOADOUT, 0)                 -- word low  = 0 (AUTO)
-    H.writeByte(LOADOUT + 1, 0)             -- word high = 0
+    local L = H.readByte(LEARNED)
+    local n = 0
+    while (L >> n) & 1 == 1 do n = n + 1 end
+    H.log(string.format("$1cf7 = $%02x as saved: %d techs learned", L, n))
+    H.assertEq(L, (1 << n) - 1,
+      "Cyan's real learned set is contiguous from tech 0 (level-derived)")
+    H.assertEq(n >= 2, true,
+      "at least two techs learned, so the R cycle below has somewhere to go")
+    -- Ot6LoadoutAutoTech: ceiling c, base max(0, c-2), row s -> min(c, b+s-1)
+    local c = n - 1
+    local b = math.max(0, c - 2)
+    t1, t2, t3 = math.min(c, b), math.min(c, b + 1), math.min(c, b + 2)
+    -- R cycles word slot 1 from t1 to the NEXT learned tech; t1 < c always
+    -- holds for n >= 2, so that is simply t1+1.
+    wantWord = t1 | ((t1 + 1) << 3) | (t2 << 6) | (t3 << 9)
+    H.log(string.format("derived: window {%d,%d,%d}, post-edit word $%04x",
+      t1, t2, t3, wantWord))
+    H.assertEq(word(), 0,
+      "the loadout word is $0000 as saved -- no real save has ever configured "
+      .. "one, so AUTO is the arrival state and nothing needs zeroing")
   end),
 
   -- open the field menu (X) and walk to Skills->SwdTech by pad.  Every drive
@@ -76,23 +113,34 @@ H.run({ maxFrames = 20000 }, {
   H.waitUntil(function() return H.readByte(ZMENUSTATE) == ST_MAIN end,
     400, "main menu", 5),
   H.waitFrames(30),
-  -- Stage the door key: the SwdTech row is enabled iff the selected
-  -- character's battle-command list contains BUSHIDO (skills.asm _c34d3d).
-  -- The fixture's leader is not Cyan, so grant the command -- data staging on
-  -- the same footing as the LEARNED byte above, not a state-machine force.
-  -- zCharID is only valid while the menu module owns the zero page, hence
-  -- staged here rather than before the X press.
+  -- THE REALNESS CHECK that replaced the staged command: CYAN is FOUND in the
+  -- party (measured: he does NOT sit in menu slot 1 on this fixture -- slot 1
+  -- reads $FF, a leftover of the Sabin-scenario party shuffle), and HIS OWN
+  -- character record carries BUSHIDO.  zCharID is only valid while the menu
+  -- module owns the zero page, hence read here.
   H.call(function()
-    local id = H.readByte(ZCHARID)          -- party slot 1's character
-    H.assertEq(id < 16, true, "party leader is a real character")
-    local rec = 0x1600 + 37 * id            -- CharPropPtrs stride (menu_init.asm)
-    H.writeByte(rec + 0x17, CMD_BUSHIDO)    -- battle command slot 2 of 4
-    H.log(string.format("staged BUSHIDO command on character %d ($%04x)",
-      id, rec + 0x17))
+    local ids = {}
+    for s = 0, 3 do
+      local id = H.readByte(ZCHARID + s)
+      ids[#ids + 1] = string.format("slot %d = char $%02x", s, id)
+      if id == CHAR_CYAN and cyanSlot == nil then cyanSlot = s end
+    end
+    H.log("party: " .. table.concat(ids, ", "))
+    H.assertEq(cyanSlot ~= nil, true,
+      "cyan_defence's party contains CYAN -- he IS this fixture; without him "
+      .. "this test is not testing the thing it exists to test")
+    local rec = 0x1600 + 37 * CHAR_CYAN     -- CharPropPtrs stride (menu_init.asm)
+    local has = false
+    for i = 0, 3 do
+      if H.readByte(rec + 0x16 + i) == CMD_BUSHIDO then has = true end
+    end
+    H.assertEq(has, true,
+      "CYAN's own record carries BATTLE_CMD::BUSHIDO -- the SwdTech row is "
+      .. "enabled by the character, not by this test")
   end),
   -- DOWN moves the main-menu cursor from Items (0) to Skills (1); A opens
-  -- character select; A again picks the leader (CheckSkillValid passes: the
-  -- staged command enables at least one skill row).
+  -- character select; walk the cursor onto CYAN's slot and confirm
+  -- (CheckSkillValid passes: Cyan's real command enables the SwdTech row).
   H.driveUntil(function()
     return H.readByte(ZMENUSTATE) == ST_MAIN and H.readByte(ZCURSOR) == 1
   end, 600, {
@@ -101,6 +149,9 @@ H.run({ maxFrames = 20000 }, {
   H.pressButtons({ "a" }, 4),
   H.waitUntil(function() return H.readByte(ZMENUSTATE) == ST_CHARSEL end,
     300, "character select", 5),
+  H.waitFrames(10),
+  H.driveUntil(function() return H.readByte(ZCURSOR) == cyanSlot end, 900,
+    { H.pressButtons({ "down" }, 2), H.waitFrames(8) }, "cursor onto CYAN"),
   H.pressButtons({ "a" }, 4),
   H.waitUntil(function() return H.readByte(ZMENUSTATE) == ST_SKILLS end,
     600, "skills submenu", 5),
@@ -118,13 +169,15 @@ H.run({ maxFrames = 20000 }, {
   H.call(function() H.screenshot("bushido_loadout_field") end),
 
   -- SEED-FROM-AUTO (implicit): Open writes nothing, so the word is still $0000.
-  -- The three rows still draw {5,6,7} because Ot6LoadoutSlotTech computes the
-  -- auto window per slot whenever the word is 0.
+  -- The three rows still draw {b, b+1, b+2} because Ot6LoadoutSlotTech computes
+  -- the auto window per slot whenever the word is 0.
   H.call(function()
     H.assertEq(H.readByte(ZMENUSTATE), ST_LOADOUT, "configurator state is live ($7b)")
     H.assertEq(word(), 0, "still AUTO after opening -- Open seeds nothing (word $0000)")
     H.assertEq(H.readByte(ZCURSORY), 0, "Open put the cursor on the top row")
-    H.log("SEED: entering AUTO left the word at $0000; the display computes {5,6,7}")
+    H.log(string.format(
+      "SEED: entering AUTO left the word at $0000; the display computes {%d,%d,%d}",
+      t1, t2, t3))
   end),
 
   -- CURSOR (#38): three rows.  The exact step count per press is the menu's
@@ -165,20 +218,27 @@ H.run({ maxFrames = 20000 }, {
   end),
 
   -- ASSIGN: R cycles the cursored row 0 (= WORD SLOT 1) to the next learned
-  -- tech.  The first edit freezes the auto window into the word -- {5,5,6,7},
-  -- slot 0 mirroring slot 1 -- THEN bumps slot 1 from 5 to 6, so the result is
-  -- {5,6,6,7} = $0fb5 and mode is now MANUAL (nonzero).
+  -- tech.  The first edit freezes the auto window into the word -- {t1, t1,
+  -- t2, t3}, slot 0 mirroring slot 1 -- THEN bumps slot 1 from t1 to the next
+  -- learned t1+1, so the result is {t1, t1+1, t2, t3}, nonzero = MANUAL.
   H.pressButtons({ "r" }, 3),
   H.waitFrames(20),
   H.call(function()
     H.assertEq(word() ~= 0, true, "the first edit flipped the loadout to MANUAL (word nonzero)")
-    H.assertEq(word(), 0x0FB5, "packed word = {5,6,6,7} = $0fb5")
-    H.assertEq(slot(0), 5, "the RETIRED slot 0 holds the seed's mirror of slot 1 (5)")
-    H.assertEq(slot(1), 6, "R cycled row 0 = slot 1x from auto tech 5 to the next learned 6")
-    H.assertEq(slot(2), 6, "un-edited slot 2x kept its auto tech 6")
-    H.assertEq(slot(3), 7, "un-edited slot 3x kept its auto tech 7")
+    H.assertEq(word(), wantWord, string.format(
+      "packed word = {%d,%d,%d,%d} = $%04x, derived from the learned set as read",
+      t1, t1 + 1, t2, t3, wantWord))
+    H.assertEq(slot(0), t1,
+      "the RETIRED slot 0 holds the seed's mirror of slot 1 (" .. t1 .. ")")
+    H.assertEq(slot(1), t1 + 1, string.format(
+      "R cycled row 0 = slot 1x from auto tech %d to the next learned %d",
+      t1, t1 + 1))
+    H.assertEq(slot(2), t2, "un-edited slot 2x kept its auto tech " .. t2)
+    H.assertEq(slot(3), t3, "un-edited slot 3x kept its auto tech " .. t3)
     H.screenshot("bushido_loadout_edited")
-    H.log("ASSIGN: first edit froze the auto window then cycled slot 1x (word $0fb5, MANUAL)")
+    H.log(string.format(
+      "ASSIGN: first edit froze the auto window then cycled slot 1x (word $%04x, MANUAL)",
+      word()))
   end),
 
   -- REVERT: Y writes $0000 (AUTO).  No reseed -- the display recomputes the window.
@@ -186,7 +246,7 @@ H.run({ maxFrames = 20000 }, {
   H.waitFrames(20),
   H.call(function()
     H.assertEq(word(), 0, "Y reverted the loadout to AUTO (word $0000)")
-    H.log("REVERT: Y cleared the word to $0000; the display recomputes {5,6,7}")
-    H.log("PASSED: field configurator seeds implicitly, assigns (packs the word), and reverts")
+    H.log("REVERT: Y cleared the word to $0000; the display recomputes the window")
+    H.log("PASSED: field configurator seeds implicitly, assigns (packs the word), and reverts -- for a REAL CYAN, nothing staged")
   end),
 })
