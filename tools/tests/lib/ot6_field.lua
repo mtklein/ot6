@@ -60,12 +60,53 @@ M.FLEE_CAP = 1800
 -- the field module no longer owned that RAM -- and failed as "navTo
 -- timeout".  Neither log contained the word "died".
 --
--- The character table at $1600 is the right witness: it is save state, not
--- module-owned scratch, so it survives the battle module, the menu module
--- and the Game Over screen alike.  Debounced hard (300 frames) because a
--- module handoff can blank things for a moment and a false wipe would be
--- worse than the timeout it replaces.
+-- The character table at $1600 is the right FIELD witness: it is save
+-- state, not module-owned scratch, so it survives the battle module, the
+-- menu module and the Game Over screen alike.  Debounced hard (300
+-- frames) because a module handoff can blank things for a moment and a
+-- false wipe would be worse than the timeout it replaces.
+--
+-- BUT $1600 KEEPS PRE-BATTLE HP WHILE A BATTLE RUNS -- the battle module
+-- works on its own table at $3BF4 and syncs back at teardown, and a
+-- battle that ends in a wipe tears down into the Game Over, where the
+-- sync the field witness is waiting on never says "dead".  Two legs
+-- found this independently and converged on the same battle-side
+-- signature (gen_sabin_gau's staging walk, gen_sabin_trench's dive):
+-- every party slot whose battle MAX HP looks SANE -- nonzero and under
+-- 1000, where a WoB max is a few hundred and module-transition garbage
+-- reads tens of thousands -- showing zero HP.  M.partyWipedInBattle is
+-- that signature lifted into the library; M.partyWiped consults it
+-- first, so the navigators' canary names an in-battle wipe instead of
+-- pressing buttons into the Game Over.
+--
+-- Related trap, documented where the shared witness lives because the
+-- copies are scattered through gens: the ad-hoc per-gen `inBattle()`
+-- (read $3BF4 words, SKIP entries that are 0 or FFFF, first survivor
+-- under 10000 decides) cannot see a DEAD party in battle at all --
+-- every slot reads 0, every slot is skipped, the loop falls through to
+-- "not in battle".  gen_sabin_trench's ride held LEFT at a Game Over
+-- through three full 60000-frame budgets on exactly that blindness.
+-- Any driver gating on that pattern needs this witness beside it.
+function M.partyWipedInBattle()
+  if not M.battleLoadStarted() then return false end
+  local want = 0
+  for c = 0, 15 do
+    if (M.readByte(0x1850 + c) & 0x07) ~= 0 then want = want + 1 end
+  end
+  if want < 1 or want > 4 then return false end
+  local sane, alive = 0, 0
+  for e = 0, 3 do
+    local mx = M.readWord(0x3c1c + e * 2)
+    if mx > 0 and mx < 1000 then
+      sane = sane + 1
+      if M.readWord(0x3bf4 + e * 2) > 0 then alive = alive + 1 end
+    end
+  end
+  return sane >= want and alive == 0
+end
+
 function M.partyWiped()
+  if M.partyWipedInBattle() then return true end
   local any = false
   for _, c in ipairs(M.partyMembers()) do
     any = true
@@ -524,6 +565,18 @@ function M.navTo(txIn, tyIn, opts)
           return
         end
         if tactical then tactical.frame(); return end
+        -- honest=true reaches here: the battle is about to be "cleared"
+        -- by BLIND A-TAPS -- no menu awareness, no items, no flee.  This
+        -- is the branch that walked BANON's escort into a wipe at
+        -- terra_clifftop while its log said "navTo timeout".  It stays
+        -- because unconverted legs still ride it, but it must never be
+        -- ridden SILENTLY: converted routes want honest="flee" (corridor
+        -- trash) or honest="tactical" (fights that matter).
+        if opts.honest == true and battN % 3600 == 3 then
+          M.log('HONEST=true IS FIGHTING THIS BATTLE BY BLIND A-TAPS -- ' ..
+            'no menus, no items, no flee.  If this leg loses parties or ' ..
+            'drags, convert it: honest="flee" or honest="tactical".')
+        end
         if M.monstersPresent() > 0 and not opts.honest then
           for slot = 0, 5 do
             if M.readByte(0x3aa8 + slot * 2) % 2 == 1 then
@@ -737,6 +790,18 @@ function M.advanceStory(pred, maxFrames, opts)
           return
         end
         if tactical then tactical.frame(); return end
+        -- honest=true reaches here: the battle is about to be "cleared"
+        -- by BLIND A-TAPS -- no menu awareness, no items, no flee.  This
+        -- is the branch that walked BANON's escort into a wipe at
+        -- terra_clifftop while its log said "navTo timeout".  It stays
+        -- because unconverted legs still ride it, but it must never be
+        -- ridden SILENTLY: converted routes want honest="flee" (corridor
+        -- trash) or honest="tactical" (fights that matter).
+        if opts.honest == true and battN % 3600 == 3 then
+          M.log('HONEST=true IS FIGHTING THIS BATTLE BY BLIND A-TAPS -- ' ..
+            'no menus, no items, no flee.  If this leg loses parties or ' ..
+            'drags, convert it: honest="flee" or honest="tactical".')
+        end
         if M.monstersPresent() > 0 and not opts.honest then
           for slot = 0, 5 do
             if M.readByte(0x3aa8 + slot * 2) % 2 == 1 then
@@ -1010,6 +1075,18 @@ function M.worldNavTo(txIn, tyIn, opts)
           return
         end
         if tactical then tactical.frame(); return end
+        -- honest=true reaches here: the battle is about to be "cleared"
+        -- by BLIND A-TAPS -- no menu awareness, no items, no flee.  This
+        -- is the branch that walked BANON's escort into a wipe at
+        -- terra_clifftop while its log said "navTo timeout".  It stays
+        -- because unconverted legs still ride it, but it must never be
+        -- ridden SILENTLY: converted routes want honest="flee" (corridor
+        -- trash) or honest="tactical" (fights that matter).
+        if opts.honest == true and battN % 3600 == 3 then
+          M.log('HONEST=true IS FIGHTING THIS BATTLE BY BLIND A-TAPS -- ' ..
+            'no menus, no items, no flee.  If this leg loses parties or ' ..
+            'drags, convert it: honest="flee" or honest="tactical".')
+        end
         if M.monstersPresent() > 0 and not opts.honest then
           for slot = 0, 5 do
             if M.readByte(0x3aa8 + slot * 2) % 2 == 1 then
@@ -1597,9 +1674,65 @@ end
 -- overworld, and "the menu is closed and the party has control again" is a
 -- different question on each: the world module has its own position and
 -- control registers and every field predicate is meaningless there.
+--
+-- AND THE ANSWER IS ONLY TRUSTWORTHY HELD, not glimpsed.  Measured on
+-- the overworld (gen_sabin_gau's staging walk, 2026-08-09): the close
+-- drive's exit read one satisfying frame mid-handoff -- "back to the
+-- field satisfied after 58 frames" -- while the MAIN MENU was still
+-- open behind it (ZMENUSTATE=05), because the world control/alignment
+-- registers held stale-live values during the menu module's teardown.
+-- The caller's walk then parked against an invisible open menu for its
+-- whole budget, every single care stop, until it grew its own B-tap
+-- recovery.  So the WORLD close is now DEBOUNCED: its condition must
+-- hold 30 consecutive frames before the close is believed, a stale-live
+-- coincidence cannot survive that.
+--
+-- BUT THE DEBOUNCE IS WORLD-MODE ONLY, because only the world close was
+-- ever broken.  On a FIELD map hasControl() already reads false for the
+-- entire menu lifetime and snaps true only once the field module is
+-- genuinely back (measured: the pre-dive close sampled ctl=false
+-- straight through the menu, then ctl=true stable) -- so the field exit
+-- is correct on the FIRST true frame and needs no wait, and forcing 30
+-- CONSECUTIVE true frames there instead HANGS it: every B tap the close
+-- driver sends to shut the menu drops control for that frame, and
+-- 4-of-12 tapping never leaves 30 clean frames in a row (measured:
+-- 2400-frame timeout with ctl=true on every heartbeat).  careClose()
+-- below carries that split; careBackOnMap() is the raw predicate it and
+-- the setRows first stage build on.
 local function careBackOnMap()
   if M.worldMode() then return M.worldHasControl() and M.worldAligned() end
   return M.hasControl() and M.tileAligned()
+end
+
+-- careClose: the close predicate a care/rows drive waits on.  ONE
+-- closure, deciding world vs field at RUNTIME every frame (the step
+-- table is built before H.run starts, so the mode cannot be resolved
+-- when this is called).
+--
+--   WORLD -> debounced (30 consecutive true frames) AND the
+--   ZMENUSTATE-still-a-menu guard: the world menu module keeps $26 at
+--   05 through the half-close, so a single satisfying frame is a
+--   stale-live coincidence mid-handoff -- the bug this whole change
+--   exists for.
+--   FIELD -> raw single frame plus the caller's own ZM guard: on the
+--   field hasControl() reads false for the entire menu lifetime and
+--   snaps true only when the field module is genuinely back, so the
+--   first true frame is correct.  Debouncing it instead HANGS (every
+--   B tap the close driver sends drops control for a frame; 4-of-12
+--   tapping never leaves 30 clean frames in a row).
+local function careClose(zmExtra)
+  local calm = 0
+  return function()
+    if M.worldMode() then
+      local zm = M.readByte(0x26)
+      local ok = M.worldHasControl() and M.worldAligned()
+             and zm ~= 0x05 and zm ~= 0x08
+      calm = ok and calm + 1 or 0
+      return calm >= 30
+    end
+    return M.hasControl() and M.tileAligned()
+       and (zmExtra == nil or zmExtra())
+  end
 end
 
 local CARE_ZM, CARE_CUR, CARE_REFUSE = 0x26, 0x4b, 0xb5
@@ -1642,6 +1775,83 @@ end
 function M.invCountOf(id)
   local s = M.invSlotOf(id)
   return s and M.readByte(0x1969 + s) or 0
+end
+
+-- M.buyItem: buy `qtyFn()` MORE of shop row `row`, fully CLOSED-LOOP,
+-- with the shop ALREADY OPEN at its options window (menu state $25).
+-- Promoted from gen_sabin_train/gen_sabin_gau, where two identical
+-- copies had earned every line the hard way:
+--
+--  * The list cursor row is MoveCursor's own cell (DP $4E,
+--    menu_common.asm:1318) and the quantity is zSelIndex (DP $28,
+--    menu_ram.inc) -- both READ and STEERED, never press-counted (menu
+--    direction holds auto-repeat: a counted 4-frame hold measurably
+--    bought 25 Tonics instead of 14 and parked the next lap on the
+--    wrong row).  Widget deltas (shop.asm MenuState_27): RIGHT +1,
+--    LEFT -1, UP +10, DOWN -10, gil-clamped by the handler.
+--  * THE CLAMP IS THE PURSE'S ANSWER: steering toward a want the gil
+--    cannot cover pins qty at the affordable maximum, and a loop that
+--    keeps pressing burns its whole budget against that wall
+--    (gen_sabin_gau's "TONIC to 99" on 209 gil -- FAIL, timeout at
+--    20000).  A player buys what the purse covers; 240 unmoving frames
+--    against the clamp accept the clamped qty, loudly.  Order the buys
+--    so the marginal item comes LAST and a poor purse shorts it, never
+--    the essentials.
+--  * Purchases are verified AFTER the shop closes; mid-menu inventory
+--    reads measurably lie (the field bag does not update until the
+--    shop hands RAM back).
+function M.buyItem(id, row, qtyFn, name)
+  local phase = 0
+  local seen27, bought = false, false
+  local want = nil
+  local lastQty, stall = nil, 0
+  return M.driveUntil(function() return bought end, 20000, {
+    M.call(function()
+      phase = (phase + 1) % 8
+      local st = M.readByte(0x0026)
+      if want == nil then
+        want = qtyFn()
+        if want < 1 then want = 1 end
+        M.log(string.format("[shop] %s: buying %d", name, want))
+      end
+      if st == 0x27 then
+        seen27 = true
+        local qty = M.readByte(0x0028)
+        if qty == lastQty and qty < want then
+          stall = stall + 1
+          if stall > 240 then
+            M.log(string.format(
+              "[shop] %s: purse-clamped at %d (wanted %d) -- taking it",
+              name, qty, want))
+            want = qty
+          end
+        elseif qty ~= lastQty then
+          stall = 0
+        end
+        lastQty = qty
+        local btn = nil
+        if qty < want then
+          btn = (want - qty >= 10) and "up" or "right"
+        elseif qty > want then
+          btn = (qty - want >= 10) and "down" or "left"
+        else
+          btn = "a"
+        end
+        M.setPad(phase < 2 and { [btn] = true } or {})
+      elseif seen27 then
+        bought = true
+        M.setPad({})
+      elseif st == 0x25 then
+        M.setPad(phase < 2 and { "a" } or {})
+      elseif st == 0x26 then
+        local cur = M.readByte(0x004E)
+        local btn = cur < row and "down" or cur > row and "up" or "a"
+        M.setPad(phase < 2 and { [btn] = true } or {})
+      else
+        M.setPad({})
+      end
+    end),
+  }, "buy " .. name)
 end
 
 function M.fieldCare(opts)
@@ -1814,10 +2024,10 @@ function M.fieldCare(opts)
       M.call(serveFrame),
     }, tag .. ": heal/revive through the item menu"),
     M.release(),
-    M.driveUntil(function()
-      return careBackOnMap()
-         and M.readByte(CARE_ZM) ~= 0x05 and M.readByte(CARE_ZM) ~= 0x08
-    end, 2400, {
+    M.driveUntil(careClose(function()
+      local zm = M.readByte(CARE_ZM)
+      return zm ~= 0x05 and zm ~= 0x08
+    end), 2400, {
       M.call(function()
         phase = (phase + 1) % 12
         M.setPad(phase < 4 and { "b" } or {})
@@ -2005,9 +2215,8 @@ function M.setRows(spec, opts)
       end),
     }, tag .. ": back to the main menu"),
     M.release(),
-    M.driveUntil(function()
-      return careBackOnMap() and M.readByte(ZM) ~= 0x05
-    end, 2400, {
+    M.driveUntil(careClose(function() return M.readByte(ZM) ~= 0x05 end),
+      2400, {
       M.call(function()
         phase = (phase + 1) % 12
         M.setPad(phase < 4 and { "b" } or {})
@@ -2148,10 +2357,10 @@ function M.equipOptimum(opts)
       end),
       -- back to the field before the next slot, so every pass starts from
       -- the same place rather than from wherever the last one stopped
-      M.driveUntil(function()
-        return careBackOnMap() and M.readByte(ZM) ~= ST_MAIN
-           and M.readByte(ZM) ~= ST_CHAR and M.readByte(ZM) ~= ST_OPT
-      end, 2400, {
+      M.driveUntil(careClose(function()
+        local zm = M.readByte(ZM)
+        return zm ~= ST_MAIN and zm ~= ST_CHAR and zm ~= ST_OPT
+      end), 2400, {
         M.call(function() tap("b") end),
       }, tag .. ": back to the field"),
       M.release(), M.waitFrames(20),

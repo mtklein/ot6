@@ -467,75 +467,11 @@ local function openShop()
   }, "the ghost merchant's shop opens")
 end
 
--- buy `qtyFn()` MORE of shop row `row`, fully CLOSED-LOOP: the list
--- cursor row is MoveCursor's own cell (DP $4E, menu_common.asm:1318) and
--- the quantity is zSelIndex (DP $28, menu_ram.inc) -- both read and
--- steered, never press-counted (menu direction holds auto-repeat: a
--- counted 4-frame hold measurably bought 25 Tonics instead of 14 and
--- parked the potion lap on the wrong row).  Widget deltas (shop.asm
--- MenuState_27): RIGHT +1, LEFT -1, UP +10, DOWN -10, gil-clamped by the
--- handler.  Purchases are verified AFTER the shop closes; mid-menu
--- inventory reads measurably lie.
-local function buyItem(id, row, qtyFn, name)
-  local phase = 0
-  local seen27, bought = false, false
-  local want = nil
-  local lastQty, stall = nil, 0
-  return H.driveUntil(function() return bought end, 20000, {
-    H.call(function()
-      phase = (phase + 1) % 8
-      local st = mstateMenu()
-      if want == nil then
-        want = qtyFn()
-        if want < 1 then want = 1 end
-        H.log(string.format("[shop] %s: buying %d", name, want))
-      end
-      if st == 0x27 then
-        seen27 = true
-        local qty = H.readByte(0x0028)
-        -- THE CLAMP IS THE PURSE'S ANSWER (2026-08-09, found at Mobliz):
-        -- steering toward a want the gil cannot cover pins qty at the
-        -- affordable maximum, and a loop that keeps pressing burns its
-        -- whole budget against that wall (gen_sabin_gau's "TONIC to 99"
-        -- did exactly that on 209 gil -- FAIL, timeout at 20000).  A
-        -- player buys what the purse covers; 240 unmoving frames
-        -- against the clamp accepts the clamped qty.
-        if qty == lastQty and qty < want then
-          stall = stall + 1
-          if stall > 240 then
-            H.log(string.format(
-              "[shop] %s: purse-clamped at %d (wanted %d) -- taking it",
-              name, qty, want))
-            want = qty
-          end
-        elseif qty ~= lastQty then
-          stall = 0
-        end
-        lastQty = qty
-        local btn = nil
-        if qty < want then
-          btn = (want - qty >= 10) and "up" or "right"
-        elseif qty > want then
-          btn = (qty - want >= 10) and "down" or "left"
-        else
-          btn = "a"
-        end
-        H.setPad(phase < 2 and { [btn] = true } or {})
-      elseif seen27 then
-        bought = true
-        H.setPad({})
-      elseif st == 0x25 then
-        H.setPad(phase < 2 and { "a" } or {})
-      elseif st == 0x26 then
-        local cur = H.readByte(0x004E)
-        local btn = cur < row and "down" or cur > row and "up" or "a"
-        H.setPad(phase < 2 and { [btn] = true } or {})
-      else
-        H.setPad({})
-      end
-    end),
-  }, "buy " .. name)
-end
+-- shop buys ride the library's closed-loop, purse-clamp-accepting
+-- drive (M.buyItem, promoted from this file's local copy -- the cursor
+-- cells, the widget deltas, and the clamp acceptance are documented at
+-- the definition)
+local buyItem = H.buyItem
 
 local function closeShop()
   local phase = 0
