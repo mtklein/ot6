@@ -31,11 +31,20 @@
 --      pre-battle MP minus exactly what was spent, for every member (the
 --      max-0 skip no longer hides the pool, so this is the guard that the
 --      now-live writeback path is honest).
--- Monster-side staging only (stop + HP pinned high so nothing dies before
--- the measurement); no character row is ever poked.
+-- No state is written at all (issue #75).  Two idioms this file used to
+-- carry are gone: the danger pin ($1f6e := 0xff00 per pace frame) is the
+-- identical pin 77bc4f9 deleted on this very fixture -- the pace loop was
+-- already walking the lane, so the engine accrues danger per step and
+-- rolls the encounter itself; and the monster staging (stop bit + HP
+-- floored to 0xF000 so nothing died before the measurement) is deleted
+-- outright -- the party only Defends until Edgar's turn, so nobody on our
+-- side deals damage, and the map-96 pool's damage output cannot zero
+-- anyone's MP (MP is what phases 1-2 measure).  The battle then ends by
+-- FLEE (held L+R, the engine's own run mechanic) instead of the kill-bit
+-- clearBattle, which makes phase 3 a STRONGER claim: the writeback path
+-- is exercised on the flee exit, not just the victory exit.
 local H = dofile("tools/tests/lib/ot6.lua")
 local STATE = "build/states/kolts_cave.mss.lua"
-local DANGER = 0x1f6e
 
 local MENU, ACTOR = 0x7BCA, 0x62CA
 local EDGAR = 0x04
@@ -45,7 +54,6 @@ local ITEMLIST = 0x4005                    -- MakeToolsList's wItemList
 local function CURMP(s) return 0x3C08 + s * 2 end
 local function MAXMP(s) return 0x3C30 + s * 2 end
 local function MHP(m)  return 0x3BFC + m * 2 end
-local function ST3(e)  return 0x3EF8 + e end
 local CHARS = { [0]="TERRA","LOCKE","CYAN","SHADOW","EDGAR","SABIN",
                 "CELES","STRAGO","RELM","SETZER","MOG","GAU","GOGO","UMARO" }
 
@@ -62,17 +70,11 @@ local function monsterHpSum()
   return t
 end
 
-local function pinMonsters()
-  for _, m in ipairs(msPresent) do
-    local e = 8 + m * 2
-    H.writeByte(ST3(e), H.readByte(ST3(e)) | 0x10)   -- stop: nobody acts back
-    if H.readWord(MHP(m)) < 0x6000 then H.writeWord(MHP(m), 0xF000) end
-  end
-end
-
 -- wait for a character's menu, consuming other characters' turns with a
 -- real Defend (right swaps Fight->Def, then A) -- the probe_factory_menus
--- pattern; Defend is unpriced so it cannot move anyone's MP
+-- pattern; Defend is unpriced so it cannot move anyone's MP.  The monsters
+-- take their own turns in here now (no stop bit): their damage lands on
+-- party HP, which nothing in this test asserts on.
 local function menuFor(charId, what)
   local ph = 0
   local function up()
@@ -80,7 +82,6 @@ local function menuFor(charId, what)
   end
   return H.driveUntil(up, 20000, {
     H.call(function()
-      pinMonsters()
       ph = ph + 1
       if H.readByte(MENU) ~= 0 and H.readByte(ACTOR) ~= slotOf[charId] then
         local step = ph % 40
@@ -110,7 +111,9 @@ H.run({ maxFrames = 60000 }, {
   H.call(function() H.assertEq(map(), 96, "kolts_cave on map 96") end),
 
   -- pace the auto-detected lane until a natural encounter fires
-  -- (battle_flyin's drive, verbatim: danger counter is field-side pacing)
+  -- (battle_flyin's drive: the danger counter accrues per step and rolls
+  -- the encounter itself -- 77bc4f9 measured the honest roll at ~1300
+  -- frames of pacing on this fixture, well inside the budget below)
   (function()
     local battN, waited, lane = 0, 0, nil
     local BACK = { left = "right", right = "left", up = "down", down = "up" }
@@ -123,7 +126,6 @@ H.run({ maxFrames = 60000 }, {
     end, 8600, {
       H.call(function()
         if not (H.hasControl() and H.tileAligned()) then H.setPad({}) return end
-        H.writeWord(DANGER, 0xff00)
         local x, y = H.fieldX(), H.fieldY()
         if lane == nil then
           for _, d in ipairs({ "right", "left", "up", "down" }) do
@@ -164,7 +166,6 @@ H.run({ maxFrames = 60000 }, {
     assert(slotOf[0x00], "TERRA present (the innate-mage control)")
     H.assertEq(fieldPre[slotOf[EDGAR]] >= XBOW_COST, true,
       "positive control: Edgar's save MP can afford an AutoCrossbow")
-    pinMonsters()
     -- mp-cost queue store (CreateAction), filtered to Tools (cmd $09):
     -- battle_stealmp's instrument
     emu.addMemoryCallback(function(_, v)
@@ -237,7 +238,11 @@ H.run({ maxFrames = 60000 }, {
   end),
 
   -- ------------------------------------ 3. writeback: field MP honest --
-  H.clearBattle(12000),
+  -- End the fight the way a player can: FLEE (held L+R).  The kill-bit
+  -- clearBattle this replaces ended by forced victory; the flee exit runs
+  -- the same character writeback, and asserting on it here means the
+  -- writeback guard now covers the exit path a real escape takes.
+  H.fleeBattle(12000),
   H.waitFrames(120),
   H.call(function()
     for s = 0, 3 do
