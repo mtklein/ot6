@@ -978,7 +978,17 @@ function M.newFightDriver(tag, opts)
   end
 
   local function makePlan(actor)
-    local row = opts.items and cmdRow(actor, CMD_ITEM) or nil
+    -- opts.healer = <battle chid>: only that character runs the item medic
+    -- line; everyone else always attacks.  MEASURED NEED (2026-08-09, the
+    -- escape cave): with every actor a medic, a party whose only damage is
+    -- LOCKE's Fight heal-locks -- one enemy round costs more than the
+    -- Tonic his turn drinks, so he never swings, the monster never dies,
+    -- and the bag drains to a wipe.  A player splits the jobs: the safe
+    -- back-row member heals, the fighter fights.  Unset = old behavior
+    -- (every actor may heal), which is right for solo parties.
+    local mayHeal = opts.healer == nil
+        or M.readByte(BCHID + actor * 2) == opts.healer
+    local row = (opts.items and mayHeal) and cmdRow(actor, CMD_ITEM) or nil
     if row ~= nil then
       for e = 0, 3 do
         if M.readWord(0x3C1C + e * 2) > 0 and M.readWord(0x3BF4 + e * 2) == 0

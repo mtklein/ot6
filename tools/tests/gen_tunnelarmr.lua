@@ -159,7 +159,7 @@ local function settleField(dstMap, maxF)
       return not H.worldMode() and H.tileAligned()
          and not H.battleLoadStarted() and not H.dialogWaiting()
          and (dstMap == nil or map() == dstMap)
-    end), maxF or 12000, { honest = "flee", fleeCap = FLEE_CAP, bank = 3 }),
+    end), maxF or 12000, { honest = "flee", fleeCap = FLEE_CAP, bank = 3, healer = 6 }),
     H.waitFrames(30),
   })
 end
@@ -172,7 +172,7 @@ local aPhase = 0
 -- these rather than one query.
 local function hop(tx, ty, what)
   return seq({
-    H.navTo(tx, ty, { maxFrames = 12000, honest = "flee", fleeCap = FLEE_CAP, bank = 3 }),
+    H.navTo(tx, ty, { maxFrames = 12000, honest = "flee", fleeCap = FLEE_CAP, bank = 3, healer = 6 }),
     H.release(),
     H.call(function()
       H.assertEq(H.fieldX(), tx, what .. ": at x=" .. tx)
@@ -235,7 +235,7 @@ local function go(sx, sy, dm, dx, dy, what)
   return seq({
     H.call(function() pick, startMap = nil, map() end),
     H.navTo(function() return stage()[1] end, function() return stage()[2] end,
-      { maxFrames = 20000, arrive = arrived, honest = "flee", fleeCap = FLEE_CAP, bank = 3 }),
+      { maxFrames = 20000, arrive = arrived, honest = "flee", fleeCap = FLEE_CAP, bank = 3, healer = 6 }),
     H.cond(function() return stage()[3] ~= nil end, {
       H.driveUntil(arrived, 1800, {
         H.call(function()
@@ -272,7 +272,8 @@ local function safeWalk(tx, ty, what, budget)
   -- budget died (the same failure the header describes on map 87).  Same
   -- flee-then-tactical-fallback shape as navTo's honest="flee" branch.
   local F = H.newFightDriver(what or "safeWalk",
-    { tactical = true, boost = true, bank = 3, items = true, healPercent = 55 })
+    { tactical = true, boost = true, bank = 3, items = true, healPercent = 55,
+      healer = 6 })
   local battN = 0
   return seq({
     H.driveUntil(function()
@@ -306,7 +307,7 @@ local function warpTo(sx, sy, dx, dy, dmap, what)
     H.logStep(function()
       return string.format("%s: from (%d,%d)", what, H.fieldX(), H.fieldY())
     end),
-    H.navTo(sx, sy, { maxFrames = 20000, honest = "flee", fleeCap = FLEE_CAP, bank = 3, arrive = function()
+    H.navTo(sx, sy, { maxFrames = 20000, honest = "flee", fleeCap = FLEE_CAP, bank = 3, healer = 6, arrive = function()
       return H.fieldX() == dx and H.fieldY() == dy
     end }),
     H.release(),
@@ -607,7 +608,7 @@ H.run({ maxFrames = 300000 }, {
   -- above) then needs none
   H.fieldCare({ tag = "care before leaving town", threshold = 0.95 }),
   -- exit via the x=56 column -> world (87,112)
-  H.navTo(56, 34, { maxFrames = 12000, honest = "flee", fleeCap = FLEE_CAP, bank = 3,
+  H.navTo(56, 34, { maxFrames = 12000, honest = "flee", fleeCap = FLEE_CAP, bank = 3, healer = 6,
     arrive = function() return H.worldMode() end }),
   H.release(),
   (function()
@@ -616,7 +617,7 @@ H.run({ maxFrames = 300000 }, {
       local ok = H.worldMode() and H.worldHasControl() and H.worldAligned()
         and bright() >= 15
       cnt = ok and cnt + 1 or 0; return cnt >= 20
-    end, 12000, { honest = "flee", fleeCap = FLEE_CAP, bank = 3 })
+    end, 12000, { honest = "flee", fleeCap = FLEE_CAP, bank = 3, healer = 6 })
   end)(),
   H.waitFrames(30),
   H.call(function()
@@ -647,7 +648,7 @@ H.run({ maxFrames = 300000 }, {
   -- WRAM ownership, inside fieldCare's world-exit path, which this route
   -- was likely the first mint to exercise.  Care happens on the field
   -- before leaving town instead; follow-up filed for the library.)
-  H.worldNavTo(75, 102, { maxFrames = 45000, honest = "flee", fleeCap = FLEE_CAP, bank = 3,
+  H.worldNavTo(75, 102, { maxFrames = 45000, honest = "flee", fleeCap = FLEE_CAP, bank = 3, healer = 6,
     arrive = function() return not H.worldMode() end }),
   H.release(),
   settleField(69),
