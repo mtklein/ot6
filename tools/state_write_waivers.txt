@@ -50,8 +50,6 @@ tools/tests/battle_fontrestore.lua	.writeByte(
 tools/tests/battle_fontrestore.lua	emu.write
 tools/tests/battle_gaufight.lua	.writeByte(
 tools/tests/battle_gaufight.lua	.writeWord(
-tools/tests/battle_hudtrack.lua	.writeByte(
-tools/tests/battle_hudtrack.lua	.writeWord(
 tools/tests/battle_loadgate.lua	.writeWord(
 tools/tests/battle_magicite.lua	.writeByte(
 tools/tests/battle_magicite.lua	.writeWord(
