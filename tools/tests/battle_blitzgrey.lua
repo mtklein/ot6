@@ -1,4 +1,4 @@
--- @suite
+-- @suite frontier=vargas_won slow
 -- battle_blitzgrey.lua -- v0.5 MP costs: the Blitz menu greys what Sabin can't
 -- afford, exactly as vanilla Magic greys a spell whose MP cost exceeds current
 -- MP.
@@ -17,75 +17,66 @@
 -- universal charge at CalcAttackEffect later subtracts from, so the menu greys
 -- precisely what the charge would refuse.
 --
--- Sabin is INSTALLED into the opening guard fight the way battle_blitzlist pins
--- him: every party slot gets CHAR::SABIN ($3ED8) and an all-Blitz command list
--- ($202E, stride 12), and the known-blitz set $1D28 is written directly.  The
--- twist here: current MP ($3C08) is pinned LOW so the learned kit straddles the
--- affordability line.
---
--- Learned kit (LEARNED $E5) and its Ot6AbilityCostTbl prices (#45 rescale, #57
--- anchor -- this block was stale at 2/7/12/18/30 until #57 swept it):
---   Pummel   $5d  4      Air Blade $62 28
---   Suplex   $5f 13      Spiraler  $63 50
---                        Bum Rush  $64 99
--- With MP pinned to 16, Pummel(4) and Suplex(13) are affordable (white); Air
--- Blade(28), Spiraler(50) and Bum Rush(99) are not (grey) -- a mix of both on
--- one screen.
+-- ISSUE #75 CONVERSION -- the boundary is SPENT to, not written.  This file
+-- used to install an all-Sabin party into the magitek intro fight, write the
+-- known-blitz mask, and PIN current MP -- first low (grey pass), then high
+-- (white pass) -- which proved the grey follows a poked number.  It now
+-- boots vargas_won (the REAL post-boss Sabin, learned set read off $1d28:
+-- Pummel 4 MP / AuraBolt 10 MP at his real level), fights real ledge
+-- encounters, and drives his pool across the affordability line WITH THE
+-- BLITZES THEMSELVES: AuraBolts while the pool is rich, one Pummel to
+-- finish, until current MP lands in [4,9] -- AuraBolt unaffordable, Pummel
+-- still affordable.  Strictly stronger than the pins: the charge and the
+-- grey are proven to read the same cell, in both directions on the same
+-- rows (rich pool = every row white; spent pool = the expensive row grey).
 --
 -- What is asserted (attribute byte = the odd/high byte of each name tile's
--- tilemap word, $21 white / $25 grey -- the same VRAM attribute battle_class.lua
--- reads):
---   1. AFFORDABLE STAYS WHITE.  Pummel and Suplex render at attribute $21.
---   2. UNAFFORDABLE GREYS.  Spiraler renders at attribute $25 ($21 | $04).
+-- tilemap word, $21 white / $25 grey):
+--   1. RICH POOL: every learned blitz the real pool affords renders WHITE --
+--      including the very row that greys below (grey tracks MP, the old
+--      pass-2 claim, made first).
+--   2. SPENT-TO BOUNDARY: with MP really spent into [4,9], the expensive
+--      learned blitz renders GREY and the cheap one WHITE on one screen.
 --   3. THE GREY IS THE DISABLED BIT.  grey - white == $04, magic's own delta.
--- Then a second pass restores full MP and reopens the menu to prove the grey is
--- affordability-driven, not unconditional: with MP high, Spiraler is white too.
 local H = dofile("tools/tests/lib/ot6.lua")
-local STATE = "build/states/battle_doorstep.mss.lua"
+local STATE = "build/states/vargas_won.mss.lua"
 
 local MENU, ACTOR, MSTATE = 0x7BCA, 0x62CA, 0x7BC2
-local ST_TOOLS = 0x30
+local ST_CMD, ST_TOOLS, ST_TGT = 0x05, 0x30, 0x38
 local CMD_BLITZ = 0x0A
-local CMDTBL, KNOWN, CURMP = 0x202E, 0x1D28, 0x3C08
-local LEARNED = 0xE5                    -- Pummel Suplex AirBlade Spiraler BumRush
-local WHITE, GREY = 0x21, 0x25          -- ListText font palette: white, and $21|$04
-local PARTY = { 0, 1, 2 }
+local CMDTBL, ITEMLIST, KNOWN = 0x202E, 0x4005, 0x1D28
+local SABIN = 0x05
+local BLITZ_ATK0 = 0x5D
+local WHITE, GREY = 0x21, 0x25
 
--- FF6 battle-font glyphs: 'A'..'Z' = $80.., 'a'..'z' = $9a.. (the mapping
--- battle_blitzlist / battle_toolslist pin down).
-local function glyphs(s)
-  local t = {}
-  for i = 1, #s do
-    local c = s:sub(i, i)
-    t[i] = (c >= "A" and c <= "Z") and (0x80 + c:byte() - ("A"):byte())
-                                    or  (0x9a + c:byte() - ("a"):byte())
-  end
+local ATKNAME = H.sym("AttackName") & 0x3FFFFF
+local ATKNAME_0, NAME_SIZE = 0x51, 10
+local function nameSeq(id)
+  local t, rec = {}, id - ATKNAME_0
+  for i = 0, NAME_SIZE - 1 do t[#t + 1] = H.readRomByte(ATKNAME + rec * NAME_SIZE + i) end
+  while #t > 0 and t[#t] == 0xff do table.remove(t) end
   return t
 end
--- spaceless names only, so the glyph run is contiguous in VRAM.
-local NM = {
-  Pummel   = glyphs("Pummel"),         -- $5d  cost 4  -> affordable
-  Suplex   = glyphs("Suplex"),         -- $5f  cost 13 -> affordable
-  Spiraler = glyphs("Spiraler"),       -- $63  cost 50 -> unaffordable
-}
-
-local mp = 16                           -- pinned current MP (mutated for pass 2)
-
--- Install a full-Blitz Sabin, with current MP pinned to `mp`, every frame.
-local function pinSabin()
-  H.writeByte(KNOWN, LEARNED)
-  for _, s in ipairs(PARTY) do
-    H.writeByte(0x3ED8 + s * 2, 0x05)               -- CHAR::SABIN
-    local st1 = 0x3EE4 + s * 2
-    H.writeByte(st1, H.readByte(st1) & 0xF7)        -- clear magitek
-    for i = 0, 3 do H.writeByte(CMDTBL + s * 12 + i * 3, CMD_BLITZ) end
-    H.writeWord(0x3BF4 + s * 2, 999)                -- nobody dies mid-bench
-    H.writeWord(CURMP + s * 2, mp)                  -- the affordability knob
+local function nameText(id)
+  local s = ""
+  for _, b in ipairs(nameSeq(id)) do
+    if b >= 0x80 and b <= 0x99 then s = s .. string.char(65 + b - 0x80)
+    elseif b >= 0x9a and b <= 0xb3 then s = s .. string.char(97 + b - 0x9a)
+    else s = s .. "?" end
+  end
+  return s
+end
+local COSTTBL = H.sym("Ot6AbilityCostTbl") & 0x3FFFFF
+local function costOf(id)
+  local x = 0
+  while true do
+    local key = H.readRomByte(COSTTBL + x)
+    if key == 0xff then return 0 end
+    if key == id then return H.readRomByte(COSTTBL + x + 1) end
+    x = x + 2
   end
 end
 
--- word address of a rendered glyph run in VRAM, or nil (battle_blitzlist's
--- findName).
 local function findName(seq)
   local vr = emu.memType.snesVideoRam
   for w = 0x6000, 0x7FF0 do
@@ -97,72 +88,221 @@ local function findName(seq)
   end
   return nil
 end
-
--- attribute (palette) byte of a drawn name's first tile: the odd byte of its
--- tilemap word.  $21 white, $25 grey.  nil if the name is not on screen.
 local function attrOf(seq)
   local w = findName(seq)
   if not w then return nil end
   return emu.read(w * 2 + 1, emu.memType.snesVideoRam)
 end
 
--- open the blitz list (state $30) fresh from the command window.
-local function openBlitz()
-  return H.driveUntil(function() return H.readByte(MSTATE) == ST_TOOLS end, 900, {
-    H.call(function() pinSabin(); H.setPad({ "a" }) end),
-    H.waitFrames(2),
-    H.call(function() H.setPad({}) end),
-    H.waitFrames(14),
-  }, "the blitz list opens (tools-shell state $30)")
+local function map() return H.mapId() & 0x1ff end
+
+-- the save's learned ladder, and the two rows the boundary is built from
+local learned = {}
+local cheap, dear = nil, nil            -- min-cost and max-cost learned ids
+
+local sabinSlot, sabinOfs = nil, 37 * SABIN
+local function pool()
+  if H.battleLoadStarted() and sabinSlot then
+    return H.readWord(0x3C08 + sabinSlot * 2)
+  end
+  return H.readWord(0x160d + sabinOfs)
 end
 
-H.run({ maxFrames = 40000 }, {
+-- the spend plan: park the pool in [costOf(cheap), costOf(dear)-1].
+local function planCast(mp)
+  local cD, cC = costOf(dear), costOf(cheap)
+  if mp >= cD + cC then return dear end
+  if mp >= cD then return cheap end
+  return nil
+end
+
+-- ------------------------------------------------------------------------
+-- the per-frame machine (battle_toolsgrey's, retargeted at the Blitz shell):
+-- "spend" casts planCast's blitz on Sabin's menu; "open" holds the list up.
+-- Bystanders Defend; battle dialogs are paged with A (the battle_vargas
+-- hazard, measured on this family's first run); off-battle the lane is
+-- paced for the next natural encounter.
+-- ------------------------------------------------------------------------
+local mode = "spend"
+local ph, lane, hb = 0, nil, -600
+local BACK = { left = "right", right = "left", up = "down", down = "up" }
+local function pulse()
+  ph = ph + 1
+  if H.frame - hb >= 600 then
+    hb = H.frame
+    H.log(string.format("[hb f%d] mode=%s pool=%d batt=%s menu=%02x actor=%d "
+      .. "mstate=%02x map=%d", H.frame, mode, pool(),
+      tostring(H.battleLoadStarted()), H.readByte(MENU), H.readByte(ACTOR),
+      H.readByte(MSTATE), map()))
+  end
+  local edge = ph % 10 < 5
+  if not H.battleLoadStarted() then
+    if not (H.hasControl() and H.tileAligned()) then H.setPad({}) return end
+    if map() ~= 98 then error("paced off map 98 (now " .. map() .. ")", 0) end
+    local x, y = H.fieldX(), H.fieldY()
+    if lane == nil then
+      for _, d in ipairs({ "right", "left", "up", "down" }) do
+        if H.canStep(x, y, d) then lane = { ax = x, ay = y, out = d, back = BACK[d] } break end
+      end
+    end
+    H.setPad({ [(x == lane.ax and y == lane.ay) and lane.out or lane.back] = true })
+    return
+  end
+  if H.readByte(MENU) == 0 then
+    H.setPad(ph % 8 < 4 and { a = true } or {})     -- page battle dialogs
+    return
+  end
+  local a = H.readByte(ACTOR)
+  if a ~= sabinSlot then
+    local step = ph % 40
+    if step < 4 then H.setPad({ right = true })
+    elseif step >= 20 and step < 24 then H.setPad({ a = true })
+    else H.setPad({}) end
+    return
+  end
+  local st = H.readByte(MSTATE)
+  local wantBlitz = (mode == "spend") and planCast(pool()) or cheap
+  if mode == "spend" and wantBlitz == nil then H.setPad({}) return end
+  if st == ST_CMD then
+    local wantCell = nil
+    for i = 0, 3 do
+      if H.readByte(CMDTBL + a * 12 + i * 3) == CMD_BLITZ then wantCell = i end
+    end
+    assert(wantCell, "SABIN's real command list carries Blitz")
+    local cur = H.readByte(0x890F + a)
+    if cur == wantCell then H.setPad(edge and { a = true } or {})
+    elseif cur < wantCell then H.setPad(edge and { down = true } or {})
+    else H.setPad(edge and { up = true } or {}) end
+  elseif st == ST_TOOLS then
+    if mode == "open" then H.setPad({}) return end
+    local entry = nil
+    for i = 0, 7 do
+      if H.readByte(ITEMLIST + i * 3) == wantBlitz then entry = i end
+    end
+    if entry == nil then H.setPad({}) return end
+    local row, col = entry // 2, entry % 2
+    local cr, cc = H.readByte(0x8967 + a), H.readByte(0x8963 + a)
+    if cr ~= row then H.setPad(edge and { [(cr < row) and "down" or "up"] = true } or {})
+    elseif cc ~= col then H.setPad(edge and { [(cc < col) and "right" or "left"] = true } or {})
+    else H.setPad(edge and { a = true } or {}) end
+  elseif st == ST_TGT then
+    H.setPad(edge and { a = true } or {})
+  elseif st == 0x01 then
+    H.setPad({})
+  else
+    H.setPad(edge and { b = true } or {})
+  end
+end
+
+local function openBlitzWindow(what)
+  return H.repeatN(1, {
+    H.call(function() mode = "open" end),
+    H.driveUntil(function()
+      return H.battleLoadStarted() and H.readByte(MENU) ~= 0
+         and H.readByte(ACTOR) == sabinSlot and H.readByte(MSTATE) == ST_TOOLS
+    end, 30000, { H.call(pulse), H.waitFrames(1) }, what),
+    H.waitFrames(20),
+  })
+end
+
+H.run({ maxFrames = 200000 }, {
   H.waitFrames(20),
   H.loadState(STATE),
-  H.waitFrames(10),
-  H.enterEncounter(),
-
-  H.driveUntil(function() return H.readByte(MENU) ~= 0 end, 3000, {
-    H.call(pinSabin), H.waitFrames(1),
-  }, "a battle menu opens"),
+  H.waitFrames(20),
+  H.waitUntil(function() return H.hasControl() and H.tileAligned() end, 3000,
+    "field control on map 98"),
   H.call(function()
-    H.log(string.format("sabin installed in slot %d, known $%02x, MP pinned to %d",
-      H.readByte(ACTOR), H.readByte(KNOWN), mp))
+    H.assertEq(map(), 98, "vargas_won on map 98, the Kolts ledge")
+    local mask = H.readByte(KNOWN)
+    for i = 0, 7 do
+      if (mask >> i) & 1 == 1 then
+        local id = BLITZ_ATK0 + i
+        learned[#learned + 1] = id
+        if cheap == nil or costOf(id) < costOf(cheap) then cheap = id end
+        if dear == nil or costOf(id) > costOf(dear) then dear = id end
+      end
+    end
+    local names = {}
+    for _, id in ipairs(learned) do
+      names[#names + 1] = string.format("%s(%d)", nameText(id), costOf(id))
+    end
+    H.log(string.format("$1d28 = $%02x as saved: %s", mask, table.concat(names, " ")))
+    H.assertEq(#learned >= 2, true, "two learned blitzes -- a boundary needs both sides")
+    H.assertEq(costOf(dear) > costOf(cheap), true,
+      "the learned costs differ, so one screen can show white and grey at once")
+    H.assertEq(costOf(dear) >= 2 * costOf(cheap), true,
+      "the spend plan's remainder arithmetic holds (cMax >= 2*cMin) -- for "
+      .. "Pummel 4 / AuraBolt 10 it does; a repricing that breaks this needs "
+      .. "a new plan, not a pin")
+    H.log(string.format("SABIN field MP as saved: %d", pool()))
+    H.assertEq(pool() >= costOf(dear), true,
+      "positive control: the saved pool can afford the dear blitz, so the "
+      .. "first open has the white row that will later grey")
   end),
 
-  -- PASS 1: MP = 8 -- some blitzes affordable, some not ----------------------
-  openBlitz(),
-  H.waitFrames(6),                     -- let every row finish drawing
-  H.call(function() H.screenshot("blitz_grey_display") end),
+  -- first natural encounter
+  H.driveUntil(function() return H.battleLoadStarted() end, 12600,
+    { H.call(pulse), H.waitFrames(1) }, "a ledge encounter fires"),
+  H.release(),
+  H.waitUntil(function() return H.battleActive() end, 900, "battle armed", 5),
+  H.waitFrames(240),
   H.call(function()
-    local aP, aS, aSp = attrOf(NM.Pummel), attrOf(NM.Suplex), attrOf(NM.Spiraler)
-    H.log(string.format("attr: Pummel=%s Suplex=%s Spiraler=%s (white=$%02x grey=$%02x)",
-      aP and string.format("$%02x", aP) or "nil",
-      aS and string.format("$%02x", aS) or "nil",
-      aSp and string.format("$%02x", aSp) or "nil", WHITE, GREY))
-    H.assertEq(aP, WHITE, "Pummel (cost 4, MP 16) renders white -- affordable")
-    H.assertEq(aS, WHITE, "Suplex (cost 13, MP 16) renders white -- affordable")
-    H.assertEq(aSp, GREY, "Spiraler (cost 50, MP 16) renders grey -- unaffordable")
-    H.assertEq(aSp - aP, 0x04,
+    for s = 0, 3 do
+      if H.readByte(0x3ED8 + s * 2) == SABIN then sabinSlot = s end
+    end
+    assert(sabinSlot, "SABIN present (vargas_won party)")
+    H.log(string.format("SABIN slot %d, battle pool %d", sabinSlot, pool()))
+  end),
+
+  -- 1. RICH POOL: every affordable row white --------------------------------
+  openBlitzWindow("sabin's blitz window, rich pool"),
+  H.call(function()
+    local mp = pool()
+    H.screenshot("blitz_grey_rich")
+    for _, id in ipairs(learned) do
+      local a = attrOf(nameSeq(id))
+      local want = (mp >= costOf(id)) and WHITE or GREY
+      H.log(string.format("  rich pool (%d MP): %-9s attr=%s want $%02x",
+        mp, nameText(id), a and string.format("$%02x", a) or "nil", want))
+      H.assertEq(a, want, string.format(
+        "%s (cost %d, MP %d) renders %s at the rich pool", nameText(id),
+        costOf(id), mp, want == WHITE and "white" or "grey"))
+    end
+    H.assertEq(pool() >= costOf(dear), true,
+      "the rich-pool pass had the dear row white -- the row that greys below")
+  end),
+
+  -- 2. SPEND to the boundary with the blitzes themselves --------------------
+  H.call(function() mode = "spend" end),
+  H.driveUntil(function() return pool() < costOf(dear) end, 150000,
+    { H.call(pulse), H.waitFrames(1) }, "the pool is spent into the boundary"),
+  H.call(function()
+    local mp = pool()
+    H.log(string.format("pool after real casts: %d MP", mp))
+    H.assertEq(mp >= costOf(cheap) and mp < costOf(dear), true, string.format(
+      "the spend plan parked the pool in [%d,%d]: %s unaffordable, %s "
+      .. "affordable -- both states on one screen",
+      costOf(cheap), costOf(dear) - 1, nameText(dear), nameText(cheap)))
+  end),
+
+  -- ... and the boundary window: grey and white side by side ----------------
+  openBlitzWindow("sabin's blitz window, spent pool"),
+  H.call(function()
+    local mp = pool()
+    H.screenshot("blitz_grey_display")
+    local aC, aD = attrOf(nameSeq(cheap)), attrOf(nameSeq(dear))
+    local fmt = function(a) return a and string.format("$%02x", a) or "nil" end
+    H.log(string.format("spent pool (%d MP): %s=%s %s=%s",
+      mp, nameText(cheap), fmt(aC), nameText(dear), fmt(aD)))
+    H.assertEq(aD, GREY, string.format(
+      "%s (cost %d, MP %d) renders grey -- the charge priced it out",
+      nameText(dear), costOf(dear), mp))
+    H.assertEq(aC, WHITE, string.format(
+      "%s (cost %d, MP %d) renders white -- still affordable",
+      nameText(cheap), costOf(cheap), mp))
+    H.assertEq(aD - aC, 0x04,
       "grey - white == $04, magic's own disabled-bit delta")
-  end),
-
-  -- PASS 2: MP high -- the same row is white, proving grey tracks MP ---------
-  H.call(function() H.setPad({ "b" }) end), H.waitFrames(6),  -- close the list
-  H.call(function() H.setPad({}) end),
-  H.driveUntil(function() return H.readByte(MSTATE) ~= ST_TOOLS end, 300, {
-    H.call(function() H.setPad({ "b" }) end), H.waitFrames(2),
-    H.call(function() H.setPad({}) end), H.waitFrames(2),
-  }, "the blitz list closes back to the command window"),
-  H.call(function() mp = 99 end),      -- pinSabin now writes full MP every frame
-  H.waitFrames(4),
-  openBlitz(),
-  H.waitFrames(6),
-  H.call(function()
-    local aSp = attrOf(NM.Spiraler)
-    H.log(string.format("MP now %d -> Spiraler attr = %s", mp,
-      aSp and string.format("$%02x", aSp) or "nil"))
-    H.assertEq(aSp, WHITE, "Spiraler (cost 50, MP 99) is white now -- grey tracks MP")
-    H.log("PASSED: Blitz greys the unaffordable rows and only the unaffordable rows")
+    H.log("PASSED: the blitz menu greys exactly what the SPENT pool cannot "
+      .. "afford, and only that -- the charge and the grey read the same cell")
   end),
 })
