@@ -219,20 +219,15 @@ local mf = 0
 local celesMode = "defer"                -- "defer"|"summon"|"cast"|"park"
 local lockeMode = "medic"                -- "medic"|"summon"
 local castRec = nil                      -- list record to cast in "cast"
-local tgtLatch, tgtAge, tgtPress
+-- the character-target latch/steer machine (battle_steal's lesson,
+-- promoted into the lib as H.targetCursor)
+local tc = H.targetCursor({ mask = 0x7B7D,
+                            dirs = { "down", "up", "left", "right" } })
 local function decide()
   if H.readByte(MENU) == 0 then
     return (H.frame % 8 < 4) and { a = true } or {}
   end
-  if H.readByte(MSTATE) == ST_TGT then
-    local m = H.readByte(0x7B7D)
-    if m ~= 0 then
-      if m == tgtLatch then tgtAge = (tgtAge or 0) + 1
-      else tgtLatch, tgtAge = m, 1 end
-    end
-  else
-    tgtLatch, tgtAge, tgtPress = nil, 0, 0
-  end
+  tc.observe()
   mf = mf + 1
   local act = H.readByte(ACTOR) & 3
   local st = H.readByte(MSTATE)
@@ -290,13 +285,7 @@ local function decide()
           if pct < wpct then worst, wpct = s, pct end
         end
       end
-      if worst == nil or tgtLatch == (1 << worst) and (tgtAge or 0) >= 4 then
-        btn = "a"
-      else
-        local dirs = { "down", "up", "left", "right" }
-        if (mf - 1) % 8 == 0 then tgtPress = (tgtPress or 0) + 1 end
-        btn = dirs[(((tgtPress or 1) - 1) // 2) % 4 + 1]
-      end
+      btn = tc.steer(worst, mf)
     else btn = "b" end
   elseif act == celes then
     if celesMode == "defer" then

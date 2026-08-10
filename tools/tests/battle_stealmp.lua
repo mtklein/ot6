@@ -102,23 +102,17 @@ local function armWatches()
 end
 
 -- ------------------------------------------------------ the menu drive --
--- battle_steal.lua's measured machine: latched blink-proof target mask,
--- per-cycle direction rotation, slow item-window cadence.
+-- battle_steal.lua's measured machine: latched blink-proof target mask
+-- (H.targetCursor, the lib promotion of that copy), slow item-window
+-- cadence.
 local mf = 0
 local drive = { wantBp = 0, wantPend = 0, target = nil }
+local tc = H.targetCursor({ mask = 0x7B7E })
 local function decide()
   if H.readByte(MENU) == 0 then
     return (H.frame % 8 < 4) and { a = true } or {}
   end
-  if H.readByte(MSTATE) == ST_TGT then
-    local m = H.readByte(0x7B7E)
-    if m ~= 0 then
-      if m == drive.curMask then drive.maskAge = (drive.maskAge or 0) + 1
-      else drive.curMask, drive.maskAge = m, 1 end
-    end
-  else
-    drive.curMask, drive.maskAge, drive.tgtPress = nil, 0, 0
-  end
+  tc.observe()
   mf = mf + 1
   local act = H.readByte(ACTOR) & 3
   local st = H.readByte(MSTATE)
@@ -157,16 +151,7 @@ local function decide()
       else btn = (cur < want) and "down" or "up" end
     elseif st == ST_THIEF then btn = "a"
     elseif st == ST_TGT then
-      if drive.target == nil then
-        btn = "a"                                -- any monster will do
-      elseif drive.curMask == (1 << drive.target)
-          and (drive.maskAge or 0) >= 4 then
-        btn = "a"
-      else
-        local dirs = { "left", "down", "right", "up" }
-        if (mf - 1) % 8 == 0 then drive.tgtPress = (drive.tgtPress or 0) + 1 end
-        btn = dirs[(((drive.tgtPress or 1) - 1) // 2) % 4 + 1]
-      end
+      btn = tc.steer(drive.target, mf)   -- nil target: any monster will do
     else btn = "b" end
   end
   return btn and { [btn] = true } or {}
