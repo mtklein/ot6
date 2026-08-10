@@ -133,38 +133,37 @@ H.run({ maxFrames = 60000 }, {
 
   -- 2. reunion, Cranes, flights, into the flashback.  honest="tactical".
   --
-  -- MEASURED WALL, phase-2 first live run (2026-08-10, run 9c4SgDmR --
-  -- this leg's first honest attempt ever, and it does not complete):
-  --   * reunion fires, party lands on the Blackjack deck (map 6);
-  --   * the ONE forced fight is the Cranes, formation 010D 010E
-  --     (bosses-wob.md 16: Left $10D weak water+piercing, Right $10E
-  --     weak bolt+water+piercing, 6 shields each);
-  --   * the library fighter HEAL-LOCKS, exactly the n128-boss pattern:
-  --     the Cranes hit hard, the party fell to 128/197/99/122, the
-  --     fighter spent its turns on Item heals, and over ~9600 battle
-  --     frames it took ONE Crane from 1800 -> 1434 and 6 -> 5 shields
-  --     -- one chip.  Both Cranes are PIERCING-weak (EDGAR's
-  --     AutoCrossbow) and share a WATER weakness -- but the honest
-  --     chain party here is LOCKE+SABIN+EDGAR+TERRA and newFightDriver
-  --     casts NO attack magic, so TERRA's Water (the actual key) is
-  --     never thrown;
-  --   * the battle then ENDS with the party alive (not a wipe) -- and
-  --     the ride WEDGES on map 6 (15,7), ev=true / ctl=false / dlg=false,
-  --     for 30000+ frames with no battle, no dialog, and no progress
-  --     toward the pred's map==219.  advanceStory holds neutral through a
-  --     running event that is not a dialog; whatever the post-Cranes
-  --     script wants, it is not the tap-A patience the ride offers.
+  -- RESOLVED to a DRIVABLE INPUT, not a wall (2026-08-10,
+  -- probe_banquet_recall's sibling probe_cranes_wedge; three bisecting
+  -- runs, logs are the record).  The earlier "MEASURED WALL" read was
+  -- wrong on both counts:
+  --   * the Cranes fight is SCRIPTED-END and the party survives at FULL
+  --     HP (persistent $1600 table full; the battle table's 0/0/0/0 is
+  --     teardown, HANDOFF trap 1).  Both Cranes stay alive -- WINNING IS
+  --     NOT THE GATE, so the attack-magic branch is not the lever here
+  --     (it landed anyway, and helps other bosses);
+  --   * the post-Cranes scene has an A-GATED beat: left with NO input the
+  --     event holds 13000+ frames unchanged; a PURE EDGE-A run advances
+  --     it all the way to _cc9aeb (SavePoint) on the map-6 Blackjack
+  --     DECK.  The beat does not raise the dialog flag ($056f=0), which
+  --     is exactly why advanceStory's honest="tactical" patience -- it
+  --     taps A only when dlg=true -- holds neutral and never presses it.
+  --   * the scene's endpoint is the deck save point with control
+  --     RETURNED (SavePoint EventReturns, $01B5 set; hasControl()
+  --     flickers on the tile, the anchor-gen pattern).  map 219 (the
+  --     flashback, load_map at event_main.asm:24258) is reached LATER,
+  --     through the deck's own scripted sequence -- NOT directly, as the
+  --     pred below and the whole downstream route assume.
   --
-  -- Two things block this leg, and both are the flagged risk, not a
-  -- contract delta: (a) the fighter needs an ATTACK-MAGIC branch to make
-  -- the Cranes' water weakness pay (a newFightDriver enhancement, or a
-  -- Cranes-specific drive that casts Water on TERRA's turns and
-  -- AutoCrossbows on EDGAR's); (b) the post-fight map-6 scene needs its
-  -- own investigation -- it may need input advanceStory does not give, or
-  -- it may be branching on the near-dead survival state.  Left FAILING on
-  -- purpose (dispatch: report the numbers, do not force).  Cuts 6-10
-  -- (narshe/gate_cave/vector_crash/banquet) chain-boot downstream of
-  -- terra-returned-v1 and are blocked until this is cut.
+  -- THE FIX (follow-on, not applied here): replace this advanceStory with
+  -- an EDGE-A drive through the post-Cranes scene, terminate on
+  -- control-return at the deck (position + $01B5, never raw hasControl),
+  -- then re-derive the route from map 6 forward -- the downstream navTo
+  -- chain is written for a map-219 landing that does not happen.  Cuts
+  -- 6-10 (narshe/gate_cave/vector_crash/banquet) chain-boot downstream of
+  -- terra-returned-v1 and stay blocked until that route re-authoring
+  -- lands.  Left FAILING deliberately; the missing input and the true
+  -- endpoint are now known, no game-side change involved.
   H.advanceStory(function()
     return map() == 219 and sw(0x01C2) == 1 and settled()
   end, 100000, { honest = "tactical" }),

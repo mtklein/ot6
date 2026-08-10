@@ -21,38 +21,48 @@
 -- Ends after the wedge dump cycle or on reaching map 219.
 -- NOT a suite test; no fixture output.
 --
--- ============================ MEASURED (2026-08-10) ======================
--- THE CRANES FIGHT is scripted-end, NOT a required kill.  Both Cranes are
--- on stage at once (010D 1800hp/sh6 + 010E 2300hp/sh6 = 4100hp behind 12
--- shields), and the battle ENDS ON ITS OWN after ~7400 frames with BOTH
--- ALIVE (measured: Crane0 chipped to ~1095/sh5, Crane1 UNTOUCHED at
--- 2300/sh6 -- the shared fighter only ever targets the lower slot).  So
--- winning is not the gate; the party survives and the scene proceeds.
+-- ============================ RESOLVED (2026-08-10) ======================
+-- NOT a product bug, NOT off the rails: a DRIVABLE input the ride was
+-- missing.  Three runs bisected it (logs are the record):
 --
--- THE MAP-6 WEDGE is a frozen event, and it is NOT any of the waits the
--- interpreter's main loop knows how to hold on (event.asm:88-124):
---   evPC=CB40E8 (20 bytes past _ObjEnd4456 -- object-script territory),
---   $e0=F0 $e1=00 $e2=01  -> waitObj=NO (not object/fade/scroll: $e1 bit7
---     is the object wait, bit6 fade, bit5 scroll, all clear),
---   $ba=2 $d3=0, $056e/f=0 (no choice up), dlg=false, ctl=false,
---   ev=true, batt=false, party stacked at (15,7), object 6 frozen at
---   (10,8) -- nothing moves across 600-frame samples.
--- All three inputs advanceStory never gives were probed round-robin at
--- the wedge -- a held DOWN burst, a B tap, a long A hold -- and NONE
--- changed evPC or any cell.  So it is not a hidden dialog or a walk-out
--- the tap-A model missed.
+--   * THE CRANES FIGHT is scripted-end, party survives at FULL HP
+--     (persistent $1600 table reads c1/c4/c5/c9 all full; the battle
+--     table's 0/0/0/0 is teardown, HANDOFF trap 1).  Both Cranes stay
+--     alive (010D 1095/sh5, 010E untouched 2300/sh6) -- winning is not
+--     the gate.
+--   * THE POST-CRANES SCENE HAS AN A-GATED BEAT.  Left alone (no input)
+--     the event parks and holds for 13000+ measured frames (f12565 ->
+--     f25499, unchanged).  A round-robin poke run, and then a PURE
+--     EDGE-A run, both ADVANCE it -- edge-A alone carries the whole
+--     scene through to CC9AEB = SavePoint (_cc9aeb, event_main.asm) on
+--     the map-6 Blackjack DECK.  So the beat is an ordinary A wait that
+--     does NOT raise the dialog flag ($056f=0, dlg=false), which is
+--     exactly why advanceStory's honest="tactical" patience -- it only
+--     taps A when dlg=true -- holds neutral and wedges there.
+--   * THE SCENE'S ENDPOINT is the deck save point, control RETURNED
+--     (SavePoint EventReturns with $01B5 set; hasControl() flickers on
+--     the save tile, the documented anchor-gen pattern).  The gen's ride
+--     pred (map==219) and its whole downstream route assume the party
+--     lands on map 219 directly; the real control-return is on MAP 6,
+--     and the flashback (219) is reached later through the deck's own
+--     scripted sequence (load_map 219 at event_main.asm:24258, gated
+--     behind object moves + a wait_obj).
 --
--- OPEN: the exact CB40E8 opcode and why it loops in place with no wait
--- flag set is unresolved from static reading (the LoROM-mapped bytes did
--- not disassemble cleanly, and CB40E8 sits in object-script DATA past an
--- _ObjEnd label -- so the field may be executing an object script whose
--- own PC is the frozen value, distinct from the main event interpreter).
--- This wants a live Mesen debugger step or the dispatch's call, not more
--- static guessing -- reported as a finding.  The honest Cranes fight's
--- ~7400-frame duration (vs a kill-bit's ~3 frames) is the one thing that
--- changed versus every prior green run of this scene, so the leading
--- hypothesis is a scene-timing desync the long fight introduces.
+-- THE FIX (gen-side, terra_returned_anchor's ride): replace the
+-- advanceStory(map==219) patience with an EDGE-A drive through the
+-- post-Cranes scene, terminate it on control-return at the deck (position
+-- + $01B5, never raw hasControl), then re-derive the downstream route
+-- from map 6 forward.  That route re-authoring (deck -> 219 trigger, then
+-- the rest) is follow-on measurement; this probe nails the missing input
+-- and the true endpoint.  No game-side change.
+
 local H = dofile("tools/tests/lib/ot6.lua")
+
+-- TIMELINE KNOB for the divergence experiment: "A" = the tactical fighter
+-- (heals at 45, the wedging timeline); "B" = plain Fights, no items, no
+-- boost -- maximum honest contrast in fight shape/duration, same route.
+-- Edit here between runs; the evPC transition trace below is the diff.
+local TIMELINE = "A"
 
 local function map() return H.mapId() & 0x1ff end
 local function bright() return emu.getState()["ppu.screenBrightness"] or 0 end
@@ -135,13 +145,24 @@ H.run({ maxFrames = 200000 }, {
   -- the instrumented ride: tactical fighter, with battle-edge dumps and
   -- the wedge instrument
   (function()
-    local F = H.newFightDriver("cranes probe", { tactical = true,
-      boost = true, bank = 1, items = true, healPercent = 45, cadence = 12 })
+    local F = H.newFightDriver("cranes probe",
+      TIMELINE == "A"
+        and { tactical = true, boost = true, bank = 1, items = true,
+              healPercent = 45, cadence = 12 }
+        or  { tactical = false, boost = false, items = false, cadence = 12 })
     local ph, battN, wasBatt = 0, 0, false
     local quiet, lastX, lastY, lastDump = 0, -1, -1, 0
     local wedgeDumps, pokes = 0, 0
+    local tracing, lastPC, traceN, ctlHold = false, nil, 0, 0
     return H.driveUntil(function()
-      return map() == 219 or wedgeDumps >= 12
+      if map() == 219 then return true end
+      if H.hasControl() and H.tileAligned() then
+        ctlHold = ctlHold + 1
+        if ctlHold >= 60 then return true end
+      else
+        ctlHold = 0
+      end
+      return wedgeDumps >= 30
     end, 180000, {
       H.call(function()
         ph = (ph + 1) % 8
@@ -154,6 +175,33 @@ H.run({ maxFrames = 200000 }, {
           wasBatt = false
           battleDump("battle CLOSED")
           dump("post-battle")
+          -- the party's MODULE-INDEPENDENT hp (the $1600 table -- the
+          -- battle table reads 0 during teardown, HANDOFF trap 1) is a
+          -- prime scene-input candidate
+          local hp = {}
+          for c = 0, 13 do
+            local b = H.readByte(0x1850 + c)
+            if b ~= 0 and (b & 0x07) == H.readByte(0x1A6D) then
+              hp[#hp + 1] = string.format("c%d=%d/%d", c,
+                H.readWord(0x1600 + 37 * c + 9), H.readWord(0x1600 + 37 * c + 11))
+            end
+          end
+          H.log("[post-battle] persistent party hp: " .. table.concat(hp, " "))
+          tracing = true
+        end
+        -- THE TRACE: every evPC transition from fight close on, frame
+        -- stamped (sampled per frame -- HANDOFF trap 1, never watchpoints)
+        if tracing then
+          local pc = H.readByte(0x00e7) * 65536 + H.readByte(0x00e6) * 256
+                   + H.readByte(0x00e5)
+          if pc ~= lastPC then
+            traceN = traceN + 1
+            if traceN <= 400 or traceN % 50 == 0 then
+              H.log(string.format("[trace %d] f%d evPC %06X -> %06X ($e1=%02X)",
+                traceN, H.frame, lastPC or 0, pc, H.readByte(0x00e1)))
+            end
+            lastPC = pc
+          end
         end
         if battN >= 3 then
           if battN % 600 == 0 then battleDump("battle") end
@@ -171,27 +219,18 @@ H.run({ maxFrames = 200000 }, {
           quiet = 0
         end
         lastX, lastY = x, y
-        if quiet > 600 and H.frame - lastDump >= 600 then
+        if quiet > 400 and H.frame - lastDump >= 600 then
           lastDump = H.frame
           wedgeDumps = wedgeDumps + 1
-          dump("wedge " .. wedgeDumps)
-          -- probe the inputs advanceStory never gives, one per cycle:
-          -- a direction burst, then B, then A held longer, round-robin
-          pokes = pokes + 1
-          local kind = pokes % 3
-          if kind == 1 then
-            H.log("[wedge] probing a held DOWN burst")
-            H.setPad({ down = true })
-            return
-          elseif kind == 2 then
-            H.log("[wedge] probing a B tap")
-            H.setPad({ b = true })
-            return
-          else
-            H.log("[wedge] probing a long A hold")
-            H.setPad({ a = true })
-            return
-          end
+          dump("quiet " .. wedgeDumps)
+        end
+        -- PURE EDGE-A: once the fight is over, edge-tap A through the whole
+        -- post-Cranes scene, whether or not dlg is set.  If this reaches
+        -- 219 or returns control, the button-gated beat is an ordinary A
+        -- wait advanceStory's patience skipped, and the gen fix is an
+        -- edge-A ride.
+        if tracing then
+          H.setPad(ph < 4 and { "a" } or {}); return
         end
         if H.dialogWaiting() then H.setPad(ph < 4 and { "a" } or {}); return end
         H.setPad({})
@@ -200,9 +239,12 @@ H.run({ maxFrames = 200000 }, {
   end)(),
   H.call(function()
     dump("END")
-    H.log(string.format("[end] map=%d -- %s", map(),
-      map() == 219 and "REACHED THE FLASHBACK (no wedge with this config)"
-      or "wedge dumps exhausted; see the evPC/obj lines"))
+    H.log(string.format("[end] map=%d ctl=%s (%d,%d) $01B5=%d $01BF=%d $006B=%d "
+      .. "$01C2=%d -- %s", map(), tostring(H.hasControl()),
+      H.fieldX(), H.fieldY(), sw(0x01B5), sw(0x01BF), sw(0x006B), sw(0x01C2),
+      map() == 219 and "REACHED THE FLASHBACK"
+      or (H.hasControl() and "CONTROL RETURNED on this map -- the ride must walk on from here"
+      or "no control -- genuinely stuck")))
     H.screenshot("cranes_wedge_end")
   end),
 })
