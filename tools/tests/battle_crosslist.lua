@@ -1,4 +1,4 @@
--- @suite
+-- @suite frontier=figaro_cleared
 -- battle_crosslist.lua -- gate for issue #36: "Tools shows Cure 2".
 --
 -- MECHANISM UNDER GUARD: Ot6RestageGate_ext (ot6_hud.asm) re-renders the open
@@ -22,27 +22,44 @@
 -- measured $3410=$83 NoiseBlaster, never $2e Cure 2) -- but a menu that says
 -- Cure 2 and fires NoiseBlaster is a lying surface, the #27/#32 class.
 --
--- What is asserted:
+-- Issue #75 conversion.  The old apparatus faked the whole cast on the
+-- magitek doorstep: Magic+Tools installed into Terra's $202E rows, eight
+-- tools FORGED into the bag, mp:=99, bp:=5, guard pins and stops, saved
+-- cursor pokes -- and, worst of the lot, L163's "greyed row forced
+-- selectable" write, which strong-armed the exact refusal surface the
+-- grey tests exist to protect.  On figaro_cleared none of it is needed,
+-- and the reproduction is now the SIGHTING's own shape, cross-character:
+-- TERRA really owns Magic (Fire/Cure), EDGAR really owns Tools with the
+-- three tools gen_edgar really bought (measured bag: BioBlaster $A4,
+-- NoiseBlaster $A3, AutoCrossbow $AA), his Tools row is genuinely
+-- enabled, and the R edge commits a real boost off his opening-bp
+-- economy (Ot6InitBP gives Terra the 1 bp the R spends).  The fixture
+-- boots riding the chocobo; a real B dismounts (gen_kolts' drive) and a
+-- short desert pace raises a real encounter.
+--
+-- What is asserted (all four originals):
 --   1. THE CYCLE REALLY RAN.  OT6_RESTAGE saw $80 and $7ba5 went mid-cycle
 --      ($8x) during the R->B window -- the test cannot pass by boost or the
 --      restage gate being disabled outright.
 --   2. THE STRAND IS REPAIRED.  After leaving browse mid-cycle, $7ba5 reads
 --      0 (pre-fix: $83).
---   3. THE TOOLS WINDOW IS ALL TOOLS.  Every row renders a tool name
---      (rows 0..3 sampled) and no magic-list name survives anywhere in the
---      BG1 text region (pre-fix: "Fire"/"Cure" present, tool rows absent).
---   4. THE LIST DATA WAS ALWAYS SOUND.  wItemList holds the eight tool ids.
+--   3. THE TOOLS WINDOW IS ALL TOOLS.  Edgar's window renders his real
+--      tools' names and no magic-list name survives anywhere in the BG1
+--      text region (pre-fix: "Fire"/"Cure" present, tool rows absent).
+--   4. THE LIST DATA WAS ALWAYS SOUND.  wItemList holds exactly the tool
+--      ids his real bag carries.
 local H = dofile("tools/tests/lib/ot6.lua")
-local STATE = "build/states/battle_doorstep.mss.lua"
+local STATE = "build/states/figaro_cleared.mss.lua"
 
-local MENU, ACTOR, MSTATE = 0x7BCA, 0x62CA, 0x7BC2
-local ST_SPELL, ST_TOOLS = 0x0E, 0x30
-local STAGE, RESTAGE = 0x7BA5, 0x57D4
+local MENU, ACTOR, MSTATE, CMDROW = 0x7BCA, 0x62CA, 0x7BC2, 0x890F
+local ST_CMD, ST_SPELL, ST_TOOLS, ST_TRANS = 0x05, 0x0E, 0x30, 0x01
+local CMD_MAGIC, CMD_TOOLS = 0x02, 0x09
+local STAGE = 0x7BA5
 
-local TOOLS = {
-  { 0xA3, "NoiseBlaster" }, { 0xA4, "BioBlaster" }, { 0xA5, "Flash" },
-  { 0xA6, "ChainSaw" }, { 0xA7, "Debilitator" }, { 0xA8, "Drill" },
-  { 0xA9, "AirAnchor" }, { 0xAA, "AutoCrossbow" },
+local NAMES = {
+  [0xA3] = "NoiseBlaster", [0xAA] = "AutoCrossbow",
+  -- "Bio Blaster", "Chain Saw", "Air Anchor" carry spaces the contiguous
+  -- glyph match below cannot span; ids still assert via wItemList.
 }
 
 local function up(c)  return 0x80 + (c:byte() - ("A"):byte()) end
@@ -68,57 +85,89 @@ local function findName(seq)
   return nil
 end
 
-local actor
-local sawFresh, sawMidCycle = false, false
-
--- pinned every frame until the menu opens: the command window is BUILT from
--- $202e at open, so writing it later changes nothing the cursor can reach.
-local function pinTerra()
-  for s = 0, 3 do
-    if H.readByte(0x3ed8 + s*2) == 0 then
-      local s1 = 0x3ee4 + s*2                   -- clear magitek
-      H.writeByte(s1, H.readByte(s1) & 0xf7)
-      H.writeByte(0x202e + s*12 + 0*3, 0x02)    -- Magic
-      H.writeByte(0x202e + s*12 + 1*3, 0x09)    -- Tools
-      H.writeByte(0x202e + s*12 + 2*3, 0xff)
-      H.writeByte(0x202e + s*12 + 3*3, 0xff)
-      H.writeWord(0x3c08 + s*2, 99)             -- mp
-    end
+local function cmdRowOf(slot, cmd)
+  for r = 0, 3 do
+    if H.readByte(0x202E + slot*12 + r*3) == cmd then return r end
   end
-  for i, t in ipairs(TOOLS) do                  -- battle_toolslist's item pin
-    local b = 0x2686 + (i - 1) * 5
-    H.writeByte(b + 0, t[1])
-    H.writeByte(b + 1, 0x40)
-    H.writeByte(b + 2, 0x00)
-    H.writeByte(b + 3, 1)
-  end
+  return nil
 end
 
-H.run({ maxFrames = 40000 }, {
+-- the real tool ids in the battle bag ($2686, 5-byte entries), read not
+-- written: the set wItemList must reproduce
+local function bagTools()
+  local t = {}
+  for i = 0, 251 do
+    local id = H.readByte(0x2686 + i*5)
+    if id >= 0xA3 and id <= 0xAA and H.readByte(0x2686 + i*5 + 3) > 0 then
+      t[id] = true
+    end
+  end
+  return t
+end
+
+local terra, edgar
+local sawFresh, sawMidCycle = false, false
+
+-- steer the menu toward `who`'s command window (everyone else defers with
+-- X), then run `phase` there; 4-on/4-off command-window cadence.
+local mf = 0
+local function windowOf(who, onCmd)
+  if H.readByte(MENU) == 0 then
+    return (H.frame % 8 < 4) and { a = true } or {}
+  end
+  mf = mf + 1
+  if (mf - 1) % 8 >= 4 then return {} end
+  local act = H.readByte(ACTOR) & 3
+  local st = H.readByte(MSTATE)
+  if st == ST_TRANS then return {} end
+  local btn
+  if act ~= who then
+    btn = (st == ST_CMD) and "x" or "b"
+  else
+    btn = onCmd(st)
+  end
+  return btn and { [btn] = true } or {}
+end
+
+H.run({ maxFrames = 60000 }, {
   H.waitFrames(20),
   H.loadState(STATE),
-  H.waitFrames(10),
-  H.enterEncounter(),
-  H.waitFrames(240),
-  H.driveUntil(function()
-    if H.readByte(MENU) == 0 then pinTerra(); return false end
-    return H.readByte(0x3ed8 + (H.readByte(ACTOR) & 3)*2) == 0
-  end, 8000, {
+  H.waitFrames(30),
+  -- the fixture boots riding the chocobo out of Figaro; dismount for real
+  -- (chocobos suppress encounters) -- gen_kolts' measured B-hold drive
+  H.hold({ "b" }),
+  H.driveUntil(function() return H.readByte(0x11fa) & 3 == 0 end, 900, {
+    H.waitFrames(1),
+  }, "chocobo dismount"),
+  H.release(),
+  H.waitFrames(120),
+  -- pace the desert band until a real encounter fires (measured: ~340
+  -- frames off the dismount tile)
+  H.driveUntil(function() return H.battleLoadStarted() end, 20000, {
     H.call(function()
-      pinTerra()
-      if H.readByte(MENU) ~= 0 then H.setPad({ "a" }) end
+      if not H.worldMode() or not H.worldHasControl() then H.setPad({}); return end
+      local phase = (H.frame // 120) % 2
+      H.setPad(phase == 0 and { left = true } or { right = true })
     end),
-    H.waitFrames(4),
-    H.call(function() H.setPad({}) end),
-    H.waitFrames(24),
-  }, "terra holds the menu"),
+  }, "desert encounter"),
+  H.release(),
+  H.waitUntil(function() return H.battleActive() end, 900, "battle active", 30),
+  H.waitFrames(90),
   H.call(function()
-    actor = H.readByte(ACTOR) & 3
-    H.writeByte(0x3e9c + actor*2, 5)            -- bp so R commits a boost
-    H.writeByte(0x3e9d + actor*2, 0)
-    H.writeWord(0x3C00, 3000); H.writeWord(0x3C02, 3000)
-    H.writeByte(0x3f04, H.readByte(0x3f04) | 0x10)  -- quiet the guards
-    H.writeByte(0x3f06, H.readByte(0x3f06) | 0x10)
+    for slot = 0, 3 do
+      local chid = H.readByte(0x3ED8 + slot*2)
+      if chid == 0x00 then terra = slot end
+      if chid == 0x04 then edgar = slot end
+    end
+    H.assertEq(terra ~= nil, true, "TERRA is really in this party")
+    H.assertEq(edgar ~= nil, true, "EDGAR is really in this party")
+    H.assertEq(cmdRowOf(terra, CMD_MAGIC) ~= nil, true,
+      "her Magic command is real")
+    H.assertEq(cmdRowOf(edgar, CMD_TOOLS) ~= nil, true,
+      "his Tools command is real")
+    local tools, n = bagTools(), 0
+    for _ in pairs(tools) do n = n + 1 end
+    H.assertEq(n >= 2, true, "the bag really carries the bought tools")
     -- positive controls: the restage request fires and the cycle starts
     emu.addMemoryCallback(function(_, v)
       if v == 0x80 then sawFresh = true end
@@ -128,20 +177,42 @@ H.run({ maxFrames = 40000 }, {
     end, emu.callbackType.write, 0x7e7ba5, 0x7e7ba5)
   end),
 
-  -- open the magic list (command cursor rests on row 0 = Magic)
-  H.driveUntil(function() return H.readByte(MSTATE) == ST_SPELL end, 600, {
-    H.pressButtons({ "a" }, 4), H.waitFrames(16),
-  }, "spell list open"),
-  H.call(function()
-    H.writeByte(0x8913 + actor, 0)              -- park the list at the top
-    H.writeByte(0x8917 + actor, 0)
-    H.writeByte(0x891b + actor, 0)
-  end),
+  -- open Terra's real magic list (walk the cursor to her Magic row)
+  H.driveUntil(function()
+    return (H.readByte(ACTOR) & 3) == terra and H.readByte(MSTATE) == ST_SPELL
+  end, 20000, {
+    H.call(function()
+      H.setPad(windowOf(terra, function(st)
+        if st == ST_CMD then
+          local want = cmdRowOf(terra, CMD_MAGIC)
+          local cur = H.readByte(CMDROW + terra) & 3
+          if cur == want then return "a" end
+          return (cur < want) and "down" or "up"
+        end
+        return "b"
+      end))
+    end),
+  }, "her real spell list open"),
+  H.call(function() H.setPad({}) end),   -- drop any held press at the boundary
   H.waitFrames(20),
+  H.call(function()
+    H.assertEq(H.readByte(MSTATE), ST_SPELL,
+      "still browsing her list when the R lands (no leaked confirm)")
+    H.log(string.format("pre-R: pend=%d bp=%d stage=%02x",
+      H.readByte(0x3e9d + terra*2), H.readByte(0x3e9c + terra*2),
+      H.readByte(STAGE)))
+  end),
 
-  -- the trigger ordering: R (boost -> restage) then B before the 4-line
-  -- cycle finishes
-  H.hold({ "r" }), H.waitFrames(2), H.release(),
+  -- the trigger ordering: R (a real boost off her real 1-bp bank ->
+  -- restage) then B before the 4-line cycle finishes.  The old fixture's
+  -- 2-frame R hold does not register on this fixture's poll timing
+  -- (measured: pend stayed 0, no $80 request), so R is HELD until the
+  -- commit is visible in pending -- the B then lands 1-2 frames after the
+  -- restage request, well inside the 4-line cycle.
+  H.hold({ "r" }),
+  H.driveUntil(function() return H.readByte(0x3e9d + terra*2) == 1 end, 120, {
+    H.waitFrames(1),
+  }, "the R edge commits (pending 1)"),
   H.hold({ "b" }), H.waitFrames(4), H.release(),
   H.waitFrames(14),
   H.call(function()
@@ -152,41 +223,54 @@ H.run({ maxFrames = 40000 }, {
       "the abandoned restage hands the shared staging byte $7ba5 back closed")
   end),
 
-  -- open Tools on the same character and demand an honest window
-  H.driveUntil(function() return H.readByte(MSTATE) == ST_TOOLS end, 600, {
+  -- cross-character, the sighting's own shape: EDGAR opens his real Tools
+  -- window next and it must be an honest window
+  H.driveUntil(function()
+    return (H.readByte(ACTOR) & 3) == edgar and H.readByte(MSTATE) == ST_TOOLS
+  end, 20000, {
     H.call(function()
-      local s = H.readByte(MSTATE)
-      if s == ST_SPELL or s == 0x0d then
-        H.setPad({ "b" })
-      elseif s == 0x05 or s == 0x01 then
-        H.writeByte(0x890f + actor, 1)          -- command cursor -> Tools
-        H.writeByte(0x202e + actor*12 + 1*3 + 1, 0x00)  -- row enabled
-        H.setPad({ "a" })
-      else
-        H.setPad({})
-      end
+      H.setPad(windowOf(edgar, function(st)
+        if st == ST_CMD then
+          local want = cmdRowOf(edgar, CMD_TOOLS)
+          local cur = H.readByte(CMDROW + edgar) & 3
+          if cur == want then return "a" end
+          return (cur < want) and "down" or "up"
+        end
+        return "b"
+      end))
     end),
-    H.waitFrames(2),
-    H.call(function() H.setPad({}) end),
-    H.waitFrames(6),
-  }, "tools window open"),
+  }, "his real tools window open"),
+  H.call(function() H.setPad({}) end),
   H.waitFrames(12),                             -- let every row finish drawing
   H.call(function()
+    H.setPad({})
     H.screenshot("crosslist_tools_after")
-    local ids = {}
-    for i = 0, 7 do ids[i] = H.readByte(0x4005 + i*3) end
-    for i, t in ipairs(TOOLS) do
-      H.assertEq(ids[i - 1], t[1],
-        string.format("wItemList row %d is tool $%02x", i - 1, t[1]))
+    -- 4. the list data was always sound: wItemList reproduces exactly the
+    --    bag's real tool set, nothing else
+    local want = bagTools()
+    local seen = {}
+    for i = 0, 7 do
+      local id = H.readByte(0x4005 + i*3)
+      if id ~= 0xFF then
+        H.assertEq(want[id] == true, true,
+          string.format("wItemList row %d ($%02x) is a tool the bag holds", i, id))
+        seen[id] = true
+      end
     end
-    -- one name per window row: 0 NoiseBlaster, 1 Flash, 2 Drill,
-    -- 3 AutoCrossbow -- pre-fix only row 3 drew ("Chain Saw"/"Air Anchor"
-    -- carry spaces findName's contiguous glyph match cannot span)
-    for _, nm in ipairs({ "NoiseBlaster", "Flash", "Drill", "AutoCrossbow" }) do
-      H.assertEq(findName(glyphs(nm)) ~= nil, true,
-        "\"" .. nm .. "\" renders in the tools window")
+    for id in pairs(want) do
+      H.assertEq(seen[id] == true, true,
+        string.format("the bag's tool $%02x reached wItemList", id))
     end
-    -- and no magic-list row survives -- pre-fix "Fire"/"Cure" sat in rows 0-2
+    -- 3a. his real tools' names render in the window
+    for id, nm in pairs(NAMES) do
+      if want[id] then
+        H.assertEq(findName(glyphs(nm)) ~= nil, true,
+          "\"" .. nm .. "\" renders in the tools window")
+      end
+    end
+    -- 3b. and no magic-list row survives -- pre-fix "Fire"/"Cure" sat in
+    --     the window (both really live in Terra's list on this fixture,
+    --     so the scan is armed, not vacuous)
     for _, nm in ipairs({ "Fire", "Cure" }) do
       H.assertEq(findName(glyphs(nm)), nil,
         "no stale magic row (\"" .. nm .. "\") in the tools window")
