@@ -2,211 +2,361 @@
 --
 --   tools/tests/run.sh tools/tests/battle_assassinate.lua
 --
--- STATUS: scaffold, NOT yet in suite.sh. Ot6Assassinate's gate logic is a
--- verified near-copy of Oblivion's (battle_divines proves the shared $3e88
--- Broken / $3aa1.2 boss / $3dd4 kill / OT6_DIVINE_USED latch machinery), but
--- this harness cannot yet DRIVE Shadow's installed Fight to LAND on a guard --
--- the diagnostic showed characters cycling turns with the guards' HP never
--- moving, so the fight never reaches CalcAttackEffect against a broken target.
--- The open item is the fight-DELIVERY drive (or wiring Shadow's real kit),
--- not the proc. See the final report.
+-- STATUS: evidence scaffold, not in suite.sh (unchanged by the #75
+-- conversion; promoting it is a separate call).
 --
--- Ot6Assassinate (ot6.asm) is hooked at the same seam Oblivion uses -- just
--- after ChooseTarget in CalcAttackEffect, where the target finally exists -- and
--- fires when SHADOW (char id $03) lands an attack on a Broken ($3e88 nonzero)
--- non-boss ($3aa1 bit 2 clear -- the instant-death-protection bit a boss carries)
--- while his once-per-battle divine (OT6_DIVINE_USED, $3ECB) is unspent. It marks
--- Death in the target's $3dd4 (SetStatus1's byte, applied by UpdateStatus
--- regardless of the hit roll) and spends the latch. Any other target -- a boss,
--- an unbroken enemy, or once the latch is spent -- is left to the ordinary
--- attack. Shadow's kit is a sketch, so the milestone gates on the attacker being
--- Shadow (any attack he lands, simplest faithful reading of the sketch);
--- narrowing to his Throw signature is a one-line change once his kit is built.
+-- Ot6Assassinate (ot6_divine.asm:174) is hooked at the same seam Oblivion
+-- uses -- just after ChooseTarget in CalcAttackEffect -- and fires when
+-- SHADOW (char id $03) lands an attack on a Broken (OT6_BROKEN_TICKS $3e88
+-- nonzero) non-boss ($3aa1 bit 2 clear) while his once-per-battle divine
+-- (OT6_DIVINE_USED, $3ecb) is unspent.  It marks Death in the target's
+-- $3dd4 and spends the latch.
 --
--- Shadow is not recruitable here, so he is INSTALLED into the guard fight the
--- way the balance labs pin state: every slot gets CHAR::SHADOW ($03) and a Fight
--- command, and Shadow simply FIGHTS -- a driveable action that reaches the same
--- CalcAttackEffect his divine hooks. Three fresh battles (a state reload each),
--- so every case is a clean run:
---   1. BROKEN NON-BOSS: a Broken, killable guard takes Shadow's fight -> DEATH,
---      and a Shadow latch is SET. The core kill + the once-per-battle spend.
---   2. BOSS GATE (loud): both guards Broken but DEATH-IMMUNE. Shadow's fights
---      land (the guards lose HP -- the loud control that he actually acted) but
---      inflict NO Death and set NO latch: a boss is never assassinated.
---   3. ONCE PER BATTLE (loud): Broken non-boss guards, but every Shadow's latch
---      is pre-SET. His fights land (HP falls) yet inflict NO Death: a spent
---      divine does not fire again.
+-- ISSUE #75 CONVERSION -- a REAL SHADOW, and the break is EARNED.  The old
+-- scaffold installed CHAR::SHADOW into every doorstep slot, forged command
+-- rows, pinned guard HP to $F000, and painted Broken/boss states on with
+-- writes.  It now boots camp_escaped -- the honest post-Magitek mint,
+-- world (179,71), SABIN + SHADOW + CYAN, Shadow's own record carrying
+-- Fight and his Imperial ($25, PIERCE per Ot6WeapClassTbl) -- and walks
+-- into the real local pool (measured 2026-08-10: species $2f 243hp
+-- PIERCE-weak x3 / $29+$18 SLASH-weak mixes, all 3 shields, none
+-- death-protected).  Draws without >= 2 PIERCE-weak 200+hp bodies are
+-- fled; on a suitable draw SHADOW HIMSELF chips a real gauge to Broken
+-- with his own weapon class while the bench answers its menus with real
+-- Defends (slotsboot's idiom -- no damage, so every monster HP drop is
+-- Shadow's).
+--
+-- OBSERVATION is read-only and mechanism-exact: a pc-gated write watch on
+-- the monster $3dd4 cells counts Death marks written FROM INSIDE
+-- Ot6Assassinate (the divine's own kill), and the $3ecb latch byte is
+-- read.  That replaces the old "did the guard's wound bit set" assert,
+-- which an honest 4x-broken damage kill would confound (243hp bodies die
+-- to plain damage too).
+--
+--   1. BROKEN NON-BOSS: Shadow chips a body to Broken, and his next landed
+--      attack on it divine-kills: exactly one in-proc Death mark, on a
+--      body whose Broken state was live, and the latch is SET.
+--   2. ONCE PER BATTLE (loud): the same battle continues -- Shadow breaks
+--      and strikes further bodies, monster HP keeps falling (the loud
+--      control that he still acts and lands), yet the in-proc kill count
+--      stays 1 and the latch byte never changes again.
+--
+-- *** ONE LABELED ISOLATION ARM (issue #75) -- one write site STAYS ***
+-- 3. THE BOSS GATE.  No honest boss shares a battle with Shadow anywhere
+--    in the minted tree (the camp pursuit is four troops; the Ghost Train
+--    boss has no doorstep fixture; the local pool carries no $3aa1.2
+--    species -- measured), so the non-boss gate's negative is an isolation
+--    arm: a FRESH battle, a body chipped Broken by real play, then the ONE
+--    write -- its $3aa1 bit 2 set, the exact bit a boss carries
+--    (ScimitarEffect reads the same bit, battle_main.asm:9147) -- and
+--    Shadow's next landed hit on it must fire NO divine and spend NO
+--    latch.  It MAY NEVER PRODUCE FIXTURES; it converts organically when
+--    a chain leg mints a boss-with-Shadow doorstep.  This is the file's
+--    only surviving write (.writeByte( waiver line).
 local H = dofile("tools/tests/lib/ot6.lua")
-local STATE = "build/states/battle_doorstep.mss.lua"
+local STATE = "build/states/camp_escaped.mss.lua"
 
-local MENU, ACTOR = 0x7BCA, 0x62CA
+local MENU, ACTOR, MSTATE = 0x7BCA, 0x62CA, 0x7BC2
+local ST_CMD, ST_TGT = 0x05, 0x38
 local DIVINE_USED = 0x3ECB
 local SHADOW = 0x03
+local OT6_PIERCE = 0x02
 
-local PARTY = { 0, 1, 2 }
-local GUARDS = { 2, 3 }
-local function SH(s)  return 0x3E38 + (8 + s * 2) end
-local function TM(s)  return 0x3E88 + (8 + s * 2) end
-local function DP(s)  return 0x3AA1 + (8 + s * 2) end
-local function MHP(s) return 0x3BFC + s * 2 end
-local function PRESENT(s) return 0x3AA8 + s * 2 end
-local function ST3(e) return 0x3EF8 + e end
-local function dead(s) return H.readByte(0x3EE4 + (8 + s * 2)) & 0x80 ~= 0 end
-local function hp(s) return H.readWord(MHP(s)) end
+local function ent(m) return 8 + m * 2 end
+local function brk(m) return H.readByte(0x3E88 + ent(m)) end
+local function sh(m) return H.readByte(0x3E38 + ent(m)) end
+local function weak(m) return H.readByte(0x3E9C + ent(m)) end
+local function aa1(m) return H.readByte(0x3AA1 + ent(m)) end
+local function mhp(m) return H.readWord(0x3BFC + m * 2) end
+local function present(m) return H.readByte(0x3AA8 + m * 2) % 2 == 1 end
 local function latchByte() return H.readByte(DIVINE_USED) end
 
-local OT6_SLASH = 0x01
+local shadowSlot, msPresent = nil, {}
 
-local guardBroken = { [2] = true, [3] = true }
-local guardImmune = { [2] = false, [3] = false }
-local hp0 = { 0, 0 }
-local guardHp = 0xF000              -- durable: a fight must NOT damage-remove a
-                                    -- broken guard before the Death status (our
-                                    -- kill witness) is even set. Set once per
-                                    -- battle; not re-pinned, so a fight's damage
-                                    -- still SHOWS (the loud control for negatives).
-local presetLatch = false           -- battle 3: pre-spend every Shadow's divine
-
-local function pinShadow()
-  for _, s in ipairs(PARTY) do
-    H.writeByte(0x3ED8 + s * 2, SHADOW)                -- CHAR::SHADOW
-    local st1 = 0x3EE4 + s * 2
-    H.writeByte(st1, H.readByte(st1) & 0xF7)           -- clear magitek
-    H.writeByte(0x202E + s * 12, 0x00)                 -- Fight, alone
-    H.writeByte(0x2031 + s * 12, 0xFF)
-    H.writeByte(0x2034 + s * 12, 0xFF)
-    H.writeByte(0x2037 + s * 12, 0xFF)
-    H.writeWord(0x3BF4 + s * 2, 999)                   -- nobody on the bench dies
-    if presetLatch then
-      H.writeByte(DIVINE_USED, H.readByte(DIVINE_USED) | (1 << s))
+-- ---- the in-proc kill watch: Death marks written BY the divine ----------
+local ASSN = H.sym("Ot6Assassinate")
+local divineKills = {}          -- { m = body, brkAtKill = its last-seen brk }
+local lastBrk, lastHp = {}, {}
+local watching = false
+emu.addMemoryCallback(function(addr, v)
+  if not watching or (v & 0x80) == 0 then return end
+  pcall(function()
+    local s = emu.getState()
+    local pc = (s["cpu.k"] << 16) | s["cpu.pc"]
+    if pc >= ASSN and pc < ASSN + 0x60 then
+      local m = ((addr - 0x7E0000 - 0x3DD4) - 8) // 2
+      divineKills[#divineKills + 1] = { m = m, brkAtKill = lastBrk[m] }
     end
-  end
-end
+  end)
+end, emu.callbackType.write, 0x7E3DD4 + 8, 0x7E3DD4 + 0x13)
 
-local function pinGuards()
-  for _, s in ipairs(GUARDS) do
-    if H.readByte(PRESENT(s)) & 1 == 1 then
-      H.writeByte(0x3BE0 + (8 + s * 2), OT6_SLASH)     -- weak, so the fight bites
-      H.writeByte(0x3E9C + (8 + s * 2), OT6_SLASH)
-      H.writeByte(TM(s), guardBroken[s] and 0xFF or 0)
-      H.writeByte(SH(s), guardBroken[s] and 0 or 8)
-      local dp = H.readByte(DP(s))
-      H.writeByte(DP(s), guardImmune[s] and (dp | 0x04) or (dp & 0xFB))
+-- monster HP drops attributed per body (bench Defends, so every drop is
+-- Shadow's); brokenHits counts drops on a body whose Broken state was live
+local hpDrops, brokenHits = 0, 0
+local function scanBodies()
+  for _, m in ipairs(msPresent) do
+    local hp = mhp(m)
+    if lastHp[m] ~= nil and hp < lastHp[m] then
+      hpDrops = hpDrops + 1
+      if (lastBrk[m] or 0) ~= 0 then brokenHits = brokenHits + 1 end
     end
+    lastHp[m] = hp
+    lastBrk[m] = brk(m)
   end
 end
 
-local function pin() pinShadow(); pinGuards() end
-
--- give both guards a big HP pool ONCE (not re-pinned): durable against a fight's
--- damage so the Death status is what ends them, yet damage still visibly lands.
-local function setGuardHp()
-  for _, s in ipairs(GUARDS) do
-    if H.readByte(PRESENT(s)) & 1 == 1 then H.writeWord(MHP(s), guardHp) end
+-- ---- the action machine: SHADOW Fights, the bench Defends ---------------
+local mf, hb = 0, -1200
+local function fightPulse()
+  scanBodies()
+  if H.frame - hb >= 600 then
+    hb = H.frame
+    local parts = {}
+    for _, m in ipairs(msPresent) do
+      parts[#parts + 1] = string.format("m%d:%d/sh%d", m, mhp(m), sh(m))
+    end
+    H.log(string.format("[pulse f%d] menu=%02x act=%d st=%02x drops=%d "
+      .. "cur=%d %s", H.frame, H.readByte(MENU), H.readByte(ACTOR) & 3,
+      H.readByte(MSTATE), hpDrops,
+      H.readByte(0x890F + (H.readByte(ACTOR) & 3)) & 3,
+      table.concat(parts, " ")))
   end
+  if H.readByte(MENU) == 0 then H.setPad({}); return end
+  mf = mf + 1
+  local step = mf % 40
+  local act = H.readByte(ACTOR) & 3
+  local st = H.readByte(MSTATE)
+  if act ~= shadowSlot then
+    -- a real Defend: right swaps Fight->Def, then A (slotsboot's idiom)
+    if st ~= ST_CMD then H.setPad(step < 4 and { b = true } or {}); return end
+    if step < 4 then H.setPad({ right = true })
+    elseif step >= 20 and step < 24 then H.setPad({ a = true })
+    else H.setPad({}) end
+    return
+  end
+  if (mf - 1) % 10 >= 5 then H.setPad({}); return end
+  local btn
+  if st == ST_CMD then
+    local cur = H.readByte(0x890F + shadowSlot) & 3
+    btn = (cur == 0) and "a" or (cur < 4 and "up" or nil)   -- Fight is row 0
+  elseif st == ST_TGT then
+    btn = "a"                       -- default monster target
+  else
+    btn = "a"                       -- messages / transitions
+  end
+  H.setPad(btn and { [btn] = true } or {})
 end
 
--- boot from the doorstep into the guard battle and install Shadow (inlined per
--- battle: a reload restarts the preamble)
-local function bootSteps()
+-- ---- encounter selection: >= 2 PIERCE-weak 200+hp bodies, else flee -----
+local function walkSteps(n)
+  local ph = 0
+  local pattern = { "down", "down", "left", "left", "up", "up",
+                    "right", "right" }
   return {
-    H.waitFrames(20),
-    H.loadState(STATE),
-    H.waitFrames(10),
-    H.enterEncounter(),
-    H.driveUntil(function() return H.readByte(MENU) ~= 0 end, 3000, {
-      H.call(pin), H.waitFrames(1),
-    }, "a battle menu opens"),
+    H.waitUntil(function()
+      return H.worldMode() and H.worldHasControl() and H.worldAligned()
+    end, 4000, "world control (draw " .. n .. ")", 5),
+    H.driveUntil(function() return H.battleLoadStarted() end, 40000, {
+      H.call(function()
+        if H.battleLoadStarted() then H.setPad({}) return end
+        if not H.worldHasControl() then H.setPad({}) return end
+        ph = ph + 1
+        local dir = pattern[(math.floor(ph / 25) % #pattern) + 1]
+        H.setPad({ [dir] = true })
+      end),
+    }, "a real world encounter fires (draw " .. n .. ")"),
+    H.call(function() H.setPad({}) end),
+    H.waitUntil(function() return H.battleActive() end, 1200,
+      "battle active (draw " .. n .. ")", 5),
+    H.waitFrames(120),
+    H.call(function()
+      msPresent = {}
+      for m = 0, 5 do if present(m) then msPresent[#msPresent + 1] = m end end
+      local good = 0
+      for _, m in ipairs(msPresent) do
+        if (weak(m) & OT6_PIERCE) ~= 0 and mhp(m) >= 200 then good = good + 1 end
+      end
+      H.vars.suitable = good >= 2
+      local parts = {}
+      for _, m in ipairs(msPresent) do
+        parts[#parts + 1] = string.format("m%d hp=%d sh=%d weak=%02x aa1=%02x",
+          m, mhp(m), sh(m), weak(m), aa1(m))
+      end
+      H.log(string.format("draw %d: %s -> %s", n, table.concat(parts, " | "),
+        H.vars.suitable and "FIGHT" or "flee"))
+    end),
+    H.cond(function() return not H.vars.suitable end, {
+      H.fleeBattle(9000),
+      H.waitFrames(30),
+    }, {}),
   }
 end
-
--- tap A to drive Shadow fights (each fight lands on the default guard); a short
--- press because $04 is the repeat-mode button word
-local fightDrive = {
-  H.call(function() pin(); if H.readByte(MENU) ~= 0 then H.setPad({ "a" }) end end),
-  H.waitFrames(3),
-  H.call(function() H.setPad({}) end),
-  H.waitFrames(9),
-}
+local function encounter(tag)
+  local steps = { H.call(function() H.vars.suitable = false end) }
+  for n = 1, 6 do
+    local w = walkSteps(n)
+    if n == 1 then
+      for _, s in ipairs(w) do steps[#steps + 1] = s end
+    else
+      steps[#steps + 1] = H.cond(function() return not H.vars.suitable end, w, {})
+    end
+  end
+  steps[#steps + 1] = H.call(function()
+    H.assertEq(H.vars.suitable, true,
+      tag .. ": the pool dealt a suitable formation within six draws")
+    for s = 0, 3 do
+      if H.readByte(0x3ED8 + s * 2) == SHADOW then shadowSlot = s end
+    end
+    H.assertEq(shadowSlot ~= nil, true, tag .. ": SHADOW is really here")
+    lastBrk, lastHp = {}, {}
+    hpDrops, brokenHits = 0, 0
+    divineKills = {}
+    mf = 0
+    scanBodies()
+    watching = true
+  end)
+  return steps
+end
 
 local steps = {}
 local function add(t) for _, s in ipairs(t) do steps[#steps + 1] = s end end
 
--- ===================== BATTLE 1: broken non-boss -> kill + latch ============
-add(bootSteps())
+add({
+  H.waitFrames(20),
+  H.loadState(STATE),
+  H.waitFrames(20),
+  -- SHADOW to the BACK ROW, through the real Order screen (H.setRows).
+  -- Measured: his front-row Fight lands ~110 on a shielded 243-hp body, so
+  -- a 3-shield gauge (chips are -1 per landed weak-class hit) damage-kills
+  -- at shield 1 and nothing ever breaks.  The back row halves his physical
+  -- damage (~55): three chips leave the body alive at ~78 hp, Broken, and
+  -- the fourth hit is the divine's.  A player picking a smaller stick is
+  -- play, not staging.
+  H.setRows({ [SHADOW] = true }, { tag = "shadow back row" }),
+})
+
+-- ===================== BATTLE 1: arms 1 + 2 ================================
+add(encounter("battle 1"))
 add({
   H.call(function()
-    guardBroken = { [2] = true, [3] = true }
-    guardImmune = { [2] = false, [3] = false }   -- both killable
-    presetLatch = false
-    pin(); setGuardHp()
-    H.log(string.format("battle 1: shadow party; latch $%02X", latchByte()))
     H.assertEq(latchByte(), 0, "divine latch clear at battle start")
+    for _, m in ipairs(msPresent) do
+      H.assertEq(aa1(m) & 0x04, 0, string.format(
+        "body %d is a non-boss (no $3aa1.2) -- the pool precondition", m))
+    end
   end),
-  H.driveUntil(function() return dead(2) or dead(3) end, 20000, fightDrive,
-    "a Shadow fight assassinates a broken non-boss guard"),
-  H.waitFrames(30),
+  -- arm 1: chip to Broken and let the next landed hit assassinate.  The
+  -- drive also exits on battle end, so a fight that damage-kills everything
+  -- before a break fails on the assert below with the ledger in the log,
+  -- not on a mute timeout.
+  H.driveUntil(function()
+    return #divineKills >= 1 or not H.battleLoadStarted()
+  end, 30000, { H.call(fightPulse), H.waitFrames(2) },
+    "Shadow chips a gauge to Broken and his divine kills it"),
   H.call(function()
-    H.log(string.format("battle 1: Death %s/%s, latch $%02X",
-      tostring(dead(2)), tostring(dead(3)), latchByte()))
-    H.assertEq(dead(2) or dead(3), true, "a Broken non-boss guard was assassinated")
-    H.assertEq(latchByte() ~= 0, true, "a Shadow's once-per-battle latch is SET")
+    H.assertEq(#divineKills >= 1, true,
+      "the divine fired before the battle ended (hpDrops=" .. hpDrops .. ")")
+    local k = divineKills[1]
+    H.log(string.format("divine kill: body %d, brk-at-kill=%02x, latch=$%02x, "
+      .. "hpDrops=%d", k.m, k.brkAtKill or 0, latchByte(), hpDrops))
+    H.assertEq((k.brkAtKill or 0) ~= 0, true,
+      "the divine fired on a body whose BROKEN state was live -- the gauge "
+      .. "was chipped by real play, not painted on")
+    H.assertEq(latchByte() ~= 0, true,
+      "Shadow's once-per-battle latch is SET by the kill")
+    H.vars.latchAfterKill = latchByte()
+    H.vars.brokenHits0 = brokenHits
     H.screenshot("assassinate_kill")
+  end),
+  -- arm 2: the battle continues; more breaks, more landed hits, no 2nd spend
+  (function()
+    local budget = 0
+    return H.driveUntil(function()
+      budget = budget + 1
+      -- done when Shadow landed >= 1 more hit on a live-Broken body after
+      -- the kill, or the battle ended (all bodies damage-killed)
+      if brokenHits > H.vars.brokenHits0 then return true end
+      return not H.battleLoadStarted()
+    end, 30000, { H.call(fightPulse), H.waitFrames(2) },
+      "the once-per-battle window rides out")
+  end)(),
+  H.call(function()
+    H.log(string.format("after the kill: divineKills=%d latch=$%02x "
+      .. "hpDrops=%d brokenHits=%d (was %d)", #divineKills, latchByte(),
+      hpDrops, brokenHits, H.vars.brokenHits0))
+    H.assertEq(#divineKills, 1,
+      "ONCE PER BATTLE: the divine's in-proc Death mark happened exactly "
+      .. "once, though Shadow kept landing (hpDrops is the loud control)")
+    H.assertEq(hpDrops > 2, true,
+      "loud control: Shadow's attacks really landed beyond the kill ("
+      .. hpDrops .. " monster HP drops)")
+    if H.battleLoadStarted() then
+      H.assertEq(latchByte(), H.vars.latchAfterKill,
+        "and the latch byte never changed again")
+    end
+    watching = false
   end),
 })
 
--- ===================== BATTLE 2: boss gate (loud) ===========================
-add(bootSteps())
+-- ============== BATTLE 3: *** LABELED ISOLATION ARM (issue #75) ***
+-- The boss gate, with the one injected bit -- see the header.  A fresh
+-- battle (fresh latch), a body Broken by real chips, then $3aa1.2 is SET on
+-- it and Shadow's next landed hit must decline: no in-proc Death mark, no
+-- latch spend.  The write below is this file's only one and may never
+-- produce fixtures.
+add({
+  H.loadState(STATE),
+  H.waitFrames(20),
+  H.setRows({ [SHADOW] = true }, { tag = "shadow back row (arm 3)" }),
+})
+add(encounter("isolation arm"))
 add({
   H.call(function()
-    guardBroken = { [2] = true, [3] = true }
-    guardImmune = { [2] = true, [3] = true }      -- both Broken BOSSES
-    presetLatch = false
-    pin(); setGuardHp()
-    hp0 = { hp(2), hp(3) }
-    H.log(string.format("battle 2: boss guards hp %d/%d latch $%02X", hp0[1], hp0[2], latchByte()))
-    H.assertEq(latchByte(), 0, "latch clear at battle 2 start")
+    H.assertEq(latchByte(), 0, "fresh battle: latch clear (the gate reads "
+      .. "in order shadow -> latch -> broken -> boss, so an unspent latch "
+      .. "is what routes execution to the boss check)")
+    H.vars.bossBody = nil
   end),
-  -- fight for a while; a boss must never take Death, but the fights must LAND
-  H.driveUntil(function() return hp(2) < hp0[1] or hp(3) < hp0[2] end, 20000, fightDrive,
-    "Shadow's fights land on the boss guards"),
-  H.repeatN(60, fightDrive),
+  -- chip until SOME body is Broken, with no divine yet possible?  The
+  -- divine WOULD fire on the first post-break hit -- so the injection must
+  -- land in the same frame the break is first seen.  The pulse's per-frame
+  -- scan gives exactly that window: inject as soon as brk != 0 and before
+  -- the next landed hit resolves (hit resolution takes whole action rounds;
+  -- one frame is comfortably inside it).
+  H.driveUntil(function()
+    for _, m in ipairs(msPresent) do
+      if present(m) and brk(m) ~= 0 and mhp(m) > 0 then
+        H.vars.bossBody = m
+        return true
+      end
+    end
+    return false
+  end, 30000, { H.call(fightPulse), H.waitFrames(2) },
+    "a body breaks by real chips (isolation arm)"),
   H.call(function()
-    H.log(string.format("battle 2: hp %d/%d (was %d/%d), Death %s/%s, latch $%02X",
-      hp(2), hp(3), hp0[1], hp0[2], tostring(dead(2)), tostring(dead(3)), latchByte()))
-    H.assertEq(hp(2) < hp0[1] or hp(3) < hp0[2], true,
-      "Shadow's fights actually LANDED on a boss (loud control)")
-    H.assertEq(dead(2), false, "a Broken BOSS took no Death")
-    H.assertEq(dead(3), false, "nor did the other Broken boss")
-    H.assertEq(latchByte(), 0, "and no divine was spent on a boss")
+    local m = H.vars.bossBody
+    H.writeByte(0x3AA1 + ent(m), aa1(m) | 0x04)   -- THE arm's write (header)
+    lastBrk, lastHp = {}, {}
+    hpDrops, brokenHits = 0, 0
+    divineKills = {}
+    scanBodies()
+    watching = true
+    H.log(string.format("[isolation arm] body %d Broken by play; $3aa1.2 "
+      .. "SET -- the bit a boss carries", m))
+  end),
+  H.driveUntil(function() return brokenHits >= 1 end, 30000,
+    { H.call(fightPulse), H.waitFrames(2) },
+    "Shadow lands on the Broken 'boss' (isolation arm)"),
+  H.call(function()
+    H.log(string.format("[isolation arm] brokenHits=%d divineKills=%d "
+      .. "latch=$%02x", brokenHits, #divineKills, latchByte()))
+    H.assertEq(#divineKills, 0,
+      "a Broken BOSS is never assassinated: the landed hit fired no "
+      .. "in-proc Death mark")
+    H.assertEq(latchByte(), 0, "and no divine was spent on it")
+    watching = false
     H.screenshot("assassinate_boss")
   end),
 })
 
--- ===================== BATTLE 3: once-per-battle (loud) =====================
-add(bootSteps())
-add({
-  H.call(function()
-    guardBroken = { [2] = true, [3] = true }
-    guardImmune = { [2] = false, [3] = false }   -- Broken non-boss...
-    presetLatch = true                           -- ...but every divine pre-spent
-    pin(); setGuardHp()
-    hp0 = { hp(2), hp(3) }
-    H.log(string.format("battle 3: latch pre-set $%02X, guards hp %d/%d", latchByte(), hp0[1], hp0[2]))
-    H.assertEq(latchByte() ~= 0, true, "every Shadow's divine is pre-spent")
-  end),
-  H.driveUntil(function() return hp(2) < hp0[1] or hp(3) < hp0[2] end, 20000, fightDrive,
-    "Shadow's fights land while the divine is spent"),
-  H.repeatN(60, fightDrive),
-  H.call(function()
-    H.log(string.format("battle 3: hp %d/%d (was %d/%d), Death %s/%s",
-      hp(2), hp(3), hp0[1], hp0[2], tostring(dead(2)), tostring(dead(3))))
-    H.assertEq(hp(2) < hp0[1] or hp(3) < hp0[2], true,
-      "Shadow's fights LANDED on the broken non-boss guards (loud control)")
-    H.assertEq(dead(2), false, "a spent divine does not assassinate (guard 2)")
-    H.assertEq(dead(3), false, "nor guard 3 -- once per battle holds")
-    H.screenshot("assassinate_spent")
-  end),
-})
-
-H.run({ maxFrames = 120000 }, steps)
+H.run({ maxFrames = 300000 }, steps)

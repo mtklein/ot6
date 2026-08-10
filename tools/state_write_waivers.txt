@@ -23,7 +23,6 @@ tools/tests/bal_party.lua	.writeByte(
 tools/tests/bal_party.lua	.writeWord(
 tools/tests/bal_party.lua	emu.write
 tools/tests/battle_assassinate.lua	.writeByte(
-tools/tests/battle_assassinate.lua	.writeWord(
 tools/tests/battle_break.lua	.writeByte(
 tools/tests/battle_break.lua	.writeWord(
 tools/tests/battle_breakflash.lua	.writeByte(
