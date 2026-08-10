@@ -6,23 +6,50 @@
 -- and the fill never reaches battle init -- into the intro Guard fight, and
 -- asserts a fresh, never-chipped enemy shows '?'.
 --
--- suite.sh runs this under OT6_RAM_POWERON=AllOnes (deterministic AND dirty).
--- Slot 1 is deliberately POPULATED before New Game. The New Game hook must
--- select and clear the fourth transient page, proving an unsaved game cannot
--- inherit slot 1's knowledge. This simultaneously isolates the RAM/clear path.
+-- suite.sh runs this under OT6_RAM_POWERON=AllOnes (deterministic AND dirty)
+-- and OT6_SRAM_ANCHOR=tools/tests/anchors/post-opera-v1.  Issue #75
+-- conversion: the battery used to be FORGED -- slot 1's codex hand-stamped
+-- 'O8' with all 384 species knowing everything, and the transient page's
+-- magic zeroed to force the invalid path.  It is now the REAL tracked
+-- post-opera anchor (a battery written by the game's own Save UI on the
+-- honest chain, provenance in its manifest), whose slot 3 carries a real
+-- earned codex page and whose TRANSIENT page arrives VALID with the
+-- pre-save chain's knowledge still in it.  That valid stale transient is
+-- the truer real-world hazard: it is exactly what a cartridge holds after
+-- someone plays a New Game without saving and powers off.  New Game must
+-- (a) leave the saved slot's knowledge untouched, and (b) WIPE the stale
+-- transient page (Ot6CodexNewGame, ot6_codex.asm) so an unsaved game
+-- cannot inherit knowledge from EITHER source.  Both are asserted against
+-- byte-level snapshots of the anchor's real content -- reads, not writes.
+--
+-- (The old staging populated slot 1 specifically; nothing in the claim
+-- needs slot 1 -- "the persistent page survives and is not consulted" is
+-- slot-agnostic, and the anchor's slot 3 pins it against real bytes.)
 --
 -- Complements battle_reveal, which pokes the masks at SEED entry (AFTER
--- InitBattle's clear) to exercise the seed's own zeroing / Cmd_20 reload path.
--- THIS test lets the power-on fill flow through InitBattle's clear untouched:
--- the seed-entry snapshot reads 0 because InitBattle cleared the dirt (a live
--- write-trace showed its clear storing $00 to these bytes before the seed),
--- and the fresh enemy draws '?'.
+-- InitBattle's clear) to exercise the seed's own zeroing / Cmd_20 reload
+-- path.  THIS test lets the power-on fill flow through InitBattle's clear
+-- untouched: the seed-entry snapshot reads 0 because InitBattle cleared
+-- the dirt (a live write-trace showed its clear storing $00 to these bytes
+-- before the seed), and the fresh enemy draws '?'.
+--
+-- BOOT DRIVE, measured: with a valid battery the title no longer skips the
+-- select screen -- Start lands on the load menu (ZMENUSTATE $21, cursor
+-- $4b) showing New Game / Empty / Empty / the anchor's slot-3 save, with
+-- the cursor preselecting the saved slot (row 3).  UP edges walk it to
+-- row 0 = New Game, A commits, and Ot6CodexNewGame's wipe is observable
+-- in SRAM the moment it runs.
 --
 -- Monster slot s -> entity $08+2s: revealed elems $3e91+2s, revealed classes
 -- $3ea5+2s, broken timer $3e90+2s, class-weak $3ea4+2s. HUD row s at $5762+14s,
 -- weakness cells low byte +6/+8/+10/+12 ('?' = $BF, blank = $FF/$00).
+-- OT6_ANCHOR_LAYOUT: ot6-codex-o8-v1
 local H = dofile("tools/tests/lib/ot6.lua")
 
+local SLOT3, TEMP = 0x316800, 0x316C00  -- codex pages (root $316000 + $400*n)
+local PAGE_USED = 0x310                 -- magic + elem@$10 + class@$190
+
+local function sram(a) return emu.read(a, emu.memType.snesMemory) end
 local function present(slot) return (H.readByte(0x3aa8 + slot * 2) & 1) == 1 end
 local function wcell(slot, k) return H.readByte(H.shadowLine(slot) + 6 + k * 2) end
 
@@ -43,33 +70,75 @@ local function armSeedSnapshot()
   end, emu.callbackType.exec, SEED, SEED)
 end
 
+local slot3Boot = nil                   -- the anchor page, byte for byte
+
 H.run({ maxFrames = 70000 }, {
   H.call(function()
     armSeedSnapshot()
-    -- Existing slot 1 knows everything. Transient is invalid/empty, as on a
-    -- genuinely fresh unsaved game; battle seed must initialize that page
-    -- rather than consult slot 1.
-    emu.write(0x316000, 0x4f, emu.memType.snesMemory)
-    emu.write(0x316001, 0x38, emu.memType.snesMemory)
-    for i = 0, 0x2ff do
-      emu.write(0x316010+i, 0xff, emu.memType.snesMemory)
+    -- The anchor's REAL content, read and latched (the forged staging this
+    -- replaces could not fail; these positive controls can):
+    H.assertEq(sram(SLOT3), 0x4f, "anchor slot-3 codex magic 'O'")
+    H.assertEq(sram(SLOT3 + 1), 0x38, "anchor slot-3 codex magic '8'")
+    H.assertEq(sram(TEMP), 0x4f, "anchor transient codex magic 'O' (VALID)")
+    H.assertEq(sram(TEMP + 1), 0x38, "anchor transient codex magic '8'")
+    local s3n, tn = 0, 0
+    slot3Boot = {}
+    for off = 0, PAGE_USED - 1 do
+      slot3Boot[off] = sram(SLOT3 + off)
+      if off >= 0x10 and slot3Boot[off] ~= 0 then s3n = s3n + 1 end
+      if off >= 0x10 and sram(TEMP + off) ~= 0 then tn = tn + 1 end
     end
-    emu.write(0x316c00, 0, emu.memType.snesMemory)
-    emu.write(0x316c01, 0, emu.memType.snesMemory)
+    H.log(string.format("[poweron] anchor knowledge: slot3 %d byte(s), " ..
+      "stale transient %d byte(s)", s3n, tn))
+    H.assertEq(s3n > 0, true,
+      "positive control: the anchor's slot-3 page carries earned knowledge")
+    H.assertEq(tn > 0, true,
+      "positive control: the anchor's STALE transient page carries " ..
+      "knowledge for New Game to wipe (the real-world unsaved-reset case)")
   end),
 
   H.waitFrames(355),
   H.repeatN(5, { H.pressButtons({ "start" }, 8), H.waitFrames(25) }),
-  H.logStep("title handled; waiting out the opening..."),
-  H.waitUntil(function() return H.frame >= 15400 end, 16000, "intro to finish"),
+  -- with a battery present the title leads to the load menu -- but only
+  -- an A press summons it once the title settles (measured three ways:
+  -- the menu pops ZMENUSTATE $21 ~366 frames after an A; five Starts
+  -- plus 1800 idle frames never reach it; Start edges every 128 frames
+  -- never reach it either).  Press A edges, well spaced so at most one
+  -- stray lands in the menu fade; the cursor walk below asserts $21 in
+  -- its own pred, so a stray that somehow confirmed the saved slot
+  -- fails loudly instead of continuing into a Continue.
+  H.driveUntil(function() return H.readByte(0x26) == 0x21 end, 3600, {
+    H.pressButtons({ "a" }, 8), H.waitFrames(160),
+  }, "load menu (ZMENUSTATE $21)"),
+  -- walk the cursor to row 0 = New Game (it preselects the anchor's
+  -- saved slot, row 3 -- measured) and commit
+  H.driveUntil(function()
+    return H.readByte(0x26) == 0x21 and H.readByte(0x4b) == 0
+  end, 600, {
+    H.pressButtons({ "up" }, 4), H.waitFrames(16),
+  }, "load-menu cursor on New Game"),
+  H.pressButtons({ "a" }, 6),
+  H.waitFrames(60),
   H.call(function()
     H.assertEq(H.readByte(0x021f), 0, "New Game selected transient codex")
-    H.assertEq(emu.read(0x316010, emu.memType.snesMemory), 0xff,
-      "New Game preserved existing slot 1 knowledge")
-    H.assertEq(emu.read(0x316c00, emu.memType.snesMemory), 0,
-      "unsaved New Game transient page starts invalid")
+    -- (a) the saved slot's page survives New Game untouched, byte for byte
+    for off = 0, PAGE_USED - 1 do
+      H.assertEq(sram(SLOT3 + off), slot3Boot[off],
+        string.format("New Game preserved the anchor's slot-3 page (+%03X)",
+          off))
+    end
+    -- (b) the stale VALID transient page was wiped, not inherited:
+    -- Ot6CodexNewGame's signature is magic 'O8' over all-zero content
+    H.assertEq(sram(TEMP), 0x4f, "New Game re-stamped transient magic 'O'")
+    H.assertEq(sram(TEMP + 1), 0x38, "New Game re-stamped transient magic '8'")
+    for off = 0x10, PAGE_USED - 1 do
+      H.assertEq(sram(TEMP + off), 0, string.format(
+        "New Game WIPED the stale transient knowledge (+%03X)", off))
+    end
   end),
 
+  H.logStep("New Game committed; waiting out the opening..."),
+  H.waitUntil(function() return H.frame >= 16800 end, 18000, "intro to finish"),
   H.driveUntil(function() return H.battleLoadStarted() end, 24000, {
     H.hold({ "up" }), H.waitFrames(20), H.release(), H.waitFrames(2),
     H.pressButtons({ "a" }, 4),

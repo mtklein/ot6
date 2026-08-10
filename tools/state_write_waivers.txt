@@ -53,8 +53,6 @@ tools/tests/battle_dancemp.lua	.writeByte(
 tools/tests/battle_dancemp.lua	.writeWord(
 tools/tests/battle_divines.lua	.writeByte(
 tools/tests/battle_divines.lua	.writeWord(
-tools/tests/battle_dmgnum.lua	.writeByte(
-tools/tests/battle_dmgnum.lua	.writeWord(
 tools/tests/battle_dotchip.lua	.writeByte(
 tools/tests/battle_dotchip.lua	.writeWord(
 tools/tests/battle_fold.lua	.writeByte(
@@ -67,7 +65,6 @@ tools/tests/battle_hits.lua	.writeByte(
 tools/tests/battle_hits.lua	.writeWord(
 tools/tests/battle_hudtrack.lua	.writeByte(
 tools/tests/battle_hudtrack.lua	.writeWord(
-tools/tests/battle_kefka.lua	.writeWord(
 tools/tests/battle_lateboost.lua	.writeByte(
 tools/tests/battle_lateboost.lua	.writeWord(
 tools/tests/battle_levelup.lua	.writeByte(
@@ -77,8 +74,6 @@ tools/tests/battle_magicite.lua	.writeByte(
 tools/tests/battle_magicite.lua	.writeWord(
 tools/tests/battle_mpcost.lua	.writeByte(
 tools/tests/battle_mpcost.lua	.writeWord(
-tools/tests/battle_naturalmp.lua	.writeByte(
-tools/tests/battle_naturalmp.lua	.writeWord(
 tools/tests/battle_preview.lua	.writeByte(
 tools/tests/battle_preview.lua	.writeWord(
 tools/tests/battle_rage.lua	.writeByte(
@@ -86,7 +81,6 @@ tools/tests/battle_rage.lua	.writeWord(
 tools/tests/battle_reveal.lua	.writeByte(
 tools/tests/battle_reveal.lua	.writeWord(
 tools/tests/battle_reveal.lua	emu.write
-tools/tests/battle_reveal_poweron.lua	emu.write
 tools/tests/battle_runic.lua	.writeByte(
 tools/tests/battle_runic.lua	.writeWord(
 tools/tests/battle_slots.lua	.writeByte(
@@ -107,8 +101,6 @@ tools/tests/battle_toolslist.lua	.writeByte(
 tools/tests/battle_toolslist.lua	.writeWord(
 tools/tests/battle_trueknight.lua	.writeByte(
 tools/tests/battle_trueknight.lua	.writeWord(
-tools/tests/battle_vargas.lua	.writeByte(
-tools/tests/battle_vargas.lua	.writeWord(
 tools/tests/battle_walletmp.lua	.writeByte(
 tools/tests/battle_walletmp.lua	.writeWord(
 tools/tests/codex_ctx.lua	.writeByte(
@@ -119,8 +111,6 @@ tools/tests/field_navstep.lua	.writeByte(
 tools/tests/gen_battle2.lua	.writeWord(
 tools/tests/gen_whelk.lua	.writeByte(
 tools/tests/gen_whelk.lua	emu.write
-tools/tests/hud_stability.lua	.writeByte(
-tools/tests/hud_stability.lua	.writeWord(
 tools/tests/lib/ot6.lua	.writeByte(
 tools/tests/lib/ot6.lua	.writeWord(
 tools/tests/lib/ot6.lua	emu.loadSavestate

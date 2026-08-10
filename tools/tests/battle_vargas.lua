@@ -22,8 +22,8 @@
 --      (item $a4; InitTarget_03 subtracts ThrowToolsOffsetTbl to reach
 --      attack $7d, battle_main.asm:6495-6584; MagicProp+1 = $08 poison)
 --      takes a shield and reveals poison in $3E89.  Its NEGATIVE CONTROL
---      runs first and in the same fight: the party's plain weapon swings
---      are driven onto Vargas until his hp moves, and the gauge is asserted
+--      runs first and in the same fight: the party's weapon swings are
+--      driven onto Vargas until his hp moves, and the gauge is asserted
 --      untouched at that moment.  Same actor, same target, one turn apart --
 --      only the weapon changes.  This is the payoff of rung 2's discovery
 --      arc (the mines tease, the Figaro shop, the Narshe school), and it is
@@ -42,34 +42,32 @@
 --      not HP, not the gauge -- is what wins.  Asserted by the battle
 --      tearing down within a bounded window of the Pummel that caused it.
 --
--- WHY THE HP POKE.  This fight is TWO PHASES and the second one is where
--- Sabin exists as a combatant.  Measured: from the opening bell, entities
--- 0/1/2 (Edgar/Locke/Terra) take turns and entity 3 (Sabin, char $05,
--- level 9) NEVER gets a menu -- 9000 frames of it.  His turns start only
--- after Vargas's own reaction script runs `battle_event $07` at hp <= 10880
--- ("Enough!! Off with ya now!") and `battle_event $08` at hp <= 10368
--- (ai_script.asm:4392-4404), which is the beat that blows the trio offstage
--- and leaves the monk alone -- exactly the fight bosses-wob.md describes.
--- So the test clamps his HP to just under the second threshold and lets HIS
--- OWN SCRIPT fire the transition on the party's next landed hit.  Nothing
--- about the gauge is poked: shields, elements, classes and every chip below
--- are the engine's, and Ipooh/Vargas seed values are read before the clamp.
--- Edgar acts in PHASE ONE, which is where proof 3 has to happen.
+-- HOW THE FIGHT IS DRIVEN (issue #75 conversion: real input, zero writes).
+-- This file used to pin party HP/MP every frame, clamp the Ipoohs to 1 hp,
+-- clamp Vargas under his own phase-2 threshold, install command ids into
+-- $202E and write the menu cursor triples directly.  All of that is gone;
+-- the drive is now gen_vargas's closed-loop menu machine (the generator
+-- that beats this same fight honestly to mint vargas_won): every press is
+-- decided from readable menu state ($7BC2), cursors are WALKED with the
+-- d-pad and verified by re-reading the cell, boost points are banked with
+-- real R presses, Potions/Cures go to whoever is hurt through the real
+-- item/magic/target windows, and Vargas crosses his own script's phase
+-- gates (`battle_event $07` at hp <= 10880, `$08` at hp <= 10368,
+-- ai_script.asm:4392-4404) on REAL damage.  Submenus freeze battle time
+-- (wait-mode), the command list does not -- so menu navigation is safe
+-- however long it takes.
 --
--- WHY THE IPOOH POKE.  A tool cannot reach Vargas while an Ipooh lives, and
--- that is the engine's rule, not ours.  BioBlaster's item targeting byte is
--- $6a = ONE_SIDE|INIT_GROUP|MULTI_TARGET|ENEMY (item_prop +14; TARGET flags
--- in const.inc:1295) -- crucially WITHOUT $01 MANUAL, so the target cursor
--- cannot be walked.  key_target_2's INIT_GROUP branch (btlgfx_main.asm
--- @7875) aims at monster target group A ($7B79) and only falls through to
--- group B ($7B7B) when no live monster is left in A.  This formation puts
--- the two Ipoohs in A and Vargas alone in B: measured, the target mask
--- $7B7E read $06 for the first four BioBlasters, $04 for the next three,
--- and $01 only after both Ipoohs were dead -- eight tool turns and ~9500
--- frames to reach him.  So the Ipoohs are clamped to 1 hp and the party's
--- own swings finish them; nothing about the gauge, the elements or the
--- targeting is touched, and the mask the engine chose is ASSERTED rather
--- than assumed before the chip is credited.
+-- THE ORDER THE POKES USED TO FORCE now falls out of the engine's own
+-- targeting rule: BioBlaster's targeting byte is $6a = ONE_SIDE|INIT_GROUP|
+-- MULTI_TARGET|ENEMY without $01 MANUAL, so the target cursor cannot be
+-- walked and key_target_2's INIT_GROUP branch (btlgfx_main.asm @7875) aims
+-- at monster group A -- the two Ipoohs -- until no live monster is left in
+-- it.  The negative control (proof 3a) already requires both Ipoohs dead
+-- before the plain-hit sample, so by the time the BioBlaster fires it aims
+-- at Vargas on the FIRST cast -- which is also what retires the old MP
+-- pin: the pin existed because eight 8-MP casts (the old Ipooh-gate walk)
+-- outran Edgar's ~19-MP WoB pool, and one cast does not.  The pool is
+-- ASSERTED sufficient before the cast instead of being written.
 --
 -- SABIN'S LEVEL IS ASSERTED, not assumed.  AuraBolt is a level-6 Blitz; if
 -- the join level ever drops under it, proof 4 is testing nothing, so the
@@ -90,18 +88,27 @@ local OT6_BLUDG, OT6_SLASH = 0x04, 0x01
 local HOLY, POISON = 0x20, 0x08
 local PUMMEL, AURABOLT = 0x5D, 0x5E
 local BIOBLASTER, BIO_ATK = 0xA4, 0x7D  -- item id -> the attack it resolves to
+local BIO_MP = 8                        -- v0.5 cost (Ot6AbilityCostTbl)
+local CMD_FIGHT, CMD_ITEM, CMD_MAGIC = 0x00, 0x01, 0x02
 local CMD_TOOLS = 0x09                  -- battle command id (gen_arvis CMDNAME)
 local CMD_BLITZ = 0x0A                  -- blitz command id (opens the menu now)
 local SABIN_E = 3                       -- entity index SABIN joins into
 local EDGAR_E = 0                       -- entity index EDGAR holds (asserted)
+local TERRA_E = 2                       -- entity index TERRA holds (gen_vargas)
 local MENU, ACTOR, MSTATE = 0x7BCA, 0x62CA, 0x7BC2
 local ST_CMD   = 0x05                   -- the command list, cursor live
+local ST_ITEM  = 0x0A                   -- the item list
+local ST_MAGIC = 0x0E                   -- the magic list
 local ST_TOOLS = 0x30                   -- UpdateMenuState_30, the tools/blitz list
 local ST_TGT   = 0x38                   -- UpdateMenuState_38, target select
 local CMDTBL   = 0x202E                 -- in-battle commands, slot*12 + i*3
 local ITEMLIST = 0x4005                 -- wItemList (btlgfx_ram.inc:36), 3/entry
 local BATTINV  = 0x2686                 -- battle inventory, 5 bytes/entry
 local MONMASK  = 0x7B7E                 -- monster target mask (key_target_2)
+local POTION, TONIC = 0xE9, 0xE8
+local CURE_ID = 0x2D
+-- packed per-character battle spell lists: $2092 + ptr[slot] + idx*4
+local SPELL_PTR = { [0] = 0x0000, [1] = 0x013C, [2] = 0x0278, [3] = 0x03B4 }
 
 -- monster slot s -> entity offset 8 + 2s (battle_class's map)
 local function SH(s)  return 0x3E38 + (8 + s * 2) end
@@ -112,27 +119,57 @@ local function WKC(s) return 0x3E9C + (8 + s * 2) end
 local function RVC(s) return 0x3E9D + (8 + s * 2) end
 local function MHP(s) return 0x3BFC + s * 2 end
 
+local function hp(e) return H.readWord(0x3BF4 + e * 2) end
+local function maxhp(e) return H.readWord(0x3C1C + e * 2) end
+local function mp(e) return H.readWord(0x3C08 + e * 2) end
+local function bp(e) return H.readByte(0x3E9C + e * 2) end
+local function pend(e) return H.readByte(0x3E9D + e * 2) end
+local function alive(e) return hp(e) > 0 end
+
 local aPh = 0
 local spells, shWrites = {}, {}
 local vSlot = 0
 local vHp0 = 0                          -- Vargas's seed hp, for the control
-local edgarCmds = {}                    -- restored once proof 3 has landed
+local edgarCmds = {}                    -- read at seed, asserted, never written
 local toolTurns, nudges, tgtMask = 0, 0, nil
+local bioEntry = nil                    -- where the tools list rendered the tool
+local pummelVhp = nil                   -- Vargas's real hp when Pummel confirmed
 
--- Keep the party upright: Vargas hits hard, a wipe ends the run before it
--- has measured anything, and party HP is not what any of this is about.
-local function pinParty()
-  for e = 0, 3 do
-    H.writeWord(0x3BF4 + e * 2, H.readWord(0x3C1C + e * 2))   -- HP = max: no wipe
-    -- v0.5 costs are LIVE. This test drives Edgar's BioBlaster (8 MP) across
-    -- ~8 tool turns (the Ipooh-gate walk, see "WHY THE IPOOH POKE") plus
-    -- Sabin's AuraBolt (5) and Pummel (2). Edgar's WoB pool (~19) cannot fund
-    -- eight 8-MP casts, and this test is about the CHIP CLASSES, not scarcity,
-    -- so pin MP high (both cur and max -- max is below the 8-MP cost here) so a
-    -- costed verb never fizzles mid-drive.
-    H.writeWord(0x3C30 + e * 2, 99)                          -- max MP
-    H.writeWord(0x3C08 + e * 2, 99)                          -- current MP
+local function itemSlot(id)
+  for i = 0, 15 do
+    if H.readByte(BATTINV + i * 5) == id
+       and H.readByte(BATTINV + i * 5 + 3) > 0 then return i end
   end
+  return nil
+end
+local function spellIndexOf(slot, id)
+  for i = 0, 15 do
+    local a = 0x2092 + SPELL_PTR[slot] + i * 4
+    if H.readByte(a) == id and (H.readByte(a + 1) & 0x80) == 0 then return i end
+  end
+  return nil
+end
+local healBusy = {}                     -- target -> frame a heal was queued
+local function needsHeal(thresh)
+  local best, bestR = nil, 1.0
+  for e = 0, 2 do
+    if alive(e) and maxhp(e) > 0 then
+      local r = hp(e) / maxhp(e)
+      if r < thresh and r < bestR
+         and (not healBusy[e] or H.frame - healBusy[e] > 900) then
+        best, bestR = e, r
+      end
+    end
+  end
+  return best
+end
+local function hpLine()
+  local s = ""
+  for e = 0, 3 do
+    s = s .. string.format(" e%d=%d/%d(b%d,%dmp)", e, hp(e), maxhp(e),
+      bp(e), mp(e))
+  end
+  return s .. string.format(" V=%d", H.readWord(MHP(vSlot)))
 end
 
 -- metrics_battle's liveness criterion (the hud builder's own): present bit
@@ -151,16 +188,6 @@ local function ipoohsDown()
   end
   return true
 end
--- Speed the Ipoohs' deaths WITHOUT killing them ourselves: floor their hp so
--- the party's next landed swing finishes each.  See "WHY THE IPOOH POKE".
-local function clampIpoohs()
-  for s = 0, 5 do
-    if s ~= vSlot and H.readWord(0x57C0 + s * 2) == IPOOH and monsterAlive(s)
-       and H.readWord(MHP(s)) > 1 then
-      H.writeWord(MHP(s), 1)
-    end
-  end
-end
 
 local function shields() return H.readByte(SH(vSlot)) end
 local function snap(t)
@@ -176,7 +203,6 @@ end
 -- queue until it is dismissed -- measured, 9000 frames of menu=00/mstate=00
 -- with the fight otherwise alive and nothing pressing anything.
 local function tapUnlessSabin()
-  pinParty()
   aPh = (aPh + 1) % 8
   if H.readByte(MENU) ~= 0 and H.readByte(ACTOR) == SABIN_E then
     H.setPad({})
@@ -185,127 +211,254 @@ local function tapUnlessSabin()
   end
 end
 
--- ------------------------------------------------------------- proof 3 --
--- THE TOOLS LIST IS DRIVEN BY STATE, not by counting presses: $7BC2 is the
--- battle menu state (UpdateMenuState dispatches on it, btlgfx_main.asm
--- :12536), so the machine below only presses in a stable select state and an
--- input can never land in a window that is still opening.  The walk a Tools
--- turn takes, measured: $05 command list -> $2e OpenToolsWindow (five frames
--- of MakeToolsList_00..04 building wItemList) -> $01 the open-animation wait
--- -> $30 tools select -> $38 target select -> $2f close.
---
--- The wanted tool is reached by WRITING the cursor triple, metrics_battle's
--- idiom: _c18470 (btlgfx_main.asm:20152) indexes the list as
--- ((scroll + row) * 2 + col) * 3 over a 2-column grid, so entry i is
--- addressed by scroll 0 / col i%2 / row i//2 with no d-pad walking, no wrap
--- rules and no dependence on where a previous turn left the cursor.  The
--- entries themselves are PACKED (MakeToolsList filters the battle inventory
--- through the $40 tools flag), so the BioBlaster is found by scanning rather
--- than by arithmetic.
-local function toolsCursor(slot, itemId)
-  for i = 0, 7 do                       -- 4 rows x 2 columns is the window
-    if H.readByte(ITEMLIST + i * 3) == itemId then
-      H.writeByte(0x895F + slot, 0)     -- scroll
-      H.writeByte(0x8963 + slot, i % 2) -- column
-      H.writeByte(0x8967 + slot, i // 2)-- row
-      return i
-    end
+-- ------------------------------------------------- the per-menu machine --
+-- gen_vargas's machine, with a MODE the test script advances so each proof
+-- fires exactly the action it is measuring:
+--   control: trio banks boost points and Fights (Ipoohs die, then Vargas's
+--            hp moves under plain weapon swings); Potions under 30%, Terra
+--            Cures under 60%; SABIN untouched (he has no menu in phase 1).
+--   bio:     EDGAR's next turn is Tools -> BioBlaster, everyone else as in
+--            control; single-shot (bioFired).
+--   grind:   as control, until Vargas's own script fires phase 2.
+--   aurabolt/pummel: SABIN picks that Blitz from the real list;
+--            single-shot (blitzFired) so a queued action can never be
+--            doubled while the test waits on its reveal commit.
+--   hold:    everyone hands off (between proofs).
+-- One pulse per frame while a menu is up; M resets on every actor change
+-- and whenever the menu closes; presses are 5-on/5-off edges; a watchdog
+-- backs out with B and falls back to a plain Fight rather than wedging
+-- (and counts a nudge -- proof 3 asserts none happened on its watch).
+local mode = "control"
+local bioFired, blitzFired = false, false
+local pressKind, pressName = nil, nil    -- a proof action's confirm is in flight
+local M = {}
+local function resetM()
+  M.actor, M.n, M.plan, M.via, M.d = nil, 0, nil, nil, 0
+  M.lastCur, M.dirI, M.tgtN = nil, nil, 0
+end
+resetM()
+
+-- the single-shot latch: a proof action counts as SUBMITTED when the menu
+-- actually leaves the actor's hands after target-confirm presses -- the
+-- commit closes the window in wait-mode, a B backout only steps to the
+-- tools list.  (A fixed press count latched too early: measured, the
+-- target window discards the presses that land while it is still opening,
+-- so the first run wedged with the action never sent.)
+local function latchSubmit()
+  if pressKind == "bio" then
+    bioFired = true
+  elseif pressKind == "blitz" then
+    blitzFired = true
+    H.log(string.format("[vargas] %s confirmed by f%d, V=%d",
+      pressName or "?", H.frame, pummelVhp or -1))
   end
-  return nil
+  pressKind = nil
 end
 
--- Which command window opens is decided the same way battle_class.lua:603
--- decides it: write the wanted command into ALL FOUR of the actor's cells,
--- so whatever row the cursor rests on opens Tools with one press.  The poke
--- is into battle scratch that InitCmdList rebuilds per battle, and the
--- ORIGINAL list is read at seed time and restored after the chip -- Edgar
--- really does own Tools (cell 1), so this can never hand him a command he
--- does not have.
-local ep = { slot = nil, placed = false, pulses = 0 }
-local function toolPulse()
-  pinParty()
-  if H.readByte(MENU) == 0 then ep.slot = nil; return nil end
-  local slot = H.readByte(ACTOR)
-  -- Reset on ANY actor change, before the Edgar test: the menu flag does not
-  -- return to 0 between every pair of actors (measured -- actor 2's window
-  -- hands straight to actor 0's), so keying the reset off Edgar alone let his
-  -- pulse count carry across turns and trip the watchdog on a healthy menu.
-  if ep.slot ~= slot then ep.slot, ep.placed, ep.pulses = slot, false, 0 end
-  if slot ~= EDGAR_E then return { "a" } end   -- everyone else keeps swinging
-  ep.pulses = ep.pulses + 1
-  if ep.pulses > 40 then                -- a window that will not commit:
-    ep.pulses, ep.placed = 0, false     -- back out and replan.  nudges is
-    nudges = nudges + 1                 -- asserted 0 -- a stalled menu path
-    return { "b" }                      -- must not pass as a quiet success.
+local function decidePlan(a)
+  if a == SABIN_E then
+    if mode == "aurabolt" and not blitzFired then
+      return { kind = "blitz", skill = AURABOLT, name = "AURABOLT" }
+    end
+    if mode == "pummel" and not blitzFired then
+      return { kind = "blitz", skill = PUMMEL, name = "PUMMEL" }
+    end
+    return { kind = "wait" }
   end
+  if mode == "hold" then return { kind = "wait" } end
+  if mode == "bio" and a == EDGAR_E and not bioFired then
+    return { kind = "bio" }
+  end
+  local emerg = needsHeal(0.30)
+  if emerg then
+    local slot = itemSlot(POTION) or itemSlot(TONIC)
+    if slot then return { kind = "potion", target = emerg, slot = slot } end
+  end
+  if a == TERRA_E and mp(TERRA_E) >= 10 then
+    local t = needsHeal(0.60)
+    if t then return { kind = "cure", target = t } end
+  end
+  return { kind = "fight" }
+end
+
+local function pulse()
+  local a = H.readByte(ACTOR)
+  if M.actor ~= a then
+    latchSubmit()
+    resetM()
+    M.actor, M.plan = a, decidePlan(a)
+    if M.plan.kind ~= "fight" and M.plan.kind ~= "wait" then
+      H.log(string.format("[vargas plan f%d] actor=%d %s |%s",
+        H.frame, a, M.plan.kind, hpLine()))
+    end
+  end
+  if M.plan.kind == "wait" then return {} end
+  M.n = M.n + 1
+  local ph = M.n % 10
   local st = H.readByte(MSTATE)
+  if M.n > 1200 then                     -- wedge watchdog: back out, Fight
+    H.log(string.format("[vargas wd f%d] actor=%d st=%02X plan=%s",
+      H.frame, a, st, M.plan.kind))
+    if M.plan.kind == "bio" or M.plan.kind == "blitz" then
+      nudges = nudges + 1
+    end
+    pressKind = nil                      -- a backed-out confirm never latches
+    M.n, M.via, M.d = 0, nil, 0
+    M.plan = { kind = "fight" }
+    return { "b" }
+  end
   if st == ST_CMD then
-    for i = 0, 3 do H.writeByte(CMDTBL + slot * 12 + i * 3, CMD_TOOLS) end
-    return { "a" }
+    M.via = nil
+    local wantCmd = CMD_FIGHT
+    if M.plan.kind == "potion" then wantCmd = CMD_ITEM end
+    if M.plan.kind == "cure" then wantCmd = CMD_MAGIC end
+    if M.plan.kind == "bio" then wantCmd = CMD_TOOLS end
+    if M.plan.kind == "blitz" then wantCmd = CMD_BLITZ end
+    local wantCell = nil
+    for i = 0, 3 do
+      if H.readByte(CMDTBL + a * 12 + i * 3) == wantCmd then wantCell = i end
+    end
+    if wantCell == nil then M.plan = { kind = "fight" }; wantCell = 0 end
+    local cur = H.readByte(0x890F + a)
+    if cur == wantCell then
+      if M.plan.kind == "fight" then
+        local want = math.min(bp(a), 3)
+        if pend(a) < want then return (ph < 5) and { "r" } or {} end
+      end
+      return (ph < 5) and { "a" } or {}
+    end
+    -- move the command cursor; a direction that provably moves nothing
+    -- rotates to the next, so the window's d-pad semantics are never
+    -- assumed
+    local DIRS = { "down", "up", "left", "right" }
+    if ph == 0 then
+      if M.lastCur == cur then M.dirI = ((M.dirI or 0) % 4) + 1
+      else M.dirI = M.dirI or 1 end
+      M.lastCur = cur
+    end
+    return (ph < 5) and { DIRS[M.dirI or 1] } or {}
+  end
+  if st == ST_ITEM then
+    M.d = 0
+    if M.plan.kind ~= "potion" then return (ph < 5) and { "b" } or {} end
+    M.via = "item"
+    local cr = H.readByte(0x894F)
+    if cr ~= M.plan.slot then
+      return (ph < 5) and { (cr < M.plan.slot) and "down" or "up" } or {}
+    end
+    return (ph < 5) and { "a" } or {}
+  end
+  if st == ST_MAGIC then
+    M.d = 0
+    if M.plan.kind ~= "cure" then return (ph < 5) and { "b" } or {} end
+    M.via = "magic"
+    local idx = spellIndexOf(a, CURE_ID)
+    if idx == nil then
+      M.plan = { kind = "fight" }
+      return (ph < 5) and { "b" } or {}
+    end
+    local wantRow, wantCol = idx // 2, idx % 2
+    local absRow = H.readByte(0x8913 + a) + H.readByte(0x891B + a)
+    local col = H.readByte(0x8917 + a)
+    if absRow ~= wantRow then
+      return (ph < 5) and { (absRow < wantRow) and "down" or "up" } or {}
+    end
+    if col ~= wantCol then
+      return (ph < 5) and { (col < wantCol) and "right" or "left" } or {}
+    end
+    return (ph < 5) and { "a" } or {}
   end
   if st == ST_TOOLS then
-    if not ep.placed then               -- place once, idle a pulse so the
-      ep.placed = true                  -- list redraws under the cursor
-      toolTurns = toolTurns + 1
-      ep.entry = toolsCursor(slot, BIOBLASTER)
-      return nil
+    M.d = 0
+    if M.plan.kind ~= "bio" and M.plan.kind ~= "blitz" then
+      return (ph < 5) and { "b" } or {}
     end
-    return { "a" }
+    local wantId = (M.plan.kind == "bio") and BIOBLASTER or M.plan.skill
+    local entry = nil
+    for i = 0, 7 do
+      if H.readByte(ITEMLIST + i * 3) == wantId then entry = i end
+    end
+    if entry == nil then return {} end   -- list still building
+    if M.via ~= "toolshell" then
+      M.via = "toolshell"
+      if M.plan.kind == "bio" then
+        toolTurns = toolTurns + 1
+        bioEntry = entry
+        H.log(string.format("[vargas] BioBlaster rendered at tools entry %d",
+          entry))
+      else
+        H.log(string.format("[vargas] %s rendered at blitz entry %d",
+          M.plan.name, entry))
+        snap(M.plan.name .. " window")
+      end
+    end
+    local row, col = entry // 2, entry % 2
+    local cr, cc = H.readByte(0x8967 + a), H.readByte(0x8963 + a)
+    if cr ~= row then return (ph < 5) and { (cr < row) and "down" or "up" } or {} end
+    if cc ~= col then return (ph < 5) and { (cc < col) and "right" or "left" } or {} end
+    return (ph < 5) and { "a" } or {}
   end
   if st == ST_TGT then
-    tgtMask = H.readByte(MONMASK)       -- what the engine aimed at, recorded
-    return { "a" }                      -- BEFORE we confirm it
+    if M.plan.kind == "potion" or M.plan.kind == "cure" then
+      if M.via ~= "item" and M.via ~= "magic" then
+        return (ph < 5) and { "b" } or {}   -- reached via a stray Fight
+      end
+      local want = 1 << M.plan.target
+      if H.readByte(MONMASK) ~= 0 then
+        return (ph < 5) and { "left" } or {}
+      end
+      if H.readByte(0x7B7D) ~= want then
+        M.d = M.d + 1
+        if M.d > 40 then                    -- take whoever is under it
+          healBusy[M.plan.target] = H.frame
+          return (ph < 5) and { "a" } or {}
+        end
+        return (ph < 5) and { "down" } or {}
+      end
+      healBusy[M.plan.target] = H.frame
+      return (ph < 5) and { "a" } or {}
+    end
+    if M.plan.kind == "bio" or M.plan.kind == "blitz" then
+      if M.via ~= "toolshell" then return (ph < 5) and { "b" } or {} end
+      -- edge-press A until the commit closes the window; latchSubmit()
+      -- (on menu close / actor change) makes the action single-shot so a
+      -- second copy can never queue while the test waits on its reveal
+      M.tgtN = M.tgtN + 1
+      if M.tgtN == 1 and M.plan.kind == "bio" then
+        tgtMask = H.readByte(MONMASK)     -- what the engine aimed, recorded
+        H.log(string.format("[vargas] tool target mask $%02X", tgtMask))
+      end
+      pressKind, pressName = M.plan.kind, M.plan.name
+      pummelVhp = H.readWord(MHP(vSlot))  -- his real hp as of the confirm
+      return (ph < 5) and { "a" } or {}
+    end
+    return (ph < 5) and { "a" } or {}
   end
-  return nil                            -- transient open/close: hands off
+  return {}                              -- transient open/close: hands off
 end
 
--- One Blitz, driven the way v0.3 makes it a menu: wait for SABIN's command
--- list, poke Blitz ($0a) into all four command cells (the pokeCmd idiom, so
--- whichever row the cursor rests on opens it), A to open.  _c1776b now hands
--- off to the Tools window shell in blitz mode (Ot6BlitzListOpen fills
--- wItemList with the LEARNED blitzes, keyed by the resolved attack id $5D..
--- $64), so the wanted blitz is picked exactly like a tool: scan wItemList for
--- its id, WRITE the cursor triple ($895F/$8963/$8967) to that cell, A to
--- confirm.  The confirm shim (UpdateMenuState_30) subtracts $5D back to the
--- raw index cmd $0a stores -- the same byte UpdateMenuState_3d used to write.
-local function blitz(skillId, name)
-  return H.cond(function() return true end, {
-    H.driveUntil(function()
-      return H.readByte(MENU) ~= 0 and H.readByte(ACTOR) == SABIN_E
-         and H.readByte(MSTATE) == ST_CMD
-    end, 12000, { H.call(tapUnlessSabin), H.waitFrames(1) },
-      name .. ": SABIN's command list"),
-    H.waitFrames(10),
-    H.call(function()
-      for i = 0, 3 do H.writeByte(CMDTBL + SABIN_E * 12 + i * 3, CMD_BLITZ) end
-    end),
-    H.pressButtons({ "a" }, 4), H.waitFrames(10),
-    H.driveUntil(function()
-      return H.readByte(ACTOR) == SABIN_E and H.readByte(MSTATE) == ST_TOOLS
-    end, 3000, { H.call(tapUnlessSabin), H.waitFrames(1) },
-      name .. ": the blitz list is open (tools-shell state $30)"),
-    H.call(function()
-      local row = nil
-      for i = 0, 7 do
-        if H.readByte(ITEMLIST + i * 3) == skillId then row = i end
-      end
-      H.assertEq(row ~= nil, true,
-        name .. ": listed in the rendered blitz menu (wItemList)")
-      local slot = H.readByte(ACTOR)
-      H.writeByte(0x895F + slot, 0)         -- scroll
-      H.writeByte(0x8963 + slot, row % 2)   -- column
-      H.writeByte(0x8967 + slot, row // 2)  -- row
-      snap(name .. " window")
-    end),
-    H.waitFrames(2),                        -- let the list redraw under the cursor
-    H.pressButtons({ "a" }, 4),
-    H.waitFrames(8),
-  })
+-- the one driver every proof shares: page dialogs when no menu is up,
+-- otherwise let the machine act under the current mode
+local hb = -600
+local function fightDriver()
+  return H.call(function()
+    if H.frame - hb >= 600 then
+      hb = H.frame
+      H.log(string.format("[vargas f%d %s]%s", H.frame, mode, hpLine()))
+    end
+    if H.readByte(MENU) == 0 then
+      latchSubmit()
+      resetM()
+      H.setPad(H.frame % 8 < 4 and { "a" } or {})
+      return
+    end
+    H.setPad(pulse())
+  end)
 end
 
 local nBefore = 0                       -- gauge-write count before a chip
 
-H.run({ maxFrames = 60000 }, {
+H.run({ maxFrames = 150000 }, {
   H.loadState(DOOR),
   H.waitFrames(30),
   H.call(function()
@@ -325,7 +478,7 @@ H.run({ maxFrames = 60000 }, {
   H.waitFrames(120),
 
   -- ===================================================================== --
-  -- 1 + 2: the seed.  Read BEFORE anything is poked or pressed.
+  -- 1 + 2: the seed.  Read BEFORE anything is pressed.
   -- ===================================================================== --
   H.call(function()
     local w = {}
@@ -407,21 +560,20 @@ H.run({ maxFrames = 60000 }, {
   end),
 
   -- ===================================================================== --
-  -- 3a: THE NEGATIVE CONTROL for the poison chip.  Clear the Ipoohs out of
-  -- the tool's target group (see "WHY THE IPOOH POKE") and keep swinging
-  -- until a PLAIN weapon hit has moved Vargas's hp.  Nobody in this party
-  -- carries a poison, holy or bludgeoning weapon, so the gauge must not have
-  -- moved -- which is the assertion.  Without it, "the shield went down
-  -- after Edgar acted" would be equally explained by "anything that hits him
-  -- takes a shield", and proof 3 would be worth nothing.
+  -- 3a: THE NEGATIVE CONTROL for the poison chip.  The trio's own (boosted)
+  -- weapon swings kill both Ipoohs for real -- the engine's targeting rule
+  -- sends Fights at group A until it is empty -- and then land on Vargas
+  -- until his hp moves.  Nobody in this party carries a poison, holy or
+  -- bludgeoning weapon (boost multiplies damage, it does not change the
+  -- weapon's class), so the gauge must not have moved -- which is the
+  -- assertion.  Without it, "the shield went down after Edgar acted" would
+  -- be equally explained by "anything that hits him takes a shield", and
+  -- proof 3 would be worth nothing.
   -- ===================================================================== --
   H.driveUntil(function()
     return ipoohsDown() and H.readWord(MHP(vSlot)) < vHp0
-  end, 24000, {
-    H.call(function()
-      clampIpoohs()
-      tapUnlessSabin()
-    end),
+  end, 36000, {
+    fightDriver(),
   }, "both Ipoohs down and a plain weapon hit has landed on VARGAS"),
   H.call(function()
     snap("control")
@@ -435,39 +587,37 @@ H.run({ maxFrames = 60000 }, {
 
   -- ===================================================================== --
   -- 3b: POISON.  Edgar, one turn later, at the same target, changes only the
-  -- weapon: Tools -> BioBlaster.
+  -- weapon: Tools -> BioBlaster, picked by walking the real cursors.
   -- ===================================================================== --
-  -- the pred runs every frame, the body once per 30 (one pulse of 6 pad
-  -- frames then 24 idle, metrics_battle's cadence), so the party pin lives
-  -- in the pred: Vargas can burst a character down inside a single pulse.
+  H.call(function()
+    -- the real check that replaced the old MP pin: one cast must be
+    -- fundable from the pool the fixture really carries
+    H.log(string.format("EDGAR's pool before the cast: %d MP", mp(EDGAR_E)))
+    H.assertEq(mp(EDGAR_E) >= BIO_MP, true,
+      "EDGAR's own MP funds one BioBlaster (the old pin's honest need)")
+    mode = "bio"
+  end),
   H.driveUntil(function()
-    pinParty()
     return #shWrites > 0
   end, 20000, {
-    H.call(function() H.setPad(toolPulse() or {}) end),
-    H.waitFrames(6),
-    H.call(function() H.setPad({}) end),
-    H.waitFrames(24),
+    fightDriver(),
   }, "the BioBlaster reaches VARGAS's gauge"),
   -- #33 moved the on-screen reveal to the DAMAGE frame: the chip banks the
   -- poison bit as pending at damage CALC (the shield write above) and
   -- Ot6RevealCommit moves it into OT6_REVEALED_ELEM when the damage numeral
   -- displays, a few hundred frames later.  wait for the commit before
   -- asserting it (battle_clockwork pins the commit timing itself).
+  H.call(function() mode = "hold" end),
   H.driveUntil(function()
-    pinParty()
     return H.readByte(RVE(vSlot)) & POISON == POISON
   end, 1800, {
     H.waitFrames(2),
   }, "the poison reveal commits on its damage frame"),
   H.call(function()
     snap("after BIOBLASTER")
-    for i = 0, 3 do
-      H.writeByte(CMDTBL + EDGAR_E * 12 + i * 3, edgarCmds[i])
-    end
-    H.log(string.format("tool turns: %d, cursor entry: %s, target mask: $%02X",
-      toolTurns, tostring(ep.entry), tgtMask or 0xFF))
-    H.assertEq(ep.entry ~= nil, true,
+    H.log(string.format("tool turns: %d, tools entry: %s, target mask: $%02X",
+      toolTurns, tostring(bioEntry), tgtMask or 0xFF))
+    H.assertEq(bioEntry ~= nil, true,
       "the BioBlaster was found in the rendered tools list (wItemList)")
     H.assertEq(nudges, 0,
       "the tools menu committed without a watchdog back-out (no quiet stall)")
@@ -486,19 +636,19 @@ H.run({ maxFrames = 60000 }, {
   end),
 
   -- ===================================================================== --
-  -- Into phase two: clamp Vargas under his own script's second threshold
-  -- and let the party's hits fire battle_event $07 / $08.  The gauge is
-  -- untouched; only HP moves, and only downward past a scripted gate.
+  -- Into phase two: keep fighting until Vargas's own script crosses its
+  -- thresholds on REAL damage (`battle_event $07` at hp <= 10880, `$08` at
+  -- hp <= 10368) and blows the trio offstage.  The old MHP clamp is gone;
+  -- only landed hits move his hp now.
   -- ===================================================================== --
+  H.call(function() mode = "grind" end),
   H.driveUntil(function()
     return H.readByte(MENU) ~= 0 and H.readByte(ACTOR) == SABIN_E
-  end, 20000, {
-    H.call(function()
-      if H.readWord(MHP(vSlot)) > 10300 then H.writeWord(MHP(vSlot), 10300) end
-      tapUnlessSabin()
-    end),
+  end, 60000, {
+    fightDriver(),
   }, "SABIN takes the field (battle_event $07/$08 ran)"),
   H.call(function()
+    mode = "hold"
     H.assertEq(H.readByte(SH(vSlot)), 4,
       "the gauge reads 4 -- phase one moved HP, and exactly one shield")
     H.assertEq(#shWrites, 1,
@@ -508,17 +658,21 @@ H.run({ maxFrames = 60000 }, {
   end),
 
   -- ===================================================================== --
-  -- 4: HOLY.  AuraBolt (Blitz 1, resolved attack id $5e) picked from the menu.
+  -- 4: HOLY.  AuraBolt (Blitz 1, resolved attack id $5e) picked from the
+  -- real blitz list by walking the real cursor.
   -- ===================================================================== --
-  H.call(function() nBefore = #shWrites end),
-  blitz(AURABOLT, "AURABOLT"),
-  H.driveUntil(function() return #shWrites > nBefore end, 2400, {
-    H.call(tapUnlessSabin),
+  H.call(function()
+    nBefore = #shWrites
+    blitzFired = false
+    mode = "aurabolt"
+  end),
+  H.driveUntil(function() return #shWrites > nBefore end, 15000, {
+    fightDriver(),
   }, "AURABOLT reaches the gauge"),
   -- #33 again: the chip banks holy as pending at damage CALC (the gauge
   -- write above) and Ot6RevealPoll commits it on the damage-numeral frame
+  H.call(function() mode = "hold" end),
   H.driveUntil(function()
-    pinParty()
     return H.readByte(RVE(vSlot)) & HOLY == HOLY
   end, 1800, {
     H.waitFrames(2),
@@ -543,20 +697,27 @@ H.run({ maxFrames = 60000 }, {
   -- class proof and the win path; the shield write and the teardown are
   -- asserted separately.
   -- ===================================================================== --
-  H.call(function() nBefore = #shWrites end),
-  blitz(PUMMEL, "PUMMEL"),
-  H.driveUntil(function() return #shWrites > nBefore end, 2400, {
-    H.call(tapUnlessSabin),
+  H.call(function()
+    nBefore = #shWrites
+    blitzFired = false
+    mode = "pummel"
+  end),
+  H.driveUntil(function() return #shWrites > nBefore end, 15000, {
+    fightDriver(),
   }, "PUMMEL reaches the gauge"),
   -- #33: the CLASS chip defers the same way the element chips do
+  H.call(function() mode = "hold" end),
   H.driveUntil(function()
-    pinParty()
     return H.readByte(RVC(vSlot)) & OT6_BLUDG == OT6_BLUDG
   end, 1800, {
     H.waitFrames(2),
   }, "the bludgeoning reveal commits on its damage frame"),
   H.call(function()
     snap("after PUMMEL")
+    -- his REAL hp as the script kills him (the blitz shell auto-confirms
+    -- its fixed target, so the ST_TGT bookkeeping never sees the blitz --
+    -- measured: pummelVhp still held the bio-confirm value here)
+    pummelVhp = H.readWord(MHP(vSlot))
     H.assertEq(H.readByte(0x3410), PUMMEL, "the resolved skill was Pummel ($5d)")
     H.assertEq(shields(), 2, "PUMMEL took a shield: 3 -> 2")
     H.assertEq(H.readByte(RVC(vSlot)) & OT6_BLUDG, OT6_BLUDG,
@@ -565,16 +726,12 @@ H.run({ maxFrames = 60000 }, {
       "both elements stay revealed across the class chip")
   end),
   H.driveUntil(function() return not H.battleLoadStarted() end, 9000, {
-    H.call(function()
-      pinParty()
-      aPh = (aPh + 1) % 8
-      H.setPad(aPh < 4 and { "a" } or {})
-    end),
+    H.call(tapUnlessSabin),
   }, "the fight ends (battle_event $09 / kill_monsters ALL)"),
   H.call(function()
     H.assertEq(H.battleLoadStarted(), false, "battle torn down after PUMMEL")
-    H.log(string.format("PASSED with VARGAS at %d HP -- the script killed him, " ..
-      "not the damage", 11600 - 10300))
+    H.log(string.format("PASSED with VARGAS at %s HP -- the script killed " ..
+      "him, not the damage", tostring(pummelVhp)))
     H.log("skill writes: " .. #spells .. ", gauge writes: " .. #shWrites)
     for i = 1, #shWrites do
       H.log(string.format("  gauge f%d -> %d", shWrites[i][1], shWrites[i][2]))
