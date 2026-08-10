@@ -305,7 +305,7 @@ local function worldWalkFight(tx, ty, budget, what, arriveOffWorld, opts)
   local plan, planActor, btn, mstreak = nil, nil, nil, 0
   local calm = 0
   local fought, wasBattle = 0, false
-  local stuckN, battleFrames = 0, 0
+  local stuckN, battleFrames, segFrames = 0, 0, 0
   local function makePlan(actor)
     -- `worldWalkFight()` episodes are constructed before H.run starts, so
     -- resolve this at execution time.  The field party byte is repurposed in
@@ -449,6 +449,24 @@ local function worldWalkFight(tx, ty, budget, what, arriveOffWorld, opts)
        and H.worldAligned() and not H.battleLoadStarted() then
       if fought >= 1 then return true end
       if H.worldX() == tx and H.worldY() == ty then return true end
+    end
+    -- SEGMENT TIMEOUT IS A LADDER LOSS, NOT A RUN ABORT.  A segment
+    -- runs behind the route/staging ladder, so a draw that will not
+    -- resolve inside the budget (the formation lottery handing the west
+    -- bend a five-monster pack that outlasts the frames -- observed
+    -- 2026-08-09 booting a stale-stamped chain) must set `lost` and let
+    -- driveUntil finish CLEANLY, so the ladder reloads on a staggered
+    -- timeline.  Without this the segment's own driveUntil raises at
+    -- budget and kills the whole mint before attempt 2.  Non-segment
+    -- callers keep the raising budget (they are not laddered).
+    if opts.segment then
+      segFrames = segFrames + 1
+      if segFrames > (budget or 40000) - 400 and lost == nil then
+        lost = string.format("segment %s timed out (%d frames, at %d,%d) " ..
+          "-- a stiff draw; the ladder reloads", what, segFrames,
+          H.worldX(), H.worldY())
+        H.log("[gau] " .. lost)
+      end
     end
     return lost ~= nil or (arriveOffWorld and not H.worldMode()) or calm >= 30
   end, budget or 40000, {
