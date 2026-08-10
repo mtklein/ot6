@@ -120,9 +120,24 @@ diagnoses were wrong in instructive ways:**
   one fact causes half the remaining waivers.  Two systemic calls pend:
   a leveled/collected fixture tier (5 files), and an observation-window
   doctrine (~20 files).
-- Waivers **318 → 303** today, all shrink, checker green at every merge.
-- The probe disposition (100 waived probes) is an owner call pending on
-  #75 (recommendation: keep a named handful, delete the rest).
+- Waivers **318 → 123** across 2026-08-09/10, all shrink, checker green
+  at every merge; write sites 1617 → 762.  The probe retirement executed
+  (owner-delegated): 73 settled one-shots deleted, 26 kept by reference.
+- **2026-08-10 additions**: five batteries re-cut through the real Save
+  UI (post-opera + boundaries B-E); the fight driver casts real attack
+  magic (opts.magic); H.cond re-asks its predicate; the banquet and
+  moogle_defense graph edges are live (114 states); ~35 suite tests
+  converted by fixture-swap waves (see git log wt/menu-family,
+  wt/mech-family, wt/convert-cheap).
+- **OWNER RULING PENDING — the Cranes** (reunion airship fight): honestly
+  unwinnable as tuned; its designed key (water, bosses-wob 16) is
+  unobtainable by the mandated party.  Full record in
+  gen_terra_returned_anchor's header + probe_cranes_wedge.  The
+  terra-returned battery re-cut and the four cuts chained after it
+  (narshe-mission, gate-cave-save, vector-crash, banquet-done) wait on
+  this ruling.  NOTE: one retracted wrong verdict lives in that file's
+  history (the Game Over continue-flow read as a completing scene) —
+  trust the f7d32da correction, not cc2ce35.
 
 ### Doctrine (measured; do not re-derive)
 
