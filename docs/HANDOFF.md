@@ -179,20 +179,38 @@ reachability).  `clearGateSoldier` was promoted into `lib/ot6_field.lua`
 anyway, with `talkToObj` and `rideOut`, and `gen_sfigaro` calls the
 library versions.
 
-Two more findings rode along: **traversal on a shopless escape route must
-FLEE** -- the tactical driver won the first tunnel fight honestly (real
-Fenix Down revival mid-battle) and the win emptied the bag, so the next
-encounter wiped a party that had nothing left to drink; gen_kolts's cave
-doctrine (run from trash, fight where the levels are needed) now governs
-every leg of this route.  And **the wipe canary missed that wipe** --
-`M.partyWiped()` reads $1600, which still carries pre-battle HP when the
-party dies inside a battle, so `RandBattle`'s GameOver held the event PC
-forever while the canary stayed quiet.  Third wipe to impersonate a stuck
-navigator, first with the canary deployed; it needs a battle-module
-witness ($3BF4 while `battleLoadStarted()`).  Also landed: CELES is
-ARMED at gen_tunnelarmr's boot (she was relic-only through the whole
-downstream chain -- audit_equipment's defect class exactly), with the
-celes_freed waiver line making that fixture legitimately story-bare.
+Getting the leg green took five measured findings past the first one, in
+order: **the cave rolls PINCERS** (Trilobiter + Primordites, party
+surrounded) which FF6 refuses to release, so flee needs a short per-route
+cap (`opts.fleeCap`, this route uses 420) or the party dies holding L+R
+before the tactical fallback engages; **rows persist** -- gen_sfigaro's
+back-row LOCKE (right for solo battle 11) walked into this chapter still
+hiding, and a back-row LOCKE is the pair's whole offense taxed to nothing
+(24 damage across 6000 frames) -- the escape re-deals front LOCKE / back
+CELES; **an all-medic party heal-locks** -- newFightDriver now takes
+`opts.healer` so CELES heals and LOCKE always swings; **the escape route
+has no shop**, so the cave crossing drains the bag no matter how well it
+is fought -- and **map 70 keeps map 73's recovery spring** at (47,29)
+(`_cba3e4` -> `_cacfbd`, full party HP/MP, the same facing-UP+A gate as
+the clock), which is what lets the boss be entered full.  With all five,
+TunnelArmr fell HONESTLY on attempt 1 (f30918; LOCKE 2 hp, CELES 190
+behind Runic) and the chain minted sfigaro_escape f5529 /
+tunnelarmr_doorstep f23882 / locke_done f31341.
+
+Two library follow-ups fell out: **the wipe canary misses in-battle
+wipes** -- `M.partyWiped()` reads $1600, which still carries pre-battle
+HP when the party dies inside a battle, so `RandBattle`'s GameOver held
+the event PC forever while the canary stayed quiet (third wipe to
+impersonate a stuck navigator, first with the canary deployed; it needs
+a battle-module witness, $3BF4 while `battleLoadStarted()`).  And
+**fieldCare's world-map exit measured broken** the first time a mint
+exercised it: after a real heal through the menu ON the world map, the
+world DP cells $E0/$E2 read garbage and the world engine never resumed
+-- trap 1's ownership, inside careBackOnMap's world witness.  This route
+takes its care on the field instead.  Also landed: CELES is ARMED at
+gen_tunnelarmr's boot (she was relic-only through the whole downstream
+chain -- audit_equipment's defect class exactly), with the celes_freed
+waiver line making that fixture legitimately story-bare.
 
 **Frontier status, end of 2026-08-09: FOUR blockers found, TWO fixed.**
 Running `make frontier NINJAFLAGS="-k 0"` (continue past failures) is how
