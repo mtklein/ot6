@@ -1,7 +1,8 @@
 # Handoff — state of play
 
-Last refreshed 2026-08-06; rewritten 2026-07-30, replacing the 2026-07-27
-version wholesale. That one
+Last refreshed 2026-08-09 (the honesty section rewritten wholesale that
+day); before that 2026-08-06; rewritten 2026-07-30, replacing the
+2026-07-27 version wholesale. That one
 described v0.6-era state and three releases had shipped since; a handoff that
 is behind is worse than no handoff, so this file is the exception to
 CONTRIBUTING's "append a dated correction" rule — **rewrite it when it goes
