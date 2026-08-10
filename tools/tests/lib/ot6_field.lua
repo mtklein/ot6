@@ -565,6 +565,18 @@ function M.navTo(txIn, tyIn, opts)
           return
         end
         if tactical then tactical.frame(); return end
+        -- honest=true reaches here: the battle is about to be "cleared"
+        -- by BLIND A-TAPS -- no menu awareness, no items, no flee.  This
+        -- is the branch that walked BANON's escort into a wipe at
+        -- terra_clifftop while its log said "navTo timeout".  It stays
+        -- because unconverted legs still ride it, but it must never be
+        -- ridden SILENTLY: converted routes want honest="flee" (corridor
+        -- trash) or honest="tactical" (fights that matter).
+        if opts.honest == true and battN % 3600 == 3 then
+          M.log('HONEST=true IS FIGHTING THIS BATTLE BY BLIND A-TAPS -- ' ..
+            'no menus, no items, no flee.  If this leg loses parties or ' ..
+            'drags, convert it: honest="flee" or honest="tactical".')
+        end
         if M.monstersPresent() > 0 and not opts.honest then
           for slot = 0, 5 do
             if M.readByte(0x3aa8 + slot * 2) % 2 == 1 then
@@ -778,6 +790,18 @@ function M.advanceStory(pred, maxFrames, opts)
           return
         end
         if tactical then tactical.frame(); return end
+        -- honest=true reaches here: the battle is about to be "cleared"
+        -- by BLIND A-TAPS -- no menu awareness, no items, no flee.  This
+        -- is the branch that walked BANON's escort into a wipe at
+        -- terra_clifftop while its log said "navTo timeout".  It stays
+        -- because unconverted legs still ride it, but it must never be
+        -- ridden SILENTLY: converted routes want honest="flee" (corridor
+        -- trash) or honest="tactical" (fights that matter).
+        if opts.honest == true and battN % 3600 == 3 then
+          M.log('HONEST=true IS FIGHTING THIS BATTLE BY BLIND A-TAPS -- ' ..
+            'no menus, no items, no flee.  If this leg loses parties or ' ..
+            'drags, convert it: honest="flee" or honest="tactical".')
+        end
         if M.monstersPresent() > 0 and not opts.honest then
           for slot = 0, 5 do
             if M.readByte(0x3aa8 + slot * 2) % 2 == 1 then
@@ -1051,6 +1075,18 @@ function M.worldNavTo(txIn, tyIn, opts)
           return
         end
         if tactical then tactical.frame(); return end
+        -- honest=true reaches here: the battle is about to be "cleared"
+        -- by BLIND A-TAPS -- no menu awareness, no items, no flee.  This
+        -- is the branch that walked BANON's escort into a wipe at
+        -- terra_clifftop while its log said "navTo timeout".  It stays
+        -- because unconverted legs still ride it, but it must never be
+        -- ridden SILENTLY: converted routes want honest="flee" (corridor
+        -- trash) or honest="tactical" (fights that matter).
+        if opts.honest == true and battN % 3600 == 3 then
+          M.log('HONEST=true IS FIGHTING THIS BATTLE BY BLIND A-TAPS -- ' ..
+            'no menus, no items, no flee.  If this leg loses parties or ' ..
+            'drags, convert it: honest="flee" or honest="tactical".')
+        end
         if M.monstersPresent() > 0 and not opts.honest then
           for slot = 0, 5 do
             if M.readByte(0x3aa8 + slot * 2) % 2 == 1 then
