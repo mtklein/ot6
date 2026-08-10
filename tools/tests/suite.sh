@@ -82,7 +82,11 @@ TESTS="$SUITE"
 # pin every run, so this env applies to exactly the one invocation.
 ram_env_for() {
   case "$1" in
-    battle_reveal_poweron) echo "OT6_RAM_POWERON=AllOnes" ;;
+    # battle_reveal_poweron additionally cold-boots the tracked post-opera
+    # battery (issue #75): its slot-3 page is the real persistent knowledge
+    # New Game must preserve, and its valid stale transient page is the
+    # knowledge New Game must wipe.
+    battle_reveal_poweron) echo "OT6_RAM_POWERON=AllOnes OT6_SRAM_ANCHOR=tools/tests/anchors/post-opera-v1" ;;
     # battle_slotsboot cold-Continues the tracked terra-returned battery --
     # the same anchor hand-off the Makefile's SMOKE_ANCHOR_* map gives
     # anchored smoke generators (run.sh materializes it before boot).
