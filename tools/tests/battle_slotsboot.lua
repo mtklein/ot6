@@ -4,13 +4,23 @@
 -- save-points-vector.md section 5 boundary F; the Continue restores the party
 -- ON FOOT at the grounded Blackjack's tile), walk the plain south of Zozo
 -- into a REAL world encounter, and drive real Slot spins with real button
--- presses.  NO character-side pokes: BP accumulates through Ot6ActionEnd's
--- own regen (battle opens at 1, +1 per unboosted turn), boost is spent with
--- real R presses, and the reels are stopped by real A presses -- whatever
--- icons they land on, the tier promises are asserted as invariants of the
--- mechanism's own cells.  Monster-side staging only (stop status + HP pinned
--- high + instant-death protection so nothing dies mid-observation), the
--- probe_mp_universal discipline.
+-- presses.  NO pokes on either side (issue #75): BP accumulates through
+-- Ot6ActionEnd's own regen (battle opens at 1, +1 per unboosted turn), boost
+-- is spent with real R presses, and the reels are stopped by real A presses
+-- -- whatever icons they land on, the tier promises are asserted as
+-- invariants of the mechanism's own cells.
+--
+-- ISSUE #75 CONVERSION -- headroom by TARGET SELECTION, not staging.  The
+-- monster-side stop/death-proof/HP-floor pins are gone; in their place the
+-- encounter is CHOSEN: unsuitable draws are fled (L+R, the engine's own run
+-- mechanic -- battle_steal's formation-variance idiom) until the plain
+-- south of Zozo deals a formation with enough bodies and HP to survive
+-- three Slot resolutions with the enemy side acting freely.  Unforced
+-- spins overwhelmingly resolve Lagomorph (a party heal) and the boosted
+-- spin's chosen triple is reel 1's honest stop, so the fight's damage
+-- budget is small; the gate below is calibrated from the pool's measured
+-- draws.  The bench still answers its menus with real Defends and the
+-- party takes the enemy's real hits.
 --
 -- The three spins:
 --   spin 1 (0 bp): the plumbing is invisible -- nothing pending, the turn
@@ -58,15 +68,6 @@ local function onFoot()
   return (H.readByte(0x11FA) & 3) == 0 and H.readByte(0x11F3) == 0
 end
 
-local function pinField()
-  for _, m in ipairs(msPresent) do
-    local e = 8 + m * 2
-    H.writeByte(0x3EF8 + e, H.readByte(0x3EF8 + e) | 0x10)   -- stopped
-    H.writeByte(0x3AA1 + e, H.readByte(0x3AA1 + e) | 0x04)   -- death-proof
-    if H.readWord(0x3BFC + m * 2) < 0x6000 then H.writeWord(0x3BFC + m * 2, 0xF000) end
-  end
-end
-
 -- wait for a character's menu; consume any other character's menu with a
 -- real Defend (right swaps Fight->Def, then A) -- probe_mp_universal's idiom
 local function menuFor(charId, what)
@@ -76,7 +77,6 @@ local function menuFor(charId, what)
   end
   return H.driveUntil(up, 30000, {
     H.call(function()
-      pinField()
       ph = ph + 1
       if H.readByte(MENU) ~= 0 and H.readByte(ACTOR) ~= slotOf[charId] then
         local step = ph % 40
@@ -111,7 +111,6 @@ local function openSlotWindow(what)
       return H.readByte(0x890F + slotOf[SETZER]) == row
     end, 900, {
       H.call(function()
-        pinField()
         local cur = H.readByte(0x890F + slotOf[SETZER])
         if cur < row then H.setPad({ down = true })
         elseif cur > row then H.setPad({ up = true }) end
@@ -122,7 +121,7 @@ local function openSlotWindow(what)
       return H.readByte(MSTATE) == 0x08 and H.readByte(PRESS[1]) == 0
              and H.readByte(STOP[1]) == 0
     end, 1500, {
-      H.call(function() pinField(); H.setPad({ a = true }) end),
+      H.call(function() H.setPad({ a = true }) end),
       H.waitFrames(3), H.call(function() H.setPad({}) end), H.waitFrames(20),
     }, what .. ": slot window open"),
     H.waitFrames(12),
@@ -131,7 +130,7 @@ end
 
 local function pressAUntilFn(predFn, what)
   return H.driveUntil(predFn, 3000, {
-    H.call(function() pinField(); H.setPad({ a = true }) end),
+    H.call(function() H.setPad({ a = true }) end),
     H.waitFrames(3), H.call(function() H.setPad({}) end), H.waitFrames(11),
   }, what)
 end
@@ -181,36 +180,73 @@ H.run({ maxFrames = 400000 }, {
   H.release(),
   H.waitFrames(30),
 
-  -- walk the plain until a real encounter fires
+  -- walk the plain until a real encounter fires -- and CHOOSE it: a draw
+  -- without the headroom to survive three Slot resolutions is fled (L+R)
+  -- and the walk resumes.  Gate calibrated from the pool's measured draws
+  -- (2026-08-10: the first draw dealt 3 bodies / 1237 total max HP, well
+  -- over the >= 2 bodies / >= 600 HP floor).
   (function()
     local ph = 0
     local pattern = { "down", "down", "right", "right", "down", "down",
                       "left", "left" }
-    return H.driveUntil(function() return H.battleLoadStarted() end, 40000, {
-      H.call(function()
-        ph = ph + 1
-        local dir = pattern[(math.floor(ph / 20) % #pattern) + 1]
-        H.setPad({ [dir] = true })
-      end),
-    }, "a real world encounter fires")
+    local walkStep = function()
+      return H.driveUntil(function() return H.battleLoadStarted() end, 40000, {
+        H.call(function()
+          ph = ph + 1
+          local dir = pattern[(math.floor(ph / 20) % #pattern) + 1]
+          H.setPad({ [dir] = true })
+        end),
+      }, "a real world encounter fires")
+    end
+    local surveyStep = H.call(function()
+      msPresent = {}
+      for m = 0, 5 do
+        if H.readByte(0x3AA8 + m * 2) % 2 == 1 then
+          msPresent[#msPresent + 1] = m
+        end
+      end
+      local mhp = 0
+      for _, m in ipairs(msPresent) do mhp = mhp + H.readWord(0x3BFC + m * 2) end
+      H.vars.mhpTotal = mhp
+      H.vars.suitable = (#msPresent >= 2 and mhp >= 600)
+      H.log(string.format("draw: %d bodies, %d total max HP -> %s",
+        #msPresent, mhp, H.vars.suitable and "FIGHT" or "flee"))
+    end)
+    local attempt = function(n)
+      return H.cond(function() return not H.vars.suitable end, {
+        walkStep(),
+        H.release(),
+        H.waitUntil(function() return H.battleActive() end, 900,
+          "battle active (draw " .. n .. ")", 30),
+        H.waitFrames(240),
+        surveyStep,
+        H.cond(function() return not H.vars.suitable end, {
+          H.fleeBattle(9000),
+          H.waitUntil(function()
+            return H.worldMode() and H.worldHasControl()
+          end, 1200, "back on the plain after fleeing draw " .. n, 10),
+          H.waitFrames(30),
+        }, {}),
+      }, {})
+    end
+    local steps = {}
+    for n = 1, 6 do steps[#steps + 1] = attempt(n) end
+    steps[#steps + 1] = H.call(function()
+      H.assertEq(H.vars.suitable, true,
+        "the pool dealt a survivable formation within six draws")
+    end)
+    return H.repeatN(1, steps)
   end)(),
-  H.release(),
-  H.waitUntil(function() return H.battleActive() end, 900, "battle active", 30),
-  H.waitFrames(240),
 
   H.call(function()
     for s = 0, 3 do
       local id = H.readByte(0x3ED8 + s * 2)
       if id ~= 0xFF then slotOf[id] = s end
     end
-    for m = 0, 5 do
-      if H.readByte(0x3AA8 + m * 2) % 2 == 1 then msPresent[#msPresent + 1] = m end
-    end
     H.assertEq(slotOf[SETZER] ~= nil, true, "SETZER present")
     actor = slotOf[SETZER]
     H.log(string.format("setzer slot %d monsters={%s} joker=$%02x",
       actor, table.concat(msPresent, ","), H.readByte(JOKER)))
-    pinField()
     -- the C1 commit write of the result index
     emu.addMemoryCallback(function(a, v)
       pcall(function()
@@ -264,7 +300,7 @@ H.run({ maxFrames = 400000 }, {
     H.assertEq(pend(), 0, "spin1: still nothing pending at commit")
   end),
   H.driveUntil(function() return bp() == 2 end, 9000,
-    { H.call(pinField), H.waitFrames(1) }, "spin1: unboosted turn regens 1 -> 2"),
+    { H.waitFrames(1) }, "spin1: unboosted turn regens 1 -> 2"),
 
   -- ------------------------------------------------ spin 2: 0 bp, bank to 3
   menuFor(SETZER, "setzer menu (spin 2)"),
@@ -275,7 +311,7 @@ H.run({ maxFrames = 400000 }, {
   waitStop(3, "spin2 reel3"),
   pressCommit("spin2 commit"),
   H.driveUntil(function() return bp() == 3 end, 9000,
-    { H.call(pinField), H.waitFrames(1) }, "spin2: bp 2 -> 3"),
+    { H.waitFrames(1) }, "spin2: bp 2 -> 3"),
 
   -- ------------------------------------- spin 3: three real R presses, CHOSEN
   menuFor(SETZER, "setzer menu (spin 3)"),
@@ -332,7 +368,7 @@ H.run({ maxFrames = 400000 }, {
     H.screenshot("slotsboot_chosen")
   end),
   H.driveUntil(function() return pend() == 0 end, 15000,
-    { H.call(pinField), H.waitFrames(1) }, "spin3: the boosted action resolves"),
+    { H.waitFrames(1) }, "spin3: the boosted action resolves"),
   H.waitFrames(60),
   H.call(function()
     H.assertEq(bp(), 0, "spin3: 3 bp charged in full, no regen on a boosted turn")
