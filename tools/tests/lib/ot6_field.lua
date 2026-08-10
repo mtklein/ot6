@@ -1683,19 +1683,55 @@ end
 -- registers held stale-live values during the menu module's teardown.
 -- The caller's walk then parked against an invisible open menu for its
 -- whole budget, every single care stop, until it grew its own B-tap
--- recovery.  Every "back on the map" exit below is therefore DEBOUNCED:
--- the condition must hold 30 consecutive frames before the close is
--- believed.  calmly() builds that predicate.
+-- recovery.  So the WORLD close is now DEBOUNCED: its condition must
+-- hold 30 consecutive frames before the close is believed, a stale-live
+-- coincidence cannot survive that.
+--
+-- BUT THE DEBOUNCE IS WORLD-MODE ONLY, because only the world close was
+-- ever broken.  On a FIELD map hasControl() already reads false for the
+-- entire menu lifetime and snaps true only once the field module is
+-- genuinely back (measured: the pre-dive close sampled ctl=false
+-- straight through the menu, then ctl=true stable) -- so the field exit
+-- is correct on the FIRST true frame and needs no wait, and forcing 30
+-- CONSECUTIVE true frames there instead HANGS it: every B tap the close
+-- driver sends to shut the menu drops control for that frame, and
+-- 4-of-12 tapping never leaves 30 clean frames in a row (measured:
+-- 2400-frame timeout with ctl=true on every heartbeat).  careClose()
+-- below carries that split; careBackOnMap() is the raw predicate it and
+-- the setRows first stage build on.
 local function careBackOnMap()
   if M.worldMode() then return M.worldHasControl() and M.worldAligned() end
   return M.hasControl() and M.tileAligned()
 end
 
-local function calmly(pred, n)
+-- careClose: the close predicate a care/rows drive waits on.  ONE
+-- closure, deciding world vs field at RUNTIME every frame (the step
+-- table is built before H.run starts, so the mode cannot be resolved
+-- when this is called).
+--
+--   WORLD -> debounced (30 consecutive true frames) AND the
+--   ZMENUSTATE-still-a-menu guard: the world menu module keeps $26 at
+--   05 through the half-close, so a single satisfying frame is a
+--   stale-live coincidence mid-handoff -- the bug this whole change
+--   exists for.
+--   FIELD -> raw single frame plus the caller's own ZM guard: on the
+--   field hasControl() reads false for the entire menu lifetime and
+--   snaps true only when the field module is genuinely back, so the
+--   first true frame is correct.  Debouncing it instead HANGS (every
+--   B tap the close driver sends drops control for a frame; 4-of-12
+--   tapping never leaves 30 clean frames in a row).
+local function careClose(zmExtra)
   local calm = 0
   return function()
-    calm = pred() and calm + 1 or 0
-    return calm >= (n or 30)
+    if M.worldMode() then
+      local zm = M.readByte(0x26)
+      local ok = M.worldHasControl() and M.worldAligned()
+             and zm ~= 0x05 and zm ~= 0x08
+      calm = ok and calm + 1 or 0
+      return calm >= 30
+    end
+    return M.hasControl() and M.tileAligned()
+       and (zmExtra == nil or zmExtra())
   end
 end
 
@@ -1988,9 +2024,9 @@ function M.fieldCare(opts)
       M.call(serveFrame),
     }, tag .. ": heal/revive through the item menu"),
     M.release(),
-    M.driveUntil(calmly(function()
-      return careBackOnMap()
-         and M.readByte(CARE_ZM) ~= 0x05 and M.readByte(CARE_ZM) ~= 0x08
+    M.driveUntil(careClose(function()
+      local zm = M.readByte(CARE_ZM)
+      return zm ~= 0x05 and zm ~= 0x08
     end), 2400, {
       M.call(function()
         phase = (phase + 1) % 12
@@ -2179,9 +2215,8 @@ function M.setRows(spec, opts)
       end),
     }, tag .. ": back to the main menu"),
     M.release(),
-    M.driveUntil(calmly(function()
-      return careBackOnMap() and M.readByte(ZM) ~= 0x05
-    end), 2400, {
+    M.driveUntil(careClose(function() return M.readByte(ZM) ~= 0x05 end),
+      2400, {
       M.call(function()
         phase = (phase + 1) % 12
         M.setPad(phase < 4 and { "b" } or {})
@@ -2322,9 +2357,9 @@ function M.equipOptimum(opts)
       end),
       -- back to the field before the next slot, so every pass starts from
       -- the same place rather than from wherever the last one stopped
-      M.driveUntil(calmly(function()
-        return careBackOnMap() and M.readByte(ZM) ~= ST_MAIN
-           and M.readByte(ZM) ~= ST_CHAR and M.readByte(ZM) ~= ST_OPT
+      M.driveUntil(careClose(function()
+        local zm = M.readByte(ZM)
+        return zm ~= ST_MAIN and zm ~= ST_CHAR and zm ~= ST_OPT
       end), 2400, {
         M.call(function() tap("b") end),
       }, tag .. ": back to the field"),
