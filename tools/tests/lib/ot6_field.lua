@@ -60,12 +60,53 @@ M.FLEE_CAP = 1800
 -- the field module no longer owned that RAM -- and failed as "navTo
 -- timeout".  Neither log contained the word "died".
 --
--- The character table at $1600 is the right witness: it is save state, not
--- module-owned scratch, so it survives the battle module, the menu module
--- and the Game Over screen alike.  Debounced hard (300 frames) because a
--- module handoff can blank things for a moment and a false wipe would be
--- worse than the timeout it replaces.
+-- The character table at $1600 is the right FIELD witness: it is save
+-- state, not module-owned scratch, so it survives the battle module, the
+-- menu module and the Game Over screen alike.  Debounced hard (300
+-- frames) because a module handoff can blank things for a moment and a
+-- false wipe would be worse than the timeout it replaces.
+--
+-- BUT $1600 KEEPS PRE-BATTLE HP WHILE A BATTLE RUNS -- the battle module
+-- works on its own table at $3BF4 and syncs back at teardown, and a
+-- battle that ends in a wipe tears down into the Game Over, where the
+-- sync the field witness is waiting on never says "dead".  Two legs
+-- found this independently and converged on the same battle-side
+-- signature (gen_sabin_gau's staging walk, gen_sabin_trench's dive):
+-- every party slot whose battle MAX HP looks SANE -- nonzero and under
+-- 1000, where a WoB max is a few hundred and module-transition garbage
+-- reads tens of thousands -- showing zero HP.  M.partyWipedInBattle is
+-- that signature lifted into the library; M.partyWiped consults it
+-- first, so the navigators' canary names an in-battle wipe instead of
+-- pressing buttons into the Game Over.
+--
+-- Related trap, documented where the shared witness lives because the
+-- copies are scattered through gens: the ad-hoc per-gen `inBattle()`
+-- (read $3BF4 words, SKIP entries that are 0 or FFFF, first survivor
+-- under 10000 decides) cannot see a DEAD party in battle at all --
+-- every slot reads 0, every slot is skipped, the loop falls through to
+-- "not in battle".  gen_sabin_trench's ride held LEFT at a Game Over
+-- through three full 60000-frame budgets on exactly that blindness.
+-- Any driver gating on that pattern needs this witness beside it.
+function M.partyWipedInBattle()
+  if not M.battleLoadStarted() then return false end
+  local want = 0
+  for c = 0, 15 do
+    if (M.readByte(0x1850 + c) & 0x07) ~= 0 then want = want + 1 end
+  end
+  if want < 1 or want > 4 then return false end
+  local sane, alive = 0, 0
+  for e = 0, 3 do
+    local mx = M.readWord(0x3c1c + e * 2)
+    if mx > 0 and mx < 1000 then
+      sane = sane + 1
+      if M.readWord(0x3bf4 + e * 2) > 0 then alive = alive + 1 end
+    end
+  end
+  return sane >= want and alive == 0
+end
+
 function M.partyWiped()
+  if M.partyWipedInBattle() then return true end
   local any = false
   for _, c in ipairs(M.partyMembers()) do
     any = true
