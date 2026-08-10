@@ -58,19 +58,18 @@
 -- pay; Tintinabar/Charm Bangle do NOT), out to world (120,188), and the
 -- world battery save -- boundary J.
 --
--- THE RECALL FINDING (measured live, runs sn55GdwQ/MAh3rdsY -- do NOT
--- re-assume the +5).  banquet-decode.md §4 item 5 says the first
--- question sets $0231/$0232/$0233 recording WHICH was asked, and item 8
--- pays +5 when the recall answer matches.  Under live pad-driven play the
--- first question's +2 LANDS but NO record bit ever sets -- read directly
--- after the +2, all three bits are 0 -- so recall's +5 cannot be relied
--- on.  (probe_banquet_qa.lua, which hard-asserts $0231=1, was never run:
--- the banquet_dinner.mss fixture it boots never existed; this gen is the
--- first live drive of the Q&A.)  The recall question is DRIVEN (option 0)
--- but its points are not asserted, and the tier arithmetic above clears
--- >=67 with recall paying 0.  Whether the record mechanic is a decode
--- error or a real defect is open on #31/#75 -- if a defect, recall is
--- unearnable for players too, a balance data point.
+-- THE RECALL QUESTION, SETTLED (probe_banquet_recall.lua, 2026-08-10):
+-- the record mechanic works exactly as decoded -- the first question
+-- latches $0230 + one of $0231/2/3, and recall pays +5 iff the answer
+-- matches, deterministically (+5/+0/+0 measured against a first=0
+-- record).  This gen's earlier "no record bit ever sets" reading was an
+-- INSTRUMENTATION RACE: add_var runs BEFORE the switch lines in the
+-- script, so a read taken the frame var0 crosses its +2 milestone can
+-- see zeros (captured live: first=1/2 read $1EC6=20/40 at the milestone
+-- and 25/49 settled).  The recall drive below still asserts nothing
+-- about its points and the tier arithmetic still clears >=67 at
+-- recall=0 -- belt and braces that costs nothing -- but the uncertainty
+-- was ours, not the game's.
 --
 -- THE SAVE-UI BLOCK AT THE END KEEPS ITS POKES AND ITS WAIVERS: it is
 -- the legacy-anchor apparatus (codex witness seeding + deterministic
@@ -696,6 +695,11 @@ local steps = {
     H.assertEq(var0(), windowScore, "var0 carried into dinner")
     dinner.w0 = var0()
   end),
+  -- DEV SCRATCH (probe_banquet_recall boots this): the dinner table with
+  -- the toast choice up and a KNOWN var0.  Not a fixture: no graph edge,
+  -- no stamp, never a suite boot -- probes may never produce fixtures and
+  -- this is a probe INPUT, cut by a generator.
+  H.saveState("banquet_dinner_scratch.mss"),
 
   -- ---- 5. the Q&A, perfect, relative to the window --------------------------
   picks({ 2 }, atPlus(5), 6000, "toast: hometowns (+5)"),
