@@ -241,15 +241,39 @@ with $7BC2-gated d-pad.  Per-file specifics:
   (`:1196-1197` is env-gated, live).
 - `battle_assassinate.lua:96` — pinGuardHp false at every site.
 
-## Two systemic calls to make once
+## Two systemic calls — both now decided
 
-1. **The learn-ceiling tier.**  battle_divines (tech 8 = L68),
-   menu_blitzpage (8 blitzes = L70), menu_swdtechpage all-eight,
-   battle_bushido's ceiling, battle_rage/menu_ragepage's 8-rage loadout —
-   all honestly reachable by grinding (gen_sabin_gau's Veldt grind is the
-   precedent).  Decide once whether to mint a "leveled/collected" fixture
-   tier; five files hinge on it.
+1. **The learn-ceiling tier: RULED, owner, 2026-08-10.**  No
+   leveled-fixture grind tier.  The bar is AREA-level honesty ("when we
+   say we've rebalanced an area, we have played through it in a way that
+   is possible for a person with a controller to do"); targeted feature
+   questions answered via isolated memory-hack tests are acceptable, and
+   as the project expands toward higher-level content we look for
+   opportunities to exercise those features organically instead.  So the
+   true ceiling arms — Cyan tech 8 (L68) in battle_divines /
+   battle_bushido / menu_swdtechpage's all-eight phase, Sabin's eighth
+   Blitz (L70) in menu_blitzpage — stay waived as labeled isolation
+   arms, converted organically later.
+   **CORRECTION that shrank the class:** `InitRage` (field/init.asm:355)
+   grants Gau NINE rages at New Game — the 8-slot rage loadout was never
+   a ceiling case.  battle_rage and menu_ragepage convert against the
+   existing honest gau_joined with no collection mint.
 2. **The observation-window doctrine.**  "Monsters STOPped + HP floored +
    death-protected" appears in ~20 files — the single most common
-   remaining waiver.  Solve once (no-damage action, a real high-gauge
-   boss for headroom, or one observation per battle), not twenty times.
+   remaining waiver.  Under the owner's area-vs-mechanism calibration,
+   these are per-file judgment: where the observation is a MECHANISM
+   claim (a decode, a renderer), the staging may stay as a labeled
+   isolation arm; where it claims play behavior, convert via no-damage
+   actions, a real high-gauge boss for headroom, or one observation per
+   battle.  Decide per file in the wave, not twenty separate doctrines.
+
+## Probe disposition (dispatcher call, delegated by the owner 2026-08-10)
+
+Keep a named handful, retire the rest: settled one-shot probes are
+deleted (their measurements live in docs/commits, and most were taken
+against poked states — re-derivation against the honest chain is the
+right move if a number ever matters again); instruments that docs or
+current investigations actively point at stay (the stall/trench/banquet
+reproduction probes, probe_lockekit, the pad-input save template
+probe_banquet_timer_save, and kin — the retirement wave assembles the
+keep-list from actual references, not memory).
