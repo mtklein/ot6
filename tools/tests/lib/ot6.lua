@@ -936,6 +936,64 @@ end
 -- Budget note: an honest win costs real ATB rounds -- budget thousands of
 -- frames where clearBattle needed hundreds.
 
+-- ------------------------------------------------------- target cursor --
+-- The battle target-select steering machine, promoted from four grown
+-- copies (battle_steal, battle_stealmp, battle_thief, battle_magicite --
+-- the #75 mech family).  The measured facts it encodes:
+--   * the live cursor mask ($7B7E monster / $7B7D character) BLINKS -- it
+--     reads 0 on off-frames -- so the mask is LATCHED while target select
+--     ($7BC2 == $38) is up, and the latch/age/press state RESETS the
+--     moment it is not: a latch that survives between selections confirms
+--     instantly on the previous action's cursor (battle_steal's measured
+--     wrong-monster steal off a stale latch);
+--   * steering rotates the d-pad one direction per press CYCLE, not per
+--     frame -- a per-frame rotation flips direction mid-hold and registers
+--     nothing (battle_steal's measurement);
+--   * the cursor grid follows the formation's SCREEN layout, so rotating
+--     through all four directions settles on any reachable slot: monster
+--     grids walk {left,down,right,up} (battle_steal's measured 08 -left->
+--     04 -down-> 01), character columns {down,up,left,right}.
+-- KNOWN LIMIT (probe_tgtcursor, measured on mrf_entry's 2x2 group-80
+-- formation): the two-press rotation cycles among three hover positions
+-- and the ally column, and can never reach a slot that needs a bare
+-- up-then-right (left,left -> $08; up -> $04; right -> $01).  All four
+-- masks ARE reachable by SINGLE presses with a dwell between them; a
+-- caller whose formation needs that steers with its own press plan and
+-- uses only the latch half of this machine.
+-- opts: mask = 0x7B7E (monster, default) or 0x7B7D (character); dirs = the
+-- rotation list; minAge = settled frames before confirming (default 4).
+-- Use: call observe() once per drive frame, in ANY menu state (it manages
+-- its own reset); inside ST_TGT call steer(targetSlot, mf) -> a button
+-- name: "a" once the latched mask has settled on 1<<targetSlot for minAge
+-- frames (or immediately when targetSlot is nil -- take the default), else
+-- the next rotation direction.  mf is the caller's drive-frame counter --
+-- the same one that paces its press cadence.
+function M.targetCursor(opts)
+  opts = opts or {}
+  local mask = opts.mask or 0x7B7E
+  local dirs = opts.dirs or { "left", "down", "right", "up" }
+  local minAge = opts.minAge or 4
+  local T = { mask = nil, age = 0, press = 0 }
+  function T.observe()
+    if M.readByte(0x7BC2) == 0x38 then
+      local m = M.readByte(mask)
+      if m ~= 0 then
+        if m == T.mask then T.age = T.age + 1
+        else T.mask, T.age = m, 1 end
+      end
+    else
+      T.mask, T.age, T.press = nil, 0, 0
+    end
+  end
+  function T.steer(target, mf)
+    if target == nil then return "a" end
+    if T.mask == (1 << target) and T.age >= minAge then return "a" end
+    if (mf - 1) % 8 == 0 then T.press = T.press + 1 end
+    return dirs[((T.press - 1) // 2) % #dirs + 1]
+  end
+  return T
+end
+
 -- A stateful controller for parties whose useful command is not necessarily
 -- on row 0.  It reads the engine's live command table and cursor and builds a
 -- paced controller episode from those observations.  The baseline policy is

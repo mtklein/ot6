@@ -136,21 +136,16 @@ end
 local mf = 0
 local modeOf = {}                        -- slot -> mode
 local target = nil                       -- character-target slot for Bestow
-local decideMask, decideAge, tgtPress    -- blink-proof target-mask latch
+-- blink-proof latch/steer of the character-target mask (battle_steal's
+-- lesson, promoted into the lib as H.targetCursor; the character column
+-- walks {down,up,left,right})
+local tc = H.targetCursor({ mask = TCURSOR,
+                            dirs = { "down", "up", "left", "right" } })
 local function decide()
   if H.readByte(MENU) == 0 then
     return (H.frame % 8 < 4) and { a = true } or {}
   end
-  -- blink-proof latch of the character-target mask (battle_steal's lesson)
-  if H.readByte(MSTATE) == ST_TGT then
-    local m = H.readByte(TCURSOR)
-    if m ~= 0 then
-      if m == decideMask then decideAge = (decideAge or 0) + 1
-      else decideMask, decideAge = m, 1 end
-    end
-  else
-    decideMask, decideAge, tgtPress = nil, 0, 0
-  end
+  tc.observe()
   mf = mf + 1
   local act = H.readByte(ACTOR) & 3
   local st = H.readByte(MSTATE)
@@ -204,14 +199,7 @@ local function decide()
         else btn = "a" end
       end
     elseif st == ST_TGT then
-      if target == nil then btn = "a"
-      elseif decideMask == (1 << target) and (decideAge or 0) >= 4 then
-        btn = "a"
-      else
-        local dirs = { "down", "up", "left", "right" }
-        if (mf - 1) % 8 == 0 then tgtPress = (tgtPress or 0) + 1 end
-        btn = dirs[(((tgtPress or 1) - 1) // 2) % 4 + 1]
-      end
+      btn = tc.steer(target, mf)
     else btn = "b" end
   end
   return btn and { [btn] = true } or {}

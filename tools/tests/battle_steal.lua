@@ -123,23 +123,17 @@ end
 -- `wantPend` by real R edges, then steals at the monster slot `target`.
 local mf = 0
 local drive = { wantBp = 0, wantPend = 0, target = nil }
+-- the target-cursor latch/steer machine, promoted into the lib from this
+-- file's original copy (H.targetCursor keeps the measured facts: the
+-- blink-proof every-frame latch, the reset outside target select --
+-- measured here: the re-loot arm stole from the wrong monster off a stale
+-- latch -- and the per-press-cycle {left,down,right,up} grid rotation)
+local tc = H.targetCursor({ mask = 0x7B7E })
 local function decide()
   if H.readByte(MENU) == 0 then
     return (H.frame % 8 < 4) and { a = true } or {}
   end
-  -- latch the target mask on EVERY frame while target select is up, and
-  -- RESET it the moment it is not: a latch that survives between steals
-  -- confirms instantly on the previous steal's cursor (measured: the
-  -- re-loot arm stole from the wrong monster off a stale latch)
-  if H.readByte(MSTATE) == ST_TGT then
-    local m = H.readByte(0x7B7E)
-    if m ~= 0 then
-      if m == drive.curMask then drive.maskAge = (drive.maskAge or 0) + 1
-      else drive.curMask, drive.maskAge = m, 1 end
-    end
-  else
-    drive.curMask, drive.maskAge, drive.tgtPress = nil, 0, 0
-  end
+  tc.observe()
   mf = mf + 1
   local act = H.readByte(ACTOR) & 3
   local st = H.readByte(MSTATE)
@@ -180,19 +174,7 @@ local function decide()
       else btn = (cur < want) and "down" or "up" end
     elseif st == ST_THIEF then btn = "a"         -- Steal is submenu row 0
     elseif st == ST_TGT then
-      -- steer on the LATCHED mask (see above).  The cursor grid follows
-      -- the formation's screen layout (measured here: 08 -left-> 04
-      -- -down-> 01), so steering rotates directions every second press
-      -- until the latched mask settles on the wanted monster.
-      if drive.curMask == (1 << drive.target) and (drive.maskAge or 0) >= 4 then
-        btn = "a"
-      else
-        -- one increment per press CYCLE, not per frame -- a per-frame
-        -- increment rotated the direction mid-hold and registered nothing
-        local dirs = { "left", "down", "right", "up" }
-        if (mf - 1) % 8 == 0 then drive.tgtPress = (drive.tgtPress or 0) + 1 end
-        btn = dirs[(((drive.tgtPress or 1) - 1) // 2) % 4 + 1]
-      end
+      btn = tc.steer(drive.target, mf)
     else btn = "b" end
   end
   if btn and (mf - 1) % 32 == 0 then
