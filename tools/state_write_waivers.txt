@@ -55,8 +55,6 @@ tools/tests/battle_divines.lua	.writeByte(
 tools/tests/battle_divines.lua	.writeWord(
 tools/tests/battle_dotchip.lua	.writeByte(
 tools/tests/battle_dotchip.lua	.writeWord(
-tools/tests/battle_fold.lua	.writeByte(
-tools/tests/battle_fold.lua	.writeWord(
 tools/tests/battle_fontrestore.lua	.writeByte(
 tools/tests/battle_fontrestore.lua	emu.write
 tools/tests/battle_gaufight.lua	.writeByte(
