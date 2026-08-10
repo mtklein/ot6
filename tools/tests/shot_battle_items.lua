@@ -1,43 +1,66 @@
 -- shot_battle_items.lua -- SCREENSHOT EVIDENCE for weapon-class icons in the
--- battle Item list. The magitek party carries no weapons, so poke one weapon
--- of each break class (plus the classless Heal Rod) into the field inventory
--- at $1869/$1969 before walking into fight 1, then open Item and shoot.
+-- battle Item list.
 --
---   slot 0  $00 Dirk       PIERCE  {spear} (was {dagger})
---   slot 1  $2B Ashura     SLASH   {sword} (was {katana})
---   slot 2  $47 Boomerang  BLUDG   {staff} (was {special})
---   slot 3  $51 Dice       SPECIAL {special} (was {card})
---   slot 4  $33 Heal Rod   no class - repurposed {card} cell (dash)
+-- ISSUE #75 CONVERSION.  This script used to poke one weapon per break class
+-- into the magitek doorstep's empty bag and shoot the forged list.  It now
+-- boots vector_doorstep -- the class-richest HONEST bag on the chain (see
+-- shot_field_items.lua's header for the recon; PIERCE + SLASH is everything
+-- any honest v0.6 save owns) -- walks one step south out of Vector onto the
+-- world map (the fixture stands on the long entrance at map 242 (32,61);
+-- measured: a held DOWN reaches the world in ~30 frames), walks the
+-- random-battle band into a REAL world encounter, and shoots the Item list
+-- the battle menu builds from the save's own $1869 bag.
+--
+-- The weapon rows in the measured bag order (battle list order = bag order):
+--   row  9 Dirk PIERCE, row 19 ThunderBlade SLASH, row 23 MithrilKnife
+--   PIERCE, row 26 Ashura SLASH -- with TOOL/RELIC/consumable rows around
+--   them for the no-class face.
 local H = dofile("tools/tests/lib/ot6.lua")
-local STATE = "build/states/battle_doorstep.mss.lua"
+local STATE = "build/states/vector_doorstep.mss.lua"
 
-local ITEMS = { 0x00, 0x2B, 0x47, 0x51, 0x33 }
+local MENU = 0x7BCA
 
-H.run({ maxFrames = 20000 }, {
+H.run({ maxFrames = 60000 }, {
   H.waitFrames(20),
   H.loadState(STATE),
   H.waitFrames(10),
-
+  H.waitUntil(function() return H.hasControl() end, 600, "field control", 5),
   H.call(function()
-    for i, id in ipairs(ITEMS) do
-      H.writeByte(0x1869 + i - 1, id)
-      H.writeByte(0x1969 + i - 1, 9)
-    end
-    H.log("inventory slots 0-4 poked with one weapon per class")
+    H.assertEq(H.mapId() & 0x1ff, 242, "vector_doorstep stands in Vector")
   end),
 
-  H.driveUntil(function() return H.battleLoadStarted() end, 4000, {
-    H.hold({ "up" }), H.waitFrames(20), H.release(), H.waitFrames(2),
-    H.pressButtons({ "a" }, 4),
-  }, "battle load from doorstep"),
+  -- south out of the town onto the world map
+  H.driveUntil(function() return H.worldMode() and H.worldHasControl() end,
+    3000, { H.call(function() H.setPad({ down = true }) end) },
+    "walk south out of Vector to the world"),
+  H.call(function() H.setPad({}) end),
+  H.waitFrames(30),
+
+  -- the random-battle band right outside the trigger: pace until the world's
+  -- own encounter roll wins (battle_gaufight's Veldt-grind pacing, no danger
+  -- poke)
+  (function()
+    local flip = false
+    return H.driveUntil(function() return H.battleLoadStarted() end, 40000, {
+      H.call(function()
+        if H.battleLoadStarted() then H.setPad({}) return end
+        if not H.worldHasControl() then H.setPad({}) return end
+        if not H.worldAligned() then return end
+        flip = not flip
+        H.setPad({ [flip and "left" or "right"] = true })
+      end),
+    }, "a real world encounter fires")
+  end)(),
+  H.call(function() H.setPad({}) end),
   H.waitUntil(function() return H.battleActive() end, 900, "battle active", 30),
   -- input during the first window-open animation wedges the battle menu
   H.waitFrames(240),
 
-  H.waitUntil(function() return H.readByte(0x7bca) ~= 0 end, 1200,
+  H.waitUntil(function() return H.readByte(MENU) ~= 0 end, 1200,
     "command window ready", 10),
   H.call(function()
-    -- battle command table: 4 x [cmd, ?, targeting] per slot
+    -- battle command table: 4 x [cmd, ?, targeting] per slot -- logged so the
+    -- shot is self-describing (real kits now, not installs)
     for slot = 0, 3 do
       local base = 0x202e + 12 * slot
       H.log(string.format("cmds slot %d: %02X %02X %02X %02X", slot,
@@ -46,17 +69,23 @@ H.run({ maxFrames = 20000 }, {
     end
   end),
 
-  -- Item is the LAST command for every magitek rider (slot dumps:
-  -- 1D FF 02 01 / 1D FF FF 01); up from the top wraps straight to it
+  -- Item is the LAST command row for this real party (FIGHT/kit/MAGIC/ITEM);
+  -- up from the top wraps straight to it
   H.pressButtons({ "up" }, 4), H.waitFrames(12),
   H.pressButtons({ "a" }, 4),
   H.waitFrames(180),
   H.call(function() H.screenshot("battle_items_top") end),
 
-  -- scroll down to put the 5th row (Heal Rod) in view
-  H.pressButtons({ "down" }, 4), H.waitFrames(12),
-  H.pressButtons({ "down" }, 4), H.waitFrames(12),
-  H.pressButtons({ "down" }, 4), H.waitFrames(12),
-  H.pressButtons({ "down" }, 4), H.waitFrames(30),
+  -- scroll to the first weapon block (Dirk, bag row 9)
+  H.repeatN(9, { H.pressButtons({ "down" }, 4), H.waitFrames(12) }),
+  H.waitFrames(30),
+  H.call(function() H.screenshot("battle_items_pierce") end),
+
+  -- and to the SLASH rows (ThunderBlade row 19 .. Ashura row 26)
+  H.repeatN(12, { H.pressButtons({ "down" }, 4), H.waitFrames(12) }),
+  H.waitFrames(30),
+  H.call(function() H.screenshot("battle_items_slash") end),
+  H.repeatN(6, { H.pressButtons({ "down" }, 4), H.waitFrames(12) }),
+  H.waitFrames(30),
   H.call(function() H.screenshot("battle_items_scrolled") end),
 })
