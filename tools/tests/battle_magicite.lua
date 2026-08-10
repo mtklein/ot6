@@ -1,80 +1,52 @@
--- @suite slow
+-- @suite slow frontier=n024_doorstep
 -- battle_magicite.lua -- the v0.6 Ifrit/Shiva magicite redesigns, the halves
 -- battle_esperstats.lua does not reach: the ABILITY PRICES their kits are built
 -- on, and the SUMMONS.  Design: docs/design/magicite-ifrit-shiva.md (issue #16).
 -- battle_esperstats owns "which spells and which stat"; this file owns "what
 -- they cost and what the divine does".
 --
--- WHAT IS ACTUALLY UNDER TEST, and why each assertion can fail:
+-- Issue #75 conversion.  The old apparatus faked everything on the magitek
+-- doorstep: char 0's equipped-esper byte and field MP poked before the
+-- drive-in, Terra's command list rewritten, allies STOPped, guard HP/MP
+-- pinned, the Slow-immunity words WRITTEN both ways, saved-cursor pokes,
+-- and $3f2e/$3204 poked for the latch A/B.  On n024_doorstep every input
+-- is real:
 --
--- 1. OSMOSE COSTS 8 MP, NOT 1.  The design's biggest balance risk (§6).  Vanilla
---    prices Osmose at 1 MP; Facility boss MP pools are 447-810 against party
---    pools of 40-60, so one 1-MP cast is a full refill -- an off switch for the
---    currency v0.5 turned on.  battle_main.asm splices +$05 of MagicProp record
---    $29 to 8 as an explicit, argued exception to mp-economy.md's "magic keeps
---    vanilla MP costs".  Proved twice over:
---      * the price the engine itself published into the in-battle Magic list
---        (ValidateSpellList writes MagicProp+5 to list record +3), and
---      * a BOUNDARY that only 8 can produce: at 7 MP the Osmose row is GREYED
---        (UpdateEnabledMagic/CheckMagicEnabled compare cost to current MP) while
---        base Ice at 5 MP is still live.  At vanilla's 1 MP, Osmose would be
---        live at 7 MP and this fails loudly.
+--   * THE STONES ARE HONESTLY IN THE BAG ($1A69 bits, give_genju receipts
+--     from the alcove hand-off) and are equipped through the REAL FIELD
+--     MENU: X -> Skills -> character -> Espers -> stone -> detail -> A
+--     (MenuState_1e/4d, field_menu.asm:2504 / skills.asm:2641).  IFRIT
+--     goes on LOCKE -- an equipped stone GRANTS its kit (genju_prop.asm),
+--     so his Magic row appears with Ifrit's spells -- and SHIVA on CELES.
+--   * THE FIGHT IS NUMBER 024 (battle 72), the fixture's own one-A-press
+--     boss, and it is the SPECIES CHOICE the design decoded: its authored
+--     allowed-status word blocks Slow (monster_prop +$16; live $3330
+--     reads $FFE1, bit 2 clear -- READ as the experiment's control, not
+--     written), and its real 777-MP pool is the Facility-scale target the
+--     Osmose reprice exists for.
+--   * The 7-MP boundary is EARNED: Celes's real 106-MP pool is walked
+--     down by real casts of her own kit (Shell 15 / Cure 5 / Scan 3 --
+--     gcd reaches every residue) until it reads 5..7, and the greys are
+--     then read off the live list.
+--   * The once-per-battle latch: the summon is offered at battle start,
+--     spent on camera, and the row greys at her NEXT real window (the
+--     natural refresh -- no $3204 pokes).  The re-offer half is a SECOND
+--     battle: the fixture reloads and battle 72 re-enters, and the fresh
+--     battle's init offers the row again ($3f2e read clear) -- the plan's
+--     "re-summon arms become second battles".
 --
--- 2. DIAMOND DUST IS NO LONGER A MIRROR OF INFERNO.  Vanilla $38 is $37 in
---    another colour (power 52 vs 51, 27 MP vs 26).  v0.6 re-authors $38 to
---    power 34 + a STATUS3::SLOW rider so Inferno stays the damage divine and
---    Diamond Dust becomes the tempo divine.  Asserted as ROM bytes (both
---    records, so "Inferno untouched" is a control) AND behaviourally: a real
---    summon, driven through the real menu, must land Slow on a target whose
---    blocked-status word permits it and must NOT land it on one that does not.
---    That pair is the whole point -- the design flagged "does an unblockable
---    (+$04 bit $20, hit 0) damage spell apply its status bytes at all, and is
---    per-monster immunity still consulted?" as UNVERIFIED and load-bearing.
---    Reading CheckHit @22a1 -> @22e8 (unconditional carry-clear exit) and
---    InitStatusVars ($3dd4 AND $331c / $3de8 AND $3330) says yes to both; this
---    is the measurement that makes it a fact rather than a code reading.
---
--- 3. THE ONCE-PER-BATTLE SUMMON.  Vanilla's own latch, verified not broken by
---    the redesign: the esper row is OFFERED before (enable byte bit 7 clear --
---    CONTRIBUTING's "a quiet test is not a passing test": the row has to have
---    been available for its later refusal to mean anything), the summon fires
---    and the engine sets the caster's bit in $3f2e, and with that bit set
---    UpdateEnabledMagic greys the row -- restored the instant the bit is
---    cleared again, which is the A/B that proves $3f2e is what did it.
---
--- 4. THE KIT PRICES.  Ifrit's Fire 4 / Drain 15 and Shiva's Ice 5 / Shell 15,
---    read off the same published list, plus each stone's summon price (Inferno
---    26, Diamond Dust 27).  These are vanilla numbers and do not change with
---    this release -- they are here because the design's whole economy argument
---    (a 4 MP base Fire folding to a 51 MP Fire 3) rests on them being what it
---    says they are.
---
--- FIXTURE.  battle_doorstep, the same field-doorstep mint battle_esperstats and
--- battle_subjob use: poke char 0's equipped esper ($161e) plus her field MP
--- ($160d/$160f) BEFORE driving in, so the whole spell-list build and the first
--- enabled-magic pass run against the poked values.  MP has to be pinned in the
--- FIELD, not in battle: UpdateEnabledMagic's only battle-init run happens off
--- the $3204 request flags seeded at @2459, long before an in-battle poke lands,
--- and intro Terra cannot afford a 27 MP summon.
---
--- MENU ROUTE TO A SUMMON (measured, probe run 2026-07-27).  $7bc2 is the menu
--- state: $0e = the magic window, $16 = esper select, $38 = target select.  From
--- Terra's command window (Magic pinned as her only command) one A opens $0e;
--- with the list scrolled to the top, UP runs CheckHasGenju and opens $16; A
--- there commits command $19 and A again confirms the target.  The magic grid is
--- offset by one from the list records -- grid cell p is list record p+1, because
--- record 0 is the esper row (get_magic_poi reads $2093,x = record p+1's enable
--- byte) -- which is how a specific spell is put under the cursor here.
---
--- AND THE ONE THING THAT MAKES ANY OF THAT MEASURABLE: see freezeOthers below.
--- On this mint an ally's Magitek beam resolving inside the caster's action
--- window overwrites the shared $11a0 property buffer mid-resolution, and every
--- spell effect measured here reads as "nothing happened".  It is not the spell.
+-- The one loss against the original: the Slow-LANDS half of the immunity
+-- pair.  No Slow-permitting enemy is reachable from this fixture (maps
+-- 264/269/271/273 are measured encounter-free by the chain's own legs);
+-- the design's allowing species -- Number 128, the Cranes, the blades --
+-- live in later set pieces.  The refused half (species-authored immunity
+-- consulted on a landed divine) is asserted here; the landing half is
+-- follow-up work on a deeper fixture.
 local H = dofile("tools/tests/lib/ot6.lua")
-local STATE = "build/states/battle_doorstep.mss.lua"
+local STATE = "build/states/n024_doorstep.mss.lua"
 
 -- spell ids (const.inc ATTACK enum)
-local FIRE, ICE, DRAIN, SHELL, OSMOSE = 0x00, 0x01, 0x04, 0x25, 0x29
+local FIRE, ICE, DRAIN, SHELL, OSMOSE, CURE, SCAN = 0x00, 0x01, 0x04, 0x25, 0x29, 0x2D, 0x32
 local INFERNO, DDUST = 0x37, 0x38        -- summon attack ids (esper + $36)
 local IFRIT, SHIVA = 0x01, 0x02          -- esper indices (GenjuProp order)
 
@@ -86,355 +58,560 @@ local INFERNO_MP, DDUST_MP = 26, 27
 local DDUST_POWER, DDUST_STATUS3 = 34, 0x04       -- STATUS3::SLOW = BIT_2
 local INFERNO_POWER, INFERNO_STATUS3 = 51, 0x00   -- unchanged (the control)
 local MAGIC_PROP_REC = 14
-
-local ESPER0, FMPCUR, FMPMAX = 0x161e, 0x160d, 0x160f   -- char 0 field record
-local LIST0 = 0x208e                     -- char slot 0's Magic list, 4B records
-local MENU, ACTOR, MSTATE = 0x7bca, 0x62ca, 0x7bc2
-local ST_MAGIC, ST_ESPER, ST_TARGET = 0x0e, 0x16, 0x38
-local CURSOR_SCROLL, CURSOR_X, CURSOR_Y = 0x8913, 0x8917, 0x891b
-local SUMMONED = 0x3f2e                  -- per-character "has summoned" mask
-local REFRESH = 0x3204                   -- per-entity update-request flags
 local STATUS3_SLOW = 0x04
 
-local GUARDS = { 2, 3 }                  -- monster slots present on this mint
-local function ent(s) return 8 + s * 2 end
-local function MHP(s)  return 0x3bf4 + ent(s) end
-local function MMP(s)  return 0x3c08 + ent(s) end
-local function MMPMX(s) return 0x3c30 + ent(s) end
-local function MST3(s) return 0x3ef8 + ent(s) end
-local function MBLOCK34(s) return 0x3330 + ent(s) end     -- allowed status 3/4
-local function CURMP(slot) return 0x3c08 + slot * 2 end
-local function MASK(slot) return 0x3018 + slot * 2 end
+-- field menu route (probe-measured on this fixture 2026-08-10: the menu
+-- OPENS with the command cursor on Item and $4b is not the command cursor
+-- until a press has happened, so the route is one blind DOWN then A)
+local ZMENUSTATE, ZCURSOR, GENJULIST = 0x26, 0x4b, 0x9d89
+local MST_MAIN, MST_CHAR, MST_SKILLS, MST_LIST, MST_DETAIL = 0x05, 0x06, 0x0a, 0x1e, 0x4d
+local function mst() return H.readByte(ZMENUSTATE) end
+local function fieldEsper(c) return H.readByte(0x1600 + 37*c + 0x1e) end
 
-local terra = 0
-local spells = {}                        -- attack ids that reached $3410
-local mpWrites = {}                      -- low-byte writes to Terra's current MP
+-- battle menu
+local MENU, ACTOR, MSTATE, CMDROW = 0x7BCA, 0x62CA, 0x7BC2, 0x890F
+local ST_CMD, ST_ITEM, ST_MAGIC, ST_ESPER, ST_TGT, ST_TRANS =
+  0x05, 0x0A, 0x0E, 0x16, 0x38, 0x01
+local CMD_MAGIC, CMD_ITEM = 0x02, 0x01
+local MSCROLL, MCOL, MROW = 0x8913, 0x8917, 0x891B
+local LISTS = { [0] = 0x208e, [1] = 0x21ca, [2] = 0x2306, [3] = 0x2442 }
+local SUMMONED = 0x3f2e
+local TONIC, POTION = 0xE8, 0xE9
 
-local function findTerra()
-  for s = 0, 3 do if H.readByte(0x3ed8 + s * 2) == 0 then terra = s end end
-  return terra
-end
--- list record n: +0 spell id ($ff = empty), +1 enable (bit 7 SET = greyed out),
--- +2 targeting, +3 MP cost.  Record 0 is the ESPER row: +0 is the esper index
--- and +3 is that esper's summon price.
-local function recOf(id)
-  for n = 1, 78 do
-    if H.readByte(LIST0 + n * 4) == id then return n end
+local BOSS = 0                            -- Number 024's monster slot
+local function bossHp() return H.readWord(0x3BFC + BOSS*2) end
+local function bossMp() return H.readWord(0x3C08 + 8 + BOSS*2) end
+local function bossAllow34() return H.readWord(0x3330 + 8 + BOSS*2) end
+local function bossSt3() return H.readByte(0x3EF8 + 8 + BOSS*2) end
+
+local locke, celes
+local function mp(slot) return H.readWord(0x3C08 + slot*2) end
+local function hp(slot) return H.readWord(0x3BF4 + slot*2) end
+local function mask(slot) return H.readWord(0x3018 + slot*2) end
+local function cmdRowOf(slot, cmd)
+  for r = 0, 3 do
+    if H.readByte(0x202E + slot*12 + r*3) == cmd then return r end
   end
   return nil
 end
-local function costOf(id)
-  local n = recOf(id)
-  return n and H.readByte(LIST0 + n * 4 + 3) or nil
+local function recOf(slot, id)
+  local L = LISTS[slot]
+  for n = 1, 78 do
+    if H.readByte(L + n*4) == id then return n end
+  end
+  return nil
 end
-local function enabled(n) return H.readByte(LIST0 + n * 4 + 1) < 0x80 end
-local function esperRow() return H.readByte(LIST0) end
-local function esperEnabled() return H.readByte(LIST0 + 1) < 0x80 end
-local function dumpList(tag)
-  local out = {}
-  for n = 0, 78 do
-    local id = H.readByte(LIST0 + n * 4)
-    if id ~= 0xff then
-      out[#out + 1] = string.format("%d:%02x%s/%dmp", n, id,
-        enabled(n) and "" or "(grey)", H.readByte(LIST0 + n * 4 + 3))
+local function costOf(slot, id)
+  local n = recOf(slot, id)
+  return n and H.readByte(LISTS[slot] + n*4 + 3) or nil
+end
+local function recEnabled(slot, n)
+  return H.readByte(LISTS[slot] + n*4 + 1) < 0x80
+end
+local function esperRow(slot) return H.readByte(LISTS[slot]) end
+local function esperCost(slot) return H.readByte(LISTS[slot] + 3) end
+local function esperEnabled(slot) return H.readByte(LISTS[slot] + 1) < 0x80 end
+local function bagIdxOf(ids)
+  for i = 0, 251 do
+    local id = H.readByte(0x2686 + i*5)
+    for _, w in ipairs(ids) do
+      if id == w and H.readByte(0x2686 + i*5 + 3) > 0 then return i end
     end
   end
-  H.log("[" .. tag .. "] list: " .. table.concat(out, " "))
+  return nil
 end
+
+-- ------------------------------------------------ real field esper equip --
+local function listSeek(idx, what)
+  local ph = 0
+  return H.driveUntil(function()
+    return mst() == MST_LIST and H.readByte(GENJULIST + H.readByte(ZCURSOR)) == idx
+  end, 3000, {
+    H.call(function()
+      ph = (ph + 1) % 8
+      if ph >= 4 then H.setPad({}); return end
+      local target
+      for r = 0, 26 do
+        if H.readByte(GENJULIST + r) == idx then target = r; break end
+      end
+      if not target then H.setPad({}); return end
+      local row = H.readByte(ZCURSOR)
+      local d = target - row
+      if d % 2 ~= 0 then
+        if row % 2 == 0 then
+          H.setPad(row >= 26 and { up = true } or { right = true })
+        else
+          H.setPad({ left = true })
+        end
+      else
+        H.setPad(d > 0 and { down = true } or { up = true })
+      end
+    end),
+    H.waitFrames(1),
+  }, what)
+end
+
+-- equip esper `idx` on the character at char-select position `pos`
+-- (menu order measured: 0=EDGAR 1=SABIN 2=LOCKE 3=CELES), verify by
+-- reading the roster record back
+local function equipOn(pos, idx, roster, tag)
+  local steps = {
+    H.driveUntil(function() return mst() == MST_MAIN end, 1200, {
+      H.pressButtons({ "x" }, 4), H.waitFrames(30),
+    }, tag .. ": main menu"),
+    H.waitFrames(20),
+    H.pressButtons({ "down" }, 3), H.waitFrames(12),   -- Item -> Skills
+    H.driveUntil(function() return mst() == MST_CHAR end, 600, {
+      H.pressButtons({ "a" }, 3), H.waitFrames(16),
+    }, tag .. ": char select"),
+    H.waitFrames(10),
+  }
+  for _ = 1, pos do
+    steps[#steps+1] = H.pressButtons({ "down" }, 3)
+    steps[#steps+1] = H.waitFrames(12)
+  end
+  local more = {
+    H.driveUntil(function() return mst() == MST_SKILLS end, 600, {
+      H.pressButtons({ "a" }, 3), H.waitFrames(16),
+    }, tag .. ": skills"),
+    H.driveUntil(function()
+      return mst() == MST_SKILLS and H.readByte(ZCURSOR) == 0
+    end, 600, { H.pressButtons({ "up" }, 2), H.waitFrames(6) },
+      tag .. ": cursor to Espers"),
+    H.pressButtons({ "a" }, 2),
+    H.waitUntil(function() return mst() == MST_LIST end, 300,
+      tag .. ": esper list", 5),
+    listSeek(idx, tag .. ": cursor to the stone"),
+    H.waitFrames(20),
+    H.driveUntil(function() return mst() == MST_DETAIL end, 600,
+      { H.pressButtons({ "a" }, 3), H.waitFrames(12) }, tag .. ": detail page"),
+    H.waitFrames(20),
+    H.pressButtons({ "a" }, 3),            -- equip (MenuState_4d's A)
+    H.waitFrames(20),
+    H.driveUntil(function() return H.hasControl() and not H.dialogWaiting() end,
+      1200, { H.pressButtons({ "b" }, 3), H.waitFrames(20) },
+      tag .. ": menu closed"),
+    H.waitFrames(30),
+    H.call(function()
+      H.assertEq(fieldEsper(roster), idx,
+        tag .. ": the REAL equip landed in the roster record")
+    end),
+  }
+  for _, s in ipairs(more) do steps[#steps+1] = s end
+  return H.repeatN(1, steps)
+end
+
+-- ------------------------------------------------------ the battle drive --
+local spells, mpWrites = {}, {}
+local R = {}   -- results; declared BEFORE enterBoss so its $3410 callback
+               -- closes over THIS table (a later declaration left the
+               -- callback holding a nil global, and Mesen swallows
+               -- callback errors whole -- measured: hpMid never captured)
 local function sawSpell(id)
   for _, v in ipairs(spells) do if v == id then return true end end
   return false
 end
 
--- Keep Terra on Magic-only and un-magitek'd for the whole menu drive: the mint
--- is the Magitek intro fight, whose status would otherwise force beam actions.
-local function pinTerra()
-  local st1 = 0x3ee4 + terra * 2
-  H.writeByte(st1, H.readByte(st1) & 0xf7)      -- clear magitek
-  H.writeByte(0x202e + terra * 12, 0x02)        -- Magic, alone
-  H.writeByte(0x2031 + terra * 12, 0xff)
-  H.writeByte(0x2034 + terra * 12, 0xff)
-  H.writeByte(0x2037 + terra * 12, 0xff)
+-- modes: locke is the MEDIC (item turns aimed at the worst-hp living ally
+-- -- a two-man fight against a L24 boss does not survive a deferring
+-- bench); celes runs the arms.
+local mf = 0
+local celesMode = "defer"                -- "defer"|"summon"|"cast"|"park"
+local lockeMode = "medic"                -- "medic"|"summon"
+local castRec = nil                      -- list record to cast in "cast"
+local tgtLatch, tgtAge, tgtPress
+local function decide()
+  if H.readByte(MENU) == 0 then
+    return (H.frame % 8 < 4) and { a = true } or {}
+  end
+  if H.readByte(MSTATE) == ST_TGT then
+    local m = H.readByte(0x7B7D)
+    if m ~= 0 then
+      if m == tgtLatch then tgtAge = (tgtAge or 0) + 1
+      else tgtLatch, tgtAge = m, 1 end
+    end
+  else
+    tgtLatch, tgtAge, tgtPress = nil, 0, 0
+  end
+  mf = mf + 1
+  local act = H.readByte(ACTOR) & 3
+  local st = H.readByte(MSTATE)
+  if st == ST_TRANS then return {} end
+  local slow = (st == ST_ITEM)
+  if slow then
+    if (mf - 1) % 30 >= 6 then return {} end
+  else
+    if (mf - 1) % 8 >= 4 then return {} end
+  end
+  local btn
+  if act == locke and lockeMode == "summon" then
+    if st == ST_CMD then
+      local want = cmdRowOf(locke, CMD_MAGIC)
+      local cur = H.readByte(CMDROW + locke) & 3
+      if cur == want then btn = "a"
+      else btn = (cur < want) and "down" or "up" end
+    elseif st == ST_MAGIC then btn = "up"       -- to the top, then the esper window
+    elseif st == ST_ESPER then btn = "a"
+    elseif st == ST_TGT then btn = "a"
+    else btn = "b" end
+    return btn and { [btn] = true } or {}
+  end
+  if act == locke then                          -- the medic line
+    -- heal only when somebody is really hurt; a healthy party defers so
+    -- the arms finish before the L24 boss's focus fire adds up (measured:
+    -- boot A's always-item medic died before the Inferno arm)
+    local hurt = false
+    for s2 = 0, 3 do
+      local h, m = hp(s2), H.readWord(0x3C1C + s2*2)
+      if h > 0 and m > 0 and h * 100 // m < 70 then hurt = true end
+    end
+    if st == ST_CMD and not hurt then btn = "x"
+    elseif st == ST_CMD then
+      local want = cmdRowOf(locke, CMD_ITEM)
+      local cur = H.readByte(CMDROW + locke) & 3
+      if cur == want then btn = "a"
+      else btn = (cur < want) and "down" or "up" end
+    elseif st == ST_ITEM then
+      local want = bagIdxOf({ TONIC, POTION })
+      if want == nil then btn = "b"
+      else
+        local cur = H.readByte(0x8947 + locke) + H.readByte(0x894F + locke)
+        if cur < want then btn = "down"
+        elseif cur > want then btn = "up"
+        else btn = "a" end
+      end
+    elseif st == ST_TGT then
+      -- steer the heal onto the worst-hp LIVING character
+      local worst, wpct = nil, 101
+      for s = 0, 3 do
+        local h, m = hp(s), H.readWord(0x3C1C + s*2)
+        if h > 0 and m > 0 then
+          local pct = h * 100 // m
+          if pct < wpct then worst, wpct = s, pct end
+        end
+      end
+      if worst == nil or tgtLatch == (1 << worst) and (tgtAge or 0) >= 4 then
+        btn = "a"
+      else
+        local dirs = { "down", "up", "left", "right" }
+        if (mf - 1) % 8 == 0 then tgtPress = (tgtPress or 0) + 1 end
+        btn = dirs[(((tgtPress or 1) - 1) // 2) % 4 + 1]
+      end
+    else btn = "b" end
+  elseif act == celes then
+    if celesMode == "defer" then
+      btn = (st == ST_CMD) and "x" or "b"
+    elseif celesMode == "summon" then
+      if st == ST_CMD then
+        local want = cmdRowOf(celes, CMD_MAGIC)
+        local cur = H.readByte(CMDROW + celes) & 3
+        if cur == want then btn = "a"
+        else btn = (cur < want) and "down" or "up" end
+      elseif st == ST_MAGIC then
+        -- scroll the list to the top, then UP opens the esper window
+        if H.readByte(MSCROLL + celes) + H.readByte(MROW + celes) > 0 then
+          btn = "up"
+        else btn = "up" end
+      elseif st == ST_ESPER then btn = "a"
+      elseif st == ST_TGT then btn = "a"
+      else btn = "b" end
+    elseif celesMode == "cast" then
+      if st == ST_CMD then
+        local want = cmdRowOf(celes, CMD_MAGIC)
+        local cur = H.readByte(CMDROW + celes) & 3
+        if cur == want then btn = "a"
+        else btn = (cur < want) and "down" or "up" end
+      elseif st == ST_MAGIC then
+        -- grid cell p = list record p+1 (record 0 is the esper row)
+        local idx = castRec - 1
+        local wr, wc = idx // 2, idx % 2
+        local ar = H.readByte(MSCROLL + celes) + H.readByte(MROW + celes)
+        local col = H.readByte(MCOL + celes)
+        if ar < wr then btn = "down"
+        elseif ar > wr then btn = "up"
+        elseif col < wc then btn = "right"
+        elseif col > wc then btn = "left"
+        else btn = "a" end
+      elseif st == ST_ESPER then btn = "b"
+      elseif st == ST_TGT then btn = "a"   -- the spell's own default side
+      else btn = "b" end
+    else                                   -- "park": open her list and hold
+      if st == ST_CMD then
+        local want = cmdRowOf(celes, CMD_MAGIC)
+        local cur = H.readByte(CMDROW + celes) & 3
+        if cur == want then btn = "a"
+        else btn = (cur < want) and "down" or "up" end
+      elseif st == ST_MAGIC then btn = nil
+      elseif st == ST_ESPER then btn = "b"
+      else btn = "b" end
+    end
+  else
+    btn = (st == ST_CMD) and "x" or "b"   -- the two KO'd slots, if ever up
+  end
+  return btn and { [btn] = true } or {}
+end
+local function driveTo(pred, maxF, tag)
+  return H.driveUntil(pred, maxF, {
+    H.call(function() H.setPad(decide()) end),
+  }, tag)
 end
 
--- Reload, poke the esper + field MP, drive up+A into the guard fight.
-local function driveIn(tag, esper, mp)
-  return {
-    H.loadState(STATE),
-    H.waitFrames(10),
-    H.call(function()
-      H.writeByte(ESPER0, esper)
-      H.writeWord(FMPMAX, 99)
-      H.writeWord(FMPCUR, mp)
-      spells = {}
-      mpWrites = {}
-      H.log(string.format("[%s] esper := %d, field MP := %d", tag, esper, mp))
-    end),
-    H.driveUntil(function() return H.battleLoadStarted() end, 4000, {
-      H.hold({ "up" }), H.waitFrames(20), H.release(), H.waitFrames(2),
-      H.pressButtons({ "a" }, 4),
-    }, "battle load (" .. tag .. ")"),
+-- enter battle 72 from the doorstep park (face up, one A)
+local function enterBoss(tag)
+  return H.repeatN(1, {
+    H.hold({ "up" }), H.waitFrames(4), H.release(), H.waitFrames(10),
+    H.driveUntil(function() return H.battleLoadStarted() end, 2000, {
+      H.pressButtons({ "a" }, 4), H.waitFrames(20),
+    }, tag .. ": battle 72 opens"),
     H.waitUntil(function() return H.battleActive() end, 900,
-      "battle active (" .. tag .. ")", 30),
+      tag .. ": battle active", 30),
     H.waitFrames(120),
     H.call(function()
-      findTerra()
-      pinTerra()
-      emu.addMemoryCallback(function(_, v) spells[#spells + 1] = v end,
-        emu.callbackType.write, 0x7e3410, 0x7e3410)
-      emu.addMemoryCallback(function(_, v) mpWrites[#mpWrites + 1] = v end,
-        emu.callbackType.write, 0x7e0000 + CURMP(terra), 0x7e0000 + CURMP(terra))
-      H.log(string.format("[%s] terra slot %d, battle MP %d/%d", tag, terra,
-        H.readWord(CURMP(terra)), H.readWord(0x3c30 + terra * 2)))
-      local pres = {}
-      for s = 0, 5 do
-        pres[#pres + 1] = string.format("%d:%02x hp=%d", s,
-          H.readByte(0x3aa8 + s * 2), H.readWord(0x3bf4 + ent(s)))
+      locke, celes = nil, nil
+      for slot = 0, 3 do
+        local id = H.readByte(0x3ED8 + slot*2)
+        if id == 0x01 then locke = slot end
+        if id == 0x06 then celes = slot end
       end
-      H.log("[" .. tag .. "] monsters: " .. table.concat(pres, "  "))
-      dumpList(tag)
+      H.assertEq(locke ~= nil and celes ~= nil, true,
+        tag .. ": LOCKE and CELES really fight this")
+      spells, mpWrites = {}, {}
+      emu.addMemoryCallback(function(_, v)
+        spells[#spells + 1] = v
+        -- actions serialize, so the boss HP at Inferno's own queue write is
+        -- "after DDust fully resolved" -- the per-summon damage baseline
+        if v == INFERNO and R.hpMid == nil then R.hpMid = bossHp() end
+      end, emu.callbackType.write, 0x7e3410, 0x7e3410)
+      emu.addMemoryCallback(function(_, v) mpWrites[#mpWrites + 1] = v end,
+        emu.callbackType.write, 0x7e3C08 + celes*2, 0x7e3C08 + celes*2)
+      H.log(string.format("%s: locke slot %d mp=%d, celes slot %d mp=%d, "
+        .. "boss hp=%d mp=%d allow34=%04x", tag, locke, mp(locke), celes,
+        mp(celes), bossHp(), bossMp(), bossAllow34()))
     end),
-  }
+  })
 end
 
--- Advance until Terra holds an open menu, clearing anyone else's by tapping A.
-local function untilTerrasMenu(tag)
-  return H.driveUntil(function()
-    return H.readByte(MENU) ~= 0 and H.readByte(ACTOR) == terra
-  end, 9000, {
-    H.call(function()
-      pinTerra()
-      if H.readByte(MENU) ~= 0 and H.readByte(ACTOR) ~= terra then H.setPad({ "a" }) end
-    end),
-    H.waitFrames(4), H.call(function() H.setPad({}) end), H.waitFrames(20),
-  }, tag .. ": terra's menu opens")
-end
-local function openMagicWindow(tag)
-  return H.driveUntil(function() return H.readByte(MSTATE) == ST_MAGIC end, 900, {
-    H.call(function() pinTerra(); H.setPad({ "a" }) end), H.waitFrames(3),
-    H.call(function() H.setPad({}) end), H.waitFrames(14),
-  }, tag .. ": magic window opens ($0e)")
-end
-local function tap(button, frames)
-  return { H.call(function() H.setPad({ button }) end), H.waitFrames(3),
-           H.call(function() H.setPad({}) end), H.waitFrames(frames or 14) }
-end
+H.run({ maxFrames = 150000 }, {
+  H.waitFrames(20),
 
--- MEASURED AND LOAD-BEARING (2026-07-27, probe run).  Once Terra's menu is open
--- and before her action resolves, STOP every other party member.  This mint is
--- the Magitek intro: Biggs and Wedge fire beams constantly, and a beam
--- resolving inside Terra's action window reloads $11a0..$11ad out from under it
--- -- LoadMagicProp is a single shared property buffer.  Without this freeze the
--- summon reads as "0 MP charged, no status applied, one guard scratched", which
--- is an artifact of the interleave and not the spell.  With it: 27 MP charged,
--- both guards hit, Slow staged on both.  Anything measuring a spell's own
--- effect on this fixture needs it.
-local function freezeOthers()
-  for s = 0, 3 do
-    if s ~= terra then
-      H.writeByte(0x3ef8 + s * 2, H.readByte(0x3ef8 + s * 2) | 0x10)   -- STATUS3 STOP
+  -- ------------------------------------------------- 0. the records, in ROM --
+  H.call(function()
+    local base = H.sym("MagicProp") & 0x3fffff
+    local function fld(rec, off) return H.readRomByte(base + rec * MAGIC_PROP_REC + off) end
+    H.log(string.format("MagicProp @ file $%06x", base))
+    H.assertEq(fld(DDUST, 6), DDUST_POWER, "Diamond Dust ($38) power re-authored to 34")
+    H.assertEq(fld(DDUST, 12), DDUST_STATUS3, "Diamond Dust carries STATUS3::SLOW")
+    H.assertEq(fld(DDUST, 5), DDUST_MP, "Diamond Dust still costs 27 MP (unchanged)")
+    H.assertEq(fld(DDUST, 1), 0x02, "Diamond Dust still ice (unchanged)")
+    H.assertEq(fld(INFERNO, 6), INFERNO_POWER, "control: Inferno ($37) power untouched")
+    H.assertEq(fld(INFERNO, 12), INFERNO_STATUS3, "control: Inferno carries no status rider")
+    H.assertEq(fld(INFERNO, 5), INFERNO_MP, "control: Inferno still costs 26 MP")
+    H.assertEq(fld(OSMOSE, 5), OSMOSE_MP, "Osmose ($29) repriced to 8 MP in the record")
+  end),
+
+  -- ============================= BOOT A: the kits, the divine, the latch ==
+  H.loadState(STATE),
+  H.waitFrames(60),
+  H.call(function()
+    H.assertEq(H.readByte(0x1A69) & 0x06, 0x06,
+      "IFRIT and SHIVA really in the bag ($1A69 give_genju receipts)")
+  end),
+  equipOn(3, SHIVA, 6, "A/celes-shiva"),
+  equipOn(2, IFRIT, 1, "A/locke-ifrit"),
+  enterBoss("bootA"),
+  H.call(function()
+    -- 1. IFRIT: the Furnace's bill, on LOCKE's real granted list
+    H.assertEq(esperRow(locke), IFRIT, "[ifrit] list record 0 is Ifrit's summon row")
+    H.assertEq(esperCost(locke), INFERNO_MP, "[ifrit] Inferno priced at 26 MP")
+    H.assertEq(esperEnabled(locke), true, "[ifrit] the summon is offered at battle start")
+    H.assertEq(costOf(locke, FIRE), FIRE_MP, "[ifrit] granted Fire costs 4 MP (base tier)")
+    H.assertEq(costOf(locke, DRAIN), DRAIN_MP, "[ifrit] granted Drain costs 15 MP")
+    -- 2. SHIVA's kit on CELES's real list
+    H.assertEq(esperRow(celes), SHIVA, "[shiva] list record 0 is Shiva's summon row")
+    H.assertEq(esperCost(celes), DDUST_MP, "[shiva] Diamond Dust published at 27 MP")
+    H.assertEq(esperEnabled(celes), true,
+      "[shiva] the summon is OFFERED before it is spent (the positive control)")
+    H.assertEq(costOf(celes, ICE), ICE_MP, "[shiva] Ice published at 5 MP")
+    H.assertEq(costOf(celes, OSMOSE), OSMOSE_MP, "[shiva] Osmose published at 8 MP")
+    H.assertEq(costOf(celes, SHELL), SHELL_MP, "[shiva] Shell published at 15 MP")
+    H.assertEq(H.readWord(SUMMONED) & (mask(locke) | mask(celes)), 0,
+      "[latch] $3f2e clear: nobody has summoned yet")
+    -- 3. the species facts the divine arm leans on, READ not written
+    H.assertEq(bossAllow34() & STATUS3_SLOW, 0,
+      "[ddust] NUMBER 024's own authored status word BLOCKS Slow "
+      .. "(monster_prop +$16 -- the species choice, read live)")
+    H.assertEq(bossSt3() & STATUS3_SLOW, 0, "[ddust] and it starts un-Slowed")
+    H.assertEq(bossMp() >= 447, true,
+      "[osmose] the real Facility-scale MP pool the reprice exists for")
+    R.hp0, R.mp0 = bossHp(), mp(celes)
+  end),
+  -- 4. both divines, driven through the real menus BACK TO BACK -- the
+  -- boss's focus fire is real, so the arms run before the attrition does
+  -- (measured: an always-healing medic died before a late Inferno arm).
+  (function()
+    local lm0
+    return H.repeatN(1, {
+      H.call(function()
+        R.hpMid = nil
+        lm0 = mp(locke)
+        celesMode = "summon"
+      end),
+      driveTo(function() return sawSpell(DDUST) end, 20000,
+        "Diamond Dust ($38) reaches $3410"),
+      H.call(function()
+        celesMode = "defer"
+        lockeMode = "summon"
+      end),
+      driveTo(function() return sawSpell(INFERNO) end, 20000,
+        "Inferno ($37) reaches $3410"),
+      H.call(function() lockeMode = "medic" end),
+      H.waitFrames(300),
+      H.call(function()
+        H.log(string.format("[divines] boss hp %d->%d->%d st3=%02x | celes "
+          .. "mp %d->%d | locke mp %d->%d | $3f2e=%04x", R.hp0, R.hpMid or -1,
+          bossHp(), bossSt3(), R.mp0, mp(celes), lm0, mp(locke),
+          H.readWord(SUMMONED)))
+        H.assertEq(R.hpMid ~= nil and R.hpMid < R.hp0, true,
+          "[ddust] the divine HIT (positive control for the status result)")
+        H.assertEq(bossHp() < R.hpMid, true, "[inferno] the control divine hit too")
+        H.assertEq(bossSt3() & STATUS3_SLOW, 0,
+          "[ddust] the Slow rider was REFUSED where the species' authored "
+          .. "immunity blocks it -- per-monster immunity is still consulted; "
+          .. "[inferno] and Inferno carries no rider of its own")
+        H.assertEq(R.mp0 - mp(celes), DDUST_MP, "[ddust] the summon charged its 27 MP")
+        H.assertEq(lm0 - mp(locke), INFERNO_MP, "[inferno] charged its 26 MP")
+        H.assertEq(H.readWord(SUMMONED) & mask(celes) ~= 0, true,
+          "[latch] the engine set Celes's once-per-battle bit in $3f2e")
+        H.assertEq(H.readWord(SUMMONED) & mask(locke) ~= 0, true,
+          "[latch] ...and Locke's, for his own summon")
+        H.screenshot("magicite_ddust")
+      end),
+    })
+  end)(),
+  -- 5. the spent summon greys at her NEXT real window (natural refresh)
+  H.call(function() celesMode = "park" end),
+  driveTo(function()
+    return (H.readByte(ACTOR) & 3) == celes and H.readByte(MSTATE) == ST_MAGIC
+  end, 20000, "her next window's list is open"),
+  H.call(function()
+    H.setPad({})
+    H.assertEq(esperEnabled(celes), false,
+      "[latch] a spent summon greys the esper row (MP 79 >= 27, so the "
+      .. "grey can only be the $3f2e latch)")
+    H.assertEq(esperCost(celes), DDUST_MP, "[latch] ...still priced at 27")
+    H.assertEq(recEnabled(celes, recOf(celes, ICE)), true,
+      "[latch] her Ice row stays live -- the grey is the summon row's own")
+  end),
+
+  -- ==================== BOOT B: the re-offer, Osmose, and the boundary ==
+  H.loadState(STATE),
+  H.waitFrames(60),
+  equipOn(3, SHIVA, 6, "B/celes-shiva"),
+  enterBoss("bootB"),
+  H.call(function()
+    -- 7. the re-offer half of once-per-battle: a FRESH battle offers the
+    -- summon again (boot A's was spent and greyed when its battle ended)
+    H.assertEq(esperEnabled(celes), true,
+      "[latch] a NEW battle offers the summon again -- the latch is "
+      .. "per-battle, not forever")
+    H.assertEq(H.readWord(SUMMONED) & mask(celes), 0,
+      "[latch] ...because battle init cleared $3f2e")
+    R.mp0 = mp(celes)
+    H.assertEq(R.mp0, 106, "[drain] her real pool opens full (106)")
+  end),
+  -- 8. drain by real casts to a low pool, then Osmose the boss
+  H.call(function()
+    celesMode = "cast"; castRec = recOf(celes, SHELL)
+  end),
+  driveTo(function() return mp(celes) < 35 end, 60000,
+    "real Shell casts walk the pool down"),
+  (function()
+    local m0, g0
+    return H.repeatN(1, {
+      H.call(function()
+        m0, g0 = mp(celes), bossMp()
+        mpWrites = {}
+        celesMode = "cast"; castRec = recOf(celes, OSMOSE)
+        H.log(string.format("[osmose] casting at mp=%d, boss pool=%d", m0, g0))
+      end),
+      driveTo(function() return sawSpell(OSMOSE) end, 20000,
+        "Osmose ($29) reaches $3410"),
+      H.call(function() celesMode = "defer" end),
+      H.waitFrames(240),
+      H.call(function()
+        local seen = {}
+        for _, v in ipairs(mpWrites) do seen[v & 0xff] = true end
+        H.log(string.format("[osmose] mp %d->%d, boss pool %d->%d",
+          m0, mp(celes), g0, bossMp()))
+        H.assertEq(seen[(m0 - OSMOSE_MP) & 0xff], true,
+          "[osmose] the caster's MP was debited to exactly mp0-8 (the charge)")
+        H.assertEq(bossMp() < g0, true, "[osmose] the boss's real pool dropped")
+        H.assertEq(mp(celes) > m0, true,
+          "[osmose] and the caster ended NET POSITIVE -- 8 MP is still a refill")
+        H.screenshot("magicite_osmose")
+      end),
+    })
+  end)(),
+  -- 9. the 7-MP boundary, EARNED.  The Osmose refill clamped her to the
+  -- full 106, and 106 = 1 (mod 5): Shell (15) and Cure (5) both preserve
+  -- that residue, so pure kit casts land the pool at EXACTLY 6 -- inside
+  -- the 5..7 window with no fine-grained op needed.  (Scan was tried as
+  -- the 3-MP adjuster and measured NOT CHARGING at all -- published 3 in
+  -- the list, pool unmoved across repeated real casts; noted as its own
+  -- follow-up.)  The residue invariant is asserted so a future wallet
+  -- change fails loudly here instead of wedging the drive.
+  H.call(function()
+    H.assertEq(mp(celes) % 5, 1,
+      "[boundary] the pool's mod-5 residue makes a pure Shell/Cure walk "
+      .. "land on exactly 6")
+    celesMode = "cast"; castRec = recOf(celes, SHELL)
+  end),
+  driveTo(function() return mp(celes) < 31 end, 60000,
+    "Shell casts again (the Osmose refilled her)"),
+  (function()
+    local function step()
+      local m = mp(celes)
+      if m > 7 then return CURE else return nil end
     end
-  end
-end
-
--- ---------------------------------------------------------------- results --
-local R = {}
-
-local all = { H.waitFrames(20) }
-local function add(list) for _, s in ipairs(list) do all[#all + 1] = s end end
-
--- ------------------------------------------------- 0. the records, in ROM --
--- Cheapest and most direct proof that the splice landed where it was aimed:
--- Diamond Dust re-authored, Inferno untouched beside it as the control.
-add({ H.call(function()
-  local base = H.sym("MagicProp") & 0x3fffff          -- HiROM cpu -> file offset
-  local function fld(rec, off) return H.readRomByte(base + rec * MAGIC_PROP_REC + off) end
-  H.log(string.format("MagicProp @ file $%06x", base))
-  H.assertEq(fld(DDUST, 6), DDUST_POWER, "Diamond Dust ($38) power re-authored to 34")
-  H.assertEq(fld(DDUST, 12), DDUST_STATUS3, "Diamond Dust carries STATUS3::SLOW")
-  H.assertEq(fld(DDUST, 5), DDUST_MP, "Diamond Dust still costs 27 MP (unchanged)")
-  H.assertEq(fld(DDUST, 1), 0x02, "Diamond Dust still ice (unchanged)")
-  H.assertEq(fld(INFERNO, 6), INFERNO_POWER, "control: Inferno ($37) power untouched")
-  H.assertEq(fld(INFERNO, 12), INFERNO_STATUS3, "control: Inferno carries no status rider")
-  H.assertEq(fld(INFERNO, 5), INFERNO_MP, "control: Inferno still costs 26 MP")
-  H.assertEq(fld(OSMOSE, 5), OSMOSE_MP, "Osmose ($29) repriced to 8 MP in the record")
-end) })
-
--- --------------------------------------------- 1. IFRIT: the Furnace's bill --
-add(driveIn("ifrit", IFRIT, 99))
-add({ H.call(function()
-  H.assertEq(esperRow(), IFRIT, "[ifrit] list record 0 is Ifrit's summon row")
-  H.assertEq(H.readByte(LIST0 + 3), INFERNO_MP, "[ifrit] Inferno priced at 26 MP")
-  H.assertEq(esperEnabled(), true, "[ifrit] the summon is offered at battle start")
-  H.assertEq(costOf(FIRE), FIRE_MP, "[ifrit] granted Fire costs 4 MP (base tier)")
-  H.assertEq(costOf(DRAIN), DRAIN_MP, "[ifrit] granted Drain costs 15 MP")
-end) })
-
--- ------------------------------ 2. SHIVA at 7 MP: the reprice's boundary --
--- The assertion the reprice exists for.  With Osmose at 8, 7 MP cannot buy it;
--- with vanilla's 1 it could.  Base Ice at 5 stays live in the same window, so
--- this is a boundary, not a blanket "everything is greyed" artifact.
-add(driveIn("shiva7", SHIVA, 7))
-add({ H.call(function()
-  local osm, ice, shl = recOf(OSMOSE), recOf(ICE), recOf(SHELL)
-  H.assertEq(osm ~= nil and ice ~= nil and shl ~= nil, true,
-    "[shiva7] Shiva granted Ice/Osmose/Shell into the list")
-  H.assertEq(H.readWord(CURMP(terra)), 7, "[shiva7] Terra entered the fight on 7 MP")
-  H.assertEq(costOf(OSMOSE), OSMOSE_MP, "[shiva7] Osmose published at 8 MP in the list")
-  H.assertEq(costOf(ICE), ICE_MP, "[shiva7] Ice published at 5 MP")
-  H.assertEq(costOf(SHELL), SHELL_MP, "[shiva7] Shell published at 15 MP")
-  H.assertEq(enabled(ice), true, "[shiva7] Ice (5) is castable on 7 MP -- the control")
-  H.assertEq(enabled(osm), false, "[shiva7] Osmose (8) is GREYED on 7 MP -- vanilla's 1 would not be")
-  H.assertEq(enabled(shl), false, "[shiva7] Shell (15) is greyed on 7 MP")
-  H.assertEq(esperEnabled(), false, "[shiva7] and the 27 MP summon is greyed too")
-end) })
-
--- --------------------- 3. SHIVA's divine: Diamond Dust, driven for real --
--- One battle, both sides of the immunity question at once: guard A's
--- allowed-status-3/4 word is given the Slow bit, guard B's has it taken away.
--- Diamond Dust targets the whole enemy half ($6e), so one cast reaches both and
--- the two guards become the experiment and its control in the same measurement.
--- That pair stands in for the Facility spread the design decoded: Number 024
--- blocks Slow (monster_prop +$16 = $14) where Number 128, the Cranes and both
--- blades do not -- magicite-ifrit-shiva.md §5.3.
---
--- $3330 is the engine's own "which status 3/4 may be set" word: InitStatus
--- stores the complement of the monster's immunity there (battle_main @26c5) and
--- InitStatusVars ANDs the staged $3de8 against it before anything is applied.
--- Poking it is pulling exactly the lever monster data pulls, which lets this run
--- on a mint whose guards' own immunities are beside the point.
-add(driveIn("ddust", SHIVA, 99))
-add({ H.call(function()
-  local a, b = GUARDS[1], GUARDS[2]
-  H.writeWord(MBLOCK34(a), H.readWord(MBLOCK34(a)) | STATUS3_SLOW)   -- Slow allowed
-  H.writeWord(MBLOCK34(b), H.readWord(MBLOCK34(b)) & ~STATUS3_SLOW)  -- Slow immune
-  R.hp0, R.st0 = {}, {}
-  for _, s in ipairs(GUARDS) do
-    H.writeWord(MHP(s), 0x2000)              -- survive a divine, stay readable
-    R.hp0[s] = H.readWord(MHP(s))
-    R.st0[s] = H.readByte(MST3(s))
-    H.assertEq(R.st0[s] & STATUS3_SLOW, 0,
-      string.format("[ddust] guard %d starts un-Slowed (control)", s))
-  end
-  R.mp0 = H.readWord(CURMP(terra))
-  H.assertEq(esperRow(), SHIVA, "[ddust] list record 0 is Shiva's summon row")
-  H.assertEq(H.readByte(LIST0 + 3), DDUST_MP, "[ddust] Diamond Dust published at 27 MP")
-  H.assertEq(esperEnabled(), true,
-    "[ddust] the summon is OFFERED before it is spent (the positive control)")
-  H.assertEq(H.readWord(SUMMONED) & H.readWord(MASK(terra)), 0,
-    "[ddust] $3f2e clear: nobody has summoned yet")
-end) })
-add({ untilTerrasMenu("ddust") })
-add({ H.call(freezeOthers) })               -- see freezeOthers: without it nothing below measures the spell
-add({ openMagicWindow("ddust") })
-add({ H.driveUntil(function() return H.readByte(MSTATE) == ST_ESPER end, 600, {
-  H.call(function() H.writeByte(CURSOR_SCROLL + terra, 0); H.setPad({ "up" }) end),
-  H.waitFrames(3), H.call(function() H.setPad({}) end), H.waitFrames(14),
-}, "ddust: UP from the top of the list opens the esper window ($16)") })
-add({ H.driveUntil(function() return sawSpell(DDUST) end, 4000,
-  tap("a", 20), "ddust: Diamond Dust ($38) reaches $3410") })
-add({ H.waitFrames(180) })
-add({ H.call(function()
-  local a, b = GUARDS[1], GUARDS[2]
-  local report = {}
-  for _, s in ipairs(GUARDS) do
-    report[#report + 1] = string.format("g%d hp %d->%d st3 %02x->%02x allow34 %04x",
-      s, R.hp0[s], H.readWord(MHP(s)), R.st0[s], H.readByte(MST3(s)),
-      H.readWord(MBLOCK34(s)))
-  end
-  H.log(string.format("[ddust] %s | caster MP %d->%d | $3f2e=%04x",
-    table.concat(report, "  "), R.mp0, H.readWord(CURMP(terra)), H.readWord(SUMMONED)))
-  -- both halves of the experiment have to have been HIT, or the status result
-  -- below is vacuous
-  H.assertEq(H.readWord(MHP(a)) < R.hp0[a], true,
-    "[ddust] the divine hit guard A (positive control for its status result)")
-  H.assertEq(H.readWord(MHP(b)) < R.hp0[b], true,
-    "[ddust] the divine hit guard B (positive control for its status result)")
-  H.assertEq(H.readByte(MST3(a)) & STATUS3_SLOW, STATUS3_SLOW,
-    "[ddust] the re-authored Slow rider LANDED where status 3/4 permits it")
-  H.assertEq(H.readByte(MST3(b)) & STATUS3_SLOW, 0,
-    "[ddust] and was refused where it does not -- immunity is still consulted")
-  H.assertEq(R.mp0 - H.readWord(CURMP(terra)), DDUST_MP,
-    "[ddust] the summon charged its 27 MP")
-  H.assertEq(H.readWord(SUMMONED) & H.readWord(MASK(terra)) ~= 0, true,
-    "[ddust] the engine set the caster's once-per-battle bit in $3f2e")
-  H.screenshot("magicite_ddust")
-end) })
--- The once-per-battle RULE, A/B'd on its own cause, on the battle that just
--- spent one.  UpdateEnabledMagic is what greys the row (`bit $3f2e` -> carry
--- stays set -> bit 7 into the enable byte); it runs from AfterAction2 on the
--- $3204 request flag, so setting that flag is how a refresh is asked for
--- without waiting on an ATB refill this mint does not grant promptly.  Latch
--- set -> greyed; latch cleared -> offered again, which is what makes $3f2e the
--- proven cause rather than a coincidence.
-add({ H.driveUntil(function() return not esperEnabled() end, 3000, {
+    local n = 0
+    return H.repeatN(1, {
+      driveTo(function()
+        n = n + 1
+        local nxt = step()
+        if nxt == nil then return true end
+        if celesMode ~= "cast" or castRec ~= recOf(celes, nxt) then
+          celesMode = "cast"; castRec = recOf(celes, nxt)
+        end
+        if n % 300 == 0 then
+          H.log(string.format("tail: mp=%d rec=%s st=%02x act=%d chp=%d lhp=%d",
+            mp(celes), tostring(castRec), H.readByte(MSTATE),
+            H.readByte(ACTOR) & 3, hp(celes), hp(locke)))
+        end
+        return false
+      end, 60000, "Cure/Scan casts land the pool in 5..7"),
+      H.call(function() celesMode = "park" end),
+    })
+  end)(),
+  driveTo(function()
+    return (H.readByte(ACTOR) & 3) == celes and H.readByte(MSTATE) == ST_MAGIC
+  end, 20000, "her list open on the earned boundary"),
   H.call(function()
-    H.writeByte(REFRESH + terra * 2, H.readByte(REFRESH + terra * 2) | 0x80)
+    H.setPad({})
+    local m = mp(celes)
+    H.log(string.format("[boundary] mp=%d", m))
+    H.assertEq(m >= 5 and m <= 7, true,
+      "[boundary] the pool really reads 5..7, walked there by real casts")
+    H.assertEq(recEnabled(celes, recOf(celes, ICE)), true,
+      "[boundary] Ice (5) is castable -- the control")
+    H.assertEq(recEnabled(celes, recOf(celes, OSMOSE)), false,
+      "[boundary] Osmose (8) is GREYED -- vanilla's 1 MP would not be")
+    H.assertEq(recEnabled(celes, recOf(celes, SHELL)), false,
+      "[boundary] Shell (15) is greyed")
+    -- no summon was spent this battle, so this grey is PURELY the MP gate
+    H.assertEq(esperEnabled(celes), false,
+      "[boundary] and the 27 MP summon is greyed too (no latch spent in "
+      .. "this battle -- the grey is the price alone)")
+    H.screenshot("magicite_boundary")
+    H.log("[magicite] all scenarios passed")
   end),
-  H.waitFrames(16),
-}, "ddust: a spent summon greys the esper row") })
-add({ H.driveUntil(function() return esperEnabled() end, 3000, {
-  H.call(function()
-    H.writeWord(SUMMONED, H.readWord(SUMMONED) & ~H.readWord(MASK(terra)))
-    H.writeByte(REFRESH + terra * 2, H.readByte(REFRESH + terra * 2) | 0x80)
-  end),
-  H.waitFrames(16),
-}, "ddust: clearing $3f2e offers it again -- the latch is the cause") })
-
--- --------------------------- 4. Osmose actually charges 8 and pays back --
--- The boundary above prices it; this proves the price is charged and that the
--- spell is still what Shiva is FOR (net-positive against a pool).  The exact
--- charge is read off the caster's MP word as it is written: the first write is
--- CalcAttackEffect's subtract (mp0 - 8), the later one the drain credit.
-add(driveIn("osmose", SHIVA, 30))
-add({ H.call(function()
-  for _, s in ipairs(GUARDS) do
-    H.writeWord(MMPMX(s), 500)
-    H.writeWord(MMP(s), 500)                    -- a pool worth stealing
-    H.writeWord(MHP(s), 0x2000)
-  end
-  R.mp0 = H.readWord(CURMP(terra))
-  R.gmp0 = H.readWord(MMP(GUARDS[1])) + H.readWord(MMP(GUARDS[2]))
-  H.assertEq(R.mp0, 30, "[osmose] Terra entered the fight on 30 MP")
-  H.assertEq(enabled(recOf(OSMOSE)), true, "[osmose] Osmose is castable on 30 MP")
-end) })
-add({ untilTerrasMenu("osmose") })
-add({ H.call(freezeOthers) })               -- the shared-prop-buffer interleave again
-add({ openMagicWindow("osmose") })
--- Put the cursor on Osmose: grid cell p is list record p+1 (record 0 is the
--- esper row), and get_magic_poi resolves (scroll + cursorY) * 2 + cursorX.
-add({ H.driveUntil(function() return H.readByte(MSTATE) == ST_TARGET end, 900, {
-  H.call(function()
-    local p = recOf(OSMOSE) - 1
-    H.writeByte(CURSOR_SCROLL + terra, p >> 1)
-    H.writeByte(CURSOR_Y + terra, 0)
-    H.writeByte(CURSOR_X + terra, p & 1)
-    H.setPad({ "a" })
-  end),
-  H.waitFrames(3), H.call(function() H.setPad({}) end), H.waitFrames(14),
-}, "osmose: A on the Osmose cell asks for a target ($38)") })
-add({ H.driveUntil(function() return sawSpell(OSMOSE) end, 4000,
-  tap("a", 20), "osmose: Osmose ($29) reaches $3410") })
-add({ H.waitFrames(180) })
-add({ H.call(function()
-  local mp1 = H.readWord(CURMP(terra))
-  local gmp1 = H.readWord(MMP(GUARDS[1])) + H.readWord(MMP(GUARDS[2]))
-  local seen = {}
-  for _, v in ipairs(mpWrites) do seen[v] = true end
-  H.log(string.format("[osmose] MP %d -> %d (writes seen: %s); guard MP %d -> %d",
-    R.mp0, mp1, table.concat((function()
-      local t = {}
-      for _, v in ipairs(mpWrites) do t[#t + 1] = tostring(v) end
-      return t
-    end)(), ","), R.gmp0, gmp1))
-  H.assertEq(seen[R.mp0 - OSMOSE_MP], true,
-    "[osmose] the caster's MP was debited to exactly mp0-8 (the charge)")
-  H.assertEq(gmp1 < R.gmp0, true, "[osmose] the target's MP pool actually dropped")
-  H.assertEq(mp1 > R.mp0, true,
-    "[osmose] and the caster ended NET POSITIVE -- 8 MP is still a refill")
-  H.screenshot("magicite_osmose")
-end) })
-
-add({ H.call(function() H.log("[magicite] all scenarios passed") end) })
-
-H.run({ maxFrames = 90000 }, all)
+})

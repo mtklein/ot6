@@ -62,8 +62,6 @@ tools/tests/battle_hudtrack.lua	.writeWord(
 tools/tests/battle_levelup.lua	.writeByte(
 tools/tests/battle_levelup.lua	.writeWord(
 tools/tests/battle_loadgate.lua	.writeWord(
-tools/tests/battle_magicite.lua	.writeByte(
-tools/tests/battle_magicite.lua	.writeWord(
 tools/tests/battle_mpcost.lua	.writeByte(
 tools/tests/battle_mpcost.lua	.writeWord(
 tools/tests/battle_rage.lua	.writeByte(
