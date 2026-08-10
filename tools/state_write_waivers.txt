@@ -114,7 +114,6 @@ tools/tests/lib/ot6.lua	emu.writeWord
 tools/tests/lib/ot6_field.lua	.writeByte(
 tools/tests/menu_blitzpage.lua	.writeByte(
 tools/tests/menu_bushidoloadout.lua	.writeByte(
-tools/tests/menu_esperdetail.lua	.writeByte(
 tools/tests/menu_esperdetail_tube6.lua	.writeByte(
 tools/tests/menu_ragepage.lua	.writeByte(
 tools/tests/menu_swdtechpage.lua	.writeByte(
