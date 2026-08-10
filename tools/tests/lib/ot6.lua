@@ -1089,7 +1089,17 @@ function M.newFightDriver(tag, opts)
       return { kind = "magic", rec = mg.rec, row = cmdRow(actor, CMD_MAGIC),
                boostLeft = boost }
     end
-    if opts.tactical and id == 4 and M.readWord(CURMP + actor * 2) >= 4
+    -- opts.tools = false parks the Tools line while keeping the rest of the
+    -- tactical kit.  MEASURED NEED (2026-08-10, the Cranes): AutoCrossbow is
+    -- ALL-target, and each Crane counts every hit in an if_hit retal var --
+    -- past the threshold the victim feeds its SIBLING the sibling's absorbed
+    -- element (Bolt2/Fire2 across the deck; +329 hp observed on the Left
+    -- Crane, more than three of our boosted hits undone).  Against a
+    -- formation where splash literally heals the enemy, Edgar's
+    -- single-target pierce Fight chips the same class-weak shields without
+    -- ever paying the sibling.
+    if opts.tactical and opts.tools ~= false and id == 4
+       and M.readWord(CURMP + actor * 2) >= 4
        and cmdRow(actor, CMD_TOOLS) then
       return { kind = "skill", cmd = CMD_TOOLS, skill = AUTOCROSSBOW,
                row = cmdRow(actor, CMD_TOOLS), boostLeft = boost }
@@ -1200,6 +1210,57 @@ function M.newFightDriver(tag, opts)
             "want=%02X) -- confirming on whoever is highlighted",
             tag or "fight", chars, wantMask))
         end
+      end
+      -- opts.focus = { {slot=S, mask=M}, ... }: MONSTER kill order, steered
+      -- against the live target mask ($7B7E) exactly the way the item line
+      -- steers $7B7D.  Each entry names a monster SLOT (for the liveness
+      -- check against $3BFC) and the $7B7E MASK bit that puts the cursor on
+      -- it -- two different orderings, MEASURED different (2026-08-10, the
+      -- Cranes): the mask's bit 0 is the cursor's default rest position and
+      -- landed damage on SLOT 1 ($010E), so mask bits follow the on-screen
+      -- formation layout, not monster-table order.  The need is the same
+      -- fight: each Crane counts hits in an if_hit retal var, and past the
+      -- threshold the victim feeds its SIBLING the sibling's absorbed
+      -- element -- so the unfocused default (everyone on the Right) had the
+      -- Right Crane casting Bolt2 into the Left all fight: Left healed to
+      -- FULL each time and, worse, Bolt2 is LIGHTNING, so the same feed
+      -- walked Left's Giga Volt charge to level 3 and the nuke wiped the
+      -- party ($010D at 1800/1800 across three attempts' close dumps).
+      -- Focus picks the first entry whose slot is still alive; single-
+      -- target plans steer to its mask (summons and items keep their own
+      -- targeting), and the tgtSpin backstop still confirms rather than
+      -- hold the turn open.
+      if opts.focus and plan.kind ~= "item" and plan.kind ~= "summon" then
+        local want = nil
+        for _, e in ipairs(opts.focus) do
+          local mid = M.readWord(M.MONSTER_IDS + e.slot * 2)
+          if mid ~= 0 and mid ~= 0xFFFF
+             and M.readWord(0x3BFC + e.slot * 2) > 0 then want = e.mask; break end
+        end
+        if want ~= nil then
+          local mons = M.readByte(TGTMONS)
+          if mons ~= want then
+            tgtSpin = tgtSpin + 1
+            if tgtSpin < 24 then
+              -- on the ally side (mons == 0), LEFT crosses to the enemy
+              -- side.  Among monsters the walk leads with LEFT/RIGHT --
+              -- measured on the Cranes (side-by-side formation): 24 ticks
+              -- of down/up never moved the rest mask, the pair is a
+              -- horizontal walk
+              if mons == 0 then return { "left" } end
+              local dirs = { "left", "right", "down", "up" }
+              return { dirs[1 + ((tgtSpin // 6) % 4)] }
+            end
+            M.log(string.format("[%s] focus steer gave up (mons=%02X " ..
+              "want=%02X) -- confirming on whoever is highlighted",
+              tag or "fight", mons, want))
+          end
+        end
+      end
+      if opts.traceTgt then
+        M.log(string.format("[%s] tgt CONFIRM kind=%s actor=%d chars=%02X "
+          .. "mons=%02X", tag or "fight", plan.kind, actor,
+          M.readByte(TGTCHARS), M.readByte(TGTMONS)))
       end
       plan, planActor, tgtSpin = nil, nil, 0
       return { "a" }

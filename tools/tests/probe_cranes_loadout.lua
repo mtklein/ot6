@@ -42,16 +42,27 @@ H.run({ maxFrames = 900 }, {
             known[#known + 1] = SPELLS[s] or string.format("$%02X", s)
           end
         end
+        local gear = {}
+        for g = 31, 36 do gear[#gear + 1] = string.format("%02X", H.readByte(base + g)) end
         H.log(string.format(
           "[char c%d] actor=%d(%s) lvl=%d hp=%d/%d mp=%d/%d esper=%02X "
-          .. "knows{%s}", c, actor, NAMES[actor] or "?", H.readByte(base + 8),
+          .. "gear=%s knows{%s}", c, actor, NAMES[actor] or "?", H.readByte(base + 8),
           H.readWord(base + 9), H.readWord(base + 11),
           H.readWord(base + 13), H.readWord(base + 15),
-          H.readByte(base + 30), table.concat(known, ",")))
+          H.readByte(base + 30), table.concat(gear, " "), table.concat(known, ",")))
       end
     end
     H.log(string.format("[switches] $006B(reunion)=%d $02F6(celes)=%d",
       (H.readByte(0x1E80 + (0x6B >> 3)) >> (0x6B & 7)) & 1,
       (H.readByte(0x1E80 + (0x2F6 >> 3)) >> (0x2F6 & 7)) & 1))
+    -- the whole bag, weapon-range ids: what could re-arm the riders?
+    local bag = {}
+    for i = 0, 255 do
+      local id, qty = H.readByte(0x1869 + i), H.readByte(0x1969 + i)
+      if id ~= 0xFF and qty > 0 and id < 0x5A then
+        bag[#bag + 1] = string.format("%02X x%d", id, qty)
+      end
+    end
+    H.log("[bag weapons/gear] " .. table.concat(bag, ", "))
   end),
 })
