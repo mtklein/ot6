@@ -144,9 +144,13 @@ diagnoses were wrong in instructive ways:**
   Historical wipe record: gen_terra_returned_anchor f7d32da +
   probe_cranes_wedge (one retracted wrong verdict lives there — the
   Game Over continue-flow read as a completing scene; trust f7d32da,
-  not cc2ce35).  The terra-returned re-cut and the chained tail
-  (narshe-mission, gate-cave-save, vector-crash, banquet-done) are
-  unblocked and being cut.
+  not cc2ce35).  The terra-returned re-cut and the chained tail are ALL
+  CUT on the honest lineage the same day, each through the real Save UI
+  with sealed mechanical provenance: terra-returned-v1 (PASS f52308, 21
+  fields), narshe-mission-v1 (f10369, 27), gate-cave-save-v1 (f14754,
+  22), vector-crash-v1 (f28613, 30), and banquet-done-v1 (f52694, 40
+  fields; the honest 70-point tier reproduced exactly -- window 21 +
+  dinner 49 -- with the >=77/>=90 reward negatives verified).
 
 ### Doctrine (measured; do not re-derive)
 
