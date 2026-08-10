@@ -1638,9 +1638,29 @@ end
 -- overworld, and "the menu is closed and the party has control again" is a
 -- different question on each: the world module has its own position and
 -- control registers and every field predicate is meaningless there.
+--
+-- AND THE ANSWER IS ONLY TRUSTWORTHY HELD, not glimpsed.  Measured on
+-- the overworld (gen_sabin_gau's staging walk, 2026-08-09): the close
+-- drive's exit read one satisfying frame mid-handoff -- "back to the
+-- field satisfied after 58 frames" -- while the MAIN MENU was still
+-- open behind it (ZMENUSTATE=05), because the world control/alignment
+-- registers held stale-live values during the menu module's teardown.
+-- The caller's walk then parked against an invisible open menu for its
+-- whole budget, every single care stop, until it grew its own B-tap
+-- recovery.  Every "back on the map" exit below is therefore DEBOUNCED:
+-- the condition must hold 30 consecutive frames before the close is
+-- believed.  calmly() builds that predicate.
 local function careBackOnMap()
   if M.worldMode() then return M.worldHasControl() and M.worldAligned() end
   return M.hasControl() and M.tileAligned()
+end
+
+local function calmly(pred, n)
+  local calm = 0
+  return function()
+    calm = pred() and calm + 1 or 0
+    return calm >= (n or 30)
+  end
 end
 
 local CARE_ZM, CARE_CUR, CARE_REFUSE = 0x26, 0x4b, 0xb5
@@ -1855,10 +1875,10 @@ function M.fieldCare(opts)
       M.call(serveFrame),
     }, tag .. ": heal/revive through the item menu"),
     M.release(),
-    M.driveUntil(function()
+    M.driveUntil(calmly(function()
       return careBackOnMap()
          and M.readByte(CARE_ZM) ~= 0x05 and M.readByte(CARE_ZM) ~= 0x08
-    end, 2400, {
+    end), 2400, {
       M.call(function()
         phase = (phase + 1) % 12
         M.setPad(phase < 4 and { "b" } or {})
@@ -2046,9 +2066,9 @@ function M.setRows(spec, opts)
       end),
     }, tag .. ": back to the main menu"),
     M.release(),
-    M.driveUntil(function()
+    M.driveUntil(calmly(function()
       return careBackOnMap() and M.readByte(ZM) ~= 0x05
-    end, 2400, {
+    end), 2400, {
       M.call(function()
         phase = (phase + 1) % 12
         M.setPad(phase < 4 and { "b" } or {})
@@ -2189,10 +2209,10 @@ function M.equipOptimum(opts)
       end),
       -- back to the field before the next slot, so every pass starts from
       -- the same place rather than from wherever the last one stopped
-      M.driveUntil(function()
+      M.driveUntil(calmly(function()
         return careBackOnMap() and M.readByte(ZM) ~= ST_MAIN
            and M.readByte(ZM) ~= ST_CHAR and M.readByte(ZM) ~= ST_OPT
-      end, 2400, {
+      end), 2400, {
         M.call(function() tap("b") end),
       }, tag .. ": back to the field"),
       M.release(), M.waitFrames(20),
