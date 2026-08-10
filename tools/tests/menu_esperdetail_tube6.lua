@@ -1,4 +1,4 @@
--- @suite frontier=arvis_wake
+-- @suite frontier=esper_tubes
 -- menu_esperdetail_tube6.lua -- the SIX TUBE-ROOM STONES on the esper detail
 -- page (docs/design/magicite-tube-six.md §11, issue #31).
 --
@@ -21,11 +21,28 @@
 -- blank, and (Maduin) that a MINUS sign renders.
 --
 -- Same drive and same instrument as menu_esperdetail.lua (issue #27): X ->
--- Skills -> character -> Espers -> list -> detail from the arvis_wake fixture,
--- with the esper inventory pinned directly (the battle_bushido "install state"
--- house pattern) because arvis_wake owns no stones yet.  That file stays as it
--- is -- it is #27's shipped gate on the page's SHAPE (dead columns gone, mod
--- and no-mod both correct) and this one is #31's gate on the page's CONTENT.
+-- Skills -> character -> Espers -> list -> detail -- but from the esper_tubes
+-- fixture now (issue #75 conversion), the honest v0.6 mint of the tube-room
+-- set piece itself: its bag REALLY holds the boot roster (RAMUH IFRIT SHIVA
+-- SIREN) plus the six give_genju grants SHOAT MADUIN BISMARK CARBUNKL PHANTOM
+-- UNICORN (gen_esper_tubes_done asserts the delta bit by bit).  So the MADUIN
+-- and UNICORN pages below are rendered for stones the save owns, with no
+-- inventory write at all.  menu_esperdetail.lua stays as #27's gate on the
+-- page's SHAPE (against magicite_ifrit_shiva's three stones) and this one is
+-- #31's gate on the page's CONTENT.
+--
+-- *** ONE LABELED ISOLATION ARM (issue #75) -- a single state write STAYS ***
+-- The TERRATO page is the page's honest-empty control: Ot6EsperStatTbl $0000,
+-- NO caption, NO terms -- and no stone any reachable save owns carries a
+-- $0000 row (ot6_progression.asm authors Terrato as "THE NO-MOD CONTROL"
+-- precisely because he arrives far beyond the current frontier).  Per the
+-- burn-down plan's observation-window ruling (docs/waiver-burndown-plan.md,
+-- systemic call 2: a RENDERER mechanism claim may stay as a loudly-labeled
+-- isolation arm), the single write below ORs Terrato's bit into $1a69 --
+-- adding one list row -- so the honest-empty path stays exercised until a
+-- fixture deep enough to own a no-mod stone exists.  It is one OR of one bit
+-- (the old test REPLACED the whole bitfield); this file keeps its .writeByte(
+-- waiver line for exactly that site and MAY NEVER PRODUCE FIXTURES.
 --
 -- THE THREE PAGES:
 --   MADUIN  (6)  the marquee, twice over.  Three spell rows that must read Fire
@@ -72,7 +89,7 @@
 -- two ranges therefore agree, and a term landing on a row this file expects
 -- empty would fail here loudly.
 local H = dofile("tools/tests/lib/ot6.lua")
-local STATE = "build/states/arvis_wake.mss.lua"
+local STATE = "build/states/esper_tubes.mss.lua"
 
 local ZMENUSTATE = 0x26                 -- menu direct-page vars (menu_ram.inc)
 local ZLISTTYPE  = 0x2a
@@ -256,16 +273,28 @@ local toList = {
   H.waitFrames(10),
   H.waitUntil(function() return H.hasControl() end, 400, "field control", 5),
 
-  -- Pin the esper inventory to exactly MADUIN + TERRATO + UNICORN.
-  -- bitfield $1a69, bit n of byte n>>3: MADUIN 6 -> $40 and TERRATO 4 -> $10
-  -- in byte 0; UNICORN 23 -> bit 7 of byte 2.
+  -- POSITIVE CONTROL, read-only: the tube-room set piece really granted its
+  -- six stones on top of the boot roster (gen_esper_tubes_done's own exit
+  -- assertion, re-made at consume time).  MADUIN (bit 6 of byte 0) and
+  -- UNICORN (bit 7 of byte 2) -- the two honest pages below -- are owned.
   H.call(function()
-    H.log(string.format("[pin] $1a69 was %02x; pinning MADUIN+TERRATO+UNICORN",
-      H.readByte(ESPERS)))
-    H.writeByte(ESPERS + 0, 0x50)
-    H.writeByte(ESPERS + 1, 0x00)
-    H.writeByte(ESPERS + 2, 0x80)
-    H.writeByte(ESPERS + 3, 0x00)
+    H.log(string.format("[espers] $1a69 = %02x %02x %02x %02x (read)",
+      H.readByte(ESPERS), H.readByte(ESPERS + 1), H.readByte(ESPERS + 2),
+      H.readByte(ESPERS + 3)))
+    H.assertEq(H.readByte(ESPERS) & 0xEF, 0xEF,
+      "the save owns RAMUH IFRIT SHIVA SIREN + SHOAT MADUIN BISMARK")
+    H.assertEq(H.readByte(ESPERS + 2) & 0x98, 0x98,
+      "... and CARBUNKL PHANTOM UNICORN (the give_genju receipts)")
+  end),
+
+  -- *** THE LABELED ISOLATION ARM'S ONE WRITE (see header) ***  OR Terrato's
+  -- bit (esper 4, bit 4 of byte 0) into the owned set so the honest-empty
+  -- no-mod page can be visited; nothing else is written, and the ten real
+  -- stones are untouched.
+  H.call(function()
+    H.writeByte(ESPERS + 0, H.readByte(ESPERS) | 0x10)
+    H.log("[isolation arm] TERRATO's bit OR'd into $1a69 -- the $0000 no-mod "
+      .. "control, unreachable on this frontier (see header)")
   end),
 
   -- driveUntil, not one press: the X that opens the field menu is the first
@@ -289,7 +318,8 @@ local toList = {
   H.waitFrames(10),
 
   H.call(function()
-    H.assertEq(H.readByte(SKILLCOLOR), 0x20, "Espers row enabled (the pin took)")
+    H.assertEq(H.readByte(SKILLCOLOR), 0x20,
+      "Espers row enabled (the save owns stones)")
   end),
   H.driveUntil(function()
     return st() == ST_SKILLS and H.readByte(ZCURSOR) == 0
@@ -348,7 +378,9 @@ add({ H.call(function()
 end) })
 add(backToList())
 
--- ---- TERRATO: the surviving no-mod control, revisited after Maduin -------
+-- ---- TERRATO: the no-mod control, revisited after Maduin -----------------
+-- (THE ISOLATION ARM's page -- the one row the $1a69 OR above added.  Every
+-- cell assertion below is the mechanism claim the arm exists to keep.)
 add(page(TERRATO, "Terrato"))
 add({ H.call(function()
   H.assertEq(H.readByte(Z99), TERRATO, "detail page is TERRATO's")
