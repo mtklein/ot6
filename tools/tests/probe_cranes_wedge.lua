@@ -21,40 +21,49 @@
 -- Ends after the wedge dump cycle or on reaching map 219.
 -- NOT a suite test; no fixture output.
 --
--- ============================ RESOLVED (2026-08-10) ======================
--- NOT a product bug, NOT off the rails: a DRIVABLE input the ride was
--- missing.  Three runs bisected it (logs are the record):
+-- ==================== CORRECTED VERDICT (2026-08-10, final) ==============
+-- The earlier RESOLVED note in this header claimed the wedge was "a
+-- drivable A-press, not a product bug".  THAT WAS WRONG, and the error is
+-- worth recording: the "scene" the edge-A run drove to completion was
+-- THE GAME OVER SEQUENCE.  The trace's post-fight addresses CCE56E..CCE5xx
+-- sit inside .proc GameOver (event_main.asm:113054, cc/e566), and the
+-- CC9AEB "SavePoint" loop at the end is the continue flow, not a deck
+-- save point.  What actually happens, measured across five runs:
 --
---   * THE CRANES FIGHT is scripted-end, party survives at FULL HP
---     (persistent $1600 table reads c1/c4/c5/c9 all full; the battle
---     table's 0/0/0/0 is teardown, HANDOFF trap 1).  Both Cranes stay
---     alive (010D 1095/sh5, 010E untouched 2300/sh6) -- winning is not
---     the gate.
---   * THE POST-CRANES SCENE HAS AN A-GATED BEAT.  Left alone (no input)
---     the event parks and holds for 13000+ measured frames (f12565 ->
---     f25499, unchanged).  A round-robin poke run, and then a PURE
---     EDGE-A run, both ADVANCE it -- edge-A alone carries the whole
---     scene through to CC9AEB = SavePoint (_cc9aeb, event_main.asm) on
---     the map-6 Blackjack DECK.  So the beat is an ordinary A wait that
---     does NOT raise the dialog flag ($056f=0, dlg=false), which is
---     exactly why advanceStory's honest="tactical" patience -- it only
---     taps A when dlg=true -- holds neutral and wedges there.
---   * THE SCENE'S ENDPOINT is the deck save point, control RETURNED
---     (SavePoint EventReturns with $01B5 set; hasControl() flickers on
---     the save tile, the documented anchor-gen pattern).  The gen's ride
---     pred (map==219) and its whole downstream route assume the party
---     lands on map 219 directly; the real control-return is on MAP 6,
---     and the flashback (219) is reached later through the deck's own
---     scripted sequence (load_map 219 at event_main.asm:24258, gated
---     behind object moves + a wait_obj).
+--   * the Cranes' AI scripts (AIScript::_269/_270) contain NO end_battle
+--     -- the fight ends by KILL or WIPE only, plus a 60s repeating
+--     Magnitude8 timer and charge counters fed by absorbed elements;
+--   * every honest configuration tried WIPES: tactical/heal45 at ~f8400
+--     (timeline B, plain fights: wiped with both Cranes at FULL hp);
+--     tactical/heal45+bank1 wiped ~f6800-8400 across trajectories after
+--     chipping at best 1800->1095/sh5 on Crane0; the terra6 gen run
+--     wiped ~f+7500 (party 143/43/203/39 at f+5700, Crane0 1357/sh5);
+--   * the wipe closes the battle (battle CLOSED, both Cranes alive),
+--     GameOver restores the party to full persistent HP -- the reads
+--     that looked like "scripted end, party survives at full HP" were
+--     the game-over restore, not survival;
+--   * the CB40E8 hold (~1800 frames, advances on A, no dialog flag) is a
+--     beat inside the wipe -> GameOver handoff -- the "drivable input"
+--     was the player pressing through their own death screen.
 --
--- THE FIX (gen-side, terra_returned_anchor's ride): replace the
--- advanceStory(map==219) patience with an EDGE-A drive through the
--- post-Cranes scene, terminate it on control-return at the deck (position
--- + $01B5, never raw hasControl), then re-derive the downstream route
--- from map 6 forward.  That route re-authoring (deck -> 219 trigger, then
--- the rest) is follow-on measurement; this probe nails the missing input
--- and the true endpoint.  No game-side change.
+-- CHIP PACE vs SURVIVAL: when attacking, the fighter chips ~440hp + 1
+-- shield per ~5700 frames on one Crane -- a win needs ~40-60k battle
+-- frames sustained, and no tried healing configuration survives past
+-- ~8400.  Survival, not damage, is the binding constraint.
+--
+-- THE PRODUCT/BALANCE FINDING for the dispatch: bosses-wob.md 16 names
+-- the Cranes' elemental key as WATER ("the elemental key here is
+-- water"), and the mandated party at this point (LOCKE/SABIN/EDGAR/
+-- TERRA, natural magic only, fire-lean) has NO water access of any kind.
+-- The fight's designed counter is unobtainable by the party that must
+-- fight it; the owner's playtest stopped at Ifrit/Shiva, so no human has
+-- crossed this in OT6.  Whether that is intended difficulty or a tuning
+-- gap is an owner call; the July anchor only ever passed because the
+-- kill-bit ended the fight in 3 frames.
+--
+-- HARNESS NOTE: several earlier "Mesen crashes" during these runs were
+-- run.sh's 600s wall-clock cap (OT6_TIMEOUT raises it); the reap message
+-- says so explicitly when it happens.
 
 local H = dofile("tools/tests/lib/ot6.lua")
 
@@ -62,7 +71,7 @@ local H = dofile("tools/tests/lib/ot6.lua")
 -- (heals at 45, the wedging timeline); "B" = plain Fights, no items, no
 -- boost -- maximum honest contrast in fight shape/duration, same route.
 -- Edit here between runs; the evPC transition trace below is the diff.
-local TIMELINE = "A"
+local TIMELINE = "B"
 
 local function map() return H.mapId() & 0x1ff end
 local function bright() return emu.getState()["ppu.screenBrightness"] or 0 end
@@ -153,16 +162,14 @@ H.run({ maxFrames = 200000 }, {
     local ph, battN, wasBatt = 0, 0, false
     local quiet, lastX, lastY, lastDump = 0, -1, -1, 0
     local wedgeDumps, pokes = 0, 0
-    local tracing, lastPC, traceN, ctlHold = false, nil, 0, 0
+    local tracing, lastPC, traceN, ctlHold, rearmed = false, nil, 0, 0, nil
     return H.driveUntil(function()
-      if map() == 219 then return true end
-      if H.hasControl() and H.tileAligned() then
-        ctlHold = ctlHold + 1
-        if ctlHold >= 60 then return true end
-      else
-        ctlHold = 0
+      if map() == 219 then H.log("[verdict] STORY CONTINUES (flashback)"); return true end
+      if tracing and battN >= 3 then
+        rearmed = (rearmed or 0) + 1
+        if rearmed == 1 then H.log("[verdict] BATTLE RE-TRIGGERED (retry loop)") end
       end
-      return wedgeDumps >= 30
+      return wedgeDumps >= 25
     end, 180000, {
       H.call(function()
         ph = (ph + 1) % 8

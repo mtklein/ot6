@@ -117,7 +117,10 @@ local function talkApproached(pred, maxFrames, what)
   }, what)
 end
 
-H.run({ maxFrames = 60000 }, {
+-- 110000: the July budget (60000) was sized for 3-frame kill-bit fights;
+-- the honest Cranes alone runs ~7000 frames and the A-gated scene beats
+-- add more.  Measured need ~75k; headroom for fight variance.
+H.run({ maxFrames = 110000 }, {
   H.loadState("build/states/n128_won.mss.lua"),
   H.waitFrames(150),
   H.call(function()
@@ -133,40 +136,66 @@ H.run({ maxFrames = 60000 }, {
 
   -- 2. reunion, Cranes, flights, into the flashback.  honest="tactical".
   --
-  -- RESOLVED to a DRIVABLE INPUT, not a wall (2026-08-10,
-  -- probe_banquet_recall's sibling probe_cranes_wedge; three bisecting
-  -- runs, logs are the record).  The earlier "MEASURED WALL" read was
-  -- wrong on both counts:
-  --   * the Cranes fight is SCRIPTED-END and the party survives at FULL
-  --     HP (persistent $1600 table full; the battle table's 0/0/0/0 is
-  --     teardown, HANDOFF trap 1).  Both Cranes stay alive -- WINNING IS
-  --     NOT THE GATE, so the attack-magic branch is not the lever here
-  --     (it landed anyway, and helps other bosses);
-  --   * the post-Cranes scene has an A-GATED beat: left with NO input the
-  --     event holds 13000+ frames unchanged; a PURE EDGE-A run advances
-  --     it all the way to _cc9aeb (SavePoint) on the map-6 Blackjack
-  --     DECK.  The beat does not raise the dialog flag ($056f=0), which
-  --     is exactly why advanceStory's honest="tactical" patience -- it
-  --     taps A only when dlg=true -- holds neutral and never presses it.
-  --   * the scene's endpoint is the deck save point with control
-  --     RETURNED (SavePoint EventReturns, $01B5 set; hasControl()
-  --     flickers on the tile, the anchor-gen pattern).  map 219 (the
-  --     flashback, load_map at event_main.asm:24258) is reached LATER,
-  --     through the deck's own scripted sequence -- NOT directly, as the
-  --     pred below and the whole downstream route assume.
+  -- THE WALL, FINAL FORM (2026-08-10, probe_cranes_wedge's corrected
+  -- verdict -- the intermediate "drivable A-press" reading was WRONG;
+  -- the scene it drove was .proc GameOver, cc/e566):
+  --   * the Cranes' AI has NO end_battle -- kill or wipe only;
+  --   * every honest fighter configuration tried WIPES by ~f8400 (the
+  --     "party survives at full HP" reads were GameOver's restore);
+  --   * chip pace while attacking (~440hp+1sh per 5700f on one Crane)
+  --     needs 40-60k sustained battle frames; survival fails first;
+  --   * bosses-wob.md 16 names the Cranes' key element WATER, and this
+  --     party has no water access -- the designed counter is
+  --     unobtainable here.  Balance finding for the owner; the July
+  --     anchor passed only because the kill-bit ended the fight in 3
+  --     frames.  This leg stays FAILING until the owner rules (retune,
+  --     or a fight the library can win some other way), and cuts 6-10
+  --     stay chain-blocked behind it.
   --
-  -- THE FIX (follow-on, not applied here): replace this advanceStory with
-  -- an EDGE-A drive through the post-Cranes scene, terminate on
-  -- control-return at the deck (position + $01B5, never raw hasControl),
-  -- then re-derive the route from map 6 forward -- the downstream navTo
-  -- chain is written for a map-219 landing that does not happen.  Cuts
-  -- 6-10 (narshe/gate_cave/vector_crash/banquet) chain-boot downstream of
-  -- terra-returned-v1 and stay blocked until that route re-authoring
-  -- lands.  Left FAILING deliberately; the missing input and the true
-  -- endpoint are now known, no game-side change involved.
-  H.advanceStory(function()
-    return map() == 219 and sw(0x01C2) == 1 and settled()
-  end, 100000, { honest = "tactical" }),
+  -- The re-authored ride (the fix the RESOLVED note above prescribes):
+  -- the same terminator -- the flashback with control as MADUIN -- but
+  -- EDGE-A through the scene instead of neutral patience, because the
+  -- post-Cranes beat is an A wait that never raises the dialog flag.
+  -- Battles (the Cranes) go to the tactical fighter; every non-battle
+  -- frame edge-taps A, which is exactly what a player crossing this
+  -- scene does.  probe_cranes_wedge measured all of this.
+  -- 7-frame stagger: the first two cut attempts crashed the EMULATOR
+  -- (Mesen vanished, no crash report) at the identical battle frame --
+  -- f+7800, Crane0 at 662 -- twice, because same inputs = same
+  -- deterministic trajectory.  Shifting the ride's start by a few frames
+  -- re-rolls the whole battle path around whatever the emulator chokes
+  -- on.  A harness workaround, not a game fix; noted for the dispatch.
+  H.waitFrames(7),
+  (function()
+    local F = H.newFightDriver("terra ride", { tactical = true,
+      boost = true, bank = 1, items = true, healPercent = 45 })
+    local ph, battN = 0, 0
+    return H.driveUntil(function()
+      local d = map() == 219 and sw(0x01C2) == 1 and settled()
+      if d then H.setPad({}) end
+      return d
+    end, 100000, {
+      H.call(function()
+        ph = (ph + 1) % 8
+        battN = H.battleLoadStarted() and battN + 1 or 0
+        if battN >= 3 then F.frame(); return end
+        if battN > 0 then F.idle(); H.setPad({}); return end
+        F.idle()
+        -- edge-A ONLY until the flashback loads: the A-gated beat lives on
+        -- map 6, and the flashback's start tile sits by the Esper-world
+        -- SAVE POINT -- blind A there re-opens the save query dialog
+        -- forever, which is precisely how the first budget-burn run spent
+        -- 55k frames (dialogWaiting high, settled() never true).  On 219,
+        -- neutral with A only for real dialogs, and settled() fires.
+        if map() == 219 then
+          if H.dialogWaiting() then H.setPad(ph < 4 and { "a" } or {})
+          else H.setPad({}) end
+          return
+        end
+        H.setPad(ph < 4 and { "a" } or {})
+      end),
+    }, "edge-A ride: Cranes -> Terra's return -> the flashback (map 219)")
+  end)(),
   H.waitFrames(90),
   H.call(function()
     H.assertEq(map(), 219, "the Esper-World flashback (map 219)")
