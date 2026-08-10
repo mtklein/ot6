@@ -118,13 +118,6 @@ local H = dofile("tools/tests/lib/ot6.lua")
 local function map() return H.mapId() & 0x1ff end
 local function bright() return emu.getState()["ppu.screenBrightness"] or 0 end
 local function sw(id) return (H.readByte(0x1E80 + (id >> 3)) >> (id & 7)) & 1 end
-local function killBitAll()
-  for s = 0, 5 do
-    if H.readByte(0x3aa8 + s * 2) % 2 == 1 then
-      H.writeByte(0x3eec + s * 2, H.readByte(0x3eec + s * 2) | 0x80)
-    end
-  end
-end
 local function settled()
   return H.hasControl() and H.tileAligned() and bright() >= 15
      and not H.dialogWaiting() and not H.battleLoadStarted() and not H.worldMode()
@@ -171,55 +164,9 @@ end
 
 local DELTA = { up = { 0, -1 }, right = { 1, 0 }, down = { 0, 1 }, left = { -1, 0 } }
 
--- Tap `dir` whenever the party has control, hands off while a scene owns
--- it, edge-A through dialogs.  Used to walk INTO a trigger whose scene then
--- takes over -- the tap keeps the party from sliding past the tile.
-local function tapInto(dir, pred, maxFrames, what)
-  local phase, n, ph, calm, hb = 0, 0, 0, 0, 0
-  return H.driveUntil(function()
-    calm = (pred() and settled()) and calm + 1 or 0
-    return calm >= 16
-  end, maxFrames or 12000, {
-    H.call(function()
-      ph = (ph + 1) % 8
-      hb = hb + 1
-      if hb % 120 == 0 then
-        H.log(string.format("tapInto f%d (%d,%d) phase=%d ctl=%s algn=%s "
-          .. "dlg=%s ev=%s $01B5=%d face=%d",
-          H.frame, H.fieldX(), H.fieldY(), phase, tostring(H.hasControl()),
-          tostring(H.tileAligned()), tostring(H.dialogWaiting()),
-          tostring(H.eventRunning()), sw(0x01B5),
-          H.readByte(0x087f + H.readWord(0x0803))))
-      end
-      if H.battleLoadStarted() then
-        killBitAll(); H.setPad(ph < 4 and { "a" } or {}); phase = 0; return
-      end
-      if H.dialogWaiting() then
-        H.setPad(ph < 4 and { "a" } or {}); phase = 0; return
-      end
-      if phase == 0 then
-        H.setPad({})
-        -- STOP TAPPING once we are where we were going.  The terminator
-        -- wants 16 consecutive calm frames on the target, and an eager tap
-        -- walks straight off it before the count gets there: the first
-        -- version of this rode the chute correctly to (10,45) and then
-        -- tapped itself to (10,46) and timed out.
-        if pred() then return end
-        if settled() then phase, n = 1, 0 end
-        return
-      end
-      if phase == 1 then
-        n = n + 1
-        H.setPad({ [dir] = true })
-        if n >= 8 then phase, n = 2, 0 end
-        return
-      end
-      H.setPad({})
-      n = n + 1
-      if n >= 24 then phase = 0 end
-    end),
-  }, what)
-end
+-- (a tapInto helper used to sit here, DEFINED and never called -- the same
+-- dead battle toolkit every conversion in this wave has deleted; its only
+-- battle handling was the kill-bit)
 
 local function census(tag, targets)
   local sx, sy = H.fieldX(), H.fieldY()
@@ -245,21 +192,77 @@ local function census(tag, targets)
 end
 
 
--- Ride the cutscene: kill-bit every battle, edge-A through every text, and
--- RECORD each fight's formation words on its rising edge so the assertions
--- afterwards are about what was actually fought.
-local fights, battN, rideStart = {}, 0, nil
-local function rideDriver(pred, maxFrames, what)
-  local ph, hb = 0, 0
-  return H.driveUntil(pred, maxFrames, {
+-- a bare step list cannot be spliced into a step list; H.cond with an
+-- always-true predicate is the library's public way to wrap one into a step
+local function seq(steps) return H.cond(function() return true end, steps) end
+
+-- Ride the cutscene, HONESTLY (issue #75): every one of the six forced
+-- battles is FOUGHT with the library fighter -- these are event battles
+-- the train engine issues by writing $0011E0, the ride waits on each win,
+-- and fleeing is not the design -- and each fight's formation words are
+-- RECORDED on the rising edge so the assertions afterwards are about what
+-- was actually fought.  Outside battle the ride is on rails: edge-A pages
+-- the text, a held direction would only fight the engine.
+--
+-- The ride is wrapped in gen_tunnelarmr's phase-spread retry ladder: six
+-- honest fights back to back with no field care between them is exactly
+-- the shape that eats a party on a bad roll, a loss is GAME OVER, and the
+-- RNG seed is the frame phase at battle init.  A wipe is detected IN the
+-- drive (the party's battle HP all zero, debounced) so the ladder can
+-- reload instead of riding the Annihilated screen into a timeout.
+-- FIGHT 6 IS TARGETED, and the reason is measured, not assumed: on the
+-- first honest attempt the fighter's default targeting fed the BLADES for
+-- 8500 frames -- Left Blade read 515/sh1 and then 700/sh3 again, i.e. THE
+-- BLADES REGENERATE -- while the body sat untouched at 3276/sh7, and the
+-- party bled out on the treadmill.  The body's authored break axis is
+-- PIERCING (bosses-wob.md 15, as re-decoded by #23: the bolt/water row was
+-- never written; the physical class is the shipped axis), which is
+-- EDGAR's AutoCrossbow -- so the override below steers every single-target
+-- confirm onto the LIVE $010B slot and lets the xbow chip the 7 shields
+-- while everyone's damage goes where it counts.  Items still target the
+-- party (the override skips char-side selects), and a 40-frame spin
+-- give-up keeps an untargetable state from deadlocking a turn.
+local fights, rideStart = {}, nil
+local function rideDriver(pred, lostRef, maxFrames, what)
+  local ph, hb, battN, wipeN, tgtSpin = 0, 0, 0, 0, 0
+  -- POLICY, revised twice, both times on measured losses.  Round one (run
+  -- N0mLGnDD, ladder red at fights 6/4/6): healPercent 60 reacted too
+  -- late to the Mag Roaders' whole-party bursts, and bank=3 wasted BP --
+  -- a chip is per boosted HIT, so three boost-1 swings out-chip one
+  -- boost-3 swing.  Round two (run R0crCD3T): healPercent 75 fixed the
+  -- Roader attrition completely (the party reached fight 6 at full) and
+  -- then HEAL-LOCKED the boss marathon -- under the boss + two blades
+  -- someone is always below 75%%, EDGAR spent every turn on the bag, the
+  -- body took ONE chip in 4900 frames on attempt 1 and ZERO on attempt 2,
+  -- and the fight stalled until the bag ran dry.  So the policy is SPLIT:
+  -- the five Roader fights heal greedily at 75%% (they end fast; the bag
+  -- spend is small), and the boss fight drops to 55%% so EDGAR's turns go
+  -- to the AutoCrossbow that actually breaks the body.
+  local Ftrash = H.newFightDriver("n128 trash", { tactical = true,
+    boost = true, bank = 1, items = true, healPercent = 75, cadence = 12 })
+  local Fboss = H.newFightDriver("n128 boss", { tactical = true,
+    boost = true, bank = 1, items = true, healPercent = 55, cadence = 12 })
+  return H.driveUntil(function() return lostRef.lost or pred() end, maxFrames, {
     H.call(function()
       ph = (ph + 1) % 8
       hb = hb + 1
       if hb % 600 == 0 then
-        H.log(string.format("ride f%d map=%d (%d,%d) world=%s ctl=%s batt=%s "
-          .. "fights=%d", H.frame, map(), H.fieldX(), H.fieldY(),
-          tostring(H.worldMode()), tostring(H.hasControl()),
-          tostring(H.battleLoadStarted()), #fights))
+        local mhp = {}
+        if H.battleLoadStarted() then
+          for m = 0, 5 do
+            local id = H.readWord(0x57C0 + m * 2)
+            if id ~= 0xFFFF and id ~= 0 then
+              mhp[#mhp + 1] = string.format("%04X:%d/sh%d", id,
+                H.readWord(0x3BFC + m * 2), H.readByte(0x3E40 + m * 2))
+            end
+          end
+        end
+        H.log(string.format("ride f%d map=%d (%d,%d) ctl=%s batt=%s "
+          .. "fights=%d party %d/%d/%d | %s", H.frame, map(),
+          H.fieldX(), H.fieldY(), tostring(H.hasControl()),
+          tostring(H.battleLoadStarted()), #fights,
+          H.readWord(0x3BF4), H.readWord(0x3BF6), H.readWord(0x3BF8),
+          table.concat(mhp, " ")))
       end
       battN = H.battleLoadStarted() and battN + 1 or 0
       if battN == 3 then
@@ -270,19 +273,139 @@ local function rideDriver(pred, maxFrames, what)
           w[1], w[2], w[3], w[4], w[5], w[6]))
       end
       if battN >= 3 then
-        killBitAll()
-        H.setPad(ph < 4 and { "a" } or {})
+        -- a wipe never sets $0069; catch it here so the ladder can act.
+        -- Debounced 120 frames: the HP table can read zero for a moment
+        -- while a battle deals the party in.
+        local alive = false
+        for e = 0, 3 do
+          if H.readWord(0x3BF4 + e * 2) > 0 then alive = true end
+        end
+        wipeN = (not alive) and wipeN + 1 or 0
+        if wipeN >= 120 and not lostRef.lost then
+          lostRef.lost = true
+          H.log(string.format("[ride] PARTY WIPED in fight %d at f%d",
+            #fights, H.frame))
+        end
+        local F = (#fights >= 6) and Fboss or Ftrash
+        F.frame()
+        -- fight 6: steer single-target confirms onto the body (header)
+        if #fights >= 6 and H.readByte(0x7BC2) == 0x38 then
+          local mons = H.readByte(0x7B7E)
+          if mons ~= 0 then
+            local body = nil
+            for m = 0, 5 do
+              if H.readWord(0x57C0 + m * 2) == 0x010B
+                 and H.readByte(0x3AA8 + m * 2) % 2 == 1 then body = m; break end
+            end
+            if body then
+              local want = 1 << body
+              if mons == want then
+                tgtSpin = 0
+                H.setPad(ph < 4 and { a = true } or {})
+              else
+                tgtSpin = tgtSpin + 1
+                if tgtSpin < 40 then
+                  local cur = 0
+                  for m = 0, 5 do
+                    if mons & (1 << m) ~= 0 then cur = m; break end
+                  end
+                  H.setPad(ph < 4
+                    and { [cur < body and "down" or "up"] = true } or {})
+                else
+                  H.setPad(ph < 4 and { a = true } or {})
+                end
+              end
+            end
+          end
+        else
+          tgtSpin = 0
+        end
         return
       end
-      if battN > 0 then H.setPad({}); return end
-      -- outside battle: advance any text, otherwise hands off.  The ride
-      -- is on rails; a held direction would only fight the engine.
+      -- OUT of battle: a wipe that outruns the in-battle debounce shows
+      -- itself as the Game Over Continue landing back on the BOOT SAVE
+      -- TILE (272 {3,55}) -- measured on the first honest attempt, where
+      -- the A-taps paged the Game Over and the battery Continue parked
+      -- the party there with the ride's pred forever false.
+      if #fights > 0 and map() == 272
+         and H.fieldX() == 3 and H.fieldY() == 55 and not lostRef.lost then
+        lostRef.lost = true
+        H.log(string.format("[ride] LOSS: the Game Over Continue landed on "
+          .. "the boot save tile after fight %d, f%d", #fights, H.frame))
+      end
+      if battN > 0 then Ftrash.idle(); Fboss.idle(); H.setPad({}); return end
+      Ftrash.idle(); Fboss.idle()
       H.setPad(ph < 4 and { "a" } or {})
     end),
   }, what)
 end
 
-H.run({ maxFrames = 100000 }, {
+local rideBlob, rideWon = nil, false
+
+-- One attempt, flat (driveUntil bodies replay latched state, so every
+-- attempt builds fresh closures).  Attempt 1 runs in place; later attempts
+-- reload the prepared CID doorstep and shift the RNG phase.  The outcome
+-- is the ride's own terminator: control on map 240 with $0069 set.
+local function rideAttempt(n)
+  local loadReq
+  local lostRef = { lost = false }
+  return H.cond(function() return rideWon end, {}, {
+    H.logStep(function()
+      return string.format("minecart ride attempt %d (phase offset %d) at f%d",
+        n, (n - 1) * 37, H.frame)
+    end),
+    n > 1 and seq({
+      H.call(function()
+        fights = {}                    -- a lost attempt's record is void
+        loadReq = H.requestLoadState(rideBlob)
+      end),
+      H.waitFrames(2),
+      H.call(function() H.checkReq(loadReq, "ride doorstep reload") end),
+      H.waitFrames(90),
+      H.call(function()
+        H.assertEq(map(), 272, "reloaded onto map 272")
+        H.assertEq(H.fieldX() == 9 and H.fieldY() == 52, true,
+          "reloaded beside CID")
+      end),
+    }) or seq({}),
+    H.waitFrames((n - 1) * 37),         -- vary the battle RNG seed
+    -- A into CID -> _cc8022 -> ... -> `cutscene TRAIN`
+    (function() local ph = 0
+      return H.driveUntil(function() return sw(0x02BC) == 1 end, 20000, {
+        H.call(function() ph = (ph + 1) % 8
+          if H.dialogWaiting() or not settled() then
+            H.setPad(ph < 4 and { "a" } or {})
+          else
+            H.setPad(ph < 4 and { "a", "up" } or { "up" })
+          end
+        end) }, "A into CID -> $02BC -> cutscene TRAIN")
+    end)(),
+    H.call(function()
+      rideStart = H.frame
+      H.assertEq(sw(0x02BC), 1, "$02BC SET -- the minecart cutscene has begun")
+      H.log(string.format("[ride] cutscene TRAIN entered at frame %d", H.frame))
+      H.screenshot("minecart_ride")
+    end),
+    -- ride it out; terminates early on a detected wipe so the ladder can
+    -- reload instead of timing out
+    rideDriver(function()
+      return map() == 240 and sw(0x0069) == 1 and settled()
+    end, lostRef, 120000, "the minecart ride -> map 240 with $0069"),
+    H.call(function()
+      H.setPad({})
+      if not lostRef.lost and map() == 240 and sw(0x0069) == 1 then
+        rideWon = true
+        H.log(string.format("minecart ride SURVIVED on attempt %d, f%d "
+          .. "(%d fights fought honestly)", n, H.frame, #fights))
+      else
+        H.log(string.format("attempt %d LOST (wipe in fight %d), f%d",
+          n, #fights, H.frame))
+      end
+    end),
+  })
+end
+
+H.run({ maxFrames = 400000 }, {
   -- ANCHORED BOOT: cold Continue into the 272 save tile {3,55}, entry
   -- contract, then walk back beside CID and face him.
   H.waitFrames(350),
@@ -305,7 +428,7 @@ H.run({ maxFrames = 100000 }, {
     H.assertEntryContract("minecart-platform-v1")
     H.log(partyReport("minecart-platform-v1 entry"))
   end),
-  H.navTo(9, 52, { maxFrames = 9000 }),
+  H.navTo(9, 52, { maxFrames = 9000, honest = "flee" }),
   -- face CID: his object occupies (9,51), so an UP press only turns
   H.hold({ "up" }), H.waitFrames(8), H.release(), H.waitFrames(20),
   H.call(function()
@@ -317,7 +440,12 @@ H.run({ maxFrames = 100000 }, {
     H.assertEq(sw(0x0069), 0, "$0069 CLEAR at boot")
     -- THREE, not one -- see the history block at the top of this file.
     -- Named as well as counted: the count alone would stay green if the
-    -- chain swapped EDGAR for CYAN somewhere upstream.
+    -- chain swapped EDGAR for CYAN somewhere upstream.  THIS IS ALSO THE
+    -- OWNER RULE for Number 128, recorded on #75: the boss is fought by
+    -- LOCKE + EDGAR + SABIN, seated through the REAL party menu at the
+    -- Zozo leave cutscene (gen_zozo5_ramuh) and carried here by the
+    -- anchor -- no party menu exists at this leg (the ride hangs off
+    -- talking to CID), so the roster verification IS the drive.
     local cur, n, who = H.readByte(0x1A6D), 0, {}
     for c = 0, 13 do
       local b = H.readByte(0x1850 + c)
@@ -330,27 +458,43 @@ H.run({ maxFrames = 100000 }, {
     H.log(partyReport("minecart_doorstep"))
   end),
 
-  -- 1. A into CID -> _cc8022 -> ... -> `cutscene TRAIN`
-  (function() local ph = 0
-    return H.driveUntil(function() return sw(0x02BC) == 1 end, 20000, {
-      H.call(function() ph = (ph + 1) % 8
-        if H.dialogWaiting() or not settled() then
-          H.setPad(ph < 4 and { "a" } or {})
-        else
-          H.setPad(ph < 4 and { "a", "up" } or { "up" })
-        end
-      end) }, "A into CID -> $02BC -> cutscene TRAIN")
-  end)(),
+  -- 1. the player's prep, all through real menus, BEFORE the retry blob:
+  --    the July-cut anchor delivers the party bare-handed and possibly
+  --    hurt (the trap every anchored leg in this wave has measured), and
+  --    the ride is six fights with no field access between them
+  H.equipOptimum({ tag = "n128 kit" }),
+  H.fieldCare({ tag = "care before the ride", threshold = 0.95 }),
+  H.navTo(9, 52, { maxFrames = 9000, honest = "flee" }),
+  H.hold({ "up" }), H.waitFrames(8), H.release(), H.waitFrames(20),
   H.call(function()
-    rideStart = H.frame
-    H.assertEq(sw(0x02BC), 1, "$02BC SET -- the minecart cutscene has begun")
-    H.log(string.format("[ride] cutscene TRAIN entered at frame %d", H.frame))
-    H.screenshot("minecart_ride")
+    H.assertEq(H.fieldX() == 9 and H.fieldY() == 52, true,
+      "back beside CID, prepared")
+    H.assertEq(H.readByte(0x087f + H.readWord(0x0803)), 0, "facing CID again")
+    H.log(partyReport("ride doorstep, prepared"))
   end),
+  -- capture the prepared doorstep as the retry ladder's reload blob
+  (function()
+    local req
+    return seq({
+      H.call(function() req = H.requestSaveState() end),
+      H.waitFrames(2),
+      H.call(function()
+        H.checkReq(req, "ride retry blob")
+        rideBlob = req.blob
+        H.log(string.format("retry blob captured: %d bytes", #rideBlob))
+      end),
+    })
+  end)(),
 
-  -- 2. ride it out
-  rideDriver(function() return map() == 240 and sw(0x0069) == 1 and settled() end,
-    80000, "the minecart ride -> map 240 with $0069"),
+  -- 2. the ride, on the phase-spread retry ladder
+  rideAttempt(1),
+  rideAttempt(2),
+  rideAttempt(3),
+  H.call(function()
+    H.assertEq(rideWon, true,
+      "the minecart ride survived honestly within 3 attempts (six real "
+      .. "fights, the library fighter)")
+  end),
   H.waitFrames(90),
 
   H.call(function()
@@ -394,7 +538,7 @@ H.run({ maxFrames = 100000 }, {
   --    The last step is a held RIGHT from (57,7) -- a save tile flickers
   --    hasControl() (the SavePoint re-entry), so arrival is judged on
   --    position + $01BF + alignment.
-  H.navTo(57, 7, { maxFrames = 15000 }),
+  H.navTo(57, 7, { maxFrames = 15000, honest = "flee" }),
   (function() local calm = 0
     return H.driveUntil(function()
       calm = (H.fieldX() == 58 and H.fieldY() == 7 and sw(0x01BF) == 1
@@ -403,7 +547,7 @@ H.run({ maxFrames = 100000 }, {
       return calm >= 8
     end, 9000, {
       H.call(function()
-        if H.battleLoadStarted() then killBitAll(); H.setPad({ "a" }); return end
+        if H.battleLoadStarted() then H.setPad({ l = true, r = true }); return end
         if H.dialogWaiting() then H.setPad({ "a" }); return end
         if H.fieldX() == 58 and H.fieldY() == 7 then H.setPad({}); return end
         H.setPad({ right = true })
@@ -421,6 +565,33 @@ H.run({ maxFrames = 100000 }, {
     H.screenshot("n128_won")
   end),
   H.saveState("n128_won.mss"),
+  -- RELOAD-VERIFIED (gen_sabin_gau's pattern).  The party is parked ON a
+  -- save tile, where hasControl() flickers (the SavePoint re-entry), so
+  -- the reload is judged the way the park itself was: position + latch +
+  -- alignment, never the control flag.
+  (function()
+    local saveReq, loadReq
+    return seq({
+      H.call(function() saveReq = H.requestSaveState() end),
+      H.waitFrames(2),
+      H.call(function()
+        H.checkReq(saveReq, "mint verify: capture")
+        loadReq = H.requestLoadState(saveReq.blob)
+      end),
+      H.waitFrames(2),
+      H.call(function() H.checkReq(loadReq, "mint verify: reload") end),
+      H.waitFrames(180),
+      H.call(function()
+        H.assertEq(map(), 240, "reload: still on map 240")
+        H.assertEq(H.fieldX() == 58 and H.fieldY() == 7, true,
+          "reload: still on the save tile")
+        H.assertEq(H.tileAligned(), true, "reload: at rest on the tile")
+        H.assertEq(H.battleLoadStarted(), false, "reload: no battle pending")
+        H.assertEq(sw(0x0069), 1, "reload: $0069 still SET -- the win held")
+        H.log("mint verify: the reload stayed calm -- n128_won verified")
+      end),
+    })
+  end)(),
   H.call(function()
     census("n128_won", {
       { 58, 7, "the save point revealed by $06AE" },
