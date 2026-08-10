@@ -68,13 +68,6 @@ local DUMMY = 0x017b            -- the gate set pieces' one formation word
 local function map() return H.mapId() & 0x1ff end
 local function bright() return emu.getState()["ppu.screenBrightness"] or 0 end
 local function sw(id) return (H.readByte(0x1E80 + (id >> 3)) >> (id & 7)) & 1 end
-local function killBitAll()
-  for s = 0, 5 do
-    if H.readByte(0x3aa8 + s * 2) % 2 == 1 then
-      H.writeByte(0x3eec + s * 2, H.readByte(0x3eec + s * 2) | 0x80)
-    end
-  end
-end
 local function partyOf(c) return H.readByte(0x1850 + c) & 0x07 end
 
 -- gen_vector_doorstep's grind-and-replan world walker
@@ -87,7 +80,7 @@ local function worldGrind(tx, ty, what)
     H.call(function()
       ph = (ph + 1) % 8
       if H.battleLoadStarted() then
-        killBitAll(); plan = nil; H.setPad(ph < 4 and { "a" } or {}); return
+        plan = nil; H.setPad({ l = true, r = true }); return
       end
       if not H.worldMode() then H.setPad({}); return end
       if not H.worldHasControl() then plan = nil; H.setPad({}); return end
@@ -108,7 +101,7 @@ local function pressWalk(dir, pred, maxFrames, what)
     H.call(function()
       ph = (ph + 1) % 8
       if H.battleLoadStarted() then
-        killBitAll(); H.setPad(ph < 4 and { "a" } or {}); return
+        H.setPad({ l = true, r = true }); return
       end
       if H.dialogWaiting() then H.setPad(ph < 4 and { "a" } or {}); return end
       H.setPad({ [dir] = true })
@@ -176,7 +169,7 @@ H.run({ maxFrames = 240000 }, {
   pressWalk("down", function()
     return H.fieldY() >= 55 and H.tileAligned()
   end, 1200, "held DOWN off the save-point re-entry tile"),
-  H.navTo(73, 58, { maxFrames = 9000 }),
+  H.navTo(73, 58, { honest = "flee", maxFrames = 9000 }),
   pressWalk("down", function() return map() == 384 end, 1200,
     "held DOWN off 386 (73,59) -> 384 (64,12)"),
   H.waitUntil(landed(384, 10), 2400, "384 re-entry", 1),
@@ -187,16 +180,16 @@ H.run({ maxFrames = 240000 }, {
   end),
 
   -- ---- 2. the west traverse: two levers, one teleport ---------------------
-  H.navTo(71, 15, { maxFrames = 20000 }),
+  H.navTo(71, 15, { honest = "flee", maxFrames = 20000 }),
   tapLever(0x0174, 900, "tap-once UP+A on (71,15) -> $0174 (the x=76 column)"),
   stepOff({ "down", "left", "right", "up" }, 2400,
     "step off the (71,15) re-entry trigger"),
-  H.navTo(104, 17, { maxFrames = 30000 }),
+  H.navTo(104, 17, { honest = "flee", maxFrames = 30000 }),
   tapLever(0x01F5, 900, "tap-once UP+A on (104,17) -> $01F5 (the tower)"),
   H.release(),
   stepOff({ "down", "left", "right" }, 2400,
     "step off the (104,17) toggle (a further A press would toggle it back)"),
-  H.navTo(121, 22, { maxFrames = 20000 }),
+  H.navTo(121, 22, { honest = "flee", maxFrames = 20000 }),
   pressWalk("down", function()
     return H.fieldX() <= 8 and H.tileAligned()
   end, 2400, "held DOWN onto the (121,23) teleport -> (4,37)"),
@@ -211,7 +204,7 @@ H.run({ maxFrames = 240000 }, {
   -- the door row (9..11,27) is approached from the SOUTH (census G: the
   -- x=9..11 column below it is the only walkway; (12,27) is not walkable),
   -- so the doorstep is (10,28) -- the same tile the scene exits onto
-  H.navTo(10, 28, { maxFrames = 20000 }),
+  H.navTo(10, 28, { honest = "flee", maxFrames = 20000 }),
   H.call(function()
     assertGateParty("the gate doorstep (field side, before the scene)")
     H.assertEq(sw(0x0079), 0, "$0079 CLEAR at the doorstep")
@@ -222,7 +215,7 @@ H.run({ maxFrames = 240000 }, {
   H.advanceStory(function()
     return map() == 384 and sw(0x0079) == 1 and H.hasControl()
        and H.tileAligned() and bright() >= 15
-  end, 90000, { spare = { DUMMY } }),
+  end, 90000, { honest = "flee", spare = { DUMMY } }),
   H.waitFrames(60),
   H.call(function()
     H.assertEq(map(), 384, "back on 384 after the gate scene")
@@ -236,7 +229,7 @@ H.run({ maxFrames = 240000 }, {
   end),
 
   -- ---- 4. the shortcut out -------------------------------------------------
-  H.navTo(5, 42, { maxFrames = 20000,
+  H.navTo(5, 42, { honest = "flee", maxFrames = 20000,
     arrive = function() return map() == 382 end }),
   pressWalk("down", function() return map() == 382 end, 1200,
     "held DOWN onto the (5,43) shortcut -> 382 (31,41)"),
@@ -244,7 +237,7 @@ H.run({ maxFrames = 240000 }, {
   -- the mouth is the (25,37)/(25,38) pair: (25,37) is the world entry's
   -- landing, (25,38) the exit tile (short-entrance decode); approach the
   -- landing tile and step DOWN out
-  H.navTo(25, 37, { maxFrames = 15000,
+  H.navTo(25, 37, { honest = "flee", maxFrames = 15000,
     arrive = function() return H.worldMode() end }),
   pressWalk("down", function() return H.worldMode() end, 1200,
     "held DOWN onto the mouth exit (25,38) -> world (169,194)"),
@@ -265,13 +258,13 @@ H.run({ maxFrames = 240000 }, {
   -- walk west toward the trigger row; _cb280f owns everything from there
   -- to the crash -- the scene, $0242=1, the deck, battle 123, the flight,
   -- and control back on MAP 6 at (16,6) with parent world (83,239)
-  H.navTo(9, 17, { maxFrames = 20000 }),
+  H.navTo(9, 17, { honest = "flee", maxFrames = 20000 }),
   pressWalk("left", function() return not H.hasControl() or map() ~= 377 end,
     2400, "held LEFT into the west trigger row -> _cb280f"),
   H.advanceStory(function()
     return map() == 6 and sw(0x007A) == 1 and H.hasControl()
        and H.tileAligned() and bright() >= 15
-  end, 120000, { spare = { DUMMY } }),
+  end, 120000, { honest = "flee", spare = { DUMMY } }),
   H.waitFrames(60),
   H.call(function()
     H.assertEq(map(), 6, "control back on the wrecked Blackjack (map 6)")
@@ -290,7 +283,7 @@ H.run({ maxFrames = 240000 }, {
   -- lift-off choice ($0170 is set on this chain).  Dead ($007A=1, $0176=0)
   -- _caf532 EventReturns before any dialog (event_main.asm:36118-36127).
   -- 300 frames of LEFT+A edges must therefore open NOTHING.
-  H.navTo(14, 6, { maxFrames = 6000, calmFrames = 8 }),
+  H.navTo(14, 6, { honest = "flee", maxFrames = 6000, calmFrames = 8 }),
   (function() local n = 0
     return H.driveUntil(function() n = n + 1; return n >= 300 end, 400, {
       H.call(function()
@@ -313,17 +306,17 @@ H.run({ maxFrames = 240000 }, {
   H.waitUntil(landed(7, 10), 2400, "map 7 landing", 1),
   -- the hatch (8,36) is reached through the interior stair-teleports
   -- (short-entrance decode): (40,18) -> (50,51), then (50,62) -> (10,30)
-  H.navTo(40, 17, { maxFrames = 9000 }),
+  H.navTo(40, 17, { honest = "flee", maxFrames = 9000 }),
   pressWalk("down", function()
     return H.fieldY() >= 45 and H.tileAligned()
   end, 900, "stairs (40,18) -> (50,51)"),
   H.waitFrames(30),
-  H.navTo(50, 61, { maxFrames = 9000 }),
+  H.navTo(50, 61, { honest = "flee", maxFrames = 9000 }),
   pressWalk("down", function()
     return H.fieldY() <= 35 and H.tileAligned()
   end, 900, "stairs (50,62) -> (10,30)"),
   H.waitFrames(30),
-  H.navTo(8, 36, { maxFrames = 20000,
+  H.navTo(8, 36, { honest = "flee", maxFrames = 20000,
     arrive = function() return H.worldMode() end }),
   pressWalk("up", function() return H.worldMode() end, 1200,
     "held UP onto the hatch (8,36) -> world, on foot (_caf4b1)"),
