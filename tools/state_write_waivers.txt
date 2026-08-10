@@ -115,7 +115,6 @@ tools/tests/codex_ctx.lua	.writeByte(
 tools/tests/codex_ctx.lua	emu.write
 tools/tests/codex_saveas.lua	.writeByte(
 tools/tests/codex_saveas.lua	emu.write
-tools/tests/field_navstep.lua	.writeByte(
 tools/tests/gen_banquet_done.lua	.writeByte(
 tools/tests/gen_banquet_done.lua	.writeWord(
 tools/tests/gen_banquet_done.lua	emu.write

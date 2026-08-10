@@ -41,23 +41,24 @@
 local H = dofile("tools/tests/lib/ot6.lua")
 local STATE = "build/states/vector_sneak.mss.lua"
 
-local function killBitAll()
-  for s = 0, 5 do
-    if H.readByte(0x3aa8 + s * 2) % 2 == 1 then
-      H.writeByte(0x3eec + s * 2, H.readByte(0x3eec + s * 2) | 0x80)
-    end
-  end
-end
-
 -- Hold the arrival assertion open for n frames: the party must stay on
 -- (tx,ty) the whole time.  A stray Vector encounter is not a navigation
--- failure, so it is kill-bitted and the count restarts once control is back.
+-- failure, so it is FLED (held L+R, the engine's own run mechanic -- the
+-- 1914283 idiom; the kill-bit poke this replaced is an issue-#75 write)
+-- and the count restarts once control is back.  A formation that refuses
+-- to release fails the driveUntil budget loudly instead of being poked
+-- out of existence.  The subject here -- navTo's release timing on map
+-- 242 -- is unaffected by how an interrupting fight ends.
 local function watchTile(tx, ty, n, what)
   local seen = 0
   return H.driveUntil(function() return seen >= n end, n * 8 + 1200, {
     H.call(function()
       H.setPad({})
-      if H.battleLoadStarted() then killBitAll(); seen = 0; return end
+      if H.battleLoadStarted() then
+        H.setPad({ l = true, r = true })
+        seen = 0
+        return
+      end
       if not H.hasControl() then seen = 0; return end
       local x, y = H.fieldX(), H.fieldY()
       if x ~= tx or y ~= ty then
