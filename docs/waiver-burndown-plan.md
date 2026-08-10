@@ -277,3 +277,21 @@ current investigations actively point at stay (the stall/trench/banquet
 reproduction probes, probe_lockekit, the pad-input save template
 probe_banquet_timer_save, and kin — the retirement wave assembles the
 keep-list from actual references, not memory).
+
+**Executed 2026-08-10** (wt/probe-retire): 73 waived probes deleted, 104
+waiver lines gone (257 → 153 pairs, pure deletion).  26 waived probes
+stay, each for a concrete reference: `@suite` members (probe_ctrboost,
+probe_shadow_overlap), README-documented instruments (probe_896f,
+probe_bushido, probe_canstep, probe_input, probe_junk16,
+probe_reveal_trace, probe_slots, probe_srmboot, probe_train_tail,
+probe_vargas), the banquet timer set banquet-decode.md designates kept
+(probe_banquet_timer, probe_banquet_timerwatch, probe_banquet_timer_save)
+plus probe_banquet_stage (mints the banquet_window state the kept
+circuit/greedy probes boot), self-declared REFERENCE PROBEs
+(probe_fieldicons, probe_menucols) and kit-gau.md's isolated instrument
+(probe_cursorgutter), the anchor-verification pair
+(probe_esperdetail_anchor, probe_esperdetail_tube6_anchor), the #25
+fail-before controls for the three tracked anchors
+(probe_v07_h/i/j_negative), compose.py's canonical comment-hazard example
+(probe_dottick), and multi-hit.md's planned-suite-test template
+(probe_multihit).  Read-only probes were untouched.
