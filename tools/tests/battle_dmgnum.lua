@@ -97,14 +97,58 @@ H.run({ maxFrames = 40000 }, {
   H.waitFrames(10),
   H.enterEncounter(),
   H.waitFrames(240),
+  H.call(function() watchNumerals() end),
+  -- issue #75: the actor used to be HANDED 3 bp, the guards pinned to
+  -- 3000 HP and the party to 900.  The bank is EARNED now, exactly as
+  -- battle_boost earns it on this same fixture (its driver, lifted
+  -- whole): every character opens with 1 bp (Ot6InitBP), an unboosted
+  -- action regens +1 (Ot6ActionEnd), so the first slot whose menu opens
+  -- takes two real row-2 beams and arrives holding 3.  The submit is
+  -- driven BY MENU STATE ($7BC2) -- a fixed sequence lands its downs in
+  -- whatever window holds the cursor -- and battle_boost's dead-end notes
+  -- carry over: Heal Force is priced out of the opening MP (A refused
+  -- forever), the item window is a trap (empty bag + Wait mode freeze),
+  -- and any OTHER ready character defers focus with X.
+  (function()
+    local mf, downs = 0, 0
+    return H.driveUntil(function()
+      if H.readByte(0x7bca) == 0 then return false end
+      local act = H.readByte(0x62ca)
+      if actor == nil then
+        actor = act & 3
+        H.log("banking bp on the first active slot: " .. actor)
+      end
+      return (act & 3) == actor and H.readByte(0x3e9c + actor*2) >= 3
+    end, 12000, {
+      H.call(function()
+        if H.readByte(0x7bca) == 0 then mf, downs = 0, 0; H.setPad({}); return end
+        local act = H.readByte(0x62ca) & 3
+        if actor ~= nil and act == actor
+           and H.readByte(0x3e9c + actor*2) >= 3 then
+          H.setPad({}); return
+        end
+        mf = mf + 1
+        if (mf - 1) % 8 >= 4 then H.setPad({}); return end
+        local st = H.readByte(0x7bc2)
+        local btn
+        if actor ~= nil and act ~= actor then
+          btn = st == 0x05 and "x" or "b"   -- defer focus; back out first
+        elseif st == 0x05 then btn = "a"    -- open the magitek list
+        elseif st == 0x2a then
+          if downs < 2 then
+            if (mf - 1) % 8 == 0 then downs = downs + 1 end
+            btn = "down"
+          else btn = "a" end                -- the row-2 beam
+        elseif st == 0x38 then btn = "a"    -- confirm the default target
+        elseif st == 0x01 then H.setPad({}); return
+        else btn = "b" end
+        H.setPad({ [btn] = true })
+      end),
+    }, "bank 3 bp by real beam turns")
+  end)(),
   H.call(function()
-    actor = H.readByte(0x62ca) & 3
-    H.writeByte(0x3e9c + actor*2, 3)
-    H.writeWord(0x3C00, 3000); H.writeWord(0x3C02, 3000)
-    for s = 0, 3 do
-      if H.readWord(0x3bf4 + s*2) > 0 then H.writeWord(0x3bf4 + s*2, 900) end
-    end
-    watchNumerals()
+    H.assertEq(H.readByte(0x3e9c + actor*2), 3,
+      "3 bp banked by real turns (1 open + 2 regen)")
   end),
   -- arm a boost: this is the state the retired drawer painted in.
   -- driven by state, not by counting presses -- a press landing in a
@@ -120,20 +164,26 @@ H.run({ maxFrames = 40000 }, {
   -- hold the boost up for a while, sampling, before spending it
   H.waitUntil(function() sample(); return frames >= 120 end, 300,
     "boost held and sampled", 1),
-  -- now let the battle run so damage numerals fly
+  -- now let the battle run so damage numerals fly.  Issue #75 note: the
+  -- pinned version A-mashed through the window, spending and re-arming
+  -- boosts against 3000-HP guards.  Unpinned, our beams would end the
+  -- fight mid-window, so the party holds still instead: the boost stays
+  -- PENDING the whole run (the exact state the retired drawer painted
+  -- in, every frame), and the numerals are the GUARDS' own attacks
+  -- landing on the party -- nobody on our side deals damage, so the
+  -- fight cannot end, and no HP pin is needed on either side.  The
+  -- positive controls below are unchanged and keep this honest: a quiet
+  -- window with no numerals still fails.
   H.driveUntil(function()
     sample()
     return frames >= 2400
   end, 30000, {
     H.call(function()
-      if H.readByte(0x7bca) ~= 0 then
-        -- keep re-arming a boost so the mark state recurs all run
-        if H.readByte(0x3e9d + (H.readByte(0x62ca) & 3)*2) == 0
-           and (frames // 53) % 2 == 0 then
-          H.setPad({ "r" })
-        else
-          H.setPad({ "a" })
-        end
+      -- re-arm only if the pending boost somehow drops (it should not:
+      -- no action is ever submitted), so pendFrames cannot quietly starve
+      if H.readByte(0x7bca) ~= 0
+         and H.readByte(0x3e9d + (H.readByte(0x62ca) & 3)*2) == 0 then
+        H.setPad({ "r" })
       else H.setPad({}) end
     end),
     H.waitFrames(3),
