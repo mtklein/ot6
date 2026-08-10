@@ -123,7 +123,28 @@ diagnoses were wrong in instructive ways:**
 - Waivers **318 → 123** across 2026-08-09/10, all shrink, checker green
   at every merge; write sites 1617 → 762.  The probe retirement executed
   (owner-delegated): 73 settled one-shots deleted, 26 kept by reference.
-- **2026-08-10 additions**: five batteries re-cut through the real Save
+- **A FALSE GREEN LIVED IN THE HARNESS UNTIL 2026-08-10 -- read this
+before trusting any pre-fix green.**  `run.sh` decided pass-vs-fail with
+`grep '^\[ot6\] PASS'`, a PREFIX.  Nine converted tests log
+`H.log("PASSED...")` lines (battle_thief, battle_blitzlist/grey/cursor,
+battle_bushido, battle_bushidoloadout, battle_dancemp, battle_crosslist,
+battle_rage), so any of them KILLED BY THE WALL-CLOCK CAP partway through
+matched the pass pattern and was scored green -- reproduced directly as
+`testrunner exit: 255 (verdict: 0)`.  Fixed: PASS_RE/FAIL_RE anchor on
+the parenthesis and colon only the real verdicts carry, one definition
+feeds every consumer, and `run.sh --verdict-selftest` (nine cases, the
+regression verbatim, fail-before proven) is wired into `make test`.  A
+reap now also RETRIES itself (OT6_REAP_RETRIES, default 1) -- reaps are
+non-verdicts and runs are isolated, so that is safe; a real FAIL is
+never retried.
+**OPEN, AND IT IS THE TOP ITEM: those nine tests have NOT been re-run
+under the fixed harness.**  Their greens were reported by agent sessions
+using the broken parser.  Nothing proves they were reaped -- each agent
+quoted a terminal `PASS (frame N)`, which a reaped run cannot produce --
+but "probably fine" is not this program's standard.  Re-run all nine and
+record the frames.
+
+**2026-08-10 additions**: five batteries re-cut through the real Save
   UI (post-opera + boundaries B-E); the fight driver casts real attack
   magic (opts.magic); H.cond re-asks its predicate; the banquet and
   moogle_defense graph edges are live (114 states); ~35 suite tests
@@ -187,11 +208,21 @@ diagnoses were wrong in instructive ways:**
 
 ### What remains before #75 may close
 
+0. **Re-run the nine PASSED-logging tests under the fixed harness**
+   (above).  Cheapest real check available and it gates trusting today's
+   conversion waves.
 1. **The full root-first re-mint under the new lib** — the sfigaro-escape
    merge's lib promotion deliberately staled ~106/109 stamps by hash;
-   `make frontier NINJAFLAGS="-k 0"` (bounded -j while agents live) is
-   the next dispatcher action once in-flight agent work lands, and its
-   result decides the frontier claim.
+   `make frontier NINJAFLAGS="-k 0"` is the next dispatcher action, and
+   its result decides the frontier claim.  A first attempt ran
+   2026-08-10 and was STOPPED at edge 66 of 149 to end the session
+   cleanly; it left 30 of 111 fixtures fresh and reported ZERO reaps.
+   Two real failures in that partial run, both honest ladders losing
+   three attempts on freshly re-minted upstreams -- `magicite_ifrit_shiva`
+   (battle 70) and `n128_won` (the minecart ride).  Both legs passed when
+   minted individually by their agents, so the suspicion is upstream
+   party/economy drift now that the whole chain is honest, not the
+   drives.  That is the first thing the next full run will re-answer.
 2. The banquet feasibility verdict (in flight), gau_joined's post-join
    ladder (in flight), and the convert-cheap test wave (in flight).
 3. **Re-cut all legacy battery anchors through the real Save UI** — now
