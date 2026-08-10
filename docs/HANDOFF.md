@@ -383,6 +383,65 @@ retry rather than debugging the generator. Bound a full `make frontier` with
   (2026-07-30). Frontier-gated tests join once `make frontier` has minted
   their fixtures.
 
+## Working this program on smaller models (owner-requested, 2026-08-10)
+
+Sonnet and Opus sessions pick this program up on days the larger model is
+unavailable.  The work is tiered so capability is spent where it matters;
+when in doubt about which tier a task is, treat it as the higher one and
+STOP-AND-NOTE instead of deciding.
+
+**Tier 1 — take freely (mechanical, precedent-rich).**  Fixture-swap test
+conversions from docs/waiver-burndown-plan.md (the per-file work orders
+name the fixture, the writes, and the replacement idiom; four merged
+waves in git log are worked examples — copy their shapes: the $7BC2 menu
+machine, flee-not-kill-bit, baseline-latch, earn-don't-hand, the counted
+ledger, the read-only RNG decode).  Waiver/probe hygiene.  Doc
+corrections with measurements in hand.  Running the frontier or suite
+gates and reporting results verbatim.  Rules that are absolute in this
+tier: KEEP every original assertion (conversions change how state is
+REACHED, never what is claimed); one commit per test with the
+measurement in the message; the checker green with the file's waiver
+lines deleted before commit; fail-before/pass-after when a claim is "the
+poke was unnecessary".
+
+**Tier 2 — take with the guardrails on (judgment inside a template).**
+Boss-fight legs and gen re-mints: use the established toolkit only
+(equipOptimum + fieldCare prep, newFightDriver with tactical/boost/
+bank/items/healer/magic, 3-attempt phase-spread ladder, reload-verified
+mints).  The ladder stays at 3 — widening it until it gets lucky is the
+#74 mistake and is never acceptable.  A leg that loses all three
+attempts is a FINDING: write the numbers at the assert, leave the leg
+red, note it on #75.  Do not retune game data, ever.
+
+**Tier 3 — do NOT decide on a smaller-model day; stop and leave a note.**
+Overturning any documented measurement or verdict (the record shows even
+strong runs got the Cranes wrong twice — the cost of a confident wrong
+correction is days); lib/*.lua changes (they stale every fixture and
+their bugs surface as OTHER legs' failures); frontier_graph.py edges and
+anchor entry/exit contracts; quarantine/isolation-arm classification
+calls; anything requiring a NEW diagnosis mechanism rather than an
+established one.  For these, write the observation (what was measured,
+what it seems to mean, what you did NOT do) into the relevant file
+header or a #75 comment and move to Tier-1 work instead.
+
+**The escalation rule that subsumes the tiers:** before concluding
+anything surprising, re-read "The failure mode worth knowing about"
+below.  If your conclusion requires believing a documented measurement
+is wrong, the odds strongly favor your instrumentation over the record —
+verify with the cheapest possible look (a probe, a byte read, a re-run)
+or leave it for a stronger session.  A wrong finding written confidently
+is the most expensive artifact this program produces; three of them are
+already in the record, each caught only by re-measurement.
+
+**Mechanical anchors that keep any session honest:** the state-write
+checker and its shrink-only list; the equipment audit; compose
+--check-states before debugging any red test; the runtime write gate
+(violations name themselves at the call); `make frontier
+NINJAFLAGS="-k 0"` to enumerate blockers rather than hitting them one
+per run.  Trust these over reasoning.  Keep main, the integration
+branch, and the owner's checkout fast-forwarded together at every
+gate-green checkpoint (owner rule: simple, visible, clear).
+
 ## Working agreements
 
 - Delegated work gets [agent-brief.md](agent-brief.md) included by reference —
