@@ -24,13 +24,6 @@ local H = dofile("tools/tests/lib/ot6.lua")
 local function map() return H.mapId() & 0x1ff end
 local function bright() return emu.getState()["ppu.screenBrightness"] or 0 end
 local function sw(id) return (H.readByte(0x1E80 + (id >> 3)) >> (id & 7)) & 1 end
-local function killBitAll()
-  for s = 0, 5 do
-    if H.readByte(0x3aa8 + s * 2) % 2 == 1 then
-      H.writeByte(0x3eec + s * 2, H.readByte(0x3eec + s * 2) | 0x80)
-    end
-  end
-end
 local function settled()
   return H.hasControl() and H.tileAligned() and bright() >= 15
      and not H.dialogWaiting() and not H.battleLoadStarted() and not H.worldMode()
@@ -99,7 +92,7 @@ local function tapInto(dir, pred, maxFrames, what)
           H.readByte(0x087f + H.readWord(0x0803))))
       end
       if H.battleLoadStarted() then
-        killBitAll(); H.setPad(ph < 4 and { "a" } or {}); phase = 0; return
+        H.setPad({ l = true, r = true }); phase = 0; return
       end
       if H.dialogWaiting() then
         H.setPad(ph < 4 and { "a" } or {}); phase = 0; return
@@ -153,6 +146,7 @@ end
 
 
 local cid = nil
+local verifyReq, verifyLoad = nil, nil
 
 -- every tile the object map says is occupied inside a window
 local function objDump(x0, x1, y0, y1, tag)
@@ -188,7 +182,7 @@ H.run({ maxFrames = 60000 }, {
   --    and the map never changed, measured at 219 frames.  That half is
   --    fixed in the library now; the doorstep-then-tap shape is not a
   --    workaround, it is how a trigger tile is entered.)
-  H.navTo(20, 12, { maxFrames = 15000, arrive = function() return map() ~= 274 end }),
+  H.navTo(20, 12, { maxFrames = 15000, honest = "flee", arrive = function() return map() ~= 274 end }),
   tapInto("down", function() return map() ~= 274 end, 9000,
     "DOWN onto {20,13} -> the lift"),
   H.waitUntil(function() return map() == 272 end, 20000, "map 272 (the minecart platform)", 5),
@@ -222,7 +216,7 @@ H.run({ maxFrames = 60000 }, {
   --     tile is entered from the east.  Standing on a save tile re-enters
   --     SavePoint every frame and hasControl() flickers, so arrival is
   --     judged on position + $01BF + alignment.
-  H.navTo(4, 55, { maxFrames = 9000 }),
+  H.navTo(4, 55, { maxFrames = 9000, honest = "flee" }),
   (function() local calm = 0
     return H.driveUntil(function()
       calm = (H.fieldX() == 3 and H.fieldY() == 55 and sw(0x01BF) == 1
@@ -231,7 +225,7 @@ H.run({ maxFrames = 60000 }, {
       return calm >= 8
     end, 9000, {
       H.call(function()
-        if H.battleLoadStarted() then killBitAll(); H.setPad({ "a" }); return end
+        if H.battleLoadStarted() then H.setPad({ l = true, r = true }); return end
         if H.dialogWaiting() then H.setPad({ "a" }); return end
         if H.fieldX() == 3 and H.fieldY() == 55 then H.setPad({}); return end
         H.setPad({ left = true })
@@ -264,7 +258,7 @@ H.run({ maxFrames = 60000 }, {
       cid[1], cid[2], cid[3]))
   end),
   H.navTo(function() return cid[1] end, function() return cid[2] end,
-    { maxFrames = 9000 }),                 -- beside CID
+    { maxFrames = 9000, honest = "flee" }),   -- beside CID
   (function() local calm = 0
     return H.driveUntil(function()
       local ok = H.fieldX() == cid[1] and H.fieldY() == cid[2] and settled()
@@ -274,7 +268,7 @@ H.run({ maxFrames = 60000 }, {
       return false
     end, 4000, {
       H.call(function()
-        if H.battleLoadStarted() then killBitAll(); H.setPad({ "a" }); return end
+        if H.battleLoadStarted() then H.setPad({ l = true, r = true }); return end
         if H.readByte(0x087f + H.readWord(0x0803)) ~= cid[4] then
           H.setPad({ [cid[3]] = true })
         else
@@ -299,6 +293,29 @@ H.run({ maxFrames = 60000 }, {
     H.screenshot("minecart_doorstep")
   end),
   H.saveState("minecart_doorstep.mss"),
+  -- RELOAD-VERIFIED (gen_sabin_gau's pattern): capture-calm does NOT imply
+  -- reload-calm, so reload the parked moment and require it quiet.
+  H.call(function() verifyReq = H.requestSaveState() end),
+  H.waitFrames(2),
+  H.call(function()
+    H.checkReq(verifyReq, "mint verify: capture")
+    verifyLoad = H.requestLoadState(verifyReq.blob)
+  end),
+  H.waitFrames(2),
+  H.call(function() H.checkReq(verifyLoad, "mint verify: reload") end),
+  H.waitFrames(180),
+  H.call(function()
+    H.assertEq(map(), 272, "reload: still on map 272")
+    H.assertEq(H.fieldX() == cid[1] and H.fieldY() == cid[2], true,
+      "reload: still parked beside CID")
+    H.assertEq(H.readByte(0x087f + H.readWord(0x0803)), cid[4],
+      "reload: still facing CID")
+    H.assertEq(H.battleLoadStarted(), false, "reload: no battle pending")
+    H.assertEq(H.hasControl() and H.tileAligned(), true,
+      "reload: controllable at rest")
+    H.assertEq(sw(0x02BC), 0, "reload: $02BC still CLEAR")
+    H.log("mint verify: the reload stayed calm -- minecart_doorstep verified")
+  end),
   H.logStep(function()
     return string.format("minecart_doorstep minted at frame %d -- map 272 "
       .. "(%d,%d) facing CID, one A-press from `cutscene TRAIN`",
