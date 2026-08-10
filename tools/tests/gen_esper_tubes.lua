@@ -15,9 +15,24 @@
 --
 -- BATTLE 72 (_cc79ed, event_main.asm:95385) is `battle 72 / call _ca5ea9 /
 -- hide_obj NPC_1 / sort_obj / switch $0649=0` -- no `if_b_switch` gate at
--- all, so the route's kill-bit idiom is enough and $0649 going to 0 is the
--- receipt (recon probe 5).  Measured formation at the doorstep:
--- `010A FFFF FFFF FFFF FFFF FFFF` -- Number 024 alone, as decoded.
+-- all, and $0649 going to 0 is the receipt (recon probe 5).  Measured
+-- formation at the doorstep: `010A FFFF FFFF FFFF FFFF FFFF` -- Number 024
+-- alone, as decoded.
+--
+-- THE FIGHT IS PLAYED, NOT KILL-BITTED (issue #75).  NUMBER 024 is the
+-- specimen guard (bosses-wob.md section 14): 7 shields, a ROTATING
+-- elemental wall (WallChange), and the fixed chip classes are slashing +
+-- piercing -- the doc's own "handhold while the wall spins", which is
+-- exactly what the library fighter swings: boosted Fights (slashing) and
+-- EDGAR's AutoCrossbow (piercing).  The drive is H.newFightDriver
+-- (tactical + boost bank + real Item heals/revival, the configuration
+-- that has now beaten VARGAS, battle 70 and the brokendeath guard), after
+-- the player's own prep -- H.equipOptimum and H.fieldCare -- because the
+-- July-cut anchor delivers the party hurt and LOCKE/CELES bare-handed
+-- (the Vector remove_equip; measured on the sibling anchored leg, and
+-- the equip audit names both).  gen_tunnelarmr's phase-spread retry
+-- ladder wraps the engagement: battle 72 is an event battle, a loss is
+-- GAME OVER, and the RNG seed is the frame phase at battle init.
 --
 -- THE TUBE-ROOM TRIGGER IS FACING+BUTTON GATED, and this is the second
 -- place in v0.6 where that is load bearing (the first was the Vector sneak
@@ -59,13 +74,9 @@ local H = dofile("tools/tests/lib/ot6.lua")
 local function map() return H.mapId() & 0x1ff end
 local function bright() return emu.getState()["ppu.screenBrightness"] or 0 end
 local function sw(id) return (H.readByte(0x1E80 + (id >> 3)) >> (id & 7)) & 1 end
-local function killBitAll()
-  for s = 0, 5 do
-    if H.readByte(0x3aa8 + s * 2) % 2 == 1 then
-      H.writeByte(0x3eec + s * 2, H.readByte(0x3eec + s * 2) | 0x80)
-    end
-  end
-end
+-- a bare step list cannot be spliced into a step list; H.cond with an
+-- always-true predicate is the library's public way to wrap one into a step
+local function seq(steps) return H.cond(function() return true end, steps) end
 local function settled()
   return H.hasControl() and H.tileAligned() and bright() >= 15
      and not H.dialogWaiting() and not H.battleLoadStarted() and not H.worldMode()
@@ -111,55 +122,138 @@ local function partyReport(tag)
 end
 
 local DELTA = { up = { 0, -1 }, right = { 1, 0 }, down = { 0, 1 }, left = { -1, 0 } }
+-- (a tapInto helper used to sit here, DEFINED and never called -- the same
+-- dead battle toolkit gen_tunnelarmr's and gen_n024_doorstep's conversions
+-- deleted from their own files; its only battle handling was the kill-bit)
 
--- Tap `dir` whenever the party has control, hands off while a scene owns
--- it, edge-A through dialogs.  Used to walk INTO a trigger whose scene then
--- takes over -- the tap keeps the party from sliding past the tile.
-local function tapInto(dir, pred, maxFrames, what)
-  local phase, n, ph, calm, hb = 0, 0, 0, 0, 0
-  return H.driveUntil(function()
-    calm = (pred() and settled()) and calm + 1 or 0
-    return calm >= 16
-  end, maxFrames or 12000, {
-    H.call(function()
-      ph = (ph + 1) % 8
-      hb = hb + 1
-      if hb % 120 == 0 then
-        H.log(string.format("tapInto f%d (%d,%d) phase=%d ctl=%s algn=%s "
-          .. "dlg=%s ev=%s $01B5=%d face=%d",
-          H.frame, H.fieldX(), H.fieldY(), phase, tostring(H.hasControl()),
-          tostring(H.tileAligned()), tostring(H.dialogWaiting()),
-          tostring(H.eventRunning()), sw(0x01B5),
-          H.readByte(0x087f + H.readWord(0x0803))))
-      end
-      if H.battleLoadStarted() then
-        killBitAll(); H.setPad(ph < 4 and { "a" } or {}); phase = 0; return
-      end
-      if H.dialogWaiting() then
-        H.setPad(ph < 4 and { "a" } or {}); phase = 0; return
-      end
-      if phase == 0 then
-        H.setPad({})
-        -- STOP TAPPING once we are where we were going.  The terminator
-        -- wants 16 consecutive calm frames on the target, and an eager tap
-        -- walks straight off it before the count gets there: the first
-        -- version of this rode the chute correctly to (10,45) and then
-        -- tapped itself to (10,46) and timed out.
-        if pred() then return end
-        if settled() then phase, n = 1, 0 end
-        return
-      end
-      if phase == 1 then
-        n = n + 1
-        H.setPad({ [dir] = true })
-        if n >= 8 then phase, n = 2, 0 end
-        return
-      end
-      H.setPad({})
-      n = n + 1
-      if n >= 24 then phase = 0 end
+-- ------------------------- battle 72, played honestly (issue #75) --------
+local N024 = 0x010A
+local function eoff(m) return 8 + m * 2 end
+local function mshields(m) return H.readByte(0x3E38 + eoff(m)) end
+local function mticks(m)   return H.readByte(0x3E88 + eoff(m)) end
+local function mhp(m)      return H.readWord(0x3BFC + m * 2) end
+local function mspecies(m) return H.readWord(0x57C0 + m * 2) end
+
+local fightBlob, fightWon = nil, false
+
+-- One attempt, flat (driveUntil bodies replay latched state, so every
+-- attempt builds fresh closures).  Attempt 1 runs in place -- the live
+-- timeline IS the blob's timeline; later attempts reload the doorstep blob
+-- and shift the RNG phase.  The outcome is decided on $0649: _cc79ed's
+-- tail clears it after a win, while a loss rides the Annihilated screen
+-- into GAME OVER and never touches it.
+local function n024Attempt(n)
+  local loadReq
+  local NSLOT = nil
+  local sawBreak, deathFrame, deathTicks = nil, nil, nil
+  local hb, ph, giveUp = 0, 0, 0
+  local F = H.newFightDriver("b72", { tactical = true, boost = true, bank = 3,
+    items = true, healPercent = 60, cadence = 12 })
+  return H.cond(function() return fightWon end, {}, {
+    H.logStep(function()
+      return string.format("battle 72 attempt %d (phase offset %d) at f%d",
+        n, (n - 1) * 37, H.frame)
     end),
-  }, what)
+    n > 1 and seq({
+      H.call(function() loadReq = H.requestLoadState(fightBlob) end),
+      H.waitFrames(2),
+      H.call(function() H.checkReq(loadReq, "doorstep reload") end),
+      H.waitFrames(90),
+      H.call(function()
+        H.assertEq(map(), 273, "reloaded onto map 273")
+        H.assertEq(H.fieldX() == 25 and H.fieldY() == 52, true,
+          "reloaded at the (25,52) doorstep")
+      end),
+    }) or seq({}),
+    H.waitFrames((n - 1) * 37),         -- vary the battle RNG seed
+    -- A into NUMBER 024 -> battle 72.  Confirm the formation before
+    -- fighting it: a win over the WRONG battle would look identical in
+    -- the log without the assert.
+    H.driveUntil(function() return H.battleLoadStarted() end, 6000, {
+      H.hold({ "a", "up" }), H.waitFrames(4), H.hold({ "up" }), H.waitFrames(4),
+    }, "A into NUMBER 024 -> battle 72"),
+    H.release(),
+    H.waitUntil(function() return H.battleActive() end, 900,
+      "battle 72 active", 30),
+    H.call(function()
+      local w = H.formationWords()
+      H.log(string.format("[battle 72] formation = %04X %04X %04X %04X %04X %04X",
+        w[1], w[2], w[3], w[4], w[5], w[6]))
+      H.assertEq(H.formationHas({ [N024] = true }), true,
+        "battle 72 is NUMBER 024 $010A -- fighting the right battle")
+      for m = 5, 0, -1 do
+        if mspecies(m) == N024 then NSLOT = m end   -- lowest slot wins
+      end
+      H.assertEq(NSLOT ~= nil, true, "a NUMBER 024 slot resolved")
+      -- NO-STAGING CONTROL: the gauge seeds FULL from the authored table
+      -- (bosses-wob.md 14: 7 shields), not pre-cleared by a rig
+      H.assertEq(mshields(NSLOT), 7,
+        "NUMBER 024 opens with his authored 7 shields")
+      H.assertEq(mticks(NSLOT), 0, "NUMBER 024 is NOT pre-broken")
+      H.log(string.format("[battle 72] n024 hp=%d sh=%d", mhp(NSLOT),
+        mshields(NSLOT)))
+      H.screenshot("n024_battle")
+    end),
+    H.waitFrames(90),
+    -- the honest fight: the library fighter, gauges logged around it.  Its
+    -- menu==0 branch pages battle text and the victory teardown, so this
+    -- one drive carries the battle to the field (or through the
+    -- Annihilated screen, on a loss).
+    H.driveUntil(function() return not H.battleLoadStarted() end, 90000, {
+      H.call(function()
+        hb = hb + 1
+        if hb % 600 == 0 then
+          H.log(string.format(
+            "f%d n024 hp=%d sh=%d tk=%d | party %d/%d/%d/%d",
+            H.frame, mhp(NSLOT), mshields(NSLOT), mticks(NSLOT),
+            H.readWord(0x3BF4), H.readWord(0x3BF6),
+            H.readWord(0x3BF8), H.readWord(0x3BFA)))
+        end
+        if not sawBreak and mshields(NSLOT) == 0 and mticks(NSLOT) ~= 0 then
+          sawBreak = H.frame
+          H.log(string.format("NUMBER 024 BROKEN at f%d: shields 0, timer %d "
+            .. "-- seven real chips did this", H.frame, mticks(NSLOT)))
+        end
+        if not deathFrame and mhp(NSLOT) == 0 then
+          deathFrame, deathTicks = H.frame, mticks(NSLOT)
+          H.log(string.format("NUMBER 024 hp hit 0 at f%d (broken timer %d)",
+            deathFrame, deathTicks))
+        end
+        F.frame()
+      end),
+    }, "battle 72, played (tactical + boost bank + real items)"),
+    H.call(function() F.idle(); H.setPad({}) end),
+    H.logStep(function()
+      return string.format(
+        "battle 72 torn down at f%d (break %s; kill %s); deciding",
+        H.frame, sawBreak and ("f" .. sawBreak) or "not observed",
+        deathFrame and ("f" .. deathFrame .. " tk=" .. deathTicks) or "not seen")
+    end),
+    -- won or lost?  Tap A while control is away (pages _ca5ea9's scene
+    -- and, on a loss, the Annihilated screen); give the tail 3000 frames
+    -- to clear $0649 before calling the attempt lost.
+    H.driveUntil(function()
+      giveUp = giveUp + 1
+      return sw(0x0649) == 0 or giveUp >= 3000
+    end, 3200, {
+      H.call(function()
+        ph = (ph + 1) % 8
+        if not H.hasControl() then H.setPad(ph < 4 and { "a" } or {})
+        else H.setPad({}) end
+      end),
+    }, "the _cc79ed tail clears $0649 (or the loss shows itself)"),
+    H.call(function()
+      H.setPad({})
+      if sw(0x0649) == 0 then
+        fightWon = true
+        H.log(string.format("battle 72 WON HONESTLY on attempt %d, f%d "
+          .. "(tactical + boost bank + items)", n, H.frame))
+      else
+        H.log(string.format("attempt %d LOST (no $0649 clear after teardown), f%d",
+          n, H.frame))
+      end
+    end),
+  })
 end
 
 local function census(tag, targets)
@@ -186,7 +280,7 @@ local function census(tag, targets)
 end
 
 
-H.run({ maxFrames = 60000 }, {
+H.run({ maxFrames = 300000 }, {
   -- COLD BATTERY BOOT (issue #25): title -> Continue -> the sole valid
   -- slot (3) -> the NEW 273 save point, standing on the tile the anchor
   -- was saved on.
@@ -214,7 +308,7 @@ H.run({ maxFrames = 60000 }, {
   end),
 
   -- the two steps back onto the 024 doorstep (§5's "C + 2 steps")
-  H.navTo(25, 52, { maxFrames = 6000 }),
+  H.navTo(25, 52, { maxFrames = 6000, honest = "flee" }),
   H.call(function()
     H.assertEq(map(), 273, "on map 273")
     H.assertEq(H.fieldX(), 25, "024 doorstep x")
@@ -223,20 +317,47 @@ H.run({ maxFrames = 60000 }, {
     H.log(partyReport("024 doorstep (walked from anchor C)"))
   end),
 
-  -- 1. A into NUMBER 024 -> battle 72
-  H.driveUntil(function() return H.battleLoadStarted() end, 6000, {
-    H.hold({ "a", "up" }), H.waitFrames(4), H.hold({ "up" }), H.waitFrames(4),
-  }, "A into NUMBER 024 -> battle 72"),
-  H.waitUntil(function() return H.battleActive() end, 900, "battle 72 active", 30),
+  -- 1. the player's prep, all through real menus: the July-cut anchor
+  --    delivers LOCKE and CELES bare-handed and the party can arrive hurt
+  --    (both measured on the sibling anchored legs) -- re-equip
+  --    (Equip -> Optimum, a no-op for anyone armed) and top HP up from
+  --    the bag BEFORE the retry blob, so every attempt replays a
+  --    prepared party
+  H.equipOptimum({ tag = "n024 kit" }),
+  H.fieldCare({ tag = "care before battle 72", threshold = 0.95 }),
+  H.navTo(25, 52, { maxFrames = 6000, honest = "flee" }),
   H.call(function()
-    local w = H.formationWords()
-    H.log(string.format("[battle 72] formation = %04X %04X %04X %04X %04X %04X",
-      w[1], w[2], w[3], w[4], w[5], w[6]))
-    H.assertEq(H.formationHas({ [0x010a] = true }), true,
-      "battle 72 is NUMBER 024 $010A -- kill-bitting the right fight")
-    H.screenshot("n024_battle")
+    H.assertEq(H.fieldX() == 25 and H.fieldY() == 52, true,
+      "back at the doorstep, armed and topped up")
+    H.log(partyReport("024 doorstep, prepared"))
   end),
-  H.advanceStory(function() return sw(0x0649) == 0 and settled() end, 20000),
+  -- capture the prepared doorstep as the retry ladder's reload blob
+  (function()
+    local req
+    return seq({
+      H.call(function() req = H.requestSaveState() end),
+      H.waitFrames(2),
+      H.call(function()
+        H.checkReq(req, "doorstep retry blob")
+        fightBlob = req.blob
+        H.log(string.format("retry blob captured: %d bytes", #fightBlob))
+      end),
+    })
+  end)(),
+
+  -- 2. battle 72, played honestly, on the phase-spread retry ladder
+  n024Attempt(1),
+  n024Attempt(2),
+  n024Attempt(3),
+  H.call(function()
+    H.assertEq(fightWon, true,
+      "battle 72 won honestly within 3 attempts (the library fighter: "
+      .. "tactical + boost bank + real items)")
+  end),
+  -- ride the post-battle tail out to a settled field ($0649 already
+  -- cleared; honest -- no battle can occur here)
+  H.advanceStory(function() return sw(0x0649) == 0 and settled() end, 12000,
+    { honest = true }),
   H.waitFrames(60),
   H.call(function()
     H.assertEq(map(), 273, "still on map 273 after battle 72")
@@ -249,9 +370,35 @@ H.run({ maxFrames = 60000 }, {
     H.screenshot("n024_won")
   end),
   H.saveState("n024_won.mss"),
+  -- RELOAD-VERIFIED (gen_sabin_gau's pattern, a trap this program has paid
+  -- for): capture-calm does NOT imply reload-calm, so reload the parked
+  -- moment and require the consumer's boot to find it quiet.
+  (function()
+    local saveReq, loadReq
+    return seq({
+      H.call(function() saveReq = H.requestSaveState() end),
+      H.waitFrames(2),
+      H.call(function()
+        H.checkReq(saveReq, "n024_won verify: capture")
+        loadReq = H.requestLoadState(saveReq.blob)
+      end),
+      H.waitFrames(2),
+      H.call(function() H.checkReq(loadReq, "n024_won verify: reload") end),
+      H.waitFrames(180),
+      H.call(function()
+        H.assertEq(map(), 273, "reload: still on map 273")
+        H.assertEq(H.battleLoadStarted(), false, "reload: no battle pending")
+        H.assertEq(H.dialogWaiting(), false, "reload: no dialog pending")
+        H.assertEq(H.hasControl() and H.tileAligned(), true,
+          "reload: controllable at rest")
+        H.assertEq(sw(0x0649), 0, "reload: $0649 still CLEAR -- the win held")
+        H.log("n024_won verify: the reload stayed calm")
+      end),
+    })
+  end)(),
 
   -- 2. {25,50} -> map 274 {10,25}
-  H.navTo(25, 50, { maxFrames = 9000, arrive = function() return map() == 274 end }),
+  H.navTo(25, 50, { maxFrames = 9000, honest = "flee", arrive = function() return map() == 274 end }),
   H.waitUntil(function() return map() == 274 and settled() end, 6000,
     "map 274 control", 5),
   H.waitFrames(60),
@@ -268,7 +415,7 @@ H.run({ maxFrames = 60000 }, {
   end),
 
   -- 3. up to {10,10}, one step below the trigger tile.
-  H.navTo(10, 10, { maxFrames = 12000 }),
+  H.navTo(10, 10, { maxFrames = 12000, honest = "flee" }),
 
   -- 3a. WHY THE DOORSTEP IS NOT ON {10,9}.  A first version of this leg
   --     tried to park ON the trigger tile and timed out: the terminator
@@ -306,8 +453,8 @@ H.run({ maxFrames = 60000 }, {
   -- straight back onto the trigger tile.  Every earlier face-an-NPC press
   -- in this chain was safe only because an NPC object occupied the
   -- destination and the step was refused.
-  H.navTo(10, 11, { maxFrames = 6000 }),   -- back off the trigger tile
-  H.navTo(10, 10, { maxFrames = 6000 }),   -- back onto the doorstep, facing UP
+  H.navTo(10, 11, { maxFrames = 6000, honest = "flee" }),   -- back off the trigger tile
+  H.navTo(10, 10, { maxFrames = 6000, honest = "flee" }),   -- back onto the doorstep, facing UP
   (function() local calm = 0
     return H.driveUntil(function()
       local ok = H.fieldX() == 10 and H.fieldY() == 10 and settled()
@@ -317,7 +464,7 @@ H.run({ maxFrames = 60000 }, {
       return false
     end, 3000, {
       H.call(function()
-        if H.battleLoadStarted() then killBitAll(); H.setPad({ "a" }); return end
+        if H.battleLoadStarted() then H.setPad({ l = true, r = true }); return end
         H.setPad({})
       end) }, "twenty settled frames below the BIG_SWITCH tile")
   end)(),
@@ -339,6 +486,35 @@ H.run({ maxFrames = 60000 }, {
     H.screenshot("esper_tubes_doorstep")
   end),
   H.saveState("esper_tubes_doorstep.mss"),
+  -- RELOAD-VERIFIED, and deliberately BEFORE the A-hold trigger check
+  -- below, which consumes the doorstep by firing the scene -- after the
+  -- reload the verify below runs from a state byte-equivalent to the mint.
+  (function()
+    local saveReq, loadReq
+    return seq({
+      H.call(function() saveReq = H.requestSaveState() end),
+      H.waitFrames(2),
+      H.call(function()
+        H.checkReq(saveReq, "doorstep verify: capture")
+        loadReq = H.requestLoadState(saveReq.blob)
+      end),
+      H.waitFrames(2),
+      H.call(function() H.checkReq(loadReq, "doorstep verify: reload") end),
+      H.waitFrames(180),
+      H.call(function()
+        H.assertEq(map(), 274, "reload: still on map 274")
+        H.assertEq(H.fieldX() == 10 and H.fieldY() == 10, true,
+          "reload: still parked at (10,10)")
+        H.assertEq(H.readByte(0x087f + H.readWord(0x0803)), 0,
+          "reload: still facing UP")
+        H.assertEq(H.battleLoadStarted(), false, "reload: no battle pending")
+        H.assertEq(H.hasControl() and H.tileAligned(), true,
+          "reload: controllable at rest")
+        H.assertEq(sw(0x0068), 0, "reload: $0068 still CLEAR")
+        H.log("esper_tubes_doorstep verify: the reload stayed calm")
+      end),
+    })
+  end)(),
 
   -- 4. VERIFY, after the mint, that an A-HOLD really fires _cc7a60.  This
   --    is the assertion that a plain navTo could never satisfy, and it is
