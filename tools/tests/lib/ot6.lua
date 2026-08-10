@@ -954,8 +954,8 @@ function M.newFightDriver(tag, opts)
     0x202E, 0x890F, 0x3ED8, 0x3E9C, 0x3C08
   local CMD_FIGHT, CMD_ITEM, CMD_MAGIC, CMD_TOOLS, CMD_BLITZ =
     0x00, 0x01, 0x02, 0x09, 0x0A
-  local ST_CMD, ST_ITEM, ST_MAGIC, ST_TGT, ST_TOOLS =
-    0x05, 0x0A, 0x0E, 0x38, 0x30
+  local ST_CMD, ST_ITEM, ST_MAGIC, ST_TGT, ST_TOOLS, ST_ESPER =
+    0x05, 0x0A, 0x0E, 0x38, 0x30, 0x16
   local ITEMSCR, ITEMROW, BATTINV, ITEMLIST = 0x8947, 0x894F, 0x2686, 0x4005
   local BLCOL, BLROW = 0x8963, 0x8967
   -- the magic list's cursor triple (btlgfx_main UpdateMenuState_0e:
@@ -1057,6 +1057,24 @@ function M.newFightDriver(tag, opts)
       if opts.bank and have < opts.bank then boost = 0
       else boost = math.min(have, 3) end
     end
+    -- opts.summon = { [charId] = { mp = cost } }: the ONCE-PER-BATTLE GENJU,
+    -- through the menu route battle_magicite measured (2026-07-27): from the
+    -- magic list scrolled to the top, UP runs CheckHasGenju and opens the
+    -- esper window ($7BC2 = $16), A commits, A confirms the default target.
+    -- The engine's own latch is the gate: the caster's entity bit in $3f2e
+    -- (once set, UpdateEnabledMagic greys the row -- battle_magicite point
+    -- 3), so the plan is offered only while that bit is CLEAR and the
+    -- character can pay.  The Magic command row only exists while the stone
+    -- is worn (battle_subjob's grant), so an unequipped caller falls
+    -- through to the branches beneath exactly like an exhausted mage.
+    -- Written for the Cranes re-test (2026-08-10): BISMARK's Sea Song is
+    -- the game's only water verb, and water is that fight's designed key.
+    local sm = opts.summon and opts.summon[id]
+    if sm and M.readWord(CURMP + actor * 2) >= (sm.mp or 50)
+       and (M.readWord(0x3f2e) & M.readWord(0x3018 + actor * 2)) == 0
+       and cmdRow(actor, CMD_MAGIC) then
+      return { kind = "summon", row = cmdRow(actor, CMD_MAGIC) }
+    end
     -- opts.magic = { [charId] = { rec = N, mp = cost } }: the ATTACK-MAGIC
     -- line, same shape as the tactical skills -- open the real Magic list
     -- through the $7BC2 state machine, steer to master record N against
@@ -1121,6 +1139,15 @@ function M.newFightDriver(tag, opts)
       if cur > want then return { "up" } end
       return { "a" }
     end
+    if st == ST_MAGIC and plan.kind == "summon" then
+      -- UP walks the grid cursor to the top and, from the top, opens the
+      -- esper window -- one button serves both phases (the cursor cells are
+      -- live, so this converges from any scroll position).
+      return { "up" }
+    end
+    if st == ST_ESPER and plan.kind == "summon" then
+      return { "a" }
+    end
     if st == ST_MAGIC and plan.kind == "magic" then
       local idx = plan.rec - 1
       local wr, wc = idx // 2, idx % 2
@@ -1177,7 +1204,7 @@ function M.newFightDriver(tag, opts)
       plan, planActor, tgtSpin = nil, nil, 0
       return { "a" }
     end
-    if st == ST_ITEM or st == ST_TOOLS or st == ST_MAGIC then
+    if st == ST_ITEM or st == ST_TOOLS or st == ST_MAGIC or st == ST_ESPER then
       plan, planActor = nil, nil
       return { "b" }
     end
