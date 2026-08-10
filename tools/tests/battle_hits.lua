@@ -1,63 +1,167 @@
--- @suite slow
+-- @suite slow frontier=worldmap_narshe
 -- battle_hits: a boosted Fight swings again — +2 swings per pending BP
 -- (one real hit per BP for a one-weapon character; a genji pair swings
--- both hands again). The magitek party has no Fight command, so the test
--- forces the vanilla auto-Fight path: rewrite every command list to
--- Fight-only and berserk the party (RandCharAction reads the LIVE $202e
--- list -> Cmd_00 -> FightAttack, no menus pausing wait-mode atb).
--- The character whose menu is open when berserk lands keeps replaying its
--- stale menu-staged action (C1 staging), so the test subject is a
--- DIFFERENT slot — one that never had a menu up.
---   asserts: $3a70 gets the boosted swing count 1 + 2*pending exactly
---   once (only the subject has pending), never more, and the boost is
---   consumed with no regen after the swing.
+-- both hands again).
+--
+-- Issue #75 conversion.  The old apparatus existed only because the
+-- magitek intro party has no Fight command: it rewrote every $202E
+-- command list to Fight-only, berserked the party, cleared the magitek
+-- status bit, handed the subject bp:=3/pending:=2, and pinned the guards
+-- at 500 HP so the rigged auto-Fights had something to hit.  On
+-- worldmap_narshe none of that is needed: LOCKE (chid $01) really carries
+-- Fight on row 0 and Steal on row 1 (measured 2026-08-10: cmds
+-- 00,05,FF,01), so the whole berserk/Fight-only machine drops out and the
+-- boost bank is EARNED the way battle_boost earns it -- every character
+-- opens with 1 bp (Ot6InitBP) and each unboosted action regens +1
+-- (Ot6ActionEnd).  Locke banks with STEAL: a real command, zero MP, zero
+-- damage, so two banking turns cannot end the fight however weak the
+-- grass-band trash is.  TERRA defers every turn with X (vanilla's own
+-- turn-cycling key), so the subject's boost accounting is the only party
+-- arithmetic in flight -- "only the subject has pending" is now true by
+-- play, not by poke.
+--
+--   asserts (all four originals, same numbers): $3a70 gets the boosted
+--   swing count 1 + 2*pending = 5 exactly once, never more, the boost is
+--   consumed (3-2 = 1) with no regen after the swing, and pending clears.
+--   Plus the earn-on-camera controls: bp really reached 3 by two steals,
+--   pending really reached 2 by two R presses.
 local H = dofile("tools/tests/lib/ot6.lua")
-local STATE = "build/states/battle_doorstep.mss.lua"
+local STATE = "build/states/worldmap_narshe.mss.lua"
+
+local MENU, ACTOR, MSTATE, CMDROW = 0x7BCA, 0x62CA, 0x7BC2, 0x890F
+-- $30 is the THIEF SUBMENU (tools shell): since #55 the Steal row opens it
+-- with Steal on row 0, so one attempt is A (submenu), A (row 0), A (target)
+-- -- gen_sfigaro.lua's measured drive.  $01 is transitional: hands off.
+local ST_CMD, ST_THIEF, ST_TGT, ST_TRANS = 0x05, 0x30, 0x38, 0x01
+local CMD_FIGHT, CMD_STEAL = 0x00, 0x05
 local function pend(slot) return H.readByte(0x3e9d + slot*2) end
 local function bp(slot) return H.readByte(0x3e9c + slot*2) end
-local subject, bp0
-local swings, swingRef = {}, nil
+local function cmdRow(slot, cmd)
+  for r = 0, 3 do
+    if H.readByte(0x202E + slot*12 + r*3) == cmd then return r end
+  end
+  return nil
+end
+local function worldReady()
+  return (H.readWord(0x1f64) & 0x03ff) < 3
+     and H.readByte(0x0019) == 0
+     and (H.readByte(0x00e7) & 0x01) == 0
+end
 
-H.run({ maxFrames = 30000 }, {
+local subject                  -- Locke's battle slot, found by reading $3ED8
+local rPresses = 0             -- real R edges counted at the subject's menu
+local swings, swingRef = {}, nil
+local armed = false
+
+-- one pad decision per 8 frames, 4 held + 4 released (the menu-proven edge
+-- cadence battle_boost uses); returns the button table to hold this frame.
+local mf = 0
+local function decide()
+  if H.readByte(MENU) == 0 then
+    -- no interactive menu: page battle text / victory the driver way
+    return (H.frame % 8 < 4) and { a = true } or {}
+  end
+  mf = mf + 1
+  if (mf - 1) % 8 >= 4 then return {} end
+  local act = H.readByte(ACTOR) & 3
+  local st = H.readByte(MSTATE)
+  if st == ST_TRANS then return {} end           -- hands off mid-handoff
+  local btn
+  if act ~= subject then
+    btn = (st == ST_CMD) and "x" or "b"          -- defer everyone else
+  elseif bp(subject) < 3 then                    -- BANK: two real steals
+    if st == ST_CMD then
+      local want = cmdRow(subject, CMD_STEAL)
+      local cur = H.readByte(CMDROW + subject) & 3
+      if cur == want then btn = "a"
+      else btn = (cur < want) and "down" or "up" end
+    elseif st == ST_THIEF then btn = "a"         -- Steal is submenu row 0
+    elseif st == ST_TGT then btn = "a"           -- default monster target
+    else btn = "b" end
+  elseif pend(subject) < 2 then                  -- BOOST: two real R edges
+    if st == ST_CMD then
+      if not armed then
+        armed = true
+        swingRef = emu.addMemoryCallback(function(addr, value)
+          swings[#swings + 1] = value
+        end, emu.callbackType.write, 0x7e3a70, 0x7e3a70)
+      end
+      btn = "r"
+      if (mf - 1) % 8 == 0 then rPresses = rPresses + 1 end
+    else btn = "b" end
+  else                                           -- FIGHT, boosted
+    if st == ST_CMD then
+      local want = cmdRow(subject, CMD_FIGHT)
+      local cur = H.readByte(CMDROW + subject) & 3
+      if cur == want then btn = "a"
+      else btn = (cur < want) and "down" or "up" end
+    elseif st == ST_TGT then btn = "a"
+    else btn = "b" end
+  end
+  if btn and (mf - 1) % 8 == 0 then
+    H.log(string.format("hits: f%d st=%02x act=%d press %s (bp=%d pend=%d)",
+      H.frame, st, act, btn, bp(subject), pend(subject)))
+  end
+  return btn and { [btn] = true } or {}
+end
+
+local plan, idx, goal = nil, 1, { 82, 56 }
+
+H.run({ maxFrames = 45000 }, {
   H.waitFrames(20),
   H.loadState(STATE),
   H.waitFrames(10),
-  H.enterEncounter(),
-  H.waitFrames(240),
+  H.waitUntil(worldReady, 500, "world-map control", 5),
+  -- patrol the grass band south of Narshe until a real encounter fires
+  -- (codex_saveas's measured route: ~230 frames off the fixture tile)
+  H.driveUntil(function() return H.battleLoadStarted() end, 20000, {
+    H.call(function()
+      if not H.worldMode() then H.setPad({}); return end
+      if not H.worldHasControl() then plan = nil; H.setPad({}); return end
+      if not H.worldAligned() then return end
+      if not plan or idx > #plan then
+        if H.worldX() == goal[1] and H.worldY() == goal[2] then
+          goal = (goal[2] == 56) and { 82, 50 } or { 82, 56 }
+        end
+        plan = H.worldBfs(goal[1], goal[2]); idx = 1
+        if not plan or #plan == 0 then plan = nil; H.setPad({}); return end
+      end
+      local dir = plan[idx]; idx = idx + 1
+      if not dir then H.setPad({}); return end
+      H.setPad({ [dir] = true })
+    end),
+  }, "grass-band encounter"),
+  H.release(),
+  H.waitUntil(function() return H.battleActive() end, 900, "battle active", 30),
+  H.waitFrames(90),
   H.call(function()
-    local menuHolder = H.readByte(0x62ca)
-    subject = (menuHolder + 1) % 3
-    bp0 = bp(subject)
-    H.log(string.format("menu holder slot %d, test subject slot %d, bp0 %d",
-      menuHolder, subject, bp0))
-    H.writeWord(0x3C00, 500); H.writeWord(0x3C02, 500)  -- guards survive
-    for slot = 0, 3 do                    -- entries are [cmd,d,d] x4 = 12/char
-      H.writeByte(0x202e + slot*12, 0x00)
-      H.writeByte(0x2031 + slot*12, 0xff)
-      H.writeByte(0x2034 + slot*12, 0xff)
-      H.writeByte(0x2037 + slot*12, 0xff)
-      local a = 0x3ee5 + slot*2
-      H.writeByte(a, H.readByte(a) | 0x10)
+    for slot = 0, 3 do
+      if H.readByte(0x3ED8 + slot*2) == 0x01 then subject = slot end
     end
+    H.assertEq(subject ~= nil, true, "LOCKE is really in this party")
+    H.assertEq(cmdRow(subject, CMD_FIGHT), 0, "his real Fight sits on row 0")
+    H.assertEq(cmdRow(subject, CMD_STEAL) ~= nil, true,
+      "and his real Steal exists to bank with")
+    H.log(string.format("subject slot %d (LOCKE): bp=%d hp=%d",
+      subject, bp(subject), H.readWord(0x3BF4 + subject*2)))
   end),
-  -- the subject may have an action pre-queued by the battle-entry mash;
-  -- let their first action (queued beam or clean fight) flush unboosted
-  H.waitUntil(function() return bp(subject) ~= bp0 end, 8000, "first action flushed", 10),
+  -- bank 3 bp (1 open + 2 steal regens), boost to pending 2, Fight
+  H.driveUntil(function()
+    return pend(subject) == 2 and bp(subject) == 3
+  end, 20000, {
+    H.call(function() H.setPad(decide()) end),
+  }, "3 bp banked by real steals, pending 2 by real R"),
   H.call(function()
-    -- magitek status routes every berserk/confused action to a random
-    -- beam (RandMagitekAction) no matter the command list — clear it so
-    -- berserk picks Fight from the live list
-    local st1 = 0x3ee4 + subject*2
-    H.writeByte(st1, H.readByte(st1) & 0xf7)
-    H.writeByte(0x3e9c + subject*2, 3)    -- bp to spend
-    H.writeByte(0x3e9d + subject*2, 2)    -- boost their next auto-Fight
-    swingRef = emu.addMemoryCallback(function(addr, value)
-      swings[#swings + 1] = value
-    end, emu.callbackType.write, 0x7e3a70, 0x7e3a70)
+    H.assertEq(bp(subject), 3, "3 bp banked by real turns (1 open + 2 steals)")
+    H.assertEq(pend(subject), 2, "pending 2 from real R presses")
+    H.assertEq(rPresses >= 2, true, "at least two R edges were really sent")
   end),
-  H.waitUntil(function() return pend(subject) == 0 end, 8000, "boosted fight lands", 10),
+  H.driveUntil(function() return pend(subject) == 0 end, 10000, {
+    H.call(function() H.setPad(decide()) end),
+  }, "boosted fight lands"),
   H.waitFrames(120),
   H.call(function()
+    H.setPad({})
     emu.removeMemoryCallback(swingRef, emu.callbackType.write, 0x7e3a70, 0x7e3a70)
     local n5, maxv, vals = 0, -1, {}
     for _, v in ipairs(swings) do

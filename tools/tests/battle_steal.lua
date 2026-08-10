@@ -1,4 +1,4 @@
--- @suite
+-- @suite slow frontier=figaro_cleared
 -- battle_steal.lua -- boost-tiered Steal, the first "chance verb" of the
 -- canon rule DESIGN.md states: on damage verbs boost multiplies; on chance
 -- verbs boost GUARANTEES. Unboosted Steal is pure vanilla; each BP tilts the
@@ -12,350 +12,451 @@
 --     3 bp clamps to $ff so the next `adc #$32` overflows and vanilla's own
 --     `bcs` guarantees the steal -- drawing no success RNG at all.
 --   Ot6StealSlot -- replaces the vanilla 1/8-rare slot roll. 0 bp is the exact
---     vanilla roll (an empty picked slot still yields "nothing"); 1-3 bp are
---     fallback-aware (never "nothing" on a boosted success) and bias to the
---     rare slot, certain at 3 bp.
+--     vanilla roll; 1-3 bp are fallback-aware (never "nothing" on a boosted
+--     success) and bias to the rare slot, certain at 3 bp.
 --   Ot6BoostDmg's $05 gate -- steal never gets a damage multiplier.
 --
--- HOW THE RESOLUTION IS EXERCISED. TargetEffect_52's path is
--- target-type-agnostic -- it reads $3308+y/$3309+y and grants $32f4+x for ANY
--- target y -- so the identical success-roll + slot-pick + boost-tier code runs
--- whether the cursor lands on a monster or on a party entity. EVERY entity on
--- BOTH SIDES therefore gets this scenario's two sentinel steal slots (the RAM
--- the notes call "$3308 Steal Item 1 (12.5%)" / "$3309 Steal Item 2 (87.5%)",
--- stride 2) and level 50, the way battle_bushido installs Cyan by poke. Until
--- #55 only the party side was poked, because the fixture's forged command byte
--- ($202e without the $2030 targeting byte beside it) left the cursor opening on
--- the party; #55's submenu gives the Steal row its own correct
--- MANUAL|ONE_SIDE|ENEMY byte, so it opens on the enemy the way a real Steal
--- always has. Pinning both sides makes the test indifferent to that, which is
--- where it should have been all along. One actor acts per scenario (others +
--- enemies stopped), so every steal is attributable.
+-- Issue #75 conversion.  The old apparatus rebuilt the entire battle by
+-- poke: LOCKE installed into all three magitek slots, Steal forged into
+-- $202E, level 50 written to BOTH sides, sentinel steal slots written into
+-- $3308/$3309 for every entity, enemies HP-pinned and STOPped, bp/pending
+-- handed, MP pinned, and the $BE RNG index seeded at RandA to chosen
+-- bytes.  On figaro_cleared every one of those is a fact instead: LOCKE
+-- really carries Steal (row 1, the #55 thief submenu), the desert pool's
+-- formation seeds real species with real authored steal slots (measured:
+-- species $5C rare=$F2=common, two $5D with rare EMPTY / common Tonic --
+-- LoadMonsterProp loads them from MonsterItems, battle_main.asm:7505), and
+-- levels are real on both sides (L6 vs L6 -> vanilla chance = 6+50-6 = 50,
+-- a coin flip).  The bank is earned by real zero-MP item turns; pending by
+-- real R edges.
 --
--- THE RNG IS DRIVEN DETERMINISTICALLY. With attacker and target both at level
--- 50, level cancels: chance = level+50-targetLevel = 50, a coin flip. We pin
--- the battle RNG index $be the instant the roll runs -- an exec callback at
--- RandA (a $be write made anywhere earlier does not survive the intervening
--- draws) -- keyed to a value derived from the live RNGTbl so the success RandA
--- and the slot Rand land on chosen bytes: V_fail (a losing roll), V_common (the
--- 7/8 slot), V_rare (the 1/8 slot). The natural $be is stashed and handed back
--- when the message clears, so the pin never accumulates. That is the
--- seeded-stream idiom (bal_mines) sharpened to a single frame. 3 bp NEVER draws
--- RandA (its clamp overflows first), so those seeds simply never fire -- which
--- is the whole point: the guarantee is roll-free, provable by pinning the very
--- seeds that miss or take the common at 0 bp and still getting the rare.
+-- THE SEED PINS ARE REPLACED BY A SHARPER ZERO-WRITE DECODE.  An exec
+-- callback at RandA READS $BE at the instant the success roll runs and
+-- computes the byte the engine is about to draw (r1 = RNGTbl[be+1],
+-- roll = r1*100>>8); every unboosted attempt then asserts its OUTCOME
+-- matches vanilla's own model (lands iff roll < 50) -- so a miss is not
+-- luck-noise but a verified prediction, and a run of successes cannot
+-- silently weaken the gamble claim.  The 3-bp guarantee is proven
+-- ROLL-FREE directly: zero RandA draws during its resolution -- stronger
+-- than any adversarial seed, because there is no roll to survive.
+--
+-- THE SNEAK RING ARM IS A LABELED ISOLATION ARM (owner ruling 2026-08-10,
+-- waiver-burndown plan: mechanism decodes may keep memory-hack staging
+-- where the fixture cannot produce the input on cue).  No fixture chain
+-- owns a Sneak Ring; the game's own sources are a shop we never visit and
+-- a steal FROM species $14 -- honest ring ownership is future work.  The
+-- arm sets/clears one relic bit ($3C45 bit 0) around two unboosted
+-- attempts and uses the same roll decode: with the ring the model becomes
+-- "lands iff roll < 100", and any observed roll >= 50 that lands is a
+-- roll the bare arm verifiably missed on.  This is the file's ONLY
+-- remaining write surface (the .writeByte waiver survives for it alone).
 local H = dofile("tools/tests/lib/ot6.lua")
-local STATE = "build/states/battle_doorstep.mss.lua"
+local STATE = "build/states/figaro_cleared.mss.lua"
 
-local MENU, ACTOR = 0x7BCA, 0x62CA
-local PARTY = { 0, 1, 2 }
-local MSLOTS = { 0, 1, 2, 3, 4, 5 }
-local function ENT_C(s) return s * 2 end
-local function ENT_M(s) return 8 + s * 2 end
-local LOCKE = 0x01
-local RARE, COMMON = 0xE0, 0xE1     -- distinct sentinel item ids
+local MENU, ACTOR, MSTATE, CMDROW = 0x7BCA, 0x62CA, 0x7BC2, 0x890F
+local ST_CMD, ST_THIEF, ST_ITEM, ST_TGT, ST_TRANS = 0x05, 0x30, 0x0A, 0x38, 0x01
+local CMD_STEAL, CMD_ITEM = 0x05, 0x01
 local NONE = 0xFF
+local TONIC, POTION = 0xE8, 0xE9
+local RNGTBL = H.sym("RNGTbl") & 0x3FFFFF
+local RANDA = H.sym("RandA")
 
-local cfg = { rare = RARE, common = COMMON, pend = 3, ring = false, pinHp = true }
-local actor, hp0
-local V_fail, V_common, V_rare       -- $be seeds derived from RNGTbl at runtime
-local pinBe = nil                    -- the seed to pin at the next steal roll
-local armRoll = nil                  -- armed by $3401->2, fired at RandA (exec)
-local beSaved = nil                  -- natural $be, handed back when the steal ends
-local RNGTBL = H.sym("RNGTbl") & 0x3FFFFF   -- RNGTbl as a snesPrgRom FILE
-                                     --   offset (CPU $C0FD00 -> $00FD00)
-local RANDA = H.sym("RandA")         -- battle RandA entry (CPU addr). Both
-                                     --   derived from ff6-en.dbg at compose
-                                     --   time, so a bank-$C0/$C2 shift can no
-                                     --   longer stale them. Pinning $be HERE,
-                                     --   the instant the roll runs, is the only
-                                     --   pin that survives to it.
-
-local function stealRare(e)   return 0x3308 + e end
-local function stealCommon(e) return 0x3309 + e end
-
-local function pinEnemies()
-  for _, s in ipairs(MSLOTS) do
-    H.writeWord(0x3BFC + s * 2, 0xF000)                        -- never dies
-    H.writeByte(0x3EF8 + ENT_M(s), H.readByte(0x3EF8 + ENT_M(s)) | 0x10) -- stopped:
-    -- no enemy acts, so nothing attacks the actor (the no-damage assert is
-    -- clean) and the RNG stays ours between drives.
-    --
-    -- #55: THE ENEMY SIDE IS PINNED IDENTICALLY TO THE PARTY SIDE NOW.  This
-    -- fixture used to rely on the steal landing on a PARTY entity, which it did
-    -- for a reason that was never the game's intent: pinParty forges a command
-    -- BYTE at $202e without the TARGETING byte at $2030 beside it, so the row
-    -- kept the original command's targeting and the cursor opened on the party.
-    -- Locke's Steal has always been MANUAL|ONE_SIDE|ENEMY (battle_cmd_prop.asm:53)
-    -- and #55's submenu supplies exactly that byte per row, so the cursor now
-    -- opens where a real Steal always opened -- on the enemy -- and the steal
-    -- resolved against a monster holding vanilla loot instead of this
-    -- scenario's sentinels.  Rather than re-forge the party-side quirk, both
-    -- sides are pinned: the same two sentinel slots and the same level 50, so
-    -- `chance = level + 50 - targetLevel = 50` and every seeded outcome below
-    -- holds WHICHEVER side the cursor lands on.  TargetEffect_52 is
-    -- target-type-agnostic (it reads $3308+y/$3309+y and grants $32f4+x for any
-    -- target y), which is what made the old party-side run sound and makes this
-    -- one sound too -- the test no longer depends on the answer either way.
-    H.writeByte(0x3B18 + ENT_M(s), 50)
-    H.writeByte(stealRare(ENT_M(s)), cfg.rare)
-    H.writeByte(stealCommon(ENT_M(s)), cfg.common)
+local locke
+local function bp() return H.readByte(0x3E9C + locke*2) end
+local function pend() return H.readByte(0x3E9D + locke*2) end
+local function mp() return H.readWord(0x3C08 + locke*2) end
+local function lockeHp() return H.readWord(0x3BF4 + locke*2) end
+local function stealRare(s)   return H.readByte(0x3308 + 8 + s*2) end
+local function stealCommon(s) return H.readByte(0x3309 + 8 + s*2) end
+local function monLevel(s)    return H.readByte(0x3B18 + 8 + s*2) end
+local function cmdRowOf(slot, cmd)
+  for r = 0, 3 do
+    if H.readByte(0x202E + slot*12 + r*3) == cmd then return r end
   end
+  return nil
 end
-
-local function pinParty()
-  for _, s in ipairs(PARTY) do
-    H.writeByte(0x3ED8 + s * 2, LOCKE)                         -- a real stealer
-    H.writeByte(0x3EE4 + s * 2, H.readByte(0x3EE4 + s * 2) & 0xF7)  -- -magitek
-    H.writeByte(0x3EE5 + s * 2, H.readByte(0x3EE5 + s * 2) & 0xCF)  -- -muddle/-berserk
-    H.writeByte(0x202E + s * 12, 0x05)                         -- Steal, alone
-    H.writeByte(0x2031 + s * 12, NONE)
-    H.writeByte(0x2034 + s * 12, NONE)
-    H.writeByte(0x2037 + s * 12, NONE)
-    H.writeByte(0x3B18 + ENT_C(s), 50)                         -- level 50 both sides
-    H.writeByte(stealRare(ENT_C(s)), cfg.rare)                 -- this scenario's slots
-    H.writeByte(stealCommon(ENT_C(s)), cfg.common)
-    if cfg.pinHp then H.writeWord(0x3BF4 + s * 2, 999) end
-    H.writeWord(0x3C08 + s * 2, 99)   -- MP: Steal costs 2 MP now (v0.5) -- keep
-                                      --   the stealer solvent so it never fizzles
-                                      --   (the MP economy itself is battle_stealmp's
-                                      --   job; here Steal just has to RESOLVE)
-  end
-  if actor then
-    for _, s in ipairs(PARTY) do                               -- only the actor acts
-      if s ~= actor then
-        H.writeByte(0x3EF8 + ENT_C(s), H.readByte(0x3EF8 + ENT_C(s)) | 0x10)
-      end
+local function bagIdxOf(ids)
+  for i = 0, 251 do
+    local id = H.readByte(0x2686 + i*5)
+    for _, w in ipairs(ids) do
+      if id == w and H.readByte(0x2686 + i*5 + 3) > 0 then return i end
     end
-    H.writeByte(0x3E9C + actor * 2, 5)                         -- full bank
-    H.writeByte(0x3E9D + actor * 2, cfg.pend)                  -- pending boost
-    local r2 = 0x3C45 + actor * 2                              -- relic effects 2
-    if cfg.ring then H.writeByte(r2, H.readByte(r2) | 0x01)    -- bit 0 = Sneak Ring
-    else H.writeByte(r2, H.readByte(r2) & 0xFE) end
   end
+  return nil
 end
 
-local function pin() pinEnemies(); pinParty() end
+-- ------------------------------------------------- the observation rig --
+-- per-steal record: code trail ($3401: 1=entry, 2=past empty check,
+-- 3=stole; $ff=cleared), grant ($32F4 range), RandA draws inside the
+-- resolution window with the roll each would produce, hp at entry/clear.
+local rec = nil
+local function newRec() rec = { draws = {}, code = 0 } end
+local function rollOf(be)
+  return (H.readRomByte(RNGTBL + ((be + 1) & 0xFF)) * 100) >> 8
+end
+local function armWatches()
+  emu.addMemoryCallback(function(_, v)
+    if not rec then return end
+    if v == 1 then rec.code = math.max(rec.code, 1); rec.hp0 = lockeHp()
+    elseif v == 2 then rec.code = math.max(rec.code, 2)
+    elseif v == 3 then rec.code = math.max(rec.code, 3)
+    elseif v == NONE and rec.code >= 1 and not rec.done then
+      rec.done = true; rec.hp1 = lockeHp()
+    end
+  end, emu.callbackType.write, 0x7E3401, 0x7E3401)
+  emu.addMemoryCallback(function()
+    if rec and rec.code >= 1 and not rec.done then
+      local be = H.readByte(0xBE)
+      rec.draws[#rec.draws + 1] = { be = be, roll = rollOf(be) }
+    end
+  end, emu.callbackType.exec, RANDA, RANDA)
+  -- gate the grant on the steal message being OPEN (code >= 1): the bank
+  -- turns' item use also writes its item id into this region (measured:
+  -- a banking Tonic's $E8 landed in the re-loot record as a false grant)
+  emu.addMemoryCallback(function(_, v)
+    if rec and rec.code >= 1 and v ~= NONE and not rec.done then rec.grant = v end
+  end, emu.callbackType.write, 0x7E32F4, 0x7E32F4 + 18)
+end
 
--- outcome recorder: one entry per steal, delimited by the $3401=1 entry write
-local attempts = {}
-local function resetRec() attempts = {}; armRoll = nil; beSaved = nil end
-local function cur() return attempts[#attempts] end
+-- ------------------------------------------------------ the menu drive --
+-- others defer with X; Locke banks item turns to `wantBp`, boosts to
+-- `wantPend` by real R edges, then steals at the monster slot `target`.
+local mf = 0
+local drive = { wantBp = 0, wantPend = 0, target = nil }
+local function decide()
+  if H.readByte(MENU) == 0 then
+    return (H.frame % 8 < 4) and { a = true } or {}
+  end
+  -- latch the target mask on EVERY frame while target select is up, and
+  -- RESET it the moment it is not: a latch that survives between steals
+  -- confirms instantly on the previous steal's cursor (measured: the
+  -- re-loot arm stole from the wrong monster off a stale latch)
+  if H.readByte(MSTATE) == ST_TGT then
+    local m = H.readByte(0x7B7E)
+    if m ~= 0 then
+      if m == drive.curMask then drive.maskAge = (drive.maskAge or 0) + 1
+      else drive.curMask, drive.maskAge = m, 1 end
+    end
+  else
+    drive.curMask, drive.maskAge, drive.tgtPress = nil, 0, 0
+  end
+  mf = mf + 1
+  local act = H.readByte(ACTOR) & 3
+  local st = H.readByte(MSTATE)
+  if st == ST_TRANS then return {} end
+  -- the item window needs the slow 6-on/24-off cadence (battle_preview's
+  -- measurement); everything else takes 4-on/4-off
+  local slow = (act == locke and st == ST_ITEM)
+  if slow then
+    if (mf - 1) % 30 >= 6 then return {} end
+  else
+    if (mf - 1) % 8 >= 4 then return {} end
+  end
+  local btn
+  if act ~= locke then
+    btn = (st == ST_CMD) and "x" or "b"
+  elseif bp() < drive.wantBp then                -- BANK: real item turns
+    if st == ST_CMD then
+      local want = cmdRowOf(locke, CMD_ITEM)
+      local cur = H.readByte(CMDROW + locke) & 3
+      if cur == want then btn = "a"
+      else btn = (cur < want) and "down" or "up" end
+    elseif st == ST_ITEM then
+      local want = bagIdxOf({ TONIC, POTION })
+      if want == nil then error("bank ran out of items", 0) end
+      local cur = H.readByte(0x8947 + locke) + H.readByte(0x894F + locke)
+      if cur < want then btn = "down"
+      elseif cur > want then btn = "up"
+      else btn = "a" end
+    elseif st == ST_TGT then btn = "a"
+    else btn = "b" end
+  elseif pend() < drive.wantPend then            -- BOOST: real R edges
+    btn = (st == ST_CMD) and "r" or "b"
+  else                                           -- STEAL via the #55 submenu
+    if st == ST_CMD then
+      local want = cmdRowOf(locke, CMD_STEAL)
+      local cur = H.readByte(CMDROW + locke) & 3
+      if cur == want then btn = "a"
+      else btn = (cur < want) and "down" or "up" end
+    elseif st == ST_THIEF then btn = "a"         -- Steal is submenu row 0
+    elseif st == ST_TGT then
+      -- steer on the LATCHED mask (see above).  The cursor grid follows
+      -- the formation's screen layout (measured here: 08 -left-> 04
+      -- -down-> 01), so steering rotates directions every second press
+      -- until the latched mask settles on the wanted monster.
+      if drive.curMask == (1 << drive.target) and (drive.maskAge or 0) >= 4 then
+        btn = "a"
+      else
+        -- one increment per press CYCLE, not per frame -- a per-frame
+        -- increment rotated the direction mid-hold and registered nothing
+        local dirs = { "left", "down", "right", "up" }
+        if (mf - 1) % 8 == 0 then drive.tgtPress = (drive.tgtPress or 0) + 1 end
+        btn = dirs[(((drive.tgtPress or 1) - 1) // 2) % 4 + 1]
+      end
+    else btn = "b" end
+  end
+  if btn and (mf - 1) % 32 == 0 then
+    H.log(string.format("drv: f%d st=%02x act=%d %s (bp=%d pend=%d mp=%d tgt=%s mask=%02x code=%s)",
+      H.frame, st, act, btn, bp(), pend(), mp(), tostring(drive.target),
+      H.readByte(0x7B7E), rec and tostring(rec.code) or "-"))
+  end
+  return btn and { [btn] = true } or {}
+end
 
--- drive one FRESH steal: settle first (let the cfg's slots take and any prior
--- action drain), then A (pick Steal), A (confirm the default self/party target)
-local function driveOneSteal()
+-- one steal: configure the drive, run it until the record completes.
+-- drive.target is set by the caller (it needs live classify() data).
+local function oneSteal(tag, wantBp, wantPend)
   return H.repeatN(1, {
-    H.repeatN(30, { H.call(pin), H.waitFrames(1) }),
-    H.call(resetRec),
-    H.driveUntil(function() return #attempts >= 1 and cur().done end, 9000, {
-      H.call(function()
-        pin()
-        if H.readByte(MENU) ~= 0 then H.setPad({ "a" }) end
-      end),
-      H.waitFrames(3), H.call(function() H.setPad({}) end), H.waitFrames(3),
-      H.call(function() if H.readByte(MENU) ~= 0 then H.setPad({ "a" }) end end),
-      H.waitFrames(3), H.call(function() H.setPad({}) end), H.waitFrames(14),
-    }, "a steal resolves"),
+    H.call(function()
+      drive.wantBp, drive.wantPend = wantBp, wantPend
+      newRec()
+    end),
+    H.driveUntil(function() return rec.done == true end, 30000, {
+      H.call(function() H.setPad(decide()) end),
+    }, tag),
+    H.call(function()
+      H.setPad({})
+      local d = {}
+      for _, w in ipairs(rec.draws) do d[#d+1] = tostring(w.roll) end
+      H.log(string.format("[%s] code=%d grant=%s draws={%s} bp=%d pend=%d "
+        .. "mp=%d hp %s->%s", tag, rec.code, rec.grant and
+        string.format("%02X", rec.grant) or "nil", table.concat(d, ","),
+        bp(), pend(), mp(), tostring(rec.hp0), tostring(rec.hp1)))
+    end),
+    H.waitFrames(60),
   })
 end
 
-local function outcome()
-  local a = cur() or {}
-  if a.grant == RARE then return "rare"
-  elseif a.grant == COMMON then return "common"
-  elseif a.grant ~= nil then return "item:" .. string.format("%02x", a.grant)
-  else return "nothing" end
+-- --------------------------------------------------------- the battles --
+local plan, idx, goal = nil, 1, nil
+-- classify the live formation: `rareT` = a slot whose rare slot is
+-- populated; `emptyRareTs` = slots with rare EMPTY but common populated.
+local rareT, fbT1, fbT2
+local function classify()
+  rareT, fbT1, fbT2 = nil, nil, nil
+  for s = 0, 5 do
+    if H.readWord(0x3BFC + s*2) > 0 then
+      if stealRare(s) ~= NONE then rareT = rareT or s
+      elseif stealCommon(s) ~= NONE then
+        if fbT1 == nil then fbT1 = s else fbT2 = fbT2 or s end
+      end
+    end
+  end
 end
 
-H.run({ maxFrames = 200000 }, {
+-- enter a desert battle whose formation is SUITABLE for the arm: every
+-- arm needs a both-populated species (rareT); battle 3 additionally
+-- needs a common-only species (fbT1) for the fallback arm.  Flee
+-- anything else and re-patrol (measured: the pool draws at least two
+-- formation types -- 1x$5C+2x$5D mixed, and rare-holders-only).
+local needFb = false
+local function suitable()
+  return rareT ~= nil and ((not needFb) or fbT1 ~= nil)
+end
+local function enterDesertBattle(n, wantFb)
+  local steps = { H.call(function() needFb = wantFb or false end) }
+  for try = 1, 6 do
+    steps[#steps+1] = H.cond(function()
+      return H.battleLoadStarted() and suitable()
+    end, {}, {
+      H.cond(function() return H.battleLoadStarted() end, {
+        H.logStep("formation unsuitable -- fleeing for a fresh draw"),
+        H.fleeBattle(12000),
+        H.waitFrames(240),
+      }, {}),
+      H.call(function() plan, goal = nil, nil end),
+      H.driveUntil(function() return H.battleLoadStarted() end, 25000, {
+        H.call(function()
+          if not H.worldMode() or not H.worldHasControl() then
+            plan = nil; H.setPad({}); return
+          end
+          local phase = (H.frame // 120) % 2
+          H.setPad(phase == 0 and { left = true } or { right = true })
+        end),
+      }, "desert encounter " .. n .. " try " .. try),
+      H.release(),
+      H.waitUntil(function() return H.battleActive() end, 900,
+        "battle " .. n .. " active", 30),
+      H.waitFrames(90),
+      H.call(function()
+        locke = nil
+        for slot = 0, 3 do
+          if H.readByte(0x3ED8 + slot*2) == 0x01 then locke = slot end
+        end
+        H.assertEq(locke ~= nil, true, "LOCKE is really in this party")
+        H.assertEq(cmdRowOf(locke, CMD_STEAL) ~= nil, true,
+          "his real Steal exists")
+        classify()
+        H.log(string.format("battle %d formation: rareT=%s fbT1=%s fbT2=%s",
+          n, tostring(rareT), tostring(fbT1), tostring(fbT2)))
+      end),
+    })
+  end
+  steps[#steps+1] = H.call(function()
+    H.assertEq(suitable(), true,
+      "a suitable desert formation drawn within six encounters")
+  end)
+  return H.repeatN(1, steps)
+end
+
+H.run({ maxFrames = 150000 }, {
   H.waitFrames(20),
   H.loadState(STATE),
-  H.waitFrames(10),
-  H.enterEncounter(),
-  H.driveUntil(function() return H.readByte(MENU) ~= 0 end, 3000, {
-    H.call(pin), H.waitFrames(1),
-  }, "menu opens (Locke installed)"),
-  H.call(function()
-    actor = H.readByte(ACTOR)
-    H.log(string.format("actor slot %d id=$%02x cmd0=$%02x",
-      actor, H.readByte(0x3ED8 + actor * 2), H.readByte(0x202E + actor * 12)))
-
-    -- Derive $be seeds from the live RNGTbl. RandA(100) at be=V reads
-    -- RNGTbl[(V+1)&255]=r1 -> floor(r1*100/256); fails vs chance 50 iff r1>=128.
-    -- The slot Rand then reads RNGTbl[(V+2)&255]=r2 -> rare iff r2<$20. Seeds
-    -- re-derive each run, so an RNGTbl edit cannot silently invalidate a claim.
-    local function rt(i) return H.readRomByte(RNGTBL + (i & 0xFF)) end
-    for V = 0, 255 do
-      local r1, r2 = rt(V + 1), rt(V + 2)
-      local fail = ((r1 * 100) >> 8) >= 50
-      if fail and not V_fail then V_fail = V end
-      if not fail and r2 >= 0x20 and not V_common then V_common = V end
-      if not fail and r2 < 0x20 and not V_rare then V_rare = V end
-    end
-    H.log(string.format("$be seeds: fail=%s common=%s rare=%s",
-      tostring(V_fail), tostring(V_common), tostring(V_rare)))
-    H.assertEq(V_fail ~= nil and V_common ~= nil and V_rare ~= nil, true,
-      "RNGTbl yields a fail / common / rare seed")
-    -- (RANDA is H.sym("RandA") now -- derived from ff6-en.dbg at compose time,
-    -- so the old "does RANDA still open RandA's phx" drift guard is redundant:
-    -- the address cannot be stale by construction.)
-
-    -- $3401 message code (1=entry, 2=past empty check, 3=stole); $ff = cleared.
-    -- The 2 ARMS the seed; the RandA exec callback applies it the instant the
-    -- roll runs (a write-time pin does not survive -- other RNG draws between).
-    emu.addMemoryCallback(function(_, v)
-      if v == 1 then attempts[#attempts + 1] = { code = 1 }
-      elseif v == 2 and cur() then
-        cur().code = 2
-        if pinBe then armRoll = pinBe end
-      elseif v == 3 and cur() then cur().code = 3
-      elseif v == NONE then
-        if cur() and not cur().done then cur().done = true end
-        if beSaved then H.writeByte(0xBE, beSaved); beSaved = nil end  -- hand back
-      end
-    end, emu.callbackType.write, 0x7E3401, 0x7E3401)
-    -- Pin $be at RandA (the success roll): it reads RNGTbl[seed+1], the slot Rand
-    -- then RNGTbl[seed+2]. Stash the natural value; restore it when the steal's
-    -- message clears so nothing accumulates across drives. 3 bp skips RandA (its
-    -- clamp overflows first), so an armed seed never fires -- guarantee is
-    -- roll-free.
-    emu.addMemoryCallback(function()
-      if armRoll then beSaved = H.readByte(0xBE); H.writeByte(0xBE, armRoll); armRoll = nil end
-    end, emu.callbackType.exec, RANDA, RANDA)
-    -- $32f4,x obtained item; non-$ff = the item stolen
-    emu.addMemoryCallback(function(_, v)
-      if v ~= NONE and cur() then cur().grant = v end
-    end, emu.callbackType.write, 0x7E32F4, 0x7E32F4 + 18)
-    pin()
-  end),
-
-  -- 1. THREE BP = GUARANTEED RARE, ACROSS ADVERSARIAL SEEDS. 3 bp takes no roll
-  -- (the clamp overflows before $ee is even formed), so we pin $be to the very
-  -- seeds a 0-bp steal would MISS on (V_fail) or take the COMMON on (V_common)
-  -- and demand a rare success every time. Six different points in the stream:
-  -- not one lucky roll.
-  H.call(function() cfg = { rare = RARE, common = COMMON, pend = 3, ring = false, pinHp = true } end),
-  H.call(function() pinBe = V_fail end), driveOneSteal(),
-  H.call(function()
-    H.assertEq(outcome(), "rare", "3 bp took the RARE item (seed V_fail)")
-    H.assertEq(cur().code, 3, "3 bp is a guaranteed success")
-  end),
-  H.call(function() pinBe = V_common end), driveOneSteal(),
-  H.call(function() H.assertEq(outcome(), "rare", "3 bp rare (seed V_common)") end),
-  H.call(function() pinBe = V_rare end), driveOneSteal(),
-  H.call(function() H.assertEq(outcome(), "rare", "3 bp rare (seed V_rare)") end),
-  H.call(function() pinBe = 0x40 end), driveOneSteal(),
-  H.call(function() H.assertEq(outcome(), "rare", "3 bp rare (seed $40)") end),
-  H.call(function() pinBe = 0xC0 end), driveOneSteal(),
-  H.call(function()
-    H.assertEq(outcome(), "rare", "3 bp rare (seed $C0)")
-    H.screenshot("steal_3bp_rare")
-  end),
-
-  -- 2. ZERO BP IS THE VANILLA ROLL, DRIVEN DETERMINISTICALLY. On a winning seed
-  -- the unboosted steal lands and takes the COMMON -- the 7/8 slot, exactly
-  -- vanilla, and NOT the rare 3 bp forces on the same both-present enemy.
-  H.call(function() cfg = { rare = RARE, common = COMMON, pend = 0, ring = false, pinHp = true } end),
-  H.call(function() pinBe = V_common end), driveOneSteal(),
-  H.call(function()
-    H.assertEq(outcome(), "common", "0 bp lands and takes the COMMON (vanilla 7/8)")
-  end),
-  -- the 1/8 seed takes the rare: 0 bp CAN reach it, just rarely.
-  H.call(function() pinBe = V_rare end), driveOneSteal(),
-  H.call(function()
-    H.assertEq(outcome(), "rare", "0 bp reaches the rare only on the 1/8 roll")
-  end),
-  -- the losing seed MISSES: the exact seed 3 bp shrugged off. Boost has not
-  -- leaked into the 0-bp path.
-  H.call(function() pinBe = V_fail end), driveOneSteal(),
-  H.call(function()
-    H.assertEq(outcome(), "nothing", "0 bp MISSES on the losing roll (a real gamble)")
-  end),
-
-  -- 2b. 3 bp on a common-only enemy: fallback-aware, so it takes the common.
-  -- The guarantee is "rare IF PRESENT" -- here it is not, and boost never
-  -- conjures. (No pin: 3 bp draws no roll.)
-  H.call(function()
-    cfg = { rare = NONE, common = COMMON, pend = 3, ring = false, pinHp = true }; pinBe = nil
-  end),
-  driveOneSteal(),
-  H.call(function()
-    H.assertEq(outcome(), "common",
-      "3 bp falls back to the COMMON when the rare is absent (guarantee != conjuring)")
-  end),
-
-  -- 3. SNEAK RING keeps helping the unboosted (the deliberate ruling). Pin the
-  -- SAME losing seed V_fail that missed bare above: the ring doubles chance
-  -- 50->100, so now it LANDS. Both slots hold the same item so the slot roll
-  -- can't vary the result. (At 3 bp the ring is moot -- the clamp overflows
-  -- before $ee is ever formed.)
-  H.call(function()
-    cfg = { rare = 0x66, common = 0x66, pend = 0, ring = true, pinHp = true }; pinBe = V_fail
-  end),
-  driveOneSteal(),
-  H.call(function()
-    H.assertEq(cur().code, 3, "sneak ring doubles chance 50->100: the losing seed now lands")
-    H.assertEq(outcome(), "item:66", "the ringed 0-bp steal took the item")
-  end),
-
-  -- 4. THE ECONOMY: 3 bp charged, no +1 regen that turn, pending cleared.
-  H.call(function()
-    cfg = { rare = RARE, common = COMMON, pend = 3, ring = false, pinHp = true }; pinBe = nil
-    H.writeByte(0x3E9C + actor * 2, 5); H.writeByte(0x3E9D + actor * 2, 3)
-  end),
-  driveOneSteal(),
-  H.waitUntil(function() return H.readByte(0x3E9D + actor * 2) == 0 end, 1200,
-    "pending consumed", 10),
   H.waitFrames(30),
-  H.call(function()
-    H.log(string.format("economy: bp=%d pending=%d",
-      H.readByte(0x3E9C + actor * 2), H.readByte(0x3E9D + actor * 2)))
-    H.assertEq(H.readByte(0x3E9C + actor * 2), 2, "5 bp - 3 spent = 2, regen skipped")
-    H.assertEq(H.readByte(0x3E9D + actor * 2), 0, "pending cleared after the action")
-  end),
+  H.hold({ "b" }),                    -- real chocobo dismount (gen_kolts)
+  H.driveUntil(function() return H.readByte(0x11fa) & 3 == 0 end, 900, {
+    H.waitFrames(1),
+  }, "chocobo dismount"),
+  H.release(),
+  H.waitFrames(120),
 
-  -- 5. NO DAMAGE MULTIPLIER (Ot6BoostDmg's $05 gate). Self-target means any
-  -- stray damage lands on the actor; its HP must not move across a 3-bp steal.
+  -- ================= BATTLE 1: the 3-bp guarantee, and no re-looting ====
+  enterDesertBattle(1),
   H.call(function()
-    cfg = { rare = RARE, common = COMMON, pend = 3, ring = false, pinHp = false }; pinBe = nil
-    H.writeByte(0x3E9C + actor * 2, 5); H.writeByte(0x3E9D + actor * 2, 3)
-    hp0 = H.readWord(0x3BF4 + actor * 2)
+    armWatches()
+    H.assertEq(rareT ~= nil, true,
+      "the real formation seeds a rare-slot species ($5C)")
+    H.log(string.format("targets: rare=%s (slots %02X/%02X, lvl %d) "
+      .. "locke lvl %d mp %d", tostring(rareT), stealRare(rareT),
+      stealCommon(rareT), monLevel(rareT), H.readByte(0x3B18 + locke*2), mp()))
   end),
-  driveOneSteal(),
+  -- ARM 1: bank 3 by real item turns, R x3, steal the rare holder.
+  (function()
+    local wantRare
+    return H.repeatN(1, {
+      H.call(function()
+        wantRare = stealRare(rareT)
+        drive.target = rareT
+      end),
+      oneSteal("3bp guaranteed steal", 3, 3),
+      H.call(function()
+        H.assertEq(rec.code, 3, "3 bp is a guaranteed success")
+        H.assertEq(#rec.draws, 0,
+          "...and draws NO success RNG at all (the clamp overflows first)")
+        H.assertEq(rec.grant, wantRare,
+          "3 bp took the RARE slot's item (species-authored, read live)")
+        H.assertEq(stealRare(rareT), NONE,
+          "the game's own clear emptied the rare slot")
+        H.assertEq(stealCommon(rareT), NONE, "...and the common slot")
+        H.assertEq(rec.hp1, rec.hp0,
+          "steal dealt no damage (boost bought certainty, not a x8)")
+      end),
+      -- the charge lands at Ot6ActionEnd, after the message clears
+      H.waitUntil(function() return pend() == 0 end, 900,
+        "the boost is consumed", 10),
+      H.waitFrames(30),
+      H.call(function()
+        H.assertEq(bp(), 0, "3 banked - 3 spent = 0, regen skipped")
+        H.assertEq(pend(), 0, "pending cleared after the action")
+        H.screenshot("steal_3bp_rare")
+      end),
+    })
+  end)(),
+  -- ARM 6b: an already-looted enemy.  Re-bank, 3 bp again, same target:
+  -- boost cannot conjure -- nothing is taken, and still no roll.
+  oneSteal("3bp re-loot attempt", 3, 3),   -- drive.target still the looted one
   H.call(function()
-    local hp1 = H.readWord(0x3BF4 + actor * 2)
-    H.log(string.format("actor hp %d -> %d across a 3-bp steal", hp0, hp1))
-    H.assertEq(hp1, hp0, "steal dealt no damage (boost bought certainty, not a x8)")
+    H.assertEq(rec.grant, nil, "already-looted enemy: 3 bp re-loots nothing")
+    H.assertEq(rec.code < 3, true, "no stole-message on an empty enemy")
+    H.assertEq(#rec.draws, 0, "and still no roll (empties exit before it)")
   end),
+  H.fleeBattle(12000),
+  H.waitFrames(240),
 
-  -- 6a. NEGATIVE CONTROL -- boost cannot conjure loot. Both slots empty ($ff):
-  -- even 3 bp yields nothing (the $ffff top check drops out before the hooks).
+  -- ================= BATTLE 2: the RING (labeled isolation arm) =========
+  -- One ringed attempt, on the BOTH-populated species: on a common-only
+  -- target vanilla's 1/8 slot roll can pick the empty rare and turn a
+  -- landed roll into "nothing", which would muddy the lands-iff-roll<100
+  -- model this arm asserts.
+  enterDesertBattle(2),
   H.call(function()
-    cfg = { rare = NONE, common = NONE, pend = 3, ring = false, pinHp = true }; pinBe = nil
-    H.writeByte(0x3E9C + actor * 2, 5); H.writeByte(0x3E9D + actor * 2, 3)
+    -- ISOLATION WRITE (waived, labeled): no fixture owns a Sneak Ring; see
+    -- the file header.  One relic bit on, cleared again below.
+    H.writeByte(0x3C45 + locke*2, H.readByte(0x3C45 + locke*2) | 0x01)
+    drive.target = rareT
   end),
-  driveOneSteal(),
+  oneSteal("ringed 0-bp steal", 0, 0),
   H.call(function()
-    H.assertEq(outcome(), "nothing", "empty enemy: 3 bp steals nothing (no conjuring)")
+    H.assertEq(#rec.draws >= 1, true,
+      "the ringed steal still DREW the roll (0 bp stays vanilla-shaped)")
+    local roll = rec.draws[1].roll
+    H.log(string.format("ringed roll=%d (bare model would %s)", roll,
+      roll < 50 and "also land" or "MISS -- doubling witnessed"))
+    H.assertEq(rec.code, 3,
+      "ringed steal landed (model: lands iff roll < 100)")
+    H.assertEq(rec.grant ~= nil, true, "and took an item")
+    -- take the ring back off: the arms below must be bare vanilla
+    H.writeByte(0x3C45 + locke*2, H.readByte(0x3C45 + locke*2) & 0xFE)
   end),
+  H.fleeBattle(12000),
+  H.waitFrames(240),
 
-  -- 6b. NEGATIVE CONTROL -- an already-looted enemy. Steal a both-present enemy
-  -- once at 3 bp (takes the rare, clears both slots); freeze the slots empty; a
-  -- second 3-bp steal must yield nothing (the clear is vanilla; no re-looting).
-  H.call(function()
-    cfg = { rare = RARE, common = COMMON, pend = 3, ring = false, pinHp = true }; pinBe = nil
-    H.writeByte(0x3E9C + actor * 2, 5); H.writeByte(0x3E9D + actor * 2, 3)
-  end),
-  driveOneSteal(),
-  H.call(function()
-    H.assertEq(outcome(), "rare", "first 3-bp steal took the rare and cleared the slots")
-    cfg.rare, cfg.common = NONE, NONE           -- freeze empty against the re-pin
-    H.writeByte(0x3E9C + actor * 2, 5); H.writeByte(0x3E9D + actor * 2, 3)
-  end),
-  driveOneSteal(),
-  H.call(function()
-    H.assertEq(outcome(), "nothing", "already-looted enemy: 3 bp re-loots nothing")
-    H.screenshot("steal_negatives")
-  end),
+  -- ========== BATTLE 3: the fallback, and the bare vanilla gamble =======
+  enterDesertBattle(3, true),
+  -- ARM 2b: 3 bp on a common-only enemy: fallback-aware, so it takes the
+  -- common.  The guarantee is "rare IF PRESENT" -- here it is not, and
+  -- boost never conjures.  Still roll-free.
+  (function()
+    local wantCommon
+    return H.repeatN(1, {
+      H.call(function()
+        H.assertEq(fbT1 ~= nil, true, "a common-only monster seeded")
+        wantCommon = stealCommon(fbT1)
+        drive.target = fbT1
+      end),
+      oneSteal("3bp fallback steal", 3, 3),
+      H.call(function()
+        H.assertEq(rec.code, 3, "3 bp still a guaranteed success")
+        H.assertEq(#rec.draws, 0, "still roll-free")
+        H.assertEq(rec.grant, wantCommon,
+          "3 bp falls back to the COMMON when the rare is absent "
+          .. "(guarantee != conjuring)")
+      end),
+    })
+  end)(),
+  -- ARM 2: 0 bp is the vanilla roll, DECODED not seeded: each attempt
+  -- must draw the success roll, and its outcome must match vanilla's own
+  -- model (lands iff roll < 50, chance = L6+50-L6).  Attempts run until
+  -- one lands or the MP budget for two is spent.
+  -- ARM 2: 0 bp is the vanilla roll, DECODED not seeded: each attempt
+  -- must draw the success roll, and its outcome must match vanilla's own
+  -- model (lands iff roll < 50, chance = L6+50-L6).  The target is the
+  -- BOTH-populated species so the slot pick cannot turn a landed roll
+  -- into "nothing" (see the ring arm's note).  Up to three attempts
+  -- (4 MP each against the remaining real pool).
+  (function()
+    local tries, landed, wantVal = 0, false, nil
+    return H.repeatN(1, {
+      H.driveUntil(function() return landed or tries >= 3 end, 90000, {
+        H.call(function()
+          drive.target = rareT
+          wantVal = stealRare(rareT)
+        end),
+        oneSteal("bare 0-bp attempt", 0, 0),
+        H.call(function()
+          tries = tries + 1
+          H.assertEq(#rec.draws >= 1, true,
+            "0 bp DREW the success roll (boost has not leaked in)")
+          local roll = rec.draws[1].roll
+          local hit = rec.code == 3
+          H.log(string.format("bare attempt %d: roll=%d -> %s",
+            tries, roll, hit and "landed" or "missed"))
+          -- vanilla's own model, verified per attempt: this is the seeded
+          -- V_fail/V_common sweep collapsed into a prediction check
+          H.assertEq(hit, roll < 50,
+            "outcome matches vanilla's model exactly (lands iff roll < 50)")
+          if hit then
+            landed = true
+            H.assertEq(rec.grant, wantVal,
+              "the landed 0-bp steal took the species' authored item")
+          end
+        end),
+      }, "bare vanilla attempts"),
+      H.call(function()
+        H.log(string.format("bare arm done: %d attempt(s), landed=%s, mp=%d",
+          tries, tostring(landed), mp()))
+        H.screenshot("steal_vanilla")
+      end),
+    })
+  end)(),
 })
