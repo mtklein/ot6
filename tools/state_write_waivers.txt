@@ -134,6 +134,5 @@ tools/tests/probe_vargas.lua	.writeByte(
 tools/tests/probe_vargas.lua	.writeWord(
 tools/tests/save_checksum.lua	emu.write
 tools/tests/shot_battle_items.lua	.writeByte(
-tools/tests/shot_field_items.lua	.writeByte(
 tools/tests/whelkbal_run.lua	.writeByte(
 tools/tests/whelkbal_tek.lua	.writeWord(
