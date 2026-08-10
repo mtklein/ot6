@@ -1,4 +1,4 @@
--- @suite frontier=arvis_wake
+-- @suite frontier=gau_joined
 -- menu_ragepage.lua -- issue #40: the field Skills->Rage LOADOUT page RENDERS.
 --
 -- The page (MenuState_7c / Ot6Rage* in ot6_kits.asm, the C3 shim at
@@ -17,6 +17,38 @@
 --     caption and its three-digit count -- and, the class-closer, that every
 --     row the page never draws on is still all-zero (a runaway unterminated
 --     draw cannot leave them blank).
+--
+-- ISSUE #75 CONVERSION -- a REAL GAU, and the InitRage floor.  This file used
+-- to stage everything onto arvis_wake's lead: the Rage command, a hand-picked
+-- learned bitfield, and zeroed loadout bytes.  It now boots gau_joined -- the
+-- honest post-join mint, world map, CYAN + SABIN + GAU -- finds GAU in
+-- zCharID, and reads everything off his save:
+--   * the Rage command is his record's own;
+--   * the learned set is `InitRage` (field/init.asm InitRage table): NINE
+--     rages at New Game -- ids 11, 14, 19, 21, 25, 46, 54, 57, 66 -- and
+--     hunting only ever ADDS, so >= 9 is a floor for every real save and is
+--     asserted as one.  The expected names are still read out of the ROM's
+--     MonsterName records, now for ids taken from the save's own bitfield;
+--   * the loadout bytes are $00 AS SAVED (no real save has configured a
+--     loadout), so AUTO needs no zeroing and the revert is driven with the
+--     page's own Y command, never a write.
+-- The nine-rage floor makes the page FULL from its first open: AUTO's window
+-- always fills all eight slots, and the LEARNED count (009) exceeding the
+-- eight drawn is now asserted on the FIRST render -- the "count counts the
+-- whole bitfield, not the slots" claim the old test needed a second, staged
+-- visit to make.
+--
+-- *** ONE LABELED ISOLATION ARM (issue #75) -- one write site STAYS ***
+-- The "- EMPTY -" marker (#44) is UNREACHABLE BY PLAY, in both of its
+-- documented causes: AUTO shows an empty slot only below eight known rages,
+-- and InitRage's floor is nine; MANUAL shows one only for a stored $00 byte,
+-- and Ot6RageCycleCore can only ever store a LEARNED id + 1.  A renderer
+-- state no controller can produce is a mechanism claim (burn-down plan
+-- systemic call 2), so the marker's assertions live in a loudly-labeled tail
+-- arm that writes the $1d2c bitfield down to five species -- the one write
+-- this file keeps its .writeByte( waiver line for.  It MAY NEVER PRODUCE
+-- FIXTURES.  (Follow-up filed in the conversion report: given the floor, the
+-- marker may be permanently dead UI.)
 --
 -- THE 12-PIXEL CADENCE (found by this test's first run, and the reason the
 -- page's layout changed).  The tilemap was always CORRECT; what was wrong was
@@ -71,26 +103,20 @@
 -- an unset slot was a run of $ff pads, which reads as a rendering bug rather
 -- than as "you have not hunted eight species yet".  Row 3 was spare (the page
 -- draws on 1/5/7/9/11/15), so the hint cost nothing but that row; the marker
--- replaces the pad fill over exactly the same ten cells.  The EXPECTED cells
--- below were rewritten to that layout deliberately -- assertRowBlank(3) became
--- a positive assertion on the hint plus head/tail guards, and assertEmptyRow
--- checks the marker's bytes instead of ten pads.  Neither was loosened.
---
--- Fixture: arvis_wake (the menu_swdtechpage / menu_bushidoloadout boot).  Its
--- lead has no Rage command, so it is installed the house "install state" way:
--- the lead's third battle-command byte becomes BATTLE_CMD::RAGE ($10) and five
--- bits are set in the $1d2c-$1d4b learned-rage bitfield.  Five is chosen on
--- purpose -- inside the eight slots, so the SAME render exercises filled rows
--- (name + cost) and empty rows (the $ff-blanked name field and blanked cost),
--- and AUTO's window is short.  The loadout bytes stay $00 (AUTO): opening the
--- page must write NOTHING, the implicit-seed property the Bushido page has.
+-- replaces the pad fill over exactly the same ten cells.
+-- issue #49 -- THE MODE BLOCK.  All eight bytes zero is AUTO -- the game
+-- picks the first eight species in id order and keeps re-picking as Gau
+-- hunts -- and the first cycle calls Ot6RageSeed and freezes that window into
+-- the save, permanently, until Y clears it.  Row 13 carries the mode word and
+-- the Y=AUTO control, worded identically to the Bushido page's (the #44 rule:
+-- one idiom, one wording, or a player has to learn it twice).
 local H = dofile("tools/tests/lib/ot6.lua")
-local STATE = "build/states/arvis_wake.mss.lua"
+local STATE = "build/states/gau_joined.mss.lua"
 
 local ZMENUSTATE, ZCURSOR = 0x26, 0x4b
+local ZCHARID = 0x69                    -- zCharID::Slot1..4 (menu_ram.inc)
 local RAGE_ROW_COLOR = 0x7e             -- zSkillsTextColor::Rage (menu_ram.inc)
-local CMD3 = 0x1618                     -- lead char's 3rd battle command
-local BATTLE_CMD_RAGE = 0x10
+local CHAR_GAU = 0x0b                   -- CHAR::GAU (const.inc)
 local RAGES = 0x1D2C                    -- learned-rage bitfield, 32 bytes
 local RAGELOAD = 0x1E1F                 -- OT6_RAGELOAD: 8 bytes, id+1, 0 = unset
 local ST_MAIN, ST_CHAR, ST_SKILLS, ST_RAGELOAD = 0x05, 0x06, 0x0a, 0x7c
@@ -117,20 +143,14 @@ local EACH_TX = { T.E,T.A,T.C,T.H }
 -- have to re-learn it on the other, so the strings are asserted to be equal by
 -- being written out identically in both tests.
 local HINT    = { T.L,T.SLASH,T.R,T.SP,T.S,T.W,T.A,T.P,T.S }  -- L/R SWAPS
--- #49: the STATE that L/R changes, which the page never showed.  All eight
--- bytes zero is AUTO -- the game picks the first eight species in id order and
--- keeps re-picking as Gau hunts -- and the first cycle calls Ot6RageSeed and
--- freezes that window into the save, permanently, until Y clears it.  A player
--- could not see which of the two they were in, nor that Y existed.
---
--- Both words are six cells, "AUTO" space-padded, so a MANUAL -> AUTO revert
--- overwrites the whole field; asserted as an equality below rather than trusted.
--- Written out character for character in BOTH page tests on purpose, the #44
--- rule: two pages that teach the same idiom must teach it in the same words.
+-- #49: both mode words are six cells, "AUTO" space-padded, so a MANUAL ->
+-- AUTO revert overwrites the whole field; asserted as an equality below
+-- rather than trusted.  Written out character for character in BOTH page
+-- tests on purpose, the #44 rule.
 local MODE_AUTO   = { T.A,T.U,T.T,T.O,T.SP,T.SP }
 local MODE_MANUAL = { T.M,T.A,T.N,T.U,T.A,T.L }
 local MODE_HINT   = { T.Y,T.EQ,T.A,T.U,T.T,T.O }              -- Y=AUTO
--- #44: what an UNSET slot draws now, in place of a run of $ff pads.  Exactly
+-- #44: what an UNSET slot draws, in place of a run of $ff pads.  Exactly
 -- MonsterName::ITEM_SIZE (10) cells, so it still overwrites a name completely
 -- and a revert wipes what was there -- the property the pad fill had.
 local EMPTY_TX = { T.DASH,T.SP,T.E,T.M,T.P,T.T,T.Y,T.SP,T.DASH,T.SP }
@@ -158,18 +178,16 @@ local function nameText(id)             -- for the log only
   return s
 end
 
--- Five species, spread over several bitfield bytes so the AUTO window has to
--- cross byte boundaries the way a real Gau's does, and short of eight so the
--- same page shows filled AND empty rows.
-local KNOWN = { 3, 20, 41, 90, 130 }    -- Ninja Ursus Beakor Ghost Zombone
--- #44: ten species -- more than the eight slots -- so the last phase of this
--- test can show the page with NO empty row on it.  The empty marker is only
--- honest if it disappears the moment a slot has something in it, and the only
--- way to see that is a state where the AUTO window fills every slot.  AUTO is
--- "the first eight known in id order" (Ot6RageNth), so the eight drawn are the
--- eight lowest ids here and 150/200 stay out of the loadout.
-local KNOWN_FULL = { 3, 5, 20, 41, 60, 77, 90, 130, 150, 200 }
+-- The save's own collection, derived at boot: KNOWN = every learned id in
+-- ascending order (AUTO's window is its first eight).
+local KNOWN = {}
+local gauSlot = nil
 
+-- The isolation arm's five species (the old staged set), spread over several
+-- bitfield bytes and short of eight so the marker has slots to appear in.
+local ARM_KNOWN = { 3, 20, 41, 90, 130 }  -- Ninja Ursus Beakor Ghost Zombone
+
+-- teach() survives ONLY for the labeled isolation arm at the tail.
 local function teach(ids)
   for i = 0, 31 do H.writeByte(RAGES + i, 0) end
   for _, id in ipairs(ids) do
@@ -214,12 +232,6 @@ local LEFT_COL = 3                      -- the page's left margin (gutter = 1-2)
 -- deliberately, and mp-economy.md's band for a flat possess-verb price is 4-10.
 local COST_COL, EACH_COL = 16, 22
 local COUNT_COL = 11                    -- just past "LEARNED " at 3..9
--- #49: row 13 was this page's one spare row (it draws on 1/3/5/7/9/11/15) and
--- issue #49's survey costed it at 27 free columns.  The mode goes at column 3
--- and the control that changes it at 16 -- the page's OWN two slot columns, so
--- the pair lines up under the grid instead of floating.  Row 13 is therefore no
--- longer in the "undrawn odd row" list below; that assertion became the
--- positive one in assertModeBlock, deliberately, not by being dropped.
 local MODE_ROW, MODE_COL, MODE_HINT_COL = 13, 3, 16
 local function slotRow(slot) return 5 + (slot & ~1) end
 local function slotCol(slot) return (slot % 2 == 0) and LEFT_COL or 16 end
@@ -297,21 +309,9 @@ local function assertFilledRow(slot, id)
   local y, c = slotRow(slot), slotCol(slot)
   assertRun(c, y, nameBytes(id), string.format("slot %d name %s", slot, nameText(id)))
 end
--- An UNSET slot (#44).  It used to be $ff pads across the full name width --
--- correct (a revert wiped what was there) and unreadable: the owner's playtest
--- read the blank rows as a bug.  It now spells "- EMPTY - " over exactly the
--- same ten cells, so the overwrite property is unchanged and the row says what
--- it means.
---
--- WHY "EMPTY" AND NOT "DEFAULT".  A blank row has two causes and both mean the
--- slot contributes NOTHING to the battle list, so neither is a default:
---   * AUTO (all eight bytes $00) with fewer than eight species hunted --
---     Ot6RageNth returns carry clear past the end of the window
---     (ot6_kits.asm:1856-1858), and Ot6RageList's AUTO arm writes no id for it;
---   * MANUAL with a $00 byte -- Ot6RageSlot returns carry clear (:1820) and
---     Ot6RageList's @manual arm SKIPS the slot (:1993-2002).
--- This test exercises the first (five species known, slots 5-7 unset) and the
--- second (after the first edit, Ot6RageSeed leaves the tail at $00).
+-- An UNSET slot (#44): "- EMPTY - " over exactly the ten name cells, so the
+-- overwrite property is unchanged and the row says what it means.  Reachable
+-- only through the isolation arm now -- see the header.
 local function assertEmptyRow(slot)
   local y, c = slotRow(slot), slotCol(slot)
   H.assertEq(#EMPTY_TX, NAME_SIZE,
@@ -324,43 +324,150 @@ local function assertEmptyRow(slot)
   end
 end
 
-H.run({ maxFrames = 30000 }, {
+-- The LEARNED counter: three zero-padded digits at COUNT_COL.
+local function assertCount(n, what)
+  assertRun(COUNT_COL, LEARNED_ROW,
+    { ZERO_CHAR + (n // 100), ZERO_CHAR + ((n // 10) % 10), ZERO_CHAR + (n % 10) },
+    string.format("%s: LEARNED count = %03d", what, n))
+end
+
+-- The shared chrome + geometry sweep, parameterized by how many of the eight
+-- slots are filled and with which ids (win[1..8], nil = empty).
+local function assertPage(win, nKnown, what)
+  assertRun(LEFT_COL, TITLE_ROW, TITLE, what .. ": title RAGE LOADOUT")
+  -- the flat price, stated once: "8 MP EACH" on the title row.  #56: five
+  -- cells, right-aligned -- the tens cell is BLANK for a one-digit price and
+  -- must not be '0' (vanilla's own rule: HexToDec3 overwrites leading zeroes
+  -- with $ff, menu_common.asm:906-918).
+  H.assertEq(cell(COST_COL, TITLE_ROW), PAD,
+    what .. ": the trance price is one digit, so its tens cell is blank, not '0'")
+  H.assertEq(cell(COST_COL + 1, TITLE_ROW), ZERO_CHAR + 8,
+    what .. ": the trance price on the title row is 8 (Dance's number, one authority)")
+  assertRun(COST_COL + 2, TITLE_ROW, MP_SUFFIX, what .. ": ' MP' after the price")
+  H.assertEq(cell(EACH_COL - 1, TITLE_ROW), 0,
+    what .. ": a gap separates the price field from 'EACH' -- without it the "
+    .. "title row reads '8 MPEACH' (the #49 failure, on this page's row)")
+  assertRun(EACH_COL, TITLE_ROW, EACH_TX, what .. ": 'EACH' -- the price is per trance")
+  -- #44: the control hint, on the one spare row above the slots
+  assertRun(LEFT_COL, HINT_ROW, HINT, what .. ": L/R SWAPS control hint")
+  assertRun(LEFT_COL, LEARNED_ROW, LEARNED, what .. ": LEARNED caption")
+  assertCount(nKnown, what)
+
+  for slot = 0, 7 do
+    if win[slot + 1] then
+      assertFilledRow(slot, win[slot + 1])
+    else
+      assertEmptyRow(slot)
+    end
+  end
+
+  -- THE EVEN-ROW CANARY -- the regression this test exists for.  An even
+  -- tilemap row is shown as three scanlines in this window, so nothing the
+  -- page draws may land on one.  Rows past 15 are outside the window
+  -- entirely, so nothing may land there either.  Both were violated before
+  -- (slots on 4..18, LEARNED on 20), and a plain tilemap assertion could
+  -- not see it -- only the geometry rule can.
+  for y = 0, 27 do
+    if y % 2 == 0 or y > 15 then
+      assertRowBlank(y, string.format(
+        "%s: row %d is unusable (%s) and must stay blank", what, y,
+        y > 15 and "outside the window" or "even: 3 scanlines"))
+    end
+  end
+  -- the hint row's own head and tail, so the hint cannot grow into the cursor
+  -- gutter on its left or the window border on its right.  The hint runs
+  -- 3..11; everything else on row 3 is blank.
+  for x = 0, 2 do
+    H.assertEq(cell(x, HINT_ROW), 0, string.format(
+      "%s: {%d,%d} is the cursor gutter -- the hint starts at column %d",
+      what, x, HINT_ROW, LEFT_COL))
+  end
+  for x = LEFT_COL + #HINT, 31 do
+    H.assertEq(cell(x, HINT_ROW), 0,
+      string.format("%s: hint row tail blank {%d,%d}", what, x, HINT_ROW))
+  end
+  -- the gaps on the title row, its head and its tail: nothing may sit left
+  -- of the page's margin (columns 0-2, the cursor's own gutter) and nothing
+  -- may run into the window's right border, which lives in column 30.
+  -- "RAGE LOADOUT" occupies 3..14, the price 16..20 (#56: five cells, its
+  -- leading one blank at this price), EACH 22..25.
+  for _, x in ipairs({ 0, 1, 2, 15, 21, 26, 27, 28, 29, 30, 31 }) do
+    H.assertEq(cell(x, TITLE_ROW), 0,
+      string.format("%s: title row gap/tail blank {%d,%d}", what, x, TITLE_ROW))
+  end
+  -- and the same for the LEARNED row: caption 3..9, count 11..13.
+  for _, x in ipairs({ 0, 1, 2, 10, 14, 15, 29, 30, 31 }) do
+    H.assertEq(cell(x, LEARNED_ROW), 0,
+      string.format("%s: LEARNED row gap/tail blank {%d,%d}", what, x, LEARNED_ROW))
+  end
+  -- THE CURSOR GUTTER CANARY, every slot -- filled rows and $ff-blanked ones.
+  for n = 0, 7 do assertCursorGutter(n, what) end
+end
+
+H.run({ maxFrames = 40000 }, {
   H.waitFrames(20),
   H.loadState(STATE),
   H.waitFrames(10),
-  H.waitUntil(function() return H.hasControl() end, 400, "field control", 5),
+  H.waitUntil(function() return H.worldHasControl() or H.hasControl() end,
+    600, "control on the world map", 5),
 
-  -- install state: the Rage command on the lead + five hunted species, AUTO
-  -- loadout (all eight bytes zero -- the state every real save is in).
+  -- The save's own state, read: derive the collection, assert the InitRage
+  -- floor, and prove the loadout has never been configured.
   H.call(function()
-    H.writeByte(CMD3, BATTLE_CMD_RAGE)
-    teach(KNOWN)
-    for i = 0, 7 do H.writeByte(RAGELOAD + i, 0) end
-    H.log("installed: Rage on the lead, " .. #KNOWN .. " species hunted, AUTO loadout")
+    for id = 0, 254 do
+      if (H.readByte(RAGES + (id >> 3)) >> (id & 7)) & 1 == 1 then
+        KNOWN[#KNOWN + 1] = id
+      end
+    end
+    local names = {}
+    for _, id in ipairs(KNOWN) do names[#names + 1] = id .. ":" .. nameText(id) end
+    H.log(string.format("$1d2c as saved: %d rages -- %s", #KNOWN,
+      table.concat(names, " ")))
+    H.assertEq(#KNOWN >= 9, true,
+      "InitRage grants NINE rages at New Game (field/init.asm) and hunting "
+      .. "only adds -- fewer than nine means the fixture is not a real save")
+    for i = 0, 7 do
+      H.assertEq(H.readByte(RAGELOAD + i), 0,
+        string.format("OT6_RAGELOAD+%d is $00 AS SAVED -- no real save has "
+          .. "configured a loadout, AUTO needs no zeroing", i))
+    end
   end),
 
-  -- the player's path: X -> main menu -> Skills -> lead character -> submenu
+  -- the player's path: X -> main menu -> Skills -> GAU -> the Rage row -> A.
   -- driveUntil, not one press: the X that opens the field menu is the first
   -- step in these tests that needs a SPECIFIC frame, so it is where a
   -- fixture minted against a different ROM surfaces -- as "timeout waiting
   -- for main menu", which reads like a menu bug and is not one.  Retrying
   -- the press costs nothing when the pairing is fine and removes the false
   -- report when it is not.  Same shape probe_fieldicons.lua and
-  -- menu_blitzpage_sabin.lua already use.  The assertion is unchanged: the
-  -- main menu must still come up.
+  -- menu_blitzpage_sabin.lua already use.
   H.driveUntil(function() return st() == ST_MAIN end, 1200,
     { H.pressButtons({ "x" }, 4), H.waitFrames(30) }, "main menu"),
   H.waitFrames(20),
+  -- FIND Gau rather than assume his row.
+  H.call(function()
+    local ids = {}
+    for s = 0, 3 do
+      local id = H.readByte(ZCHARID + s)
+      ids[#ids + 1] = string.format("slot %d = char $%02x", s, id)
+      if id == CHAR_GAU and gauSlot == nil then gauSlot = s end
+    end
+    H.log("party: " .. table.concat(ids, ", "))
+    H.assertEq(gauSlot ~= nil, true, "gau_joined's party contains GAU")
+  end),
   H.pressButtons({ "down" }, 2),            -- Items -> Skills
   H.waitFrames(6),
   H.pressButtons({ "a" }, 2),
   H.waitUntil(function() return st() == ST_CHAR end, 300, "character select", 5),
+  H.waitFrames(10),
+  H.driveUntil(function() return H.readByte(ZCURSOR) == gauSlot end, 900,
+    { H.pressButtons({ "down" }, 2), H.waitFrames(8) }, "cursor onto GAU"),
   H.pressButtons({ "a" }, 2),
   H.waitUntil(function() return st() == ST_SKILLS end, 300, "skills submenu", 5),
   H.waitFrames(10),
   H.call(function()
     H.assertEq(H.readByte(RAGE_ROW_COLOR), 0x20,
-      "Rage row enabled (install-state command took)")
+      "Rage row enabled -- GAU's own record carries the command")
   end),
 
   -- cursor down to the Rage row, A opens the configurator through
@@ -374,103 +481,37 @@ H.run({ maxFrames = 30000 }, {
     "rage configurator open via the player path", 5),
   H.waitFrames(90),                         -- draws + DMA settle
 
+  -- ---- the FULL page every real Gau opens: AUTO's window = KNOWN[1..8] ----
   H.call(function()
-    -- chrome
-    assertRun(LEFT_COL, TITLE_ROW, TITLE, "title RAGE LOADOUT")
-    -- the flat price, stated once: "8 MP EACH" on the title row.  #56: five
-    -- cells, right-aligned -- the tens cell is BLANK for a one-digit price and
-    -- must not be '0' (vanilla's own rule: HexToDec3 overwrites leading zeroes
-    -- with $ff, menu_common.asm:906-918).
-    H.assertEq(cell(COST_COL, TITLE_ROW), PAD,
-      "the trance price is one digit, so its tens cell is blank, not '0'")
-    H.assertEq(cell(COST_COL + 1, TITLE_ROW), ZERO_CHAR + 8,
-      "the trance price on the title row is 8 (Dance's number, one authority)")
-    assertRun(COST_COL + 2, TITLE_ROW, MP_SUFFIX, "' MP' after the price")
-    H.assertEq(cell(EACH_COL - 1, TITLE_ROW), 0,
-      "a gap separates the price field from 'EACH' -- without it the title row "
-      .. "reads '8 MPEACH' (the #49 failure, on this page's row)")
-    assertRun(EACH_COL, TITLE_ROW, EACH_TX, "'EACH' -- the price is per trance")
-    -- #44: the control hint, on the one spare row above the slots
-    assertRun(LEFT_COL, HINT_ROW, HINT, "L/R SWAPS control hint")
-    assertRun(LEFT_COL, LEARNED_ROW, LEARNED, "LEARNED caption")
-    -- the collection score: three digits at col 11 of the caption row
-    assertRun(COUNT_COL, LEARNED_ROW, { ZERO_CHAR, ZERO_CHAR, ZERO_CHAR + #KNOWN },
-      "LEARNED count = 00" .. #KNOWN)
-
-    -- AUTO's window: the first eight known rages in id order.  Five are known,
-    -- so slots 0-4 draw those five and slots 5-7 draw blank.
-    for i, id in ipairs(KNOWN) do
-      assertFilledRow(i - 1, id)
-      H.log(string.format("slot %d at {%d,%d} = rage %d '%s'",
-        i - 1, slotCol(i - 1), slotRow(i - 1), id, nameText(id)))
+    local win = {}
+    for s = 1, 8 do win[s] = KNOWN[s] end
+    assertPage(win, #KNOWN, "real save")
+    -- the marker appears NOWHERE: a filled slot starts with a name's first
+    -- letter, never the marker's leading dash (the old staged full-page
+    -- phase's closer, now true of the first render).
+    for slot = 0, 7 do
+      H.assertEq(cell(slotCol(slot), slotRow(slot)) ~= T.DASH, true,
+        string.format("slot %d is filled, so it must not draw the empty "
+          .. "marker at {%d,%d}", slot, slotCol(slot), slotRow(slot)))
     end
-    for slot = #KNOWN, 7 do assertEmptyRow(slot) end
-
+    -- ... and the count exceeds the slots: #KNOWN >= 9 > 8, so this render
+    -- alone proves LEARNED counts the whole bitfield, not the loadout.
+    H.assertEq(#KNOWN > 8, true,
+      "the collection exceeds the eight slots, so the count above is counting "
+      .. "the bitfield, not the page")
     -- opening the page WRITES NOTHING: AUTO is computed per slot on the fly
     -- (Ot6RageShow), so an un-edited page leaves every save byte at zero.
     for i = 0, 7 do
       H.assertEq(H.readByte(RAGELOAD + i), 0,
         string.format("opening the page did not seed OT6_RAGELOAD+%d", i))
     end
-
-    -- THE EVEN-ROW CANARY -- the regression this test exists for.  An even
-    -- tilemap row is shown as three scanlines in this window, so nothing the
-    -- page draws may land on one.  Rows past 15 are outside the window
-    -- entirely, so nothing may land there either.  Both were violated before
-    -- (slots on 4..18, LEARNED on 20), and a plain tilemap assertion could
-    -- not see it -- only the geometry rule can.
-    for y = 0, 27 do
-      if y % 2 == 0 or y > 15 then
-        assertRowBlank(y, string.format(
-          "row %d is unusable (%s) and must stay blank", y,
-          y > 15 and "outside the window" or "even: 3 scanlines"))
-      end
-    end
-    -- Every odd row this page has is spoken for now.  Row 3 was the last one
-    -- until #44 spent it on the control hint; #49 has spent row 13 on the mode
-    -- block.  Both were asserted blank here once and both became POSITIVE
-    -- assertions instead (assertRun on the hint above, assertModeBlock below) --
-    -- neither was dropped, and assertModeBlock still pins every cell of row 13
-    -- that is not one of the two words.
     assertModeBlock(true, "opened untouched")
-    -- ... and the hint row's own head and tail, so the hint cannot grow into
-    -- the cursor gutter on its left or the window border on its right.  The
-    -- hint runs 3..11; everything else on row 3 is blank.
-    for x = 0, 2 do
-      H.assertEq(cell(x, HINT_ROW), 0, string.format(
-        "{%d,%d} is the cursor gutter -- the hint starts at column %d",
-        x, HINT_ROW, LEFT_COL))
-    end
-    for x = LEFT_COL + #HINT, 31 do
-      H.assertEq(cell(x, HINT_ROW), 0,
-        string.format("hint row tail blank {%d,%d}", x, HINT_ROW))
-    end
-    -- the gaps on the title row, its head and its tail: nothing may sit left
-    -- of the page's margin (columns 0-2, the cursor's own gutter) and nothing
-    -- may run into the window's right border, which lives in column 30.
-    -- "RAGE LOADOUT" occupies 3..14, the price 16..20 (#56: five cells, its
-    -- leading one blank at this price), EACH 22..25.  Column 16 is therefore
-    -- no longer in this list -- it holds the price field's blank tile ($ff),
-    -- which is asserted above as a value rather than dropped from here.
-    for _, x in ipairs({ 0, 1, 2, 15, 21, 26, 27, 28, 29, 30, 31 }) do
-      H.assertEq(cell(x, TITLE_ROW), 0,
-        string.format("title row gap/tail blank {%d,%d}", x, TITLE_ROW))
-    end
-    -- and the same for the LEARNED row: caption 3..9, count 11..13.
-    for _, x in ipairs({ 0, 1, 2, 10, 14, 15, 29, 30, 31 }) do
-      H.assertEq(cell(x, LEARNED_ROW), 0,
-        string.format("LEARNED row gap/tail blank {%d,%d}", x, LEARNED_ROW))
-    end
-    -- THE CURSOR GUTTER CANARY, every slot: nothing under the sprite, the slot
-    -- starting in the column right after it -- on BOTH columns.  Five species
-    -- are known, so this covers filled rows and $ff-blanked ones in one pass.
-    for n = 0, 7 do assertCursorGutter(n, "5 known") end
     H.screenshot("rage_page_player_path")
-    H.log("RENDER OK: Skills->Rage via the player's path -- title, eight slots "
-      .. "in two columns on the window's odd rows, names against MonsterName "
-      .. "verbatim, the flat 8 MP stated once, LEARNED count; nothing on an "
-      .. "even row, nothing past row 15, nothing in the border column, nothing "
-      .. "in either cursor's gutter")
+    H.log("RENDER OK: Skills->Rage via the player's path for a REAL GAU -- "
+      .. "title, eight slots FULL from InitRage's nine, names against "
+      .. "MonsterName verbatim, the flat 8 MP stated once, LEARNED counting "
+      .. "the whole collection; nothing on an even row, nothing past row 15, "
+      .. "nothing in the border column, nothing in either cursor's gutter")
   end),
 
   -- ---- the page is LIVE, not a one-shot draw: R cycles the cursored slot ----
@@ -482,20 +523,11 @@ H.run({ maxFrames = 30000 }, {
   H.call(function()
     H.assertEq(H.readByte(RAGELOAD + 0), KNOWN[2] + 1,
       "R cycled slot 0 to the next learned rage (stored byte = id + 1)")
-    for i = 2, #KNOWN do
+    for i = 2, 8 do
       H.assertEq(H.readByte(RAGELOAD + i - 1), KNOWN[i] + 1,
         string.format("the first edit froze AUTO's window into slot %d", i - 1))
     end
-    for i = #KNOWN, 7 do
-      H.assertEq(H.readByte(RAGELOAD + i), 0,
-        string.format("slot %d had no window entry to freeze, stays unset", i))
-    end
     assertFilledRow(0, KNOWN[2])
-    -- #44: the page is MANUAL now and the tail slots are stored $00 -- a
-    -- genuinely empty slot that Ot6RageList skips, not an "unfilled default".
-    -- The marker must read the same here as it did under AUTO, because it
-    -- means the same thing: nothing in this slot, nothing in the battle list.
-    for slot = #KNOWN, 7 do assertEmptyRow(slot) end
     -- #49: and the page must SAY it went manual, on this same redraw and
     -- without being reopened.  A mode drawn once at page-init would still read
     -- AUTO here, which is the exact failure this assertion exists for.
@@ -512,8 +544,8 @@ H.run({ maxFrames = 30000 }, {
   -- named on screen -- and it is the half that proves the two mode words are the
   -- same width: a five-cell "AUTO " would leave MANUAL's trailing L behind.
   -- Ot6RageInput's Y arm zeroes all eight bytes (ot6_kits.asm), so the window
-  -- goes back to being computed on the fly and the five known species must
-  -- re-appear in id order exactly as they did on entry.
+  -- goes back to being computed on the fly and the first eight known species
+  -- must re-appear in id order exactly as they did on entry.
   H.pressButtons({ "y" }, 3),
   H.waitFrames(40),
   H.call(function()
@@ -522,8 +554,7 @@ H.run({ maxFrames = 30000 }, {
         string.format("Y cleared OT6_RAGELOAD+%d: the loadout is AUTO again", i))
     end
     assertModeBlock(true, "after Y")
-    for i, id in ipairs(KNOWN) do assertFilledRow(i - 1, id) end
-    for slot = #KNOWN, 7 do assertEmptyRow(slot) end
+    for i = 1, 8 do assertFilledRow(i - 1, KNOWN[i]) end
     H.screenshot("rage_page_reverted")
     H.log("REVERT: Y put the page back on AUTO -- the eight bytes are zero, the "
       .. "window is recomputed, and 'MANUAL' left nothing of itself behind in "
@@ -567,8 +598,8 @@ H.run({ maxFrames = 30000 }, {
   -- ---- and a LOWER row, so the shipped screenshots cover more than row 5 ----
   -- The canary above reads the whole cursor table, but only the row the sprite
   -- is parked on shows up in a picture.  Walk back to the LEFT column -- the
-  -- half that moved -- and down to slot 4, the last FILLED left-hand row, so
-  -- the shot shows the cursor abutting a name and not empty space.
+  -- half that moved -- and down to slot 4, so the shot shows the cursor
+  -- abutting a name.
   H.pressButtons({ "left" }, 3),
   H.waitFrames(20),
   H.pressButtons({ "down" }, 3),
@@ -585,50 +616,70 @@ H.run({ maxFrames = 30000 }, {
       .. "gutter is a property of the page, not of which slot is selected")
   end),
 
-  -- ---- #44: a FULL page -- the empty marker must not survive a filled slot --
-  -- Every state above has empty rows in it, so on its own it cannot tell
-  -- "- EMPTY -" drawn for an unset slot from "- EMPTY -" leaking over a real
-  -- one.  Back out, hunt ten species, revert to AUTO, and re-enter: the window
-  -- now fills all eight slots, and the marker must appear NOWHERE on the page.
+  -- ======================================================================= --
+  -- *** LABELED ISOLATION ARM (issue #75, renderer-mechanism doctrine) *** --
+  -- The "- EMPTY -" marker, in BOTH its documented causes -- neither of which
+  -- a controller can produce (see header: InitRage's nine-rage floor kills
+  -- the AUTO cause, and Ot6RageCycleCore only ever stores learned ids, which
+  -- kills the MANUAL cause).  The one write: the $1d2c bitfield is set to
+  -- five species.  The loadout bytes are NOT written -- Y is pressed first so
+  -- the page's own revert leaves them $00, asserted.
+  -- ======================================================================= --
+  H.pressButtons({ "y" }, 3),               -- the page's own revert, not a write
+  H.waitFrames(20),
   H.pressButtons({ "b" }, 3),
   H.waitUntil(function() return st() == ST_SKILLS end, 300,
     "back out of the rage configurator", 5),
   H.call(function()
-    teach(KNOWN_FULL)
-    for i = 0, 7 do H.writeByte(RAGELOAD + i, 0) end   -- AUTO again
+    for i = 0, 7 do
+      H.assertEq(H.readByte(RAGELOAD + i), 0,
+        "Y left OT6_RAGELOAD+" .. i .. " at $00 -- nothing to zero by hand")
+    end
+    teach(ARM_KNOWN)                        -- THE arm's write (see header)
+    H.log("[isolation arm] $1d2c := five species -- below the InitRage floor, "
+      .. "a collection no real save can hold")
   end),
   H.pressButtons({ "a" }, 2),
   H.waitUntil(function() return st() == ST_RAGELOAD end, 300,
-    "rage configurator reopened with ten species hunted", 5),
+    "rage configurator reopened with five species", 5),
   H.waitFrames(90),
 
   H.call(function()
-    assertRun(LEFT_COL, TITLE_ROW, TITLE, "title still on row 1")
-    assertRun(LEFT_COL, HINT_ROW, HINT, "control hint still on row 3")
-    -- eight filled slots: AUTO's window is the eight LOWEST known ids
-    for slot = 0, 7 do
-      assertFilledRow(slot, KNOWN_FULL[slot + 1])
+    -- AUTO with five known: slots 0-4 carry the five, slots 5-7 the marker.
+    local win = {}
+    for i = 1, #ARM_KNOWN do win[i] = ARM_KNOWN[i] end
+    assertPage(win, #ARM_KNOWN, "isolation arm, AUTO")
+    for i = 0, 7 do
+      H.assertEq(H.readByte(RAGELOAD + i), 0,
+        string.format("opening the page did not seed OT6_RAGELOAD+%d", i))
     end
-    -- ... and the marker is gone from the page entirely.  Scan every slot
-    -- row's first cell: a filled slot starts with a name's first letter, never
-    -- with the marker's leading dash.
-    for slot = 0, 7 do
-      H.assertEq(cell(slotCol(slot), slotRow(slot)) ~= T.DASH, true,
-        string.format("slot %d is filled, so it must not draw the empty "
-          .. "marker at {%d,%d}", slot, slotCol(slot), slotRow(slot)))
+    assertModeBlock(true, "isolation arm, AUTO")
+    H.screenshot("rage_page_empty_marker")
+    H.log("ISOLATION ARM (AUTO cause): five species -- slots 5-7 read "
+      .. "'- EMPTY -', the count reads 005, and the page still wrote nothing")
+  end),
+
+  -- ... and the MANUAL cause: the first R freezes only the five-window
+  -- (Ot6RageSeed stops when the window runs out), leaving stored $00 tails
+  -- that Ot6RageList skips -- and the marker must read the same over them.
+  H.pressButtons({ "r" }, 3),
+  H.waitFrames(40),
+  H.call(function()
+    H.assertEq(H.readByte(RAGELOAD + 0), ARM_KNOWN[2] + 1,
+      "R cycled slot 0 to the next learned rage (stored byte = id + 1)")
+    for i = 2, #ARM_KNOWN do
+      H.assertEq(H.readByte(RAGELOAD + i - 1), ARM_KNOWN[i] + 1,
+        string.format("the first edit froze AUTO's window into slot %d", i - 1))
     end
-    -- the collection score counts the WHOLE bitfield, not the eight slots:
-    -- ten hunted, eight loaded, and the page must say ten.
-    assertRun(COUNT_COL, LEARNED_ROW,
-      { ZERO_CHAR, ZERO_CHAR + 1, ZERO_CHAR }, "LEARNED count = 010")
-    -- the eight bytes were re-zeroed before this re-entry, so the page is AUTO
-    -- again -- and the indicator must have been redrawn to match on OPEN, not
-    -- only on an in-page edit.
-    assertModeBlock(true, "reopened on AUTO with ten hunted")
-    for n = 0, 7 do assertCursorGutter(n, "ten known, page full") end
-    H.screenshot("rage_page_full")
-    H.log("FULL PAGE: ten species hunted -- all eight slots carry a beast, the "
-      .. "'- EMPTY -' marker appears nowhere, and LEARNED still reports the "
-      .. "whole collection (010), not the eight that fit")
+    for i = #ARM_KNOWN, 7 do
+      H.assertEq(H.readByte(RAGELOAD + i), 0,
+        string.format("slot %d had no window entry to freeze, stays unset", i))
+    end
+    assertFilledRow(0, ARM_KNOWN[2])
+    for slot = #ARM_KNOWN, 7 do assertEmptyRow(slot) end
+    assertModeBlock(false, "isolation arm, after the first edit")
+    H.screenshot("rage_page_manual_empty")
+    H.log("ISOLATION ARM (MANUAL cause): the freeze stopped at the window's "
+      .. "end, the $00 tails still read '- EMPTY -', and the mode says MANUAL")
   end),
 })
