@@ -480,6 +480,7 @@ local function buyItem(id, row, qtyFn, name)
   local phase = 0
   local seen27, bought = false, false
   local want = nil
+  local lastQty, stall = nil, 0
   return H.driveUntil(function() return bought end, 20000, {
     H.call(function()
       phase = (phase + 1) % 8
@@ -492,6 +493,25 @@ local function buyItem(id, row, qtyFn, name)
       if st == 0x27 then
         seen27 = true
         local qty = H.readByte(0x0028)
+        -- THE CLAMP IS THE PURSE'S ANSWER (2026-08-09, found at Mobliz):
+        -- steering toward a want the gil cannot cover pins qty at the
+        -- affordable maximum, and a loop that keeps pressing burns its
+        -- whole budget against that wall (gen_sabin_gau's "TONIC to 99"
+        -- did exactly that on 209 gil -- FAIL, timeout at 20000).  A
+        -- player buys what the purse covers; 240 unmoving frames
+        -- against the clamp accepts the clamped qty.
+        if qty == lastQty and qty < want then
+          stall = stall + 1
+          if stall > 240 then
+            H.log(string.format(
+              "[shop] %s: purse-clamped at %d (wanted %d) -- taking it",
+              name, qty, want))
+            want = qty
+          end
+        elseif qty ~= lastQty then
+          stall = 0
+        end
+        lastQty = qty
         local btn = nil
         if qty < want then
           btn = (want - qty >= 10) and "up" or "right"
@@ -1173,16 +1193,21 @@ H.run({ maxFrames = 400000 }, {
   -- Tonics fund the round-by-round chip damage, Potions the Wheel spikes.
   -- 15/6 covers ~10 medic turns each with margin; the gil floors keep a
   -- short purse from zeroing out (log tells the story either way).
-  -- Buy ORDER is deliberate: Potions moved LAST and raised to 20 (the
-  -- 2026-08-09 medic line wants the depth, and the fresh purse -- 7484
-  -- gil, 9000 poorer than the July lineage that first won here -- covers
-  -- the whole list at 7350 with 134 to spare).  The shop widget is
-  -- gil-clamped, so if a future upstream arrives poorer still, the item
-  -- that gets shorted is the marginal Potion, never the Fenix Downs or
-  -- SHADOW's Shurikens.
+  -- THIS SHOP FUNDS THE WHOLE REST OF THE SCENARIO (2026-08-09).  The
+  -- fresh honest chain arrives with 7484 gil -- 9000 poorer than the
+  -- July lineage, the flee discipline earning nothing -- and after this
+  -- stop the only income before GAU joins is battle 47's ~75, because
+  -- every encounter past the falls is a VELDT formation and Veldt
+  -- formations pay zero.  A first cut spent 7350 here and the Mobliz leg
+  -- then wiped on the staging walk with 3 Tonics and a 209-gil purse
+  -- (measured: gau_joined FAIL f32927).  So the list is a BUDGET:
+  -- ~5700 spent, ~1850 carried forward for Dried Meat and the Veldt
+  -- grind's Tonics.  Buy ORDER is deliberate -- the marginal Potion is
+  -- LAST, so a poorer future upstream shorts it (via the purse-clamp
+  -- acceptance in buyItem), never the Fenix Downs or the Shurikens.
   buyItem(TONIC, 0, function() return 20 - invCount(TONIC) end, "TONIC to 20"),
-  buyItem(ANTIDOTE, 2, function() return 6 - invCount(ANTIDOTE) end,
-    "ANTIDOTE to 6"),
+  buyItem(ANTIDOTE, 2, function() return 3 - invCount(ANTIDOTE) end,
+    "ANTIDOTE to 3"),
   -- Fenix Downs are for REVIVING ALLIES (battle 47's prolonged tail
   -- measurably killed SHADOW, and he walked into the boss dead); the
   -- item target steer never confirms on the monster side, so the
@@ -1194,8 +1219,8 @@ H.run({ maxFrames = 400000 }, {
   -- the #74 thread's own suggestion made real
   buyItem(SHURIKEN, 6, function() return 10 - invCount(SHURIKEN) end,
     "SHURIKEN to 10"),
-  buyItem(POTION, 1, function() return 20 - invCount(POTION) end,
-    "POTION to 20"),
+  buyItem(POTION, 1, function() return 15 - invCount(POTION) end,
+    "POTION to 15"),
   closeShop(),
   H.call(function()
     H.log(string.format("[shop] done: gil=%d tonics=%d potions=%d",
