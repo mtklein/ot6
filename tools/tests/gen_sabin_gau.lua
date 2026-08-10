@@ -505,11 +505,15 @@ local function worldWalkFight(tx, ty, budget, what, arriveOffWorld, opts)
     -- opts.segment: hand control back after any ONE fought battle, once
     -- the world is live again -- the caller interleaves H.fieldCare
     -- between battles, healing on the FIELD where it costs no battle
-    -- turns (the sustain arithmetic below is why)
-    if opts.segment and fought >= 1 and H.worldMode()
-       and H.worldHasControl() and H.worldAligned()
-       and not H.battleLoadStarted() then
-      return true
+    -- turns (the sustain arithmetic below is why).  A segment also
+    -- exits the INSTANT it stands parked on its target: calm>=30
+    -- basically never holds on the Veldt (the danger bit stays hot
+    -- between reloads), so a no-battle segment that arrived would
+    -- otherwise sit on the tile burning its whole budget into a raise.
+    if opts.segment and H.worldMode() and H.worldHasControl()
+       and H.worldAligned() and not H.battleLoadStarted() then
+      if fought >= 1 then return true end
+      if H.worldX() == tx and H.worldY() == ty then return true end
     end
     return lost ~= nil or (arriveOffWorld and not H.worldMode()) or calm >= 30
   end, budget or 40000, {
@@ -587,21 +591,28 @@ local function worldWalkFight(tx, ty, budget, what, arriveOffWorld, opts)
       if not live then
         -- A WIPE AT BATTLE'S END NEVER MEETS THE IN-BATTLE CANARY: the
         -- killing blow tears the battle down, battleLoadStarted goes
-        -- false, and the GAME OVER screen reads as module limbo -- all
-        -- party HP zero UNDER NONZERO MAX HP (transition garbage reads
-        -- zero maxes; a real wipe keeps them).  Measured f75413:
-        -- [0/231 0/254 0/246] off-world.  Name it as a LOSS so the
-        -- ladder reloads, and never tap A here -- A at a Game Over
-        -- walks into a brand-new game (the M.FLEE_CAP horror).
+        -- false, and the GAME OVER screen reads as module limbo with
+        -- all party HP zero under the party's REAL max HP (measured
+        -- f75413: [0/231 0/254 0/246] off-world).  The signature must
+        -- be the real maxes, not merely nonzero ones: a first draft
+        -- keyed on maxHP > 0 and a module transition reading
+        -- [0/63512 0/7692] promptly named a phantom wipe at f13143 and
+        -- killed a walk the party was winning.  A WoB max is a few
+        -- hundred; transition garbage reads tens of thousands.  Every
+        -- slot must look sane and dead, debounced 90 frames.  Name it
+        -- a LOSS so the ladder reloads, and never tap A here -- A at a
+        -- Game Over walks into a brand-new game (the M.FLEE_CAP
+        -- horror).
         local partyEntities = fed and 3 or 2
-        local anyMax, anyAlive = false, false
+        local sane, alive = 0, 0
         for e = 0, partyEntities - 1 do
-          if pMaxHP(e) > 0 then
-            anyMax = true
-            if pHP(e) > 0 then anyAlive = true end
+          local mx = pMaxHP(e)
+          if mx > 0 and mx < 1000 then
+            sane = sane + 1
+            if pHP(e) > 0 then alive = alive + 1 end
           end
         end
-        if anyMax and not anyAlive then
+        if sane >= partyEntities and alive == 0 then
           wipeN = wipeN + 1
           if wipeN >= 90 and not lost then
             lost = string.format("wiped (game over) during %s at f%d [%s]",
@@ -611,6 +622,7 @@ local function worldWalkFight(tx, ty, budget, what, arriveOffWorld, opts)
           H.setPad({})
           return
         end
+        wipeN = 0
         stuckN = stuckN + 1
         if stuckN == 601 then
           H.log(string.format("[gau] walk[%s] STUCK 600 frames off-world " ..
@@ -1127,6 +1139,96 @@ local function walkAttempt(n)
   return H.cond(function() return not walkDone end, steps, {})
 end
 
+-- The POST-JOIN route ladder: the same siege discipline, applied to the
+-- fence S-curve from the join tile to Crescent Mountain's doorstep.  The
+-- 2026-08-09 run that first got GAU aboard lost his whole party to the
+-- formation lottery at f75413 on this very stretch -- with GAU joined and
+-- the pre-join walk green -- because these nine legs were still bare
+-- worldWalkFights with no care stops, no ladder, and (before the
+-- Game-Over canary) not even a name for the wipe.  Each waypoint keeps
+-- its BFS disc small around the fence; each is now besieged one battle
+-- at a time with field care between, and the whole route reloads on a
+-- 17-frame stagger when a draw goes fatal.  Care threshold is 0.75 here
+-- (not 0.9): a care visit costs ~700-900 frames including the recovery
+-- from M.fieldCare's transient exit, and this route fights ~20 battles.
+local ROUTE = {
+  { 216, 128, "fence north" },
+  { 218, 140, "east bend" },
+  { 220, 149, "south bend" },
+  { 219, 153, "south bend 1" },
+  { 217, 155, "south bend 2" },
+  { 212, 156, "south run" },
+  { 205, 153, "west bend" },
+  { 207, 151, "northwest bend" },
+  { 214, 149, "Crescent doorstep" },
+}
+local routeBlob, routeDone = nil, false
+local function routeCheckpoint()
+  local ckReq
+  return H.cond(function() return true end, {
+    H.call(function() ckReq = H.requestSaveState() end),
+    H.waitFrames(2),
+    H.call(function()
+      H.checkReq(ckReq, "post-join route checkpoint")
+      routeBlob = ckReq.blob
+      H.log(string.format("[gau] post-join route checkpoint captured " ..
+        "(%d bytes) f%d", #routeBlob, H.frame))
+    end),
+  }, {})
+end
+local function routeAttempt(n)
+  local ldReq
+  local steps = {
+    H.cond(function() return n > 1 end, {
+      H.logStep(function()
+        return string.format("[gau] post-join route ATTEMPT %d -- " ..
+          "reloading (%s)", n, tostring(lost))
+      end),
+      H.call(function() ldReq = H.requestLoadState(routeBlob) end),
+      H.waitFrames(2),
+      H.call(function() H.checkReq(ldReq, "route attempt " .. n) end),
+      H.waitFrames(60 + (n - 1) * 17),
+    }, {}),
+    H.call(function() lost, wipeN = nil, 0 end),
+  }
+  for w = 1, #ROUTE do
+    local tx, ty, name = ROUTE[w][1], ROUTE[w][2], ROUTE[w][3]
+    for i = 1, 12 do
+      steps[#steps + 1] = H.cond(function()
+        return lost == nil and not (H.worldMode() and H.worldX() == tx
+           and H.worldY() == ty and H.worldHasControl()
+           and H.worldAligned())
+      end, {
+        worldWalkFight(tx, ty, 12000,
+          string.format("route a%d %s seg %d", n, name, i), nil,
+          { segment = true }),
+        H.cond(function() return lost == nil end, {
+          H.fieldCare({ tag = string.format("route a%d %s care %d",
+                          n, name, i),
+                        threshold = 0.75, maxFrames = 12000 }),
+        }, {}),
+      }, {})
+    end
+    steps[#steps + 1] = H.call(function()
+      if lost == nil and not (H.worldMode() and H.worldX() == tx
+         and H.worldY() == ty) then
+        lost = string.format("route attempt %d never reached %s (%d,%d) " ..
+          "in 12 segments; at (%d,%d) f%d", n, name, tx, ty,
+          H.worldX(), H.worldY(), H.frame)
+        H.log("[gau] " .. lost)
+      end
+    end)
+  end
+  steps[#steps + 1] = H.call(function()
+    if lost == nil then
+      routeDone = true
+      H.log(string.format("[gau] post-join route attempt %d ARRIVED at " ..
+        "the Crescent doorstep f%d [%s]", n, H.frame, partyLine()))
+    end
+  end)
+  return H.cond(function() return not routeDone end, steps, {})
+end
+
 H.run({ maxFrames = 500000 }, {
   H.loadState(DOOR),
   H.waitFrames(30),
@@ -1284,23 +1386,18 @@ H.run({ maxFrames = 500000 }, {
   H.waitFrames(120),
 
   -- park on Crescent Mountain's doorstep (one short of the (214,148)
-  -- entrance) and mint; waypoints keep each BFS disc small (the fence
-  -- S-curve -- see the route notes in the git history of this file).  The
-  -- Veldt's encounters are unrunable, so use the same honest menu fighter as
-  -- transit rather than an L+R flee policy.
-  worldWalkFight(216, 128, 30000, "join -> fence north"),
-  worldWalkFight(218, 140, 30000, "fence north -> east bend"),
-  worldWalkFight(220, 149, 30000, "east bend -> south bend"),
-  worldWalkFight(219, 153, 20000, "south bend 1"),
-  worldWalkFight(217, 155, 20000, "south bend 2"),
-  worldWalkFight(212, 156, 20000, "south run"),
-  worldWalkFight(205, 153, 40000, "west bend"),
-  worldWalkFight(207, 151, 20000, "northwest bend"),
-  worldWalkFight(214, 149, 30000, "Crescent doorstep"),
+  -- entrance) and mint.  The route rides the ladder defined above (the
+  -- SIEGE comment there carries the measurements); the Veldt's
+  -- encounters are unrunable, so every one is fought by the honest menu
+  -- fighter, one per segment, with field care between.
+  routeCheckpoint(),
+  routeAttempt(1),
+  routeAttempt(2),
+  routeAttempt(3),
   H.call(function()
-    if lost ~= nil then
-      error("gau: post-join walk to Crescent Mountain was lost -- " ..
-        tostring(lost), 0)
+    if not routeDone then
+      error(string.format("gau: post-join walk to Crescent Mountain was " ..
+        "lost on all 3 staggered attempts -- last: %s", tostring(lost)), 0)
     end
   end),
   -- The landing step itself can WIN the encounter roll ($E8 bit5 the
