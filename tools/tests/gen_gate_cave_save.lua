@@ -53,13 +53,6 @@ local TEMP_CLASS = 0x316d90 + ULTROS2
 local function map() return H.mapId() & 0x1ff end
 local function bright() return emu.getState()["ppu.screenBrightness"] or 0 end
 local function sw(id) return (H.readByte(0x1E80 + (id >> 3)) >> (id & 7)) & 1 end
-local function killBitAll()
-  for s = 0, 5 do
-    if H.readByte(0x3aa8 + s * 2) % 2 == 1 then
-      H.writeByte(0x3eec + s * 2, H.readByte(0x3eec + s * 2) | 0x80)
-    end
-  end
-end
 local function shipX() return H.readWord(0x34) >> 4 end
 local function shipY() return H.readWord(0x38) >> 4 end
 local function partyOf(c) return H.readByte(0x1850 + c) & 0x07 end
@@ -92,7 +85,7 @@ local function worldGrind(tx, ty, what)
     H.call(function()
       ph = (ph + 1) % 8
       if H.battleLoadStarted() then
-        killBitAll(); plan = nil; H.setPad(ph < 4 and { "a" } or {}); return
+        plan = nil; H.setPad({ l = true, r = true }); return
       end
       if not H.worldMode() then H.setPad({}); return end
       if not H.worldHasControl() then plan = nil; H.setPad({}); return end
@@ -113,7 +106,7 @@ local function pressWalk(dir, pred, maxFrames, what)
     H.call(function()
       ph = (ph + 1) % 8
       if H.battleLoadStarted() then
-        killBitAll(); H.setPad(ph < 4 and { "a" } or {}); return
+        H.setPad({ l = true, r = true }); return
       end
       if H.dialogWaiting() then H.setPad(ph < 4 and { "a" } or {}); return end
       H.setPad({ [dir] = true })
@@ -284,7 +277,7 @@ H.run({ maxFrames = 200000 }, {
   pressWalk("right", function() return map() == 7 end, 900,
     "held RIGHT along row 6 -> deck door (20,6) -> map 7"),
   H.waitUntil(landed(7, 10), 1200, "map 7 landing", 1),
-  H.navTo(40, 17, { maxFrames = 9000 }),
+  H.navTo(40, 17, { honest = "flee", maxFrames = 9000 }),
   pressWalk("down", function()
     return H.fieldY() >= 45 and H.tileAligned()
   end, 900, "stairs (40,18) -> the swap room (50,51)"),
@@ -343,11 +336,11 @@ H.run({ maxFrames = 200000 }, {
   end),
 
   -- ---- 3. wheel, fly to the base pass, walk the base, into the cave ------
-  H.navTo(40, 11, { maxFrames = 6000 }),
+  H.navTo(40, 11, { honest = "flee", maxFrames = 6000 }),
   pressWalk("up", function() return map() == 6 end, 900,
     "door (40,10) -> the deck"),
   H.waitUntil(landed(6, 10), 1200, "deck again", 1),
-  H.navTo(14, 6, { maxFrames = 6000, calmFrames = 8 }),
+  H.navTo(14, 6, { honest = "flee", maxFrames = 6000, calmFrames = 8 }),
   -- $0170 is SET on this chain, so the wheel opens dlg $052A and only an
   -- EDGE of A opens it -- LEFT+A edges until the choice list is up
   (function() local ph = 0
@@ -395,7 +388,7 @@ H.run({ maxFrames = 200000 }, {
     return H.fieldX() >= 9 and H.tileAligned() and H.hasControl()
   end, 2400, "held RIGHT off the entrance trigger row"),
   H.waitFrames(45),
-  H.navTo(30, 12, { maxFrames = 20000,
+  H.navTo(30, 12, { honest = "flee", maxFrames = 20000,
     arrive = function() return H.worldMode() end }),
   pressWalk("right", function() return H.worldMode() end, 900,
     "east door (31,12) -> world (167,194)"),
@@ -407,12 +400,12 @@ H.run({ maxFrames = 200000 }, {
   pressWalk("right", function() return not H.worldMode() and map() == 382 end,
     900, "(169,194) -> CAVE TO THE SEALED GATE (382)"),
   H.waitUntil(landed(382, 10), 2400, "382 landing", 1),
-  H.navTo(31, 42, { maxFrames = 15000,
+  H.navTo(31, 42, { honest = "flee", maxFrames = 15000,
     arrive = function() return map() == 383 end }),
   pressWalk("down", function() return map() == 383 end, 900,
     "door (31,43) -> BASEMENT 1 (383)"),
   H.waitUntil(landed(383, 10), 2400, "383 landing", 1),
-  H.navTo(53, 57, { maxFrames = 20000,
+  H.navTo(53, 57, { honest = "flee", maxFrames = 20000,
     arrive = function() return map() == 385 end }),
   pressWalk("down", function() return map() == 385 end, 900,
     "door (53,58) -> BASEMENT 2 (385), the timed floor"),
@@ -445,13 +438,13 @@ H.run({ maxFrames = 200000 }, {
   end),
 
   -- ---- 5. BASEMENT 3's south loop, the door switch, the save point --------
-  H.navTo(62, 11, { maxFrames = 30000 }),
+  H.navTo(62, 11, { honest = "flee", maxFrames = 30000 }),
   (function() local ph = 0
     return H.driveUntil(function() return sw(0x0173) == 1 end, 3000, {
       H.call(function()
         ph = (ph + 1) % 8
         if H.battleLoadStarted() then
-          killBitAll(); H.setPad(ph < 4 and { "a" } or {}); return
+          H.setPad({ l = true, r = true }); return
         end
         if H.dialogWaiting() then H.setPad(ph < 4 and { "a" } or {}); return end
         H.setPad(ph < 4 and { "up", "a" } or { "up" })
@@ -459,7 +452,7 @@ H.run({ maxFrames = 200000 }, {
     }, "face-UP+A on (62,11) -> $0173 (the save-room door)")
   end)(),
   H.waitFrames(60),
-  H.navTo(64, 11, { maxFrames = 9000 }),
+  H.navTo(64, 11, { honest = "flee", maxFrames = 9000 }),
   pressWalk("up", function() return map() == 386 end, 1200,
     "held UP onto the save-room door (64,10) -> map 386"),
   H.waitUntil(landed(386, 10), 2400, "386 landing", 1),
@@ -468,7 +461,7 @@ H.run({ maxFrames = 200000 }, {
     H.assertEq(H.fieldX(), 73, "386 arrival x (short entrance 384 (64,10))")
     H.assertEq(H.fieldY(), 58, "386 arrival y")
   end),
-  H.navTo(74, 54, { maxFrames = 9000 }),
+  H.navTo(74, 54, { honest = "flee", maxFrames = 9000 }),
   -- tapInto the save tile: a HELD press walks straight THROUGH (74,53)
   -- without firing the SavePoint trigger (measured, probe_v07_386tile --
   -- CheckEventTriggers wants an exactly-aligned rest the step chain never
@@ -489,7 +482,7 @@ H.run({ maxFrames = 200000 }, {
       H.call(function()
         ph = (ph + 1) % 8
         if H.battleLoadStarted() then
-          killBitAll(); H.setPad(ph < 4 and { "a" } or {}); phase = 0; return
+          H.setPad({ l = true, r = true }); phase = 0; return
         end
         if H.dialogWaiting() then
           H.setPad(ph < 4 and { "a" } or {}); phase = 0; return
