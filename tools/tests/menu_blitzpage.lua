@@ -1,4 +1,4 @@
--- @suite frontier=arvis_wake
+-- @suite frontier=vargas_won
 -- menu_blitzpage.lua -- issue #46: the field Skills->Blitz page describes the
 -- ABILITY, not a retired input system.
 --
@@ -65,20 +65,39 @@
 -- (lib/frontier_stamp.sh:82-85), so a helper added there would mark every
 -- minted fixture drifted.
 --
--- Fixture: arvis_wake (the menu_swdtechpage / menu_ragepage boot).  Its lead has
--- no Blitz command, so it is installed the house "install state" way: the lead's
--- third battle-command byte becomes BATTLE_CMD::BLITZ ($0a) and the known-blitz
--- bitmask $1d28 is written directly.  Three phases: THREE known (so the same
--- render carries learned rows AND locked ones), ALL EIGHT (every row a Blitz,
--- the state that proves the locked marker cannot leak onto a learned row, and
--- the only state that puts a two-digit price on screen), and NONE (the page a
--- fresh Sabin opens -- eight locked rows and not one number).
+-- Fixture (issue #75 conversion): vargas_won -- a REAL SABIN, on Mt. Kolts
+-- right after his own boss fight, found in zCharID and entered by walking the
+-- character cursor onto his slot (menu_blitzpage_sabin.lua's realness
+-- pattern).  The Blitz command is his record's own; the learned mask $1d28 is
+-- whatever the save holds, so the PARTIAL phase -- learned rows AND locked
+-- ones on the same render -- is now the page a real mid-Kolts Sabin opens.
+-- The mask is read and each row asserted against it, so a join-level change
+-- moves which rungs are lit without touching this file.
+--
+-- *** TWO LABELED ISOLATION ARMS (issue #75) -- one write site STAYS ***
+-- The other two learned-counts this page must render CANNOT be produced on
+-- any real save:
+--   * ALL EIGHT -- the state that proves the locked marker cannot leak onto
+--     a learned row, and the only state that renders Bum Rush's two-digit
+--     price -- needs Sabin's eighth Blitz, which is LEVEL 70.  The owner's
+--     learn-ceiling ruling (2026-08-10, docs/waiver-burndown-plan.md
+--     systemic call 1) keeps exactly this arm as a loudly-labeled
+--     memory-hack isolation arm, converted organically when high-level
+--     content reaches the frontier.
+--   * NONE -- eight locked rows and not one digit -- is UNREACHABLE BY PLAY
+--     in the other direction: Pummel is learned at level 1, so every real
+--     Sabin's mask has bit 0 set from the moment he exists.  A renderer
+--     state no controller can produce is a mechanism claim (systemic call
+--     2), so it stays beside the all-eight arm rather than being deleted.
+-- Both arms write the ONE byte $1d28 and nothing else; this file keeps its
+-- .writeByte( waiver line for that site and MAY NEVER PRODUCE FIXTURES.
 local H = dofile("tools/tests/lib/ot6.lua")
-local STATE = "build/states/arvis_wake.mss.lua"
+local STATE = "build/states/vargas_won.mss.lua"
 
 local ZMENUSTATE, ZCURSOR = 0x26, 0x4b
+local ZCHARID = 0x69                    -- zCharID::Slot1..4 (menu_ram.inc)
 local BLITZ_ROW_COLOR = 0x7c            -- zSkillsTextColor::Blitz (menu_ram.inc)
-local CMD3 = 0x1618                     -- lead char's 3rd battle command
+local CHAR_SABIN = 0x05                 -- CHAR::SABIN (const.inc)
 local BATTLE_CMD_BLITZ = 0x0a
 local BLITZES = 0x1D28                  -- known-blitz bitmask (FixPlayerAttack's)
 local ST_MAIN, ST_CHAR, ST_SKILLS, ST_BLITZ = 0x05, 0x06, 0x0a, 0x33
@@ -339,7 +358,12 @@ local function assertNoCombos(what)
   end
 end
 
+-- teach() survives ONLY for the two labeled isolation arms at the tail (see
+-- header); the honest phases read the mask and write nothing.
 local function teach(mask) H.writeByte(BLITZES, mask) end
+
+local learnedMask = nil                 -- $1d28 as read off the save
+local sabinSlot = nil                   -- SABIN's menu slot, found not assumed
 
 H.run({ maxFrames = 30000 }, {
   H.waitFrames(20),
@@ -347,11 +371,17 @@ H.run({ maxFrames = 30000 }, {
   H.waitFrames(10),
   H.waitUntil(function() return H.hasControl() end, 400, "field control", 5),
 
-  -- install state: the Blitz command on the lead + three learned rungs.
+  -- The save's own state, read: the mask must have learned rungs AND locked
+  -- ones, or the partial phase would only exercise one row kind.  A mid-Kolts
+  -- Sabin has both by construction (Pummel at L1, Bum Rush at L70).
   H.call(function()
-    H.writeByte(CMD3, BATTLE_CMD_BLITZ)
-    teach(0x07)                         -- Pummel / AuraBolt / Suplex
-    H.log("installed: Blitz on the lead, 3 of 8 rungs learned")
+    learnedMask = H.readByte(BLITZES)
+    local n = 0
+    for i = 0, 7 do if (learnedMask >> i) & 1 == 1 then n = n + 1 end end
+    H.log(string.format("$1d28 = $%02x as saved: %d of 8 rungs learned",
+      learnedMask, n))
+    H.assertEq(n > 0 and n < 8, true,
+      "the real mask mixes learned and locked rows -- both render paths run")
     -- the shape of the price data this page has to render, asserted as a shape
     -- rather than as numbers so a balance retune cannot turn the page red:
     -- there is at least one one-digit price and at least one two-digit price,
@@ -399,16 +429,38 @@ H.run({ maxFrames = 30000 }, {
   H.driveUntil(function() return st() == ST_MAIN end, 1200,
     { H.pressButtons({ "x" }, 4), H.waitFrames(30) }, "main menu"),
   H.waitFrames(20),
+  -- FIND Sabin rather than assume his row, and assert HIS record carries the
+  -- Blitz command -- the realness pair from menu_blitzpage_sabin.lua.
+  H.call(function()
+    local ids = {}
+    for s = 0, 3 do
+      local id = H.readByte(ZCHARID + s)
+      ids[#ids + 1] = string.format("slot %d = char $%02x", s, id)
+      if id == CHAR_SABIN and sabinSlot == nil then sabinSlot = s end
+    end
+    H.log("party: " .. table.concat(ids, ", "))
+    H.assertEq(sabinSlot ~= nil, true, "vargas_won's party contains SABIN")
+    local rec = 0x1600 + 37 * CHAR_SABIN
+    local has = false
+    for i = 0, 3 do
+      if H.readByte(rec + 0x16 + i) == BATTLE_CMD_BLITZ then has = true end
+    end
+    H.assertEq(has, true,
+      "SABIN's own record carries BATTLE_CMD::BLITZ -- nothing is installed")
+  end),
   H.pressButtons({ "down" }, 2),            -- Items -> Skills
   H.waitFrames(6),
   H.pressButtons({ "a" }, 2),
   H.waitUntil(function() return st() == ST_CHAR end, 300, "character select", 5),
+  H.waitFrames(10),
+  H.driveUntil(function() return H.readByte(ZCURSOR) == sabinSlot end, 900,
+    { H.pressButtons({ "down" }, 2), H.waitFrames(8) }, "cursor onto SABIN"),
   H.pressButtons({ "a" }, 2),
   H.waitUntil(function() return st() == ST_SKILLS end, 300, "skills submenu", 5),
   H.waitFrames(10),
   H.call(function()
     H.assertEq(H.readByte(BLITZ_ROW_COLOR), 0x20,
-      "Blitz row enabled (install-state command took)")
+      "Blitz row enabled -- SABIN's own record carries the command")
   end),
 
   -- cursor to the Blitz row, A opens the page through SkillsOption_03
@@ -422,16 +474,24 @@ H.run({ maxFrames = 30000 }, {
   H.waitFrames(90),                         -- draws + DMA settle
 
   H.call(function()
-    for i = 0, 2 do assertLearnedRow(i) end
-    for i = 3, 7 do assertLockedRow(i) end
-    assertNoCombos("3 learned")
-    assertGeometry("3 learned")
-    for n = 0, 7 do assertCursorGutter(n, "3 learned") end
+    local nL = 0
+    for i = 0, 7 do
+      if (learnedMask >> i) & 1 == 1 then
+        assertLearnedRow(i)
+        nL = nL + 1
+      else
+        assertLockedRow(i)
+      end
+    end
+    assertNoCombos("real mask")
+    assertGeometry("real mask")
+    for n = 0, 7 do assertCursorGutter(n, "real mask") end
     H.screenshot("blitz_page_player_path")
-    H.log("RENDER OK: Skills->Blitz via the player's path -- three learned rungs "
-      .. "carry name + break class + price, five unreached rungs say '- LOCKED -', "
-      .. "no combo glyph anywhere, every drawn cell on an ODD row inside row 15, "
-      .. "clear of the border column and of every cursor's gutter")
+    H.log(string.format("RENDER OK: Skills->Blitz via the player's path for a "
+      .. "REAL SABIN -- %d learned rungs carry name + probe icon + price, %d "
+      .. "unreached rungs say '- LOCKED -', no combo glyph anywhere, every "
+      .. "drawn cell on an ODD row inside row 15, clear of the border column "
+      .. "and of every cursor's gutter", nL, 8 - nL))
   end),
 
   -- ---- the cursor MOVES, and picks the row's description ----
@@ -456,15 +516,23 @@ H.run({ maxFrames = 30000 }, {
       .. "happens to be selected")
   end),
 
-  -- ---- ALL EIGHT: no locked row anywhere, and a two-digit price on screen ----
+  -- ======================================================================= --
+  -- *** LABELED ISOLATION ARM 1 (issue #75, owner's learn-ceiling ruling) ***
+  -- ALL EIGHT: no locked row anywhere, and a two-digit price on screen.
   -- Every state above has locked rows in it, so on its own it cannot tell
   -- "- LOCKED -" drawn for an unreached rung from "- LOCKED -" leaking over a
-  -- learned one.  It is also the only state that renders Bum Rush, the 30 MP top
-  -- of the ladder and the only row that fills the tens cell.
+  -- learned one.  It is also the only state that renders Bum Rush, the 99 MP
+  -- top of the ladder and the only row that fills the tens cell -- and the
+  -- eighth Blitz is LEVEL 70, which the no-grind-tier ruling keeps out of the
+  -- fixture chain.  One byte is written: $1d28.  See the header.
+  -- ======================================================================= --
   H.pressButtons({ "b" }, 3),
   H.waitUntil(function() return st() == ST_SKILLS end, 300,
     "back out of the blitz page", 5),
-  H.call(function() teach(0xff) end),
+  H.call(function()
+    teach(0xff)
+    H.log("[isolation arm] $1d28 := $ff -- the L70 all-eight Sabin")
+  end),
   H.pressButtons({ "a" }, 2),
   H.waitUntil(function() return st() == ST_BLITZ end, 300,
     "blitz page reopened with all eight learned", 5),
@@ -487,14 +555,21 @@ H.run({ maxFrames = 30000 }, {
       .. "their prices, the '- LOCKED -' marker nowhere on the page")
   end),
 
-  -- ---- NONE: the page a fresh Sabin opens ----
-  -- Sabin joins knowing Pummel, but a level-1 read of this page is the honest
-  -- worst case for the marker, and it is the one state where NOTHING on the page
-  -- is data.  Nothing may be priced and nothing may carry a class.
+  -- ======================================================================= --
+  -- *** LABELED ISOLATION ARM 2 (issue #75, renderer-mechanism doctrine) ***
+  -- NONE: eight locked rows and not one digit -- the one state where NOTHING
+  -- on the page is data.  UNREACHABLE BY PLAY: Pummel is learned at level 1,
+  -- so every real Sabin's mask has bit 0 set from the moment he exists; the
+  -- empty ladder can only be shown to the renderer by hand.  Same one-byte
+  -- write, same waiver site.  See the header.
+  -- ======================================================================= --
   H.pressButtons({ "b" }, 3),
   H.waitUntil(function() return st() == ST_SKILLS end, 300,
     "back out of the blitz page", 5),
-  H.call(function() teach(0x00) end),
+  H.call(function()
+    teach(0x00)
+    H.log("[isolation arm] $1d28 := $00 -- the empty ladder no real save holds")
+  end),
   H.pressButtons({ "a" }, 2),
   H.waitUntil(function() return st() == ST_BLITZ end, 300,
     "blitz page reopened with none learned", 5),
