@@ -24,12 +24,6 @@ tools/tests/bal_party.lua	.writeWord(
 tools/tests/bal_party.lua	emu.write
 tools/tests/battle_assassinate.lua	.writeByte(
 tools/tests/battle_assassinate.lua	.writeWord(
-tools/tests/battle_blitzcursor.lua	.writeByte(
-tools/tests/battle_blitzcursor.lua	.writeWord(
-tools/tests/battle_blitzgrey.lua	.writeByte(
-tools/tests/battle_blitzgrey.lua	.writeWord(
-tools/tests/battle_blitzlist.lua	.writeByte(
-tools/tests/battle_blitzlist.lua	.writeWord(
 tools/tests/battle_break.lua	.writeByte(
 tools/tests/battle_break.lua	.writeWord(
 tools/tests/battle_breakflash.lua	.writeByte(
@@ -47,7 +41,6 @@ tools/tests/battle_clockwork.lua	.writeWord(
 tools/tests/battle_codex.lua	.writeByte(
 tools/tests/battle_codex.lua	.writeWord(
 tools/tests/battle_codex.lua	emu.write
-tools/tests/battle_dancemp.lua	.writeByte(
 tools/tests/battle_dancemp.lua	.writeWord(
 tools/tests/battle_divines.lua	.writeByte(
 tools/tests/battle_divines.lua	.writeWord(
@@ -80,14 +73,8 @@ tools/tests/battle_slotsboot.lua	.writeWord(
 tools/tests/battle_steal.lua	.writeByte(
 tools/tests/battle_subjob.lua	.writeByte(
 tools/tests/battle_subjob.lua	.writeWord(
-tools/tests/battle_toolsgrey.lua	.writeByte(
-tools/tests/battle_toolsgrey.lua	.writeWord(
-tools/tests/battle_toolslist.lua	.writeByte(
-tools/tests/battle_toolslist.lua	.writeWord(
 tools/tests/battle_trueknight.lua	.writeByte(
 tools/tests/battle_trueknight.lua	.writeWord(
-tools/tests/battle_walletmp.lua	.writeByte(
-tools/tests/battle_walletmp.lua	.writeWord(
 tools/tests/gen_battle2.lua	.writeWord(
 tools/tests/gen_whelk.lua	.writeByte(
 tools/tests/gen_whelk.lua	emu.write
@@ -98,8 +85,6 @@ tools/tests/lib/ot6.lua	emu.write
 tools/tests/lib/ot6.lua	emu.writeWord
 tools/tests/lib/ot6_field.lua	.writeByte(
 tools/tests/menu_blitzpage.lua	.writeByte(
-tools/tests/menu_bushidoloadout.lua	.writeByte(
-tools/tests/menu_esperdetail.lua	.writeByte(
 tools/tests/menu_esperdetail_tube6.lua	.writeByte(
 tools/tests/menu_ragepage.lua	.writeByte(
 tools/tests/menu_swdtechpage.lua	.writeByte(

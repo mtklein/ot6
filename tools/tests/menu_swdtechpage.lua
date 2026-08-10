@@ -1,4 +1,4 @@
--- @suite frontier=arvis_wake
+-- @suite frontier=cyan_defence
 -- menu_swdtechpage.lua -- issue #39: the field Skills->SwdTech page RENDERS.
 --
 -- The v0.5 loadout configurator (#8 Layer B) shipped with its pos_text labels
@@ -111,23 +111,41 @@
 -- "30 MP", and column 23 keeps "30 MP" off "MANUAL" -- the failure #49 shipped
 -- a screenshot of.  Full derivation over Ot6LoadoutDrawSlots, field_menu.asm.
 --
--- Fixture: arvis_wake (same boot as menu_bushidoloadout / menu_esperdetail).
--- Its lead has no Bushido command, so the SwdTech row is installed the house
--- "install state" way (menu_esperdetail pins esper bits the same way): the
--- lead's third battle-command byte becomes BUSHIDO, and $1cf7 = $07 -- the
--- natural learned set of the owner's scenario-band Cyan (Dispatch, Retort,
--- Slash; the LV14-era set from the #39 report), loadout word $0000 = AUTO.
--- With exactly 3 of 8 techs learned the ceiling is 2, so the three-rung auto
--- window (base = max(0, ceiling-2) = 0) draws Dispatch/Retort/Slash at
--- 1x/2x/3x -- every learned tech reachable, none duplicated -- and the pool
--- holds the same three names.
+-- Fixture (issue #75 conversion): cyan_defence -- a REAL CYAN, alone at Doma
+-- (map 120, gen_sabin_camp), whose own record carries BUSHIDO.  The "install
+-- state" stagings this file used on arvis_wake (command byte, learned set,
+-- loadout zeroing) are gone: the command is asserted off his record, the
+-- learned set and the loadout word are READ, and the slot/pool expectations
+-- are DERIVED from $1cf7 as read (Ot6LoadoutAutoTech's window: ceiling c =
+-- highest learned, base b = max(0, c-2), row s shows min(c, b+s-1)).
+--
+-- MEASURED on this fixture: $1cf7 = $03 -- TWO techs, Dispatch and Retort
+-- (the burn-down plan's "$07 scenario-band" note describes a later Cyan) --
+-- so c = 1 and the window is {0, 1, 1}: the 3x rung is CLAMPED to the
+-- ceiling and shows Retort TWICE.  That is a page state the old $07 staging
+-- never rendered, and it is the honest one: a real early Cyan's page
+-- duplicates his top tech on the deeper rungs.  Also measured: CYAN does not
+-- sit in menu slot 1 here (slot 1 reads $FF after the scenario shuffle), so
+-- he is FOUND in zCharID and the character cursor is walked to him.
+--
+-- *** ONE LABELED ISOLATION ARM (issue #75) -- a single state write STAYS ***
+-- The ALL-EIGHT phase (the full pool, and Quadra Slice's 12-cell name beside
+-- its two-digit price -- the #56 arm this page exists to hold) needs a Cyan
+-- who has learned tech 8, which is LEVEL 68.  Per the owner's learn-ceiling
+-- ruling (2026-08-10, docs/waiver-burndown-plan.md systemic call 1: no
+-- leveled-fixture grind tier; true ceiling arms stay as loudly-labeled
+-- memory-hack isolation arms, converted organically as higher-level content
+-- arrives), the LAST phase below writes $1cf7 = $ff -- one byte, once -- and
+-- this file keeps its .writeByte( waiver line for exactly that site.  It MAY
+-- NEVER PRODUCE FIXTURES.
 local H = dofile("tools/tests/lib/ot6.lua")
-local STATE = "build/states/arvis_wake.mss.lua"
+local STATE = "build/states/cyan_defence.mss.lua"
 
 local ZMENUSTATE, ZCURSOR = 0x26, 0x4b
+local ZCHARID = 0x69                    -- zCharID::Slot1..4 (menu_ram.inc)
 local BUSHIDO_ROW_COLOR = 0x7b          -- zSkillsTextColor::Bushido
-local CMD3 = 0x1618                     -- lead char's 3rd battle command
 local LEARNED, LOADOUT = 0x1cf7, 0x1e1d
+local CHAR_CYAN = 0x02                  -- CHAR::CYAN (const.inc)
 local BATTLE_CMD_BUSHIDO = 0x07
 local ST_MAIN, ST_CHAR, ST_SKILLS, ST_LOADOUT = 0x05, 0x06, 0x0a, 0x7b
 
@@ -396,22 +414,38 @@ local function assertGeometry(what)
   end
 end
 
+-- Derived from the learned set as READ: the auto window techs for rows
+-- 1x/2x/3x, and n = the learned count (filled at runtime).
+local t = {}
+local nLearned = 0
+local cyanSlot = nil
+
 H.run({ maxFrames = 30000 }, {
   H.waitFrames(20),
   H.loadState(STATE),
   H.waitFrames(10),
   H.waitUntil(function() return H.hasControl() end, 400, "field control", 5),
 
-  -- install state: SwdTech command on the lead + the scenario-band learned
-  -- set (Dispatch/Retort/Slash), AUTO loadout word.
+  -- The save's own state, read -- nothing installed.  Derive the auto window
+  -- Ot6LoadoutAutoTech will draw and assert the word has never been touched.
   H.call(function()
-    H.writeByte(CMD3, BATTLE_CMD_BUSHIDO)
-    H.writeByte(LEARNED, 0x07)
-    H.writeByte(LOADOUT, 0)
-    H.writeByte(LOADOUT + 1, 0)
+    local L = H.readByte(LEARNED)
+    while (L >> nLearned) & 1 == 1 do nLearned = nLearned + 1 end
+    H.log(string.format("$1cf7 = $%02x as saved: %d techs learned", L, nLearned))
+    H.assertEq(L, (1 << nLearned) - 1,
+      "Cyan's real learned set is contiguous from tech 0 (level-derived)")
+    H.assertEq(nLearned >= 2, true,
+      "at least two techs learned -- one-tech and empty pages would render, "
+      .. "but the duplicate-rung clamp below needs a second tech to show")
+    local c = nLearned - 1
+    local b = math.max(0, c - 2)
+    t = { math.min(c, b), math.min(c, b + 1), math.min(c, b + 2) }
+    H.log(string.format("auto window {%d,%d,%d}", t[1], t[2], t[3]))
+    H.assertEq(H.readByte(LOADOUT) | (H.readByte(LOADOUT + 1) << 8), 0,
+      "the loadout word is $0000 as saved (no real save has configured one)")
   end),
 
-  -- the player's path: X -> main menu -> Skills -> lead character -> submenu
+  -- the player's path: X -> main menu -> Skills -> CYAN -> submenu
   -- driveUntil, not one press: the X that opens the field menu is the first
   -- step in these tests that needs a SPECIFIC frame, so it is where a
   -- fixture minted against a different ROM surfaces -- as "timeout waiting
@@ -423,16 +457,30 @@ H.run({ maxFrames = 30000 }, {
   H.driveUntil(function() return st() == ST_MAIN end, 1200,
     { H.pressButtons({ "x" }, 4), H.waitFrames(30) }, "main menu"),
   H.waitFrames(20),
+  -- FIND Cyan rather than assume his row (measured: menu slot 1 is $FF here).
+  H.call(function()
+    local ids = {}
+    for s = 0, 3 do
+      local id = H.readByte(ZCHARID + s)
+      ids[#ids + 1] = string.format("slot %d = char $%02x", s, id)
+      if id == CHAR_CYAN and cyanSlot == nil then cyanSlot = s end
+    end
+    H.log("party: " .. table.concat(ids, ", "))
+    H.assertEq(cyanSlot ~= nil, true, "cyan_defence's party contains CYAN")
+  end),
   H.pressButtons({ "down" }, 2),            -- Items -> Skills
   H.waitFrames(6),
   H.pressButtons({ "a" }, 2),
   H.waitUntil(function() return st() == ST_CHAR end, 300, "character select", 5),
+  H.waitFrames(10),
+  H.driveUntil(function() return H.readByte(ZCURSOR) == cyanSlot end, 900,
+    { H.pressButtons({ "down" }, 2), H.waitFrames(8) }, "cursor onto CYAN"),
   H.pressButtons({ "a" }, 2),
   H.waitUntil(function() return st() == ST_SKILLS end, 300, "skills submenu", 5),
   H.waitFrames(10),
   H.call(function()
     H.assertEq(H.readByte(BUSHIDO_ROW_COLOR), 0x20,
-      "SwdTech row enabled (install-state command took)")
+      "SwdTech row enabled -- CYAN's own record carries BUSHIDO")
   end),
 
   -- cursor to the SwdTech row (row 2: Espers, Magic, SwdTech), A opens the
@@ -462,24 +510,41 @@ H.run({ maxFrames = 30000 }, {
       H.assertEq(cell(LEFT_COL, y) == 0xb4 and cell(LEFT_COL + 1, y) == lo.x, false,
         string.format("no 0x label at row %d (#38 retired the free rung)", y))
     end
-    -- the three boost slots: ceiling 2 -> base 0 -> Dispatch/Retort/Slash
-    -- #56: costs 4 / 10 / 13 -- deliberately spanning the one- to two-digit
-    -- boundary, so this arm alone proves both alignments on one page.
-    assertSlotRow(BOOST_ROWS[1], DISPATCH, 0, "slot 1x Dispatch")
-    assertSlotRow(BOOST_ROWS[2], RETORT,   1, "slot 2x Retort")
-    assertSlotRow(BOOST_ROWS[3], SLASH,    2, "slot 3x Slash")
-    -- the LEARNED pool: exactly the three learned names, left column, on the
-    -- window's odd rows.  Cross-check the hardcoded literals against the ROM
-    -- records the drawing code actually reads.
-    for n, name in ipairs({ DISPATCH, RETORT, SLASH }) do
-      assertRun(poolCol(n - 1), poolRow(n - 1), name, "pool cell " .. (n - 1))
-      assertRun(poolCol(n - 1), poolRow(n - 1), bushBytes(n - 1),
-        "pool cell " .. (n - 1) .. " vs BushidoName record")
+    -- the three boost slots, derived from the save's own set: window {0,1,1}
+    -- on the measured fixture, i.e. the 3x rung CLAMPED to the ceiling shows
+    -- the top tech AGAIN -- the honest early-Cyan page the old staging never
+    -- rendered.  #56: costs 4 / 10 -- the one- to two-digit boundary is still
+    -- on screen (Retort is two-digit).
+    assertSlotRow(BOOST_ROWS[1], bushBytes(t[1]), t[1],
+      "slot 1x " .. bushText(t[1]))
+    assertSlotRow(BOOST_ROWS[2], bushBytes(t[2]), t[2],
+      "slot 2x " .. bushText(t[2]))
+    assertSlotRow(BOOST_ROWS[3], bushBytes(t[3]), t[3],
+      "slot 3x " .. bushText(t[3]) .. " (ceiling clamp)")
+    -- the LEARNED pool: exactly the learned names, in id order, column-major.
+    -- Cross-check the hardcoded literals against the ROM records the drawing
+    -- code actually reads (the encode-pipeline positive control).
+    local LIT = { DISPATCH, RETORT, SLASH }
+    for k = 0, nLearned - 1 do
+      assertRun(poolCol(k), poolRow(k), bushBytes(k),
+        "pool cell " .. k .. " vs BushidoName record")
+      if LIT[k + 1] then
+        assertRun(poolCol(k), poolRow(k), LIT[k + 1],
+          "pool cell " .. k .. " vs the spelled-out literal")
+      end
     end
-    H.assertEq(cell(poolCol(3), poolRow(3)), 0, "no 4th pool cell (only 3 learned)")
-    H.assertEq(cell(poolCol(4), poolRow(0)), 0, "right pool column empty (3 learned)")
-    -- spray canaries: undrawn odd rows are still cleared
-    assertRowBlank(9 + 3 * 2, "row 15 (no 4th learned tech)")
+    for k = nLearned, 3 do
+      H.assertEq(cell(poolCol(k), poolRow(k)), 0,
+        string.format("no pool cell %d (only %d learned)", k, nLearned))
+    end
+    if nLearned <= 4 then
+      H.assertEq(cell(poolCol(4), poolRow(0)), 0,
+        "right pool column empty (" .. nLearned .. " learned)")
+    end
+    -- spray canaries: undrawn odd pool rows are still cleared
+    if nLearned < 4 then
+      assertRowBlank(9 + 3 * 2, "row 15 (no 4th learned tech)")
+    end
     -- the title row's gaps and tail (#44).  Three chrome words now share it:
     -- SWDTECH 3..9, the hint 11..19, LEARNED 22..28.  The gaps are what keeps
     -- them from reading as one string, so they are asserted, not tolerated --
@@ -495,70 +560,18 @@ H.run({ maxFrames = 30000 }, {
         string.format("title row tail blank {%d,1}", x))
     end
     -- #49: the loadout word is $0000 here, so the page must say AUTO
-    assertModeBlock(true, "3 learned, untouched")
+    assertModeBlock(true, "real set, untouched")
     H.assertEq(H.readByte(LOADOUT), 0, "the loadout word is still AUTO ...")
     H.assertEq(H.readByte(LOADOUT + 1), 0, "... in both its bytes")
-    assertGeometry("3 learned")
+    assertGeometry("real set")
     -- the cursor gutter, on every one of the three boost rows: nothing under
     -- the sprite, content starting in the column right after it.
-    for n = 0, 2 do assertCursorGutter(n, true, "3 learned") end
+    for n = 0, 2 do assertCursorGutter(n, true, "real set") end
     H.screenshot("swdtech_page_player_path")
-    H.log("PASSED: Skills->SwdTech via the player's path renders -- title, "
-      .. "labels, slots, costs, pool correct; every drawn cell on an ODD row "
-      .. "inside row 15 and clear of the border column")
-  end),
-
-  -- ---- #43: the WHOLE learned pool is inside the window ----
-  -- Three learned techs only ever exercised the left column's top three cells,
-  -- which is why a grid whose rows ran to 21 looked fine.  Back out to the
-  -- skills submenu, teach all eight, and re-enter: the pool now fills both
-  -- columns of all four rows, and every one of those cells must still be on an
-  -- odd row <= 15.  This is the acceptance criterion the old layout could not
-  -- meet at any learned count above three.
-  H.pressButtons({ "b" }, 3),
-  H.waitUntil(function() return st() == ST_SKILLS end, 300,
-    "back out of the configurator", 5),
-  H.call(function()
-    H.writeByte(LEARNED, 0xff)            -- all eight Bushido techs
-    H.writeByte(LOADOUT, 0)
-    H.writeByte(LOADOUT + 1, 0)           -- AUTO again
-  end),
-  H.pressButtons({ "a" }, 2),
-  H.waitUntil(function() return st() == ST_LOADOUT end, 300,
-    "configurator reopened with all eight learned", 5),
-  H.waitFrames(90),
-
-  H.call(function()
-    assertRun(LEFT_COL, TITLE_ROW, TITLE, "title still on row 1")
-    assertRun(HINT_COL, TITLE_ROW, HINT, "control hint still on row 1")
-    assertRun(POOL_CAPTION_COL, TITLE_ROW, POOL, "LEARNED caption still on row 1")
-    -- all eight, column-major: cells 0-3 down col 3, cells 4-7 down col 17.
-    for n = 0, 7 do
-      assertRun(poolCol(n), poolRow(n), bushBytes(n),
-        string.format("pool cell %d '%s' at {%d,%d}",
-          n, bushText(n), poolCol(n), poolRow(n)))
-    end
-    -- the three boost rows are still full-height rows with a priced tech on
-    -- them (ceiling 7 -> base 5 -> Stunner / Quadra Slice / Cleave).
-    -- #56: this is the STRONGEST arm for the price field -- tech 6 is
-    -- "Quadra Slice", the only BushidoName that fills all twelve of its cells,
-    -- and its price is 30, so the widest name and a two-digit number sit either
-    -- side of the single blank at column 17.  That pairing is exactly what the
-    -- old four-cell field could not hold.
-    for i, y in ipairs(BOOST_ROWS) do
-      assertRun(NAME_COL, y, bushBytes(4 + i), "boost row " .. i .. " tech")
-      assertCostField(y, 4 + i, string.format("boost row %d '%s'",
-        i, bushText(4 + i)))
-    end
-    assertModeBlock(true, "8 learned, untouched")
-    assertGeometry("8 learned")
-    -- the full pool is the case that puts a glyph in EVERY cursored row and in
-    -- both pool columns, so it is the strongest state to check the gutter in.
-    for n = 0, 2 do assertCursorGutter(n, true, "8 learned") end
-    H.screenshot("swdtech_page_full_pool")
-    H.log("FULL POOL: all eight Bushido techs drawn in two columns of four on "
-      .. "rows 9/11/13/15 -- every cell inside the window, none on an even "
-      .. "row, none past row 15, none in column 30, none under the cursor")
+    H.log("PASSED: Skills->SwdTech via the player's path renders for a REAL "
+      .. "CYAN -- title, labels, slots (with the ceiling clamp), costs, pool "
+      .. "correct; every drawn cell on an ODD row inside row 15 and clear of "
+      .. "the border column")
   end),
 
   -- ---- #49: the mode is LIVE, in both directions ----
@@ -594,7 +607,7 @@ H.run({ maxFrames = 30000 }, {
     assertGeometry("after Y")
     -- the boost rows still name techs (AUTO recomputes them on the fly)
     for i, y in ipairs(BOOST_ROWS) do
-      assertRun(NAME_COL, y, bushBytes(4 + i), "boost row " .. i .. " back on auto")
+      assertRun(NAME_COL, y, bushBytes(t[i]), "boost row " .. i .. " back on auto")
     end
     H.screenshot("swdtech_page_reverted")
     H.log("REVERT: Y put the page back on AUTO, the indicator followed, and "
@@ -618,5 +631,64 @@ H.run({ maxFrames = 30000 }, {
     H.log("CURSOR WALK: the sprite is on the 3x row and columns 1-2 are still "
       .. "empty on all three -- the gutter is a property of the page, not of "
       .. "which row happens to be selected")
+  end),
+
+  -- ======================================================================= --
+  -- *** LABELED ISOLATION ARM (issue #75, owner's learn-ceiling ruling) *** --
+  -- The WHOLE learned pool inside the window (#43), and Quadra Slice's
+  -- twelve-cell name beside its two-digit price (#56) -- both need all eight
+  -- techs, and tech 8 is LEVEL 68.  One byte is written, once: $1cf7 = $ff.
+  -- The loadout word is NOT written -- Y above already proved it $0000, and
+  -- that is asserted rather than re-zeroed.  See the header; this arm may
+  -- never produce fixtures, and converts organically when high-level content
+  -- reaches the frontier.
+  -- ======================================================================= --
+  H.pressButtons({ "b" }, 3),
+  H.waitUntil(function() return st() == ST_SKILLS end, 300,
+    "back out of the configurator", 5),
+  H.call(function()
+    H.writeByte(LEARNED, 0xff)            -- THE arm's one write (see header)
+    H.assertEq(H.readByte(LOADOUT) | (H.readByte(LOADOUT + 1) << 8), 0,
+      "the word is still $0000 from Y's revert -- nothing to zero")
+    H.log("[isolation arm] $1cf7 := $ff -- the L68 all-eight Cyan, unmintable "
+      .. "under the no-grind-tier ruling")
+  end),
+  H.pressButtons({ "a" }, 2),
+  H.waitUntil(function() return st() == ST_LOADOUT end, 300,
+    "configurator reopened with all eight learned", 5),
+  H.waitFrames(90),
+
+  H.call(function()
+    assertRun(LEFT_COL, TITLE_ROW, TITLE, "title still on row 1")
+    assertRun(HINT_COL, TITLE_ROW, HINT, "control hint still on row 1")
+    assertRun(POOL_CAPTION_COL, TITLE_ROW, POOL, "LEARNED caption still on row 1")
+    -- all eight, column-major: cells 0-3 down col 3, cells 4-7 down col 17.
+    for n = 0, 7 do
+      assertRun(poolCol(n), poolRow(n), bushBytes(n),
+        string.format("pool cell %d '%s' at {%d,%d}",
+          n, bushText(n), poolCol(n), poolRow(n)))
+    end
+    -- the three boost rows are still full-height rows with a priced tech on
+    -- them (ceiling 7 -> base 5 -> Stunner / Quadra Slice / Cleave).
+    -- #56: this is the STRONGEST arm for the price field -- tech 6 is
+    -- "Quadra Slice", the only BushidoName that fills all twelve of its cells,
+    -- and its price is 30, so the widest name and a two-digit number sit either
+    -- side of the single blank at column 17.  That pairing is exactly what the
+    -- old four-cell field could not hold.
+    for i, y in ipairs(BOOST_ROWS) do
+      assertRun(NAME_COL, y, bushBytes(4 + i), "boost row " .. i .. " tech")
+      assertCostField(y, 4 + i, string.format("boost row %d '%s'",
+        i, bushText(4 + i)))
+    end
+    assertModeBlock(true, "8 learned, untouched")
+    assertGeometry("8 learned")
+    -- the full pool is the case that puts a glyph in EVERY cursored row and in
+    -- both pool columns, so it is the strongest state to check the gutter in.
+    for n = 0, 2 do assertCursorGutter(n, true, "8 learned") end
+    H.screenshot("swdtech_page_full_pool")
+    H.log("FULL POOL (isolation arm): all eight Bushido techs drawn in two "
+      .. "columns of four on rows 9/11/13/15 -- every cell inside the window, "
+      .. "none on an even row, none past row 15, none in column 30, none "
+      .. "under the cursor")
   end),
 })

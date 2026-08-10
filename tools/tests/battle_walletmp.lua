@@ -1,4 +1,4 @@
--- @suite
+-- @suite frontier=vargas_won slow
 -- battle_walletmp.lua -- issue #35: the costed submenus carry a WALLET --
 -- the actor's CURRENT MP painted at the top of the open list window,
 -- beside the per-row costs those windows already show.
@@ -11,86 +11,58 @@
 -- charge debits -- and painted every nmi by the flush (blanked one-shot on
 -- close/switch so Magic/Item lists never inherit it).
 --
+-- ISSUE #75 CONVERSION -- the wallet follows SPENT MP, and real casters.
+-- This file used to install synthetic all-Sabin/all-Terra parties into the
+-- magitek intro, STOP the monsters, pin HP/monster HP, stage the pools with
+-- one labeled poke (47), poke a live change (123) to watch the repaint, and
+-- bench bystanders by writing their status bits.  It now boots vargas_won:
+-- the REAL party (TERRA LOCKE EDGAR SABIN), a real ledge encounter, and the
+-- pools the save carries.  Poking $3c08 proved the paint follows a poke;
+-- SPENDING MP proves it follows the game -- so the "live tracking" poke arm
+-- is retired in favor of the drop arm, and the old 47 -> 123 mid-run switch
+-- becomes TWO CASTERS with genuinely different pools (Sabin's Blitz window,
+-- then Edgar's Tools window -- both tools-shell $30 consumers of the same
+-- wallet).  Bystander turns are consumed with real Defends; battle dialogs
+-- are paged with A (the battle_vargas hazard).
+--
 -- Asserted:
---   1. NON-CASTER: an installed all-Blitz SABIN opens Blitz and the wallet
---      cells spell M P <his current MP> -- the value read live from $3c08,
---      not a constant.  (MP staged once at battle start, battle_naturalmp's
---      no-per-frame-pinning discipline: the fixture's guests carry ~0 MP,
---      so one labeled poke stands in for a real pool.)
---   2. LIVE: while the window is open, a poked $3c08 change repaints the
---      wallet within a few frames (the mechanism that makes the number
---      drop the frame a queued verb's cost is paid).
---   3. CASTER: the same window under an installed TERRA (knows spells)
---      shows her pool the same way -- the wallet is universal.
---   4. DROP: after Sabin's Pummel resolves, reopening Blitz -- THE PAYING
---      CHARACTER'S OWN Blitz -- shows exactly its 4 MP less.  ("two less"
---      here until 2026-07-30: #45 repriced Pummel 2 -> 4 and this half of
---      the file was never updated, because it was never running.  See the
---      note above the phase.)
---   5. CLEANUP: the vanilla Magic list, opened after, does NOT carry the
---      wallet cells (the one-shot blank on switch).
+--   1. WALLET: SABIN's open Blitz list paints M P <his current MP> -- the
+--      value read live from $3c08 at the moment of the assert, white $21.
+--   2. DROP: after his real Pummel resolves (4 MP, Ot6AbilityCostTbl),
+--      HIS OWN reopened Blitz window shows exactly the charge less -- the
+--      payer's window, the assertion that spent its old life dead behind an
+--      `if who == actor` guard (see the pre-conversion header's forensics).
+--   3. TWO CASTERS: EDGAR's Tools window, opened next, paints EDGAR's pool
+--      -- a different number (asserted different), read from his cell.  The
+--      wallet is per-actor, not a stale singleton.
+--   4. CLEANUP: the vanilla Magic list, opened after a wallet was up, does
+--      NOT carry the wallet cells (the one-shot blank on switch).
 local H = dofile("tools/tests/lib/ot6.lua")
-local STATE = "build/states/battle_doorstep.mss.lua"
+local STATE = "build/states/vargas_won.mss.lua"
 
 local MENU, ACTOR, MSTATE = 0x7BCA, 0x62CA, 0x7BC2
+local ST_CMD, ST_TOOLS, ST_MAGIC, ST_TGT = 0x05, 0x30, 0x0E, 0x38
+local CMD_MAGIC, CMD_TOOLS, CMD_BLITZ = 0x02, 0x09, 0x0A
+local CMDTBL, ITEMLIST = 0x202E, 0x4005
+local SABIN, EDGAR = 0x05, 0x04
+local PUMMEL, PUMMEL_COST = 0x5D, 4     -- Ot6AbilityCostTbl (asserted below)
 local WALLET = 0x7C16                    -- vram word: $7c00 map, row 0, col 22
 local GLYPH_M, GLYPH_P, BLANK = 0x8C, 0x8F, 0xFF
 local ZERO = 0xB4
 
-local msPresent = {}
-local mode = "sabin"
-
--- When set to a party slot, every OTHER party slot is STOPped so only that
--- slot's gauge can fill and only that slot can own the next command window.
--- Phase 4 needs it: the wallet paints the OPEN LIST OWNER's pool, so the drop
--- can only be read from the window of the character who actually paid.
-local benchTo = nil
-
-local function pinField()
-  for s = 0, 3 do
-    if H.readByte(0x3ED8 + s * 2) ~= 0xFF then
-      local st1 = 0x3EE4 + s * 2
-      H.writeByte(st1, H.readByte(st1) & 0xF7)          -- clear magitek
-      if mode == "sabin" then
-        H.writeByte(0x3ED8 + s * 2, 0x05)               -- CHAR::SABIN
-        for i = 0, 3 do H.writeByte(0x202E + s * 12 + i * 3, 0x0A) end
-      elseif mode == "terra" then
-        H.writeByte(0x3ED8 + s * 2, 0x00)               -- CHAR::TERRA (caster)
-        H.writeByte(0x202E + s * 12 + 0 * 3, 0x0A)      -- Blitz
-        H.writeByte(0x202E + s * 12 + 1 * 3, 0xFF)
-        H.writeByte(0x202E + s * 12 + 2 * 3, 0xFF)
-        H.writeByte(0x202E + s * 12 + 3 * 3, 0xFF)
-      else                                              -- "magic"
-        H.writeByte(0x3ED8 + s * 2, 0x00)               -- TERRA, Magic first
-        H.writeByte(0x202E + s * 12 + 0 * 3, 0x02)      -- Magic
-        H.writeByte(0x202E + s * 12 + 1 * 3, 0xFF)
-        H.writeByte(0x202E + s * 12 + 2 * 3, 0xFF)
-        H.writeByte(0x202E + s * 12 + 3 * 3, 0xFF)
-      end
-      H.writeWord(0x3BF4 + s * 2, 999)
-    end
-  end
-  if benchTo then
-    for s = 0, 3 do
-      if H.readByte(0x3ED8 + s * 2) ~= 0xFF then
-        local st3 = 0x3EF8 + s * 2
-        if s == benchTo then
-          H.writeByte(st3, H.readByte(st3) & 0xEF)
-        else
-          H.writeByte(st3, H.readByte(st3) | 0x10)      -- stopped
-        end
-      end
-    end
-  end
-  H.writeByte(0x1D28, 0x01)                             -- known: Pummel
-  for _, m in ipairs(msPresent) do
-    local e = 8 + m * 2
-    H.writeByte(0x3EF8 + e, H.readByte(0x3EF8 + e) | 0x10)   -- stopped
-    if H.readWord(0x3BFC + m * 2) < 0x6000 then
-      H.writeWord(0x3BFC + m * 2, 0xF000)
-    end
+local COSTTBL = H.sym("Ot6AbilityCostTbl") & 0x3FFFFF
+local function costOf(id)
+  local x = 0
+  while true do
+    local key = H.readRomByte(COSTTBL + x)
+    if key == 0xff then return 0 end
+    if key == id then return H.readRomByte(COSTTBL + x + 1) end
+    x = x + 2
   end
 end
+
+local function map() return H.mapId() & 0x1ff end
+local function mpOf(slot) return H.readWord(0x3C08 + slot * 2) end
 
 local function walletWords()
   local t = {}
@@ -102,10 +74,10 @@ end
 
 -- expected wallet glyphs for a value (leading zeros blank, ones always)
 local function expect(v)
-  local h, t, o = math.floor(v / 100) % 10, math.floor(v / 10) % 10, v % 10
+  local h, t = math.floor(v / 100) % 10, math.floor(v / 10) % 10
   local gh = (h == 0) and BLANK or (ZERO + h)
   local gt = (t == 0 and h == 0) and BLANK or (ZERO + t)
-  return { GLYPH_M, GLYPH_P, gh, gt, ZERO + o }
+  return { GLYPH_M, GLYPH_P, gh, gt, ZERO + v % 10 }
 end
 
 local function assertWallet(tag, v)
@@ -119,149 +91,216 @@ local function assertWallet(tag, v)
   end
 end
 
-local function openList(what)
-  return H.driveUntil(function() return H.readByte(MSTATE) == 0x30 end, 1500, {
-    H.call(function()
-      pinField()
-      if H.readByte(MENU) ~= 0 then H.setPad({ "a" }) end
-    end),
-    H.waitFrames(2),
-    H.call(function() H.setPad({}) end),
-    H.waitFrames(14),
-  }, what)
-end
-
-local function closeList(what)
-  return H.driveUntil(function() return H.readByte(MSTATE) ~= 0x30 end, 300, {
-    H.call(function() H.setPad({ "b" }) end), H.waitFrames(2),
-    H.call(function() H.setPad({}) end), H.waitFrames(2),
-  }, what)
-end
-
-local actor, mpPre
-
-H.run({ maxFrames = 40000 }, {
-  H.waitFrames(20),
-  H.loadState(STATE),
-  H.waitFrames(10),
-  H.enterEncounter(),
-  H.waitFrames(240),
-  H.call(function()
-    for m = 0, 5 do
-      if H.readByte(0x3AA8 + m * 2) % 2 == 1 then msPresent[#msPresent + 1] = m end
+-- ------------------------------------------------------------------------
+-- the family machine (battle_toolsgrey's), driven by a MODE table: reach
+-- `char`'s window for command `cmd`, then either HOLD the target state open
+-- or pick `entry` and confirm.  Bystanders Defend; dialogs are paged.
+-- ------------------------------------------------------------------------
+local slotOf = {}
+local mode = nil          -- { char=, cmd=, state=, hold=true } or { cast=id }
+local ph, hb, lane = 0, -600, nil
+local BACK = { left = "right", right = "left", up = "down", down = "up" }
+local function pulse()
+  ph = ph + 1
+  if H.frame - hb >= 600 then
+    hb = H.frame
+    H.log(string.format("[hb f%d] batt=%s menu=%02x actor=%d mstate=%02x",
+      H.frame, tostring(H.battleLoadStarted()), H.readByte(MENU),
+      H.readByte(ACTOR), H.readByte(MSTATE)))
+  end
+  local edge = ph % 10 < 5
+  if not H.battleLoadStarted() then
+    -- a pack died under the drives (measured: run 3's pack ended before the
+    -- Edgar arm) -- pace the lane to the next natural encounter; the pools
+    -- ride the writeback, so every arm continues where it stood.  Until
+    -- control returns, page the victory/EXP/level-up dialogs with A
+    -- (measured: run 4 sat behind them for 40k frames with hands off).
+    if not (H.hasControl() and H.tileAligned()) then
+      H.setPad(ph % 8 < 4 and { a = true } or {})
+      return
     end
-    pinField()
-    -- ONE labeled MP staging (the guests' natural pools are ~0); never
-    -- re-pinned, so every later read/drop is the machine's own arithmetic
-    for s = 0, 3 do
-      if H.readByte(0x3ED8 + s * 2) ~= 0xFF then
-        H.writeWord(0x3C30 + s * 2, 99)
-        H.writeWord(0x3C08 + s * 2, 47)
+    if map() ~= 98 then error("paced off map 98 (now " .. map() .. ")", 0) end
+    local x, y = H.fieldX(), H.fieldY()
+    if lane == nil then
+      for _, d in ipairs({ "right", "left", "up", "down" }) do
+        if H.canStep(x, y, d) then lane = { ax = x, ay = y, out = d, back = BACK[d] } break end
       end
     end
-  end),
-  H.driveUntil(function() return H.readByte(MENU) ~= 0 end, 3000, {
-    H.call(pinField), H.waitFrames(1),
-  }, "a battle menu opens"),
+    H.setPad({ [(x == lane.ax and y == lane.ay) and lane.out or lane.back] = true })
+    return
+  end
+  lane = nil          -- re-anchor the lane at wherever the NEXT field return
+                      -- stands: a stale anchor walks one direction forever
+                      -- (measured: run 5 marched off map 98 onto map 19)
+  if H.readByte(MENU) == 0 then
+    H.setPad(ph % 8 < 4 and { a = true } or {})     -- page battle dialogs
+    return
+  end
+  local a = H.readByte(ACTOR)
+  if a ~= slotOf[mode.char] then
+    -- bystander: back OUT of any submenu a previous held-open arm left up
+    -- (measured: arm 3 holds Edgar's tools list, and a blind cadence then
+    -- oscillates $30<->$38 in it forever), then a real FIGHT -- not a
+    -- Defend: an all-defend party erodes to a wipe over a long run
+    -- (measured, run 6: ~5k frames of victory-screen garbage then map 19),
+    -- while Fights end packs fast and the machine just re-encounters.
+    local st = H.readByte(MSTATE)
+    if st == ST_TGT then
+      H.setPad(ph % 10 < 5 and { a = true } or {})
+    elseif st ~= ST_CMD then
+      H.setPad(ph % 10 < 5 and { b = true } or {})
+    elseif H.readByte(0x890F + a) > 0 then
+      H.setPad(ph % 10 < 5 and { up = true } or {})   -- cursor onto Fight
+    else
+      H.setPad(ph % 10 < 5 and { a = true } or {})
+    end
+    return
+  end
+  local st = H.readByte(MSTATE)
+  if st == mode.state and mode.hold then H.setPad({}) return end
+  if st == ST_CMD then
+    local wantCell = nil
+    for i = 0, 3 do
+      if H.readByte(CMDTBL + a * 12 + i * 3) == mode.cmd then wantCell = i end
+    end
+    assert(wantCell, string.format("char %d's real command list carries $%02x",
+      mode.char, mode.cmd))
+    local cur = H.readByte(0x890F + a)
+    if cur == wantCell then H.setPad(edge and { a = true } or {})
+    elseif cur < wantCell then H.setPad(edge and { down = true } or {})
+    else H.setPad(edge and { up = true } or {}) end
+  elseif st == ST_TOOLS and mode.cast then
+    local entry = nil
+    for i = 0, 7 do
+      if H.readByte(ITEMLIST + i * 3) == mode.cast then entry = i end
+    end
+    if entry == nil then H.setPad({}) return end
+    local row, col = entry // 2, entry % 2
+    local cr, cc = H.readByte(0x8967 + a), H.readByte(0x8963 + a)
+    if cr ~= row then H.setPad(edge and { [(cr < row) and "down" or "up"] = true } or {})
+    elseif cc ~= col then H.setPad(edge and { [(cc < col) and "right" or "left"] = true } or {})
+    else H.setPad(edge and { a = true } or {}) end
+  elseif st == ST_TGT then
+    H.setPad(edge and { a = true } or {})
+  elseif st == 0x01 then
+    H.setPad({})
+  else
+    H.setPad(edge and { b = true } or {})
+  end
+end
 
-  -- 1. non-caster wallet ---------------------------------------------------
-  openList("blitz list opens (Sabin, non-caster)"),
+local function reachWindow(m, what)
+  return H.repeatN(1, {
+    H.call(function() mode = m end),
+    H.driveUntil(function()
+      return H.battleLoadStarted() and H.readByte(MENU) ~= 0
+         and H.readByte(ACTOR) == slotOf[m.char]
+         and H.readByte(MSTATE) == m.state
+    end, 30000, { H.call(pulse), H.waitFrames(1) }, what),
+    H.waitFrames(20),                   -- let the wallet stage + flush
+  })
+end
+
+local sabinPre = nil
+
+H.run({ maxFrames = 150000 }, {
   H.waitFrames(20),
+  H.loadState(STATE),
+  H.waitFrames(20),
+  H.waitUntil(function() return H.hasControl() and H.tileAligned() end, 3000,
+    "field control on map 98"),
   H.call(function()
-    actor = H.readByte(ACTOR)
-    assertWallet("sabin", H.readWord(0x3C08 + actor * 2))
+    H.assertEq(map(), 98, "vargas_won on map 98, the Kolts ledge")
+    H.assertEq(costOf(PUMMEL), PUMMEL_COST,
+      "Pummel's charge-table price is the 4 this file's drop arm counts on")
+  end),
+
+  -- natural encounter (battle_naturalmp's lane pacing)
+  (function()
+    local lane = nil
+    local BACK = { left = "right", right = "left", up = "down", down = "up" }
+    return H.driveUntil(function() return H.battleLoadStarted() end, 12600, {
+      H.call(function()
+        if not (H.hasControl() and H.tileAligned()) then H.setPad({}) return end
+        if map() ~= 98 then error("paced off map 98 (now " .. map() .. ")", 0) end
+        local x, y = H.fieldX(), H.fieldY()
+        if lane == nil then
+          for _, d in ipairs({ "right", "left", "up", "down" }) do
+            if H.canStep(x, y, d) then lane = { ax = x, ay = y, out = d, back = BACK[d] } break end
+          end
+        end
+        H.setPad({ [(x == lane.ax and y == lane.ay) and lane.out or lane.back] = true })
+      end),
+      H.waitFrames(1),
+    }, "a ledge encounter fires")
+  end)(),
+  H.release(),
+  H.waitUntil(function() return H.battleActive() end, 900, "battle armed", 5),
+  H.waitFrames(240),
+  H.call(function()
+    for s = 0, 3 do
+      local id = H.readByte(0x3ED8 + s * 2)
+      if id ~= 0xFF then slotOf[id] = s end
+    end
+    assert(slotOf[SABIN], "SABIN present (vargas_won party)")
+    assert(slotOf[EDGAR], "EDGAR present (vargas_won party)")
+    assert(slotOf[0x00], "TERRA present (the innate mage for the magic arm)")
+    H.log(string.format("SABIN slot %d pool %d, EDGAR slot %d pool %d",
+      slotOf[SABIN], mpOf(slotOf[SABIN]), slotOf[EDGAR], mpOf(slotOf[EDGAR])))
+    H.assertEq(mpOf(slotOf[SABIN]) ~= mpOf(slotOf[EDGAR]), true,
+      "the two casters' REAL pools differ -- the per-actor arm below can "
+      .. "tell them apart without a poke")
+  end),
+
+  -- 1. the wallet on SABIN's real Blitz window ------------------------------
+  reachWindow({ char = SABIN, cmd = CMD_BLITZ, state = ST_TOOLS, hold = true },
+    "sabin's blitz window"),
+  H.call(function()
+    sabinPre = mpOf(slotOf[SABIN])
+    assertWallet("sabin", sabinPre)
     H.screenshot("walletmp_blitz")
   end),
 
-  -- 2. live tracking -------------------------------------------------------
-  H.call(function() H.writeWord(0x3C08 + actor * 2, 123) end),
-  H.waitFrames(6),
-  H.call(function()
-    assertWallet("live-repaint (poked 123)", 123)
-    H.writeWord(0x3C08 + actor * 2, 47)
-  end),
-  H.waitFrames(6),
-
-  -- 4. the drop: latch Pummel, let it resolve, reopen ----------------------
-  H.call(function() mpPre = H.readWord(0x3C08 + actor * 2) end),
-  H.driveUntil(function() return H.readByte(MSTATE) ~= 0x30 end, 900, {
-    H.call(function() H.setPad({ "a" }) end),   -- pick Pummel + confirm target
-    H.waitFrames(2),
-    H.call(function() H.setPad({}) end),
-    H.waitFrames(14),
-  }, "Pummel latched (list closes)"),
+  -- 2. the drop: a real Pummel, then THE PAYER'S OWN reopened window --------
+  reachWindow({ char = SABIN, cmd = CMD_BLITZ, state = ST_TOOLS, cast = PUMMEL },
+    "sabin's blitz window (casting)"),
   H.driveUntil(function()
-    return H.readWord(0x3C08 + actor * 2) ~= mpPre
-  end, 12000, {
-    H.waitFrames(2),                            -- hands off: wait mode
-  }, "the Pummel resolves (MP charged)"),
+    return mpOf(slotOf[SABIN]) == sabinPre - PUMMEL_COST
+  end, 20000, { H.call(pulse), H.waitFrames(1) }, "the Pummel charge lands"),
   H.call(function()
-    H.assertEq(H.readWord(0x3C08 + actor * 2), mpPre - 4,
-      "Pummel charged its 4 MP")
+    H.assertEq(mpOf(slotOf[SABIN]), sabinPre - PUMMEL_COST,
+      "Pummel charged exactly its table price from the real pool")
   end),
-  -- THE REOPEN MUST BE THE PAYER'S OWN WINDOW.  The wallet paints the pool of
-  -- whoever owns the open list, so a reopen owned by a bystander carries that
-  -- bystander's untouched MP and says nothing about the drop.  This is exactly
-  -- how the assertion below spent its life dead: it was guarded by
-  -- `if who == actor`, and `who` was never `actor` (measured 2026-07-30:
-  -- who=1, actor=2), so the whole of item 4 never ran -- with a stale `- 2`
-  -- inside it that #45 had already repriced to 4, i.e. it would have failed
-  -- the moment it did run.
-  --
-  -- Bench the other three so only the payer's gauge fills.  Benching does NOT
-  -- close a window a bystander is ALREADY holding, and this fixture runs in
-  -- Wait mode where an open window freezes the battle clock (battle_thief.lua:
-  -- 388-404 measured the same hazard), so pending windows are walked out with
-  -- A first -- each bystander takes row 0 and hands the clock back.
-  H.call(function() benchTo = actor end),
-  H.driveUntil(function()
-    return H.readByte(MENU) ~= 0 and H.readByte(ACTOR) == actor
-  end, 12000, {
-    H.call(function()
-      pinField()
-      if H.readByte(MENU) ~= 0 and H.readByte(ACTOR) ~= actor then
-        H.setPad({ "a" })
-      end
-    end),
-    H.waitFrames(2),
-    H.call(function() H.setPad({}) end),
-    H.waitFrames(10),
-  }, "the paying actor owns the reopened command window"),
-  openList("blitz reopens after the charge"),
-  H.waitFrames(20),
+  reachWindow({ char = SABIN, cmd = CMD_BLITZ, state = ST_TOOLS, hold = true },
+    "the payer's blitz window reopens"),
   H.call(function()
-    local who = H.readByte(ACTOR)
-    H.assertEq(who, actor, "the reopened list belongs to the character who paid")
-    assertWallet("post-charge reopen", H.readWord(0x3C08 + who * 2))
-    H.assertEq(H.readWord(0x3C08 + who * 2), mpPre - 4,
-      "the reopened wallet shows the drop -- Pummel's 4 MP, the price #45 set")
+    H.assertEq(H.readByte(ACTOR), slotOf[SABIN],
+      "the reopened list belongs to the character who paid")
+    assertWallet("post-charge reopen", mpOf(slotOf[SABIN]))
+    H.assertEq(mpOf(slotOf[SABIN]), sabinPre - PUMMEL_COST,
+      "the reopened wallet shows the drop -- the real cast's price, in the "
+      .. "payer's own window")
   end),
-  H.call(function() benchTo = nil end),
-  closeList("blitz closes"),
 
-  -- 3 + 5. caster wallet, then the Magic list stays wallet-free ------------
-  H.call(function() mode = "terra"; pinField() end),
-  H.waitFrames(20),
-  openList("blitz list opens (Terra, caster)"),
-  H.waitFrames(20),
+  -- 3. the second caster: EDGAR's Tools window paints EDGAR's pool ----------
+  reachWindow({ char = EDGAR, cmd = CMD_TOOLS, state = ST_TOOLS, hold = true },
+    "edgar's tools window"),
   H.call(function()
-    local who = H.readByte(ACTOR)
-    assertWallet("terra", H.readWord(0x3C08 + who * 2))
-    H.screenshot("walletmp_terra")
+    local e = mpOf(slotOf[EDGAR])
+    assertWallet("edgar", e)
+    H.assertEq(e ~= mpOf(slotOf[SABIN]), true,
+      "and it is a DIFFERENT number than Sabin's -- the wallet is per-actor")
+    H.screenshot("walletmp_tools")
   end),
-  closeList("terra's blitz closes"),
-  H.call(function() mode = "magic"; pinField() end),
-  H.waitFrames(20),
-  H.driveUntil(function() return H.readByte(MSTATE) == 0x0e end, 1500, {
-    H.call(function()
-      pinField()
-      if H.readByte(MENU) ~= 0 then H.setPad({ "a" }) end
-    end),
-    H.waitFrames(2),
-    H.call(function() H.setPad({}) end),
-    H.waitFrames(12),
-  }, "the Magic list opens (browse $0e)"),
-  H.waitFrames(20),
+
+  -- 4. the vanilla Magic list stays wallet-free -----------------------------
+  -- TERRA's Magic command (the party's innate mage -- measured: a spell-less
+  -- Edgar's BATTLE command row carries no $02 even though his field record
+  -- does, so only a real spell-knower can open this list), the next window
+  -- after a wallet was up: the one-shot blank on switch must have wiped the
+  -- wallet cells.
+  reachWindow({ char = 0x00, cmd = CMD_MAGIC, state = ST_MAGIC, hold = true },
+    "terra's magic list (browse $0e)"),
   H.call(function()
     local w = walletWords()
     local got = {}
@@ -275,5 +314,6 @@ H.run({ maxFrames = 40000 }, {
     end
     H.screenshot("walletmp_magic_clean")
   end),
-  H.logStep(function() return "battle_walletmp complete" end),
+  H.logStep(function() return "battle_walletmp complete -- the wallet paints "
+    .. "each caster's own SPENT pool and leaves the magic list clean" end),
 })

@@ -1,4 +1,4 @@
--- @suite
+-- @suite frontier=moogle_cleared slow
 -- battle_dancemp.lua -- issue #34: Dance costs MP -- flat, paid at
 -- dance-START, per docs/design/mp-economy.md:96.
 --
@@ -11,233 +11,389 @@
 -- transform) and greys an unaffordable row via Ot6AbilityGrey; the #35
 -- wallet paints the actor's current MP on the window's top edge.
 --
--- STAGING (labeled): Mog is not in the supported frontier yet, so every
--- slot is poked to MOG with a Dance-only command list (battle_blitzgrey's
--- install pattern); the natural-boot test lands with his rung.  The known
--- dance is pinned to the one MATCHING the current battle background
--- (BattleBGDance), so Cmd_13's 50% bg-mismatch stumble never fires and the
--- multi-turn measurement is deterministic.
+-- ISSUE #75 CONVERSION -- the REAL MOG, and the game's own dance-learning.
+-- The old header said "Mog is not in the supported frontier yet"; that is
+-- STALE -- he leads P2 of the Narshe moogle defense (gen_moogle,
+-- moogle_defense.mss, minted en route to moogle_cleared -- hence the
+-- frontier gate on moogle_cleared, whose mint refreshes both).  So every
+-- staging is gone: no CHAR::MOG installs, no command-row writes, no monster
+-- stop/HP/death-proof pins, no $1d4c pin, no $267e rebuild.  In their
+-- place, the game's own arming:
+--   * the defense is DEPLOYED exactly as gen_moogle deploys it (P3 east,
+--     P2 west, P1 back to the choke), and the wave storm is fought with
+--     honest tap-A -- except P2's battles, which are this test's subject;
+--   * P2's FIRST wave battle is won with plain Fights, and the VICTORY is
+--     what teaches Mog his first dance: the battle-end path sets the
+--     current background's dance in $1d4c ("mastered a new dance!",
+--     battle_main.asm:15842) -- asserted as the delta, 0 before, the
+--     BattleBGDance bit after.  Until then Mog has NO Dance command at all
+--     (InitCmd_02 removes it on a zero mask, battle_main.asm:14129) --
+--     also asserted, because it is the reason no earlier fixture could
+--     host this file honestly;
+--   * P2's SECOND wave battle is the measurement: the known dance now
+--     MATCHES the battle background BY CONSTRUCTION (it was learned on
+--     this very terrain), so Cmd_13's 50% bg-mismatch stumble never fires
+--     and the multi-turn phases are deterministic -- the property the old
+--     file bought with a pinned mask, earned from the game's own rule.
 --
--- Asserted:
---   1. MENU: the dance row renders [cost 8][name] with the #35 pattern
---      (cost tiles at the row head), white when affordable; the wallet
---      shows the actor's current MP on the window.
+-- Asserted (phases 1-3 in P2's second wave battle, zero writes):
+--   1. MENU: the learned dance's row renders [cost 8][name] with the #35
+--      pattern, white (affordable at Mog's real pool); the wallet paints
+--      his real MP; the name is DanceName's own record, read from the ROM.
 --   2. CHARGE AT START: the cost queue prices the commit at 8, MP drops
---      exactly 8, and the DANCE status locks in.
+--      exactly 8 from the REAL pool, and the DANCE status locks in.
 --   3. FREE STEPS: two further auto-queued dance turns price at 0 and MP
 --      stays put (one payment per battle).
---   4. REFUSAL: with MP pinned below 8 the commit fizzles through the
---      standard surface -- the row greys ($25), and the universal
---      insufficient-MP gate refuses: no dance status, MP unmoved.
+--
+-- *** ONE LABELED ISOLATION ARM (issue #75) -- two writes STAY ***
+--   4. REFUSAL: the below-price fizzle (row greys $25, the commit still
+--      queues at 8, the universal insufficient-MP gate refuses: no dance
+--      status, MP unmoved).  The honest input is a Mog whose pool is under
+--      8 -- trivially reachable in open play by dancing across fights, but
+--      NOT inside this set piece: the defense gives P2 exactly TWO wave
+--      battles, the first is spent learning the dance (the game's own
+--      precondition), and once Mog is dancing his turns auto-queue and his
+--      menu never reopens.  Per the burn-down plan's observation-window
+--      ruling (systemic call 2), the arm runs BEFORE the honest dance in
+--      the same battle: Mog's pool is written to 7, the refusal is
+--      measured, and the pool is restored to the value read at battle
+--      start.  Both writes are this file's .writeWord( waiver; it MAY
+--      NEVER PRODUCE FIXTURES.
 local H = dofile("tools/tests/lib/ot6.lua")
-local STATE = "build/states/battle_doorstep.mss.lua"
+local STATE = "build/states/moogle_defense.mss.lua"
 
 local MENU, ACTOR, MSTATE = 0x7BCA, 0x62CA, 0x7BC2
-local DANCE_COST = 8
+local ST_CMD, ST_DANCE, ST_TGT = 0x05, 0x21, 0x38
+local CMD_DANCE = 0x13
+local CMDTBL = 0x202E
+local MOG = 0x0A
+local DANCES = 0x1D4C                   -- known-dance mask
+local FIGHTPARTY = 0x1A6D               -- which party a defense battle engaged
+local DANCE_COST = 8                    -- Ot6DanceCost (asserted vs the queue)
 local WALLET = 0x7C16
-local msPresent = {}
-local danceId, mp0 = nil, 30
-local costs = {}          -- cost-queue stores while cmd $13 queues
+local WHITE, GREY = 0x21, 0x25
 
-local function pinField()
-  for s = 0, 3 do
-    if H.readByte(0x3ED8 + s * 2) ~= 0xFF then
-      local st1 = 0x3EE4 + s * 2
-      H.writeByte(st1, H.readByte(st1) & 0xF7)          -- clear magitek
-      H.writeByte(0x3ED8 + s * 2, 0x0A)                 -- CHAR::MOG (staged)
-      H.writeByte(0x202E + s * 12 + 0 * 3, 0x13)        -- Dance, alone
-      H.writeByte(0x2031 + s * 12, 0xFF)
-      H.writeByte(0x2034 + s * 12, 0xFF)
-      H.writeByte(0x2037 + s * 12, 0xFF)
-      H.writeWord(0x3BF4 + s * 2, 999)
-    end
+-- DanceName: 12-byte records, read from the ROM the drawer streams.
+local DANCENAME = H.sym("DanceName") & 0x3FFFFF
+local function danceNameSeq(id)
+  local t = {}
+  for i = 0, 11 do t[#t + 1] = H.readRomByte(DANCENAME + id * 12 + i) end
+  while #t > 0 and t[#t] == 0xff do table.remove(t) end
+  return t
+end
+local function danceNameText(id)
+  local s = ""
+  for _, b in ipairs(danceNameSeq(id)) do
+    if b >= 0x80 and b <= 0x99 then s = s .. string.char(65 + b - 0x80)
+    elseif b >= 0x9a and b <= 0xb3 then s = s .. string.char(97 + b - 0x9a)
+    elseif b == 0xfe then s = s .. " "
+    else s = s .. "?" end
   end
-  H.writeByte(0x1D4C, 1 << danceId)                     -- the matching dance
-  for i = 0, 7 do                                       -- $267e is built from
-    H.writeByte(0x267E + i, i == danceId and i or 0xFF) -- $1d4c at InitSkills
-  end                                                   -- (battle init) -- the
-                                                        -- staged poke re-does it
-  for _, m in ipairs(msPresent) do
-    local e = 8 + m * 2
-    H.writeByte(0x3EF8 + e, H.readByte(0x3EF8 + e) | 0x10)   -- stopped
-    if H.readWord(0x3BFC + m * 2) < 0x6000 then
-      H.writeWord(0x3BFC + m * 2, 0xF000)
-    end
-    H.writeByte(0x3AA1 + e, H.readByte(0x3AA1 + e) | 0x04)   -- death-proof
-  end
+  return s
 end
 
-local function openDance(what)
-  return H.driveUntil(function() return H.readByte(MSTATE) == 0x21 end, 1500, {
+-- find a glyph run in the $7c00 menu MAP (the dance window stages there;
+-- rows 1/3/5/7).  Returns the word address, or nil.
+local function findInMap(seq)
+  for w = 0x7C00, 0x7CF0 do
+    local hit = true
+    for i = 1, #seq do
+      if (emu.readWord((w + i - 1) * 2, emu.memType.snesVideoRam) & 0xFF) ~= seq[i] then
+        hit = false; break
+      end
+    end
+    if hit then return w end
+  end
+  return nil
+end
+local function mapWord(w) return emu.readWord(w * 2, emu.memType.snesVideoRam) end
+
+-- squads (gen_moogle's tables): P2 = MOG + three moogles, leader obj $019A
+local LEADER_OFF = { [1] = 0x0029, [2] = 0x019A, [3] = 0x0148 }
+
+local function ySwitchTo(p)
+  return H.driveUntil(function()
+    return H.readWord(0x0803) == LEADER_OFF[p]
+  end, 1800, {
+    H.pressButtons({ "y" }, 6),
+    H.waitFrames(40),
+  }, "Y-switch to party " .. p)
+end
+
+local mogSlot = nil
+local function mpOf(slot) return H.readWord(0x3C08 + slot * 2) end
+
+-- ------------------------------------------------------------------------
+-- the storm driver: fight every NON-P2 battle with honest tap-A; STOP the
+-- moment a battle engages P2 (this test's subject).  Off-battle, hands off
+-- (the defense choreography moves the waves itself); dialogs are paged.
+-- ------------------------------------------------------------------------
+local ph, hb = 0, -600
+local function untilP2Battle(what)
+  local battN = 0
+  return H.driveUntil(function()
+    battN = H.battleLoadStarted() and battN + 1 or 0
+    return battN >= 30 and H.readByte(FIGHTPARTY) == 2
+  end, 60000, {
     H.call(function()
-      pinField()
-      if H.readByte(MENU) ~= 0 then H.setPad({ "a" }) end
+      ph = ph + 1
+      if H.frame - hb >= 600 then
+        hb = H.frame
+        H.log(string.format("[hb f%d] batt=%s party=%d menu=%02x guards=%02x",
+          H.frame, tostring(H.battleLoadStarted()), H.readByte(FIGHTPARTY),
+          H.readByte(MENU), H.readByte(0x1f41)))
+      end
+      if H.battleLoadStarted() and H.readByte(FIGHTPARTY) ~= 2 then
+        H.setPad(ph % 8 < 4 and { a = true } or {})   -- honest tap-A win
+      elseif not H.battleLoadStarted() then
+        H.setPad(ph % 8 < 4 and { a = true } or {})   -- page dialogs/victory
+      else
+        H.setPad({})
+      end
     end),
-    H.waitFrames(2),
-    H.call(function() H.setPad({}) end),
-    H.waitFrames(14),
+    H.waitFrames(1),
   }, what)
 end
 
-local function mapWord(w) return emu.readWord(w * 2, emu.memType.snesVideoRam) end
-
-local actor
-
-H.run({ maxFrames = 40000 }, {
-  H.waitFrames(20),
-  H.loadState(STATE),
-  H.waitFrames(10),
-  H.enterEncounter(),
-  H.waitFrames(240),
-  H.call(function()
-    for m = 0, 5 do
-      if H.readByte(0x3AA8 + m * 2) % 2 == 1 then msPresent[#msPresent + 1] = m end
-    end
-    -- the dance whose home is THIS battle background never stumbles
-    local bg = H.readByte(0x11E2)
-    danceId = H.readRomByte((H.sym("BattleBGDance") & 0x3FFFFF) + bg)
-    H.log(string.format("battle bg %02x -> matching dance %d", bg, danceId))
-    pinField()
-    emu.addMemoryCallback(function(_, v)
-      if H.readByte(0x3A7A) == 0x13 then costs[#costs + 1] = v end
-    end, emu.callbackType.write, 0x7E3620, 0x7E3620 + 0xFE)
-  end),
-  H.driveUntil(function() return H.readByte(MENU) ~= 0 end, 3000, {
-    H.call(pinField), H.waitFrames(1),
-  }, "a battle menu opens"),
-  H.call(function()
-    actor = H.readByte(ACTOR)
-    H.writeWord(0x3C30 + actor * 2, 99)
-    H.writeWord(0x3C08 + actor * 2, mp0)      -- staged pool (Mog is poked in)
-    H.log("actor slot " .. actor .. " (MOG staged), MP " .. mp0)
-  end),
-
-  -- 1. the menu: cost display + wallet -------------------------------------
-  openDance("the dance list opens"),
-  H.waitFrames(20),
-  H.call(function()
-    H.log(string.format("dance browse mstate=%02x", H.readByte(MSTATE)))
-
-    local w = {}
-    for i = 0, 4 do w[#w + 1] = string.format("%04x", mapWord(WALLET + i)) end
-    H.log("wallet cells: " .. table.concat(w, " "))
-    -- the known dance (the bg-matching one, index 3) sits in list row 1's
-    -- RIGHT column; the decorator's [font][cost][name] re-layout puts its
-    -- cost tiles at map row 3 cols 14-15 and the name at 16-27 (measured:
-    -- probe_dancerow found "Love" at $7c70 = row 3 col 16)
-    H.assertEq(mapWord(0x7C6E), 0x21FF, "cost tens place blank, white")
-    H.assertEq(mapWord(0x7C6F), 0x2100 + 0xB4 + DANCE_COST,
-      "the dance row leads with its cost (8), white -- the #35 pattern")
-    H.assertEq(mapWord(0x7C70) & 0xFF, 0x8B,
-      "the dance name follows its cost ('L' of Love Sonata)")
-    -- the wallet shows the actor's current MP
-    H.assertEq(mapWord(WALLET) & 0xFF, 0x8C, "wallet 'M' on the dance window")
-    H.assertEq(mapWord(WALLET + 1) & 0xFF, 0x8F, "wallet 'P'")
-    H.assertEq(mapWord(WALLET + 3) & 0xFF, 0xB4 + math.floor(mp0 / 10),
-      "wallet tens digit = the staged pool's")
-    H.assertEq(mapWord(WALLET + 4) & 0xFF, 0xB4 + mp0 % 10,
-      "wallet ones digit")
-    H.screenshot("dancemp_menu")
-  end),
-
-  -- 2. charge at dance start ----------------------------------------------
-  H.call(function() costs = {} end),
-  -- the known dance is cell 3 (row 1, right column): walk the cursor there
-  H.pressButtons({ "down" }, 4), H.waitFrames(10),
-  H.pressButtons({ "right" }, 4), H.waitFrames(10),
-  -- confirm the dance, then its target prompt; hands off once our actor's
-  -- action is queued (another A would open the NEXT character's menu)
-  H.driveUntil(function()
-    return H.readByte(0x32CC + actor * 2) ~= 0xFF
-           or (H.readByte(0x3EF8 + actor * 2) & 0x01) == 1
-  end, 1800, {
+-- tap-A through a whole P2 battle (battle 1: plain moogle Fights win it)
+local function winByTapA(what)
+  return H.driveUntil(function() return not H.battleLoadStarted() end, 30000, {
     H.call(function()
-      if H.readByte(MENU) ~= 0 and H.readByte(ACTOR) == actor then
-        H.setPad({ "a" })
+      ph = ph + 1
+      H.setPad(ph % 8 < 4 and { a = true } or {})
+    end),
+    H.waitFrames(1),
+  }, what)
+end
+
+-- wait for MOG's own menu; bystander moogles DEFEND (the pack must live
+-- through the dance turns); dialogs paged.
+local function mogMenu(what)
+  return H.driveUntil(function()
+    return H.battleLoadStarted() and H.readByte(MENU) ~= 0
+       and H.readByte(ACTOR) == mogSlot and H.readByte(MSTATE) == ST_CMD
+  end, 30000, {
+    H.call(function()
+      ph = ph + 1
+      if not H.battleLoadStarted() then H.setPad({}) return end
+      if H.readByte(MENU) == 0 then
+        H.setPad(ph % 8 < 4 and { a = true } or {})
+        return
+      end
+      local a = H.readByte(ACTOR)
+      if a ~= mogSlot then
+        local st = H.readByte(MSTATE)
+        local step = ph % 40
+        if st ~= ST_CMD then H.setPad(ph % 10 < 5 and { b = true } or {})
+        elseif step < 4 then H.setPad({ right = true })    -- Fight -> Def
+        elseif step >= 20 and step < 24 then H.setPad({ a = true })
+        else H.setPad({}) end
+      else
+        H.setPad({})
       end
     end),
-    H.waitFrames(2),
-    H.call(function() H.setPad({}) end),
-    H.waitFrames(14),
-  }, "the dance commits (action queued)"),
-  H.driveUntil(function()
-    return H.readWord(0x3C08 + actor * 2) ~= mp0
-  end, 12000, {
-    H.call(function() pinField() end),   -- hands off otherwise (wait mode)
-    H.waitFrames(2),
-  }, "the dance-start charge lands"),
+    H.waitFrames(1),
+  }, what)
+end
+
+-- from Mog's command window: walk onto Dance and open the list ($21)
+local function openDance(what)
+  return H.driveUntil(function() return H.readByte(MSTATE) == ST_DANCE end,
+    1200, {
+      H.call(function()
+        ph = ph + 1
+        local edge = ph % 10 < 5
+        local a = H.readByte(ACTOR)
+        if H.readByte(MSTATE) ~= ST_CMD then H.setPad({}) return end
+        local wantCell = nil
+        for i = 0, 3 do
+          if H.readByte(CMDTBL + a * 12 + i * 3) == CMD_DANCE then wantCell = i end
+        end
+        assert(wantCell, "MOG's real battle command list carries Dance now")
+        local cur = H.readByte(0x890F + a)
+        if cur == wantCell then H.setPad(edge and { a = true } or {})
+        elseif cur < wantCell then H.setPad(edge and { down = true } or {})
+        else H.setPad(edge and { up = true } or {}) end
+      end),
+      H.waitFrames(1),
+    }, what)
+end
+
+local danceId, mp0 = nil, nil
+local costs = {}                        -- cost-queue stores while cmd $13 queues
+
+-- walk the dance cursor onto the KNOWN dance's cell.  The $267e list is
+-- POSITIONAL -- entry i holds dance i or $ff (UpdateMenuState_21's confirm
+-- reads $267e,x and BUZZES on a $ff cell) -- so the one learned dance sits
+-- at CELL danceId (row danceId//2, col danceId%2 on the 2-column grid), not
+-- at cell 0.  Cursor vars: col $8937+slot, row $893b+slot (the state's own
+-- w7e8937,y / w7e893b,y).  Measured the hard way: an A-mash at cell 0
+-- buzzed forever on the first run of this conversion.
+local function danceCursorToKnown(what)
+  -- danceId is discovered at runtime, so the target row/col are computed
+  -- inside the callbacks, not at step-construction time.
+  return H.driveUntil(function()
+    local a = H.readByte(ACTOR)
+    return H.readByte(MSTATE) == ST_DANCE
+       and H.readByte(0x8937 + a) == danceId % 2
+       and H.readByte(0x893B + a) == danceId // 2
+  end, 900, {
+    H.call(function()
+      ph = ph + 1
+      local edge = ph % 10 < 5
+      local a = H.readByte(ACTOR)
+      if H.readByte(MSTATE) ~= ST_DANCE then H.setPad({}) return end
+      local row, col = danceId // 2, danceId % 2
+      local cr, cc = H.readByte(0x893B + a), H.readByte(0x8937 + a)
+      if cr ~= row then H.setPad(edge and { [(cr < row) and "down" or "up"] = true } or {})
+      elseif cc ~= col then H.setPad(edge and { [(cc < col) and "right" or "left"] = true } or {})
+      else H.setPad({}) end
+    end),
+    H.waitFrames(1),
+  }, what)
+end
+
+H.run({ maxFrames = 250000 }, {
+  H.waitFrames(20),
+  H.loadState(STATE),
+  H.waitFrames(30),
+  H.waitUntil(function() return H.hasControl() and H.tileAligned() end, 3000,
+    "control on the defense map"),
   H.call(function()
-    H.assertEq(H.readWord(0x3C08 + actor * 2), mp0 - DANCE_COST,
-      "dance-start charged exactly the flat 8")
-    H.assertEq(costs[1], DANCE_COST,
-      "the cost queue priced the commit at 8 (Ot6AbilityCost cmd $13)")
-    H.assertEq(H.readByte(0x3EF8 + actor * 2) & 0x01, 1,
-      "the DANCE status locked in (whole-battle state bought)")
+    H.assertEq(H.mapId(), 51, "moogle_defense on map 51")
+    H.assertEq(H.readByte(DANCES), 0,
+      "a real WoB Mog has learned NO dance yet -- $1d4c is zero as saved, "
+      .. "which is why the learn must be earned before anything can be measured")
+    emu.addMemoryCallback(function(_, v)
+      if H.readByte(0x3A7A) == CMD_DANCE then costs[#costs + 1] = v end
+    end, emu.callbackType.write, 0x7E3620, 0x7E3620 + 0xFE)
   end),
 
-  -- 3. the locked-in steps are free ----------------------------------------
-  H.driveUntil(function() return #costs >= 3 end, 20000, {
-    H.call(function() pinField() end),
-    H.waitFrames(2),
-  }, "two more dance turns queue"),
+  -- deployment, gen_moogle's exact march order: P1 unboxes the mound, P3
+  -- east, P2 (MOG's squad) west, P1 back to the choke.
+  H.navTo(15, 15, { maxFrames = 2500, honest = true }),
+  ySwitchTo(3),
+  H.navTo(20, 20, { maxFrames = 4000, honest = true }),
+  ySwitchTo(2),
+  H.navTo(10, 21, { maxFrames = 4000, honest = true }),
+  ySwitchTo(1),
+  H.navTo(14, 14, { maxFrames = 2500, honest = true }),
+  H.logStep("deployed; letting the storm come"),
+
+  -- ---- P2's FIRST wave battle: win it, and the WIN teaches the dance ----
+  untilP2Battle("the west arm's first wave engages MOG's squad"),
+  H.waitFrames(240),
   H.call(function()
-    local c = {}
-    for _, v in ipairs(costs) do c[#c + 1] = tostring(v) end
-    H.log("cmd-$13 cost queue: {" .. table.concat(c, ",") .. "}")
-    H.assertEq(costs[2], 0, "mid-dance turn 1 queues at 0 MP")
-    H.assertEq(costs[3], 0, "mid-dance turn 2 queues at 0 MP")
-    H.assertEq(H.readWord(0x3C08 + actor * 2), mp0 - DANCE_COST,
-      "MP unmoved across the locked-in steps -- one payment per battle")
-    H.screenshot("dancemp_locked")
+    for s = 0, 3 do
+      if H.readByte(0x3ED8 + s * 2) == MOG then mogSlot = s end
+    end
+    assert(mogSlot, "MOG is in P2's battle party")
+    -- the reason this file needed the defense: no dance known -> no Dance
+    -- command at all (InitCmd_02's zero-mask removal)
+    local hasDance = false
+    for i = 0, 3 do
+      if H.readByte(CMDTBL + mogSlot * 12 + i * 3) == CMD_DANCE then hasDance = true end
+    end
+    H.assertEq(hasDance, false,
+      "before the first win MOG has NO Dance command -- InitCmd_02 removed "
+      .. "it on the zero mask (battle_main.asm:14129)")
+    -- the dance this battle's background will teach
+    local bg = H.readByte(0x11E2)
+    danceId = H.readRomByte((H.sym("BattleBGDance") & 0x3FFFFF) + bg)
+    H.log(string.format("battle bg %02x teaches dance %d '%s' on a win",
+      bg, danceId, danceNameText(danceId)))
+    H.assertEq(danceId < 8, true, "this background HAS a dance to teach")
+  end),
+  winByTapA("P2's first wave won with plain Fights"),
+  H.waitFrames(60),
+  H.call(function()
+    H.assertEq(H.readByte(DANCES), 1 << danceId,
+      "the VICTORY taught exactly the background's dance -- battle_main.asm"
+      .. ":15842's tsb $1d4c, the game's own learning rule, zero writes")
+    H.log(string.format("MOG mastered '%s' ($1d4c = $%02x)",
+      danceNameText(danceId), H.readByte(DANCES)))
   end),
 
-  -- 4. refusal below the price ---------------------------------------------
-  H.driveUntil(function()
-    local who = H.readByte(ACTOR)
-    return H.readByte(MENU) ~= 0 and who ~= actor
-           and H.readByte(0x3EF8 + who * 2) & 0x01 == 0
-  end, 12000, {
-    H.call(function() pinField() end),
-    H.waitFrames(4),
-  }, "a second (not yet dancing) actor's menu"),
+  -- ---- P2's SECOND wave battle: the measurement -------------------------
+  untilP2Battle("the west arm's second wave engages MOG's squad"),
+  H.waitFrames(240),
   H.call(function()
-    actor = H.readByte(ACTOR)
-    H.writeWord(0x3C30 + actor * 2, 99)
-    H.writeWord(0x3C08 + actor * 2, DANCE_COST - 1)   -- one short
-    costs = {}
+    for s = 0, 3 do
+      if H.readByte(0x3ED8 + s * 2) == MOG then mogSlot = s end
+    end
+    assert(mogSlot, "MOG is in P2's second battle")
+    mp0 = mpOf(mogSlot)
+    H.log(string.format("MOG slot %d, real pool %d MP", mogSlot, mp0))
+    H.assertEq(mp0 >= DANCE_COST, true,
+      "positive control: the real pool funds the dance-start charge")
+    -- the learned dance matches THIS background by construction: same
+    -- terrain, same BattleBGDance row -- the determinism the old file
+    -- bought with a pinned mask.
+    local bg = H.readByte(0x11E2)
+    H.assertEq(H.readRomByte((H.sym("BattleBGDance") & 0x3FFFFF) + bg), danceId,
+      "same terrain, same dance: the bg-mismatch stumble cannot fire")
+  end),
+
+  -- ======================================================================
+  -- *** THE LABELED ISOLATION ARM (see header): the below-price refusal.
+  -- Mog's pool is written to 7, the refusal is measured through the
+  -- standard surfaces, and the pool is restored to the value read above.
+  -- Runs BEFORE the honest dance because a dancing Mog's menu never
+  -- reopens (RandDanceAction auto-queues his turns).
+  -- ======================================================================
+  mogMenu("mog's command window (isolation arm)"),
+  H.call(function()
+    H.writeWord(0x3C08 + mogSlot * 2, DANCE_COST - 1)
+    H.log("[isolation arm] MOG's pool := 7 -- below the flat price")
   end),
   openDance("the poor dancer's list opens"),
   H.waitFrames(20),
-  H.pressButtons({ "down" }, 4), H.waitFrames(10),
-  H.pressButtons({ "right" }, 4), H.waitFrames(10),
   H.call(function()
-    -- the row greys: cost AND name carry $25 (the standard refusal surface)
-    H.assertEq(mapWord(0x7C6F), 0x2500 + 0xB4 + DANCE_COST,
-      "the unaffordable row's cost greys ($25 -- Ot6AbilityGrey)")
-    H.assertEq(mapWord(0x7C70) >> 8, 0x25,
-      "...and the name greys with it (one font colors the pair)")
+    costs = {}
+    -- the one learned dance's row: cost tile and name, both GREY ($25)
+    local w = findInMap(danceNameSeq(danceId))
+    H.assertEq(w ~= nil, true, "the learned dance's name is drawn in the list")
+    H.assertEq(mapWord(w) >> 8, GREY,
+      "the unaffordable row's name greys ($25 -- Ot6AbilityGrey)")
+    H.assertEq(mapWord(w - 1) & 0xFF, 0xb4 + DANCE_COST,
+      "the row leads with its cost (8) -- the #35 [font][cost][name] layout")
+    H.assertEq(mapWord(w - 1) >> 8, GREY,
+      "...and the cost greys with it (one font colors the pair)")
     H.screenshot("dancemp_grey")
   end),
   -- the menu lets the commit through (the block deliberately stays out of
   -- C1 -- Ot6AbilityGrey's SCOPE comment); the refusal is the universal
-  -- execution-time fizzle
+  -- execution-time fizzle.
+  danceCursorToKnown("cursor onto the learned dance's cell (isolation arm)"),
   H.driveUntil(function()
-    return H.readByte(0x32CC + actor * 2) ~= 0xFF
+    return H.readByte(0x32CC + mogSlot * 2) ~= 0xFF
   end, 1800, {
     H.call(function()
-      if H.readByte(MENU) ~= 0 and H.readByte(ACTOR) == actor then
-        H.setPad({ "a" })
-      end
+      ph = ph + 1
+      if H.readByte(MENU) ~= 0 and H.readByte(ACTOR) == mogSlot then
+        H.setPad(ph % 10 < 5 and { a = true } or {})
+      else H.setPad({}) end
     end),
-    H.waitFrames(2),
-    H.call(function() H.setPad({}) end),
-    H.waitFrames(14),
+    H.waitFrames(1),
   }, "the refused dance still commits (action queued)"),
   H.driveUntil(function()
-    return H.readByte(0x32CC + actor * 2) == 0xFF
+    return H.readByte(0x32CC + mogSlot * 2) == 0xFF
   end, 12000, {
-    H.call(function() pinField() end),
-    H.waitFrames(2),
+    H.call(function()
+      ph = ph + 1
+      -- bystanders keep the clock moving with Defends
+      if H.readByte(MENU) ~= 0 and H.readByte(ACTOR) ~= mogSlot then
+        local st = H.readByte(MSTATE)
+        local step = ph % 40
+        if st ~= ST_CMD then H.setPad(ph % 10 < 5 and { b = true } or {})
+        elseif step < 4 then H.setPad({ right = true })
+        elseif step >= 20 and step < 24 then H.setPad({ a = true })
+        else H.setPad({}) end
+      elseif H.readByte(MENU) == 0 then
+        H.setPad(ph % 8 < 4 and { a = true } or {})
+      else H.setPad({}) end
+    end),
+    H.waitFrames(1),
   }, "the queued dance drains (fizzles at execution)"),
   H.waitFrames(120),
   H.call(function()
@@ -246,10 +402,112 @@ H.run({ maxFrames = 40000 }, {
     H.log("refusal cost queue: {" .. table.concat(c, ",") .. "}")
     H.assertEq(costs[1], DANCE_COST,
       "the commit was priced at 8 (it reached the queue -- not a vacuous pass)")
-    H.assertEq(H.readWord(0x3C08 + actor * 2), DANCE_COST - 1,
+    H.assertEq(mpOf(mogSlot), DANCE_COST - 1,
       "the universal insufficient-MP gate refused: MP unmoved")
-    H.assertEq(H.readByte(0x3EF8 + actor * 2) & 0x01, 0,
+    H.assertEq(H.readByte(0x3EF8 + mogSlot * 2) & 0x01, 0,
       "and the dance never started (no whole-battle state for free)")
+    -- restore the REAL pool read at battle start -- the arm's second write
+    H.writeWord(0x3C08 + mogSlot * 2, mp0)
+    H.log("[isolation arm] MOG's pool restored to the real " .. mp0)
   end),
-  H.logStep(function() return "battle_dancemp complete" end),
+
+  -- ---- 1. the menu, at the REAL pool: white row, cost, wallet ----------
+  mogMenu("mog's command window (honest phases)"),
+  openDance("the dance list opens"),
+  H.waitFrames(20),
+  H.call(function()
+    costs = {}
+    local w = findInMap(danceNameSeq(danceId))
+    H.assertEq(w ~= nil, true, "the learned dance's name is drawn in the list")
+    H.assertEq(mapWord(w) >> 8, WHITE, "affordable at the real pool: white")
+    H.assertEq(mapWord(w - 1) & 0xFF, 0xb4 + DANCE_COST,
+      "the row leads with its cost (8), white -- the #35 pattern")
+    H.assertEq(mapWord(w - 2) & 0xFF, 0xFF,
+      "the tens place is blank, not '0' (one-digit price)")
+    -- the wallet paints MOG's real MP
+    H.assertEq(mapWord(WALLET) & 0xFF, 0x8C, "wallet 'M' on the dance window")
+    H.assertEq(mapWord(WALLET + 1) & 0xFF, 0x8F, "wallet 'P'")
+    H.assertEq(mapWord(WALLET + 3) & 0xFF,
+      (mp0 >= 10) and (0xb4 + math.floor(mp0 / 10) % 10) or 0xFF,
+      "wallet tens digit = the real pool's")
+    H.assertEq(mapWord(WALLET + 4) & 0xFF, 0xb4 + mp0 % 10,
+      "wallet ones digit = the real pool's")
+    H.screenshot("dancemp_menu")
+  end),
+
+  -- ---- 2. charge at dance start ----------------------------------------
+  -- walk onto the known dance's POSITIONAL cell (see danceCursorToKnown)
+  -- and confirm; the dance self-targets, so one confirm queues it.
+  danceCursorToKnown("cursor onto the learned dance's cell"),
+  H.driveUntil(function()
+    return H.readByte(0x32CC + mogSlot * 2) ~= 0xFF
+           or (H.readByte(0x3EF8 + mogSlot * 2) & 0x01) == 1
+  end, 1800, {
+    H.call(function()
+      ph = ph + 1
+      if H.readByte(MENU) ~= 0 and H.readByte(ACTOR) == mogSlot then
+        H.setPad(ph % 10 < 5 and { a = true } or {})
+      else H.setPad({}) end
+    end),
+    H.waitFrames(1),
+  }, "the dance commits (action queued)"),
+  H.driveUntil(function()
+    return mpOf(mogSlot) ~= mp0
+  end, 12000, {
+    H.call(function()
+      ph = ph + 1
+      if H.readByte(MENU) ~= 0 and H.readByte(ACTOR) ~= mogSlot then
+        local st = H.readByte(MSTATE)
+        local step = ph % 40
+        if st ~= ST_CMD then H.setPad(ph % 10 < 5 and { b = true } or {})
+        elseif step < 4 then H.setPad({ right = true })
+        elseif step >= 20 and step < 24 then H.setPad({ a = true })
+        else H.setPad({}) end
+      elseif H.readByte(MENU) == 0 then
+        H.setPad(ph % 8 < 4 and { a = true } or {})
+      else H.setPad({}) end
+    end),
+    H.waitFrames(1),
+  }, "the dance-start charge lands"),
+  H.call(function()
+    H.assertEq(mpOf(mogSlot), mp0 - DANCE_COST,
+      "dance-start charged exactly the flat 8 from the REAL pool")
+    H.assertEq(costs[1], DANCE_COST,
+      "the cost queue priced the commit at 8 (Ot6AbilityCost cmd $13)")
+    H.assertEq(H.readByte(0x3EF8 + mogSlot * 2) & 0x01, 1,
+      "the DANCE status locked in (whole-battle state bought)")
+  end),
+
+  -- ---- 3. the locked-in steps are free ----------------------------------
+  H.driveUntil(function() return #costs >= 3 end, 30000, {
+    H.call(function()
+      ph = ph + 1
+      -- Mog auto-dances; bystanders Defend to keep the pack alive; dialogs
+      -- and victory pages get A.
+      if not H.battleLoadStarted() then
+        H.setPad(ph % 8 < 4 and { a = true } or {})
+      elseif H.readByte(MENU) ~= 0 and H.readByte(ACTOR) ~= mogSlot then
+        local st = H.readByte(MSTATE)
+        local step = ph % 40
+        if st ~= ST_CMD then H.setPad(ph % 10 < 5 and { b = true } or {})
+        elseif step < 4 then H.setPad({ right = true })
+        elseif step >= 20 and step < 24 then H.setPad({ a = true })
+        else H.setPad({}) end
+      else H.setPad({}) end
+    end),
+    H.waitFrames(1),
+  }, "two more dance turns queue"),
+  H.call(function()
+    local c = {}
+    for _, v in ipairs(costs) do c[#c + 1] = tostring(v) end
+    H.log("cmd-$13 cost queue: {" .. table.concat(c, ",") .. "}")
+    H.assertEq(costs[2], 0, "mid-dance turn 1 queues at 0 MP")
+    H.assertEq(costs[3], 0, "mid-dance turn 2 queues at 0 MP")
+    H.assertEq(mpOf(mogSlot), mp0 - DANCE_COST,
+      "MP unmoved across the locked-in steps -- one payment per battle")
+    H.screenshot("dancemp_locked")
+    H.log("PASSED: the real MOG learned his dance by WINNING on this terrain, "
+      .. "paid the flat 8 once from his real pool, danced the rest for free; "
+      .. "the refusal below the price lives in the labeled isolation arm")
+  end),
 })
