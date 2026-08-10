@@ -65,7 +65,6 @@ tools/tests/battle_hits.lua	.writeByte(
 tools/tests/battle_hits.lua	.writeWord(
 tools/tests/battle_hudtrack.lua	.writeByte(
 tools/tests/battle_hudtrack.lua	.writeWord(
-tools/tests/battle_kefka.lua	.writeWord(
 tools/tests/battle_lateboost.lua	.writeByte(
 tools/tests/battle_lateboost.lua	.writeWord(
 tools/tests/battle_levelup.lua	.writeByte(
