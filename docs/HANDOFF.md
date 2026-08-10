@@ -424,6 +424,12 @@ established one.  For these, write the observation (what was measured,
 what it seems to mean, what you did NOT do) into the relevant file
 header or a #75 comment and move to Tier-1 work instead.
 
+**Pace is sanctioned to drop (owner, 2026-08-10): "i'd rather it go
+steadily well than quickly but wrong."**  Doing one Tier-1 item
+carefully beats three hastily; an idle day beats a wrong finding.  No
+session should feel pressure to match the large-model sessions' merge
+rate.
+
 **The escalation rule that subsumes the tiers:** before concluding
 anything surprising, re-read "The failure mode worth knowing about"
 below.  If your conclusion requires believing a documented measurement
