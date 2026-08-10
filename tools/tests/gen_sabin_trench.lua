@@ -81,6 +81,7 @@ end
 -- first, tap-A fight after ~900 stubborn frames (see the header)
 local function ride(dir, pred, what, budget, choiceWant)
   local phase, hb, battN = 0, -900, 0
+  local lastEd, edStill = nil, 0
   return H.driveUntil(pred, budget or 30000, {
     H.call(function()
       phase = (phase + 1) % 8
@@ -117,6 +118,46 @@ local function ride(dir, pred, what, budget, choiceWant)
         return
       end
       if H.dialogWaiting() then H.setPad(phase < 4 and { "a" } or {}); return end
+      -- THE ARROW WINDOW IS SET-THEN-CONFIRM.  Four measured failures
+      -- on the fresh chain triangulated it: (1) pure held-LEFT froze at
+      -- the window -- $ed=0200 static from f9143 into the whole
+      -- 60000-frame budget, with $01B7 ALREADY 1 (the direction had
+      -- registered; something else was awaited).  (2)+(3) blanket
+      -- A-taps resolved the window but WRONG -- $01B7 read 0 afterward
+      -- and the ride detoured (run 2 looped the side pocket 38000
+      -- frames: map 20 (38,54) $ed=3508 at f15443 and byte-identical
+      -- at f53243; run 3 surfaced into cave 19 against a wall), because
+      -- an A raining down from ride-start confirms window one before
+      -- the held direction ever sets the bit.  (4) direction PULSES
+      -- alone never resolved it -- the bit sat at 1, frozen to budget.
+      -- So the window wants the branch bit SET by a direction and then
+      -- an A to CONFIRM -- and the bit is readable ($1EB6 bit 7, the
+      -- $01B7 the heartbeat logs).  When $00ED (the ride's monotonic
+      -- progress signal) freezes 300+ frames: bit set -> tap A; bit
+      -- clear -> pulse the direction to set it.
+      --
+      -- (5) THIS RESOLVES WINDOW ONE ON THE MAINLINE ($01B7=1, ride
+      -- proceeds 2 -> 5 -> 3) and the ride still LOOPS: by map 18 the
+      -- bit reads 0 again and map-18 states recur (f19043 (9,12) seen
+      -- again at f38843).  Something later -- the second window's
+      -- semantics, or the in-battle tap-A fighter pressing A within a
+      -- window -- re-clears the pick.  Five blind permutations is the
+      -- line where reasoning must yield to looking (HANDOFF's failure
+      -- mode): this leg is OPEN pending a probe that instruments the
+      -- show_arrows handler's actual polls against $1EB6/$00ED and
+      -- names each window's frame.  The fixture chain upstream
+      -- (gau_joined) is green and unaffected.
+      local ed = H.readWord(0xed)
+      if ed ~= lastEd then lastEd, edStill = ed, 0
+      else edStill = edStill + 1 end
+      if edStill > 300 and dir then
+        if (H.readByte(0x1EB6) >> 7) & 1 == 1 then
+          H.setPad(phase < 2 and { a = true } or {})
+        else
+          H.setPad(phase < 4 and { [dir] = true } or {})
+        end
+        return
+      end
       H.setPad(dir and { [dir] = true } or {})
     end),
   }, what)
