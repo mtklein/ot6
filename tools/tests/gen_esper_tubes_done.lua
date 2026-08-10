@@ -37,13 +37,6 @@ local H = dofile("tools/tests/lib/ot6.lua")
 local function map() return H.mapId() & 0x1ff end
 local function bright() return emu.getState()["ppu.screenBrightness"] or 0 end
 local function sw(id) return (H.readByte(0x1E80 + (id >> 3)) >> (id & 7)) & 1 end
-local function killBitAll()
-  for s = 0, 5 do
-    if H.readByte(0x3aa8 + s * 2) % 2 == 1 then
-      H.writeByte(0x3eec + s * 2, H.readByte(0x3eec + s * 2) | 0x80)
-    end
-  end
-end
 local function settled()
   return H.hasControl() and H.tileAligned() and bright() >= 15
      and not H.dialogWaiting() and not H.battleLoadStarted() and not H.worldMode()
@@ -90,55 +83,10 @@ end
 
 local DELTA = { up = { 0, -1 }, right = { 1, 0 }, down = { 0, 1 }, left = { -1, 0 } }
 
--- Tap `dir` whenever the party has control, hands off while a scene owns
--- it, edge-A through dialogs.  Used to walk INTO a trigger whose scene then
--- takes over -- the tap keeps the party from sliding past the tile.
-local function tapInto(dir, pred, maxFrames, what)
-  local phase, n, ph, calm, hb = 0, 0, 0, 0, 0
-  return H.driveUntil(function()
-    calm = (pred() and settled()) and calm + 1 or 0
-    return calm >= 16
-  end, maxFrames or 12000, {
-    H.call(function()
-      ph = (ph + 1) % 8
-      hb = hb + 1
-      if hb % 120 == 0 then
-        H.log(string.format("tapInto f%d (%d,%d) phase=%d ctl=%s algn=%s "
-          .. "dlg=%s ev=%s $01B5=%d face=%d",
-          H.frame, H.fieldX(), H.fieldY(), phase, tostring(H.hasControl()),
-          tostring(H.tileAligned()), tostring(H.dialogWaiting()),
-          tostring(H.eventRunning()), sw(0x01B5),
-          H.readByte(0x087f + H.readWord(0x0803))))
-      end
-      if H.battleLoadStarted() then
-        killBitAll(); H.setPad(ph < 4 and { "a" } or {}); phase = 0; return
-      end
-      if H.dialogWaiting() then
-        H.setPad(ph < 4 and { "a" } or {}); phase = 0; return
-      end
-      if phase == 0 then
-        H.setPad({})
-        -- STOP TAPPING once we are where we were going.  The terminator
-        -- wants 16 consecutive calm frames on the target, and an eager tap
-        -- walks straight off it before the count gets there: the first
-        -- version of this rode the chute correctly to (10,45) and then
-        -- tapped itself to (10,46) and timed out.
-        if pred() then return end
-        if settled() then phase, n = 1, 0 end
-        return
-      end
-      if phase == 1 then
-        n = n + 1
-        H.setPad({ [dir] = true })
-        if n >= 8 then phase, n = 2, 0 end
-        return
-      end
-      H.setPad({})
-      n = n + 1
-      if n >= 24 then phase = 0 end
-    end),
-  }, what)
-end
+-- (a tapInto helper used to sit here, DEFINED and never called -- the same
+-- dead battle toolkit the other tube-leg conversions deleted; its only
+-- battle handling was the kill-bit.  issue #75: this file now has ZERO
+-- state writes -- the scene is ridden with honest input only)
 
 local function census(tag, targets)
   local sx, sy = H.fieldX(), H.fieldY()
@@ -165,6 +113,7 @@ end
 
 
 local boot = { 0, 0, 0, 0 }
+local verifyReq, verifyLoad = nil, nil
 local function espers()
   local t = {}
   for i = 0, 3 do t[i + 1] = H.readByte(0x1A69 + i) end
@@ -217,7 +166,8 @@ H.run({ maxFrames = 90000 }, {
   end),
 
   -- 2. ride the ~850-line set piece to its `switch $0068=1`
-  H.advanceStory(function() return sw(0x0068) == 1 end, 60000),
+  H.advanceStory(function() return sw(0x0068) == 1 end, 60000,
+    { honest = true }),
   H.waitUntil(settled, 9000, "control back after the tube-room scene", 5),
   H.waitFrames(90),
 
@@ -270,6 +220,27 @@ H.run({ maxFrames = 90000 }, {
     H.screenshot("esper_tubes")
   end),
   H.saveState("esper_tubes.mss"),
+  -- RELOAD-VERIFIED (gen_sabin_gau's pattern): capture-calm does NOT imply
+  -- reload-calm, so reload the parked moment and require it quiet.
+  H.call(function() verifyReq = H.requestSaveState() end),
+  H.waitFrames(2),
+  H.call(function()
+    H.checkReq(verifyReq, "mint verify: capture")
+    verifyLoad = H.requestLoadState(verifyReq.blob)
+  end),
+  H.waitFrames(2),
+  H.call(function() H.checkReq(verifyLoad, "mint verify: reload") end),
+  H.waitFrames(180),
+  H.call(function()
+    H.assertEq(map(), 274, "reload: still on map 274")
+    H.assertEq(H.battleLoadStarted(), false, "reload: no battle pending")
+    H.assertEq(H.dialogWaiting(), false, "reload: no dialog pending")
+    H.assertEq(H.hasControl() and H.tileAligned(), true,
+      "reload: controllable at rest")
+    H.assertEq(sw(0x0068), 1, "reload: $0068 still SET")
+    H.assertEq(H.readByte(0x1850 + 6) & 0x07, 0, "reload: CELES still out")
+    H.log("mint verify: the reload stayed calm -- esper_tubes verified")
+  end),
 
   H.call(function()
     census("esper_tubes", {
