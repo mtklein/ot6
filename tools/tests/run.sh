@@ -28,6 +28,58 @@
 set -u
 ROOT="$(cd "$(dirname "$0")/../.." && pwd)"
 ROM="${OT6_ROM:-$ROOT/build/ot6.sfc}"
+# THE VERDICT PATTERNS ARE EXACT, AND THAT IS LOAD-BEARING.  lib/ot6.lua
+# emits exactly two terminal lines -- `PASS (frame N)` and `FAIL: <why>` --
+# through M.log, so they arrive as `[ot6] PASS (frame N)` / `[ot6] FAIL: ...`.
+# This used to be matched with `^\[ot6\] PASS`, a PREFIX, and that is a
+# false-green generator: battle_thief logs `PASSED phase 1: ...` per phase,
+# so a run KILLED BY THE WALL-CLOCK CAP after phase 1 matched the pass
+# pattern and was scored green -- measured 2026-08-10 (testrunner exit 255,
+# verdict 0, on a deliberately short OT6_TIMEOUT).  A truncated run reporting
+# success is the exact failure #75 exists to abolish, so the patterns below
+# anchor on the parenthesis and the colon that only the real verdicts carry.
+PASS_RE='^\[ot6\] PASS \(frame '
+FAIL_RE='^\[ot6\] FAIL: '
+verdict_spoken() { grep -qE "$PASS_RE|$FAIL_RE" "$1"; }
+
+# --verdict-selftest: falsify the PASS/FAIL parsing WITHOUT launching Mesen.
+# This exists because the parsing did not have one, and the gap shipped a
+# false green: `^\[ot6\] PASS` is a PREFIX, battle_thief logs `PASSED phase
+# 1: ...` per phase, and a run killed by the wall-clock cap after phase 1 was
+# therefore scored PASS (measured 2026-08-10: testrunner exit 255, verdict 0).
+# Every other mechanical anchor in this repo carries a selftest -- the
+# state-write checker, compose, the ninja graph, runner isolation -- and the
+# one component that decides pass-vs-fail for every test in the project did
+# not.  Wired into `make test` beside the others.
+if [ "${1:-}" = "--verdict-selftest" ]; then
+  fails=0
+  vcheck() {  # <label> <log body> <want: pass|fail|none>
+    _t=$(mktemp); printf '%s\n' "$2" > "$_t"
+    if grep -qE "$PASS_RE" "$_t"; then _got=pass
+    elif grep -qE "$FAIL_RE" "$_t"; then _got=fail
+    else _got=none; fi
+    rm -f "$_t"
+    if [ "$_got" = "$3" ]; then printf '  pass  %s\n' "$1"
+    else printf '  FAIL  %s (scored %s, want %s)\n' "$1" "$_got" "$3"; fails=$(( fails + 1 )); fi
+  }
+  vcheck "a real PASS verdict scores pass"        '[ot6] PASS (frame 309)'            pass
+  vcheck "a real FAIL verdict scores fail"        '[ot6] FAIL: assertEq failed: x'     fail
+  vcheck "the budget FAIL scores fail"            '[ot6] FAIL: frame budget exceeded (900 frames)' fail
+  # THE REGRESSION, verbatim in shape: a truncated run that announced phases.
+  vcheck "PASSED-phase lines alone score NONE"    '[ot6] PASSED phase 1: the submenu
+[ot6] PASSED phase 2: the ledger' none
+  vcheck "a phase line plus a real verdict passes" '[ot6] PASSED phase 1: the submenu
+[ot6] PASS (frame 13056)'                         pass
+  vcheck "FAILED-phase lines alone score NONE"    '[ot6] FAILED phase 3: the cap'      none
+  vcheck "an empty log scores none (a reap)"      ''                                   none
+  vcheck "prose naming PASS does not score"       '[ot6] this run will PASS if the gauge breaks' none
+  vcheck "an unprefixed PASS does not score"      'PASS (frame 1)'                     none
+  if [ "$fails" -ne 0 ]; then
+    echo "run.sh --verdict-selftest: $fails FAILURE(S)"; exit 1
+  fi
+  echo "run.sh --verdict-selftest: OK"; exit 0
+fi
+
 SCRIPT="${1:?usage: run.sh <script.lua> [logfile]}"
 
 # A worker id used to select a persistent directory and was therefore an
@@ -242,18 +294,53 @@ fi
 # print() is the only channel out.  Kept for the ROM-info banner.
 # CFFIXED_USER_HOME is the isolation boundary measured above.
 CAP="${OT6_TIMEOUT:-600}"
-t0=$(date +%s)
-env CFFIXED_USER_HOME="$MESEN_HOME" \
-  "$SHARED_APP/Contents/MacOS/Mesen" --testrunner --timeout="$CAP" --enableStdout \
-  "$ROM" "$COMPOSED" > "$RUN_LOG" 2>&1
-code=$?
-elapsed=$(( $(date +%s) - t0 ))
+# A REAP IS NOT A RESULT, SO THE HARNESS RESOLVES IT INSTEAD OF REPORTING IT.
+# The cap is WALL clock and `nice` does not slow the wall, so concurrent jobs
+# starve each other: a mint that takes 400s alone can cross 600s when a dozen
+# share ten cores.  That used to surface as a red edge with a paragraph of
+# explanation, and every reader had to re-learn that "exit 255, truncated
+# stdout" is not a crash.  Isolation was already solved -- every invocation
+# gets its own workspace and CFFIXED_USER_HOME (dd2266a, 10ce17c) -- which is
+# exactly what makes a retry SAFE and deterministic: the same inputs, run
+# again, with nothing shared to have been disturbed.  So retry it.
+#
+# RETRIED ONLY ON THE REAP SIGNATURE, and this distinction is load-bearing:
+# no verdict in the log AND the run lived to the cap.  A real FAIL is NEVER
+# retried -- retrying failures until they pass is the #74 mistake in harness
+# clothing, and it would silently launder a flaky test into a green one.  A
+# no-verdict run that died WELL SHORT of the cap is not retried either: that
+# is a Lua load error, which is deterministic and will fail identically.
+RETRIES="${OT6_REAP_RETRIES:-1}"
+attempt=0
+retried=0
+while :; do
+  attempt=$(( attempt + 1 ))
+  t0=$(date +%s)
+  env CFFIXED_USER_HOME="$MESEN_HOME" \
+    "$SHARED_APP/Contents/MacOS/Mesen" --testrunner --timeout="$CAP" --enableStdout \
+    "$ROM" "$COMPOSED" > "$RUN_LOG" 2>&1
+  code=$?
+  elapsed=$(( $(date +%s) - t0 ))
+  verdict_spoken "$RUN_LOG" && break
+  [ $(( elapsed + 5 )) -ge "$CAP" ] || break
+  [ "$attempt" -le "$RETRIES" ] || break
+  retried=$(( retried + 1 ))
+  printf '[ot6] REAPED after %ss against a %ss wall-clock cap -- retrying (attempt %s of %s).  Runs are isolated, so this is safe and is not a re-roll of a failure: no verdict was ever reached.\n' \
+    "$elapsed" "$CAP" "$(( attempt + 1 ))" "$(( RETRIES + 1 ))" >&2
+  sleep 5
+done
 
 python3 "$ROOT/tools/tests/lib/decode_b64.py" "$RUN_LOG" "$ART"
 
-if grep -q '^\[ot6\] PASS' "$RUN_LOG"; then
+if [ "$retried" -gt 0 ] && verdict_spoken "$RUN_LOG"; then
+  # Never let a retry be silent: a machine reaping runs is a fact worth
+  # seeing even when the retry rescued the result.
+  printf '[ot6] this run was REAPED %s time(s) by the %ss wall-clock cap and retried; the verdict below is from attempt %s.\n' \
+    "$retried" "$CAP" "$attempt" >> "$RUN_LOG"
+fi
+if grep -qE "$PASS_RE" "$RUN_LOG"; then
   verdict=0
-elif grep -q '^\[ot6\] FAIL' "$RUN_LOG"; then
+elif grep -qE "$FAIL_RE" "$RUN_LOG"; then
   verdict=1
 else
   verdict=$code
@@ -283,13 +370,14 @@ else
   reap() { printf '[ot6] %s\n' "$@" >> "$RUN_LOG"; }
   if [ $(( elapsed + 5 )) -ge "$CAP" ]; then
     reap "REAPED: no verdict, and the run lasted ${elapsed}s against a ${CAP}s wall-clock cap (--timeout).  Mesen killed it; it did not crash." \
+         "  This is the FINAL attempt: the harness already retried it ${retried} time(s)" \
+         "  automatically (OT6_REAP_RETRIES=${RETRIES}), so the cap is not merely being" \
+         "  grazed -- this run cannot finish inside it on this machine right now." \
          "  Load right now: $(uptime | sed 's/.*load average/load average/')" \
-         "  On a busy machine this is CONTENTION, not your change.  The cap is" \
-         "  wall clock, so nice(1) does not protect it -- concurrent jobs are" \
-         "  all equally niced and starve each other.  The signature is several" \
-         "  runs failing at once that each pass alone." \
-         "  Before debugging: lower parallelism (make frontier NINJAFLAGS=-j2)" \
-         "  and retry, or raise the cap for this run with OT6_TIMEOUT=1200."
+         "  The cap is wall clock, so nice(1) does not protect it -- concurrent" \
+         "  jobs are all equally niced and starve each other." \
+         "  Next: raise the cap for this run (OT6_TIMEOUT=1200), allow more" \
+         "  retries (OT6_REAP_RETRIES=3), or lower parallelism (NINJAFLAGS=-j2)."
   elif [ "$verdict" -ne 0 ]; then
     reap "no verdict after ${elapsed}s (cap ${CAP}s): the script died before reaching PASS or FAIL." \
          "  Well short of the cap, so this is NOT the reap -- read this log for a Lua load error."

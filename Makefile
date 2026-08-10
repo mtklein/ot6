@@ -146,6 +146,13 @@ test: rom nomp-rom graph
 	ninja -f $(NINJA_FILE) $(NINJAFLAGS) $(SUITE_STATES)
 	python3 tools/tests/lib/compose.py --selftest
 	python3 tools/tests/lib/sram_anchor.py selftest
+	@# The harness's own PASS/FAIL parsing.  It had no selftest until
+	@# 2026-08-10, and the gap shipped a FALSE GREEN: the pass pattern was
+	@# a prefix (`^[ot6] PASS`), battle_thief logs `PASSED phase N` per
+	@# phase, so a run killed by the wall-clock cap mid-test scored as a
+	@# pass.  Every other anchor here is falsifiable; the one that decides
+	@# pass-vs-fail for the whole suite must be too.
+	sh tools/tests/run.sh --verdict-selftest
 	@# bosses-wob.md vs the shipped break data.  It carried four waivers for
 	@# rows the doc authored in prose and nobody wrote into the ROM; issue #23
 	@# landed all of them, the WAIVERS dict is empty, and the script is a plain
