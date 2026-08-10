@@ -82,6 +82,13 @@ STATES = [
     S("narshe_streets", gen="gen_narshe_escape", prev="arvis_wake"),
     S("moogle_doorstep", gen="gen_mines_chase", prev="narshe_streets"),
     S("moogle_cleared", gen="gen_moogle", prev="moogle_doorstep"),
+    # moogle_defense: gen_moogle's second artifact (mid-set-piece, MOG
+    # leading P2) -- the first_battle pattern (#41): one edge per artifact,
+    # or the fixture silently goes stale while its sibling re-mints.
+    # battle_dancemp consumes it (the only real MOG-with-Dance window the
+    # chain has; measured 2026-08-10, the set piece is where dances are
+    # learned, so no earlier fixture can host that test).
+    S("moogle_defense", gen="gen_moogle", after="moogle_cleared"),
     S("worldmap_narshe", gen="gen_worldmap", prev="moogle_cleared"),
     S("figaro_doorstep", gen="gen_figaro", prev="worldmap_narshe"),
     S("figaro_intro", gen="gen_edgar", prev="figaro_doorstep"),
