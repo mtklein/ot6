@@ -2,9 +2,19 @@
   "schema": "ot6.sram-anchor/v1",
   "payload": "n024-doorstep-save.sram",
   "size": 32768,
-  "sha256": "48b2927e34cc2ccf8c17c20708a4b1fc20104491453d1368f1d7cc512d3fb099",
+  "sha256": "7fad05ac757876f8d7ca556b7bc9b36cce64c9681ff5f55cbbb50c7fb40d39e1",
   "slot": 3,
   "milestone": "n024-doorstep-save",
-  "provenance": "n024_doorstep.mss; real in-game Save UI at the NEW #10 save point 273 (26,53); party LOCKE CELES SABIN EDGAR (#21); boundary C of save-points-vector.md \u00a75",
+  "provenance": {
+    "format": "ot6-provenance/v1",
+    "payload_sha256": "7fad05ac757876f8d7ca556b7bc9b36cce64c9681ff5f55cbbb50c7fb40d39e1",
+    "mint_sig": "270d6b8739c083c8d388f1ad08662066b5adfbe315922111ff57fdf1f57f4cb4 gen_n024_save_anchor",
+    "ancestors": [
+      {
+        "path": "build/states/n024_doorstep.stamp",
+        "sha256": "59a6d4786d99e216d867dfd4521d32727d7d443b86d47c1e7b8dd005cb89c248"
+      }
+    ]
+  },
   "persistent_layout": "ot6-codex-o8-v1"
 }

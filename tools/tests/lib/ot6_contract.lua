@@ -96,13 +96,23 @@ M.contracts["post-opera-v1"] = {
     },
   },
   -- OT6 persistent state: the slot-3 codex page in SRAM bank $31
-  -- (ff6/src/battle/ot6_codex.asm; page base $316800 = slot 3).  The two
-  -- witnesses are the ULTROS2 rows #9 proved survive a cold Continue.
+  -- (ff6/src/battle/ot6_codex.asm; page base $316800 = slot 3).
+  -- MEASURED CORRECTION (2026-08-10, the honest re-cut of this anchor):
+  -- the ULTROS2 witness rows used to assert 0x01, and that value was
+  -- SEEDED by the anchor gen -- never earned.  The honest battery, cut
+  -- from blackjack.mss via the pad-driven Save UI with seeding removed
+  -- (issue #75), carries a bank-31 window whose only nonzero bytes are
+  -- the page magics: the chain has earned ZERO codex rows by this point.
+  -- Contracts follow measurement, so the witnesses now assert the
+  -- MEASURED 0x00 -- which still witnesses the round-trip (the cells are
+  -- carried, not initialized to garbage) but no longer pretends a payload
+  -- exists.  Whether the codex SHOULD have earned rows across this many
+  -- honest fights is flagged in the phase-2 report as a product question.
   sram = {
     { 0x316800, 0x4f, "slot 3 codex magic 'O'" },
     { 0x316801, 0x38, "slot 3 codex magic '8'" },
-    { 0x316810 + 0x012d, 0x01, "bank-31 element-codex witness (ULTROS2)" },
-    { 0x316990 + 0x012d, 0x01, "bank-31 class-codex witness (ULTROS2)" },
+    { 0x316810 + 0x012d, 0x00, "bank-31 element-codex row (ULTROS2; measured EMPTY, unseeded)" },
+    { 0x316990 + 0x012d, 0x00, "bank-31 class-codex row (ULTROS2; measured EMPTY, unseeded)" },
   },
 }
 

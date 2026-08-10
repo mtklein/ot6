@@ -2,9 +2,19 @@
   "schema": "ot6.sram-anchor/v1",
   "payload": "mrf-save-room.sram",
   "size": 32768,
-  "sha256": "b1598fb3725d865c90a1c278f86d6b425c8ef629340d2914f9516fbf22dcf419",
+  "sha256": "554d24da1bdc57d844e9066a0944beeba812fa99902f8a15e91dfad385117ce0",
   "slot": 3,
   "milestone": "mrf-save-room",
-  "provenance": "ifrit_doorstep.mss; real in-game Save UI at the map-270 save point (25,10); party LOCKE CELES SABIN EDGAR (#21); boundary B of save-points-vector.md \u00a75",
+  "provenance": {
+    "format": "ot6-provenance/v1",
+    "payload_sha256": "554d24da1bdc57d844e9066a0944beeba812fa99902f8a15e91dfad385117ce0",
+    "mint_sig": "c0e07c757c2575a5b6f705c2a9882fd79d203c78ae773c4fb3d542763baea331 gen_mrf_save_room_anchor",
+    "ancestors": [
+      {
+        "path": "build/states/ifrit_doorstep.stamp",
+        "sha256": "8f07027f768879a07af045323f8e7a61ee0c902e0765ce616bea4a1143d2d7c0"
+      }
+    ]
+  },
   "persistent_layout": "ot6-codex-o8-v1"
 }
