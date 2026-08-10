@@ -1741,6 +1741,83 @@ function M.invCountOf(id)
   return s and M.readByte(0x1969 + s) or 0
 end
 
+-- M.buyItem: buy `qtyFn()` MORE of shop row `row`, fully CLOSED-LOOP,
+-- with the shop ALREADY OPEN at its options window (menu state $25).
+-- Promoted from gen_sabin_train/gen_sabin_gau, where two identical
+-- copies had earned every line the hard way:
+--
+--  * The list cursor row is MoveCursor's own cell (DP $4E,
+--    menu_common.asm:1318) and the quantity is zSelIndex (DP $28,
+--    menu_ram.inc) -- both READ and STEERED, never press-counted (menu
+--    direction holds auto-repeat: a counted 4-frame hold measurably
+--    bought 25 Tonics instead of 14 and parked the next lap on the
+--    wrong row).  Widget deltas (shop.asm MenuState_27): RIGHT +1,
+--    LEFT -1, UP +10, DOWN -10, gil-clamped by the handler.
+--  * THE CLAMP IS THE PURSE'S ANSWER: steering toward a want the gil
+--    cannot cover pins qty at the affordable maximum, and a loop that
+--    keeps pressing burns its whole budget against that wall
+--    (gen_sabin_gau's "TONIC to 99" on 209 gil -- FAIL, timeout at
+--    20000).  A player buys what the purse covers; 240 unmoving frames
+--    against the clamp accept the clamped qty, loudly.  Order the buys
+--    so the marginal item comes LAST and a poor purse shorts it, never
+--    the essentials.
+--  * Purchases are verified AFTER the shop closes; mid-menu inventory
+--    reads measurably lie (the field bag does not update until the
+--    shop hands RAM back).
+function M.buyItem(id, row, qtyFn, name)
+  local phase = 0
+  local seen27, bought = false, false
+  local want = nil
+  local lastQty, stall = nil, 0
+  return M.driveUntil(function() return bought end, 20000, {
+    M.call(function()
+      phase = (phase + 1) % 8
+      local st = M.readByte(0x0026)
+      if want == nil then
+        want = qtyFn()
+        if want < 1 then want = 1 end
+        M.log(string.format("[shop] %s: buying %d", name, want))
+      end
+      if st == 0x27 then
+        seen27 = true
+        local qty = M.readByte(0x0028)
+        if qty == lastQty and qty < want then
+          stall = stall + 1
+          if stall > 240 then
+            M.log(string.format(
+              "[shop] %s: purse-clamped at %d (wanted %d) -- taking it",
+              name, qty, want))
+            want = qty
+          end
+        elseif qty ~= lastQty then
+          stall = 0
+        end
+        lastQty = qty
+        local btn = nil
+        if qty < want then
+          btn = (want - qty >= 10) and "up" or "right"
+        elseif qty > want then
+          btn = (qty - want >= 10) and "down" or "left"
+        else
+          btn = "a"
+        end
+        M.setPad(phase < 2 and { [btn] = true } or {})
+      elseif seen27 then
+        bought = true
+        M.setPad({})
+      elseif st == 0x25 then
+        M.setPad(phase < 2 and { "a" } or {})
+      elseif st == 0x26 then
+        local cur = M.readByte(0x004E)
+        local btn = cur < row and "down" or cur > row and "up" or "a"
+        M.setPad(phase < 2 and { [btn] = true } or {})
+      else
+        M.setPad({})
+      end
+    end),
+  }, "buy " .. name)
+end
+
 function M.fieldCare(opts)
   opts = opts or {}
   local tag = opts.tag or "care"
