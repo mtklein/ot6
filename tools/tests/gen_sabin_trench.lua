@@ -79,12 +79,49 @@ end
 
 -- ride driver with choice steering and trench battle handling: flee
 -- first, tap-A fight after ~900 stubborn frames (see the header)
+-- Set when the ride-scoped wipe canary fires; every ride() pred also
+-- exits on it so a lost dive ends the ATTEMPT, not the run.
+local rideLost = nil
+local rideWipeN = 0
+
 local function ride(dir, pred, what, budget, choiceWant)
   local phase, hb, battN = 0, -900, 0
-  local lastEd, edStill = nil, 0
-  return H.driveUntil(pred, budget or 30000, {
+  return H.driveUntil(function()
+    return rideLost ~= nil or pred()
+  end, budget or 30000, {
     H.call(function()
       phase = (phase + 1) % 8
+      -- A WIPE IN AN UNDERWATER BATTLE IS INVISIBLE TO inBattle():
+      -- all-zero HP entries are SKIPPED by its loop, so a dead party
+      -- reads b=false and the driver holds LEFT at the Game Over
+      -- forever -- the wedge that ate three 60000-frame budgets.
+      -- probe_trench_arrows showed how close even the surviving line
+      -- runs: it reached Nikeah at 28/0/0.  The signature is the same
+      -- one the gau walk uses: every party slot showing a SANE max
+      -- (0 < max < 1000 -- module garbage reads tens of thousands)
+      -- with zero HP, debounced 90 frames, ride map only.
+      if mapIdx() == 2 and not rideLost then
+        local sane, alive = 0, 0
+        for e = 0, 2 do
+          local mx = H.readWord(0x3c1c + e * 2)
+          if mx > 0 and mx < 1000 then
+            sane = sane + 1
+            if H.readWord(0x3bf4 + e * 2) > 0 then alive = alive + 1 end
+          end
+        end
+        if sane >= 3 and alive == 0 then
+          rideWipeN = rideWipeN + 1
+          if rideWipeN >= 90 then
+            rideLost = string.format("wiped mid-ride at f%d during %s",
+              H.frame, what)
+            H.log("[trench] LOST -- " .. rideLost)
+            H.setPad({})
+            return
+          end
+        else
+          rideWipeN = 0
+        end
+      end
       if H.frame - hb >= 900 then
         hb = H.frame
         H.log(string.format(
@@ -110,6 +147,39 @@ local function ride(dir, pred, what, budget, choiceWant)
         return
       end
       battN = 0
+      -- ON THE RIDE MAP, HOLD THE DIRECTION AND CONSULT NOTHING
+      -- FIELD-OWNED.  Five driver permutations failed this ride five
+      -- ways (the record is in dc07c44) before probe_trench_arrows and
+      -- the SOURCE settled the mechanism:
+      --
+      --   * show_arrows is NON-BLOCKING (VehicleCmd_da,
+      --     world/event.asm:589, sets $E8 bits 1|2 and returns); the
+      --     script runs `show_arrows / wait N / lock_arrows /
+      --     hide_arrows / if_switch $01B7` -- a TIMED sample, never a
+      --     modal window (event_main.asm:21212, :21253).
+      --   * The sample (world/move.asm:403-425) reads the HELD pad
+      --     cell $05 every arrows-shown frame, LEVEL-triggered: LEFT
+      --     held -> $1EB6 |= $80, RIGHT held -> &= $7F.  No press
+      --     edge, no confirm.  Holding LEFT is the whole contract.
+      --   * probe_trench_arrows rode this exact upstream to Nikeah
+      --     (map 187 at f15950) holding LEFT with only the battle
+      --     branch above -- $1EB6 bit 7 stayed set the entire way,
+      --     and the one 618-frame $00ED still-spell broke on its own
+      --     (a long scripted beat, not a waiter).
+      --
+      -- What actually broke the five gen runs: THIS function consulted
+      -- H.dialogWaiting() and CH_MAX/CH_SEL mid-ride.  Those are FIELD
+      -- module cells (trap 1: module WRAM ownership lies to you) and
+      -- they read garbage on the vehicle map -- the heartbeats logged
+      -- ch=124/0 and dlg flicker -- so the driver sprayed phantom
+      -- A-taps into the ride, which is precisely what the probe never
+      -- did.  The choice/dialog branches below remain for the REAL
+      -- field maps this driver also serves (the helmet scene, the
+      -- ferry clerk); the ride map never reaches them.
+      if mapIdx() == 2 and dir then
+        H.setPad({ [dir] = true })
+        return
+      end
       if H.readByte(CH_MAX) >= 2 and H.dialogWaiting() then
         local sel, want = H.readByte(CH_SEL), choiceWant or 0
         if sel < want then H.setPad(phase < 4 and { "down" } or {})
@@ -118,49 +188,81 @@ local function ride(dir, pred, what, budget, choiceWant)
         return
       end
       if H.dialogWaiting() then H.setPad(phase < 4 and { "a" } or {}); return end
-      -- THE ARROW WINDOW IS SET-THEN-CONFIRM.  Four measured failures
-      -- on the fresh chain triangulated it: (1) pure held-LEFT froze at
-      -- the window -- $ed=0200 static from f9143 into the whole
-      -- 60000-frame budget, with $01B7 ALREADY 1 (the direction had
-      -- registered; something else was awaited).  (2)+(3) blanket
-      -- A-taps resolved the window but WRONG -- $01B7 read 0 afterward
-      -- and the ride detoured (run 2 looped the side pocket 38000
-      -- frames: map 20 (38,54) $ed=3508 at f15443 and byte-identical
-      -- at f53243; run 3 surfaced into cave 19 against a wall), because
-      -- an A raining down from ride-start confirms window one before
-      -- the held direction ever sets the bit.  (4) direction PULSES
-      -- alone never resolved it -- the bit sat at 1, frozen to budget.
-      -- So the window wants the branch bit SET by a direction and then
-      -- an A to CONFIRM -- and the bit is readable ($1EB6 bit 7, the
-      -- $01B7 the heartbeat logs).  When $00ED (the ride's monotonic
-      -- progress signal) freezes 300+ frames: bit set -> tap A; bit
-      -- clear -> pulse the direction to set it.
-      --
-      -- (5) THIS RESOLVES WINDOW ONE ON THE MAINLINE ($01B7=1, ride
-      -- proceeds 2 -> 5 -> 3) and the ride still LOOPS: by map 18 the
-      -- bit reads 0 again and map-18 states recur (f19043 (9,12) seen
-      -- again at f38843).  Something later -- the second window's
-      -- semantics, or the in-battle tap-A fighter pressing A within a
-      -- window -- re-clears the pick.  Five blind permutations is the
-      -- line where reasoning must yield to looking (HANDOFF's failure
-      -- mode): this leg is OPEN pending a probe that instruments the
-      -- show_arrows handler's actual polls against $1EB6/$00ED and
-      -- names each window's frame.  The fixture chain upstream
-      -- (gau_joined) is green and unaffected.
-      local ed = H.readWord(0xed)
-      if ed ~= lastEd then lastEd, edStill = ed, 0
-      else edStill = edStill + 1 end
-      if edStill > 300 and dir then
-        if (H.readByte(0x1EB6) >> 7) & 1 == 1 then
-          H.setPad(phase < 2 and { a = true } or {})
-        else
-          H.setPad(phase < 4 and { [dir] = true } or {})
-        end
-        return
-      end
       H.setPad(dir and { [dir] = true } or {})
     end),
   }, what)
+end
+
+-- The dive ladder (see the call-site comment): checkpoint before the
+-- (25,18) helmet talk, an attempt is helmet scene -> dive -> Nikeah,
+-- a wipe (or a ride that never lands) reloads with the house 17-frame
+-- stagger for a different underwater-battle timeline.
+local diveBlob, diveDone = nil, false
+local function diveCheckpoint()
+  local ckReq
+  return H.cond(function() return true end, {
+    H.call(function() ckReq = H.requestSaveState() end),
+    H.waitFrames(2),
+    H.call(function()
+      H.checkReq(ckReq, "dive checkpoint")
+      diveBlob = ckReq.blob
+      H.log(string.format("[trench] dive checkpoint captured (%d bytes) f%d",
+        #diveBlob, H.frame))
+    end),
+  }, {})
+end
+local function diveAttempt(n)
+  local ldReq
+  return H.cond(function() return not diveDone end, {
+    H.cond(function() return n > 1 end, {
+      H.logStep(function()
+        return string.format("[trench] dive ATTEMPT %d -- reloading (%s)",
+          n, tostring(rideLost))
+      end),
+      H.call(function() ldReq = H.requestLoadState(diveBlob) end),
+      H.waitFrames(2),
+      H.call(function() H.checkReq(ldReq, "dive attempt " .. n) end),
+      H.waitFrames(60 + (n - 1) * 17),
+    }, {}),
+    H.call(function() rideLost, rideWipeN = nil, 0 end),
+    H.navTo(25, 18, { maxFrames = 12000, honest = "flee", arrive = function()
+      return sw(0x41) == 1 or (H.fieldX() == 25 and H.fieldY() == 18
+         and H.hasControl() and H.tileAligned()) end }),
+    ride("up", function()
+      return sw(0x41) == 1 and H.hasControl() and H.tileAligned()
+    end, "helmet scene a" .. n, 25000),
+    H.call(function()
+      H.assertEq(sw(0x41), 1, "$0041 -- the trench is open")
+      H.log(string.format("[trench] post-helmet a%d: map=%d (%d,%d)", n,
+        mapIdx(), H.fieldX(), H.fieldY()))
+    end),
+    (function()
+      -- a raising budget would abort the LADDER; a ride that neither
+      -- lands nor wipes inside 55000 frames is a loss for THIS
+      -- timeline, named as such so the stagger gets its turn
+      local frames = 0
+      return ride("left", function()
+        frames = frames + 1
+        if frames > 55000 and rideLost == nil then
+          rideLost = string.format("dive attempt %d deadline " ..
+            "(55000 frames, map=%d)", n, mapIdx())
+          H.log("[trench] LOST -- " .. rideLost)
+        end
+        return mapIdx() == 187
+      end, "the trench ride a" .. n, 60000)
+    end)(),
+    H.call(function()
+      if rideLost == nil and mapIdx() == 187 then
+        diveDone = true
+        H.log(string.format("[trench] dive attempt %d LANDED at Nikeah f%d",
+          n, H.frame))
+      elseif rideLost == nil then
+        rideLost = string.format("dive attempt %d ended off-Nikeah " ..
+          "(map=%d) f%d", n, mapIdx(), H.frame)
+        H.log("[trench] " .. rideLost)
+      end
+    end),
+  }, {})
 end
 
 H.run({ maxFrames = 200000 }, {
@@ -224,25 +326,32 @@ H.run({ maxFrames = 200000 }, {
          and mapIdx() == 167
     end, "the (12,22) beat", 15000)
   end)(),
-  H.navTo(25, 18, { maxFrames = 12000, honest = "flee", arrive = function()
-    return sw(0x41) == 1 or (H.fieldX() == 25 and H.fieldY() == 18
-       and H.hasControl() and H.tileAligned()) end }),
-  ride("up", function()
-    return sw(0x41) == 1 and H.hasControl() and H.tileAligned()
-  end, "helmet scene", 25000),
-  H.call(function()
-    H.assertEq(sw(0x41), 1, "$0041 -- the trench is open")
-    H.log(string.format("[trench] post-helmet: map=%d (%d,%d)", mapIdx(),
-      H.fieldX(), H.fieldY()))
-  end),
+  -- TOP UP BEFORE THE DIVE.  The ride's three underwater battles are
+  -- the leg's real HP race: probe_trench_arrows reached Nikeah at
+  -- 28/0/0, and the losing timelines wipe outright.  The party arrives
+  -- from gau_joined carrying ~20 Tonics and the field menu works here;
+  -- one care stop is the difference between diving at half HP and
+  -- diving full.
+  H.fieldCare({ tag = "pre-dive care", threshold = 0.95 }),
 
-  -- the helmet scene's tail IS the dive (its `if_switch $0127=0, _ca8ae3`
-  -- runs straight into the vehicle script -- measured: map 2 mid-ride the
-  -- frame control checks resume).  Hold LEFT through the whole ride
-  -- (mainline at both arrow windows), kill-bit battles 19/20/21, land at
-  -- Nikeah 187.
-  ride("left", function() return mapIdx() == 187 end,
-    "the trench ride", 60000),
+  -- THE DIVE RIDES THE HOUSE LADDER.  The helmet scene's tail IS the
+  -- dive (its `if_switch $0127=0, _ca8ae3` runs straight into the
+  -- vehicle script), so the checkpoint is cut before the (25,18) talk
+  -- and an attempt is helmet -> dive -> Nikeah.  Hold LEFT the whole
+  -- ride (mainline at both arrow windows -- the level-sampled contract,
+  -- see ride()); battles 19/20/21 are fled or fought by play; a
+  -- mid-ride wipe is named by the canary and reloads on a 17-frame
+  -- stagger, a different battle timeline.
+  diveCheckpoint(),
+  diveAttempt(1),
+  diveAttempt(2),
+  diveAttempt(3),
+  H.call(function()
+    if not diveDone then
+      error(string.format("trench: the dive did not reach Nikeah on any " ..
+        "of 3 staggered attempts -- last: %s", tostring(rideLost)), 0)
+    end
+  end),
   settle(187, "Nikeah", 8000),
   H.call(function()
     H.assertEq(mapIdx(), 187, "landed in Nikeah")
