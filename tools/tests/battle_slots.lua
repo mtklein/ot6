@@ -1,4 +1,4 @@
--- @suite
+-- @suite slow
 -- battle_slots.lua -- boost-tiered Slot (Setzer), the chance-verb canon
 -- (ROADMAP.md:79-82, kits.md:405-410) applied to the reels: on chance verbs
 -- boost buys CERTAINTY in the verb's own vocabulary.  Slot's vocabulary is
@@ -13,43 +13,58 @@
 --   Ot6SlotRig    -- latches the spin's tier ($57ba) at the first press and
 --                    stores the rig byte: untouched at 0-1 bp, forced 0 (or
 --                    $3c under the $2f49.2 joker-doom battle gate) at 2-3 bp.
---   Ot6SlotDrift  -- blessed drift budget: 4 to the byte below 3 bp, $ff
---                    (longer than the 16-icon strip, and every icon appears
---                    on every strip, so the seek always lands) at 3 bp.
+--   Ot6SlotDrift  -- blessed drift budget: 4 to the byte below 3 bp, $ff at
+--                    3 bp (longer than the 16-icon strip).
 --   Ot6SlotMiss   -- the rigged miss: vanilla avoid-mark at 0 bp, bought off
---                    at 1+ bp (the pair is blessed instead).  A 7-pair under
---                    the joker gate stays refused at every tier.
+--                    at 1+ bp.  A 7-pair under the joker gate stays refused.
 --   Ot6SlotCommit -- re-banks the latched tier into OT6_BOOST_REVEALED at
 --                    the commit press, so Ot6ActionEnd charges exactly the
 --                    tier the reels were spun with.
---   Ot6BoostDmg's $0f gate -- slot attacks never get the damage multiplier
---                    (certainty INSTEAD of multiplication, kits.md).
+--   Ot6BoostDmg's $0f gate -- slot attacks never get the damage multiplier.
 --
--- METHOD.  battle_doorstep + poked-in SETZER (battle_steal's install
--- pattern: ids/commands poked, monsters stopped + HP-pinned +
--- death-protected so every spin is attributable and nothing dies).  The
--- mechanism cells are asserted directly, and the racy ones (w7e617d is
--- decremented by the spin driver within frames of the press that stores it)
--- through write callbacks that record WHO wrote WHAT -- the hook writes from
--- bank $f0, vanilla's inline stores and the driver's decrements from $c1.
--- A STOPPED reel's position can be poked (the next press re-reads it), and a
--- stopped reel can be RESTARTED (clear its stop flag) to replay the driver's
--- boundary walk from a chosen position -- that is how the rigged miss is
--- demonstrated deterministically: restarted at $24 in avoid mode the driver
--- must SKIP the completing boundary $20 (REEL3 index 2 = icon 3) and halt at
--- $10 (icon 1); the same restart in tier-1's bless mode must HALT at $20,
--- the very boundary vanilla refused.  Same drive, one pending byte
--- different: the tier is the only variable.
+-- ISSUE #75 SPLIT.  battle_slotsboot (the honest model this file now
+-- follows) proves tier 0 and tier 3 end to end on a NATURAL anchor boot:
+-- latch 0/3, rig forced benevolent at 3, the chosen triple, the 3-bp
+-- charge, the regen, and the multiplier exemption watch -- so this file's
+-- old poked tier-3 arm is DELETED as covered.  What remains here splits in
+-- two:
 --
--- FAIL-BEFORE / PASS-AFTER.  On the pre-change ROM the 0-bp arm passes with
--- identical observables (byte-vanilla evidence) and every tier arm fails
--- (no latch, no forced rig, no bought-off miss, no $f0 writer, damage
--- multiplied); on the post-change ROM all arms pass.  Both runs are recorded
--- in the change's report; the suite keeps the pass-after side green.
+--   HONEST HALF (zero writes): a second natural boot of the
+--   terra-returned-v1 battery anchor (battle_slotsboot's cold-Continue /
+--   disembark / walk / choose-the-draw pattern, verbatim), driving the two
+--   tiers slotsboot leaves unproven with real R presses on earned bp:
+--     H1 (1 bp): latch = 1, the 1-bp charge with regen skipped, and the
+--        commit re-bank -- tier 1 leaves the drawn rig alone, so no rig
+--        value is asserted (asserting one would need the poke this file
+--        just gave up; the rig's tier-1 hands-off half lives in the
+--        quarantine lab where the byte can be planted).
+--     H2 (2 bp, banked by two real unboosted spins): latch = 2, THE RIG
+--        FORCED BENEVOLENT ($00, or $3c under a real joker gate) -- read,
+--        not written -- reel-2 help blessed toward reel 1's honest icon
+--        with vanilla's 4-icon budget stored by the $f0 hook, and the 2-bp
+--        charge.
+--
+--   *** LABELED QUARANTINE LAB (issue #75) -- the icon/rig-byte arms ***
+--   No player input selects a reel icon: the reels free-run at frame rate
+--   and a press stops them wherever the frame parity fell, so "a cursed
+--   pair of 3s", "the same triple at tier 0 and tier 3" (the exemption
+--   A/B), and "a 7-pair under the joker gate" are unproducible on cue by
+--   any honest drive.  Those arms are MECHANISM unit tests (burn-down plan
+--   systemic call 2) and stay below as one loudly-labeled block on the old
+--   doorstep install rig -- rig bytes planted, reel positions parked,
+--   stopped reels restarted to replay the driver's boundary walk, monsters
+--   staged so nothing dies mid-observation.  The block keeps this file's
+--   waiver lines and MAY NEVER PRODUCE FIXTURES.  Arms: T0 byte-vanilla +
+--   the rigged miss; T1 the miss bought off (same drive, one pending byte
+--   different); T2 the drift walk replayed on a fresh budget; T3b the
+--   exemption A/B damage ratio on identical triples; T3j the joker gate
+--   refusing a bought 7-pair at 3 bp.
+--
+-- OT6_ANCHOR_LAYOUT: ot6-codex-o8-v1
 local H = dofile("tools/tests/lib/ot6.lua")
 local STATE = "build/states/battle_doorstep.mss.lua"
 
-local MENU, ACTOR = 0x7BCA, 0x62CA
+local MENU, ACTOR, MSTATE = 0x7BCA, 0x62CA, 0x7BC2
 local RIG, HELP1, MARK, DRIFT = 0x6179, 0x617B, 0x617C, 0x617D
 local POS  = { 0x7B8C, 0x7B8D, 0x7B8E }   -- reel 1/2/3 position (icon = >>4)
 local STOP = { 0x7B8F, 0x7B90, 0x7B91 }   -- reel stopped flags
@@ -57,7 +72,6 @@ local PRESS = { 0x7B92, 0x7B93, 0x7B94 }  -- press latches 1/2/3
 local LATCH, JOKER = 0x57BA, 0x2F49
 local SETZER, NONE = 0x09, 0xFF
 local PARTY = { 0, 1, 2 }
-local function ENT_C(s) return s * 2 end
 local function ENT_M(s) return 8 + s * 2 end
 local function bp(s)   return H.readByte(0x3E9C + s * 2) end
 local function pend(s) return H.readByte(0x3E9D + s * 2) end
@@ -71,18 +85,10 @@ local REEL = {
 }
 local function icon(r) return REEL[r][(H.readByte(POS[r]) >> 4) + 1] end
 
--- sym("Ot6SlotRig") -- the literal keeps compose.py injecting the symbol;
--- its absence from OT6_SYMS identifies a pre-change ROM, so the byte-vanilla
--- T0 arm can pass there too (every tier arm still fails hard pre-change)
-local function hasTiers()
-  return type(OT6_SYMS) == "table" and OT6_SYMS["Ot6SlotRig"] ~= nil
-end
-
 local actor, msPresent = nil, {}
 local results = {}      -- $2bb0-row writes from bank $c1 = the slot commit
 local driftW = {}       -- w7e617d writes: { k = writer bank, v = value }
 local mulHits = {}      -- Ot6BoostDmg multiplier writes during cmd $0f
-local hp3, d3, hp0, d0
 
 local function lastF0Drift()
   for i = #driftW, 1, -1 do
@@ -91,6 +97,376 @@ local function lastF0Drift()
   return nil
 end
 
+local function armWatches()
+  -- the commit press writes the result index to $2bb0,y from bank $c1
+  emu.addMemoryCallback(function(a, v)
+    pcall(function()
+      local s = emu.getState()
+      if s["cpu.k"] == 0xC1 then results[#results + 1] = { addr = a, v = v } end
+    end)
+  end, emu.callbackType.write, 0x7E2BB0, 0x7E2BC9)
+  -- who writes the drift budget, and what: the hook stores from $f0, the
+  -- vanilla inline store / the driver's decrements from $c1
+  emu.addMemoryCallback(function(_, v)
+    pcall(function()
+      local s = emu.getState()
+      driftW[#driftW + 1] = { k = s["cpu.k"], v = v }
+    end)
+  end, emu.callbackType.write, 0x7E617D, 0x7E617D)
+  -- the exemption watch (cheap guards first -- see battle_slotsboot's twin)
+  local BOOSTDMG = H.sym("Ot6BoostDmg")
+  emu.addMemoryCallback(function(_, v)
+    if not (v > 0 and H.readByte(0xB5) == 0x0F) then return end
+    pcall(function()
+      local s = emu.getState()
+      local pc = (s["cpu.k"] << 16) | s["cpu.pc"]
+      if pc >= BOOSTDMG and pc < BOOSTDMG + 0xA0 then
+        mulHits[#mulHits + 1] = v
+      end
+    end)
+  end, emu.callbackType.write, 0x7E3ECE, 0x7E3ECE)
+end
+
+local steps = {}
+local function add(t) for _, s in ipairs(t) do steps[#steps + 1] = s end end
+
+-- ========================================================================
+-- HONEST HALF -- the natural anchor boot (battle_slotsboot's pattern)
+-- ========================================================================
+local slotOf = {}
+local function ent() return actor * 2 end
+local function onFoot()
+  return (H.readByte(0x11FA) & 3) == 0 and H.readByte(0x11F3) == 0
+end
+
+-- wait for a character's menu; consume any other character's menu with a
+-- real Defend (right swaps Fight->Def, then A)
+local function menuFor(charId, what)
+  local ph = 0
+  local function up()
+    return H.readByte(MENU) ~= 0 and H.readByte(ACTOR) == slotOf[charId]
+  end
+  return H.driveUntil(up, 30000, {
+    H.call(function()
+      ph = ph + 1
+      if H.readByte(MENU) ~= 0 and H.readByte(ACTOR) ~= slotOf[charId] then
+        local step = ph % 40
+        if step < 4 then H.setPad({ right = true })
+        elseif step >= 20 and step < 24 then H.setPad({ a = true })
+        else H.setPad({}) end
+      else
+        H.setPad({})
+      end
+    end),
+  }, what)
+end
+
+local function openSlotWindow(what)
+  local row = nil
+  return H.repeatN(1, {
+    H.call(function()
+      row = nil
+      for r = 0, 3 do
+        if H.readByte(0x202E + slotOf[SETZER] * 12 + r * 3) == 0x0F then
+          row = r
+        end
+      end
+      H.assertEq(row ~= nil, true, "setzer's menu offers Slot")
+    end),
+    H.driveUntil(function()
+      return H.readByte(0x890F + slotOf[SETZER]) == row
+    end, 900, {
+      H.call(function()
+        local cur = H.readByte(0x890F + slotOf[SETZER])
+        if cur < row then H.setPad({ down = true })
+        elseif cur > row then H.setPad({ up = true }) end
+      end),
+      H.waitFrames(3), H.call(function() H.setPad({}) end), H.waitFrames(10),
+    }, what .. ": cursor on the Slot row"),
+    H.driveUntil(function()
+      return H.readByte(MSTATE) == 0x08 and H.readByte(PRESS[1]) == 0
+             and H.readByte(STOP[1]) == 0
+    end, 1500, {
+      H.call(function() H.setPad({ a = true }) end),
+      H.waitFrames(3), H.call(function() H.setPad({}) end), H.waitFrames(20),
+    }, what .. ": slot window open"),
+    H.waitFrames(12),
+  })
+end
+
+local function pressAUntilFnH(predFn, what)
+  return H.driveUntil(predFn, 3000, {
+    H.call(function() H.setPad({ a = true }) end),
+    H.waitFrames(3), H.call(function() H.setPad({}) end), H.waitFrames(11),
+  }, what)
+end
+local function pressAUntilH(addr, what)
+  return pressAUntilFnH(function() return H.readByte(addr) ~= 0 end, what)
+end
+local function pressCommitH(what)
+  return H.repeatN(1, {
+    H.call(function() results = {} end),
+    pressAUntilFnH(function() return #results > 0 end, what),
+  })
+end
+local function waitStopH(r, what)
+  return H.waitUntil(function() return H.readByte(STOP[r]) ~= 0 end, 900, what, 2)
+end
+
+-- one full honest spin at the CURRENT pending tier; asserts run via `checks`
+local function honestSpin(tag, checks)
+  return {
+    openSlotWindow(tag),
+    pressAUntilH(PRESS[1], tag .. " press1"),
+    H.call(function() if checks.afterPress1 then checks.afterPress1() end end),
+    waitStopH(1, tag .. " reel1"),
+    pressAUntilH(PRESS[2], tag .. " press2"),
+    H.call(function() if checks.afterPress2 then checks.afterPress2() end end),
+    waitStopH(2, tag .. " reel2"),
+    pressAUntilH(PRESS[3], tag .. " press3"),
+    waitStopH(3, tag .. " reel3"),
+    pressCommitH(tag .. " commit"),
+    H.call(function() if checks.afterCommit then checks.afterCommit() end end),
+  }
+end
+
+add({
+  -- cold Continue (the anchor's $307ff0=3 preselects slot 3)
+  H.waitFrames(350),
+  H.repeatN(5, { H.pressButtons({ "start" }, 8), H.waitFrames(25) }),
+  H.waitFrames(120),
+  H.repeatN(3, { H.pressButtons({ "a" }, 8), H.waitFrames(40) }),
+  H.waitFrames(300),
+  H.repeatN(3, { H.pressButtons({ "a" }, 8), H.waitFrames(60) }),
+  H.waitUntil(function() return H.worldMode() end, 3000,
+    "cold Continue to the world", 10),
+  H.waitUntil(function()
+    return (emu.getState()["ppu.screenBrightness"] or 0) >= 15
+  end, 900, "fade-in", 10),
+  H.waitFrames(60),
+  H.call(function() H.assertEntryContract("terra-returned-v1") end),
+
+  -- disembark guard
+  (function()
+    local ph2 = 0
+    return H.driveUntil(function()
+      return onFoot() and H.worldHasControl() and H.worldAligned()
+    end, 8000, {
+      H.call(function()
+        ph2 = ph2 + 1
+        H.setPad((ph2 % 45) < 6 and { b = true } or {})
+      end),
+    }, "disembark the grounded Blackjack")
+  end)(),
+  H.release(),
+  H.waitFrames(30),
+})
+
+-- walk the plain and CHOOSE the draw (slotsboot's gate: this run needs FOUR
+-- resolutions, so the floor is higher)
+add({ H.call(function() H.vars.suitable = false end) })
+for n = 1, 6 do
+  local w = {
+    (function()
+      local ph = 0
+      local pattern = { "down", "down", "right", "right", "down", "down",
+                        "left", "left" }
+      return H.driveUntil(function() return H.battleLoadStarted() end, 40000, {
+        H.call(function()
+          ph = ph + 1
+          local dir = pattern[(math.floor(ph / 20) % #pattern) + 1]
+          H.setPad({ [dir] = true })
+        end),
+      }, "a real world encounter fires (draw " .. n .. ")")
+    end)(),
+    H.release(),
+    H.waitUntil(function() return H.battleActive() end, 900,
+      "battle active (draw " .. n .. ")", 30),
+    H.waitFrames(240),
+    H.call(function()
+      msPresent = {}
+      for m = 0, 5 do
+        if H.readByte(0x3AA8 + m * 2) % 2 == 1 then
+          msPresent[#msPresent + 1] = m
+        end
+      end
+      local mhp = 0
+      for _, m in ipairs(msPresent) do mhp = mhp + H.readWord(0x3BFC + m * 2) end
+      H.vars.suitable = (#msPresent >= 2 and mhp >= 900)
+      H.log(string.format("draw %d: %d bodies, %d total max HP -> %s",
+        n, #msPresent, mhp, H.vars.suitable and "FIGHT" or "flee"))
+    end),
+    H.cond(function() return not H.vars.suitable end, {
+      H.fleeBattle(9000),
+      H.waitUntil(function()
+        return H.worldMode() and H.worldHasControl()
+      end, 1200, "back on the plain after fleeing draw " .. n, 10),
+      H.waitFrames(30),
+    }, {}),
+  }
+  if n == 1 then add(w)
+  else add({ H.cond(function() return not H.vars.suitable end, w, {}) }) end
+end
+
+add({
+  H.call(function()
+    H.assertEq(H.vars.suitable, true,
+      "the pool dealt a four-resolution formation within six draws")
+    for s = 0, 3 do
+      local id = H.readByte(0x3ED8 + s * 2)
+      if id ~= 0xFF then slotOf[id] = s end
+    end
+    H.assertEq(slotOf[SETZER] ~= nil, true, "SETZER present")
+    actor = slotOf[SETZER]
+    H.log(string.format("setzer slot %d monsters={%s} joker=$%02x",
+      actor, table.concat(msPresent, ","), H.readByte(JOKER)))
+    armWatches()
+  end),
+
+  -- ---------------------------------------------- H1: the tier-1 spin
+  menuFor(SETZER, "setzer menu (H1)"),
+  H.call(function()
+    H.assertEq(bp(actor), 1, "battle opens at 1 bp (Ot6InitBP)")
+  end),
+  H.pressButtons({ "r" }, 6), H.waitFrames(20),
+  H.call(function()
+    H.assertEq(pend(actor), 1, "one real R press banks pending 1")
+  end),
+})
+add(honestSpin("H1", {
+  afterPress1 = function()
+    H.assertEq(H.readByte(LATCH), 1,
+      "H1: Ot6SlotRig latched tier 1 at the first press")
+    H.log(string.format("H1: rig drawn $%02x (tier 1 leaves it alone -- "
+      .. "value is the roll's own)", H.readByte(RIG)))
+  end,
+  afterCommit = function()
+    H.assertEq(pend(actor), 1, "H1: the commit re-banked the latched tier 1")
+  end,
+}))
+add({
+  (function()
+    local hb = -600
+    return H.driveUntil(function()
+      if H.frame - hb >= 600 then
+        hb = H.frame
+        H.log(string.format("[H1 resolve f%d] pend=%d bp=%d menu=%02x "
+          .. "act=%02x st=%02x live=%s mons=%d", H.frame, pend(actor),
+          bp(actor), H.readByte(MENU), H.readByte(ACTOR), H.readByte(MSTATE),
+          tostring(H.battleLoadStarted()), H.monstersPresent()))
+      end
+      return pend(actor) == 0 or not H.battleLoadStarted()
+    end, 15000, {
+      H.call(function()
+        -- battle MESSAGES (the result banner) block the queue until
+        -- dismissed -- codex_ctx's measured lesson; tap A through them
+        H.setPad(H.readByte(MENU) == 0 and H.frame % 8 < 4
+                 and { a = true } or {})
+      end),
+      H.waitFrames(1),
+    }, "H1: the tier-1 spin resolves")
+  end)(),
+  H.waitFrames(60),
+  H.call(function()
+    H.assertEq(bp(actor), 0,
+      "H1: 1 bp - 1 spent = 0, regen skipped on a boosted turn")
+  end),
+
+  -- ------------------------------- bank 2 bp with two unboosted spins
+  menuFor(SETZER, "setzer menu (bank spin 1)"),
+})
+add(honestSpin("bank1", {}))
+add({
+  H.driveUntil(function() return bp(actor) == 1 end, 15000, {
+    H.call(function()
+      H.setPad(H.readByte(MENU) == 0 and H.frame % 8 < 4
+               and { a = true } or {})
+    end),
+    H.waitFrames(1),
+  }, "bank1: unboosted spin regens 0 -> 1"),
+  menuFor(SETZER, "setzer menu (bank spin 2)"),
+})
+add(honestSpin("bank2", {}))
+add({
+  H.driveUntil(function() return bp(actor) == 2 end, 15000, {
+    H.call(function()
+      H.setPad(H.readByte(MENU) == 0 and H.frame % 8 < 4
+               and { a = true } or {})
+    end),
+    H.waitFrames(1),
+  }, "bank2: unboosted spin regens 1 -> 2"),
+
+  -- ---------------------------------------------- H2: the tier-2 spin
+  menuFor(SETZER, "setzer menu (H2)"),
+  H.repeatN(2, { H.pressButtons({ "r" }, 6), H.waitFrames(20) }),
+  H.call(function()
+    H.assertEq(pend(actor), 2, "two real R presses bank pending 2")
+    driftW = {}
+  end),
+})
+add(honestSpin("H2", {
+  afterPress1 = function()
+    H.assertEq(H.readByte(LATCH), 2, "H2: latched tier 2")
+    local want = (H.readByte(JOKER) & 4) ~= 0 and 0x3C or 0x00
+    H.assertEq(H.readByte(RIG), want, string.format(
+      "H2: THE RIG FORCED BENEVOLENT ($%02x) at 2 bp -- read off the "
+      .. "machine, not written to it", want))
+  end,
+  afterPress2 = function()
+    -- reel 1 stopped wherever the honest press fell; the bless must aim
+    -- reel 2 at THAT icon (unless it is the joker-gated 7)
+    local i1 = icon(1)
+    local gated = i1 == 0 and (H.readByte(JOKER) & 4) ~= 0
+    if gated then
+      H.log("H2: reel 1 landed the gated 7 -- no help, documented exception")
+      H.assertEq(H.readByte(HELP1), 0xFF, "H2: 7s stay gated")
+    else
+      H.assertEq(H.readByte(HELP1), i1, string.format(
+        "H2: reel 2 blessed toward reel 1's honest icon %d", i1))
+      H.assertEq(lastF0Drift(), 0x04,
+        "H2: with vanilla's 4-icon budget, stored by the $f0 hook")
+    end
+  end,
+  afterCommit = function()
+    H.assertEq(pend(actor), 2, "H2: the commit re-banked the latched tier 2")
+  end,
+}))
+add({
+  (function()
+    local hb = -600
+    return H.driveUntil(function()
+      if H.frame - hb >= 600 then
+        hb = H.frame
+        H.log(string.format("[H2 resolve f%d] pend=%d bp=%d menu=%02x "
+          .. "act=%02x st=%02x live=%s mons=%d", H.frame, pend(actor),
+          bp(actor), H.readByte(MENU), H.readByte(ACTOR), H.readByte(MSTATE),
+          tostring(H.battleLoadStarted()), H.monstersPresent()))
+      end
+      return pend(actor) == 0 or not H.battleLoadStarted()
+    end, 15000, {
+      H.call(function()
+        H.setPad(H.readByte(MENU) == 0 and H.frame % 8 < 4
+                 and { a = true } or {})
+      end),
+      H.waitFrames(1),
+    }, "H2: the tier-2 spin resolves")
+  end)(),
+  H.waitFrames(60),
+  H.call(function()
+    H.assertEq(bp(actor), 0, "H2: 2 bp - 2 spent = 0")
+    H.assertEq(#mulHits, 0,
+      "EXEMPTION (honest half): the damage multiplier never ran under cmd "
+      .. "$0f across all four natural resolutions")
+    H.log("honest half complete: tier-1 and tier-2 latch/rig/bless/economy "
+      .. "on a natural boot")
+  end),
+})
+
+-- ========================================================================
+-- *** LABELED QUARANTINE LAB (issue #75) -- see the header. ***
+-- Fault injection for the icon-specific machinery: rig bytes planted, reel
+-- positions parked, stopped reels restarted.  MAY NEVER PRODUCE FIXTURES.
+-- ========================================================================
 local function stageEnemies(hp)
   for _, m in ipairs(msPresent) do
     local e = ENT_M(m)
@@ -115,9 +491,7 @@ local function installSetzer()
     H.writeByte(0x2037 + s * 12, NONE)
     if actor and s ~= actor then
       -- non-actors are WOUNDED, not stopped: a stopped character's pending
-      -- menu stays open forever and starves the actor's next turn (measured
-      -- here: menu parked on slot 01, state 05, 12000+ frames).  A dead row
-      -- raises no menus at all, so every spin is the actor's.
+      -- menu stays open forever and starves the actor's next turn.
       H.writeByte(0x3EE4 + s * 2, H.readByte(0x3EE4 + s * 2) | 0x80)
       H.writeWord(0x3BF4 + s * 2, 0)
     else
@@ -131,8 +505,6 @@ end
 local function pin() stageEnemies(true); installSetzer() end
 local function pinNoHp() stageEnemies(false); installSetzer() end     -- damage windows
 
--- tap A until pred holds (a press while its stage is ineligible is
--- vanilla-ignored, so the cadence cannot double-press)
 local function pressAUntilFn(predFn, what)
   return H.driveUntil(predFn, 3000, {
     H.call(function() pin(); H.setPad({ "a" }) end),
@@ -142,8 +514,6 @@ end
 local function pressAUntil(addr, what)
   return pressAUntilFn(function() return H.readByte(addr) ~= 0 end, what)
 end
--- the commit press: detected by the C1 queue write (C2 can drain the row
--- within a frame, so polling the queue could miss it)
 local function pressCommit(what)
   return H.repeatN(1, {
     H.call(function() results = {} end),
@@ -151,30 +521,9 @@ local function pressCommit(what)
   })
 end
 
--- wait for the actor's command menu, press A on the (poked, only) Slot row,
--- wait for the live reel state ($7bc2 = 8, UpdateMenuState_08) with a fresh
--- spin (the open chain's state $32 cleared the press/stop flags).  driveUntil
--- checks its predicate BEFORE each tap, so no tap can land after state 8 is
--- already live and steal the first reel-stop press.
 local function openReels()
-  local ph = 0
   return H.repeatN(1, {
     H.driveUntil(function()
-      ph = ph + 1
-      if ph % 600 == 0 then
-        H.log(string.format(
-          "[menuwait ph=%d] menu=%02x actor=%02x st=%02x close=%02x " ..
-          "s0=%02x/%02x s1=%02x/%02x s2=%02x/%02x cmdq=%02x %02x %02x %02x ord=%02x,%02x,%02x,%02x",
-          ph, H.readByte(MENU), H.readByte(ACTOR), H.readByte(0x7BC2),
-          H.readByte(0x7BCB),
-          H.readByte(0x3EE4), H.readByte(0x3EF8),
-          H.readByte(0x3EE6), H.readByte(0x3EFA),
-          H.readByte(0x3EE8), H.readByte(0x3EFC),
-          H.readByte(0x2BAE), H.readByte(0x2BB6),
-          H.readByte(0x2BBE), H.readByte(0x2BC6),
-          H.readByte(0x64D6), H.readByte(0x64D7),
-          H.readByte(0x64D8), H.readByte(0x64D9)))
-      end
       return H.readByte(MENU) ~= 0 and H.readByte(ACTOR) == actor
     end, 12000, { H.call(pin), H.waitFrames(1) }, "setzer's menu"),
     H.waitFrames(20),
@@ -191,8 +540,6 @@ end
 
 -- restart a stopped reel from a chosen position: clear its stop flag and let
 -- the driver replay its boundary walk against the CURRENT mode cells
--- (w7e617b/c/d) -- pure vanilla driver mechanics, used to demonstrate what
--- those cells make physically possible
 local function restartReel(r, pos)
   return H.call(function()
     H.writeByte(POS[r], pos)
@@ -204,8 +551,15 @@ local function waitStop(r, what)
   return H.waitUntil(function() return H.readByte(STOP[r]) ~= 0 end, 900, what, 2)
 end
 
-H.run({ maxFrames = 250000 }, {
-  H.waitFrames(20),
+local hp3, d3, hp0, d0
+
+add({
+  H.call(function()
+    H.log("*** entering the LABELED QUARANTINE LAB (doorstep install rig; "
+      .. "see header) ***")
+    msPresent = {}
+    actor = nil
+  end),
   H.loadState(STATE),
   H.waitFrames(10),
   H.enterEncounter(),
@@ -224,58 +578,18 @@ H.run({ maxFrames = 250000 }, {
   }, "menu opens (Setzer installed)"),
   H.call(function()
     actor = H.readByte(ACTOR)
-    H.log(string.format("actor slot %d id=$%02x monsters={%s} joker=$%02x",
+    H.log(string.format("lab actor slot %d id=$%02x monsters={%s} joker=$%02x",
       actor, H.readByte(0x3ED8 + actor * 2),
       table.concat(msPresent, ","), H.readByte(JOKER)))
     pin()
-    -- the commit press writes the result index to $2bb0,y from bank $c1
-    emu.addMemoryCallback(function(a, v)
-      pcall(function()
-        local s = emu.getState()
-        if s["cpu.k"] == 0xC1 then results[#results + 1] = { addr = a, v = v } end
-      end)
-    end, emu.callbackType.write, 0x7E2BB0, 0x7E2BC9)
-    -- who writes the drift budget, and what: the hook stores from $f0, the
-    -- vanilla inline store / the driver's decrements from $c1
-    emu.addMemoryCallback(function(_, v)
-      pcall(function()
-        local s = emu.getState()
-        driftW[#driftW + 1] = { k = s["cpu.k"], v = v }
-      end)
-    end, emu.callbackType.write, 0x7E617D, 0x7E617D)
-    -- the Ot6BoostDmg multiplier path parks its loop counter in OT6_SCR_BIT
-    -- ($3ece) BEFORE multiplying; a write from INSIDE Ot6BoostDmg while the
-    -- current command is slot ($b5 = $0f) is the multiplier running -- the
-    -- exemption says it never may.  ($3ece is shared OT6 scratch and $b5
-    -- goes stale between actions, so both the pc range AND the command gate
-    -- are needed: a naive bank filter records 100k+ innocents.)
-    local BOOSTDMG = H.sym("Ot6BoostDmg")
-    emu.addMemoryCallback(function(_, v)
-      -- CHEAP GUARDS FIRST.  Same conjunction as before -- `v > 0`, the
-      -- command gate, and the pc range -- reordered, nothing dropped: the
-      -- two byte tests are exact and order-free, so the recorded set is
-      -- identical.  It matters because $3ece is shared OT6 scratch written
-      -- tens of thousands of times a run (the comment above measured "100k+
-      -- innocents"), and emu.getState() serialises the whole machine into a
-      -- fresh Lua table on EVERY call.  Paying that before the one-byte
-      -- tests was most of this test's wall clock.
-      if not (v > 0 and H.readByte(0xB5) == 0x0F) then return end
-      pcall(function()
-        local s = emu.getState()
-        local pc = (s["cpu.k"] << 16) | s["cpu.pc"]
-        if pc >= BOOSTDMG and pc < BOOSTDMG + 0xA0 then
-          mulHits[#mulHits + 1] = v
-        end
-      end)
-    end, emu.callbackType.write, 0x7E3ECE, 0x7E3ECE)
+    mulHits = {}
   end),
 
   -- ============================================================= ARM T0: 0 bp
   -- byte-vanilla, incl. the rigged miss.  All-cursed rig poked after the
   -- draw; forced pair of 3s; reel 3 restarted at $24 in the resulting avoid
   -- mode must SKIP the completing boundary $20 and halt at $10.  Economy:
-  -- +1 regen, nothing charged.  (This arm must pass IDENTICALLY on the
-  -- pre-change ROM.)
+  -- +1 regen, nothing charged.
   H.call(function()
     H.writeByte(0x3E9C + actor * 2, 2)
     H.writeByte(0x3E9D + actor * 2, 0)
@@ -284,11 +598,7 @@ H.run({ maxFrames = 250000 }, {
   openReels(),
   pressAUntil(PRESS[1], "t0 press1"),
   H.call(function()
-    if hasTiers() then
-      H.assertEq(H.readByte(LATCH), 0, "t0: latch = 0 (tier-0 spin)")
-    else
-      H.log("t0: pre-change ROM (no Ot6SlotRig symbol) -- latch not asserted")
-    end
+    H.assertEq(H.readByte(LATCH), 0, "t0: latch = 0 (tier-0 spin)")
     H.log(string.format("t0: rig drawn $%02x, poking $ff (all-cursed)", H.readByte(RIG)))
     H.writeByte(RIG, 0xFF)
   end),
@@ -373,10 +683,8 @@ H.run({ maxFrames = 250000 }, {
   end),
 
   -- ============================================================= ARM T2: 2 bp
-  -- the machine cheats FOR you: the rig byte is FORCED benevolent (an $f0
-  -- store), reel 2 is blessed toward the pair with vanilla's 4-icon budget,
-  -- and the drift walk itself is replayed: restarted three icons shy of the
-  -- match it must spend two budget icons and halt on the pair.
+  -- the drift walk itself, replayed: restarted three icons shy of the match
+  -- it must spend two budget icons and halt on the pair.
   H.call(function()
     H.writeByte(0x3E9C + actor * 2, 5)
     H.writeByte(0x3E9D + actor * 2, 2)
@@ -426,11 +734,9 @@ H.run({ maxFrames = 250000 }, {
     H.assertEq(bp(actor), 3, "t2: 5 bp - 2 spent = 3")
   end),
 
-  -- ============================================================= ARM T3: 3 bp
-  -- the reel is CHOSEN.  Reel 1 parked on icon 5 (dragon); with the
-  -- whole-strip budget reels 2 and 3 must seek it from WHEREVER the presses
-  -- fell -- no restarts, no position pokes -- and the queued result is the
-  -- chosen triple.  Damage D3 recorded for the exemption ratio.
+  -- ==================================================== ARM T3b: exemption A/B
+  -- the same triple at 3 bp and then at 0 bp: unboosted damage D0 must sit
+  -- in the same band as boosted D3 -- the multiplier would have made D3 ~8x.
   H.call(function()
     H.writeByte(0x3E9C + actor * 2, 5)
     H.writeByte(0x3E9D + actor * 2, 3)
@@ -440,53 +746,32 @@ H.run({ maxFrames = 250000 }, {
   pressAUntil(PRESS[1], "t3 press1"),
   H.call(function()
     H.assertEq(H.readByte(LATCH), 3, "t3: latch = 3")
-    local want = (H.readByte(JOKER) & 4) ~= 0 and 0x3C or 0x00
-    H.assertEq(H.readByte(RIG), want, "t3: rig forced benevolent")
   end),
   waitStop(1, "t3 reel1 stops"),
   H.call(function() H.writeByte(POS[1], 0x50) end),   -- icon1 = REEL1[5] = 5
   pressAUntil(PRESS[2], "t3 press2"),
-  H.call(function()
-    H.assertEq(H.readByte(HELP1), 0x05, "t3: reel 2 seeks the chosen icon")
-    H.assertEq(lastF0Drift(), 0xFF, "t3: with the whole-strip budget")
-  end),
   waitStop(2, "t3 reel2 stops"),
   H.call(function()
-    H.assertEq(icon(2), 5, "t3: reel 2 FOUND it, wherever the press fell")
-    driftW = {}
+    H.assertEq(icon(2), 5, "t3: reel 2 sought the chosen icon (whole-strip budget)")
   end),
   pressAUntil(PRESS[3], "t3 press3"),
-  H.call(function()
-    H.assertEq(H.readByte(MARK), 0x05, "t3: pair blessed")
-    H.assertEq(lastF0Drift(), 0xFF, "t3: whole-strip budget again")
-  end),
   waitStop(3, "t3 reel3 stops"),
   H.call(function()
-    H.assertEq(icon(3), 5, "t3: reel 3 completed the CHOSEN triple")
+    H.assertEq(icon(3), 5, "t3: the triple completes")
     stageEnemies(true)
     hp3 = hpsum()
   end),
   pressCommit("t3 commit"),
   H.call(function()
     H.assertEq(results[#results].v, 6, "t3: triple 5s resolve index 6 (megaflare)")
-    H.assertEq(pend(actor), 3, "t3: commit re-banked the latched tier")
   end),
   H.driveUntil(function() return pend(actor) == 0 and H.readByte(MENU) ~= 0 end, 12000,
     { H.call(pinNoHp), H.waitFrames(1) },   -- NO hp re-pin: the damage must stand
-    "t3: chosen triple resolves"),
+    "t3: boosted triple resolves"),
   H.call(function()
-    H.assertEq(bp(actor), 2, "t3: 5 bp - 3 spent = 2")
     d3 = hp3 - hpsum()
     H.log(string.format("t3: boosted triple-5 damage = %d", d3))
-    H.assertEq(d3 > 0, true, "t3: the chosen attack dealt damage")
-  end),
-
-  -- ==================================================== ARM T3b: exemption A/B
-  -- the SAME attack at 0 bp: reels stopped anywhere, then all three
-  -- positions parked on icon 5 before the commit press (the result mapper
-  -- reads final positions).  Unboosted damage D0 must sit in the same band
-  -- as D3 -- the multiplier would have made D3 ~8x D0.
-  H.call(function()
+    H.assertEq(d3 > 0, true, "t3: the boosted attack dealt damage")
     H.writeByte(0x3E9C + actor * 2, 2)
     H.writeByte(0x3E9D + actor * 2, 0)
   end),
@@ -565,3 +850,5 @@ H.run({ maxFrames = 250000 }, {
     H.screenshot("slots_tiers_done")
   end),
 })
+
+H.run({ maxFrames = 400000 }, steps)

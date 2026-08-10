@@ -91,6 +91,9 @@ ram_env_for() {
     # the same anchor hand-off the Makefile's SMOKE_ANCHOR_* map gives
     # anchored smoke generators (run.sh materializes it before boot).
     battle_slotsboot) echo "OT6_SRAM_ANCHOR=tools/tests/anchors/terra-returned-v1" ;;
+    # battle_slots' honest half (issue #75) cold-Continues the same anchor
+    # for its tier-1/tier-2 spins before its labeled quarantine lab.
+    battle_slots) echo "OT6_SRAM_ANCHOR=tools/tests/anchors/terra-returned-v1" ;;
     *) echo "" ;;
   esac
 }
