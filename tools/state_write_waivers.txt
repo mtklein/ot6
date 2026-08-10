@@ -30,7 +30,6 @@ tools/tests/battle_breakflash.lua	.writeByte(
 tools/tests/battle_breakflash.lua	.writeWord(
 tools/tests/battle_bushido.lua	.writeByte(
 tools/tests/battle_bushido.lua	.writeWord(
-tools/tests/battle_bushidogrey.lua	.writeByte(
 tools/tests/battle_bushidogrey.lua	.writeWord(
 tools/tests/battle_bushidoloadout.lua	.writeByte(
 tools/tests/battle_bushidoloadout.lua	.writeWord(
@@ -55,9 +54,6 @@ tools/tests/battle_hudtrack.lua	.writeWord(
 tools/tests/battle_levelup.lua	.writeByte(
 tools/tests/battle_levelup.lua	.writeWord(
 tools/tests/battle_loadgate.lua	.writeWord(
-tools/tests/battle_magicite.lua	.writeByte(
-tools/tests/battle_magicite.lua	.writeWord(
-tools/tests/battle_mpcost.lua	.writeByte(
 tools/tests/battle_mpcost.lua	.writeWord(
 tools/tests/battle_rage.lua	.writeByte(
 tools/tests/battle_rage.lua	.writeWord(
@@ -72,7 +68,6 @@ tools/tests/battle_slotsboot.lua	.writeByte(
 tools/tests/battle_slotsboot.lua	.writeWord(
 tools/tests/battle_steal.lua	.writeByte(
 tools/tests/battle_subjob.lua	.writeByte(
-tools/tests/battle_subjob.lua	.writeWord(
 tools/tests/battle_trueknight.lua	.writeByte(
 tools/tests/battle_trueknight.lua	.writeWord(
 tools/tests/gen_battle2.lua	.writeWord(

@@ -1,181 +1,200 @@
--- @suite
+-- @suite slow frontier=camp_escaped
 -- battle_mpcost.lua -- v0.5 "every ability costs MP": the OT6_MP_COSTS A/B.
 --
 -- ONE self-detecting instrument, run on BOTH builds (this is the whole A/B the
--- task asks for -- the same technique the fix_checksum rewrite used, lifted
--- from bytes to behavior). v0.5 flipped the flag ON by default, so the A/B's
--- premise INVERTS: the SHIPPED ROM now charges, and the flag-OFF build is the
--- control.
+-- task asks for).  v0.5 flipped the flag ON by default, so the A/B's premise
+-- INVERTS: the SHIPPED ROM charges, and the flag-OFF build is the control.
 --   * on the shipped, flag-ON ROM (build/ot6.sfc, the suite's default) the
 --     cost table is PRESENT in bank F0 with kits.md's numbers, so the test
---     asserts the CHARGE and the insufficient-mp REFUSAL. This is the live
---     shipped behavior.
---   * on the flag-OFF baseline (ff6/rom/ff6-en-nomp.sfc, built by `make -C ff6
---     ff6-en-nomp`, handed here via OT6_ROM) the cost table is ABSENT from
---     bank F0 -- none of the machinery is assembled, the ROM is byte-identical
---     to the pre-feature vanilla-OT6 baseline -- so the test asserts the verb
---     is FREE. This is the negative control: the identical SwdTech tech
---     charges nothing.
+--     asserts the CHARGE and the insufficient-mp REFUSAL.
+--   * on the flag-OFF baseline (ff6/rom/ff6-en-nomp.sfc, handed here via
+--     OT6_ROM) the cost table is ABSENT -- so the identical SwdTech tech is
+--     FREE.  This is the negative control.
 --
--- The mechanism under test: vanilla's GetMPCost prices only magic/lore/summon/
--- x-magic; Blitz/SwdTech/Tools fall through it at 0, so the universal charge
--- at CalcAttackEffect ($3a4c subtract, insufficient-mp fizzle) never fires for
--- them. Ot6AbilityCost (ot6.asm) swaps that 0 for the kit price keyed by the
--- id already in $3a7b. Charge AND refusal are both universal; the menu
--- grey-out/display that ships alongside (menu bank) is what let the flag turn
--- on (docs/design/mp-economy.md).
+-- The mechanism under test: vanilla's GetMPCost prices only magic/lore/
+-- summon/x-magic; Blitz/SwdTech/Tools fall through it at 0, so the universal
+-- charge at CalcAttackEffect never fires for them.  Ot6AbilityCost (ot6.asm)
+-- swaps that 0 for the kit price keyed by the id in $3a7b.
+--
+-- Issue #75 conversion.  The old apparatus installed a triple-CYAN party by
+-- poke ($3ED8, SwdTech-only $202E, the SWDTECH weapon flag written, $2020
+-- ceiling pinned), stopped and HP-pinned the guards, and pinned each
+-- scenario's MP.  On camp_escaped CYAN IS REAL (battle_bushidogrey's
+-- measured kit: katana SWDTECH flag $3BA4 bit 1 reads $82; the real learned
+-- window is Dispatch $55 @ 4 MP boost 1 / Retort $56 @ 10 MP boost 2), the
+-- fights are real world encounters, and both scenarios' MP states are the
+-- fight's own:
+--
+--   CHARGE  the battle's FIRST Cyan turn -- before any enemy has acted --
+--           casts a real Dispatch off the opening 1-bp bank against his
+--           real 67-MP pool.  ON: debited to exactly mp0-4 (write watch +
+--           direct read inside the clean window).  OFF: the pool does not
+--           move.  Both: the tech lands its hit.
+--   REFUSAL (ON only) *** LABELED ISOLATION ARM (owner calibration). ***
+--           battle_bushidogrey measured the honest routes to a broke
+--           kit-caster out of reach on this pool's economy: a deferring
+--           party is ground down before any real poverty arrives (the
+--           'enemy MP drain' first blamed was battle-teardown zeroes read
+--           ungated), and a six-battle Dispatch walk never spends the
+--           pool down -- the trash dies first.  So this arm keeps ONE
+--           write, said loudly: MP := 1 (< Dispatch's 4) with the pip
+--           rebanked by a real item turn; the retried Dispatch must
+--           fizzle -- no damage, the 1 MP untouched, never negative.
 local H = dofile("tools/tests/lib/ot6.lua")
-local STATE = "build/states/battle_doorstep.mss.lua"
+local STATE = "build/states/camp_escaped.mss.lua"
 
-local MENU, ACTOR, MSTATE = 0x7BCA, 0x62CA, 0x7BC2
-local KNOWN = 0x2020
--- v0.5 (#8): SwdTech is now a tools-shell submenu (menu state $30), not the
--- vanilla numeral gauge ($37).  The submenu row IS the boost level: pick row i
--- (cursor $8963/$8967) and confirm banks $3e9d = i+1 and latches that rung's
--- tech (#38's 1-BP floor -- there is no 0x row).
-local ST_SUB = 0x30
+local MENU, ACTOR, MSTATE, CMDROW = 0x7BCA, 0x62CA, 0x7BC2, 0x890F
+local ST_CMD, ST_ITEM, ST_TOOLS, ST_TGT, ST_TRANS = 0x05, 0x0A, 0x30, 0x38, 0x01
+local CMD_SWDTECH, CMD_ITEM = 0x07, 0x01
+local KROW = 0x8967
+local TONIC, POTION = 0xE8, 0xE9
+local DISPATCH, DISPATCH_COST = 0x55, 4
 
-local PARTY = { 0, 1, 2 }
-local GUARDS = { 2, 3 }                  -- monster slots -> entity 8+slot*2
-local OT6_SLASH = 0x01
-local QSLAM = 3                           -- Quadra Slam: tech index; id $55+3 = $58
-local QSLAM_COST = 16                     -- Ot6AbilityCostTbl: $58 -> 16 (#45)
-local GUARD_HP = 0xF000                   -- pinned high so a hit never kills
-
-local function CURMP(s) return 0x3C08 + s * 2 end
-local function MAXMP(s) return 0x3C30 + s * 2 end
-local function CURHP(s) return 0x3BF4 + s * 2 end
-local function SH(s)  return 0x3E38 + (8 + s * 2) end
-local function TM(s)  return 0x3E88 + (8 + s * 2) end
-local function WKE(s) return 0x3BE0 + (8 + s * 2) end
-local function WKC(s) return 0x3E9C + (8 + s * 2) end
-local function MHP(s) return 0x3BFC + s * 2 end
-local function ST3(e) return 0x3EF8 + e end
-local function mp(s)  return H.readWord(CURMP(s)) end
-local function inWindow() return H.readByte(MSTATE) == ST_SUB end
-local function guardHp()
+local cyan, shadow
+local function bp() return H.readByte(0x3E9C + cyan*2) end
+local function pend() return H.readByte(0x3E9D + cyan*2) end
+local function mp() return H.readWord(0x3C08 + cyan*2) end
+local function hp(slot) return H.readWord(0x3BF4 + slot*2) end
+local function monsterHpSum()
   local t = 0
-  for _, s in ipairs(GUARDS) do t = t + H.readWord(MHP(s)) end
+  for s = 0, 5 do t = t + H.readWord(0x3BFC + s*2) end
   return t
+end
+local function cmdRowOf(slot, cmd)
+  for r = 0, 3 do
+    if H.readByte(0x202E + slot*12 + r*3) == cmd then return r end
+  end
+  return nil
+end
+local function bagIdxOf(ids)
+  for i = 0, 251 do
+    local id = H.readByte(0x2686 + i*5)
+    for _, w in ipairs(ids) do
+      if id == w and H.readByte(0x2686 + i*5 + 3) > 0 then return i end
+    end
+  end
+  return nil
+end
+local function refindSlots()
+  for slot = 0, 3 do
+    local id = H.readByte(0x3ED8 + slot*2)
+    if id == 0x02 then cyan = slot end
+    if id == 0x03 then shadow = slot end
+  end
+end
+
+-- battle_bushidogrey's drive machine, verbatim shape
+local mf = 0
+local cyanMode = "defer"                 -- "defer" | "item" | "tech:<row>"
+local quietA = false                     -- suppress the menu-idle A-mash: it
+                                         -- can land on a JUST-opened window
+                                         -- and confirm a bystander's Fight
+                                         -- (measured: 104 stray damage inside
+                                         -- the refusal window)
+local function decide()
+  if H.readByte(MENU) == 0 then
+    if quietA then return {} end
+    return (H.frame % 8 < 4) and { a = true } or {}
+  end
+  mf = mf + 1
+  local act = H.readByte(ACTOR) & 3
+  local st = H.readByte(MSTATE)
+  if st == ST_TRANS then return {} end
+  local slow = (st == ST_ITEM)
+  if slow then
+    if (mf - 1) % 30 >= 6 then return {} end
+  else
+    if (mf - 1) % 8 >= 4 then return {} end
+  end
+  local btn
+  if act == shadow then
+    local hurt = false
+    for s2 = 0, 3 do
+      local h, m = hp(s2), H.readWord(0x3C1C + s2*2)
+      if h > 0 and m > 0 and h * 100 // m < 60 then hurt = true end
+    end
+    if st == ST_CMD and not hurt then btn = "x"
+    elseif st == ST_CMD then
+      local want = cmdRowOf(shadow, CMD_ITEM)
+      local cur = H.readByte(CMDROW + shadow) & 3
+      if cur == want then btn = "a"
+      else btn = (cur < want) and "down" or "up" end
+    elseif st == ST_ITEM then
+      local want = bagIdxOf({ TONIC, POTION })
+      if want == nil then btn = "b"
+      else
+        local cur = H.readByte(0x8947 + shadow) + H.readByte(0x894F + shadow)
+        if cur < want then btn = "down"
+        elseif cur > want then btn = "up"
+        else btn = "a" end
+      end
+    elseif st == ST_TGT then btn = "a"
+    else btn = "b" end
+  elseif act == cyan then
+    if cyanMode == "defer" then
+      btn = (st == ST_CMD) and "x" or "b"
+    elseif cyanMode == "item" then
+      if st == ST_CMD then
+        local want = cmdRowOf(cyan, CMD_ITEM)
+        local cur = H.readByte(CMDROW + cyan) & 3
+        if cur == want then btn = "a"
+        else btn = (cur < want) and "down" or "up" end
+      elseif st == ST_ITEM then
+        local want = bagIdxOf({ TONIC, POTION })
+        if want == nil then error("bank ran out of items", 0) end
+        local cur = H.readByte(0x8947 + cyan) + H.readByte(0x894F + cyan)
+        if cur < want then btn = "down"
+        elseif cur > want then btn = "up"
+        else btn = "a" end
+      elseif st == ST_TGT then btn = "a"
+      else btn = "b" end
+    else
+      local row = tonumber(cyanMode:match(":(%d)"))
+      if st == ST_CMD then
+        local want = cmdRowOf(cyan, CMD_SWDTECH)
+        local cur = H.readByte(CMDROW + cyan) & 3
+        if cur == want then btn = "a"
+        else btn = (cur < want) and "down" or "up" end
+      elseif st == ST_TOOLS then
+        local cur = H.readByte(KROW + cyan)
+        if cur < row then btn = "down"
+        elseif cur > row then btn = "up"
+        else btn = "a" end
+      elseif st == ST_TGT then btn = "a"
+      else btn = "b" end
+    end
+  else
+    btn = (st == ST_CMD) and "x" or "b"
+  end
+  return btn and { [btn] = true } or {}
+end
+local function frame()
+  if H.battleLoadStarted() then
+    H.setPad(decide())
+    return
+  end
+  if not H.worldMode() or not H.worldHasControl() then H.setPad({}); return end
+  H.setPad(((H.frame // 120) % 2 == 0) and { left = true } or { right = true })
+end
+local function driveTo(pred, maxF, tag)
+  return H.driveUntil(pred, maxF, {
+    H.call(frame),
+  }, tag)
 end
 
 local mode                               -- "on" (charges) | "off" (free)
--- Both scenarios use a natural FIRST turn from the opening ATB wave: all three
--- slots fill together, so after the charge actor acts the refusal actor's menu
--- is already queued (no ATB refill needed -- this fixture does not refill a
--- spent actor promptly, which is why we never reuse one). No parking: an
--- un-driven character just waits at its menu, it never auto-acts, so leaving
--- the others un-driven is enough isolation. `active` is the slot being pinned.
-local active, chargeSlot, refuseSlot
-local ceiling = 4                         -- techs known-1: window {2,3,4}
-local pinPend = 1                         -- row 1 = 2 bp -> Quadra Slam (tech 3)
-local casterMp = 50                       -- re-pinned each frame until a latch
-local pinCaster = true
-local spells = {}                         -- attack ids seen at $3410 (cleared per scenario)
-
-local function pinCyan()
-  H.writeWord(KNOWN, ceiling)
-  for _, s in ipairs(PARTY) do
-    H.writeByte(0x3ED8 + s * 2, 0x02)                 -- CHAR::CYAN
-    local st1 = 0x3EE4 + s * 2
-    H.writeByte(st1, H.readByte(st1) & 0xF7)          -- clear magitek (fixture is Magitek)
-    H.writeByte(0x202E + s * 12, 0x07)                -- SwdTech, alone
-    H.writeByte(0x2031 + s * 12, 0xFF)
-    H.writeByte(0x2034 + s * 12, 0xFF)
-    H.writeByte(0x2037 + s * 12, 0xFF)
-    H.writeByte(0x3BA4 + s * 2, H.readByte(0x3BA4 + s * 2) | 0x02)  -- SWDTECH ok
-    H.writeByte(0x3BA5 + s * 2, H.readByte(0x3BA5 + s * 2) | 0x02)
-    H.writeWord(CURHP(s), 999)                         -- nobody dies on the bench
-  end
-  if active then
-    H.writeByte(0x3E9C + active * 2, 5)                -- full bp bank
-    H.writeByte(0x3E9D + active * 2, pinPend)          -- pending boost
-    if pinCaster then
-      H.writeWord(MAXMP(active), 99)
-      H.writeWord(CURMP(active), casterMp)             -- the scenario's MP
-    end
-  end
+local spells, mpWrites = {}, {}
+local function sawSpell(id)
+  for _, v in ipairs(spells) do if v == id then return true end end
+  return false
 end
+local R = {}
 
-local function pinGuards()
-  for _, s in ipairs(GUARDS) do
-    H.writeByte(WKE(s), 0)                -- class chips only (no element x2)
-    H.writeByte(WKC(s), OT6_SLASH)        -- slashing-weak -> bushido chips
-    H.writeByte(TM(s), 0)                 -- never broken
-    local st3 = ST3(8 + s * 2)
-    H.writeByte(st3, H.readByte(st3) | 0x10)   -- stopped: nothing contests
-    H.writeWord(MHP(s), GUARD_HP)         -- survives, so damage is measurable
-    H.writeByte(SH(s), 8)
-  end
-end
-
-local function pin() pinCyan(); pinGuards() end
-
--- open the swdtech SUBMENU, put the cursor on the wanted boost row, confirm,
--- run it to $3410. clears the spell log first so each scenario waits for ITS
--- OWN execution.  techIdx is the tech the (row, ceil) window selects and the
--- attack id to watch.  #38 put a 1-BP floor under SwdTech: the window is three
--- rows and row i = boost i+1, tech = min(max(0,ceil-2)+i, ceil).  So
--- (row 1, ceiling 4) = Quadra Slam (tech 3) and (row 0, ceiling 2) = Dispatch
--- (tech 0).  The caster's bp bank is pinned to 5 throughout, so the BP gate
--- never fires and the MP refusal stays the only variable under test.
-local function latchTech(tag, techIdx, pend, ceil)
-  local attackId = 0x55 + techIdx
-  return H.repeatN(1, {
-    H.call(function() spells = {}; pinPend, ceiling = pend, ceil; pin() end),
-    H.driveUntil(inWindow, 1500, {
-      H.call(function() pin(); H.setPad({ "a" }) end),
-      H.waitFrames(2),
-      H.call(function() H.setPad({}) end),
-      H.waitFrames(14),
-    }, tag .. ": swdtech submenu opens (tools shell $30)"),
-    -- the row IS the boost: point the cursor at row `pend`, column 0 (the
-    -- single tech column; the right column is empty).
-    H.call(function()
-      pin()
-      H.writeByte(0x895F + active, 0)          -- scroll
-      H.writeByte(0x8963 + active, 0)          -- column 0 (left / only column)
-      H.writeByte(0x8967 + active, pend)       -- row = boost level
-    end),
-    H.waitFrames(2),
-    H.driveUntil(function() return not inWindow() end, 900, {
-      H.call(function() pin(); H.setPad({ "a" }) end),
-      H.waitFrames(2),
-      H.call(function() H.setPad({}) end),
-      H.waitFrames(14),
-    }, tag .. ": submenu closes on a latch"),
-    H.call(function() pinCaster = false end),          -- charge now observable
-    H.driveUntil(function()
-      for _, v in ipairs(spells) do if v == attackId then return true end end
-      return false
-    end, 12000, {
-      H.call(function()
-        pin()
-        if H.readByte(MENU) ~= 0 and not inWindow() then H.setPad({ "a" }) end
-      end),
-      H.waitFrames(4),
-      H.call(function() H.setPad({}) end),
-      H.waitFrames(16),
-    }, tag .. ": the tech reaches $3410"),
-    H.waitFrames(90),                     -- let the charge + damage settle
-  })
-end
-
-H.run({ maxFrames = 40000 }, {
+H.run({ maxFrames = 200000 }, {
   H.waitFrames(20),
-  H.loadState(STATE),
-  H.waitFrames(10),
-  H.enterEncounter(),
-  H.call(function()
-    emu.addMemoryCallback(function(_, v) spells[#spells + 1] = v end,
-      emu.callbackType.write, 0x7E3410, 0x7E3410)
-    pin()                                 -- install Cyan / clear magitek early
-  end),
 
   -- ------------------------------------------------ 1. detect build + table --
   H.call(function()
-    -- snesPrgRom is indexed by ROM FILE offset (HiROM: SNES $F0xxxx = file
-    -- $30xxxx), the convention glyphCanary scans on.
     local sig = { 0x5d, 0x04, 0x5e, 0x0a, 0x5f, 0x0d }   -- Pummel/AuraBolt/Suplex
     local base
     for a = 0x300000, 0x30FFF0 do
@@ -207,55 +226,147 @@ H.run({ maxFrames = 40000 }, {
     H.log("ON build: cost table verified for Blitz + SwdTech + Tools")
   end),
 
-  -- ------------------------------------ 2. CHARGE (ON) / FREE (OFF, control) --
-  -- The charge actor is whoever comes up first in the opening wave.
-  H.driveUntil(function() return H.readByte(MENU) ~= 0 end, 3000, {
-    H.call(pin), H.waitFrames(1),
-  }, "the opening wave's first menu"),
+  H.loadState(STATE),
+  H.waitFrames(30),
+  driveTo(function() return H.battleLoadStarted() end, 25000, "first encounter"),
+  H.release(),
+  H.waitUntil(function() return H.battleActive() end, 900, "battle active", 30),
+  H.waitFrames(90),
   H.call(function()
-    chargeSlot = H.readByte(ACTOR)
-    active, casterMp, pinCaster = chargeSlot, 50, true
-    pin()
-    H.log("charge actor = slot " .. chargeSlot)
+    refindSlots()
+    H.assertEq(cyan ~= nil and shadow ~= nil, true,
+      "CYAN and SHADOW really fight this")
+    H.assertEq(H.readByte(0x3BA4 + cyan*2) & 0x02, 0x02,
+      "his real katana carries the SWDTECH flag (read, not written)")
+    H.assertEq(bp(), 1, "the opening 1-bp bank pays Dispatch's boost")
+    R.mp0 = mp()
+    R.g0 = monsterHpSum()
+    -- ON: the real pool must afford the priced tech.  OFF: the nomp
+    -- baseline's battle-MP init reads this ON-minted save's pool as 0 --
+    -- and a FREE Dispatch executing from 0 MP is exactly the control
+    -- (battle_stealmp measured the same wallet shape on its OFF half).
+    if mode == "on" then
+      H.assertEq(R.mp0 >= DISPATCH_COST, true, "his real pool affords the tech")
+    end
+    emu.addMemoryCallback(function(_, v) spells[#spells + 1] = v end,
+      emu.callbackType.write, 0x7E3410, 0x7E3410)
+    emu.addMemoryCallback(function(_, v) mpWrites[#mpWrites + 1] = v end,
+      emu.callbackType.write, 0x7e3C08 + cyan*2, 0x7e3C08 + cyan*2)
+    H.log(string.format("cyan slot %d bp=1 mp=%d; monsters %d hp", cyan,
+      R.mp0, R.g0))
   end),
-  latchTech("affordable", QSLAM, 1, 4),   -- Quadra Slam: row 1 = 2 bp, window {2,3,4}
+
+  -- ------------------------------------ 2. CHARGE (ON) / FREE (OFF, control) --
+  -- The battle's first Cyan turn, before any enemy action can touch the
+  -- pool (this species drains MP -- the first drain measured ~2200 frames
+  -- in, the first tech resolves well before it).
+  H.call(function() cyanMode = "tech:0" end),
+  driveTo(function() return sawSpell(DISPATCH) end, 20000,
+    "the real Dispatch reaches $3410"),
+  H.call(function() cyanMode = "defer" end),
+  -- the charge lands at Ot6ActionEnd, past the tech's whole animation
+  H.waitUntil(function() return pend() == 0 end, 900,
+    "the tech resolves (pending consumed)", 10),
+  H.waitFrames(120),
   H.call(function()
-    local left, dmg = mp(chargeSlot), (GUARD_HP * #GUARDS) - guardHp()
-    H.log(string.format("affordable Quadra Slam: MP 50 -> %d, guard damage %d", left, dmg))
+    local left, dmg = mp(), R.g0 - monsterHpSum()
+    local seen = {}
+    for _, v in ipairs(mpWrites) do seen[v & 0xff] = true end
+    H.log(string.format("Dispatch: MP %d -> %d, monster damage %d", R.mp0, left, dmg))
     H.assertEq(dmg > 0, true, "the tech landed its hit (both builds)")
     if mode == "on" then
-      H.assertEq(left, 50 - QSLAM_COST, "ON: Quadra Slam charged exactly its table cost (16)")
+      H.assertEq(seen[(R.mp0 - DISPATCH_COST) & 0xff], true,
+        "ON: the pool was debited to exactly mp0-4 (write watch)")
+      H.assertEq(left, R.mp0 - DISPATCH_COST,
+        "ON: Dispatch charged exactly its table cost (4)")
     else
-      H.assertEq(left, 50, "OFF: Quadra Slam is free -- vanilla behavior, the negative control")
+      H.assertEq(left, R.mp0,
+        "OFF: Dispatch is free -- vanilla behavior, the negative control")
     end
     H.screenshot("mpcost_" .. mode .. "_affordable")
   end),
 
   -- ------------------------------------------------- 3. REFUSAL (ON only) --
-  -- The insufficient-mp path is vanilla's own; on the OFF build the tech is
-  -- free so there is nothing to refuse -- run this half only under the flag.
-  -- The refusal actor is the NEXT of the opening wave (a different, still-full
-  -- slot); Dispatch (tech 0, cost 4) sits at row 0 of the ceiling-2 window
-  -- {0,1,2}, and MP 0 < 4 fizzles.
+  -- LABELED ISOLATION ARM -- see the header.  The pip is still rebanked by
+  -- a real item turn and the attempt is a real menu drive; only the
+  -- poverty itself is staged.
   H.cond(function() return mode == "on" end, {
-    H.driveUntil(function()
-      return H.readByte(MENU) ~= 0 and H.readByte(ACTOR) ~= chargeSlot
-             and not inWindow()
-    end, 8000, { H.call(pin), H.waitFrames(2) }, "a second actor comes up"),
-    H.call(function()
-      refuseSlot = H.readByte(ACTOR)
-      active, casterMp, pinCaster = refuseSlot, 0, true
-      pin()
-      H.log("refuse actor = slot " .. refuseSlot)
-    end),
-    latchTech("unaffordable", 0, 0, 2),
-    H.call(function()
-      local left, dmg = mp(refuseSlot), (GUARD_HP * #GUARDS) - guardHp()
-      H.log(string.format("unaffordable Dispatch: MP stayed %d, guard damage %d", left, dmg))
-      H.assertEq(left, 0, "ON: too little MP is REFUSED -- MP not driven negative")
-      H.assertEq(dmg, 0, "ON: and the refused tech dealt no damage (fizzled)")
-      H.screenshot("mpcost_on_refused")
-    end),
+    (function()
+      local done = false
+      local steps = {}
+      for attempt = 1, 4 do
+        steps[#steps+1] = H.cond(function() return done end, {}, {
+          driveTo(function()
+            return H.battleLoadStarted() and H.monstersPresent() > 0
+          end, 30000, "refusal battle (attempt " .. attempt .. ")"),
+          H.call(function() refindSlots(); cyanMode = "item" end),
+          driveTo(function()
+            return not H.battleLoadStarted() or bp() >= 1
+          end, 40000, "a real item turn rebanks the pip (attempt "
+            .. attempt .. ")"),
+          H.cond(function()
+            return H.battleLoadStarted() and bp() >= 1
+          end, {
+            H.call(function()
+              -- ISOLATION WRITE (waived, labeled): the broke pool
+              H.writeWord(0x3C08 + cyan*2, 1)
+            end),
+            H.cond(function()
+              return H.battleLoadStarted() and bp() >= 1
+                and mp() < DISPATCH_COST
+            end, {
+              (function()
+                local m0, g1, latched = nil, nil, false
+                return H.repeatN(1, {
+                  H.call(function()
+                    m0 = mp()
+                    spells = {}
+                    cyanMode = "tech:0"
+                  end),
+                  -- the fizzled tech has no grant to signal on: drive on
+                  -- the latch (pending banks 1 at the submenu confirm) --
+                  -- the damage baseline is captured AT the latch, and the
+                  -- pad goes quiet for the whole bounded window so nothing
+                  -- but the (non-)fizzle can touch the monsters
+                  driveTo(function()
+                    if not H.battleLoadStarted() then return true end
+                    if pend() >= 1 and not latched then
+                      latched = true
+                      g1 = monsterHpSum()
+                    end
+                    return latched
+                  end, 30000, "the broke Dispatch is latched (attempt "
+                    .. attempt .. ")"),
+                  H.call(function() cyanMode = "defer"; quietA = true end),
+                  H.waitFrames(400),
+                  H.call(function() quietA = false end),
+                  H.call(function()
+                    if not H.battleLoadStarted() or not latched then return end
+                    local left = mp()
+                    H.log(string.format(
+                      "refused Dispatch: MP %d -> %d, damage since %d, $3410 %s",
+                      m0, left, g1 - monsterHpSum(),
+                      sawSpell(DISPATCH) and "saw $55" or "quiet"))
+                    H.assertEq(left, m0,
+                      "ON: too little MP is REFUSED -- the 1 MP is untouched, "
+                      .. "never negative")
+                    H.assertEq(g1 - monsterHpSum() <= 0, true,
+                      "ON: and the refused tech dealt no damage (fizzled)")
+                    H.screenshot("mpcost_on_refused")
+                    done = true
+                  end),
+                })
+              end)(),
+            }, {}),
+          }, {}),
+        })
+      end
+      steps[#steps+1] = H.call(function()
+        H.assertEq(done, true,
+          "the refusal completed inside one battle within four encounters")
+      end)
+      return H.repeatN(1, steps)
+    end)(),
   }, {}),
 
   H.logStep(function() return "mpcost A/B complete in " .. mode .. " mode" end),
