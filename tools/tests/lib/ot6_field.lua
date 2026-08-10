@@ -2241,6 +2241,161 @@ function M.setRows(spec, opts)
   })
 end
 
+-- M.equipEsper: equip a SPECIFIC magicite on the character at char-select
+-- position `pos`, through the real Skills -> Espers -> detail -> A walk
+-- (skills.asm MenuState_4d @5902 is the equip).  Reads and pad presses
+-- only (issue #75).  Written for the Cranes re-test (2026-08-10): the
+-- fight's designed key is BISMARK's Sea Song -- the game's only water
+-- verb -- and no honest route had ever worn a stone on purpose.
+-- The list seek is menu_esperdetail's two-column idiom against the live
+-- $7e9d89 row->esper table; an esper the save does not own never appears
+-- there, so the seek times out loudly instead of equipping the wrong row.
+function M.equipEsper(pos, esperIdx, opts)
+  opts = opts or {}
+  local tag = opts.tag or ("equip esper " .. esperIdx)
+  local ZM, CUR = 0x26, 0x4b
+  local ST_MAIN, ST_CHAR, ST_SKILLS, ST_LIST, ST_DETAIL =
+    0x05, 0x06, 0x0a, 0x1e, 0x4d
+  local GENJULIST = 0x9d89
+  local function st() return M.readByte(ZM) end
+  local seek_ph = 0
+  return M.seqStep({
+    M.driveUntil(function() return st() == ST_MAIN end, 1200,
+      { M.pressButtons({ "x" }, 4), M.waitFrames(30) }, tag .. ": main menu"),
+    M.waitFrames(20),
+    M.driveUntil(function()
+      return st() == ST_MAIN and M.readByte(CUR) == 1
+    end, 900, { M.pressButtons({ "down" }, 2), M.waitFrames(10) },
+      tag .. ": cursor on Skills"),
+    M.pressButtons({ "a" }, 2),
+    M.waitUntil(function() return st() == ST_CHAR end, 300,
+      tag .. ": character select", 5),
+    M.waitFrames(10),
+    M.driveUntil(function()
+      return st() == ST_CHAR and M.readByte(CUR) == pos
+    end, 600, { M.pressButtons({ "down" }, 2), M.waitFrames(10) },
+      tag .. ": character cursor"),
+    M.pressButtons({ "a" }, 2),
+    M.waitUntil(function() return st() == ST_SKILLS end, 300,
+      tag .. ": skills submenu", 5),
+    M.waitFrames(10),
+    M.driveUntil(function()
+      return st() == ST_SKILLS and M.readByte(CUR) == 0
+    end, 600, { M.pressButtons({ "up" }, 2), M.waitFrames(6) },
+      tag .. ": cursor to Espers"),
+    M.pressButtons({ "a" }, 2),
+    M.waitUntil(function() return st() == ST_LIST end, 300,
+      tag .. ": esper list", 5),
+    M.waitFrames(10),
+    M.driveUntil(function()
+      return st() == ST_LIST
+         and M.readByte(GENJULIST + M.readByte(CUR)) == esperIdx
+    end, 3000, {
+      M.call(function()
+        seek_ph = (seek_ph + 1) % 8
+        if seek_ph >= 4 then M.setPad({}); return end
+        local target
+        for r = 0, 26 do
+          if M.readByte(GENJULIST + r) == esperIdx then target = r; break end
+        end
+        if not target then M.setPad({}); return end
+        local row = M.readByte(CUR)
+        local d = target - row
+        if d % 2 ~= 0 then
+          if row % 2 == 0 then
+            M.setPad(row >= 26 and { up = true } or { right = true })
+          else
+            M.setPad({ left = true })
+          end
+        else
+          M.setPad(d > 0 and { down = true } or { up = true })
+        end
+      end),
+      M.waitFrames(1),
+    }, tag .. ": list cursor on the stone"),
+    M.waitFrames(20),
+    M.driveUntil(function() return st() == ST_DETAIL end, 600,
+      { M.pressButtons({ "a" }, 3), M.waitFrames(12) }, tag .. ": detail"),
+    M.waitFrames(20),
+    M.pressButtons({ "a" }, 3),          -- MenuState_4d @5902: equip esper
+    M.waitUntil(function() return st() == ST_LIST end, 300,
+      tag .. ": equipped, back on the list", 5),
+    M.driveUntil(function() return M.hasControl() end, 1200,
+      { M.pressButtons({ "b" }, 3), M.waitFrames(20) }, tag .. ": back out"),
+    M.waitFrames(20),
+  })
+end
+
+-- M.equipWeapon: put a SPECIFIC weapon in the main hand of the character
+-- at char-select position `pos`, through the real Equip menu.  States
+-- (equip.asm): $36 options (cursor 0 = Equip) -> $55 slot select (default
+-- slot 0 = R-Hand) -> $57 item select, whose list rows at $7e9d8a are BAG
+-- INDEXES into $1869 (MenuState_57 @992d reads exactly that), so the seek
+-- compares the item id under the cursor rather than guessing a row.  The
+-- list is pre-filtered by GetValidEquip, so an un-equippable weapon makes
+-- the seek time out loudly rather than equip something else.
+--
+-- WHY equipOptimum IS NOT ENOUGH, measured 2026-08-10 on the Cranes:
+-- Optimum picks by attack power and armed LOCKE and EDGAR with THUNDER
+-- BLADES ($0F: slash class, LIGHTNING element) -- and the Left Crane
+-- ABSORBS lightning, so every Fight healed the boss (+160/+198 pair
+-- heals, +943 boosted) and walked its Giga Volt charge counter.  The
+-- element-aware weapon swap is a fight-prep verb a player uses all the
+-- time, and no honest route had it until this function.
+function M.equipWeapon(pos, itemId, opts)
+  opts = opts or {}
+  local tag = opts.tag or string.format("equip weapon %02X", itemId)
+  local ZM, CUR = 0x26, 0x4b
+  local ST_MAIN, ST_CHAR = 0x05, 0x06
+  local ST_EQOPT, ST_EQSLOT, ST_EQITEM = 0x36, 0x55, 0x57
+  local function st() return M.readByte(ZM) end
+  return M.seqStep({
+    M.driveUntil(function() return st() == ST_MAIN end, 1200,
+      { M.pressButtons({ "x" }, 4), M.waitFrames(30) }, tag .. ": main menu"),
+    M.waitFrames(20),
+    M.driveUntil(function()
+      return st() == ST_MAIN and M.readByte(CUR) == 2
+    end, 900, { M.pressButtons({ "down" }, 2), M.waitFrames(10) },
+      tag .. ": cursor on Equip"),
+    M.pressButtons({ "a" }, 2),
+    M.waitUntil(function() return st() == ST_CHAR end, 300,
+      tag .. ": character select", 5),
+    M.waitFrames(10),
+    M.driveUntil(function()
+      return st() == ST_CHAR and M.readByte(CUR) == pos
+    end, 600, { M.pressButtons({ "down" }, 2), M.waitFrames(10) },
+      tag .. ": character cursor"),
+    M.pressButtons({ "a" }, 2),
+    M.waitUntil(function() return st() == ST_EQOPT end, 300,
+      tag .. ": equip options", 5),
+    M.waitFrames(10),
+    M.driveUntil(function()
+      return st() == ST_EQOPT and M.readByte(CUR) == 0
+    end, 600, { M.pressButtons({ "left" }, 2), M.waitFrames(10) },
+      tag .. ": cursor on Equip option"),
+    M.pressButtons({ "a" }, 2),
+    M.waitUntil(function() return st() == ST_EQSLOT end, 300,
+      tag .. ": slot select (R-Hand)", 5),
+    M.waitFrames(10),
+    M.pressButtons({ "a" }, 2),
+    M.waitUntil(function() return st() == ST_EQITEM end, 300,
+      tag .. ": item list", 5),
+    M.waitFrames(10),
+    M.driveUntil(function()
+      return st() == ST_EQITEM
+         and M.readByte(0x1869 + M.readByte(0x9d8a + M.readByte(CUR)))
+             == itemId
+    end, 1800, { M.pressButtons({ "down" }, 2), M.waitFrames(10) },
+      tag .. ": list cursor on the weapon"),
+    M.pressButtons({ "a" }, 2),
+    M.waitUntil(function() return st() == ST_EQSLOT end, 300,
+      tag .. ": equipped, back on slots", 5),
+    M.driveUntil(function() return M.hasControl() end, 1200,
+      { M.pressButtons({ "b" }, 3), M.waitFrames(20) }, tag .. ": back out"),
+    M.waitFrames(20),
+  })
+end
+
 -- --------------------------------------------------------------- equip --
 -- M.equipOptimum: put the party's gear back ON, through the real field
 -- Equip -> Optimum walk.  Reads and pad presses only (issue #75).

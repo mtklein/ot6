@@ -21,6 +21,15 @@
 -- Ends after the wedge dump cycle or on reaching map 219.
 -- NOT a suite test; no fixture output.
 --
+-- ==================== SUPERSEDED (2026-08-10, evening) ===================
+-- The "unwinnable as tuned" conclusion below is WITHDRAWN: it was a
+-- LOADOUT bug, not balance.  Every wipe in this record was fought with
+-- Thunder Blades (equipOptimum's power pick) into a lightning-absorbing
+-- Crane -- the party healed and charged the boss each swing.  With the
+-- vanilla playbook (Bismark/Shiva/Carbunkl worn, daggers, back rows,
+-- focus-fire) the fight falls on attempt 1: probe_cranes_water, PASS
+-- f19772.  The measurements below remain a true record of what those
+-- configurations did; only the conclusion drawn from them was wrong.
 -- ==================== CORRECTED VERDICT (2026-08-10, final) ==============
 -- The earlier RESOLVED note in this header claimed the wedge was "a
 -- drivable A-press, not a product bug".  THAT WAS WRONG, and the error is

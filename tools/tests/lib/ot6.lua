@@ -954,8 +954,8 @@ function M.newFightDriver(tag, opts)
     0x202E, 0x890F, 0x3ED8, 0x3E9C, 0x3C08
   local CMD_FIGHT, CMD_ITEM, CMD_MAGIC, CMD_TOOLS, CMD_BLITZ =
     0x00, 0x01, 0x02, 0x09, 0x0A
-  local ST_CMD, ST_ITEM, ST_MAGIC, ST_TGT, ST_TOOLS =
-    0x05, 0x0A, 0x0E, 0x38, 0x30
+  local ST_CMD, ST_ITEM, ST_MAGIC, ST_TGT, ST_TOOLS, ST_ESPER =
+    0x05, 0x0A, 0x0E, 0x38, 0x30, 0x16
   local ITEMSCR, ITEMROW, BATTINV, ITEMLIST = 0x8947, 0x894F, 0x2686, 0x4005
   local BLCOL, BLROW = 0x8963, 0x8967
   -- the magic list's cursor triple (btlgfx_main UpdateMenuState_0e:
@@ -1057,6 +1057,24 @@ function M.newFightDriver(tag, opts)
       if opts.bank and have < opts.bank then boost = 0
       else boost = math.min(have, 3) end
     end
+    -- opts.summon = { [charId] = { mp = cost } }: the ONCE-PER-BATTLE GENJU,
+    -- through the menu route battle_magicite measured (2026-07-27): from the
+    -- magic list scrolled to the top, UP runs CheckHasGenju and opens the
+    -- esper window ($7BC2 = $16), A commits, A confirms the default target.
+    -- The engine's own latch is the gate: the caster's entity bit in $3f2e
+    -- (once set, UpdateEnabledMagic greys the row -- battle_magicite point
+    -- 3), so the plan is offered only while that bit is CLEAR and the
+    -- character can pay.  The Magic command row only exists while the stone
+    -- is worn (battle_subjob's grant), so an unequipped caller falls
+    -- through to the branches beneath exactly like an exhausted mage.
+    -- Written for the Cranes re-test (2026-08-10): BISMARK's Sea Song is
+    -- the game's only water verb, and water is that fight's designed key.
+    local sm = opts.summon and opts.summon[id]
+    if sm and M.readWord(CURMP + actor * 2) >= (sm.mp or 50)
+       and (M.readWord(0x3f2e) & M.readWord(0x3018 + actor * 2)) == 0
+       and cmdRow(actor, CMD_MAGIC) then
+      return { kind = "summon", row = cmdRow(actor, CMD_MAGIC) }
+    end
     -- opts.magic = { [charId] = { rec = N, mp = cost } }: the ATTACK-MAGIC
     -- line, same shape as the tactical skills -- open the real Magic list
     -- through the $7BC2 state machine, steer to master record N against
@@ -1071,7 +1089,17 @@ function M.newFightDriver(tag, opts)
       return { kind = "magic", rec = mg.rec, row = cmdRow(actor, CMD_MAGIC),
                boostLeft = boost }
     end
-    if opts.tactical and id == 4 and M.readWord(CURMP + actor * 2) >= 4
+    -- opts.tools = false parks the Tools line while keeping the rest of the
+    -- tactical kit.  MEASURED NEED (2026-08-10, the Cranes): AutoCrossbow is
+    -- ALL-target, and each Crane counts every hit in an if_hit retal var --
+    -- past the threshold the victim feeds its SIBLING the sibling's absorbed
+    -- element (Bolt2/Fire2 across the deck; +329 hp observed on the Left
+    -- Crane, more than three of our boosted hits undone).  Against a
+    -- formation where splash literally heals the enemy, Edgar's
+    -- single-target pierce Fight chips the same class-weak shields without
+    -- ever paying the sibling.
+    if opts.tactical and opts.tools ~= false and id == 4
+       and M.readWord(CURMP + actor * 2) >= 4
        and cmdRow(actor, CMD_TOOLS) then
       return { kind = "skill", cmd = CMD_TOOLS, skill = AUTOCROSSBOW,
                row = cmdRow(actor, CMD_TOOLS), boostLeft = boost }
@@ -1119,6 +1147,15 @@ function M.newFightDriver(tag, opts)
       local cur = M.readByte(ITEMSCR + actor) + M.readByte(ITEMROW + actor)
       if cur < want then return { "down" } end
       if cur > want then return { "up" } end
+      return { "a" }
+    end
+    if st == ST_MAGIC and plan.kind == "summon" then
+      -- UP walks the grid cursor to the top and, from the top, opens the
+      -- esper window -- one button serves both phases (the cursor cells are
+      -- live, so this converges from any scroll position).
+      return { "up" }
+    end
+    if st == ST_ESPER and plan.kind == "summon" then
       return { "a" }
     end
     if st == ST_MAGIC and plan.kind == "magic" then
@@ -1174,10 +1211,61 @@ function M.newFightDriver(tag, opts)
             tag or "fight", chars, wantMask))
         end
       end
+      -- opts.focus = { {slot=S, mask=M}, ... }: MONSTER kill order, steered
+      -- against the live target mask ($7B7E) exactly the way the item line
+      -- steers $7B7D.  Each entry names a monster SLOT (for the liveness
+      -- check against $3BFC) and the $7B7E MASK bit that puts the cursor on
+      -- it -- two different orderings, MEASURED different (2026-08-10, the
+      -- Cranes): the mask's bit 0 is the cursor's default rest position and
+      -- landed damage on SLOT 1 ($010E), so mask bits follow the on-screen
+      -- formation layout, not monster-table order.  The need is the same
+      -- fight: each Crane counts hits in an if_hit retal var, and past the
+      -- threshold the victim feeds its SIBLING the sibling's absorbed
+      -- element -- so the unfocused default (everyone on the Right) had the
+      -- Right Crane casting Bolt2 into the Left all fight: Left healed to
+      -- FULL each time and, worse, Bolt2 is LIGHTNING, so the same feed
+      -- walked Left's Giga Volt charge to level 3 and the nuke wiped the
+      -- party ($010D at 1800/1800 across three attempts' close dumps).
+      -- Focus picks the first entry whose slot is still alive; single-
+      -- target plans steer to its mask (summons and items keep their own
+      -- targeting), and the tgtSpin backstop still confirms rather than
+      -- hold the turn open.
+      if opts.focus and plan.kind ~= "item" and plan.kind ~= "summon" then
+        local want = nil
+        for _, e in ipairs(opts.focus) do
+          local mid = M.readWord(M.MONSTER_IDS + e.slot * 2)
+          if mid ~= 0 and mid ~= 0xFFFF
+             and M.readWord(0x3BFC + e.slot * 2) > 0 then want = e.mask; break end
+        end
+        if want ~= nil then
+          local mons = M.readByte(TGTMONS)
+          if mons ~= want then
+            tgtSpin = tgtSpin + 1
+            if tgtSpin < 24 then
+              -- on the ally side (mons == 0), LEFT crosses to the enemy
+              -- side.  Among monsters the walk leads with LEFT/RIGHT --
+              -- measured on the Cranes (side-by-side formation): 24 ticks
+              -- of down/up never moved the rest mask, the pair is a
+              -- horizontal walk
+              if mons == 0 then return { "left" } end
+              local dirs = { "left", "right", "down", "up" }
+              return { dirs[1 + ((tgtSpin // 6) % 4)] }
+            end
+            M.log(string.format("[%s] focus steer gave up (mons=%02X " ..
+              "want=%02X) -- confirming on whoever is highlighted",
+              tag or "fight", mons, want))
+          end
+        end
+      end
+      if opts.traceTgt then
+        M.log(string.format("[%s] tgt CONFIRM kind=%s actor=%d chars=%02X "
+          .. "mons=%02X", tag or "fight", plan.kind, actor,
+          M.readByte(TGTCHARS), M.readByte(TGTMONS)))
+      end
       plan, planActor, tgtSpin = nil, nil, 0
       return { "a" }
     end
-    if st == ST_ITEM or st == ST_TOOLS or st == ST_MAGIC then
+    if st == ST_ITEM or st == ST_TOOLS or st == ST_MAGIC or st == ST_ESPER then
       plan, planActor = nil, nil
       return { "b" }
     end

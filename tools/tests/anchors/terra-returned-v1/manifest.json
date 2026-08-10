@@ -2,9 +2,19 @@
   "schema": "ot6.sram-anchor/v1",
   "payload": "terra-returned.sram",
   "size": 32768,
-  "sha256": "3bb28d0eb0eb10257c31175e2156bc1eebae9d35a7bcd8f2bfa8298edc90b1f2",
+  "sha256": "1ca43365896992db32ad4ccd2fdc68f44a7ed319050e9ffd1f59e14315c5701b",
   "slot": 3,
   "milestone": "terra-returned",
-  "provenance": "n128_won.mss; the whole E->F leg (Cranes, Terra's return, the Esper-World flashback, takeoff and grounding south of Zozo at world (24,121)); real in-game Save UI aboard the grounded Blackjack; party LOCKE EDGAR SABIN SETZER, TERRA available ($02F0=1); boundary F of save-points-vector.md \u00a75",
+  "provenance": {
+    "format": "ot6-provenance/v1",
+    "payload_sha256": "1ca43365896992db32ad4ccd2fdc68f44a7ed319050e9ffd1f59e14315c5701b",
+    "mint_sig": "bae6a52052d8d0df84299c058df57d98974af4ad421c1f2f3718311ed6ec6337 gen_terra_returned_anchor",
+    "ancestors": [
+      {
+        "path": "build/states/n128_won.stamp",
+        "sha256": "c9f688ea29f8337cd74ffbb30df9885426d800d2f0542e51dcc5d915a52d91e7"
+      }
+    ]
+  },
   "persistent_layout": "ot6-codex-o8-v1"
 }

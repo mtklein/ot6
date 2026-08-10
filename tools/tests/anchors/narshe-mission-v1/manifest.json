@@ -2,9 +2,19 @@
   "schema": "ot6.sram-anchor/v1",
   "payload": "narshe-mission.sram",
   "size": 32768,
-  "sha256": "eff15b7cc39b400bef571b5112c3627441ba6f0435a5c72a870ea140b7f26860",
+  "sha256": "2106786a66b065f3936f45de056e322ee9d5973d97dbb0a34b6da8d039c99113",
   "slot": 3,
   "milestone": "narshe-mission",
-  "provenance": "terra-returned-v1 battery, cold Continue; the whole F->G leg (board and lift off the parked Blackjack at world (24,121), strafe-fly to Narshe, land (84,36), the (84,33) entrance, the (37-39,51) escort trigger, the map-30 mission meeting to $0076=1, and the walk back out); real in-game Save UI on foot at world (84,34), the Narshe exit spawn, with the Blackjack parked at (84,36); party LOCKE EDGAR SABIN SETZER, TERRA available not active; boundary G of docs/design/sealed-gate-recon.md §2.2",
+  "provenance": {
+    "format": "ot6-provenance/v1",
+    "payload_sha256": "2106786a66b065f3936f45de056e322ee9d5973d97dbb0a34b6da8d039c99113",
+    "mint_sig": "3b89a58a87e10eefef5785ff98f4034d0d43a0b4163df5176b20a7e207cfefba gen_narshe_mission tools/tests/anchors/terra-returned-v1/manifest.json tools/tests/anchors/terra-returned-v1/terra-returned.sram",
+    "ancestors": [
+      {
+        "path": "tools/tests/anchors/terra-returned-v1/manifest.json",
+        "sha256": "7189646178dad2d56445b9ef3bd98d4cca13ab39084cdbfd2be25240643eb417"
+      }
+    ]
+  },
   "persistent_layout": "ot6-codex-o8-v1"
 }
