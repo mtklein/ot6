@@ -295,3 +295,46 @@ fail-before controls for the three tracked anchors
 (probe_v07_h/i/j_negative), compose.py's canonical comment-hazard example
 (probe_dottick), and multi-hit.md's planned-suite-test template
 (probe_multihit).  Read-only probes were untouched.
+
+## The kill-bit deletion: what still blocks it (measured 2026-08-10)
+
+The last structural #75 item is deleting the shared kill-bit paths from
+`lib/ot6_field.lua` (7 sites) and `M.clearBattle` (`lib/ot6.lua`), which
+also flips the compose-time runtime write gate strict everywhere with no
+further compose change.  Two separate blockers, measured, not guessed:
+
+**1. `M.clearBattle` is nearly free.**  Of seven files mentioning it,
+**exactly one is a live call** — `probe_world.lua:166` (`H.clearBattle(9000)`).
+The other six are prose citing it historically (battle_naturalmp,
+battle_subjob, gen_arvis, gen_whelk_poweron, probe_input, probe_vargas).
+So this half costs one probe conversion, or the probe's retirement.
+
+**2. The field kill-bit fires only for callers that pass NO `honest`
+option** (`if M.monstersPresent() > 0 and not opts.honest`), and **36
+files still make at least one bare navigator call** — `navTo`,
+`advanceStory`, `worldNavTo`, `worldWalkFight`.  Roughly: ~17 kept
+probes, ~17 gens (notably `gen_edgar` with 12, the Zozo trio, several
+Sabin legs), and 2 already-converted tests.
+
+**Scan method and its limits, so nobody treats "36" as gospel:** a
+regex for `[HM].<nav>(` whose following ~400 characters contain no
+`honest`.  It over-reports where a long multi-line call carries `honest`
+past that window, and it says nothing about whether a battle can
+actually occur on that leg — the kill-bit only fires if one does.
+Verified by hand on two: `gen_edgar` genuinely passes no opts table at
+all (`H.advanceStory(menuUp, 20000)`), and `field_navstep` — whose OWN
+kill-bit the convert-cheap wave replaced with `H.fleeBattle` — still
+calls `H.navTo(tx, ty, { maxFrames = 3000 })` bare.
+
+**The lesson that generalizes:** converting a test's own kill-bit does
+not make its leg honest if it still calls a navigator bare; the library
+will kill-bit a battle that fires mid-nav.  A conversion is complete
+only when both halves are covered.
+
+**Landing order this implies:** (a) sweep the bare calls, adding
+`honest="flee"` (corridor trash) or `"tactical"` (fights that matter) —
+cheap per site, and for legs that never draw a battle it is a no-op that
+makes the intent explicit; (b) convert or retire `probe_world`; (c) then
+delete both paths and watch the runtime gate go strict.  Do NOT attempt
+(c) before (a) — a leg that silently relied on the kill-bit becomes a
+wipe, and the deletion would be blamed for it.
