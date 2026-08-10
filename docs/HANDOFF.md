@@ -492,6 +492,27 @@ per run.  Trust these over reasoning.  Keep main, the integration
 branch, and the owner's checkout fast-forwarded together at every
 gate-green checkpoint (owner rule: simple, visible, clear).
 
+## Branch and worktree state (2026-08-10 wrap)
+
+`main`, `claude/issue-75-9a89a6` and the owner's checkout are all at the
+same commit and stay that way (owner rule: simple, visible, clear).
+
+Today's eight agent branches are merged, and their branches and
+worktrees are deleted.  What is deliberately still around:
+
+- **`wt/tail-a`** (branch + worktree) — holds ONE unmerged commit, the
+  `battle_rage` conversion, which is labeled UNVERIFIED and must not
+  reach main until it runs green on a re-minted `gau_joined`.
+- **`origin/feed-gau`** — fully merged, kept as the documented pre-#75
+  safety ref.
+- **Four `origin/worktree-agent-*` branches** (`a20451ce`, `a53262d5`,
+  `aaa205d8`, `af03cb95`, `afa759a4`) carry 1-9 unmerged commits each
+  from the early-August sessions.  Their work was integrated by
+  RE-IMPLEMENTATION rather than by merge, so those commits are believed
+  superseded, not lost — but nobody has verified that commit by commit,
+  so they are left alone rather than deleted on a guess.  Anyone
+  cleaning up should diff them against main first.
+
 ## Working agreements
 
 - Delegated work gets [agent-brief.md](agent-brief.md) included by reference —
