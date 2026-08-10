@@ -140,8 +140,12 @@ local function pulse()
   end
   local edge = ph % 10 < 5              -- 5-on/5-off press edges
   if not H.battleLoadStarted() then
-    -- field: pace the lane for the next encounter
-    if not (H.hasControl() and H.tileAligned()) then H.setPad({}) return end
+    -- field: pace the lane for the next encounter; page victory/EXP dialogs
+    -- with A until control returns (the battle_walletmp run-4 hazard)
+    if not (H.hasControl() and H.tileAligned()) then
+      H.setPad(ph % 8 < 4 and { a = true } or {})
+      return
+    end
     if map() ~= 96 then error("paced off map 96 (now " .. map() .. ")", 0) end
     local x, y = H.fieldX(), H.fieldY()
     if lane == nil then
@@ -152,6 +156,8 @@ local function pulse()
     H.setPad({ [(x == lane.ax and y == lane.ay) and lane.out or lane.back] = true })
     return
   end
+  lane = nil          -- re-anchor at the next field return (the walletmp
+                      -- run-5 hazard: a stale anchor walks off the map)
   if H.readByte(MENU) == 0 then
     -- no menu up: page any battle dialog with A -- measured on the first run
     -- of this conversion, the exact battle_vargas hazard: a monster's dialog
