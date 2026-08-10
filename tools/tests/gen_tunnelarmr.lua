@@ -674,6 +674,45 @@ H.run({ maxFrames = 300000 }, {
   end),
 
   -- ===================================================================== --
+  -- PHASE 3.5: THE RECOVERY SPRING.  Map 70 is map 73's copy, and it keeps
+  -- the copy's recovery spring: event trigger (47,29) -> _cba3e4, gated on
+  -- the same $01Bx control-flag aliases as the clock (facing UP + A), whose
+  -- payload _cacfbd is max_hp + max_mp on all four slots -- the game's own
+  -- free full heal, one room north of the TunnelArmr trigger.  The cave
+  -- crossing costs real supplies now (run 6 arrived at the boss with
+  -- tonic=0 potion=0 and LOCKE on 21/194, and lost all three attempts),
+  -- and this is what the spring is FOR: a player heals here before the
+  -- boss.  Zero writes -- the heal is the event script's.
+  -- ===================================================================== --
+  safeWalk(47, 29, "onto the recovery spring (47,29)", 10000),
+  (function()
+    local ph = 0
+    local function partyFull()
+      for _, c in ipairs(H.partyMembers()) do
+        if H.charHp(c) < H.charMaxHp(c) then return false end
+      end
+      return true
+    end
+    return seq({
+      H.driveUntil(partyFull, 1800, {
+        H.call(function()
+          ph = (ph + 1) % 8
+          if H.dialogWaiting() then H.setPad(ph < 4 and { "a" } or {}); return end
+          if facing() ~= FACE.up then H.setPad({ up = true }); return end
+          H.setPad(ph < 4 and { "a" } or {})
+        end),
+      }, "drink the spring (facing UP + edge-A -> _cacfbd full heal)"),
+      H.release(),
+      settleField(70),
+      H.call(function()
+        H.assertEq(partyFull(), true, "the spring restored the party to full")
+        H.log(string.format("spring: c1 %d/%d c6 %d/%d",
+          H.charHp(1), H.charMaxHp(1), H.charHp(6), H.charMaxHp(6)))
+      end),
+    })
+  end)(),
+
+  -- ===================================================================== --
   -- PHASE 4: THE DOORSTEP.  (47,38) fires _ca89af (event_main.asm:20990) ->
   -- battle 67.  Mint one tile SOUTH of it: (47,39), the reachable approach.
   -- (47,40) is past one of map 70's same-map warps -- navTo to it lands the
