@@ -55,333 +55,138 @@ What shipped since the last handoff, in one line each:
 
 ## The honesty program (#75) — the current all-hands effort
 
-**Dated 2026-08-06.** The owner's 2026-08-03 directive supersedes normal
-open-work ordering until done: tests and fixture mints may press buttons and
-read memory, NEVER write emulated game state ("if you are not playing actual
-game states that have been reached through actual game choices, you are just
-wasting time pretending"). The bar is PLAYABILITY — a player's inputs could
-do this, TAS-style margins fine — with balance observations logged as data
-for the post-1.0 balancing era, never treated as blockers. Fault-injection
-mechanism tests survive as a loudly-labeled quarantine (owner ruling). The
-running record is issue #75; the rule itself leads tools/tests/README.md's
-"Writing a test".
+**Rewritten 2026-08-09 (end of the second session that day), replacing the
+2026-08-06 strata wholesale** — the blocker narrative it carried was three
+findings out of date, and two of its diagnoses had been measured wrong.
 
-**The 2026-08-06 integration is landed directly on `main`; the old remote
-safety ref is `origin/feed-gau` at `2e4cabc`.** It was based on main `7770428`
-and contains the formerly
-queued Sabin, Gau, Figaro/Kolts/Vargas, Locke/Terra, Narshe/Kefka, Zozo and
-Opera conversions, plus the v0.6 route through the Ifrit doorstep. Do not
-restart those branch integrations. The static ratchet currently reports
-344 Lua files, 1496 state-write sites and **318 waived `(file,token)` pairs**
-(374 at birth); no unwaived writes and no stale waivers.
+**The directive (owner, 2026-08-03), unchanged:** tests and fixture mints
+may press buttons and read memory, NEVER write emulated game state ("if you
+are not playing actual game states that have been reached through actual
+game choices, you are just wasting time pretending").  The bar is
+PLAYABILITY — a player's inputs could do this, TAS-style margins fine —
+with balance observations logged as data for the post-1.0 balancing era,
+never treated as blockers.  Fault-injection mechanism tests survive as a
+loudly-labeled quarantine (owner ruling; the label template is
+battle_loadgate, and the three owner-named cases carry it).  The running
+record is issue #75; the rule leads tools/tests/README.md's "Writing a
+test".
 
-The important newly-proven route facts are:
+### Where the chain stands (2026-08-09, branch claude/issue-75-9a89a6)
 
-- Gau is fed Dried Meat through the real Item menu (`53700fc`); the old
-  "undrivable" model was wrong. `079043d` preserves him through the Veldt
-  mint route. The owner's command rule is explicit: **Leap on the Veldt,
-  Fight off the Veldt.**
-- The full Sabin line is honest, including real shopping, healing/revival
-  and the Phantom Train win. The integrated route also includes honest
-  Vargas, TunnelArmr, Kefka, Dadaluma and Ultros 2 wins; the Opera rats and
-  Zozo bridge are passed by real controller play.
-- `H.loadState` no longer wipes codex SRAM (`4dbfca4`); that premise was
-  measured and disproved. The shared observed-menu fighter now supports
-  real Item use for healing and Fenix Down revival (`0efa432`).
-- The Vector/factory chain is replayed green in dependency order through
-  `gen_vector_doorstep`, `gen_vector_sneak`, `gen_mrf_entry`,
-  `gen_mrf_chute`, `gen_mrf_263`, `gen_mrf_kefka` and
-  `gen_ifrit_doorstep`. Traversal fights legitimately hold L+R to flee;
-  they are not kill-bitted. The last leg passes at frame 2056, validates all
-  17 fields of `mrf-save-room-v1`, mints the quiet doorstep and verifies one
-  A press opens battle 70 containing Ifrit and Shiva. Commit `d506075` is
-  that terminal checkpoint.
+**Every gameplay leg of the v0.3–v0.6 route is converted.**  Power-on
+through the airship crash (anchor I) now runs on inputs and reads alone:
+the Whelk, Marshal, Ultros, Vargas, TunnelArmr, Kefka, Dadaluma, the gate
+soldier, the Phantom Train (#74 — honest win, medic doctrine, margin
+characterized on that issue), Ifrit/Shiva, Number 024, the tube-room set
+piece, and Number 128 (LOCKE+EDGAR+SABIN per the owner rule, blades'
+regeneration measured, split heal policy 75% trash / 55% boss).  The
+banquet (legs J–K) is being measured feasibility-first as of this writing;
+gau_joined's post-join Veldt walk is the one remaining red gameplay mint.
 
-**The 2026-08-06 frontier regression is FIXED (2026-08-09).** That run
-failed minting `vargas_won` from a freshly regenerated `vargas_doorstep`
-whose party was EDGAR 1/145, LOCKE 122/122, TERRA dead, seven Potions, no
-Fenix Down -- and four honest VARGAS attempts wiped. It was never the
-fight. Instrumenting `gen_kolts` leg by leg (a roster line now rides every
-`where`) found three separate things, all fixed on `main`:
+**Both 2026-08-09-morning frontier blockers are closed, and both
+diagnoses were wrong in instructive ways:**
 
-- **`advanceStory` accepted `honest="flee"` and ignored it.** Every other
-  navigator had a flee branch; that one fell through to the blind A-tap, so
-  every map settle that rolled an encounter fought a whole battle by
-  mashing A while its caller's header said the route runs from them.
-- **No route ever opened the item menu.** `H.fieldCare` (lib/ot6_field.lua)
-  drives the real field Item -> use -> target windows, zero writes, closed
-  loop on the game's own cells, and reads the engine's refusal flag ($B5)
-  instead of mashing A at a window that will never accept the pick. The UI
-  was MEASURED, not assumed: A on the item list PICKS A SLOT UP ($19), and
-  only a second A on the SAME slot uses it -- a first pass quietly
-  rearranged the bag instead of healing anyone. Citations:
-  `research/field-care-menu.md`, probes `probe_fieldheal` /
-  `probe_fieldcells` / `probe_fieldcare`.
-- **Mt. Kolts and map 98 are FOUGHT now, not fled** (`honest="tactical"`).
-  Fleeing is not free -- it is standing still while the formation takes
-  free rounds. Three measured runs: fled -> TERRA dead at the doorstep;
-  fled with care -> LOCKE dead on the last 53 steps; fought -> everyone
-  alive, two levels up, at 136/168/169.
-- **The party shops.** It walked through South Figaro and back out with no
-  revive item; it now buys three Fenix Downs and tops Tonics to fifteen
-  through the real shop UI. Route and stock in
-  `research/south-figaro-shop-route.md` -- the shop is **8**, not 15, and
-  it does **not** sell Potions at this point in the story.
+- `sfigaro_escape` was never the gate soldier: the park was on **map 87**
+  (same (41,43) coordinates, different map — the nav heartbeat printed no
+  map id), a random encounter dying under `honest=true`'s blind-A branch.
+  The soldier's choke is east of the whole escape route.  Five lib-level
+  fixes came out: `opts.fleeCap` (cave pincers can't be fled; the
+  1800-frame default killed the pair silently), `opts.healer` on the
+  fight driver (an all-medic pair heal-locks), rows re-dealt per leg
+  (persistent state — solo-LOCKE's back row was backwards for the pair),
+  the map-70 recovery spring at (47,29) (boss entered full for free), and
+  CELES armed at boot (equipment_waivers.txt carries the celes_freed
+  story-moment line).
+- `train_done` was never damage: the honest chain reaches the fight with
+  identical combat stats to the old winning lineage and a 9,000-gil
+  poorer purse (flee discipline earns nothing; the ghost merchant list is
+  now a hard budget).  The win needed TRIAGE — Cyan full-time medic <75%,
+  Sabin self-preserving <65%, Shadow backing up <45% — and 5 chips 6→1.
+  The break never completes; that structural margin is logged on #74.
 
-Result: `gen_vargas` wins on **attempt 1** (the retry ladder never fires),
-SABIN joins, `vargas_won` mints reload-verified, and the post-fight care
-stop raises TERRA so everything downstream inherits a whole party.
+**Infrastructure landed the same day:**
 
-**`M.FLEE_CAP` is written in blood.** At 5400 frames a cave-97 formation
-refused to release a FULL-HEALTH party, the flee held for all ninety
-seconds, the party wiped inside its own escape attempt, and the drive
-tapped A through the Game Over into a brand-new game -- eleven maps of
-intro before the budget expired. The cap is **1800** and the fallback is
-the tactical fighter, not a blind A.
+- **The runtime write gate (plan item 4)**: compose.py swaps the global
+  `emu` for a write-refusing proxy in every composed script whose file
+  has zero waivers; the lib keeps the confined raw handle only while its
+  own waivers survive, so deleting the lib kill-bit flips everything
+  strict with no further compose change.  `__OT6_EMU_RAW` is a forbidden
+  static token.  Verified both directions under Mesen.
+- **docs/waiver-burndown-plan.md**: all 60 remaining waived suite tests
+  classified with per-file work orders (1 redundant — deleted, 9
+  convert-cheap — in progress, ~35 fixture swaps, 2.5 quarantine).  The
+  headline: the honest root fixture is a kit-less MAGITEK party, and that
+  one fact causes half the remaining waivers.  Two systemic calls pend:
+  a leveled/collected fixture tier (5 files), and an observation-window
+  doctrine (~20 files).
+- Waivers **318 → 303** today, all shrink, checker green at every merge.
+- The probe disposition (100 waived probes) is an owner call pending on
+  #75 (recommendation: keep a named handful, delete the rest).
 
-**Owner note, 2026-08-09 -- FRONT ROW / BACK ROW is an open gap.** "A lot
-of ranged attackers can just sit in the back row forever at no cost."
-EDGAR's damage here is Tools and TERRA's is magic; neither cares about row,
-and no fixture in the chain has ever set one. Research is in
-`research/row-menu.md`. Rows are persistent per-character state, so setting
-them once early propagates to every downstream fixture -- do it before a
-full re-mint, not after.
+### Doctrine (measured; do not re-derive)
 
-**`sfigaro_town` IS GREEN (2026-08-09).** It was never balance -- it was
-FOUR defects stacked, and fixing any one alone still lost, which is why it
-read as tuning for three runs: LOCKE bare-handed (8 damage a swing), the
-bag drained by the Terra party upstream, the wrong ROW, and needing a top
-up before the third rematch. All three gate engagements now win on
-attempt 1. **The row is the load-bearing one** -- at ~110 a hit against
-168 hp he must heal every turn from the front and can never swing; halved
-he survives three, attacks two in three, and BREAKS the armour (495 -> 0,
-shields 3 -> 0 three times, never below 112 hp).
+- **fieldCare** drives the real Item→use→target windows; A on the field
+  item list PICKS A SLOT UP, only a second A on the same slot uses it.
+  Its world-map exit is BROKEN (careBackOnMap's witness passes a moment
+  that isn't "world module running") — care on the field, not the world,
+  until fixed.  Its exit also reads a one-frame transient (can leave the
+  menu open); a debounce wants the next planned lib-staling change.
+- **honest="flee" vs "tactical" vs true**: fleeing is standing still
+  while the formation takes free rounds; blind-A `honest=true` is a
+  foot-gun that stalls or wipes on any leg that can draw an encounter
+  (deprecation pending).  `M.FLEE_CAP` default 1800, per-call
+  `opts.fleeCap` (the escape route uses 420).  Cave pincer formations
+  cannot be fled at all — FF6's own rule.
+- **Rows**: `$B3 = $FF` for every command and only the weapon swing
+  clears it — Tools, Magic, Blitz, SwdTech, Throw, Steal are row-exempt.
+  Where damage is break-driven, back row wins; where the chipper is a
+  weapon swing, it loses (South Figaro vs Phantom Train, both measured).
+  Rows are persistent state — set them per leg on purpose.
+- **The equip audit** (tools/audit_equipment.py, a make-test gate with
+  its own shrink-only story-waiver list): any red leg gets checked
+  against it BEFORE being called balance.  LOCKE and CELES fought the
+  entire measured WoB bare-handed until 2026-08-09.  The audit currently
+  exits 1 on ~33 stale downstream fixtures that burn down with the
+  re-mint.
+- **A party wipe must say so**: the navigators' M.partyWiped() canary
+  misses IN-BATTLE wipes ($1600 keeps pre-battle HP) — a battle-module
+  witness ($3BF4 under battleLoadStarted()) is the filed fix.  Three
+  wipes have now impersonated stuck navigators.
+- **Retry ladders are 3 attempts, phase-spread by 37 frames** (battle RNG
+  seed = frame phase at init).  Widening a ladder until it gets lucky is
+  the #74 mistake; a ladder that loses all three reports a finding.
 
-**But the row lever does NOT generalise.** On the Phantom Train the same
-change measures WORSE, twice, on a fresh chain: front row shields 6 -> 3
-and SABIN down at f34707; back row shields 6 -> 6, casts 0, down at
-f19108. Blitz/Throw/SwdTech really are row-exempt and the fight still went
-the other way, so something that CHIPS that boss pays the penalty. Do not
-re-derive it from the exemption rule.
+### What remains before #75 may close
 
-**The `sfigaro_escape` blocker is FIXED (2026-08-09, wt/sfigaro-escape),
-and the paragraph that used to sit here was wrong twice.** It read "parked
-at map 75 (41,43), almost certainly the gate soldier."  Measured
-(`probe_sfigaro_escape_stall.lua`): the park is **map 87** -- (41,43)
-exists on both maps and the nav heartbeat prints no map id -- and map 87
-has no triggers and no npcs but DOES have **random encounters**; the
-event PC sits at $CA0029, inside `RandBattle` (ca/0018).  The stall was
-navTo's `honest=true` battle branch blind-tapping A at a Vector Pup pair.
-The gate soldier is irrelevant to the escape: it re-enters town at
-(48,36) and leaves by the x=56 column, both east of his (30,42) choke
-(the re-entry now logs his post -- he IS standing there -- and the exit
-reachability).  `clearGateSoldier` was promoted into `lib/ot6_field.lua`
-anyway, with `talkToObj` and `rideOut`, and `gen_sfigaro` calls the
-library versions.
+1. **The full root-first re-mint under the new lib** — the sfigaro-escape
+   merge's lib promotion deliberately staled ~106/109 stamps by hash;
+   `make frontier NINJAFLAGS="-k 0"` (bounded -j while agents live) is
+   the next dispatcher action once in-flight agent work lands, and its
+   result decides the frontier claim.
+2. The banquet feasibility verdict (in flight), gau_joined's post-join
+   ladder (in flight), and the convert-cheap test wave (in flight).
+3. **Re-cut all legacy battery anchors through the real Save UI** — now
+   the dominant remaining waiver class on the route (the Save-UI poke
+   blocks in gen_gate_cave_save / gen_vector_crash / the anchor-cutter
+   gens keep their waivers deliberately until this line executes).
+4. The remaining suite-test conversions per docs/waiver-burndown-plan.md,
+   including the two systemic calls it names.
+5. **Delete the shared kill-bit paths** from lib/ot6_field.lua and
+   H.clearBattle once no leg rides them — which flips the runtime write
+   gate strict everywhere automatically.
+6. Reduce the waiver file to the quarantine roster only; run the complete
+   test and frontier gates; only then represent the program as complete.
 
-Getting the leg green took five measured findings past the first one, in
-order: **the cave rolls PINCERS** (Trilobiter + Primordites, party
-surrounded) which FF6 refuses to release, so flee needs a short per-route
-cap (`opts.fleeCap`, this route uses 420) or the party dies holding L+R
-before the tactical fallback engages; **rows persist** -- gen_sfigaro's
-back-row LOCKE (right for solo battle 11) walked into this chapter still
-hiding, and a back-row LOCKE is the pair's whole offense taxed to nothing
-(24 damage across 6000 frames) -- the escape re-deals front LOCKE / back
-CELES; **an all-medic party heal-locks** -- newFightDriver now takes
-`opts.healer` so CELES heals and LOCKE always swings; **the escape route
-has no shop**, so the cave crossing drains the bag no matter how well it
-is fought -- and **map 70 keeps map 73's recovery spring** at (47,29)
-(`_cba3e4` -> `_cacfbd`, full party HP/MP, the same facing-UP+A gate as
-the clock), which is what lets the boss be entered full.  With all five,
-TunnelArmr fell HONESTLY on attempt 1 (f30918; LOCKE 2 hp, CELES 190
-behind Runic) and the chain minted sfigaro_escape f5529 /
-tunnelarmr_doorstep f23882 / locke_done f31341.
-
-Two library follow-ups fell out: **the wipe canary misses in-battle
-wipes** -- `M.partyWiped()` reads $1600, which still carries pre-battle
-HP when the party dies inside a battle, so `RandBattle`'s GameOver held
-the event PC forever while the canary stayed quiet (third wipe to
-impersonate a stuck navigator, first with the canary deployed; it needs
-a battle-module witness, $3BF4 while `battleLoadStarted()`).  And
-**fieldCare's world-map exit measured broken** the first time a mint
-exercised it: after a real heal through the menu ON the world map, the
-world DP cells $E0/$E2 read garbage and the world engine never resumed
--- trap 1's ownership, inside careBackOnMap's world witness.  This route
-takes its care on the field instead.  Also landed: CELES is ARMED at
-gen_tunnelarmr's boot (she was relic-only through the whole downstream
-chain -- audit_equipment's defect class exactly), with the celes_freed
-waiver line making that fixture legitimately story-bare.
-
-**Frontier status, end of 2026-08-09: FOUR blockers found, TWO fixed.**
-Running `make frontier NINJAFLAGS="-k 0"` (continue past failures) is how
-to enumerate them in one pass instead of one per multi-hour run -- do that
-first, always. The list:
-
-| leg | looked like | actually was | now |
-|---|---|---|---|
-| `terra_clifftop` | "navTo timeout, 60000 frames" | the party WIPED; the leg walked BANON's escort on `honest=true` (blind A) and never opened the item menu | **FIXED** -- `honest="tactical"` + `H.fieldCare` per crossing, green at f12782 |
-| `sfigaro_town` | balance wall | LOCKE unarmed, then out of supplies, then in-battle heals not landing | **OPEN**, see below |
-| `train_done` | — | the #74 Phantom Train, thin margin | **OPEN**, attempt 1 got it to 744 hp / 3 shields of 6 |
-
-**`sfigaro_town` IS A BALANCE FINDING. Nine hypotheses were tested and
-killed to get there; do not re-test them:**
-
-| hypothesis | verdict |
-|---|---|
-| blind button pattern, no menu awareness | replaced with `newFightDriver` -- no |
-| LOCKE unarmed | REAL, fixed: 8 -> 21 damage a swing. Not enough |
-| out of supplies | REAL, fixed: 12 Tonics + 4 Potions inherited, was 2 Tonics. Not enough |
-| item cursor index != `$2686` index | MEASURED CORRECT (`probe_battleitem`): cursor sum 1 consumed index 1. No |
-| solo-party target-cursor deadlock | real latent bug, fixed, no change here. No |
-| boost bank never reaching 3 | `opts.bank` implemented. No |
-| back row halving what he takes | front and back measure IDENTICALLY. No |
-| sneaking past the soldier | polled `bfsPath` every 60 frames for 7200 frames -- he NEVER steps off the choke. No |
-| Active battle mode punishing menu time | `$1D4D` already reads Wait, speed 2. No |
-
-**CORRECTION, and it reverses the conclusion above.** I called this a
-balance finding twice. It is not one. The arithmetic, done properly:
-
-```
-effective HP pool   168 + 4 Potions*250 + 12 Tonics*50 = 1768
-enemy hits absorbed 1768 / 110                         = 16
-actions in that time  16 * (600/300)                   = 32
-  spent healing                                        = 16
-  left to attack                                       = 16
-
-never breaking the shields:  16 * 21          =  339  vs 495  LOSE
-breaking first (3 chips, 1 per hit, measured):
-  3*21 + 13*84                                = 1167  vs 495  WIN
-```
-
-Shielded damage is HALVED and the ladder is broken:weak:unweak = 4:2:1
-(`Ot6ShieldedMulW`, `ot6_break.asm:1487-1497`), so a broken HeavyArmor
-takes **84 a swing, not 21** -- and LOCKE chips one shield per boosted
-Fight, measured (495/sh3 -> 484/sh2). Three chips and the fight is over
-with more than double the margin. **The fight is winnable and the whole
-thing turns on the break economy, which is what this game is about.**
-
-So the real blocker is the ONE remaining harness bug: **LOCKE's heals do
-not land**, so he never survives the sixteen actions the win needs. The
-trace shows the confirm at `$38` followed by `$40 -> $01 -> $0A` -- the
-item window RE-OPENING, which is what a REJECTED confirm looks like.
-Leading hypothesis, unmeasured: **cursor memory** (`$1D4E & $40`) starts
-the battle item cursor somewhere other than row 0, so the single `down`
-the driver presses lands on an empty slot. Run `gen_sfigaro` with
-`trace = true` on its `rideOut` driver -- the item-window dump prints
-scroll/row/sum beside the live `$2686` contents, which settles it in one
-run. Do NOT retune anything until that is chased.
-
-**The first full-frontier run of the honest chain got to 117 of 187 edges**
-(2026-08-09) and stopped at `sfigaro_town`. Everything through the Terra
-scenario, the Sabin line, the rapids and the scenario split re-minted
-green under the new lib.
-
-**THE RESUME POINT IS `gen_sfigaro`, and the blocker is a balance finding,
-not a harness bug.** Solo LOCKE loses `battle 11`, the South Figaro gate
-soldier, on every attempt. Chased all the way down, in this order:
-
-1. The drive was a 32-frame button pattern with no idea what a menu is --
-   sixteen Tonics sat in the bag through three losses. It is
-   `H.newFightDriver` now.
-2. Still lost, so the driver's heartbeat learned to log ENEMY hp (monsters
-   are entity slots 4..9, the same table eight bytes along). Answer:
-   **495 -> 487 and stop. Eight damage a swing.**
-3. Eight is low enough that "he is unarmed" was still live, so look:
-   `probe_lockekit` reads `$1600+37*1+$1F..$23` as **`FF FF FF FF FF`**.
-   **LOCKE starts his whole scenario with nothing equipped and his own
-   Dirk in the bag.** `remove_equip` returns gear to inventory
-   (`EventCmd_8d`) and the mint chain has never put it back on -- the same
-   bug `battle_brokendeath` found at the Vector infiltration and fixed
-   only for itself. **`H.equipOptimum` is now in the library.** Assume
-   every post-`remove_equip` fixture in the chain is bare until checked.
-
-Armed, his swing goes 8 -> 21 and he still loses: **~21 damage dealt per
-300 frames against ~117 taken**, into 495 hp at level 13 whose weaknesses
-(bolt, water) solo LOCKE cannot reach. He needs ~7200 frames of swings and
-survives ~2500. Front row and back row measure the same. **That is a
-#74-class finding and it is left FAILING on purpose.** It needs an owner
-call: retune battle 11, or make the gate passable another way.
-
-Two smaller fixes landed with it: `gen_sfigaro`'s B1 decided whether to
-fight by asking "is this tile reachable this instant", and the gate
-soldier WANDERS -- one inserted menu visit flipped the branch and the leg
-then died of "no path"; it reads `$0104` now. And `newFightDriver`'s press
-cadence is an option (at the historical 30, a boosted Fight costs two
-seconds of wall clock just to TYPE).
-
-**THE EQUIP AUDIT IS DONE AND IT WAS BIGGER THAN THE LEG THAT SURFACED
-IT.** `tools/audit_equipment.py` (wired into `make test`) reads the
-savestates directly -- no emulator, 118 fixtures in about a second -- and
-found **LOCKE bare-handed in 42 fixtures and CELES in 29**. Two of the
-four World-of-Balance characters have fought every honest battle this
-chain has ever measured with their fists. `H.equipOptimum` stops are in
-at the two chokepoints (`gen_celes` at the passage, `gen_narshe_battle`
-at the reunion) plus `gen_sfigaro`; UMARO is excluded because the equip
-mask says he can hold exactly one weapon record, which is derived rather
-than assumed. Any leg still red after a re-mint should be checked against
-this audit BEFORE it is called a balance finding.
-
-**Two library traps worth knowing, both found the expensive way:**
-`newFightDriver` re-read the battle inventory while the item window was
-open, got nil, dropped the plan and pressed B -- forever ("mid-menu
-inventory reads measurably lie" was already written down for the FIELD
-inventory in gen_sabin_train's shop drive; the battle side had the same
-trap). And a party wipe used to impersonate a stuck navigator: the three
-navigators now carry a debounced `M.partyWiped()` canary that names it,
-because neither of the two wipes so far produced a log containing the
-word "died".
-
-**The older follow-up note, kept for the numbers:** `event_main.asm` has **58 `remove_equip` sites
-in 15 clusters** (the Vector infiltration strips all thirteen at
-`:11979-11991`; `:26328-26352` and the two `:84472`/`:84534` blocks are the
-other big ones), and the mint chain has never re-equipped after ANY of
-them. Every fixture downstream of one should be checked with
-`probe_lockekit`'s read (`$1600+37c+$1F..$23`, `$FF` = empty) and given an
-`H.equipOptimum` stop if it comes back bare. Expect more walls that look
-like balance and are not.
-
-**`make test` stops at its own `--check-states` gate** while the frontier
-is mid-re-mint, which is that gate working, not a failure.
-
-**After that regression is green, resume at
-`tools/tests/gen_ifrit_magicite.lua`.** It still contains
-its kill-bit helper and uses the old cheating `H.advanceStory` path for the
-forced Ifrit/Shiva win. No new implementation was started after `d506075`.
-The known honest strategy already exists in `battle_brokendeath.lua`: equip
-all four characters through Equip → Optimum, have Celes cast Ice and Edgar
-use AutoCrossbow to chip the six shields, then finish the real scripted
-fight. Reuse or factor that observed-menu drive; do not substitute a generic
-tap-A claim without a live win. Incidental traversal battles may flee.
-
-After Ifrit/Shiva, continue in this order: `gen_n024_doorstep` traversal;
-the forced Number 024 win in `gen_esper_tubes`; the tube-room set piece in
-`gen_esper_tubes_done`; `gen_minecart_doorstep`; then the minecart and
-Number 128 chain. The Number 128 party must be **Locke + Edgar + Sabin** per
-the owner, selected through the real upstream party menu — never solo Locke.
-
-**Still required before #75 may close:** finish the v0.6 chain and banquet;
-re-cut all legacy battery anchors through the real Save UI; convert the
-remaining gameplay/lab consumers; delete the shared kill-bit paths from
-`lib/ot6_field.lua` and `H.clearBattle`; re-mint every fixture under the
-final gate/provenance contract; reduce the waiver file to only the
-explicitly quarantined mechanism tests; run the complete test and frontier
-gates.  (The compose-time runtime write gate LANDED 2026-08-09,
-waiver-aware: zero-waiver scripts compose with the global `emu` proxied and
-the write surface refused at the call; the lib keeps the confined raw
-handle only while its own waivers survive, so the kill-bit deletion flips
-the gate strict with no further compose change.  `__OT6_EMU_RAW` is a
-forbidden static token, closing the reach-around.) The branch has targeted green replays, but
-no post-integration full-suite/full-frontier result yet — do not represent
-the program as complete.
+**`make test` stops at its own `--check-states` gate while the frontier
+is mid-re-mint — that is the gate working, not a failure.**
 
 **Traps this program has already paid for (don't rediscover):**
-capture-calm does NOT imply reload-calm — every mint should reload its own
-capture and verify (`gen_sabin_gau`'s pattern, three gens use it); a stale
-seeded fixture reads exactly like a product bug (`--check-states` first —
-the Marshal "impossible geometry" was a corrupt fixture); the battle Item
-cursor is a SUM (`$8947` scroll + `$894F` row); command row zero is not
-universally Fight; concurrent worktree suites can SIGTERM each other's Mesen
-runs (stagger heavy gates).
+capture-calm does NOT imply reload-calm — every mint reloads its own
+capture and verifies; a stale seeded fixture reads exactly like a product
+bug (`--check-states` first); the battle Item cursor is a SUM (`$8947`
+scroll + `$894F` row); command row zero is not universally Fight;
+concurrent worktree suites can SIGTERM each other's Mesen runs (stagger
+heavy gates, `nice` everything, one heavy gate at a time per machine).
 
 ## Open work, in the order I would take it
 
