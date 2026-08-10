@@ -147,7 +147,11 @@ local function menuFor(charId, what)
   return H.driveUntil(up, 20000, {
     H.call(function()
       ph = ph + 1
-      if H.readByte(MENU) ~= 0 and H.readByte(ACTOR) ~= slotOf[charId] then
+      if H.readByte(MENU) == 0 then
+        -- no menu up: page any battle dialog with A (the battle_vargas
+        -- hazard -- a monster dialog blocks the queue until dismissed)
+        H.setPad(ph % 8 < 4 and { a = true } or {})
+      elseif H.readByte(ACTOR) ~= slotOf[charId] then
         local step = ph % 40
         if step < 4 then H.setPad({ right = true })
         elseif step >= 20 and step < 24 then H.setPad({ a = true })

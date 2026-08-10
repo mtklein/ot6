@@ -95,8 +95,6 @@ tools/tests/battle_subjob.lua	.writeByte(
 tools/tests/battle_subjob.lua	.writeWord(
 tools/tests/battle_thief.lua	.writeByte(
 tools/tests/battle_thief.lua	.writeWord(
-tools/tests/battle_toolsgrey.lua	.writeByte(
-tools/tests/battle_toolsgrey.lua	.writeWord(
 tools/tests/battle_trueknight.lua	.writeByte(
 tools/tests/battle_trueknight.lua	.writeWord(
 tools/tests/battle_walletmp.lua	.writeByte(
