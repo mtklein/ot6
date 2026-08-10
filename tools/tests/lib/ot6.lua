@@ -685,6 +685,15 @@ end
 M.vars = {}
 
 -- Branch: choose a step list by predicate at the moment it is reached.
+-- "Reached" means each fresh pass: task #17 (found by the codex_ctx
+-- conversion) was this step LATCHING its first-tick branch forever --
+-- it had no reset, so inside a driveUntil body, whose steps replay every
+-- cycle via seqStep:reset(), the predicate was consulted exactly once in
+-- the step's lifetime and every later cycle silently replayed the stale
+-- branch.  reset() now clears the choice so a replayed cond re-asks its
+-- predicate, which is what every driveUntil body was already assuming.
+-- Top-level steps and the ladder idiom (H.cond(function() return won end,
+-- ...)) tick once and are never reset, so their behavior is unchanged.
 function M.cond(pred, thenSteps, elseSteps)
   local chosen = nil
   return {
@@ -693,6 +702,9 @@ function M.cond(pred, thenSteps, elseSteps)
         chosen = pred() and seqStep(thenSteps) or seqStep(elseSteps or {})
       end
       return chosen:tick()
+    end,
+    reset = function()
+      chosen = nil
     end,
   }
 end
@@ -940,10 +952,17 @@ function M.newFightDriver(tag, opts)
   local MENU, ACTOR, MSTATE = 0x7BCA, 0x62CA, 0x7BC2
   local CMDTBL, CMDROW, BCHID, BP, CURMP =
     0x202E, 0x890F, 0x3ED8, 0x3E9C, 0x3C08
-  local CMD_FIGHT, CMD_ITEM, CMD_TOOLS, CMD_BLITZ = 0x00, 0x01, 0x09, 0x0A
-  local ST_CMD, ST_ITEM, ST_TGT, ST_TOOLS = 0x05, 0x0A, 0x38, 0x30
+  local CMD_FIGHT, CMD_ITEM, CMD_MAGIC, CMD_TOOLS, CMD_BLITZ =
+    0x00, 0x01, 0x02, 0x09, 0x0A
+  local ST_CMD, ST_ITEM, ST_MAGIC, ST_TGT, ST_TOOLS =
+    0x05, 0x0A, 0x0E, 0x38, 0x30
   local ITEMSCR, ITEMROW, BATTINV, ITEMLIST = 0x8947, 0x894F, 0x2686, 0x4005
   local BLCOL, BLROW = 0x8963, 0x8967
+  -- the magic list's cursor triple (btlgfx_main UpdateMenuState_0e:
+  -- scroll+row is the absolute grid row, col the column; master record
+  -- rec maps to cell (rec-1)//2 , (rec-1)%2 -- battle_brokendeath's
+  -- measured mapping, the one that drove Celes's Ice at record 8)
+  local MSCROLL, MCOL, MROW = 0x8913, 0x8917, 0x891B
   local TGTCHARS, TGTMONS = 0x7B7D, 0x7B7E
   local TONIC, POTION, FENIX_DOWN = 0xE8, 0xE9, 0xF0
   local AUTOCROSSBOW, PUMMEL = 0xAA, 0x5D
@@ -1038,6 +1057,20 @@ function M.newFightDriver(tag, opts)
       if opts.bank and have < opts.bank then boost = 0
       else boost = math.min(have, 3) end
     end
+    -- opts.magic = { [charId] = { rec = N, mp = cost } }: the ATTACK-MAGIC
+    -- line, same shape as the tactical skills -- open the real Magic list
+    -- through the $7BC2 state machine, steer to master record N against
+    -- the live cursor cells, confirm on the default enemy target.  The
+    -- caller supplies the record number (a measured grid position, not a
+    -- spell id) and the MP cost; a character below the cost falls through
+    -- to the branches beneath, so an exhausted mage Fights instead of
+    -- wedging the menu.
+    local mg = opts.magic and opts.magic[id]
+    if mg and M.readWord(CURMP + actor * 2) >= (mg.mp or 8)
+       and cmdRow(actor, CMD_MAGIC) then
+      return { kind = "magic", rec = mg.rec, row = cmdRow(actor, CMD_MAGIC),
+               boostLeft = boost }
+    end
     if opts.tactical and id == 4 and M.readWord(CURMP + actor * 2) >= 4
        and cmdRow(actor, CMD_TOOLS) then
       return { kind = "skill", cmd = CMD_TOOLS, skill = AUTOCROSSBOW,
@@ -1088,6 +1121,17 @@ function M.newFightDriver(tag, opts)
       if cur > want then return { "up" } end
       return { "a" }
     end
+    if st == ST_MAGIC and plan.kind == "magic" then
+      local idx = plan.rec - 1
+      local wr, wc = idx // 2, idx % 2
+      local ar = M.readByte(MSCROLL + actor) + M.readByte(MROW + actor)
+      local col = M.readByte(MCOL + actor)
+      if ar < wr then return { "down" } end
+      if ar > wr then return { "up" } end
+      if col < wc then return { "right" } end
+      if col > wc then return { "left" } end
+      return { "a" }
+    end
     if st == ST_TOOLS and plan.kind == "skill" then
       local want
       for i = 0, 7 do
@@ -1133,7 +1177,7 @@ function M.newFightDriver(tag, opts)
       plan, planActor, tgtSpin = nil, nil, 0
       return { "a" }
     end
-    if st == ST_ITEM or st == ST_TOOLS then
+    if st == ST_ITEM or st == ST_TOOLS or st == ST_MAGIC then
       plan, planActor = nil, nil
       return { "b" }
     end

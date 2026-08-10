@@ -500,7 +500,7 @@ function M.navTo(txIn, tyIn, opts)
         { tactical = true, boost = true, items = true,
           healPercent = opts.healPercent or 55,
           bank = opts.bank, reserve = opts.reserve,
-          healer = opts.healer }) or nil
+          healer = opts.healer, magic = opts.magic }) or nil
   local function drop(why)  -- discard the plan, saying why (once, not per frame)
     if plan or pend then
       M.log(string.format("nav: %s at (%d,%d); plan dropped", why,
@@ -738,7 +738,7 @@ function M.advanceStory(pred, maxFrames, opts)
         { tactical = true, boost = true, items = true,
           healPercent = opts.healPercent or 55,
           bank = opts.bank, reserve = opts.reserve,
-          healer = opts.healer }) or nil
+          healer = opts.healer, magic = opts.magic }) or nil
   local hb = -600                      -- heartbeat: log immediately, then every 600
   return M.driveUntil(function()
     local done = pred()
@@ -1023,7 +1023,7 @@ function M.worldNavTo(txIn, tyIn, opts)
         { tactical = true, boost = true, items = true,
           healPercent = opts.healPercent or 55,
           bank = opts.bank, reserve = opts.reserve,
-          healer = opts.healer }) or nil
+          healer = opts.healer, magic = opts.magic }) or nil
   local hb = -600
   local function resolveT(v) return type(v) == "function" and v() or v end
   return M.driveUntil(function()
