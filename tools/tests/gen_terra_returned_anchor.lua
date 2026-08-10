@@ -45,7 +45,7 @@
 local H = dofile("tools/tests/lib/ot6.lua")
 
 local ZMENUSTATE = 0x26
-local SAVE_SELECT_INIT = 0x13
+local saveArg = nil
 local SAVE_SELECT = 0x14
 local ULTROS2 = 0x012d
 local TEMP_ELEM = 0x316c10 + ULTROS2
@@ -54,13 +54,6 @@ local TEMP_CLASS = 0x316d90 + ULTROS2
 local function map() return H.mapId() & 0x1ff end
 local function bright() return emu.getState()["ppu.screenBrightness"] or 0 end
 local function sw(id) return (H.readByte(0x1E80 + (id >> 3)) >> (id & 7)) & 1 end
-local function killBitAll()
-  for s = 0, 5 do
-    if H.readByte(0x3aa8 + s * 2) % 2 == 1 then
-      H.writeByte(0x3eec + s * 2, H.readByte(0x3eec + s * 2) | 0x80)
-    end
-  end
-end
 local function settled()
   return H.hasControl() and H.tileAligned() and bright() >= 15
      and not H.dialogWaiting() and not H.battleLoadStarted() and not H.worldMode()
@@ -75,7 +68,7 @@ local function pressWalk(dir, pred, maxFrames, what)
   return H.driveUntil(pred, maxFrames, {
     H.call(function()
       ph = (ph + 1) % 8
-      if H.battleLoadStarted() then killBitAll(); H.setPad(ph < 4 and { "a" } or {}); return end
+      if H.battleLoadStarted() then H.setPad({ l = true, r = true }); return end
       if H.dialogWaiting() then H.setPad(ph < 4 and { "a" } or {}); return end
       H.setPad({ [dir] = true })
     end),
@@ -87,7 +80,7 @@ local function pressTalk(dir, pred, maxFrames, what)
   return H.driveUntil(pred, maxFrames, {
     H.call(function()
       ph = (ph + 1) % 8
-      if H.battleLoadStarted() then killBitAll(); H.setPad(ph < 4 and { "a" } or {}); return end
+      if H.battleLoadStarted() then H.setPad({ l = true, r = true }); return end
       if H.dialogWaiting() then H.setPad(ph < 4 and { "a" } or {}); return end
       H.setPad(ph < 4 and { "a", dir } or { dir })
     end),
@@ -117,7 +110,7 @@ local function talkApproached(pred, maxFrames, what)
   return H.driveUntil(pred, maxFrames, {
     H.call(function()
       ph = (ph + 1) % 8
-      if H.battleLoadStarted() then killBitAll(); H.setPad(ph < 4 and { "a" } or {}); return end
+      if H.battleLoadStarted() then H.setPad({ l = true, r = true }); return end
       if H.dialogWaiting() then H.setPad(ph < 4 and { "a" } or {}); return end
       H.setPad(ph < 4 and { "a", app[3] } or { [app[3]] = true })
     end),
@@ -134,14 +127,20 @@ H.run({ maxFrames = 60000 }, {
   end),
 
   -- 1. the reunion trigger
-  H.navTo(54, 40, { maxFrames = 25000 }),
+  H.navTo(54, 40, { honest = "flee", maxFrames = 25000 }),
   pressWalk("left", function() return map() == 6 end, 9000,
     "held LEFT onto the reunion trigger -> the Blackjack deck"),
 
-  -- 2. reunion, Cranes, flights, into the flashback
+  -- 2. reunion, Cranes, flights, into the flashback.  honest="tactical",
+  -- not "true": this ride contains the FORCED Left & Right Cranes fight
+  -- (bosses-wob.md 16, 6+6 shields), and blind tap-A does not win bosses
+  -- -- the library fighter (items, boost, AutoCrossbow/Pummel) does.  The
+  -- phase-2 re-cut is this drive's first live run; if the Cranes prove a
+  -- wall for the honest chain party, that is a measured finding for the
+  -- ladder discussion, not a reason to weaken this back.
   H.advanceStory(function()
     return map() == 219 and sw(0x01C2) == 1 and settled()
-  end, 100000),
+  end, 100000, { honest = "tactical" }),
   H.waitFrames(90),
   H.call(function()
     H.assertEq(map(), 219, "the Esper-World flashback (map 219)")
@@ -150,27 +149,27 @@ H.run({ maxFrames = 60000 }, {
   end),
 
   -- 3a/3b. out to the town, carry Madonna in
-  H.navTo(36, 14, { maxFrames = 6000 }),
+  H.navTo(36, 14, { honest = "flee", maxFrames = 6000 }),
   pressWalk("down", function() return map() == 217 end, 6000,
     "pocket exit (36,15) -> 217"),
   H.waitFrames(60),
-  H.navTo(32, 12, { maxFrames = 12000 }),
+  H.navTo(32, 12, { honest = "flee", maxFrames = 12000 }),
   pressTalk("up", function() return sw(0x006C) == 1 end, 20000,
     "talk (32,11) -> carry MADONNA in -> $006C"),
   H.waitFrames(90),
 
   -- 3c. Madonna resting -> $006E
-  H.navTo(46, 43, { maxFrames = 9000 }),
+  H.navTo(46, 43, { honest = "flee", maxFrames = 9000 }),
   pressTalk("up", function() return sw(0x006E) == 1 end, 25000,
     "talk MADONNA -> $006E"),
   H.waitFrames(90),
 
   -- 3d. to the gate (the corridor NPC ports us; the landing tile flickers)
-  H.navTo(36, 14, { maxFrames = 6000 }),
+  H.navTo(36, 14, { honest = "flee", maxFrames = 6000 }),
   pressWalk("down", function() return map() == 217 end, 6000,
     "pocket exit -> 217"),
   H.waitFrames(60),
-  H.navTo(32, 12, { maxFrames = 12000 }),
+  H.navTo(32, 12, { honest = "flee", maxFrames = 12000 }),
   pressTalk("up", function() return map() == 218 end, 15000,
     "talk (32,11) -> ported to the gate (218)"),
   H.waitFrames(90),
@@ -180,16 +179,16 @@ H.run({ maxFrames = 60000 }, {
   -- 3e. the confession -> $006F and the raid
   planApproach(0x1C),
   H.navTo(function() return app[1] end, function() return app[2] end,
-    { maxFrames = 9000 }),
+    { honest = "flee", maxFrames = 9000 }),
   talkApproached(function() return sw(0x006F) == 1 end, 40000,
     "talk MADONNA at the gate -> $006F"),
-  H.advanceStory(function() return map() == 219 and settled() end, 30000),
+  H.advanceStory(function() return map() == 219 and settled() end, 30000, { honest = true }),
   H.waitFrames(90),
 
   -- 3f. the tempest plan -> $0116
   planApproach(0x13),
   H.navTo(function() return app[1] end, function() return app[2] end,
-    { maxFrames = 9000 }),
+    { honest = "flee", maxFrames = 9000 }),
   talkApproached(function() return sw(0x0116) == 1 end, 12000,
     "talk NPC_4 -> $0116"),
   H.waitFrames(90),
@@ -197,31 +196,31 @@ H.run({ maxFrames = 60000 }, {
   -- 3g. the collapse -> $0117
   planApproach(0x12),
   H.navTo(function() return app[1] end, function() return app[2] end,
-    { maxFrames = 9000 }),
+    { honest = "flee", maxFrames = 9000 }),
   talkApproached(function() return sw(0x0117) == 1 end, 12000,
     "talk the elder -> $0117"),
   H.waitFrames(90),
 
   -- 3h. the chase to the gate -> $0118
-  H.navTo(41, 55, { maxFrames = 9000 }),
+  H.navTo(41, 55, { honest = "flee", maxFrames = 9000 }),
   pressWalk("down", function() return map() == 217 end, 6000,
     "pocket exit (41,56) -> 217"),
   H.waitFrames(60),
-  H.navTo(32, 7, { maxFrames = 15000 }),
+  H.navTo(32, 7, { honest = "flee", maxFrames = 15000 }),
   pressWalk("up", function() return map() == 218 or sw(0x0118) == 1 end, 9000,
     "onto (32,6) -> the gate trigger"),
-  H.advanceStory(function() return sw(0x0118) == 1 end, 30000),
+  H.advanceStory(function() return sw(0x0118) == 1 end, 30000, { honest = true }),
   H.waitFrames(60),
 
   -- 3i. the finale and the ride home
   planApproach(0x1C),
   H.navTo(function() return app[1] end, function() return app[2] end,
-    { maxFrames = 9000 }),
+    { honest = "flee", maxFrames = 9000 }),
   talkApproached(function() return not H.hasControl() or map() ~= 218 end, 12000,
     "talk MADONNA -> the finale _caa4e0"),
   H.advanceStory(function()
     return map() == 6 and sw(0x02F0) == 1 and settled()
-  end, 90000),
+  end, 90000, { honest = true }),
   H.waitFrames(120),
   H.call(function()
     H.assertEq(sw(0x02F0), 1, "$02F0 SET -- TERRA is available (the v0.6 stop line)")
@@ -232,7 +231,7 @@ H.run({ maxFrames = 60000 }, {
   end),
 
   -- 4. takeoff and grounding
-  H.navTo(14, 6, { maxFrames = 6000, calmFrames = 8 }),
+  H.navTo(14, 6, { honest = "flee", maxFrames = 6000, calmFrames = 8 }),
   (function() local ph = 0
     return H.driveUntil(function() return H.worldMode() end, 1200, {
       H.call(function()
@@ -278,36 +277,60 @@ H.run({ maxFrames = 60000 }, {
     }, "world menu open from the grounded ship")
   end)(),
   H.waitFrames(30),
+  H.waitUntil(function() return H.readByte(ZMENUSTATE) == 0x05 end, 600,
+    "main menu state", 5),
   H.call(function()
     H.assertEq((H.readByte(0x0201) & 0x80) ~= 0, true,
-      "menu-flags $0201 bit7 SET -- world save legal after landing")
-    emu.write(TEMP_ELEM, 0x01, emu.memType.snesMemory)
-    emu.write(TEMP_CLASS, 0x01, emu.memType.snesMemory)
-    emu.write(0x316810 + ULTROS2, 0x01, emu.memType.snesMemory)
-    emu.write(0x316990 + ULTROS2, 0x01, emu.memType.snesMemory)
-    emu.write(0x307ff0, 0x00, emu.memType.snesMemory)   -- the #29 sentinel
-    H.writeByte(ZMENUSTATE, SAVE_SELECT_INIT)
+      "menu-flags $0201 bit7 SET -- the save-enable flow reached the menu")
+    -- ARM THE HONEST SAVE RECEIPT (issue #75): a read-only exec hook on
+    -- the real CopyGameDataToSRAM entry captures the slot argument the
+    -- save runs with (codex_saveas's instrument).  This replaces the old
+    -- zeroed-$307ff0 sentinel -- an SRAM write -- as the proof that the
+    -- real save ran to completion for slot 3.
+    local entry = H.sym("CopyGameDataToSRAM")
+    emu.addMemoryCallback(function()
+      saveArg = emu.getState()["cpu.a"] & 0xff
+    end, emu.callbackType.exec, entry, entry)
   end),
-  H.waitUntil(function() return H.readByte(ZMENUSTATE) == SAVE_SELECT end,
-    300, "save-slot selection", 5),
-  H.call(function()
-    H.writeByte(0x4b, 2) -- zero-based cursor: deterministic slot 3
-    H.writeWord(0x95, 0) -- slot-3 display cache: treat it as empty
-  end),
-  H.pressButtons({ "a" }, 4),
+  -- THE PAD-DRIVEN SAVE (save-drive rule, tools/tests/README.md;
+  -- codex_saveas and probe_banquet_timer_save are the templates): UP wraps
+  -- the main-menu cursor to Save (row 6), A enters the menu's own
+  -- SelectMainMenuOption_06 path, the slot cursor is STEERED to slot 3 by
+  -- pad against its live cell, and A confirms on through any overwrite
+  -- prompt.  No ZMENUSTATE poke, no cursor poke, no display-cache poke,
+  -- and no witness seeding: the codex payload the battery carries is
+  -- whatever the chain EARNED, read and logged below (issue #75).
   H.driveUntil(function()
-    return emu.read(0x307ff0, emu.memType.snesMemory) == 3
+    return H.readByte(ZMENUSTATE) == 0x05 and H.readByte(0x4b) == 6
+  end, 600, {
+    H.pressButtons({ "up" }, 4), H.waitFrames(16),
+  }, "main-menu cursor on Save"),
+  H.pressButtons({ "a" }, 4),
+  H.waitUntil(function() return H.readByte(ZMENUSTATE) == SAVE_SELECT end,
+    600, "save-slot selection", 5),
+  H.driveUntil(function()
+    return H.readByte(ZMENUSTATE) == SAVE_SELECT and H.readByte(0x4b) == 2
+  end, 600, {
+    H.pressButtons({ "down" }, 4), H.waitFrames(16),
+  }, "save cursor on slot 3"),
+  H.driveUntil(function()
+    return saveArg == 3
+       and emu.read(0x307ff0, emu.memType.snesMemory) == 3
   end, 1800, {
     H.pressButtons({ "a" }, 4), H.waitFrames(20),
-  }, "save confirmed -- CopyGameDataToSRAM rewrote the zeroed slot marker"),
+  }, "save confirmed -- CopyGameDataToSRAM ran for slot 3 (exec hook)"),
   H.waitFrames(120),
   H.call(function()
     H.assertEq(emu.read(0x307ff0, emu.memType.snesMemory), 3,
       "SRAM $307ff0 records slot 3")
-    H.assertEq(emu.read(0x316810 + ULTROS2, emu.memType.snesMemory), 0x01,
-      "slot 3 carries the element-codex witness")
-    H.assertEq(emu.read(0x316990 + ULTROS2, emu.memType.snesMemory), 0x01,
-      "slot 3 carries the class-codex witness")
+    H.assertEq(saveArg, 3, "CopyGameDataToSRAM ran for persistent slot 3")
+    -- the codex witness cells are READ, never seeded (issue #75): the
+    -- battery carries whatever the chain actually earned.  The phase-2
+    -- anchor re-cuts measure these and the entry contracts follow the
+    -- measurement (never the reverse).
+    H.log(string.format("codex witness cells (earned): elem=%02X class=%02X",
+      emu.read(0x316810 + ULTROS2, emu.memType.snesMemory),
+      emu.read(0x316990 + ULTROS2, emu.memType.snesMemory)))
     H.log("real Save UI wrote the terra-returned anchor to slot 3")
   end),
   -- The exit contract is asserted WITH THE MENU OPEN, the post-opera

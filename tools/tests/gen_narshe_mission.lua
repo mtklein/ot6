@@ -42,7 +42,7 @@
 local H = dofile("tools/tests/lib/ot6.lua")
 
 local ZMENUSTATE = 0x26
-local SAVE_SELECT_INIT = 0x13
+local saveArg = nil
 local SAVE_SELECT = 0x14
 local ULTROS2 = 0x012d
 local TEMP_ELEM = 0x316c10 + ULTROS2
@@ -51,13 +51,6 @@ local TEMP_CLASS = 0x316d90 + ULTROS2
 local function map() return H.mapId() & 0x1ff end
 local function bright() return emu.getState()["ppu.screenBrightness"] or 0 end
 local function sw(id) return (H.readByte(0x1E80 + (id >> 3)) >> (id & 7)) & 1 end
-local function killBitAll()
-  for s = 0, 5 do
-    if H.readByte(0x3aa8 + s * 2) % 2 == 1 then
-      H.writeByte(0x3eec + s * 2, H.readByte(0x3eec + s * 2) | 0x80)
-    end
-  end
-end
 local function shipX() return H.readWord(0x34) >> 4 end
 local function shipY() return H.readWord(0x38) >> 4 end
 
@@ -73,7 +66,7 @@ local function worldGrind(tx, ty, what)
     H.call(function()
       ph = (ph + 1) % 8
       if H.battleLoadStarted() then
-        killBitAll(); plan = nil; H.setPad(ph < 4 and { "a" } or {}); return
+        plan = nil; H.setPad({ l = true, r = true }); return
       end
       if not H.worldMode() then H.setPad({}); return end
       if not H.worldHasControl() then plan = nil; H.setPad({}); return end
@@ -94,7 +87,7 @@ local function pressWalk(dir, pred, maxFrames, what)
     H.call(function()
       ph = (ph + 1) % 8
       if H.battleLoadStarted() then
-        killBitAll(); H.setPad(ph < 4 and { "a" } or {}); return
+        H.setPad({ l = true, r = true }); return
       end
       if H.dialogWaiting() then H.setPad(ph < 4 and { "a" } or {}); return end
       H.setPad({ [dir] = true })
@@ -225,10 +218,10 @@ H.run({ maxFrames = 40000 }, {
   -- ---- the escort trigger row and the mission meeting --------------------
   -- The trigger row is (37-39,51) (event_trigger.asm:114-116); park two
   -- tiles below it and enter with a held press, then ride the scene.
-  H.navTo(38, 53, { maxFrames = 12000 }),
+  H.navTo(38, 53, { honest = "flee", maxFrames = 12000 }),
   pressWalk("up", function() return map() == 30 or not H.hasControl() end,
     2400, "held UP onto the escort trigger row (38,51)"),
-  H.advanceStory(function() return map() == 30 and sw(0x0076) == 1 end, 60000),
+  H.advanceStory(function() return map() == 30 and sw(0x0076) == 1 end, 60000, { honest = true }),
   H.waitUntil(function()
     return H.hasControl() and H.tileAligned() and bright() >= 15
        and not H.dialogWaiting()
@@ -247,7 +240,7 @@ H.run({ maxFrames = 40000 }, {
   end),
 
   -- ---- out of Narshe to the world map ------------------------------------
-  H.navTo(110, 25, { maxFrames = 12000,
+  H.navTo(110, 25, { honest = "flee", maxFrames = 12000,
     arrive = function() return map() == 20 end }),
   pressWalk("down", function() return map() == 20 end, 1200,
     "door 30 (110,26) -> map 20 (18,24)"),
@@ -255,7 +248,7 @@ H.run({ maxFrames = 40000 }, {
     return map() == 20 and H.hasControl() and H.tileAligned() and bright() >= 15
   end, 1800, "map 20 control", 5),
   H.waitFrames(30),
-  H.navTo(18, 61, { maxFrames = 20000,
+  H.navTo(18, 61, { honest = "flee", maxFrames = 20000,
     arrive = function() return H.worldMode() end }),
   pressWalk("down", function() return H.worldMode() end, 1200,
     "the map-20 south-edge long entrance -> the world map"),
@@ -299,40 +292,60 @@ H.run({ maxFrames = 40000 }, {
     }, "world menu open on foot at the anchor-G tile")
   end)(),
   H.waitFrames(30),
+  H.waitUntil(function() return H.readByte(ZMENUSTATE) == 0x05 end, 600,
+    "main menu state", 5),
   H.call(function()
     H.assertEq((H.readByte(0x0201) & 0x80) ~= 0, true,
-      "menu-flags $0201 bit7 SET -- world save legal here")
-    -- the codex witnesses the boundary contract demands (an issue-#75
-    -- waived poke, burn-down pending an honest chain that reveals them by
-    -- play); a cold Continue must recover these from the battery, which
-    -- the ROM's own fresh-page formatting cannot fake
-    emu.write(TEMP_ELEM, 0x01, emu.memType.snesMemory)
-    emu.write(TEMP_CLASS, 0x01, emu.memType.snesMemory)
-    emu.write(0x316810 + ULTROS2, 0x01, emu.memType.snesMemory)
-    emu.write(0x316990 + ULTROS2, 0x01, emu.memType.snesMemory)
-    emu.write(0x307ff0, 0x00, emu.memType.snesMemory)   -- the #29 sentinel
-    H.writeByte(ZMENUSTATE, SAVE_SELECT_INIT)
+      "menu-flags $0201 bit7 SET -- the save-enable flow reached the menu")
+    -- ARM THE HONEST SAVE RECEIPT (issue #75): a read-only exec hook on
+    -- the real CopyGameDataToSRAM entry captures the slot argument the
+    -- save runs with (codex_saveas's instrument).  This replaces the old
+    -- zeroed-$307ff0 sentinel -- an SRAM write -- as the proof that the
+    -- real save ran to completion for slot 3.
+    local entry = H.sym("CopyGameDataToSRAM")
+    emu.addMemoryCallback(function()
+      saveArg = emu.getState()["cpu.a"] & 0xff
+    end, emu.callbackType.exec, entry, entry)
   end),
-  H.waitUntil(function() return H.readByte(ZMENUSTATE) == SAVE_SELECT end,
-    300, "save-slot selection", 5),
-  H.call(function()
-    H.writeByte(0x4b, 2) -- zero-based cursor: deterministic slot 3
-    H.writeWord(0x95, 0) -- slot-3 display cache: treat it as empty
-  end),
-  H.pressButtons({ "a" }, 4),
+  -- THE PAD-DRIVEN SAVE (save-drive rule, tools/tests/README.md;
+  -- codex_saveas and probe_banquet_timer_save are the templates): UP wraps
+  -- the main-menu cursor to Save (row 6), A enters the menu's own
+  -- SelectMainMenuOption_06 path, the slot cursor is STEERED to slot 3 by
+  -- pad against its live cell, and A confirms on through any overwrite
+  -- prompt.  No ZMENUSTATE poke, no cursor poke, no display-cache poke,
+  -- and no witness seeding: the codex payload the battery carries is
+  -- whatever the chain EARNED, read and logged below (issue #75).
   H.driveUntil(function()
-    return emu.read(0x307ff0, emu.memType.snesMemory) == 3
+    return H.readByte(ZMENUSTATE) == 0x05 and H.readByte(0x4b) == 6
+  end, 600, {
+    H.pressButtons({ "up" }, 4), H.waitFrames(16),
+  }, "main-menu cursor on Save"),
+  H.pressButtons({ "a" }, 4),
+  H.waitUntil(function() return H.readByte(ZMENUSTATE) == SAVE_SELECT end,
+    600, "save-slot selection", 5),
+  H.driveUntil(function()
+    return H.readByte(ZMENUSTATE) == SAVE_SELECT and H.readByte(0x4b) == 2
+  end, 600, {
+    H.pressButtons({ "down" }, 4), H.waitFrames(16),
+  }, "save cursor on slot 3"),
+  H.driveUntil(function()
+    return saveArg == 3
+       and emu.read(0x307ff0, emu.memType.snesMemory) == 3
   end, 1800, {
     H.pressButtons({ "a" }, 4), H.waitFrames(20),
-  }, "save confirmed -- CopyGameDataToSRAM rewrote the zeroed slot marker"),
+  }, "save confirmed -- CopyGameDataToSRAM ran for slot 3 (exec hook)"),
   H.waitFrames(120),
   H.call(function()
     H.assertEq(emu.read(0x307ff0, emu.memType.snesMemory), 3,
       "SRAM $307ff0 records slot 3")
-    H.assertEq(emu.read(0x316810 + ULTROS2, emu.memType.snesMemory), 0x01,
-      "slot 3 carries the element-codex witness")
-    H.assertEq(emu.read(0x316990 + ULTROS2, emu.memType.snesMemory), 0x01,
-      "slot 3 carries the class-codex witness")
+    H.assertEq(saveArg, 3, "CopyGameDataToSRAM ran for persistent slot 3")
+    -- the codex witness cells are READ, never seeded (issue #75): the
+    -- battery carries whatever the chain actually earned.  The phase-2
+    -- anchor re-cuts measure these and the entry contracts follow the
+    -- measurement (never the reverse).
+    H.log(string.format("codex witness cells (earned): elem=%02X class=%02X",
+      emu.read(0x316810 + ULTROS2, emu.memType.snesMemory),
+      emu.read(0x316990 + ULTROS2, emu.memType.snesMemory)))
     H.log("real Save UI wrote the narshe-mission anchor to slot 3")
     -- THE FULL exit contract, sram included, at the boundary save moment.
     -- Asserted with the menu still open: like the anchor-F boundary, every
