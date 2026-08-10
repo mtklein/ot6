@@ -510,24 +510,25 @@ STATES = [
     # atomic): cold-boot the vector-crash-v1 battery (the boot tile IS the
     # wreck -- no A press until the grind), the ~117-step world grind to
     # Vector 253, the castle escort, the dais face-UP+A, the 14400-frame
-    # window driven to var0==44 (24 soldiers, battles 26/27x3 kill-bit
-    # clean -- $1dd1 & $31 == 0 asserted per fight), the timer expiry, the
-    # dinner Q&A driven to the full 93 (toast/kefka/doma/celes 2-0-1-1,
-    # the question submenu asked exactly once each, espers, recall, the
-    # rest-break challenge battle 30, wish, accompany), the roster strip
-    # to TERRA+LOCKE, the (23,12) messenger (all four reward tiers -- the
-    # >=90 Charm Bangle is frontier canon), the castle exit, and the
-    # world battery save at (120,188) -- boundary J, `banquet-done-v1`.
+    # window, the dinner Q&A, the rest-break challenge (battle 30, fought),
+    # the roster strip to TERRA+LOCKE, the (23,12) messenger, the castle
+    # exit, and the world battery save at (120,188) -- boundary J.
+    #
+    # THE SCORE TIER IS SETTLED BY HONEST PLAY (2026-08-09, issue #75):
+    # the driven canon is 70 points -- window var0=21 (15 talks + 1 clean
+    # Commando; talk ~210 window-frames/+1 vs fight ~2000+/+6, so the
+    # window is talk-heavy by economics), Q&A +44, challenge +5 -- which
+    # clears the >=67 tier and stays <77, so Tintinabar/Charm Bangle are
+    # correctly ABSENT.  The old ">=90 Charm Bangle is frontier canon"
+    # reading died with the kill-bit that made it look reachable.  The
+    # split engage guard makes the tier robust even if the recall +5 pays
+    # nothing -- live, the first question's $0231 record bit never sets
+    # (banquet-decode 4's recall model is unverified; probe_banquet_qa
+    # asserts it but boots a fixture that never existed -- open on #75).
     # Re-cutting the battery is a deliberate by-hand operation:
     #     OT6_SRAM_ANCHOR=tools/tests/anchors/vector-crash-v1 \
     #     OT6_CAPTURE_SRM=tools/tests/anchors/banquet-done-v1/banquet-done.sram \
     #     tools/tests/run.sh tools/tests/gen_banquet_done.lua
     #     python3 tools/tests/lib/sram_anchor.py seal tools/tests/anchors/banquet-done-v1
-    # NOT YET IN THE GRAPH (dispatcher, 2026-07-28): gen_banquet_done is
-    # written but has never driven the >=90 circuit end to end, and anchor
-    # banquet-done-v1 has never been cut -- the window-feasibility question
-    # is open (see the addenda's budget arithmetic). An edge here would fail
-    # every `make frontier`. Restore this line with the anchor when the
-    # circuit run settles the score tier:
-    #     S("banquet_done", gen="gen_banquet_done", anchor="vector-crash-v1"),
+    S("banquet_done", gen="gen_banquet_done", anchor="vector-crash-v1"),
 ]
