@@ -96,8 +96,9 @@ local METRICS_FRAMES = 20000       -- metrics-window frame budget
 -- enough for banking to pay off. this is a stand-in until real
 -- post-magitek states exist; the delta between baseline and boost3
 -- here is the first "how much juice" number.
-local BUFF_HP   = 0                -- >0 = set every monster's hp to this
-local BUFF_FIRE = false            -- true = make monsters fire-weak
+-- (The BUFF_HP / BUFF_FIRE fixture knobs that once lived here are gone --
+-- both were hard-coded off, so their write branches were dead code, and
+-- issue #75's burn-down deletes dead writes rather than waiving them.)
 
 -- --------------------------------------------------------- addresses --
 local MENU  = 0x7bca               -- battle menu open flag
@@ -860,14 +861,6 @@ H.run({ maxFrames = METRICS_FRAMES + 12000 }, {
     end
     for slot = 0, 5 do
       if monsterAlive(slot) then
-        -- optional fixture buff, applied BEFORE the hp snapshot so the
-        -- dmg accounting starts from the buffed value ($3be0 = weak
-        -- elements, low byte fire; $3bec/$3bee mirror for the 2-guard
-        -- formation, per battle_break.lua)
-        if BUFF_FIRE then
-          H.writeByte(0x3be0 + slot*2, H.readByte(0x3be0 + slot*2) | 0x01)
-        end
-        if BUFF_HP > 0 then H.writeWord(MHP + slot*2, BUFF_HP) end
         local hp = H.readWord(MHP + slot*2)
         mons[#mons + 1] = { slot = slot, hp = hp, hp0 = hp, dmg = 0 }
         -- what the fixture actually was, so a report is readable without

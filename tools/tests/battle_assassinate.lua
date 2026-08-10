@@ -65,7 +65,6 @@ local guardHp = 0xF000              -- durable: a fight must NOT damage-remove a
                                     -- kill witness) is even set. Set once per
                                     -- battle; not re-pinned, so a fight's damage
                                     -- still SHOWS (the loud control for negatives).
-local pinGuardHp = false
 local presetLatch = false           -- battle 3: pre-spend every Shadow's divine
 
 local function pinShadow()
@@ -93,7 +92,6 @@ local function pinGuards()
       H.writeByte(SH(s), guardBroken[s] and 0 or 8)
       local dp = H.readByte(DP(s))
       H.writeByte(DP(s), guardImmune[s] and (dp | 0x04) or (dp & 0xFB))
-      if pinGuardHp then H.writeWord(MHP(s), guardHp) end
     end
   end
 end
@@ -141,7 +139,6 @@ add({
     guardBroken = { [2] = true, [3] = true }
     guardImmune = { [2] = false, [3] = false }   -- both killable
     presetLatch = false
-    pinGuardHp = false
     pin(); setGuardHp()
     H.log(string.format("battle 1: shadow party; latch $%02X", latchByte()))
     H.assertEq(latchByte(), 0, "divine latch clear at battle start")
@@ -165,7 +162,6 @@ add({
     guardBroken = { [2] = true, [3] = true }
     guardImmune = { [2] = true, [3] = true }      -- both Broken BOSSES
     presetLatch = false
-    pinGuardHp = false
     pin(); setGuardHp()
     hp0 = { hp(2), hp(3) }
     H.log(string.format("battle 2: boss guards hp %d/%d latch $%02X", hp0[1], hp0[2], latchByte()))
@@ -194,7 +190,6 @@ add({
     guardBroken = { [2] = true, [3] = true }
     guardImmune = { [2] = false, [3] = false }   -- Broken non-boss...
     presetLatch = true                           -- ...but every divine pre-spent
-    pinGuardHp = false
     pin(); setGuardHp()
     hp0 = { hp(2), hp(3) }
     H.log(string.format("battle 3: latch pre-set $%02X, guards hp %d/%d", latchByte(), hp0[1], hp0[2]))

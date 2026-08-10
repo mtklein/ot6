@@ -30,8 +30,6 @@ tools/tests/battle_blitzgrey.lua	.writeByte(
 tools/tests/battle_blitzgrey.lua	.writeWord(
 tools/tests/battle_blitzlist.lua	.writeByte(
 tools/tests/battle_blitzlist.lua	.writeWord(
-tools/tests/battle_bp.lua	.writeByte(
-tools/tests/battle_bp.lua	.writeWord(
 tools/tests/battle_break.lua	.writeByte(
 tools/tests/battle_break.lua	.writeWord(
 tools/tests/battle_breakflash.lua	.writeByte(
@@ -170,7 +168,6 @@ tools/tests/menu_esperdetail_tube6.lua	.writeByte(
 tools/tests/menu_ragepage.lua	.writeByte(
 tools/tests/menu_swdtechpage.lua	.writeByte(
 tools/tests/metrics_battle.lua	.writeByte(
-tools/tests/metrics_battle.lua	.writeWord(
 tools/tests/mines_pace.lua	.writeByte(
 tools/tests/mines_pace.lua	.writeWord(
 tools/tests/mines_pace.lua	emu.write

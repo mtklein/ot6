@@ -1191,15 +1191,13 @@ local function battleBlock(k)
         end
         for slot = 0, 5 do
           if monsterAlive(slot) then
-            if BUFF_HP > 0 then H.writeWord(MHP + slot*2, BUFF_HP) end
+            -- (the BUFF_HP / BUFF_CLASS write branches that lived here were
+            -- gated on hard-coded 0 constants -- dead code, deleted per the
+            -- issue #75 burn-down rather than waived.  BUFF_SHIELDS is the
+            -- one LIVE knob, env-gated, default off.)
             if BUFF_SHIELDS > 0 then
               H.writeByte(SHLD + slot*2, BUFF_SHIELDS)      -- current
               H.writeByte(SHLD + slot*2 + 1, BUFF_SHIELDS)  -- max (refill)
-            end
-            if BUFF_CLASS > 0 then
-              -- monster half of $3e9c (chars at +0..+6, monsters at +8)
-              H.writeByte(WKC + slot*2,
-                H.readByte(WKC + slot*2) | BUFF_CLASS)
             end
             local hp = H.readWord(MHP + slot*2)
             mons[#mons + 1] = { slot = slot, hp = hp, hp0 = hp, dmg = 0 }
