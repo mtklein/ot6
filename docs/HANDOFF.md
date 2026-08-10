@@ -129,15 +129,24 @@ diagnoses were wrong in instructive ways:**
   moogle_defense graph edges are live (114 states); ~35 suite tests
   converted by fixture-swap waves (see git log wt/menu-family,
   wt/mech-family, wt/convert-cheap).
-- **OWNER RULING PENDING — the Cranes** (reunion airship fight): honestly
-  unwinnable as tuned; its designed key (water, bosses-wob 16) is
-  unobtainable by the mandated party.  Full record in
-  gen_terra_returned_anchor's header + probe_cranes_wedge.  The
-  terra-returned battery re-cut and the four cuts chained after it
-  (narshe-mission, gate-cave-save, vector-crash, banquet-done) wait on
-  this ruling.  NOTE: one retracted wrong verdict lives in that file's
-  history (the Game Over continue-flow read as a completing scene) —
-  trust the f7d32da correction, not cc2ce35.
+- **RESOLVED 2026-08-10 — the Cranes were never a balance wall** (the
+  ruling request is withdrawn): the "honestly unwinnable" verdict was a
+  LOADOUT bug — `H.equipOptimum` had armed LOCKE and EDGAR with Thunder
+  Blades (lightning), and the Left Crane *absorbs* lightning, so every
+  Fight healed the boss and charged its Giga Volt counter.  The vanilla
+  playbook wins attempt 1 of the standard ladder (probe_cranes_water,
+  PASS f19772): BISMARK/SHIVA/CARBUNKL worn through the real Skills
+  menu (Sea Song IS obtainable water — the "no water access" premise
+  was false, $1A69 reads $EF at boundary E), daggers swapped in through
+  the real Equip menu (pierce = the Cranes' class weak, element-clean),
+  back rows, SETZER-only medic, focus-fire the Left.  Lib grew
+  equipEsper/equipWeapon/opts.summon/opts.focus/opts.tools for it.
+  Historical wipe record: gen_terra_returned_anchor f7d32da +
+  probe_cranes_wedge (one retracted wrong verdict lives there — the
+  Game Over continue-flow read as a completing scene; trust f7d32da,
+  not cc2ce35).  The terra-returned re-cut and the chained tail
+  (narshe-mission, gate-cave-save, vector-crash, banquet-done) are
+  unblocked and being cut.
 
 ### Doctrine (measured; do not re-derive)
 

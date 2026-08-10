@@ -11,9 +11,12 @@
 --     x=52 (approached from the EAST along row 40; §4.4's (52,36..38)
 --     candidates are NOT walkable live).
 --  2. The Setzer reunion auto-plays onto the Blackjack deck (map 6),
---     battle 71 (Cranes, 010D+010E) cleared with the route's kill-bit
---     idiom, then the non-interactive flights to Zozo and into the
---     flashback: control as the WEDGE-actor MADUIN at 219 (34,10).
+--     battle 71 (Cranes, 010D+010E) FOUGHT AND WON HONESTLY (2026-08-10,
+--     probe_cranes_water's playbook -- see the prep block below; the
+--     original July mint kill-bitted this fight, and the interim record
+--     called it unwinnable off a Thunder-Blade loadout bug), then the
+--     non-interactive flights to Zozo and into the flashback: control as
+--     the WEDGE-actor MADUIN at 219 (34,10).
 --  3. The flashback's interactive chain (unmapped until now):
 --       a. pocket exit (36,15) -> 217 (23,21);
 --       b. talk the (32,11) NPC -> choice -> carry MADONNA in ($006C);
@@ -117,10 +120,96 @@ local function talkApproached(pred, maxFrames, what)
   }, what)
 end
 
--- 110000: the July budget (60000) was sized for 3-frame kill-bit fights;
--- the honest Cranes alone runs ~7000 frames and the A-gated scene beats
--- add more.  Measured need ~75k; headroom for fight variance.
-H.run({ maxFrames = 110000 }, {
+-- The ride ladder (probe_cranes_water's measured shape).  Each attempt:
+-- reload the pre-trigger blob (attempt 1 skips -- it IS that state), walk
+-- onto the reunion trigger, and ride the scene with the fight driver;
+-- battles go to the driver, non-battle frames edge-A on map 6 and go
+-- NEUTRAL on 219 (the flashback's start tile sits by the Esper-world
+-- save point -- blind A there re-opens the save query forever, the first
+-- budget-burn run's 55k-frame lesson).  A wipe is detected off the LAST
+-- in-battle monster HP samples -- never the teardown table, which reads
+-- $FFFF everywhere and once turned a measured WIN into a "wipe".
+local summonChars, rideBlob, rideWon = {}, nil, false
+local function rideAttempt(n)
+  local loadReq
+  return H.cond(function() return rideWon end, {}, {
+    H.logStep(function()
+      return string.format("cranes ride attempt %d (stagger %d) at f%d",
+        n, 7 + (n - 1) * 37, H.frame)
+    end),
+    (n > 1) and H.seqStep({
+      H.call(function() loadReq = H.requestLoadState(rideBlob) end),
+      H.waitFrames(2),
+      H.call(function() H.checkReq(loadReq, "pre-attempt reload") end),
+      H.waitFrames(90),
+    }) or H.waitFrames(1),
+    H.navTo(54, 40, { honest = "flee", maxFrames = 25000 }),
+    pressWalk("left", function() return map() == 6 end, 9000,
+      "held LEFT onto the reunion trigger -> the Blackjack deck"),
+    H.release(),
+    H.waitFrames(7 + (n - 1) * 37),      -- re-roll the battle RNG phase
+    (function()
+      local F = H.newFightDriver("terra ride", { tactical = true,
+        boost = true, bank = 2, items = true, healer = 9, healPercent = 45,
+        tools = false, cadence = 12, summon = summonChars,
+        focus = { { slot = 0, mask = 0x01 } } })
+      local ph, battN, wasBatt = 0, 0, false
+      local lastHp, wiped = {}, false
+      return H.driveUntil(function()
+        if map() == 219 and sw(0x01C2) == 1 and settled() then
+          rideWon = true
+          H.setPad({})
+          H.log(string.format("[ride] attempt %d reached the flashback "
+            .. "at f%d", n, H.frame))
+          return true
+        end
+        if wiped then
+          H.log(string.format("[ride] attempt %d WIPED at f%d", n, H.frame))
+          return true
+        end
+        return false
+      end, 100000, {
+        H.call(function()
+          ph = (ph + 1) % 8
+          battN = H.battleLoadStarted() and battN + 1 or 0
+          if battN == 3 and not wasBatt then wasBatt, lastHp = true, {} end
+          if wasBatt and battN == 0 then
+            wasBatt = false
+            for m = 0, 1 do
+              if lastHp[m] and lastHp[m] > 0 then wiped = true end
+            end
+          end
+          if battN >= 3 then
+            for m = 0, 1 do
+              local id = H.readWord(0x57C0 + m * 2)
+              if id ~= 0 and id ~= 0xFFFF then
+                lastHp[m] = H.readWord(0x3BFC + m * 2)
+              end
+            end
+            F.frame()
+            return
+          end
+          if battN > 0 then F.idle(); H.setPad({}); return end
+          F.idle()
+          if map() == 219 then
+            if H.dialogWaiting() then H.setPad(ph < 4 and { "a" } or {})
+            else H.setPad({}) end
+            return
+          end
+          H.setPad(ph < 4 and { "a" } or {})
+        end),
+      }, "the reunion/Cranes ride, vanilla playbook (attempt " .. n .. ")")
+    end)(),
+  })
+end
+
+-- 160000: the July budget (60000) was sized for 3-frame kill-bit fights;
+-- the honest ride is ~13k to the flashback (probe_cranes_water: fight
+-- open f7452, both Cranes dead ~f15250, flashback f19772 with ~5.5k of
+-- menu prep in front), the flashback chain + takeoff + save measured
+-- ~55k more in July, and the ladder may burn two wiped attempts (~15k
+-- each) before its win.
+H.run({ maxFrames = 160000 }, {
   H.loadState("build/states/n128_won.mss.lua"),
   H.waitFrames(150),
   H.call(function()
@@ -129,73 +218,79 @@ H.run({ maxFrames = 110000 }, {
     H.assertEq(H.fieldY(), 7, "boot y")
   end),
 
-  -- 1. the reunion trigger
-  H.navTo(54, 40, { honest = "flee", maxFrames = 25000 }),
-  pressWalk("left", function() return map() == 6 end, 9000,
-    "held LEFT onto the reunion trigger -> the Blackjack deck"),
-
-  -- 2. reunion, Cranes, flights, into the flashback.  honest="tactical".
+  -- 1-2. FIGHT PREP, then the reunion trigger and the ride.
   --
-  -- THE WALL, FINAL FORM (2026-08-10, probe_cranes_wedge's corrected
-  -- verdict -- the intermediate "drivable A-press" reading was WRONG;
-  -- the scene it drove was .proc GameOver, cc/e566):
-  --   * the Cranes' AI has NO end_battle -- kill or wipe only;
-  --   * every honest fighter configuration tried WIPES by ~f8400 (the
-  --     "party survives at full HP" reads were GameOver's restore);
-  --   * chip pace while attacking (~440hp+1sh per 5700f on one Crane)
-  --     needs 40-60k sustained battle frames; survival fails first;
-  --   * bosses-wob.md 16 names the Cranes' key element WATER, and this
-  --     party has no water access -- the designed counter is
-  --     unobtainable here.  Balance finding for the owner; the July
-  --     anchor passed only because the kill-bit ended the fight in 3
-  --     frames.  This leg stays FAILING until the owner rules (retune,
-  --     or a fight the library can win some other way), and cuts 6-10
-  --     stay chain-blocked behind it.
+  -- THE WALL, RESOLVED (2026-08-10, probe_cranes_water -- superseding the
+  -- "honestly unwinnable as tuned" record that stood here; the full wall
+  -- history lives in that file's header and probe_cranes_wedge's):
+  -- the wall was a LOADOUT bug, not balance.  H.equipOptimum had armed
+  -- LOCKE and EDGAR with THUNDER BLADES ($0F: slash, LIGHTNING), and the
+  -- Left Crane ABSORBS lightning (monster_prop +23 = $04) -- every Fight
+  -- healed the boss and walked its Giga Volt counter (_269's if_element
+  -- LIGHTNING ladder).  The prior wipe timelines' "chip pace vs survival"
+  -- arithmetic was measured on a party feeding the boss.
   --
-  -- The re-authored ride (the fix the RESOLVED note above prescribes):
-  -- the same terminator -- the flashback with control as MADUIN -- but
-  -- EDGE-A through the scene instead of neutral patience, because the
-  -- post-Cranes beat is an A wait that never raises the dialog flag.
-  -- Battles (the Cranes) go to the tactical fighter; every non-battle
-  -- frame edge-taps A, which is exactly what a player crossing this
-  -- scene does.  probe_cranes_wedge measured all of this.
-  -- 7-frame stagger: the first two cut attempts crashed the EMULATOR
-  -- (Mesen vanished, no crash report) at the identical battle frame --
-  -- f+7800, Crane0 at 662 -- twice, because same inputs = same
-  -- deterministic trajectory.  Shifting the ride's start by a few frames
-  -- re-rolls the whole battle path around whatever the emulator chokes
-  -- on.  A harness workaround, not a game fix; noted for the dispatch.
-  H.waitFrames(7),
+  -- The vanilla playbook, all through real menus, wins attempt 1 of the
+  -- standard ladder (probe_cranes_water PASS f19772; Left dead ~b+4400,
+  -- Right broken and dead ~b+7500):
+  --   * BISMARK->EDGAR (Sea Song, the designed water key: bosses-wob 16),
+  --     SHIVA->SABIN (Diamond Dust), CARBUNKL->LOCKE (party Rflect --
+  --     the Cranes' whole normal rotation is reflectable);
+  --   * DAGGERS for both swingers (OT6_PIERCE = the Cranes' class weak:
+  --     element-clean AND shield-chipping);
+  --   * back row for all three (Blitz/summons/items are row-exempt);
+  --   * driver: healer=SETZER (the 4th rider the reunion adds; the bag
+  --     is 15 Tonics and an all-medic line heal-locks), tools=false
+  --     (AutoCrossbow splash feeds both if_hit retal counters), bank 2,
+  --     focus on the Left Crane (mask $01 = slot 0, measured by the
+  --     probe's delta logger), cadence 12.
+  -- SETZER keeps whatever row/kit he joins with -- he cannot be prepped.
+  H.equipEsper(0, 7, { tag = "BISMARK -> EDGAR" }),
+  H.equipEsper(1, 2, { tag = "SHIVA -> SABIN" }),
+  H.equipEsper(2, 19, { tag = "CARBUNKL -> LOCKE" }),
+  H.equipWeapon(0, 0x01, { tag = "EDGAR MithrilKnife" }),
+  H.equipWeapon(2, 0x02, { tag = "LOCKE Guardian" }),
+  H.setRows({ [1] = true, [4] = true, [5] = true }, { tag = "back row" }),
+  H.call(function()
+    -- key the summon table off what is actually WORN, never assumed
+    local pid = H.readByte(0x1A6D)
+    for c = 0, 13 do
+      local b = H.readByte(0x1850 + c)
+      if b ~= 0 and (b & 0x07) == pid then
+        local base = 0x1600 + 37 * c
+        local actor, esper = H.readByte(base) & 0x3f, H.readByte(base + 30)
+        if esper == 7 then summonChars[actor] = { mp = 50 } end   -- Sea Song
+        if esper == 2 then summonChars[actor] = { mp = 27 } end   -- DDust
+        if esper == 19 then summonChars[actor] = { mp = 36 } end  -- Carbunkl
+        H.log(string.format("[prep] c%d actor=%d esper=%02X weapon=%02X",
+          c, actor, esper, H.readByte(base + 31)))
+      end
+    end
+    local n = 0
+    for _ in pairs(summonChars) do n = n + 1 end
+    H.assertEq(n, 3, "three stones worn (the prep drives worked)")
+  end),
   (function()
-    local F = H.newFightDriver("terra ride", { tactical = true,
-      boost = true, bank = 1, items = true, healPercent = 45 })
-    local ph, battN = 0, 0
-    return H.driveUntil(function()
-      local d = map() == 219 and sw(0x01C2) == 1 and settled()
-      if d then H.setPad({}) end
-      return d
-    end, 100000, {
+    local req
+    return H.seqStep({
+      H.call(function() req = H.requestSaveState() end),
+      H.waitFrames(2),
       H.call(function()
-        ph = (ph + 1) % 8
-        battN = H.battleLoadStarted() and battN + 1 or 0
-        if battN >= 3 then F.frame(); return end
-        if battN > 0 then F.idle(); H.setPad({}); return end
-        F.idle()
-        -- edge-A ONLY until the flashback loads: the A-gated beat lives on
-        -- map 6, and the flashback's start tile sits by the Esper-world
-        -- SAVE POINT -- blind A there re-opens the save query dialog
-        -- forever, which is precisely how the first budget-burn run spent
-        -- 55k frames (dialogWaiting high, settled() never true).  On 219,
-        -- neutral with A only for real dialogs, and settled() fires.
-        if map() == 219 then
-          if H.dialogWaiting() then H.setPad(ph < 4 and { "a" } or {})
-          else H.setPad({}) end
-          return
-        end
-        H.setPad(ph < 4 and { "a" } or {})
+        H.checkReq(req, "the pre-trigger retry blob")
+        rideBlob = req.blob
       end),
-    }, "edge-A ride: Cranes -> Terra's return -> the flashback (map 219)")
+    })
   end)(),
+
+  -- The ride, as a 3-attempt phase-spread ladder (the doctrine).  The
+  -- 7-frame base stagger stays: the first two July cut attempts crashed
+  -- the EMULATOR at the identical battle frame twice, because same
+  -- inputs = same deterministic trajectory; the shift re-rolls it.
+  rideAttempt(1), rideAttempt(2), rideAttempt(3),
+  H.call(function()
+    H.assertEq(rideWon, true,
+      "the Cranes fell and the ride reached the flashback within 3 attempts")
+  end),
   H.waitFrames(90),
   H.call(function()
     H.assertEq(map(), 219, "the Esper-World flashback (map 219)")
