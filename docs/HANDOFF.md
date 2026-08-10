@@ -142,7 +142,11 @@ under the fixed harness.**  Their greens were reported by agent sessions
 using the broken parser.  Nothing proves they were reaped -- each agent
 quoted a terminal `PASS (frame N)`, which a reaped run cannot produce --
 but "probably fine" is not this program's standard.  Re-run all nine and
-record the frames.
+record the frames.  THREE ARE DONE (2026-08-10, under the fixed
+harness, terminal verdicts, zero reaps): battle_bushidoloadout f649,
+battle_crosslist f1161, battle_blitzlist f1530.  Six remain:
+battle_bushido, battle_blitzcursor, battle_blitzgrey, battle_thief,
+battle_dancemp, and battle_rage (the last is the unmerged WIP).
 
 **2026-08-10 additions**: five batteries re-cut through the real Save
   UI (post-opera + boundaries B-E); the fight driver casts real attack
