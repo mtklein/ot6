@@ -272,6 +272,7 @@ local function buyItem(id, row, qtyFn, name)
   local phase = 0
   local seen27, bought = false, false
   local want = nil
+  local lastQty, stall = nil, 0
   return H.driveUntil(function() return bought end, 20000, {
     H.call(function()
       phase = (phase + 1) % 8
@@ -284,6 +285,26 @@ local function buyItem(id, row, qtyFn, name)
       if st == 0x27 then
         seen27 = true
         local qty = H.readByte(0x0028)
+        -- THE CLAMP IS THE PURSE'S ANSWER (2026-08-09).  The widget is
+        -- gil-clamped, so steering toward a want the purse cannot cover
+        -- pins qty at the affordable maximum -- and the old loop pressed
+        -- into that wall until its whole 20000-frame budget died.  The
+        -- fresh honest chain reached Mobliz with 209 gil and "TONIC to
+        -- 99" wedged exactly there (fail-before observed: FAIL timeout
+        -- after 20000 frames).  A player buys what the gil covers; 240
+        -- unmoving frames against the clamp accepts the clamped qty.
+        if qty == lastQty and qty < want then
+          stall = stall + 1
+          if stall > 240 then
+            H.log(string.format(
+              "[shop] %s: purse-clamped at %d (wanted %d) -- taking it",
+              name, qty, want))
+            want = qty
+          end
+        elseif qty ~= lastQty then
+          stall = 0
+        end
+        lastQty = qty
         local btn = nil
         if qty < want then
           btn = (want - qty >= 10) and "up" or "right"
@@ -343,10 +364,13 @@ local function fedSwitch() return (H.readByte(0x3EBD) & 0x02) ~= 0 end
 -- the grind does: BFS-step toward (tx,ty), and on any battle steer each
 -- actor to Fight (command row 0), dump banked boost, self-Tonic under 40%,
 -- until the battle tears down.  No GAU on stage here, so no feed branch.
-local function worldWalkFight(tx, ty, budget, what, arriveOffWorld)
+local function worldWalkFight(tx, ty, budget, what, arriveOffWorld, opts)
+  opts = opts or {}
   local tick, dirFlip, hb = 0, false, -1800
   local plan, planActor, btn, mstreak = nil, nil, nil, 0
   local calm = 0
+  local fought, wasBattle = 0, false
+  local stuckN, battleFrames = 0, 0
   local function makePlan(actor)
     -- `worldWalkFight()` episodes are constructed before H.run starts, so
     -- resolve this at execution time.  The field party byte is repurposed in
@@ -478,9 +502,38 @@ local function worldWalkFight(tx, ty, budget, what, arriveOffWorld)
        and H.worldHasControl() and H.worldAligned()
        and not H.battleLoadStarted() and (H.readByte(0x00E8) & 0x20) == 0
     calm = parked and calm + 1 or 0
+    -- opts.segment: hand control back after any ONE fought battle, once
+    -- the world is live again -- the caller interleaves H.fieldCare
+    -- between battles, healing on the FIELD where it costs no battle
+    -- turns (the sustain arithmetic below is why)
+    if opts.segment and fought >= 1 and H.worldMode()
+       and H.worldHasControl() and H.worldAligned()
+       and not H.battleLoadStarted() then
+      return true
+    end
     return lost ~= nil or (arriveOffWorld and not H.worldMode()) or calm >= 30
   end, budget or 40000, {
     H.call(function()
+      if H.battleLoadStarted() then
+        battleFrames = (battleFrames or 0) + 1
+        if battleFrames == 120 then
+          -- name the draw: the staging band is a formation LOTTERY (a
+          -- draw at f58124 killed 231+254 HP from FULL in one battle),
+          -- so every battle logs its formation species words -- the
+          -- killer gets identified from the log, not guessed at.  Read
+          -- 120 frames in: at load time $57C0 still holds the LAST
+          -- formation's bytes (measured: five distinct battles logged
+          -- identical words at frame zero).
+          local sp = {}
+          for s = 0, 5 do sp[#sp + 1] = string.format("%04X",
+            H.readWord(0x57C0 + s * 2)) end
+          H.log(string.format("[gau] walk[%s] battle up f%d species %s [%s]",
+            what, H.frame, table.concat(sp, " "), partyLine()))
+        end
+        wasBattle = true
+      elseif wasBattle then
+        wasBattle, fought, battleFrames = false, fought + 1, 0
+      end
       if H.frame - hb >= 1800 then
         hb = H.frame
         H.log(string.format("[gau] walk[%s] f%d (%d,%d) b=%s [%s]", what,
@@ -516,9 +569,71 @@ local function worldWalkFight(tx, ty, budget, what, arriveOffWorld)
         return
       end
       plan, planActor = nil, nil
-      if not H.worldHasControl() then H.setPad({}); return end
-      if not H.worldAligned() then return end
-      if bright() < 15 then H.setPad({}); return end
+      -- NOT in a battle and NOT on a live, aligned, lit world: normally
+      -- a fade or a battle teardown, which passes on its own.  But a
+      -- state a care stop's exit read as closed one frame early holds
+      -- this FOREVER while a driver that presses nothing (or worse,
+      -- HOLDS its last pad through a bare return) waits out its whole
+      -- budget -- measured 2026-08-09, twice: 12000 frames parked in
+      -- module limbo after 'staging care 1', reading (175,0) 0/0 with
+      -- worldHasControl garbage-TRUE and worldAligned false, so the
+      -- first recovery draft (parked behind hasControl alone) never
+      -- fired.  Every not-live reading counts toward stuck now.  After
+      -- ten calm seconds it is not a transition: tap B (closes a menu
+      -- level; A would just re-enter the submenu B left, so B leads),
+      -- and only a long-stuck state earns an occasional A (a dialog).
+      local live = H.worldHasControl() and H.worldAligned()
+         and bright() >= 15
+      if not live then
+        -- A WIPE AT BATTLE'S END NEVER MEETS THE IN-BATTLE CANARY: the
+        -- killing blow tears the battle down, battleLoadStarted goes
+        -- false, and the GAME OVER screen reads as module limbo -- all
+        -- party HP zero UNDER NONZERO MAX HP (transition garbage reads
+        -- zero maxes; a real wipe keeps them).  Measured f75413:
+        -- [0/231 0/254 0/246] off-world.  Name it as a LOSS so the
+        -- ladder reloads, and never tap A here -- A at a Game Over
+        -- walks into a brand-new game (the M.FLEE_CAP horror).
+        local partyEntities = fed and 3 or 2
+        local anyMax, anyAlive = false, false
+        for e = 0, partyEntities - 1 do
+          if pMaxHP(e) > 0 then
+            anyMax = true
+            if pHP(e) > 0 then anyAlive = true end
+          end
+        end
+        if anyMax and not anyAlive then
+          wipeN = wipeN + 1
+          if wipeN >= 90 and not lost then
+            lost = string.format("wiped (game over) during %s at f%d [%s]",
+              what, H.frame, partyLine())
+            H.log("[gau] LOST -- " .. lost)
+          end
+          H.setPad({})
+          return
+        end
+        stuckN = stuckN + 1
+        if stuckN == 601 then
+          H.log(string.format("[gau] walk[%s] STUCK 600 frames off-world " ..
+            "f%d: menu=%02X map=%d field(%d,%d) ctl=%s dlg=%s -- B taps",
+            what, H.frame, H.readByte(0x0026), mapIdx(),
+            H.fieldX(), H.fieldY(), tostring(H.hasControl()),
+            tostring(H.dialogWaiting())))
+        end
+        if stuckN > 600 then
+          local ph = stuckN % 24
+          if stuckN > 2400 and ph >= 16 and ph < 20 then
+            H.setPad({ "a" })
+          elseif ph < 4 then
+            H.setPad({ "b" })
+          else
+            H.setPad({})
+          end
+        else
+          H.setPad({})
+        end
+        return
+      end
+      stuckN = 0
       local p = H.worldBfs(tx, ty)
       if p and #p > 0 then
         H.setPad({ [p[1]] = true })
@@ -947,6 +1062,71 @@ local function mintAttempt(n)
   }, {})
 end
 
+-- The staging-walk ladder (see the SIEGE comment at the call site): the
+-- checkpoint is cut on the live world just south of Mobliz, and an
+-- attempt is the whole segmented siege -- fight one battle, field-care,
+-- repeat -- ending parked at (215,119).  A wipe reloads with the house
+-- 17-frame stagger for a different formation timeline.
+local walkBlob, walkDone = nil, false
+local function walkCheckpoint()
+  local ckReq
+  return H.cond(function() return true end, {
+    H.call(function() ckReq = H.requestSaveState() end),
+    H.waitFrames(2),
+    H.call(function()
+      H.checkReq(ckReq, "staging-walk checkpoint")
+      walkBlob = ckReq.blob
+      H.log(string.format("[gau] staging-walk checkpoint captured " ..
+        "(%d bytes) f%d", #walkBlob, H.frame))
+    end),
+  }, {})
+end
+local function walkAttempt(n)
+  local ldReq
+  local steps = {
+    H.cond(function() return n > 1 end, {
+      H.logStep(function()
+        return string.format("[gau] staging-walk ATTEMPT %d -- reloading " ..
+          "(%s)", n, tostring(lost))
+      end),
+      H.call(function() ldReq = H.requestLoadState(walkBlob) end),
+      H.waitFrames(2),
+      H.call(function() H.checkReq(ldReq, "walk attempt " .. n) end),
+      H.waitFrames(60 + (n - 1) * 17),
+    }, {}),
+    H.call(function() lost, wipeN = nil, 0 end),
+  }
+  for i = 1, 30 do
+    steps[#steps + 1] = H.cond(function()
+      return lost == nil and not (H.worldMode() and H.worldX() == 215
+         and H.worldY() == 119 and H.worldHasControl() and H.worldAligned())
+    end, {
+      worldWalkFight(215, 119, 12000,
+        string.format("staging a%d seg %d", n, i), nil, { segment = true }),
+      H.cond(function() return lost == nil end, {
+        H.fieldCare({ tag = string.format("staging a%d care %d", n, i),
+                      threshold = 0.9, maxFrames = 12000 }),
+      }, {}),
+    }, {})
+  end
+  -- no non-segmented closer here: a raising driveUntil inside an attempt
+  -- would abort the LADDER, and 30 fought-and-cared segments that never
+  -- parked is a loss for THIS timeline, not for the leg
+  steps[#steps + 1] = H.call(function()
+    if lost == nil and H.worldMode() and H.worldX() == 215
+       and H.worldY() == 119 then
+      walkDone = true
+      H.log(string.format("[gau] staging walk attempt %d ARRIVED f%d",
+        n, H.frame))
+    elseif lost == nil then
+      lost = string.format("staging attempt %d never arrived (at %d,%d) " ..
+        "f%d", n, H.worldX(), H.worldY(), H.frame)
+      H.log("[gau] " .. lost)
+    end
+  end)
+  return H.cond(function() return not walkDone end, steps, {})
+end
+
 H.run({ maxFrames = 500000 }, {
   H.loadState(DOOR),
   H.waitFrames(30),
@@ -1037,11 +1217,35 @@ H.run({ maxFrames = 500000 }, {
   H.waitUntil(function()
     return H.worldMode() and H.worldHasControl() and H.worldAligned()
   end, 3000, "world live again", 5),
-  worldWalkFight(215, 119, 40000, "Mobliz -> Veldt staging"),
+  -- THE STAGING WALK IS A SIEGE BEHIND A LADDER (2026-08-09, measured
+  -- four ways on the fresh honest chain).  The packs are unrunnable
+  -- (the probe_gaustuck measurement above) and pay NOTHING -- no gil,
+  -- no exp -- so every battle is pure attrition, and in-battle healing
+  -- is bounded by TURNS: a Tonic turn heals 50 while the pack deals
+  -- 50-100 per round to each of two L10/11 characters.  Fought as one
+  -- continuous drive the party wiped at f32927 with 3 Tonics and again
+  -- at f34619 with 40 -- bag depth cannot fix a heal RATE deficit.
+  -- Field healing can: between battles the menu costs no battle turns
+  -- (the gen_kolts lesson -- "nobody was playing the item menu").  So
+  -- the walk is segmented: one fought battle per episode, then an
+  -- H.fieldCare stop (a no-op once everyone is topped).
+  --
+  -- AND the whole walk sits behind the house 3-attempt ladder, because
+  -- one draw of the formation lottery kills 231+254 HP from FULL in a
+  -- single battle (measured at f58124, siege segment 11) -- and a
+  -- replay from the same fixture is DETERMINISTIC, so without a
+  -- staggered reload every future mint walks into the same doom on
+  -- the same frame.  A 17-frame stagger is a different timeline and a
+  -- different draw: the same TAS discipline battles 47 and 68 and the
+  -- grind already use.
+  walkCheckpoint(),
+  walkAttempt(1),
+  walkAttempt(2),
+  walkAttempt(3),
   H.call(function()
-    if lost ~= nil then
-      error("gau: the walk to the Veldt staging was lost -- " ..
-        tostring(lost), 0)
+    if not walkDone then
+      error(string.format("gau: the walk to the Veldt staging was lost " ..
+        "on all 3 staggered attempts -- last: %s", tostring(lost)), 0)
     end
   end),
 
