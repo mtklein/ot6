@@ -164,13 +164,53 @@ f19108. Blitz/Throw/SwdTech really are row-exempt and the fight still went
 the other way, so something that CHIPS that boss pays the penalty. Do not
 re-derive it from the exemption rule.
 
-**NEW BLOCKER, `sfigaro_escape` (gen_tunnelarmr):** navTo timeout, party
-parked at map 75 (41,43) with no plan for 20000 frames, NOT a wipe (the
-canary stays quiet). Almost certainly the gate soldier again -- he
-respawns on every map-75 reload, nothing clears `$030C`, and (30,42) is
-the only tile joining the quarters. `gen_sfigaro` has `clearGateSoldier`
-for exactly this and `gen_tunnelarmr` has nothing; that helper wants
-promoting into the library rather than copying.
+**The `sfigaro_escape` blocker is FIXED (2026-08-09, wt/sfigaro-escape),
+and the paragraph that used to sit here was wrong twice.** It read "parked
+at map 75 (41,43), almost certainly the gate soldier."  Measured
+(`probe_sfigaro_escape_stall.lua`): the park is **map 87** -- (41,43)
+exists on both maps and the nav heartbeat prints no map id -- and map 87
+has no triggers and no npcs but DOES have **random encounters**; the
+event PC sits at $CA0029, inside `RandBattle` (ca/0018).  The stall was
+navTo's `honest=true` battle branch blind-tapping A at a Vector Pup pair.
+The gate soldier is irrelevant to the escape: it re-enters town at
+(48,36) and leaves by the x=56 column, both east of his (30,42) choke
+(the re-entry now logs his post -- he IS standing there -- and the exit
+reachability).  `clearGateSoldier` was promoted into `lib/ot6_field.lua`
+anyway, with `talkToObj` and `rideOut`, and `gen_sfigaro` calls the
+library versions.
+
+Getting the leg green took five measured findings past the first one, in
+order: **the cave rolls PINCERS** (Trilobiter + Primordites, party
+surrounded) which FF6 refuses to release, so flee needs a short per-route
+cap (`opts.fleeCap`, this route uses 420) or the party dies holding L+R
+before the tactical fallback engages; **rows persist** -- gen_sfigaro's
+back-row LOCKE (right for solo battle 11) walked into this chapter still
+hiding, and a back-row LOCKE is the pair's whole offense taxed to nothing
+(24 damage across 6000 frames) -- the escape re-deals front LOCKE / back
+CELES; **an all-medic party heal-locks** -- newFightDriver now takes
+`opts.healer` so CELES heals and LOCKE always swings; **the escape route
+has no shop**, so the cave crossing drains the bag no matter how well it
+is fought -- and **map 70 keeps map 73's recovery spring** at (47,29)
+(`_cba3e4` -> `_cacfbd`, full party HP/MP, the same facing-UP+A gate as
+the clock), which is what lets the boss be entered full.  With all five,
+TunnelArmr fell HONESTLY on attempt 1 (f30918; LOCKE 2 hp, CELES 190
+behind Runic) and the chain minted sfigaro_escape f5529 /
+tunnelarmr_doorstep f23882 / locke_done f31341.
+
+Two library follow-ups fell out: **the wipe canary misses in-battle
+wipes** -- `M.partyWiped()` reads $1600, which still carries pre-battle
+HP when the party dies inside a battle, so `RandBattle`'s GameOver held
+the event PC forever while the canary stayed quiet (third wipe to
+impersonate a stuck navigator, first with the canary deployed; it needs
+a battle-module witness, $3BF4 while `battleLoadStarted()`).  And
+**fieldCare's world-map exit measured broken** the first time a mint
+exercised it: after a real heal through the menu ON the world map, the
+world DP cells $E0/$E2 read garbage and the world engine never resumed
+-- trap 1's ownership, inside careBackOnMap's world witness.  This route
+takes its care on the field instead.  Also landed: CELES is ARMED at
+gen_tunnelarmr's boot (she was relic-only through the whole downstream
+chain -- audit_equipment's defect class exactly), with the celes_freed
+waiver line making that fixture legitimately story-bare.
 
 **Frontier status, end of 2026-08-09: FOUR blockers found, TWO fixed.**
 Running `make frontier NINJAFLAGS="-k 0"` (continue past failures) is how

@@ -40,6 +40,16 @@ assert(type(M) == "table",
 -- leg's budget finally expired.  1800 frames is 30 seconds, several rounds,
 -- long enough for a run that is going to work and short enough that the
 -- fallback still has a party to fight with.
+-- Navigators accept opts.fleeCap to SHORTEN the cap per route.  Measured
+-- 2026-08-09 on the Figaro-cave escape leg (LOCKE + CELES, 113+150 hp): a
+-- PINCER formation (Trilobiter + Primordites, party surrounded) cannot be
+-- fled at all -- FF6's own rule, no escape until one side is cleared -- so
+-- every held frame is free damage, and the full 1800 killed the party
+-- BEFORE the tactical fallback ever engaged.  Worse, a wipe inside the
+-- cap leaves no "flee: no release" line and no fallback log: the battle
+-- ends, RandBattle's GameOver holds the event PC, and the leg reads as a
+-- parked navigator.  A small party on a meaty map wants a cap of a few
+-- hundred frames (two or three failed run rolls), not ninety seconds.
 M.FLEE_CAP = 1800
 
 -- A PARTY WIPE MUST SAY SO.  Twice now a wipe has presented as something
@@ -448,7 +458,8 @@ function M.navTo(txIn, tyIn, opts)
       and M.newFightDriver("navTo",
         { tactical = true, boost = true, items = true,
           healPercent = opts.healPercent or 55,
-          bank = opts.bank, reserve = opts.reserve }) or nil
+          bank = opts.bank, reserve = opts.reserve,
+          healer = opts.healer }) or nil
   local function drop(why)  -- discard the plan, saying why (once, not per frame)
     if plan or pend then
       M.log(string.format("nav: %s at (%d,%d); plan dropped", why,
@@ -501,13 +512,13 @@ function M.navTo(txIn, tyIn, opts)
           -- is the TACTICAL driver, not a blind A-tap: a party that has
           -- already spent M.FLEE_CAP frames being hit needs its own item
           -- menu more than it needs a first command row.
-          if battN <= M.FLEE_CAP then
+          if battN <= (opts.fleeCap or M.FLEE_CAP) then
             M.setPad({ l = true, r = true })
             return
           end
-          if battN == M.FLEE_CAP + 1 then
+          if battN == (opts.fleeCap or M.FLEE_CAP) + 1 then
             M.log(string.format("flee: no release after %d frames; " ..
-              "fighting this formation out", M.FLEE_CAP))
+              "fighting this formation out", opts.fleeCap or M.FLEE_CAP))
           end
           tactical.frame()
           return
@@ -673,7 +684,8 @@ function M.advanceStory(pred, maxFrames, opts)
       and M.newFightDriver("advanceStory",
         { tactical = true, boost = true, items = true,
           healPercent = opts.healPercent or 55,
-          bank = opts.bank, reserve = opts.reserve }) or nil
+          bank = opts.bank, reserve = opts.reserve,
+          healer = opts.healer }) or nil
   local hb = -600                      -- heartbeat: log immediately, then every 600
   return M.driveUntil(function()
     local done = pred()
@@ -713,13 +725,13 @@ function M.advanceStory(pred, maxFrames, opts)
         -- which is how the party reached VARGAS with TERRA dead and EDGAR on
         -- 1 hp.  Same contract as navTo's, cap included.
         if opts.honest == "flee" then
-          if battN <= M.FLEE_CAP then
+          if battN <= (opts.fleeCap or M.FLEE_CAP) then
             M.setPad({ l = true, r = true })
             return
           end
-          if battN == M.FLEE_CAP + 1 then
+          if battN == (opts.fleeCap or M.FLEE_CAP) + 1 then
             M.log(string.format("flee: no release after %d frames; " ..
-              "fighting this formation out", M.FLEE_CAP))
+              "fighting this formation out", opts.fleeCap or M.FLEE_CAP))
           end
           tactical.frame()
           return
@@ -945,7 +957,8 @@ function M.worldNavTo(txIn, tyIn, opts)
       and M.newFightDriver("worldNavTo",
         { tactical = true, boost = true, items = true,
           healPercent = opts.healPercent or 55,
-          bank = opts.bank, reserve = opts.reserve }) or nil
+          bank = opts.bank, reserve = opts.reserve,
+          healer = opts.healer }) or nil
   local hb = -600
   local function resolveT(v) return type(v) == "function" and v() or v end
   return M.driveUntil(function()
@@ -985,13 +998,13 @@ function M.worldNavTo(txIn, tyIn, opts)
           -- is the TACTICAL driver, not a blind A-tap: a party that has
           -- already spent M.FLEE_CAP frames being hit needs its own item
           -- menu more than it needs a first command row.
-          if battN <= M.FLEE_CAP then
+          if battN <= (opts.fleeCap or M.FLEE_CAP) then
             M.setPad({ l = true, r = true })
             return
           end
-          if battN == M.FLEE_CAP + 1 then
+          if battN == (opts.fleeCap or M.FLEE_CAP) + 1 then
             M.log(string.format("flee: no release after %d frames; " ..
-              "fighting this formation out", M.FLEE_CAP))
+              "fighting this formation out", opts.fleeCap or M.FLEE_CAP))
           end
           tactical.frame()
           return
@@ -2165,5 +2178,324 @@ function M.equipOptimum(opts)
       return string.format("[%s] everyone is already armed: %s", tag,
         kitLine())
     end),
+  })
+end
+
+-- ------------------------------------------- South Figaro shared toolkit --
+-- Promoted from gen_sfigaro.lua (2026-08-09, the sfigaro_escape dispatch):
+-- gen_sfigaro and gen_tunnelarmr both walk occupied South Figaro, and the
+-- gate-soldier helper below was already flagged in HANDOFF as "wants
+-- promoting into the library rather than copying".  Everything in this
+-- section keeps gen_sfigaro's measured behavior line for line; the header
+-- comments are the original findings and travel with the code.
+
+-- field object i's live tile (pixel coords >> 4, block stride $29) -- the
+-- same read chaseTalk does internally; public because NPC positions are
+-- route inputs (the gate soldier's post IS the branch condition below)
+function M.objX(i) return M.readWord(0x086a + 0x29 * i) >> 4 end
+function M.objY(i) return M.readWord(0x086d + 0x29 * i) >> 4 end
+
+-- party facing, through the party-object offset ($0803)
+local function partyFacing() return M.readByte(0x087f + M.readWord(0x0803)) end
+local TALK_FACE = { up = 0, right = 1, down = 2, left = 3 }
+local TALK_NEIGHBOURS = {
+  { 0, 1, "up" }, { 0, -1, "down" }, { -1, 0, "right" }, { 1, 0, "left" },
+}
+-- event switch id -> live bit (event bitfield base $1E80, bit = id & 7)
+local function swv(id)
+  return (M.readByte(0x1E80 + (id >> 3)) >> (id & 7)) & 1
+end
+-- a bare step list cannot be spliced into a step list (Lua truncates a
+-- non-final table.unpack to one value); M.cond with an always-true
+-- predicate is the library's public way to wrap a list into ONE step
+local function seq(steps) return M.cond(function() return true end, steps) end
+
+-- gen_banon's talkToObj, unchanged in shape: approach re-resolved from live
+-- object coords (NPCs wander), facing computed from the live delta, soft
+-- rounds before a hard one.  CheckNPCs activates whatever the object map
+-- holds ONE TILE IN THE PARTY'S FACING DIRECTION while A is held, and a
+-- two-frame turn press does not set the facing byte -- so the direction is
+-- HELD until it reads back, and only then is A edge-tapped.
+-- (M.chaseTalk above is the WANDERING-NPC variant with a choice-prompt
+-- terminator; this one is for posted NPCs and terminates on engagement.)
+function M.talkToObj(obj, what, maxF)
+  local engaged = false
+  local function objAt() return M.objX(obj), M.objY(obj) end
+  local function adjacent()
+    local ox, oy = objAt()
+    return math.abs(ox - M.fieldX()) + math.abs(oy - M.fieldY()) == 1
+  end
+  local apFrame, apPick = -1000, nil
+  local function approach()
+    if M.frame - apFrame >= 30 then
+      apFrame = M.frame
+      local ox, oy = objAt()
+      apPick = { ox, oy + 1 }
+      for _, c in ipairs(TALK_NEIGHBOURS) do
+        local cx, cy = ox + c[1], oy + c[2]
+        if M.bfsPath(cx, cy) then apPick = { cx, cy }; break end
+      end
+    end
+    return apPick
+  end
+  local function walkStep()
+    return M.navTo(function() return approach()[1] end,
+                   function() return approach()[2] end, {
+      maxFrames = maxF or 20000, honest = true,
+      arrive = function()
+        return engaged or (adjacent() and M.hasControl() and M.tileAligned())
+      end,
+    })
+  end
+  local function pokeStep(round, budget, hard)
+    local started, waited, aPh = 0, 0, 0
+    return M.driveUntil(function()
+      started = (M.eventRunning() or M.dialogWaiting()) and started + 1 or 0
+      if started >= 6 then engaged = true; return true end
+      waited = waited + 1
+      return not hard and waited > budget
+    end, budget + 120, {
+      M.call(function()
+        aPh = (aPh + 1) % 8
+        if not (M.hasControl() and M.tileAligned() and adjacent()) then
+          M.setPad({}); return
+        end
+        local ox, oy = objAt()
+        local dx, dy = ox - M.fieldX(), oy - M.fieldY()
+        local dir = dx == 1 and "right" or dx == -1 and "left"
+                 or dy == 1 and "down" or "up"
+        if partyFacing() ~= TALK_FACE[dir] then
+          M.setPad({ [dir] = true }); return
+        end
+        M.setPad(aPh < 4 and { "a" } or {})
+      end),
+    }, string.format("%s: activation round %d", what, round))
+  end
+  return seq({
+    M.call(function() engaged, apFrame, apPick = false, -1000, nil end),
+    walkStep(), pokeStep(1, 600, false),
+    -- flat, not repeatN: it cannot replay navTo/driveUntil bodies
+    M.cond(function() return not engaged end,
+      { walkStep(), pokeStep(2, 900, true) }, {}),
+    M.release(),
+  })
+end
+
+-- Ride a scene out to a settled, controllable field, edge-tapping A on EVERY
+-- frame the party is not in control and FIGHTING anything that comes up --
+-- honestly (issue #75; the HP pin + kill-bit this branch used to carry are
+-- gone).  Battle frames drive gen_moogle's Marshal cycle: R raises the
+-- active character's pending boost (1 bp at battle start, Ot6InitBP; the R
+-- buzzes harmlessly on an empty bank), then three edge-tapped A's confirm
+-- the boosted Fight and page victory text -- so solo LOCKE alternates
+-- boosted and plain Fights against battle 11's HeavyArmor.  A LOSS is real
+-- now (the _ca85ba scenario reset); the callers wrap every engagement in a
+-- phase-spread retry ladder rather than pinning it away.
+--
+-- WHY NOT advanceStory HERE.  advanceStory taps A only while a battle is up
+-- or M.dialogWaiting() is true, and holds the pad empty otherwise.  The tail
+-- of `battle 11` has a window state that satisfies NEITHER: measured at the
+-- third gate-soldier fight, $0059 = $52 (a menu module owns the CPU) with
+-- $BA/$D3 both clear, so dialogWaiting() is false, the battle flag is
+-- already down, and advanceStory sat with the pad empty for 20000 frames
+-- while the event PC stayed parked at $CA85B9.  Tapping A on "no control"
+-- rather than on "a signal I recognise" clears it, and it cannot misfire on
+-- the open field because the tap is gated on NOT having control.
+-- (Choice prompts are the one thing this must never meet -- an A press
+-- always takes option 0 -- so every prompt on a route is answered by a
+-- choice-steering rider like gen_sfigaro's rideUntil, never by this.)
+-- ...AND WHY THE FIGHT ITSELF IS NOT A BUTTON PATTERN ANY MORE.  The first
+-- honest version of this drove every battle with a fixed 32-frame cycle --
+-- R to boost, then three edge-tapped A's -- which is a fine way to page
+-- victory text and a poor way to survive.  Measured 2026-08-09 on the first
+-- full-frontier run that ever reached this edge: solo LOCKE, level 8 with
+-- 168 hp, LOST the gate soldier's HeavyArmor three attempts running, while
+-- sixteen Tonics sat in the bag.  He never pressed a single one, because
+-- the pattern has no idea what a menu is.  M.newFightDriver does: it reads
+-- the live command table, boosts, and runs its own item medic line -- so
+-- LOCKE now drinks a Tonic when he is under 60%, which is what a player
+-- fighting a soldier alone in an occupied town would obviously do.
+-- (The FIELD half of this routine is hand-rolled; see the note above on
+-- why advanceStory cannot own the tail of battle 11.)
+function M.rideOut(what, budget, dstMap)
+  local phase, calm = 0, 0
+  local F = M.newFightDriver(what or "rideOut",
+    -- bank = 3: unboosted Fights until the actor has three BP, then unload.
+    -- Shielded damage is HALVED and a broken monster takes 4x
+    -- (Ot6ShieldedMulW, ot6_break.asm:1487-1497), so the fight is won by
+    -- breaking, not by chipping -- and a boosted Fight is what chips.
+    { tactical = true, boost = true, bank = 3, items = true,
+      healPercent = 60, cadence = 12 })
+  return seq({
+    M.driveUntil(function()
+      local ok = M.hasControl() and M.tileAligned()
+             and (emu.getState()["ppu.screenBrightness"] or 0) >= 15
+             and not M.battleLoadStarted() and not M.dialogWaiting()
+             and (dstMap == nil or (M.mapId() & 0x1ff) == dstMap)
+      calm = ok and calm + 1 or 0
+      return calm >= 20
+    end, budget or 30000, {
+      M.call(function()
+        phase = (phase + 1) % 8
+        if M.battleLoadStarted() then
+          F.frame()
+          return
+        end
+        F.idle()
+        if M.hasControl() then M.setPad({}); return end
+        M.setPad(phase < 4 and { "a" } or {})
+      end),
+    }, what),
+    M.release(),
+    M.waitFrames(30),
+  })
+end
+
+-- THE GATE SOLDIER COMES BACK EVERY TIME MAP 75 RELOADS.  `hide_obj NPC_11`
+-- (_ca856a, event_main.asm:20313) is a RUNTIME bit, not story state: leaving
+-- town for an interior and coming back re-runs InitNPCs (field/init.asm:469
+-- only skips it when reloading the SAME map) and re-creates every npc whose
+-- spawn switch still holds.  His is $030C and nothing in the scenario clears
+-- it.  So (30,42) -- the ONE tile joining the SE quarter to the rest of town
+-- -- is plugged again on every return, and gen_sfigaro's route crosses that
+-- boundary three times.  The soldier's uniform is no answer: `if_switch
+-- $0103=1` only swaps his fight for a bare "Halt!" (:20296); it does not
+-- move him.
+-- Gated on the SYMPTOM (a BFS probe to a tile on the far side) rather than
+-- assumed, so the day the respawn stops happening this says so instead of
+-- walking into a fight that is not there.
+--
+-- EVERY ENGAGEMENT IS A RETRY LADDER NOW (issue #75).  With the HP pin
+-- gone a lost battle 11 runs _ca85ba -- LOCKE revived on (47,43), both
+-- disguise switches cleared -- so each fight captures a blob first, and a
+-- loss reloads it and re-engages with a different frame offset (the
+-- battle RNG seed is the frame phase at init, so each retry plays a
+-- genuinely different fight).  Success = not dumped on the opening tile
+-- AND the probe tile reachable; three losses fail the mint loudly.
+function M.clearGateSoldier(probeX, probeY, tag)
+  local blob, won = nil, false
+  local function fightOnce(n)
+    local loadReq
+    return M.cond(function() return won end, {}, {
+      M.logStep(function()
+        return string.format("%s: battle 11 attempt %d (offset %d) at f%d",
+          tag, n, (n - 1) * 37, M.frame)
+      end),
+      n > 1 and seq({
+        M.call(function() loadReq = M.requestLoadState(blob) end),
+        M.waitFrames(2),
+        M.call(function() M.checkReq(loadReq, tag .. ": pre-fight reload") end),
+        M.waitFrames(90),
+        M.waitFrames((n - 1) * 37),      -- vary the battle RNG seed
+      }) or seq({}),
+      M.talkToObj(26, tag .. ": the gate soldier (battle 11)"),
+      M.rideOut(tag .. ": ride battle 11 out", 30000, 75),
+      M.call(function()
+        -- a LOST attempt runs the scenario reset (_ca85ba) and dumps the
+        -- party back on (47,43); being anywhere else with the lane open is
+        -- the win.  ($0104 is NOT this signal -- see the branch below.)
+        -- ...but the SAME test does not work AFTER the fight: a beaten
+        -- soldier keeps his coordinates -- the scene hides the object, it
+        -- does not move it -- so obj 26 still reads {30,42} on a win.
+        -- Each question in the place it is valid: his TILE decides whether
+        -- to fight (stable at leg start, when the object map may not be
+        -- populated), and REACHABILITY decides whether we won (stable
+        -- afterwards, when he is gone from the map even though his record
+        -- is not).  A loss dumps the party back on (47,43).
+        won = not (M.fieldX() == 47 and M.fieldY() == 43)
+          and M.bfsPath(probeX, probeY) ~= nil
+        M.log(string.format("%s: attempt %d %s at (%d,%d) f%d, $0104=%d",
+          tag, n, won and "WON" or "LOST (scenario reset)",
+          M.fieldX(), M.fieldY(), M.frame, swv(0x0104)))
+      end),
+    })
+  end
+  -- CAN HE JUST WALK PAST HIM?  No, and that is measured, not assumed.
+  -- South Figaro is a stealth chapter and the gate soldier looked like he
+  -- wandered -- the old reachability probe answered "lane open" often
+  -- enough to flip this branch by accident -- so the obvious move is to
+  -- wait him out.  Measured 2026-08-09: polling M.bfsPath(22,43) every 60
+  -- frames for 7200 frames (two minutes of game time) NEVER once found a
+  -- path.  He does not step off the choke.  The fight is mandatory, which
+  -- is what makes the balance finding below a real one and not a routing
+  -- failure.
+  --
+  -- WHICH BRANCH, decided on the STORY SWITCH and not on a BFS probe.
+  -- This used to ask "is (22,43) reachable this instant?", and the answer
+  -- depends on where the gate soldier happens to be standing: he WANDERS,
+  -- and when he steps off the choke the probe says "lane already open",
+  -- the fight is skipped, and the next navTo walks into him and dies of
+  -- "no path" twenty retries later.  Measured 2026-08-09 -- inserting a
+  -- single menu visit ahead of this cond was enough to flip it.  $0104 is
+  -- the switch the gate scene itself sets, it does not wander, and the
+  -- loss path below already reads it.
+  -- BACK TO THE ORIGINAL REACHABILITY PROBE.  I swapped this to $0104 on
+  -- the theory that the soldier wanders and the probe is a coin flip.  Both
+  -- halves of that were wrong: he does NOT wander (polled every 60 frames
+  -- for 7200 frames, the lane never opened once), and $0104 is not the
+  -- switch the gate sets -- keyed on it, this reported a LOSS on a fight
+  -- LOCKE had just won outright, HeavyArmor at 0 hp and the party standing
+  -- clear of the reset tile.  The symptom probe was right all along.
+  -- THE BRANCH IS THE SOLDIER'S OWN TILE, not a path query.  Three
+  -- readings of this have now been wrong.  $0104 is not the switch the
+  -- gate sets (it called a won fight a loss).  And the BFS probe -- right
+  -- when this leg opened with a walk -- reads "open" every time now that
+  -- the leg opens two MENUS first, so the party skips the fight, walks to
+  -- (31,42) and dies of "no path" twenty retries later.
+  --
+  -- He is a PLUG on exactly one tile: npc 10 / obj 26 sits at {30,42},
+  -- spawn switch $030C, and (30,42) is the only tile joining the starting
+  -- pocket to the rest of town.  So ask where he is.  Beaten, the object
+  -- is gone and this reads anything but his post; on his feet it reads
+  -- {30,42} whatever the object map happens to be doing that frame.
+  return M.cond(function() return M.objX(26) == 30 and M.objY(26) == 42 end, {
+    M.logStep(function()
+      return string.format("%s: the gate soldier is on his post (%d,%d) " ..
+        "at f%d; fighting him", tag, M.objX(26), M.objY(26), M.frame)
+    end),
+    -- TOP UP FIRST.  He respawns on every map-75 reload, so gen_sfigaro's
+    -- route fights him THREE times, and LOCKE arrives at the third one
+    -- carrying whatever the first two left him.  Measured: B1 won, R1 won
+    -- on its second attempt, R2 lost all three -- not because that fight is
+    -- different but because he walked into it worn down.  A player heals
+    -- between rounds with a soldier; so does this.  A no-op when he is
+    -- already full, and it never spends below the Potion floor the later
+    -- beats need.
+    M.fieldCare({ tag = "care before " .. tag, threshold = 0.95 }),
+    (function()
+      local req
+      return seq({
+        M.call(function() req = M.requestSaveState() end),
+        M.waitFrames(2),
+        M.call(function()
+          M.checkReq(req, tag .. ": retry blob")
+          blob = req.blob
+        end),
+      })
+    end)(),
+    fightOnce(1), fightOnce(2), fightOnce(3),
+    M.call(function()
+      -- THIS WAS THE WALL, and the record of it stays (2026-08-09
+      -- correction: sfigaro_town is GREEN now -- the fight opened up once
+      -- LOCKE was ARMED, in the BACK ROW, topped up between rounds, and
+      -- BREAKING the armour, one shield chip per boosted Fight and 4x once
+      -- broken).  The original measurement, kept because its numbers keep
+      -- being asked for: solo LOCKE, level 8, 168 hp, correctly equipped
+      -- through the real Equip -> Optimum walk, healing himself with
+      -- Tonics, dealt ~21 damage per 300 frames to a level-13 HeavyArmor
+      -- with 495 hp and took ~117 back.  Bare-handed -- which is how the
+      -- chain delivered him until H.equipOptimum landed -- it was eight
+      -- damage a swing, and front row and back row measured identically
+      -- BARE, which is why the row lever went unnoticed for three runs.
+      -- Its weaknesses are bolt and water (monster_prop +25 = $84) and
+      -- solo LOCKE can reach neither.  Do not widen the attempt ladder
+      -- until it gets lucky; that is the #74 mistake.
+      M.assertEq(won, true,
+        tag .. ": battle 11 won honestly within 3 attempts (boosted Fights)")
+      M.assertEq(M.bfsPath(probeX, probeY) ~= nil, true,
+        tag .. ": the lane is open again")
+    end),
+  }, {
+    M.logStep(function() return tag .. ": the lane is already open" end),
   })
 end

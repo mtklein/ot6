@@ -31,6 +31,40 @@
 -- with $001A=0 got map 73.  The cave graph is gen_kolts's, walked the other
 -- way: world (75,103) -> map 72 -> ... -> map 71 -> [trigger] -> map 70.
 --
+-- THE TUNNEL FIGHTS BACK (measured 2026-08-09, the sfigaro_escape park).
+-- Map 87 -- the clock passage -- HAS RANDOM ENCOUNTERS (Vector Pups),
+-- which no earlier leg of the basement route does (gen_celes measured its
+-- own maps encounter-free, and this file inherited that assumption).  The
+-- 2026-08-09 frontier run parked at (41,43) "with no plan" for 20000
+-- frames, and the handoff called it the map-75 gate soldier; both halves
+-- of that were wrong.  probe_sfigaro_escape_stall measured the park: it is
+-- map 87, not 75, the event PC sits at $CA0029 -- inside EventScript's
+-- RandBattle stub (ca/0018), i.e. an ordinary random encounter -- and the
+-- "missing plan" is navTo's honest=true battle branch, which answers a
+-- battle with blind edge-A.  Blind A against a Vector Pup pair left LOCKE
+-- at 0 hp with the fight still up after 2000+ frames; navigation never
+-- got the field back.
+--
+-- AND THE ANSWER IS FLEE, NOT FIGHT -- the tactical version was tried
+-- first and measured (2026-08-09, one full run): the driver WON the first
+-- tunnel encounter honestly -- 8000+ frames, two Tonic heals, a real
+-- Fenix Down revival of CELES mid-fight -- and the win emptied the bag.
+-- The very next cave encounter opened with CELES on 1 hp, no Fenix Down
+-- left to raise her, LOCKE's medic line finding nothing to drink
+-- (plan=fight at 6/194 hp is what an empty bag looks like in the log),
+-- and the party WIPED; RandBattle's GameOver then held the event PC
+-- forever, which the wipe canary missed because $1600 still carries
+-- pre-battle HP (follow-up filed).  An escape route has no shop, so
+-- supplies spent on trash are unrecoverable -- and this is gen_kolts's
+-- own cave doctrine anyway ("the cave legs RUN; the cave cost the party
+-- ten hit points end to end").  So every traversal leg here runs
+-- honest="flee" -- L+R, the engine's own mechanic, with the tactical
+-- fight driver as the M.FLEE_CAP fallback -- and safeWalk grew the same
+-- branch.  The gate soldier needed
+-- nothing here: the escape re-enters town at (48,36) and leaves by the
+-- x=56 column, both east of his (30,42) choke (the re-entry H.call logs
+-- his post and the exit reachability so a route change would say so).
+--
 -- ISSUE #75 (the honesty conversion): ZERO state writes, and the first
 -- honest TunnelArmr in the mint chain's history.  The fight is PLAYED the
 -- way it was designed: CELES re-raises RUNIC every turn -- the boss's AI
@@ -64,6 +98,20 @@ local function facing() return H.readByte(0x087f + H.readWord(0x0803)) end
 -- non-final table.unpack to one value); H.cond with an always-true
 -- predicate is the library's public way to wrap a list into ONE step
 local function seq(steps) return H.cond(function() return true end, steps) end
+
+-- THE FLEE CAP IS SHORT ON THIS ROUTE, and that is a measurement, not a
+-- taste (2026-08-09).  The Figaro cave rolls PINCER formations (Trilobiter
+-- + Primordites, party surrounded) which FF6 refuses to release until one
+-- side is cleared -- so a held L+R is nothing but free enemy rounds, and
+-- the library's default 1800-frame cap killed LOCKE + CELES (113+150 hp)
+-- outright before the tactical fallback ever engaged.  420 frames is two
+-- or three failed run rolls: a releasable formation lets go inside it, a
+-- pincer flips to the fight driver while the party still has the hp to
+-- win.  bank = 3 rides along for the fallback: boosted Fights break
+-- shields and a broken monster takes 4x (Ot6ShieldedMulW), which is what
+-- turned the first honest tunnel fight from an 8000-frame bag-draining
+-- slog into a fight the party can afford.
+local FLEE_CAP = 420
 
 local FACE = { up = 0, right = 1, down = 2, left = 3 }
 -- all EIGHT for door staging: a door at the head of a stair can only be
@@ -100,6 +148,10 @@ local function settled(n, extra)
     return cnt >= n
   end
 end
+-- honest="flee", not honest=true: a settle that rolls an encounter
+-- (map 87 and the caves both can) runs from it -- with the tactical
+-- driver as the FLEE_CAP fallback -- instead of blind-tapping A through
+-- it.  See the header for the measured why.
 local function settleField(dstMap, maxF)
   return seq({
     H.waitFrames(60),
@@ -107,7 +159,7 @@ local function settleField(dstMap, maxF)
       return not H.worldMode() and H.tileAligned()
          and not H.battleLoadStarted() and not H.dialogWaiting()
          and (dstMap == nil or map() == dstMap)
-    end), maxF or 12000, { honest = true }),
+    end), maxF or 12000, { honest = "flee", fleeCap = FLEE_CAP, bank = 3, healer = 6 }),
     H.waitFrames(30),
   })
 end
@@ -120,7 +172,7 @@ local aPhase = 0
 -- these rather than one query.
 local function hop(tx, ty, what)
   return seq({
-    H.navTo(tx, ty, { maxFrames = 12000, honest = true }),
+    H.navTo(tx, ty, { maxFrames = 12000, honest = "flee", fleeCap = FLEE_CAP, bank = 3, healer = 6 }),
     H.release(),
     H.call(function()
       H.assertEq(H.fieldX(), tx, what .. ": at x=" .. tx)
@@ -183,7 +235,7 @@ local function go(sx, sy, dm, dx, dy, what)
   return seq({
     H.call(function() pick, startMap = nil, map() end),
     H.navTo(function() return stage()[1] end, function() return stage()[2] end,
-      { maxFrames = 20000, arrive = arrived, honest = true }),
+      { maxFrames = 20000, arrive = arrived, honest = "flee", fleeCap = FLEE_CAP, bank = 3, healer = 6 }),
     H.cond(function() return stage()[3] ~= nil end, {
       H.driveUntil(arrived, 1800, {
         H.call(function()
@@ -215,12 +267,28 @@ local function safeWalk(tx, ty, what, budget)
   local ph = 0
   local DP = { up = "up", down = "down", left = "left", right = "right",
     upleft = "left", upright = "right", downleft = "left", downright = "right" }
+  -- map 70 draws random encounters like the rest of the cave; without this
+  -- branch a battle mid-walk left the drive holding an empty pad until the
+  -- budget died (the same failure the header describes on map 87).  Same
+  -- flee-then-tactical-fallback shape as navTo's honest="flee" branch.
+  local F = H.newFightDriver(what or "safeWalk",
+    { tactical = true, boost = true, bank = 3, items = true, healPercent = 55,
+      healer = 6 })
+  local battN = 0
   return seq({
     H.driveUntil(function()
       return H.fieldX() == tx and H.fieldY() == ty and H.hasControl()
     end, budget or 8000, {
       H.call(function()
         ph = (ph + 1) % 8
+        if H.battleLoadStarted() then
+          battN = battN + 1
+          if battN <= FLEE_CAP then H.setPad({ l = true, r = true })
+          else F.frame() end
+          return
+        end
+        battN = 0
+        F.idle()
         if H.dialogWaiting() then H.setPad(ph < 4 and { "a" } or {}); return end
         if not (H.hasControl() and H.tileAligned()) then H.setPad({}); return end
         local p = H.bfsPath(tx, ty)
@@ -239,7 +307,7 @@ local function warpTo(sx, sy, dx, dy, dmap, what)
     H.logStep(function()
       return string.format("%s: from (%d,%d)", what, H.fieldX(), H.fieldY())
     end),
-    H.navTo(sx, sy, { maxFrames = 20000, honest = true, arrive = function()
+    H.navTo(sx, sy, { maxFrames = 20000, honest = "flee", fleeCap = FLEE_CAP, bank = 3, healer = 6, arrive = function()
       return H.fieldX() == dx and H.fieldY() == dy
     end }),
     H.release(),
@@ -469,6 +537,31 @@ H.run({ maxFrames = 300000 }, {
     where("boot (celes_freed)")
   end),
 
+  -- CELES ARRIVES BARE-HANDED, and this is the same defect class the equip
+  -- audit was built on: the capture scene stripped her (remove_equip
+  -- returns gear to inventory, EventCmd_8d), gen_celes frees her without a
+  -- wardrobe stop, and nothing downstream ever armed her -- so she fought
+  -- TunnelArmr and walked the whole chain to the reunion with nothing on
+  -- (tools/audit_equipment.py, 2026-08-09: celes_freed gear FF FF 6A FF FF,
+  -- relic only).  Runic needs no weapon, which is why the fight was ever
+  -- winnable, but a player opens Equip before walking into a boss tunnel;
+  -- so does this.  celes_freed keeps its waiver in
+  -- tools/equipment_waivers.txt because THIS stop is the very next leg.
+  H.equipOptimum({ tag = "celes kit" }),
+
+  -- ROWS, RE-DEALT FOR A PAIR.  gen_sfigaro put LOCKE in the back row and
+  -- that was right for SOLO battle 11 (survive long enough to break one
+  -- armour); rows persist in $1850, so he arrived here still hiding -- and
+  -- measured on the cave packs (2026-08-09), a back-row LOCKE is this
+  -- party's whole offense taxed to nothing: 24 damage dealt across 6000
+  -- frames of one fight while front-row CELES died twice.  The row rule
+  -- (research/row-menu.md): only a FIGHT pays the back-row tax, and
+  -- LOCKE's Fight is all the damage this pair has -- while CELES's job
+  -- here is Runic and the item medic line, both row-exempt, so the back
+  -- row costs her nothing and halves the physicals that keep dropping
+  -- her.  Front LOCKE, back CELES.
+  H.setRows({ [1] = false, [6] = true }, { tag = "escape rows" }),
+
   -- ===================================================================== --
   -- PHASE 1: THE CLOCK.  Down to map 84, wind it, and take the passage it
   -- opens: (15,51) -> map 87 -> (57,48) -> map 86.
@@ -488,9 +581,34 @@ H.run({ maxFrames = 300000 }, {
   -- passes right by it; go's driveUntil taps A through whatever it says.
   -- Not required, so not asserted.
   go(52, 27, 75, 48, 36, "map 86 (52,27) -> town (map 75) (48,36)"),
-  H.call(function() where("back in occupied town") end),
+  H.call(function()
+    where("back in occupied town")
+    -- THE GATE SOLDIER IS NOT ON THIS ROUTE, and this is the measurement
+    -- that says so (the 2026-08-09 handoff blamed him for the escape park;
+    -- the park was a map-87 encounter, see the header).  He does respawn
+    -- on every map-75 load (spawn switch $030C, nothing clears it), but
+    -- his (30,42) choke joins the SW starting pocket to the rest of town,
+    -- and this crossing runs (48,36) -> (56,34), all east side.  Log his
+    -- post and the exit reachability so a future route change that DOES
+    -- cross his lane shows up here instead of as a navTo timeout;
+    -- H.clearGateSoldier is in the library the day that happens.
+    local post = "gone"
+    for i = 16, 31 do
+      if H.objX(i) == 30 and H.objY(i) == 42 then
+        post = string.format("obj %d at (30,42)", i); break
+      end
+    end
+    H.log(string.format("gate soldier: %s; $030C=%d; exit (56,34) %s",
+      post, sw(0x030C),
+      H.bfsPath(56, 34) and "reachable" or "NOT reachable this instant"))
+  end),
+  -- top up BEFORE leaving town, on a plain field map where fieldCare is
+  -- battle-tested -- the tunnel crossing arrives here as real spent HP,
+  -- and the world half of the route (where care measured broken, note
+  -- above) then needs none
+  H.fieldCare({ tag = "care before leaving town", threshold = 0.95 }),
   -- exit via the x=56 column -> world (87,112)
-  H.navTo(56, 34, { maxFrames = 12000, honest = true,
+  H.navTo(56, 34, { maxFrames = 12000, honest = "flee", fleeCap = FLEE_CAP, bank = 3, healer = 6,
     arrive = function() return H.worldMode() end }),
   H.release(),
   (function()
@@ -499,7 +617,7 @@ H.run({ maxFrames = 300000 }, {
       local ok = H.worldMode() and H.worldHasControl() and H.worldAligned()
         and bright() >= 15
       cnt = ok and cnt + 1 or 0; return cnt >= 20
-    end, 12000, { honest = true })
+    end, 12000, { honest = "flee", fleeCap = FLEE_CAP, bank = 3, healer = 6 })
   end)(),
   H.waitFrames(30),
   H.call(function()
@@ -521,10 +639,16 @@ H.run({ maxFrames = 300000 }, {
   -- would load map 72.  From map 69, (10,2)/(4,4) -> map 70, and (47,38) on
   -- map 70 is the TunnelArmr trigger _ca89af.
   -- ===================================================================== --
-  -- issue #75: honest=true -- a world encounter on the band south of the
-  -- range is FOUGHT by real input (LOCKE and CELES both attack under
-  -- tap-A), never kill-bitted; the budget carries the ATB rounds.
-  H.worldNavTo(75, 102, { maxFrames = 45000, honest = true,
+  -- issue #75: honest="flee" -- a world encounter on the band south of
+  -- the range is RUN FROM by the engine's own L+R (tactical driver past
+  -- FLEE_CAP), never kill-bitted; the budget carries the flee rounds.
+  -- (The care stop used to sit HERE, on the world map, and measured
+  -- broken: after fieldCare's menu visit the world DP cells $E0/$E2 read
+  -- (175,0) garbage and the world engine never resumed -- trap 1's module
+  -- WRAM ownership, inside fieldCare's world-exit path, which this route
+  -- was likely the first mint to exercise.  Care happens on the field
+  -- before leaving town instead; follow-up filed for the library.)
+  H.worldNavTo(75, 102, { maxFrames = 45000, honest = "flee", fleeCap = FLEE_CAP, bank = 3, healer = 6,
     arrive = function() return not H.worldMode() end }),
   H.release(),
   settleField(69),
@@ -550,6 +674,45 @@ H.run({ maxFrames = 300000 }, {
   end),
 
   -- ===================================================================== --
+  -- PHASE 3.5: THE RECOVERY SPRING.  Map 70 is map 73's copy, and it keeps
+  -- the copy's recovery spring: event trigger (47,29) -> _cba3e4, gated on
+  -- the same $01Bx control-flag aliases as the clock (facing UP + A), whose
+  -- payload _cacfbd is max_hp + max_mp on all four slots -- the game's own
+  -- free full heal, one room north of the TunnelArmr trigger.  The cave
+  -- crossing costs real supplies now (run 6 arrived at the boss with
+  -- tonic=0 potion=0 and LOCKE on 21/194, and lost all three attempts),
+  -- and this is what the spring is FOR: a player heals here before the
+  -- boss.  Zero writes -- the heal is the event script's.
+  -- ===================================================================== --
+  safeWalk(47, 29, "onto the recovery spring (47,29)", 10000),
+  (function()
+    local ph = 0
+    local function partyFull()
+      for _, c in ipairs(H.partyMembers()) do
+        if H.charHp(c) < H.charMaxHp(c) then return false end
+      end
+      return true
+    end
+    return seq({
+      H.driveUntil(partyFull, 1800, {
+        H.call(function()
+          ph = (ph + 1) % 8
+          if H.dialogWaiting() then H.setPad(ph < 4 and { "a" } or {}); return end
+          if facing() ~= FACE.up then H.setPad({ up = true }); return end
+          H.setPad(ph < 4 and { "a" } or {})
+        end),
+      }, "drink the spring (facing UP + edge-A -> _cacfbd full heal)"),
+      H.release(),
+      settleField(70),
+      H.call(function()
+        H.assertEq(partyFull(), true, "the spring restored the party to full")
+        H.log(string.format("spring: c1 %d/%d c6 %d/%d",
+          H.charHp(1), H.charMaxHp(1), H.charHp(6), H.charMaxHp(6)))
+      end),
+    })
+  end)(),
+
+  -- ===================================================================== --
   -- PHASE 4: THE DOORSTEP.  (47,38) fires _ca89af (event_main.asm:20990) ->
   -- battle 67.  Mint one tile SOUTH of it: (47,39), the reachable approach.
   -- (47,40) is past one of map 70's same-map warps -- navTo to it lands the
@@ -561,6 +724,12 @@ H.run({ maxFrames = 300000 }, {
   -- through it.  (47,37) is the last tile before the trigger on that path.
   safeWalk(47, 37, "approach the TunnelArmr trigger", 10000),
   H.waitFrames(30),
+  -- TOP UP BEFORE THE MINT, not after: the doorstep fixture and the retry
+  -- blob are captured from this exact state, so care taken here is care
+  -- every TunnelArmr attempt inherits.  0.95 because a loss down there is
+  -- GAME OVER (the gen_sfigaro pre-engagement pattern).  The menu visit
+  -- does not move the party; the position assert below still holds.
+  H.fieldCare({ tag = "care at the TunnelArmr doorstep", threshold = 0.95 }),
   H.call(function()
     H.assertEq(map(), 70, "still on map 70")
     H.assertEq(H.fieldX() == 47 and H.fieldY() == 37, true,
