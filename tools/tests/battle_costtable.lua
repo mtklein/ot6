@@ -44,7 +44,24 @@
 --      quoted.  Signature parity with the cheapest row of all three
 --      ladder kits is checked too, because #55 makes Steal tier one of Locke's
 --      ladder.
---   4. the Serpent-Trench section, which the owner reported as "barely
+--   4. the magic MP column (issue #76).  The kit ladders were pinned here from
+--      the day they were authored; the 54 spell prices, which are the numbers
+--      the Magic list actually prints, were pinned nowhere.  MagicProp is
+--      spliced in battle_main.asm and OT6 owns exactly one byte of that column
+--      (Osmose, 1 -> 8), so the whole thing is pinned literally, the same way
+--      step 1 pins Ot6AbilityCostTbl: a reprice has to be an explicit edit
+--      here too.  Every magic charge is derived from this byte, and the whole
+--      chain is a straight line: battle init seeds each spell-list row's cost
+--      from MagicProp+5 through _c25723 (battle_main.asm:14466, :14588-14595,
+--      stored at :14478-14481); ValidateSpellList (:14491) runs it through
+--      CalcMPCost (:14580, :14608) for the caster's relics; GetMPCost reads
+--      the row back at queue time (:13223); CreateAction banks it into $3620
+--      (:13176); InitPlayerAction stages it into $3a4c (:425); and
+--      CalcAttackEffect subtracts it from $3c08 (:8367-8371).  So a price the
+--      menu prints and a charge the wallet takes cannot disagree unless one of
+--      those steps is edited, and this pin plus battle_mpcost/battle_walletmp's
+--      measured charges cover both ends.
+--   5. the Serpent-Trench section, which the owner reported as "barely
 --      made it, intense" and which was never balance-swept.  gau_joined is
 --      that entry point, and gen_sabin_trench.lua boots from it, so the trio's
 --      pools are read live out of the fixture and every ability each of them
@@ -52,7 +69,7 @@
 --      Rage price is read too (Ot6DanceCost's immediate, which Ot6RageCost
 --      tail-calls), so a change to the possess-verb price shows up here.
 --
--- Fixture-free by design apart from step 4: steps 1-3 need no savestate, so
+-- Fixture-free by design apart from step 5: steps 1-4 need no savestate, so
 -- this test keeps working if the chain of generated savestates is stale.
 local H = dofile("tools/tests/lib/ot6.lua")
 local STATE = "build/states/gau_joined.mss.lua"
@@ -97,6 +114,48 @@ local TOOLS = {                 -- unchanged by #45; pinned so that stays true
   { 0xa8, 16, "Drill" },        { 0xa6, 18, "Chain Saw" },
   { 0xa7, 10, "Debilitator" },  { 0xa9, 14, "Air Anchor" },
 }
+
+-- #76: the 54 magic prices, MagicProp +$05 for attack ids $00-$35, in table
+-- order.  These are the numbers the Magic list prints and the numbers the
+-- wallet takes (the chain is in the header).  Names are FF3-US's, as printed.
+-- Every entry is vanilla except Osmose, OT6's one override in this column
+-- (1 -> 8, argued at battle_main.asm's MagicProp splice); MAGIC_OT6 below
+-- names it so a reader can tell the authored byte from the inherited ones.
+local MAGIC_MP = {
+  { 0x00,  4, "Fire" },   { 0x01,  5, "Ice" },    { 0x02,  6, "Bolt" },
+  { 0x03,  3, "Poison" }, { 0x04, 15, "Drain" },  { 0x05, 20, "Fire 2" },
+  { 0x06, 21, "Ice 2" },  { 0x07, 22, "Bolt 2" }, { 0x08, 26, "Bio" },
+  { 0x09, 51, "Fire 3" }, { 0x0a, 52, "Ice 3" },  { 0x0b, 53, "Bolt 3" },
+  { 0x0c, 25, "Break" },  { 0x0d, 35, "Doom" },   { 0x0e, 40, "Pearl" },
+  { 0x0f, 45, "Flare" },  { 0x10, 33, "Demi" },   { 0x11, 48, "Quartr" },
+  { 0x12, 53, "X-Zone" }, { 0x13, 62, "Meteor" }, { 0x14, 80, "Ultima" },
+  { 0x15, 50, "Quake" },  { 0x16, 75, "W Wind" }, { 0x17, 85, "Merton" },
+  { 0x18,  3, "Scan" },   { 0x19,  5, "Slow" },   { 0x1a, 12, "Rasp" },
+  { 0x1b,  8, "Mute" },   { 0x1c, 12, "Safe" },   { 0x1d,  5, "Sleep" },
+  { 0x1e,  8, "Muddle" }, { 0x1f, 10, "Haste" },  { 0x20, 10, "Stop" },
+  { 0x21, 16, "Bserk" },  { 0x22, 17, "Float" },  { 0x23, 10, "Imp" },
+  { 0x24, 22, "Rflect" }, { 0x25, 15, "Shell" },  { 0x26, 18, "Vanish" },
+  { 0x27, 38, "Haste2" }, { 0x28, 26, "Slow 2" }, { 0x29,  8, "Osmose" },
+  { 0x2a, 20, "Warp" },   { 0x2b, 99, "Quick" },  { 0x2c, 25, "Dispel" },
+  { 0x2d,  5, "Cure" },   { 0x2e, 25, "Cure 2" }, { 0x2f, 40, "Cure 3" },
+  { 0x30, 30, "Life" },   { 0x31, 60, "Life 2" }, { 0x32,  3, "Antdot" },
+  { 0x33, 15, "Remedy" }, { 0x34, 10, "Regen" },  { 0x35, 50, "Life 3" },
+}
+local MAGIC_PROP_REC = 14
+local MAGIC_PROP_MP = 5
+local MAGIC_OT6 = { [0x29] = 1 }        -- id -> the vanilla byte OT6 replaced
+-- Scan is called out by id because issue #76 reported it as publishing 3 and
+-- charging 0.  The report is a misattribution: the measurement was taken with
+-- battle_magicite's `SCAN` constant, which held $32 (ATTACK::ANTDOT,
+-- const.inc:640) rather than $18 (ATTACK::SCAN, const.inc:614), and no
+-- character in any fixture or checkpoint in this tree has Scan learned at all
+-- -- Celes learns it at level 18 (field/event.asm:1268), she is 14 at the
+-- checkpoint that fixture descends from, and the deepest saved state anywhere
+-- in the tree has her at 15 (read out of $1A6E in all 110 savestates and all
+-- 12 checkpoint SRAMs).  So nothing was measured charging 0 for Scan.  The
+-- pin below is what the report should have produced either way: the published
+-- price, in the ROM, where a future edit has to come and say so.
+local SCAN_ID, SCAN_MP = 0x18, 3
 
 -- ca65 symbol -> snesPrgRom file offset (banks $C0-$FF are HiROM).
 -- Note: compose.py scrapes literal H.sym(...) calls out of this script to build
@@ -275,7 +334,45 @@ H.run({ maxFrames = 20000 }, {
     H.log("Steal is at parity with Pummel / Dispatch / AutoCrossbow")
   end),
 
-  --------------------------------------- 4. the Serpent-Trench section -----
+  --------------------------------- 4. the magic MP column (#76) -----------
+  H.call(function()
+    local base = romOfs(H.sym("MagicProp"))
+    local ot6, checked = 0, 0
+    for _, r in ipairs(MAGIC_MP) do
+      local got = H.readRomByte(base + r[1] * MAGIC_PROP_REC + MAGIC_PROP_MP)
+      H.assertEq(got, r[2], string.format(
+        "%s ($%02x) publishes %d MP", r[3], r[1], r[2]))
+      checked = checked + 1
+      if MAGIC_OT6[r[1]] then ot6 = ot6 + 1 end
+    end
+    -- Guard the guard.  A base that resolved somewhere harmless would let the
+    -- loop above agree with itself: the record after the last pinned spell is
+    -- Ramuh's summon ($36), whose price is not in the pinned range, and the
+    -- one OT6-authored byte must read as authored rather than as vanilla.
+    H.assertEq(checked, 54, "all 54 published spell prices were read")
+    H.assertEq(ot6, 1, "exactly one price in this column is OT6's")
+    H.assertEq(H.readRomByte(base + 0x29 * MAGIC_PROP_REC + MAGIC_PROP_MP)
+               ~= MAGIC_OT6[0x29], true,
+      "Osmose no longer carries its vanilla 1 -- the splice is live, so this "
+      .. "column is MagicProp and not an untouched copy of the .dat")
+    H.assertEq(H.readRomByte(base + 0x36 * MAGIC_PROP_REC + MAGIC_PROP_MP), 25,
+      "the record past the pinned range is Ramuh at 25 MP -- the stride and "
+      .. "the base both land where they should")
+
+    -- #76's headline, named so a search for it lands here rather than on the
+    -- issue: Scan publishes 3, and the charge is that same byte.
+    H.assertEq(H.readRomByte(base + SCAN_ID * MAGIC_PROP_REC + MAGIC_PROP_MP),
+      SCAN_MP, string.format(
+        "Scan ($%02x) publishes %d MP, and that is also what it charges: "
+        .. "every magic charge is this byte, seeded into the caster's list by "
+        .. "ValidateSpellList and read back by GetMPCost (see the header). "
+        .. "Issue #76 reported Scan charging 0; the measurement behind it used "
+        .. "spell id $32 (Antdot), not $18", SCAN_ID, SCAN_MP))
+    H.log(string.format("magic: %d published prices pinned (%d authored by "
+      .. "OT6); Scan = %d", checked, ot6, SCAN_MP))
+  end),
+
+  --------------------------------------- 5. the Serpent-Trench section -----
   H.waitFrames(20),
   H.loadState(STATE),
   H.waitFrames(20),

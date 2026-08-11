@@ -25,9 +25,10 @@
 --     written), and its real 777-MP pool is the Facility-scale target the
 --     Osmose reprice exists for.
 --   * the 7-MP boundary is earned: Celes's real 106-MP pool is walked
---     down by real casts of her own kit (Shell 15, Cure 5, Scan 3, whose
---     gcd reaches every residue) until it reads 5..7, and the greys are
---     then read off the live list.
+--     down by real casts of her own kit (Shell 15 and Cure 5) until it reads
+--     5..7, and the greys are then read off the live list.  106 = 1 (mod 5)
+--     and both prices are multiples of 5, so those two alone land the pool on
+--     exactly 6; no third adjuster is needed.
 --   * the once-per-battle latch: the summon is offered at battle start,
 --     spent during the run, and the row greys at her next real window, from
 --     the natural refresh with no $3204 pokes.  The re-offer half is a second
@@ -46,7 +47,13 @@ local H = dofile("tools/tests/lib/ot6.lua")
 local STATE = "build/states/n024_entry.mss.lua"
 
 -- spell ids (const.inc ATTACK enum)
-local FIRE, ICE, DRAIN, SHELL, OSMOSE, CURE, SCAN = 0x00, 0x01, 0x04, 0x25, 0x29, 0x2D, 0x32
+local FIRE, ICE, DRAIN, SHELL, OSMOSE, CURE = 0x00, 0x01, 0x04, 0x25, 0x29, 0x2D
+-- There was a seventh name here, `SCAN = 0x32`.  $32 is ATTACK::ANTDOT
+-- (const.inc:640); ATTACK::SCAN is $18 (const.inc:614).  It was never used by
+-- any assertion, and issue #76 was filed off a development-time observation
+-- taken through it.  Removed rather than corrected: Celes learns Scan at
+-- level 18 (field/event.asm:1268) and is level 14 at this fixture's
+-- checkpoint, so a correct SCAN constant would name a spell she cannot cast.
 local INFERNO, DDUST = 0x37, 0x38        -- summon attack ids (esper + $36)
 local IFRIT, SHIVA = 0x01, 0x02          -- esper indices (GenjuProp order)
 
@@ -545,11 +552,15 @@ H.run({ maxFrames = 150000 }, {
   -- 9. the 7-MP boundary, earned.  The Osmose refill clamped her to the
   -- full 106, and 106 = 1 (mod 5): Shell (15) and Cure (5) both preserve
   -- that residue, so kit casts alone land the pool at exactly 6, inside
-  -- the 5..7 window with no finer adjustment needed.  (Scan was tried as
-  -- the 3-MP adjuster and measured as charging nothing: it publishes 3 in
-  -- the list but the pool did not move across repeated real casts; that is
-  -- its own follow-up.)  The residue invariant is asserted so a future wallet
-  -- change fails here instead of wedging the drive.
+  -- the 5..7 window with no finer adjustment needed.  (A 3-MP adjuster was
+  -- tried first and abandoned when the pool did not move across repeated
+  -- casts.  It was labelled Scan and filed as issue #76, "publishes 3 and
+  -- charges 0"; the id behind the label was $32, Antdot, and Celes cannot cast
+  -- Scan at this level at all.  Whatever stalled that drive, it was not a
+  -- price that lies: battle_costtable pins all 54 published magic prices, and
+  -- the charge is that same byte.  See the constant block above.)  The residue
+  -- invariant is asserted so a future wallet change fails here instead of
+  -- wedging the drive.
   H.call(function()
     H.assertEq(mp(celes) % 5, 1,
       "[boundary] the pool's mod-5 residue makes a pure Shell/Cure walk "
@@ -578,7 +589,7 @@ H.run({ maxFrames = 150000 }, {
             H.readByte(ACTOR) & 3, hp(celes), hp(locke)))
         end
         return false
-      end, 60000, "Cure/Scan casts land the pool in 5..7"),
+      end, 60000, "Cure casts land the pool in 5..7"),
       H.call(function() celesMode = "park" end),
     })
   end)(),
