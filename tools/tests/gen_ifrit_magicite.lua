@@ -476,6 +476,35 @@ H.run({ maxFrames = 300000 }, {
   --    bare-handed (the Vector remove_equip, never re-equipped since) --
   --    real field Equip -> Optimum per character, a no-op for anyone armed.
   --    BEFORE the retry blob, so every attempt replays an armed party.
+  --
+  --    DO NOT "FIX" OPTIMUM'S ELEMENT-BLINDNESS HERE.  It was tried and it
+  --    loses the fight; the numbers are below so nobody pays for it twice.
+  --    Optimum picks by attack power and hands the bag's two ThunderBlades
+  --    ($0F, power 108, element bolt) to EDGAR and LOCKE, and both siblings
+  --    NULL bolt -- monster_prop.dat +$18 reads $FC for each of them
+  --    (bolt|poison|wind|holy|earth|water).  That looks exactly like the
+  --    Cranes bug that H.equipWeapon was written for, and it is not.
+  --
+  --    What the element costs here is only DAMAGE, and LOCKE's swing was
+  --    never the damage.  What his swing is, is SHIELD CHIP, and chip goes
+  --    by weapon CLASS, not element: ThunderBlade is a sword, so
+  --    Ot6WeapClassTbl (ff6/src/battle/ot6_class.asm:58-64) gives it
+  --    OT6_SLASH, and Shiva's break axis is slashing (bosses-wob.md 13).
+  --    Breaking Shiva is how this fight is won -- killing EITHER sibling
+  --    ends it, and the winning run broke her (sh 6 -> 0, tk 16) and took
+  --    her 1551 -> 0 while broken.
+  --
+  --    Measured: swapping LOCKE to the Guardian ($02) and EDGAR to the
+  --    MithrilKnife ($01) -- non-elemental, and the best non-elemental
+  --    weapons either can hold -- LOST all three attempts, because both are
+  --    DAGGERS and therefore OT6_PIERCE. It bought damage that was already
+  --    nulled and sold the slashing chip that breaks Shiva; she bottomed out
+  --    at 3 shields and never broke. There is no non-elemental slashing
+  --    weapon available for LOCKE: the bag's only one is the MithrilBlade
+  --    $0A and CELES is holding it. So the ThunderBlade genuinely is his
+  --    best weapon for this fight, and Optimum's power-greedy pick is right
+  --    here by accident. A deliberate equip has to weigh class against the
+  --    boss's break axis; element alone is the wrong axis (issue #81).
   H.equipOptimum({ tag = "ifrit kit" }),
   -- 1b. the rest of the player's prep: HEAL.  The checkpoint battery was cut
   --    with EDGAR at 108/354 and SABIN at 113/363, both about 31%, and a cold
