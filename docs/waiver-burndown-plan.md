@@ -51,11 +51,12 @@ scaffold), `metrics_battle`, `mines_pace`, `shot_battle_items`,
 
 ## Convert-cheap: real input, existing fixture, no new savestate
 
-- **field_navstep** — one write: the flag that kills off incidental
-  encounters during the corridor walk on `vector_sneak`.  Swap for
-  `H.fleeBattle()` (L+R).  The subject (navTo release timing on map 242)
-  is unaffected by how the interrupting fight ends.  This is the cheapest
-  waiver line in the set.
+- **field_navstep** — DONE.  One write: the flag that marked incidental
+  encounters' monsters dead during the corridor walk on `vector_sneak`.
+  Swapped for `H.fleeBattle()` (L+R), and the navTo beside it now passes
+  `playBattles = "flee"` too, which is the half the first pass missed.  The
+  subject (navTo release timing on map 242) is unaffected by how the
+  interrupting fight ends.
 - **battle_kefka** (`savestate=kefka_entry`) — party-HP max pin (likely
   a no-op: the fixture is generated one tile from the trigger with a full
   party, so measure and delete), ATB hurry, Kefka MHP := 1 after two chips.
@@ -82,7 +83,8 @@ scaffold), `metrics_battle`, `mines_pace`, `shot_battle_items`,
   should read.  Earn the transient page: fight one world encounter, chip
   a shield (the game's own codex write), then save via the Save UI, which
   is already pad-driven.
-- **codex_ctx** (`savestate=worldmap_narshe`, moderate) — kill flag → flee;
+- **codex_ctx** (`savestate=worldmap_narshe`, moderate) — monster-dead flag
+  write → flee;
   the two distinguishable codex pages are producible by play: break enemy
   A → save → break enemy B; assert the difference (baseline-change).
 - **battle_reveal_poweron** — already the input-driven half of its pair;
@@ -268,47 +270,100 @@ with a $7BC2-driven d-pad.  Per-file specifics:
    battle.  Decide per file in the wave rather than writing twenty
    separate doctrines.
 
-## Deleting the monster-kill flag: what still blocks it
+## Deleting the monster-dead flag write: what still blocks it
 
 The last structural #75 item is deleting the shared paths that flag a
 mid-route battle's monsters as dead: 7 sites in `lib/ot6_field.lua` and
 `M.clearBattle` (`lib/ot6.lua`).  Deleting them also flips the compose-time
 runtime write check strict everywhere with no further compose change.
-Two blockers remain, both measured:
 
-**1. `M.clearBattle` is nearly free.**  Of seven files mentioning it,
-one is a live call: `probe_world.lua:166` (`H.clearBattle(9000)`).
-The other six are prose citing it historically (battle_naturalmp,
-battle_subjob, gen_arvis, gen_whelk_poweron, probe_input, probe_vargas).
-This half costs one probe conversion, or the probe's retirement.
+**Status, 2026-08-11: the call-site sweep is done and one blocker remains.**
 
-**2. The field kill fires only for callers that pass no `playBattles`
-option** (`if M.monstersPresent() > 0 and not opts.playBattles`), and **36
-files still make at least one bare navigator call**: `navTo`,
-`advanceStory`, `worldNavTo`, `worldWalkFight`.  Roughly: ~17 kept
-probes, ~17 gens (including `gen_edgar` with 12, the Zozo trio, several
-Sabin segments), and 2 already-converted tests.
+**1. `M.clearBattle` has one live caller left, and it is deliberate.**  The
+earlier count here said one live call (`probe_world.lua:166`) and six files
+citing it in prose.  That was wrong: there were two.  `probe_world` is
+converted -- it wins its measured encounter with `H.fightBattle(20000)`,
+which keeps the reload measurement comparable because the flag write also
+ended that fight as a win.  The other is `battle_subjob.lua:490`,
+`H.clearBattle(20000)  -- ISOLATION WIN (lib waiver)`, which the file's
+header records as a labeled isolation arm under the owner's 2026-08-10
+ruling: no fixture sits one real fight short of a level, so that arm keeps
+an XP pin and a library win, and converts organically when a
+near-threshold fixture exists.  So `M.clearBattle` cannot simply be
+deleted.  The choices are to convert `battle_subjob`'s arm D onto a
+near-threshold fixture, or to keep the helper as an explicitly-waived
+isolation-only helper and delete only the seven navigator sites.  The five
+remaining mentions are prose (battle_naturalmp, gen_arvis,
+gen_whelk_poweron, probe_input, probe_vargas).
 
-**Scan method and its limits, so "36" is not read as exact:** a
-regex for `[HM].<nav>(` whose following ~400 characters contain no
-`playBattles`.  It over-reports where a long multi-line call carries the
-option past that window, and it says nothing about whether a battle can
-occur on that segment; the kill only fires if one does.
-Verified by hand on two: `gen_edgar` passes no opts table at
-all (`H.advanceStory(menuUp, 20000)`), and `field_navstep`, whose own
-kill write the convert-cheap wave replaced with `H.fleeBattle`, still
-calls `H.navTo(tx, ty, { maxFrames = 3000 })` bare.
+**2. The navigator sites' guard is now unreachable from any live caller.**
+The flag write fires only for a caller that passes no `playBattles` option
+(`if M.monstersPresent() > 0 and not opts.playBattles`).  Every call to
+`navTo`, `advanceStory` and `worldNavTo` in `tools/tests` now passes one.
+The two matches a scan still reports are both correct as they stand:
+`gen_sabin_train.lua:175` is inside a local `nav()` wrapper that sets
+`o.playBattles = "flee"` on the caller's table first, and
+`lib/ot6_field.lua:1213-1214` is `M.route` handing `rstep.opts` straight
+through (that helper has no callers, and could not work if it did: `local
+steps = {}` shadows its own parameter).
 
-**The general rule:** converting a test's own kill write does
-not make its segment input-driven if it still calls a navigator bare; the
-library will kill a battle that fires mid-nav.  A conversion is complete
-only when both halves are covered.
+**How each site's spelling was decided,** so a reviewer can check it rather
+than trust it.  A field map rolls for a random battle only when byte +5 of
+its 33-byte `map_prop.dat` record has bit 7 set: `LoadMapProp` copies the
+record to `$0520` (`ff6/src/field/map.asm:143-158`) and the field step
+handler returns before the roll unless `$0525` is negative
+(`ff6/src/field/battle.asm:333-347`).  A map's pool is
+`sub_battle_group.dat[map]`, and that group's four formations are the four
+words at `rand_battle_group.dat[group*8]`; a formation's monsters are
+`battle_monsters.dat` (15 bytes: `+1` present mask, `+2..+7` indices, `+14`
+index high bits), and a formation permits a pincer when
+`battle_prop.dat` word `[f*4] ^ $00F0` has bit 6 set
+(`battle_main.asm:8175-8180` loads it, `:7758-7768` masks it).  Decoding
+that chain reproduces the library's own recorded map-98 measurement
+(Trilium + Tusker + two Cirpius) exactly, which is what validates it.
 
-**Landing order this implies:** (a) sweep the bare calls, adding
-`playBattles="flee"` (corridor trash) or `"tactical"` (fights that
-matter); this is cheap per site, and for segments that never draw a battle
-it is a no-op that makes the intent explicit.  (b) Convert or retire
-`probe_world`.  (c) Delete both paths, after which the runtime write
-check goes strict.  Do not attempt (c) before (a): a segment that silently
-relied on the kill becomes a party wipe, and the deletion would be blamed
-for it.
+  * **encounters disabled on every map the step touches** -- most sites.
+    The option is intent only.  These take `"tactical"`, because a goal
+    fight is handed back by `opts.spare`/`opts.arrive` before `playBattles`
+    is consulted, so the only battle that can reach the option is an
+    unscripted surprise, and fighting one beats spending `M.FLEE_CAP`
+    frames failing to run from it.  The banquet family is the exception:
+    those files take `"flee"` to match `gen_banquet_done`, since
+    consistency inside one route is worth more than consistency across the
+    sweep when the choice is moot anyway.
+  * **corridor travel that really can draw a battle** -- world crossings,
+    the Phantom Train, the Magitek Research Facility floors -- takes
+    `"flee"`.
+  * **`"tactical"` where fleeing is expensive or costs the route
+    something.**  Zozo (maps 221/225): several of those formations permit a
+    pincer, which raises run difficulty from 2 to 6 per monster
+    (`battle_main.asm:15584-15594`), and `gen_zozo5_ramuh` already clears
+    the same pool on the same maps with blind A-taps.
+  * **`playBattles = true` at exactly one site**, `gen_whelk`.  Map 41
+    draws encounters, but the party is the Magitek trio, whose command rows
+    carry no Fight, and the tactical driver's fallback for an actor with no
+    Fight row is to press X and pass the turn, so no actor would ever act.
+    Blind A-taps do end it.  `gen_whelk_poweron`, the maintained sibling on
+    the same map with the same party, already passes `true` for this
+    reason.
+
+**Frame budgets grew** at the sites that can now be interrupted by a real
+battle, since a played-out or fled battle costs ATB rounds where the write
+cost none: `gen_zozo3_clock` (run 60000 -> 90000, its two walks), and
+`probe_clock`, `probe_train2`, `probe_v07_384toggle`, `probe_v07_385`,
+`probe_world`.
+
+**The general rule, which is what this whole item is for:** converting a
+test's own flag write does not make its step input-driven if it still calls
+a navigator bare, because the library would end a mid-step battle by the
+same write.  A conversion is complete only when both halves are covered.
+`field_navstep` was the worked example of getting exactly half, and is now
+whole.
+
+**What is left:** delete the seven navigator sites, decide
+`M.clearBattle`'s fate against `battle_subjob`'s isolation arm, and flip
+the runtime write check strict.  Do not delete before re-running the
+chain: the sweep was decided by reading the map and formation tables, and
+almost none of it has been executed, so a step that silently relied on the
+write would surface as a party wipe or a timeout at the deletion and get
+the blame for it.

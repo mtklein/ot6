@@ -22,9 +22,9 @@
 --
 -- The drive (issue #75 conversion: the discriminator used to be forged, with
 -- fire written into all 384 slot-3 species and ice into all 384 transient
--- species, and the closing fight was ended with the kill bit.  Both pages'
--- content is now produced by play, following cb8e605's baseline-change
--- approach, and the fight is fled):
+-- species, and the closing fight was ended by the monster-dead flag write.
+-- Both pages' content is now produced by play, following cb8e605's
+-- baseline-change approach, and the fight is fled):
 --   0. the boot state is the pre-save control, read rather than staged: the
 --      never-saved chain's fights populated the transient page (lifecycle
 --      0 writes go there) while all three save-slot pages read
