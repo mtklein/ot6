@@ -21,8 +21,8 @@ Set-pieces that draw **no gauge** (scripted theater, `Ot6ShieldTbl` `0,$00`):
 Their silent HUD is the tell.
 
 v0.7 ends at the stable Thamasa mission handoff; v0.8 ends after the Thamasa
-arc; v0.9 finishes when the FC-escape fixture mints (post-Nerapa, entering
-WoR).
+arc; v0.9 finishes when the FC-escape fixture is generated (post-Nerapa,
+entering WoR).
 
 Terra becomes selectable at `event_main.asm:25542`, `switch $02F0=1`; `$02F0`
 is bit 0 of `$1EDE`, the engine's available-characters word (`EventCmd_e1` =
@@ -31,10 +31,10 @@ is bit 0 of `$1EDE`, the engine's available-characters word (`EventCmd_e1` =
 `$02F6`=Celes). The "recovers her will" dialogue (`$05D4`, `:25488`) sits 54
 lines earlier in the same uninterruptible tail — it is the same beat.
 
-The v0.6 chain's party, read from `$1850` at every set-piece doorstep: four
+The v0.6 chain's party, read from `$1850` at every set-piece entry point: four
 through the Facility, three once Celes is taken by the tube room.
 
-| doorsteps | measured party |
+| entry points | measured party |
 |---|---|
 | `vector_doorstep` … `magicite_ifrit_shiva` | LOCKE L14, EDGAR L15, SABIN L15, CELES L14 |
 | `n024_doorstep` … `esper_tubes_doorstep` | LOCKE L15, EDGAR L16, SABIN L15, CELES L15 |
@@ -43,7 +43,8 @@ through the Facility, three once Celes is taken by the tube room.
 
 The canonical fixture party is LOCKE, CELES, SABIN, EDGAR, seated at the Zozo
 `party_menu`. `gen_vector_doorstep` asserts the *count* of nonzero `$1850`
-entries at the anchor is 4, so a chain that silently loses members fails loudly.
+entries at the checkpoint is 4, so a chain that silently loses members fails
+loudly.
 
 At the v0.6 stop line (map 6, `_cacb95` at `:25669`) Terra is **available but not
 active**.
@@ -53,9 +54,9 @@ active**.
 ## 2. The fixture-authoring pattern (what a route agent does per beat)
 
 The house pattern, learned from `gen_zozo2_arrival`→`gen_zozo5_ramuh` and the
-`Makefile` frontier machinery.
+`Makefile`'s `FRONTIER` machinery.
 
-### The chain shape (doorstep → drive → mint)
+### The chain shape (entry point → drive → generate)
 Each beat is one (or a few) `gen_<beat>.lua` generators. A generator:
 1. `H.loadState(".../build/states/<previous>.mss.lua")` — boots the prior link.
 2. Asserts the boot invariants (map id, key switches) up front.
@@ -63,10 +64,11 @@ Each beat is one (or a few) `gen_<beat>.lua` generators. A generator:
 4. `H.saveState("<name>.mss")` at each reusable checkpoint, with `H.assertEq`
    guards on the switches/coords that define that checkpoint.
 
-Split a long leg into multiple mints so a failed experiment replays seconds,
-not the whole leg (e.g. `dadaluma_doorstep` then `dadaluma_won` on the same
-tile; `sabin_world`+`sabin_camp` from one script). Convention: mint a
-`<boss>_doorstep` one A-press before the fight, then `<boss>_won` after.
+Split a long segment into multiple savestates so a failed experiment replays
+seconds, not the whole segment (e.g. `dadaluma_doorstep` then `dadaluma_won`
+on the same tile; `sabin_world`+`sabin_camp` from one script). Convention:
+generate a `<boss>_doorstep` one A-press before the fight, then `<boss>_won`
+after.
 
 ### The driving toolkit (`tools/tests/lib/ot6.lua` + `ot6_field.lua`)
 - **Field nav:** `H.navTo(x,y,{maxFrames})` (BFS+drive to a tile),
@@ -88,23 +90,23 @@ tile; `sabin_world`+`sabin_camp` from one script). Convention: mint a
 - **Choice-dialog puzzles:** `gen_zozo3_clock.lua` is the template — chained
   choice dialogs each verified by their own `$01F*` latch (the clock's
   6:10:50).
-- **Kill-bit boss win:** boss fights whose post-battle event gates on
-  battle-switch (`$40`) are won by the kill-bit idiom (write `$3eec+slot*2 |=
-  $80` when `$3aa8+slot*2` is odd) — no real combat needed to mint the `_won`
-  state. Verify each post-battle gate.
+- **Monster-dead-flag boss win:** boss fights whose post-battle event gates on
+  battle-switch (`$40`) are won by setting the monster-dead flag (write
+  `$3eec+slot*2 |= $80` when `$3aa8+slot*2` is odd) — no real combat needed to
+  generate the `_won` state. Verify each post-battle gate.
 
 ### The Makefile wiring (per new link)
 Add, in order: (1) a `.word`-style dependency+recipe
 `build/states/<name>.mss.lua: build/states/<prev>.mss.lua` / `$(call
 mint,<name>,gen_<beat>)`; (2) `<name>` onto a `FRONTIER +=` line. The
-`frontier_deps.sh` gate auto-derives generator/lib freshness from the `$(call
-mint,...)` line, so a new link is gated the moment it is added.
-`make frontier` mints the chain; `make -jN frontier` parallelizes independent
+`frontier_deps.sh` check auto-derives generator/lib freshness from the `$(call
+mint,...)` line, so a new link is checked the moment it is added.
+`make frontier` generates the chain; `make -jN frontier` parallelizes independent
 branches.
 
 ### The test wiring (per beat)
 - A `battle_<boss>.lua` with first-line marker `-- @suite frontier=<boss>_doorstep`
-  boots the doorstep, drives into the fight, and asserts the gauge is
+  boots the entry point, drives into the fight, and asserts the gauge is
   **authored** (shield count ≠ formula), the **element add is live**, and the
   intended **chips break it** with a negative control — see `battle_vargas.lua`
   as the canonical example. `suite.sh` auto-discovers it and reports "skipped"
@@ -123,8 +125,8 @@ branches.
 ### Per-beat driving hazards (ranked)
 1. **Chupon's Sneeze (Beat E).** Scripted: ejects a party member mid-fight, "no
    save, no appeal" — the `ultros4_chupon` fixture driver must **survive a party
-   member leaving** and the fight "cannot be won, only survived." Mint the `_won`
-   (survived) state accordingly.
+   member leaving** and the fight "cannot be won, only survived." Generate the
+   `_won` (survived) state accordingly.
 2. **Nav-hard segments (crane-maze class).** The **crane escape** and the **IAF
    shmup** gauntlet are directed/scripted routes, not free BFS — follow the
    `gen_zozo4_dadaluma` (directed island graph, follow-the-conveyor) and
@@ -169,7 +171,7 @@ scripts decoded for several fights. **Flagged as real work, not free:**
 
 ### Balance (author-then-measure, per beat)
 Shield counts in `bosses-wob.md` are a **v1 proposal**; the trash rows were
-swept live (Measurements #8–#9). For each boss: after minting its
+swept live (Measurements #8–#9). For each boss: after generating its
 `_doorstep`, run `bal_party.lua` (`boost3`, `BAL_BUFF_SHIELDS` sweep) to confirm
 the break **lands on a live body, not a corpse** (the recurring finding: the
 formula/first-draft count is often one chip too many). Tune `Ot6ShieldTbl` and
@@ -194,6 +196,6 @@ measure the rhythm).
   `Ot6ElemAddTbl` (384)
 - Master boss design: `docs/design/bosses-wob.md`
 - Esper roster (v0.6: Ifrit/Shiva/Maduin…): `docs/design/magicite.md`
-- Frontier/mint machinery: `Makefile` (FRONTIER lists; `mint`/`stackseed` macros)
+- Savestate machinery: `Makefile` (`FRONTIER` lists; `mint`/`stackseed` macros)
 - Opera event source: `ff6/src/event/event_main.asm` ~22308–28700
 - World/vehicle nav: `docs/research/world-map-nav.md`; `tools/tests/lib/ot6_field.lua`

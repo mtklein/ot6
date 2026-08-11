@@ -1,12 +1,12 @@
 -- gen_rapids.lua -- from scenario_hub.mss into TERRA/BANON/EDGAR's scenario:
 -- the resumed raft ride down the lower LETE RIVER and the landing on the
 -- World of Balance north-east of Narshe.
--- Mints two states:
+-- Generates two states:
 --   rapids_start.mss  map 113 at the ride's re-entry tile (104,61), TERRA +
 --                     EDGAR + BANON aboard with the RAFT sprite, upstream of
---                     the leg's one FORCED fight -- the cheap doorstep for
---                     anything that wants `battle 8, RIVER` without replaying
---                     the hub.
+--                     the step's one FORCED fight -- the cheap entry point
+--                     for anything that wants `battle 8, RIVER` without
+--                     replaying the hub.
 --   rapids_done.mss   the World of Balance at (93,41), on foot and
 --                     controllable: the ride finished, the overland walk to
 --                     Narshe not started.  gen_terra_narshe rides from here.
@@ -17,7 +17,7 @@
 -- which of the three you talk to cannot matter.  TERRA (obj 19) is the one
 -- taken here, and only because the states are named for her.
 --
--- ===================== THE UPSTREAM LEG'S TWO TRAPS ARE NOT HERE ==========
+-- ==================== THE UPSTREAM STEP'S TWO TRAPS ARE NOT HERE ==========
 -- gen_scenario.lua's river needed a steering driver and two hand-walked
 -- handoffs.  This continuation needs NEITHER, and the reason is worth
 -- writing down rather than rediscovering: _cb094e (:39355-39461) contains no
@@ -29,7 +29,7 @@
 --   * THE VANILLA GRIND LOOP IS UPSTREAM.  It is _cb07f2's option 0
 --     (:39152-39197, `if_switch $0176=0, _cb07f2`), reached from the ride
 --     _cb0657 starts.  This event re-enters map 113 at (104,61) -- past it.
---     Nothing on this leg ever asks the player which way to go, so the
+--     Nothing on this step ever asks the player which way to go, so the
 --     driver below does not steer a cursor; it ASSERTS that no multiple
 --     choice ever opens ($056F >= 2 while the dialog is input-ready is a
 --     hard error), which is the same fact stated as a test.
@@ -37,7 +37,7 @@
 --     `if_switch $01B2=0, EventReturn` -- $01B2 being bit 2 of $1EB6, the
 --     engine's live control-flags byte, i.e. "facing down"
 --     (field/event.asm:5415-5432) -- and they are EventTrigger::_114's
---     (event_trigger.asm:464-468).  This leg never loads map 114.  It runs
+--     (event_trigger.asm:464-468).  This step never loads map 114.  It runs
 --     113 -> world, end of story.
 --
 -- CONTROL IS ON FOR THE ENTIRE RIDE, so hasControl() is not a progress gate
@@ -48,37 +48,37 @@
 -- anyway.  Every gate in this script is map id + position + the world-mode
 -- word; the pad is neutral except for A into a battle or an open dialog.
 --
--- THE LEG HAS ONE FORCED FIGHT AND UP TO TWO MORE ON A COIN FLIP.  The
+-- THE STEP HAS ONE FORCED FIGHT AND UP TO TWO MORE ON A COIN FLIP.  The
 -- survey called `battle 8, RIVER` (:39412) "the scenario's only combat",
--- which is true of the FORCED ones and not of the leg:
+-- which is true of the FORCED ones and not of the step:
 --       :39428  call _cb048f   ->  if_rand ; battle 8, RIVER   (:38659-38666)
 --       :39446  call _cb0486   ->  if_rand ; battle 7, RIVER   (:38653-38658)
--- are both real, both on this leg's critical path, and each fires about half
+-- are both real, both on this step's critical path, and each fires about half
 -- the time.  So the driver names and logs EVERY battle it meets, and the
 -- run's battle count is reported rather than assumed.
 --
--- ISSUE #75 -- THE FIGHTS ARE PLAYED, NOT KILL-BITTED.  Zero state writes
+-- ISSUE #75 -- THE FIGHTS ARE PLAYED, NOT WRITE-CLEARED.  Zero state writes
 -- in this generator.  The driver's edge-tapped A is the fighter (A opens
 -- the acting character's command list, A confirms its first entry, A takes
 -- the default target): TERRA and EDGAR Fight the default enemy while
 -- BANON's first command is Health, the free party heal his presence exists
 -- for -- and BANON'S DEATH IS AN INSTANT GAME OVER, which is why the
--- kill-bit was here at all.  The driver watches his battle HP every frame
--- (slot found via $3ED8+2s == 14 on each fight's rising edge) and fails
--- the run loudly with the fight's numbers if he ever stays at 0 -- the
--- #74-style balance finding, at the moment of loss, instead of a timeout
--- at the game-over screen.  gen_scenario's river fights the same way and
--- carries the fuller rationale.
+-- battle-clear write was here at all.  The driver watches his battle HP
+-- every frame (slot found via $3ED8+2s == 14 on each fight's rising edge)
+-- and fails the run loudly with the fight's numbers if he ever stays at 0
+-- -- the #74-style balance finding, at the moment of loss, instead of a
+-- timeout at the game-over screen.  gen_scenario's river fights the same
+-- way and carries the fuller rationale.
 --
 -- AND rapids_done IS VERIFIED BY RELOAD.  Calm-at-capture provably does
 -- not imply calm-at-boot on the world map: gen_sabin_gau measured a
 -- reproducible boot-into-battle from a capture whose live timeline sailed
--- on calm (2026-08-03, the honest-root pilot).  So the world-map mint here
--- is captured in memory, reloaded (becoming the consumer's timeline), and
--- only emitted once the reload sits calm at (93,41) for 300 frames; a boot
--- battle is FLED honestly (hold L+R -- WoB randoms are runnable) and the
--- post-battle world reload restores this exact tile with the danger
--- counter zeroed, where the next attempt recaptures.
+-- on calm (2026-08-03, the input-driven-root pilot).  So the world-map
+-- generation here is captured in memory, reloaded (becoming the consumer's
+-- timeline), and only emitted once the reload sits calm at (93,41) for 300
+-- frames; a boot battle is FLED with real input (hold L+R -- WoB randoms
+-- are runnable) and the post-battle world reload restores this exact tile
+-- with the danger counter zeroed, where the next attempt recaptures.
 --
 -- WHAT `battle N` RESOLVES TO (field/event.asm EventBattle, :1910-1922): the
 -- group index is scaled by FOUR -- two formation words per group -- and
@@ -86,7 +86,7 @@
 -- event_battle_group.dat: group 8 -> formation 35 (3/4) or 37 (1/4); group 7
 -- -> formation 38 (3/4) or 39 (1/4).  The species, hp and OT6 shield counts
 -- are read off battle RAM on each fight's rising edge and logged, because a
--- balance claim about this leg has to rest on what the ROM actually seeds.
+-- balance claim about this step has to rest on what the ROM actually seeds.
 local H = dofile("tools/tests/lib/ot6.lua")
 local HUB = "build/states/scenario_hub.mss.lua"
 
@@ -141,7 +141,7 @@ local function talkToObj(obj, what, maxF)
     return H.navTo(function() return approach()[1] end,
                    function() return approach()[2] end, {
       maxFrames = maxF or 20000,
-      honest = true,
+      playBattles = true,
       arrive = function()
         return engaged or (adjacent() and H.hasControl() and H.tileAligned())
       end,
@@ -180,7 +180,7 @@ local function talkToObj(obj, what, maxF)
 end
 
 -- ------------------------------------------------------------ the driver --
--- FIGHT every battle honestly (issue #75 -- see the header), tap every
+-- FIGHT every battle with real input (issue #75 -- see the header), tap every
 -- dialog, refuse every choice, touch nothing else.  `fights` accumulates
 -- one row per fight so the run can report what it actually met instead of
 -- what the route expected.
@@ -267,7 +267,7 @@ local function rideUntil(pred, what, budget, tier)
       -- 1. A CHOICE HERE WOULD MEAN THE ROUTE IS WRONG.  _cb094e has no
       --    `choice` opcode, so any prompt with >= 2 options is a fork this
       --    file does not know about -- and A-mashing an unknown fork on this
-      --    river is exactly how the upstream leg found the vanilla grind
+      --    river is exactly how the upstream step found the vanilla grind
       --    loop.  Fail loudly instead.  Read only when no battle is up (the
       --    battle module scribbles $056F) and only once the dialog is
       --    input-ready (it counts options as the text types out,
@@ -447,10 +447,10 @@ local function logParty(tag)
   end
 end
 
--- 120000 was the kill-bit-era budget; honest fights spend real ATB
--- rounds, and the reload-verified mint replays its own boot
+-- 120000 was the battle-clear-write-era budget; input-driven fights spend
+-- real ATB rounds, and the reload-verified generation replays its own boot
 -- ------------------------------------------------------ the retry ladder --
--- gen_scenario's ladder, on this leg's own checkpoint: a lost ride 2 is
+-- gen_scenario's ladder, on this step's own checkpoint: a lost ride 2 is
 -- accepted, the rapids_start-moment capture is reloaded (a player
 -- reloading their save), and the ride is taken again with the fighter
 -- escalated (tier 2+ spends EDGAR's turns on AutoCrossbow), which
@@ -489,18 +489,18 @@ local function ride2Attempt(n)
   }, {})
 end
 
--- THE RELOAD-VERIFIED WORLD MINT (gen_sabin_gau's pattern, see the
+-- THE RELOAD-VERIFIED WORLD GENERATE (gen_sabin_gau's pattern, see the
 -- header).  Capture in memory, reload the capture -- becoming the
 -- consumer's timeline -- and give it 300 frames.  Calm and parked at
--- (93,41) -> that blob is the mint.  A battle instead -> FLEE it honestly
--- (hold L+R; risking a couple of rounds of chip on BANON beats fighting a
--- fight the fixture's consumers will never see) and recapture: the party
--- never stepped, so the post-battle world reload restores this exact tile
--- with the danger counter zeroed.  Three attempts, then fail the mint
--- loudly rather than emit a state nobody can boot.
+-- (93,41) -> that blob is the generated savestate.  A battle instead ->
+-- FLEE it with real input (hold L+R; risking a couple of rounds of chip on
+-- BANON beats fighting a fight the fixture's consumers will never see) and
+-- recapture: the party never stepped, so the post-battle world reload
+-- restores this exact tile with the danger counter zeroed.  Three attempts,
+-- then fail the generation loudly rather than emit a state nobody can boot.
 local mintBlob, mintDone = nil, false
 local function mintAttempt(n)
-  local tag = string.format("[rapids_done] mint attempt %d", n)
+  local tag = string.format("[rapids_done] generation attempt %d", n)
   local saveReq, loadReq
   return H.cond(function() return not mintDone end, {
     H.call(function() saveReq = H.requestSaveState() end),
@@ -535,7 +535,7 @@ local function mintAttempt(n)
       end, 20000, {
         H.call(function()
           if H.battleLoadStarted() then
-            H.setPad({ l = true, r = true })   -- flee, honestly
+            H.setPad({ l = true, r = true })   -- flee, with real input
           else
             H.setPad({})
           end
@@ -578,7 +578,8 @@ H.run({ maxFrames = 200000 }, {
 
   -- ===================================================================== --
   -- THE RIDE, PART 1: the hub tear-down, dlg $0168, and `load_map 113,
-  -- {104,61}`.  Mint before the forced fight so a battle test can boot here.
+  -- {104,61}`.  Generate before the forced fight so a battle test can boot
+  -- here.
   -- ===================================================================== --
   rideUntil(onMap(113, 20), "the raft re-entry on map 113", 30000),
   H.release(),
@@ -586,7 +587,7 @@ H.run({ maxFrames = 200000 }, {
   H.call(function()
     H.assertEq(map(), 113, "on map 113, the LETE RIVER, aboard the raft")
     H.assertEq(H.battleLoadStarted(), false, "no battle")
-    H.assertEq(#fights, 0, "minted UPSTREAM of the forced fight")
+    H.assertEq(#fights, 0, "generated UPSTREAM of the forced fight")
     H.assertEq(H.readByte(CH_MAX), 0, "no choice prompt open")
     -- the party _cb094e assembled: TERRA (0) + EDGAR (4) + BANON (14).
     -- $185E is the byte that settles the WEDGE/BANON symbol collision:
@@ -606,7 +607,7 @@ H.run({ maxFrames = 200000 }, {
   end),
   H.saveState("rapids_start.mss"),
   H.logStep(function()
-    return string.format("rapids_start minted at frame %d", H.frame)
+    return string.format("rapids_start generated at frame %d", H.frame)
   end),
   -- the ladder's checkpoint: the same moment rapids_start captures
   (function()
@@ -626,16 +627,16 @@ H.run({ maxFrames = 200000 }, {
   -- ===================================================================== --
   -- THE RIDE, PART 2: `battle 8, RIVER`, the two if_rand fights, and the
   -- spill onto the World of Balance at (93,41) (:39455-39459).  Up to
-  -- three honest attempts (see the ladder above).
+  -- three input-driven attempts (see the ladder above).
   -- ===================================================================== --
   ride2Attempt(1),
   ride2Attempt(2),
   ride2Attempt(3),
   H.call(function()
     if not rideWon then
-      error(string.format("rapids: BANON did not survive any of 3 honest " ..
+      error(string.format("rapids: BANON did not survive any of 3 " ..
         "attempts -- last loss: %s -- the per-attempt numbers above are " ..
-        "the balance finding (#74-style); do not rig this leg",
+        "the balance finding (#74-style); do not rig this segment",
         tostring(lost)), 0)
     end
   end),
@@ -674,7 +675,7 @@ H.run({ maxFrames = 200000 }, {
     H.emitBlob("rapids_done.mss", mintBlob)
   end),
   H.logStep(function()
-    return string.format("rapids_done minted at frame %d, %d fights won " ..
-      "honestly", H.frame, #fights)
+    return string.format("rapids_done generated at frame %d, %d fights won",
+      H.frame, #fights)
   end),
 })

@@ -21,14 +21,15 @@ ROM="Final Fantasy III (USA).sfc"
 [ -e "$HERE/tools/Mesen.app" ] || ln -s "$MAIN/tools/Mesen.app" "$HERE/tools/Mesen.app"
 [ -e "$HERE/tools/bin" ] || ln -s "$MAIN/tools/bin" "$HERE/tools/bin"
 
-# Seed the main tree's minted savestates so boot-chain fixtures don't replay
-# the whole game, PLUS the ninja frontier bookkeeping (build/ninja: the
-# content latches and .ninja_log).  Ninja treats an edge with no build-log
-# entry as never built, so seeded states without the log would honestly --
-# and expensively, hours -- replay the whole frontier.  -p preserves mtimes
-# so the log's recorded times still describe the copied files; any REAL
-# drift (a local edit after seeding) still re-mints through the latch
-# edges' content compare, proven in frontier_ninja_selftest.sh.
+# Seed the main tree's generated savestates so boot-chain fixtures don't
+# replay the whole game, PLUS the ninja bookkeeping for `make frontier`
+# (build/ninja: the content latches and .ninja_log).  Ninja treats an edge
+# with no build-log entry as never built, so seeded states without the log
+# would genuinely -- and expensively, hours -- replay the whole chain.  -p
+# preserves mtimes so the log's recorded times still describe the copied
+# files; any REAL drift (a local edit after seeding) still regenerates
+# through the latch edges' content compare, proven in
+# frontier_ninja_selftest.sh.
 MAIN_BRANCH=$(git -C "$MAIN" branch --show-current 2>/dev/null || echo '?')
 HERE_BRANCH=$(git branch --show-current 2>/dev/null || echo '?')
 if [ -d "$MAIN/build/states" ] && [ ! -d "$HERE/build/states" ]; then
@@ -44,7 +45,7 @@ echo "seeded from $MAIN ($MAIN_BRANCH) into $HERE_BRANCH"
 
 # ------------------------------------------------------- is the seed FRESH?
 # This block used to be a branch-name guess: "$MAIN_BRANCH != $HERE_BRANCH,
-# so SOME tests MAY be red, confirm with a re-mint."  Both halves were wrong
+# so SOME tests MAY be red, confirm by regenerating."  Both halves were wrong
 # in the way that costs time.
 #
 #   * Wrong direction.  Equal branch names proved nothing.  Measured
@@ -53,7 +54,7 @@ echo "seeded from $MAIN ($MAIN_BRANCH) into $HERE_BRANCH"
 #     anyway, because the main checkout's own last `make frontier` (its
 #     stamps: 2026-07-28 09:15) predates commit b085cac (2026-07-28 19:47),
 #     which edited tools/tests/lib/ot6.lua.  The staleness never came from
-#     the branch; it came from the seed source not having re-minted since a
+#     the branch; it came from the seed source not having regenerated since a
 #     shared input moved.  A worktree cut from a tree in that state inherits
 #     it whatever branch either side is on.
 #   * "MAY be red" is not actionable.  An agent told that some unnamed tests

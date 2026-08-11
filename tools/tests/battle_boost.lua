@@ -122,7 +122,7 @@ H.run({ maxFrames = 30000 }, {
   -- stays retired: oam entry 96+slot must remain parked (y $e0).  It used
   -- to carry the pending-3 tile $cc at attr $36, out of obj tiles that
   -- turned out to be vanilla's damage-numeral vram -- the "chevrons turn
-  -- into numbers" bug; battle_dmgnum.lua is the dedicated gate.
+  -- into numbers" bug; battle_dmgnum.lua is the dedicated test.
   H.waitUntil(function()
     local reg = H.readByte(0x897f)
     local base = ((reg - (reg % 4)) * 256) * 2
@@ -149,7 +149,7 @@ H.run({ maxFrames = 30000 }, {
     H.assertEq(cellSeen[0x296d] ~= nil, true, "arrow-3 in yellow seen (pulse alive)")
     for w in pairs(cellSeen) do
       H.assertEq(w == 0x216d or w == 0x296d, true,
-        string.format("only arrow-3 words in the live cell, both bands (got %04x)", w))
+        string.format("only arrow-3 words in the live cell, both row ranges (got %04x)", w))
     end
     local mparts, other = {}, 0
     for k, n in pairs(markSeen) do

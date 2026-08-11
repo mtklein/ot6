@@ -140,7 +140,7 @@
 ;   MANUAL (any loadout byte nonzero): the stored, still-learned ids in SLOT
 ;     order -- the player's own arrangement, at most eight.
 ;   AUTO (all eight bytes zero, the state every pre-existing save and every
-;     tracked anchor is in): the FIRST EIGHT known rages in id order, via the
+;     tracked checkpoint is in): the FIRST EIGHT known rages in id order, via the
 ;     same Ot6RageNth window the field page draws.
 ;
 ; THE AUTO RULING, 2026-07-28 (dispatcher; kit-gau.md §2.2 vs the original
@@ -282,7 +282,7 @@
 ; the loadout says.  All entries a8/i16, D = 0 (so the $08/$09 new-press
 ; joypad and the $4d/$4e cursor position are reachable), rtl.  The learned set
 ; is read from $1d2c through the SAME Ot6RageLearned leaf the battle build
-; uses -- the invariant that kept Bushido's two readers honest.
+; uses -- the invariant that kept Bushido's two readers in agreement.
 ;
 ; The one shape difference from Bushido: Cyan's "pool" is eight techs and can
 ; be drawn as a grid, Gau's is up to 255 species and cannot.  So the L/R cycle

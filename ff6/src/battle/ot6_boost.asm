@@ -328,12 +328,12 @@ done:   rtl
 ;
 ; "SHE STILL ACTS" AND "IT LASTS LONGER" ARE THE SAME LEVER, which is the
 ; one place #59's proposal does not survive contact with the code.  The
-; issue offers them as separable rungs -- 1 BP buys the free turns, 2-3
+; issue offers them as separable tiers -- 1 BP buys the free turns, 2-3
 ; buy duration.  They cannot be separated: vanilla ends the stance in
 ; QueueAction (battle_main.asm:511) precisely BECAUSE she acted, so the
 ; only way she can act without dropping it is for the stance to outlive
 ; her action -- and that IS duration.  So the ladder is 1/2/3 turns of
-; shield-you-can-act-through, and there is no rung that buys only one of
+; shield-you-can-act-through, and there is no tier that buys only one of
 ; the two.
 ;
 ; entry (jsl from Cmd_0b, immediately after its `ora #$04 / sta $3e4c,x`
@@ -454,7 +454,7 @@ done:   rtl
 ;     BP BUYS TEMPO.  MP BUYS POWER.
 ;
 ; One Fire 3 instead of three Fires still saves two turns, which is what
-; the boost is for; the magnitude is paid for honestly.  Same correction
+; the boost is for; the magnitude is paid for in full.  Same correction
 ; #45 made to the kit ladders, where a discount had outlived its reasoning.
 ;
 ; So the fold re-prices what it queued, from the tier's own MagicProp
@@ -754,7 +754,7 @@ Ot6FoldTbl:
 ; the bank, beside the OT6_RESTAGE repaint it already requested, and
 ; Ot6ActionEnd sets it when it consumes a pending -- so the prices track the
 ; boost live and fall back the moment it is spent.  If no recheck ever
-; happens the list simply shows base prices, which is the honest answer for
+; happens the list simply shows base prices, which is the correct answer for
 ; an unboosted caster; the CHARGE never depends on this having run
 ; (Ot6QueueFold re-prices at queue time regardless).
 ;
@@ -845,7 +845,7 @@ Ot6FoldTbl:
 ; from ever matching a row. an id absent from the table charges 0 -- a
 ; missing price is FREE, never a garbage charge -- and every command that is
 ; not one of the three returns vanilla's own A untouched (magic stays priced
-; on its own ruler, the free floor stays free).
+; on its own baseline, the free floor stays free).
 ;
 ; steal (cmd $05) is a fourth costed verb, but a SINGLE ability rather than a
 ; list: FixPlayerAttack omits it from CmdWithAttackTbl, so it never earns a
@@ -1019,17 +1019,17 @@ Ot6FoldTbl:
 ; reached from its own arm of Ot6AbilityCost's command gate, and the gate is what
 ; makes the key spaces disjoint.
 ;
-; THE RULER (the same one Ot6AbilityCostTbl is on: 8-20% of the real pool at the
+; THE BASELINE (the same one Ot6AbilityCostTbl is on: 8-20% of the real pool at the
 ; level the ability arrives).  Locke joins at Narshe holding 31 MP at LV6 -- the
 ; figure Ot6StealCost measured off probe_mppools.lua -- and these are granted at
 ; join with Steal (the story-gating ruling; kits.md).  So:
 ;
-;   Steal   4  12.9%   (Ot6StealCost, unchanged -- rung one, the signature)
+;   Steal   4  12.9%   (Ot6StealCost, unchanged -- tier one, the signature)
 ;   Bestow  5  16.1%   between Cure's 12.5% and Drain's 17.2%
-;   Filch   6  19.4%   just under Life's 20.3%, the top of the ruler
+;   Filch   6  19.4%   just under Life's 20.3%, the top of the baseline
 ;
-; NOT MONOTONIC WITH THE RUNG ORDER, deliberately: kits.md numbers Filch rung 4
-; and Bestow rung 5, so a monotonic column would want Filch cheaper.  SwdTech is
+; NOT MONOTONIC WITH THE TIER ORDER, deliberately: kits.md numbers Filch tier 4
+; and Bestow tier 5, so a monotonic column would want Filch cheaper.  SwdTech is
 ; the one kit that must stay monotonic and its table says why -- "the row IS the
 ; boost level, so a dearer 2x row than 3x row would read as a bug".  The thief
 ; submenu is a FREE-CHOICE menu like Blitz, which the same header exempts from
@@ -1037,7 +1037,7 @@ Ot6FoldTbl:
 ; already ships Mantra 16 beneath Fire Dance 17 for the same reason.  Price by
 ; what the ability does, not by where kits.md happened to list it.
 ;
-; Filch sits at the TOP of the ruler on purpose: it is the only class-blind and
+; Filch sits at the TOP of the baseline on purpose: it is the only class-blind and
 ; element-blind shield remover in the game and the only way to gain two BP in a
 ; turn (see Ot6Filch), and at 6 a full LV6 pool buys five of them.  Bestow is
 ; dearer than Steal because it is a party-wide tempo move rather than a probe,
@@ -1110,7 +1110,7 @@ Ot6ThiefCostTbl:
 ; [ the Dance price -- one authority for the charge and the menu (#34) ]
 ;
 ; mp-economy.md's verb survey rules Dance "flat, paid at start, 4-10: one
-; payment starts a whole-battle state".  8 -- the top half of the band --
+; payment starts a whole-battle state".  8 -- the top half of the range --
 ; because the single
 ; payment funds every subsequent turn's verb for the rest of the battle
 ; (each locked-in step is free), so it prices above the per-use signature
@@ -1127,22 +1127,22 @@ Ot6ThiefCostTbl:
 ; [ the Steal price -- the flat verb's one authority (#52) ]
 ;
 ; 4, up from the 2 that shipped in v0.5.  #52's headline was "2 MP is ~2% of
-; Locke's LV14 pool", but that measures at the wrong level and the ruler this
+; Locke's LV14 pool", but that measures at the wrong level and the baseline this
 ; column is on measures at the level an ability ARRIVES: Locke joins at Narshe
 ; holding 31 MP (LV6, read off worldmap_narshe by probe_mppools.lua), where 2
 ; is 6.5% -- under the 8-20% a vanilla spell costs at ITS arrival -- and 4 is
-; 12.9%, between Fire's 10.0% and Cure's 12.5%.  So the honest fix is the same
+; 12.9%, between Fire's 10.0% and Cure's 12.5%.  So the right fix is the same
 ; 2x #45 gave the Blitz floor, not a bigger number chosen to look right at LV14.
 ; (Every signature dilutes the same way by then: Pummel is 4.3% of Sabin's LV14
 ; pool and Dispatch 4.3% of Cyan's.  Pricing against a late pool would mean
-; per-level prices, which the ruler explicitly does not do.)
+; per-level prices, which the baseline explicitly does not do.)
 ;
 ; 4 is also exact PARITY with the cheapest row of all three ladder kits --
 ; Pummel $5d, Dispatch $55, AutoCrossbow $aa, every one of them 4 -- and Steal
 ; is Locke's signature, mp-economy.md's "signatures become the cheapest rows of
-; their kits".  That parity is load-bearing for #55: Steal is a RUNG, not the
+; their kits".  That parity is load-bearing for #55: Steal is a TIER, not the
 ; ceiling (owner, 2026-07-29 -- Locke's 99 is Master's Mark, kits.md's Locke
-; ladder rung 8), so it should read as rung one of an eight-rung ladder, not
+; ladder tier 8), so it should read as tier one of an eight-tier ladder, not
 ; as its own thing.
 ;
 ; NOTE WHAT THIS PRICE STILL CANNOT DO: it cannot be SEEN.  Steal is a
@@ -1176,7 +1176,7 @@ Ot6ThiefCostTbl:
 ; needs a 255-row price surface where the flat rule needs one number.
 ;
 ; 8 -- deliberately Dance's own number, not a number near it.  If the Dance
-; figure ever moves inside mp-economy's 4-10 band, RAGE FOLLOWS IT: the rule
+; figure ever moves inside mp-economy's 4-10 range, RAGE FOLLOWS IT: the rule
 ; ("possess-verbs share one flat price") outranks the digit, so this leaf
 ; tail-calls Ot6DanceCost rather than repeating the literal, and the two can
 ; never drift.  PURE leaf: cost in A, preserves X and Y, rtl.
@@ -1189,7 +1189,7 @@ Ot6ThiefCostTbl:
 ;
 ; #40 gave Leap a flat 2 (Ot6LeapCost, deleted here), reasoned from "only the
 ; basic Fight command is free" (mp-economy.md, as it then read) and that doc's
-; probe-collect rung, the same row Steal sits on.  Two things retired it:
+; probe-collect tier, the same row Steal sits on.  Two things retired it:
 ;
 ;   1. the price was NEVER DISPLAYED.  Leap is a top-level command row, not a
 ;      list entry, so nothing ever drew "2 MP" beside it -- the id-keyed
@@ -1243,10 +1243,10 @@ Ot6ThiefCostTbl:
 ; owner 2026-07-29); where an internal disassembly label differs it is marked
 ; as such, never used as the primary.
 ;
-; -------- the ruler these numbers are on (#45 rescale, 2026-07-29) --------
+; -------- the baseline these numbers are on (#45 rescale, 2026-07-29) --------
 ;
 ; mp-economy.md's "one price scale" says kit skills price on the vanilla spell
-; ruler.  That ruler was never MEASURED until #45, so here it is: vanilla
+; baseline.  That baseline was never MEASURED until #45, so here it is: vanilla
 ; natural magic, cost as a fraction of the caster's real pool at the level the
 ; spell is LEARNED (pool = char_prop base MP + LevelUpMP running sum, both
 ; read out of this ROM, not recalled) --
@@ -1259,7 +1259,7 @@ Ot6ThiefCostTbl:
 ; level -- L6, pool 40, read off kolts_doorstep -- the same clamp the kit rows
 ; use, because a pool the game never presents is not a price anyone pays.)
 ; so a vanilla spell costs roughly 8-20% of the pool it is first cast from.
-; The v0.4/v0.5 kit columns did NOT sit on that ruler.  Measured the same way,
+; The v0.4/v0.5 kit columns did NOT sit on that baseline.  Measured the same way,
 ; SwdTech ran 1.0-3.9% and Blitz 3.6-12.5% -- three to eight times under the
 ; scale the doc claimed they shared.  The owner's v0.7 playtest found it from
 ; the other end: at LV14 Cyan holds a 96 MP pool against techs costing 1/2/3,
@@ -1271,18 +1271,18 @@ Ot6ThiefCostTbl:
 ;
 ;   1. RETIRE SwdTech's ~1/3 discount.  It was justified by "the BP ladder is
 ;      the real price, so MP rides ~1/3 of a comparable Blitz/Tool" -- a claim
-;      about the FOUR-rung 0x/1x/2x/3x ladder.  #38 rewrote that ladder to
+;      about the FOUR-tier 0x/1x/2x/3x ladder.  #38 rewrote that ladder to
 ;      1x/2x/3x and explicitly deferred the MP column ("MP costs per tech
 ;      unchanged"), so the discount kept applying after the premise that earned
 ;      it had been rewritten.  SwdTech now prices at PARITY with the Blitz row
 ;      of the same index -- which is a level statement, not an index
 ;      coincidence: BlitzLevelTbl is 1/6/10/15/23/30/42/70 and BushidoLevelTbl
 ;      1/6/12/15/24/34/44/70 (field/event.asm:1236-1240), so row n of either
-;      kit lands in the same band against nearly the same pool.
+;      kit lands in the same range against nearly the same pool.
 ;   2. A GENERAL FLOOR LIFT of ~1.5-2x on the Blitz ladder, tapering toward
 ;      1.5x at the top -- COMPRESSION, not a flat multiply.  Pools grow far
 ;      faster than a fixed cost, so the same ladder scaled flat would price the
-;      late rows above the ruler while leaving the early ones under it.
+;      late rows above the baseline while leaving the early ones under it.
 ;
 ; What that lands (cost / real pool at the level the row is reachable; rows 1-2
 ; evaluated at L10, the earliest either character is actually IN the party):
@@ -1298,15 +1298,15 @@ Ot6ThiefCostTbl:
 ; early WoB, exactly where mp-economy.md already said it was.
 ;
 ; TOOLS ARE DELIBERATELY UNCHANGED.  Measured against Edgar's real pool at the
-; band each tool is acquired they already run 7-21% -- dead on the vanilla
-; ruler above (AutoCrossbow 11.1% @L7, Drill 18.4% @L13, Chain Saw 20.7% @L13).
+; stage each tool is acquired they already run 7-21% -- dead on the vanilla
+; baseline above (AutoCrossbow 11.1% @L7, Drill 18.4% @L13, Chain Saw 20.7% @L13).
 ; The general lift was offered to them and the measurement declined it: a 1.5x
 ; on Chain Saw would put it at 31%, off the top of the scale.  gil buys the tool
 ; once, MP is the per-use cost, and that price was already right.
 ;
 ; Every number here is a playtest placeholder (mp-economy.md's standing
-; preamble) and successive rescales are expected, not churn.  The gate that
-; keeps a future column on the ruler is tools/tests/battle_costtable.lua, which
+; preamble) and successive rescales are expected, not churn.  The test that
+; keeps a future column on the baseline is tools/tests/battle_costtable.lua, which
 ; recomputes these fractions from the ROM's own tables.
 ;
 ; -------- the 99 ANCHOR (issue #57, 2026-07-29) --------
@@ -1314,7 +1314,7 @@ Ot6ThiefCostTbl:
 ; Owner: "it would be cool to scale ability MP costs so that each character's
 ; own ultimate ends up costing 99 MP", refined to "99 where it makes sense, not
 ; universal".  Two rows in this table qualify -- BUM RUSH ($64) and CLEAVE
-; ($5c), each its kit's divine top rung.  Tools does NOT participate: its
+; ($5c), each its kit's divine top tier.  Tools does NOT participate: its
 ; capstone is Overclock, which kits.md prices as the SUM of the two tools it
 ; fires and which is not built, and Air Anchor ($a9) is explicitly "a findable
 ; item mid-kit gag, not the capstone" (kits.md, Edgar) -- so there is no top
@@ -1339,19 +1339,19 @@ Ot6ThiefCostTbl:
 ; pool while the middle of the ladder sat at 15-23%.  The anchor is the
 ; correction to that hedge: the tail is re-derived UP so that %-of-pool climbs
 ; into the anchor instead of falling away from it, and rows 1-5 are untouched
-; because they already measure inside the ruler at the level they arrive.
+; because they already measure inside the baseline at the level they arrive.
 ;
 ;   Blitz    7.1 17.9 23.2 16.3  8.4 10.1 11.1 13.0 %   (tail was 7.9 6.7 6.1)
 ;   SwdTech  6.9 17.2 17.1 15.1  8.8  8.4 10.4 13.0 %   (tail was 6.6 6.2 6.0)
 ;
 ; This is deliberately NOT a proportional scale of the old column (99/46 =
 ; 2.15x): that would leave Suplex at 28 MP -- 50% of a LV10 pool -- and push
-; rows 2-4 clean off the top of the ruler.  The old column was right in the
+; rows 2-4 clean off the top of the baseline.  The old column was right in the
 ; middle and wrong at the ends; only the end moves.
 Ot6AbilityCostTbl:
         ; -- Blitz (Sabin), cmd $0a, attack ids $5d-$64.  levels are
         ;    BlitzLevelTbl.  ladder shape kept (Mantra deliberately under Fire
-        ;    Dance: a utility off-ramp, not a damage rung); level lifted.
+        ;    Dance: a utility off-ramp, not a damage tier); level lifted.
         .byte   $5d,  4         ; Pummel     L1  signature -- cheapest row
         .byte   $5e, 10         ; AuraBolt   L6  holy chip
         .byte   $5f, 13         ; Suplex     L10 bludgeon
@@ -1361,7 +1361,7 @@ Ot6AbilityCostTbl:
         .byte   $63, 50         ; Spiraler   L42                (#57: was 30)
         .byte   $64, 99         ; Bum Rush   L70 divine, bludgeon x8 -- THE
                                 ;   ANCHOR (#57).  13.0% of the L70 pool of
-                                ;   760, inside the ruler; 7 uses from full.
+                                ;   760, inside the baseline; 7 uses from full.
         ; -- SwdTech (Cyan), cmd $07, attack ids $55-$5c.  levels are
         ;    BushidoLevelTbl.  names are BushidoName, the table the SwdTech
         ;    window actually renders from (`Bushido` survives only as the
@@ -1390,7 +1390,7 @@ Ot6AbilityCostTbl:
         ; -- Tools (Edgar), cmd $09, tool ITEM ids $a3-$aa.  names are
         ;    item_name_en.json's, i.e. what the Tools window prints.
         ;    UNCHANGED by the #45 rescale -- see "TOOLS ARE DELIBERATELY
-        ;    UNCHANGED" above: measured, they are already on the ruler.
+        ;    UNCHANGED" above: measured, they are already on the baseline.
         .byte   $aa,  4         ; AutoCrossbow signature, piercing x4 shredder
         .byte   $a3,  6         ; NoiseBlaster confuse
         .byte   $a4,  8         ; Bio Blaster  poison, all -- the armor-break key
@@ -1545,7 +1545,7 @@ Ot6AbilityCostTbl:
 ; ceiling is vanilla's own $2020 (techs known - 1, the same value that capped
 ; the bar). while he knows four or fewer techs base is 0 and every learned tech
 ; is reachable -- 0/1/2/3 land on exactly the ones he has. this REPLACES the
-; old band table, which named each of four bands' TOP tech (fang / tiger /
+; old tier table, which named each of four tiers' TOP tech (fang / tiger /
 ; dragon / oblivion) and clamped it to the ceiling, so a 3-tech cyan got
 ; Dispatch / Slash / Slash / Slash and could never cast the Retort he had
 ; learned -- issue #5's bug. learn a fifth tech and the window slides up one,
@@ -1558,16 +1558,16 @@ Ot6AbilityCostTbl:
 ; grows with him, and the player-chosen loadout (the #5 sequel) is where the
 ; retire is answered. playtest is the filter.
 ;
-; oblivion (tech 7, the divine) is the window's CONDITIONAL TOP RUNG, not a
+; oblivion (tech 7, the divine) is the window's CONDITIONAL TOP TIER, not a
 ; case bolted outside it: at full kit the window is {4,5,6,7} and boost 3 lands
-; on 7 = oblivion by the same base+boost sum as any other rung -- it falls out
+; on 7 = oblivion by the same base+boost sum as any other tier -- it falls out
 ; for free. it is SELECTED here only when learned (ceiling 7) and unspent, and
 ; still fires exactly as before: gated at RESOLUTION by Ot6Oblivion (the proc
 ; name is internal; the screen prints the tech as Cleave) (hooked
 ; after ChooseTarget -- the target does not exist at this command-latch time,
 ; swdtech being in RetargetCmdTbl), and dropped back to tempest (6) here for
 ; the rest of any battle whose once-per-battle latch is already set. cyan
-; learns oblivion off the phantom train, so the top rung is oblivion only at
+; learns oblivion off the phantom train, so the top tier is oblivion only at
 ; full kit.
 ;
 ; bp is READ, never written: the spend is whatever Ot6Boost banked in
@@ -1583,7 +1583,7 @@ Ot6AbilityCostTbl:
 ;
 ; v0.5 SUBMENU (issue #8): SwdTech is now a tools-shell submenu -- one row per
 ; boost level, the row IS the boost, weakest at top. The base/ceiling arithmetic
-; and the Cleave top-rung swap are factored into three leaf helpers below so
+; and the Cleave top-tier swap are factored into three leaf helpers below so
 ; single-select (this proc, called at the submenu's confirm latch) and the row
 ; ENUMERATION (Ot6BushidoWindow) can never diverge -- offering a tech the latch
 ; would not fire, or firing one the menu never showed. $7b82 is still stamped

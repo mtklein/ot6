@@ -1,14 +1,14 @@
 -- gen_terra_narshe.lua -- from rapids_done.mss across the World of Balance
 -- into NARSHE, and through the townsfolk's turn-away at the checkpoint.
--- Mints one state:
+-- Generates one state:
 --   terra_narshe.mss  map 20 (39,53), EDGAR leading TERRA and BANON, first
 --                     controllable frame after the "Get out of here!" scene,
---                     with $001F set.  The doorstep for the rest of the
+--                     with $001F set.  The entry point for the rest of the
 --                     scenario, and deliberately its own link: everything
 --                     past here goes through the secret wall and the mines,
 --                     which is the part worth iterating on.
 --
--- THE WORLD LEG is short and dull: `load_map 0, {93,41}` drops the party
+-- THE WORLD STEP is short and dull: `load_map 0, {93,41}` drops the party
 -- north-east of Narshe and the town's world tile is (84,33) -> map 20
 -- (38,61) (ShortEntrance::_0).  21 steps, planned by worldBfs and asserted
 -- to exist before it is walked.
@@ -96,20 +96,20 @@ H.run({ maxFrames = 60000 }, {
     H.assertEq((H.readByte(0x185e) & 0x07) ~= 0, true, "BANON in the party")
     local p = H.worldBfs(84, 33)
     H.assertEq(p ~= nil, true, "Narshe's world tile (84,33) is reachable")
-    H.log(string.format("world leg: (%d,%d) -> (84,33), %d steps",
+    H.log(string.format("world segment: (%d,%d) -> (84,33), %d steps",
       H.worldX(), H.worldY(), #p))
   end),
 
   -- ===================================================================== --
-  -- THE WORLD LEG: (93,41) -> (84,33) -> map 20 (38,61).
+  -- THE WORLD STEP: (93,41) -> (84,33) -> map 20 (38,61).
   -- ===================================================================== --
-  -- issue #75: honest=true -- an encounter on the WoB band is FOUGHT by
+  -- issue #75: playBattles=true -- an encounter in the WoB area is FOUGHT by
   -- real input (TERRA/EDGAR attack, BANON's first command is his Health
-  -- heal), never kill-bitted; the budget carries the ATB rounds.
-  H.worldNavTo(84, 33, { maxFrames = 60000, honest = true,
+  -- heal), never write-cleared; the budget carries the ATB rounds.
+  H.worldNavTo(84, 33, { maxFrames = 60000, playBattles = true,
     arrive = function() return not H.worldMode() end }),
   H.release(),
-  H.advanceStory(settleArrival, 20000, { honest = true }),
+  H.advanceStory(settleArrival, 20000, { playBattles = true }),
   H.waitFrames(30),
   H.call(function()
     H.assertEq(map(), 20, "on map 20, the Narshe streets")
@@ -124,9 +124,9 @@ H.run({ maxFrames = 60000 }, {
   -- fires on OUR held step rather than in the middle of a plan, then the
   -- scene is handed to advanceStory the instant it picks up.
   -- ===================================================================== --
-  H.navTo(38, 51, { maxFrames = 12000, honest = true }),
+  H.navTo(38, 51, { maxFrames = 12000, playBattles = true }),
   H.release(),
-  H.call(function() where("checkpoint doorstep") end),
+  H.call(function() where("checkpoint entry point") end),
   H.driveUntil(function()
     return H.eventRunning() or H.dialogWaiting() or sw(0x001F) == 1
   end, 3000, {
@@ -136,7 +136,7 @@ H.run({ maxFrames = 60000 }, {
   H.call(function() where("_ccb230 running") end),
   H.advanceStory(function()
     return sw(0x001F) == 1 and settleScene()
-  end, 30000, { honest = true }),
+  end, 30000, { playBattles = true }),
   H.waitFrames(30),
 
   H.call(function()
@@ -170,6 +170,6 @@ H.run({ maxFrames = 60000 }, {
   end),
   H.saveState("terra_narshe.mss"),
   H.logStep(function()
-    return string.format("terra_narshe minted at frame %d", H.frame)
+    return string.format("terra_narshe generated at frame %d", H.frame)
   end),
 })

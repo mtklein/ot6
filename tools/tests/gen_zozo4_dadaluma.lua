@@ -1,5 +1,5 @@
--- gen_zozo4_dadaluma.lua -- v0.4 leg 3: zozo_arrival (map 221 street) ->
--- the crane maze -> DADALUMA.  Mints dadaluma_doorstep.mss at (30,13),
+-- gen_zozo4_dadaluma.lua -- v0.4 step 3: zozo_arrival (map 221 street) ->
+-- the crane maze -> DADALUMA.  Generates dadaluma_doorstep.mss at (30,13),
 -- one A-press from the fight, and dadaluma_won.mss on the same tile after
 -- battle 69's scripted win clears him off the tower porch.
 --
@@ -17,7 +17,7 @@
 --    walkers climbing its one-wide stair column (x=53, y=18..29) and the
 --    top "\" beam forever, so a snapshot BFS almost never sees a clear
 --    path (probe_climb8 starved on 20 straight no-paths).  The engine
---    itself queues a held direction behind a moving body, so that leg is
+--    itself queues a held direction behind a moving body, so that step is
 --    driven as follow-the-queue: press the route direction for the
 --    current tile and wait out whoever is standing in it.
 --  * THE JUMPS ($01B0-$01B5 = the live $1EB6 control bits, event_trigger
@@ -39,7 +39,7 @@
 --    flips the party to upper), then the SAME tiles again as upright
 --    diagonals -- (32,16)/(33,15)/(34,14) carry $44/$49 bridge-diag props
 --    that only engage at z=1 -- onto the y=13 strip and west to (30,13),
---    facing DOWN at him.  That loop is the LAST rung of THREE: the whole
+--    facing DOWN at him.  That loop is the LAST tier of THREE: the whole
 --    corridor from the (30,22) landing is a switchback ladder of the same
 --    motif (full measured tile dump at corridorDir below), and it is
 --    driven SCRIPTED, not pathfound -- the bridge-diag tiles move
@@ -67,7 +67,7 @@ local function settled()
      and not H.dialogWaiting() and not H.battleLoadStarted()
 end
 
--- ----------------------------------------------------- the honest fighter --
+-- ----------------------------------------------- the input-driven fighter --
 -- gen_narshe_battle's menu-episode machine (gen_scenario's cadence) for the
 -- DADALUMA fight.  Party here is LOCKE+CELES+SABIN+EDGAR (#21's canonical
 -- four); his authored row (Ot6ShieldTbl: 6 shields, PIERCE|BLUDG; ElemAdd:
@@ -370,7 +370,7 @@ end
 
 -- THE WEST-ROOM CROSSING (map 225): the party lands at (118,26) from door
 -- 221(15,39) and must reach the exit door (104,27)->221 (the W33 strip).  This
--- leg is why `followPath` timed out (measured twice + probe_westroom.lua):
+-- step is why `followPath` timed out (measured twice + probe_westroom.lua):
 --  * The two chambers of the west room connect ONLY through a "\" diagonal
 --    beam (111,15)->(110,14)->(109,13)->(108,12); a cardinal-only door-walled
 --    BFS finds NO path, and (104,27)'s only non-door neighbour is (104,26),
@@ -406,7 +406,7 @@ local function westRoomCross()
             H.fieldX(), H.fieldY(), H.readByte(0x00b2) & 3))
         end
         if H.battleLoadStarted() then
-          H.setPad(hb % 8 < 4 and { "a" } or {}); return   -- fought, not kill-bit
+          H.setPad(hb % 8 < 4 and { "a" } or {}); return   -- fought, not write-cleared
         end
         if H.dialogWaiting() then H.setPad(hb % 8 < 4 and { "a" } or {}); return end
         -- the (111,15) scene: RIDE it with A -- a direction press here hangs
@@ -454,7 +454,7 @@ local function bridgeCross()
             H.fieldX(), H.fieldY(), H.readByte(0x00b2) & 3))
         end
         if H.battleLoadStarted() then
-          H.setPad(hb % 8 < 4 and { "a" } or {}); return   -- fought, not kill-bit
+          H.setPad(hb % 8 < 4 and { "a" } or {}); return   -- fought, not write-cleared
         end
         if H.dialogWaiting() then H.setPad(hb % 8 < 4 and { "a" } or {}); return end
         if not H.hasControl() then H.setPad({}); return end
@@ -480,25 +480,26 @@ end
 -- SWITCHBACK LADDER over "/" ($43/$4B) and "\" ($83/$8B) z-loop beams
 -- (probe_westroom.lua solve; a single-live-z door-walled BFS gives the same
 -- route, verified probe_climb_suppress.lua).  The table below IS correct and
--- reaches (30,34) at z=2 every rung.
+-- reaches (30,34) at z=2 every tier.
 --
 -- THE REAL BLOCKER WAS A HANGING RANDOM ENCOUNTER, NOT A WARP (sixth pass,
 -- probe_climb_dump/live/stall/suppress).  The v0.5 fifth-pass diagnosis --
 -- "(30,41) is a corrupting warp that chains 225->5->18->19, the Narshe intro"
 -- -- was WRONG.  Measured facts that overturn it:
 --   * (30,41) has p1=$43, byte-identical to (30,57) which the party crosses
---     fine one rung below; it is NEITHER a short/long entrance (all 22 map-225
---     records decode to map 221, none at (30,41)) NOR an event trigger (map
---     225 has exactly 3: the clock {98,59} and {125,46}/{103,55}).
+--     fine one tier below; it is NEITHER a short/long entrance (all 22
+--     map-225 records decode to map 221, none at (30,41)) NOR an event
+--     trigger (map 225 has exactly 3: the clock {98,59} and
+--     {125,46}/{103,55}).
 --   * Stepping (29,41)->(30,41) rolls a RANDOM ENCOUNTER: the event PC jumps
 --     to $CA0029 = inside RandBattle ($CA0018).  On this ambiguous-z beam the
 --     party sprite's z oscillates 0/2/3 and the pre-battle scroll_obj never
 --     settles, so the encounter HANGS at $CA0029 forever -- battleLoadStarted
---     never latches (so the kill-bit can't fire it) and both A-mash and a
---     neutral pad leave it stuck.  Riding that hang under A is what the fifth
---     pass mis-rode into the intro maps.
--- THE HONEST CROSSING (issue #75 -- the old fix wrote $1f6e/$1f6f to 0
--- every frame, suppressing the roll; a mint script may never write game
+--     never latches (so the battle-clear write can't fire it) and both
+--     A-mash and a neutral pad leave it stuck.  Riding that hang under A is
+--     what the fifth pass mis-rode into the intro maps.
+-- THE input-driven crossing (issue #75 -- the old fix wrote $1f6e/$1f6f to 0
+-- every frame, suppressing the roll; a generator script may never write game
 -- state, so that is gone).  What replaced it is what a cautious PLAYER
 -- can actually do, informed by the same mechanism (battle.asm:350-388):
 -- every step adds the map's rate to the 16-bit accumulator $1f6e, a
@@ -507,15 +508,15 @@ end
 -- as low as it ever gets.  So each climb attempt:
 --   1. BURNS the pending encounter at the BASE, on flat ground: pace
 --      (30,61)<->(30,60) until the roll fires on a safe tile, then FIGHT
---      it honestly (tap-A).  The counter is now zero.
+--      it with real input (tap-A).  The counter is now zero.
 --   2. climbs the BRIDGE2 ladder immediately, watching for the hang
 --      signature (control lost, no battle latch, position frozen, the
 --      event PC inside RandBattle) -- a roll that lands on one of the
 --      ambiguous-z beams anyway.
 --   3. a hang or an in-climb loss RELOADS the pre-climb checkpoint (the
---      mint-script spelling of a player reloading a save) and goes
+--      generator's spelling of a player reloading a save) and goes
 --      again; the burn pacing itself reshuffles every subsequent roll.
--- Five attempts; if all five hang, the mint FAILS with the full
+-- Five attempts; if all five hang, the generation FAILS with the full
 -- characterization on the record -- that outcome is the product bug the
 -- header describes (a human player crossing this shaft can hit the same
 -- un-settleable encounter and softlock), and it must be fixed game-side,
@@ -551,7 +552,7 @@ local function hangLine(tag)
     H.readByte(0x00e7), H.readByte(0x00e6), H.readByte(0x00e5))
 end
 -- one pace-burn: walk (30,61)<->(30,60) until a battle fires ON FLAT
--- GROUND, fight it honestly, and settle.  Bounded; a base that never
+-- GROUND, fight it with real input, and settle.  Bounded; a base that never
 -- rolls within the budget just proceeds with whatever the counter holds.
 local function burnStep()
   local hb, fought, battN = 0, false, 0
@@ -563,7 +564,7 @@ local function burnStep()
       battN = H.battleLoadStarted() and battN + 1 or 0
       if battN >= 3 then
         fought = true
-        H.setPad(hb % 8 < 4 and { "a" } or {})   -- fight it, honestly
+        H.setPad(hb % 8 < 4 and { "a" } or {})   -- fight it, with real input
         return
       end
       if H.dialogWaiting() then H.setPad(hb % 8 < 4 and { "a" } or {}); return end
@@ -708,7 +709,7 @@ local function bridgeClimb()
     climbAttempt(5),
     H.call(function()
       if not climbDone then
-        error("[bridge2] the shaft could not be crossed honestly in 5 " ..
+        error("[bridge2] the shaft could not be crossed in 5 " ..
           "attempts -- last: " .. tostring(climbFail) .. " -- this is the " ..
           "PRODUCT BUG the header describes (a random encounter rolled on " ..
           "the ambiguous-z beams of map 225's shaft never settles and " ..
@@ -775,17 +776,17 @@ end
 -- a pure function of tile, canStep-gated -- stairDir's pattern, for a
 -- cousin of stairDir's reason.  followPath's firstStep seeds its BFS at
 -- ALL FOUR z-levels (the party carries exactly one), and this corridor is
--- the one leg where that lies: its bridge-diag tiles move DIFFERENTLY per
+-- the one step where that lies: its bridge-diag tiles move DIFFERENTLY per
 -- z (diagonal at z=1, plain floor at z=2 -- player.asm's own c&$04 + z==2
 -- suppression, transcribed in diagStep above), so the phantom-z first
--- step keeps disagreeing with the live engine and the leg oscillates on
+-- step keeps disagreeing with the live engine and the step oscillates on
 -- the y=19 strip forever (measured twice: 9000-frame timeouts, x
 -- wandering 30..35; it once passed on an older ROM by RNG luck).
 --
 -- The corridor itself, measured (p1/p2 dump of x24..40 y8..24 from
 -- zozo_arrival -- the street is the same map 221, so the decompressed
--- prop tables are live there), is a THREE-RUNG SWITCHBACK of the header's
--- z-loop motif.  Every rung is the same four bytes: a $0B drop tile, a
+-- prop tables are live there), is a THREE-TIER SWITCHBACK of the header's
+-- z-loop motif.  Every tier is the same four bytes: a $0B drop tile, a
 -- $41 "/" beam base (zAfter flips the party to upper stepping off it), a
 -- $44/$44/$49 upright chain, and a $03 both-z strip top:
 --   A: (30,22)R (31,22)D (31,23)R $41(32,23) /$44(33,22)(34,21)
@@ -794,7 +795,7 @@ end
 --      $49(35,17) U-> y=16 strip, west (35,16)..(30,16)
 --   C: (30,16)D (30,17)R $41(31,17) /$44(32,16)(33,15)
 --      $49(34,14) U-> (34,13), west along y=13 to (30,13)
---      -- rung C is exactly the header's documented loop.
+--      -- tier C is exactly the header's documented loop.
 -- The loop tiles (33,19)/(32,16) are stood on TWICE -- flat westbound on
 -- the lower level, diagonally on the climb -- so their entry lists the
 -- climb first and canStep (live z) picks: upright is dead at z=2 by the
@@ -802,7 +803,7 @@ end
 -- THE DRIVE PULSES THE PAD: press only while tile-aligned, clear it the
 -- frame the step commits.  A direction still held at the arrival instant
 -- CHAINS -- the engine latches the next step before this callback can
--- swap the pad (measured here: the leg's first held right chained
+-- swap the pad (measured here: the step's first held right chained
 -- (30,22)->(31,22)->(32,22) and parked off-route for the whole 9000-frame
 -- budget).  stairFollow can hold its presses because every stairDir
 -- corner is map-fenced and the column is body-throttled besides; this
@@ -815,7 +816,7 @@ end
 -- stairFollow-style; the 300-frame heartbeat names the stuck tile.
 local CORRIDOR = {}
 local function corr(x, y, dirs) CORRIDOR[key(x, y)] = dirs end
-corr(30, 22, { "right" })            -- rung A: hook east-south to the base
+corr(30, 22, { "right" })            -- tier A: hook east-south to the base
 corr(31, 22, { "down" })
 corr(32, 22, { "left" })             -- recovery: the measured pre-pulse
                                      -- chaining overshoot parked here
@@ -828,7 +829,7 @@ corr(35, 19, { "left" })             -- y=19 strip westbound (z drops to 2)
 corr(34, 19, { "left" })
 corr(33, 19, { "upright", "left" })  -- LOOP tile: climb at z=1, cross at z=2
 corr(32, 19, { "left" })
-corr(31, 19, { "down" })             -- rung B: hook south to the base
+corr(31, 19, { "down" })             -- tier B: hook south to the base
 corr(31, 20, { "right" })
 corr(32, 20, { "upright" })          -- $41 base
 corr(34, 18, { "upright" })          -- $44 ((33,19) is the loop tile above)
@@ -836,14 +837,14 @@ corr(35, 17, { "up" })               -- $49 top
 corr(35, 16, { "left" })             -- y=16 strip westbound
 corr(34, 16, { "left" })
 corr(33, 16, { "left" })
-corr(32, 16, { "upright", "left" })  -- LOOP tile: rung C's chain
+corr(32, 16, { "upright", "left" })  -- LOOP tile: tier C's chain
 corr(31, 16, { "left" })
-corr(30, 16, { "down" })             -- rung C: the header's documented loop
+corr(30, 16, { "down" })             -- tier C: the header's documented loop
 corr(30, 17, { "right" })
 corr(31, 17, { "upright" })          -- $41 base -- "the / beam at (31,17)"
 corr(33, 15, { "upright" })          -- $44 ((32,16) is the loop tile above)
 corr(34, 14, { "up" })               -- $49 top -> the y=13 strip
-corr(34, 13, { "left" })             -- west to the doorstep
+corr(34, 13, { "left" })             -- west to the entry point
 corr(33, 13, { "left" })
 corr(32, 13, { "left" })             -- $44 crossed flat (z=2 here, always)
 corr(31, 13, { "left" })
@@ -852,12 +853,12 @@ corr(31, 13, { "left" })
 -- first clean walk of this route rolled trash on its FINAL steps -- a
 -- position-only arrive fired while the battle load was already in flight
 -- ($4c mid-fade, the object map's NPC byte cleared, battleLoadStarted
--- latched), and the minted doorstep booted INTO that battle, starving the
--- talk that follows (hasControl never true; measured via probe replay of
--- the contaminated state).  So the pred demands twenty straight settled()
--- frames at (30,13) -- jumpRow's calm-counter, aimed at a tile -- and a
--- last-step roll is FOUGHT by the same battle interrupt every other leg
--- carries, BEFORE the mint instead of inside it.
+-- latched), and the generated entry point booted INTO that battle, starving
+-- the talk that follows (hasControl never true; measured via probe replay
+-- of the contaminated state).  So the pred demands twenty straight
+-- settled()  frames at (30,13) -- jumpRow's calm-counter, aimed at a tile
+-- -- and a last-step roll is FOUGHT by the same battle interrupt every
+-- other step carries, BEFORE the generation instead of inside it.
 local function corridorFollow()
   local hb, calm = 0, 0
   return H.driveUntil(function()
@@ -922,7 +923,7 @@ local function jumpRow(dir, pred, maxFrames, what)
         end
         evWas = ev
         if H.battleLoadStarted() then
-          H.setPad(hb % 8 < 4 and { "a" } or {})   -- fought, not kill-bit
+          H.setPad(hb % 8 < 4 and { "a" } or {})   -- fought, not write-cleared
           return
         end
         if ev or not H.hasControl() then
@@ -975,16 +976,17 @@ H.run({ maxFrames = 400000 }, {
   bridgeClimb(),
   corridorFollow(),
 
-  -- the doorstep: one A-press from battle 69.  The extra beat plus the
-  -- settled assert keep this mint honest: the state is the suite's boot
-  -- point, so a battle-load or event in flight here poisons everything
-  -- downstream (see corridorFollow's arrive note for the measured case).
+  -- the entry point: one A-press from battle 69.  The extra beat plus the
+  -- settled assert keep this generated savestate trustworthy: the state is
+  -- the suite's boot point, so a battle-load or event in flight here
+  -- poisons everything downstream (see corridorFollow's arrive note for the
+  -- measured case).
   H.waitFrames(60),
   H.call(function()
     H.assertEq(map(), 221, "on the roof (map 221)")
     H.assertEq(H.fieldX() == 30 and H.fieldY() == 13, true,
       "at (30,13), north of the gentleman")
-    H.assertEq(settled(), true, "doorstep is QUIET -- no battle/event in flight")
+    H.assertEq(settled(), true, "entry point is QUIET -- no battle/event in flight")
     H.assertEq(sw(0x034A), 1, "$034A still set -- he waits below")
     H.log(string.format("[dadaluma_doorstep] f%d at (%d,%d)",
       H.frame, H.fieldX(), H.fieldY()))
@@ -992,18 +994,19 @@ H.run({ maxFrames = 400000 }, {
   end),
   H.saveState("dadaluma_doorstep.mss"),
 
-  -- face him and talk, then FIGHT battle 69 -- honestly (issue #75).
+  -- face him and talk, then FIGHT battle 69 -- with real input (issue #75).
   -- _ca96a9: dlg $042D -> set_b_switch $4B -> `battle 69` -> _ca5ea9,
   -- which gates on battle-switch $40: a WIN despawns him ($034A=0, control
   -- back at (30,13)); a LOSS is `call GameOver`.  Formation 438 = DADALUMA
   -- $0107 + two $006C (verified probe_fight.lua).  The drive is the menu-
   -- episode fighter above, wrapped in a three-attempt retry ladder off the
-  -- doorstep just minted: a wipe reloads the doorstep -- the mint-script
-  -- spelling of a player reloading a save, caught BEFORE the GameOver
-  -- fade -- and escalates the tier (2 adds EDGAR's AutoCrossbow, 3 adds
-  -- SABIN's Pummel), which reshuffles every subsequent roll.  Outside the
-  -- battle the driver still edge-A's broadly: the talk dialog, the reward
-  -- and the win-tail text do NOT set the dialogWaiting latch.
+  -- entry point just generated: a wipe reloads the entry point -- the
+  -- generator script's spelling of a player reloading a save, caught BEFORE
+  -- the GameOver fade -- and escalates the tier (2 adds EDGAR's
+  -- AutoCrossbow, 3 adds SABIN's Pummel), which reshuffles every subsequent
+  -- roll.  Outside the battle the driver still edge-A's broadly: the talk
+  -- dialog, the reward and the win-tail text do NOT set the dialogWaiting
+  -- latch.
   (function()
     local dadaBlob, dadaWon = nil, false
     local dadaLost = nil
@@ -1027,7 +1030,7 @@ H.run({ maxFrames = 400000 }, {
           F.idle()
           H.setPad(H.frame % 8 < 4 and { "a" } or {})
         end),
-      }, "Dadaluma fought honestly (tier " .. tier .. ") -> $034A clear")
+      }, "Dadaluma fought (tier " .. tier .. ") -> $034A clear")
     end
     local function attempt(n)
       local ldReq
@@ -1035,7 +1038,7 @@ H.run({ maxFrames = 400000 }, {
         H.cond(function() return n > 1 end, {
           H.logStep(function()
             return string.format("[dadaluma] ATTEMPT %d -- reloading the " ..
-              "doorstep after a loss (%s)", n, tostring(dadaLost))
+              "entry point after a loss (%s)", n, tostring(dadaLost))
           end),
           H.call(function() ldReq = H.requestLoadState(dadaBlob) end),
           H.waitFrames(2),
@@ -1049,7 +1052,7 @@ H.run({ maxFrames = 400000 }, {
           if dadaLost == nil then
             dadaWon = true
             H.log(string.format("[dadaluma] attempt %d WON battle 69 " ..
-              "honestly at f%d", n, H.frame))
+              "at f%d", n, H.frame))
           end
         end),
       }, {})
@@ -1059,9 +1062,9 @@ H.run({ maxFrames = 400000 }, {
       H.call(function() ckReq = H.requestSaveState() end),
       H.waitFrames(2),
       H.call(function()
-        H.checkReq(ckReq, "doorstep checkpoint")
+        H.checkReq(ckReq, "entry point checkpoint")
         dadaBlob = ckReq.blob
-        H.log(string.format("[dadaluma] doorstep checkpoint captured " ..
+        H.log(string.format("[dadaluma] entry point checkpoint captured " ..
           "(%d bytes) f%d", #dadaBlob, H.frame))
       end),
       attempt(1),
@@ -1069,7 +1072,7 @@ H.run({ maxFrames = 400000 }, {
       attempt(3),
       H.call(function()
         if not dadaWon then
-          error(string.format("[dadaluma] battle 69 not won in 3 honest " ..
+          error(string.format("[dadaluma] battle 69 not won in 3 " ..
             "attempts -- last loss: %s -- the per-attempt numbers above " ..
             "are the balance finding (#74-style); do not rig this fight",
             tostring(dadaLost)), 0)
@@ -1093,6 +1096,6 @@ H.run({ maxFrames = 400000 }, {
   H.saveState("dadaluma_won.mss"),
   H.logStep(function()
     return string.format(
-      "dadaluma_won minted at frame %d -- the maze is climbed", H.frame)
+      "dadaluma_won generated at frame %d -- the maze is climbed", H.frame)
   end),
 })

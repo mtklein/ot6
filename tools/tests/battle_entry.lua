@@ -10,7 +10,7 @@
 -- break-system changes -- no 4.5-minute intro replay.
 --
 -- Exit codes: 0 = battle came up, 1 = battle load began but engine never
--- became active (the current break-ROM crash signature) or no doorstep
+-- became active (the current break-ROM crash signature) or no entry-point
 -- state exists, 2 = frame budget blown.
 
 local H = dofile("tools/tests/lib/ot6.lua")
@@ -26,7 +26,7 @@ H.run({ maxFrames = 8000 }, {
   H.driveUntil(function() return H.battleLoadStarted() end, 4000, {
     H.hold({ "up" }), H.waitFrames(20), H.release(), H.waitFrames(2),
     H.pressButtons({ "a" }, 4),
-  }, "battle load from doorstep"),
+  }, "battle load from entry point"),
   H.logStep(function() return "battle load began at frame " .. H.frame end),
 
   H.waitUntilSoft(function() return H.battleActive() end, 900, "battle_up", 30),

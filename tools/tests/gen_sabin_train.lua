@@ -1,7 +1,7 @@
--- gen_sabin_train.lua -- leg 8 of SABIN's scenario: the Phantom Train,
--- boarding to the Ghost Train's fall.  Mints:
+-- gen_sabin_train.lua -- step 8 of SABIN's scenario: the Phantom Train,
+-- boarding to the Ghost Train's fall.  Generates:
 --   train_done.mss   World of Balance (178,93), on foot, $003A/$003B set,
---                    SABIN+CYAN+SHADOW -- the Baren Falls leg builds here.
+--                    SABIN+CYAN+SHADOW -- the Baren Falls step builds here.
 --
 -- THE MAZE, as measured (probe_train, probe_train2, probe_train3 -- the
 -- floods and the trap forensics live in their headers and commits):
@@ -41,7 +41,7 @@
 -- everyone but SABIN, the train clamped to 1 HP, menu-cursor pokes, and a
 -- $1DD2 SHADOW pin.  All of it is gone.  What replaced it:
 --
---  * RANDOM/UNGATED BATTLES ARE FLED (hold L+R; navTo honest="flee").  A
+--  * RANDOM/UNGATED BATTLES ARE FLED (hold L+R; navTo playBattles="flee").  A
 --    fled battle is not a WIN, and SHADOW's 1/16 post-battle walk-off
 --    (battle_main.asm:11976-11991; $4B story-CLEAR through the train until
 --    the jump-off scene re-sets it, :63061) rolls only at a win -- so the
@@ -52,21 +52,21 @@
 --    park, so the fight sits behind a three-attempt retry ladder on a
 --    checkpoint taken before the talk: a loss OR a walked-off SHADOW
 --    reloads with a 17-frame stagger (a different timeline, a different
---    roll) -- the TAS discipline #75 names for exactly this leg.
+--    roll) -- the TAS discipline #75 names for exactly this step.
 --  * BATTLE 68 (the Ghost Train) is WON THE WAY A PLAYER WINS IT (the
 --    owner beat it first-try in v0.7 as shipped; per the 2026-08-04
---    direction the leg's obligation is an honest WIN, not the full
+--    direction the step's obligation is a real WIN, not the full
 --    6-shield break -- the break-pace tuning stays open on #74).  SABIN's
 --    first two turns are the MECHANISM PROOFS kept from battle_vargas:
 --    AuraBolt (10 MP) chips a shield off the 6 and reveals HOLY, Pummel
 --    (4 MP) chips another and reveals the OT6_BLUDG class -- both
 --    asserted from the recorded chip rows at the win.  After that all
 --    three attack with banked-boost Fights, healing themselves from the
---    ghost-merchant bag (Tonics/Potions bought honestly) under 50%.
---    Fenix Down is never selected: the mint proves a real fight, not the
---    undead trick.  Everything is logged turn by turn, and the fight
---    sits behind a retry ladder (a wipe or a SHADOW walk-off reloads the
---    pre-smokestack checkpoint with a stagger).
+--    ghost-merchant bag (Tonics/Potions bought with real input) under 50%.
+--    Fenix Down is never selected: the generated state proves a real fight,
+--    not the undead trick.  Everything is logged turn by turn, and the
+--    fight sits behind a retry ladder (a wipe or a SHADOW walk-off reloads
+--    the pre-smokestack checkpoint with a stagger).
 --
 --    FOR THE #74 RECORD, the strict pacifist line WAS driven first and
 --    measured: entry HP at the smokestack is [3/231, 150/197, 56/254]
@@ -171,7 +171,7 @@ end
 -- navTo, always fleeing (the corridor discipline -- see the header)
 local function nav(x, y, o)
   o = o or {}
-  o.honest = "flee"
+  o.playBattles = "flee"
   return H.navTo(x, y, o)
 end
 
@@ -187,16 +187,16 @@ local function swDump(tag)
 end
 
 -- ------------------------------------------------ the b47 fighter (+topup) --
--- The closed-loop engine (the leg fighters' second-pass machine), with one
+-- The closed-loop engine (the step fighters' second-pass machine), with one
 -- b47-specific doctrine: THE FIGHT IS ALSO THE INFIRMARY.  The party walks
 -- into battle 68 with whatever HP it leaves the maze carrying, and the
--- first honest run measured that entry at ~25% -- the pacifist line then
--- lost the attrition war before the 6th chip (SABIN down at chip 3, both
--- wipes inside 4000 frames).  A player heals before a boss; the only
--- healing surface this leg owns is a battle menu, so battle 47 does it:
--- any member under 95% gets a Tonic/Potion INSTEAD of a Fight, and the
--- trap ghosts only die once everyone is topped.  Capped at 24 heal turns
--- so a bad interleaving cannot prolong the fight forever.
+-- first input-driven run measured that entry at ~25% -- the pacifist line
+-- then lost the attrition war before the 6th chip (SABIN down at chip 3,
+-- both wipes inside 4000 frames).  A player heals before a boss; the only
+-- healing surface this step owns is a battle menu, so battle 47 does it:
+-- any member under 95% gets a Tonic/Potion INSTEAD of a Fight, and the trap
+-- ghosts only die once everyone is topped.  Capped at 24 heal turns so a
+-- bad interleaving cannot prolong the fight forever.
 local fightTier = 1
 local lost = nil
 local wipeN = 0
@@ -360,7 +360,7 @@ local function holdDrive(dir, pred, what, budget, fightMode)
           if lost then H.setPad({}); return end
           fightPulse(phase)
         else
-          H.setPad({ l = true, r = true })   -- flee, honestly
+          H.setPad({ l = true, r = true })   -- flee, with real input
         end
         return
       end
@@ -508,9 +508,9 @@ local b68 = {
   lastSH, lastHP,
 }
 local function b68Log(msg) H.log("[b68] " .. msg) end
--- neediest by FRACTION (the first honest fight measured SHADOW at 56/197
--- dying unhealed while absolute-missing ranking pointed both medics at
--- bigger pools), with SABIN jumping the queue under 60% -- he is the win
+-- neediest by FRACTION (the first input-driven fight measured SHADOW at
+-- 56/197 dying unhealed while absolute-missing ranking pointed both medics
+-- at bigger pools), with SABIN jumping the queue under 60% -- he is the win
 -- condition and no Fenix Down exists on this line
 local function neediest(limit20)
   limit20 = limit20 or 15                       -- default: under 75%
@@ -793,7 +793,7 @@ end
 -- save point at {20,10} lives in the caboose chamber, whose only door is
 -- (23,13) -> map 152 -- a REAR-strip car that detaches with the rear
 -- half.  The engineer's room flood is x=5..9, y=7..13.  The b47
--- infirmary and the in-fight bag line are the healing surfaces this leg
+-- infirmary and the in-fight bag line are the healing surfaces this step
 -- actually owns.)
 
 -- ------------------------------------------------- the battle-47 ladder --
@@ -1091,7 +1091,7 @@ H.run({ maxFrames = 400000 }, {
   --
   -- They do not.  Front row: shields 6 -> 3, SABIN down at f34707.  Back
   -- row: shields 6 -> 6, casts 0, SABIN down at f19108 -- worse, and
-  -- reproduced on a freshly minted chain after the first attempt was
+  -- reproduced on a freshly generated chain after the first attempt was
   -- thrown out for booting a stale ancestor.  Whatever chips this boss is
   -- paying the row penalty, so halving it costs more than the halved
   -- damage taken buys.
@@ -1130,11 +1130,11 @@ H.run({ maxFrames = 400000 }, {
   -- 15/6 covers ~10 medic turns each with margin; the gil floors keep a
   -- short purse from zeroing out (log tells the story either way).
   -- THIS SHOP FUNDS THE WHOLE REST OF THE SCENARIO (2026-08-09).  The
-  -- fresh honest chain arrives with 7484 gil -- 9000 poorer than the
+  -- fresh input-driven chain arrives with 7484 gil -- 9000 poorer than the
   -- July lineage, the flee discipline earning nothing -- and after this
   -- stop the only income before GAU joins is battle 47's ~75, because
   -- every encounter past the falls is a VELDT formation and Veldt
-  -- formations pay zero.  A first cut spent 7350 here and the Mobliz leg
+  -- formations pay zero.  A first cut spent 7350 here and the Mobliz step
   -- then wiped on the staging walk with 3 Tonics and a 209-gil purse
   -- (measured: gau_joined FAIL f32927).  So the list is a BUDGET:
   -- ~5700 spent, ~1850 carried forward for Dried Meat and the Veldt
@@ -1162,9 +1162,9 @@ H.run({ maxFrames = 400000 }, {
     H.log(string.format("[shop] done: gil=%d tonics=%d potions=%d",
       gil(), invCount(TONIC), invCount(POTION)))
     H.assertEq(invCount(TONIC) >= 12, true,
-      "at least 12 Tonics for the medic line (bought honestly)")
+      "at least 12 Tonics for the medic line (bought)")
     H.assertEq(invCount(POTION) >= 8, true,
-      "at least 8 Potions for the medic line (bought honestly)")
+      "at least 8 Potions for the medic line (bought)")
   end),
 
   -- Car B's aisle first gets a plain HELD walk, and only then bfs: on the
@@ -1174,7 +1174,7 @@ H.run({ maxFrames = 400000 }, {
   -- the ENGINE walked straight through the same stretch, the moving party
   -- shouldering past as gaps opened (measured: hold-left crossed the
   -- "cut" and reached (4,7) in 419 frames while bfs still saw no path).
-  -- The model is honestly conservative here -- it reads the object map at
+  -- The model is genuinely conservative here -- it reads the object map at
   -- one instant; a held walk renegotiates every frame.  Same idiom as the
   -- exits' holdDrive; navTo then lands the final tiles precisely.
   (function()
@@ -1200,7 +1200,7 @@ H.run({ maxFrames = 400000 }, {
     return sw(0x3D) == 1 and H.hasControl() and H.tileAligned()
   end, "bait the follower ghost", 4000),
 
-  -- ---- battle 47, honestly, behind the ladder ----
+  -- ---- battle 47, with real input, behind the ladder ----
   b47Checkpoint(),
   b47Attempt(1),
   b47Attempt(2),
@@ -1208,7 +1208,7 @@ H.run({ maxFrames = 400000 }, {
   H.call(function()
     if not b47Won() then
       error(string.format("train: battle 47 did not complete cleanly on " ..
-        "any of 3 honest attempts -- last: %s -- do not rig this leg",
+        "any of 3 attempts -- last: %s -- do not rig this segment",
         tostring(lost)), 0)
     end
   end),
@@ -1296,7 +1296,7 @@ H.run({ maxFrames = 400000 }, {
   -- 2026-08-09 run entered battle 68 with CYAN at 2/254 on attempt 1 (45
   -- and 25 on the staggered reloads), one medic effectively absent for
   -- the opening rounds, and every attempt lost.  The old section comment
-  -- claimed "the only healing surface this leg owns is a battle menu";
+  -- claimed "the only healing surface this step owns is a battle menu";
   -- that was true when it was written and is not any more -- H.fieldCare
   -- (lib/ot6_field.lua, the gen_kolts fix) drives the real field Item
   -- menu with zero writes.  One care stop HERE, before the checkpoint,
@@ -1311,7 +1311,7 @@ H.run({ maxFrames = 400000 }, {
   H.call(function()
     if not b68Won() then
       error(string.format("train: battle 68 did not complete cleanly on " ..
-        "any of 3 honest attempts -- last: %s", tostring(lost)), 0)
+        "any of 3 attempts -- last: %s", tostring(lost)), 0)
     end
   end),
 
@@ -1356,8 +1356,8 @@ H.run({ maxFrames = 400000 }, {
   end),
   H.saveState("train_done.mss"),
   H.logStep(function()
-    return string.format("train_done minted at frame %d world (%d,%d) -- " ..
-      "battle 68 won honestly (chips + Shurikens + Suplex, no writes)",
+    return string.format("train_done generated at frame %d world (%d,%d) -- " ..
+      "battle 68 won (chips + Shurikens + Suplex, no writes)",
       H.frame, H.worldX(), H.worldY())
   end),
 })

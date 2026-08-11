@@ -3,20 +3,21 @@
 --
 -- ISSUE #75 CONVERSION.  This script used to poke one weapon per break class
 -- into arvis_wake's empty bag ($1869/$1969) and shoot the forged list.  It
--- now boots vector_doorstep -- the honest post-Opera mint (LOCKE CELES SABIN
--- EDGAR standing in Vector) -- and shoots the bag THAT SAVE really carries.
+-- now boots vector_doorstep -- the input-driven post-Opera savestate (LOCKE
+-- CELES SABIN EDGAR standing in Vector) -- and shoots the bag THAT SAVE
+-- really carries.
 --
--- What the honest bag holds (measured 2026-08-10, recon over the Aug-9
--- re-mints; vector_doorstep is the class-richest bag on the whole honest
--- chain):
+-- What the real bag holds (measured 2026-08-10, recon over the Aug-9
+-- regenerations; vector_doorstep is the class-richest bag on the whole
+-- input-driven chain):
 --   PIERCE  $00 Dirk, $01 MithrilKnife x3, $02 Guardian, $AA
 --   SLASH   $0F ThunderBlade x2, $2B Ashura
 --   ...plus a page of classless rows (tools, relics, consumables), so the
 --   icon column's "no class = no icon" face shows beside both glyphs.
--- That is TWO of the four classes.  No honest v0.6 bag holds BLUDG or
+-- That is TWO of the four classes.  No v0.6 bag reachable in play holds BLUDG or
 -- SPECIAL yet (the recon swept every Aug-9 fixture); those two glyphs'
 -- correctness is asserted per-class in battle_class/battle_breaktbl, and
--- their menu face can be shot organically once a chain leg buys or finds
+-- their menu face can be shot organically once a chain step buys or finds
 -- one (the plan's "four classes is fine" expected a richer bag than the
 -- chain really owns -- recorded here so the gap is a fact, not a surprise).
 --
@@ -43,7 +44,7 @@ H.run({ maxFrames = 20000 }, {
   H.waitFrames(10),
   H.waitUntil(function() return H.hasControl() end, 600, "field control", 5),
 
-  -- the honest bag, read and logged -- the evidence the shot is OF
+  -- the real bag, read and logged -- the evidence the shot is OF
   H.call(function()
     local classes = {}
     for i = 0, 255 do
@@ -60,7 +61,7 @@ H.run({ maxFrames = 20000 }, {
     local cs = {}
     for k in pairs(classes) do cs[#cs + 1] = k end
     table.sort(cs)
-    H.log("honest bag weapon classes: " .. table.concat(cs, " "))
+    H.log("bag weapon classes: " .. table.concat(cs, " "))
     H.assertEq(#cs >= 2, true,
       "the save's own bag carries at least two weapon classes to shoot")
   end),

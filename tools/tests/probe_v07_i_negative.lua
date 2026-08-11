@@ -1,7 +1,7 @@
 -- probe_v07_i_negative.lua -- FAIL-BEFORE control for the vector-crash-v1
--- contract (issue #31, the #25 discipline): boot the minted boundary
+-- contract (issue #31, the #25 discipline): boot the generated boundary
 -- state, PERTURB one contract-checked fact -- clear $007A, the
--- airship-dead switch the whole post-crash band plans around -- and
+-- airship-dead switch the whole post-crash section plans around -- and
 -- assert the exit contract.  The expected outcome is a FAILURE that names
 -- the switch; this probe passing would mean the contract asserts nothing.
 -- NOT a suite test; run by hand, expect exit 1, grep the log for the

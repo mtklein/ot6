@@ -1,6 +1,6 @@
--- gen_opera5_dance.lua -- v0.5 Beat A leg 5: opera_stage (map 238 {99,20},
+-- gen_opera5_dance.lua -- v0.5 Beat A step 5: opera_stage (map 238 {99,20},
 -- $0056=1) -> the ARIA forks {0,1,0} -> the FLOWER DANCE on map 236 -> $0111=1.
--- Mints opera_dance_done.mss on map 238 {98,7} after the aria is solved.
+-- Generates opera_dance_done.mss on map 238 {98,7} after the aria is solved.
 --
 -- THE FLOWER DANCE (every claim measured -- probe_opera_geom/occ/dance5-8):
 --  * Map 236 is Z-SPLIT.  p1 tile props: 09 = upper-z only, 02 = lower-z only,
@@ -214,20 +214,21 @@ H.run({ maxFrames = 60000 }, {
   -- ride the wedding-waltz finale (untimed; stop_timer fired on (8,9)) -> $0111
   rideOpen(function() return sw(0x0111)==1 end, 20000, "finale->$0111"),
 
-  -- settle on map 238 and mint the doorstep: the flower dance is SOLVED
+  -- settle on map 238 and generate the entry point: the flower dance is
+  -- SOLVED
   H.waitUntil(function() return map()==238 and settled() end, 6000, "control back on 238", 10),
   H.waitFrames(30),
   H.call(function()
     H.assertEq(map(), 238, "back on the stage (map 238)")
     H.assertEq(sw(0x0111), 1, "$0111 SET -- THE ARIA IS SOLVED (flower dance cracked)")
     H.assertEq(sw(0x0057), 1, "$0057 still SET")
-    H.assertEq(settled(), true, "doorstep is QUIET -- no battle/event in flight")
+    H.assertEq(settled(), true, "entry point is QUIET -- no battle/event in flight")
     H.log(string.format("[opera_dance_done] f%d map=%d (%d,%d) $0111=%d",
       H.frame, map(), H.fieldX(), H.fieldY(), sw(0x0111)))
     H.screenshot("opera_dance_done")
   end),
   H.saveState("opera_dance_done.mss"),
   H.logStep(function()
-    return string.format("opera_dance_done minted at frame %d -- $0111=1, the flower-dance blocker is CRACKED", H.frame)
+    return string.format("opera_dance_done generated at frame %d -- $0111=1, the flower-dance blocker is CRACKED", H.frame)
   end),
 })

@@ -26,11 +26,11 @@
 -- needs a fixture to be a measurement rather than arithmetic, and this is it.
 --
 -- THE CROSSING is gen_kolts' K2, verbatim: shelf F (19,17) -> map 96 region
--- P.  Everything else -- the honest flee policy during the walk (issue #75:
--- encounters are RUN FROM with held L+R, zero state writes; the old
--- danger-counter suppression is gone), the settle, the "prove an encounter
--- really fires" tail -- is gen_kolts_pool's, and its header carries the
--- reasoning for all three.
+-- P.  Everything else -- the input-driven flee policy during the walk
+-- (issue #75:  encounters are RUN FROM with held L+R, zero state writes;
+-- the old danger-counter suppression is gone), the settle, the "prove an
+-- encounter really fires" tail -- is gen_kolts_pool's, and its header
+-- carries the reasoning for all three.
 local H = dofile("tools/tests/lib/ot6.lua")
 
 local POOL = "build/states/kolts_pool.mss.lua"
@@ -43,8 +43,9 @@ local function where(tag)
     tostring(H.hasControl()), tostring(H.tileAligned())))
 end
 
--- gen_kolts_pool's settle: advanceStory (honest="flee") so an arrival-tile
--- encounter is fled instead of stalling a passive wait to timeout.
+-- gen_kolts_pool's settle: advanceStory (playBattles="flee") so an
+-- arrival-tile encounter is fled instead of stalling a passive wait to
+-- timeout.
 local function settleField(what, dstMap, maxF)
   local held = 0
   return H.advanceStory(function()
@@ -53,7 +54,7 @@ local function settleField(what, dstMap, maxF)
       and (dstMap == nil or map() == dstMap)
     held = ok and held + 1 or 0
     return held >= 30
-  end, maxF or 12000, { honest = "flee" })
+  end, maxF or 12000, { playBattles = "flee" })
 end
 
 local function mapChanged()
@@ -74,7 +75,7 @@ H.run({ maxFrames = 60000 }, {
   end),
 
   H.navTo(19, 17, { maxFrames = 20000, arrive = mapChanged(),
-           honest = "flee" }),
+           playBattles = "flee" }),
   H.release(),
   settleField("cave 96 P", 96),
   H.call(function()
@@ -90,9 +91,9 @@ H.run({ maxFrames = 60000 }, {
   -- the spawn tile and one neighbour, so every other step RE-ENTERS the
   -- trigger, the cutscene takes control, and the run dies on "timeout
   -- waiting for field control" before a single encounter.  Measured
-  -- exactly that on the first mint.  Two tiles east is clear of both
-  -- triggers ((16,22) and (14,12)) and still inside region P.
-  H.navTo(18, 22, { maxFrames = 8000, honest = "flee" }),
+  -- exactly that on the first generation run.  Two tiles east is clear of
+  -- both triggers ((16,22) and (14,12)) and still inside region P.
+  H.navTo(18, 22, { maxFrames = 8000, playBattles = "flee" }),
   H.release(),
   settleField("cave 96 P, off-trigger", 96),
   H.call(function()
@@ -101,14 +102,14 @@ H.run({ maxFrames = 60000 }, {
     H.assertEq(H.fieldY(), 22, "spawn tile is (18,22), not the trigger")
     H.assertEq(H.hasControl(), true, "controllable")
     H.assertEq(H.tileAligned(), true, "tile-aligned")
-    H.log(string.format("[kolts_cave] danger counter at mint: %04X (honest -- "
+    H.log(string.format("[kolts_cave] danger counter at generation: %04X (unrigged -- "
       .. "whatever the walk accumulated)", H.readWord(0x1f6e)))
     where("cave spawn")
     H.screenshot("kolts_cave")
   end),
   H.saveState("kolts_cave.mss"),
   H.logStep(function()
-    return string.format("kolts_cave minted at frame %d", H.frame)
+    return string.format("kolts_cave generated at frame %d", H.frame)
   end),
 
   -- PROOF THE FIXTURE IS WHAT IT CLAIMS, gen_kolts_pool's tail.  The lane is

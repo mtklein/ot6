@@ -206,7 +206,7 @@ local function decide()
 end
 
 -- the multi-battle frame: in battle, run the menus; out of battle, pace
--- the world band to the next encounter (bp and MP persist across battles)
+-- the world area to the next encounter (bp and MP persist across battles)
 local function frame()
   if H.battleLoadStarted() then
     H.setPad(decide())
@@ -312,7 +312,7 @@ H.run({ maxFrames = 150000 }, {
   end),
 
   -- 4. MP GREY -- *** LABELED ISOLATION ARM (owner calibration). ***
-  -- The honest walk was tried three ways and measured out of reach on this
+  -- The input-driven walk was tried three ways and measured out of reach on this
   -- pool's economy: a Retort walk's counters end the battle; a deferring
   -- party is ground down (and battle-RAM teardown zeroes masquerade as
   -- "enemy MP drains" to any ungated read); and a six-battle Dispatch

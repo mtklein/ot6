@@ -14,11 +14,11 @@ not brew-installable — [docs/TOOLING.md](docs/TOOLING.md) has those steps.
 
 ```sh
 make rom     # build build/ot6.sfc
-make test    # full headless gate: the self-registering suite (a few minutes),
+make test    # full headless run: the self-registering suite (a few minutes),
              # discovered from each test's `-- @suite` marker -- see
-             # `tools/tests/suite.sh --list`.  Frontier-gated tests join once
-             # `make frontier` has minted their fixtures; `make frontier-test`
-             # does both
+             # `tools/tests/suite.sh --list`.  Tests that load a deep story
+             # savestate join once `make frontier` has generated it;
+             # `make frontier-test` does both
 make run     # launch the built ROM in Mesen (GUI)
 ```
 
@@ -37,24 +37,24 @@ disassembly (GPL-3.0) — treat everything under it except our hack files as
 upstream, and prefer adding to bank `$F0` over editing vanilla banks.
 
 - [docs/DESIGN.md](docs/DESIGN.md) — the mechanics design
-- [docs/ROADMAP.md](docs/ROADMAP.md) — milestones and the "playable frontier"
+- [docs/ROADMAP.md](docs/ROADMAP.md) — milestones and how far the game is playable
 - [docs/research/](docs/research/) — reverse-engineering notes
 - [tools/tests/README.md](tools/tests/README.md) — the test harness
 
 ## House rules
 
-**Vanilla's quirks stay; vanilla's destructive failures do not ship in a
-supported frontier.** Useless stats, row jank, animation oddities — the
-original game not being quite right is part of its charm, and none of it
-gets modernized unless an OT6 mechanic actually requires it. That bias is
-deliberate and it is not going away.
+**Vanilla's quirks stay; vanilla's destructive failures do not ship in the
+stretch of game we call playable.** Useless stats, row jank, animation
+oddities — the original game not being quite right is part of its charm, and
+none of it gets modernized unless an OT6 mechanic actually requires it. That
+bias is deliberate and it is not going away.
 
 But it is a bias against *cleanup*, not against *reliability*. A vanilla
 defect that can crash the game, corrupt or lose a save, corrupt persistent
 state, or soft-lock progression is a different thing from charm, and
-before a release advertises a frontier, every known defect of that class
-reachable inside it is fixed, mitigated, or explicitly accepted in the
-release notes — never shipped silently.
+before a release claims a stretch of game is playable, every known defect
+of that class reachable inside it is fixed, mitigated, or explicitly
+accepted in the release notes — never shipped silently.
 
 **The Sketch bug stays, by explicit owner decision.** It is named here so
 the question does not get re-litigated. Sketch is the canonical "charm"
@@ -65,8 +65,8 @@ decision is theirs to reopen, not this document's.
 
 The inventory lives in
 [docs/research/vanilla-destructive-bugs.md](docs/research/vanilla-destructive-bugs.md):
-each entry carries source evidence and the frontier where it becomes
-player-reachable, including the below-the-bar list kept so those defects
+each entry carries source evidence and the point in the game where it
+becomes player-reachable, including the below-the-bar list kept so those defects
 are not rediscovered and re-argued. A defect joins the fix list only with
 a reproduction or instruction-level source basis — this is not a
 folklore-driven bug sweep — and a fix lands the way every OT6 change
@@ -162,8 +162,8 @@ not.
   is evidence only if X is the only thing that changed.
 - **Failing before and passing after does not prove the fix is the right
   shape.** A regression pins the case you thought of, and the same test can
-  pass against two different repairs, one of which hangs the frontier. Run
-  the thing it is a proxy for.
+  pass against two different repairs, one of which hangs a real playthrough.
+  Run the thing it is a proxy for.
 
 ## Claiming RAM
 

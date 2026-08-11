@@ -1,11 +1,11 @@
 # Research: vanilla destructive-bug inventory (issue #13)
 
 Issue [#13](https://github.com/mtklein/ot6/issues/13) narrows the "Vanilla's
-bugs stay" house rule: harmless quirks are preserved, but before a release
-frontier reaches affected content we fix or explicitly accept vanilla defects
-that can **crash, lock up, corrupt SRAM/save data, corrupt persistent game
-state, cause unavoidable soft locks or progression loss, or produce arbitrary
-memory effects with materially destructive outcomes**.
+bugs stay" house rule: harmless quirks are preserved, but before a release's
+playable range reaches affected content we fix or explicitly accept vanilla
+defects that can **crash, lock up, corrupt SRAM/save data, corrupt persistent
+game state, cause unavoidable soft locks or progression loss, or produce
+arbitrary memory effects with materially destructive outcomes**.
 
 This document is the inventory. It is deliberately short. Per #13, "do not turn
 this into a general folklore-driven bug-fix sweep."
@@ -111,7 +111,7 @@ random encounter. By the time the Veldt is reachable the bitmap has dozens of
 bits.
 
 **Classification: confirmed no-termination loop, no vanilla path to it.** It is
-a live hazard for **OT6 fixtures**, though: a savestate or frontier fixture
+a live hazard for **OT6 fixtures**, though: a savestate or generated fixture
 that warps a party onto a Veldt sector without the encounter history that
 populates the bitmap hangs the headless test runner with no error — precisely
 the "quiet test" failure mode `CONTRIBUTING.md` warns about.

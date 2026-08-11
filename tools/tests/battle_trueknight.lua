@@ -19,7 +19,7 @@
 --   OT6 hooks Ot6CoverBP -- the same shape as Ot6RunicBP at RunicEffect's
 --   enrolment instruction.
 --
--- THE FIXTURE IS LABELLED, NOT NATURAL.  Nobody in the doorstep party wears
+-- THE FIXTURE IS LABELLED, NOT NATURAL.  Nobody in the entry-point party wears
 -- True Knight, so the blocker's relic-effect word is STAGED: $3c58,slot |= $40,
 -- the bit LoadCharProp would have written from the relic (:6868).  The rest of
 -- the staging only makes covers HAPPEN often enough to measure:
@@ -440,7 +440,7 @@ H.run({ maxFrames = 60000 }, {
     -- is why it is a threshold and not a fudge factor.  1715 leaves 80 frames
     -- of headroom for legitimate drift below and still lands 83 frames clear
     -- of the cliff.  It is deliberately NOT an equality on 1635: this must
-    -- survive a few bytes of honest growth off the per-battle-frame path (the
+    -- survive a few bytes of legitimate growth off the per-battle-frame path (the
     -- v0.9 merge added ~49 bytes of $C2 at four per-action sites and this span
     -- did not move at all), and it must NOT survive a real overrun.
     --

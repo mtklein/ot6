@@ -2,11 +2,11 @@
 --
 -- The SAME menu drive and the SAME cell-level assertions as
 -- menu_esperdetail_tube6.lua (the suite test), booted instead from a COLD
--- Continue off the tracked post-Opera battery anchor, which survives ROM
+-- Continue off the tracked post-Opera battery checkpoint, which survives ROM
 -- changes (issue #9) where savestate fixtures do not.  This build changes ROM
 -- DATA in two banks (genju_prop, ot6_progression), so it is exactly the class
--- of change that can leave a minted .mss describing the previous ROM; run this
--- to check the page from a boot that cannot be stale:
+-- of change that can leave a generated .mss describing the previous ROM;
+-- run this to check the page from a boot that cannot be stale:
 --
 --   OT6_SRAM_ANCHOR=tools/tests/anchors/post-opera-v1 \
 --     tools/tests/run.sh tools/tests/probe_esperdetail_tube6_anchor.lua
@@ -21,7 +21,8 @@
 -- Name tiles and stat-line geometry: see menu_esperdetail_tube6.lua's header.
 --
 -- OT6_ANCHOR_LAYOUT: ot6-codex-o8-v1
--- ^ the persistent-SRAM layout this leg understands (issue #25).  run.sh reads
+-- ^ the persistent-SRAM layout this step understands (issue #25).  run.sh
+-- reads
 --   the marker line above and refuses -- BEFORE the emulator boots -- any
 --   OT6_SRAM_ANCHOR whose manifest.json declares a different persistent_layout.
 --   NOTE: probe_esperdetail_anchor.lua, the #27 probe this file mirrors, has
@@ -197,7 +198,7 @@ local function backToList()
 end
 
 local all = {
-  -- gen_vector_doorstep.lua's cold Continue off the battery anchor.
+  -- gen_vector_doorstep.lua's cold Continue off the battery checkpoint.
   H.waitFrames(350),
   H.repeatN(5, { H.pressButtons({ "start" }, 8), H.waitFrames(25) }),
   H.waitFrames(120),
@@ -206,7 +207,7 @@ local all = {
   H.repeatN(3, { H.pressButtons({ "a" }, 8), H.waitFrames(60) }),
   H.waitUntil(function()
     return (H.mapId() & 0x1ff) == 0 and H.worldHasControl() and H.worldAligned()
-  end, 3000, "cold Continue to post-Opera world doorstep", 10),
+  end, 3000, "cold Continue to post-Opera world entry point", 10),
   H.waitUntil(function()
     return (emu.getState()["ppu.screenBrightness"] or 0) >= 15
   end, 900, "cold Continue fade-in", 10),
@@ -307,7 +308,7 @@ add({ H.call(function()
 end) })
 
 add({ H.call(function()
-  H.log("PASSED (anchor boot): the tube-room six render their new grant lists "
+  H.log("PASSED (checkpoint boot): the tube-room six render their new grant lists "
     .. "and stat lines on the real esper detail page")
 end) })
 

@@ -1,12 +1,12 @@
 -- gen_returner.lua -- from vargas_won.mss (TERRA + LOCKE + EDGAR + SABIN on
 -- VARGAS's ledge, map 98) down the far side of Mt. Kolts and across the world
--- to the RETURNER HIDEOUT.  The first link of the rung-3 route: everything
+-- to the RETURNER HIDEOUT.  The first link of the tier-3 route: everything
 -- from here to the scenario split runs through this door.
--- Mints one state:
+-- Generates one state:
 --   returner_hideout.mss  map 108 (11,55), the hideout's entry hall, first
 --                         controllable frame -- the fixture gen_banon starts
---                         from and the doorstep for anything that wants the
---                         hideout without replaying the mountain.
+--                         from and the entry point for anything that wants
+--                         the hideout without replaying the mountain.
 --
 -- THE ROUTE, and the three places the tables alone would strand you.
 --
@@ -20,7 +20,7 @@
 --    (event_main.asm:31276-31283) and never moves Vargas's object out of the
 --    way; it is `switch $031C=0` at :20147 that despawns him.  So the exit is
 --    only walkable BECAUSE the fight was won, and $031C is asserted clear
---    below before the leg is planned.
+--    below before the step is planned.
 --
 -- 2. MAP 100 LANDS THE PARTY ONE TILE FROM THE WAY BACK.  The arrival tile is
 --    (8,48) and (7,48) -- its immediate west neighbour -- is the entrance
@@ -52,24 +52,24 @@
 --    World (104,64) -> map 108 (11,55) (ShortEntrance::_0); map 108's own way
 --    back is the long entrance (6,57) length $11 -> world (104,65).  From the
 --    mountain's north door at (98,93) that is a long stretch of overworld,
---    and the world leg is planned by worldBfs and asserted to exist before it
---    is walked rather than discovered by holding a direction.
+--    and the world step is planned by worldBfs and asserted to exist before
+--    it is walked rather than discovered by holding a direction.
 --
--- ISSUE #75 -- THIS MINT IS ZERO-WRITE.  Every field navigator runs with
--- opts.honest (mid-route encounters on Mt. Kolts are FOUGHT by the
--- edge-tapped A auto-fighter, not kill-bitted), and the world leg never
--- lets worldNavTo's own battle branch -- which still carries the kill-bit
--- and has no honest option -- see a battle at all: worldWalkHonest below
--- stops the walk on the world engine's battle-pending bit ($E8 bit5, set
--- the INSTANT the encounter roll wins, move.asm's `ora #$20` -- frames
--- before worldNavTo's 3-frame debounce could act), fights the encounter
--- with H.fightBattle, rides out the post-battle world reload (position
--- restored, danger counter zeroed -- move.asm:916-921 /
--- world_start.asm:465-482), and resumes.  Fighting rather than fleeing is
--- deliberate: L+R can fail on unrunnable/back-attack formations and this
--- post-Vargas four (TERRA/LOCKE/EDGAR/SABIN) one-rounds the northern
--- plains' trash, so the fight always terminates and the walk stays
--- deterministic from the fixture.
+-- ISSUE #75 -- THIS GENERATE IS ZERO-WRITE.  Every field navigator runs with
+-- opts.playBattles (mid-route encounters on Mt. Kolts are FOUGHT by the
+-- edge-tapped A auto-fighter, not write-cleared), and the world step never
+-- lets worldNavTo's own battle branch -- which still carries the
+-- battle-clear write and has no real option -- see a battle at all:
+-- worldWalkFighting below stops the walk on the world engine's
+-- battle-pending bit ($E8 bit5, set the INSTANT the encounter roll wins,
+-- move.asm's `ora #$20` -- frames before worldNavTo's 3-frame debounce
+-- could act), fights the encounter with H.fightBattle, rides out the
+-- post-battle world reload (position restored, danger counter zeroed --
+-- move.asm:916-921 / world_start.asm:465-482), and resumes.  Fighting
+-- rather than fleeing is deliberate: L+R can fail on unrunnable/back-attack
+-- formations and this post-Vargas four (TERRA/LOCKE/EDGAR/SABIN) one-rounds
+-- the northern plains' trash, so the fight always terminates and the walk
+-- stays deterministic from the fixture.
 local H = dofile("tools/tests/lib/ot6.lua")
 local WON = "build/states/vargas_won.mss.lua"
 
@@ -101,9 +101,10 @@ end
 
 -- Settle after a map load: a fully lit screen plus whatever `extra` demands,
 -- held for n CONSECUTIVE frames.  Both halves are load-bearing and both cost
--- a previous agent a bad mint -- see gen_kolts.lua's header: a cutscene can
--- report control on a black screen, and a single-shot check passes mid-load
--- while the field module still holds the OLD map's control byte.
+-- a previous agent a bad generated state -- see gen_kolts.lua's header: a
+-- cutscene can report control on a black screen, and a single-shot check
+-- passes mid-load while the field module still holds the OLD map's control
+-- byte.
 local function settled(n, extra)
   local cnt = 0
   return function()
@@ -115,7 +116,7 @@ end
 
 -- The settle DRIVES rather than waits, for the reason gen_kolts measured on
 -- map 96: this is encounter territory, and a battle rolled on the arrival
--- tile stalls a passive waitUntil forever.  advanceStory (honest mode --
+-- tile stalls a passive waitUntil forever.  advanceStory (playBattles mode --
 -- issue #75) FIGHTS whatever came up with the same edge-tapped A that pages
 -- the victory text; on a quiet field it holds the pad empty.  It also deliberately does NOT require player control -- $087C&$0F
 -- flickers 2<->4 while any async object script is live -- and leaves "can I
@@ -127,7 +128,7 @@ local function settleField(dstMap, maxF)
       return not H.worldMode() and H.tileAligned()
          and not H.battleLoadStarted() and not H.dialogWaiting()
          and (dstMap == nil or map() == dstMap)
-    end), maxF or 12000, { honest = true }),
+    end), maxF or 12000, { playBattles = true }),
     H.waitFrames(30),
   })
 end
@@ -136,7 +137,7 @@ local function settleWorld(maxF)
   return seq({
     H.advanceStory(settled(20, function()
       return H.worldHasControl() and H.worldAligned()
-    end), maxF or 12000, { honest = true }),
+    end), maxF or 12000, { playBattles = true }),
     H.waitFrames(30),
   })
 end
@@ -152,7 +153,7 @@ local function crossTo(tx, ty, dstMap, what, maxF)
         what, H.fieldX(), H.fieldY(), tx, ty, dstMap)
     end),
     H.navTo(tx, ty, { maxFrames = maxF or 20000, arrive = mapChanged(),
-      honest = true }),
+      playBattles = true }),
     H.release(),
     settleField(dstMap),
     H.call(function()
@@ -162,13 +163,13 @@ local function crossTo(tx, ty, dstMap, what, maxF)
   })
 end
 
--- ISSUE #75: the honest world walk (the header's point on zero writes).
+-- ISSUE #75: the input-driven world walk (the header's point on zero writes).
 -- One round = walk toward the hideout until either the entrance fires (off
 -- the world map) or the encounter roll wins -- $E8 bit5, set the instant
 -- the roll wins and checked here as the navigator's arrive() EVERY frame,
--- so worldNavTo's own 3-frame-debounced kill-bit branch can never run --
--- then FIGHT the encounter for real and ride out the post-battle world
--- reload before the next round re-plans.  Rounds are written out flat:
+-- so worldNavTo's own 3-frame-debounced battle-clear-write branch can never
+-- run -- then FIGHT the encounter for real and ride out the post-battle
+-- world reload before the next round re-plans.  Rounds are written out flat:
 -- navigator and driveUntil bodies latch state and cannot be replayed
 -- (gen_banon's talkTo rounds, same reason).
 local function battlePending()
@@ -180,8 +181,8 @@ local function worldRound(n, tx, ty)
       arrive = function() return battlePending() or not H.worldMode() end }),
     H.cond(battlePending, {
       H.logStep(function()
-        return string.format("world leg round %d: encounter roll won at " ..
-          "(%d,%d) f%d -- fighting it honestly", n, H.worldX(), H.worldY(),
+        return string.format("world segment round %d: encounter roll won at " ..
+          "(%d,%d) f%d -- fighting it", n, H.worldX(), H.worldY(),
           H.frame)
       end),
       H.waitUntil(function() return H.battleLoadStarted() end, 1800,
@@ -189,9 +190,9 @@ local function worldRound(n, tx, ty)
       H.fightBattle(20000),
       H.driveUntil(function()
         return H.worldMode() and H.worldHasControl() and H.worldAligned()
-      end, 8000, { H.release() }, "world reload after the honest fight"),
+      end, 8000, { H.release() }, "world reload after the fight"),
       H.call(function()
-        H.log(string.format("world leg round %d: fight done, reloaded at " ..
+        H.log(string.format("world segment round %d: fight done, reloaded at " ..
           "(%d,%d) f%d", n, H.worldX(), H.worldY(), H.frame))
       end),
     }, {}),
@@ -229,8 +230,9 @@ local function planAvoids(tx, ty, bad, what)
   end)
 end
 
--- 120000 was the kill-bit budget; honest fights spend real ATB rounds, so
--- the ceiling carries headroom for every encounter the route can roll
+-- 120000 was the battle-clear-write budget; input-driven fights spend real
+-- ATB rounds, so the ceiling carries headroom for every encounter the route
+-- can roll
 H.run({ maxFrames = 220000 }, {
   H.loadState(WON),
   H.waitFrames(30),
@@ -275,7 +277,7 @@ H.run({ maxFrames = 220000 }, {
     return string.format("cross M3: (%d,%d) -> (10,57) -> world (98,93)",
       H.fieldX(), H.fieldY())
   end),
-  H.navTo(10, 57, { maxFrames = 20000, honest = true,
+  H.navTo(10, 57, { maxFrames = 20000, playBattles = true,
     arrive = function() return H.worldMode() end }),
   H.release(),
   settleWorld(),
@@ -286,7 +288,7 @@ H.run({ maxFrames = 220000 }, {
   end),
 
   -- ===================================================================== --
-  -- PHASE 2: THE WORLD LEG.  (98,93) -> (104,64), the hideout's door.
+  -- PHASE 2: THE WORLD STEP.  (98,93) -> (104,64), the hideout's door.
   -- Asserted reachable before it is walked: worldBfs answering nil here
   -- would mean the north door does not open into the hideout's region, and
   -- that is worth failing on rather than holding UP and hoping.
@@ -294,10 +296,10 @@ H.run({ maxFrames = 220000 }, {
   H.call(function()
     local p = H.worldBfs(104, 64)
     H.assertEq(p ~= nil, true, "the Returner Hideout is reachable from here")
-    H.log(string.format("world leg: (%d,%d) -> (104,64), %d steps",
+    H.log(string.format("world segment: (%d,%d) -> (104,64), %d steps",
       H.worldX(), H.worldY(), #p))
   end),
-  -- Twelve honest rounds: ~45 tiles of encounter territory has never
+  -- Twelve input-driven rounds: ~45 tiles of encounter territory has never
   -- rolled more than a handful of fights, and a spent round costs nothing
   -- (its cond sees the world already left).  A 13th battle would surface
   -- as the settle below timing out on map 108.
@@ -329,6 +331,6 @@ H.run({ maxFrames = 220000 }, {
   end),
   H.saveState("returner_hideout.mss"),
   H.logStep(function()
-    return string.format("returner_hideout minted at frame %d", H.frame)
+    return string.format("returner_hideout generated at frame %d", H.frame)
   end),
 })

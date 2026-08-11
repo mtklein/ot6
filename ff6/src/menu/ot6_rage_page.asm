@@ -82,7 +82,7 @@ Ot6RageDrawC3:
 ; Growing rightwards instead would have rendered "10 MPEACH".  This page's price
 ; is 8 today and CAN reach two digits without anyone editing this file: it is a
 ; tail-call to Ot6DanceCost (ot6_boost.asm:600-619) -- deliberately Dance's own
-; number and not a copy of it -- and mp-economy.md's band for a flat
+; number and not a copy of it -- and mp-economy.md's range for a flat
 ; possess-verb price is 4-10.  The title row still fits: "RAGE LOADOUT" ends at
 ; 14, so 15 is the gap, the price is 16-20, 21 is the gap, "EACH" is 22-25.
 Ot6RagePrice:
@@ -231,7 +231,7 @@ Ot6RageDrawMode:
 ; #44: an unset slot used to be a run of $ff pads -- correct (it overwrote the
 ; whole name field, so a revert wiped what was there) and unreadable.  The
 ; owner's playtest read the blank rows as a bug rather than as "you have not
-; hunted eight species yet".  It now spells "- EMPTY -", which is the honest
+; hunted eight species yet".  It now spells "- EMPTY -", which is the accurate
 ; word in BOTH of the states that produce a blank row: an AUTO window shorter
 ; than eight, and a MANUAL slot whose byte is $00.  Ot6RageList skips exactly
 ; these slots when it builds the battle menu, so an empty row here is an empty

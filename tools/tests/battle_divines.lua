@@ -16,13 +16,14 @@
 --     place (power 70, Death cleared): the reduced fallback, latch CLEAR.
 --
 -- ISSUE #75 CONVERSION -- everything reachable converts; the CEILING stays.
--- The old file installed a triple-CYAN party on the magitek doorstep, pinned
+-- The old file installed a triple-CYAN party on the magitek entry point, pinned
 -- HP/MP/bp/pending, painted Broken/boss/stop states onto guards, and poked
--- the latch and both cursors.  It now boots cyan_defence -- the honest Doma
--- interlude mint: REAL solo CYAN (L11, katana, his own record) on map 120,
--- surrounded by the map's own battle-43 grinding soldiers (2x species $001,
--- 100 hp, 2 shields, weak $03 -- his SLASH chips them) and the battle-46
--- commander (species $14E, 456 hp, 3 shields, weak $01 -- chippable too).
+-- the latch and both cursors.  It now boots cyan_defence -- the input-driven
+-- Doma interlude savestate: REAL solo CYAN (L11, katana, his own record) on
+-- map 120, surrounded by the map's own battle-43 grinding soldiers (2x
+-- species $001, 100 hp, 2 shields, weak $03 -- his SLASH chips them) and the
+-- battle-46 commander (species $14E, 456 hp, 3 shields, weak $01 --
+-- chippable too).
 -- Measured 2026-08-10, this file's recon:
 --   * CYAN is battle slot 1, opens at 1 bp, real MP 67, real techs 2
 --     ($1cf7=03; submenu rows enumerate $55/$56 and row 2 is EMPTY);
@@ -43,23 +44,23 @@
 --     the kill SETS the latch (battle 2) and the next battle's fresh open
 --     enumerates Oblivion again (battle 3) -- no poke ever produces those
 --     two readings;
---   * kills are witnessed mechanism-exactly: a pc-gated write watch counts
+--   * kills are checked mechanism-exactly: a pc-gated write watch counts
 --     Death marks written FROM INSIDE Ot6Oblivion (battle_assassinate's
 --     idiom), so a fallback that damage-kills cannot masquerade as a divine.
 --
 -- *** LABELED ISOLATION ARM (issue #75, owner learn-ceiling ruling
 -- 2026-08-10) -- the CEILING writes STAY ***
--- Oblivion is Bushido tech 8: L68 Cyan, 99 MP (#57).  The honest chain's
+-- Oblivion is Bushido tech 8: L68 Cyan, 99 MP (#57).  The input-driven chain's
 -- Cyan is L11 with 67 max MP, and the ruling keeps it that way -- no
 -- leveled-fixture grind tier.  So every battle below stages the ceiling in
 -- ONE labeled block: KNOWN ($2020) := 7 so the window can enumerate the
 -- divine, and MP := 999 so the 99-MP cast is not refused.  The boss-gate
 -- negative additionally sets the target's $3aa1 bit 2 -- the bit a boss
--- carries -- because NO minted battle fields a death-protected body beside
+-- carries -- because NO generated battle fields a death-protected body beside
 -- Cyan (the commander reads aa1=$01, measured).  And the latch-driven
 -- ENUMERATION (row 2 falls to Tempest $5b while the latch is set) keeps the
--- old latch pokes, inside battle 1's staging: the only honest setter is the
--- kill, the kill can only land on the commander, and killing the solo
+-- old latch pokes, inside battle 1's staging: the only setter in normal play
+-- is the kill, the kill can only land on the commander, and killing the solo
 -- commander ends the battle before the window could reopen -- so the
 -- set-side reading is unproducible by play at this fixture.  These writes
 -- may never produce fixtures; they convert organically as the project's
@@ -302,7 +303,7 @@ add({
     H.screenshot("divine_oblivion_selectable")
   end),
   -- *** labeled arm: the latch-driven enumeration (see header).  The set
-  -- side cannot be produced by play here (the only honest setter kills the
+  -- side cannot be produced by play here (the only setter in normal play kills the
   -- solo commander and ends the battle), so the latch bit is poked SET,
   -- read, and poked CLEAR again -- the poke never leaves this block. ***
   closeWindow("battle 1: close, then set the latch and reopen"),
@@ -383,7 +384,7 @@ add({
     H.assertEq(dead(divineKills[1]), true,
       "and that body is dead (the engine's own resolution)")
     H.assertEq(latchSet(), true,
-      "the engine SET the divine latch on the kill -- the honest set-side "
+      "the engine SET the divine latch on the kill -- the set-side "
       .. "latch edge (battle 1's poked pair covers only the enumeration)")
     watching = false
     H.screenshot("divine_oblivion_kill")
@@ -402,9 +403,9 @@ add({
   H.call(function()
     local m = msPresent[1]
     H.assertEq(brk(m) ~= 0, true, "commander Broken by play")
-    -- *** the labeled arm's boss bit (see header): no minted battle fields
+    -- *** the labeled arm's boss bit (see header): no generated battle fields
     -- a death-protected body beside Cyan, so the one bit is painted on the
-    -- honestly-Broken commander ***
+    -- commander that real play Broke ***
     H.writeByte(0x3AA1 + ent(m), H.readByte(0x3AA1 + ent(m)) | 0x04)
     stageCeiling("battle 3")
     H.log(string.format("[battle 3] body %d broken (brk=%02x), $3aa1.2 SET",

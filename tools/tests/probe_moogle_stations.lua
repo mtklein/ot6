@@ -1,6 +1,6 @@
--- probe_moogle_stations.lua -- the Moogle defense played honestly the way
--- the set-piece was DESIGNED: pre-position all three squads at separate
--- interception stations before the marches arrive (issue #75,
+-- probe_moogle_stations.lua -- the Moogle defense played with real input
+-- the way the set-piece was DESIGNED: pre-position all three squads at
+-- separate interception stations before the marches arrive (issue #75,
 -- marshal-investigation).  Zero writes; walking, Y-taps, and tap-A only.
 --
 -- Why stations and not mid-defense goalie swaps (probe_moogle_rotation's
@@ -123,15 +123,15 @@ H.run({ maxFrames = 140000 }, {
   -- P3 first: its east station is the earliest one a march reaches
   -- (NPC_4 passes (20,20) around field-frame ~1400; the west arm's first
   -- guard needs ~1800; the choke ~2100 -- probe_moogle_switch timings)
-  H.navTo(15, 15, { maxFrames = 2500, honest = true }),
+  H.navTo(15, 15, { maxFrames = 2500, playBattles = true }),
   ySwitchTo(3),
-  H.navTo(20, 20, { maxFrames = 4000, honest = true }),
+  H.navTo(20, 20, { maxFrames = 4000, playBattles = true }),
   logGuards("P3 at east station"),
   ySwitchTo(2),
-  H.navTo(10, 21, { maxFrames = 4000, honest = true }),
+  H.navTo(10, 21, { maxFrames = 4000, playBattles = true }),
   logGuards("P2 at west station"),
   ySwitchTo(1),
-  H.navTo(14, 14, { maxFrames = 2500, honest = true }),
+  H.navTo(14, 14, { maxFrames = 2500, playBattles = true }),
   logGuards("deployed"),
   logPools("deployed"),
 
@@ -140,7 +140,7 @@ H.run({ maxFrames = 140000 }, {
   -- tap-A wins each fight, the win path despawns that guard.
   H.advanceStory(function()
     return (H.readByte(0x1f41) & 0xFC) == 0
-  end, 60000, { honest = true }),
+  end, 60000, { playBattles = true }),
   H.logStep(function()
     return string.format("all six waves down at f%d", H.frame)
   end),
@@ -161,7 +161,7 @@ H.run({ maxFrames = 140000 }, {
       return defenseWon()
           or (marshalAdjacent() and H.hasControl() and H.tileAligned())
     end,
-    maxFrames = 15000, honest = true,
+    maxFrames = 15000, playBattles = true,
   }),
   H.logStep(function()
     return string.format("beside the Marshal at (%d,%d) f%d",
@@ -173,7 +173,7 @@ H.run({ maxFrames = 140000 }, {
   }, {}),
   H.call(function()
     H.assertEq(defenseWon(), true, "defense won (switch $0631 cleared)")
-    H.log(string.format("MARSHAL DOWN HONESTLY at f%d", H.frame))
+    H.log(string.format("MARSHAL DOWN at f%d", H.frame))
   end),
   logPools("victory"),
 })

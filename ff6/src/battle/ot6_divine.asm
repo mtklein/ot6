@@ -57,14 +57,14 @@
 ;                           Break window IS the guarantee, the same ruling
 ;                           Assassinate takes. SET the once-per-battle latch.
 ;   unbroken, OR a Broken
-;   but death-immune boss -> the props are SURGERIED to a Tempest-like hit in
+;   but death-immune boss -> the props are PATCHED to a Tempest-like hit in
 ;                           place: power 70, Status-1 cleared (no Death), the
 ;                           instant-death-spell and auto-miss flags cleared. The
 ;                           per-target loop then lands a 70-power elementless
-;                           slash -- the honest "reduced" fallback (kits.md names
+;                           slash -- the plain "reduced" fallback (kits.md names
 ;                           fizzle-or-reduced). Keeping a real hit as the
 ;                           fallback is the whole reason Oblivion could rejoin
-;                           the BP3 band without retiring Tempest, and the latch
+;                           the BP3 tier without retiring Tempest, and the latch
 ;                           stays CLEAR (the divine was not spent), so the menu
 ;                           keeps offering Oblivion until it truly lands.
 ;
@@ -154,7 +154,7 @@ done:   plp
 ; (SetStatus1's byte, applied by UpdateStatus for every present entity regardless
 ; of the hit roll) and the once-per-battle gate is the shared OT6_DIVINE_USED
 ; bit. A Broken non-boss dies; a boss (its Death can't take) or an unbroken
-; target is left alone -- the ordinary attack stands, the honest no-op fallback.
+; target is left alone -- the ordinary attack stands, the plain no-op fallback.
 ;
 ; UNDERSPECIFIED, reported not invented: the sketch does not say HOW Shadow
 ; invokes it -- his Throw signature, a dedicated command, or a boost cost -- and

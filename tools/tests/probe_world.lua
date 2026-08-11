@@ -14,7 +14,7 @@
 --   3. WorldTileProp bit4 vs reality: predict passability of the four
 --      neighbors from ROM ($EE9B14 + world*512 + tile*2), then try to
 --      step each way and compare
---   4. random-encounter aftermath: walk until one fires, kill-bit it,
+--   4. random-encounter aftermath: walk until one fires, write-clear it,
 --      measure the reload (position/facing survival, frames to control,
 --      $E8 flags)
 --   5. misc flags: $20 world type, $11FA vehicle, $11F3, $E7/$E8/$E9
@@ -130,7 +130,7 @@ H.run({ maxFrames = 30000 }, {
 
   -- ------------------------------------------------------------------ --
   -- 4. random encounter: pace over battle-enabled plains until one
-  -- fires, kill-bit it, and measure the aftermath frame by frame.
+  -- fires, write-clear it, and measure the aftermath frame by frame.
   -- The up-step trace above parked us on (84,33), the Narshe GATE
   -- STRIP -- prop $0007, battles DISABLED -- and this probe's first
   -- revision paced right/left along it for 12000 fruitless frames

@@ -1,13 +1,13 @@
 -- gen_celes.lua -- from sfigaro_passage.mss (LOCKE in the rich man's secret
 -- passage, map 86 at (7,51)) through the mansion and the basement to the
 -- moment Celes is freed and joins.  The second link of the v0.3 Locke chain.
--- Mints one state:
+-- Generates one state:
 --   celes_freed.mss  map 83 (56,9), LOCKE + CELES, the sleeping soldier's
---                    clock key taken -- the doorstep of the escape to the
+--                    clock key taken -- the entry point of the escape to the
 --                    Figaro cave where TunnelArmr waits
 --
 -- SIX THINGS THIS SCRIPT MEASURED, four of them map-maze facts the entrance
--- tables do not give and two of them harness gates the brief warned about.
+-- tables do not give and two of them harness blockers the brief warned about.
 --
 -- 1. THE RICH MAN'S MANSION (map 81) IS A WARP MAZE, and the entrance table
 --    lists its rooms but not which reach which.  The secret passage
@@ -67,16 +67,16 @@
 --    84, not a cave exit.  The clock key is taken anyway -- it costs nothing
 --    and leaves the state faithful to a real playthrough.
 --
--- ISSUE #75 (the honesty conversion): this generator now performs ZERO
--- state writes.  Its route never draws a battle at all -- the mansion,
--- basement and warp maze carry no encounter groups, and every beat on it
--- is dialog and cutscene -- so the conversion was removing the gate-
+-- ISSUE #75 (the input-driven test conversion): this generator now performs
+-- ZERO state writes.  Its route never draws a battle at all -- the mansion,
+-- basement and warp maze carry no encounter groups, and every beat on it is
+-- dialog and cutscene -- so the conversion was removing the gate-
 -- soldier/steal battle helpers this file inherited from gen_sfigaro and
--- never called (rideOut's HP pin + kill-bit, clearGateSoldier, the
--- stealDriver's command-table pokes: all dead code here, confirmed by
--- grep before deletion) and flagging every navigator honest so a battle
--- that DID somehow fire would be played by real input rather than
--- kill-bitted by the library.
+-- never called (rideOut's HP pin + battle-clear write, clearGateSoldier,
+-- the stealDriver's command-table pokes: all dead code here, confirmed by
+-- grep before deletion) and setting playBattles on every navigator so a
+-- battle that DID somehow fire would be played by real input rather than
+-- write-cleared by the library.
 local H = dofile("tools/tests/lib/ot6.lua")
 local DOOR = "build/states/sfigaro_passage.mss.lua"
 
@@ -140,20 +140,20 @@ local function settleField(dstMap, maxF)
       return not H.worldMode() and H.tileAligned()
          and not H.battleLoadStarted() and not H.dialogWaiting()
          and (dstMap == nil or map() == dstMap)
-    end), maxF or 12000, { honest = true }),
+    end), maxF or 12000, { playBattles = true }),
     H.waitFrames(30),
   })
 end
 
 local aPhase = 0
 
--- One SHORT leg to a waypoint on the current map.  See note 4: long BFS
+-- One SHORT step to a waypoint on the current map.  See note 4: long BFS
 -- queries on map 75 run the 4096-node cap dry and answer "no path" for
 -- tiles that are plainly walkable, so every cross-town walk is a chain of
 -- these rather than one query.
 local function hop(tx, ty, what)
   return seq({
-    H.navTo(tx, ty, { maxFrames = 12000, honest = true }),
+    H.navTo(tx, ty, { maxFrames = 12000, playBattles = true }),
     H.release(),
     H.call(function()
       H.assertEq(H.fieldX(), tx, what .. ": at x=" .. tx)
@@ -216,7 +216,7 @@ local function go(sx, sy, dm, dx, dy, what)
   return seq({
     H.call(function() pick, startMap = nil, map() end),
     H.navTo(function() return stage()[1] end, function() return stage()[2] end,
-      { maxFrames = 20000, arrive = arrived, honest = true }),
+      { maxFrames = 20000, arrive = arrived, playBattles = true }),
     H.cond(function() return stage()[3] ~= nil end, {
       H.driveUntil(arrived, 1800, {
         H.call(function()
@@ -265,7 +265,7 @@ local function talkToObj(obj, what, maxF)
   local function walkStep()
     return H.navTo(function() return approach()[1] end,
                    function() return approach()[2] end, {
-      maxFrames = maxF or 20000, honest = true,
+      maxFrames = maxF or 20000, playBattles = true,
       arrive = function()
         return engaged or (adjacent() and H.hasControl() and H.tileAligned())
       end,
@@ -369,7 +369,7 @@ end
 local function deepDoor(fx, fy, dstMap, dir, what)
   local sm
   return seq({
-    hop(fx, fy, what .. ": to the doorstep"),
+    hop(fx, fy, what .. ": to the entry point"),
     -- latch the source map BEFORE the drive: a predicate that reads an
     -- un-latched `sm` compares map() to nil and "arrives" on frame 0
     H.call(function() sm = map() end),
@@ -400,7 +400,7 @@ local function reachCelesCutscene()
   return seq({
     (function()
       local lost = 0
-      return H.navTo(35, 15, { maxFrames = 16000, honest = true,
+      return H.navTo(35, 15, { maxFrames = 16000, playBattles = true,
         arrive = function()
           lost = (not H.hasControl()) and lost + 1 or 0
           return lost >= 90 or H.fieldX() >= 50
@@ -523,6 +523,6 @@ H.run({ maxFrames = 150000 }, {
   end),
   H.saveState("celes_freed.mss"),
   H.logStep(function()
-    return string.format("celes_freed minted at frame %d", H.frame)
+    return string.format("celes_freed generated at frame %d", H.frame)
   end),
 })

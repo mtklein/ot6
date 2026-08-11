@@ -1,5 +1,5 @@
 -- @suite frontier=worldmap_narshe
--- battle_levelup.lua -- v0.4 gate: FULL HP/MP RESTORE ON LEVEL UP.
+-- battle_levelup.lua -- v0.4 test: FULL HP/MP RESTORE ON LEVEL UP.
 --
 -- The mechanic (docs/design/mp-economy.md "Full HP/MP restore on level up"):
 -- when a character gains a level, current HP and MP refill to the new maxima.
@@ -10,14 +10,15 @@
 -- (UpdateSRAM, battle_main.asm:12136-12141) right after WinBattle returns.
 --
 -- ISSUE #75 CONVERSION -- the level is EARNED, and the record is its own
--- witness.  The old file pinned XP one threshold over, planted a $3FFF record
--- sentinel, forced the win with kill-bits, and faked the negative with a
--- level-50 poke.  All of it is replaced by the fixture's own arithmetic:
+-- check.  The old file pinned XP one threshold over, planted a $3FFF record
+-- sentinel, forced the win by writing the battle-clearing flag, and faked the
+-- negative with a level-50 poke.  All of it is replaced by the fixture's own
+-- arithmetic:
 -- worldmap_narshe's TERRA stands 23 XP short of level 5 (measured 2026-08-10:
--- exp=377, threshold=400 via LevelUpExp -- the honest near-boundary save the
+-- exp=377, threshold=400 via LevelUpExp -- the genuine near-boundary save the
 -- burn-down plan hoped a recon would find), while LOCKE needs 342 more, so
--- one grass-band battle levels her and cannot level him.  Real world
--- encounters are walked into (battle_fold's grass-band loop), fought through
+-- one grass-area battle levels her and cannot level him.  Real world
+-- encounters are walked into (battle_fold's grass-area loop), fought through
 -- the real menus (newFightDriver -- Terra casts her real Fire so her MP is
 -- visibly SPENT, everyone else Fights), and won by damage.
 --
@@ -192,19 +193,19 @@ add({
         "char " .. c .. " max MP carries no boost tier")
       if deficit == nil or d < deficit then nearest, deficit = c, d end
     end
-    -- the honest-arm precondition the burn-down plan asked a recon to find:
+    -- the input-driven arm's precondition the burn-down plan asked a recon to find:
     -- somebody is near enough that a couple of grass battles cross the line.
     H.assertEq(deficit <= 200, true, string.format(
-      "char %d is within honest reach of a level (deficit %d) -- if this "
-      .. "fires, the fixture re-mint moved the XP and the fixture choice "
+      "char %d is within reach of a level (deficit %d) -- if this "
+      .. "fires, the fixture regeneration moved the XP and the fixture choice "
       .. "needs re-measuring, not a bigger budget", nearest, deficit))
     H.log(string.format("climber: char %d, %d XP short", nearest, deficit))
   end),
 })
 
--- one earned battle: walk the grass band (battle_fold's loop), fight through
+-- one earned battle: walk the grass area (battle_fold's loop), fight through
 -- the real menus, then judge every record against its pre-battle latch.
--- Legs after the first two only run while the goal is unmet (H.cond), so a
+-- Steps after the first two only run while the goal is unmet (H.cond), so a
 -- lucky early run costs two battles and an unlucky one has budget.
 local function battleLeg(n)
   local plan, idx, goal = nil, 1, { 82, 56 }
@@ -232,7 +233,7 @@ local function battleLeg(n)
         if not dir then H.setPad({}); return end
         H.setPad({ [dir] = true })
       end),
-    }, "grass-band encounter " .. n),
+    }, "grass-area encounter " .. n),
     H.release(),
     H.driveUntil(function() return not H.battleLoadStarted() end, 30000, {
       H.call(battlePulse),

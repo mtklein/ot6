@@ -30,7 +30,7 @@
 -- holds in every field cell it did not draw, priority-clear, safe in both
 -- tile modes.  An abandoned cell is word-identical to one never touched.
 --
--- THE GATE, frontier-gated on rapids_start.mss: ride into the forced
+-- THE TEST, which needs rapids_start.mss: ride into the forced
 -- fight (no menu input -- the flash is before any turn), track every cell
 -- a hud line abandons, and assert on every mid-battle bg3-16x16 frame
 -- that no abandoned cell holds a priority-set word ($21FF or otherwise)

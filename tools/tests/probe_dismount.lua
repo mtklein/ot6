@@ -3,7 +3,7 @@
 -- scene's `vehicle ... CHOCOBO`), and InitChoco (world/init.asm:402) never
 -- writes the on-foot tile registers $E0/$E2 -- only InitWorld does, from
 -- $1F60 (init.asm:758-762) -- so H.worldX/worldY read 0 and worldNavTo
--- cannot plan a thing until the party is on its feet.  Everything on rung 2
+-- cannot plan a thing until the party is on its feet.  Everything on tier 2
 -- past Figaro depends on undoing that, so it gets measured before it gets
 -- used.
 --
@@ -33,7 +33,7 @@
 -- So: hold B, wait out the descent, and the party is standing on the tile
 -- the bird was over with the registers the navigator needs.
 --
--- The probe also plans (does not walk) the two rung-2 world legs from the
+-- The probe also plans (does not walk) the two tier-2 world steps from the
 -- landing tile, so a route bug shows up here rather than 10000 frames into
 -- gen_kolts: South Figaro's world entrance (86,111) and Mt. Kolts's
 -- (102,100), both read out of the WoB's own short-entrance block (map 0 of
@@ -92,10 +92,10 @@ H.run({ maxFrames = 12000 }, {
   H.call(function() snap("vehicle byte cleared") end),
 
   -- ===================================================================== --
-  -- Settle exactly the way route()'s world leg does -- control AND full
+  -- Settle exactly the way route()'s world step does -- control AND full
   -- brightness AND alignment, then the 30-frame margin.  (A world module
   -- can report control on a black screen mid-cutscene; gen_edgar's header
-  -- documents the 5700-frame mint that cost.)
+  -- documents the 5700-frame generation that cost.)
   -- ===================================================================== --
   H.waitUntil(function()
     return H.worldHasControl() and H.worldAligned() and bright() >= 15
@@ -117,7 +117,7 @@ H.run({ maxFrames = 12000 }, {
   end),
 
   -- ===================================================================== --
-  -- Plan both rung-2 legs from here.  Planning only: a path that exists is
+  -- Plan both tier-2 steps from here.  Planning only: a path that exists is
   -- the claim being checked, and it costs nothing to check it now.
   -- ===================================================================== --
   H.call(function()

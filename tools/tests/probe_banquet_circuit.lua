@@ -1,4 +1,4 @@
--- probe_banquet_circuit.lua -- I->J leg development (issue #31): the ≥90
+-- probe_banquet_circuit.lua -- I->J step development (issue #31): the ≥90
 -- WINDOW CIRCUIT, driven from the staged banquet_window savestate
 -- (probe_banquet_stage.lua) so iteration does not replay the world grind.
 --
@@ -15,7 +15,7 @@
 -- b-switches $1dd1 & $31 == 0, var0 delta +6.
 --
 -- Ends: var0==44 checkpoint, ride the expiry to the dinner table, stop on
--- the TOAST choice ($056F>=2), mint banquet_dinner.mss for the Q&A probe.
+-- the TOAST choice ($056F>=2), generate banquet_dinner.mss for the Q&A probe.
 --
 --   tools/tests/run.sh tools/tests/probe_banquet_circuit.lua
 local H = dofile("tools/tests/lib/ot6.lua")
@@ -60,7 +60,7 @@ local function soldier(objIdx, latch, what)
   }
 end
 
--- one FIGHT soldier: same chase; the battle is kill-bit cleared by
+-- one FIGHT soldier: same chase; the battle is battle-clear-write cleared by
 -- chaseTalk itself; afterwards assert species, clean flags, +6
 local function fightSoldier(objIdx, latch, species, what)
   expect = expect + 6

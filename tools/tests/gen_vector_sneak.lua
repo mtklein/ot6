@@ -1,8 +1,8 @@
--- gen_vector_sneak.lua -- v0.6 leg 2: vector_doorstep (VECTOR, map 242,
+-- gen_vector_sneak.lua -- v0.6 step 2: vector_doorstep (VECTOR, map 242,
 -- {32,61}) -> the Returner sympathizer at {45,39} -> his choice dialog ->
 -- the FACING-GATED sneak ledge at {43,38} -> control back at {57,34}, north
 -- of both the gate guards and the "You!? How'd you get in here?" trap row.
--- Mints vector_sneak.
+-- Generates vector_sneak.
 --
 -- WHY THE MAGITEK FACTORY DOOR IS NOT navTo-ABLE FROM THE ARRIVAL TILE.
 -- The door is map 242's long entrance at (57,2) len 2 -> map 262 (28,8).
@@ -45,7 +45,7 @@
 --     navTo releases the pad between steps and plans by shortest path, so
 --     it will happily arrive on {43,38} from the east facing LEFT and the
 --     trigger will silently no-op.  The party must arrive by stepping DOWN
---     from {43,37}, which is why this leg navTos to {43,37} and then drives
+--     from {43,37}, which is why this step navTos to {43,37} and then drives
 --     a held DOWN rather than navTo-ing the trigger tile.
 --
 -- WHERE IT ENDS.  _cc96c9's SLOT_1 obj_script walks the party over
@@ -164,11 +164,11 @@ H.run({ maxFrames = 60000 }, {
   --    rightward; the library lands exactly now, so one navTo does it.
   --    A DOWN press on {45,38} cannot step (his object occupies {45,39})
   --    so it only turns the party -- the standard face-an-NPC idiom.
-  H.navTo(45, 38, { maxFrames = 40000, honest = "tactical" }),
+  H.navTo(45, 38, { maxFrames = 40000, playBattles = "tactical" }),
   H.hold({ "down" }), H.waitFrames(8), H.release(), H.waitFrames(20),
   H.call(function()
-    H.assertEq(H.fieldX(), 45, "at the sympathizer's doorstep x")
-    H.assertEq(H.fieldY(), 38, "at the sympathizer's doorstep y")
+    H.assertEq(H.fieldX(), 45, "at the sympathizer's entry point x")
+    H.assertEq(H.fieldY(), 38, "at the sympathizer's entry point y")
     H.assertEq(facing(), 2, "facing DOWN toward the sympathizer (EVENT_DIR 2)")
     H.log(string.format("[oldman] at (%d,%d) facing %d $01F0=%d",
       H.fieldX(), H.fieldY(), facing(), sw(0x01F0)))
@@ -191,7 +191,7 @@ H.run({ maxFrames = 60000 }, {
   --    onto {43,38} leaves the party facing DOWN, which is the $01B2 the
   --    trigger demands.  A navTo straight to {43,38} would be free to
   --    arrive facing LEFT and the trigger would no-op silently.
-  H.navTo(43, 37, { maxFrames = 30000, honest = "tactical" }),
+  H.navTo(43, 37, { maxFrames = 30000, playBattles = "tactical" }),
   H.call(function()
     H.assertEq(H.fieldX(), 43, "above the sneak ledge x")
     H.assertEq(H.fieldY(), 37, "above the sneak ledge y")
@@ -230,7 +230,7 @@ H.run({ maxFrames = 60000 }, {
     H.assertEq(sw(0x062B), 1, "$062B still SET -- the guards are still standing")
     -- The party is now NORTH of the trap row (56..58,39) and of the guard
     -- lanes; the column to the factory door is clear.  Assert that the
-    -- door tile is reachable NOW, which is the whole point of this leg --
+    -- door tile is reachable NOW, which is the whole point of this step --
     -- it was NO-PATH from the arrival tile.
     H.assertEq(H.bfsPath(57, 2) ~= nil, true,
       "the factory door (57,2) is now reachable -- it was NO-PATH before the sneak")
@@ -242,7 +242,7 @@ H.run({ maxFrames = 60000 }, {
   H.saveState("vector_sneak.mss"),
   H.logStep(function()
     return string.format(
-      "vector_sneak minted at frame %d -- VECTOR (57,34), past the gate guards",
+      "vector_sneak generated at frame %d -- VECTOR (57,34), past the gate guards",
       H.frame)
   end),
 })

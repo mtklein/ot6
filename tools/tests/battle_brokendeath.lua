@@ -41,7 +41,7 @@
 -- whole test degrades into "the boss dies", which passes with no gate at
 -- all and proves nothing about placement.
 --
--- ============================ THE HONEST REBUILD (#75) ====================
+-- ====================== THE INPUT-DRIVEN REBUILD (#75) ====================
 -- The previous version of this file STAGED its scenario: it pinned every
 -- party member to 900 HP, set Ifrit's shield count to 0 and his broken
 -- timer to $10 by direct write, and clamped his HP to 12 so the next landed
@@ -63,9 +63,9 @@
 -- rebuild drove CELES -> Magic -> Ice and EDGAR -> Tools -> AutoCrossbow
 -- while Ifrit was on stage, and its header reported a measured win (kill
 -- at tick 4 of the first break, f8283).  On the 2026-08-09 ifrit_doorstep
--- re-mint that drive WIPES, reproducibly: party 0/0/0/0 by ~f6300 with
+-- regeneration that drive WIPES, reproducibly: party 0/0/0/0 by ~f6300 with
 -- Ifrit still at ~3057 hp and 5 of 6 shields.  Traced on the sibling
--- anchored leg (gen_ifrit_magicite), the mechanism is the TAG: the
+-- checkpoint-based step (gen_ifrit_magicite), the mechanism is the TAG: the
 -- specials were gated on Ifrit being ON STAGE, and in every measured run
 -- he took the stage for ~2400 frames, tagged out, and stayed hidden for
 -- the next ~7800 while Shiva soaked everything -- she got BROKEN and then
@@ -87,13 +87,13 @@
 -- of the staged lab, not of the property.
 --
 -- THE RETRY LADDER (gen_tunnelarmr's; measured necessary here 2026-08-09).
--- This fixture's party is a harder start than the anchored leg's -- CELES
+-- This fixture's party is a harder start than the checkpoint-based step's -- CELES
 -- arrives at 221/349 and the bag is the Vector chain's leavings -- and the
 -- first library-fighter run on it fought well (heals and all three Fenix
 -- revives landed) and still wiped at phase 0.  The battle RNG seed is the
 -- frame phase at battle init (gen_whelk_poweron's measurement), so the
 -- test tops the party up through the real field Item menu (H.fieldCare),
--- captures the doorstep as a blob, and replays up to three phase-spread
+-- captures the entry point as a blob, and replays up to three phase-spread
 -- attempts.  An attempt only counts as THE observation when a boss died
 -- with its broken timer running; anything else -- a wipe, or a kill that
 -- landed after the window lapsed -- reloads and re-rolls.  That is
@@ -154,7 +154,7 @@ end
 
 -- One attempt, flat (driveUntil bodies replay latched state, so every
 -- attempt builds fresh closures).  Attempt 1 runs in place -- the live
--- timeline IS the blob's timeline; later attempts reload the doorstep blob
+-- timeline IS the blob's timeline; later attempts reload the entry-point blob
 -- and shift the RNG phase.  An attempt records into `won` only when a boss
 -- died WITH ITS BROKEN TIMER RUNNING and the break was watched happen.
 local function attempt(n)
@@ -176,10 +176,10 @@ local function attempt(n)
     n > 1 and seq({
       H.call(function() loadReq = H.requestLoadState(fightBlob) end),
       H.waitFrames(2),
-      H.call(function() H.checkReq(loadReq, "doorstep blob reload") end),
+      H.call(function() H.checkReq(loadReq, "entry-point blob reload") end),
       H.waitFrames(90),
       H.call(function()
-        H.assertEq(H.hasControl(), true, "reloaded controllable at the doorstep")
+        H.assertEq(H.hasControl(), true, "reloaded controllable at the entry point")
       end),
     }) or seq({}),
     H.waitFrames((n - 1) * 37),          -- vary the battle RNG seed
@@ -227,7 +227,7 @@ local function attempt(n)
       "ifrit takes the stage", 10),
     H.waitFrames(90),
 
-    -- the honest fight: the library fighter, gauges logged around it.  Its
+    -- the input-driven fight: the library fighter, gauges logged around it.  Its
     -- menu==0 branch also pages the recognition scene's dialogs and the
     -- victory teardown, so this one drive carries the battle from fly-in
     -- to field (or through the Annihilated screen, on a loss).
@@ -294,14 +294,14 @@ H.run({ maxFrames = 250000 }, {
   H.equipOptimum({ tag = "brokendeath kit" }),
   H.fieldCare({ tag = "care before battle 70", threshold = 0.95 }),
 
-  -- 2. capture the prepared doorstep as the retry ladder's reload blob
+  -- 2. capture the prepared entry point as the retry ladder's reload blob
   (function()
     local req
     return seq({
       H.call(function() req = H.requestSaveState() end),
       H.waitFrames(2),
       H.call(function()
-        H.checkReq(req, "doorstep retry blob")
+        H.checkReq(req, "entry-point retry blob")
         fightBlob = req.blob
         H.log(string.format("retry blob captured: %d bytes", #fightBlob))
       end),

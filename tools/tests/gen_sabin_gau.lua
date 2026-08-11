@@ -1,6 +1,6 @@
--- gen_sabin_gau.lua -- leg 10 of SABIN's scenario: GAU.  Mints:
---   gau_joined.mss   world (214,147), Crescent Mountain's doorstep, party
---                    SABIN+CYAN+GAU -- the trench leg steps in from here.
+-- gen_sabin_gau.lua -- step 10 of SABIN's scenario: GAU.  Generates:
+--   gau_joined.mss   world (214,147), Crescent Mountain's entry point, party
+--                    SABIN+CYAN+GAU -- the trench step steps in from here.
 --
 -- Every Crescent Mountain helmet-scene variant gates on $01AB (GAU in the
 -- party), so the trench cannot open without him.  The route: off the shore
@@ -34,24 +34,24 @@
 -- encounter.  Every gameplay change is controller input; all addresses here
 -- are observations used to close the loop.
 --
--- THE GRIND IS FOUGHT, NOT KILL-BITTED (#75): the appearance rolls only
+-- THE GRIND IS FOUGHT, NOT WRITE-CLEARED (#75): the appearance rolls only
 -- at a WIN, so wins are earned by the house menu-episode machine (bank
 -- boost to 2, dump on Fight), with a self-heal branch (Item -> TONIC,
 -- default self target) under 40% HP -- the Tonics are bought in Mobliz
 -- alongside the meat.  A wipe reloads a pre-grind checkpoint (three
--- attempts, 17-frame stagger).  SHADOW is gone before this leg, so no
+-- attempts, 17-frame stagger).  SHADOW is gone before this step, so no
 -- leave roll exists to manage.
 --
--- THE MINT IS VERIFIED BY RELOAD, because calm-at-capture provably does not
--- imply calm-at-boot.  Measured landing the honest-root pilot (2026-08-03):
--- a capture taken at (214,149) with full world control -- $E8 gate clear,
--- aligned, the doorstep guard below satisfied in 0 frames -- REPRODUCIBLY
--- boots into a battle: every reload read $E8=$28 (bit5, battle pending)
--- within a frame and battle_gaufight's 'world control' wait timed out at
--- 4000 frames, while the live mint timeline sailed on calm past the same
--- capture point.  The only test that matters for a fixture is the
--- consumer's-eye one: reload what you captured and require the calm you
--- promised.
+-- THE GENERATE IS VERIFIED BY RELOAD, because calm-at-capture provably does
+-- not imply calm-at-boot.  Measured landing the input-driven-root pilot
+-- (2026-08-03):  a capture taken at (214,149) with full world control --
+-- $E8 gate clear, aligned, the entry point guard below satisfied in 0
+-- frames -- REPRODUCIBLY boots into a battle: every reload read $E8=$28
+-- (bit5, battle pending)  within a frame and battle_gaufight's 'world
+-- control' wait timed out at 4000 frames, while the live generation
+-- timeline sailed on calm past the same capture point.  The only test that
+-- matters for a fixture is the consumer's-eye one: reload what you captured
+-- and require the calm you promised.
 local H = dofile("tools/tests/lib/ot6.lua")
 local DOOR = "build/states/falls_done.mss.lua"
 local ZMENUSTATE, MAIN_MENU, CONFIG_MENU = 0x26, 0x05, 0x0E
@@ -266,9 +266,9 @@ end
 local buyItem = H.buyItem
 
 -- ------------------------------------------------------- the grind driver --
--- One driveUntil to GAU's join: world wander for encounters; honest fights
--- (boost + Fight, Tonic-self under 40%); the FEED the moment $2F4E holds
--- with the meat still in the bag; hands-off-plus-taps for the return
+-- One driveUntil to GAU's join: world wander for encounters; input-driven
+-- fights (boost + Fight, Tonic-self under 40%); the FEED the moment $2F4E
+-- holds with the meat still in the bag; hands-off-plus-taps for the return
 -- visit.  All cursor state read live, all input by pad.
 local lost = nil
 local fightTier = 1
@@ -291,7 +291,7 @@ end
 local function fedSwitch() return (H.readByte(0x3EBD) & 0x02) ~= 0 end
 
 -- ------------------------------------- world walk that FIGHTS its randoms --
--- The stretch from the falls shore to Mobliz crosses a VELDT band whose
+-- The stretch from the falls shore to Mobliz crosses a VELDT area whose
 -- packs are UNRUNNABLE (measured, probe_gaustuck: L+R never ended the
 -- (203,116) encounter across 37000 frames) and too stiff for blind tap-A
 -- (a SABIN+CYAN party whose row-0 commands are submenus stalls the pack
@@ -341,9 +341,10 @@ local function worldWalkFight(tx, ty, budget, what, arriveOffWorld, opts)
       end
     end
     -- Gau's shared row is terrain-dependent: LEAP on the Veldt, FIGHT off it.
-    -- Read the built list.  Never select Leap on this fixture-mint route (it
-    -- deliberately removes Gau); switch to another ready actor instead.  If
-    -- this same driver reaches an off-Veldt fight, use the real Fight row.
+    -- Read the built list.  Never select Leap on this fixture-generating
+    -- route (it deliberately removes Gau); switch to another ready actor
+    -- instead.  If this same driver reaches an off-Veldt fight, use the
+    -- real Fight row.
     if fed and actor == 2 then
       local row0 = H.readByte(CMDTBL + actor * 12)
       if row0 == CMD_FIGHT then return { kind = "fight", boostLeft = 0 } end
@@ -457,8 +458,8 @@ local function worldWalkFight(tx, ty, budget, what, arriveOffWorld, opts)
     -- 2026-08-09 booting a stale-stamped chain) must set `lost` and let
     -- driveUntil finish CLEANLY, so the ladder reloads on a staggered
     -- timeline.  Without this the segment's own driveUntil raises at
-    -- budget and kills the whole mint before attempt 2.  Non-segment
-    -- callers keep the raising budget (they are not laddered).
+    -- budget and kills the whole generation run before attempt 2.
+    -- Non-segment callers keep the raising budget (they are not laddered).
     if opts.segment then
       segFrames = segFrames + 1
       if segFrames > (budget or 40000) - 400 and lost == nil then
@@ -474,7 +475,7 @@ local function worldWalkFight(tx, ty, budget, what, arriveOffWorld, opts)
       if H.battleLoadStarted() then
         battleFrames = (battleFrames or 0) + 1
         if battleFrames == 120 then
-          -- name the draw: the staging band is a formation LOTTERY (a
+          -- name the draw: the staging area is a formation LOTTERY (a
           -- draw at f58124 killed 231+254 HP from FULL in one battle),
           -- so every battle logs its formation species words -- the
           -- killer gets identified from the log, not guessed at.  Read
@@ -885,7 +886,7 @@ local function grindStep()
             grind.fights, H.frame, w[1], w[2], w[3], w[4]))
         end
         -- wipe watch (a random-encounter wipe is a Game Over)
-        -- This leg's live party is exactly Sabin+Cyan.  Unused battle slots
+        -- This step's live party is exactly Sabin+Cyan.  Unused battle slots
         -- retain stale nonzero HP words, so counting all four masks a real
         -- two-character wipe and leaves the driver wandering through Game
         -- Over memory.
@@ -976,10 +977,10 @@ local function grindAttempt(n)
   }, {})
 end
 
--- THE RELOAD-VERIFIED MINT (see the header).
+-- THE RELOAD-VERIFIED GENERATE (see the header).
 local mintBlob, mintDone = nil, false
 local function mintAttempt(n)
-  local tag = string.format("[gau_joined] mint attempt %d", n)
+  local tag = string.format("[gau_joined] generation attempt %d", n)
   local saveReq, loadReq
   return H.cond(function() return not mintDone end, {
     H.call(function() saveReq = H.requestSaveState() end),
@@ -1001,7 +1002,7 @@ local function mintAttempt(n)
     end, {
       H.call(function()
         mintDone = true
-        H.log(tag .. ": reload stayed calm at the doorstep -- verified")
+        H.log(tag .. ": reload stayed calm at the entry point -- verified")
       end),
     }, {
       H.logStep(function()
@@ -1014,14 +1015,14 @@ local function mintAttempt(n)
       end, 20000, {
         H.call(function()
           if H.battleLoadStarted() then
-            H.setPad({ l = true, r = true })   -- flee, honestly
+            H.setPad({ l = true, r = true })   -- flee, with real input
           else
             H.setPad({})
           end
         end),
       }, tag .. ": flee the boot battle, ride out the world reload"),
       H.call(function() H.setPad({}) end),
-      H.worldNavTo(214, 149, { maxFrames = 8000, honest = true }),
+      H.worldNavTo(214, 149, { maxFrames = 8000, playBattles = true }),
       H.waitFrames(30),
     }),
   }, {})
@@ -1076,7 +1077,7 @@ local function walkAttempt(n)
   end
   -- no non-segmented closer here: a raising driveUntil inside an attempt
   -- would abort the LADDER, and 30 fought-and-cared segments that never
-  -- parked is a loss for THIS timeline, not for the leg
+  -- parked is a loss for THIS timeline, not for the step
   steps[#steps + 1] = H.call(function()
     if lost == nil and H.worldMode() and H.worldX() == 215
        and H.worldY() == 119 then
@@ -1093,10 +1094,10 @@ local function walkAttempt(n)
 end
 
 -- The POST-JOIN route ladder: the same siege discipline, applied to the
--- fence S-curve from the join tile to Crescent Mountain's doorstep.  The
+-- fence S-curve from the join tile to Crescent Mountain's entry point.  The
 -- 2026-08-09 run that first got GAU aboard lost his whole party to the
 -- formation lottery at f75413 on this very stretch -- with GAU joined and
--- the pre-join walk green -- because these nine legs were still bare
+-- the pre-join walk green -- because these nine steps were still bare
 -- worldWalkFights with no care stops, no ladder, and (before the
 -- Game-Over canary) not even a name for the wipe.  Each waypoint keeps
 -- its BFS disc small around the fence; each is now besieged one battle
@@ -1113,7 +1114,7 @@ local ROUTE = {
   { 212, 156, "south run" },
   { 205, 153, "west bend" },
   { 207, 151, "northwest bend" },
-  { 214, 149, "Crescent doorstep" },
+  { 214, 149, "Crescent entry point" },
 }
 local routeBlob, routeDone = nil, false
 local function routeCheckpoint()
@@ -1176,7 +1177,7 @@ local function routeAttempt(n)
     if lost == nil then
       routeDone = true
       H.log(string.format("[gau] post-join route attempt %d ARRIVED at " ..
-        "the Crescent doorstep f%d [%s]", n, H.frame, partyLine()))
+        "the Crescent entry point f%d [%s]", n, H.frame, partyLine()))
     end
   end)
   return H.cond(function() return not routeDone end, steps, {})
@@ -1192,7 +1193,7 @@ H.run({ maxFrames = 500000 }, {
   end),
 
   -- off the shore, to Mobliz, buy the Dried Meat and the grind's Tonics
-  H.navTo(8, 14, { maxFrames = 6000, honest = "flee", arrive = function()
+  H.navTo(8, 14, { maxFrames = 6000, playBattles = "flee", arrive = function()
     return H.worldMode() end }),
   H.waitUntil(function() return H.worldMode() and H.worldHasControl() end,
     3000, "on the world", 5),
@@ -1204,14 +1205,14 @@ H.run({ maxFrames = 500000 }, {
     end
   end),
   settle(157, "Mobliz"),
-  H.navTo(26, 22, { maxFrames = 10000, honest = "flee", arrive = function()
+  H.navTo(26, 22, { maxFrames = 10000, playBattles = "flee", arrive = function()
     return mapIdx() == 164 end }),
   H.cond(function() return mapIdx() ~= 164 end, {
-    H.navTo(26, 21, { maxFrames = 3000, honest = "flee", arrive = function()
+    H.navTo(26, 21, { maxFrames = 3000, playBattles = "flee", arrive = function()
       return mapIdx() == 164 end }),
   }, {}),
   settle(164, "item shop"),
-  H.navTo(29, 50, { maxFrames = 6000, honest = "flee" }),
+  H.navTo(29, 50, { maxFrames = 6000, playBattles = "flee" }),
   (function()
     local phase = 0
     return H.driveUntil(function() return mstateMenu() == 0x25 end, 3000, {
@@ -1246,13 +1247,13 @@ H.run({ maxFrames = 500000 }, {
 
   -- out of town; settle the world fully (a stray press during the init
   -- transient walks back in -- measured), then clear of the entrance
-  H.navTo(29, 53, { maxFrames = 4000, honest = "flee", arrive = function()
+  H.navTo(29, 53, { maxFrames = 4000, playBattles = "flee", arrive = function()
     return mapIdx() == 157 end }),
   settle(157, "town again"),
   -- (18,41) is Mobliz's south exit ROW, and a row you leave a town by is a
   -- tile you STEP THROUGH, never one you come to rest on.  navTo to the
-  -- doorstep and press SOUTH through the row.
-  H.navTo(18, 40, { maxFrames = 8000, honest = "flee", arrive = function()
+  -- entry point and press SOUTH through the row.
+  H.navTo(18, 40, { maxFrames = 8000, playBattles = "flee", arrive = function()
     return H.worldMode() end }),
   (function()
     local hb = -600
@@ -1273,7 +1274,7 @@ H.run({ maxFrames = 500000 }, {
     return H.worldMode() and H.worldHasControl() and H.worldAligned()
   end, 3000, "world live again", 5),
   -- THE STAGING WALK IS A SIEGE BEHIND A LADDER (2026-08-09, measured
-  -- four ways on the fresh honest chain).  The packs are unrunnable
+  -- four ways on the fresh input-driven chain).  The packs are unrunnable
   -- (the probe_gaustuck measurement above) and pay NOTHING -- no gil,
   -- no exp -- so every battle is pure attrition, and in-battle healing
   -- is bounded by TURNS: a Tonic turn heals 50 while the pack deals
@@ -1289,7 +1290,7 @@ H.run({ maxFrames = 500000 }, {
   -- one draw of the formation lottery kills 231+254 HP from FULL in a
   -- single battle (measured at f58124, siege segment 11) -- and a
   -- replay from the same fixture is DETERMINISTIC, so without a
-  -- staggered reload every future mint walks into the same doom on
+  -- staggered reload every future generation run walks into the same doom on
   -- the same frame.  A 17-frame stagger is a different timeline and a
   -- different draw: the same TAS discipline battles 47 and 68 and the
   -- grind already use.
@@ -1304,7 +1305,7 @@ H.run({ maxFrames = 500000 }, {
     end
   end),
 
-  -- the grind, honestly, behind the ladder (see the header)
+  -- the grind, with real input, behind the ladder (see the header)
   (function()
     local ckReq
     return H.cond(function() return true end, {
@@ -1324,7 +1325,7 @@ H.run({ maxFrames = 500000 }, {
   H.call(function()
     if not grindWon then
       error(string.format("gau: the Veldt grind did not recruit GAU on " ..
-        "any of 3 honest attempts -- last: %s", tostring(lost)), 0)
+        "any of 3 attempts -- last: %s", tostring(lost)), 0)
     end
     H.assertEq(fed, true,
       "the Dried Meat was fed to GAU through the real battle Item menu " ..
@@ -1338,10 +1339,10 @@ H.run({ maxFrames = 500000 }, {
   end, 20000, "world after the join", 5),
   H.waitFrames(120),
 
-  -- park on Crescent Mountain's doorstep (one short of the (214,148)
-  -- entrance) and mint.  The route rides the ladder defined above (the
+  -- park on Crescent Mountain's entry point (one short of the (214,148)
+  -- entrance) and generate.  The route rides the ladder defined above (the
   -- SIEGE comment there carries the measurements); the Veldt's
-  -- encounters are unrunable, so every one is fought by the honest menu
+  -- encounters are unrunable, so every one is fought by the input-driven menu
   -- fighter, one per segment, with field care between.
   routeCheckpoint(),
   routeAttempt(1),
@@ -1354,19 +1355,19 @@ H.run({ maxFrames = 500000 }, {
     end
   end),
   -- The landing step itself can WIN the encounter roll ($E8 bit5 the
-  -- instant it wins); require REAL control before minting, fleeing any
+  -- instant it wins); require REAL control before generating, fleeing any
   -- landing-roll battle -- the post-battle reload restores this tile.
   H.driveUntil(function()
     return H.worldMode() and H.worldHasControl() and H.worldAligned()
   end, 20000, {
     H.call(function()
       if H.battleLoadStarted() then
-        H.setPad({ l = true, r = true })   -- flee, honestly
+        H.setPad({ l = true, r = true })   -- flee, with real input
       else
         H.setPad({})
       end
     end),
-  }, "calm, controllable doorstep (flee any landing-roll battle)"),
+  }, "calm, controllable entry point (flee any landing-roll battle)"),
   H.waitFrames(30),
   H.call(function()
     H.assertEq(H.worldMode(), true, "on the world")
@@ -1386,11 +1387,11 @@ H.run({ maxFrames = 500000 }, {
   mintAttempt(3),
   H.call(function()
     H.assertEq(mintDone, true,
-      "a reload-verified calm doorstep capture within 3 attempts")
+      "a reload-verified calm entry point capture within 3 attempts")
     H.emitBlob("gau_joined.mss", mintBlob)
   end),
   H.logStep(function()
-    return string.format("gau_joined minted at frame %d world (%d,%d) -- " ..
+    return string.format("gau_joined generated at frame %d world (%d,%d) -- " ..
       "GAU fed and recruited through real menus", H.frame,
       H.worldX(), H.worldY())
   end),

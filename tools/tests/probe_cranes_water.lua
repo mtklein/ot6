@@ -1,11 +1,11 @@
 -- probe_cranes_water.lua -- READ-ONLY instrument (issue #75, the Cranes
 -- vanilla-playbook re-test): does the fight's DESIGNED key actually turn it?
 --
--- The wall record (gen_terra_returned_anchor header) reports every honest
--- configuration wiping by ~f8400 and names the designed counter -- water,
--- bosses-wob.md 16 -- "unobtainable by the mandated party".
--- probe_cranes_loadout falsified the premise: BISMARK ($1A69 bit 7) is
--- owned at n128_won, everyone can pay Sea Song's 50 MP, and Sea Song
+-- The wall record (gen_terra_returned_anchor header) reports every
+-- input-driven configuration wiping by ~f8400 and names the designed
+-- counter -- water, bosses-wob.md 16 -- "unobtainable by the mandated
+-- party".  probe_cranes_loadout falsified the premise: BISMARK ($1A69 bit
+-- 7) is owned at n128_won, everyone can pay Sea Song's 50 MP, and Sea Song
 -- ($3d: WATER 58, all enemies) hits BOTH Cranes' shared weakness while
 -- feeding NEITHER absorb ($10D absorbs bolt $04, $10E fire $01 --
 -- monster_prop.dat +23).  SHIVA's Diamond Dust ($38: ice, power 34 + a
@@ -214,7 +214,7 @@ local function attempt(n)
       H.call(function() H.checkReq(loadReq, "pre-attempt reload") end),
     }) or H.waitFrames(1),
     H.waitFrames(90 + (n - 1) * 37),     -- vary the battle RNG seed
-    H.navTo(54, 40, { honest = "flee", maxFrames = 25000 }),
+    H.navTo(54, 40, { playBattles = "flee", maxFrames = 25000 }),
     (function() local ph = 0
       return H.driveUntil(function() return map() == 6 end, 9000, {
         H.call(function()
@@ -275,7 +275,7 @@ local function attempt(n)
             -- edge itself -- teardown reads $FFFF everywhere (HANDOFF trap
             -- 1), and this file's first WIN was thrown away as a "wipe" by
             -- exactly that read.  The delta logger's LAST IN-BATTLE values
-            -- are the honest witnesses: any Crane still above zero on its
+            -- are the real checks: any Crane still above zero on its
             -- final in-battle sample means we lost.
             if type(lastSt) == "table" then
               for m = 0, 1 do

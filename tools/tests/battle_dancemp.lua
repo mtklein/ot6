@@ -13,16 +13,16 @@
 -- wallet paints the actor's current MP on the window's top edge.
 --
 -- ISSUE #75 CONVERSION -- the REAL MOG, and the game's own dance-learning.
--- The old header said "Mog is not in the supported frontier yet"; that is
+-- The old header said Mog was not reachable yet; that is
 -- STALE -- he leads P2 of the Narshe moogle defense (gen_moogle,
--- moogle_defense.mss, minted en route to moogle_cleared -- hence the
--- frontier gate on moogle_cleared, whose mint refreshes both).  So every
+-- moogle_defense.mss, generated en route to moogle_cleared -- hence the
+-- frontier=moogle_cleared line above, whose run refreshes both).  So every
 -- staging is gone: no CHAR::MOG installs, no command-row writes, no monster
 -- stop/HP/death-proof pins, no $1d4c pin, no $267e rebuild.  In their
 -- place, the game's own arming:
 --   * the defense is DEPLOYED exactly as gen_moogle deploys it (P3 east,
 --     P2 west, P1 back to the choke), and the wave storm is fought with
---     honest tap-A -- except P2's battles, which are this test's subject;
+--     plain tap-A -- except P2's battles, which are this test's subject;
 --   * P2's FIRST wave battle is won with plain Fights, and the VICTORY is
 --     what teaches Mog his first dance: the battle-end path sets the
 --     current background's dance in $1d4c ("mastered a new dance!",
@@ -30,7 +30,7 @@
 --     BattleBGDance bit after.  Until then Mog has NO Dance command at all
 --     (InitCmd_02 removes it on a zero mask, battle_main.asm:14129) --
 --     also asserted, because it is the reason no earlier fixture could
---     host this file honestly;
+--     host this file with real inputs;
 --   * P2's SECOND wave battle is the measurement: the known dance now
 --     MATCHES the battle background BY CONSTRUCTION (it was learned on
 --     this very terrain), so Cmd_13's 50% bg-mismatch stumble never fires
@@ -49,13 +49,13 @@
 -- *** ONE LABELED ISOLATION ARM (issue #75) -- two writes STAY ***
 --   4. REFUSAL: the below-price fizzle (row greys $25, the commit still
 --      queues at 8, the universal insufficient-MP gate refuses: no dance
---      status, MP unmoved).  The honest input is a Mog whose pool is under
+--      status, MP unmoved).  The input-driven case is a Mog whose pool is under
 --      8 -- trivially reachable in open play by dancing across fights, but
 --      NOT inside this set piece: the defense gives P2 exactly TWO wave
 --      battles, the first is spent learning the dance (the game's own
 --      precondition), and once Mog is dancing his turns auto-queue and his
 --      menu never reopens.  Per the burn-down plan's observation-window
---      ruling (systemic call 2), the arm runs BEFORE the honest dance in
+--      ruling (systemic call 2), the arm runs BEFORE the real dance in
 --      the same battle: Mog's pool is written to 7, the refusal is
 --      measured, and the pool is restored to the value read at battle
 --      start.  Both writes are this file's .writeWord( waiver; it MAY
@@ -125,7 +125,7 @@ local mogSlot = nil
 local function mpOf(slot) return H.readWord(0x3C08 + slot * 2) end
 
 -- ------------------------------------------------------------------------
--- the storm driver: fight every NON-P2 battle with honest tap-A; STOP the
+-- the storm driver: fight every NON-P2 battle with plain tap-A; STOP the
 -- moment a battle engages P2 (this test's subject).  Off-battle, hands off
 -- (the defense choreography moves the waves itself); dialogs are paged.
 -- ------------------------------------------------------------------------
@@ -145,7 +145,7 @@ local function untilP2Battle(what)
           H.readByte(MENU), H.readByte(0x1f41)))
       end
       if H.battleLoadStarted() and H.readByte(FIGHTPARTY) ~= 2 then
-        H.setPad(ph % 8 < 4 and { a = true } or {})   -- honest tap-A win
+        H.setPad(ph % 8 < 4 and { a = true } or {})   -- plain tap-A win
       elseif not H.battleLoadStarted() then
         H.setPad(ph % 8 < 4 and { a = true } or {})   -- page dialogs/victory
       else
@@ -272,13 +272,13 @@ H.run({ maxFrames = 250000 }, {
 
   -- deployment, gen_moogle's exact march order: P1 unboxes the mound, P3
   -- east, P2 (MOG's squad) west, P1 back to the choke.
-  H.navTo(15, 15, { maxFrames = 2500, honest = true }),
+  H.navTo(15, 15, { maxFrames = 2500, playBattles = true }),
   ySwitchTo(3),
-  H.navTo(20, 20, { maxFrames = 4000, honest = true }),
+  H.navTo(20, 20, { maxFrames = 4000, playBattles = true }),
   ySwitchTo(2),
-  H.navTo(10, 21, { maxFrames = 4000, honest = true }),
+  H.navTo(10, 21, { maxFrames = 4000, playBattles = true }),
   ySwitchTo(1),
-  H.navTo(14, 14, { maxFrames = 2500, honest = true }),
+  H.navTo(14, 14, { maxFrames = 2500, playBattles = true }),
   H.logStep("deployed; letting the storm come"),
 
   -- ---- P2's FIRST wave battle: win it, and the WIN teaches the dance ----
@@ -339,7 +339,7 @@ H.run({ maxFrames = 250000 }, {
   -- *** THE LABELED ISOLATION ARM (see header): the below-price refusal.
   -- Mog's pool is written to 7, the refusal is measured through the
   -- standard surfaces, and the pool is restored to the value read above.
-  -- Runs BEFORE the honest dance because a dancing Mog's menu never
+  -- Runs BEFORE the real dance because a dancing Mog's menu never
   -- reopens (RandDanceAction auto-queues his turns).
   -- ======================================================================
   mogMenu("mog's command window (isolation arm)"),
@@ -413,7 +413,7 @@ H.run({ maxFrames = 250000 }, {
   end),
 
   -- ---- 1. the menu, at the REAL pool: white row, cost, wallet ----------
-  mogMenu("mog's command window (honest phases)"),
+  mogMenu("mog's command window (input-driven phases)"),
   openDance("the dance list opens"),
   H.waitFrames(20),
   H.call(function()

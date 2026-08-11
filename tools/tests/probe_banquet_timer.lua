@@ -5,9 +5,9 @@
 -- the castle (243 row y=31 -> 253 -> world, all ungated during $007B=1)
 -- and world-save with the event timer LIVE.  Does that save round-trip?
 --
--- STAGING, stated honestly: the banquet is 5 unminted legs downstream of
+-- STAGING, stated plainly: the banquet is 5 ungenerated steps downstream of
 -- terra-returned-v1, so this probe does NOT reach it.  It cold-Continues
--- the terra-returned anchor (world (24,121), on foot at the parked
+-- the terra-returned checkpoint (world (24,121), on foot at the parked
 -- Blackjack) and hand-writes the timer-0 block exactly as
 -- `start_timer 0, N, _cc8a96, {FIELD_VISIBLE, BANQUET,
 -- MENU_BATTLE_VISIBLE}` would (EventCmd_a0, field/event.asm:3736-3757:
@@ -43,7 +43,7 @@ local H = dofile("tools/tests/lib/ot6.lua")
 local ZMENUSTATE = 0x26
 local SAVE_SELECT_INIT = 0x13
 local SAVE_SELECT = 0x14
-local STAGE_FRAMES = 5400          -- 90s: room for the menu legs to tick
+local STAGE_FRAMES = 5400          -- 90s: room for the menu steps to tick
 local SLOT3 = 0x307400             -- $306000 + SRAMSlotPtrs[3] ($1400)
 local SLOT3_TIMER = SLOT3 + (0x1FA8 - 0x1600)
 local SLOT3_VAR0  = SLOT3 + (0x1FC2 - 0x1600)
@@ -63,8 +63,8 @@ local function sram(off) return emu.read(off, emu.memType.snesMemory) end
 local menuT0 = 0
 
 H.run({ maxFrames = 30000 }, {
-  -- cold Continue (the anchor's $307ff0=3 preselects slot 3) -- the exact
-  -- boot leg probe_mp_universal measured: restores ON FOOT at (24,121).
+  -- cold Continue (the checkpoint's $307ff0=3 preselects slot 3) -- the exact
+  -- boot step probe_mp_universal measured: restores ON FOOT at (24,121).
   H.waitFrames(350),
   H.repeatN(5, { H.pressButtons({ "start" }, 8), H.waitFrames(25) }),
   H.waitFrames(120),
@@ -79,10 +79,10 @@ H.run({ maxFrames = 30000 }, {
   H.waitFrames(60),
   H.call(function()
     H.assertEntryContract("terra-returned-v1")
-    H.assertEq(H.worldHasControl(), true, "world control at the anchor")
+    H.assertEq(H.worldHasControl(), true, "world control at the checkpoint")
   end),
 
-  -- STAGE the live banquet timer + window state (see header for honesty).
+  -- STAGE the live banquet timer + window state (see header for staging).
   H.call(function()
     H.writeByte(0x1188, 0x72)          -- pfrmxxee = 0111 0010
     H.writeWord(0x1189, STAGE_FRAMES)  -- counter

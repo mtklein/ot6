@@ -12,7 +12,8 @@
 --    JITTER alone (k*11 field frames before the trigger step, and
 --    240 + 7(k-1) in-battle settle frames before the driver arms).
 --  * the fight is played to the end by POLICY (below), all-legit: no
---    HP pins, no kill-bits. A wipe is a sample, not a failure.
+--    HP pins, no writes of the battle-clearing flag. A wipe is a sample,
+--    not a failure.
 --  * battle menus eat input during their open animation EVERY turn:
 --    presses are gated on the menu flag holding 4 consecutive 30-frame
 --    pulses (bal_mines' hard-won settle rule). When no menu is up, A is

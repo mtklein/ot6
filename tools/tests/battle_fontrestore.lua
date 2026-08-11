@@ -10,7 +10,7 @@ local goodFire, goodShield
 -- byte 0 of vanilla's banner name scratch — see battle_banner), and the
 -- battle NMI re-lays our icons in vblank, ONE ~128-byte slice per frame
 -- (6 stages; a single-shot re-lay was ~46 scanlines and tore the frame).
--- (flag-after-restore ordering matters: battle_dlgmenu gates the real
+-- (flag-after-restore ordering matters: battle_dlgmenu tests the real
 -- dialogue flow). This test drives the MECHANISM directly: corrupt the
 -- icon cells in vram, raise the flag, and confirm the NMI restores them
 -- and clears the flag.

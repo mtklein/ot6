@@ -1,18 +1,18 @@
 -- @suite slow
--- battle_reveal_poweron.lua -- the dirty-RAM, fresh-battle reveal gate.
+-- battle_reveal_poweron.lua -- the dirty-RAM, fresh-battle reveal test.
 -- Reproduces the USER'S condition (RamPowerOnState != AllZeros) that a
 -- savestate-loading test structurally cannot: it boots from POWER-ON -- no
--- state load, because a state restores the RAM it was minted with (AllZeros)
+-- state load, because a state restores the RAM it was generated with (AllZeros)
 -- and the fill never reaches battle init -- into the intro Guard fight, and
 -- asserts a fresh, never-chipped enemy shows '?'.
 --
 -- suite.sh runs this under OT6_RAM_POWERON=AllOnes (deterministic AND dirty)
 -- and OT6_SRAM_ANCHOR=tools/tests/anchors/post-opera-v1.  Issue #75
--- conversion: the battery used to be FORGED -- slot 1's codex hand-stamped
+-- conversion: the SRAM save used to be FORGED -- slot 1's codex hand-stamped
 -- 'O8' with all 384 species knowing everything, and the transient page's
 -- magic zeroed to force the invalid path.  It is now the REAL tracked
--- post-opera anchor (a battery written by the game's own Save UI on the
--- honest chain, provenance in its manifest), whose slot 3 carries a real
+-- post-opera checkpoint (an SRAM save written by the game's own Save UI on
+-- the input-driven chain, provenance in its manifest), whose slot 3 carries a real
 -- earned codex page and whose TRANSIENT page arrives VALID with the
 -- pre-save chain's knowledge still in it.  That valid stale transient is
 -- the truer real-world hazard: it is exactly what a cartridge holds after
@@ -20,11 +20,11 @@
 -- (a) leave the saved slot's knowledge untouched, and (b) WIPE the stale
 -- transient page (Ot6CodexNewGame, ot6_codex.asm) so an unsaved game
 -- cannot inherit knowledge from EITHER source.  Both are asserted against
--- byte-level snapshots of the anchor's real content -- reads, not writes.
+-- byte-level snapshots of the checkpoint's real content -- reads, not writes.
 --
 -- (The old staging populated slot 1 specifically; nothing in the claim
 -- needs slot 1 -- "the persistent page survives and is not consulted" is
--- slot-agnostic, and the anchor's slot 3 pins it against real bytes.)
+-- slot-agnostic, and the checkpoint's slot 3 pins it against real bytes.)
 --
 -- Complements battle_reveal, which pokes the masks at SEED entry (AFTER
 -- InitBattle's clear) to exercise the seed's own zeroing / Cmd_20 reload
@@ -33,9 +33,9 @@
 -- the dirt (a live write-trace showed its clear storing $00 to these bytes
 -- before the seed), and the fresh enemy draws '?'.
 --
--- BOOT DRIVE, measured: with a valid battery the title no longer skips the
+-- BOOT DRIVE, measured: with a valid SRAM save the title no longer skips the
 -- select screen -- Start lands on the load menu (ZMENUSTATE $21, cursor
--- $4b) showing New Game / Empty / Empty / the anchor's slot-3 save, with
+-- $4b) showing New Game / Empty / Empty / the checkpoint's slot-3 save, with
 -- the cursor preselecting the saved slot (row 3).  UP edges walk it to
 -- row 0 = New Game, A commits, and Ot6CodexNewGame's wipe is observable
 -- in SRAM the moment it runs.
@@ -70,17 +70,17 @@ local function armSeedSnapshot()
   end, emu.callbackType.exec, SEED, SEED)
 end
 
-local slot3Boot = nil                   -- the anchor page, byte for byte
+local slot3Boot = nil                   -- the checkpoint page, byte for byte
 
 H.run({ maxFrames = 70000 }, {
   H.call(function()
     armSeedSnapshot()
-    -- The anchor's REAL content, read and latched (the forged staging this
+    -- The checkpoint's REAL content, read and latched (the forged staging this
     -- replaces could not fail; these positive controls can):
-    H.assertEq(sram(SLOT3), 0x4f, "anchor slot-3 codex magic 'O'")
-    H.assertEq(sram(SLOT3 + 1), 0x38, "anchor slot-3 codex magic '8'")
-    H.assertEq(sram(TEMP), 0x4f, "anchor transient codex magic 'O' (VALID)")
-    H.assertEq(sram(TEMP + 1), 0x38, "anchor transient codex magic '8'")
+    H.assertEq(sram(SLOT3), 0x4f, "checkpoint slot-3 codex magic 'O'")
+    H.assertEq(sram(SLOT3 + 1), 0x38, "checkpoint slot-3 codex magic '8'")
+    H.assertEq(sram(TEMP), 0x4f, "checkpoint transient codex magic 'O' (VALID)")
+    H.assertEq(sram(TEMP + 1), 0x38, "checkpoint transient codex magic '8'")
     local s3n, tn = 0, 0
     slot3Boot = {}
     for off = 0, PAGE_USED - 1 do
@@ -88,18 +88,18 @@ H.run({ maxFrames = 70000 }, {
       if off >= 0x10 and slot3Boot[off] ~= 0 then s3n = s3n + 1 end
       if off >= 0x10 and sram(TEMP + off) ~= 0 then tn = tn + 1 end
     end
-    H.log(string.format("[poweron] anchor knowledge: slot3 %d byte(s), " ..
+    H.log(string.format("[poweron] checkpoint knowledge: slot3 %d byte(s), " ..
       "stale transient %d byte(s)", s3n, tn))
     H.assertEq(s3n > 0, true,
-      "positive control: the anchor's slot-3 page carries earned knowledge")
+      "positive control: the checkpoint's slot-3 page carries earned knowledge")
     H.assertEq(tn > 0, true,
-      "positive control: the anchor's STALE transient page carries " ..
+      "positive control: the checkpoint's STALE transient page carries " ..
       "knowledge for New Game to wipe (the real-world unsaved-reset case)")
   end),
 
   H.waitFrames(355),
   H.repeatN(5, { H.pressButtons({ "start" }, 8), H.waitFrames(25) }),
-  -- with a battery present the title leads to the load menu -- but only
+  -- with an SRAM save present the title leads to the load menu -- but only
   -- an A press summons it once the title settles (measured three ways:
   -- the menu pops ZMENUSTATE $21 ~366 frames after an A; five Starts
   -- plus 1800 idle frames never reach it; Start edges every 128 frames
@@ -110,7 +110,7 @@ H.run({ maxFrames = 70000 }, {
   H.driveUntil(function() return H.readByte(0x26) == 0x21 end, 3600, {
     H.pressButtons({ "a" }, 8), H.waitFrames(160),
   }, "load menu (ZMENUSTATE $21)"),
-  -- walk the cursor to row 0 = New Game (it preselects the anchor's
+  -- walk the cursor to row 0 = New Game (it preselects the checkpoint's
   -- saved slot, row 3 -- measured) and commit
   H.driveUntil(function()
     return H.readByte(0x26) == 0x21 and H.readByte(0x4b) == 0
@@ -124,7 +124,7 @@ H.run({ maxFrames = 70000 }, {
     -- (a) the saved slot's page survives New Game untouched, byte for byte
     for off = 0, PAGE_USED - 1 do
       H.assertEq(sram(SLOT3 + off), slot3Boot[off],
-        string.format("New Game preserved the anchor's slot-3 page (+%03X)",
+        string.format("New Game preserved the checkpoint's slot-3 page (+%03X)",
           off))
     end
     -- (b) the stale VALID transient page was wiped, not inherited:

@@ -6,13 +6,13 @@
 -- conversion: the knowledge used to be FORGED (a fire bit written into the
 -- transient page for species 0, $021f forced to 0, and slot 3's bytes
 -- zeroed to "assert" an emptiness) -- now every precondition is READ and
--- the payload is EARNED.  The chain that mints worldmap_narshe never
+-- the payload is EARNED.  The chain that generates worldmap_narshe never
 -- saves, so the lifecycle cell already reads 0 and the transient page
--- already carries the chain's honestly-earned reveals (measured: species
+-- already carries the chain's genuinely earned reveals (measured: species
 -- $019/$01B/$064/$134 -- mines, whelk, moogle-defense fights); slot 3 is
 -- really empty and is asserted so by reading it.  On top of that
 -- inherited payload the test earns one byte ON CAMERA: it patrols the
--- grass band south of Narshe (measured: an encounter fires ~230 frames
+-- grass area south of Narshe (measured: an encounter fires ~230 frames
 -- off the fixture tile; the pool's staple species $17 seeds weak
 -- $81 = fire|water with 2 shields), Terra casts a real Fire, and the chip
 -- path's own "learn it forever" store (ot6_break.asm, Ot6Chip) writes the
@@ -70,7 +70,7 @@ local function spellIndexOf(slot, id)
   return nil
 end
 
--- one grass-band fight: patrol until an encounter, then TERRA casts Fire
+-- one grass-area fight: patrol until an encounter, then TERRA casts Fire
 -- and everyone else Fights, all through the live menus (4-frame-held
 -- presses -- 1-frame presses are provably lost at the poll), until the
 -- battle ends.  Trash here dies to the same drive, so no flee is needed.
@@ -94,7 +94,7 @@ local function grassFight(n)
         if not dir then H.setPad({}); return end
         H.setPad({ [dir] = true })
       end),
-    }, "grass-band encounter " .. n),
+    }, "grass-area encounter " .. n),
     H.release(),
     H.waitUntil(function() return H.monstersPresent() > 0 end, 900,
       "monsters seeded", 5),
@@ -195,7 +195,7 @@ H.run({ maxFrames = 90000 }, {
       if sram(TEMP + off) ~= 0 then known = known + 1 end
     end
     H.log(string.format("[saveas] transient page carries %d earned byte(s) "
-      .. "from the mint chain", known))
+      .. "from the generation chain", known))
     H.assertEq(known > 0, true,
       "positive control: the chain's own fights populated the transient page")
     tempBefore = snapPage(TEMP)

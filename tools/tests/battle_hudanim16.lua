@@ -28,7 +28,7 @@
 -- effects and dialogue windows get -- and repaints the instant the mode
 -- comes back.
 --
--- THE GATE, frontier-gated on kolts_cave.mss (battle_flyin's fixture --
+-- THE TEST, which needs kolts_cave.mss (battle_flyin's fixture --
 -- the natural pool IS the sighting's formation class): pace into the
 -- Cirpius fight, let the entry finish, then run ~2 player turns with
 -- TERRA CASTING (her spells carry the 16x16-with-priority anims) under a
@@ -162,7 +162,7 @@ H.run({ maxFrames = 40000 }, {
       H.call(function()
         if not (H.hasControl() and H.tileAligned()) then H.setPad({}) return end
         -- issue #75: the $1f6e danger pin is gone -- the pace rolls the
-        -- encounter honestly (deterministic from the fixture; see
+        -- encounter on its own (deterministic from the fixture; see
         -- battle_flyin's note at the same loop).
         local x, y = H.fieldX(), H.fieldY()
         if lane == nil then

@@ -3,7 +3,7 @@
 -- with control lost, NO battle flag and NO dialog -- a different shape
 -- from the map-87 park (which had a live battle).  The same tile hosted a
 -- real battle in the tactical run, so the tile itself is fine.  This
--- replays from the freshly-minted sfigaro_escape (world map), crosses to
+-- replays from the freshly-generated sfigaro_escape (world map), crosses to
 -- the cave, walks toward warp A, and dumps everything the moment control
 -- goes away: field cells, world-module cells, the $3BF4 battle-HP words
 -- battleLoadStarted() reads, the event PC, and screenshots.
@@ -46,7 +46,7 @@ H.run({ maxFrames = 60000 }, {
   H.loadState(DOOR),
   H.waitFrames(60),
   H.call(function() dump("boot (sfigaro_escape)") end),
-  H.worldNavTo(75, 102, { maxFrames = 45000, honest = "flee",
+  H.worldNavTo(75, 102, { maxFrames = 45000, playBattles = "flee",
     arrive = function() return not H.worldMode() end }),
   H.release(),
   seq({
@@ -55,7 +55,7 @@ H.run({ maxFrames = 60000 }, {
       return not H.worldMode() and H.tileAligned()
          and not H.battleLoadStarted() and not H.dialogWaiting()
          and map() == 69
-    end), 12000, { honest = "flee" }),
+    end), 12000, { playBattles = "flee" }),
     H.waitFrames(30),
   }),
   H.call(function() dump("cave landing") end),

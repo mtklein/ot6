@@ -174,7 +174,7 @@ H.run({ maxFrames = 30000 }, {
   H.waitFrames(20),
   H.loadState(STATE),
   H.waitFrames(10),
-  -- walk into the whelk trigger (battle_dlgmenu's doorstep walk; the
+  -- walk into the whelk trigger (battle_dlgmenu's entry point walk; the
   -- route is one step, so any battle that comes up is the whelk)
   H.driveUntil(function()
     return H.battleLoadStarted() and H.monstersPresent() > 0

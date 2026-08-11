@@ -1,15 +1,15 @@
 #!/usr/bin/env python3
-"""No test may WRITE emulated game state.  This is the gate that enforces it.
+"""No test may WRITE emulated game state.  This is the check that enforces it.
 
-The rule (owner directive, 2026-08): test and mint Lua scripts may inject
-controller input and READ emulated memory; they may never write it.  A test
-that pokes HP, warps the party, or plants an item is not testing the game,
-it is testing its own poke -- every fixture and every green mark downstream
-of a poked state is vouching for a game nobody played.
+The rule (owner directive, 2026-08): test and savestate-generating Lua scripts
+may inject controller input and READ emulated memory; they may never write it.
+A test that pokes HP, warps the party, or plants an item is not testing the
+game, it is testing its own poke -- every fixture and every green mark
+downstream of a poked state is vouching for a game nobody played.
 
 This linter scans every tools/tests/**/*.lua (lib/ included), strips Lua
 comments and string literals first (the corpus talks ABOUT write APIs far
-more often than it calls them -- prose must not trip the gate), and then
+more often than it calls them -- prose must not trip the check), and then
 flags the write-side surface:
 
     emu.write / emu.writeWord / emu.write16 / emu.write32
@@ -27,7 +27,7 @@ grandfathered into tools/state_write_waivers.txt, a BURN-DOWN list of
   * a hit whose (file, token) pair is not in the list fails the run --
     new writes are impossible to land, anywhere, from day one;
   * a listed pair that no longer matches anything also fails the run --
-    the stale line must be deleted, so the list ratchets downward and a
+    the stale line must be deleted, so the list only ever shrinks and a
     cleaned-up file can never quietly regress back onto its old waiver.
 
 Granularity is per (file, token), not per line: line numbers churn with
@@ -40,11 +40,11 @@ cleans whole files and the waiver dies with the last call.
 the cleanup waves (delete writes, regen, watch the list shrink); running it
 to LAUNDER a new write is visible in the diff of a checked-in file.
 
-Wired into `make test` (both the gate and --selftest) and into `make
-frontier` (so mints cannot run from a poking generator even when the suite
-was skipped).  It lives in the Makefile rather than suite.sh because suite
-discovery globs *.lua for a `-- @suite` marker and cannot see a .py file --
-same reason check_boss_rows.py sits there.
+Wired into `make test` (both the check and --selftest) and into `make
+frontier` (so savestate generation cannot run from a poking generator even
+when the suite was skipped).  It lives in the Makefile rather than suite.sh
+because suite discovery globs *.lua for a `-- @suite` marker and cannot see
+a .py file -- same reason check_boss_rows.py sits there.
 
 Nothing here writes game state; it is a read-only linter (only
 --regen-waivers touches anything, and only the waiver file).
@@ -220,8 +220,8 @@ WAIVER_HEADER = """\
 #   * adding a line to cover new code is the exact cheat the checker exists
 #     to prevent -- new writes fail `make test`, full stop;
 #   * a line whose pair no longer matches anything FAILS the check as stale
-#     and must be deleted (that is the ratchet -- a cleaned file cannot
-#     quietly regress onto its old waiver).
+#     and must be deleted (that is the only-shrinks rule -- a cleaned file
+#     cannot quietly regress onto its old waiver).
 #
 # After a cleanup wave:  python3 tools/check_state_writes.py --regen-waivers
 # regenerates this file from the corpus; the diff must be pure deletion.
@@ -429,7 +429,7 @@ def main() -> int:
                     help="rewrite the burn-down list from the current corpus "
                          "(for cleanup waves; the diff must be pure deletion)")
     ap.add_argument("--selftest", action="store_true",
-                    help="verify stripping, detection, and waiver ratchet "
+                    help="verify stripping, detection, and waiver burn-down "
                          "logic on synthetic input")
     ap.add_argument("-v", "--verbose", action="store_true",
                     help="print every hit, waived ones included")

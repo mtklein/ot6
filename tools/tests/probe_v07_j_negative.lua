@@ -1,5 +1,5 @@
 -- probe_v07_j_negative.lua -- FAIL-BEFORE control for the banquet-done-v1
--- contract (issue #31, the #25 discipline): boot the minted boundary
+-- contract (issue #31, the #25 discipline): boot the generated boundary
 -- state, PERTURB one contract-checked fact -- seat EDGAR back into party
 -- 1, un-doing the banquet's forced TERRA+LOCKE strip that is this
 -- boundary's headline (#21's count control, inverted) -- and assert the

@@ -1917,7 +1917,7 @@ DrawBlitzMenu:
 ;                eight rows -- three of them elemental probes -- drew nothing.
 ;                #53 uploads them into the menu font too (Ot6MenuIcons4bpp_ext,
 ;                ot6_icons.asm), and the column says what it was always meant to.
-;                Two rows still draw blank and that is the honest answer:
+;                Two rows still draw blank and that is the correct answer:
 ;                Mantra and Spiraler carry neither an element nor a class.
 ;   col  16..20  "nn MP", from Ot6LoadoutCost -> Ot6CostFor, the same leaf the
 ;                charge and the battle row read (blank under nomp, which prices
@@ -1948,10 +1948,10 @@ DrawBlitzMenu:
 ;
 ; WHAT AN UNLEARNED BLITZ SAYS.  Vanilla blanked the row ($ff pads).  Blank rows
 ; on a page that has some filled ones read as a rendering fault -- that is the
-; owner's own report on the Rage page's unset slots (#44) -- so an unlearned rung
+; owner's own report on the Rage page's unset slots (#44) -- so an unlearned tier
 ; spells "- LOCKED -" in the page's chrome colour, ten cells wide, with its class
 ; and price fields blanked.  It is NOT "- EMPTY -": a Rage slot with nothing in
-; it contributes nothing to the battle list, whereas this rung exists and is
+; it contributes nothing to the battle list, whereas this tier exists and is
 ; simply not reached yet, and one word must not carry both facts.
 ;
 ; The learned set still comes from GetBlitzList, which stages the blitz index (or

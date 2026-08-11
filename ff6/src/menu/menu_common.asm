@@ -2322,10 +2322,10 @@ DrawHPMP:
 ; SIZE-NEUTRAL on purpose: the 2-byte sec/rts head is repaid by dropping the
 ; now-unreachable @0d63 tail, so every later C3 address is UNCHANGED.  A
 ; plain insert shifted the whole menu bank and broke booting the seeded
-; frontier savestates (gen_zozo5_ramuh loaded dadaluma_won onto map 192
-; instead of 221 -- measured, this wave), because a field state can hold
-; live C3 return addresses.  The dead body's branches retarget the head's
-; own sec/rts; with the flag off the original tail assembles instead and
+; savestates `make frontier` generates (gen_zozo5_ramuh loaded dadaluma_won
+; onto map 192 instead of 221 -- measured, this wave), because a field state
+; can hold live C3 return addresses.  The dead body's branches retarget the
+; head's own sec/rts; with the flag off the original tail assembles instead and
 ; the routine is byte-for-byte vanilla.
 .ifndef OT6_MP_COSTS
 OT6_MP_COSTS = 1

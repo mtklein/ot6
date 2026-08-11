@@ -1,19 +1,20 @@
--- gen_opera2_open.lua -- v0.5 Beat A leg 2: opera_doorstep (map 209, one
+-- gen_opera2_open.lua -- v0.5 Beat A step 2: opera_doorstep (map 209, one
 -- A-press below the map-209 IMPRESARIO) -> DRIVE THE OPERA-OPEN CUTSCENE
 -- (_ca9337 "Maria!?" -> the letter $0331 -> the Setzer intro + name_menu ->
 -- $0340=1) -> travel 209 -> Jidoor (198) -> world -> the OPERA HOUSE (map 237,
 -- world {45,154}) -> parked at {60,49} facing UP below the now-VISIBLE
--- IMPRESARIO ({60,48}, _caae15).  Mints opera_open.mss -- one A-press from the
--- performance proper (the aria).
+-- IMPRESARIO ({60,48}, _caae15).  Generates opera_open.mss -- one A-press
+-- from the performance proper (the aria).
 --
 -- MEASURED (probe_opera_intro): the intro rides on a hasControl-gated stall
 -- fallback that alternates A and START, which clears BOTH the dialog pages and
 -- the name_menu SETZER without special-casing either; it ends on map 209
--- {118,24} with control and $0340=1/$010E=1.  Travel anchors: 209's {118,29}
--- door -> Jidoor {16,14}; Jidoor's SOUTH edge (long-entrance src{0,63} HORIZ
--- len31) -> world {27,132}; world -> opera approach {45,153} -> step DOWN.
--- Issue #75: no state writes -- strays are fought by the drivers' own
--- edge-tapped A, and walks run under the honest nav modes.
+-- {118,24} with control and $0340=1/$010E=1.  Travel checkpoints: 209's
+-- {118,29} door -> Jidoor {16,14}; Jidoor's SOUTH edge (long-entrance
+-- src{0,63} HORIZ len31) -> world {27,132}; world -> opera approach
+-- {45,153} -> step DOWN.  Issue #75: no state writes -- strays are fought
+-- by the drivers' own edge-tapped A, and walks run under the playBattles
+-- nav modes.
 local H = dofile("tools/tests/lib/ot6.lua")
 local function map() return H.mapId() & 0x1ff end
 local function bright() return emu.getState()["ppu.screenBrightness"] or 0 end
@@ -35,10 +36,11 @@ end
 -- every field frame and $0000 for every frame a menu is up.  So the battle
 -- branch answers true throughout the Setzer name_menu, and with it on top
 -- this driver would edge-A the name grid instead of committing it with
--- START (and, in the kill-bit era, scribble $7E3EEC.. while those bytes
--- belonged to the menu -- the writes are gone, the ordering lesson stays).
--- gen_zozo5_ramuh's leave cutscene is the case that measured it: blind A on
--- a party_menu walks into a character's Status page and never comes out.
+-- START (and, in the battle-clear-write era, scribble $7E3EEC.. while those
+-- bytes belonged to the menu -- the writes are gone, the ordering lesson
+-- stays).  gen_zozo5_ramuh's leave cutscene is the case that measured it:
+-- blind A on a party_menu walks into a character's Status page and never
+-- comes out.
 local function rideOpen(pred, maxFrames, what)
   local aPh,sPh,stallN,lx,ly = 0,0,0,-1,-1
   return H.driveUntil(function() local d=pred(); if d then H.setPad({}) end; return d end,
@@ -83,7 +85,7 @@ H.run({ maxFrames = 250000 }, {
   rideOpen(function() return sw(0x0331)==1 end, 12000, "impresario scene -> letter"),
   H.waitUntil(function() return map()==209 and H.hasControl() and H.tileAligned() end, 3000, "control after impresario", 5),
   -- read the letter NPC at {118,25}
-  H.navTo(118, 26, { maxFrames=9000, honest=true }),
+  H.navTo(118, 26, { maxFrames=9000, playBattles=true }),
   H.hold({"up"}), H.waitFrames(8), H.release(), H.waitFrames(6),
   (function() local aPh=0
     return H.driveUntil(function() return H.dialogWaiting() or sw(0x01CC)==1 or map()~=209 end, 2400, {
@@ -98,14 +100,14 @@ H.run({ maxFrames = 250000 }, {
   end),
 
   -- 2. travel: 209 -> its {118,29} door -> Jidoor (198) {16,14}
-  H.navTo(118, 28, { maxFrames=9000, honest=true }),
+  H.navTo(118, 28, { maxFrames=9000, playBattles=true }),
   pushTo("down", 198, 9000, "209 -> Jidoor (map 198)"),
   H.waitUntil(function() return map()==198 and settled() end, 2400, "Jidoor control", 5),
   H.waitFrames(150),
   H.call(function() H.log(string.format("[jidoor] at (%d,%d)", H.fieldX(), H.fieldY())) end),
 
   -- 3. Jidoor -> the SOUTH edge -> world {27,132}: navTo above the edge, push down
-  H.navTo(16, 61, { maxFrames=24000, honest=true }),
+  H.navTo(16, 61, { maxFrames=24000, playBattles=true }),
   (function() local hb=0
     return H.driveUntil(function() return H.worldMode() end, 6000, {
       H.call(function() hb=hb+1
@@ -118,7 +120,7 @@ H.run({ maxFrames = 250000 }, {
   H.call(function() H.log(string.format("[world] Jidoor exit at (%d,%d)", H.worldX(), H.worldY())) end),
 
   -- 4. world -> the opera-house approach {45,153}, step DOWN -> map 237
-  H.worldNavTo(45, 153, { maxFrames=60000, honest=true, arrive=function() return not H.worldMode() end }),
+  H.worldNavTo(45, 153, { maxFrames=60000, playBattles=true, arrive=function() return not H.worldMode() end }),
   H.waitUntil(function() return H.worldHasControl() and H.worldAligned() end, 2000, "opera approach", 5),
   (function() local hb=0
     return H.driveUntil(function() return not H.worldMode() and map()==237 end, 4000, {
@@ -133,7 +135,7 @@ H.run({ maxFrames = 250000 }, {
   end),
 
   -- 5. up to {60,49}, below the now-VISIBLE IMPRESARIO ({60,48}); face UP
-  H.navTo(60, 49, { maxFrames=9000, honest=true }),
+  H.navTo(60, 49, { maxFrames=9000, playBattles=true }),
   H.hold({"up"}), H.waitFrames(8), H.release(), H.waitFrames(6),
   (function() local calm=0
     return H.driveUntil(function()
@@ -166,5 +168,5 @@ H.run({ maxFrames = 250000 }, {
     H.assertEq(sw(0x0055)==1 or map()~=237, true, "VERIFIED: one A-press fired _caae15 (the performance)")
     H.screenshot("opera_open_verify")
   end),
-  H.logStep(function() return string.format("opera_open minted at frame %d -- opera OPEN, at the performance trigger", H.frame) end),
+  H.logStep(function() return string.format("opera_open generated at frame %d -- opera OPEN, at the performance trigger", H.frame) end),
 })

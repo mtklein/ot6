@@ -22,10 +22,10 @@
 -- ISSUE #75 CONVERSION -- the stones are OWNED, not poked.  This file used to
 -- boot arvis_wake (which owns no espers) and write the $1a69 inventory
 -- bitfield directly to stage IFRIT + TERRATO.  It now boots
--- magicite_ifrit_shiva, the honest v0.6 mint whose bag REALLY holds RAMUH,
--- IFRIT and SHIVA (gen_ifrit_magicite: give_genju receipts, $1A69 = $07), and
--- asserts the pages of all three -- zero state writes.  What each owned stone
--- buys the test:
+-- magicite_ifrit_shiva, the input-driven v0.6 savestate whose bag REALLY
+-- holds RAMUH, IFRIT and SHIVA (gen_ifrit_magicite: give_genju receipts,
+-- $1A69 = $07), and asserts the pages of all three -- zero state writes.
+-- What each owned stone buys the test:
 --   IFRIT  (+6 vigor / +4 stamina / -3 mag.pwr) -- #62's marquee, the row
 --          magicite-ifrit-shiva.md's ledger recorded as unbuildable under
 --          the old encoding: three terms, SPEED SKIPPED (packing proof), and a
@@ -43,7 +43,7 @@
 --          filled.  That is the other half of what the Terrato page proved.
 -- What no owned stone can show: the NO-MOD page (Ot6EsperStatTbl $0000 -- no
 -- caption at all).  Terrato, the authored no-mod control, is not in any
--- reachable bag on the current frontier; that arm lives on as
+-- reachable bag as far as the game is playable; that arm lives on as
 -- menu_esperdetail_tube6.lua's loudly-labeled isolation arm.
 --
 -- THE ASSERTIONS THAT CHANGED IN #62, AND WHY -- deliberately, not loosened:
@@ -181,7 +181,7 @@ end
 -- ---- #62: the while-worn stat block ----------------------------------------
 
 -- The caption field at {13,15}: 2 blanks, then "While worn..." on cols 15-27.
--- (The `present = false` arm -- the honest no-mod page -- is exercised by
+-- (The `present = false` arm -- the truly no-mod page -- is exercised by
 -- menu_esperdetail_tube6.lua's labeled Terrato isolation arm: no stone this
 -- save owns carries a $0000 row.)
 local function assertCaption(tag, present)
@@ -272,7 +272,7 @@ H.run({ maxFrames = 30000 }, {
   -- X opens the field menu; ride the fade to the main-menu steady state.
   -- driveUntil, not one press: the X that opens the field menu is the first
   -- step in these tests that needs a SPECIFIC frame, so it is where a
-  -- fixture minted against a different ROM surfaces -- as "timeout waiting
+  -- fixture generated against a different ROM surfaces -- as "timeout waiting
   -- for main menu", which reads like a menu bug and is not one.  Retrying
   -- the press costs nothing when the pairing is fine and removes the false
   -- report when it is not.  Same shape probe_fieldicons.lua and
@@ -391,7 +391,7 @@ H.run({ maxFrames = 30000 }, {
     assertTerm("ramuh", 0, STAT.STAMINA, "Stamina", CH_PLUS, 4)
     assertTerm("ramuh", 1, STAT.MAGPWR,  "Mag.Pwr", CH_PLUS, 2)
     -- slot 2 held "Mag.Pwr -3" on Ifrit's page and "Mag.Pwr +6" on Shiva's;
-    -- for Ramuh it MUST be blank -- the clear, witnessed against real content.
+    -- for Ramuh it MUST be blank -- the clear, checked against real content.
     assertTermRowBlank("ramuh", 2)
     assertTermRowBlank("ramuh", 3)
     assertTermRowBlank("ramuh", 4)

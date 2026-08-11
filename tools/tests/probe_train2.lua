@@ -80,9 +80,9 @@ local function flood(tag)
 end
 
 -- flap-tolerant hold; tap-A dialogs; battles get REAL tap-A wins (the train's
--- scripted fights all tail into _ca5ea9's win-bit check -- kill-bit would
--- GameOver), EXCEPT pure random trash when spareReal is false.  On the train
--- every fight ends up tap-A: cheap, and uniformly safe.
+-- scripted fights all tail into _ca5ea9's win-bit check -- battle-clear
+-- write would GameOver), EXCEPT pure random trash when spareReal is false.
+-- On the train every fight ends up tap-A: cheap, and uniformly safe.
 local function holdDrive(dir, pred, what, budget)
   local phase, hb = 0, -600
   return H.driveUntil(pred, budget or 15000, {

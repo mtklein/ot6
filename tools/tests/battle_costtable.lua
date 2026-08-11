@@ -1,12 +1,12 @@
 -- @suite frontier=gau_joined
--- battle_costtable.lua -- issue #45.  The MP rescale's GATE: the kit cost
+-- battle_costtable.lua -- issue #45.  The MP rescale's TEST: the kit cost
 -- columns are pinned, and -- the part that matters -- they are checked against
--- the RULER the design claims they sit on, recomputed from this ROM's own
+-- the BASELINE the design claims they sit on, recomputed from this ROM's own
 -- tables rather than from numbers copied into a test.
 --
 -- WHY THIS EXISTS.  mp-economy.md has always said kit skills price on "the
--- vanilla spell ruler", but nothing ever measured what that ruler is, so the
--- v0.4/v0.5 columns drifted three-to-eight times under it without any gate
+-- vanilla spell baseline", but nothing ever measured what that baseline is, so
+-- the v0.4/v0.5 columns drifted three-to-eight times under it without any test
 -- noticing.  The owner found it by PLAYING (v0.7, LV14: Cyan holding a 96 MP
 -- pool against techs costing 1/2/3, so neither MP nor BP bound him and Fight
 -- had no case).  A playtest is an expensive way to learn an arithmetic fact.
@@ -14,17 +14,17 @@
 -- WHAT IT ASSERTS, all derived, none recalled:
 --   1. Ot6AbilityCostTbl is exactly the shipped 24-row column, $ff-terminated.
 --      (A plain pin: a rescale must be a deliberate edit here too.)
---   2. THE RULER.  For every Blitz and SwdTech row, cost as a fraction of the
+--   2. THE BASELINE.  For every Blitz and SwdTech row, cost as a fraction of the
 --      caster's REAL max MP at the level the row is reachable stays inside
 --      4%..25%.  Pool = CharProp+$01 ("starting mp") + the LevelUpMP running
 --      sum, which is literally what InitMaxMP computes (field/event.asm:1405).
 --      Levels are BlitzLevelTbl / BushidoLevelTbl (event.asm:1236-1240).
 --      Vanilla natural magic measured the same way runs 7.5%..20.3%, which is
 --      where the 4%/25% brackets come from -- generous on both sides, so this
---      gate catches a column that has fallen OFF the scale, not one that is
+--      check catches a column that has fallen OFF the scale, not one that is
 --      merely tuned differently.
 --   2b. THE 99 ANCHOR (issue #57).  Each ladder's genuine ultimate -- Bum Rush
---      and Cleave, the divine top rung of the only two priced ladders -- costs
+--      and Cleave, the divine top tier of the only two priced ladders -- costs
 --      exactly 99, and NO row anywhere costs more than 99.  That ceiling is not
 --      taste: every OT6 price drawer renders two digits (ListText cmd $02,
 --      btlgfx_main.asm:15045-15073, divides by ten exactly once;
@@ -39,20 +39,20 @@
 --      argued.
 --   3b. STEAL (issue #52).  The one costed verb with no table row: Steal is
 --      flat, priced by the Ot6StealCost leaf, so its immediate is read at the
---      source and held to the SAME ruler -- measured against the pool Locke
+--      source and held to the SAME baseline -- measured against the pool Locke
 --      actually joins with (LV6, 31 MP), not the LV14 pool #52's headline
 --      quoted.  Plus signature parity with the cheapest row of all three
---      ladder kits, because #55 makes Steal rung one of Locke's ladder.
---   4. THE SERPENT-TRENCH BAND (the knife-edge the owner reported as "barely
+--      ladder kits, because #55 makes Steal tier one of Locke's ladder.
+--   4. THE SERPENT-TRENCH SECTION (the knife-edge the owner reported as "barely
 --      made it, intense" and which was never balance-swept).  gau_joined IS
---      that doorstep -- gen_sabin_trench.lua boots from it -- so the trio's
+--      that entry point -- gen_sabin_trench.lua boots from it -- so the trio's
 --      pools are read live out of the fixture and every ability each of them
 --      has actually LEARNED at that level is checked for uses-per-pool.  Gau's
 --      Rage price is read too (Ot6DanceCost's immediate, which Ot6RageCost
 --      tail-calls), so a change to the possess-verb price shows up here.
 --
 -- Fixture-free by design apart from step 4: steps 1-3 need no savestate, so
--- this gate keeps working if the frontier chain is stale.
+-- this test keeps working if the chain of generated savestates is stale.
 local H = dofile("tools/tests/lib/ot6.lua")
 local STATE = "build/states/gau_joined.mss.lua"
 
@@ -61,7 +61,7 @@ local CHARPROP_SIZE, CHARPROP_MP = 0x16, 0x01
 local REC, REC_SIZE = 0x1600, 37
 local REC_LEVEL, REC_MAXMP = 0x08, 0x0f
 
-local LO, HI = 4.0, 25.0        -- the ruler brackets, in percent
+local LO, HI = 4.0, 25.0        -- the baseline brackets, in percent
 local MIN_USES = 4              -- payability floor, uses from a full pool
 
 -- The shipped column, key -> cost, in table order.  Names are the ones the
@@ -176,7 +176,7 @@ H.run({ maxFrames = 20000 }, {
       ANCHOR, rows, ANCHOR))
   end),
 
-  ------------------------------------------- 2/3. the ruler + payability ---
+  ---------------------------------------- 2/3. the baseline + payability ---
   H.call(function()
     levelUpMp = romOfs(H.sym("LevelUpMP"))
     charProp  = romOfs(H.sym("CharProp"))
@@ -193,10 +193,10 @@ H.run({ maxFrames = 20000 }, {
         levels = learnLevels(H.sym("BushidoLevelTbl")) },
     }
     -- Rows 1-2 are "learned" at levels 1 and 6, but neither character can be
-    -- in the party that early -- both join around LV10-11 on the honest chain
+    -- in the party that early -- both join around LV10-11 on the input-driven chain
     -- (measured: gau_joined has Cyan 11 / Sabin 11).  Pricing them against a
     -- LV1 pool would be arithmetic about a state the game cannot reach, so the
-    -- reachable level is clamped up to the earliest join band.
+    -- reachable level is clamped up to the earliest join level.
     local JOIN = 10
     for _, kit in ipairs(kits) do
       for i, r in ipairs(kit.rows) do
@@ -226,7 +226,7 @@ H.run({ maxFrames = 20000 }, {
   -- Steal has no id-table row (FixPlayerAttack omits it from CmdWithAttackTbl,
   -- so it never earns a per-ability id), so its price is a leaf immediate --
   -- Ot6StealCost, the shape Ot6DanceCost has.  Read it AT THE SOURCE, the same
-  -- way the Rage price is read below, and hold it to the same ruler.
+  -- way the Rage price is read below, and hold it to the same baseline.
   H.call(function()
     local ofs = romOfs(H.sym("Ot6StealCost"))
     H.assertEq(H.readRomByte(ofs), 0xa9,
@@ -234,7 +234,7 @@ H.run({ maxFrames = 20000 }, {
     local steal = H.readRomByte(ofs + 1)
     H.assertEq(steal, STEAL_COST, "Steal costs " .. STEAL_COST .. " MP (#52)")
 
-    -- The ruler, at the level Steal ARRIVES -- Locke joins at Narshe holding
+    -- The baseline, at the level Steal ARRIVES -- Locke joins at Narshe holding
     -- 31 MP (LV6, probe_mppools.lua off worldmap_narshe), not at the LV14 pool
     -- #52's headline measured against.  No JOIN clamp here: unlike Sabin's and
     -- Cyan's row-1 abilities, this level is one the game really presents.
@@ -253,9 +253,9 @@ H.run({ maxFrames = 20000 }, {
       "Steal affords only %d uses from Locke's full LV%d pool",
       math.floor(p / steal), LOCKE_JOIN_LV))
 
-    -- SIGNATURE PARITY.  Steal is Locke's signature and #55 makes it rung one
+    -- SIGNATURE PARITY.  Steal is Locke's signature and #55 makes it tier one
     -- of a ladder that tops at Master's Mark; it must price like every other
-    -- kit's cheapest row, or "signature" stops meaning a price band.
+    -- kit's cheapest row, or "signature" stops meaning a price range.
     local base = romOfs(H.sym("Ot6AbilityCostTbl"))
     for _, sig in ipairs({ { 0x5d, "Pummel" }, { 0x55, "Dispatch" },
                            { 0xaa, "AutoCrossbow" } }) do
@@ -274,7 +274,7 @@ H.run({ maxFrames = 20000 }, {
     H.log("Steal is at parity with Pummel / Dispatch / AutoCrossbow")
   end),
 
-  ------------------------------------------ 4. the Serpent-Trench band -----
+  --------------------------------------- 4. the Serpent-Trench section -----
   H.waitFrames(20),
   H.loadState(STATE),
   H.waitFrames(20),
@@ -302,7 +302,7 @@ H.run({ maxFrames = 20000 }, {
       assert(worst > 0, m.who .. " has learned no priced ability at LV" .. lv)
       local uses = math.floor(mp / worst)
       assert(uses >= MIN_USES, string.format(
-        "at the Serpent-Trench band %s (LV%d, %d MP) affords only %d uses of "
+        "at the Serpent-Trench area %s (LV%d, %d MP) affords only %d uses of "
         .. "his dearest learned ability (%s, %d MP) -- the rescale has turned "
         .. "an 'intense, barely made it' fight into an unanswerable one",
         m.who, lv, mp, uses, worstName, worst))
@@ -319,7 +319,7 @@ H.run({ maxFrames = 20000 }, {
     H.log(string.format("trench  Gau LV%d pool %d: %d Rages",
       H.readByte(gb + REC_LEVEL), gmp, math.floor(gmp / rage)))
     assert(math.floor(gmp / rage) >= MIN_USES,
-      "Gau cannot afford " .. MIN_USES .. " Rages at the trench band")
+      "Gau cannot afford " .. MIN_USES .. " Rages at the trench area")
   end),
   H.logStep(function() return "battle_costtable complete" end),
 })

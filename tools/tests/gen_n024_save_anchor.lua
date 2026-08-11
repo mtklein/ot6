@@ -1,9 +1,10 @@
--- gen_n024_save_anchor.lua -- mint battery anchor C, `n024-doorstep-save-v1`
--- (the A-F save-point boundary band is lettered in
--- tools/tests/frontier_graph.py): boot n024_doorstep (the nearest minted
--- predecessor, map 273 {25,52} facing NUMBER 024), step off the doorstep,
--- walk onto the NEW #10 save point at {26,53}, and save through the game's
--- OWN Save UI into slot 3.  run.sh captures the 32 KiB battery on shutdown.
+-- gen_n024_save_anchor.lua -- generate SRAM checkpoint C,
+-- `n024-doorstep-save-v1` (the A-F save-point boundary range is lettered in
+-- tools/tests/frontier_graph.py): boot n024_doorstep (the nearest generated
+-- predecessor, map 273 {25,52} facing NUMBER 024), step off the entry
+-- point, walk onto the NEW #10 save point at {26,53}, and save through the
+-- game's OWN Save UI into slot 3.  run.sh captures the 32 KiB battery on
+-- shutdown.
 --
 -- THIS IS ALSO THE FIRST LIVE EXERCISE OF THE 273 SAVE POINT that ends in a
 -- real battery save (#15's save/reset/load item for #10's one authored
@@ -14,8 +15,9 @@
 --  * stepping onto {26,53} fires the shared SavePoint script -- $01BF
 --    (save-enable) and $01B5 (once-per-tile latch) both set;
 --  * the vanilla Save UI writes a slot-3 record from that tile, and a cold
---    Continue of the captured battery boots gen_esper_tubes' anchored leg,
---    which asserts this same table as its ENTRY contract.
+--    Continue of the captured battery boots gen_esper_tubes'
+--    checkpoint-booted step, which asserts this same table as its ENTRY
+--    contract.
 --
 -- The approach never presses A while facing NUMBER 024 -- the first move
 -- is a plain RIGHT step off the contact line ({25,52} -> {26,52}), then
@@ -109,7 +111,7 @@ H.run({ maxFrames = 20000 }, {
   end),
 
   -- off the 024 contact line, then down onto the sparkle
-  H.navTo(26, 52, { honest = "flee", maxFrames = 6000 }),
+  H.navTo(26, 52, { playBattles = "flee", maxFrames = 6000 }),
   tapInto("down", onSaveTile(26, 53), 9000,
     "onto the NEW save tile 273 (26,53)", tileCalm),
   H.waitFrames(45),
@@ -145,7 +147,7 @@ H.run({ maxFrames = 20000 }, {
   H.call(function()
     H.assertEq((H.readByte(0x0201) & 0x80) ~= 0, true,
       "menu-flags $0201 bit7 SET -- the save-enable flow reached the menu")
-    -- ARM THE HONEST SAVE RECEIPT (issue #75): a read-only exec hook on
+    -- ARM THE input-driven save receipt (issue #75): a read-only exec hook on
     -- the real CopyGameDataToSRAM entry captures the slot argument the
     -- save runs with (codex_saveas's instrument).  This replaces the old
     -- zeroed-$307ff0 sentinel -- an SRAM write -- as the proof that the
@@ -193,12 +195,12 @@ H.run({ maxFrames = 20000 }, {
     H.assertEq(saveArg, 3, "CopyGameDataToSRAM ran for persistent slot 3")
     -- the codex witness cells are READ, never seeded (issue #75): the
     -- battery carries whatever the chain actually earned.  The phase-2
-    -- anchor re-cuts measure these and the entry contracts follow the
+    -- checkpoint re-cuts measure these and the entry contracts follow the
     -- measurement (never the reverse).
     H.log(string.format("codex witness cells (earned): elem=%02X class=%02X",
       emu.read(0x316810 + ULTROS2, emu.memType.snesMemory),
       emu.read(0x316990 + ULTROS2, emu.memType.snesMemory)))
-    H.log("real Save UI wrote the n024-doorstep-save anchor to slot 3")
+    H.log("real Save UI wrote the n024-doorstep-save checkpoint to slot 3")
   end),
 
   (function() local calm = 0

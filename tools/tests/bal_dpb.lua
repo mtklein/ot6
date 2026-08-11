@@ -181,7 +181,7 @@ H.run({ maxFrames = 60000 }, {
   H.driveUntil(function() return H.battleLoadStarted() end, 4000, {
     H.hold({ "up" }), H.waitFrames(20), H.release(), H.waitFrames(2),
     H.pressButtons({ "a" }, 4),
-  }, "battle load from doorstep"),
+  }, "battle load from entry point"),
   H.waitUntil(function() return H.battleActive() end, 900, "battle active", 30),
   H.waitFrames(240),
   -- equalize the three casters so Fire Beam base is caster-independent

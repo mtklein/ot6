@@ -1,5 +1,5 @@
 -- @suite frontier=figaro_cleared
--- battle_crosslist.lua -- gate for issue #36: "Tools shows Cure 2".
+-- battle_crosslist.lua -- test for issue #36: "Tools shows Cure 2".
 --
 -- MECHANISM UNDER GUARD: Ot6RestageGate_ext (ot6_hud.asm) re-renders the open
 -- magic list when boost moves, by borrowing the SHARED 4-line staging cycle
@@ -13,7 +13,7 @@
 -- @58be, OpenItemWindow @5769, ...), so the NEXT list to open skipped its
 -- own init and drew only the cycle's remaining lines: the owner's Tools
 -- window rendering "Cure 2" and "Fire 2" over three of its four rows
--- (crosslist_tools.png from probe_crosslist.lua is the sighting, minted
+-- (crosslist_tools.png from probe_crosslist.lua is the sighting, captured
 -- deterministically).  Same mechanism covers the original report -- another
 -- character's magic list keeping the previous caster's rows.
 --
@@ -23,7 +23,7 @@
 -- Cure 2 and fires NoiseBlaster is a lying surface, the #27/#32 class.
 --
 -- Issue #75 conversion.  The old apparatus faked the whole cast on the
--- magitek doorstep: Magic+Tools installed into Terra's $202E rows, eight
+-- magitek entry point: Magic+Tools installed into Terra's $202E rows, eight
 -- tools FORGED into the bag, mp:=99, bp:=5, guard pins and stops, saved
 -- cursor pokes -- and, worst of the lot, L163's "greyed row forced
 -- selectable" write, which strong-armed the exact refusal surface the
@@ -141,7 +141,7 @@ H.run({ maxFrames = 60000 }, {
   }, "chocobo dismount"),
   H.release(),
   H.waitFrames(120),
-  -- pace the desert band until a real encounter fires (measured: ~340
+  -- pace the desert area until a real encounter fires (measured: ~340
   -- frames off the dismount tile)
   H.driveUntil(function() return H.battleLoadStarted() end, 20000, {
     H.call(function()
@@ -224,7 +224,7 @@ H.run({ maxFrames = 60000 }, {
   end),
 
   -- cross-character, the sighting's own shape: EDGAR opens his real Tools
-  -- window next and it must be an honest window
+  -- window next and it must be an uncorrupted window
   H.driveUntil(function()
     return (H.readByte(ACTOR) & 3) == edgar and H.readByte(MSTATE) == ST_TOOLS
   end, 20000, {

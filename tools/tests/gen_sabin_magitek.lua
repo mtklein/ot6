@@ -1,7 +1,7 @@
--- gen_sabin_magitek.lua -- leg 6 of SABIN's scenario: the Magitek escape from
--- the Imperial Camp.  From doma_defended (map 119 at (14,30), SABIN+CYAN(+
--- SHADOW) mounted on Magitek), ride the camp's fight/interlude gauntlet out to
--- the World of Balance.  Mints:
+-- gen_sabin_magitek.lua -- step 6 of SABIN's scenario: the Magitek escape
+-- from the Imperial Camp.  From doma_defended (map 119 at (14,30),
+-- SABIN+CYAN(+ SHADOW) mounted on Magitek), ride the camp's fight/interlude
+-- gauntlet out to the World of Balance.  Generates:
 --   camp_escaped.mss   world map (179,71), on foot toward the Phantom Forest,
 --                      $0037=1 (the escape is done).
 --
@@ -14,14 +14,14 @@
 -- Between them the party WALKS with real user control ($087C nibble 2) -- the
 -- escape is walked, not ridden.  Three facts, all measured (probe_esc):
 --
---  1. EACH BATTLE MUST BE WON BY TAP-A, NEVER KILL-BIT.  _cb1955's tail
+--  1. EACH BATTLE MUST BE WON BY TAP-A, NEVER WRITE-CLEARED.  _cb1955's tail
 --     (event_main.asm:42026) is `call _ca5ea9`, which is `if_b_switch $40,
 --     ...; call GameOver` (:14171): a battle that exits WITHOUT the win bit
---     $40 -- which is exactly what kill-bitting during load produces -- calls
---     GameOver and parks the event forever.  That silent park is the
+--     $40 -- which is exactly what write-clearing during load produces --
+--     calls GameOver and parks the event forever.  That silent park is the
 --     "$CB1955 forever" the predecessor measured.  Auto-battle (edge-tap A)
---     lets the Magitek party win cleanly; then the teardown sets $01F4=1 and
---     control returns a few frames after fade-in.
+--     lets the Magitek party win cleanly; then the teardown sets $01F4=1
+--     and control returns a few frames after fade-in.
 --
 --  2. THE TRIGGER RE-FIRES EVERY ALIGNED FRAME (CheckEventTriggers has no
 --     once-per-tile latch, field/event.asm:5740-5786; its guard fires
@@ -75,9 +75,10 @@ local function inBattle()
 end
 
 -- FLAP-TOLERANT PERSISTENT HOLD.  Hold `dir` every field frame; edge-tap A
--- (4 on / 4 off) through any battle or dialog, NEVER kill-bit; never give up
--- on control loss.  On each clean frame the held direction begins a step into
--- the walkable corridor tile, un-aligning the party off the re-firing trigger.
+-- (4 on / 4 off) through any battle or dialog, never write-cleared; never
+-- give up on control loss.  On each clean frame the held direction begins a
+-- step into the walkable corridor tile, un-aligning the party off the
+-- re-firing trigger.
 local battles = {}
 local function holdCross(dir, donePred, what, budget)
   local phase, hb, battN, dlgN = 0, -900, 0, 0
@@ -104,7 +105,7 @@ local function holdCross(dir, donePred, what, budget)
             "form=(%04X %04X %04X %04X %04X %04X)", H.frame, H.fieldX(),
             H.fieldY(), monCount(), w[1], w[2], w[3], w[4], w[5], w[6]))
         end
-        H.setPad(phase < 4 and { "a" } or {})   -- tap-A, never kill-bit
+        H.setPad(phase < 4 and { "a" } or {})   -- tap-A, never write-cleared
         return
       end
       if dlgN >= 3 then H.setPad(phase < 4 and { "a" } or {}); return end
@@ -114,7 +115,7 @@ local function holdCross(dir, donePred, what, budget)
   }, what)
 end
 
--- a clean-segment nav that refuses to kill-bit an escape fight (species
+-- a clean-segment nav that refuses to write-clear an escape fight (species
 -- $0042): if one ever fires mid-segment it hands off and we notice via the
 -- budget, rather than corrupting a teardown.  The segments are chosen off the
 -- triggers, where control does not flap and navTo is reliable.
@@ -207,7 +208,7 @@ H.run({ maxFrames = 120000 }, {
   end),
   H.saveState("camp_escaped.mss"),
   H.logStep(function()
-    return string.format("camp_escaped minted at frame %d world (%d,%d)",
+    return string.format("camp_escaped generated at frame %d world (%d,%d)",
       H.frame, H.worldX(), H.worldY())
   end),
 })

@@ -1,4 +1,4 @@
-# The esper stat ruler — what a gear upgrade is actually worth
+# The esper stat baseline — what a gear upgrade is actually worth
 
 The owner's direction is *"rebalance esper passives by making equipping an
 esper feel like equipping a next-level-up piece of equipment, so something
@@ -29,10 +29,10 @@ byte offset it was read from. The two measurement scripts are transcribed in
    `GenjuProp` bonus byte to `$ff`. So "next-level-up" cannot mean *character*
    level: measured, that reading is worth nothing at all.
 3. **Vanilla's gear ladder does not ladder stat packages.** Within a slot,
-   consecutive rungs raise *defense power* by +1..+7 and **change the shape**
+   consecutive tiers raise *defense power* by +1..+7 and **change the shape**
    of the stat package rather than growing its sum (§2). "The next tier up" is
    a sidegrade in stats and an upgrade in defense.
-4. **+10 across several stats is about three rungs, not one** — measured
+4. **+10 across several stats is about three tiers, not one** — measured
    against WoB shop stock, whose stat-bearing pieces run **median net +3, q3
    +6, ceiling +11**. It is, almost exactly, *the single best stat package
    purchasable in the World of Balance* (Power Sash, +11, 5000 gil).
@@ -43,7 +43,7 @@ byte offset it was read from. The two measurement scripts are transcribed in
 
 ---
 
-## 1. Ruler A — what an equipment stat package actually is
+## 1. Baseline A — what an equipment stat package actually is
 
 ### 1.1 The encoding, read from the decoder
 
@@ -83,7 +83,7 @@ The sign decode, worked through: for a nibble `v` with bit 3 set,
 magnitude**, giving `0`..`+7` and `$9`..`$f` = `−1`..`−7`. `$8` is a dead code
 that decodes to zero.
 
-**This is the ruler's unit.** Every number in §1.2 and §2 is in these units,
+**This is the baseline's unit.** Every number in §1.2 and §2 is in these units,
 so a design number transcribes into a table byte without conversion.
 
 ### 1.2 The distribution over all 256 records
@@ -125,19 +125,19 @@ implied it.
 
 ---
 
-## 2. Ruler B — what "the next tier up" actually grants
+## 2. Baseline B — what "the next tier up" actually grants
 
 WoB shop stock, decoded from `ff6/src/menu/shop_prop.dat` (9 bytes per shop:
 +0 type/price-adjust, +1..+8 item ids, `$ff` empty; `shop.asm:1802` for the
 type mask, `:819` for the item slots). WoB = shops 0-45; the Diamond/Crystal
-tiers first appear at shop 57 and Thamasa (the v0.8 band) is shops 33/34/35.
+tiers first appear at shop 57 and Thamasa (the v0.8 stretch) is shops 33/34/35.
 
 Ordered by defense/battle power (`ItemProp+20`), which is how the game tiers
 a slot:
 
 ### Helmets
 
-| rung | Dpow | Δ Dpow | package | net | gil |
+| tier | Dpow | Δ Dpow | package | net | gil |
 |---|---|---|---|---|---|
 | Hair Band | 12 | — | — | 0 | 150 |
 | Plumed Hat | 14 | +2 | — | 0 | 250 |
@@ -155,7 +155,7 @@ a slot:
 
 ### Body armour
 
-| rung | Dpow | Δ Dpow | package | net | gil |
+| tier | Dpow | Δ Dpow | package | net | gil |
 |---|---|---|---|---|---|
 | Cotton Robe | 32 | — | — | 0 | 200 |
 | Kung Fu Suit | 34 | +2 | — | 0 | 250 |
@@ -170,20 +170,20 @@ a slot:
 | Gold Armor | 55 | +2 | — | 0 | 10000 |
 
 Shields in the WoB (Buckler 16 → Heavy 22 → Mithril 27 → Gold 34) carry **no
-stat package at all** — the shield ladder is pure defense, Δ +5..+7 a rung.
+stat package at all** — the shield ladder is pure defense, Δ +5..+7 a tier.
 Relics: of the 17 WoB-purchasable relics, only Barrier Ring carries a package
 (mag +2); the other three stat relics in the game (Blizzard Orb mag +5, Rage
 Ring vig +5, Sneak Ring spd +5) are WoR/found.
 
-**What one rung is worth, measured:** +1 to +7 defense power, and a stat
+**What one tier is worth, measured:** +1 to +7 defense power, and a stat
 package that *changes shape* rather than growing. Nine of the thirteen WoB
-helmet rungs carry no stat package at all; the four that do run +2 to +6 and
-are role sidegrades of each other (Magus Hat and Head Band are the same rung
+helmet tiers carry no stat package at all; the four that do run +2 to +6 and
+are role sidegrades of each other (Magus Hat and Head Band are the same tier
 by defense and opposite by role).
 
 ---
 
-## 3. Ruler C — the level-up readings
+## 3. Baseline C — the level-up readings
 
 The owner's phrase is "next-**level-up** piece of equipment", which supports
 two readings. Both were measured.
@@ -192,20 +192,21 @@ two readings. Both were measured.
 |---|---|---|
 | **character level-up** | **max HP and max MP only.** Vigor / speed / stamina / mag.pwr do not grow with level in FF6 at all. | `DoLevelUp`, `battle_main.asm:16053-16111`: reads `LevelUpHP-2,x` / `LevelUpMP-2,x` and writes `$160b` max HP / `$160f` max MP. No `$161a-$161d` write on any path. |
 | **vanilla esper per-level bonus** | **+1 or +2 in exactly one stat, per level**, capped at 128 | `GenjuBonus_09..GenjuBonus_10`, `battle_main.asm:16198-16209`. The enum names it: `STRENGTH_1/2`, `SPEED_1/2`, `STAMINA_1/2`, `MAGPWR_1/2` (`ff6/include/const.inc:858-876`). |
-| **the OT6 model** | the §4 ladder — +6..+10 gross across 2-3 stats, with a downside on the upper rungs, while worn | `Ot6EsperStatTbl`, `ot6_progression.asm` |
+| **the OT6 model** | the §4 ladder — +6..+10 gross across 2-3 stats, with a downside on the upper tiers, while worn | `Ot6EsperStatTbl`, `ot6_progression.asm` |
 
 Two consequences.
 
 1. **Reading one is dead** — measured, a level-up is worth zero base stats, so
    it cannot be the comparison. Only the *equipment* reading survives, which
    is what §1 and §2 measure.
-2. **Reading two is smaller than it looks.** An OT6 WoB band is 1-3 levels
-   (`wob-route.md` doorstep table: LOCKE L14 → L15, EDGAR L15 → L16 across
-   the whole v0.6 beat). Under vanilla, wearing Ramuh for that band would have
-   granted +1..+3 stamina — **permanently**. So one band of vanilla esper
+2. **Reading two is smaller than it looks.** An OT6 WoB stretch is 1-3 levels
+   (`wob-route.md`'s table of fight entry points: LOCKE L14 → L15, EDGAR L15 →
+   L16 across the whole v0.6 beat). Under vanilla, wearing Ramuh for that
+   stretch would have granted +1..+3 stamina — **permanently**. So one stretch
+   of vanilla esper
    growth is worth about a flat while-worn +3, delivered up front and taken
    back on unequip. That is the correct like-for-like, and it is why a *gear
-   tier's* worth is a much larger ask than one band's.
+   tier's* worth is a much larger ask than one stretch's.
 
 ---
 
@@ -217,30 +218,30 @@ and almost exactly the WoB ceiling.**
 | the number | measured comparator |
 |---|---|
 | net **+3** | the **median** stat-bearing piece of WoB shop gear |
-| net **+6** | q3 of WoB shop gear — Head Band, Tiger Mask (mid-band helmets, 1600-2500 gil) |
+| net **+6** | q3 of WoB shop gear — Head Band, Tiger Mask (mid-range helmets, 1600-2500 gil) |
 | net **+10** | ~3× the median; between Tiger Mask (+6) and the ceiling |
 | net **+11** | **Power Sash** — the best stat package purchasable in the World of Balance, 5000 gil, Thamasa |
-| net **+24..+28** | BehemothSuit, Illumina, Ragnarok — WoR marquee, out of band |
+| net **+24..+28** | BehemothSuit, Illumina, Ragnarok — WoR marquee, out of range |
 
-So the owner's `+10` is not a one-rung step. It is *"the best stat armour in
+So the owner's `+10` is not a one-tier step. It is *"the best stat armour in
 the World of Balance, worn in addition to your armour."* That is a defensible
 target for a magicite — a magicite is a scarce, fought-for, one-per-character
 slot, and there are twelve of them competing for four slots — but it should be
 authored knowingly and it should not be the *whole* number.
 
-**The design call this ruler supports** (the values are in
+**The design call this baseline supports** (the values are in
 `ot6_progression.asm`):
 
 > Spend the owner's ~+10 as the **upside column**, and buy the top of that
 > range with a **downside** of −2 or −3, so the **net** lands at +6..+7 — one
-> honest rung above the mid-band helmet the player is actually wearing, with a
+> clear tier above the mid-range helmet the player is actually wearing, with a
 > big legible number on the stat that matters. The ladder is then expressed in
 > the gross reward and in the sharpness of the trade, not in the net — which
 > is exactly how §2 measured vanilla's own ladder behaving.
 
-Rungs, with their measured comparator:
+Tiers, with their measured comparator:
 
-| rung | who | upside column | downside | net | comparator |
+| tier | who | upside column | downside | net | comparator |
 |---|---|---|---|---|---|
 | **FIELD** | the Zozo four (found on a floor) | **+6** across 2 | — | +6 | Head Band / Tiger Mask, q3 of WoB gear |
 | **STORY** | the tube six (handed over in a scene) | **+8** across 3 | −2 | +6 | above q3, below the ceiling |
@@ -254,7 +255,7 @@ needed. Only Maduin reaches 7, and the encoding cannot express more.
 unresolved value is not a blocker): whether the ladder should separate on
 *net* as well as on gross — i.e. FIELD +6 / STORY +7 / BOSS +9 net. This
 version keeps the net flat at +6..+7 deliberately, because §2 measured
-vanilla's rungs as shape changes rather than sum changes, and because a stone
+vanilla's tiers as shape changes rather than sum changes, and because a stone
 found on a Zozo floor is worn for twenty hours while a boss stone competes
 with eleven others. Only a playthrough settles it; the alternative is noted in
 the table comment beside the roster.
@@ -267,7 +268,7 @@ the table comment beside the roster.
 esper, four signed nibbles, −7..+7 each, `$0000` = no mod. The argument is not
 that it is the cleverest packing; it is that
 
-- the ruler measured above is *already in these units*, so a design number is
+- the baseline measured above is *already in these units*, so a design number is
   transcribed rather than converted;
 - the object an esper carries becomes literally the same kind of object a
   piece of equipment carries — which is the issue's title;
@@ -287,15 +288,15 @@ per esper is not a space question.
 
 Both scripts read only tracked source and need no ROM.
 
-**Ruler A** — every record's package, plus the distribution: decode
+**Baseline A** — every record's package, plus the distribution: decode
 `ff6/src/menu/item_prop_en.dat` at stride 30, bytes +16/+17, four nibbles per
 record, `bit3` = sign / `bits0-2` = magnitude; type from `+0 & 7`
 (1 weapon, 2 body, 3 shield, 4 helmet, 5 relic); defense/battle power `+20`;
 price `+28/+29` little-endian (price 2 = not sold). Names from
 `ff6/src/text/item_name_en.json` `text[]`, stripping the leading `{glyph}`.
 
-**Ruler B** — WoB stock: `ff6/src/menu/shop_prop.dat` at stride 9, items in
+**Baseline B** — WoB stock: `ff6/src/menu/shop_prop.dat` at stride 9, items in
 +1..+8, `$ff` empty; take shops 0-45.
 
-**Ruler C** — `battle_main.asm:16053` (`DoLevelUp`) and `:16198`
+**Baseline C** — `battle_main.asm:16053` (`DoLevelUp`) and `:16198`
 (`GenjuBonus_09`) read directly; no script.

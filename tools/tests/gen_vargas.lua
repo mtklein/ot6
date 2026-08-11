@@ -1,10 +1,11 @@
 -- gen_vargas.lua -- from vargas_doorstep.mss: FIGHT VARGAS FOR REAL, ride
--- the reunion, and mint vargas_won.mss on the first controllable frame
--- after it.  The frontier's last rung-2 link, and the first boss in the
--- mint chain won by an actual strategy under issue #75's rule: inputs in,
--- observations out, zero writes to emulated game state.  The old mint
--- pinned party HP/MP every frame, clamped Vargas to 10300 to force his
--- phase-2 event, and poked the Blitz cursor cells; all of that is gone.
+-- the reunion, and generate vargas_won.mss on the first controllable frame
+-- after it.  The last tier-2 link in the generated chain, and the first
+-- boss in the chain of generated savestates won by an actual strategy under
+-- issue #75's rule: inputs in, observations out, zero writes to emulated
+-- game state.  The old generator pinned party HP/MP every frame, clamped
+-- Vargas to 10300 to force his phase-2 event, and poked the Blitz cursor
+-- cells; all of that is gone.
 --
 -- THE FIGHT (bosses-wob.md section 3, both human playtests loved it):
 -- Vargas (11600 hp, 5 shields, weak poison|holy + bludgeoning) plus two
@@ -43,7 +44,7 @@
 -- so menu navigation is safe however long it takes, and the fight's
 -- danger lives only in the open field between menus.
 --
--- MEASURED (probe_vargas_win2/win5 off the rung-2 fixture): the policy
+-- MEASURED (probe_vargas_win2/win5 off the tier-2 fixture): the policy
 -- wins in ~13000 battle frames.  Both Ipoohs die to boosted Fights by
 -- ~f3300; three potions and two Cures carry the trio through Gale Cut;
 -- Vargas crosses his own script's gates at real hp (11600 -> 10304); the
@@ -54,14 +55,14 @@
 -- actually looked like.
 --
 -- THE RETRY LADDER is the game's own defeat flow made explicit: the
--- doorstep is captured ONCE at boot (a savestate blob in memory, zero
+-- entry point is captured ONCE at boot (a savestate blob in memory, zero
 -- writes); a party wipe tears the battle down into Game Over instead of
 -- the reunion, the attempt's post-fight ride times out on "map 98, calm,
--- SABIN in the party", and the next attempt reloads the doorstep blob
+-- SABIN in the party", and the next attempt reloads the entry point blob
 -- and idles a different number of frames before the opening A-press --
 -- shifting every RNG draw downstream.  Four attempts, then fail loudly.
 --
--- THE MINT IS VERIFIED BY RELOAD (gen_sabin_gau's discipline): capture,
+-- THE GENERATE IS VERIFIED BY RELOAD (gen_sabin_gau's discipline): capture,
 -- reload the capture as the consumer timeline, give it 300 frames, and
 -- require the same calm map-98 field before accepting the blob.
 local H = dofile("tools/tests/lib/ot6.lua")
@@ -299,7 +300,7 @@ local function fightAttempt(n)
     H.logStep(function()
       return string.format("[vargas] attempt %d begins at f%d", n, H.frame)
     end),
-    -- attempts past the first rewind to the doorstep and shift the RNG by
+    -- attempts past the first rewind to the entry point and shift the RNG by
     -- idling a per-attempt number of frames before the opening A-press
     H.cond(function() return n > 1 end, {
       H.call(function()
@@ -307,7 +308,7 @@ local function fightAttempt(n)
       end),
       H.waitFrames(2),
       H.call(function()
-        H.checkReq(loadReq, "attempt " .. n .. ": doorstep reload")
+        H.checkReq(loadReq, "attempt " .. n .. ": entry point reload")
       end),
       H.waitFrames(30 + n * 37),
     }, {}),
@@ -371,7 +372,7 @@ local function fightAttempt(n)
         calmN = ok and calmN + 1 or 0
         if calmN >= 30 then fightWon = true; return true end
         return false
-      end, 30000, { honest = true })
+      end, 30000, { playBattles = true })
     end)(),
     H.logStep(function()
       return string.format("[vargas] attempt %d verdict: %s", n,
@@ -380,10 +381,10 @@ local function fightAttempt(n)
   }, {})
 end
 
--- ------------------------------------------- reload-verified mint (gau) --
+-- ------------------------------------- reload-verified generation (gau) --
 local mintBlob, mintDone = nil, false
 local function mintAttempt(n)
-  local tag = string.format("[vargas_won] mint attempt %d", n)
+  local tag = string.format("[vargas_won] generation attempt %d", n)
   local saveReq, loadReq
   local mx, my
   return H.cond(function() return not mintDone end, {
@@ -421,7 +422,7 @@ local function mintAttempt(n)
       H.advanceStory(function()
         return H.hasControl() and H.tileAligned()
            and not H.battleLoadStarted()
-      end, 9000, { honest = true }),
+      end, 9000, { playBattles = true }),
       H.waitFrames(60),
     }),
   }, {})
@@ -430,7 +431,7 @@ end
 H.run({ maxFrames = 700000 }, {
   H.loadState(DOOR),
   H.waitFrames(30),
-  -- capture the doorstep ONCE: the retry ladder's rewind point.  The blob
+  -- capture the entry point ONCE: the retry ladder's rewind point.  The blob
   -- is this boot's own state -- nothing is written to the game.
   (function()
     local req
@@ -438,9 +439,9 @@ H.run({ maxFrames = 700000 }, {
       H.call(function() req = H.requestSaveState() end),
       H.waitFrames(2),
       H.call(function()
-        H.checkReq(req, "doorstep capture")
+        H.checkReq(req, "entry point capture")
         doorstepBlob = req.blob
-        H.log(string.format("doorstep captured (%d bytes) for the retry ladder",
+        H.log(string.format("entry point captured (%d bytes) for the retry ladder",
           #doorstepBlob))
       end),
     }, {})
@@ -452,7 +453,7 @@ H.run({ maxFrames = 700000 }, {
   fightAttempt(4),
   H.call(function()
     H.assertEq(fightWon, true,
-      "VARGAS beaten honestly within 4 attempts (real damage, real menus)")
+      "VARGAS beaten within 4 attempts (real damage, real menus)")
   end),
   H.waitFrames(30),
 
@@ -469,7 +470,7 @@ H.run({ maxFrames = 700000 }, {
   H.fieldCare({ tag = "post-vargas care", threshold = 0.9 }),
 
   -- ===================================================================== --
-  -- Assert the reunion's outcome and mint, reload-verified.
+  -- Assert the reunion's outcome and generate, reload-verified.
   -- ===================================================================== --
   H.call(function()
     H.assertEq(H.mapId() & 0x1ff, 98, "back on map 98 after the reunion")
@@ -505,6 +506,6 @@ H.run({ maxFrames = 700000 }, {
     H.emitBlob("vargas_won.mss", mintBlob)
   end),
   H.logStep(function()
-    return string.format("vargas_won minted at frame %d", H.frame)
+    return string.format("vargas_won generated at frame %d", H.frame)
   end),
 })

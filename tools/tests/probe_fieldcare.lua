@@ -1,7 +1,7 @@
--- probe_fieldcare.lua -- exercise H.fieldCare on the exact party the honest
--- Mt. Kolts route currently delivers: TERRA dead at 0/94, LOCKE untouched,
--- EDGAR on 1/145, five Tonics and seven Potions in the bag and NO Fenix
--- Down.  Reads and pad presses only (issue #75).
+-- probe_fieldcare.lua -- exercise H.fieldCare on the exact party the
+-- input-driven Mt. Kolts route currently delivers: TERRA dead at 0/94,
+-- LOCKE untouched, EDGAR on 1/145, five Tonics and seven Potions in the bag
+-- and NO Fenix Down.  Reads and pad presses only (issue #75).
 --
 -- What this pins down:
 --   * EDGAR is healed through the real Item -> use -> target windows;
@@ -35,7 +35,7 @@ H.run({ maxFrames = 60000 }, {
   H.call(function()
     H.log("before: " .. line())
     for _, c in ipairs(H.partyMembers()) do before[c] = H.charHp(c) end
-    H.assertEq(H.charHp(0), 0, "TERRA is down at the doorstep")
+    H.assertEq(H.charHp(0), 0, "TERRA is down at the entry point")
     H.assertEq(H.invCountOf(0xF0), 0, "and there is no Fenix Down to raise her")
     H.screenshot("care_before")
   end),

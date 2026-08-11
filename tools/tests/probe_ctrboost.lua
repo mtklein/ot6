@@ -129,7 +129,7 @@ H.run({ maxFrames = 90000 }, {
     else
       H.log("VERDICT: counters ignore pending boost -- consistent")
     end
-    -- regression gate (for the $b1.0 counterattack gate in the exec
+    -- regression test (for the $b1.0 counterattack gate in the exec
     -- hooks): a counter's swing count must not scale with pending.
     H.assertEq(a.swings, b.swings,
       "a counterattack's swing count does not scale with pending boost")

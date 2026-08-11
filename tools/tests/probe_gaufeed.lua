@@ -1,7 +1,8 @@
--- probe_gaufeed.lua -- measurement instrument for #75's honest Gau feed.
--- It routes falls_done -> Mobliz -> Veldt through controller input, switches
--- Battle Mode to Active through Config, and wins the final monster with
--- Cyan's delayed Retort while a party member is parked in Item targeting.
+-- probe_gaufeed.lua -- measurement instrument for #75's input-driven Gau
+-- feed.  It routes falls_done -> Mobliz -> Veldt through controller input,
+-- switches Battle Mode to Active through Config, and wins the final monster
+-- with Cyan's delayed Retort while a party member is parked in Item
+-- targeting.
 --
 -- The measured engine wrinkle is two-stage targeting.  GauAppears first makes
 -- Gau a one-shot $2f4e target, before UpdateDead has placed him in $3a42.  An
@@ -529,7 +530,7 @@ local function grindToAppearance()
       if want == nil then
         if plan.kind == "retort" then
           retortUnavailable = true
-          H.log("[gaufeed] Retort is absent from Cyan's honest Bushido window")
+          H.log("[gaufeed] Retort is absent from Cyan's Bushido window")
         end
         plan, planActor = nil, nil
         return { "b" }
@@ -634,7 +635,7 @@ local function grindToAppearance()
           dismissingAppearance = true
           grind.appearances = grind.appearances + 1
           H.log(string.format("[gaufeed] appearance #%d had no live feed " ..
-            "target; dismissing honestly -- %s", grind.appearances,
+            "target; dismissing -- %s", grind.appearances,
             engineLine()))
         end
         tick = tick + 1
@@ -764,7 +765,7 @@ local function grindToAppearance()
         end
         mstreak = mstreak + 1
         if mstreak < 4 then H.setPad({}); return end
-        -- Retort is delayed honest damage: once it is armed, park Cyan in
+        -- Retort is delayed real damage: once it is armed, park Cyan in
         -- a Tonic target selection and let Active mode advance the enemy.
         -- A physical hit on Cyan fires the counter while this target screen
         -- remains live, so Gau can arrive without any post-kill menu opening.
@@ -974,7 +975,7 @@ H.run({ maxFrames = 700000 }, {
     H.assertEq(sw(0x3F), 1, "$003F set -- GAU met at the falls")
     H.assertEq(inParty(11), false, "GAU not yet in the party")
   end),
-  H.navTo(8, 14, { maxFrames = 6000, honest = "flee", arrive = function()
+  H.navTo(8, 14, { maxFrames = 6000, playBattles = "flee", arrive = function()
     return H.worldMode() end }),
   H.waitUntil(function() return H.worldMode() and H.worldHasControl() end,
     3000, "on the world", 5),
@@ -983,14 +984,14 @@ H.run({ maxFrames = 700000 }, {
     if lost ~= nil then error("transit lost -- " .. tostring(lost), 0) end
   end),
   settle(157, "Mobliz"),
-  H.navTo(26, 22, { maxFrames = 10000, honest = "flee", arrive = function()
+  H.navTo(26, 22, { maxFrames = 10000, playBattles = "flee", arrive = function()
     return mapIdx() == 164 end }),
   H.cond(function() return mapIdx() ~= 164 end, {
-    H.navTo(26, 21, { maxFrames = 3000, honest = "flee", arrive = function()
+    H.navTo(26, 21, { maxFrames = 3000, playBattles = "flee", arrive = function()
       return mapIdx() == 164 end }),
   }, {}),
   settle(164, "item shop"),
-  H.navTo(29, 50, { maxFrames = 6000, honest = "flee" }),
+  H.navTo(29, 50, { maxFrames = 6000, playBattles = "flee" }),
   (function()
     local phase = 0
     return H.driveUntil(function() return mstateMenu() == 0x25 end, 3000, {
@@ -1014,10 +1015,10 @@ H.run({ maxFrames = 700000 }, {
     H.log(string.format("[gaufeed] leaving shop: gil=%d tonics=%d",
       gil(), invCount(TONIC)))
   end),
-  H.navTo(29, 53, { maxFrames = 4000, honest = "flee", arrive = function()
+  H.navTo(29, 53, { maxFrames = 4000, playBattles = "flee", arrive = function()
     return mapIdx() == 157 end }),
   settle(157, "town again"),
-  H.navTo(18, 40, { maxFrames = 8000, honest = "flee", arrive = function()
+  H.navTo(18, 40, { maxFrames = 8000, playBattles = "flee", arrive = function()
     return H.worldMode() end }),
   (function()
     return H.driveUntil(function() return H.worldMode() end, 1800, {
@@ -1066,7 +1067,7 @@ H.run({ maxFrames = 700000 }, {
 
   -- Active mode is selected through the ordinary Config UI.  In Wait mode,
   -- opening Item/target selection freezes the queued attack that must deliver
-  -- the final blow; Active mode lets that honest attack resolve while the
+  -- the final blow; Active mode lets that real attack resolve while the
   -- Tonic target cursor is banked; it normalizes Gau's special target state
   -- before the real Dried-Meat submission.
   H.release(),

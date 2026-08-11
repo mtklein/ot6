@@ -35,19 +35,19 @@
 --
 -- *** ONE LABELED ISOLATION ARM (issue #75) -- one write site STAYS ***
 -- THE OFF-VELDT VERDICT (arms 1d/2/3) CANNOT BE REACHED BY GEOGRAPHY from
--- any minted fixture: gau_joined's entire walkable component was enumerated
+-- any generated fixture: gau_joined's entire walkable component was enumerated
 -- live (2026-08-10, BFS over worldPassable from (214,149)) -- 1239 tiles
 -- spanning exactly three 32x32 sectors, and WorldBattleGroup reads $ff
 -- (Veldt) for all three; the component is walled by Crescent Mountain and
 -- the sea, and no other fixture fields Gau at all (sabin_done is the bare
 -- scenario hub).  "Walk off the Veldt" is therefore IMPOSSIBLE from the
--- honest tree today, and battle B keeps the burn-down plan's instrumented
+-- input-driven tree today, and battle B keeps the burn-down plan's instrumented
 -- bit as a loudly-labeled isolation arm: an exec callback on InitCmdList
 -- clears $11e4 bit 1 at the exact moment the code under test reads it (the
 -- callback COUNTS its firings and asserts the bit really was set, so it
 -- cannot be vacuous), and the bit is restored the moment the lists are
 -- read.  It MAY NEVER PRODUCE FIXTURES; it converts organically when the
--- chain crosses the Serpent Trench and mints a world-side Gau fixture off
+-- chain crosses the Serpent Trench and generates a world-side Gau fixture off
 -- the Veldt.  This is the file's only write site (.writeByte( waiver).
 --
 -- Asserted:
@@ -424,7 +424,7 @@ add({
 -- *** LABELED ISOLATION ARM (issue #75) -- see the header. ***  A FRESH
 -- load, with one bit instrumented at the exact moment the code under test
 -- reads it, because the off-Veldt verdict is unreachable by geography from
--- the minted tree (the component enumeration in the header).
+-- the generated tree (the component enumeration in the header).
 add({
   H.loadState(STATE),
   H.waitFrames(20),

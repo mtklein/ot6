@@ -1,6 +1,6 @@
--- gen_opera6_rafter.lua -- v0.5 Beat A leg 6: opera_dance_done (map 238 {98,7},
--- $0111=1) -> the RAFTER CHASE -> mint ultros2_doorstep one interaction before
--- battle 104 (Ultros②, $012d, 6 shields, slash|pierce).
+-- gen_opera6_rafter.lua -- v0.5 Beat A step 6: opera_dance_done (map 238
+-- {98,7}, $0111=1) -> the RAFTER CHASE -> generate ultros2_doorstep one
+-- interaction before battle 104 (Ultros②, $012d, 6 shields, slash|pierce).
 --
 -- Measured route: touch Ultros's letter, return through the active theater to
 -- alert the Impresario, ride the briefing, talk to the stage master, operate
@@ -11,17 +11,17 @@
 -- be switched off before map 235 instantiated; now they wander live.  Each
 -- is a no_react collision NPC whose event is `battle 25` -> win despawns it
 -- and clears its switch, loss restarts the chase (_caba0b).  The catwalk
--- crossing simply FIGHTS whichever rats collide -- navTo's honest mode taps
--- the fight like any encounter -- inside the same 5-minute timer
--- (start_timer 0, 18000, event_main.asm:28736; it ticks through battles,
--- so the route stays lean and un-collided rats are left alone).  Before
--- the doorstep mint the script WAITS until no live rat stands within 4
+-- crossing simply FIGHTS whichever rats collide -- navTo's playBattles mode
+-- taps the fight like any encounter -- inside the same 5-minute timer
+-- (start_timer 0, 18000, event_main.asm:28736; it ticks through battles, so
+-- the route stays lean and un-collided rats are left alone).  Before the
+-- entry point generate the script WAITS until no live rat stands within 4
 -- tiles of (14,7), so the banked state cannot boot into a rat collision
 -- under battle_ultros2's immediate A-taps.
 --
--- THE FACING IS EARNED, NOT POKED: the old mint wrote the object facing
+-- THE FACING IS EARNED, NOT POKED: the old generator wrote the object facing
 -- byte and $0743 to point the party at Ultros; now the last act at the
--- doorstep is a short RIGHT press against his occupied tile {15,7} -- a
+-- entry point is a short RIGHT press against his occupied tile {15,7} -- a
 -- blocked press turns the party in place -- and the facing is asserted
 -- from RAM afterwards.  This file writes no emulated game state.
 --
@@ -114,10 +114,10 @@ end
 local function bumpInto(sx, sy, dir, pred, maxF, what)
   local ph=0
   return H.cond(function() return true end, {
-    H.navTo(sx, sy, { maxFrames=12000, honest=true }),
+    H.navTo(sx, sy, { maxFrames=12000, playBattles=true }),
     H.driveUntil(pred, maxF, { H.call(function() ph=(ph+1)%16
       if H.battleLoadStarted() then
-        H.setPad(ph % 8 < 4 and { "a" } or {})   -- fought, not kill-bit
+        H.setPad(ph % 8 < 4 and { "a" } or {})   -- fought, not write-cleared
         return
       end
       if ph<8 then H.setPad({[dir]=true}) elseif ph<12 then H.setPad({"a"}) else H.setPad({}) end
@@ -127,7 +127,7 @@ end
 
 local function toDoor(tx,ty,bumpDir,destMap,what)
   return H.cond(function() return true end, {
-    H.navTo(tx,ty,{maxFrames=18000,honest=true,arrive=function() return map()==destMap end}),
+    H.navTo(tx,ty,{maxFrames=18000,playBattles=true,arrive=function() return map()==destMap end}),
     (function() local n=0 return H.driveUntil(function() return map()==destMap end,3000,{
       H.call(function()
         n=n+1
@@ -145,7 +145,7 @@ H.run({ maxFrames = 250000 }, {
   H.waitFrames(60),
   H.call(function()
     -- BOOT INVARIANTS (these are the only lines this file can guarantee until
-    -- opera_dance_done can be minted).
+    -- opera_dance_done can be generated).
     H.assertEq(map(), 238, "boot on the stage (map 238)")
     H.assertEq(sw(0x0111), 1, "$0111 SET -- the aria is solved (opera_dance_done)")
     H.assertEq(sw(0x0058), 0, "$0058 CLEAR -- Ultros has not dropped in yet")
@@ -153,7 +153,7 @@ H.run({ maxFrames = 250000 }, {
     dumpsw("BOOT"); H.screenshot("rafter_boot")
   end),
 
-  -- LEG 1: walk into the envelope at {99,20} -> _cabf31 -> $0058=1.
+  -- STEP 1: walk into the envelope at {99,20} -> _cabf31 -> $0058=1.
   bumpInto(99, 19, "down", function() return sw(0x0058)==1 or map()~=238 end, 6000,
     "touch the envelope -> $0058"),
   rideScene(function() return H.hasControl() and not H.dialogWaiting() end, 4000,
@@ -162,18 +162,18 @@ H.run({ maxFrames = 250000 }, {
     H.assertEq(sw(0x0058), 1, "$0058 SET -- Ultros threatened the opera")
     dumpsw("AFTER-ENVELOPE"); H.screenshot("rafter_ultros_dropped")
   end),
-  -- CHECKPOINT: this is a clean, cheap replay point for the legs below.
+  -- CHECKPOINT: this is a clean, cheap replay point for the steps below.
   H.saveState("ultros_dropped.mss"),
 
-  -- LEG 2 (measured): 238 stage door -> 237, then the audience-floor step
+  -- STEP 2 (measured): 238 stage door -> 237, then the audience-floor step
   -- trigger at {72,30}.  Since $0057=1, _ca5f48 loads map 233 (the active-opera
   -- variant of the theater), whose IMPRESARIO is still _cab724 at {15,46}.
   -- Stand above him at {15,45} and talk; the long 5-minute briefing lands on
   -- map 231 and sets $0110.
   toDoor(100,23,"down",237,"stage -> opera house"),
-  H.navTo(72,30,{maxFrames=12000,honest=true,arrive=function() return map()==233 end}),
+  H.navTo(72,30,{maxFrames=12000,playBattles=true,arrive=function() return map()==233 end}),
   H.waitUntil(function() return map()==233 and settled() end,3000,"active theater settled",5),
-  H.navTo(15,45,{maxFrames=12000,honest=true}),
+  H.navTo(15,45,{maxFrames=12000,playBattles=true}),
   (function() local n=0 return H.driveUntil(function()
     return sw(0x0110)==1 or H.dialogWaiting()
   end,3000,{H.call(function()
@@ -189,10 +189,10 @@ H.run({ maxFrames = 250000 }, {
   end),
   H.saveState("rafter_briefing.mss"),
 
-  -- LEG 3: stage master, far-right switch, then the newly-opened far-left
+  -- STEP 3: stage master, far-right switch, then the newly-opened far-left
   -- framework.  The room landings and stairs are Z-split, so the short raw
-  -- presses below are measured joins around otherwise ordinary navTo legs.
-  H.navTo(28,24,{maxFrames=6000,honest=true,arrive=function() return map()==232 end}),
+  -- presses below are measured joins around otherwise ordinary navTo steps.
+  H.navTo(28,24,{maxFrames=6000,playBattles=true,arrive=function() return map()==232 end}),
   H.waitUntil(function() return map()==232 and settled() end,1000,"right room",3),
   H.driveUntil(function() return H.fieldY()==35 end,300,{H.hold({"up"})},"leave right landing"),
   H.driveUntil(function() return H.fieldY()==34 end,300,{H.hold({"up"})},"right stair 1"),
@@ -207,23 +207,23 @@ H.run({ maxFrames = 250000 }, {
     end)},"reach stage master"),
   H.driveUntil(function() return sw(0x01B4)==1 end,1000,{
     H.call(function() H.setPad({"right","a"}) end)},"talk stage master"),
-  H.navTo(120,28,{maxFrames=1500,honest=true}),
+  H.navTo(120,28,{maxFrames=1500,playBattles=true}),
   H.driveUntil(function() return sw(0x0355)==0 end,500,{
     H.call(function() H.setPad({"up","a"}) end)},"operate far-right switch"),
-  H.navTo(114,37,{maxFrames=3000,honest=true,arrive=function() return map()==231 end}),
+  H.navTo(114,37,{maxFrames=3000,playBattles=true,arrive=function() return map()==231 end}),
   H.waitUntil(function() return map()==231 and settled() end,1000,"return theater",3),
-  H.navTo(28,27,{maxFrames=500,honest=true}),
-  H.navTo(4,24,{maxFrames=6000,honest=true,arrive=function() return map()==232 end}),
+  H.navTo(28,27,{maxFrames=500,playBattles=true}),
+  H.navTo(4,24,{maxFrames=6000,playBattles=true,arrive=function() return map()==232 end}),
   H.waitUntil(function() return map()==232 and settled() end,1000,"left room",3),
   H.driveUntil(function() return H.fieldY()==13 end,500,{H.hold({"up"})},"leave left landing"),
-  H.navTo(117,5,{maxFrames=2500,honest=true}),
+  H.navTo(117,5,{maxFrames=2500,playBattles=true}),
   -- The five rat gates stay LIVE (see the header): the catwalk is crossed
-  -- with navTo's honest mode, and a rat that collides fires battle 25 --
+  -- with navTo's playBattles mode, and a rat that collides fires battle 25 --
   -- fought by the same taps; a win despawns it and clears its gate.
-  H.navTo(117,3,{maxFrames=6000,honest=true,arrive=function() return map()==235 end}),
+  H.navTo(117,3,{maxFrames=6000,playBattles=true,arrive=function() return map()==235 end}),
   H.waitUntil(function() return map()==235 and settled() end,1500,"framework",3),
   H.call(function() H.log("[rats] on 235: " .. ratLine()) end),
-  H.navTo(6,16,{maxFrames=30000,honest=true}),
+  H.navTo(6,16,{maxFrames=30000,playBattles=true}),
   (function() local hb=0
     return H.driveUntil(function() return H.fieldY()<=10 end,12000,{
       H.call(function() hb=hb+1
@@ -239,7 +239,7 @@ H.run({ maxFrames = 250000 }, {
         if not H.hasControl() then H.setPad({}); return end
         H.setPad({down=true}) end) }, "step onto rafters") end)(),
 
-  H.navTo(14,7,{maxFrames=30000,honest=true}),
+  H.navTo(14,7,{maxFrames=30000,playBattles=true}),
   -- face Ultros by INPUT: his NPC occupies {15,7}, so a short RIGHT press
   -- is a blocked step that turns the party in place
   H.hold({ "right" }), H.waitFrames(6), H.release(), H.waitFrames(6),
@@ -250,7 +250,7 @@ H.run({ maxFrames = 250000 }, {
       "facing RIGHT at Ultros (EVENT_DIR 1), earned by the blocked press")
   end),
   -- the banked state must not boot into a rat collision: wait until no
-  -- LIVE rat stands within 4 tiles of the doorstep (they wander off; the
+  -- LIVE rat stands within 4 tiles of the entry point (they wander off; the
   -- timer has headroom for this wait, and the log shows the field)
   (function() local calm=0
     return H.driveUntil(function()
@@ -258,16 +258,16 @@ H.run({ maxFrames = 250000 }, {
       return calm >= 20
     end, 9000, { H.call(function()
       if H.battleLoadStarted() then H.setPad(H.frame%8<4 and {"a"} or {}); return end
-      H.setPad({}) end) }, "a rat-free, settled doorstep") end)(),
+      H.setPad({}) end) }, "a rat-free, settled entry point") end)(),
   H.call(function()
-    H.assertEq(map(),235,"Ultros doorstep is on rafters map 235")
-    H.assertEq(sw(0x02BC),1,"rafter timer is active at doorstep")
+    H.assertEq(map(),235,"Ultros entry point is on rafters map 235")
+    H.assertEq(sw(0x02BC),1,"rafter timer is active at the entry point")
     H.assertEq(H.readByte(0x087f + H.readWord(0x0803)), 1, "facing RIGHT")
-    H.log("[rats] at mint: " .. ratLine())
+    H.log("[rats] at generation: " .. ratLine())
     dumpsw("ULTROS2-DOORSTEP")
   end),
   H.saveState("ultros2_doorstep.mss"),
   H.logStep(function()
-    return string.format("gen_opera6_rafter: catwalk traversal banked Ultros 2 doorstep at f%d", H.frame)
+    return string.format("gen_opera6_rafter: catwalk traversal banked the Ultros 2 entry point at f%d", H.frame)
   end),
 })

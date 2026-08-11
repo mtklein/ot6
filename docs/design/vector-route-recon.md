@@ -59,7 +59,7 @@ Therefore:
 | `$01B7` | serpent-trench arrow direction |
 
 This is what arms the opera weight trap (`_cab497` needs `$01B0=1 && $01B4=1` =
-*face up and hold A*), and it is load-bearing across the Vector band:
+*face up and hold A*), and it is load-bearing across the Vector area:
 
 - `_cc96c9` (Vector sneak ledge): `$01B2` = face DOWN.
 - `_cc7a60` (esper tube room): `$01B0 && $01B4` = face UP + hold A.

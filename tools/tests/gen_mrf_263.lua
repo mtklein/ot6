@@ -1,6 +1,6 @@
--- gen_mrf_263.lua -- v0.6 leg 5: mrf_chute (MAGITEK FACTORY map 262,
+-- gen_mrf_263.lua -- v0.6 step 5: mrf_chute (MAGITEK FACTORY map 262,
 -- {10,45}) -> the RIGHT conveyor at {11,45} -> {20,45} -> the scripted
--- transition at {22,53} -> map 263, the factory's lower floor.  Mints
+-- transition at {22,53} -> map 263, the factory's lower floor.  Generates
 -- mrf_263.
 --
 -- MEASURED at (10,45) (census in gen_mrf_chute's log): 123 tiles reachable,
@@ -9,7 +9,7 @@
 -- steps).  {22,53}, {22,54}, {10,54}, {12,60}, {15,60}, {21,27}, {4,22}
 -- and {9,22} are all NO PATH.  So the lower half of map 262 is a chain of
 -- scripted rides, exactly as the route recon's third traversal hazard
--- predicted, and this leg rides the next link.
+-- predicted, and this step rides the next link.
 --
 -- _cc78d0 (event_main.asm:95182), on {11,45}, is ungated -- no $01B5
 -- latch, no facing gate -- and runs
@@ -158,7 +158,7 @@ H.run({ maxFrames = 60000 }, {
     H.assertEq(H.fieldY(), 45, "boot y")
     -- Positive control: the conveyor's landing tile and the {22,53}
     -- transition must both be NO-PATH on foot right now.  If either ever
-    -- becomes walkable this leg is walking a route it claims to ride.
+    -- becomes walkable this step is walking a route it claims to ride.
     H.assertEq(H.bfsPath(20, 45), nil,
       "CONTROL: (20,45) is NO-PATH on foot -- the {11,45} conveyor is the way across")
     H.assertEq(H.bfsPath(22, 53), nil,
@@ -188,9 +188,9 @@ H.run({ maxFrames = 60000 }, {
   end),
 
   -- 2. across to {22,52} and one tapped DOWN onto {22,53} -> map 263
-  H.navTo(22, 52, { maxFrames = 40000, honest = "flee",
+  H.navTo(22, 52, { maxFrames = 40000, playBattles = "flee",
     arrive = function() return map() == 263 end }),
-  H.navTo(22, 52, { maxFrames = 18000, honest = "flee" }), -- transition
+  H.navTo(22, 52, { maxFrames = 18000, playBattles = "flee" }), -- transition
   tapInto("down", function() return map() == 263 end, 12000,
     "DOWN onto {22,53} -> the scripted transition to map 263"),
   H.waitUntil(function() return map() == 263 and settled() end,
@@ -226,7 +226,7 @@ H.run({ maxFrames = 60000 }, {
     })
   end),
   H.logStep(function()
-    return string.format("mrf_263 minted at frame %d -- map 263 (%d,%d)",
+    return string.format("mrf_263 generated at frame %d -- map 263 (%d,%d)",
       H.frame, H.fieldX(), H.fieldY())
   end),
 })

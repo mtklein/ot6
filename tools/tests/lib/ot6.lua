@@ -30,7 +30,7 @@
 -- worldNavTo / advanceStory / route) lives in lib/ot6_field.lua, and
 -- lib/compose.py inlines BOTH halves into every composed script -- the
 -- dofile line above stays the only line a test writes, and H carries the
--- merged API.  The mint signature (lib/frontier_stamp.sh sig) hashes
+-- merged API.  The freshness signature (lib/frontier_stamp.sh sig) hashes
 -- generator ++ this file ++ ot6_field.lua, in that fixed order.
 --
 -- Environment notes (Mesen 2.1.1, verified against Mesen's source):
@@ -337,7 +337,8 @@ function M.loadState(sidecarPath)
       -- either (run.sh deletes <saves>/*.srm before every boot).  This used
       -- to be the site of an emu.write loop that re-formatted all four
       -- codex pages after every load -- an issue-#75 state write that also
-      -- OVERWROTE the fixture's minted codex.  Runs that boot fresh instead
+      -- OVERWROTE the codex the fixture was generated with.  Runs that boot
+      -- fresh instead
       -- of loading rely on the ROM's own lazy page formatting
       -- (Ot6CodexEnsure / Ot6CodexNewGame / Ot6CodexLoaded,
       -- ff6/src/battle/ot6_codex.asm): an unsigned page is zeroed and
@@ -415,8 +416,8 @@ end
 -- and at least one character must actually be alive.  $FFFF and $FF00 are not
 -- HP, and one of them anywhere means these bytes belong to somebody else.
 --
--- Three earlier versions, each of which shipped and each of which cost a full
--- frontier re-mint.  Do not reinstate any of them:
+-- Three earlier versions, each of which shipped and each of which cost a
+-- regeneration of every savestate in the chain.  Do not reinstate any of them:
 --   * slot 0, rejecting 0 -- said "no battle" the moment the first character
 --     died, so worldNavTo pressed directions into a live battle (#24).
 --   * slot 0, $FFFF only -- said "battle" for every frame a menu was up, and
@@ -427,7 +428,7 @@ end
 -- a sanity check: it is what rejects the FF00 scribble.
 --
 -- Known limit, deliberate: a TOTAL party wipe is all zeros, which is also what
--- a menu leaves, so this reports false.  Separating those needs a witness
+-- a menu leaves, so this reports false.  Separating those needs a check
 -- outside this table; a wiped party in a fixture is a failure anyway.
 -- Regression: battle_loadgate.lua.
 function M.battleLoadStarted()
@@ -484,7 +485,7 @@ seqStep = function(steps)
   }
 end
 
--- Exported for lib/ot6_field.lua alone: route() there glues per-leg waits
+-- Exported for lib/ot6_field.lua alone: route() there glues per-segment waits
 -- and navigators into one step, and this combinator is the only core
 -- LOCAL the field half needs by name (everything else it touches is
 -- public M.* API).  Tests never call it -- they hand M.run a plain list,
@@ -603,15 +604,15 @@ end
 -- ---------------------------------------------------------- timeout blame --
 -- A wait that runs out says "timeout after 600 frames waiting for main menu",
 -- and that sentence is a lie of omission often enough to matter.  The usual
--- cause is not the menu: it is that the savestate was minted against a
+-- cause is not the menu: it is that the savestate was generated against a
 -- DIFFERENT ROM than the one running, so the first step needing a specific
 -- frame -- typically the field X press -- lands on a frame the fixture's
 -- timing no longer has.  Read literally the message sends you into the menu
 -- code, and it has: at least one agent went looking for a product bug there.
 --
 -- So every timeout appends what the run actually knows: which fixture it
--- booted, and whether composition already flagged that fixture as minted from
--- sources this tree no longer has (OT6_STALE, emitted by lib/compose.py).
+-- booted, and whether composition already flagged that fixture as generated
+-- from sources this tree no longer has (OT6_STALE, emitted by lib/compose.py).
 -- This adds context; it never suppresses the failure.
 M.lastState = nil
 
@@ -623,7 +624,7 @@ function M.timeoutContext()
   local stale = type(OT6_STALE) == "table" and OT6_STALE[M.lastState]
   if stale then
     out = out .. "\n  and it is STALE: " .. stale
-    out = out .. "\n  A savestate minted against a different ROM resumes at a"
+    out = out .. "\n  A savestate generated against a different ROM resumes at a"
       .. " PC and a frame parity that\n  have since moved, so the first input"
       .. " needing a specific frame is where it surfaces --\n  usually as a"
       .. " timeout on something innocent, like this one."
@@ -634,7 +635,7 @@ function M.timeoutContext()
       .. "  mismatched pairing looks like.)"
   end
   return out .. "\n  Confirm: python3 tools/tests/lib/compose.py"
-    .. " --check-states\n  Re-mint:  nice -n 10 ninja -f build/build.ninja <state>"
+    .. " --check-states\n  Regenerate: nice -n 10 ninja -f build/build.ninja <state>"
 end
 
 -- Wait until pred() is truthy, polling every pollEvery frames (default 1).
@@ -758,7 +759,7 @@ function M.driveUntil(pred, maxFrames, steps, what)
   }
 end
 
--- STEP: the canonical first-battle entry from a doorstep fixture.  The
+-- STEP: the canonical first-battle entry from a `*_doorstep` fixture.  The
 -- battle_doorstep savestate parks the party one step short of its
 -- encounter trigger, and entering the fight is always the same dance:
 -- hold up long enough to commit the step (20 frames), release and let
@@ -774,8 +775,8 @@ end
 -- frame the encounter fires on.  This helper exists so that majority is
 -- ONE definition instead of a fleet-wide copy-paste (31 verbatim copies
 -- when it was extracted, several already drifted); a test that needs a
--- different entry (another direction, other timeouts, kill-bit
--- handling, a story scene that walks into its own fight) keeps writing
+-- different entry (another direction, other timeouts, battle-clearing
+-- flag handling, a story scene that walks into its own fight) keeps writing
 -- its own drive.
 function M.enterEncounter()
   return seqStep({
@@ -916,24 +917,24 @@ function M.clearBattle(maxFrames, spare)
   }, "clear battle")
 end
 
--- ------------------------------------------------- honest battle endings --
+-- -------------------------------------------- input-driven battle endings --
 -- Issue #75: a script may inject INPUT and READ memory; it may never WRITE
 -- emulated game state.  These two end a battle the way a player can, with
--- zero writes -- the opt-in replacements for clearBattle's kill-bit.  The
--- kill-bit path above stays only while unconverted generators depend on it;
--- new scripts and converted legs use these.
+-- zero writes -- the opt-in replacements for clearBattle's flag write.  The
+-- flag-write path above stays only while unconverted generators depend on
+-- it; new scripts and converted steps use these.
 --
 -- fightBattle: WIN by edge-tapped A (4 on / 4 off).  A blind A masher is a
--- real strategy on the legs this is for: A on the top command opens the
+-- real strategy on the steps this is for: A on the top command opens the
 -- actor's command list, A confirms its first entry, A accepts the default
 -- target, and the early-game magitek beams one-shot their trash.  The proof
 -- predates the helper: gen_sabin_magitek wins battles 15/16/17 by exactly
--- these taps because kill-bitting them softlocks the win-bit check, and the
+-- these taps because the flag write softlocks the win-bit check, and the
 -- vanilla-faithful intro guards die to one beam each.  The same edge taps
 -- page through battle dialogs, level-ups, and the victory text.  `spare`
 -- keeps clearBattle's goal-formation contract: if the battle we're asked to
 -- fight IS the goal set-piece, that's a script bug -- fail loudly.
--- Budget note: an honest win costs real ATB rounds -- budget thousands of
+-- Budget note: a played-out win costs real ATB rounds -- budget thousands of
 -- frames where clearBattle needed hundreds.
 
 -- ------------------------------------------------------- target cursor --
@@ -1444,7 +1445,7 @@ function M.fightBattle(maxFrames, spare)
       end
       M.setPad(aPhase < 4 and { "a" } or {})
     end),
-  }, "fight battle honestly (tap-A)")
+  }, "fight battle (tap-A)")
 end
 
 -- The command-table-aware counterpart to fightBattle().  Prefer this for a
@@ -1464,14 +1465,14 @@ function M.fightBattleByMenu(maxFrames, spare)
       end
       F.frame()
     end),
-  }, "fight battle honestly through the Fight menu")
+  }, "fight battle through the Fight menu")
 end
 
 -- fleeBattle: hold L+R -- the engine's own run mechanic (see the pad map
 -- above; vanilla's run timer counts held L or R).  Shifts fewer frames than
 -- fighting when it works, but FAILS (times out) on unrunnable formations
 -- and on every event battle whose win-bit the story checks -- callers pick
--- fight vs flee per leg and say why.  Zero writes.
+-- fight vs flee per step and say why.  Zero writes.
 function M.fleeBattle(maxFrames)
   return M.driveUntil(function()
     return not M.battleLoadStarted()

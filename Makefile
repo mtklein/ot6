@@ -23,8 +23,9 @@ rom: verify
 	@# Copy only when the bytes actually differ. `rom` is PHONY, so its recipe
 	@# runs on every `make frontier` (which lists rom as a prerequisite); an
 	@# unconditional cp would rewrite build/ot6.sfc under the worker-isolated
-	@# mints that `make -jN frontier` now runs in parallel, and a mint's Mesen
-	@# reads that very file at boot. Same cmp-guard the state mints already use.
+	@# savestate generations that `make -jN frontier` now runs in parallel, and
+	@# a generator's Mesen reads that very file at boot. Same cmp-guard the
+	@# state generators already use.
 	@cmp -s ff6/rom/ff6-en.sfc build/ot6.sfc || cp ff6/rom/ff6-en.sfc build/ot6.sfc
 
 # No distributable may be built from an untested ROM.  `test` stamps the
@@ -32,7 +33,7 @@ rom: verify
 # ROM on disk is still that one.  This is structural on purpose: a human
 # (or an agent) reading "green" off a scrolled-past terminal, or piping
 # the suite through `tail` so the shell reports tail's exit status, is
-# how v0.2 got tagged without anyone actually knowing the gate was green.
+# how v0.2 got tagged without anyone actually knowing the check was green.
 # Nothing here is allowed to depend on remembering to look.
 STAMP := build/.suite-pass
 
@@ -53,10 +54,11 @@ patch: tested
 	$(FLIPS) --create --bps "$(BASE)" build/ot6.sfc build/dist/ot6-from-ff3us10.bps
 	@ls -la build/dist/ot6-from-ff3us10.bps
 
-# release: build the ROM, run BOTH gates, then emit the distribution patch.
-# `test` is intentionally the fast development gate and permits frontier tests
-# to skip when their deep fixtures are absent.  A release must also mint the
-# complete advertised story frontier and rerun the suite with those tests live.
+# release: build the ROM, run BOTH checks, then emit the distribution patch.
+# `test` is intentionally the fast development check and lets the tests that
+# need generated savestates skip when those fixtures are absent.  A release
+# must also generate the complete advertised story chain and rerun the suite
+# with those tests live.
 release-test:
 	$(MAKE) frontier
 	$(MAKE) test
@@ -84,8 +86,8 @@ run: rom
 	fi
 
 # ------------------------------------------------- the savestate graph -----
-# EVERY minted savestate -- the suite's own three fixtures and the whole
-# story frontier -- lives in ONE generated ninja graph (issue #25):
+# EVERY generated savestate -- the suite's own three fixtures and the whole
+# story chain -- lives in ONE generated ninja graph (issue #25):
 #
 #   tools/tests/frontier_graph.py        the graph, as data (one entry/state)
 #   tools/tests/lib/frontier_ninja.py    emits it as build/build.ninja
@@ -121,7 +123,7 @@ graph:
 		{ echo "ERROR: ninja not installed -- run 'brew bundle'"; exit 1; }
 	@python3 tools/tests/lib/frontier_ninja.py
 
-# compose.py's selftest is pure python and gates the suite: it is the positive
+# compose.py's selftest is pure python and guards the suite: it is the positive
 # control for sidecar resolution, and a wrong resolution silently tests the
 # wrong ROM's savestates rather than failing.
 # ot6 v0.5 "every ability costs MP": now LIVE in the shipped ROM. This builds
@@ -150,13 +152,13 @@ test: rom nomp-rom graph
 	@# 2026-08-10, and the gap shipped a FALSE GREEN: the pass pattern was
 	@# a prefix (`^[ot6] PASS`), battle_thief logs `PASSED phase N` per
 	@# phase, so a run killed by the wall-clock cap mid-test scored as a
-	@# pass.  Every other anchor here is falsifiable; the one that decides
+	@# pass.  Every other check here is falsifiable; the one that decides
 	@# pass-vs-fail for the whole suite must be too.
 	sh tools/tests/run.sh --verdict-selftest
 	@# bosses-wob.md vs the shipped break data.  It carried four waivers for
 	@# rows the doc authored in prose and nobody wrote into the ROM; issue #23
 	@# landed all of them, the WAIVERS dict is empty, and the script is a plain
-	@# gate now.  It lives here rather than in suite.sh because suite discovery
+	@# check now.  It lives here rather than in suite.sh because suite discovery
 	@# globs *.lua for a `-- @suite` marker and cannot see a .py file -- same
 	@# reason compose.py and sram_anchor.py sit on these lines.
 	python3 tools/check_boss_rows.py
@@ -168,12 +170,13 @@ test: rom nomp-rom graph
 	python3 tools/check_state_writes.py --selftest
 	python3 tools/check_state_writes.py
 	@# Nobody fights bare-handed.  The game strips characters at story beats
-	@# and returns their gear to inventory; no leg ever put it back, so LOCKE
+	@# and returns their gear to inventory; no generator step ever put it back, so LOCKE
 	@# was unarmed in 42 fixtures and CELES in 29, and solo LOCKE punching a
 	@# 495-hp HeavyArmor read as a balance wall for three runs.  Reads the
 	@# savestates directly -- no emulator, ~1s for the whole tree -- so the
 	@# check is cheap enough to be unconditional.  Silent on an empty
-	@# build/states, because `make test` must not require a minted frontier.
+	@# build/states, because `make test` must not require the generated
+	@# savestates.
 	python3 tools/audit_equipment.py
 	python3 tools/tests/lib/frontier_ninja.py --selftest
 	sh tools/tests/lib/frontier_ninja_selftest.sh
@@ -185,11 +188,11 @@ test: rom nomp-rom graph
 	@# reaches the FAIL/xfail/dead-worker branches a green suite never does.
 	sh tools/tests/lib/suite_tally_selftest.sh
 	sh tools/tests/lib/anchor_negatives.sh
-	@# Fixture provenance is a GATE (issue #75 step 5), not a warning: every
+	@# Fixture provenance is a HARD CHECK (issue #75 step 5), not a warning: every
 	@# stamped fixture must hash back to the sources, the artifact bytes, and
 	@# the ancestor stamp it claims -- transitively, chain by chain.  A stale
 	@# or unbound fixture fails HERE, with the full list and the smallest
-	@# sufficient re-mint command, instead of warning from inside a composed
+	@# sufficient regeneration command, instead of warning from inside a composed
 	@# file nobody reads until some downstream test goes red for it.
 	python3 tools/tests/lib/compose.py --check-states
 	@rm -f $(STAMP)
@@ -201,36 +204,38 @@ test: rom nomp-rom graph
 	@echo "suite green — stamped `cat $(STAMP)`"
 
 # ---------------------------------------------------------------- frontier --
-# The story chain past the whelk, minted through the generated ninja graph
-# above.  `test` deliberately depends on none of it: every frontier state is
-# a multi-minute scripted playthrough, and the suite's remint cost has to
-# stay what it was.  Build it on demand -- everything with `make frontier`,
+# The story chain past the whelk, produced by the generated ninja graph
+# above.  `test` deliberately depends on none of it: every state in it is
+# a multi-minute scripted playthrough, and the suite's regeneration cost has
+# to stay what it was.  Build it on demand -- everything with `make frontier`,
 # or one state (and its stale transitive predecessors) by naming it:
 #
 #   ninja -f build/build.ninja vargas_doorstep
 #
-# The play-order chain, the anchor keys, the per-state route notes and the
+# The play-order chain, the checkpoint keys, the per-state route notes and the
 # scenario-stacking story all live with the data: tools/tests/frontier_graph.py.
-# FRONTIER_JOBS bounds the frontier -- and ONLY the frontier -- by default.
+# FRONTIER_JOBS bounds `make frontier` -- and ONLY that target -- by default.
 # Every other ninja target here is cheap and stays on ninja's own default.
 #
-# WHY A BOUND AT ALL.  Each mint is a Mesen process racing a WALL-CLOCK cap
-# (run.sh --timeout=600).  nice(1) does not slow the wall, and every mint is
-# equally niced, so they starve EACH OTHER: unbounded, `frontier` fans out to
-# cores+2 emulators, each gets well under a core, and the longest legs cross
-# 600s and are reaped -- the frontier is the one target that reliably
-# provokes this, because it is the one that parallelises hard on its own.
+# WHY A BOUND AT ALL.  Each savestate generation is a Mesen process racing a
+# WALL-CLOCK cap (run.sh --timeout=600).  nice(1) does not slow the wall, and
+# every one of them is equally niced, so they starve EACH OTHER: unbounded,
+# `frontier` fans out to cores+2 emulators, each gets well under a core, and
+# the longest steps cross 600s and are killed by the timeout -- `frontier` is
+# the one target that reliably provokes this, because it is the one that
+# parallelises hard on its own.
 # "Green" then depends on how loaded the machine happened to be.
 #
-# WHY 4.  It is the number that has been measured, not derived: 109 mints in
-# ~60 min with ZERO reaps (2026-07-29, M4 Max, other agents live).  Raise it
+# WHY 4.  It is the number that has been measured, not derived: 109 states
+# generated in ~60 min with ZERO timeout kills (2026-07-29, M4 Max, other
+# agents live).  Raise it
 # on an idle machine -- NINJAFLAGS still overrides everything, and
 # `make frontier FRONTIER_JOBS=8` overrides just this.
 FRONTIER_JOBS ?= 4
 frontier: rom graph
-	@# Gate the mint the same way `test` is gated: a generator that pokes
-	@# game state mints a fixture nobody played, and frontier can be run
-	@# with `make test` skipped -- so the no-state-write check runs here too.
+	@# Check generation the same way `test` is checked: a generator that pokes
+	@# game state produces a fixture nobody played, and `make frontier` can be
+	@# run with `make test` skipped -- so the no-state-write check runs here too.
 	python3 tools/check_state_writes.py
 	ninja -f $(NINJA_FILE) $(if $(NINJAFLAGS),$(NINJAFLAGS),-j$(FRONTIER_JOBS)) frontier
 	@echo "frontier states up to date"
@@ -273,14 +278,14 @@ smoke: $(SMOKE_TARGETS)
 	fi; \
 	echo "smoke: all $(words $(SMOKE)) generators ran and passed"
 
-# Anchored generators cold-load a tracked battery instead of booting a
-# predecessor savestate, so smoke must hand each one its anchor exactly as
-# the graph's anchored mint edges do (OT6_SRAM_ANCHOR) -- without it the run
-# times out waiting for the cold Continue.  One entry per anchored smoke
-# generator, keyed by gen name; a gen with no entry boots savestates.  This
-# map is what retired gen_n128's dual-boot battery probe: smoke now hands
-# every anchored generator its battery instead of asking the generator to
-# guess its boot from SRAM contents.
+# Generators that start from a checkpoint cold-load a tracked battery instead
+# of booting a predecessor savestate, so smoke must hand each one its
+# checkpoint exactly as the graph's checkpoint edges do (OT6_SRAM_ANCHOR) --
+# without it the run times out waiting for the cold Continue.  One entry per
+# such smoke generator, keyed by gen name; a gen with no entry boots
+# savestates.  This map is what retired gen_n128's dual-boot battery probe:
+# smoke now hands every such generator its battery instead of asking the
+# generator to guess its boot from SRAM contents.
 SMOKE_ANCHOR_gen_vector_doorstep := tools/tests/anchors/post-opera-v1
 SMOKE_ANCHOR_gen_n128            := tools/tests/anchors/minecart-platform-v1
 
@@ -294,36 +299,37 @@ $(SMOKE_TARGETS): smoke-%: rom
 	  || { echo "  $*: FAIL -- build/states/smoke_$*.log"; \
 	       grep -E 'FAIL|assertEq' build/states/smoke_$*.log | head -3; exit 1; }
 
-# ---- battery anchors, keyed by milestone (issue #25) ----------------------
-# tools/tests/anchors/<key>/ is one milestone anchor: manifest.json plus a
-# 32 KiB battery payload minted through the game's own Save UI (#9 -- never
+# ---- SRAM checkpoints, keyed by milestone (issue #25) ---------------------
+# tools/tests/anchors/<key>/ is one milestone checkpoint: manifest.json plus a
+# 32 KiB battery payload generated through the game's own Save UI (#9 -- never
 # synthesised).  The key is the milestone name; post-opera-v1 is the only
-# real one today, and frontier_graph.py's A-F boundary band names the states
+# real one today, and frontier_graph.py's A-F boundary section names the states
 # this convention must hold (mrf-save-room, n024-doorstep-save, ...).  Dirs
 # named negative-* are deliberately wrong fixtures for `make anchor-negatives`
-# below; frontier_ninja.py refuses a graph entry that names one.  Anchored
-# mints live in the ninja graph (anchor="<key>" in frontier_graph.py): the
-# manifest and payload ride the leg's dependency set, so editing either
-# re-mints every state hung off the anchor, and run.sh's persistent_layout
-# gate refuses the load before boot if the generator does not declare the
-# anchor's layout.  Smoke's anchored generators get theirs through the
-# SMOKE_ANCHOR_* map above.
+# below; frontier_ninja.py refuses a graph entry that names one.  Generation
+# from a checkpoint lives in the ninja graph (anchor="<key>" in
+# frontier_graph.py): the manifest and payload ride that step's dependency
+# set, so editing either regenerates every state hung off the checkpoint, and
+# run.sh's persistent_layout check refuses the load before boot if the
+# generator does not declare the checkpoint's layout.  Smoke's checkpoint
+# generators get theirs through the SMOKE_ANCHOR_* map above.
 
-# The stale-anchor regression (#25): prove both refusal paths FAIL, loudly,
-# naming what differed -- the pre-boot persistent_layout gate and the
-# in-emulator entry contract.  A gate is only evidence when its negative has
-# been observed failing; a green anchored run alone cannot show that.
+# The stale-checkpoint regression (#25): prove both refusal paths FAIL, loudly,
+# naming what differed -- the pre-boot persistent_layout check and the
+# in-emulator entry contract.  A check is only evidence when its negative has
+# been observed failing; a green run from a checkpoint alone cannot show that.
 # Costs one short emulator boot (~1 min); not part of smoke.
 .PHONY: anchor-negatives
 anchor-negatives: rom
 	sh tools/tests/lib/anchor_negatives.sh
 
-# The suite INCLUDING its frontier-gated tests.  battle_vargas asserts on
-# vargas_doorstep, and `test` deliberately does not depend on it: minting it
-# replays the whole story chain, which is the cost the frontier exists to
-# keep out of the gate.  suite.sh picks the test up automatically once the
-# fixture is on disk and reports it as skipped when it is not, so this target
-# is just "mint the frontier, then run the same suite".
+# The suite INCLUDING the tests that need generated savestates.  battle_vargas
+# asserts on vargas_doorstep, and `test` deliberately does not depend on it:
+# generating it replays the whole story chain, which is the cost `make
+# frontier` exists to keep out of `make test`.  suite.sh picks the test up
+# automatically once the fixture is on disk and reports it as skipped when it
+# is not, so this target is just "generate the chain, then run the same
+# suite".
 frontier-test: frontier
 	python3 tools/tests/lib/compose.py --selftest
 	tools/tests/suite.sh

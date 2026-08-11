@@ -12,7 +12,7 @@
 -- monster's shield/'?' cells into empty space -- a scatter of white glyphs on
 -- the still-dark battlefield, worst with the cave's 3-5 fly-in trash.  The
 -- entry ANIMATION was already veiled (Ot6EntryExitVeil, battle_whelkwipe's
--- gate); the gap this closes is the window BEFORE it.  Fix: gate the hud on
+-- test); the gap this closes is the window BEFORE it.  Fix: gate the hud on
 -- $201E, the same mask the sprites use.
 --
 -- The coverage gap was "nobody ever fought fly-in enemies under instruments":
@@ -20,7 +20,7 @@
 -- fly in.  kolts_cave's map-96 pool is 93.75% Cirpius x3 (gen_kolts_cave),
 -- three birds that fly in together -- so the natural encounter here spends
 -- ~45 frames with every monster present-but-not-shown, exactly the window the
--- bug lived in.  Frontier-gated on kolts_cave.mss (make frontier), the
+-- bug lived in.  Needs kolts_cave.mss (make frontier), the
 -- battle_vargas pattern.
 --
 -- Assert, every frame of that window: any present-but-unshown monster's hud
@@ -136,7 +136,7 @@ H.run({ maxFrames = 30000 }, {
         if not (H.hasControl() and H.tileAligned()) then H.setPad({}) return end
         -- issue #75: the danger counter ($1f6e) used to be pinned to 0xff00
         -- here so the first step forced the roll.  The engine rolls it
-        -- honestly now: pacing the lane accrues danger per step, and from a
+        -- on its own now: pacing the lane accrues danger per step, and from a
         -- fixed fixture plus this deterministic pace the encounter -- and
         -- its formation -- land on the same frame every run, so the pin
         -- bought nothing but a head start.

@@ -1,7 +1,7 @@
 -- @suite frontier=rapids_start
 -- battle_hudtrack: the under-monster HUD anchor must TRACK the battlefield.
 --
--- THE DEBT THIS GATES.  Ot6BgHudLine's anchor word (OT6_SHADOW+0 per line)
+-- THE DEBT THIS COVERS.  Ot6BgHudLine's anchor word (OT6_SHADOW+0 per line)
 -- was a one-shot latch: computed once per battle, never again, because
 -- recomputing every frame made the line jitter on attack-animation coord
 -- transients ($8057 priority shifts, $80/$82 x shoves, $e2/$e3 y bounces --
@@ -18,8 +18,8 @@
 -- is gone: this test now boots rapids_start and rides into the Lete River's
 -- forced fight, whose entrance SLIDES the shown monsters across the field --
 -- the exact class of change the latch left stale, delivered by the engine
--- itself (battle_hudtrail gates the abandoned-cell blanking of this same
--- slide; this file gates the anchors).  Measured on this fixture
+-- itself (battle_hudtrail covers the abandoned-cell blanking of this same
+-- slide; this file covers the anchors).  Measured on this fixture
 -- (2026-08-10): battle load zero-inits all six lines' anchors once (2 byte
 -- writes each), then the slide walks the live lines' anchors in 17 word-
 -- store adoptions each across ~30 frames, then every line is silent.

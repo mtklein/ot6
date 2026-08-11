@@ -1,12 +1,13 @@
 -- gen_terra_done.lua -- from terra_clifftop.mss: the last short walk of the
 -- TERRA/BANON scenario -- across the ledge into ARVIS'S HOUSE, onto the
 -- meeting trigger, and out the far side of the scenario.
--- Mints one state:
+-- Generates one state:
 --   terra_done.mss  map 9 (8,3), SCENARIO_MOG alone, controllable, with
 --                   $0021 SET and the BANON/TERRA/EDGAR hub NPCs gone -- the
 --                   TERRA/BANON scenario complete and the hub back on two
---                   choices.  The same beat gen_scenario mints scenario_hub
---                   at, so the two states are directly comparable.
+--                   choices.  The same beat gen_scenario generates
+--                   scenario_hub at, so the two states are directly
+--                   comparable.
 --
 -- TWO HOPS.
 --
@@ -35,7 +36,7 @@
 -- `if_all` at :26654 to the reunion _caadb9 only opens on $0021 && $001E &&
 -- $0044) it takes the `if_any` at :26665 to _caadb4 and plays dlg $0B8C,
 -- "Choose a scenario… kupo!", skipping the first-visit recap $016F.  The
--- mint is the first controllable frame after that.
+-- state is generated on the first controllable frame after that.
 --
 -- STACK-CLEAN: this generator also runs under OT6_STACK (booted from a
 -- t2_terra_clifftop that descends from locke_done, $001E=1), so every claim
@@ -50,7 +51,7 @@
 -- of pure cutscene measured on the poked twin, probe_narshe_spike).  On
 -- that boot this file takes its REUNION FORK below: instead of the hub
 -- gate it rides the cutscene to the map-22 staging -- party at (20,9),
--- $0045 set, first controllable frame -- and mints reunion_ready.mss,
+-- $0045 set, first controllable frame -- and generates reunion_ready.mss,
 -- the state gen_narshe_battle boots.  The fork is written from the
 -- measured spike ride; it has not yet had a live all-three run (that
 -- needs Sabin's ending), which is exactly the run that will prove it.
@@ -143,18 +144,19 @@ H.run({ maxFrames = 60000 }, {
 
   -- ===================================================================== --
   -- 1. INTO ARVIS'S HOUSE.  (53,9) IS ITSELF the door tile (its neighbours
-  --    below are solid ledge, so there is no doorstep to stop one short on --
-  --    a first cut aimed at (53,10) and BFS answered "no path").  So navTo
-  --    walks onto (53,9) directly and terminates on the map change it fires.
+  --    below are solid ledge, so there is no entry point to stop one short
+  --    on -- a first cut aimed at (53,10) and BFS answered "no path").  So
+  --    navTo walks onto (53,9) directly and terminates on the map change it
+  --    fires.
   -- ===================================================================== --
-  -- issue #75: honest=true on every navigator and story ride -- this leg's
-  -- maps draw no encounters, so nothing changes on the happy path, but a
-  -- battle that ever did fire would be fought by real input, never
-  -- kill-bitted.
-  H.navTo(53, 9, { maxFrames = 20000, honest = true,
+  -- issue #75: playBattles=true on every navigator and story ride -- this
+  -- step's maps draw no encounters, so nothing changes on the happy path,
+  -- but a battle that ever did fire would be fought by real input, never
+  -- write-cleared.
+  H.navTo(53, 9, { maxFrames = 20000, playBattles = true,
     arrive = function() return map() ~= 20 end }),
   H.release(),
-  H.advanceStory(settleHouse, 20000, { honest = true }),
+  H.advanceStory(settleHouse, 20000, { playBattles = true }),
   H.waitFrames(30),
   H.call(function()
     H.assertEq(map(), 30, "on map 30, ARVIS'S HOUSE")
@@ -170,7 +172,7 @@ H.run({ maxFrames = 60000 }, {
   --    by the reciprocal door back to the ledge at (67,26), planned clear.
   -- ===================================================================== --
   planAvoids(66, 35, { { 67, 26 } }, "Arvis's house: (67,28) -> (66,35)"),
-  H.navTo(66, 35, { maxFrames = 20000, honest = true, arrive = function()
+  H.navTo(66, 35, { maxFrames = 20000, playBattles = true, arrive = function()
     return sw(0x0021) == 1 or H.eventRunning() or H.dialogWaiting()
   end }),
   H.release(),
@@ -180,12 +182,12 @@ H.run({ maxFrames = 60000 }, {
     -- ------------------------------------------------------------------ --
     -- THE REUNION FORK (all-three boot): _caad4c's if_all fires _caadb9 ->
     -- _ccb4da, ~10,400 frames of dialog-tap cutscene ending on the map-22
-    -- staging (measured on the poked twin, probe_narshe_spike).  Mint
+    -- staging (measured on the poked twin, probe_narshe_spike).  Generate
     -- reunion_ready.mss at the first controllable frame.
     -- ------------------------------------------------------------------ --
     H.advanceStory(function()
       return sw(0x0021) == 1 and settleStaging()
-    end, 60000, { honest = true }),
+    end, 60000, { playBattles = true }),
     H.waitFrames(30),
     H.call(function()
       H.assertEq(map(), 22, "the reunion ends on map 22, the battlefield staging")
@@ -199,7 +201,7 @@ H.run({ maxFrames = 60000 }, {
     end),
     H.saveState("reunion_ready.mss"),
     H.logStep(function()
-      return string.format("reunion_ready minted at frame %d -- the Battle " ..
+      return string.format("reunion_ready generated at frame %d -- the Battle " ..
         "for Narshe is bootable", H.frame)
     end),
   }, {
@@ -208,7 +210,7 @@ H.run({ maxFrames = 60000 }, {
     -- ------------------------------------------------------------------ --
     H.advanceStory(function()
       return sw(0x0021) == 1 and settleHub()
-    end, 60000, { honest = true }),
+    end, 60000, { playBattles = true }),
     H.waitFrames(30),
     H.call(function()
       H.assertEq(map(), 9, "back on map 9, the SCENARIO HUB")
@@ -248,7 +250,7 @@ H.run({ maxFrames = 60000 }, {
     end),
     H.saveState("terra_done.mss"),
     H.logStep(function()
-      return string.format("terra_done minted at frame %d", H.frame)
+      return string.format("terra_done generated at frame %d", H.frame)
     end),
   }),
 })

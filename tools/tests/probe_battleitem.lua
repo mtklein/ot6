@@ -34,7 +34,7 @@
 local H = dofile("tools/tests/lib/ot6.lua")
 -- vargas_doorstep, not first_battle: the opening battle carries an EMPTY
 -- bag ($2686 reads FF x0 straight across, measured), so there is nothing
--- to select and the target window never opens.  The Vargas doorstep is one
+-- to select and the target window never opens.  The Vargas entry point is one
 -- A press from `battle 66` and the party walks in with Tonics, Potions and
 -- Fenix Downs -- a real bag to index into.
 local STATE = "build/states/vargas_doorstep.mss.lua"

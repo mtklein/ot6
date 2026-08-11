@@ -12,7 +12,7 @@
 --   $7E3E95/$7E3E97  revealed masks
 --
 -- This doubles as the key input experiment: driving the battle with buttons
--- when NO savestate was loaded mid-battle (the doorstep load happens in the
+-- when NO savestate was loaded mid-battle (the entry-point load happens in the
 -- field, long before battle init).
 --
 -- Exit codes: 0 = battle came up, input drove the menus, and the action
@@ -53,7 +53,7 @@ H.run({ maxFrames = 12000 }, {
   H.driveUntil(function() return H.battleLoadStarted() end, 4000, {
     H.hold({ "up" }), H.waitFrames(20), H.release(), H.waitFrames(2),
     H.pressButtons({ "a" }, 4),
-  }, "battle load from doorstep"),
+  }, "battle load from entry point"),
   ramReport("load+0"),
 
   -- 2. Battle must actually come up (this is where broken builds die).

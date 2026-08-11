@@ -22,11 +22,11 @@ them. Blitz is a menu, Steal guarantees the rare at three boost pips, and
 level-ups fully restore HP and MP.
 
 Route work follows the Sealed Gate: the Narshe mission handoff, the cave,
-the Esper attack, the Imperial banquet, and the Thamasa handoff. Pushing the
-playable frontier to the end of the World of Balance is v0.10's job.
+the Esper attack, the Imperial banquet, and the Thamasa handoff. Getting the
+game playable to the end of the World of Balance is v0.10's job.
 
-See [docs/ROADMAP.md](docs/ROADMAP.md) for milestones and the "playable
-frontier" metric, [docs/DESIGN.md](docs/DESIGN.md) for the mechanics design,
+See [docs/ROADMAP.md](docs/ROADMAP.md) for milestones and how far the game is
+playable, [docs/DESIGN.md](docs/DESIGN.md) for the mechanics design,
 and [docs/HANDOFF.md](docs/HANDOFF.md) for the traps that cost real time to
 rediscover.
 
@@ -43,8 +43,9 @@ Drop that file at the repo root, then:
 
 ```sh
 make rom     # build build/ot6.sfc
-make test    # full headless correctness gate (the whole suite + the mp-cost A/B)
-make frontier-test  # the same gate plus its frontier-gated tests (slow: mints the story chain)
+make test    # full headless correctness run (the whole suite + the mp-cost A/B)
+make frontier-test  # the same, plus the tests that need the deep story savestates
+                    #   (slow: generates that chain of savestates first)
 make run     # launch the built ROM in Mesen (GUI)
 make patch   # emit a distributable .bps
 ```

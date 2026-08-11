@@ -9,10 +9,10 @@
 -- Two candidate causes, and they need different fixes, so this measures
 -- rather than guesses:
 --   (a) the party was WIPED and the game is sitting on GAME OVER / the
---       title screen.  The Makefile's rung-3 notes already record that
---       shape -- "battles 15/16/17 are each WON BY TAP-A (kill-bit ->
---       GameOver softlock)" -- and this fight is LOCKE ALONE, so it is
---       the obvious suspect;
+--       title screen.  The Makefile's tier-3 notes already record that
+--       shape -- "battles 15/16/17 are each WON BY TAP-A (battle-clear
+--       write -> GameOver softlock)" -- and this fight is LOCKE ALONE, so
+--       it is the obvious suspect;
 --   (b) the train script never reached its `$ff` item, so TrainCmd_ff's
 --       `stz $f0 / stz $22 / inc $19` (world/train_script.asm:951-957)
 --       never ran and the cutscene is still nominally live.
@@ -63,7 +63,7 @@ H.run({ maxFrames = 30000 }, {
   end)(),
   H.call(function() dump("cutscene-start") end),
 
-  -- ride until the sixth fight is over, kill-bitting as gen_n128 did
+  -- ride until the sixth fight is over, write-clearing as gen_n128 did
   (function() local ph = 0
     return H.driveUntil(function() return fights >= 6 and battN == 0 end, 20000, {
       H.call(function()

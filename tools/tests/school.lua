@@ -3,7 +3,7 @@
 -- Exit code 0 = pass, 1 = fail.  (smoke.lua pattern: pure ROM bytes.)
 --
 -- Three sentinel dialogs from docs/design/narshe-school.md are asserted
--- in full: the greeter ($0257, "The war has new rules..."), the rung-2
+-- in full: the greeter ($0257, "The war has new rules..."), the tier-2
 -- seed ($0276, the deserter), and the Runic lesson ($026F), which stopped
 -- being a kept-vanilla line the moment Runic started banking a BP -- a
 -- reverted Ot6RunicBP and a reverted advisor now fail one test each.

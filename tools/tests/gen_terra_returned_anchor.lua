@@ -1,23 +1,23 @@
--- gen_terra_returned_anchor.lua -- mint battery anchor F, `terra-returned-v1`
--- (the A-F save-point boundary band is lettered in
--- tools/tests/frontier_graph.py): the WHOLE E->F leg in one run, from n128_won
--- (the nearest minted predecessor, parked on boundary E) to a world-map
--- battery save one takeoff after Terra's return.  This leg cannot
--- be split legally -- a save inside the Esper-World flashback would save as
--- the WEDGE-actor Maduin with the roster rewritten -- so the anchor gen IS
--- the leg.
+-- gen_terra_returned_anchor.lua -- generate SRAM checkpoint F,
+-- `terra-returned-v1` (the A-F save-point boundary range is lettered in
+-- tools/tests/frontier_graph.py): the WHOLE E->F step in one run, from
+-- n128_won (the nearest generated predecessor, parked on boundary E) to a
+-- world-map battery save one takeoff after Terra's return.  This step
+-- cannot be split legally -- a save inside the Esper-World flashback would
+-- save as the WEDGE-actor Maduin with the roster rewritten -- so the
+-- checkpoint gen IS the step.
 --
 -- The route, every step measured on the probe ladder (2026-07-27):
 --  1. 240 (58,7) -> (54,40) -> held LEFT onto the reunion trigger column
 --     x=52 (approached from the EAST along row 40; §4.4's (52,36..38)
 --     candidates are NOT walkable live).
 --  2. The Setzer reunion auto-plays onto the Blackjack deck (map 6),
---     battle 71 (Cranes, 010D+010E) FOUGHT AND WON HONESTLY (2026-08-10,
---     probe_cranes_water's playbook -- see the prep block below; the
---     original July mint kill-bitted this fight, and the interim record
---     called it unwinnable off a Thunder-Blade loadout bug), then the
---     non-interactive flights to Zozo and into the flashback: control as
---     the WEDGE-actor MADUIN at 219 (34,10).
+--     battle 71 (Cranes, 010D+010E) FOUGHT AND WON WITH REAL INPUT
+--     (2026-08-10, probe_cranes_water's playbook -- see the prep block
+--     below; the original July generator write-cleared this fight, and the
+--     interim record called it unwinnable off a Thunder-Blade loadout bug),
+--     then the non-interactive flights to Zozo and into the flashback:
+--     control as the WEDGE-actor MADUIN at 219 (34,10).
 --  3. The flashback's interactive chain (unmapped until now):
 --       a. pocket exit (36,15) -> 217 (23,21);
 --       b. talk the (32,11) NPC -> choice -> carry MADONNA in ($006C);
@@ -144,7 +144,7 @@ local function rideAttempt(n)
       H.call(function() H.checkReq(loadReq, "pre-attempt reload") end),
       H.waitFrames(90),
     }) or H.waitFrames(1),
-    H.navTo(54, 40, { honest = "flee", maxFrames = 25000 }),
+    H.navTo(54, 40, { playBattles = "flee", maxFrames = 25000 }),
     pressWalk("left", function() return map() == 6 end, 9000,
       "held LEFT onto the reunion trigger -> the Blackjack deck"),
     H.release(),
@@ -204,12 +204,12 @@ local function rideAttempt(n)
   })
 end
 
--- 160000: the July budget (60000) was sized for 3-frame kill-bit fights;
--- the honest ride is ~13k to the flashback (probe_cranes_water: fight
--- open f7452, both Cranes dead ~f15250, flashback f19772 with ~5.5k of
--- menu prep in front), the flashback chain + takeoff + save measured
--- ~55k more in July, and the ladder may burn two wiped attempts (~15k
--- each) before its win.
+-- 160000: the July budget (60000) was sized for 3-frame battle-clear-write
+-- fights;  the input-driven ride is ~13k to the flashback
+-- (probe_cranes_water: fight open f7452, both Cranes dead ~f15250,
+-- flashback f19772 with ~5.5k of menu prep in front), the flashback chain +
+-- takeoff + save measured ~55k more in July, and the ladder may burn two
+-- wiped attempts (~15k each) before its win.
 H.run({ maxFrames = 160000 }, {
   H.loadState("build/states/n128_won.mss.lua"),
   H.waitFrames(150),
@@ -222,8 +222,8 @@ H.run({ maxFrames = 160000 }, {
   -- 1-2. FIGHT PREP, then the reunion trigger and the ride.
   --
   -- THE WALL, RESOLVED (2026-08-10, probe_cranes_water -- superseding the
-  -- "honestly unwinnable as tuned" record that stood here; the full wall
-  -- history lives in that file's header and probe_cranes_wedge's):
+  -- "unwinnable in normal play as tuned" record that stood here; the full
+  -- wall history lives in that file's header and probe_cranes_wedge's):
   -- the wall was a LOADOUT bug, not balance.  H.equipOptimum had armed
   -- LOCKE and EDGAR with THUNDER BLADES ($0F: slash, LIGHTNING), and the
   -- Left Crane ABSORBS lightning (monster_prop +23 = $04) -- every Fight
@@ -300,27 +300,27 @@ H.run({ maxFrames = 160000 }, {
   end),
 
   -- 3a/3b. out to the town, carry Madonna in
-  H.navTo(36, 14, { honest = "flee", maxFrames = 6000 }),
+  H.navTo(36, 14, { playBattles = "flee", maxFrames = 6000 }),
   pressWalk("down", function() return map() == 217 end, 6000,
     "pocket exit (36,15) -> 217"),
   H.waitFrames(60),
-  H.navTo(32, 12, { honest = "flee", maxFrames = 12000 }),
+  H.navTo(32, 12, { playBattles = "flee", maxFrames = 12000 }),
   pressTalk("up", function() return sw(0x006C) == 1 end, 20000,
     "talk (32,11) -> carry MADONNA in -> $006C"),
   H.waitFrames(90),
 
   -- 3c. Madonna resting -> $006E
-  H.navTo(46, 43, { honest = "flee", maxFrames = 9000 }),
+  H.navTo(46, 43, { playBattles = "flee", maxFrames = 9000 }),
   pressTalk("up", function() return sw(0x006E) == 1 end, 25000,
     "talk MADONNA -> $006E"),
   H.waitFrames(90),
 
   -- 3d. to the gate (the corridor NPC ports us; the landing tile flickers)
-  H.navTo(36, 14, { honest = "flee", maxFrames = 6000 }),
+  H.navTo(36, 14, { playBattles = "flee", maxFrames = 6000 }),
   pressWalk("down", function() return map() == 217 end, 6000,
     "pocket exit -> 217"),
   H.waitFrames(60),
-  H.navTo(32, 12, { honest = "flee", maxFrames = 12000 }),
+  H.navTo(32, 12, { playBattles = "flee", maxFrames = 12000 }),
   pressTalk("up", function() return map() == 218 end, 15000,
     "talk (32,11) -> ported to the gate (218)"),
   H.waitFrames(90),
@@ -330,16 +330,16 @@ H.run({ maxFrames = 160000 }, {
   -- 3e. the confession -> $006F and the raid
   planApproach(0x1C),
   H.navTo(function() return app[1] end, function() return app[2] end,
-    { honest = "flee", maxFrames = 9000 }),
+    { playBattles = "flee", maxFrames = 9000 }),
   talkApproached(function() return sw(0x006F) == 1 end, 40000,
     "talk MADONNA at the gate -> $006F"),
-  H.advanceStory(function() return map() == 219 and settled() end, 30000, { honest = true }),
+  H.advanceStory(function() return map() == 219 and settled() end, 30000, { playBattles = true }),
   H.waitFrames(90),
 
   -- 3f. the tempest plan -> $0116
   planApproach(0x13),
   H.navTo(function() return app[1] end, function() return app[2] end,
-    { honest = "flee", maxFrames = 9000 }),
+    { playBattles = "flee", maxFrames = 9000 }),
   talkApproached(function() return sw(0x0116) == 1 end, 12000,
     "talk NPC_4 -> $0116"),
   H.waitFrames(90),
@@ -347,31 +347,31 @@ H.run({ maxFrames = 160000 }, {
   -- 3g. the collapse -> $0117
   planApproach(0x12),
   H.navTo(function() return app[1] end, function() return app[2] end,
-    { honest = "flee", maxFrames = 9000 }),
+    { playBattles = "flee", maxFrames = 9000 }),
   talkApproached(function() return sw(0x0117) == 1 end, 12000,
     "talk the elder -> $0117"),
   H.waitFrames(90),
 
   -- 3h. the chase to the gate -> $0118
-  H.navTo(41, 55, { honest = "flee", maxFrames = 9000 }),
+  H.navTo(41, 55, { playBattles = "flee", maxFrames = 9000 }),
   pressWalk("down", function() return map() == 217 end, 6000,
     "pocket exit (41,56) -> 217"),
   H.waitFrames(60),
-  H.navTo(32, 7, { honest = "flee", maxFrames = 15000 }),
+  H.navTo(32, 7, { playBattles = "flee", maxFrames = 15000 }),
   pressWalk("up", function() return map() == 218 or sw(0x0118) == 1 end, 9000,
     "onto (32,6) -> the gate trigger"),
-  H.advanceStory(function() return sw(0x0118) == 1 end, 30000, { honest = true }),
+  H.advanceStory(function() return sw(0x0118) == 1 end, 30000, { playBattles = true }),
   H.waitFrames(60),
 
   -- 3i. the finale and the ride home
   planApproach(0x1C),
   H.navTo(function() return app[1] end, function() return app[2] end,
-    { honest = "flee", maxFrames = 9000 }),
+    { playBattles = "flee", maxFrames = 9000 }),
   talkApproached(function() return not H.hasControl() or map() ~= 218 end, 12000,
     "talk MADONNA -> the finale _caa4e0"),
   H.advanceStory(function()
     return map() == 6 and sw(0x02F0) == 1 and settled()
-  end, 90000, { honest = true }),
+  end, 90000, { playBattles = true }),
   H.waitFrames(120),
   H.call(function()
     H.assertEq(sw(0x02F0), 1, "$02F0 SET -- TERRA is available (the v0.6 stop line)")
@@ -382,7 +382,7 @@ H.run({ maxFrames = 160000 }, {
   end),
 
   -- 4. takeoff and grounding
-  H.navTo(14, 6, { honest = "flee", maxFrames = 6000, calmFrames = 8 }),
+  H.navTo(14, 6, { playBattles = "flee", maxFrames = 6000, calmFrames = 8 }),
   (function() local ph = 0
     return H.driveUntil(function() return H.worldMode() end, 1200, {
       H.call(function()
@@ -433,7 +433,7 @@ H.run({ maxFrames = 160000 }, {
   H.call(function()
     H.assertEq((H.readByte(0x0201) & 0x80) ~= 0, true,
       "menu-flags $0201 bit7 SET -- the save-enable flow reached the menu")
-    -- ARM THE HONEST SAVE RECEIPT (issue #75): a read-only exec hook on
+    -- ARM THE input-driven save receipt (issue #75): a read-only exec hook on
     -- the real CopyGameDataToSRAM entry captures the slot argument the
     -- save runs with (codex_saveas's instrument).  This replaces the old
     -- zeroed-$307ff0 sentinel -- an SRAM write -- as the proof that the
@@ -477,12 +477,12 @@ H.run({ maxFrames = 160000 }, {
     H.assertEq(saveArg, 3, "CopyGameDataToSRAM ran for persistent slot 3")
     -- the codex witness cells are READ, never seeded (issue #75): the
     -- battery carries whatever the chain actually earned.  The phase-2
-    -- anchor re-cuts measure these and the entry contracts follow the
+    -- checkpoint re-cuts measure these and the entry contracts follow the
     -- measurement (never the reverse).
     H.log(string.format("codex witness cells (earned): elem=%02X class=%02X",
       emu.read(0x316810 + ULTROS2, emu.memType.snesMemory),
       emu.read(0x316990 + ULTROS2, emu.memType.snesMemory)))
-    H.log("real Save UI wrote the terra-returned anchor to slot 3")
+    H.log("real Save UI wrote the terra-returned checkpoint to slot 3")
   end),
   -- The exit contract is asserted WITH THE MENU OPEN, the post-opera
   -- precedent: the grounded-airship world menu does not unwind on B the

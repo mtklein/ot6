@@ -1,9 +1,9 @@
--- gen_minecart_doorstep.lua -- v0.6 leg 12: esper_tubes (map 274 {10,12},
+-- gen_minecart_doorstep.lua -- v0.6 step 12: esper_tubes (map 274 {10,12},
 -- $0068=1, LOCKE alone) -> the lift trigger {20,13} -> map 266 -> Cid's
 -- "I'm going to talk to the Emperor" scene -> map 272 {8,46} -> parked
--- beside CID, one A-press from the minecart.  Mints minecart_doorstep.
+-- beside CID, one A-press from the minecart.  Generates minecart_doorstep.
 --
--- _cc7f43 (event_main.asm:96313) is gated only on `$0068=1`, which leg 11
+-- _cc7f43 (event_main.asm:96313) is gated only on `$0068=1`, which step 11
 -- banked, so walking onto {20,13} is enough.  It rides the lift down
 -- (`load_map 266, {7,0}`, :96341), plays Cid's decision (dlg $057E) and
 -- ends `load_map 272, {8,46}, RIGHT` + `player_ctrl_on` (:96406-96457) --
@@ -16,7 +16,7 @@
 -- event_main.asm:96463), whose tail is
 --     switch $02BC=1 / cutscene TRAIN / call _ca5ea9 / ...
 --     load_map 240, {64,13}
--- (:96579-96586).  This leg banks the doorstep in front of him and dumps
+-- (:96579-96586).  This step banks the entry point in front of him and dumps
 -- the live object map so the parking tile is measured rather than read off
 -- an obj_script.
 local H = dofile("tools/tests/lib/ot6.lua")
@@ -177,12 +177,12 @@ H.run({ maxFrames = 60000 }, {
   --    The trigger is stepped onto with an explicit DOWN tap rather than a
   --    navTo whose goal IS the trigger tile: navTo terminates on the party
   --    coming to rest, and a tile that loads a map is one it never rests
-  --    on.  (Before #22 this leg had a second reason -- a downward navTo
+  --    on.  (Before #22 this step had a second reason -- a downward navTo
   --    step overshot by a tile, so navTo "arrived" at {20,13} from {20,14}
   --    and the map never changed, measured at 219 frames.  That half is
-  --    fixed in the library now; the doorstep-then-tap shape is not a
+  --    fixed in the library now; the entry point-then-tap shape is not a
   --    workaround, it is how a trigger tile is entered.)
-  H.navTo(20, 12, { maxFrames = 15000, honest = "flee", arrive = function() return map() ~= 274 end }),
+  H.navTo(20, 12, { maxFrames = 15000, playBattles = "flee", arrive = function() return map() ~= 274 end }),
   tapInto("down", function() return map() ~= 274 end, 9000,
     "DOWN onto {20,13} -> the lift"),
   H.waitUntil(function() return map() == 272 end, 20000, "map 272 (the minecart platform)", 5),
@@ -206,17 +206,17 @@ H.run({ maxFrames = 60000 }, {
     H.screenshot("minecart_platform")
   end),
 
-  -- 1b. THE BOUNDARY DETOUR (issue #25).  This leg is C->D's terminal, so
+  -- 1b. THE BOUNDARY DETOUR (issue #25).  This step is C->D's terminal, so
   --     before parking beside CID it stands on the platform save point at
   --     {3,55} and asserts the minecart-platform-v1 boundary table -- the
   --     same table gen_minecart_platform_anchor saves under and gen_n128's
-  --     anchored boot asserts as its ENTRY contract.  The sram witnesses
+  --     checkpoint boot asserts as its ENTRY contract.  The sram witnesses
   --     are products of the boundary save, so the pre-save variant is
   --     asserted (lib/ot6_contract.lua).  (3,54) is a wall (measured); the
   --     tile is entered from the east.  Standing on a save tile re-enters
   --     SavePoint every frame and hasControl() flickers, so arrival is
   --     judged on position + $01BF + alignment.
-  H.navTo(4, 55, { maxFrames = 9000, honest = "flee" }),
+  H.navTo(4, 55, { maxFrames = 9000, playBattles = "flee" }),
   (function() local calm = 0
     return H.driveUntil(function()
       calm = (H.fieldX() == 3 and H.fieldY() == 55 and sw(0x01BF) == 1
@@ -241,8 +241,8 @@ H.run({ maxFrames = 60000 }, {
   end),
 
   -- 2. park beside CID.  His {9,51} is occupied by his own object, so the
-  --    doorstep is whichever of its four neighbours the live object map and
-  --    tilemap leave open -- resolved here rather than read off an
+  --    entry point is whichever of its four neighbours the live object map
+  --    and tilemap leave open -- resolved here rather than read off an
   --    obj_script, because _cc7f43's tail repositions him and the recon's
   --    {9,46} is NO PATH from the landing.
   H.call(function()
@@ -258,7 +258,7 @@ H.run({ maxFrames = 60000 }, {
       cid[1], cid[2], cid[3]))
   end),
   H.navTo(function() return cid[1] end, function() return cid[2] end,
-    { maxFrames = 9000, honest = "flee" }),   -- beside CID
+    { maxFrames = 9000, playBattles = "flee" }),   -- beside CID
   (function() local calm = 0
     return H.driveUntil(function()
       local ok = H.fieldX() == cid[1] and H.fieldY() == cid[2] and settled()
@@ -279,11 +279,11 @@ H.run({ maxFrames = 60000 }, {
 
   H.call(function()
     H.assertEq(map(), 272, "on map 272")
-    H.assertEq(H.fieldX(), cid[1], "CID doorstep x")
-    H.assertEq(H.fieldY(), cid[2], "CID doorstep y")
+    H.assertEq(H.fieldX(), cid[1], "CID entry point x")
+    H.assertEq(H.fieldY(), cid[2], "CID entry point y")
     H.assertEq(H.readByte(0x087f + H.readWord(0x0803)), cid[4],
       "facing CID at (9,51)")
-    H.assertEq(settled(), true, "the doorstep is QUIET")
+    H.assertEq(settled(), true, "the entry point is QUIET")
     H.assertEq(sw(0x02BC), 0, "$02BC CLEAR -- `cutscene TRAIN` has not run")
     H.assertEq(sw(0x0069), 0, "$0069 CLEAR -- the escape has not happened")
     H.log(string.format("[minecart_doorstep] f%d map=%d (%d,%d) face=%d",
@@ -298,11 +298,11 @@ H.run({ maxFrames = 60000 }, {
   H.call(function() verifyReq = H.requestSaveState() end),
   H.waitFrames(2),
   H.call(function()
-    H.checkReq(verifyReq, "mint verify: capture")
+    H.checkReq(verifyReq, "generated-state verify: capture")
     verifyLoad = H.requestLoadState(verifyReq.blob)
   end),
   H.waitFrames(2),
-  H.call(function() H.checkReq(verifyLoad, "mint verify: reload") end),
+  H.call(function() H.checkReq(verifyLoad, "generated-state verify: reload") end),
   H.waitFrames(180),
   H.call(function()
     H.assertEq(map(), 272, "reload: still on map 272")
@@ -314,10 +314,10 @@ H.run({ maxFrames = 60000 }, {
     H.assertEq(H.hasControl() and H.tileAligned(), true,
       "reload: controllable at rest")
     H.assertEq(sw(0x02BC), 0, "reload: $02BC still CLEAR")
-    H.log("mint verify: the reload stayed calm -- minecart_doorstep verified")
+    H.log("generated-state verify: the reload stayed calm -- minecart_doorstep verified")
   end),
   H.logStep(function()
-    return string.format("minecart_doorstep minted at frame %d -- map 272 "
+    return string.format("minecart_doorstep generated at frame %d -- map 272 "
       .. "(%d,%d) facing CID, one A-press from `cutscene TRAIN`",
       H.frame, H.fieldX(), H.fieldY())
   end),

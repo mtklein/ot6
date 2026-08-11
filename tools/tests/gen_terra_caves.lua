@@ -1,8 +1,8 @@
 -- gen_terra_caves.lua -- from terra_narshe.mss: open the secret wall Locke
 -- once used and go under Narshe through the mines.
--- Mints one state:
+-- Generates one state:
 --   terra_caves.mss  map 41 (7,33), the Narshe mines, first controllable
---                    frame inside -- the doorstep for the run to Arvis's
+--                    frame inside -- the entry point for the run to Arvis's
 --                    house, and the only fixture in the chain that stands in
 --                    this scenario's random-encounter pool.
 --
@@ -105,10 +105,10 @@ H.run({ maxFrames = 60000 }, {
   -- uses to face Arvis.  Only then is A edge-pressed, and the phase ends
   -- when the scene picks up rather than after a fixed number of tries.
   -- ===================================================================== --
-  -- issue #75: honest=true on every navigator -- map 20's streets draw no
-  -- encounters, so nothing changes on the happy path, but a battle that
-  -- ever did fire here would be fought by real input, never kill-bitted.
-  H.navTo(15, 57, { maxFrames = 12000, honest = true }),
+  -- issue #75: playBattles=true on every navigator -- map 20's streets draw
+  -- no encounters, so nothing changes on the happy path, but a battle that
+  -- ever did fire here would be fought by real input, never write-cleared.
+  H.navTo(15, 57, { maxFrames = 12000, playBattles = true }),
   H.release(),
   H.call(function() where("at the wall") end),
   --
@@ -186,7 +186,7 @@ H.run({ maxFrames = 60000 }, {
     H.hold({ "up" }), H.waitFrames(8), H.release(), H.waitFrames(4),
   }, "step through the hole into map 41"),
   H.release(),
-  H.advanceStory(settleCave, 20000, { honest = true }),
+  H.advanceStory(settleCave, 20000, { playBattles = true }),
   H.waitFrames(30),
   H.call(function()
     H.assertEq(map(), 41, "on map 41, the NARSHE MINES")
@@ -220,6 +220,6 @@ H.run({ maxFrames = 60000 }, {
   end),
   H.saveState("terra_caves.mss"),
   H.logStep(function()
-    return string.format("terra_caves minted at frame %d", H.frame)
+    return string.format("terra_caves generated at frame %d", H.frame)
   end),
 })

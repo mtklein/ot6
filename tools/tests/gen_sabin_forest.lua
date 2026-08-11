@@ -1,7 +1,9 @@
--- gen_sabin_forest.lua -- leg 7 of SABIN's scenario: the Phantom Forest, from
--- the World-of-Balance landing to boarding the Phantom Train.  Mints:
+-- gen_sabin_forest.lua -- step 7 of SABIN's scenario: the Phantom Forest,
+-- from the World-of-Balance landing to boarding the Phantom Train.
+-- Generates:
 --   forest_done.mss   map 145 (26,11), the Phantom Train interior -- the
---                     party has just boarded; the train leg builds from here.
+--                     party has just boarded; the train step builds from
+--                     here.
 --
 -- THE ROUTE (verified from the entrance tables + event scripts, decoded by a
 -- read-only source pass; short-entrance record = [SrcX,SrcY,Map,Flags,DestX,
@@ -23,17 +25,18 @@
 -- ISSUE #75 -- EVERY ENCOUNTER IS FLED, AND THAT RETIRES THE SHADOW PIN.
 -- Zero state writes in this generator.  The old file pinned $1DD2 bit $08
 -- ("shadow won't leave") for the walk and restored the boot byte before
--- the save, because every kill-bitted WIN rolled SHADOW's 1/16 walk-off
+-- the save, because every write-cleared WIN rolled SHADOW's 1/16 walk-off
 -- (battle_main.asm:11976-11991; the camp exit ran `clr_b_switch $4B` at
--- event_main.asm:42251, so the bit is story-CLEAR for this whole leg).
--- The honest replacement is not to fight better -- it is to never WIN a
+-- event_main.asm:42251, so the bit is story-CLEAR for this whole step).
+-- The input-driven replacement is not to fight better -- it is to never WIN a
 -- random battle at all: every encounter is FLED (hold L+R, the engine's
--- own run mechanic; navTo/worldNavTo honest="flee" plus the same hold in
+-- own run mechanic; navTo/worldNavTo playBattles="flee" plus the same hold in
 -- the local drivers), the leave roll runs only at a win, so this route
--- rolls it ZERO times and SHADOW's presence at the mint is deterministic
--- with no pin and no timing games.  Cost: a few real flee rounds per
--- encounter (budgets grew), and an unrunnable formation would time out
--- loudly -- the forest/overworld pools here are all runnable trash.
+-- rolls it ZERO times and SHADOW's presence at generation time is
+-- deterministic with no pin and no timing games.  Cost: a few real flee
+-- rounds per encounter (budgets grew), and an unrunnable formation would
+-- time out loudly -- the forest/overworld pools here are all runnable
+-- trash.
 local H = dofile("tools/tests/lib/ot6.lua")
 local DOOR = "build/states/camp_escaped.mss.lua"
 
@@ -61,7 +64,7 @@ local function worldToMap(tx, ty, what, budget)
       end
       if H.battleLoadStarted() then
         plan = nil
-        H.setPad({ l = true, r = true })   -- flee, honestly
+        H.setPad({ l = true, r = true })   -- flee, with real input
         return
       end
       if not H.worldHasControl() then H.setPad({}); return end
@@ -90,7 +93,7 @@ local function crossVia(wx, wy, dir, toMap, what)
         "%s -> map %d from (%d,%d) f%d", what, wx, wy, dir, toMap,
         H.fieldX(), H.fieldY(), H.frame)
     end),
-    H.navTo(wx, wy, { maxFrames = 14000, honest = "flee",
+    H.navTo(wx, wy, { maxFrames = 14000, playBattles = "flee",
       arrive = function()
       return mapIdx() == toMap or (H.fieldX() == wx and H.fieldY() == wy
          and H.hasControl() and H.tileAligned()) end }),
@@ -100,7 +103,7 @@ local function crossVia(wx, wy, dir, toMap, what)
         H.call(function()
           phase = (phase + 1) % 8
           if H.battleLoadStarted() then
-            H.setPad({ l = true, r = true })   -- flee, honestly
+            H.setPad({ l = true, r = true })   -- flee, with real input
             return
           end
           if H.dialogWaiting() then H.setPad(phase < 4 and { "a" } or {}); return end
@@ -124,9 +127,10 @@ end
 
 -- walk to field edge tile (tx,ty) on the current map and cross; done when the
 -- map index becomes `toMap`.  navTo handles the walk, random encounters
--- (FLED, honest="flee"), and any cutscene dialogs (tap-A); the short-entrance fires on
--- arrival, so control is never handed back on (tx,ty) itself.  Use this only
--- where the path to (tx,ty) does not brush another exit; else use crossVia.
+-- (FLED, playBattles="flee"), and any cutscene dialogs (tap-A); the
+-- short-entrance fires on arrival, so control is never handed back on
+-- (tx,ty) itself.  Use this only where the path to (tx,ty) does not brush
+-- another exit; else use crossVia.
 local function crossTo(tx, ty, toMap, what)
   return H.cond(function() return true end, {
     H.logStep(function()
@@ -134,7 +138,7 @@ local function crossTo(tx, ty, toMap, what)
         "from map %d (%d,%d) f%d", what, tx, ty, toMap, mapIdx(),
         H.fieldX(), H.fieldY(), H.frame)
     end),
-    H.navTo(tx, ty, { maxFrames = 16000, honest = "flee",
+    H.navTo(tx, ty, { maxFrames = 16000, playBattles = "flee",
       arrive = function() return mapIdx() == toMap end }),
     H.waitUntil(function()
       return mapIdx() == toMap and H.hasControl() and H.tileAligned()
@@ -156,9 +160,9 @@ H.run({ maxFrames = 120000 }, {
     H.assertEq(H.worldMode(), true, "start on the World of Balance")
     H.assertEq(sw(0x0037), 1, "$0037 set -- escape done")
     -- NO SHADOW PIN (issue #75; see the header).  Battle switch $4B is
-    -- story-CLEAR here, and the honest answer is that this route never
+    -- story-CLEAR here, and the accurate answer is that this route never
     -- WINS a random battle -- every encounter is fled, the 1/16 walk-off
-    -- rolls only at a win, so SHADOW's presence at the mint is
+    -- rolls only at a win, so SHADOW's presence at generation time is
     -- deterministic without writing a byte.
     H.log(string.format("[forest] start world (%d,%d) $1dd2&08=%d (story's own)",
       H.worldX(), H.worldY(), H.readByte(0x1dd2) & 0x08))
@@ -199,7 +203,7 @@ H.run({ maxFrames = 120000 }, {
         H.call(function()
           phase = (phase + 1) % 8
           if H.battleLoadStarted() then
-            H.setPad({ l = true, r = true })   -- flee, honestly
+            H.setPad({ l = true, r = true })   -- flee, with real input
             return
           end
           if H.dialogWaiting() then H.setPad(phase < 4 and { "a" } or {}); return end
@@ -233,7 +237,7 @@ H.run({ maxFrames = 120000 }, {
     H.log(string.format("[forest] on map 140 at (%d,%d) -- board the train",
       H.fieldX(), H.fieldY()))
   end),
-  H.navTo(72, 11, { maxFrames = 16000, honest = "flee",
+  H.navTo(72, 11, { maxFrames = 16000, playBattles = "flee",
     arrive = function() return mapIdx() == 145 end }),
   (function()
     local phase, hb = 0, -600
@@ -251,7 +255,7 @@ H.run({ maxFrames = 120000 }, {
             tostring(H.eventRunning()), sw(0x0038)))
         end
         if H.battleLoadStarted() then
-          H.setPad({ l = true, r = true })   -- flee, honestly
+          H.setPad({ l = true, r = true })   -- flee, with real input
           return
         end
         if H.dialogWaiting() then H.setPad(phase < 4 and { "a" } or {}); return end
@@ -264,7 +268,7 @@ H.run({ maxFrames = 120000 }, {
     }, "board the train onto map 145")
   end)(),
 
-  -- settled on the train (map 145); mint the doorstep
+  -- settled on the train (map 145); generate the entry point
   H.call(function()
     H.assertEq(mapIdx(), 145, "boarded -- Phantom Train interior map 145")
     H.assertEq(sw(0x0038), 1, "$0038 set -- train discovered")
@@ -280,7 +284,7 @@ H.run({ maxFrames = 120000 }, {
   end),
   H.saveState("forest_done.mss"),
   H.logStep(function()
-    return string.format("forest_done minted at frame %d map 145 (%d,%d)",
+    return string.format("forest_done generated at frame %d map 145 (%d,%d)",
       H.frame, H.fieldX(), H.fieldY())
   end),
 })

@@ -1,5 +1,5 @@
 -- probe_v07_385win.lua -- the map-385 REWRITE-WINDOW instrument (issue
--- #31, leg G->H).  NOT a suite test.  Tests the crossing hypothesis that
+-- #31, step G->H).  NOT a suite test.  Tests the crossing hypothesis that
 -- probe_v07_385walk.lua's phaseWalk was missing:
 --
 --   1. Every swap callback rewrites the tilemap BEFORE it flips the phase

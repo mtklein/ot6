@@ -2,18 +2,18 @@
 """Encounter-and-party break-class reachability check.
 
 The break floor's regression tests prove nonzero table bytes; nothing static
-proved that the party who actually walks a route band can FIELD a class some
-body in every formation is weak to.  This linter closes that gap for the
-declared bands (docs/design/break-band-vector.md SS10.2 item 3):
+proved that the party who actually walks a section of a route can FIELD a
+class some body in every formation is weak to.  This linter closes that gap
+for the declared areas (docs/design/break-band-vector.md SS10.2 item 3):
 
-  * walk SubBattleGroup -> RandBattleGroup -> BattleMonsters for the band's
+  * walk SubBattleGroup -> RandBattleGroup -> BattleMonsters for the area's
     named encounter maps (field/battle.asm:392,:408; battle_main.asm:16610),
   * PLUS the forced-battle list: EventBattleGroup entries reached by event
     `battle` commands (field/event.asm EventBattle) and by the magitek train
     ride script's $e0/$e1/$e2 items (world/train_script.asm TrainCmd_e0/e1/e2)
     -- the minecart writes $0011e0 directly and is invisible to any
     event-script scan,
-  * take the declared party for each leg and compute the weapon/ability
+  * take the declared party for each step and compute the weapon/ability
     classes each member can field (item_prop_en.dat equip mask at +$01,
     16-bit, bit N = actor N -- docs/research/data-formats.md; classes from
     Ot6WeapClassTbl / Ot6SkillClassTbl in ot6_class.asm),
@@ -37,8 +37,8 @@ runtime fixture assertion (break-band-vector.md SS10.3), not a static one.
 Weapons carrying OT6_NULLBRK chip nothing (ot6_class.asm:14-17) and grant no
 class here.
 
-Bands are declared in BANDS below; add a band by adding an entry, nothing
-else changes.  The vector-factory band's map set and forced list are the
+Areas are declared in BANDS below; add an area by adding an entry, nothing
+else changes.  The vector-factory area's map set and forced list are the
 survey's SS1.1/SS2 decode; the party is docs/design/bosses-wob.md SS13-16
 (LOCKE CELES SABIN EDGAR, three after the tube room takes Celes).
 
@@ -50,7 +50,7 @@ Usage:  python3 tools/check_break_reach.py [--repo ROOT] [-v]
 
 --party and --drop-class exist to demonstrate failure (an impoverished
 party, or "nobody can field bludgeon") and for what-if probes; the bare
-invocation is the gate.
+invocation is the check.
 """
 
 from __future__ import annotations
@@ -110,11 +110,11 @@ AUTO_SWINGERS = {"UMARO"}
 
 # actors whose only verb is derivative.  GOGO can equip weapons but owns only
 # MIMIC, so every class he "fields" is one somebody else fielded first; he is
-# credited nothing of his own.  No declared band seats him.
+# credited nothing of his own.  No declared area seats him.
 MIMIC_ONLY = {"GOGO"}
 
 # --------------------------------------------------------------------------
-# band declarations.  A band is a list of legs; a leg is a party plus the
+# area declarations.  An area is a list of steps; a step is a party plus the
 # random-encounter maps it walks and the forced battles it must fight.
 # events: (event battle id, tuple of EventBattleGroup word slots reached,
 #          human label).  EventBattle rolls word 0 at 75% / word 1 at 25%
@@ -150,7 +150,7 @@ BANDS = {
         ],
     },
     # The Cave to the Sealed Gate (issue #31, v0.7).  Map set verified from
-    # data, not the recon: 382/383/384/385 are the only maps in the band
+    # data, not the recon: 382/383/384/385 are the only maps in the area
     # with the enable bit set AND an entrance or load_map reaching them
     # (379/380/381/387/388 carry enable bits or groups but nothing targets
     # them -- the map-275 pattern).  The Imperial Base (377/378) has the
@@ -461,7 +461,7 @@ def check_band(data, band_name, band, party_override, drop_mask, verbose):
             per_actor[who] = data.actor_classes(who) & ~drop_mask
             fieldable |= per_actor[who]
         if verbose:
-            print("  leg %r party=%s fields %s (%s)"
+            print("  step %r party=%s fields %s (%s)"
                   % (leg["name"], ",".join(party), class_str(fieldable),
                      " ".join("%s=%s" % (w, class_str(m))
                               for w, m in per_actor.items())))
@@ -470,7 +470,7 @@ def check_band(data, band_name, band, party_override, drop_mask, verbose):
         for m in leg["maps"]:
             if not data.map_random_enabled(m):
                 problems.append(
-                    "band %s: map %d is declared as encounter-bearing but its "
+                    "area %s: map %d is declared as encounter-bearing but its "
                     "random-battle enable bit is CLEAR (%s +%d bit7) -- the "
                     "declaration has drifted from the data"
                     % (band_name, m, MAP_PROP, m * MAP_REC + 5))
@@ -485,7 +485,7 @@ def check_band(data, band_name, band, party_override, drop_mask, verbose):
         seen = set()
         for where, f in jobs:
             if f >= N_FORMS:
-                problems.append("band %s: %s names formation $%03x, out of "
+                problems.append("area %s: %s names formation $%03x, out of "
                                 "range (max $%03x)" % (band_name, where, f, N_FORMS - 1))
                 continue
             key = (where, f)
@@ -494,7 +494,7 @@ def check_band(data, band_name, band, party_override, drop_mask, verbose):
             seen.add(key)
             bodies = data.formation_bodies(f)
             if not bodies:
-                problems.append("band %s: %s formation $%03x has an empty "
+                problems.append("area %s: %s formation $%03x has an empty "
                                 "present mask -- decode drift" % (band_name, where, f))
                 continue
             checked += 1
@@ -516,7 +516,7 @@ def check_band(data, band_name, band, party_override, drop_mask, verbose):
                 continue    # nothing in the fight carries a gauge at all
             if keys & fieldable == 0:
                 problems.append(
-                    "band %s / %s / formation $%03x: NO REACHABLE BREAK CLASS\n"
+                    "area %s / %s / formation $%03x: NO REACHABLE BREAK CLASS\n"
                     "    bodies: %s\n"
                     "    formation keys %s vs party {%s} fielding %s"
                     % (band_name, where, f, " ".join(parts),
@@ -524,7 +524,7 @@ def check_band(data, band_name, band, party_override, drop_mask, verbose):
 
     if checked < band["min_formations"]:
         problems.append(
-            "band %s: only %d formations checked, declaration expects >= %d "
+            "area %s: only %d formations checked, declaration expects >= %d "
             "-- the walk has drifted (map set, group table, or parser)"
             % (band_name, checked, band["min_formations"]))
     return problems, checked
@@ -536,9 +536,9 @@ def main():
     ap.add_argument("--repo", default=os.path.dirname(os.path.dirname(
         os.path.abspath(__file__))))
     ap.add_argument("--band", choices=sorted(BANDS), default=None,
-                    help="check one band (default: all declared bands)")
+                    help="check one area (default: all declared areas)")
     ap.add_argument("--party", default=None,
-                    help="comma-separated actor names overriding every leg's "
+                    help="comma-separated actor names overriding every step's "
                          "declared party (what-if / failure demo)")
     ap.add_argument("--drop-class", action="append", default=[],
                     choices=sorted(CLASS_BIT),
@@ -566,7 +566,7 @@ def main():
             mode += " party-override=%s" % ",".join(party_override)
         if drop_mask:
             mode += " dropped=%s" % class_str(drop_mask)
-        print("  band %-16s: %d formations checked%s" % (bn, checked, mode))
+        print("  area %-16s: %d formations checked%s" % (bn, checked, mode))
         all_problems.extend(problems)
         total += checked
 
@@ -577,7 +577,7 @@ def main():
             print("  " + p.replace("\n", "\n  "))
             print()
         return 1
-    print("  OK -- every checked formation has a break-class key the leg's "
+    print("  OK -- every checked formation has a break-class key the step's "
           "party can field")
     return 0
 

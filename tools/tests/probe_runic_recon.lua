@@ -32,12 +32,12 @@
 -- reachable by cursor rotation -- $7B7E bit-to-slot mapping is NOT the
 -- 1<<slot the steal family measured on its own formation).
 --
--- RUN 5 (this file): the pivot candidate.  The post-opera-v1 anchor cold
--- Continues to the WORLD MAP at Vector's west doorstep with the same
--- four -- and world-band trash is leveled for this party where the
--- factory band is not.  Questions:
---   1. Does the anchor's config carry Wait mode (park policy viable)?
---   2. What does the band serve: species, levels, HP, MP -- and do any
+-- RUN 5 (this file): the pivot candidate.  The post-opera-v1 checkpoint cold
+-- Continues to the WORLD MAP at Vector's west entry point with the same
+-- four -- and world-area trash is leveled for this party where the
+-- factory area is not.  Questions:
+--   1. Does the checkpoint's config carry Wait mode (park policy viable)?
+--   2. What does the area serve: species, levels, HP, MP -- and do any
 --      of them CAST (absorbable strays would foul runic baselines)?
 --   3. Temper: what does an unattended party eat here?
 --   4. Do the formations flee on their own, and does L+R work?
@@ -57,7 +57,7 @@ local spells = {}
 local hpTrace = {}
 
 H.run({ maxFrames = 90000 }, {
-  -- cold Continue (the anchor's $307ff0=3 preselects slot 3) -- the
+  -- cold Continue (the checkpoint's $307ff0=3 preselects slot 3) -- the
   -- probe_mp_universal boot, verbatim from battle_slotsboot
   H.waitFrames(350),
   H.repeatN(5, { H.pressButtons({ "start" }, 8), H.waitFrames(25) }),
@@ -93,7 +93,7 @@ H.run({ maxFrames = 90000 }, {
   end),
 
   -- find the nearest battle-enabled tile (world tile-prop bit6) and pace
-  -- on it -- the doorstep tile itself drew nothing in 40000 frames
+  -- on it -- the entry-point tile itself drew nothing in 40000 frames
   H.call(function()
     local x0, y0 = H.worldX(), H.worldY()
     local best, bd = nil, 1e9
@@ -111,7 +111,7 @@ H.run({ maxFrames = 90000 }, {
     end
     H.assertEq(best ~= nil, true, "a battle-enabled world tile is in reach")
     H.vars.bandX, H.vars.bandY = best[1], best[2]
-    H.log(string.format("[band] nearest battle-enabled tile: (%d,%d)",
+    H.log(string.format("[area] nearest battle-enabled tile: (%d,%d)",
       best[1], best[2]))
   end),
   H.call(function()
@@ -127,9 +127,9 @@ H.run({ maxFrames = 90000 }, {
         break
       end
     end
-    H.assertEq(pair ~= nil, true, "the band tile has a safe pacing partner")
+    H.assertEq(pair ~= nil, true, "the area tile has a safe pacing partner")
     H.vars.paceDir, H.vars.pairX, H.vars.pairY = pair[1], pair[2], pair[3]
-    H.log(string.format("[band] pacing (%d,%d) <-> (%d,%d) via %s",
+    H.log(string.format("[area] pacing (%d,%d) <-> (%d,%d) via %s",
       x, y, pair[2], pair[3], pair[1]))
   end),
   (function()
@@ -152,7 +152,7 @@ H.run({ maxFrames = 90000 }, {
         end
       end),
       H.waitFrames(1),
-    }, "a real world-band encounter fires")
+    }, "a real world-area encounter fires")
   end)(),
   H.release(),
   H.waitUntil(function() return H.battleActive() end, 900, "battle active", 30),
@@ -216,7 +216,7 @@ H.run({ maxFrames = 90000 }, {
   H.cond(function() return H.battleLoadStarted() end, {
     H.driveUntil(function() return not H.battleLoadStarted() end, 8000, {
       H.call(function() H.setPad({ l = true, r = true }) end),
-    }, "the band encounter is fled"),
+    }, "the area encounter is fled"),
     H.release(),
   }, {}),
   H.waitUntil(function()

@@ -2,7 +2,7 @@
 -- (issue #75, marshal-investigation).  probe_moogle_stations proved the
 -- wave phase (three squads at three interception stations, two waves
 -- each, all six down by ~f14.6k) and then lost the Marshal to plain
--- tap-A at 330/543.  This run upgrades every fight to the honest tactic
+-- tap-A at 330/543.  This run upgrades every fight to the input-driven tactic
 -- a human uses on a hard fight in OT6: spend boost.  The pad cycle in
 -- battle is R (raise pending boost -- characters open with 1 bp and
 -- regen 1 per unboosted turn, Ot6InitBP/Ot6ActionEnd), then A-A to
@@ -131,13 +131,13 @@ H.run({ maxFrames = 140000 }, {
   logPools("boot"),
 
   -- deployment, east arm first (NPC_4 passes (20,20) ~f1400)
-  H.navTo(15, 15, { maxFrames = 2500, honest = true }),
+  H.navTo(15, 15, { maxFrames = 2500, playBattles = true }),
   ySwitchTo(3),
-  H.navTo(20, 20, { maxFrames = 4000, honest = true }),
+  H.navTo(20, 20, { maxFrames = 4000, playBattles = true }),
   ySwitchTo(2),
-  H.navTo(10, 21, { maxFrames = 4000, honest = true }),
+  H.navTo(10, 21, { maxFrames = 4000, playBattles = true }),
   ySwitchTo(1),
-  H.navTo(14, 14, { maxFrames = 2500, honest = true }),
+  H.navTo(14, 14, { maxFrames = 2500, playBattles = true }),
   logPools("deployed"),
 
   -- the storm, boosted
@@ -159,7 +159,7 @@ H.run({ maxFrames = 140000 }, {
       return defenseWon()
           or (marshalAdjacent() and H.hasControl() and H.tileAligned())
     end,
-    maxFrames = 15000, honest = true,
+    maxFrames = 15000, playBattles = true,
   }),
   pokeStep(),
   boostedDrive(function()
@@ -167,7 +167,7 @@ H.run({ maxFrames = 140000 }, {
   end, 30000, "Marshal fight (boosted)"),
   H.call(function()
     H.assertEq(defenseWon(), true, "defense won (switch $0631 cleared)")
-    H.log(string.format("MARSHAL DOWN HONESTLY (boosted) at f%d", H.frame))
+    H.log(string.format("MARSHAL DOWN (boosted) at f%d", H.frame))
   end),
   logPools("victory"),
 })

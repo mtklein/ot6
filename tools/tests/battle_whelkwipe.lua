@@ -14,13 +14,14 @@
 -- word-identical to vanilla's for the whole animation; the shadow is
 -- untouched, so the first flush afterwards repaints the hud.
 --
--- Flow: whelk doorstep -> battle -> settle -> passive Heal Force drive
+-- Flow: whelk entry point -> battle -> settle -> passive Heal Force drive
 -- (self-target: the only transitions are the shell's own timer cycle)
 -- -> FADE_DOWN trip (exec callback on vanilla C2/E668) -> per-frame
 -- cell-level assert through the whole animation (no OT6-claimed glyph
 -- char in the field map; every live hud line reads $01ee) -> head-gone
 -- hud check -> FADE_UP trip -> same asserts -> hud back + glyphCanary.
--- Cell asserts only, no pixel compares: mint-independent, deterministic.
+-- Cell asserts only, no pixel compares: insensitive to savestate
+-- regeneration, deterministic.
 local H = dofile("tools/tests/lib/ot6.lua")
 local STATE = "build/states/whelk_doorstep.mss.lua"
 

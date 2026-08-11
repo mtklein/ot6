@@ -1,5 +1,6 @@
--- gen_opera7_blackjack.lua -- v0.5 terminal leg: ultros2_doorstep -> defeat
--- Ultros 2 -> ride the Setzer/coin-toss/Blackjack sequence -> mint blackjack.
+-- gen_opera7_blackjack.lua -- v0.5 terminal step: ultros2_doorstep -> defeat
+-- Ultros 2 -> ride the Setzer/coin-toss/Blackjack sequence -> generate
+-- blackjack.
 --
 -- The terminal is the first stable, controllable world-map frame after the
 -- Blackjack lands outside Vector.  Source (_cac128 -> _cb2007 -> _cb2379)
@@ -21,11 +22,11 @@
 -- :29954): `if_b_switch $40, _cac128` -- the WIN clears $034B; the loss
 -- path (_cabdba) restarts the whole opera and, on the third failure, is
 -- game over.  A wipe is therefore caught by the 90-frame watch and the
--- three-attempt ladder reloads the booted doorstep BEFORE the failure
--- path runs -- the mint-script spelling of a player reloading a save --
--- with the tier escalated.  A third loss fails the mint with every
--- attempt's numbers on the record (#74).  The deeper break-mechanics
--- contract stays battle_ultros2.lua's, on the same doorstep.
+-- three-attempt ladder reloads the booted entry point BEFORE the failure
+-- path runs -- the generator script's spelling of a player reloading a
+-- save -- with the tier escalated.  A third loss fails the generation with
+-- every attempt's numbers on the record (#74).  The deeper break-mechanics
+-- contract stays battle_ultros2.lua's, on the same entry point.
 local H = dofile("tools/tests/lib/ot6.lua")
 local DOOR = "build/states/ultros2_doorstep.mss.lua"
 
@@ -42,7 +43,7 @@ local function pulseAdvance()
   H.setPad(aPhase < 4 and { "a", "start" } or {})
 end
 
--- ----------------------------------------------------- the honest fighter --
+-- ----------------------------------------------- the input-driven fighter --
 -- gen_narshe_battle's menu-episode machine for the Ultros 2 fight; party is
 -- #21's canonical LOCKE+CELES+SABIN+EDGAR.
 local BCHID, BCHP, BCMAXHP = 0x3ed8, 0x3bf4, 0x3c1c
@@ -214,7 +215,7 @@ local function attempt(n)
     H.cond(function() return n > 1 end, {
       H.logStep(function()
         return string.format("[ultros2] ATTEMPT %d -- reloading the " ..
-          "doorstep after a loss (%s)", n, tostring(u2Lost))
+          "entry point after a loss (%s)", n, tostring(u2Lost))
       end),
       H.call(function() ldReq = H.requestLoadState(u2Blob) end),
       H.waitFrames(2),
@@ -222,7 +223,7 @@ local function attempt(n)
       H.waitFrames(60),
     }, {}),
     H.call(function() u2Lost = nil end),
-    -- the doorstep contract is one advance from the WoB story battle 104
+    -- the entry-point contract is one advance from the WoB story battle 104
     H.driveUntil(function() return H.battleLoadStarted() end, 20000, {
       H.call(pulseAdvance),
     }, "enter Ultros 2"),
@@ -232,16 +233,16 @@ local function attempt(n)
     H.call(function()
       if u2Lost == nil then
         u2Won = true
-        H.log(string.format("[ultros2] attempt %d WON battle 104 honestly " ..
+        H.log(string.format("[ultros2] attempt %d WON battle 104 " ..
           "at f%d", n, H.frame))
-        H.screenshot("ultros2_won_honest")
+        H.screenshot("ultros2_won_played")
       end
     end),
   }, {})
 end
 
--- Budget: the kill-bit era ran in 90k frames; the honest fight costs real
--- ATB rounds and the ladder may replay it three times.
+-- Budget: the battle-clear-write era ran in 90k frames; the input-driven
+-- fight costs real ATB rounds and the ladder may replay it three times.
 H.run({ maxFrames = 400000 }, {
   H.loadState(DOOR),
   H.waitFrames(30),
@@ -250,16 +251,16 @@ H.run({ maxFrames = 400000 }, {
     H.assertEq(sw(0x005D), 0, "$005D clear before Setzer's bargain")
   end),
 
-  -- the ladder's checkpoint IS the booted doorstep
+  -- the ladder's checkpoint IS the booted entry point
   (function()
     local ckReq
     return H.cond(function() return true end, {
       H.call(function() ckReq = H.requestSaveState() end),
       H.waitFrames(2),
       H.call(function()
-        H.checkReq(ckReq, "doorstep checkpoint")
+        H.checkReq(ckReq, "entry point checkpoint")
         u2Blob = ckReq.blob
-        H.log(string.format("[ultros2] doorstep checkpoint captured " ..
+        H.log(string.format("[ultros2] entry point checkpoint captured " ..
           "(%d bytes) f%d", #u2Blob, H.frame))
       end),
     })
@@ -269,7 +270,7 @@ H.run({ maxFrames = 400000 }, {
   attempt(3),
   H.call(function()
     if not u2Won then
-      error(string.format("[ultros2] battle 104 not won in 3 honest " ..
+      error(string.format("[ultros2] battle 104 not won in 3 " ..
         "attempts -- last loss: %s -- the per-attempt numbers above are " ..
         "the balance finding (#74-style); do not rig this fight",
         tostring(u2Lost)), 0)
@@ -287,7 +288,7 @@ H.run({ maxFrames = 400000 }, {
   H.driveUntil(function()
     return map()==7 and H.hasControl() and H.tileAligned()
   end,12000,{H.call(pulseAdvance)},"ride Opera finale to Blackjack interior"),
-  H.navTo(12,9,{maxFrames=1000,honest=true}),
+  H.navTo(12,9,{maxFrames=1000,playBattles=true}),
   H.driveUntil(function() return sw(0x005D)==1 end,6000,{
     H.call(function()
       aPhase=(aPhase+1)%8
@@ -348,7 +349,7 @@ H.run({ maxFrames = 400000 }, {
   -- into the dead window and asserted there ("world map is controllable: got
   -- false, want true").  Nothing here is relaxed: the run still has to reach
   -- a genuinely controllable, aligned world frame, and now the state is
-  -- MINTED on one too rather than possibly inside the redraw -- which
+  -- GENERATED on one too rather than possibly inside the redraw -- which
   -- matters, because every downstream generator boots this .mss and would
   -- inherit a first frame the battle gate calls a battle.
   (function()
@@ -357,7 +358,7 @@ H.run({ maxFrames = 400000 }, {
       calm = (map() == 0 and H.worldHasControl() and H.worldAligned())
              and calm + 1 or 0
       return calm >= 45
-    end, 6000, "a settled, controllable world frame to mint on", 1)
+    end, 6000, "a settled, controllable world frame to generate on", 1)
   end)(),
 
   H.call(function()
@@ -375,7 +376,7 @@ H.run({ maxFrames = 400000 }, {
   H.saveState("blackjack.mss"),
   H.logStep(function()
     return string.format(
-      "blackjack minted at frame %d -- Opera complete, Setzer allied, Blackjack acquired",
+      "blackjack generated at frame %d -- Opera complete, Setzer allied, Blackjack acquired",
       H.frame)
   end),
 })

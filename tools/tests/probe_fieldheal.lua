@@ -1,10 +1,12 @@
 -- probe_fieldheal.lua -- LEARN the field Item/Use/target UI by driving it and
--- watching, so the honest routes can heal the party between legs with real
--- presses (issue #75: inputs in, observations out; this probe writes nothing).
+-- watching, so the input-driven routes can heal the party between steps
+-- with real presses (issue #75: inputs in, observations out; this probe
+-- writes nothing).
 --
--- It boots vargas_doorstep.mss, which the honest Mt. Kolts route currently
--- delivers with TERRA dead (0/94) and EDGAR on 1/145 and seven Potions and
--- five Tonics unspent -- exactly the state a player would open the menu on.
+-- It boots vargas_doorstep.mss, which the input-driven Mt. Kolts route
+-- currently delivers with TERRA dead (0/94) and EDGAR on 1/145 and seven
+-- Potions and five Tonics unspent -- exactly the state a player would open
+-- the menu on.
 --
 -- WHAT THE FIRST TWO PASSES ESTABLISHED (and where they went wrong):
 --   * ZMENUSTATE is DP $26, the shared cursor row is DP $4B.

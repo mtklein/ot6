@@ -21,8 +21,8 @@ H.run({ maxFrames = 45000 }, {
   H.loadState(STATE),
   H.waitFrames(10),
   H.call(function()
-    -- Plant legacy O7 over the doorstep fixture's codex pages (the fixture
-    -- is a cold-boot mint, so they arrive unformatted; this write fully
+    -- Plant legacy O7 over the entry-point fixture's codex pages (the fixture
+    -- is generated from a cold boot, so they arrive unformatted; this write fully
     -- specifies page 1 either way).
     -- Poison is old global knowledge; O8 migration must preserve it in all
     -- slots.  Deliberately load slot 2 first: migration must not depend on

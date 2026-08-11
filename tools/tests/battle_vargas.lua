@@ -1,5 +1,5 @@
 -- @suite frontier=vargas_doorstep slow
--- battle_vargas.lua -- rung 2's boss gate: VARGAS's break gauge, the three
+-- battle_vargas.lua -- tier 2's boss test: VARGAS's break gauge, the three
 -- chips that are supposed to reach it, and the scripted finish.
 --
 --   tools/tests/run.sh tools/tests/battle_vargas.lua
@@ -25,7 +25,7 @@
 --      runs first and in the same fight: the party's weapon swings are
 --      driven onto Vargas until his hp moves, and the gauge is asserted
 --      untouched at that moment.  Same actor, same target, one turn apart --
---      only the weapon changes.  This is the payoff of rung 2's discovery
+--      only the weapon changes.  This is the payoff of tier 2's discovery
 --      arc (the mines tease, the Figaro shop, the Narshe school), and it is
 --      the last link in it that had never been watched work.
 --   4. HOLY CHIPS.  Sabin's AuraBolt (Blitz 1, skill $5e, element $20) takes
@@ -47,7 +47,7 @@
 -- clamp Vargas under his own phase-2 threshold, install command ids into
 -- $202E and write the menu cursor triples directly.  All of that is gone;
 -- the drive is now gen_vargas's closed-loop menu machine (the generator
--- that beats this same fight honestly to mint vargas_won): every press is
+-- that beats this same fight by real play to generate vargas_won): every press is
 -- decided from readable menu state ($7BC2), cursors are WALKED with the
 -- d-pad and verified by re-reading the cell, boost points are banked with
 -- real R presses, Potions/Cures go to whoever is hurt through the real
@@ -594,7 +594,7 @@ H.run({ maxFrames = 150000 }, {
     -- fundable from the pool the fixture really carries
     H.log(string.format("EDGAR's pool before the cast: %d MP", mp(EDGAR_E)))
     H.assertEq(mp(EDGAR_E) >= BIO_MP, true,
-      "EDGAR's own MP funds one BioBlaster (the old pin's honest need)")
+      "EDGAR's own MP funds one BioBlaster (the old pin's real need)")
     mode = "bio"
   end),
   H.driveUntil(function()

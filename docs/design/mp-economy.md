@@ -14,7 +14,7 @@ The economy exists to buy back a choice vanilla never offered.
 > *"In that game there really wasn't ever any reason for Cyan or Sabin to
 > just attack instead of using one of their abilities."*
 
-That is the honest diagnosis of FF6: for the ability characters, the
+That is the accurate diagnosis of FF6: for the ability characters, the
 ability strictly dominates Fight, so the "choice" each turn is not one.
 Octopath's answer is resources — you bank by *not* spending, and a plain
 attack is what banking looks like. So the target for every number in this
@@ -36,8 +36,8 @@ expected and are not churn.
 ## The ceiling: 99
 
 The owner's shape for the top of every ladder: **each character's own
-ultimate costs 99 MP.** It agrees with the ruler below — 99 against a
-L70 pool of ~760 is 13%, inside the 8-20% band — so it anchors the table
+ultimate costs 99 MP.** It agrees with the baseline below — 99 against a
+L70 pool of ~760 is 13%, inside the 8-20% range — so it caps the table
 rather than recalibrating it, and it makes ladders comparable across
 characters.
 
@@ -53,7 +53,7 @@ the live table, not just the rows it pins by name.
 
 **Vanilla already agrees.** Measured off `magic_prop_en.dat` +$05: the
 dearest *spell* in the game is **Quick at exactly 99**, then Merton 85
-and Ultima 80. So the anchor is not an imported number — it is the
+and Ultima 80. So the number is not imported — it is the
 ceiling FF6's own spell table already sits under, which is why a 99 kit
 ultimate reads as "the top" instead of as an outlier.
 
@@ -90,22 +90,22 @@ to fill with an invented capstone.
 | kit | top row | 99? | why |
 |---|---|---|---|
 | Blitz | **Bum Rush** `$64` | **yes** | divine, L70, the ladder's stated top |
-| SwdTech | **Cleave** `$5c` | **yes** | divine, the window's conditional top rung |
+| SwdTech | **Cleave** `$5c` | **yes** | divine, the window's conditional top tier |
 | Tools | **Overclock** | **no — not yet** | Edgar's divine, and it is *not built*. It has no tool item id and therefore no row in `Ot6AbilityCostTbl`; kits.md prices it as the **sum** of the two tools it fires (max 34). |
 | Steal / Slot / Rage / Dance | — | **no** | flat verbs, no ladder |
 
 **Air Anchor is not the Tools capstone.** kits.md is explicit: "Air Anchor
 stays a findable *item* mid-kit gag, not the capstone." So Tools has no
-top row to anchor today, and when Overclock is built the Σ rule and the 99
-anchor collide — **that decision belongs to the change that builds
+top row to fix today, and when Overclock is built the Σ rule and the 99
+ceiling collide — **that decision belongs to the change that builds
 Overclock**, because either answer prices an ability that currently has no
 code.
 
 Locke is the other case worth naming: Steal is flat *for now*, but his
 kit (`kits.md`) already designs **Master's Mark** — steal from all
 enemies and reveal everything — which is exactly a 99's shape: it fires
-once and ends the probing phase outright. That is his anchor, which also
-means Steal is a rung, not the ceiling.
+once and ends the probing phase outright. That is his 99, which also
+means Steal is a tier, not the ceiling.
 
 **Does Magic participate? No — and measurement says it should not.**
 Against `magic_prop_en.dat` +$05: Ultima
@@ -119,7 +119,7 @@ stands with its one named exception (Osmose, below).
 ## Unresolved numbers are not blockers
 
 Where two documents disagree about a *value* — Overclock priced as the sum
-of its tools (`kits.md`) versus the 99 anchor above — that is not a
+of its tools (`kits.md`) versus the 99 ceiling above — that is not a
 contradiction to resolve on paper. The owner's ruling: *"doesn't matter
 what we start with, playtesting will help make it clear."*
 
@@ -167,7 +167,7 @@ mistake, not shipping the wrong number once.
   something without buying it too cheaply.
 
   As %-of-pool those tiers run **8–11% at the level they are
-  naturally learned** — dead on the 8–20% vanilla ruler, which is
+  naturally learned** — dead on the 8–20% vanilla baseline, which is
   unsurprising since they *are* vanilla prices — but **40–133% at
   the level folding reaches them**. That gap is the purchase: at L6
   a folded Fire 3 costs more than Terra's entire bar, so it is
@@ -199,7 +199,7 @@ mistake, not shipping the wrong number once.
   authority. With `OT6_MP_COSTS` off it reverts to free, byte-for-byte.
 - **One price scale.** Kit skills live in the same ability
   records as spells (research/data-formats.md), so they price
-  on the vanilla spell ruler: Fire 4, Fire 2 20, Fire 3 51.
+  on the vanilla spell baseline: Fire 4, Fire 2 20, Fire 3 51.
 
 ## The verb survey
 
@@ -237,8 +237,8 @@ Vanilla-free player verbs, with proposed cost shapes:
 | Steal (Locke #1) | flat small | **4** | 12.9% of the 31 MP pool Locke actually joins with, and exact parity with every other kit's signature row (Pummel, Dispatch, AutoCrossbow are all 4) — see "Steal's price is real and invisible" below |
 | New kit skills (Locke #2–7, Analyze, …) | scaled by tier | 3–20 | born costed via M4 kit tables — never free in vanilla; Analyze stays cheap (2–3) because scouting fuels the loop |
 | Tools (Edgar) | scaled by tier | 3–20 | reusable capital bought with gil; MP is the operating cost — AutoCrossbow 3–4, Drill/Chain Saw 12–20, Debilitator 8–12, Overclock costs the sum of the two tools it fires |
-| Blitz (Sabin) | scaled by tier | 4–99 | Pummel 4, mid-kit 10–17, then 28/50 into **Bum Rush 99, the anchor** |
-| SwdTech (Cyan) | BP tier + MP at Blitz parity | 4–99 | he pays both currencies (below), and **Cleave anchors at 99** |
+| Blitz (Sabin) | scaled by tier | 4–99 | Pummel 4, mid-kit 10–17, then 28/50 into **Bum Rush 99, the ceiling** |
+| SwdTech (Cyan) | BP tier + MP at Blitz parity | 4–99 | he pays both currencies (below), and **Cleave tops out at 99** |
 | Dance (Mog) | flat, paid at start | 4–10 | one payment starts a whole-battle state — vanilla's can't-stop-dancing lock is preserved, so the price is per battle, not per step |
 | Rage (Gau) | flat, paid at start | 8 | one payment starts a whole-battle possession, every possessed turn after it free — the same rule Dance takes, and `Ot6RageCost` tail-calls `Ot6DanceCost` so the two can never drift |
 | Leap (Gau) | free — exception | 0 | **the free floor, not an exemption**: Leap shares Gau's FIGHT row on the Veldt (kits.md), so on the Veldt it *is* the Fight command |
@@ -254,7 +254,7 @@ Vanilla-free player verbs, with proposed cost shapes:
 
 ### Steal's price is real and invisible
 
-**The price: 4 MP.** This document's ruler measures
+**The price: 4 MP.** This document's baseline measures
 an ability against the pool at the level it **arrives**, and Steal
 arrives at Narshe with Locke at **LV6 holding 31 MP** (measured,
 `probe_mppools.lua` off `worldmap_narshe`), where 4 MP is **12.9%**,
@@ -263,12 +263,12 @@ between Fire's 10.0% and Cure's 12.5%.
 Worth stating plainly because it will come up again: **every signature
 dilutes the way Steal does.** Pummel is 4.3% of Sabin's LV14 pool and
 Dispatch 4.3% of Cyan's. Chasing the late-game fraction would mean
-per-level prices, which this ruler explicitly does not do.
+per-level prices, which this baseline explicitly does not do.
 
 4 is also **exact parity with the cheapest row of all three ladder
 kits** — Pummel, Dispatch and AutoCrossbow are each 4 — which is what
 "signatures become the cheapest rows of their kits" means in numbers.
-Steal is rung one of Locke's ladder, not a
+Steal is the first tier of Locke's ladder, not a
 one-off, and his 99 is Master's Mark. `battle_costtable.lua` asserts
 that parity, so moving one signature without the others is a red test.
 
@@ -313,13 +313,13 @@ player has to work to reach.
 
 ### Cyan pays in both
 
-SwdTech costs both currencies: a BP rung (there is no 0-BP rung —
+SwdTech costs both currencies: a BP tier (there is no 0-BP tier —
 `Ot6BushidoTech`, `ot6_kits.asm:74-79`, clamps a stray 0 up to 1, and the
-window is three rungs over Cyan's top three *learned* techs,
+window is three tiers over Cyan's top three *learned* techs,
 `ot6_kits.asm:65-70`) plus an MP price on top. The ladder replaces the
 vanilla charge gauge's wait-to-charge rhythm while preserving agency:
 the wait still exists — later techs need a fuller bank, and banking to 3
-is the only way to reach the top band — but Cyan acts while it builds.
+is the only way to reach the top of the ladder — but Cyan acts while it builds.
 The design consequence: Cyan is the one kit where banking BP has
 intrinsic purpose. Greedy spending beats banking against trash, measured,
 so for every other kit banking
@@ -342,7 +342,7 @@ index**, and ships at 4/10/13/16/18/28/50/99 (`Ot6AbilityCostTbl`,
 coincidence: `BlitzLevelTbl` is 1/6/10/15/23/30/42/70 and
 `BushidoLevelTbl` 1/6/12/15/24/34/44/70
 (`ff6/src/field/event.asm:1236-1240`), so row *n* of either kit
-arrives in the same band against nearly the same pool. Cyan
+arrives at the same stage against nearly the same pool. Cyan
 pays BP on top; if parity plus the 1-BP floor leaves
 him starved, the lever is **BP seed/regen, not the floor, and not this
 column.**
@@ -355,13 +355,13 @@ than the 3× row would read as a bug. Blitz is a free-choice
 menu and needs no such rule, which is why Mantra stays a
 cheap utility off-ramp under Fire Dance.
 
-### The ruler
+### The baseline
 
-Kit skills price on the vanilla spell ruler: cost as a fraction of the
+Kit skills price on the vanilla spell baseline: cost as a fraction of the
 caster's real max MP **at the level the ability is learned**, pools computed
 the way `InitMaxMP` computes them (`CharProp+$01` plus the
 `LevelUpMP` running sum) and cross-checked against pools read
-out of minted saves (`tools/tests/probe_mppools.lua`):
+out of generated savestates (`tools/tests/probe_mppools.lua`):
 
 Spells learned below Terra's earliest *measured* level are
 priced at that level (L6, pool 40 — read off `kolts_doorstep`),
@@ -380,7 +380,7 @@ unreachable state. MP costs are `magic_prop_en.dat` +$05.
 | Life | 30 | L18 | 148 | 20.3% |
 
 **So a vanilla spell costs roughly 8–20% of the pool it is
-first cast from.** Against that ruler, the shipped columns. Rows 1–2 are
+first cast from.** Against that baseline, the shipped columns. Rows 1–2 are
 priced at L10, the earliest either character is in the party at
 all (measured: `gau_joined` has Cyan and Sabin both at LV11). Every
 figure is recomputed by `battle_costtable.lua` from the ROM's own tables
@@ -413,16 +413,16 @@ on each `make test`, not derived by hand.
 | Steal (Locke) | L6, Narshe | 31 | **4** | 12.9% | 7 |
 | Rage / Dance | — | — | **8** | — | — |
 
-%-of-pool climbs *into* the 13.0% anchor along each ladder (8.4 → 10.1 →
+%-of-pool climbs *into* the 13.0% ceiling along each ladder (8.4 → 10.1 →
 11.1 → 13.0 for Blitz) rather than falling away from it.
 
 Two deliberate non-uniformities:
 
 - **Mantra stays at 16, under Fire Dance's 17.** It is a utility
-  off-ramp, not a damage rung, and Blitz is a free-choice menu where all
+  off-ramp, not a damage tier, and Blitz is a free-choice menu where all
   learned rows are visible at once — a heal that costs more than the
-  fire-all rung reads as a bug. At 8.4% of the L23 pool it is still on
-  the ruler; the dip is in the *shape*, not off the scale. Empowerer
+  fire-all tier reads as a bug. At 8.4% of the L23 pool it is still on
+  the baseline; the dip is in the *shape*, not off the scale. Empowerer
   keeps its +2 over Mantra for SwdTech's monotonicity rule.
 - **The signature rows stay at 4** (7.1% / 6.9%), just under the 8%
   vanilla floor, and **Suplex stays at 23.2%**, just over the 20% top —
@@ -432,13 +432,13 @@ Two deliberate non-uniformities:
 Two things the measurement adds that the numbers alone do not show:
 
 - **Tools are deliberately untouched.**
-  Against Edgar's real pool at the band each tool is acquired
+  Against Edgar's real pool at the stage each tool is acquired
   they run 7–21% — AutoCrossbow 11.1% at L7, Drill 18.4% and
-  Chain Saw 20.7% at L13 — i.e. dead on the ruler above. A general
+  Chain Saw 20.7% at L13 — i.e. dead on the baseline above. A general
   floor lift does not apply to them: 1.5× on Chain Saw would be 31%,
   off the top of the scale. Gil buys the tool once and MP is the
   per-use cost.
-- **The gate.** `tools/tests/battle_costtable.lua`
+- **The test.** `tools/tests/battle_costtable.lua`
   recomputes every one of these fractions from the ROM's own
   tables on each `make test` and refuses a column that has
   fallen outside 4–25%.
@@ -459,14 +459,14 @@ level through the 40s, so pools outgrow mid-kit costs as kits
 fill in on their level schedules (kits.md); the squeeze is
 early WoB, which is where the demo lives.
 
-Measured pools, read off the minted chain by
+Measured pools, read off the generated chain by
 `tools/tests/probe_mppools.lua`, which boots each state and dumps
 every `$1600` record. Max MP, in-party characters only (a
 character who has not joined yet carries a placeholder record —
 Cyan reads LV7/39 at `kolts_doorstep`, which is *not* a pool
 anyone can spend):
 
-| band (fixture) | Terra | Locke | Cyan | Edgar | Sabin | Celes | Gau |
+| stretch (fixture) | Terra | Locke | Cyan | Edgar | Sabin | Celes | Gau |
 |---|---|---|---|---|---|---|---|
 | Narshe (`worldmap_narshe`) | 29 `L4` | 31 `L6` | — | — | — | — | — |
 | Mt Kolts (`kolts_doorstep`) | 40 `L6` | 37 `L7` | — | 36 `L7` | — | — | — |
@@ -480,7 +480,7 @@ Every one of these equals `CharProp+$01` plus the `LevelUpMP`
 running sum to that level, exactly as `InitMaxMP`
 (`ff6/src/field/event.asm:1405`) builds it — so the pool at *any*
 level is computable, and the owner's reported "LV14 Cyan, 96 MP"
-is reproduced to the byte (5 + 91). That is what makes the ruler
+is reproduced to the byte (5 + 91). That is what makes the baseline
 table above checkable rather than anecdotal.
 
 ## Full HP/MP restore on level up
@@ -508,7 +508,7 @@ level, current HP and MP are set to the new maximums.
 The esper passive pool (magicite.md) is where MP relief lives;
 slot rules and learning stay as written there — up to 4 slots,
 learned by battles carried, stat passives competing for the
-same slots. The anchor pair follows Octopath's support-skill
+same slots. The core pair follows Octopath's support-skill
 shapes; names here are descriptive placeholders:
 
 - **MP on victory** — winning a battle restores ~15–25% of max
@@ -608,13 +608,13 @@ pass still watches Osmose-cycling next to Facet + Rune Eater.
     on the shipped ON ROM, free+absent on the `nomp` baseline).
   - Costs and the level-up refill ship together: costs alone are
     attrition without income.
-- **M5 — passives.** The anchor pair rides the esper passive
+- **M5 — passives.** The core pair rides the esper passive
   machinery; max-MP-up rides the stat channel.
 - **M6 — numbers.** The harness (balance-metrics.md) grows MP
   lines: per-fight mp_spent / mp_restored / pool fraction at
   fight end; refill cadence as fights-between-level-ups on the
   pacing route (the mines_pace rig); mp-zero incidence. First
-  proposed bands, to be re-proposed after measurement: a trash
+  proposed ranges, to be re-proposed after measurement: a trash
   fight spends ~10–25% of an on-curve pool unboosted; mp-zero
   never happens on-route at on-curve levels; a refill arrives
   before ~70% depletion.

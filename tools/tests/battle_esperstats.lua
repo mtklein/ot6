@@ -12,13 +12,13 @@
 -- $161a-$161d record, so "no esper" is the reverted state: the negative control
 -- (scenario BASE) doubles as the unequip-reverts proof.
 --
--- ===================== THE HONEST REBUILD (#75) ===========================
+-- =============== THE INPUT-DRIVEN REBUILD (#75) ===========================
 -- The previous version of this file POKED char 0's equipped-esper byte $161e
 -- and ran on battle_doorstep -- the Narshe intro, where Terra owns no esper
 -- at all, so the menu could never have equipped one and the poke was the only
 -- way in.  Issue #75's rule (inputs in, observations out, never write
 -- emulated state) retired the poke, and with it the fixture: equipping
--- honestly requires OWNING the stone, so this file now runs on
+-- in normal play requires OWNING the stone, so this file now runs on
 -- MINECART_DOORSTEP -- the first fixture on the chain that owns all six
 -- stones under test (the Zozo four from gen_zozo5_ramuh, Ifrit/Shiva from
 -- the MRF hand-off; $1A69 reads EF 01 9A 00 here) AND offers a battle:
@@ -40,7 +40,7 @@
 --
 -- THE FIXTURE CHANGE STRENGTHENS EVERY CONTROL.  The party here is LOCKE,
 -- SABIN and EDGAR, and NaturalMagic (field/event.asm) teaches spells only to
--- TERRA and CELES -- Celes left the roster at the tube room, one leg before
+-- TERRA and CELES -- Celes left the roster at the tube room, one step before
 -- this fixture.  So the party innately knows NOTHING: the BASE union is
 -- asserted literally EMPTY, and every grant signature below -- including
 -- FIRE and CURE, which the old Narshe fixture could never use because Terra
@@ -50,7 +50,7 @@
 -- BASE could assert absent, this BASE can too.
 --
 -- THE MEASURED CHARACTER is whoever leads the party (the character menu's
--- slot 0 -- EDGAR on this mint), FOUND from the live menu RAM and asserted
+-- slot 0 -- EDGAR on this savestate), FOUND from the live menu RAM and asserted
 -- against the field party order, never assumed.  Stat deltas are vs the
 -- BASE scenario for the same character, so the change of body from Terra
 -- changes nothing about what the numbers prove.  VIGOR is stored DOUBLED
@@ -387,7 +387,7 @@ add({ checkEsper("kirin", KIRIN, { mag = 4, stam = 2 },
 add(driveSteps("stray", STRAY))
 add({ checkEsper("stray", STRAY, { mag = 4, spd = 2 },
   { { MUDDLE, "Muddle" }, { IMP, "Imp" }, { FLOAT, "Float" } }) })
--- v0.6 boss stones, on #62's BOSS rung: upside +10 across three stats bought
+-- v0.6 boss stones, on #62's BOSS tier: upside +10 across three stats bought
 -- with a -3.  Ifrit's +6 vigor reads as +12 because $3b2c is the doubled
 -- copy, and his mag.pwr -3 is the two-sided mod the old encoding could not
 -- say.  On this fixture BOTH grants are proof -- the old file had to call

@@ -54,7 +54,7 @@ H.run({ maxFrames = 40000 }, {
   H.waitFrames(30),
   -- walk to the commander (obj 16) and poke him
   H.navTo(function() return objXf(16) end, function() return objYf(16) - 1 end,
-    { maxFrames = 15000, honest = true }),
+    { maxFrames = 15000, playBattles = true }),
   (function()
     local phase = 0
     return H.driveUntil(function() return inBattle() end, 4000, {

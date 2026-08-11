@@ -15,15 +15,16 @@
 -- So this test pokes NOTHING.  Its whole job is that every input is the
 -- game's own:
 --   * the fixture is vector_doorstep, cold-booted from the tracked
---     post-opera-v1 battery (frontier_graph.py:390), whose manifest names its
---     party LOCKE CELES SABIN EDGAR -- one anchored leg, no story replay;
+--     post-opera-v1 SRAM save (frontier_graph.py:390), whose manifest names its
+--     party LOCKE CELES SABIN EDGAR -- one step from that checkpoint, no story
+--     replay;
 --   * SABIN is FOUND, not assumed: zCharID ($69, four bytes, one per party
 --     slot) is read and searched for CHAR::SABIN, and the character cursor is
 --     driven to that slot.  A party reshuffle moves the row, not the test;
 --   * the Blitz row is enabled because Sabin's own character record carries
 --     BATTLE_CMD::BLITZ, which this test asserts rather than arranges;
 --   * the learned set is whatever the save holds.  The rows are checked
---     against $1D28 as read, so a level or a story beat can move which rungs
+--     against $1D28 as read, so a level or a story beat can move which tiers
 --     are lit without touching this file.
 --
 -- WHAT IT ADDS OVER menu_blitzpage.lua.  Only the realness -- deliberately.
@@ -32,7 +33,7 @@
 -- duplicating them here would be two copies to keep in step for no new
 -- coverage.  What is genuinely only checkable HERE is that the page a player
 -- actually opens agrees with the ROM: the names, the #53 probe icons, and the
--- locked marker on rungs a mid-game Sabin has not reached.
+-- locked marker on tiers a mid-game Sabin has not reached.
 --
 -- THE ICONS (#53) are the reason a real Sabin matters more than usual now.
 -- Three of his eight Blitzes carry an ELEMENT and no break class -- AuraBolt
@@ -192,10 +193,10 @@ H.run({ maxFrames = 40000 }, {
   H.loadState(STATE),
   H.waitFrames(10),
   H.waitUntil(function() return H.worldHasControl() or H.hasControl() end,
-    600, "control at the vector doorstep", 5),
+    600, "control at the vector entry point", 5),
 
   -- the player's path in: X opens the menu.  driveUntil, not one press: this
-  -- fixture is a cold anchor boot and the frame the state lands on is not
+  -- fixture is a cold checkpoint boot and the frame the state lands on is not
   -- something a single 4-frame press can be pinned to.
   H.driveUntil(function() return st() == ST_MAIN end, 1200,
     { H.pressButtons({ "x" }, 4), H.waitFrames(30) }, "main menu"),
@@ -292,7 +293,7 @@ H.run({ maxFrames = 40000 }, {
       .. "Fire Dance fire, Air Blade wind, and this is the cue #53 exists to "
       .. "put on the page.  Zero here means either the fixture regressed to a "
       .. "level below AuraBolt or the font upload stopped happening")
-    H.log(string.format("REAL SABIN: %d of 8 rungs learned, %d of them showing "
+    H.log(string.format("REAL SABIN: %d of 8 tiers learned, %d of them showing "
       .. "an element icon", nLearned, elemRows))
     H.screenshot("blitz_page_real_sabin")
   end),

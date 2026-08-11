@@ -1,6 +1,6 @@
 -- @suite slow
 -- battle_slotsboot.lua -- boost-tiered Slot on a NATURAL boot: cold-Continue
--- the terra-returned-v1 battery anchor (party LOCKE EDGAR SABIN SETZER,
+-- the terra-returned-v1 SRAM checkpoint (party LOCKE EDGAR SABIN SETZER,
 -- save-point boundary F, lettered in tools/tests/frontier_graph.py; the
 -- Continue restores the party ON FOOT at the grounded Blackjack's tile),
 -- walk the plain south of Zozo into a REAL world encounter, and drive real Slot spins with real button
@@ -17,8 +17,8 @@
 -- south of Zozo deals a formation with enough bodies and HP to survive
 -- three Slot resolutions with the enemy side acting freely.  Unforced
 -- spins overwhelmingly resolve Lagomorph (a party heal) and the boosted
--- spin's chosen triple is reel 1's honest stop, so the fight's damage
--- budget is small; the gate below is calibrated from the pool's measured
+-- spin's chosen triple is reel 1's real stop, so the fight's damage
+-- budget is small; the check below is calibrated from the pool's measured
 -- draws.  The bench still answers its menus with real Defends and the
 -- party takes the enemy's real hits.
 --
@@ -36,7 +36,7 @@
 -- The Ot6BoostDmg exemption rides the whole run as a write-watch: the
 -- multiplier's $f0-bank OT6_SCR_BIT store must never happen under cmd $0f.
 --
--- Boot drive is probe_mp_universal's, verbatim where possible (the anchored
+-- Boot drive is probe_mp_universal's, verbatim where possible (the checkpoint
 -- cold Continue, the disembark guard, the encounter walk).
 --
 -- OT6_ANCHOR_LAYOUT: ot6-codex-o8-v1
@@ -148,7 +148,7 @@ local function waitStop(r, what)
 end
 
 H.run({ maxFrames = 400000 }, {
-  -- cold Continue (the anchor's $307ff0=3 preselects slot 3) -- the
+  -- cold Continue (the checkpoint's $307ff0=3 preselects slot 3) -- the
   -- probe_mp_universal boot, verbatim
   H.waitFrames(350),
   H.repeatN(5, { H.pressButtons({ "start" }, 8), H.waitFrames(25) }),
@@ -182,7 +182,7 @@ H.run({ maxFrames = 400000 }, {
 
   -- walk the plain until a real encounter fires -- and CHOOSE it: a draw
   -- without the headroom to survive three Slot resolutions is fled (L+R)
-  -- and the walk resumes.  Gate calibrated from the pool's measured draws
+  -- and the walk resumes.  Check calibrated from the pool's measured draws
   -- (2026-08-10: the first draw dealt 3 bodies / 1237 total max HP, well
   -- over the >= 2 bodies / >= 600 HP floor).
   (function()
@@ -330,12 +330,12 @@ H.run({ maxFrames = 400000 }, {
   end),
   waitStop(1, "spin3 reel1"),
   H.call(function()
-    H.log(string.format("spin3: reel 1 stopped honestly on icon %d (pos $%02x)",
+    H.log(string.format("spin3: reel 1 stopped on icon %d (pos $%02x)",
       icon(1), H.readByte(POS[1])))
   end),
   pressAUntil(PRESS[2], "spin3 press2"),
   H.call(function()
-    -- the chosen icon: reel 1's honest stop.  In a joker-forbidden battle a
+    -- the chosen icon: reel 1's real stop.  In a joker-forbidden battle a
     -- timed 7 is the documented exception: no help, no bought triple.
     local chosen = icon(1)
     local gated = chosen == 0 and (H.readByte(JOKER) & 4) ~= 0

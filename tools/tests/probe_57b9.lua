@@ -1,6 +1,6 @@
 -- probe_57b9.lua -- write-watcher: is $7E57B9 (candidate OT6_FONTDIRTY
 -- relocation target, spare byte in the m2 trace-verified strip) free of
--- vanilla writers?  Watches $7E57B9-$7E57BF through doorstep -> battle ->
+-- vanilla writers?  Watches $7E57B9-$7E57BF through entry point -> battle ->
 -- Fire Beam banner -> resolution.  $7E57D5 rides along as the positive
 -- control: the banner machinery MUST hit it (GfxCmd_01 et al).
 
@@ -31,7 +31,7 @@ H.run({ maxFrames = 12000 }, {
   H.driveUntil(function() return H.battleLoadStarted() end, 4000, {
     H.hold({ "up" }), H.waitFrames(20), H.release(), H.waitFrames(2),
     H.pressButtons({ "a" }, 4),
-  }, "battle load from doorstep"),
+  }, "battle load from the entry point"),
   H.waitUntil(function() return H.battleActive() end, 900, "battle active", 30),
   H.waitFrames(240),
   H.pressButtons({ "a" }, 6), H.waitFrames(24),

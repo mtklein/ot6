@@ -19,17 +19,18 @@
 -- field-state reads both halves stand on (fieldX/hasControl/formation...)
 -- stay in the core because suite battle tests use them too.
 --
--- Freshness: a minted route fixture is a function of BOTH halves, so
+-- Freshness: a generated route fixture is a function of BOTH halves, so
 -- lib/frontier_stamp.sh hashes generator ++ ot6.lua ++ ot6_field.lua
--- (that fixed order) into the mint signature.
+-- (that fixed order) into the signature it stamps beside the fixture.
 
 local M = ...
 assert(type(M) == "table",
   "ot6_field.lua is inlined by lib/compose.py after lib/ot6.lua and " ..
   "receives the core module table; it cannot be loaded on its own")
 
--- How long honest="flee" holds L+R before it accepts that this formation is
--- not going to release the party and fights the battle out instead.  The run
+-- How long playBattles="flee" holds L+R before it accepts that this
+-- formation is not going to release the party and fights the battle out
+-- instead.  The run
 -- mechanic is a per-round roll against level/speed, so a short tail is
 -- normal -- but holding L+R is not a neutral act, it is standing still while
 -- the formation takes free rounds.  MEASURED 2026-08-09 with this cap at
@@ -37,17 +38,17 @@ assert(type(M) == "table",
 -- FULL-HEALTH party, the flee held for all 5400 frames, the party WIPED
 -- inside its own escape attempt, and the drive then tapped A through the
 -- Game Over and into a brand-new game -- eleven maps of intro before the
--- leg's budget finally expired.  1800 frames is 30 seconds, several rounds,
+-- step's budget finally expired.  1800 frames is 30 seconds, several rounds,
 -- long enough for a run that is going to work and short enough that the
 -- fallback still has a party to fight with.
 -- Navigators accept opts.fleeCap to SHORTEN the cap per route.  Measured
--- 2026-08-09 on the Figaro-cave escape leg (LOCKE + CELES, 113+150 hp): a
+-- 2026-08-09 on the Figaro-cave escape step (LOCKE + CELES, 113+150 hp): a
 -- PINCER formation (Trilobiter + Primordites, party surrounded) cannot be
 -- fled at all -- FF6's own rule, no escape until one side is cleared -- so
 -- every held frame is free damage, and the full 1800 killed the party
 -- BEFORE the tactical fallback ever engaged.  Worse, a wipe inside the
 -- cap leaves no "flee: no release" line and no fallback log: the battle
--- ends, RandBattle's GameOver holds the event PC, and the leg reads as a
+-- ends, RandBattle's GameOver holds the event PC, and the step reads as a
 -- parked navigator.  A small party on a meaty map wants a cap of a few
 -- hundred frames (two or three failed run rolls), not ninety seconds.
 M.FLEE_CAP = 1800
@@ -60,7 +61,7 @@ M.FLEE_CAP = 1800
 -- the field module no longer owned that RAM -- and failed as "navTo
 -- timeout".  Neither log contained the word "died".
 --
--- The character table at $1600 is the right FIELD witness: it is save
+-- The character table at $1600 is the right FIELD check: it is save
 -- state, not module-owned scratch, so it survives the battle module, the
 -- menu module and the Game Over screen alike.  Debounced hard (300
 -- frames) because a module handoff can blank things for a moment and a
@@ -69,7 +70,7 @@ M.FLEE_CAP = 1800
 -- BUT $1600 KEEPS PRE-BATTLE HP WHILE A BATTLE RUNS -- the battle module
 -- works on its own table at $3BF4 and syncs back at teardown, and a
 -- battle that ends in a wipe tears down into the Game Over, where the
--- sync the field witness is waiting on never says "dead".  Two legs
+-- sync the field check is waiting on never says "dead".  Two steps
 -- found this independently and converged on the same battle-side
 -- signature (gen_sabin_gau's staging walk, gen_sabin_trench's dive):
 -- every party slot whose battle MAX HP looks SANE -- nonzero and under
@@ -79,14 +80,14 @@ M.FLEE_CAP = 1800
 -- first, so the navigators' canary names an in-battle wipe instead of
 -- pressing buttons into the Game Over.
 --
--- Related trap, documented where the shared witness lives because the
+-- Related trap, documented where the shared check lives because the
 -- copies are scattered through gens: the ad-hoc per-gen `inBattle()`
 -- (read $3BF4 words, SKIP entries that are 0 or FFFF, first survivor
 -- under 10000 decides) cannot see a DEAD party in battle at all --
 -- every slot reads 0, every slot is skipped, the loop falls through to
 -- "not in battle".  gen_sabin_trench's ride held LEFT at a Game Over
 -- through three full 60000-frame budgets on exactly that blindness.
--- Any driver gating on that pattern needs this witness beside it.
+-- Any driver keying on that pattern needs this check beside it.
 function M.partyWipedInBattle()
   if not M.battleLoadStarted() then return false end
   local want = 0
@@ -374,22 +375,24 @@ local function resolve(v) return type(v) == "function" and v() or v end
 -- for that edge: blocklist it (persists across re-plans within this
 -- navTo) and re-BFS.  Any deviation from the plan (event force-moves,
 -- post-battle drift) also re-plans -- BFS is cheap, guessing isn't.
--- Encounters that fire mid-walk are cleared inline with the kill-bit
--- idiom UNLESS the formation matches opts.spare (the goal fight: hands
--- off, let opts.arrive see it).  Dialogs are advanced with EDGE-pressed
--- A; other control losses (events walking the party) get a neutral pad.
+-- Encounters that fire mid-walk are cleared inline by writing the
+-- battle-clearing flag UNLESS the formation matches opts.spare (the goal
+-- fight: hands off, let opts.arrive see it).  Dialogs are advanced with
+-- EDGE-pressed A; other control losses (events walking the party) get a
+-- neutral pad.
 --   opts.avoid     list of {x,y} the plan must never route THROUGH (a
 --                  one-way entrance inside a walkable region); the goal
 --                  tile itself is exempt
 --   opts.arrive    extra terminator predicate (checked before everything)
 --   opts.maxFrames frame budget -> error (default 20000)
---   opts.spare     list of formation species words never to kill-bit
---   opts.honest    clear mid-route battles by REAL PLAY instead of the
---                  kill-bit -- ZERO state writes on this navigator (issue
+--   opts.spare     list of formation species words never to clear by a
+--                  flag write
+--   opts.playBattles  clear mid-route battles by REAL PLAY instead of the
+--                  flag write -- ZERO state writes on this navigator (issue
 --                  #75).  Opt-in while unconverted generators still lean on
---                  the kill-bit; costs real ATB rounds per encounter, so
---                  honest legs budget more frames.  Three spellings, the
---                  same contract worldNavTo carries:
+--                  the flag write; costs real ATB rounds per encounter, so
+--                  input-driven steps budget more frames.  Three spellings,
+--                  the same contract worldNavTo carries:
 --                  true    auto-fight by edge-tapped A (the taps already
 --                          driving the victory text double as a fighter:
 --                          A opens the command list, A confirms its first
@@ -401,7 +404,7 @@ local function resolve(v) return type(v) == "function" and v() or v end
 --                          was 35 and 35 was too late: measured on map 98
 --                          (Trilium + Tusker + two Cirpius), a party healing
 --                          only below a third spent FIVE Fenix Downs on one
---                          leg -- reviving is what healing late costs, and a
+--                          step -- reviving is what healing late costs, and a
 --                          Tonic is fifty gil against five hundred;
 --                  "flee"  hold L+R, the engine's own run mechanic.  A
 --                          fled battle is not a WIN, so win-only rolls
@@ -410,10 +413,10 @@ local function resolve(v) return type(v) == "function" and v() or v end
 --                          Sabin chain's whole reason to run.  A formation
 --                          that has not released the party after
 --                          M.FLEE_CAP consecutive battle frames is fought
---                          out by edge-tapped A instead of hanging the leg
+--                          out by edge-tapped A instead of hanging the step
 --                          (unrunnable formations exist and a run that
---                          cannot end is not "honest", it is a timeout);
---                          callers pick fight vs flee per leg and say why.
+--                          cannot end is not real play, it is a timeout);
+--                          callers pick fight vs flee per step and say why.
 --   opts.calmFrames  consecutive settled frames on the goal tile the
 --                  terminator requires (default 16; see ISSUE #22 below)
 --   opts.noPathRetries  BFS-no-path retries, 45 idle frames apart, before
@@ -495,7 +498,7 @@ function M.navTo(txIn, tyIn, opts)
   -- built for "tactical" AND for "flee": the flee branch falls back to it
   -- once M.FLEE_CAP says this formation is not letting go
   local wipeCheck = wipeCanary("navTo")
-  local tactical = (opts.honest == "tactical" or opts.honest == "flee")
+  local tactical = (opts.playBattles == "tactical" or opts.playBattles == "flee")
       and M.newFightDriver("navTo",
         { tactical = true, boost = true, items = true,
           healPercent = opts.healPercent or 55,
@@ -546,7 +549,7 @@ function M.navTo(txIn, tyIn, opts)
           M.setPad({})                 -- goal fight: hands off, arrive() sees it
           return
         end
-        if opts.honest == "flee" then
+        if opts.playBattles == "flee" then
           -- L+R is the engine's own run mechanic; M.FLEE_CAP is the point
           -- at which "still holding" stops being a run and starts being a
           -- slow death, and the battle is fought out instead.  The fallback
@@ -565,19 +568,19 @@ function M.navTo(txIn, tyIn, opts)
           return
         end
         if tactical then tactical.frame(); return end
-        -- honest=true reaches here: the battle is about to be "cleared"
+        -- playBattles=true reaches here: the battle is about to be "cleared"
         -- by BLIND A-TAPS -- no menu awareness, no items, no flee.  This
         -- is the branch that walked BANON's escort into a wipe at
         -- terra_clifftop while its log said "navTo timeout".  It stays
-        -- because unconverted legs still ride it, but it must never be
-        -- ridden SILENTLY: converted routes want honest="flee" (corridor
-        -- trash) or honest="tactical" (fights that matter).
-        if opts.honest == true and battN % 3600 == 3 then
-          M.log('HONEST=true IS FIGHTING THIS BATTLE BY BLIND A-TAPS -- ' ..
-            'no menus, no items, no flee.  If this leg loses parties or ' ..
-            'drags, convert it: honest="flee" or honest="tactical".')
+        -- because unconverted steps still ride it, but it must never be
+        -- ridden SILENTLY: converted routes want playBattles="flee" (corridor
+        -- trash) or playBattles="tactical" (fights that matter).
+        if opts.playBattles == true and battN % 3600 == 3 then
+          M.log('playBattles=true IS FIGHTING THIS BATTLE BY BLIND A-TAPS -- ' ..
+            'no menus, no items, no flee.  If this step loses parties or ' ..
+            'drags, convert it: playBattles="flee" or playBattles="tactical".')
         end
-        if M.monstersPresent() > 0 and not opts.honest then
+        if M.monstersPresent() > 0 and not opts.playBattles then
           for slot = 0, 5 do
             if M.readByte(0x3aa8 + slot * 2) % 2 == 1 then
               M.writeByte(0x3eec + slot * 2, M.readByte(0x3eec + slot * 2) | 0x80)
@@ -709,12 +712,13 @@ end
 -- maxFrames).  Frames are classified with navTo's 3-frame debounce (the
 -- battle/dialog signal bytes live in RAM the field module also scribbles
 -- on; acting on a one-frame ghost would tap A on the open field):
---   battle  -> kill-bit everything present + edge-tap A through the text
---              (with opts.honest, NO kill-bit: the same edge-tapped A
+--   battle  -> flag-clear everything present + edge-tap A through the text
+--              (with opts.playBattles, NO flag write: the same edge-tapped A
 --              auto-fights the encounter for real -- zero state writes,
 --              issue #75 -- at the price of real ATB rounds).
 --              A formation matching opts.spare is a scripted set-piece:
---              never kill-bitted, and hands OFF for its first 300 frames,
+--              never cleared by a flag write, and hands OFF for its first
+--              300 frames,
 --              THEN edge-tapped.  Both halves are load-bearing (measured,
 --              esper zap): the set-piece ends via a monster-turn battle
 --              event, and A pressed during the load queues player actions
@@ -733,7 +737,7 @@ function M.advanceStory(pred, maxFrames, opts)
   local aPhase = 0
   local battN, dlgN = 0, 0
   local wipeCheck = wipeCanary("advanceStory")
-  local tactical = (opts.honest == "tactical" or opts.honest == "flee")
+  local tactical = (opts.playBattles == "tactical" or opts.playBattles == "flee")
       and M.newFightDriver("advanceStory",
         { tactical = true, boost = true, items = true,
           healPercent = opts.healPercent or 55,
@@ -770,14 +774,14 @@ function M.advanceStory(pred, maxFrames, opts)
           M.setPad(battN > 300 and aPhase < 4 and { "a" } or {})
           return
         end
-        -- honest="flee" was accepted here and then IGNORED: every navigator
+        -- playBattles="flee" was accepted here and then IGNORED: every navigator
         -- had a flee branch and this one did not, so a settle that rolled an
         -- encounter blind-tapped A through a whole fight while its caller's
         -- header said the route runs from them.  Measured on gen_kolts
         -- (2026-08-09): the mountain settles fought Cirpius packs by tap-A,
         -- which is how the party reached VARGAS with TERRA dead and EDGAR on
         -- 1 hp.  Same contract as navTo's, cap included.
-        if opts.honest == "flee" then
+        if opts.playBattles == "flee" then
           if battN <= (opts.fleeCap or M.FLEE_CAP) then
             M.setPad({ l = true, r = true })
             return
@@ -790,19 +794,19 @@ function M.advanceStory(pred, maxFrames, opts)
           return
         end
         if tactical then tactical.frame(); return end
-        -- honest=true reaches here: the battle is about to be "cleared"
+        -- playBattles=true reaches here: the battle is about to be "cleared"
         -- by BLIND A-TAPS -- no menu awareness, no items, no flee.  This
         -- is the branch that walked BANON's escort into a wipe at
         -- terra_clifftop while its log said "navTo timeout".  It stays
-        -- because unconverted legs still ride it, but it must never be
-        -- ridden SILENTLY: converted routes want honest="flee" (corridor
-        -- trash) or honest="tactical" (fights that matter).
-        if opts.honest == true and battN % 3600 == 3 then
-          M.log('HONEST=true IS FIGHTING THIS BATTLE BY BLIND A-TAPS -- ' ..
-            'no menus, no items, no flee.  If this leg loses parties or ' ..
-            'drags, convert it: honest="flee" or honest="tactical".')
+        -- because unconverted steps still ride it, but it must never be
+        -- ridden SILENTLY: converted routes want playBattles="flee" (corridor
+        -- trash) or playBattles="tactical" (fights that matter).
+        if opts.playBattles == true and battN % 3600 == 3 then
+          M.log('playBattles=true IS FIGHTING THIS BATTLE BY BLIND A-TAPS -- ' ..
+            'no menus, no items, no flee.  If this step loses parties or ' ..
+            'drags, convert it: playBattles="flee" or playBattles="tactical".')
         end
-        if M.monstersPresent() > 0 and not opts.honest then
+        if M.monstersPresent() > 0 and not opts.playBattles then
           for slot = 0, 5 do
             if M.readByte(0x3aa8 + slot * 2) % 2 == 1 then
               M.writeByte(0x3eec + slot * 2, M.readByte(0x3eec + slot * 2) | 0x80)
@@ -906,7 +910,7 @@ end
 -- wraps at 256 in both axes.  `blockedEdges` (keys from worldEdgeKey)
 -- prunes edges the executor has proven wrong, same contract as the
 -- field bfsPath.  The node cap is 60000, not the field's 4096: world
--- legs run 60+ tiles (Narshe->Figaro BFS'd 63 steps, probe_world3) and
+-- segments run 60+ tiles (Narshe->Figaro BFS'd 63 steps, probe_world3) and
 -- the search disc grows quadratically with them -- the I->J crash-site
 -- grind is ~117 steps and its disc blew straight through the old 20000
 -- cap, which returned nil and left worldGrind idling to its frame
@@ -974,18 +978,18 @@ end
 --    press provably never moved us)
 --  * battles RELOAD THE WORLD: move.asm:916-921 snapshots the tile into
 --    $1F60/$1F61 before Battle_ext and world_start.asm:465-482 reruns
---    ReloadMap after -- measured: kill-bit clear, then ~95 frames of
+--    ReloadMap after -- measured: flag-write clear, then ~95 frames of
 --    fade/init, position and facing back exactly, danger counter zeroed.
---    The walker clears non-spared battles inline (kill-bit + edge-A) and
+--    The walker clears non-spared battles inline (flag write + edge-A) and
 --    stalls until the reload finishes (aligned + full brightness) before
 --    planning again
 --  * no dialog branch: world triggers run world event scripts, not the
 --    field dialog engine; $BA/$D3 are stale field RAM here
 --   opts.arrive    extra terminator (checked first, every frame)
 --   opts.maxFrames frame budget -> error (default 20000)
---   opts.spare     formation species words never to kill-bit
---   opts.honest    end mid-walk battles by REAL PLAY instead of the
---                  kill-bit -- ZERO state writes on this navigator (issue
+--   opts.spare     formation species words never to clear by a flag write
+--   opts.playBattles  end mid-walk battles by REAL PLAY instead of the
+--                  flag write -- ZERO state writes on this navigator (issue
 --                  #75), the same opt-in contract navTo/advanceStory carry.
 --                  true    = auto-fight by edge-tapped A (A opens the acting
 --                            character's command list, A confirms its first
@@ -994,18 +998,19 @@ end
 --                  "tactical" = read the live command table and use Edgar's
 --                            Tools, Sabin's Blitz, and Fight for everyone else;
 --                  "flee"  = hold L+R, the engine's own run mechanic.  On a
---                            fixture chain this is often the RIGHT honest
---                            ending for world trash: it earns no win, so
+--                            fixture chain this is often the RIGHT
+--                            input-driven ending for world trash: it earns
+--                            no win, so
 --                            win-only rolls (SHADOW's 1/16 post-battle
 --                            leave, battle_main.asm:11976) never happen --
 --                            but it FAILS (times out) on unrunnable
 --                            formations, so callers pick fight vs flee per
---                            leg and say why.  Either way the post-battle
+--                            step and say why.  Either way the post-battle
 --                            world reload restores the pre-battle tile with
 --                            the danger counter zeroed (move.asm:916-921 /
 --                            world_start.asm:465-482), and the walker
---                            re-plans from it.  Honest endings cost real ATB
---                            rounds; budget frames accordingly.
+--                            re-plans from it.  Input-driven endings cost
+--                            real ATB rounds; budget frames accordingly.
 function M.worldNavTo(txIn, tyIn, opts)
   opts = opts or {}
   local maxFrames = opts.maxFrames or 20000
@@ -1018,7 +1023,7 @@ function M.worldNavTo(txIn, tyIn, opts)
   local aPhase = 0
   local battN = 0
   local wipeCheck = wipeCanary("worldNavTo")
-  local tactical = (opts.honest == "tactical" or opts.honest == "flee")
+  local tactical = (opts.playBattles == "tactical" or opts.playBattles == "flee")
       and M.newFightDriver("worldNavTo",
         { tactical = true, boost = true, items = true,
           healPercent = opts.healPercent or 55,
@@ -1056,7 +1061,7 @@ function M.worldNavTo(txIn, tyIn, opts)
           M.setPad({})
           return
         end
-        if opts.honest == "flee" then
+        if opts.playBattles == "flee" then
           -- L+R is the engine's own run mechanic; M.FLEE_CAP is the point
           -- at which "still holding" stops being a run and starts being a
           -- slow death, and the battle is fought out instead.  The fallback
@@ -1075,19 +1080,19 @@ function M.worldNavTo(txIn, tyIn, opts)
           return
         end
         if tactical then tactical.frame(); return end
-        -- honest=true reaches here: the battle is about to be "cleared"
+        -- playBattles=true reaches here: the battle is about to be "cleared"
         -- by BLIND A-TAPS -- no menu awareness, no items, no flee.  This
         -- is the branch that walked BANON's escort into a wipe at
         -- terra_clifftop while its log said "navTo timeout".  It stays
-        -- because unconverted legs still ride it, but it must never be
-        -- ridden SILENTLY: converted routes want honest="flee" (corridor
-        -- trash) or honest="tactical" (fights that matter).
-        if opts.honest == true and battN % 3600 == 3 then
-          M.log('HONEST=true IS FIGHTING THIS BATTLE BY BLIND A-TAPS -- ' ..
-            'no menus, no items, no flee.  If this leg loses parties or ' ..
-            'drags, convert it: honest="flee" or honest="tactical".')
+        -- because unconverted steps still ride it, but it must never be
+        -- ridden SILENTLY: converted routes want playBattles="flee" (corridor
+        -- trash) or playBattles="tactical" (fights that matter).
+        if opts.playBattles == true and battN % 3600 == 3 then
+          M.log('playBattles=true IS FIGHTING THIS BATTLE BY BLIND A-TAPS -- ' ..
+            'no menus, no items, no flee.  If this step loses parties or ' ..
+            'drags, convert it: playBattles="flee" or playBattles="tactical".')
         end
-        if M.monstersPresent() > 0 and not opts.honest then
+        if M.monstersPresent() > 0 and not opts.playBattles then
           for slot = 0, 5 do
             if M.readByte(0x3aa8 + slot * 2) % 2 == 1 then
               M.writeByte(0x3eec + slot * 2, M.readByte(0x3eec + slot * 2) | 0x80)
@@ -1172,11 +1177,11 @@ function M.worldNavTo(txIn, tyIn, opts)
   }, "worldNavTo")
 end
 
--- Drive a route that crosses engine modes: legs = { {mode="field", x, y,
--- opts}, {mode="world", x, y, opts}, ... }.  Between legs the engine is
+-- Drive a route that crosses engine modes: `legs` = { {mode="field", x, y,
+-- opts}, {mode="world", x, y, opts}, ... }.  Between steps the engine is
 -- expected to change modes on its own (an exit tile fires as the
--- previous leg lands, a world trigger loads a field map); each leg first
--- waits for its declared mode plus the matching settle gates -- control,
+-- previous step lands, a world trigger loads a field map); each step first
+-- waits for its declared mode plus the matching settle checks -- control,
 -- tile alignment, full screen brightness, then a 30-frame margin, the
 -- post-map-load discipline every field fixture uses -- and only then
 -- dispatches the mode's navigator.
@@ -1401,7 +1406,7 @@ function M.phaseWalk(tx, ty, spec)
       battN = M.battleLoadStarted() and battN + 1 or 0
       if battN >= 3 then
         if plan or lastFlip then
-          M.log(string.format("[phaseWalk] encounter at f%d -- kill-bit, "
+          M.log(string.format("[phaseWalk] encounter at f%d -- battle-clear write, "
             .. "then re-observe", M.frame))
         end
         plan, grids, lastFlip, lastB = nil, {}, nil, nil
@@ -1555,7 +1560,7 @@ end
 
 -- ------------------------------------------- levers and re-entry escapes --
 -- Promoted from gen_vector_crash (2026-07-28, pre-approved in the I->J
--- dispatch) the moment a second leg needed both: the banquet's dais is the
+-- dispatch) the moment a second step needed both: the banquet's dais is the
 -- same face-UP+A trigger class as 384's levers, and its boot/exit tiles are
 -- the same stood-on re-entry class as the SavePoint boot.
 
@@ -1564,8 +1569,8 @@ end
 -- with A released never re-fires; a SECOND A press on a TOGGLE tile flips
 -- it back.  So: tap once, hold up, wait for the flip.  Dialogs opened by
 -- the event are advanced with edge-A; a battle that fires on the tile is
--- kill-bit cleared (no lever on any route so far draws one, but the world
--- module has surprised this harness before).
+-- cleared by a flag write (no lever on any route so far draws one, but the
+-- world module has surprised this harness before).
 function M.tapLever(swId, maxFrames, what)
   local n = 0
   local function swv(id)
@@ -1625,11 +1630,11 @@ end
 -- point of HP this restores is restored by the game's own item code,
 -- driven the way a player drives it.
 --
--- WHY THIS EXISTS.  The honest routes run from random encounters, and a run
--- is not free: the party takes a round or two of hits every time the dice
+-- WHY THIS EXISTS.  The input-driven routes run from random encounters, and
+-- a run is not free: the party takes a round or two of hits every time the dice
 -- say no.  Measured on gen_kolts (2026-08-09), the mountain crossing spent
 -- TERRA from 94 to 39 and then the map-98 approach took her to 1 and EDGAR
--- from 106 to 1, at which point four straight honest VARGAS attempts wiped
+-- from 106 to 1, at which point four straight played-out VARGAS attempts wiped
 -- -- while SEVEN POTIONS AND FIVE TONICS sat unused in the bag the whole
 -- way.  The route was not too hard; nobody was playing the item menu.
 --
@@ -1663,13 +1668,13 @@ end
 --
 -- opts.threshold  heal a living member below this fraction of max HP
 --                 (default 0.55)
--- opts.reserve    { [itemId] = n } -- keep n of that item unspent, so a leg
+-- opts.reserve    { [itemId] = n } -- keep n of that item unspent, so a step
 --                 can hold Potions back for the fight it is walking toward
 -- opts.maxFrames  budget for the whole visit (default 24000)
 -- opts.tag        log prefix
 --
 -- It is a no-op -- not even a menu open -- when nobody needs anything, so a
--- route can call it after every leg and pay only where it matters.
+-- route can call it after every step and pay only where it matters.
 -- Both M.fieldCare and M.setRows can be called on a field map or on the
 -- overworld, and "the menu is closed and the party has control again" is a
 -- different question on each: the world module has its own position and
@@ -2069,7 +2074,7 @@ end
 --
 -- WHY.  Owner note, 2026-08-09: "a lot of ranged attackers can just sit in
 -- the back row forever at no cost."  He is right, and no fixture in this
--- chain had ever set a row -- every honest route walked its whole party
+-- chain had ever set a row -- every input-driven route walked its whole party
 -- into the front rank and paid full physical damage for it.
 --
 -- THE EXEMPTION IS REAL IN THIS ROM, not inherited lore.  ExecCmd sets
@@ -2246,7 +2251,7 @@ end
 -- (skills.asm MenuState_4d @5902 is the equip).  Reads and pad presses
 -- only (issue #75).  Written for the Cranes re-test (2026-08-10): the
 -- fight's designed key is BISMARK's Sea Song -- the game's only water
--- verb -- and no honest route had ever worn a stone on purpose.
+-- verb -- and no input-driven route had ever worn a stone on purpose.
 -- The list seek is menu_esperdetail's two-column idiom against the live
 -- $7e9d89 row->esper table; an esper the save does not own never appears
 -- there, so the seek times out loudly instead of equipping the wrong row.
@@ -2341,7 +2346,7 @@ end
 -- ABSORBS lightning, so every Fight healed the boss (+160/+198 pair
 -- heals, +943 boosted) and walked its Giga Volt charge counter.  The
 -- element-aware weapon swap is a fight-prep verb a player uses all the
--- time, and no honest route had it until this function.
+-- time, and no input-driven route had it until this function.
 function M.equipWeapon(pos, itemId, opts)
   opts = opts or {}
   local tag = opts.tag or string.format("equip weapon %02X", itemId)
@@ -2402,9 +2407,10 @@ end
 --
 -- WHY THIS IS A LIBRARY FUNCTION AND NOT A ONE-OFF.  The game strips
 -- characters and returns their gear TO INVENTORY at story beats --
--- `remove_equip` / EventCmd_8d -- and the mint chain has never once put it
--- back.  battle_brokendeath found this at the Vector infiltration and
--- drove Equip -> Optimum by hand to fix its own fixture.  It is not one
+-- `remove_equip` / EventCmd_8d -- and the chain of generated savestates has
+-- never once put it back.  battle_brokendeath found this at the Vector
+-- infiltration and drove Equip -> Optimum by hand to fix its own fixture.
+-- It is not one
 -- fixture's problem: measured 2026-08-09, solo LOCKE starts his whole
 -- South Figaro scenario with $1600+37*1+$1F..$23 all reading $FF -- no
 -- weapon, no armor, no relics, his own Dirk sitting in the bag -- and
@@ -2605,7 +2611,7 @@ function M.talkToObj(obj, what, maxF)
   local function walkStep()
     return M.navTo(function() return approach()[1] end,
                    function() return approach()[2] end, {
-      maxFrames = maxF or 20000, honest = true,
+      maxFrames = maxF or 20000, playBattles = true,
       arrive = function()
         return engaged or (adjacent() and M.hasControl() and M.tileAligned())
       end,
@@ -2647,8 +2653,9 @@ end
 
 -- Ride a scene out to a settled, controllable field, edge-tapping A on EVERY
 -- frame the party is not in control and FIGHTING anything that comes up --
--- honestly (issue #75; the HP pin + kill-bit this branch used to carry are
--- gone).  Battle frames drive gen_moogle's Marshal cycle: R raises the
+-- by real input (issue #75; the HP pin + battle-clearing flag write this
+-- branch used to carry are gone).  Battle frames drive gen_moogle's Marshal
+-- cycle: R raises the
 -- active character's pending boost (1 bp at battle start, Ot6InitBP; the R
 -- buzzes harmlessly on an empty bank), then three edge-tapped A's confirm
 -- the boosted Fight and page victory text -- so solo LOCKE alternates
@@ -2669,10 +2676,10 @@ end
 -- always takes option 0 -- so every prompt on a route is answered by a
 -- choice-steering rider like gen_sfigaro's rideUntil, never by this.)
 -- ...AND WHY THE FIGHT ITSELF IS NOT A BUTTON PATTERN ANY MORE.  The first
--- honest version of this drove every battle with a fixed 32-frame cycle --
--- R to boost, then three edge-tapped A's -- which is a fine way to page
--- victory text and a poor way to survive.  Measured 2026-08-09 on the first
--- full-frontier run that ever reached this edge: solo LOCKE, level 8 with
+-- input-driven version of this drove every battle with a fixed 32-frame
+-- cycle -- R to boost, then three edge-tapped A's -- which is a fine way to
+-- page victory text and a poor way to survive.  Measured 2026-08-09 on the
+-- first end-to-end run that ever reached this edge: solo LOCKE, level 8 with
 -- 168 hp, LOST the gate soldier's HeavyArmor three attempts running, while
 -- sixteen Tonics sat in the bag.  He never pressed a single one, because
 -- the pattern has no idea what a menu is.  M.newFightDriver does: it reads
@@ -2735,7 +2742,7 @@ end
 -- loss reloads it and re-engages with a different frame offset (the
 -- battle RNG seed is the frame phase at init, so each retry plays a
 -- genuinely different fight).  Success = not dumped on the opening tile
--- AND the probe tile reachable; three losses fail the mint loudly.
+-- AND the probe tile reachable; three losses fail generation loudly.
 function M.clearGateSoldier(probeX, probeY, tag)
   local blob, won = nil, false
   local function fightOnce(n)
@@ -2762,7 +2769,7 @@ function M.clearGateSoldier(probeX, probeY, tag)
         -- soldier keeps his coordinates -- the scene hides the object, it
         -- does not move it -- so obj 26 still reads {30,42} on a win.
         -- Each question in the place it is valid: his TILE decides whether
-        -- to fight (stable at leg start, when the object map may not be
+        -- to fight (stable at step start, when the object map may not be
         -- populated), and REACHABILITY decides whether we won (stable
         -- afterwards, when he is gone from the map even though his record
         -- is not).  A loss dumps the party back on (47,43).
@@ -2803,8 +2810,8 @@ function M.clearGateSoldier(probeX, probeY, tag)
   -- THE BRANCH IS THE SOLDIER'S OWN TILE, not a path query.  Three
   -- readings of this have now been wrong.  $0104 is not the switch the
   -- gate sets (it called a won fight a loss).  And the BFS probe -- right
-  -- when this leg opened with a walk -- reads "open" every time now that
-  -- the leg opens two MENUS first, so the party skips the fight, walks to
+  -- when this step opened with a walk -- reads "open" every time now that
+  -- the step opens two MENUS first, so the party skips the fight, walks to
   -- (31,42) and dies of "no path" twenty retries later.
   --
   -- He is a PLUG on exactly one tile: npc 10 / obj 26 sits at {30,42},
@@ -2855,7 +2862,7 @@ function M.clearGateSoldier(probeX, probeY, tag)
       -- solo LOCKE can reach neither.  Do not widen the attempt ladder
       -- until it gets lucky; that is the #74 mistake.
       M.assertEq(won, true,
-        tag .. ": battle 11 won honestly within 3 attempts (boosted Fights)")
+        tag .. ": battle 11 won within 3 attempts (boosted Fights)")
       M.assertEq(M.bfsPath(probeX, probeY) ~= nil, true,
         tag .. ": the lane is open again")
     end),

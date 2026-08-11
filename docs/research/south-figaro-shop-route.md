@@ -1,4 +1,4 @@
-# South Figaro: the honest shopping / resting stop
+# South Figaro: the input-driven shopping / resting stop
 
 Every coordinate is `(x,y)` in field tiles.
 
@@ -89,20 +89,20 @@ and the base shops 5/6/7/8 are what open.**
 
 ## 3. The route: map 75 (1,28) → the item merchant
 
-### 3.1 Legs
+### 3.1 Segments
 
 ```
-leg 1  map 75: walk (1,28) -> (44,32)                    [73 steps, BFS]
-leg 2  map 75: at (44,32) HOLD UP
-         -> first UP press opens the door (CheckDoor), party does not move
-         -> next two UP steps: (44,31), (44,30)
-         -> (44,30) is ShortEntrance +$0726 -> map 85 (104,57), facing UP
-leg 3  map 85: walk (104,57) -> (106,54)                 [5 steps, BFS]
-leg 4  map 85: face UP, press A
-         -> talks ACROSS the counter (106,53) to NPC index 2 at (106,52)
-         -> _ca7884 -> shop_menu 8
-return map 85: walk (106,54) -> (104,58) [6 steps]; (104,58) is
-         ShortEntrance +$07e6 -> map 75 (44,32), facing DOWN
+segment 1  map 75: walk (1,28) -> (44,32)                [73 steps, BFS]
+segment 2  map 75: at (44,32) HOLD UP
+             -> first UP press opens the door (CheckDoor), party does not move
+             -> next two UP steps: (44,31), (44,30)
+             -> (44,30) is ShortEntrance +$0726 -> map 85 (104,57), facing UP
+segment 3  map 85: walk (104,57) -> (106,54)             [5 steps, BFS]
+segment 4  map 85: face UP, press A
+             -> talks ACROSS the counter (106,53) to NPC index 2 at (106,52)
+             -> _ca7884 -> shop_menu 8
+return     map 85: walk (106,54) -> (104,58) [6 steps]; (104,58) is
+             ShortEntrance +$07e6 -> map 75 (44,32), facing DOWN
 ```
 
 ### 3.2 The door is a BUMP entrance, not a walkable tile
@@ -126,7 +126,7 @@ So the **doorstep is `(44,32)`**: from there `(44,31)` is `$15` and the
 door being opened is `(44,30)`.  `CheckDoor` is called before
 `CheckPlayerMove` on every directional press (`player.asm:463/476/489/502`)
 and the frame the door opens the party does **not** step
-(`bne @49ef`, `:490-491`) — so this leg must be a *held* UP, not a tap.
+(`bne @49ef`, `:490-491`) — so this segment must be a *held* UP, not a tap.
 After the open, `$04`/`$14` both carry `p1 = $03` (walkable) and the two
 UP steps land the party on `(44,30)`, where `CheckShortEntrance`
 (`entrance.asm:269-300`, exact `$af` XY match) fires.
@@ -302,20 +302,20 @@ entrance pair (`+$0738` `(48,3)` → `(69,10)`; `+$073e` `(70,11)` →
 - region B, 245 tiles around `x=67..90, y=7..21` — the **inn**.
 
 ```
-leg 1  map 75: walk (1,28) -> (15,39)                    [25 steps]
-leg 2  map 75: at (15,39) HOLD UP -> door (15,37)
-         -> ShortEntrance +$070e -> map 76 (52,14)
-leg 3  map 76: walk (52,14) -> (48,3)                    [17 steps]
-         (52,14)(52,13)(52,12)(52,11)(53,11)(53,10)(53,9)(54,9)(55,9)
-         (55,8)(55,7)(54,7)(53,6)(52,5)(51,5)(50,5)(49,4)(48,3)
-         -- (49,4) and (48,3) are DIAGONAL steps (p1 bit7/bit6); the
-            lib's diagonal branch already models these
-            (tools/tests/lib/ot6_field.lua:122-141, diagStep)
-leg 4  (48,3) is ShortEntrance +$0738 -> map 76 (69,10)
-leg 5  map 76: walk (69,10) -> (81,19)                   [26 steps]
-         (69,10)(68,9)(67,9)(67,10)..(67,17)(68,17)(69,17)(70,17)
-         (70,18)(71,18)..(78,18)(78,19)(79,19)(80,19)(81,19)
-leg 6  face UP, press A -> _ca7894
+segment 1  map 75: walk (1,28) -> (15,39)                [25 steps]
+segment 2  map 75: at (15,39) HOLD UP -> door (15,37)
+             -> ShortEntrance +$070e -> map 76 (52,14)
+segment 3  map 76: walk (52,14) -> (48,3)                [17 steps]
+             (52,14)(52,13)(52,12)(52,11)(53,11)(53,10)(53,9)(54,9)(55,9)
+             (55,8)(55,7)(54,7)(53,6)(52,5)(51,5)(50,5)(49,4)(48,3)
+             -- (49,4) and (48,3) are DIAGONAL steps (p1 bit7/bit6); the
+                lib's diagonal branch already models these
+                (tools/tests/lib/ot6_field.lua:122-141, diagStep)
+segment 4  (48,3) is ShortEntrance +$0738 -> map 76 (69,10)
+segment 5  map 76: walk (69,10) -> (81,19)               [26 steps]
+             (69,10)(68,9)(67,9)(67,10)..(67,17)(68,17)(69,17)(70,17)
+             (70,18)(71,18)..(78,18)(78,19)(79,19)(80,19)(81,19)
+segment 6  face UP, press A -> _ca7894
 ```
 
 Total from `(1,28)`: 25 + 17 + 26 = 68 walked steps, three map loads.
@@ -496,9 +496,9 @@ In my static model the entire `x=56` world-exit column is reachable *only*
 through that wrap (blocking `x=0`/`x=63` removes all of it), and stepping
 on `x=0` fires the world exit first — so it is not a live hazard for a
 party spawning at `(1,28)`.  It is still worth an assertion, because a
-BFS that ever plans a leftward leg from the west edge would tunnel.
+BFS that ever plans a leftward step from the west edge would tunnel.
 
-### 6.4 The other doorsteps are one step from an exit
+### 6.4 The other landing tiles are one step from an exit
 
 Both landing tiles on this route sit adjacent to their own return trigger:
 
@@ -516,7 +516,7 @@ Random battles are gated on `$0525` bit 7 (`ff6/src/field/battle.asm:332`,
 `lda $0525 / bpl Done`), i.e. `map_prop.dat` record `33*map + 5`.  That
 byte is `$00` for maps **75, 76, 77, 78, 80, 85, 86** — all zero, no
 encounters.  (For contrast the cave maps 70/72/73 are `$80`.)  So the
-shopping/resting stop needs no `honest="flee"` handling of its own; only
+shopping/resting stop needs no `playBattles="flee"` handling of its own; only
 the approach through the cave does.
 
 ---
@@ -613,18 +613,18 @@ Sanity checks that the model is not fantasy, all of which passed:
    same probe.
 3. **Whether NPC 6's ASYNC first-visit walk is still in flight in
    `south_figaro.mss`.**  `$000A` is set by `_caeba1` on the first load, so
-   a fixture minted at `(1,28)` has already started it.  *Probe:* read
+   a fixture generated at `(1,28)` has already started it.  *Probe:* read
    event bit `$000A` and `$7E2000` occupancy along the route at settle,
    and re-read after 600 frames.
 4. **Whether the counter-talk actually opens shop 8.**  The mechanism is
-   read, not run.  *Probe:* the mint itself — stand at `(106,54)`, face
-   UP, tap A, assert `ZMENUSTATE $25` reaches the shop options state and
+   read, not run.  *Probe:* the generator run itself — stand at `(106,54)`,
+   face UP, tap A, assert `ZMENUSTATE $25` reaches the shop options state and
    `$7E9D89+5 == $F0`.
 5. **Gold.**  Fenix Down is 500 GP and the inn is 80 GP; I did not check
    what the party carries at `figaro_cleared`.  Both `take_gil` (inn) and
    the shop fail *quietly* when short.  *Probe:* assert gold before each,
    in the generator.
-6. **Map 76 leg 3's diagonal staircase.**  `(49,4)` and `(48,3)` are
+6. **Map 76 segment 3's diagonal staircase.**  `(49,4)` and `(48,3)` are
    diagonal-only steps in my model (`p1` bit 7/bit 6).  The lib models
    these (it was built for Figaro's staircases) but this particular
    staircase has never been walked by a fixture.  *Probe:* only needed if

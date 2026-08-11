@@ -1,6 +1,6 @@
 -- gen_figaro.lua -- from worldmap_narshe.mss (LOCKE + TERRA on foot at
 -- WoB (84,34)): world-nav south across the plains to Figaro Castle's
--- gate trigger, ride the entry event into the castle complex, and mint
+-- gate trigger, ride the entry event into the castle complex, and generate
 -- figaro_doorstep.mss at the first controllable interior moment.  The
 -- Edgar/Kefka sequence beyond is the NEXT stretch, not this script's.
 --
@@ -26,7 +26,7 @@
 --     random encounter + world reload included, before this script
 --     existed.  worldNavTo targets (64,77) -- one tile SOUTH of the
 --     trigger -- then takes the deliberate step north, the same
---     doorstep discipline every trigger fixture uses.
+--     entry point discipline every trigger fixture uses.
 local H = dofile("tools/tests/lib/ot6.lua")
 local WORLD = "build/states/worldmap_narshe.mss.lua"
 
@@ -52,16 +52,16 @@ H.run({ maxFrames = 90000 }, {
   end),
 
   -- ===================================================================== --
-  -- The world leg: (84,34) -> (64,77), one south of the gate trigger.
-  -- Random encounters are FOUGHT inline by worldNavTo (honest tap-A play,
+  -- The world step: (84,34) -> (64,77), one south of the gate trigger.
+  -- Random encounters are FOUGHT inline by worldNavTo (real tap-A play,
   -- issue #75 -- the plains trash dies to a swing or two and the XP is the
   -- XP a walking player banks; the world reloads itself after each fight
-  -- and position survives, measured).  An honest fight costs real ATB
-  -- rounds, so the leg budget triples over the kill-bit era's.
+  -- and position survives, measured).  An input-driven fight costs real ATB
+  -- rounds, so the step budget triples over the battle-clear-write era's.
   -- ===================================================================== --
-  H.worldNavTo(64, 77, { maxFrames = 45000, honest = true }),
+  H.worldNavTo(64, 77, { maxFrames = 45000, playBattles = true }),
   H.logStep(function()
-    return string.format("at the Figaro doorstep (%d,%d), frame %d, danger=%04X",
+    return string.format("at the Figaro entry point (%d,%d), frame %d, danger=%04X",
       H.worldX(), H.worldY(), H.frame, H.readWord(0x1f6e))
   end),
 
@@ -69,9 +69,9 @@ H.run({ maxFrames = 90000 }, {
   -- The deliberate step onto (64,76): the world event takes over ($E7
   -- bit0), fades, and loads map 55.  A last-tile random encounter is
   -- FOUGHT inline by the same edge-tapped A that pages the victory text
-  -- (honest play, zero writes -- issue #75); the world reload then puts
+  -- (real play, zero writes -- issue #75); the world reload then puts
   -- the party back on the tile and the step re-presses.  Budget covers a
-  -- full honest fight plus the entry event.
+  -- full input-driven fight plus the entry event.
   -- ===================================================================== --
   H.driveUntil(function() return not H.worldMode() end, 9000, {
     H.call(function()
@@ -94,7 +94,7 @@ H.run({ maxFrames = 90000 }, {
   H.waitFrames(30),
 
   -- ===================================================================== --
-  -- Assert + mint.  Masked map compare: SET_PARENT rode bit9 into
+  -- Assert + generate.  Masked map compare: SET_PARENT rode bit9 into
   -- $1F64 (raw $0237, recorded below).
   -- ===================================================================== --
   H.call(function()
@@ -112,12 +112,12 @@ H.run({ maxFrames = 90000 }, {
     H.assertEq((H.readByte(0x1f46) & 0x02), 0, "defense-won switch state")
     H.assertEq((H.readByte(0x1ea5) & 0x40) ~= 0, true, "$012E set")
     H.assertEq((H.readByte(0x1ea1) & 0x08) ~= 0, true, "$010B still set")
-    H.log(string.format("figaro doorstep: map=%d (%d,%d) frame=%d",
+    H.log(string.format("figaro entry point: map=%d (%d,%d) frame=%d",
       H.readWord(0x1f64) & 0x1FF, H.fieldX(), H.fieldY(), H.frame))
     H.screenshot("figaro_doorstep")
   end),
   H.saveState("figaro_doorstep.mss"),
   H.logStep(function()
-    return string.format("figaro_doorstep minted at frame %d", H.frame)
+    return string.format("figaro_doorstep generated at frame %d", H.frame)
   end),
 })

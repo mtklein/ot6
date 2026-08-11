@@ -1,30 +1,30 @@
--- gen_n128.lua -- v0.6 leg 13, the leg OUT of boundary D (#25): the
+-- gen_n128.lua -- v0.6 step 13, the step OUT of boundary D (#25): the
 -- minecart platform (map 272, CID at {9,51}) -> A -> `cutscene TRAIN` ->
 -- the minecart's six forced battles, NUMBER 128 among them -> the Kefka
 -- explosion on map 240 -> control with $0069=1 -> parked ON the escape
--- map's save point {58,7} (boundary E).  Mints n128_won.
+-- map's save point {58,7} (boundary E).  Generates n128_won.
 --
--- ONE BOOT, ANCHORED (issue #25; the dual-boot probe retired by #30):
--- every caller -- the ninja graph's mint edge AND `make smoke` (via the
--- Makefile's SMOKE_ANCHOR_* map) -- supplies OT6_SRAM_ANCHOR=
--- minecart-platform-v1, so run.sh materializes the anchor .srm and SRAM
+-- ONE BOOT, FROM A CHECKPOINT (issue #25; the dual-boot probe retired by
+-- #30):  every caller -- the ninja graph's generation edge AND `make smoke`
+-- (via the Makefile's SMOKE_ANCHOR_* map) -- supplies OT6_SRAM_ANCHOR=
+-- minecart-platform-v1, so run.sh materializes the checkpoint .srm and SRAM
 -- carries slot 3 + the codex magic + the seeded ULTROS2 witness.  Cold
 -- Continue -> the 272 save tile {3,55} -> ENTRY CONTRACT -> walk to CID.
 -- This file used to probe four SRAM bytes at runtime and fall back to
 -- booting minecart_doorstep.mss when they were absent (smoke's old
--- anchorless invocation); with the anchor map there is no anchorless
--- caller left, and a boot chosen by guessing at SRAM contents was one
--- more way for a leg to quietly test something other than what its edge
--- declared.
+-- checkpointless invocation); with the checkpoint map there is no
+-- checkpointless caller left, and a boot chosen by guessing at SRAM
+-- contents was one more way for a step to quietly test something other than
+-- what its edge declared.
 --
 -- OT6_ANCHOR_LAYOUT: ot6-codex-o8-v1
--- ^ the persistent-SRAM layout this leg understands (issue #25).  run.sh
+-- ^ the persistent-SRAM layout this step understands (issue #25).  run.sh
 --   reads the marker line above and refuses -- BEFORE the emulator boots,
 --   naming both strings -- any OT6_SRAM_ANCHOR whose manifest.json declares
 --   a different persistent_layout.
 --
--- WHY THIS LEG IS NOT AN EVENT WALK.  The route recon flagged this as the
--- beat most likely to eat the minting pass, and the reason is that
+-- WHY THIS STEP IS NOT AN EVENT WALK.  The route recon flagged this as the
+-- beat most likely to eat the generating pass, and the reason is that
 -- **`battle 73` appears nowhere in `event_main.asm`**.  The ride is opcode `$ae`, `CUTSCENE::TRAIN`
 -- (include/event_cmd.inc:707), issued at event_main.asm:96580; it runs in
 -- the world module's train engine off a fixed 5-byte-per-item course
@@ -37,8 +37,8 @@
 --     item 31 cmd $e1 -> battle 144
 --     item 36 cmd $e2 -> TrainCmd_e2 (:899) -> event battle $49 = battle 73
 --                        = NUMBER 128 $010b + Left Blade $0140 + RightBlade $013f
--- so nothing in the event disassembly names the boss and no doorstep
--- fixture can be parked in front of it.  This leg therefore RECORDS every
+-- so nothing in the event disassembly names the boss and no entry point
+-- fixture can be parked in front of it.  This step therefore RECORDS every
 -- battle the ride throws instead: the driver below logs each formation on
 -- its rising edge and the assertions afterwards are about that record --
 -- six fights seen, and one of them $010b with both blades.  A quiet ride
@@ -51,15 +51,16 @@
 --
 -- ############################################################################
 -- ## THE BLOCK BELOW IS HISTORY.  IT WAS CLEARED ON 2026-07-27 (#21).       ##
--- ## Everything from "THIS GENERATOR DOES NOT MINT" to "PARTY: LOCKE ALONE" ##
--- ## described a ride fought SOLO because the fixture chain walked out of   ##
--- ## Zozo two-handed.  Its own "WHAT WOULD UNBLOCK THIS" has now happened:  ##
--- ## gen_zozo5_ramuh seats SABIN and EDGAR at the leave cutscene's          ##
--- ## party_menu, the whole chain and the tracked post-opera-v1 anchor were  ##
--- ## re-minted from it, and minecart_doorstep now boots LOCKE + SABIN +     ##
--- ## EDGAR (measured: $1850 LOCKE=$51 EDGAR=$C1 SABIN=$49, CELES=$00 after  ##
--- ## the tube room).  The solo measurements below are kept verbatim as the  ##
--- ## fail-before record; the assertions at the doorstep now require three.  ##
+-- ## Everything from "THIS GENERATOR DOES NOT GENERATE" to "PARTY: LOCKE    ##
+-- ## ALONE" described a ride fought SOLO because the fixture chain walked   ##
+-- ## out of Zozo two-handed.  Its own "WHAT WOULD UNBLOCK THIS" has now     ##
+-- ## happened: gen_zozo5_ramuh seats SABIN and EDGAR at the leave           ##
+-- ## cutscene's party_menu, the whole chain and the tracked post-opera-v1   ##
+-- ## checkpoint were regenerated from it, and minecart_doorstep now boots   ##
+-- ## LOCKE + SABIN + EDGAR (measured: $1850 LOCKE=$51 EDGAR=$C1 SABIN=$49,  ##
+-- ## CELES=$00 after the tube room).  The solo measurements below are kept  ##
+-- ## verbatim as the fail-before record; the assertions at the entry point  ##
+-- ## now require three.                                                     ##
 -- ############################################################################
 --
 -- Run against minecart_doorstep it rides the cutscene correctly and fights
@@ -79,7 +80,7 @@
 --   fight 1: 501   fight 4: 385   fight 5: 261   fight 6: 151   -> 0
 --
 -- i.e. he enters the ride at full HP and the five Mag Roader fights take
--- ~70 HP each even though every one of them is kill-bitted within three
+-- ~70 HP each even though every one of them is write-cleared within three
 -- frames of `battleLoadStarted()`; the boss finishes what is left.  The
 -- screenshot `shots/train_after6.png` is the sighting: Number 128, Left
 -- Blade and RightBlade all standing, LOCKE alone on 151.
@@ -92,24 +93,25 @@
 --     party_menu 1, NO_RESET, {LOCKE, CELES}
 --
 -- -- a FOUR-SLOT party menu with Locke and Celes forced and the other two
--- slots free.  Measured at the post-Opera anchor, $1EDE=$76 / $1EDF=$88, so
--- CYAN, EDGAR, SABIN and GAU are all available to fill them; but $1850 reads
--- LOCKE=$C1, CELES=$49 and every other character $00, so nobody was added.
--- After the tube room takes Celes (`char_party CELES, 0`, :96154) that
--- leaves ONE.  docs/design/bosses-wob.md §13-§16 ("Locke, Celes + two") is
--- describing the intended band; the fixture chain is what is wrong.
+-- slots free.  Measured at the post-Opera checkpoint, $1EDE=$76 /
+-- $1EDF=$88, so CYAN, EDGAR, SABIN and GAU are all available to fill them;
+-- but $1850 reads LOCKE=$C1, CELES=$49 and every other character $00, so
+-- nobody was added.  After the tube room takes Celes (`char_party CELES,
+-- 0`, :96154) that leaves ONE.  docs/design/bosses-wob.md §13-§16 ("Locke,
+-- Celes + two") is describing the intended area; the fixture chain is what
+-- is wrong.
 --
--- WHAT WOULD UNBLOCK THIS.  The v0.5 leg that answers that party_menu has
+-- WHAT WOULD UNBLOCK THIS.  The v0.5 step that answers that party_menu has
 -- to pick two more characters, and everything from there down -- including
--- the tracked 32 KiB anchor at tools/tests/anchors/post-opera-v1/, which is
--- minted from blackjack.mss by gen_post_opera_anchor.lua -- has to be
--- re-minted.  That is a v0.5 change, not a v0.6 one, so this generator is
--- left in the tree as the evidence rather than being made to pass by
--- weakening what it checks.
+-- the tracked 32 KiB checkpoint at tools/tests/anchors/post-opera-v1/,
+-- which is generated from blackjack.mss by gen_post_opera_anchor.lua -- has
+-- to be regenerated.  That is a v0.5 change, not a v0.6 one, so this
+-- generator is left in the tree as the evidence rather than being made to
+-- pass by weakening what it checks.
 --
--- PARTY: LOCKE ALONE.  Leg 11 measured $1850 after the tube room -- one
+-- PARTY: LOCKE ALONE.  Step 11 measured $1850 after the tube room -- one
 -- character with a nonzero party nibble -- so every fight on this ride,
--- Number 128 included, is a solo fight.  Asserted at the doorstep so the
+-- Number 128 included, is a solo fight.  Asserted at the entry point so the
 -- balance work has a measurement to stand on rather than
 -- docs/design/bosses-wob.md §15's "three".
 local H = dofile("tools/tests/lib/ot6.lua")
@@ -165,7 +167,7 @@ local DELTA = { up = { 0, -1 }, right = { 1, 0 }, down = { 0, 1 }, left = { -1, 
 
 -- (a tapInto helper used to sit here, DEFINED and never called -- the same
 -- dead battle toolkit every conversion in this wave has deleted; its only
--- battle handling was the kill-bit)
+-- battle handling was the battle-clear write)
 
 local function census(tag, targets)
   local sx, sy = H.fieldX(), H.fieldY()
@@ -195,7 +197,7 @@ end
 -- always-true predicate is the library's public way to wrap one into a step
 local function seq(steps) return H.cond(function() return true end, steps) end
 
--- Ride the cutscene, HONESTLY (issue #75): every one of the six forced
+-- Ride the cutscene, WITH REAL INPUT (issue #75): every one of the six forced
 -- battles is FOUGHT with the library fighter -- these are event battles
 -- the train engine issues by writing $0011E0, the ride waits on each win,
 -- and fleeing is not the design -- and each fight's formation words are
@@ -204,23 +206,23 @@ local function seq(steps) return H.cond(function() return true end, steps) end
 -- the text, a held direction would only fight the engine.
 --
 -- The ride is wrapped in gen_tunnelarmr's phase-spread retry ladder: six
--- honest fights back to back with no field care between them is exactly
+-- input-driven fights back to back with no field care between them is exactly
 -- the shape that eats a party on a bad roll, a loss is GAME OVER, and the
 -- RNG seed is the frame phase at battle init.  A wipe is detected IN the
 -- drive (the party's battle HP all zero, debounced) so the ladder can
 -- reload instead of riding the Annihilated screen into a timeout.
 -- FIGHT 6 IS TARGETED, and the reason is measured, not assumed: on the
--- first honest attempt the fighter's default targeting fed the BLADES for
--- 8500 frames -- Left Blade read 515/sh1 and then 700/sh3 again, i.e. THE
--- BLADES REGENERATE -- while the body sat untouched at 3276/sh7, and the
--- party bled out on the treadmill.  The body's authored break axis is
+-- first input-driven attempt the fighter's default targeting fed the BLADES
+-- for 8500 frames -- Left Blade read 515/sh1 and then 700/sh3 again, i.e.
+-- THE BLADES REGENERATE -- while the body sat untouched at 3276/sh7, and
+-- the party bled out on the treadmill.  The body's authored break axis is
 -- PIERCING (bosses-wob.md 15, as re-decoded by #23: the bolt/water row was
--- never written; the physical class is the shipped axis), which is
--- EDGAR's AutoCrossbow -- so the override below steers every single-target
--- confirm onto the LIVE $010B slot and lets the xbow chip the 7 shields
--- while everyone's damage goes where it counts.  Items still target the
--- party (the override skips char-side selects), and a 40-frame spin
--- give-up keeps an untargetable state from deadlocking a turn.
+-- never written; the physical class is the shipped axis), which is EDGAR's
+-- AutoCrossbow -- so the override below steers every single-target confirm
+-- onto the LIVE $010B slot and lets the xbow chip the 7 shields while
+-- everyone's damage goes where it counts.  Items still target the party
+-- (the override skips char-side selects), and a 40-frame spin give-up keeps
+-- an untargetable state from deadlocking a turn.
 local fights, rideStart = {}, nil
 local function rideDriver(pred, lostRef, maxFrames, what)
   local ph, hb, battN, wipeN, tgtSpin = 0, 0, 0, 0, 0
@@ -323,9 +325,9 @@ local function rideDriver(pred, lostRef, maxFrames, what)
       end
       -- OUT of battle: a wipe that outruns the in-battle debounce shows
       -- itself as the Game Over Continue landing back on the BOOT SAVE
-      -- TILE (272 {3,55}) -- measured on the first honest attempt, where
-      -- the A-taps paged the Game Over and the battery Continue parked
-      -- the party there with the ride's pred forever false.
+      -- TILE (272 {3,55}) -- measured on the first input-driven attempt,
+      -- where the A-taps paged the Game Over and the battery Continue
+      -- parked the party there with the ride's pred forever false.
       if #fights > 0 and map() == 272
          and H.fieldX() == 3 and H.fieldY() == 55 and not lostRef.lost then
         lostRef.lost = true
@@ -343,7 +345,7 @@ local rideBlob, rideWon = nil, false
 
 -- One attempt, flat (driveUntil bodies replay latched state, so every
 -- attempt builds fresh closures).  Attempt 1 runs in place; later attempts
--- reload the prepared CID doorstep and shift the RNG phase.  The outcome
+-- reload the prepared CID entry point and shift the RNG phase.  The outcome
 -- is the ride's own terminator: control on map 240 with $0069 set.
 local function rideAttempt(n)
   local loadReq
@@ -359,7 +361,7 @@ local function rideAttempt(n)
         loadReq = H.requestLoadState(rideBlob)
       end),
       H.waitFrames(2),
-      H.call(function() H.checkReq(loadReq, "ride doorstep reload") end),
+      H.call(function() H.checkReq(loadReq, "ride entry point reload") end),
       H.waitFrames(90),
       H.call(function()
         H.assertEq(map(), 272, "reloaded onto map 272")
@@ -395,7 +397,7 @@ local function rideAttempt(n)
       if not lostRef.lost and map() == 240 and sw(0x0069) == 1 then
         rideWon = true
         H.log(string.format("minecart ride SURVIVED on attempt %d, f%d "
-          .. "(%d fights fought honestly)", n, H.frame, #fights))
+          .. "(%d fights fought)", n, H.frame, #fights))
       else
         H.log(string.format("attempt %d LOST (wipe in fight %d), f%d",
           n, #fights, H.frame))
@@ -405,7 +407,7 @@ local function rideAttempt(n)
 end
 
 H.run({ maxFrames = 400000 }, {
-  -- ANCHORED BOOT: cold Continue into the 272 save tile {3,55}, entry
+  -- checkpoint boot: cold Continue into the 272 save tile {3,55}, entry
   -- contract, then walk back beside CID and face him.
   H.waitFrames(350),
   H.repeatN(5, { H.pressButtons({ "start" }, 8), H.waitFrames(25) }),
@@ -413,7 +415,7 @@ H.run({ maxFrames = 400000 }, {
   H.repeatN(3, { H.pressButtons({ "a" }, 8), H.waitFrames(40) }),
   H.waitFrames(300),
   H.repeatN(3, { H.pressButtons({ "a" }, 8), H.waitFrames(60) }),
-  -- SOFT landing wait: a wrong-boundary anchor must fail via the entry
+  -- SOFT landing wait: a wrong-boundary checkpoint must fail via the entry
   -- contract naming the wrong map, never via a timeout here.
   H.waitUntilSoft(function()
     return map() == 272 and H.tileAligned() and bright() >= 15
@@ -422,12 +424,12 @@ H.run({ maxFrames = 400000 }, {
   H.call(function()
     -- THE ENTRY CONTRACT (issue #25): declared once in
     -- lib/ot6_contract.lua under "minecart-platform-v1" -- the same
-    -- table gen_minecart_doorstep (the leg INTO D) and the anchor mint
-    -- assert as their EXIT contract.
+    -- table gen_minecart_doorstep (the step INTO D) and the checkpoint
+    -- generator assert as their EXIT contract.
     H.assertEntryContract("minecart-platform-v1")
     H.log(partyReport("minecart-platform-v1 entry"))
   end),
-  H.navTo(9, 52, { maxFrames = 9000, honest = "flee" }),
+  H.navTo(9, 52, { maxFrames = 9000, playBattles = "flee" }),
   -- face CID: his object occupies (9,51), so an UP press only turns
   H.hold({ "up" }), H.waitFrames(8), H.release(), H.waitFrames(20),
   H.call(function()
@@ -443,7 +445,7 @@ H.run({ maxFrames = 400000 }, {
     -- OWNER RULE for Number 128, recorded on #75: the boss is fought by
     -- LOCKE + EDGAR + SABIN, seated through the REAL party menu at the
     -- Zozo leave cutscene (gen_zozo5_ramuh) and carried here by the
-    -- anchor -- no party menu exists at this leg (the ride hangs off
+    -- checkpoint -- no party menu exists at this step (the ride hangs off
     -- talking to CID), so the roster verification IS the drive.
     local cur, n, who = H.readByte(0x1A6D), 0, {}
     for c = 0, 13 do
@@ -458,20 +460,21 @@ H.run({ maxFrames = 400000 }, {
   end),
 
   -- 1. the player's prep, all through real menus, BEFORE the retry blob:
-  --    the July-cut anchor delivers the party bare-handed and possibly
-  --    hurt (the trap every anchored leg in this wave has measured), and
-  --    the ride is six fights with no field access between them
+  --    the July-cut checkpoint delivers the party bare-handed and possibly
+  --    hurt (the trap every checkpoint-booted step in this wave has
+  --    measured), and the ride is six fights with no field access between
+  --    them
   H.equipOptimum({ tag = "n128 kit" }),
   H.fieldCare({ tag = "care before the ride", threshold = 0.95 }),
-  H.navTo(9, 52, { maxFrames = 9000, honest = "flee" }),
+  H.navTo(9, 52, { maxFrames = 9000, playBattles = "flee" }),
   H.hold({ "up" }), H.waitFrames(8), H.release(), H.waitFrames(20),
   H.call(function()
     H.assertEq(H.fieldX() == 9 and H.fieldY() == 52, true,
       "back beside CID, prepared")
     H.assertEq(H.readByte(0x087f + H.readWord(0x0803)), 0, "facing CID again")
-    H.log(partyReport("ride doorstep, prepared"))
+    H.log(partyReport("ride entry point, prepared"))
   end),
-  -- capture the prepared doorstep as the retry ladder's reload blob
+  -- capture the prepared entry point as the retry ladder's reload blob
   (function()
     local req
     return seq({
@@ -491,7 +494,7 @@ H.run({ maxFrames = 400000 }, {
   rideAttempt(3),
   H.call(function()
     H.assertEq(rideWon, true,
-      "the minecart ride survived honestly within 3 attempts (six real "
+      "the minecart ride survived within 3 attempts (six real "
       .. "fights, the library fighter)")
   end),
   H.waitFrames(90),
@@ -530,14 +533,14 @@ H.run({ maxFrames = 400000 }, {
   end),
 
   -- 3. park ON boundary E: the escape map's save point {58,7}, revealed by
-  --    $06AE.  n128_won IS the D->E terminal, so it is minted standing on
+  --    $06AE.  n128_won IS the D->E terminal, so it is generated standing on
   --    the boundary tile with the vector-escape-v1 table asserted (the
   --    same table gen_vector_escape_anchor saves under).  Map 240 is an
-  --    encounter map (rate $0070); navTo kill-bits any draw on the walk.
+  --    encounter map (rate $0070); navTo write-clears any draw on the walk.
   --    The last step is a held RIGHT from (57,7) -- a save tile flickers
   --    hasControl() (the SavePoint re-entry), so arrival is judged on
   --    position + $01BF + alignment.
-  H.navTo(57, 7, { maxFrames = 15000, honest = "flee" }),
+  H.navTo(57, 7, { maxFrames = 15000, playBattles = "flee" }),
   (function() local calm = 0
     return H.driveUntil(function()
       calm = (H.fieldX() == 58 and H.fieldY() == 7 and sw(0x01BF) == 1
@@ -574,11 +577,11 @@ H.run({ maxFrames = 400000 }, {
       H.call(function() saveReq = H.requestSaveState() end),
       H.waitFrames(2),
       H.call(function()
-        H.checkReq(saveReq, "mint verify: capture")
+        H.checkReq(saveReq, "generated-state verify: capture")
         loadReq = H.requestLoadState(saveReq.blob)
       end),
       H.waitFrames(2),
-      H.call(function() H.checkReq(loadReq, "mint verify: reload") end),
+      H.call(function() H.checkReq(loadReq, "generated-state verify: reload") end),
       H.waitFrames(180),
       H.call(function()
         H.assertEq(map(), 240, "reload: still on map 240")
@@ -587,7 +590,7 @@ H.run({ maxFrames = 400000 }, {
         H.assertEq(H.tileAligned(), true, "reload: at rest on the tile")
         H.assertEq(H.battleLoadStarted(), false, "reload: no battle pending")
         H.assertEq(sw(0x0069), 1, "reload: $0069 still SET -- the win held")
-        H.log("mint verify: the reload stayed calm -- n128_won verified")
+        H.log("generated-state verify: the reload stayed calm -- n128_won verified")
       end),
     })
   end)(),
@@ -598,7 +601,7 @@ H.run({ maxFrames = 400000 }, {
     })
   end),
   H.logStep(function()
-    return string.format("n128_won minted at frame %d -- map 240 (%d,%d), "
+    return string.format("n128_won generated at frame %d -- map 240 (%d,%d), "
       .. "$0069=1 after %d fights on the minecart", H.frame,
       H.fieldX(), H.fieldY(), #fights)
   end),

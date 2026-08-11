@@ -122,7 +122,7 @@ H.run({ maxFrames = 120000 }, {
   H.waitUntil(function()
     return H.hasControl() and H.tileAligned() and bright() >= 15
   end, 4000, "Crescent live", 5),
-  H.navTo(12, 23, { maxFrames = 8000, honest = "flee" }),
+  H.navTo(12, 23, { maxFrames = 8000, playBattles = "flee" }),
   (function()
     local sceneSeen = false
     return ride("up", function()
@@ -131,7 +131,7 @@ H.run({ maxFrames = 120000 }, {
          and mapIdx() == 167
     end, "the (12,22) beat", 15000)
   end)(),
-  H.navTo(25, 18, { maxFrames = 12000, honest = "flee", arrive = function()
+  H.navTo(25, 18, { maxFrames = 12000, playBattles = "flee", arrive = function()
     return sw(0x41) == 1 or (H.fieldX() == 25 and H.fieldY() == 18
        and H.hasControl() and H.tileAligned()) end }),
   ride("up", function()

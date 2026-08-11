@@ -29,10 +29,10 @@
 ; and the moment he equips an esper the row he does have back is Magic -- which
 ; kits.md's row-sharing rule says is never the row to sacrifice.
 ;
-; Nor does Locke need a new command.  Steal is rung ONE of an eight-rung ladder
+; Nor does Locke need a new command.  Steal is tier ONE of an eight-tier ladder
 ; (Ot6StealCost's own header, the owner's 2026-07-29 ruling that Locke's 99 is
 ; Master's Mark), so the ladder belongs BEHIND the Steal row, exactly as
-; SwdTech's eight rungs sit behind Cyan's.  OpenCmdMenuTbl[$05] now opens a
+; SwdTech's eight tiers sit behind Cyan's.  OpenCmdMenuTbl[$05] now opens a
 ; Tools-shell list whose FIRST row is Steal itself.  Three consequences, all of
 ; them wanted:
 ;   * no command slot is spent, no row is shared, and Magic survives.
@@ -251,7 +251,7 @@ OT6_THIEF_BESTOW = $58
 ; complements Debilitator rather than replacing it.
 ;
 ; THE BP IS THE CHIP'S PAYMENT, not a fee for pointing at an enemy: no chip, no
-; pip.  Against an already-Broken or shieldless target Filch is an honest no-op
+; pip.  Against an already-Broken or shieldless target Filch is a plain no-op
 ; (the Ot6Assassinate fallback shape).  A landed Filch therefore nets Locke +2
 ; BP on the turn -- this pip plus Ot6ActionEnd's own unboosted regen -- and that
 ; is the point of the ability and the only way in the game to gain two in a
@@ -290,7 +290,7 @@ OT6_THIEF_BESTOW = $58
 @have:  lda     OT6_BROKEN_TICKS,y
         bne     @out            ; already broken: no chip until recovery
         lda     OT6_SHIELD_CUR,y
-        beq     @out            ; shieldless: honest no-op
+        beq     @out            ; shieldless: plain no-op
         dec     a
         sta     OT6_SHIELD_CUR,y
         bne     @bank
@@ -336,7 +336,7 @@ done:   plp
 ; BP the same way boosting into Runic is, and it is noted as a follow-up rather
 ; than fixed with a new refusal surface.
 ;
-; THREE REFUSALS, all honest no-ops rather than errors, because by the time this
+; THREE REFUSALS, all plain no-ops rather than errors, because by the time this
 ; runs the turn is already committed and there is no menu left to buzz at:
 ;   * Locke holds no BP (nothing to give);
 ;   * the chosen ally is Locke himself (a transfer to yourself is the cap check

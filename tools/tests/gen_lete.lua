@@ -1,10 +1,11 @@
 -- gen_lete.lua -- from banon_joined.mss (map 112, the passage out of the
 -- Returner Hideout) onto the LETE RIVER map, one tile from the raft.
--- Mints one state:
+-- Generates one state:
 --   lete_river.mss  map 113 (30,50), controllable, with the raft's boarding
---                   trigger at (31,51) unfired -- the doorstep gen_scenario
---                   rides from, and the fixture anything that wants to study
---                   the river (or the vanilla loop) should start at.
+--                   trigger at (31,51) unfired -- the entry point
+--                   gen_scenario rides from, and the fixture anything that
+--                   wants to study the river (or the vanilla loop) should
+--                   start at.
 --
 -- A SHORT LINK ON PURPOSE.  The ride itself is long, forced, and full of
 -- battles, and it is the part worth iterating on; keeping the walk to it in
@@ -23,10 +24,10 @@
 -- Map 112 has no NPCs and no event triggers at all (NPCProp::_112 and
 -- EventTrigger::_112 are both empty), so nothing else here can fire.
 --
--- ISSUE #75 -- ZERO-WRITE: both navigators run with opts.honest.  Map 112
--- rolls no encounters, so the battle branch should never fire -- honest
--- mode makes that a property of the code path, not a hope: a battle here
--- would be fought with real input, never kill-bitted.
+-- ISSUE #75 -- ZERO-WRITE: both navigators run with opts.playBattles.  Map
+-- 112 rolls no encounters, so the battle branch should never fire --
+-- playBattles mode makes that a property of the code path, not a hope: a
+-- battle here would be fought with real input, never write-cleared.
 local H = dofile("tools/tests/lib/ot6.lua")
 local DOOR = "build/states/banon_joined.mss.lua"
 
@@ -50,7 +51,7 @@ local function settleField(dstMap, maxF)
       return not H.worldMode() and H.tileAligned()
          and not H.battleLoadStarted() and not H.dialogWaiting()
          and (dstMap == nil or map() == dstMap)
-    end), maxF or 12000, { honest = true }),
+    end), maxF or 12000, { playBattles = true }),
     H.waitFrames(30),
   })
 end
@@ -92,7 +93,7 @@ H.run({ maxFrames = 40000 }, {
     return string.format("cross: (%d,%d) -> (8,60) -> map 113 (30,50)",
       H.fieldX(), H.fieldY())
   end),
-  H.navTo(8, 60, { maxFrames = 20000, honest = true, arrive = function()
+  H.navTo(8, 60, { maxFrames = 20000, playBattles = true, arrive = function()
     return map() ~= 112
   end }),
   H.release(),
@@ -105,7 +106,7 @@ H.run({ maxFrames = 40000 }, {
     H.assertEq(H.tileAligned(), true, "tile-aligned")
     H.assertEq(H.battleLoadStarted(), false, "no battle")
     -- the boarding trigger is (31,51), _cb059f (event_trigger.asm:462);
-    -- it has NOT fired, which is exactly what makes this a doorstep
+    -- it has NOT fired, which is exactly what makes this an entry point
     H.assertEq(sw(0x01B5), 0,
       "$01B5 clear -- _cb059f's re-entry guard is unarmed, the raft is unboarded")
     H.assertEq(sw(0x0019), 0, "$0019 clear -- the ride has not started")
@@ -123,6 +124,6 @@ H.run({ maxFrames = 40000 }, {
   end),
   H.saveState("lete_river.mss"),
   H.logStep(function()
-    return string.format("lete_river minted at frame %d", H.frame)
+    return string.format("lete_river generated at frame %d", H.frame)
   end),
 })

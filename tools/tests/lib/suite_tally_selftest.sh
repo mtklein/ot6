@@ -57,7 +57,7 @@ check() {  # check <label> <got> <want>
 }
 tally() { sed -n 's/^OT6 suite: [A-Z][A-Z]* -- //p' "$1"; }
 
-# ---- 1. all green, plus a frontier test whose fixture is absent ----------
+# ---- 1. all green, plus a test whose generated fixture is absent --------
 mk pass_a; mk pass_b; mk pass_c
 mk pass_gated deep_fixture           # no build/states/deep_fixture.mss -> skip
 for j in 1 3; do
@@ -110,10 +110,10 @@ check "...and keeps compose's own explanation" \
   "$(grep -c 'absolute sidecar reference' "$TMP/out.compose")" "1"
 rm "$TMP/tools/tests/pass_badref.lua"
 
-# ---- 2. a skipped frontier test joins the count once its fixture exists --
+# ---- 2. a skipped test joins the count once its fixture exists ----------
 : > "$TMP/build/states/deep_fixture.mss"
 OT6_JOBS=3 "$TMP/tools/tests/suite.sh" > "$TMP/out.gated" 2>&1
-check "a minted fixture moves its test from skipped into the total" \
+check "a generated fixture moves its test from skipped into the total" \
   "$(tally "$TMP/out.gated")" "4 ran: 4 pass, 0 fail"
 rm "$TMP/build/states/deep_fixture.mss"
 

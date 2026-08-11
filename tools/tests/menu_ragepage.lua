@@ -21,7 +21,7 @@
 -- ISSUE #75 CONVERSION -- a REAL GAU, and the InitRage floor.  This file used
 -- to stage everything onto arvis_wake's lead: the Rage command, a hand-picked
 -- learned bitfield, and zeroed loadout bytes.  It now boots gau_joined -- the
--- honest post-join mint, world map, CYAN + SABIN + GAU -- finds GAU in
+-- input-driven post-join savestate, world map, CYAN + SABIN + GAU -- finds GAU in
 -- zCharID, and reads everything off his save:
 --   * the Rage command is his record's own;
 --   * the learned set is `InitRage` (field/init.asm InitRage table): NINE
@@ -55,9 +55,9 @@
 -- WHERE on it the page drew.  The EN field-menu window does not show BG1
 -- ScreenA one tile row per eight scanlines: a row PAIR occupies twelve
 -- scanlines, the ODD row getting eight and the even row four, and nothing past
--- row 15 is inside the window at all (measured with a per-row glyph ruler,
--- probe_ragegeom.lua; vanilla's own cursor tables say it from the other side --
--- every EN list for this window is `cursor_pos {x, 116 + n*12}`,
+-- row 15 is inside the window at all (measured with a glyph drawn in every
+-- row, probe_ragegeom.lua; vanilla's own cursor tables say it from the other
+-- side -- every EN list for this window is `cursor_pos {x, 116 + n*12}`,
 -- skills.asm:125-126, and DrawRageName biases its row `.if LANG_EN`,
 -- skills.asm:1571-1574).  The page shipped with eight slots on EVEN rows
 -- 4..18 and LEARNED on row 20, so through the player's path every beast name
@@ -83,8 +83,8 @@
 -- ROM and checks both halves against the tilemap, so neither can move alone.
 -- It is duplicated from menu_swdtechpage.lua rather than shared: the only lua
 -- the runner inlines is lib/ot6{,_field,_contract}.lua, and those three files
--- ARE the frontier mint signature (lib/frontier_stamp.sh:82-85), so a helper
--- added there would mark every minted fixture drifted.
+-- ARE the savestate generation signature (lib/frontier_stamp.sh:82-85), so a
+-- helper added there would mark every generated fixture drifted.
 --
 -- THE NAME SOURCE, and why it is not the SwdTech one.  Ot6DrawRageName
 -- (field_menu.asm:2992-3016) calls GetMonsterNamePtr (skills.asm:1557-1565),
@@ -229,7 +229,7 @@ local LEFT_COL = 3                      -- the page's left margin (gutter = 1-2)
 -- fixed pos_text at 22 and a five-cell field starting at 17 would have rendered
 -- "8 MPEACH".  This page's number is 8 today and can reach two digits without
 -- anyone editing it: Ot6RageCost tail-calls Ot6DanceCost (ot6_boost.asm:600-619)
--- deliberately, and mp-economy.md's band for a flat possess-verb price is 4-10.
+-- deliberately, and mp-economy.md's range for a flat possess-verb price is 4-10.
 local COST_COL, EACH_COL = 16, 22
 local COUNT_COL = 11                    -- just past "LEARNED " at 3..9
 local MODE_ROW, MODE_COL, MODE_HINT_COL = 13, 3, 16
@@ -436,7 +436,7 @@ H.run({ maxFrames = 40000 }, {
   -- the player's path: X -> main menu -> Skills -> GAU -> the Rage row -> A.
   -- driveUntil, not one press: the X that opens the field menu is the first
   -- step in these tests that needs a SPECIFIC frame, so it is where a
-  -- fixture minted against a different ROM surfaces -- as "timeout waiting
+  -- fixture generated against a different ROM surfaces -- as "timeout waiting
   -- for main menu", which reads like a menu bug and is not one.  Retrying
   -- the press costs nothing when the pairing is fine and removes the false
   -- report when it is not.  Same shape probe_fieldicons.lua and

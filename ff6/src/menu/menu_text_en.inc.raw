@@ -141,12 +141,12 @@ MENU_TEXT_INC = 1
 ; over the leading glyph -- the $b5,$00 of "1x".  The page's left margin is column 3  ; 1
 ; now and everything right of it moved with it; the CURSOR table did not move,
 ; because it was already vanilla's.
-; #44: THE TITLE PAYS FOR THE CONTROL HINT.  L/R cycling the cursored rung is
+; #44: THE TITLE PAYS FOR THE CONTROL HINT.  L/R cycling the cursored tier is
 ; this page's only real interaction and nothing on screen said so ("that part
 ; was not obvious" -- owner playtest, v0.7).  All eight of the window's text
 ; rows are already spoken for, so the hint needed FOUND space, and the title
 ; was the cheapest source: $81,$94,$92,$87,$88,$83,$8e,$ff,$8b,$8e,$80,$83,$8e,$94,$93,$00 spanned columns 3-17 to say what  ; BUSHIDO LOADOUT
-; the 1x/2x/3x rungs and the LEARNED pool below it already show.
+; the 1x/2x/3x tiers and the LEARNED pool below it already show.
 ;
 ; Shortening it to $92,$96,$83,$93,$84,$82,$87,$00 is also a NAMING FIX that was owed anyway.  Every  ; SWDTECH
 ; other player-facing string in the EN build calls this skill SwdTech --
@@ -300,7 +300,7 @@ MENU_TEXT_INC = 1
 ; own reading of the Rage page's blank slots, issue #44).  Ten cells wide --
 ; exactly AttackName::ITEM_SIZE -- so it overwrites a name completely, the
 ; property OT6_RAGE_EMPTY is sized for.  $c4,$ff,$8b,$8e,$82,$8a,$84,$83,$ff,$c4,$00 and not "- EMPTY -":  ; - LOCKED -
-; nothing is empty here, the ladder is fixed and this rung is simply not
+; nothing is empty here, the ladder is fixed and this tier is simply not
 ; reached yet, and the two words must not be used for two different facts.
 .define OT6_BLITZ_LOCKED                {$c4,$ff,$8b,$8e,$82,$8a,$84,$83,$ff,$c4,$00}  ; - LOCKED -
 

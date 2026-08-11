@@ -1,8 +1,8 @@
--- gen_sabin_falls.lua -- leg 9 of SABIN's scenario: Baren Falls.  Mints:
+-- gen_sabin_falls.lua -- step 9 of SABIN's scenario: Baren Falls.  Generates:
 --   falls_done.mss   map 159 (the Veldt shore), SABIN+CYAN, $003C/$003F set
 --                    -- SHADOW left at the overlook, GAU named but NOT
 --                    joined (he grabs nothing and runs; recruitment is the
---                    next leg's Veldt work).
+--                    next step's Veldt work).
 --
 -- THE ROUTE (entrances decoded from trigger/*.dat; events read at the
 -- cited lines):
@@ -29,7 +29,7 @@
 --     a three-attempt retry ladder reloads a checkpoint taken before the
 --     jump with a 17-frame stagger and the fighter escalated (tier 2+
 --     dumps at 1 BP).  Random encounters elsewhere on the route are FLED
---     (hold L+R / honest="flee") -- no win needed, no writes.
+--     (hold L+R / playBattles="flee") -- no win needed, no writes.
 --     RIZOPAS ($0155) HIDES
 --     IN SLOT 5 behind two visible Piranhas and is surfaced by the
 --     piranhas' own death script, so the watch below KEYS ON THE
@@ -63,7 +63,7 @@ local rizo = { seen = false, species = 0, shields = 0, smax = 0, wkc = 0,
                mask0 = nil }
 
 -- ---------------------------------------------------------- the fighter --
--- The honest battle driver (issue #75; the house menu-episode machine):
+-- The input-driven battle driver (issue #75; the house menu-episode machine):
 -- boost prefix + Fight from a settled menu, one button per 30-frame pulse.
 local MENU, ACTOR = 0x7BCA, 0x62CA
 local BP = 0x3E9C
@@ -80,14 +80,14 @@ local function partyLine()
   return table.concat(p, " ")
 end
 -- CLOSED-LOOP (2nd pass): the seq machine assumed full-HP parties, and
--- the first honest mint of the chain proved fights now carry damage
--- forward between legs (SABIN entered the courtyard at 46/231).  So the
--- fighter reads the engine's own cursor state ($890F/$8947 + actor, the
+-- the first input-driven generation of the chain proved fights now carry
+-- damage forward between steps (SABIN entered the courtyard at 46/231).  So
+-- the fighter reads the engine's own cursor state ($890F/$8947 + actor, the
 -- $7BC2 menu state) and steers by pad: boost-and-Fight as before, plus a
--- SELF-HEAL branch under 50% HP funded from the real bag (Potion when
--- >=150 HP is missing, else Tonic; battle inventory $2686 stride 5,
--- count at +3 -- a zero-count row is never picked).  Item targets
--- default to self, so no target steering is needed here.
+-- SELF-HEAL branch under 50% HP funded from the real bag (Potion when >=150
+-- HP is missing, else Tonic; battle inventory $2686 stride 5, count at +3
+-- -- a zero-count row is never picked).  Item targets default to self, so
+-- no target steering is needed here.
 local MSTATE = 0x7BC2
 local ST_CMD, ST_ITEM, ST_TGT, ST_TOOLS = 0x05, 0x0A, 0x38, 0x30
 local CMD_ITEM = 0x01
@@ -97,7 +97,7 @@ local CMDTBL, CMDROW = 0x202E, 0x890F
 -- (btlgfx_main.asm:_c189be) sums them before the *5; reading the scroll
 -- alone selected inventory index 4 while the display said 1 (measured,
 -- probe_itemuse: the select/deselect toggle that wedged the first
--- honest courtyard mint)
+-- input-driven courtyard generation)
 local ITEMSCR, ITEMROW = 0x8947, 0x894F
 local function itemIdxOf(a)
   return H.readByte(ITEMSCR + a) + H.readByte(ITEMROW + a)
@@ -139,7 +139,7 @@ local function makeFightPlan(actor)
     end
   end
   local bp = H.readByte(BP + actor * 2)
-  -- dump banked boost EVERY turn: these are 1-2 member legs where a dead
+  -- dump banked boost EVERY turn: these are 1-2 member steps where a dead
   -- enemy is the only mitigation, and the pursuit measured bank-to-2
   -- losing the tempo war against four attackers
   local boost = bp >= 1 and math.min(bp, 3) or 0
@@ -297,7 +297,7 @@ local function ride(dir, pred, what, budget, fightMode, choiceWant)
           if lost then H.setPad({}); return end
           fightPulse(phase)
         else
-          H.setPad({ l = true, r = true })   -- flee, honestly
+          H.setPad({ l = true, r = true })   -- flee, with real input
         end
         return
       end
@@ -354,12 +354,12 @@ local function settle(toMap, what)
   }, {})
 end
 
--- world walk: the lib's verified-step walker (kill-bits trash inline and
+-- world walk: the lib's verified-step walker (write-clears trash inline and
 -- stalls out the post-battle world reload); the entrance firing mid-plan
 -- is the arrival
 local function worldToMap(tx, ty, what, budget)
   return H.worldNavTo(tx, ty, { maxFrames = budget or 30000,
-    honest = "flee",
+    playBattles = "flee",
     arrive = function() return not H.worldMode() end })
 end
 
@@ -387,7 +387,7 @@ local function jumpAttempt(n)
       lost, fightTier, wipeN = nil, n, 0
       rizo.seen, rizo.mask0 = false, nil
     end),
-    H.navTo(13, 11, { maxFrames = 5000, honest = "flee" }),
+    H.navTo(13, 11, { maxFrames = 5000, playBattles = "flee" }),
     (function()
       local frames = 0
       return ride("up", function()
@@ -426,10 +426,10 @@ H.run({ maxFrames = 250000 }, {
   -- world -> the falls cave 166 -> the overlook 155 -> the falls 156
   worldToMap(185, 93, "falls cave (185,93)", 20000),
   settle(166, "cave 166"),
-  H.navTo(7, 5, { maxFrames = 6000, honest = "flee" }),
+  H.navTo(7, 5, { maxFrames = 6000, playBattles = "flee" }),
   ride("up", function() return mapIdx() == 155 end, "-> 155", 3000),
   settle(155, "overlook 155"),
-  H.navTo(10, 5, { maxFrames = 6000, honest = "flee" }),
+  H.navTo(10, 5, { maxFrames = 6000, playBattles = "flee" }),
   ride("up", function() return mapIdx() == 156 end, "-> 156", 3000),
   settle(156, "falls top 156"),
 
@@ -465,9 +465,9 @@ H.run({ maxFrames = 250000 }, {
   jumpAttempt(3),
   H.call(function()
     if not jumpWon then
-      error(string.format("falls: battle 18 was lost on all 3 honest " ..
+      error(string.format("falls: battle 18 was lost on all 3 " ..
         "attempts -- last loss: %s -- the per-attempt numbers above are " ..
-        "the balance finding (#74-style); do not rig this leg",
+        "the balance finding (#74-style); do not rig this segment",
         tostring(lost)), 0)
     end
   end),
@@ -490,7 +490,7 @@ H.run({ maxFrames = 250000 }, {
   end),
   H.saveState("falls_done.mss"),
   H.logStep(function()
-    return string.format("falls_done minted at frame %d map 159 (%d,%d)",
+    return string.format("falls_done generated at frame %d map 159 (%d,%d)",
       H.frame, H.fieldX(), H.fieldY())
   end),
 })

@@ -18,14 +18,14 @@
 -- CONTRIBUTING.md warns about.  Map 242's Vector corridor does: measured
 -- with probe_step2, py 544 -> 560 over frames 6..21, then straight on to 576.
 --
--- WHY ONE-TILE LEGS.  A multi-tile navTo hides the bug: the overshoot is
+-- WHY ONE-TILE SEGMENTS.  A multi-tile navTo hides the bug: the overshoot is
 -- re-planned around (a slide along the same move leaves the edge proven
 -- good), and an even overshoot can land on the goal by luck.  It is only
 -- visible when the LAST planned step is the one that reaches the goal.
 --
 -- WHY THE CARRY-TILE ASSERTIONS.  The engine can only carry the party past
 -- the goal if the tile BEYOND it is passable -- against a wall the bug is
--- invisible.  Each leg therefore asserts both the step it is about to take
+-- invisible.  Each segment therefore asserts both the step it is about to take
 -- and the overshoot tile it would land on, so a map or fixture change that
 -- walls the corridor fails loudly instead of quietly measuring nothing.
 --
@@ -35,7 +35,7 @@
 -- library.  watchTile holds the assertion open for 48 frames -- three full
 -- tiles of walking -- and fails the moment the party moves off.
 --
--- FAIL-BEFORE / PASS-AFTER, measured: on the pre-fix library the DOWN leg
+-- FAIL-BEFORE / PASS-AFTER, measured: on the pre-fix library the DOWN segment
 -- reported navTo success at (57,35) with the party at (57,36) sixty frames
 -- later; watchTile catches it 16 frames in.
 local H = dofile("tools/tests/lib/ot6.lua")
@@ -44,7 +44,7 @@ local STATE = "build/states/vector_sneak.mss.lua"
 -- Hold the arrival assertion open for n frames: the party must stay on
 -- (tx,ty) the whole time.  A stray Vector encounter is not a navigation
 -- failure, so it is FLED (held L+R, the engine's own run mechanic -- the
--- 1914283 idiom; the kill-bit poke this replaced is an issue-#75 write)
+-- 1914283 idiom; the battle-clearing flag poke this replaced is an issue-#75 write)
 -- and the count restarts once control is back.  A formation that refuses
 -- to release fails the driveUntil budget loudly instead of being poked
 -- out of existence.  The subject here -- navTo's release timing on map
@@ -72,7 +72,7 @@ local function watchTile(tx, ty, n, what)
   }, what)
 end
 
--- one leg: assert the step is real (and, for the two latching directions,
+-- one segment: assert the step is real (and, for the two latching directions,
 -- that the overshoot tile is passable so the bug WOULD be observable), walk
 -- it, then prove the party stopped there.
 local function leg(fx, fy, dir, tx, ty, what)
@@ -112,7 +112,7 @@ H.run({ maxFrames = 30000 }, {
   -- stays inside the three-wide column x=56..58 the sneak lands in, north of
   -- the gate guards' forced-battle row.  (The column is one-way in places --
   -- (57,35) cannot be left upward, (57,33) cannot be left downward -- which
-  -- is why the UP leg is taken from (57,36).)
+  -- is why the UP segment is taken from (57,36).)
   leg(57, 34, "down", 57, 35, "one tile DOWN"),
   leg(57, 35, "down", 57, 36, "a second tile DOWN"),
   leg(57, 36, "up", 57, 35, "one tile UP"),

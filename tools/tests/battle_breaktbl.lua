@@ -6,7 +6,7 @@
 -- actually land in the assembled ROM. The audit found a class of enemies
 -- that no forced party could break -- formula species (no class weakness)
 -- whose party could reach none of their vanilla/added ELEMENTS. This test
--- is the regression gate for the fix: every gap enemy now carries the
+-- is the regression test for the fix: every gap enemy now carries the
 -- weapon class its forced party can reach, TEMPLAR gained the conducting
 -- bolt half of the armor palette, and the LEADER/GRUNT poison adds -- the
 -- retired "one right tool" artifacts on enemies whose forced parties

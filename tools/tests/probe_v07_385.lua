@@ -1,5 +1,5 @@
 -- probe_v07_385.lua -- the BASEMENT 2 timed-floor instrument (issue #31,
--- leg G->H).  NOT a suite test.  Boots v07q_385_entry.mss (map 385 (1,2),
+-- step G->H).  NOT a suite test.  Boots v07q_385_entry.mss (map 385 (1,2),
 -- party TERRA LOCKE EDGAR SABIN) and answers, live:
 --   * what the room's reachable set is in the UNARMED state (map-init
 --     _cb2b0f -> _cb2bc9, event_main.asm:44714 region);

@@ -1,5 +1,5 @@
 -- @suite
--- battle_banner.lua -- TEMPORAL gate: attack-name banners must not tear.
+-- battle_banner.lua -- TEMPORAL test: attack-name banners must not tear.
 --
 --   tools/tests/run.sh tools/tests/battle_banner.lua
 --
@@ -94,7 +94,7 @@ H.run({ maxFrames = 12000 }, {
   H.driveUntil(function() return H.battleLoadStarted() end, 4000, {
     H.hold({ "up" }), H.waitFrames(20), H.release(), H.waitFrames(2),
     H.pressButtons({ "a" }, 4),
-  }, "battle load from doorstep"),
+  }, "battle load from entry point"),
   H.waitUntil(function() return H.battleActive() end, 900,
     "battle to become active (screen rendering)", 30),
   H.waitFrames(240),

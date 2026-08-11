@@ -1,18 +1,18 @@
 #!/bin/sh
-# anchor_negatives.sh -- the stale-anchor regression (#25), run by
+# anchor_negatives.sh -- the stale-checkpoint regression (#25), run by
 # `make anchor-negatives`.
 #
 # Issue #25's acceptance criterion: "A stale anchor fails loudly, naming
 # what differed -- with a regression proving it FAILS, not merely that it
 # passes when correct."  Every fixture bug this project has had is a check
-# that can only agree with itself; a refusal gate whose refusal has never
+# that can only agree with itself; a refusal check whose refusal has never
 # been observed is the same shape.  So this script drives BOTH refusal
-# paths through the REAL path -- tools/tests/run.sh with a real anchor
+# paths through the REAL path -- tools/tests/run.sh with a real checkpoint
 # directory -- and asserts on the refusal text itself:
 #
 #   1. tools/tests/anchors/negative-unknown-layout-v1: a byte-identical
 #      copy of post-opera-v1 whose manifest declares a persistent_layout
-#      no leg supports.  Must be refused BEFORE the emulator boots
+#      no generator step supports.  Must be refused BEFORE the emulator boots
 #      (run.sh + lib/sram_anchor.py), naming BOTH layout strings.
 #   2. tools/tests/anchors/negative-stale-witness-v1: one contract-checked
 #      byte perturbed and the manifest re-hashed, so it validates and
@@ -40,7 +40,7 @@ reap_retained() {
   esac
 }
 
-# ---- negative 1: the persistent_layout gate refuses BEFORE boot -----------
+# ---- negative 1: the persistent_layout check refuses BEFORE boot ----------
 LOG="$OUT/anchor_negative_layout.log"
 echo "anchor-negatives: 1/2 unknown persistent_layout (pre-boot refusal)..."
 if OT6_NO_PUBLISH=1 OT6_WORKER=neg_layout \
@@ -55,18 +55,18 @@ grep -q "persistent_layout mismatch" "$LOG" ||
 grep -q "ot6-codex-o9-experimental" "$LOG" ||
   fail "refusal does not name the ANCHOR's layout string ($LOG)"
 grep -q "ot6-codex-o8-v1" "$LOG" ||
-  fail "refusal does not name the LEG's supported layout string ($LOG)"
+  fail "refusal does not name the GENERATOR's supported layout string ($LOG)"
 # Pre-boot means the testrunner never ran: run.sh prints its "testrunner
-# exit" line after every emulator invocation, so its absence is the witness.
+# exit" line after every emulator invocation, so its absence is the proof.
 if grep -q "testrunner exit" "$LOG"; then
-  fail "the emulator RAN; the layout gate must refuse before boot ($LOG)"
+  fail "the emulator RAN; the layout check must refuse before boot ($LOG)"
 fi
 reap_retained "$LOG"
 echo "anchor-negatives: 1/2 refused pre-boot, naming both layout strings"
 
 # ---- negative 2: the entry contract names the perturbed field -------------
 LOG="$OUT/anchor_negative_stale.log"
-echo "anchor-negatives: 2/2 stale codex witness (in-emulator contract)..."
+echo "anchor-negatives: 2/2 stale codex check (in-emulator contract)..."
 if OT6_NO_PUBLISH=1 OT6_WORKER=neg_stale \
    OT6_SRAM_ANCHOR="$ROOT/tools/tests/anchors/negative-stale-witness-v1" \
    sh "$ROOT/tools/tests/run.sh" "$ROOT/tools/tests/gen_vector_doorstep.lua" \

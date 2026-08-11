@@ -22,24 +22,25 @@
 --
 -- Same drive and same instrument as menu_esperdetail.lua (issue #27): X ->
 -- Skills -> character -> Espers -> list -> detail -- but from the esper_tubes
--- fixture now (issue #75 conversion), the honest v0.6 mint of the tube-room
--- set piece itself: its bag REALLY holds the boot roster (RAMUH IFRIT SHIVA
--- SIREN) plus the six give_genju grants SHOAT MADUIN BISMARK CARBUNKL PHANTOM
--- UNICORN (gen_esper_tubes_done asserts the delta bit by bit).  So the MADUIN
+-- fixture now (issue #75 conversion), the input-driven v0.6 savestate of the
+-- tube-room set piece itself: its bag REALLY holds the boot roster (RAMUH
+-- IFRIT SHIVA SIREN) plus the six give_genju grants SHOAT MADUIN BISMARK
+-- CARBUNKL PHANTOM UNICORN (gen_esper_tubes_done asserts the delta bit by
+-- bit).  So the MADUIN
 -- and UNICORN pages below are rendered for stones the save owns, with no
--- inventory write at all.  menu_esperdetail.lua stays as #27's gate on the
+-- inventory write at all.  menu_esperdetail.lua stays as #27's test on the
 -- page's SHAPE (against magicite_ifrit_shiva's three stones) and this one is
--- #31's gate on the page's CONTENT.
+-- #31's test on the page's CONTENT.
 --
 -- *** ONE LABELED ISOLATION ARM (issue #75) -- a single state write STAYS ***
--- The TERRATO page is the page's honest-empty control: Ot6EsperStatTbl $0000,
+-- The TERRATO page is the page's genuinely-empty control: Ot6EsperStatTbl $0000,
 -- NO caption, NO terms -- and no stone any reachable save owns carries a
 -- $0000 row (ot6_progression.asm authors Terrato as "THE NO-MOD CONTROL"
--- precisely because he arrives far beyond the current frontier).  Per the
+-- precisely because he arrives far beyond how far the game is playable).  Per the
 -- burn-down plan's observation-window ruling (docs/waiver-burndown-plan.md,
 -- systemic call 2: a RENDERER mechanism claim may stay as a loudly-labeled
 -- isolation arm), the single write below ORs Terrato's bit into $1a69 --
--- adding one list row -- so the honest-empty path stays exercised until a
+-- adding one list row -- so the genuinely-empty path stays exercised until a
 -- fixture deep enough to own a no-mod stone exists.  It is one OR of one bit
 -- (the old test REPLACED the whole bitfield); this file keeps its .writeByte(
 -- waiver line for exactly that site and MAY NEVER PRODUCE FIXTURES.
@@ -53,7 +54,7 @@
 --                it must cost no line -- which is what proves the walk packs.
 --   TERRATO (4)  the surviving no-mod control.  Its Ot6EsperStatTbl row is
 --                still $0000 after #62 (deliberately -- ot6_progression.asm
---                says so on the row), so the honest-empty path is still
+--                says so on the row), so the genuinely-empty path is still
 --                exercised: NO caption and no term anywhere.  Revisited after
 --                Maduin, it proves the page overwrites rather than leaving the
 --                previous stone's block behind.
@@ -276,7 +277,7 @@ local toList = {
   -- POSITIVE CONTROL, read-only: the tube-room set piece really granted its
   -- six stones on top of the boot roster (gen_esper_tubes_done's own exit
   -- assertion, re-made at consume time).  MADUIN (bit 6 of byte 0) and
-  -- UNICORN (bit 7 of byte 2) -- the two honest pages below -- are owned.
+  -- UNICORN (bit 7 of byte 2) -- the two genuinely-owned pages below -- are owned.
   H.call(function()
     H.log(string.format("[espers] $1a69 = %02x %02x %02x %02x (read)",
       H.readByte(ESPERS), H.readByte(ESPERS + 1), H.readByte(ESPERS + 2),
@@ -288,7 +289,7 @@ local toList = {
   end),
 
   -- *** THE LABELED ISOLATION ARM'S ONE WRITE (see header) ***  OR Terrato's
-  -- bit (esper 4, bit 4 of byte 0) into the owned set so the honest-empty
+  -- bit (esper 4, bit 4 of byte 0) into the owned set so the genuinely-empty
   -- no-mod page can be visited; nothing else is written, and the ten real
   -- stones are untouched.
   H.call(function()
@@ -299,7 +300,7 @@ local toList = {
 
   -- driveUntil, not one press: the X that opens the field menu is the first
   -- step in these tests that needs a SPECIFIC frame, so it is where a
-  -- fixture minted against a different ROM surfaces -- as "timeout waiting
+  -- fixture generated against a different ROM surfaces -- as "timeout waiting
   -- for main menu", which reads like a menu bug and is not one.  Retrying
   -- the press costs nothing when the pairing is fine and removes the false
   -- report when it is not.  Same shape probe_fieldicons.lua and

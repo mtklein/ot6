@@ -30,7 +30,7 @@
 --   3. WRITEBACK INTEGRITY -- after the battle the field character data holds
 --      pre-battle MP minus exactly what was spent, for every member (the
 --      max-0 skip no longer hides the pool, so this is the guard that the
---      now-live writeback path is honest).
+--      now-live writeback path is correct).
 -- No state is written at all (issue #75).  Two idioms this file used to
 -- carry are gone: the danger pin ($1f6e := 0xff00 per pace frame) is the
 -- identical pin 77bc4f9 deleted on this very fixture -- the pace loop was
@@ -40,9 +40,9 @@
 -- outright -- the party only Defends until Edgar's turn, so nobody on our
 -- side deals damage, and the map-96 pool's damage output cannot zero
 -- anyone's MP (MP is what phases 1-2 measure).  The battle then ends by
--- FLEE (held L+R, the engine's own run mechanic) instead of the kill-bit
--- clearBattle, which makes phase 3 a STRONGER claim: the writeback path
--- is exercised on the flee exit, not just the victory exit.
+-- FLEE (held L+R, the engine's own run mechanic) instead of clearBattle
+-- writing the battle-clearing flag, which makes phase 3 a STRONGER claim:
+-- the writeback path is exercised on the flee exit, not just the victory exit.
 local H = dofile("tools/tests/lib/ot6.lua")
 local STATE = "build/states/kolts_cave.mss.lua"
 
@@ -112,7 +112,7 @@ H.run({ maxFrames = 60000 }, {
 
   -- pace the auto-detected lane until a natural encounter fires
   -- (battle_flyin's drive: the danger counter accrues per step and rolls
-  -- the encounter itself -- 77bc4f9 measured the honest roll at ~1300
+  -- the encounter itself -- 77bc4f9 measured the natural roll at ~1300
   -- frames of pacing on this fixture, well inside the budget below)
   (function()
     local battN, waited, lane = 0, 0, nil
@@ -237,9 +237,9 @@ H.run({ maxFrames = 60000 }, {
     H.screenshot("naturalmp_xbow_resolved")
   end),
 
-  -- ------------------------------------ 3. writeback: field MP honest --
-  -- End the fight the way a player can: FLEE (held L+R).  The kill-bit
-  -- clearBattle this replaces ended by forced victory; the flee exit runs
+  -- ----------------------------------- 3. writeback: field MP correct --
+  -- End the fight the way a player can: FLEE (held L+R).  The clearBattle
+  -- flag write this replaces ended by forced victory; the flee exit runs
   -- the same character writeback, and asserting on it here means the
   -- writeback guard now covers the exit path a real escape takes.
   H.fleeBattle(12000),

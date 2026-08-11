@@ -221,7 +221,7 @@ has one* (boost buys certainty, never loot the enemy never had). It deals no
 damage and takes no multiplier — a chance verb answers to guarantee, not
 potency, and keeping the two axes disjoint is what keeps the rule legible.
 Steal's tier table and the full ruling live in design/kits.md; Dance's approved
-shape (built when Mog's rung lands) is there too.
+shape (built when Mog's milestone lands) is there too.
 
 **The third category: on reactive verbs, boost buys duration.** A verb that
 does not act but *waits* — Runic, and every reactive verb after it — has
@@ -231,7 +231,7 @@ above: *buffs/debuffs get duration per BP*, and a stance is a buff you cast on
 the situation. **Runic is the shipped example**: 1/2/3 BP buys 1/2/3
 of Celes's own turns during which the stance stands and **she acts normally**.
 
-Those two halves are one lever and not two rungs, which is worth stating
+Those two halves are one lever and not two tiers, which is worth stating
 because it is not obvious from outside the code: vanilla ends the stance the
 moment she takes a turn, so "she still acts" is *only* achievable by making the
 stance outlive her action — which is duration. There is no 1-BP option that
@@ -265,15 +265,15 @@ vanilla — is deleted. The 8 techniques are priced in BP:
 | 8 | Cleave | 3, usable only on a Broken enemy (divine) |
 
 Boost *selects* the tech, the way it folds a mage's spell tier, and
-vanilla's own count of techs known clamps the band to the best one Cyan has
+vanilla's own count of techs known clamps the range to the best one Cyan has
 learned. Every SwdTech carries a **1-BP floor**: `Ot6BushidoTech`
 (`ff6/src/battle/ot6_kits.asm:74-79`) opens with `cmp #$01 / bcs :+ /
-lda #$01`, so a stray 0 is clamped *up* to the cheapest rung rather than
+lda #$01`, so a stray 0 is clamped *up* to the cheapest tier rather than
 allowed to name a tech, and the menu never offers boost 0 at all. The
 mapping is `base = max(0, ceiling-2)`, `tech = min(base + boost-1, ceiling)`
 (`ot6_kits.asm:65-70`), so boost 1/2/3 selects Cyan's **top three learned**
 techs, weakest to strongest. The per-tech BP numbers in the table are
-therefore not fixed prices — what a given rung costs slides as he learns
+therefore not fixed prices — what a given tier costs slides as he learns
 more; read the column as the *relative* ordering it was drawn for. Pricing
 consequences are in `design/kits.md` and `design/mp-economy.md`.
 
@@ -354,7 +354,7 @@ lands in M4. Fun mechanics don't wait on menu plumbing.
 ## Balance levers (known problems, planned answers)
 
 - **Shields lengthen fights** → shielded resistance carries the
-  lengthening, not an HP dial: `Ot6HpMulTbl` is `$10` — 1× — in every band
+  lengthening, not an HP dial: `Ot6HpMulTbl` is `$10` — 1× — in every range
   (`ff6/src/battle/ot6_break.asm:636-642`), because resistance is selective
   where a flat HP bump is not. See "The HP dial is not the difficulty
   lever" below.
@@ -376,7 +376,7 @@ Enemy **difficulty** numbers are likewise an OT6 tuning surface. The
 current broad HP pass is applied as a *runtime transform*: at monster
 seed time (the same bank-F0 hook that seeds shields), each
 non-authored species' battle HP — current and max copies — is
-multiplied by a per-species-band value in 16ths (`Ot6HpMulTbl`),
+multiplied by a per-species-range value in 16ths (`Ot6HpMulTbl`),
 clamped at 16 bits. Authored `Ot6ShieldTbl` species are exempt (boss
 difficulty is bosses-wob.md's job, planned as HP *cuts*), as are
 scene-change battles whose monsters carry HP over. Stamina stays
@@ -384,7 +384,7 @@ derived from vanilla HP; fraction-of-HP attacks read the transformed
 cells and scale with the monster.
 
 **The HP dial is not the difficulty lever — shielded resistance is.**
-`Ot6HpMulTbl` ships **1x in every band**; the mechanism is kept present
+`Ot6HpMulTbl` ships **1x in every species range**; the mechanism is kept present
 and neutral for future per-stretch bumps. The reason is that a flat HP
 bump rewards nothing: it lengthens every fight equally whether or not
 the player engages the loop. Resistance is selective — it halves only
@@ -397,7 +397,7 @@ section above for the mechanic.
 
 Vanilla being too easy for the loop to express is still the problem
 being solved (mines trash dies in one action, so neither boosting nor
-breaking can fire); resistance is the answer that stuck. Honest limit:
+breaking can fire); resistance is the answer that stuck. Known limit:
 no HP dial makes intro trash
 expressive, because fire one-shots 15–24 HP mobs at any multiplier —
 that is M6 class-weakness authoring, not a difficulty number.

@@ -12,8 +12,8 @@
 -- it falls back to the auto window for that slot.
 --
 -- issue #38 refloored Bushido at 1 BP.  The STORED FORMAT DID NOT MOVE -- same
--- word, same four 3-bit fields, same AUTO sentinel, so every tracked battery
--- anchor (persistent_layout ot6-codex-o8-v1) still decodes -- but WORD SLOT 0
+-- word, same four 3-bit fields, same AUTO sentinel, so every tracked SRAM
+-- checkpoint (persistent_layout ot6-codex-o8-v1) still decodes -- but WORD SLOT 0
 -- IS NOW DEAD: menu row i and window row i both address word slot i+1, and no
 -- code reads slot 0 back.  A loadout {-,7,0,3} therefore packs as
 -- 7<<3 | 0<<6 | 3<<9 = $0638 and enumerates $5c,$55,$58 into rows 0/1/2, with
@@ -58,7 +58,7 @@ local actor
 local ceiling = 4
 local learnedBits = 0xFF               -- $1cf7 mask (which techs are learned)
 -- word slots 0..3.  slots[1] is the DEAD slot 0 (#38); slots[2..4] are the
--- 1x/2x/3x rungs the menu and the battle window actually read.
+-- 1x/2x/3x tiers the menu and the battle window actually read.
 local slots = { 0, 0, 0, 0 }
 local bpbank = 5
 local sawNumeral = false

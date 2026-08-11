@@ -58,27 +58,27 @@ The inject idiom (front 8 KB to cpu `$30:6000`):
       emu.write(0x306000 + i - 1, string.byte(data, i), emu.memType.snesMemory)
     end
 
-## Versioned battery anchors
+## Versioned SRAM checkpoints
 
-Durable frontier shortcuts use a complete 32 KiB Mesen `.srm`, not the legacy
-8 KiB sidecar. `tools/tests/anchors/post-opera-v1/` contains a small manifest
-and its hashed payload. `sram_anchor.py` rejects unknown schemas, unsafe
-payload names, wrong sizes, and hash mismatches before a run starts:
+Durable shortcuts deep into the game use a complete 32 KiB Mesen `.srm`, not
+the legacy 8 KiB sidecar. `tools/tests/anchors/post-opera-v1/` contains a small
+manifest and its hashed payload. `sram_anchor.py` rejects unknown schemas,
+unsafe payload names, wrong sizes, and hash mismatches before a run starts:
 
     python3 tools/tests/lib/sram_anchor.py validate \
       tools/tests/anchors/post-opera-v1
 
-`run.sh` installs a verified anchor by value into the invocation-private save
-folder when `OT6_SRAM_ANCHOR` is set. Mesen then takes its ordinary cold-load
-path; no Lua writes SRAM. `gen_vector_doorstep.lua` drives title Continue,
-validates slot 3's story/codex contract, and then walks the world map to the
-Vector event trigger.
+`run.sh` installs a verified checkpoint by value into the invocation-private
+save folder when `OT6_SRAM_ANCHOR` is set. Mesen then takes its ordinary
+cold-load path; no Lua writes SRAM. `gen_vector_doorstep.lua` drives title
+Continue, validates slot 3's story/codex contract, and then walks the world
+map to the Vector event trigger.
 
-The tracked anchor was produced by `gen_post_opera_anchor.lua`: it loads the
-`blackjack` tactical fixture, settles the final arrival, crosses and exits
+The tracked checkpoint was produced by `gen_post_opera_anchor.lua`: it loads
+the `blackjack` tactical fixture, settles the final arrival, crosses and exits
 ALBROOK to normalize the world-menu state (the comment there says "Vector";
-it is the map-323 gate one step east of the anchor tile), then uses the real
-in-game Save UI
+it is the map-323 exit one step east of the checkpoint tile), then uses the
+real in-game Save UI
 to save slot 3. `OT6_CAPTURE_SRM` captures Mesen's complete battery file only
 after emulator shutdown. Its payload and manifest are included in
 `vector_doorstep`'s content freshness stamp.
@@ -89,7 +89,7 @@ To regenerate the payload deliberately:
       tools/tests/run.sh tools/tests/gen_post_opera_anchor.lua
 
 Then update the manifest SHA-256 and validate it before committing. The
-generator plants a nonzero codex witness which must survive the real Save As
+generator plants a nonzero codex marker which must survive the real Save As
 copy and cold Continue, proving that bank `$31` was preserved rather than
 merely reinitialized.
 
@@ -113,7 +113,7 @@ Addresses (from the vendored disassembly, `src/field/player.asm` /
 | `$B2` | party z-level (bit 0 upper, bit 1 lower) |
 
 Events can walk the party with `$1EB9`/`$0084`/`$0059` all looking
-innocent, so control gating checks the movement type and event PC too —
+innocent, so the control check tests the movement type and event PC too —
 that's `H.hasControl()`. Two event-PC subtleties, both load-bearing:
 
 - On maps with ambient NPC activity (a stove flame, a wanderer) the event
@@ -128,7 +128,7 @@ that's `H.hasControl()`. Two event-PC subtleties, both load-bearing:
   `$80`. The likely truth is duller — `$E5`-`$E7` are shared direct-page
   scratch that 30+ files write, so a non-`$CA` bank just means some other
   subsystem parked a pointer there. The true source of `$80` is UNVERIFIED;
-  the bank gate is correct either way, so this is a comprehension hazard,
+  the bank check is correct either way, so this is a comprehension hazard,
   not a bug.
 - A stood-on **event trigger re-fires every 4 frames**. Once its switch
   makes it a no-op, the cycle is 3 frames of event (movement type 4) and
@@ -168,13 +168,13 @@ stack -- compose inlines both, so scripts see one `H`):
 - `H.clearBattle(maxFrames, spare)` — win the current fight headlessly:
   set each present monster's dead-status bit (`$3AA8` bit 0 →
   `$3EEC` bit 7) and edge-tap A through the victory text. Formations
-  whose species words appear in `spare` are never kill-bitted — clearing
+  whose species words appear in `spare` are never force-killed — clearing
   the fight a route exists to reach is a script bug, so it errors.
 - `H.advanceStory(pred, maxFrames, opts)` — ride out a non-interactive
   story stretch (long automatic events, intermittent dialogs, scripted
-  battles) until `pred()`: battles are kill-bitted and edge-tapped,
+  battles) until `pred()`: battles are force-killed and edge-tapped,
   dialogs edge-tapped, everything else gets a neutral pad. A formation
-  in `opts.spare` is a set-piece: never kill-bitted, hands off for its
+  in `opts.spare` is a set-piece: never force-killed, hands off for its
   first 300 frames (A during the load queues player actions that starve
   the battle event that ends it), then edge-tapped (its battle dialogs
   stall without A). This is how the esper-zap scene is crossed.
@@ -275,7 +275,7 @@ this `navTo` (it persists across re-plans) and the route re-BFSes. Any
 other deviation — an event force-move, post-battle drift — just
 re-plans from the live position. Along the way it:
 
-- clears random encounters with the kill-bit idiom, edge-tapping A
+- clears random encounters with the force-kill idiom, edge-tapping A
   through the victory text — but **never** a formation listed in
   `opts.spare` (the goal fight: pad released, `opts.arrive` sees it);
 - edge-taps A through dialogs (`dialogWaiting`);
@@ -296,7 +296,7 @@ tile-aligned.
 `gen_whelk_poweron.lua` runs the whole stack deterministically from a
 COLD POWER-ON — no injected save, so it works on a fresh clone. It plays
 the New Game intro and the Narshe gauntlet down to the mines (map 41),
-rides the security-door blast scene, then `navTo(42, 6)` and mints
+rides the security-door blast scene, then `navTo(42, 6)` and generates
 `whelk_doorstep.mss` one tile short of the trigger. The Whelk event
 trigger is the single tile **(42,5)**; stepping onto it tile-aligned
 while user-controlled fires the event, which force-walks the party down,
@@ -304,7 +304,7 @@ shows dialogs `$0B6E` / `$0B6F` (edge-tapped through), and starts the
 Whelk battle. During the fight the formation species words at `$57C0`
 read `0x0100` and `0x0134` — match on those (`$57C0` is battle scratch:
 whatever `RamPowerOnState` filled it with before the first fight — zeros
-under the pinned test profile — and stale words after one, so gate any
+under the pinned test profile — and stale words after one, so condition any
 read on `battleLoadStarted()`). The whelk-done event switch is `$1EA6`
 bit `$20`; once set, the trigger is inert — the script asserts it clear
 at boot, then (positive control) takes the one deliberate step onto the
@@ -314,7 +314,7 @@ limits).
 
 ### Reaching a balance fixture
 
-The demo doorstep is the mech-suit intro — beam party, no clean
+The demo entry point is the mech-suit intro — beam party, no clean
 weakness/break loop, unfit for balance numbers. The fastest path to a
 real balance fixture is a **fresh save-point save past the mech-suit
 intro** (into the scenario split — normal-command parties vs.
@@ -350,6 +350,6 @@ deliberately diverge from the play profile here: runs are bit-reproducible
 by construction.
 
 Frame budgets (`H.run`'s `maxFrames`) remain the per-script failsafe;
-the whelk power-on mint, for one, plays the entire New Game intro before
+the whelk power-on generator, for one, plays the entire New Game intro before
 it reaches the mines — tens of thousands of frames (its header has the
 phase-by-phase route).

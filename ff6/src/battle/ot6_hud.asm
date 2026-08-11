@@ -584,7 +584,7 @@ Ot6ShownBitTbl:
                                 ; ~46-scanline font re-lay in the nmi tail
                                 ; and tore the frame (probe_banner: flush
                                 ; end at scanline 292; battle_banner is
-                                ; the regression gate). $57b9 is the spare
+                                ; the regression test). $57b9 is the spare
                                 ; byte after OT6_ATKCLASS, inside the m2
                                 ; trace-verified strip and the InitBP @clr
                                 ; (probe_57b9 write-watch: only bank-F0
@@ -666,7 +666,7 @@ OT6_RANDMAGIC := $a5            ; the marker value (junk is $00/$ff in
 ; nothing visible but its own mask tiles: vanilla blanks even its banner
 ; rows to the $01ee junk fill before scrolling. our under-enemy hud
 ; lines ride that same map, so the wipe smeared their glyphs across the
-; screen (v0.1 whelk playtest; battle_whelkwipe is the regression gate —
+; screen (v0.1 whelk playtest; battle_whelkwipe is the regression test —
 ; veiling exactly the hud words removed every stray pixel, measured
 ; against the base image frame by frame). while the veil byte is set the
 ; nmi flush writes the $01ee fill over each live line instead of its
@@ -1178,7 +1178,7 @@ OT6_RANDMAGIC := $a5            ; the marker value (junk is $00/$ff in
         ; would re-price at the end of the NEXT action rather than under the
         ; player's cursor.  Measured on exactly that version -- an L press
         ; refolded Fire 3 to Fire 2 and left the row priced at 4 MP for the
-        ; rest of the menu (battle_preview.lua's ladder is the gate).
+        ; rest of the menu (battle_preview.lua's ladder is the test).
         ; Ot6ActionEnd still uses the request bit, because there the timing
         ; is right: an action has just ended, so AfterAction2 is next.
         ;
@@ -1722,7 +1722,7 @@ Ot6ShieldTbl:
         ; narshe intro / escape
         .word   $0000
         .byte   2, OT6_PIERCE   ; guard: armored infantry, the tekmissile
-                                ;   probe (2 = formula value, kept honest)
+                                ;   probe (2 = formula value, kept as-is)
         .word   $0019
         .byte   3, OT6_PIERCE   ; lobo: bitier trash, and the table's
                                 ;   permanent regression coverage
@@ -1868,7 +1868,7 @@ Ot6ShieldTbl:
         ; it was unbreakable by the exact party the game hands you. the fix
         ; is a weapon class, chosen per that party (class chips ignore
         ; absorb/null, so the water/bolt these bodies absorb never matters).
-        ; shields track the early-war trash/miniboss band (2 basic, 3
+        ; shields track the early-war trash/miniboss tier (2 basic, 3
         ; elite). NOTE the trade: an Ot6ShieldTbl row exempts a species from
         ; Ot6HpScale, which the armor-line ElemAddTbl block deliberately
         ; avoided -- but a class weakness has nowhere else to live, so
@@ -1940,7 +1940,7 @@ Ot6ShieldTbl:
         ; and all eight SwdTechs (slash). NOBODY here pierces.
         ;
         ; so one key each is arithmetically impossible with two keys, and
-        ; the honest shape is 2 bludg + 1 slash -- which is also the party's
+        ; the workable shape is 2 bludg + 1 slash -- which is also the party's
         ; own shape (two bludgeon wielders, one slash specialist), so every
         ; member's A button still answers a creature. all three absorb water
         ; and their vanilla element (bolt/fire) is dead or L15-gated for
@@ -2026,8 +2026,8 @@ Ot6ShieldTbl:
         .byte   6, OT6_PIERCE   ; crane (element sides verified at m6 entry)
         .word   $010e
         .byte   6, OT6_PIERCE   ; crane
-        ; ---- the v0.6 VECTOR / MAGITEK FACTORY band (issue #11), the first
-        ; route band authored off the generated floor. survey, arithmetic and
+        ; ---- the v0.6 VECTOR / MAGITEK FACTORY section (issue #11), the first
+        ; route section authored off the generated floor. survey, arithmetic and
         ; per-formation reading: docs/design/break-band-vector.md.
         ;
         ; THE PROBLEM this replaces: in the deepest third of the facility
@@ -2041,7 +2041,7 @@ Ot6ShieldTbl:
         ; as machines -- exactly Garm/Commando/ProtoArmor/Pipsqueak/Trapper/
         ; Chaser carry a `Program NN` special-attack name, 6 of 384 in the
         ; game -- so "the machines do not care about your sword" is a rule
-        ; the player can guess before probing. bludgeon carries the band,
+        ; the player can guess before probing. bludgeon carries the section,
         ; pierce is the second key on the imperial line, slash comes off the
         ; machines, and ¤ sits the beat out (Setzer is flying the getaway, so
         ; a ¤ row would be a composition lock on the one character the
@@ -2070,7 +2070,7 @@ Ot6ShieldTbl:
         ; precedent-following, not a sweep: the Mt. Kolts and Zozo balance
         ; passes (where a 1200-hp HadesGigas went 4 -> 2) both found
         ; independently that the formula's count
-        ; lands the break on a corpse. Landing this wants a Vector doorstep
+        ; lands the break on a corpse. Landing this wants a Vector entry-point
         ; fixture and a bal_party BAL_BUFF_SHIELDS sweep over 1/2/3, with a
         ; separate three-character arm (less damage per round means the same
         ; count breaks later). break-band-vector.md §8.2/§10.3.
@@ -2078,7 +2078,7 @@ Ot6ShieldTbl:
         .byte   2, OT6_PIERCE|OT6_BLUDG ; garm: a magitek quadruped
                                 ;   (Program 95), not a hound -- pierce the
                                 ;   joints or cave the housing. commonest
-                                ;   body at the entrance, where the band
+                                ;   body at the entrance, where the section
                                 ;   teaches its rule, so it teaches both
                                 ;   halves. keeps vanilla bolt|water
         .word   $00c7
@@ -2094,7 +2094,7 @@ Ot6ShieldTbl:
                                 ;   vanilla bolt stays the ranged key
         .word   $0041
         .byte   2, OT6_PIERCE   ; pipsqueak: the swarm body, up to x5 and
-                                ;   22% of all bodies in the band. pierce so
+                                ;   22% of all bodies in the section. pierce so
                                 ;   Edgar's AutoCrossbow -- whole enemy side,
                                 ;   chipping per hit -- is the designed
                                 ;   answer to a five-stack
@@ -2118,7 +2118,7 @@ Ot6ShieldTbl:
                                 ;   backs it up
         .word   $00a0
         .byte   2, OT6_PIERCE|OT6_BLUDG ; chaser: 1202 hp, the widest break
-                                ;   window in the band, on the ESCAPE map
+                                ;   window in the section, on the ESCAPE map
                                 ;   where no shop trip is possible mid-
                                 ;   sequence. two keys so whatever three
                                 ;   walked out of the tube room hold one
@@ -2127,7 +2127,7 @@ Ot6ShieldTbl:
                                 ;   all, so this row is its ONLY key. the
                                 ;   one soft body in a dungeon of machines
                                 ;   -- cut it or stick it. deliberately the
-                                ;   band's slash target, placed in the
+                                ;   section's slash target, placed in the
                                 ;   deepest pool so the blade has work in
                                 ;   the room where the machines stopped
                                 ;   caring about it
@@ -2137,7 +2137,7 @@ Ot6ShieldTbl:
                                 ;   the rest of the facility teaches would
                                 ;   HEAL it. armoured bulk with no seam ->
                                 ;   bludgeon, and bludgeon alone: the one
-                                ;   body in the band that asks the player to
+                                ;   body in the section that asks the player to
                                 ;   have brought a blunt instrument, and the
                                 ;   reason to bring Sabin
         .word   $0006
@@ -2154,7 +2154,7 @@ Ot6ShieldTbl:
                                 ;   formation $075 puts them in one fight so
                                 ;   the wrong splash heals half the screen.
                                 ;   flattening that onto the class axis
-                                ;   would waste the best puzzle in the band.
+                                ;   would waste the best puzzle in the section.
                                 ;   NB both are named "Mag Roader", so the
                                 ;   name-keyed floor generator could not
                                 ;   have told them apart even if it wanted

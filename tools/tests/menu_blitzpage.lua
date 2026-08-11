@@ -32,8 +32,9 @@
 --     element tiles were uploaded into the BATTLE font only.  The expectation
 --     changed here because the correct BEHAVIOUR changed, not to get green:
 --     the three rows are now asserted to carry their element, and only Mantra
---     and Spiraler stay blank (neither element nor class -- honest).  Measured
---     before and after on purpose-built ROMs, tools/tests/probe_fieldicons.lua.
+--     and Spiraler stay blank (neither element nor class -- correctly so).
+--     Measured before and after on purpose-built ROMs,
+--     tools/tests/probe_fieldicons.lua.
 --
 --     Each named cell is ALSO checked to have art in the menu font's own vram
 --     copy, which is the half a tilemap assertion cannot see: a page can name
@@ -61,9 +62,9 @@
 -- The canary reads BOTH halves out of the ROM/tilemap the menu itself uses, so
 -- neither can move alone.  It is duplicated from menu_ragepage.lua rather than
 -- shared: the only lua the runner inlines is lib/ot6{,_field,_contract}.lua,
--- and those three files ARE the frontier mint signature
+-- and those three files ARE the savestate generation signature
 -- (lib/frontier_stamp.sh:82-85), so a helper added there would mark every
--- minted fixture drifted.
+-- generated fixture drifted.
 --
 -- Fixture (issue #75 conversion): vargas_won -- a REAL SABIN, on Mt. Kolts
 -- right after his own boss fight, found in zCharID and entered by walking the
@@ -72,7 +73,7 @@
 -- whatever the save holds, so the PARTIAL phase -- learned rows AND locked
 -- ones on the same render -- is now the page a real mid-Kolts Sabin opens.
 -- The mask is read and each row asserted against it, so a join-level change
--- moves which rungs are lit without touching this file.
+-- moves which tiers are lit without touching this file.
 --
 -- *** TWO LABELED ISOLATION ARMS (issue #75) -- one write site STAYS ***
 -- The other two learned-counts this page must render CANNOT be produced on
@@ -83,7 +84,7 @@
 --     learn-ceiling ruling (2026-08-10, docs/waiver-burndown-plan.md
 --     systemic call 1) keeps exactly this arm as a loudly-labeled
 --     memory-hack isolation arm, converted organically when high-level
---     content reaches the frontier.
+--     content becomes reachable in play.
 --   * NONE -- eight locked rows and not one digit -- is UNREACHABLE BY PLAY
 --     in the other direction: Pummel is learned at level 1, so every real
 --     Sabin's mask has bit 0 set from the moment he exists.  A renderer
@@ -320,10 +321,10 @@ local function assertLearnedRow(i)
   assertRun(COST_COL + 2, y, MP_SUFFIX, string.format("blitz %d ' MP'", i))
 end
 
--- A rung the character has not reached.  It is NOT blank (vanilla drew ten pads,
+-- A tier the character has not reached.  It is NOT blank (vanilla drew ten pads,
 -- which the owner's playtest of the Rage page read as a rendering fault) and it
 -- is NOT "- EMPTY -" (that word belongs to a Rage slot holding nothing; this
--- rung exists and is merely unreached).  Ten cells, exactly a name field wide,
+-- tier exists and is merely unreached).  Ten cells, exactly a name field wide,
 -- so a learn wipes it completely; the class and price fields blank with it, or
 -- the page would price something the player cannot pick.
 local function assertLockedRow(i)
@@ -359,7 +360,7 @@ local function assertNoCombos(what)
 end
 
 -- teach() survives ONLY for the two labeled isolation arms at the tail (see
--- header); the honest phases read the mask and write nothing.
+-- header); the input-driven phases read the mask and write nothing.
 local function teach(mask) H.writeByte(BLITZES, mask) end
 
 local learnedMask = nil                 -- $1d28 as read off the save
@@ -371,14 +372,14 @@ H.run({ maxFrames = 30000 }, {
   H.waitFrames(10),
   H.waitUntil(function() return H.hasControl() end, 400, "field control", 5),
 
-  -- The save's own state, read: the mask must have learned rungs AND locked
+  -- The save's own state, read: the mask must have learned tiers AND locked
   -- ones, or the partial phase would only exercise one row kind.  A mid-Kolts
   -- Sabin has both by construction (Pummel at L1, Bum Rush at L70).
   H.call(function()
     learnedMask = H.readByte(BLITZES)
     local n = 0
     for i = 0, 7 do if (learnedMask >> i) & 1 == 1 then n = n + 1 end end
-    H.log(string.format("$1d28 = $%02x as saved: %d of 8 rungs learned",
+    H.log(string.format("$1d28 = $%02x as saved: %d of 8 tiers learned",
       learnedMask, n))
     H.assertEq(n > 0 and n < 8, true,
       "the real mask mixes learned and locked rows -- both render paths run")
@@ -413,14 +414,14 @@ H.run({ maxFrames = 30000 }, {
       nElem, nClass, nBlank))
     H.assertEq(nElem > 0 and nClass > 0 and nBlank > 0, true,
       "the Blitz ladder must exercise all three answers of the icon column -- "
-      .. "element, break class, and honestly nothing -- or the assertions "
+      .. "element, break class, and nothing at all -- or the assertions "
       .. "below only ever test one of them")
   end),
 
   -- the player's path: X -> main menu -> Skills -> lead character -> submenu
   -- driveUntil, not one press: the X that opens the field menu is the first
   -- step in these tests that needs a SPECIFIC frame, so it is where a
-  -- fixture minted against a different ROM surfaces -- as "timeout waiting
+  -- fixture generated against a different ROM surfaces -- as "timeout waiting
   -- for main menu", which reads like a menu bug and is not one.  Retrying
   -- the press costs nothing when the pairing is fine and removes the false
   -- report when it is not.  Same shape probe_fieldicons.lua and
@@ -488,8 +489,8 @@ H.run({ maxFrames = 30000 }, {
     for n = 0, 7 do assertCursorGutter(n, "real mask") end
     H.screenshot("blitz_page_player_path")
     H.log(string.format("RENDER OK: Skills->Blitz via the player's path for a "
-      .. "REAL SABIN -- %d learned rungs carry name + probe icon + price, %d "
-      .. "unreached rungs say '- LOCKED -', no combo glyph anywhere, every "
+      .. "REAL SABIN -- %d learned tiers carry name + probe icon + price, %d "
+      .. "unreached tiers say '- LOCKED -', no combo glyph anywhere, every "
       .. "drawn cell on an ODD row inside row 15, clear of the border column "
       .. "and of every cursor's gutter", nL, 8 - nL))
   end),
@@ -520,7 +521,7 @@ H.run({ maxFrames = 30000 }, {
   -- *** LABELED ISOLATION ARM 1 (issue #75, owner's learn-ceiling ruling) ***
   -- ALL EIGHT: no locked row anywhere, and a two-digit price on screen.
   -- Every state above has locked rows in it, so on its own it cannot tell
-  -- "- LOCKED -" drawn for an unreached rung from "- LOCKED -" leaking over a
+  -- "- LOCKED -" drawn for an unreached tier from "- LOCKED -" leaking over a
   -- learned one.  It is also the only state that renders Bum Rush, the 99 MP
   -- top of the ladder and the only row that fills the tens cell -- and the
   -- eighth Blitz is LEVEL 70, which the no-grind-tier ruling keeps out of the
@@ -551,7 +552,7 @@ H.run({ maxFrames = 30000 }, {
     assertGeometry("8 learned")
     for n = 0, 7 do assertCursorGutter(n, "8 learned") end
     H.screenshot("blitz_page_full")
-    H.log("FULL PAGE: all eight rungs learned -- eight names, their classes and "
+    H.log("FULL PAGE: all eight tiers learned -- eight names, their classes and "
       .. "their prices, the '- LOCKED -' marker nowhere on the page")
   end),
 

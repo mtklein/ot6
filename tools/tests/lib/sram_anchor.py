@@ -1,11 +1,12 @@
 #!/usr/bin/env python3
 """Validate and materialize OT6's small, versioned battery-save anchors.
 
-PROVENANCE (issue #75 step 5).  An anchor is a frontier ancestor: states
-mint from it, and states mint from those, so anchor honesty is the root of
-every chain above it.  Historically the manifest's `provenance` field was
-PROSE -- a paragraph describing the leg that cut the battery -- which a
-human can read and nothing can verify.  The mechanical form is a dict:
+PROVENANCE (issue #75 step 5).  An anchor is the ancestor of a chain of
+generated savestates: states are generated from it, and states are generated
+from those, so an anchor's provenance is the root of every chain above it.
+Historically the manifest's `provenance` field was PROSE -- a paragraph
+describing the run that cut the battery -- which a human can read and
+nothing can verify.  The mechanical form is a dict:
 
     "provenance": {
       "format": "ot6-provenance/v1",
@@ -24,11 +25,12 @@ run.sh's OT6_CAPTURE_SRM mode writes exactly this object to
 `<payload>.provenance.json` beside the captured battery, hashed from the
 real files of the capture run -- no hand-typing.  `seal ANCHOR` folds the
 sidecar into manifest.json (recomputing size/sha256 while it is there), so
-re-cutting an anchor honestly is: run the capture, run seal, commit.
+re-cutting an anchor with verifiable provenance is: run the capture, run
+seal, commit.
 
 A manifest whose `provenance` is still prose (or absent) is LEGACY-V0:
 grandfathered with a loud warning, never a failure, because the existing
-anchors' generators are still being converted to honest play (#75) and
+anchors' generators are still being converted to input-driven play (#75) and
 re-cutting them is the burn-down, not a precondition.  A manifest whose
 `provenance` IS a dict gets verified at load -- i.e. before every boot that
 materializes it: format string, payload hash agreement, well-formed sig and
@@ -65,7 +67,8 @@ def provenance_problem(prov: dict, payload_sha256: str) -> str | None:
     Shape-checks everything and cross-checks the one hash that is locally
     checkable (the payload's).  Ancestor FILES are deliberately not re-read
     here: the record documents what the capture run saw in ITS tree, and
-    the consuming tree's build/states legitimately moves on every re-mint.
+    the consuming tree's build/states legitimately moves on every
+    regeneration.
     """
     if prov.get("format") != PROVENANCE_FORMAT:
         return (f"provenance format {prov.get('format')!r} is not "
@@ -92,13 +95,13 @@ def provenance_problem(prov: dict, payload_sha256: str) -> str | None:
 def load(anchor: Path, expected_layout: str | None = None) -> tuple[dict, Path]:
     """Validate an anchor directory; return (manifest, payload path).
 
-    expected_layout is the persistent-SRAM layout string the CONSUMING LEG
+    expected_layout is the persistent-SRAM layout string the CONSUMING STEP
     declares support for (issue #25, leg-fixtures.md "Anchors carry a
     version").  None means "no consumer, structural checks only" (the bare
     CLI `validate ANCHOR` form).  Anything else -- including the empty
-    string, i.e. a leg that declares nothing -- must match the manifest's
+    string, i.e. a step that declares nothing -- must match the manifest's
     persistent_layout exactly, and the refusal names both strings.  This
-    gate runs BEFORE the emulator boots: a layout mismatch is a schema-drift
+    check runs BEFORE the emulator boots: a layout mismatch is a schema-drift
     correctness bug and must never surface as an in-emulator timeout.
     """
     manifest_path = anchor / "manifest.json"
@@ -126,15 +129,15 @@ def load(anchor: Path, expected_layout: str | None = None) -> tuple[dict, Path]:
     layout = manifest.get("persistent_layout")
     if not isinstance(layout, str) or not layout:
         # An anchor without a layout string can never be refused by version,
-        # which defeats the whole #25 schema-drift gate.  Fail closed.
+        # which defeats the whole #25 schema-drift check.  Fail closed.
         raise AnchorError(f"{manifest_path} declares no persistent_layout")
     if expected_layout is not None and layout != expected_layout:
         raise AnchorError(
             f"persistent_layout mismatch: anchor {anchor} declares "
-            f"{layout!r}, but this leg declares support for "
+            f"{layout!r}, but this step declares support for "
             + (f"{expected_layout!r}" if expected_layout
                else "NO layout (no 'OT6_ANCHOR_LAYOUT:' marker in the "
-                    "script; a leg that consumes an anchor must declare "
+                    "script; a step that consumes an anchor must declare "
                     "the layout it understands)")
         )
     # Provenance (issue #75): a mechanical record is verified, right here,
@@ -149,9 +152,9 @@ def load(anchor: Path, expected_layout: str | None = None) -> tuple[dict, Path]:
         print(
             f"sram anchor: WARNING: {anchor} carries legacy-v0 provenance "
             f"(prose, nothing mechanically verifiable).  Grandfathered "
-            f"under issue #75 -- the burn-down is re-cutting it honestly "
-            f"(capture run, then `sram_anchor.py seal`), not editing the "
-            f"manifest.",
+            f"under issue #75 -- the burn-down is re-cutting it from real "
+            f"play (capture run, then `sram_anchor.py seal`), not editing "
+            f"the manifest.",
             file=sys.stderr,
         )
     return manifest, payload
@@ -279,7 +282,7 @@ def selftest() -> None:
         }
         (root / "manifest.json").write_text(json.dumps(base))
         load(root)
-        load(root, "ot6-test-layout/v1")   # a leg that declares support
+        load(root, "ot6-test-layout/v1")   # a step that declares support
         out = root / "out.srm"
         materialize(root, out, "ot6-test-layout/v1")
         assert out.read_bytes() == payload
@@ -302,7 +305,7 @@ def selftest() -> None:
             else:
                 raise AssertionError(f"negative validation accepted bad {field}")
 
-        # THE LAYOUT GATE (#25).  A mismatch must refuse AND NAME BOTH
+        # THE LAYOUT CHECK (#25).  A mismatch must refuse AND NAME BOTH
         # strings -- asserting the raise alone would pass a mute refusal.
         (root / "manifest.json").write_text(json.dumps(base))
         for expected, must_name in (
@@ -317,7 +320,7 @@ def selftest() -> None:
                         f"layout refusal does not name {needle!r}: {exc}")
             else:
                 raise AssertionError(
-                    f"layout gate accepted expected={expected!r} against "
+                    f"layout check accepted expected={expected!r} against "
                     f"anchor layout 'ot6-test-layout/v1'")
 
         # ---- provenance (issue #75 step 5) --------------------------------
@@ -399,9 +402,9 @@ def main(argv: list[str]) -> int:
         if argv == ["selftest"]:
             selftest()
         elif len(argv) in (2, 3) and argv[0] == "validate":
-            # The optional third argument is the consuming leg's declared
+            # The optional third argument is the consuming step's declared
             # persistent_layout; run.sh passes it (possibly empty, meaning
-            # the leg declared nothing -- refused) so the gate fires before
+            # the step declared nothing -- refused) so the check fires before
             # the emulator boots.  Absent entirely = structural checks only.
             manifest, _ = load(Path(argv[1]),
                                argv[2] if len(argv) == 3 else None)

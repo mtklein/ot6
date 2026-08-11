@@ -1,10 +1,10 @@
--- gen_zozo1_submerge.lua -- v0.4 leg 1a: kefka_won (Arvis's house, map 30
+-- gen_zozo1_submerge.lua -- v0.4 step 1a: kefka_won (Arvis's house, map 30
 -- {60,37}, LOCKE+CELES+EDGAR+SABIN) -> Narshe streets -> the world -> the
 -- EAST Figaro castle -> the engine-room attendant -> the Kohlingen crossing
--- -> mint figaro_submerged.mss (map 61 {6,34}, castle parked WEST).
+-- -> generate figaro_submerged.mss (map 61 {6,34}, castle parked WEST).
 --
--- ROUTE ANCHORS, all read from source (not the survey -- the survey's
--- "underwater encounters battle 19/20/21" leg does NOT exist on this route;
+-- ROUTE checkpoints, all read from source (not the survey -- the survey's
+-- "underwater encounters battle 19/20/21" step does NOT exist on this route;
 -- those battles are the SERPENT TRENCH's, Sabin's scenario, _ca8ae3):
 --  * map 30 door (55,35) -> map 20 {49,14} (short_entrance.dat _30)
 --  * map 20's south edge y=62 x0..43 -> world {83,36} (long_entrance _20)
@@ -85,8 +85,8 @@ H.run({ maxFrames = 90000 }, {
   end),
 
   -- 1. Arvis's house -> Narshe town by the FRONT DOOR (55,35) -> map 20
-  --    {49,14}.  Rung 1's invisible door-NPC no longer stands there
-  --    (probe_n30: reachable in 9, tile unoccupied) -- and the rung-1
+  --    {49,14}.  Tier 1's invisible door-NPC no longer stands there
+  --    (probe_n30: reachable in 9, tile unoccupied) -- and the tier-1
   --    corridor exit's (53,8) clifftop perch is POST-BATTLE ISOLATED
   --    (probe_n20 census after full settle: zero reachable tiles), so the
   --    front door is now the only way to the streets.
@@ -171,6 +171,6 @@ H.run({ maxFrames = 90000 }, {
   end),
   H.saveState("figaro_submerged.mss"),
   H.logStep(function()
-    return string.format("figaro_submerged minted at frame %d", H.frame)
+    return string.format("figaro_submerged generated at frame %d", H.frame)
   end),
 })

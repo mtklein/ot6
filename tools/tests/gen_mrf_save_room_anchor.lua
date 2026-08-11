@@ -1,18 +1,19 @@
--- gen_mrf_save_room_anchor.lua -- mint battery anchor B, `mrf-save-room-v1`
--- (the A-F save-point boundary band is lettered in
--- tools/tests/frontier_graph.py): boot ifrit_doorstep (the nearest minted
--- predecessor, map 264 {3,7}), walk the {3,5} door into the map-270 save
--- room, walk onto the vanilla save point at {25,10}, and save through the
--- game's OWN Save UI into slot 3.  run.sh captures Mesen's complete 32 KiB
--- battery file after shutdown (OT6_CAPTURE_SRM) -- the same procedure and
--- menu path as gen_post_opera_anchor.lua, nothing synthesised.
+-- gen_mrf_save_room_anchor.lua -- generate SRAM checkpoint B,
+-- `mrf-save-room-v1` (the A-F save-point boundary range is lettered in
+-- tools/tests/frontier_graph.py): boot ifrit_doorstep (the nearest
+-- generated predecessor, map 264 {3,7}), walk the {3,5} door into the
+-- map-270 save room, walk onto the vanilla save point at {25,10}, and save
+-- through the game's OWN Save UI into slot 3.  run.sh captures Mesen's
+-- complete 32 KiB battery file after shutdown (OT6_CAPTURE_SRM) -- the same
+-- procedure and menu path as gen_post_opera_anchor.lua, nothing
+-- synthesised.
 --
 -- Getting here and saving IS the save/reset/load evidence #15 wants for
 -- this save point: the walk proves the room reachable on the played route,
 -- the SavePoint event proves the save-enable flow ran ($01BF), and the
 -- post-save asserts prove the slot-3 record and the codex page landed in
 -- SRAM.  The cold-Continue half of the round trip is gen_ifrit_magicite's
--- anchored boot, which asserts this same table as its ENTRY contract.
+-- checkpoint boot, which asserts this same table as its ENTRY contract.
 --
 -- TWO MEASURED TRAPS this file's shape depends on:
 --  * Standing ON a save tile re-enters the SavePoint script every frame
@@ -22,10 +23,11 @@
 --    $01BF + tile alignment only, and the menu is opened through repeated
 --    edge presses.
 --  * The ULTROS2 row witnesses the boundary contract demands are seeded
---    (an issue-#75 waived poke, burn-down pending an honest chain that
+--    (an issue-#75 waived poke, burn-down pending an input-driven chain that
 --    reveals them by play) right before the save, exactly as the
---    post-opera anchor does -- a cold Continue must then recover them from
---    the battery, which the ROM's own fresh-page formatting cannot fake.
+--    post-opera checkpoint does -- a cold Continue must then recover them
+--    from the battery, which the ROM's own fresh-page formatting cannot
+--    fake.
 local H = dofile("tools/tests/lib/ot6.lua")
 
 local ZMENUSTATE = 0x26
@@ -98,7 +100,7 @@ H.run({ maxFrames = 20000 }, {
   end),
 
   -- through the {3,5} door into the save room
-  H.navTo(3, 6, { honest = "flee", maxFrames = 6000 }),
+  H.navTo(3, 6, { playBattles = "flee", maxFrames = 6000 }),
   tapInto("up", function() return map() == 270 end, 9000,
     "door 264 (3,5) -> map 270"),
   H.waitFrames(60),
@@ -109,7 +111,7 @@ H.run({ maxFrames = 20000 }, {
   end),
 
   -- onto the save point
-  H.navTo(25, 11, { honest = "flee", maxFrames = 6000 }),
+  H.navTo(25, 11, { playBattles = "flee", maxFrames = 6000 }),
   tapInto("up", onSaveTile(25, 10), 9000,
     "onto the save tile 270 (25,10)", tileCalm),
   H.waitFrames(45),
@@ -146,7 +148,7 @@ H.run({ maxFrames = 20000 }, {
   H.call(function()
     H.assertEq((H.readByte(0x0201) & 0x80) ~= 0, true,
       "menu-flags $0201 bit7 SET -- the save-enable flow reached the menu")
-    -- ARM THE HONEST SAVE RECEIPT (issue #75): a read-only exec hook on
+    -- ARM THE input-driven save receipt (issue #75): a read-only exec hook on
     -- the real CopyGameDataToSRAM entry captures the slot argument the
     -- save runs with (codex_saveas's instrument).  This replaces the old
     -- zeroed-$307ff0 sentinel -- an SRAM write -- as the proof that the
@@ -194,12 +196,12 @@ H.run({ maxFrames = 20000 }, {
     H.assertEq(saveArg, 3, "CopyGameDataToSRAM ran for persistent slot 3")
     -- the codex witness cells are READ, never seeded (issue #75): the
     -- battery carries whatever the chain actually earned.  The phase-2
-    -- anchor re-cuts measure these and the entry contracts follow the
+    -- checkpoint re-cuts measure these and the entry contracts follow the
     -- measurement (never the reverse).
     H.log(string.format("codex witness cells (earned): elem=%02X class=%02X",
       emu.read(0x316810 + ULTROS2, emu.memType.snesMemory),
       emu.read(0x316990 + ULTROS2, emu.memType.snesMemory)))
-    H.log("real Save UI wrote the mrf-save-room anchor to slot 3")
+    H.log("real Save UI wrote the mrf-save-room checkpoint to slot 3")
   end),
 
   -- close the menu and prove the game is back in playable field state,

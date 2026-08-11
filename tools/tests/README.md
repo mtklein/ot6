@@ -9,58 +9,59 @@ scripted input, assert on RAM, and capture screenshots/savestates.
 make rom                                        # build build/ot6.sfc
 tools/tests/run.sh tools/tests/gen_battle_state.lua   # power-on -> first battle -> savestate
 tools/tests/run.sh tools/tests/battle_smoke.lua       # load savestate -> assert battle state
-make frontier                                   # mint the deep story states (slow)
+make frontier                                   # generate the deep story savestates (slow)
 
-python3 tools/tests/lib/compose.py --check-states      # IS A RED TEST MINE?
+python3 tools/tests/lib/compose.py --check-states      # IS THIS RED TEST A STALE FIXTURE?
 ```
 
 **Ask `--check-states` first when something is red and you did not expect
-it.**  A frontier fixture that was minted from sources this tree no longer
+it.**  A savestate that was generated from sources this tree no longer
 has boots into a ROM whose timing it does not match, and the result is a
 red test that has nothing to do with your change -- usually a *timeout on
 some innocent step*, which reads exactly like a product bug.  This is the
 common case in a fresh worktree, not an exotic one: `tools/worktree-setup.sh`
-seeds from whatever the main checkout last minted, which is routinely a whole
-tree of stale fixtures.
+seeds from whatever the main checkout last generated, which is routinely a
+whole tree of stale fixtures.
 
 `--check-states` answers it in ~2s, names the shared input that moved when
-there is one, and gives you the targeted re-mint
+there is one, and gives you the command to regenerate just that one savestate
 (`nice -n 10 ninja -f build/build.ninja <state>`) rather than the hours-long
 full chain.  `suite.sh` and `worktree-setup.sh` both run it for you, and a
 timeout that happens on a fixture it flagged says so in the failure itself.
 Ask it before you start re-running the same tests against unmodified `main`
 to see whether they were red there too.
 
-`make test` mints only the three states the suite asserts on.  The
+`make test` generates only the three savestates the suite asserts on.  The
 STORY CHAIN past the whelk -- the Narshe escape, the Figaro chapter,
 Mt. Kolts and Vargas, the three-scenario reunion and the Battle for
 Narshe, and on through Kefka to Zozo -- lives behind
 `make frontier`, which
-nothing in the gate depends on: each link is a multi-minute scripted playthrough that
-consumes the previous link's savestate, and the suite's remint cost has
-to stay what it was.
+nothing in `make test` depends on: each link is a multi-minute scripted
+playthrough that consumes the previous link's savestate, and the suite's
+regeneration cost has to stay what it was.
 
-The graph of minted states is DATA -- `tools/tests/frontier_graph.py`, one
-entry per state -- and `lib/frontier_ninja.py` emits it as
+The graph of generated savestates is DATA -- `tools/tests/frontier_graph.py`,
+one entry per state -- and `lib/frontier_ninja.py` emits it as
 `build/build.ninja`; `make frontier` / `make test` are thin wrappers over
-`ninja -f build/build.ninja`.  A minted link is a function of
+`ninja -f build/build.ninja`.  A generated link is a function of
 the ROM bytes, its generator `gen_*.lua`, and all THREE lib halves
 `lib/compose.py` inlines into every composed script -- `lib/ot6.lua`
 (battle core), `lib/ot6_field.lua` (field/world navigation) and
-`lib/ot6_contract.lua` (anchor invariant contracts) -- plus, for an
-anchored leg, the anchor's manifest and battery payload.  Every one of
+`lib/ot6_contract.lua` (invariant contracts for saved checkpoints) -- plus,
+for a segment that starts from a saved checkpoint, that checkpoint's manifest
+and SRAM payload.  Every one of
 those is a declared ninja dependency, routed through a content LATCH edge
 (`cmp || cp` with `restat = 1`), so staleness is decided by CONTENT inside
 ninja's own scheduler: a rebuild or checkout that bumps timestamps without
-moving bytes re-mints nothing, a changed input re-runs every transitive
+moving bytes regenerates nothing, a changed input re-runs every transitive
 dependent, and there is no stamp beside the graph to disagree with it.
-Editing one generator re-mints only the states it feeds (and their
-descendants down the chain); editing any lib half re-mints the whole
-frontier, since every route runs through them -- an acceptable cost because
+Editing one generator regenerates only the states it feeds (and their
+descendants down the chain); editing any lib half regenerates the whole
+chain, since every route runs through them -- an acceptable cost because
 the lib is stable (it is the rare file to change) while generators churn
 constantly.  `lib/frontier_ninja_selftest.sh` proves those semantics
 against real ninja on a mock tree in seconds, no emulator.
-`lib/frontier_stamp.sh` survives as the PROVENANCE half: each mint edge
+`lib/frontier_stamp.sh` survives as the PROVENANCE half: each generation step
 stamps `build/states/<state>.stamp` with three claims --
 
     sha256(GATE_CONTRACT ++ generator ++ ot6.lua ++ ot6_field.lua ++
@@ -73,35 +74,36 @@ stamps `build/states/<state>.stamp` with three claims --
 
 -- and `lib/compose.py` re-verifies ALL of them at CONSUME time, printing a
 loud `[ot6]` line if a fixture a test is about to boot has drifted from its
-generator+lib, had its `.mss` replaced without a mint, or sits on a chain
-whose ancestor stamp moved (the artifact and ancestor bindings make the
-whole chain verifiable transitively from files on disk).  `GATE_CONTRACT`
+generator+lib, had its `.mss` replaced without being regenerated, or sits on
+a chain whose ancestor stamp moved (the artifact and ancestor bindings make
+the whole chain verifiable transitively from files on disk).  `GATE_CONTRACT`
 (`ot6-provenance/v1`, one constant in `frontier_stamp.sh`) is a fixed sig
-input: bumping it deliberately stales every stamp and forces a full
-re-mint under new rules.  `compose.py --check-states` asks the same
-question of the whole tree and is a hard `make test` gate.
+input: bumping it deliberately stales every stamp and forces everything to be
+regenerated under new rules.  `compose.py --check-states` asks the same
+question of the whole tree and is a hard `make test` check.
 
-Some suite tests are FRONTIER-GATED: each declares
-`-- @suite frontier=<fixture>` and asserts on a state only `make frontier`
-mints -- `battle_vargas` on `vargas_doorstep.mss`, `battle_flyin` on
-`kolts_cave.mss` (the entry hud gate -- a fight whose monsters fly in,
+Some suite tests need a savestate only `make frontier` generates: each
+declares `-- @suite frontier=<fixture>` and asserts on that state --
+`battle_vargas` on `vargas_doorstep.mss`, `battle_flyin` on
+`kolts_cave.mss` (the entry hud test -- a fight whose monsters fly in,
 present-but-not-shown at battle start), `battle_kefka` on
 `kefka_doorstep.mss` (the Battle for Narshe -- deeper still, since its boot
 needs the REUNION: all three scenarios completed in one playthrough via the
 graph's scenario STACK), and others.  `tools/tests/suite.sh --list`
-prints the current gated set.  suite.sh adds each the moment its fixture
+prints the current set.  suite.sh adds each the moment its fixture
 exists and reports it as `skip` when it does not -- never silently drops it
--- so `make test` costs what it always did and `make frontier-test` (mint
-the chain, then run the same suite) is the command that always runs whatever
-is mintable.
+-- so `make test` costs what it always did and `make frontier-test`
+(generate the chain, then run the same suite) is the command that always
+runs everything that can be generated.
 
 The **scenario STACK** turns those three opening chains (Locke, Terra,
 Sabin) into one lineage.  The reunion needs all three completed in a single
-playthrough, but each honest chain sets only its own flag, so a *stacked*
-mint replays a chain's route logic from a different boot: `OT6_STACK=<prefix>`
+playthrough, but each input-driven chain sets only its own flag, so a
+*stacked* run replays a chain's route logic from a different boot:
+`OT6_STACK=<prefix>`
 makes `compose.py` rewrite every `.mss` basename in the script (never the
 lib), so the same generator boots a prefixed predecessor and emits prefixed
-artifacts, leaving the honest states untouched.  The graph seeds each
+artifacts, leaving the original savestates untouched.  The graph seeds each
 stacked hub from the previous chain's ending (`seed=` entries in
 `frontier_graph.py`) and stacks the `t2_`/`s2_`/`t3_` layers up to
 `reunion_ready`.  The full account is `frontier_graph.py`'s `SCENARIO
@@ -147,8 +149,8 @@ and reported, and `OT6_KEEP_RUNS=1` retains successful ones for investigation.
 `suite.sh` likewise creates unique bookkeeping under `build/test-suites/`, so
 two complete suites may overlap without sharing compositions, claims, or
 results. It honors `OT6_JOBS=N` (1 = serial) and fans tests out across
-scheduling labels; every suite test is a pure savestate load (the mints run
-through the ninja graph first), so order doesn't matter. Suite logs stay at
+scheduling labels; every suite test is a pure savestate load (the savestates
+are generated through the ninja graph first), so order doesn't matter. Suite logs stay at
 `build/states/suite_<t>.log` either way, and each test line reports its worker
 label and wall time. `runner_isolation_selftest.sh`, run by `make test`,
 deliberately overlaps same-label runner calls and complete-suite workspaces as
@@ -210,7 +212,7 @@ set -- and never creates `SaveStates/`.)
   `battle_doorstep.mss` and walks into the first battle (~30 s wall clock,
   PASS/FAIL on whether the battle engine actually comes up).  This is the
   tight iteration loop for battle/break-system changes.
-- `battle_firebeam.lua` - full interaction test: doorstep -> fresh battle ->
+- `battle_firebeam.lua` - full interaction test: entry point -> fresh battle ->
   A/A/A drives MagiTek Fire Beam onto a guard; asserts each press visibly
   changes the screen and the action resolves (guard HP drops).  Logs break
   RAM (guard shields $3E44/$3E46, HP $3C00/$3C02, revealed masks
@@ -221,9 +223,9 @@ set -- and never creates `SaveStates/`.)
   a press has no visible effect).
 - `probe16.lua` - diagnostic: savestate save/clobber/load round-trip
   (validates the exec-callback trampoline and the base64 codec).
-- `probe19.lua` - diagnostic: doorstep -> battle with screenshots + RAM
+- `probe19.lua` - diagnostic: entry point -> battle with screenshots + RAM
   dumps at +0/+60/+180/+420/+900/+1500/+2400 frames.
-- `gen_whelk_poweron.lua` - the suite's whelk mint: COLD POWER-ON ->
+- `gen_whelk_poweron.lua` - the suite's whelk generator: COLD POWER-ON ->
   intro -> Narshe streets -> mines -> BFS to (42,6); emits
   `build/states/whelk_doorstep.mss` (field, one tile short of the
   trigger) plus a positive-control `whelk_battle` screenshot.  Needs no
@@ -233,22 +235,22 @@ set -- and never creates `SaveStates/`.)
   Whelk fight comes up, a battle command menu opens, and a command list
   actually draws.  A run that fails leaves no `whelk_doorstep.mss` at
   all rather than an unvalidated one.  The sweep exists because the
-  doorstep's frame phase seeds the battle RNG (`lda $021e / asl2 /
+  fixture's frame phase seeds the battle RNG (`lda $021e / asl2 /
   sta $be`, battle_main.asm:6092-6094) and therefore picks whose menu
-  opens first — but the mint cannot steer that for anybody, because the
+  opens first — but the generator cannot steer that for anybody, because the
   seed is set at BATTLE init and each consumer adds its own walk length
   first (measured on one identical fixture: probe_shadow_overlap 264
   frames, battle_whelkwipe 266, battle_dlgmenu 267 — three walks, three
-  seeds, and on one ROM three different menu owners).  So the mint
+  seeds, and on one ROM three different menu owners).  So the generator
   proves the fixture works across rolls instead of tuning a settle to
   chase one.
-- `gen_whelk.lua` - the SRM-based route to the same doorstep: boot an
+- `gen_whelk.lua` - the SRM-based route to the same spot: boot an
   injected play save and BFS the mines (see `docs/playing-headless.md`).
   Kept because probe_slots and the balance instruments still consume
   `make_srm_sidecar.sh` saves; requires a pre-Whelk save, which does not
   exist locally.
 - `gen_post_opera_anchor.lua` - provenance generator for the tracked 32 KiB
-  post-Opera battery anchor. It settles `blackjack.mss`, uses the real Save UI
+  post-Opera SRAM checkpoint. It settles `blackjack.mss`, uses the real Save UI
   to write slot 3, and relies on `run.sh`'s explicit `OT6_CAPTURE_SRM` mode to
   capture Mesen's file after shutdown.
 
@@ -259,24 +261,26 @@ set -- and never creates `SaveStates/`.)
   and silently corrupts the live `$1188` event-timer block in WRAM (SRAM is
   pushed first and stays correct).  `probe_banquet_timer_save.lua` is the
   pad-input template.
-- `gen_vector_doorstep.lua` - cold boots with the verified post-Opera anchor,
+- `gen_vector_doorstep.lua` - cold boots with the verified post-Opera
+  checkpoint,
   drives vanilla Continue, checks story state plus the slot-3 OT6 codex page,
-  then WALKS THE WORLD to the Vector event trigger at (121,187) and mints
+  then WALKS THE WORLD to the Vector event trigger at (121,187) and generates
   `vector_doorstep` on map 242.  Vector has no entrance record at all; it is
   `event_trigger.asm:36-37` -> `_ca5ecf` -> `load_map 242 {32,61}`, so the
-  opening leg is an on-foot world walk through a fully battle-enabled band
+  opening segment is an on-foot world walk through an area with random
+  encounters fully enabled
   (worldGrind, not worldNavTo).  Its positive control reads the map name the
   ENGINE would print -- the live title index `$0520`, through `MapTitlePtrs`
-  into `MapTitle` -- and requires "VECTOR"; the same read is exercised on the
-  Albrook gate first and required to say "ALBROOK", so it cannot pass by
+  into `MapTitle` -- and requires "VECTOR"; the same read is exercised at the
+  Albrook map transition first and required to say "ALBROOK", so it cannot pass by
   returning nothing.  The rest of the Vector chain (`gen_vector_sneak`,
   `gen_mrf_entry`, `gen_mrf_chute`, `gen_mrf_263`, `gen_mrf_kefka`,
   `gen_ifrit_doorstep`, `gen_ifrit_magicite`, `gen_n024_doorstep`,
   `gen_esper_tubes`, `gen_esper_tubes_done`, `gen_minecart_doorstep`) chains
   off it; each generator's header documents the mechanism it had to measure.
-  `gen_n128.lua` is written but does NOT mint -- see its header and
-  `probe_train_tail.lua`.
-- `gen_edgar.lua` - THE WHOLE FIGARO CHAPTER, gate to world map: walks
+  `gen_n128.lua` is written but does NOT produce a savestate -- see its header
+  and `probe_train_tail.lua`.
+- `gen_edgar.lua` - THE WHOLE FIGARO CHAPTER, entrance to world map: walks
   `figaro_doorstep.mss` in, buys the BioBlaster + NoiseBlaster from the
   tool merchant (the ONLY window - the merchant refuses once EDGAR or
   SABIN is in the party), takes Edgar's audience, crosses the
@@ -298,8 +302,8 @@ set -- and never creates `SaveStates/`.)
   (BFS plans those itself), why map 55's row y=43 must stay off
   every route (it is a world-exit trigger, not a wall), and maps the
   beats it stops short of.
-- `gen_kolts.lua` - rung 2's last route leg: figaro_cleared (world map,
-  ON A CHOCOBO) to the Vargas doorstep on Mt. Kolts.  Mints
+- `gen_kolts.lua` - tier 2's last route segment: figaro_cleared (world map,
+  ON A CHOCOBO) to just before the Vargas fight on Mt. Kolts.  Generates
   `south_figaro.mss` (frame 6699), `kolts_doorstep.mss` (8133) and
   `vargas_doorstep.mss` (20240).  Its header documents three mechanisms
   no table in the ROM gives you: the CHOCOBO DISMOUNT (InitChoco never
@@ -314,12 +318,13 @@ set -- and never creates `SaveStates/`.)
   Vargas's walk-on parks him on it.  Also: the crossing settle must not
   wait on `hasControl`, because the caves' async cutscenes flip the
   party's movement-type byte every few frames.
-- `gen_vargas.lua` - the fight, and the frontier's last rung-2 link:
+- `gen_vargas.lua` - the fight, and the chain's last tier-2 link:
   boots vargas_doorstep, clamps Vargas under his own script's second
   threshold so `battle_event $07/$08` put SABIN on the field, kills him
-  with a real PUMMEL input, rides the reunion and mints `vargas_won.mss`
+  with a real PUMMEL input, rides the reunion and generates `vargas_won.mss`
   (frame 11426, SABIN level 9 in the party for good).
-- `battle_vargas.lua` - FRONTIER-GATED gate for rung 2's boss: Vargas
+- `battle_vargas.lua` - needs a generated savestate; the test for tier 2's
+  boss: Vargas
   seeds 5/5 with class row $04 (OT6_BLUDG) and Ipoohs 2/2 slash-weak,
   his weak byte reads exactly $28 = poison|holy (the poison bit is
   vanilla, the HOLY bit is Ot6ElemAddTbl's row -- this is the assertion
@@ -328,8 +333,8 @@ set -- and never creates `SaveStates/`.)
   same Pummel ends the fight through `if_attack PUMMEL -> battle_event
   $09 / kill_monsters ALL`.  Both Blitzes are driven as real pad EDGES
   into the code window, not poked.
-- `battle_flyin.lua` - FRONTIER-GATED (kolts_cave.mss).  Guards the entry
-  hud gate: a monster is flagged present (`$3AA8`) from battle init, but
+- `battle_flyin.lua` - needs the generated `kolts_cave.mss`.  Guards the entry
+  hud case: a monster is flagged present (`$3AA8`) from battle init, but
   its sprite is not drawn until its fly-in animation runs, so the hud must
   not paint its shield/'?' cells before the "monsters shown" mask `$201E`
   covers it.  Paces map 96's Cirpius-x3 pool and asserts, every frame of
@@ -338,8 +343,8 @@ set -- and never creates `SaveStates/`.)
   window was sampled and that the hud comes back once the birds land.
   Fails loudly on `cur=$54AC` -- glyphs floating on the still-dark
   battlefield.
-- `battle_hudanim16.lua` - FRONTIER-GATED (kolts_cave.mss, battle_flyin's
-  fixture).  Guards the anim-mode veil: battle animation inits flip the
+- `battle_hudanim16.lua` - needs the generated `kolts_cave.mss`
+  (battle_flyin's fixture).  Guards the anim-mode veil: battle animation inits flip the
   battlefield's $2105 shadow (`$896F`) to 16x16 bg3 tiles while an effect
   uses bg3 as its canvas or color-math mask, and in that mode a map cell
   renders at doubled size/position pulling three neighbor tiles -- so any
@@ -371,14 +376,14 @@ set -- and never creates `SaveStates/`.)
   answers the two questions the sources do not -- that SABIN gets NO
   turns until the script's phase-two transition (measured: 9000 frames
   of entities 0/1/2 taking turns and entity 3 never), and what the
-  harness's kill-bit idiom does to a boss whose death is scripted (it
+  harness's force-kill idiom does to a boss whose death is scripted (it
   ends the fight cleanly in 117 frames -- `if_self_dead / boss_death`
   sits ahead of the Pummel branch -- but the scripted finish is the one
-  the fixtures are minted through).
+  the fixtures are generated through).
 - `probe_dismount.lua` - the measurement instrument for getting off the
   chocobo: records the whole B -> $19=3 -> descent -> $11FA=0 ->
   InitWorld state machine frame by frame, asserts $E0/$E2 come back live
-  from $1F60/$1F61, and plans (without walking) both rung-2 world legs.
+  from $1F60/$1F61, and plans (without walking) both tier-2 world segments.
 - `probe_canstep.lua` - validates `H.canStep` (the movement-model port)
   against real movement, in two parts, one per engine branch.  Part 1,
   CARDINAL (`CheckPlayerMove`): four directions x two rounds at the mines
@@ -392,7 +397,7 @@ set -- and never creates `SaveStates/`.)
   assertions demand the sweep actually produced all three outcomes the
   branch can have (a diagonal, a diagonal-refused-to-cardinal fallback,
   and a refused press), so it cannot pass by exercising nothing.
-- `battle_banner.lua` - TEMPORAL gate for the banner screen-tear: exec
+- `battle_banner.lua` - TEMPORAL test for the banner screen-tear: exec
   callbacks at the battle NMI's entry / flush start / flush end / post-
   INIDISP sample `ppu.scanline` on EVERY frame through a Fire Beam cast
   (named banners: vanilla writes its name scratch at $7E57D5) and assert
@@ -406,7 +411,7 @@ set -- and never creates `SaveStates/`.)
   screenshot burst across the banner window.
 - `probe_57b9.lua` - write-watcher over $7E57B9-BF (OT6_FONTDIRTY's
   relocated home) with $7E57D5 as positive control; logs writer PCs.
-- `battle_bushido.lua` - gate for BP-Bushido: boost points pick Cyan's
+- `battle_bushido.lua` - test for BP-Bushido: boost points pick Cyan's
   tech and vanilla's charge gauge is gone.  Cyan is not in the party at
   the opening guard fight, so he is INSTALLED into it the way
   the balance labs pin state -- CHAR::CYAN into $3ED8, a Bushido-only
@@ -427,7 +432,7 @@ set -- and never creates `SaveStates/`.)
   and answers the questions the source alone does not (does one A press
   reach menu state $37, does L/R still move the boost inside that
   window, what does the bar actually do per frame).
-- `battle_whelkwipe.lua` - gate for the monster entry/exit wipe: the
+- `battle_whelkwipe.lua` - test for the monster entry/exit wipe: the
   whelk retract cycle (FADE_DOWN/FADE_UP) sweeps the battle-field BG3
   region with a per-scanline scroll wave, so the field map must hold
   nothing but vanilla's tiles while the effect runs.
@@ -437,7 +442,8 @@ set -- and never creates `SaveStates/`.)
   the field map, every live hud line veiled to vanilla's $01ee fill
   (OT6_HUDVEIL $57BE is the wrapper's own end marker).  After each
   transition: hud gone with the head, hud repainted on return,
-  glyphCanary.  No pixel compares, so it stays mint-independent.
+  glyphCanary.  No pixel compares, so it does not depend on the exact
+  bytes of the savestate it loads.
 - `probe_whelkwipe.lua` / `probe_whelkwipe2.lua` - the measurement
   instruments behind battle_whelkwipe: frame-by-frame screenshots of
   both transitions plus BG3 field-map/small-font readback diffs
@@ -456,15 +462,15 @@ the two images.
 
 ## Writing a test
 
-**THE HONESTY RULE (owner directive).**  A test or
+**THE INPUT-DRIVEN RULE (owner directive).**  A test or
 generator may inject controller input and READ emulated memory to assert
 things.  It may NEVER WRITE emulated game state -- no HP/MP pins, no
-kill-bits, no boss clamps, no cursor or menu-state pokes, no event-flag or
+forced kills, no boss clamps, no cursor or menu-state pokes, no event-flag or
 RNG writes.  When we test "can a person play this game," the script gets
 only the capabilities a person has: buttons and eyes.  Determinism comes
-from fixed, honestly-minted fixtures plus frame-exact input (the TAS way),
-never from rigging.  Fixture honesty is transitive: a savestate or anchor
-minted by a poking script is contaminated, and so is everything derived
+from fixed, input-driven fixtures plus frame-exact input (the TAS way),
+never from rigging.  That property is transitive: a savestate or checkpoint
+generated by a poking script is contaminated, and so is everything derived
 from it.
 
 Enforcement is mechanical, not honor-system: `tools/check_state_writes.py`
@@ -490,7 +496,8 @@ zero-checksum save, legacy-format codex migration).  These are unit tests
 of mechanisms, not claims about gameplay; they keep their waivers, say so
 loudly in their header comment, and may never produce fixtures.
 
-House patterns for playing honestly: `gen_arvis.lua` (real boss kill),
+House patterns for driving the game through real input: `gen_arvis.lua`
+(real boss kill),
 `gen_moogle.lua` (multi-party set-piece, boosted fights, retry ladder),
 `gen_scenario.lua`/`gen_rapids.lua` (menu-episode fighter, bank-and-dump
 boost doctrine), `gen_sabin_gau.lua` (self-consuming capture verification:
@@ -525,15 +532,15 @@ Reference savestates TREE-RELATIVELY -- `H.loadState("build/states/x.mss.lua")`
 -- never by absolute path.  compose.py resolves every reference
 against the running tree's own `build/states/` and REFUSES a reference that
 resolves only outside the tree (including into a nested worktree), so a
-worktree can never quietly boot a fixture minted from another tree's ROM.
+worktree can never quietly boot a fixture generated from another tree's ROM.
 The gen_*.lua generators still carry the older absolute-path convention only
-because their bytes are hashed into the frontier freshness stamps; behavior
+because their bytes are hashed into the savestate freshness stamps; behavior
 is tree-local for them too (see compose.py's resolve_sidecar).
 
 **Registering it in the suite.**  A test opts into `make test` with a
 first-line marker in its own file -- `-- @suite` (plain), `-- @suite slow`
 (a long-runner; an LPT scheduling hint), or `-- @suite frontier=<fixture>`
-(runs only once `make frontier` has minted `build/states/<fixture>.mss`).
+(runs only once `make frontier` has generated `build/states/<fixture>.mss`).
 Adding a test is thus a one-line edit to that test, never to a shared list;
 `tools/tests/suite.sh --list` shows what discovery resolved, and the marker
 grammar is documented at the head of `tools/tests/suite.sh`.
@@ -583,7 +590,7 @@ Plain functions (call from `H.call`/predicates):
   vanilla battles still show one stale word there, e.g. 874B, left over
   from earlier RAM traffic.  Treat `monstersPresent() > 0` as "battle has
   occupants", nothing finer.  For identifying a *specific* fight, match the
-  formation species words at $57C0 via `H.formationHas`, gated on
+  formation species words at $57C0 via `H.formationHas`, conditioned on
   `battleLoadStarted()`.)
 - Field navigation (`H.fieldX/Y`, `H.hasControl`, `H.tileAligned`,
   `H.dialogWaiting`, `H.canStep`, `H.movePress`, `H.bfsPath`, `H.navTo`,
@@ -704,7 +711,7 @@ parallel.  Three harness pins make it so:
 - `pin_test_saves.py` pins `Snes.RamPowerOnState = "AllZeros"`.  FF6 reads
   uninitialized RAM, so Mesen's default `Random` fed the RNG different
   garbage every boot -- battle-trigger frames drifted (+-frames, extra
-  encounters) and minted savestates embedded the garbage.
+  encounters) and generated savestates embedded the garbage.
 - `pin_test_saves.py` pins `Snes.DisableFrameSkipping = true`.  Frame-skip
   picks rendered frames by HOST timing, so screenshots (and the framebuffer
   inside savestates) varied run-to-run, worse under parallel load.
@@ -715,7 +722,7 @@ parallel.  Three harness pins make it so:
 
 Battery SRAM (the OT6 weakness codex included) RIDES Mesen savestates
 (markers in banks $30 and $31 are both restored by `emu.loadSavestate`), so
-post-load SRAM is a pure function of the fixture's own minted bytes.
+post-load SRAM is a pure function of the fixture's own generated bytes.
 `H.loadState` therefore performs no codex normalization of its own --
 normalizing would be both a state write and an overwrite of fixture
 content.  Runs that boot fresh instead of loading get their codex
@@ -790,7 +797,7 @@ because every ROM or route edit shifts them.
   (`pin_test_saves.py` pins `Debug.ScriptWindow.ScriptTimeout = 30`).
   stdout is block-buffered, so output stops well before the actual death.
   ANY error at script load has the same signature: no callbacks register,
-  the emulator free-runs, the cap reaps it.  A bare syntax error looks
+  the emulator free-runs, the cap kills it.  A bare syntax error looks
   identical to a "crash".
 - **Script errors are invisible headless.**  `--enableStdout` mirrors the
   EMULATOR message log (`MessageManager`); Lua errors and watchdog kills go

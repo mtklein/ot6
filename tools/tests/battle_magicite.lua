@@ -6,13 +6,13 @@
 -- they cost and what the divine does".
 --
 -- Issue #75 conversion.  The old apparatus faked everything on the magitek
--- doorstep: char 0's equipped-esper byte and field MP poked before the
+-- entry point: char 0's equipped-esper byte and field MP poked before the
 -- drive-in, Terra's command list rewritten, allies STOPped, guard HP/MP
 -- pinned, the Slow-immunity words WRITTEN both ways, saved-cursor pokes,
 -- and $3f2e/$3204 poked for the latch A/B.  On n024_doorstep every input
 -- is real:
 --
---   * THE STONES ARE HONESTLY IN THE BAG ($1A69 bits, give_genju receipts
+--   * THE STONES ARE REALLY IN THE BAG ($1A69 bits, give_genju receipts
 --     from the alcove hand-off) and are equipped through the REAL FIELD
 --     MENU: X -> Skills -> character -> Espers -> stone -> detail -> A
 --     (MenuState_1e/4d, field_menu.asm:2504 / skills.asm:2641).  IFRIT
@@ -37,7 +37,7 @@
 --
 -- The one loss against the original: the Slow-LANDS half of the immunity
 -- pair.  No Slow-permitting enemy is reachable from this fixture (maps
--- 264/269/271/273 are measured encounter-free by the chain's own legs);
+-- 264/269/271/273 are measured encounter-free by the chain's own steps);
 -- the design's allowing species -- Number 128, the Cranes, the blades --
 -- live in later set pieces.  The refused half (species-authored immunity
 -- consulted on a landed divine) is asserted here; the landing half is
@@ -345,7 +345,7 @@ local function driveTo(pred, maxF, tag)
   }, tag)
 end
 
--- enter battle 72 from the doorstep park (face up, one A)
+-- enter battle 72 from the entry-point park (face up, one A)
 local function enterBoss(tag)
   return H.repeatN(1, {
     H.hold({ "up" }), H.waitFrames(4), H.release(), H.waitFrames(10),

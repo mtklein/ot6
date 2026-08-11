@@ -1,16 +1,16 @@
--- gen_sabin_world.lua -- leg 1 of SABIN's scenario: the hub dispatch, the
+-- gen_sabin_world.lua -- step 1 of SABIN's scenario: the hub dispatch, the
 -- overworld landing, SHADOW's house, and the walk to the Imperial Camp gate.
--- Mints two states:
+-- Generates two states:
 --   sabin_world.mss  world map 0 at (161,36), SABIN alone -- the first
 --                    controllable frame of the scenario
 --   sabin_camp.mss   map 117 (IMPERIAL CAMP) just inside the north gate,
 --                    SABIN + SHADOW, controllable
 --
--- WHY TWO, AND WHY THIS LEG IS ITS OWN FILE.  The Sabin arc is ~15 maps and
+-- WHY TWO, AND WHY THIS STEP IS ITS OWN FILE.  The Sabin arc is ~15 maps and
 -- a single generator for it would be tens of thousands of frames long: every
 -- experiment on the Phantom Train would replay the hub, the house and the
 -- camp first.  So the arc is cut at the points where the game itself hands
--- control back on a fresh map, and each cut is a frontier link.
+-- control back on a fresh map, and each cut is a link in the generated chain.
 --
 -- THE ROUTE, read off the event script (ff6/src/event/event_main.asm):
 --   hub obj 17 SABIN  $032a -> _cb0a1c            (:39463)
@@ -56,15 +56,15 @@
 -- menu closes, and $0059 alone is true of any menu.  CYAN (:61204) and GAU
 -- (:66618) hit the same menu later in the arc.
 --
--- ISSUE #75 -- ZERO STATE WRITES.  This leg's only battles are random
+-- ISSUE #75 -- ZERO STATE WRITES.  This step's only battles are random
 -- encounters on the two overworld walks (the hub, the house and the camp
 -- have none), and every one of them is FLED -- hold L+R, the engine's own
--- run mechanic (worldNavTo's honest="flee"; the same hold in the leg
+-- run mechanic (worldNavTo's playBattles="flee"; the same hold in the step
 -- driver's own battle branch).  Fleeing is chosen over fighting on
 -- purpose: WoB overworld trash is runnable, a fled battle earns no WIN,
 -- and SHADOW's 1/16 post-battle leave roll (battle_main.asm:11976) runs
--- only at a win -- so from the moment he joins mid-leg, this route never
--- rolls it at all.  The field walks pass honest=true besides; their maps
+-- only at a win -- so from the moment he joins mid-step, this route never
+-- rolls it at all.  The field walks pass playBattles=true besides; their maps
 -- have no encounter pools, so the flag is documentation, not behavior.
 local H = dofile("tools/tests/lib/ot6.lua")
 local DOOR = "build/states/scenario_hub.mss.lua"
@@ -117,7 +117,7 @@ local function talkToObj(obj, what, maxF)
     return H.navTo(function() return approach()[1] end,
                    function() return approach()[2] end, {
       maxFrames = maxF or 20000,
-      honest = true,
+      playBattles = true,
       arrive = function()
         return engaged or (adjacent() and H.hasControl() and H.tileAligned())
       end,
@@ -154,7 +154,7 @@ local function talkToObj(obj, what, maxF)
   })
 end
 
--- Every `choice` this leg can reach, answered in order.  `max` is asserted
+-- Every `choice` this step can reach, answered in order.  `max` is asserted
 -- against $056F, so a fork the route does not know about fails loudly
 -- instead of being answered blind.
 local CHOICES = {
@@ -165,9 +165,9 @@ local CHOICES = {
 local ci, inChoice = 0, false
 local nameMenusSeen = 0
 
--- The leg driver.  Steers choices, FLEES battles (see the header -- no win,
+-- The step driver.  Steers choices, FLEES battles (see the header -- no win,
 -- no leave roll, no writes), taps dialogs, and dismisses the name menu.
--- Everything the arc's later legs need is here so they can copy one
+-- Everything the arc's later steps need is here so they can copy one
 -- function rather than five special cases.
 local function rideUntil(pred, what, budget)
   local phase, battN, dlgN, quiet, hb = 0, 0, 0, 0, -900
@@ -199,7 +199,7 @@ local function rideUntil(pred, what, budget)
           local c = CHOICES[ci]
           if not c then
             error(string.format("sabin: unexpected choice prompt #%d (%d " ..
-              "options) on map %d -- this leg knows of only %d",
+              "options) on map %d -- this segment knows of only %d",
               ci, chMax, map(), #CHOICES), 0)
           end
           H.assertEq(chMax, c.max,
@@ -217,10 +217,10 @@ local function rideUntil(pred, what, budget)
         H.log(string.format("sabin: choice #%d resolved at f%d", ci, H.frame))
       end
 
-      -- 2. battle: FLEE it honestly (hold L+R) -- WoB overworld trash is
-      --    runnable, and a fled battle earns no win for SHADOW's leave
-      --    roll to run at.  A zero-monster table (shouldn't happen on this
-      --    leg) just gets its text paged.
+      -- 2. battle: FLEE it with real input (hold L+R) -- WoB overworld
+      --    trash is runnable, and a fled battle earns no win for SHADOW's
+      --    leave roll to run at.  A zero-monster table (shouldn't happen on
+      --    this step) just gets its text paged.
       if battN >= 3 then
         quiet = 0
         if battN == 3 then
@@ -308,12 +308,12 @@ end
 -- (165,35), and the BFS toward the camp went east through the door on its
 -- second step.  Landing on any map other than `want` now fails immediately
 -- and says which one.
--- `want` is the field map this leg is ALLOWED to end on (nil = the leg ends
+-- `want` is the field map this step is ALLOWED to end on (nil = the step ends
 -- on the overworld, at the target tile, and any field map at all is wrong).
 local function worldLeg(tx, ty, want, what, budget)
   return H.worldNavTo(tx, ty, {
     maxFrames = budget or 30000,
-    honest = "flee",
+    playBattles = "flee",
     arrive = function()
       if H.worldMode() then return false end          -- let the coord check run
       if want and map() == want then return true end
@@ -358,7 +358,7 @@ H.run({ maxFrames = 90000 }, {
   end),
   H.saveState("sabin_world.mss"),
   H.logStep(function()
-    return string.format("sabin_world minted at frame %d", H.frame)
+    return string.format("sabin_world generated at frame %d", H.frame)
   end),
 
   -- ==================================================================== --
@@ -410,7 +410,7 @@ H.run({ maxFrames = 90000 }, {
   -- ==================================================================== --
   H.navTo(7, 15, {
     maxFrames = 8000,
-    honest = true,
+    playBattles = true,
     arrive = function() return H.worldMode() end,
   }),
   rideUntil(landedWorld(10), "back on the overworld", 8000),
@@ -447,6 +447,6 @@ H.run({ maxFrames = 90000 }, {
   end),
   H.saveState("sabin_camp.mss"),
   H.logStep(function()
-    return string.format("sabin_camp minted at frame %d", H.frame)
+    return string.format("sabin_camp generated at frame %d", H.frame)
   end),
 })

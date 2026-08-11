@@ -1,11 +1,12 @@
--- gen_whelk_poweron.lua -- reach the Whelk doorstep from COLD POWER-ON, fully
--- scripted, with NO save sidecar.  This is the SRM-free replacement for
--- gen_whelk.lua: same output (build/states/whelk_doorstep.mss, the field state
--- one tile SOUTH of the Whelk trigger at map 41 (42,5)), reached by playing the
--- opening from New Game instead of injecting a human play save into SRAM.  The
--- SRM path was a fresh-clone trap -- gen_whelk boots from
--- build/states/playthrough_srm.mss.lua, a git-ignored fixture minted from a
--- human save by make_srm_sidecar.sh, so a fresh checkout could not mint STATE3.
+-- gen_whelk_poweron.lua -- reach the Whelk entry point from COLD POWER-ON,
+-- fully scripted, with NO save sidecar.  This is the SRM-free replacement
+-- for gen_whelk.lua: same output (build/states/whelk_doorstep.mss, the
+-- field state one tile SOUTH of the Whelk trigger at map 41 (42,5)),
+-- reached by playing the opening from New Game instead of injecting a human
+-- play save into SRAM.  The SRM path was a fresh-clone trap -- gen_whelk
+-- boots from build/states/playthrough_srm.mss.lua, a git-ignored fixture
+-- generated from a human save by make_srm_sidecar.sh, so a fresh checkout
+-- could not generate STATE3.
 --
 -- ROUTE (all New-Game, all automatic input; trigger tiles from
 -- event_trigger.asm, scene bodies from event_main.asm, both verified):
@@ -18,12 +19,12 @@
 --   -> map 19 (Narshe approach): scripted fights fire at the x=38 column
 --     triggers {38,38} {38,26} {38,17} (event_trigger.asm map 19); blind
 --     held-UP climbs y=38 -> 1 into map 39, and every fight on the way is
---     WON HONESTLY by edge-tapped A (issue #75: this mint makes zero state
---     writes).  Tap-A is a real strategy here, not a shortcut: A opens the
---     magitek command, A confirms the first beam, A takes the default
---     target, and the vanilla-faithful intro guards die to one beam each
---     -- fleeing (L+R) is NOT used on this leg because these are event
---     `battle` fights whose win the script chain expects.
+--     WON WITH REAL INPUT by edge-tapped A (issue #75: this generator makes
+--     zero state writes).  Tap-A is a real strategy here, not a shortcut: A
+--     opens the magitek command, A confirms the first beam, A takes the
+--     default target, and the vanilla-faithful intro guards die to one beam
+--     each -- fleeing (L+R) is NOT used on this step because these are
+--     event `battle` fights whose win the script chain expects.
 --   -> map 39 (Narshe town): blind-UP stalls at (26,42) (measured), so BFS
 --     to (31,23), one south of the mines-approach trigger line {30..32,22}
 --     (_cc9db2).  En route the {30,37} trigger (_cc9d0d) springs the 4-guard
@@ -33,12 +34,13 @@
 --     map 41 at (38,33) facing up (load_map 41, event_main.asm:101393).
 --   -> map 41 (Narshe mines): the security door at {41,5}x{3,4} boots CLOSED
 --     (map-init draws wall tiles while switch $012C=0, _cc9ef2), so the
---     doorstep (42,6) is BFS-UNREACHABLE until the door-blast scene at
+--     entry point (42,6) is BFS-UNREACHABLE until the door-blast scene at
 --     trigger {42,9} (_cc9e23) runs: choreography + dialog $0011, the BG mod
 --     opens the x=42 column, TERRA ends force-marched to (42,8), and
 --     switch $012C=1 marks it done.  So: navTo(42,9) with arrive=blastDone,
 --     THEN navTo(42,6) -- two tiles, never touching (42,5).
---   -> assert the doorstep is calm and the whelk-done switch is CLEAR, mint
+--   -> assert the entry point is calm and the whelk-done switch is CLEAR,
+--   generate
 --     whelk_doorstep.mss, then (positive control) take the one deliberate
 --     step onto the trigger and prove the Whelk fight comes up.
 --
@@ -75,7 +77,8 @@ local function whelk()
 end
 
 -- whelk-done event switch $0135 -> $1EA6 bit $20 (derivation above).  Once set
--- the trigger is inert, so the doorstep is worthless: assert it CLEAR at mint.
+-- the trigger is inert, so the entry point is worthless: assert it CLEAR at
+-- generation.
 local function whelkDone() return (H.readByte(0x1ea6) & 0x20) ~= 0 end
 
 -- door-blast event switch $012C -> $1E80 + ($12C>>3) = $1EA5, bit ($12C&7)=4
@@ -103,16 +106,16 @@ end, emu.eventType.startFrame)
 -- (docs/playing-headless.md; ot6.lua clearBattle/advanceStory use the same).
 local aPhase = 0
 
--- FIGHT the current battle in place, honestly: edge-tap A (4 on / 4 off).
--- This replaced the kill-bit clear (issue #75 -- a mint may inject input
--- and read memory, never write game state).  The taps are the whole
--- strategy: A opens the top command (magitek for this party), A confirms
--- the first beam, A accepts the default target, and the intro guards die
--- to one beam; the same edge taps page the pre-fight dialogs and the
--- victory text.  Cost: a real fight runs ~1-3 ATB rounds (thousands of
--- frames) where the kill-bit cleared in hundreds -- the drive budgets
--- below carry the difference.  NEVER call it on the whelk: callers gate
--- on `whelk()` first and hand off instead.
+-- FIGHT the current battle in place, with real input: edge-tap A (4 on / 4
+-- off).  This replaced the battle-clear-write clear (issue #75 -- a
+-- generator may inject input and read memory, never write game state).  The
+-- taps are the whole strategy: A opens the top command (magitek for this
+-- party), A confirms the first beam, A accepts the default target, and the
+-- intro guards die to one beam; the same edge taps page the pre-fight
+-- dialogs and the victory text.  Cost: a real fight runs ~1-3 ATB rounds
+-- (thousands of frames) where the battle-clear-write cleared in hundreds --
+-- the drive budgets below carry the difference.  NEVER call it on the
+-- whelk: callers gate on `whelk()` first and hand off instead.
 local function fightRandomStep()
   H.setPad(aPhase < 4 and { "a" } or {})
 end
@@ -131,7 +134,7 @@ local climbMap = -1
 -- jammed against a wall (or stopped at a corridor turn blind-UP can't round)
 -- is aligned every frame at a fixed Y and trips this in a few seconds.  240
 -- frames (~4 s) is well past any legitimate pause.  Map 19's corridor is
--- measured UP-navigable; map 39's is not (that leg is BFS'd) -- if the route
+-- measured UP-navigable; map 39's is not (that step is BFS'd) -- if the route
 -- shifts, this errors AT the stuck tile with the map/coords to fix.
 local STALL_LIMIT = 240
 
@@ -141,7 +144,8 @@ local STALL_LIMIT = 240
 -- navTo/advanceStory 3-frame debounce (the battle/dialog signal bytes live in
 -- RAM the field module also scribbles on; acting on a 1-frame ghost would
 -- tap A on the open field):
---   battle -> fight it honestly by tap-A (never the whelk); dialog -> edge-tap A;
+--   battle -> fight it with real input by tap-A (never the whelk); dialog
+--   -> edge-tap A;
 --   other control loss (scenes walking the party, fades) -> neutral pad;
 --   control -> stall-watch, then hold UP.
 local function climbStep()
@@ -159,8 +163,8 @@ local function climbStep()
     dlgN  = H.dialogWaiting() and dlgN + 1 or 0
 
     -- battle: fight randoms/forced fights for real.  The whelk cannot appear
-    -- on the climb legs (it lives past the map-41 door), but gate defensively
-    -- anyway so a surprise never gets blind-mashed.
+    -- on the climb steps (it lives past the map-41 door), but gate
+    -- defensively anyway so a surprise never gets blind-mashed.
     if battN >= 3 then
       if whelk() then H.setPad({}); return end
       fightRandomStep()
@@ -177,7 +181,7 @@ local function climbStep()
 
     -- in control: stall-watch on valid (tile-aligned) position samples, then
     -- hold UP.  (We hold through the unaligned frames too -- a continuous
-    -- climb, not step-verified -- because these legs only need "keep going
+    -- climb, not step-verified -- because these steps only need "keep going
     -- north"; BFS owns every precise part.)
     if H.tileAligned() then
       if H.mapId() ~= climbMap then
@@ -192,7 +196,7 @@ local function climbStep()
         if stall > STALL_LIMIT then
           error(string.format(
             "climb stalled at map %d (%d,%d) after %d aligned frames: blind-UP " ..
-            "cannot advance here (a corridor turn or wall).  Teach this leg an " ..
+            "cannot advance here (a corridor turn or wall).  Teach this segment an " ..
             "H.navTo target -- see the route map in the header.",
             H.mapId(), H.fieldX(), H.fieldY(), stall), 0)
         end
@@ -202,10 +206,10 @@ local function climbStep()
   end)
 end
 
--- ------------------------------------------------------- the mint's proof --
--- The captured doorstep, held in memory until the sweep clears it.  Emitting
--- only after validation means a run that fails leaves NO whelk_doorstep.mss
--- behind to be mistaken for a good one.
+-- -------------------------------------------- the generated state's proof --
+-- The captured entry point, held in memory until the sweep clears it.
+-- Emitting only after validation means a run that fails leaves NO
+-- whelk_doorstep.mss behind to be mistaken for a good one.
 local mintReq, doorstep = nil, nil
 
 -- The single deliberate step onto the trigger (verbatim from gen_whelk.lua
@@ -259,25 +263,27 @@ end, emu.callbackType.write, 0x7E5755, 0x7E5761)
 -- Battle init seeds the RNG index from the game-time frame counter --
 -- `lda $021e / asl2 / sta $be` (battle_main.asm:6092-6094) -- and $021E
 -- ticks once per frame, wrapping at 60 (time_calc, C3/13C8-C3/1410).  So the
--- doorstep's frame phase picks one of sixty battle seeds, InitGauge draws
+-- entry point's frame phase picks one of sixty battle seeds, InitGauge draws
 -- the starting ATB gauges off it (battle_main.asm:6230+), and that decides
 -- whose menu opens first.  That much the old comment here had right.
 --
--- What it had wrong is that the mint can steer it.  It cannot: the seed is
--- set at BATTLE init, not at the doorstep, so every consumer adds its own
--- walk length to the mint's phase before the roll happens.  Measured, all
--- three consumers on one identical fixture (sha 84209ed55945):
---   probe_shadow_overlap  264 frames doorstep -> fight
+-- What it had wrong is that the generator can steer it.  It cannot: the
+-- seed is set at BATTLE init, not at the entry point, so every consumer
+-- adds its own walk length to the generator's phase before the roll
+-- happens.  Measured, all three consumers on one identical fixture (sha
+-- 84209ed55945):
+--   probe_shadow_overlap  264 frames entry point -> fight
 --   battle_whelkwipe      266
 --   battle_dlgmenu        267
 -- Three walks, three residues of $021E, three different seeds.  One knob
 -- here cannot set three rolls, so "advance a frame and re-check" would only
--- move the coin flip around -- it would satisfy whichever consumer the mint
--- happened to imitate and re-roll the other two.
+-- move the coin flip around -- it would satisfy whichever consumer the
+-- generator happened to imitate and re-roll the other two.
 --
--- The useful thing the mint CAN do is prove the fixture does not depend on
--- the roll at all.  So: replay the doorstep at four spread phases, and
--- require of each that the Whelk fight comes up, a battle command menu
+-- The useful thing the generator CAN do is prove the fixture does not
+-- depend on the roll at all.  So: replay the entry point at four spread
+-- phases, and require of each that the Whelk fight comes up, a battle
+-- command menu
 -- opens, and a command list actually draws.  Four seeds is not sixty --
 -- this is a roll-dependence detector, not a proof over the whole seed space
 -- -- but it is the difference between a fixture that happened to work once
@@ -302,13 +308,14 @@ local steps = {
   -- ===================================================================== --
   -- Phase 2a: frame 15500 is still MID-CREDITS (measured: poweron_cliff.png
   -- shows the "MAIN PROGRAMMER" snow walk, byte-identical to the passing
-  -- mint's gen_cliff.png), and a hands-off pad from here leaves the game in
-  -- the attract loop FOREVER (measured: the map/position signature repeats
-  -- with an ~11k-frame period -- the real game never starts).  The blind
-  -- UP-hold + A-press masher is what lands the game-starting keypress and
-  -- rides the cliff dialogs into the first scripted guard fight, so reuse it
-  -- VERBATIM from gen_battle_state.lua:38-53 (minus the rolling-savestate
-  -- machinery), with its exact proven terminator: battleLoadStarted().
+  -- generator's gen_cliff.png), and a hands-off pad from here leaves the
+  -- game in the attract loop FOREVER (measured: the map/position signature
+  -- repeats with an ~11k-frame period -- the real game never starts).  The
+  -- blind UP-hold + A-press masher is what lands the game-starting keypress
+  -- and rides the cliff dialogs into the first scripted guard fight, so
+  -- reuse it VERBATIM from gen_battle_state.lua:38-53 (minus the
+  -- rolling-savestate machinery), with its exact proven terminator:
+  -- battleLoadStarted().
   -- ===================================================================== --
   H.driveUntil(function() return H.battleLoadStarted() end, 15000, {
     H.hold({ "up" }), H.waitFrames(20), H.release(), H.waitFrames(2),
@@ -354,7 +361,7 @@ local steps = {
   -- self-gating on $0131) springs en route if BFS crosses it; navTo clears
   -- it like any fight.
   -- ===================================================================== --
-  H.navTo(31, 23, { maxFrames = 14000, honest = true }),
+  H.navTo(31, 23, { maxFrames = 14000, playBattles = true }),
   H.logStep(function()
     return string.format("at the mines approach (31,23), frame %d", H.frame)
   end),
@@ -399,7 +406,7 @@ local steps = {
   -- ===================================================================== --
   H.navTo(42, 9, {
     arrive = function() return blastDone() or whelk() end,
-    maxFrames = 16000, spare = SPARE, honest = true,
+    maxFrames = 16000, spare = SPARE, playBattles = true,
   }),
   -- navTo can complete in the 1-frame window between landing on (42,9) and
   -- the event engine starting the scene (measured: run 4 arrived in exactly
@@ -408,37 +415,39 @@ local steps = {
   -- ($0011), stays hands-off through the choreography, and returns the
   -- moment switch $012C lands.  Instant no-op if the scene already ran.
   H.advanceStory(function() return blastDone() end, 4000,
-    { spare = SPARE, honest = true }),
+    { spare = SPARE, playBattles = true }),
   H.logStep(function()
     return string.format("door blasted (switch $012C set); at (%d,%d), frame %d",
       H.fieldX(), H.fieldY(), H.frame)
   end),
 
   -- ===================================================================== --
-  -- Phase 3b: BFS to the doorstep tile (42,6), one south of the trigger --
+  -- Phase 3b: BFS to the entry-point tile (42,6), one south of the trigger --
   -- from (42,8) that is two steps up the now-open door column, never
   -- touching (42,5).  Identical contract to gen_whelk.lua:54.
   -- ===================================================================== --
   H.navTo(42, 6, { arrive = whelk, maxFrames = 8000, spare = SPARE,
-                   honest = true }),
+                   playBattles = true }),
 
   -- ===================================================================== --
-  -- Phase 4: assert + mint + prove.  Mirrors gen_whelk.lua:56-112 so the two
-  -- generators emit interchangeable states (downstream tests are documented
-  -- mint-independent: battle_dlgmenu / battle_whelkwipe / probe_shadow_overlap
-  -- each load whelk_doorstep.mss and drive it onto the trigger themselves).
+  -- Phase 4: assert + generate + prove.  Mirrors gen_whelk.lua:56-112 so
+  -- the two generators emit interchangeable states (downstream tests are
+  -- documented generator-independent: battle_dlgmenu / battle_whelkwipe /
+  -- probe_shadow_overlap each load whelk_doorstep.mss and drive it onto the
+  -- trigger themselves).
   -- ===================================================================== --
   H.cond(function() return whelk() end, {
     -- shouldn't happen (BFS from the south never crosses (42,5)); if the event
-    -- somehow fired en route the fight IS the goal -- just no doorstep this run
-    H.logStep("whelk fired en route; NO doorstep state minted this run"),
+    -- somehow fired en route the fight IS the goal -- just no entry point
+    -- this run
+    H.logStep("whelk fired en route; NO entry point state generated this run"),
   }, {
     H.call(function()
       H.assertEq(H.mapId(), 41, "on the Narshe mines map (41)")
       H.assertEq(H.fieldX() == 42 and H.fieldY() == 6, true,
-        "at the whelk doorstep (42,6)")
+        "at the whelk entry point (42,6)")
       H.assertEq(H.hasControl() and H.tileAligned(), true,
-        "doorstep is calm (user control, at rest, no battle)")
+        "entry point is calm (user control, at rest, no battle)")
       H.assertEq(whelkDone(), false,
         "whelk-done switch $1EA6 bit $20 is CLEAR (trigger still live)")
     end),
@@ -448,17 +457,17 @@ local steps = {
     H.call(function() mintReq = H.requestSaveState() end),
     H.waitFrames(2),
     H.call(function()
-      H.checkReq(mintReq, "doorstep savestate capture")
+      H.checkReq(mintReq, "entry point savestate capture")
       doorstep = mintReq.blob
-      H.log(string.format("doorstep captured at (42,6), frame %d (%d bytes) " ..
+      H.log(string.format("entry point captured at (42,6), frame %d (%d bytes) " ..
         "-- NOT emitted until the sweep below passes", H.frame, #doorstep))
     end),
   }),
 }
 
 -- ===================================================================== --
--- Phase 5: THE SWEEP.  Replay the captured doorstep at each phase and
--- require a usable fight of every one.  This is also the mint's positive
+-- Phase 5: THE SWEEP.  Replay the captured entry point at each phase and
+-- require a usable fight of every one.  This is also the generator's positive
 -- control -- it takes the same deliberate step onto (42,5) the old
 -- single-shot control did, four times, and asks more of each.
 -- ===================================================================== --
@@ -471,23 +480,23 @@ for _, k in ipairs(SWEEP) do
     H.call(function() loadReq = H.requestLoadState(doorstep) end),
     H.waitFrames(2),
     H.call(function()
-      H.checkReq(loadReq, tag .. ": doorstep reload")
+      H.checkReq(loadReq, tag .. ": entry point reload")
       -- DOCUMENTED GAP (issue #75): this sweep used to zero the codex
       -- signature bytes at $316000/1 to imitate H.loadState's consumer-side
-      -- wipe.  Those were the mint's last two state writes, so they are
-      -- gone: the replays now run on the honest run's OWN battery -- the
-      -- codex holds whatever the gauntlet fights genuinely taught.  That is
-      -- a fidelity difference from consumers (which still wipe at load),
-      -- but nothing the sweep asserts -- whelk fires, a menu opens, a list
-      -- draws -- reads the codex, so the roll-dependence detector it exists
-      -- to be is unchanged.
+      -- wipe.  Those were the generator's last two state writes, so they are
+      -- gone: the replays now run on the input-driven run's OWN battery --
+      -- the codex holds whatever the gauntlet fights genuinely taught.
+      -- That is a fidelity difference from consumers (which still wipe at
+      -- load), but nothing the sweep asserts -- whelk fires, a menu opens,
+      -- a list draws -- reads the codex, so the roll-dependence detector it
+      -- exists to be is unchanged.
       listWrites = 0
     end),
     H.waitFrames(k),        -- the phase itself: k more ticks of $021E
     H.call(function()
       shot.t0 = H.readByte(0x021e)
       H.assertEq(H.fieldX() == 42 and H.fieldY() == 6, true,
-        tag .. ": reloaded state is the doorstep (42,6)")
+        tag .. ": reloaded state is the entry point (42,6)")
     end),
     H.driveUntil(function() return whelk() end, 2200,
       { stepOntoTrigger() }, tag .. ": whelk event fires"),
@@ -529,7 +538,7 @@ for _, k in ipairs(SWEEP) do
 end
 
 steps[#steps + 1] = H.call(function()
-  H.log("---- doorstep proved usable at every swept phase ----")
+  H.log("---- entry point proved usable at every swept phase ----")
   for _, line in ipairs(seen) do H.log("  " .. line) end
 end)
 
@@ -551,12 +560,12 @@ end)
 -- whelk_doorstep.mss at all rather than an unvalidated one.
 steps[#steps + 1] = H.call(function()
   H.emitBlob("whelk_doorstep.mss", doorstep)
-  H.log("doorstep minted")
+  H.log("entry point generated")
 end)
 
--- Budget: the kill-bit route reached the doorstep at ~24.3k frames and the
--- whole run (sweep included) fit 60k.  Honest fights spend real ATB rounds
--- on the gauntlet, the ambush, and any random draw, so the ceiling carries
--- headroom for the difference; the mint log's "doorstep captured at" line
--- is the per-run measurement.
+-- Budget: the battle-clear-write route reached the entry point at ~24.3k
+-- frames and the whole run (sweep included) fit 60k.  input-driven fights
+-- spend real ATB rounds on the gauntlet, the ambush, and any random draw,
+-- so the ceiling carries headroom for the difference; the generation log's
+-- "doorstep captured at" line is the per-run measurement.
 H.run({ maxFrames = 90000 }, steps)

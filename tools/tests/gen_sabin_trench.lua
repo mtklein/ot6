@@ -1,5 +1,5 @@
--- gen_sabin_trench.lua -- leg 11, the last of SABIN's scenario: Crescent
--- Mountain, the Serpent Trench, and the Nikeah ferry.  Mints:
+-- gen_sabin_trench.lua -- step 11, the last of SABIN's scenario: Crescent
+-- Mountain, the Serpent Trench, and the Nikeah ferry.  Generates:
 --   sabin_done.mss   map 9 (the scenario hub), $0044=1 -- SABIN's scenario
 --                    complete, the hub's "Choose a scenario…kupo!" spoken,
 --                    the party dissolved to the hub's MOG cursor
@@ -36,8 +36,8 @@
 --   forever.  _ca8d22 sails the ship, replays 187 {14,16} for the
 --   "stone's throw from Narshe" beat, sets $0044=1 and calls _caad4c: the
 --   hub.  (The reunion if_all needs $0021+$001E+$0044 in ONE playthrough;
---   the honest chain has only $0044, so the hub speaks and hands control
---   back -- the stacked replays are where the reunion fires.)
+--   the input-driven chain has only $0044, so the hub speaks and hands
+--   control back -- the stacked replays are where the reunion fires.)
 local H = dofile("tools/tests/lib/ot6.lua")
 local DOOR = "build/states/gau_joined.mss.lua"
 
@@ -136,7 +136,7 @@ local function ride(dir, pred, what, budget, choiceWant)
       if inBattle() or H.battleLoadStarted() then
         battN = battN + 1
         if battN < 900 and H.monstersPresent() > 0 then
-          H.setPad({ l = true, r = true })   -- flee, honestly
+          H.setPad({ l = true, r = true })   -- flee, with real input
         else
           if battN == 900 then
             H.log(string.format("[trench:%s] formation would not run for " ..
@@ -225,7 +225,7 @@ local function diveAttempt(n)
       H.waitFrames(60 + (n - 1) * 17),
     }, {}),
     H.call(function() rideLost, rideWipeN = nil, 0 end),
-    H.navTo(25, 18, { maxFrames = 12000, honest = "flee", arrive = function()
+    H.navTo(25, 18, { maxFrames = 12000, playBattles = "flee", arrive = function()
       return sw(0x41) == 1 or (H.fieldX() == 25 and H.fieldY() == 18
          and H.hasControl() and H.tileAligned()) end }),
     ride("up", function()
@@ -275,7 +275,7 @@ H.run({ maxFrames = 200000 }, {
   end),
 
   -- step into Crescent Mountain
-  H.worldNavTo(214, 148, { maxFrames = 4000, honest = "flee",
+  H.worldNavTo(214, 148, { maxFrames = 4000, playBattles = "flee",
     arrive = function() return not H.worldMode() end }),
   settle(167, "Crescent 167"),
 
@@ -314,7 +314,7 @@ H.run({ maxFrames = 200000 }, {
         table.concat(rows[y], ",")))
     end
   end),
-  H.navTo(12, 23, { maxFrames = 8000, honest = "flee" }),
+  H.navTo(12, 23, { maxFrames = 8000, playBattles = "flee" }),
   -- (12,22) runs a PRELIMINARY beat (GAU scampers ahead; the party is
   -- re-parked at (12,17)); the $0041 helmet scene proper is _cbc5fb's
   -- tail, triggered at (25,17)
@@ -327,7 +327,7 @@ H.run({ maxFrames = 200000 }, {
     end, "the (12,22) beat", 15000)
   end)(),
   -- TOP UP BEFORE THE DIVE.  The ride's three underwater battles are
-  -- the leg's real HP race: probe_trench_arrows reached Nikeah at
+  -- the step's real HP race: probe_trench_arrows reached Nikeah at
   -- 28/0/0, and the losing timelines wipe outright.  The party arrives
   -- from gau_joined carrying ~20 Tonics and the field menu works here;
   -- one care stop is the difference between diving at half HP and
@@ -360,7 +360,7 @@ H.run({ maxFrames = 200000 }, {
   end),
 
   -- the ferry clerk at (17,15): option 1 boards
-  H.navTo(17, 16, { maxFrames = 8000, honest = "flee" }),
+  H.navTo(17, 16, { maxFrames = 8000, playBattles = "flee" }),
   (function()
     local phase = 0
     return H.driveUntil(function()
@@ -390,7 +390,7 @@ H.run({ maxFrames = 200000 }, {
   end),
   H.saveState("sabin_done.mss"),
   H.logStep(function()
-    return string.format("sabin_done minted at frame %d -- the scenario arc "..
+    return string.format("sabin_done generated at frame %d -- the scenario arc "..
       "closes at the hub", H.frame)
   end),
 })

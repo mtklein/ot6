@@ -29,7 +29,7 @@
 --      Ot6RevealCommit's tail, and #63 was filed on the theory that this made
 --      it reveal-dependent; it does not, because Ot6RevealPoll calls that proc
 --      on every damage-numeral edge whether anything is pending or not.  This
---      phase is a PIN on that, not a witness -- it passes pre-fix too.
+--      phase is a PIN on that, not a regression check -- it passes pre-fix too.
 --   6c. THE BREAK THAT ALSO KILLS (#63, THE REGRESSION).  A breaking hit takes
 --      elemental x2 AND broken x2, so in real play the break usually IS the
 --      kill -- and pinLab's HP pin made that case unreachable here, which is
@@ -54,7 +54,7 @@
 -- byte per slot, :23374) is pinned nonzero for both guards.  Every palette-3
 -- frame observed after that is OT6's.
 --
--- Otherwise battle_break.lua's proven laboratory: walk into the doorstep
+-- Otherwise battle_break.lua's proven laboratory: walk into the entry-point
 -- guard fight, poke both guards fire-weak and tough, spam Fire Beam.  Guards
 -- sit in monster slots 2/3 -> slot offsets 4/6.
 
@@ -233,7 +233,7 @@ H.run({ maxFrames = 60000 }, {
   H.driveUntil(function() return H.battleLoadStarted() end, 4000, {
     H.hold({ "up" }), H.waitFrames(20), H.release(), H.waitFrames(2),
     H.pressButtons({ "a" }, 4),
-  }, "battle load from doorstep"),
+  }, "battle load from entry point"),
   H.waitUntil(function() return H.battleActive() end, 900, "battle active", 30),
   H.waitFrames(240),
 
@@ -381,13 +381,13 @@ H.run({ maxFrames = 60000 }, {
   end),
 
   -- ---------------- phase 2: two armed at once share one cleave -----------
-  -- The doorstep is a two-monster formation and a single-target beam cannot
+  -- The entry point is a two-monster formation and a single-target beam cannot
   -- break both in one action, so the multi-break case is staged at the
   -- mechanism: bank BOTH pending and let the next numeral arm them.
   H.call(function()
     resetWatch()
     for g = 1, 2 do
-      H.writeByte(BROKEN + G[g], 0)            -- unbreak: no re-chip, no gate
+      H.writeByte(BROKEN + G[g], 0)            -- unbreak: no re-chip, no check
       H.writeByte(BRKTICK + G[g], 0xFF)        -- both pending
     end
     pinLab()
@@ -473,9 +473,9 @@ H.run({ maxFrames = 60000 }, {
   -- BYTE-IDENTICAL across the whole phase.  So the break moment cannot be
   -- riding a reveal -- there is none to ride.
   --
-  -- HONEST ABOUT FAIL-BEFORE: this phase passes on the pre-#63 ROM too.  It is
-  -- a pin on a property that was already true, not the witness for the bug --
-  -- phase 5 is.
+  -- FAIL-BEFORE, STATED PLAINLY: this phase passes on the pre-#63 ROM too.  It
+  -- is a pin on a property that was already true, not the check that catches
+  -- the bug -- phase 5 is.
   H.call(function()
     resetWatch()
     local b = H.vars.tgt

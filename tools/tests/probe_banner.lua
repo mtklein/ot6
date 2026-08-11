@@ -91,7 +91,7 @@ H.run({ maxFrames = 12000 }, {
   H.driveUntil(function() return H.battleLoadStarted() end, 4000, {
     H.hold({ "up" }), H.waitFrames(20), H.release(), H.waitFrames(2),
     H.pressButtons({ "a" }, 4),
-  }, "battle load from doorstep"),
+  }, "battle load from the entry point"),
 
   H.waitUntil(function() return H.battleActive() end, 900,
     "battle to become active (screen rendering)", 30),

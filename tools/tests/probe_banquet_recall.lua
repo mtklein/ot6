@@ -4,7 +4,7 @@
 -- plus in-run savestate blobs to replay the same choice point with all
 -- three answers.
 --
--- WHY THIS EXISTS.  gen_banquet_done's honest rebuild read $0231/2/3 as
+-- WHY THIS EXISTS.  gen_banquet_done's input-driven rebuild read $0231/2/3 as
 -- ALL ZERO right after the first question's +2 landed (runs sn55GdwQ,
 -- MAh3rdsY) and concluded the record mechanic might be broken --
 -- "recall's +5 cannot be relied on".  The event source says otherwise

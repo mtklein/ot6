@@ -23,15 +23,15 @@
 --                    tier the reels were spun with.
 --   Ot6BoostDmg's $0f gate -- slot attacks never get the damage multiplier.
 --
--- ISSUE #75 SPLIT.  battle_slotsboot (the honest model this file now
--- follows) proves tier 0 and tier 3 end to end on a NATURAL anchor boot:
+-- ISSUE #75 SPLIT.  battle_slotsboot (the input-driven model this file now
+-- follows) proves tier 0 and tier 3 end to end on a NATURAL checkpoint boot:
 -- latch 0/3, rig forced benevolent at 3, the chosen triple, the 3-bp
 -- charge, the regen, and the multiplier exemption watch -- so this file's
 -- old poked tier-3 arm is DELETED as covered.  What remains here splits in
 -- two:
 --
---   HONEST HALF (zero writes): a second natural boot of the
---   terra-returned-v1 battery anchor (battle_slotsboot's cold-Continue /
+--   INPUT-DRIVEN HALF (zero writes): a second natural boot of the
+--   terra-returned-v1 SRAM checkpoint (battle_slotsboot's cold-Continue /
 --   disembark / walk / choose-the-draw pattern, verbatim), driving the two
 --   tiers slotsboot leaves unproven with real R presses on earned bp:
 --     H1 (1 bp): latch = 1, the 1-bp charge with regen skipped, and the
@@ -41,18 +41,18 @@
 --        quarantine lab where the byte can be planted).
 --     H2 (2 bp, banked by two real unboosted spins): latch = 2, THE RIG
 --        FORCED BENEVOLENT ($00, or $3c under a real joker gate) -- read,
---        not written -- reel-2 help blessed toward reel 1's honest icon
---        with vanilla's 4-icon budget stored by the $f0 hook, and the 2-bp
---        charge.
+--        not written -- reel-2 help blessed toward the icon reel 1 really
+--        stopped on, with vanilla's 4-icon budget stored by the $f0 hook,
+--        and the 2-bp charge.
 --
 --   *** LABELED QUARANTINE LAB (issue #75) -- the icon/rig-byte arms ***
 --   No player input selects a reel icon: the reels free-run at frame rate
 --   and a press stops them wherever the frame parity fell, so "a cursed
 --   pair of 3s", "the same triple at tier 0 and tier 3" (the exemption
 --   A/B), and "a 7-pair under the joker gate" are unproducible on cue by
---   any honest drive.  Those arms are MECHANISM unit tests (burn-down plan
+--   any input-driven drive.  Those arms are MECHANISM unit tests (burn-down plan
 --   systemic call 2) and stay below as one loudly-labeled block on the old
---   doorstep install rig -- rig bytes planted, reel positions parked,
+--   entry-point install rig -- rig bytes planted, reel positions parked,
 --   stopped reels restarted to replay the driver's boundary walk, monsters
 --   staged so nothing dies mid-observation.  The block keeps this file's
 --   waiver lines and MAY NEVER PRODUCE FIXTURES.  Arms: T0 byte-vanilla +
@@ -132,7 +132,7 @@ local steps = {}
 local function add(t) for _, s in ipairs(t) do steps[#steps + 1] = s end end
 
 -- ========================================================================
--- HONEST HALF -- the natural anchor boot (battle_slotsboot's pattern)
+-- INPUT-DRIVEN HALF -- the natural checkpoint boot (battle_slotsboot's pattern)
 -- ========================================================================
 local slotOf = {}
 local function ent() return actor * 2 end
@@ -214,8 +214,8 @@ local function waitStopH(r, what)
   return H.waitUntil(function() return H.readByte(STOP[r]) ~= 0 end, 900, what, 2)
 end
 
--- one full honest spin at the CURRENT pending tier; asserts run via `checks`
-local function honestSpin(tag, checks)
+-- one full spin played through real input at the CURRENT pending tier; asserts run via `checks`
+local function playedSpin(tag, checks)
   return {
     openSlotWindow(tag),
     pressAUntilH(PRESS[1], tag .. " press1"),
@@ -232,7 +232,7 @@ local function honestSpin(tag, checks)
 end
 
 add({
-  -- cold Continue (the anchor's $307ff0=3 preselects slot 3)
+  -- cold Continue (the checkpoint's $307ff0=3 preselects slot 3)
   H.waitFrames(350),
   H.repeatN(5, { H.pressButtons({ "start" }, 8), H.waitFrames(25) }),
   H.waitFrames(120),
@@ -263,7 +263,7 @@ add({
   H.waitFrames(30),
 })
 
--- walk the plain and CHOOSE the draw (slotsboot's gate: this run needs FOUR
+-- walk the plain and CHOOSE the draw (slotsboot's check: this run needs FOUR
 -- resolutions, so the floor is higher)
 add({ H.call(function() H.vars.suitable = false end) })
 for n = 1, 6 do
@@ -334,7 +334,7 @@ add({
     H.assertEq(pend(actor), 1, "one real R press banks pending 1")
   end),
 })
-add(honestSpin("H1", {
+add(playedSpin("H1", {
   afterPress1 = function()
     H.assertEq(H.readByte(LATCH), 1,
       "H1: Ot6SlotRig latched tier 1 at the first press")
@@ -376,7 +376,7 @@ add({
   -- ------------------------------- bank 2 bp with two unboosted spins
   menuFor(SETZER, "setzer menu (bank spin 1)"),
 })
-add(honestSpin("bank1", {}))
+add(playedSpin("bank1", {}))
 add({
   H.driveUntil(function() return bp(actor) == 1 end, 15000, {
     H.call(function()
@@ -387,7 +387,7 @@ add({
   }, "bank1: unboosted spin regens 0 -> 1"),
   menuFor(SETZER, "setzer menu (bank spin 2)"),
 })
-add(honestSpin("bank2", {}))
+add(playedSpin("bank2", {}))
 add({
   H.driveUntil(function() return bp(actor) == 2 end, 15000, {
     H.call(function()
@@ -405,7 +405,7 @@ add({
     driftW = {}
   end),
 })
-add(honestSpin("H2", {
+add(playedSpin("H2", {
   afterPress1 = function()
     H.assertEq(H.readByte(LATCH), 2, "H2: latched tier 2")
     local want = (H.readByte(JOKER) & 4) ~= 0 and 0x3C or 0x00
@@ -414,7 +414,7 @@ add(honestSpin("H2", {
       .. "machine, not written to it", want))
   end,
   afterPress2 = function()
-    -- reel 1 stopped wherever the honest press fell; the bless must aim
+    -- reel 1 stopped wherever the real press fell; the bless must aim
     -- reel 2 at THAT icon (unless it is the joker-gated 7)
     local i1 = icon(1)
     local gated = i1 == 0 and (H.readByte(JOKER) & 4) ~= 0
@@ -423,7 +423,7 @@ add(honestSpin("H2", {
       H.assertEq(H.readByte(HELP1), 0xFF, "H2: 7s stay gated")
     else
       H.assertEq(H.readByte(HELP1), i1, string.format(
-        "H2: reel 2 blessed toward reel 1's honest icon %d", i1))
+        "H2: reel 2 blessed toward reel 1's actual icon %d", i1))
       H.assertEq(lastF0Drift(), 0x04,
         "H2: with vanilla's 4-icon budget, stored by the $f0 hook")
     end
@@ -456,9 +456,9 @@ add({
   H.call(function()
     H.assertEq(bp(actor), 0, "H2: 2 bp - 2 spent = 0")
     H.assertEq(#mulHits, 0,
-      "EXEMPTION (honest half): the damage multiplier never ran under cmd "
+      "EXEMPTION (unrigged half): the damage multiplier never ran under cmd "
       .. "$0f across all four natural resolutions")
-    H.log("honest half complete: tier-1 and tier-2 latch/rig/bless/economy "
+    H.log("unrigged half complete: tier-1 and tier-2 latch/rig/bless/economy "
       .. "on a natural boot")
   end),
 })
@@ -556,7 +556,7 @@ local hp3, d3, hp0, d0
 
 add({
   H.call(function()
-    H.log("*** entering the LABELED QUARANTINE LAB (doorstep install rig; "
+    H.log("*** entering the LABELED QUARANTINE LAB (entry-point install rig; "
       .. "see header) ***")
     msPresent = {}
     actor = nil
@@ -737,7 +737,7 @@ add({
 
   -- ==================================================== ARM T3b: exemption A/B
   -- the same triple at 3 bp and then at 0 bp: unboosted damage D0 must sit
-  -- in the same band as boosted D3 -- the multiplier would have made D3 ~8x.
+  -- in the same range as boosted D3 -- the multiplier would have made D3 ~8x.
   H.call(function()
     H.writeByte(0x3E9C + actor * 2, 5)
     H.writeByte(0x3E9D + actor * 2, 3)

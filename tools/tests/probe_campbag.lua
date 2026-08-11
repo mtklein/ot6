@@ -1,6 +1,6 @@
 -- probe_campbag.lua -- one-shot diagnostic: what does camp_cleared carry?
 -- Party HP/MP per character and the full non-empty inventory, so the
--- escape leg's healing budget is a measurement instead of a guess.
+-- escape step's healing budget is a measurement instead of a guess.
 local H = dofile("tools/tests/lib/ot6.lua")
 
 H.run({ maxFrames = 2000 }, {

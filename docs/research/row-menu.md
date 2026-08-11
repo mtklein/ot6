@@ -453,13 +453,14 @@ All three gain **half physical damage taken** (§3.3) for that price.
 ### 4.4 What I could not settle from source, and the probe
 
 `char_prop.asm` gives the weapon each character *joins with*. What they are
-actually holding when the honest route reaches the Magitek Factory depends on
-chests, shops and whatever the generator equipped — that is save state, not
-source. **Probe:** read the equipped weapon at **`$1600 + 37*c + $1F`**
-(`ff6/notes/field-ram.txt:923`, `field/event.asm:1056-1057`) and the off-hand at
-`+$20`, then look up `ItemProp + 30*id + 19` and test bit `$20`. `ItemProp` is an
-exported symbol (`item.asm:2592`), so a fixture can resolve it from the map file
-the way `tools/tests/battle_magicite.lua` resolves `MagicProp`.
+actually holding when the input-driven route reaches the Magitek Factory
+depends on chests, shops and whatever the generator equipped — that is save
+state, not source. **Probe:** read the equipped weapon at
+**`$1600 + 37*c + $1F`** (`ff6/notes/field-ram.txt:923`,
+`field/event.asm:1056-1057`) and the off-hand at `+$20`, then look up
+`ItemProp + 30*id + 19` and test bit `$20`. `ItemProp` is an exported symbol
+(`item.asm:2592`), so a fixture can resolve it from the map file the way
+`tools/tests/battle_magicite.lua` resolves `MagicProp`.
 
 Shops *do* stock back-row weapons early — scanning `ff6/src/menu/shop_prop.dat`
 (128 records × 9 bytes: type byte + 8 item ids) shows `FLAIL` in shop records 0

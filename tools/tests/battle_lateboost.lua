@@ -32,7 +32,7 @@
 -- and -- the subtle one -- no saved-cursor pokes: the list cursor walks
 -- to Fire by real d-pad edges against the live $8913/$8917/$891B bytes.
 -- The bank is EARNED (1 bp at open + 1 regen from a real zero-MP Tonic
--- turn = 2), and that resizes the arithmetic honestly: ONE R at the
+-- turn = 2), and that resizes the arithmetic accordingly: ONE R at the
 -- target cursor is the accepted spend (pending 1 folds Fire -> Fire 2,
 -- 20 MP against her real 29 -- the tier her wallet buys, battle_fold's
 -- doctrine), and the post-commit refusal keeps its teeth because bp 2 >
@@ -136,7 +136,7 @@ H.run({ maxFrames = 60000 }, {
       if not dir then H.setPad({}); return end
       H.setPad({ [dir] = true })
     end),
-  }, "grass-band encounter"),
+  }, "grass-area encounter"),
   H.release(),
   H.waitUntil(function() return H.battleActive() end, 900, "battle active", 30),
   H.waitFrames(90),

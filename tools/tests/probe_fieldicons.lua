@@ -143,7 +143,8 @@ H.run({ maxFrames = 30000 }, {
   end),
   -- driveUntil, not a single press: this probe is meant to be run against a
   -- DIFFERENT ROM too (OT6_ROM=<pre-change>.sfc), where the fixture's timing
-  -- is not the timing it was minted for and one X can land on a dead frame.
+  -- is not the timing it was generated for and one X can land on a dead
+  -- frame.
   H.driveUntil(function() return st() == ST_MAIN end, 1200,
     { H.pressButtons({ "x" }, 4), H.waitFrames(30) }, "main menu"),
   H.waitFrames(30),

@@ -1,8 +1,8 @@
--- gen_vector_crash.lua -- v0.7 LEG H->I (issue #31), and the generator
--- that cuts battery anchor I, `vector-crash-v1`.
+-- gen_vector_crash.lua -- v0.7 STEP H->I (issue #31), and the generator
+-- that cuts battery checkpoint I, `vector-crash-v1`.
 --
--- The leg: cold-Continue the tracked `gate-cave-save-v1` battery (boundary
--- H -- map 386 (74,53), the band's only interior save point), assert its
+-- The step: cold-Continue the tracked `gate-cave-save-v1` battery (boundary
+-- H -- map 386 (74,53), the area's only interior save point), assert its
 -- contract, then:
 --   1. leave the save room (386 (73,59) short entrance -> 384 (64,12));
 --   2. THE 384 WEST TRAVERSE (measured, probe_v07_384west/2/3/4/5 +
@@ -21,7 +21,7 @@
 --      then the (121,23) -> (4,37) teleport (short-entrance record; the
 --      pairs are one-way: (4,36)->(121,22) is the return) and the west
 --      walk to the gate door row (9..11,27) -- a 3-tile long entrance,
---      len 2 H, so the doorstep must sit OFF that row.
+--      len 2 H, so the entry point must sit OFF that row.
 --      The (58,18) span switch, the (89,29)/(96,18)/(99,18) walk-overs
 --      and the (112,16)/(99,13) toggles are NOT on this route: the span
 --      only opens the (46..41,11) west bridge (a dead end for the
@@ -29,7 +29,7 @@
 --   3. THE SEALED GATE SCENE (map 391; entry (8,21) IS the scene trigger,
 --      _cb39ca, :45953): ridden hands-off with advanceStory, battles 121
 --      and 122 in opts.spare -- the $17b dummy is unloseable and must
---      NEVER be kill-bitted (its battle_event IS the scene, measured).
+--      NEVER be write-cleared (its battle_event IS the scene, measured).
 --      The tail sets $0079=1 and returns control at 384 (10,28);
 --   4. out the post-gate shortcut ((5,43) -> _cb2a9f -> 382 (31,41),
 --      exposed by the $0079 map-init retile), the cave mouth (25,38) ->
@@ -112,7 +112,7 @@ end
 
 -- tapLever / stepOff: the measured lever and re-entry-escape idioms this
 -- generator introduced now live in lib/ot6_field.lua (M.tapLever /
--- M.stepOff -- promoted 2026-07-28 when the I->J leg needed both again).
+-- M.stepOff -- promoted 2026-07-28 when the I->J step needed both again).
 local tapLever, stepOff = H.tapLever, H.stepOff
 
 local function landed(m, n)
@@ -171,7 +171,7 @@ H.run({ maxFrames = 240000 }, {
   pressWalk("down", function()
     return H.fieldY() >= 55 and H.tileAligned()
   end, 1200, "held DOWN off the save-point re-entry tile"),
-  H.navTo(73, 58, { honest = "flee", maxFrames = 9000 }),
+  H.navTo(73, 58, { playBattles = "flee", maxFrames = 9000 }),
   pressWalk("down", function() return map() == 384 end, 1200,
     "held DOWN off 386 (73,59) -> 384 (64,12)"),
   H.waitUntil(landed(384, 10), 2400, "384 re-entry", 1),
@@ -182,16 +182,16 @@ H.run({ maxFrames = 240000 }, {
   end),
 
   -- ---- 2. the west traverse: two levers, one teleport ---------------------
-  H.navTo(71, 15, { honest = "flee", maxFrames = 20000 }),
+  H.navTo(71, 15, { playBattles = "flee", maxFrames = 20000 }),
   tapLever(0x0174, 900, "tap-once UP+A on (71,15) -> $0174 (the x=76 column)"),
   stepOff({ "down", "left", "right", "up" }, 2400,
     "step off the (71,15) re-entry trigger"),
-  H.navTo(104, 17, { honest = "flee", maxFrames = 30000 }),
+  H.navTo(104, 17, { playBattles = "flee", maxFrames = 30000 }),
   tapLever(0x01F5, 900, "tap-once UP+A on (104,17) -> $01F5 (the tower)"),
   H.release(),
   stepOff({ "down", "left", "right" }, 2400,
     "step off the (104,17) toggle (a further A press would toggle it back)"),
-  H.navTo(121, 22, { honest = "flee", maxFrames = 20000 }),
+  H.navTo(121, 22, { playBattles = "flee", maxFrames = 20000 }),
   pressWalk("down", function()
     return H.fieldX() <= 8 and H.tileAligned()
   end, 2400, "held DOWN onto the (121,23) teleport -> (4,37)"),
@@ -205,11 +205,11 @@ H.run({ maxFrames = 240000 }, {
   -- ---- 3. the gate door and the scene -------------------------------------
   -- the door row (9..11,27) is approached from the SOUTH (census G: the
   -- x=9..11 column below it is the only walkway; (12,27) is not walkable),
-  -- so the doorstep is (10,28) -- the same tile the scene exits onto
-  H.navTo(10, 28, { honest = "flee", maxFrames = 20000 }),
+  -- so the entry point is (10,28) -- the same tile the scene exits onto
+  H.navTo(10, 28, { playBattles = "flee", maxFrames = 20000 }),
   H.call(function()
-    assertGateParty("the gate doorstep (field side, before the scene)")
-    H.assertEq(sw(0x0079), 0, "$0079 CLEAR at the doorstep")
+    assertGateParty("the gate entry point (field side, before the scene)")
+    H.assertEq(sw(0x0079), 0, "$0079 CLEAR at the entry point")
     H.screenshot("leg_hi_gate_doorstep")
   end),
   pressWalk("up", function() return map() == 391 end, 1200,
@@ -217,7 +217,7 @@ H.run({ maxFrames = 240000 }, {
   H.advanceStory(function()
     return map() == 384 and sw(0x0079) == 1 and H.hasControl()
        and H.tileAligned() and bright() >= 15
-  end, 90000, { honest = "flee", spare = { DUMMY } }),
+  end, 90000, { playBattles = "flee", spare = { DUMMY } }),
   H.waitFrames(60),
   H.call(function()
     H.assertEq(map(), 384, "back on 384 after the gate scene")
@@ -231,7 +231,7 @@ H.run({ maxFrames = 240000 }, {
   end),
 
   -- ---- 4. the shortcut out -------------------------------------------------
-  H.navTo(5, 42, { honest = "flee", maxFrames = 20000,
+  H.navTo(5, 42, { playBattles = "flee", maxFrames = 20000,
     arrive = function() return map() == 382 end }),
   pressWalk("down", function() return map() == 382 end, 1200,
     "held DOWN onto the (5,43) shortcut -> 382 (31,41)"),
@@ -239,7 +239,7 @@ H.run({ maxFrames = 240000 }, {
   -- the mouth is the (25,37)/(25,38) pair: (25,37) is the world entry's
   -- landing, (25,38) the exit tile (short-entrance decode); approach the
   -- landing tile and step DOWN out
-  H.navTo(25, 37, { honest = "flee", maxFrames = 15000,
+  H.navTo(25, 37, { playBattles = "flee", maxFrames = 15000,
     arrive = function() return H.worldMode() end }),
   pressWalk("down", function() return H.worldMode() end, 1200,
     "held DOWN onto the mouth exit (25,38) -> world (169,194)"),
@@ -260,13 +260,13 @@ H.run({ maxFrames = 240000 }, {
   -- walk west toward the trigger row; _cb280f owns everything from there
   -- to the crash -- the scene, $0242=1, the deck, battle 123, the flight,
   -- and control back on MAP 6 at (16,6) with parent world (83,239)
-  H.navTo(9, 17, { honest = "flee", maxFrames = 20000 }),
+  H.navTo(9, 17, { playBattles = "flee", maxFrames = 20000 }),
   pressWalk("left", function() return not H.hasControl() or map() ~= 377 end,
     2400, "held LEFT into the west trigger row -> _cb280f"),
   H.advanceStory(function()
     return map() == 6 and sw(0x007A) == 1 and H.hasControl()
        and H.tileAligned() and bright() >= 15
-  end, 120000, { honest = "flee", spare = { DUMMY } }),
+  end, 120000, { playBattles = "flee", spare = { DUMMY } }),
   H.waitFrames(60),
   H.call(function()
     H.assertEq(map(), 6, "control back on the wrecked Blackjack (map 6)")
@@ -285,7 +285,7 @@ H.run({ maxFrames = 240000 }, {
   -- lift-off choice ($0170 is set on this chain).  Dead ($007A=1, $0176=0)
   -- _caf532 EventReturns before any dialog (event_main.asm:36118-36127).
   -- 300 frames of LEFT+A edges must therefore open NOTHING.
-  H.navTo(14, 6, { honest = "flee", maxFrames = 6000, calmFrames = 8 }),
+  H.navTo(14, 6, { playBattles = "flee", maxFrames = 6000, calmFrames = 8 }),
   (function() local n = 0
     return H.driveUntil(function() n = n + 1; return n >= 300 end, 400, {
       H.call(function()
@@ -308,17 +308,17 @@ H.run({ maxFrames = 240000 }, {
   H.waitUntil(landed(7, 10), 2400, "map 7 landing", 1),
   -- the hatch (8,36) is reached through the interior stair-teleports
   -- (short-entrance decode): (40,18) -> (50,51), then (50,62) -> (10,30)
-  H.navTo(40, 17, { honest = "flee", maxFrames = 9000 }),
+  H.navTo(40, 17, { playBattles = "flee", maxFrames = 9000 }),
   pressWalk("down", function()
     return H.fieldY() >= 45 and H.tileAligned()
   end, 900, "stairs (40,18) -> (50,51)"),
   H.waitFrames(30),
-  H.navTo(50, 61, { honest = "flee", maxFrames = 9000 }),
+  H.navTo(50, 61, { playBattles = "flee", maxFrames = 9000 }),
   pressWalk("down", function()
     return H.fieldY() <= 35 and H.tileAligned()
   end, 900, "stairs (50,62) -> (10,30)"),
   H.waitFrames(30),
-  H.navTo(8, 36, { honest = "flee", maxFrames = 20000,
+  H.navTo(8, 36, { playBattles = "flee", maxFrames = 20000,
     arrive = function() return H.worldMode() end }),
   pressWalk("up", function() return H.worldMode() end, 1200,
     "held UP onto the hatch (8,36) -> world, on foot (_caf4b1)"),
@@ -328,10 +328,11 @@ H.run({ maxFrames = 240000 }, {
   end, 3600, "world at the crash site", 5),
   H.waitFrames(45),
   -- MEASURED (probe_v07_gatescene3): the hatch drops the party ON the
-  -- wreck's own world tile (83,238) -- the route recon's proposed anchor-I
-  -- tile -- on foot, with $1F60/61 == $1F62/63 == (83,238).  An A tap
-  -- HERE re-enters the wreck interior (it does not lift off, and the gen
-  -- never presses it); the flight refusal was proven at the wheel above.
+  -- wreck's own world tile (83,238) -- the route recon's proposed
+  -- checkpoint-I tile -- on foot, with $1F60/61 == $1F62/63 == (83,238).
+  -- An A tap HERE re-enters the wreck interior (it does not lift off, and
+  -- the gen never presses it); the flight refusal was proven at the wheel
+  -- above.
   H.call(function()
     H.log(string.format("[crash site] world (%d,%d) ship cells $1F62/63 = "
       .. "(%d,%d) $11FA=%02X $11F3=%02X $1F60/61=(%d,%d)",
@@ -350,7 +351,7 @@ H.run({ maxFrames = 240000 }, {
     H.assertExitContractPreSave("vector-crash-v1")
     H.screenshot("leg_hi_i_tile")
   end),
-  -- THE LEG'S SAVESTATE IS MINTED HERE, BEFORE THE MENU (the world menu
+  -- THE STEP'S SAVESTATE IS GENERATED HERE, BEFORE THE MENU (the world menu
   -- does not unwind on B, measured)
   H.saveState("vector_crash.mss"),
 
@@ -373,7 +374,7 @@ H.run({ maxFrames = 240000 }, {
   H.call(function()
     H.assertEq((H.readByte(0x0201) & 0x80) ~= 0, true,
       "menu-flags $0201 bit7 SET -- the save-enable flow reached the menu")
-    -- ARM THE HONEST SAVE RECEIPT (issue #75): a read-only exec hook on
+    -- ARM THE input-driven save receipt (issue #75): a read-only exec hook on
     -- the real CopyGameDataToSRAM entry captures the slot argument the
     -- save runs with (codex_saveas's instrument).  This replaces the old
     -- zeroed-$307ff0 sentinel -- an SRAM write -- as the proof that the
@@ -417,7 +418,7 @@ H.run({ maxFrames = 240000 }, {
     H.assertEq(saveArg, 3, "CopyGameDataToSRAM ran for persistent slot 3")
     -- the codex witness cells are READ, never seeded (issue #75): the
     -- battery carries whatever the chain actually earned.  The phase-2
-    -- anchor re-cuts measure these and the entry contracts follow the
+    -- checkpoint re-cuts measure these and the entry contracts follow the
     -- measurement (never the reverse).
     H.log(string.format("codex witness cells (earned): elem=%02X class=%02X",
       emu.read(0x316810 + ULTROS2, emu.memType.snesMemory),
@@ -427,7 +428,7 @@ H.run({ maxFrames = 240000 }, {
   end),
   H.logStep(function()
     return string.format("vector-crash-v1 saved via the real Save UI at "
-      .. "frame %d -- the crash-site world save; boundary I of the v0.7 band",
+      .. "frame %d -- the crash-site world save; boundary I of the v0.7 range",
       H.frame)
   end),
 })

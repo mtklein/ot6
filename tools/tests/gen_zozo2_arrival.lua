@@ -1,9 +1,9 @@
--- gen_zozo2_arrival.lua -- v0.4 leg 1b: figaro_submerged (engine room, map
+-- gen_zozo2_arrival.lua -- v0.4 step 1b: figaro_submerged (engine room, map
 -- 61 {6,34}, castle parked WEST at ~world {30,48}) -> up and out of the
--- castle -> the western WoB -> Zozo's world tiles {21..22,92} -> mint
+-- castle -> the western WoB -> Zozo's world tiles {21..22,92} -> generate
 -- zozo_arrival.mss on map 221 at the street landing {61,44}.
 --
--- ROUTE ANCHORS (source, not survey):
+-- ROUTE checkpoints (source, not survey):
 --  * 61 door (11,32) -> 59 {10,48}; 59 door (12,41) -> 55 {28,31}
 --    (short_entrance.dat _61/_59)
 --  * map 55's row y=43 is the world-exit long entrance (gen_kolts's rule:
@@ -14,7 +14,7 @@
 --    SET_PARENT points at the west parking ~{30,48})
 --  * world {30,48}/{31,48} are the WEST castle trigger tiles (_ca5ec2,
 --    gated $010C=1 -- LIVE for us): triggers fire on STEP, so the exit
---    placement is safe, and the Zozo leg heads SW away from them
+--    placement is safe, and the Zozo step heads SW away from them
 --  * Zozo: world {21,92}/{22,92}/{22,93} -> map 221 {61,44}
 --    (short_entrance.dat _0)
 local H = dofile("tools/tests/lib/ot6.lua")
@@ -115,6 +115,6 @@ H.run({ maxFrames = 90000 }, {
   end),
   H.saveState("zozo_arrival.mss"),
   H.logStep(function()
-    return string.format("zozo_arrival minted at frame %d", H.frame)
+    return string.format("zozo_arrival generated at frame %d", H.frame)
   end),
 })

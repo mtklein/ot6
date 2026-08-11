@@ -1,6 +1,6 @@
 -- gen_worldmap.lua -- from moogle_cleared.mss (LOCKE leading TERRA on the
 -- Narshe streets, map 20): walk out the south gate onto the World of
--- Balance and mint worldmap_narshe.mss at the first controllable world
+-- Balance and generate worldmap_narshe.mss at the first controllable world
 -- moment.  This is the harness's FIRST world-map state, so the script
 -- doubles as the recording instrument for the transition: every mode/
 -- position/flag byte the world navigator will build on gets logged.
@@ -122,11 +122,11 @@ H.run({ maxFrames = 20000 }, {
   end),
   H.saveState("worldmap_narshe.mss"),
   H.logStep(function()
-    return string.format("worldmap_narshe minted at frame %d", H.frame)
+    return string.format("worldmap_narshe generated at frame %d", H.frame)
   end),
 
   -- ===================================================================== --
-  -- Positive control (post-mint, so the state stays virgin): prove the
+  -- Positive control (post-generation, so the state stays virgin): prove the
   -- pad drives world movement.  Narshe sits in mountains, so try each
   -- direction until the tile budges; log which ones worked.
   -- ===================================================================== --

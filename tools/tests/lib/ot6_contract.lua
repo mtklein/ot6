@@ -1,14 +1,14 @@
 -- ot6_contract.lua -- the INVARIANT-CONTRACT half of the OT6 test library:
--- declared entry/exit contracts for battery-anchor boundaries (#25).
+-- declared entry/exit contracts for SRAM checkpoint boundaries (#25).
 --
--- docs/design/leg-fixtures.md, "The invariant contract": parallel legs can
--- all be green while the composition is broken, because a leg run from a
--- stored anchor never sees its predecessor's output.  So every leg asserts
--- its entry invariants before doing anything, and a boundary's contract is
--- written ONCE, here, and shared -- the leg INTO a boundary asserts it as an
--- exit contract, the leg OUT OF the boundary asserts the same table as its
--- entry contract, and a mismatch is a diff between two named things rather
--- than a judgement call.
+-- docs/design/leg-fixtures.md, "The invariant contract": parallel steps can
+-- all be green while the composition is broken, because a step run from a
+-- stored checkpoint never sees its predecessor's output.  So every step
+-- asserts its entry invariants before doing anything, and a boundary's
+-- contract is written ONCE, here, and shared -- the step INTO a boundary
+-- asserts it as an exit contract, the step OUT OF the boundary asserts the
+-- same table as its entry contract, and a mismatch is a diff between two
+-- named things rather than a judgement call.
 --
 -- Like lib/ot6_field.lua, this file is NOT a standalone module: lib/compose.py
 -- inlines it as a third chunk after the battle core and the nav half, invoking
@@ -19,14 +19,14 @@
 -- A contract FAILS BY NAMING WHAT DIFFERED: every field is read, every
 -- mismatch is logged as its own "CONTRACT DIFF" line (expected vs read, per
 -- field), and the final error carries all of them -- one stale field and one
--- wrecked anchor both come out as a precise list, never a timeout.
+-- wrecked checkpoint both come out as a precise list, never a timeout.
 --
 -- What a contract can declare (all fields optional):
 --   slot     = 3                          -- SRAM $307ff0 last-saved slot, 1..3
 --   world    = { x = 137, y = 203 }       -- ON THE WORLD MAP at this tile
 --   field    = { map = 270, x = 25, y = 10 }  -- ON this field map at this tile
 --                (a save-point boundary: where a cold Continue of the
---                boundary's anchor puts the party -- the save tile itself)
+--                boundary's checkpoint puts the party -- the save tile itself)
 --   switches = { { id, 0|1, "what" }, ... }   -- story switches $1E80 bits
 --   party    = { size = N,                -- COUNT of $1850 party assignments
 --                members = { { charId, "NAME" }, ... } }  -- each in party 1
@@ -38,16 +38,17 @@
 --                give_item appends to the first free slot, so the position
 --                is chain-history, not a boundary fact.  Added for
 --                banquet-done-v1 (issue #31): the banquet's reward ladder
---                pays by score tier, so the tier is witnessed BOTH ways --
+--                pays by score tier, so the tier is checked BOTH ways --
 --                what it earned and what it did not.
 --   sram     = { { snesAddr, byte, "what" }, ... }  -- OT6 persistent state,
 --                read via emu.memType.snesMemory (bank $31 = the codex bank)
 --
--- The pre-boot half of the same design -- refusing an anchor whose
--- manifest.json persistent_layout the leg does not declare support for --
--- lives in run.sh + lib/sram_anchor.py, keyed off the leg's
+-- The pre-boot half of the same design -- refusing a checkpoint whose
+-- manifest.json persistent_layout the step does not declare support for --
+-- lives in run.sh + lib/sram_anchor.py, keyed off the step's
 -- "OT6_ANCHOR_LAYOUT:" marker comment.  This file is the in-emulator half:
--- the anchor LOADED, but its semantic content is not what the leg declared.
+-- the checkpoint LOADED, but its semantic content is not what the step
+-- declared.
 
 local M = ...
 assert(type(M) == "table",
@@ -58,24 +59,24 @@ assert(type(M) == "table",
 
 M.contracts = {}
 
--- post-opera-v1: the tracked battery anchor minted in #9 (world save at
+-- post-opera-v1: the tracked SRAM checkpoint cut in #9 (world save at
 -- (137,203), slot 3, party LOCKE CELES SABIN EDGAR).  Entry contract for
--- gen_vector_doorstep (leg A->B of the save-point boundary band lettered
--- in tools/tests/frontier_graph.py); the exit contract of whatever leg
--- someday mints this anchor is THIS SAME TABLE.
+-- gen_vector_doorstep (step A->B of the save-point boundary sequence
+-- lettered in tools/tests/frontier_graph.py); the exit contract of whatever
+-- step someday cuts this checkpoint is THIS SAME TABLE.
 --
 -- THE PARTY COUNT IS THE CONTROL (#21).  The roster check used to be a log
 -- line and nothing else, and that is exactly how #21 survived a release and
 -- a half: the leave-Zozo `party_menu 1, NO_RESET, {LOCKE, CELES}` was
 -- answered with START, the two free slots were never filled, and the whole
--- v0.5 tail plus every v0.6 leg ran two characters -- while every fixture
+-- v0.5 tail plus every v0.6 step ran two characters -- while every fixture
 -- kept passing, because each was asserting story switches and map ids, and
 -- a switch cannot say how many people are walking.  COUNTING the $1850
 -- entries is the check that catches a chain which silently loses (or never
--- gains) a member; it lives in the anchor's contract because this boundary
+-- gains) a member; it lives in the checkpoint's contract because this boundary
 -- is what every v0.6 balance number is measured across.  The canonical
 -- fixture party is LOCKE CELES SABIN EDGAR (#21, 2026-07-27): slash, pierce
--- and bludgeon covered with no shop trip, SABIN answering the Vector band's
+-- and bludgeon covered with no shop trip, SABIN answering the Vector area's
 -- deliberate OT6_BLUDG row.
 M.contracts["post-opera-v1"] = {
   slot = 3,                       -- Continue loaded save slot 3 ($307ff0)
@@ -98,17 +99,17 @@ M.contracts["post-opera-v1"] = {
   },
   -- OT6 persistent state: the slot-3 codex page in SRAM bank $31
   -- (ff6/src/battle/ot6_codex.asm; page base $316800 = slot 3).
-  -- MEASURED CORRECTION (2026-08-10, the honest re-cut of this anchor):
-  -- the ULTROS2 witness rows used to assert 0x01, and that value was
-  -- SEEDED by the anchor gen -- never earned.  The honest battery, cut
-  -- from blackjack.mss via the pad-driven Save UI with seeding removed
-  -- (issue #75), carries a bank-31 window whose only nonzero bytes are
-  -- the page magics: the chain has earned ZERO codex rows by this point.
-  -- Contracts follow measurement, so the witnesses now assert the
-  -- MEASURED 0x00 -- which still witnesses the round-trip (the cells are
+  -- MEASURED CORRECTION (2026-08-10, the input-driven re-cut of this
+  -- checkpoint): the ULTROS2 rows used to assert 0x01, and that value was
+  -- SEEDED by the checkpoint generator -- never earned.  The input-driven
+  -- SRAM, cut from blackjack.mss via the pad-driven Save UI with seeding
+  -- removed (issue #75), carries a bank-31 window whose only nonzero bytes
+  -- are the page magics: the chain has earned ZERO codex rows by this point.
+  -- Contracts follow measurement, so the checks now assert the
+  -- MEASURED 0x00 -- which still proves the round-trip (the cells are
   -- carried, not initialized to garbage) but no longer pretends a payload
   -- exists.  Whether the codex SHOULD have earned rows across this many
-  -- honest fights is flagged in the phase-2 report as a product question.
+  -- played-out fights is flagged in the phase-2 report as a product question.
   sram = {
     { 0x316800, 0x4f, "slot 3 codex magic 'O'" },
     { 0x316801, 0x38, "slot 3 codex magic '8'" },
@@ -117,28 +118,29 @@ M.contracts["post-opera-v1"] = {
   },
 }
 
--- The Vector-band battery anchors B-E (issue #25; the A-F save-point boundary
--- band is lettered in tools/tests/frontier_graph.py).
+-- The Vector-area SRAM checkpoints B-E (issue #25; the A-F save-point
+-- boundary sequence is lettered in tools/tests/frontier_graph.py).
 -- Every value below is MEASURED, not derived: the boot dumps of the
--- serial-minted boundary states (ifrit_doorstep / n024_doorstep /
--- minecart_doorstep, probed 2026-07-27) and, for E, the n128_won mint log.
+-- serially generated boundary states (ifrit_doorstep / n024_doorstep /
+-- minecart_doorstep, probed 2026-07-27) and, for E, the n128_won run log.
 -- Shared shape notes:
---  * field = the save tile itself: a cold Continue of the anchor puts the
---    party exactly there, and the leg INTO the boundary walks onto the same
---    tile to assert its exit (so both ends compare the same coordinates).
---  * THE PARTY COUNT stays the #21 control at every boundary.  The band's
+--  * field = the save tile itself: a cold Continue of the checkpoint puts
+--    the party exactly there, and the step INTO the boundary walks onto the
+--    same tile to assert its exit (so both ends compare the same
+--    coordinates).
+--  * THE PARTY COUNT stays the #21 control at every boundary.  The area's
 --    canonical four are LOCKE CELES SABIN EDGAR until the tube room takes
 --    CELES ($02F6=0, event_main.asm:96157); D and E count THREE and pin
 --    $02F6=0 so a chain that quietly keeps (or loses) her fails by name.
 --  * ram $1A69 is the give_genju receipt (field/event.asm:3238): magicite
 --    ownership is a byte, not a switch, and §5 names it load-bearing at C.
---  * sram carries the same four bank-$31 witnesses as post-opera-v1.  The
---    row witnesses are properties of the boundary BATTERY, seeded by the
---    anchor gens before their real Save UI drive; a leg that boots from a
---    savestate instead sees whatever codex its fixture embeds (battery
---    SRAM rides Mesen savestates -- lib/ot6.lua's loadState note), which
---    is generally NOT the boundary battery's content.  The pre-save exit
---    check below (assertExitContractPreSave) is what the leg INTO a
+--  * sram carries the same four bank-$31 checks as post-opera-v1.  The
+--    row checks are properties of the boundary SRAM, seeded by the
+--    checkpoint generators before their real Save UI drive; a step that
+--    boots from a savestate instead sees whatever codex its fixture embeds
+--    (battery SRAM rides Mesen savestates -- lib/ot6.lua's loadState note),
+--    which is generally NOT the boundary SRAM's content.  The pre-save exit
+--    check below (assertExitContractPreSave) is what the step INTO a
 --    boundary uses because of that.
 
 M.contracts["mrf-save-room-v1"] = {
@@ -262,7 +264,7 @@ M.contracts["vector-escape-v1"] = {
   },
 }
 
--- terra-returned-v1: boundary F, the v0.6 stop line (§5) -- a world battery
+-- terra-returned-v1: boundary F, the v0.6 stop line (§5) -- a world SRAM
 -- save one takeoff after Terra's return, aboard the GROUNDED Blackjack on
 -- the plain south of Zozo (the ship strafes south from the takeoff hover
 -- until the live tile prop allows landing; measured 2026-07-27).  Saving
@@ -279,7 +281,7 @@ M.contracts["terra-returned-v1"] = {
   -- worldX/worldY: this boundary's exit is asserted with the save menu
   -- still open (the grounded-airship world menu does not unwind on B), and
   -- the menu module overlays $e0/$e2 -- the same #29 class the slot
-  -- witness already dodges.  $1f60/$1f61 are the world-position cells the
+  -- check already dodges.  $1f60/$1f61 are the world-position cells the
   -- save itself records; $1f65 bit5 is the airship flag of $1f64.
   ram = {
     { 0x1f60, 0xFF, 24, "world x (save-block cell $1f60): the grounded Blackjack" },
@@ -313,33 +315,33 @@ M.contracts["terra-returned-v1"] = {
   },
 }
 
--- ===================== the v0.7 Sealed Gate band (issue #31) ==============
--- The v0.7 route recon proposed anchors G-K; these are the
+-- ===================== the v0.7 Sealed Gate area (issue #31) ==============
+-- The v0.7 route recon proposed checkpoints G-K; these are the
 -- two the first slice cuts.  Every value below is MEASURED on the live
 -- chain (probe_v07_f2g / probe_v07_g2h / probe_v07_385, 2026-07-28), not
 -- derived from the recon's tables.
 --
 -- POSITION IS PINNED THROUGH $1f60/$1f61, NOT worldX/worldY.  Both v0.7
 -- boundaries are asserted as EXIT contracts with the save menu still open
--- (the leg saves, then judges), and the menu module overlays $e0/$e2 -- the
--- same #29 module-overlay class the slot witness already dodges by reading
+-- (the step saves, then judges), and the menu module overlays $e0/$e2 -- the
+-- same #29 module-overlay class the slot check already dodges by reading
 -- SRAM $307ff0 instead of $021f.  $1f60/$1f61 are the world-position cells
 -- the save block itself records, stable in every module context, and a cold
 -- Continue seeds $e0/$e2 from them (world/init.asm ReloadMap tail), so both
 -- ends of the boundary compare the same two bytes.
 
--- narshe-mission-v1: boundary G.  A world battery save at the Narshe exit
+-- narshe-mission-v1: boundary G.  A world SRAM save at the Narshe exit
 -- spawn, world (84,34), taken ON FOOT with the Blackjack parked one tile
--- south at (84,36) -- the tile the leg landed on, and the tile the leg OUT
--- of G walks back onto to re-board.  $0076=1 is the whole point of the leg:
+-- south at (84,36) -- the tile the step landed on, and the tile the step OUT
+-- of G walks back onto to re-board.  $0076=1 is the whole point of the step:
 -- the mission meeting on map 30 has run (event_main.asm:94170) and the ten
 -- Imperial-Base soldier NPCs have been withdrawn ($045E-$0467=0), which is
--- what opens the base entrance for leg G->H.
+-- what opens the base entrance for step G->H.
 --
 -- THE PARTY IS STILL THE v0.6 FOUR.  Terra is available ($02F0=1) but NOT
--- active: seating her is leg G->H's first act (the Blackjack swap room),
--- and the recon's §2.3 "Terra invariant" starts at anchor H, not here.  The
--- #21 count control therefore reads 4 with TERRA's party nibble ZERO -- a
+-- active: seating her is step G->H's first act (the Blackjack swap room),
+-- and the recon's §2.3 "Terra invariant" starts at checkpoint H, not here.
+-- The #21 count control therefore reads 4 with TERRA's party nibble ZERO -- a
 -- chain that seated her early fails by name at this boundary.
 M.contracts["narshe-mission-v1"] = {
   slot = 3,
@@ -347,9 +349,9 @@ M.contracts["narshe-mission-v1"] = {
     { 0x1f60, 0xFF, 84, "world x (save-block cell $1f60): the Narshe exit spawn" },
     { 0x1f61, 0xFF, 34, "world y (save-block cell $1f61)" },
     -- the parked Blackjack rides its own save cells, two south of the
-    -- party (measured); the leg OUT of this boundary
+    -- party (measured); the step OUT of this boundary
     -- re-boards from here, so a drifted ship is a contract violation,
-    -- not a mid-leg timeout
+    -- not a mid-step timeout
     { 0x1f62, 0xFF, 84, "parked Blackjack x (save-block cell $1f62)" },
     { 0x1f63, 0xFF, 36, "parked Blackjack y (save-block cell $1f63)" },
     { 0x11FA, 0x03, 0x00, "ON FOOT (not aboard a vehicle)" },
@@ -386,18 +388,18 @@ M.contracts["narshe-mission-v1"] = {
 }
 
 -- gate-cave-save-v1: boundary H, the vanilla save point on map 386 at
--- (74,53) -- the ONLY interior save in the whole v0.7 band (the recon's S3),
+-- (74,53) -- the ONLY interior save in the whole v0.7 area (the recon's S3),
 -- reached off map 384 (64,10).  Exercised by gen_gate_cave_save
 -- (2026-07-28): the 385 timed-floor crossing that blocked the first pass
 -- is lib/ot6_field.lua's M.phaseWalk (the rewrite-window mechanism),
 -- and every value below was asserted at the live
--- boundary moment through the real anchored mint.
+-- boundary moment through the real checkpoint-booted run.
 --
 -- THE TERRA INVARIANT IS THIS TABLE'S REASON TO EXIST.  The
 -- Imperial Base entrance refuses passage to any party without TERRA in the
 -- ACTIVE four (_cb25d6, event_main.asm:44004-44016) and bounces it back to
--- world (164,194); a stale anchor minted with the wrong four would pass
--- every ordinary check and then bounce off the base on the leg out.  So the
+-- world (164,194); a stale checkpoint cut with the wrong four would pass
+-- every ordinary check and then bounce off the base on the step out.  So the
 -- roster is asserted member by member AND counted (#21), and SETZER's
 -- absence is asserted too -- he is the one the swap benched, and a chain
 -- that benched somebody else has a different cave kit.
@@ -434,7 +436,7 @@ M.contracts["gate-cave-save-v1"] = {
   },
 }
 
--- vector-crash-v1: boundary I, the crash-site world battery save -- the
+-- vector-crash-v1: boundary I, the crash-site world SRAM save -- the
 -- route recon's `vector-crash` boundary, cut at its own proposed tile: the
 -- party stands ON the dead Blackjack's world tile (83,238), on foot,
 -- because that is where the map-7 hatch (_caf4b1) drops them after the
@@ -445,7 +447,7 @@ M.contracts["gate-cave-save-v1"] = {
 -- the base re-cross, battle 123 and the scripted crash flight.
 --
 -- THE HEADLINE IS THE DEAD AIRSHIP.  $007A=1 and $0246=0 are what every
--- later leg plans around (recon headline 6: everything after the crash is
+-- later step plans around (recon headline 6: everything after the crash is
 -- on foot or by boat), and the wreck's cells $1F62/63 still read (83,238)
 -- -- the ship has a position even though nothing can fly it; a chain that
 -- somehow kept the airship alive fails here by name.  The party is still
@@ -495,10 +497,10 @@ M.contracts["vector-crash-v1"] = {
   },
 }
 
--- banquet-done-v1: boundary J, the post-banquet world battery save -- the
+-- banquet-done-v1: boundary J, the post-banquet world SRAM save -- the
 -- route recon's own `banquet-done` name, cut at the Vector world exit's
 -- landing tile (120,188): the first world tile after the banquet block,
--- where the recon's leg-5-to-Albrook walk starts.  Exercised by
+-- where the recon's step-5-to-Albrook walk starts.  Exercised by
 -- gen_banquet_done (2026-07-28): the I->J grind, the whole banquet block
 -- ($007C=1 -> $0238=1) driven to the >=67 tier (banquet-decode.md §5.2:
 -- the window is worth at most 44 and measured 26, the Q&A 44 and the
@@ -509,11 +511,11 @@ M.contracts["vector-crash-v1"] = {
 -- party to TERRA+LOCKE and rewrites availability wholesale
 -- (event_main.asm:99058-99067, :99079-99101): the #21 count control reads
 -- TWO here, inverted -- a chain that somehow kept Edgar/Sabin walking
--- fails by name.  The >=67 tier is frontier-wide canon from
--- this boundary on: all three reward switches pay and NEITHER reward
+-- fails by name.  The >=67 tier is canon across the whole playable chain
+-- from this boundary on: all three reward switches pay and NEITHER reward
 -- item does (the item asserts are the score receipt in BOTH directions,
 -- since var0 itself is zeroed by the messenger), and the Doma / South
--- Figaro world-state flips ride every later leg.
+-- Figaro world-state flips ride every later step.
 M.contracts["banquet-done-v1"] = {
   slot = 3,
   ram = {
@@ -559,7 +561,7 @@ M.contracts["banquet-done-v1"] = {
       { 0x01, "LOCKE (the escort)" },
     },
   },
-  -- THE TIER IS WITNESSED BOTH WAYS (banquet-decode.md §5.2): the leg
+  -- THE TIER IS CHECKED BOTH WAYS (banquet-decode.md §5.2): the step
   -- ships the >=67 tier -- measured best window score 26 of 44, total
   -- 26+44+5 = 75 -- so the base-weapons unlock pays and the two higher
   -- rewards do NOT.  Asserting their ABSENCE is what stops a future
@@ -706,24 +708,24 @@ function M.assertContract(key, side) judge(lookup(key), key, side) end
 function M.assertEntryContract(key) M.assertContract(key, "entry") end
 function M.assertExitContract(key)  M.assertContract(key, "exit")  end
 
--- The PRE-SAVE exit check, for the leg INTO a boundary.  That leg walks
+-- The PRE-SAVE exit check, for the step INTO a boundary.  That step walks
 -- onto the save tile and asserts the boundary table BEFORE its final
 -- saveState -- but the `sram` kind declares properties of the boundary
--- SAVE itself: the bank-$31 codex row witnesses are what the anchor gen
--- seeds and the real Save UI then writes into the battery.  A
--- savestate-booted leg carries its FIXTURE's codex bytes instead (battery
+-- SAVE itself: the bank-$31 codex row checks are what the checkpoint
+-- generator seeds and the real Save UI then writes into SRAM.  A
+-- savestate-booted step carries its FIXTURE's codex bytes instead (battery
 -- SRAM rides Mesen savestates; lib/ot6.lua's loadState note), which need
--- not match the boundary battery, so the leg INTO a boundary asserts
+-- not match the boundary SRAM, so the step INTO a boundary asserts
 -- everything else here, and the FULL table -- sram included -- is asserted
--- at both real boundary moments: by the anchor gen after its save
--- (assertExitContract), and by the leg OUT after its cold Continue
+-- at both real boundary moments: by the checkpoint generator after its save
+-- (assertExitContract), and by the step OUT after its cold Continue
 -- (assertEntryContract).  `slot` stays in the pre-save set: $307ff0 rides
 -- Mesen savestates (measured 2026-07-27, re-confirmed 2026-08-04) and
--- witnesses the chain descends from a slot-3 battery load.
+-- proves the chain descends from a slot-3 SRAM load.
 function M.assertExitContractPreSave(key)
   local c, pre = lookup(key), {}
   for k, v in pairs(c) do
     if k ~= "sram" then pre[k] = v end
   end
-  judge(pre, key, "exit pre-save; sram witnessed at the boundary save")
+  judge(pre, key, "exit pre-save; sram checked at the boundary save")
 end

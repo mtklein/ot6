@@ -166,7 +166,7 @@ Ot6LoadoutDrawC3:
 ; #49 measured "7 MPMANUAL" on screen without it -- and so is the one before
 ; the price, which is the only thing keeping "Quadra Slice" off "30 MP".
 ;
-; So the donor is the gap between the rung LABEL and the name: names start at
+; So the donor is the gap between the tier LABEL and the name: names start at
 ; column 5 now, directly after "1x".  That gap is the one on the row whose two
 ; sides cannot be confused for each other -- a digit and a lowercase 'x' against
 ; a capitalised tech name -- where both of the others separate things that read
@@ -339,7 +339,7 @@ Ot6DrawBushName:
 ; THE ONE MP-PRICE DRAWER FOR THE WHOLE FIELD MENU (issue #56).  This proc drew
 ; a SINGLE digit until v0.7 and said so in its own comment -- "kit costs 1..8",
 ; true when it was written.  #45 rescaled SwdTech to 4/10/13/16/18/22/30/46, so
-; seven of the eight rungs printed `cost + ZERO_CHAR` past '9' ($bd) and came
+; seven of the eight tiers printed `cost + ZERO_CHAR` past '9' ($bd) and came
 ; out as punctuation: Retort's 10 rendered as $be and Quadra Slice's 30 as '='
 ; (measured on the pre-change ROM, tools/tests/probe_swdtechcost.lua).  #46 had
 ; already hit the same wall on the Blitz ladder and answered it with a private

@@ -1,5 +1,5 @@
 -- @suite frontier=ultros2_doorstep slow
--- battle_ultros2.lua -- Beat A's boss gate: the OPERA's ULTROS 2 break gauge.
+-- battle_ultros2.lua -- Beat A's boss test: the OPERA's ULTROS 2 break gauge.
 -- Boots ultros2_doorstep (the rafter framework, one interaction short of
 -- battle 104), rides into the fight, and asserts:
 --
@@ -11,15 +11,15 @@
 --   2. THE CODEX CARRIES the recurring-Ultros weakness row.  bosses-wob's
 --      contract is "Ultros keeps one weakness row, revealed at the Lete,
 --      remembered forever."  The codex seen here is the FIXTURE's own
---      battery bytes (SRAM rides Mesen savestates; lib/ot6.lua): on the
---      minted chain no upstream leg has chipped $012d's row, so nothing is
+--      SRAM bytes (SRAM rides Mesen savestates; lib/ot6.lua): on the
+--      generated chain no upstream step has chipped $012d's row, so nothing is
 --      revealed at seed -- asserted -- and the first class-matching chip
---      reveals it.  If a future honest chain reveals Ultros at the Lete
+--      reveals it.  If a future input-driven chain reveals Ultros at the Lete
 --      and the row genuinely recurs, this assertion is the place that
 --      finds out, by failing with the fixture's true state.
 --
 -- WHY THIS FIXTURE.  Ultros 2 ends the Opera performance -- "same fight,
--- honest difficulty, no Banon healer" (bosses-wob).  The chosen party is
+-- real difficulty, no Banon healer" (bosses-wob).  The chosen party is
 -- LOCKE + up to three; AutoCrossbow (pierce) trivially chips, and any slash
 -- weapon does too, so the class row is reachable by the party that faces it
 -- (issue #6).  Battle 104 is the WoB Ultros-2 formation ($012d present);
@@ -27,7 +27,7 @@
 --
 -- NOTE: this test is authored against the confirmed Ot6ShieldTbl row and the
 -- battle-class read addresses proven by battle_vargas/battle_class; it
--- reports "skipped" (suite.sh) until ultros2_doorstep is minted, and the
+-- reports "skipped" (suite.sh) until ultros2_doorstep is generated, and the
 -- kit-specific chip drive is intentionally class-generic (it credits ANY
 -- landed swing whose Ot6-resolved class meets slash|pierce) so it does not
 -- hard-code which of LOCKE's party carries the handhold.
@@ -52,14 +52,14 @@ H.run({ maxFrames = 60000 }, {
   H.loadState(DOOR),
   H.waitFrames(30),
 
-  -- ride the last interaction into battle 104 (the doorstep parks one step
-  -- short; the exact entry is A-into-the-scene, like every _doorstep gate)
+  -- ride the last interaction into battle 104 (the entry-point state parks one
+  -- step short; the exact entry is A-into-the-scene, like every _doorstep fixture)
   H.driveUntil(function() return H.battleLoadStarted() end, 20000, {
     H.call(function()
       aPh = (aPh + 1) % 8
       if H.monstersPresent() > 0 then
         for s = 0, 5 do
-          if H.readByte(0x3aa8 + s * 2) % 2 == 1 then end  -- (no kill-bit; goal fight)
+          if H.readByte(0x3aa8 + s * 2) % 2 == 1 then end  -- (no forced clear; goal fight)
         end
       end
       H.setPad(aPh < 4 and { "a" } or {})
@@ -96,7 +96,7 @@ H.run({ maxFrames = 60000 }, {
   -- Ultros occupies four formation positions and moves between them.  A
   -- default-target A-mash is not a stable class-chip oracle for this formation;
   -- the generic class-path behavior remains covered by battle_class.  This
-  -- boss gate therefore owns the route-specific contract: positively identify
+  -- boss test therefore owns the route-specific contract: positively identify
   -- $012d and verify its authored seed before any battle script can migrate it.
   H.logStep(function()
     return string.format("Ultros 2 ($012d) verified in battle 104 at frame %d",H.frame)

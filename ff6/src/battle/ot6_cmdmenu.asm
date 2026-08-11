@@ -456,7 +456,7 @@
 ; OpenCmdMenuTbl[7] now hits a C1 stub that jsl's here then jmp's OpenToolsWindow.
 ;
 ; The rows ARE the boost window: row r (weakest at TOP) = boost r+1 = the tech
-; Ot6BushidoTier returns for that boost (#38: no 0x rung). Ot6BushidoWindow
+; Ot6BushidoTier returns for that boost (#38: no 0x tier). Ot6BushidoWindow
 ; enumerates the <=3 techs into wItemList's LEFT column (cells r*2, so row r
 ; reads at wItemList offset r*6 -- what _c18470 computes for column 0); the
 ; right column and any unused rows are $ff (empty), so the window renders a
@@ -508,9 +508,9 @@
 ; writes attack id ($55 + tech[i]) for ROW i = 0..min(2,ceiling) into
 ; wItemList::Index at cell i*2 (the LEFT column of row i), and $ff-fills every
 ; other cell through the 8-cell (4x2) window. #38: row i IS boost i+1 -- the
-; 0x rung is retired, so the window is three rows deep and row 3 always stays
+; 0x tier is retired, so the window is three rows deep and row 3 always stays
 ; $ff (blank, and the C1 confirm refuses it). tech[i] shares Ot6BushidoTech's
-; base+boost math and Ot6BushidoOblivion's top-rung swap with single-select, so
+; base+boost math and Ot6BushidoOblivion's top-tier swap with single-select, so
 ; the menu can never offer a tech the confirm latch would not fire. When Cyan
 ; knows fewer than three techs (ceiling < 2) only the known rows are emitted -- a
 ; boost past the ceiling would just cap to a duplicate tech, so its row is left
@@ -539,9 +539,9 @@
         pha                         ; left-cell write offset -> $01,s
         ldy     #$0000              ; row i
 @row:   tya                         ; A = row i
-        inc     a                   ; #38: row i -> boost i+1 (no 0x rung)
+        inc     a                   ; #38: row i -> boost i+1 (no 0x tier)
         jsl     Ot6BushidoTech      ; A = tech (preserves Y; clobbers X)
-        jsl     Ot6BushidoOblivion  ; A = tech, top-rung swap (preserves Y)
+        jsl     Ot6BushidoOblivion  ; A = tech, top-tier swap (preserves Y)
         clc
         adc     #$55                ; A = attack id $55 + tech
         pha                         ; park id ($01,s; offset now $02,s, max $03,s)
@@ -573,7 +573,7 @@
 
 ; ------------------------------------------------------------------------------
 
-; [ commit a Bushido submenu row: row i = boost i+1, fire that rung's tech ]
+; [ commit a Bushido submenu row: row i = boost i+1, fire that tier's tech ]
 ;
 ; jsl from the C1 tools-confirm (@8809, bushido mode w7e6168=2). The C1 side has
 ; already rejected an $ff (empty) cell, so X points at a real left-column tech

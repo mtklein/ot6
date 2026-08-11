@@ -17,7 +17,7 @@
 -- Storage is EIGHT BYTES at $1e1f-$1e26, the next scrap after the Bushido
 -- loadout word inside the checksummed working-save block.  byte = rage id + 1;
 -- $00 = unset; all eight zero = AUTO.  No persistent_layout bump: the sentinel
--- means every existing save and every tracked battery anchor -- which hold
+-- means every existing save and every tracked SRAM checkpoint -- which hold
 -- zeros there, measured -- decodes as AUTO, the state they are genuinely in.
 --
 -- THE AUTO RULING, 2026-07-28.  kit-gau.md contradicted itself: §2.2 defined
@@ -141,7 +141,7 @@ end
 
 -- One arm: reload the field fixture, install the save-side state, drop into a
 -- battle, and read the list InitSkills just built.  A savestate reload per arm
--- is the only honest way to re-run InitSkills -- it runs exactly once, from
+-- is the only real way to re-run InitSkills -- it runs exactly once, from
 -- InitBattle.
 local function arm(tag, setup, check)
   return {
@@ -821,7 +821,7 @@ add({
 -- REVERSED 2026-07-29 (owner): "I don't recall showing a cost for Leap.  If
 -- it's 2 MP, let's just make it free."  #40 had priced it at a flat 2 from
 -- "only the basic Fight command is free" (mp-economy.md, as it then read)
--- plus that doc's probe-collect rung.  Two things retired that:
+-- plus that doc's probe-collect tier.  Two things retired that:
 --
 --   * THE PRICE WAS NEVER DISPLAYED.  Leap is a top-level command ROW, not a
 --     list entry, and the four-row battle command window draws names only.
@@ -884,7 +884,7 @@ add({
 -- TargetEffect_54 needs >= 2 while this harness wounds the bench), and reading
 -- battle RAM after the battle stops being active reads nothing meaningful.
 -- So the measurement has to be taken INSIDE the live window, and the minimum
--- over that window is the honest form of "the pool never moved".
+-- over that window is the correct form of "the pool never moved".
 local function sampleWhileLive(n)
   return H.repeatN(n, {
     H.call(function()

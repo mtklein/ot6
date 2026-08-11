@@ -1,4 +1,4 @@
--- metrics_battle: auto-battler balance probe. loads a doorstep state,
+-- metrics_battle: auto-battler balance probe. loads an entry-point state,
 -- enters the fight, and PLAYS it with a swappable input policy while
 -- recording what the balance work needs (docs/design/balance-metrics.md):
 -- actions per side, damage split broken/unbroken, bp regen/spends by
@@ -90,7 +90,7 @@ local STATE = STATES.doorstep2
 local ROUNDS = 0                   -- player actions to record; 0 = to the end
 local SETTLE_EXTRA = 0             -- extra pre-arm frames (rng phase jitter)
 local METRICS_FRAMES = 20000       -- metrics-window frame budget
--- BUFF turns the demo doorstep (40-hp guards, no party-hittable
+-- BUFF turns the demo entry point (40-hp guards, no party-hittable
 -- weakness -> break/boost never engage) into a MEASURABLE fixture:
 -- inject a fire weakness and enough hp that the fight lasts long
 -- enough for banking to pay off. this is a stand-in until real
@@ -261,8 +261,8 @@ end
 -- ------------------------------------------------------------- kits --
 -- What a character DOES with a turn, independent of the boost discipline
 -- the policy sets. An entry is { tag, cmd, pick = <cursor setter>,
--- mp = <mp floor>, want = <gate> }; the first entry whose command the actor
--- actually owns and whose gate passes is taken, so a kit reads as a
+-- mp = <mp floor>, want = <condition> }; the first entry whose command the
+-- actor actually owns and whose condition passes is taken, so a kit reads as a
 -- preference ladder and an actor without the command falls through to the
 -- next line.
 --
@@ -394,7 +394,7 @@ local function newChar(slot)
   local cix = H.readByte(CHARIX + slot*2)
   local kit = KITS[cix] or FALLBACK_KIT
   -- the UNPOKED battle command list: read once, before any turn rewrites
-  -- it, and never re-read. It is both the gate on what the kit may ask
+  -- it, and never re-read. It is both the check on what the kit may ask
   -- for and the value restored at teardown.
   local cmds = {}
   for i = 0, 3 do cmds[i] = battleCmd(slot, i) end
@@ -660,7 +660,7 @@ local function sample()
       if broken(m.slot) then                 -- the game's own x2 criterion
         S.playerDmgBroken = S.playerDmgBroken + d
       end
-      -- fan-out by the acting entity, and keep the leftovers honest
+      -- fan-out by the acting entity, and keep the leftovers accounted for
       local rec = curSlot and bySlot[curSlot]
       if rec then
         rec.dmg = rec.dmg + d

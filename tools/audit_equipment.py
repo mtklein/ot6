@@ -3,12 +3,12 @@
 
 WHY THIS EXISTS.  The game strips characters and returns their gear to the
 inventory at story beats -- `remove_equip` / EventCmd_8d, 58 sites in 15
-clusters across event_main.asm -- and the mint chain has never once put it
-back on.  battle_brokendeath found this at the Vector infiltration in
-2026-07 and drove Equip -> Optimum by hand to fix its own fixture.  Nobody
-checked whether it was a general problem.
+clusters across event_main.asm -- and the chain of generated savestates has
+never once put it back on.  battle_brokendeath found this at the Vector
+infiltration in 2026-07 and drove Equip -> Optimum by hand to fix its own
+fixture.  Nobody checked whether it was a general problem.
 
-It is.  On 2026-08-09 the first full-frontier run of the honest chain
+It is.  On 2026-08-09 the first end-to-end run of the input-driven chain
 stalled at `sfigaro_town`, where solo LOCKE lost the gate soldier three
 times running.  It read exactly like a balance wall -- a level-13 machine
 with 495 hp against a level-8 thief -- and it was nothing of the sort:
@@ -258,7 +258,7 @@ def main() -> int:
         print(f"\n{len(bad)} fixture(s) hand a party member NOTHING TO FIGHT "
               f"WITH.  A bare-handed character reads exactly like a balance\n"
               f"wall -- solo LOCKE punched a 495-hp HeavyArmor for 8 a swing "
-              f"before anyone looked.  Give the leg an H.equipOptimum stop.")
+              f"before anyone looked.  Give the step an H.equipOptimum stop.")
         return 1
     print("  OK -- everybody in every party is holding something")
     return 0

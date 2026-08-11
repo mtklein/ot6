@@ -2,19 +2,19 @@
 -- wake-flow event (_cca06f) through its dialogs, the character-naming menu
 -- (default OCTO; START commits it -- name_change.asm exits on START unless
 -- the name is blank), the guards-at-the-gate scene and the knocking at the
--- door, until control returns downstairs with switch $0001 set.  Mint
+-- door, until control returns downstairs with switch $0001 set.  Generate
 -- narshe_escape_start.mss there, then leave the way Arvis pointed: the
 -- front door at (55,35) stays blocked by its invisible door-NPC (the
 -- soldiers are behind it), so the way out is the corridor above the
 -- bedroom -- exit (67,26) -> map 20 (Narshe outdoors) at (53,8), high on
--- the cliffs.  Mint narshe_streets.mss at the first calm tile outside.
+-- the cliffs.  Generate narshe_streets.mss at the first calm tile outside.
 -- The naming menu is the one story beat advanceStory cannot tap through --
 -- $0059 goes 1 while it opens, so the script splits there and presses
 -- START itself.
 --
--- Issue #75: every navTo/advanceStory leg passes honest=true, so if any
+-- Issue #75: every navTo/advanceStory step passes playBattles=true, so if any
 -- encounter ever fires on this stretch it is FOUGHT by tap-A rather than
--- kill-bitted (the wake-flow maps drew none in any measured run -- the
+-- write-cleared (the wake-flow maps drew none in any measured run -- the
 -- flag is the guarantee, not a behavior change).  This gen contains no
 -- write idiom of its own.
 local H = dofile("tools/tests/lib/ot6.lua")
@@ -44,14 +44,14 @@ H.run({ maxFrames = 30000 }, {
 
   -- Arvis stands at (64,29), three tiles right of the wake position; walk
   -- beside him, face him (a blocked press just turns), and talk
-  H.navTo(63, 29, { maxFrames = 4000, honest = true }),
+  H.navTo(63, 29, { maxFrames = 4000, playBattles = true }),
   H.hold({ "right" }), H.waitFrames(6), H.release(), H.waitFrames(4),
   H.pressButtons({ "a" }, 6),
   H.waitUntil(function() return H.dialogWaiting() end, 300, "arvis dialog opens"),
 
   -- dialogs up to the naming menu ($0059 flips to 1 as it opens)
   H.advanceStory(function() return H.readByte(0x0059) ~= 0 end, 8000,
-    { honest = true }),
+    { playBattles = true }),
   H.logStep("naming menu opening; committing the default name"),
   H.waitFrames(180),                    -- menu fade-in
   H.call(function() H.screenshot("escape_naming") end),
@@ -61,7 +61,7 @@ H.run({ maxFrames = 30000 }, {
   -- the rest of the scene: name echo dialog, the gate cutscene on map 19,
   -- the knocking, the force-walk downstairs; ends with switch $0001 set
   -- and control returned
-  H.advanceStory(calm(30, escapeStarted), 20000, { honest = true }),
+  H.advanceStory(calm(30, escapeStarted), 20000, { playBattles = true }),
   H.call(function()
     H.assertEq(escapeStarted(), true, "escape switch $0001 set")
     H.assertEq(H.mapId(), 30, "still in Arvis's house")
@@ -73,7 +73,7 @@ H.run({ maxFrames = 30000 }, {
 
   -- out via the corridor above the bedroom: (67,26) exits to map 20 (53,8)
   H.navTo(67, 26, { arrive = function() return H.mapId() == 20 end,
-                    maxFrames = 8000, honest = true }),
+                    maxFrames = 8000, playBattles = true }),
   H.waitUntil(calm(30), 900, "streets control"),
   H.waitFrames(90),                     -- let the map fade-in finish
   H.call(function()
@@ -83,6 +83,6 @@ H.run({ maxFrames = 30000 }, {
   end),
   H.saveState("narshe_streets.mss"),
   H.logStep(function()
-    return string.format("narshe_streets minted at frame %d", H.frame)
+    return string.format("narshe_streets generated at frame %d", H.frame)
   end),
 })

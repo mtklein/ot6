@@ -47,7 +47,7 @@ verdict_spoken() { grep -qE "$PASS_RE|$FAIL_RE" "$1"; }
 # false green: `^\[ot6\] PASS` is a PREFIX, battle_thief logs `PASSED phase
 # 1: ...` per phase, and a run killed by the wall-clock cap after phase 1 was
 # therefore scored PASS (measured 2026-08-10: testrunner exit 255, verdict 0).
-# Every other mechanical anchor in this repo carries a selftest -- the
+# Every other mechanical check in this repo carries a selftest -- the
 # state-write checker, compose, the ninja graph, runner isolation -- and the
 # one component that decides pass-vs-fail for every test in the project did
 # not.  Wired into `make test` beside the others.
@@ -71,7 +71,7 @@ if [ "${1:-}" = "--verdict-selftest" ]; then
   vcheck "a phase line plus a real verdict passes" '[ot6] PASSED phase 1: the submenu
 [ot6] PASS (frame 13056)'                         pass
   vcheck "FAILED-phase lines alone score NONE"    '[ot6] FAILED phase 3: the cap'      none
-  vcheck "an empty log scores none (a reap)"      ''                                   none
+  vcheck "an empty log scores none (a timeout kill)" ''                                none
   vcheck "prose naming PASS does not score"       '[ot6] this run will PASS if the gauge breaks' none
   vcheck "an unprefixed PASS does not score"      'PASS (frame 1)'                     none
   if [ "$fails" -ne 0 ]; then
@@ -157,7 +157,7 @@ fi
 # docs/TOOLING.md), so macOS runs a first-launch Gatekeeper assessment on
 # every NEW bundle path: a user-visible "Verifying Mesen..." dialog and a
 # multi-second scan of all 413MB (measured: 4.7s and 6.1s on two fresh paths
-# against 0.3-0.5s once the path is known).  The old scheme minted four of
+# against 0.3-0.5s once the path is known).  The old scheme created four of
 # those per tree and four more every time an agent made a worktree.  Clearing
 # quarantine does not help -- `xattr -cr` before first launch still cost 5.5s,
 # and the kernel puts com.apple.provenance straight back on exec -- because
@@ -257,25 +257,25 @@ python3 "$ROOT/tools/tests/lib/pin_test_saves.py" \
 
 # Fresh battery every run: the testrunner flushes SRAM to <saves>/*.srm on
 # exit and silently reloads it next boot -- a stale srm is a hidden
-# cross-run coupling channel (and fossilizes into minted savestates).
+# cross-run coupling channel (and fossilizes into generated savestates).
 # Tests that need a save inject it explicitly (SRM sidecars).
 rm -f "$TEST_SAVES"/*.srm
 if [ -n "${OT6_SRAM_ANCHOR:-}" ]; then
-  # THE persistent_layout GATE (issue #25).  A leg declares the persistent-
-  # SRAM layout it understands with a marker comment in its script,
+  # THE persistent_layout CHECK (issue #25).  A generator step declares the
+  # persistent-SRAM layout it understands with a marker comment in its script,
   #
   #     [dash][dash] OT6_ANCHOR_LAYOUT: ot6-codex-o8-v1
   #
   # (spelled as a real Lua comment at the start of a line; not written out
   # here so THIS file can never satisfy the grep).  The declaration rides
-  # the script itself rather than an env var, so every consumer -- mint,
-  # smoke, a bare manual run.sh -- gets the same refusal with no caller
-  # wiring, and it survives composition (comments do).  sram_anchor.py
-  # compares it against the anchor manifest's persistent_layout and refuses
+  # the script itself rather than an env var, so every consumer -- savestate
+  # generation, smoke, a bare manual run.sh -- gets the same refusal with no
+  # caller wiring, and it survives composition (comments do).  sram_anchor.py
+  # compares it against the checkpoint manifest's persistent_layout and refuses
   # a mismatch NAMING BOTH STRINGS, here, before the emulator boots: a
-  # schema-drift stale anchor must be a named refusal, never an in-emulator
-  # timeout.  A leg with no marker declares support for nothing and is
-  # refused too -- fail closed, or the gate only guards legs that opted in.
+  # schema-drift stale checkpoint must be a named refusal, never an in-emulator
+  # timeout.  A step with no marker declares support for nothing and is
+  # refused too -- fail closed, or the check only guards steps that opted in.
   ANCHOR_LAYOUT=$(sed -n 's/^-- OT6_ANCHOR_LAYOUT: *\([^ ]*\).*$/\1/p' "$COMPOSED" | head -n 1)
   python3 "$ROOT/tools/tests/lib/sram_anchor.py" materialize \
     "$OT6_SRAM_ANCHOR" "$TEST_SAVES/$(basename "$ROM" .sfc).srm" \
@@ -283,10 +283,10 @@ if [ -n "${OT6_SRAM_ANCHOR:-}" ]; then
     { echo "invalid SRAM anchor: $OT6_SRAM_ANCHOR (refused BEFORE boot)"; exit 2; }
 fi
 # --timeout: Mesen's testrunner has a hard DEFAULT 100-second wall-clock
-# cap (exit -1/255 + truncated stdout on expiry) that reaped long runs; keep
+# cap (exit -1/255 + truncated stdout on expiry) that killed long runs; keep
 # a cap as the only defense against a genuinely hung emulator, just a roomy one.
 # OT6_TIMEOUT raises it for a run you already know is competing for cores --
-# the cap is WALL clock, so `nice` does not protect it (see the reap
+# the cap is WALL clock, so `nice` does not protect it (see the timeout
 # diagnosis below).
 # --enableStdout mirrors the EMULATOR message log to stdout.  It does NOT
 # carry Lua errors or watchdog kills -- those go to the script log, which
@@ -294,18 +294,20 @@ fi
 # print() is the only channel out.  Kept for the ROM-info banner.
 # CFFIXED_USER_HOME is the isolation boundary measured above.
 CAP="${OT6_TIMEOUT:-600}"
-# A REAP IS NOT A RESULT, SO THE HARNESS RESOLVES IT INSTEAD OF REPORTING IT.
-# The cap is WALL clock and `nice` does not slow the wall, so concurrent jobs
-# starve each other: a mint that takes 400s alone can cross 600s when a dozen
-# share ten cores.  That used to surface as a red edge with a paragraph of
-# explanation, and every reader had to re-learn that "exit 255, truncated
-# stdout" is not a crash.  Isolation was already solved -- every invocation
+# A TIMEOUT KILL IS NOT A RESULT, SO THE HARNESS RESOLVES IT INSTEAD OF
+# REPORTING IT.  The cap is WALL clock and `nice` does not slow the wall, so
+# concurrent jobs starve each other: a savestate generation that takes 400s
+# alone can cross 600s when a dozen share ten cores.  That used to surface as
+# a red edge with a paragraph of explanation, and every reader had to re-learn
+# that "exit 255, truncated stdout" is not a crash.
+# Isolation was already solved -- every invocation
 # gets its own workspace and CFFIXED_USER_HOME (dd2266a, 10ce17c) -- which is
 # exactly what makes a retry SAFE and deterministic: the same inputs, run
 # again, with nothing shared to have been disturbed.  So retry it.
 #
-# RETRIED ONLY ON THE REAP SIGNATURE, and this distinction is load-bearing:
-# no verdict in the log AND the run lived to the cap.  A real FAIL is NEVER
+# RETRIED ONLY ON THE TIMEOUT-KILL SIGNATURE, and this distinction is
+# load-bearing: no verdict in the log AND the run lived to the cap.
+# A real FAIL is NEVER
 # retried -- retrying failures until they pass is the #74 mistake in harness
 # clothing, and it would silently launder a flaky test into a green one.  A
 # no-verdict run that died WELL SHORT of the cap is not retried either: that
@@ -325,7 +327,7 @@ while :; do
   [ $(( elapsed + 5 )) -ge "$CAP" ] || break
   [ "$attempt" -le "$RETRIES" ] || break
   retried=$(( retried + 1 ))
-  printf '[ot6] REAPED after %ss against a %ss wall-clock cap -- retrying (attempt %s of %s).  Runs are isolated, so this is safe and is not a re-roll of a failure: no verdict was ever reached.\n' \
+  printf '[ot6] KILLED BY THE TIMEOUT after %ss against a %ss wall-clock cap -- retrying (attempt %s of %s).  Runs are isolated, so this is safe and is not a re-roll of a failure: no verdict was ever reached.\n' \
     "$elapsed" "$CAP" "$(( attempt + 1 ))" "$(( RETRIES + 1 ))" >&2
   sleep 5
 done
@@ -333,9 +335,9 @@ done
 python3 "$ROOT/tools/tests/lib/decode_b64.py" "$RUN_LOG" "$ART"
 
 if [ "$retried" -gt 0 ] && verdict_spoken "$RUN_LOG"; then
-  # Never let a retry be silent: a machine reaping runs is a fact worth
-  # seeing even when the retry rescued the result.
-  printf '[ot6] this run was REAPED %s time(s) by the %ss wall-clock cap and retried; the verdict below is from attempt %s.\n' \
+  # Never let a retry be silent: a machine killing runs on the timeout is a
+  # fact worth seeing even when the retry rescued the result.
+  printf '[ot6] this run was KILLED %s time(s) by the %ss wall-clock cap and retried; the verdict below is from attempt %s.\n' \
     "$retried" "$CAP" "$attempt" >> "$RUN_LOG"
 fi
 if grep -qE "$PASS_RE" "$RUN_LOG"; then
@@ -349,14 +351,15 @@ else
   # the cap, the killer was the cap.  Say so, because the raw signature is
   # "exit 255, truncated stdout" and that reads exactly like a crash: the
   # brief has to keep re-teaching agents that it is not one, and it is the
-  # documented top cause of a mint failing for reasons that are not the mint.
+  # documented top cause of a savestate generation failing for reasons that
+  # are not the generation.
   #
   # WHY THIS IS USUALLY CONTENTION AND NOT THE TEST: the cap is WALL clock,
   # and `nice` does not slow the wall.  Niced work yields to the owner's
   # game, but every agent's jobs are equally niced, so they starve EACH
-  # OTHER -- a mint that takes 400s alone can cross 600s when a dozen of
-  # them share ten cores.  Observed 2026-07-29: nine states minted fine,
-  # four reaped, all four green when re-run alone.
+  # OTHER -- a generation that takes 400s alone can cross 600s when a dozen of
+  # them share ten cores.  Observed 2026-07-29: nine states generated fine,
+  # four killed by the timeout, all four green when re-run alone.
   # "Lived to the cap" with 5s of slack for rounding -- not a fixed 30s
   # margin, which goes negative and always fires under a small OT6_TIMEOUT.
   #
@@ -369,7 +372,7 @@ else
   # read the log, so appending now is safe.
   reap() { printf '[ot6] %s\n' "$@" >> "$RUN_LOG"; }
   if [ $(( elapsed + 5 )) -ge "$CAP" ]; then
-    reap "REAPED: no verdict, and the run lasted ${elapsed}s against a ${CAP}s wall-clock cap (--timeout).  Mesen killed it; it did not crash." \
+    reap "KILLED BY THE TIMEOUT: no verdict, and the run lasted ${elapsed}s against a ${CAP}s wall-clock cap (--timeout).  Mesen killed it; it did not crash." \
          "  This is the FINAL attempt: the harness already retried it ${retried} time(s)" \
          "  automatically (OT6_REAP_RETRIES=${RETRIES}), so the cap is not merely being" \
          "  grazed -- this run cannot finish inside it on this machine right now." \
@@ -380,7 +383,7 @@ else
          "  retries (OT6_REAP_RETRIES=3), or lower parallelism (NINJAFLAGS=-j2)."
   elif [ "$verdict" -ne 0 ]; then
     reap "no verdict after ${elapsed}s (cap ${CAP}s): the script died before reaching PASS or FAIL." \
-         "  Well short of the cap, so this is NOT the reap -- read this log for a Lua load error."
+         "  Well short of the cap, so this is NOT a timeout kill -- read this log for a Lua load error."
   fi
 fi
 if [ "$verdict" -eq 0 ] && [ -n "${OT6_EXPECT_ARTIFACT:-}" ]; then
@@ -399,7 +402,7 @@ publish_file() {
   tmp="$dest.tmp.$$"
   cp "$src" "$tmp" && mv -f "$tmp" "$dest"
 }
-# Anchor creation is intentionally a separate, explicit operation.  Mesen
+# Checkpoint creation is intentionally a separate, explicit operation.  Mesen
 # flushes battery SRAM only while shutting down, so the complete 32 KiB file
 # becomes available here, after the Lua script has exercised the real Save UI.
 if [ "$verdict" -eq 0 ] && [ -n "${OT6_CAPTURE_SRM:-}" ]; then
@@ -408,15 +411,16 @@ if [ "$verdict" -eq 0 ] && [ -n "${OT6_CAPTURE_SRM:-}" ]; then
     mkdir -p "$(dirname "$OT6_CAPTURE_SRM")"
     publish_file "$captured" "$OT6_CAPTURE_SRM"
     # Provenance sidecar (issue #75 step 5): record MECHANICALLY what cut
-    # this battery -- the capturing generator's mint sig (from the one
-    # authority, frontier_stamp.sh), plus the hash of everything the run
-    # booted FROM: the stamp of each savestate compose embedded (read off
+    # this battery -- the capturing generator's provenance signature (from
+    # the one authority, frontier_stamp.sh), plus the hash of everything the
+    # run booted FROM: the stamp of each savestate compose embedded (read off
     # the composed file's own `-- state` provenance lines) and, when the
-    # run Continued from a prior anchor, that anchor's manifest.  The
+    # run Continued from a prior checkpoint, that checkpoint's manifest.  The
     # sidecar lands beside the payload; `sram_anchor.py seal` folds it
     # into manifest.json.  A capture that cannot state its provenance is
-    # refused outright -- an anchor is a frontier root, and an unprovable
-    # root is the exact thing this program exists to stop minting.
+    # refused outright -- a checkpoint is a root of the generated chain, and
+    # an unprovable root is the exact thing this program exists to stop
+    # generating.
     gen=$(basename "$SCRIPT" .lua)
     anchor_extras=""
     adir=""
@@ -444,7 +448,7 @@ $ancestors"
         "$mint_sig" $ancestors ||
         { echo "capture provenance sidecar failed for $OT6_CAPTURE_SRM"; verdict=2; }
     else
-      echo "capture refused: cannot derive a mint sig for $SCRIPT" \
+      echo "capture refused: cannot derive a provenance signature for $SCRIPT" \
            "(a capture must run a tools/tests generator; issue #75)"
       verdict=2
     fi
@@ -456,24 +460,25 @@ fi
 publish_file "$RUN_LOG" "$LOG"
 # OT6_NO_PUBLISH=1 runs a generator for its VERDICT ONLY, leaving build/states
 # untouched.  `make smoke` uses it to falsify a lib change in minutes without
-# half-updating the chain: a state minted mid-smoke would be fresher than its
-# neighbours and make the tree harder to reason about, for no benefit -- the
-# stamp gate would re-mint it anyway.
+# half-updating the chain: a state generated mid-smoke would be fresher than
+# its neighbours and make the tree harder to reason about, for no benefit --
+# the stamp check would regenerate it anyway.
 #
-# A MINT EDGE PUBLISHES ONLY ITS OWN ARTIFACTS (issue #30).  OT6_EXPECT_ARTIFACT
-# is set exactly by frontier_ninja.py's mint rule, naming the ONE state the
-# invoking ninja edge is for.  A multi-mint script emits EVERY sibling state
-# on every invocation (gen_edgar plays the whole Figaro chapter and emits all
+# A GENERATING EDGE PUBLISHES ONLY ITS OWN ARTIFACTS (issue #30).
+# OT6_EXPECT_ARTIFACT is set exactly by frontier_ninja.py's `mint` rule, naming
+# the ONE state the invoking ninja edge is for.  A script that generates several
+# states emits EVERY sibling state on every invocation (gen_edgar plays the
+# whole Figaro chapter and emits all
 # three figaro states no matter which edge invoked it), and each sibling is
 # its own ninja edge running this same script -- so publishing the whole
 # workspace let one edge rewrite ANOTHER edge's declared outputs with fresh
 # mtimes.  For gen_edgar's figaro_cleared edge that meant republishing
 # figaro_matron.mss -- its own INPUT -- after its own outputs (the "$ART"/*
 # glob publishes cleared before matron), so ninja saw input-newer-than-output
-# forever and consecutive `make frontier` runs re-minted every multi-mint
-# family and its downstream trunk with zero content changes.  The sibling
-# copies this run just emitted are deliberately DISCARDED, not moved: every
-# sibling has its own edge, so the published copy is always the one whose
+# forever and consecutive `make frontier` runs regenerated every such
+# multi-state family and its downstream trunk with zero content changes.
+# The sibling copies this run just emitted are deliberately DISCARDED, not
+# moved: every sibling has its own edge, so the published copy is always the one whose
 # edge ninja scheduled and whose stamp frontier_stamp.sh wrote.  Screenshots
 # still publish either way -- they are forensic output, not scheduled ninja
 # outputs, and no edge declares them.

@@ -33,9 +33,9 @@
 -- where was wrong from v0.5.  The EN field-menu window does not show BG1
 -- ScreenA one tile row per eight scanlines: a row PAIR occupies twelve
 -- scanlines, the ODD row getting eight and the even row four, and nothing past
--- row 15 is inside the window at all (measured with a per-row glyph ruler,
--- tools/tests/probe_ragegeom.lua; vanilla says it from the other side -- every
--- EN cursor list for this window is `cursor_pos {x, 116 + n*12}`,
+-- row 15 is inside the window at all (measured with a glyph drawn in every
+-- row, tools/tests/probe_ragegeom.lua; vanilla says it from the other side --
+-- every EN cursor list for this window is `cursor_pos {x, 116 + n*12}`,
 -- skills.asm:125-126, and DrawRageName biases its row `.if LANG_EN`,
 -- skills.asm:1571-1574).  The page drew its slots on EVEN rows 4/6/8 and its
 -- LEARNED grid on 15/17/19/21, so every tech name rendered as a four-scanline
@@ -69,16 +69,16 @@
 -- the text is read out of the tilemap -- so moving either half alone fails
 -- here.  It is duplicated in menu_ragepage.lua rather than shared: the only
 -- lua the runner inlines is lib/ot6{,_field,_contract}.lua, and those three
--- files ARE the frontier mint signature (lib/frontier_stamp.sh:82-85), so a
--- helper added there would mark every minted fixture drifted.
+-- files ARE the savestate generation signature (lib/frontier_stamp.sh:82-85),
+-- so a helper added there would mark every generated fixture drifted.
 --
 -- issue #44 -- THE CONTROL HINT, and why the title row's expectations moved.
 -- The page rendered correctly and the owner still could not use it: L/R
--- cycling the cursored rung is its only real interaction and nothing on screen
+-- cycling the cursored tier is its only real interaction and nothing on screen
 -- said so.  All eight of the window's text rows were already spoken for, so
 -- the hint had to come out of found space, and the title was the cheapest
 -- source -- "BUSHIDO LOADOUT" spent columns 3-17 saying what the 1x/2x/3x
--- rungs and the LEARNED pool already show.  It is "SWDTECH" now (3-9), the
+-- tiers and the LEARNED pool already show.  It is "SWDTECH" now (3-9), the
 -- hint sits at 11-19, LEARNED is unmoved at 22-28.  The EXPECTED cells below
 -- were rewritten to that layout deliberately; nothing was loosened, and the
 -- title-row gap assertion gained a job it did not have before (it now pins the
@@ -121,10 +121,10 @@
 --
 -- MEASURED on this fixture: $1cf7 = $03 -- TWO techs, Dispatch and Retort
 -- (the burn-down plan's "$07 scenario-band" note describes a later Cyan) --
--- so c = 1 and the window is {0, 1, 1}: the 3x rung is CLAMPED to the
+-- so c = 1 and the window is {0, 1, 1}: the 3x tier is CLAMPED to the
 -- ceiling and shows Retort TWICE.  That is a page state the old $07 staging
--- never rendered, and it is the honest one: a real early Cyan's page
--- duplicates his top tech on the deeper rungs.  Also measured: CYAN does not
+-- never rendered, and it is the accurate one: a real early Cyan's page
+-- duplicates his top tech on the deeper tiers.  Also measured: CYAN does not
 -- sit in menu slot 1 here (slot 1 reads $FF after the scenario shuffle), so
 -- he is FOUND in zCharID and the character cursor is walked to him.
 --
@@ -169,14 +169,14 @@ local T = { B=0x81, U=0x94, S=0x92, H=0x87, I=0x88, D=0x83, O=0x8e, L=0x8b,
 -- the player picks to reach this page.
 local TITLE = { T.S,T.W,T.D,T.T,T.E,T.C,T.H }
 -- #44: the control hint the page shipped without.  L/R cycling the cursored
--- rung is this page's only real interaction and nothing named it ("that part
+-- tier is this page's only real interaction and nothing named it ("that part
 -- was not obvious", owner playtest v0.7).  Character for character the same
 -- string the Rage page draws -- the two loadout pages share the idiom and must
 -- teach it with the same words.
 local HINT  = { T.L,T.SLASH,T.R,T.SP,T.S,T.W,T.A,T.P,T.S }
 local POOL  = { T.L,T.E,T.A,T.R,T.N,T.E,T.D }
 -- issue #44 gave this page a control hint; issue #49 gives it the STATE that
--- control changes.  An all-zero $1e1d is AUTO -- the game picks each rung from
+-- control changes.  An all-zero $1e1d is AUTO -- the game picks each tier from
 -- the moving window, and keeps re-picking as Cyan learns -- and the first L/R
 -- edit freezes that window into the word, permanently, until Y clears it.  The
 -- page said nothing about which of the two it was in, and nothing named Y.
@@ -259,7 +259,7 @@ local BOOST_ROWS = { 3, 5, 7 }
 -- #49: the mode block, in the page's one free run -- columns 23-29 of the three
 -- slot rows (the survey in issue #49).  Mode on row 3, the control that changes
 -- it on row 5, row 7 left clear so the two read as a pair and not as a third
--- column of per-rung data.
+-- column of per-tier data.
 --
 -- The block starts at 24, not 23, and MODE_SEP_COL below is why: the slot's
 -- price field is "n MP" at columns 19-22, and the first cut of this change put
@@ -335,7 +335,7 @@ end
 -- Right-aligned with a LEADING BLANK and never a leading zero -- vanilla's own
 -- rule for a menu number (HexToDec3 overwrites each leading '0' with $ff,
 -- menu_common.asm:906-918, and DrawNum2 prints the low two,
--- menu_common.asm:856-860) -- so the three rungs read as a column.  Asserting
+-- menu_common.asm:856-860) -- so the three tiers read as a column.  Asserting
 -- PAD rather than "anything" for a one-digit price is the half that catches a
 -- drawer which right-pads instead ("4  MP") or zero-fills ("04 MP").
 local function assertCostField(y, techIndex, what)
@@ -436,7 +436,7 @@ H.run({ maxFrames = 30000 }, {
       "Cyan's real learned set is contiguous from tech 0 (level-derived)")
     H.assertEq(nLearned >= 2, true,
       "at least two techs learned -- one-tech and empty pages would render, "
-      .. "but the duplicate-rung clamp below needs a second tech to show")
+      .. "but the duplicate-tier clamp below needs a second tech to show")
     local c = nLearned - 1
     local b = math.max(0, c - 2)
     t = { math.min(c, b), math.min(c, b + 1), math.min(c, b + 2) }
@@ -448,7 +448,7 @@ H.run({ maxFrames = 30000 }, {
   -- the player's path: X -> main menu -> Skills -> CYAN -> submenu
   -- driveUntil, not one press: the X that opens the field menu is the first
   -- step in these tests that needs a SPECIFIC frame, so it is where a
-  -- fixture minted against a different ROM surfaces -- as "timeout waiting
+  -- fixture generated against a different ROM surfaces -- as "timeout waiting
   -- for main menu", which reads like a menu bug and is not one.  Retrying
   -- the press costs nothing when the pairing is fine and removes the false
   -- report when it is not.  Same shape probe_fieldicons.lua and
@@ -504,15 +504,15 @@ H.run({ maxFrames = 30000 }, {
     assertRun(LEFT_COL, BOOST_ROWS[1], { 0xb5, lo.x }, "label 1x")
     assertRun(LEFT_COL, BOOST_ROWS[2], { 0xb6, lo.x }, "label 2x")
     assertRun(LEFT_COL, BOOST_ROWS[3], { 0xb7, lo.x }, "label 3x")
-    -- #38: no 0x label anywhere on the page -- the retired rung must not be
+    -- #38: no 0x label anywhere on the page -- the retired tier must not be
     -- drawn at its old home nor anywhere else in the label column.
     for y = 0, 15 do
       H.assertEq(cell(LEFT_COL, y) == 0xb4 and cell(LEFT_COL + 1, y) == lo.x, false,
-        string.format("no 0x label at row %d (#38 retired the free rung)", y))
+        string.format("no 0x label at row %d (#38 retired the free tier)", y))
     end
     -- the three boost slots, derived from the save's own set: window {0,1,1}
-    -- on the measured fixture, i.e. the 3x rung CLAMPED to the ceiling shows
-    -- the top tech AGAIN -- the honest early-Cyan page the old staging never
+    -- on the measured fixture, i.e. the 3x tier CLAMPED to the ceiling shows
+    -- the top tech AGAIN -- the accurate early-Cyan page the old staging never
     -- rendered.  #56: costs 4 / 10 -- the one- to two-digit boundary is still
     -- on screen (Retort is two-digit).
     assertSlotRow(BOOST_ROWS[1], bushBytes(t[1]), t[1],
@@ -578,7 +578,7 @@ H.run({ maxFrames = 30000 }, {
   -- Everything above is AUTO.  A mode indicator that only ever renders one of
   -- its two words proves nothing, and one drawn at page-init would keep saying
   -- AUTO for as long as the player stayed on the page -- which is exactly the
-  -- failure this block exists to catch.  R cycles the cursored rung, which calls
+  -- failure this block exists to catch.  R cycles the cursored tier, which calls
   -- Ot6LoadoutSeedWord and makes $1e1d nonzero = MANUAL; the page must say so on
   -- the very next redraw, without leaving the page.
   H.pressButtons({ "r" }, 3),
@@ -641,7 +641,7 @@ H.run({ maxFrames = 30000 }, {
   -- The loadout word is NOT written -- Y above already proved it $0000, and
   -- that is asserted rather than re-zeroed.  See the header; this arm may
   -- never produce fixtures, and converts organically when high-level content
-  -- reaches the frontier.
+  -- becomes reachable in play.
   -- ======================================================================= --
   H.pressButtons({ "b" }, 3),
   H.waitUntil(function() return st() == ST_SKILLS end, 300,
@@ -650,7 +650,7 @@ H.run({ maxFrames = 30000 }, {
     H.writeByte(LEARNED, 0xff)            -- THE arm's one write (see header)
     H.assertEq(H.readByte(LOADOUT) | (H.readByte(LOADOUT + 1) << 8), 0,
       "the word is still $0000 from Y's revert -- nothing to zero")
-    H.log("[isolation arm] $1cf7 := $ff -- the L68 all-eight Cyan, unmintable "
+    H.log("[isolation arm] $1cf7 := $ff -- the L68 all-eight Cyan, not generatable "
       .. "under the no-grind-tier ruling")
   end),
   H.pressButtons({ "a" }, 2),

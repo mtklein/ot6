@@ -1,11 +1,11 @@
 -- @suite frontier=worldmap_narshe
 -- (The marker was a bare `-- @suite` until v0.6.  This test loads
 -- build/states/worldmap_narshe.mss.lua at :34, which only `make frontier`
--- mints, so a plain marker made it a hard `make test` failure -- "compose
--- failed: save_checksum" -- in every tree without frontier states, i.e. every
+-- generates, so a plain marker made it a hard `make test` failure -- "compose
+-- failed: save_checksum" -- in every tree without the generated states, i.e. every
 -- fresh worktree.  It passed in the main tree only because that tree happens
 -- to have the fixture.  codex_saveas.lua loads the same state and declares the
--- same gate; this now matches it.  Found while landing #11/#23.)
+-- same requirement; this now matches it.  Found while landing #11/#23.)
 -- Regression for #18.  CheckSaveSlotChecksum returns the checksum ITSELF as its
 -- validity token and 0 for invalid -- there is no separate flag -- and every
 -- caller tests it with beq.  So a perfectly intact save whose 2558-byte sum

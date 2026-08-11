@@ -1,5 +1,6 @@
--- probe_moogle_marshal.lua -- how close does the honest Marshal fight get,
--- and what honest levers remain?  (issue #75, marshal-investigation)
+-- probe_moogle_marshal.lua -- how close does the input-driven Marshal fight
+-- get, and what input-driven levers remain?  (issue #75,
+-- marshal-investigation)
 --
 -- probe_moogle_stations (plain tap-A) and probe_moogle_boosted (naive
 -- R/A/A) both cleared the six waves 2-2-2 and then LOST battle 6 with P2
@@ -8,7 +9,7 @@
 -- table slots 4..9) every 240 frames, so the loss (or win) carries its
 -- margin.  It also dumps the party's item inventory at defense-live --
 -- if the players are carrying Tonics/Potions, menu healing before the
--- fight is an honest lever this route has not pulled yet.  The battle
+-- fight is an input-driven lever this route has not pulled yet.  The battle
 -- driver here presses R once per ~half-second and A thrice, a gentler
 -- boost cadence than probe_moogle_boosted's.  Zero writes.
 local H = dofile("tools/tests/lib/ot6.lua")
@@ -156,13 +157,13 @@ H.run({ maxFrames = 140000 }, {
   end),
 
   -- stations deployment (east first), plain tap-A storm
-  H.navTo(15, 15, { maxFrames = 2500, honest = true }),
+  H.navTo(15, 15, { maxFrames = 2500, playBattles = true }),
   ySwitchTo(3),
-  H.navTo(20, 20, { maxFrames = 4000, honest = true }),
+  H.navTo(20, 20, { maxFrames = 4000, playBattles = true }),
   ySwitchTo(2),
-  H.navTo(10, 21, { maxFrames = 4000, honest = true }),
+  H.navTo(10, 21, { maxFrames = 4000, playBattles = true }),
   ySwitchTo(1),
-  H.navTo(14, 14, { maxFrames = 2500, honest = true }),
+  H.navTo(14, 14, { maxFrames = 2500, playBattles = true }),
   logPools("deployed"),
   plainDrive(function()
     return (H.readByte(0x1f41) & 0xFC) == 0
@@ -175,7 +176,7 @@ H.run({ maxFrames = 140000 }, {
       return defenseWon()
           or (marshalAdjacent() and H.hasControl() and H.tileAligned())
     end,
-    maxFrames = 15000, honest = true,
+    maxFrames = 15000, playBattles = true,
   }),
   logPools("pre-marshal"),
   pokeStep(),

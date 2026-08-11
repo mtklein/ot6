@@ -1,8 +1,8 @@
-# OT6 v0.7 — Sealed Gate / Banquet route recon
+# OT6 v0.7 — Sealed Gate / Banquet route survey
 
-## 1. The route, leg by leg
+## 1. The route, segment by segment
 
-### Leg 7 — Vector → Albrook → the voyage → Crescent Island
+### Segment 7 — Vector → Albrook → the voyage → Crescent Island
 
 Exit the castle and Vector; world walk to Albrook, `(138/139,203) → 323
 (2,17)` — **33 steps** (offline BFS) from Vector's south exit.
@@ -28,7 +28,7 @@ lines (the `$007D` branch cluster, `:90701-91940`). The port is **map 332**
   `party_chars TERRA`** (`:68483-68488`) — Terra alone for the Leo
   conversation (`_cbcefc`, `:68497+`), then the Shadow scene ("In this world
   are many like me who've killed their emotions", `:68854`), Locke's
-  seasickness comedy, second sail leg `load_map 0 {193,157}` (`:68963`),
+  seasickness comedy, second sail segment `load_map 0 {193,157}` (`:68963`),
   `$0086=1` (`:69018`), Leo's split briefing — "CELES and I will form one
   group. TERRA, you go with LOCKE and SHADOW" (`_cbd1f3`, `:69024`).
 - Landing (`:69154-69190`): `char_party LOCKE, 1`, **`create_obj SHADOW` +
@@ -40,17 +40,17 @@ lines (the `$007D` branch cluster, `:90701-91940`). The port is **map 332**
 $0083=1 $0086=1`, airship still dead (`$007A=1`), Gau unavailable
 (`$02FB=0`).** The Thamasa world trigger (`_cbd2ee`, `:69190` → map 343
 (23,46)) is at **(250,128)** — a 40+ step walk from the stop line across
-encounter-active ground, not a doorstep. Crescent Island's world trash is
+encounter-active ground, not an entry point. Crescent Island's world trash is
 terrain-split across three encounter groups, not one
-(`thamasa-recon.md` §1 leg 1).
+(`thamasa-recon.md` §1 segment 1).
 
 ---
 
 ## 6. Open questions for the milestone
 
 7. **The Albrook night window**: is leaving town (to world-save) mid-sequence
-   safe, or does `$0084/$0085` state wedge? Decides whether the leg to the
-   stop line gets a mid-leg savestate.
+   safe, or does `$0084/$0085` state wedge? Decides whether the segment to
+   the stop line gets a mid-segment savestate.
 
 ---
 

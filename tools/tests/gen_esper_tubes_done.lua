@@ -1,6 +1,6 @@
--- gen_esper_tubes_done.lua -- v0.6 leg 11: esper_tubes_doorstep (map 274
+-- gen_esper_tubes_done.lua -- v0.6 step 11: esper_tubes_doorstep (map 274
 -- {10,10} facing UP) -> UP + A onto {10,9} -> _cc7a60, the Cid/Kefka tube
--- room set piece -> six espers, CELES LEFT BEHIND, $0068=1.  Mints
+-- room set piece -> six espers, CELES LEFT BEHIND, $0068=1.  Generates
 -- esper_tubes.
 --
 -- _cc7a60 (event_main.asm:95456-96299) is ~850 lines and entirely
@@ -25,11 +25,11 @@
 --  * `switch $064B=1 / switch $0068=1` (:96298-96299) then
 --    `player_ctrl_on`.  $0068 is what unlocks the lift trigger _cc7f43 on
 --    {20,13} (`if_switch $0068=0, EventReturn`, :96313-96314), so it is
---    both the receipt for this leg and the key to the next.
+--    both the receipt for this step and the key to the next.
 --
 -- THE PARTY THIS LEAVES BEHIND is the load-bearing measurement of this
 -- whole beat and it is asserted below rather than described.  Measured at
--- every doorstep from the post-Opera anchor onward, $1850 read
+-- every entry point from the post-Opera checkpoint onward, $1850 read
 -- LOCKE=$C1 CELES=$49 and every other character $00, i.e. an ACTIVE PARTY
 -- OF TWO -- so what walks out of this room is LOCKE ALONE.
 local H = dofile("tools/tests/lib/ot6.lua")
@@ -84,9 +84,9 @@ end
 local DELTA = { up = { 0, -1 }, right = { 1, 0 }, down = { 0, 1 }, left = { -1, 0 } }
 
 -- (a tapInto helper used to sit here, DEFINED and never called -- the same
--- dead battle toolkit the other tube-leg conversions deleted; its only
--- battle handling was the kill-bit.  issue #75: this file now has ZERO
--- state writes -- the scene is ridden with honest input only)
+-- dead battle toolkit the other tube-step conversions deleted; its only
+-- battle handling was the battle-clear write.  issue #75: this file now has
+-- ZERO state writes -- the scene is ridden with real input only)
 
 local function census(tag, targets)
   local sx, sy = H.fieldX(), H.fieldY()
@@ -133,8 +133,8 @@ H.run({ maxFrames = 90000 }, {
     local e = espers()
     -- MEASURED boot roster, not assumed.  $1A69+0 = $0F is RAMUH(0),
     -- IFRIT(1), SHIVA(2), SIREN(3) -- Ifrit and Shiva are this beat's, the
-    -- other two ride in from earlier legs.  The rest is recorded rather
-    -- than asserted bit by bit, because what this leg proves is the DELTA:
+    -- other two ride in from earlier steps.  The rest is recorded rather
+    -- than asserted bit by bit, because what this step proves is the DELTA:
     -- boot0/boot2 are captured here and the post-scene assertion is
     -- boot | the six give_genju bits, so an esper arriving from somewhere
     -- else cannot be mistaken for one of these six.
@@ -167,7 +167,7 @@ H.run({ maxFrames = 90000 }, {
 
   -- 2. ride the ~850-line set piece to its `switch $0068=1`
   H.advanceStory(function() return sw(0x0068) == 1 end, 60000,
-    { honest = true }),
+    { playBattles = true }),
   H.waitUntil(settled, 9000, "control back after the tube-room scene", 5),
   H.waitFrames(90),
 
@@ -225,11 +225,11 @@ H.run({ maxFrames = 90000 }, {
   H.call(function() verifyReq = H.requestSaveState() end),
   H.waitFrames(2),
   H.call(function()
-    H.checkReq(verifyReq, "mint verify: capture")
+    H.checkReq(verifyReq, "generated-state verify: capture")
     verifyLoad = H.requestLoadState(verifyReq.blob)
   end),
   H.waitFrames(2),
-  H.call(function() H.checkReq(verifyLoad, "mint verify: reload") end),
+  H.call(function() H.checkReq(verifyLoad, "generated-state verify: reload") end),
   H.waitFrames(180),
   H.call(function()
     H.assertEq(map(), 274, "reload: still on map 274")
@@ -239,7 +239,7 @@ H.run({ maxFrames = 90000 }, {
       "reload: controllable at rest")
     H.assertEq(sw(0x0068), 1, "reload: $0068 still SET")
     H.assertEq(H.readByte(0x1850 + 6) & 0x07, 0, "reload: CELES still out")
-    H.log("mint verify: the reload stayed calm -- esper_tubes verified")
+    H.log("generated-state verify: the reload stayed calm -- esper_tubes verified")
   end),
 
   H.call(function()
@@ -248,7 +248,7 @@ H.run({ maxFrames = 90000 }, {
     })
   end),
   H.logStep(function()
-    return string.format("esper_tubes minted at frame %d -- map 274, six "
+    return string.format("esper_tubes generated at frame %d -- map 274, six "
       .. "espers taken, CELES gone, $0068=1", H.frame)
   end),
 })

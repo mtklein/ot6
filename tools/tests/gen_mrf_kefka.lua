@@ -1,6 +1,6 @@
--- gen_mrf_kefka.lua -- v0.6 leg 6: mrf_263 (map 263, {22,18}) -> the
+-- gen_mrf_kefka.lua -- v0.6 step 6: mrf_263 (map 263, {22,18}) -> the
 -- {24,18} ride down to {40,30} -> the {40,32} trigger -> KEFKA'S
--- ESPER-DRAIN SCENE -> $005F=1.  Mints mrf_kefka.
+-- ESPER-DRAIN SCENE -> $005F=1.  Generates mrf_kefka.
 --
 -- MEASURED at (22,18) (census in gen_mrf_263's log): 493 tiles reachable,
 -- and of the waypoints this beat needs, only {24,17} (3 steps) and
@@ -22,7 +22,7 @@
 -- each walks SLOT_1 a step or two UP_LEFT before falling into _cc7451
 -- (:94409) -- the scene where Kefka drains the espers.  Its tail
 -- (:94620-94622) is `switch $005F=1 / unlock_camera / player_ctrl_on`,
--- and $005F is what this leg banks.
+-- and $005F is what this step banks.
 local H = dofile("tools/tests/lib/ot6.lua")
 
 local function map() return H.mapId() & 0x1ff end
@@ -162,7 +162,7 @@ H.run({ maxFrames = 60000 }, {
   end),
 
   -- 1. two steps east onto {24,18} -> the ride -> {40,30}
-  H.navTo(23, 18, { maxFrames = 12000, honest = "flee" }),
+  H.navTo(23, 18, { maxFrames = 12000, playBattles = "flee" }),
   tapInto("right", function() return H.fieldX() == 40 and H.fieldY() == 30 end,
     12000, "RIGHT onto {24,18} -> the ride -> (40,30)"),
   H.waitFrames(30),
@@ -208,7 +208,7 @@ H.run({ maxFrames = 60000 }, {
     })
   end),
   H.logStep(function()
-    return string.format("mrf_kefka minted at frame %d -- map 263 (%d,%d), $005F=1",
+    return string.format("mrf_kefka generated at frame %d -- map 263 (%d,%d), $005F=1",
       H.frame, H.fieldX(), H.fieldY())
   end),
 })

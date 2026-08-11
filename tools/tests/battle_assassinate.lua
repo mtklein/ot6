@@ -13,9 +13,10 @@
 -- $3dd4 and spends the latch.
 --
 -- ISSUE #75 CONVERSION -- a REAL SHADOW, and the break is EARNED.  The old
--- scaffold installed CHAR::SHADOW into every doorstep slot, forged command
--- rows, pinned guard HP to $F000, and painted Broken/boss states on with
--- writes.  It now boots camp_escaped -- the honest post-Magitek mint,
+-- scaffold installed CHAR::SHADOW into every slot of the entry-point
+-- fixture, forged command rows, pinned guard HP to $F000, and painted
+-- Broken/boss states on with
+-- writes.  It now boots camp_escaped -- the input-driven post-Magitek savestate,
 -- world (179,71), SABIN + SHADOW + CYAN, Shadow's own record carrying
 -- Fight and his Imperial ($25, PIERCE per Ot6WeapClassTbl) -- and walks
 -- into the real local pool (measured 2026-08-10: species $2f 243hp
@@ -30,7 +31,7 @@
 -- the monster $3dd4 cells counts Death marks written FROM INSIDE
 -- Ot6Assassinate (the divine's own kill), and the $3ecb latch byte is
 -- read.  That replaces the old "did the guard's wound bit set" assert,
--- which an honest 4x-broken damage kill would confound (243hp bodies die
+-- which a plain 4x-broken damage kill would confound (243hp bodies die
 -- to plain damage too).
 --
 --   1. BROKEN NON-BOSS: Shadow chips a body to Broken, and his next landed
@@ -42,16 +43,16 @@
 --      stays 1 and the latch byte never changes again.
 --
 -- *** ONE LABELED ISOLATION ARM (issue #75) -- one write site STAYS ***
--- 3. THE BOSS GATE.  No honest boss shares a battle with Shadow anywhere
---    in the minted tree (the camp pursuit is four troops; the Ghost Train
---    boss has no doorstep fixture; the local pool carries no $3aa1.2
---    species -- measured), so the non-boss gate's negative is an isolation
+-- 3. THE BOSS CHECK.  No boss shares a battle with Shadow anywhere
+--    in the generated tree (the camp pursuit is four troops; the Ghost Train
+--    boss has no entry-point fixture; the local pool carries no $3aa1.2
+--    species -- measured), so the non-boss check's negative is an isolation
 --    arm: a FRESH battle, a body chipped Broken by real play, then the ONE
 --    write -- its $3aa1 bit 2 set, the exact bit a boss carries
 --    (ScimitarEffect reads the same bit, battle_main.asm:9147) -- and
 --    Shadow's next landed hit on it must fire NO divine and spend NO
 --    latch.  It MAY NEVER PRODUCE FIXTURES; it converts organically when
---    a chain leg mints a boss-with-Shadow doorstep.  This is the file's
+--    a chain step generates a boss-with-Shadow entry point.  This is the file's
 --    only surviving write (.writeByte( waiver line).
 local H = dofile("tools/tests/lib/ot6.lua")
 local STATE = "build/states/camp_escaped.mss.lua"
@@ -299,7 +300,7 @@ add({
 })
 
 -- ============== BATTLE 3: *** LABELED ISOLATION ARM (issue #75) ***
--- The boss gate, with the one injected bit -- see the header.  A fresh
+-- The boss check, with the one injected bit -- see the header.  A fresh
 -- battle (fresh latch), a body Broken by real chips, then $3aa1.2 is SET on
 -- it and Shadow's next landed hit must decline: no in-proc Death mark, no
 -- latch spend.  The write below is this file's only one and may never

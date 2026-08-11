@@ -50,14 +50,14 @@ Dialog id = index into `ff6/src/text/dlg1_en.json` ($0257 = entry 599).
 The player enters at the bottom-right; the greeter stands beside the
 entrance and names the course. No forced order (vanilla had none), but
 the natural nearest-door-first walk is 107 → 106 → 105, which lands:
-supplies and a practice fight on the doorstep, the core loop in the
-middle, the economy and the rung-2 seed in the deepest room.
+supplies and a practice fight just inside the door, the core loop in the
+middle, the economy and the tier-2 seed in the deepest room.
 
 | Room | Teaches | Changed ids |
 |---|---|---|
 | Hall (104) | orientation: the war has new rules | $0257 |
 | Middle (106) | **the core loop**: shields, chip-on-weakness, Break; hidden '?', reveal, the forever-codex, ability element marks | $0267, $0264 |
-| Left (105) | **the economy**: BP gain/bank/spend, R/L; the no-regen rule, why greed loses (shielded resistance); spell folding; the rung-2 seed | $026D, $0270, $026E, $0276 |
+| Left (105) | **the economy**: BP gain/bank/spend, R/L; the no-regen rule, why greed loses (shielded resistance); spell folding; the tier-2 seed | $026D, $0270, $026E, $0276 |
 | Right (107) | vanilla supplies/save, plus the practice dare at the live monster chest | $025D |
 
 Slot choice inside each room: the replaced advisors carried the most
@@ -114,7 +114,7 @@ capitalized as proper mechanics; shields stay common.
 > spell's MP.{page}Watch the spell list as you tap the R Button. What
 > you see is what will cast.
 
-**$0276 — the rung-2 seed (left room, deepest corner):**
+**$0276 — the tier-2 seed (left room, deepest corner):**
 
 > A deserter from the Empire says their armored machines turn a careless
 > blow aside.{page}``Every plate has its seam, and no two the same,'' he
@@ -134,7 +134,7 @@ turn / cap 5 / spend ≤3 (Ot6InitBP, Ot6ActionEnd, Ot6Boost), no regen
 on a boosted turn (Ot6ActionEnd), folds per Ot6FoldTbl with base-tier
 MP (Ot6QueueFold), live list re-fold (Ot6PreviewList_ext).
 
-The rung-2 seed ($0276) rides the imperial line's **varied, per-party**
+The tier-2 seed ($0276) rides the imperial line's **varied, per-party**
 weaknesses (pierce/slash/bolt/bludgeon, chosen so every forced party
 carries a key): armor turns a careless blow aside, but every plate has a
 seam, and no two are the same — bring the weapon your party carries. That

@@ -1,13 +1,13 @@
 -- @suite slow
--- probe_shadow_overlap.lua -- regression gate for the OT6_SHADOW overlap.
+-- probe_shadow_overlap.lua -- regression test for the OT6_SHADOW overlap.
 --
 -- HISTORY.  OT6_SHADOW used to live at $5762, annotated "trace-verified
 -- free".  It was not: $5762 sits 13 bytes inside vanilla's `ram_res
 -- w7e5755, 128` (btlgfx/btlgfx_ram.inc:71), and the battle command-list
 -- text drawers write $5755-$576a.  This probe reproduced it -- with the
 -- party's top command repointed at Item, DrawItemListText ran and bank C1
--- wrote $7E5762-$7E5767, leaving the HUD line-0 anchor at $00FF, which the
--- latch at Ot6BgHudLine's @done then made permanent for the battle.
+-- wrote $7E5762-$7E5767, leaving the HUD line-0 checkpoint at $00FF, which
+-- the latch at Ot6BgHudLine's @done then made permanent for the battle.
 -- OT6_SHADOW now lives at $ecf1, past the end of vanilla's battle-graphics
 -- RAM chain.  See the block comment at the symbol for the evidence.
 --
@@ -64,7 +64,7 @@ end
 -- OT6_SHADOW now lives at $ecf1 (see ot6.asm). Two assertions:
 --   1. nothing but bank F0 writes the NEW home
 --   2. nothing from bank F0 writes the OLD home -- i.e. we really vacated
-local NEW_LO, NEW_HI = 0x7EECF1, 0x7EECFE   -- new line 0 (anchor+prev+cells)
+local NEW_LO, NEW_HI = 0x7EECF1, 0x7EECFE   -- new line 0 (checkpoint+prev+cells)
 local OLD_LO, OLD_HI = 0x7E5762, 0x7E576F   -- old line 0, now vanilla's alone
 
 local hits = {}           -- addr -> { count, pcs = {pcstr -> n} }
@@ -132,7 +132,7 @@ H.run({ maxFrames = 30000 }, {
   H.call(function() H.setPad({}) end),
   H.waitFrames(120),
 
-  -- The whelk/doorstep party rides magitek armor, and the MAGITEK list
+  -- The whelk/entry point party rides magitek armor, and the MAGITEK list
   -- drawer is not one of the overlapping ones -- it writes only +5/+11,
   -- stopping at $5761, one byte below OT6_SHADOW.  The drawers that reach
   -- into the buffer are the Item/Magic/Tools family (indexed loops bounded

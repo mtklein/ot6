@@ -2,7 +2,7 @@
 --
 -- The SAME menu drive and cell-level assertions as menu_esperdetail.lua (the
 -- suite test), booted instead from a COLD Continue off the tracked post-Opera
--- battery anchor, which survives ROM changes (issue #9) where savestate
+-- battery checkpoint, which survives ROM changes (issue #9) where savestate
 -- fixtures do not.  Run it in a tree whose fixtures are stale against a fresh
 -- menu-bank build:
 --
@@ -153,7 +153,7 @@ local function assertOldLineGone(tag)
 end
 
 H.run({ maxFrames = 80000 }, {
-  -- gen_vector_doorstep.lua's cold Continue off the battery anchor.
+  -- gen_vector_doorstep.lua's cold Continue off the battery checkpoint.
   H.waitFrames(350),
   H.repeatN(5, { H.pressButtons({ "start" }, 8), H.waitFrames(25) }),
   H.waitFrames(120),
@@ -163,7 +163,7 @@ H.run({ maxFrames = 80000 }, {
   H.waitUntil(function()
     return (H.mapId() & 0x1ff) == 0 and H.worldHasControl()
       and H.worldAligned()
-  end, 3000, "cold Continue to post-Opera world doorstep", 10),
+  end, 3000, "cold Continue to post-Opera world entry point", 10),
   H.waitUntil(function()
     return (emu.getState()["ppu.screenBrightness"] or 0) >= 15
   end, 900, "cold Continue fade-in", 10),

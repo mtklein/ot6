@@ -42,8 +42,8 @@ def main() -> int:
     # own '=' padding -- land in the log under one tag.  Naive
     # concatenation puts padding mid-stream, b64decode raises "Incorrect
     # padding", and (before this fix) that one bad tag killed the WHOLE
-    # decode: gen_sabin_train's honest battle-68 WIN minted its state into
-    # the log and run.sh still reported "did not emit expected artifact",
+    # decode: gen_sabin_train's input-driven battle-68 WIN wrote its state
+    # into the log and run.sh still reported "did not emit expected artifact",
     # because a screenshot two tags earlier had been emitted three times.
     # The Aug 4 lineage never hit this only because it won on attempt 1.
     #
@@ -54,7 +54,7 @@ def main() -> int:
     # exactly the old behavior.)  Each tag is also fault-isolated now: a
     # tag that still fails to decode is reported and SKIPPED, and the
     # expected-artifact check in run.sh catches the case where the skipped
-    # tag was one the mint needed.
+    # tag was one the savestate the run was generating needed.
     failures = 0
     for tag, parts in chunks.items():
         if "/" in tag or "\\" in tag or ".." in tag:

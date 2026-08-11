@@ -1,10 +1,11 @@
 -- gen_scenario_locke.lua -- one step PAST the hub: pick LOCKE's scenario and
--- mint the first controllable frame of it.  Reconnaissance, not the Locke
+-- generate the first controllable frame of it.  Reconnaissance, not the Locke
 -- chain: it proves the hub is dispatchable and measures what "choosing a
 -- scenario" actually costs, so the three v0.3 chains can be scoped.
--- Mints one state:
+-- Generates one state:
 --   locke_scenario.mss  map 75 (South Figaro) at (48,43), LOCKE alone,
---                       controllable -- the doorstep of the Locke scenario.
+--                       controllable -- the entry point of the Locke
+--                       scenario.
 --
 -- THE HUB IS SIX NPCs ON A TINY MAP (NPCProp::_9, npc_prop.asm:473-521), and
 -- the party -- SCENARIO_MOG, char 13, dropped in at (8,3) by _caad4c -- walks
@@ -25,7 +26,7 @@
 -- shapes how the chains get dispatched:
 --   LOCKE  _ca84ab  party_chars LOCKE / load_map 75 {48,43} / … /
 --                   player_ctrl_on.  A FIELD map, and it is the same map 75
---                   gen_kolts already mints south_figaro on.
+--                   gen_kolts already generates south_figaro on.
 --   SABIN  _cb0a1c  party_chars SABIN / load_map 0 {161,36} /
 --                   set_script_mode WORLD.  Starts on the OVERWORLD, so that
 --                   chain needs worldNavTo from its first frame.
@@ -147,8 +148,9 @@ H.run({ maxFrames = 60000 }, {
 
   -- ===================================================================== --
   -- PICK LOCKE.  One of three; chosen because it lands on a FIELD map the
-  -- frontier already knows (75, where gen_kolts mints south_figaro), which
-  -- makes it the cheapest of the three to verify as a doorstep.
+  -- generated chain already knows (75, where gen_kolts generates
+  -- south_figaro), which makes it the cheapest of the three to verify as an
+  -- entry point.
   -- ===================================================================== --
   talkToObj(16, "LOCKE's scenario NPC"),
   H.advanceStory(function()
@@ -179,6 +181,6 @@ H.run({ maxFrames = 60000 }, {
   end),
   H.saveState("locke_scenario.mss"),
   H.logStep(function()
-    return string.format("locke_scenario minted at frame %d", H.frame)
+    return string.format("locke_scenario generated at frame %d", H.frame)
   end),
 })

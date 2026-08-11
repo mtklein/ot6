@@ -43,7 +43,7 @@ scripts address NPCs as {map, index-within-block}, so a record added ahead of
 an existing NPC renumbers everything after it.
 
 A separate NPC record in `ff6/src/event/npc_prop.asm` at the same tile —
-**9 bytes** (record layout `npc_prop.asm:137-176`). The two in-band examples
+**9 bytes** (record layout `npc_prop.asm:137-176`). The two examples in this area
 are identical in shape (`npc_prop.asm`, maps 270 and 272 blocks):
 
 ```
@@ -79,5 +79,6 @@ Both segments are `fixed_block`s at hard addresses (`event_triggers` at
 `ff6/rom/ff6-en.map:200-201`; `fixed_block` errors at assembly if overrun,
 `ff6/include/macros.inc:409-431`).
 
-Any such edit is a ROM change, so it invalidates every savestate in the
-frontier (`leg-fixtures.md`, "The problem"); battery anchors survive.
+Any such edit is a ROM change, so it invalidates every savestate in
+the generated chain (`leg-fixtures.md`, "The problem"); batch checkpoints
+survive.

@@ -1,7 +1,7 @@
--- probe_moogle_geom.lua -- the passability dump the Moogle-defense honest
--- attempt was missing (issue #75, marshal-investigation).  Boots
--- moogle_defense.mss (defense live, party 1 at the (14,14) choke) and,
--- with ZERO writes and ZERO input, renders:
+-- probe_moogle_geom.lua -- the passability dump the Moogle-defense
+-- input-driven attempt was missing (issue #75, marshal-investigation).
+-- Boots moogle_defense.mss (defense live, party 1 at the (14,14) choke)
+-- and, with ZERO writes and ZERO input, renders:
 --   * every field object's tile position (parties, moogles, Marshal,
 --     guards, TERRA-down)
 --   * the arena's passability x 2..28, y 6..46 -- prop bytes p1/p2 plus

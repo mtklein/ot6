@@ -1,7 +1,7 @@
--- probe_v07_fly.lua -- flight-register instrument (issue #31, leg F->G).
+-- probe_v07_fly.lua -- flight-register instrument (issue #31, step F->G).
 -- Cold-Continues terra-returned-v1, boards with A, then holds each
 -- direction while dumping the candidate position cells, then tries B
--- (land) and X (deck) so the leg gen knows every control.
+-- (land) and X (deck) so the step gen knows every control.
 -- OT6_ANCHOR_LAYOUT: ot6-codex-o8-v1
 local H = dofile("tools/tests/lib/ot6.lua")
 

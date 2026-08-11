@@ -1,10 +1,10 @@
--- gen_sabin_camp.lua -- leg 2 of SABIN's scenario: the Imperial Camp's
--- opening, which is not about SABIN at all.  Mints one state:
+-- gen_sabin_camp.lua -- step 2 of SABIN's scenario: the Imperial Camp's
+-- opening, which is not about SABIN at all.  Generates one state:
 --   camp_intro.mss  map 117 at (36,2), SABIN + SHADOW, controllable, with
 --                   $02E2 set so the gate cutscene cannot re-fire
 --
 -- WALKING ONE TILE SOUTH HANDS THE GAME TO CYAN, ON ANOTHER MAP, FOR ~9,000
--- FRAMES.  This is the whole content of this leg and it is not what the
+-- FRAMES.  This is the whole content of this step and it is not what the
 -- route map suggests.  Stepping from the camp gate onto (36,3) fires
 -- _cb0c2f (event_trigger.asm:33, event_main.asm:39785), which walks the
 -- party UP 1 / RIGHT 2 to (38,2) and calls the commander scene _cb0c87
@@ -22,7 +22,7 @@
 -- (:61245), parks SLOT_1 on (33,44) and the commander (NPC_1, obj 16) on
 -- (33,54) (:61246-61269), and only then reaches `player_ctrl_on` (:61482).
 --
--- WHAT THIS COST, AND WHY THE FILE IS SHAPED THIS WAY.  Run 1 of this leg
+-- WHAT THIS COST, AND WHY THE FILE IS SHAPED THIS WAY.  Run 1 of this step
 -- pointed navTo at the LEO scene's tile and let it walk.  navTo dropped its
 -- plan on the first frame ("control lost at (36,2)") and then sat for
 -- 20,000 frames while the heartbeat printed the party object drifting
@@ -31,7 +31,7 @@
 -- $0803 offset and all completely invisible as MAP CHANGES because navTo's
 -- heartbeat does not print the map.  It froze for good at (10,39) --
 -- `name_menu CYAN`, which navTo has no branch for and never will.  So:
--- nothing on this leg is walked with navTo except the two short stretches
+-- nothing on this step is walked with navTo except the two short stretches
 -- where the party genuinely has control, and everything else is ridden.
 --
 -- ONLY THE COMMANDER MATTERS.  Map 120 stands up twelve soldiers (NPCProp
@@ -43,7 +43,7 @@
 -- which re-creates SABIN and SHADOW and reloads map 117 at (36,2).  So the
 -- interlude is exactly one fight long and the eleven others are skipped.
 --
--- ISSUE #75 -- BATTLE 46 IS FOUGHT, NOT KILL-BITTED.  Zero state writes in
+-- ISSUE #75 -- BATTLE 46 IS FOUGHT, NOT WRITE-CLEARED.  Zero state writes in
 -- this generator.  The fight is CYAN alone (battle slot ONE -- see the
 -- inBattle note) against event battle group 46 = formation 409 = one $14E,
 -- and its loss is unrecoverable in-timeline: `battle 46` is followed by
@@ -55,12 +55,12 @@
 -- A A confirms the boosted Fight on the default target -- the same
 -- bank-and-dump doctrine the river fighters proved.  A loss (CYAN at 0 HP
 -- for 90 straight frames) does not error: it sets `lost` and the RETRY
--- LADDER reloads the cyan_defence-moment checkpoint -- the mint-script
--- spelling of a player reloading their save -- and pokes the commander
--- again with the fighter escalated (attempt 2+ dumps at 1 BP, which
--- changes every input from the first turn and reshuffles the whole
--- interleaving).  Three attempts, then fail with every attempt's numbers
--- on the record.
+-- LADDER reloads the cyan_defence-moment checkpoint -- the generator
+-- script's spelling of a player reloading their save -- and pokes the
+-- commander again with the fighter escalated (attempt 2+ dumps at 1 BP,
+-- which changes every input from the first turn and reshuffles the whole
+-- interleaving).  Three attempts, then fail with every attempt's numbers on
+-- the record.
 local H = dofile("tools/tests/lib/ot6.lua")
 local DOOR = "build/states/sabin_camp.mss.lua"
 
@@ -106,7 +106,7 @@ end
 --     $3BF4=FF00 $3BF6=0020 $3BF8=FF00 $3BFA=0020
 -- ($3BF6 = 32 reads perfectly like a hit point).  That is OpenMenu_ext
 -- scribbling on the same RAM while the field module is suspended, and
--- taking it for a battle made the driver kill-bit and mash A at the name
+-- taking it for a battle made the driver write-clear and mash A at the name
 -- menu instead of pressing START -- a new stall in place of the old one.
 -- A LOADED battle party table only ever holds a real HP, or 0 / $FFFF for
 -- a slot nobody is in; $FF00 is neither, and one impossible word condemns
@@ -187,7 +187,7 @@ local function talkToObj(obj, what, maxF)
   })
 end
 
--- No `choice` exists anywhere on this leg -- map 117's only prompt is the
+-- No `choice` exists anywhere on this step -- map 117's only prompt is the
 -- sealed-chest gag _cb0dbe (:40058) on obj 29 at {45,5}, which the route
 -- never touches, and map 120 has none at all.  CHOICES stays empty so an
 -- unexpected prompt is a hard failure rather than a blind A-press.
@@ -196,8 +196,9 @@ local ci, inChoice = 0, false
 local nameMenus, battles = 0, {}
 
 -- ---------------------------------------------------------- the fighter --
--- The honest battle driver (issue #75; gen_scenario's menu-episode machine,
--- reduced to the one policy this leg needs): from a settled battle menu
+-- The input-driven battle driver (issue #75; gen_scenario's menu-episode
+-- machine, reduced to the one policy this step needs): from a settled
+-- battle menu
 -- (flag $7BCA held 4 straight pulses), one button per 30-frame pulse --
 -- boost prefix (R per banked point, dumped at the tier's threshold), then
 -- A A = Fight on the default target.  Outside a settled menu, edge-tap A
@@ -217,14 +218,14 @@ local function partyLine()
   return table.concat(p, " ")
 end
 -- CLOSED-LOOP (2nd pass): the seq machine assumed full-HP parties, and
--- the first honest mint of the chain proved fights now carry damage
--- forward between legs (SABIN entered the courtyard at 46/231).  So the
--- fighter reads the engine's own cursor state ($890F/$8947 + actor, the
+-- the first input-driven generation of the chain proved fights now carry
+-- damage forward between steps (SABIN entered the courtyard at 46/231).  So
+-- the fighter reads the engine's own cursor state ($890F/$8947 + actor, the
 -- $7BC2 menu state) and steers by pad: boost-and-Fight as before, plus a
--- SELF-HEAL branch under 50% HP funded from the real bag (Potion when
--- >=150 HP is missing, else Tonic; battle inventory $2686 stride 5,
--- count at +3 -- a zero-count row is never picked).  Item targets
--- default to self, so no target steering is needed here.
+-- SELF-HEAL branch under 50% HP funded from the real bag (Potion when >=150
+-- HP is missing, else Tonic; battle inventory $2686 stride 5, count at +3
+-- -- a zero-count row is never picked).  Item targets default to self, so
+-- no target steering is needed here.
 local MSTATE = 0x7BC2
 local ST_CMD, ST_ITEM, ST_TGT, ST_TOOLS = 0x05, 0x0A, 0x38, 0x30
 local CMD_ITEM = 0x01
@@ -234,7 +235,7 @@ local CMDTBL, CMDROW = 0x202E, 0x890F
 -- (btlgfx_main.asm:_c189be) sums them before the *5; reading the scroll
 -- alone selected inventory index 4 while the display said 1 (measured,
 -- probe_itemuse: the select/deselect toggle that wedged the first
--- honest courtyard mint)
+-- input-driven courtyard generation)
 local ITEMSCR, ITEMROW = 0x8947, 0x894F
 local function itemIdxOf(a)
   return H.readByte(ITEMSCR + a) + H.readByte(ITEMROW + a)
@@ -276,7 +277,7 @@ local function makeFightPlan(actor)
     end
   end
   local bp = H.readByte(BP + actor * 2)
-  -- dump banked boost EVERY turn: these are 1-2 member legs where a dead
+  -- dump banked boost EVERY turn: these are 1-2 member steps where a dead
   -- enemy is the only mitigation, and the pursuit measured bank-to-2
   -- losing the tempo war against four attackers
   local boost = bp >= 1 and math.min(bp, 3) or 0
@@ -431,7 +432,7 @@ local function rideUntil(pred, what, budget)
           ci = ci + 1
           if not CHOICES[ci] then
             error(string.format("camp: unexpected choice prompt (%d options) " ..
-              "on map %d at (%d,%d) -- this leg expects none",
+              "on map %d at (%d,%d) -- this segment expects none",
               chMax, map(), H.fieldX(), H.fieldY()), 0)
           end
         end
@@ -645,13 +646,13 @@ H.run({ maxFrames = 120000 }, {
   cmdAttempt(3),
   H.call(function()
     if not cmdWon then
-      error(string.format("camp: CYAN lost battle 46 on all 3 honest " ..
+      error(string.format("camp: CYAN lost battle 46 on all 3 " ..
         "attempts -- last loss: %s -- the per-attempt numbers above are " ..
-        "the balance finding (#74-style); do not rig this leg",
+        "the balance finding (#74-style); do not rig this segment",
         tostring(lost)), 0)
     end
   end),
-  -- STEP OFF THE TRIGGER BEFORE MINTING.  _cb0bc4 puts the party back on
+  -- STEP OFF THE TRIGGER BEFORE GENERATING.  _cb0bc4 puts the party back on
   -- (36,2) and walks it DOWN 1, so it comes to rest on (36,3) -- which is
   -- _cb0c2f's own trigger tile.  CheckEventTriggers (field/event.asm:5740)
   -- has no once-per-tile latch: it re-fires every frame the party stands
@@ -661,7 +662,7 @@ H.run({ maxFrames = 120000 }, {
   -- heartbeat read ctl=true while landedField's every-frame sample read
   -- ctl=false, and "10 consecutive settled frames" never once happened in
   -- 6,000.  (36,5) is two tiles south, off every trigger on the map and on
-  -- the road the next leg takes anyway.
+  -- the road the next step takes anyway.
   H.navTo(36, 5, { maxFrames = 4000 }),
   rideUntil(landedField(117, 10), "camp control settled off the trigger", 6000),
   H.waitFrames(30),
@@ -675,7 +676,7 @@ H.run({ maxFrames = 120000 }, {
     H.assertEq(inParty(2), false, "CYAN is out again")
     -- $02E2 is the gate scene's own latch: _cb0c2f/_cb0c47/_cb0c5e all open
     -- `if_switch $02E2=1, EventReturn` (:39786, :39797, :39807), so with it
-    -- set the three gate tiles are inert and the next leg can walk south
+    -- set the three gate tiles are inert and the next step can walk south
     -- across them without replaying the interlude.
     H.assertEq(sw(0x02E2), 1, "$02E2 set -- the gate tiles are inert now")
     H.assertEq(sw(0x002B), 0, "$002B clear -- the LEO scene is still ahead")
@@ -696,6 +697,6 @@ H.run({ maxFrames = 120000 }, {
   end),
   H.saveState("camp_intro.mss"),
   H.logStep(function()
-    return string.format("camp_intro minted at frame %d", H.frame)
+    return string.format("camp_intro generated at frame %d", H.frame)
   end),
 })

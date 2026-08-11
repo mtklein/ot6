@@ -1,12 +1,12 @@
-# Multi-hit as a first-class dial — design dive v1 (2026-07-30)
+# Multi-hit as a first-class dial
 
-Scope: issue #54. **Hit count is break rate** — a landed hit that matches a
-weakness chips a shield, so the number of times an action strikes is the
-strongest lever OT6 has over the break loop, and it multiplies straight
-against v0.8's MP costs. This is a **design pass**: no data moves, no
-assembly. §10 is the literal build list for the issue that does move them.
+**Hit count is break rate** — a landed hit that matches a weakness chips a
+shield, so the number of times an action strikes is the strongest lever OT6 has
+over the break loop, and it multiplies straight against v0.8's MP costs. This is
+a **design pass**: no data moves, no assembly. §10 is the literal build list for
+the pass that does move them.
 
-Owner direction (2026-07-29): *"Pummel seems like a good candidate to do 2x
+Owner direction: *"Pummel seems like a good candidate to do 2x
 bludgeon, where Suplex is one big hit. Bum Rush could go either way. And not
 just Sabin, but also Tools, Quadra Slam should hit 4x, etc."* And the target
 shape: *"In Octopath most characters have at least one multi-hit ability they
@@ -14,17 +14,9 @@ can lean on for breaking, and a couple have more."*
 
 **Evidence rule (CONTRIBUTING.md).** Every mechanical claim cites the file
 and line it was read from, or is labelled **UNVERIFIED**. Numbers taken out
-of `.dat` files name the record and byte offset. Line numbers are from the
-`wt/breakrate` worktree on 2026-07-30, off `main` at `4ab93c2`.
-**Re-pointed to `main` at `7b77f60` later the same day**: the v0.9 merges
-inserted four `jsl` hooks into `battle_main.asm` and shifted every citation
-below by 3–72 lines. Each was remapped mechanically (diff the two revisions,
-carry each cited line to its `equal`-block image) and **every one landed on
-the identical source line** — no claim in this document changed, only the
-addresses. The `4ab93c2` baseline is kept above as the record of when the
-measurements were taken.
+of `.dat` files name the record and byte offset.
 
-**Two instruments back this document**, and both are committed:
+**Two instruments back this document**:
 `tools/tests/probe_multihit.lua` (the live rule and the break-window cap) and
 `tools/audit_multihit.py` (the shipped table, re-derived from the ROM sources
 on every run — it exits nonzero if the enumeration below has gone stale).
@@ -34,8 +26,7 @@ on every run — it exits nonzero if the enumeration below has gone stale).
 ## Headline findings
 
 1. **Chip is per hit. Measured, not inferred.** One boosted Fight action
-   chipped **four** shields off one guard (§1). The design docs asserted
-   per-hit chip long before any run was cited; §1 is that run.
+   chipped **four** shields off one guard (§1).
 2. **Cyan is the only character in the game with a multi-hit ability.** Not
    "the only one with a good one" — the only one at all. Pummel is ×1, Bum
    Rush is ×1, AutoCrossbow is ×1 per body (§3). Every ×2/×4/×8 in
@@ -50,7 +41,7 @@ on every run — it exits nonzero if the enumeration below has gone stale).
    self-limiting.
 5. **1 BP already buys 1 extra chip**, for free, for everybody
    (`Ot6FightBoost`, measured §1.1). That is the price ceiling every
-   multi-hit ability is competing against, and it is the honest answer to
+   multi-hit ability is competing against, and it is the direct answer to
    "is a 2× Pummel at 4 MP broken" (§7).
 
 ---
@@ -81,7 +72,7 @@ Slam needs Cyan at LV15.
 
 Measured (`probe_multihit.lua` phase 1) against a guard authored six shields,
 class-weak to the party's weapon and weak to **no** element — so neither a
-beam nor a poison tick (#60) could contribute a chip:
+beam nor a poison tick could contribute a chip:
 
 | action | `$3a70` set to | chips | shields |
 |---|---|---|---|
@@ -134,8 +125,9 @@ should invent.
 
 ## 2. Rate, breadth, reach, duration — four levers, priced differently
 
-The issue's comments named three cost curves. The audit found a fourth
-hiding inside the first, and the distinction is load-bearing.
+Rate, breadth, reach and duration are four separate levers with four separate
+prices. Breadth hides inside rate if you are not careful, and that distinction
+is load-bearing.
 
 ### 2.1 Rate — hits per action, paid per action
 `$3a70`. Chips the *same* body repeatedly. This is the boss lever.
@@ -166,15 +158,14 @@ whatever is held (`Ot6WeaponClass`), while a Blitz/SwdTech/Tool carries its own
 class from `Ot6SkillClassTbl` / `Ot6WeapClassTbl` (`ot6_class.asm:184-197` / `:14-163`).
 So a multi-hit can open an axis the weapon cannot.
 
-**A correction to how this has been measured.** `check_break_reach.py` models
-"can field" as *game-wide equippability* — every weapon the actor could ever
-wear. Under that model every walking character reaches slash, pierce and
+**What the static tooling can and cannot answer.** `check_break_reach.py`
+models "can field" as *game-wide equippability* — every weapon the actor could
+ever wear. Under that model every walking character reaches slash, pierce and
 bludgeoning, and the "ability-only" column is empty for all fourteen
-(`audit_multihit.py`'s per-character section prints exactly that). The
-question #54 actually asks is narrower: **can they reach a second axis
-without re-equipping**, from the hand they are holding right now. That is
-runtime state, and nothing static answers it. Recorded as a gap (§9), not
-papered over.
+(`audit_multihit.py`'s per-character section prints exactly that). The question
+this design needs answered is narrower: **can they reach a second axis without
+re-equipping**, from the hand they are holding right now. That is runtime
+state, and nothing static answers it. Recorded as a gap (§9), not papered over.
 
 The one reach fact that is robust: **Sabin's fists are bludgeoning and so is
 Pummel** (`ot6_class.asm:163`, `:192`), so a bare-fisted Sabin's Blitz opens no
@@ -182,7 +173,7 @@ axis his Fight does not. Put claws on him (slashing, `ot6_class.asm:139-147`)
 and Pummel becomes his second axis for free. That asymmetry is his design.
 
 ### 2.4 Duration — hits per turn thereafter, paid once
-Established by #60 and measured there: a **poison status tick chips**. Cmd_22
+A **poison status tick chips**, measured. Cmd_22
 stores element `$08` itself (`battle_main.asm:13402-13405`) and tail-jumps
 `ExecSelfAttack`, so a tick is an ordinary poison hit with no attacker, and it
 reaches `Ot6Chip` through the weak branch at `battle_main.asm:1894-1896`.
@@ -283,7 +274,7 @@ settle it, and no recommendation below depends on it.
 
 ### 3.2 The per-character gap
 
-Read straight off §3.1, and it is the finding that reframes the issue:
+Read straight off §3.1:
 
 | character | multi-hit today | probe without spending BP |
 |---|---|---|
@@ -330,9 +321,9 @@ Identity: **cheapest chips in the game, on one axis** (two if he wears claws).
 
 | ability | count | reason |
 |---|---|---|
-| **AutoCrossbow** | **×1 per body**, unchanged | It is *breadth* (§2.2) and it is already the designed swarm answer in two band docs. Making it ×4 per body would be 16 chips against a four-stack. `kits.md`'s "×4" is corrected to "whole side, one chip each". |
+| **AutoCrossbow** | **×1 per body**, unchanged | It is *breadth* (§2.2) and it is already the designed swarm answer in two of the break-band docs. Making it ×4 per body would be 16 chips against a four-stack. `kits.md`'s "×4" is corrected to "whole side, one chip each". |
 | **Drill** | **×2** piercing | The owner said "Tools too", and this is the one that should change: Drill is the armoured-boss answer (it ignores defence, `ToolsEffect_05`, `battle_main.asm:7330-7333`), so two chips into *one* gauge is precisely the boss-facing complement to AutoCrossbow's swarm-facing breadth. 16 MP → 8.0 MP/chip: rate priced above breadth, which is the correct relationship. Power 191 → ~105 per hit (P4). |
-| **Bio Blaster** | ×1 per body **+ the DOT** | Duration (§2.4), and #60 rules it stays. No hit count. |
+| **Bio Blaster** | ×1 per body **+ the DOT** | Duration (§2.4); the tick chip stays as it is. No hit count. |
 | **Chain Saw** | ×1 | The slash committer, 252 power. P3. |
 | Air Anchor / NoiseBlaster / Flash / Debilitator | ×1 | Gag, and three non-damaging utilities. |
 
@@ -358,30 +349,30 @@ Identity: **four chips into one gauge, on a slash axis, at burst prices.**
 ### 4.4 Everyone else
 
 Thirteen characters have no multi-hit ability, and this pass should **not**
-invent counts for kits that are still being designed (Locke #55, Gau #40, Mog
-dances, Strago lores, Setzer slots, Shadow throw, Relm). What it should do is
-hand those issues the rule:
+invent counts for kits that are still being designed (Locke, Gau, Mog dances,
+Strago lores, Setzer slots, Shadow throw, Relm). What it should do is hand
+those passes the rule:
 
 > **Every kit with a damaging physical verb gets exactly one cheap, early,
 > repeatable multi-hit** (P1/P2). A kit whose verbs are all magical satisfies
 > the Octopath rule differently — through element spread plus boosted Fight —
 > and needs no hit count.
 
-Applied to the pending kits, as **proposals for their own issues**, not
+Applied to the pending kits, as **proposals for their own passes**, not
 decisions here:
 
 | character | candidate | why |
 |---|---|---|
 | Shadow | **Throw ×2** | He throws a pair. His only damaging verb, and his weapon classes (pierce/bludg) are narrow. |
 | Setzer | Slots' physical face ×? | Chance verb; boost already buys certainty (DESIGN.md's canon rule), so hit count may be the wrong dial for him entirely. |
-| Locke | — | #55's Filch/Bestow are utility. His probe is his weapon; leave rate out. |
+| Locke | — | Filch and Bestow are utility. His probe is his weapon; leave rate out. |
 | Mog / Strago / Relm / Gau / Terra / Celes | — | Element and breadth kits. Boosted Fight is their rate. |
 
-**The honest reading of the owner's rule.** *"Even a weak attacker can be
+**The plain reading of the owner's rule.** *"Even a weak attacker can be
 useful in a pinch if they can multihit with a staff or something"* is already
 true in OT6 for everybody: `Ot6FightBoost` gives +1 landed hit per BP with any
-weapon (§1.1, measured). The rule that actually binds is the sharper one from
-the issue's comments — **who is forced to spend BP to probe?** — and after
+weapon (§1.1, measured). The rule that actually binds is the sharper one —
+**who is forced to spend BP to probe?** — and after
 this pass the answer is "everyone except Sabin, Edgar and Cyan", which is the
 correct answer, because those three are the physical-kit characters.
 
@@ -408,7 +399,7 @@ The OT6-shaped answer is a small table, not a special effect:
 The hook must fire **once per action, not once per swing**, or it re-arms
 itself forever. `AttackerEffect_32` shows the vanilla precedent for that
 problem and its fix: it `stz $11a9`s itself immediately after setting the
-count (`battle_main.asm:10799`, inside `:10782-10788`). The build issue must pick the site and
+count (`battle_main.asm:10799`, inside `:10782-10788`). The build pass must pick the site and
 **prove the once-per-action property with a probe** before trusting it —
 `Ot6SkillClass`'s site inside `LoadMagicProp` (`battle_main.asm:6938`) and
 `Ot6ItemClass`'s inside `CalcItemEffect` (`battle_main.asm:7181`) are the two candidates,
@@ -434,8 +425,8 @@ override, no `ItemProp` override, no new RAM.
   damage. One rule, three levers — worth saying in the player-facing manual.
 - **Reveal is per species.** A chip reveals the weakness on *every* same-
   species slot (`Ot6RevealCommit`), so a whole-side or multi-hit action is
-  also the fastest way to *learn*. Observed in #60's probe: a poison tick on
-  one guard revealed poison on both.
+  also the fastest way to *learn*. Measured: a poison tick on one guard
+  revealed poison on both.
 
 ---
 
@@ -450,7 +441,7 @@ priced ability cannot be "broken on MP/chip" in isolation. What it can do is
 make BP-spending pointless, and that is the test.
 
 **Measured pools** (`mp-economy.md`'s table, re-derived from `CharProp+$01`
-plus `LevelUpMP`) at Zozo, the band the owner played: Sabin 84 (L13), Edgar 87
+plus `LevelUpMP`) at Zozo, the stretch the owner played: Sabin 84 (L13), Edgar 87
 (L13), Cyan 76 (L12). Chips per **full pool**, single target:
 
 | ability | MP | chips/cast | casts | chips per pool |
@@ -501,7 +492,7 @@ rate is nonzero, and this pass is what makes it nonzero.
   ×8 empties every authored gauge but one in a single action, which turns the
   capstone into the opener and deletes the composition puzzle from every fight
   it appears in. Recorded rather than deleted because it is the owner's own
-  figure and he may want the statement — if so, the honest way to have it is
+  figure and he may want the statement — if so, the clean way to have it is
   Cleave's: gate the ability on the target being Broken, so its eight hits are
   damage rather than break rate.
 - **AutoCrossbow ×4 per body.** Rejected as a category error (§2.2): it is
@@ -514,7 +505,7 @@ rate is nonzero, and this pass is what makes it nonzero.
   effect slot, which five of the candidate abilities already spend.
 - **Inventing hit counts for the seven kits still being designed.** Declined
   (§4.4): half a hit-count table is worse than none, and those kits have their
-  own issues. The *rule* is handed over instead.
+  own passes. The *rule* is handed over instead.
 
 ---
 
@@ -534,7 +525,7 @@ rate is nonzero, and this pass is what makes it nonzero.
 - **Where the hit-count hook goes** (§5). Two candidate sites, neither checked
   for once-per-action behaviour.
 - **Whether a DOT tick's chip should count against a hit-count budget at all.**
-  #60 rules the behaviour stays; whether Bio Blaster's price should rise now
+  The tick chip stays; whether Bio Blaster's price should rise now
   that its duration curve is understood is a question for the MP economy, not
   for this table.
 
@@ -542,7 +533,7 @@ rate is nonzero, and this pass is what makes it nonzero.
 
 ## 10. The build list, literally
 
-For the issue that moves data. Nothing here is done yet.
+For the pass that moves data. Nothing here is done yet.
 
 1. `Ot6HitCountTbl` in `ot6_class.asm`, beside `Ot6SkillClassTbl`:
    `$5d, 1` (Pummel ×2), `$64, 3` (Bum Rush ×4), `$a8, 1` (Drill ×2),
@@ -562,5 +553,6 @@ For the issue that moves data. Nothing here is done yet.
 6. Update `kits.md`'s Chip column to the rates this pass builds: "×2" on
    Pummel and Drill, "×4" on Bum Rush. AutoCrossbow's row already reads
    "piercing, whole side", which is the correct reading.
-7. `check_break_reach.py` band re-run — hit counts do not change which classes
-   a party can field, but `break-band-*.md`'s feel notes will want revisiting.
+7. `check_break_reach.py` re-run per stretch — hit counts do not change which
+   classes a party can field, but `break-band-*.md`'s feel notes will want
+   revisiting.

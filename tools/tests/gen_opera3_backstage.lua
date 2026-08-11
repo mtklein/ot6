@@ -1,7 +1,7 @@
--- gen_opera3_backstage.lua -- v0.5 Beat A leg 3: opera_open (map 237, one
+-- gen_opera3_backstage.lua -- v0.5 Beat A step 3: opera_open (map 237, one
 -- A-press below the IMPRESARIO _caae15) -> RIDE THE PERFORMANCE INTRO -> the
 -- party lands controllable BACKSTAGE in the theater, map 234 at {16,46},
--- $0055=1 (performance underway).  Mints opera_backstage.mss.
+-- $0055=1 (performance underway).  Generates opera_backstage.mss.
 --
 -- MEASURED (probe_opera_aria):
 --  * Talking the impresario fires _caae15; the long intro cutscene (Locke's
@@ -11,7 +11,8 @@
 --    the party in the stalls) -- at {16,46} facing DOWN, $0055=1, $0340=0.
 --  * The intro is NOT ~14,400 frames of the survey's guess; it settles to
 --    control near frame ~6k.  The ride terminates on 30 straight settled()
---    frames on a non-237 map so a transient control blip cannot mint early.
+--    frames on a non-237 map so a transient control blip cannot generate
+--    early.
 --  * The two STAGE doors out of 234 sit at its top corners {4,24} (left) and
 --    {28,24} (right); the theater floor exits {7,49}/{25,49} lead to the
 --    opera-house interior (237).  gen_opera4 routes 234 -> 237 -> the stage.
@@ -26,9 +27,10 @@ local function settled()
      and not H.dialogWaiting() and not H.battleLoadStarted() and not H.worldMode()
 end
 -- the generic "advance everything" ride (gen_opera2's rideOpen idiom).
--- Issue #75: the kill-bit helper this file DEFINED but whose branch never
--- fired on the measured intro (no battle exists on this ride) is stripped;
--- a stray battle would now be fought by the same edge-tapped A.
+-- Issue #75: the battle-clear-write helper this file DEFINED but whose
+-- branch never fired on the measured intro (no battle exists on this ride)
+-- is stripped;  a stray battle would now be fought by the same edge-tapped
+-- A.
 local function rideOpen(pred, maxFrames, what)
   local aPh,sPh,stallN,lx,ly = 0,0,0,-1,-1
   return H.driveUntil(function() local d=pred(); if d then H.setPad({}) end; return d end,
@@ -88,6 +90,6 @@ H.run({ maxFrames = 160000 }, {
   end),
   H.saveState("opera_backstage.mss"),
   H.logStep(function()
-    return string.format("opera_backstage minted at frame %d -- theater (map 234), $0055=1", H.frame)
+    return string.format("opera_backstage generated at frame %d -- theater (map 234), $0055=1", H.frame)
   end),
 })

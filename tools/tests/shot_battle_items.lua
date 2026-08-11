@@ -2,13 +2,13 @@
 -- battle Item list.
 --
 -- ISSUE #75 CONVERSION.  This script used to poke one weapon per break class
--- into the magitek doorstep's empty bag and shoot the forged list.  It now
--- boots vector_doorstep -- the class-richest HONEST bag on the chain (see
+-- into the magitek entry point's empty bag and shoot the forged list.  It now
+-- boots vector_doorstep -- the class-richest REAL bag on the chain (see
 -- shot_field_items.lua's header for the recon; PIERCE + SLASH is everything
--- any honest v0.6 save owns) -- walks one step south out of Vector onto the
+-- any v0.6 save owns in normal play) -- walks one step south out of Vector onto the
 -- world map (the fixture stands on the long entrance at map 242 (32,61);
 -- measured: a held DOWN reaches the world in ~30 frames), walks the
--- random-battle band into a REAL world encounter, and shoots the Item list
+-- random-battle area into a REAL world encounter, and shoots the Item list
 -- the battle menu builds from the save's own $1869 bag.
 --
 -- The weapon rows in the measured bag order (battle list order = bag order):
@@ -36,7 +36,7 @@ H.run({ maxFrames = 60000 }, {
   H.call(function() H.setPad({}) end),
   H.waitFrames(30),
 
-  -- the random-battle band right outside the trigger: pace until the world's
+  -- the random-battle area right outside the trigger: pace until the world's
   -- own encounter roll wins (battle_gaufight's Veldt-grind pacing, no danger
   -- poke)
   (function()

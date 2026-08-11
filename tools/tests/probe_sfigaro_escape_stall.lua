@@ -1,5 +1,5 @@
 -- probe_sfigaro_escape_stall.lua -- REPRODUCTION INSTRUMENT, temporary.
--- gen_tunnelarmr's escape leg parks at (41,43) with no control and no plan
+-- gen_tunnelarmr's escape step parks at (41,43) with no control and no plan
 -- for 20000 frames on the "map 87 (57,48) -> map 86 (49,31)" crossing.
 -- Map 87 has NO event triggers and NO npcs in the tables, so nothing
 -- SHOULD be able to take control there.  This replays the route to the
@@ -54,7 +54,7 @@ local function settleField(dstMap, maxF)
       return not H.worldMode() and H.tileAligned()
          and not H.battleLoadStarted() and not H.dialogWaiting()
          and (dstMap == nil or map() == dstMap)
-    end), maxF or 12000, { honest = true }),
+    end), maxF or 12000, { playBattles = true }),
     H.waitFrames(30),
   })
 end
@@ -67,7 +67,7 @@ local function go(sx, sy, dm, dx, dy, what)
   end
   return seq({
     H.call(function() startMap = map() end),
-    H.navTo(sx, sy, { maxFrames = 20000, arrive = arrived, honest = true }),
+    H.navTo(sx, sy, { maxFrames = 20000, arrive = arrived, playBattles = true }),
     H.release(),
     settleField(dm),
     H.call(function()
@@ -78,7 +78,7 @@ end
 
 local function hop(tx, ty, what)
   return seq({
-    H.navTo(tx, ty, { maxFrames = 12000, honest = true }),
+    H.navTo(tx, ty, { maxFrames = 12000, playBattles = true }),
     H.release(),
   })
 end

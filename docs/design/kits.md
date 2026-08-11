@@ -113,12 +113,12 @@ Levels below are `BlitzLevelTbl` (`field/event.asm:1240`).
 | 8 | **Bum Rush** (divine) | **99** | bludgeoning | 70 / Duncan |
 
 The MP column lives in `Ot6AbilityCostTbl` keyed by attack id $5d–$64,
-charged under `OT6_MP_COSTS`. Bum Rush is Sabin's genuine ultimate and anchors
-at **99** — 13.0% of his L70 pool of 760, the same fraction Cleave is of
-Cyan's, which is the point of anchoring both. Mantra stays deliberately under
-Fire Dance: it is a utility off-ramp, not a damage rung. Full per-row
-derivation, and the ruler it is measured against, in mp-economy.md's
-"The ruler".
+charged under `OT6_MP_COSTS`. Bum Rush is Sabin's genuine ultimate and is
+fixed at **99** — 13.0% of his L70 pool of 760, the same fraction Cleave is
+of Cyan's, which is the point of pinning both there. Mantra stays deliberately
+under Fire Dance: it is a utility off-ramp, not a damage tier. Full per-row
+derivation, and the baseline it is measured against, in mp-economy.md's
+"The baseline".
 
 - Passive candidates: *Iron Fist* (unarmed counts as a bludgeon
   weapon), *Discipline* (+1 BP when striking a Broken enemy),
@@ -150,8 +150,8 @@ that a comment already buys.
 SwdTech prices at **parity with the Blitz row of the same index**, which
 is a level claim rather than an index coincidence: `BlitzLevelTbl` is
 1/6/10/15/23/30/42/70 and `BushidoLevelTbl` 1/6/12/15/24/34/44/70
-(`ff6/src/field/event.asm:1236-1240`), so row *n* of either kit lands in the
-same band against nearly the same pool. **Cyan pays both currencies**, and if
+(`ff6/src/field/event.asm:1236-1240`), so row *n* of either kit lands at the
+same stage against nearly the same pool. **Cyan pays both currencies**, and if
 parity plus the 1-BP floor leaves him starved, the lever is BP seed/regen, not
 the floor, and not this column.
 
@@ -163,13 +163,13 @@ dearer than the 3× row would read as a bug.
 Dispatch is the cheapest row of any kit (the "free-to-learn is not
 free-to-use" floor) at 4 MP — 6.9% of the pool Cyan actually
 joins with, against the 8–21% a vanilla spell costs at the level it is learned.
-Cleave tops the ladder at **99, the anchor**: each character with
+Cleave tops the ladder at **99, the shared ceiling**: each character with
 a genuine ultimate pays 99 for it, which is 13.0% of the L70 pool Cleave is
-gated behind (762), inside the ruler and comfortably payable at 7 casts from
-full. 99 is also the largest number any OT6 price cell can render, so it is the
-literal top of the table and not merely its current maximum. Per-row
-measurement, and the ruler, in mp-economy.md's "The ruler"; gated by
-`tools/tests/battle_costtable.lua`.
+gated behind (762), inside the baseline range and comfortably payable at 7
+casts from full. 99 is also the largest number any OT6 price cell can render,
+so it is the literal top of the table and not merely its current maximum.
+Per-row measurement, and the baseline, in mp-economy.md's "The baseline";
+checked by `tools/tests/battle_costtable.lua`.
 
 These numbers live in `Ot6AbilityCostTbl` (ff6/src/battle/ot6_boost.asm),
 charged under the `OT6_MP_COSTS` build flag, which defaults ON, so the shipped
@@ -180,7 +180,7 @@ replaces the charge gauge's clock in `UpdateMenuState_37`; the window, its
 numerals, the grey-out of unlearned techs, the A-button latch,
 `FixPlayerAttack`'s `+$55` and `Cmd_07` are all vanilla and untouched. Boost
 1/2/3 selects a **moving window of three** — Cyan's top three *learned* techs,
-weakest → strongest. There is no 0× rung: `Ot6BushidoTech` clamps a stray 0 up,
+weakest → strongest. There is no 0× tier: `Ot6BushidoTech` clamps a stray 0 up,
 and the menu never offers one. With `ceiling` = vanilla's own `$2020` (techs
 known − 1, the value that used to cap the bar), `base = max(0, ceiling−2)` and
 boost picks `min(base+boost−1, ceiling)`. Pure arithmetic — no table.
@@ -206,14 +206,14 @@ Three rulings, documented in `Ot6BushidoTier`'s header:
 - **No affordable floor.** The 1× slot is always the cheapest tech *in the
   window*, so it slides up (gets pricier) as Cyan levels — accepted, because his
   MP pool grows on the same schedule.
-- **Cleave is the window's conditional top rung**, not a case bolted outside
+- **Cleave is the window's conditional top tier**, not a case bolted outside
   it. At full kit the window is Stunner/Quadra Slice/Cleave and BP3
-  lands on Cleave (tech 7) by the same `base+boost` sum as any other rung — it falls out
-  for free, so it is *cleaner* as the top rung than as a separate invocation. It
+  lands on Cleave (tech 7) by the same `base+boost` sum as any other tier — it falls out
+  for free, so it is *cleaner* as the top tier than as a separate invocation. It
   fires exactly as the divine pass built it: selected only when learned and
   unspent, gated at resolution by `Ot6Oblivion` (target must be Broken), and
   dropped back to Quadra Slice (6) here for the rest of any battle whose once-
-  per-battle latch is set. `battle_divines` gates that shape (BP3 = Cleave
+  per-battle latch is set. `battle_divines` checks that shape (BP3 = Cleave
   clear, Quadra Slice spent).
 
 **BP is read, never written.** `Ot6ActionEnd` consumes the spend and skips that
@@ -270,7 +270,7 @@ table (`ot6_class.asm:185-192`) marks all eight slashing, per
 weapon-classes.md's "Cyan is a slashing specialist". Retort's and Empowerer's
 "—" and Quadra Slice's wind are unbuilt refinements, not a contradiction.
 
-Gate: `tools/tests/battle_bushido.lua`.
+Test: `tools/tests/battle_bushido.lua`.
 
 - Passive candidates: *Vengeance* (+1 BP whenever any enemy Breaks),
   *Retort* (the vanilla counter as a passive — deliberately the same name as
@@ -335,7 +335,7 @@ corrode — and a little merchant blood (he'd say TREASURE HUNTER).
   turn's BP gain), *First Strike* (battle opens +1 BP for Locke),
   *Fence* (steals sell for more).
 
-**The thief submenu.** Steal is rung one of this ladder, not
+**The thief submenu.** Steal is tier one of this ladder, not
 a verb of its own, so the ladder lives BEHIND the Steal row:
 `OpenCmdMenuTbl[$05]` opens the Tools-window shell with Steal / Filch / Bestow
 in it (`Ot6ThiefListOpen`), priced, with unaffordable rows greyed. That is
@@ -353,7 +353,7 @@ table: character rows hold boost points, **monster rows hold the species'
 authored class-weakness mask**, seeded at battle init by `Ot6SeedShields`
 (`ot6_break.asm:36` authored, `:51` generated floor). There is no monster BP to
 take, and decrementing that byte would corrupt what the break system thinks the
-monster is weak to. The alternative reading — Filch simply *mints* Locke a pip —
+monster is weak to. The alternative reading — Filch simply *hands* Locke a pip —
 is dead on arrival: `Ot6ActionEnd` already pays +1 BP for any turn a character
 did not boost through (`ot6_boost.asm:171-175`), so an ability whose whole effect is
 +1 BP is strictly worse than Fight.
@@ -367,7 +367,7 @@ remover. It reveals nothing (it takes the shield without teaching the row, so it
 complements Debilitator rather than replacing it) and deals no damage. A landed
 Filch nets Locke **+2 BP on the turn** — the filched pip plus his own unboosted
 regen — which nothing else in the game does. Against an already-Broken or
-shieldless target it is an honest no-op.
+shieldless target it is a plain no-op.
 
 Bestow is the sketch verbatim. Its debit rides `OT6_BOOST_REVEALED` so
 `Ot6ActionEnd` does the subtraction — the only BP charge path in the game — which
@@ -383,24 +383,24 @@ thing that makes it interesting — it chips whatever the row says.
 Steal is granted at join, so they arrive with him. Reasons, in order of weight:
 (1) Locke has no learned-set byte — Blitz has `$1d28` and SwdTech `$1cf7`, and
 inventing a per-ability set for him is a change that should ride the change that
-needs *eight* rungs, not the one that ships two; (2) it
+needs *eight* tiers, not the one that ships two; (2) it
 is the only option that structurally cannot leave a past-the-beat save without
-the skill. When rungs 2/3/6/7 arrive and a learned set becomes
+the skill. When tiers 2/3/6/7 arrive and a learned set becomes
 unavoidable, the gate can be added then and grant-at-join becomes its
 already-satisfied floor for these two.
 
-**Prices** are on mp-economy.md's ruler (8-20% of the real pool at the level the
-ability arrives) against Locke's 31 MP at LV6: Steal 4 (12.9%),
-Bestow 5 (16.1%), Filch 6 (19.4%). Deliberately **not** monotonic with the rung
+**Prices** are on mp-economy.md's baseline (8-20% of the real pool at the
+level the ability arrives) against Locke's 31 MP at LV6: Steal 4 (12.9%),
+Bestow 5 (16.1%), Filch 6 (19.4%). Deliberately **not** monotonic with the tier
 numbering above: only SwdTech must be monotonic, because there the row *is* the
 boost level; this is a free-choice menu like Blitz, which already ships Mantra
-under Fire Dance. Filch sits at the top of the ruler because it is the strongest
-thing in the slice and five casts from a full LV6 pool is the scarcity
+under Fire Dance. Filch sits at the top of the baseline range because it is the
+strongest thing in the slice and five casts from a full LV6 pool is the scarcity
 `mp-economy.md` asks for. `Ot6ThiefCostTbl` is a **second** keyed table, not new
 rows in `Ot6AbilityCostTbl`: the row ids are AttackName pad slots `$56-$58`,
 which sit inside SwdTech's `$55-$5c` key range, and that shared table's single
 scan is built on its three key ranges being disjoint. The command gate is what
-keeps the two tables apart. Gate: `tools/tests/battle_thief.lua`.
+keeps the two tables apart. Test: `tools/tests/battle_thief.lua`.
 
 **Boost-tiered Steal.** Steal is the party's first *chance verb*:
 it rolls dice, so BP buys certainty, not potency (DESIGN.md's canon rule — "on
@@ -467,7 +467,7 @@ ice/order/tempo. The duality reads clearer than vanilla ever made it.
 - **Boosted Runic: on reactive verbs, boost buys duration.**
   The third canon category, stated in DESIGN.md because future reactive
   verbs inherit it. 1/2/3 BP = **1/2/3 of Celes's own turns** during which
-  the stance stands and **she acts normally**. There is no rung that buys
+  the stance stands and **she acts normally**. There is no tier that buys
   the free turns without the duration: vanilla ends the stance in
   `QueueAction` (battle_main.asm:511) *because* she acted, so the only way
   she can act without dropping it is for the stance to outlive her action.
@@ -494,7 +494,7 @@ ice/order/tempo. The duality reads clearer than vanilla ever made it.
   *reflects* what it eats (absorb the MP as BP, bounce the spell).
   **It is a separate ability, not what a boosted Runic becomes.**
   Boost buys *duration* on reactive verbs; if row 8 were simply
-  "Runic at 3 BP" the canon would have an exception at its own top rung,
+  "Runic at 3 BP" the canon would have an exception at its own top tier,
   and the divine would be unreachable for anyone out of BP. RunicBlade
   changes the *kind* of the reaction (reflect, not just absorb) and can
   then take duration from boost like any other reactive verb.
@@ -518,7 +518,7 @@ ice/order/tempo. The duality reads clearer than vanilla ever made it.
 - **Mog — Dancer (piercing: spear)**: the 8 Dances verbatim ✦,
   learned by dancing on each terrain ✦; divine **Water Rondo**, kept
   WoB-missable, vanilla-style. Easy and perfect.
-  - **Boost-tiered Dance (design canon — awaiting Mog's rung to build).**
+  - **Boost-tiered Dance (design canon — awaiting Mog's kit to build).**
     Dance is a *chance verb* like Steal, so boost buys certainty in the dance's
     own vocabulary (DESIGN.md canon rule). **Keep the possession** — Mog still
     dances on his own once it starts; that loss of control IS the dance. Boost
@@ -533,7 +533,7 @@ ice/order/tempo. The duality reads clearer than vanilla ever made it.
 
 **The chance-verb family.** Steal and Dance (above) are the first two;
 **Sketch (Relm), Slot (Setzer), and Rage (Gau)** answer to the SAME rule when
-their rungs arrive — each rolls dice, so each spends BP on certainty in its own
+their kits arrive — each rolls dice, so each spends BP on certainty in its own
 terms (a chosen sketch, a fixed reel, a picked rage) rather than on a potency it
 doesn't have. Held in reserve deliberately: coupling steal odds to a *broken*
 enemy.
@@ -547,7 +547,7 @@ player prunes the kit all game. Same model, different collection verbs:
 - **Strago — Scholar (bludgeoning: rod)**: Lores by observation ✦
   (Cyrus/Hikari). Aqua Rake free ✦; **Analyze** cheap and early ✦
   (full weakness reveal — the party's scout tool). Learns every lore
-  he witnesses, equips 5. Divine: a taught-only capstone lore
+  he sees cast, equips 5. Divine: a taught-only capstone lore
   (Grand Train candidate, WoR).
 
 - **Relm — Painter (special ¤: brush)**: Sketch ✦ signature (bug

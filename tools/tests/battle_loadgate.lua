@@ -20,7 +20,7 @@
 -- shapes ($FFFF / 0000-empty / 0000-dead) that the gate must distinguish,
 -- because the question is "does battleLoadStarted() decode these bytes
 -- correctly", not "can a player reach them".  Reaching slot-0-dead
--- honestly means killing the lead character on cue every run -- a
+-- through real play means killing the lead character on cue every run -- a
 -- performance that would test nothing this test does not already pin.
 -- Per the owner-ratified policy on #75, it keeps its waiver, says so
 -- loudly here, and MAY NEVER PRODUCE FIXTURES.
@@ -52,7 +52,7 @@ H.run({ maxFrames = 30000 }, {
   H.driveUntil(function() return H.battleLoadStarted() end, 4000, {
     H.hold({ "up" }), H.waitFrames(20), H.release(), H.waitFrames(2),
     H.pressButtons({ "a" }, 4),
-  }, "battle load from doorstep"),
+  }, "battle load from entry point"),
   H.waitUntil(function() return H.battleActive() end, 900, "battle active", 30),
   H.waitFrames(240),
 
@@ -72,7 +72,7 @@ H.run({ maxFrames = 30000 }, {
     --    ridePartyMenu into a blind A-hammer over the menu (it drove onto a
     --    Status page).  So all-zero must read as NO battle.  The cost is that a
     --    total party wipe is indistinguishable here and also reads false; that
-    --    needs a witness outside this table, and a wiped fixture is a failure
+    --    needs a check outside this table, and a wiped fixture is a failure
     --    anyway.
     setTbl(0x0000, 0x0000, 0x0000, 0x0000)
     H.assertEq(H.battleLoadStarted(), false,

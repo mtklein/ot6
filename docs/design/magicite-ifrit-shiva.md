@@ -32,11 +32,11 @@ table implies.
 | Channel | Shipped? | Shape | Evidence |
 |---|---|---|---|
 | Spell grant | ✅ | **≤ 5 spell ids** per esper, from the vanilla esper record | `ot6_progression.asm:142-181` (`Ot6EsperSpellKnown`, scans `GenjuProp+1,+3,+5,+7,+9`) and `:203-252` (`Ot6UnionEspers`, seeds the union so a spell nobody knows still gets a list slot) |
-| Stat mod | ✅ | up to **four** stats, **signed**, −7..+7 each, in vanilla's own equipment layout | `ot6_progression.asm` `Ot6EsperStatMod` + `Ot6EsperStatTbl`: two bytes per esper, `byte0 = [speed:4][vigor:4]`, `byte1 = [magpwr:4][stamina:4]`, each nibble `[sign:1][mag:3]`; `$0000` = no mod. Mirrors `CalcEquipEffect`, `battle_main.asm:2521-2539`. Ruler: `esper-stat-ruler.md` |
+| Stat mod | ✅ | up to **four** stats, **signed**, −7..+7 each, in vanilla's own equipment layout | `ot6_progression.asm` `Ot6EsperStatMod` + `Ot6EsperStatTbl`: two bytes per esper, `byte0 = [speed:4][vigor:4]`, `byte1 = [magpwr:4][stamina:4]`, each nibble `[sign:1][mag:3]`; `$0000` = no mod. Mirrors `CalcEquipEffect`, `battle_main.asm:2521-2539`. Baseline: `esper-stat-ruler.md` |
 | Summon | ✅ (vanilla) | one attack record per esper, `id = esper + $36`; once per battle **per character** | `FixPlayerAttack` sets the character's bit in `$3f2e` (`battle_main.asm:12739-12747`); the Magic menu's esper row is disabled when that bit is set (`battle_main.asm:14436-14439`) |
 | Boost-tier folding | ✅ | **8 families only**: fire, ice, bolt, poison→bio, cure, life, slow, haste | `Ot6FoldTbl`, `ot6_boost.asm:340-348`; scanned with a hard `cpx #$0018` bound at `:255`, `:317` |
 | Boost on non-folding actions | ✅ | ×2/×4/×8 on base damage; exempted commands are fight `$00`, capture `$06`, bushido `$07`, steal `$05` — **summons (`$19`) are not exempt** | `Ot6BoostDmg`, `ot6_kits.asm:1190-1256` |
-| Ability MP cost | ✅ live | Magic prices on the vanilla ruler (`GetMPCost`); `Ot6AbilityCostTbl` only keys blitz/bushido/tool ids | `ot6_boost.asm:352-400` (`Ot6AbilityCost` header); mp-economy.md "Where it lands" |
+| Ability MP cost | ✅ live | Magic prices on the vanilla baseline (`GetMPCost`); `Ot6AbilityCostTbl` only keys blitz/bushido/tool ids | `ot6_boost.asm:352-400` (`Ot6AbilityCost` header); mp-economy.md "Where it lands" |
 | **Weapon permit** | ❌ **not built** | no equip-side consumer exists | `ot6_class.asm:17` names equip permits as a *future* consumer; nothing reads a permit anywhere in `ff6/src` |
 | **Named passives** | ❌ **not built** | no passive pool, no slots, no learning meter | ROADMAP M4 lists "Passives unlock at 2/4/6/8" as ⬜ |
 | **Esper menu copy** | ◐ **stat block only** | the while-equipped stat block is drawn from `Ot6EsperStatTbl`; the detail screen still draws vanilla learn-% | `skills.asm:2570-2645` — reads `GenjuProp` learn-rate bytes (all zeroed by M5) |
@@ -85,8 +85,8 @@ The Facility party, from the repo's own route work:
   recovers her will" in **Beat C / v0.7**. Either way her return is *after* the
   Facility, not before it. Any design premised on "Terra has just rejoined" is
   premised on the wrong beat. **MARK: the two docs disagree by one release on
-  when exactly she is playable again; confirm against the Beat B fixture when it
-  mints.**
+  when exactly she is playable again; confirm against the Beat B fixture when
+  it is generated.**
 
 So the roster the two new stones are competing inside is Locke (pierce, thief),
 Celes (slash, ice + Runic), and two of {Edgar, Sabin, Cyan, Gau, Setzer}.
@@ -311,7 +311,7 @@ is a worse fit for a stone meant to make a fighter *better*, not automatic.
 ### 4.2 The stat: vigor
 
 Ifrit's `Ot6EsperStatTbl` row is **+6 vigor / +4 stamina / −3 mag.pwr** — the
-opposite specialisation to Shiva's (§5.2), on rungs measured against vanilla's
+opposite specialisation to Shiva's (§5.2), on tiers measured against vanilla's
 own equipment ladder; see `docs/design/esper-stat-ruler.md` §4.
 
 - **Nobody else grants vigor.** The four Zozo rows are Ramuh +3 stamina,
@@ -422,7 +422,7 @@ opposites without being the same shape twice — Ice / Osmose / Shell is a kit
 about acting first and acting often. See `docs/design/esper-stat-ruler.md`.
 
 Base mag.pwr sits at 25–39 (`char_prop.asm`: Celes 36, Terra 39, Strago 34,
-Locke 28, Sabin 28), and mag.pwr is the honest selector: her list is three
+Locke 28, Sabin 28), and mag.pwr is the natural selector: her list is three
 spells, two of which scale off it.
 
 ### 5.3 The divine: Diamond Dust
@@ -512,14 +512,15 @@ It is one byte, and it applies globally (ZoneSeek inherits it, correctly).
 
 **This is the single biggest balance risk in the design** and the one to
 measure first: `bal_party.lua` with an Osmose-cycling policy against a Facility
-fixture, watching mp-economy.md's proposed M6 bands (`mp_spent`,
+fixture, watching mp-economy.md's proposed M6 ranges (`mp_spent`,
 `mp_restored`, mp-zero incidence, "a refill arrives before ~70% depletion").
 
 **A harness fact for anyone measuring a spell here.** `LoadMagicProp` fills one
-shared property buffer (`$11a0..$11ad`), so on the Magitek intro mint an ally's
-beam resolving inside your caster's action window overwrites the record
-mid-resolution. Uninstrumented, that reads as "the summon charged 0 MP, applied
-no status, and scratched one guard" — an artifact of the interleave, not the
+shared property buffer (`$11a0..$11ad`), so on the generated Magitek intro
+savestate an ally's beam resolving inside your caster's action window
+overwrites the record mid-resolution. Uninstrumented, that reads as "the summon
+charged 0 MP, applied no status, and scratched one guard" — an artifact of the
+interleave, not the
 spell. Freeze the rest of the party first.
 
 ---
@@ -655,7 +656,7 @@ reachable axis, keep the keys roughly even):
   bolt-only, so adding ice widens rather than replaces.
 - **Do not** blanket-add bolt. Six of ten species already carry it and Ramuh is
   already close to a skeleton key here; Rhinox's bolt *absorb* is the one thing
-  keeping that honest and should stay.
+  keeping that in check and should stay.
 
 That is a separate change from the kits, but the two should ship in the same
 release or Ifrit and Shiva will read as dead loot.
@@ -672,8 +673,8 @@ release or Ifrit and Shiva will read as dead loot.
   urgency but not the call.
 - Do the boss-tier stat magnitudes (+5 / +4) move `char_dmg_taken` and
   `player_actions_broken` enough to be felt, without moving break-lands-at%
-  past the band? Run `bal_party.lua`'s `boost3` policy with and without each
-  stone equipped and diff.
+  past the target range? Run `bal_party.lua`'s `boost3` policy with and without
+  each stone equipped and diff.
 
 ### 9.4 MP arithmetic, one worked line
 

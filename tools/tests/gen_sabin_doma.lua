@@ -1,6 +1,6 @@
--- gen_sabin_doma.lua -- leg 4 of SABIN's scenario: CYAN's run home through
--- Doma Castle, the family scene, and the handoff back to SABIN.  Mints one
--- state:
+-- gen_sabin_doma.lua -- step 4 of SABIN's scenario: CYAN's run home through
+-- Doma Castle, the family scene, and the handoff back to SABIN.  Generates
+-- one state:
 --   camp_cleared.mss  map 119 (DOMA CASTLE), SABIN alone, controllable,
 --                     with CYAN's defence of the gate already underway
 --
@@ -16,10 +16,10 @@
 -- `player_ctrl_on` (:41067-41068).
 --
 -- THE TRAP DOOR: map 123 (17,39) goes straight back to map 121, and it is
--- one tile south of where this leg ARRIVES on map 123.  The field BFS knows
+-- one tile south of where this step ARRIVES on map 123.  The field BFS knows
 -- tile passability and nothing about doorways, so any plan that clips that
--- tile silently un-does the leg.  fieldLeg() below is the field twin of
--- gen_sabin_world's worldLeg: it names the map the leg is allowed to end on
+-- tile silently un-does the step.  fieldLeg() below is the field twin of
+-- gen_sabin_world's worldLeg: it names the map the step is allowed to end on
 -- and fails loudly on any other, instead of leaving a walker to idle out
 -- its budget on the wrong map.
 --
@@ -73,7 +73,7 @@ end
 --     $3BF4=FF00 $3BF6=0020 $3BF8=FF00 $3BFA=0020
 -- ($3BF6 = 32 reads perfectly like a hit point).  That is OpenMenu_ext
 -- scribbling on the same RAM while the field module is suspended, and
--- taking it for a battle made the driver kill-bit and mash A at the name
+-- taking it for a battle made the driver write-clear and mash A at the name
 -- menu instead of pressing START -- a new stall in place of the old one.
 -- A LOADED battle party table only ever holds a real HP, or 0 / $FFFF for
 -- a slot nobody is in; $FF00 is neither, and one impossible word condemns
@@ -118,7 +118,7 @@ local function talkToObj(obj, what, maxF)
     return H.navTo(function() return approach()[1] end,
                    function() return approach()[2] end, {
       maxFrames = maxF or 20000,
-      honest = true,
+      playBattles = true,
       arrive = function()
         return engaged or (adjacent() and H.hasControl() and H.tileAligned())
       end,
@@ -155,11 +155,11 @@ local function talkToObj(obj, what, maxF)
   })
 end
 
--- No `choice` exists anywhere on this leg -- map 117's only prompt is the
+-- No `choice` exists anywhere on this step -- map 117's only prompt is the
 -- sealed-chest gag _cb0dbe (:40058) on obj 29 at {45,5}, which the route
 -- never touches, and map 120 has none at all.  CHOICES stays empty so an
 -- unexpected prompt is a hard failure rather than a blind A-press.
-local CHOICES = {}   -- this leg reaches no `choice` at all
+local CHOICES = {}   -- this step reaches no `choice` at all
 local ci, inChoice = 0, false
 local nameMenus, battles = 0, {}
 
@@ -198,7 +198,7 @@ local function rideUntil(pred, what, budget)
           ci = ci + 1
           if not CHOICES[ci] then
             error(string.format("doma: unexpected choice prompt (%d options) " ..
-              "on map %d at (%d,%d) -- this leg expects none",
+              "on map %d at (%d,%d) -- this segment expects none",
               chMax, map(), H.fieldX(), H.fieldY()), 0)
           end
         end
@@ -236,12 +236,12 @@ local function rideUntil(pred, what, budget)
           H.setPad(battN > 300 and phase < 4 and { "a" } or {})
           return
         end
-        -- Issue #75: no route on this leg has an encounter pool (the Doma
+        -- Issue #75: no route on this step has an encounter pool (the Doma
         -- interiors are event maps), so a monster table here would be a
-        -- surprise -- and the honest answer to a surprise is to PLAY it:
+        -- surprise -- and the accurate answer to a surprise is to PLAY it:
         -- the edge-tapped A below is the lib's own blind auto-fighter (A
         -- opens the command list, A confirms Fight, A takes the default
-        -- target).  The kill-bit that used to sit here is gone.
+        -- target).  The battle-clear write that used to sit here is gone.
         H.setPad(phase < 4 and { "a" } or {})
         return
       end
@@ -375,7 +375,7 @@ local function crawl123(gx, gy, dest)
       end),
       H.navTo(function() return target[1] end, function() return target[2] end, {
         maxFrames = 9000,
-        honest = true,
+        playBattles = true,
         -- A DOOR FIRES THE MOMENT THE PARTY STEPS ON IT, WHISKING IT AWAY --
         -- so navTo never rests on the door tile and its own terminator
         -- (on the tile, with control) can never fire.  For an inner door
@@ -416,13 +416,13 @@ local function crawl123(gx, gy, dest)
 end
 
 -- navTo with a WRONG-MAP GUARD, the field twin of gen_sabin_world's
--- worldLeg.  `want` is the map this leg is allowed to end on; landing
+-- worldLeg.  `want` is the map this step is allowed to end on; landing
 -- anywhere else is a doorway the BFS did not know was a doorway, and it
 -- fails here rather than 20,000 frames later.
 local function fieldLeg(tx, ty, from, want, what, budget)
   return H.navTo(tx, ty, {
     maxFrames = budget or 15000,
-    honest = true,
+    playBattles = true,
     arrive = function()
       local m = map()
       if m == from then return false end            -- still walking
@@ -473,7 +473,7 @@ H.run({ maxFrames = 60000 }, {
   rideUntil(landedField(119, 10), "SABIN at DOMA's gate (map 119)", 30000),
   H.waitFrames(30),
   H.waitUntil(function() return H.hasControl() and H.tileAligned() end,
-    900, "a genuinely controllable frame to mint on"),
+    900, "a genuinely controllable frame to generate on"),
   H.call(function()
     H.assertEq(map(), 119, "map 119 -- DOMA CASTLE, the gate")
     H.assertEq(H.hasControl(), true, "controllable")
@@ -501,6 +501,6 @@ H.run({ maxFrames = 60000 }, {
   end),
   H.saveState("camp_cleared.mss"),
   H.logStep(function()
-    return string.format("camp_cleared minted at frame %d", H.frame)
+    return string.format("camp_cleared generated at frame %d", H.frame)
   end),
 })

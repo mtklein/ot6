@@ -1,11 +1,11 @@
 -- gen_kefka_won.lua -- v0.4's FIRST link: boot kefka_doorstep, win battle 57
 -- again -- FOR REAL (issue #75: this file writes no emulated game state;
 -- the fight is played with gen_narshe_battle's menu-episode fighter and a
--- three-attempt retry ladder off the booted doorstep, exactly the honest
+-- three-attempt retry ladder off the booted entry point, exactly the real
 -- win that file just proved from the same state) -- then ride the whole
 -- win tail -- the esper cliff on map 23, TERRA's morph, the flight across
 -- the world, the regroup in Arvis's house -- through the party-select menu
--- to the first controllable frame, and mint kefka_won.mss on map 30 at
+-- to the first controllable frame, and generate kefka_won.mss on map 30 at
 -- (60,37).
 --
 -- THE WIN TAIL IS THREE DIFFERENT WAITS, none of them a field dialog with
@@ -22,7 +22,7 @@
 --     (that is the real story behind "dialogs present but flags read 0").
 --     And battleLoadStarted() is BLIND to this battle: it reads party
 --     battle-HP slot 0, and TERRA alone leaves slot 0 at $FFFF.  So
---     advanceStory neither taps (no dialogWaiting, no battN) nor kill-bits
+--     advanceStory neither taps (no dialogWaiting, no battN) nor write-clears
 --     -- hands off forever was the ORIGINAL $CCBEBA stall (632af69).  The
 --     set-piece is detected here by its formation word instead ($57C0
 --     slot 0 in the TRITOCH set -- $FFFF outside the fight on this route,
@@ -47,7 +47,8 @@
 --
 -- After the menu: _ccc1b5 reloads map 30 at {60,37} facing DOWN, sets
 -- $0602/$010B/$0048, set_parent_map 0 {84,33}, player_ctrl_on, return
--- (event_main.asm:107272,107193-107208).  That calm is the mint.
+-- (event_main.asm:107272,107193-107208).  That calm is where the state is
+-- generated.
 local H = dofile("tools/tests/lib/ot6.lua")
 
 -- the esper-zap species set, same triple gen_arvis spares for the intro twin
@@ -59,7 +60,7 @@ local function sw(id)
 end
 local function bright() return emu.getState()["ppu.screenBrightness"] or 0 end
 
--- ----------------------------------------------------- the honest fighter --
+-- ----------------------------------------------- the input-driven fighter --
 -- gen_narshe_battle's menu-episode machine (gen_scenario's cadence), cut to
 -- what this file fights: KEFKA, with P1 = TERRA+EDGAR+CELES.  Boost banked
 -- to 2 and dumped; EDGAR on Tools -> AutoCrossbow from tier 2, CELES on
@@ -274,11 +275,11 @@ local function landed(m, n)
 end
 
 -- ------------------------------------------------------ the KEFKA ladder --
--- gen_narshe_battle's honest-attempt shape: activation by clean edge-A,
+-- gen_narshe_battle's input-driven attempt shape: activation by clean edge-A,
 -- the fight PLAYED, the verdict read off the scripted branch (the win
 -- scene owning the stage vs the {25,5} lose-path save point), and a loss
--- reloading the booted doorstep -- the mint-script spelling of a player
--- reloading their save -- with the fighter's tier escalated.
+-- reloading the booted entry point -- the generator script's spelling of a
+-- player reloading their save -- with the fighter's tier escalated.
 local kefkaBlob, kefkaWon = nil, false
 local kefkaLost = nil
 local function kefkaBody(tier)
@@ -321,7 +322,7 @@ local function kefkaAttempt(n)
   return H.cond(function() return not kefkaWon end, {
     H.cond(function() return n > 1 end, {
       H.logStep(function()
-        return string.format("[kefka] ATTEMPT %d -- reloading the doorstep " ..
+        return string.format("[kefka] ATTEMPT %d -- reloading the entry point " ..
           "after a loss (%s)", n, tostring(kefkaLost))
       end),
       H.call(function() ldReq = H.requestLoadState(kefkaBlob) end),
@@ -340,30 +341,31 @@ local function kefkaAttempt(n)
     H.call(function()
       if kefkaLost == nil then
         kefkaWon = true
-        H.log(string.format("[kefka] attempt %d WON battle 57 honestly " ..
+        H.log(string.format("[kefka] attempt %d WON battle 57 " ..
           "at f%d", n, H.frame))
       end
     end),
   }, {})
 end
 
--- Budget: the kill-bit era ran this file in ~90k frames; the honest fight
--- costs real ATB rounds and the ladder may replay it three times.
+-- Budget: the battle-clear-write era ran this file in ~90k frames; the
+-- input-driven fight costs real ATB rounds and the ladder may replay it
+-- three times.
 H.run({ maxFrames = 400000 }, {
   H.loadState("build/states/kefka_doorstep.mss.lua"),
   H.waitFrames(30),
 
-  -- the ladder's checkpoint IS the booted doorstep (gen_narshe_battle
-  -- minted it one clean edge-A from battle 57 and proved the activation)
+  -- the ladder's checkpoint IS the booted entry point (gen_narshe_battle
+  -- generated it one clean edge-A from battle 57 and proved the activation)
   (function()
     local ckReq
     return H.cond(function() return true end, {
       H.call(function() ckReq = H.requestSaveState() end),
       H.waitFrames(2),
       H.call(function()
-        H.checkReq(ckReq, "doorstep checkpoint")
+        H.checkReq(ckReq, "entry point checkpoint")
         kefkaBlob = ckReq.blob
-        H.log(string.format("[kefka] doorstep checkpoint captured " ..
+        H.log(string.format("[kefka] entry point checkpoint captured " ..
           "(%d bytes) f%d", #kefkaBlob, H.frame))
       end),
     })
@@ -373,7 +375,7 @@ H.run({ maxFrames = 400000 }, {
   kefkaAttempt(3),
   H.call(function()
     if not kefkaWon then
-      error(string.format("[kefka] battle 57 not won in 3 honest attempts " ..
+      error(string.format("[kefka] battle 57 not won in 3 attempts " ..
         "-- last loss: %s -- the per-attempt numbers above are the balance " ..
         "finding (#74-style); do not rig this fight", tostring(kefkaLost)), 0)
     end
@@ -412,7 +414,8 @@ H.run({ maxFrames = 400000 }, {
         end
         if battN >= 3 then
           -- no other battle exists on this route; a stray would be FOUGHT
-          -- honestly by the same edge-tapped A (issue #75 -- no kill-bit)
+          -- with real input by the same edge-tapped A (issue #75 -- no
+          -- battle-clear write)
           H.setPad(aPh < 4 and { "a" } or {})
           return
         end
@@ -448,7 +451,7 @@ H.run({ maxFrames = 400000 }, {
   H.logStep("party committed; riding _ccc1b5's reload to control"),
 
   -- the remainder: NPC creates, load_map 30 {60,37}, fade_in, ctrl on
-  H.advanceStory(landed(30, 60), 8000, { honest = true }),
+  H.advanceStory(landed(30, 60), 8000, { playBattles = true }),
   H.waitFrames(30),
   H.call(function()
     H.assertEq(map(), 30, "landed in Arvis's house (map 30)")
@@ -475,6 +478,6 @@ H.run({ maxFrames = 400000 }, {
   end),
   H.saveState("kefka_won.mss"),
   H.logStep(function()
-    return string.format("kefka_won minted at frame %d -- v0.4's first link", H.frame)
+    return string.format("kefka_won generated at frame %d -- v0.4's first link", H.frame)
   end),
 })

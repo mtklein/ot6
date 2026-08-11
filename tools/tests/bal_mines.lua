@@ -447,7 +447,7 @@ local function paceStep(k)
   -- field/battle.asm), so eventRunning alone is normal here: pacing goes
   -- hands-off during any event and only voids if no battle follows
   -- within 600 frames (a guard-catch's chatter would stall that long;
-  -- its battle, if one comes, is caught by the formation pool gate).
+  -- its battle, if one comes, is caught by the formation pool check).
   -- Never raises from the predicate: void reasons flow into the report.
   local battN, evHold, waited, lastX = 0, 0, 0, nil
   return H.driveUntil(function()
@@ -512,7 +512,7 @@ local function battleBlock(k)
         "battle_active_b" .. k, 30),
       H.waitFrames(240 + 7 * (k - 1)),   -- settle + rng phase jitter
       H.call(function()
-        -- formation gate: every present species must be from the pool
+        -- formation check: every present species must be from the pool
         for slot = 0, 5 do
           if monsterAlive(slot) then
             local sp = H.readWord(0x57c0 + slot*2)

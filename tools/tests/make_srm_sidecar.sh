@@ -3,7 +3,7 @@
 # its front 8 KB (vanilla save-slot data only) into an embeddable base64
 # sidecar the legacy headless probes can inject at boot.  This deliberately
 # DOES NOT include bank $31 or OT6's per-slot codex pages.  New durable route
-# anchors use the complete 32 KiB format under tools/tests/anchors/.
+# checkpoints use the complete 32 KiB format under tools/tests/anchors/.
 #
 #   tools/tests/make_srm_sidecar.sh
 #

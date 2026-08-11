@@ -7,8 +7,8 @@
 #   * adding a line to cover new code is the exact cheat the checker exists
 #     to prevent -- new writes fail `make test`, full stop;
 #   * a line whose pair no longer matches anything FAILS the check as stale
-#     and must be deleted (that is the ratchet -- a cleaned file cannot
-#     quietly regress onto its old waiver).
+#     and must be deleted (that is the only-shrinks rule -- a cleaned file
+#     cannot quietly regress onto its old waiver).
 #
 # After a cleanup wave:  python3 tools/check_state_writes.py --regen-waivers
 # regenerates this file from the corpus; the diff must be pure deletion.

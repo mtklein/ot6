@@ -1,6 +1,6 @@
 -- @suite slow
 -- battle_dlgmenu: battles that OPEN with a scripted battle dialogue must
--- come back with intact, working menus.  Regression gate for the whelk
+-- come back with intact, working menus.  Regression test for the whelk
 -- garbled-menu bug (first bad: 0666392): Ot6MarkFontDirty_ext was hooked
 -- BETWEEN _c143b9's parameter setup and its jmp WaitTfrVRAM and clobbered
 -- A -- WaitTfrVRAM's SOURCE BANK -- so every dialogue-close "restore"
@@ -8,7 +8,7 @@
 -- $5800 and all later menu/list text rendered as noise (the map words
 -- stayed correct; deep list picks read as "rejected" only because nobody
 -- could see which rows were real).
---   flow: whelk doorstep -> step onto the trigger -> edge-tap the opening
+--   flow: whelk entry point -> step onto the trigger -> edge-tap the opening
 --   dialogues -> first menu entirely hands-off -> whole-font byte scan
 --   (every claimed OT6 cell == its bank-F0 data, every other byte ==
 --   SmallFontGfx) -> open the magitek list -> staged-row map-word asserts
@@ -119,7 +119,7 @@ end
 -- the test could only pass on the battle-start ATB rolls where somebody
 -- OTHER than Terra held the first menu -- i.e. it was a coin flip on
 -- which ROM bytes happened to be assembled, which is the one thing
--- CONTRIBUTING.md says a gate must never be.
+-- CONTRIBUTING.md says a test must never be.
 --
 -- The allowed set is derived, not listed here: claimedCells() finds the
 -- icon data in bank F0 by signature scan, and assertFontIntact() then
@@ -162,10 +162,10 @@ H.run({ maxFrames = 12000 }, {
       if H.battleLoadStarted() then
         if whelk() then H.setPad({}); return end
         -- an incidental encounter on the way to the trigger is FLED, not
-        -- kill-bitted (issue #75): L+R is the engine's own run mechanic,
-        -- the same idiom every converted traversal leg uses.  If the
-        -- formation refuses to release, the driveUntil budget fails this
-        -- loudly rather than a poke papering over it.
+        -- ended by writing the battle-clearing flag (issue #75): L+R is the
+        -- engine's own run mechanic, the idiom every converted traversal step
+        -- uses.  If the formation refuses to release, the driveUntil budget
+        -- fails this loudly rather than a poke papering over it.
         H.setPad({ l = true, r = true })
         return
       end

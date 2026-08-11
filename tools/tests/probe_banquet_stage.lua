@@ -1,15 +1,15 @@
--- probe_banquet_stage.lua -- I->J leg STAGING (issue #31): cold-Continue
+-- probe_banquet_stage.lua -- I->J step STAGING (issue #31): cold-Continue
 -- the vector-crash-v1 battery, walk the world grind to Vector 253, enter
--- the castle, ride the escort, start the banquet at the dais, and mint
+-- the castle, ride the escort, start the banquet at the dais, and generate
 -- TWO development savestates:
 --
 --   banquet_predais.mss  -- standing beside the dais, window NOT started
 --   banquet_window.mss   -- control back after the Gestahl/Cid scene,
 --                           $007C=1, timer 0 live (the 14400 window)
 --
--- These are ITERATION fixtures for the circuit/Q&A probes, not frontier
--- states; the leg generator (gen_banquet_done) replays this whole route
--- itself.  Run:
+-- These are ITERATION fixtures for the circuit/Q&A probes, not
+-- states in the generated chain; the step generator (gen_banquet_done)
+-- replays this whole route itself.  Run:
 --
 --   OT6_SRAM_ANCHOR=tools/tests/anchors/vector-crash-v1 \
 --   tools/tests/run.sh tools/tests/probe_banquet_stage.lua
@@ -40,12 +40,12 @@ local function var0() return H.readWord(0x1fc2) end
 -- the party sits aligned for several frames before each press latches --
 -- on straight lines the wasted entries agree in direction and nothing
 -- shows, but every TURN of a long path desyncs the plan and forces a
--- 60000-node replan.  Measured on this leg's ~117-step grind (run 4,
+-- 60000-node replan.  Measured on this step's ~117-step grind (run 4,
 -- 2026-07-28): ~139 frames/tile, a (73,221)<->(73,222) oscillation with
 -- plan lengths jumping 86->93, and the emulator dragged to ~40fps by the
 -- per-replan BFS.  This version consumes an entry only when the party
 -- LANDS on that entry's destination tile (navTo's rule, worldized): one
--- BFS per leg plus one per battle return, 16 frames/tile.
+-- BFS per step plus one per battle return, 16 frames/tile.
 local function worldGrind(tx, ty, what)
   local plan, idx, ph, hb = nil, 1, 0, -600
   local step = nil

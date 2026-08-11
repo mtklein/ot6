@@ -25,7 +25,7 @@
 -- The bank is earned: one real Tonic turn (zero MP, so the ladder's
 -- arithmetic never moves) banks the second bp; pending only ever comes
 -- from real R/L edges at her open list.  The one assertion that cannot
--- survive honestly is the old "a poked pending has not re-priced anything
+-- survive on real inputs is the old "a poked pending has not re-priced anything
 -- yet" control — its subject was the poke itself.  Its replacement is the
 -- pending-0 baseline read before any R edge: price 4, tier 1, ungreyed.
 --
@@ -205,7 +205,7 @@ H.run({ maxFrames = 60000 }, {
       if not dir then H.setPad({}); return end
       H.setPad({ [dir] = true })
     end),
-  }, "grass-band encounter"),
+  }, "grass-area encounter"),
   H.release(),
   H.waitUntil(function() return H.battleActive() end, 900, "battle active", 30),
   H.waitFrames(90),
@@ -271,7 +271,7 @@ H.run({ maxFrames = 60000 }, {
   }, "her open list parked on Fire"),
   H.waitFrames(30),
   -- ------------------------------------------------ pending 0: the baseline --
-  -- the honest replacement for the old poked-pending control: before any R
+  -- the input-driven replacement for the old poked-pending control: before any R
   -- edge the row must carry Fire's own name and price, ungreyed.
   H.call(function()
     H.assertEq(pend(terra), 0, "no pending before any R edge")

@@ -1,6 +1,6 @@
 -- gen_banon.lua -- from returner_hideout.mss (map 108, the entry hall) through
 -- the RETURNER HIDEOUT to the moment the party casts off for Narshe.
--- Mints one state:
+-- Generates one state:
 --   banon_joined.mss  map 112 (7,43), TERRA + EDGAR + SABIN + BANON, $0018
 --                     set -- the raft is armed and the Lete River is one map
 --                     away.  This is the fixture gen_lete starts from.
@@ -78,7 +78,7 @@
 -- through to _cafb99 (:37120), which is
 --       call _cafba6      ; despawn the hideout, set $0013
 --       call _cb0080      ; THE DEPARTURE SCENE, called directly
--- so there is no "now go find everyone" leg.  _cb0080 (:37934) gathers the
+-- so there is no "now go find everyone" step.  _cb0080 (:37934) gathers the
 -- party on map 109, runs Banon's "We've no time to dilly-dally" speech at
 -- _cb0106 (:38020) and ends `call _cafff0` (:37855) -- which puts EDGAR and
 -- SABIN back in the party, drops LOCKE (he is off to South Figaro), loads
@@ -103,14 +103,15 @@
 -- bits 0-3 = the party's facing direction one-hot and bit4 = "A is held".
 -- So the gag's real condition is "A pressed while facing DOWN": it is an
 -- EXAMINE, not a step trigger, and walking over the tile does nothing.
--- Rather than trust even that, the mint asserts $016B -- the flag _cb002b
--- sets the instant it fires -- is still clear, which catches it by outcome
--- no matter which tile the navigator chose.
--- ISSUE #75 -- ZERO-WRITE: every navigator here runs with opts.honest.
+-- Rather than trust even that, the generator asserts $016B -- the flag
+-- _cb002b sets the instant it fires -- is still clear, which catches it by
+-- outcome no matter which tile the navigator chose.
+-- ISSUE #75 -- ZERO-WRITE: every navigator here runs with opts.playBattles.
 -- The hideout has no random encounters (its maps carry no encounter
--- territory) so nothing SHOULD ever reach the battle branch -- honest mode
--- makes that a property of the code path rather than a hope: if a battle
--- ever did fire, it would be fought with real input, never kill-bitted.
+-- territory) so nothing SHOULD ever reach the battle branch -- playBattles
+-- mode makes that a property of the code path rather than a hope: if a
+-- battle ever did fire, it would be fought with real input, never
+-- write-cleared.
 local H = dofile("tools/tests/lib/ot6.lua")
 local DOOR = "build/states/returner_hideout.mss.lua"
 
@@ -153,7 +154,7 @@ local function settleField(dstMap, maxF)
       return not H.worldMode() and H.tileAligned()
          and not H.battleLoadStarted() and not H.dialogWaiting()
          and (dstMap == nil or map() == dstMap)
-    end), maxF or 12000, { honest = true }),
+    end), maxF or 12000, { playBattles = true }),
     H.waitFrames(30),
   })
 end
@@ -174,7 +175,7 @@ local function crossTo(tx, ty, dstMap, what)
         what, H.fieldX(), H.fieldY(), tx, ty, dstMap)
     end),
     H.navTo(tx, ty, { maxFrames = 20000, arrive = mapChanged(),
-      honest = true }),
+      playBattles = true }),
     H.release(),
     settleField(dstMap),
     H.call(function()
@@ -194,7 +195,7 @@ local function crossDoorHold(sx, sy, dir, dstMap, what)
         what, sx, sy, dir, dstMap)
     end),
     H.navTo(sx, sy, { maxFrames = 20000, arrive = mapChanged(),
-      honest = true }),
+      playBattles = true }),
     H.release(),
     H.driveUntil(function() return map() ~= 109 and map() ~= 110
                             or map() == dstMap end, 1800, {
@@ -258,7 +259,7 @@ local function talkToObj(obj, what, maxF)
     return H.navTo(function() return approach()[1] end,
                    function() return approach()[2] end, {
       maxFrames = maxF or 20000,
-      honest = true,
+      playBattles = true,
       arrive = function()
         return engaged or (adjacent() and H.hasControl() and H.tileAligned())
       end,
@@ -316,7 +317,7 @@ local function rideTo(pred, what, maxF)
     H.advanceStory(function()
       return pred() and H.hasControl() and H.tileAligned() and bright() >= 15
          and not H.battleLoadStarted()
-    end, maxF or 25000, { honest = true }),
+    end, maxF or 25000, { playBattles = true }),
     H.waitFrames(20),
     H.call(function() where(what) end),
   })
@@ -378,7 +379,7 @@ H.run({ maxFrames = 200000 }, {
   end),
   talkToObj(16, "BANON (the speech)"),
   -- the speech reloads map 110 at (21,48): same map id, so $0011 is the
-  -- only honest arrival signal
+  -- only real arrival signal
   rideTo(function() return map() == 110 and sw(0x0011) == 1 end,
     "after the speech", 40000),
   H.call(function()
@@ -462,7 +463,7 @@ H.run({ maxFrames = 200000 }, {
   H.advanceStory(function()
     return map() == 112 and sw(0x0018) == 1 and H.hasControl()
        and H.tileAligned() and bright() >= 15 and not H.battleLoadStarted()
-  end, 50000, { honest = true }),
+  end, 50000, { playBattles = true }),
   H.waitFrames(30),
   H.call(function()
     H.assertEq(map(), 112, "on map 112 -- the passage to the Lete River")
@@ -493,6 +494,6 @@ H.run({ maxFrames = 200000 }, {
   end),
   H.saveState("banon_joined.mss"),
   H.logStep(function()
-    return string.format("banon_joined minted at frame %d", H.frame)
+    return string.format("banon_joined generated at frame %d", H.frame)
   end),
 })

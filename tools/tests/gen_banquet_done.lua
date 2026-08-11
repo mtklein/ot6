@@ -1,28 +1,29 @@
--- gen_banquet_done.lua -- v0.7 LEG I->J (issue #31), and the generator
--- that cuts battery anchor J, `banquet-done-v1`.
+-- gen_banquet_done.lua -- v0.7 STEP I->J (issue #31), and the generator
+-- that cuts battery checkpoint J, `banquet-done-v1`.
 --
--- THE HONEST REBUILD (issue #75, 2026-08-09).  The previous version of
+-- THE input-driven rebuild (issue #75, 2026-08-09).  The previous version of
 -- this file encoded banquet-decode.md's old ≥90 route, which that doc
 -- WITHDREW after live measurement (control returns inside the throne
 -- tower, the castle is severed until _cc8490, map 243 is a one-way
 -- pocket, and ≥90 needs 41 of the window's 44 points against a measured
 -- best of 26).  Canon is the ≥67 tier (banquet-decode.md §5.2).  This
--- rebuild drives the canon tier HONESTLY -- zero state writes outside the
--- Save-UI anchor block -- and the arithmetic that makes ≥67 the honest target is worth
--- stating up front, because it is different from the kill-bit era's:
+-- rebuild drives the canon tier WITH REAL INPUT -- zero state writes
+-- outside the Save-UI checkpoint block -- and the arithmetic that makes ≥67
+-- the input-driven target is worth stating up front, because it is
+-- different from the battle-clear-write era's:
 --
---   * A KILL-BIT window fight cost ~3 frames for +6 points.  An honest
---     fight against even a lone Commando costs real ATB rounds -- 2000+
---     frames of a 14400-frame window -- for the same +6, while a talk
---     costs ~210 frames (measured, §9.2) for +1.  Points per frame the
---     two are comparable, but the fight carries wipe/timer risk INSIDE
---     the window and the talk carries none.  So the honest window is
---     TALK-ONLY: the four fight soldiers are skipped outright, capping
---     the window at 20 and the leg total at 20 + 44 (Q&A) + 5 (the
---     troopers' challenge) = 69.
+--   * A battle-clear-write window fight cost ~3 frames for +6 points.  An
+--     input-driven fight against even a lone Commando costs real ATB rounds
+--     -- 2000+ frames of a 14400-frame window -- for the same +6, while a
+--     talk costs ~210 frames (measured, §9.2) for +1.  Points per frame the
+--     two are comparable, but the fight carries wipe/timer risk INSIDE the
+--     window and the talk carries none.  So the input-driven window is
+--     TALK-ONLY: the four fight soldiers are skipped outright, capping the
+--     window at 20 and the step total at 20 + 44 (Q&A) + 5 (the troopers'
+--     challenge) = 69.
 --   * The tier ledger under that cap:  total >= 67 needs window >= 18
 --     (of 20) with a PERFECT Q&A and a CLEAN challenge win.  The ≥77
---     Tintinabar tier is out of honest talk-only reach BY CONSTRUCTION
+--     Tintinabar tier is out of input-driven talk-only reach BY CONSTRUCTION
 --     (69 < 77), which suits the contract: `banquet-done-v1` asserts the
 --     Tintinabar and Charm Bangle ABSENT.
 --   * The window driver is probe_banquet_greedy.lua's, lifted whole:
@@ -30,7 +31,7 @@
 --     crossing, 243 LAST (it is a one-way pocket), one strike per
 --     soldier, never plan on a transition frame.  Its measured best was
 --     26 points from 16 soldiers WITH the fight NPCs in the pool; a
---     talk-only pass of the same driver is the leg's own measurement,
+--     talk-only pass of the same driver is the step's own measurement,
 --     logged at expiry -- and a window under 18 fails RIGHT THERE with
 --     var0, the timer, the soldier count and the full route log, never
 --     as a quietly lower tier at the messenger.
@@ -43,10 +44,10 @@
 --     timer-expiry pays nothing and must fail loudly.
 --   * The party PREPARES before entering the castle -- H.equipOptimum
 --     and H.fieldCare through the real menus, outside the window, where
---     frames are free (the anchor-descended party arrives hurt and part
---     bare on every leg this wave has measured).
+--     frames are free (the checkpoint-descended party arrives hurt and part
+--     bare on every step this wave has measured).
 --
--- The leg (banquet-decode.md is the script; the route recon's legs 5-6 the
+-- The step (banquet-decode.md is the script; the route recon's steps 5-6 the
 -- route): cold-Continue the tracked `vector-crash-v1` battery
 -- (boundary I -- world (83,238), standing ON the dead Blackjack; NO A
 -- press on the boot tile, it re-enters the wreck -- measured),
@@ -72,8 +73,8 @@
 -- was ours, not the game's.
 --
 -- THE SAVE-UI BLOCK AT THE END KEEPS ITS POKES AND ITS WAIVERS: it is
--- the legacy-anchor apparatus (codex witness seeding + deterministic
--- slot-3 drive), its own listed line of #75, converted with the anchor
+-- the legacy-checkpoint apparatus (codex witness seeding + deterministic
+-- slot-3 drive), its own listed line of #75, converted with the checkpoint
 -- re-cut program, not here.  (The timer is DEAD by then -- the §5.3
 -- harness hazard about poked menus inside a live window does not apply.)
 --
@@ -221,7 +222,7 @@ end
 
 -- ---- the TALK-ONLY greedy window (probe_banquet_greedy's driver) ---------
 -- The 24-soldier census of banquet-decode §3, with the four fight
--- soldiers KEPT IN THE TABLE but marked -- the honest window skips them
+-- soldiers KEPT IN THE TABLE but marked -- the input-driven window skips them
 -- (see the header arithmetic); they stay listed so the skip is explicit
 -- data, not a silent omission.
 local SOLDIERS = {
@@ -272,7 +273,7 @@ local function circuitSettled()
      and not H.dialogWaiting() and not H.battleLoadStarted()
 end
 
--- THE BAND GUARD, split so the tier is robust to the ONE unverified Q&A
+-- THE range guard, split so the tier is robust to the ONE unverified Q&A
 -- mechanic (recall's +5 -- see the Q&A section; the first-question record
 -- $0231/2/3 that recall matches against does NOT latch under live play,
 -- measured, so recall's +5 is NOT assumed).  Arithmetic:
@@ -290,8 +291,8 @@ local function soldierDone(s) return sw(s.latch) == 1 end
 -- ELIGIBLE: talks, plus the COMMANDO fights ($0c7) -- measured (run
 -- tgW7P8hV), a talk-only window yields 15 of the 18 points the tier
 -- needs: the effective talk rate is ~960 frames/point once travel and
--- crossing churn are paid, while an honest Commando (580 hp, weak
--- bolt+water, fought by the equipped band party) is +6 for ~2000-2500
+-- crossing churn are paid, while a real Commando (580 hp, weak
+-- bolt+water, fought by the section's equipped party) is +6 for ~2000-2500
 -- frames -- a better rate -- and both route-side Commandos sit ON the
 -- corridor the talk circuit already walks.  The B26 Mega Armor stays
 -- excluded: it lives in the one-way 243 pocket and is 1000 hp.
@@ -368,7 +369,7 @@ local function circuitRunner()
     tick = function(self)
       -- a fight soldier's talk opens battle 26/27 mid-chase: hand the
       -- battle to the library fighter (the timer keeps ticking -- that is
-      -- the honest cost), then resume the circuit when it ends.  The +1
+      -- the real cost), then resume the circuit when it ends.  The +1
       -- and the clean +5 both land in the script tail AFTER the battle.
       if H.battleLoadStarted() then
         if not inFight then
@@ -427,7 +428,7 @@ local function circuitRunner()
         if not cappedAt then
           cappedAt = H.frame
           H.log(string.format(
-            "== circuit CAPPED at var0=%d (>= %d): the band guard -- "
+            "== circuit CAPPED at var0=%d (>= %d): the range guard -- "
             .. "idling out the timer at f%d ==",
             var0(), TALK_BELOW, H.frame))
         end
@@ -564,17 +565,17 @@ local steps = {
   H.waitFrames(30),
 
   -- ---- 1b. the player's prep, OUTSIDE the window, where frames are free ----
-  -- (the anchor-descended party arrives hurt and part bare on every leg
+  -- (the checkpoint-descended party arrives hurt and part bare on every step
   -- this wave has measured; the challenge is a real fight now)
   H.equipOptimum({ tag = "banquet kit" }),
   H.fieldCare({ tag = "care before the banquet", threshold = 0.95 }),
 
   -- ---- 2. the castle and the dais ------------------------------------------
-  H.navTo(28, 2, { maxFrames = 30000, honest = "flee" }),
+  H.navTo(28, 2, { maxFrames = 30000, playBattles = "flee" }),
   pressWalk("up", function() return map() == 243 end, 900,
     "castle door 253 (28,1) -> 243 (15,29)"),
   H.waitUntil(landed(243, 10), 2400, "castle antechamber 243", 1),
-  H.navTo(8, 18, { maxFrames = 12000, calmFrames = 4, honest = "flee" }),
+  H.navTo(8, 18, { maxFrames = 12000, calmFrames = 4, playBattles = "flee" }),
   H.stepOff({ "right", "down", "up" }, 6000,
     "escort: A through $06A6, step off (8,18)"),
   H.waitUntil(function() return sw(0x013A) == 1 end, 3000,
@@ -583,7 +584,7 @@ local steps = {
   H.call(function()
     H.assertEq(sw(0x062F), 1, "$062F -- the soldier population is up")
   end),
-  H.navTo(15, 9, { maxFrames = 12000, honest = "flee" }),
+  H.navTo(15, 9, { maxFrames = 12000, playBattles = "flee" }),
   pressWalk("up", function() return map() == 250 end, 900,
     "door 243 (15,8) -> 250 (23,33)"),
   H.waitUntil(landed(250, 10), 2400, "250 first entry", 1),
@@ -591,21 +592,22 @@ local steps = {
     H.assertEq(sw(0x013B), 1, "$013B -- 250 map-init opened the {22,29} door")
   end),
   -- THE MEASURED ROUTE TO THE DAIS (probe_banquet_stage, iterations 1-8;
-  -- the first honest run of this gen failed here with "no path (23,33)->
-  -- (54,17)" because the pre-window 250 entry is a 131-tile component and
-  -- the dais is NOT in it): the {22,29} doorway is a door tile the BFS
-  -- model reads as a wall (held UP crosses it); (23,12) is the gated-off
-  -- messenger trigger that re-enters at every rest frame and wedges navTo
-  -- (a held press skips walk-over triggers, so it and the (23,9) stairs
-  -- are crossed in ONE pressWalk); (23,9) short-entrances to (54,34)
-  -- inside the throne tower, and the dais is an ordinary navTo from there.
-  H.navTo(23, 30, { maxFrames = 6000, honest = "flee" }),
+  -- the first input-driven run of this gen failed here with "no path
+  -- (23,33)-> (54,17)" because the pre-window 250 entry is a 131-tile
+  -- component and the dais is NOT in it): the {22,29} doorway is a door
+  -- tile the BFS model reads as a wall (held UP crosses it); (23,12) is the
+  -- gated-off messenger trigger that re-enters at every rest frame and
+  -- wedges navTo (a held press skips walk-over triggers, so it and the
+  -- (23,9) stairs are crossed in ONE pressWalk); (23,9) short-entrances to
+  -- (54,34)  inside the throne tower, and the dais is an ordinary navTo
+  -- from there.
+  H.navTo(23, 30, { maxFrames = 6000, playBattles = "flee" }),
   pressWalk("up", function()
     return H.fieldY() <= 28 and H.tileAligned()
   end, 900, "held UP through the {22,29} doorway"),
   H.release(),
   H.waitFrames(30),
-  H.navTo(23, 13, { maxFrames = 9000, honest = "flee" }),
+  H.navTo(23, 13, { maxFrames = 9000, playBattles = "flee" }),
   pressWalk("up", function()
     return (H.fieldX() ~= 23 or H.fieldY() > 20) and H.tileAligned()
   end, 1200, "held UP past (23,12) onto the (23,9) stairs -> (54,34)"),
@@ -616,7 +618,7 @@ local steps = {
     H.assertEq(H.fieldX(), 54, "stairs landing x (short entrance 23,9)")
     H.assertEq(H.fieldY(), 34, "stairs landing y")
   end),
-  H.navTo(54, 16, { maxFrames = 20000, honest = "flee" }),
+  H.navTo(54, 16, { maxFrames = 20000, playBattles = "flee" }),
   H.call(function()
     H.assertEq(sw(0x007C), 0, "$007C clear at the dais")
     H.screenshot("leg_ij_dais")
@@ -655,18 +657,18 @@ local steps = {
   H.waitFrames(45),
   circuitRunner(),
 
-  -- THE FEASIBILITY GATE (issue #75, and the §8 measurement): the tier
+  -- THE FEASIBILITY CHECK (issue #75, and the §8 measurement): the tier
   -- ledger needs window >= 18 given a perfect Q&A (+44) and a clean
   -- challenge (+5).  A short window fails HERE, with the numbers, never
   -- as a quietly lower tier at the messenger.
   H.call(function()
     H.assertEq(windowScore ~= nil, true, "the window expired ($013C)")
     H.log(string.format(
-      "== HONEST WINDOW MEASUREMENT: var0=%d, %d of 20 talk soldiers, "
+      "== WINDOW MEASUREMENT: var0=%d, %d of 20 talk soldiers, "
       .. "need >= 18 for the >=67 tier ==", windowScore, windowSoldiers))
     if windowScore < 18 then
       error(string.format(
-        "HONEST WINDOW SHORT: var0=%d of the 18 the >=67 tier needs "
+        "WINDOW SHORT: var0=%d of the 18 the >=67 tier needs "
         .. "(talk-only cap 20; Q&A 44 + challenge 5 assumed perfect).  "
         .. "This is the feasibility FINDING -- route log above.",
         windowScore), 0)
@@ -733,7 +735,7 @@ local steps = {
   -- first-listed question; break option 0 = "Yes"), so a single
   -- cursor-0 pick carries both and ends on control returning to the
   -- dinner floor.  Its points are not asserted; the tier is made robust
-  -- to recall=0 by the window band guard.
+  -- to recall=0 by the window range guard.
   picks({ 0 }, function()
     return H.hasControl() and H.tileAligned() and not H.dialogWaiting()
        and H.readByte(0x056f) < 2
@@ -818,7 +820,7 @@ local steps = {
   H.call(function()
     H.assertEq(var0(), dinner.preAccompany + 3, "accompany +3")
     -- THE TIER, measured: window + everything the dinner actually paid.
-    -- Robust to recall by construction (band guard); assert BOTH bounds so
+    -- Robust to recall by construction (range guard); assert BOTH bounds so
     -- an accidental >=77 (which would give Tintinabar, contradicting the
     -- exit contract) fails just as loudly as a short one.
     local total = var0()
@@ -838,7 +840,7 @@ local steps = {
   H.advanceStory(function()
     return sw(0x007D) == 1 and map() == 251 and H.hasControl()
        and H.tileAligned() and bright() >= 15
-  end, 60000, { honest = true }),
+  end, 60000, { playBattles = true }),
   H.waitFrames(60),
   H.call(function()
     H.assertEq(sw(0x007D), 1, "$007D -- the banquet tail ran")
@@ -858,13 +860,13 @@ local steps = {
   -- entered it -- the (53,35) long entrance down to the corridor (23,11)
   -- -- before walking to the messenger.  (A direct navTo (53,12)->(23,12)
   -- has no path; measured, run QkbMFqWb.)
-  H.navTo(80, 26, { maxFrames = 9000, honest = "flee" }),
+  H.navTo(80, 26, { maxFrames = 9000, playBattles = "flee" }),
   pressWalk("down", function() return map() == 250 end, 900,
     "251 door row -> 250 (53,11)"),
   H.waitFrames(30),
   H.stepOff({ "down", "left", "right" }, 2400,
     "off the (53,11) trigger tile"),
-  H.navTo(53, 34, { maxFrames = 9000, honest = "flee" }),
+  H.navTo(53, 34, { maxFrames = 9000, playBattles = "flee" }),
   (function() local ph = 0
     return H.driveUntil(function() return H.fieldX() < 40 end, 1200, {
       H.call(function()
@@ -876,7 +878,7 @@ local steps = {
   end)(),
   H.release(),
   H.waitFrames(30),
-  H.navTo(23, 12, { maxFrames = 20000, calmFrames = 4, honest = "flee" }),
+  H.navTo(23, 12, { maxFrames = 20000, calmFrames = 4, playBattles = "flee" }),
   (function() local ph = 0
     return H.driveUntil(function() return sw(0x0238) == 1 end, 9000, {
       H.call(function()
@@ -898,15 +900,15 @@ local steps = {
   -- ---- 8. out of the castle, out of Vector ----------------------------------
   H.stepOff({ "down", "left", "right" }, 2400,
     "off the messenger trigger tile"),
-  H.navTo(23, 33, { maxFrames = 20000, honest = "flee" }),
+  H.navTo(23, 33, { maxFrames = 20000, playBattles = "flee" }),
   pressWalk("down", function() return map() == 243 end, 1200,
     "door 250 (22..24,34) -> 243 (15,10)"),
   H.waitUntil(landed(243, 10), 2400, "243 on the way out", 1),
-  H.navTo(15, 30, { maxFrames = 12000, honest = "flee" }),
+  H.navTo(15, 30, { maxFrames = 12000, playBattles = "flee" }),
   pressWalk("down", function() return map() == 253 end, 1200,
     "south rows -> 253 (29,2)"),
   H.waitUntil(landed(253, 10), 2400, "Vector 253 on the way out", 1),
-  H.navTo(30, 62, { maxFrames = 30000, honest = "flee",
+  H.navTo(30, 62, { maxFrames = 30000, playBattles = "flee",
     arrive = function() return H.worldMode() end }),
   pressWalk("down", function() return H.worldMode() end, 1200,
     "253 (30,63) world exit -> world (120,188)"),
@@ -916,8 +918,8 @@ local steps = {
   end, 3600, "world control outside Vector", 5),
   H.waitFrames(45),
   H.call(function()
-    H.assertEq(H.worldX(), 120, "anchor-J tile x")
-    H.assertEq(H.worldY(), 188, "anchor-J tile y")
+    H.assertEq(H.worldX(), 120, "checkpoint-J tile x")
+    H.assertEq(H.worldY(), 188, "checkpoint-J tile y")
     H.assertEq(H.readByte(0x11FA) & 3, 0, "ON FOOT at the J tile")
     H.screenshot("leg_ij_j_tile")
   end),
@@ -926,7 +928,7 @@ local steps = {
   H.call(function()
     H.assertExitContractPreSave("banquet-done-v1")
   end),
-  -- THE LEG'S SAVESTATE IS MINTED HERE, BEFORE THE MENU (the world menu
+  -- THE STEP'S SAVESTATE IS GENERATED HERE, BEFORE THE MENU (the world menu
   -- does not unwind on B, measured)
   H.saveState("banquet_done.mss"),
   -- RELOAD-VERIFIED (gen_sabin_gau's pattern, a trap this program has
@@ -939,11 +941,11 @@ local steps = {
       H.call(function() saveReq = H.requestSaveState() end),
       H.waitFrames(2),
       H.call(function()
-        H.checkReq(saveReq, "mint verify: capture")
+        H.checkReq(saveReq, "generated-state verify: capture")
         loadReq = H.requestLoadState(saveReq.blob)
       end),
       H.waitFrames(2),
-      H.call(function() H.checkReq(loadReq, "mint verify: reload") end),
+      H.call(function() H.checkReq(loadReq, "generated-state verify: reload") end),
       H.waitFrames(180),
       H.call(function()
         H.assertEq(H.worldMode(), true, "reload: on the world map")
@@ -953,7 +955,7 @@ local steps = {
         H.assertEq(H.worldHasControl() and H.worldAligned(), true,
           "reload: controllable at rest")
         H.assertEq(H.battleLoadStarted(), false, "reload: no battle pending")
-        H.log("mint verify: the reload stayed calm -- banquet_done verified")
+        H.log("generated-state verify: the reload stayed calm -- banquet_done verified")
       end),
     })
   end)(),
@@ -976,7 +978,7 @@ local steps = {
   H.call(function()
     H.assertEq((H.readByte(0x0201) & 0x80) ~= 0, true,
       "menu-flags $0201 bit7 SET -- the save-enable flow reached the menu")
-    -- ARM THE HONEST SAVE RECEIPT (issue #75): a read-only exec hook on
+    -- ARM THE input-driven save receipt (issue #75): a read-only exec hook on
     -- the real CopyGameDataToSRAM entry captures the slot argument the
     -- save runs with (codex_saveas's instrument).  This replaces the old
     -- zeroed-$307ff0 sentinel -- an SRAM write -- as the proof that the
@@ -1020,7 +1022,7 @@ local steps = {
     H.assertEq(saveArg, 3, "CopyGameDataToSRAM ran for persistent slot 3")
     -- the codex witness cells are READ, never seeded (issue #75): the
     -- battery carries whatever the chain actually earned.  The phase-2
-    -- anchor re-cuts measure these and the entry contracts follow the
+    -- checkpoint re-cuts measure these and the entry contracts follow the
     -- measurement (never the reverse).
     H.log(string.format("codex witness cells (earned): elem=%02X class=%02X",
       emu.read(0x316810 + ULTROS2, emu.memType.snesMemory),
@@ -1030,8 +1032,8 @@ local steps = {
   end),
   H.logStep(function()
     return string.format("banquet-done-v1 saved via the real Save UI at "
-      .. "frame %d -- honest window %d + 49 = %d, the >=67 tier; "
-      .. "boundary J of the v0.7 band", H.frame,
+      .. "frame %d -- window %d + 49 = %d, the >=67 tier; "
+      .. "boundary J of the v0.7 range", H.frame,
       dinner.w0 or -1, (dinner.w0 or -68) + 49)
   end),
 }

@@ -24,7 +24,7 @@
 --   1+1=2) -> three item turns (5 = the Ot6ActionEnd cap, asserted by a
 --   FOURTH item turn that must bank nothing) -> Filch at cap (shield off,
 --   banks nothing) -> ally banked to cap by her own item turns -> Bestow
---   to the capped ally (an honest no-op costing Locke nothing).
+--   to the capped ally (a genuine no-op costing Locke nothing).
 --
 -- Every original assertion survives:
 --   1. THE SUBMENU OPENS: tools-shell state $30, thief mode w7e6168 == 3,
@@ -39,7 +39,7 @@
 --   6. BESTOW MOVES A PIP BETWEEN ACTORS: ally +1, Locke charged through
 --      the pending byte (regen skipped) -- never free.
 --   7. THE CAPS AND NO-REGEN RULE: Filch at 5 still chips, banks nothing;
---      Bestow to a capped ally is an honest no-op costing Locke nothing.
+--      Bestow to a capped ally is a genuine no-op costing Locke nothing.
 local H = dofile("tools/tests/lib/ot6.lua")
 local STATE = "build/states/figaro_cleared.mss.lua"
 
@@ -369,9 +369,9 @@ H.run({ maxFrames = 120000 }, {
   -- item turns, INTERLEAVED -- a deferred ally who waits her turn out for
   -- another 30k frames dies to the desert chip damage (measured: the
   -- serial version timed out on her bank), while item turns self-heal.
-  -- Then a FOURTH Locke turn must bank nothing (the cap, witnessed);
+  -- Then a FOURTH Locke turn must bank nothing (the cap, asserted);
   -- Filch at cap chips but banks nothing; and a Bestow to the capped
-  -- ally is an honest no-op.
+  -- ally is a genuine no-op.
   H.call(function() modeOf[locke] = "item"; modeOf[ally] = "item" end),
   driveTo(function() return bp(locke) == 5 and bp(ally) == 5 end, 60000,
     "interleaved item turns walk both banks to the cap"),
@@ -430,7 +430,7 @@ H.run({ maxFrames = 120000 }, {
       bp(locke), H.vars.bC, bp(ally)))
     H.assertEq(bp(ally), 5, "a Bestow to a capped ally leaves her at the cap")
     H.assertEq(bp(locke), H.vars.bC,
-      "...and is an honest no-op that costs Locke nothing")
+      "...and is a no-op that costs Locke nothing")
     H.log("PASSED phase 5: the caps and the no-regen rule are Runic's, unchanged")
     H.screenshot("thief_done")
   end),

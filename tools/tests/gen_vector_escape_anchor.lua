@@ -1,10 +1,10 @@
--- gen_vector_escape_anchor.lua -- mint battery anchor E, `vector-escape-v1`
--- (the A-F save-point boundary band is lettered in
--- tools/tests/frontier_graph.py): boot n128_won (the nearest minted
--- predecessor, which gen_n128 parks ON the escape map's save point, map
--- 240 {58,7}, the sparkle $06AE revealed), re-arm the save-enable flow if
--- the savestate did not carry it, and save through the game's OWN Save UI
--- into slot 3.  run.sh captures the 32 KiB battery on shutdown.
+-- gen_vector_escape_anchor.lua -- generate SRAM checkpoint E,
+-- `vector-escape-v1` (the A-F save-point boundary range is lettered in
+-- tools/tests/frontier_graph.py): boot n128_won (the nearest generated
+-- predecessor, which gen_n128 parks ON the escape map's save point, map 240
+-- {58,7}, the sparkle $06AE revealed), re-arm the save-enable flow if the
+-- savestate did not carry it, and save through the game's OWN Save UI into
+-- slot 3.  run.sh captures the 32 KiB battery on shutdown.
 --
 -- See gen_mrf_save_room_anchor.lua for the traps this file's shape
 -- inherits: the save-tile control flicker (arrival/idle judged without
@@ -32,7 +32,7 @@ H.run({ maxFrames = 20000 }, {
     H.assertEq(H.fieldY(), 7, "boot y")
     H.assertEq(sw(0x06AE), 1, "$06AE SET -- the sparkle is revealed")
   end),
-  -- The savestate was minted standing on the tile with $01BF/$01B5 set; if
+  -- The savestate was generated standing on the tile with $01BF/$01B5 set; if
   -- a load ever comes up without them, step off and back on to re-fire the
   -- SavePoint script rather than saving through a stale flag.
   H.cond(function() return sw(0x01BF) == 1 end, {}, {
@@ -62,7 +62,8 @@ H.run({ maxFrames = 20000 }, {
     H.screenshot("anchor_e_save_tile")
   end),
 
-  -- Open the ordinary field menu ($0059 blip-proofed; see anchor B's gen).
+  -- Open the ordinary field menu ($0059 blip-proofed; see checkpoint B's
+  -- gen).
   (function() local calm, ph = 0, 0
     return H.driveUntil(function()
       calm = (H.readByte(0x59) ~= 0) and calm + 1 or 0
@@ -81,7 +82,7 @@ H.run({ maxFrames = 20000 }, {
   H.call(function()
     H.assertEq((H.readByte(0x0201) & 0x80) ~= 0, true,
       "menu-flags $0201 bit7 SET -- the save-enable flow reached the menu")
-    -- ARM THE HONEST SAVE RECEIPT (issue #75): a read-only exec hook on
+    -- ARM THE input-driven save receipt (issue #75): a read-only exec hook on
     -- the real CopyGameDataToSRAM entry captures the slot argument the
     -- save runs with (codex_saveas's instrument).  This replaces the old
     -- zeroed-$307ff0 sentinel -- an SRAM write -- as the proof that the
@@ -129,12 +130,12 @@ H.run({ maxFrames = 20000 }, {
     H.assertEq(saveArg, 3, "CopyGameDataToSRAM ran for persistent slot 3")
     -- the codex witness cells are READ, never seeded (issue #75): the
     -- battery carries whatever the chain actually earned.  The phase-2
-    -- anchor re-cuts measure these and the entry contracts follow the
+    -- checkpoint re-cuts measure these and the entry contracts follow the
     -- measurement (never the reverse).
     H.log(string.format("codex witness cells (earned): elem=%02X class=%02X",
       emu.read(0x316810 + ULTROS2, emu.memType.snesMemory),
       emu.read(0x316990 + ULTROS2, emu.memType.snesMemory)))
-    H.log("real Save UI wrote the vector-escape anchor to slot 3")
+    H.log("real Save UI wrote the vector-escape checkpoint to slot 3")
   end),
 
   (function() local calm = 0

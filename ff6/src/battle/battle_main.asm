@@ -14843,7 +14843,7 @@ InitSkills:
         ; and even RandRage's confused-rager pick.
         ;
         ; 2026-07-28 ruling: an all-zero loadout (AUTO -- the state every
-        ; existing save and every tracked anchor is in) no longer hands back to
+        ; existing save and every tracked checkpoint is in) no longer hands back to
         ; the vanilla walk.  AUTO is the FIRST EIGHT known rages, so the
         ; 200-entry wall is not reachable through inaction.  Ot6RageList
         ; therefore always returns carry set and the walk below is unreachable

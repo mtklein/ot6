@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
-"""frontier_ninja.py -- emit the frontier graph (tools/tests/frontier_graph.py)
-as build/build.ninja.
+"""frontier_ninja.py -- emit the savestate graph
+(tools/tests/frontier_graph.py) as build/build.ninja.
 
 Replaces the Makefile's mint/mint_anchor/stackseed macros, the FRONTIER
 lists, the ~104 hand-written rules, and the frontier_deps.sh grep-include
@@ -9,17 +9,17 @@ four failure modes the old shape kept producing, and the mechanism here that
 kills each one:
 
  * "content stamp beside a touch": make decides staleness by mtime, so the
-   content gate (frontier_stamp.sh needsmint) had to `touch` the target to
+   content check (frontier_stamp.sh needsmint) had to `touch` the target to
    stop make re-deciding -- two mechanisms that could disagree, and did
    (2026-07-27: a resumed run printed "rom content changed" then booted an
    old-ROM savestate against the new ROM).  Here the DECISION and the
-   EXECUTION are one mechanism: every mint declares its real inputs, and the
-   only "is the content the same?" question is answered by `restat` latch
-   edges (below), inside ninja's own scheduler.
+   EXECUTION are one mechanism: every generated state declares its real
+   inputs, and the only "is the content the same?" question is answered by
+   `restat` latch edges (below), inside ninja's own scheduler.
  * "make never reconsiders": a target with no newer prerequisite is skipped
    without its recipe running, so frontier_deps.sh existed only to graft
    generator/lib prerequisites back on.  Ninja edges list every input
-   directly, emitted from the same data entry that defines the leg -- there
+   directly, emitted from the same data entry that defines the step -- there
    is no second list to rot.
  * "silent .PHONY no-op": GNU make does not apply implicit pattern rules to
    .PHONY targets, so `smoke-%: rom` matched nothing and reported success in
@@ -30,33 +30,34 @@ kills each one:
    graph is now ONE data list; this script is mechanical.
 
 The content-staleness idiom (`restat`): git checkouts and rebuilds bump
-mtimes without changing bytes, and a savestate mint costs minutes to hours,
-so mtime alone must never schedule one.  Every SOURCE input to a mint -- the
-ROM, the generator .lua, the three composed-in lib halves, anchor manifests
-and payloads -- is therefore routed through a latch edge:
+mtimes without changing bytes, and generating a savestate costs minutes to
+hours, so mtime alone must never schedule one.  Every SOURCE input to a
+generated state -- the ROM, the generator .lua, the three composed-in lib
+halves, anchor manifests and payloads -- is therefore routed through a latch
+edge:
 
     build build/ninja/src/<path>: latch <path>      (cmp -s || cp; restat=1)
 
 The latch re-runs on any mtime bump (cheap: one cmp), rewrites its output
 ONLY when bytes differ, and `restat = 1` tells ninja to re-stat the output
 and prune everything downstream when it did not move.  A touched-but-equal
-file re-mints nothing; a changed ROM re-runs every transitive dependent,
-because the mints' staleness IS their position in this graph.  Minted
-states themselves are not latched: a re-minted .mss is genuinely new bytes
+file regenerates nothing; a changed ROM re-runs every transitive dependent,
+because a state's staleness IS its position in this graph.  Generated
+states themselves are not latched: a regenerated .mss is genuinely new bytes
 and everything booted from it must replay.
 
-What deliberately does NOT participate in staleness (same as the stamp gate
+What deliberately does NOT participate in staleness (same as the stamp check
 this replaces): the harness itself (run.sh, compose.py, decode_b64.py,
 pin_test_saves.py, sram_anchor.py) and ff6-en.dbg.  A harness edit has never
-invalidated a minted state; widening that would re-mint the world on every
-tooling tweak.
+invalidated a generated state; widening that would regenerate the world on
+every tooling tweak.
 
-frontier_stamp.sh survives with a narrower job: each mint edge still
-`write`s build/states/<state>.stamp after success, because lib/compose.py
-re-derives that signature at embed time to catch a fixture that reached a
-test WITHOUT passing any mint gate (a worktree-seeded state a local edit has
-since drifted).  The stamp is provenance for that consume-time check -- it
-no longer schedules anything.
+frontier_stamp.sh survives with a narrower job: each state-generating edge
+still `write`s build/states/<state>.stamp after success, because
+lib/compose.py re-derives that signature at embed time to catch a fixture
+that reached a test WITHOUT passing any freshness check (a worktree-seeded
+state a local edit has since drifted).  The stamp is provenance for that
+consume-time check -- it no longer schedules anything.
 
 Usage:
     python3 tools/tests/lib/frontier_ninja.py             # (re)write build/build.ninja
@@ -66,9 +67,10 @@ Usage:
 The write is compare-and-conditionally-write, so an unchanged graph leaves
 build/build.ninja's mtime alone; build.ninja also regenerates itself via a
 `generator = 1` edge when this script or the graph data changes, so bare
-`ninja -f build/build.ninja` stays honest without the make wrapper.
+`ninja -f build/build.ninja` stays correct without the make wrapper.
 Emitted paths are RELATIVE to the repo root: run ninja from the root (the
-make wrappers do), or a mint's run.sh invocation will not resolve.
+make wrappers do), or a state-generating edge's run.sh invocation will not
+resolve.
 """
 
 import argparse
@@ -87,7 +89,7 @@ ROM = "build/ot6.sfc"
 LATCH_DIR = "build/ninja/src"
 # The three lib halves compose.py inlines into EVERY composed generator, in
 # inline order.  ot6_contract.lua is the invariant-contract half: an edit to
-# a contract must re-run every leg that asserts it (issue #25), which the old
+# a contract must re-run every step that asserts it (issue #25), which the old
 # stamp signature never covered.
 LIB_HALVES = (
     "tools/tests/lib/ot6.lua",
@@ -102,7 +104,7 @@ FIELDS = {"state", "gen", "prev", "anchor", "seed", "stack", "after"}
 
 def anchor_inputs(root, key):
     """manifest first, then sorted payloads -- the exact order the Makefile's
-    anchor_inputs always hashed, so no anchored mint signature changes."""
+    anchor_inputs always hashed, so no anchored state's signature changes."""
     adir = f"tools/tests/anchors/{key}"
     payloads = sorted(p.name for p in (root / adir).glob("*.sram"))
     return [f"{adir}/manifest.json"] + [f"{adir}/{p}" for p in payloads]
@@ -150,7 +152,7 @@ def validate(states, root):
             err(e, f"after {after!r} is not an earlier state")
         if anchor:
             # Dirs named negative-* are deliberately-wrong fixtures for
-            # `make anchor-negatives`; no mint may ever name one.
+            # `make anchor-negatives`; no generated state may ever name one.
             if anchor.startswith("negative"):
                 err(e, f"anchor {anchor!r} is a negative fixture")
             elif not (root / "tools/tests/anchors" / anchor /
@@ -216,7 +218,7 @@ def emit(states, root):
     w("")
     w("# A stacked chain's boot is a finished chain's ending: a pure copy of")
     w("# both halves AND the stamp.  No generator, no emulator.  The stamp")
-    w("# copy is honest by construction: the seed's bytes ARE the source's")
+    w("# copy is correct by construction: the seed's bytes ARE the source's")
     w("# bytes, so the source's stamp -- its sig, its artifact hash, its")
     w("# ancestor -- vouches for the copy verbatim, and the copied stamp is")
     w("# what lets a stacked mint bind ITS ancestor line to a real file (#75).")
@@ -263,7 +265,7 @@ def emit(states, root):
         order = ""
         # The provenance ancestor (issue #75): what frontier_stamp.sh write
         # hashes into the stamp's `ancestor` line.  Exactly one of prev= /
-        # anchor= can be set (validate() enforces it); a mint with neither
+        # anchor= can be set (validate() enforces it); a state with neither
         # is a power-on root and records no ancestor.
         ancestor = "-"
         if e.get("prev"):
@@ -421,9 +423,9 @@ def selftest():
               "build/states/b.stamp" in text)
         check("seed copies the stamp with the state (#75)",
               "cp build/states/$src.stamp build/states/$state.stamp" in text)
-        # provenance ancestors (#75): what each edge tells the stamp gate to
-        # hash into its `ancestor` line.
-        check("mint rule threads $ancestor to the stamp gate",
+        # provenance ancestors (#75): what each edge tells frontier_stamp.sh
+        # to hash into its `ancestor` line.
+        check("mint rule threads $ancestor to frontier_stamp.sh",
               "frontier_stamp.sh write $state $gen $ancestor" in text)
         check("root mint records no ancestor", "ancestor = -" in text)
         check("chained mint binds its predecessor's stamp",

@@ -1,7 +1,7 @@
 -- probe_cranes_wedge.lua -- READ-ONLY instrument (issue #75, phase-2
 -- wall): what does the post-Cranes map-6 event actually WAIT for?
 --
--- gen_terra_returned_anchor's first honest run (9c4SgDmR) fought the
+-- gen_terra_returned_anchor's first input-driven run (9c4SgDmR) fought the
 -- Cranes for ~11000 frames, ended the battle with the party alive, and
 -- then wedged on map 6 (15,7) -- ev=true / ctl=false / dlg=false -- for
 -- 30000+ frames under advanceStory's tap-A patience.  This probe rides
@@ -42,7 +42,7 @@
 --   * the Cranes' AI scripts (AIScript::_269/_270) contain NO end_battle
 --     -- the fight ends by KILL or WIPE only, plus a 60s repeating
 --     Magnitude8 timer and charge counters fed by absorbed elements;
---   * every honest configuration tried WIPES: tactical/heal45 at ~f8400
+--   * every input-driven configuration tried WIPES: tactical/heal45 at ~f8400
 --     (timeline B, plain fights: wiped with both Cranes at FULL hp);
 --     tactical/heal45+bank1 wiped ~f6800-8400 across trajectories after
 --     chipping at best 1800->1095/sh5 on Crane0; the terra6 gen run
@@ -67,18 +67,18 @@
 -- The fight's designed counter is unobtainable by the party that must
 -- fight it; the owner's playtest stopped at Ifrit/Shiva, so no human has
 -- crossed this in OT6.  Whether that is intended difficulty or a tuning
--- gap is an owner call; the July anchor only ever passed because the
--- kill-bit ended the fight in 3 frames.
+-- gap is an owner call; the July checkpoint only ever passed because the
+-- battle-clear write ended the fight in 3 frames.
 --
 -- HARNESS NOTE: several earlier "Mesen crashes" during these runs were
--- run.sh's 600s wall-clock cap (OT6_TIMEOUT raises it); the reap message
+-- run.sh's 600s wall-clock cap (OT6_TIMEOUT raises it); the timeout message
 -- says so explicitly when it happens.
 
 local H = dofile("tools/tests/lib/ot6.lua")
 
 -- TIMELINE KNOB for the divergence experiment: "A" = the tactical fighter
 -- (heals at 45, the wedging timeline); "B" = plain Fights, no items, no
--- boost -- maximum honest contrast in fight shape/duration, same route.
+-- boost -- maximum real contrast in fight shape/duration, same route.
 -- Edit here between runs; the evPC transition trace below is the diff.
 local TIMELINE = "B"
 
@@ -143,9 +143,9 @@ H.run({ maxFrames = 200000 }, {
     dump("boot")
   end),
 
-  -- the same route the anchor gen drives: to (54,40), held LEFT onto the
+  -- the same route the checkpoint gen drives: to (54,40), held LEFT onto the
   -- reunion trigger, then the ride
-  H.navTo(54, 40, { honest = "flee", maxFrames = 25000 }),
+  H.navTo(54, 40, { playBattles = "flee", maxFrames = 25000 }),
   (function() local ph = 0
     return H.driveUntil(function() return map() == 6 end, 9000, {
       H.call(function()

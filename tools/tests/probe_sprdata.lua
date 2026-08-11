@@ -1,5 +1,5 @@
 -- probe_sprdata.lua -- who writes w7e80db (monster sprite data / obj palette
--- number) during the doorstep guard fight, and what the formation actually
+-- number) during the entry-point guard fight, and what the formation actually
 -- looks like.  #48 scratch probe, not a suite test.
 local H = dofile("tools/tests/lib/ot6.lua")
 local STATE = "build/states/battle_doorstep.mss.lua"

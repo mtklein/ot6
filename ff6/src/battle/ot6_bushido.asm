@@ -1,7 +1,7 @@
 ; ------------------------------------------------------------------------------
 ; CYAN -- THE BUSHIDO LADDER, BATTLE SIDE
 ;
-; boost -> tech, the ceiling it is measured against, the spent-divine top-rung
+; boost -> tech, the ceiling it is measured against, the spent-divine top-tier
 ; swap, and Ot6BushidoTier, the one entry the battle actually calls. Reads the
 ; packed loadout word documented below; the FIELD side that writes that word is
 ; ot6_loadout.asm, and the submenu that displays the ladder is ot6_cmdmenu.asm.
@@ -38,18 +38,18 @@
 ; 2x, 3x -- and his no-pip turn is Fight, as it should be.
 ;
 ; The STORED FORMAT DID NOT MOVE.  The word is still two bytes at $1e1d with
-; four 3-bit fields, because every tracked battery anchor was minted against
+; four 3-bit fields, because every tracked checkpoint in the batch was generated against
 ; persistent_layout ot6-codex-o8-v1 and a schema change invalidates all of
 ; them.  What changed is that SLOT 0 IS NEVER READ: rows map i -> boost i+1 ->
 ; word slot i+1, and slot 0 is left as whatever Ot6LoadoutSeedWord's mirror
 ; wrote (see there).  Old saves keep decoding: a MANUAL word's slots 1..3 mean
 ; exactly what they meant before, and word 0 is still AUTO.
 ;
-; AUTO re-derived for three rungs: the window is the TOP THREE learned techs,
+; AUTO re-derived for three tiers: the window is the TOP THREE learned techs,
 ; base = max(0, ceiling-2), tech = min(base + boost-1, ceiling).  At the full
 ; kit (ceiling 7) that is {5,6,7} at 1x/2x/3x -- the same three techs the old
-; four-rung window put at boosts 1/2/3, so the tuned top of the ladder (and
-; Oblivion on 3x) is unchanged; only the free rung is gone.
+; four-tier window put at boosts 1/2/3, so the tuned top of the ladder (and
+; Oblivion on 3x) is unchanged; only the free tier is gone.
 ;
 ; word == 0  -> AUTO (the moving window).  This is ALSO the sentinel: an all-zero
 ;   word decodes to "all four slots = tech 0", a degenerate config no player sets
@@ -84,7 +84,7 @@
 ; and the window slides up one, retiring the weakest. no table -- pure
 ; arithmetic.  boost 0 no longer names a tech (#38's 1-BP floor); it is clamped
 ; to 1 rather than allowed to underflow the window, so any caller that reaches
-; here with a cleared pending byte gets the cheapest rung instead of garbage.
+; here with a cleared pending byte gets the cheapest tier instead of garbage.
 ; a8/i16.  in: A = boost (0..3).  out: A = tech (0..ceiling).  clobbers X.
 .proc Ot6BushidoTech
         .a8
@@ -122,7 +122,7 @@
         pha                     ; park ceiling ($01,s ; boost now $02,s)
         sec
         sbc     #$02            ; ceiling - 2   (A still = ceiling) -- #38: the
-        bcs     :+              ;   window is three rungs wide, not four
+        bcs     :+              ;   window is three tiers wide, not four
         lda     #$00            ; ceiling < 2: base floors at 0 (the window is all
 :       ;                       ;   of {0..ceiling}, fewer than three techs)
         clc
@@ -141,15 +141,15 @@
         rtl
 .endproc
 
-; [ Bushido Oblivion top-rung swap ]
-; the window's top rung IS Oblivion (tech 7) once Cyan has learned all eight:
+; [ Bushido Oblivion top-tier swap ]
+; the window's top tier IS Oblivion (tech 7) once Cyan has learned all eight:
 ; ceiling 7, boost 3 -> base 4 + 3 = 7, by the same base+boost sum as any other
-; rung -- the divine falls out of the window for free, no special case bolted
+; tier -- the divine falls out of the window for free, no special case bolted
 ; outside it. it fires exactly as before: SELECTED here only when learned and
 ; unspent, gated at RESOLUTION by Ot6Oblivion (hooked after ChooseTarget in
 ; CalcAttackEffect -- the target does not exist at command-latch time, swdtech
 ; being in RetargetCmdTbl). read the once-per-battle latch here and drop a spent
-; Oblivion back to Tempest (6) so BP3 keeps a live top rung. (a divine is spent
+; Oblivion back to Tempest (6) so BP3 keeps a live top tier. (a divine is spent
 ; only on a broken, killable target; an unbroken/boss target folds to tempest at
 ; RESOLUTION and leaves the latch clear, so the menu keeps offering it.)
 ; a8/i16.  in: A = tech (0..7).  out: A = tech (a spent tech-7 -> 6).  clobbers X.
@@ -188,7 +188,7 @@
         bcc     :+
         lda     #$03            ; (defensive: Ot6Boost already caps at 3)
 :       jsl     Ot6BushidoTech      ; boost -> tech (shared window math)
-        jsl     Ot6BushidoOblivion  ; spent-divine top rung -> tempest
+        jsl     Ot6BushidoOblivion  ; spent-divine top tier -> tempest
         pha
         asl5                    ; level * 32 — the counter value vanilla's
         sta     $7b82           ;   bar drew, so w7e7b82 still feeds the

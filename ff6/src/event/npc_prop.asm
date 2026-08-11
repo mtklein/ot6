@@ -12486,7 +12486,7 @@ NPCProp::_273:
         ; OT6 (#10): the pre-024 save sparkle.  APPENDED, never inserted:
         ; event scripts address NPCs as {map, index in this block}, so a
         ; record added ahead of NUMBER_024 renumbers it and the post-battle
-        ; cleanup clears the sparkle instead -- the n024_won mint caught
+        ; cleanup clears the sparkle instead -- generating n024_won caught
         ; exactly that on 2026-07-27.
         make_npc {26, 53}, $0632
                 set_npc_no_react

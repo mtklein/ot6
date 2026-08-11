@@ -1,4 +1,4 @@
-# Break band — Vector / Magitek Research Facility (survey + authored rows)
+# Break coverage — Vector / Magitek Research Facility (survey + authored rows)
 
 Everything below is decoded from the vendored data under `ff6/`. Where a claim
 is an inference rather than something read out of the source, it is labelled.
@@ -22,20 +22,20 @@ the generated floor on a miss:
   `OT6_FLOOR_CLASS[species]` (the generated floor) plus `2 + level/8` capped
   at 6.
 
-The table itself lives at `ff6/src/battle/ot6_hud.asm:1273`. So **authoring a
-band means adding `Ot6ShieldTbl` rows; it needs no generator change at all.**
+The table itself lives at `ff6/src/battle/ot6_hud.asm:1273`. So **authoring an
+area means adding `Ot6ShieldTbl` rows; it needs no generator change at all.**
 The separate generator work is in §10.
 
 One coupling worth restating (documented at `ot6_hud.asm:1380-1392`): an
 `Ot6ShieldTbl` row also exempts its species from `Ot6HpScale`
-(`ot6_break.asm:466-476`). That is inert today — every band of `Ot6HpMulTbl`
+(`ot6_break.asm:466-476`). That is inert today — every entry of `Ot6HpMulTbl`
 ships `$10` = 1× (`ot6_break.asm:568-575`) — but it is why overworld species
 that need only a weakness go on `Ot6ElemAddTbl` instead. Class weaknesses have
 nowhere else to live, so the rows below take that trade knowingly.
 
 ---
 
-## 1. The band, decoded from the tables
+## 1. The area, decoded from the tables
 
 Decode chain:
 
@@ -56,7 +56,7 @@ into `SubBattleRateTbl` = `$0070, $0040, $0160, $0200`
 
 ### 1.1 The route and the encounter-bearing maps
 
-Map graph and leg order are the Vector route's own recon
+Map graph and segment order are the Vector route's own recon
 (`vector-route-recon.md`); the encounter columns are decoded here.
 
 ```
@@ -86,7 +86,7 @@ for the escape.
 | 274 `$112` | — | n | 106 | — | esper tube room; same |
 | 275 `$113` | BASEMENT 3 | Y | 106 | — | **unreachable** |
 
-**Map 275 is unreachable and is excluded from the band.** No short or long
+**Map 275 is unreachable and is excluded from the area.** No short or long
 entrance record anywhere in the game targets it, and `load_map 275` appears
 nowhere in `ff6/src/`. It carries group 106 and the battle-enable bit but
 cannot be visited. The random-encounter map set is **seven maps**.
@@ -112,7 +112,7 @@ offset lands 0):
 `SubBattleGroup = 0` — group 0 is the Narshe overworld pool (Leafer `$017`,
 Dark Wind `$028`, level 5). They read as cutscene rooms, so the player probably
 never takes a danger-checked step on them, but that is an inference. **If they
-do roll, the band draws level-5 trash.** Worth one runtime check; not authored
+do roll, the area draws level-5 trash.** Worth one runtime check; not authored
 for here, because Leafer belongs to the deferred v0.5 pool.
 
 ---
@@ -208,7 +208,7 @@ event disassembly).
 **Neither Mag Roader appears in any random battle group anywhere in the game** —
 `$006` lives only in formations `$06f`/`$075`/`$196` and `$0af` only in
 `$075`/`$197`, none of which any `RandBattleGroup` slot points at. Authoring
-rows for them touches this band and nothing else.
+rows for them touches this area and nothing else.
 
 ### The bosses
 
@@ -224,7 +224,7 @@ rows for them touches this band and nothing else.
 | Crane | `$10e` | 24 | 2300 | bolt\|water / — / fire | 6 · pierce (`:1557`) |
 | Guardian | `$111`/`$112` | 71/67 | 50000/60000 | — | 0 · `$00`, gauge-less |
 
-**Every boss row in the band is authored and reachable by the party that
+**Every boss row in the area is authored and reachable by the party that
 fights it** (§6.3). The elements on Number 128 are `Ot6ElemAddTbl` rows rather
 than vanilla bits: `bosses-wob.md` §15 specifies **bolt + water on the body
 and bolt on both blades**, and vanilla gives all three no weakness at all
@@ -253,7 +253,7 @@ neither added bit, so nothing is fed.
 **A body-reading gift from vanilla.** Exactly **6 of 384** species in the game
 have a `Program NN` special-attack name (`src/text/monster_special_name_en.json`),
 and they are exactly Garm, Commando, ProtoArmor, Pipsqueak, Trapper and
-Chaser — this band's six machines. Vanilla's own data splits the pool into
+Chaser — this area's six machines. Vanilla's own data splits the pool into
 *six things running programs* and *four things that are alive* (an ooze, an
 officer, a maw, a beast). That split is the spine of §8, and it is the rule the
 player can guess before probing: **the machines do not care about your sword.**
@@ -265,7 +265,7 @@ player can guess before probing: **the machines do not care about your sword.**
 | Mag Roader | `$006` | 19 | 420 | **fire** | **ice** | Wheel |
 | Mag Roader | `$0af` | 18 | 250 | **ice** | — | Rush |
 
-These two carry the best elemental puzzle in the band, and it is vanilla's own:
+These two carry the best elemental puzzle in the area, and it is vanilla's own:
 
 - **Their elements are opposed and one is a trap.** `$006` is weak to fire and
   **absorbs ice**; `$0af` is weak to ice. Formation `$075` puts them in the
@@ -309,7 +309,7 @@ HadesGigas sits at 2 and the break lands penultimate).
 | Chaser `$0a0` | PIERCE | inferred, keyword `chaser` (`:57`) |
 | Flan `$047` | BLUDGEON | inferred, keyword `flan` (`:78`) |
 
-Raw species count for the band: **7 SLASH, 4 PIERCE, 1 BLUDGEON**, of which
+Raw species count for the area: **7 SLASH, 4 PIERCE, 1 BLUDGEON**, of which
 **6 are defaulted** and 6 keyword-inferred. Zero are explicitly authored.
 
 ### The global picture
@@ -380,21 +380,21 @@ species defaulted to slash.**
   encounters**, because both species there landed on slash — one by outright
   default (Gobbler) and one by a keyword that fired on the wrong body
   (Rhinox / `rhino`).
-- Those two are **the only random-pool species in the band with no vanilla
+- Those two are **the only random-pool species in the area with no vanilla
   elemental weakness at all**, so the class row is not one option among
   several: it is their entire break axis. Getting it wrong there costs the
   whole mechanic in that room.
 - **Rhinox absorbs bolt** (`monster_prop.dat` +23 = `$04`) — the element the
-  rest of the band teaches. This is Mt. Kolts' Brawler-absorbs-poison case
-  (`ot6_hud.asm:1348-1360`) one band later, on a bigger body.
+  rest of the area teaches. This is Mt. Kolts' Brawler-absorbs-poison case
+  (`ot6_hud.asm:1348-1360`) one area later, on a bigger body.
 - **The minecart is the purest form of the problem** (§3.2): a genuinely good
   vanilla puzzle whose two keys are both slashing swords, sitting on two
   species that both defaulted to slash.
-- ¤ is at 0 %, and §6 explains why it should stay there for this band.
+- ¤ is at 0 %, and §6 explains why it should stay there for this area.
 
 ---
 
-## 6. The party that walks this band
+## 6. The party that walks this area
 
 ### 6.1 Composition
 
@@ -407,7 +407,7 @@ species defaulted to slash.**
 | Left & Right Cranes | **three** — the same set; Setzer is flying the getaway | `bosses-wob.md` §16 |
 
 Terra is available but **not active** until the tail of the beat
-(`wob-route.md`), so no fight in this band may assume her, and Setzer is flying
+(`wob-route.md`), so no fight in this area may assume her, and Setzer is flying
 the airship through the escape, so no fight may assume him either.
 
 The exact roster is runtime state, and `bosses-wob.md` §15 says plainly it is
@@ -443,13 +443,13 @@ Full Moon, Boomerang). Vector's own weapon shop (27) and Albrook's (25) stock
 none — but that only matters to a party that brought neither Sabin nor Gau and
 wants bludgeon anyway.
 
-**Bludgeon is therefore the band's one deliberate class, and it is properly
+**Bludgeon is therefore the area's one deliberate class, and it is properly
 reachable**: free for the cost of a party pick, or buyable for the cost of a
 weapon slot. That is exactly the shape `weapon-classes.md`'s coverage table
 already promises this stretch — *"Magitek factory: all — armored spread:
 bludgeon/pierce featured."*
 
-**¤ has no place in this band.** Setzer is its only wielder and he is not in
+**¤ has no place in this area.** Setzer is its only wielder and he is not in
 the fights that close it, so a ¤ row would be a composition lock on the one
 character the climax excludes. `weapon-classes.md`'s same table earmarks
 Opera → Vector for "the first ¤-weak enemies"; on this beat's roster that
@@ -490,14 +490,14 @@ Three facts set the shape.
 3. **Vanilla already labelled six of the ten bodies as machines** (§3.1), so
    the rule the player guesses before probing writes itself.
 
-So: **bludgeon carries the band, pierce is the second key on the imperial line,
+So: **bludgeon carries the area, pierce is the second key on the imperial line,
 slash comes off the machines entirely, and ¤ sits this beat out.**
 
-Slash does not disappear — **three of the band's six set-pieces are already
+Slash does not disappear — **three of the area's six set-pieces are already
 slash rows**: Shiva 6·slash, RightBlade and Left Blade 3·slash each, and
 Number 024 slash|pierce. Cyan's Quadra Slam (four hits, and multi-hit actions
 chip per hit — `weapon-classes.md`, "Weapons as chip carriers") and Celes'
-sword have real work in this band. What they lose is the guarantee that holding A chips every random
+sword have real work in this area. What they lose is the guarantee that holding A chips every random
 encounter.
 
 The measurable target is not an even four-way split. It is: *every encounter
@@ -508,7 +508,7 @@ automatic answer on the common bodies*.
 
 ---
 
-## 8. The band's `Ot6ShieldTbl` rows
+## 8. The area's `Ot6ShieldTbl` rows
 
 Format matches the existing table (`ot6_hud.asm:1273`): `.word` species,
 `.byte` shields, `.byte` class mask.
@@ -517,25 +517,25 @@ Format matches the existing table (`ot6_hud.asm:1273`): `.word` species,
 
 | species | id | shields | class mask | rationale |
 |---|---|---|---|---|
-| Garm | `$0cb` | 2 | `OT6_PIERCE\|OT6_BLUDG` | A magitek quadruped (`Program 95`), not a hound: pierce the joints or cave the housing. The commonest body at the entrance, where the band teaches its rule, so it teaches both halves of it. |
+| Garm | `$0cb` | 2 | `OT6_PIERCE\|OT6_BLUDG` | A magitek quadruped (`Program 95`), not a hound: pierce the joints or cave the housing. The commonest body at the entrance, where the area teaches its rule, so it teaches both halves of it. |
 | Commando | `$0c7` | 2 | `OT6_PIERCE` | Imperial rank keeps the imperial answer — templar `$0002` and officer `$0175` are both pierce (`ot6_hud.asm:1433-1487`). Consistency, not novelty. |
 | ProtoArmor | `$165` | 2 | `OT6_BLUDG` | A sealed suit has no seam to put a point in; you dent it. Retires pierce so the armored *machine* and the armored *man* stop having the same answer. Vanilla bolt stays as the ranged key. |
-| Pipsqueak | `$041` | 2 | `OT6_PIERCE` | The swarm body, up to ×5 and 22 % of all bodies in the band. Pierce so Edgar's AutoCrossbow — whole enemy side, chipping per hit — is the designed answer to a five-stack. |
+| Pipsqueak | `$041` | 2 | `OT6_PIERCE` | The swarm body, up to ×5 and 22 % of all bodies in the area. Pierce so Edgar's AutoCrossbow — whole enemy side, chipping per hit — is the designed answer to a five-stack. |
 | Flan | `$047` | 2 | `OT6_BLUDG` | Keep the generator's read (`gen_break_floor.py:78`): you cannot cut an ooze. Its element is fire, which the Flame Sabre two maps upstream and Ifrit's magicite both supply — and this pool is the floor Ifrit & Shiva are fought on, so the player will be standing in it. |
 | General | `$066` | 2 | `OT6_PIERCE\|OT6_BLUDG` | An officer in plate. Vanilla poison already answers him **if** Edgar was picked; the class row is what makes him breakable when he wasn't. |
 | Trapper | `$02d` | 2 | `OT6_BLUDG` | A fixed trap mechanism (`Program 18`) — you smash a device, you do not stab it. Comes ×3, and vanilla bolt\|water backs it up. |
-| Chaser | `$0a0` | 2 | `OT6_PIERCE\|OT6_BLUDG` | 1202 HP, the widest break window in the band, on the escape map where no shop trip is possible mid-sequence. Two keys so whatever three walked out of the tube room, they hold one. |
-| Gobbler | `$088` | 2 | `OT6_SLASH\|OT6_PIERCE` | No vanilla weakness at all, so this row is its only key. The one soft body in a dungeon of machines: cut it or stick it. Deliberately the band's slash target, placed in the deepest pool so the blade has work in the room where the machines have stopped caring about it. |
-| Rhinox | `$075` | 2 | `OT6_BLUDG` | **The flagship.** No weakness of any kind *and* it absorbs bolt, so the answer the rest of the facility teaches would heal it. Armoured bulk with no seam → bludgeon, and bludgeon alone: this is the one body in the band that asks the player to have brought a blunt instrument, and it is the reason to bring Sabin. |
+| Chaser | `$0a0` | 2 | `OT6_PIERCE\|OT6_BLUDG` | 1202 HP, the widest break window in the area, on the escape map where no shop trip is possible mid-sequence. Two keys so whatever three walked out of the tube room, they hold one. |
+| Gobbler | `$088` | 2 | `OT6_SLASH\|OT6_PIERCE` | No vanilla weakness at all, so this row is its only key. The one soft body in a dungeon of machines: cut it or stick it. Deliberately the area's slash target, placed in the deepest pool so the blade has work in the room where the machines have stopped caring about it. |
+| Rhinox | `$075` | 2 | `OT6_BLUDG` | **The flagship.** No weakness of any kind *and* it absorbs bolt, so the answer the rest of the facility teaches would heal it. Armoured bulk with no seam → bludgeon, and bludgeon alone: this is the one body in the area that asks the player to have brought a blunt instrument, and it is the reason to bring Sabin. |
 | Mag Roader | `$006` | 2 | `OT6_BLUDG` | A thing on wheels: you smash the wheel. Its vanilla fire weakness (Ifrit's magicite, or the Flame Sabre) stays the reward for reading the fight, and the ice trap stays a trap. |
-| Mag Roader | `$0af` | 2 | `OT6_BLUDG` | Same creature, same class — the *element* is what distinguishes the pair, and flattening that onto the class axis would waste the best puzzle in the band. Shiva's magicite answers this one; Ifrit's answers its sibling. |
+| Mag Roader | `$0af` | 2 | `OT6_BLUDG` | Same creature, same class — the *element* is what distinguishes the pair, and flattening that onto the class axis would waste the best puzzle in the area. Shiva's magicite answers this one; Ifrit's answers its sibling. |
 
 ### 8.2 Shield counts
 
 All twelve sit at **2**, against a formula value of 4: the formula's count
 lands the break on a corpse (`ot6_hud.asm:1489-1510`).
 
-**Unmeasured.** Validating them wants a Vector doorstep fixture and a
+**Unmeasured.** Validating them wants a Vector entry-point fixture and a
 `bal_party.lua` `boost3` run with `BAL_BUFF_SHIELDS` over 1/2/3 against groups
 80, 104, 105 and 106 with a four-character party, and against group 108 and
 the minecart formations with three. The three-character arm matters on its
@@ -587,13 +587,13 @@ Per-formation reading — the table to argue with:
 
 ## 9. Reachability, and what the party cannot break
 
-The generated floor leaves nothing in the band unbreakable — the safety net
+The generated floor leaves nothing in the area unbreakable — the safety net
 works — but its failure is quality, not coverage: without the rows, the answer
 to 100 % of encounters in the deepest third of the facility is "hold A with a
 sword", and the dungeon hands you four swords.
 
 With the rows, **every encounter is chippable by some buildable party**, and
-the honest costs are:
+the real costs are:
 
 - **33.04 % of draws are bludgeon-only on the class axis**, plus all five
   minecart fights. Every one of them except the Rhinox pair keeps a reachable
@@ -604,7 +604,7 @@ the honest costs are:
 - **8.93 % of draws — formation `$168`, Rhinox ×2, 31.25 % of the draws on the
   two deepest maps — can be chipped by nothing but a blunt instrument.** Rhinox
   has no vanilla weakness and absorbs bolt, so no element substitutes. This is
-  the band's one hard demand, and it is deliberate: it is what makes bringing
+  the area's one hard demand, and it is deliberate: it is what makes bringing
   Sabin, or buying a Flail before you go, a decision with a consequence. Sabin's
   Blitz costs nothing to bring and hits it; so do Gau's fists; so does a Full
   Moon on Locke.
@@ -625,7 +625,7 @@ free, and Locke and Celes can buy it in four towns before the walk.
 scans *before* `@formula` (`ot6_break.asm:24-38`). Authored rows win by
 construction; the generator needs no change to accommodate them.
 
-**Not able, in general**, and this band supplies two proofs. Name-substring
+**Not able, in general**, and this area supplies two proofs. Name-substring
 classification cannot express per-species intent wherever two species share a
 name, and **15 names in the game cover 42 species**:
 
@@ -644,11 +644,11 @@ keying has to move from name to species id.
 
 ### 10.2 Three generator/tooling changes this survey argues for
 
-1. **Three-way review output — explicit / inferred / defaulted.** This band
+1. **Three-way review output — explicit / inferred / defaulted.** This area
    shows why two categories are not enough. `break_floor_review.txt` triages
    only DEFAULT rows as "the
    taste-review surface" (`gen_break_floor.py:202-203`). Rhinox — no weakness at
-   all, absorbs the band's key element, 68.75 % of the deep pool — is **not on
+   all, absorbs the area's key element, 68.75 % of the deep pool — is **not on
    that list**, because `rhino` matched. Inferred rows need review too.
 2. **Mark authored species as AUTHORED and exclude them from the headline
    counts.** 62 of the 384 rows the review counts never reach `@formula`; the
@@ -670,7 +670,7 @@ keying has to move from name to species id.
 Inventory is ids at `$1869 + i` and counts at `$1969 + i` (the helper at
 `gen_kolts.lua:588-593`). Equipped weapon is `$161f + char*37`.
 
-**At the Vector doorstep**, before the on-foot world walk into town:
+**At the Vector entry point**, before the on-foot world walk into town:
 
 - Assert a bludgeon key exists: Sabin or Gau in the active party (their fists
   and Blitz need nothing), **or** `invCount(0x44) + invCount(0x46) ≥ 1`
@@ -683,7 +683,7 @@ Inventory is ids at `$1869 + i` and counts at `$1969 + i` (the helper at
 - Assert the active party is four with Locke and Celes among them, so the
   fixture cannot drift off `bosses-wob.md` §13's roster.
 
-**At the Ifrit & Shiva doorstep** (map 264, which is also the Flan pool):
+**At the Ifrit & Shiva entry point** (map 264, which is also the Flan pool):
 assert Flame Sabre `$0d` is carried or equipped. It is Shiva's element key and
 Flan's, and it is a chest two maps back.
 
@@ -693,7 +693,7 @@ the party is three, and assert **Ifrit and Shiva magicite are owned** — they
 are the five Mag Roader fights' elemental answers and the facility awards both
 upstream.
 
-**At the Crane doorstep** (map 240, one step from (52,39)/(52,40)/(52,41)):
+**At the Crane entry point** (map 240, one step from (52,39)/(52,40)/(52,41)):
 assert the party is the three that boarded, since `bosses-wob.md` §16's roster
 is the thing most likely to drift.
 
@@ -701,9 +701,9 @@ is the thing most likely to drift.
 
 ## 11. Open items
 
-`tools/tests/battle_breakvector.lua` is the regression gate on the rows: it
+`tools/tests/battle_breakvector.lua` is the regression test on the rows: it
 walks `SubBattleGroup → RandBattleGroup → BattleMonsters` out of the shipped
-ROM, asserts every band body is authored rather than floored, enumerates the
+ROM, asserts every body in the area is authored rather than floored, enumerates the
 six free four-parties and asserts every formation is answerable by one, pins
 formation `$168` (Rhinox ×2) as bludgeon-only *and* element-less, and
 recomputes the key shares to assert bludgeon outranks slash.
@@ -711,20 +711,21 @@ recomputes the key shares to assert bludgeon outranks slash.
 Each of these is a separate piece of work:
 
 - **The shield counts in §8.2 are UNMEASURED** — a precedent-following 2
-  against a formula 4. They need their own sweep with a Vector doorstep
+  against a formula 4. They need their own sweep with a Vector entry-point
   fixture and a separate three-character arm (§8.2, §10.3). This is the single
-  largest unvalidated assumption in the band.
-- **The §10.3 fixture assertions are not written**, because no Vector doorstep
-  / minecart-boarding / Crane-doorstep fixture is minted yet. The Rhinox row's
+  largest unvalidated assumption in the area.
+- **The §10.3 fixture assertions are not written**, because no Vector
+  entry-point / minecart-boarding / Crane entry-point fixture has been
+  generated yet. The Rhinox row's
   "a bludgeon key is in the party or the bag" assertion lives there.
 - **The §10.2 generator/tooling items are untouched**: three-way
   explicit/inferred/defaulted review output, marking authored species and
   excluding them from the headline counts, and the generalised
   encounter/party reachability check. `battle_breakvector.lua` implements the
-  third of those for *this band only*; generalising it is the remaining work.
+  third of those for *this area only*; generalising it is the remaining work.
 - Whether maps 265 / 267 / 268 actually roll their group-0 encounters (§1.1)
   wants one runtime check.
 - The generated floor remains the documented provisional safety net for every
-  band **except this one**. Retro-authoring Narshe → Blackjack is deferred.
+  area **except this one**. Retro-authoring Narshe → Blackjack is deferred.
 - **No human playtesting.** The distribution is measured; whether it *feels*
   right is not.

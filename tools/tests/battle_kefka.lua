@@ -1,8 +1,8 @@
 -- @suite frontier=kefka_doorstep
--- battle_kefka.lua -- FRONTIER-GATED gate for v0.3's stop-line boss: the
+-- battle_kefka.lua -- the generated-savestate test for v0.3's stop-line boss: the
 -- Battle for Narshe's KEFKA, fought for REAL from kefka_doorstep.mss
 -- (party 1 = TERRA+EDGAR+CELES at (19,36), KEFKA one tile below --
--- gen_narshe_battle mints it; suite.sh adds this test when the fixture
+-- gen_narshe_battle generates it; suite.sh adds this test when the fixture
 -- exists and reports `skip` when it does not, the battle_vargas pattern).
 --
 -- What it asserts, and why each line is the one that matters:
@@ -26,8 +26,8 @@
 --
 -- Issue #75 conversion.  Three write idioms are gone:
 --   * party HP := max + ATB := $1000 every frame ("keep the rotation
---     moving") -- replaced by gen_narshe_battle's honest fighter, the
---     machine that beats this exact battle to mint the fixture: one
+--     moving") -- replaced by gen_narshe_battle's input-driven fighter, the
+--     machine that beats this exact battle to generate the fixture: one
 --     button per 30-frame pulse once the menu flag holds, a per-turn
 --     sequence built live from the actor's id and banked BP (boost to
 --     2-3 and dump; EDGAR's AutoCrossbow at tier 2+; CELES's Runic at
@@ -36,16 +36,16 @@
 --   * KEFKA MHP := 1 after two chips ("the vargas clamp idiom") -- the
 --     fight now runs on real damage until his own script ends it.
 --   * losses are handled the way the generator handles them: the
---     doorstep is captured ONCE at boot (a savestate blob in memory,
+--     entry point is captured ONCE at boot (a savestate blob in memory,
 --     zero writes) and a lost attempt reloads it and escalates the
---     policy tier, three attempts total -- the same ladder that minted
+--     policy tier, three attempts total -- the same ladder that generated
 --     the fixture, so a fixture this test can boot is a fixture this
 --     ladder can beat.
 --
 -- FIXTURE VINTAGE NOTE (2026-08-10): kefka_doorstep.mss is the July 30
--- mint -- stamp-fresh against current sources, but minted before the
--- chain's own honesty conversion caught up to this rung.  The honest
--- re-mint replaces the bytes, not this test.
+-- generation -- stamp-fresh against current sources, but generated before
+-- the chain's own input-driven conversion caught up to this tier.  The
+-- input-driven regeneration replaces the bytes, not this test.
 local H = dofile("tools/tests/lib/ot6.lua")
 local DOOR = "build/states/kefka_doorstep.mss.lua"
 
@@ -187,7 +187,7 @@ local function attempt(n)
   return H.cond(function() return not won end, {
     H.cond(function() return n > 1 end, {
       H.logStep(function()
-        return string.format("[kefka] ATTEMPT %d -- reloading the doorstep " ..
+        return string.format("[kefka] ATTEMPT %d -- reloading the entry point " ..
           "after a loss (%s)", n, tostring(lostWhy))
       end),
       H.call(function() ldReq = H.requestLoadState(doorBlob) end),
@@ -257,7 +257,7 @@ local function attempt(n)
       if lostWhy == nil then
         won = true
         H.vars.chippedTwice = F.chippedTwice
-        H.log(string.format("[kefka] attempt %d WON battle 57 honestly at f%d",
+        H.log(string.format("[kefka] attempt %d WON battle 57 at f%d",
           n, H.frame))
       end
     end),
@@ -270,10 +270,10 @@ H.run({ maxFrames = 300000 }, {
   H.call(function()
     H.assertEq(H.mapId() & 0x1ff, 22, "booted on map 22")
     H.assertEq(H.fieldX() == 19 and H.fieldY() == 36, true,
-      "at (19,36), KEFKA's doorstep")
+      "at (19,36), KEFKA's entry point")
     H.assertEq(H.readByte(0x1a6d), 1, "party 1 (TERRA+EDGAR+CELES) active")
   end),
-  -- capture the doorstep ONCE: the retry ladder's rewind point (this
+  -- capture the entry point ONCE: the retry ladder's rewind point (this
   -- boot's own state; nothing is written to the game)
   (function()
     local req
@@ -281,7 +281,7 @@ H.run({ maxFrames = 300000 }, {
       H.call(function() req = H.requestSaveState() end),
       H.waitFrames(2),
       H.call(function()
-        H.checkReq(req, "doorstep capture")
+        H.checkReq(req, "entry-point capture")
         doorBlob = req.blob
       end),
     }, {})
@@ -294,7 +294,7 @@ H.run({ maxFrames = 300000 }, {
   -- the win verdict: chips actually happened, and the WIN branch ran
   H.call(function()
     H.assertEq(won, true,
-      "KEFKA beaten honestly within 3 attempts (real damage, real menus)")
+      "KEFKA beaten within 3 attempts (real damage, real menus)")
     H.assertEq(H.vars.chippedTwice, true,
       "two real class chips landed and revealed before the fight ended")
     local atSave = H.fieldX() == 25 and H.fieldY() == 5

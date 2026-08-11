@@ -1,7 +1,7 @@
--- gen_n024_doorstep.lua -- v0.6 leg 9: magicite_ifrit_shiva (map 264
+-- gen_n024_doorstep.lua -- v0.6 step 9: magicite_ifrit_shiva (map 264
 -- {9,7}) -> {9,5} -> map 269 {44,53} -> {42,12} -> map 271 "MAGITEK RES.
 -- FACILITY" {31,28} -> {3,27} -> map 273 {30,60} -> parked at {25,52}
--- facing UP, one A-press below NUMBER 024.  Mints n024_doorstep.
+-- facing UP, one A-press below NUMBER 024.  Generates n024_doorstep.
 --
 -- Three ordinary short entrances, decoded from ShortEntrance
 -- ($DFBB00/$DFBF02) and agreeing with the recon's map graph:
@@ -17,17 +17,17 @@
 --     battle 72 / call _ca5ea9 / hide_obj NPC_1 / sort_obj / switch $0649=0
 -- It stands directly below the {25,50} short entrance to map 274 (the
 -- esper tube room), so it physically plugs the only way on -- the same
--- shape as Shiva on {9,6} last leg, and the same positive control: the
--- doorstep asserts {25,50} is NO-PATH now, so "the fight opened it" will
+-- shape as Shiva on {9,6} last step, and the same positive control: the
+-- entry point asserts {25,50} is NO-PATH now, so "the fight opened it" will
 -- mean something.
 --
--- ISSUE #75 (the honesty conversion): ZERO state writes.  The kill-bit
--- helper is gone; any encounter on the walk is FLED with the real L+R run
--- (honest="flee" on every navTo, the same branch in the two inline
--- drives).  No route battle has ever actually fired on maps 264/269/271/
--- 273 -- the branch exists so the day one does, it is played, not rigged.
--- This pass also deleted two helpers this file DEFINED and never called
--- (tapInto and a stub `door`) -- the same dead-toolkit pattern
+-- ISSUE #75 (the input-driven test conversion): ZERO state writes.  The
+-- battle-clear write helper is gone; any encounter on the walk is FLED with
+-- the real L+R run (playBattles="flee" on every navTo, the same branch in
+-- the two inline drives).  No route battle has ever actually fired on maps
+-- 264/269/271/ 273 -- the branch exists so the day one does, it is played,
+-- not rigged.  This pass also deleted two helpers this file DEFINED and
+-- never called (tapInto and a stub `door`) -- the same dead-toolkit pattern
 -- gen_tunnelarmr's conversion cleaned out of its own file.
 local H = dofile("tools/tests/lib/ot6.lua")
 
@@ -115,7 +115,7 @@ H.run({ maxFrames = 90000 }, {
   end),
 
   -- 264 {9,5} -> 269 {44,53}
-  H.navTo(9, 5, { maxFrames = 9000, honest = "flee", arrive = function() return map() == 269 end }),
+  H.navTo(9, 5, { maxFrames = 9000, playBattles = "flee", arrive = function() return map() == 269 end }),
   H.waitUntil(function() return map() == 269 and settled() end, 6000,
     "map 269 control", 5),
   H.waitFrames(60),
@@ -127,7 +127,7 @@ H.run({ maxFrames = 90000 }, {
   end),
 
   -- 269 {42,12} -> 271 {31,28}
-  H.navTo(42, 12, { maxFrames = 25000, honest = "flee", arrive = function() return map() == 271 end }),
+  H.navTo(42, 12, { maxFrames = 25000, playBattles = "flee", arrive = function() return map() == 271 end }),
   H.waitUntil(function() return map() == 271 and settled() end, 6000,
     "map 271 control", 5),
   H.waitFrames(60),
@@ -142,7 +142,7 @@ H.run({ maxFrames = 90000 }, {
   end),
 
   -- 271 {3,27} -> 273 {30,60}
-  H.navTo(3, 27, { maxFrames = 25000, honest = "flee", arrive = function() return map() == 273 end }),
+  H.navTo(3, 27, { maxFrames = 25000, playBattles = "flee", arrive = function() return map() == 273 end }),
   H.waitUntil(function() return map() == 273 and settled() end, 6000,
     "map 273 control", 5),
   H.waitFrames(60),
@@ -152,21 +152,21 @@ H.run({ maxFrames = 90000 }, {
     H.assertEq(H.fieldY(), 60, "273 landing y")
     H.assertEq(sw(0x0649), 1, "$0649 SET -- NUMBER 024 is on {25,51}")
     census("273", {
-      { 25, 52, "the 024 doorstep" },
+      { 25, 52, "the 024 entry point" },
       { 25, 50, "the door to map 274 (esper tubes)" },
     })
   end),
 
-  -- THE BOUNDARY DETOUR (issue #25).  This leg is B->C's terminal, so
-  -- before parking on the 024 doorstep it stands on the NEW #10 save point
+  -- THE BOUNDARY DETOUR (issue #25).  This step is B->C's terminal, so
+  -- before parking on the 024 entry point it stands on the NEW #10 save point
   -- at {26,53} and asserts the n024-doorstep-save-v1 boundary table -- the
   -- same table gen_n024_save_anchor saves under and gen_esper_tubes'
-  -- anchored boot asserts as its ENTRY contract.  The sram witnesses are
+  -- checkpoint boot asserts as its ENTRY contract.  The sram witnesses are
   -- products of the boundary save, so the pre-save variant is asserted
   -- (lib/ot6_contract.lua).  Standing on a save tile re-enters SavePoint
   -- every frame and hasControl() flickers, so arrival is judged on
   -- position + $01BF + alignment.  The approach never faces 024 with A.
-  H.navTo(26, 52, { maxFrames = 9000, honest = "flee" }),
+  H.navTo(26, 52, { maxFrames = 9000, playBattles = "flee" }),
   (function() local calm = 0
     return H.driveUntil(function()
       calm = (H.fieldX() == 26 and H.fieldY() == 53 and sw(0x01BF) == 1
@@ -198,7 +198,7 @@ H.run({ maxFrames = 90000 }, {
   end),
 
   -- park at {25,52}, facing UP into NUMBER 024 on {25,51}
-  H.navTo(25, 52, { maxFrames = 15000, honest = "flee" }),
+  H.navTo(25, 52, { maxFrames = 15000, playBattles = "flee" }),
   H.hold({ "up" }), H.waitFrames(8), H.release(), H.waitFrames(20),
   (function() local calm = 0
     return H.driveUntil(function()
@@ -216,11 +216,11 @@ H.run({ maxFrames = 90000 }, {
 
   H.call(function()
     H.assertEq(map(), 273, "on map 273")
-    H.assertEq(H.fieldX(), 25, "024 doorstep x")
-    H.assertEq(H.fieldY(), 52, "024 doorstep y")
+    H.assertEq(H.fieldX(), 25, "024 entry point x")
+    H.assertEq(H.fieldY(), 52, "024 entry point y")
     H.assertEq(H.readByte(0x087f + H.readWord(0x0803)), 0,
       "facing UP toward NUMBER 024 (EVENT_DIR 0)")
-    H.assertEq(settled(), true, "the doorstep is QUIET")
+    H.assertEq(settled(), true, "the entry point is QUIET")
     H.assertEq(sw(0x0649), 1, "$0649 SET -- 024 has not been fought")
     H.assertEq(H.bfsPath(25, 50), nil,
       "CONTROL: the esper-tube door (25,50) is NO-PATH -- 024 plugs {25,51}")
@@ -232,7 +232,8 @@ H.run({ maxFrames = 90000 }, {
   end),
   H.saveState("n024_doorstep.mss"),
 
-  -- VERIFY the doorstep is one A-press from battle 72, after the mint.
+  -- VERIFY the entry point is one A-press from battle 72, after the state
+  -- is generated.
   (function() local aPh = 0
     return H.driveUntil(function()
       return H.battleLoadStarted() and H.formationHas({ [0x010a] = true })
@@ -250,7 +251,7 @@ H.run({ maxFrames = 90000 }, {
     H.screenshot("n024_doorstep_verify")
   end),
   H.logStep(function()
-    return string.format("n024_doorstep minted at frame %d -- map 273 (25,52) "
+    return string.format("n024_doorstep generated at frame %d -- map 273 (25,52) "
       .. "facing NUMBER 024, one A-press from battle 72", H.frame)
   end),
 })

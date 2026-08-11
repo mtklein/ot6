@@ -1,7 +1,8 @@
--- gen_opera1_doorstep.lua -- v0.5 Beat A leg 1: zozo_done (map 221 Zozo
+-- gen_opera1_doorstep.lua -- v0.5 Beat A step 1: zozo_done (map 221 Zozo
 -- street {57,45}) -> the world -> JIDOOR (map 198) -> its north door {16,12}
 -- -> map 209 (the opera-plot room) -> parked at {117,20} facing UP, one
--- A-press below the IMPRESARIO ({117,19}, _ca9337).  Mints opera_doorstep.mss.
+-- A-press below the IMPRESARIO ({117,19}, _ca9337).  Generates
+-- opera_doorstep.mss.
 --
 -- WHY HERE, NOT THE OPERA-HOUSE FOYER (the survey's guess).  Measured: the
 -- opera house is map 237 (world {45,154}, "far to the south" of Jidoor), and
@@ -15,7 +16,7 @@
 -- sequence" is here, at the map-209 impresario -- the whole opera cutscene
 -- chain hangs off this single talk.
 --
--- ROUTE ANCHORS (source + measured, probe_opera_route/jidoor_door):
+-- ROUTE checkpoints (source + measured, probe_opera_route/jidoor_door):
 --  * Zozo world-exit: VERTICAL long-entrance column x=63, y=32..63 -> world
 --    {23,92}.  navTo {62,45}, step RIGHT.
 --  * world {~22,91} -> Jidoor approach {27,129}; step DOWN onto {27,130}
@@ -24,15 +25,16 @@
 --    wall flanked by $F7, triggered by walking UP into it from {16,13} (the
 --    reachable approach, 51 steps from the entrance).  Landing map 209 {118,28}.
 --  * map 209: the IMPRESARIO stands at {117,19} (faces LEFT).  navTo {117,20},
---    face UP.  The doorstep VERIFIES (after the mint) that one A-press fires
---    _ca9337 -- so the banked state can never be a dead one A-press short.
+--    face UP.  The entry point VERIFIES (after the state is generated) that
+--    one A-press fires _ca9337 -- so the banked state can never be a dead
+--    one A-press short.
 --
 -- ROSTER: LOCKE+CELES+SABIN+EDGAR, #21's canonical four (the leave menu
 -- seats all four since gen_zozo5's issue-#21 fix).
 --
 -- Issue #75: no state writes.  World encounters are fled by the engine's
 -- own run mechanic (held L+R) with an edge-A fight fallback; field strays
--- are fought; walks run under the honest nav modes.
+-- are fought; walks run under the playBattles nav modes.
 local H = dofile("tools/tests/lib/ot6.lua")
 
 local function map() return H.mapId() & 0x1ff end
@@ -45,21 +47,23 @@ local function settled()
 end
 
 -- Robust world walk to (tx,ty).  worldNavTo's verified-step BLOCKLIST breaks
--- on the Zozo->Jidoor route: the band around (34,103) is a dense random-battle
--- zone (world tile prop bit6 $40), and every encounter snapshots+restores the
--- party to the same tile, so worldNavTo reads "the press never moved us",
--- condemns all four edges and loops forever (measured, probe_opera_world.lua).
--- This grinds through instead: re-plan a worldBfs each time the plan runs out,
--- press the next step -- no edge is ever condemned, so a battle-restored tile
--- just gets retried until a step lands.  Arrives at (tx,ty) or when the party
--- leaves the world (an entrance fired).
+-- on the Zozo->Jidoor route: the area around (34,103) is a dense
+-- random-battle zone (world tile prop bit6 $40), and every encounter
+-- snapshots+restores the party to the same tile, so worldNavTo reads "the
+-- press never moved us", condemns all four edges and loops forever
+-- (measured, probe_opera_world.lua).  This grinds through instead: re-plan
+-- a worldBfs each time the plan runs out, press the next step -- no edge is
+-- ever condemned, so a battle-restored tile just gets retried until a step
+-- lands.  Arrives at (tx,ty) or when the party leaves the world (an
+-- entrance fired).
 --
--- ENCOUNTERS ARE HANDLED HONESTLY (issue #75 -- no kill-bit): first the
--- engine's own run mechanic, a held L+R, exactly what a player does to
--- world trash; a formation that has not broken after ~20 real seconds is
--- treated as unrunnable and FOUGHT by edge-tapped A instead (A confirms
--- Fight with the default target; the same taps page the victory text).
--- Either ending reloads the world on the same tile and the grind re-plans.
+-- ENCOUNTERS ARE HANDLED WITH REAL INPUT (issue #75 -- no battle-clear
+-- write): first the engine's own run mechanic, a held L+R, exactly what a
+-- player does to world trash; a formation that has not broken after ~20
+-- real seconds is treated as unrunnable and FOUGHT by edge-tapped A instead
+-- (A confirms Fight with the default target; the same taps page the victory
+-- text).  Either ending reloads the world on the same tile and the grind
+-- re-plans.
 local function worldGrind(tx, ty, what)
   local plan, idx, ph, battN = nil, 1, 0, 0
   return H.driveUntil(function()
@@ -78,7 +82,7 @@ local function worldGrind(tx, ty, what)
             w[1], w[2], w[3], w[4], w[5], w[6]))
         end
         if battN < 1200 then
-          H.setPad({ l = true, r = true })     -- flee, honestly
+          H.setPad({ l = true, r = true })     -- flee, with real input
         else
           H.setPad(ph < 4 and { "a" } or {})   -- unrunnable: fight it
         end
@@ -109,7 +113,7 @@ H.run({ maxFrames = 250000 }, {
   end),
 
   -- 1. off the street to the world (approach {62,45}, step RIGHT onto x=63)
-  H.navTo(62, 45, { maxFrames = 12000, honest = true }),
+  H.navTo(62, 45, { maxFrames = 12000, playBattles = true }),
   (function() local hb=0
     return H.driveUntil(function() return H.worldMode() end, 4000, {
       H.call(function() hb=hb+1
@@ -141,7 +145,7 @@ H.run({ maxFrames = 250000 }, {
 
   -- 3. Jidoor -> the north door: navTo the approach {16,13}, BUMP up into
   --    the {16,12}->209 archway (a $F7 wall entrance).
-  H.navTo(16, 13, { maxFrames=24000, honest=true, arrive=function() return map()==209 end }),
+  H.navTo(16, 13, { maxFrames=24000, playBattles=true, arrive=function() return map()==209 end }),
   (function() local hb=0
     return H.driveUntil(function() return map()==209 end, 3000, {
       H.call(function() hb=hb+1
@@ -157,7 +161,7 @@ H.run({ maxFrames = 250000 }, {
   end),
 
   -- 4. up to {117,20}, directly below the IMPRESARIO ({117,19}); face UP.
-  H.navTo(117, 20, { maxFrames=12000, honest=true }),
+  H.navTo(117, 20, { maxFrames=12000, playBattles=true }),
   H.hold({ "up" }), H.waitFrames(8), H.release(), H.waitFrames(6),
   (function() local calm=0
     return H.driveUntil(function()
@@ -174,7 +178,7 @@ H.run({ maxFrames = 250000 }, {
     H.assertEq(map(), 209, "on map 209")
     H.assertEq(H.fieldX()==117 and H.fieldY()==20, true, "at (117,20)")
     H.assertEq(facing(), 0, "facing UP toward the IMPRESARIO")
-    H.assertEq(settled(), true, "doorstep is QUIET")
+    H.assertEq(settled(), true, "entry point is QUIET")
     H.assertEq(sw(0x0331), 0, "$0331 CLEAR -- the letter has not appeared yet")
     H.assertEq(sw(0x0340), 0, "$0340 CLEAR -- the opera is not open yet")
     H.log(string.format("[opera_doorstep] f%d map=%d (%d,%d) face=%d",
@@ -185,8 +189,9 @@ H.run({ maxFrames = 250000 }, {
 
   -- VERIFY the banked state is truly one A-press from the plot: tap A up and
   -- confirm _ca9337 fires (the "Maria!?" dialog, then $0331=1 as the letter
-  -- NPC spawns).  This runs AFTER the mint, so the saved blob is untouched;
-  -- it just proves the doorstep is not a dead one-press-short state.
+  -- NPC spawns).  This runs AFTER the state is generated, so the saved blob
+  -- is untouched;  it just proves the entry point is not a dead
+  -- one-press-short state.
   (function() local hb,aPh=0,0
     return H.driveUntil(function() return sw(0x0331)==1 or map()~=209 end, 12000, {
       H.call(function() hb=hb+1; aPh=(aPh+1)%8
@@ -202,6 +207,6 @@ H.run({ maxFrames = 250000 }, {
     H.screenshot("opera_doorstep_verify")
   end),
   H.logStep(function()
-    return string.format("opera_doorstep minted at frame %d -- one A-press below the map-209 IMPRESARIO", H.frame)
+    return string.format("opera_doorstep generated at frame %d -- one A-press below the map-209 IMPRESARIO", H.frame)
   end),
 })

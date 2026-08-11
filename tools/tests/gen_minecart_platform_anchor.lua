@@ -1,11 +1,11 @@
--- gen_minecart_platform_anchor.lua -- mint battery anchor D,
--- `minecart-platform-v1` (the A-F save-point boundary band is lettered in
+-- gen_minecart_platform_anchor.lua -- generate SRAM checkpoint D,
+-- `minecart-platform-v1` (the A-F save-point boundary range is lettered in
 -- tools/tests/frontier_graph.py): boot minecart_doorstep
--- (the nearest minted predecessor, map 272 {9,52} facing CID), walk the
+-- (the nearest generated predecessor, map 272 {9,52} facing CID), walk the
 -- platform to the vanilla save point at {3,55}, and save through the
 -- game's OWN Save UI into slot 3.  run.sh captures the 32 KiB battery on
 -- shutdown.  The cold-Continue half of the round trip is gen_n128's
--- anchored boot, which asserts this same table as its ENTRY contract.
+-- checkpoint boot, which asserts this same table as its ENTRY contract.
 --
 -- The tile is approached FROM THE EAST: (3,54) is a wall (measured -- the
 -- offline pocket claim in §4.2 is about map 273, not here), so the walk is
@@ -84,7 +84,7 @@ H.run({ maxFrames = 20000 }, {
   end),
 
   -- across the platform onto the save point (from the east; (3,54) is wall)
-  H.navTo(4, 55, { honest = "flee", maxFrames = 9000 }),
+  H.navTo(4, 55, { playBattles = "flee", maxFrames = 9000 }),
   tapInto("left", onSaveTile(3, 55), 9000,
     "onto the save tile 272 (3,55)", tileCalm),
   H.waitFrames(45),
@@ -119,7 +119,7 @@ H.run({ maxFrames = 20000 }, {
   H.call(function()
     H.assertEq((H.readByte(0x0201) & 0x80) ~= 0, true,
       "menu-flags $0201 bit7 SET -- the save-enable flow reached the menu")
-    -- ARM THE HONEST SAVE RECEIPT (issue #75): a read-only exec hook on
+    -- ARM THE input-driven save receipt (issue #75): a read-only exec hook on
     -- the real CopyGameDataToSRAM entry captures the slot argument the
     -- save runs with (codex_saveas's instrument).  This replaces the old
     -- zeroed-$307ff0 sentinel -- an SRAM write -- as the proof that the
@@ -167,12 +167,12 @@ H.run({ maxFrames = 20000 }, {
     H.assertEq(saveArg, 3, "CopyGameDataToSRAM ran for persistent slot 3")
     -- the codex witness cells are READ, never seeded (issue #75): the
     -- battery carries whatever the chain actually earned.  The phase-2
-    -- anchor re-cuts measure these and the entry contracts follow the
+    -- checkpoint re-cuts measure these and the entry contracts follow the
     -- measurement (never the reverse).
     H.log(string.format("codex witness cells (earned): elem=%02X class=%02X",
       emu.read(0x316810 + ULTROS2, emu.memType.snesMemory),
       emu.read(0x316990 + ULTROS2, emu.memType.snesMemory)))
-    H.log("real Save UI wrote the minecart-platform anchor to slot 3")
+    H.log("real Save UI wrote the minecart-platform checkpoint to slot 3")
   end),
 
   (function() local calm = 0

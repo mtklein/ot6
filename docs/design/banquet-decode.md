@@ -16,7 +16,7 @@ Companion to `sealed-gate-recon.md`, the v0.7 route recon this block sits in.
 | castle escort | 243 (8,18) trigger | `$013A=1`, `$062F=1`, opens the 243 (15,8) door via `mod_bg_tiles {14,8}` | `event_trigger.asm:1094` → `_cc835c`, `event_main.asm:97039-97078` |
 | 250 first entry | map-init | `$013B=1`, `$062D=0`, opens a door at {22,29} | `map_init_event.asm:269` → `_cc839e`, `:97079-97098` |
 | banquet start | 250 (54,16), face-UP+A on the dais | `$007C=1`, `set_var 0,0`, `start_timer 0,14400,_cc8a96,{FIELD_VISIBLE,BANQUET,MENU_BATTLE_VISIBLE}`, `$0634=1` (window soldiers appear), `$062E/$0630=0` | `event_trigger.asm:1123` → `_cc8490` `:97242`; gates `:97243-97247` (`$01B4`,`$01B0`,`$007C=0`); tail `:97414-97420` |
-| the 4-minute circuit | maps 243/244/250/252 | per-soldier latches `$0217-$022E`, talk counter rungs `$014F,$0200-$0216` | §2, §3 |
+| the 4-minute circuit | maps 243/244/250/252 | per-soldier latches `$0217-$022E`, talk counter slots `$014F,$0200-$0216` | §2, §3 |
 | dinner | timer-0 expiry, wherever the party stands | `stop_timer 0`, **`$013C=1`** (kills all further soldier scoring), `load_map 5` "That evening…", `$062C=1`, `load_map 251 {80,25}` | `_cc8a96` `:98045-98069` |
 | Q&A + challenge | 251 dinner table | `$0230-$0236` question bookkeeping, `$0237` challenge latch, `$01B5` table-trigger re-arm | §4 |
 | roster rewrite | Q&A tail | `$02F0-$02F9` forced (`:98934-98943`), `norm_lvl LOCKE/TERRA` (`:98944-98945`), `remove_equip CYAN/EDGAR/SABIN/SETZER` (`:98953-98956`, GAU `:98920`, MOG `:98932`), `char_party` → TERRA+LOCKE only (`:99079-99101`), **`$007D=1`** (`:99133`), control back on 251 (`:99142-99144`) |
@@ -37,7 +37,7 @@ callback collects the party from **any field map** (§5.3).
 **No early-out exists.** The only writer of `$013C=1` in the game is
 `_cc8a96` itself (`:98047`; every other grep hit is an `if_any` condition),
 and `_cc8a96` is reached only as the timer-0 callback. The 14400-frame
-timer is a hard floor on leg I→J.
+timer is a hard floor on segment I→J.
 
 ## 2. The timer machinery ($1188 family)
 
@@ -82,8 +82,8 @@ survives a battery cycle (§5.3).
 Score = event variable 0 (`$1FC2`). Zeroed at `$007C=1` (`:97419`) and
 after the rewards (`:99261`).
 
-**The talk counter is one global 24-rung ladder**, `_cc88bf`
-(`:97835-98002`): each call takes the next unclaimed rung
+**The talk counter is one global 24-slot ladder**, `_cc88bf`
+(`:97835-98002`): each call takes the next unclaimed slot
 (`$014F`, then `$0200-$0216`), `add_var 0,1`, and toasts "N people".
 Exactly 24 callers exist, each latching its own switch first, so ladder
 capacity = caller count = 24. Scoring is confined to the window by two
@@ -232,7 +232,7 @@ Always: South Figaro withdrawal `$0276=1` (`:99198`). Then
 - **≥77**: Tintinabar (`give_item`, `:99236`)
 - **≥90**: **Charm Bangle** (`:99249`)
 
-### 5.2 The circuit and the reward tier (frontier canon)
+### 5.2 The circuit and the reward tier (what the savestate chain drives)
 
 Absolute maximum = 44 (window) + 5 (challenge) + 44 (Q&A) = **93**. The
 window half is the scarce half: the dinner reliably pays its 49, and the
@@ -252,7 +252,7 @@ translate into **window** requirements:
 and `banquet-done-v1` asserts their ABSENCE rather than their presence.
 ≥90 needs 41 of the window's 44 points, i.e. essentially a perfect
 circuit; ≥77 needs only 2 more window points than the driven best and is
-the obvious target for a tuned route, but the release ratchet says canon
+the obvious target for a tuned route, but the release rule says canon
 is what has been driven. Re-open the tier when a tuned circuit clears 28.
 
 Three route constraints govern the window:
@@ -350,17 +350,17 @@ destructive: the world map **pauses** the banquet clock indefinitely
 (§1) — the dinner teleport is what un-strands the player.
 
 **Standing harness rule: any save made inside a timer window must drive
-the menu with pad input only.** The anchor-gen save idiom that
+the menu with pad input only.** The checkpoint-generating save idiom that
 force-writes `ZMENUSTATE=$13` to enter the save selector **corrupts the
 live `$1188-$119F` block** — leftover menu-state tasks scribble on it
 (bank-C3 writers at C3/E04F+E052 and RAM-stub block moves; exact task
 unidentified, ledger §8). The SRAM copy is written first (`PushTimers`
-precedes) and stays correct, which is why anchors without a live timer
+precedes) and stays correct, which is why checkpoints without a live timer
 are unaffected.
 
 **No fixture boundary belongs inside the block.** Transient switches
-(`$013C`, `$0230-$0237`, ladder rungs) plus a live timer are no place for
-an anchor.
+(`$013C`, `$0230-$0237`, ladder slots) plus a live timer are no place for
+a checkpoint.
 
 ### 5.4 Battles 26/27/30 — contents, loseability, gen asserts
 
@@ -377,27 +377,27 @@ flags). Battles are forceable with the `EventBattle` RAM recipe
 | 27 ×3 | 418 | 1× Commando `$0c7`, HP 580 | L18, absorb none, weak bolt+water (`$84`) |
 | 30 | 157 | 3× Sp Forces `$0c2`, HP 700 each | L21, absorb none, weak poison (`$08`) |
 
-Clean kill-bit wins end with `$1dd1 = $00` — b-switches $40/$44/$45 all
+Clean kills end with `$1dd1 = $00` — b-switches $40/$44/$45 all
 clear. Loseability: a wipe is NOT a game over
 (§3) — the script continues, the +5 is skipped, the +1 still lands, and
 the party walks away from the fade-in (post-loss party HP state:
 unverified, ledger). **The gen must assert, per fight:** formation words
 match (species `$102`/`$0c7`/`$0c2` at `$3F46+`), and on the win
 `$1dd1 & $31 == 0` plus the var0 +6 delta — a "win" that arrived by
-timer-expiry or wipe must fail the leg, not pass quietly with a lower
+timer-expiry or wipe must fail the segment, not pass quietly with a lower
 tier.
 
 ## 8. Unverified-claims ledger
 
 - **A window above 26 points** is undemonstrated. ≥77 needs 28 and ≥90
-  needs 41; whether a tuned route reaches either for the real leg party
-  (TERRA/LOCKE/EDGAR/SABIN at band levels) is unmeasured, and the tier
-  ruling in §5.2 reopens only when one does.
+  needs 41; whether a tuned route reaches either for the real segment
+  party (TERRA/LOCKE/EDGAR/SABIN at the levels that area expects) is
+  unmeasured, and the tier ruling in §5.2 reopens only when one does.
 - **250's interior passability / route order** between the coordinate
   clusters in §5.2 is derived from entrances + NPC coordinates only; no
   full live census. 250 is not a `mod_bg_tiles` map (its init is
   `_cc839e`, one door, latched), so offline reading should hold — but the
-  v0.6 precedent says census at mint anyway.
+  v0.6 precedent says census at savestate-generation time anyway.
 - **Post-loss party state** after a lost banquet fight (HP floor,
   status) — unread and unmeasured; the gen never loses, players can.
 - **`$44`'s full trigger set**: `BattleEnd_01` is also reachable via the

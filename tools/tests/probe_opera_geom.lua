@@ -1,7 +1,8 @@
 -- probe_opera_geom.lua -- boot opera_stage, drive the aria forks {0,1,0} to
--- control on map 236, MINT aria_postfork.mss, then dump ground truth for the
--- flower-dance nav: every field object (vis/x/y/face/movetype), and the p1/p2
--- passability grid over the pocket+stairs+balcony region x[3..18] y[6..27].
+-- control on map 236, GENERATE aria_postfork.mss, then dump ground truth
+-- for the flower-dance nav: every field object (vis/x/y/face/movetype), and
+-- the p1/p2 passability grid over the pocket+stairs+balcony region x[3..18]
+-- y[6..27].
 local H = dofile("tools/tests/lib/ot6.lua")
 local function map() return H.mapId() & 0x1ff end
 local function sw(id) return (H.readByte(0x1E80 + math.floor(id/8)) >> (id%8)) & 1 end

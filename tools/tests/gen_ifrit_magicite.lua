@@ -1,17 +1,18 @@
--- gen_ifrit_magicite.lua -- v0.6 leg 8, the leg OUT of boundary B (#25):
--- cold battery Continue from the tracked mrf-save-room-v1 anchor (the
+-- gen_ifrit_magicite.lua -- v0.6 step 8, the step OUT of boundary B (#25):
+-- cold battery Continue from the tracked mrf-save-room-v1 checkpoint (the
 -- map-270 save room, slot 3), the boundary's ENTRY CONTRACT asserted as
 -- the first real act, then down through the {3,5} door to the alcove ->
 -- battle 70 -> the four-interaction esper hand-off -> both magicite in
--- the bag.  Mints magicite_ifrit_shiva.
+-- the bag.  Generates magicite_ifrit_shiva.
 --
--- ANCHORED MINT (frontier_graph.py: anchor="mrf-save-room-v1").  The leg
--- used to boot ifrit_doorstep.mss; it now starts from power-on and lets
--- Mesen load the anchor battery run.sh materialized, so a ROM change
--- re-runs this leg from its own anchor in parallel with every other leg
--- instead of behind the whole serial trunk (docs/design/leg-fixtures.md).
--- ifrit_doorstep stays minted as A->B's terminal; the ~15-step walk from
--- the save tile to the fight is replayed here from the anchor instead.
+-- GENERATED FROM A CHECKPOINT (frontier_graph.py:
+-- anchor="mrf-save-room-v1").  The step used to boot ifrit_doorstep.mss; it
+-- now starts from power-on and lets Mesen load the checkpoint battery
+-- run.sh materialized, so a ROM change re-runs this step from its own
+-- checkpoint in parallel with every other step instead of behind the whole
+-- serial trunk (docs/design/leg-fixtures.md).  ifrit_doorstep stays
+-- generated as A->B's terminal; the ~15-step walk from the save tile to the
+-- fight is replayed here from the checkpoint instead.
 --
 -- THE HAND-OFF IS FOUR SEPARATE NPC INTERACTIONS, not one scene, and the
 -- gates interlock (event_main.asm:95260-95385):
@@ -34,32 +35,33 @@
 -- `give_genju` (EventCmd_86, field/event.asm:3238) sets bit (id-$36) of
 -- $1A69, and GENJU::RAMUH=$36 / IFRIT=$37 / SHIVA=$38 (include/const.inc
 -- :564-566), so the receipts are $1A69 bits 1 and 2 and they are what this
--- leg asserts -- not a switch that merely says a scene ran.
+-- step asserts -- not a switch that merely says a scene ran.
 --
 -- CORRECTION to the route recon's battle-70 decode, which read it as
 -- formation 439 containing "species $0109 Ifrit only", said
 -- "Shiva $0108 is NOT in the formation ... she is not in any formation in
 -- the game -- I swept all 576", and listed "does Shiva enter via the AI
--- script?" as probe 1.  Measured live at the doorstep, the formation
+-- script?" as probe 1.  Measured live at the entry point, the formation
 -- species words $57C0 read
 --
 --     0109 0108 0109 0108 FFFF FFFF
 --
 -- at battle start: **Shiva is in the formation from the first frame.**  No
--- AI-script entrance is involved.  (gen_ifrit_doorstep.lua's post-mint
+-- AI-script entrance is involved.  (gen_ifrit_doorstep.lua's post-generation
 -- verification is where that is measured; it is re-asserted below.)
 --
--- THE FIGHT IS PLAYED, NOT KILL-BITTED (issue #75).  The kill-bit helper
--- this file carried is gone (bosses-wob.md section 13: Ifrit 6 shields
--- weak ice + piercing, Shiva 6 weak fire + slashing, vanilla's tag fight):
+-- THE FIGHT IS PLAYED, NOT WRITE-CLEARED (issue #75).  The
+-- battle-clear-write helper this file carried is gone (bosses-wob.md
+-- section 13: Ifrit 6 shields weak ice + piercing, Shiva 6 weak fire +
+-- slashing, vanilla's tag fight):
 --
 --   * THE PARTY RE-EQUIPS FIRST -- H.equipOptimum through the real field
 --     Equip menu.  The Vector infiltration's `remove_equip`
 --     (event_main.asm:11979-11988) stripped everyone and returned the gear
---     TO INVENTORY, and no mint between there and here ever re-equipped,
---     so the anchor's party arrives with LOCKE and CELES bare-handed
+--     TO INVENTORY, and no generator between there and here ever re-equipped,
+--     so the checkpoint's party arrives with LOCKE and CELES bare-handed
 --     (tools/audit_equipment.py names them).  A player opens the menu
---     before a boss; so does this leg, pad input only.
+--     before a boss; so does this step, pad input only.
 --   * THE FIGHT IS THE LIBRARY FIGHTER'S -- H.newFightDriver, tactical +
 --     boost bank + real Item heals and Fenix revival.  See the block over
 --     ifritAttempt for why battle_brokendeath's Celes-Ice machine, which
@@ -73,21 +75,21 @@
 --     (recon probe 5) -- $0060/$0273 are asserted below.
 --
 -- THE RETRY LADDER (gen_tunnelarmr's): battle 70 is an event battle, so a
--- loss is GAME OVER, not a revive.  The doorstep is captured as a blob
+-- loss is GAME OVER, not a revive.  The entry point is captured as a blob
 -- beside the walk, and each attempt reloads it and waits a different
 -- number of frames before the A press -- the battle RNG seed is the frame
 -- phase at battle init (gen_whelk_poweron's measurement), so each retry
 -- genuinely plays a different fight.  Three attempts, then fail loudly.
 -- The combat CONTRACT for this fight (break observed pre-kill, the
 -- if_self_dead placement guard) stays in battle_brokendeath.lua, booted on
--- ifrit_doorstep.mss; this leg only needs a real win banked.
+-- ifrit_doorstep.mss; this step only needs a real win banked.
 --
 -- Incidental traversal battles on the walk (there have never been any on
 -- maps 270/264, but the branch exists) FLEE by the real L+R mechanic --
 -- gen_ifrit_doorstep's idiom, zero writes.
 --
 -- OT6_ANCHOR_LAYOUT: ot6-codex-o8-v1
--- ^ the persistent-SRAM layout this leg understands (issue #25).  run.sh
+-- ^ the persistent-SRAM layout this step understands (issue #25).  run.sh
 --   reads the marker line above and refuses -- BEFORE the emulator boots,
 --   naming both strings -- any OT6_SRAM_ANCHOR whose manifest.json declares
 --   a different persistent_layout.
@@ -223,7 +225,7 @@ end
 
 
 -- Hold a direction into an NPC and edge-press A until `pred` latches.
--- The direction press is safe because every NPC this leg talks to occupies
+-- The direction press is safe because every NPC this step talks to occupies
 -- the destination tile, so the step is refused and only the facing takes
 -- (the face-an-NPC idiom).  Hands off entirely while a scene owns control.
 -- A battle mid-talk (never yet seen here) is FLED with the real L+R run.
@@ -253,7 +255,7 @@ local function talkTo(dir, pred, maxFrames, what)
   }, what)
 end
 
--- --------------------------- battle 70, played honestly (issue #75) ------
+-- -------------------- battle 70, played with real input (issue #75) ------
 -- The drive is the LIBRARY's shared observed-menu fighter, H.newFightDriver
 -- -- tactical (EDGAR fires AutoCrossbow, SABIN Pummels), boost BANKED to 3
 -- and unloaded (the break economy: a boosted hit chips a shield), real Item
@@ -262,15 +264,15 @@ end
 --
 -- WHY NOT battle_brokendeath's Celes-Ice machine, which the handoff called
 -- proven: it was MEASURED here first and it LOSES on today's fixtures.
--- Run on the fresh ifrit_doorstep (2026-08-09 mint), battle_brokendeath
+-- Run on the fresh ifrit_doorstep (generated 2026-08-09), battle_brokendeath
 -- itself wipes -- party 0/0/0/0 at f6309 with Ifrit still at 3057 hp and
--- 5 of 6 shields.  Traced on this leg's anchor party, the mechanism is the
--- tag: its Ice/AutoCrossbow policy is gated on Ifrit being ON STAGE, and
--- in every run measured Ifrit took the stage for ~2400 frames, tagged out,
--- and stayed hidden for the next ~7800 while Shiva soaked the specials
+-- 5 of 6 shields.  Traced on this step's checkpoint party, the mechanism is
+-- the tag: its Ice/AutoCrossbow policy is gated on Ifrit being ON STAGE,
+-- and in every run measured Ifrit took the stage for ~2400 frames, tagged
+-- out, and stayed hidden for the next ~7800 while Shiva soaked the specials
 -- (she got broken and RE-SEEDED her shields, 0 -> 6, mid-fight).  Exactly
--- one Ice ever fired (CELES mp 106 -> 101), the party had no heal plan,
--- and it died of attrition every time.  The library fighter has the heal
+-- one Ice ever fired (CELES mp 106 -> 101), the party had no heal plan, and
+-- it died of attrition every time.  The library fighter has the heal
 -- plan; its boosted Fights chip WHOEVER is up (slashing chips Shiva --
 -- measured, sh 6 -> 3 under plain Fights -- and AutoCrossbow's pierce
 -- chips Ifrit).  The tag means the fight is long; the budget carries it.
@@ -286,7 +288,7 @@ local function mspecies(m) return H.readWord(0x57C0 + m * 2) end
 local fightBlob, fightWon = nil, false
 
 -- One attempt, flat (driveUntil bodies replay latched state, so every
--- attempt builds fresh closures).  Reloads the doorstep blob (attempt 1
+-- attempt builds fresh closures).  Reloads the entry point blob (attempt 1
 -- runs in place -- the live timeline IS the blob's timeline), offsets the
 -- RNG phase, presses A into IFRIT, plays battle 70, and decides on $0060:
 -- _cc7937's tail sets it within ~2000 frames of the teardown, while a loss
@@ -306,17 +308,17 @@ local function ifritAttempt(n)
     n > 1 and seq({
       H.call(function() loadReq = H.requestLoadState(fightBlob) end),
       H.waitFrames(2),
-      H.call(function() H.checkReq(loadReq, "doorstep reload") end),
+      H.call(function() H.checkReq(loadReq, "entry point reload") end),
       H.waitFrames(90),
       H.call(function()
         H.assertEq(map(), 264, "reloaded onto map 264")
         H.assertEq(H.fieldX() == 3 and H.fieldY() == 7, true,
-          "reloaded at the (3,7) doorstep")
+          "reloaded at the (3,7) entry point")
       end),
     }) or seq({}),
     H.waitFrames((n - 1) * 37),         -- vary the battle RNG seed
     -- A into IFRIT -> _cc7937 -> battle 70.  Confirm the formation before
-    -- fighting it: this is the fight the leg exists to pass through, and a
+    -- fighting it: this is the fight the step exists to pass through, and a
     -- win over the WRONG battle would look identical in the log without
     -- the assert.
     H.driveUntil(function() return H.battleLoadStarted() end, 6000, {
@@ -356,10 +358,10 @@ local function ifritAttempt(n)
     H.waitUntil(function() return onfield(ISLOT) == 1 end, 3600,
       "ifrit takes the stage", 10),
     H.waitFrames(90),
-    -- the honest fight: the library fighter, with gauge logging around it.
-    -- Its own menu==0 branch pages battle text, the recognition scene's
-    -- dialogs and the victory teardown, so this one drive carries the
-    -- whole battle from fly-in to field.
+    -- the input-driven fight: the library fighter, with gauge logging
+    -- around it.  Its own menu==0 branch pages battle text, the recognition
+    -- scene's dialogs and the victory teardown, so this one drive carries
+    -- the whole battle from fly-in to field.
     H.driveUntil(function() return not H.battleLoadStarted() end, 90000, {
       H.call(function()
         hb = hb + 1
@@ -415,7 +417,7 @@ local function ifritAttempt(n)
       H.setPad({})
       if sw(0x0060) == 1 then
         fightWon = true
-        H.log(string.format("battle 70 WON HONESTLY on attempt %d, f%d "
+        H.log(string.format("battle 70 WON on attempt %d, f%d "
           .. "(tactical + boost bank + items, the if_self_dead ending)", n, H.frame))
       else
         H.log(string.format("attempt %d LOST (no $0060 after teardown), f%d",
@@ -427,8 +429,8 @@ end
 
 H.run({ maxFrames = 300000 }, {
   -- COLD BATTERY BOOT (issue #25): title -> Continue -> the sole valid
-  -- slot (3) -> the map-270 save room, standing on the tile the anchor was
-  -- saved on.  Repeated edge presses tolerate title timing; the entry
+  -- slot (3) -> the map-270 save room, standing on the tile the checkpoint
+  -- was saved on.  Repeated edge presses tolerate title timing; the entry
   -- contract below prevents a false landing.
   H.waitFrames(350),
   H.repeatN(5, { H.pressButtons({ "start" }, 8), H.waitFrames(25) }),
@@ -436,7 +438,7 @@ H.run({ maxFrames = 300000 }, {
   H.repeatN(3, { H.pressButtons({ "a" }, 8), H.waitFrames(40) }),
   H.waitFrames(300),
   H.repeatN(3, { H.pressButtons({ "a" }, 8), H.waitFrames(60) }),
-  -- SOFT landing wait: a wrong-boundary anchor lands somewhere else, and
+  -- SOFT landing wait: a wrong-boundary checkpoint lands somewhere else, and
   -- the failure must be the entry contract NAMING the wrong map -- never a
   -- timeout here (leg-fixtures.md, "fails loudly, naming what differed").
   H.waitUntilSoft(function()
@@ -444,70 +446,70 @@ H.run({ maxFrames = 300000 }, {
   end, 3000, "landed_at_b"),
   H.waitFrames(60),
   H.call(function()
-    -- THE ENTRY CONTRACT (issue #25): everything this leg requires of
+    -- THE ENTRY CONTRACT (issue #25): everything this step requires of
     -- boundary B -- the save tile, slot, switches, the #21 party count and
     -- roster, and the bank-$31 codex witnesses -- declared as DATA in
     -- lib/ot6_contract.lua under "mrf-save-room-v1", the same table the
-    -- leg INTO B (gen_ifrit_doorstep) and the anchor mint
+    -- step INTO B (gen_ifrit_doorstep) and the checkpoint generator
     -- (gen_mrf_save_room_anchor) assert as their EXIT contract.  A stale
-    -- or wrong anchor fails HERE by naming what differed.
+    -- or wrong checkpoint fails HERE by naming what differed.
     H.assertEntryContract("mrf-save-room-v1")
     H.log(partyReport("mrf-save-room-v1 entry"))
   end),
 
-  -- down through the save room's door and back to the fight's doorstep
+  -- down through the save room's door and back to the fight's entry point
   tapInto("down", function() return map() == 264 end, 12000,
     "save room -> door -> map 264"),
   H.waitFrames(60),
-  H.navTo(3, 7, { maxFrames = 9000, honest = "flee" }),
+  H.navTo(3, 7, { maxFrames = 9000, playBattles = "flee" }),
   H.call(function()
     H.assertEq(map(), 264, "at the Ifrit/Shiva alcove")
-    H.assertEq(H.fieldX(), 3, "Ifrit doorstep x")
-    H.assertEq(H.fieldY(), 7, "Ifrit doorstep y")
-    H.assertEq(sw(0x0060), 0, "$0060 CLEAR at the doorstep")
+    H.assertEq(H.fieldX(), 3, "Ifrit entry point x")
+    H.assertEq(H.fieldY(), 7, "Ifrit entry point y")
+    H.assertEq(sw(0x0060), 0, "$0060 CLEAR at the entry point")
     H.assertEq(H.readByte(0x1A69) & 0x06, 0,
       "neither IFRIT nor SHIVA owned yet ($1A69 bits 1-2)")
-    H.log(partyReport("ifrit doorstep (walked from anchor B)"))
+    H.log(partyReport("ifrit entry point (walked from checkpoint B)"))
   end),
 
-  -- 1. the player's prep: the anchor's party arrives with LOCKE and CELES
+  -- 1. the player's prep: the checkpoint's party arrives with LOCKE and CELES
   --    bare-handed (the Vector remove_equip, never re-equipped since) --
   --    real field Equip -> Optimum per character, a no-op for anyone armed.
   --    BEFORE the retry blob, so every attempt replays an armed party.
   H.equipOptimum({ tag = "ifrit kit" }),
-  H.navTo(3, 7, { maxFrames = 9000, honest = "flee" }),
+  H.navTo(3, 7, { maxFrames = 9000, playBattles = "flee" }),
   H.call(function()
     H.assertEq(H.fieldX() == 3 and H.fieldY() == 7, true,
-      "back at the doorstep, armed")
-    H.log(partyReport("ifrit doorstep, armed"))
+      "back at the entry point, armed")
+    H.log(partyReport("ifrit entry point, armed"))
   end),
-  -- capture the doorstep as the retry ladder's reload blob
+  -- capture the entry point as the retry ladder's reload blob
   (function()
     local req
     return seq({
       H.call(function() req = H.requestSaveState() end),
       H.waitFrames(2),
       H.call(function()
-        H.checkReq(req, "doorstep retry blob")
+        H.checkReq(req, "entry point retry blob")
         fightBlob = req.blob
         H.log(string.format("retry blob captured: %d bytes", #fightBlob))
       end),
     })
   end)(),
 
-  -- 2. battle 70, played honestly, on the phase-spread retry ladder
+  -- 2. battle 70, played with real input, on the phase-spread retry ladder
   ifritAttempt(1),
   ifritAttempt(2),
   ifritAttempt(3),
   H.call(function()
     H.assertEq(fightWon, true,
-      "battle 70 won honestly within 3 attempts (the library fighter: "
+      "battle 70 won within 3 attempts (the library fighter: "
       .. "tactical + boost bank + real items)")
   end),
   -- ride the post-battle tail out to a settled field ($0060 already
-  -- latched; honest -- no battle can occur here, and none ever has)
+  -- latched; playBattles=true -- no battle can occur here, and none ever has)
   H.advanceStory(function() return sw(0x0060) == 1 and settled() end, 12000,
-    { honest = true }),
+    { playBattles = true }),
   H.waitFrames(60),
   H.call(function()
     H.assertEq(sw(0x0060), 1, "$0060 SET -- battle 70 won (recon probe 5: the "
@@ -519,13 +521,13 @@ H.run({ maxFrames = 300000 }, {
   end),
 
   -- 3. SHIVA at {9,6}: stand at {9,7} and face UP.  $0274.
-  H.navTo(9, 7, { maxFrames = 9000, honest = "flee" }),
+  H.navTo(9, 7, { maxFrames = 9000, playBattles = "flee" }),
   talkTo("up", function() return sw(0x0274) == 1 end, 12000,
     "talk SHIVA -> $0274"),
 
   -- 4. IFRIT again at {3,8}: $0272, which (with $0274 already set) falls
   --    straight into _cc79a4, the hand-off.
-  H.navTo(3, 7, { maxFrames = 9000, honest = "flee" }),
+  H.navTo(3, 7, { maxFrames = 9000, playBattles = "flee" }),
   talkTo("down", function() return sw(0x0647) == 1 and sw(0x0648) == 1 end,
     16000, "talk IFRIT -> $0272 -> the hand-off _cc79a4"),
   H.waitFrames(60),
@@ -542,7 +544,7 @@ H.run({ maxFrames = 300000 }, {
   -- 5. the two magicite pickups
   talkTo("down", function() return (H.readByte(0x1A69) & 0x02) ~= 0 end, 12000,
     "take the IFRIT magicite -> $1A69 bit1"),
-  H.navTo(9, 7, { maxFrames = 9000, honest = "flee" }),
+  H.navTo(9, 7, { maxFrames = 9000, playBattles = "flee" }),
   talkTo("up", function() return (H.readByte(0x1A69) & 0x04) ~= 0 end, 12000,
     "take the SHIVA magicite -> $1A69 bit2"),
   H.waitFrames(60),
@@ -572,11 +574,11 @@ H.run({ maxFrames = 300000 }, {
       H.call(function() saveReq = H.requestSaveState() end),
       H.waitFrames(2),
       H.call(function()
-        H.checkReq(saveReq, "mint verify: capture")
+        H.checkReq(saveReq, "generated-state verify: capture")
         loadReq = H.requestLoadState(saveReq.blob)
       end),
       H.waitFrames(2),
-      H.call(function() H.checkReq(loadReq, "mint verify: reload") end),
+      H.call(function() H.checkReq(loadReq, "generated-state verify: reload") end),
       H.waitFrames(180),
       H.call(function()
         H.assertEq(map(), 264, "reload: still on map 264")
@@ -586,7 +588,7 @@ H.run({ maxFrames = 300000 }, {
           "reload: controllable at rest")
         H.assertEq(H.readByte(0x1A69) & 0x07, 0x07,
           "reload: RAMUH+IFRIT+SHIVA still owned")
-        H.log("mint verify: the reload stayed calm -- magicite_ifrit_shiva verified")
+        H.log("generated-state verify: the reload stayed calm -- magicite_ifrit_shiva verified")
       end),
     })
   end)(),
@@ -598,7 +600,7 @@ H.run({ maxFrames = 300000 }, {
     })
   end),
   H.logStep(function()
-    return string.format("magicite_ifrit_shiva minted at frame %d -- map 264, "
+    return string.format("magicite_ifrit_shiva generated at frame %d -- map 264, "
       .. "$1A69=%02X (RAMUH+IFRIT+SHIVA)", H.frame, H.readByte(0x1A69))
   end),
 })

@@ -126,7 +126,7 @@ make_genju_prop {QUAKE, 0}, {QUARTR, 0}, {W_WIND, 0}, {}, {}
 ;   over: it is the pre-folded CAP of the poison family (Ot6FoldTbl row 3,
 ;   ot6_boost.asm:344 -- a 26 MP dead tier beside a 3 MP fold) and poison is
 ;   Edgar's authored key (Bio Blaster, kits.md's Edgar tool table).  It is
-;   also poison into a cave band where four of five species ABSORB poison (magicite-tube-six.md §2.2) -- a 26 MP self-heal
+;   also poison into a cave section where four of five species ABSORB poison (magicite-tube-six.md §2.2) -- a 26 MP self-heal
 ;   button for the enemy.  Both spells are power-0 hit-rolled death-class:
 ;   outside BOTH boost axes (no damage to multiply, no fold row, and no
 ;   chance-verb certainty mechanism exists for magic) -- ledger item (§13.4),
@@ -190,7 +190,7 @@ make_genju_prop {RASP, 0}, {OSMOSE, 0}, {SHELL, 0}, {}, {}
 
 ; 19: carbunkl -- "the Facet" (v0.7, magicite-tube-six.md §7).  The mirror:
 ;   Rflect (nobody else grants it) + Safe (the physical wall -- Celes and
-;   Golem are both absent all band).  HASTE moved to Bismark (identity, not
+;   Golem are both absent all section).  HASTE moved to Bismark (identity, not
 ;   fifth wheel); SHELL stays Shiva's; WARP is field furniture, dropped.
 make_genju_prop {RFLECT, 0}, {SAFE, 0}, {}, {}, {}
 
@@ -209,7 +209,7 @@ make_genju_prop {SAFE, 0}, {STOP, 0}, {CURE_2, 0}, {}, {}
 
 ; 23: unicorn -- "the Purity" (v0.7, magicite-tube-six.md §9).  The paladin:
 ;   smite + cleanse.  PEARL is BRANCH A of the cross-doc holy decision, DECIDED
-;   by the dispatcher 2026-07-28 (§9 decision box): the band's pearl
+;   by the dispatcher 2026-07-28 (§9 decision box): the section's pearl
 ;   REACHABILITY stands on Sabin's AuraBolt plus the survey's authored class
 ;   rows (break-band-sealed-gate.md), never on this stone -- Unicorn grants
 ;   Pearl as the paladin identity and the big-hit option, its vanilla 40 MP

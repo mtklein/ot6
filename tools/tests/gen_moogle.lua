@@ -1,6 +1,6 @@
 -- gen_moogle.lua -- from moogle_doorstep.mss (TERRA in Magitek armor at
 -- (55,12), map 50, one south of the collapse trigger): step onto (55,11)
--- and ride the WHOLE opening set-piece chain to its far side, minting two
+-- and ride the WHOLE opening set-piece chain to its far side, generating two
 -- states on the way:
 --
 --   moogle_defense.mss  -- the three-party Moogle defense, first player-
@@ -14,8 +14,8 @@
 --   * bridge collapse choreography; TERRA falls (map 51 mosaic scene)
 --   * Kefka slave-crown flashback (map 250), then the scripted Magitek
 --     flashback fight `battle 115` (map 5, event_main.asm:102351) --
---     plain soldiers, WON honestly by tap-A (TERRA's beams one-shot them,
---     the same arithmetic as the intro gauntlet)
+--     plain soldiers, won with real input by tap-A (TERRA's beams one-shot
+--     them, the same arithmetic as the intro gauntlet)
 --   * Gestahl rally (map 244), TERRA wakes in the caves (map 51)
 --   * Arvis recruits LOCKE (map 30): dialogs, then `name_menu LOCKE`
 --     (event_main.asm:102678) -- the ONE beat advanceStory cannot tap
@@ -28,8 +28,8 @@
 --     map 51 loads with STARTUP_EVENT (its map-init _ccab6f starts the
 --     six guard marches), fade in, player_ctrl_on (:103280-103283)
 --
--- THE DEFENSE, PLAYED THE WAY IT WAS DESIGNED (issue #75, the honest
--- conversion; every number below measured by probe_moogle_geom /
+-- THE DEFENSE, PLAYED THE WAY IT WAS DESIGNED (issue #75, the input-driven
+-- test conversion; every number below measured by probe_moogle_geom /
 -- _switch / _rotation / _stations / _marshal on a fresh fixture):
 --   * guards NPC_4..NPC_9 spawn at (15,34)..(15,39) (npc_prop.asm map
 --     51) and march scripted paths (map-init _ccab6f) that converge on
@@ -54,7 +54,7 @@
 --   * the Marshal (NPC_3) stands at (15,40) facing UP, npc event
 --     _ccada8 -> `battle 6` = Marshal (420 HP) + 2 Lobos.  Plain tap-A
 --     LOSES this fight from a two-wave-worn pool (~330/543, measured
---     twice); the winning honest tactic is OT6's own boost -- R raises
+--     twice); the winning input-driven tactic is OT6's own boost -- R raises
 --     the active character's pending boost (1 bp at battle start,
 --     Ot6InitBP), A-A-A confirms the boosted Fight -- which won with
 --     MOG alone standing at 89 HP (probe_moogle_marshal).  The margin
@@ -80,8 +80,8 @@
 -- squad each march collides with, and the Marshal falls to boosted
 -- Fights; beating him IS winning battle 6, so unlike gen_arvis there is
 -- NO spare list anywhere; the fight logger below still names every
--- formation for the record.  Honest fights cost real ATB rounds, so
--- every budget in this file grew against its kill-bit ancestor.
+-- formation for the record.  input-driven fights cost real ATB rounds, so
+-- every budget in this file grew against its battle-clear-write ancestor.
 --
 -- Switch -> RAM derivations (event bitfield base $1E80, bit = switch&7):
 --   $012E -> $1EA5 mask $40      $0631 -> $1F46 mask $02
@@ -201,7 +201,7 @@ local function pokeStep(round)
   }, "battle 6 engages [attempt " .. round .. "]")
 end
 
--- the honest battle-6 driver: R raises the active character's pending
+-- the input-driven battle-6 driver: R raises the active character's pending
 -- boost (characters open with 1 bp, regen 1 per unboosted turn --
 -- Ot6InitBP/Ot6ActionEnd), then three edge-tapped A's confirm the
 -- boosted Fight and page victory text.  Once the battle module reads
@@ -252,7 +252,7 @@ end
 -- one full Marshal attempt by squad p: activate it, walk beside the
 -- Marshal, poke, fight boosted, settle.  Written flat (cond/driveUntil/
 -- navTo steps carry no reset(), so repeated bodies replay latched
--- state -- the same reason the kill-bit ancestor wrote its two poke
+-- state -- the same reason the battle-clear-write ancestor wrote its two poke
 -- rounds out flat).
 local function attempt(p, round)
   return H.cond(function() return defenseWon() end, {}, {
@@ -263,7 +263,7 @@ local function attempt(p, round)
         return defenseWon()
             or (marshalAdjacent() and H.hasControl() and H.tileAligned())
       end,
-      maxFrames = 15000, honest = true,
+      maxFrames = 15000, playBattles = true,
     }),
     pokeStep(round),
     marshalFight(30000),
@@ -274,17 +274,17 @@ end
 H.run({ maxFrames = 200000 }, {
   H.loadState(DOORSTEP),
   H.waitFrames(10),
-  H.waitUntil(function() return H.hasControl() end, 300, "doorstep control", 5),
+  H.waitUntil(function() return H.hasControl() end, 300, "entry point control", 5),
   H.call(function()
     H.assertEq(H.mapId(), 50, "boot map is the mines chase map (50)")
     H.assertEq(H.fieldX() == 55 and H.fieldY() == 12, true,
-      "at the moogle doorstep (55,12)")
+      "at the moogle entry point (55,12)")
     H.assertEq(collapseStarted(), false, "collapse switch $012E clear")
   end),
 
   -- ===================================================================== --
   -- Phase 1: the deliberate step onto (55,11).  A random encounter on the
-  -- step is FOUGHT inline by the same edge-tapped A (honest -- bal_mines'
+  -- step is FOUGHT inline by the same edge-tapped A (real input -- bal_mines'
   -- baseline policy beats this map's whole pool); the trigger fires the
   -- moment we stand on the tile, so the terminator is a sustained event.
   -- ===================================================================== --
@@ -307,7 +307,7 @@ H.run({ maxFrames = 200000 }, {
 
   -- ===================================================================== --
   -- Phase 2: everything up to the LOCKE naming menu.  advanceStory taps
-  -- dialogs, FIGHTS battle 115's soldiers (honest tap-A), and stays
+  -- dialogs, FIGHTS battle 115's soldiers (real tap-A), and stays
   -- hands-off through the choreography.  The menu detector is NOT the
   -- $0059 idiom gen_narshe_escape used: $59 is also battle-module
   -- scratch, and run 1 measured it flipping nonzero DURING battle 115 --
@@ -330,7 +330,7 @@ H.run({ maxFrames = 200000 }, {
       cnt = quiet and cnt + 1 or 0
       return cnt >= 120
     end
-  end)(), 35000, { honest = true }),
+  end)(), 35000, { playBattles = true }),
   H.logStep("naming menu open (field module suspended); committing LOCKE"),
   H.call(function() H.screenshot("moogle_naming") end),
   -- START commits the default name (name_change.asm exits on START unless
@@ -350,7 +350,7 @@ H.run({ maxFrames = 200000 }, {
   -- ===================================================================== --
   H.advanceStory(calm(30, function()
     return H.mapId() == 51 and collapseStarted()
-  end), 25000, { honest = true }),
+  end), 25000, { playBattles = true }),
   H.call(function()
     H.assertEq(H.mapId(), 51, "on the defense map (51)")
     H.assertEq(collapseStarted(), true, "defense-live switch $012E set")
@@ -379,13 +379,13 @@ H.run({ maxFrames = 200000 }, {
   -- with ~800 frames to spare (probe_moogle_stations measured f1515
   -- deployed against the f1630 first collision).
   -- ===================================================================== --
-  H.navTo(15, 15, { maxFrames = 2500, honest = true }),
+  H.navTo(15, 15, { maxFrames = 2500, playBattles = true }),
   ySwitchTo(3),
-  H.navTo(20, 20, { maxFrames = 4000, honest = true }),
+  H.navTo(20, 20, { maxFrames = 4000, playBattles = true }),
   ySwitchTo(2),
-  H.navTo(10, 21, { maxFrames = 4000, honest = true }),
+  H.navTo(10, 21, { maxFrames = 4000, playBattles = true }),
   ySwitchTo(1),
-  H.navTo(14, 14, { maxFrames = 2500, honest = true }),
+  H.navTo(14, 14, { maxFrames = 2500, playBattles = true }),
   logPools("deployed"),
 
   -- ===================================================================== --
@@ -393,11 +393,11 @@ H.run({ maxFrames = 200000 }, {
   -- squad, the collision auto-engages that squad, tap-A wins the wave
   -- (Vomammoth + Lobo), and the win path despawns the guard --
   -- $060A..$060F clear one by one, two waves per squad at ~90-190 HP
-  -- each.  advanceStory's honest mode is exactly this driver.
+  -- each.  advanceStory's playBattles mode is exactly this driver.
   -- ===================================================================== --
   H.advanceStory(function()
     return (H.readByte(0x1f41) & 0xFC) == 0
-  end, 60000, { honest = true }),
+  end, 60000, { playBattles = true }),
   H.logStep(function()
     return string.format("all six wave guards down at frame %d; corridor open",
       H.frame)
@@ -406,11 +406,11 @@ H.run({ maxFrames = 200000 }, {
   H.waitUntil(calm(30), 1800, "post-storm calm"),
 
   -- ===================================================================== --
-  -- Phase 4c: the Marshal, up to three honest attempts.  P2 first (MOG's
-  -- squad, the biggest pool -- it won at 330/543 with MOG alone standing
-  -- at 89 HP, probe_moogle_marshal), then P1, then P3 if a wipe lands:
-  -- battle 6's loss path revives the loser at 1 HP on (14,11) and the
-  -- Marshal still stands, so retrying with the next squad is the same
+  -- Phase 4c: the Marshal, up to three input-driven attempts.  P2 first
+  -- (MOG's squad, the biggest pool -- it won at 330/543 with MOG alone
+  -- standing at 89 HP, probe_moogle_marshal), then P1, then P3 if a wipe
+  -- lands:  battle 6's loss path revives the loser at 1 HP on (14,11) and
+  -- the Marshal still stands, so retrying with the next squad is the same
   -- move a human player makes.  Attempts 2 and 3 are no-ops (cond on the
   -- won-switch) when an earlier one already cleared it.
   -- ===================================================================== --
@@ -430,10 +430,10 @@ H.run({ maxFrames = 200000 }, {
   -- ===================================================================== --
   H.advanceStory(calm(60, function()
     return H.mapId() == 20 and (H.readByte(0x1eb9) & 0x10) ~= 0
-  end), 30000, { honest = true }),
+  end), 30000, { playBattles = true }),
 
   -- ===================================================================== --
-  -- Phase 6: assert the far side and mint.  Roster: char_party TERRA,1 /
+  -- Phase 6: assert the far side and generate.  Roster: char_party TERRA,1 /
   -- LOCKE,1 and every moogle-bearing slot zeroed (event_main.asm:
   -- 103810-103821); party bytes live at $1850+char (low 3 bits = party).
   -- ===================================================================== --
@@ -463,6 +463,6 @@ H.run({ maxFrames = 200000 }, {
   end),
   H.saveState("moogle_cleared.mss"),
   H.logStep(function()
-    return string.format("moogle_cleared minted at frame %d", H.frame)
+    return string.format("moogle_cleared generated at frame %d", H.frame)
   end),
 })

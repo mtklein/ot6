@@ -1,16 +1,14 @@
-# The tube-room six — magicite sub-job designs (v0.7) — design dive v1 (2026-07-28)
+# The tube-room six — magicite sub-job designs (v0.7)
 
-Scope: issue #31's headline. The six espers the v0.6 tube room grants at once —
-MADUIN, SHOAT, PHANTOM, CARBUNKL, BISMARK, UNICORN (`give_genju` block,
-`ff6/src/field/event_main.asm:95777-95782` per sealed-gate-recon.md's decode) —
-redesigned **in place**: the all-six-at-once acquisition stays (dispatcher
-ruling, magicite.md's 2026-07-28 note; redistribution would be an event edit
-plus a full re-mint buying no player-visible pacing). This is a **design
-pass**: no assembly, no data edits. Everything the build pass needs is listed
-literally in §11.
+The six espers the tube room grants at once — MADUIN, SHOAT, PHANTOM,
+CARBUNKL, BISMARK, UNICORN (`give_genju` block,
+`ff6/src/field/event_main.asm:95777-95782`) — designed **in place**: the
+all-six-at-once acquisition stays, because redistribution would be an event
+edit plus regenerating every savestate and would buy no player-visible pacing.
+§11 is the data, literally.
 
 v0.7 has no conventional boss (`wob-route.md` §1's beat table), so these
-six stones **are** the band's player-facing content. The exit criterion is
+six stones **are** the stretch's player-facing content. The exit criterion is
 M5's: six stones sharing one acquisition moment need six distinct reasons to
 swap mid-dungeon — differentiation, not a power ranking.
 
@@ -21,25 +19,22 @@ is learned, the summon is the once-per-battle divine
 stone is treated as an **identity seed** — its PASSIVE column (*Trinity*,
 *Gorgon Eye*, *Ghostwalk*, *Facet*, *Tidal*, *Purity*) is unbuildable (no
 passive channel exists in the ROM) and is re-expressed here through what IS
-buildable, or honestly dropped into §13's ledger. The seed names survive as
+buildable, or dropped outright into §13's ledger. The seed names survive as
 each stone's documentation nickname.
 
 **Evidence rule (CONTRIBUTING.md).** Every mechanical claim cites the file and
 line it was read from, or is labelled **UNVERIFIED**. Numbers taken out of
-`.dat` files name the record and byte offset. Line numbers are from the
-`wt/v07-espers` worktree on 2026-07-28.
+`.dat` files name the record and byte offset.
 
 ---
 
 ## Summary table
 
-**Stat rows superseded 2026-07-29 by #62** (`docs/design/esper-stat-ruler.md`).
-`Ot6EsperStatTbl` is no longer one selector plus an unsigned magnitude; it is two
-bytes per esper in vanilla's own equipment layout — four *signed* nibbles, −7..+7
-each — so every stone below moves two or three stats and five of the six now
-carry a **downside**. The identities in this document did not change; they are
-what the new rows were authored from. `ot6_progression.asm`'s table carries the
-per-esper reasoning.
+A stone's stat package is two bytes in vanilla's own equipment layout — four
+*signed* nibbles, −7..+7 each, over vigor/speed/stamina/mag.pwr
+(`docs/design/esper-stat-ruler.md`). Each stone below moves two or three stats
+and five of the six carry a **downside**; `ot6_progression.asm`'s table carries
+the per-esper reasoning.
 
 | esper (idx) | nickname | grants | stat vig/spd/stm/mag | divine (vanilla record, all kept) | the swap reason |
 |---|---|---|---|---|---|
@@ -48,7 +43,7 @@ per-esper reasoning.
 | Phantom (20) | **the Ghostwalk** | Vanish, Demi | **0 / +6 / −2 / +2** | **Fader** `$4a`: Clear on the party, 38 MP | the party stops being hit by physicals |
 | Carbunkl (19) | **the Facet** | Rflect, Safe | **0 / −2 / +6 / +2** | **Ruby Power** `$49`: Rflect on the party, 36 MP | the fight's spellfire turns around |
 | Bismark (7) | **the Tide** | Haste, Slow | **+5 / −2 / +3 / 0** | **Sea Song** `$3d`: WATER 58, all enemies, 50 MP | tempo both ways — and the game's only water verb |
-| Unicorn (23) | **the Purity** | **Pearl** (§9, cross-doc), Remedy | **0 / 0 / +5 / +2** | **Heal Horn** `$4d`: Remedy on the party, 30 MP | the undead band's master key, and the cleanse |
+| Unicorn (23) | **the Purity** | **Pearl** (§9), Remedy | **0 / 0 / +5 / +2** | **Heal Horn** `$4d`: Remedy on the party, 30 MP | the undead stretch's master key, and the cleanse |
 
 Six stones, six *shapes*: Maduin is a caster who cannot punch, Shoat a striker's
 speed without the strike, Phantom fast and bodiless, Carbunkl a wall that does
@@ -66,70 +61,61 @@ MagicProp splice gains **zero new overrides** this pass.
 
 ---
 
-## 1. The constraint budget — deltas since the Ifrit/Shiva pass
+## 1. The constraint budget
 
 magicite-ifrit-shiva.md §1 is the authority on what the machinery can express:
 ≤5 spell ids per stone (`ot6_progression.asm:142-181` `Ot6EsperSpellKnown`,
-`:203-252` `Ot6UnionEspers`), ~~exactly one unsigned stat mod
-`[selector:4][magnitude:4]`~~ **— superseded 2026-07-29 by #62: four *signed*
-nibbles, −7..+7 each, in vanilla's own `ItemProp+16/+17` layout —** from
-Vigor/Speed/Stamina/Mag.Pwr
-(`ot6_progression.asm`, `Ot6EsperStatMod`), the once-per-battle summon on vanilla's
-`$3f2e` latch (`battle_main.asm:12852` sets it, `:14550` greys the menu row),
-boost folding for 8 families only (`Ot6FoldTbl`, `ot6_boost.asm:340-348`), and
-the ×2/×4/×8 multiplier on non-folding damage (`Ot6BoostDmg`,
-`ot6_kits.asm:1190-1256`; summons are not exempt, `:1206-1224`). No passives,
-no permits, ~~no two-sided or multi-stat mods~~ (**both built by #62**), no learn
-rates.
+`:203-252` `Ot6UnionEspers`), a while-worn stat package of four *signed*
+nibbles, −7..+7 each, over Vigor/Speed/Stamina/Mag.Pwr in vanilla's own
+`ItemProp+16/+17` layout (`ot6_progression.asm`, `Ot6EsperStatMod`), the
+once-per-battle summon on vanilla's `$3f2e` latch (`battle_main.asm:12852` sets
+it, `:14550` greys the menu row), boost folding for 8 families only
+(`Ot6FoldTbl`, `ot6_boost.asm:340-348`), and the ×2/×4/×8 multiplier on
+non-folding damage (`Ot6BoostDmg`, `ot6_kits.asm:1190-1256`; summons are not
+exempt, `:1206-1224`). No passives, no permits, no learn rates.
 
-Two things changed since that section was written:
+Two things the design leans on:
 
-1. **The esper detail page now renders the kit honestly.** The learn-% column
-   is gone (blanked caption `skills.asm:2528-2544`, forced blank per-row
-   `:2606-2608`) and the old bonus line is now a **"While worn...&lt;Stat&gt;+N"**
-   line drawn straight from `Ot6EsperStatTbl` (`skills.asm:2624-2673`). The
-   most player-visible gap of the v0.6 pass is closed: **authoring a stat byte
-   below is automatically player-visible**, and a `$00` row draws a blank
-   line — which is exactly what all six stones show today.
-2. **MP is universal** — every character brings their save's pool into battle
-   (commit `97f6d6e`, #32). A stone on Locke or Sabin has a real pool behind
-   it; granted-spell MP prices below are judged against band pools of roughly
-   40-60.
+1. **The esper detail page renders the kit accurately.** There is no learn-%
+   column (blanked caption `skills.asm:2528-2544`, forced blank per-row
+   `:2606-2608`), and the bonus line is a **"While worn...&lt;Stat&gt;+N"**
+   block drawn straight from `Ot6EsperStatTbl` (`skills.asm:2624-2673`). So an
+   authored stat row is automatically player-visible, and a `$0000` row draws a
+   blank line.
+2. **MP is universal** — every character brings their save's pool into battle.
+   A stone on Locke or Sabin has a real pool behind it; granted-spell MP prices
+   below are judged against this stretch's pools of roughly 40-60.
 
-The six current rows are placeholders and several are actively broken, the
-same way Ifrit's and Shiva's were:
+The vanilla rows these replace are placeholders, and three of them are broken
+the same way Ifrit's and Shiva's were:
 
-- **Maduin grants three dead pre-folded tiers** — `FIRE_2, ICE_2, BOLT_2`
-  (`genju_prop.asm:128`), 20-22 MP each for what the base spells deliver at
-  4-6 MP under one boost. All three must go (the Kirin reason,
-  `genju_prop.asm:160-165`).
-- **Bismark grants Life** (`genju_prop.asm:131`), which violates kits.md's
-  written rule that revival "lives on Terra, Fenix Downs, and Sraphim, and
-  nowhere else" (kits.md, Terra section). The shipped state has revival live
-  on a stone anyone can wear; this redesign removes it.
-- **Shoat grants Bio** (`genju_prop.asm:125`) — the pre-folded **cap** of the
-  poison family (`Ot6FoldTbl` row 3, `ot6_boost.asm:344`): 26 MP for what a
-  3-MP Poison folds into at 1 BP. It is also poison into a band where four of
-  five cave species **absorb** poison (§2.2) — a 26-MP self-heal button for
-  the enemy. Dropped.
-- All six stat rows are `$00` (`ot6_progression.asm:429-448`), so all six
-  detail pages show a blank while-worn line.
+- **Vanilla Maduin grants three dead pre-folded tiers** — `FIRE_2, ICE_2,
+  BOLT_2`, 20-22 MP each for what the base spells deliver at 4-6 MP under one
+  boost. All three go (the Kirin reason).
+- **Vanilla Bismark grants Life**, which violates kits.md's written rule that
+  revival "lives on Terra, Fenix Downs, and Sraphim, and nowhere else"
+  (kits.md, Terra section) — revival on a stone anyone can wear. Dropped.
+- **Vanilla Shoat grants Bio** — the pre-folded **cap** of the poison family
+  (`Ot6FoldTbl` row 3, `ot6_boost.asm:344`): 26 MP for what a 3-MP Poison folds
+  into at 1 BP. It is also poison into a stretch where four of five cave
+  species **absorb** poison (§2.2) — a 26-MP self-heal button for the enemy.
+  Dropped.
 
 ---
 
 ## 2. Where the player is standing
 
-### 2.1 The band's three parties
+### 2.1 The stretch's three parties
 
-From sealed-gate-recon.md:
+The stretch's route puts three different parties in front of these stones:
 
-- **The cave: TERRA / LOCKE / EDGAR / SABIN** (dispatcher ruling; Terra is a
-  hard gate at the base, recon headline 3). Terra is the band's only innate
-  mage — at band levels ~15-16 she knows Fire, Cure, Drain (kits.md, Terra's
+- **The cave: TERRA / LOCKE / EDGAR / SABIN** (owner ruling; Terra is a hard
+  requirement at the base). Terra is the stretch's only innate
+  mage — at these levels ~15-16 she knows Fire, Cure, Drain (kits.md, Terra's
   table; Life is L18). Locke, Edgar, Sabin cast **only** through their stones.
-- **The banquet: TERRA + LOCKE** (`event_main.asm:99079-99086` per recon).
+- **The banquet: TERRA + LOCKE** (`event_main.asm:99079-99086`).
 - **The stop line: TERRA / LOCKE / SHADOW** at world (232,150). Shadow joins
-  in the band's final frames — his kit is a sketch (kits.md, Sketches), so a
+  in the stretch's final frames — his kit is a sketch (kits.md, Sketches), so a
   stone is most of what he can be handed.
 
 **Twelve stones, four slots.** By the cave the player owns Ramuh, Kirin,
@@ -137,7 +123,7 @@ Siren, Stray, Ifrit, Shiva plus these six. The incumbents' jobs (bolt+Rasp /
 heal / sleep-mute control / trickster / vigor+Drain / economy+Shell) are the
 competition every design below must name a win against.
 
-### 2.2 The cave is an undead band that punishes the obvious buttons
+### 2.2 The cave is an undead stretch that punishes the obvious buttons
 
 Species table from `break-band-sealed-gate.md` §3, extended this pass with the
 status-immunity bytes (`monster_prop.dat` +0x14/+0x15/+0x16 = blocked
@@ -153,12 +139,12 @@ STATUS1/2/3; element masks +0x17 absorb / +0x19 weak; STATUS1 `DEAD=$80`,
 | Zombone | `$082` | 1991 | 160 | fire, **pearl** | poison | **open** | blocked | **lands** | **lands** |
 | Coelecite | `$0b3` | 480 | 15 | ice | fire | **open** | **open** | **lands** | **lands** |
 
-Plus the band's one real ambush, the trap-switch **Ninja** `$003` (HP 1650,
+Plus the stretch's one real ambush, the trap-switch **Ninja** `$003` (HP 1650,
 weak bolt+pearl, absorbs poison; death open, petrify/slow/stop blocked), and
 the banquet slate: **Mega Armor** `$102` / **Commando** `$0c7` (both weak
 bolt+water, death open, slow/stop land) and the elite **Sp Forces** `$0c2`
 (weak poison; death, petrify, slow, stop ALL blocked — the one body in the
-band that answers only to damage).
+stretch that answers only to damage).
 
 Four findings that shape the designs:
 
@@ -169,22 +155,23 @@ Four findings that shape the designs:
    §9 makes Unicorn the deliberate second source, marked as the cross-doc
    coupling with the parallel cave-survey pass.
 2. **Fire is a trap** (absorbed by 4 of 5) and Terra is forced into the party
-   — the band inverts her signature exactly the way Zozo inverted poison.
-   Ice is the honest secondary (Apparite, Coelecite); water reaches Ing.
+   — the stretch inverts her signature exactly the way Zozo inverted poison.
+   Ice is the natural secondary (Apparite, Coelecite); water reaches Ing.
 3. **Death is open on every cave species** by the immunity byte — the undead
    cave is, on its face, Doom country. **UNVERIFIED and load-bearing for
    Shoat (§5):** whether the undead special-property flag (+0x12 bit `$80`,
    set on Apparite/Lich/Ing/Zombone) alters death-type resolution in C2
    before the immunity byte is consulted. The C2 death path was not read this
    pass; a probe test settles it (§12 row 9).
-4. **Enemy MP pools are thin** (15-160) — Osmose income in this band is
+4. **Enemy MP pools are thin** (15-160) — Osmose income in this stretch is
    scraps, so Shiva does not automatically own a slot the way she did in the
    Facility. That is good for the new six.
 
-### 2.3 The rest of the band's fights
+### 2.3 The rest of the stretch's fights
 
 The gate battles 121/122 and the deck battle 123 decode to dummy formations
-and are scripted theater (recon §3.1) — no stone is designed against them.
+and are scripted theater (`break-band-sealed-gate.md` §1.3) — no stone is
+designed against them.
 The banquet's optional fights and the 2-minute challenge are real: bolt+water
 keys (Ramuh, Maduin, Sea Song) and a poison key nobody fields with Edgar
 absent (Sp Forces resist all six stones' control — they are a damage check,
@@ -207,24 +194,18 @@ re-expressed through the three real channels (list, stat, divine):
 | Maduin *Trinity* — "first spell each battle +1 tier" | the only stone granting **all three** foldable attack elements; the biggest mag.pwr in the game |
 | Shoat *Gorgon Eye* — "Break may chip 2" | the two deletion verbs (Break/Doom) plus the petrify-all divine |
 | Phantom *Ghostwalk* — "first hit taken each battle misses" | **Fader literally is Ghostwalk for the whole party** — the divine carries the passive's soul unchanged |
-| Carbunkl *Facet* — "Runic feeds +1 more BP" | undeliverable (Celes is absent all band, §13); the stone keeps the gem's real verb: reflection, single and party-wide |
+| Carbunkl *Facet* — "Runic feeds +1 more BP" | undeliverable (Celes is absent for the whole stretch, §13); the stone keeps the gem's real verb: reflection, single and party-wide |
 | Bismark *Tidal* — "water chip +1" | no water spell exists to grant (§13); **Sea Song is the game's only water verb**, and the kit becomes the tide itself: Haste/Slow |
 | Unicorn *Purity* — "status durations halved" | cure-after-the-fact instead of shorten: Remedy in the kit, party-Remedy as the divine — plus the horn's light (Pearl, §9) |
 
-Stat ladder: **superseded 2026-07-29 by #62**, which re-cut the rungs against a
-measurement of vanilla's own equipment ladder rather than against a percentage of
-a base stat (`docs/design/esper-stat-ruler.md` §4). They are now FIELD upside +6
-across 2 stats / STORY upside +8 across 3 with a −2 / BOSS upside +10 across 3
-with a −3, and Maduin sits on the BOSS rung. The *reasoning* below — story-granted
-stones sit under fought-for ones, and Maduin is the one exception because v0.7 has
-no boss — is unchanged and is exactly why he is on the top rung. Original text:
-
-Stat ladder: the shipped tiers are FIELD 2-3 / BOSS 4-5
-(`ot6_progression.asm:386-393`). The tube six are story-granted, not fought
-for, so they sit at **3-4** — with one deliberate exception: **Maduin at 5**.
-v0.7 has no boss, Maduin is Terra's inheritance and the band's crown, and his
-stone being the strongest stat in the game so far *is* the reward the band
-pays. M6 owns the final numbers.
+Stat ladder: the tiers are FIELD (upside +6 across 2 stats, no downside), STORY
+(+8 across 3, downside −2) and BOSS (+10 across 3, downside −3), cut against a
+measurement of vanilla's own equipment ladder
+(`docs/design/esper-stat-ruler.md` §4). The tube six are story-granted, not
+fought for, so they sit on **STORY** — with one deliberate exception:
+**Maduin on BOSS**. v0.7 has no boss, Maduin is Terra's inheritance and the
+stretch's crown, and his stone being the strongest stat in the game so far *is*
+the reward the stretch pays.
 
 ---
 
@@ -235,7 +216,7 @@ pays. M6 owns the final numbers.
 | channel | value |
 |---|---|
 | Grants | **Fire**, **Ice**, **Bolt** |
-| Stat (while worn) | **vig −3 / stm +3 / mag +7** (#62; was `+5 mag.pwr`) |
+| Stat (while worn) | **vig −3 / stm +3 / mag +7** |
 | Divine | **Chaos Wing** `$3c` — non-elemental, all enemies, power 55, 44 MP, unblockable (+0x04 `$20`, hit 0). Vanilla, unchanged. |
 
 **The kit is three fold families on one stone.** Fire `$00` (4 MP), Ice `$01`
@@ -250,20 +231,22 @@ his empty fourth and fifth slots are the same statement Ifrit's were.
 elements *plus a job* (Drain / Osmose+Shell / Rasp). Maduin's offer is
 breadth: the wearer is never elementally wrong for more than one turn. In the
 cave that means ice for Apparite and Coelecite while fire stays holstered —
-the stone that grants fire teaching you not to cast it is the band's absorb
+the stone that grants fire teaching you not to cast it is the stretch's absorb
 lesson restated. At the banquet fights it means bolt into Mega Armor and
 Commando without carrying Ramuh out of the cave.
 
-**Stat.** +5 mag.pwr, one step over Shiva's +4 — the strongest stat stone in
-the game, per §3's crown argument. Base mag.pwr 25-39 (`char_prop.asm`), so
-~13-20%. The honest selector: all three spells scale off it.
+**Stat.** +7 mag.pwr, one step over Shiva's +6 — the strongest stat stone in
+the game, per §3's crown argument, and both the encoding's ceiling and
+vanilla's own per-stat ceiling. Base mag.pwr 25-39 (`char_prop.asm`). All three
+of his grants scale off it; the −3 vigor is Terra's father as a caster who
+cannot punch.
 
 **Divine.** Chaos Wing kept exactly: non-elemental, so it is never absorbed —
 the apex button that works in the fire-hostile cave and against Sp Forces,
-and the damage-check answer the band otherwise lacks. `Ot6BoostDmg` multiplies
+and the damage-check answer the stretch otherwise lacks. `Ot6BoostDmg` multiplies
 it (summons are not exempt, `ot6_kits.asm:1206-1224`), so a 3-BP Chaos Wing is
-the band's biggest number. Its 44 MP is most of a band-level pool — one cast,
-funded deliberately.
+the stretch's biggest number. Its 44 MP is most of a pool at these levels —
+one cast, funded deliberately.
 
 **Trinity, the passive, is dropped** (§13.1) — no passive channel. The
 first-cast-free-tier idea was flagged "too strong a folding interaction?" in
@@ -279,7 +262,7 @@ so what is lost is flavor, not function.
 | channel | value |
 |---|---|
 | Grants | **Break**, **Doom** |
-| Stat (while worn) | **vig −2 / spd +6 / stm +2** (#62; was `+3 speed`) |
+| Stat (while worn) | **vig −2 / spd +6 / stm +2** |
 | Divine | **Demon Eye** `$3b` — petrify, all enemies, hit 96, blockable death-class (+0x04 `$10`), 45 MP. Vanilla, unchanged. |
 
 **The executioner's two verbs.** Break `$0c` (25 MP, hit 120, sets PETRIFY)
@@ -292,11 +275,11 @@ the immunity byte allow" — and the immunity byte is exactly what makes him a
 Bio is dropped (§1); two spells is the Ramuh/Ifrit precedent, and the third
 slot is deliberately the divine.
 
-**In this band.** Petrify is blocked by 4 of 5 cave species, the Ninja, Mega
+**In this stretch.** Petrify is blocked by 4 of 5 cave species, the Ninja, Mega
 Armor and Commando — but **death is open on every one of them except Sp
 Forces**. If the undead-flag question (§2.2 finding 3) resolves "death-type
 lands", Shoat is the cave's quiet monster: 35 MP deletes a 1991-HP Zombone
-that would otherwise be the longest trash fight in the band. If it resolves
+that would otherwise be the longest trash fight in the stretch. If it resolves
 "undead shrug off death", his cave value collapses to Coelecite (petrifiable)
 and the Ninja, and his real life starts in v0.8. **The design accepts either
 outcome** — the executioner being situational is the identity — but the copy
@@ -310,10 +293,10 @@ BP-buys-certainty — Steal's shipped shape — but no such mechanism exists for
 hit-rolled magic. Shoat is the first stone whose whole kit sits outside both
 boost axes; the UI will let a player spend 3 BP on Doom for nothing.
 
-**Stat.** +3 speed. His spells scale off nothing (fixed hit rates vs target
-m.block), so the honest bonus is tempo: the executioner acts before the
-telegraph lands. Kept a step under Phantom's +4 so the two speed stones read
-as a ladder.
+**Stat.** +6 speed, −2 vigor, +2 stamina. His spells scale off nothing (fixed
+hit rates vs target m.block), so the natural bonus is tempo: the executioner
+acts before the telegraph lands. The vigor downside is the fiction — the Gorgon
+Eye is a stare, not a strike.
 
 **Divine.** Demon Eye kept: petrify-all at hit 96 — the trash-wipe apex where
 petrify is legal, a whiff everywhere §2.2 says so. 45 MP prices it as the
@@ -331,7 +314,7 @@ the same idea, not a second copy of it.
 | channel | value |
 |---|---|
 | Grants | **Vanish**, **Demi** |
-| Stat (while worn) | **spd +6 / stm −2 / mag +2** (#62; was `+4 speed`) |
+| Stat (while worn) | **spd +6 / stm −2 / mag +2** |
 | Divine | **Fader** `$4a` — Clear (INVISIBLE) on the whole party, 38 MP. Vanilla, unchanged. |
 
 **The divine IS the unbuildable passive.** magicite.md's *Ghostwalk* — "first
@@ -345,7 +328,7 @@ assassin's tool in both directions: on an ally, one guaranteed physical dodge;
 on an enemy — targeting `$01` retargets in vanilla — the setup for the oldest
 trick in the game (below). Demi `$10` (33 MP, gravity: fraction flag +0x04
 `$80`) is the ghost's other half — halve the fat body you cannot yet kill.
-Against Zombone's 1991 HP it is the band's best single action if the
+Against Zombone's 1991 HP it is the stretch's best single action if the
 death-class miss check (+0x04 `$10` rides Demi too) passes the same
 undead-flag question as Doom — one probe answers both (§12 row 9). Bserk is
 dropped from the vanilla row for the recorded Ifrit reason: it removes player
@@ -357,12 +340,13 @@ magic to bypass its hit roll, which in vanilla lets death-class spells ignore
 protection. DESIGN.md's house rule is "vanilla's bugs stay" — the Sketch bug
 is canon — and this combo costs two esper slots, two characters' turns, and
 53 MP, which is a real price. **Recommendation: preserve it, as house-rule
-charm.** But (a) the exploit's exact code path was **not read this pass** —
-whether OT6's CheckHit changes touched it is UNVERIFIED — and (b) unlike the
-Sketch bug it can trivialize authored bosses in later bands, so it is a
-dispatcher decision, not a subagent's. Flagged in §14.2 with the options.
+charm.** But (a) the exploit's exact code path is **unread** — whether OT6's
+CheckHit changes touched it is UNVERIFIED — and (b) unlike the Sketch bug it
+can trivialize authored bosses in later stretches, so it is the owner's call.
+Flagged in §14.2 with the options.
 
-**Stat.** +4 speed — the roster seed's selector at the story-tier magnitude.
+**Stat.** +6 speed, −2 stamina, +2 mag.pwr — the roster seed's selector at the
+STORY tier, and the ghost is thinner for being faster.
 The ghost moves first; on Locke it stacks with the thief read, and it is the
 obvious hand-off to Shadow at the stop line: **Phantom is Shadow's stone**
 (kits.md sketches him as the assassin; his kit debt is v0.8's, and this stone
@@ -382,37 +366,37 @@ key (magic ignores Clear), which keeps Carbunkl's job separate next door.
 | channel | value |
 |---|---|
 | Grants | **Rflect**, **Safe** |
-| Stat (while worn) | **spd −2 / stm +6 / mag +2** (#62; was `+4 stamina`) |
+| Stat (while worn) | **spd −2 / stm +6 / mag +2** |
 | Divine | **Ruby Power** `$49` — Reflect on the whole party, 36 MP. Vanilla, unchanged. |
 
 **The mirror stone.** Rflect `$24` (22 MP, single) and Safe `$1c` (12 MP,
 single) — the two walls nobody else grants: Shiva owns Shell (magic damage
 *through* the wall), Carbunkl owns Reflect (magic *turned around*) and Safe
 (the physical wall, unclaimed since Celes and Golem are both absent from the
-band). The vanilla row's grab bag (Haste/Shell/Warp beside them,
+stretch). The vanilla row's grab bag (Haste/Shell/Warp beside them,
 `genju_prop.asm:172`) is trimmed to the two spells that are the job: Haste
 moves to Bismark where it is the identity rather than a fifth wheel, Shell
 stays Shiva's, Warp is field furniture.
 
-**Facet, the seed passive, is undeliverable this band and dropped honestly**
-(§13.3): "Runic feeds +1 more BP" needs Celes, who is an NPC from the banquet
-to past the stop line (recon §4). When she returns, the pairing is a *player
-discovery* (Carbunkl + Runic is already good without a passive), not a
-mechanic this pass can author.
+**Facet, the seed passive, is undeliverable this stretch and dropped rather
+than faked** (§13.3): "Runic feeds +1 more BP" needs Celes, who is an NPC from
+the banquet to past the stop line. When she returns, the pairing is
+a *player discovery* (Carbunkl + Runic is already good without a passive), not
+a mechanic this pass can author.
 
 **Swap reason.** The cave undead carry real MP (Lich 90, Zombone 160) and the
-band's set pieces telegraph magic; Ruby Power before a telegraph turns the
-enemy's biggest turn into yours. The honest cost is vanilla's own: a
+stretch's set pieces telegraph magic; Ruby Power before a telegraph turns the
+enemy's biggest turn into yours. The real cost is vanilla's own: a
 reflected party bounces *friendly* magic too — Kirin's Cure thrown at a
 Ruby-Powered ally lands on the enemy. That tension (Carbunkl wearer vs Kirin
 wearer negotiating turns) is the party puzzle working as designed, and the
 copy should not hide it. **UNVERIFIED:** the cave species' AI scripts were
 not read; whether they actually cast reflectable spells decides how much of
-Carbunkl's cave value is real. The survey pass or a doorstep probe settles
-it; his Safe half and the divine keep him honest either way.
+Carbunkl's cave value is real. The survey pass or a probe at the fight's entry
+point settles it; his Safe half and the divine carry him either way.
 
-**Stat.** +4 stamina — the roster seed's selector, story-tier magnitude, one
-step over Ramuh's +3. The gem endures.
+**Stat.** +6 stamina, −2 speed, +2 mag.pwr — the roster seed's selector at the
+STORY tier. The gem endures, and it does not move.
 
 ---
 
@@ -423,7 +407,7 @@ step over Ramuh's +3. The gem endures.
 | channel | value |
 |---|---|
 | Grants | **Haste**, **Slow** |
-| Stat (while worn) | **vig +5 / spd −2 / stm +3** (#62; was `+4 vigor`) |
+| Stat (while worn) | **vig +5 / spd −2 / stm +3** |
 | Divine | **Sea Song** `$3d` — WATER (element `$80`), all enemies, power 58, 50 MP, unblockable. Vanilla, unchanged. |
 
 **The kit is tempo in both directions, and both halves fold.** Haste `$1f`
@@ -438,7 +422,7 @@ it is the single number §10 most wants measured.
 does Bismark grant the game's only Water spell? — answers itself against the
 machinery: there is **no water-element record in the player-magic range** to
 grant (scanned `magic_prop_en.dat` records `$00-$35`, +0x01 bit `$80`: none),
-and the grant channel cannot mint new spells (§13.5). Sea Song **is** the
+and the grant channel cannot create new spells (§13.5). Sea Song **is** the
 only water verb the party can ever field this era, which makes Bismark's
 divine unique in kind, not just in size: Ing in the cave, Mega Armor and
 Commando at the banquet are all water-weak, and boost multiplies it. Tidal,
@@ -457,13 +441,11 @@ but three sources is one too many. Recommendation for Siren's eventual pass
 already flagged): drop her Slow, consolidate her as the sleep/mute
 controller. Follow-up, §14.4 — not this document's edit to make.
 
-**Stat.** +4 vigor. The leviathan is mass; on the cave party it gives
-Edgar/Sabin/Locke a second body stone so Ifrit stops being the only vigor
-answer — deliberately breaking Ifrit's "ONLY vigor stone" comment
-(`ot6_progression.asm:396-398`), which §11 amends. In the cave, where slow
-is blocked by Apparite/Lich and the undead absorb the obvious elements,
-vigor-on-the-class-axis is his floor value — the same argument that carried
-Ifrit through the Facility.
+**Stat.** +5 vigor, +3 stamina, −2 speed: the leviathan is mass that is slow.
+On the cave party it gives Edgar/Sabin/Locke a second body stone, so Ifrit is
+not the only vigor answer. In the cave, where slow is blocked by Apparite/Lich
+and the undead absorb the obvious elements, vigor-on-the-class-axis is his
+floor value — the same argument that carried Ifrit through the Facility.
 
 **Swap reason.** Wear Bismark when the fight is about turns: haste the party
 into a telegraph window, slow what survives, and hold Sea Song for the
@@ -471,78 +453,54 @@ water-weak. He is the tempo mage the roster has never had.
 
 ---
 
-## 9. Unicorn — **the Purity** — and the holy coupling, laid out for decision
+## 9. Unicorn — **the Purity** — and the holy coupling
 
 > *Menu line:* **UNICORN** — *The horn answers what should not be walking.*
 
 | channel | value |
 |---|---|
-| Grants | **Pearl** *(branch A — the recommendation; see the decision box)*, **Remedy** |
-| Stat (while worn) | **stm +5 / mag +2** (#62; was `+3 stamina`) |
+| Grants | **Pearl**, **Remedy** |
+| Stat (while worn) | **stm +5 / mag +2** |
 | Divine | **Heal Horn** `$4d` — Remedy's full status-clear set on the whole party (status bytes `45/e8/14`, identical to record `$33`; cleanse flag +0x04 `$04`), 30 MP. Vanilla, unchanged. |
 
 **The paladin: smite and cleanse.** Remedy `$33` (15 MP, single-target full
 cleanse) re-expresses *Purity* — cure-after-the-fact instead of
 duration-halving — and Heal Horn scales it party-wide as the divine. Pearl
-`$0e` (40 MP, holy, power 108) is the horn's light: the band's master key
+`$0e` (40 MP, holy, power 108) is the horn's light: the stretch's master key
 (§2.2 — pearl-weak on 4 of 5 cave species and the Ninja) on the stone whose
 whole fantasy is "the undead do not get to keep walking". Cure 2 (dead
 pre-folded tier — Kirin reason), Dispel, Safe (→ Carbunkl), Shell (Shiva's)
 all drop from the vanilla five-row.
 
-> **CROSS-DOC DECISION (dispatcher + the parallel cave-survey pass).** The
-> survey's open question — pearl/holy is the undead band's natural key and
-> almost no kit fields it — has two answers that must not both ship blind:
->
-> - **Branch A (recommended): Unicorn grants Pearl.** The band gets a real
->   pearl key on a swap-in stone; Sabin's AuraBolt (holy, 5 MP,
->   `ot6_class.asm:172`, record `$5e` elem `$20`) stays the chip-tempo
->   source; the cave reads as designed. Costs: Pearl at power 108 one-shots
->   band trash on-weakness (worked number in §10.3), takes `Ot6BoostDmg`
->   ×2/×4/×8 as a non-folding damage spell, and undercuts Terra's L30 Pearl
->   learn (kits.md) by a while-worn copy fifteen levels early. Its 40 MP —
->   a whole band-level pool — is the honest limiter: roughly one cast per
->   fight, no reprice recommended (the Osmose exception is precedent that
->   repricing is *possible*; here the vanilla price is doing exactly the
->   work we want).
-> - **Branch B: Unicorn stays support-only** (`{REMEDY, DISPEL}`) and the
->   survey pass authors secondary axes instead (ice/water rows, or
->   class-row authoring on the cave bodies). The cave key then comes from
->   encounter data, not a kit; Unicorn is the weakest of the six (two
->   utility spells against Kirin's four) and the copy must sell the cleanse
->   as the job.
->
-> These are substitutes: **if the survey authors a reachable pearl-adjacent
-> answer into the encounter data, branch A double-pays the key; if it does
-> not and branch B ships, the band has no pearl damage at all.** One owner
-> must pick. Everything else in this document is independent of the choice;
-> §11 lists both rows.
->
-> **DECIDED (dispatcher, 2026-07-28): branch A, with the premise
-> corrected.** The parallel survey (`break-band-sealed-gate.md`)
-> disproved "no kit fields pearl" — Sabin's AuraBolt is a shipped 5 MP
-> pearl chip, load-bearing since Vargas, and pearl keys 90.6% of cave
-> draws with zero absorbers. So the substitutes framing dissolves: the
-> band's REACHABILITY stands on AuraBolt plus the survey's authored
-> class rows and never on Unicorn, while Unicorn still grants Pearl as
-> the paladin identity and the big-hit option (40 MP keeps it a
-> decision, not the default swing). Double-paying a key one party
-> member already carries in a five-slot Blitz list is depth, not
-> redundancy.
+**Pearl here is identity, not the cave's reachability.** The stretch's pearl
+key is Sabin's AuraBolt — a 5 MP holy chip, load-bearing since Vargas
+(`ot6_class.asm:172`, record `$5e` elem `$20`) — plus the authored class rows
+in `break-band-sealed-gate.md`; pearl keys 90.6 % of cave draws with zero
+absorbers, and none of that runs through this stone. What Unicorn adds is the
+paladin's smite and the big-hit option. Its costs are real and accepted: power
+108 one-shots this stretch's trash on-weakness (worked number in §10.3), it
+takes `Ot6BoostDmg`'s ×2/×4/×8 as a non-folding damage spell, and it undercuts
+Terra's L30 Pearl learn (kits.md) by a while-worn copy fifteen levels early.
+The vanilla 40 MP — a whole pool at these levels — is the limiter, roughly one
+cast a fight, and it is not repriced: the vanilla price is doing exactly the
+work we want. Double-paying a key one party member already carries in a
+five-slot Blitz list is depth, not redundancy.
 
-**Why Unicorn and not Carbunkl carries the holy branch:** the horn is the
+**Why Unicorn and not Carbunkl carries holy:** the horn is the
 holy image; the gem's identity (reflection) is already whole without it, and
 loading Pearl onto Carbunkl would make one stone the wall *and* the smite
 while Unicorn stays a two-utility also-ran — the opposite of six distinct
 reasons to swap.
 
-**Stat.** +3 stamina — the protector's selector at the lower story rung
-(branch A's kit is strong enough; the stat should not also be the biggest).
+**Stat.** +5 stamina, +2 mag.pwr — the protector's selector, and the only
+package of the six with no downside. His kit is where his power is, so the stat
+should not also be the biggest.
 
-**Swap reason.** The cave: Pearl into anything (branch A), Remedy/Heal Horn
-against the zombie/poison riders undead bands carry (**UNVERIFIED which
+**Swap reason.** The cave: Pearl into anything, Remedy/Heal Horn
+against the zombie/poison riders undead stretches carry (**UNVERIFIED which
 statuses the cave AI actually inflicts** — same unread-AI caveat as
-Carbunkl's; the cleanse kit is the bet, the survey pass confirms the threat).
+Carbunkl's; the cleanse kit is the bet, and a survey of the cave AI confirms
+the threat).
 The banquet and voyage: the two- and three-person parties have no Kirin slot
 to spare, and Unicorn is the healer-adjacent stone that also swings.
 
@@ -550,38 +508,37 @@ to spare, and Unicorn is the healer-adjacent stone that also swings.
 
 ## 10. Balance
 
-### 10.1 The slot fight, leg by leg
+### 10.1 The slot fight, segment by segment
 
 The M5 exit criterion: six stones granted together, each with a reason to be
-worn at some point in the band.
+worn at some point in the stretch.
 
-| leg | party | the four slots' strongest claims | the six's entry points |
+| segment | party | the four slots' strongest claims | the six's entry points |
 |---|---|---|---|
-| cave (382-386) | Terra, Locke, Edgar, Sabin | Kirin (undead chip damage is constant), Maduin (ice + the crown stat), Unicorn-A (the key), one of Bismark/Carbunkl/Shoat by threat | Maduin and Unicorn near-locks; Bismark for tempo+Sea Song (Ing), Shoat if Doom lands (probe), Carbunkl if the undead cast (probe), Phantom vs the Ninja ambush and Zombone (Demi) |
+| cave (382-386) | Terra, Locke, Edgar, Sabin | Kirin (undead chip damage is constant), Maduin (ice + the crown stat), Unicorn (the key), one of Bismark/Carbunkl/Shoat by threat | Maduin and Unicorn near-locks; Bismark for tempo+Sea Song (Ing), Shoat if Doom lands (probe), Carbunkl if the undead cast (probe), Phantom vs the Ninja ambush and Zombone (Demi) |
 | banquet fights | Terra + Locke | two slots only: Maduin (bolt into Mega Armor/Commando; Chaos Wing for Sp Forces) + Bismark (Sea Song covers both water-weak bodies; Haste inside the 2-minute timer) | Shoat: death is open on Mega Armor/Commando — one-cast solutions to the +5 score fights |
-| voyage / stop line | Terra, Locke, Shadow | free choice, no fights until v0.8 — the leg exists to hand **Phantom to Shadow** | the v0.8 doorstep loadout is the player's first three-stone build statement |
+| voyage / stop line | Terra, Locke, Shadow | free choice, no fights until v0.8 — the segment exists to hand **Phantom to Shadow** | the loadout at the v0.8 entry point is the player's first three-stone build statement |
 
-The failure mode to watch is **Maduin + Unicorn-A becoming the only answer**
-in the cave (crown stat + master key). The levers, in order: Maduin's
-magnitude (5→4), never his list; Pearl's presence (branch B), never its
-price.
+The failure mode to watch is **Maduin + Unicorn becoming the only answer** in
+the cave (crown stat + master key). The levers, in order: Maduin's magnitude,
+never his list; Pearl's presence, never its price.
 
 ### 10.2 What each incumbent keeps
 
-Ramuh keeps bolt+Rasp (and is skippable in-band — Maduin covers bolt, which
-is fine: Ramuh's era was Zozo/Vector). Kirin keeps the only sustained heal.
-Shiva keeps Shell + the only MP income (thin here, §2.2.4 — honest). Ifrit
-keeps Drain and shares vigor with Bismark. Siren and Stray keep their control
-kits with the Slow collision flagged (§14.4). No new stone strictly contains
-an old one.
+Ramuh keeps bolt+Rasp (and is skippable within the stretch — Maduin covers
+bolt, which is fine: Ramuh's era was Zozo/Vector). Kirin keeps the only
+sustained heal. Shiva keeps Shell + the only MP income (thin here, §2.2.4 —
+admittedly thin). Ifrit keeps Drain and shares vigor with Bismark. Siren and
+Stray keep their control kits with the Slow collision flagged (§14.4). No new
+stone strictly contains an old one.
 
-### 10.3 Numbers to measure first (M6, when the band's fixtures mint)
+### 10.3 Numbers to measure first, once the stretch's savestates are generated
 
 1. **Party Haste2 at 1 BP / 10 MP** (Bismark). Run `bal_party.lua`'s policies
    with and without; if it dominates every fight, the lever is the fold
    table's haste row (make Haste2 2-BP by repeating the base tier), not the
    grant.
-2. **Pearl one-shots** (Unicorn-A). Worked line: at L16, mag.pwr ~30, power
+2. **Pearl one-shots** (Unicorn). Worked line: at L16, mag.pwr ~30, power
    108 computes ≈ 2000 unboosted, ×2 on weakness — over every cave HP pool
    before boost. The 40-MP price means ~1 cast/fight; measure whether that
    cadence reads as "the key" or "the delete button", and whether ×8 boosted
@@ -590,17 +547,16 @@ an old one.
 3. **Doom/Demi vs the undead flag** — the §12 row 9 probe, before any cave
    balance conclusion includes Shoat or Phantom.
 4. **Six-stone swap incidence** — the M5 criterion itself: instrument which
-   stones the test policies equip per leg; any stone with zero wear-time in
+   stones the test policies equip per segment; any stone with zero wear-time in
    every policy failed differentiation and gets redesigned, not buffed.
 
 ---
 
 ## 11. The data, literally
 
-No new battle code. No MagicProp overrides. Two files, plus one comment
-amendment.
+No new battle code. No MagicProp overrides. Two files.
 
-**`ff6/src/menu/genju_prop.asm`** — replace rows 5, 6, 7, 19, 20, 23:
+**`ff6/src/menu/genju_prop.asm`** — rows 5, 6, 7, 19, 20, 23:
 
 ```
 ; 5: shoat -- "the Gorgon Eye" (v0.7, magicite-tube-six.md §5).  The
@@ -640,21 +596,16 @@ make_genju_prop {RFLECT, 0}, {SAFE, 0}, {}, {}, {}
 make_genju_prop {VANISH, 0}, {DEMI, 0}, {}, {}, {}
 
 ; 23: unicorn -- "the Purity" (v0.7, magicite-tube-six.md §9).  The paladin:
-;   smite + cleanse.  PEARL is BRANCH A of the cross-doc holy decision (§9
-;   decision box) -- if the cave-survey pass authors the pearl answer into
-;   encounter data instead, this row is {REMEDY, 0}, {DISPEL, 0} (branch B).
+;   smite + cleanse.  PEARL is the paladin identity and the big-hit option;
+;   the cave's pearl reachability stands on Sabin's AuraBolt plus the authored
+;   class rows (break-band-sealed-gate.md), never on this stone.
 ;   CURE_2 dropped (dead pre-folded tier); SAFE -> Carbunkl; SHELL stays
 ;   Shiva's.
 make_genju_prop {PEARL, 0}, {REMEDY, 0}, {}, {}, {}
 ```
 
-**`ff6/src/battle/ot6_progression.asm`**, `Ot6EsperStatTbl` — six rows leave
-`OT6_SM_NONE`.
-
-**SHIPPED, then superseded 2026-07-29 by #62.** The six rows below were built as
-written; #62 then replaced the whole encoding with vanilla's four-signed-nibble
-equipment layout and re-cut every magnitude against the measured ladder in
-`docs/design/esper-stat-ruler.md`. The shipped rows are now:
+**`ff6/src/battle/ot6_progression.asm`**, `Ot6EsperStatTbl` — six rows in
+vanilla's four-signed-nibble equipment layout, vigor/speed/stamina/mag.pwr:
 
 ```
         esper_stat   -2,  +6,  +2,   0   ;  5 shoat
@@ -665,31 +616,7 @@ equipment layout and re-cut every magnitude against the measured ladder in
         esper_stat    0,   0,  +5,  +2   ; 23 unicorn
 ```
 
-The v0.7 originals, kept because the identity each was chosen from is unchanged
-and each new row leads on the same stat:
-
-```
-        .byte   OT6_SM_SPEED  | 3       ;  5 shoat    +3 speed (the executioner
-                                        ;    acts first; his spells scale off
-                                        ;    nothing, so tempo is the honest pick)
-        .byte   OT6_SM_MAGPWR | 5       ;  6 maduin   +5 mag.pwr -- the crown.
-                                        ;    v0.7 has no boss; Terra's
-                                        ;    inheritance being the strongest
-                                        ;    stat stone IS the band's reward
-                                        ;    (magicite-tube-six.md §3)
-        .byte   OT6_SM_VIGOR  | 4       ;  7 bismark  +4 vigor (the leviathan;
-                                        ;    second vigor stone -- see the Ifrit
-                                        ;    comment amendment)
-        .byte   OT6_SM_STAM   | 4       ; 19 carbunkl +4 stamina (the gem endures)
-        .byte   OT6_SM_SPEED  | 4       ; 20 phantom  +4 speed (the ghost moves
-                                        ;    first; Shadow's stone at the stop line)
-        .byte   OT6_SM_STAM   | 3       ; 23 unicorn  +3 stamina (the protector;
-                                        ;    kept low -- branch A's kit is the power)
-```
-
-**Comment amendment, same file:** Ifrit's row comment (`:396-398`) says "+5
-vigor -- the ONLY vigor stone (nobody else claims the selector)". Bismark now
-claims it; reword to "the first vigor stone (Bismark joins at v0.7)".
+Bismark is the second vigor stone, so Ifrit no longer owns that stat alone.
 
 **Unchanged, explicitly:** all six summon records `$3b/$3c/$3d/$49/$4a/$4d`
 (the MagicProp splice gains nothing); every learn-rate byte (stays 0); every
@@ -699,9 +626,7 @@ fusing them would punish wearing a stone).
 
 **Menu copy: zero work required.** The detail page renders granted spell
 names and the while-worn stat mod directly from these two tables
-(`skills.asm`); authoring the bytes above is the whole player-facing job. That
-claim survived #62: the page grew from one line to a multi-term block, and the
-six rows above became player-visible with no further copy work.
+(`skills.asm`); authoring the bytes above is the whole player-facing job.
 
 ---
 
@@ -709,28 +634,29 @@ six rows above became player-visible with no further copy work.
 
 Same files and shapes as the v0.6 pass: grants/absents in
 `battle_esperstats.lua` scenarios, behavior in `battle_magicite.lua`. All
-band-dependent rows ride v0.7 fixtures (`@suite frontier=<name>`) and report
-"skipped" until the chain mints.
+rows that depend on this stretch ride v0.7 fixtures (`@suite frontier=<name>`)
+and report "skipped" until the chain is generated.
 
 | # | assertion | notes |
 |---|---|---|
 | 1 | Shoat worn → Break, Doom in the Magic list; **Bio absent** | the `checkEsper(grants, absents)` shape |
 | 2 | Maduin worn → Fire, Ice, Bolt; **Fire 2, Ice 2, Bolt 2 absent** | the three dead tiers are the row's whole point |
 | 3 | Bismark worn → Haste, Slow; **Life, Fire, Ice, Bolt absent** | the Life absence is the kits.md revival rule, asserted |
-| 4 | Carbunkl worn → Rflect, Safe; Warp/Haste/Shell absent. Phantom worn → Vanish, Demi; Bserk absent. Unicorn worn → per shipped branch | |
-| 5 | each stone worn → its stat package exactly, and no other stat moved | `battle_esperstats.lua`'s comparison — a table of all four expected deltas since #62, so a downside that failed to apply now fails here |
+| 4 | Carbunkl worn → Rflect, Safe; Warp/Haste/Shell absent. Phantom worn → Vanish, Demi; Bserk absent. Unicorn worn → Pearl, Remedy | |
+| 5 | each stone worn → its stat package exactly, and no other stat moved | `battle_esperstats.lua`'s comparison — a table of all four expected deltas, so a downside that failed to apply fails here |
 | 6 | Haste at 1 BP queues `$27` and charges **10** MP; Slow at 1 BP queues `$28` and charges **5** | the fold rows under test; the §10.3-1 risk's mechanical half |
 | 7 | each summon fires once per battle per character and greys after (`$3f2e`); positive control that the row was offered | six stones, one latch test each — the Demon Eye row doubles as the petrify-immunity control (blocked on Apparite, lands on Coelecite) |
 | 8 | Chaos Wing and Sea Song take the boost multiplier; Fader/Ruby Power/Heal Horn/Demon Eye unchanged by boost | the damage-verb vs no-damage boundary of `Ot6BoostDmg` |
 | 9 | **THE PROBE: Doom (and Demi) vs an undead-flagged cave body.** Fire Doom at a Zombone; assert loudly whichever way it lands, then pin the answer | settles §2.2 finding 3 for Shoat and Phantom both; must fail loudly, not skip quietly |
-| 10 | Vanish cast on an enemy, then Doom: does the death land through the Clear status? | pins the §14.2 ruling either way — if the dispatcher preserves the trick, this is its conformance test; if not, its regression test |
+| 10 | Vanish cast on an enemy, then Doom: does the death land through the Clear status? | pins the §14.2 ruling either way — if the owner preserves the trick, this is its conformance test; if not, its regression test |
 
 ---
 
 ## 13. What the shipped machinery cannot express
 
-The honest ledger. Items 1-3 of the Ifrit/Shiva §12 list (two-sided mods,
-multi-stat, HP/MP%) all still apply; new or newly-instantiated items:
+The full ledger. Of the Ifrit/Shiva §12 list, HP/MP-percentage mods still
+cannot be expressed; two-sided and multi-stat mods now can (§1). New or
+newly-instantiated items:
 
 1. **Maduin's *Trinity*** ("first spell each battle +1 tier") — no passive
    channel, and no per-battle-first-cast hook exists anywhere. Dropped;
@@ -739,8 +665,8 @@ multi-stat, HP/MP%) all still apply; new or newly-instantiated items:
    Break could not chip regardless: chip requires a damaging hit (DESIGN.md,
    Break system) and Break deals none. Dropped.
 3. **Carbunkl's *Facet*** ("Runic feeds +1 more BP") — no passive channel,
-   and its beneficiary is absent all band. Dropped; revisit as a passive-pool
-   candidate if M4's channel ever lands.
+   and its beneficiary is absent for the whole stretch. Dropped; revisit as a
+   passive-pool candidate if M4's channel ever lands.
 4. **BP-buys-certainty for hit-rolled magic.** DESIGN.md's chance-verb canon
    is implemented only for Steal (command-specific). Break, Doom, Vanish —
    Shoat's and Phantom's whole lists — sit outside both boost axes: the UI
@@ -751,7 +677,7 @@ multi-stat, HP/MP%) all still apply; new or newly-instantiated items:
 5. **A water spell in a kit** (Bismark's *Tidal*). Structural: no
    water-element record exists in the player-magic range (`magic_prop_en.dat`
    `$00-$35` scanned, +0x01 bit `$80` — none), and the grant channel cannot
-   mint records. Water is expressible only at divine cadence (Sea Song) —
+   create records. Water is expressible only at divine cadence (Sea Song) —
    until/unless a vanilla record is deliberately re-authored to water, which
    would be a global spell change of the Osmose-exception class.
 6. **Unicorn's *Purity*** ("status durations halved") — no passive channel,
@@ -762,12 +688,8 @@ multi-stat, HP/MP%) all still apply; new or newly-instantiated items:
 
 ---
 
-## 14. Open questions / follow-ups for the dispatcher
+## 14. Open questions and follow-ups
 
-1. **The Unicorn holy coupling (§9 decision box)** — branch A (Pearl on
-   Unicorn) vs branch B (survey authors the answer into encounter data).
-   Substitutes, not complements; needs one owner across this doc and the
-   cave-survey pass. Recommendation: branch A.
 2. **The Vanish+Doom ruling (§6).** Preserve as house-rule charm (recommended,
    with test row 10 pinning it) or break it deliberately. Either way the
    exploit's code path needs one read — it is UNVERIFIED that OT6's hit-path
@@ -775,18 +697,13 @@ multi-stat, HP/MP%) all still apply; new or newly-instantiated items:
 3. **The Doom/Demi-vs-undead probe (§12 row 9)** decides Shoat's and half of
    Phantom's cave story before any balance copy ships. If death-type misses
    undead, Shoat's acquisition copy should say what he is for (the Ninja, the
-   banquet, v0.8) so he does not read as dead loot in his own band.
-4. **Siren's Slow (and her leftover Fire).** Three Slow sources exist once
-   Bismark ships (§8). Recommend Siren's overdue pass drop both leftovers and
-   consolidate her as the sleep/mute controller — she and Stray are now the
-   last two vanilla-row stones in the game.
-5. **Maduin at +5 mag.pwr** — the deliberate crown (§3). If M6 measurement
-   shows Maduin locked into a slot all band, drop to 4 before touching his
-   list.
-6. **The stat-ladder doc** (`ot6_progression.asm:386-393` comment) should gain
-   the story-tier rung (3-4, crown exception) when the build pass lands the
-   bytes, so the three-rung ladder is written where the data lives.
+   banquet, v0.8) so he does not read as dead loot in his own stretch.
+4. **Siren's Slow (and her leftover Fire).** Three Slow sources exist (§8).
+   Siren's overdue pass should drop both leftovers and consolidate her as the
+   sleep/mute controller — she and Stray are the last two vanilla-row stones in
+   the game.
+5. **Maduin at +7 mag.pwr** — the deliberate crown (§3). If measurement shows
+   Maduin locked into a slot for the whole stretch, drop to +6 before touching
+   his list.
 7. **Shadow's kit debt (v0.8)** — Phantom is designed as his bridge stone
-   (§6), which softens but does not settle kits.md's Shadow sketch; the
-   recon already flags his kit as this milestone's exit criterion or v0.8's
-   entry debt.
+   (§6), which softens but does not settle kits.md's Shadow sketch.

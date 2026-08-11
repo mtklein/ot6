@@ -1,6 +1,6 @@
 -- gen_scenario.lua -- from lete_river.mss (map 113, one tile off the raft)
 -- down the LETE RIVER, through ULTROS, to the THREE-WAY SCENARIO SPLIT.
--- Mints one state:
+-- Generates one state:
 --   scenario_hub.mss  map 9, party = SCENARIO_MOG alone, first controllable
 --                     frame after Mog's "Choose a scenario…kupo!" -- the
 --                     entry point of the whole v0.3 arc, and the fixture the
@@ -120,7 +120,7 @@
 -- (`battle 7, RIVER`) and _cb04a1 (`battle 8, RIVER`) outright, and
 -- _cb0486/_cb048f are `if_rand` coin-flips into them (:38660-38678).  A
 -- dozen or so fire on the way down.  Since issue #75 they are FOUGHT, not
--- kill-bitted: this generator writes no game state.  The fighter is the
+-- write-cleared: this generator writes no game state.  The fighter is the
 -- ride's own edge-tapped A -- A opens the acting character's command list,
 -- A confirms its first entry, A takes the default target -- which on this
 -- raft spells out the game's own designed sustain: TERRA, EDGAR and SABIN
@@ -130,25 +130,26 @@
 -- round while the other three chew through the formation.
 --
 -- BANON'S DEATH IS AN INSTANT GAME OVER -- that is WHY this file used to
--- kill-bit.  The honest driver watches his battle HP every frame and fails
--- the run loudly the moment he stays down, with the fight's full numbers on
--- the record: a #74-style balance finding beats a timeout 30,000 frames
--- later at the game-over screen.  The route is deterministic from the
--- fixture, so a surviving run replays exactly and a losing one is a fact
--- about the tuning, not about luck.
+-- battle-clear write.  The input-driven driver watches his battle HP every
+-- frame and fails the run loudly the moment he stays down, with the fight's
+-- full numbers on the record: a #74-style balance finding beats a timeout
+-- 30,000 frames later at the game-over screen.  The route is deterministic
+-- from the fixture, so a surviving run replays exactly and a losing one is
+-- a fact about the tuning, not about luck.
 --
 -- ULTROS: `battle 103, RIVER` at _cb08db (:39301) -- WON FOR REAL, the
--- first honest Ultros in this chain's history.  He has an authored shield
+-- first real Ultros in this chain's history.  He has an authored shield
 -- row -- Ot6ShieldTbl carries $012c (MONSTER::ULTROS_RIVER) at 5 shields,
 -- OT6_SLASH|OT6_PIERCE, "ultros 1: the row he keeps all game"
 -- (ff6/src/battle/ot6.asm:3008-3009) -- and the design brief for the fight
--- (bosses-wob.md #4) names the loss condition this mint now actually risks:
--- Tentacle slams Banon.  The winning line here is the same tap-A policy as
+-- (bosses-wob.md #4) names the loss condition this generator now actually
+-- risks:  Tentacle slams Banon.  The winning line here is the same tap-A
+-- policy as
 -- the trash -- three attackers on him, Banon healing through Tentacle --
 -- with his HP, shields and the party's HP logged every 300 in-battle frames
 -- so the whole trajectory is on the record.  A deeper breaking run (probe
 -- fire, bank BP, break on the fuse) belongs in a battle test built ON this
--- state; the mint's job is a real, survivable win.
+-- state; the generator's job is a real, survivable win.
 --
 -- AFTER HIM the script needs no more input: Sabin is swept overboard,
 -- `switch $001A=1`, and `call _caad4c` (:39355 -> :26626) tears the party
@@ -157,8 +158,9 @@
 -- SABIN…" recap) and falls into _caadb4 (:26677) -- wait_30f, then
 -- dlg $0B8C "Choose a scenario…kupo!", then `return`.
 --
--- WHERE THE MINT LANDS, and why not mid-dialog.  The state is taken on the
--- first CONTROLLABLE frame after that last dialog is dismissed -- i.e. the
+-- WHERE THE GENERATE LANDS, and why not mid-dialog.  The state is taken on
+-- the first CONTROLLABLE frame after that last dialog is dismissed -- i.e.
+-- the
 -- moment the player could actually walk to one of the three scenario NPCs --
 -- rather than on the frame the prompt is on screen.  A fixture frozen inside
 -- a dlg is awkward to build on (every consumer would have to dismiss it
@@ -215,19 +217,19 @@ local CHOICES = {
 }
 local ci, inChoice = 0, false
 
--- The ride driver: steer choices, FIGHT battles honestly (issue #75 --
+-- The ride driver: steer choices, FIGHT battles with real input (issue #75 --
 -- zero state writes), tap dialogs, touch nothing else.  Reused for each
 -- ladder attempt.
 --
--- THE FIGHTER.  This river outpaces a blind A-masher: run 1 of the honest
--- conversion lost BANON in fight #3 (the 3-monster roll) with the party
--- never healed once, because tap-A confirms each actor's FIRST command and
--- Banon's first command is FIGHT -- his famous Health is ROW 1 of his list
--- (char_prop.asm:321: set_char_prop_cmds FIGHT, HEALTH, NONE, ITEM), so
--- the "free party heal" never fired.  Battles therefore run a menu-episode
--- machine (gen_arvis's cadence: presses start only once the battle-menu
--- flag has held 4 straight frames, then ONE button per 30-frame pulse,
--- 6 held + 24 released -- battle menus eat input during their open
+-- THE FIGHTER.  This river outpaces a blind A-masher: run 1 of the
+-- input-driven test conversion lost BANON in fight #3 (the 3-monster roll)
+-- with the party never healed once, because tap-A confirms each actor's
+-- FIRST command and Banon's first command is FIGHT -- his famous Health is
+-- ROW 1 of his list (char_prop.asm:321: set_char_prop_cmds FIGHT, HEALTH,
+-- NONE, ITEM), so the "free party heal" never fired.  Battles therefore run
+-- a menu-episode machine (gen_arvis's cadence: presses start only once the
+-- battle-menu flag has held 4 straight frames, then ONE button per 30-frame
+-- pulse, 6 held + 24 released -- battle menus eat input during their open
 -- animation every turn):
 --     BANON (char 14)      down A A    Health, the designed sustain
 --     EDGAR (4), tier 2+   down A A A  Tools -> AutoCrossbow, his kit's
@@ -249,7 +251,7 @@ local ci, inChoice = 0, false
 -- exists to threaten; a full party wipe is the same fact the long way.
 -- Neither errors out of the run any more: they set `lost`, the attempt's
 -- pred fires, and the RETRY LADDER below reloads the pre-board checkpoint
--- -- the mint-script spelling of a player reloading their save -- and
+-- -- the generator script's spelling of a player reloading their save -- and
 -- rides again with the escalated tier.
 local BCHID, BCHP, BCMAXHP = 0x3ed8, 0x3bf4, 0x3c1c
 local MENU, ACTOR = 0x7bca, 0x62ca -- battle menu open flag / whose menu
@@ -467,7 +469,7 @@ local function rideUntil(pred, what, budget, idle, tier)
         if bt.gone >= 3 then
           H.log(string.format("river: battle #%d done at f%d (%d frames)%s " ..
             "-- party [%s]", bt.n, H.frame, H.frame - bt.f0,
-            bt.ultros and " -- ULTROS BEATEN HONESTLY" or "",
+            bt.ultros and " -- ULTROS BEATEN" or "",
             bt.lastParty or "?"))
           if bt.ultros then H.screenshot("scenario_ultros_won") end
           bt = nil
@@ -558,14 +560,14 @@ end
 
 -- ------------------------------------------------------ the retry ladder --
 -- A lost river run is ACCEPTED, not rigged around: the checkpoint captured
--- at the doorstep (before the boarding trigger) is reloaded -- the
--- mint-script spelling of a player reloading their save -- and the ride is
+-- at the entry point (before the boarding trigger) is reloaded -- the
+-- generator's spelling of a player reloading their save -- and the ride is
 -- taken again.  The reload replays byte-identically until the INPUT
 -- differs, so each attempt escalates the fighter's tier (attempt 2+ spends
 -- Edgar's turns on AutoCrossbow, the whole-side opener), which reshuffles
 -- every subsequent ATB interleaving and roll as a side effect.  Three
--- attempts; a third loss fails the mint with every attempt's numbers
--- already on the record -- an honest partial beats a fudged whole.
+-- attempts; a third loss fails the generation with every attempt's numbers
+-- already on the record -- a real partial beats a fudged whole.
 local rideBlob, rideWon = nil, false
 local function rideAttempt(n)
   local ldReq
@@ -584,7 +586,7 @@ local function rideAttempt(n)
       ci, inChoice, lost, nBattles = 0, false, nil, 0
       announced = {}
     end),
-    H.navTo(31, 51, { maxFrames = 12000, honest = true,
+    H.navTo(31, 51, { maxFrames = 12000, playBattles = true,
       arrive = function() return sw(0x01B5) == 1 end }),
     H.release(),
     -- ONE driver for the whole river: it steers the four prompts, fights
@@ -602,15 +604,15 @@ local function rideAttempt(n)
       if lost == nil then
         rideWon = true
         H.log(string.format("river: attempt %d WON the ride -- %d battles " ..
-          "fought honestly", n, nBattles))
+          "fought", n, nBattles))
       end
     end),
   }, {})
 end
 
--- 200000 was the kill-bit-era budget; an honest ride spends real ATB
--- rounds on a dozen forced fights plus ULTROS, the ladder may ride the
--- river up to three times, and each ceiling carries headroom for the
+-- 200000 was the battle-clear-write-era budget; an input-driven ride spends
+-- real ATB rounds on a dozen forced fights plus ULTROS, the ladder may ride
+-- the river up to three times, and each ceiling carries headroom for the
 -- measured cost of actually playing it
 H.run({ maxFrames = 700000 }, {
   H.loadState(DOOR),
@@ -621,7 +623,7 @@ H.run({ maxFrames = 700000 }, {
     H.assertEq(sw(0x0018), 1, "$0018 set -- _cb059f will board")
     H.assertEq(sw(0x001A), 0, "$001A clear -- the river has not been run")
     H.assertEq(sw(0x0176), 0,
-      "$0176 clear -- the ride's continuations are armed (every leg of the " ..
+      "$0176 clear -- the ride's continuations are armed (every segment of the " ..
       "river ends `if_switch $0176=0, <next>`)")
     H.assertEq((H.readByte(0x185e) & 0x07) ~= 0, true, "BANON in the party")
     H.log(string.format("[booted] map=%d (%d,%d)", map(), H.fieldX(), H.fieldY()))
@@ -629,7 +631,7 @@ H.run({ maxFrames = 700000 }, {
 
   -- ===================================================================== --
   -- THE CHECKPOINT, then BOARD.  The pre-board capture is the ladder's
-  -- reload point: it holds the doorstep BEFORE (31,51) fires _cb059f
+  -- reload point: it holds the entry point BEFORE (31,51) fires _cb059f
   -- (event_trigger.asm:462), so a reloaded attempt replays the boarding
   -- exactly.  NB $01B5 is NOT set the moment the trigger fires: _cb059f
   -- runs clr_status/max_hp for the party (the raft leaves FULLY HEALED,
@@ -659,9 +661,9 @@ H.run({ maxFrames = 700000 }, {
   rideAttempt(3),
   H.call(function()
     if not rideWon then
-      error(string.format("river: BANON did not survive any of 3 honest " ..
+      error(string.format("river: BANON did not survive any of 3 " ..
         "attempts -- last loss: %s -- the per-attempt numbers above are " ..
-        "the balance finding (#74-style); do not rig this leg",
+        "the balance finding (#74-style); do not rig this segment",
         tostring(lost)), 0)
     end
   end),
@@ -710,6 +712,6 @@ H.run({ maxFrames = 700000 }, {
   end),
   H.saveState("scenario_hub.mss"),
   H.logStep(function()
-    return string.format("scenario_hub minted at frame %d", H.frame)
+    return string.format("scenario_hub generated at frame %d", H.frame)
   end),
 })

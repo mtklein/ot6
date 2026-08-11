@@ -1,24 +1,24 @@
-# OT6 v0.8 — Thamasa route recon
+# OT6 v0.8 — Thamasa route survey
 
-Scope per ROADMAP v0.8: the v0.7 stop line — anchor K, world (232,150), party
-TERRA·LOCKE·SHADOW (`sealed-gate-recon.md` §1 leg 7) — through Thamasa town,
-Strago joining, the burning house and FlameEater, Relm joining, the Esper
-Mountain and Ultros ③, Kefka's massacre, and the post-massacre mission
+Scope per ROADMAP v0.8: the v0.7 stop line — checkpoint K, world (232,150),
+party TERRA·LOCKE·SHADOW (`sealed-gate-recon.md` §1 segment 7) — through
+Thamasa town, Strago joining, the burning house and FlameEater, Relm joining,
+the Esper Mountain and Ultros ③, Kefka's massacre, and the post-massacre mission
 transition, ending where control returns on the world map beside the repaired
 Blackjack.
 
 Claims cite a file and line or are labelled **UNVERIFIED**. Every formation
 table below is an offline read of `battle_monsters.dat` /
-`event_battle_group.dat` and is marked verify-at-doorstep. Distances are
+`event_battle_group.dat` and is marked verify-on-arrival. Distances are
 Manhattan lower bounds or unmeasured — no offline BFS has been run for this
-band, and two of its maps are retiled by events mid-band (§7 hazard 4), so a
-step model needs the right tile state.
+area, and two of its maps are retiled by events partway through (§7 hazard
+4), so a step model needs the right tile state.
 
 ---
 
 ## 0. HEADLINES
 
-1. **The stop line is established precisely.** The band ends at
+1. **The stop line is established precisely.** The area ends at
    `event_main.asm:78007-78009`: `load_map 0, {249,128}` + `airship_pos
    {249,127}` — control on the WoB world map at **(249,128)**, one tile from
    the repaired, re-flying(?) Blackjack, party **TERRA·LOCKE·STRAGO·RELM**,
@@ -26,7 +26,7 @@ step model needs the right tile state.
    (`$02F3` set 0 at `:77970` and never restored; `norm_lvl` sweep
    `:77976-77982`; availability restore `:77983-77988`; `$009D=1` `:77992`).
    Whether the party stands beside or aboard the ship, and whether liftoff
-   works immediately (`$007A` is never cleared in the band — the fly-refusal
+   works immediately (`$007A` is never cleared in the area — the fly-refusal
    script branches on `$007D=1` to `_cb1fef`, unread), is **UNVERIFIED** —
    v0.9's first probe.
 2. **Two joins, one guest, and Shadow leaves twice.** Strago joins mid-fire
@@ -47,11 +47,11 @@ step model needs the right tile state.
    Sketch is the only player source of Tentacle. The charm moment and the
    shipped bug share a die roll — a *missed* Sketch is exactly the bug's
    entry condition (§5).
-4. **The band grants zero magicite.** No `give_genju` exists anywhere in
+4. **The area grants zero magicite.** No `give_genju` exists anywhere in
    `:69190-78110` (grepped). Kefka *takes* the drained espers; the player
    gets none. `magicite.md`'s "Bismark — Thamasa" acquisition proposal is
    contradicted by shipped state.
-5. **The massacre is this band's banquet — one indivisible auto-chain.**
+5. **The massacre is this area's banquet — one indivisible auto-chain.**
    From the mountain-top trigger 375 (15,17) (`_cbf2b5` `:74063`) the script
    runs the esper reveal, Yura, the return to town (`$0099=1` `:75156`), the
    Leo/Yura scene, and Kefka's arrival without returning control until the
@@ -65,7 +65,7 @@ step model needs the right tile state.
 6. **Vanilla already covers Ultros ③** — the mountain save point at 375
    (8,44) (`event_trigger.asm:1795`, sparkle in `NPCProp::_375` on the
    standing `$0632` switch) sits seven tiles from the statue-room door
-   (375 (2,45) → 371 (9,9), short-entrance table). The band's two real holes
+   (375 (2,45) → 371 (9,9), short-entrance table). The area's two real holes
    are the **burning house** and the **massacre approach**. Plugging both
    costs 2 triggers + 2 NPC records — **the entire remaining game-wide
    budget** (13 trailing `$FF` bytes = 2 trigger slots, 76 = 8 NPC records,
@@ -80,7 +80,7 @@ step model needs the right tile state.
    symbol-addressed far reads (`event.asm:5770-5804`, `player.asm:761-781`).
    The one hardcoded consumer in the repo is
    `tools/tests/battle_runic.lua:68` (`MAGIC_PROP = 0x046AC0`). Plus the
-   standing cost: every savestate re-mints; battery anchors survive (#9).
+   standing cost: every savestate regenerates; batch checkpoints survive (#9).
 8. **The encounter shape is the Zozo inversion, authored by vanilla itself.**
    Fire is the Esper Mountain's master key — Mandrake, Insecare, and Slurm
    are all weak to fire (§3.2) — and then FlameEater *absorbs* fire and
@@ -91,7 +91,7 @@ step model needs the right tile state.
 
 ---
 
-## 1. The route, leg by leg
+## 1. The route, segment by segment
 
 Switch chronology (all sets read from source):
 `$008B/$008C` (magic vignettes, optional) → `$008D` (Strago talked,
@@ -101,7 +101,7 @@ joins) → `$0090` (FlameEater down, `:72129`) → `$0091+$0098` (morning after,
 (statues, `:74018-74019`) → `$02E8/$02F8` (Relm joins) → `$0095` (Ultros
 beaten, `:73801`) → `$0099` (back in town, `:75156`) → `$018A` (Kefka,
 `:76337`) → `$009B` (Leo fallen, `:76598`) → `$009C` (burial, `:77313`) →
-`$009D` (band tail, `:77992`).
+`$009D` (area tail, `:77992`).
 
 Town map variants: map **343** until `$0099`, **341** while `$0099 && !$009C`
 (the massacre state), **340** after `$009C`, **344** after `$00A4` (v0.9;
@@ -109,7 +109,7 @@ Town map variants: map **343** until `$0099`, **341** while `$0099 && !$009C`
 Map 342 is a third variant that nothing loads (`load_map 342` appears
 nowhere; empty trigger block) — the map-275 pattern, excluded.
 
-### Leg 1 — anchor K → Thamasa town
+### Segment 1 — checkpoint K → Thamasa town
 
 From world (232,150), walk to the Thamasa world trigger at **(250,128)**
 (`event_trigger.asm:35` → `_cbd2ee` `:69190`) → map 343 (23,46). Manhattan
@@ -142,7 +142,7 @@ pre-`$0099`). The inn demands 1500 GP until Strago is talked to
 magic-in-secret vignettes on 343 arm at (35,15) and (25,12)
 (`event_trigger.asm:1670-1672`; `$008B` `:69719`, `$008C` `:69802`).
 
-### Leg 2 — Strago's house, the inn night, the fire
+### Segment 2 — Strago's house, the inn night, the fire
 
 Strago's house is map **349** (town door 343 (29,13) → 349 (37,24); interior
 stair pair (39,10)↔(61,20); Memento Ring chest at (56,16) upstairs). Talking
@@ -164,7 +164,7 @@ is a mod_bg_tiles map during the fire window** (§7 hazard 4). Town exits
 ungated, so a world save mid-fire looks legal — **UNVERIFIED live**. The inn
 refuses service during the fire ("FIRE!!", `:69493` → `:69566`).
 
-### Leg 3 — the burning house and FlameEater (map 351)
+### Segment 3 — the burning house and FlameEater (map 351)
 
 Talk to Strago at the house door — an NPC event, not a tile trigger
 (`NPCProp::_343` record at (39,24) on switch `$0508`,
@@ -202,7 +202,7 @@ exit, and the night talk at Strago's house (`load_map 349 {64,16}`
 `:72613`), ending `$0091=1 $0098=1` (`:73000-73001`) with control in the
 house, party TERRA·LOCKE·STRAGO.
 
-### Leg 4 — Shadow's departure
+### Segment 4 — Shadow's departure
 
 Leaving Strago's house (349 (37,25), `event_trigger.asm:1708` → `_cbec92`
 `:73010`, gated `$0091 && !$0092`) plays Shadow's goodbye on 343 (29,15):
@@ -211,7 +211,7 @@ inventory assertions should expect it), Interceptor stays behind with Relm,
 `$0092=1` (`:73302`). Town and world are then free; last chance to shop and
 world-save before the mountain.
 
-### Leg 5 — Esper Mountain: 375 ⇄ 372/373/374 → 371
+### Segment 5 — Esper Mountain: 375 ⇄ 372/373/374 → 371
 
 World entrance **0 (229,130) → 375 (55,31)** (short-entrance table; return
 375 (55,32) → world). Whether the entrance is *reachable* before `$0098` —
@@ -271,7 +271,7 @@ fires **Ultros ③** (`_cbefa5` `:73495`, gated `$0097 && !$0095`):
 The player can walk back out to the 375 save point (and the world) here —
 the last save before the massacre.
 
-### Leg 6 — the massacre (one atomic chain)
+### Segment 6 — the massacre (one atomic chain)
 
 Stepping on 375 **(15,17)** (`_cbf2b5` `:74063`, gated `!$0099`; resets the
 vignette latches) starts the chain: espers reveal themselves, Yura's "Halt!"
@@ -309,12 +309,12 @@ HP50001, whose AI is pure theater — espers cast Fire/Fire 2/Fire 3 at him,
 the scene, the party is restored (`:77242-77253`, WEDGE out), and the grave
 scene on map 340 (54,19) (`:77259`) sets **`$009C=1` (`:77313`)**.
 
-### Leg 7 — burial, the Blackjack returns, the handoff
+### Segment 7 — burial, the Blackjack returns, the handoff
 
 Auto-chained scenes: Terra at Leo's grave, wounded Interceptor, the airship
 flying in (`load_map 0 {211,170} AIRSHIP` `:77500`), Setzer/Cyan/Edgar/Sabin
 at 340 (22,28) ("We've been had!! The Emperor is a liar!"), Strago and Relm
-talking themselves aboard, then the band tail (`:77962-78009`):
+talking themselves aboard, then the area tail (`:77962-78009`):
 availability zeroed and rebuilt with `norm_lvl` for
 CYAN/SHADOW/EDGAR/SABIN/SETZER/GAU/CELES (+MOG if available, `_cc0935`
 `:78014`), everyone restored **except `$02F3` (Shadow)**, `and_status
@@ -323,27 +323,27 @@ SHADOW, NONE` (`:77990`), `$009D=1 $01BA=1` (`:77992-77993`), and control at
 
 **The v0.8 stop line: world (249,128), party TERRA·LOCKE·STRAGO·RELM,
 `$0099=$009B=$009C=$009D=1`, `$02E7/$02E8/$02F7/$02F8=1`, `$02F3=0`,
-world-saveable.** The natural battery anchor (§2).
+world-saveable.** The natural batch checkpoint (§2).
 
 ---
 
-## 2. Save opportunities and anchor candidates
+## 2. Save opportunities and checkpoint candidates
 
 ### 2.1 Inventory, route order
 
 | # | where | what | evidence |
 |---|---|---|---|
-| S0 | world (232,150) | anchor K, the v0.7 terminal | `sealed-gate-recon.md` §1 leg 7 |
+| S0 | world (232,150) | checkpoint K, the v0.7 terminal | `sealed-gate-recon.md` §1 segment 7 |
 | S1 | world, Crescent Island | save anywhere on the walk to (250,128) and on every town↔mountain crossing until `$0099` | dlg `$06D4` world-save rule (`save-points-vector.md` §1) |
 | S2 | world outside town, mid-fire | structurally open (343's exits are ungated during `$008E`) | **UNVERIFIED live** |
 | S3 | **map 375 (8,44)** | the Esper Mountain save point — before the statues, and reachable again between Ultros ③ and the massacre trigger | `event_trigger.asm:1795`; `NPCProp::_375` sparkle |
-| S4 | world (249,128) | the stop line | leg 7 |
+| S4 | world (249,128) | the stop line | segment 7 |
 
-No `SavePoint` trigger exists on any other band map — the blocks for
+No `SavePoint` trigger exists on any other map in this area — the blocks for
 340-351 and 371-375 were read in full (`event_trigger.asm:1647-1803`; the
-nearby SavePoints on maps 353/354/355/358 belong to other bands' maps —
+nearby SavePoints on maps 353/354/355/358 belong to other areas' maps —
 Veldt Cave, Floating-Continent-era maps, and an event-only interior — none
-is reachable from this band). The town has **no save point in any variant**,
+is reachable from this area). The town has **no save point in any variant**,
 and map 341 additionally cannot be exited.
 
 The two holes, measured against #10's principles:
@@ -351,17 +351,17 @@ The two holes, measured against #10's principles:
 - **The burning house.** Retry boundary for FlameEater is S2 (if the fire
   window really allows leaving town) or the pre-inn world save — either way
   a retry replays the fire-night scene and/or the flame gauntlet. Not
-  catastrophic (the gauntlet is short) but it is the band's only boss whose
-  doorstep has no save inside ~40 steps.
+  catastrophic (the gauntlet is short) but it is the area's only boss whose
+  entry point has no save inside ~40 steps.
 - **The massacre approach.** Battle 124 is a loseable solo fight buried
   ~three scenes deep in an unskippable chain; a loss replays from S3 plus
   the entire mountain-top → Yura → town → Kefka choreography. This is the
-  single worst retry cost in the band and it lands on the band's least
+  single worst retry cost in the area and it lands on the area's least
   conventional fight.
 
-### 2.2 Proposed anchors (leg-fixtures.md letters continue from K)
+### 2.2 Proposed checkpoints (leg-fixtures.md letters continue from K)
 
-| anchor | battery save at | exists? |
+| checkpoint | batch save at | exists? |
 |---|---|---|
 | **K** `thamasa-mission` | world (232,150) — the input | v0.7 deliverable |
 | **L** `thamasa-night` | world outside town, `$008D=1`, party TERRA·LOCKE·SHADOW, pre-inn | world save, no authoring |
@@ -370,28 +370,28 @@ The two holes, measured against #10's principles:
 | **O** `ultros-won` | map 375 (8,44) again, `$0095=1`, party +RELM | same save point, second visit |
 | **P** `thamasa-done` | world (249,128), `$009C=$009D=1` — the v0.8 terminal | world save, no authoring |
 
-Legs: K→L (world walk, town, two name menus — short), L→M (**the fire
+Segments: K→L (world walk, town, two name menus — short), L→M (**the fire
 block**: inn scene, house gauntlet, FlameEater, rescue night, Shadow's
-goodbye — one long interior stretch with no legal anchor inside; splittable
+goodbye — one long interior stretch with no legal checkpoint inside; splittable
 only by savestates at `house_entry` / `flameeater_won`), M→N (world walk +
 mountain approach), N→O (statues + Ultros ③ — short, the vanilla save point
-serves both ends), O→P (**the massacre block**: the atomic chain of leg 6 —
+serves both ends), O→P (**the massacre block**: the atomic chain of segment 6 —
 battle 124 is the risk point; savestate splits at `massacre_start` /
-`kefka_duel_won`, never anchors). K→L, M→N are trivial; L→M and O→P are the
-work.
+`kefka_duel_won`, never checkpoints). K→L, M→N are trivial; L→M and O→P are
+the work.
 
 ### 2.3 Entry contracts worth pinning
 
 - L/M/N/O/P must assert the **availability vector** (`$02F3=0` from M
-  onward; `$02E7/$02F7` from M; `$02E8/$02F8` from O) — the band is
-  join-heavy and a stale anchor with the wrong roster passes size checks
+  onward; `$02E7/$02F7` from M; `$02E8/$02F8` from O) — the area is
+  join-heavy and a stale checkpoint with the wrong roster passes size checks
   while breaking every scene's `party_chars`.
 - M must assert Shadow's equipment is back in inventory (`remove_equip`,
   `:73018`) — the #21 count-assert pattern applied to gear.
 - O must assert `$0095=1 && $0099=0` — the window between Ultros and the
-  massacre trigger is the only place O can legally exist; a save minted
+  massacre trigger is the only place O can legally exist; a save generated
   after stepping on (15,17) is unreachable-in-principle.
-- P asserts the leg-7 tail: `$009D=1`, four-person party, Shadow
+- P asserts the segment-7 tail: `$009D=1`, four-person party, Shadow
   unavailable, `norm_lvl`'d bench (spot-check one benched level against the
   party average).
 
@@ -419,7 +419,7 @@ leaving zero for the deferred v0.5/Opera backfill (~5 wanted per #10's
 deferred list).** The combined need (≈7) exceeds the budget (2) — the
 dispatch's expectation holds. §6 is the relocation design that resolves it.
 
-The honest minimum is also on the table: **zero mandatory spends.** Vanilla
+The bare minimum is also on the table: **zero mandatory spends.** Vanilla
 covers Ultros ③; the fire window arguably has S2; the massacre hole is
 mostly a *fixture* problem (savestates) and vanilla shipped it this way.
 But both placements score well against #10's published principles, and the
@@ -432,7 +432,7 @@ budget, not for skipping the saves.
 
 ### 3.1 The fight slate
 
-| fight | where | formation (offline decode — verify at doorstep, §11 precedent) | notes |
+| fight | where | formation (offline decode — verify on arrival, §11 precedent) | notes |
 |---|---|---|---|
 | battle 31 ×12 | map 351 flames | 158/159 → Balloon `$0de` ×3 (75%) / ×6 (25%) | contact battles; Exploder = full-HP self-destruct; flames wander randomly |
 | battle 45 | 351 (21,22) | 411 → Balloon ×4 | scripted ambush |
@@ -443,7 +443,7 @@ budget, not for skipping the saves.
 | battle 105 | esper flyover | 389 → dummy `$17b` | theater |
 | battle 97 | drain scene | 392 → KEFKA_VS_ESPER `$17a` HP50001 | pure script: espers cast, `battle_event $1a`, end (`ai_script.asm:8047-8056`) |
 
-Boss break data is **already authored** for the band's two conventional
+Boss break data is **already authored** for the area's two conventional
 bosses and the Balloons (`ot6_hud.asm:1716-1721`), and FlameEater's water
 add shipped with #23 (`ot6_break.asm:472-479`). What is *not* authored:
 `$173`/`$17a` (massacre Kefkas) have no rows — the break floor will give
@@ -452,9 +452,9 @@ them a weapon-class weakness and the HUD will draw a formula gauge
 
 ### 3.2 Encounter survey shape (the #11-style pass)
 
-The band's random-encounter surface is small: three mountain cave maps
+The area's random-encounter surface is small: three mountain cave maps
 (group 89), the mountain exterior (group 90), and three world terrain
-groups (24/25/26) — §1 legs 1 and 5 carry the full pools. The shape:
+groups (24/25/26) — §1 segments 1 and 5 carry the full pools. The shape:
 
 - **Fire is the mountain's master key** (Mandrake, Insecare, Slurm), teaching
   exactly the button FlameEater then absorbs — vanilla authored the OT6
@@ -464,11 +464,11 @@ groups (24/25/26) — §1 legs 1 and 5 carry the full pools. The shape:
   Baskervor, Chimera have empty weak rows and ride the generated break
   floor (weapon classes only). The survey pass should decide whether any
   gets an authored element row or whether class-only is the intended
-  texture for a band whose kit additions (rods = bludgeon, brush = special)
+  texture for an area whose kit additions (rods = bludgeon, brush = special)
   want weapon-class relevance anyway.
 - Levels: island L20-22, mountain L23-24, bosses L25-26 vs a party arriving
-  from v0.7 at roughly L16-19 (**unestablished** — v0.7 has not been minted;
-  wob-route measured L15-16 at the v0.6 tail). The gap is the band's
+  from v0.7 at roughly L16-19 (**unestablished** — v0.7 has not been generated;
+  wob-route measured L15-16 at the v0.6 tail). The gap is the area's
   balance question: vanilla tuned Thamasa for ~L22+ parties. The XP texture
   on the way (two scripted Balloon gauntlets, a repeatable Guardian that
   only Leo can farm) does not close it. Measure at authoring, per the M6
@@ -478,7 +478,7 @@ groups (24/25/26) — §1 legs 1 and 5 carry the full pools. The shape:
 
 ## 4. Character / kit / magicite obligations
 
-- **Strago (Blue Mage/Scholar, `kits.md`'s "Curated kits").** Joins leg 3
+- **Strago (Blue Mage/Scholar, `kits.md`'s "Curated kits").** Joins in segment 3
   with no norm_lvl and fights FlameEater within minutes — his debut showcase
   is already designed (Analyze scout + Aqua Breath water chip, bosses-wob §18)
   but **the machinery is not built**: the curated-kit model (learn many,
@@ -486,17 +486,17 @@ groups (24/25/26) — §1 legs 1 and 5 carry the full pools. The shape:
   Lore-by-observation, and Analyze itself (it rides that same M4 kit work) are
   all open. Aqua Breath free at join, Lores MP-priced (`mp-economy.md`, "The
   verb survey"). Base MP 13 (`mp-economy.md`, "Early pools") under the
-  now-universal pool (#32). This is the band's largest kit build.
-- **Relm (Pictomancer, `kits.md`'s "Curated kits").** Joins leg 5 *inside*
+  now-universal pool (#32). This is the area's largest kit build.
+- **Relm (Pictomancer, `kits.md`'s "Curated kits").** Joins in segment 5 *inside*
   the Ultros scene. Kit is "Sketch ✦ signature (bug preserved ✦), support/trickster kit
   TBD" — v0.8 must at minimum decide the 8-slot sketch (sic) of her kit even
   if only Sketch + basics ship. Sketch's MP price is proposed flat 2-4,
   no refund on the bug (`mp-economy.md`, "The verb survey"). Control is
   explicitly deferred there too ("priced when her kit lands"). Base MP 18.
   Boost canon: §5.5.
-- **Shadow — the #31 entry debt.** He is party-active only from anchor K to
-  the inn night (leg 1-2: one town, no mandatory fights, then gone until the
-  Floating Continent). The v0.7 issue moved his kit here; the honest scope
+- **Shadow — the #31 entry debt.** He is party-active only from checkpoint K to
+  the inn night (segments 1-2: one town, no mandatory fights, then gone until the
+  Floating Continent). The v0.7 issue moved his kit here; the real scope
   question is whether a kit that is *reachable* for ~20 controllable minutes
   with zero required battles justifies the build now, or whether the debt
   moves once more to v0.9 (where he is forced party on the FC approach and
@@ -509,13 +509,13 @@ groups (24/25/26) — §1 legs 1 and 5 carry the full pools. The shape:
   no authored OT6 row, and Leo has no BP/boost tutorialization — does the
   gauge/boost HUD even behave with a WEDGE-actor solo party? Probe;
   Report/decision 4.
-- **Magicite: zero new stones** (headline 4). The band's M5 obligation is
+- **Magicite: zero new stones** (headline 4). The area's M5 obligation is
   whatever v0.7 left: if the six tube-room redesigns shipped in v0.7 (per
-  #31's commitment), v0.8 has **no esper work at all** — the first such band.
+  #31's commitment), v0.8 has **no esper work at all** — the first such area.
   If v0.7 re-scoped, the debt compounds here. Either way v0.8 adds none.
-- **Equipment flow to assert in fixtures:** Shadow's gear returns at leg 4
-  (`:73018`); the band tail norm-levels the entire bench (`:77976-77982`)
-  — any fixture asserting exact bench levels across the band boundary will
+- **Equipment flow to assert in fixtures:** Shadow's gear returns at segment 4
+  (`:73018`); the area tail norm-levels the entire bench (`:77976-77982`)
+  — any fixture asserting exact bench levels across the area boundary will
   see them move.
 
 ---
@@ -536,7 +536,7 @@ finish rewards Sketch specifically — `MonsterSketch[302]` = TENTACLE,
 TENTACLE (`monster_sketch.asm:313`), and Ultros's reaction block converts an
 incoming TENTACLE into surrender + `kill_monsters ALL`
 (`ai_script.asm:6315-6321`). After `$0095`, every random battle with Relm
-deployed carries Sketch: the rest of the band has *no mandatory battles
+deployed carries Sketch: the rest of the area has *no mandatory battles
 with Relm* (she is benched for the massacre), so within v0.8 the exposure
 surface is battle 125 plus optional mountain/world trash on the walk out.
 From the stop line onward she is a free-pick party member and the surface
@@ -551,7 +551,7 @@ target flagged unsketchable (`$3c80,y` bit `$20`), or the
 is a level ratio — attacker level vs target level (Coronet scales it);
 when the attacker's level is not clearly above the target's, a random roll
 decides. Direction of the division **read but not traced** — the operational
-consequence is the same either way: **at band levels (Relm ~L17-24 vs
+consequence is the same either way: **at the levels here (Relm ~L17-24 vs
 Ultros L25) a Sketch miss is a live outcome, plausibly ~20-30% per cast,
 and every miss walks the `$b7=$ff` path into `AnimType_2f`'s unguarded
 index** (`vanilla-destructive-bugs.md`: severity is
@@ -589,32 +589,32 @@ accidentally. **Yes, with meaningful probability, at the worst possible
 moment:**
 
 - The natural way to script battle 125 is the way the game teaches — drive
-  Sketch. Every driven Sketch at band levels risks the ~1-in-4 miss, and a
-  miss during a *minting* run can sweep bank `$7e` — the save block and
-  battle inventory — right before the harness writes the battery anchor
-  (O `ultros-won`) that every downstream leg will trust. A corrupted-but-
-  checksum-valid tracked anchor is the nastiest failure the leg-fixtures
+  Sketch. Every driven Sketch at the levels here risks the ~1-in-4 miss, and a
+  miss during a savestate-generation run can sweep bank `$7e` — the save block
+  and battle inventory — right before the harness writes the batch checkpoint
+  (O `ultros-won`) that every downstream segment will trust. A corrupted-but-
+  checksum-valid tracked checkpoint is the nastiest failure the leg-fixtures
   design can produce (the invariant contract is the only net under it).
-- The same applies to any post-band gen that deploys Relm and sweeps
+- The same applies to any gen past this area that deploys Relm and sweeps
   commands.
 
 Proposed harness rules (for the dispatcher to adopt into the agent brief /
 gen conventions):
 
-1. **Frontier gens never issue Sketch.** Battle 125's minting fixture ends
+1. **Savestate-generating scripts never issue Sketch.** Battle 125's generator ends
    the fight on HP (22000 HP is long but deterministic) or — if the Sketch
    finish is wanted for route fidelity — only after a probe confirms the
-   attacker-level ≥ target-level auto-hit condition holds for the minted
-   party (it will not, at expected band levels; so: HP finish).
+   attacker-level ≥ target-level auto-hit condition holds for the generated
+   party (it will not, at the levels expected here; so: HP finish).
 2. **The Sketch charm moment gets one dedicated, isolated probe fixture** —
-   savestate-in, savestate-out, feeding **no** anchor — that drives Sketch,
+   savestate-in, savestate-out, feeding **no** checkpoint — that drives Sketch,
    observes both outcomes (Tentacle finish on hit; on a forced miss,
    watches `($76),3` / `$b7` per the research doc's settle-list) and
    documents the shipped behavior. That probe doubles as the release-notes
    evidence and settles the Sketch row of
    `vanilla-destructive-bugs.md`'s "REPORTED, UNVERIFIED" table — worth doing
    even though no fix will follow.
-3. **Anchor O's entry contract** (and P's) should include an inventory
+3. **Checkpoint O's entry contract** (and P's) should include an inventory
    checksum/spot-assert so a silent `$7e` sweep in any earlier drive fails
    loudly instead of laundering into the baseline.
 
@@ -684,19 +684,19 @@ splices in `battle_main.asm`/`shop.asm`). Sixteen-and-sixteen covers v0.8
 (≤2), the Opera backfill (~5), and the rest of the WoB with margin, and
 spends only `$E0` of the `$1540` headroom.
 
-### 6.3 What breaks — the honest list
+### 6.3 What breaks — the full list
 
 1. **`tools/tests/battle_runic.lua:68`** pins `MAGIC_PROP = 0x046AC0` (with
    the comment at `:39` acknowledging the pin). One-line fix; better, make
    it read the address from the map file the build already produces, so the
    next growth is free.
 2. **Every savestate dies** — this is a ROM change like any other
-   (`leg-fixtures.md`, "The problem"); the full frontier re-mints once. **Battery
-   anchors survive** (#9's proven property) — which is precisely why the
-   anchor conversion should be ahead of this change, and why the change
-   should land **in v0.8's already-inevitable ROM window** (kit tables,
-   encounter rows, and any new save points are ROM changes too; one window,
-   one re-mint).
+   (`leg-fixtures.md`, "The problem"); the full savestate chain regenerates
+   once. **Batch checkpoints survive** (#9's proven property) — which is
+   precisely why the checkpoint conversion should be ahead of this change,
+   and why the change should land **in v0.8's already-inevitable ROM
+   window** (kit tables, encounter rows, and any new save points are ROM
+   changes too; one window, one regeneration).
 3. **The BPS patch grows**: every byte from `C41A10` to `C4A4BF` shifts, so
    the patch carries a ~35 KB shifted region it didn't before. Cosmetic,
    but worth expecting in the release diff.
@@ -710,14 +710,14 @@ spends only `$E0` of the `$1540` headroom.
 
 ### 6.4 Recommendation
 
-Land the growth **with v0.8's first ROM change**, before the band's save
+Land the growth **with v0.8's first ROM change**, before the area's save
 points and kit tables, so the budget stops constraining design during the
 milestone rather than after it. The v0.8 spends (decision 1) then come out
 of a 16-slot pool instead of a 2-slot one, and the Opera backfill stops
 being blocked on segment surgery. If the dispatcher prefers deferring, the
-fallback is honest too: v0.8 fits in the existing 2 slots (§2.4), and the
-growth waits for the backfill — but it re-mints the frontier a second time
-for no saved work.
+fallback is reasonable too: v0.8 fits in the existing 2 slots (§2.4), and the
+growth waits for the backfill — but it regenerates the whole savestate chain a
+second time for no saved work.
 
 ---
 
@@ -725,13 +725,13 @@ for no saved work.
 
 1. **The massacre chain is atomic and loseable in the middle.** From 375
    (15,17) to the 340 grave there is no save, no exit (341 has none), and
-   battle 124 is a real solo fight (§1 leg 6). Fixtures: savestate splits
+   battle 124 is a real solo fight (§1 segment 6). Fixtures: savestate splits
    only; assert `rideScene`/`hasControl` around the two Leo control
    windows. Players: the retry is S3 + the whole chain — the §2.4
    mountain-top save point is the mitigation.
-2. **Sketch in harness drives** (§5.4). One rule — frontier gens never
-   issue Sketch — removes the whole class; adopt it before the first Relm
-   fixture exists, not after a corrupted anchor.
+2. **Sketch in harness drives** (§5.4). One rule — savestate-generating scripts
+   never issue Sketch — removes the whole class; adopt it before the first Relm
+   fixture exists, not after a corrupted checkpoint.
 3. **Nondeterministic actors on the critical path.** The 12 burning-house
    flames wander `RANDOM` with collision on; the Balloon draw is 75/25
    (3 vs 6); world/mountain trash is standard RNG. The house drive needs
@@ -742,16 +742,16 @@ for no saved work.
    after `$0097` (the three shortcut retiles). Offline BFS on those maps in
    the wrong state will lie — the v0.6 §11 correction class. Live census at
    authoring.
-5. **Two naming screens mid-scene** (`name_menu STRAGO/RELM`, leg 2). A new
+5. **Two naming screens mid-scene** (`name_menu STRAGO/RELM`, segment 2). A new
    driving idiom; a gen that only knows dialog-advance will hang on the
    first one.
 6. **The `$0099→$009C` town lockdown**: any fixture assuming "towns can be
-   exited" breaks on 341. Conversely the leg-6 exit-row triggers fight a
+   exited" breaks on 341. Conversely the segment-6 exit-row triggers fight a
    repeatable Guardian — a drive that wanders into an exit row mid-window
    eats a 50000-HP theater fight (and Leo banks the XP; he leaves forever,
    so it is pure waste plus RNG).
 7. **Join levels are un-normalized at join** (Strago `:71790-71801`, Relm
-   `:73694-73701` — no `norm_lvl`; the band tail normalizes the *bench*,
+   `:73694-73701` — no `norm_lvl`; the area tail normalizes the *bench*,
    not them). If `char_prop` init-averaging is weaker than assumed
    (**UNVERIFIED**), Strago could reach FlameEater at a floor level.
    One probe: read Strago's level at M.
@@ -760,7 +760,7 @@ for no saved work.
    gates the world entrance (229,130) before the fire (`$0098` is written,
    never read as a gate — grepped). If a pre-Strago party can walk in, the
    scene is a probable hang. Vanilla may prevent it by geometry
-   (**UNVERIFIED**). Worth one doorstep probe; not a route risk for the
+   (**UNVERIFIED**). Worth one probe at the entry point; not a route risk for the
    canonical chain.
 9. **Offline decode trust boundaries**: formation 445 ("Guardian" for the
    Leo exit fights) and every dummy-species formation (105/97) carry the
@@ -791,11 +791,11 @@ for no saved work.
 8. **The v0.8 offline BFS set**: 343 (both tile states), 351, 375 (both
    states), 372/373/374 — run the ported step model with per-state
    tilemaps; live-census 375's shortcut retiles.
-9. **XP/gil conservation across the band's scripted battles** (12× battle
+9. **XP/gil conservation across the area's scripted battles** (12× battle
    31 at player option, repeatable battle 75 on a departing guest): does
-   the balance band need a rule for Leo-banked XP?
+   this area's balance need a rule for Leo-banked XP?
 10. **Where does `battle_event $17` (Leo's fall) leave battle state** — the
-    kill-bit idiom question for the one real fight in the massacre.
+    monster-dead-flag idiom question for the one real fight in the massacre.
 
 ---
 
@@ -816,7 +816,7 @@ for no saved work.
 | FlameEater | `_cbe767 :72095`; party `:72101`; **battle 79 `:72124`**; `$0090 :72129`; shield row `ot6_hud.asm:1718-1719`; water add `ot6_break.asm:472-479` |
 | post-fire night / morning | `load_map 349 :72613`; `$0091/$0098 :73000-73001` |
 | Shadow departs | `_cbec92 :73010`; `remove_equip SHADOW :73018`; `$0092 :73302` |
-| Esper Mtn entrances | world `0 (229,130)→375 (55,31)`; graph §1 leg 5 (short-entrance decode) |
+| Esper Mtn entrances | world `0 (229,130)→375 (55,31)`; graph §1 segment 5 (short-entrance decode) |
 | Mtn save point | `event_trigger.asm:1795` (375 (8,44)); sparkle `NPCProp::_375` (`$0632`) |
 | statue scene | `_cbf168 :73807`; `$0096/$0097 :74018-74019` |
 | Ultros ③ scene | `_cbefa5 :73495`; **RELM join `:73694-73701`**; **battle 125 `:73702`**; post-party `:73709`; `$0095 :73801`; shield row `ot6_hud.asm:1716-1717` |
@@ -828,7 +828,7 @@ for no saved work.
 | Kefka duel | Kefka NPC talk `npc_prop.asm:15056` → `_cbfff4 :76452`; VICKS=KEFKA_4 `:76461`; **battle 124 `:76470`**; AI `ai_script.asm:7952-7965` |
 | theater battles | `$009B :76598`; battle 105 `:76601` + flyover `:76602-76627`; battle 97 `:76954` (AI `ai_script.asm:8047-8056`) |
 | party restore / grave | `:77242-77253`; `load_map 340 {54,19} :77259`; `$009C :77313` |
-| band tail / stop line | avail+`norm_lvl` `:77964-77989`; `and_status SHADOW :77990`; `$009D :77992`; **`load_map 0 {249,128} :78007`; `airship_pos {249,127} :78009`** |
+| area tail / stop line | avail+`norm_lvl` `:77964-77989`; `and_status SHADOW :77990`; `$009D :77992`; **`load_map 0 {249,128} :78007`; `airship_pos {249,127} :78009`** |
 | shops | `shop_prop.dat` rows 33/34/35/45; menus `:69475/:69480/:69485/:69540` |
 | treasure | `treasure_prop.dat` blocks 343/349/351/372/373/374/375 |
 | encounter decode chain | `break-band-vector.md` §1 method; world terrain OR `field/battle.asm:97-147` |

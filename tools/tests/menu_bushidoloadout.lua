@@ -3,8 +3,8 @@
 --
 -- ISSUE #75 CONVERSION -- a REAL CYAN, zero state writes.  This file's header
 -- used to open "reaching Skills->SwdTech for a real Cyan headlessly needs a
--- party+field fixture we do not mint"; that is STALE -- the honest chain
--- mints cyan_defence (gen_sabin_camp: Doma castle interior, map 120, CYAN
+-- party+field fixture we do not generate"; that is STALE -- the input-driven
+-- chain generates cyan_defence (gen_sabin_camp: Doma castle interior, map 120, CYAN
 -- alone in the party with field control).  So the two data stagings this file
 -- carried are gone:
 --   * the BUSHIDO command is not granted to the leader's record -- CYAN's own
@@ -22,7 +22,7 @@
 --
 -- issue #38 put a 1-BP floor under every tech, so the page is THREE rows
 -- (1x/2x/3x) and menu row i edits WORD SLOT i+1.  The stored format did not
--- move -- same word, same four fields, same sentinel, so no battery anchor is
+-- move -- same word, same four fields, same sentinel, so no SRAM checkpoint is
 -- disturbed -- word slot 0 is simply retired.  Ot6LoadoutSeedWord still writes
 -- it (its auto-tech clamp makes it a mirror of slot 1), and nothing reads it.
 -- So:
@@ -37,7 +37,7 @@
 --     b = max(0, c-2), slot s (1..3) shows min(c, b+s-1), retired slot 0
 --     mirrors slot 1.  Cyan's real set here is $03 -- TWO techs, Dispatch and
 --     Retort (the plan doc's "$07 scenario-band set" describes a later Cyan)
---     -- so c=1, the window is {0,1,1} with the 3x rung CLAMPED to the
+--     -- so c=1, the window is {0,1,1} with the 3x tier CLAMPED to the
 --     ceiling, the seed is {0,0,1,1}, and R on row 0 cycles WORD SLOT 1 from
 --     0 to 1, leaving {0,1,1,1} = $0248, nonzero = MANUAL.  All of it is
 --     DERIVED from $1cf7 as read, so a fixture whose Cyan joins knowing more
@@ -106,10 +106,10 @@ H.run({ maxFrames = 20000 }, {
   -- opens its menu the same way).  $59 is the FIELD's own menu-opening flag
   -- (player.asm), readable while the field still owns the zero page;
   -- ZMENUSTATE only means anything once the menu module has taken over, so
-  -- it is the second gate, not the first.
+  -- it is the second check, not the first.
   H.driveUntil(function() return H.readByte(0x59) ~= 0 end, 600, {
     H.pressButtons({ "x" }, 4), H.waitFrames(30),
-  }, "menu opening ($59, field-side witness)"),
+  }, "menu opening ($59, field-side check)"),
   H.waitUntil(function() return H.readByte(ZMENUSTATE) == ST_MAIN end,
     400, "main menu", 5),
   H.waitFrames(30),

@@ -1,4 +1,4 @@
--- gen_battle2: win fight 1, walk to fight 2 (mixed formation), mint a
+-- gen_battle2: win fight 1, walk to fight 2 (mixed formation), generate a
 -- doorstep2 state and audit clean 16x16 sprite anchors THERE.
 local H = dofile("tools/tests/lib/ot6.lua")
 local STATE = "build/states/battle_doorstep.mss.lua"

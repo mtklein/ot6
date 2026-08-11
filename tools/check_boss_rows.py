@@ -311,7 +311,7 @@ WAIVERS = {
     # EMPTY, and that is the point.  Every row bosses-wob.md authors in prose
     # is authored into Ot6ElemAddTbl, so nothing needs waiving.
     #
-    # With no waivers left this script is a plain gate, and it is registered in
+    # With no waivers left this script is a plain check, and it is registered in
     # `make test` (the Makefile's test target, next to the compose/sram_anchor
     # selftests) so doc-vs-data drift fails the suite from here.  Suite.sh's own
     # discovery globs *.lua for a `-- @suite` marker and cannot see a .py file,

@@ -54,7 +54,7 @@ though since we build from source with ld65, the cleaner move is to
 allocate new battle-RAM segments through the linker config instead of
 scavenging.
 
-Broken = per-entity timer + five surgical checks (turn gate, always-hit,
+Broken = per-entity timer + five hook sites (turn gate, always-hit,
 ×2 damage, tick, wear-off) — every one at a verified address above, each
 copying a vanilla pattern (Stop/Freeze). Spell data byte $07 has six free
 bits per *attack* (per Synchysi) if we need to flag attacks specially.

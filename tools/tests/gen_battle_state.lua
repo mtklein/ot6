@@ -16,7 +16,7 @@
 --   shots/gen_*.png            progress screenshots
 --
 -- Exit codes: 0 = in-battle state captured, 1 = battle never became active
--- (doorstep state still emitted), 2 = frame budget blown.
+-- (entry point state still emitted), 2 = frame budget blown.
 
 local H = dofile("tools/tests/lib/ot6.lua")
 
@@ -34,12 +34,12 @@ H.run({ maxFrames = 60000 }, {
   H.call(function() H.screenshot("gen_cliff") end),
 
   -- 3. Cliff dialogs + town gate: walk north, mash A, keep rolling
-  --    doorstep savestates so we always have a just-before-battle state.
+  --    entry point savestates so we always have a just-before-battle state.
   H.driveUntil(function() return H.battleLoadStarted() end, 15000, {
     H.hold({ "up" }), H.waitFrames(20), H.release(), H.waitFrames(2),
     H.pressButtons({ "a" }, 4),
     H.call(function()
-      -- rolling doorstep capture via the exec-callback trampoline:
+      -- rolling entry point capture via the exec-callback trampoline:
       -- harvest last cycle's request, then issue a new one every ~150 frames
       if saveReq and saveReq.done and saveReq.blob then
         doorstepPrev = doorstep

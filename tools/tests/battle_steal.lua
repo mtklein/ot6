@@ -44,7 +44,7 @@
 -- waiver-burndown plan: mechanism decodes may keep memory-hack staging
 -- where the fixture cannot produce the input on cue).  No fixture chain
 -- owns a Sneak Ring; the game's own sources are a shop we never visit and
--- a steal FROM species $14 -- honest ring ownership is future work.  The
+-- a steal FROM species $14 -- owning the ring in normal play is future work.  The
 -- arm sets/clears one relic bit ($3C45 bit 0) around two unboosted
 -- attempts and uses the same roll decode: with the ring the model becomes
 -- "lands iff roll < 100", and any observed roll >= 50 that lands is a
@@ -363,7 +363,7 @@ H.run({ maxFrames = 150000 }, {
       "the ringed steal still DREW the roll (0 bp stays vanilla-shaped)")
     local roll = rec.draws[1].roll
     H.log(string.format("ringed roll=%d (bare model would %s)", roll,
-      roll < 50 and "also land" or "MISS -- doubling witnessed"))
+      roll < 50 and "also land" or "MISS -- doubling observed"))
     H.assertEq(rec.code, 3,
       "ringed steal landed (model: lands iff roll < 100)")
     H.assertEq(rec.grant ~= nil, true, "and took an item")

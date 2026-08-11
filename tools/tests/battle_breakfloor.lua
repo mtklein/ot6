@@ -7,7 +7,7 @@
 -- fallback (ot6.asm): a monster with NO authored Ot6ShieldTbl row now seeds
 -- its class-weak mask $3e9c from OT6_FLOOR_CLASS[species] instead of clearing
 -- it to zero -- so every species is breakable by SOME weapon class.  This
--- test is the regression gate that the generated table (gen_break_floor.py)
+-- test is the regression check that the generated table (gen_break_floor.py)
 -- actually lands in the assembled ROM with the classes the classifier chose.
 --
 -- OT6_FLOOR_CLASS is one class byte per species (0..383), directly indexed by

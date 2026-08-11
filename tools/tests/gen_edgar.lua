@@ -5,7 +5,7 @@
 -- to the MATRON and ride her flashback (the beat that puts Edgar back on
 -- his throne), take the second audience into KEFKA's arrival, work the
 -- confrontation, LOCKE's regroup and the burning night, and finally let
--- the castle submerge and ride the chocobos out.  Mints three states:
+-- the castle submerge and ride the chocobos out.  Generates three states:
 --   figaro_intro.mss    after the first audience ($0004 set)
 --   figaro_matron.mss   after the flashback ($0308 set again)
 --   figaro_cleared.mss  first controllable frame on the world map,
@@ -82,7 +82,7 @@
 --   still TERRA + LOCKE.  Shop 82 stocks AutoCrossbow $AA / NoiseBlaster
 --   $A3 / BioBlaster $A4 (shop_prop.dat record 82 = 33 aa a3 a4 ff...);
 --   the AutoCrossbow arrives free in the intro (`give_item AUTOCROSSBOW`
---   :15310), so the gil goes on the BioBlaster (750, the rung-2 poison
+--   :15310), so the gil goes on the BioBlaster (750, the tier-2 poison
 --   key) and the NoiseBlaster (500).
 --
 -- THE CASTLE IS NOT ONE WALKABLE PLACE.  This is the part that cost the
@@ -123,7 +123,7 @@
 --       -> (80,18) -> 55 (33,33) = ring
 --   and comes back the mirror way through 59 (82,10) -> 60 (97,25).
 --
---   THE RING IS TWO BANDS, which is why the route takes the WEST stair
+--   THE RING IS TWO ARCS, which is why the route takes the WEST stair
 --   and not the east one:
 --     east  (x >= 32), via map 60: carries the guest-wing doors
 --                      (44,19)/(44,26);
@@ -141,10 +141,10 @@
 --   one DOWN press from (28,42) lands (28,43), and 84 frames later the
 --   party is outside the castle.  What the earlier pass logged as "edge
 --   (28,43)->left blocked in reality" was navTo holding a direction during
---   that map load.  So: the matron needs the WEST band, reached by the
+--   that map load.  So: the matron needs the WEST arc, reached by the
 --   chamber staircase above, and the guest wing -- which the burning night
 --   needs -- takes the map-60 stair instead.  BFS still does not know about
---   entrance triggers; keep route legs off y=43.
+--   entrance triggers; keep route steps off y=43.
 --
 -- THE ROSTER CHANGES FOUR TIMES, so nothing may read a fixed character
 --   slot.  LOCKE leaves during the first audience; the Kefka scene makes
@@ -154,9 +154,10 @@
 --   (`char_party EDGAR, 0 / delete_obj EDGAR` :16813-16814,
 --   `party_chars TERRA` :16818); the burning night makes it EDGAR alone
 --   once more (:16944-16949).  Only after the submerge are all three in
---   the party at once (asserted at the mint, by party byte not by slot).
---   Every position read in this script goes through the $0803 party-object
---   offset (H.fieldX/fieldY), which is what makes that survivable.
+--   the party at once (asserted at generation time, by party byte not by
+--   slot).  Every position read in this script goes through the $0803
+--   party-object offset (H.fieldX/fieldY), which is what makes that
+--   survivable.
 --
 -- OBJECT NUMBERS are map-NPC index + 16, in npc_prop.asm order.  Map 55:
 --   19 courtyard guard {24,16} $0315 -> _ca5f9f (the submerge), 20 KEFKA
@@ -226,7 +227,7 @@ end
 -- and $19/$E8 are clear, so worldHasControl() is TRUE for ~56 frames on a
 -- fully black screen (measured: brightness 0 throughout, then the event
 -- engine takes $E7 bit0 at +56 and the screen only lights afterwards).
--- A 30-frame calm window latched onto exactly that and minted a state
+-- A 30-frame calm window latched onto exactly that and generated a state
 -- 5700 frames early.  Requiring control and a lit screen SIMULTANEOUSLY
 -- rejects it, because the two never overlap during the transient.
 local function worldCalm(n)
@@ -510,7 +511,7 @@ end
 H.run({ maxFrames = 120000 }, {
   H.loadState(DOOR),
   H.waitFrames(10),
-  H.waitUntil(calm(10), 600, "doorstep control", 5),
+  H.waitUntil(calm(10), 600, "entry point control", 5),
   H.call(function()
     H.assertEq(map(), 55, "boot map is the Figaro courtyard (55)")
     H.assertEq(H.fieldX() == 28 and H.fieldY() == 42, true, "at the gate (28,42)")
@@ -580,7 +581,7 @@ H.run({ maxFrames = 120000 }, {
   end),
 
   -- ==================================================================== --
-  -- PHASE 4: assert the far side and mint.
+  -- PHASE 4: assert the far side and generate.
   -- ==================================================================== --
   H.call(function()
     H.assertEq(map(), 58, "still in the throne room")
@@ -601,7 +602,7 @@ H.run({ maxFrames = 120000 }, {
   end),
   H.saveState("figaro_intro.mss"),
   H.logStep(function()
-    return string.format("figaro_intro minted at frame %d", H.frame)
+    return string.format("figaro_intro generated at frame %d", H.frame)
   end),
 
   -- ==================================================================== --
@@ -610,10 +611,10 @@ H.run({ maxFrames = 120000 }, {
   -- that ring is the chamber behind 55 (23,24): its floor reaches (48,58)
   -- and from there one continuous RIGHT walks a diagonal staircase through
   -- (49,59)/(50,60), takes 59 (50,60) -> 59 (65,43) and carries on into
-  -- the west wing.  The wing's door (66,50) is the ring's west band.
+  -- the west wing.  The wing's door (66,50) is the ring's west arc.
   -- (The EAST ring, reached the mirror way through map 60, carries the
   -- guest-wing doors instead; the castle block at x=24..32 keeps the two
-  -- bands apart and the row that joins them, y=43, is map 55's world-exit
+  -- arcs apart and the row that joins them, y=43, is map 55's world-exit
   -- trigger row -- see the header.)
   -- ==================================================================== --
   crossDoor(102, 56, 59, 27, 15, "D7 throne room -> throne hall"),
@@ -631,7 +632,8 @@ H.run({ maxFrames = 120000 }, {
   -- Her room's own staircase (the "\" tiles (66,26)/(65,25)/(64,24)) needed
   -- three more hand-holds before the fix -- the (67,27) arrival flooded to
   -- FOUR tiles.  talkTo's own navTo crosses it now: BFS finds an 11-step
-  -- plan from (67,27) to her doorstep, two of them diagonal (probe_canstep).
+  -- plan from (67,27) to her entry point, two of them diagonal
+  -- (probe_canstep).
   talkTo(17, "MATRON", 9000),
   commitName("sabin_naming"),
   H.advanceStory(calm(30, function()
@@ -647,11 +649,11 @@ H.run({ maxFrames = 120000 }, {
   end),
   H.saveState("figaro_matron.mss"),
   H.logStep(function()
-    return string.format("figaro_matron minted at frame %d", H.frame)
+    return string.format("figaro_matron generated at frame %d", H.frame)
   end),
 
   -- ==================================================================== --
-  -- PHASE 6: back to the throne for the SECOND AUDIENCE.  The west band
+  -- PHASE 6: back to the throne for the SECOND AUDIENCE.  The west arc
   -- is a cul-de-sac: its only way out is the wing door 55 (23,31), so the
   -- return re-crosses the chamber staircase from the other side.  That
   -- one is D-K3 below and it is the door the four-neighbour staging
@@ -722,7 +724,7 @@ H.run({ maxFrames = 120000 }, {
   -- spawn $0313) runs _ca700e, which is the whole night: the party becomes
   -- EDGAR alone again, map 55 reloads at night with STARTUP_EVENT, and it
   -- ends `$01F8=1 / player_ctrl_on` (:17070-17071).  He hangs off the EAST
-  -- band, so this is the map-60 crossing the west route never needed.
+  -- arc, so this is the map-60 crossing the west route never needed.
   -- ==================================================================== --
   crossDoor(33, 24, 60, 103, 29, "K7 inner courtyard -> map 60"),
   crossDoor(96, 26, 59, 81, 11, "K8 map 60 -> east wing (diagonal stair)"),
@@ -791,6 +793,6 @@ H.run({ maxFrames = 120000 }, {
   end),
   H.saveState("figaro_cleared.mss"),
   H.logStep(function()
-    return string.format("figaro_cleared minted at frame %d", H.frame)
+    return string.format("figaro_cleared generated at frame %d", H.frame)
   end),
 })

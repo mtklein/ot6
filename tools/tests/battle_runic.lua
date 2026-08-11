@@ -91,7 +91,7 @@
 --
 -- Also asserted:
 --   - the BANK CAP: an absorb at 5 BP stays 5.  It must not wrap to 0
---     (a plain inc) and must not mint a 6th pip Ot6Boost would let her
+--     (a plain inc) and must not create a 6th pip Ot6Boost would let her
 --     spend (`cmp $3e9c`, ot6.asm).
 --   - the HUD really moves: the party-window pip glyph for Celes's own
 --     menu row is read out of VRAM and must equal Ot6PipCellTbl's cell

@@ -1,6 +1,6 @@
--- gen_ifrit_doorstep.lua -- v0.6 leg 7: mrf_kefka (map 263, {39,31},
+-- gen_ifrit_doorstep.lua -- v0.6 step 7: mrf_kefka (map 263, {39,31},
 -- $005F=1) -> the {36,44}/{37,44}/{38,44} chute -> map 264, the
--- Ifrit/Shiva alcove, control at {10,7}.  Mints ifrit_doorstep.
+-- Ifrit/Shiva alcove, control at {10,7}.  Generates ifrit_doorstep.
 --
 -- The Kefka scene leaves the party at {39,31} and OPENS the way south:
 -- measured, the chute row went from NO PATH at the {40,30} ride exit to
@@ -14,7 +14,7 @@
 --     show_obj / fade_in / DOWN 3 / DOWN_LEFT 3 / jump_low DOWN_LEFT
 --     player_ctrl_on
 -- {14,0} + DOWN 3 = {14,3}, + DOWN_LEFT 3 = {11,6}, + DOWN_LEFT = {10,7}.
--- The recon read that landing as "approximately (10,7)"; this leg asserts
+-- The recon read that landing as "approximately (10,7)"; this step asserts
 -- it exactly.
 --
 -- WHAT IS WAITING THERE.  npc_prop.asm:12289/:12298 put Ifrit at {3,8} and
@@ -165,7 +165,7 @@ H.run({ maxFrames = 60000 }, {
 
   -- 1. south to the chute row.  Any of {36,44}/{37,44}/{38,44} fires it,
   --    so navTo aims at the middle one and terminates on the map change.
-  H.navTo(37, 44, { maxFrames = 40000, honest = "flee",
+  H.navTo(37, 44, { maxFrames = 40000, playBattles = "flee",
     arrive = function() return map() == 264 end }),
   H.waitUntil(function() return map() == 264 end, 12000,
     "the chute -> map 264", 5),
@@ -187,7 +187,7 @@ H.run({ maxFrames = 60000 }, {
     -- save-room door and does not -- the save room is reachable before the
     -- fight.  Measured here rather than assumed, and asserted in the
     -- direction that is actually true, because this is the positive
-    -- control for the fight leg: if {9,5} were already walkable, "the
+    -- control for the fight step: if {9,5} were already walkable, "the
     -- fight opened the way onward" would prove nothing.
     H.log(string.format("[doors] bfsPath (3,5) save room = %s ; (9,5) onward = %s",
       H.bfsPath(3, 5) and (#H.bfsPath(3, 5) .. " steps") or "NO PATH",
@@ -206,22 +206,22 @@ H.run({ maxFrames = 60000 }, {
     H.screenshot("mrf_264_landing")
   end),
 
-  -- 1b. THE BOUNDARY DETOUR (issue #25).  This leg is A->B's terminal, so
-  --     before parking on the fight's doorstep it walks the {3,5} door
+  -- 1b. THE BOUNDARY DETOUR (issue #25).  This step is A->B's terminal, so
+  --     before parking on the fight's entry point it walks the {3,5} door
   --     into the map-270 save room, stands on the save point, and asserts
   --     the mrf-save-room-v1 boundary table -- the same table
   --     gen_mrf_save_room_anchor saves under and gen_ifrit_magicite's
-  --     anchored boot asserts as its ENTRY contract.  The sram witnesses
-  --     are products of the boundary save itself, so the leg asserts the
+  --     checkpoint boot asserts as its ENTRY contract.  The sram witnesses
+  --     are products of the boundary save itself, so the step asserts the
   --     pre-save variant (lib/ot6_contract.lua, assertExitContractPreSave).
   --     Standing on a save tile re-enters SavePoint every frame and
   --     hasControl() flickers (the same trap gen_esper_tubes measured on
   --     {10,9}), so arrival is judged on position + $01BF + alignment.
-  H.navTo(3, 6, { maxFrames = 12000, honest = "flee" }),
+  H.navTo(3, 6, { maxFrames = 12000, playBattles = "flee" }),
   tapInto("up", function() return map() == 270 end, 9000,
     "door 264 (3,5) -> map 270 (the save room)"),
   H.waitFrames(60),
-  H.navTo(25, 11, { maxFrames = 12000, honest = "flee" }),
+  H.navTo(25, 11, { maxFrames = 12000, playBattles = "flee" }),
   (function() local calm = 0
     return H.driveUntil(function()
       calm = (H.fieldX() == 25 and H.fieldY() == 10 and sw(0x01BF) == 1
@@ -248,11 +248,11 @@ H.run({ maxFrames = 60000 }, {
     "back down through the door -> 264"),
   H.waitFrames(60),
 
-  -- 2. park ON THE DOORSTEP OF THE FIGHT: {3,7}, directly above Ifrit's
+  -- 2. park ON THE ENTRY POINT OF THE FIGHT: {3,7}, directly above Ifrit's
   --    {3,8}, facing DOWN.  One A-press from _cc7937 and `battle 70`, the
   --    same shape as opera_doorstep.  A DOWN press here cannot step (his
   --    object occupies {3,8}) so it only turns the party.
-  H.navTo(3, 7, { maxFrames = 24000, honest = "flee" }),
+  H.navTo(3, 7, { maxFrames = 24000, playBattles = "flee" }),
   H.hold({ "down" }), H.waitFrames(8), H.release(), H.waitFrames(20),
   (function() local calm = 0
     return H.driveUntil(function()
@@ -270,11 +270,11 @@ H.run({ maxFrames = 60000 }, {
 
   H.call(function()
     H.assertEq(map(), 264, "on map 264")
-    H.assertEq(H.fieldX(), 3, "Ifrit doorstep x")
-    H.assertEq(H.fieldY(), 7, "Ifrit doorstep y")
+    H.assertEq(H.fieldX(), 3, "Ifrit entry point x")
+    H.assertEq(H.fieldY(), 7, "Ifrit entry point y")
     H.assertEq(H.readByte(0x087f + H.readWord(0x0803)), 2,
       "facing DOWN toward IFRIT (EVENT_DIR 2)")
-    H.assertEq(settled(), true, "the doorstep is QUIET")
+    H.assertEq(settled(), true, "the entry point is QUIET")
     H.assertEq(sw(0x0060), 0, "$0060 CLEAR -- battle 70 is still ahead")
     H.assertEq(sw(0x0273), 0, "$0273 CLEAR")
     H.assertEq(H.readByte(0x1A69) & 0x02, 0, "IFRIT not yet owned ($1A69 bit1)")
@@ -289,9 +289,9 @@ H.run({ maxFrames = 60000 }, {
   H.saveState("ifrit_doorstep.mss"),
 
   -- 3. VERIFY the banked state is genuinely one A-press from battle 70.
-  --    Runs AFTER the mint, so the saved blob is untouched.  Without this
-  --    a doorstep can be a dead one-press-short state and nothing notices
-  --    until the fight leg fails far away from the cause.
+  --    Runs AFTER the state is generated, so the saved blob is untouched.
+  --    Without this an entry point can be a dead one-press-short state and
+  --    nothing notices until the fight step fails far away from the cause.
   (function() local hb, aPh = 0, 0
     return H.driveUntil(function()
       return H.battleLoadStarted() and H.formationHas({ [0x0109] = true })
@@ -313,7 +313,7 @@ H.run({ maxFrames = 60000 }, {
     H.screenshot("ifrit_doorstep_verify")
   end),
   H.logStep(function()
-    return string.format("ifrit_doorstep minted at frame %d -- map 264 (3,7) "
+    return string.format("ifrit_doorstep generated at frame %d -- map 264 (3,7) "
       .. "facing IFRIT, one A-press from battle 70", H.frame)
   end),
 })

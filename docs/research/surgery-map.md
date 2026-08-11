@@ -1,4 +1,4 @@
-# OT6 Surgery Map — everything8215/ff6 source
+# OT6 hook-site map — everything8215/ff6 source
 
 Line numbers drift as we insert code; `@xxxx:` labels are the classic
 C2/C1 addresses (names, not pins — linking is symbolic). The label lines

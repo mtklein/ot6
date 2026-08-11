@@ -65,7 +65,7 @@ H.run({ maxFrames = 45000 }, {
   H.waitUntil(function() return H.battleActive() end, 900, "battle active", 30),
   H.waitFrames(240),
 
-  -- 1. THE GATE: garbage was handed to the seed and the codex is virgin, so
+  -- 1. THE CHECK: garbage was handed to the seed and the codex is virgin, so
   -- every un-chipped weakness must still read hidden and draw '?'.
   H.call(function()
     local checked = 0
@@ -86,7 +86,7 @@ H.run({ maxFrames = 45000 }, {
         H.assertEq(brk, 0, "slot "..slot.." broken timer cleared (not broken) despite seed garbage")
         -- class-weak mask ($3e9c): the $FF must be REPLACED, never OR'd, by the
         -- seed's authoritative value -- else the hud draws phantom class cells.
-        -- The doorstep Guards are AUTHORED (species 0, class PIERCE $02): the
+        -- The entry-point Guards are AUTHORED (species 0, class PIERCE $02): the
         -- @hit path OVERWRITES, so it lands exactly $02 over the $FF (confirming
         -- overwrite-not-OR). A formula species would land 0 via the @formula
         -- clear; no formula species is reachable in this fixture, but the clear

@@ -149,7 +149,7 @@ local function sabinDefends(what)
 end
 
 -- field: drive the REAL Config menu until the cursor bit reads `wantMem`.
--- The witness is $1d4e read back -- the test never writes it.
+-- The check is $1d4e read back -- the test never writes it.
 local function setConfigCursor(wantMem, what)
   return H.repeatN(1, {
     H.driveUntil(function() return H.readByte(ZMENUSTATE) == ST_MAIN end, 1200,

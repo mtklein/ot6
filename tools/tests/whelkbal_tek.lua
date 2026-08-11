@@ -5,7 +5,7 @@
 --
 --   tools/tests/run.sh tools/tests/whelkbal_tek.lua build/states/whelkbal_tek.log
 --
--- Drive: whelk doorstep -> fight -> dismiss the opening dialog -> burn
+-- Drive: whelk entry point -> fight -> dismiss the opening dialog -> burn
 -- non-terra menus on their row-1 beam (classless, and the head has no
 -- vanilla element weakness, so beams cannot move shields) -> when terra's
 -- menu comes up, walk her 2x4 magitek grid to the bottom-right cell

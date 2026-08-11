@@ -5,7 +5,7 @@
 -- Vanilla SwdTech ran a free bar (btlgfx_main.asm UpdateMenuState_35/37); OT6
 -- deletes that path (OpenCmdMenuTbl[7] -> _c1_bushido_open) and drives SwdTech
 -- through the Tools window shell (menu state $30).  Each row IS a boost level,
--- weakest at TOP; #38's 1-BP floor makes row i = boost i+1, no free rung.
+-- weakest at TOP; #38's 1-BP floor makes row i = boost i+1, no free tier.
 --
 -- Issue #75 conversion.  The old apparatus installed a triple-CYAN party by
 -- poke, wrote the katana flag, pinned $2020/bp/MP/HP/shields, stopped the
@@ -13,7 +13,7 @@
 -- bushidogrey/mpcost kit: katana SWDTECH flag $3BA4 bit 1 reads $82; two
 -- techs really learned -- $2020's low byte reads HIS true ceiling 1, under
 -- the same garbage high byte issue #4 documents InitSkills leaving), and
--- the honest arms run against his REAL window {Dispatch $55 @4, Retort
+-- the input-driven arms run against his REAL window {Dispatch $55 @4, Retort
 -- $56 @10} with cursor rows WALKED, never poked:
 --
 --   1. THE NUMERAL GAUGE IS GONE: opening SwdTech lands in $30; a watch
@@ -42,7 +42,7 @@
 --   with the real ceiling restored after.  The CLASS-CHIP/REVEAL half of
 --   the old confirm arm is also labeled: every SwdTech is authored SLASH
 --   (Ot6SkillClassTbl, $01) and this pool's species author weak-class
---   $02, so no honest chip can fire here -- the arm stages the $01 bit
+--   $02, so no chip can fire here in normal play -- the arm stages the $01 bit
 --   into every live monster's weak mask (every one, because the tech's
 --   default target is the engine's pick -- measured: staging one monster
 --   read 3->3 while the hit landed elsewhere) and the REAL Dispatch then
@@ -276,12 +276,12 @@ local function checkWindow(ceil, tag)
       end
     else
       H.assertEq(id, 0xFF, string.format(
-        "%s row %d: no row (#38: three rungs, fewer when the learned set is "
+        "%s row %d: no row (#38: three tiers, fewer when the learned set is "
         .. "short)", tag, r))
     end
   end
   H.assertEq(H.readByte(ITEMLIST + 3 * 6), 0xFF,
-    tag .. ": the 4th window row is always empty (the 0x rung is gone)")
+    tag .. ": the 4th window row is always empty (the 0x tier is gone)")
 end
 
 local R = {}
@@ -342,7 +342,7 @@ H.run({ maxFrames = 150000 }, {
   -- 5. confirm resolves: row 0 at the real bank ----------------------------
   -- (the chip/reveal halves live in the LABELED arm below: every SwdTech
   -- is authored SLASH $01 and this pool's species author $02, so no
-  -- honest chip can fire here)
+  -- chip can fire here in normal play)
   (function()
     local g0
     return H.repeatN(1, {
@@ -414,7 +414,7 @@ H.run({ maxFrames = 150000 }, {
     steps[#steps+1] = H.call(function()
       H.assertEq(H.readByte(ITEMLIST + 2 * 6), 0x5c,
         "ceiling 7 row 2 (boost 3) = tech 7 (Cleave/Oblivion, id $5c) -- "
-        .. "the divine top rung, the named tech-8 ceiling arm")
+        .. "the divine top tier, the named tech-8 ceiling arm")
       H.assertEq(findName(glyphs("Dispatch")), nil,
         "at ceiling 7 the retired \"Dispatch\" is no longer drawn (the "
         .. "window slid weakest-out)")

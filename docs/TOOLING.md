@@ -21,14 +21,14 @@ Top-level `Makefile` targets:
 | Target | Does |
 |---|---|
 | `make rom` | verify base-ROM SHA1 → build `ff6/rom/ff6-en.sfc` → copy to `build/ot6.sfc` |
-| `make test` | full headless correctness gate: the compose, frontier-stamp, and concurrent-runner isolation selftests, then the marker-discovered suite (`tools/tests/suite.sh`) — which runs the MP-cost A/B's charge+refusal half on the shipped ROM — then the free-behavior half on the `nomp` baseline; stamps the passing ROM's sha1. Exit code = pass/fail |
-| `make tested` | gate: refuse unless `build/ot6.sfc` is the exact ROM `make test` last passed on (guards distributables) |
+| `make test` | full headless correctness run: the compose, frontier-stamp, and concurrent-runner isolation selftests, then the marker-discovered suite (`tools/tests/suite.sh`) — which runs the MP-cost A/B's charge+refusal half on the shipped ROM — then the free-behavior half on the `nomp` baseline; stamps the passing ROM's sha1. Exit code = pass/fail |
+| `make tested` | check: refuse unless `build/ot6.sfc` is the exact ROM `make test` last passed on (guards distributables) |
 | `make nomp-rom` | build the `OT6_MP_COSTS=0` baseline `ff6/rom/ff6-en-nomp.sfc` (the pre-feature vanilla-OT6 build) and assert it differs from the shipped ON ROM — the A/B's OFF control (since v0.5 the shipped ROM charges MP; "every ability costs MP" is live by default) |
 | `make patch` | (needs `tested`) emit the distributable BPS `build/dist/ot6-from-ff3us10.bps` (Flips; stores only what differs from the base ROM) |
-| `make release` | build, run the full gate, then emit `build/release/ot6-v$(VERSION).bps` plus release notes |
+| `make release` | build, run the full test suite, then emit `build/release/ot6-v$(VERSION).bps` plus release notes |
 | `make run` | open the built ROM in Mesen (GUI) |
-| `make frontier` | mint the deep story-chain fixtures past the whelk (slow; nothing in `make test` depends on them) |
-| `make frontier-test` | `make frontier`, then run the suite with those fixtures present (so the frontier-gated tests run) |
+| `make frontier` | generate the deep story-chain savestate fixtures past the whelk (slow; nothing in `make test` depends on them) |
+| `make frontier-test` | `make frontier`, then run the suite with those fixtures present (so the tests that need the generated savestates run) |
 
 Hello-world proof: default name TERRA→OCTO in
 `ff6/src/text/char_name_en.json` → rebuild → exactly 7 bytes differ from

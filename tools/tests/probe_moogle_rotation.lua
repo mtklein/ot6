@@ -1,6 +1,7 @@
--- probe_moogle_rotation.lua -- play the WHOLE Moogle defense honestly by
--- squad rotation (issue #75, marshal-investigation).  Zero state writes;
--- input is walking, Y-switching, and tap-A fighting -- a human's toolkit.
+-- probe_moogle_rotation.lua -- plays the WHOLE Moogle defense with real
+-- input by squad rotation (issue #75, marshal-investigation).  Zero state
+-- writes;  input is walking, Y-switching, and tap-A fighting -- a human's
+-- toolkit.
 --
 -- The strategy under test (from the measured geometry + march scripts):
 --   * every march funnels into the tail (15,17)->(15,16)->(14,16)->
@@ -95,13 +96,13 @@ local function wave(n, mask)
     logGuards("pre-wave " .. n),
     H.advanceStory(function()
       return (H.readByte(0x1f41) & mask) == 0
-    end, 18000, { honest = true }),
+    end, 18000, { playBattles = true }),
     logPools("post-wave " .. n),
     H.waitUntil(calmish(20), 1800, "calm after wave " .. n),
   })
 end
 
--- the Marshal's post + activation (gen_moogle's pokeStep, honest)
+-- the Marshal's post + activation (gen_moogle's pokeStep, input-driven)
 local MX, MY = 15, 40
 local aPhase = 0
 local function defenseWon()
@@ -143,9 +144,9 @@ H.run({ maxFrames = 140000 }, {
 
   -- swap A: P1 aside to the off-path (15,15); P2 to the choke
   logGuards("swap A start"),
-  H.navTo(15, 15, { maxFrames = 4000, honest = true }),
+  H.navTo(15, 15, { maxFrames = 4000, playBattles = true }),
   ySwitchTo(2),
-  H.navTo(14, 14, { maxFrames = 4000, honest = true }),
+  H.navTo(14, 14, { maxFrames = 4000, playBattles = true }),
   logGuards("swap A done"),
   logPools("swap A done"),
 
@@ -154,9 +155,9 @@ H.run({ maxFrames = 140000 }, {
 
   -- swap B: P2 back up to its mound park (13,13); P3 to the choke
   logGuards("swap B start"),
-  H.navTo(13, 13, { maxFrames = 4000, honest = true }),
+  H.navTo(13, 13, { maxFrames = 4000, playBattles = true }),
   ySwitchTo(3),
-  H.navTo(14, 14, { maxFrames = 4000, honest = true }),
+  H.navTo(14, 14, { maxFrames = 4000, playBattles = true }),
   logGuards("swap B done"),
   logPools("swap B done"),
 
@@ -184,7 +185,7 @@ H.run({ maxFrames = 140000 }, {
       return defenseWon()
           or (marshalAdjacent() and H.hasControl() and H.tileAligned())
     end,
-    maxFrames = 15000, honest = true,
+    maxFrames = 15000, playBattles = true,
   }),
   H.logStep(function()
     return string.format("beside the Marshal at (%d,%d) f%d",
@@ -196,7 +197,7 @@ H.run({ maxFrames = 140000 }, {
   }, {}),
   H.call(function()
     H.assertEq(defenseWon(), true, "defense won (switch $0631 cleared)")
-    H.log(string.format("MARSHAL DOWN HONESTLY at f%d", H.frame))
+    H.log(string.format("MARSHAL DOWN at f%d", H.frame))
   end),
   logPools("victory"),
 })

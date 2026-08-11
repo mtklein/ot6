@@ -145,7 +145,7 @@ H.run({ maxFrames = 40000 }, {
     for m = 0, 5 do
       if H.readByte(0x3AA8 + m * 2) % 2 == 1 then msPresent[#msPresent + 1] = m end
     end
-    H.assertEq(#msPresent, 2, "two guards (same species) on the doorstep")
+    H.assertEq(#msPresent, 2, "two guards (same species) at the entry point")
     H.assertEq(H.readWord(0x57C0 + msPresent[1] * 2),
                H.readWord(0x57C0 + msPresent[2] * 2),
                "the two monsters are the same species")
@@ -166,7 +166,7 @@ H.run({ maxFrames = 40000 }, {
     emu.addEventCallback(function() sample() end, emu.eventType.startFrame)
   end),
 
-  -- open the swdtech submenu, latch row 2 (= the pinned boost 3, #38's top rung)
+  -- open the swdtech submenu, latch row 2 (= the pinned boost 3, #38's top tier)
   H.driveUntil(inWindow, 1500, {
     H.call(function() pinField(); H.setPad({ "a" }) end),
     H.waitFrames(2),

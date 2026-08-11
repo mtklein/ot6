@@ -1,6 +1,7 @@
--- probe_opera_rafter2.lua -- Beat A rafter-chase recon, leg 1 (Ultros drop-in).
--- Boots opera_dance_done (238 {98,7} $0111=1, $0345=1).  MECHANISM (measured
--- from ff6/src/event, event_main.asm + npc_prop.asm + event_trigger.asm):
+-- probe_opera_rafter2.lua -- Beat A rafter-chase recon, step 1 (Ultros
+-- drop-in).  Boots opera_dance_done (238 {98,7} $0111=1, $0345=1).
+-- MECHANISM (measured from ff6/src/event, event_main.asm + npc_prop.asm +
+-- event_trigger.asm):
 --  * 238 {99,20}: ENVELOPE NPC (vis gate $0345=1) event _cabf31 -> dlg
 --    $04C8/$04C9, sets $0345=0, $0058=1 (Ultros threatens; "tell the
 --    Impresario").  no_react NPC: fires on contact/bump.
@@ -43,8 +44,8 @@ H.run({ maxFrames = 20000 }, {
     end
   end),
 
-  -- Leg 1: reach {99,20} and touch the envelope.  March down toward it, nudging
-  -- x to 99, then bump down/A when adjacent.
+  -- Step 1: reach {99,20} and touch the envelope.  March down toward it,
+  -- nudging x to 99, then bump down/A when adjacent.
   (function() local hb=0
     return H.driveUntil(function() return sw(0x0058)==1 or map()~=238 end, 8000, {
       H.call(function() hb=hb+1

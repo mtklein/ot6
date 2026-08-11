@@ -46,7 +46,7 @@
 ; Ot6FightBoost, Ot6QueueFold all carry it): a countered action runs through
 ; ExecRetal and ends at an UNHOOKED EndAction, so Ot6ActionEnd never charges
 ; what it delivered. A steal can't itself counter, but reading the gate keeps
-; the "boost is always paid for" invariant honest (the boost-economy audit).
+; the "boost is always paid for" invariant intact (the boost-economy audit).
 ;
 ; a8/i8 — the width DoTargetEffect's `shortai` pinned; x = attacker, y =
 ; target, BOTH preserved (the caller still needs them). Returns a = the level

@@ -15,7 +15,7 @@
 -- opens with 1 bp (Ot6InitBP) and each unboosted action regens +1
 -- (Ot6ActionEnd).  Locke banks with STEAL: a real command, zero MP, zero
 -- damage, so two banking turns cannot end the fight however weak the
--- grass-band trash is.  TERRA defers every turn with X (vanilla's own
+-- grass-area trash is.  TERRA defers every turn with X (vanilla's own
 -- turn-cycling key), so the subject's boost accounting is the only party
 -- arithmetic in flight -- "only the subject has pending" is now true by
 -- play, not by poke.
@@ -112,7 +112,7 @@ H.run({ maxFrames = 45000 }, {
   H.loadState(STATE),
   H.waitFrames(10),
   H.waitUntil(worldReady, 500, "world-map control", 5),
-  -- patrol the grass band south of Narshe until a real encounter fires
+  -- patrol the grass area south of Narshe until a real encounter fires
   -- (codex_saveas's measured route: ~230 frames off the fixture tile)
   H.driveUntil(function() return H.battleLoadStarted() end, 20000, {
     H.call(function()
@@ -130,7 +130,7 @@ H.run({ maxFrames = 45000 }, {
       if not dir then H.setPad({}); return end
       H.setPad({ [dir] = true })
     end),
-  }, "grass-band encounter"),
+  }, "grass-area encounter"),
   H.release(),
   H.waitUntil(function() return H.battleActive() end, 900, "battle active", 30),
   H.waitFrames(90),

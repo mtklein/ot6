@@ -14,7 +14,7 @@
 --
 -- The marks are retired (there is no free obj vram to move them to --
 -- probe_objsentinel.lua and probe_objtail.lua), so the invariant this
--- test gates is: while a boost is pending and damage numbers are flying,
+-- test checks is: while a boost is pending and damage numbers are flying,
 --   * oam entries 96-99 (the old mark entries) stay parked, and
 --   * no oam entry ever points at a tile in the numeral block 192-223
 --     wearing OT6's palette-3/priority-3 attribute.
@@ -172,8 +172,8 @@ H.run({ maxFrames = 40000 }, {
   -- in, every frame), and the numerals are the GUARDS' own attacks
   -- landing on the party -- nobody on our side deals damage, so the
   -- fight cannot end, and no HP pin is needed on either side.  The
-  -- positive controls below are unchanged and keep this honest: a quiet
-  -- window with no numerals still fails.
+  -- positive controls below are unchanged and keep this from passing
+  -- vacuously: a quiet window with no numerals still fails.
   H.driveUntil(function()
     sample()
     return frames >= 2400

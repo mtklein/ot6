@@ -1,7 +1,7 @@
--- gen_gate_cave_save.lua -- v0.7 LEG G->H (issue #31), and the generator
--- that cuts battery anchor H, `gate-cave-save-v1`.
+-- gen_gate_cave_save.lua -- v0.7 STEP G->H (issue #31), and the generator
+-- that cuts battery checkpoint H, `gate-cave-save-v1`.
 --
--- The leg: cold-Continue the tracked `narshe-mission-v1` battery (boundary
+-- The step: cold-Continue the tracked `narshe-mission-v1` battery (boundary
 -- G -- world (84,34), the Narshe exit spawn, ship parked at (84,36)),
 -- assert its contract, then:
 --   1. board the parked Blackjack (one A tap boards AND lifts off) and X
@@ -34,9 +34,10 @@
 --      probe_v07_386tile); only a tap-and-settle stops on the tile;
 --   6. the ordinary Save UI into slot 3; run.sh captures the battery.
 --
--- Anchor H is the route recon's gate-cave-save boundary: the ONLY interior
--- save point in the whole v0.7 band (386 (74,53), off 384 (64,10)).  ONE
--- generator does the leg AND cuts the anchor, gen_narshe_mission's shape.
+-- Checkpoint H is the route recon's gate-cave-save boundary: the ONLY
+-- interior save point in the whole v0.7 section (386 (74,53), off 384
+-- (64,10)).  ONE generator does the step AND cuts the checkpoint,
+-- gen_narshe_mission's shape.
 --
 -- OT6_ANCHOR_LAYOUT: ot6-codex-o8-v1
 -- ^ run.sh refuses -- BEFORE boot -- any OT6_SRAM_ANCHOR whose manifest
@@ -247,7 +248,7 @@ H.run({ maxFrames = 200000 }, {
   H.waitFrames(300),
   H.repeatN(3, { H.pressButtons({ "a" }, 8), H.waitFrames(60) }),
   H.waitUntil(function() return H.worldMode() end, 3000,
-    "cold Continue to the narshe-mission world doorstep", 10),
+    "cold Continue to the narshe-mission world entry point", 10),
   H.waitUntil(function() return bright() >= 15 end, 900,
     "cold Continue fade-in", 10),
   H.waitFrames(60),
@@ -258,7 +259,7 @@ H.run({ maxFrames = 200000 }, {
     -- MEASURED (probe_v07_g_boot): on foot on the world, word($34)/($38)
     -- track the PARTY, not the ship -- the ship's saved position is the
     -- save-block pair $1F62/$1F63, and a cold Continue restores it there:
-    -- (84,36), where the F->G leg parked it.  (On anchor F the two
+    -- (84,36), where the F->G step parked it.  (On checkpoint F the two
     -- coincided because that save was taken aboard.)
     H.assertEq(H.readByte(0x1F62), 84, "the Blackjack is parked at (84,.) -- $1F62")
     H.assertEq(H.readByte(0x1F63), 36, "the Blackjack is parked at (.,36) -- $1F63")
@@ -277,7 +278,7 @@ H.run({ maxFrames = 200000 }, {
   pressWalk("right", function() return map() == 7 end, 900,
     "held RIGHT along row 6 -> deck door (20,6) -> map 7"),
   H.waitUntil(landed(7, 10), 1200, "map 7 landing", 1),
-  H.navTo(40, 17, { honest = "flee", maxFrames = 9000 }),
+  H.navTo(40, 17, { playBattles = "flee", maxFrames = 9000 }),
   pressWalk("down", function()
     return H.fieldY() >= 45 and H.tileAligned()
   end, 900, "stairs (40,18) -> the swap room (50,51)"),
@@ -336,11 +337,11 @@ H.run({ maxFrames = 200000 }, {
   end),
 
   -- ---- 3. wheel, fly to the base pass, walk the base, into the cave ------
-  H.navTo(40, 11, { honest = "flee", maxFrames = 6000 }),
+  H.navTo(40, 11, { playBattles = "flee", maxFrames = 6000 }),
   pressWalk("up", function() return map() == 6 end, 900,
     "door (40,10) -> the deck"),
   H.waitUntil(landed(6, 10), 1200, "deck again", 1),
-  H.navTo(14, 6, { honest = "flee", maxFrames = 6000, calmFrames = 8 }),
+  H.navTo(14, 6, { playBattles = "flee", maxFrames = 6000, calmFrames = 8 }),
   -- $0170 is SET on this chain, so the wheel opens dlg $052A and only an
   -- EDGE of A opens it -- LEFT+A edges until the choice list is up
   (function() local ph = 0
@@ -388,7 +389,7 @@ H.run({ maxFrames = 200000 }, {
     return H.fieldX() >= 9 and H.tileAligned() and H.hasControl()
   end, 2400, "held RIGHT off the entrance trigger row"),
   H.waitFrames(45),
-  H.navTo(30, 12, { honest = "flee", maxFrames = 20000,
+  H.navTo(30, 12, { playBattles = "flee", maxFrames = 20000,
     arrive = function() return H.worldMode() end }),
   pressWalk("right", function() return H.worldMode() end, 900,
     "east door (31,12) -> world (167,194)"),
@@ -400,12 +401,12 @@ H.run({ maxFrames = 200000 }, {
   pressWalk("right", function() return not H.worldMode() and map() == 382 end,
     900, "(169,194) -> CAVE TO THE SEALED GATE (382)"),
   H.waitUntil(landed(382, 10), 2400, "382 landing", 1),
-  H.navTo(31, 42, { honest = "flee", maxFrames = 15000,
+  H.navTo(31, 42, { playBattles = "flee", maxFrames = 15000,
     arrive = function() return map() == 383 end }),
   pressWalk("down", function() return map() == 383 end, 900,
     "door (31,43) -> BASEMENT 1 (383)"),
   H.waitUntil(landed(383, 10), 2400, "383 landing", 1),
-  H.navTo(53, 57, { honest = "flee", maxFrames = 20000,
+  H.navTo(53, 57, { playBattles = "flee", maxFrames = 20000,
     arrive = function() return map() == 385 end }),
   pressWalk("down", function() return map() == 385 end, 900,
     "door (53,58) -> BASEMENT 2 (385), the timed floor"),
@@ -438,7 +439,7 @@ H.run({ maxFrames = 200000 }, {
   end),
 
   -- ---- 5. BASEMENT 3's south loop, the door switch, the save point --------
-  H.navTo(62, 11, { honest = "flee", maxFrames = 30000 }),
+  H.navTo(62, 11, { playBattles = "flee", maxFrames = 30000 }),
   (function() local ph = 0
     return H.driveUntil(function() return sw(0x0173) == 1 end, 3000, {
       H.call(function()
@@ -452,7 +453,7 @@ H.run({ maxFrames = 200000 }, {
     }, "face-UP+A on (62,11) -> $0173 (the save-room door)")
   end)(),
   H.waitFrames(60),
-  H.navTo(64, 11, { honest = "flee", maxFrames = 9000 }),
+  H.navTo(64, 11, { playBattles = "flee", maxFrames = 9000 }),
   pressWalk("up", function() return map() == 386 end, 1200,
     "held UP onto the save-room door (64,10) -> map 386"),
   H.waitUntil(landed(386, 10), 2400, "386 landing", 1),
@@ -461,7 +462,7 @@ H.run({ maxFrames = 200000 }, {
     H.assertEq(H.fieldX(), 73, "386 arrival x (short entrance 384 (64,10))")
     H.assertEq(H.fieldY(), 58, "386 arrival y")
   end),
-  H.navTo(74, 54, { honest = "flee", maxFrames = 9000 }),
+  H.navTo(74, 54, { playBattles = "flee", maxFrames = 9000 }),
   -- tapInto the save tile: a HELD press walks straight THROUGH (74,53)
   -- without firing the SavePoint trigger (measured, probe_v07_386tile --
   -- CheckEventTriggers wants an exactly-aligned rest the step chain never
@@ -512,7 +513,7 @@ H.run({ maxFrames = 200000 }, {
     H.assertExitContractPreSave("gate-cave-save-v1")
     H.screenshot("leg_gh_save_tile")
   end),
-  -- THE LEG'S SAVESTATE IS MINTED HERE, on the save tile, before the menu
+  -- THE STEP'S SAVESTATE IS GENERATED HERE, on the save tile, before the menu
   H.saveState("gate_cave_save.mss"),
 
   -- ---- 6. the real Save UI, slot 3 ---------------------------------------
@@ -536,7 +537,7 @@ H.run({ maxFrames = 200000 }, {
   H.call(function()
     H.assertEq((H.readByte(0x0201) & 0x80) ~= 0, true,
       "menu-flags $0201 bit7 SET -- the save-enable flow reached the menu")
-    -- ARM THE HONEST SAVE RECEIPT (issue #75): a read-only exec hook on
+    -- ARM THE input-driven save receipt (issue #75): a read-only exec hook on
     -- the real CopyGameDataToSRAM entry captures the slot argument the
     -- save runs with (codex_saveas's instrument).  This replaces the old
     -- zeroed-$307ff0 sentinel -- an SRAM write -- as the proof that the
@@ -580,7 +581,7 @@ H.run({ maxFrames = 200000 }, {
     H.assertEq(saveArg, 3, "CopyGameDataToSRAM ran for persistent slot 3")
     -- the codex witness cells are READ, never seeded (issue #75): the
     -- battery carries whatever the chain actually earned.  The phase-2
-    -- anchor re-cuts measure these and the entry contracts follow the
+    -- checkpoint re-cuts measure these and the entry contracts follow the
     -- measurement (never the reverse).
     H.log(string.format("codex witness cells (earned): elem=%02X class=%02X",
       emu.read(0x316810 + ULTROS2, emu.memType.snesMemory),
@@ -601,7 +602,7 @@ H.run({ maxFrames = 200000 }, {
   end),
   H.logStep(function()
     return string.format("gate-cave-save-v1 saved via the real Save UI at "
-      .. "frame %d -- map 386 (74,53), slot 3; boundary H of the v0.7 band",
+      .. "frame %d -- map 386 (74,53), slot 3; boundary H of the v0.7 range",
       H.frame)
   end),
 })

@@ -1,21 +1,18 @@
-# Break band — the Cave to the Sealed Gate (survey + proposed rows)
+# Break coverage — the Cave to the Sealed Gate (survey + proposed rows)
 
-Issue #31, v0.7 scope, the #11 pattern (`break-band-vector.md` is the model).
+v0.7 scope; `break-band-vector.md` is the model.
 **PROPOSAL ONLY — nothing here is landed.** The six rows in §8 are not in
-`Ot6ShieldTbl`; they land with the band's implementation wave. The one thing
+`Ot6ShieldTbl`; they land with the area's implementation wave. The one thing
 that ships with this survey is the `sealed-gate` entry in
-`tools/check_break_reach.py` `BANDS`, which gates the *current* data honestly
-(§10).
+`tools/check_break_reach.py`'s `BANDS` table, which checks the *current* data
+as it stands (§10).
 
-Everything below was decoded from the vendored data under `ff6/` on
-2026-07-28 in a clean worktree at 97f6d6e. Every species byte, map byte,
-group word, formation record and arithmetic figure was recomputed from
-`sub_battle_group.dat` / `rand_battle_group.dat` / `battle_monsters.dat` /
-`monster_prop.dat` / `map_prop.dat` and the entrance `.dat` pair — not read
-off `sealed-gate-recon.md`'s own encounter survey (which it nonetheless
-confirms, with the corrections in §1.2). `monster_prop.dat +23` is absorb,
-`+25` is weak (`docs/HANDOFF.md`, canonical). Where a claim is an inference it is
-labelled.
+Everything below is decoded from the vendored data under `ff6/`. Every species
+byte, map byte, group word, formation record and arithmetic figure is
+recomputed from `sub_battle_group.dat` / `rand_battle_group.dat` /
+`battle_monsters.dat` / `monster_prop.dat` / `map_prop.dat` and the entrance
+`.dat` pair. `monster_prop.dat +23` is absorb, `+25` is weak
+(`docs/HANDOFF.md`, canonical). Where a claim is an inference it is labelled.
 
 ---
 
@@ -30,10 +27,10 @@ random-battle enable → `SubBattleGroup[map]` (`field/battle.asm:392`) →
 Per-step rate: all four encounter maps carry rate code 0 → `$0070`
 (`sub_battle_rate.dat`; table `SubBattleRateTbl` verified at
 `field/battle.asm:259-262`, read at `:375-376`). **Because every map in the
-band has the same rate, equal-map weight and rate weight are the same
+area has the same rate, equal-map weight and rate weight are the same
 number**, and the OT6 danger multiplier (`Ot6DangerMulW`,
-`ot6_break.asm:644-671`) cancels out of every share below. This band has
-none of the Vector band's two-rate split.
+`ot6_break.asm:644-671`) cancels out of every share below. This area has
+none of the Vector area's two-rate split.
 
 Forced battles decode through `event_battle_group.dat[battle*4]`, word 0 at
 75 % / word 1 at 25 % (`field/event.asm` `EventBattle`, per the checker
@@ -41,7 +38,7 @@ header).
 
 ---
 
-## 1. The band's map set, verified from data
+## 1. The area's map set, verified from data
 
 ### 1.1 The encounter-bearing maps: exactly four
 
@@ -55,14 +52,13 @@ header).
 | 391 | SEALED GATE | n | 0 | — | the scene room; no encounters |
 | 377/378 | IMPERIAL BASE | **n** | 110 | — | **the base has no encounters at all** |
 
-**The Imperial Base contributes nothing to the band.** Maps 377/378/379 have
+**The Imperial Base contributes nothing to the area.** Maps 377/378/379 have
 the enable bit clear. The whole random-encounter surface of v0.7's interior
-legs is these four cave maps plus one forced ambush (§2.2).
+segments is these four cave maps plus one forced ambush (§2.2).
 
-### 1.2 Recon corrections
+### 1.2 The unreachable and cutscene-only maps
 
-- **The dispatch's "base 381" is wrong twice over.** The Imperial Base is
-  maps **377/378** (confirmed by the entrance scan: world
+- **The Imperial Base is maps 377/378**, not 381 (entrance scan: world
   `(165,194)→377`, `(166,194)→377 (30,13)`, `377 (13,18)→378`).
   Map **381** is a Sealed-Gate-*tileset* cutscene map used only by the
   Esper-World flashback (`load_map 381` at `event_main.asm:11909`, in the
@@ -76,27 +72,23 @@ legs is these four cave maps plus one forced ambush (§2.2).
   (enable Y, group 94) are unreachable cave duplicates; **380** (enable Y,
   group 110 → ChickenLip ×5, formation `$095`) and **381** (enable Y,
   group **0** — the Narshe overworld pool) are unreachable or
-  cutscene-only. Map 381 is the band's copy of the v0.6 maps-265/267/268
+  cutscene-only. Map 381 is the area's copy of the v0.6 maps-265/267/268
   anomaly: if the flashback ever took a danger-checked step there it would
   draw level-5 Narshe trash. Inference, same as v0.6: scene choreography
   never takes a free step, so it never rolls. Not authored for; worth the
   same one runtime check.
-- **The recon's pools, species stats and rates all
-  reproduce exactly** — formations, counts, levels, HP, absorb/weak bytes,
-  `$0070` rates. The recon's one substantive error is the reachability
-  claim its design question rests on (§7).
 
 ### 1.3 The forced battles
 
 | fight | where | formation | contents | in this survey? |
 |---|---|---|---|---|
 | battle 149 | 384 (66,11) trap switch (`event_main.asm:45177`) | `$20c` (both words) | **Ninja `$003`** ×1 | **yes** — real body, §3 |
-| battle 121/122 | map 391 gate scene | `$180`/`$181` | dummy `$17b` L1 HP1 | no — battle-event contents, **being probed by a separate agent**; this survey deliberately decides nothing about them |
+| battle 121/122 | map 391 gate scene | `$180`/`$181` | dummy `$17b` L1 HP1 | no — battle-event contents, unprobed; this survey deliberately decides nothing about them |
 | battle 123 | Blackjack deck | `$182` | dummy `$17b` | no — same |
 
-The banquet fights (26/27/30) and the two world bands (southern continent,
+The banquet fights (26/27/30) and the two world areas (southern continent,
 Crescent Island) are outside this survey's scope; §12 flags them as the
-remaining #11-shaped debt of the milestone.
+milestone's remaining unsurveyed encounter surface.
 
 ---
 
@@ -144,7 +136,7 @@ Per-species, equal-map weight (= rate weight, §0):
 | Zombone | 0.3906 | 14.53 % | 31.25 % |
 | Coelecite | 0.3594 | 13.37 % | 17.19 % |
 
-2.6875 bodies per draw. Ing is the band's swarm body — ×3 at 37.5 % on two
+2.6875 bodies per draw. Ing is the area's swarm body — ×3 at 37.5 % on two
 of the four maps.
 
 ---
@@ -167,7 +159,7 @@ The vanilla data tells one story three times:
   pearl-weak body (§5).
 - **Fire and poison are traps**: fire is absorbed by 4 of 5 species
   (84.38 % of draws feed a fire-splash) and poison by 4 of 5 plus the
-  Ninja. This band forces Terra into the party (the base gate demands her)
+  Ninja. This area forces Terra into the party (the base entrance demands her)
   and then punishes her fire lean (`kits.md`'s Terra entry) — the Zozo
   poison inversion again, and worth keeping.
 - **The exception is deliberate-looking**: Coelecite, the one body with no
@@ -178,14 +170,14 @@ The vanilla data tells one story three times:
 Shield counts as they stand: levels 20-21 give `2 + level/8` = **4**
 (`ot6_break.asm` `@formula`); Ninja at 27 gives 5. Both prior authoring
 passes measured 4 as one-too-many on trash and landed on 2
-(`ot6_hud.asm:1489-1510`, `break-band-vector.md` §8.2 — the third band to
+(`ot6_hud.asm:1489-1510`, `break-band-vector.md` §8.2 — the third area to
 inherit that finding unmeasured, see §9).
 
 ---
 
 ## 4. What the generated floor currently says
 
-No band species has an `Ot6ShieldTbl` row today (scanned `ot6_hud.asm`; also
+No species in the area has an `Ot6ShieldTbl` row today (scanned `ot6_hud.asm`; also
 visible in the checker's `[floor]` provenance tags).
 
 | species | current class | how (`ff6/tools/gen_break_floor.py` keyword lists) |
@@ -220,7 +212,7 @@ Equal-map weight = rate weight throughout (§0).
 | special ¤ | 0.00 % | 0.00 % |
 
 Pierce — Locke's A button and Edgar's entire Tools kit — has literally no
-work anywhere in the band.
+work anywhere in the area.
 
 ### 5.2 Element axis, vanilla data
 
@@ -242,8 +234,8 @@ one, so fire is a single-target key only — the Mag Roader lesson shape.
 
 ## 6. The party, and what it can actually field
 
-Dispatcher ruling (issue #31): **TERRA, LOCKE, EDGAR, SABIN** — Terra is a
-hard gate at the base entrance, Setzer is benched.
+Owner ruling: **TERRA, LOCKE, EDGAR, SABIN** — Terra is a hard requirement at
+the base entrance, Setzer is benched.
 
 ### 6.1 Classes
 
@@ -260,18 +252,18 @@ parser):
 
 Every class is free for this party; no shop trip is load-bearing.
 
-### 6.2 The element ring — including what the recon missed
+### 6.2 The element ring
 
 Espers owned entering v0.7: Ramuh (Zozo, `event_main.asm:25789`;
 Siren/Kirin/Stray grant sites exist at `:26463-26487` but whether the
-driven chain collects them is anchor state, not asserted here — no key
+driven chain collects them is checkpoint state, not asserted here — no key
 below depends on them), Ifrit + Shiva (facility), and the six tube stones
 Maduin/Phantom/Unicorn/Bismark/Carbunkl/Shoat (`:95777-95782`,
 granted-while-worn under M5, `genju_prop.asm:56-66`).
 
 - **Pearl — REACHABLE TODAY: Sabin's AuraBolt.** Blitz #2, learned at
-  **level 6** (`BlitzLevelTbl`, `field/event.asm:1239`; Sabin is ~L15-16 at
-  the band, `wob-route.md` measured tail), element **pearl** in the spell
+  **level 6** (`BlitzLevelTbl`, `field/event.asm:1239`; Sabin is ~L15-16 by
+  this point, `wob-route.md` measured tail), element **pearl** in the spell
   data (`magic_prop_en.dat` record `$5e` +1 = `$20`; layout
   `battle_main.asm:6918-6921`), priced at **5 MP** in `Ot6AbilityCostTbl`
   (`ot6_boost.asm:478`, its own comment: *"AuraBolt L6 holy chip"*). It is
@@ -287,56 +279,52 @@ granted-while-worn under M5, `genju_prop.asm:56-66`).
 - **Water** — **Bismark's summon** (esper 7 → attack `$3d`, the
   esper-index+`$36` mapping verified at `battle_main.asm:14382-14389`;
   `magic_prop_en.dat $3d` +1 = `$80` water, power 58). Once per battle, but
-  a real key on Ing. The recon missed this too.
+  a real key on Ing.
 - **Bolt** — Ramuh; dead on the draws, right on the Ninja.
 - **Poison** — Edgar's Bio Blaster, Shoat's Bio: **do not bring them out**;
   4 of 5 species absorb.
 
-MP note: AuraBolt at 5 MP against band pools of ~40-60 is ~10 casts per
-pool, and MP is universal now (97f6d6e) with Osmose income on Shiva. The
-key is not gated on a resource cliff.
+MP note: AuraBolt at 5 MP against pools of ~40-60 at this stage is ~10 casts
+per pool, and MP is universal with Osmose income on Shiva. The
+key does not depend on a resource cliff.
 
 ---
 
 ## 7. The pearl/holy question, resolved
 
-The recon (`sealed-gate-recon.md`) framed the band as "keyed on
-pearl/holy — an element no kit in the band can currently produce" and the
-dispatch asked for three options. Laid out with the math:
+The area looks at first glance like it is keyed on pearl/holy, an element no
+kit here can produce. Three options, laid out with the math:
 
-### (a) Authored class rows carry the band physically
+### (a) Authored class rows carry the area physically
 
 The §8 rows make every formation chippable by a free class for the ruled
 party — slash/pierce/bludgeon all cost nothing (§6.1). Under (a) alone the
-element axis is flavor and the band works with zero MP. This is necessary
+element axis is flavor and the area works with zero MP. This is necessary
 regardless of the pearl answer (formula-4 shields and two DEFAULT rows are
 the same quality debt Vector had), but as the *whole* answer it wastes the
-best element story vanilla has handed any band yet: a 90.63 % master key
+best element story vanilla has handed any area yet: a 90.63 % master key
 with zero absorb overlap.
 
-### (b) A holy-adjacent key through the tube-esper redesign
+### (b) A holy-adjacent key through the tube espers
 
-The exact grant that closes the hole: **Unicorn (esper 23,
-`genju_prop.asm:183-184`) grants base-tier `PEARL`** (`ATTACK::PEARL =
-$0e`, `const.inc:611`; 40 MP, power 108 in `magic_prop_en.dat`) — one
-`make_genju_prop` slot, e.g. `{PEARL, 0}` alongside a trimmed support list.
+The grant that would close the hole: **Unicorn (esper 23) grants base-tier
+`PEARL`** (`ATTACK::PEARL = $0e`, `const.inc:611`; 40 MP, power 108 in
+`magic_prop_en.dat`) — one `make_genju_prop` slot alongside a trimmed
+support list, which is how his row is authored (`magicite-tube-six.md` §9).
 Fiction is clean (the holy horn; the stones freed from the tubes light the
 road to their own gate) and Alexandr granting Pearl later is the
-established Ramuh/ZoneSeek-style overlap. Carbunkl is the weaker candidate
-— its identity is Reflect, nothing in its kit or fiction says holy.
+established Ramuh/ZoneSeek-style overlap. Carbunkl would be the weaker
+candidate — its identity is Reflect, nothing in its kit or fiction says holy.
 
-But as the *load-bearing* answer, (b) has two costs: 40 MP a cast is most
-of a band-level pool (against AuraBolt's 5), and it sequences this band's
-reachability behind a redesign being authored in parallel by another agent.
-Recommend it to that agent as **flavor coupling, not as the key**: if
-Unicorn gains Pearl, wearer-agnostic holy becomes available (Terra or Locke
-can wear the stone), which softens the single-point-of-Sabin note in §9.
+As the *load-bearing* answer it fails on price: 40 MP a cast is most of a pool
+at this level, against AuraBolt's 5. It is **flavour coupling, not the key**.
+What it does buy is wearer-agnostic holy — Terra or Locke can wear the stone —
+which softens the single-point-of-Sabin note in §9.
 
-### (c) The vanilla-data key the recon missed — and it is the answer
+### (c) The vanilla-data key — and it is the answer
 
-**Sabin's AuraBolt is a pearl chip today** (§6.2), and Sabin is in the
-party by dispatcher ruling. The claimed hole does not exist for the ruled
-party:
+**Sabin's AuraBolt is a pearl chip today** (§6.2), and Sabin is in the ruled
+party. The hole does not exist:
 
 | species | elemental keys reachable today |
 |---|---|
@@ -347,22 +335,22 @@ party:
 | Coelecite | ice (Shiva/Maduin/Bismark) |
 | Ninja | pearl (AuraBolt), bolt (Ramuh) |
 
-**Recommendation: (c) + (a).** Ship the band on vanilla elements plus the
+**Recommendation: (c) + (a).** Ship the area on vanilla elements plus the
 §8 class rows; adopt no element add and no new spell grant as load-bearing.
 The encounter math: AuraBolt alone keys 90.63 % of draws at 5 MP; the
 remaining 9.37 % (`$09a`, Coelecite ×3) is keyed by ice, which three owned
 stones grant; the class rows key 100 % of draws for an MP-empty party. The
-band's teaching writes itself: *the monk's holy fist is the master key to
+area's teaching writes itself: *the monk's holy fist is the master key to
 an undead cave, the esper mage's favorite button feeds it* — a designed
-spotlight for the character the dispatcher just seated, in the band whose
-gate is about espers.
+spotlight for the character the ruled party seats, in the area whose gate is
+about espers.
 
 Considered and rejected: adding pearl to Coelecite via `Ot6ElemAddTbl` (it
 is a rock, not a corpse; flattening the one non-undead fight onto the
-master key deletes the band's only "wrong button" lesson on the pearl
+master key deletes the area's only "wrong button" lesson on the pearl
 axis); a cure-spell-chips-undead mechanic (vanilla's undead-heal reversal
 is a damage-side flag, not an element byte — the chip path keys on the
-weak byte, so this needs new battle code for a band that has no hole).
+weak byte, so this needs new battle code for an area that has no hole).
 
 ---
 
@@ -376,8 +364,8 @@ Format per the existing table: `.word` species, `.byte` shields,
 | Apparite | `$06e` | 2 | `OT6_SLASH\|OT6_PIERCE` | A shade has no anatomy: any blade's edge or point disperses it. The cave-mouth body (both entrance maps) teaches "blades still work on the *hollow* dead" before bone and stone retire them. Ice and pearl both back it. |
 | Ing | `$048` | 2 | `OT6_PIERCE` | The swarm body — 32.6 % of all bodies, ×3 at 37.5 % on two maps. Pin the walking corpse; Edgar's AutoCrossbow (whole side, chips per hit) is the designed swarm answer — the Pipsqueak precedent (`break-band-vector.md` §8.1). Pearl and water back it. |
 | Lich | `$0e5` | 2 | `OT6_BLUDG` | A robed skeleton: bones shatter. The keyword got it right; make it authored. Its element is pearl *only*, so the class row is the whole non-AuraBolt path — and bludgeon is not Sabin-locked (fists are universal, Terra's Flail, Locke's Full Moon). |
-| Zombone | `$082` | 2 | `OT6_BLUDG` | **The flagship body**: 1991 HP, the largest trash body in any authored band. A dragon of dry bone — you break it apart. Fire is Terra's one clean elemental target here; pearl backs it; the `bone` keyword was right by substring accident, this makes it right on purpose. |
-| Coelecite | `$0b3` | 2 | `OT6_BLUDG` | Stone, not corpse — crack it. Deliberately the band's one pearl-less body: `$09a` (×3, 37.5 % of the timed-floor map) is the fight where the master key does nothing and Shiva's ice or a blunt swing must answer. Keep that. |
+| Zombone | `$082` | 2 | `OT6_BLUDG` | **The flagship body**: 1991 HP, the largest trash body in any authored area. A dragon of dry bone — you break it apart. Fire is Terra's one clean elemental target here; pearl backs it; the `bone` keyword was right by substring accident, this makes it right on purpose. |
+| Coelecite | `$0b3` | 2 | `OT6_BLUDG` | Stone, not corpse — crack it. Deliberately the area's one pearl-less body: `$09a` (×3, 37.5 % of the timed-floor map) is the fight where the master key does nothing and Shiva's ice or a blunt swing must answer. Keep that. |
 | Ninja | `$003` | 3 | `OT6_SLASH\|OT6_PIERCE` | The one real forced fight (battle 149, the 384 trap switch). A duelist answers to blades; 1650 HP and a one-off ambush earn the wider window (the blades-at-3 precedent). Bolt (Ramuh) and pearl back it. |
 
 No `Ot6ElemAddTbl` rows. Absorb discipline (`ot6_break.asm:180-184`): every
@@ -417,7 +405,7 @@ single-key-and-element-less (Vector's Rhinox pair has no analogue here).
 
 ---
 
-## 9. Reachability, and the honest costs
+## 9. Reachability, and the real costs
 
 Under the **current** floor nothing is unbreakable for the ruled party
 (slash+bludgeon cover all 12 formations, and everyone fields both — the
@@ -435,46 +423,45 @@ Under the proposal:
   Edgar's crossbow, with pearl and water behind them.
 - **AuraBolt concentrates on Sabin.** If Sabin is dead or silenced, pearl
   is gone (Terra's natural Pearl is L57 vanilla data / L30 in kits.md's
-  unimplemented schedule — either way not at band level). The band still
-  stands: every formation keeps a non-pearl answer. If the esper agent
-  adopts §7(b)'s Unicorn-grants-Pearl, holy also becomes wearer-agnostic;
-  nice-to-have, not load-bearing.
-- **Shield count 2 (Ninja 3) is UNMEASURED** — the third band to inherit
-  the 4-is-one-too-many finding. Needs its own sweep at a cave doorstep
-  fixture (anchor H, map 386, is the natural place), with the mixed
+  unimplemented schedule — either way not at this point in the game). The area
+  still stands: every formation keeps a non-pearl answer. Unicorn's granted
+  Pearl (§7(b)) makes holy wearer-agnostic at 40 MP a cast; nice-to-have, not
+  load-bearing.
+- **Shield count 2 (Ninja 3) is UNMEASURED** — the third area to inherit
+  the 4-is-one-too-many finding. Needs its own sweep at a cave entry-point
+  fixture (checkpoint H, map 386, is the natural place), with the mixed
   `$097`/`$09b` fights as the interesting arms.
 - Fixture assertions this implies (the §10.3 pattern): at the cave mouth,
   assert Sabin active (AuraBolt is the master key) and Terra active (the
-  base gate demands her anyway); assert Shiva
+  base entrance demands her anyway); assert Shiva
   and Bismark owned (the `$09a` ice key, the Ing water key).
 
 ---
 
-## 10. The checker entry, and its honest verdict
+## 10. The checker entry, and its verdict
 
-`tools/check_break_reach.py` now declares band `"sealed-gate"`: one leg,
+`tools/check_break_reach.py` declares `"sealed-gate"` in its `BANDS`
+table: one segment,
 party TERRA/LOCKE/EDGAR/SABIN, maps 382/383/384/385, forced battle 149,
 `min_formations` 13 (3 unique formations × 4 maps + the Ninja; `$099`,
 `$097`, `$098` repeat across maps and are checked per map-group). Battles
 121/122/123 are deliberately **not** declared — their offline decode is
 dummy-only (`$17b`) and known-suspect (the Shiva precedent), and their real
-contents are another agent's probe; the entry's comment says to add them
-when that lands.
+contents are unprobed; the entry's comment says to add them when that lands.
 
-Verdict against current data, run in this worktree:
+Verdict against current data:
 
-- **Bare run: PASSES — honestly.** All 13 formations carry a floor class
-  (slash or bludgeon) that the party can field. This is a true statement
-  about the class axis and *only* the class axis: the checker models
-  weapon/ability classes, not elements, so the pearl question of §7 is
-  invisible to it by design. The pass is not "the band is fine"; it is
-  "no formation is class-unreachable", which was already true here.
+- **Bare run: PASSES, and the pass means something narrow.** All 13
+  formations carry a floor class (slash or bludgeon) that the party can field.
+  That is a statement about the class axis and *only* the class axis: the
+  checker models weapon/ability classes, not elements, so the pearl question
+  of §7 is invisible to it by design. The pass is not "the area is fine"; it
+  is "no formation is class-unreachable", which is already true here.
 - **Failure demonstration (the tool's own `--drop-class` arm, built for
   exactly this):** `--band sealed-gate --drop-class bludg` fails loudly
   with 4 problems — precisely the four bludgeon-only formations (`$09c`,
   `$024`, `$096`, `$09a`). The entry has teeth; a future data drift that
   strips bludgeon coverage (or an authored-row typo) will be caught.
-- The vector-factory band still passes 29 formations, unchanged.
 
 After the §8 rows land the bare run must still pass (every proposed mask is
 fieldable by the ruled party); the row-landing commit should re-run it and
@@ -485,12 +472,12 @@ say so.
 ## 11. Cross-references
 
 - **Battles 121/122/123** — scripted set pieces, contents in battle-event
-  scripts, loseability unknown; owned by the parallel probe agent. This
-  survey makes no claim about them beyond: their formation words decode to
-  dummy `$17b` and they are excluded from the checker band until probed.
-- **The tube-esper redesign** (parallel agent): §7(b) names the one
-  coupling — Unicorn granting base-tier `PEARL` — as recommended flavor,
-  explicitly not load-bearing for this band's reachability.
+  scripts, loseability unknown. This survey makes no claim about them beyond:
+  their formation words decode to dummy `$17b` and they are excluded from the
+  checker's entry until probed.
+- **The tube espers**: §7(b) names the one coupling — Unicorn granting
+  base-tier `PEARL` — as flavour, explicitly not load-bearing for this area's
+  reachability.
 - **The banquet fights** (26: Mega Armor, bolt|water; 27 ×3: Commando,
   bolt|water; 30: Sp Forces ×3, poison — all decoded and confirmed real)
   and the **southern-continent / Crescent Island world pools** are the
@@ -501,17 +488,17 @@ say so.
 
 ## 12. Follow-ups
 
-1. Land the §8 rows with the band's implementation wave; re-run
+1. Land the §8 rows with the area's implementation wave; re-run
    `check_break_reach.py` (must still pass) and add the runtime analogue of
-   `battle_breakvector.lua` for this band, pinning `$09a` as the
+   `battle_breakvector.lua` for this area, pinning `$09a` as the
    pearl-less ice fight and asserting pierce outranks its current zero.
-2. Shield-count sweep (2 vs formula 4; Ninja 3) at the anchor-H doorstep.
+2. Shield-count sweep (2 vs formula 4; Ninja 3) at the checkpoint-H entry point.
 3. Fixture asserts: Sabin+Terra active, Shiva+Bismark owned (§9).
 4. One runtime check that the flashback cutscene maps (381, and v0.6's
    265/267/268) never take a danger-checked step.
-5. When the 121/122/123 probe lands, extend the `sealed-gate` band's
+5. When the 121/122/123 probe lands, extend the `sealed-gate` entry's
    `events` list with whatever real formations they carry.
-6. The banquet trio and the two world bands need their own #11 pass.
+6. The banquet trio and the two world areas need their own coverage pass.
 7. `gen_break_floor.py`'s three-way review output (`break-band-vector.md`
    §10.2 item 1) would have surfaced Apparite/Ing/Ninja as DEFAULT rows on
    this route automatically; still worth building.

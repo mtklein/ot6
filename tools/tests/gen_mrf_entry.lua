@@ -1,15 +1,15 @@
--- gen_mrf_entry.lua -- v0.6 leg 3: vector_sneak (VECTOR map 242, {57,34})
+-- gen_mrf_entry.lua -- v0.6 step 3: vector_sneak (VECTOR map 242, {57,34})
 -- -> the column north to the factory door -> map 262, the MAGITEK FACTORY
--- upper floor, at {28,8}.  Mints mrf_entry.
+-- upper floor, at {28,8}.  Generates mrf_entry.
 --
 -- The door is map 242's LONG entrance, decoded from LongEntrance
 -- ($EDF480/$EDF882): src {57,2}, horizontal, length 2 -> map 262 dest
 -- {28,8}.  So x=57..59 on row y=2 all fire it.  From the sneak exit at
 -- {57,34} the column is clean -- the party is already north of the guard
 -- lanes (y=39..41) and of the "You!? How'd you get in here?" trap row
--- (56..58,39), which is the entire reason leg 2 exists.
+-- (56..58,39), which is the entire reason step 2 exists.
 --
--- This leg also carries the live NAVIGATION CENSUS the route recon asked
+-- This step also carries the live NAVIGATION CENSUS the route recon asked
 -- for as its probe 2.  Offline BFS over
 -- the static tilemap said map 262 has only ~130 tiles reachable from the
 -- door and that (4,22), (11,45), (12,60), (22,53) and (22,54) are all
@@ -17,7 +17,7 @@
 -- transitions and because several of its triggers rewrite BG1 at runtime
 -- with `mod_bg_tiles` (event_main.asm:94962-95060).  The census below is
 -- measured against the LIVE tilemap the engine actually loaded, so the
--- next leg can be routed off a fact instead of an offline guess.
+-- next step can be routed off a fact instead of an offline guess.
 local H = dofile("tools/tests/lib/ot6.lua")
 
 local function map() return H.mapId() & 0x1ff end
@@ -116,13 +116,13 @@ H.run({ maxFrames = 60000 }, {
   end),
 
   -- 1. north up the column to {57,3}, one tile short of the door row.
-  H.navTo(57, 3, { maxFrames = 40000, honest = "flee",
+  H.navTo(57, 3, { maxFrames = 40000, playBattles = "flee",
     arrive = function() return map() == 262 end }),
-  H.navTo(57, 3, { maxFrames = 18000, honest = "flee" }), -- doorstep
+  H.navTo(57, 3, { maxFrames = 18000, playBattles = "flee" }), -- entry point
   H.call(function()
-    H.assertEq(map(), 242, "still in VECTOR at the factory doorstep")
-    H.assertEq(H.fieldX(), 57, "factory doorstep x")
-    H.assertEq(H.fieldY(), 3, "factory doorstep y")
+    H.assertEq(map(), 242, "still in VECTOR at the factory entry point")
+    H.assertEq(H.fieldX(), 57, "factory entry point x")
+    H.assertEq(H.fieldY(), 3, "factory entry point y")
     H.screenshot("mrf_doorstep")
   end),
 
@@ -158,9 +158,9 @@ H.run({ maxFrames = 60000 }, {
   end),
   H.saveState("mrf_entry.mss"),
 
-  -- 3. THE CENSUS (recon probe 2).  Run AFTER the mint so the banked state
-  --    is untouched by it.  The targets are every tile the recon's offline
-  --    pass called NO-PATH plus the two doors onward.
+  -- 3. THE CENSUS (recon probe 2).  Run AFTER the state is generated so the
+  --    banked state is untouched by it.  The targets are every tile the
+  --    recon's offline pass called NO-PATH plus the two doors onward.
   H.call(function()
     census("mrf_entry", {
       { 22, 53, "the scripted 263 transition trigger" },
@@ -178,7 +178,7 @@ H.run({ maxFrames = 60000 }, {
   end),
   H.logStep(function()
     return string.format(
-      "mrf_entry minted at frame %d -- MAGITEK FACTORY (map 262) at (28,8)",
+      "mrf_entry generated at frame %d -- MAGITEK FACTORY (map 262) at (28,8)",
       H.frame)
   end),
 })

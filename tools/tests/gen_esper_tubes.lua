@@ -1,26 +1,27 @@
--- gen_esper_tubes.lua -- v0.6 leg 10, the leg OUT of boundary C (#25):
--- cold battery Continue from the tracked n024-doorstep-save-v1 anchor (the
--- NEW #10 save point, map 273 {26,53}, slot 3), the boundary's ENTRY
--- CONTRACT asserted as the first real act, two steps to the 024 doorstep
+-- gen_esper_tubes.lua -- v0.6 step 10, the step OUT of boundary C (#25):
+-- cold battery Continue from the tracked n024-doorstep-save-v1 checkpoint
+-- (the NEW #10 save point, map 273 {26,53}, slot 3), the boundary's ENTRY
+-- CONTRACT asserted as the first real act, two steps to the 024 entry point
 -- -> battle 72 -> the {25,50} door -> map 274, the esper tube room ->
 -- parked at {10,10} FACING UP, one UP-step-plus-A-hold from the Cid/Kefka
--- set piece.  Mints n024_won and esper_tubes_doorstep.
+-- set piece.  Generates n024_won and esper_tubes_doorstep.
 --
--- ANCHORED MINT (frontier_graph.py: anchor="n024-doorstep-save-v1" on
--- BOTH of this script's states -- one script, one boot, two mints, so the
--- second state cannot ride a predecessor edge the boot never uses).  The
--- leg used to boot n024_doorstep.mss; that state stays minted as B->C's
--- terminal, and the cold Continue replays its last two steps from the
--- anchor instead (the "C + 2 steps" hybrid; boundary C is lettered in
+-- GENERATED FROM A CHECKPOINT (frontier_graph.py:
+-- anchor="n024-doorstep-save-v1" on BOTH of this script's states -- one
+-- script, one boot, two generated states, so the second state cannot ride a
+-- predecessor edge the boot never uses).  The step used to boot
+-- n024_doorstep.mss; that state is still generated as B->C's terminal, and
+-- the cold Continue replays its last two steps from the checkpoint instead
+-- (the "C + 2 steps" hybrid; boundary C is lettered in
 -- tools/tests/frontier_graph.py).
 --
 -- BATTLE 72 (_cc79ed, event_main.asm:95385) is `battle 72 / call _ca5ea9 /
 -- hide_obj NPC_1 / sort_obj / switch $0649=0` -- no `if_b_switch` gate at
 -- all, and $0649 going to 0 is the receipt (recon probe 5).  Measured
--- formation at the doorstep: `010A FFFF FFFF FFFF FFFF FFFF` -- Number 024
+-- formation at the entry point: `010A FFFF FFFF FFFF FFFF FFFF` -- Number 024
 -- alone, as decoded.
 --
--- THE FIGHT IS PLAYED, NOT KILL-BITTED (issue #75).  NUMBER 024 is the
+-- THE FIGHT IS PLAYED, NOT WRITE-CLEARED (issue #75).  NUMBER 024 is the
 -- specimen guard (bosses-wob.md section 14): 7 shields, a ROTATING
 -- elemental wall (WallChange), and the fixed chip classes are slashing +
 -- piercing -- the doc's own "handhold while the wall spins", which is
@@ -29,11 +30,11 @@
 -- (tactical + boost bank + real Item heals/revival, the configuration
 -- that has now beaten VARGAS, battle 70 and the brokendeath guard), after
 -- the player's own prep -- H.equipOptimum and H.fieldCare -- because the
--- July-cut anchor delivers the party hurt and LOCKE/CELES bare-handed
--- (the Vector remove_equip; measured on the sibling anchored leg, and
--- the equip audit names both).  gen_tunnelarmr's phase-spread retry
--- ladder wraps the engagement: battle 72 is an event battle, a loss is
--- GAME OVER, and the RNG seed is the frame phase at battle init.
+-- July-cut checkpoint delivers the party hurt and LOCKE/CELES bare-handed
+-- (the Vector remove_equip; measured on the sibling checkpoint-booted step,
+-- and the equip audit names both).  gen_tunnelarmr's phase-spread retry
+-- ladder wraps the engagement: battle 72 is an event battle, a loss is GAME
+-- OVER, and the RNG seed is the frame phase at battle init.
 --
 -- THE TUBE-ROOM TRIGGER IS FACING+BUTTON GATED, and this is the second
 -- place in v0.6 where that is load bearing (the first was the Vector sneak
@@ -56,12 +57,12 @@
 -- (ot6_field.lua:340-351).
 --
 -- OT6_ANCHOR_LAYOUT: ot6-codex-o8-v1
--- ^ the persistent-SRAM layout this leg understands (issue #25).  run.sh
+-- ^ the persistent-SRAM layout this step understands (issue #25).  run.sh
 --   reads the marker line above and refuses -- BEFORE the emulator boots,
 --   naming both strings -- any OT6_SRAM_ANCHOR whose manifest.json declares
 --   a different persistent_layout.
 --
--- The doorstep is banked ONE TILE SOUTH of the trigger, at {10,10} already
+-- The entry point is banked ONE TILE SOUTH of the trigger, at {10,10} already
 -- facing UP, and not on {10,9} itself.  Measured reason, sampled in this
 -- run and logged: standing on {10,9} with A released, hasControl() held
 -- for only 68 of 90 frames and eventRunning() for 22 -- _cc7a60 is
@@ -125,9 +126,10 @@ end
 local DELTA = { up = { 0, -1 }, right = { 1, 0 }, down = { 0, 1 }, left = { -1, 0 } }
 -- (a tapInto helper used to sit here, DEFINED and never called -- the same
 -- dead battle toolkit gen_tunnelarmr's and gen_n024_doorstep's conversions
--- deleted from their own files; its only battle handling was the kill-bit)
+-- deleted from their own files; its only battle handling was the
+-- battle-clear write)
 
--- ------------------------- battle 72, played honestly (issue #75) --------
+-- ------------------ battle 72, played with real input (issue #75) --------
 local N024 = 0x010A
 local function eoff(m) return 8 + m * 2 end
 local function mshields(m) return H.readByte(0x3E38 + eoff(m)) end
@@ -139,7 +141,7 @@ local fightBlob, fightWon = nil, false
 
 -- One attempt, flat (driveUntil bodies replay latched state, so every
 -- attempt builds fresh closures).  Attempt 1 runs in place -- the live
--- timeline IS the blob's timeline; later attempts reload the doorstep blob
+-- timeline IS the blob's timeline; later attempts reload the entry point blob
 -- and shift the RNG phase.  The outcome is decided on $0649: _cc79ed's
 -- tail clears it after a win, while a loss rides the Annihilated screen
 -- into GAME OVER and never touches it.
@@ -158,12 +160,12 @@ local function n024Attempt(n)
     n > 1 and seq({
       H.call(function() loadReq = H.requestLoadState(fightBlob) end),
       H.waitFrames(2),
-      H.call(function() H.checkReq(loadReq, "doorstep reload") end),
+      H.call(function() H.checkReq(loadReq, "entry point reload") end),
       H.waitFrames(90),
       H.call(function()
         H.assertEq(map(), 273, "reloaded onto map 273")
         H.assertEq(H.fieldX() == 25 and H.fieldY() == 52, true,
-          "reloaded at the (25,52) doorstep")
+          "reloaded at the (25,52) entry point")
       end),
     }) or seq({}),
     H.waitFrames((n - 1) * 37),         -- vary the battle RNG seed
@@ -196,9 +198,9 @@ local function n024Attempt(n)
       H.screenshot("n024_battle")
     end),
     H.waitFrames(90),
-    -- the honest fight: the library fighter, gauges logged around it.  Its
-    -- menu==0 branch pages battle text and the victory teardown, so this
-    -- one drive carries the battle to the field (or through the
+    -- the input-driven fight: the library fighter, gauges logged around it.
+    -- Its menu==0 branch pages battle text and the victory teardown, so
+    -- this one drive carries the battle to the field (or through the
     -- Annihilated screen, on a loss).
     H.driveUntil(function() return not H.battleLoadStarted() end, 90000, {
       H.call(function()
@@ -247,7 +249,7 @@ local function n024Attempt(n)
       H.setPad({})
       if sw(0x0649) == 0 then
         fightWon = true
-        H.log(string.format("battle 72 WON HONESTLY on attempt %d, f%d "
+        H.log(string.format("battle 72 WON on attempt %d, f%d "
           .. "(tactical + boost bank + items)", n, H.frame))
       else
         H.log(string.format("attempt %d LOST (no $0649 clear after teardown), f%d",
@@ -283,7 +285,7 @@ end
 
 H.run({ maxFrames = 300000 }, {
   -- COLD BATTERY BOOT (issue #25): title -> Continue -> the sole valid
-  -- slot (3) -> the NEW 273 save point, standing on the tile the anchor
+  -- slot (3) -> the NEW 273 save point, standing on the tile the checkpoint
   -- was saved on.
   H.waitFrames(350),
   H.repeatN(5, { H.pressButtons({ "start" }, 8), H.waitFrames(25) }),
@@ -291,7 +293,7 @@ H.run({ maxFrames = 300000 }, {
   H.repeatN(3, { H.pressButtons({ "a" }, 8), H.waitFrames(40) }),
   H.waitFrames(300),
   H.repeatN(3, { H.pressButtons({ "a" }, 8), H.waitFrames(60) }),
-  -- SOFT landing wait: a wrong-boundary anchor lands somewhere else, and
+  -- SOFT landing wait: a wrong-boundary checkpoint lands somewhere else, and
   -- the failure must be the entry contract NAMING the wrong map -- never a
   -- timeout here (leg-fixtures.md, "fails loudly, naming what differed").
   H.waitUntilSoft(function()
@@ -300,65 +302,65 @@ H.run({ maxFrames = 300000 }, {
   H.waitFrames(60),
   H.call(function()
     -- THE ENTRY CONTRACT (issue #25): declared once in lib/ot6_contract.lua
-    -- under "n024-doorstep-save-v1" -- the same table the leg INTO C
-    -- (gen_n024_doorstep) and the anchor mint (gen_n024_save_anchor)
-    -- assert as their EXIT contract.  A stale or wrong anchor fails HERE
+    -- under "n024-doorstep-save-v1" -- the same table the step INTO C
+    -- (gen_n024_doorstep) and the checkpoint generator (gen_n024_save_anchor)
+    -- assert as their EXIT contract.  A stale or wrong checkpoint fails HERE
     -- by naming what differed.
     H.assertEntryContract("n024-doorstep-save-v1")
     H.log(partyReport("n024-doorstep-save-v1 entry"))
   end),
 
-  -- the two steps back onto the 024 doorstep (§5's "C + 2 steps")
-  H.navTo(25, 52, { maxFrames = 6000, honest = "flee" }),
+  -- the two steps back onto the 024 entry point (§5's "C + 2 steps")
+  H.navTo(25, 52, { maxFrames = 6000, playBattles = "flee" }),
   H.call(function()
     H.assertEq(map(), 273, "on map 273")
-    H.assertEq(H.fieldX(), 25, "024 doorstep x")
-    H.assertEq(H.fieldY(), 52, "024 doorstep y")
+    H.assertEq(H.fieldX(), 25, "024 entry point x")
+    H.assertEq(H.fieldY(), 52, "024 entry point y")
     H.assertEq(sw(0x0649), 1, "$0649 SET -- 024 has not been fought")
-    H.log(partyReport("024 doorstep (walked from anchor C)"))
+    H.log(partyReport("024 entry point (walked from checkpoint C)"))
   end),
 
-  -- 1. the player's prep, all through real menus: the July-cut anchor
+  -- 1. the player's prep, all through real menus: the July-cut checkpoint
   --    delivers LOCKE and CELES bare-handed and the party can arrive hurt
-  --    (both measured on the sibling anchored legs) -- re-equip
+  --    (both measured on the sibling checkpoint-booted steps) -- re-equip
   --    (Equip -> Optimum, a no-op for anyone armed) and top HP up from
   --    the bag BEFORE the retry blob, so every attempt replays a
   --    prepared party
   H.equipOptimum({ tag = "n024 kit" }),
   H.fieldCare({ tag = "care before battle 72", threshold = 0.95 }),
-  H.navTo(25, 52, { maxFrames = 6000, honest = "flee" }),
+  H.navTo(25, 52, { maxFrames = 6000, playBattles = "flee" }),
   H.call(function()
     H.assertEq(H.fieldX() == 25 and H.fieldY() == 52, true,
-      "back at the doorstep, armed and topped up")
-    H.log(partyReport("024 doorstep, prepared"))
+      "back at the entry point, armed and topped up")
+    H.log(partyReport("024 entry point, prepared"))
   end),
-  -- capture the prepared doorstep as the retry ladder's reload blob
+  -- capture the prepared entry point as the retry ladder's reload blob
   (function()
     local req
     return seq({
       H.call(function() req = H.requestSaveState() end),
       H.waitFrames(2),
       H.call(function()
-        H.checkReq(req, "doorstep retry blob")
+        H.checkReq(req, "entry point retry blob")
         fightBlob = req.blob
         H.log(string.format("retry blob captured: %d bytes", #fightBlob))
       end),
     })
   end)(),
 
-  -- 2. battle 72, played honestly, on the phase-spread retry ladder
+  -- 2. battle 72, played with real input, on the phase-spread retry ladder
   n024Attempt(1),
   n024Attempt(2),
   n024Attempt(3),
   H.call(function()
     H.assertEq(fightWon, true,
-      "battle 72 won honestly within 3 attempts (the library fighter: "
+      "battle 72 won within 3 attempts (the library fighter: "
       .. "tactical + boost bank + real items)")
   end),
   -- ride the post-battle tail out to a settled field ($0649 already
-  -- cleared; honest -- no battle can occur here)
+  -- cleared; playBattles=true -- no battle can occur here)
   H.advanceStory(function() return sw(0x0649) == 0 and settled() end, 12000,
-    { honest = true }),
+    { playBattles = true }),
   H.waitFrames(60),
   H.call(function()
     H.assertEq(map(), 273, "still on map 273 after battle 72")
@@ -399,7 +401,7 @@ H.run({ maxFrames = 300000 }, {
   end)(),
 
   -- 2. {25,50} -> map 274 {10,25}
-  H.navTo(25, 50, { maxFrames = 9000, honest = "flee", arrive = function() return map() == 274 end }),
+  H.navTo(25, 50, { maxFrames = 9000, playBattles = "flee", arrive = function() return map() == 274 end }),
   H.waitUntil(function() return map() == 274 and settled() end, 6000,
     "map 274 control", 5),
   H.waitFrames(60),
@@ -416,9 +418,9 @@ H.run({ maxFrames = 300000 }, {
   end),
 
   -- 3. up to {10,10}, one step below the trigger tile.
-  H.navTo(10, 10, { maxFrames = 12000, honest = "flee" }),
+  H.navTo(10, 10, { maxFrames = 12000, playBattles = "flee" }),
 
-  -- 3a. WHY THE DOORSTEP IS NOT ON {10,9}.  A first version of this leg
+  -- 3a. WHY THE ENTRY POINT IS NOT ON {10,9}.  A first version of this step
   --     tried to park ON the trigger tile and timed out: the terminator
   --     wants consecutive settled frames and settled() never held there.
   --     Measured below rather than assumed -- step up onto {10,9} with NO
@@ -427,8 +429,8 @@ H.run({ maxFrames = 300000 }, {
   --     re-entered every frame the party stands on it, takes its early
   --     `goto EventReturn` because $01B4 is clear, and the event PC
   --     bouncing into bank $CA is enough to make eventRunning() -- and so
-  --     hasControl() -- flicker forever.  Then step back off and mint from
-  --     {10,10}, one UP-step-plus-A-hold from the scene.
+  --     hasControl() -- flicker forever.  Then step back off and generate
+  --     from {10,10}, one UP-step-plus-A-hold from the scene.
   H.hold({ "up" }), H.waitFrames(8), H.release(), H.waitFrames(40),
   (function() local n, ctl, ev = 0, 0, 0
     return H.driveUntil(function() return n >= 90 end, 300, {
@@ -454,8 +456,8 @@ H.run({ maxFrames = 300000 }, {
   -- straight back onto the trigger tile.  Every earlier face-an-NPC press
   -- in this chain was safe only because an NPC object occupied the
   -- destination and the step was refused.
-  H.navTo(10, 11, { maxFrames = 6000, honest = "flee" }),   -- back off the trigger tile
-  H.navTo(10, 10, { maxFrames = 6000, honest = "flee" }),   -- back onto the doorstep, facing UP
+  H.navTo(10, 11, { maxFrames = 6000, playBattles = "flee" }),   -- back off the trigger tile
+  H.navTo(10, 10, { maxFrames = 6000, playBattles = "flee" }),   -- back onto the entry point, facing UP
   (function() local calm = 0
     return H.driveUntil(function()
       local ok = H.fieldX() == 10 and H.fieldY() == 10 and settled()
@@ -472,12 +474,12 @@ H.run({ maxFrames = 300000 }, {
 
   H.call(function()
     H.assertEq(map(), 274, "on map 274")
-    H.assertEq(H.fieldX(), 10, "tube-room doorstep x -- one step below {10,9}")
-    H.assertEq(H.fieldY(), 10, "tube-room doorstep y")
+    H.assertEq(H.fieldX(), 10, "tube-room entry point x -- one step below {10,9}")
+    H.assertEq(H.fieldY(), 10, "tube-room entry point y")
     H.assertEq(H.readByte(0x087f + H.readWord(0x0803)), 0,
       "facing UP toward the trigger tile (EVENT_DIR 0 -- this is the $01B0 "
       .. "the trigger demands, already set)")
-    H.assertEq(settled(), true, "the doorstep is QUIET")
+    H.assertEq(settled(), true, "the entry point is QUIET")
     H.assertEq(sw(0x0068), 0, "$0068 CLEAR")
     H.assertEq(H.readByte(0x1A69) & 0x07, 0x07, "still RAMUH + IFRIT + SHIVA")
     H.log(string.format("[esper_tubes_doorstep] f%d map=%d (%d,%d) face=%d $1A69=%02X",
@@ -488,19 +490,20 @@ H.run({ maxFrames = 300000 }, {
   end),
   H.saveState("esper_tubes_doorstep.mss"),
   -- RELOAD-VERIFIED, and deliberately BEFORE the A-hold trigger check
-  -- below, which consumes the doorstep by firing the scene -- after the
-  -- reload the verify below runs from a state byte-equivalent to the mint.
+  -- below, which consumes the entry point by firing the scene -- after the
+  -- reload the verify below runs from a state byte-equivalent to the
+  -- generated savestate.
   (function()
     local saveReq, loadReq
     return seq({
       H.call(function() saveReq = H.requestSaveState() end),
       H.waitFrames(2),
       H.call(function()
-        H.checkReq(saveReq, "doorstep verify: capture")
+        H.checkReq(saveReq, "entry point verify: capture")
         loadReq = H.requestLoadState(saveReq.blob)
       end),
       H.waitFrames(2),
-      H.call(function() H.checkReq(loadReq, "doorstep verify: reload") end),
+      H.call(function() H.checkReq(loadReq, "entry point verify: reload") end),
       H.waitFrames(180),
       H.call(function()
         H.assertEq(map(), 274, "reload: still on map 274")
@@ -517,10 +520,11 @@ H.run({ maxFrames = 300000 }, {
     })
   end)(),
 
-  -- 4. VERIFY, after the mint, that an A-HOLD really fires _cc7a60.  This
-  --    is the assertion that a plain navTo could never satisfy, and it is
-  --    the whole reason the doorstep is a tile-with-a-facing rather than a
-  --    tile: a fixture that merely stands here proves nothing.
+  -- 4. VERIFY, after the state is generated, that an A-HOLD really fires
+  --    _cc7a60.  This is the assertion that a plain navTo could never
+  --    satisfy, and it is the whole reason the entry point is a
+  --    tile-with-a-facing rather than a tile: a fixture that merely stands
+  --    here proves nothing.
   (function() local n = 0
     return H.driveUntil(function()
       return H.fieldY() == 9 and n > 120 and (not H.hasControl() or sw(0x0068) == 1)
@@ -540,8 +544,8 @@ H.run({ maxFrames = 300000 }, {
     H.screenshot("esper_tubes_verify")
   end),
   H.logStep(function()
-    return string.format("n024_won and esper_tubes_doorstep minted; "
-      .. "doorstep is map 274 (10,10) facing UP, one UP-step-plus-A-hold "
+    return string.format("n024_won and esper_tubes_doorstep generated; "
+      .. "the entry point is map 274 (10,10) facing UP, one UP-step-plus-A-hold "
       .. "from _cc7a60 (frame %d)", H.frame)
   end),
 })

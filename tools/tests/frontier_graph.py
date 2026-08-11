@@ -1,47 +1,49 @@
-# frontier_graph.py -- THE frontier savestate graph, as data (issue #25).
+# frontier_graph.py -- THE generated-savestate graph, as data (issue #25).
 #
-# One entry per minted state, in play order.  tools/tests/lib/frontier_ninja.py
-# reads this list and emits build/build.ninja; nothing else consumes it.  The
-# graph used to live as ~104 make rules plus three macros (mint / mint_anchor /
-# stackseed) plus a grep-generated include; every axis of it now rides ONE
-# field here:
+# One entry per generated state, in play order.  frontier_ninja.py (in
+# tools/tests/lib) reads this list and emits build/build.ninja; nothing else
+# consumes it.  The graph used to live as ~104 make rules plus three macros
+# (mint / mint_anchor / stackseed) plus a grep-generated include; every axis
+# of it now rides ONE field here:
 #
 #   S("arvis_wake", gen="gen_arvis", prev="whelk_doorstep")
-#       a plain mint: boot the predecessor's savestate, run the generator,
+#       the plain form: boot the predecessor's savestate, run the generator,
 #       publish <state>.mss + <state>.mss.lua through tools/tests/run.sh.
 #
 #   S("vector_doorstep", gen="gen_vector_doorstep", anchor="post-opera-v1")
-#       an ANCHORED mint: cold-boot the tracked battery anchor
+#       generated from a CHECKPOINT: cold-boot the tracked SRAM checkpoint in
 #       tools/tests/anchors/<key>/ instead of a predecessor savestate.
-#       Cutting a leg loose at a save-point boundary (the A-F band lettered
-#       in the boundary comments below) is exactly this: prev= becomes
-#       anchor=.
+#       Cutting a step loose at a save-point boundary (the A-F sequence
+#       lettered in the boundary comments below) is exactly this: prev=
+#       becomes anchor=.
 #
 #   S("t2_rapids_start", gen="gen_rapids", prev="t2_scenario_hub", stack="t2_")
-#       a STACKED mint: compose.py replays the generator's route logic against
-#       prefix_-named fixtures (OT6_STACK) -- see SCENARIO STACKING below.
+#       a STACKED state: compose.py replays the generator's route logic
+#       against prefix_-named fixtures (OT6_STACK) -- see SCENARIO STACKING
+#       below.
 #
 #   S("t2_scenario_hub", seed="locke_done")
 #       a stack SEED: a pure copy of a finished chain's ending under the
 #       stacked chain's boot name.  No generator, no emulator.
 #
 #   S("whelk_doorstep", gen="gen_whelk_poweron", after="battle2_doorstep")
-#       a power-on mint (no savestate input) ORDERED after another state so
-#       the two emulator runs never race, without inheriting its staleness --
-#       ninja's order-only dependency.
+#       generated from power-on (no savestate input) and ORDERED after
+#       another state so the two emulator runs never race, without inheriting
+#       its staleness -- ninja's order-only dependency.
 #
-# What participates in a mint's staleness (all by CONTENT, via the generator's
-# latch edges -- a checkout's mtime bump re-mints nothing):
+# What participates in a state's staleness (all by CONTENT, via the
+# generator's latch edges -- a checkout's mtime bump regenerates nothing):
 #   * the ROM (build/ot6.sfc),
 #   * the generator .lua,
 #   * all three composed-in lib halves: lib/ot6.lua, lib/ot6_field.lua and
 #     lib/ot6_contract.lua (the invariant-contract half rides in every
-#     composed script, so a contract edit re-runs every leg that asserts it),
-#   * for anchored mints, the anchor's manifest.json and every *.sram payload,
-#   * the predecessor's minted state, transitively.
+#     composed script, so a contract edit re-runs every step that asserts it),
+#   * for checkpoint-booted states, the checkpoint's manifest.json and every
+#     *.sram payload,
+#   * the predecessor's generated state, transitively.
 #
 # S() takes keyword-only fields ON PURPOSE: a typo'd field name is a
-# TypeError here, not a silently-plain mint downstream.
+# TypeError here, not a silently-plain entry downstream.
 
 
 def S(state, *, gen=None, prev=None, anchor=None, seed=None, stack=None,
@@ -63,10 +65,10 @@ STATES = [
     # report). after= orders the two identical emulator runs, no data dep.
     S("first_battle", gen="gen_battle_state", after="battle_doorstep"),
     S("battle2_doorstep", gen="gen_battle2", prev="battle_doorstep"),
-    # whelk doorstep: the dialog-opening boss fight battle_dlgmenu gates.
-    # gen_whelk_poweron mints it from COLD POWER-ON -- plays the New Game
+    # whelk_doorstep: the dialog-opening boss fight battle_dlgmenu tests.
+    # gen_whelk_poweron generates it from COLD POWER-ON -- plays the New Game
     # intro through the Narshe gauntlet to the mines -- so it consumes no
-    # predecessor savestate; `after=` only keeps the three suite mints from
+    # predecessor savestate; `after=` only keeps the three suite states from
     # racing each other's emulator boots, exactly the order make ran them in.
     S("whelk_doorstep", gen="gen_whelk_poweron", after="battle2_doorstep"),
 
@@ -85,7 +87,7 @@ STATES = [
     S("moogle_cleared", gen="gen_moogle", prev="moogle_doorstep"),
     # moogle_defense: gen_moogle's second artifact (mid-set-piece, MOG
     # leading P2) -- the first_battle pattern (#41): one edge per artifact,
-    # or the fixture silently goes stale while its sibling re-mints.
+    # or the fixture silently goes stale while its sibling regenerates.
     # battle_dancemp consumes it (the only real MOG-with-Dance window the
     # chain has; measured 2026-08-10, the set piece is where dances are
     # learned, so no earlier fixture can host that test).
@@ -93,7 +95,7 @@ STATES = [
     S("worldmap_narshe", gen="gen_worldmap", prev="moogle_cleared"),
     S("figaro_doorstep", gen="gen_figaro", prev="worldmap_narshe"),
     S("figaro_intro", gen="gen_edgar", prev="figaro_doorstep"),
-    # same script, later mints; each gates on its own file so a half-run
+    # same script, later states; each keys on its own file so a half-run
     # re-runs
     S("figaro_matron", gen="gen_edgar", prev="figaro_intro"),
     S("figaro_cleared", gen="gen_edgar", prev="figaro_matron"),
@@ -101,8 +103,8 @@ STATES = [
     S("south_figaro", gen="gen_kolts", prev="figaro_cleared"),
     S("kolts_doorstep", gen="gen_kolts", prev="south_figaro"),
     S("vargas_doorstep", gen="gen_kolts", prev="kolts_doorstep"),
-    # gen_kolts_pool: one crossing past the doorstep onto map 100 shelf F.
-    # The doorstep map (95) is transit only and carries no encounter group --
+    # gen_kolts_pool: one crossing past kolts_doorstep onto map 100 shelf F.
+    # That map (95) is transit only and carries no encounter group --
     # 437 paced tiles there drew nothing -- so balance runs that want the
     # Mt. Kolts trash pool need this one, not kolts_doorstep.
     S("kolts_pool", gen="gen_kolts_pool", prev="kolts_doorstep"),
@@ -116,11 +118,10 @@ STATES = [
     # gen_vargas: the fight itself, finished by Pummel, and the reunion
     S("vargas_won", gen="gen_vargas", prev="vargas_doorstep"),
 
-    # ---- rung 3: the road to the scenario split ----
+    # ---- tier 3: the road to the scenario split ----
     # gen_returner: off the mountain's north side and across the world map
     S("returner_hideout", gen="gen_returner", prev="vargas_won"),
-    # gen_banon: the hideout's conversation graph, ending on the raft's
-    # doorstep
+    # gen_banon: the hideout's conversation graph, ending just before the raft
     S("banon_joined", gen="gen_banon", prev="returner_hideout"),
     # gen_lete: the short walk to the raft -- kept its own link so that a
     # failed experiment on the river replays 530 frames, not the whole hideout
@@ -129,15 +130,15 @@ STATES = [
     # the three-way split -- the entry point of the v0.3 arc
     S("scenario_hub", gen="gen_scenario", prev="lete_river"),
     # one step PAST the hub: proves the split is dispatchable and hands the
-    # v0.3 Locke chain its doorstep.  The Sabin and Terra/Banon branches
+    # v0.3 Locke chain its entry point.  The Sabin and Terra/Banon branches
     # start from scenario_hub the same way.
     S("locke_scenario", gen="gen_scenario_locke", prev="scenario_hub"),
 
     # ---- the TERRA/BANON scenario: the shortest of the three, from the hub -
     # gen_rapids: talk to Terra at the hub, resume the raft down the lower
     # Lete (the FORCED battle 8 plus two if_rand fights), spill onto the
-    # world map.  Two mints: rapids_start is the cheap doorstep UPSTREAM of
-    # the forced fight; rapids_done is on foot on the WoB NE of Narshe.
+    # world map.  Two states: rapids_start is the cheap entry point UPSTREAM
+    # of the forced fight; rapids_done is on foot on the WoB NE of Narshe.
     S("rapids_start", gen="gen_rapids", prev="scenario_hub"),
     S("rapids_done", gen="gen_rapids", prev="rapids_start"),
     # gen_terra_narshe: the world walk into Narshe and the townsfolk's
@@ -164,7 +165,7 @@ STATES = [
     S("sabin_camp", gen="gen_sabin_world", prev="sabin_world"),
     # gen_sabin_camp: one step south of the camp gate hands the game to CYAN
     # on map 120 for ~9,000 frames (the Doma defence, name menu and all)
-    # before SABIN gets it back.  cyan_defence is minted mid-run so an
+    # before SABIN gets it back.  cyan_defence is generated mid-run so an
     # experiment on the commander fight replays 800 frames instead of 6,000.
     S("cyan_defence", gen="gen_sabin_camp", prev="sabin_camp"),
     S("camp_intro", gen="gen_sabin_camp", prev="cyan_defence"),
@@ -177,18 +178,19 @@ STATES = [
     S("camp_cleared", gen="gen_sabin_doma", prev="kefka_done"),
     # gen_sabin_escape: the Doma courtyard defence -- three talk-to-CYAN
     # fights, CYAN joins, everyone mounts Magitek.  Stops at (14,30), the
-    # escape's starting line (the escape walk itself is the next leg).
+    # escape's starting line (the escape walk itself is the next step).
     S("doma_defended", gen="gen_sabin_escape", prev="camp_cleared"),
     # gen_sabin_magitek: the Imperial Camp escape -- ride the fight/interlude
     # gauntlet out to the World of Balance.  Battles 15/16/17 are each WON BY
-    # TAP-A (kill-bit -> GameOver softlock), and each latchless re-firing
-    # trigger is left by holding the corridor's walkable direction through
-    # the ~25% control flap (see the generator header).
+    # TAP-A (writing the battle-clearing flag instead softlocks on GameOver),
+    # and each latchless re-firing trigger is left by holding the corridor's
+    # walkable direction through the ~25% control flap (see the generator
+    # header).
     S("camp_escaped", gen="gen_sabin_magitek", prev="doma_defended"),
     # gen_sabin_forest: the Phantom Forest -- world (178,82) into map 132,
     # the 132->133->134->135->140 chain (map 133's one-way recovery spring is
     # a MANDATORY conveyor past its back-exit), then boarding the Phantom
-    # Train at 140 (72,11) -> map 145.  Mints forest_done on the train.
+    # Train at 140 (72,11) -> map 145.  Generates forest_done on the train.
     S("forest_done", gen="gen_sabin_forest", prev="camp_escaped"),
     # gen_sabin_train: the Phantom Train, boarding to the Ghost Train's fall
     # -- the maze decoded and driven, and battle 68 fought with real Blitz
@@ -208,7 +210,7 @@ STATES = [
     # option-1 prompt -- $0044=1 and the hub.  SABIN's scenario closes here.
     S("sabin_done", gen="gen_sabin_trench", prev="gau_joined"),
 
-    # ---- rung 4: LOCKE's scenario, hub -> South Figaro -> TunnelArmr ----
+    # ---- tier 4: LOCKE's scenario, hub -> South Figaro -> TunnelArmr ----
     # gen_sfigaro: the occupied town.  The gate soldier (battle 11), then the
     # cafe's cider runner -- STOLEN from, not killed, because the merchant's
     # clothes come off the steal's reaction script and nothing else -- then
@@ -229,26 +231,27 @@ STATES = [
 
     # ---- SCENARIO STACKING: the road to the reunion ------------------------
     # The reunion _caadb9 (event_main.asm:26683) needs $0021 && $001E && $0044
-    # in ONE playthrough; each honest chain sets one.  compose.py's OT6_STACK
-    # prefix replays a whole chain's ROUTE LOGIC from a different boot: a
-    # stacked mint composes the same generator with every .mss basename
-    # prefixed, so it boots the prefixed predecessor and mints prefixed
-    # artifacts -- the honest states are never touched.  The full stack is
-    # LOCKE (honest) -> SABIN (s2_) -> TERRA (t3_); the earlier two_done
-    # milestone (LOCKE + TERRA, t2_) proved the mechanism on Terra's chain:
+    # in ONE playthrough; each input-driven chain sets one.  compose.py's
+    # OT6_STACK prefix replays a whole chain's ROUTE LOGIC from a different
+    # boot: a stacked state composes the same generator with every .mss
+    # basename prefixed, so it boots the prefixed predecessor and generates
+    # prefixed artifacts -- the input-driven states are never touched.  The
+    # full stack is LOCKE (input-driven) -> SABIN (s2_) -> TERRA (t3_); the
+    # earlier two_done milestone (LOCKE + TERRA, t2_) proved the mechanism on
+    # Terra's chain:
     #  * Terra's is the shortest chain, so that first stacking layer -- the
     #    one that had to prove the mechanism -- replays the least;
     #  * the THIRD chain's hub return fires the reunion instead of reaching
     #    the hub (the if_all at :26654), so whichever chain goes last cannot
-    #    end on its own "back at the hub" gate.  That final leg belongs to
+    #    end on its own "back at the hub" check.  That final step belongs to
     #    gen_narshe_battle.  Terra takes it -- gen_terra_done's all-three
     #    fork is already reunion-aware -- so Sabin's chain goes second and
     #    its clean hub-return ending seeds the Terra layer.
     #
     # A stacked chain's "scenario_hub" IS the previous chain's ending: the
-    # seed entries copy both halves (state + sidecar), and a source re-mint
-    # (ROM changed, or the chain below replayed) re-seeds and the stack above
-    # replays -- that is just the dependency edge now.
+    # seed entries copy both halves (state + sidecar), and a regenerated
+    # source (ROM changed, or the chain below replayed) re-seeds and the
+    # stack above replays -- that is just the dependency edge now.
     S("t2_scenario_hub", seed="locke_done"),
     S("t2_rapids_start", gen="gen_rapids", prev="t2_scenario_hub",
       stack="t2_"),
@@ -262,15 +265,15 @@ STATES = [
       stack="t2_"),
     S("t2_terra_done", gen="gen_terra_done", prev="t2_terra_clifftop",
       stack="t2_"),
-    # the acceptance gate: asserts BOTH flags on the stacked ending and
+    # the acceptance check: asserts BOTH flags on the stacked ending and
     # re-saves it under the canonical name (gen_two_done.lua's header says
     # why the assert lives outside the mechanically-prefixed chain).
     S("two_done", gen="gen_two_done", prev="t2_terra_done"),
 
     # ---- the FULL stack: SABIN second (s2_), TERRA last (t3_) --------------
     # ORDER (from the reunion spike): whichever chain returns to the hub
-    # THIRD rides the reunion instead of reaching the hub, so the final leg
-    # must be reunion-aware -- gen_terra_done is (its all-three fork mints
+    # THIRD rides the reunion instead of reaching the hub, so the final step
+    # must be reunion-aware -- gen_terra_done is (its all-three fork generates
     # t3_reunion_ready at the map-22 staging).  Sabin's chain replays SECOND
     # on top of locke_done, ending at his hub return ($001E+$0044).
     S("s2_scenario_hub", seed="locke_done"),
@@ -313,10 +316,10 @@ STATES = [
     S("t3_terra_clifftop", gen="gen_terra_clifftop", prev="t3_terra_caves",
       stack="t3_"),
     # gen_terra_done on the all-three boot takes its REUNION FORK: rides
-    # _caadb9's cutscene to the map-22 staging and mints t3_reunion_ready.
+    # _caadb9's cutscene to the map-22 staging and generates t3_reunion_ready.
     S("t3_reunion_ready", gen="gen_terra_done", prev="t3_terra_clifftop",
       stack="t3_"),
-    # the acceptance gate (gen_two_done's shape, one layer up): assert ALL
+    # the acceptance check (gen_two_done's shape, one layer up): assert ALL
     # THREE flags + the reunion on the stacked ending and re-save it as the
     # canonical reunion_ready -- the boot gen_narshe_battle consumes.
     S("reunion_ready", gen="gen_reunion_ready", prev="t3_reunion_ready"),
@@ -324,13 +327,13 @@ STATES = [
     # ---- the Battle for Narshe ---------------------------------------------
     # gen_narshe_battle: reunion staging -> BANON -> the three-party
     # assignment menu (P1=TERRA+EDGAR+CELES, P2=CYAN+SABIN, P3=LOCKE+GAU) ->
-    # defense live -> the measured cliff descent -> KEFKA'S doorstep -> the
-    # scripted win.
+    # defense live -> the measured cliff descent -> just before the KEFKA
+    # fight -> the scripted win.
     S("narshe_battle", gen="gen_narshe_battle", prev="reunion_ready"),
     S("kefka_doorstep", gen="gen_narshe_battle", prev="narshe_battle"),
-    # kefka_won is v0.4's FIRST link and the honest chain's head: the win
-    # tail (esper scene, TERRA's flight, the Arvis regroup and its
-    # party-select menu) mints the map-30 boot the Zozo arc consumes.
+    # kefka_won is v0.4's FIRST link and the input-driven chain's head: the
+    # win tail (esper scene, TERRA's flight, the Arvis regroup and its
+    # party-select menu) generates the map-30 boot the Zozo arc consumes.
     S("kefka_won", gen="gen_kefka_won", prev="kefka_doorstep"),
 
     # ---- v0.4: the search for TERRA (kefka_won -> Zozo) --------------------
@@ -350,8 +353,8 @@ STATES = [
     S("zozo_clock_solved", gen="gen_zozo3_clock", prev="zozo_arrival"),
     # gen_zozo4_dadaluma: the crane maze -- five doors, the stair room's
     # bandit conveyor, both jump rows, and the z-level loop onto the y=13
-    # strip beside DADALUMA at (30,14).  Doorstep = (30,13); the fight is
-    # battle 69, won by the kill-bit like Kefka/Vargas.
+    # strip beside DADALUMA at (30,14).  Entry point = (30,13); the fight is
+    # battle 69, won by writing the battle-clearing flag like Kefka/Vargas.
     S("dadaluma_doorstep", gen="gen_zozo4_dadaluma", prev="zozo_arrival"),
     S("dadaluma_won", gen="gen_zozo4_dadaluma", prev="dadaluma_doorstep"),
     # gen_zozo5_ramuh: the tower door (33,9) -> map 226 -> TERRA (talked
@@ -363,11 +366,11 @@ STATES = [
     # gen_opera1_doorstep: zozo_done -> the world -> JIDOOR -> its north BUMP
     # door -> map 209 (the opera-plot room) -> parked at {117,20} facing UP,
     # one A-press below the IMPRESARIO ({117,19}, _ca9337).  The generator
-    # self-verifies (after the mint) that one A-press fires _ca9337.
+    # self-verifies (after generating) that one A-press fires _ca9337.
     S("opera_doorstep", gen="gen_opera1_doorstep", prev="zozo_done"),
     # gen_opera2_open: DRIVE the opera-open cutscene chain on map 209 ->
     # Jidoor -> world -> the OPERA HOUSE (map 237) -> parked at {60,49}
-    # below the now-VISIBLE IMPRESARIO.  Mints opera_open.
+    # below the now-VISIBLE IMPRESARIO.  Generates opera_open.
     S("opera_open", gen="gen_opera2_open", prev="opera_doorstep"),
     # gen_opera3_backstage: talk the IMPRESARIO -> RIDE the performance
     # intro -> controllable BACKSTAGE, map 234 {16,46}, $0055=1.
@@ -377,24 +380,26 @@ STATES = [
     S("opera_stage", gen="gen_opera4_stage", prev="opera_backstage"),
     # gen_opera5_dance: fire the aria trigger {97,7} -> map 236 -> the lyric
     # forks {0,1,0} -> the FLOWER DANCE (hand-coded corridorFollow stair
-    # legs; map 236 is z-split) -> the balcony {8,9} -> _cabe6d -> $0111=1.
+    # segments; map 236 is z-split) -> the balcony {8,9} -> _cabe6d ->
+    # $0111=1.
     S("opera_dance_done", gen="gen_opera5_dance", prev="opera_stage"),
     # gen_opera6_rafter: the RAFTER CHASE -> ultros2_doorstep, one
     # interaction before battle 104 (Ultros II).
     S("ultros2_doorstep", gen="gen_opera6_rafter", prev="opera_dance_done"),
-    # gen_opera7_blackjack: battle 104 (route kill-bit) -> Setzer's coin-toss
-    # bargain -> first stable controllable world-map frame after the
-    # Blackjack lands outside Vector.  The v0.5 terminal fixture.
+    # gen_opera7_blackjack: battle 104 (the route writes the battle-clearing
+    # flag) -> Setzer's coin-toss bargain -> first stable controllable
+    # world-map frame after the Blackjack lands outside Vector.  The v0.5
+    # terminal fixture.
     S("blackjack", gen="gen_opera7_blackjack", prev="ultros2_doorstep"),
 
     # ---- v0.6: the raid on Vector and the Magitek Research Facility --------
-    # The chain hangs off the tracked 32 KiB post-Opera battery anchor rather
+    # The chain hangs off the tracked 32 KiB post-Opera SRAM checkpoint rather
     # than off blackjack.mss: gen_vector_doorstep cold-boots, drives vanilla
     # Continue into slot 3, and walks the world from there.  Every later link
-    # is an ordinary savestate chain.  run.sh's persistent_layout gate
-    # refuses the anchor load BEFORE boot if the generator does not declare
-    # the anchor's layout; the manifest + payload ride the dependency set, so
-    # editing either re-mints every state hung off the anchor.
+    # is an ordinary savestate chain.  run.sh's persistent_layout check
+    # refuses the checkpoint load BEFORE boot if the generator does not
+    # declare its layout; the manifest + payload ride the dependency set,
+    # so editing either regenerates every state hung off the checkpoint.
     S("vector_doorstep", gen="gen_vector_doorstep", anchor="post-opera-v1"),
     # gen_vector_sneak: the Returner sympathizer's choice dialog ($01F0) and
     # the FACING-GATED ledge on {43,38} -> control at {57,34}.
@@ -414,25 +419,25 @@ STATES = [
     # {3,7} facing IFRIT, one A-press from battle 70.
     S("ifrit_doorstep", gen="gen_ifrit_doorstep", prev="mrf_kefka"),
     # ---- boundary B: the map-270 save room ---------------------------------
-    # ifrit_doorstep above is leg A->B's terminal; gen_ifrit_doorstep also
-    # walks the save room and asserts B's exit contract pre-save, and
-    # gen_mrf_save_room_anchor (run by hand, never by this graph) minted
-    # the tracked battery from it.  The leg OUT of B is anchored:
-    # gen_ifrit_magicite cold-Continues the anchor, asserts the entry
+    # ifrit_doorstep above is the terminal of step A->B; gen_ifrit_doorstep
+    # also walks the save room and asserts B's exit contract pre-save, and
+    # gen_mrf_save_room_anchor (run by hand, never by this graph) cut the
+    # tracked SRAM checkpoint from it.  The step OUT of B starts from that
+    # checkpoint: gen_ifrit_magicite cold-Continues it, asserts the entry
     # contract, walks back to the alcove, then battle 70 and the
     # four-interaction hand-off -> both magicite ($1A69's give_genju bits).
     S("magicite_ifrit_shiva", gen="gen_ifrit_magicite",
       anchor="mrf-save-room-v1"),
     # gen_n024_doorstep: 264 -> 269 -> 271 -> 273, the NEW #10 save point
-    # at {26,53} (boundary C: exit contract pre-save + sparkle witness),
+    # at {26,53} (boundary C: exit contract pre-save + sparkle check),
     # then parked at {25,52} facing NUMBER 024, one A-press from battle 72.
     # B->C's terminal.
     S("n024_doorstep", gen="gen_n024_doorstep", prev="magicite_ifrit_shiva"),
     # ---- boundary C: the NEW 273 save point --------------------------------
-    # The leg OUT of C is anchored on BOTH of gen_esper_tubes' mints: one
-    # script, one cold-Continue boot, two states -- a prev= edge on the
-    # second would claim a predecessor the boot never loads.  battle 72,
-    # then the {25,50} door into map 274 and the doorstep for the
+    # The step OUT of C starts from a checkpoint for BOTH of gen_esper_tubes'
+    # states: one script, one cold-Continue boot, two states -- a prev= edge
+    # on the second would claim a predecessor the boot never loads.  battle
+    # 72, then the {25,50} door into map 274 and the entry point for the
     # facing+A-gated BIG_SWITCH trigger.
     S("n024_won", gen="gen_esper_tubes", anchor="n024-doorstep-save-v1"),
     S("esper_tubes_doorstep", gen="gen_esper_tubes",
@@ -445,42 +450,43 @@ STATES = [
     # beside CID, one A-press from `cutscene TRAIN`.  C->D's terminal.
     S("minecart_doorstep", gen="gen_minecart_doorstep", prev="esper_tubes"),
     # ---- boundary D: the minecart platform save point ----------------------
-    # The leg OUT of D (D->E, one whole leg -- Number 128 lives mid-cutscene
-    # and has no doorstep, ever): the ride, the escape, and the park ON
+    # The step OUT of D (D->E, one whole step -- Number 128 lives mid-cutscene
+    # and has no entry point, ever): the ride, the escape, and the park ON
     # boundary E, the $06AE-revealed save point 240 {58,7}.  gen_n128 boots
-    # this anchor everywhere: `make smoke` hands it the same battery via
+    # this checkpoint everywhere: `make smoke` hands it the same SRAM via
     # the Makefile's SMOKE_ANCHOR_* map (the dual-boot probe is retired).
     S("n128_won", gen="gen_n128", anchor="minecart-platform-v1"),
     # ---- boundaries E and F ------------------------------------------------
-    # gen_vector_escape_anchor mints E's tracked battery from n128_won.  The
-    # E->F leg (Cranes -> Terra's return -> the Esper-World flashback ->
+    # gen_vector_escape_anchor cuts E's tracked SRAM checkpoint from n128_won.
+    # The E->F step (Cranes -> Terra's return -> the Esper-World flashback ->
     # takeoff -> the grounded-Blackjack world save at (24,121)) lives WHOLE
     # in gen_terra_returned_anchor -- §5 forbids splitting it (a save inside
-    # the flashback would save as the WEDGE-actor Maduin) -- and mints F's
-    # battery, `terra-returned-v1`: the v0.6 stop line and the anchor
-    # v0.7's first leg will hang from.
+    # the flashback would save as the WEDGE-actor Maduin) -- and cuts F's
+    # checkpoint, `terra-returned-v1`: the v0.6 stop line and the checkpoint
+    # v0.7's first step will hang from.
 
-    # ---- v0.7: the Sealed Gate band (issue #31) ----------------------------
+    # ---- v0.7: the Sealed Gate area (issue #31) ----------------------------
     # ---- boundary F -> boundary G ------------------------------------------
-    # The first v0.7 leg, and the second anchored mint in the tree: cold-boot
-    # the terra-returned-v1 battery, board and fly the parked Blackjack to
-    # Narshe, drive the map-30 mission meeting to $0076=1, walk back out, and
-    # save at the Narshe exit spawn, world (84,34) -- boundary G,
-    # `narshe-mission-v1`.  ONE generator does the leg AND cuts the anchor,
-    # gen_terra_returned_anchor's shape, because the boundary is a world
-    # battery save with nothing to author.  Re-cutting the battery itself is
+    # The first v0.7 step, and the second checkpoint-booted state in the tree:
+    # cold-boot the terra-returned-v1 checkpoint, board and fly the parked
+    # Blackjack to Narshe, drive the map-30 mission meeting to $0076=1, walk
+    # back out, and save at the Narshe exit spawn, world (84,34) -- boundary
+    # G, `narshe-mission-v1`.  ONE generator does the step AND cuts the
+    # checkpoint, gen_terra_returned_anchor's shape, because the boundary is a
+    # world SRAM save with nothing to author.  Re-cutting the SRAM itself is
     # still a deliberate by-hand operation:
     #     OT6_SRAM_ANCHOR=tools/tests/anchors/terra-returned-v1 \
     #     OT6_CAPTURE_SRM=tools/tests/anchors/narshe-mission-v1/narshe-mission.sram \
     #     tools/tests/run.sh tools/tests/gen_narshe_mission.lua
     #     python3 tools/tests/lib/sram_anchor.py seal tools/tests/anchors/narshe-mission-v1
     # This graph edge runs the same generator for its savestate and its
-    # contract verdict; run.sh only captures a battery when OT6_CAPTURE_SRM
-    # is set, so a mint can never quietly rewrite a tracked anchor.
+    # contract verdict; run.sh only captures SRAM when OT6_CAPTURE_SRM is
+    # set, so generating a state can never quietly rewrite a tracked
+    # checkpoint.
     S("narshe_mission", gen="gen_narshe_mission", anchor="terra-returned-v1"),
     # ---- boundary G -> boundary H ------------------------------------------
-    # Leg G->H, whole in one generator (gen_narshe_mission's shape): cold-
-    # boot the narshe-mission-v1 battery, seat TERRA / bench SETZER in the
+    # Step G->H, whole in one generator (gen_narshe_mission's shape): cold-
+    # boot the narshe-mission-v1 checkpoint, seat TERRA / bench SETZER in the
     # Blackjack swap room (chase-talk the wandering NPC, YES on $0528, the
     # NO_RESET party menu), fly to the base pass, walk the Imperial Base
     # ($0172 -- TERRA is the hard gate, _cb25d6), the cave 382 -> 383 ->
@@ -488,24 +494,25 @@ STATES = [
     # (3,2), window (6,2)->(7,2), arm B at (11,3), three windows down the
     # east half), 384's south loop to the (62,11) face-UP+A door switch
     # ($0173), and the map-386 vanilla save point (74,53) -- boundary H,
-    # `gate-cave-save-v1`, the band's only interior save.  Re-cutting the
-    # battery is a deliberate by-hand operation:
+    # `gate-cave-save-v1`, the area's only interior save.  Re-cutting the
+    # SRAM is a deliberate by-hand operation:
     #     OT6_SRAM_ANCHOR=tools/tests/anchors/narshe-mission-v1 \
     #     OT6_CAPTURE_SRM=tools/tests/anchors/gate-cave-save-v1/gate-cave-save.sram \
     #     tools/tests/run.sh tools/tests/gen_gate_cave_save.lua
     #     python3 tools/tests/lib/sram_anchor.py seal tools/tests/anchors/gate-cave-save-v1
     S("gate_cave_save", gen="gen_gate_cave_save", anchor="narshe-mission-v1"),
     # ---- boundary H -> boundary I ------------------------------------------
-    # Leg H->I, whole in one generator: cold-boot the gate-cave-save-v1
-    # battery, back down to BASEMENT 3, the WEST traverse (two levers --
+    # Step H->I, whole in one generator: cold-boot the gate-cave-save-v1
+    # checkpoint, back down to BASEMENT 3, the WEST traverse (two levers --
     # (71,15) $0174 and the (104,17) $01F5 tap-once TOGGLE -- then the
     # (121,23)->(4,37) teleport; measured (the (58,18) span and the three
     # walk-overs are NOT on the route), the Sealed Gate
-    # scene (battles 121/122 spared, never kill-bitted), the $0079 tail,
-    # the (5,43) shortcut out, the base re-cross (battle 123 spared, the
+    # scene (battles 121/122 spared, never cleared by a flag write), the
+    # $0079 tail, the (5,43) shortcut out, the base re-cross (battle 123
+    # spared, the
     # scripted crash flight), off the wreck via the map-7 hatch (8,36),
-    # and the world battery save at the crash site (83,239) -- boundary I,
-    # `vector-crash-v1`.  Re-cutting the battery is a deliberate by-hand
+    # and the world SRAM save at the crash site (83,239) -- boundary I,
+    # `vector-crash-v1`.  Re-cutting the SRAM is a deliberate by-hand
     # operation:
     #     OT6_SRAM_ANCHOR=tools/tests/anchors/gate-cave-save-v1 \
     #     OT6_CAPTURE_SRM=tools/tests/anchors/vector-crash-v1/vector-crash.sram \
@@ -513,27 +520,27 @@ STATES = [
     #     python3 tools/tests/lib/sram_anchor.py seal tools/tests/anchors/vector-crash-v1
     S("vector_crash", gen="gen_vector_crash", anchor="gate-cave-save-v1"),
     # ---- boundary I -> boundary J ------------------------------------------
-    # Leg I->J, whole in one generator (banquet-decode.md is the script;
-    # #10 forbids any boundary inside the banquet block, so the leg is
-    # atomic): cold-boot the vector-crash-v1 battery (the boot tile IS the
+    # Step I->J, whole in one generator (banquet-decode.md is the script;
+    # #10 forbids any boundary inside the banquet block, so the step is
+    # atomic): cold-boot the vector-crash-v1 checkpoint (the boot tile IS the
     # wreck -- no A press until the grind), the ~117-step world grind to
     # Vector 253, the castle escort, the dais face-UP+A, the 14400-frame
     # window, the dinner Q&A, the rest-break challenge (battle 30, fought),
     # the roster strip to TERRA+LOCKE, the (23,12) messenger, the castle
-    # exit, and the world battery save at (120,188) -- boundary J.
+    # exit, and the world SRAM save at (120,188) -- boundary J.
     #
-    # THE SCORE TIER IS SETTLED BY HONEST PLAY (2026-08-09, issue #75):
+    # THE SCORE TIER IS SETTLED BY INPUT-DRIVEN PLAY (2026-08-09, issue #75):
     # the driven canon is 70 points -- window var0=21 (15 talks + 1 clean
     # Commando; talk ~210 window-frames/+1 vs fight ~2000+/+6, so the
     # window is talk-heavy by economics), Q&A +44, challenge +5 -- which
     # clears the >=67 tier and stays <77, so Tintinabar/Charm Bangle are
-    # correctly ABSENT.  The old ">=90 Charm Bangle is frontier canon"
-    # reading died with the kill-bit that made it look reachable.  The
+    # correctly ABSENT.  The old ">=90 Charm Bangle is canon for the chain"
+    # reading died with the flag write that made it look reachable.  The
     # split engage guard makes the tier robust even if the recall +5 pays
     # nothing -- live, the first question's $0231 record bit never sets
     # (banquet-decode 4's recall model is unverified; probe_banquet_qa
     # asserts it but boots a fixture that never existed -- open on #75).
-    # Re-cutting the battery is a deliberate by-hand operation:
+    # Re-cutting the SRAM is a deliberate by-hand operation:
     #     OT6_SRAM_ANCHOR=tools/tests/anchors/vector-crash-v1 \
     #     OT6_CAPTURE_SRM=tools/tests/anchors/banquet-done-v1/banquet-done.sram \
     #     tools/tests/run.sh tools/tests/gen_banquet_done.lua

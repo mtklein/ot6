@@ -29,7 +29,7 @@
 -- hide a regression: the dialogue must actually have clobbered the tiles
 -- (tileDirty frames > 0) -- else the hazard was never exercised.
 --
--- Frontier-gated on moogle_doorstep.mss (make frontier), the battle_vargas
+-- Needs moogle_doorstep.mss (make frontier), the battle_vargas
 -- pattern.
 --   tools/tests/run.sh tools/tests/battle_hudclobber.lua   (needs moogle_doorstep.mss)
 local H = dofile("tools/tests/lib/ot6.lua")

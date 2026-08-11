@@ -28,10 +28,10 @@
 --      never-saved chain's fights populated the TRANSIENT page (lifecycle
 --      0 writes really go there) while all three save-slot pages read
 --      empty -- asserted byte-for-byte.
---   1. walk onto the grass band (82,52) and save into empty slot 3 via the
+--   1. walk onto the grass area (82,52) and save into empty slot 3 via the
 --      REAL Save command, pad input only (save-drive rule).  SaveAs copies
 --      the transient payload, so at this instant the two pages are EQUAL.
---   2. walk back into the grass band and fight until a battle TEACHES
+--   2. walk back into the grass area and fight until a battle TEACHES
 --      something (Terra's real Fire on the pool's fire-weak staple, species
 --      $17, measured weak $81 with 2 shields).  The chip path's "learn it
 --      forever" store consults Ot6CodexActive mid-battle -- so the page
@@ -46,7 +46,8 @@
 --      if any module had overlaid $021f between the save and this battle,
 --      Ot6CodexActive would fall back to the transient page and the
 --      pre-reveal would be missing.  (Species not in the taught set defer
---      the check to the next encounter -- bounded retries, fled honestly.)
+--      the check to the next encounter -- bounded retries, fled with the
+--      real run mechanic.)
 local H = dofile("tools/tests/lib/ot6.lua")
 local STATE = "build/states/worldmap_narshe.mss.lua"
 
@@ -96,7 +97,7 @@ local slot3Before, tempBefore = nil, nil
 -- Fire through the live magic menu, everyone else Fights; 4-frame-held
 -- presses on a 5-on/5-off cadence
 local lastActor, mfM, actM = nil, 0, nil
--- TERRA's cast is the only teach this kit has on the fire-weak band, and
+-- TERRA's cast is the only teach this kit has in the fire-weak area, and
 -- it only lands reliably in the FIRST battle after a stretch of world
 -- control -- measured across five drive variants: in back-to-back
 -- battles her window sits in the queue-wait state $01 for whole fights
@@ -168,10 +169,10 @@ local function battlePulse()
 end
 
 -- a world patrol beat along the proven Narshe<->Figaro corridor (the
--- fixture nav's own waypoints: x=82 from the grass band down to the
+-- fixture nav's own waypoints: x=82 from the grass area down to the
 -- desert edge).  A goal that cannot be planned rotates to the next, so
 -- an unreachable point stalls nothing.
--- the grass band's two-point beat along the corridor column x=82 (the
+-- the grass area's two-point beat along the corridor column x=82 (the
 -- fixture nav's own proven waypoints)
 local GOALS = { { 82, 44 }, { 82, 60 } }
 local plan, planIdx, goalI = nil, 1, 1
@@ -235,7 +236,7 @@ H.run({ maxFrames = 90000 }, {
       known))
   end),
 
-  -- Park ON THE GRASS BAND, off the Narshe entrance tile: closing a world
+  -- Park ON THE GRASS AREA, off the Narshe entrance tile: closing a world
   -- menu ends in ReloadMap, which re-fires the entrance under the party's
   -- feet (measured: closing on the fixture tile dropped the party into a
   -- town), so the save happens on a plain corridor tile.  Grass rather
@@ -284,7 +285,7 @@ H.run({ maxFrames = 90000 }, {
 
   -- Close the menu.  worldReady()/worldHasControl() read menu-module
   -- garbage while the menu owns the zero page (measured), so the positive
-  -- witness that the world module is really back is the exact parked tile.
+  -- check that the world module is really back is the exact parked tile.
   H.driveUntil(function()
     return H.worldMode() and H.worldAligned() and bright() >= 15
        and H.worldX() == 82 and H.worldY() == 52
@@ -292,7 +293,7 @@ H.run({ maxFrames = 90000 }, {
     H.pressButtons({ "b" }, 4), H.waitFrames(20),
   }, "world control after menu close"),
 
-  -- 2. THE WRITE HALF: walk back toward the grass band; fight whatever
+  -- 2. THE WRITE HALF: walk back toward the grass area; fight whatever
   -- interrupts; after each battle, diff both pages.  The first battle that
   -- teaches must have written the SLOT-3 page and only it.  (Desert
   -- encounters on the way teach nothing to this kit -- measured: species

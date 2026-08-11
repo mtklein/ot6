@@ -7,7 +7,7 @@ Tuning M3's weakness spread and M6's per-monster shield table by feel
 alone won't survive contact with three scenario parties. So before the
 knobs, an instrument: `tools/tests/metrics_battle.lua` plays a fight
 by policy and emits one greppable `[ot6] [metrics] key=value` line per
-stat. Same rig as the acceptance tests (doorstep savestate, headless
+stat. Same rig as the acceptance tests (entry-point savestate, headless
 Mesen, drive-by-state), but it *plays* instead of asserting.
 
 ## What we measure and why
@@ -35,9 +35,9 @@ Blitz. Every stat fans out per party slot (`char_actions`, `char_dmg`,
 `char_chips`, `char_breaks`, `char_boosts`, `char_bp_*`,
 `char_dmg_taken`) using the same `sN:value` CSV the monster lines use.
 
-## Proposed target bands (for the driver)
+## Proposed target ranges (for the driver)
 
-| Band | Proposed target |
+| Range | Proposed target |
 |---|---|
 | Trash TTK, unboosted | **3–5 player actions** |
 | Trash TTK, boost3 | **2–3 player actions** (implied multiplier ~1.5–2×) |
@@ -54,21 +54,21 @@ but playing it well makes it shorter than it ever was."
 
 ## Running it, now and across formations
 
-Now: two doorstep states exist (`battle_doorstep`, `battle2_doorstep`
+Now: two entry-point states exist (`battle_doorstep`, `battle2_doorstep`
 — the `STATE` knob), so the matrix is 2 formations × 3 policies. One
 run is deterministic (rng phase is frame-driven); distributions come
 from the `SETTLE_EXTRA` jitter knob — sweep 0..90 in ~10-frame steps
 for ~10 samples per cell. Aggregation is a grep: every stat is one
 `key=value` line in `build/states/last_run.log`.
 
-Once post-magitek states exist (M3+): mint one doorstep per stretch
-with the `gen_battle2` pattern (win, walk to the next trigger, save),
-named `battleN_doorstep`, and run the same matrix. The rows to fill
+Once post-magitek states exist (M3+): generate one entry-point state per
+stretch with the `gen_battle2` pattern (win, walk to the next trigger,
+save), named `battleN_doorstep`, and run the same matrix. The rows to fill
 are exactly the stretch table in `weapon-classes.md` — the coverage
 rule ("the story's actual party chips every non-boss encounter")
-becomes checkable: per stretch, every formation shows a sane TTK band
+becomes checkable: per stretch, every formation shows a sane TTK range
 and a nonzero break rate *with that stretch's party*. Boss states get
-their own band row (break windows, uptime) once a boss is reachable.
+their own range row (break windows, uptime) once a boss is reachable.
 
 Attribution: damage, chips and breaks are credited to the entity whose
 action is running, read from the battle loop's own action-queue

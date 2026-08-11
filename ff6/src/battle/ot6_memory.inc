@@ -50,7 +50,7 @@ OT6_LOADOUT          := $7e1e1d
 ; string ot6-codex-o8-v1 was coined for a world that already contained the
 ; Bushido word, whose own precedent is exactly this -- a zero-sentinel
 ; addition to save-block scraps changes no existing byte's meaning, so no
-; tracked anchor can be misread.  All 11 tracked anchors hold zeros here
+; tracked checkpoint can be misread.  All 11 tracked checkpoints hold zeros here
 ; (kit-gau.md §4.2, measured), and zeros decode as AUTO, the state those
 ; saves are genuinely in.  Remaining scrap after this: $1e27-$1e3f.
 OT6_RAGELOAD         := $7e1e1f
@@ -247,7 +247,7 @@ OT6_PIPPEND          := $ed74   ; #42: a DEFERRED pip paint -- character slot
 ;                                                       frame number in the run
 ;                                                       byte-identical to clean
 ;   80 NOPs in Ot6BgHud_ext ......................... 1798   -> still over
-; The original observation is left on the record because it was honestly
+; The original observation is left on the record because it was properly
 ; measured and it did block work for a day; what changed underneath it was
 ; not investigated.
 ;

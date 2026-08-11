@@ -17,20 +17,20 @@
 -- The party is whatever kolts_doorstep carries -- the Figaro->Kolts three,
 -- TERRA + LOCKE + EDGAR -- which is the point: every party number in
 -- the balance harness before this fixture was solo Terra or the two-thirds
--- Locke+Terra of worldmap_narshe, so Edgar's Tools rungs (the pierce and
+-- Locke+Terra of worldmap_narshe, so Edgar's Tools tiers (the pierce and
 -- poison CLASS chips, the only class-chip carrier the stretch has) had
 -- never been driven against a live pool.
 --
--- ENCOUNTERS ON THE CROSSING ARE FLED, honestly (issue #75).  The old
--- mint held the danger accumulator $1F6E at zero so no encounter could
+-- ENCOUNTERS ON THE CROSSING ARE FLED with real input (issue #75).  The old
+-- generator held the danger accumulator $1F6E at zero so no encounter could
 -- fire at all -- a state write, and a party no player ever walks in with.
--- Now the crossing runs the lib's honest="flee" mode: an encounter that
+-- Now the crossing runs the lib's playBattles="flee" mode: an encounter that
 -- rolls is RUN FROM with held L+R (the engine's own mechanic, zero
 -- writes), which is exactly what a player protecting a fresh party does,
 -- and what it costs is what it costs a player -- a few battle frames and
 -- whatever hits land before the run succeeds.  The fixture's party is
 -- therefore a real player's near-pristine party, not a lab-pure one, and
--- the mint log below records exactly what it carried.  (An unrunnable
+-- the generation log below records exactly what it carried.  (An unrunnable
 -- formation falls back to the lib's tap-A fight after FLEE_CAP frames.)
 local H = dofile("tools/tests/lib/ot6.lua")
 
@@ -47,9 +47,9 @@ end
 
 -- gen_kolts' settleField, minus the story-chain scaffolding it does not
 -- need here: control + alignment + the expected map, held for 30 frames.
--- advanceStory (honest="flee") drives it rather than a passive wait, so an
--- encounter that rolled on the arrival tile is fled instead of stalling
--- the settle to its timeout.
+-- advanceStory (playBattles="flee") drives it rather than a passive wait,
+-- so an encounter that rolled on the arrival tile is fled instead of
+-- stalling the settle to its timeout.
 local function settleField(what, dstMap, maxF)
   local held = 0
   return H.advanceStory(function()
@@ -58,7 +58,7 @@ local function settleField(what, dstMap, maxF)
       and (dstMap == nil or map() == dstMap)
     held = ok and held + 1 or 0
     return held >= 30
-  end, maxF or 12000, { honest = "flee" })
+  end, maxF or 12000, { playBattles = "flee" })
 end
 
 local function mapChanged()
@@ -72,12 +72,12 @@ end
 H.run({ maxFrames = 60000 }, {
   H.loadState(DOORSTEP),
   H.waitFrames(30),
-  settleField("kolts doorstep", 95),
+  settleField("kolts entry point", 95),
   H.call(function()
     H.assertEq(map(), 95, "loaded on map 95, the Mt. Kolts entrance")
-    where("doorstep")
+    where("entry point")
     -- the roster, so the fixture's party is on the record in the log that
-    -- minted it rather than inferred from a later measurement
+    -- generated it rather than inferred from a later measurement
     for i = 0, 3 do
       local id = H.readByte(0x1a6d + i)          -- party slot -> char index
       if id ~= 0xff then
@@ -95,7 +95,7 @@ H.run({ maxFrames = 60000 }, {
   -- shelf F.  gen_kolts pre-checks this plan against the map's world-exit
   -- row (y=37, two tiles south of the spawn) before walking it; the same
   -- check runs here, because a BFS shortest path that clips that row walks
-  -- the party off the mountain and the mint would save the WORLD map.
+  -- the party off the mountain and the generator would save the WORLD map.
   H.call(function()
     local p = H.bfsPath(11, 26)
     H.assertEq(p ~= nil, true, "a path to (11,26) exists")
@@ -114,27 +114,28 @@ H.run({ maxFrames = 60000 }, {
     H.assertEq(hit, false, "plan stays off map 95's world-exit row 37")
   end),
   H.navTo(11, 26, { maxFrames = 20000, arrive = mapChanged(),
-           honest = "flee" }),
+           playBattles = "flee" }),
   H.release(),
   settleField("shelf F", 100),
   H.call(function()
     H.assertEq(map(), 100, "crossed onto map 100, MT. KOLTS shelf F")
     H.assertEq(H.hasControl(), true, "controllable")
     H.assertEq(H.tileAligned(), true, "tile-aligned")
-    H.log(string.format("[kolts_pool] danger counter at mint: %04X (honest -- "
+    H.log(string.format("[kolts_pool] danger counter at generation: %04X (unrigged -- "
       .. "whatever the walk accumulated)", H.readWord(0x1f6e)))
     where("shelf F")
     H.screenshot("kolts_pool")
   end),
   H.saveState("kolts_pool.mss"),
   H.logStep(function()
-    return string.format("kolts_pool minted at frame %d", H.frame)
+    return string.format("kolts_pool generated at frame %d", H.frame)
   end),
 
   -- PROOF THE FIXTURE IS WHAT IT CLAIMS: pace the shelf and show an
   -- encounter actually fires.  Map 95 looked fine by every other check and
   -- was still unmeasurable, so "this map has a pool" is asserted here, once,
-  -- at mint time -- not discovered as six voided samples in a balance run.
+  -- at generation time -- not discovered as six voided samples in a balance
+  -- run.
   --
   -- The lane is RIGHT, and that is not a coin flip.  The passability model
   -- allows LEFT from the (8,13) arrival tile, and (7,13) is shelf F's

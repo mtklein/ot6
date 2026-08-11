@@ -1,4 +1,5 @@
--- gen_post_opera_anchor.lua -- create the v1 battery anchor from blackjack.
+-- gen_post_opera_anchor.lua -- create the v1 battery checkpoint from
+-- blackjack.
 --
 -- This does not synthesize vanilla save checksums.  It opens the ordinary
 -- field menu, enters vanilla's Save selector, chooses slot 3, and lets
@@ -42,7 +43,7 @@ H.run({ maxFrames = 5000 }, {
   end)(),
   H.release(),
   H.call(function()
-    H.assertEq(H.mapId() & 0x1ff, 0, "post-Opera anchor starts on WoB map")
+    H.assertEq(H.mapId() & 0x1ff, 0, "post-Opera checkpoint starts on WoB map")
     H.assertEq(H.worldHasControl(), true, "Blackjack route has world control")
     H.assertEq(sw(0x034b), 0, "Ultros 2 cleared")
     H.assertEq(sw(0x005d), 1, "Setzer bargain complete")
@@ -52,9 +53,9 @@ H.run({ maxFrames = 5000 }, {
       H.fieldX(), H.fieldY(), H.worldX(), H.worldY()))
   end),
   -- Cross Vector's entrance once, then immediately leave.  Besides proving
-  -- the exact anchor doorstep, the field/world handoff leaves the ordinary
-  -- world menu available (the Blackjack-arrival frame itself still carries
-  -- special vehicle state that rejects X).
+  -- the exact checkpoint entry point, the field/world handoff leaves the
+  -- ordinary world menu available (the Blackjack-arrival frame itself still
+  -- carries special vehicle state that rejects X).
   H.driveUntil(function() return (H.mapId() & 0x1ff) == 323 end, 1200, {
     H.hold({ "right" }),
   }, "step right into Vector"),
@@ -64,10 +65,10 @@ H.run({ maxFrames = 5000 }, {
     H.assertEq(H.fieldX(), 2, "Vector entrance x")
     H.assertEq(H.fieldY(), 17, "Vector entrance y")
   end),
-  H.navTo(1, 17, { honest = "flee", maxFrames = 600 }),
+  H.navTo(1, 17, { playBattles = "flee", maxFrames = 600 }),
   H.driveUntil(function() return (H.mapId() & 0x1ff) == 0 end, 800, {
     H.hold({ "left" }),
-  }, "leave Vector to its west doorstep"),
+  }, "leave Vector to its west entry point"),
   H.release(),
   H.waitFrames(180),
   H.repeatN(3, { H.pressButtons({ "x" }, 6), H.waitFrames(50) }),
@@ -78,7 +79,7 @@ H.run({ maxFrames = 5000 }, {
   H.call(function()
     H.assertEq((H.readByte(0x0201) & 0x80) ~= 0, true,
       "menu-flags $0201 bit7 SET -- the save-enable flow reached the menu")
-    -- ARM THE HONEST SAVE RECEIPT (issue #75): a read-only exec hook on
+    -- ARM THE input-driven save receipt (issue #75): a read-only exec hook on
     -- the real CopyGameDataToSRAM entry captures the slot argument the
     -- save runs with (codex_saveas's instrument).  This replaces the old
     -- zeroed-$307ff0 sentinel -- an SRAM write -- as the proof that the
@@ -126,11 +127,11 @@ H.run({ maxFrames = 5000 }, {
     H.assertEq(saveArg, 3, "CopyGameDataToSRAM ran for persistent slot 3")
     -- the codex witness cells are READ, never seeded (issue #75): the
     -- battery carries whatever the chain actually earned.  The phase-2
-    -- anchor re-cuts measure these and the entry contracts follow the
+    -- checkpoint re-cuts measure these and the entry contracts follow the
     -- measurement (never the reverse).
     H.log(string.format("codex witness cells (earned): elem=%02X class=%02X",
       emu.read(0x316810 + ULTROS2, emu.memType.snesMemory),
       emu.read(0x316990 + ULTROS2, emu.memType.snesMemory)))
-    H.log("real Save UI wrote post-Opera anchor to slot 3")
+    H.log("real Save UI wrote post-Opera checkpoint to slot 3")
   end),
 })

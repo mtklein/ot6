@@ -3,7 +3,7 @@
 --
 --   tools/tests/run.sh tools/tests/battle_class.lua
 --
--- The doorstep guards are AUTHORED piercing-weak (Ot6ShieldTbl now carries
+-- The entry-point guards are AUTHORED piercing-weak (Ot6ShieldTbl now carries
 -- a class byte), so the seed itself is under test before any pokes. The
 -- magitek party has no Fight command, so this borrows battle_hits's
 -- driver: rewrite the live command lists to Fight-only and berserk the
@@ -30,7 +30,7 @@
 --      terra is un-berserked, her real commands restored, and her menu
 --      driven to TekMissile -- a flags3-nonzero classed skill MUST chip a
 --      pierce-weak guard (the whole-byte $f2 gate silently blocked every
---      such chip; this is the regression gate for the bit-0 narrowing).
+--      such chip; this is the regression test for the bit-0 narrowing).
 --      the drive traverses terra's magitek list, so its rendered rows
 --      also carry the v0.2 ability-list assert: TekMissile (elementless,
 --      Ot6SkillClassTbl pierce) wears the pierce class icon after its
@@ -224,7 +224,7 @@ H.run({ maxFrames = 90000 }, {
   H.driveUntil(function() return H.battleLoadStarted() end, 4000, {
     H.hold({ "up" }), H.waitFrames(20), H.release(), H.waitFrames(2),
     H.pressButtons({ "a" }, 4),
-  }, "battle load from doorstep"),
+  }, "battle load from entry point"),
   H.waitUntil(function() return H.battleActive() end, 900,
     "battle active", 30),
   H.waitFrames(240),
@@ -247,8 +247,8 @@ H.run({ maxFrames = 90000 }, {
   report("seeded"),
 
   -- hud: guards carry no element weakness, so each line's first slot is
-  -- the CLASS slot -- '?' until a probe reveals it (the doorstep fixture
-  -- is a cold-boot mint, codex-virgin by construction)
+  -- the CLASS slot -- '?' until a probe reveals it (the entry-point fixture
+  -- is generated from a cold boot, codex-virgin by construction)
   H.waitUntil(function() return #hudSlotWords() >= 2 end, 300,
     "both guard hud lines up", 10),
   H.call(function()

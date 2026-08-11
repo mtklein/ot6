@@ -1,5 +1,5 @@
 -- probe_mpu_boot.lua -- measurement instrument for probe_mp_universal's
--- boot leg: what state does a cold Continue of terra-returned-v1 land in,
+-- boot step: what state does a cold Continue of terra-returned-v1 land in,
 -- and which inputs take off / land / disembark.  NOT a suite test.
 -- OT6_ANCHOR_LAYOUT: ot6-codex-o8-v1
 local H = dofile("tools/tests/lib/ot6.lua")

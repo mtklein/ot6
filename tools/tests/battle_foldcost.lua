@@ -1,5 +1,5 @@
 -- @suite
--- battle_foldcost.lua -- issue #64's RULER, recomputed from this ROM.
+-- battle_foldcost.lua -- issue #64's BASELINE, recomputed from this ROM.
 -- (school.lua / battle_breaktbl pattern: pure ROM bytes, no savestate.)
 --
 --   tools/tests/run.sh tools/tests/battle_foldcost.lua
@@ -8,7 +8,7 @@
 -- spell's.  The live half of that -- what the queue actually charges -- is
 -- battle_fold.lua's.  This is the arithmetic half, and it exists because #45
 -- taught us that an unmeasured price scale drifts for three releases and is
--- then found by the owner PLAYING rather than by a gate.
+-- then found by the owner PLAYING rather than by a test.
 --
 -- Every number below is read out of the shipped ROM: the family table is
 -- Ot6FoldTbl (ot6_boost.asm), the costs are MagicProp+5 -- the very byte
@@ -103,7 +103,7 @@ local function mpCost(id)
 end
 
 -- pool(charId, level) exactly as InitMaxMP builds it (battle_costtable's own
--- helper, kept identical so the two gates cannot disagree about a pool).
+-- helper, kept identical so the two tests cannot disagree about a pool).
 local function pool(id, level)
   local mp = H.readRomByte(charProp + id * CHARPROP_SIZE + CHARPROP_MP)
   for i = 0, level - 2 do mp = mp + H.readRomByte(levelUpMp + i) end
@@ -210,7 +210,7 @@ H.run({ maxFrames = 20000 }, {
       dearestName, dearest, CEILING - dearest, CEILING))
   end),
 
-  ----------------------------------- 4 & 5. the ruler, and what folding buys --
+  -------------------------------- 4 & 5. the baseline, and what folding buys --
   H.call(function()
     H.log("family   tier      MP   reachable-by-fold      learned      payable")
     local checked = 0

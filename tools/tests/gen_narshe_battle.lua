@@ -1,7 +1,7 @@
 -- gen_narshe_battle.lua -- the BATTLE FOR NARSHE, reunion staging to
 -- KEFKA's fall: v0.3's climax and its stop line.  Boots
 -- reunion_ready.mss -- the map-22 staging the reunion cutscene ends on
--- (party at (20,9), $0045 set) -- and mints three states:
+-- (party at (20,9), $0045 set) -- and generates three states:
 --
 --   narshe_battle.mss   the defense LIVE: parties assigned and parked at
 --                       {20,10}/{18,10}/{22,10}, twelve marches walking,
@@ -13,20 +13,20 @@
 --
 -- (kefka_won.mss is gen_kefka_won's, one file downstream -- see step 5.)
 --
--- ISSUE #75 -- THIS FILE PLAYS FOR REAL NOW.  The kill-bit that used to
--- clear every descent collision and KEFKA himself is gone; this script
--- writes NO emulated game state.  What replaced it:
+-- ISSUE #75 -- THIS FILE PLAYS FOR REAL NOW.  The battle-clear write that
+-- used to clear every descent collision and KEFKA himself is gone; this
+-- script writes NO emulated game state.  What replaced it:
 --  * descent collisions are FOUGHT: the menu-episode fighter below
 --    (gen_scenario's cadence) spends each actor's turn -- boost banked to
 --    2 and dumped, EDGAR on Tools -> AutoCrossbow from tier 2, CELES on
 --    Runic from tier 3, everyone else on Fight.  Collision battles
 --    auto-engage the COLLIDED party (gen_moogle's measured rule), so the
 --    same fighter serves whichever squad a march runs into; a win resets
---    that raider's whole march exactly as the kill-bit win did, and
+--    that raider's whole march exactly as the battle-clear write win did, and
 --    battle time freezes all field clocks, so the descent's measured
---    field-frame race (~5400 to the doorstep vs ~6100 for a march to
+--    field-frame race (~5400 to the entry point vs ~6100 for a march to
 --    reach BANON) is untouched by how long the fights take.
---  * KEFKA is fought for real -- the first honest Kefka in this chain's
+--  * KEFKA is fought for real -- the first real Kefka in this chain's
 --    history.  His authored profile (bosses-wob.md #10): 3000 HP, gauge
 --    6/6, class row $03 = slash|pierce, weak byte $09 = poison|fire.
 --    P1 = TERRA+EDGAR+CELES was picked for exactly these axes (fire +
@@ -36,14 +36,14 @@
 --    shielded is the break system's own business (shields attenuate,
 --    the break doubles -- battle_break.lua); the fighter just plays.
 --  * LOSSES ARE HANDLED THE WAY A PLAYER HANDLES THEM: a retry ladder
---    (gen_scenario's) reloads an in-run checkpoint -- the mint-script
---    spelling of reloading a save -- and escalates the fighter's tier,
---    which reshuffles every subsequent ATB interleaving and roll.
---    Three descent attempts (a wipe mid-descent or a march reaching
---    BANON ends the attempt), three KEFKA attempts (battle 57's loss
---    path warps the party to the {25,5} save point -- detected, not
---    fatal).  A third loss fails the mint with every attempt's numbers
---    on the record: an honest partial beats a fudged whole (#74).
+--    (gen_scenario's) reloads an in-run checkpoint -- the generator
+--    script's spelling of reloading a save -- and escalates the fighter's
+--    tier, which reshuffles every subsequent ATB interleaving and roll.
+--    Three descent attempts (a wipe mid-descent or a march reaching BANON
+--    ends the attempt), three KEFKA attempts (battle 57's loss path warps
+--    the party to the {25,5} save point -- detected, not fatal).  A third
+--    loss fails the generation with every attempt's numbers on the record:
+--    a real partial beats a fudged whole (#74).
 --
 -- EVERY FIELD MECHANISM HERE WAS MEASURED FIRST (probe_narshe_spike*,
 -- probe_kefka_npc, probe_kefka_fight -- spike lineage, commits
@@ -66,7 +66,7 @@
 --    (18,11), probe_narshe_edge).  So the descent launches AT ONCE and
 --    walks raider o25's measured march reversed -- 18 waypoints, an
 --    axis-alternating held pusher.  Field-frame timing is preserved
---    under honest fighting because battles freeze all field clocks.
+--    under input-driven fighting because battles freeze all field clocks.
 --  * KEFKA (NPC_1, no_react, no collision): activation needs a CLEAN
 --    edge-A -- any held direction starves CheckNPCs (player.asm:142).
 --    battle 57 = formation 505 = KEFKA_NARSHE $014A alone.  The win
@@ -147,7 +147,7 @@ local function assign(srcCell, dstCell, charId, name)
 end
 local function partyOf(c) return H.readByte(0x1850 + c) & 0x07 end
 
--- ----------------------------------------------------- the honest fighter --
+-- ----------------------------------------------- the input-driven fighter --
 -- gen_scenario's menu-episode machine, generalized: presses start only once
 -- the battle-menu flag has held 4 straight frames, then ONE button per
 -- 30-frame pulse (6 held + 24 released -- battle menus eat input during
@@ -327,7 +327,7 @@ local function landed(m, n)
   end
 end
 
--- ------------------------------------------------------- the descent leg --
+-- ------------------------------------------------------ the descent step --
 -- o25's march reversed, an axis-alternating held pusher, every collision
 -- FOUGHT.  One attempt = one full descent from the narshe_battle state;
 -- it ends done (party 1 parked at (19,36)), lost (a wipe read by the
@@ -402,7 +402,7 @@ local function descentBody(tier)
       end
       H.setPad({ [press] = true })
     end),
-  }, "the descent to Kefka's doorstep (honest, tier " .. tier .. ")")
+  }, "the descent to Kefka's entry point (tier " .. tier .. ")")
 end
 local function descentAttempt(n)
   local ldReq
@@ -424,14 +424,14 @@ local function descentAttempt(n)
     H.call(function()
       if descLost == nil then
         descDone = true
-        H.log(string.format("[descent] attempt %d reached the doorstep " ..
+        H.log(string.format("[descent] attempt %d reached the entry point " ..
           "after %d collision fights", n, fights))
       end
     end),
   }, {})
 end
 
--- --------------------------------------------------------- the KEFKA leg --
+-- -------------------------------------------------------- the KEFKA step --
 -- One attempt: clean edge-A activation, the authored seed asserted, the
 -- fight PLAYED to its end, the verdict read off the scripted branch --
 -- the win scene owning the stage vs the {25,5} lose-path save point.
@@ -504,7 +504,7 @@ local function kefkaAttempt(n)
   return H.cond(function() return not kefkaWon end, {
     H.cond(function() return n > 1 end, {
       H.logStep(function()
-        return string.format("[kefka] ATTEMPT %d -- reloading the doorstep " ..
+        return string.format("[kefka] ATTEMPT %d -- reloading the entry point " ..
           "after a loss (%s)", n, tostring(kefkaLost))
       end),
       H.call(function() ldReq = H.requestLoadState(kefkaBlob) end),
@@ -526,18 +526,18 @@ local function kefkaAttempt(n)
     H.call(function()
       if kefkaLost == nil then
         kefkaWon = true
-        H.log(string.format("[kefka] attempt %d WON battle 57 honestly " ..
+        H.log(string.format("[kefka] attempt %d WON battle 57 " ..
           "at f%d", n, H.frame))
-        H.screenshot("kefka_won_honest")
+        H.screenshot("kefka_won_played")
       end
     end),
   }, {})
 end
 
--- Budgets: the kill-bit era ran this file in ~120k frames; honest fights
--- spend real ATB rounds on every descent collision and on KEFKA himself,
--- and the ladders may replay the descent and the fight up to three times
--- each.
+-- Budgets: the battle-clear-write era ran this file in ~120k frames;
+-- input-driven fights spend real ATB rounds on every descent collision and
+-- on KEFKA himself, and the ladders may replay the descent and the fight up
+-- to three times each.
 H.run({ maxFrames = 600000 }, {
   H.loadState(BOOT),
   H.waitFrames(30),
@@ -554,9 +554,9 @@ H.run({ maxFrames = 600000 }, {
   -- the Narshe defense, Kefka, Zozo, the Opera, Vector -- inherits whatever
   -- the party is holding here, and tools/audit_equipment.py says that has
   -- been NOTHING for LOCKE in 42 fixtures and CELES in 29.  The story's
-  -- remove_equip returns gear to inventory and no leg has ever put it back.
+  -- remove_equip returns gear to inventory and no step has ever put it back.
   -- A no-op when everyone is already armed, so it costs nothing once the
-  -- upstream legs are fixed too.
+  -- upstream steps are fixed too.
   H.equipOptimum({ tag = "reunion kit" }),
 
   -- ==================================================================== --
@@ -567,11 +567,11 @@ H.run({ maxFrames = 600000 }, {
   -- no direction at all: a held direction starves CheckNPCs
   -- (player.asm:142).  Face him ONCE with a held UP that cannot step,
   -- release, then pure edge-A.
-  H.navTo(20, 8, { maxFrames = 6000, honest = true }),
+  H.navTo(20, 8, { maxFrames = 6000, playBattles = true }),
   H.hold({ "up" }), H.waitFrames(8), H.release(), H.waitFrames(6),
   H.call(function()
     local po = H.readWord(0x0803)
-    H.assertEq(H.fieldX() == 20 and H.fieldY() == 8, true, "on BANON's doorstep")
+    H.assertEq(H.fieldX() == 20 and H.fieldY() == 8, true, "at BANON's entry point")
     H.assertEq(H.readByte(0x087f + po), 0, "facing UP at BANON (EVENT_DIR 0)")
     H.assertEq(H.readByte(0x7E2000 + 7 * 256 + 20) & 0x80, 0,
       "BANON's object occupies {20,7}")
@@ -619,7 +619,7 @@ H.run({ maxFrames = 600000 }, {
   H.pressButtons({ "start" }, 6),
   H.waitUntil(function() return not menuUp() end, 1200, "menu closed", 5),
   H.logStep("assignment committed; riding the battle-start event"),
-  H.advanceStory(landed(22), 30000, { honest = true }),
+  H.advanceStory(landed(22), 30000, { playBattles = true }),
   H.waitFrames(30),
 
   H.call(function()
@@ -644,8 +644,8 @@ H.run({ maxFrames = 600000 }, {
   H.saveState("narshe_battle.mss"),
 
   -- ==================================================================== --
-  -- 3. THE DESCENT, AT ONCE, up to three honest attempts.  The ladder's
-  --    checkpoint is the defense-live moment the mint above captured;
+  -- 3. THE DESCENT, AT ONCE, up to three input-driven attempts.  The ladder's
+  --    checkpoint is the defense-live moment the generation above captured;
   --    re-capturing it in memory keeps the reload in-run.
   -- ==================================================================== --
   (function()
@@ -666,25 +666,25 @@ H.run({ maxFrames = 600000 }, {
   descentAttempt(3),
   H.call(function()
     if not descDone then
-      error(string.format("[descent] no attempt survived of 3 honest tries " ..
+      error(string.format("[descent] no attempt survived of 3 tries " ..
         "-- last loss: %s -- the per-attempt numbers above are the balance " ..
-        "finding (#74-style); do not rig this leg", tostring(descLost)), 0)
+        "finding (#74-style); do not rig this segment", tostring(descLost)), 0)
     end
   end),
   H.call(function()
     H.assertEq(H.fieldX() == 19 and H.fieldY() == 36, true,
       "party 1 at (19,36), KEFKA one tile below")
     H.assertEq(H.readByte(0x1a6d), 1, "still party 1")
-    H.log(string.format("[doorstep] f%d after %d fights (all attempts)",
+    H.log(string.format("[entry point] f%d after %d fights (all attempts)",
       H.frame, fights))
     H.screenshot("kefka_doorstep")
   end),
   H.saveState("kefka_doorstep.mss"),
 
   -- ==================================================================== --
-  -- 4. KEFKA, PLAYED: up to three honest attempts off the doorstep just
-  --    minted.  The checkpoint is re-captured in memory so a loss reloads
-  --    the exact state battle_kefka and gen_kefka_won will boot.
+  -- 4. KEFKA, PLAYED: up to three input-driven attempts off the entry point
+  --    just generated.  The checkpoint is re-captured in memory so a loss
+  --    reloads the exact state battle_kefka and gen_kefka_won will boot.
   -- ==================================================================== --
   (function()
     local ckReq
@@ -692,9 +692,9 @@ H.run({ maxFrames = 600000 }, {
       H.call(function() ckReq = H.requestSaveState() end),
       H.waitFrames(2),
       H.call(function()
-        H.checkReq(ckReq, "doorstep checkpoint")
+        H.checkReq(ckReq, "entry point checkpoint")
         kefkaBlob = ckReq.blob
-        H.log(string.format("[kefka] doorstep checkpoint captured " ..
+        H.log(string.format("[kefka] entry point checkpoint captured " ..
           "(%d bytes) f%d", #kefkaBlob, H.frame))
       end),
     })
@@ -704,14 +704,14 @@ H.run({ maxFrames = 600000 }, {
   kefkaAttempt(3),
   H.call(function()
     if not kefkaWon then
-      error(string.format("[kefka] battle 57 not won in 3 honest attempts " ..
+      error(string.format("[kefka] battle 57 not won in 3 attempts " ..
         "-- last loss: %s -- the per-attempt numbers above are the balance " ..
         "finding (#74-style); do not rig this fight", tostring(kefkaLost)), 0)
     end
   end),
 
   -- ==================================================================== --
-  -- 5. STOP AT THE STOP LINE.  The honest win above IS v0.3's milestone;
+  -- 5. STOP AT THE STOP LINE.  The real win above IS v0.3's milestone;
   --    everything after it (the esper scene, Arvis, the walk to control)
   --    is v0.4's first link and stalls the walker (issue #3).  The tail
   --    lives in gen_kefka_won.lua, deliberately outside FRONTIER.
@@ -721,9 +721,9 @@ H.run({ maxFrames = 600000 }, {
     H.assertEq(atSave, false,
       "NOT at the {25,5} save point -- the lose path did not run")
     H.assertEq(H.battleLoadStarted(), false, "the fight is over")
-    H.log(string.format("[narshe_battle] the honest win stands at f%d", H.frame))
+    H.log(string.format("[narshe_battle] the win stands at f%d", H.frame))
   end),
   H.logStep(function()
-    return string.format("Kefka beaten HONESTLY at frame %d -- v0.3's stop line; the win tail is gen_kefka_won's (issue #3)", H.frame)
+    return string.format("Kefka beaten at frame %d -- v0.3's stop line; the win tail is gen_kefka_won's (issue #3)", H.frame)
   end),
 })

@@ -1,6 +1,7 @@
--- gen_opera4_stage.lua -- v0.5 Beat A leg 4: opera_backstage (theater map 234
--- {16,46}) -> ROUTE A onto the STAGE (map 238) with the aria ARMED ($0056=1),
--- parked at {99,20} one navTo from the aria trigger {97,7}.  Mints opera_stage.mss.
+-- gen_opera4_stage.lua -- v0.5 Beat A step 4: opera_backstage (theater map
+-- 234 {16,46}) -> ROUTE A onto the STAGE (map 238) with the aria ARMED
+-- ($0056=1), parked at {99,20} one navTo from the aria trigger {97,7}.
+-- Generates opera_stage.mss.
 --
 -- ROUTE A, measured (probe_opera_route/stage), from the decoded door topology
 -- (short_entrance.dat, maps 234/237/238):
@@ -27,7 +28,7 @@ end
 -- Issue #75: no state writes -- a stray battle is fought by the taps.
 local function toDoor(tx,ty,bumpDir,destMap,what)
   return H.cond(function() return true end, {
-    H.navTo(tx, ty, { maxFrames=24000, honest=true, arrive=function() return map()==destMap end }),
+    H.navTo(tx, ty, { maxFrames=24000, playBattles=true, arrive=function() return map()==destMap end }),
     (function() local hb=0
       return H.driveUntil(function() return map()==destMap end, 4000, {
         H.call(function() hb=hb+1
@@ -60,7 +61,7 @@ H.run({ maxFrames = 120000 }, {
     H.log(string.format("[238] at (%d,%d)", H.fieldX(), H.fieldY())) end),
 
   -- talk CELES ({99,19}) from below -> _caba44/_cabaa8 -> $0056=1
-  H.navTo(99, 21, { maxFrames=12000, honest=true }),
+  H.navTo(99, 21, { maxFrames=12000, playBattles=true }),
   (function() local hb=0
     return H.driveUntil(function() return sw(0x0056)==1 or H.dialogWaiting() end, 4000, {
       H.call(function() hb=hb+1
@@ -81,13 +82,13 @@ H.run({ maxFrames = 120000 }, {
     H.assertEq(sw(0x0057), 0, "$0057 CLEAR -- fresh attempt")
     H.assertEq(sw(0x0111), 0, "$0111 CLEAR -- aria not yet solved")
     H.assertEq(H.bfsPath(97,7)~=nil, true, "aria trigger (97,7) reachable")
-    H.assertEq(settled(), true, "stage doorstep is QUIET")
+    H.assertEq(settled(), true, "stage entry point is QUIET")
     H.log(string.format("[opera_stage] f%d map=%d (%d,%d) $0056=%d",
       H.frame, map(), H.fieldX(), H.fieldY(), sw(0x0056)))
     H.screenshot("opera_stage")
   end),
   H.saveState("opera_stage.mss"),
   H.logStep(function()
-    return string.format("opera_stage minted at frame %d -- stage armed ($0056=1), one navTo from the aria", H.frame)
+    return string.format("opera_stage generated at frame %d -- stage armed ($0056=1), one navTo from the aria", H.frame)
   end),
 })

@@ -1,8 +1,8 @@
 -- gen_sfigaro.lua -- from locke_scenario.mss (LOCKE alone, one step past the
 -- three-way hub, map 75 at (47,43)) through occupied South Figaro to the
--- doorstep of the rich man's secret passage.  The first link of the v0.3
+-- entry point of the rich man's secret passage.  The first link of the v0.3
 -- Locke chain.
--- Mints two states:
+-- Generates two states:
 --   sfigaro_town.mss     map 75, the gate soldier beaten and LOCKE wearing
 --                        the merchant's clothes with the old man's cider
 --   sfigaro_passage.mss  map 86 (7,51), inside the secret passage the
@@ -22,9 +22,9 @@
 --    CLEAR (field/event.asm:4053-4060), and the jump target is the branch
 --    that SKIPS `obj_gfx LOCKE, MERCHANT` / `switch $0104=1`.  So a fight
 --    finished any other way leaves Locke in his own clothes: measured, the
---    harness's kill-bit idiom beat the officer clean and $0103 stayed 0.
---    In battle those flags live at $3EB4+n -- the field copy $1DC9+n is
---    loaded in at battle start and written back at the end
+--    harness's battle-clear-write idiom beat the officer clean and $0103
+--    stayed 0.  In battle those flags live at $3EB4+n -- the field copy
+--    $1DC9+n is loaded in at battle start and written back at the end
 --    (battle_main.asm:6088, :12182) -- so $4C is bit 4 of $3EBD live and of
 --    $1DD2 afterwards.  Both are asserted below.
 --
@@ -48,7 +48,7 @@
 --    found; from (22,44), one tile further along that same plan, the same
 --    query returns nil.  A first cut read that as "the SE quarter is behind
 --    a one-way z step" and rebuilt the route around a wall that is not
---    there.  Every long leg here is therefore walked as SHORT HOPS through
+--    there.  Every long step here is therefore walked as SHORT HOPS through
 --    named waypoints, which keeps each query far inside the cap.
 --
 -- 5. A DESTINATION COORDINATE IS NOT AN ARRIVAL TEST.  `go` used to call
@@ -58,8 +58,8 @@
 --    the settle then waited 12000 frames for a map id that was never
 --    coming.  Only a SAME-MAP warp has no map change to watch.
 --
--- ISSUE #75 (the honesty conversion): ZERO state writes.  The two fights
--- on this route are PLAYED now:
+-- ISSUE #75 (the input-driven test conversion): ZERO state writes.  The two
+-- fights on this route are PLAYED now:
 --   * battle 11 (the gate soldier's HeavyArmor, up to three times -- he
 --     respawns on every map-75 reload) is won by solo LOCKE on boosted
 --     Fights: R raises pending boost out of the 1 bp Ot6InitBP grants,
@@ -71,7 +71,7 @@
 --     different frame offset; the battle RNG seed is the frame phase at
 --     init, gen_whelk_poweron's measurement).
 --   * the cider runner's Merchant is STOLEN from by real menu input
---     through the #55 thief submenu, with the boost banked honestly:
+--     through the #55 thief submenu, with the boost banked by real input:
 --     LOCKE opens with 1 bp and regens +1 per unboosted action
 --     (Ot6ActionEnd), and a steal ATTEMPT is itself an action -- so the
 --     driver steals unboosted while the bank grows (each attempt rolls
@@ -79,7 +79,7 @@
 --     R-R-R first, which Ot6StealBoostLevel converts to a GUARANTEED
 --     steal (kits.md's tier table).  Steal costs 4 MP (Ot6StealCost),
 --     paid from LOCKE's own pool -- the driver logs bank/MP per attempt
---     so an empty wallet is visible in the mint log, not pinned over.
+--     so an empty wallet is visible in the generation log, not pinned over.
 -- The stealDriver that poked STEAL into every command cell and forced
 -- banked+pending boost to the cap, and the pinParty HP writes, are gone.
 local H = dofile("tools/tests/lib/ot6.lua")
@@ -136,7 +136,7 @@ local function settleField(dstMap, maxF)
       return not H.worldMode() and H.tileAligned()
          and not H.battleLoadStarted() and not H.dialogWaiting()
          and (dstMap == nil or map() == dstMap)
-    end), maxF or 12000, { honest = true }),
+    end), maxF or 12000, { playBattles = true }),
     H.waitFrames(30),
   })
 end
@@ -144,16 +144,16 @@ end
 local aPhase = 0
 
 -- rideOut -- ride a scene out to a settled, controllable field, fighting
--- anything that comes up honestly -- is H.rideOut now (promoted to
+-- anything that comes up with real input -- is H.rideOut now (promoted to
 -- lib/ot6_field.lua with its full measured history, 2026-08-09).
 
--- One SHORT leg to a waypoint on the current map.  See note 4: long BFS
+-- One SHORT step to a waypoint on the current map.  See note 4: long BFS
 -- queries on map 75 run the 4096-node cap dry and answer "no path" for
 -- tiles that are plainly walkable, so every cross-town walk is a chain of
 -- these rather than one query.
 local function hop(tx, ty, what)
   return seq({
-    H.navTo(tx, ty, { maxFrames = 12000, honest = true }),
+    H.navTo(tx, ty, { maxFrames = 12000, playBattles = true }),
     H.release(),
     H.call(function()
       H.assertEq(H.fieldX(), tx, what .. ": at x=" .. tx)
@@ -216,7 +216,7 @@ local function go(sx, sy, dm, dx, dy, what)
   return seq({
     H.call(function() pick, startMap = nil, map() end),
     H.navTo(function() return stage()[1] end, function() return stage()[2] end,
-      { maxFrames = 20000, arrive = arrived, honest = true }),
+      { maxFrames = 20000, arrive = arrived, playBattles = true }),
     H.cond(function() return stage()[3] ~= nil end, {
       H.driveUntil(arrived, 1800, {
         H.call(function()
@@ -314,10 +314,10 @@ end
 -- gen_tunnelarmr re-enters the same town and needed the same answer).
 
 -- ------------------------------------------------------------- the steal --
--- THE HONEST STEAL (issue #75).  Locke's command window is `FIGHT, STEAL,
--- MAGIC, ITEM` (char_prop.asm:157); MAGIC is removed at runtime for a
--- spell-less Locke (InitCmd_03), the rows stay four, and STEAL is one DOWN
--- from the resting cursor.  Since #55 the Steal row opens the THIEF
+-- THE input-driven steal (issue #75).  Locke's command window is `FIGHT,
+-- STEAL, MAGIC, ITEM` (char_prop.asm:157); MAGIC is removed at runtime for
+-- a spell-less Locke (InitCmd_03), the rows stay four, and STEAL is one
+-- DOWN from the resting cursor.  Since #55 the Steal row opens the THIEF
 -- SUBMENU (tools shell, state $30) with Steal on row 0, so one attempt is
 -- the edge sequence  down, A (submenu opens), A (row 0 = Steal), A (the
 -- target cursor opens MANUAL|ONE_SIDE|ENEMY on the lone Merchant).
@@ -396,7 +396,7 @@ local function stealDriver(what, maxF)
 end
 
 -- ========================================================================= --
--- Budget note (issue #75): honest fights cost real ATB rounds, and the
+-- Budget note (issue #75): input-driven fights cost real ATB rounds, and the
 -- retry ladders can replay them -- the ceiling covers the worst case of
 -- three three-attempt ladders plus the steal's.
 H.run({ maxFrames = 350000 }, {
@@ -421,8 +421,9 @@ H.run({ maxFrames = 350000 }, {
   -- 495-hp HeavyArmor for EIGHT damage a swing and lost three attempts
   -- running, which reads exactly like a balance finding and is nothing of
   -- the sort.  The story's own remove_equip returns gear to inventory
-  -- (EventCmd_8d) and the mint chain never put it back on.  A player opens
-  -- the Equip menu before walking into an occupied town; so does this.
+  -- (EventCmd_8d) and the chain of generated savestates never put it back
+  -- on.  A player opens the Equip menu before walking into an occupied
+  -- town; so does this.
   H.equipOptimum({ tag = "locke kit" }),
 
   -- AND THE BACK ROW, which is what wins battle 11.  The note that used to
@@ -449,15 +450,15 @@ H.run({ maxFrames = 350000 }, {
   -- HeavyArmor $09F.  He is a PLUG, not scenery: (30,42) is the only tile
   -- joining the starting pocket to the rest of town, and BFS reaches
   -- exactly 107 tiles until he is gone.  Won any way at all -- the clothes
-  -- branches are a different fight -- but "any way" is HONEST now: solo
+  -- branches are a different fight -- but "any way" is INPUT-DRIVEN now: solo
   -- LOCKE on boosted Fights, with the retry ladder around the engagement.
-  -- The probe tile is the cafe doorstep the win must open.
+  -- The probe tile is the cafe entry point the win must open.
   -- ===================================================================== --
   H.clearGateSoldier(22, 43, "B1 (open the town)"),
   H.call(function()
     H.assertEq(map(), 75, "still in town after battle 11")
     H.assertEq(H.bfsPath(22, 43) ~= nil, true,
-      "the town opened: the cafe doorstep is reachable now")
+      "the town opened: the cafe entry point is reachable now")
     where("town open")
   end),
 
@@ -491,8 +492,8 @@ H.run({ maxFrames = 350000 }, {
         }) or seq({}),
         H.talkToObj(22, "the cider runner"),
         -- ride the two dialogs into the fight BY HAND: advanceStory's
-        -- honest mode would blind-tap A in the fight, and A on the resting
-        -- cursor is FIGHT -- the merchant must never be killed
+        -- playBattles mode would blind-tap A in the fight, and A on the
+        -- resting cursor is FIGHT -- the merchant must never be killed
         (function()
           local ph = 0
           return H.driveUntil(function() return H.battleLoadStarted() end, 9000, {
@@ -517,7 +518,7 @@ H.run({ maxFrames = 350000 }, {
         stealDriver("the cider runner"),
         -- SOFT aftermath ride: on the steal the scene settles back on map
         -- 78; on a surprise loss the game-over screen never settles, and a
-        -- hard timeout here would abort the whole mint instead of letting
+        -- hard timeout here would abort the whole generate instead of letting
         -- the ladder reload and retry -- so this ride gives up quietly
         -- after its budget and lets the $1DD2 check below decide.
         (function()
@@ -563,7 +564,7 @@ H.run({ maxFrames = 350000 }, {
       stealAttempt(1), stealAttempt(2), stealAttempt(3),
       H.call(function()
         H.assertEq(stolen, true,
-          "the clothes were STOLEN honestly within 3 attempts")
+          "the clothes were STOLEN within 3 attempts")
       end),
     })
   end)(),
@@ -597,7 +598,7 @@ H.run({ maxFrames = 350000 }, {
   end),
   H.saveState("sfigaro_town.mss"),
   H.logStep(function()
-    return string.format("sfigaro_town minted at frame %d", H.frame)
+    return string.format("sfigaro_town generated at frame %d", H.frame)
   end),
 
   -- ===================================================================== --
@@ -619,7 +620,7 @@ H.run({ maxFrames = 350000 }, {
   hop(30, 43, "W5 down the SE lane"),
   hop(34, 43, "W6 east"),
   hop(34, 46, "W7 south"),
-  hop(36, 46, "W8 to the old man's doorstep"),
+  hop(36, 46, "W8 to the old man's entry point"),
   go(37, 40, 86, 36, 22, "E1 town (37,40) -> map 86 (36,22)"),
   talkThrough(17, "the old man (cider -> $0107)"),
   H.call(function()
@@ -666,6 +667,6 @@ H.run({ maxFrames = 350000 }, {
   end),
   H.saveState("sfigaro_passage.mss"),
   H.logStep(function()
-    return string.format("sfigaro_passage minted at frame %d", H.frame)
+    return string.format("sfigaro_passage generated at frame %d", H.frame)
   end),
 })

@@ -1,15 +1,16 @@
--- gen_sabin_escape.lua -- leg 5 of SABIN's scenario: the Doma courtyard
--- defence -- three fights, CYAN joins, everyone mounts Magitek.  Mints one
--- state:
+-- gen_sabin_escape.lua -- step 5 of SABIN's scenario: the Doma courtyard
+-- defence -- three fights, CYAN joins, everyone mounts Magitek.  Generates
+-- one state:
 --   doma_defended.mss  map 119 at (14,30), SABIN + CYAN mounted on Magitek,
 --                      controllable -- the starting line of the escape to
 --                      the overworld
 --
--- SCOPE NOTE: this leg stops at the moment the escape hands the player
+-- SCOPE NOTE: this step stops at the moment the escape hands the player
 -- control, NOT at the overworld.  The escape's walk from (14,30) to the
 -- world exit is a fight/scripted-interlude/fight sequence whose interlude
 -- holds the party in an obj-script a plain navTo never sees end (measured;
--- see the long comment at the mint below).  That walk is the next leg.
+-- see the long comment at generation time below).  That walk is the next
+-- step.
 --
 -- THE DEFENCE IS THREE TALKS TO CYAN, AND THE TALK DETECTOR IS THE WHOLE
 -- TRICK.  SABIN arrives at (8,29) on map 119 with CYAN (the warrior NPC,
@@ -50,7 +51,7 @@
 -- CYAN/SHADOW, {MAGITEK, SHOW_RIDER}`, :41654-41735) and the four soldier
 -- fights (battle 15/16/17 at _cb1955/_cb19af/_cb19e6/_cb1985, :42025-42094)
 -- -- runs on obj_scripts with control OFF.  So the escape is RIDDEN, not
--- walked: kill-bit the fights, tap the dialogs, hands off otherwise, until
+-- walked: write-clear the fights, tap the dialogs, hands off otherwise, until
 -- the world map appears.  (This confirms, on this map, the survey's note
 -- that the raft's `vehicle` opcodes are cosmetic sprite swaps on an ordinary
 -- field map -- the Magitek "mode" here is likewise just a sprite the escape
@@ -60,19 +61,20 @@
 -- THE EXIT LANDS ON THE CAMP-ENTRY TRIGGER.  World (179,71) is the very
 -- tile whose trigger _cb0bb7 (:39715) loaded the camp -- but it now opens
 -- `if_switch $0037=1, WorldReturn`, and the escape has set $0037, so
--- re-stepping it returns instead of re-entering.  The mint is taken on the
--- first settled world frame, before any walk, so the fixture is unambiguous.
+-- re-stepping it returns instead of re-entering.  The savestate is
+-- generated on the first settled world frame, before any walk, so the
+-- fixture is unambiguous.
 --
--- ISSUE #75 -- THE WAVES ARE FOUGHT, NOT KILL-BITTED.  Zero state writes
+-- ISSUE #75 -- THE WAVES ARE FOUGHT, NOT WRITE-CLEARED.  Zero state writes
 -- in this generator.  Battles 13/13/14 (Imperial troops; SABIN solo for
 -- waves 1-2, wave 3 is where CYAN joins) run the house menu-episode
 -- machine: bank boost to 2, dump it on Fight (R..R A A on a settled menu,
 -- one button per 30-frame pulse), edge-tapped A for every dialog and
 -- victory page.  A loss (90 straight frames of every real party slot at
 -- 0 HP) sets `lost` and the three-attempt retry ladder reloads the
--- boot-moment checkpoint -- the mint-script spelling of a player
+-- boot-moment checkpoint -- the generator script's spelling of a player
 -- reloading their save -- with the fighter escalated (tier 2+ dumps at
--- 1 BP) and a 17-frame reload stagger; three losses fail the mint with
+-- 1 BP) and a 17-frame reload stagger; three losses fail the generation with
 -- every attempt's numbers on the record.  SHADOW's leave roll does not
 -- run here: battle switch $4B is story-SET until the magitek escape's
 -- exit clears it (event_main.asm:42251).
@@ -121,7 +123,7 @@ end
 --     $3BF4=FF00 $3BF6=0020 $3BF8=FF00 $3BFA=0020
 -- ($3BF6 = 32 reads perfectly like a hit point).  That is OpenMenu_ext
 -- scribbling on the same RAM while the field module is suspended, and
--- taking it for a battle made the driver kill-bit and mash A at the name
+-- taking it for a battle made the driver write-clear and mash A at the name
 -- menu instead of pressing START -- a new stall in place of the old one.
 -- A LOADED battle party table only ever holds a real HP, or 0 / $FFFF for
 -- a slot nobody is in; $FF00 is neither, and one impossible word condemns
@@ -202,16 +204,16 @@ local function talkToObj(obj, what, maxF)
   })
 end
 
--- No `choice` exists anywhere on this leg -- map 117's only prompt is the
+-- No `choice` exists anywhere on this step -- map 117's only prompt is the
 -- sealed-chest gag _cb0dbe (:40058) on obj 29 at {45,5}, which the route
 -- never touches, and map 120 has none at all.  CHOICES stays empty so an
 -- unexpected prompt is a hard failure rather than a blind A-press.
-local CHOICES = {}   -- this leg reaches no `choice` at all
+local CHOICES = {}   -- this step reaches no `choice` at all
 local ci, inChoice = 0, false
 local nameMenus, battles = 0, {}
 
 -- ---------------------------------------------------------- the fighter --
--- The honest battle driver (issue #75; gen_sabin_camp's copy of
+-- The input-driven battle driver (issue #75; gen_sabin_camp's copy of
 -- gen_scenario's menu-episode machine).  fightFrame() is the one entry
 -- point every battle-seeing site calls each frame: it opens the per-fight
 -- bookkeeping on a rising edge (a >10-frame gap in sightings), runs the
@@ -232,14 +234,14 @@ local function partyLine()
   return table.concat(p, " ")
 end
 -- CLOSED-LOOP (2nd pass): the seq machine assumed full-HP parties, and
--- the first honest mint of the chain proved fights now carry damage
--- forward between legs (SABIN entered the courtyard at 46/231).  So the
--- fighter reads the engine's own cursor state ($890F/$8947 + actor, the
+-- the first input-driven generation of the chain proved fights now carry
+-- damage forward between steps (SABIN entered the courtyard at 46/231).  So
+-- the fighter reads the engine's own cursor state ($890F/$8947 + actor, the
 -- $7BC2 menu state) and steers by pad: boost-and-Fight as before, plus a
--- SELF-HEAL branch under 50% HP funded from the real bag (Potion when
--- >=150 HP is missing, else Tonic; battle inventory $2686 stride 5,
--- count at +3 -- a zero-count row is never picked).  Item targets
--- default to self, so no target steering is needed here.
+-- SELF-HEAL branch under 50% HP funded from the real bag (Potion when >=150
+-- HP is missing, else Tonic; battle inventory $2686 stride 5, count at +3
+-- -- a zero-count row is never picked).  Item targets default to self, so
+-- no target steering is needed here.
 local MSTATE = 0x7BC2
 local ST_CMD, ST_ITEM, ST_TGT, ST_TOOLS = 0x05, 0x0A, 0x38, 0x30
 local CMD_ITEM = 0x01
@@ -249,7 +251,7 @@ local CMDTBL, CMDROW = 0x202E, 0x890F
 -- (btlgfx_main.asm:_c189be) sums them before the *5; reading the scroll
 -- alone selected inventory index 4 while the display said 1 (measured,
 -- probe_itemuse: the select/deselect toggle that wedged the first
--- honest courtyard mint)
+-- input-driven courtyard generation)
 local ITEMSCR, ITEMROW = 0x8947, 0x894F
 local function itemIdxOf(a)
   return H.readByte(ITEMSCR + a) + H.readByte(ITEMROW + a)
@@ -291,7 +293,7 @@ local function makeFightPlan(actor)
     end
   end
   local bp = H.readByte(BP + actor * 2)
-  -- dump banked boost EVERY turn: these are 1-2 member legs where a dead
+  -- dump banked boost EVERY turn: these are 1-2 member steps where a dead
   -- enemy is the only mitigation, and the pursuit measured bank-to-2
   -- losing the tempo war against four attackers
   local boost = bp >= 1 and math.min(bp, 3) or 0
@@ -457,7 +459,7 @@ local function rideUntil(pred, what, budget)
           ci = ci + 1
           if not CHOICES[ci] then
             error(string.format("escape: unexpected choice prompt (%d options) " ..
-              "on map %d at (%d,%d) -- this leg expects none",
+              "on map %d at (%d,%d) -- this segment expects none",
               chMax, map(), H.fieldX(), H.fieldY()), 0)
           end
         end
@@ -470,7 +472,7 @@ local function rideUntil(pred, what, budget)
         inChoice = false
       end
 
-      -- battle: hand the frame to the honest fighter (issue #75) -- it
+      -- battle: hand the frame to the input-driven fighter (issue #75) -- it
       -- opens the bookkeeping, runs the loss watch, and drives the
       -- boost-and-Fight episode machine (script battles just ride).
       if battN >= 3 then
@@ -586,7 +588,8 @@ local function talkForFight(cx, cy, wantSw, what, budget)
   -- thrashes -- caught CYAN on one boot's phase, hard-timed-out on another
   -- (the s2_ stack).  So take bfsPath's first step and HOLD it through the
   -- flap: a step begins on each clean frame and un-aligns the party off the
-  -- trigger, the magitek leg's fix.  Kill-bit any wave that fires mid-walk.
+  -- trigger, the magitek step's fix.  write-clear any wave that fires
+  -- mid-walk.
   local function approachStep(phase)
     if inBattle() then
       fightFrame(phase, what)              -- a wave caught mid-walk: play it
@@ -712,7 +715,8 @@ H.run({ maxFrames = 250000 }, {
       H.frame, H.fieldX(), H.fieldY(), cyanX(), cyanY()))
   end),
 
-  -- 1. the three waves, honestly, behind the ladder.  CYAN moves between
+  -- 1. the three waves, with real input, behind the ladder.  CYAN moves
+  --    between
   -- them, so his tile is a thunk.
   (function()
     local ckReq
@@ -733,8 +737,8 @@ H.run({ maxFrames = 250000 }, {
   H.call(function()
     if not wavesWon then
       error(string.format("escape: the courtyard waves were lost on all 3 " ..
-        "honest attempts -- last loss: %s -- the per-attempt numbers above " ..
-        "are the balance finding (#74-style); do not rig this leg",
+        "attempts -- last loss: %s -- the per-attempt numbers above " ..
+        "are the balance finding (#74-style); do not rig this segment",
         tostring(lost)), 0)
     end
   end),
@@ -746,13 +750,13 @@ H.run({ maxFrames = 250000 }, {
   end),
 
   -- 2. THE ESCAPE HANDS CONTROL TO THE PLAYER AT (14,30), and that is the
-  -- deliberate end of this leg.  After CYAN joins, the mount sequence
+  -- deliberate end of this step.  After CYAN joins, the mount sequence
   -- auto-walks the party (obj_scripts, control off) up through the castle
   -- and back down, then returns USER control -- measured, a pure hands-off
   -- ride from here idles at exactly (14,30), $087C=02, ev=false,
   -- indefinitely (probe_ride).  That is the Magitek escape's starting line.
   --
-  -- WHY THE LEG STOPS HERE, stated so the next agent does not rediscover it.
+  -- WHY THE STEP STOPS HERE, stated so the next agent does not rediscover it.
   -- The escape from (14,30) to the world exit (36,14) is NOT a plain walk:
   -- it is fight / scripted-interlude / fight.  Walking onto (24,28) fires
   -- `battle 15` (_cb1955, :42014); the fight is WON (the tail runs past
@@ -763,8 +767,8 @@ H.run({ maxFrames = 250000 }, {
   -- party inside an obj-script interlude that a plain navTo (which only
   -- hands off and waits when control is lost) never sees end.  Driving the
   -- escape needs a fight/interlude/fight state machine, or the interlude's
-  -- own exit condition decoded, and that is scoped as the next leg rather
-  -- than thrashed here.  doma_defended is the clean, reproducible doorstep
+  -- own exit condition decoded, and that is scoped as the next step rather
+  -- than thrashed here.  doma_defended is the clean, reproducible entry point
   -- it should build from.
   rideUntil(function()
     return map() == 119 and H.fieldX() == 14 and H.fieldY() == 30
@@ -799,6 +803,6 @@ H.run({ maxFrames = 250000 }, {
   end),
   H.saveState("doma_defended.mss"),
   H.logStep(function()
-    return string.format("doma_defended minted at frame %d", H.frame)
+    return string.format("doma_defended generated at frame %d", H.frame)
   end),
 })

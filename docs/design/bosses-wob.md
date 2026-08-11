@@ -141,7 +141,7 @@ Party: Terra, Locke, Edgar — Sabin storms in at the midpoint with
 Pummel and, at vanilla level 6, AuraBolt too, so the fight is planned
 assuming holy chip is present.
 
-MEASURED, in `battle_vargas.lua` off the rung-2 fixtures: he seeds
+MEASURED, in `battle_vargas.lua` off the tier-2 fixtures: he seeds
 **5/5 with class row $04 (bludgeoning)**, the Ipoohs 2/2 slash-weak,
 and his weak byte reads **$28 — poison|holy**, the holy bit being
 `Ot6ElemAddTbl`'s add on top of vanilla's poison. "Storms in at the
@@ -178,11 +178,11 @@ fire + slashing.
   bear screen while the script insists you're losing. Then Sabin
   arrives and the chip engine starts: Pummel ×2 bludgeoning,
   AuraBolt for holy. Mechanics and narrative agree: you couldn't
-  break him without the monk. **The escorts gate the key** (measured,
+  break him without the monk. **The escorts block the key** (measured,
   above): the spray goes to the Ipoohs' target group until both are
   down, so phase one reads clear the adds, *then* spend the tool —
   which is a better beat than the design assumed, and free.
-- **Jank ✦: the Blitz gate stays.** Doom Fist's Condemned countdown
+- **Jank ✦: the Blitz requirement stays.** Doom Fist's Condemned countdown
   on Sabin, the Pummel-input finish, all of it — he dies to the
   script, not to HP. Breaking him is setup, not checkmate: what the
   ×2 window buys is calm — free turns to land the input while he
@@ -213,7 +213,7 @@ he keeps all game.
 ## The split — three scenarios, three proofs
 
 The coverage rule's stress test (weapon-classes.md). Terra and
-Banon's leg through the caves is the deliberate breather: no boss —
+Banon's segment through the caves is the deliberate breather: no boss —
 their exam is the Narshe defense. Per-party notes below.
 
 ### 5. TunnelArmor — South Figaro escape (Locke + Celes)
@@ -307,7 +307,7 @@ dropped vanilla's bolt bit and never mentioned the absorb at all.)
 
 - **Telegraph:** the whistle screams down the corridor → **Evil
   Toot**, party-wide status roulette. Break the boiler before the
-  note lands; Acid Rain between fuses keeps the healing honest.
+  note lands; Acid Rain between fuses keeps the healing under pressure.
 - **Break story:** the scenario's gifts are the keys — AuraBolt is
   holy chip at range, Pummel ×2 grinds, and Shadow's elemental skeans
   probe two of the three element bits, not one: Fire Skean is fire
@@ -326,7 +326,7 @@ dropped vanilla's bolt bit and never mentioned the absorb at all.)
   but it needs writing down where an author will hit it. Edgar's Bio
   Blaster is poison: the Throw/Tools table maps item `$a4` to spell
   `$7d` (battle_main.asm:6577) and that spell's element byte is `$08`.
-  The Narshe school's rung-2 seed once teased that tool as the answer to
+  The Narshe school's tier-2 seed once teased that tool as the answer to
   armored things ("Every armor fears one right tool", narshe-school.md) —
   a framing the v0.5 break pass retired and the seed's own rewrite has
   since dropped (see "The imperial soldier line"), but the poison-heal
@@ -335,7 +335,7 @@ dropped vanilla's bolt bit and never mentioned the absorb at all.)
   flips the damage sign and jumps clear past the weakness branch where
   the shield chip lives (battle_main.asm:1850, chip at :1872): the hit
   heals the train *and* chips nothing. Nothing is broken today —
-  Edgar is on Terra's leg and this party carries no poison — so the
+  Edgar is on Terra's segment and this party carries no poison — so the
   trap is latent, not live. Do not hang a poison beat on the Phantom
   Train, and re-read this before routing Edgar onto it.
 - **The train is a poison dead zone, boss *and* chest.** Decoded while
@@ -404,7 +404,7 @@ lives, and because the **v0.5 break-coverage pass rewrote the whole
 idea.** (This section replaces the old "one right tool" writeup, kept in
 git history.)
 
-**The doctrine that was.** The Narshe school's rung-2 seed promised "their
+**The doctrine that was.** The Narshe school's tier-2 seed promised "their
 armored machines shrug off blade and fire alike… Every armor fears one
 right tool" (narshe-school.md), the tool being Edgar's Bio Blaster
 (poison, `$08`). Four species got a poison `Ot6ElemAddTbl` add so the
@@ -436,7 +436,7 @@ it* can reach:
 | Rider | `$003F` | 3 · slash\|pierce | Narshe waves — any squad | ditto (fire still breaks it on the train) |
 | HeavyArmor | `$009F` | 3 · slash\|pierce | Locke SOLO `b11` (pierce) + Narshe wave (slash) | heavy plate; a blade at the seams |
 
-Shields track the early-war band (2 basic infantry, 3 for the elite /
+Shields track the early-war stretch (2 basic infantry, 3 for the elite /
 heavier / duel bodies). **Class chips ignore absorb/null**, so
 HeavyArmor's vanilla water-absorb and everyone's stray element bits never
 sour the break — the class is a clean, always-legal key.
@@ -475,7 +475,7 @@ not to Edgar alone.
 that fights it (Shadow's Bolt Edge / the Magitek bolt beam at the camp),
 so it was never a gap; it carries the bolt half of the palette natively.
 
-**The school seed now matches, by design.** The rung-2 dialog ($0276) was
+**The school seed now matches, by design.** The tier-2 dialog ($0276) was
 rewritten under the school's own story/dialog sanction (narshe-school.md's
 fence) to teach the new fiction — armor turns a careless blow aside, but
 every plate has a seam, and no two are the same; bring the weapon that
@@ -502,7 +502,7 @@ he owns a pair) — **and that is the whole ring**. Every trench aquatic was
 a formula species
 whose vanilla element the party can't reach — Anguiform is bolt-only (no
 bolt in the party) and Actaneon/Aspik are fire-weak but Sabin's Fire
-Dance is L15-gated — and all three **absorb water**, so a careless
+Dance needs level 15 — and all three **absorb water**, so a careless
 element add would heal them. Class is the clean answer, and with two keys
 across three creatures the split follows the *party's* own shape — two
 bludgeon wielders, one slash specialist:
@@ -513,7 +513,7 @@ bludgeon wielders, one slash specialist:
 | Actaneon | `$005E` | 2 · bludg | a shelled crustacean, cracked by Sabin's fists |
 | Aspik | `$0059` | 2 · bludg | a constrictor, crushed by a monk's fists |
 
-Vanilla bits are kept (dead or level-gated for this party, live for a
+Vanilla bits are kept (dead or level-locked for this party, live for a
 later party that carries the element); class chips ignore the
 water-absorb.
 
@@ -528,14 +528,14 @@ water-absorb.
   *every* un-authored body is breakable by some weapon class. The palette
   follows the authored taste — armored/mechanical/dragon/insect → **pierce**,
   brute/ooze/golem/monk → **bludgeon**, beasts/humanoids/casters → **slash**
-  (the honest remainder). Authored `Ot6ShieldTbl` rows still win (the `@hit`
+  (the remainder). Authored `Ot6ShieldTbl` rows still win (the `@hit`
   path overwrites the mask); the floor only fills the gap. `battle_breakfloor`
-  is the regression gate — it asserts all 384 species carry a breakable class.
+  is the regression test — it asserts all 384 species carry a breakable class.
   Pacing impact (universal breakability = more breaks) is a playtest/balance
   matter, like the Kolts shield-count sweep.
 - **Tentacle_2 / Tentacle_3 (`$013D`/`$013E`) — out of WoB scope, by
   intent.** They trace to the World-of-Ruin Figaro engine room, past this
-  document's World-of-Balance frontier. The floor gives them a class like any
+  document's World-of-Balance scope. The floor gives them a class like any
   other species, but their fight lives in the WoR; revisit their break design
   with the WoR pass, not as a WoB gap.
 
@@ -573,7 +573,7 @@ as designed).
   the running gag lives *inside* the telegraph system now.
 - **Break story:** no Banon to babysit this time; the tentacle aims
   at whoever you can least afford. One more shield than the river,
-  minus the free healer — same fight, honest difficulty.
+  minus the free healer — same fight, real difficulty.
 - **Jank:** the battle happens on stage and the show absorbs it; the
   Impresario would call the break window "act three."
 
@@ -887,7 +887,7 @@ damage sign — and dropped vanilla's ice and bolt, against the
    Confirm — or should a break force the swap instead, handing the
    window to the sibling?
 3. **024's anti-codex:** WallChange re-hiding the element row
-   mid-fight — delightful or dishonest? (Classes stay revealed
+   mid-fight — delightful or unfair? (Classes stay revealed
    either way.)
 4. **Atma's added row:** fire/ice/bolt + slash/pierce is generous by
    design (free-pick party). Narrow it and risk a lineup that can't

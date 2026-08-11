@@ -1,7 +1,7 @@
--- gen_zozo3_clock.lua -- v0.4 leg 2a: zozo_arrival (map 221 street) -> the
+-- gen_zozo3_clock.lua -- v0.4 step 2a: zozo_arrival (map 221 street) -> the
 -- CAFE building door (42,28) -> the clock room (map 225, landing {98,61})
 -- -> THE CLOCK at {98,59}: an A+facing-up tile interaction (NOT an NPC),
--- solved 6:10:50 -> the hidden staircase opens -> mint zozo_clock_solved.
+-- solved 6:10:50 -> the hidden staircase opens -> generate zozo_clock_solved.
 --
 -- THE CLOCK, from source (event_main.asm _ca96bd:22895 + event_trigger
 -- _225 {98,59}):
@@ -153,6 +153,6 @@ H.run({ maxFrames = 60000 }, {
   end),
   H.saveState("zozo_clock_solved.mss"),
   H.logStep(function()
-    return string.format("zozo_clock_solved minted at frame %d", H.frame)
+    return string.format("zozo_clock_solved generated at frame %d", H.frame)
   end),
 })

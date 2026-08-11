@@ -2,10 +2,10 @@
 -- in Arvis's house.  From whelk_doorstep.mss (party calm at (42,6), map 41):
 -- step onto the trigger at (42,5), edge-tap the guard dialogs $0B6E/$0B6F,
 -- then BEAT the Whelk BY PLAYING IT (issue #75: zero state writes -- the
--- kill-bit clearBattle this used to call is gone).  The strategy is the
--- measured "tutorial" policy from whelkbal_run.lua, the designed line the
--- head's fire-weak add exists for (the whelk balance measurement + the
--- resistance re-check: 3/3 honest wins, ~6 beams + 1-2 teks):
+-- battle-clear-write clearBattle this used to call is gone).  The strategy
+-- is the measured "tutorial" policy from whelkbal_run.lua, the designed
+-- line the head's fire-weak add exists for (the whelk balance measurement +
+-- the resistance re-check: 3/3 real wins, ~6 beams + 1-2 teks):
 --   * head up: everyone fires their first beam at the default target (the
 --     head -- chips land, measured); when exactly ONE shield remains and
 --     the head is not yet broken, TERRA's turn walks the 2x4 magitek grid
@@ -17,7 +17,7 @@
 --     mixed-naive policy lost 5/5 to it.  Its claim that a Terra KO
 --     game-overs this fight measured FALSE here, twice: runs 5-6 both
 --     lost her mid-fight and the soldiers finished the head, the event
---     epilogue ran, and the wake-up minted clean -- but her survival
+--     epilogue ran, and the wake-up generated clean -- but her survival
 --     still buys a third beam per window, so the policy protects her).
 -- The event epilogue sets switch $0135 ($1EA6 bit $20, asserted).  North
 -- of the fight, tiles (41..43, y=4) exit to map 0x2A at (86,28), the
@@ -25,9 +25,10 @@
 -- automatic esper scene: the party is zapped (scripted battle 77 --
 -- Tritoch, spared so it plays itself out), flashback, and Terra wakes
 -- alone in Arvis's house (map 30).  advanceStory rides all of it out
--- (honest=true -- no route battle is kill-bitted anywhere in this gen).
--- Emits arvis_wake.mss at the first calm control point, plus progress
--- screenshots, and logs the roster + command lists the fixture has.
+-- (playBattles=true -- no route battle is write-cleared anywhere in this
+-- gen).  Emits arvis_wake.mss at the first calm control point, plus
+-- progress screenshots, and logs the roster + command lists the fixture
+-- has.
 local H = dofile("tools/tests/lib/ot6.lua")
 local DOORSTEP = "build/states/whelk_doorstep.mss.lua"
 
@@ -43,7 +44,7 @@ end
 local TRITOCH = { 0x0114, 0x0115, 0x0144 }
 
 -- pred factory: n consecutive calm frames (control, at rest), optionally
--- with an extra condition -- one-frame control blips mustn't mint states
+-- with an extra condition -- one-frame control blips mustn't generate states
 local function calm(n, extra)
   local cnt = 0
   return function()
@@ -122,7 +123,7 @@ end
 
 local aPhase = 0
 
--- ------------------------------------------------ the honest Whelk win --
+-- -------------------------------------------------- the real Whelk win --
 -- Addresses and menu-episode discipline lifted from whelkbal_run.lua (the
 -- instrument that measured this exact fight 3/3 winnable on this policy).
 local MENU  = 0x7bca               -- battle menu open flag
@@ -132,8 +133,9 @@ local SHLD  = 0x3e40               -- monster cur shields, +slot*2
 local TIMER = 0x3e90               -- monster broken timer, +slot*2
 local ALIVE = 0x3aa8               -- monster presence bit0, +slot*2
 local MSTAT = 0x3eec               -- monster status-1, +slot*2 (READ-only
-                                   -- here: $c2 = gone/hidden; the kill-bit
-                                   -- WROTE bit7 -- this gen never does)
+                                   -- here: $c2 = gone/hidden; the
+                                   -- battle-clear write WROTE bit7 -- this
+                                   -- gen never does)
 local SPEC  = 0x57c0               -- formation species words
 local CHID  = 0x3ed8               -- char id, +slot*2 (0 = terra)
 
@@ -300,22 +302,22 @@ local function winWhelk()
     H.waitFrames(6),
     H.call(function() H.setPad({}) end),
     H.waitFrames(24),
-  }, "whelk beaten honestly (tutorial policy)")
+  }, "whelk beaten (tutorial policy)")
 end
 
 H.run({ maxFrames = 120000 }, {
   H.loadState(DOORSTEP),
   H.waitFrames(10),
-  H.waitUntil(function() return H.hasControl() end, 300, "doorstep control", 5),
+  H.waitUntil(function() return H.hasControl() end, 300, "entry point control", 5),
   H.call(function()
     H.assertEq(H.mapId(), 41, "boot map is the Narshe mines")
-    H.assertEq(H.fieldX() == 42 and H.fieldY() == 6, true, "at the doorstep (42,6)")
+    H.assertEq(H.fieldX() == 42 and H.fieldY() == 6, true, "at the entry point (42,6)")
     H.assertEq(H.readByte(0x1ea6) & 0x20, 0, "whelk-done switch clear")
   end),
 
   -- the deliberate step onto (42,5); the event force-walks us to (42,7) and
   -- opens the guard dialogs.  A random encounter on the step is FOUGHT
-  -- inline by the same edge-tapped A (honest; nothing on this one-step
+  -- inline by the same edge-tapped A (real input; nothing on this one-step
   -- route should draw one); the goal fight is hands-off (whelk() stops the
   -- loop; winWhelk plays it).
   H.driveUntil(function() return whelk() end, 8000, {
@@ -336,7 +338,7 @@ H.run({ maxFrames = 120000 }, {
     end),
   }, "whelk event fires"),
 
-  -- WIN the fight for real: the first honest boss kill in the mint chain's
+  -- WIN the fight for real: the first real boss kill in the generated chain's
   -- history.  Real menus, real target defaults, real turns; the retract
   -- cycle is the fight's clock and Heal Force spends the hidden phases.
   H.logStep("whelk battle up; playing it (tutorial policy)"),
@@ -347,7 +349,7 @@ H.run({ maxFrames = 120000 }, {
   end),
 
   -- event epilogue: fade back in, switch $0135 set, control returns
-  H.advanceStory(calm(30), 3000, { honest = true }),
+  H.advanceStory(calm(30), 3000, { playBattles = true }),
   H.call(function()
     H.assertEq(H.readByte(0x1ea6) & 0x20, 0x20, "whelk-done switch $0135 set")
     H.log(string.format("whelk won; back on field at (%d,%d) map=%d",
@@ -357,7 +359,7 @@ H.run({ maxFrames = 120000 }, {
 
   -- north through the y=4 exit line into the Tritoch chamber
   H.navTo(42, 4, { arrive = function() return H.mapId() == 0x2A end,
-                   maxFrames = 6000, honest = true }),
+                   maxFrames = 6000, playBattles = true }),
   H.waitUntil(calm(30), 900, "tritoch chamber control"),
   H.call(function()
     H.assertEq(H.mapId(), 0x2A, "in the tritoch chamber (map 0x2A)")
@@ -366,14 +368,14 @@ H.run({ maxFrames = 120000 }, {
   end),
 
   -- approach the esper: the single trigger at (87,12) starts the scene
-  H.navTo(87, 12, { arrive = eventFor(30), maxFrames = 12000, honest = true }),
+  H.navTo(87, 12, { arrive = eventFor(30), maxFrames = 12000, playBattles = true }),
   H.logStep("tritoch scene fired; hands off"),
 
   -- the long automatic stretch: zap battle (spared), flashback, wake-up.
   -- done = calm on a map that is neither mines (41) nor chamber (42)
   H.advanceStory(calm(60, function()
     return H.mapId() ~= 41 and H.mapId() ~= 42
-  end), 45000, { spare = TRITOCH, honest = true }),
+  end), 45000, { spare = TRITOCH, playBattles = true }),
 
   H.call(function()
     H.log(string.format("awake: map=%d (0x%X) at (%d,%d)",
@@ -383,6 +385,6 @@ H.run({ maxFrames = 120000 }, {
   H.saveState("arvis_wake.mss"),
   H.call(logPartyDump),
   H.logStep(function()
-    return string.format("arvis_wake minted at frame %d", H.frame)
+    return string.format("arvis_wake generated at frame %d", H.frame)
   end),
 })

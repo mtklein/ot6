@@ -111,7 +111,7 @@ H.run({ maxFrames = 60000 }, {
     H.log(string.format("booted map=%d at (%d,%d) facing=%d",
       H.mapId() & 0x1ff, H.fieldX(), H.fieldY(),
       H.readByte(0x087f + H.readWord(0x0803))))
-    dumpParty("doorstep")
+    dumpParty("entry point")
   end),
 
   -- ===================================================================== --
@@ -174,14 +174,14 @@ H.run({ maxFrames = 60000 }, {
   end),
 
   -- ===================================================================== --
-  -- THE KILL-BIT QUESTION.  The harness's standard way to end a fight is to
-  -- set $3EEC+off bit7 on every live monster (H.clearBattle).  Vargas's
-  -- reaction script opens with `if_self_dead / boss_death` (ai_script.asm
-  -- :4382-4384) BEFORE the `if_attack PUMMEL` branch, so what a kill bit
-  -- does to a boss whose death is scripted was an open question.  It is
-  -- asked here, once, and whatever it answers is logged rather than
-  -- assumed -- battle_vargas.lua does not depend on it either way, because
-  -- the Pummel path is proven and is the one the story means.
+  -- THE battle-clear-write QUESTION.  The harness's standard way to end a
+  -- fight is to set $3EEC+off bit7 on every live monster (H.clearBattle).
+  -- Vargas's reaction script opens with `if_self_dead / boss_death`
+  -- (ai_script.asm :4382-4384) BEFORE the `if_attack PUMMEL` branch, so
+  -- what a kill bit does to a boss whose death is scripted was an open
+  -- question.  It is asked here, once, and whatever it answers is logged
+  -- rather than assumed -- battle_vargas.lua does not depend on it either
+  -- way, because the Pummel path is proven and is the one the story means.
   -- ===================================================================== --
   H.call(function()
     for slot = 0, 5 do
@@ -189,7 +189,7 @@ H.run({ maxFrames = 60000 }, {
         H.writeByte(0x3eec + slot * 2, H.readByte(0x3eec + slot * 2) | 0x80)
       end
     end
-    H.log("kill bits set on every live monster slot")
+    H.log("battle-clear writes made on every live monster slot")
   end),
   H.driveUntil(function() return not H.battleLoadStarted() end, 6000, {
     H.call(function()
@@ -197,14 +197,14 @@ H.run({ maxFrames = 60000 }, {
       aPh = (aPh + 1) % 8
       H.setPad(aPh < 4 and { "a" } or {})
       if H.frame % 600 == 0 then
-        H.log(string.format("kill-bit watch f%d: batt=%s monsters=%d " ..
+        H.log(string.format("battle-clear watch f%d: batt=%s monsters=%d " ..
           "vHP=%d shields=%d", H.frame, tostring(H.battleLoadStarted()),
           H.monstersPresent(), H.readWord(0x3BFC), H.readByte(0x3E40)))
       end
     end),
-  }, "kill-bit teardown"),
+  }, "battle-clear teardown"),
   H.call(function()
-    H.log(string.format("KILL-BIT VERDICT: battle ended at f%d (batt=%s)",
+    H.log(string.format("BATTLE-CLEAR VERDICT: battle ended at f%d (batt=%s)",
       H.frame, tostring(H.battleLoadStarted())))
     H.screenshot("vargas_killbit")
   end),

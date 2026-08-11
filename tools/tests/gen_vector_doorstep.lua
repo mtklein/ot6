@@ -1,22 +1,24 @@
--- gen_vector_doorstep.lua -- v0.6 leg 1: cold Continue from the versioned
--- post-Opera battery anchor, validate its semantic contract, then walk the
--- world to the VECTOR event trigger and mint the real v0.6 doorstep.
+-- gen_vector_doorstep.lua -- v0.6 step 1: cold Continue from the versioned
+-- post-Opera battery checkpoint, validate its semantic contract, then walk
+-- the world to the VECTOR event trigger and generate the real v0.6 entry
+-- point.
 --
--- Unlike the tactical frontier chain, this starts from power-on and lets
--- Mesen load an ordinary .srm from its private save directory.  The anchor
--- contains one valid game in slot 3.
+-- Unlike the tactical chain of generated savestates, this starts from
+-- power-on and lets Mesen load an ordinary .srm from its private save
+-- directory.  The checkpoint contains one valid game in slot 3.
 --
 -- WHAT THIS REPLACES (issue #17).  The previous version of this generator
--- held RIGHT off the anchor tile until `(mapId & 0x1ff) == 323`, asserted
--- field (2,17), and minted `vector_arrival.mss` logging "entered Vector".
+-- held RIGHT off the checkpoint tile until `(mapId & 0x1ff) == 323`, asserted
+-- field (2,17), and generated `vector_arrival.mss` logging "entered Vector".
 -- **Map 323 is ALBROOK.**  `ff6/src/field/map_prop.dat` is 33 bytes x 415
 -- records and byte 0 is the map-title index (`LoadMapProp`,
 -- `ff6/src/field/map.asm:143-157`, copies the record to $0520..$0540;
 -- `ShowMapTitle`, `ff6/src/field/text.asm:112-119`, indexes MapTitlePtrs
 -- with $0520).  Map 323 -> title 53 -> "ALBROOK"; maps 242 and 253 ->
--- title 49 -> "VECTOR".  The east step off the anchor lands in the Albrook
--- short-entrance record at world (138,203)/(139,203), which is why the old
--- assertions were green while standing in the wrong town, and why nothing
+-- title 49 -> "VECTOR".  The east step off the checkpoint lands in the
+-- Albrook short-entrance record at world (138,203)/(139,203), which is why
+-- the old assertions were green while standing in the wrong town, and why
+-- nothing
 -- downstream of it could ever have reached the Magitek Research Facility --
 -- map 323's only exits are the four Albrook shops, maps 330/332, and the
 -- long entrance back to the world.
@@ -38,14 +40,15 @@
 -- v0.6 opening is therefore an ordinary ON-FOOT WORLD WALK, not an airship
 -- sequence: no vehicle/airship_pos opcode is involved.
 --
--- WHY worldGrind AND NOT worldNavTo.  The 31-step walk from the anchor tile
--- (137,203) to (122,187) runs entirely inside the random-battle band (world
--- tile prop bit6 $40 on every tile of the path).  A battle snapshots and
--- restores the party to the same tile (move.asm:916-921 / world_start.asm
--- :465-482), which worldNavTo's verified-step loop reads as "the press
--- never moved us"; it condemns the edge, and with the whole band hot it
--- condemns them all.  That is the failure that broke gen_opera1; the same
--- grind-and-replan walker is used here (see gen_opera1_doorstep.lua:47-76).
+-- WHY worldGrind AND NOT worldNavTo.  The 31-step walk from the checkpoint
+-- tile (137,203) to (122,187) runs entirely inside the random-battle area
+-- (world tile prop bit6 $40 on every tile of the path).  A battle snapshots
+-- and restores the party to the same tile (move.asm:916-921 /
+-- world_start.asm :465-482), which worldNavTo's verified-step loop reads as
+-- "the press never moved us"; it condemns the edge, and with the whole area
+-- hot it condemns them all.  That is the failure that broke gen_opera1; the
+-- same grind-and-replan walker is used here (see
+-- gen_opera1_doorstep.lua:47-76).
 --
 -- THE POSITIVE CONTROL.  Issue #17's acceptance criterion is that this
 -- fixture must fail loudly if the party is on the wrong map, rather than
@@ -60,12 +63,12 @@
 -- by returning "" for everything.
 --
 -- OT6_ANCHOR_LAYOUT: ot6-codex-o8-v1
--- ^ the persistent-SRAM layout this leg understands (issue #25).  run.sh
+-- ^ the persistent-SRAM layout this step understands (issue #25).  run.sh
 --   reads the marker line above and refuses -- BEFORE the emulator boots,
 --   naming both strings -- any OT6_SRAM_ANCHOR whose manifest.json declares
 --   a different persistent_layout.  An SRAM schema change bumps the layout
---   string in new anchor manifests, and every leg then refuses the old
---   anchors until it is deliberately migrated to declare the new string
+--   string in new checkpoint manifests, and every step then refuses the old
+--   checkpoints until it is deliberately migrated to declare the new string
 --   (leg-fixtures.md, "Costs, named").
 local H = dofile("tools/tests/lib/ot6.lua")
 local function sw(id)
@@ -137,16 +140,16 @@ H.run({ maxFrames = 160000 }, {
   H.waitUntil(function()
     return (H.mapId() & 0x1ff) == 0 and H.worldHasControl()
       and H.worldAligned()
-  end, 3000, "cold Continue to post-Opera world doorstep", 10),
+  end, 3000, "cold Continue to post-Opera world entry point", 10),
   H.waitUntil(function()
     return (emu.getState()["ppu.screenBrightness"] or 0) >= 15
   end, 900, "cold Continue fade-in", 10),
-  -- THE ENTRY CONTRACT (issue #25).  Everything this leg requires of the
+  -- THE ENTRY CONTRACT (issue #25).  Everything this step requires of the
   -- post-Opera boundary -- save slot, story switches, world tile, the #21
   -- party count and roster, and the bank-$31 codex witnesses -- is declared
   -- as DATA in tools/tests/lib/ot6_contract.lua under "post-opera-v1", the
-  -- same table a predecessor leg will someday assert as its EXIT contract.
-  -- A stale or wrong anchor fails here by NAMING WHAT DIFFERED, one
+  -- same table a predecessor step will someday assert as its EXIT contract.
+  -- A stale or wrong checkpoint fails here by NAMING WHAT DIFFERED, one
   -- "CONTRACT DIFF" line per field (expected vs read), never by timing out
   -- somewhere downstream.  This SUBSUMES the #21 party-count control that
   -- used to live inline: the contract COUNTS the $1850 assignments and
@@ -168,7 +171,7 @@ H.run({ maxFrames = 160000 }, {
   -- east into the Albrook gate exactly the way the retired generator did,
   -- read the name the game itself would print, and require "ALBROOK" --
   -- the string the old fixture was silently standing on.  Then walk back
-  -- out of town so the real leg starts from the anchor tile.
+  -- out of town so the real step starts from the checkpoint tile.
   H.driveUntil(function() return map() == 323 end, 1200, {
     H.hold({ "right" }),
   }, "step RIGHT into the ALBROOK gate (control probe)"),
@@ -204,24 +207,24 @@ H.run({ maxFrames = 160000 }, {
   -- $E0/$E2 read (0,0) for tens of frames after the exit fires -- world
   -- control and full brightness both come back BEFORE InitWorld has
   -- written the position from $1F60.  Gate on the destination tile itself
-  -- (the x=0 column's LongEntrance DestPos) so the log and the leg below
+  -- (the x=0 column's LongEntrance DestPos) so the log and the step below
   -- both start from a real coordinate.
   H.waitUntil(function()
     return H.worldHasControl() and H.worldAligned() and bright() >= 15
        and H.worldX() == 137 and H.worldY() == 203
-  end, 2400, "back on the world at (137,203), the anchor tile", 5),
+  end, 2400, "back on the world at (137,203), the checkpoint tile", 5),
   H.waitFrames(30),
   H.call(function()
     H.assertEq(H.worldX(), 137, "back on the world: x")
     H.assertEq(H.worldY(), 203, "back on the world: y")
   end),
 
-  -- LEG 1: the world walk.  29 steps, every tile battle-enabled.
+  -- STEP 1: the world walk.  29 steps, every tile battle-enabled.
   --
   -- THE WALK STOPS THREE TILES EAST OF THE TRIGGER, NOT ONE.  It used to
   -- aim at (122,187), the tile the trigger is stepped onto FROM, and that
   -- put the walker's own slop right on top of (121,187).  Measured per
-  -- frame on the re-minted anchor:
+  -- frame on the regenerated checkpoint:
   --
   --   f3508 (122,188) aligned, 1-step plan UP pressed  -> f3510 (121,188)
   --   f3524 (121,188) aligned, 2-step plan pressed     -> f3526 (121,187)
@@ -244,7 +247,7 @@ H.run({ maxFrames = 160000 }, {
   -- ENTERED WITH A HELD PRESS, NOT WITH A WALKER AIMED NEXT TO IT.  Row
   -- 187 is passable for x=116..130 (measured), so aiming at (124,187)
   -- leaves the whole +-1 slop window on safe tiles and puts no shortest
-  -- path anywhere near x=121; the held-LEFT leg below then covers the last
+  -- path anywhere near x=121; the held-LEFT step below then covers the last
   -- three tiles, which is what it already did for the last one.
   worldGrind(124, 187, "world walk -> the Vector trigger approach (124,187)"),
   H.waitUntil(function()
@@ -293,7 +296,7 @@ H.run({ maxFrames = 160000 }, {
       local p = H.readByte(0x1850 + c)
       if p ~= 0 and (p & 0x07) == cur then
         H.assertEq(H.readWord(0x1609 + 37 * c) > 0, true,
-          string.format("active character %d is standing at the Vector mint", c))
+          string.format("active character %d is standing at the Vector generation point", c))
       end
     end
     H.log(string.format("[vector_doorstep] f%d map=%d title=%q (%d,%d)",
@@ -304,6 +307,6 @@ H.run({ maxFrames = 160000 }, {
   H.logStep(function()
     return string.format(
       "cold battery Continue walked the world into VECTOR (map 242, %q) "
-      .. "and minted vector_doorstep at frame %d", mapTitleHere(), H.frame)
+      .. "and generated vector_doorstep at frame %d", mapTitleHere(), H.frame)
   end),
 })

@@ -6,8 +6,8 @@
 -- Issue #75 conversion.  The old fixture poked char 0's equipped-esper byte
 -- ($161e) in the field, rewrote command lists, muddled the caster for
 -- menu-less casts, pinned guards, and handed bp/pending/MP.  On
--- n024_doorstep the inputs are real: RAMUH is honestly owned ($1A69 bit 0,
--- gifted at Zozo and asserted at the alcove mint), and it is equipped on
+-- n024_doorstep the inputs are real: RAMUH is genuinely owned ($1A69 bit 0,
+-- gifted at Zozo and asserted in the alcove savestate), and it is equipped on
 -- CELES through the REAL FIELD MENU (battle_magicite.lua's measured route:
 -- X -> Skills -> character -> Espers -> stone -> detail -> A).  Ramuh is
 -- authored to base-tier Bolt ($02) + Rasp ($1a); Celes innately knows
@@ -44,8 +44,8 @@
 --
 --               *** LABELED ISOLATION ARM (owner ruling 2026-08-10, the
 --               waiver-burndown plan names this exact arm). ***  No fixture
---               sits one honest fight short of a level, the n024 maps are
---               measured encounter-free, and the honest boss win is a whole
+--               sits one real fight short of a level, the n024 maps are
+--               measured encounter-free, and winning the boss by play is a whole
 --               generator's job (gen_esper_tubes).  So this arm keeps two
 --               memory-hack stagings, said loudly: the XP pin (one threshold
 --               over, so the next win levels) and the lib's clearBattle win.
@@ -371,7 +371,7 @@ H.run({ maxFrames = 150000 }, {
   H.waitFrames(60),
   H.call(function()
     H.assertEq(H.readByte(0x1A69) & 0x01, 0x01,
-      "RAMUH is honestly owned ($1A69 bit 0, the Zozo gift)")
+      "RAMUH is genuinely owned ($1A69 bit 0, the Zozo gift)")
     H.assertEq(H.readByte(ESPERB), 0xff, "Celes starts with no esper (control)")
   end),
   enterBoss("A"),

@@ -1,7 +1,7 @@
 -- probe_climb_dump.lua -- boot bridge_checkpoint (map 225, ~30,61) and DUMP
 -- the bridge-room shaft prop tables + a door-walled all-z BFS to (30,34),
 -- to resolve: is there a non-warp route to the (30,34) door, or is (30,41)
--- unavoidable?  Read-only measurement; mints nothing.
+-- unavoidable?  Read-only measurement; generates nothing.
 local H = dofile("tools/tests/lib/ot6.lua")
 local function map() return H.mapId() & 0x1ff end
 local function key(x, y) return y * 256 + x end

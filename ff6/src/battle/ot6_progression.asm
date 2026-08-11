@@ -321,13 +321,13 @@
 ;
 ; So Ot6EsperStatTbl is now TWO BYTES per esper in exactly that layout:
 ;       byte 0 = [speed:4][vigor:4]      byte 1 = [magpwr:4][stamina:4]
-; $0000 = no mod at all.  Adopted rather than invented because (a) the ruler in
+; $0000 = no mod at all.  Adopted rather than invented because (a) the baseline in
 ; esper-stat-ruler.md is already measured IN THESE UNITS, so a design number is
 ; transcribed and not converted; (b) an esper's stat package becomes literally the
 ; same kind of object a piece of armour carries, which is #62's whole ask; (c) the
 ; sign bit -- and therefore the downside stat that was wanted and refused for
-; space -- is free.  The cost is a per-stat ceiling of 7 instead of 15; the ruler
-; measured vanilla's own ceiling at exactly 7 (nothing in 256 item records exceeds
+; space -- is free.  The cost is a per-stat ceiling of 7 instead of 15; the
+; baseline measured vanilla's own ceiling at exactly 7 (nothing in 256 item records exceeds
 ; it), and mp-economy.md's standing rule is to prefer the series' own numbers
 ; where a cap is needed.  Use the `esper_stat` macro below; do not hand-pack.
 ;
@@ -457,12 +457,12 @@ out:    longi                   ; i16 to match the phx width
 ; mod), a data-append exactly like their spell lists (genju_prop.asm).
 ;
 ; THE LADDER, REBUILT FROM MEASUREMENT (#62, docs/design/esper-stat-ruler.md).
-; The old rungs were single-stat magnitudes 2-5 chosen as "~10-16% of a base
-; stat".  The ruler pass measured what a gear upgrade is actually worth in
+; The old tiers were single-stat magnitudes 2-5 chosen as "~10-16% of a base
+; stat".  The baseline pass measured what a gear upgrade is actually worth in
 ; vanilla's own units and re-cut them.  WoB shop-purchasable stat-bearing gear
 ; runs median net +3, q3 +6, ceiling +11 (Power Sash, 5000 gil, Thamasa); nine of
-; thirteen WoB helmet rungs carry no stat package at all, and a rung is a SHAPE
-; change plus +1..+7 defense rather than a bigger sum.  So the rungs here separate
+; thirteen WoB helmet tiers carry no stat package at all, and a tier is a SHAPE
+; change plus +1..+7 defense rather than a bigger sum.  So the tiers here separate
 ; on the UPSIDE COLUMN and on the sharpness of the trade, not on the net:
 ;
 ;   FIELD  upside +6 across 2 stats, no downside, net +6
@@ -488,8 +488,8 @@ out:    longi                   ; i16 to match the phx width
 ;
 ; UNRESOLVED, SHIPPING A DEFENSIBLE DEFAULT (owner's ruling: an unresolved value
 ; is not a blocker).  The net is deliberately FLAT at +6..+7 across all three
-; rungs; the alternative is separating the net too (FIELD +6 / STORY +7 / BOSS
-; +9).  Flat was chosen because the ruler measured vanilla's rungs as shape
+; tiers; the alternative is separating the net too (FIELD +6 / STORY +7 / BOSS
+; +9).  Flat was chosen because the baseline measured vanilla's tiers as shape
 ; changes rather than sum changes, and because a Zozo floor stone is worn for
 ; twenty hours while a boss stone competes with eleven others.  Only a playthrough
 ; settles it.  If it needs to move, move the DOWNSIDES first (-3 -> -2, -2 -> 0):
@@ -526,31 +526,31 @@ Ot6EsperStatTbl:
                                          ;    at $0000 on purpose: menu_esperdetail
                                          ;    and probe_esperdetail_anchor use this
                                          ;    row to prove the detail page stays
-                                         ;    honest for a stone with no mod, so
+                                         ;    correct for a stone with no mod, so
                                          ;    authoring it would delete a control.
         esper_stat   -2,  +6,  +2,   0   ;  5 shoat -- STORY, "the Gorgon Eye".
                                          ;    The executioner acts first, and
                                          ;    Break/Doom scale off nothing at all,
-                                         ;    so speed is the only honest lead.
+                                         ;    so speed is the only real lead.
                                          ;    -2 vigor: the Gorgon Eye is a stare,
                                          ;    not a strike.
-        esper_stat   -3,   0,  +3,  +7   ;  6 maduin -- BOSS rung, THE CROWN.  +7
+        esper_stat   -3,   0,  +3,  +7   ;  6 maduin -- BOSS tier, THE CROWN.  +7
                                          ;    mag.pwr is the encoding's ceiling AND
                                          ;    vanilla's own per-stat ceiling
                                          ;    (Enhancer, Magus Rod, Illumina all
                                          ;    sit at +7).  v0.7 has no conventional
-                                         ;    boss -- the band ends on the
+                                         ;    boss -- the section ends on the
                                          ;    banquet, not a fight -- and
                                          ;    all three of his grants scale off
                                          ;    mag.pwr, so the crown stat IS the
-                                         ;    band's reward.  -3 vigor: Terra's
+                                         ;    section's reward.  -3 vigor: Terra's
                                          ;    inheritance is a mage's, not a
                                          ;    fighter's.
         esper_stat   +5,  -2,  +3,   0   ;  7 bismark -- STORY, "the Tide".  The
                                          ;    leviathan is mass: it hits, it
                                          ;    endures, and it is slow.  -2 speed is
                                          ;    the Iron Armor shape, deliberately.
-                                         ;    Kept a rung under Ifrit, which is the
+                                         ;    Kept a tier under Ifrit, which is the
                                          ;    same relation the old table had.
         esper_stat    0,  +2,   0,  +4   ;  8 stray -- FIELD.  Mag.pwr leads
                                          ;    (vanilla MAGPWR_1); the trickster is
@@ -569,7 +569,7 @@ Ot6EsperStatTbl:
         esper_stat    0,   0,   0,   0   ; 18 zoneseek
         esper_stat    0,  -2,  +6,  +2   ; 19 carbunkl -- STORY, "the Facet".  The
                                          ;    wall stone's stat is the wall stat,
-                                         ;    at the story rung's top.  -2 speed:
+                                         ;    at the story tier's top.  -2 speed:
                                          ;    a gem is inert.
         esper_stat    0,  +6,  -2,  +2   ; 20 phantom -- STORY, "the Ghostwalk".
                                          ;    Fast and incorporeal: -2 stamina,

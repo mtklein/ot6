@@ -159,7 +159,7 @@ H.run({ maxFrames = 45000 }, {
       if not dir then H.setPad({}); return end
       H.setPad({ [dir] = true })
     end),
-  }, "grass-band encounter"),
+  }, "grass-area encounter"),
   H.release(),
   H.waitUntil(function() return H.battleActive() end, 900, "battle active", 30),
   H.waitFrames(90),
@@ -230,7 +230,7 @@ H.run({ maxFrames = 45000 }, {
       "the real wallet after one fold cannot buy a second (#64's economy)")
     -- potency: the fold executed the tier's own record against the
     -- monsters.  The COMPUTED damage (numeral cell $33D0,y, pre-HP-clamp)
-    -- is the witness, because the trash's ~33 HP saturates any HP-drop
+    -- is the check, because the trash's ~33 HP saturates any HP-drop
     -- bound.  MEASURED 2026-08-10: the folded Fire 2 computes 234 here.
     -- Base Fire (power 21 vs Fire 2's 60) would land near 234*21/60 ~ 82,
     -- so the floor is 150 -- above any base-fire roll, half the tier-2

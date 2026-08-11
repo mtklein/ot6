@@ -1,6 +1,6 @@
--- gen_mrf_chute.lua -- v0.6 leg 4: mrf_entry (MAGITEK FACTORY map 262,
+-- gen_mrf_chute.lua -- v0.6 step 4: mrf_entry (MAGITEK FACTORY map 262,
 -- {28,8}) -> the conveyor chute at {19,25} -> the factory's lower half,
--- control back at {10,45}.  Mints mrf_chute.
+-- control back at {10,45}.  Generates mrf_chute.
 --
 -- MAP 262 IS NOT ONE WALKABLE REGION, and the reason is scripted
 -- transitions rather than a maze.  Measured live off the loaded tilemap
@@ -169,7 +169,7 @@ H.run({ maxFrames = 60000 }, {
     H.assertEq(map(), 262, "booted on map 262")
     H.assertEq(H.fieldX(), 28, "boot x")
     H.assertEq(H.fieldY(), 8, "boot y")
-    -- Positive control for the leg itself: the chute's landing zone must be
+    -- Positive control for the step itself: the chute's landing zone must be
     -- unreachable on foot RIGHT NOW.  If it ever becomes reachable this
     -- generator is walking somewhere it thinks it is riding, and the
     -- assertion below that we ended at (10,45) would stop proving anything.
@@ -180,9 +180,9 @@ H.run({ maxFrames = 60000 }, {
   end),
 
   -- 1. across the upper floor to {19,22}, one tile above the door frames.
-  H.navTo(19, 22, { maxFrames = 50000, honest = "flee",
+  H.navTo(19, 22, { maxFrames = 50000, playBattles = "flee",
     arrive = function() return H.fieldY() >= 40 end }),
-  H.navTo(19, 22, { maxFrames = 18000, honest = "flee" }), -- doors
+  H.navTo(19, 22, { maxFrames = 18000, playBattles = "flee" }), -- doors
   H.call(function()
     H.assertEq(H.fieldX(), 19, "above the chute x")
     H.assertEq(H.fieldY(), 22, "above the chute y")
@@ -209,7 +209,7 @@ H.run({ maxFrames = 60000 }, {
   end),
   H.saveState("mrf_chute.mss"),
 
-  -- 3. census of the lower half, to plan the next leg off measurement.
+  -- 3. census of the lower half, to plan the next step off measurement.
   H.call(function()
     census("mrf_chute", {
       { 11, 45, "_cc78d0" },
@@ -225,7 +225,7 @@ H.run({ maxFrames = 60000 }, {
     })
   end),
   H.logStep(function()
-    return string.format("mrf_chute minted at frame %d -- map 262 (10,45), "
+    return string.format("mrf_chute generated at frame %d -- map 262 (10,45), "
       .. "below the one-way chute", H.frame)
   end),
 })

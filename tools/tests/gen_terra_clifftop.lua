@@ -2,7 +2,7 @@
 -- caves: map 41 -> a walled-off pocket of map 20 -> maps 48, 49, 50 -> out
 -- onto the CLIFFTOP above Narshe, behind the checkpoint that turned the
 -- party away.
--- Mints one state:
+-- Generates one state:
 --   terra_clifftop.mss  map 20 (27,8), the ledge the caves come out on,
 --                       first controllable frame -- one short walk from
 --                       Arvis's back door and the end of the scenario.
@@ -56,19 +56,19 @@
 -- Event variables themselves live at $1FC2 + 2n (EventCmd_e8, :4458-4464),
 -- so var 0 is the word at $1FC2 and every gate below asserts it.
 --
--- ISSUE #75 (the honesty conversion): ZERO state writes.  The caves are
--- this scenario's only random-encounter pool, and every encounter is now
--- FOUGHT by real input instead of kill-bitted: the same edge-tapped A
--- that used to page the victory text doubles as the auto-fighter (A opens
--- the active character's command list, A confirms its first entry, A
--- takes the default target), which for this party is TERRA and EDGAR
--- attacking while BANON's first command is his Health heal -- the pool's
--- Repo Men and Vaporites die to it and the heal keeps the party topped
--- between waves.  That is the lib's own opts.honest doctrine, applied to
--- the two local drivers (mazeWalk/gateStep) that carry their own battle
--- branches, and opts.honest passed to every lib navigator.  Honest
--- fights cost real ATB rounds, so the per-crossing budgets grew against
--- their kill-bit ancestors.
+-- ISSUE #75 (the input-driven test conversion): ZERO state writes.  The
+-- caves are this scenario's only random-encounter pool, and every encounter
+-- is now FOUGHT by real input instead of write-cleared: the same
+-- edge-tapped A that used to page the victory text doubles as the
+-- auto-fighter (A opens the active character's command list, A confirms its
+-- first entry, A takes the default target), which for this party is TERRA
+-- and EDGAR attacking while BANON's first command is his Health heal -- the
+-- pool's Repo Men and Vaporites die to it and the heal keeps the party
+-- topped between waves.  That is the lib's own opts.playBattles doctrine,
+-- applied to the two local drivers (mazeWalk/gateStep) that carry their own
+-- battle branches, and opts.playBattles passed to every lib navigator.
+-- Input-driven fights cost real ATB rounds, so the per-crossing budgets
+-- grew against their battle-clear-write ancestors.
 --
 -- The order is fixed and one-way; it is seeded by the trigger on (111,26),
 -- _ccd9c4 (:111026), which is the maze's own intro cutscene and ends
@@ -154,8 +154,8 @@ local STEP = { up = { 0, -1 }, right = { 1, 0 }, down = { 0, 1 }, left = { -1, 0
 -- the intro cutscene (_ccd9c4, walked onto at (111,26)) shows dlg $01AC
 -- (EDGAR/TERRA explaining the light, :111093) and moves the party with
 -- obj_scripts, and a direction held into it jams it.  So this one taps
--- dialogs, FIGHTS battles honestly by the same edge-tapped A (issue #75 --
--- no kill-bit), and otherwise releases and waits.
+-- dialogs, FIGHTS battles with real input by the same edge-tapped A (issue
+-- #75 -- no battle-clear write), and otherwise releases and waits.
 local function mazeWalk(gx, gy, what, budget)
   local plan, idx, tx, ty, startMap = nil, 1, nil, nil, nil
   local aPh, battN, dlgN = 0, 0, 0
@@ -220,10 +220,11 @@ end
 -- the re-fire resolves (a plain held UP was measured blowing through gates 10
 -- and 11 without stopping), so this driver NEVER releases for an event -- it
 -- keeps pressing toward the target, only pausing the press to tap a dialog or
--- fight a battle honestly (issue #75 -- the same edge-tapped A, no kill-bit).
--- It stops one tile short of overshoot by ending the frame
--- the tile coordinate first reads the target (which, moving up/left, is ~1px
--- into the final step -- exactly enough to have triggered the gate).
+-- fight a battle with real input (issue #75 -- the same edge-tapped A, no
+-- battle-clear write).  It stops one tile short of overshoot by ending the
+-- frame the tile coordinate first reads the target (which, moving up/left,
+-- is ~1px into the final step -- exactly enough to have triggered the
+-- gate).
 local function gateStep(gx, gy, what, budget)
   local aPh, battN = 0, 0
   return H.driveUntil(function()
@@ -295,23 +296,23 @@ local function cross(tx, ty, dstMap, ax, ay, bad, what, budget)
   local settle = landed(dstMap)
   return seq({
     planAvoids(tx, ty, bad, what),
-    -- honest="tactical", not honest=true.  Plain `true` is the blind
-    -- edge-tapped A: it opens the command list, confirms whatever is on
-    -- row 0 and takes the default target, with no idea what a command
-    -- table or an item is.  This leg escorts BANON, where any death is a
+    -- playBattles="tactical", not playBattles=true.  Plain `true` is the
+    -- blind edge-tapped A: it opens the command list, confirms whatever is
+    -- on row 0 and takes the default target, with no idea what a command
+    -- table or an item is.  This step escorts BANON, where any death is a
     -- Game Over, and it walked the whole thing without once opening the
     -- item menu -- measured 2026-08-09, the party WIPED and the navigator
     -- then spent sixty thousand frames planning routes from field position
     -- (44,1888), which is what a wipe looks like when nothing is watching
     -- for one.  Same fix Mt. Kolts needed: real menus, real boost, and the
     -- driver's own medic line.
-    H.navTo(tx, ty, { maxFrames = budget or 60000, honest = "tactical",
+    H.navTo(tx, ty, { maxFrames = budget or 60000, playBattles = "tactical",
       arrive = function()
         seeBattles()
         return map() == dstMap
       end }),
     H.release(),
-    H.advanceStory(settle, 20000, { honest = "tactical" }),
+    H.advanceStory(settle, 20000, { playBattles = "tactical" }),
     H.waitFrames(30),
     -- and the layer of care, every crossing, exactly as gen_kolts does it
     H.fieldCare({ tag = "care " .. what, threshold = 0.8 }),
@@ -420,7 +421,7 @@ H.run({ maxFrames = 250000 }, {
   planAvoids(111, 24, ALL_GATES, "map 49: onto the maze floor (111,24)"),
   mazeWalk(111, 24, "map 49: onto the maze floor (111,24)"),
   H.release(),
-  H.advanceStory(landed(49), 20000, { honest = "tactical" }),
+  H.advanceStory(landed(49), 20000, { playBattles = "tactical" }),
   H.waitFrames(30),
   H.call(function()
     H.assertEq(sw(0x01F0), 1, "$01F0 set -- _ccd9c4, the maze intro, ran")
@@ -439,7 +440,7 @@ H.run({ maxFrames = 250000 }, {
   planAvoids(111, 10, ALL_GATES, "map 49: the maze exit (111,10)"),
   mazeWalk(111, 10, "map 49: to the exit (111,10)", 30000),
   H.release(),
-  H.advanceStory(landed(50), 20000, { honest = "tactical" }),
+  H.advanceStory(landed(50), 20000, { playBattles = "tactical" }),
   H.waitFrames(30),
   H.call(function()
     H.assertEq(map(), 50, "map 49 -> map 50")
@@ -484,7 +485,7 @@ H.run({ maxFrames = 250000 }, {
   end),
   H.saveState("terra_clifftop.mss"),
   H.logStep(function()
-    return string.format("terra_clifftop minted at frame %d (%d encounters)",
+    return string.format("terra_clifftop generated at frame %d (%d encounters)",
       H.frame, #encounters)
   end),
 })

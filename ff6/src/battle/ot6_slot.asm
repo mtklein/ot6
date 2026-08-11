@@ -16,7 +16,7 @@
 ; reel rig, and vanilla's
 ; rig is ONE byte: w7e6179, a single Rand() drawn at the first A press of a
 ; spin (btlgfx_main.asm, UpdateMenuState_08 @7f16 -- OR'd with $3c when the
-; battle disables joker doom, $2f49.2). Everything dishonest the machine does
+; battle disables joker doom, $2f49.2). Every cheat the machine pulls
 ; flows from `rig AND SlotRateTbl[icon]` ($1f,$03,$01,$01,$00,$00 for icons
 ; 0-5, btlgfx_main.asm SlotRateTbl @7ee1):
 ;   == 0 (blessed): the machine helps -- reel 2 drifts up to w7e617d = 4 extra
@@ -25,8 +25,8 @@
 ;   != 0 (cursed): reel 2 gets no help, and -- the rigged miss proper -- a
 ;        landed pair marks w7e617c bit 7 so reel 3 REFUSES to stop on the
 ;        completing icon (@80c6): the triple is untimeable, by design.
-; Reel 1 always stops honestly where the player timed it. The tiers escalate
-; the machine's own drift/avoid vocabulary, one rung per rung:
+; Reel 1 always stops exactly where the player timed it. The tiers escalate
+; the machine's own drift/avoid vocabulary, one step at a time:
 ;
 ;   0 BP  vanilla to the byte. Ot6SlotRig hands the drawn rig byte back
 ;         untouched; every downstream compare, drift and refusal is vanilla's.
@@ -41,7 +41,7 @@
 ;   3 BP  the reel is CHOSEN: drift budget becomes $ff (the whole strip, every
 ;         icon appears on every reel -- SlotReelTbl @a800), so reels 2 and 3
 ;         spin until they MATCH. The triple of whatever icon the player
-;         stopped reel 1 on is guaranteed: the selection is reel 1's honest,
+;         stopped reel 1 on is guaranteed: the selection is reel 1's unrigged,
 ;         vanilla-timed stop, so "the player's selection lands" with zero UI
 ;         change. (True per-reel choice needs no new UI -- choosing the
 ;         outcome IS choosing reel 1's icon, since the result vocabulary is
@@ -125,7 +125,7 @@
 ; reel-3 @7f9b). w7e617d is how many extra icons a blessed reel may spin past
 ; while hunting the match; vanilla's 4 makes the help a nudge. Tier 3 spends
 ; $ff -- longer than the 16-icon strip, and every icon appears on every strip
-; (SlotReelTbl), so the hunt ALWAYS lands: that is the whole "chosen" rung.
+; (SlotReelTbl), so the hunt ALWAYS lands: that is the whole "chosen" tier.
 ; a8, db=$7e. clobbers a only.
 .proc Ot6SlotDrift
         .a8

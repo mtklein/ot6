@@ -114,9 +114,10 @@ OT6 scales it 0.5x (`Ot6DangerMulW=$0008`), it accrues into the 16-bit
 snapshots position/facing into `$1F60/$1F61/$1F68` first (from the
 $0A00 page-0 snapshot), sets the reload bit in `$E8`, and
 `world_start.asm:465-482` reruns `ReloadMap` after the battle.
-Measured end to end (`probe_world3`): kill-bit clears the fight, then
-~95 frames of fade + re-init, and the party is back on the SAME tile,
-same facing, aligned, danger counter zeroed, `$E7=$00 $E8=$00 $19=$00`.
+Measured end to end (`probe_world3`): writing the monster-death flag
+clears the fight, then ~95 frames of fade + re-init, and the party is
+back on the SAME tile, same facing, aligned, danger counter zeroed,
+`$E7=$00 $E8=$00 $19=$00`.
 A plan in flight survives trivially — position is where it was — but
 `H.worldNavTo` re-plans anyway (BFS is cheap) and waits for full
 screen brightness before launching the next step.

@@ -1,15 +1,15 @@
--- gen_zozo5_ramuh.lua -- v0.4 leg 4, the arc's last: dadaluma_won (map 221,
+-- gen_zozo5_ramuh.lua -- v0.4 step 4, the arc's last: dadaluma_won (map 221,
 -- the roof clear) -> the top door (33,9) -> TERRA's tower (map 226, landing
 -- {82,37}) -> up to TERRA at {81,17} -> THE RAMUH SCENE -> the four
 -- magicite -> the gather room -> the leave-Zozo walk-down -> $0054=1 ->
--- map 221 {57,45} -> mint zozo_done.mss, v0.4's chain tail.
+-- map 221 {57,45} -> generate zozo_done.mss, v0.4's chain tail.
 --
 -- Everything below was MEASURED end to end (probe_ramuh/tower3/gather/leave),
 -- not predicted.  Four surprises the predecessor's source-read missed:
 --
 --  1. THE TOWER PORCH ROLLS RANDOM ENCOUNTERS.  The (33,10)->(33,9) door
---     leg fired battle 19-class trash on the first run (event PC parked at
---     $CA0029 = RandBattle).  Every player-controlled drive kill-bits a
+--     step fired battle 19-class trash on the first run (event PC parked at
+--     $CA0029 = RandBattle).  Every player-controlled drive write-clears a
 --     stray before its own work.
 --  2. TERRA IS TALKED FROM THE WEST, not below.  Her tile {81,17} is
 --     z=UPPER ($0888=1, prop $01); {81,18} below is z=LOWER ($0A), and
@@ -54,25 +54,25 @@
 -- -- four slots with LOCKE and CELES FORCED and two FREE, and CYAN, EDGAR,
 -- SABIN and GAU all sitting in the pool the char_party 0 lines just put
 -- them in.  Answering it with START committed a party of TWO, and the whole
--- v0.5 tail plus every v0.6 leg then ran two characters (one after the tube
+-- v0.5 tail plus every v0.6 step then ran two characters (one after the tube
 -- room takes CELES).  Nothing counted the party, so it read as normal for a
 -- release and a half; gen_vector_doorstep now asserts the COUNT at the
--- post-Opera anchor so this cannot go quiet again.
+-- post-Opera checkpoint so this cannot go quiet again.
 --
 -- OWNER DECISION (#21, 2026-07-27): the canonical fixture party is LOCKE,
 -- CELES, SABIN, EDGAR.  SABIN fills the free BLUDGEON slot that
--- docs/design/break-band-vector.md makes the Vector band's one deliberate
+-- docs/design/break-band-vector.md makes the Vector area's one deliberate
 -- class -- the Rhinox row (OT6_BLUDG, no weakness, absorbs bolt, 8.93% of
--- band draws) exists to ask for it, and bare fists plus Pummel/Suplex/Bum
+-- area draws) exists to ask for it, and bare fists plus Pummel/Suplex/Bum
 -- Rush answer it with no shop trip.  EDGAR brings pierce and Tools.  This
 -- is the baseline every downstream balance number is measured on; changing
--- it re-mints the chain and invalidates all of them.
+-- it regenerates the chain and invalidates all of them.
 --
 -- Issue #75: this file writes NO emulated game state.  The porch/tower
--- random encounters the old file kill-bit are FOUGHT -- the same
+-- random encounters the old file write-clear are FOUGHT -- the same
 -- edge-tapped A that pages dialogs opens the command list, confirms
 -- Fight and takes the default target -- and every walk runs under
--- navTo's honest mode.  Budgets grew where a fight can now interrupt.
+-- navTo's playBattles mode.  Budgets grew where a fight can now interrupt.
 --
 -- The menu driver is gen_kefka_won's state-fed one, but it looks the layout
 -- up LIVE rather than hard-coding cells: NO_RESET opens with the forced two
@@ -110,9 +110,9 @@ end
 -- at $CA0029 -- inside RandBattle, right after its rand_battle command --
 -- while a battle-blind hold-up drive pressed into the transition for 900
 -- frames).  Every drive here that runs under player control clears a
--- stray battle with the kill-bit idiom before doing its own work.
--- (the kill-bit helper that lived here is gone -- issue #75: strays are
--- fought by the drivers' own edge-tapped A)
+-- stray battle with the battle-clear-write idiom before doing its own work.
+-- (the battle-clear-write helper that lived here is gone -- issue #75:
+-- strays are fought by the drivers' own edge-tapped A)
 
 -- advanceStory + the TEXT_ONLY stall fallback.  pred as usual; when the
 -- scene holds the stage with no dialog flags and no party motion, edge-tap
@@ -143,7 +143,7 @@ local function rideScene(pred, maxFrames, what)
       lx, ly = x, y
       if H.battleLoadStarted() then
         stallN = 0
-        H.setPad(aPh < 4 and { "a" } or {})   -- fought, not kill-bit
+        H.setPad(aPh < 4 and { "a" } or {})   -- fought, not write-cleared
         return
       end
       if H.dialogWaiting() then
@@ -250,7 +250,7 @@ local function menuAct(tgt, btn, doneState, what)
   }, what)
 end
 -- take character `id` out of the pool and drop it in the first free slot.
--- Both cells are resolved at the moment the leg runs (thunks), and both
+-- Both cells are resolved at the moment the step runs (thunks), and both
 -- ends are asserted afterwards: a cursor that wandered onto the wrong cell
 -- would otherwise commit whoever it was standing on, silently.
 local function seat(id, name)
@@ -297,9 +297,10 @@ end
 -- read like a hang (no control, no dialog, no event, $59 latched) but the
 -- game was fine: it was rendering a Status screen and waiting for B.
 --
--- (When this driver still kill-bit strays, writing $7E3EEC.. under a live
--- menu was the other half of why the order matters -- those are menu bytes
--- while the menu is up.  The taps-only driver keeps the same order.)
+-- (When this driver still battle-clear write strays, writing $7E3EEC..
+-- under a live menu was the other half of why the order matters -- those
+-- are menu bytes while the menu is up.  The taps-only driver keeps the same
+-- order.)
 --
 -- The detector is composite for gen_kefka_won's reason: $0059 alone blips
 -- outside real menus.  $0200=4 is the menu mode and $26=$2d the interactive
@@ -323,7 +324,7 @@ local function ridePartyMenu()
       end
       if H.readByte(0x0059) ~= 0 then H.setPad({}); return end  -- hands OFF
       if H.battleLoadStarted() then
-        H.setPad(aPh < 4 and { "a" } or {}); return   -- fought, not kill-bit
+        H.setPad(aPh < 4 and { "a" } or {}); return   -- fought, not write-cleared
       end
       if H.dialogWaiting() then H.setPad(aPh < 4 and { "a" } or {}); return end
       H.setPad({})
@@ -337,7 +338,7 @@ end
 local function talk(sx, sy, dir, what)
   local aPh = 0
   return H.cond(function() return true end, {
-    H.navTo(sx, sy, { maxFrames = 12000, honest = true }),
+    H.navTo(sx, sy, { maxFrames = 12000, playBattles = true }),
     H.hold({ dir }), H.waitFrames(8), H.release(), H.waitFrames(4),
     -- a porch/tower encounter that interrupts the approach is FOUGHT by
     -- the same taps; the budget covers a real fight's ATB rounds
@@ -361,7 +362,7 @@ end
 local function bumpTake(sx, sy, dir, what)
   local ph = 0
   return H.cond(function() return true end, {
-    H.navTo(sx, sy, { maxFrames = 12000, honest = true }),
+    H.navTo(sx, sy, { maxFrames = 12000, playBattles = true }),
     H.driveUntil(function() return H.dialogWaiting() end, 9000, {
       H.call(function()
         ph = (ph + 1) % 16
@@ -389,14 +390,14 @@ H.run({ maxFrames = 200000 }, {
   -- 1. the top door (33,9) -> 226 {82,37}, then up the tower to TERRA.
   --    Battle-aware: the porch encounter (see the header) fired
   --    exactly here on the first run.
-  H.navTo(33, 10, { maxFrames = 12000, honest = true }),
+  H.navTo(33, 10, { maxFrames = 12000, playBattles = true }),
   (function()
     local ph = 0
     return H.driveUntil(function() return map() == 226 end, 9000, {
       H.call(function()
         ph = (ph + 1) % 8
         if H.battleLoadStarted() then
-          H.setPad(ph < 4 and { "a" } or {})   -- fought, not kill-bit
+          H.setPad(ph < 4 and { "a" } or {})   -- fought, not write-cleared
           return
         end
         if not H.hasControl() then H.setPad({}); return end
@@ -513,10 +514,10 @@ H.run({ maxFrames = 200000 }, {
         aPh = (aPh + 1) % 8
         -- same order as ridePartyMenu, and for the same measured reason: a
         -- menu makes battleLoadStarted() answer true, and this driver must
-        -- never press A (or kill-bit menu RAM) inside one.
+        -- never press A (or write-clear menu RAM) inside one.
         if H.readByte(0x0059) ~= 0 then H.setPad({}); return end
         if H.battleLoadStarted() then
-          H.setPad(aPh < 4 and { "a" } or {}); return   -- fought, not kill-bit
+          H.setPad(aPh < 4 and { "a" } or {}); return   -- fought, not write-cleared
         end
         if H.dialogWaiting() then H.setPad(aPh < 4 and { "a" } or {}); return end
         H.setPad({})
@@ -573,6 +574,6 @@ H.run({ maxFrames = 200000 }, {
   H.saveState("zozo_done.mss"),
   H.logStep(function()
     return string.format(
-      "zozo_done minted at frame %d -- v0.4's Zozo stop line", H.frame)
+      "zozo_done generated at frame %d -- v0.4's Zozo stop line", H.frame)
   end),
 })

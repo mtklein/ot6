@@ -67,7 +67,7 @@
         jsl     Ot6LoadoutCeil      ; A = ceiling
         pha                         ; park ceiling ($01,s ; slot now $02,s)
         sec
-        sbc     #$02                ; ceiling - 2  (#38: three rungs, not four)
+        sbc     #$02                ; ceiling - 2  (#38: three tiers, not four)
         bcs     :+
         lda     #$00                ; base floors at 0
 :       clc

@@ -31,7 +31,7 @@
 --           direct read inside the clean window).  OFF: the pool does not
 --           move.  Both: the tech lands its hit.
 --   REFUSAL (ON only) *** LABELED ISOLATION ARM (owner calibration). ***
---           battle_bushidogrey measured the honest routes to a broke
+--           battle_bushidogrey measured the input-driven routes to a broke
 --           kit-caster out of reach on this pool's economy: a deferring
 --           party is ground down before any real poverty arrives (the
 --           'enemy MP drain' first blamed was battle-teardown zeroes read
@@ -242,7 +242,7 @@ H.run({ maxFrames = 200000 }, {
     R.mp0 = mp()
     R.g0 = monsterHpSum()
     -- ON: the real pool must afford the priced tech.  OFF: the nomp
-    -- baseline's battle-MP init reads this ON-minted save's pool as 0 --
+    -- baseline's battle-MP init reads this ON-build save's pool as 0 --
     -- and a FREE Dispatch executing from 0 MP is exactly the control
     -- (battle_stealmp measured the same wallet shape on its OFF half).
     if mode == "on" then

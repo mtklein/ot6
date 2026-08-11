@@ -1,13 +1,14 @@
 #!/bin/sh
-# suite.sh -- the OT6 correctness gate. Runs every test on every covered
+# suite.sh -- the OT6 correctness check. Runs every test on every covered
 # formation, honors an
 # explicit expected-fail list. Nonzero exit on any unexpected result.
 #
 # OT6_JOBS=N fans the tests out across N isolated run.sh workers
 # (OT6_WORKER; 1 = serial). Every suite test is a pure savestate load -- the
-# mints (gen_battle_state, gen_battle2) run as Makefile prerequisites BEFORE
-# the suite -- so tests are independent and fan out freely. Tests are composed
-# once up front: composing reads lib/ot6.lua + lib/ot6_field.lua live, and a
+# savestate generators (gen_battle_state, gen_battle2) run as Makefile
+# prerequisites BEFORE the suite -- so tests are independent and fan out
+# freely. Tests are composed once up front:
+# composing reads lib/ot6.lua + lib/ot6_field.lua live, and a
 # mid-suite edit must not split the suite across two libs.
 #
 # The default is the machine's P-core count (perflevel0), not a fixed number.
@@ -52,15 +53,17 @@ fi
 #   -- @suite slow                     member; a long-runner (LPT ordering hint)
 #   -- @suite frontier=<fixture>       member IFF build/states/<fixture>.mss
 #                                      exists -- else reported SKIPPED, never
-#                                      silently dropped (see FRONTIER-GATED below)
-#   -- @suite frontier=<fixture> slow  frontier member that is also a long-runner
+#                                      silently dropped (see the frontier=
+#                                      section below)
+#   -- @suite frontier=<fixture> slow  frontier= member, also a long-runner
 #
 # The four lists suite.sh used to hand-sync -- TESTS, FRONTIER_TESTS,
 # frontier_fixture(), SCHED_LONG -- are ALL derived here in one pass from those
 # markers.  The glob expands in sorted order, so discovery is deterministic; and
 # because every suite test is a pure savestate load that run.sh isolates, the
 # order tests run and print in carries no meaning (README: "order doesn't
-# matter").  Membership and gating are what must be exact, and they are.
+# matter").  Membership and the fixture condition are what must be exact, and
+# they are.
 SUITE=""; FRONTIER_TESTS=""; FRONTIER_FIX=""; SLOW=""
 for f in "$ROOT"/tools/tests/*.lua; do
   grep -q '^-- @suite' "$f" || continue
@@ -88,24 +91,26 @@ ram_env_for() {
     # knowledge New Game must wipe.
     battle_reveal_poweron) echo "OT6_RAM_POWERON=AllOnes OT6_SRAM_ANCHOR=tools/tests/anchors/post-opera-v1" ;;
     # battle_slotsboot cold-Continues the tracked terra-returned battery --
-    # the same anchor hand-off the Makefile's SMOKE_ANCHOR_* map gives
-    # anchored smoke generators (run.sh materializes it before boot).
+    # the same checkpoint hand-off the Makefile's SMOKE_ANCHOR_* map gives
+    # the smoke generators that use one (run.sh materializes it before boot).
     battle_slotsboot) echo "OT6_SRAM_ANCHOR=tools/tests/anchors/terra-returned-v1" ;;
-    # battle_slots' honest half (issue #75) cold-Continues the same anchor
-    # for its tier-1/tier-2 spins before its labeled quarantine lab.
+    # battle_slots' input-driven half (issue #75) cold-Continues the same
+    # checkpoint for its tier-1/tier-2 spins before its labeled quarantine lab.
     battle_slots) echo "OT6_SRAM_ANCHOR=tools/tests/anchors/terra-returned-v1" ;;
     *) echo "" ;;
   esac
 }
-# FRONTIER-GATED TESTS.  A frontier test asserts on a fixture that only
-# `make frontier` mints -- reaching it replays the whole story chain, many
-# multi-minute scripted playthroughs, the very cost the frontier exists to keep
-# out of `make test`.  Such a test declares `-- @suite frontier=<fixture>` and
+# TESTS THAT NEED THE GENERATED SAVESTATES.  Such a test asserts on a fixture
+# that only `make frontier` generates -- reaching it replays the whole story
+# chain, many multi-minute scripted playthroughs, the very cost `make frontier`
+# exists to keep out of `make test`.  Such a test declares
+# `-- @suite frontier=<fixture>` and
 # joins the suite the instant build/states/<fixture>.mss exists; until then it is
-# reported SKIPPED (below), never silently dropped.  `make frontier-test` mints
-# the chain first, so it always runs whatever is mintable.  The per-test WHY --
-# which fixture, and why that formation is the one that exercises the gate --
-# lives in each test's own header now, right under its @suite marker.
+# reported SKIPPED (below), never silently dropped.  `make frontier-test`
+# generates the chain first, so it always runs whatever can be generated.  The
+# per-test WHY -- which fixture, and why that formation is the one that
+# exercises the check -- lives in each test's own header now, right under its
+# @suite marker.
 frontier_fixture() {   # test name -> the abs .mss path from its @suite marker
   for pair in $FRONTIER_FIX; do
     case "$pair" in "$1="*) echo "$ROOT/build/states/${pair#*=}.mss"; return ;; esac
@@ -123,7 +128,7 @@ done
 # `suite.sh --list` -- print what discovery resolved, run nothing, exit.  A fast
 # check that a new @suite marker took: which tests would run, which are SKIPPED
 # for an absent fixture, which count as long-runners.  `make test` calls suite.sh
-# with no args, so this never touches the gate.
+# with no args, so this never touches the correctness check.
 if [ "${1:-}" = "--list" ]; then
   set -- $TESTS;   echo "TESTS ($#): $*"
   set -- $skipped; echo "SKIPPED ($#): $*"
@@ -138,7 +143,7 @@ fail=0; summary=""
 # an agent who does that from a scrolled terminal is doing arithmetic on a
 # window rather than on the run.  Same reasoning as the $(STAMP) machinery in
 # the Makefile ("nothing here is allowed to depend on remembering to look"),
-# one level down: the exit status is still the gate, but the number is now
+# one level down: the exit status is still what decides, but the number is now
 # stated rather than reconstructed.  Counted in verdict()/result() so no
 # category can be added later and quietly stay out of the total -- the
 # breakdown is summed at print time and cross-checked against it.
@@ -165,7 +170,7 @@ verdict() {
 }
 
 # Fixture freshness, stated BEFORE the run rather than discovered after it.
-# A stale frontier fixture makes a test red for a reason that is not the
+# A stale generated fixture makes a test red for a reason that is not the
 # reader's change, and the only notice of it used to be a print() buried in
 # build/states/suite_<t>.log -- which nobody opens for a test they did not
 # expect to fail.  ~2s for ~105 fixtures, against a multi-minute suite.

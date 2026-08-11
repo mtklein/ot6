@@ -1,6 +1,6 @@
--- gen_sabin_kefka.lua -- leg 3 of SABIN's scenario: the LEO scene, the
+-- gen_sabin_kefka.lua -- step 3 of SABIN's scenario: the LEO scene, the
 -- poisoning of Doma, both KEFKA gags, the pursuit, and the handoff back to
--- CYAN.  Mints one state:
+-- CYAN.  Generates one state:
 --   kefka_done.mss  map 121 (DOMA CASTLE grounds), CYAN alone, controllable
 --                   -- the first frame after the camp is behind us
 --
@@ -18,13 +18,13 @@
 --          `call _cba0ec` (:40877)
 --
 -- ORDER IS NOT OPTIONAL, AND THE MAP WILL SHOVE YOU.  Once $002C is set,
--- two tile bands turn into one-way barriers:
+-- two tile strips turn into one-way barriers:
 --   (35..37,14) _cb1104 :40656  pushes the party DOWN 1 -- you cannot walk
 --                               back north toward the gate
 --   (18,29..32) _cb1112 :40668  pushes the party RIGHT 1 *unless* $002F
 -- The second is why the KEFKA talks come before the walk west: (17,29) and
 -- (17,31) are the tiles that fire the pursuit (_cb11cb/_cb11da, :40946
--- /:40955), they sit past the x=18 band, and the band only opens after the
+-- /:40955), they sit past the x=18 strip, and the strip only opens after the
 -- third gag.  Walking west first would be shoved back east forever.
 --
 -- BOTH KEFKA GAGS ARE FIGHTS WITH NOTHING IN THEM.  `battle 56` is event
@@ -32,15 +32,16 @@
 -- EventBattleGroup at group*4 as two formation words); group 56 is
 -- {504, 504}, and formation 504's record in battle_monsters.dat (stride 15)
 -- is present mask $00 with all six id slots the $01ff empty sentinel.  No
--- monster is loaded, so Ot6SeedShields never runs and the kill-bit idiom
--- has nothing to write to.  What ends the fight is battle_prop's
--- character-AI script ($2f49 bit 7, $2f4a = $04 = CHAR_AI::KEFKA_IMP_CAMP_1)
--- playing its lines out.  The driver treats "battle up, zero monsters
--- present" as a set-piece: hands off for 300 frames, then edge-tap A.
+-- monster is loaded, so Ot6SeedShields never runs and the
+-- battle-clear-write idiom has nothing to write to.  What ends the fight is
+-- battle_prop's character-AI script ($2f49 bit 7, $2f4a = $04 =
+-- CHAR_AI::KEFKA_IMP_CAMP_1)  playing its lines out.  The driver treats
+-- "battle up, zero monsters present" as a set-piece: hands off for 300
+-- frames, then edge-tap A.
 --
 -- THE PURSUIT IS A REAL FIGHT: group 44 = formation 410, present mask $0f,
 -- two $002 and two $001 -- four ordinary Imperial troops -- and since
--- issue #75 it is FOUGHT, not kill-bitted: zero state writes in this
+-- issue #75 it is FOUGHT, not write-cleared: zero state writes in this
 -- generator.  SABIN + SHADOW run the house menu-episode machine (bank
 -- boost to 2, dump it on Fight -- R..R A A on a settled menu, one button
 -- per 30-frame pulse); the same edge-tapped A pages dialogs and victory
@@ -53,12 +54,12 @@
 -- $4B ("won't leave") is story-SET through the camp -- the escape's exit
 -- is what clears it (event_main.asm:42251, gen_sabin_forest's header).
 --
--- WHERE THIS LEG ENDS, AND WHY NOT AT DOMA.  _cba0ec (:61858) does not
+-- WHERE THIS STEP ENDS, AND WHY NOT AT DOMA.  _cba0ec (:61858) does not
 -- hand SABIN to map 119.  It takes CYAN back to Doma -- `load_map 121,
 -- {23,12}` (:61870) -- and gives the player control of him again at
 -- :62104.  Getting from there to SABIN on map 119 is another two maps of
 -- walking (121 -> 123 -> 124, where trigger (28,36) fires the family scene
--- _cb1283 at :40863), so it is the next leg's problem and this one stops
+-- _cb1283 at :40863), so it is the next step's problem and this one stops
 -- on the first controllable frame of map 121.
 local H = dofile("tools/tests/lib/ot6.lua")
 local DOOR = "build/states/camp_intro.mss.lua"
@@ -105,7 +106,7 @@ end
 --     $3BF4=FF00 $3BF6=0020 $3BF8=FF00 $3BFA=0020
 -- ($3BF6 = 32 reads perfectly like a hit point).  That is OpenMenu_ext
 -- scribbling on the same RAM while the field module is suspended, and
--- taking it for a battle made the driver kill-bit and mash A at the name
+-- taking it for a battle made the driver write-clear and mash A at the name
 -- menu instead of pressing START -- a new stall in place of the old one.
 -- A LOADED battle party table only ever holds a real HP, or 0 / $FFFF for
 -- a slot nobody is in; $FF00 is neither, and one impossible word condemns
@@ -186,16 +187,16 @@ local function talkToObj(obj, what, maxF)
   })
 end
 
--- No `choice` exists anywhere on this leg -- map 117's only prompt is the
+-- No `choice` exists anywhere on this step -- map 117's only prompt is the
 -- sealed-chest gag _cb0dbe (:40058) on obj 29 at {45,5}, which the route
 -- never touches, and map 120 has none at all.  CHOICES stays empty so an
 -- unexpected prompt is a hard failure rather than a blind A-press.
-local CHOICES = {}   -- this leg reaches no `choice` at all
+local CHOICES = {}   -- this step reaches no `choice` at all
 local ci, inChoice = 0, false
 local nameMenus, battles = 0, {}
 
 -- ---------------------------------------------------------- the fighter --
--- The honest battle driver (issue #75; gen_sabin_camp's copy of
+-- The input-driven battle driver (issue #75; gen_sabin_camp's copy of
 -- gen_scenario's menu-episode machine): from a settled battle menu, one
 -- button per 30-frame pulse -- boost prefix, then A A = Fight on the
 -- default target.  Outside a settled menu, edge-tap A.
@@ -214,14 +215,14 @@ local function partyLine()
   return table.concat(p, " ")
 end
 -- CLOSED-LOOP (2nd pass): the seq machine assumed full-HP parties, and
--- the first honest mint of the chain proved fights now carry damage
--- forward between legs (SABIN entered the courtyard at 46/231).  So the
--- fighter reads the engine's own cursor state ($890F/$8947 + actor, the
+-- the first input-driven generation of the chain proved fights now carry
+-- damage forward between steps (SABIN entered the courtyard at 46/231).  So
+-- the fighter reads the engine's own cursor state ($890F/$8947 + actor, the
 -- $7BC2 menu state) and steers by pad: boost-and-Fight as before, plus a
--- SELF-HEAL branch under 50% HP funded from the real bag (Potion when
--- >=150 HP is missing, else Tonic; battle inventory $2686 stride 5,
--- count at +3 -- a zero-count row is never picked).  Item targets
--- default to self, so no target steering is needed here.
+-- SELF-HEAL branch under 50% HP funded from the real bag (Potion when >=150
+-- HP is missing, else Tonic; battle inventory $2686 stride 5, count at +3
+-- -- a zero-count row is never picked).  Item targets default to self, so
+-- no target steering is needed here.
 local MSTATE = 0x7BC2
 local ST_CMD, ST_ITEM, ST_TGT, ST_TOOLS = 0x05, 0x0A, 0x38, 0x30
 local CMD_ITEM = 0x01
@@ -231,7 +232,7 @@ local CMDTBL, CMDROW = 0x202E, 0x890F
 -- (btlgfx_main.asm:_c189be) sums them before the *5; reading the scroll
 -- alone selected inventory index 4 while the display said 1 (measured,
 -- probe_itemuse: the select/deselect toggle that wedged the first
--- honest courtyard mint)
+-- input-driven courtyard generation)
 local ITEMSCR, ITEMROW = 0x8947, 0x894F
 local function itemIdxOf(a)
   return H.readByte(ITEMSCR + a) + H.readByte(ITEMROW + a)
@@ -273,7 +274,7 @@ local function makeFightPlan(actor)
     end
   end
   local bp = H.readByte(BP + actor * 2)
-  -- dump banked boost EVERY turn: these are 1-2 member legs where a dead
+  -- dump banked boost EVERY turn: these are 1-2 member steps where a dead
   -- enemy is the only mitigation, and the pursuit measured bank-to-2
   -- losing the tempo war against four attackers
   local boost = bp >= 1 and math.min(bp, 3) or 0
@@ -425,7 +426,7 @@ local function rideUntil(pred, what, budget)
           ci = ci + 1
           if not CHOICES[ci] then
             error(string.format("kefka: unexpected choice prompt (%d options) " ..
-              "on map %d at (%d,%d) -- this leg expects none",
+              "on map %d at (%d,%d) -- this segment expects none",
               chMax, map(), H.fieldX(), H.fieldY()), 0)
           end
         end
@@ -562,7 +563,7 @@ local function stepOnto(x, y, untilPred, what, budget)
     end),
     H.navTo(x, y, {
       maxFrames = budget or 12000,
-      honest = true,
+      playBattles = true,
       -- hand any battle straight to rideUntil below: its fighter carries
       -- the boost doctrine and the loss watch, navTo's plain tap-A doesn't
       arrive = function() return untilPred() or inBattle() end,
@@ -592,8 +593,9 @@ local function pursuitAttempt(n)
     }, {}),
     H.call(function() lost, fightTier = nil, n end),
     -- the deadline lives INSIDE the pred so a lost fight retries instead
-    -- of raising out of stepOnto (attempt 1 of the first honest run died
-    -- exactly there: SABIN down, SHADOW grinding alone, timeout at 25000)
+    -- of raising out of stepOnto (attempt 1 of the first input-driven run
+    -- died exactly there: SABIN down, SHADOW grinding alone, timeout at
+    -- 25000)
     (function()
       local frames = 0
       return stepOnto(17, 31, function()
@@ -680,7 +682,7 @@ H.run({ maxFrames = 150000 }, {
   end, "KEFKA gag 3 ($002F)", 20000),
   H.waitFrames(30),
   H.call(function()
-    H.assertEq(sw(0x002F), 1, "$002F set -- the x=18 band is open")
+    H.assertEq(sw(0x002F), 1, "$002F set -- the x=18 area is open")
     H.log(string.format("[kefka] $002F f%d; party (%d,%d) KEFKA (%d,%d)",
       H.frame, H.fieldX(), H.fieldY(), objX(21), objY(21)))
   end),
@@ -706,8 +708,8 @@ H.run({ maxFrames = 150000 }, {
   H.call(function()
     if not pursuitWon then
       error(string.format("kefka: the pursuit (battle 44) was lost on all " ..
-        "3 honest attempts -- last loss: %s -- the per-attempt numbers " ..
-        "above are the balance finding (#74-style); do not rig this leg",
+        "3 attempts -- last loss: %s -- the per-attempt numbers " ..
+        "above are the balance finding (#74-style); do not rig this segment",
         tostring(lost)), 0)
     end
   end),
@@ -736,12 +738,12 @@ H.run({ maxFrames = 150000 }, {
       H.frame, map(), H.fieldX(), H.fieldY()))
     H.screenshot("kefka_done")
   end),
-  -- mint on a frame where control is REALLY ours, not on whichever frame
+  -- generate on a frame where control is REALLY ours, not on whichever frame
   -- of the flap the step machine happened to land on
   H.waitUntil(function() return H.hasControl() and H.tileAligned() end,
-    900, "a genuinely controllable frame to mint on"),
+    900, "a genuinely controllable frame to generate on"),
   H.saveState("kefka_done.mss"),
   H.logStep(function()
-    return string.format("kefka_done minted at frame %d", H.frame)
+    return string.format("kefka_done generated at frame %d", H.frame)
   end),
 })

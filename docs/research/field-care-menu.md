@@ -515,7 +515,7 @@ game sets `$1D54 = 0` (`ff6/src/field/init.asm:249`), so **by default Cure `$2D`
 is list index 0 → `$4B = 0`, page row 0, column 0, `$4A = 0`.** But the player
 can change spell order in Config, so do not hardcode it.
 
-#### How to find Cure honestly
+#### How to find Cure reliably
 
 Read `$7E9D89 + i` for i in 0..`$35` and take the i where the byte is `$2D`;
 that i is the `$4B` you must reach. Then check `$7E9E09 + i == $20` before

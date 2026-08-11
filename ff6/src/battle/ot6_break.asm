@@ -197,9 +197,9 @@ done:   rtl
 ;
 ; the v0.3 arc added ARMOR-LINE rows here under a doctrine the v0.6
 ; break-coverage pass has since RETIRED. the doctrine was the narshe
-; school's rung-2 seed: "their armored machines shrug off blade and fire
+; school's tier-2 seed: "their armored machines shrug off blade and fire
 ; alike ... every armor fears one right tool" (the school's superseded
-; rung-2 copy; narshe-school.md now carries the replacement),
+; tier-2 copy; narshe-school.md now carries the replacement),
 ; the tool being edgar's bio blaster (item $a4 -> attack $7d, element $08
 ; poison -- battle_main.asm:6577). that made POISON the sole key to the
 ; imperial line, and the fixed-party audit found the hole: the forced
@@ -476,16 +476,16 @@ Ot6ElemAddTbl:
         ; already +poison above AND ice-weak. the desert half of this region is
         ; covered without a row here.
         ; UNMEASURED, and said plainly: no world-map fixture stands in this
-        ; region (the search arc is not on any minted state), so these five are
-        ; coverage on the same census+arithmetic footing measurement #8 gave the
-        ; figaro-desert rows -- shields left to the formula, element table only
-        ; (no HpScale exemption), numbers to be taken once a corridor fixture is
-        ; minted. THE FIRE HOLE, flagged: a few western-WoB bodies are fire- or
-        ; wind-weak ONLY ($090 fire, $08c fire|wind, $02a wind) and this party
-        ; casts neither, so their vanilla weakness is dead for it. they are left
-        ; as-is rather than blindly double-keyed: whether they even sit on the
-        ; walked route is exactly what the missing fixture would settle. see
-        ; measurement #9.
+        ; region (the search arc is not on any generated savestate), so these
+        ; five are coverage on the same census+arithmetic footing measurement #8
+        ; gave the figaro-desert rows -- shields left to the formula, element
+        ; table only (no HpScale exemption), numbers to be taken once a corridor
+        ; fixture is generated. THE FIRE HOLE, flagged: a few western-WoB
+        ; bodies are fire- or wind-weak ONLY ($090 fire, $08c fire|wind, $02a
+        ; wind) and this party casts neither, so their vanilla weakness is dead
+        ; for it. they are left as-is rather than blindly double-keyed: whether
+        ; they even sit on the walked route is exactly what the missing fixture
+        ; would settle. see measurement #9.
         .word   $0018
         .byte   $08, $00        ; stray cat: no weakness, absorbs nothing
         .word   $001d
@@ -660,7 +660,7 @@ hpmul:  .a16
 ;
 ; measurement #5 stood the multiplier DOWN to 1x. it and shielded
 ; resistance both lengthen fights, and stacking 2x hp with the 0.5x
-; resistance overshot the snappy-fight band (baseline mines TTK ~6 real
+; resistance overshot the snappy-fight range (baseline mines TTK ~6 real
 ; actions, a slog). the co-tune sweep found 1x hp x 0.5x resistance is
 ; the sweet spot: shielded resistance now carries the "fights are
 ; longer" load (it halves off-weakness damage, so the loop-IGNORER's
@@ -1123,9 +1123,9 @@ done:   rts
 ; is not ALREADY spoken for by something a player hears every fight: $a0 is
 ; every connecting swing (BlockSfxTbl, :27078), $2d is a monster dying (:22295)
 ; and would read as a kill, $0d is the whiff.  Odin is not obtainable until the
-; WoR Ancient Castle, so through the whole supported frontier this sound has no
-; prior meaning to overwrite.  It is one constant (OT6_BREAK_SFX) if the owner
-; wants a different one after hearing it.
+; WoR Ancient Castle, so through the whole supported part of the game this
+; sound has no prior meaning to overwrite.  It is one constant (OT6_BREAK_SFX)
+; if the owner wants a different one after hearing it.
 ;
 ; It is queued by writing PlayAnimSfx's own four bytes (btlgfx_main.asm:3175-
 ; 3182) rather than by jsl-ing that routine, because PlayAnimSfx takes its pan
@@ -1209,7 +1209,7 @@ done:   rts
 ; collects vanilla's elemental x2 and then Ot6BrokenDmg's x2, 4x base, and
 ; this file's own trash-pass note already recorded that nothing on Mt. Kolts
 ; except tusker has the hp to survive its own break.  probe_breakplay drove
-; the same doorstep laboratory battle_breakflash uses with hp left unpinned
+; the same entry-point laboratory battle_breakflash uses with hp left unpinned
 ; and caught the refusal directly (hp=0000, status $80, Ot6BreakStart refused
 ; at the hp gate, zero cleaves queued), while the two cells that kept the
 ; monster alive both armed and both queued their $be.  The flash is STILL
