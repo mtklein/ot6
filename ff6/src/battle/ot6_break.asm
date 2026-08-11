@@ -1677,42 +1677,46 @@ done:   rtl
 ; shield.  21 turns began with his timer up, 19 of them counterattacks.
 ; Ot6Gate itself was working; the turns were leaking past it.
 ;
-; So this asks the same question at execution time, folded into the presence
-; test both call sites were already doing, which is what keeps it near
-; size-neutral in the full bank $C1/$C2 neighbourhood:
-;   * CheckRetal (battle_main.asm:12761), +6 bytes.  A Broken monster creates
-;     no counterattack, which is the design's ruling in
-;     docs/design/bosses-wob.md:34-37: a Broken enemy loses its counters
-;     along with its turns.  The placement is load-bearing.  It sits below
-;     the `bit $3a56` died-branch (:12755), because `if_self_dead` scripts
-;     reach CheckRetal by that same path -- Ifrit and Shiva's whole ending is
-;     one (ai_script.asm:4595-4606) -- and a break's x2 makes dying while
-;     Broken the common case.  Gating at the top of the routine assembles
-;     cleanly, reads tidily, and soft-locks the boss.
-;     tools/tests/battle_brokendeath.lua is the guard on that.
-;   * ExecAction's pre-dispatch check (battle_main.asm:274), +3 bytes,
-;     replacing the `lsr` of the value just stored.  A Broken actor takes the
-;     branch vanilla already uses for an absent one: the turn is consumed and
-;     its bookkeeping runs, but ExecCmd never dispatches.  Every arrival goes
-;     through here, so this covers both ungated ones, the $3820 drain and the
-;     $3406 multi-action resume (:307).
+; So this asks the same question at execution time, from one site: CheckRetal
+; (battle_main.asm:12762), +6 bytes.  A Broken monster creates no
+; counterattack, which is the design's ruling in
+; docs/design/bosses-wob.md:34-37: a Broken enemy loses its counters along with
+; its turns.  Where it sits is load-bearing twice over and the call site gives
+; both reasons.  tools/tests/battle_brokendeath.lua guards them.
 ;
-; What this does not close, measured rather than assumed.  ExecAction runs the
-; monster's AI script before it reaches @0183: the `cmp #$1f` arm calls
-; ExecMonsterAction (battle_main.asm:238) and loops back to @0100, so on an
-; already-queued turn the script still runs and its own side effects still
-; land, including battle-var writes and the kill_monsters/show_monsters pair
-; that performs the Ifrit/Shiva tag.  Only the resulting ExecCmd dispatch is
-; refused.  Measured after this change on the same fixture and the same
-; driver: 0 commands dispatched by a Broken actor against 11 before, and turns
-; beginning with the timer up down from 21 to 1.  That one turn still ran the
-; monster's AI script, so the turn is consumed, its script's side effects land,
-; and only the command is thrown away.
-; Closing the residual leak needs the queue entry purged at break time
-; (QuetzEffect's walk, battle_main.asm:1814-1822) rather than refused at
-; execution.  Gating earlier inside ExecAction is not the answer: @01a6's
-; `lda $32cc,x / inc / bne @01d5` (:291-293) would re-enter ExecAction forever
-; on a command list that never got consumed.
+; One site rather than two, and that is a frame-budget decision rather than a
+; design one.  945b9ed also hooked ExecAction's pre-dispatch check (:274),
+; replacing the `lsr` of the value just stored, which is the site that would
+; cover the $3820 action-queue drain.  It cannot land.  The $C2 action path
+; has under 18 cycles of slack, and going over costs a missed vblank per
+; battle-loop iteration, which battle_trueknight phase 4b sees as its covers
+; span jumping 1635 -> 1798.  Measured on this branch, five builds, same
+; fixture:
+;   pre-change ..................................... 1635  PASS
+;   this change, CheckRetal only ................... 1635  PASS
+;   + the ExecAction hook .......................... 1798  FAIL
+;   CONTROL: 9 bare NOPs at the ExecAction site .... 1798  FAIL
+;   CONTROL: 9 unreachable bytes before ExecAction . 1635  PASS
+; The two controls settle what it is.  Both grow battle_code by the same 9
+; bytes to $652c; the executed one fails and the unreachable one passes.  So
+; it is cycles on the action path, not bank $C2's size and not its layout.
+;
+; What one site leaves open, measured rather than assumed.  The action queue
+; is still ungated at execution, so a turn queued before the break lands
+; drains into ExecAction (battle_main.asm:150-159) and runs.  ExecAction also
+; runs the monster's AI script before any dispatch -- the `cmp #$1f` arm calls
+; ExecMonsterAction (:238) and loops back to @0100 -- so that turn's script
+; side effects land either way, including the kill_monsters/show_monsters pair
+; that performs the Ifrit/Shiva tag.  Measured after this change on the same
+; fixture and driver as the before-run: 0 commands dispatched by a Broken
+; actor against 11 before, and one turn that began with the timer up, ran its
+; AI script, and dispatched nothing.  The ExecAction hook would have refused
+; that turn's dispatch but not its script, so it buys less than it looks like
+; it does.  Closing the rest needs the queue entry purged at break time
+; (QuetzEffect's walk, battle_main.asm:1814-1822), which spends bank $F0
+; cycles rather than $C2 ones.  Gating earlier inside ExecAction is not the
+; answer either: @01a6's `lda $32cc,x / inc / bne @01d5` (:288-290) would
+; re-enter ExecAction forever on a command list that never got consumed.
 ;
 ; Characters can never trip it.  Ot6Chip refuses entity < $08
 ; (ot6_break.asm:843-845) and InitBattle's $3a20-$3ed3 clear
@@ -1724,12 +1728,11 @@ done:   rtl
 ; caring, because plp would restore the very carry it exists to return.  a8 is
 ; required: under a 16-bit accumulator `lda OT6_BROKEN_TICKS,x` would pull the
 ; word $3e88/$3e89, broken ticks together with the revealed-element mask, and
-; any revealed weakness would read as "broken".  Both sites are a8 and that is
-; checked rather than assumed.  ExecAction is 8-bit from `lda #$12 / sta $b5`
-; (battle_main.asm:213-214), with the only `longa` on the jump branch closed
-; by `shorta` before @014e (:242-246).  CheckRetal opens 8-bit (`stz $b8 /
-; stz $b9`, :12739-12740) with its own longa/shorta pairs around the target
-; words (:12748-12756).
+; any revealed weakness would read as "broken".  The call site is a8 and that
+; is checked rather than assumed: CheckRetal opens 8-bit (`stz $b8 / stz $b9`,
+; battle_main.asm:12737-12738) with its own longa/shorta pairs around the
+; target words (:12746-12754), the last closed by the `shorta` at :12754,
+; two instructions ahead of the branch that leads here.
 ;
 ; x = entity.  clobbers a; preserves x/y.
 ; out: carry set = may act (present and not broken); carry clear = skip.

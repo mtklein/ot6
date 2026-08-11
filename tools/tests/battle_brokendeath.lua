@@ -8,8 +8,8 @@
 -- load-bearing and was got wrong once.
 --
 -- Ot6MayAct (ot6_break.asm) refuses a Broken monster's turn at execution
--- time.  One of its two call sites is inside CheckRetal (battle_main.asm),
--- and CheckRetal is not only the counterattack path: an AI script's
+-- time.  Its one call site is inside CheckRetal (battle_main.asm), and
+-- CheckRetal is not only the counterattack path: an AI script's
 -- `if_self_dead` block reaches it too, through the `bit $3a56`
 -- died-branch ($3a56 is "characters/monsters that have died",
 -- set at battle_main.asm:11859-11863).
@@ -150,8 +150,11 @@ local function seq(steps) return H.cond(function() return true end, steps) end
 -- still take a turn?  Ot6Gate answers at queue time (battle_main.asm:1421) and
 -- nothing between the queue entry and the turn used to re-check, so turns
 -- arrived by two ungated paths, the $3820 action-queue drain (:150-159) and
--- the $3920 counterattack queue (:103-112).  Ot6MayAct closes both at
--- execution time, at ExecAction (:274) and inside CheckRetal (:12761).
+-- the $3920 counterattack queue (:103-112).  Ot6MayAct closes the second at
+-- execution time, inside CheckRetal (:12762).  The first stays open: the
+-- ExecAction hook that would close it does not fit the action path's cycle
+-- budget, which battle_trueknight phase 4b measures.  See the block comment
+-- over Ot6MayAct for the five builds that settled that.
 --
 -- What that is worth asserting on is the command dispatch, not the queue
 -- entry: Ot6MayAct lets the turn be consumed and thrown away, so bare
