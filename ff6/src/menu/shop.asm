@@ -2318,9 +2318,9 @@ ShopOnlyOneMsgText:             pos_text SHOP_ONLY_ONE_MSG
 ; silently re-pointed shop table.
 ;
 ; Record layout (9 bytes): byte 0 = shop type in bits 0-2 and price adjustment
-; in bits 3-5 (MenuState_24 does `and #$07`, :1802; AdjustShopPrice does
-; `and #$38`, :874); bytes 1-8 = eight item ids, $FF = empty (the buy loop
-; runs `cpy #8` at :846).
+; in bits 3-5 (DrawShopTypeText masks the type at :1802-1803, AdjustShopPrice
+; masks the adjustment at :900-901); bytes 1-8 = eight item ids, $FF = empty
+; (the stock is read at :819 and the buy loop runs `cpy #8` at :846).
 ; ------------------------------------------------------------------------------
 
 SHOP_PROP_REC   = 9
