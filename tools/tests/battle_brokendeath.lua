@@ -1,36 +1,37 @@
 -- @suite savestate=ifrit_entry slow
--- battle_brokendeath.lua -- the guard on where the Broken turn gate may sit.
+-- battle_brokendeath.lua -- the Broken turn gate: that it holds, and where it
+-- may sit.
+--
+-- Two properties, both measured in one run of battle 70.  Issue #66 is the
+-- first: a Broken monster must not dispatch a command.  This file's original
+-- subject is the second: the gate's placement inside CheckRetal, which is
+-- load-bearing and was got wrong once.
 --
 -- Ot6MayAct (ot6_break.asm) refuses a Broken monster's turn at execution
 -- time.  One of its two call sites is inside CheckRetal (battle_main.asm),
 -- and CheckRetal is not only the counterattack path: an AI script's
 -- `if_self_dead` block reaches it too, through the `bit $3a56`
 -- died-branch ($3a56 is "characters/monsters that have died",
--- battle_main.asm:11849).
+-- set at battle_main.asm:11859-11863).
 --
 -- Ifrit and Shiva do not end by dying.  They end by a script in that block:
--- dlg $1b / restore_monsters / dlg $1c / dlg $1d / end_battle
--- (ai_script.asm:4551-4562), and a break's damage multiplier makes dying
+-- three dlg lines around a restore_monsters, then end_battle (Shiva's at
+-- ai_script.asm:4546-4557, Ifrit's at :4595-4606), and a break's x2 makes dying
 -- while Broken the ordinary way that block is reached.  So a Broken gate
 -- placed at the top of CheckRetal, which assembles cleanly and reads
 -- tidily, strands the ending and soft-locks the boss.  This test kills a
 -- Broken boss in battle 70 and requires the fight to end anyway.
 --
--- Status on this branch: the Broken turn gate is not currently applied.
--- It was written, measured, and then reverted because battle_trueknight's
--- 6a assertion cannot survive any growth of bank $C2's battle path (five
--- bare NOPs reproduce that failure exactly; see the revert commit).  So
--- today this test passes without exercising any gate.  It is kept because
--- it is the guard the gate needs when it lands, and because the
--- placement mistake it catches has been made before.
+-- Status on this branch: the Broken turn gate is applied, and this test
+-- is the guard on where it sits.
 --
--- Fail-before observed, on a build that had the gate: with `jsl Ot6MayAct`
--- at CheckRetal's top (replacing `lda $3aa0,x / lsr`, the size-neutral and
--- therefore tempting placement), the kill landed with no post-kill
--- AI-retal entries recorded, and the fight ended early as an ordinary
--- victory with the recognition scene absent.  Pass-after observed
--- with the gate below the died-branch: one post-kill ExecAIRetal for the
--- dead monster.  Both builds were run; neither result is inferred.
+-- Fail-before observed, on a build with `jsl Ot6MayAct` at CheckRetal's top
+-- (replacing `lda $3aa0,x / lsr`, the size-neutral and therefore tempting
+-- placement): the kill landed with no post-kill AI-retal entries recorded,
+-- and the fight ended early as an ordinary victory with the recognition
+-- scene absent.  Pass-after observed with the gate below the died-branch:
+-- post-kill ExecAIRetal entries for the dead monster.  Both builds were
+-- run; neither result is inferred.
 --
 -- The first version of this test asserted only that the battle ended, and that
 -- passed in both placements, since killing the only on-stage monster is an
@@ -126,6 +127,7 @@ local function partyAlive()
 end
 
 local retals, detectorArmed = {}, false
+local cmds, execs = {}, {}   -- the leak detector's raw entries, see below
 local fightBlob = nil
 local won = nil    -- the winning attempt's observation, once one produces it
 
@@ -143,6 +145,48 @@ local function seq(steps) return H.cond(function() return true end, steps) end
 -- monster after the kill.  Armed once; frame numbers only rise across the
 -- ladder's reloads, so entries from a lost attempt can never satisfy the
 -- winning attempt's `f >= deathFrame` filter.
+--
+-- The second detector is the one issue #66 is about: does a Broken monster
+-- still take a turn?  Ot6Gate answers at queue time (battle_main.asm:1421) and
+-- nothing between the queue entry and the turn used to re-check, so turns
+-- arrived by two ungated paths, the $3820 action-queue drain (:150-159) and
+-- the $3920 counterattack queue (:103-112).  Ot6MayAct closes both at
+-- execution time, at ExecAction (:274) and inside CheckRetal (:12761).
+--
+-- What that is worth asserting on is the command dispatch, not the queue
+-- entry: Ot6MayAct lets the turn be consumed and thrown away, so bare
+-- ExecAction/ExecRetal entries with the timer up still happen and are not the
+-- defect.  So hook `_dispatcher` (battle_main.asm:3120, the battle ExecCmd's
+-- unique alias; the bare name `ExecCmd` is defined twice in ff6-en.dbg and
+-- H.sym refuses it) and require zero dispatches by an entity whose broken
+-- timer is running.
+--
+-- The window is battle start to the kill, and that bound is the property
+-- rather than a convenience.  The kill ends this fight: the dead monster's
+-- `if_self_dead` block reaches CheckRetal above the Ot6MayAct check, through
+-- the `bit $3a56` died-branch (battle_main.asm:12753-12757), and the
+-- dispatches behind it are the recognition scene that the assertion four
+-- steps up requires to run.  Counting them would be asserting the opposite of
+-- that, and it would contradict the design's own rule that scripts run
+-- regardless of break state (docs/design/bosses-wob.md:28-33).  So the claim
+-- is about the fight, which is where the punish window lives and where the
+-- owner saw the defect.  Post-kill dispatches are logged rather than
+-- asserted; measured with the gate in, all four were Ifrit's `if_self_dead`
+-- block in script order -- `dlg $1c` (Cmd_21, battle_main.asm:13492),
+-- `restore_monsters` (Cmd_24, :13294), `dlg $1b`, `dlg $1d`
+-- (ai_script.asm:4595-4606).
+--
+-- Classifying them by reading $3a56 at the dispatch does not work, which cost
+-- a run to find out: ExecAIRetal clears the entity's died bit on entry
+-- (`trb $3a56`, battle_main.asm:12682) before it runs a line of script, and
+-- carrying a flag from ExecAIRetal does not work either, because the block's
+-- four commands drain one per ExecRetal call (:12662-12668 re-arms $3407 and
+-- the next BattleLoop iteration re-enters), so there is no single turn to
+-- scope the flag to.  A frame bound needs neither.
+--
+-- Its positive control is the same hook's other tally: monsters must be seen
+-- dispatching commands while unbroken, inside the same window.  Without that,
+-- "no broken dispatches" and "the hook never fired" report the same green.
 local function armRetalDetector()
   if detectorArmed then return end
   detectorArmed = true
@@ -150,7 +194,36 @@ local function armRetalDetector()
   emu.addMemoryCallback(function()
     retals[#retals + 1] = { f = H.frame, ent = emu.getState()["cpu.x"] & 0xff }
   end, emu.callbackType.exec, a, a)
-  H.log(string.format("ExecAIRetal detector armed at $%06X", a))
+  local d = H.sym("_dispatcher")
+  emu.addMemoryCallback(function()
+    local e = emu.getState()["cpu.x"] & 0xff
+    cmds[#cmds + 1] = { f = H.frame, ent = e, tk = H.readByte(0x3E88 + e),
+                        cmd = H.readByte(0x00B5) }
+  end, emu.callbackType.exec, d, d)
+  for _, name in ipairs({ "ExecAction", "ExecRetal" }) do
+    local s = H.sym(name)
+    emu.addMemoryCallback(function()
+      local e = emu.getState()["cpu.x"] & 0xff
+      execs[#execs + 1] = { f = H.frame, ent = e, tk = H.readByte(0x3E88 + e),
+                            kind = name }
+    end, emu.callbackType.exec, s, s)
+  end
+  -- Reported, not asserted: the residual leak issue #66 names.  ExecAction
+  -- runs the monster's AI script (`jsr ExecMonsterAction`,
+  -- battle_main.asm:238) before it reaches the gate at :274, so an
+  -- already-queued turn still runs the script and lands its side effects --
+  -- battle-var writes, and the kill_monsters/show_monsters pair that performs
+  -- the Ifrit/Shiva tag.  Only the ExecCmd dispatch is refused.  Closing it
+  -- needs the queue entry purged at break time and is a separate change.
+  local ms = H.sym("ExecMonsterAction")
+  emu.addMemoryCallback(function()
+    local e = emu.getState()["cpu.x"] & 0xff
+    execs[#execs + 1] = { f = H.frame, ent = e, tk = H.readByte(0x3E88 + e),
+                          kind = "ExecMonsterAction" }
+  end, emu.callbackType.exec, ms, ms)
+  H.log(string.format("detectors armed: ExecAIRetal $%06X, ExecCmd $%06X, "
+    .. "ExecAction $%06X, ExecRetal $%06X", a, d,
+    H.sym("ExecAction"), H.sym("ExecRetal")))
 end
 
 -- One attempt, flat (driveUntil bodies replay latched state, so every
@@ -163,6 +236,7 @@ local function attempt(n)
   local ISLOT, SSLOT = nil, nil
   local sawBreak = {}              -- [slot] = first frame shields 0 + timer up
   local deathSlot, deathFrame, deathTicks = nil, nil, nil
+  local startFrame = nil           -- first frame of THIS attempt's battle
   local hb = 0
   local F = H.newFightDriver("brokendeath", { tactical = true, boost = true,
     bank = 3, items = true, healPercent = 60, cadence = 12 })
@@ -219,6 +293,7 @@ local function attempt(n)
       H.assertEq(mhp(SSLOT), 3000, "shiva opens at her authored 3000 HP (no clamp)")
       H.assertEq(ticks(ISLOT), 0, "ifrit is NOT pre-broken")
       H.assertEq(ticks(SSLOT), 0, "shiva is NOT pre-broken")
+      startFrame = H.frame
       armRetalDetector()
     end),
 
@@ -266,6 +341,7 @@ local function attempt(n)
         won = { slot = deathSlot, name = mname(deathSlot),
                 deathFrame = deathFrame, deathTicks = deathTicks,
                 breakFrame = sawBreak[deathSlot], endFrame = H.frame,
+                startFrame = startFrame,
                 partyAlive = partyAlive(),
                 battleOver = not H.battleActive() }
         H.log(string.format("attempt %d: %s killed mid-break (tk=%d) -- "
@@ -351,5 +427,72 @@ H.run({ maxFrames = 250000 }, {
       .. "%d post-kill AI-retal entries for the dead %s",
       won.endFrame, won.endFrame - won.deathFrame, postKill, won.name))
     H.screenshot("brokendeath_end")
+  end),
+
+  -- 5. Issue #66: a Broken monster does not take the turn.  The window is the
+  -- winning attempt's battle up to the kill; frame numbers only rise across
+  -- the ladder's reloads, so a lost attempt's entries cannot enter it.
+  H.call(function()
+    -- Entities are $00..$12 in steps of 2.  ExecCmd's third caller, "execute
+    -- immediate action" (battle_main.asm:5778-5797), is entered with A = a
+    -- command-list pointer and X left as it was, so those arrivals carry no
+    -- entity and are counted separately rather than attributed to whatever X
+    -- happened to hold.  A baseline run produced four of them at x=$ff, whose
+    -- $3e88+$ff read lands outside the broken-timer table entirely.
+    local function isEntity(e) return e <= 0x12 and e % 2 == 0 end
+    local leaks, ending, monsterCmds, charCmds, noEntity = {}, {}, 0, 0, {}
+    for _, r in ipairs(cmds) do
+      if r.f >= won.startFrame then
+        if not isEntity(r.ent) then noEntity[#noEntity + 1] = r
+        elseif r.f > won.deathFrame then
+          if r.ent >= 0x08 and r.tk ~= 0 then ending[#ending + 1] = r end
+        elseif r.ent < 0x08 then charCmds = charCmds + 1
+        elseif r.tk == 0 then monsterCmds = monsterCmds + 1
+        else leaks[#leaks + 1] = r end
+      end
+    end
+    local byKind = {}
+    for _, r in ipairs(execs) do
+      if r.f >= won.startFrame and r.f <= won.deathFrame
+         and isEntity(r.ent) and r.ent >= 0x08 and r.tk ~= 0 then
+        byKind[r.kind] = (byKind[r.kind] or 0) + 1
+        H.log(string.format("  consumed and dropped: %-18s f%-6d ent=$%02X "
+          .. "timer=%d", r.kind, r.f, r.ent, r.tk))
+      end
+    end
+    for _, r in ipairs(ending) do
+      H.log(string.format("  after the kill: ExecCmd f%-6d ent=$%02X cmd=$%02X "
+        .. "timer=%d (the `if_self_dead` ending, outside the window)",
+        r.f, r.ent, r.cmd, r.tk))
+    end
+    for _, r in ipairs(leaks) do
+      H.log(string.format("  LEAK: ExecCmd f%-6d ent=$%02X cmd=$%02X "
+        .. "timer=%d", r.f, r.ent, r.cmd, r.tk))
+    end
+    for _, r in ipairs(noEntity) do
+      H.log(string.format("  no entity: ExecCmd f%-6d x=$%02X cmd=$%02X "
+        .. "(the immediate-action caller; not attributable)", r.f, r.ent, r.cmd))
+    end
+    H.log(string.format("f%d..f%d: %d command dispatches by monsters (%d by "
+      .. "characters); %d of the monster ones had a broken timer running.  "
+      .. "%d turns began with the timer up "
+      .. "(%d ExecAction, %d ExecRetal), %d of them after running the "
+      .. "monster's AI script -- the residual leak, reported not asserted.  "
+      .. "%d dispatches by a broken actor after the kill (the ending), "
+      .. "%d not attributable to an entity.",
+      won.startFrame, won.deathFrame, monsterCmds + #leaks, charCmds, #leaks,
+      (byKind.ExecAction or 0) + (byKind.ExecRetal or 0),
+      byKind.ExecAction or 0, byKind.ExecRetal or 0,
+      byKind.ExecMonsterAction or 0, #ending, #noEntity))
+    -- The positive control.  Without it, a detector that never fired and a
+    -- gate that works report the same green.
+    H.assertEq(monsterCmds > 0, true,
+      "control: inside this same window the ExecCmd detector saw monsters "
+      .. "dispatch commands while unbroken, so a count of zero below means "
+      .. "the gate held rather than that nothing was watching")
+    H.assertEq(#leaks, 0,
+      "no monster dispatched a command while its broken timer was running "
+      .. "(issue #66: Ot6Gate answers at queue time, and before Ot6MayAct "
+      .. "nothing re-checked between the queue entry and the turn)")
   end),
 })

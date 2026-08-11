@@ -271,8 +271,10 @@ ExecAction:
         and     #$d7        ; clear $3aa0.3 and $3aa0.5
         ora     #$40        ; set $3aa0.6
         sta     $3aa0,x
-        lsr
-        bcc     @01a6       ; branch if target is not present
+        jsl     Ot6MayAct   ; ot6: was `lsr` on the byte just stored.  It now
+                            ;   also refuses a Broken actor, and it is the
+                            ;   only re-check between the queue and the turn.
+        bcc     @01a6       ; branch if target is not present (or broken)
         lda     $3204,x
         ora     #$04
         sta     $3204,x
@@ -12756,6 +12758,16 @@ CheckRetal:
         lda     $b1         ; counterattack flag
         lsr
         bcs     @4cbe       ; skip if a counterattack (can't counter a counter)
+        jsl     Ot6MayAct   ; ot6: a Broken monster does not counter either;
+        bcc     @4cbe       ;   Broken have no turns.  This sits below the
+                            ;   $3a56 died-branch above on purpose.
+                            ;   `if_self_dead` scripts reach CheckRetal by the
+                            ;   same path, and a break's x2 makes dying while
+                            ;   broken the common case, so gating at the top
+                            ;   of CheckRetal strands Ifrit and Shiva's
+                            ;   end_battle (ai_script.asm:4595-4606) and
+                            ;   soft-locks the fight.  Guarded by
+                            ;   tools/tests/battle_brokendeath.lua.
         lda     $b8
         ora     $b9
         beq     @4cbe       ; branch if there are no retaliation targets
