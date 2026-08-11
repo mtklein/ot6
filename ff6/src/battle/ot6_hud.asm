@@ -1540,7 +1540,7 @@ OT6_RANDMAGIC := $a5            ; the marker value (junk is $00/$ff in
 
 ; ------------------------------------------------------------------------------
 
-; [ re-render the open magic list when boost moved ]
+; [ re-render an open ability list when what it draws has moved ]
 
 ; polled once per frame from the battle main loop just before the
 ; menu-text pump. runs menu state $0d's work (clear the line
@@ -1551,6 +1551,33 @@ OT6_RANDMAGIC := $a5            ; the marker value (junk is $00/$ff in
 ; re-staged rows run through Ot6PreviewList_ext, so the
 ; fold preview redraws with the current pending; the window stays
 ; parked in browse the whole time. a8/i16, db = $7e.
+;
+; Two windows are served (#77).  The magic list (browse state $0e) is #64's:
+; a boost moved, so the folded names and their re-derived prices have to
+; follow.  The kit window (browse state $30: Tools, Blitz, SwdTech, Steal) is
+; the same problem with a different input, the BP bank: Ot6BushidoRowGrey
+; greys a row whose boost exceeds the caster's bank, and that grey was read
+; once at window open and never again, so a bank that moved behind an open
+; window (a cover, a Runic absorb, a Bestow, or the caster's own action
+; charging) left the window claiming a row was reachable when the confirm
+; would refuse it, or greyed when it would not.
+;
+; The two share this proc rather than each getting one, because the staging
+; they need is the same four-line cycle over the same shared bytes -- $7ba5
+; (the staging latch), $7ba6 (the draw cursor) and $7ba9 (the queued line
+; transfer).  Two gates driving those independently would have to agree about
+; who owns the latch, and $7ba5's abandoned-cycle hazard below is exactly the
+; kind of disagreement that produced issue #36.  Only two things differ per
+; window: which cursor holds the scroll top ($8913 magic / $895f kit, read off
+; the same 16-bit `ldx $62ca` both vanilla openers use) and which C1 row
+; drawer stages a line.
+;
+; The kit window's own opener is MakeToolsList_04 (btlgfx_main.asm:13195) and
+; it does exactly what the magic arm does: _c15a17, the scroll top into $7ba6,
+; $7ba5 = $80, then DrawToolsListText / _c15729 per tick.  It carries no
+; per-open setup of its own (the magic opener's `jsr _c18414` spell-list
+; pointer has no counterpart), so a re-stage from here needs nothing the
+; magic arm did not already need.
 
 ; the staging routines are jsr-linkage C1 locals; call them from here
 ; with the rts->rtl thunk: [bank][ret16][thunk16] on the stack, then jml;
@@ -1563,10 +1590,10 @@ OT6_RANDMAGIC := $a5            ; the marker value (junk is $00/$ff in
 :
 .endmacro
 
-; flag protocol: 0 idle, $80 fresh request (Ot6Boost), 1-3 lines left
-; in an active cycle. one line per frame: the nmi's _c15d99 drains a
-; single $80-byte line buffer ($5e4d) per frame, which is exactly why
-; vanilla's state $0d stages one row-pair per tick.
+; flag protocol: 0 idle, $80 fresh request (Ot6Boost, and every writer of a
+; character's BP bank), 1-3 lines left in an active cycle. one line per frame:
+; the nmi's _c15d99 drains a single $80-byte line buffer ($5e4d) per frame,
+; which is exactly why vanilla's state $0d stages one row-pair per tick.
 
 .proc Ot6RestageGate_ext
         .a8
@@ -1575,9 +1602,12 @@ OT6_RANDMAGIC := $a5            ; the marker value (junk is $00/$ff in
         beq     @no
         lda     $7bca           ; menu closed: stale flag
         beq     @drop
-        lda     $7bc2           ; the per-frame menu state: $0e = magic
-        cmp     #$0e            ; list up and browsing (idle machinery)
-        bne     @wait
+        lda     $7bc2           ; the per-frame menu state: $0e = magic list,
+        cmp     #$0e            ;   $30 = kit window; either one up and
+        beq     @browse         ;   browsing (idle machinery).  a scroll or a
+        cmp     #$30            ;   close moves the state off both, and @wait
+        bne     @wait           ;   holds a fresh request until it comes back
+@browse:
         lda     $7ba9           ; a line transfer is still queued:
         bne     @no             ; let the nmi drain it first
         lda     f:$7e0000+OT6_RESTAGE
@@ -1591,8 +1621,16 @@ OT6_RANDMAGIC := $a5            ; the marker value (junk is $00/$ff in
         rtl
 @fresh: phx
         jsr_c1  _c15a17         ; clear the line transfer buffer
-        ldx     $62ca           ; active character slot (vanilla does
-        lda     $8913,x         ; this same 16-bit ldx)
+        ldx     $62ca           ; active character slot (both vanilla openers
+                                ;   do this same 16-bit ldx)
+        lda     $7bc2
+        cmp     #$0e
+        bne     @kittop
+        lda     $8913,x         ; magic list scroll top (OpenMagicWindow's)
+        bra     @havetop
+@kittop:
+        lda     $895f,x         ; kit window scroll top (MakeToolsList_04's)
+@havetop:
         sta     $7ba6           ; draw cursor = this list's scroll top
         lda     #$80
         sta     $7ba5           ; reset the 4-line staging cycle
@@ -1617,9 +1655,21 @@ OT6_RANDMAGIC := $a5            ; the marker value (junk is $00/$ff in
 :       lda     #$00            ; cycle complete (or abandoned mid-way)
         sta     f:$7e0000+OT6_RESTAGE
 @no:    rtl
-@draw:  lda     $7ba6           ; stage one row-pair and arm its
-        jsr_c1  DrawMagicListText       ; transfer; carry = list done
-        jsr_c1  _c15729
+        ; stage one row-pair and arm its transfer; carry = list done.  the
+        ; browse state is re-read here rather than latched at @fresh: it
+        ; cannot change under a running cycle without the gate above sending
+        ; that cycle to @drop first, and a latch would need a byte of RAM to
+        ; say something $7bc2 already says.
+@draw:  lda     $7bc2
+        cmp     #$0e
+        bne     @drawkit
+        lda     $7ba6
+        jsr_c1  DrawMagicListText
+        bra     @drawn
+@drawkit:
+        lda     $7ba6
+        jsr_c1  DrawToolsListText
+@drawn: jsr_c1  _c15729
         rts
 .endproc
 

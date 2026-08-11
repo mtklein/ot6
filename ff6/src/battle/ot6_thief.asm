@@ -303,6 +303,8 @@ OT6_THIEF_BESTOW = $58
         bcs     @out            ; the bank cap holds; a filch never wraps
         inc     a
         sta     OT6_BP_CLASS,x
+        jsr     Ot6BankMoved    ; #77: an open kit window's BP grey is read
+                                ;   at open only
 @out:   ply
 done:   plp
         rtl
@@ -377,6 +379,9 @@ done:   plp
         bcs     @out            ; the ally is capped: the point would be lost
         inc     a
         sta     OT6_BP_CLASS,y  ; the ally banks it
+        jsr     Ot6BankMoved    ; #77: the ALLY's bank moved, and the ally
+                                ;   is the one who may have a kit window open,
+                                ;   since Locke is mid-action
         lda     OT6_BOOST_REVEALED,x       ; Locke's half: let Ot6ActionEnd charge it
         bne     @out            ;   a spend already armed by L/R stands as is
         lda     #$01

@@ -109,6 +109,9 @@ OT6_SM_NEG = $8
 .global Ot6EntryExitVeil_ext
 .global Ot6ScriptBegin_ext, Ot6ScriptEnd_ext
 .global Ot6C1Rtl, DrawMagicListText, _c15a17, _c15729, WaitTfrVRAM_far
+.global DrawToolsListText       ; #77: the kit window's row drawer, staged
+                                ;   from Ot6RestageGate_ext exactly as
+                                ;   DrawMagicListText is for the magic list
 .global DoMonsterEntryExit
 .global MonsterOverlap          ; per-species $8057 seed (btlgfx data);
                                 ;   the hud anchor re-derives load-time
