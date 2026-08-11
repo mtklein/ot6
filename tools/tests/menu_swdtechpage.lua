@@ -34,7 +34,7 @@
 -- ScreenA one tile row per eight scanlines: a row pair occupies twelve
 -- scanlines, the odd row getting eight and the even row four, and nothing past
 -- row 15 is inside the window at all (measured with a glyph drawn in every
--- row, tools/tests/probe_ragegeom.lua; vanilla says the same from the other
+-- row; vanilla says the same from the other
 -- side, since every EN cursor list for this window is
 -- `cursor_pos {x, 116 + n*12}`, skills.asm:125-126, and DrawRageName biases
 -- its row `.if LANG_EN`, skills.asm:1571-1574).  The page drew its slots on

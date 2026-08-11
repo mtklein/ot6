@@ -495,8 +495,8 @@ this window is `cursor_pos {x, 116 + n*12}` (`skills.asm:125-126`, `:249-250`,
 `:292-293`), and `DrawRageName` biases its row by one under `.if LANG_EN`
 (`skills.asm:1571-1574`) for this reason. A single column of eight on
 rows 4-18 draws eight three-scanline slivers and a caption below the window's
-bottom edge. `tools/tests/probe_ragegeom.lua` is the per-row glyph probe that
-measures it, poked straight into the BG1A shadow.
+bottom edge. This was measured by drawing a glyph in every row, poked
+straight into the BG1A shadow.
 
 **So the page is two columns of four on odd rows, vanilla's own shape for this
 window** (the rage browse is `cursor_prop {0,0}, {2,8}`, `skills.asm:281-299`):

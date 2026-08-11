@@ -102,8 +102,8 @@ Ot6LoadoutDrawC3:
 ; The EN field-menu window does not show BG1 ScreenA one tile row per eight
 ; scanlines: a tilemap row pair is displayed in twelve scanlines, the odd row
 ; getting eight of them and the even row four, and nothing past row 15 is
-; inside the window at all.  Measured with a per-row glyph ruler poked into the
-; shadow (tools/tests/probe_ragegeom.lua): odd rows 1,3,5,..,15 render whole at
+; inside the window at all.  Measured with a glyph drawn in every row, poked
+; into the shadow: odd rows 1,3,5,..,15 render whole at
 ; screen y = 116 + 6*(row-1); even rows show only their bottom three scanlines.
 ; Vanilla's own tables agree: every EN cursor list for this
 ; window is `cursor_pos {x, 116 + n*12}` (skills.asm:125-126, :249-250,
@@ -343,7 +343,7 @@ Ot6DrawBushName:
 ; 4/10/13/16/18/22/30/46, so
 ; seven of the eight tiers printed `cost + ZERO_CHAR` past '9' ($bd) and came
 ; out as punctuation: Retort's 10 rendered as $be and Quadra Slice's 30 as '='
-; (measured on the pre-change ROM, tools/tests/probe_swdtechcost.lua).  #46 had
+; (measured on the pre-change ROM).  #46 had
 ; already hit the same limit on the Blitz ladder and answered it with a private
 ; copy, Ot6BlitzDrawCost in skills.asm, whose own report flagged the duplicate
 ; as something to remove; the copy is gone and its body is here, so there is one

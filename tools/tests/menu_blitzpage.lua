@@ -6,7 +6,7 @@
 -- _c1776b's 64-frame pad-edge buffer and UpdateMenuState_3d's button matcher).
 -- The field page went on drawing vanilla's button combos, eight ten-tile runs
 -- of arrow and shoulder glyphs out of BlitzInputTileTbl.  Measured on the
--- pre-change ROM with tools/tests/probe_blitzpage.lua: rows 1/5/9/13, columns
+-- pre-change ROM: rows 1/5/9/13, columns
 -- 4-13 and 18-27, cells $d4/$d5/$d6 (the up, right and down-left arrows) and
 -- $91/$8b/$97/$98 (R/L/X/Y); for example row 9 read `RLRLXY` and row 13
 -- `RLXY->->`.  Nothing on the page could be acted on, because the combos do
@@ -49,7 +49,7 @@
 -- Geometry, in the loadout pages' style (#43, and the reason this window has
 -- caused four problems).  The EN field-menu window shows a tilemap row pair
 -- in twelve scanlines, odd row eight and even row four, and nothing past row 15
--- is inside it (probe_ragegeom.lua; vanilla says the same from the other side,
+-- is inside it (vanilla says the same from the other side,
 -- since every EN cursor list here is `cursor_pos {x, 116 + n*12}`,
 -- skills.asm:125-126).  The page is one column of eight now, on rows
 -- 1/3/5/7/9/11/13/15, so the even-row, row>15 and border-column canary below
@@ -347,7 +347,7 @@ end
 
 -- ---- the retired input system, listed so it cannot come back ----
 -- Vanilla's combo glyphs, from BlitzInputTileTbl by way of GetBlitzInputTiles.
--- Measured on the pre-change ROM (probe_blitzpage.lua): these are the codes
+-- Measured on the pre-change ROM: these are the codes
 -- that filled columns 4-13 and 18-27 of rows 1/5/9/13.  If any of them
 -- reappears anywhere on this page, the page is teaching the retired system
 -- again.

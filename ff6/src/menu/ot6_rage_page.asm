@@ -104,8 +104,8 @@ Ot6RagePrice:
 ; columns.  The EN field-menu window this page lives in does not show BG1
 ; ScreenA one tile row per eight scanlines: a tilemap row pair is displayed in
 ; twelve scanlines, the odd row getting eight of them and the even row four.
-; Measured with a per-row glyph ruler poked straight into the shadow
-; (probe_ragegeom.lua): odd rows 1,3,5,..,15 render whole at screen y =
+; Measured with a glyph drawn in every row, poked straight into the shadow:
+; odd rows 1,3,5,..,15 render whole at screen y =
 ; 116 + 6*(row-1); even rows show only their bottom three scanlines; nothing
 ; past row 15 is inside the window at all.  Vanilla's own tables agree:
 ; every EN cursor list for this window is

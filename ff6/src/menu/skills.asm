@@ -1926,7 +1926,7 @@ DrawBlitzMenu:
 ; The geometry (#43's rules, which this window has now needed three times).  The
 ; EN field-menu window shows a tilemap row pair in twelve scanlines, the odd
 ; row getting eight and the even row four, and nothing past row 15 is inside it
-; at all (measured with a per-row glyph ruler, tools/tests/probe_ragegeom.lua;
+; at all (measured with a glyph drawn in every row;
 ; vanilla says it from the other side, every EN cursor list here being
 ; `cursor_pos {x, 116 + n*12}`).  So: eight usable text rows, and eight Blitzes,
 ; one per row, on 1/3/5/7/9/11/13/15.
