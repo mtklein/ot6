@@ -23,8 +23,22 @@ the game, and every recruited character's kit is in place there.
 
 Releases are named for their theme rather than for a tier. The owner plays,
 files findings, and a themed release folds them in within a day or two, so a
-release need not extend how far the game is playable at all. v0.9 is
-released; extending play to the end of the World of Balance is v0.10's goal.
+release need not extend how far the game is playable at all.
+
+**v0.10 is a balance release.** It does not extend how far the game is
+playable. Its theme is hit count as the break dial (#54). A landed hit that matches a weakness chips a shield,
+so how many times an ability hits is the strongest single lever over the break
+loop, and it gives the three ability characters different jobs against the
+same enemy: Sabin opens shields fast with cheap multi-hits, Cyan buys single
+big commitments, Edgar's Tools sit between. The release also carries the
+Phantom Train fix (#74, reported from outside), Scan charging the price it
+publishes (#76), the kit window repainting a changed BP bank (#77), and a
+Broken monster no longer taking the turns that leak past the gate (#66).
+
+Extending play to the end of the World of Balance moves to a later release.
+It needs the rest of the kits and espers, the wide weakness pass, and route
+and tuning work through the Sealed Gate, Thamasa and the Floating Continent,
+which is more than one release of work.
 
 **On versions:** 0.9 is followed by 0.10, not 1.0; these are ordinary
 increments, not a countdown. 1.0 is a long way off: the end of the World of
@@ -45,7 +59,9 @@ which refuses any ROM the test suite has not stamped green. The human bar
 is the owner's no-regression rule: a tag must be at least as good as previous
 releases as far as the owner has played. Stretches he has not played yet ship
 on the automated tests alone, with their gaps documented, and the owner's
-playthrough trails behind.
+playthrough trails behind. Since the work on issue #75, those automated tests
+reach the state they test through controller input rather than by writing
+emulator memory, so "the tests passed" now means the fights were played.
 
 ## M4 — Skill lists on the native verbs — shipping piecemeal
 
