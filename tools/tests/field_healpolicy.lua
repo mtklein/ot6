@@ -46,7 +46,8 @@
 local H = dofile("tools/tests/lib/ot6.lua")
 
 local ZOZO = "build/states/zozo_arrival.mss.lua"
-local LOCKE, CELES = 1, 6
+local LOCKE, EDGAR, CELES = 1, 4, 6
+local refuseState = nil       -- the menu state the case-5 refusal came from
 
 -- ZMENUSTATE trace: one entry per distinct value, with a frame count, so a
 -- 300-frame visit reads as a dozen lines instead of 300.
@@ -195,7 +196,7 @@ H.run({ maxFrames = 200000 }, {
     -- A refusal driven by hand, because no fixture on the route produces
     -- one: M.fieldCare's own planner never proposes a pair the game will
     -- turn down.  Tonic ($E8) on EDGAR, who is at 280/280.
-    local EDGAR, TONIC = 4, 0xE8
+    local TONIC = 0xE8
     local phase, done = 0, false
     local function steer(cur, row)
       if cur == row then return { "a" } end
@@ -205,7 +206,13 @@ H.run({ maxFrames = 200000 }, {
       H.call(function()
         phase = (phase + 1) % 12
         local st, held = H.readByte(0x26), nil
-        if (H.readByte(0xB5) & 0xF0) ~= 0 then done = true; H.setPad({}); return end
+        -- Record WHERE the mosaic started.  Twenty-one places in src/menu
+        -- create that task (section 3 of the research note), so "the cell
+        -- went nonzero" on its own would not prove this drive produced the
+        -- refusal it meant to; refuseState is asserted below.
+        if (H.readByte(0xB5) & 0xF0) ~= 0 then
+          refuseState = st; done = true; H.setPad({}); return
+        end
         if st == 0x05 then held = steer(H.readByte(0x4B), 0)
         elseif st == 0x08 then held = steer(H.readByte(0x4B), H.invSlotOf(TONIC))
         elseif st == 0x19 then
@@ -225,10 +232,12 @@ H.run({ maxFrames = 200000 }, {
   end)(),
   H.release(),
   H.call(function()
+    H.assertEq(refuseState, 0x70,
+      "the refusal came from the item target window, not somewhere else")
     H.assertEq((H.readByte(0xB5) & 0xF0) ~= 0, true,
-      "the refusal is announced in zMosaic's high nibble")
-    H.assertEq(H.invCountOf(0xE8), 6, "and the Tonic was not spent")
-    H.assertEq(H.charHp(4), 280, "EDGAR is untouched")
+      "and it is announced in zMosaic's high nibble")
+    H.assertEq(H.invCountOf(0xE8), 6, "the Tonic was not spent")
+    H.assertEq(H.charHp(EDGAR), 280, "EDGAR is untouched")
   end),
   H.waitFrames(40),
   H.call(function()
