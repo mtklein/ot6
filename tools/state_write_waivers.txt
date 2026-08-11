@@ -59,8 +59,6 @@ tools/tests/battle_subjob.lua	.writeByte(
 tools/tests/battle_trueknight.lua	.writeByte(
 tools/tests/battle_trueknight.lua	.writeWord(
 tools/tests/gen_battle2.lua	.writeWord(
-tools/tests/gen_whelk.lua	.writeByte(
-tools/tests/gen_whelk.lua	emu.write
 tools/tests/lib/ot6.lua	.writeByte(
 tools/tests/lib/ot6.lua	.writeWord(
 tools/tests/lib/ot6.lua	emu.loadSavestate
