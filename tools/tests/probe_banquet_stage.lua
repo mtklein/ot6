@@ -20,6 +20,11 @@
 -- the world map, and the grind presses directions only.
 --
 -- OT6_CHECKPOINT_LAYOUT: ot6-codex-o8-v1
+-- Issue #75: playBattles = "flee" keeps these walks out of the library's
+-- monster-dead flag write, and matches gen_banquet_done, the generator these
+-- probes prototype.  Moot either way: maps 243, 244, 250, 251, 252 and 253
+-- all have random encounters disabled (map_prop.dat byte +5 bit 7 clear;
+-- ff6/src/field/battle.asm:333-347 returns before the roll).
 local H = dofile("tools/tests/lib/ot6.lua")
 
 local function map() return H.mapId() & 0x1ff end
@@ -205,7 +210,7 @@ H.run({ maxFrames = 120000 }, {
   end),
 
   -- ---- 253 -> castle door (28,1)+2 -> 243 (15,29) --------------------------
-  H.navTo(28, 2, { maxFrames = 30000 }),
+  H.navTo(28, 2, { maxFrames = 30000, playBattles = "flee" }),
   pressWalk("up", function() return map() == 243 end, 900,
     "castle door 253 (28,1) -> 243 (15,29)"),
   H.waitUntil(landed(243, 10), 2400, "castle antechamber 243", 1),
@@ -216,7 +221,7 @@ H.run({ maxFrames = 120000 }, {
   -- dismissed and player_ctrl_on returns mid-script, so stepOff does both
   -- jobs: A through the dialog, then an unconditional held walk off the
   -- tile while the NPC finishes and the door opens.
-  H.navTo(8, 18, { maxFrames = 12000, calmFrames = 4 }),
+  H.navTo(8, 18, { maxFrames = 12000, calmFrames = 4, playBattles = "flee" }),
   H.stepOff({ "right", "down", "up" }, 6000,
     "escort: A through $06A6, step off (8,18)"),
   H.waitUntil(function() return sw(0x013A) == 1 end, 3000,
@@ -227,7 +232,7 @@ H.run({ maxFrames = 120000 }, {
   end),
 
   -- ---- through the opened door (15,8) -> 250 (23,33) ------------------------
-  H.navTo(15, 9, { maxFrames = 12000 }),
+  H.navTo(15, 9, { maxFrames = 12000, playBattles = "flee" }),
   pressWalk("up", function() return map() == 250 end, 900,
     "door 243 (15,8) -> 250 (23,33)"),
   H.waitUntil(landed(250, 10), 2400, "250 first entry", 1),
@@ -253,13 +258,13 @@ H.run({ maxFrames = 120000 }, {
   --     messenger tile and the (23,9) stairs are crossed in one pressWalk;
   --   * (23,9) -> (54,34) (short entrance), and from (54,34) the dais is
   --     an ordinary 17-step navTo inside the throne tower.
-  H.navTo(23, 30, { maxFrames = 6000 }),
+  H.navTo(23, 30, { maxFrames = 6000, playBattles = "flee" }),
   pressWalk("up", function()
     return H.fieldY() <= 28 and H.tileAligned()
   end, 900, "held UP through the {22,29} doorway"),
   H.release(),
   H.waitFrames(30),
-  H.navTo(23, 13, { maxFrames = 9000 }),
+  H.navTo(23, 13, { maxFrames = 9000, playBattles = "flee" }),
   pressWalk("up", function()
     return (H.fieldX() ~= 23 or H.fieldY() > 20) and H.tileAligned()
   end, 1200, "held UP past (23,12) onto the (23,9) stairs -> (54,34)"),
@@ -270,7 +275,7 @@ H.run({ maxFrames = 120000 }, {
     H.assertEq(H.fieldX(), 54, "stairs landing x (short entrance 23,9)")
     H.assertEq(H.fieldY(), 34, "stairs landing y")
   end),
-  H.navTo(54, 16, { maxFrames = 20000 }),
+  H.navTo(54, 16, { maxFrames = 20000, playBattles = "flee" }),
   H.call(function()
     H.assertEq(sw(0x007C), 0, "$007C still clear at the dais")
     H.screenshot("bq_stage_dais")

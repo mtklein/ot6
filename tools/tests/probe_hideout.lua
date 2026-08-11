@@ -16,6 +16,11 @@
 -- is standing, ~200 nodes per frame (gen_kolts warns that a whole flood in
 -- one Lua slice trips Mesen's script watchdog with no message), and prints
 -- the reachable set as a map.  '@' party, '.' reachable, ' ' not.
+-- Issue #75: playBattles = "tactical" keeps this walk out of the library's
+-- monster-dead flag write.  It is intent only -- the Returner Hideout maps 108/109/110 draw no random battles (map_prop.dat byte +5
+-- bit 7 clear, so the field step handler at ff6/src/field/battle.asm:333-347
+-- returns before the roll) -- and "tactical" rather than "flee" because the
+-- only battle that could reach the option there is an unscripted surprise.
 local H = dofile("tools/tests/lib/ot6.lua")
 local DOOR = "build/states/returner_hideout.mss.lua"
 
@@ -116,7 +121,7 @@ local function settleField(dstMap)
       return not H.worldMode() and H.tileAligned()
          and not H.battleLoadStarted() and not H.dialogWaiting()
          and (dstMap == nil or map() == dstMap)
-    end), 12000),
+    end), 12000, { playBattles = "tactical" }),
     H.waitFrames(30),
   })
 end
@@ -125,7 +130,7 @@ local function talkAt(nx, ny, sx, sy, dir, what)
   local FACE = { up = 0, right = 1, down = 2, left = 3 }
   local aPh, started = 0, 0
   return seq({
-    H.navTo(sx, sy, { maxFrames = 12000 }),
+    H.navTo(sx, sy, { maxFrames = 12000, playBattles = "tactical" }),
     H.release(),
     H.driveUntil(function()
       started = (H.eventRunning() or H.dialogWaiting()) and started + 1 or 0
@@ -152,7 +157,7 @@ H.run({ maxFrames = 60000 }, {
     { 14, 49, "B", "BANON's later tile" },
   }),
 
-  H.navTo(10, 48, { maxFrames = 20000,
+  H.navTo(10, 48, { maxFrames = 20000, playBattles = "tactical",
     arrive = function() return map() ~= 108 end }),
   H.release(),
   settleField(109),
@@ -164,7 +169,7 @@ H.run({ maxFrames = 60000 }, {
   H.advanceStory(function()
     return map() == 109 and H.hasControl() and H.tileAligned()
        and bright() >= 15
-  end, 20000),
+  end, 20000, { playBattles = "tactical" }),
   H.waitFrames(60),
   H.call(function()
     H.log(string.format("after the escort: (%d,%d) $01F0=%d $01F1=%d " ..
@@ -221,7 +226,7 @@ H.run({ maxFrames = 60000 }, {
   -- for a party pressing into it (player.asm:959), which is why bfsPath
   -- reports NO PATH to it while (25,16) directly under it is 8 steps away.
   -- It is crossed gen_edgar-style: stage on the neighbour, then hold into it.
-  H.navTo(25, 16, { maxFrames = 20000 }),
+  H.navTo(25, 16, { maxFrames = 20000, playBattles = "tactical" }),
   H.release(),
   (function()
     local aPh = 0

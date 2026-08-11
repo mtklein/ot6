@@ -9,6 +9,13 @@
 -- roof lever (28,5) facing-up+A (_cbb645: $0183=1, cinematic -> 141
 -- (117,8)).  Floods each new pocket so a blocked step is reported with its
 -- tile.
+-- Issue #75: playBattles = "flee" keeps these walks out of the library's
+-- monster-dead flag write, and here it is not a no-op: the Phantom Train
+-- maps 142, 145 and 149 all draw random battles (map_prop.dat byte +5
+-- bit 7 set).  Fled rather than fought, matching gen_sabin_train's corridor
+-- policy and for its measured reason: a fled battle is not a win, and
+-- SHADOW's 1/16 post-battle walk-off (battle_main.asm:11976-11991) rolls
+-- only at a win, so fleeing keeps the party this instrument is measuring.
 local H = dofile("tools/tests/lib/ot6.lua")
 local DOOR = "build/states/forest_done.mss.lua"
 
@@ -128,7 +135,7 @@ H.run({ maxFrames = 120000 }, {
   H.waitUntil(function()
     return H.hasControl() and H.tileAligned() and bright() >= 15
   end, 4000, "post-departure", 5),
-  H.navTo(2, 7, { maxFrames = 12000 }),
+  H.navTo(2, 7, { maxFrames = 12000, playBattles = "flee" }),
   holdDrive("left", function() return mapIdx() == 142 end, "A west exit", 4000),
   settle(142, "west pocket (66,8)"),
 
@@ -140,13 +147,13 @@ H.run({ maxFrames = 120000 }, {
   end),
 
   -- across car B, out the west door
-  H.navTo(2, 7, { maxFrames = 12000 }),
+  H.navTo(2, 7, { maxFrames = 12000, playBattles = "flee" }),
   holdDrive("left", function() return mapIdx() == 142 end, "B west exit", 4000),
   settle(142, "pocket (50,8)"),
   H.call(function() flood("west of car B") end),
 
   -- strip to (41,8), then face up into car C's side door
-  H.navTo(41, 8, { maxFrames = 8000, arrive = function()
+  H.navTo(41, 8, { maxFrames = 12000, playBattles = "flee", arrive = function()
     return mapIdx() == 145 or (H.fieldX() == 41 and H.fieldY() == 8
        and H.hasControl() and H.tileAligned()) end }),
   holdDrive("up", function() return mapIdx() == 145 and sw(0x180) == 1 end,
@@ -164,7 +171,7 @@ H.run({ maxFrames = 120000 }, {
 
   -- walk down to (26,9), face the ghost at (26,10), talk: _cbb265
   -- ($017C=1, battle 47 fought, mob scene -> 142 (41,9) pocket)
-  H.navTo(26, 9, { maxFrames = 3000 }),
+  H.navTo(26, 9, { maxFrames = 6000, playBattles = "flee" }),
   (function()
     local phase = 0
     return H.driveUntil(function() return sw(0x17C) == 1 end, 3000, {
@@ -185,7 +192,7 @@ H.run({ maxFrames = 120000 }, {
   end),
 
   -- roof: climb at x=40 (the (40,6) trigger fires the roof-mob beat)
-  H.navTo(40, 8, { maxFrames = 4000 }),
+  H.navTo(40, 8, { maxFrames = 8000, playBattles = "flee" }),
   holdDrive("up", function()
     return H.fieldY() <= 6 and H.hasControl() and H.tileAligned()
   end, "climb to the roof", 15000),
@@ -212,7 +219,7 @@ H.run({ maxFrames = 120000 }, {
   -- the east vestibule climbs inside: (28,5) is directly reachable
   -- (measured: 149's flood from (30,7) is x=27..31, y=5..10, so the ladder
   -- column x=26 that the exterior implies is not the way; the lever tile is).
-  H.navTo(28, 5, { maxFrames = 6000 }),
+  H.navTo(28, 5, { maxFrames = 9000, playBattles = "flee" }),
   (function()
     local phase = 0
     return H.driveUntil(function() return sw(0x183) == 1 end, 3000, {

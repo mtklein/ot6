@@ -1,6 +1,12 @@
 -- probe_opera_aria3.lua -- boots opera_stage, fires the aria (step 97,7 -> map
 -- 236), drives the three lyric forks {0,1,0}, then observes the post-fork state
 -- (the flower dance): CELES pos, $0057/$0111/$01F0-2, NPCs.  Tight budgets.
+-- Issue #75: playBattles = "tactical" keeps these walks out of the library's
+-- monster-dead flag write.  It is intent only -- the opera maps 236 and 238
+-- draw no random battles (map_prop.dat byte +5 bit 7 clear, so the field
+-- step handler at ff6/src/field/battle.asm:333-347 returns before the roll)
+-- -- and "tactical" rather than "flee" because the only battle that could
+-- reach the option there is an unscripted surprise.
 local H = dofile("tools/tests/lib/ot6.lua")
 local function map() return H.mapId() & 0x1ff end
 local function bright() return emu.getState()["ppu.screenBrightness"] or 0 end
@@ -38,7 +44,8 @@ H.run({ maxFrames = 50000 }, {
   H.call(function() H.assertEq(map(),238,"boot 238"); dumpsw("boot") end),
 
   -- fire the aria: step onto (97,7); the event fades and loads map 236
-  H.navTo(97, 7, { maxFrames=8000, arrive=function() return map()~=238 end }),
+  H.navTo(97, 7, { maxFrames=8000, playBattles="tactical",
+                   arrive=function() return map()~=238 end }),
   H.waitUntil(function() return map()==236 end, 6000, "aria loaded map 236", 10),
   H.waitFrames(30),
   H.call(function() dumpsw("aria on 236"); H.screenshot("aria_236") end),

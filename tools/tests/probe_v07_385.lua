@@ -13,6 +13,11 @@
 --     always; event_trigger.asm:1844-1885).
 -- Everything is a dump; it never tries to cross.
 -- OT6_CHECKPOINT_LAYOUT: ot6-codex-o8-v1
+-- Issue #75: playBattles = "flee" keeps this walk out of the library's
+-- monster-dead flag write, and here it is not a no-op: this Magitek Research
+-- Facility basement draws random battles (map_prop.dat byte +5 bit 7 set).
+-- "flee" is the spelling every gen_mrf_* generator already uses on these
+-- floors: the instrument is measuring a floor mechanism, not a fight.
 local H = dofile("tools/tests/lib/ot6.lua")
 
 local function map() return H.mapId() & 0x1ff end
@@ -99,7 +104,7 @@ H.run({ maxFrames = 40000 }, {
   H.call(function() reach("unarmed") end),
 
   -- arm cycle A: walk to (3,2)
-  H.navTo(3, 2, { maxFrames = 9000,
+  H.navTo(3, 2, { maxFrames = 12000, playBattles = "flee",
     arrive = function() return sw(0x01F0) == 1 end }),
   H.waitUntil(function() return sw(0x01F0) == 1 end, 3000,
     "cycle A armed ($01F0)", 5),

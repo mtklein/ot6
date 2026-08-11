@@ -25,6 +25,11 @@
 --
 -- PASS iff zero mismatches in either part, at least 6 of 8 part-1 samples
 -- landed, and part 2 saw a diagonal, a fallback and a refusal.
+-- Issue #75: playBattles = "tactical" keeps this walk out of the library's
+-- monster-dead flag write.  It is intent only -- the Figaro castle maps 55/57/59/60 draw no random battles (map_prop.dat byte +5
+-- bit 7 clear, so the field step handler at ff6/src/field/battle.asm:333-347
+-- returns before the roll) -- and "tactical" rather than "flee" because the
+-- only battle that could reach the option there is an unscripted surprise.
 local H = dofile("tools/tests/lib/ot6.lua")
 local SRM = "build/states/playthrough_srm.mss.lua"
 local MATRON = "build/states/figaro_matron.mss.lua"
@@ -303,7 +308,7 @@ local dsteps = {
   -- party, and from there the matron used to be unreachable; her room
   -- "flooded to FOUR tiles" and gen_edgar needed three pushUntil hand-holds
   -- to cross the staircase.  BFS must now find her with no hand-holds.
-  H.navTo(67, 27, { maxFrames = 6000 }),
+  H.navTo(67, 27, { maxFrames = 6000, playBattles = "tactical" }),
   -- settle before reading the object map: the party's marker at $7e2000 is
   -- written by CheckPlayerMove as the step begins (player.asm:1176-1189) and
   -- the tile just vacated is only released a few frames later, so a BFS run
@@ -329,12 +334,12 @@ local dsteps = {
 -- sweep the staircase: at each tile, all four presses, restoring position
 -- between trials with navTo, which the diagonal fix makes possible
 for _, t in ipairs(STAIR) do
-  dsteps[#dsteps + 1] = H.navTo(t[1], t[2], { maxFrames = 4000 })
+  dsteps[#dsteps + 1] = H.navTo(t[1], t[2], { maxFrames = 4000, playBattles = "tactical" })
   dsteps[#dsteps + 1] = H.logStep(string.format(
     "stair tile (%d,%d):", t[1], t[2]))
   for _, btn in ipairs({ "up", "right", "down", "left" }) do
     dsteps[#dsteps + 1] = diagTrial(t[1], t[2], btn)
-    dsteps[#dsteps + 1] = H.navTo(t[1], t[2], { maxFrames = 4000 })
+    dsteps[#dsteps + 1] = H.navTo(t[1], t[2], { maxFrames = 4000, playBattles = "tactical" })
   end
 end
 

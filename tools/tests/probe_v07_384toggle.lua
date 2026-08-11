@@ -5,6 +5,11 @@
 -- watch.  This settles what iteration 3/4 could not: when the switch
 -- flips, how long the event runs, and whether a lingering press re-fires.
 -- OT6_CHECKPOINT_LAYOUT: ot6-codex-o8-v1
+-- Issue #75: playBattles = "flee" keeps this walk out of the library's
+-- monster-dead flag write, and here it is not a no-op: this Magitek Research
+-- Facility basement draws random battles (map_prop.dat byte +5 bit 7 set).
+-- "flee" is the spelling every gen_mrf_* generator already uses on these
+-- floors: the instrument is measuring a floor mechanism, not a fight.
 local H = dofile("tools/tests/lib/ot6.lua")
 
 local function map() return H.mapId() & 0x1ff end
@@ -34,7 +39,7 @@ H.run({ maxFrames = 30000 }, {
     H.log(string.format("[boot] (%d,%d) $01F5=%d", H.fieldX(), H.fieldY(),
       sw(0x01F5)))
   end),
-  H.navTo(104, 17, { maxFrames = 9000 }),
+  H.navTo(104, 17, { maxFrames = 12000, playBattles = "flee" }),
   H.call(function()
     H.log(string.format("[on tile] (%d,%d) $01F5=%d facing=%02X",
       H.fieldX(), H.fieldY(), sw(0x01F5), H.readByte(0x0757)))
