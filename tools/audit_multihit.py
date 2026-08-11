@@ -8,12 +8,12 @@ reads them out.
 
 Hit counts are set by code, not by a data field.  The engine has one
 multi-hit register: `$3a70`, "number of attacks (0 = 1 attack)"
-(battle_main.asm:6404).  The attack loop is
+(battle_main.asm:6428).  The attack loop is
 
     @3288:  plx
             dec  $3a70
             bmi  @3291
-            pea  ExecAttack-1        ; battle_main.asm:8322-8328
+            pea  ExecAttack-1        ; battle_main.asm:8389-8392
     @3291:  rts
 
 so every extra count is an extra ExecAttack -> CalcTargetDmg pass, and
@@ -22,15 +22,15 @@ $3a70 is therefore an exhaustive enumeration of single-target multi-hit, and
 there are only eight writers (this script re-checks that the set has not
 grown, so the audit cannot go stale unnoticed):
 
-    battle_main.asm:3495   FightAttack        = 1 (two hands), = 7 (Offering)
-    ot6_boost.asm:247      Ot6FightBoost     += 2 per pending BP
-    battle_main.asm:3943+  Jump/Dragon Horn  += 1..3 (random)
-    battle_main.asm:8870   CheckWeaponMagic  += 1 (random weapon spellcast)
-    battle_main.asm:10547  AttackerEffect_49 += 1 (magicite / random summon)
-    battle_main.asm:10784  AttackerEffect_32  = 3  -> four attacks, random
+    battle_main.asm:3513   FightAttack        = 1 (two hands), = 7 (Offering)
+    ot6_boost.asm:426      Ot6FightBoost     += 2 per pending BP
+    battle_main.asm:3961+  Jump/Dragon Horn  += 1..3 (random)
+    battle_main.asm:8936   CheckWeaponMagic  += 1 (random weapon spellcast)
+    battle_main.asm:10613  AttackerEffect_49 += 1 (magicite / random summon)
+    battle_main.asm:10850  AttackerEffect_32  = 3  -> four attacks, random
                                                      target (quadra slam,
                                                      quadra slice)
-    battle_main.asm:10987  AttackerEffect_36 += 1 (empowerer, at 1/4 power)
+    battle_main.asm:11053  AttackerEffect_36 += 1 (empowerer, at 1/4 power)
     ot6_hitcount.asm       Ot6HitCount       += Ot6HitCountTbl's value for
                                                 this ability id (#54)
 
@@ -45,17 +45,17 @@ boss.  That is a different lever from four hits on one target, so the audit
 keeps them in separate columns.  Breadth comes from the
 targeting byte's INIT field (const.inc:1298-1302): INIT_SINGLE ($00)
 collapses the mask to one random body (ChooseTarget's `bit #$0c` /
-RandBit, battle_main.asm:14879-14889), anything else keeps every target in
+RandBit, battle_main.asm:14980-14985), anything else keeps every target in
 the mask.
 
 Sources
   MagicProp   ff6/src/battle/magic_prop_en.dat, 14 B/record, id-indexed:
               +0 targeting  +1 element  +2..4 flags  +5 MP  +6 power
               +7 flags  +8 hit  +9 special effect  +10..13 status
-              (layout: battle_main.asm:6961-6963)
+              (layout: battle_main.asm:6985-6987)
   ItemProp    ff6/src/menu/item_prop_en.dat, 30 B/record:
-              +14 targeting (battle_main.asm:6572), +15 element,
-              +20 power, +27 special effect (battle_main.asm:7196-7202)
+              +14 targeting (battle_main.asm:6596), +15 element,
+              +20 power, +27 special effect (battle_main.asm:7257-7264)
   classes     Ot6SkillClassTbl / Ot6WeapClassTbl (ot6_class.asm), reused
               from tools/check_break_reach.py so there is one parser
 
@@ -376,13 +376,13 @@ def main():
              item_pow.get(i, r[20]), eff, costs.get(i, 0))
 
     # ---- 2b. the tools that resolve as spells ----------------------------
-    # InitTarget_03 (battle_main.asm:6551-6558) rewrites five item ids into
+    # InitTarget_03 (battle_main.asm:6575-6580) rewrites five item ids into
     # magic ids before the record is loaded, so their real properties are in
     # MagicProp rather than ItemProp.  That includes Bio Blaster, the ability
     # #60 is about.
     print()
     print("== tools/throwables that resolve as a SPELL "
-          "(ThrowToolsItemTbl, battle_main.asm:6635-6642) ==")
+          "(ThrowToolsItemTbl, battle_main.asm:6659-6666) ==")
     for item, off in ((0xA4, 0x27), (0xA5, 0x27), (0xAB, 0x5A),
                       (0xAC, 0x5A), (0xAD, 0x5A)):
         sid = item - off
