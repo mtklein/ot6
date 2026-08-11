@@ -2604,7 +2604,7 @@ ItemBlankQtyText:               pos_text ITEM_BLANK_QTY
 ; named, with the vanilla value it replaces and the reason, and the .dat stays
 ; byte-identical to the FF3us 1.0 base.
 ;
-; Record layout, the two fields this splice needs (battle_main.asm:7196-7202):
+; Record layout, the two fields this splice needs (battle_main.asm:7257-7264):
 ;   +$0e targeting  +$0f element  +$14 power  +$1b special effect
 ;
 ; ---- override 1: Drill ($a8) power, 191 -> 96 -------------------------------
@@ -2612,12 +2612,15 @@ ItemBlankQtyText:               pos_text ITEM_BLANK_QTY
 ; ability's power; it does not add to it".  Ot6HitCountTbl (ot6_hitcount.asm)
 ; makes Drill strike twice, and each strike is a whole ExecAttack pass carrying
 ; the record's full power, so without this cut a 16-MP Tool would deal double
-; damage as well as chipping twice.  191 / 2 rounds down to 95, and 96 is used
-; instead only because the halves must not silently under-deliver on a
-; defence-ignoring tool; the difference is one point either way.
+; damage as well as chipping twice.  191 / 2 is 95.5; 96 rounds the spare half
+; point to the player, and the difference is one point either way.
+;
+; The split is uncompensated, for the reasons multi-hit.md §1.3 reads out of
+; the damage path: defence is a multiplier rather than a subtraction, so it
+; distributes over a split, and Drill ignores it in any case.
 ;
 ; Drill is the Tool that gets rate because it ignores defence (ToolsEffect_05,
-; battle_main.asm:7330-7333), which makes it the armoured-boss answer and the
+; battle_main.asm:7384-7386), which makes it the armoured-boss answer and the
 ; complement to AutoCrossbow's one-hit-per-body breadth.  AutoCrossbow is
 ; deliberately left alone: it is breadth, not rate.
 DRILL_POWER_OT6     = 96

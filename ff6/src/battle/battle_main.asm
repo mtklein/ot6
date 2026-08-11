@@ -7057,13 +7057,18 @@ DDUST_STATUS3_OT6    = STATUS3::SLOW
 ; which is a straight buff rather than the damage-for-break-rate trade the pass
 ; is built on.
 ;
-; The split is power / hits, exactly.  It is not compensated upward for the
-; per-hit defence subtraction (CalcDmg, battle_main.asm:7404 onward) or for
-; OT6's ×0.5 shielded attenuation (Ot6ShieldedDmg, once per hit and therefore
-; not compounding), so N hits at P/N land slightly under one hit at P against
-; anything with defence.  That residue is left in deliberately: it is the price
-; of the extra chips, and inventing a compensation curve would be a number
-; nobody measured.  The measured size of it is recorded in multi-hit.md §9.
+; The split is power / hits, exactly, and uncompensated.  multi-hit.md §1.3
+; has the reading behind that: defence is a MULTIPLIER (the one site is
+; :2004-2012, `~(def-1)` through MultDmg), not a subtraction, so it
+; distributes over a split and costs a divided ability nothing extra -- and
+; both records here carry ignore-defence anyway ($5d is $21, $64 is $20 at
+; +$02, tested by the `bit #$20` at :2005).  OT6's ×0.5 shielded attenuation
+; is also a per-hit multiplier and also distributes.  The one asymmetry runs
+; the player's way: CalcDmg (:7458 onward) is affine in power rather than
+; linear, because the hit-rate term $11ae is added before the level multiply
+; and is not divided when power is, so N hits at P/N land somewhat ABOVE one
+; hit at P.  Its size is unmeasured (multi-hit.md §9).  A compensation curve
+; would have corrected in the wrong direction.
 ;
 ;   Pummel   110 -> 55  (×2)
 ;   Bum Rush 128 -> 32  (×4)

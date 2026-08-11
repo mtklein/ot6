@@ -116,15 +116,40 @@ the point the target breaks. This property matters for the design, because a
 hit count larger than a given enemy's gauge still does something useful, and
 because hit count and the damage ladder come out of one budget rather than two.
 
-### 1.3 What a hit costs in damage
+### 1.3 What splitting an ability's power actually costs
 
-FF6 subtracts the target's defence per hit (`CalcDmg`,
-`battle_main.asm:7458` onward), and OT6 attenuates ×0.5 per hit while shields
-hold (`Ot6ShieldedDmg`, called from `Ot6HitJoin`). N hits at power `P/N`
-therefore deal strictly less than one hit at power `P` against anything with
-defence. Multi-hit is not free: it trades damage for break rate, which is the
-shape this dial should have. The exact
-compensation curve is a phase-3 measurement (§9) and is not invented here.
+This section said, through v0.9, that FF6 *subtracts* the target's defence per
+hit, so N hits at power `P/N` deal strictly less than one hit at power `P`.
+Both halves of that are wrong, and the build pass found out by reading the
+code before dividing anything.
+
+**Defence is a multiplier, applied once per hit, and it is not a subtraction.**
+There is exactly one site: `battle_main.asm:2004-2012` loads `$3bb9,y` (or
+`$3bb8,y` for the magic side), turns it into `~(def-1)` and runs `MultDmg`
+(`:2071-2080`, a 24-bit multiply-and-shift). A multiplier distributes over a
+split: two hits each multiplied by `m` total the same as one double-sized hit
+multiplied by `m`. Defence therefore costs a multi-hit ability nothing that it
+does not cost a single-hit one.
+
+**And the three abilities this pass splits skip it anyway.** The same site
+opens with `lda $11a2 / bit #$20 / bne`, so the ignore-defence flag branches
+past the whole block. Pummel's `MagicProp+$02` is `$21` (physical +
+ignore-defence), Bum Rush's is `$20` (ignore-defence, magic damage), and Drill
+gets `$20` at runtime from `ToolsEffect_05` (`battle_main.asm:7384-7386`).
+All three ignore defence.
+
+OT6's own ×0.5 shielded attenuation (`Ot6ShieldedDmg`, called from
+`Ot6HitJoin`) is likewise a per-hit multiplier and likewise distributes.
+
+What the split does cost runs the other way, and is small. FF6's physical
+damage is **affine in power rather than linear**: `CalcDmg`
+(`battle_main.asm:7458` onward) scales power by 1.75, then adds the hit-rate
+term `$11ae` *before* the level multiply, and adds one more raw power term
+after it. The hit-rate half is not divided when power is, so N hits at `P/N`
+deal somewhat **more** total damage than one hit at `P`, not less. Read off
+the formula rather than measured; §9 keeps the magnitude open, and it is the
+reason the splits below are exact division with no compensation — a
+compensation curve would be correcting in the wrong direction.
 
 ---
 
@@ -235,6 +260,27 @@ and that table has three rows:
 | `$5d` | Pummel | 1 | **×2** |
 | `$64` | Bum Rush | 3 | **×4** |
 | `$a8` | Drill (tool item id) | 1 | **×2** |
+
+**Cross-checked against the published accounts of vanilla**, since `kits.md`
+once asserted Flurry ×4, Tempest ×4 and Bum Rush ×8 without a source. The
+community references agree with this ROM on all three, including the one that
+matters: **vanilla Bum Rush is a single hit**, a magic-damage Blitz of power
+128 that ignores magic defence, not an eight-hit combo. The ×8 figure belongs
+to *Phantom Rush*, the later remakes' replacement for it (seven hits at 9.25×
+plus one at 11.75×), which is a different ability in a different game. So the
+×8 in `kits.md` was never a description of anything OT6 shipped or vanilla
+did, and §8's ledger entry for it is a design option rather than a
+restoration.
+
+The two Quadras check out too, and the difference between them is one this
+ROM's data shows: Flurry (Quadra Slam) makes four randomly-targeted attacks
+that do **not** ignore defence — `MagicProp+$02` = `$01`, physical only —
+while Tempest (Quadra Slice) makes four that **do**, `+$02` = `$21`. That is
+why Quadra Slice is the late-ladder one at 50 MP.
+
+Treat the above as what it is: web accounts used as hypotheses, each
+confirmed against the record bytes before it was written down.
+`tools/audit_multihit.py` is the check that outlives any of those pages.
 
 ### 3.1 The three kits, as shipped
 
@@ -351,7 +397,7 @@ constant while the job changes, which is P3 applied inside one axis.
 | ability | count | reason |
 |---|---|---|
 | **AutoCrossbow** | **×1 per body**, unchanged | It is breadth (§2.2) and it is already the designed swarm answer in two of the break-coverage docs. Making it ×4 per body would be 16 chips against a four-stack. `kits.md` says "whole side, one hit per body", which is the correct reading. |
-| **Drill** | **×2** piercing | The owner said "Tools too", and Drill is the tool that should change: it is the armoured-boss answer, since it ignores defence (`ToolsEffect_05`, `battle_main.asm:7384-7386`), so two chips into one gauge complements AutoCrossbow's breadth against swarms. 16 MP → 8.0 MP/chip, which prices rate above breadth, the correct relationship. Power 191 → **96** per hit (P4; 191 halves to 95.5 and the extra point goes to the player). Because Drill ignores defence, it is also the one row where the split loses nothing: §1.3's residue is the per-hit defence subtraction, and Drill has none. |
+| **Drill** | **×2** piercing | The owner said "Tools too", and Drill is the tool that should change: it is the armoured-boss answer, since it ignores defence (`ToolsEffect_05`, `battle_main.asm:7384-7386`), so two chips into one gauge complements AutoCrossbow's breadth against swarms. 16 MP → 8.0 MP/chip, which prices rate above breadth, the correct relationship. Power 191 → **96** per hit (P4; 191 halves to 95.5 and the extra point goes to the player). Drill's `$20` ignore-defence flag comes from `ToolsEffect_05` at runtime rather than from its record, which is why the audit's ItemProp columns do not show it. |
 | **Bio Blaster** | ×1 per body **+ the DOT** | Duration (§2.4); the tick chip stays as it is. No hit count. |
 | **Chain Saw** | ×1 | The slash committer, 252 power. P3. |
 | Air Anchor / NoiseBlaster / Flash / Debilitator | ×1 | Gag, and three non-damaging utilities. |
@@ -489,8 +535,12 @@ the FF3us base. Both splices are pinned by position in
 `tools/tests/battle_hitcount.lua`, which reads the records back out of the
 built ROM, with Suplex `$5f` and Chain Saw `$a6` as the untouched controls.
 
-The split is exact division, uncompensated. §1.3's residue — the target's
-defence subtracted once per hit — is left in as the price of the extra chips.
+The split is exact division, uncompensated, and §1.3 is why: defence is a
+multiplier rather than a subtraction, it distributes over a split, and all
+three of these abilities ignore it anyway. The only asymmetry runs in the
+player's favour, because FF6's physical formula is affine in power, so the
+divided ability keeps the undivided hit-rate term on every hit. Its size is
+unmeasured (§9); a compensation curve would have corrected the wrong way.
 
 Cost: one table (24 bytes), one proc, two `jsl` shims in bank `$C2`, three
 spliced data bytes. No new RAM.
@@ -591,7 +641,9 @@ lever once chip rate is nonzero, which is what this pass provides.
 
 ## 8. What was rejected, and why
 
-- **Bum Rush ×8** (`kits.md`'s number). Rejected on P5 and the shield census:
+- **Bum Rush ×8** (`kits.md`'s number, which came from nowhere in this game:
+  §3 shows vanilla Bum Rush is a single hit and the ×8 belongs to the remakes'
+  *Phantom Rush*). Rejected on P5 and the shield census:
   ×8 empties every authored gauge but one in a single action, which turns the
   capstone into the opener and removes the composition decision from every
   fight it appears in. Recorded rather than deleted because it is the owner's
@@ -616,15 +668,18 @@ lever once chip rate is nonzero, which is what this pass provides.
 
 - **What the power split actually costs in damage.** The split shipped as
   exact division, uncompensated (§5.2), which is a decision rather than a
-  measurement: nobody has put a number on the residue from FF6's per-hit
-  defence subtraction. Drill is exempt, since it ignores defence. A damage
-  measurement against a defended target, using `balance-metrics.md`'s
-  instrumentation, would say whether Pummel's two 55s land meaningfully under
-  one 110 or within rounding.
+  measurement. §1.3 establishes the direction from the formula — N hits at
+  P/N deal somewhat MORE than one hit at P, because the hit-rate term inside
+  the level multiply is not divided — but nobody has put a number on it. A damage
+  measurement, using `balance-metrics.md`'s instrumentation, would say how far
+  over one 110 Pummel's two 55s actually land. It cannot be done against a
+  defended target, because Pummel ignores defence.
 - **Bum Rush's price rather than its count.** 99 MP for 4×32 is the worst
   damage-per-MP row in the Blitz list, and dividing its power made it worse.
   The count is right by P1/P5; the 99 is `mp-economy.md`'s ceiling rule
-  applied to an ability whose vanilla power was already low. Worth a look next
+  applied to an ability whose vanilla power was already low. Dividing it made
+  it worse only in the sense of the number on the record: §1.3 says the split
+  itself is damage-neutral to slightly favourable. Worth a look next
   time the MP economy is opened, and unreachable in play before LV70 either
   way.
 - **Whether ×4 or ×8 is the Bum Rush the owner wants.** ×4 shipped, with §8's
