@@ -28,11 +28,31 @@ scaffold), `metrics_battle`, `mines_pace`, `shot_battle_items`,
   Setzer → the terra-returned-v1 checkpoint (`battle_slotsboot` boots it);
   Gau → `gau_joined`; Shadow → `camp_intro` / `camp_escaped`; espers
   really in the bag → `magicite_ifrit_shiva` and `esper_tubes`.
-- **Saved-cursor pokes are one shared conversion.**  `$8913/$8917/$891b`
-  (magic), `$895F/$8963/$8967` (tools/blitz/bushido), `$892B/$892F/$8933`
-  (rage), esper-list CURSOR_* — poked in ~14 files to select a list row.
-  All convert to d-pad edges driven by the menu-state bank `$7BC2`, the
-  idiom `battle_boost` uses.
+- **Saved-cursor pokes are one shared conversion, and here is the whole
+  recipe.**  `$8913/$8917/$891b` (magic), `$895F/$8963/$8967`
+  (tools/blitz/bushido), `$892B/$892F/$8933` (rage), esper-list `CURSOR_*` —
+  poked in ~14 files to select a list row.  All convert to d-pad edges
+  driven off the battle menu-state byte `$7BC2`.  The reference
+  implementation is `battle_boost.lua:62-98`; copy its shape rather than
+  writing a new one.  What it does, and why each part is there:
+
+  | `$7BC2` | what is up | what to press |
+  |---|---|---|
+  | `$01` | transitional | nothing — leave the pad alone |
+  | `$05` | the top command window | `a` to open the list |
+  | `$2A` | a command's list/submenu | `down`/`up` to the row, then `a` |
+  | `$38` | target select | `a` for the default target |
+  | other | somewhere unexpected | `b` to back out and rebuild |
+
+  Three rules come with it, all measured in that file's own comment.  Drive
+  on menu state, never on a fixed button sequence: a fixed sequence lands
+  its `down`s in whatever window happens to hold the cursor.  Count the
+  `down`s on the pulse edge (`(mf - 1) % 8 == 0`), not per frame, or one
+  press repeats.  And when a character other than the one under test holds
+  the menu, defer with `x`, which is vanilla's own turn-cycling key, rather
+  than acting for them.  Converting a cursor poke is cheap per site, but it
+  only removes a waiver line when it is the file's last write, so sequence
+  it after the file's other writes rather than before.
 - **`H.enterEncounter()` is input-driven** (hold up + A).  Nothing below is
   blocked on the lib.
 - **Precedents already landed** that decide several calls: `77bc4f9`
@@ -267,6 +287,44 @@ with a $7BC2-driven d-pad.  Per-file specifics:
    actions, a real high-gauge boss for headroom, or one observation per
    battle.  Decide per file in the wave rather than writing twenty
    separate doctrines.
+3. **HP pinned for measurement headroom: pick a different body, don't
+   write HP.**  Settled by a worked case rather than by argument.
+   `battle_break` and `battle_reveal` both built the same laboratory on the
+   entry-point Guards — fire weakness OR'd in, HP written to 4000, casters'
+   level and mag.pwr pinned equal — because a 40-HP Guard with no fire
+   weakness cannot show a chip, a break and a recovery.  Both now boot the
+   Whelk head instead and write nothing.  The rule the case establishes:
+   when a test pins HP so that a measurement fits, the fix is a body that
+   already has the HP, the weakness and the gauge; when it pins stats so a
+   comparison is fair, the fix is to make the measurement single-source
+   (one character, one spell) rather than to equalize several.  The second
+   half is strictly stronger than the pin it replaces, because a pin makes
+   casters equal on paper while single-sourcing makes the measurement equal
+   in fact.
+
+   **What to pick from, measured.**  Decode `monster_prop.dat` (record 32
+   bytes; HP at +8 16-bit, level +$10, absorb +23, null +24, weak +25) and
+   apply `Ot6ElemAddTbl` (`ot6_break.asm:404+`) and `Ot6ShieldTbl`
+   (`ot6_hud.asm`, else the level floor `min(6, 2 + level/8)`);
+   `tools/check_boss_rows.py` already parses all four and can be imported.
+   The early-game answer is the Whelk head, `$0134`: 1600 HP, authored
+   4 shields, authored `OT6_PIERCE`, authored fire weakness, reachable from
+   `whelk_entry` with a party that owns Fire Beam and TekMissile — so it
+   offers an element axis and a class axis on the same body, which is what
+   a "one chip reveals one thing" control needs.  Do **not** reach for this
+   stretch's fire-weak trash (leafer, dark wind, hornet, bleary, crawly,
+   trilium, vaporite): `ot6_break.asm:354-360` already records that they
+   run 33 to 147 HP against a 4x breaking hit and cannot hold a break
+   window at all.
+
+   **Driving that fight costs nothing new.**  `battle_whelkwipe.lua:177-210`
+   is the field walk and intro dismissal, and the menu policy is
+   `whelkbal_run.lua:103-127`: from the settled top command menu, a beam at
+   the default target is `A A A` and Heal Force is `A dn dn A A`.  Give
+   every character that is not the one under test Heal Force.  That
+   self-targets, moves no gauge and heals, which at once keeps the
+   measurement single-source, keeps every hit off the shell (whose MegaVolt
+   counter is lethal), and removes the reason the party-HP floor existed.
 
 ## Deleting the monster-kill flag: what still blocks it
 
