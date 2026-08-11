@@ -139,9 +139,14 @@ everything, and keep to one heavy run at a time per machine.
   and `check_break_reach.py` enforce doc/data agreement inside `make test`.
 - **`OT6_BREAK_TICKS` is `$10`** (`ff6/src/battle/ot6_break.asm:1`) and gives
   a **2159-frame** window, about 36 s, not roughly one turn.
-- **There are three multi-hit abilities in the game:** Quadra Slam
-  ×4, Quadra Slice ×4, and Empowerer ×2. `tools/audit_multihit.py` checks
-  this and fails if it changes.
+- **There are six multi-hit abilities in the game:** vanilla's Quadra Slam
+  ×4, Quadra Slice ×4 and Empowerer ×2, plus v0.10's Pummel ×2, Bum Rush ×4
+  and Drill ×2 (`Ot6HitCountTbl`, `ff6/src/battle/ot6_hitcount.asm`).
+  `tools/audit_multihit.py` checks this and fails if it changes. **Hit count
+  is authored in that table, not in the `.dat` files**, and each ability's
+  power is divided by its count through a named splice, so reading a power
+  byte out of `magic_prop_en.dat` or `item_prop_en.dat` gives the vanilla
+  number rather than the shipped one.
 - **SwdTech has a 1-BP floor**; there is no 0-BP tier. `Ot6BushidoTech`
   (`ff6/src/battle/ot6_kits.asm:74-79`) clamps a stray 0 up, and boost 1/2/3
   selects Cyan's *top three learned* techs, so a given tier's price slides as

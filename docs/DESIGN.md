@@ -141,17 +141,21 @@ weakness bits in vanilla), one weapon-class (new side table in expanded ROM).
 
 **Chip.** Any damaging hit that matches a weakness removes 1 shield, and a
 multi-hit action chips per hit (one boosted Fight chips four shields off one
-guard — `multi-hit.md` §1, `probe_multihit.lua`). Multi-hit is rare: an audit
-of all 256 `MagicProp` + 256
-`ItemProp` records (`tools/audit_multihit.py`, which exits nonzero if it goes
-stale) finds **three** multi-hit abilities in the whole game: Quadra
-Slam ×4 and Quadra Slice ×4 (`MagicProp $58` effect `$32`,
-`AttackerEffect_32` at `battle_main.asm:10794-10796`) and Empowerer ×2.
+guard — `multi-hit.md` §1, `probe_multihit.lua`). Multi-hit is deliberately
+scarce: `tools/audit_multihit.py` (which exits nonzero if it goes stale)
+enumerates **six** multi-hit abilities in the whole game, spread over the
+three physical kits. Cyan's are vanilla's — Quadra Slam ×4 and Quadra Slice ×4
+(`MagicProp $58`/`$5b` effect `$32`, `AttackerEffect_32` at
+`battle_main.asm:10794-10796`) and Empowerer ×2. Sabin's Pummel ×2 and Bum
+Rush ×4 and Edgar's Drill ×2 come from `Ot6HitCountTbl`
+(`ff6/src/battle/ot6_hitcount.asm`), which adds to the same `$3a70` counter;
+each of those three has its power divided by its hit count, so the extra hits
+buy break rate rather than damage.
 Edgar's AutoCrossbow hits the *whole enemy side* rather than hitting one
-target several times: `ItemProp $aa` sets no extra-attack effect, so it lands
-one hit per body and exactly **one** chip against a solo boss. Abilities that
-strip several shields at once are the design target; `design/multi-hit.md`
-§10 is the build list that would make that true.
+target several times: `ItemProp $aa` sets no extra-attack effect and has no
+table row, so it lands one hit per body and exactly **one** chip against a
+solo boss. Breadth and rate are separate levers and are priced separately;
+`design/multi-hit.md` is the survey.
 
 **Break.** At 0 shields: the enemy's ATB resets and it is inflicted with a
 Broken state for the length of a private broken timer at `$3e88,y` gated by
