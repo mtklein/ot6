@@ -1,7 +1,7 @@
 -- @suite slow
 -- battle_slotsboot.lua -- boost-tiered Slot on a NATURAL boot: cold-Continue
 -- the terra-returned-v1 SRAM checkpoint (party LOCKE EDGAR SABIN SETZER,
--- save-point boundary F, lettered in tools/tests/frontier_graph.py; the
+-- save-point boundary F, lettered in tools/tests/savestate_graph.py; the
 -- Continue restores the party ON FOOT at the grounded Blackjack's tile),
 -- walk the plain south of Zozo into a REAL world encounter, and drive real Slot spins with real button
 -- presses.  NO pokes on either side (issue #75): BP accumulates through
@@ -39,7 +39,7 @@
 -- Boot drive is probe_mp_universal's, verbatim where possible (the checkpoint
 -- cold Continue, the disembark guard, the encounter walk).
 --
--- OT6_ANCHOR_LAYOUT: ot6-codex-o8-v1
+-- OT6_CHECKPOINT_LAYOUT: ot6-codex-o8-v1
 local H = dofile("tools/tests/lib/ot6.lua")
 
 local MENU, ACTOR, MSTATE = 0x7BCA, 0x62CA, 0x7BC2

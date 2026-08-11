@@ -1,0 +1,20 @@
+{
+  "schema": "ot6.sram-checkpoint/v1",
+  "payload": "vector-crash.sram",
+  "size": 32768,
+  "sha256": "ad0b5e285b6463ecee07cf1abfab3ada1e2d5787a743fb2d967e2ce324a6e839",
+  "slot": 3,
+  "milestone": "vector-crash",
+  "provenance": {
+    "format": "ot6-provenance/v1",
+    "payload_sha256": "ad0b5e285b6463ecee07cf1abfab3ada1e2d5787a743fb2d967e2ce324a6e839",
+    "generator_sig": "8eda3a269aac804f0f0520308301a3fa41207e28bd12fad32d30a68bc05b119a gen_vector_crash tools/tests/checkpoints/gate-cave-save-v1/manifest.json tools/tests/checkpoints/gate-cave-save-v1/gate-cave-save.sram",
+    "ancestors": [
+      {
+        "path": "tools/tests/checkpoints/gate-cave-save-v1/manifest.json",
+        "sha256": "f361fc68ed07857278e5b6d4150d8883e081fd52679db42daee8e06628933b01"
+      }
+    ]
+  },
+  "persistent_layout": "ot6-codex-o8-v1"
+}

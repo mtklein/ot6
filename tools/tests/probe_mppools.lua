@@ -24,12 +24,12 @@ local CHARS = {
 -- field entry point for every area.
 local STATES = {
   "build/states/worldmap_narshe.mss.lua",   -- Narshe area (opening)
-  "build/states/kolts_doorstep.mss.lua",    -- Mt Kolts area
+  "build/states/kolts_entry.mss.lua",    -- Mt Kolts area
   "build/states/gau_joined.mss.lua",        -- Veldt/Serpent-Trench area
   "build/states/scenario_hub.mss.lua",      -- post-scenario area
   "build/states/zozo_arrival.mss.lua",      -- Zozo area
-  "build/states/opera_doorstep.mss.lua",    -- Opera area
-  "build/states/vector_doorstep.mss.lua",   -- Vector area
+  "build/states/opera_entry.mss.lua",    -- Opera area
+  "build/states/vector_entry.mss.lua",   -- Vector area
 }
 
 local function dump(tag)

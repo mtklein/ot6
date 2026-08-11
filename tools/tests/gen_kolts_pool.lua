@@ -1,10 +1,10 @@
--- gen_kolts_pool.lua -- one crossing past kolts_doorstep, for a fixture that
+-- gen_kolts_pool.lua -- one crossing past kolts_entry, for a fixture that
 -- actually HAS a random-encounter pool.
 --
 --   kolts_pool.mss   map 100 shelf F, the first walkable stretch of the
 --                    mountain, party in control and tile-aligned.
 --
--- WHY THIS EXISTS.  kolts_doorstep.mss (map 95) is the mountain's ENTRANCE
+-- WHY THIS EXISTS.  kolts_entry.mss (map 95) is the mountain's ENTRANCE
 -- map, and it is transit only: a balance run paced 437 tiles on it across
 -- six samples and drew zero encounters, voiding every one as a timeout.
 -- That is not a pacing bug and not a rate to tune -- map 95 simply carries
@@ -14,7 +14,7 @@
 -- crossing that reaches it, and this script is exactly gen_kolts' K1 with a
 -- save on the far side.
 --
--- The party is whatever kolts_doorstep carries -- the Figaro->Kolts three,
+-- The party is whatever kolts_entry carries -- the Figaro->Kolts three,
 -- TERRA + LOCKE + EDGAR -- which is the point: every party number in
 -- the balance harness before this fixture was solo Terra or the two-thirds
 -- Locke+Terra of worldmap_narshe, so Edgar's Tools tiers (the pierce and
@@ -34,7 +34,7 @@
 -- formation falls back to the lib's tap-A fight after FLEE_CAP frames.)
 local H = dofile("tools/tests/lib/ot6.lua")
 
-local DOORSTEP = "build/states/kolts_doorstep.mss.lua"
+local ENTRY = "build/states/kolts_entry.mss.lua"
 
 -- map compares stay MASKED: loaders ride flag bits in $1F64's high byte
 local function map() return H.mapId() & 0x1ff end
@@ -70,7 +70,7 @@ local function mapChanged()
 end
 
 H.run({ maxFrames = 60000 }, {
-  H.loadState(DOORSTEP),
+  H.loadState(ENTRY),
   H.waitFrames(30),
   settleField("kolts entry point", 95),
   H.call(function()

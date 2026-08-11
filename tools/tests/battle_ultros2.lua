@@ -1,6 +1,6 @@
--- @suite frontier=ultros2_doorstep slow
+-- @suite savestate=ultros2_entry slow
 -- battle_ultros2.lua -- Beat A's boss test: the OPERA's ULTROS 2 break gauge.
--- Boots ultros2_doorstep (the rafter framework, one interaction short of
+-- Boots ultros2_entry (the rafter framework, one interaction short of
 -- battle 104), rides into the fight, and asserts:
 --
 --   1. THE GAUGE IS AUTHORED, not formula.  Ultros 2 ($012d) seeds 6/6 with
@@ -27,12 +27,12 @@
 --
 -- NOTE: this test is authored against the confirmed Ot6ShieldTbl row and the
 -- battle-class read addresses proven by battle_vargas/battle_class; it
--- reports "skipped" (suite.sh) until ultros2_doorstep is generated, and the
+-- reports "skipped" (suite.sh) until ultros2_entry is generated, and the
 -- kit-specific chip drive is intentionally class-generic (it credits ANY
 -- landed swing whose Ot6-resolved class meets slash|pierce) so it does not
 -- hard-code which of LOCKE's party carries the handhold.
 local H = dofile("tools/tests/lib/ot6.lua")
-local DOOR = "build/states/ultros2_doorstep.mss.lua"
+local DOOR = "build/states/ultros2_entry.mss.lua"
 
 local ULTROS2 = 0x012d
 local OT6_SLASH, OT6_PIERCE = 0x01, 0x02
@@ -53,7 +53,7 @@ H.run({ maxFrames = 60000 }, {
   H.waitFrames(30),
 
   -- ride the last interaction into battle 104 (the entry-point state parks one
-  -- step short; the exact entry is A-into-the-scene, like every _doorstep fixture)
+  -- step short; the exact entry is A-into-the-scene, like every _entry fixture)
   H.driveUntil(function() return H.battleLoadStarted() end, 20000, {
     H.call(function()
       aPh = (aPh + 1) % 8

@@ -23,7 +23,7 @@
 --   A1  the WORLD module does not tick timer 0 (no DecTimers call in
 --       ff6/src/world/ -- measured here, not just grepped);
 --   A2  the MENU does tick it (menu_common.asm:3466);
---   A3  the real Save UI (gen_post_opera_anchor's exact drive) writes the
+--   A3  the real Save UI (gen_post_opera_checkpoint's exact drive) writes the
 --       timer block into the slot-3 save: PushTimers (menu/save.asm:108)
 --       copies $1188-$119F to $1FA8, CopyGameDataToSRAM copies
 --       $1600-$1FFF to SRAM -- asserted by reading the slot-3 bytes back
@@ -33,11 +33,11 @@
 -- resume, tick on a field map, and fire _cc8a96.
 --
 -- Run:
---   OT6_SRAM_ANCHOR=tools/tests/anchors/terra-returned-v1 \
+--   OT6_SRAM_CHECKPOINT=tools/tests/checkpoints/terra-returned-v1 \
 --   OT6_CAPTURE_SRM=build/states/banquet_timer_live.srm \
 --   tools/tests/run.sh tools/tests/probe_banquet_timer.lua
 --
--- OT6_ANCHOR_LAYOUT: ot6-codex-o8-v1
+-- OT6_CHECKPOINT_LAYOUT: ot6-codex-o8-v1
 local H = dofile("tools/tests/lib/ot6.lua")
 
 local ZMENUSTATE = 0x26
@@ -120,7 +120,7 @@ H.run({ maxFrames = 30000 }, {
     H.screenshot("banquet_timer_menu")
   end),
 
-  -- A3: real Save UI to slot 3 (gen_post_opera_anchor's drive, verbatim
+  -- A3: real Save UI to slot 3 (gen_post_opera_checkpoint's drive, verbatim
   -- mechanics: zero the $307ff0 sentinel, enter the save selector the way
   -- the menu's own Save command does, confirm, watch the sentinel return).
   H.call(function()

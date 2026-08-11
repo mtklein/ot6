@@ -110,7 +110,7 @@ owner.** `nice` fixes contention with the owner's game; it does not fix
 Mesen's testrunner wall-clock kill. The signature is several savestates
 failing to generate with `code=255` at once while the same ones succeed in
 isolation. Lower `-j` and retry rather than debugging the generator. Bound a
-full `make frontier` with `NINJAFLAGS=-j4` when other agents are live.
+full `make savestates` with `NINJAFLAGS=-j4` when other agents are live.
 
 Also paid for, and cheaper to read than to rediscover: capture-calm does NOT
 imply reload-calm — every generator reloads its own capture and verifies; a
@@ -127,7 +127,7 @@ one heavy run at a time per machine).
   entry point in `design/wob-route.md`; the post-opera checkpoint's entry
   contract counts the `$1850` assignments so a chain that loses members
   fails loudly.
-- **Map 323 is Albrook; Vector is 242 and 253** (`design/vector-route-recon.md`,
+- **Map 323 is Albrook; Vector is 242 and 253** (`design/vector-route.md`,
   both title index 49).
 - **The item equip mask is `item_prop_en.dat` offset `+$01`, 16-bit, bit N =
   actor N** (`research/data-formats.md`). Byte `+$00` always looks like a mask
@@ -154,7 +154,7 @@ one heavy run at a time per machine).
   (`design/save-points-vector.md` §1).
 - **The suite is self-registering**, discovered from each test's `-- @suite`
   marker; `tools/tests/suite.sh --list` reports what runs. Tests that load a
-  deep story savestate join once `make frontier` has generated it.
+  deep story savestate join once `make savestates` has generated it.
 
 ## Working agreements
 
@@ -163,7 +163,7 @@ one heavy run at a time per machine).
   which sits on the release branch he is playtesting and can be weeks stale.
 - Agents commit to their own branches in revertible units, file exclusivity is
   "declare your hunks and expect merges", and regenerating a single savestate
-  (`ninja -f build/build.ninja <state>`) is theirs. The full `make frontier`
+  (`ninja -f build/build.ninja <state>`) is theirs. The full `make savestates`
   chain stays with the dispatcher.
 - Agents report follow-ups; the dispatcher files issues.
 - Parallel work goes in separate git worktrees; `tools/worktree-setup.sh`
@@ -191,7 +191,7 @@ strongly favor your instrumentation over the record — verify with the cheapest
 possible look (a probe, a byte read, a re-run). Trust the mechanical checks
 over reasoning: the state-write checker and its only-shrinks list, the
 equipment audit, `compose.py --check-states` before debugging any red test,
-the runtime write guard, and `make frontier NINJAFLAGS="-k 0"` to enumerate
+the runtime write guard, and `make savestates NINJAFLAGS="-k 0"` to enumerate
 blockers rather than hitting them one per run.
 
 The rules in CONTRIBUTING under *"your job is not to write correct code, it

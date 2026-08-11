@@ -10,7 +10,7 @@
 --   -> scripted guard battle trigger.
 --
 -- Outputs (decoded from stdout by run.sh into build/states/):
---   battle_doorstep.mss[.lua]  field state a few seconds before the trigger
+--   battle_entry.mss[.lua]     field state a few seconds before the trigger
 --   first_battle.mss[.lua]     in-battle state (only if the battle engine
 --                              comes up; on a broken build this is skipped)
 --   shots/gen_*.png            progress screenshots
@@ -20,7 +20,7 @@
 
 local H = dofile("tools/tests/lib/ot6.lua")
 
-local doorstep, doorstepPrev, saveReq = nil, nil, nil
+local entry, entryPrev, saveReq = nil, nil, nil
 
 H.run({ maxFrames = 60000 }, {
   -- 1. Title screen: press Start a few times while the logo is up.  (The
@@ -42,8 +42,8 @@ H.run({ maxFrames = 60000 }, {
       -- rolling entry point capture via the exec-callback trampoline:
       -- harvest last cycle's request, then issue a new one every ~150 frames
       if saveReq and saveReq.done and saveReq.blob then
-        doorstepPrev = doorstep
-        doorstep = saveReq.blob
+        entryPrev = entry
+        entry = saveReq.blob
         saveReq = nil
       end
       if not saveReq and H.frame % 150 < 30 then
@@ -54,8 +54,8 @@ H.run({ maxFrames = 60000 }, {
 
   H.call(function()
     H.log("battle load began at frame " .. H.frame)
-    local d = doorstepPrev or doorstep
-    if d then H.emitBlob("battle_doorstep.mss", d) end
+    local d = entryPrev or entry
+    if d then H.emitBlob("battle_entry.mss", d) end
   end),
 
   -- 4. Wait for the battle to become ACTIVE (battle RAM + screen rendering).
@@ -79,7 +79,7 @@ H.run({ maxFrames = 60000 }, {
     -- this is the regression signature this harness exists to catch.
     H.call(function()
       error("battle load started but battle never became active " ..
-        "(battle_doorstep.mss emitted; see shots/gen_battle_entry.png)", 0)
+        "(battle_entry.mss emitted; see shots/gen_battle_entry.png)", 0)
     end),
   }),
 })

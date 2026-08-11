@@ -1,4 +1,4 @@
--- @suite frontier=esper_tubes
+-- @suite savestate=esper_tubes
 -- menu_esperdetail_tube6.lua -- the SIX TUBE-ROOM STONES on the esper detail
 -- page (docs/design/magicite-tube-six.md §11, issue #31).
 --
@@ -295,7 +295,7 @@ local toList = {
   H.call(function()
     H.writeByte(ESPERS + 0, H.readByte(ESPERS) | 0x10)
     H.log("[isolation arm] TERRATO's bit OR'd into $1a69 -- the $0000 no-mod "
-      .. "control, unreachable on this frontier (see header)")
+      .. "control, unreachable on this savestate chain (see header)")
   end),
 
   -- driveUntil, not one press: the X that opens the field menu is the first

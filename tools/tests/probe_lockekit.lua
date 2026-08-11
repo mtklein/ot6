@@ -1,7 +1,7 @@
 -- probe_lockekit.lua -- what is solo LOCKE actually holding, and what are his
 -- stats, at the top of his own scenario?  Reads only (issue #75).
 --
--- Asked because the first full-frontier run that ever reached sfigaro_town
+-- Asked because the first full savestate run that ever reached sfigaro_town
 -- measured him doing EIGHT damage a swing to the gate soldier's HeavyArmor
 -- (495 hp, level 13, weak to bolt|water -- neither of which LOCKE can
 -- reach).  Eight is low enough that "he is unarmed" and "the fight is tuned

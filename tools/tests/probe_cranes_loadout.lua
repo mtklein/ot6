@@ -2,7 +2,7 @@
 -- vanilla-playbook re-test): what does the party n128_won actually carries
 -- bring to the reunion fight?
 --
--- The wall record (gen_terra_returned_anchor header, probe_cranes_wedge)
+-- The wall record (gen_terra_returned_checkpoint header, probe_cranes_wedge)
 -- says the fight's designed key -- water, bosses-wob.md 16 -- is
 -- unobtainable by this party.  The vanilla playbook says otherwise:
 -- BISMARK ($1A69 bit 7, the tube-room give_genju per gen_esper_tubes_done)

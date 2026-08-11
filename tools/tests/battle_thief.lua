@@ -1,4 +1,4 @@
--- @suite slow frontier=figaro_cleared
+-- @suite slow savestate=figaro_cleared
 -- battle_thief.lua -- #55, Locke's kit, first slice: the THIEF SUBMENU behind
 -- the Steal row, and the two merchant verbs in it.
 --

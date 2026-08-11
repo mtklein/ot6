@@ -16,7 +16,7 @@
 -- Run it directly:
 --   OT6_KEEP_RUNS=1 OT6_NO_PUBLISH=1 tools/tests/run.sh tools/tests/probe_rows.lua
 local H = dofile("tools/tests/lib/ot6.lua")
-local STATE = "build/states/kolts_doorstep.mss.lua"
+local STATE = "build/states/kolts_entry.mss.lua"
 
 local function rowOf(c) return (H.readByte(0x1850 + c) & 0x20) ~= 0 end
 local function line()

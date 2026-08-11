@@ -1,7 +1,7 @@
 -- probe_cranes_wedge.lua -- READ-ONLY instrument (issue #75, phase-2
 -- wall): what does the post-Cranes map-6 event actually WAIT for?
 --
--- gen_terra_returned_anchor's first input-driven run (9c4SgDmR) fought the
+-- gen_terra_returned_checkpoint's first input-driven run (9c4SgDmR) fought the
 -- Cranes for ~11000 frames, ended the battle with the party alive, and
 -- then wedged on map 6 (15,7) -- ev=true / ctl=false / dlg=false -- for
 -- 30000+ frames under advanceStory's tap-A patience.  This probe rides

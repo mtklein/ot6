@@ -41,7 +41,7 @@ the cleanup waves (delete writes, regen, watch the list shrink); running it
 to LAUNDER a new write is visible in the diff of a checked-in file.
 
 Wired into `make test` (both the check and --selftest) and into `make
-frontier` (so savestate generation cannot run from a poking generator even
+savestates` (so savestate generation cannot run from a poking generator even
 when the suite was skipped).  It lives in the Makefile rather than suite.sh
 because suite discovery globs *.lua for a `-- @suite` marker and cannot see
 a .py file -- same reason check_boss_rows.py sits there.

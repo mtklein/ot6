@@ -1,4 +1,4 @@
--- @suite frontier=worldmap_narshe slow
+-- @suite savestate=worldmap_narshe slow
 -- codex_ctx.lua -- a battle entered from the world map AFTER a menu save
 -- selects the SAVED game's codex page, not the transient page (issue #29).
 --

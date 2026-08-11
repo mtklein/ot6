@@ -3,9 +3,9 @@
 -- three vetoes before the event dispatch: the collision bit ($087c bit6),
 -- the already-activated check ($087c low nibble == 4), and the z-level
 -- match ($b8&7 vs the object's $0888).  Read them all off
--- spike_doorstep.mss, then try the A press while watching them.
+-- spike_entry.mss, then try the A press while watching them.
 local H = dofile("tools/tests/lib/ot6.lua")
-local DOOR = "build/states/spike_doorstep.mss.lua"
+local DOOR = "build/states/spike_entry.mss.lua"
 
 local KO = 16 * 0x29                    -- KEFKA = object 16's record offset
 

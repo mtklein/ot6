@@ -1,0 +1,11 @@
+{
+  "format": "ot6-provenance/v1",
+  "payload_sha256": "2106786a66b065f3936f45de056e322ee9d5973d97dbb0a34b6da8d039c99113",
+  "generator_sig": "3b89a58a87e10eefef5785ff98f4034d0d43a0b4163df5176b20a7e207cfefba gen_narshe_mission tools/tests/checkpoints/terra-returned-v1/manifest.json tools/tests/checkpoints/terra-returned-v1/terra-returned.sram",
+  "ancestors": [
+    {
+      "path": "tools/tests/checkpoints/terra-returned-v1/manifest.json",
+      "sha256": "7189646178dad2d56445b9ef3bd98d4cca13ab39084cdbfd2be25240643eb417"
+    }
+  ]
+}

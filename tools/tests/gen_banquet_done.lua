@@ -78,8 +78,8 @@
 -- re-cut program, not here.  (The timer is DEAD by then -- the §5.3
 -- harness hazard about poked menus inside a live window does not apply.)
 --
--- OT6_ANCHOR_LAYOUT: ot6-codex-o8-v1
--- ^ run.sh refuses -- BEFORE boot -- any OT6_SRAM_ANCHOR whose manifest
+-- OT6_CHECKPOINT_LAYOUT: ot6-codex-o8-v1
+-- ^ run.sh refuses -- BEFORE boot -- any OT6_SRAM_CHECKPOINT whose manifest
 --   declares a different persistent_layout.
 local H = dofile("tools/tests/lib/ot6.lua")
 
@@ -621,7 +621,7 @@ local steps = {
   H.navTo(54, 16, { maxFrames = 20000, playBattles = "flee" }),
   H.call(function()
     H.assertEq(sw(0x007C), 0, "$007C clear at the dais")
-    H.screenshot("leg_ij_dais")
+    H.screenshot("step_ij_dais")
   end),
 
   -- ---- 3. the window --------------------------------------------------------
@@ -673,7 +673,7 @@ local steps = {
         .. "This is the feasibility FINDING -- route log above.",
         windowScore), 0)
     end
-    H.screenshot("leg_ij_window")
+    H.screenshot("step_ij_window")
   end),
 
   -- ---- 4. the dinner --------------------------------------------------------
@@ -850,7 +850,7 @@ local steps = {
     H.assertEq(n, 2, "party COUNT is two (#21 control, inverted)")
     H.assertEq(partyOf(0x00), 1, "TERRA in party 1")
     H.assertEq(partyOf(0x01), 1, "LOCKE in party 1")
-    H.screenshot("leg_ij_two")
+    H.screenshot("step_ij_two")
   end),
 
   -- ---- 7. the messenger -----------------------------------------------------
@@ -894,7 +894,7 @@ local steps = {
     H.assertEq(sw(0x0277), 1, "$0277 -- Doma withdrawal (>=50)")
     H.assertEq(sw(0x0278), 1, "$0278 -- base weapons unlock (>=67)")
     H.assertEq(var0(), 0, "var0 zeroed by the messenger")
-    H.screenshot("leg_ij_messenger")
+    H.screenshot("step_ij_messenger")
   end),
 
   -- ---- 8. out of the castle, out of Vector ----------------------------------
@@ -921,7 +921,7 @@ local steps = {
     H.assertEq(H.worldX(), 120, "checkpoint-J tile x")
     H.assertEq(H.worldY(), 188, "checkpoint-J tile y")
     H.assertEq(H.readByte(0x11FA) & 3, 0, "ON FOOT at the J tile")
-    H.screenshot("leg_ij_j_tile")
+    H.screenshot("step_ij_j_tile")
   end),
 
   -- ---- 9. the world battery save -- boundary J ------------------------------
@@ -1028,7 +1028,7 @@ local steps = {
       emu.read(0x316810 + ULTROS2, emu.memType.snesMemory),
       emu.read(0x316990 + ULTROS2, emu.memType.snesMemory)))
     H.assertExitContract("banquet-done-v1")
-    H.screenshot("leg_ij_saved")
+    H.screenshot("step_ij_saved")
   end),
   H.logStep(function()
     return string.format("banquet-done-v1 saved via the real Save UI at "

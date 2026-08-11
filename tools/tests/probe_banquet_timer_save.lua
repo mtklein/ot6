@@ -7,7 +7,7 @@
 -- "save completion corrupts" from "the menu-state poke corrupts".
 -- Staging identical to probe_banquet_timer (see its header).  NOT a
 -- suite test.
--- OT6_ANCHOR_LAYOUT: ot6-codex-o8-v1
+-- OT6_CHECKPOINT_LAYOUT: ot6-codex-o8-v1
 local H = dofile("tools/tests/lib/ot6.lua")
 
 local STAGE = 5400

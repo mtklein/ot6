@@ -6,21 +6,21 @@
 --
 -- ONE BOOT, FROM A CHECKPOINT (issue #25; the dual-boot probe retired by
 -- #30):  every caller -- the ninja graph's generation edge AND `make smoke`
--- (via the Makefile's SMOKE_ANCHOR_* map) -- supplies OT6_SRAM_ANCHOR=
+-- (via the Makefile's SMOKE_CHECKPOINT_* map) -- supplies OT6_SRAM_CHECKPOINT=
 -- minecart-platform-v1, so run.sh materializes the checkpoint .srm and SRAM
 -- carries slot 3 + the codex magic + the seeded ULTROS2 witness.  Cold
 -- Continue -> the 272 save tile {3,55} -> ENTRY CONTRACT -> walk to CID.
 -- This file used to probe four SRAM bytes at runtime and fall back to
--- booting minecart_doorstep.mss when they were absent (smoke's old
+-- booting minecart_entry.mss when they were absent (smoke's old
 -- checkpointless invocation); with the checkpoint map there is no
 -- checkpointless caller left, and a boot chosen by guessing at SRAM
 -- contents was one more way for a step to quietly test something other than
 -- what its edge declared.
 --
--- OT6_ANCHOR_LAYOUT: ot6-codex-o8-v1
+-- OT6_CHECKPOINT_LAYOUT: ot6-codex-o8-v1
 -- ^ the persistent-SRAM layout this step understands (issue #25).  run.sh
 --   reads the marker line above and refuses -- BEFORE the emulator boots,
---   naming both strings -- any OT6_SRAM_ANCHOR whose manifest.json declares
+--   naming both strings -- any OT6_SRAM_CHECKPOINT whose manifest.json declares
 --   a different persistent_layout.
 --
 -- WHY THIS STEP IS NOT AN EVENT WALK.  The route recon flagged this as the
@@ -56,14 +56,14 @@
 -- ## out of Zozo two-handed.  Its own "WHAT WOULD UNBLOCK THIS" has now     ##
 -- ## happened: gen_zozo5_ramuh seats SABIN and EDGAR at the leave           ##
 -- ## cutscene's party_menu, the whole chain and the tracked post-opera-v1   ##
--- ## checkpoint were regenerated from it, and minecart_doorstep now boots   ##
+-- ## checkpoint were regenerated from it, and minecart_entry now boots   ##
 -- ## LOCKE + SABIN + EDGAR (measured: $1850 LOCKE=$51 EDGAR=$C1 SABIN=$49,  ##
 -- ## CELES=$00 after the tube room).  The solo measurements below are kept  ##
 -- ## verbatim as the fail-before record; the assertions at the entry point  ##
 -- ## now require three.                                                     ##
 -- ############################################################################
 --
--- Run against minecart_doorstep it rides the cutscene correctly and fights
+-- Run against minecart_entry it rides the cutscene correctly and fights
 -- all six battles in the scripted order --
 --
 --   1  f1281  0006 2A2A ...           Mag Roader           (battle 41)
@@ -103,8 +103,8 @@
 --
 -- WHAT WOULD UNBLOCK THIS.  The v0.5 step that answers that party_menu has
 -- to pick two more characters, and everything from there down -- including
--- the tracked 32 KiB checkpoint at tools/tests/anchors/post-opera-v1/,
--- which is generated from blackjack.mss by gen_post_opera_anchor.lua -- has
+-- the tracked 32 KiB checkpoint at tools/tests/checkpoints/post-opera-v1/,
+-- which is generated from blackjack.mss by gen_post_opera_checkpoint.lua -- has
 -- to be regenerated.  That is a v0.5 change, not a v0.6 one, so this
 -- generator is left in the tree as the evidence rather than being made to
 -- pass by weakening what it checks.
@@ -424,7 +424,7 @@ H.run({ maxFrames = 400000 }, {
   H.call(function()
     -- THE ENTRY CONTRACT (issue #25): declared once in
     -- lib/ot6_contract.lua under "minecart-platform-v1" -- the same
-    -- table gen_minecart_doorstep (the step INTO D) and the checkpoint
+    -- table gen_minecart_entry (the step INTO D) and the checkpoint
     -- generator assert as their EXIT contract.
     H.assertEntryContract("minecart-platform-v1")
     H.log(partyReport("minecart-platform-v1 entry"))
@@ -456,7 +456,7 @@ H.run({ maxFrames = 400000 }, {
     H.assertEq(who[0x01] == true, true, "and they are LOCKE...")
     H.assertEq(who[0x05] == true, true, "...SABIN (the bludgeon slot)...")
     H.assertEq(who[0x04] == true, true, "...and EDGAR (pierce + Tools)")
-    H.log(partyReport("minecart_doorstep"))
+    H.log(partyReport("minecart_entry"))
   end),
 
   -- 1. the player's prep, all through real menus, BEFORE the retry blob:
@@ -535,7 +535,7 @@ H.run({ maxFrames = 400000 }, {
   -- 3. park ON boundary E: the escape map's save point {58,7}, revealed by
   --    $06AE.  n128_won IS the D->E terminal, so it is generated standing on
   --    the boundary tile with the vector-escape-v1 table asserted (the
-  --    same table gen_vector_escape_anchor saves under).  Map 240 is an
+  --    same table gen_vector_escape_checkpoint saves under).  Map 240 is an
   --    encounter map (rate $0070); navTo write-clears any draw on the walk.
   --    The last step is a held RIGHT from (57,7) -- a save tile flickers
   --    hasControl() (the SavePoint re-entry), so arrival is judged on

@@ -498,20 +498,20 @@ end
 -- recapture: the party never stepped, so the post-battle world reload
 -- restores this exact tile with the danger counter zeroed.  Three attempts,
 -- then fail the generation loudly rather than emit a state nobody can boot.
-local mintBlob, mintDone = nil, false
-local function mintAttempt(n)
+local genBlob, genDone = nil, false
+local function genAttempt(n)
   local tag = string.format("[rapids_done] generation attempt %d", n)
   local saveReq, loadReq
-  return H.cond(function() return not mintDone end, {
+  return H.cond(function() return not genDone end, {
     H.call(function() saveReq = H.requestSaveState() end),
     H.waitFrames(2),
     H.call(function()
       H.checkReq(saveReq, tag .. ": capture")
-      mintBlob = saveReq.blob
+      genBlob = saveReq.blob
       H.log(string.format("%s: captured %d bytes at world (%d,%d) f%d -- " ..
-        "reloading to verify the consumer's boot", tag, #mintBlob,
+        "reloading to verify the consumer's boot", tag, #genBlob,
         H.worldX(), H.worldY(), H.frame))
-      loadReq = H.requestLoadState(mintBlob)
+      loadReq = H.requestLoadState(genBlob)
     end),
     H.waitFrames(2),
     H.call(function() H.checkReq(loadReq, tag .. ": verify reload") end),
@@ -521,7 +521,7 @@ local function mintAttempt(n)
          and H.worldX() == 93 and H.worldY() == 41
     end, {
       H.call(function()
-        mintDone = true
+        genDone = true
         H.log(tag .. ": reload stayed calm at (93,41) -- verified")
       end),
     }, {
@@ -666,13 +666,13 @@ H.run({ maxFrames = 200000 }, {
       H.frame, H.worldX(), H.worldY(), H.readWord(0x1f64)))
     H.screenshot("rapids_done")
   end),
-  mintAttempt(1),
-  mintAttempt(2),
-  mintAttempt(3),
+  genAttempt(1),
+  genAttempt(2),
+  genAttempt(3),
   H.call(function()
-    H.assertEq(mintDone, true,
+    H.assertEq(genDone, true,
       "a reload-verified calm world capture within 3 attempts")
-    H.emitBlob("rapids_done.mss", mintBlob)
+    H.emitBlob("rapids_done.mss", genBlob)
   end),
   H.logStep(function()
     return string.format("rapids_done generated at frame %d, %d fights won",

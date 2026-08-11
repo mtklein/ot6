@@ -1,4 +1,4 @@
--- @suite frontier=worldmap_narshe
+-- @suite savestate=worldmap_narshe
 -- battle_levelup.lua -- v0.4 test: FULL HP/MP RESTORE ON LEVEL UP.
 --
 -- The mechanic (docs/design/mp-economy.md "Full HP/MP restore on level up"):
@@ -209,7 +209,7 @@ add({
 -- lucky early run costs two battles and an unlucky one has budget.
 local function battleLeg(n)
   local plan, idx, goal = nil, 1, { 82, 56 }
-  local leg = {
+  local advance = {
     H.waitUntil(worldReady, 1500, "world control before battle " .. n, 5),
     H.call(function()
       latch()
@@ -284,9 +284,9 @@ local function battleLeg(n)
     end),
   }
   if n <= 2 then
-    add(leg)
+    add(advance)
   else
-    add({ H.cond(function() return not done() end, leg, {
+    add({ H.cond(function() return not done() end, advance, {
       H.call(function()
         H.log(string.format("battle %d skipped -- goal already met", n))
       end),

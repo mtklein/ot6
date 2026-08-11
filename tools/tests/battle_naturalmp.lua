@@ -1,4 +1,4 @@
--- @suite frontier=kolts_cave
+-- @suite savestate=kolts_cave
 -- battle_naturalmp.lua -- issue #32: battle MP is UNIVERSAL, on NATURAL MP.
 --
 -- THE BUG.  Vanilla's battle init loads every character's MP through
@@ -14,7 +14,7 @@
 -- generator pins MP before acting.  This test pins NO character state -- it is
 -- the natural-MP coverage the class of bug requires.
 --
--- FIXTURE.  kolts_cave.mss (make frontier): map 96, party TERRA LOCKE EDGAR
+-- FIXTURE.  kolts_cave.mss (make savestates): map 96, party TERRA LOCKE EDGAR
 -- with whatever MP their real save carries -- one innate mage (TERRA, the
 -- unchanged-path control) and two spell-less kit carriers.  The natural
 -- encounter drive is battle_flyin's (same fixture, same lane pacing).

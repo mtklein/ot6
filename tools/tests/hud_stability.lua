@@ -7,7 +7,7 @@
 --   3. an attack may contest BG3, but within 120 frames of the action
 --      landing the HUD is back and stays put for 300 more frames
 local H = dofile("tools/tests/lib/ot6.lua")
-local STATE = "build/states/battle_doorstep.mss.lua"
+local STATE = "build/states/battle_entry.mss.lua"
 local GLYPH = {[0x65]=1,[0x66]=1,[0x67]=1,[0x69]=1,[0x6a]=1,[0x6b]=1,[0x71]=1,
                [0xbf]=1,[0xeb]=1,[0xec]=1,[0xed]=1,[0x64]=1,[0xef]=1,
                [0xfb]=1,[0xfc]=1,[0xfd]=1}

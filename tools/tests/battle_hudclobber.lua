@@ -1,4 +1,4 @@
--- @suite frontier=moogle_doorstep slow
+-- @suite savestate=moogle_entry slow
 -- battle_hudclobber: a battle dialogue must never leave the under-enemy HUD
 -- drawing from blanked glyph tiles -- junk over and around the enemies.
 --
@@ -29,11 +29,11 @@
 -- hide a regression: the dialogue must actually have clobbered the tiles
 -- (tileDirty frames > 0) -- else the hazard was never exercised.
 --
--- Needs moogle_doorstep.mss (make frontier), the battle_vargas
+-- Needs moogle_entry.mss (make savestates), the battle_vargas
 -- pattern.
---   tools/tests/run.sh tools/tests/battle_hudclobber.lua   (needs moogle_doorstep.mss)
+--   tools/tests/run.sh tools/tests/battle_hudclobber.lua   (needs moogle_entry.mss)
 local H = dofile("tools/tests/lib/ot6.lua")
-local STATE = "build/states/moogle_doorstep.mss.lua"
+local STATE = "build/states/moogle_entry.mss.lua"
 local VR, ROM = emu.memType.snesVideoRam, emu.memType.snesPrgRom
 
 -- OT6 glyph cells + their rom source (glyphCanary's signature scan)

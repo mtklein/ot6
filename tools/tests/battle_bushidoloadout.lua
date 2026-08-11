@@ -35,7 +35,7 @@
 --   6. SLOT 0 IS IGNORED (#38): a word whose dead slot 0 holds a wildly
 --      different tech still enumerates from slots 1..3 only.
 local H = dofile("tools/tests/lib/ot6.lua")
-local STATE = "build/states/battle_doorstep.mss.lua"
+local STATE = "build/states/battle_entry.mss.lua"
 
 local MENU, ACTOR, MSTATE = 0x7BCA, 0x62CA, 0x7BC2
 local KNOWN, LEARNED, ITEMLIST = 0x2020, 0x1CF7, 0x4005

@@ -1,4 +1,4 @@
--- @suite slow frontier=camp_escaped
+-- @suite slow savestate=camp_escaped
 -- battle_bushidogrey.lua -- v0.5 MP costs + BP gating: the SwdTech submenu greys
 -- what Cyan cannot reach, for TWO reasons -- not enough MP (like Magic/Blitz),
 -- and not enough BP (the boost the row would spend).

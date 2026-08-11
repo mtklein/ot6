@@ -11,7 +11,7 @@
 -- states in the generated chain; the step generator (gen_banquet_done)
 -- replays this whole route itself.  Run:
 --
---   OT6_SRAM_ANCHOR=tools/tests/anchors/vector-crash-v1 \
+--   OT6_SRAM_CHECKPOINT=tools/tests/checkpoints/vector-crash-v1 \
 --   tools/tests/run.sh tools/tests/probe_banquet_stage.lua
 --
 -- HAZARD (the H->I report's first-hazard note): the boot
@@ -19,7 +19,7 @@
 -- re-enters the wreck interior.  The Continue drive below presses A only
 -- while NOT on the world map, and the grind presses directions only.
 --
--- OT6_ANCHOR_LAYOUT: ot6-codex-o8-v1
+-- OT6_CHECKPOINT_LAYOUT: ot6-codex-o8-v1
 local H = dofile("tools/tests/lib/ot6.lua")
 
 local function map() return H.mapId() & 0x1ff end
@@ -36,7 +36,7 @@ local function timerCount() return H.readWord(0x1189) end
 local function var0() return H.readWord(0x1fc2) end
 
 -- VERIFIED-STEP world grinder.  The shared grind-and-replan idiom
--- (gen_vector_doorstep's) consumes one plan entry per ALIGNED FRAME, and
+-- (gen_vector_entry's) consumes one plan entry per ALIGNED FRAME, and
 -- the party sits aligned for several frames before each press latches --
 -- on straight lines the wasted entries agree in direction and nothing
 -- shows, but every TURN of a long path desyncs the plan and forces a

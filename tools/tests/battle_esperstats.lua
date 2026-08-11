@@ -1,4 +1,4 @@
--- @suite frontier=minecart_doorstep slow
+-- @suite savestate=minecart_entry slow
 -- battle_esperstats.lua -- M5 espers-as-sub-jobs, the WHILE-EQUIPPED STAT BOOST
 -- (the owner's fork-4 pick) plus a per-esper kit confirmation for the four Zozo
 -- espers and the two MRF stones.  Companion to battle_subjob.lua, which proved
@@ -14,12 +14,12 @@
 --
 -- =============== THE INPUT-DRIVEN REBUILD (#75) ===========================
 -- The previous version of this file POKED char 0's equipped-esper byte $161e
--- and ran on battle_doorstep -- the Narshe intro, where Terra owns no esper
+-- and ran on battle_entry -- the Narshe intro, where Terra owns no esper
 -- at all, so the menu could never have equipped one and the poke was the only
 -- way in.  Issue #75's rule (inputs in, observations out, never write
 -- emulated state) retired the poke, and with it the fixture: equipping
 -- in normal play requires OWNING the stone, so this file now runs on
--- MINECART_DOORSTEP -- the first fixture on the chain that owns all six
+-- MINECART_ENTRY -- the first fixture on the chain that owns all six
 -- stones under test (the Zozo four from gen_zozo5_ramuh, Ifrit/Shiva from
 -- the MRF hand-off; $1A69 reads EF 01 9A 00 here) AND offers a battle:
 --
@@ -89,7 +89,7 @@
 --                  Ice(base)/Osmose/Shell, and NOT Ice2 and NOT Rasp
 --                  (left to Ramuh).  Ifrit's mirror, as §5.2 asked.
 local H = dofile("tools/tests/lib/ot6.lua")
-local STATE = "build/states/minecart_doorstep.mss.lua"
+local STATE = "build/states/minecart_entry.mss.lua"
 
 -- spell ids (const.inc ATTACK enum)
 local BOLT, RASP           = 0x02, 0x1a

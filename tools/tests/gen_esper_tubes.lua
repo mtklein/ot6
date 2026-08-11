@@ -1,19 +1,19 @@
 -- gen_esper_tubes.lua -- v0.6 step 10, the step OUT of boundary C (#25):
--- cold battery Continue from the tracked n024-doorstep-save-v1 checkpoint
+-- cold battery Continue from the tracked n024-entry-save-v1 checkpoint
 -- (the NEW #10 save point, map 273 {26,53}, slot 3), the boundary's ENTRY
 -- CONTRACT asserted as the first real act, two steps to the 024 entry point
 -- -> battle 72 -> the {25,50} door -> map 274, the esper tube room ->
 -- parked at {10,10} FACING UP, one UP-step-plus-A-hold from the Cid/Kefka
--- set piece.  Generates n024_won and esper_tubes_doorstep.
+-- set piece.  Generates n024_won and esper_tubes_entry.
 --
--- GENERATED FROM A CHECKPOINT (frontier_graph.py:
--- anchor="n024-doorstep-save-v1" on BOTH of this script's states -- one
+-- GENERATED FROM A CHECKPOINT (savestate_graph.py:
+-- checkpoint="n024-entry-save-v1" on BOTH of this script's states -- one
 -- script, one boot, two generated states, so the second state cannot ride a
 -- predecessor edge the boot never uses).  The step used to boot
--- n024_doorstep.mss; that state is still generated as B->C's terminal, and
+-- n024_entry.mss; that state is still generated as B->C's terminal, and
 -- the cold Continue replays its last two steps from the checkpoint instead
 -- (the "C + 2 steps" hybrid; boundary C is lettered in
--- tools/tests/frontier_graph.py).
+-- tools/tests/savestate_graph.py).
 --
 -- BATTLE 72 (_cc79ed, event_main.asm:95385) is `battle 72 / call _ca5ea9 /
 -- hide_obj NPC_1 / sort_obj / switch $0649=0` -- no `if_b_switch` gate at
@@ -56,10 +56,10 @@
 -- releases the pad between steps and never presses A on the open field
 -- (ot6_field.lua:340-351).
 --
--- OT6_ANCHOR_LAYOUT: ot6-codex-o8-v1
+-- OT6_CHECKPOINT_LAYOUT: ot6-codex-o8-v1
 -- ^ the persistent-SRAM layout this step understands (issue #25).  run.sh
 --   reads the marker line above and refuses -- BEFORE the emulator boots,
---   naming both strings -- any OT6_SRAM_ANCHOR whose manifest.json declares
+--   naming both strings -- any OT6_SRAM_CHECKPOINT whose manifest.json declares
 --   a different persistent_layout.
 --
 -- The entry point is banked ONE TILE SOUTH of the trigger, at {10,10} already
@@ -125,7 +125,7 @@ end
 
 local DELTA = { up = { 0, -1 }, right = { 1, 0 }, down = { 0, 1 }, left = { -1, 0 } }
 -- (a tapInto helper used to sit here, DEFINED and never called -- the same
--- dead battle toolkit gen_tunnelarmr's and gen_n024_doorstep's conversions
+-- dead battle toolkit gen_tunnelarmr's and gen_n024_entry's conversions
 -- deleted from their own files; its only battle handling was the
 -- battle-clear write)
 
@@ -295,19 +295,19 @@ H.run({ maxFrames = 300000 }, {
   H.repeatN(3, { H.pressButtons({ "a" }, 8), H.waitFrames(60) }),
   -- SOFT landing wait: a wrong-boundary checkpoint lands somewhere else, and
   -- the failure must be the entry contract NAMING the wrong map -- never a
-  -- timeout here (leg-fixtures.md, "fails loudly, naming what differed").
+  -- timeout here (checkpoint-fixtures.md, "fails loudly, naming what differed").
   H.waitUntilSoft(function()
     return map() == 273 and H.tileAligned() and bright() >= 15
   end, 3000, "landed_at_c"),
   H.waitFrames(60),
   H.call(function()
     -- THE ENTRY CONTRACT (issue #25): declared once in lib/ot6_contract.lua
-    -- under "n024-doorstep-save-v1" -- the same table the step INTO C
-    -- (gen_n024_doorstep) and the checkpoint generator (gen_n024_save_anchor)
+    -- under "n024-entry-save-v1" -- the same table the step INTO C
+    -- (gen_n024_entry) and the checkpoint generator (gen_n024_save_checkpoint)
     -- assert as their EXIT contract.  A stale or wrong checkpoint fails HERE
     -- by naming what differed.
-    H.assertEntryContract("n024-doorstep-save-v1")
-    H.log(partyReport("n024-doorstep-save-v1 entry"))
+    H.assertEntryContract("n024-entry-save-v1")
+    H.log(partyReport("n024-entry-save-v1 entry"))
   end),
 
   -- the two steps back onto the 024 entry point (§5's "C + 2 steps")
@@ -482,13 +482,13 @@ H.run({ maxFrames = 300000 }, {
     H.assertEq(settled(), true, "the entry point is QUIET")
     H.assertEq(sw(0x0068), 0, "$0068 CLEAR")
     H.assertEq(H.readByte(0x1A69) & 0x07, 0x07, "still RAMUH + IFRIT + SHIVA")
-    H.log(string.format("[esper_tubes_doorstep] f%d map=%d (%d,%d) face=%d $1A69=%02X",
+    H.log(string.format("[esper_tubes_entry] f%d map=%d (%d,%d) face=%d $1A69=%02X",
       H.frame, map(), H.fieldX(), H.fieldY(),
       H.readByte(0x087f + H.readWord(0x0803)), H.readByte(0x1A69)))
-    H.log(partyReport("esper_tubes_doorstep"))
-    H.screenshot("esper_tubes_doorstep")
+    H.log(partyReport("esper_tubes_entry"))
+    H.screenshot("esper_tubes_entry")
   end),
-  H.saveState("esper_tubes_doorstep.mss"),
+  H.saveState("esper_tubes_entry.mss"),
   -- RELOAD-VERIFIED, and deliberately BEFORE the A-hold trigger check
   -- below, which consumes the entry point by firing the scene -- after the
   -- reload the verify below runs from a state byte-equivalent to the
@@ -515,7 +515,7 @@ H.run({ maxFrames = 300000 }, {
         H.assertEq(H.hasControl() and H.tileAligned(), true,
           "reload: controllable at rest")
         H.assertEq(sw(0x0068), 0, "reload: $0068 still CLEAR")
-        H.log("esper_tubes_doorstep verify: the reload stayed calm")
+        H.log("esper_tubes_entry verify: the reload stayed calm")
       end),
     })
   end)(),
@@ -544,7 +544,7 @@ H.run({ maxFrames = 300000 }, {
     H.screenshot("esper_tubes_verify")
   end),
   H.logStep(function()
-    return string.format("n024_won and esper_tubes_doorstep generated; "
+    return string.format("n024_won and esper_tubes_entry generated; "
       .. "the entry point is map 274 (10,10) facing UP, one UP-step-plus-A-hold "
       .. "from _cc7a60 (frame %d)", H.frame)
   end),

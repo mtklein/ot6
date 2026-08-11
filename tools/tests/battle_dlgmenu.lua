@@ -23,7 +23,7 @@
 -- It was not always so -- see the block comment there -- and the fixture
 -- generator must NOT be tuned to steer the roll on this test's behalf.
 local H = dofile("tools/tests/lib/ot6.lua")
-local STATE = "build/states/whelk_doorstep.mss.lua"
+local STATE = "build/states/whelk_entry.mss.lua"
 local WHELK = { [0x0134] = true }
 local function whelk()
   return H.battleLoadStarted() and H.formationHas(WHELK)

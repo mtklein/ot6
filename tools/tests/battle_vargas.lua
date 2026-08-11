@@ -1,10 +1,10 @@
--- @suite frontier=vargas_doorstep slow
+-- @suite savestate=vargas_entry slow
 -- battle_vargas.lua -- tier 2's boss test: VARGAS's break gauge, the three
 -- chips that are supposed to reach it, and the scripted finish.
 --
 --   tools/tests/run.sh tools/tests/battle_vargas.lua
 --
--- Boots vargas_doorstep.mss (gen_kolts), presses A once into `_ca828f`
+-- Boots vargas_entry.mss (gen_kolts), presses A once into `_ca828f`
 -- (npc_prop.asm:4006 -> event_main.asm:19818), rides the scene through
 -- `char_party SABIN,0` (:19906) into `battle 66, MOUNTAINS_EXT` (:19909),
 -- and asserts:
@@ -30,7 +30,7 @@
 --      the last link in it that had never been watched work.
 --   4. HOLY CHIPS.  Sabin's AuraBolt (Blitz 1, skill $5e, element $20) takes
 --      a shield AND reveals holy in $3E89 -- the runtime half of the proof
---      main commit 5d00086 deferred to "the vargas-doorstep fixture".  Holy
+--      main commit 5d00086 deferred to "the vargas-entry fixture".  Holy
 --      is the ONLY way that shield can move on that turn: it is checked
 --      against the recorded skill id, and Sabin is alone on the field.
 --   5. BLUDGEONING CHIPS.  Pummel (Blitz 0, skill $5d, OT6_BLUDG per
@@ -81,7 +81,7 @@
 -- without opening that window on that row, so a regression times out here
 -- rather than shipping a freeze.
 local H = dofile("tools/tests/lib/ot6.lua")
-local DOOR = "build/states/vargas_doorstep.mss.lua"
+local DOOR = "build/states/vargas_entry.mss.lua"
 
 local VARGAS, IPOOH = 0x0103, 0x014D
 local OT6_BLUDG, OT6_SLASH = 0x04, 0x01

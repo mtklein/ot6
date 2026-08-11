@@ -1,4 +1,4 @@
--- @suite frontier=gau_joined
+-- @suite savestate=gau_joined
 -- menu_ragepage.lua -- issue #40: the field Skills->Rage LOADOUT page RENDERS.
 --
 -- The page (MenuState_7c / Ot6Rage* in ot6_kits.asm, the C3 shim at
@@ -83,7 +83,7 @@
 -- ROM and checks both halves against the tilemap, so neither can move alone.
 -- It is duplicated from menu_swdtechpage.lua rather than shared: the only lua
 -- the runner inlines is lib/ot6{,_field,_contract}.lua, and those three files
--- ARE the savestate generation signature (lib/frontier_stamp.sh:82-85), so a
+-- ARE the savestate generation signature (lib/savestate_stamp.sh:82-85), so a
 -- helper added there would mark every generated fixture drifted.
 --
 -- THE NAME SOURCE, and why it is not the SwdTech one.  Ot6DrawRageName

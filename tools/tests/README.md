@@ -9,7 +9,7 @@ scripted input, assert on RAM, and capture screenshots/savestates.
 make rom                                        # build build/ot6.sfc
 tools/tests/run.sh tools/tests/gen_battle_state.lua   # power-on -> first battle -> savestate
 tools/tests/run.sh tools/tests/battle_smoke.lua       # load savestate -> assert battle state
-make frontier                                   # generate the deep story savestates (slow)
+make savestates                                   # generate the deep story savestates (slow)
 
 python3 tools/tests/lib/compose.py --check-states      # IS THIS RED TEST A STALE FIXTURE?
 ```
@@ -35,14 +35,14 @@ to see whether they were red there too.
 STORY CHAIN past the whelk -- the Narshe escape, the Figaro chapter,
 Mt. Kolts and Vargas, the three-scenario reunion and the Battle for
 Narshe, and on through Kefka to Zozo -- lives behind
-`make frontier`, which
+`make savestates`, which
 nothing in `make test` depends on: each link is a multi-minute scripted
 playthrough that consumes the previous link's savestate, and the suite's
 regeneration cost has to stay what it was.
 
-The graph of generated savestates is DATA -- `tools/tests/frontier_graph.py`,
-one entry per state -- and `lib/frontier_ninja.py` emits it as
-`build/build.ninja`; `make frontier` / `make test` are thin wrappers over
+The graph of generated savestates is DATA -- `tools/tests/savestate_graph.py`,
+one entry per state -- and `lib/savestate_ninja.py` emits it as
+`build/build.ninja`; `make savestates` / `make test` are thin wrappers over
 `ninja -f build/build.ninja`.  A generated link is a function of
 the ROM bytes, its generator `gen_*.lua`, and all THREE lib halves
 `lib/compose.py` inlines into every composed script -- `lib/ot6.lua`
@@ -59,16 +59,16 @@ Editing one generator regenerates only the states it feeds (and their
 descendants down the chain); editing any lib half regenerates the whole
 chain, since every route runs through them -- an acceptable cost because
 the lib is stable (it is the rare file to change) while generators churn
-constantly.  `lib/frontier_ninja_selftest.sh` proves those semantics
+constantly.  `lib/savestate_ninja_selftest.sh` proves those semantics
 against real ninja on a mock tree in seconds, no emulator.
-`lib/frontier_stamp.sh` survives as the PROVENANCE half: each generation step
+`lib/savestate_stamp.sh` survives as the PROVENANCE half: each generation step
 stamps `build/states/<state>.stamp` with three claims --
 
     sha256(GATE_CONTRACT ++ generator ++ ot6.lua ++ ot6_field.lua ++
            ot6_contract.lua ++ extras) <generator> [extras]
     artifact <sha256 of build/states/<state>.mss>
     ancestor <path> <sha256 of that file>     (prev= edges bind their
-                                               predecessor's stamp; anchor=
+                                               predecessor's stamp; checkpoint=
                                                edges their manifest.json;
                                                power-on roots have no line)
 
@@ -77,22 +77,22 @@ loud `[ot6]` line if a fixture a test is about to boot has drifted from its
 generator+lib, had its `.mss` replaced without being regenerated, or sits on
 a chain whose ancestor stamp moved (the artifact and ancestor bindings make
 the whole chain verifiable transitively from files on disk).  `GATE_CONTRACT`
-(`ot6-provenance/v1`, one constant in `frontier_stamp.sh`) is a fixed sig
+(`ot6-provenance/v1`, one constant in `savestate_stamp.sh`) is a fixed sig
 input: bumping it deliberately stales every stamp and forces everything to be
 regenerated under new rules.  `compose.py --check-states` asks the same
 question of the whole tree and is a hard `make test` check.
 
-Some suite tests need a savestate only `make frontier` generates: each
-declares `-- @suite frontier=<fixture>` and asserts on that state --
-`battle_vargas` on `vargas_doorstep.mss`, `battle_flyin` on
+Some suite tests need a savestate only `make savestates` generates: each
+declares `-- @suite savestate=<fixture>` and asserts on that state --
+`battle_vargas` on `vargas_entry.mss`, `battle_flyin` on
 `kolts_cave.mss` (the entry hud test -- a fight whose monsters fly in,
 present-but-not-shown at battle start), `battle_kefka` on
-`kefka_doorstep.mss` (the Battle for Narshe -- deeper still, since its boot
+`kefka_entry.mss` (the Battle for Narshe -- deeper still, since its boot
 needs the REUNION: all three scenarios completed in one playthrough via the
 graph's scenario STACK), and others.  `tools/tests/suite.sh --list`
 prints the current set.  suite.sh adds each the moment its fixture
 exists and reports it as `skip` when it does not -- never silently drops it
--- so `make test` costs what it always did and `make frontier-test`
+-- so `make test` costs what it always did and `make savestates-test`
 (generate the chain, then run the same suite) is the command that always
 runs everything that can be generated.
 
@@ -105,8 +105,8 @@ makes `compose.py` rewrite every `.mss` basename in the script (never the
 lib), so the same generator boots a prefixed predecessor and emits prefixed
 artifacts, leaving the original savestates untouched.  The graph seeds each
 stacked hub from the previous chain's ending (`seed=` entries in
-`frontier_graph.py`) and stacks the `t2_`/`s2_`/`t3_` layers up to
-`reunion_ready`.  The full account is `frontier_graph.py`'s `SCENARIO
+`savestate_graph.py`) and stacks the `t2_`/`s2_`/`t3_` layers up to
+`reunion_ready`.  The full account is `savestate_graph.py`'s `SCENARIO
 STACKING` section and `compose.py`'s `SCENARIO STACKING (OT6_STACK)`
 docstring.
 
@@ -202,14 +202,14 @@ set -- and never creates `SaveStates/`.)
   merged `H`.
 - `lib/decode_b64.py` - decodes `[b64:tag]` stdout payloads into files.
 - `gen_battle_state.lua` - title screen -> New Game -> intro -> Narshe ->
-  walk into the first guard battle; emits `build/states/battle_doorstep.mss`
+  walk into the first guard battle; emits `build/states/battle_entry.mss`
   (field, ~5 s before the trigger) and `build/states/first_battle.mss`
   (in battle) plus progress screenshots.
 - `battle_smoke.lua` - loads `first_battle.mss` and asserts battle liveness,
   logging monster IDs and party HP.
 - `smoke.lua` - original ROM-content smoke test (OCTO name bytes).
 - `battle_entry.lua` - FAST battle-entry regression test: loads
-  `battle_doorstep.mss` and walks into the first battle (~30 s wall clock,
+  `battle_entry.mss` and walks into the first battle (~30 s wall clock,
   PASS/FAIL on whether the battle engine actually comes up).  This is the
   tight iteration loop for battle/break-system changes.
 - `battle_firebeam.lua` - full interaction test: entry point -> fresh battle ->
@@ -227,13 +227,13 @@ set -- and never creates `SaveStates/`.)
   dumps at +0/+60/+180/+420/+900/+1500/+2400 frames.
 - `gen_whelk_poweron.lua` - the suite's whelk generator: COLD POWER-ON ->
   intro -> Narshe streets -> mines -> BFS to (42,6); emits
-  `build/states/whelk_doorstep.mss` (field, one tile short of the
+  `build/states/whelk_entry.mss` (field, one tile short of the
   trigger) plus a positive-control `whelk_battle` screenshot.  Needs no
   save file at all, so it works on a fresh clone; byte-identical every
   run.  The state is CAPTURED, then VALIDATED, then emitted: a sweep
   replays it at four spread frame phases and requires of each that the
   Whelk fight comes up, a battle command menu opens, and a command list
-  actually draws.  A run that fails leaves no `whelk_doorstep.mss` at
+  actually draws.  A run that fails leaves no `whelk_entry.mss` at
   all rather than an unvalidated one.  The sweep exists because the
   fixture's frame phase seeds the battle RNG (`lda $021e / asl2 /
   sta $be`, battle_main.asm:6092-6094) and therefore picks whose menu
@@ -249,7 +249,7 @@ set -- and never creates `SaveStates/`.)
   Kept because probe_slots and the balance instruments still consume
   `make_srm_sidecar.sh` saves; requires a pre-Whelk save, which does not
   exist locally.
-- `gen_post_opera_anchor.lua` - provenance generator for the tracked 32 KiB
+- `gen_post_opera_checkpoint.lua` - provenance generator for the tracked 32 KiB
   post-Opera SRAM checkpoint. It settles `blackjack.mss`, uses the real Save UI
   to write slot 3, and relies on `run.sh`'s explicit `OT6_CAPTURE_SRM` mode to
   capture Mesen's file after shutdown.
@@ -261,11 +261,11 @@ set -- and never creates `SaveStates/`.)
   and silently corrupts the live `$1188` event-timer block in WRAM (SRAM is
   pushed first and stays correct).  `probe_banquet_timer_save.lua` is the
   pad-input template.
-- `gen_vector_doorstep.lua` - cold boots with the verified post-Opera
+- `gen_vector_entry.lua` - cold boots with the verified post-Opera
   checkpoint,
   drives vanilla Continue, checks story state plus the slot-3 OT6 codex page,
   then WALKS THE WORLD to the Vector event trigger at (121,187) and generates
-  `vector_doorstep` on map 242.  Vector has no entrance record at all; it is
+  `vector_entry` on map 242.  Vector has no entrance record at all; it is
   `event_trigger.asm:36-37` -> `_ca5ecf` -> `load_map 242 {32,61}`, so the
   opening segment is an on-foot world walk through an area with random
   encounters fully enabled
@@ -275,13 +275,13 @@ set -- and never creates `SaveStates/`.)
   Albrook map transition first and required to say "ALBROOK", so it cannot pass by
   returning nothing.  The rest of the Vector chain (`gen_vector_sneak`,
   `gen_mrf_entry`, `gen_mrf_chute`, `gen_mrf_263`, `gen_mrf_kefka`,
-  `gen_ifrit_doorstep`, `gen_ifrit_magicite`, `gen_n024_doorstep`,
-  `gen_esper_tubes`, `gen_esper_tubes_done`, `gen_minecart_doorstep`) chains
+  `gen_ifrit_entry`, `gen_ifrit_magicite`, `gen_n024_entry`,
+  `gen_esper_tubes`, `gen_esper_tubes_done`, `gen_minecart_entry`) chains
   off it; each generator's header documents the mechanism it had to measure.
   `gen_n128.lua` is written but does NOT produce a savestate -- see its header
   and `probe_train_tail.lua`.
 - `gen_edgar.lua` - THE WHOLE FIGARO CHAPTER, entrance to world map: walks
-  `figaro_doorstep.mss` in, buys the BioBlaster + NoiseBlaster from the
+  `figaro_entry.mss` in, buys the BioBlaster + NoiseBlaster from the
   tool merchant (the ONLY window - the merchant refuses once EDGAR or
   SABIN is in the party), takes Edgar's audience, crosses the
   castle to the MATRON and rides her flashback, which is what puts
@@ -304,8 +304,8 @@ set -- and never creates `SaveStates/`.)
   beats it stops short of.
 - `gen_kolts.lua` - tier 2's last route segment: figaro_cleared (world map,
   ON A CHOCOBO) to just before the Vargas fight on Mt. Kolts.  Generates
-  `south_figaro.mss` (frame 6699), `kolts_doorstep.mss` (8133) and
-  `vargas_doorstep.mss` (20240).  Its header documents three mechanisms
+  `south_figaro.mss` (frame 6699), `kolts_entry.mss` (8133) and
+  `vargas_entry.mss` (20240).  Its header documents three mechanisms
   no table in the ROM gives you: the CHOCOBO DISMOUNT (InitChoco never
   writes $E0/$E2, so worldNavTo cannot plan until a held B walks the
   LandAirship -> descent -> ExitVehicle -> ReloadMap -> InitWorld chain),
@@ -319,7 +319,7 @@ set -- and never creates `SaveStates/`.)
   wait on `hasControl`, because the caves' async cutscenes flip the
   party's movement-type byte every few frames.
 - `gen_vargas.lua` - the fight, and the chain's last tier-2 link:
-  boots vargas_doorstep, clamps Vargas under his own script's second
+  boots vargas_entry, clamps Vargas under his own script's second
   threshold so `battle_event $07/$08` put SABIN on the field, kills him
   with a real PUMMEL input, rides the reunion and generates `vargas_won.mss`
   (frame 11426, SABIN level 9 in the party for good).
@@ -539,8 +539,8 @@ is tree-local for them too (see compose.py's resolve_sidecar).
 
 **Registering it in the suite.**  A test opts into `make test` with a
 first-line marker in its own file -- `-- @suite` (plain), `-- @suite slow`
-(a long-runner; an LPT scheduling hint), or `-- @suite frontier=<fixture>`
-(runs only once `make frontier` has generated `build/states/<fixture>.mss`).
+(a long-runner; an LPT scheduling hint), or `-- @suite savestate=<fixture>`
+(runs only once `make savestates` has generated `build/states/<fixture>.mss`).
 Adding a test is thus a one-line edit to that test, never to a shared list;
 `tools/tests/suite.sh --list` shows what discovery resolved, and the marker
 grammar is documented at the head of `tools/tests/suite.sh`.

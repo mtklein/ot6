@@ -260,27 +260,27 @@ python3 "$ROOT/tools/tests/lib/pin_test_saves.py" \
 # cross-run coupling channel (and fossilizes into generated savestates).
 # Tests that need a save inject it explicitly (SRM sidecars).
 rm -f "$TEST_SAVES"/*.srm
-if [ -n "${OT6_SRAM_ANCHOR:-}" ]; then
+if [ -n "${OT6_SRAM_CHECKPOINT:-}" ]; then
   # THE persistent_layout CHECK (issue #25).  A generator step declares the
   # persistent-SRAM layout it understands with a marker comment in its script,
   #
-  #     [dash][dash] OT6_ANCHOR_LAYOUT: ot6-codex-o8-v1
+  #     [dash][dash] OT6_CHECKPOINT_LAYOUT: ot6-codex-o8-v1
   #
   # (spelled as a real Lua comment at the start of a line; not written out
   # here so THIS file can never satisfy the grep).  The declaration rides
   # the script itself rather than an env var, so every consumer -- savestate
   # generation, smoke, a bare manual run.sh -- gets the same refusal with no
-  # caller wiring, and it survives composition (comments do).  sram_anchor.py
+  # caller wiring, and it survives composition (comments do).  sram_checkpoint.py
   # compares it against the checkpoint manifest's persistent_layout and refuses
   # a mismatch NAMING BOTH STRINGS, here, before the emulator boots: a
   # schema-drift stale checkpoint must be a named refusal, never an in-emulator
   # timeout.  A step with no marker declares support for nothing and is
   # refused too -- fail closed, or the check only guards steps that opted in.
-  ANCHOR_LAYOUT=$(sed -n 's/^-- OT6_ANCHOR_LAYOUT: *\([^ ]*\).*$/\1/p' "$COMPOSED" | head -n 1)
-  python3 "$ROOT/tools/tests/lib/sram_anchor.py" materialize \
-    "$OT6_SRAM_ANCHOR" "$TEST_SAVES/$(basename "$ROM" .sfc).srm" \
-    "$ANCHOR_LAYOUT" ||
-    { echo "invalid SRAM anchor: $OT6_SRAM_ANCHOR (refused BEFORE boot)"; exit 2; }
+  CHECKPOINT_LAYOUT=$(sed -n 's/^-- OT6_CHECKPOINT_LAYOUT: *\([^ ]*\).*$/\1/p' "$COMPOSED" | head -n 1)
+  python3 "$ROOT/tools/tests/lib/sram_checkpoint.py" materialize \
+    "$OT6_SRAM_CHECKPOINT" "$TEST_SAVES/$(basename "$ROM" .sfc).srm" \
+    "$CHECKPOINT_LAYOUT" ||
+    { echo "invalid SRAM checkpoint: $OT6_SRAM_CHECKPOINT (refused BEFORE boot)"; exit 2; }
 fi
 # --timeout: Mesen's testrunner has a hard DEFAULT 100-second wall-clock
 # cap (exit -1/255 + truncated stdout on expiry) that killed long runs; keep
@@ -312,7 +312,7 @@ CAP="${OT6_TIMEOUT:-600}"
 # clothing, and it would silently launder a flaky test into a green one.  A
 # no-verdict run that died WELL SHORT of the cap is not retried either: that
 # is a Lua load error, which is deterministic and will fail identically.
-RETRIES="${OT6_REAP_RETRIES:-1}"
+RETRIES="${OT6_TIMEOUT_RETRIES:-1}"
 attempt=0
 retried=0
 while :; do
@@ -370,19 +370,19 @@ else
   # script prints it for a direct invocation, and it is inside
   # build/states/suite_<test>.log for a suite one.  decode_b64 has already
   # read the log, so appending now is safe.
-  reap() { printf '[ot6] %s\n' "$@" >> "$RUN_LOG"; }
+  timeout_note() { printf '[ot6] %s\n' "$@" >> "$RUN_LOG"; }
   if [ $(( elapsed + 5 )) -ge "$CAP" ]; then
-    reap "KILLED BY THE TIMEOUT: no verdict, and the run lasted ${elapsed}s against a ${CAP}s wall-clock cap (--timeout).  Mesen killed it; it did not crash." \
+    timeout_note "KILLED BY THE TIMEOUT: no verdict, and the run lasted ${elapsed}s against a ${CAP}s wall-clock cap (--timeout).  Mesen killed it; it did not crash." \
          "  This is the FINAL attempt: the harness already retried it ${retried} time(s)" \
-         "  automatically (OT6_REAP_RETRIES=${RETRIES}), so the cap is not merely being" \
+         "  automatically (OT6_TIMEOUT_RETRIES=${RETRIES}), so the cap is not merely being" \
          "  grazed -- this run cannot finish inside it on this machine right now." \
          "  Load right now: $(uptime | sed 's/.*load average/load average/')" \
          "  The cap is wall clock, so nice(1) does not protect it -- concurrent" \
          "  jobs are all equally niced and starve each other." \
          "  Next: raise the cap for this run (OT6_TIMEOUT=1200), allow more" \
-         "  retries (OT6_REAP_RETRIES=3), or lower parallelism (NINJAFLAGS=-j2)."
+         "  retries (OT6_TIMEOUT_RETRIES=3), or lower parallelism (NINJAFLAGS=-j2)."
   elif [ "$verdict" -ne 0 ]; then
-    reap "no verdict after ${elapsed}s (cap ${CAP}s): the script died before reaching PASS or FAIL." \
+    timeout_note "no verdict after ${elapsed}s (cap ${CAP}s): the script died before reaching PASS or FAIL." \
          "  Well short of the cap, so this is NOT a timeout kill -- read this log for a Lua load error."
   fi
 fi
@@ -412,28 +412,28 @@ if [ "$verdict" -eq 0 ] && [ -n "${OT6_CAPTURE_SRM:-}" ]; then
     publish_file "$captured" "$OT6_CAPTURE_SRM"
     # Provenance sidecar (issue #75 step 5): record MECHANICALLY what cut
     # this battery -- the capturing generator's provenance signature (from
-    # the one authority, frontier_stamp.sh), plus the hash of everything the
+    # the one authority, savestate_stamp.sh), plus the hash of everything the
     # run booted FROM: the stamp of each savestate compose embedded (read off
     # the composed file's own `-- state` provenance lines) and, when the
     # run Continued from a prior checkpoint, that checkpoint's manifest.  The
-    # sidecar lands beside the payload; `sram_anchor.py seal` folds it
+    # sidecar lands beside the payload; `sram_checkpoint.py seal` folds it
     # into manifest.json.  A capture that cannot state its provenance is
     # refused outright -- a checkpoint is a root of the generated chain, and
     # an unprovable root is the exact thing this program exists to stop
     # generating.
     gen=$(basename "$SCRIPT" .lua)
-    anchor_extras=""
+    checkpoint_extras=""
     adir=""
-    if [ -n "${OT6_SRAM_ANCHOR:-}" ]; then
-      adir="$OT6_SRAM_ANCHOR"
+    if [ -n "${OT6_SRAM_CHECKPOINT:-}" ]; then
+      adir="$OT6_SRAM_CHECKPOINT"
       case "$adir" in "$ROOT"/*) adir="${adir#"$ROOT"/}" ;; esac
-      anchor_extras="$adir/manifest.json"
+      checkpoint_extras="$adir/manifest.json"
       for p in "$ROOT/$adir"/*.sram; do
-        [ -f "$p" ] && anchor_extras="$anchor_extras $adir/$(basename "$p")"
+        [ -f "$p" ] && checkpoint_extras="$checkpoint_extras $adir/$(basename "$p")"
       done
     fi
     # shellcheck disable=SC2086 -- extras/ancestors are space-separated lists
-    if mint_sig=$(sh "$ROOT/tools/tests/lib/frontier_stamp.sh" sig "$gen" $anchor_extras); then
+    if generator_sig=$(sh "$ROOT/tools/tests/lib/savestate_stamp.sh" sig "$gen" $checkpoint_extras); then
       ancestors=$(
         sed -n 's/^-- state \([A-Za-z0-9_]*\)\.mss\.lua .*/\1/p' "$COMPOSED" |
           while IFS= read -r s; do
@@ -443,9 +443,9 @@ if [ "$verdict" -eq 0 ] && [ -n "${OT6_CAPTURE_SRM:-}" ]; then
       [ -z "$adir" ] || ancestors="$adir/manifest.json
 $ancestors"
       # shellcheck disable=SC2086
-      python3 "$ROOT/tools/tests/lib/sram_anchor.py" capture "$ROOT" \
+      python3 "$ROOT/tools/tests/lib/sram_checkpoint.py" capture "$ROOT" \
         "$OT6_CAPTURE_SRM.provenance.json" "$OT6_CAPTURE_SRM" \
-        "$mint_sig" $ancestors ||
+        "$generator_sig" $ancestors ||
         { echo "capture provenance sidecar failed for $OT6_CAPTURE_SRM"; verdict=2; }
     else
       echo "capture refused: cannot derive a provenance signature for $SCRIPT" \
@@ -465,7 +465,7 @@ publish_file "$RUN_LOG" "$LOG"
 # the stamp check would regenerate it anyway.
 #
 # A GENERATING EDGE PUBLISHES ONLY ITS OWN ARTIFACTS (issue #30).
-# OT6_EXPECT_ARTIFACT is set exactly by frontier_ninja.py's `mint` rule, naming
+# OT6_EXPECT_ARTIFACT is set exactly by savestate_ninja.py's `generate` rule, naming
 # the ONE state the invoking ninja edge is for.  A script that generates several
 # states emits EVERY sibling state on every invocation (gen_edgar plays the
 # whole Figaro chapter and emits all
@@ -475,14 +475,14 @@ publish_file "$RUN_LOG" "$LOG"
 # mtimes.  For gen_edgar's figaro_cleared edge that meant republishing
 # figaro_matron.mss -- its own INPUT -- after its own outputs (the "$ART"/*
 # glob publishes cleared before matron), so ninja saw input-newer-than-output
-# forever and consecutive `make frontier` runs regenerated every such
+# forever and consecutive `make savestates` runs regenerated every such
 # multi-state family and its downstream trunk with zero content changes.
 # The sibling copies this run just emitted are deliberately DISCARDED, not
 # moved: every sibling has its own edge, so the published copy is always the one whose
-# edge ninja scheduled and whose stamp frontier_stamp.sh wrote.  Screenshots
+# edge ninja scheduled and whose stamp savestate_stamp.sh wrote.  Screenshots
 # still publish either way -- they are forensic output, not scheduled ninja
 # outputs, and no edge declares them.
-# frontier_ninja_selftest.sh's stub run.sh MIRRORS this block; keep in lockstep.
+# savestate_ninja_selftest.sh's stub run.sh MIRRORS this block; keep in lockstep.
 if [ "$verdict" -eq 0 ] && [ -z "${OT6_NO_PUBLISH:-}" ]; then
   if [ -n "${OT6_EXPECT_ARTIFACT:-}" ]; then
     for src in $OT6_EXPECT_ARTIFACT; do

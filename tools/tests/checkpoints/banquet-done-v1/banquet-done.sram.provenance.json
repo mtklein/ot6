@@ -1,0 +1,11 @@
+{
+  "format": "ot6-provenance/v1",
+  "payload_sha256": "80a368767f817146d65be7cdfc06fcd847351a651070f1231cf0acad5cf6aeba",
+  "generator_sig": "5c1795a8e8007f91b89980844f03abd28b4c083f8ce4f027d62e91e4c6bbeeb1 gen_banquet_done tools/tests/checkpoints/vector-crash-v1/manifest.json tools/tests/checkpoints/vector-crash-v1/vector-crash.sram",
+  "ancestors": [
+    {
+      "path": "tools/tests/checkpoints/vector-crash-v1/manifest.json",
+      "sha256": "dcf7e8dc35482f4d7d4127ee2ed354b317ffa6c77d4fda022becbc279defe82e"
+    }
+  ]
+}

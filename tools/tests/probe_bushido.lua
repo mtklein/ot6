@@ -18,7 +18,7 @@
 --   4. what does a short A press in the window latch, and what attack id
 --      reaches $3410 ("last spell used", InitTarget_02 battle_main.asm:6545)?
 local H = dofile("tools/tests/lib/ot6.lua")
-local STATE = "build/states/battle_doorstep.mss.lua"
+local STATE = "build/states/battle_entry.mss.lua"
 
 local MENU, ACTOR, MSTATE, BAR, KNOWN = 0x7BCA, 0x62CA, 0x7BC2, 0x7B82, 0x2020
 local PARTY = { 0, 1, 2 }

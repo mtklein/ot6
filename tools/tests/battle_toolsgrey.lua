@@ -1,4 +1,4 @@
--- @suite frontier=kolts_cave slow
+-- @suite savestate=kolts_cave slow
 -- battle_toolsgrey.lua -- v0.5 MP costs: the Tools window greys what Edgar
 -- can't afford, the twin of battle_blitzgrey on the REAL tools window.
 --

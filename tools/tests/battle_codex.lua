@@ -14,7 +14,7 @@
 -- test ever splits.)  It keeps its waivers, and it MAY NEVER PRODUCE
 -- FIXTURES.
 local H = dofile("tools/tests/lib/ot6.lua")
-local STATE = "build/states/battle_doorstep.mss.lua"
+local STATE = "build/states/battle_entry.mss.lua"
 local function sram(addr) return emu.read(addr, emu.memType.snesMemory) end
 H.run({ maxFrames = 45000 }, {
   H.waitFrames(20),

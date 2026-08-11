@@ -1,0 +1,11 @@
+{
+  "format": "ot6-provenance/v1",
+  "payload_sha256": "1ca43365896992db32ad4ccd2fdc68f44a7ed319050e9ffd1f59e14315c5701b",
+  "generator_sig": "bae6a52052d8d0df84299c058df57d98974af4ad421c1f2f3718311ed6ec6337 gen_terra_returned_checkpoint",
+  "ancestors": [
+    {
+      "path": "build/states/n128_won.stamp",
+      "sha256": "c9f688ea29f8337cd74ffbb30df9885426d800d2f0542e51dcc5d915a52d91e7"
+    }
+  ]
+}

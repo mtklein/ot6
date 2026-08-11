@@ -4,8 +4,8 @@
 -- Generates three states:
 --   south_figaro.mss    map 75 (1,28), the town's west gate (a fixture the
 --                       v0.3 Locke scenario will want)
---   kolts_doorstep.mss  map 95 (14,35), the mountain's entrance map
---   vargas_doorstep.mss map 98, party tile-aligned next to VARGAS with his
+--   kolts_entry.mss  map 95 (14,35), the mountain's entrance map
+--   vargas_entry.mss map 98, party tile-aligned next to VARGAS with his
 --                       approach event already run -- one interaction short
 --                       of `battle 66`
 --
@@ -808,10 +808,10 @@ H.run({ maxFrames = 400000 }, {
     where("kolts entry point")
   end),
   care("kolts entry point"),
-  H.call(function() H.screenshot("kolts_doorstep") end),
-  H.saveState("kolts_doorstep.mss"),
+  H.call(function() H.screenshot("kolts_entry") end),
+  H.saveState("kolts_entry.mss"),
   H.logStep(function()
-    return string.format("kolts_doorstep generated at frame %d", H.frame)
+    return string.format("kolts_entry generated at frame %d", H.frame)
   end),
 
   -- ===================================================================== --
@@ -986,10 +986,10 @@ H.run({ maxFrames = 400000 }, {
     H.assertEq((H.readByte(0x1854 + 0) & 0x20) ~= 0, true, "EDGAR back row")
     H.assertEq((H.readByte(0x1851 + 0) & 0x20) == 0, true, "LOCKE front row")
     where("vargas entry point")
-    H.screenshot("vargas_doorstep")
+    H.screenshot("vargas_entry")
   end),
-  H.saveState("vargas_doorstep.mss"),
+  H.saveState("vargas_entry.mss"),
   H.logStep(function()
-    return string.format("vargas_doorstep generated at frame %d", H.frame)
+    return string.format("vargas_entry generated at frame %d", H.frame)
   end),
 })

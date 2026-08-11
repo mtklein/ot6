@@ -6,7 +6,7 @@
 --   narshe_battle.mss   the defense LIVE: parties assigned and parked at
 --                       {20,10}/{18,10}/{22,10}, twelve marches walking,
 --                       $0132=1, first controllable frame after "Go!!"
---   kefka_doorstep.mss  party 1 at (19,36), KEFKA one tile below, the
+--   kefka_entry.mss  party 1 at (19,36), KEFKA one tile below, the
 --                       descent done -- battle_kefka's boot (a suite test
 --                       must be a pure savestate load + a short fight,
 --                       not a 5,400-frame descent)
@@ -677,9 +677,9 @@ H.run({ maxFrames = 600000 }, {
     H.assertEq(H.readByte(0x1a6d), 1, "still party 1")
     H.log(string.format("[entry point] f%d after %d fights (all attempts)",
       H.frame, fights))
-    H.screenshot("kefka_doorstep")
+    H.screenshot("kefka_entry")
   end),
-  H.saveState("kefka_doorstep.mss"),
+  H.saveState("kefka_entry.mss"),
 
   -- ==================================================================== --
   -- 4. KEFKA, PLAYED: up to three input-driven attempts off the entry point
@@ -714,7 +714,7 @@ H.run({ maxFrames = 600000 }, {
   -- 5. STOP AT THE STOP LINE.  The real win above IS v0.3's milestone;
   --    everything after it (the esper scene, Arvis, the walk to control)
   --    is v0.4's first link and stalls the walker (issue #3).  The tail
-  --    lives in gen_kefka_won.lua, deliberately outside FRONTIER.
+  --    lives in gen_kefka_won.lua, deliberately outside SAVESTATES.
   -- ==================================================================== --
   H.call(function()
     local atSave = H.fieldX() == 25 and H.fieldY() == 5

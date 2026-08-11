@@ -39,8 +39,8 @@
 -- (64,10)).  ONE generator does the step AND cuts the checkpoint,
 -- gen_narshe_mission's shape.
 --
--- OT6_ANCHOR_LAYOUT: ot6-codex-o8-v1
--- ^ run.sh refuses -- BEFORE boot -- any OT6_SRAM_ANCHOR whose manifest
+-- OT6_CHECKPOINT_LAYOUT: ot6-codex-o8-v1
+-- ^ run.sh refuses -- BEFORE boot -- any OT6_SRAM_CHECKPOINT whose manifest
 --   declares a different persistent_layout.
 local H = dofile("tools/tests/lib/ot6.lua")
 
@@ -76,7 +76,7 @@ local function spec385(over)
   return s
 end
 
--- gen_vector_doorstep's grind-and-replan world walker
+-- gen_vector_entry's grind-and-replan world walker
 local function worldGrind(tx, ty, what)
   local plan, idx, ph = nil, 1, 0
   return H.driveUntil(function()
@@ -333,7 +333,7 @@ H.run({ maxFrames = 200000 }, {
     H.assertEq(partyOf(0x04), 1, "EDGAR in party 1")
     H.assertEq(partyOf(0x05), 1, "SABIN in party 1")
     H.assertEq(partyOf(0x09), 0, "SETZER benched")
-    H.screenshot("leg_gh_swapped")
+    H.screenshot("step_gh_swapped")
   end),
 
   -- ---- 3. wheel, fly to the base pass, walk the base, into the cave ------
@@ -435,7 +435,7 @@ H.run({ maxFrames = 200000 }, {
   H.call(function()
     H.assertEq(H.fieldX(), 26, "384 landing x")
     H.assertEq(H.fieldY(), 8, "384 landing y")
-    H.screenshot("leg_gh_384")
+    H.screenshot("step_gh_384")
   end),
 
   -- ---- 5. BASEMENT 3's south loop, the door switch, the save point --------
@@ -511,7 +511,7 @@ H.run({ maxFrames = 200000 }, {
     H.assertEq(sw(0x01BF), 1, "$01BF SET -- the SavePoint script ran")
     H.assertEq(sw(0x01B5), 1, "$01B5 SET -- the once-per-tile latch")
     H.assertExitContractPreSave("gate-cave-save-v1")
-    H.screenshot("leg_gh_save_tile")
+    H.screenshot("step_gh_save_tile")
   end),
   -- THE STEP'S SAVESTATE IS GENERATED HERE, on the save tile, before the menu
   H.saveState("gate_cave_save.mss"),
@@ -598,7 +598,7 @@ H.run({ maxFrames = 200000 }, {
   H.waitFrames(45),
   H.call(function()
     H.assertExitContract("gate-cave-save-v1")
-    H.screenshot("leg_gh_saved")
+    H.screenshot("step_gh_saved")
   end),
   H.logStep(function()
     return string.format("gate-cave-save-v1 saved via the real Save UI at "

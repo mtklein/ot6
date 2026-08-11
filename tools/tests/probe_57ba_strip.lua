@@ -6,7 +6,7 @@
 --            Ot6MarkRandom's $57BC write from the field trigger, the
 --            InitBP consume into $57BD) ->
 --            fight mashed to victory (exercises Ot6RewardScale reads).
---   phase 2: whelk_doorstep -> the dialog-opening boss fight, mashed
+--   phase 2: whelk_entry -> the dialog-opening boss fight, mashed
 --            for ~6000 frames: battle DIALOGS ($0B6E/$0B6F + the
 --            shell's "Gruuu......") and fire-beam attack-name BANNERS
 --            both run, the exact family that clobbered $57D5+.
@@ -15,7 +15,7 @@
 
 local H = dofile("tools/tests/lib/ot6.lua")
 local MINES = "build/states/mines_chase.mss.lua"
-local WHELK = "build/states/whelk_doorstep.mss.lua"
+local WHELK = "build/states/whelk_entry.mss.lua"
 
 local hits = {}       -- addr -> { count, pcs = {pcstr -> n} }
 local foreign = {}    -- strip writes from outside bank $F0

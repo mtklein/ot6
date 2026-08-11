@@ -187,7 +187,7 @@ H.run({ maxFrames = 60000 }, {
     H.assertEq(H.fieldX(), 19, "above the chute x")
     H.assertEq(H.fieldY(), 22, "above the chute y")
     H.log(string.format("[chute] poised at (%d,%d)", H.fieldX(), H.fieldY()))
-    H.screenshot("mrf_chute_doorstep")
+    H.screenshot("mrf_chute_entry")
   end),
 
   -- 2. three tapped DOWN steps: {19,23} and {19,24} animate the door open,

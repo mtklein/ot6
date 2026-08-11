@@ -1,5 +1,5 @@
 -- probe_runic_recon.lua -- READ-ONLY recon for battle_runic's #75 conversion
--- (the measured redirect off n024_doorstep, where a two-man party dies
+-- (the measured redirect off n024_entry, where a two-man party dies
 -- inside runic's multi-arm exposure).  Buttons and eyes only.
 --
 -- RUN 1 (vector_sneak) settled the field facts and one dispatch error:
@@ -42,10 +42,10 @@
 --   3. Temper: what does an unattended party eat here?
 --   4. Do the formations flee on their own, and does L+R work?
 --
---   OT6_SRAM_ANCHOR=tools/tests/anchors/post-opera-v1 \
+--   OT6_SRAM_CHECKPOINT=tools/tests/checkpoints/post-opera-v1 \
 --     tools/tests/run.sh tools/tests/probe_runic_recon.lua
 --
--- OT6_ANCHOR_LAYOUT: ot6-codex-o8-v1
+-- OT6_CHECKPOINT_LAYOUT: ot6-codex-o8-v1
 local H = dofile("tools/tests/lib/ot6.lua")
 
 local MAGIC_PROP = 0x046AC0

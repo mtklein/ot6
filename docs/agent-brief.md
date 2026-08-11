@@ -71,7 +71,7 @@ Targeted regeneration is yours: `nice -n 10 ninja -f build/build.ninja <state>`
 regenerates exactly what a state needs. Use them freely — a stale fixture is
 not a reason to ship "could not establish."
 
-The **full** chain (`make frontier`, `frontier-test`, `release-test`, which
+The **full** chain (`make savestates`, `savestates-test`, `release-test`, which
 regenerate every savestate the deeper tests load) stays with the dispatcher
 unless your dispatch grants it: it is long and serial, and only one agent
 can own it at a time.
@@ -113,7 +113,7 @@ generations failing `code=255` at once while the same ones pass in
 isolation. If you see that, it is contention, not your change — lower
 `-j` and retry rather than debugging the generator.
 
-A **full** `make frontier` is the case that provokes it, because it
+A **full** `make savestates` is the case that provokes it, because it
 parallelises hard on its own. Bound it (`NINJAFLAGS=-j4`) when other
 agents are live.
 

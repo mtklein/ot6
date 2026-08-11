@@ -3,7 +3,7 @@
 --
 --   tools/tests/run.sh tools/tests/battle_firebeam.lua
 --
--- Loads build/states/battle_doorstep.mss (a FIELD state), walks north into
+-- Loads build/states/battle_entry.mss (a FIELD state), walks north into
 -- the scripted guard battle, waits for the battle to come up, then presses
 -- A (command: MagiTek) / A (Fire Beam) / A (confirm target) and watches the
 -- action resolve.  Screenshots before/during/after plus break-system RAM:
@@ -19,7 +19,7 @@
 -- visibly resolved; 1 = any stage failed (each is asserted loudly).
 
 local H = dofile("tools/tests/lib/ot6.lua")
-local STATE = "build/states/battle_doorstep.mss.lua"
+local STATE = "build/states/battle_entry.mss.lua"
 
 local function ramReport(tag)
   return H.call(function()

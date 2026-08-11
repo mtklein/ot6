@@ -1,0 +1,11 @@
+{
+  "format": "ot6-provenance/v1",
+  "payload_sha256": "fb4cf77576c27973088015184fb688eb18a905a997b4b264eb099ee111784054",
+  "generator_sig": "5006fa11a6f8f42d642ed31aacb06e5fe1645041156034b5b0e226408a6a19af gen_gate_cave_save tools/tests/checkpoints/narshe-mission-v1/manifest.json tools/tests/checkpoints/narshe-mission-v1/narshe-mission.sram",
+  "ancestors": [
+    {
+      "path": "tools/tests/checkpoints/narshe-mission-v1/manifest.json",
+      "sha256": "cd9f2683dc0e0e997816390ebf790870267e2ba7d4038d564a074c675fbb6c06"
+    }
+  ]
+}

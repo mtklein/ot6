@@ -100,8 +100,8 @@ tools/tests/probe_ctrboost.lua	.writeWord(
 tools/tests/probe_cursorgutter.lua	.writeByte(
 tools/tests/probe_dottick.lua	.writeByte(
 tools/tests/probe_dottick.lua	.writeWord(
-tools/tests/probe_esperdetail_anchor.lua	.writeByte(
-tools/tests/probe_esperdetail_tube6_anchor.lua	.writeByte(
+tools/tests/probe_esperdetail_checkpoint.lua	.writeByte(
+tools/tests/probe_esperdetail_tube6_checkpoint.lua	.writeByte(
 tools/tests/probe_fieldicons.lua	.writeByte(
 tools/tests/probe_input.lua	.writeByte(
 tools/tests/probe_input.lua	emu.write

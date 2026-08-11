@@ -1,0 +1,20 @@
+{
+  "schema": "ot6.sram-checkpoint/v1",
+  "payload": "minecart-platform.sram",
+  "size": 32768,
+  "sha256": "71efcae3095a35de13bfe106f75a627e0304e3e15a4e4af3fff4fcee55dcc12b",
+  "slot": 3,
+  "milestone": "minecart-platform",
+  "provenance": {
+    "format": "ot6-provenance/v1",
+    "payload_sha256": "71efcae3095a35de13bfe106f75a627e0304e3e15a4e4af3fff4fcee55dcc12b",
+    "generator_sig": "8beda179e30dff16a6500d78f72ed09611c2ef7e2196b5c8b793970fb8514c37 gen_minecart_platform_checkpoint",
+    "ancestors": [
+      {
+        "path": "build/states/minecart_entry.stamp",
+        "sha256": "ca1acea2a6ebe56bee33bc6b50a0445ee2fd8cf790178b14219d07991d2fe81c"
+      }
+    ]
+  },
+  "persistent_layout": "ot6-codex-o8-v1"
+}

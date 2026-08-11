@@ -23,7 +23,7 @@
 -- Cell asserts only, no pixel compares: insensitive to savestate
 -- regeneration, deterministic.
 local H = dofile("tools/tests/lib/ot6.lua")
-local STATE = "build/states/whelk_doorstep.mss.lua"
+local STATE = "build/states/whelk_entry.mss.lua"
 
 local VR = emu.memType.snesVideoRam
 local ROM = emu.memType.snesPrgRom

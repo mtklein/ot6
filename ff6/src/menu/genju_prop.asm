@@ -211,7 +211,7 @@ make_genju_prop {SAFE, 0}, {STOP, 0}, {CURE_2, 0}, {}, {}
 ;   smite + cleanse.  PEARL is BRANCH A of the cross-doc holy decision, DECIDED
 ;   by the dispatcher 2026-07-28 (§9 decision box): the section's pearl
 ;   REACHABILITY stands on Sabin's AuraBolt plus the survey's authored class
-;   rows (break-band-sealed-gate.md), never on this stone -- Unicorn grants
+;   rows (break-coverage-sealed-gate.md), never on this stone -- Unicorn grants
 ;   Pearl as the paladin identity and the big-hit option, its vanilla 40 MP
 ;   keeping it a decision rather than the default swing.  CURE_2 dropped (dead
 ;   pre-folded tier, the Kirin reason); SAFE -> Carbunkl; SHELL stays Shiva's;

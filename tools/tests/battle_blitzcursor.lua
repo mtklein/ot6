@@ -1,4 +1,4 @@
--- @suite frontier=vargas_won slow
+-- @suite savestate=vargas_won slow
 -- battle_blitzcursor.lua -- v0.3 Blitz-as-menu: it obeys Config>Cursor.
 --
 -- Vanilla's battle command lists (Magic, Tools, Item, ...) REMEMBER where the

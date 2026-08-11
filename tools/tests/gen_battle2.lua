@@ -1,7 +1,7 @@
 -- gen_battle2: win fight 1, walk to fight 2 (mixed formation), generate a
--- doorstep2 state and audit clean 16x16 sprite anchors THERE.
+-- entry2 state and audit clean 16x16 sprite anchors THERE.
 local H = dofile("tools/tests/lib/ot6.lua")
-local STATE = "build/states/battle_doorstep.mss.lua"
+local STATE = "build/states/battle_entry.mss.lua"
 
 local function auditAnchors(tag)
   local vr = emu.memType.snesVideoRam
@@ -65,7 +65,7 @@ H.run({ maxFrames = 60000 }, {
     return not H.battleLoadStarted()
   end, 9000, { H.pressButtons({ "a" }, 6), H.waitFrames(24) }, "back to field"),
   H.waitFrames(60),
-  H.saveState("battle2_doorstep.mss"),
+  H.saveState("battle2_entry.mss"),
   H.driveUntil(function() return H.battleLoadStarted() end, 8000, {
     H.hold({ "up" }), H.waitFrames(20), H.release(), H.waitFrames(2),
     H.pressButtons({ "a" }, 4),

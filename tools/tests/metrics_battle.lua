@@ -83,10 +83,10 @@ local H = dofile("tools/tests/lib/ot6.lua")
 -- ------------------------------------------------------------- knobs --
 local POLICY = "boost3"            -- see POLICIES below
 local STATES = {
-  doorstep  = "build/states/battle_doorstep.mss.lua",
-  doorstep2 = "build/states/battle2_doorstep.mss.lua",
+  entry  = "build/states/battle_entry.mss.lua",
+  entry2 = "build/states/battle2_entry.mss.lua",
 }
-local STATE = STATES.doorstep2
+local STATE = STATES.entry2
 local ROUNDS = 0                   -- player actions to record; 0 = to the end
 local SETTLE_EXTRA = 0             -- extra pre-arm frames (rng phase jitter)
 local METRICS_FRAMES = 20000       -- metrics-window frame budget
@@ -122,7 +122,7 @@ local CHARBLK = 0x1600             -- character data blocks, 37 bytes each
 -- attack. $3720 does NOT -- it dispatches _c22188 (`_gaugefull`,
 -- battle_main.asm:5734), the atb-gauge-full handler that only calls
 -- QueueAction and sets up a jump, never damage. Letting it move the
--- shadow was measurably wrong: on battle2_doorstep a Wedge gauge-fill
+-- shadow was measurably wrong: on battle2_entry a Wedge gauge-fill
 -- landed between Terra's action dequeue and Terra's beam, and Terra's
 -- shield chip was credited to Wedge, who had taken no action at all.
 local QUEUES = {
@@ -164,7 +164,7 @@ local function charName(cix)
 end
 -- The IN-BATTLE command list: $202E + slot*12 + i*3, four [cmd,cmd,
 -- targeting] triples. It is indexed by BATTLE SLOT, not by character
--- index -- probed live on battle2_doorstep, where slot 1 (Wedge, char
+-- index -- probed live on battle2_entry, where slot 1 (Wedge, char
 -- $0E) reads Magitek/--/--/Item by slot and garbage by char index. It is
 -- also the only correct source: a magitek-armor body's battle commands
 -- are NOT its character block's (Terra's block says Fight/Morph/Magic/
@@ -531,7 +531,7 @@ end
 -- fires the instant the store executes, mid-frame, whereas the sampler
 -- reads the dequeue pointers at the next frame boundary -- so a chip
 -- landing in the same frame as the dequeue that began its action would
--- see a stale shadow. Measured, not theorised: on battle2_doorstep that
+-- see a stale shadow. Measured, not theorised: on battle2_entry that
 -- lost Terra's opening chip to "unattributed" every run while her damage
 -- attributed correctly one frame later. Queuing the event and draining it
 -- in the sampler AFTER the queue walk puts both on the same shadow. The
@@ -821,7 +821,7 @@ local function report()
   -- last monster dies, which is before the killing action reaches
   -- Ot6ActionEnd, so its bp write is never observed. Measured constant at
   -- -1 across 6/6 world-pool battles regardless of action count (1 or 2)
-  -- and on battle2_doorstep. A skew that GROWS with actions would mean
+  -- and on battle2_entry. A skew that GROWS with actions would mean
   -- the dequeue pairing is wrong; a steady -1 means it is right.
   mline("actions_sum", aSum)
   mline("actions_residual", S.playerActions - aSum)
@@ -875,7 +875,7 @@ H.run({ maxFrames = METRICS_FRAMES + 12000 }, {
     -- seed the actor shadow from the action queue's LAST dequeued entry.
     -- Arming happens 240 frames into the battle, so an action can already
     -- be in flight; without this its damage and chips land in the
-    -- unattributed buckets (measured: 1 of battle2_doorstep's 2 chips).
+    -- unattributed buckets (measured: 1 of battle2_entry's 2 chips).
     local last = (H.readByte(QUEUES[2].ptr) - 1) & 0xff
     local v = H.readByte(QUEUES[2].base + last)
     if (v & 0x80) == 0 then

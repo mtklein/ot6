@@ -7,7 +7,7 @@
 --   * party slot 0 is EMPTY      -- that word reads 0000
 --   * slot 0's character is DEAD -- that word reads 0000
 --
--- Measured on battle_doorstep: field = FFFF FFFF FFFF FFFF, live battle =
+-- Measured on battle_entry: field = FFFF FFFF FFFF FFFF, live battle =
 -- 003F 0044 003D 0000 (slot 3 empty).  So a dead or absent first character
 -- made the gate say "no battle" while the battle was still running -- and
 -- worldNavTo then stopped tapping A and pressed directions into it forever.
@@ -25,7 +25,7 @@
 -- Per the owner-ratified policy on #75, it keeps its waiver, says so
 -- loudly here, and MAY NEVER PRODUCE FIXTURES.
 local H = dofile("tools/tests/lib/ot6.lua")
-local STATE = "battle_doorstep.mss.lua"
+local STATE = "battle_entry.mss.lua"
 local HP = 0x3BF4
 
 local function tbl()

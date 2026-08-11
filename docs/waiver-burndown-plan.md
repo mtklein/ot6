@@ -13,7 +13,7 @@ scaffold), `metrics_battle`, `mines_pace`, `shot_battle_items`,
 
 ## Cross-cutting facts the table leans on
 
-- **`battle_doorstep`/`first_battle` is a MAGITEK party** (Terra/Biggs/
+- **`battle_entry`/`first_battle` is a MAGITEK party** (Terra/Biggs/
   Wedge, no Fight, no Magic, no kits).  That single fact causes ~30 of the
   60 waivers: every "install CHAR::X into $3ED8 + rewrite $202E command
   rows + clear the magitek status bit" block exists only because the
@@ -21,10 +21,10 @@ scaffold), `metrics_battle`, `mines_pace`, `shot_battle_items`,
   **fixture swap**, not by cleverness.
 - **Real-kit fixtures exist**: Cyan →
   `cyan_defence` / `doma_defended` / `camp_escaped`; Sabin → `vargas_won`
-  (L9, Blitz) and `vector_doorstep` (LOCKE CELES SABIN EDGAR, post-opera
-  checkpoint); Edgar → `figaro_cleared`, `vector_doorstep`; Locke+Terra with
+  (L9, Blitz) and `vector_entry` (LOCKE CELES SABIN EDGAR, post-opera
+  checkpoint); Edgar → `figaro_cleared`, `vector_entry`; Locke+Terra with
   Magic and live world encounters → `worldmap_narshe`; Celes →
-  `celes_freed`, `vector_doorstep`; Mog → `moogle_defense` (P2 leader);
+  `celes_freed`, `vector_entry`; Mog → `moogle_defense` (P2 leader);
   Setzer → the terra-returned-v1 checkpoint (`battle_slotsboot` boots it);
   Gau → `gau_joined`; Shadow → `camp_intro` / `camp_escaped`; espers
   really in the bag → `magicite_ifrit_shiva` and `esper_tubes`.
@@ -56,18 +56,18 @@ scaffold), `metrics_battle`, `mines_pace`, `shot_battle_items`,
   `H.fleeBattle()` (L+R).  The subject (navTo release timing on map 242)
   is unaffected by how the interrupting fight ends.  The single cheapest
   waiver line in the set.
-- **battle_kefka** (`frontier=kefka_doorstep`) — party-HP max pin (likely
+- **battle_kefka** (`savestate=kefka_entry`) — party-HP max pin (likely
   a no-op: the fixture is generated one tile from the trigger with a full
   party — measure and delete), ATB hurry, Kefka MHP := 1 after two chips.
   `gen_narshe_battle` beats this exact Kefka on real input; lift that drive.
-- **battle_vargas** (`frontier=vargas_doorstep`) — HP/MP pins at open,
+- **battle_vargas** (`savestate=vargas_entry`) — HP/MP pins at open,
   Ipooh kill-clamp, Vargas MHP clamp under the phase threshold, cursor
   pokes, $202E command installs.  The party just before that fight
   genuinely holds Edgar-with-Tools and Sabin-with-Blitz: read the rows
   instead of installing them; `gen_vargas` kills the boss with a real
   Pummel; cursor → $7BC2 d-pad.  Only the MP pin may need a real check
   first.
-- **battle_naturalmp** (`frontier=kolts_cave`) — the identical danger pin
+- **battle_naturalmp** (`savestate=kolts_cave`) — the identical danger pin
   `77bc4f9` deleted on this very fixture, plus monster stop/HP-floor.
   The MP survey happens at battle init: read MP in the first ~120 frames,
   then flee.
@@ -77,12 +77,12 @@ scaffold), `metrics_battle`, `mines_pace`, `shot_battle_items`,
 - **battle_dmgnum** — bp := 3 handed, guard HP 3000, party HP 900.  Earn
   the bank as `battle_boost` does; choose the non-lethal action; if the
   numeral window is too short, becomes a headroom swap.
-- **codex_saveas** (`frontier=worldmap_narshe`) — $021F force, forged
+- **codex_saveas** (`savestate=worldmap_narshe`) — $021F force, forged
   slot-3 header/codex bytes, zeroing writes that assert an emptiness they
   should read.  Earn the transient page: fight one world encounter, chip
   a shield (the game's own codex write), then save via the Save UI, which
   is already pad-driven.
-- **codex_ctx** (`frontier=worldmap_narshe`, moderate) — kill flag → flee;
+- **codex_ctx** (`savestate=worldmap_narshe`, moderate) — kill flag → flee;
   the two distinguishable codex pages are producible by play: break enemy
   A → save → break enemy B; assert the difference (baseline-change).
 - **battle_reveal_poweron** — already the input-driven half of its pair;
@@ -99,16 +99,16 @@ in the party with the real command row, fight a real encounter, drive lists
 with a $7BC2-driven d-pad.  Per-file specifics:
 
 - **battle_toolslist / battle_toolsgrey** → `figaro_cleared` /
-  `vector_doorstep` (gen_edgar BUYS BioBlaster/NoiseBlaster — real tools
+  `vector_entry` (gen_edgar BUYS BioBlaster/NoiseBlaster — real tools
   exist).  Grey knob: spend MP with real casts until the row greys —
   stronger than a poked pool (proves charge and grey agree).
 - **battle_blitzlist / battle_blitzgrey / battle_blitzcursor** →
-  `vargas_won` / `vector_doorstep`.  Learned set = whatever the save
+  `vargas_won` / `vector_entry`.  Learned set = whatever the save
   holds (the `menu_blitzpage_sabin` doctrine); the 2x2-grid geometry
-  claim needs ≥4 learned blitzes (Sabin L10+ → `vector_doorstep`).
+  claim needs ≥4 learned blitzes (Sabin L10+ → `vector_entry`).
   blitzcursor's Config bit is set in the real field Config menu; a fresh
   command-window open is the next turn, not a $7BC2 poke.
-- **battle_walletmp** → `vector_doorstep`.  Poking $3C08 proves the paint
+- **battle_walletmp** → `vector_entry`.  Poking $3C08 proves the paint
   follows a poke; SPENDING MP proves it follows the game.  The 47→123
   switch becomes two casters with different pools.
 - **battle_bushidogrey / battle_bushido / battle_bushidoloadout /
@@ -123,7 +123,7 @@ with a $7BC2-driven d-pad.  Per-file specifics:
   leveled Cyan (a grind, not an impossible input) or split that one arm
   into a labeled quarantine.  The "make this guard a boss" $3AA1.2 poke
   should become a real boss target instead.
-- **battle_clockwork** → `vector_doorstep` (Setzer) + Cyan fixture.  The
+- **battle_clockwork** → `vector_entry` (Setzer) + Cyan fixture.  The
   chip-without-break window = a real 5-gauge boss (Vargas) chipped by a
   real weapon class.
 - **battle_steal / battle_stealmp / battle_thief** → real Locke fixtures.
@@ -132,7 +132,7 @@ with a $7BC2-driven d-pad.  Per-file specifics:
   the field menu; the $BE RNG arming becomes N sampled attempts and a
   rate assertion (the 3-BP guaranteed arm draws no RNG at all); Bestow
   arithmetic: drive two characters to known banks by counting actions.
-- **battle_runic** → `celes_freed` / `vector_doorstep`.  Muddle exists
+- **battle_runic** → `celes_freed` / `vector_entry`.  Muddle exists
   only to force menu-less casts — with a real party, pick Magic from the
   menu; Runic is a real command and must be issued, not written.
 - **battle_dancemp** → `moogle_defense` (the header's claim that Mog is
@@ -186,7 +186,7 @@ with a $7BC2-driven d-pad.  Per-file specifics:
   single-arm quarantine if measurement shows no numeral-less covering
   action exists — split it if so.
 - **battle_crosslist** → a party with real Magic AND Tools
-  (`figaro_cleared`/`vector_doorstep`).  Kill first: L163's "greyed row
+  (`figaro_cleared`/`vector_entry`).  Kill first: L163's "greyed row
   forced selectable" — the same lying surface the grey tests prevent.
 - **battle_fold / battle_preview / battle_lateboost** →
   `worldmap_narshe` (real Terra, real Fire/Cure).  The fold's ≥51-MP

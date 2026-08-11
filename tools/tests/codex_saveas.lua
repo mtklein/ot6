@@ -1,4 +1,4 @@
--- @suite frontier=worldmap_narshe
+-- @suite savestate=worldmap_narshe
 -- codex_saveas.lua -- an unsaved New Game's transient codex follows its first
 -- real in-game save into the chosen slot.
 --

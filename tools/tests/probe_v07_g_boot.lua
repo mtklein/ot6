@@ -1,8 +1,8 @@
 -- probe_v07_g_boot.lua -- what does a cold Continue of narshe-mission-v1
 -- actually restore?  NOT a suite test.  Run with:
---   OT6_SRAM_ANCHOR=tools/tests/anchors/narshe-mission-v1 \
+--   OT6_SRAM_CHECKPOINT=tools/tests/checkpoints/narshe-mission-v1 \
 --   tools/tests/run.sh tools/tests/probe_v07_g_boot.lua
--- OT6_ANCHOR_LAYOUT: ot6-codex-o8-v1
+-- OT6_CHECKPOINT_LAYOUT: ot6-codex-o8-v1
 local H = dofile("tools/tests/lib/ot6.lua")
 
 local function bright() return emu.getState()["ppu.screenBrightness"] or 0 end

@@ -32,7 +32,7 @@ line it was read from, or is labelled **UNVERIFIED**. Numbers taken out of
 
 A stone's stat package is two bytes in vanilla's own equipment layout — four
 *signed* nibbles, −7..+7 each, over vigor/speed/stamina/mag.pwr
-(`docs/design/esper-stat-ruler.md`). Each stone below moves two or three stats
+(`docs/design/esper-stat-baseline.md`). Each stone below moves two or three stats
 and five of the six carry a **downside**; `ot6_progression.asm`'s table carries
 the per-esper reasoning.
 
@@ -125,7 +125,7 @@ competition every design below must name a win against.
 
 ### 2.2 The cave is an undead stretch that punishes the obvious buttons
 
-Species table from `break-band-sealed-gate.md` §3, extended this pass with the
+Species table from `break-coverage-sealed-gate.md` §3, extended this pass with the
 status-immunity bytes (`monster_prop.dat` +0x14/+0x15/+0x16 = blocked
 STATUS1/2/3; element masks +0x17 absorb / +0x19 weak; STATUS1 `DEAD=$80`,
 `PETRIFY=$40`, `INVISIBLE=$10`, STATUS3 `SLOW=$04`, `STOP=$10` —
@@ -170,7 +170,7 @@ Four findings that shape the designs:
 ### 2.3 The rest of the stretch's fights
 
 The gate battles 121/122 and the deck battle 123 decode to dummy formations
-and are scripted theater (`break-band-sealed-gate.md` §1.3) — no stone is
+and are scripted theater (`break-coverage-sealed-gate.md` §1.3) — no stone is
 designed against them.
 The banquet's optional fights and the 2-minute challenge are real: bolt+water
 keys (Ramuh, Maduin, Sea Song) and a poison key nobody fields with Edgar
@@ -201,7 +201,7 @@ re-expressed through the three real channels (list, stat, divine):
 Stat ladder: the tiers are FIELD (upside +6 across 2 stats, no downside), STORY
 (+8 across 3, downside −2) and BOSS (+10 across 3, downside −3), cut against a
 measurement of vanilla's own equipment ladder
-(`docs/design/esper-stat-ruler.md` §4). The tube six are story-granted, not
+(`docs/design/esper-stat-baseline.md` §4). The tube six are story-granted, not
 fought for, so they sit on **STORY** — with one deliberate exception:
 **Maduin on BOSS**. v0.7 has no boss, Maduin is Terra's inheritance and the
 stretch's crown, and his stone being the strongest stat in the game so far *is*
@@ -475,7 +475,7 @@ all drop from the vanilla five-row.
 **Pearl here is identity, not the cave's reachability.** The stretch's pearl
 key is Sabin's AuraBolt — a 5 MP holy chip, load-bearing since Vargas
 (`ot6_class.asm:172`, record `$5e` elem `$20`) — plus the authored class rows
-in `break-band-sealed-gate.md`; pearl keys 90.6 % of cave draws with zero
+in `break-coverage-sealed-gate.md`; pearl keys 90.6 % of cave draws with zero
 absorbers, and none of that runs through this stone. What Unicorn adds is the
 paladin's smite and the big-hit option. Its costs are real and accepted: power
 108 one-shots this stretch's trash on-weakness (worked number in §10.3), it
@@ -598,7 +598,7 @@ make_genju_prop {VANISH, 0}, {DEMI, 0}, {}, {}, {}
 ; 23: unicorn -- "the Purity" (v0.7, magicite-tube-six.md §9).  The paladin:
 ;   smite + cleanse.  PEARL is the paladin identity and the big-hit option;
 ;   the cave's pearl reachability stands on Sabin's AuraBolt plus the authored
-;   class rows (break-band-sealed-gate.md), never on this stone.
+;   class rows (break-coverage-sealed-gate.md), never on this stone.
 ;   CURE_2 dropped (dead pre-folded tier); SAFE -> Carbunkl; SHELL stays
 ;   Shiva's.
 make_genju_prop {PEARL, 0}, {REMEDY, 0}, {}, {}, {}
@@ -634,7 +634,7 @@ names and the while-worn stat mod directly from these two tables
 
 Same files and shapes as the v0.6 pass: grants/absents in
 `battle_esperstats.lua` scenarios, behavior in `battle_magicite.lua`. All
-rows that depend on this stretch ride v0.7 fixtures (`@suite frontier=<name>`)
+rows that depend on this stretch ride v0.7 fixtures (`@suite savestate=<name>`)
 and report "skipped" until the chain is generated.
 
 | # | assertion | notes |

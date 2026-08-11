@@ -5,7 +5,7 @@
 --   tools/tests/run.sh tools/tests/whelkbal_run.lua build/states/whelkbal_<p>.log
 --
 -- Protocol (bal_mines discipline, adapted to a scripted boss):
---  * every battle starts from an identical loadState(whelk_doorstep);
+--  * every battle starts from an identical loadState(whelk_entry);
 --    battles are fully independent (HP/RNG reset; loadState re-virgins
 --    the codex). The formation is scripted ($0100 shell + $0134 head),
 --    so there are no encounter seeds: battle k decorrelates by SETTLE
@@ -49,7 +49,7 @@ local H = dofile("tools/tests/lib/ot6.lua")
 
 -- ------------------------------------------------------------- knobs --
 local POLICY = "beams"
-local STATE = "build/states/whelk_doorstep.mss.lua"
+local STATE = "build/states/whelk_entry.mss.lua"
 local NBATTLES = 5
 local BATTLE_FRAMES = 20000        -- policy-driven battle budget
 local WHELK = { [0x0134] = true }

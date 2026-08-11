@@ -1,4 +1,4 @@
--- @suite slow frontier=figaro_cleared
+-- @suite slow savestate=figaro_cleared
 -- battle_stealmp.lua -- v0.5 "every ability costs MP": Steal (cmd $05) joins the
 -- cost gate. The SAME self-detecting A/B as battle_mpcost.lua, aimed at the one
 -- costed verb that test does NOT drive -- Locke's Steal -- proving the flat-cost

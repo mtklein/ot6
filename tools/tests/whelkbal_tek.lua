@@ -13,7 +13,7 @@
 -- missile finds the HEAD no matter which part the cursor defaults to.
 
 local H = dofile("tools/tests/lib/ot6.lua")
-local STATE = "build/states/whelk_doorstep.mss.lua"
+local STATE = "build/states/whelk_entry.mss.lua"
 local WHELK = { [0x0134] = true }
 local function whelk()
   return H.battleLoadStarted() and H.formationHas(WHELK)

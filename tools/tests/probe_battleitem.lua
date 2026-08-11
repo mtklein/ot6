@@ -32,12 +32,12 @@
 --
 --   OT6_KEEP_RUNS=1 OT6_NO_PUBLISH=1 tools/tests/run.sh tools/tests/probe_battleitem.lua
 local H = dofile("tools/tests/lib/ot6.lua")
--- vargas_doorstep, not first_battle: the opening battle carries an EMPTY
+-- vargas_entry, not first_battle: the opening battle carries an EMPTY
 -- bag ($2686 reads FF x0 straight across, measured), so there is nothing
 -- to select and the target window never opens.  The Vargas entry point is one
 -- A press from `battle 66` and the party walks in with Tonics, Potions and
 -- Fenix Downs -- a real bag to index into.
-local STATE = "build/states/vargas_doorstep.mss.lua"
+local STATE = "build/states/vargas_entry.mss.lua"
 
 local MSTATE, ACTOR = 0x7BC2, 0x62CA
 local CMDTBL, CMDROW = 0x202E, 0x890F

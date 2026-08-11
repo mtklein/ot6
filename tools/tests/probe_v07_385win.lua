@@ -28,7 +28,7 @@
 -- reachable set in BOTH phases -- the data the (11,3) -> (13,13) plan
 -- needs, which no prior run has measured (cycle B has never been armed
 -- with the room in a driveable state).
--- OT6_ANCHOR_LAYOUT: ot6-codex-o8-v1
+-- OT6_CHECKPOINT_LAYOUT: ot6-codex-o8-v1
 local H = dofile("tools/tests/lib/ot6.lua")
 
 local function map() return H.mapId() & 0x1ff end

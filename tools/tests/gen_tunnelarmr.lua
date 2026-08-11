@@ -3,7 +3,7 @@
 -- to the Figaro cave, to the entry point of the TunnelArmr fight that ends
 -- the Locke scenario.  Generates:
 --   sfigaro_escape.mss    on the world map, out of occupied South Figaro
---   tunnelarmr_doorstep.mss  map 70, one tile short of the (47,38) trigger
+--   tunnelarmr_entry.mss  map 70, one tile short of the (47,38) trigger
 --
 -- THE CLOCK IS THE ESCAPE, and this is the correction to gen_celes's note 6.
 -- All three of the basement's forward exits are dead-end pockets -- map 84's
@@ -34,7 +34,7 @@
 -- Map 87 -- the clock passage -- HAS RANDOM ENCOUNTERS (Vector Pups),
 -- which no earlier step of the basement route does (gen_celes measured its
 -- own maps encounter-free, and this file inherited that assumption).  The
--- 2026-08-09 frontier run parked at (41,43) "with no plan" for 20000
+-- 2026-08-09 savestate run parked at (41,43) "with no plan" for 20000
 -- frames, and the handoff called it the map-75 gate soldier; both halves
 -- of that were wrong.  probe_sfigaro_escape_stall measured the park: it is
 -- map 87, not 75, the event PC sits at $CA0029 -- inside EventScript's
@@ -379,7 +379,7 @@ end
 -- THE RETRY LADDER.  The fight's RNG seed is the frame phase at battle
 -- init (`lda $021e / asl2 / sta $be`, gen_whelk_poweron's measurement),
 -- so a lost fight is retried by reloading the entry point blob captured
--- beside the tunnelarmr_doorstep generate and waiting a different number of
+-- beside the tunnelarmr_entry generate and waiting a different number of
 -- frames before stepping onto the trigger -- each attempt genuinely
 -- plays a different fight.  Three attempts, then fail loudly.
 local MENU, ACTOR, CHID = 0x7BCA, 0x62CA, 0x3ED8
@@ -735,7 +735,7 @@ H.run({ maxFrames = 300000 }, {
       "at the (47,37) entry point, one tile above the trigger")
     H.assertEq(H.hasControl(), true, "controllable at the entry point")
     H.assertEq(sw(0x001E), 0, "$001E clear -- TunnelArmr not fought yet")
-    where("tunnelarmr_doorstep")
+    where("tunnelarmr_entry")
     for c = 0, 15 do
       if (H.readByte(0x1850 + c) & 0x07) ~= 0 then
         local base = 0x1600 + 37 * c
@@ -744,11 +744,11 @@ H.run({ maxFrames = 300000 }, {
           H.readWord(base + 9), H.readWord(base + 11)))
       end
     end
-    H.screenshot("tunnelarmr_doorstep")
+    H.screenshot("tunnelarmr_entry")
   end),
-  H.saveState("tunnelarmr_doorstep.mss"),
+  H.saveState("tunnelarmr_entry.mss"),
   H.logStep(function()
-    return string.format("tunnelarmr_doorstep generated at frame %d", H.frame)
+    return string.format("tunnelarmr_entry generated at frame %d", H.frame)
   end),
   -- capture the same entry point as the retry ladder's reload blob
   (function()

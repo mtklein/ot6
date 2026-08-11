@@ -2,7 +2,7 @@
 -- build: a mines random encounter (settled, hud up) and the Whelk fight.
 local H = dofile("tools/tests/lib/ot6.lua")
 local MINES = "build/states/mines_chase.mss.lua"
-local WHELK = "build/states/whelk_doorstep.mss.lua"
+local WHELK = "build/states/whelk_entry.mss.lua"
 
 local aPhase = 0
 

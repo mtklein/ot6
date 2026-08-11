@@ -85,7 +85,7 @@
 -- byte moving is.  Hence the ordering and the `>= 2` at assertion 6.
 
 local H = dofile("tools/tests/lib/ot6.lua")
-local STATE = "build/states/battle_doorstep.mss.lua"
+local STATE = "build/states/battle_entry.mss.lua"
 
 local A, B = 0x0c, 0x0e            -- guards in monster slots 2/3
 local POISON = 0x04                -- $3ee4,y bit 2 (battle_main.asm:15292)

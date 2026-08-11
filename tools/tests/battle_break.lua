@@ -36,7 +36,7 @@
 -- mag.pwr $3B41+2i.
 
 local H = dofile("tools/tests/lib/ot6.lua")
-local STATE = "build/states/battle_doorstep.mss.lua"
+local STATE = "build/states/battle_entry.mss.lua"
 
 local function shields() return H.readByte(0x3E44), H.readByte(0x3E46) end
 local function timers() return H.readByte(0x3E94), H.readByte(0x3E96) end

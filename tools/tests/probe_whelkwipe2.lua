@@ -18,7 +18,7 @@
 local H = dofile("tools/tests/lib/ot6.lua")
 
 local TAG = "wo2"
-local STATE = "build/states/whelk_doorstep.mss.lua"
+local STATE = "build/states/whelk_entry.mss.lua"
 local BURST = 150
 
 local TRIP_PC = 0xC2E668

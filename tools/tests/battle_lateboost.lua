@@ -1,4 +1,4 @@
--- @suite frontier=worldmap_narshe
+-- @suite savestate=worldmap_narshe
 -- battle_lateboost: where the boost window closes.
 --
 -- v0.2 RC playtest: "you can boost after selecting the ability", "once

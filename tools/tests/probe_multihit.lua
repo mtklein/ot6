@@ -39,7 +39,7 @@
 -- once their own earlier hits have broken the target?
 
 local H = dofile("tools/tests/lib/ot6.lua")
-local STATE = "build/states/battle_doorstep.mss.lua"
+local STATE = "build/states/battle_entry.mss.lua"
 
 local A, B = 0x0c, 0x0e
 local WEAPON = 0x0a          -- MithrilBlade: Ot6WeapClassTbl slash ($01)

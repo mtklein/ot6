@@ -5,7 +5,7 @@ Source decode of the whole banquet block (maps 243/244/250/251/252,
 save/reset/load behaviour, and battles 26/27/30. Claims cite `file:line` or
 sit in the unverified ledger (§8).
 
-Companion to `sealed-gate-recon.md`, the v0.7 route recon this block sits in.
+Companion to `sealed-gate-route.md`, the v0.7 route survey this block sits in.
 
 ---
 

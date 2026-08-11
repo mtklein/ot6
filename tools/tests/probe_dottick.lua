@@ -78,7 +78,7 @@
 --      because "this accelerator does not work" is worth knowing.)
 
 local H = dofile("tools/tests/lib/ot6.lua")
-local STATE = "build/states/battle_doorstep.mss.lua"
+local STATE = "build/states/battle_entry.mss.lua"
 
 -- entity map (battle_break.lua's fight): guards in monster slots 2/3
 local A, B = 0x0c, 0x0e

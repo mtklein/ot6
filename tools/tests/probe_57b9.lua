@@ -5,7 +5,7 @@
 -- control: the banner machinery MUST hit it (GfxCmd_01 et al).
 
 local H = dofile("tools/tests/lib/ot6.lua")
-local STATE = "build/states/battle_doorstep.mss.lua"
+local STATE = "build/states/battle_entry.mss.lua"
 
 local hits = {}       -- addr -> { count, pcs = {pcstr -> n} }
 local function watch(lo, hi)

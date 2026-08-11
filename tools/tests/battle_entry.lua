@@ -3,7 +3,7 @@
 --
 --   tools/tests/run.sh tools/tests/battle_entry.lua
 --
--- Loads build/states/battle_doorstep.mss (field, just south of the first
+-- Loads build/states/battle_entry.mss (field, just south of the first
 -- guard-battle trigger; produced by gen_battle_state.lua), walks north into
 -- the battle, and passes iff the battle engine actually comes up (screen
 -- rendering + battle RAM).  This is the quick iteration loop for battle/
@@ -14,13 +14,13 @@
 -- state exists, 2 = frame budget blown.
 
 local H = dofile("tools/tests/lib/ot6.lua")
-local STATE = "build/states/battle_doorstep.mss.lua"
+local STATE = "build/states/battle_entry.mss.lua"
 
 H.run({ maxFrames = 8000 }, {
   H.waitFrames(20),
   H.loadState(STATE),
   H.waitFrames(10),
-  H.call(function() H.screenshot("entry_doorstep") end),
+  H.call(function() H.screenshot("entry_entry") end),
 
   -- Walk north / mash A into the scripted battle trigger.
   H.driveUntil(function() return H.battleLoadStarted() end, 4000, {

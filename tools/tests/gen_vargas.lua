@@ -1,4 +1,4 @@
--- gen_vargas.lua -- from vargas_doorstep.mss: FIGHT VARGAS FOR REAL, ride
+-- gen_vargas.lua -- from vargas_entry.mss: FIGHT VARGAS FOR REAL, ride
 -- the reunion, and generate vargas_won.mss on the first controllable frame
 -- after it.  The last tier-2 link in the generated chain, and the first
 -- boss in the chain of generated savestates won by an actual strategy under
@@ -66,7 +66,7 @@
 -- reload the capture as the consumer timeline, give it 300 frames, and
 -- require the same calm map-98 field before accepting the blob.
 local H = dofile("tools/tests/lib/ot6.lua")
-local DOOR = "build/states/vargas_doorstep.mss.lua"
+local DOOR = "build/states/vargas_entry.mss.lua"
 
 local MENU, ACTOR, MSTATE = 0x7BCA, 0x62CA, 0x7BC2
 local ST_CMD, ST_TOOLS, ST_TGT, ST_ITEM, ST_MAGIC = 0x05, 0x30, 0x38, 0x0A, 0x0E
@@ -290,7 +290,7 @@ local function pulse()
 end
 
 -- --------------------------------------------------- the retry ladder --
-local doorstepBlob = nil                 -- captured once, below
+local entryBlob = nil                 -- captured once, below
 local fightWon = false
 
 local function fightAttempt(n)
@@ -304,7 +304,7 @@ local function fightAttempt(n)
     -- idling a per-attempt number of frames before the opening A-press
     H.cond(function() return n > 1 end, {
       H.call(function()
-        loadReq = H.requestLoadState(doorstepBlob)
+        loadReq = H.requestLoadState(entryBlob)
       end),
       H.waitFrames(2),
       H.call(function()
@@ -382,12 +382,12 @@ local function fightAttempt(n)
 end
 
 -- ------------------------------------- reload-verified generation (gau) --
-local mintBlob, mintDone = nil, false
-local function mintAttempt(n)
+local genBlob, genDone = nil, false
+local function genAttempt(n)
   local tag = string.format("[vargas_won] generation attempt %d", n)
   local saveReq, loadReq
   local mx, my
-  return H.cond(function() return not mintDone end, {
+  return H.cond(function() return not genDone end, {
     H.call(function()
       mx, my = H.fieldX(), H.fieldY()
       saveReq = H.requestSaveState()
@@ -395,11 +395,11 @@ local function mintAttempt(n)
     H.waitFrames(2),
     H.call(function()
       H.checkReq(saveReq, tag .. ": capture")
-      mintBlob = saveReq.blob
+      genBlob = saveReq.blob
       H.log(string.format("%s: captured %d bytes at (%d,%d) f%d -- " ..
-        "reloading to verify the consumer's boot", tag, #mintBlob, mx, my,
+        "reloading to verify the consumer's boot", tag, #genBlob, mx, my,
         H.frame))
-      loadReq = H.requestLoadState(mintBlob)
+      loadReq = H.requestLoadState(genBlob)
     end),
     H.waitFrames(2),
     H.call(function() H.checkReq(loadReq, tag .. ": verify reload") end),
@@ -410,7 +410,7 @@ local function mintAttempt(n)
          and H.fieldX() == mx and H.fieldY() == my
     end, {
       H.call(function()
-        mintDone = true
+        genDone = true
         H.log(tag .. ": reload stayed calm on map 98 -- verified")
       end),
     }, {
@@ -440,9 +440,9 @@ H.run({ maxFrames = 700000 }, {
       H.waitFrames(2),
       H.call(function()
         H.checkReq(req, "entry point capture")
-        doorstepBlob = req.blob
+        entryBlob = req.blob
         H.log(string.format("entry point captured (%d bytes) for the retry ladder",
-          #doorstepBlob))
+          #entryBlob))
       end),
     }, {})
   end)(),
@@ -497,13 +497,13 @@ H.run({ maxFrames = 700000 }, {
       H.mapId() & 0x1ff, H.fieldX(), H.fieldY()))
     H.screenshot("vargas_won")
   end),
-  mintAttempt(1),
-  mintAttempt(2),
-  mintAttempt(3),
+  genAttempt(1),
+  genAttempt(2),
+  genAttempt(3),
   H.call(function()
-    H.assertEq(mintDone, true,
+    H.assertEq(genDone, true,
       "a reload-verified calm vargas_won capture within 3 attempts")
-    H.emitBlob("vargas_won.mss", mintBlob)
+    H.emitBlob("vargas_won.mss", genBlob)
   end),
   H.logStep(function()
     return string.format("vargas_won generated at frame %d", H.frame)

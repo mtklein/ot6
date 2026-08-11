@@ -1,4 +1,4 @@
--- @suite slow frontier=n024_doorstep
+-- @suite slow savestate=n024_entry
 -- battle_subjob.lua -- M5 espers-as-sub-jobs, the FORK-INDEPENDENT core: an
 -- equipped esper GRANTS its spells to the in-battle Magic list (additively), the
 -- grant never teaches permanently, and level-up esper stat bonuses are gone.
@@ -6,7 +6,7 @@
 -- Issue #75 conversion.  The old fixture poked char 0's equipped-esper byte
 -- ($161e) in the field, rewrote command lists, muddled the caster for
 -- menu-less casts, pinned guards, and handed bp/pending/MP.  On
--- n024_doorstep the inputs are real: RAMUH is genuinely owned ($1A69 bit 0,
+-- n024_entry the inputs are real: RAMUH is genuinely owned ($1A69 bit 0,
 -- gifted at Zozo and asserted in the alcove savestate), and it is equipped on
 -- CELES through the REAL FIELD MENU (battle_magicite.lua's measured route:
 -- X -> Skills -> character -> Espers -> stone -> detail -> A).  Ramuh is
@@ -57,7 +57,7 @@
 -- (+4 stamina, +2 mag.pwr) and NEITHER may ever reach the $16xx record, so D
 -- reads both cells -- two independent windows onto the same rule.
 local H = dofile("tools/tests/lib/ot6.lua")
-local STATE = "build/states/n024_doorstep.mss.lua"
+local STATE = "build/states/n024_entry.mss.lua"
 
 local BOLT, BOLT3, RASP = 0x02, 0x0b, 0x1a
 local BOLT3_MP = 53

@@ -20,7 +20,7 @@
 -- stay in the core because suite battle tests use them too.
 --
 -- Freshness: a generated route fixture is a function of BOTH halves, so
--- lib/frontier_stamp.sh hashes generator ++ ot6.lua ++ ot6_field.lua
+-- lib/savestate_stamp.sh hashes generator ++ ot6.lua ++ ot6_field.lua
 -- (that fixed order) into the signature it stamps beside the fixture.
 
 local M = ...
@@ -1177,7 +1177,7 @@ function M.worldNavTo(txIn, tyIn, opts)
   }, "worldNavTo")
 end
 
--- Drive a route that crosses engine modes: `legs` = { {mode="field", x, y,
+-- Drive a route that crosses engine modes: `steps` = { {mode="field", x, y,
 -- opts}, {mode="world", x, y, opts}, ... }.  Between steps the engine is
 -- expected to change modes on its own (an exit tile fires as the
 -- previous step lands, a world trigger loads a field map); each step first
@@ -1185,23 +1185,23 @@ end
 -- tile alignment, full screen brightness, then a 30-frame margin, the
 -- post-map-load discipline every field fixture uses -- and only then
 -- dispatches the mode's navigator.
-function M.route(legs)
+function M.route(steps)
   local steps = {}
-  for _, leg in ipairs(legs) do
-    local isWorld = leg.mode == "world"
+  for _, rstep in ipairs(steps) do
+    local isWorld = rstep.mode == "world"
     steps[#steps + 1] = M.waitUntil(function()
       if isWorld then
         return M.worldHasControl() and M.worldAligned()
       end
       return not M.worldMode() and M.hasControl() and M.tileAligned()
-    end, (leg.opts and leg.opts.modeWait) or 1200,
-      "route: " .. leg.mode .. " mode + control", 5)
+    end, (rstep.opts and rstep.opts.modeWait) or 1200,
+      "route: " .. rstep.mode .. " mode + control", 5)
     steps[#steps + 1] = M.waitUntil(function()
       return (emu.getState()["ppu.screenBrightness"] or 0) >= 15
-    end, 900, "route: " .. leg.mode .. " fade-in", 10)
+    end, 900, "route: " .. rstep.mode .. " fade-in", 10)
     steps[#steps + 1] = M.waitFrames(30)
-    steps[#steps + 1] = isWorld and M.worldNavTo(leg.x, leg.y, leg.opts)
-                        or M.navTo(leg.x, leg.y, leg.opts)
+    steps[#steps + 1] = isWorld and M.worldNavTo(rstep.x, rstep.y, rstep.opts)
+                        or M.navTo(rstep.x, rstep.y, rstep.opts)
   end
   return M.seqStep(steps)
 end
@@ -1639,7 +1639,7 @@ end
 -- way.  The route was not too hard; nobody was playing the item menu.
 --
 -- THE UI, measured by probe_fieldheal.lua / probe_fieldcells.lua against a
--- real vargas_doorstep and cross-read against src/menu (the full citation
+-- real vargas_entry and cross-read against src/menu (the full citation
 -- trail is docs/research/field-care-menu.md):
 --
 --   ZMENUSTATE = DP $26, and the shared list cursor is DP $4B.

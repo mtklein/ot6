@@ -18,12 +18,12 @@
 -- Alongside: $57D5 (OT6_FONTDIRTY / vanilla banner string byte 0), $8000/
 -- $8006 (large-transfer flag/size for PartialTfrVRAM), $62AC (msg flag).
 --
--- Drive: battle_doorstep -> walk into the guard fight -> MagiTek Fire Beam
+-- Drive: battle_entry -> walk into the guard fight -> MagiTek Fire Beam
 -- (A/A/A), which announces via the attack-name banner.  ~40 per-frame
 -- screenshots bracket the confirm press for visual tear inspection.
 
 local H = dofile("tools/tests/lib/ot6.lua")
-local STATE = "build/states/battle_doorstep.mss.lua"
+local STATE = "build/states/battle_entry.mss.lua"
 
 local rec = {}          -- per-frame records, appended at NMI entry
 local armed = false

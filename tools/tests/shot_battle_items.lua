@@ -3,7 +3,7 @@
 --
 -- ISSUE #75 CONVERSION.  This script used to poke one weapon per break class
 -- into the magitek entry point's empty bag and shoot the forged list.  It now
--- boots vector_doorstep -- the class-richest REAL bag on the chain (see
+-- boots vector_entry -- the class-richest REAL bag on the chain (see
 -- shot_field_items.lua's header for the recon; PIERCE + SLASH is everything
 -- any v0.6 save owns in normal play) -- walks one step south out of Vector onto the
 -- world map (the fixture stands on the long entrance at map 242 (32,61);
@@ -16,7 +16,7 @@
 --   PIERCE, row 26 Ashura SLASH -- with TOOL/RELIC/consumable rows around
 --   them for the no-class face.
 local H = dofile("tools/tests/lib/ot6.lua")
-local STATE = "build/states/vector_doorstep.mss.lua"
+local STATE = "build/states/vector_entry.mss.lua"
 
 local MENU = 0x7BCA
 
@@ -26,7 +26,7 @@ H.run({ maxFrames = 60000 }, {
   H.waitFrames(10),
   H.waitUntil(function() return H.hasControl() end, 600, "field control", 5),
   H.call(function()
-    H.assertEq(H.mapId() & 0x1ff, 242, "vector_doorstep stands in Vector")
+    H.assertEq(H.mapId() & 0x1ff, 242, "vector_entry stands in Vector")
   end),
 
   -- south out of the town onto the world map

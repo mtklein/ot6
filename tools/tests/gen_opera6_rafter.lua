@@ -1,5 +1,5 @@
 -- gen_opera6_rafter.lua -- v0.5 Beat A step 6: opera_dance_done (map 238
--- {98,7}, $0111=1) -> the RAFTER CHASE -> generate ultros2_doorstep one
+-- {98,7}, $0111=1) -> the RAFTER CHASE -> generate ultros2_entry one
 -- interaction before battle 104 (Ultros②, $012d, 6 shields, slash|pierce).
 --
 -- Measured route: touch Ultros's letter, return through the active theater to
@@ -264,9 +264,9 @@ H.run({ maxFrames = 250000 }, {
     H.assertEq(sw(0x02BC),1,"rafter timer is active at the entry point")
     H.assertEq(H.readByte(0x087f + H.readWord(0x0803)), 1, "facing RIGHT")
     H.log("[rats] at generation: " .. ratLine())
-    dumpsw("ULTROS2-DOORSTEP")
+    dumpsw("ULTROS2-ENTRY")
   end),
-  H.saveState("ultros2_doorstep.mss"),
+  H.saveState("ultros2_entry.mss"),
   H.logStep(function()
     return string.format("gen_opera6_rafter: catwalk traversal banked the Ultros 2 entry point at f%d", H.frame)
   end),

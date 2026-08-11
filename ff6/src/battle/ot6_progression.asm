@@ -305,7 +305,7 @@
 ; ONE byte per esper, [selector:4][magnitude:4] -- one unsigned stat, max 15 --
 ; which is why magicite-ifrit-shiva.md's ledger recorded two-sided and
 ; multi-stat mods as unbuildable.  #62 asked for both, and the measurement pass
-; (docs/design/esper-stat-ruler.md) found that FF6 ALREADY HAS the object we
+; (docs/design/esper-stat-baseline.md) found that FF6 ALREADY HAS the object we
 ; wanted: ItemProp+16/+17 is two bytes holding FOUR SIGNED 4-BIT stat deltas, and
 ; CalcEquipEffect (battle_main.asm:2521-2539) is its reference decoder:
 ;
@@ -322,7 +322,7 @@
 ; So Ot6EsperStatTbl is now TWO BYTES per esper in exactly that layout:
 ;       byte 0 = [speed:4][vigor:4]      byte 1 = [magpwr:4][stamina:4]
 ; $0000 = no mod at all.  Adopted rather than invented because (a) the baseline in
-; esper-stat-ruler.md is already measured IN THESE UNITS, so a design number is
+; esper-stat-baseline.md is already measured IN THESE UNITS, so a design number is
 ; transcribed and not converted; (b) an esper's stat package becomes literally the
 ; same kind of object a piece of armour carries, which is #62's whole ask; (c) the
 ; sign bit -- and therefore the downside stat that was wanted and refused for
@@ -456,7 +456,7 @@ out:    longi                   ; i16 to match the phx width
 ; pays out (v0.7, docs/design/magicite-tube-six.md §11).  The rest are $0000 (no
 ; mod), a data-append exactly like their spell lists (genju_prop.asm).
 ;
-; THE LADDER, REBUILT FROM MEASUREMENT (#62, docs/design/esper-stat-ruler.md).
+; THE LADDER, REBUILT FROM MEASUREMENT (#62, docs/design/esper-stat-baseline.md).
 ; The old tiers were single-stat magnitudes 2-5 chosen as "~10-16% of a base
 ; stat".  The baseline pass measured what a gear upgrade is actually worth in
 ; vanilla's own units and re-cut them.  WoB shop-purchasable stat-bearing gear
@@ -524,7 +524,7 @@ Ot6EsperStatTbl:
         esper_stat    0,  +4,   0,  +2   ;  3 siren -- FIELD (tempo/control caster)
         esper_stat    0,   0,   0,   0   ;  4 terrato -- THE NO-MOD CONTROL.  Left
                                          ;    at $0000 on purpose: menu_esperdetail
-                                         ;    and probe_esperdetail_anchor use this
+                                         ;    and probe_esperdetail_checkpoint use this
                                          ;    row to prove the detail page stays
                                          ;    correct for a stone with no mod, so
                                          ;    authoring it would delete a control.

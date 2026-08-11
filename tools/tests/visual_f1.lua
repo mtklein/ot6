@@ -5,7 +5,7 @@
 -- the party window. the ability-list icon assert lives in battle_break,
 -- whose drive reliably traverses the list.
 local H = dofile("tools/tests/lib/ot6.lua")
-local STATE = "build/states/battle_doorstep.mss.lua"
+local STATE = "build/states/battle_entry.mss.lua"
 H.run({ maxFrames = 20000 }, {
   H.waitFrames(20),
   H.loadState(STATE),

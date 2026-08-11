@@ -1,0 +1,10 @@
+{
+  "schema": "ot6.sram-checkpoint/v1",
+  "payload": "post-opera.sram",
+  "size": 32768,
+  "sha256": "8003f8ef86075138ffc0cde570235f498f49f6d687d6317c1fb424bafbf701fe",
+  "slot": 3,
+  "milestone": "negative-unknown-layout",
+  "provenance": "DELIBERATELY WRONG fixture for `make checkpoint-negatives` (#25): byte-identical copy of post-opera-v1 whose persistent_layout names a schema no step declares support for.  Exercises the pre-boot refusal in run.sh + lib/sram_checkpoint.py; no generate rule may ever name this checkpoint.",
+  "persistent_layout": "ot6-codex-o9-experimental"
+}

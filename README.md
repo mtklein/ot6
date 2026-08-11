@@ -44,7 +44,7 @@ Drop that file at the repo root, then:
 ```sh
 make rom     # build build/ot6.sfc
 make test    # full headless correctness run (the whole suite + the mp-cost A/B)
-make frontier-test  # the same, plus the tests that need the deep story savestates
+make savestates-test  # the same, plus the tests that need the deep story savestates
                     #   (slow: generates that chain of savestates first)
 make run     # launch the built ROM in Mesen (GUI)
 make patch   # emit a distributable .bps

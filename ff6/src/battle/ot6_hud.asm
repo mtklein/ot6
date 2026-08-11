@@ -2028,7 +2028,7 @@ Ot6ShieldTbl:
         .byte   6, OT6_PIERCE   ; crane
         ; ---- the v0.6 VECTOR / MAGITEK FACTORY section (issue #11), the first
         ; route section authored off the generated floor. survey, arithmetic and
-        ; per-formation reading: docs/design/break-band-vector.md.
+        ; per-formation reading: docs/design/break-coverage-vector.md.
         ;
         ; THE PROBLEM this replaces: in the deepest third of the facility
         ; (group 106, maps 271/273) the generated floor answered 100% of
@@ -2073,7 +2073,7 @@ Ot6ShieldTbl:
         ; lands the break on a corpse. Landing this wants a Vector entry-point
         ; fixture and a bal_party BAL_BUFF_SHIELDS sweep over 1/2/3, with a
         ; separate three-character arm (less damage per round means the same
-        ; count breaks later). break-band-vector.md §8.2/§10.3.
+        ; count breaks later). break-coverage-vector.md §8.2/§10.3.
         .word   $00cb
         .byte   2, OT6_PIERCE|OT6_BLUDG ; garm: a magitek quadruped
                                 ;   (Program 95), not a hound -- pierce the

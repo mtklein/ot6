@@ -73,7 +73,7 @@
 -- preceded the numeral by 83-147 frames while OT6_PIPTAIL is 32, so the pip
 -- flashed and faded about two seconds before the block visibly landed.
 local H = dofile("tools/tests/lib/ot6.lua")
-local STATE = "build/states/battle_doorstep.mss.lua"
+local STATE = "build/states/battle_entry.mss.lua"
 
 local MENU, ACTOR = 0x7BCA, 0x62CA
 local TRUE_KNIGHT = 0x40          -- $3c58 bit 6 (relic effects 4)

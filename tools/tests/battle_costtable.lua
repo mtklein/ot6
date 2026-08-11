@@ -1,4 +1,4 @@
--- @suite frontier=gau_joined
+-- @suite savestate=gau_joined
 -- battle_costtable.lua -- issue #45.  The MP rescale's TEST: the kit cost
 -- columns are pinned, and -- the part that matters -- they are checked against
 -- the BASELINE the design claims they sit on, recomputed from this ROM's own

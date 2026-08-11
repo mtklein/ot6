@@ -1,4 +1,4 @@
--- @suite frontier=vargas_won slow
+-- @suite savestate=vargas_won slow
 -- battle_walletmp.lua -- issue #35: the costed submenus carry a WALLET --
 -- the actor's CURRENT MP painted at the top of the open list window,
 -- beside the per-row costs those windows already show.

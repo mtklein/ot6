@@ -23,7 +23,7 @@ local goodFire, goodShield
 -- machinery itself and needs the corruption on cue.  It keeps its
 -- waivers, and it MAY NEVER PRODUCE FIXTURES.
 local H = dofile("tools/tests/lib/ot6.lua")
-local STATE = "build/states/battle_doorstep.mss.lua"
+local STATE = "build/states/battle_entry.mss.lua"
 local vr = emu.memType.snesVideoRam
 local FONTDIRTY = 0x57b9
 local RELAY_STAGES = 6

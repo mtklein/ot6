@@ -59,7 +59,7 @@
 -- sit in monster slots 2/3 -> slot offsets 4/6.
 
 local H = dofile("tools/tests/lib/ot6.lua")
-local STATE = "build/states/battle_doorstep.mss.lua"
+local STATE = "build/states/battle_entry.mss.lua"
 
 local BRKTICK   = 0xED76        -- OT6_BRKTICK, stride 2 by slot offset
 local FLASHPAL  = 0x7F60        -- w7e7e00::_11, obj palette 3

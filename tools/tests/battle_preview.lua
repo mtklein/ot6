@@ -1,4 +1,4 @@
--- @suite frontier=worldmap_narshe
+-- @suite savestate=worldmap_narshe
 -- battle_preview: the un-made choice telegraphs its boost.  With BP
 -- pending, opening Terra's magic list renders the folded tier in Fire's
 -- row (Ot6PreviewList_ext folds the render-scoped id) — and since #64 the

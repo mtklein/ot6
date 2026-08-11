@@ -1,10 +1,10 @@
--- probe19.lua: battle-entry deep diagnostic from the doorstep savestate.
--- Loads battle_doorstep.mss, walks into the battle, then samples screenshots
+-- probe19.lua: battle-entry deep diagnostic from the entry-point savestate.
+-- Loads battle_entry.mss, walks into the battle, then samples screenshots
 -- and RAM at several points to see exactly what battle entry does.
 -- Always exits 0 (pure diagnostic).
 
 local H = dofile("tools/tests/lib/ot6.lua")
-local STATE = "build/states/battle_doorstep.mss.lua"
+local STATE = "build/states/battle_entry.mss.lua"
 
 local function dumpRam(tag)
   local b = {}
@@ -37,7 +37,7 @@ H.run({ maxFrames = 10000 }, {
   H.driveUntil(function() return H.battleLoadStarted() end, 4000, {
     H.hold({ "up" }), H.waitFrames(20), H.release(), H.waitFrames(2),
     H.pressButtons({ "a" }, 4),
-  }, "battle load from doorstep"),
+  }, "battle load from the entry point"),
   H.logStep(function() return "battle load at frame " .. H.frame end),
   sample(0),
   H.waitFrames(60), sample(60),

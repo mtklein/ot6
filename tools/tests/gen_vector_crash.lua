@@ -53,8 +53,8 @@
 --      `vector-crash-v1` (the route recon's own name for the boundary, at
 --      the recon's own proposed tile (83,238)).
 --
--- OT6_ANCHOR_LAYOUT: ot6-codex-o8-v1
--- ^ run.sh refuses -- BEFORE boot -- any OT6_SRAM_ANCHOR whose manifest
+-- OT6_CHECKPOINT_LAYOUT: ot6-codex-o8-v1
+-- ^ run.sh refuses -- BEFORE boot -- any OT6_SRAM_CHECKPOINT whose manifest
 --   declares a different persistent_layout.
 local H = dofile("tools/tests/lib/ot6.lua")
 
@@ -71,7 +71,7 @@ local function bright() return emu.getState()["ppu.screenBrightness"] or 0 end
 local function sw(id) return (H.readByte(0x1E80 + (id >> 3)) >> (id & 7)) & 1 end
 local function partyOf(c) return H.readByte(0x1850 + c) & 0x07 end
 
--- gen_vector_doorstep's grind-and-replan world walker
+-- gen_vector_entry's grind-and-replan world walker
 local function worldGrind(tx, ty, what)
   local plan, idx, ph = nil, 1, 0
   return H.driveUntil(function()
@@ -198,7 +198,7 @@ H.run({ maxFrames = 240000 }, {
   H.waitUntil(landed(384, 10), 3600, "west side after the teleport", 1),
   H.waitFrames(30),
   H.call(function()
-    H.screenshot("leg_hi_westside")
+    H.screenshot("step_hi_westside")
     H.log(string.format("[west] (%d,%d)", H.fieldX(), H.fieldY()))
   end),
 
@@ -210,7 +210,7 @@ H.run({ maxFrames = 240000 }, {
   H.call(function()
     assertGateParty("the gate entry point (field side, before the scene)")
     H.assertEq(sw(0x0079), 0, "$0079 CLEAR at the entry point")
-    H.screenshot("leg_hi_gate_doorstep")
+    H.screenshot("step_hi_gate_entry")
   end),
   pressWalk("up", function() return map() == 391 end, 1200,
     "held UP onto the door row (10,27) -> SEALED GATE (391)"),
@@ -227,7 +227,7 @@ H.run({ maxFrames = 240000 }, {
     H.assertEq(sw(0x0471), 1, "$0471 SET (the scene tail)")
     H.assertEq(sw(0x064D), 1, "$064D SET (the scene tail)")
     assertGateParty("after the gate scene (Terra restored, :46202)")
-    H.screenshot("leg_hi_post_gate")
+    H.screenshot("step_hi_post_gate")
   end),
 
   -- ---- 4. the shortcut out -------------------------------------------------
@@ -277,7 +277,7 @@ H.run({ maxFrames = 240000 }, {
     H.assertEq(sw(0x0246), 0, "$0246 CLEAR -- no active airship")
     assertGateParty("after the crash (field side -- battle_event $15's "
       .. "deck roster never leaks out)")
-    H.screenshot("leg_hi_wreck_deck")
+    H.screenshot("step_hi_wreck_deck")
   end),
 
   -- ---- the airship-dead check: the wheel refuses ---------------------------
@@ -343,13 +343,13 @@ H.run({ maxFrames = 240000 }, {
     H.assertEq(H.worldX(), 83, "crash-site x -- standing on the wreck")
     H.assertEq(H.worldY(), 238, "crash-site y")
     H.assertEq(H.readByte(0x11FA) & 3, 0, "ON FOOT at the crash site")
-    H.screenshot("leg_hi_crash_site")
+    H.screenshot("step_hi_crash_site")
   end),
 
   -- ---- 7. the world battery save at the crash site -- boundary I ----------
   H.call(function()
     H.assertExitContractPreSave("vector-crash-v1")
-    H.screenshot("leg_hi_i_tile")
+    H.screenshot("step_hi_i_tile")
   end),
   -- THE STEP'S SAVESTATE IS GENERATED HERE, BEFORE THE MENU (the world menu
   -- does not unwind on B, measured)
@@ -424,7 +424,7 @@ H.run({ maxFrames = 240000 }, {
       emu.read(0x316810 + ULTROS2, emu.memType.snesMemory),
       emu.read(0x316990 + ULTROS2, emu.memType.snesMemory)))
     H.assertExitContract("vector-crash-v1")
-    H.screenshot("leg_hi_saved")
+    H.screenshot("step_hi_saved")
   end),
   H.logStep(function()
     return string.format("vector-crash-v1 saved via the real Save UI at "

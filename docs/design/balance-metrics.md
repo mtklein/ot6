@@ -54,7 +54,7 @@ but playing it well makes it shorter than it ever was."
 
 ## Running it, now and across formations
 
-Now: two entry-point states exist (`battle_doorstep`, `battle2_doorstep`
+Now: two entry-point states exist (`battle_entry`, `battle2_entry`
 — the `STATE` knob), so the matrix is 2 formations × 3 policies. One
 run is deterministic (rng phase is frame-driven); distributions come
 from the `SETTLE_EXTRA` jitter knob — sweep 0..90 in ~10-frame steps
@@ -63,7 +63,7 @@ for ~10 samples per cell. Aggregation is a grep: every stat is one
 
 Once post-magitek states exist (M3+): generate one entry-point state per
 stretch with the `gen_battle2` pattern (win, walk to the next trigger,
-save), named `battleN_doorstep`, and run the same matrix. The rows to fill
+save), named `battleN_entry`, and run the same matrix. The rows to fill
 are exactly the stretch table in `weapon-classes.md` — the coverage
 rule ("the story's actual party chips every non-boss encounter")
 becomes checkable: per stretch, every formation shows a sane TTK range

@@ -1,4 +1,4 @@
--- @suite frontier=kolts_cave
+-- @suite savestate=kolts_cave
 -- battle_flyin: the under-enemy hud must not paint a monster that has not
 -- entered yet.
 --
@@ -20,7 +20,7 @@
 -- fly in.  kolts_cave's map-96 pool is 93.75% Cirpius x3 (gen_kolts_cave),
 -- three birds that fly in together -- so the natural encounter here spends
 -- ~45 frames with every monster present-but-not-shown, exactly the window the
--- bug lived in.  Needs kolts_cave.mss (make frontier), the
+-- bug lived in.  Needs kolts_cave.mss (make savestates), the
 -- battle_vargas pattern.
 --
 -- Assert, every frame of that window: any present-but-unshown monster's hud

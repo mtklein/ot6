@@ -364,7 +364,7 @@ the way `InitMaxMP` computes them (`CharProp+$01` plus the
 out of generated savestates (`tools/tests/probe_mppools.lua`):
 
 Spells learned below Terra's earliest *measured* level are
-priced at that level (L6, pool 40 — read off `kolts_doorstep`),
+priced at that level (L6, pool 40 — read off `kolts_entry`),
 the same clamp the kit tables below use, because pricing a spell
 against a pool the game never presents is arithmetic about an
 unreachable state. MP costs are `magic_prop_en.dat` +$05.
@@ -463,18 +463,18 @@ Measured pools, read off the generated chain by
 `tools/tests/probe_mppools.lua`, which boots each state and dumps
 every `$1600` record. Max MP, in-party characters only (a
 character who has not joined yet carries a placeholder record —
-Cyan reads LV7/39 at `kolts_doorstep`, which is *not* a pool
+Cyan reads LV7/39 at `kolts_entry`, which is *not* a pool
 anyone can spend):
 
 | stretch (fixture) | Terra | Locke | Cyan | Edgar | Sabin | Celes | Gau |
 |---|---|---|---|---|---|---|---|
 | Narshe (`worldmap_narshe`) | 29 `L4` | 31 `L6` | — | — | — | — | — |
-| Mt Kolts (`kolts_doorstep`) | 40 `L6` | 37 `L7` | — | 36 `L7` | — | — | — |
+| Mt Kolts (`kolts_entry`) | 40 `L6` | 37 `L7` | — | 36 `L7` | — | — | — |
 | Serpent Trench (`gau_joined`) | 69 `L10` | 44 `L8` | 67 `L11` | 59 `L10` | 65 `L11` | — | 72 `L11` |
 | scenario hub (`scenario_hub`) | 69 `L10` | 44 `L8` | — | 59 `L10` | 56 `L10` | — | — |
 | Zozo (`zozo_arrival`) | 78 `L11` | 69 `L11` | 76 `L12` | 87 `L13` | 84 `L13` | 77 `L11` | 81 `L12` |
-| Opera (`opera_doorstep`) | 78 `L11` | 88 `L13` | 76 `L12` | 97 `L14` | 94 `L14` | 96 `L13` | 81 `L12` |
-| Vector (`vector_doorstep`) | 78 `L11` | 98 `L14` | 67 `L11` | 107 `L15` | 104 `L15` | 106 `L14` | 72 `L11` |
+| Opera (`opera_entry`) | 78 `L11` | 88 `L13` | 76 `L12` | 97 `L14` | 94 `L14` | 96 `L13` | 81 `L12` |
+| Vector (`vector_entry`) | 78 `L11` | 98 `L14` | 67 `L11` | 107 `L15` | 104 `L15` | 106 `L14` | 72 `L11` |
 
 Every one of these equals `CharProp+$01` plus the `LevelUpMP`
 running sum to that level, exactly as `InitMaxMP`

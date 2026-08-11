@@ -1,6 +1,6 @@
--- @suite frontier=kefka_doorstep
+-- @suite savestate=kefka_entry
 -- battle_kefka.lua -- the generated-savestate test for v0.3's stop-line boss: the
--- Battle for Narshe's KEFKA, fought for REAL from kefka_doorstep.mss
+-- Battle for Narshe's KEFKA, fought for REAL from kefka_entry.mss
 -- (party 1 = TERRA+EDGAR+CELES at (19,36), KEFKA one tile below --
 -- gen_narshe_battle generates it; suite.sh adds this test when the fixture
 -- exists and reports `skip` when it does not, the battle_vargas pattern).
@@ -42,12 +42,12 @@
 --     the fixture, so a fixture this test can boot is a fixture this
 --     ladder can beat.
 --
--- FIXTURE VINTAGE NOTE (2026-08-10): kefka_doorstep.mss is the July 30
+-- FIXTURE VINTAGE NOTE (2026-08-10): kefka_entry.mss is the July 30
 -- generation -- stamp-fresh against current sources, but generated before
 -- the chain's own input-driven conversion caught up to this tier.  The
 -- input-driven regeneration replaces the bytes, not this test.
 local H = dofile("tools/tests/lib/ot6.lua")
-local DOOR = "build/states/kefka_doorstep.mss.lua"
+local DOOR = "build/states/kefka_entry.mss.lua"
 
 local KEFKA = 0x014A
 

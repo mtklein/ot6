@@ -19,7 +19,7 @@ data, and the file/offset that proves it.
 Nothing here writes; it is a read-only linter.  Exit status 0 = clean.
 
 Wired into `make test` (Makefile's test target, alongside the compose.py and
-sram_anchor.py selftests) as of the issue #23 pass that emptied WAIVERS.
+sram_checkpoint.py selftests) as of the issue #23 pass that emptied WAIVERS.
 
 Usage:  python3 tools/check_boss_rows.py [--repo ROOT] [-v]
 """
@@ -312,7 +312,7 @@ WAIVERS = {
     # is authored into Ot6ElemAddTbl, so nothing needs waiving.
     #
     # With no waivers left this script is a plain check, and it is registered in
-    # `make test` (the Makefile's test target, next to the compose/sram_anchor
+    # `make test` (the Makefile's test target, next to the compose/sram_checkpoint
     # selftests) so doc-vs-data drift fails the suite from here.  Suite.sh's own
     # discovery globs *.lua for a `-- @suite` marker and cannot see a .py file,
     # which is why registration is a Makefile line rather than a marker.

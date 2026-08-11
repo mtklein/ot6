@@ -21,7 +21,7 @@ block is safe at assembly time — every downstream pointer recomputes.
 
 - gated on `$01B5=0` — the once-per-tile latch, so it fires once per arrival
   (`:100750`; `$01B5` = `$1EB6` bit 5, decoded at
-  `vector-route-recon.md` §7);
+  `vector-route.md` §7);
 - plays sfx 209 and a blue flash, sets **`$01BF=1`** (`:100752-100755`);
 - the first save point the player ever touches (`$0133=0`) also shows the
   "eerie glow" info dialog `$000A`/`$06D4` (`:100759-100773`).
@@ -80,5 +80,5 @@ Both segments are `fixed_block`s at hard addresses (`event_triggers` at
 `ff6/include/macros.inc:409-431`).
 
 Any such edit is a ROM change, so it invalidates every savestate in
-the generated chain (`leg-fixtures.md`, "The problem"); batch checkpoints
+the generated chain (`checkpoint-fixtures.md`, "The problem"); batch checkpoints
 survive.

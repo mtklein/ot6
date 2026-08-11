@@ -39,9 +39,9 @@ case "$(basename "$1")" in fail_*) exit 1 ;; *) exit 0 ;; esac
 STUB
 chmod +x "$TMP/tools/tests/run.sh"
 
-mk() {  # mk <name> [frontier-fixture]
+mk() {  # mk <name> [savestate-fixture]
   if [ -n "${2:-}" ]; then
-    echo "-- @suite frontier=$2" > "$TMP/tools/tests/$1.lua"
+    echo "-- @suite savestate=$2" > "$TMP/tools/tests/$1.lua"
   else
     echo "-- @suite" > "$TMP/tools/tests/$1.lua"
   fi
@@ -65,7 +65,7 @@ for j in 1 3; do
   rc=$?
   check "OT6_JOBS=$j green exits 0" "$rc" "0"
   check "OT6_JOBS=$j green tally" "$(tally "$TMP/out.$j")" \
-    "3 ran: 3 pass, 0 fail; 1 skipped (need \`make frontier\`)"
+    "3 ran: 3 pass, 0 fail; 1 skipped (need \`make savestates\`)"
 done
 # The verdict is on the line, not just in the exit status: an agent reading a
 # scrolled terminal sees which one it was without scrolling back.
@@ -78,7 +78,7 @@ check "green run says GREEN" \
 # runs.  The stale case is built by hand: a stamp naming a real generator,
 # carrying a signature that is simply not the one those bytes hash to.
 check "an unstamped tree says so and does not cry stale" \
-  "$(grep -c 'no minted fixtures in this tree' "$TMP/out.3")" "1"
+  "$(grep -c 'no generated fixtures in this tree' "$TMP/out.3")" "1"
 echo '-- a generator' > "$TMP/tools/tests/gen_fake.lua"
 echo "0000000000000000000000000000000000000000000000000000000000000000 gen_fake" \
   > "$TMP/build/states/fake_leg.stamp"
@@ -92,7 +92,7 @@ check "...above the per-test list, where it will actually be read" \
                      (s<p) ? "before" : "after"}' "$TMP/out.stale")" "before"
 check "...and does NOT by itself fail the suite" \
   "$(tally "$TMP/out.stale")" \
-  "3 ran: 3 pass, 0 fail; 1 skipped (need \`make frontier\`)"
+  "3 ran: 3 pass, 0 fail; 1 skipped (need \`make savestates\`)"
 rm "$TMP/build/states/fake_leg.stamp" "$TMP/tools/tests/gen_fake.lua"
 
 # ---- 1c. a compose failure must print WHY.  suite.sh used to send compose's
@@ -124,7 +124,7 @@ rc=$?
 check "a failure exits nonzero" "$rc" "1"
 check "a failure is counted and the verdict flips to RED" \
   "$(tally "$TMP/out.red")" \
-  "4 ran: 3 pass, 1 fail; 1 skipped (need \`make frontier\`)"
+  "4 ran: 3 pass, 1 fail; 1 skipped (need \`make savestates\`)"
 check "red run says RED" "$(grep -c '^OT6 suite: RED' "$TMP/out.red")" "1"
 
 # ---- 4. the tally agrees with the per-test list it summarises -------------
@@ -157,7 +157,7 @@ rc=$?
 check "a worker that never reports exits nonzero" "$rc" "1"
 check "...and is counted, so the total still covers every discovered test" \
   "$(tally "$TMP/out.vanish")" \
-  "4 ran: 3 pass, 1 fail; 1 skipped (need \`make frontier\`)"
+  "4 ran: 3 pass, 1 fail; 1 skipped (need \`make savestates\`)"
 check "...via the 'worker never reported' line, not a plain FAIL" \
   "$(grep -c 'worker never reported' "$TMP/out.vanish")" "1"
 

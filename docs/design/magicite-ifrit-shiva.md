@@ -32,7 +32,7 @@ table implies.
 | Channel | Shipped? | Shape | Evidence |
 |---|---|---|---|
 | Spell grant | ✅ | **≤ 5 spell ids** per esper, from the vanilla esper record | `ot6_progression.asm:142-181` (`Ot6EsperSpellKnown`, scans `GenjuProp+1,+3,+5,+7,+9`) and `:203-252` (`Ot6UnionEspers`, seeds the union so a spell nobody knows still gets a list slot) |
-| Stat mod | ✅ | up to **four** stats, **signed**, −7..+7 each, in vanilla's own equipment layout | `ot6_progression.asm` `Ot6EsperStatMod` + `Ot6EsperStatTbl`: two bytes per esper, `byte0 = [speed:4][vigor:4]`, `byte1 = [magpwr:4][stamina:4]`, each nibble `[sign:1][mag:3]`; `$0000` = no mod. Mirrors `CalcEquipEffect`, `battle_main.asm:2521-2539`. Baseline: `esper-stat-ruler.md` |
+| Stat mod | ✅ | up to **four** stats, **signed**, −7..+7 each, in vanilla's own equipment layout | `ot6_progression.asm` `Ot6EsperStatMod` + `Ot6EsperStatTbl`: two bytes per esper, `byte0 = [speed:4][vigor:4]`, `byte1 = [magpwr:4][stamina:4]`, each nibble `[sign:1][mag:3]`; `$0000` = no mod. Mirrors `CalcEquipEffect`, `battle_main.asm:2521-2539`. Baseline: `esper-stat-baseline.md` |
 | Summon | ✅ (vanilla) | one attack record per esper, `id = esper + $36`; once per battle **per character** | `FixPlayerAttack` sets the character's bit in `$3f2e` (`battle_main.asm:12739-12747`); the Magic menu's esper row is disabled when that bit is set (`battle_main.asm:14436-14439`) |
 | Boost-tier folding | ✅ | **8 families only**: fire, ice, bolt, poison→bio, cure, life, slow, haste | `Ot6FoldTbl`, `ot6_boost.asm:340-348`; scanned with a hard `cpx #$0018` bound at `:255`, `:317` |
 | Boost on non-folding actions | ✅ | ×2/×4/×8 on base damage; exempted commands are fight `$00`, capture `$06`, bushido `$07`, steal `$05` — **summons (`$19`) are not exempt** | `Ot6BoostDmg`, `ot6_kits.asm:1190-1256` |
@@ -312,7 +312,7 @@ is a worse fit for a stone meant to make a fighter *better*, not automatic.
 
 Ifrit's `Ot6EsperStatTbl` row is **+6 vigor / +4 stamina / −3 mag.pwr** — the
 opposite specialisation to Shiva's (§5.2), on tiers measured against vanilla's
-own equipment ladder; see `docs/design/esper-stat-ruler.md` §4.
+own equipment ladder; see `docs/design/esper-stat-baseline.md` §4.
 
 - **Nobody else grants vigor.** The four Zozo rows are Ramuh +3 stamina,
   Siren +2 speed, Stray +3 mag.pwr, Kirin +3 mag.pwr
@@ -419,7 +419,7 @@ two-sided mirror of Ifrit's: the pair read as opposite specialisations rather
 than as "a big number for fighters" and "a big number for mages". Shiva's second
 stat is *speed* rather than a mirror of Ifrit's stamina, so the two are
 opposites without being the same shape twice — Ice / Osmose / Shell is a kit
-about acting first and acting often. See `docs/design/esper-stat-ruler.md`.
+about acting first and acting often. See `docs/design/esper-stat-baseline.md`.
 
 Base mag.pwr sits at 25–39 (`char_prop.asm`: Celes 36, Terra 39, Strago 34,
 Locke 28, Sabin 28), and mag.pwr is the natural selector: her list is three

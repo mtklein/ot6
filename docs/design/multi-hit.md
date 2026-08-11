@@ -143,7 +143,7 @@ AutoCrossbow is the case that has been misfiled: targeting byte `$6a`
 (`INIT` = one-side), `ToolsEffect_07` setting *don't split damage*
 (`battle_main.asm:7352-7355`). Against a four-stack it is four chips on four
 gauges; against a boss it is **one**. `kits.md`'s "piercing ×4" reads as rate
-and is breadth. `break-band-vector.md` §8.1 and `break-band-sealed-gate.md` §8
+and is breadth. `break-coverage-vector.md` §8.1 and `break-coverage-sealed-gate.md` §8
 already use it correctly as the swarm answer — those two are right and
 `kits.md` is the one to correct.
 
@@ -321,7 +321,7 @@ Identity: **cheapest chips in the game, on one axis** (two if he wears claws).
 
 | ability | count | reason |
 |---|---|---|
-| **AutoCrossbow** | **×1 per body**, unchanged | It is *breadth* (§2.2) and it is already the designed swarm answer in two of the break-band docs. Making it ×4 per body would be 16 chips against a four-stack. `kits.md`'s "×4" is corrected to "whole side, one chip each". |
+| **AutoCrossbow** | **×1 per body**, unchanged | It is *breadth* (§2.2) and it is already the designed swarm answer in two of the break-coverage docs. Making it ×4 per body would be 16 chips against a four-stack. `kits.md`'s "×4" is corrected to "whole side, one chip each". |
 | **Drill** | **×2** piercing | The owner said "Tools too", and this is the one that should change: Drill is the armoured-boss answer (it ignores defence, `ToolsEffect_05`, `battle_main.asm:7330-7333`), so two chips into *one* gauge is precisely the boss-facing complement to AutoCrossbow's swarm-facing breadth. 16 MP → 8.0 MP/chip: rate priced above breadth, which is the correct relationship. Power 191 → ~105 per hit (P4). |
 | **Bio Blaster** | ×1 per body **+ the DOT** | Duration (§2.4); the tick chip stays as it is. No hit count. |
 | **Chain Saw** | ×1 | The slash committer, 252 power. P3. |
@@ -554,5 +554,5 @@ For the pass that moves data. Nothing here is done yet.
    Pummel and Drill, "×4" on Bum Rush. AutoCrossbow's row already reads
    "piercing, whole side", which is the correct reading.
 7. `check_break_reach.py` re-run per stretch — hit counts do not change which
-   classes a party can field, but `break-band-*.md`'s feel notes will want
+   classes a party can field, but `break-coverage-*.md`'s feel notes will want
    revisiting.

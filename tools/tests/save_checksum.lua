@@ -1,6 +1,6 @@
--- @suite frontier=worldmap_narshe
+-- @suite savestate=worldmap_narshe
 -- (The marker was a bare `-- @suite` until v0.6.  This test loads
--- build/states/worldmap_narshe.mss.lua at :34, which only `make frontier`
+-- build/states/worldmap_narshe.mss.lua at :34, which only `make savestates`
 -- generates, so a plain marker made it a hard `make test` failure -- "compose
 -- failed: save_checksum" -- in every tree without the generated states, i.e. every
 -- fresh worktree.  It passed in the main tree only because that tree happens

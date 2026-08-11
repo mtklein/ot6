@@ -1,4 +1,4 @@
--- gen_opera2_open.lua -- v0.5 Beat A step 2: opera_doorstep (map 209, one
+-- gen_opera2_open.lua -- v0.5 Beat A step 2: opera_entry (map 209, one
 -- A-press below the map-209 IMPRESARIO) -> DRIVE THE OPERA-OPEN CUTSCENE
 -- (_ca9337 "Maria!?" -> the letter $0331 -> the Setzer intro + name_menu ->
 -- $0340=1) -> travel 209 -> Jidoor (198) -> world -> the OPERA HOUSE (map 237,
@@ -71,7 +71,7 @@ local function pushTo(dir, destMap, maxFrames, what)
 end
 
 H.run({ maxFrames = 250000 }, {
-  H.loadState("build/states/opera_doorstep.mss.lua"),
+  H.loadState("build/states/opera_entry.mss.lua"),
   H.waitFrames(60),
   H.call(function()
     H.assertEq(map(), 209, "boot map 209")

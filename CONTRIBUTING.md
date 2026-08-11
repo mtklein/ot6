@@ -17,8 +17,8 @@ make rom     # build build/ot6.sfc
 make test    # full headless run: the self-registering suite (a few minutes),
              # discovered from each test's `-- @suite` marker -- see
              # `tools/tests/suite.sh --list`.  Tests that load a deep story
-             # savestate join once `make frontier` has generated it;
-             # `make frontier-test` does both
+             # savestate join once `make savestates` has generated it;
+             # `make savestates-test` does both
 make run     # launch the built ROM in Mesen (GUI)
 ```
 

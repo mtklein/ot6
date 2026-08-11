@@ -1,4 +1,4 @@
--- @suite slow frontier=worldmap_narshe
+-- @suite slow savestate=worldmap_narshe
 -- battle_hits: a boosted Fight swings again — +2 swings per pending BP
 -- (one real hit per BP for a one-weapon character; a genji pair swings
 -- both hands again).

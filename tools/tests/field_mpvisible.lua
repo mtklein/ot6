@@ -1,4 +1,4 @@
--- @suite frontier=sfigaro_passage
+-- @suite savestate=sfigaro_passage
 -- field_mpvisible.lua -- issue #35 (field half): the field menu shows EVERY
 -- character's MP.  Vanilla's CheckMPVisible (menu_common.asm:2311) hid the
 -- pool unless the party owned an esper, the character was Gogo, or they

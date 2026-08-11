@@ -1,4 +1,4 @@
--- gen_kefka_won.lua -- v0.4's FIRST link: boot kefka_doorstep, win battle 57
+-- gen_kefka_won.lua -- v0.4's FIRST link: boot kefka_entry, win battle 57
 -- again -- FOR REAL (issue #75: this file writes no emulated game state;
 -- the fight is played with gen_narshe_battle's menu-episode fighter and a
 -- three-attempt retry ladder off the booted entry point, exactly the real
@@ -352,7 +352,7 @@ end
 -- input-driven fight costs real ATB rounds and the ladder may replay it
 -- three times.
 H.run({ maxFrames = 400000 }, {
-  H.loadState("build/states/kefka_doorstep.mss.lua"),
+  H.loadState("build/states/kefka_entry.mss.lua"),
   H.waitFrames(30),
 
   -- the ladder's checkpoint IS the booted entry point (gen_narshe_battle

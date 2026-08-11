@@ -79,7 +79,7 @@
 -- row $8933,y indexed by the actor slot, entry = (scroll + row) * 2 + column
 -- (_c18438, btlgfx_main.asm:20096-20111).
 local H = dofile("tools/tests/lib/ot6.lua")
-local STATE = "build/states/battle_doorstep.mss.lua"
+local STATE = "build/states/battle_entry.mss.lua"
 
 local MENU = 0x7BCA
 local RAGES = 0x1D2C                 -- learned-rage bitfield, 32 bytes

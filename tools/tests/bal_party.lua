@@ -122,8 +122,8 @@ local FIXTURES = {
   -- has a group (59) it can never draw. The observation stands, the
   -- mechanism did not. Kept as the entry point gen_kolts_pool.lua crosses
   -- from; measure the mountain on kolts_pool and kolts_cave.
-  kolts_doorstep = {
-    state = "build/states/kolts_doorstep.mss.lua",
+  kolts_entry = {
+    state = "build/states/kolts_entry.mss.lua",
     mode = "field", map = 95,
     seeds = { {fa1=0x37,fa2=0x00}, {fa1=0x6e,fa2=0x01}, {fa1=0xa5,fa2=0x02},
               {fa1=0xdc,fa2=0x03}, {fa1=0x13,fa2=0x04}, {fa1=0x4a,fa2=0x05} },
@@ -154,8 +154,8 @@ local FIXTURES = {
   -- Seeds are inert here (fixed formation), so the six samples differ only
   -- by settle jitter -- a distribution of the SAME boss fight, whelkbal's
   -- shape. BOSS_FRAMES is longer: 3270 HP + revives + self-heal is a slog.
-  dadaluma_doorstep = {
-    state = "build/states/dadaluma_doorstep.mss.lua",
+  dadaluma_entry = {
+    state = "build/states/dadaluma_entry.mss.lua",
     mode = "field", map = 221, trigger = "talk", face = "down",
     nbattles = 4, battleFrames = 24000, runFrames = 240000,
     seeds = { {}, {}, {}, {} },
@@ -934,7 +934,7 @@ local function report()
   -- last monster dies, which is before the killing action reaches
   -- Ot6ActionEnd, so its bp write is never observed. Measured constant at
   -- -1 across 6/6 world-pool battles regardless of action count (1 or 2)
-  -- and on battle2_doorstep. A skew that GROWS with actions would mean
+  -- and on battle2_entry. A skew that GROWS with actions would mean
   -- the dequeue pairing is wrong; a steady -1 means it is right.
   mline("actions_sum", aSum)
   mline("actions_residual", S.playerActions - aSum)

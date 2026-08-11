@@ -1,4 +1,4 @@
--- @suite frontier=vargas_won slow
+-- @suite savestate=vargas_won slow
 -- battle_blitzgrey.lua -- v0.5 MP costs: the Blitz menu greys what Sabin can't
 -- afford, exactly as vanilla Magic greys a spell whose MP cost exceeds current
 -- MP.

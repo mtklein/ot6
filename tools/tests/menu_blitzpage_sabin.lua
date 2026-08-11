@@ -1,4 +1,4 @@
--- @suite frontier=vector_doorstep
+-- @suite savestate=vector_entry
 -- menu_blitzpage_sabin.lua -- issue #53: the field Skills->Blitz page, opened
 -- for A REAL SABIN.
 --
@@ -14,8 +14,8 @@
 --
 -- So this test pokes NOTHING.  Its whole job is that every input is the
 -- game's own:
---   * the fixture is vector_doorstep, cold-booted from the tracked
---     post-opera-v1 SRAM save (frontier_graph.py:390), whose manifest names its
+--   * the fixture is vector_entry, cold-booted from the tracked
+--     post-opera-v1 SRAM save (savestate_graph.py:390), whose manifest names its
 --     party LOCKE CELES SABIN EDGAR -- one step from that checkpoint, no story
 --     replay;
 --   * SABIN is FOUND, not assumed: zCharID ($69, four bytes, one per party
@@ -43,7 +43,7 @@
 -- puts real element icons on a real page; the test asserts each named cell
 -- both in the tilemap AND as art present in the menu font's vram copy.
 local H = dofile("tools/tests/lib/ot6.lua")
-local STATE = "build/states/vector_doorstep.mss.lua"
+local STATE = "build/states/vector_entry.mss.lua"
 
 local ZMENUSTATE, ZCURSOR, ZSELINDEX = 0x26, 0x4b, 0x28
 local ZCHARID = 0x69                    -- zCharID::Slot1..4 (menu_ram.inc:168)
@@ -217,7 +217,7 @@ H.run({ maxFrames = 40000 }, {
     end
     H.log("party: " .. table.concat(ids, ", "))
     H.assertEq(sabinSlot ~= nil, true,
-      "vector_doorstep's party must contain SABIN -- post-opera-v1's manifest "
+      "vector_entry's party must contain SABIN -- post-opera-v1's manifest "
       .. "says LOCKE CELES SABIN EDGAR.  Without him this test is not testing "
       .. "the thing it exists to test, so it fails rather than falls back")
     -- his own record carries Blitz; the test does not install it

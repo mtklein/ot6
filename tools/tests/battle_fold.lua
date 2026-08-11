@@ -1,11 +1,11 @@
--- @suite frontier=worldmap_narshe
+-- @suite savestate=worldmap_narshe
 -- battle_fold: boost folds tiered spells — Terra casting with pending BP
 -- executes the spell a tier up (queued as the -ra/-ga id in CreateAction,
 -- so name, animation, and power are the higher tier's own), is CHARGED
 -- THAT TIER'S OWN MP (issue #64), and tier-family spells never take the
 -- generic damage multiplier.
 --
--- Issue #75 conversion.  The old apparatus lived on battle_doorstep,
+-- Issue #75 conversion.  The old apparatus lived on battle_entry,
 -- where TERRA has no Magic command: it rewrote her $202E rows, cleared
 -- her magitek bit, MUDDLED her to force menu-less casts, pinned guards
 -- at 3000 HP / stopped them, handed her bp:=3/pending:=2, and pumped her

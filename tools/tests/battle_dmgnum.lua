@@ -28,7 +28,7 @@
 -- Positive controls: a boost really was pending, and damage numerals
 -- really did fire, during the sampled window.
 local H = dofile("tools/tests/lib/ot6.lua")
-local STATE = "build/states/battle_doorstep.mss.lua"
+local STATE = "build/states/battle_entry.mss.lua"
 
 local NUM_LO, NUM_HI = 192, 223       -- vram $2c00-$2dff as obj tile ids
 local actor

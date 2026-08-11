@@ -1,4 +1,4 @@
--- @suite frontier=vector_sneak
+-- @suite savestate=vector_sneak
 -- field_navstep: navTo must land EXACTLY on the tile it was asked for, and
 -- must never report success from a tile the party has already left (#22).
 --
@@ -13,7 +13,7 @@
 -- frame while the party was already walking off it.
 --
 -- WHY THIS FIXTURE.  The overshoot needs a map that walks 1 px/frame; the
--- base whelk_doorstep fixture (map 41) walks ~1.33 px/frame with jitter and
+-- base whelk_entry fixture (map 41) walks ~1.33 px/frame with jitter and
 -- does NOT reproduce it -- a control written there is exactly the quiet test
 -- CONTRIBUTING.md warns about.  Map 242's Vector corridor does: measured
 -- with probe_step2, py 544 -> 560 over frames 6..21, then straight on to 576.
@@ -75,7 +75,7 @@ end
 -- one segment: assert the step is real (and, for the two latching directions,
 -- that the overshoot tile is passable so the bug WOULD be observable), walk
 -- it, then prove the party stopped there.
-local function leg(fx, fy, dir, tx, ty, what)
+local function segment(fx, fy, dir, tx, ty, what)
   local latching = (dir == "right" or dir == "down")
   return H.cond(function() return true end, {
     H.call(function()
@@ -113,11 +113,11 @@ H.run({ maxFrames = 30000 }, {
   -- the gate guards' forced-battle row.  (The column is one-way in places --
   -- (57,35) cannot be left upward, (57,33) cannot be left downward -- which
   -- is why the UP segment is taken from (57,36).)
-  leg(57, 34, "down", 57, 35, "one tile DOWN"),
-  leg(57, 35, "down", 57, 36, "a second tile DOWN"),
-  leg(57, 36, "up", 57, 35, "one tile UP"),
-  leg(57, 35, "left", 56, 35, "one tile LEFT"),
-  leg(56, 35, "right", 57, 35, "one tile RIGHT"),
+  segment(57, 34, "down", 57, 35, "one tile DOWN"),
+  segment(57, 35, "down", 57, 36, "a second tile DOWN"),
+  segment(57, 36, "up", 57, 35, "one tile UP"),
+  segment(57, 35, "left", 56, 35, "one tile LEFT"),
+  segment(56, 35, "right", 57, 35, "one tile RIGHT"),
 
   H.logStep("navTo lands exactly and comes to REST, in all four directions"),
 })

@@ -1,4 +1,4 @@
--- @suite frontier=figaro_cleared
+-- @suite savestate=figaro_cleared
 -- battle_crosslist.lua -- test for issue #36: "Tools shows Cure 2".
 --
 -- MECHANISM UNDER GUARD: Ot6RestageGate_ext (ot6_hud.asm) re-renders the open

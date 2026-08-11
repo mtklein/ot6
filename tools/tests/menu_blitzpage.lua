@@ -1,4 +1,4 @@
--- @suite frontier=vargas_won
+-- @suite savestate=vargas_won
 -- menu_blitzpage.lua -- issue #46: the field Skills->Blitz page describes the
 -- ABILITY, not a retired input system.
 --
@@ -63,7 +63,7 @@
 -- neither can move alone.  It is duplicated from menu_ragepage.lua rather than
 -- shared: the only lua the runner inlines is lib/ot6{,_field,_contract}.lua,
 -- and those three files ARE the savestate generation signature
--- (lib/frontier_stamp.sh:82-85), so a helper added there would mark every
+-- (lib/savestate_stamp.sh:82-85), so a helper added there would mark every
 -- generated fixture drifted.
 --
 -- Fixture (issue #75 conversion): vargas_won -- a REAL SABIN, on Mt. Kolts

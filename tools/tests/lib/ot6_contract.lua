@@ -1,7 +1,7 @@
 -- ot6_contract.lua -- the INVARIANT-CONTRACT half of the OT6 test library:
 -- declared entry/exit contracts for SRAM checkpoint boundaries (#25).
 --
--- docs/design/leg-fixtures.md, "The invariant contract": parallel steps can
+-- docs/design/checkpoint-fixtures.md, "The invariant contract": parallel steps can
 -- all be green while the composition is broken, because a step run from a
 -- stored checkpoint never sees its predecessor's output.  So every step
 -- asserts its entry invariants before doing anything, and a boundary's
@@ -45,8 +45,8 @@
 --
 -- The pre-boot half of the same design -- refusing a checkpoint whose
 -- manifest.json persistent_layout the step does not declare support for --
--- lives in run.sh + lib/sram_anchor.py, keyed off the step's
--- "OT6_ANCHOR_LAYOUT:" marker comment.  This file is the in-emulator half:
+-- lives in run.sh + lib/sram_checkpoint.py, keyed off the step's
+-- "OT6_CHECKPOINT_LAYOUT:" marker comment.  This file is the in-emulator half:
 -- the checkpoint LOADED, but its semantic content is not what the step
 -- declared.
 
@@ -61,8 +61,8 @@ M.contracts = {}
 
 -- post-opera-v1: the tracked SRAM checkpoint cut in #9 (world save at
 -- (137,203), slot 3, party LOCKE CELES SABIN EDGAR).  Entry contract for
--- gen_vector_doorstep (step A->B of the save-point boundary sequence
--- lettered in tools/tests/frontier_graph.py); the exit contract of whatever
+-- gen_vector_entry (step A->B of the save-point boundary sequence
+-- lettered in tools/tests/savestate_graph.py); the exit contract of whatever
 -- step someday cuts this checkpoint is THIS SAME TABLE.
 --
 -- THE PARTY COUNT IS THE CONTROL (#21).  The roster check used to be a log
@@ -119,10 +119,10 @@ M.contracts["post-opera-v1"] = {
 }
 
 -- The Vector-area SRAM checkpoints B-E (issue #25; the A-F save-point
--- boundary sequence is lettered in tools/tests/frontier_graph.py).
+-- boundary sequence is lettered in tools/tests/savestate_graph.py).
 -- Every value below is MEASURED, not derived: the boot dumps of the
--- serially generated boundary states (ifrit_doorstep / n024_doorstep /
--- minecart_doorstep, probed 2026-07-27) and, for E, the n128_won run log.
+-- serially generated boundary states (ifrit_entry / n024_entry /
+-- minecart_entry, probed 2026-07-27) and, for E, the n128_won run log.
 -- Shared shape notes:
 --  * field = the save tile itself: a cold Continue of the checkpoint puts
 --    the party exactly there, and the step INTO the boundary walks onto the
@@ -175,7 +175,7 @@ M.contracts["mrf-save-room-v1"] = {
   },
 }
 
-M.contracts["n024-doorstep-save-v1"] = {
+M.contracts["n024-entry-save-v1"] = {
   slot = 3,
   field = { map = 273, x = 26, y = 53 },   -- the NEW #10 save point before 024
   switches = {
@@ -363,7 +363,7 @@ M.contracts["narshe-mission-v1"] = {
     { 0x064E, 1, "the meeting-scene latch" },
     { 0x045E, 0, "the Imperial-Base soldiers were withdrawn (:94171-94180)" },
     { 0x0079, 0, "CLEAR -- the Sealed Gate scene is still ahead" },
-    { 0x02F0, 1, "TERRA is available (she is seated in leg G->H, not here)" },
+    { 0x02F0, 1, "TERRA is available (she is seated in step G->H, not here)" },
     { 0x0070, 1, "the Blackjack party-swap room is armed" },
     { 0x02F9, 1, "SETZER is available" },
     { 0x02F6, 0, "CELES is still out of the roster" },
@@ -412,7 +412,7 @@ M.contracts["gate-cave-save-v1"] = {
     { 0x0173, 1, "the (62,11) switch stands -- 384's save-room door is open" },
     { 0x0079, 0, "CLEAR -- the Sealed Gate scene is still ahead" },
     { 0x0242, 0, "CLEAR -- the base entrance has not gone silent" },
-    { 0x007A, 0, "CLEAR -- the airship still flies (the crash is leg H->I)" },
+    { 0x007A, 0, "CLEAR -- the airship still flies (the crash is step H->I)" },
     { 0x02F0, 1, "TERRA is available" },
     { 0x02F6, 0, "CELES is still out of the roster" },
   },
@@ -468,7 +468,7 @@ M.contracts["vector-crash-v1"] = {
   switches = {
     { 0x0079, 1, "the Sealed Gate scene ran (event_main.asm:46316)" },
     { 0x0471, 1, "the gate-scene tail latch (:46313)" },
-    { 0x007A, 1, "THE AIRSHIP IS DEAD (:44451) -- no leg after I may fly" },
+    { 0x007A, 1, "THE AIRSHIP IS DEAD (:44451) -- no step after I may fly" },
     { 0x007B, 1, "Vector's soldier machinery stands down (:44453)" },
     { 0x01BA, 1, "the crash latch (:44452)" },
     { 0x0242, 1, "the base entrance went silent forever (:44351)" },

@@ -64,7 +64,7 @@
 -- measured at a CLAMPED level rather than skipped: they arrive by esper, which
 -- is story-gated rather than level-gated, so there is no learn level to read.
 -- #45 hit the same wall and set the same clamp -- L6, the earliest level the
--- party is actually presented at (kolts_doorstep) -- on the grounds that a
+-- party is actually presented at (kolts_entry) -- on the grounds that a
 -- pool the game never shows is not a price anyone pays.  Those rows take part
 -- in 1-3 and are logged in 5; assertion 4 needs a real learn level and says so.
 local H = dofile("tools/tests/lib/ot6.lua")

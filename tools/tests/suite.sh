@@ -51,27 +51,27 @@ fi
 #
 #   -- @suite                          plain member
 #   -- @suite slow                     member; a long-runner (LPT ordering hint)
-#   -- @suite frontier=<fixture>       member IFF build/states/<fixture>.mss
+#   -- @suite savestate=<fixture>      member IFF build/states/<fixture>.mss
 #                                      exists -- else reported SKIPPED, never
-#                                      silently dropped (see the frontier=
+#                                      silently dropped (see the savestate=
 #                                      section below)
-#   -- @suite frontier=<fixture> slow  frontier= member, also a long-runner
+#   -- @suite savestate=<fixture> slow savestate= member, also a long-runner
 #
-# The four lists suite.sh used to hand-sync -- TESTS, FRONTIER_TESTS,
-# frontier_fixture(), SCHED_LONG -- are ALL derived here in one pass from those
+# The four lists suite.sh used to hand-sync -- TESTS, SAVESTATE_TESTS,
+# savestate_fixture(), SCHED_LONG -- are ALL derived here in one pass from those
 # markers.  The glob expands in sorted order, so discovery is deterministic; and
 # because every suite test is a pure savestate load that run.sh isolates, the
 # order tests run and print in carries no meaning (README: "order doesn't
 # matter").  Membership and the fixture condition are what must be exact, and
 # they are.
-SUITE=""; FRONTIER_TESTS=""; FRONTIER_FIX=""; SLOW=""
+SUITE=""; SAVESTATE_TESTS=""; SAVESTATE_FIX=""; SLOW=""
 for f in "$ROOT"/tools/tests/*.lua; do
   grep -q '^-- @suite' "$f" || continue
   t=$(basename "$f" .lua)
   attrs=$(sed -n 's/^-- @suite *//p' "$f" | head -n1)   # text after "@suite"
-  fix=$(printf '%s' "$attrs" | sed -n 's/.*frontier=\([A-Za-z0-9_]*\).*/\1/p')
+  fix=$(printf '%s' "$attrs" | sed -n 's/.*savestate=\([A-Za-z0-9_]*\).*/\1/p')
   if [ -n "$fix" ]; then
-    FRONTIER_TESTS="$FRONTIER_TESTS $t"; FRONTIER_FIX="$FRONTIER_FIX $t=$fix"
+    SAVESTATE_TESTS="$SAVESTATE_TESTS $t"; SAVESTATE_FIX="$SAVESTATE_FIX $t=$fix"
   else
     SUITE="$SUITE $t"
   fi
@@ -89,36 +89,36 @@ ram_env_for() {
     # battery (issue #75): its slot-3 page is the real persistent knowledge
     # New Game must preserve, and its valid stale transient page is the
     # knowledge New Game must wipe.
-    battle_reveal_poweron) echo "OT6_RAM_POWERON=AllOnes OT6_SRAM_ANCHOR=tools/tests/anchors/post-opera-v1" ;;
+    battle_reveal_poweron) echo "OT6_RAM_POWERON=AllOnes OT6_SRAM_CHECKPOINT=tools/tests/checkpoints/post-opera-v1" ;;
     # battle_slotsboot cold-Continues the tracked terra-returned battery --
-    # the same checkpoint hand-off the Makefile's SMOKE_ANCHOR_* map gives
+    # the same checkpoint hand-off the Makefile's SMOKE_CHECKPOINT_* map gives
     # the smoke generators that use one (run.sh materializes it before boot).
-    battle_slotsboot) echo "OT6_SRAM_ANCHOR=tools/tests/anchors/terra-returned-v1" ;;
+    battle_slotsboot) echo "OT6_SRAM_CHECKPOINT=tools/tests/checkpoints/terra-returned-v1" ;;
     # battle_slots' input-driven half (issue #75) cold-Continues the same
     # checkpoint for its tier-1/tier-2 spins before its labeled quarantine lab.
-    battle_slots) echo "OT6_SRAM_ANCHOR=tools/tests/anchors/terra-returned-v1" ;;
+    battle_slots) echo "OT6_SRAM_CHECKPOINT=tools/tests/checkpoints/terra-returned-v1" ;;
     *) echo "" ;;
   esac
 }
 # TESTS THAT NEED THE GENERATED SAVESTATES.  Such a test asserts on a fixture
-# that only `make frontier` generates -- reaching it replays the whole story
-# chain, many multi-minute scripted playthroughs, the very cost `make frontier`
+# that only `make savestates` generates -- reaching it replays the whole story
+# chain, many multi-minute scripted playthroughs, the very cost `make savestates`
 # exists to keep out of `make test`.  Such a test declares
-# `-- @suite frontier=<fixture>` and
+# `-- @suite savestate=<fixture>` and
 # joins the suite the instant build/states/<fixture>.mss exists; until then it is
-# reported SKIPPED (below), never silently dropped.  `make frontier-test`
+# reported SKIPPED (below), never silently dropped.  `make savestates-test`
 # generates the chain first, so it always runs whatever can be generated.  The
 # per-test WHY -- which fixture, and why that formation is the one that
 # exercises the check -- lives in each test's own header now, right under its
 # @suite marker.
-frontier_fixture() {   # test name -> the abs .mss path from its @suite marker
-  for pair in $FRONTIER_FIX; do
+savestate_fixture() {   # test name -> the abs .mss path from its @suite marker
+  for pair in $SAVESTATE_FIX; do
     case "$pair" in "$1="*) echo "$ROOT/build/states/${pair#*=}.mss"; return ;; esac
   done
 }
 skipped=""
-for t in $FRONTIER_TESTS; do
-  if [ -f "$(frontier_fixture "$t")" ]; then
+for t in $SAVESTATE_TESTS; do
+  if [ -f "$(savestate_fixture "$t")" ]; then
     TESTS="$TESTS $t"
   else
     skipped="$skipped $t"
@@ -272,7 +272,7 @@ else
 fi
 
 for t in $skipped; do
-  result "$t" "skip (needs \`make frontier\`: $(frontier_fixture "$t") absent)"
+  result "$t" "skip (needs \`make savestates\`: $(savestate_fixture "$t") absent)"
   n_skip=$((n_skip + 1))
 done
 
@@ -288,7 +288,7 @@ ran=$((n_pass + n_fail + n_xfail + n_xpass))
 line="$ran ran: $n_pass pass, $n_fail fail"
 [ "$n_xfail" -gt 0 ] && line="$line, $n_xfail xfail"
 [ "$n_xpass" -gt 0 ] && line="$line, $n_xpass XPASS"
-[ "$n_skip"  -gt 0 ] && line="$line; $n_skip skipped (need \`make frontier\`)"
+[ "$n_skip"  -gt 0 ] && line="$line; $n_skip skipped (need \`make savestates\`)"
 if [ "$ran" -ne "$discovered" ]; then
   line="$line -- BUG: $discovered tests were discovered but $ran reported"
   fail=1

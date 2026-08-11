@@ -26,7 +26,7 @@ local function dump(tag)
 end
 
 H.run({ maxFrames = 20000 }, {
-  H.loadState("build/states/vector_doorstep.mss.lua"),
+  H.loadState("build/states/vector_entry.mss.lua"),
   H.waitFrames(150),
   H.call(function()
     H.log(string.format("map=%d  xmask=$%02X ymask=$%02X",

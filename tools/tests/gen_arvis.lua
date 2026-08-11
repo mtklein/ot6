@@ -1,5 +1,5 @@
 -- gen_arvis.lua -- WIN the Whelk and ride the esper scene to Terra's wake-up
--- in Arvis's house.  From whelk_doorstep.mss (party calm at (42,6), map 41):
+-- in Arvis's house.  From whelk_entry.mss (party calm at (42,6), map 41):
 -- step onto the trigger at (42,5), edge-tap the guard dialogs $0B6E/$0B6F,
 -- then BEAT the Whelk BY PLAYING IT (issue #75: zero state writes -- the
 -- battle-clear-write clearBattle this used to call is gone).  The strategy
@@ -30,7 +30,7 @@
 -- progress screenshots, and logs the roster + command lists the fixture
 -- has.
 local H = dofile("tools/tests/lib/ot6.lua")
-local DOORSTEP = "build/states/whelk_doorstep.mss.lua"
+local ENTRY = "build/states/whelk_entry.mss.lua"
 
 -- goal-fight signature (same as gen_whelk): 0x134 "Head" is the distinctive
 -- word; $57C0 is battle scratch, so gate every read on battleLoadStarted
@@ -306,7 +306,7 @@ local function winWhelk()
 end
 
 H.run({ maxFrames = 120000 }, {
-  H.loadState(DOORSTEP),
+  H.loadState(ENTRY),
   H.waitFrames(10),
   H.waitUntil(function() return H.hasControl() end, 300, "entry point control", 5),
   H.call(function()

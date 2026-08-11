@@ -27,7 +27,7 @@
 -- FightAttack stores the vanilla swing count (1), then Ot6FightBoost
 -- stores 1+2*pending -- a [1,7] pair on a $b1.0=1 action is the leak.
 local H = dofile("tools/tests/lib/ot6.lua")
-local STATE = "build/states/battle_doorstep.mss.lua"
+local STATE = "build/states/battle_entry.mss.lua"
 
 local swings = {}           -- {frame=, v=, ctr=} for every $3a70 write
 local results = {}

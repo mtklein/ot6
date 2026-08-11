@@ -1,4 +1,4 @@
--- @suite frontier=ifrit_doorstep slow
+-- @suite savestate=ifrit_entry slow
 -- battle_brokendeath.lua -- THE GUARD on where the Broken turn gate may sit.
 --
 -- Ot6MayAct (ot6_break.asm) refuses a Broken monster's turn at execution
@@ -62,7 +62,7 @@
 -- CORRECTION 2026-08-09, and it replaced the whole drive.  The Aug-06
 -- rebuild drove CELES -> Magic -> Ice and EDGAR -> Tools -> AutoCrossbow
 -- while Ifrit was on stage, and its header reported a measured win (kill
--- at tick 4 of the first break, f8283).  On the 2026-08-09 ifrit_doorstep
+-- at tick 4 of the first break, f8283).  On the 2026-08-09 ifrit_entry
 -- regeneration that drive WIPES, reproducibly: party 0/0/0/0 by ~f6300 with
 -- Ifrit still at ~3057 hp and 5 of 6 shields.  Traced on the sibling
 -- checkpoint-based step (gen_ifrit_magicite), the mechanism is the TAG: the
@@ -108,7 +108,7 @@
 -- watched a corpse that never moved.
 local H = dofile("tools/tests/lib/ot6.lua")
 
-local STATE = "build/states/ifrit_doorstep.mss.lua"
+local STATE = "build/states/ifrit_entry.mss.lua"
 local IFRIT, SHIVA = 0x0109, 0x0108
 local EDGAR, CELES = 0x04, 0x06
 
@@ -210,7 +210,7 @@ local function attempt(n)
       H.assertEq(SSLOT ~= nil, true, "a SHIVA slot resolved")
       -- NO-STAGING CONTROLS: the lab this file used to build is gone, and a
       -- relapse would show here.  Both gauges seed FULL and both HP words
-      -- read their authored values (break-band-vector.md §2 "The bosses" /
+      -- read their authored values (break-coverage-vector.md §2 "The bosses" /
       -- bosses-wob.md 13).
       H.assertEq(shields(ISLOT), 6, "ifrit opens with his authored 6 shields")
       H.assertEq(shields(SSLOT), 6, "shiva opens with her authored 6 shields")

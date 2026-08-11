@@ -4,7 +4,7 @@
 --   L lowers it, the party-window pip cell tracks live, and the boosted
 --   action consumes the points (and skips that turn's +1 regen).
 local H = dofile("tools/tests/lib/ot6.lua")
-local STATE = "build/states/battle_doorstep.mss.lua"
+local STATE = "build/states/battle_entry.mss.lua"
 local function pend(slot) return H.readByte(0x3e9d + slot*2) end
 local function bp(slot) return H.readByte(0x3e9c + slot*2) end
 local actor

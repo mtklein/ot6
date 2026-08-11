@@ -2,7 +2,7 @@
 -- Cold-Continues terra-returned-v1, boards with A, then holds each
 -- direction while dumping the candidate position cells, then tries B
 -- (land) and X (deck) so the step gen knows every control.
--- OT6_ANCHOR_LAYOUT: ot6-codex-o8-v1
+-- OT6_CHECKPOINT_LAYOUT: ot6-codex-o8-v1
 local H = dofile("tools/tests/lib/ot6.lua")
 
 local function bright() return emu.getState()["ppu.screenBrightness"] or 0 end

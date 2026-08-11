@@ -978,20 +978,20 @@ local function grindAttempt(n)
 end
 
 -- THE RELOAD-VERIFIED GENERATE (see the header).
-local mintBlob, mintDone = nil, false
-local function mintAttempt(n)
+local genBlob, genDone = nil, false
+local function genAttempt(n)
   local tag = string.format("[gau_joined] generation attempt %d", n)
   local saveReq, loadReq
-  return H.cond(function() return not mintDone end, {
+  return H.cond(function() return not genDone end, {
     H.call(function() saveReq = H.requestSaveState() end),
     H.waitFrames(2),
     H.call(function()
       H.checkReq(saveReq, tag .. ": capture")
-      mintBlob = saveReq.blob
+      genBlob = saveReq.blob
       H.log(string.format("%s: captured %d bytes at (%d,%d) f%d -- " ..
-        "reloading to verify the consumer's boot", tag, #mintBlob,
+        "reloading to verify the consumer's boot", tag, #genBlob,
         H.worldX(), H.worldY(), H.frame))
-      loadReq = H.requestLoadState(mintBlob)
+      loadReq = H.requestLoadState(genBlob)
     end),
     H.waitFrames(2),
     H.call(function() H.checkReq(loadReq, tag .. ": verify reload") end),
@@ -1001,7 +1001,7 @@ local function mintAttempt(n)
          and H.worldX() == 214 and H.worldY() == 149
     end, {
       H.call(function()
-        mintDone = true
+        genDone = true
         H.log(tag .. ": reload stayed calm at the entry point -- verified")
       end),
     }, {
@@ -1382,13 +1382,13 @@ H.run({ maxFrames = 500000 }, {
       H.worldX(), H.worldY()))
     H.screenshot("gau_joined")
   end),
-  mintAttempt(1),
-  mintAttempt(2),
-  mintAttempt(3),
+  genAttempt(1),
+  genAttempt(2),
+  genAttempt(3),
   H.call(function()
-    H.assertEq(mintDone, true,
+    H.assertEq(genDone, true,
       "a reload-verified calm entry point capture within 3 attempts")
-    H.emitBlob("gau_joined.mss", mintBlob)
+    H.emitBlob("gau_joined.mss", genBlob)
   end),
   H.logStep(function()
     return string.format("gau_joined generated at frame %d world (%d,%d) -- " ..

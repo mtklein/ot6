@@ -12,7 +12,7 @@
 --     (_cb2dbb tiles hurt while $01F5, _cb2dd2 while $01F6, (15,10)
 --     always -- event_trigger.asm:1844-1885).
 -- Everything is a dump; it never tries to cross.
--- OT6_ANCHOR_LAYOUT: ot6-codex-o8-v1
+-- OT6_CHECKPOINT_LAYOUT: ot6-codex-o8-v1
 local H = dofile("tools/tests/lib/ot6.lua")
 
 local function map() return H.mapId() & 0x1ff end

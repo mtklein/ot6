@@ -61,9 +61,9 @@
 --   exemption A/B damage ratio on identical triples; T3j the joker gate
 --   refusing a bought 7-pair at 3 bp.
 --
--- OT6_ANCHOR_LAYOUT: ot6-codex-o8-v1
+-- OT6_CHECKPOINT_LAYOUT: ot6-codex-o8-v1
 local H = dofile("tools/tests/lib/ot6.lua")
-local STATE = "build/states/battle_doorstep.mss.lua"
+local STATE = "build/states/battle_entry.mss.lua"
 
 local MENU, ACTOR, MSTATE = 0x7BCA, 0x62CA, 0x7BC2
 local RIG, HELP1, MARK, DRIFT = 0x6179, 0x617B, 0x617C, 0x617D

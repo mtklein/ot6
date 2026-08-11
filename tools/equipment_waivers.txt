@@ -1,6 +1,6 @@
 # Fixtures where a party member holding nothing is the STORY, not a bug.
 #
-# Format:  <fixture>\t<CHARACTER>\t<why, and which leg arms them>
+# Format:  <fixture>\t<CHARACTER>\t<why, and which step arms them>
 #
 # The rule this waives is tools/audit_equipment.py: nobody walks the story
 # bare-handed, because a wrong fixture reads exactly like a balance wall
@@ -8,8 +8,8 @@
 # three runs before anyone read his equipment block).
 #
 # A waiver is only legitimate when the fixture captures the exact moment
-# the game itself took the gear away and the very next leg puts it back.
-# "This leg is hard" is never a reason.  Like the state-write list, this is
+# the game itself took the gear away and the very next step puts it back.
+# "This step is hard" is never a reason.  Like the state-write list, this is
 # a BURN-DOWN: a line that matches nothing fails the run, so a fixture that
 # gets armed upstream cannot quietly keep its exemption.
 #
@@ -21,4 +21,4 @@
 locke_scenario	LOCKE	the scenario opens with him stripped and captured; gen_sfigaro's H.equipOptimum arms him before the gate soldier
 gau_joined	GAU	GAU joins off the Veldt wearing nothing, which is the character
 s2_gau_joined	GAU	same join, second-scenario variant
-celes_freed	CELES	the capture scene stripped her and gen_celes frees her still bare; gen_tunnelarmr's H.equipOptimum arms her at boot, the very next leg
+celes_freed	CELES	the capture scene stripped her and gen_celes frees her still bare; gen_tunnelarmr's H.equipOptimum arms her at boot, the very next step

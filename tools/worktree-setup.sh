@@ -22,14 +22,14 @@ ROM="Final Fantasy III (USA).sfc"
 [ -e "$HERE/tools/bin" ] || ln -s "$MAIN/tools/bin" "$HERE/tools/bin"
 
 # Seed the main tree's generated savestates so boot-chain fixtures don't
-# replay the whole game, PLUS the ninja bookkeeping for `make frontier`
+# replay the whole game, PLUS the ninja bookkeeping for `make savestates`
 # (build/ninja: the content latches and .ninja_log).  Ninja treats an edge
 # with no build-log entry as never built, so seeded states without the log
 # would genuinely -- and expensively, hours -- replay the whole chain.  -p
 # preserves mtimes so the log's recorded times still describe the copied
 # files; any REAL drift (a local edit after seeding) still regenerates
 # through the latch edges' content compare, proven in
-# frontier_ninja_selftest.sh.
+# savestate_ninja_selftest.sh.
 MAIN_BRANCH=$(git -C "$MAIN" branch --show-current 2>/dev/null || echo '?')
 HERE_BRANCH=$(git branch --show-current 2>/dev/null || echo '?')
 if [ -d "$MAIN/build/states" ] && [ ! -d "$HERE/build/states" ]; then
@@ -51,7 +51,7 @@ echo "seeded from $MAIN ($MAIN_BRANCH) into $HERE_BRANCH"
 #   * Wrong direction.  Equal branch names proved nothing.  Measured
 #     2026-07-30: `git diff main release/v0.9` was EMPTY, so the heuristic
 #     stayed silent -- and every one of the 105 seeded fixtures was stale
-#     anyway, because the main checkout's own last `make frontier` (its
+#     anyway, because the main checkout's own last `make savestates` (its
 #     stamps: 2026-07-28 09:15) predates commit b085cac (2026-07-28 19:47),
 #     which edited tools/tests/lib/ot6.lua.  The staleness never came from
 #     the branch; it came from the seed source not having regenerated since a

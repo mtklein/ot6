@@ -123,7 +123,7 @@ H.run({ maxFrames = 60000 }, {
     H.assertEq(map(), 242, "still in VECTOR at the factory entry point")
     H.assertEq(H.fieldX(), 57, "factory entry point x")
     H.assertEq(H.fieldY(), 3, "factory entry point y")
-    H.screenshot("mrf_doorstep")
+    H.screenshot("mrf_entry")
   end),
 
   -- 2. UP onto row y=2 -> LongEntrance {57,2} len 2 -> map 262 {28,8}

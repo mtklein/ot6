@@ -1,4 +1,4 @@
--- gen_esper_tubes_done.lua -- v0.6 step 11: esper_tubes_doorstep (map 274
+-- gen_esper_tubes_done.lua -- v0.6 step 11: esper_tubes_entry (map 274
 -- {10,10} facing UP) -> UP + A onto {10,9} -> _cc7a60, the Cid/Kefka tube
 -- room set piece -> six espers, CELES LEFT BEHIND, $0068=1.  Generates
 -- esper_tubes.
@@ -121,7 +121,7 @@ local function espers()
 end
 
 H.run({ maxFrames = 90000 }, {
-  H.loadState("build/states/esper_tubes_doorstep.mss.lua"),
+  H.loadState("build/states/esper_tubes_entry.mss.lua"),
   H.waitFrames(150),
   H.call(function()
     H.assertEq(map(), 274, "booted on map 274")
@@ -146,7 +146,7 @@ H.run({ maxFrames = 90000 }, {
       "boot espers do NOT include CARBUNKL(19), PHANTOM(20) or UNICORN(23)")
     H.log(string.format("[boot espers] $1A69 = %02X %02X %02X %02X",
       e[1], e[2], e[3], e[4]))
-    H.log(partyReport("esper_tubes_doorstep"))
+    H.log(partyReport("esper_tubes_entry"))
   end),
 
   -- 1. UP + A held: step onto {10,9} with $01B0 (facing up) and $01B4 (A

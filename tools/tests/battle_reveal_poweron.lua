@@ -7,7 +7,7 @@
 -- asserts a fresh, never-chipped enemy shows '?'.
 --
 -- suite.sh runs this under OT6_RAM_POWERON=AllOnes (deterministic AND dirty)
--- and OT6_SRAM_ANCHOR=tools/tests/anchors/post-opera-v1.  Issue #75
+-- and OT6_SRAM_CHECKPOINT=tools/tests/checkpoints/post-opera-v1.  Issue #75
 -- conversion: the SRAM save used to be FORGED -- slot 1's codex hand-stamped
 -- 'O8' with all 384 species knowing everything, and the transient page's
 -- magic zeroed to force the invalid path.  It is now the REAL tracked
@@ -43,7 +43,7 @@
 -- Monster slot s -> entity $08+2s: revealed elems $3e91+2s, revealed classes
 -- $3ea5+2s, broken timer $3e90+2s, class-weak $3ea4+2s. HUD row s at $5762+14s,
 -- weakness cells low byte +6/+8/+10/+12 ('?' = $BF, blank = $FF/$00).
--- OT6_ANCHOR_LAYOUT: ot6-codex-o8-v1
+-- OT6_CHECKPOINT_LAYOUT: ot6-codex-o8-v1
 local H = dofile("tools/tests/lib/ot6.lua")
 
 local SLOT3, TEMP = 0x316800, 0x316C00  -- codex pages (root $316000 + $400*n)

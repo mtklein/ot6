@@ -3,12 +3,12 @@
 --
 -- ISSUE #75 CONVERSION.  This script used to poke one weapon per break class
 -- into arvis_wake's empty bag ($1869/$1969) and shoot the forged list.  It
--- now boots vector_doorstep -- the input-driven post-Opera savestate (LOCKE
+-- now boots vector_entry -- the input-driven post-Opera savestate (LOCKE
 -- CELES SABIN EDGAR standing in Vector) -- and shoots the bag THAT SAVE
 -- really carries.
 --
 -- What the real bag holds (measured 2026-08-10, recon over the Aug-9
--- regenerations; vector_doorstep is the class-richest bag on the whole
+-- regenerations; vector_entry is the class-richest bag on the whole
 -- input-driven chain):
 --   PIERCE  $00 Dirk, $01 MithrilKnife x3, $02 Guardian, $AA
 --   SLASH   $0F ThunderBlade x2, $2B Ashura
@@ -23,7 +23,7 @@
 --
 -- The bag composition is LOGGED (read-only) so the shot is self-describing.
 local H = dofile("tools/tests/lib/ot6.lua")
-local STATE = "build/states/vector_doorstep.mss.lua"
+local STATE = "build/states/vector_entry.mss.lua"
 
 local WCLASS = H.sym("Ot6WeapClassTbl") & 0x3FFFFF
 

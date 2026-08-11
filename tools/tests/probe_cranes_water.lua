@@ -1,7 +1,7 @@
 -- probe_cranes_water.lua -- READ-ONLY instrument (issue #75, the Cranes
 -- vanilla-playbook re-test): does the fight's DESIGNED key actually turn it?
 --
--- The wall record (gen_terra_returned_anchor header) reports every
+-- The wall record (gen_terra_returned_checkpoint header) reports every
 -- input-driven configuration wiping by ~f8400 and names the designed
 -- counter -- water, bosses-wob.md 16 -- "unobtainable by the mandated
 -- party".  probe_cranes_loadout falsified the premise: BISMARK ($1A69 bit

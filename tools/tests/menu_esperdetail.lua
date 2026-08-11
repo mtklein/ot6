@@ -1,4 +1,4 @@
--- @suite frontier=magicite_ifrit_shiva
+-- @suite savestate=magicite_ifrit_shiva
 -- menu_esperdetail.lua -- issue #27, rebuilt for #62: the esper detail page
 -- shows the while-worn stat BLOCK and never the dead learn-rate columns.
 --

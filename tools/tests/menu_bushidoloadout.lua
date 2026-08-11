@@ -1,4 +1,4 @@
--- @suite frontier=cyan_defence
+-- @suite savestate=cyan_defence
 -- menu_bushidoloadout.lua -- issue #8 Layer B FIELD configurator (Skills->SwdTech).
 --
 -- ISSUE #75 CONVERSION -- a REAL CYAN, zero state writes.  This file's header

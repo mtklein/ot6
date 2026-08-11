@@ -4,7 +4,7 @@
 -- control every 20 frames for 900 frames.  Then a second clean edge, same
 -- watch.  This settles what iteration 3/4 could not: when the switch
 -- flips, how long the event runs, and whether a lingering press re-fires.
--- OT6_ANCHOR_LAYOUT: ot6-codex-o8-v1
+-- OT6_CHECKPOINT_LAYOUT: ot6-codex-o8-v1
 local H = dofile("tools/tests/lib/ot6.lua")
 
 local function map() return H.mapId() & 0x1ff end

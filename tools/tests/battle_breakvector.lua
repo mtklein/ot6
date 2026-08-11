@@ -19,7 +19,7 @@
 -- the automatic answer.  Those are the claims that were false before the pass
 -- and that a byte-equality check alone would not notice going false again.
 --
--- Survey, arithmetic and per-formation reading: docs/design/break-band-vector.md.
+-- Survey, arithmetic and per-formation reading: docs/design/break-coverage-vector.md.
 --
 -- ROM addressing.  HiROM PRG file offset = SNES addr - $C00000 (school.lua
 -- documents the same mapping).  From the link map:
@@ -102,7 +102,7 @@ check(shieldRows >= 70, string.format(
 -- --------------------------------------------------------- the authored rows
 -- Exact shields AND class: a missing row reads nil, a drifted one reads a
 -- different byte, and both fail.  Rationale for each is in ot6_hud.asm beside
--- the row and in break-band-vector.md §8.1.
+-- the row and in break-coverage-vector.md §8.1.
 local want = {
   { 0x00cb, 2, PIERCE | BLUDG, "garm (magitek quadruped, entrance)" },
   { 0x00c7, 2, PIERCE,         "commando (imperial line keeps pierce)" },
@@ -126,10 +126,10 @@ for _, w in ipairs(want) do
 end
 
 -- -------------------------------------------------- the encounter chain, live
--- Seven encounter-bearing maps (break-band-vector.md §1.1).  Map 275 carries
+-- Seven encounter-bearing maps (break-coverage-vector.md §1.1).  Map 275 carries
 -- group 106 and the enable bit but no entrance record targets it, so it is
 -- excluded; 270/272/274 carry a group with the enable bit CLEAR.
-local BAND_MAPS = { 262, 263, 264, 269, 271, 273, 240 }
+local AREA_MAPS = { 262, 263, 264, 269, 271, 273, 240 }
 local WANT_GROUP = { [262] = 80, [263] = 81, [264] = 104, [269] = 105,
                      [271] = 106, [273] = 106, [240] = 108 }
 local SLOT_P = { 0.3125, 0.3125, 0.3125, 0.0625 }
@@ -149,7 +149,7 @@ end
 -- Every section map must still point at the group this pass was authored against.
 -- If a map is ever repointed, every distribution claim below is stale and the
 -- test says so rather than quietly measuring a different dungeon.
-for _, m in ipairs(BAND_MAPS) do
+for _, m in ipairs(AREA_MAPS) do
   local g = rb(SUBGRP + m)
   check(g == WANT_GROUP[m], string.format(
     "map %d -> battle group %d (want %d)", m, g, WANT_GROUP[m]))
@@ -157,11 +157,11 @@ end
 
 -- Collect the section's random formations, each with its draw weight.
 local randForms = {}
-for _, m in ipairs(BAND_MAPS) do
+for _, m in ipairs(AREA_MAPS) do
   local g = rb(SUBGRP + m)
   for i = 0, 3 do
     local f = rw(RANDGRP + g * 8 + i * 2)
-    randForms[#randForms + 1] = { f = f, w = SLOT_P[i + 1] / #BAND_MAPS }
+    randForms[#randForms + 1] = { f = f, w = SLOT_P[i + 1] / #AREA_MAPS }
   end
 end
 check(#randForms == 28, string.format(
@@ -197,7 +197,7 @@ end
 
 -- ------------------------------------------------------------- party model
 -- Fixed core Locke + Celes, two free picks from Edgar/Sabin/Cyan/Gau
--- (break-band-vector.md §6.1; Terra is not yet active and Setzer is flying the
+-- (break-coverage-vector.md §6.1; Terra is not yet active and Setzer is flying the
 -- getaway).  These are the classes each brings for FREE -- joining kit and
 -- abilities only, no shop trip:
 --   Locke  swords + daggers            slash|pierce

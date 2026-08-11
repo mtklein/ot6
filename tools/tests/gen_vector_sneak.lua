@@ -1,4 +1,4 @@
--- gen_vector_sneak.lua -- v0.6 step 2: vector_doorstep (VECTOR, map 242,
+-- gen_vector_sneak.lua -- v0.6 step 2: vector_entry (VECTOR, map 242,
 -- {32,61}) -> the Returner sympathizer at {45,39} -> his choice dialog ->
 -- the FACING-GATED sneak ledge at {43,38} -> control back at {57,34}, north
 -- of both the gate guards and the "You!? How'd you get in here?" trap row.
@@ -147,7 +147,7 @@ local function talkPick(idx, doneId, maxFrames, what)
 end
 
 H.run({ maxFrames = 60000 }, {
-  H.loadState("build/states/vector_doorstep.mss.lua"),
+  H.loadState("build/states/vector_entry.mss.lua"),
   H.waitFrames(150),
   H.call(function()
     H.assertEq(mapTitleHere(), "VECTOR", "booted in VECTOR (live map title)")
@@ -155,7 +155,7 @@ H.run({ maxFrames = 60000 }, {
     H.assertEq(H.fieldX(), 32, "boot x")
     H.assertEq(H.fieldY(), 61, "boot y")
     H.assertEq(sw(0x01F0), 0, "$01F0 CLEAR at boot")
-    H.log(partyReport("vector_doorstep"))
+    H.log(partyReport("vector_entry"))
   end),
 
   -- 1. up to {45,38}, directly ABOVE the sympathizer at {45,39}.  This was

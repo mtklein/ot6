@@ -2,7 +2,7 @@
 -- number) during the entry-point guard fight, and what the formation actually
 -- looks like.  #48 scratch probe, not a suite test.
 local H = dofile("tools/tests/lib/ot6.lua")
-local STATE = "build/states/battle_doorstep.mss.lua"
+local STATE = "build/states/battle_entry.mss.lua"
 
 local writes = {}
 

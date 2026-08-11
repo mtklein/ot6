@@ -1,4 +1,4 @@
--- @suite frontier=cyan_defence
+-- @suite savestate=cyan_defence
 -- menu_swdtechpage.lua -- issue #39: the field Skills->SwdTech page RENDERS.
 --
 -- The v0.5 loadout configurator (#8 Layer B) shipped with its pos_text labels
@@ -69,7 +69,7 @@
 -- the text is read out of the tilemap -- so moving either half alone fails
 -- here.  It is duplicated in menu_ragepage.lua rather than shared: the only
 -- lua the runner inlines is lib/ot6{,_field,_contract}.lua, and those three
--- files ARE the savestate generation signature (lib/frontier_stamp.sh:82-85),
+-- files ARE the savestate generation signature (lib/savestate_stamp.sh:82-85),
 -- so a helper added there would mark every generated fixture drifted.
 --
 -- issue #44 -- THE CONTROL HINT, and why the title row's expectations moved.

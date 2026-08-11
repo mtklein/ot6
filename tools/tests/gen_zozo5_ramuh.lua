@@ -56,12 +56,12 @@
 -- them in.  Answering it with START committed a party of TWO, and the whole
 -- v0.5 tail plus every v0.6 step then ran two characters (one after the tube
 -- room takes CELES).  Nothing counted the party, so it read as normal for a
--- release and a half; gen_vector_doorstep now asserts the COUNT at the
+-- release and a half; gen_vector_entry now asserts the COUNT at the
 -- post-Opera checkpoint so this cannot go quiet again.
 --
 -- OWNER DECISION (#21, 2026-07-27): the canonical fixture party is LOCKE,
 -- CELES, SABIN, EDGAR.  SABIN fills the free BLUDGEON slot that
--- docs/design/break-band-vector.md makes the Vector area's one deliberate
+-- docs/design/break-coverage-vector.md makes the Vector area's one deliberate
 -- class -- the Rhinox row (OT6_BLUDG, no weakness, absorbs bolt, 8.93% of
 -- area draws) exists to ask for it, and bare fists plus Pummel/Suplex/Bum
 -- Rush answer it with no shop trip.  EDGAR brings pierce and Tools.  This

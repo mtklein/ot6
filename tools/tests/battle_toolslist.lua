@@ -1,4 +1,4 @@
--- @suite frontier=kolts_cave
+-- @suite savestate=kolts_cave
 -- battle_toolslist.lua -- menu-bank: the Tools window prices each tool.
 --
 -- v0.5 costs every ability MP; the menu-bank modules SHOW the price beside the

@@ -50,7 +50,7 @@ end
 local fights, battN = 0, 0
 
 H.run({ maxFrames = 30000 }, {
-  H.loadState("build/states/minecart_doorstep.mss.lua"),
+  H.loadState("build/states/minecart_entry.mss.lua"),
   H.waitFrames(150),
   H.call(function() dump("boot") end),
 

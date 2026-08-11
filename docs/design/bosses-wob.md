@@ -68,7 +68,7 @@ and his shields grow instead. The player learns; Ultros doesn't.
 | 14 | Number 024 | Magitek factory | 7 |
 | 15 | Number 128 | minecart escape | 7 (blades 3 each) |
 | 16 | Left & Right Cranes | airship escape | 6 + 6 |
-| 17 | Ultros ③ | Esper Mountain (v0.8 — corrected 2026-07-28; battle 125's only call site is the Relm-joining scene, see thamasa-recon.md §3.1) | 7 |
+| 17 | Ultros ③ | Esper Mountain (v0.8 — corrected 2026-07-28; battle 125's only call site is the Relm-joining scene, see thamasa-route.md §3.1) | 7 |
 | 18 | FlameEater | Thamasa | 7 (Balloons 1) |
 | 19 | Ultros ④ + Chupon | FC approach | 7 + 4 |
 | 20 | AirForce | FC approach | 8 (pods 3/3, Speck 1) |

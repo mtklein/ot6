@@ -1,4 +1,4 @@
--- gen_edgar.lua -- THE WHOLE FIGARO CHAPTER, from figaro_doorstep.mss
+-- gen_edgar.lua -- THE WHOLE FIGARO CHAPTER, from figaro_entry.mss
 -- (TERRA + LOCKE at map 55 (28,42), the castle gate) to the world map
 -- outside the sand.  Walk in, BUY THE TOOLS in the only window the game
 -- ever offers, take the throne-room audience with EDGAR, cross the castle
@@ -90,7 +90,7 @@
 --   to you: a Figaro "map" is several DISCONNECTED walking regions that
 --   only reach each other through doors.  Map 55 alone has three --
 --     * the gate pocket, 13 tiles: (27..29, 39..43) plus the door
---       (28,38).  That is all figaro_doorstep can walk to.  Its south
+--       (28,38).  That is all figaro_entry can walk to.  Its south
 --       edge y=43 is map 55's world-exit border (long entrance
 --       (0,43) len 63 -> the world), so BFS happily plans through it and
 --       a walker who trusts BFS leaves the castle;
@@ -137,7 +137,7 @@
 --   it reads p1=$02 / p2=$8f -- ordinary floor, all four exits.  y=43 is
 --   map 55's WORLD-EXIT ROW: the long entrance (0,43) length 63 fires on
 --   arrival (entrance.asm CheckLongEntrance), and a walker that steps onto
---   it is on the world map a second later.  Measured from figaro_doorstep:
+--   it is on the world map a second later.  Measured from figaro_entry:
 --   one DOWN press from (28,42) lands (28,43), and 84 frames later the
 --   party is outside the castle.  What the earlier pass logged as "edge
 --   (28,43)->left blocked in reality" was navTo holding a direction during
@@ -182,7 +182,7 @@
 --   and the crossing can happen before the hold ever starts -- crossDoor
 --   treats a map change during its approach as arrival for that reason.
 local H = dofile("tools/tests/lib/ot6.lua")
-local DOOR = "build/states/figaro_doorstep.mss.lua"
+local DOOR = "build/states/figaro_entry.mss.lua"
 
 -- event switch id -> live bit (event bitfield base $1E80, bit = id & 7)
 local function sw(id) return (H.readByte(0x1e80 + (id >> 3)) >> (id & 7)) & 1 end

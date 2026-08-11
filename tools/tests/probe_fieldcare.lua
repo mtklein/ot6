@@ -14,7 +14,7 @@
 -- Run it directly:
 --   OT6_KEEP_RUNS=1 OT6_NO_PUBLISH=1 tools/tests/run.sh tools/tests/probe_fieldcare.lua
 local H = dofile("tools/tests/lib/ot6.lua")
-local STATE = "build/states/vargas_doorstep.mss.lua"
+local STATE = "build/states/vargas_entry.mss.lua"
 
 local function line()
   local out = {}

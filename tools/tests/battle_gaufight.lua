@@ -1,4 +1,4 @@
--- @suite frontier=gau_joined slow
+-- @suite savestate=gau_joined slow
 -- battle_gaufight.lua -- issue #47: GAU HAS A FREE ACTION, IN BOTH TERRITORIES.
 --
 -- THE HOLE.  Vanilla gives Gau four command slots and no Fight among them:

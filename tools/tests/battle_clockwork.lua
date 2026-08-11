@@ -3,7 +3,7 @@
 -- reveals land on the MECHANICAL frame, not near it.
 --
 -- MEASURED DESYNC THIS GUARDS AGAINST (probe_clockwork on the pre-change
--- ROM, battle_doorstep, boosted Quadra Slam):
+-- ROM, battle_entry, boosted Quadra Slam):
 --   - pips: the staged party-row cell showed bp-minus-pending at the menu
 --     restage (~f605), ~900 frames BEFORE Ot6ActionEnd's charge (f1504).
 --   - reveals: the class chip wrote the revealed byte at damage CALC
@@ -28,7 +28,7 @@
 -- pair (one charge site, one painter), and battle_boost keeps the Fight
 -- path's arrow/consume coverage.
 local H = dofile("tools/tests/lib/ot6.lua")
-local STATE = "build/states/battle_doorstep.mss.lua"
+local STATE = "build/states/battle_entry.mss.lua"
 
 local MENU, ACTOR, MSTATE = 0x7BCA, 0x62CA, 0x7BC2
 local KNOWN = 0x2020

@@ -1,6 +1,6 @@
 -- gen_whelk_poweron.lua -- reach the Whelk entry point from COLD POWER-ON,
 -- fully scripted, with NO save sidecar.  This is the SRM-free replacement
--- for gen_whelk.lua: same output (build/states/whelk_doorstep.mss, the
+-- for gen_whelk.lua: same output (build/states/whelk_entry.mss, the
 -- field state one tile SOUTH of the Whelk trigger at map 41 (42,5)),
 -- reached by playing the opening from New Game instead of injecting a human
 -- play save into SRAM.  The SRM path was a fresh-clone trap -- gen_whelk
@@ -41,7 +41,7 @@
 --     THEN navTo(42,6) -- two tiles, never touching (42,5).
 --   -> assert the entry point is calm and the whelk-done switch is CLEAR,
 --   generate
---     whelk_doorstep.mss, then (positive control) take the one deliberate
+--     whelk_entry.mss, then (positive control) take the one deliberate
 --     step onto the trigger and prove the Whelk fight comes up.
 --
 -- WHELK trigger, verbatim semantics from gen_whelk / the disassembly:
@@ -209,8 +209,8 @@ end
 -- -------------------------------------------- the generated state's proof --
 -- The captured entry point, held in memory until the sweep clears it.
 -- Emitting only after validation means a run that fails leaves NO
--- whelk_doorstep.mss behind to be mistaken for a good one.
-local mintReq, doorstep = nil, nil
+-- whelk_entry.mss behind to be mistaken for a good one.
+local genReq, entry = nil, nil
 
 -- The single deliberate step onto the trigger (verbatim from gen_whelk.lua
 -- :74-99): the event force-walks the party down and opens the edge-triggered
@@ -433,7 +433,7 @@ local steps = {
   -- Phase 4: assert + generate + prove.  Mirrors gen_whelk.lua:56-112 so
   -- the two generators emit interchangeable states (downstream tests are
   -- documented generator-independent: battle_dlgmenu / battle_whelkwipe /
-  -- probe_shadow_overlap each load whelk_doorstep.mss and drive it onto the
+  -- probe_shadow_overlap each load whelk_entry.mss and drive it onto the
   -- trigger themselves).
   -- ===================================================================== --
   H.cond(function() return whelk() end, {
@@ -454,13 +454,13 @@ local steps = {
     -- A short settle before the capture.  THE NUMBER IS ARBITRARY, and the
     -- sweep below is what makes that safe to say -- see its block comment.
     H.waitFrames(14),
-    H.call(function() mintReq = H.requestSaveState() end),
+    H.call(function() genReq = H.requestSaveState() end),
     H.waitFrames(2),
     H.call(function()
-      H.checkReq(mintReq, "entry point savestate capture")
-      doorstep = mintReq.blob
+      H.checkReq(genReq, "entry point savestate capture")
+      entry = genReq.blob
       H.log(string.format("entry point captured at (42,6), frame %d (%d bytes) " ..
-        "-- NOT emitted until the sweep below passes", H.frame, #doorstep))
+        "-- NOT emitted until the sweep below passes", H.frame, #entry))
     end),
   }),
 }
@@ -477,7 +477,7 @@ for _, k in ipairs(SWEEP) do
   local shot = {}
   local loadReq
   local phaseSteps = {
-    H.call(function() loadReq = H.requestLoadState(doorstep) end),
+    H.call(function() loadReq = H.requestLoadState(entry) end),
     H.waitFrames(2),
     H.call(function()
       H.checkReq(loadReq, tag .. ": entry point reload")
@@ -557,9 +557,9 @@ steps[#steps + 1] = H.call(function()
 end)
 
 -- EMIT LAST, after every assertion above has held.  A failed run leaves no
--- whelk_doorstep.mss at all rather than an unvalidated one.
+-- whelk_entry.mss at all rather than an unvalidated one.
 steps[#steps + 1] = H.call(function()
-  H.emitBlob("whelk_doorstep.mss", doorstep)
+  H.emitBlob("whelk_entry.mss", entry)
   H.log("entry point generated")
 end)
 
@@ -567,5 +567,5 @@ end)
 -- frames and the whole run (sweep included) fit 60k.  input-driven fights
 -- spend real ATB rounds on the gauntlet, the ambush, and any random draw,
 -- so the ceiling carries headroom for the difference; the generation log's
--- "doorstep captured at" line is the per-run measurement.
+-- "entry point captured at" line is the per-run measurement.
 H.run({ maxFrames = 90000 }, steps)

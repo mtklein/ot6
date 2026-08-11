@@ -8,7 +8,7 @@
 -- (55,12), ONE TILE short of the trigger at (55,11) that starts the
 -- bridge-collapse -> Kefka flashback -> Moogle-defense chain (a
 -- THREE-PARTY set-piece this harness does not enter).  Generate
--- moogle_doorstep.mss there, calm, trigger unfired.
+-- moogle_entry.mss there, calm, trigger unfired.
 --
 -- Issue #75: every navigator step passes playBattles=true -- the map-50
 -- random pool is FOUGHT (tap-A = Fight, confirm at default target), never
@@ -115,10 +115,10 @@ H.run({ maxFrames = 50000 }, {
     H.assertEq(H.hasControl() and H.tileAligned(), true,
       "entry point is calm (control, at rest)")
     H.assertEq(H.eventRunning(), false, "collapse trigger unfired")
-    H.screenshot("moogle_doorstep")
+    H.screenshot("moogle_entry")
   end),
-  H.saveState("moogle_doorstep.mss"),
+  H.saveState("moogle_entry.mss"),
   H.logStep(function()
-    return string.format("moogle_doorstep generated at frame %d", H.frame)
+    return string.format("moogle_entry generated at frame %d", H.frame)
   end),
 })

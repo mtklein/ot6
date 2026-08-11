@@ -1,5 +1,5 @@
 -- probe_moogfont.lua -- ROOT-CAUSE the OT6 HUD font-tile corruption seen in the
--- moogle_doorstep fight (Narshe, Kefka + Soldiers): probe_hudspray6 measured the
+-- moogle_entry fight (Narshe, Kefka + Soldiers): probe_hudspray6 measured the
 -- 24 OT6 glyph cells at vram $B000 diverging from their bank-F0 source for 5104
 -- of 9000 frames, with OT6_FONTDIRTY==0 (no re-lay pending) -- so the HUD map,
 -- which still references those cells, renders junk over the enemies.
@@ -9,7 +9,7 @@
 -- state, active gfx command) so the clobber can be named.
 
 local H = dofile("tools/tests/lib/ot6.lua")
-local STATE = "build/states/moogle_doorstep.mss.lua"
+local STATE = "build/states/moogle_entry.mss.lua"
 local VR  = emu.memType.snesVideoRam
 local ROM = emu.memType.snesPrgRom
 

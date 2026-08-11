@@ -61,32 +61,32 @@ The inject idiom (front 8 KB to cpu `$30:6000`):
 ## Versioned SRAM checkpoints
 
 Durable shortcuts deep into the game use a complete 32 KiB Mesen `.srm`, not
-the legacy 8 KiB sidecar. `tools/tests/anchors/post-opera-v1/` contains a small
-manifest and its hashed payload. `sram_anchor.py` rejects unknown schemas,
+the legacy 8 KiB sidecar. `tools/tests/checkpoints/post-opera-v1/` contains a small
+manifest and its hashed payload. `sram_checkpoint.py` rejects unknown schemas,
 unsafe payload names, wrong sizes, and hash mismatches before a run starts:
 
-    python3 tools/tests/lib/sram_anchor.py validate \
-      tools/tests/anchors/post-opera-v1
+    python3 tools/tests/lib/sram_checkpoint.py validate \
+      tools/tests/checkpoints/post-opera-v1
 
 `run.sh` installs a verified checkpoint by value into the invocation-private
-save folder when `OT6_SRAM_ANCHOR` is set. Mesen then takes its ordinary
-cold-load path; no Lua writes SRAM. `gen_vector_doorstep.lua` drives title
+save folder when `OT6_SRAM_CHECKPOINT` is set. Mesen then takes its ordinary
+cold-load path; no Lua writes SRAM. `gen_vector_entry.lua` drives title
 Continue, validates slot 3's story/codex contract, and then walks the world
 map to the Vector event trigger.
 
-The tracked checkpoint was produced by `gen_post_opera_anchor.lua`: it loads
+The tracked checkpoint was produced by `gen_post_opera_checkpoint.lua`: it loads
 the `blackjack` tactical fixture, settles the final arrival, crosses and exits
 ALBROOK to normalize the world-menu state (the comment there says "Vector";
 it is the map-323 exit one step east of the checkpoint tile), then uses the
 real in-game Save UI
 to save slot 3. `OT6_CAPTURE_SRM` captures Mesen's complete battery file only
 after emulator shutdown. Its payload and manifest are included in
-`vector_doorstep`'s content freshness stamp.
+`vector_entry`'s content freshness stamp.
 
 To regenerate the payload deliberately:
 
-    OT6_CAPTURE_SRM=tools/tests/anchors/post-opera-v1/post-opera.sram \
-      tools/tests/run.sh tools/tests/gen_post_opera_anchor.lua
+    OT6_CAPTURE_SRM=tools/tests/checkpoints/post-opera-v1/post-opera.sram \
+      tools/tests/run.sh tools/tests/gen_post_opera_checkpoint.lua
 
 Then update the manifest SHA-256 and validate it before committing. The
 generator plants a nonzero codex marker which must survive the real Save As
@@ -297,7 +297,7 @@ tile-aligned.
 COLD POWER-ON — no injected save, so it works on a fresh clone. It plays
 the New Game intro and the Narshe gauntlet down to the mines (map 41),
 rides the security-door blast scene, then `navTo(42, 6)` and generates
-`whelk_doorstep.mss` one tile short of the trigger. The Whelk event
+`whelk_entry.mss` one tile short of the trigger. The Whelk event
 trigger is the single tile **(42,5)**; stepping onto it tile-aligned
 while user-controlled fires the event, which force-walks the party down,
 shows dialogs `$0B6E` / `$0B6F` (edge-tapped through), and starts the

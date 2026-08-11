@@ -18,7 +18,7 @@ sitting in the bag.  He was punching it.  Armed, his swing went 8 -> 21.
 A wrong fixture reads exactly like a balance finding.  That is the trap
 this file exists to close, and closing it cheaply matters -- so this reads
 the SAVESTATES DIRECTLY, with no emulator: 110 fixtures in about a second,
-against a `make frontier` measured in hours.
+against a `make savestates` measured in hours.
 
 HOW IT FINDS THE DATA.  A .mss is a short header then zlib streams; the
 biggest one carries WRAM.  The character table ($1600, 16 records of 37

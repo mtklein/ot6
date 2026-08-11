@@ -1,7 +1,7 @@
 -- gen_figaro.lua -- from worldmap_narshe.mss (LOCKE + TERRA on foot at
 -- WoB (84,34)): world-nav south across the plains to Figaro Castle's
 -- gate trigger, ride the entry event into the castle complex, and generate
--- figaro_doorstep.mss at the first controllable interior moment.  The
+-- figaro_entry.mss at the first controllable interior moment.  The
 -- Edgar/Kefka sequence beyond is the NEXT stretch, not this script's.
 --
 -- THE GATE (read + live-probed, see world-map-nav.md "Warp / teleport levers"):
@@ -114,10 +114,10 @@ H.run({ maxFrames = 90000 }, {
     H.assertEq((H.readByte(0x1ea1) & 0x08) ~= 0, true, "$010B still set")
     H.log(string.format("figaro entry point: map=%d (%d,%d) frame=%d",
       H.readWord(0x1f64) & 0x1FF, H.fieldX(), H.fieldY(), H.frame))
-    H.screenshot("figaro_doorstep")
+    H.screenshot("figaro_entry")
   end),
-  H.saveState("figaro_doorstep.mss"),
+  H.saveState("figaro_entry.mss"),
   H.logStep(function()
-    return string.format("figaro_doorstep generated at frame %d", H.frame)
+    return string.format("figaro_entry generated at frame %d", H.frame)
   end),
 })

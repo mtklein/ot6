@@ -30,7 +30,7 @@
 -- worldNavTo / advanceStory / route) lives in lib/ot6_field.lua, and
 -- lib/compose.py inlines BOTH halves into every composed script -- the
 -- dofile line above stays the only line a test writes, and H carries the
--- merged API.  The freshness signature (lib/frontier_stamp.sh sig) hashes
+-- merged API.  The freshness signature (lib/savestate_stamp.sh sig) hashes
 -- generator ++ this file ++ ot6_field.lua, in that fixed order.
 --
 -- Environment notes (Mesen 2.1.1, verified against Mesen's source):
@@ -759,8 +759,8 @@ function M.driveUntil(pred, maxFrames, steps, what)
   }
 end
 
--- STEP: the canonical first-battle entry from a `*_doorstep` fixture.  The
--- battle_doorstep savestate parks the party one step short of its
+-- STEP: the canonical first-battle entry from a `*_entry` fixture.  The
+-- battle_entry savestate parks the party one step short of its
 -- encounter trigger, and entering the fight is always the same dance:
 -- hold up long enough to commit the step (20 frames), release and let
 -- the engine settle (2), tap A (pressButtons' 4 on / 2 off -- clears any

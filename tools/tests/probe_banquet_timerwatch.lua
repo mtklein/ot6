@@ -7,7 +7,7 @@
 -- (Caveat per HANDOFF trap 1: block moves/DMA are invisible to Mesen
 -- write callbacks -- a silent clobber here means "sample, don't
 -- watchpoint" and this probe also samples each menu frame.)
--- OT6_ANCHOR_LAYOUT: ot6-codex-o8-v1
+-- OT6_CHECKPOINT_LAYOUT: ot6-codex-o8-v1
 local H = dofile("tools/tests/lib/ot6.lua")
 
 local ZMENUSTATE = 0x26

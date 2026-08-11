@@ -1,4 +1,4 @@
--- @suite frontier=minecart_doorstep slow
+-- @suite savestate=minecart_entry slow
 -- battle_esperstats_tube6.lua -- the SIX TUBE-ROOM STONES, in battle
 -- (docs/design/magicite-tube-six.md, issue #31): Maduin, Shoat, Phantom,
 -- Carbunkl, Bismark and Unicorn grant their designed spell lists live and
@@ -15,9 +15,9 @@
 --
 -- =============== THE INPUT-DRIVEN REBUILD (#75) ===========================
 -- The previous version POKED char 0's equipped-esper byte $161e on
--- battle_doorstep -- the Narshe intro, three chapters before these stones
+-- battle_entry -- the Narshe intro, three chapters before these stones
 -- exist, where the menu could never have equipped one.  The poke is gone;
--- the fixture is now MINECART_DOORSTEP, the first state on the chain where
+-- the fixture is now MINECART_ENTRY, the first state on the chain where
 -- this file's scenario is real play: it sits one step after the tube-room
 -- set piece that grants all six stones at once ($1A69 = EF 01 9A 00 here),
 -- and one A-press at CID from the minecart ride whose scripted first fight
@@ -63,7 +63,7 @@
 -- Run this file against a ROM built before the genju_prop change and the
 -- absent-checks fail; that is the point of them.
 local H = dofile("tools/tests/lib/ot6.lua")
-local STATE = "build/states/minecart_doorstep.mss.lua"
+local STATE = "build/states/minecart_entry.mss.lua"
 
 -- spell ids (const.inc ATTACK enum)
 local FIRE, ICE, BOLT           = 0x00, 0x01, 0x02

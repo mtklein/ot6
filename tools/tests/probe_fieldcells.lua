@@ -2,7 +2,7 @@
 -- differencing memory across a single pad edge, instead of guessing which
 -- direct-page byte "is" the cursor.  Reads only; writes nothing (issue #75).
 --
--- probe_fieldheal established the state chain off vargas_doorstep.mss:
+-- probe_fieldheal established the state chain off vargas_entry.mss:
 --   $05 main menu (Item on row 0) -A-> $08 item list -A-> $19 -A-> $70,
 -- and that an A in $70 consumed a TONIC (slot 0) and healed EDGAR +50 --
 -- i.e. neither the item row nor the target row followed DP $4B, which stayed
@@ -16,7 +16,7 @@
 -- Run it directly:
 --   OT6_KEEP_RUNS=1 OT6_NO_PUBLISH=1 tools/tests/run.sh tools/tests/probe_fieldcells.lua
 local H = dofile("tools/tests/lib/ot6.lua")
-local STATE = "build/states/vargas_doorstep.mss.lua"
+local STATE = "build/states/vargas_entry.mss.lua"
 
 local ZMENUSTATE = 0x26
 

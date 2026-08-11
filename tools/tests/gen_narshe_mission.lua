@@ -8,7 +8,7 @@
 -- exit spawn -- world (84,34) -- which is boundary G.
 --
 -- WHAT THE RECON GOT RIGHT, AND WHAT IT COULD NOT KNOW.  The route recon's
--- step-1 entry (docs/design/sealed-gate-recon.md, since trimmed) called this
+-- step-1 entry (docs/design/sealed-gate-route.md, since trimmed) called this
 -- step "fly to Narshe, walk the mission meeting"; the corrections below are
 -- this pass's own measurements and supersede it:
 --  * The escort trigger row IS (37-39,51) on map 20 and the meeting IS on
@@ -23,7 +23,7 @@
 --        $E0/$E2 (the on-foot world position cells), so "airborne" is
 --        `$E0==0 and $E2==0` and the SHIP tile is word($34)>>4, word($38)>>4;
 --      - a bare d-pad in flight ROTATES the ship and never translates it;
---        Y+direction STRAFES.  That is gen_terra_returned_anchor's landing
+--        Y+direction STRAFES.  That is gen_terra_returned_checkpoint's landing
 --        idiom, and it is the ONLY way to fly a planned course;
 --      - B over a tile whose live prop byte $c2 has bit1 clear grounds the
 --        ship; the party is then in the parked state again and one step in
@@ -36,10 +36,10 @@
 -- Narshe exit spawn because that tile is where a cold Continue of the
 -- checkpoint will put the party -- the step OUT of G starts there.
 --
--- OT6_ANCHOR_LAYOUT: ot6-codex-o8-v1
+-- OT6_CHECKPOINT_LAYOUT: ot6-codex-o8-v1
 -- ^ the persistent-SRAM layout this step understands (issue #25).  run.sh
 --   reads the marker line above and refuses -- BEFORE the emulator boots,
---   naming both strings -- any OT6_SRAM_ANCHOR whose manifest.json declares
+--   naming both strings -- any OT6_SRAM_CHECKPOINT whose manifest.json declares
 --   a different persistent_layout.
 local H = dofile("tools/tests/lib/ot6.lua")
 
@@ -56,7 +56,7 @@ local function sw(id) return (H.readByte(0x1E80 + (id >> 3)) >> (id & 7)) & 1 en
 local function shipX() return H.readWord(0x34) >> 4 end
 local function shipY() return H.readWord(0x38) >> 4 end
 
--- gen_vector_doorstep's grind-and-replan world walker: no edge is ever
+-- gen_vector_entry's grind-and-replan world walker: no edge is ever
 -- condemned, so a battle-restored tile is simply retried (the gen_opera1
 -- lesson -- worldNavTo reads a battle's snapshot/restore as a dead edge).
 local function worldGrind(tx, ty, what)
@@ -163,7 +163,7 @@ H.run({ maxFrames = 40000 }, {
   H.waitFrames(240),
   H.call(function()
     H.log(string.format("[airborne] ship=(%d,%d)", shipX(), shipY()))
-    H.screenshot("leg_fg_airborne")
+    H.screenshot("step_fg_airborne")
   end),
 
   -- ---- fly to Narshe and land beside the gate ---------------------------
@@ -184,7 +184,7 @@ H.run({ maxFrames = 40000 }, {
   H.call(function()
     H.assertEq(H.worldX(), 84, "grounded x")
     H.assertEq(H.worldY(), 36, "grounded y")
-    H.screenshot("leg_fg_grounded")
+    H.screenshot("step_fg_grounded")
   end),
 
   -- ---- disembark and walk into Narshe -----------------------------------
@@ -203,7 +203,7 @@ H.run({ maxFrames = 40000 }, {
   worldGrind(84, 34, "world walk -> the Narshe entry point (84,34)"),
   -- (84,33) is the short entrance -> map 20 (38,61); a tile that takes the
   -- party away is entered with a HELD press, never with a walker aimed at
-  -- it (the #22 / gen_vector_doorstep lesson).
+  -- it (the #22 / gen_vector_entry lesson).
   pressWalk("up", function() return not H.worldMode() and map() == 20 end,
     1200, "held UP onto (84,33) -> NARSHE (map 20)"),
   H.waitUntil(function()
@@ -238,7 +238,7 @@ H.run({ maxFrames = 40000 }, {
       "$045E CLEAR -- the Imperial-Base soldier NPCs were withdrawn "
       .. "(:94171-94180)")
     H.log(string.format("[meeting] done at (%d,%d)", H.fieldX(), H.fieldY()))
-    H.screenshot("leg_fg_meeting")
+    H.screenshot("step_fg_meeting")
   end),
 
   -- ---- out of Narshe to the world map ------------------------------------
@@ -268,11 +268,11 @@ H.run({ maxFrames = 40000 }, {
     -- everything the boundary declares except the sram witnesses, which
     -- only the save itself can put into the battery
     H.assertExitContractPreSave("narshe-mission-v1")
-    H.screenshot("leg_fg_g_tile")
+    H.screenshot("step_fg_g_tile")
   end),
   -- THE STEP'S SAVESTATE IS GENERATED HERE, BEFORE THE MENU -- not after.
   -- The WORLD menu does not unwind on B (measured: 900 frames of
-  -- edge-pressed B left $0059 nonzero; gen_terra_returned_anchor recorded
+  -- edge-pressed B left $0059 nonzero; gen_terra_returned_checkpoint recorded
   -- the same for the grounded-airship world menu and simply never closed
   -- it).  So the only playable frame this generator can capture is the one
   -- before the save UI opens; the save itself is proven by the FULL exit
@@ -354,7 +354,7 @@ H.run({ maxFrames = 40000 }, {
     -- every declared field reads from cells the menu leaves intact
     -- ($1f60/$1f61 rather than $e0/$e2 -- the #29 module-overlay class).
     H.assertExitContract("narshe-mission-v1")
-    H.screenshot("leg_fg_saved")
+    H.screenshot("step_fg_saved")
   end),
 
   H.logStep(function()

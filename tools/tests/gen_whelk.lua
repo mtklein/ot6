@@ -7,7 +7,7 @@
 -- them!") -- both EDGE-tapped through -- and starts the Whelk battle
 -- (formation $01B0; species words 0x0100/0x0134 land in $57C0).  Random
 -- encounters en route are cleared with the battle-clear-write idiom; the goal
--- formation is spared by guard.  Emits whelk_doorstep.mss + whelk_battle
+-- formation is spared by guard.  Emits whelk_entry.mss + whelk_battle
 -- screenshot.  Deterministic by construction (the harness pins AllZeros
 -- power-on RAM + no frame skipping + a pre-launch srm wipe): PASS at
 -- frame 2813 with byte-identical artifacts every run, ~8.5 s wall.
@@ -65,7 +65,7 @@ H.run({ maxFrames = 9000 }, {
       H.assertEq(H.hasControl() and H.tileAligned(), true,
         "entry point is calm (user control, at rest, no battle)")
     end),
-    H.saveState("whelk_doorstep.mss"),
+    H.saveState("whelk_entry.mss"),
     H.logStep(function()
       return string.format("entry point generated at (42,6), frame %d", H.frame)
     end),

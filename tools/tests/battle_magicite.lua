@@ -1,4 +1,4 @@
--- @suite slow frontier=n024_doorstep
+-- @suite slow savestate=n024_entry
 -- battle_magicite.lua -- the v0.6 Ifrit/Shiva magicite redesigns, the halves
 -- battle_esperstats.lua does not reach: the ABILITY PRICES their kits are built
 -- on, and the SUMMONS.  Design: docs/design/magicite-ifrit-shiva.md (issue #16).
@@ -9,7 +9,7 @@
 -- entry point: char 0's equipped-esper byte and field MP poked before the
 -- drive-in, Terra's command list rewritten, allies STOPped, guard HP/MP
 -- pinned, the Slow-immunity words WRITTEN both ways, saved-cursor pokes,
--- and $3f2e/$3204 poked for the latch A/B.  On n024_doorstep every input
+-- and $3f2e/$3204 poked for the latch A/B.  On n024_entry every input
 -- is real:
 --
 --   * THE STONES ARE REALLY IN THE BAG ($1A69 bits, give_genju receipts
@@ -43,7 +43,7 @@
 -- consulted on a landed divine) is asserted here; the landing half is
 -- follow-up work on a deeper fixture.
 local H = dofile("tools/tests/lib/ot6.lua")
-local STATE = "build/states/n024_doorstep.mss.lua"
+local STATE = "build/states/n024_entry.mss.lua"
 
 -- spell ids (const.inc ATTACK enum)
 local FIRE, ICE, DRAIN, SHELL, OSMOSE, CURE, SCAN = 0x00, 0x01, 0x04, 0x25, 0x29, 0x2D, 0x32

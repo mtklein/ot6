@@ -1,5 +1,5 @@
 -- gen_zozo4_dadaluma.lua -- v0.4 step 3: zozo_arrival (map 221 street) ->
--- the crane maze -> DADALUMA.  Generates dadaluma_doorstep.mss at (30,13),
+-- the crane maze -> DADALUMA.  Generates dadaluma_entry.mss at (30,13),
 -- one A-press from the fight, and dadaluma_won.mss on the same tile after
 -- battle 69's scripted win clears him off the tower porch.
 --
@@ -988,11 +988,11 @@ H.run({ maxFrames = 400000 }, {
       "at (30,13), north of the gentleman")
     H.assertEq(settled(), true, "entry point is QUIET -- no battle/event in flight")
     H.assertEq(sw(0x034A), 1, "$034A still set -- he waits below")
-    H.log(string.format("[dadaluma_doorstep] f%d at (%d,%d)",
+    H.log(string.format("[dadaluma_entry] f%d at (%d,%d)",
       H.frame, H.fieldX(), H.fieldY()))
-    H.screenshot("dadaluma_doorstep")
+    H.screenshot("dadaluma_entry")
   end),
-  H.saveState("dadaluma_doorstep.mss"),
+  H.saveState("dadaluma_entry.mss"),
 
   -- face him and talk, then FIGHT battle 69 -- with real input (issue #75).
   -- _ca96a9: dlg $042D -> set_b_switch $4B -> `battle 69` -> _ca5ea9,

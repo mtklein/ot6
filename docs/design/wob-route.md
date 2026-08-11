@@ -36,13 +36,13 @@ through the Facility, three once Celes is taken by the tube room.
 
 | entry points | measured party |
 |---|---|
-| `vector_doorstep` … `magicite_ifrit_shiva` | LOCKE L14, EDGAR L15, SABIN L15, CELES L14 |
-| `n024_doorstep` … `esper_tubes_doorstep` | LOCKE L15, EDGAR L16, SABIN L15, CELES L15 |
-| `esper_tubes`, `minecart_doorstep` | LOCKE, EDGAR, SABIN — Celes taken by the tube room |
+| `vector_entry` … `magicite_ifrit_shiva` | LOCKE L14, EDGAR L15, SABIN L15, CELES L14 |
+| `n024_entry` … `esper_tubes_entry` | LOCKE L15, EDGAR L16, SABIN L15, CELES L15 |
+| `esper_tubes`, `minecart_entry` | LOCKE, EDGAR, SABIN — Celes taken by the tube room |
 | `n128_won` | LOCKE L15, EDGAR L16, SABIN L16 |
 
 The canonical fixture party is LOCKE, CELES, SABIN, EDGAR, seated at the Zozo
-`party_menu`. `gen_vector_doorstep` asserts the *count* of nonzero `$1850`
+`party_menu`. `gen_vector_entry` asserts the *count* of nonzero `$1850`
 entries at the checkpoint is 4, so a chain that silently loses members fails
 loudly.
 
@@ -54,7 +54,7 @@ active**.
 ## 2. The fixture-authoring pattern (what a route agent does per beat)
 
 The house pattern, learned from `gen_zozo2_arrival`→`gen_zozo5_ramuh` and the
-`Makefile`'s `FRONTIER` machinery.
+`Makefile`'s `SAVESTATES` machinery.
 
 ### The chain shape (entry point → drive → generate)
 Each beat is one (or a few) `gen_<beat>.lua` generators. A generator:
@@ -65,16 +65,16 @@ Each beat is one (or a few) `gen_<beat>.lua` generators. A generator:
    guards on the switches/coords that define that checkpoint.
 
 Split a long segment into multiple savestates so a failed experiment replays
-seconds, not the whole segment (e.g. `dadaluma_doorstep` then `dadaluma_won`
+seconds, not the whole segment (e.g. `dadaluma_entry` then `dadaluma_won`
 on the same tile; `sabin_world`+`sabin_camp` from one script). Convention:
-generate a `<boss>_doorstep` one A-press before the fight, then `<boss>_won`
+generate a `<boss>_entry` one A-press before the fight, then `<boss>_won`
 after.
 
 ### The driving toolkit (`tools/tests/lib/ot6.lua` + `ot6_field.lua`)
 - **Field nav:** `H.navTo(x,y,{maxFrames})` (BFS+drive to a tile),
   `H.fieldX/Y`, `H.hasControl`, `H.tileAligned`, `H.dialogWaiting`,
   `H.canStep`, `H.movePress`, `H.bfsPath`.
-- **World nav:** `H.worldNavTo(x,y)`, `H.worldBfs`, `H.route(legs)` (the
+- **World nav:** `H.worldNavTo(x,y)`, `H.worldBfs`, `H.route(steps)` (the
   field↔world handoff driver), `H.worldMode/worldX/Y`.
 - **Cutscene riders (the reusable idioms, all in gen_zozo5_ramuh):**
   - `talk(sx,sy,dir,what)` — navTo, face, clean edge-A until a dialog answers.
@@ -98,14 +98,14 @@ after.
 ### The Makefile wiring (per new link)
 Add, in order: (1) a `.word`-style dependency+recipe
 `build/states/<name>.mss.lua: build/states/<prev>.mss.lua` / `$(call
-mint,<name>,gen_<beat>)`; (2) `<name>` onto a `FRONTIER +=` line. The
-`frontier_deps.sh` check auto-derives generator/lib freshness from the `$(call
-mint,...)` line, so a new link is checked the moment it is added.
-`make frontier` generates the chain; `make -jN frontier` parallelizes independent
+generate,<name>,gen_<beat>)`; (2) `<name>` onto a `SAVESTATES +=` line. The
+dependency-include check auto-derives generator/lib freshness from the `$(call
+generate,...)` line, so a new link is checked the moment it is added.
+`make savestates` generates the chain; `make -jN savestates` parallelizes independent
 branches.
 
 ### The test wiring (per beat)
-- A `battle_<boss>.lua` with first-line marker `-- @suite frontier=<boss>_doorstep`
+- A `battle_<boss>.lua` with first-line marker `-- @suite savestate=<boss>_entry`
   boots the entry point, drives into the fight, and asserts the gauge is
   **authored** (shield count ≠ formula), the **element add is live**, and the
   intended **chips break it** with a negative control — see `battle_vargas.lua`
@@ -172,7 +172,7 @@ scripts decoded for several fights. **Flagged as real work, not free:**
 ### Balance (author-then-measure, per beat)
 Shield counts in `bosses-wob.md` are a **v1 proposal**; the trash rows were
 swept live (Measurements #8–#9). For each boss: after generating its
-`_doorstep`, run `bal_party.lua` (`boost3`, `BAL_BUFF_SHIELDS` sweep) to confirm
+`_entry`, run `bal_party.lua` (`boost3`, `BAL_BUFF_SHIELDS` sweep) to confirm
 the break **lands on a live body, not a corpse** (the recurring finding: the
 formula/first-draft count is often one chip too many). Tune `Ot6ShieldTbl` and
 re-measure. Notable bodies to watch: AtmaWeapon (11 shields = 2–3 break cycles —
@@ -196,6 +196,6 @@ measure the rhythm).
   `Ot6ElemAddTbl` (384)
 - Master boss design: `docs/design/bosses-wob.md`
 - Esper roster (v0.6: Ifrit/Shiva/Maduin…): `docs/design/magicite.md`
-- Savestate machinery: `Makefile` (`FRONTIER` lists; `mint`/`stackseed` macros)
+- Savestate machinery: `Makefile` (`SAVESTATES` lists; `generate`/`stackseed` macros)
 - Opera event source: `ff6/src/event/event_main.asm` ~22308–28700
 - World/vehicle nav: `docs/research/world-map-nav.md`; `tools/tests/lib/ot6_field.lua`

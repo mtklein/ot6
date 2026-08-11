@@ -5,12 +5,12 @@
 -- battle 70 -> the four-interaction esper hand-off -> both magicite in
 -- the bag.  Generates magicite_ifrit_shiva.
 --
--- GENERATED FROM A CHECKPOINT (frontier_graph.py:
--- anchor="mrf-save-room-v1").  The step used to boot ifrit_doorstep.mss; it
+-- GENERATED FROM A CHECKPOINT (savestate_graph.py:
+-- checkpoint="mrf-save-room-v1").  The step used to boot ifrit_entry.mss; it
 -- now starts from power-on and lets Mesen load the checkpoint battery
 -- run.sh materialized, so a ROM change re-runs this step from its own
 -- checkpoint in parallel with every other step instead of behind the whole
--- serial trunk (docs/design/leg-fixtures.md).  ifrit_doorstep stays
+-- serial trunk (docs/design/checkpoint-fixtures.md).  ifrit_entry stays
 -- generated as A->B's terminal; the ~15-step walk from the save tile to the
 -- fight is replayed here from the checkpoint instead.
 --
@@ -47,7 +47,7 @@
 --     0109 0108 0109 0108 FFFF FFFF
 --
 -- at battle start: **Shiva is in the formation from the first frame.**  No
--- AI-script entrance is involved.  (gen_ifrit_doorstep.lua's post-generation
+-- AI-script entrance is involved.  (gen_ifrit_entry.lua's post-generation
 -- verification is where that is measured; it is re-asserted below.)
 --
 -- THE FIGHT IS PLAYED, NOT WRITE-CLEARED (issue #75).  The
@@ -82,16 +82,16 @@
 -- genuinely plays a different fight.  Three attempts, then fail loudly.
 -- The combat CONTRACT for this fight (break observed pre-kill, the
 -- if_self_dead placement guard) stays in battle_brokendeath.lua, booted on
--- ifrit_doorstep.mss; this step only needs a real win banked.
+-- ifrit_entry.mss; this step only needs a real win banked.
 --
 -- Incidental traversal battles on the walk (there have never been any on
 -- maps 270/264, but the branch exists) FLEE by the real L+R mechanic --
--- gen_ifrit_doorstep's idiom, zero writes.
+-- gen_ifrit_entry's idiom, zero writes.
 --
--- OT6_ANCHOR_LAYOUT: ot6-codex-o8-v1
+-- OT6_CHECKPOINT_LAYOUT: ot6-codex-o8-v1
 -- ^ the persistent-SRAM layout this step understands (issue #25).  run.sh
 --   reads the marker line above and refuses -- BEFORE the emulator boots,
---   naming both strings -- any OT6_SRAM_ANCHOR whose manifest.json declares
+--   naming both strings -- any OT6_SRAM_CHECKPOINT whose manifest.json declares
 --   a different persistent_layout.
 local H = dofile("tools/tests/lib/ot6.lua")
 
@@ -152,7 +152,7 @@ local DELTA = { up = { 0, -1 }, right = { 1, 0 }, down = { 0, 1 }, left = { -1, 
 -- it, edge-A through dialogs.  Used to walk INTO a trigger whose scene then
 -- takes over -- the tap keeps the party from sliding past the tile.
 -- A battle here (never yet seen on these two maps) is FLED with the real
--- L+R run mechanic -- gen_ifrit_doorstep's idiom, zero writes.
+-- L+R run mechanic -- gen_ifrit_entry's idiom, zero writes.
 local function tapInto(dir, pred, maxFrames, what)
   local phase, n, ph, calm, hb = 0, 0, 0, 0, 0
   return H.driveUntil(function()
@@ -264,7 +264,7 @@ end
 --
 -- WHY NOT battle_brokendeath's Celes-Ice machine, which the handoff called
 -- proven: it was MEASURED here first and it LOSES on today's fixtures.
--- Run on the fresh ifrit_doorstep (generated 2026-08-09), battle_brokendeath
+-- Run on the fresh ifrit_entry (generated 2026-08-09), battle_brokendeath
 -- itself wipes -- party 0/0/0/0 at f6309 with Ifrit still at 3057 hp and
 -- 5 of 6 shields.  Traced on this step's checkpoint party, the mechanism is
 -- the tag: its Ice/AutoCrossbow policy is gated on Ifrit being ON STAGE,
@@ -345,7 +345,7 @@ local function ifritAttempt(n)
       H.assertEq(SSLOT ~= nil, true, "a SHIVA slot resolved")
       -- NO-STAGING CONTROLS (issue #75): both gauges seed FULL and both HP
       -- words read their authored values -- numbers a rigged run could
-      -- never show (break-band-vector.md §2 "The bosses" / bosses-wob.md 13).
+      -- never show (break-coverage-vector.md §2 "The bosses" / bosses-wob.md 13).
       H.assertEq(mshields(ISLOT), 6, "ifrit opens with his authored 6 shields")
       H.assertEq(mshields(SSLOT), 6, "shiva opens with her authored 6 shields")
       H.assertEq(mhp(ISLOT), 3300, "ifrit opens at his authored 3300 HP")
@@ -440,7 +440,7 @@ H.run({ maxFrames = 300000 }, {
   H.repeatN(3, { H.pressButtons({ "a" }, 8), H.waitFrames(60) }),
   -- SOFT landing wait: a wrong-boundary checkpoint lands somewhere else, and
   -- the failure must be the entry contract NAMING the wrong map -- never a
-  -- timeout here (leg-fixtures.md, "fails loudly, naming what differed").
+  -- timeout here (checkpoint-fixtures.md, "fails loudly, naming what differed").
   H.waitUntilSoft(function()
     return map() == 270 and H.tileAligned() and bright() >= 15
   end, 3000, "landed_at_b"),
@@ -450,8 +450,8 @@ H.run({ maxFrames = 300000 }, {
     -- boundary B -- the save tile, slot, switches, the #21 party count and
     -- roster, and the bank-$31 codex witnesses -- declared as DATA in
     -- lib/ot6_contract.lua under "mrf-save-room-v1", the same table the
-    -- step INTO B (gen_ifrit_doorstep) and the checkpoint generator
-    -- (gen_mrf_save_room_anchor) assert as their EXIT contract.  A stale
+    -- step INTO B (gen_ifrit_entry) and the checkpoint generator
+    -- (gen_mrf_save_room_checkpoint) assert as their EXIT contract.  A stale
     -- or wrong checkpoint fails HERE by naming what differed.
     H.assertEntryContract("mrf-save-room-v1")
     H.log(partyReport("mrf-save-room-v1 entry"))

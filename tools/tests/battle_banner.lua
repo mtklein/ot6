@@ -36,7 +36,7 @@
 --   $C10CA4 first instruction after sta hINIDISP
 
 local H = dofile("tools/tests/lib/ot6.lua")
-local STATE = "build/states/battle_doorstep.mss.lua"
+local STATE = "build/states/battle_entry.mss.lua"
 local vr = emu.memType.snesVideoRam
 local FONTDIRTY = 0x57B9
 local SHADOW = H.SHADOW         -- 6 lines x 14 bytes: cur,prev,5 cells

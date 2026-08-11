@@ -1,4 +1,4 @@
--- @suite frontier=moogle_cleared slow
+-- @suite savestate=moogle_cleared slow
 -- battle_dancemp.lua -- issue #34: Dance costs MP -- flat, paid at
 -- dance-START, per docs/design/mp-economy.md's verb survey (Dance: "flat,
 -- paid at start", 4-10).
@@ -16,7 +16,7 @@
 -- The old header said Mog was not reachable yet; that is
 -- STALE -- he leads P2 of the Narshe moogle defense (gen_moogle,
 -- moogle_defense.mss, generated en route to moogle_cleared -- hence the
--- frontier=moogle_cleared line above, whose run refreshes both).  So every
+-- savestate=moogle_cleared line above, whose run refreshes both).  So every
 -- staging is gone: no CHAR::MOG installs, no command-row writes, no monster
 -- stop/HP/death-proof pins, no $1d4c pin, no $267e rebuild.  In their
 -- place, the game's own arming:

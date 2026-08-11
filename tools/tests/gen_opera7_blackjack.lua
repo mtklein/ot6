@@ -1,4 +1,4 @@
--- gen_opera7_blackjack.lua -- v0.5 terminal step: ultros2_doorstep -> defeat
+-- gen_opera7_blackjack.lua -- v0.5 terminal step: ultros2_entry -> defeat
 -- Ultros 2 -> ride the Setzer/coin-toss/Blackjack sequence -> generate
 -- blackjack.
 --
@@ -28,7 +28,7 @@
 -- every attempt's numbers on the record (#74).  The deeper break-mechanics
 -- contract stays battle_ultros2.lua's, on the same entry point.
 local H = dofile("tools/tests/lib/ot6.lua")
-local DOOR = "build/states/ultros2_doorstep.mss.lua"
+local DOOR = "build/states/ultros2_entry.mss.lua"
 
 local ULTROS2 = 0x012d
 local aPhase = 0

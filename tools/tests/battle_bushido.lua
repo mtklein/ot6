@@ -1,4 +1,4 @@
--- @suite slow frontier=camp_escaped
+-- @suite slow savestate=camp_escaped
 -- battle_bushido.lua -- v0.5 Bushido submenu (issue #8): SwdTech is a tools-shell
 -- SUBMENU, not the vanilla numeral gauge.
 --

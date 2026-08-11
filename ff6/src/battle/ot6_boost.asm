@@ -1256,7 +1256,7 @@ Ot6ThiefCostTbl:
 ;   Life 30 @L18 20.3%
 ;
 ; (spells learned below Terra's earliest measured level are priced at that
-; level -- L6, pool 40, read off kolts_doorstep -- the same clamp the kit rows
+; level -- L6, pool 40, read off kolts_entry -- the same clamp the kit rows
 ; use, because a pool the game never presents is not a price anyone pays.)
 ; so a vanilla spell costs roughly 8-20% of the pool it is first cast from.
 ; The v0.4/v0.5 kit columns did NOT sit on that baseline.  Measured the same way,

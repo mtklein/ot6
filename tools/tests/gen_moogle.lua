@@ -1,4 +1,4 @@
--- gen_moogle.lua -- from moogle_doorstep.mss (TERRA in Magitek armor at
+-- gen_moogle.lua -- from moogle_entry.mss (TERRA in Magitek armor at
 -- (55,12), map 50, one south of the collapse trigger): step onto (55,11)
 -- and ride the WHOLE opening set-piece chain to its far side, generating two
 -- states on the way:
@@ -89,7 +89,7 @@
 --   $012F -> $1EA5 mask $80      $01CC -> $1EB9 mask $10
 --   $0003 -> $1E80 mask $08
 local H = dofile("tools/tests/lib/ot6.lua")
-local DOORSTEP = "build/states/moogle_doorstep.mss.lua"
+local ENTRY = "build/states/moogle_entry.mss.lua"
 
 local function collapseStarted()        -- $012E: set as the defense goes live
   return (H.readByte(0x1ea5) & 0x40) ~= 0
@@ -272,7 +272,7 @@ local function attempt(p, round)
 end
 
 H.run({ maxFrames = 200000 }, {
-  H.loadState(DOORSTEP),
+  H.loadState(ENTRY),
   H.waitFrames(10),
   H.waitUntil(function() return H.hasControl() end, 300, "entry point control", 5),
   H.call(function()
