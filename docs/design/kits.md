@@ -50,7 +50,13 @@ the physical equivalent of non-elemental magic.
 
 Chip is per hit, and excess hits after a break convert to the broken ×2
 rather than being wasted. `design/multi-hit.md` is the full survey of what
-the engine can express.
+the engine can express. A ×N in the Chip column below means the ability
+strikes the same body N times and therefore chips up to N shields per use;
+its power is divided by N to pay for that. Six abilities carry one: Pummel
+×2, Bum Rush ×4, Drill ×2, Quadra Slam ×4, Quadra Slice ×4, Empowerer ×2.
+Breadth is a different thing and is written out in words: AutoCrossbow hits
+every body once, which is four chips against a four-stack and one against a
+boss.
 
 ---
 
@@ -66,7 +72,7 @@ The 8 Tools, verbatim ✦, learned by acquisition.
 | 2 | NoiseBlaster | 6 | — (confuse) | Figaro shop |
 | 3 | Bio Blaster | 8 | poison | Figaro shop |
 | 4 | Flash | 6 | — (blind) | Figaro shop, restocked South Figaro |
-| 5 | Drill | 16 | piercing | Figaro castle, after the sand dive |
+| 5 | Drill | 16 | piercing ×2 | Figaro castle, after the sand dive |
 | 6 | Chain Saw | 18 | slashing | Zozo chest (vanilla) |
 | 7 | Debilitator | 10 | adds + reveals a random weakness ✦ | Vector shop |
 | 8 | **Overclock** ✦ (divine) | Σ | — | Magitek factory (story) |
@@ -105,14 +111,14 @@ Levels below are `BlitzLevelTbl` (`field/event.asm:1240`).
 
 | # | Blitz | MP | Chip | Level |
 |---|---|---|---|---|
-| 1 | Pummel ✦ | 4 | bludgeoning | 1 (has it at join) |
+| 1 | Pummel ✦ | 4 | bludgeoning ×2 | 1 (has it at join) |
 | 2 | AuraBolt | 10 | holy | 6 |
 | 3 | Suplex | 13 | bludgeoning | 10 |
 | 4 | Fire Dance | 17 | fire | 15 |
 | 5 | Mantra | 16 | — (heal) | 23 |
 | 6 | Air Blade | 28 | wind | 30 |
 | 7 | Spiraler | 50 | — | 42 |
-| 8 | **Bum Rush** (divine) | **99** | bludgeoning | 70 / Duncan |
+| 8 | **Bum Rush** (divine) | **99** | bludgeoning ×4 | 70 / Duncan |
 
 The MP column lives in `Ot6AbilityCostTbl` keyed by attack id $5d–$64,
 charged under `OT6_MP_COSTS`. Bum Rush is Sabin's ultimate and is
@@ -144,7 +150,7 @@ against upstream for something a comment already handles.
 | 2 | Retort | 1 | 10 | — (counter stance) | 6 |
 | 3 | Slash | 1 | 13 | slashing | 12 |
 | 4 | Quadra Slam | 2 | 16 | slashing ×4 | 15 |
-| 5 | Empowerer | 2 | 18 | — (drain) | 24 |
+| 5 | Empowerer | 2 | 18 | — (drain; strikes ×2 at quarter power) | 24 |
 | 6 | Stunner | 3 | 28 | slashing, all enemies | 34 |
 | 7 | Quadra Slice | 3 | 50 | wind ×4 | 44 |
 | 8 | **Cleave** (divine) | 3, target must be Broken | **99** | — | Phantom Train farewell (story) |

@@ -56,3 +56,7 @@
 
 ; weapon/ability class data (m3)
         .include "ot6_class.asm"
+
+; multi-hit hit counts (#54).  appended after the block above rather than
+; inserted into it, so no existing symbol in bank $f0 moves.
+        .include "ot6_hitcount.asm"
