@@ -477,11 +477,41 @@ H.run({ maxFrames = 300000 }, {
   --    real field Equip -> Optimum per character, a no-op for anyone armed.
   --    BEFORE the retry blob, so every attempt replays an armed party.
   H.equipOptimum({ tag = "ifrit kit" }),
+  -- 1b. the rest of the player's prep: HEAL.  The checkpoint battery was cut
+  --    with EDGAR at 108/354 and SABIN at 113/363, both about 31%, and a cold
+  --    Continue restores exactly that -- FF6's save point saves without
+  --    healing, so the party walks in at the HP it was saved at.  Every
+  --    comparable step already tops up first (battle_brokendeath:296 before
+  --    THIS fight, gen_esper_tubes:331 before battle 72, gen_n128:469,
+  --    gen_banquet_done:570); this one was the only boss step with no
+  --    H.fieldCare at all, and that omission is what lost the ladder.
+  --    Measured on the unhealed run: the fight driver's healPercent=60 is
+  --    already unmet at the fight's first frame, so it opens in a heal
+  --    deadlock and never leaves it -- 87 of 100 actions across all three
+  --    attempts were item uses, LOCKE attacked exactly zero times, and
+  --    attempts 1 and 2 ended with IFRIT untouched at 3300 hp / 6 shields.
+  --    Threshold and tag match battle_brokendeath's call for this fight.
+  H.fieldCare({ tag = "care before battle 70", threshold = 0.95 }),
   H.navTo(3, 7, { maxFrames = 9000, playBattles = "flee" }),
   H.call(function()
     H.assertEq(H.fieldX() == 3 and H.fieldY() == 7, true,
       "back at the entry point, armed")
     H.log(partyReport("ifrit entry point, armed"))
+    -- The prep above has to be checked, not assumed: a fieldCare that
+    -- silently no-ops and an equipOptimum that silently no-ops both leave a
+    -- party that loses the fight for a reason the battle log does not name.
+    -- That is exactly how this step failed before -- it read as a balance
+    -- wall.  Require the numbers the prep is supposed to produce.
+    for _, c in ipairs(H.partyMembers()) do
+      local base = 0x1600 + 37 * c
+      local hp, maxhp = H.readWord(base + 0x09), H.readWord(base + 0x0B)
+      H.assertEq(maxhp > 0, true, CHARS[c + 1] .. " has a max HP")
+      H.assertEq(hp * 100 >= maxhp * 90, true, string.format(
+        "%s enters battle 70 topped up (%d/%d, want >= 90%%)",
+        CHARS[c + 1], hp, maxhp))
+      H.assertEq(H.readByte(base + 0x1F) ~= 0xFF, true,
+        CHARS[c + 1] .. " enters battle 70 holding a weapon")
+    end
   end),
   -- capture the entry point as the retry ladder's reload blob
   (function()
