@@ -1644,9 +1644,10 @@ end
 --   Refusals are readable.  CheckCanUseItem (item.asm:2243-2330) allows only
 --   a Fenix Down on a KO'd target and allows Tonic/Potion only on a living
 --   character below full HP; an invalid pick starts the mosaic task, which
---   writes DP $B5 (zMosaic) for eight frames.  This driver watches that cell
---   and gives up on that plan instead of pressing A at a window that will
---   never accept it.
+--   writes DP $B5 (zMosaic) for eight frames and then stops without clearing
+--   it.  This driver watches the high nibble, which is the only part of that
+--   cell that goes back to zero, and gives up on the plan instead of
+--   pressing A at a window that will never accept it.  See serveFrame.
 --
 -- ---- casting instead of drinking ----
 --
@@ -1660,9 +1661,9 @@ end
 -- the next level, while a Tonic drunk in that corridor is gone for good and
 -- the Phantom Train's shop is a hard gil budget.  Casting is therefore the
 -- cheap move and the bag is the fallback, which is the order this driver
--- picks in.  Cure is 5 MP (MagicProp+5) against pools of 40-77 at the
--- fixtures measured, so a caster covers eight to fifteen heals between
--- level ups.
+-- picks in.  Cure is 5 MP (MagicProp+5) against pools of 40 to 106 at the
+-- fixtures measured, so with the default floor a caster covers six to
+-- fifteen heals between level ups.
 --
 -- The magic path, same sources as above (field-care-menu.md section 5):
 --
@@ -1701,9 +1702,14 @@ end
 -- opts.reserve    { [itemId] = n } -- keep n of that item unspent, so a step
 --                 can hold Potions back for the fight it is walking toward
 -- opts.maxFrames  budget for the whole visit (default 24000)
--- opts.maxTries   plans to attempt before giving up (default 48).  Cure
---                 restores less than a Potion, so a magic visit runs more
---                 plans than an item one for the same party.
+-- opts.maxTries   plans to attempt before giving up (default 48).  A magic
+--                 visit runs more plans than an item one for the same
+--                 party, because a Cure restores less than a Potion at
+--                 these levels: measured at the battle-70 stop, one Cure
+--                 from a level 14 CELES restored 197 HP against a Potion's
+--                 246, and a Tonic is a flat 50.  It is still the shorter
+--                 visit in frames, because the extra plans stay inside $3B
+--                 while each item use pays a full fade round trip.
 -- opts.tag        log prefix
 --
 -- It is a no-op, and does not even open the menu, when nobody needs
