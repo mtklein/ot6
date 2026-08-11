@@ -122,13 +122,20 @@ end
 -- visible, rather than corrupting a teardown.  The segments are chosen off
 -- the triggers, where control is continuous and navTo is reliable.
 local IMP = 0x0042
+-- playBattles = "tactical" (issue #75) keeps the flag write out of the
+-- library path too.  It is intent only: map 119 has random encounters
+-- disabled (map_prop.dat byte +5 bit 7 clear; the field step handler at
+-- ff6/src/field/battle.asm:333-347 returns before the roll unless $0525 is
+-- negative), and the escape fights are goal fights that opts.spare hands
+-- back to the caller before the option is consulted.
 local function seg(tx, ty, what)
   return H.cond(function() return true end, {
     H.logStep(function()
       return string.format("[magitek] navTo (%d,%d) for %s from (%d,%d) f%d",
         tx, ty, what, H.fieldX(), H.fieldY(), H.frame)
     end),
-    H.navTo(tx, ty, { maxFrames = 14000, spare = { IMP }, arrive = function()
+    H.navTo(tx, ty, { maxFrames = 14000, spare = { IMP },
+                      playBattles = "tactical", arrive = function()
       return map() == 119 and H.fieldX() == tx and H.fieldY() == ty
          and H.hasControl() and H.tileAligned()
     end }),

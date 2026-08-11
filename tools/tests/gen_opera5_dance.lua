@@ -35,6 +35,20 @@
 --  * The timer: start_timer 0, 2336, _cabd21 arms as control returns on 236
 --    (~2287 grace).  climb+waltz+flowers+balcony to (8,9) measured ~1360
 --    frames, then stop_timer, so there is a wide margin.
+--
+-- Issue #75, playBattles: the one navigator call below passes
+-- playBattles = "tactical", so it does not fall through to the library's
+-- monster-dead flag write.
+-- It runs on map 238, the opera stage, which has random encounters
+-- disabled.
+-- A field map rolls for a random battle only when byte +5 of its 33-byte
+-- map_prop.dat record has bit 7 set: LoadMapProp copies the record to $0520
+-- (ff6/src/field/map.asm:143-158), and the step handler returns before the roll
+-- unless $0525 is negative (ff6/src/field/battle.asm:333-347).  So the option
+-- is intent only here.  "tactical" rather than "flee" because the only battle
+-- that could still reach it is an unscripted surprise -- a goal fight is taken
+-- by opts.spare or opts.arrive first -- and fighting one beats spending
+-- M.FLEE_CAP frames failing to run from it.
 local H = dofile("tools/tests/lib/ot6.lua")
 local function map() return H.mapId() & 0x1ff end
 local function bright() return emu.getState()["ppu.screenBrightness"] or 0 end
@@ -179,7 +193,8 @@ H.run({ maxFrames = 60000 }, {
   end),
 
   -- fire the aria trigger {97,7} -> map 236 -> the lyric forks {0,1,0}
-  H.navTo(97, 7, { maxFrames=8000, arrive=function() return map()~=238 end }),
+  H.navTo(97, 7, { maxFrames=8000, playBattles="tactical",
+                   arrive=function() return map()~=238 end }),
   H.waitUntil(function() return map()==236 end, 6000, "aria loads map 236", 10),
   ariaFork(0, "fork1 (0)"), ariaFork(1, "fork2 (1)"), ariaFork(0, "fork3 (0)"),
   H.waitUntil(function() return map()==236 and H.hasControl() and H.tileAligned() end, 6000, "control on 236 (timer armed)", 5),

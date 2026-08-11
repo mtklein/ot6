@@ -41,6 +41,20 @@
 -- River's landing.  It therefore takes its short path (sfx, flash,
 -- `player_ctrl_on`, return) rather than the one-time tutorial, whose "No"
 -- answer ends in a bare EventReturn and never returns control.
+--
+-- Issue #75, playBattles: every navigator call below passes
+-- playBattles = "tactical", so it does not fall through to the library's
+-- monster-dead flag write.
+-- They run on map 9 (the scenario hub) and map 75 (South Figaro), both
+-- with random encounters disabled.
+-- A field map rolls for a random battle only when byte +5 of its 33-byte
+-- map_prop.dat record has bit 7 set: LoadMapProp copies the record to $0520
+-- (ff6/src/field/map.asm:143-158), and the step handler returns before the roll
+-- unless $0525 is negative (ff6/src/field/battle.asm:333-347).  So the option
+-- is intent only here.  "tactical" rather than "flee" because the only battle
+-- that could still reach it is an unscripted surprise -- a goal fight is taken
+-- by opts.spare or opts.arrive first -- and fighting one beats spending
+-- M.FLEE_CAP frames failing to run from it.
 local H = dofile("tools/tests/lib/ot6.lua")
 local DOOR = "build/states/scenario_hub.mss.lua"
 
@@ -82,7 +96,7 @@ local function talkToObj(obj, what, maxF)
   local function walkStep()
     return H.navTo(function() return approach()[1] end,
                    function() return approach()[2] end, {
-      maxFrames = maxF or 20000,
+      maxFrames = maxF or 20000, playBattles = "tactical",
       arrive = function()
         return engaged or (adjacent() and H.hasControl() and H.tileAligned())
       end,
@@ -155,7 +169,7 @@ H.run({ maxFrames = 60000 }, {
   H.advanceStory(function()
     return map() == 75 and H.hasControl() and H.tileAligned()
        and bright() >= 15 and not H.battleLoadStarted()
-  end, 30000),
+  end, 30000, { playBattles = "tactical" }),
   H.waitFrames(30),
   H.call(function()
     H.assertEq(map(), 75, "on map 75 -- SOUTH FIGARO, LOCKE's scenario")
