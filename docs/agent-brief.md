@@ -65,15 +65,16 @@ redone — that is an accepted cost, not a failure, as long as it stays
 unusual. If the dispatch explicitly names another agent's territory, stay
 out of it and report the collision instead of resolving it yourself.
 
-## The frontier
+## The generated savestates
 
-Targeted re-mints are yours: `nice -n 10 ninja -f build/build.ninja <state>`
-re-mints exactly what a state needs. Use them freely — a stale fixture is
+Targeted regeneration is yours: `nice -n 10 ninja -f build/build.ninja <state>`
+regenerates exactly what a state needs. Use them freely — a stale fixture is
 not a reason to ship "could not establish."
 
-The **full** chain (`make frontier`, `frontier-test`, `release-test`) stays
-with the dispatcher unless your dispatch grants it: it is long and serial,
-and only one agent can own it at a time.
+The **full** chain (`make frontier`, `frontier-test`, `release-test`, which
+regenerate every savestate the deeper tests load) stays with the dispatcher
+unless your dispatch grants it: it is long and serial, and only one agent
+can own it at a time.
 
 Expect seeded fixtures to be stale against any ROM you build. Before
 reporting a red test as yours, check whether it fails identically on the
@@ -99,18 +100,18 @@ Not rules — these are what has actually worked here.
 
 ## Run things under `nice`
 
-Prefix builds, mints, suite runs and emulator jobs with `nice -n 10`, then
-use whatever parallelism suits the job (`-j10` for smoke is the documented
-fast loop). Niced work yields to the owner's game and soaks up idle cores,
-so no throttle arithmetic is needed from you.
+Prefix builds, savestate generation, suite runs and emulator jobs with
+`nice -n 10`, then use whatever parallelism suits the job (`-j10` for smoke
+is the documented fast loop). Niced work yields to the owner's game and
+soaks up idle cores, so no throttle arithmetic is needed from you.
 
-**The one thing `nice` does not fix: the 600-second reap.** Mesen's
+**The one thing `nice` does not fix: the 600-second timeout.** Mesen's
 testrunner kills a run on wall-clock, and every competing job is equally
 niced — so agents can starve *each other* past that deadline even though
-none of them starves the owner. The signature is several mints failing
-`code=255` at once while the same mints pass in isolation. If you see
-that, it is contention, not your change — lower `-j` and retry rather
-than debugging the generator.
+none of them starves the owner. The signature is several savestate
+generations failing `code=255` at once while the same ones pass in
+isolation. If you see that, it is contention, not your change — lower
+`-j` and retry rather than debugging the generator.
 
 A **full** `make frontier` is the case that provokes it, because it
 parallelises hard on its own. Bound it (`NINJAFLAGS=-j4`) when other
