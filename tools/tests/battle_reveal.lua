@@ -11,27 +11,78 @@
 -- re-runs the seed with no such clear, and real uninitialized RAM would too.
 -- The seed now zeroes the masks itself before the codex merge.
 --
--- This test exercises that dirty condition regardless of RAM power-on
--- state: a one-shot exec callback at Ot6SeedShields ($F00000) re-dirties every
+-- Quarantined mechanism arm (issue #75); ONE state write survives, and it is
+-- the seed-entry mask dirtier below.  Nothing a player can press produces a
+-- dirty reveal mask at seed time: InitBattle clears $3A20-$3ED3 before every
+-- normal battle, and only a Cmd_20 scene reload or uninitialized RAM hands the
+-- seed garbage.  So a one-shot exec callback at Ot6SeedShields re-dirties every
 -- monster reveal mask to $FF the instant the seed starts, after InitBattle's
--- clear, which is the same stale state the Cmd_20 reload hands over. The
--- assertion holds for any garbage: an enemy with a virgin codex and no chips
--- must show '?'. Then a fire chip must still reveal, which shows the fix does
--- not simply hide everything.
+-- clear, which is the same stale state a Cmd_20 reload hands over.  That is a
+-- unit test of the seed's own defensiveness rather than a claim about play.
+-- Per the policy on #75 it keeps its `emu.write` waiver, records that here,
+-- and may never produce fixtures.  It converts to a real multi-phase fight if
+-- and when someone measures a reachable formation that runs Cmd_20 (the
+-- Number 128 train chain and the MRF fights are the candidates the burn-down
+-- plan names).
 --
--- Guards sit in monster slots 2/3 -> entity $0C/$0E. revealed elems
--- $3E95/$3E97, weak elems $3BEC/$3BEE, HP $3C00/$3C02, party levels $3B18+2i,
--- mag.pwr $3B41+2i. HUD shadow line for slot s is H.shadowLine(s); the four
--- weakness cells are the low bytes at +6/+8/+10/+12 ('?' = $BF, fire = $EB).
+-- Issue #75 conversion, the other half.  Phase 2 used to build the same
+-- laboratory battle_break did: the entry-point Guards poked fire-weak, their
+-- HP written to 4000, and the three casters' level and mag.pwr pinned equal.
+-- All of that is gone.  This file now boots the same body battle_break does,
+-- the Whelk head, for the same reasons: $0134 is authored fire-weak
+-- (Ot6ElemAddTbl, ot6_break.asm:404-406) and class-weak PIERCE with four
+-- shields (Ot6ShieldTbl, ot6_hud.asm:1730-1731), and carries 1600 HP, so one
+-- real Fire Beam chips a real weakness on a body that survives it.
+--
+-- The move strengthens phase 1 as well.  On the Guards, every present species
+-- was authored class-weak $02, so the "the seed OVERWRITES the $FF rather than
+-- OR-ing it" assertion only ever saw a nonzero replacement, and the file said
+-- so ("no formula species is reachable in this fixture").  This formation
+-- carries both: the head at $02 and the Whelk shell ($0100, Ot6ShieldTbl row
+-- `0, $00`, ot6_hud.asm:1728-1729) at $00, so the same $FF must come back as
+-- $02 on one body and $00 on the other in the same seed.
+--
+-- What changed shape, and why, so nobody reads it as a loosened test.  The
+-- old phase-2 control was "the chipped Guard's SECOND authored ELEMENT
+-- weakness is still hidden", which needed a body with two element bits; the
+-- head has exactly one.  Its second authored axis is the class axis, so the
+-- control is now "a fire chip reveals the element axis and leaves the
+-- authored PIERCE class axis hidden", asserted the same way as a pair: the
+-- second axis is really there, and it is really still hidden.  That is the
+-- same claim about the same failure (one hit disclosing more than it earned)
+-- across the two masks the seed actually zeroes.  Two assertions also got
+-- tighter rather than looser: the revealed-element byte is now checked for
+-- equality with $01 instead of for the fire bit, which is what catches a
+-- blanket $FF, and the HUD '?' count is unchanged.
+--
+-- Addresses, all +slot*2 off the monster slot the body lands in (found by
+-- species scan, never hardcoded): revealed elements $3E91, revealed classes
+-- $3EA5, broken timer $3E90, class-weak mask $3EA4, weak elements $3BE8,
+-- shields $3E40, HP $3BFC, presence $3AA8, status-1 $3EEC, species $57C0.
+-- HUD shadow line for slot s is H.shadowLine(s); the four weakness cells are
+-- the low bytes at +6/+8/+10/+12 ('?' = $BF, fire = $EB).
 local H = dofile("tools/tests/lib/ot6.lua")
-local STATE = "build/states/battle_entry.mss.lua"
+local STATE = "build/states/whelk_entry.mss.lua"
 
-local function present(slot) return (H.readByte(0x3aa8 + slot * 2) & 1) == 1 end
-local function wcell(slot, k) return H.readByte(H.shadowLine(slot) + 6 + k * 2) end  -- k=0..3
+local REVEAL, RCLASS, TIMER, CWEAK = 0x3E91, 0x3EA5, 0x3E90, 0x3EA4
+local WEAK, SHLD, MHP = 0x3BE8, 0x3E40, 0x3BFC
+local ALIVE, MSTAT, SPEC = 0x3AA8, 0x3EEC, 0x57C0
+local MENU, ACTOR, CHID = 0x7BCA, 0x62CA, 0x3ED8
+local HEAD_SP, SHELL_SP = 0x0134, 0x0100
+local CHAR_TERRA = 0x00
+
+local hs, ss, terra                  -- head slot, shell slot, Terra's slot
+
+local function present(slot) return (H.readByte(ALIVE + slot * 2) & 1) == 1 end
+local function wcell(slot, k) return H.readByte(H.shadowLine(slot) + 6 + k * 2) end
+local function headAlive()
+  return present(hs) and (H.readByte(MSTAT + hs * 2) & 0xC2) == 0
+end
 
 -- One-shot: the instant the seed begins, re-dirty every monster reveal mask.
 -- This is the state the Cmd_20 reload (and uninitialized RAM) hands the seed;
 -- InitBattle's clear has already run, so a correct seed must re-hide these.
+-- THE QUARANTINED WRITE (see header): the only one left in this file.
 local SEED = H.sym("Ot6SeedShields")
 local seedRef
 local function armSeedDirtier()
@@ -49,33 +100,132 @@ local function armSeedDirtier()
   end, emu.callbackType.exec, SEED, SEED)
 end
 
-H.run({ maxFrames = 45000 }, {
+-- ------------------------------------------------------------- driver --
+-- battle_break's policy, and for the same reason: only Terra beams, so the
+-- one chip this file needs is one character casting one spell, and no beam is
+-- ever spent on the shell (whose MegaVolt counter is lethal).  Sequences from
+-- the settled top command menu on the MagiTek cursor, measured in
+-- whelkbal_run.lua:103-127.
+local BEAM = { "a", "a", "a" }
+local HEAL = { "a", "down", "down", "a", "a" }
+local mStreak, mSeq, mIdx, mStall, mNoMenu = 0, nil, 1, 0, 0
+local beamsOrdered = 0
+
+local function policyPulse()
+  if H.readByte(MENU) == 0 then
+    mStreak, mSeq, mIdx, mStall = 0, nil, 1, 0
+    mNoMenu = mNoMenu + 1
+    return mNoMenu % 2 == 0 and { "a" } or {}
+  end
+  mNoMenu = 0
+  mStreak = mStreak + 1
+  if mStreak < 4 then return {} end
+  if mSeq == nil then
+    if H.readByte(ACTOR) == terra and headAlive() then
+      beamsOrdered = beamsOrdered + 1
+      mSeq = BEAM
+    else
+      mSeq = HEAL
+    end
+    mIdx = 1
+  end
+  if mIdx <= #mSeq then
+    local b = mSeq[mIdx]
+    mIdx = mIdx + 1
+    return { b }
+  end
+  mStall = mStall + 1
+  if mStall > 2 then
+    mSeq, mStall = nil, 0
+    return { "b" }
+  end
+  return { "a" }
+end
+
+local pulseAge = 29
+local function pulseTick()
+  pulseAge = (pulseAge + 1) % 30
+  if pulseAge == 0 then
+    H.setPad(policyPulse())
+  elseif pulseAge == 6 then
+    H.setPad({})
+  end
+end
+
+local aPhase = 0
+
+H.run({ maxFrames = 60000 }, {
   H.waitFrames(20),
   H.loadState(STATE),
   H.waitFrames(10),
   H.call(function()
     armSeedDirtier()
-    H.log(string.format("armed seed-entry mask dirtier at $%06X", SEED))
+    H.log(string.format("armed seed-entry mask dirtier at $%06X "
+      .. "(the quarantined write -- see header)", SEED))
   end),
 
-  H.driveUntil(function() return H.battleLoadStarted() end, 8000, {
-    H.hold({ "up" }), H.waitFrames(20), H.release(), H.waitFrames(2),
-    H.pressButtons({ "a" }, 4),
-  }, "battle load"),
-  H.waitUntil(function() return H.battleActive() end, 900, "battle active", 30),
-  H.waitFrames(240),
+  -- walk onto the trigger tile; battle_whelkwipe.lua:177-190's field drive
+  H.driveUntil(function()
+    return H.battleLoadStarted() and H.monstersPresent() > 0
+  end, 2600, {
+    H.call(function()
+      aPhase = (aPhase + 1) % 8
+      if H.battleLoadStarted() then H.setPad({}); return end
+      if H.dialogWaiting() then
+        H.setPad(aPhase < 4 and { "a" } or {})
+        return
+      end
+      if not H.hasControl() then H.setPad({}); return end
+      if not H.tileAligned() then H.setPad({}); return end
+      H.setPad(H.fieldY() <= 5 and { down = true } or { up = true })
+    end),
+  }, "whelk event fires"),
+  H.call(function() H.setPad({}) end),
+  H.waitUntil(function() return H.battleActive() end, 900, "whelk up", 30),
+
+  -- The scripted intro re-uploads the small font for its whole run and the
+  -- hud is veiled while it is up (battle_hudclobber), so the cell reads below
+  -- must wait for a font-whole, un-veiled hud.  The run is past the intro when
+  -- the first battle menu opens.
+  H.driveUntil(function()
+    return H.readByte(MENU) ~= 0 and H.readByte(0x64d5) == 0
+       and H.fieldHudPresent()
+  end, 6000, {
+    H.call(function()
+      if H.readByte(MENU) == 0 then H.setPad({ "a" }) else H.setPad({}) end
+    end),
+    H.waitFrames(10), H.release(), H.waitFrames(10),
+  }, "whelk intro dismissed, menu up, hud font whole"),
+  H.waitFrames(120),
+
+  H.call(function()
+    H.assertEq(H.formationHas({ [HEAD_SP] = true }), true, "whelk head fight")
+    for slot = 0, 5 do
+      local sp = H.readWord(SPEC + slot * 2)
+      if sp == HEAD_SP then hs = slot end
+      if sp == SHELL_SP then ss = slot end
+    end
+    H.assertEq(hs ~= nil, true, "the head has a monster slot")
+    H.assertEq(ss ~= nil, true, "the shell has a monster slot")
+    for s = 0, 3 do
+      if H.readByte(CHID + s * 2) == CHAR_TERRA then terra = s end
+    end
+    H.assertEq(terra ~= nil, true, "TERRA has a party slot (the only beamer)")
+    H.log(string.format("head slot %d, shell slot %d, terra slot %d",
+      hs, ss, terra))
+  end),
 
   -- 1. the check: garbage was handed to the seed and the codex is virgin, so
   -- every un-chipped weakness must still read hidden and draw '?'.
   H.call(function()
-    local checked = 0
+    local checked, sawAuthored, sawZero = 0, false, false
     for slot = 0, 5 do
       if present(slot) then
-        local sp   = H.readWord(0x57c0 + slot * 2)
-        local relm = H.readByte(0x3e91 + slot * 2)
-        local rcls = H.readByte(0x3ea5 + slot * 2)
-        local brk  = H.readByte(0x3e90 + slot * 2)  -- broken timer ($3e88+8)
-        local clsW = H.readByte(0x3ea4 + slot * 2)  -- class-weak mask ($3e9c+8)
+        local sp   = H.readWord(SPEC + slot * 2)
+        local relm = H.readByte(REVEAL + slot * 2)
+        local rcls = H.readByte(RCLASS + slot * 2)
+        local brk  = H.readByte(TIMER + slot * 2)
+        local clsW = H.readByte(CWEAK + slot * 2)
         H.log(string.format("slot%d sp=%d revE=%02X revC=%02X brk=%02X clsW=%02X cells=%02X,%02X,%02X,%02X",
           slot, sp, relm, rcls, brk, clsW,
           wcell(slot, 0), wcell(slot, 1), wcell(slot, 2), wcell(slot, 3)))
@@ -85,16 +235,18 @@ H.run({ maxFrames = 45000 }, {
         -- $FF at seed (as a Cmd_20 reload would) must not start broken.
         H.assertEq(brk, 0, "slot "..slot.." broken timer cleared (not broken) despite seed garbage")
         -- class-weak mask ($3e9c): the $FF must be replaced, not OR'd, by the
-        -- seed's authoritative value, or the hud draws class cells that are not
-        -- there.  The entry-point Guards are authored (species 0, class PIERCE
-        -- $02) and the @hit path overwrites, so it lands exactly $02 over the
-        -- $FF, which confirms it overwrites rather than ORs.  A formula species
-        -- would land 0 via the @formula clear; no formula species is reachable
-        -- in this fixture, but the clear is the same lda#0/sta idiom the reveal
-        -- masks above exercise.
+        -- seed's authoritative value, or the hud draws class cells that are
+        -- not there.  This formation carries both sides of that: the head is
+        -- authored PIERCE $02 and the shell is authored $00, so one seed has
+        -- to land a nonzero over the $FF and a zero over the $FF.
         H.assertEq(clsW ~= 0xFF, true, "slot "..slot.." class-weak mask replaced, not OR'd (got FF)")
-        if sp == 0 then
-          H.assertEq(clsW, 0x02, "slot "..slot.." authored Guard class-weak overwritten to PIERCE $02")
+        if sp == HEAD_SP then
+          H.assertEq(clsW, 0x02, "head's authored class-weak overwritten to PIERCE $02")
+          sawAuthored = true
+        end
+        if sp == SHELL_SP then
+          H.assertEq(clsW, 0x00, "shell's authored gaugeless row overwritten to $00")
+          sawZero = true
         end
         for k = 0, 3 do
           local g = wcell(slot, k)
@@ -107,65 +259,57 @@ H.run({ maxFrames = 45000 }, {
       end
     end
     H.assertEq(checked > 0, true, "at least one monster on screen to check")
+    -- neither half of the overwrite claim may go unexercised
+    H.assertEq(sawAuthored, true,
+      "the nonzero-over-$FF case really ran (the head was on screen)")
+    H.assertEq(sawZero, true,
+      "and the zero-over-$FF case really ran (the shell was on screen)")
     H.screenshot("reveal_gate_hidden")
   end),
 
-  -- 2. the reveal still works: fire-chip a guard and watch its fire weakness
-  -- change from '?' to the fire glyph. Guards carry no natural fire weakness,
-  -- so poke one in; equalize casters and toughen HP as battle_break does, for
-  -- a clean chip.
+  -- 2. the reveal still works, on an authored weakness rather than a poked
+  -- one: Terra beams the head until its fire weakness turns over.
   H.call(function()
-    H.writeByte(0x3BEC, H.readByte(0x3BEC) | 0x01)
-    H.writeByte(0x3BEE, H.readByte(0x3BEE) | 0x01)
-    H.writeWord(0x3C00, 4000); H.writeWord(0x3C02, 4000)
-    for c = 0, 2 do
-      H.writeByte(0x3B18 + c * 2, 5)
-      H.writeByte(0x3B41 + c * 2, 10)
-    end
-    H.log("lab: guards fire-weak + tough, casters equalized")
+    H.assertEq(H.readByte(WEAK + hs * 2) & 0x01, 0x01,
+      "control: the head really is fire-weak (Ot6ElemAddTbl) -- without this "
+      .. "the chip below would prove nothing")
+    H.assertEq(H.readByte(SHLD + hs * 2), 4, "and carries its authored gauge")
   end),
   H.driveUntil(function()
-    return (H.readByte(0x3E95) & 1) == 1 or (H.readByte(0x3E97) & 1) == 1
-  end, 30000, {
-    H.call(function() if H.readByte(0x7bca) ~= 0 then H.setPad({ "a" }) end end),
-    H.waitFrames(4),
-    H.call(function() H.setPad({}) end),
-    H.waitFrames(26),
-  }, "a fire chip to reveal fire"),
+    return (H.readByte(REVEAL + hs * 2) & 0x01) == 1
+  end, 40000, { H.call(pulseTick) }, "a fire chip to reveal fire"),
   H.release(),
   H.waitFrames(30),
   H.call(function()
-    local r2, r3 = H.readByte(0x3E95), H.readByte(0x3E97)
-    H.assertEq((r2 | r3) & 0x01, 0x01, "fire weakness revealed after the chip")
-    local guard = ((r2 & 1) == 1) and 2 or 3
+    local r = H.readByte(REVEAL + hs * 2)
+    H.assertEq(beamsOrdered >= 1, true,
+      "a beam was really ordered -- a reveal with no beam ordered would mean "
+      .. "something other than the chip disclosed it")
+    -- exact, not masked: a gate that leaked the whole strip would put $FF
+    -- here and still satisfy a bit test
+    H.assertEq(r, 0x01, "exactly the fire bit revealed after the chip")
     local drewFire = false
-    for k = 0, 3 do if wcell(guard, k) == 0xEB then drewFire = true end end
-    H.assertEq(drewFire, true, "chipped guard's HUD row shows the fire glyph, not '?'")
+    for k = 0, 3 do if wcell(hs, k) == 0xEB then drewFire = true end end
+    H.assertEq(drewFire, true, "chipped head's HUD row shows the fire glyph, not '?'")
 
-    -- and only fire.  Everything above this line was satisfiable by a ROM
-    -- that reveals the whole weakness strip on the first matched chip, which
-    -- is the same shape as the bug this file was written for: the assert at
-    -- :137 is the same condition as the driveUntil predicate at :125-127, so
-    -- it is guaranteed by construction, and `drewFire` only asks that one cell
-    -- turned over.  A reveal that leaked every element would satisfy both.
-    --
-    -- The fixture already contains the control: the guards carry an authored
-    -- second element weakness in bit 3 (measured $3BEC/$3BEE = $09, where $01
-    -- is the fire bit this test pokes in at :114 and $08 is the species' own),
-    -- and a fire chip must not disclose it.  Asserted as a pair: the second
-    -- weakness is present, and it is still hidden.  Measured three times,
-    -- frame-identical (PASS at frame 1028, revElem $01 against weakElem $09).
-    local OTHER = 0x08
-    local w = ((r2 & 1) == 1) and H.readByte(0x3BEC) or H.readByte(0x3BEE)
-    local r = ((r2 & 1) == 1) and r2 or r3
-    H.assertEq(w & OTHER, OTHER,
-      "control: the chipped guard really has a SECOND authored weakness to "
-      .. "keep hidden (without this the next assertion tests nothing)")
-    H.assertEq(r & OTHER, 0,
-      "one chip reveals ONE element -- the guard's other authored weakness is "
-      .. "still hidden, not disclosed by the first hit")
+    -- And only that axis.  Everything above this line was satisfiable by a
+    -- ROM that discloses everything it knows on the first matched chip, which
+    -- is the same shape as the bug this file was written for.  The head's
+    -- second authored axis is its class weakness, so it is the control:
+    -- asserted as a pair, the axis is really there, and it is really still
+    -- hidden.
+    local clsW = H.readByte(CWEAK + hs * 2)
+    H.assertEq(clsW, 0x02,
+      "control: the head really has a SECOND authored axis to keep hidden -- "
+      .. "class-weak PIERCE (without this the next assertion tests nothing)")
+    H.assertEq(H.readByte(RCLASS + hs * 2), 0,
+      "one fire chip reveals the ELEMENT axis only -- the head's authored "
+      .. "PIERCE weakness is still hidden, not disclosed by the same hit")
+    -- and the shell, which took no hit at all, disclosed nothing
+    H.assertEq(H.readByte(REVEAL + ss * 2), 0,
+      "the untouched shell revealed nothing -- the disclosure is per body")
     local stillUnknown = 0
-    for k = 0, 3 do if wcell(guard, k) == 0xBF then stillUnknown = stillUnknown + 1 end end
+    for k = 0, 3 do if wcell(hs, k) == 0xBF then stillUnknown = stillUnknown + 1 end end
     H.assertEq(stillUnknown > 0, true,
       "and the HUD row still carries a '?' -- the strip was not blanket-revealed")
     H.screenshot("reveal_gate_chipped")
