@@ -5,12 +5,28 @@
 --
 --   tools/tests/run.sh tools/tests/whelkbal_tek.lua build/states/whelkbal_tek.log
 --
--- Drive: whelk entry point -> fight -> dismiss the opening dialog -> burn
--- non-terra menus on their row-1 beam (classless, and the head has no
--- vanilla element weakness, so beams cannot move shields) -> when terra's
--- menu comes up, walk her 2x4 magitek grid to the bottom-right cell
--- (TekMissile) and fire. Laps rotate a target nudge (none/down/up) so the
--- missile finds the head whichever part the cursor defaults to.
+-- Drive: whelk entry point -> fight -> dismiss the opening dialog -> spend
+-- non-terra menus on Heal Force (self-target) -> when terra's menu comes up,
+-- walk her 2x4 magitek grid to the bottom-right cell (TekMissile) and fire.
+-- Laps rotate a target nudge (none/down/up) so the missile finds the head
+-- whichever part the cursor defaults to.
+--
+-- Issue #75 conversion, and a stale premise fixed with it.  This file used to
+-- burn the non-terra menus on their row-1 beam, on the stated grounds that
+-- "the head has no vanilla element weakness, so beams cannot move shields".
+-- That has not been true since Ot6ElemAddTbl gave $0134 a fire weakness
+-- (ot6_break.asm:404-406, "the tutorial probe"): a beam chips the head like
+-- anything else, so the 4 -> 3 this file measures could have come from Vicks
+-- or Wedge rather than from the TekMissile it is about.  Heal Force is
+-- self-target and moves no gauge, so the missile is now the only thing in the
+-- fight that can chip, and the attribution holds.
+--
+-- The two writes are gone with it.  The party-HP floor and the head's max-HP
+-- re-pin existed to keep the fight alive across an open-ended beam exchange;
+-- with two of the three characters healing and the drive stopping at the
+-- first chip, neither is needed.  Both become assertions instead: the head
+-- must still be alive at the end, and its element-reveal mask must still be
+-- zero, which is the direct proof that no beam ever landed on it.
 
 local H = dofile("tools/tests/lib/ot6.lua")
 local STATE = "build/states/whelk_entry.mss.lua"
@@ -20,7 +36,7 @@ local function whelk()
 end
 
 local MENU, ACTOR = 0x7bca, 0x62ca
-local PHP, MHP = 0x3bf4, 0x3bfc
+local MHP = 0x3bfc
 local SPEC, CHID = 0x57c0, 0x3ed8
 local hs, ss, terra
 local function headShields() return H.readByte(0x3E40 + hs * 2) end
@@ -28,22 +44,35 @@ local function headCRev() return H.readByte(0x3EA5 + hs * 2) end
 
 local function sram(addr) return emu.read(addr, emu.memType.snesMemory) end
 
-local classWrites = {}
-local function keepalive()
-  for c = 0, 2 do
-    if H.readWord(PHP + c * 2) < 200 then H.writeWord(PHP + c * 2, 200) end
-  end
-  if hs then H.writeWord(MHP + hs * 2, 1600) end
+-- The codex is per save slot: Ot6CodexActive (ot6_codex.asm:38-59) picks the
+-- page from wSaveSlotToLoad ($7e021f) -- 1/2/3 map to $000/$400/$800 and
+-- anything else, which includes a New Game, uses the transient page
+-- OT6_CODEX_TEMP = $0c00 (ot6_memory.inc:23-28).  This fixture is a New
+-- Game, so the assertion below used to read page 1 and find nothing there.
+local CODEX_ROOT, CODEX_CLASS, CODEX_TEMP = 0x316000, 0x0190, 0x0c00
+local function codexPage()
+  local slot = H.readByte(0x021f)
+  if slot == 1 then return 0x0000 end
+  if slot == 2 then return 0x0400 end
+  if slot == 3 then return 0x0800 end
+  return CODEX_TEMP
+end
+local function codexClass(sp)
+  return sram(CODEX_ROOT + codexPage() + CODEX_CLASS + sp)
 end
 
--- one cast lap per menu: non-terra menus fire their row-1 beam; terra's
--- menu walks to TekMissile with this lap's target nudge
+local classWrites = {}
+local function headElemRev() return H.readByte(0x3E91 + hs * 2) end
+local function headHp() return H.readWord(MHP + hs * 2) end
+
+-- one cast lap per menu: non-terra menus spend their turn on Heal Force,
+-- which is self-target and moves no gauge, so nothing but the missile can
+-- chip; terra's menu walks to TekMissile with this lap's target nudge
 local lap = 0
 local function castStep(donePred, budget, what)
   local streak, idx, stall, mySeq, noMenu = 0, 0, 0, nil, 0
   return H.driveUntil(donePred, budget, {
     H.call(function()
-      keepalive()
       if H.readByte(MENU) == 0 then
         streak, idx, stall, mySeq = 0, 0, 0, nil
         noMenu = noMenu + 1
@@ -62,7 +91,10 @@ local function castStep(donePred, budget, what)
           mySeq[#mySeq + 1] = "a"
           lap = lap + 1
         else
-          mySeq = { "a", "a", "a" }
+          -- Heal Force is (2,0) in both magitek lists and self-targets by
+          -- default (whelkbal_run.lua:103-108); (1,1) is a blank cell the
+          -- cursor can wedge on, which was measured.
+          mySeq = { "a", "down", "down", "a", "a" }
         end
         idx = 1
         H.log(string.format("f%d cast[%s] actor=%d seq=%s", H.frame, what,
@@ -132,19 +164,37 @@ H.run({ maxFrames = 40000 }, {
 
   -- fire tek missiles until the head's shields move
   castStep(function()
-    keepalive()
     return hs ~= nil and headShields() < 4
   end, 25000, "tekmissile chips the whelk head"),
   H.call(function() H.setPad({}) end),
-  H.waitFrames(40),
+  -- The shield write lands at damage-calc time; the reveal is committed later,
+  -- on the damage frame's first numeral (Ot6RevealCommit, called from
+  -- Ot6RevealPoll -- ot6_memory.inc:125-128), with Ot6ActionEnd as the
+  -- no-numeral backstop.  The 40-frame settle this used to take stopped short
+  -- of that, so the class-reveal assertion below read a mask the game had not
+  -- written yet.  Fixed settle, not a wait-until: a waitUntil on the bit would
+  -- make the assertion agree with itself.
+  H.waitFrames(300),
 
   H.call(function()
     H.assertEq((classWrites[0x02] or 0) >= 1, true,
       "a PIERCING skill load resolved (nobody fights: only TekMissile)")
     H.assertEq(headShields(), 3, "head shields chipped 4 -> 3")
     H.assertEq(headCRev() & 0x02, 0x02, "piercing revealed on the head")
-    H.assertEq(sram(0x316190 + 0x134) & 0x02, 0x02,
-      "class codex learned piercing for species $134")
+    -- the attribution, asserted rather than assumed: nothing but the missile
+    -- touched the head, so its element axis is still undisclosed.  A beam
+    -- landing on the fire-weak head would have turned this over, and the
+    -- 4 -> 3 above would not have been the missile's.
+    H.assertEq(headElemRev(), 0,
+      "no beam ever landed on the head -- its element axis is still hidden, "
+      .. "so the chip above is the TekMissile's")
+    -- and it lived through the fight on its own 1600, with no HP written
+    H.assertEq(headHp() > 0, true,
+      "the head survived on its authored HP -- no pin, no re-heal")
+    H.log(string.format("save slot $021f=%d -> codex page $%04x",
+      H.readByte(0x021f), codexPage()))
+    H.assertEq(codexClass(0x134) & 0x02, 0x02,
+      "class codex learned piercing for species $134 on the active page")
     H.log(string.format("head shields=%d crev=%02x", headShields(), headCRev()))
     H.screenshot("whelkbal_tek_chip")
   end),
