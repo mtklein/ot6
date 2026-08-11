@@ -338,9 +338,13 @@ Principles, stated so they can be reviewed:
 | **Pummel** | **×2** bludgeoning | The owner's proposal, and it fits P1: 4 MP at level 1, the earliest multi-hit in the game and his signature. Two chips per action against the 31 authored 2-shield species means Sabin breaks trash without help, which matches the Bio Blaster sighting. Power 110 → **55** per hit (P4, straight halving). |
 | **Suplex** | **×1** | The owner's proposal, and P3: this is the single-hit committer. 180 power is the highest in the Blitz list and it should stay one number. |
 | **Bum Rush** | **×4** bludgeoning, not ×8 | ×8 breaks every authored gauge but one in a single action (shield census: 31 species at 2, 10 at 3, 4 at 4, 5 at 5, 8 at 6, 5 at 7, one at 8, one at 11), which fails both P5 and P1, because the ultimate would become the opener. ×4 empties trash and the low bosses outright and is still a capstone moment, while bosses with 5 or more shields need Sabin's own Pummel or a partner to finish. See §8 for the ×8 ledger entry. Power 128 → **32** per hit (P4). This is the one row where P4 bites hard: 99 MP already buys the worst damage-per-MP in the Blitz list, and dividing it makes an expensive capstone weaker still against defended targets. It is applied anyway, because leaving it at 128 across four hits would make the ultimate both the best opener and the best nuke. The price, not the count, is the thing to revisit; see §9. |
-| AuraBolt / Fire Dance / Air Blade | ×1 | Element probes, and Fire Dance/Air Blade are already breadth. Adding rate on top would make Sabin the answer to every fight. |
+| AuraBolt / Fire Dance / Air Blade | ×1 | Element probes, and Fire Dance/Air Blade are already breadth. Adding rate on top would make Sabin the answer to every fight, and P2 allows him one rate ability, which Pummel is. |
+| Mantra / Spiraler | ×1, and the question does not arise | Neither strikes an enemy. Mantra heals the party and Spiraler is a sacrifice; a hit count on either has nothing to chip. |
 
 Identity: the cheapest chips in the game, on one axis (two if he wears claws).
+His three bludgeoning Blitzes are one of each shape — Pummel is the rate probe,
+Suplex the single-hit committer, Bum Rush the capstone — so the class stays
+constant while the job changes, which is P3 applied inside one axis.
 
 ### 4.2 Edgar — the machinist, three curves in one kit
 
@@ -358,17 +362,34 @@ Identity: the only character who fields all three cost curves, breadth
 
 ### 4.3 Cyan — the burst prober, unchanged
 
-Quadra Slam ×4 and Quadra Slice ×4 already ship and already satisfy the
-owner's "×4" instruction. No data moves for Cyan. Two things are worth
-recording rather than changing:
+No data moves for Cyan. Vanilla already gave him the counts this pass would
+have chosen, and the SwdTech ladder reads correctly as a whole: two burst
+probes at the tiers where a shield is worth opening, and single big numbers
+everywhere else. Stated per tech, so the ladder can be argued with rather than
+assumed:
 
-- Both are `AttackerEffect_32`, which sets the random target flag
-  (`tsb $ba, #$40`, `battle_main.asm:10797-10798`). Against a boss all four hits
-  land on the boss; against a four-stack they scatter. Quadra Slam is
-  therefore strong against a single boss gauge and unreliable against groups,
-  which is the opposite of AutoCrossbow. That behaviour is unintended in
-  vanilla but should be kept.
-- Empowerer ×2 at quarter power is a drain rather than a probe. Leave it.
+| tech | count | reason |
+|---|---|---|
+| Dispatch `$55` | ×1 | The cheapest row of any kit at 4 MP. Its job is one reliable slash chip a turn, which is what a tier-1 signature should be. Rate here would make the rest of the ladder pointless. |
+| Retort `$56` | ×1 | A counter stance rather than an action. Hit count belongs to what it counters with, and multiplying a counter's hits would pay Cyan for being attacked. |
+| Slash `$57` | ×1 | Power 8; it is a status verb wearing a damage record. Nothing to divide. |
+| **Quadra Slam** `$58` | **×4** | Vanilla's, and the owner's "×4" instruction. 16 MP for four slash chips into one body is the best rate-per-MP in the game after Pummel, and it arrives at LV15, which is where a party first meets 4-and-5-shield bosses. |
+| Empowerer `$59` | ×2 | Vanilla's, at quarter power, and it is a drain. Left as it is: the two hits are a consequence of the drain effect rather than a probing choice, and repricing a drain belongs to the MP economy. |
+| Stunner `$5a` | ×1 | Already breadth: one slash chip on every body. P3 says breadth and rate should be different abilities, and Quadra Slam is the rate one. |
+| **Quadra Slice** `$5b` | **×4** | Vanilla's. The late-ladder repeat of Quadra Slam at 50 MP, which prices it as burst rather than as a probe: 12.5 MP per chip against Quadra Slam's 4.0. |
+| Cleave `$5c` | ×1 | It refuses a target that is not already Broken, so it never chips at all. It is the rule P1 is named after. |
+
+Two behaviours are worth recording rather than changing:
+
+- Quadra Slam and Quadra Slice are `AttackerEffect_32`, which sets the random
+  target flag (`tsb $ba, #$40`, `battle_main.asm:10797-10798`). Against a boss
+  all four hits land on the boss; against a four-stack they scatter. Quadra
+  Slam is therefore strong against a single boss gauge and unreliable against
+  groups, which is the opposite of AutoCrossbow. That behaviour is unintended
+  in vanilla but should be kept.
+- Neither Quadra gets a power split, because vanilla already priced them as
+  four-hit records: 72 and 70 against Dispatch's 120 and Stunner's 97. P4 is
+  satisfied without moving a byte.
 
 Identity: four chips into one gauge, on a slash axis, at burst prices.
 

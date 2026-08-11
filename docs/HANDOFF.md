@@ -148,7 +148,7 @@ everything, and keep to one heavy run at a time per machine.
   byte out of `magic_prop_en.dat` or `item_prop_en.dat` gives the vanilla
   number rather than the shipped one.
 - **SwdTech has a 1-BP floor**; there is no 0-BP tier. `Ot6BushidoTech`
-  (`ff6/src/battle/ot6_kits.asm:74-79`) clamps a stray 0 up, and boost 1/2/3
+  (`ff6/src/battle/ot6_bushido.asm:92-94`) clamps a stray 0 up, and boost 1/2/3
   selects Cyan's *top three learned* techs, so a given tier's price slides as
   he learns more.
 - **A poison DOT tick chips a shield; Sap does not.** A tick is an ordinary
