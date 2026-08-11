@@ -454,16 +454,29 @@ H.run({ maxFrames = 60000 }, {
     --   the frame issue #67 records for every failing build.  So the
     --   mechanism here is the same one, caught by the right assertion now.
     --
-    -- What no longer reproduces, which matters for whoever reads #67 next:
-    --   five bare NOPs in the $C2 action path (immediately before
-    --   `jsr CheckRetal` in _dispatcher, battle_main.asm:3146), which was
-    --   #67's main control, came back 1635 and passed, with every frame number
-    --   in the run byte-identical to the unmodified build.  That control was
-    --   real when it was taken (8d8a570), but it does not reproduce on v0.9.
-    --   It agrees with the correction comment on #67: the ~49
-    --   bytes v0.9 added at per-action sites were free too.  Per-action
-    --   cycles are no longer near the cliff; per-battle-frame cycles still
-    --   are, which is the rule this canary now states outright.
+    -- The $C2 action path is near the cliff too, measured 2026-08-11 while
+    -- landing issue #66, and this corrects what stood here before.  This
+    -- comment used to say that five bare NOPs in the $C2 action path came
+    -- back 1635 and that per-action cycles were no longer near the cliff.
+    -- They are.  Nine bare NOPs at ExecAction's pre-dispatch check
+    -- (battle_main.asm:274, the `lsr` of the byte just stored) give 1798,
+    -- carrying no behaviour at all.  So the margin on that path is under 18
+    -- cycles, and the earlier five-NOP result was taken at a different site,
+    -- immediately before `jsr CheckRetal` in _dispatcher.
+    --
+    -- It is cycles, not bytes, and that is controlled rather than assumed.
+    -- Nine unreachable bytes placed just before ExecAction's label give 1635
+    -- and pass.  Both builds grow battle_code by the same nine bytes to
+    -- $652c, so bank $C2's size and the code motion of everything after the
+    -- insertion point are both ruled out.  This also settles HANDOFF trap
+    -- 2's UNVERIFIED hypothesis that only per-battle-frame code moves this
+    -- number: per-action code moves it too.
+    --
+    -- What that means for a reader whose build lands here: the fix is to
+    -- spend fewer cycles on the executed action path, not to find a smaller
+    -- encoding.  Issue #66 shipped one gate site instead of two for exactly
+    -- this reason, and moved the surviving one below a test that makes it
+    -- run rarely.
     H.vars.coversSpan = H.frame - H.vars.coversF0
     H.log(string.format("frame-budget canary: the covers phase took %d frames "
       .. "(intact 1635, missed-vblank cliff 1798, threshold 1715)",
@@ -474,12 +487,14 @@ H.run({ maxFrames = 60000 }, {
       .. "missed vblank per battle-loop iteration (ot6_memory.inc:206-230), "
       .. "so cycles were added to a path that runs once per battle frame. "
       .. "This is NOT a True Knight failure -- nothing about covers, banks or "
-      .. "pips has changed.  Look at what your change costs ONCE PER BATTLE "
-      .. "FRAME (WaitFrame -> UpdateCharText -> Ot6BgHud_ext, "
-      .. "btlgfx_main.asm:432-445), not at this test.  Per-action and "
-      .. "per-menu-redraw cost does not move this number; measured on v0.9, "
-      .. "80 NOPs in the per-frame path do and 5 NOPs in the $C2 action path "
-      .. "do not (issue #67).",
+      .. "pips has changed.  Look at what your change costs per battle "
+      .. "frame (WaitFrame -> UpdateCharText -> Ot6BgHud_ext, "
+      .. "btlgfx_main.asm:432-445) AND on the executed $C2 action path "
+      .. "(ExecAction, ExecCmd, CheckRetal), not at this test.  Both are "
+      .. "near the cliff: 80 bare NOPs in the per-frame path move this "
+      .. "number and so do 9 bare NOPs at ExecAction's pre-dispatch check, "
+      .. "while 9 unreachable bytes at the same segment size do not.  It is "
+      .. "cycles on code that runs, not bytes (issues #66, #67).",
       H.vars.coversSpan))
   end),
 
