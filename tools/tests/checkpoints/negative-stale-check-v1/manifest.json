@@ -2,9 +2,9 @@
   "schema": "ot6.sram-checkpoint/v1",
   "payload": "post-opera.sram",
   "size": 32768,
-  "sha256": "bcd8202967b8b754adccf6adc413a3407dbb9cbc9b8a8af05af089be13b13b19",
+  "sha256": "b4a5cd0795b933719364b2d9b669306b17a589a89e1f0535e916e195ae3b5fc7",
   "slot": 3,
   "milestone": "negative-stale-check",
-  "provenance": "DELIBERATELY STALE fixture for `make checkpoint-negatives` (#25): copy of post-opera-v1 with the slot-3 element-codex witness (SRAM 0x293D, SNES $31693D, ULTROS2) flipped 0x01 -> 0x00 and the sha256 recomputed, so it re-validates and cold-boots.  Models an anchor whose semantic content drifted from its contract; the post-opera-v1 ENTRY contract must fail naming this exact field.  NOT produced by the game's save routine -- that is the point; no generate rule may ever name it.",
+  "provenance": "Deliberately wrong fixture for `make checkpoint-negatives` (#25). A copy of post-opera-v1's payload with one byte changed: the slot-3 element-codex row (SRAM 0x293D, SNES $31693D, ULTROS2) flipped 0x00 -> 0x01, with the sha256 recomputed so it re-validates and cold-boots. It models a checkpoint whose content drifted from its contract, and post-opera-v1's entry contract must fail naming that one field. It is not produced by the game's save routine, which is the point; no generate rule may name it. Rebuilt 2026-08-11 from the re-cut post-opera-v1: the previous copy predated e65af20, differed from it in 98 bytes, and perturbed a row the re-cut contract no longer expected, so the negative fired on the class-codex row while the script grepped for the element-codex one.",
   "persistent_layout": "ot6-codex-o8-v1"
 }

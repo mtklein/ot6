@@ -76,9 +76,9 @@ then
 fi
 grep -q "CONTRACT DIFF \[post-opera-v1\]" "$LOG" ||
   fail "no per-field CONTRACT DIFF line in $LOG"
-grep -q "element-codex witness" "$LOG" ||
+grep -q "element-codex row" "$LOG" ||
   fail "the diff does not name the perturbed field ($LOG)"
-grep -q "expected 0x01, read 0x00" "$LOG" ||
+grep -q "expected 0x00, read 0x01" "$LOG" ||
   fail "the diff does not carry expected-vs-read values ($LOG)"
 grep -q "contract post-opera-v1 (entry) VIOLATED" "$LOG" ||
   fail "the [ot6] FAIL verdict does not name the violated contract ($LOG)"
