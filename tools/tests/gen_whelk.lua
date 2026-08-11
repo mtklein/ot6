@@ -6,11 +6,24 @@
 -- dialogs $0B6E ("We won't hand over the Esper!!") / $0B6F ("Whelk! Get
 -- them!"), both tapped through on edges, and starts the Whelk battle
 -- (formation $01B0; species words 0x0100/0x0134 land in $57C0).  Random
--- encounters en route are cleared with the battle-clear-write idiom; the goal
--- formation is spared by guard.  Emits whelk_entry.mss and the whelk_battle
+-- encounters en route are fought by edge-tapped A; the goal formation is
+-- spared by guard.  Emits whelk_entry.mss and the whelk_battle
 -- screenshot.  Deterministic by construction (the harness pins AllZeros
 -- power-on RAM, no frame skipping, and a pre-launch srm wipe): PASS at
 -- frame 2813 with byte-identical artifacts every run, ~8.5 s wall.
+--
+-- Issue #75, playBattles: the walk passes playBattles = true, which keeps it
+-- out of the library's monster-dead flag write.  Map 41, the Narshe mines,
+-- really does draw encounters -- map_prop.dat byte +5 bit 7 is set, and the
+-- pool is group 57: three Were-Rats, or a Were-Rat and a Repo Man -- so this
+-- is not a no-op.  "true" rather than "tactical" or "flee" because the party
+-- here is the Magitek trio, whose command rows carry no Fight: the tactical
+-- driver's fallback for an actor with no Fight row is to press X and pass
+-- the turn (lib/ot6.lua "kind = switch"), so with no actor able to act the
+-- battle would never end.  Blind A-taps do end it, because a Magitek beam
+-- kills a Were-Rat outright.  gen_whelk_poweron, the maintained sibling that
+-- reaches the same tile on the same map with the same party, already passes
+-- playBattles = true at all three of its navigator calls for this reason.
 local H = dofile("tools/tests/lib/ot6.lua")
 local SRM = "build/states/playthrough_srm.mss.lua"
 
@@ -51,7 +64,8 @@ H.run({ maxFrames = 9000 }, {
   end),
 
   -- walk to the entry-point tile (42,6), one short of the trigger
-  H.navTo(42, 6, { arrive = whelk, maxFrames = 6000, spare = SPARE }),
+  H.navTo(42, 6, { arrive = whelk, maxFrames = 6000, spare = SPARE,
+                   playBattles = true }),
 
   H.cond(function() return whelk() end, {
     -- BFS from the south never crosses (42,5), so this branch is not

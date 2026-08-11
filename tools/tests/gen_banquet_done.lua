@@ -457,6 +457,12 @@ local function circuitRunner()
         cur = H.navTo(c[1], c[2], {
           maxFrames = 3000,
           noPathRetries = 3,
+          -- issue #75: the same spelling the rest of this file uses, so no
+          -- step here reaches the library's monster-dead flag write.  It is
+          -- intent only inside the castle: maps 243/250/251/253 all have
+          -- random encounters disabled (map_prop.dat byte +5 bit 7 clear;
+          -- ff6/src/field/battle.asm:333-347 returns before the roll).
+          playBattles = "flee",
           avoid = (map() == 250 and anyLeftOutside243()) and DOOR243 or nil,
           arrive = function()
             return map() ~= fromMap
@@ -642,7 +648,7 @@ local steps = {
 
   -- leave the throne tower (the (53,35) long entrance to the corridor),
   -- then run the talk-only greedy circuit until the timer kills it
-  H.navTo(53, 34, { maxFrames = 9000 }),
+  H.navTo(53, 34, { maxFrames = 9000, playBattles = "flee" }),
   (function() local ph = 0
     return H.driveUntil(function() return H.fieldX() < 40 end, 1200, {
       H.call(function()
@@ -802,7 +808,7 @@ local steps = {
   end),
   -- back to the table: wish +5, accompany +3, measured from a fresh
   -- capture so recall's uncertainty does not propagate into these asserts
-  H.navTo(80, 20, { maxFrames = 9000, calmFrames = 4 }),
+  H.navTo(80, 20, { maxFrames = 9000, calmFrames = 4, playBattles = "flee" }),
   H.waitUntil(function() return H.readByte(0x056f) >= 2 end, 1200,
     "'Shall we begin again?'", 5),
   H.call(function() dinner.preWish = var0() end),
