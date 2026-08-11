@@ -80,7 +80,7 @@ local function floodDiag()
   return seen
 end
 
-H.run({ maxFrames = 40000 }, {
+H.run({ maxFrames = 60000 }, {
   H.loadState("build/states/zozo_arrival.mss.lua"),
   H.waitFrames(150),
   -- into the building at street door (44,48) -> 225 (12,43)

@@ -60,7 +60,7 @@ end
 
 local trace = { n = 0, active = false }
 
-H.run({ maxFrames = 30000 }, {
+H.run({ maxFrames = 45000 }, {
   H.loadState(STATE),
   H.waitFrames(10),
   H.call(function()

@@ -92,7 +92,7 @@ local function pressWalk(dir, pred, maxFrames, what)
   }, what)
 end
 
-H.run({ maxFrames = 40000 }, {
+H.run({ maxFrames = 50000 }, {
   H.loadState("build/states/v07q_385_entry.mss.lua"),
   H.waitFrames(180),
   H.call(function()

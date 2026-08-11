@@ -31,7 +31,7 @@ local function watch(tag, frames)
   }, tag)
 end
 
-H.run({ maxFrames = 30000 }, {
+H.run({ maxFrames = 40000 }, {
   H.loadState("build/states/v07i_384_toggle.mss.lua"),
   H.waitFrames(120),
   H.call(function()

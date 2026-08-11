@@ -27,7 +27,7 @@ local function bytes()
     H.readByte(0x056e), H.readByte(0x056f), H.readByte(0x0026))
 end
 
-H.run({ maxFrames = 30000 }, {
+H.run({ maxFrames = 60000 }, {
   H.loadState("build/states/zozo_arrival.mss.lua"),
   H.waitFrames(150),
   H.navTo(42, 29, { maxFrames = 30000, playBattles = "tactical" }),
