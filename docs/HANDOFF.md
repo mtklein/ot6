@@ -60,14 +60,26 @@ like a bug in those tests. Keep work there inline at the call site; a `jsr`
 into a proc that early-outs is already too expensive.
 
 12 NOPs being safe at that site does not make 12 NOPs safe anywhere else: the
-same bare-NOP control in bank `$C2`'s **action** path fails at **five** NOPs,
-so that path's margin is under 10 cycles. Growth in `$C2` by itself is not
-the trigger: four `$C2` call sites were added (`battle_main.asm:514`, `:3409`,
-`:4152`, `:14652`, plus `Ot6RecheckMagic` at `:14715`) with no degradation at
-all. **Hypothesis, UNVERIFIED:** the cost comes from per-battle-*frame* code
-rather than per-action or per-menu-redraw code. Nobody has run the NOP control
-at those four sites, and that is the experiment that would settle it. The full
-record is the block comment over `OT6_BRKLIVE` in
+same bare-NOP control in bank `$C2`'s **action** path fails at **nine** NOPs,
+so that path's margin is under 18 cycles. The canary is
+`battle_trueknight` phase 4b, whose covers span reads 1635 intact and 1798
+over.
+
+**It is cycles on code that runs, not bytes.** Settled 2026-08-11 landing
+issue #66, with the control that had been missing: nine *unreachable* bytes
+placed just before `ExecAction`'s label give 1635 and pass, while nine bare
+NOPs at `ExecAction`'s pre-dispatch check (`battle_main.asm:274`) give 1798
+and fail. Both builds grow `battle_code` by the same nine bytes, to `$652c`,
+so bank `$C2`'s size and the code motion of everything after the insertion
+point are both ruled out. That also disposes of the old hypothesis here that
+only per-battle-*frame* code moves this number; per-action code moves it too,
+and the four `$C2` call sites that were added for free
+(`battle_main.asm:514`, `:3409`, `:4152`, `:14652`, plus `Ot6RecheckMagic` at
+`:14715`) were free for some other reason. The practical rule: a change that
+lands here needs to spend fewer cycles on the executed path, not to find a
+smaller encoding. Issue #66 shipped one gate site instead of two on that
+basis, and moved the surviving one below a test that makes it run rarely. The
+`Ot6BgHud_ext` record is the block comment over `OT6_BRKLIVE` in
 `ff6/src/battle/ot6_memory.inc`. (This is distinct from the vblank-TRANSFER
 budget, which is about VRAM words, not cycles.)
 

@@ -134,7 +134,7 @@ branches.
 3. **Nerapa's timers (Beat F).** Nerapa casts `Condemned` on the whole party
    before the first input, with no telegraph, and the FC escape clock is running
    as well. The driver must win before the countdown ends. The full Nerapa
-   script is on the M6 audit list, open question #7; decode it before authoring.
+   script is on the M6 audit list, open question #6 in `bosses-wob.md`; decode it before authoring.
 
 ### Scenario / party constraints (issue #6 principle)
 Every enemy must be breakable **by the party that can face it**: fixed
@@ -158,7 +158,7 @@ and its parts already have a shield+class row (`Ot6ShieldTbl`,
 `ff6/src/battle/ot6_hud.asm:1676–2155`). The class rows make every boss
 class-breakable now; the data is unused until fixtures exist to measure it.
 
-### Telegraph / vanilla-script work (open question #7, M6 data entry)
+### Telegraph / vanilla-script work (bosses-wob.md open question #6, M6 data entry)
 The "one telegraph per boss, break-cancels-the-fuse" contract needs the vanilla
 scripts decoded for several fights. This is work that has to be done:
 - The Cranes do not use a contract fuse. Their charge is element-driven

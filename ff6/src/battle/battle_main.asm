@@ -12817,6 +12817,21 @@ CheckRetal:
         lda     $b8
         ora     $b9
         beq     @4cbe       ; branch if there are no retaliation targets
+        jsl     Ot6MayAct   ; ot6: a Broken monster does not counter; Broken
+        bcc     @4cbe       ;   have no turns.  Two things about where this
+                            ;   sits.  It is below the $3a56 died-branch
+                            ;   above, because `if_self_dead` scripts reach
+                            ;   CheckRetal by that same path and a break's x2
+                            ;   makes dying while broken the common case, so
+                            ;   gating at the top of CheckRetal strands Ifrit
+                            ;   and Shiva's end_battle (ai_script.asm:4595-
+                            ;   4606) and soft-locks the fight.  It is also
+                            ;   below the retaliation-target test, so it runs
+                            ;   only when a counter is really about to be
+                            ;   queued rather than once per target: this is
+                            ;   the $C2 action path and it has under 18
+                            ;   cycles of slack (battle_trueknight phase 4b).
+                            ;   Both guarded by battle_brokendeath.lua.
 @4c9d:  lda     $3269,x     ; pointer to ai counterattack script
         bmi     @4cb1
         lda     $32cd,x     ; counter queue pointer

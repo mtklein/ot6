@@ -31,10 +31,12 @@ Stated once, assumed by every block:
   combat, not scripted story events. (Kefka's camp flees used to head
   this list. They have no state to override, because they have no
   monster and no gauge; see 6.)
-- **Proposed ruling: counters are disabled while Broken.** A Broken
-  enemy loses its counters along with its turns, so Whelk's shell does
-  not counter during the window. This matches Octopath; it is a driver
-  decision, open question 1.
+- **Counters are disabled while Broken.** A Broken enemy loses its
+  counters along with its turns, so Whelk's shell does not counter
+  during the window. This matches Octopath. Owner decision on issue
+  #66, shipping in v0.10: `Ot6MayAct` (`ot6_break.asm:1666`) asks the
+  same question at turn time that `Ot6Gate` asks at queue time, at
+  `battle_main.asm:274` and inside `CheckRetal` at `:12761`.
 - **A nameplate with no shields is itself information.** Scripted
   set-pieces (Tritoch, Guardian, the Imperial Camp Kefka) draw no
   gauge at all, which tells the player the fight is scripted.
@@ -618,26 +620,28 @@ Party: Locke, Celes + two.
 - This is vanilla's tag fight: they swap in and out. Each keeps its
   own gauge across swaps, and a swapped-out sibling's break timer
   keeps running; it is not frozen behind the `$3aa0.0` presence gate.
-- **"Breaking pins them on stage" is an intent, not the fight as it
-  stands.** Nothing implements a tag lock. The effect would have to
-  come from `Ot6Gate` (`ot6_break.asm:1655`, consulted at
-  `battle_main.asm:1419`) refusing to queue a broken monster's turn,
-  and the swap is one of the turns that passes that gate. The tag is
-  the first branch of Ifrit's own main AI script
-  (`if_battle_var_greater 3, 5 / kill_monsters_wait MONSTER_1 /
-  show_monsters MONSTER_2`, `ff6/src/battle/ai_script.asm:4566-4571`),
-  so it needs a main-script turn, and main-script turns run while
-  Broken: 103 executions with the broken timer up in one battle-70
-  run, including 7 casts of Fire from `attack BATTLE, FIRE, FIRE`
-  (`ai_script.asm:4577`) in the same script the tag branch heads. The
-  counter the tag reads is also advanced by `add_battle_var 3, 1` in
-  the `if_hit` retaliation block (`ai_script.asm:4613`), 50 of those
-  103, so chipping a Broken sibling still advances its swap timer.
-  **UNVERIFIED:** nobody has watched a Broken sibling complete a
-  tag-out; what is observed is that the script containing the swap
-  runs while Broken. `Ot6MayAct` (preserved on `wt/ifritbreak`, commit
-  `945b9ed`) drops 103 → 2 and would make the pinning true, but it
-  cannot land while `battle_trueknight` 6a stands.
+- **A Broken sibling takes no turns; whether that pins it on stage is
+  still open.** Two gates now stand. `Ot6Gate` (`ot6_break.asm:1654`,
+  consulted at `battle_main.asm:1421`) refuses to queue a broken
+  monster's turn, and `Ot6MayAct` (`ot6_break.asm:1666`) refuses one
+  that was queued before the break landed, at `battle_main.asm:274`
+  and `:12761`. Measured on battle 70 through real play in
+  `battle_brokendeath.lua`, one run each on the same fixture and the
+  same driver: 11 commands dispatched by a Broken Ifrit before the
+  second gate landed, 3 of them casts of Fire from his `if_hit`
+  retaliation block (`ai_script.asm:4613-4616`), and 0 after. Turns
+  beginning with the timer up fell from 21 to 1 over the same window.
+- The tag is the one thing this does not settle. It is the first
+  branch of Ifrit's main AI script (`if_battle_var_greater 3, 5 /
+  kill_monsters_wait MONSTER_1 / show_monsters MONSTER_2`,
+  `ff6/src/battle/ai_script.asm:4573-4577`), and `ExecAction` runs the
+  AI script (`battle_main.asm:238`) before it reaches the gate
+  (`:274`), so a turn queued before the break still runs the script
+  and lands its side effects; only the command dispatch is refused.
+  One such turn was measured in the run after the fix. Closing it
+  needs the queue entry purged at break time (`QuetzEffect`'s walk,
+  `battle_main.asm:1814-1822`). **UNVERIFIED:** nobody has watched a
+  Broken sibling complete a tag-out, before or after the fix.
 
 - **Telegraph:** Ifrit inhales and the air shimmers → **Fire 2**;
   Shiva does the same with **Ice 2**. Whichever one is on the field
@@ -909,24 +913,20 @@ damage sign — and dropped vanilla's ice and bolt, against the
 
 ## Open questions for the driver
 
-1. **Broken counters:** the proposal is that counters are disabled
-   during Break, so Whelk's shell does not counter during the window.
-   That matches Octopath, but it weakens the shell's lesson. Keep it,
-   or let counters fire during Break?
-2. **Ifrit/Shiva pinning:** a Broken sibling cannot tag out (Stop
+1. **Ifrit/Shiva pinning:** a Broken sibling cannot tag out (Stop
    rules). Confirm this, or should a break force the swap instead and
    hand the window to the sibling?
-3. **024's element row:** WallChange re-hides the element row
+2. **024's element row:** WallChange re-hides the element row
    mid-fight. Keep that or not? (Classes stay revealed either way.)
-4. **Atma's added row:** fire/ice/bolt + slash/pierce is broad by
+3. **Atma's added row:** fire/ice/bolt + slash/pierce is broad by
    design, because the party is a free pick. Narrowing it risks a
    lineup that cannot chip the fight at all.
-5. **Chupon:** keep the 4-shield gauge, or draw him shieldless like
+4. **Chupon:** keep the 4-shield gauge, or draw him shieldless like
    Tritoch, given that Sneeze ends the fight regardless?
-6. **Part-break feeding:** should breaking a limb chip the body 1
+5. **Part-break feeding:** should breaking a limb chip the body 1
    (128, Cranes, AirForce)? v1 says no: parts pay in cancels, not in
    chip.
-7. **Vanilla-script audit** (M6 data entry): TunnelArmor's quake =
+6. **Vanilla-script audit** (M6 data entry): TunnelArmor's quake =
    Magnitude8; Number 128's sweep = Gale Cut; Crane left/right
    element sides; Nerapa's full script; Telstar's reinforcement call;
    Guardian's WoB location. The poison bits on
