@@ -407,9 +407,17 @@ end
 -- Car B (map 145, $017E=1) carries NPC_14 = object 29, visibility switch
 -- $0567 (set by the departure scene): "Howdy, folks.  I have some great,
 -- value-priced items!" -- _cbad44, dlg $02D0, choice 0 = shop_menu 85.
--- Stock (menu/shop_prop.dat record 85): TONIC, POTION, ANTIDOTE, GREEN
--- CHERRY, FENIX DOWN, SLEEPING BAG, $41.  There is no Tincture, so SABIN's
--- MP pool is the whole break budget, which is the arithmetic #74 describes.
+-- Stock (shop record 85, rows 0-7): TONIC, POTION, ANTIDOTE, GREEN CHERRY,
+-- FENIX DOWN, SLEEPING BAG, SHURIKEN $41, FIRE SKEAN $ab.  There is no
+-- Tincture, so SABIN's MP pool is the whole break budget, which is the
+-- arithmetic #74 describes.  Row 7 is OT6's: vanilla left the slot empty and
+-- issue #74 filled it with the skean so SHADOW has an in-scenario chip
+-- (ff6/src/menu/shop.asm carries the splice and the reasoning).  Rows 0-6 are
+-- unmoved, so the row indices the buys below use are unaffected.  This drive
+-- does not buy the skean: the purse is a hard budget (see the buy list) and
+-- spending it on chips instead of Potions is a balance question for a run
+-- that is trying to complete the break, not for this fixture, whose job is to
+-- deliver a party to the falls.
 --
 -- One hazard, decoded before driving: car B's other ghosts at {6,8}/{23,6}
 -- (objects 22/23, _cbaadd/_cbaae8) open "Bring it along?", where option 0

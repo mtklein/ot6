@@ -210,6 +210,113 @@ check(rb(MPROP + 0x0117 * MREC + OFF_WEAK) == 0x00,
   "monster_prop base sane: $117 AtmaWeapon vanilla weak is $00 (the whole "
   .. "point of its added row)")
 
+-- ---------------------------------------------------------------- issue #74
+-- A break key the player cannot buy is not a key.  bosses-wob.md §8 budgets
+-- Shadow into the Phantom Train as the second chipper, throwing elemental
+-- skeans, but the scenario sold him none, so the fight delivered one chip per
+-- round through Sabin alone and the break never completed.  The fix is a slot
+-- in the ghost merchant's stock (shop 85, spliced in ff6/src/menu/shop.asm);
+-- this asserts the property that fix exists for, rather than the byte.
+--
+-- Derived end to end from ROM data, so a restock that keeps the property
+-- passes and one that loses it fails:
+--   shop 85's stock -> each stocked id's thrown attack (ThrowToolsItemTbl /
+--   ThrowToolsOffsetTbl) -> that attack's element (MagicProp +$01) -> does it
+--   intersect GhostTrain's weakness (monster_prop +25, OR any Ot6ElemAddTbl
+--   row)?
+--
+-- The Shurikens the merchant already sold are not a key and never were: item
+-- $41 is OT6_PIERCE (ot6_class.asm:120), the shield row is OT6_BLUDG, and a
+-- Shuriken throw has no element, so it is damage without a chip.  That is the
+-- shape of the hole, and it is why "the merchant already sells something
+-- throwable" was not enough.
+--
+-- ShopProp is `.incbin shop_prop.dat` spliced at shop.asm; link map:
+-- shop_prop C47AC0..C47F3F, so PRG offset = $C47AC0 - $C00000 = $047AC0.
+-- 128 records of 9 bytes: byte 0 = type (bits 0-2) and price adjustment
+-- (bits 3-5), bytes 1-8 = eight item ids, $FF empty.  magic_prop C46AC0 ->
+-- $046AC0, 14-byte records, +$01 element.
+local SHOPPROP, SHOPREC = 0x047AC0, 9
+local MAGICPROP, MAGICREC = 0x046AC0, 14
+local GHOST_MERCHANT = 85               -- car B, `shop_menu 85` (_cbad44)
+local GHOSTTRAIN = 0x0106
+
+-- The throw mapping, located by its own bytes rather than by a hardcoded
+-- address: ThrowToolsItemTbl and ThrowToolsOffsetTbl are adjacent five-byte
+-- tables (battle_main.asm:6648-6655) and their concatenation is a distinctive
+-- ten-byte run inside bank $C2.  InitTarget_03 (:6564-6569) matches the item
+-- id and subtracts the paired offset, and the `cmp` that matched set carry,
+-- so the `sbc` is a plain subtraction.
+local throwBase = find({ 0xa4, 0xa5, 0xab, 0xac, 0xad,
+                         0x27, 0x27, 0x5a, 0x5a, 0x5a }, 0x020000, 0x030000)
+check(throwBase ~= nil, "ThrowToolsItemTbl located in bank $C2")
+
+-- what element does throwing this item deliver?  nil if it is not a throw
+-- item (a Shuriken keeps its own attack and carries no element).
+local function throwElement(item)
+  if not throwBase then return nil end
+  for i = 0, 4 do
+    if rb(throwBase + i) == item then
+      local attack = (item - rb(throwBase + 5 + i)) & 0xff
+      return rb(MAGICPROP + attack * MAGICREC + 1), attack
+    end
+  end
+  return nil
+end
+
+do
+  local base = SHOPPROP + GHOST_MERCHANT * SHOPREC
+  -- guard the guard: if the record is not where this thinks it is, the loop
+  -- below reads arbitrary bytes and its verdict means nothing.  Type 3 is
+  -- Item (menu_text_en.inc:483-487) and vanilla's markup on this record is 0.
+  -- The neighbours are the splice's own controls: a wrong .incbin count would
+  -- shift every record past shop 85, and these two would move with it.
+  check(rb(base) == 0x03 and rb(base + 1) == 0xe8, string.format(
+    "shop %d reads Item-type / Tonic-first (byte 0 = $%02X, byte 1 = $%02X)",
+    GHOST_MERCHANT, rb(base), rb(base + 1)))
+  check(rb(base - SHOPREC) == 0x33 and rb(base - SHOPREC + 1) == 0xaa
+        and rb(base + SHOPREC) == 0x03 and rb(base + SHOPREC + 1) == 0xe9,
+    "the records either side of shop 85 are their untouched vanilla selves "
+    .. "-- the splice moved nothing")
+
+  local weak = rb(MPROP + GHOSTTRAIN * MREC + OFF_WEAK)
+  local add = E[GHOSTTRAIN] and E[GHOSTTRAIN][1] or 0
+  local chippable = weak | add
+  -- the premise, pinned: 6 shields behind bludgeoning, which is what makes
+  -- Sabin the only chipper in a party of Sabin, Cyan and Shadow.
+  local row = S[GHOSTTRAIN]
+  check(row ~= nil and row[1] == 6 and row[2] == BLUDG, string.format(
+    "GhostTrain $%04X row is 6 shields / OT6_BLUDG (got %s) -- the premise of "
+    .. "#74", GHOSTTRAIN,
+    row and string.format("%d/%02X", row[1], row[2]) or "MISSING"))
+  check(chippable ~= 0, string.format(
+    "GhostTrain has an element axis at all (weak $%02X | add $%02X)",
+    weak, add))
+
+  local keys, stocked = {}, 0
+  for slot = 1, 8 do
+    local item = rb(base + slot)
+    if item ~= 0xff then
+      stocked = stocked + 1
+      local elem, attack = throwElement(item)
+      if elem and (elem & chippable) ~= 0 then
+        keys[#keys + 1] = string.format("item $%02x -> attack $%02x elem $%02x",
+          item, attack, elem)
+      end
+    end
+  end
+  local line = string.format("breaktbl: ghost merchant stocks %d items; "
+    .. "GhostTrain chippable elements $%02X; keys: %s", stocked, chippable,
+    #keys > 0 and table.concat(keys, ", ") or "NONE")
+  emu.log(line)
+  print(line)                           -- see check()'s note on the channels
+  check(#keys > 0, string.format(
+    "the ghost merchant sells at least one throw item whose element chips "
+    .. "GhostTrain (chippable $%02X) -- issue #74: without one, Shadow has no "
+    .. "key inside his own scenario and the 6-shield break can only be worked "
+    .. "at Sabin's one chip per round", chippable))
+end
+
 if fails == 0 then
   emu.log("breaktbl: all v0.6 break-coverage rows present - PASS")
   emu.stop(0)

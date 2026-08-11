@@ -40,9 +40,12 @@ Price = `ItemProp[item*30 + $1c]`, 16-bit (`CalcShopPrice`,
 bytes for 256 items).
 
 Neither `ff6/src/menu/shop_prop.dat` nor `ff6/src/menu/item_prop_en.dat`
-has been touched by OT6: `git log` on both shows only `fba50e7 flatten:
-absorb ff6 disassembly into the main repo`.  The stock and prices below are
-vanilla.
+has been touched by OT6, and neither ever will be: a byte changed inside a
+fixed-record blob is invisible in a diff.  OT6's one change to the shop table
+is spliced over the `.incbin` in `ff6/src/menu/shop.asm`, named and argued
+there — the Phantom Train ghost merchant (record 85) gained a Fire Skean in
+his empty eighth slot for issue #74.  The South Figaro stock and prices below
+are untouched.
 
 ---
 

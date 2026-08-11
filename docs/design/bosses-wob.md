@@ -331,6 +331,20 @@ dropped vanilla's bolt bit and never mentioned the absorb at all.)
   **Cleave** unlocks (kits.md), and Cleave requires a Broken target,
   so the train is the first target it can be used on. Another
   character has to break it for him.
+- **Where Shadow's key comes from (issue #74).** That break story was
+  unbuyable for four releases: no shop in the scenario sold a skean, so
+  Shadow chipped nothing unless the player had bought one in South Figaro
+  before the party split, and the fight delivered one chip per round
+  through Sabin alone. The ghost merchant in the train's car B (shop
+  record 85) now sells **Fire Skean** in the slot vanilla left empty; the
+  splice and the reasoning are in `ff6/src/menu/shop.asm`, and
+  `battle_breaktbl.lua` asserts that his stock still contains a throw item
+  whose element chips this row. Fire and not bolt because fire also opens
+  Specter, the monster-in-a-box below, and one key for two bodies beats two
+  keys for one each. At 500 GP against a purse that reaches this shop with
+  about 7,500 GP and a list that already spends about 5,700, the break is
+  something the player buys with the scenario's last money rather than
+  something the shop hands over.
 - **Jank ✦: Suplex still works.** It is also mechanically consistent
   now: Suplex is bludgeoning and the train is bludgeon-weak. The
   undead flag stays as well, so one Fenix Down kills the train
