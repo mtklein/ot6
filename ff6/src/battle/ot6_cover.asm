@@ -99,6 +99,9 @@
         bcs     done            ; the bank cap holds; a cover never wraps
         inc
         sta     OT6_BP_CLASS,x
+        jsr     Ot6BankMoved    ; #77: the knight's bank rose behind
+                                ;   whatever window he has open, and the kit
+                                ;   window read its BP grey at open only
         lda     $3018,x
         ora     f:$7e0000+OT6_COVERPAID
         sta     f:$7e0000+OT6_COVERPAID  ; latch: paid this round

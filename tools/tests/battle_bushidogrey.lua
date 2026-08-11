@@ -39,10 +39,24 @@
 --      grey while Dispatch (boost 1) is white.  grey - white == $04.
 --   2. both clear: one real item turn banks bp 2, and Retort goes white, so
 --      the grey tracks the bank rather than being unconditional.
---   3. zero BP greys everything (#38): two Dispatches spend the bank to 0,
+--   3. the open window ACCEPTS A REPAINT REQUEST (#77).  Passes 1, 2, 4 and 5
+--      each open a window onto a bank that has stopped moving and read what
+--      the row decorator derived at open.  #77 is the other half: the rows
+--      are staged once, at open, and before the fix nothing re-staged them,
+--      so a bank that moved behind an open window was drawn stale until the
+--      window was closed and reopened.  The fix makes Ot6RestageGate_ext
+--      serve the kit window ($30) beside the magic list ($0e), and has every
+--      BP writer ask it for a repaint.  This pass drives a request through
+--      its real path -- an L/R press, which is Ot6Boost's own OT6_RESTAGE
+--      raise (#64) -- and watches the byte: before the fix the gate ignored a
+--      request while $30 was up, so it stood at $80 for the rest of the menu;
+--      after, the gate spends it within a few frames and leaves the window up
+--      with its rows still right.  See the pass for why the bank move itself
+--      is not what is driven here.
+--   4. zero BP greys everything (#38): two Dispatches spend the bank to 0,
 --      both rows grey, and the names are still drawn, greyed rather than
 --      absent.
---   4. MP grey: the bank is rebuilt (bp >= 2, isolating MP) while real
+--   5. MP grey: the bank is rebuilt (bp >= 2, isolating MP) while real
 --      Retorts walk the pool to 9, so Dispatch (4) is white and Retort (10)
 --      is grey, this time for the other reason.
 local H = dofile("tools/tests/lib/ot6.lua")
@@ -52,11 +66,13 @@ local MENU, ACTOR, MSTATE, CMDROW = 0x7BCA, 0x62CA, 0x7BC2, 0x890F
 local ST_CMD, ST_ITEM, ST_TOOLS, ST_TGT, ST_TRANS = 0x05, 0x0A, 0x30, 0x38, 0x01
 local CMD_SWDTECH, CMD_ITEM = 0x07, 0x01
 local KROW = 0x8967                       -- kit list cursor row (read!)
+local RESTAGE = 0x57D4                    -- #77: the gate's request byte (read!)
 local WHITE, GREY = 0x21, 0x25
 local TONIC, POTION = 0xE8, 0xE9
 local DISPATCH_MP, RETORT_MP = 4, 10
 
 local cyan, shadow
+local restageTrace = {}          -- #77: OT6_RESTAGE, sampled per frame
 local function bp() return H.readByte(0x3E9C + cyan*2) end
 local function pend() return H.readByte(0x3E9D + cyan*2) end
 local function mp() return H.readWord(0x3C08 + cyan*2) end
@@ -294,7 +310,93 @@ H.run({ maxFrames = 150000 }, {
     H.assertEq(attrOf(NM.Dispatch), WHITE, "Dispatch stays white")
   end),
 
-  -- 3. zero BP greys everything (#38) ---------------------------------------
+  -- 3. the open window accepts a repaint request (#77) ----------------------
+  -- Why the request and not a bank move.  The thing #77 describes is a bank
+  -- that moves while the window is up, and on this fixture that situation is
+  -- not reachable from the pad.  Measured here, driving Cyan into the window
+  -- and holding it: his own charge cannot land under his own window, because
+  -- the ATB restart and Ot6ActionEnd's charge are the same instruction
+  -- stream (battle_main.asm:296-303), so his menu cannot reopen until after
+  -- the bank has already moved -- observed as menu=0 across the whole
+  -- commit-to-charge interval.  The moves that CAN land under an open window
+  -- are the reactive ones (a True Knight cover, a Runic absorb, an ally's
+  -- Bestow), and no fixture puts one of those on a kit-bearing character
+  -- without staging it by hand, which this file does not do.
+  --
+  -- So this pass drives the repaint mechanism instead of one of its causes,
+  -- through the one cause that IS reachable from the pad: an L/R press.
+  -- Ot6Boost raises OT6_RESTAGE on that edge (#64) whatever window is open,
+  -- and the gate is the single place a request is spent, so what is asserted
+  -- below is exactly the half of the fix a bank move would exercise.  The
+  -- before-state is what makes it a test: on the unfixed ROM the gate only
+  -- ever looked at menu state $0e, so a request raised over the kit window
+  -- was never spent and the byte stood at $80.
+  H.call(function() cyanMode = "defer" end),
+  parkRead("submenu for the repaint request"),
+  H.call(function()
+    H.assertEq(H.readByte(MSTATE), ST_TOOLS, "the kit window is up and browsing")
+    H.assertEq(H.readByte(RESTAGE), 0,
+      "and no repaint is outstanding before the press")
+  end),
+  -- Sample the byte frame by frame across the press.  A single reading after
+  -- the fact cannot tell the two ROMs apart in the direction that matters:
+  -- the fixed gate spends a request in four frames (one row-pair staged per
+  -- frame, because the nmi drains one line transfer per frame), so by the
+  -- time a press step returns it is already back to 0, and 0 also means
+  -- "nothing was ever raised".  The values in between are the signal.  The
+  -- flag protocol is $80 fresh, then 3, 2, 1 as the cycle stages its lines,
+  -- then 0 (ot6_hud.asm, over Ot6RestageGate_ext).
+  H.call(function() restageTrace = {} end),
+  H.hold({ r = true }),
+  H.repeatN(20, {
+    H.call(function() restageTrace[#restageTrace + 1] = H.readByte(RESTAGE) end),
+    H.waitFrames(1),
+  }),
+  H.release(),
+  H.waitFrames(60),
+  H.call(function()
+    local seen, sawFresh, sawCycle = {}, false, false
+    for _, v in ipairs(restageTrace) do
+      seen[#seen + 1] = string.format("%02x", v)
+      if v == 0x80 then sawFresh = true end
+      if v >= 1 and v <= 3 then sawCycle = true end
+    end
+    local left = H.readByte(RESTAGE)
+    local aD, aR = attrOf(NM.Dispatch), attrOf(NM.Retort)
+    H.log(string.format("[#77] restage across the press: %s -> %02x; "
+      .. "mstate=%02x menu=%d bp=%d pending=%d Dispatch=%s Retort=%s",
+      table.concat(seen, " "), left, H.readByte(MSTATE), H.readByte(MENU),
+      bp(), pend(), tostring(aD), tostring(aR)))
+    -- positive control: the press has to have reached Ot6Boost at all.  Its
+    -- @refold arm banks the pending boost and raises OT6_RESTAGE on the same
+    -- instruction stream (ot6_hud.asm, Ot6Boost), so a pending of 1 is proof
+    -- the request was raised even on a build that then throws it away.
+    H.assertEq(pend(), 1, "the R press reached Ot6Boost (pending 0 -> 1), "
+      .. "which is the same arm that raises the repaint request")
+    H.assertEq(sawFresh, true, "and the fresh request was visible in the trace")
+    -- the discriminator.  1..3 is a staging cycle in progress, and only a
+    -- gate that serves menu state $30 ever starts one over the kit window.
+    -- The unfixed gate looked at $0e alone, so its trace is $80 forever.
+    H.assertEq(sawCycle, true,
+      "the gate STARTED a staging cycle over the open kit window (flag 1-3) "
+      .. "-- the unfixed gate served the magic list only and left it $80 (#77)")
+    H.assertEq(left, 0, "and the cycle completed, handing the byte back")
+    H.assertEq(H.readByte(MSTATE), ST_TOOLS,
+      "the window is still up: a re-stage must not walk it shut")
+    -- and the re-staged rows still say what the bank says.  #36 was a
+    -- re-stage that handed $7ba5 back wrong and drew another list's rows, so
+    -- "it repainted" is not enough on its own.
+    H.assertEq(aD, WHITE, "Dispatch is still white after the re-stage")
+    H.assertEq(aR, WHITE, "Retort is still white after the re-stage (bp 2)")
+  end),
+  H.pressButtons({ "l" }, 6),
+  H.waitFrames(60),
+  H.call(function()
+    H.assertEq(pend(), 0, "L put the pending boost back, so the ledger below "
+      .. "is unchanged by this pass")
+  end),
+
+  -- 4. zero BP greys everything (#38) ---------------------------------------
   -- two real Dispatches spend the bank to 0 (each row-0 tech is a 1-boost
   -- action: it charges a pip and its turn regens nothing)
   H.call(function() cyanMode = "tech:0" end),
@@ -312,7 +414,7 @@ H.run({ maxFrames = 150000 }, {
     H.screenshot("bushidogrey_zero")
   end),
 
-  -- 4. MP grey: a labeled isolation arm (owner calibration).
+  -- 5. MP grey: a labeled isolation arm (owner calibration).
   -- The input-driven walk was tried three ways and measured out of reach on
   -- this pool's economy: a Retort walk's counters end the battle; a deferring
   -- party is ground down (and battle-RAM teardown zeroes read as
@@ -395,7 +497,7 @@ H.run({ maxFrames = 150000 }, {
       oneAttempt(1), oneAttempt(2), oneAttempt(3), oneAttempt(4), oneAttempt(5),
       H.call(function()
         H.assertEq(done, true, "the MP-grey arm completed within five battles")
-        H.log("[bushidogrey] all four passes hold (three earned, one labeled)")
+        H.log("[bushidogrey] all five passes hold (four earned, one labeled)")
       end),
     })
   end)(),

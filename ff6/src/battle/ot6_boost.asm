@@ -104,6 +104,78 @@
 
 ; ------------------------------------------------------------------------------
 
+; [ #77: a character's BP bank moved; repaint the list that is drawing it ]
+
+; An open ability list derives what it draws from the bank at the moment its
+; rows are staged, and nothing re-stages them: Ot6BushidoRowGrey greys a kit
+; row whose boost exceeds the caster's bank (ot6_cmdmenu.asm:385), so a bank
+; that moved behind an open window left the window claiming a row was
+; reachable when Ot6BushidoConfirm would refuse it, or greyed when it would
+; not.  Every writer of a character's bank calls this: Ot6ActionEnd's charge
+; arm and its regen arm, Ot6RunicBP, Ot6CoverBP, Ot6Filch and Ot6Bestow.
+; Ot6InitBP does not, deliberately -- no menu is open at battle init.
+;
+; The request byte and the gate that spends it are #64's (OT6_RESTAGE,
+; Ot6RestageGate_ext in ot6_hud.asm).  Detection sits here, at the writers,
+; rather than as a change detector in the gate, because the gate is polled
+; once per battle frame and none of these writers is per-frame code.
+;
+; THE MENU-STATE TEST IS NOT AN OPTIMISATION, and neither is its narrowness.
+; Both were measured, and both fix a regression the unconditional version had:
+;
+;   battle_trueknight phase 4b (the per-battle-frame budget canary)
+;     pre-change ..................................... 1635 frames  (pass)
+;     request raised unconditionally ................. 1798 frames  (fail)
+;     request raised only while a list browses ....... 1635 frames  (pass)
+;   battle_levelup (six earned world encounters, same savestate)
+;     pre-change ..................................... pass
+;     request raised for the magic list as well ...... fail
+;     request raised only for the kit window ......... pass
+;
+; The first one.  1798 is the exact saturating cost of one missed vblank per
+; battle-loop iteration, the cliff documented at OT6_BRKLIVE (ot6_memory.inc),
+; and the cause is the gate's shape rather than anything expensive here.  The
+; gate early-outs in about 14 cycles while OT6_RESTAGE is zero and takes
+; roughly 40 while a request stands, and its @wait arm HOLDS a fresh request
+; rather than dropping it whenever the menu is open in a state that is not a
+; browse state.  battle_trueknight's characters carry Fight-only command
+; lists, so their menus sit in command select, so an unconditional request
+; raised at every ActionEnd stood forever and moved the gate's long path onto
+; every battle frame.  Refusing to raise a request nothing can consume keeps
+; the byte at zero, which is what the per-frame path is budgeted for.
+;
+; The second one.  The magic list ($0e) does not read the BP bank at all: its
+; greys are Ot6AbilityGrey's MP test and its prices are Ot6FoldPrices' fold of
+; the caster's own PENDING boost, which #64 already requests from Ot6Boost at
+; the L/R edge.  Raising a request for it here re-staged four rows under the
+; player's cursor every time anyone's bank moved, which is work with no
+; content change behind it, and it moved battle_levelup off its outcome.  So
+; the test is for $30 and nothing else.
+;
+; Neither narrowing costs coverage: the only reader of the bank that can be
+; stale is a kit window whose rows are already staged, which is exactly the
+; state being tested for.  A kit window still opening ($2e) stages from the
+; live bank on its own.
+;
+; entry: jsr from bank F0, a8, index width either (no index addressing and no
+; pushes, so it is callable from Ot6CoverBP and Ot6RunicBP under their .i8
+; sites).  Reads long, so it does not care what db the caller runs under.
+; Clobbers A, which is dead at every call site.
+
+.proc Ot6BankMoved
+        .a8
+        lda     f:$7e0000+$7bca ; a battle menu open at all?
+        beq     @no
+        lda     f:$7e0000+$7bc2 ; ...and is it the kit window, up and
+        cmp     #$30            ;   browsing?  ($30 = the tools shell: Tools,
+        bne     @no             ;   Blitz, SwdTech, Steal)
+        lda     #$80            ; the gate's "fresh request" value
+        sta     f:$7e0000+OT6_RESTAGE
+@no:    rts
+.endproc
+
+; ------------------------------------------------------------------------------
+
 ; [ bp bookkeeping at the end of an entity's action ]
 
 ; called just before EndAction once the actor has no pending actions.
@@ -167,12 +239,19 @@
         lda     $3204,x
         ora     #$80            ; vanilla's "recheck enabled magic" request
         sta     $3204,x
+        jsr     Ot6BankMoved    ; #77: and the bank moved, so an open kit
+                                ;   window's BP grey is stale
         bra     done
 @gain:  lda     OT6_BP_CLASS,x
         cmp     #$05
         bcs     done            ; capped at 5
         inc
         sta     OT6_BP_CLASS,x
+        jsr     Ot6BankMoved    ; #77: same on the regen arm.  the two arms
+                                ;   are marked separately, and not at `done`,
+                                ;   because `done` is also where a monster and
+                                ;   a capped-away regen leave, neither of which
+                                ;   moved a bank
         ; #42: the backstop for a deferred cover pip.  Reached by every actor,
         ; monsters included (they are the ones whose swings a knight covers),
         ; and placed after the charge arm above so a pending cover takes the one
@@ -310,6 +389,10 @@ done:   jsr     Ot6PipPending
                                 ;   round nothing but her own action can lower
                                 ;   a held character's bank, and that action is
                                 ;   the boundary that clears this latch
+        jsr     Ot6BankMoved    ; #77: an absorb is the reactive case the
+                                ;   kit window could not see -- Celes's bank
+                                ;   rises with her own window open and nothing
+                                ;   else happening
 done:   rtl
 .endproc
 
