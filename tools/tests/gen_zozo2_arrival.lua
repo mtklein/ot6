@@ -17,6 +17,17 @@
 --    placement is safe, and the Zozo step heads south-west away from them
 --  * Zozo: world {21,92}/{22,92}/{22,93} -> map 221 {61,44}
 --    (short_entrance.dat _0)
+--
+-- Issue #75, playBattles: every navigator call passes the option, so none
+-- reaches the library's monster-dead flag write.  Maps 61, 59 and 55 have
+-- random encounters disabled -- a field map only rolls when map_prop.dat
+-- byte +5 bit 7 is set (field/map.asm:143-158 loads the record to $0520,
+-- field/battle.asm:333-347 returns early unless $0525 is negative) -- so
+-- those steps pass "tactical" as intent only, and fight rather than flee if
+-- something unscripted ever does fire.  The world crossing to Zozo passes
+-- "flee": it can draw encounters, none of them is the point of the step,
+-- and the library falls back to the tactical driver on its own after
+-- M.FLEE_CAP frames if a formation will not let go.
 local H = dofile("tools/tests/lib/ot6.lua")
 
 local function map() return H.mapId() & 0x1ff end
@@ -45,13 +56,13 @@ end
 
 local function door(nx, ny, dir, m, what)
   return H.cond(function() return true end, {
-    H.navTo(nx, ny, { maxFrames = 12000 }),
+    H.navTo(nx, ny, { maxFrames = 12000, playBattles = "tactical" }),
     H.driveUntil(function() return map() == m end, 900, {
       H.hold({ dir }), H.waitFrames(4),
     }, what .. ": through the door"),
     -- ride any arrival scene out (the west castle greets with one:
     -- measured, an event walks the party to (28,28) and parks a dialog)
-    H.advanceStory(landed(m, 10), 2400),
+    H.advanceStory(landed(m, 10), 2400, { playBattles = "tactical" }),
     -- door loads finalize the decompressed prop table late: ~150 frames
     -- after control and brightness the engine still walked (and modelled)
     -- on the previous map's props (measured, probe_n20c on map 30->20: a
@@ -73,7 +84,7 @@ H.run({ maxFrames = 90000 }, {
   --    doorway (directly reachable, probe_eng61) landing at 59 {10,48};
   --    the keep->gate door (28,32)-side needs the held press.
   H.navTo(11, 32, { arrive = function() return map() == 59 end,
-                    maxFrames = 9000 }),
+                    maxFrames = 9000, playBattles = "tactical" }),
   H.waitUntil(landed(59, 10), 1500, "keep hall", 1),
   H.waitFrames(150),
   door(12, 42, "up", 55, "keep -> the gate map"),
@@ -85,7 +96,7 @@ H.run({ maxFrames = 90000 }, {
   door(12, 49, "down", 55, "vestibule -> gate yard"),
 
   -- 3. off the castle onto the world: row y=43 is the exit
-  H.navTo(28, 42, { maxFrames = 12000 }),
+  H.navTo(28, 42, { maxFrames = 12000, playBattles = "tactical" }),
   H.driveUntil(function() return H.worldMode() end, 900, {
     H.hold({ "down" }), H.waitFrames(4),
   }, "off the castle to the world"),
@@ -100,7 +111,7 @@ H.run({ maxFrames = 90000 }, {
 
   -- 3. south-west to Zozo: park one tile above the {22,92} entrance, then
   --    step onto it.  arrive bails if a step lands the entrance early.
-  H.worldNavTo(22, 91, { maxFrames = 40000,
+  H.worldNavTo(22, 91, { maxFrames = 40000, playBattles = "flee",
     arrive = function() return not H.worldMode() end }),
   H.driveUntil(function() return not H.worldMode() and map() == 221 end, 900, {
     H.hold({ "down" }), H.waitFrames(4),

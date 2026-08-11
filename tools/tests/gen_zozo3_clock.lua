@@ -25,6 +25,21 @@
 --  * dialog choices track in $056E (EventCmd_b6); the driver below moves
 --    the cursor by value (edge-presses, re-reading $056E) so the clock's
 --    two-per-row layout needs no geometry knowledge.
+--
+-- Issue #75, playBattles: both walks pass playBattles = "tactical", so
+-- neither reaches the library's monster-dead flag write.  Both maps really
+-- do draw random battles -- map_prop.dat byte +5 bit 7 is set for 221 and
+-- 225 (field/map.asm:143-158, field/battle.asm:333-347) -- and their pools
+-- are the Zozo trash: group 78 on the street (Gabbldegak x4, Harvester +
+-- Gabbldegaks, HadesGigas, HadesGigas + Harvester) and group 77 in the
+-- buildings (SlamDancer, Harvester, and mixes of the two with Gabbldegaks),
+-- read out of sub_battle_group.dat and rand_battle_group.dat.  Fought
+-- rather than fled for two reasons: three of those eight formations allow
+-- a pincer, which raises run difficulty from 2 to 6 per monster and would
+-- often spend the whole flee cap before falling back to fighting anyway;
+-- and gen_zozo5_ramuh already beats this same pool on these same maps with
+-- nothing but blind A-taps, so the tactical driver is comfortably enough.
+-- Budgets grew to match: a battle now costs real ATB rounds mid-walk.
 local H = dofile("tools/tests/lib/ot6.lua")
 
 local function map() return H.mapId() & 0x1ff end
@@ -96,7 +111,7 @@ local function clockPick(idx, doneId, what)
   }, what)
 end
 
-H.run({ maxFrames = 60000 }, {
+H.run({ maxFrames = 90000 }, {
   H.loadState("build/states/zozo_arrival.mss.lua"),
   H.waitFrames(150),
   H.call(function()
@@ -104,7 +119,7 @@ H.run({ maxFrames = 60000 }, {
   end),
 
   -- 1. street -> the clock room: door (42,28) -> 225 {98,61}
-  H.navTo(42, 29, { maxFrames = 20000 }),
+  H.navTo(42, 29, { maxFrames = 30000, playBattles = "tactical" }),
   H.driveUntil(function() return map() == 225 end, 900, {
     H.hold({ "up" }), H.waitFrames(4),
   }, "into the clock room"),
@@ -115,7 +130,7 @@ H.run({ maxFrames = 60000 }, {
   end),
 
   -- 2. onto the clock tile {98,59} and A+facing-up until the hour menu
-  H.navTo(98, 60, { maxFrames = 9000 }),
+  H.navTo(98, 60, { maxFrames = 20000, playBattles = "tactical" }),
   H.driveUntil(function() return H.dialogWaiting() end, 900, {
     H.hold({ "up" }), H.waitFrames(6),      -- face/step up onto {98,59}
     H.hold({ "a", "up" }), H.waitFrames(6), -- A+up: $01B4|$01B0 both set

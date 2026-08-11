@@ -181,6 +181,22 @@
 --   its tile is ordinary walkable floor, so BFS routes straight over it
 --   and the crossing can happen before the hold starts, which is why
 --   crossDoor treats a map change during its approach as arrival.
+--
+-- Issue #75, playBattles: every navigator call here passes
+--   playBattles = "tactical", so none of them reaches the library's
+--   monster-dead flag write.  The whole chapter runs on maps 55/57/58/59/60,
+--   and all five have random encounters disabled: map_prop.dat is 33 bytes
+--   per map (field/map.asm:143-158 loads the record to $0520) and the field
+--   step handler returns without rolling unless $0525 bit 7 is set
+--   (field/battle.asm:333-347).  Bit 7 is clear for all five, so no step in
+--   this file can draw a random battle and the option is intent only.
+--   "tactical" rather than "flee" for that reason: the only battle that
+--   could reach the option here is a scripted one nothing in the route
+--   expects, and fighting an unexpected fight is a better default than
+--   spending M.FLEE_CAP frames trying to run from it.  The submerge's ride
+--   out lands on the world map on a chocobo, which suppresses encounters
+--   ($11FA&3=2, asserted at the tail), so the last advanceStory is a no-op
+--   for the same reason.
 local H = dofile("tools/tests/lib/ot6.lua")
 local DOOR = "build/states/figaro_entry.mss.lua"
 
@@ -321,7 +337,7 @@ local function crossDoor(sx, sy, dm, dx, dy, what, fixed)
     -- left.  So a map change counts as arrival; the far-side assert below
     -- still checks it was the right map.
     H.navTo(function() return stage()[1] end, function() return stage()[2] end,
-      { maxFrames = 9000,
+      { maxFrames = 9000, playBattles = "tactical",
         arrive = function() return map() ~= startMap end }),
     H.driveUntil(function()
       return map() ~= startMap or (H.fieldX() == dx and H.fieldY() == dy)
@@ -390,7 +406,7 @@ local function talkTo(obj, what, maxFrames)
       arrive = function()
         return engaged or (adjacent() and H.hasControl() and H.tileAligned())
       end,
-      maxFrames = maxFrames or 9000,
+      maxFrames = maxFrames or 9000, playBattles = "tactical",
     })
   end
   -- One activation attempt.  Soft rounds give up without failing (the NPC
@@ -447,7 +463,7 @@ end
 local function commitName(tag)
   local running = 0
   return seq({
-    H.advanceStory(menuUp, 20000),
+    H.advanceStory(menuUp, 20000, { playBattles = "tactical" }),
     H.waitFrames(180),
     H.call(function()
       H.log(string.format("%s: naming menu open at f%d ($59=%d, menu state $%02X)",
@@ -571,7 +587,8 @@ H.run({ maxFrames = 120000 }, {
   crossDoor(27, 13, 58, 102, 55, "D6 throne hall -> THRONE ROOM"),
   talkTo(16, "EDGAR (intro)", 9000),
   commitName("edgar_naming"),
-  H.advanceStory(calm(30, function() return sw(0x0004) == 1 end), 20000),
+  H.advanceStory(calm(30, function() return sw(0x0004) == 1 end), 20000,
+    { playBattles = "tactical" }),
   H.call(function()
     H.assertEq(sw(0x0004), 1, "intro ran ($0004 set)")
     H.assertEq(sw(0x0308), 0, "throne Edgar despawned ($0308 clear)")
@@ -638,7 +655,7 @@ H.run({ maxFrames = 120000 }, {
   commitName("sabin_naming"),
   H.advanceStory(calm(30, function()
     return map() == 57 and sw(0x0005) == 1
-  end), 30000),
+  end), 30000, { playBattles = "tactical" }),
   H.call(function()
     H.assertEq(sw(0x0005), 1, "flashback ran ($0005 set)")
     H.assertEq(sw(0x0308), 1, "EDGAR RESPAWNED on the throne ($0308 set)")
@@ -677,7 +694,7 @@ H.run({ maxFrames = 120000 }, {
   talkTo(16, "EDGAR (second audience)", 9000),
   H.advanceStory(calm(30, function()
     return map() == 55 and sw(0x0311) == 1
-  end), 30000),
+  end), 30000, { playBattles = "tactical" }),
   H.call(function()
     H.assertEq(sw(0x0311), 1, "Kefka scene ran ($0311 set)")
     H.assertEq(sw(0x0315), 0, "$0315 cleared by the scene")
@@ -695,15 +712,17 @@ H.run({ maxFrames = 120000 }, {
   -- arrives.  Talking to only one makes Kefka a no-op with no diagnostic.
   -- ==================================================================== --
   talkTo(21, "trooper east", 9000),
-  H.advanceStory(calm(20, function() return sw(0x01F0) == 1 end), 9000),
+  H.advanceStory(calm(20, function() return sw(0x01F0) == 1 end), 9000,
+    { playBattles = "tactical" }),
   H.call(function() H.assertEq(sw(0x01F0), 1, "$01F0 set (east trooper)") end),
   talkTo(22, "trooper west", 9000),
-  H.advanceStory(calm(20, function() return sw(0x01F1) == 1 end), 9000),
+  H.advanceStory(calm(20, function() return sw(0x01F1) == 1 end), 9000,
+    { playBattles = "tactical" }),
   H.call(function() H.assertEq(sw(0x01F1), 1, "$01F1 set (west trooper)") end),
   talkTo(20, "KEFKA", 9000),
   H.advanceStory(calm(30, function()
     return map() == 55 and sw(0x0006) == 1
-  end), 30000),
+  end), 30000, { playBattles = "tactical" }),
   H.call(function()
     H.assertEq(sw(0x0006), 1, "confrontation done ($0006 set)")
     where("Kefka done")
@@ -711,7 +730,7 @@ H.run({ maxFrames = 120000 }, {
   talkTo(27, "LOCKE (regroup)", 9000),
   H.advanceStory(calm(30, function()
     return map() == 55 and sw(0x0313) == 1
-  end), 30000),
+  end), 30000, { playBattles = "tactical" }),
   H.call(function()
     H.assertEq(sw(0x0313), 1, "$0313 set (guest-room LOCKE armed)")
     H.assertEq(sw(0x0315), 1, "$0315 set (courtyard guard re-armed)")
@@ -733,7 +752,7 @@ H.run({ maxFrames = 120000 }, {
   talkTo(19, "LOCKE (guest room)", 9000),
   H.advanceStory(calm(30, function()
     return map() == 55 and sw(0x01F8) == 1
-  end), 40000),
+  end), 40000, { playBattles = "tactical" }),
   H.call(function()
     H.assertEq(sw(0x01F8), 1, "the burning night ran ($01F8 set)")
     H.assertEq(map(), 55, "back on map 55, at night")
@@ -749,7 +768,7 @@ H.run({ maxFrames = 120000 }, {
   -- world-module RAM, not field RAM, so the settle predicate changes too.
   -- ==================================================================== --
   talkTo(19, "courtyard guard (submerge)", 9000),
-  H.advanceStory(worldCalm(120), 90000),
+  H.advanceStory(worldCalm(120), 90000, { playBattles = "tactical" }),
   H.waitFrames(30),
   H.call(function()
     H.assertEq(H.worldMode(), true, "on the world map")
