@@ -3435,6 +3435,13 @@ Cmd_0a:
 @15b0:  lda     #$08
         sta     $3412
 @15b5:  lda     $b6
+        jsl     Ot6HitCount             ; ot6 (#54): pummel x2, bum rush x4.
+                                        ;   here rather than in LoadMagicProp
+                                        ;   because the multi-attack loop
+                                        ;   re-enters ExecAttack, never the
+                                        ;   command handler, so this runs once
+                                        ;   per action.  $b6 is still the
+                                        ;   attack id; the sbc below rebases it.
         pha
         sec
         sbc     #$5d
@@ -4004,6 +4011,10 @@ Cmd_07:
 
 Cmd_09:
 @1885:  lda     $b6
+        jsl     Ot6HitCount             ; ot6 (#54): drill x2.  $b6 is the tool
+                                        ;   item id here, and the sbc below
+                                        ;   reads the carry the dispatcher
+                                        ;   left, so the hook preserves p.
         sbc     #$a2
         sta     $b6
         bra     _189e
@@ -7036,13 +7047,50 @@ OSMOSE_MP_VANILLA  = 1                  ; the byte this replaces
 DDUST_POWER_OT6      = 34
 DDUST_POWER_VANILLA  = 52               ; the byte this replaces
 DDUST_STATUS3_OT6    = STATUS3::SLOW
+
+; ---- overrides 4 & 5: the multi-hit power split (#54) -----------------------
+; docs/design/multi-hit.md §4 and principle P4, "hit count splits an ability's
+; power; it does not add to it".  Ot6HitCountTbl (ot6_hitcount.asm) makes
+; Pummel strike twice and Bum Rush four times, and each strike is a whole
+; ExecAttack pass carrying the record's full power.  Without a matching power
+; cut, a 4-MP level-1 Blitz would deal double damage as well as chipping twice,
+; which is a straight buff rather than the damage-for-break-rate trade the pass
+; is built on.
+;
+; The split is power / hits, exactly.  It is not compensated upward for the
+; per-hit defence subtraction (CalcDmg, battle_main.asm:7404 onward) or for
+; OT6's ×0.5 shielded attenuation (Ot6ShieldedDmg, once per hit and therefore
+; not compounding), so N hits at P/N land slightly under one hit at P against
+; anything with defence.  That residue is left in deliberately: it is the price
+; of the extra chips, and inventing a compensation curve would be a number
+; nobody measured.  The measured size of it is recorded in multi-hit.md §9.
+;
+;   Pummel   110 -> 55  (×2)
+;   Bum Rush 128 -> 32  (×4)
+;
+; Bum Rush is split too, though it is a LV70 ability that nothing in the
+; playable stretch can reach and its 99-MP price already makes it the worst
+; damage-per-MP row in the Blitz list.  Leaving it at 128 across four hits
+; would make the capstone the best opener AND the best nuke, which contradicts
+; multi-hit.md's P1 and P5.  Its price is an MP-economy question, not a
+; hit-count one.
+;
+; Drill (a Tool, ItemProp rather than MagicProp) takes the same treatment in
+; ff6/src/menu/item.asm.
+PUMMEL_POWER_OT6      = 55
+PUMMEL_POWER_VANILLA  = 110             ; the byte this replaces
+BUM_RUSH_POWER_OT6    = 32
+BUM_RUSH_POWER_VANILLA = 128            ; the byte this replaces
 ; ------------------------------------------------------------------------------
 
 ; c4/6ac0
-; byte offsets of the three overridden bytes within the blob
-OSMOSE_MP_AT       = ATTACK::OSMOSE * MAGIC_PROP_REC + 5
-DDUST_POWER_AT     = ATTACK::SHIVA  * MAGIC_PROP_REC + 6
-DDUST_STATUS3_AT   = ATTACK::SHIVA  * MAGIC_PROP_REC + 12
+; byte offsets of the overridden bytes within the blob.  They must stay in
+; ascending order: the splice below walks the blob once.
+OSMOSE_MP_AT       = ATTACK::OSMOSE   * MAGIC_PROP_REC + 5
+DDUST_POWER_AT     = ATTACK::SHIVA    * MAGIC_PROP_REC + 6
+DDUST_STATUS3_AT   = ATTACK::SHIVA    * MAGIC_PROP_REC + 12
+PUMMEL_POWER_AT    = ATTACK::PUMMEL   * MAGIC_PROP_REC + 6
+BUM_RUSH_POWER_AT  = ATTACK::BUM_RUSH * MAGIC_PROP_REC + 6
 MAGIC_PROP_END     = MAGIC_PROP_COUNT * MAGIC_PROP_REC
 
 .define magic_prop_dat .sprintf("magic_prop_%s.dat", LANG_SUFFIX)
@@ -7054,18 +7102,23 @@ MagicProp:
         .byte   DDUST_POWER_OT6                         ; $38 +$06 (was 52)
         .incbin magic_prop_dat, DDUST_POWER_AT + 1, DDUST_STATUS3_AT - DDUST_POWER_AT - 1
         .byte   DDUST_STATUS3_OT6                       ; $38 +$0c (was $00)
-        .incbin magic_prop_dat, DDUST_STATUS3_AT + 1, MAGIC_PROP_END - DDUST_STATUS3_AT - 1
+        .incbin magic_prop_dat, DDUST_STATUS3_AT + 1, PUMMEL_POWER_AT - DDUST_STATUS3_AT - 1
+        .byte   PUMMEL_POWER_OT6                        ; $5d +$06 (was 110)
+        .incbin magic_prop_dat, PUMMEL_POWER_AT + 1, BUM_RUSH_POWER_AT - PUMMEL_POWER_AT - 1
+        .byte   BUM_RUSH_POWER_OT6                      ; $64 +$06 (was 128)
+        .incbin magic_prop_dat, BUM_RUSH_POWER_AT + 1, MAGIC_PROP_END - BUM_RUSH_POWER_AT - 1
 
 ; The splice must reassemble to the vanilla LENGTH.  This catches the dangerous
 ; half of a hand-spliced binary -- a wrong .incbin COUNT, which shifts every
 ; record past the splice and silently re-points the whole spell table.  It does
 ; NOT catch a wrong offset that happens to preserve the total (that only puts a
 ; byte in the wrong record); verified by deliberately mis-offsetting one splice
-; point, 2026-07-27.  The three byte POSITIONS are pinned instead by
-; tools/tests/battle_magicite.lua, which reads records $29/$37/$38 back out of
-; the built ROM through the MagicProp symbol -- including $37 unchanged as the
-; control.  Length here, positions there; between them a mis-typed splice is a
-; failure rather than a mystery.
+; point, 2026-07-27.  The byte POSITIONS are pinned instead by two tests that
+; read the records back out of the built ROM through the MagicProp symbol:
+; tools/tests/battle_magicite.lua for $29/$37/$38 (with $37 unchanged as the
+; control) and tools/tests/battle_hitcount.lua for $5d/$64 (with $5f Suplex
+; unchanged as the control).  Length here, positions there; between them a
+; mis-typed splice is a failure rather than a mystery.
 .assert * - MagicProp = MAGIC_PROP_END, error, "MagicProp splice changed the table length"
 
 .popseg

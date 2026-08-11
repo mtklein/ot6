@@ -2594,9 +2594,54 @@ ItemBlankQtyText:               pos_text ITEM_BLANK_QTY
 .pushseg
 .segment "item_prop"
 
+; ------------------------------------------------------------------------------
+; OT6 v0.10: ItemProp is the vanilla blob plus one named byte override.
+;
+; Same splice discipline MagicProp uses (battle_main.asm, above the MagicProp
+; label), and for the same reason: item_prop_en.dat is 256 fixed 30-byte
+; records with no source form, so a byte changed inside it is invisible in a
+; diff and indistinguishable from bit-rot.  Every OT6 change to it lives here,
+; named, with the vanilla value it replaces and the reason, and the .dat stays
+; byte-identical to the FF3us 1.0 base.
+;
+; Record layout, the two fields this splice needs (battle_main.asm:7196-7202):
+;   +$0e targeting  +$0f element  +$14 power  +$1b special effect
+;
+; ---- override 1: Drill ($a8) power, 191 -> 96 -------------------------------
+; docs/design/multi-hit.md §4.2 and principle P4, "hit count splits an
+; ability's power; it does not add to it".  Ot6HitCountTbl (ot6_hitcount.asm)
+; makes Drill strike twice, and each strike is a whole ExecAttack pass carrying
+; the record's full power, so without this cut a 16-MP Tool would deal double
+; damage as well as chipping twice.  191 / 2 rounds down to 95, and 96 is used
+; instead only because the halves must not silently under-deliver on a
+; defence-ignoring tool; the difference is one point either way.
+;
+; Drill is the Tool that gets rate because it ignores defence (ToolsEffect_05,
+; battle_main.asm:7330-7333), which makes it the armoured-boss answer and the
+; complement to AutoCrossbow's one-hit-per-body breadth.  AutoCrossbow is
+; deliberately left alone: it is breadth, not rate.
+DRILL_POWER_OT6     = 96
+DRILL_POWER_VANILLA = 191               ; the byte this replaces
+
+ITEM_PROP_REC   = 30
+ITEM_PROP_COUNT = 256
+DRILL_POWER_AT  = ITEM::DRILL * ITEM_PROP_REC + $14
+ITEM_PROP_END   = ITEM_PROP_COUNT * ITEM_PROP_REC
+
+.define item_prop_dat .sprintf("item_prop_%s.dat", LANG_SUFFIX)
+
 ; d8/5000
 ItemProp:
-        incbin_lang "item_prop_%s.dat"
+        .incbin item_prop_dat, 0, DRILL_POWER_AT
+        .byte   DRILL_POWER_OT6                         ; $a8 +$14 (was 191)
+        .incbin item_prop_dat, DRILL_POWER_AT + 1, ITEM_PROP_END - DRILL_POWER_AT - 1
+
+; Same length assert MagicProp carries, catching the dangerous half of a
+; hand-spliced binary: a wrong .incbin COUNT shifts every record past the
+; splice and silently re-points the whole item table.  The byte POSITION is
+; pinned separately by tools/tests/battle_hitcount.lua, which reads records
+; $a8 and $a6 (Chain Saw, unchanged, the control) back out of the built ROM.
+.assert * - ItemProp = ITEM_PROP_END, error, "ItemProp splice changed the table length"
 
 .popseg
 
