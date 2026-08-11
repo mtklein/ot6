@@ -1,12 +1,11 @@
--- probe_tgtcursor.lua -- READ-ONLY: enumerate the battle target cursor's
--- monster-side hover positions on a real group-80 formation (mrf_entry).
+-- probe_tgtcursor.lua -- read-only: enumerate the battle target cursor's
+-- monster-side hover positions on a group-80 formation (mrf_entry).
 --
 -- battle_runic's sleep-shepherd needs to put a chosen monster under, and
 -- two draft runs measured the blind rotation never settling on some
--- bodies.  Question: pressing one direction at a time from target select,
--- what masks does $7B7E actually serve, and does the set cover all four
--- monsters?  ($7B7D logged too: the rotation measurably wanders to the
--- ally side.)
+-- bodies.  Measured here: pressing one direction at a time from target
+-- select, which masks $7B7E serves, and whether the set covers all four
+-- monsters.  ($7B7D is logged too: the rotation wanders to the ally side.)
 local H = dofile("tools/tests/lib/ot6.lua")
 local STATE = "build/states/mrf_entry.mss.lua"
 

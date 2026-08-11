@@ -1,81 +1,85 @@
--- probe_dottick.lua -- #60: does a POISON STATUS TICK reach the chip path?
+-- probe_dottick.lua -- #60: measures whether a poison status tick reaches
+-- the chip path.
 --
 --   tools/tests/run.sh tools/tests/probe_dottick.lua
 --
--- The owner's Zozo sighting was Bio Blaster's poison damage PLUS "little
+-- The owner's Zozo sighting was Bio Blaster's poison damage plus "little
 -- plink poison damage" breaking a 2-shield poison-weak enemy between them.
--- Four candidate explanations, and only one of them is a DOT tick:
---   (a) the poison STATUS TICK routes through the ordinary damage path and
+-- There are four candidate explanations, of which one is a DOT tick:
+--   (a) the poison status tick routes through the ordinary damage path and
 --       chips like any other poison-element hit,
 --   (b) Bio Blaster is itself multi-hit,
---   (c) the status APPLICATION carries a second damage event,
+--   (c) the status application carries a second damage event,
 --   (d) two separate actions happened to land in one visual beat.
 -- This probe answers (a) directly and independently of Bio Blaster, by
--- poisoning a guard in the opening fight and watching the chip hook.  (It
--- cannot rule (b)/(c) in or out -- those are read off the damage path in
--- docs/design/multi-hit.md's audit -- but (a) is decisive on its own: if
--- ticks chip, the owner's sighting needs no other explanation.)
+-- poisoning a guard in the opening fight and watching the chip hook.  It
+-- cannot rule (b) or (c) in or out; those are read off the damage path in
+-- docs/design/multi-hit.md's audit.  If ticks chip, (a) accounts for the
+-- owner's sighting on its own.
 --
--- THE ATTRIBUTION, which is the whole point: Cmd_22 (the DOT command,
--- battle_main.asm:13361) tail-jumps into ExecSelfAttack (:13429), so a DOT
--- tick's entire damage resolution -- including any Ot6Chip / Ot6ClassChip
--- call -- happens SYNCHRONOUSLY inside that one command, on the SAME
--- emulated frame.  So `inDot` = "a Cmd_22 exec callback fired on this very
--- frame", and it is cross-checked against the DOT record's own signature:
--- $11a2 = $68 and $11a6 = 2 are Cmd_22's literal stores (:13372-13375,
--- :13405-13407), which no ordinary action carries.  Two independent
--- attributions, so a chip cannot be pinned on the DOT by coincidence.
+-- Attribution: Cmd_22 (the DOT command, battle_main.asm:13361) tail-jumps
+-- into ExecSelfAttack (:13429), so a DOT tick's whole damage resolution,
+-- including any Ot6Chip / Ot6ClassChip call, happens synchronously inside
+-- that one command, on the same emulated frame.  So `inDot` means "a
+-- Cmd_22 exec callback fired on this frame", and it is cross-checked
+-- against the DOT record's own signature: $11a2 = $68 and $11a6 = 2 are
+-- Cmd_22's literal stores (:13372-13375, :13405-13407), which no ordinary
+-- action carries.  With two independent attributions, a chip cannot be
+-- pinned on the DOT by coincidence.
 --
 -- (An earlier version bracketed the window with an exec callback on
 -- ExecCmd, the CmdTbl dispatcher.  It never fired: `ExecCmd` is defined
--- TWICE in ff6-en.dbg -- field code at $C09B1B and the battle one at
--- $C213EA -- and lib/compose.py's parse_dbg_syms took the FIRST `val`
--- for a name, so H.sym("ExecCmd") silently handed back the wrong module's
--- address.  The window then never closed and every later chip read
+-- twice in ff6-en.dbg, as field code at $C09B1B and the battle one at
+-- $C213EA, and lib/compose.py's parse_dbg_syms took the first `val`
+-- for a name, so H.sym("ExecCmd") returned the wrong module's address
+-- with no warning.  The window then never closed and every later chip read
 -- inDot=true.  3838 of this ROM's 98483 label names are non-unique, so
--- that failure mode was general, and it was SILENT.
+-- that failure mode was general and produced no error message.
 --
--- FIXED: compose.py now refuses to guess.  A duplicated name is a
+-- Fixed: compose.py no longer guesses.  A duplicated name is a
 -- compose-time error naming both candidates, and the caller says which it
--- means by segment -- H.sym("ExecCmd@battle_code").  The `H.sym("ExecCmd")`
--- spelled out in this paragraph is exactly the case that must stay
--- harmless, and does: the ambiguity check is fatal only for a name reached
--- from code, never one that appears solely in prose.)
+-- means by segment: H.sym("ExecCmd@battle_code").  The `H.sym("ExecCmd")`
+-- spelled out in this paragraph is the case that must stay harmless, and
+-- does: the ambiguity check is fatal only for a name reached from code,
+-- never one that appears only in prose.)
 --
--- LABORATORY (battle_break's, plus battle_hits's berserk driver so battle
+-- Setup (battle_break's, plus battle_hits's berserk driver so battle
 -- time keeps running with no menu holding wait-mode):
---   guard A, entity $0c: weak = POISON ONLY ($3BEC=$08), class-weak 0,
---     absorb/null/resist cleared, 2 shields, POISON status set
---   guard B, entity $0e: weak = FIRE only ($3BEE=$01), class-weak 0,
---     2 shields, POISON status set -- the NEGATIVE CONTROL.  It takes the
---     same ticks; if its shields move, chipping is not element-matched.
+--   guard A, entity $0c: weak = poison only ($3BEC=$08), class-weak 0,
+--     absorb/null/resist cleared, 2 shields, poison status set
+--   guard B, entity $0e: weak = fire only ($3BEE=$01), class-weak 0,
+--     2 shields, poison status set.  This is the negative control: it
+--     takes the same ticks, and if its shields move, chipping is not
+--     element-matched.
 --   party: Fight-only command lists + berserk, magitek status cleared
---     (so berserk cannot roll Bio Blast, which IS poison and would forge
---     the result), weapon elements zeroed.  With class-weak 0 on both
---     guards and no weapon element, NO party swing can chip either guard:
---     every shield transition observed here is a DOT tick or a bug.
+--     (so berserk cannot roll Bio Blast, which is poison and would
+--     confound the result), weapon elements zeroed.  With class-weak 0 on
+--     both guards and no weapon element, no party swing can chip either
+--     guard, so every shield transition observed here is a DOT tick or a
+--     bug.
 --
 -- Phases:
---   1. POISON at the engine's own cadence.  Logs the counter machinery
+--   1. Poison at the engine's own cadence.  Logs the counter machinery
 --      ($3adc counter / $3add slow-normal-haste constant / $3af0 dot
 --      counter, DecCounters at battle_main.asm:15130-15175) so the
 --      measured gap can be checked against the designed period, and the
---      per-tick HP drop so a "tick that chipped" is never a tick that
---      did nothing.
---   2. SAP/SEIZE.  Its Cmd_22 branch never reaches the `lda #$08 /
+--      per-tick HP drop so a tick that chipped can be distinguished from
+--      a tick that did nothing.
+--   2. Sap/seize.  Its Cmd_22 branch never reaches the `lda #$08 /
 --      sta $11a1` poison-element store (battle_main.asm:13390-13393), so
---      the prediction is: ticks arrive, damage lands, nothing chips.  The
---      NON-VACUITY half matters here -- Ot6ClassChip firing inside the
---      window proves the tick reached the damage join with elem=$00, i.e.
---      the element gate is what stopped it, not a missing hit.
---   3. THE CAP -- #60's "how many, how often, capped?".  Guard A is left
---      one shield from BREAK so the next tick empties it, and the window
---      is then watched to the end and past recovery.  (This phase also
---      pokes $3add -> $80 to speed the counter up.  IT DOES NOT TAKE:
---      the counters dump shows $3add back at $40 by the phase's end -- the
---      engine re-derives the slow/normal/haste constant -- so phase 3 runs
---      at the same natural cadence phase 1 measured.  Left in, documented,
---      because "this accelerator does not work" is worth knowing.)
+--      the prediction is that ticks arrive, damage lands, and nothing
+--      chips.  The non-vacuity half matters here: Ot6ClassChip firing
+--      inside the window shows the tick reached the damage join with
+--      elem=$00, so the element gate stopped it rather than a missing hit.
+--   3. The cap, which is #60's "how many, how often, capped?".  Guard A is
+--      left one shield from break so the next tick empties it, and the
+--      window is then watched to the end and past recovery.  (This phase
+--      also pokes $3add -> $80 to speed the counter up.  That does not
+--      take effect: the counters dump shows $3add back at $40 by the
+--      phase's end, because the engine re-derives the slow/normal/haste
+--      constant, so phase 3 runs at the same natural cadence phase 1
+--      measured.  Left in and documented, because the fact that this
+--      accelerator does not work is worth recording.)
 
 local H = dofile("tools/tests/lib/ot6.lua")
 local STATE = "build/states/battle_entry.mss.lua"
@@ -224,7 +228,7 @@ local SEIZE  = 0x40          -- $3ee5,y bit 6 (battle_main.asm:15374-15377)
 
 local function setupLab()
   keepAlive()
-  -- guard A: poison-weak ONLY, nothing else can interfere
+  -- guard A: poison-weak only, so nothing else can interfere
   H.writeByte(0x3BCC + A, 0x00)   -- absorbed elements
   H.writeByte(0x3BCD + A, 0x00)   -- nullified elements
   H.writeByte(0x3BE0 + A, 0x08)   -- weak: poison only
@@ -235,7 +239,7 @@ local function setupLab()
   H.writeByte(0x3E88 + A, 0)      -- not broken
   H.writeByte(0x3E89 + A, 0)      -- nothing revealed
   H.writeByte(0x3E9D + A, 0)      -- no class revealed
-  -- guard B: the negative control -- fire-weak, poisoned all the same
+  -- guard B: the negative control, fire-weak but poisoned as well
   H.writeByte(0x3BCC + B, 0x00)
   H.writeByte(0x3BCD + B, 0x00)
   H.writeByte(0x3BE0 + B, 0x01)   -- weak: fire only
@@ -247,7 +251,7 @@ local function setupLab()
   H.writeByte(0x3E89 + B, 0)
   H.writeByte(0x3E9D + B, 0)
   H.writeByte(0x3EC8, 0x00)       -- global element field ($3ec8, CalcTargetDmg)
-  -- POISON both guards
+  -- poison both guards
   H.writeByte(0x3EE4 + A, H.readByte(0x3EE4 + A) | POISON)
   H.writeByte(0x3EE4 + B, H.readByte(0x3EE4 + B) | POISON)
   -- party: Fight-only lists, no magitek, berserk, no weapon element
@@ -273,8 +277,8 @@ end
 
 local function repokePoison()
   keepAlive()
-  -- keep both guards poisoned so the tick keeps arriving; shields are NOT
-  -- re-poked -- their motion is the measurement
+  -- keep both guards poisoned so the tick keeps arriving; shields are not
+  -- re-poked, because their motion is the measurement
   H.writeByte(0x3EE4 + A, H.readByte(0x3EE4 + A) | POISON)
   H.writeByte(0x3EE4 + B, H.readByte(0x3EE4 + B) | POISON)
 end
@@ -289,7 +293,7 @@ H.run({ maxFrames = 90000 }, {
   H.waitFrames(240),
   H.call(function() setupLab(); arm() end),
 
-  -- PHASE 1: the engine's own poison cadence
+  -- Phase 1: the engine's own poison cadence
   H.repeatN(60, { H.call(repokePoison), H.waitFrames(30) }),
   H.call(function()
     dump("p1")
@@ -301,7 +305,7 @@ H.run({ maxFrames = 90000 }, {
     H.screenshot("dottick_p1")
   end),
 
-  -- PHASE 2: SAP/SEIZE -- damage without an element
+  -- Phase 2: sap/seize, damage without an element
   H.call(function()
     reset()
     for _, e in ipairs({ A, B }) do
@@ -329,7 +333,7 @@ H.run({ maxFrames = 90000 }, {
     H.screenshot("dottick_p2")
   end),
 
-  -- PHASE 3: THE CAP -- ticks against a broken monster, then after recovery
+  -- Phase 3: the cap, ticks against a broken monster, then after recovery
   H.call(function()
     reset()
     for _, e in ipairs({ A, B }) do
@@ -338,7 +342,7 @@ H.run({ maxFrames = 90000 }, {
       H.writeByte(0x3ADD + e, 0x80)   -- accelerate this entity's counter
     end
     H.writeByte(0x3E38 + A, 1)        -- one shield: the next tick breaks it
-    H.writeByte(0x3E39 + A, 3)        -- and recovery restores THREE
+    H.writeByte(0x3E39 + A, 3)        -- and recovery restores three
     H.writeByte(0x3E88 + A, 0)
     H.log(string.format("p3 (CAP): A sh=%d/%d timer=%02X $3add=%02X",
       shieldA(), H.readByte(0x3E39 + A), timerA(), H.readByte(0x3ADD + A)))
@@ -351,7 +355,7 @@ H.run({ maxFrames = 90000 }, {
       shieldA(), H.readByte(0x3E39 + A), timerA(), revA()))
     disarm()
     H.screenshot("dottick_p3")
-    -- the probe must not pass vacuously: something has to have ticked
+    -- guard against a vacuous pass: at least one tick must have happened
     H.assertEq(phase1.dots > 0, true, "phase 1 saw poison DOT actions")
   end),
 })

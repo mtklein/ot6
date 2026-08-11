@@ -40,27 +40,27 @@ OT6_LOADOUT          := $7e1e1d
 .assert (OT6_LOADOUT & $ffff) + 1 <= $1ffd, error, "loadout word must sit inside the checksum window"
 
 ; #40 (kit-gau.md §4): Gau's 8-slot rage loadout, one byte per slot, in the
-; NEXT eight bytes of the same save-block scrap the Bushido word lives in.
+; next eight bytes of the same save-block scrap the Bushido word lives in.
 ; byte = rage id + 1; $00 = unset; all eight zero = AUTO (the first eight
-; known rages in id order -- the head of the vanilla list).  Rage ids run
+; known rages in id order, the head of the vanilla list).  Rage ids run
 ; 0..254 (InitSkills stops at $fe, LearnRage skips monster index > 255), so
 ; +1 fits a byte with nothing real outside it.
 ;
-; NO persistent_layout BUMP, and that is a ruling, not an oversight: the
+; There is no persistent_layout bump, and that is a deliberate ruling.  The
 ; string ot6-codex-o8-v1 was coined for a world that already contained the
-; Bushido word, whose own precedent is exactly this -- a zero-sentinel
+; Bushido word, and that word set the precedent: a zero-sentinel
 ; addition to save-block scraps changes no existing byte's meaning, so no
 ; tracked checkpoint can be misread.  All 11 tracked checkpoints hold zeros here
 ; (kit-gau.md §4.2, measured), and zeros decode as AUTO, the state those
-; saves are genuinely in.  Remaining scrap after this: $1e27-$1e3f.
+; saves are in.  Remaining scrap after this: $1e27-$1e3f.
 OT6_RAGELOAD         := $7e1e1f
 OT6_RAGESLOTS        = 8
-; The configurator's page GEOMETRY, shared by the C3 draw and the F0 cursor
-; walk so they can never disagree about which slot a row is.  Two columns of
-; four, because the EN field-menu window fits exactly EIGHT text rows (the
-; 12px cadence -- see field_menu.asm's Ot6RageDrawSlots header) and a single
+; The configurator's page geometry, shared by the C3 draw and the F0 cursor
+; walk so they cannot disagree about which slot a row is.  Two columns of
+; four, because the EN field-menu window fits eight text rows (the
+; 12px cadence; see field_menu.asm's Ot6RageDrawSlots header) and a single
 ; column of eight would leave no row for the title or the LEARNED count.  It
-; is also vanilla's own shape for this very window: the rage browse is
+; is also vanilla's own shape for this window: the rage browse is
 ; `cursor_prop {0,0}, {2,8}` at 12px pitch (skills.asm:281-299).
 OT6_RAGECOLS         = 2
 OT6_RAGEROWS         = 4
@@ -91,8 +91,8 @@ OT6_SLOTTIER         := $57ba   ; Slot's latched boost tier (#31 backfill):
                                 ;   Ot6ActionEnd charges what the reels
                                 ;   delivered (ot6_slot.asm, the Slot strip)
 OT6_PIPTAIL          := $57bb   ; #33: frames of live pip painting left after
-                                ;   an ActionEnd with the battle menu closed
-                                ;   -- keeps the charge visible on its own
+                                ;   an ActionEnd with the battle menu closed.
+                                ;   keeps the charge visible on its own
                                 ;   frame.  set by Ot6ActionEnd (characters),
                                 ;   decremented by Ot6PipStage, cleared by
                                 ;   InitBP (init-exempt strip: power-on junk
@@ -103,7 +103,7 @@ OT6_HUDVEIL          := $57be
 OT6_SCRIPTBUSY       := $57bf
 OT6_SPECIES          := $57c0
 OT6_PIPCUR           := $57cc   ; live pip cell (0 = off); #33 keeps the
-OT6_PIPPREV          := $57ce   ;   one-cell footprint and moves only WHICH
+OT6_PIPPREV          := $57ce   ;   one-cell footprint and moves only which
 OT6_PIPCELL          := $57d0   ;   cell it is (see Ot6PipStage)
 OT6_LASTLR           := $57d2
 OT6_RESTAGE          := $57d4
@@ -123,8 +123,8 @@ OT6_SHADOW           := $ecf1
 ; claims (ot6_hud.asm's four lines of evidence; PushMode7Vars owns $f120+).
 ;
 ; #33 pending reveals: a chip banks its newly-revealed weakness bits here at
-; damage-CALC time; Ot6RevealCommit moves them into OT6_REVEALED_ELEM /
-; monster OT6_BOOST_REVEALED (and every same-species slot) on the DAMAGE
+; damage-calc time; Ot6RevealCommit moves them into OT6_REVEALED_ELEM /
+; monster OT6_BOOST_REVEALED (and every same-species slot) on the damage
 ; frame (the first numeral display, GfxCmd_0b), with Ot6ActionEnd as the
 ; no-numeral backstop.  One byte per monster slot, stride 2 (indexed by the
 ; slot offset 0,2..10 like $3e91/$3ea5; odd bytes unused).  Cleared by
@@ -142,19 +142,20 @@ OT6_WALLETCELLS      := $ed61   ; OT6_WALLET_W words
 OT6_WALLETSIG        := $ed6d   ; staged MP value; the flush repaints only
 OT6_WALLETSIGP       := $ed6f   ;   when CUR or SIG moves (see the flush)
 OT6_PIPSLOT          := $ed6b   ; #33: the character slot the live pip cell
-                                ;   follows while OT6_PIPTAIL runs -- the one
-                                ;   who just spent BP (Ot6ActionEnd sets both)
-; The wallet's five glyph|attr words are written UNROLLED (OT6_WALLETCELLS+0
-; through +9, ot6_hud.asm:1474-1516), so nothing in the code ever mentions the
-; width -- which is exactly how OT6_WALLET_W ended up a comment-only symbol,
-; and how a sixth cell could be added there without anyone noticing that the
-; run ends flush against OT6_PIPSLOT with zero slack.  This is the check that
-; would have said so.  Equality is the current, intended fit ($ed61 + 10 =
+                                ;   follows while OT6_PIPTAIL runs, the
+                                ;   one who just spent BP (Ot6ActionEnd sets
+                                ;   both)
+; The wallet's five glyph|attr words are written unrolled (OT6_WALLETCELLS+0
+; through +9, ot6_hud.asm:1474-1516), so no code mentions the
+; width.  That is why OT6_WALLET_W is a comment-only symbol,
+; and why a sixth cell could be added there without anyone noticing that the
+; run ends flush against OT6_PIPSLOT with no slack.  The assert below catches
+; that.  Equality is the current, intended fit ($ed61 + 10 =
 ; $ed6b), so the bound is <=, not <.
 .assert OT6_WALLETCELLS + OT6_WALLET_W * 2 <= OT6_PIPSLOT, error, "OT6 wallet cells run into OT6_PIPSLOT"
 OT6_RAGETIER         := $ed73   ; #40: the boost tier latched at Cmd_10 for the
                                 ;   whole trance (Slot's OT6_SLOTTIER pattern at
-                                ;   longer range -- BP is spent once at the
+                                ;   longer range: BP is spent once at the
                                 ;   Rage-start action but the tier must outlive
                                 ;   it).  kit-gau.md §6.1 proposed $57bb, but
                                 ;   #33 took that for OT6_PIPTAIL and $57d5+ is
@@ -162,153 +163,154 @@ OT6_RAGETIER         := $ed73   ; #40: the boost tier latched at Cmd_10 for the
                                 ;   ram_res w7e57d5,128), so the strip is full;
                                 ;   this lives in the measured-free shadow tail
                                 ;   instead, past InitBP's $70-byte clear.
-                                ;   Staleness is harmless by Slot's argument:
-                                ;   read only while a RAGE status is set, and
+                                ;   Staleness is harmless for the same reason
+                                ;   as Slot's: it is read only while a RAGE
+                                ;   status is set, and
                                 ;   the only writer of that status (Cmd_10)
                                 ;   always rewrites the latch first.
 OT6_NUMCTR           := $ed71   ; #33: last-seen damage-numeral thread counter
-                                ;   ($632e).  a change means GfxCmd_0b just
-                                ;   allocated a numeral -- the damage frame --
+                                ;   ($632e).  a change means GfxCmd_0b has
+                                ;   allocated a numeral (the damage frame)
                                 ;   and Ot6RevealPoll commits pending reveals.
                                 ;   past InitBP's clear on purpose: a stale
                                 ;   value costs one no-op commit (see the proc)
 OT6_COVERPAID        := $ed72   ; #37: per-character bitmask (----1234, the
-                                ;   OT6_DIVINE_USED / $3f2f shape) -- bit set =
+                                ;   OT6_DIVINE_USED / $3f2f shape).  bit set =
                                 ;   that character's True Knight cover has
-                                ;   already banked its BP this ROUND.  set by
+                                ;   already banked its BP this round.  set by
                                 ;   Ot6CoverBP, cleared per character by
                                 ;   Ot6ActionEnd (the round boundary) and
                                 ;   wholesale by InitBP.  unlike NUMCTR a stale
-                                ;   value here would SUPPRESS a real earn, so
+                                ;   value here would suppress a real earn, so
                                 ;   it is init-cleared explicitly.
-OT6_PIPPEND          := $ed74   ; #42: a DEFERRED pip paint -- character slot
+OT6_PIPPEND          := $ed74   ; #42: a deferred pip paint: character slot
                                 ;   + 1 (0 = nothing pending).  Ot6CoverBP
                                 ;   banks the blocker here at the cover commit
                                 ;   instead of arming OT6_PIPSLOT/OT6_PIPTAIL
                                 ;   directly, because that commit precedes the
                                 ;   damage numeral by 83-147 frames while the
-                                ;   tail is 32 -- the pip flashed and faded
-                                ;   two seconds BEFORE the block visibly
+                                ;   tail is 32, so the pip flashed and faded
+                                ;   two seconds before the block visibly
                                 ;   landed.  Ot6PipPending (ot6_hud.asm) moves
                                 ;   it into the live cell on the numeral frame,
-                                ;   exactly as Ot6RevealCommit/Ot6RevealPoll do
+                                ;   as Ot6RevealCommit/Ot6RevealPoll do
                                 ;   for weakness reveals.  A stale value would
                                 ;   paint a spurious pip on the first numeral
                                 ;   of the next battle, so InitBP clears it.
-; #48: the break flash.  ONE byte per monster slot, stride 2 and indexed by
-; the slot offset 0,2..10 exactly like OT6_RVPEND_* (so a chip holding the
-; ENTITY offset in y writes OT6_BRKTICK-8,y and the walkers read
+; #48: the break flash.  One byte per monster slot, stride 2 and indexed by
+; the slot offset 0,2..10 like OT6_RVPEND_* (so a chip holding the
+; entity offset in y writes OT6_BRKTICK-8,y and the walkers read
 ; OT6_BRKTICK,y); odd bytes unused.  The byte is a small state machine:
 ;   $00        idle
-;   $ff        PENDING -- the shields emptied at damage CALC and the flash is
+;   $ff        pending: the shields emptied at damage calc and the flash is
 ;              waiting for the damage frame (Ot6BreakArm, off Ot6RevealPoll's
 ;              numeral edge / Ot6ActionEnd's backstop, the OT6_PIPPEND shape)
 ;   1..$18     a live flash, counting down one per main-loop frame
 ; OT6_BRKPAL banks the monster's own sprite-palette bits (w7e80db & $0e) for
 ; the frame the flash hands the sprite back.
-; Both live PAST InitBP's shadow clear, so power-on junk is possible; every
+; Both live past InitBP's shadow clear, so power-on junk is possible; every
 ; reader is gated on the monster being present ($3aa8) and Ot6SeedShields
-; zeroes both per slot at every seed (fresh battle AND Cmd_20 reload), which
+; zeroes both per slot at every seed (fresh battle and Cmd_20 reload), which
 ; is the same clearing contract OT6_RVPEND_* already runs on.
-; OT6_BRKLIVE gates the per-frame painter, and it is not an optimisation --
-; it is the fix for a measured regression, and the measurement is worth more
-; than the feature.  Ot6BreakFlash first walked all six monster slots every
+; OT6_BRKLIVE gates the per-frame painter; it exists to fix a measured
+; regression rather than as an optimisation.
+; Ot6BreakFlash first walked all six monster slots every
 ; main-loop frame.  That stretched the True Knight fixture's fight by 10%:
 ; battle_trueknight's "two more covers in the same round" went 1635 -> 1798
-; frames for an IDENTICAL outcome (3 covers, bank 2, one bank write), which
+; frames for an identical outcome (3 covers, bank 2, one bank write), which
 ; flipped its 6a assertion from the numeral frame to Ot6ActionEnd's backstop.
 ;
-; Eight builds to pin it, and the first four conclusions were all wrong:
+; Eight builds measured it, and the first four conclusions were wrong:
 ;   painter disabled ................................. 1635  (pass)
 ;   painter walks, sprite writes suppressed .......... 1798
-;   painter walks, EVERY store suppressed ............ 1798   -> not the writes
+;   painter walks, every store suppressed ............ 1798   -> not the writes
 ;   painter early-outs on this flag, `jsr` retained .. 1798   -> not the walk
-;   CONTROL: 12 bare NOPs here, no OT6 feature ....... 1635  (pass)
-;   CONTROL: 80 bare NOPs here, no OT6 feature ....... 1798   -> not the feature
+;   control: 12 bare NOPs here, no OT6 feature ....... 1635  (pass)
+;   control: 80 bare NOPs here, no OT6 feature ....... 1798   -> not the feature
 ;   inline gate at the call site, 8 cycles idle ...... 1635  (pass)
-; So the cause is neither writes, nor memory, nor this feature: WHAT COSTS IS
-; CYCLES SPENT IN Ot6BgHud_ext, AND THE MARGIN IS BETWEEN 12 AND 80 OF THEM.
+; So the cause is not the writes, not the memory, and not this feature: the
+; cost is cycles spent in Ot6BgHud_ext, and the margin is between 12 and 80.
 ; That site runs from WaitFrame, after WaitVblank returns, once per battle
 ; frame (btlgfx_main.asm:432-445), and the battle loop's per-iteration budget
-; is close enough to full that a hair over it makes WaitVblank miss and the
-; whole iteration costs an extra hardware frame.  The penalty saturates --
-; 20 cycles and 110 cycles both cost exactly 163 frames -- which is what a
-; near-zero-slack set of frames looks like.  #33's NMI lesson said the same
-; thing about vblank TRANSFERS; this says it about plain CPU time.
+; is close enough to full that a small overrun makes WaitVblank miss and the
+; whole iteration costs an extra hardware frame.  The penalty saturates:
+; 20 cycles and 110 cycles both cost 163 frames, which is what
+; near-zero slack looks like.  #33's NMI finding said the same
+; about vblank transfers; this says it about plain CPU time.
 ;
-; [ SCOPE, re-measured 2026-07-30 on v0.9 -- issue #67.  Read this before
-;   citing the paragraph above as a bank-wide rule. ]
+; [ Scope, re-measured 2026-07-30 on v0.9, issue #67.  The paragraph above is
+;   not a bank-wide rule; see below before citing it as one. ]
 ;
-; 8d8a570 ran the same bare-NOP control in bank $C2's ACTION path (five NOPs
+; 8d8a570 ran the same bare-NOP control in bank $C2's action path (five NOPs
 ; before `jsr CheckRetal`, battle_main.asm:3146), saw 1635 -> 1798, and
 ; concluded that $C2's battle path could not grow at all.  That conclusion is
-; RETRACTED.  Re-run on v0.9, the identical control comes back:
-;   five NOPs in the $C2 action path ................ 1635  (pass) -- every
+; retracted.  Re-run on v0.9, the same control passes:
+;   five NOPs in the $C2 action path ................ 1635  (pass); every
 ;                                                       frame number in the run
 ;                                                       byte-identical to clean
 ;   80 NOPs in Ot6BgHud_ext ......................... 1798   -> still over
-; The original observation is left on the record because it was properly
-; measured and it did block work for a day; what changed underneath it was
+; The original observation is kept on the record because it was measured
+; properly and it did block work for a day; what changed underneath it was
 ; not investigated.
 ;
 ; Independent evidence pointing the same way: the v0.9 merge added ~49 bytes
-; of $C2 across four new call sites -- battle_main.asm:514 (Ot6RunicHold, in
+; of $C2 across four new call sites (battle_main.asm:514 (Ot6RunicHold, in
 ; QueueAction), :3409 (Ot6ThiefExec, Cmd_05), :4152 (Ot6RunicRaise, Cmd_0b),
-; :14652 (Ot6FoldPrices, UpdateEnabledMagic), plus Ot6RecheckMagic at :14715
-; -- with battle_trueknight unmoved at 1635 and no partial degradation.
+; :14652 (Ot6FoldPrices, UpdateEnabledMagic), plus Ot6RecheckMagic at :14715),
+; with battle_trueknight unmoved at 1635 and no partial degradation.
 ;
-; HYPOTHESIS, UNVERIFIED: what costs is per-battle-FRAME code, not per-ACTION
-; or per-menu-redraw code.  Every v0.9 hook above runs once per action or per
-; redraw; Ot6BgHud_ext runs from WaitFrame every battle frame.  That is
-; consistent with everything measured and with the WaitFrame mechanism above,
-; and it is still only consistent-with -- NOBODY has run the NOP control at
+; HYPOTHESIS, UNVERIFIED: the cost comes from per-battle-frame code, not from
+; per-action or per-menu-redraw code.  Every v0.9 hook above runs once per
+; action or per redraw; Ot6BgHud_ext runs from WaitFrame every battle frame.
+; That is consistent with everything measured and with the WaitFrame mechanism
+; above, and no more than consistent: nobody has run the NOP control at
 ; those four v0.9 sites, which is the experiment that would settle it.
 ;
-; So the standing rule is "no growth in the ONCE-PER-BATTLE-FRAME path", not
-; "no growth in $C2", and battle_trueknight asserts it in those words now
+; So the standing rule is "no growth in the once-per-battle-frame path" rather
+; than "no growth in $C2", and battle_trueknight asserts it in those words now
 ; (phase 4b) instead of through a pip-delivery assertion that could not tell
-; the two apart.  The safe budget is PER SITE, and the only site with a
-; measured number is this one.
+; the two apart.  The safe budget is per site, and this is the only site with
+; a measured number.
 ;
-; Hence the gate is INLINE at the call site (ot6_hud.asm): even a `jsr` into
-; a proc that early-outs was over the line.  Nonzero = at least one slot has
+; So the gate is inline at the call site (ot6_hud.asm): even a `jsr` into
+; a proc that early-outs was over budget.  Nonzero = at least one slot has
 ; a live countdown; the painter recomputes it as it walks, so a stale value
 ; costs exactly one walk and the byte needs no init clear.
 OT6_BRKLIVE          := $ed75
 OT6_BRKTICK          := $ed76   ; 12 bytes
 OT6_BRKPAL           := $ed82   ; 12 bytes
-; #59: boosted Runic.  ON REACTIVE VERBS, BOOST BUYS DURATION (DESIGN.md), and
-; Runic is the first instance -- so the stance needs a lifetime, which vanilla
-; never gave it (its stance is one bit that dies on the first absorb or on
-; Celes's next action, battle_main.asm:8671 and :511).
+; #59: boosted Runic.  On reactive verbs, boost buys duration (DESIGN.md), and
+; Runic is the first instance, so the stance needs a lifetime.  Vanilla gives
+; it none: its stance is one bit that clears on the first absorb or on
+; Celes's next action (battle_main.asm:8671 and :511).
 ;
-; TURNS, one byte per character, stride 2 and indexed by the ENTITY offset
-; (0/2/4/6) like OT6_BP_CLASS -- Ot6RunicRaise latches the pending boost here
+; Turns, one byte per character, stride 2 and indexed by the entity offset
+; (0/2/4/6) like OT6_BP_CLASS.  Ot6RunicRaise latches the pending boost here
 ; at Cmd_0b, Ot6RunicHold decrements it at each of her QueueActions and puts
-; the stance bit back, and 0 means "vanilla Runic": one absorb, then gone.
-; The odd bytes are unused.  It is a TURN count and not an absorb count
-; deliberately: a turn count is legible to the player ("three turns of
-; shield") and it also BOUNDS the BP earn by construction, since the earn is
-; capped at one per round.  Cleared per character by InitBP -- it sits past
-; the shadow clear, and a stale value would hand the next battle a phantom
-; standing stance, which is a mechanic and not a cosmetic.
+; the stance bit back, and 0 means vanilla Runic: one absorb, then it clears.
+; The odd bytes are unused.  It is a turn count rather than an absorb count
+; for two reasons: a turn count is legible to the player ("three turns of
+; shield"), and it bounds the BP earn by construction, since the earn is
+; capped at one per round.  Cleared per character by InitBP, because it sits
+; past the shadow clear and a stale value would give the next battle a
+; standing stance nobody raised, which is a mechanic and not a cosmetic.
 OT6_RUNICTURNS       := $ed8e   ; 8 bytes (4 characters, stride 2)
-; #59: the once-per-round absorb-earn latch -- a per-character bitmask
+; #59: the once-per-round absorb-earn latch, a per-character bitmask
 ; (----1234, the OT6_COVERPAID / $3f2f shape).  Bit set = that character's
-; Runic has already banked its BP this ROUND.
+; Runic has already banked its BP this round.
 ;
-; A SEPARATE BYTE FROM OT6_COVERPAID, deliberately.  #37's cover latch has the
-; identical shape and four spare high bits, and sharing them was weighed: the
-; two are different verbs with different prices -- Runic costs a turn, a True
-; Knight cover costs a relic slot and nothing else -- so one shared latch
-; would make equipping True Knight silently tax Celes's Runic earn, an
-; interaction nobody asked for and nobody would find.  One rule ("a reactive
-; earn is once per round"), two ledgers.
+; This is a separate byte from OT6_COVERPAID by design.  #37's cover latch has
+; the same shape and four spare high bits, and sharing them was considered.
+; The two are different verbs with different prices: Runic costs a turn, and a
+; True Knight cover costs a relic slot and nothing else.  One shared latch
+; would make equipping True Knight reduce Celes's Runic earn, an
+; interaction nobody asked for and nobody would find.  The rule that a
+; reactive earn happens once per round is shared; the storage is not.
 OT6_RUNICPAID        := $ed96
 OT6_BREAK_FLASH      = $18      ; 24 frames: three 4-frame pulses (see
                                 ;   Ot6BreakFlash's `and #$04` cadence)
 OT6_BREAK_SFX        = $be      ; vanilla's Odin/Raiden cleave sfx
-                                ;   (btlgfx_main.asm:26054) -- see Ot6BreakArm
+                                ;   (btlgfx_main.asm:26054); see Ot6BreakArm
 .assert OT6_RVPEND_ELEM = OT6_SHADOW + (14 * 6), error, "reveal-pending must follow the shadow (InitBP clears both in one loop)"
 .assert OT6_WALLETPREV + 1 <= OT6_SHADOW + $70 - 1, error, "wallet cur/prev must sit inside InitBP's $70-byte clear"
 .assert OT6_COVERPAID = OT6_NUMCTR + 1, error, "cover-earn latch must follow the numeral counter (both live past InitBP's shadow clear)"
@@ -319,8 +321,8 @@ OT6_BREAK_SFX        = $be      ; vanilla's Odin/Raiden cleave sfx
 .assert OT6_RAGETIER <= $ef1f, error, "OT6 shadow tail exceeds the measured-free range ($f120+ is PushMode7Vars')"
 ; #40 and #37 allocated out of the same measured-free shadow tail in
 ; parallel worktrees and could not see each other.  They landed adjacent
-; and disjoint -- but nothing said so until this assert, which is exactly
-; the check a concurrent allocation needs.
+; and disjoint, but nothing checked that until this assert, which is the
+; check a concurrent allocation needs.
 .assert OT6_COVERPAID <> OT6_RAGETIER, error, "cover-earn latch and rage tier collide"
 .assert OT6_PIPPEND > OT6_RAGETIER, error, "deferred-pip cell must not collide with the rage tier"
 .assert OT6_PIPPEND > OT6_SHADOW + $70 - 1, error, "deferred-pip cell must sit PAST InitBP's shadow clear (InitBP zeroes it explicitly)"

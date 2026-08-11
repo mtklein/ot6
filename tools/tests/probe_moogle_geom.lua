@@ -1,15 +1,15 @@
 -- probe_moogle_geom.lua -- the passability dump the Moogle-defense
 -- input-driven attempt was missing (issue #75, marshal-investigation).
 -- Boots moogle_defense.mss (defense live, party 1 at the (14,14) choke)
--- and, with ZERO writes and ZERO input, renders:
+-- and, with zero writes and zero input, renders:
 --   * every field object's tile position (parties, moogles, Marshal,
 --     guards, TERRA-down)
---   * the arena's passability x 2..28, y 6..46 -- prop bytes p1/p2 plus
+--   * the arena's passability x 2..28, y 6..46: prop bytes p1/p2 plus
 --     the object-occupancy map, the same view stepAllowed() consults
---   * a flood-fill of party 1's reachable set from the choke (live
---     object map, i.e. "can party 1 step aside RIGHT NOW?")
---   * the same flood with the object map IGNORED (pure tile geometry:
---     where could anybody stand once the blockers move?)
+--   * a flood-fill of party 1's reachable set from the choke, using the
+--     live object map, so it shows where party 1 can step aside now
+--   * the same flood with the object map ignored, which is tile geometry
+--     only and shows where anybody could stand once the blockers move
 --   * BFS probes to candidate aside tiles and to the Marshal
 local H = dofile("tools/tests/lib/ot6.lua")
 local DEFENSE = "build/states/moogle_defense.mss.lua"

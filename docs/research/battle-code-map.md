@@ -13,11 +13,11 @@ matching the classic addresses), so both are cited by C2/xxxx address.
   bank): http://assassin17.brinkster.net/code2i.txt (plain HTTP)
 - Leet Sketcher "Bank C2 Disassembly v7" fills the uncommented gaps:
   http://l33t5k37ch3r.altervista.org/bank-c2-disassembly.html
-- C3 menu bank: Novalia Spirit's "$C3 Compendium" — fully commented, every
-  line (ff6hacking wiki doc:game page, ff6_bank_c3.zip). Menu work in M4
-  is well-lit after all.
-- C1 (battle gfx): bankC1.txt in slick_banks.zip on the wiki — thin,
-  tentative comments; expect real reverse-engineering for the shield-pip UI.
+- C3 menu bank: Novalia Spirit's "$C3 Compendium", fully commented on every
+  line (ff6hacking wiki doc:game page, ff6_bank_c3.zip). Menu work in M4 has
+  full comment coverage.
+- C1 (battle gfx): bankC1.txt in slick_banks.zip on the wiki. Comments are
+  thin and tentative; the shield-pip UI will need reverse-engineering.
 - Mirrors: https://github.com/clementgallet/ff6-tas/tree/master/DisassemblyDocs,
   https://datacrystal.tcrf.net/wiki/Final_Fantasy_VI:ROM_map/Assembly_C22 (etc.)
 
@@ -43,20 +43,20 @@ matching the classic addresses), so both are cited by C2/xxxx address.
 All 32 bits across $3EE4/$3EE5/$3EF8/$3EF9 are assigned (full table:
 https://www.ff6hacking.com/wiki/doku.php?id=ff3:ff3us:doc:asm:list:condition_effects).
 Community practice (madsiur/Synchysi,
-https://www.ff6hacking.com/forums/archive/index.php?thread-2153.html): don't
-add a 33rd bit; either repurpose one or build a pseudo-status from free RAM.
+https://www.ff6hacking.com/forums/archive/index.php?thread-2153.html) is to
+not add a 33rd bit, and instead either repurpose one or build a pseudo-status
+from free RAM.
 
 Precedent: Madsiur's Status Timers Hack used the blank per-entity byte
 tables $3E38/$3E39/$3E88/$3E89 + free bits $10–$80 of the expired-status
-byte $B8 (https://www.ff6hacking.com/forums/thread-4176.html). We're not
-stacking that hack, so those four blank per-entity tables are available —
-though since we build from source with ld65, the cleaner move is to
-allocate new battle-RAM segments through the linker config instead of
-scavenging.
+byte $B8 (https://www.ff6hacking.com/forums/thread-4176.html). OT6 does not
+use that hack, so those four blank per-entity tables are available. Since OT6
+builds from source with ld65, allocating new battle-RAM segments through the
+linker config is simpler than reusing them.
 
 Broken = per-entity timer + five hook sites (turn gate, always-hit,
-×2 damage, tick, wear-off) — every one at a verified address above, each
-copying a vanilla pattern (Stop/Freeze). Spell data byte $07 has six free
+×2 damage, tick, wear-off). All five are at verified addresses above, and each
+copies a vanilla pattern (Stop/Freeze). Spell data byte $07 has six free
 bits per *attack* (per Synchysi) if we need to flag attacks specially.
 
 ## Spell/attack data (for chip assignment + boost tiers)

@@ -1,6 +1,6 @@
--- probe_campbag.lua -- one-shot diagnostic: what does camp_cleared carry?
--- Party HP/MP per character and the full non-empty inventory, so the
--- escape step's healing budget is a measurement instead of a guess.
+-- probe_campbag.lua -- one-shot diagnostic: reports what camp_cleared
+-- carries.  Party HP/MP per character and the full non-empty inventory,
+-- so the escape step's healing budget can be measured.
 local H = dofile("tools/tests/lib/ot6.lua")
 
 H.run({ maxFrames = 2000 }, {

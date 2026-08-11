@@ -1,6 +1,6 @@
 -- probe_n20c.lua -- model-vs-engine on post-battle map 20: dump the
 -- (49,14) neighborhood's prop bytes, then push raw held directions and see
--- whether the ENGINE moves where the MODEL says wall.
+-- whether the engine moves where the model says wall.
 local H = dofile("tools/tests/lib/ot6.lua")
 
 local function map() return H.mapId() & 0x1ff end

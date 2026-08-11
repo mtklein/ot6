@@ -1,14 +1,14 @@
 # Narshe school — teaching the OT6 loop
 
 The Narshe Beginner's House rewritten to teach break/boost instead of
-vanilla trivia. **The fence:** this change touches the school's tutorial
-rooms only — no story scenes, no other dialog anywhere. DESIGN.md's
+vanilla trivia. **Scope:** this change touches the school's tutorial
+rooms only, and no story scenes or dialog elsewhere. DESIGN.md's
 "story/dialog changes out of scope" clause (`DESIGN.md`, "Out of scope
-(for now)") is amended by this sanction exactly that far and no farther.
+(for now)") is amended by this sanction only that far.
 
-Diff discipline: an advisor whose vanilla lesson is still true in OT6
-keeps vanilla text, byte for byte. Eight dialog ids change; everything
-else in the school is untouched.
+Diff discipline: where an advisor's vanilla lesson is still true in OT6,
+the vanilla text is kept byte for byte. Eight dialog ids change;
+everything else in the school is untouched.
 
 ## The vanilla school (inventory, from source)
 
@@ -48,10 +48,10 @@ Dialog id = index into `ff6/src/text/dlg1_en.json` ($0257 = entry 599).
 ## Room-to-lesson mapping
 
 The player enters at the bottom-right; the greeter stands beside the
-entrance and names the course. No forced order (vanilla had none), but
-the natural nearest-door-first walk is 107 → 106 → 105, which lands:
+entrance and names the course. There is no forced order (vanilla had
+none). The nearest-door-first walk is 107 → 106 → 105, which puts
 supplies and a practice fight just inside the door, the core loop in the
-middle, the economy and the tier-2 seed in the deepest room.
+middle room, and the economy and the tier-2 seed in the deepest room.
 
 | Room | Teaches | Changed ids |
 |---|---|---|
@@ -61,15 +61,16 @@ middle, the economy and the tier-2 seed in the deepest room.
 | Right (107) | vanilla supplies/save, plus the practice dare at the live monster chest | $025D |
 
 Slot choice inside each room: the replaced advisors carried the most
-expendable vanilla lessons — $0267 (numeral colors), $0264 (L/R
-multi-target: now actively *misleading*, since R/L during a spell list
-fold tiers and R/L during the command menu boost), $026D (3-way attack
-trivia), $0270 (Image), $026E (Rflect fade corner case), $0276 (Rflect
-bounce corner case). The seed sits on $0276 deliberately: the deepest
-corner of the deepest room holds the forward-looking secret. The $025D
-advisor stands directly beside the live monster chest — his dare is the
-school's graduation exercise and the echo the mines' chest ambush
-(Repo Man) pays back later.
+expendable vanilla lessons. They are $0267 (numeral colors), $0264 (L/R
+multi-target, which is now *misleading*, since R/L during a spell list
+folds tiers and R/L during the command menu boosts), $026D (3-way attack
+trivia), $0270 (Image), $026E (Rflect fade corner case), and $0276
+(Rflect bounce corner case). The tier-2 seed sits on $0276 because that
+advisor stands in the far corner of the deepest room, so a player who
+finds him has already covered the rest. The $025D advisor stands beside
+the live monster chest, so his line points at a fight the player can
+take immediately; the mines' chest ambush (Repo Man) reuses the same
+setup later.
 
 ## The copy (final)
 
@@ -134,19 +135,19 @@ turn / cap 5 / spend ≤3 (Ot6InitBP, Ot6ActionEnd, Ot6Boost), no regen
 on a boosted turn (Ot6ActionEnd), folds per Ot6FoldTbl with base-tier
 MP (Ot6QueueFold), live list re-fold (Ot6PreviewList_ext).
 
-The tier-2 seed ($0276) rides the imperial line's **varied, per-party**
-weaknesses (pierce/slash/bolt/bludgeon, chosen so every forced party
-carries a key): armor turns a careless blow aside, but every plate has a
-seam, and no two are the same — bring the weapon your party carries. That
-is the *match the tool to the foe* lesson $0264 already gestures at, not
-*one tool fits all armor*. Full scheme and rationale: bosses-wob.md,
-"The imperial soldier line."
+The tier-2 seed ($0276) describes the imperial line's **varied,
+per-party** weaknesses (pierce/slash/bolt/bludgeon, chosen so every
+forced party carries a key). The lesson is that each imperial machine has
+its own weakness and the player should bring the weapon that matches the
+one in front of them, which extends the match-the-tool-to-the-foe lesson
+$0264 introduces. Full scheme and rationale: bosses-wob.md, "The imperial
+soldier line."
 
 ## Kept vanilla (lesson still true)
 
 $0258 WoR greeter, $0259 spring, $025A/$06D4 save point, $025B pots,
-$025C curatives, $025E/$06D2 relics ($06D2 is shared with a WoR scene —
-out of fence anyway), $025F buttons, $0260 equip arrows, $0261 Wait
+$025C curatives, $025E/$06D2 relics ($06D2 is shared with a WoR scene,
+so it is out of scope anyway), $025F buttons, $0260 equip arrows, $0261 Wait
 mode, $0262 run, $0263 ATB/pass, $0265 Row/Defense, $0266 pincer,
 $0268 back row, $0269/$026A statuses, $026B undead, $026C Life 3/Regen,
 $0271 experience, $0272 near-fatal,
@@ -155,23 +156,23 @@ $0275 SwdTech (charge gauge still live today), $0277–$027D color demo,
 $03A5/$03A6 chocobo (shared with stables).
 
 When the Bushido menu or magicite sub-jobs ship, $0275 / $0274 become
-false and rejoin this exercise.
+false and will need rewriting as well.
 
 ## $026F names the Boost Point
 
 Runic absorbs the next spell for MP **and** +1 BP (Ot6RunicBP,
 ff6/src/battle/ot6.asm, hooked into vanilla's RunicEffect), so $026F
-(Runic/Morph/Dance/Rage) says so. Page 1 only, minimal diff, Morph and
-Dance/Rage untouched:
+(Runic/Morph/Dance/Rage) says so. Only page 1 changes; the Morph and
+Dance/Rage pages are untouched:
 
 > ``Runic''
 > Turns many magic attacks into MP, and earns a Boost Point! Can be
 > used repeatedly.
 
-"Boost Point" is the term $0270 already teaches, so the lesson borrows
-vocabulary the player has met rather than inventing any. Page 1 renders
-4 lines, the page maximum and exactly where the Morph page already sits,
-so no 5th-line auto-pause is introduced.
+"Boost Point" is the term $0270 already teaches, so this line reuses
+vocabulary the player has already seen instead of introducing a new one.
+Page 1 renders 4 lines, which is the page maximum and the same count the
+Morph page already uses, so no 5th-line auto-pause is introduced.
 
 ## Text-machine constraints (measured)
 
@@ -184,10 +185,10 @@ so no 5th-line auto-pause is introduced.
 - **Encoding:** char tables `dialog_en` + `dialog_escape` + `dte`.
   DTE pairs compress ~1.6:1; the encoder greedy-longest-matches. The
   ROM's DTE table (`dte_tbl_en.dat`) already agrees with the codec's
-  `dte.json` — do **not** run `make dte` (it re-derives the table from
-  the corpus and would churn every string).
-- **Wrapping:** the field renderer word-wraps automatically — x starts
-  at 4, a word that would reach x=$e0 (224) wraps
+  `dte.json`. Do **not** run `make dte`: it re-derives the table from
+  the corpus and would churn every string.
+- **Wrapping:** the field renderer word-wraps automatically. x starts
+  at 4, and a word that would reach x=$e0 (224) wraps
   (`src/field/text.asm` InitDlgText `lda #$e0 / sta $c8`,
   UpdateDlgTextOneLine `cmp $c8`). ~220px/line, proportional font
   (FontWidth, `src/gfx/font_gfx.asm`: lowercase mostly 7-8px, space
@@ -196,32 +197,34 @@ so no 5th-line auto-pause is introduced.
   here are written to wrap ≤4 lines. `{n}` only for structure.
 - **Capacity:** dialog block = `fixed_block $01f100` (127,232 B) at
   cd/0000 (`src/text/text_main.asm:96`). The *checked-in* .dat files
-  total 126,907 B — but they are ripped Square-original bytes; the
-  repo encoder re-encodes the same text to ~118.5 KB (Square's tool
-  wasn't greedy). First json edit rebuilds both banks: ROM dialog
-  bytes churn wholesale (harmless — everything reaches dialog data
-  through DlgPtrs, cc/e602), and real slack is ~8.4 KB. Built
+  total 126,907 B, but they are ripped Square-original bytes; the
+  repo encoder re-encodes the same text to ~118.5 KB, because Square's
+  tool was not greedy. The first json edit rebuilds both banks, so ROM
+  dialog bytes churn wholesale. That is harmless, since everything
+  reaches dialog data through DlgPtrs, cc/e602, and real slack is
+  ~8.4 KB. Built
   post-change total: 65,554 + 53,302 = 118,856 B (slack 8,376); the
   bank split lands at id 1715 (`Dlg1::ARRAY_LENGTH` → DlgBankInc). Total
   dialog: 65,554 + 53,302 = 118,856 B, slack 8,376.
 - **Element glyphs in dialog:** the dialog charset maps $76–$7E to
   {fire}-style escapes, but no vanilla string uses them and the M2
   icons live in battle-font cells $eb–$ef/$fb–$fd only. Unverified in
-  the field font — the copy uses words, not icons.
+  the field font, so the copy uses words rather than icons.
 
 ## Open items
 
 - **L/R during targeting:** vanilla multi-target (the old $0264) may
   now collide with Ot6Boost, which watches L/R whenever `$7bca` says a
-  battle menu is open. Needs a live check; if multi-target still
-  works, it's undocumented in the school now (acceptable — vanilla
-  discovery); if it half-works, that's an input-priority bug to file,
-  not a text problem.
+  battle menu is open. Needs a live check. If multi-target still
+  works, it is now undocumented in the school, which is acceptable
+  because vanilla left it to discovery. If it half-works, file it as
+  an input-priority bug.
 - **The magicite ghost ($0274)** teaches vanilla espers, which is what
   the ROM does today but contradicts the magicite-as-sub-jobs design.
   Rewrite belongs to the milestone that implements sub-jobs.
 - **WoR door-opener shares $0257**: he now announces the new rules at
-  the door in the World of Ruin — read and accepted (he is the
-  school's own doorman; the line is world-state-neutral).
-- **Element icons in school text** once the field font question above
-  is settled — icons teaching icons would beat words.
+  the door in the World of Ruin. Read and accepted, since he is the
+  school's own doorman and the line is world-state-neutral.
+- **Element icons in school text**, once the field font question above
+  is settled. Icons would teach the ability marks more directly than
+  words do.

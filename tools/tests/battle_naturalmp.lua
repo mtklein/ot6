@@ -1,47 +1,48 @@
 -- @suite savestate=kolts_cave
--- battle_naturalmp.lua -- issue #32: battle MP is UNIVERSAL, on NATURAL MP.
+-- battle_naturalmp.lua -- issue #32: battle MP is universal, on natural MP.
 --
--- THE BUG.  Vanilla's battle init loads every character's MP through
--- LoadCharProp (battle_main.asm:6621-6640) and then CLEARS it again unless a
--- magic/lore command init set the has-mp flag $f8 -- i.e. unless the character
--- knows a spell (InitCmdList, battle_main.asm:13950-13956 + InitCmd_03/04/05).
--- Under the live MP economy (OT6_MP_COSTS, v0.5) that sent every spell-less
--- character into battle at 0/0 while Ot6AbilityCost priced their whole kit:
--- Blitz, Tools, Bushido and Steal all fizzled through CalcAttackEffect's
--- insufficient-MP gate (:8311-8329) as silent wasted turns, and the max-0
--- writeback skip (:12265-12267) kept field MP full so nothing on the field
--- ever showed it.  The suite was blind BY CONSTRUCTION: every battle test and
--- generator pins MP before acting.  This test pins NO character state -- it is
--- the natural-MP coverage the class of bug requires.
+-- The bug: vanilla's battle init loads every character's MP through
+-- LoadCharProp (battle_main.asm:6621-6640) and then clears it again unless a
+-- magic or lore command init set the has-mp flag $f8, that is, unless the
+-- character knows a spell (InitCmdList, battle_main.asm:13950-13956 plus
+-- InitCmd_03/04/05).  Under the live MP economy (OT6_MP_COSTS, v0.5) that sent
+-- every spell-less character into battle at 0/0 while Ot6AbilityCost priced
+-- their whole kit: Blitz, Tools, Bushido and Steal all fizzled through
+-- CalcAttackEffect's insufficient-MP gate (:8311-8329) as wasted turns with no
+-- message, and the max-0 writeback skip (:12265-12267) kept field MP full so
+-- nothing on the field showed it.  The suite could not see this by
+-- construction, because every battle test and generator pins MP before acting.
+-- This test pins no character state, and is the natural-MP coverage this class
+-- of bug requires.
 --
--- FIXTURE.  kolts_cave.mss (make savestates): map 96, party TERRA LOCKE EDGAR
--- with whatever MP their real save carries -- one innate mage (TERRA, the
--- unchanged-path control) and two spell-less kit carriers.  The natural
--- encounter drive is battle_flyin's (same fixture, same lane pacing).
+-- Fixture: kolts_cave.mss (make savestates): map 96, party TERRA LOCKE EDGAR
+-- with whatever MP their real save carries, which gives one innate mage
+-- (TERRA, the unchanged-path control) and two spell-less kit carriers.  The
+-- natural encounter drive is battle_flyin's (same fixture, same lane pacing).
 --
 -- Asserted, in order:
---   1. UNIVERSAL LOAD -- every party slot enters battle with cur MP equal to
+--   1. universal load: every party slot enters battle with cur MP equal to
 --      its field MP ($160d via $3010) and max MP nonzero.  Fails pre-fix:
 --      LOCKE and EDGAR read 0/0.
---   2. A PRICED VERB EXECUTES ON NATURAL MP -- Edgar's AutoCrossbow (4 MP,
---      Ot6AbilityCostTbl) is driven as real pad edges: the cost queue prices
+--   2. a priced verb executes on natural MP: Edgar's AutoCrossbow (4 MP,
+--      Ot6AbilityCostTbl) is driven as real pad edges, the cost queue prices
 --      it, monster HP drops, and exactly that cost is charged.  Fails
 --      pre-fix: the fizzle deals nothing and charges nothing.
---   3. WRITEBACK INTEGRITY -- after the battle the field character data holds
---      pre-battle MP minus exactly what was spent, for every member (the
---      max-0 skip no longer hides the pool, so this is the guard that the
---      now-live writeback path is correct).
+--   3. writeback integrity: after the battle the field character data holds
+--      pre-battle MP minus exactly what was spent, for every member.  The
+--      max-0 skip no longer hides the pool, so this guards that the
+--      now-live writeback path is correct.
 -- No state is written at all (issue #75).  Two idioms this file used to
--- carry are gone: the danger pin ($1f6e := 0xff00 per pace frame) is the
--- identical pin 77bc4f9 deleted on this very fixture -- the pace loop was
+-- carry are gone.  The danger pin ($1f6e := 0xff00 per pace frame) is the
+-- same pin 77bc4f9 deleted on this fixture: the pace loop was
 -- already walking the lane, so the engine accrues danger per step and
--- rolls the encounter itself; and the monster staging (stop bit + HP
+-- rolls the encounter itself.  And the monster staging (stop bit plus HP
 -- floored to 0xF000 so nothing died before the measurement) is deleted
--- outright -- the party only Defends until Edgar's turn, so nobody on our
--- side deals damage, and the map-96 pool's damage output cannot zero
--- anyone's MP (MP is what phases 1-2 measure).  The battle then ends by
--- FLEE (held L+R, the engine's own run mechanic) instead of clearBattle
--- writing the battle-clearing flag, which makes phase 3 a STRONGER claim:
+-- outright, because the party only Defends until Edgar's turn, so nobody on
+-- our side deals damage, and the map-96 pool's damage output cannot zero
+-- anyone's MP, which is what phases 1-2 measure.  The battle then ends by
+-- fleeing (held L+R, the engine's own run mechanic) instead of clearBattle
+-- writing the battle-clearing flag, which makes phase 3 a stronger claim:
 -- the writeback path is exercised on the flee exit, not just the victory exit.
 local H = dofile("tools/tests/lib/ot6.lua")
 local STATE = "build/states/kolts_cave.mss.lua"
@@ -71,10 +72,10 @@ local function monsterHpSum()
 end
 
 -- wait for a character's menu, consuming other characters' turns with a
--- real Defend (right swaps Fight->Def, then A) -- the probe_factory_menus
+-- real Defend (right swaps Fight->Def, then A), the probe_factory_menus
 -- pattern; Defend is unpriced so it cannot move anyone's MP.  The monsters
--- take their own turns in here now (no stop bit): their damage lands on
--- party HP, which nothing in this test asserts on.
+-- take their own turns in here now, since there is no stop bit: their damage
+-- lands on party HP, which nothing in this test asserts on.
 local function menuFor(charId, what)
   local ph = 0
   local function up()
@@ -112,7 +113,7 @@ H.run({ maxFrames = 60000 }, {
 
   -- pace the auto-detected lane until a natural encounter fires
   -- (battle_flyin's drive: the danger counter accrues per step and rolls
-  -- the encounter itself -- 77bc4f9 measured the natural roll at ~1300
+  -- the encounter itself; 77bc4f9 measured the natural roll at ~1300
   -- frames of pacing on this fixture, well inside the budget below)
   (function()
     local battN, waited, lane = 0, 0, nil
@@ -141,7 +142,7 @@ H.run({ maxFrames = 60000 }, {
   H.waitUntil(function() return H.battleActive() end, 900, "battle armed", 5),
   H.waitFrames(240),
 
-  -- ------------------------- 1. UNIVERSAL LOAD: battle MP == field MP --
+  -- ------------------------- 1. universal load: battle MP == field MP --
   H.call(function()
     for s = 0, 3 do
       local id = H.readByte(0x3ED8 + s * 2)
@@ -185,7 +186,7 @@ H.run({ maxFrames = 60000 }, {
   tap("down", 20),                        -- Fight -> Tools (row 1, cmd $09)
   tap("a", 60),                           -- the Tools submenu opens
   -- steer to AutoCrossbow wherever MakeToolsList put it.  wItemList holds
-  -- 3-byte records (id / usage flags / targeting -- measured live: e.g.
+  -- 3-byte records (id, usage flags, targeting; measured live, for example
   -- { A4 01 6A  A3 01 6A  AA 01 6A }); the drawn grid is 2 columns,
   -- row-major, so tool index i sits at row i//2, column i%2.
   H.call(function()
@@ -238,10 +239,10 @@ H.run({ maxFrames = 60000 }, {
   end),
 
   -- ----------------------------------- 3. writeback: field MP correct --
-  -- End the fight the way a player can: FLEE (held L+R).  The clearBattle
-  -- flag write this replaces ended by forced victory; the flee exit runs
-  -- the same character writeback, and asserting on it here means the
-  -- writeback guard now covers the exit path a real escape takes.
+  -- End the fight the way a player can, by fleeing with held L+R.  The
+  -- clearBattle flag write this replaces ended by forced victory; the flee
+  -- exit runs the same character writeback, and asserting on it here means the
+  -- writeback guard covers the exit path a real escape takes.
   H.fleeBattle(12000),
   H.waitFrames(120),
   H.call(function()

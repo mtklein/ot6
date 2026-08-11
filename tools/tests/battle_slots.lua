@@ -1,14 +1,14 @@
 -- @suite slow
 -- battle_slots.lua -- boost-tiered Slot (Setzer), the chance-verb canon
 -- (ROADMAP.md "Design canon", kits.md "Boost-tiered Steal") applied to the
--- reels: on chance verbs boost buys CERTAINTY in the verb's own vocabulary.
--- Slot's vocabulary is
+-- reels: on chance verbs boost buys certainty in the verb's own terms.
+-- Slot's terms are
 -- vanilla's single rig byte (w7e6179, one Rand at the first A press) and the
--- drift/avoid machinery it drives:
---   blessed icon (rig & SlotRateTbl[icon] == 0): reels 2/3 drift up to
---     w7e617d extra icons TOWARD the pair/triple (vanilla budget 4);
---   cursed icon: no help, and a landed pair gets w7e617c bit 7 -- reel 3
---     REFUSES to stop on the completing icon (the rigged miss).
+-- drift and avoid code it drives:
+--   blessed icon (rig & SlotRateTbl[icon] == 0): reels 2 and 3 drift up to
+--     w7e617d extra icons toward the pair or triple (vanilla budget 4);
+--   cursed icon: no help, and a landed pair gets w7e617c bit 7, so reel 3
+--     refuses to stop on the completing icon (the rigged miss).
 --
 -- The hooks under test (ot6_kits.asm; C1 shims in btlgfx_main.asm):
 --   Ot6SlotRig    -- latches the spin's tier ($57ba) at the first press and
@@ -21,41 +21,41 @@
 --   Ot6SlotCommit -- re-banks the latched tier into OT6_BOOST_REVEALED at
 --                    the commit press, so Ot6ActionEnd charges exactly the
 --                    tier the reels were spun with.
---   Ot6BoostDmg's $0f gate -- slot attacks never get the damage multiplier.
+--   Ot6BoostDmg's $0f gate: slot attacks never get the damage multiplier.
 --
--- ISSUE #75 SPLIT.  battle_slotsboot (the input-driven model this file now
--- follows) proves tier 0 and tier 3 end to end on a NATURAL checkpoint boot:
--- latch 0/3, rig forced benevolent at 3, the chosen triple, the 3-bp
--- charge, the regen, and the multiplier exemption watch -- so this file's
--- old poked tier-3 arm is DELETED as covered.  What remains here splits in
+-- Issue #75 split.  battle_slotsboot (the input-driven model this file now
+-- follows) covers tier 0 and tier 3 end to end on a natural checkpoint boot:
+-- latch 0 and 3, rig forced benevolent at 3, the chosen triple, the 3-bp
+-- charge, the regen, and the multiplier exemption watch, so this file's
+-- old poked tier-3 arm is deleted as covered.  What remains here splits in
 -- two:
 --
---   INPUT-DRIVEN HALF (zero writes): a second natural boot of the
---   terra-returned-v1 SRAM checkpoint (battle_slotsboot's cold-Continue /
---   disembark / walk / choose-the-draw pattern, verbatim), driving the two
---   tiers slotsboot leaves unproven with real R presses on earned bp:
+--   The input-driven half (no writes): a second natural boot of the
+--   terra-returned-v1 SRAM checkpoint (battle_slotsboot's cold-Continue,
+--   disembark, walk and choose-the-draw pattern, unchanged), driving the two
+--   tiers slotsboot leaves unchecked with real R presses on earned bp:
 --     H1 (1 bp): latch = 1, the 1-bp charge with regen skipped, and the
---        commit re-bank -- tier 1 leaves the drawn rig alone, so no rig
---        value is asserted (asserting one would need the poke this file
---        just gave up; the rig's tier-1 hands-off half lives in the
---        quarantine lab where the byte can be planted).
---     H2 (2 bp, banked by two real unboosted spins): latch = 2, THE RIG
---        FORCED BENEVOLENT ($00, or $3c under a real joker gate) -- read,
---        not written -- reel-2 help blessed toward the icon reel 1 really
---        stopped on, with vanilla's 4-icon budget stored by the $f0 hook,
+--        commit re-bank.  Tier 1 leaves the drawn rig alone, so no rig
+--        value is asserted; asserting one would need the poke this file
+--        just gave up, and the rig's tier-1 hands-off half lives in the
+--        quarantine lab where the byte can be planted.
+--     H2 (2 bp, banked by two real unboosted spins): latch = 2, the rig
+--        forced benevolent ($00, or $3c under a real joker gate), read
+--        rather than written, with reel-2 help blessed toward the icon reel 1
+--        stopped on, vanilla's 4-icon budget stored by the $f0 hook,
 --        and the 2-bp charge.
 --
---   *** LABELED QUARANTINE LAB (issue #75) -- the icon/rig-byte arms ***
+--   Labeled quarantine lab (issue #75): the icon and rig-byte arms.
 --   No player input selects a reel icon: the reels free-run at frame rate
---   and a press stops them wherever the frame parity fell, so "a cursed
---   pair of 3s", "the same triple at tier 0 and tier 3" (the exemption
---   A/B), and "a 7-pair under the joker gate" are unproducible on cue by
---   any input-driven drive.  Those arms are MECHANISM unit tests (burn-down plan
---   systemic call 2) and stay below as one loudly-labeled block on the old
---   entry-point install rig -- rig bytes planted, reel positions parked,
---   stopped reels restarted to replay the driver's boundary walk, monsters
+--   and a press stops them wherever the frame parity fell, so a cursed
+--   pair of 3s, the same triple at tier 0 and tier 3 (the exemption
+--   A/B), and a 7-pair under the joker gate cannot be produced on cue by
+--   any input-driven drive.  Those arms are mechanism unit tests (burn-down
+--   plan systemic call 2) and stay below as one labeled block on the old
+--   entry-point install rig: rig bytes planted, reel positions parked,
+--   stopped reels restarted to replay the driver's boundary walk, and monsters
 --   staged so nothing dies mid-observation.  The block keeps this file's
---   waiver lines and MAY NEVER PRODUCE FIXTURES.  Arms: T0 byte-vanilla +
+--   waiver lines and may never produce fixtures.  Arms: T0 byte-vanilla and
 --   the rigged miss; T1 the miss bought off (same drive, one pending byte
 --   different); T2 the drift walk replayed on a fresh budget; T3b the
 --   exemption A/B damage ratio on identical triples; T3j the joker gate
@@ -114,7 +114,7 @@ local function armWatches()
       driftW[#driftW + 1] = { k = s["cpu.k"], v = v }
     end)
   end, emu.callbackType.write, 0x7E617D, 0x7E617D)
-  -- the exemption watch (cheap guards first -- see battle_slotsboot's twin)
+  -- the exemption watch (cheap guards first; see battle_slotsboot's copy)
   local BOOSTDMG = H.sym("Ot6BoostDmg")
   emu.addMemoryCallback(function(_, v)
     if not (v > 0 and H.readByte(0xB5) == 0x0F) then return end
@@ -132,7 +132,8 @@ local steps = {}
 local function add(t) for _, s in ipairs(t) do steps[#steps + 1] = s end end
 
 -- ========================================================================
--- INPUT-DRIVEN HALF -- the natural checkpoint boot (battle_slotsboot's pattern)
+-- The input-driven half: the natural checkpoint boot (battle_slotsboot's
+-- pattern)
 -- ========================================================================
 local slotOf = {}
 local function ent() return actor * 2 end
@@ -214,7 +215,8 @@ local function waitStopH(r, what)
   return H.waitUntil(function() return H.readByte(STOP[r]) ~= 0 end, 900, what, 2)
 end
 
--- one full spin played through real input at the CURRENT pending tier; asserts run via `checks`
+-- one full spin played through real input at the current pending tier;
+-- asserts run via `checks`
 local function playedSpin(tag, checks)
   return {
     openSlotWindow(tag),
@@ -263,7 +265,7 @@ add({
   H.waitFrames(30),
 })
 
--- walk the plain and CHOOSE the draw (slotsboot's check: this run needs FOUR
+-- walk the plain and choose the draw (slotsboot's check; this run needs four
 -- resolutions, so the floor is higher)
 add({ H.call(function() H.vars.suitable = false end) })
 for n = 1, 6 do
@@ -359,8 +361,8 @@ add({
       return pend(actor) == 0 or not H.battleLoadStarted()
     end, 15000, {
       H.call(function()
-        -- battle MESSAGES (the result banner) block the queue until
-        -- dismissed -- codex_ctx's measured lesson; tap A through them
+        -- battle messages (the result banner) block the queue until
+        -- dismissed, as codex_ctx measured; tap A through them
         H.setPad(H.readByte(MENU) == 0 and H.frame % 8 < 4
                  and { a = true } or {})
       end),
@@ -415,7 +417,7 @@ add(playedSpin("H2", {
   end,
   afterPress2 = function()
     -- reel 1 stopped wherever the real press fell; the bless must aim
-    -- reel 2 at THAT icon (unless it is the joker-gated 7)
+    -- reel 2 at that icon, unless it is the joker-gated 7
     local i1 = icon(1)
     local gated = i1 == 0 and (H.readByte(JOKER) & 4) ~= 0
     if gated then
@@ -464,9 +466,9 @@ add({
 })
 
 -- ========================================================================
--- *** LABELED QUARANTINE LAB (issue #75) -- see the header. ***
--- Fault injection for the icon-specific machinery: rig bytes planted, reel
--- positions parked, stopped reels restarted.  MAY NEVER PRODUCE FIXTURES.
+-- Labeled quarantine lab (issue #75); see the header.
+-- Fault injection for the icon-specific code: rig bytes planted, reel
+-- positions parked, and stopped reels restarted.  May never produce fixtures.
 -- ========================================================================
 local function stageEnemies(hp)
   for _, m in ipairs(msPresent) do
@@ -491,8 +493,9 @@ local function installSetzer()
     H.writeByte(0x2034 + s * 12, NONE)
     H.writeByte(0x2037 + s * 12, NONE)
     if actor and s ~= actor then
-      -- non-actors are WOUNDED, not stopped: a stopped character's pending
-      -- menu stays open forever and starves the actor's next turn.
+      -- non-actors are wounded rather than stopped: a stopped character's
+      -- pending menu stays open indefinitely and starves the actor's next
+      -- turn.
       H.writeByte(0x3EE4 + s * 2, H.readByte(0x3EE4 + s * 2) | 0x80)
       H.writeWord(0x3BF4 + s * 2, 0)
     else
@@ -540,7 +543,7 @@ local function openReels()
 end
 
 -- restart a stopped reel from a chosen position: clear its stop flag and let
--- the driver replay its boundary walk against the CURRENT mode cells
+-- the driver replay its boundary walk against the current mode cells
 local function restartReel(r, pos)
   return H.call(function()
     H.writeByte(POS[r], pos)
@@ -586,11 +589,11 @@ add({
     mulHits = {}
   end),
 
-  -- ============================================================= ARM T0: 0 bp
-  -- byte-vanilla, incl. the rigged miss.  All-cursed rig poked after the
-  -- draw; forced pair of 3s; reel 3 restarted at $24 in the resulting avoid
-  -- mode must SKIP the completing boundary $20 and halt at $10.  Economy:
-  -- +1 regen, nothing charged.
+  -- ============================================================= arm T0: 0 bp
+  -- byte-vanilla, including the rigged miss.  An all-cursed rig is poked after
+  -- the draw, a pair of 3s is forced, and reel 3 restarted at $24 in the
+  -- resulting avoid mode must skip the completing boundary $20 and halt at
+  -- $10.  Economy: +1 regen, nothing charged.
   H.call(function()
     H.writeByte(0x3E9C + actor * 2, 2)
     H.writeByte(0x3E9D + actor * 2, 0)
@@ -635,9 +638,10 @@ add({
     H.assertEq(pend(actor), 0, "t0: nothing pending after the turn")
   end),
 
-  -- ============================================================= ARM T1: 1 bp
-  -- the rigged miss is BOUGHT OFF.  Identical drive to T0 -- same poked rig,
-  -- same forced pair, same reel-3 restart -- one pending byte different.
+  -- ============================================================= arm T1: 1 bp
+  -- the rigged miss is bought off.  Identical drive to T0, with the same poked
+  -- rig, the same forced pair and the same reel-3 restart, and one pending
+  -- byte different.
   H.call(function()
     H.writeByte(0x3E9C + actor * 2, 5)
     H.writeByte(0x3E9D + actor * 2, 1)
@@ -683,7 +687,7 @@ add({
     H.assertEq(bp(actor), 4, "t1: 5 bp - 1 spent = 4, regen skipped")
   end),
 
-  -- ============================================================= ARM T2: 2 bp
+  -- ============================================================= arm T2: 2 bp
   -- the drift walk itself, replayed: restarted three icons shy of the match
   -- it must spend two budget icons and halt on the pair.
   H.call(function()
@@ -735,9 +739,10 @@ add({
     H.assertEq(bp(actor), 3, "t2: 5 bp - 2 spent = 3")
   end),
 
-  -- ==================================================== ARM T3b: exemption A/B
+  -- ==================================================== arm T3b: exemption A/B
   -- the same triple at 3 bp and then at 0 bp: unboosted damage D0 must sit
-  -- in the same range as boosted D3 -- the multiplier would have made D3 ~8x.
+  -- in the same range as boosted D3, since the multiplier would have made D3
+  -- about 8x.
   H.call(function()
     H.writeByte(0x3E9C + actor * 2, 5)
     H.writeByte(0x3E9D + actor * 2, 3)
@@ -806,11 +811,11 @@ add({
       "EXEMPTION: Ot6BoostDmg's multiplier path never ran under cmd $0f")
   end),
 
-  -- ================================================= ARM T3j: the joker gate
+  -- ================================================= arm T3j: the joker gate
   -- $2f49.2 poked on: even at 3 bp the rig is $3c, a 7 gets no reel-2 help,
-  -- and a forced 7-pair keeps the vanilla avoid mark -- the battle's own
-  -- prohibition cannot be bought.  (BP is still spent: certainty was offered
-  -- on every OTHER icon.)
+  -- and a forced 7-pair keeps the vanilla avoid mark, so the battle's own
+  -- prohibition cannot be bought.  (BP is still spent, because certainty was
+  -- offered on every other icon.)
   H.call(function()
     H.writeByte(JOKER, H.readByte(JOKER) | 0x04)
     H.writeByte(0x3E9C + actor * 2, 5)
@@ -835,8 +840,8 @@ add({
   end),
   waitStop(3, "t3j reel3 stops"),
   H.call(function()
-    -- park reel 3 on a SAFE icon: 7-7-BAR is the self-doom result and 7-7-7
-    -- may be script-forbidden here; 7-7-4 is a plain lagomorph
+    -- park reel 3 on a safe icon: 7-7-BAR is the self-doom result and 7-7-7
+    -- may be script-forbidden here, while 7-7-4 is a plain lagomorph
     H.writeByte(POS[3], 0x30)       -- REEL3[3] = 4
   end),
   pressCommit("t3j commit"),

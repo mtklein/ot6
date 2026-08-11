@@ -1,5 +1,5 @@
--- probe_v07_g_boot.lua -- what does a cold Continue of narshe-mission-v1
--- actually restore?  NOT a suite test.  Run with:
+-- probe_v07_g_boot.lua -- what a cold Continue of narshe-mission-v1
+-- restores.  Not a suite test.  Run with:
 --   OT6_SRAM_CHECKPOINT=tools/tests/checkpoints/narshe-mission-v1 \
 --   tools/tests/run.sh tools/tests/probe_v07_g_boot.lua
 -- OT6_CHECKPOINT_LAYOUT: ot6-codex-o8-v1
@@ -33,7 +33,7 @@ H.run({ maxFrames = 20000 }, {
     st("boot")
     H.screenshot("gboot_1")
   end),
-  -- A on the boot tile: does anything happen?
+  -- A on the boot tile: whether anything happens
   H.pressButtons({ "a" }, 8),
   H.waitFrames(180),
   H.call(function() st("after A"); H.screenshot("gboot_2") end),

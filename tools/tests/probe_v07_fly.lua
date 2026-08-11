@@ -58,7 +58,7 @@ H.run({ maxFrames = 40000 }, {
   H.release(), H.waitFrames(30), H.call(function() dump("afterU") end),
   H.call(function() H.screenshot("v07f_flew") end),
 
-  -- X: exit to deck?
+  -- X: whether it exits to the deck
   H.pressButtons({ "x" }, 8),
   H.waitFrames(240),
   H.call(function()

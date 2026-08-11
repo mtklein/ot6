@@ -1,36 +1,36 @@
--- gen_kolts_cave.lua -- one crossing past kolts_pool, for the OTHER Mt. Kolts
--- pool: the one the mountain is actually made of.
+-- gen_kolts_cave.lua -- one crossing past kolts_pool, for the second Mt.
+-- Kolts encounter pool, the one most of the mountain uses.
 --
 --   kolts_cave.mss   map 96 region P, party in control and tile-aligned.
 --
--- WHY THIS EXISTS.  kolts_pool.mss stands on map 100 (shelf F), whose
--- encounter group is 63 -- Brawler-pair 62.5% / Tusker-pair 37.5%.  That is
--- ONE of the mountain's four groups, and Measurement #7 measured it and
--- reported "two Kolts formations" as though it were the pool.  It is not.
--- Decoding SubBattleGroup for every Mt. Kolts map (field/battle.asm:391)
--- gives four:
+-- Why this exists.  kolts_pool.mss stands on map 100 (shelf F), whose
+-- encounter group is 63 (Brawler-pair 62.5%, Tusker-pair 37.5%).  That is
+-- one of the mountain's four groups.  Measurement #7 measured it and
+-- reported "two Kolts formations" as though it covered the whole mountain,
+-- which it does not.  Decoding SubBattleGroup for every Mt. Kolts map
+-- (field/battle.asm:391) gives four:
 --
 --   maps 95/96/97   group 61   Cirpius x3 (93.75%), +Tusker in slot 1
 --   maps 98/99/102  group 62   Trilium-pair 62.5%, Trilium+Tusker+Cirpius x2
 --   map  100        group 63   Brawler-pair / Tusker-pair   <- kolts_pool
 --   map  101        group 64   Brawler+Trilium+Vaporite x2 / Tusker-pair
 --
--- Group 61 is the one that matters most and the one nothing has ever
--- measured: CIRPIUS ($0086) is 93.75% of its draws, it arrives THREE AT A
--- TIME, and until the v0.3 trash pass it had no weakness of any kind
--- (monster_prop.dat +$10D9 = $00) -- so the mountain's single most common
--- fight was three unchippable birds.  The pass gives Cirpius poison, which
--- makes it the one fight in the demo where a GROUP tool answers a GROUP
--- enemy: Bio Blaster targets the whole enemy side (magic_prop_en.dat $7d,
--- targeting byte $6a), so one deliberate action chips all three.  That claim
--- needs a fixture to be a measurement rather than arithmetic, and this is it.
+-- Group 61 is the most common of the four and has not been measured.
+-- CIRPIUS ($0086) is 93.75% of its draws and arrives three at a time, and
+-- until the v0.3 trash pass it had no weakness of any kind
+-- (monster_prop.dat +$10D9 = $00), so the mountain's most common fight was
+-- three enemies with nothing to exploit.  The pass gives Cirpius poison, so
+-- a group-targeting tool answers a group enemy: Bio Blaster targets the
+-- whole enemy side (magic_prop_en.dat $7d, targeting byte $6a), and one
+-- action damages all three.  This fixture is what makes that claim a
+-- measurement rather than arithmetic.
 --
--- THE CROSSING is gen_kolts' K2, verbatim: shelf F (19,17) -> map 96 region
--- P.  Everything else -- the input-driven flee policy during the walk
--- (issue #75:  encounters are RUN FROM with held L+R, zero state writes;
--- the old danger-counter suppression is gone), the settle, the "prove an
--- encounter really fires" tail -- is gen_kolts_pool's, and its header
--- carries the reasoning for all three.
+-- The crossing is gen_kolts' K2, verbatim: shelf F (19,17) -> map 96 region
+-- P.  The rest comes from gen_kolts_pool, whose header explains all three
+-- parts: the input-driven flee policy during the walk (issue #75:
+-- encounters are run from with held L+R and no state writes; the old
+-- danger-counter suppression is gone), the settle, and the tail that checks
+-- an encounter does fire.
 local H = dofile("tools/tests/lib/ot6.lua")
 
 local POOL = "build/states/kolts_pool.mss.lua"
@@ -83,16 +83,16 @@ H.run({ maxFrames = 60000 }, {
     where("cave arrival")
   end),
 
-  -- STEP OFF THE TRIGGER BEFORE SAVING.  The crossing lands on (16,22),
+  -- Step off the trigger before saving.  The crossing lands on (16,22),
   -- and that tile is one of the two event triggers that open each Kolts
   -- cave with a glimpse of the figure on the peak (gen_kolts' header,
-  -- :170-171).  A fixture saved standing on it is unmeasurable in a way
-  -- that looks like a broken fixture: bal_party's pacer shuffles between
-  -- the spawn tile and one neighbour, so every other step RE-ENTERS the
-  -- trigger, the cutscene takes control, and the run dies on "timeout
-  -- waiting for field control" before a single encounter.  Measured
-  -- exactly that on the first generation run.  Two tiles east is clear of
-  -- both triggers ((16,22) and (14,12)) and still inside region P.
+  -- :170-171).  A fixture saved standing on it cannot be measured, and the
+  -- failure looks like a broken fixture: bal_party's pacer shuffles between
+  -- the spawn tile and one neighbour, so every other step re-enters the
+  -- trigger, the cutscene takes control, and the run fails on "timeout
+  -- waiting for field control" before a single encounter.  That is what the
+  -- first generation run did.  Two tiles east is clear of both triggers
+  -- ((16,22) and (14,12)) and still inside region P.
   H.navTo(18, 22, { maxFrames = 8000, playBattles = "flee" }),
   H.release(),
   settleField("cave 96 P, off-trigger", 96),
@@ -112,14 +112,14 @@ H.run({ maxFrames = 60000 }, {
     return string.format("kolts_cave generated at frame %d", H.frame)
   end),
 
-  -- PROOF THE FIXTURE IS WHAT IT CLAIMS, gen_kolts_pool's tail.  The lane is
-  -- not named here the way shelf F's "right" is, because map 96 P's arrival
-  -- tile is not a tile any earlier script stops on -- so the first walkable
-  -- direction is taken and the MAP IS GUARDED.  P's two exits are (16,22)
-  -- and (21,21) (gen_kolts' mountain flood); if the shuffle ever reaches
+  -- Check the fixture is what it claims, using gen_kolts_pool's tail.  The
+  -- lane is not named here the way shelf F's "right" is, because map 96 P's
+  -- arrival tile is not one any earlier script stops on, so the first
+  -- walkable direction is taken and the map is guarded.  P's two exits are
+  -- (16,22) and (21,21) (gen_kolts' mountain flood); if the shuffle reaches
   -- one, this raises with the tile in the message rather than pacing a
-  -- different map and reporting it as this one, which is the exact way map
-  -- 95 wasted six samples.
+  -- different map and reporting it as this one, which is how map 95 wasted
+  -- six samples.
   (function()
     local battN, waited, lane, lastXY, steps = 0, 0, nil, nil, 0
     local BACK = { left = "right", right = "left", up = "down", down = "up" }

@@ -1,5 +1,5 @@
 -- probe_v07_384toggle.lua -- instrument the (104,17) toggle (_cb33c9,
--- event_main.asm:45485) frame by frame (issue #31).  NOT a suite test.
+-- event_main.asm:45485) frame by frame (issue #31).  Not a suite test.
 -- One clean edge: 8 frames of up+A, then up only.  Log $01F5, position,
 -- control every 20 frames for 900 frames.  Then a second clean edge, same
 -- watch.  This settles what iteration 3/4 could not: when the switch

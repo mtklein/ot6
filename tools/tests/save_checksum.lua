@@ -1,34 +1,35 @@
 -- @suite savestate=worldmap_narshe
 -- (The marker was a bare `-- @suite` until v0.6.  This test loads
 -- build/states/worldmap_narshe.mss.lua at :34, which only `make savestates`
--- generates, so a plain marker made it a hard `make test` failure -- "compose
--- failed: save_checksum" -- in every tree without the generated states, i.e. every
--- fresh worktree.  It passed in the main tree only because that tree happens
--- to have the fixture.  codex_saveas.lua loads the same state and declares the
--- same requirement; this now matches it.  Found while landing #11/#23.)
--- Regression for #18.  CheckSaveSlotChecksum returns the checksum ITSELF as its
--- validity token and 0 for invalid -- there is no separate flag -- and every
--- caller tests it with beq.  So a perfectly intact save whose 2558-byte sum
--- happens to land on $0000 is drawn as an EMPTY slot, refuses to load, and is
--- overwritten with no confirmation prompt (field_menu.asm:1981-1988 branches on
--- the zero straight into `; slot is empty, save instantly`).
+-- generates, so a plain marker made it a hard `make test` failure, reported as
+-- "compose failed: save_checksum", in every tree without the generated states,
+-- that is, in every fresh worktree.  It passed in the main tree only because
+-- that tree has the fixture.  codex_saveas.lua loads the same state and
+-- declares the same requirement; this now matches it.  Found while landing
+-- #11/#23.)
+-- Regression for #18.  CheckSaveSlotChecksum returns the checksum itself as
+-- its validity token and 0 for invalid, with no separate flag, and every
+-- caller tests it with beq.  So an intact save whose 2558-byte sum happens to
+-- land on $0000 is drawn as an empty slot, refuses to load, and is overwritten
+-- with no confirmation prompt (field_menu.asm:1981-1988 branches on the zero
+-- straight into `; slot is empty, save instantly`).
 --
 -- CalcSaveSlotChecksum now folds a $0000 result onto $ffff.  The stored word at
--- $1ffe sits OUTSIDE the summed range ($1600..$1ffd, cpx #$09fe), so the fold
+-- $1ffe sits outside the summed range ($1600..$1ffd, cpx #$09fe), so the fold
 -- applies identically on write and on verify.
 --
--- This drives the game's REAL save, the codex_saveas way, rather than
--- reimplementing the sum: zero the summed range so it genuinely totals $0000,
--- let vanilla's own CopyGameDataToSRAM run, then read back what it stored.
--- The resulting save is deliberately garbage -- only the checksum is under test.
--- Saving is only legal on the world map, so this runs from worldmap_narshe.
+-- This drives the game's own save path, the codex_saveas way, rather than
+-- reimplementing the sum: zero the summed range so it totals $0000, let
+-- vanilla's own CopyGameDataToSRAM run, then read back what it stored.  The
+-- resulting save is garbage; only the checksum is under test.  Saving is only
+-- legal on the world map, so this runs from worldmap_narshe.
 --
--- *** QUARANTINED MECHANISM TEST (issue #75) -- state writes SANCTIONED ***
+-- Quarantined mechanism test (issue #75); state writes are sanctioned.
 -- Owner-named on the #75 policy list: the 1/65536 zero-checksum save.  A
 -- real game state whose 2558-byte sum lands exactly on $0000 exists but
 -- cannot be reached on cue by play; the zeroed range is the only way to
--- put the fold under test.  It keeps its waiver, and it MAY NEVER
--- PRODUCE FIXTURES.
+-- put the fold under test.  It keeps its waiver, and it must never produce
+-- fixtures.
 local H = dofile("tools/tests/lib/ot6.lua")
 
 local ZMENUSTATE       = 0x0026
@@ -52,10 +53,10 @@ H.run({ maxFrames = 8000 }, {
   H.waitFrames(120),
   H.waitUntil(function() return H.readByte(ZMENUSTATE) == MAIN_MENU end,
     300, "main menu", 5),
-  -- Reach save select by pad (save-drive rule, tools/tests/README): UP wraps
+  -- Reach save select by pad (save-drive rule, tools/tests/README): up wraps
   -- the main-menu cursor from Items to Save, A runs SelectMainMenuOption_06's
-  -- real entry, DOWN walks the slot cursor to slot 3.  The drives poll the
-  -- state and cursor by READING them, so no frame count is load-bearing.
+  -- real entry, down walks the slot cursor to slot 3.  The drives poll the
+  -- state and cursor by reading them, so no frame count is load-bearing.
   H.driveUntil(function()
     return H.readByte(ZMENUSTATE) == MAIN_MENU and H.readByte(0x4b) == 6
   end, 600, {
@@ -71,9 +72,9 @@ H.run({ maxFrames = 8000 }, {
   }, "save cursor on slot 3"),
   H.call(function()
     -- The game repacks $1600..$1ffd from live state during the save, so zeroing
-    -- it from a step is too early -- it gets overwritten before the sum runs.
+    -- it from a step is too early: it gets overwritten before the sum runs.
     -- Hook the checksum routine itself and zero the range on entry, so the sum
-    -- it computes really is $0000.
+    -- it computes is $0000.
     local entry = H.sym("CalcSaveSlotChecksum")
     H.assertEq(entry ~= nil, true, "CalcSaveSlotChecksum resolved")
     emu.addMemoryCallback(function()

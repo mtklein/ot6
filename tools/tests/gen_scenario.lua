@@ -1,31 +1,31 @@
 -- gen_scenario.lua -- from lete_river.mss (map 113, one tile off the raft)
--- down the LETE RIVER, through ULTROS, to the THREE-WAY SCENARIO SPLIT.
+-- down the Lete River, through Ultros, to the three-way scenario split.
 -- Generates one state:
 --   scenario_hub.mss  map 9, party = SCENARIO_MOG alone, first controllable
---                     frame after Mog's "Choose a scenario…kupo!" -- the
+--                     frame after Mog's "Choose a scenario…kupo!".  This is the
 --                     entry point of the whole v0.3 arc, and the fixture the
 --                     three scenario chains branch from.
 --
--- ============================ THE RIVER LOOPS ============================
--- THE SECOND STEERING PROMPT'S OPTION 0 IS AN INFINITE LOOP, AND IT IS
--- VANILLA.  This is the single most important fact in this file.
+-- The river loops.
+-- The second steering prompt's option 0 is an infinite loop, and it is
+-- vanilla behavior.  This is the most important fact in this file.
 --
 --   _cb07f2:  dlg $016E  "Hey, which way?  0: (Up)   1: (Left)"
 --             choice _cb07fc, _cb0840          (event_main.asm:39152-39158)
 --
 -- Option 0 (_cb07fc, :39159) rides a loop of the river and ends
--- `if_switch $0176=0, _cb07f2` (:39197) -- straight back to the same prompt.
+-- `if_switch $0176=0, _cb07f2` (:39197), which returns to the same prompt.
 -- Option 1 (_cb0840, :39199) is the only way downstream.  This is the famous
--- unattended-grind spot of vanilla FF6 -- memory cursor on, Banon healing,
--- come back to an overlevelled party -- it is intentional, CONTRIBUTING.md's
--- "vanilla's bugs stay" covers it, and it is NOT something to fix.
+-- unattended-grind spot of vanilla FF6 (memory cursor on, Banon healing,
+-- return to an overlevelled party).  It is intentional, CONTRIBUTING.md's
+-- "vanilla's bugs stay" covers it, and it is not to be fixed.
 --
 -- But it is a trap for a fixture, and a nasty one: advanceStory's blanket
--- A-press ALWAYS takes option 0, so a naive drive down this river never
+-- A-press always takes option 0, so a naive drive down this river never
 -- terminates.  It burns its whole frame budget and dies with a timeout that
 -- reads like a navigation failure rather than a wrong menu pick.  So this
 -- script never A-mashes a prompt.  Every `choice` on the route is answered
--- EXPLICITLY, by steering the multiple-choice cursor to a named option and
+-- explicitly, by steering the multiple-choice cursor to a named option and
 -- only then confirming, and each is logged so a future failure says which
 -- fork it was at.  The three, in the order they arrive:
 --
@@ -33,103 +33,103 @@
 --                 choice _cb05f0, EventReturn            (:38836-38841)
 --   2. _cb0657  dlg $016A "Which way? 0:(Straight) 1:(Left) 2:(Right)" -> 0
 --                 choice _cb0686, _cb06f7, _cb075c       (:38915-38921)
---      (all three converge -- each ends `load_map 114, {13,36}` -- so this
+--      (all three converge, each ending `load_map 114, {13,36}`, so this
 --      fork is safe either way; 0 is taken because it is shortest, and
 --      "safe" was worth verifying rather than assuming)
 --   3. _cb07f2  dlg $016E "Hey, which way?  0:(Up)  1:(Left)"        -> 1
 --                 choice _cb07fc, _cb0840                (:39152-39158)
---      ^^^ THE LOOP.  Option 0 here is the whole reason this file steers.
+--      ^^^ the loop.  Option 0 here is the reason this file steers.
 --
--- HOW THE CURSOR WORKS (src/field/text.asm:368-425, transcribed):
+-- How the cursor works (src/field/text.asm:368-425, transcribed):
 --   $056F  number of options; >= 2 means a multiple choice is live, and the
 --          engine zeroes it the moment A confirms (:425)
 --   $056E  current selection, 0-based
---   $056D  "selection is changing" latch -- set when a direction moves the
+--   $056D  "selection is changing" latch, set when a direction moves the
 --          cursor, cleared only on a frame with NO direction held (:380)
--- That latch is why the steering presses are EDGE presses (4 on / 4 off)
--- like every other input in this suite: a held DOWN moves the cursor exactly
--- one row, ever.  DOWN/RIGHT increment (and stop at $056F), UP/LEFT
+-- That latch is why the steering presses are edge presses (4 on / 4 off)
+-- like every other input in this suite: a held DOWN moves the cursor one
+-- row and no further.  DOWN/RIGHT increment (and stop at $056F), UP/LEFT
 -- decrement (and stop at 0).
 --
--- TWO WAYS TO READ $056F WRONG, both of which cost a run here:
---   * IT IS MEANINGLESS DURING A BATTLE.  It is field dialog RAM and the
+-- Two ways to read $056F wrong, both of which cost a run here:
+--   * It is meaningless during a battle.  It is field dialog RAM and the
 --     battle module scribbles it; a first cut tested it unconditionally and
 --     announced a phantom "choice #2" in the middle of the ride's second
 --     forced fight.  The handler only looks while no battle is up.
---   * IT IS BUILT UP AS THE TEXT TYPES OUT.  text.asm:684 calls it "max
---     choice found so far" -- it counts special letter $15 indicators AS
---     THEY ARE DRAWN.  Sampling it the instant it first reads >= 2 caught
+--   * It is built up as the text types out.  text.asm:684 calls it "max
+--     choice found so far"; it counts special letter $15 indicators as
+--     they are drawn.  Sampling it the instant it first reads >= 2 caught
 --     fork 1 mid-render and reported 2 options for a 3-option prompt (the
 --     screenshot showed a half-drawn box: "Which way? / (Straight)" and
 --     nothing else yet).  So nothing is read or asserted until
---     H.dialogWaiting() -- $BA=1 and $D3=1, the engine waiting for a
---     keypress -- which is the only moment $056F is final.
+--     H.dialogWaiting() ($BA=1 and $D3=1, the engine waiting for a
+--     keypress), which is the only moment $056F is final.
 --
--- ============================ THE RIDE ITSELF ============================
--- IT IS NOT A VEHICLE MODE.  The brief that scoped this work expected a
--- third engine mode beside field and world -- `set_script_mode` / `vehicle`
--- / `move_vehicle`.  It is not that.  The raft is an ORDINARY FIELD MAP
+-- The ride itself.
+-- It is not a vehicle mode.  The brief that scoped this work expected a
+-- third engine mode beside field and world (`set_script_mode` / `vehicle`
+-- / `move_vehicle`).  It is not that.  The raft is an ordinary field map
 -- (113, then 114) with the party under event control for most of it:
 -- _cb05f0 does `player_ctrl_off` (:38843) and every inch of the river is
 -- `obj_script SLOT_1, ASYNC { move ... }` followed by `wait_obj SLOT_1`.
--- The only `vehicle` opcodes involved are cosmetic -- _cb050f (:38774) sets
--- each SLOT's sprite to {RAFT, SHOW_RIDER} and _cb04aa clears it -- and
+-- The only `vehicle` opcodes involved are cosmetic: _cb050f (:38774) sets
+-- each SLOT's sprite to {RAFT, SHOW_RIDER} and _cb04aa clears it.  And
 -- `set_script_mode WORLD` appears only where the river spills onto the
 -- overworld, a branch this route does not take.  So the harness needed no
 -- new engine model: the ride is "answer the prompts, survive the battles,
 -- and walk the two handoffs below".
 --
--- THE RIDE IS NOT CONTINUOUS -- IT HANDS CONTROL BACK TWICE, AND THE WAY
--- ONWARD IS A TRIGGER YOU MUST WALK ONTO **FACING DOWN**.  This is the fact
+-- The ride is not continuous: it hands control back twice, and the way
+-- onward is a trigger the party must walk onto facing DOWN.  This is the fact
 -- that actually cost the most here.  Map 114 is where the raft puts in, and
 -- EventTrigger::_114 (event_trigger.asm:464-468) is
 --     {20,21} SavePoint   {6,13} SavePoint
 --     {20,24} _cb051c     {6,15} _cb055c
 -- Both continuations open with `if_switch $01B2=0, EventReturn` (:38746,
 -- :38777).  A first pass read $01B2 as an inert engine flag, measured it 0,
--- and shrugged -- and the ride duly stopped dead with the party standing
+-- and did nothing further, and the ride stopped with the party standing
 -- controllable at map 114 (20,22) for 130,000 frames, which is exactly what
 -- "the river hangs" looks like from the outside.
 --
--- $01B0-$01B7 ARE NOT STORY SWITCHES.  Switch id N lives at bit N&7 of
--- $1E80+(N>>3), so $01B0..$01B7 alias the byte $1EB6 -- and $1EB6 is the
+-- $01B0-$01B7 are not story switches.  Switch id N lives at bit N&7 of
+-- $1E80+(N>>3), so $01B0..$01B7 alias the byte $1EB6, and $1EB6 is the
 -- field engine's own control-flags byte.  UpdateCtrlFlags (field/event.asm
 -- :5415-5432) writes it every frame:
 --     lda $087f,y / tax / lda $1eb6 / and #$f0 / ora f:BitOrTbl,x
--- i.e. BITS 0-3 ARE THE PARTY'S FACING DIRECTION, one-hot, in the engine's
+-- i.e. bits 0-3 are the party's facing direction, one-hot, in the engine's
 -- own 0=up 1=right 2=down 3=left encoding (BitOrTbl, :5523); bit4 is "A is
 -- held"; bit5 is the once-per-tile event latch player.asm:529 clears on
 -- every step.  So, read properly:
 --     $01B0 = facing UP      $01B2 = facing DOWN     $01B4 = A held
 --     $01B1 = facing RIGHT   $01B3 = facing LEFT     $01B5 = tile-event latch
 -- `if_switch $01B2=0, EventReturn` means "unless the party is facing DOWN".
--- Hence the handoffs below are a plain HOLD DOWN -- which both walks the
--- party onto the trigger and leaves it facing the right way -- and not a
+-- Hence the handoffs below are a plain held DOWN, which both walks the
+-- party onto the trigger and leaves it facing the right way, rather than a
 -- navTo, whose last step BFS is free to make sideways.
 --
 -- The same reading retro-explains three things elsewhere in the story that
 -- had looked arbitrary: _caf79c picks Banon's approach animation off
 -- $01B0/$01B1/$01B2 (which way you walked up to him), _caf68a/_caf6f0/
 -- _caf717 pick escort variants the same way, and the Returner Hideout's
--- scrap-of-paper trigger _cb002b needs $01B4 AND $01B2 -- it is an EXAMINE
+-- scrap-of-paper trigger _cb002b needs $01B4 and $01B2, so it is an examine
 -- (press A facing down), not a step, which is why gen_banon never tripped it.
 -- And _cb059f's own `if_switch $01B5=1, EventReturn` / `switch $01B5=1` is
 -- just the standard once-per-tile latch, not a story flag.
 --
--- THE BATTLES ARE FORCED, NOT RANDOM ENCOUNTERS.  The ride calls _cb0498
+-- The battles are forced rather than random encounters.  The ride calls _cb0498
 -- (`battle 7, RIVER`) and _cb04a1 (`battle 8, RIVER`) outright, and
 -- _cb0486/_cb048f are `if_rand` coin-flips into them (:38660-38678).  A
--- dozen or so fire on the way down.  Since issue #75 they are FOUGHT, not
--- write-cleared: this generator writes no game state.  The fighter is the
--- ride's own edge-tapped A -- A opens the acting character's command list,
--- A confirms its first entry, A takes the default target -- which on this
--- raft spells out the game's own designed sustain: TERRA, EDGAR and SABIN
+-- dozen or so fire on the way down.  Since issue #75 they are fought rather
+-- than write-cleared: this generator writes no game state.  The fighter is
+-- the ride's own edge-tapped A (A opens the acting character's command list,
+-- A confirms its first entry, A takes the default target), which on this
+-- raft gives the game's own designed sustain: TERRA, EDGAR and SABIN
 -- Fight the default enemy while BANON's first command is Health, the free
 -- party-wide heal his presence exists for (bosses-wob.md #4: "Health is a
 -- free party heal; his death is a game over").  He tops the raft up every
 -- round while the other three chew through the formation.
 --
--- BANON'S DEATH IS AN INSTANT GAME OVER -- that is WHY this file used to
+-- Banon's death is an immediate game over, which is why this file used to
 -- battle-clear write.  The input-driven driver watches his battle HP every
 -- frame and fails the run loudly the moment he stays down, with the fight's
 -- full numbers on the record: a #74-style balance finding beats a timeout
@@ -137,31 +137,31 @@
 -- from the fixture, so a surviving run replays exactly and a losing one is
 -- a fact about the tuning, not about luck.
 --
--- ULTROS: `battle 103, RIVER` at _cb08db (:39301) -- WON FOR REAL, the
+-- Ultros: `battle 103, RIVER` at _cb08db (:39301), won with real input, the
 -- first real Ultros in this chain's history.  He has an authored shield
--- row -- Ot6ShieldTbl carries $012c (MONSTER::ULTROS_RIVER) at 5 shields,
+-- row: Ot6ShieldTbl carries $012c (MONSTER::ULTROS_RIVER) at 5 shields,
 -- OT6_SLASH|OT6_PIERCE, "ultros 1: the row he keeps all game"
 -- (ff6/src/battle/ot6.asm:3008-3009) -- and the design brief for the fight
 -- (bosses-wob.md #4) names the loss condition this generator now actually
 -- risks:  Tentacle slams Banon.  The winning line here is the same tap-A
 -- policy as
--- the trash -- three attackers on him, Banon healing through Tentacle --
+-- the earlier fights: three attackers on him, Banon healing through Tentacle,
 -- with his HP, shields and the party's HP logged every 300 in-battle frames
 -- so the whole trajectory is on the record.  A deeper breaking run (probe
 -- fire, bank BP, break on the fuse) belongs in a battle test built ON this
 -- state; the generator's job is a real, survivable win.
 --
--- AFTER HIM the script needs no more input: Sabin is swept overboard,
+-- After him the script needs no more input: Sabin is swept overboard,
 -- `switch $001A=1`, and `call _caad4c` (:39355 -> :26626) tears the party
 -- down to SCENARIO_MOG and loads map 9 at {8,6}.  With none of $0021/$001E/
 -- $0044 set this is the first visit, so it plays dlg $016F (the "what about
--- SABIN…" recap) and falls into _caadb4 (:26677) -- wait_30f, then
+-- SABIN…" recap) and falls into _caadb4 (:26677): wait_30f, then
 -- dlg $0B8C "Choose a scenario…kupo!", then `return`.
 --
--- WHERE THE GENERATE LANDS, and why not mid-dialog.  The state is taken on
--- the first CONTROLLABLE frame after that last dialog is dismissed -- i.e.
+-- Where the generate lands, and why not mid-dialog.  The state is taken on
+-- the first controllable frame after that last dialog is dismissed, i.e.
 -- the
--- moment the player could actually walk to one of the three scenario NPCs --
+-- moment the player could walk to one of the three scenario NPCs.
 -- rather than on the frame the prompt is on screen.  A fixture frozen inside
 -- a dlg is awkward to build on (every consumer would have to dismiss it
 -- first, and the $BA/$D3 dialog state rides in the savestate), and the
@@ -191,25 +191,25 @@ local CHOICES = {
   { want = 0, max = 3, what = "fork 1 (dlg $016A): 0 = Straight" },
   { want = 1, max = 2,
     what = "fork 2 (dlg $016E): 1 = LEFT -- option 0 is the vanilla loop" },
-  -- A FOURTH PROMPT NOBODY PUT THERE ON PURPOSE.  _cb04e6 parks the party
+  -- A fourth prompt that was not planned for.  _cb04e6 parks the party
   -- on (6,13) after the second landing, and EventTrigger::_114 puts a
   -- SavePoint on exactly that tile (event_trigger.asm:465).  SavePoint
-  -- (event_main.asm:100749) is gated on $0133 -- "has the save-point
-  -- tutorial been shown" -- and this is the first save point this route has
+  -- (event_main.asm:100749) is gated on $0133 ("has the save-point
+  -- tutorial been shown"), and this is the first save point this route has
   -- ever stepped on, so it fires its one-time
   --     dlg $000A "…Want info about Save Points?  0: Yes  1: No"
   --     choice show_save_info, EventReturn        (:100764-100770)
-  -- AND ONLY ONE OF ITS TWO ANSWERS GIVES THE PARTY BACK.  This is not
+  -- Only one of its two answers returns control to the party.  This is not
   -- scenery after all.  Look at the two branches:
   --     show_save_info:  dlg $06D4 … / player_ctrl_on / return   (:100775)
   --     EventReturn:     return                                  (:14177)
-  -- Option 1 ("No") jumps to a BARE RETURN.  Option 0's page of flavour
+  -- Option 1 ("No") jumps to a bare return.  Option 0's page of text
   -- text ends in `player_ctrl_on`; option 1 ends in nothing.  Taking "No"
-  -- here left the party frozen on (6,13) -- control never came back, the
+  -- here left the party stuck on (6,13): control never came back, the
   -- ride's next trigger could never be walked onto, and the run timed out
   -- 30,000 frames later with map/alignment/brightness/battle all reading
   -- perfectly fine and only hasControl() false.  So option 0 is taken, and
-  -- it is taken ON PURPOSE: the four pages of text cost a few hundred
+  -- it is taken deliberately: the four pages of text cost a few hundred
   -- frames and are the only branch that ends with the party able to move.
   { want = 0, max = 2,
     what = "save-point tutorial (dlg $000A): 0 = Yes -- the ONLY branch " ..
@@ -217,19 +217,19 @@ local CHOICES = {
 }
 local ci, inChoice = 0, false
 
--- The ride driver: steer choices, FIGHT battles with real input (issue #75 --
+-- The ride driver: steer choices, fight battles with real input (issue #75:
 -- zero state writes), tap dialogs, touch nothing else.  Reused for each
 -- ladder attempt.
 --
--- THE FIGHTER.  This river outpaces a blind A-masher: run 1 of the
+-- The fighter.  This river outpaces a blind A-masher: run 1 of the
 -- input-driven test conversion lost BANON in fight #3 (the 3-monster roll)
 -- with the party never healed once, because tap-A confirms each actor's
--- FIRST command and Banon's first command is FIGHT -- his famous Health is
--- ROW 1 of his list (char_prop.asm:321: set_char_prop_cmds FIGHT, HEALTH,
+-- first command and Banon's first command is Fight; his Health is
+-- row 1 of his list (char_prop.asm:321: set_char_prop_cmds FIGHT, HEALTH,
 -- NONE, ITEM), so the "free party heal" never fired.  Battles therefore run
 -- a menu-episode machine (gen_arvis's cadence: presses start only once the
--- battle-menu flag has held 4 straight frames, then ONE button per 30-frame
--- pulse, 6 held + 24 released -- battle menus eat input during their open
+-- battle-menu flag has held 4 straight frames, then one button per 30-frame
+-- pulse, 6 held and 24 released, because battle menus ignore input during their open
 -- animation every turn):
 --     BANON (char 14)      down A A    Health, the designed sustain
 --     EDGAR (4), tier 2+   down A A A  Tools -> AutoCrossbow, his kit's

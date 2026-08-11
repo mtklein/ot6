@@ -1,32 +1,33 @@
 -- @suite
 -- battle_clockwork.lua -- issue #33: the HUD's boost pips and weakness
--- reveals land on the MECHANICAL frame, not near it.
+-- reveals land on the mechanical frame, not near it.
 --
--- MEASURED DESYNC THIS GUARDS AGAINST (probe_clockwork on the pre-change
+-- The measured desync this guards against (probe_clockwork on the pre-change
 -- ROM, battle_entry, boosted Quadra Slam):
 --   - pips: the staged party-row cell showed bp-minus-pending at the menu
---     restage (~f605), ~900 frames BEFORE Ot6ActionEnd's charge (f1504).
---   - reveals: the class chip wrote the revealed byte at damage CALC
---     (f704), ~300 frames BEFORE the first damage numeral (f1006), and
+--     restage (~f605), ~900 frames before Ot6ActionEnd's charge (f1504).
+--   - reveals: the class chip wrote the revealed byte at damage calc
+--     (f704), ~300 frames before the first damage numeral (f1006), and
 --     only on the slot the hit landed on.
--- POST-CHANGE (same probe): the pip cell holds the FULL bank ($79) all
+-- Post-change (same probe): the pip cell holds the full bank ($79) all
 -- through the flight and drops to the charged value 3 frames after the bp
--- write; the reveal commits on GfxCmd_0b's numeral frame and writes BOTH
+-- write; the reveal commits on GfxCmd_0b's numeral frame and writes both
 -- same-species guards in the same frame.
 --
--- Staged exactly as battle_mpcost.lua's proven drive: all-Bushido CYAN,
--- boost banked by the swdtech submenu row, guards stopped + HP/shield
--- pinned, MP pinned once (guests carry 0 MP and the universal fizzle eats
--- the tech otherwise).  Phase 3 re-stages SETZER for the Slot input gate:
--- an R/L edge during a LATCHED spin (first reel pressed) must be fully
--- inert -- no pending change, no ching/click (the latch already decides
--- the charge; the sound acknowledged input the reels ignore).
+-- Staged with battle_mpcost.lua's drive: all-Bushido CYAN,
+-- boost banked by the swdtech submenu row, guards stopped with HP and
+-- shields pinned, MP pinned once (guests carry 0 MP and the universal fizzle
+-- would otherwise consume the tech).  Phase 3 re-stages SETZER for the Slot
+-- input gate: an R or L edge during a latched spin (first reel pressed) must
+-- be inert, with no pending change and no ching or click, because the latch
+-- has already decided the charge and the sound would acknowledge input the
+-- reels ignore.
 --
--- The boosted verb here is Bushido ($59 Dragon: single target, so the
--- same-species propagation is a real assertion, not a multi-hit accident).
--- Fight/Blitz/spell pip timing rides the same Ot6ActionEnd/Ot6PipStage
--- pair (one charge site, one painter), and battle_boost keeps the Fight
--- path's arrow/consume coverage.
+-- The boosted verb here is Bushido ($59 Dragon, single target, so the
+-- same-species propagation is a real assertion rather than a multi-hit
+-- side effect).  Fight, Blitz and spell pip timing use the same
+-- Ot6ActionEnd/Ot6PipStage pair (one charge site, one painter), and
+-- battle_boost keeps the Fight path's arrow and consume coverage.
 local H = dofile("tools/tests/lib/ot6.lua")
 local STATE = "build/states/battle_entry.mss.lua"
 
@@ -150,8 +151,8 @@ H.run({ maxFrames = 40000 }, {
                H.readWord(0x57C0 + msPresent[2] * 2),
                "the two monsters are the same species")
     pinField()
-    -- hp writes mark the damage-CALC moment (the per-frame poll would
-    -- miss them: pinField restores the value)
+    -- hp writes mark the damage-calc moment; the per-frame poll would
+    -- miss them, because pinField restores the value
     emu.addMemoryCallback(function()
       hpFrames[#hpFrames + 1] = H.frame
     end, emu.callbackType.write, 0x7E3BFC, 0x7E3C07)
@@ -180,7 +181,7 @@ H.run({ maxFrames = 40000 }, {
     H.writeByte(0x8967 + actor, 2)          -- row 2 = boost 3 -> Dragon
                                             -- (#38: the 1-BP floor made the
                                             --  window three rows, so boost 3
-                                            --  is the LAST row, not the 4th)
+                                            --  is the last row, not the 4th)
   end),
   H.waitFrames(2),
   H.driveUntil(function() return not inWindow() end, 900, {
@@ -211,7 +212,7 @@ H.run({ maxFrames = 40000 }, {
       msPresent[2], tostring(rclsF[msPresent[2]]),
       table.concat((function() local t = {} for _, f in ipairs(numeralF) do
         t[#t + 1] = tostring(f) end return t end)(), ",")))
-    -- 1. PIPS: the bank displays FULL until the charge...
+    -- 1. pips: the bank displays the full value until the charge...
     H.assertEq(spentGlyphBeforeCharge, nil,
       "the charged pip value never shows before Ot6ActionEnd's charge "
       .. "(pre-change: the menu restage painted it hundreds of frames early)")
@@ -219,7 +220,7 @@ H.run({ maxFrames = 40000 }, {
     H.assertEq(spentGlyphAfterF ~= nil and spentGlyphAfterF - chargeF <= 8, true,
       string.format("the pip drop lands on the charge frame (charge %s, drop %s)",
         tostring(chargeF), tostring(spentGlyphAfterF)))
-    -- 2. REVEALS: committed AFTER damage calc, ON a numeral frame...
+    -- 2. reveals: committed after damage calc, on a numeral frame...
     local ra, rb = rclsF[msPresent[1]], rclsF[msPresent[2]]
     H.assertEq(ra ~= nil and rb ~= nil, true, "both same-species guards revealed")
     H.assertEq(ra, rb, "and in the SAME frame (per-species propagation; "
@@ -229,7 +230,7 @@ H.run({ maxFrames = 40000 }, {
       "the reveal commits AFTER damage calc (pre-change: same frame as calc)")
     local onNumeral = false
     for _, f in ipairs(numeralF) do
-      -- the commit runs at GfxCmd_0b's ENTRY; the counter increment the
+      -- the commit runs at GfxCmd_0b's entry; the counter increment the
       -- poll can see lands after the routine's own WaitFrame/WaitA (up to
       -- ~10 frames when an earlier numeral thread is still finishing)
       if f - ra >= -2 and f - ra <= 12 then onNumeral = true end

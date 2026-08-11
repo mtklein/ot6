@@ -1,6 +1,6 @@
 -- gen_esper_tubes_done.lua -- v0.6 step 11: esper_tubes_entry (map 274
 -- {10,10} facing UP) -> UP + A onto {10,9} -> _cc7a60, the Cid/Kefka tube
--- room set piece -> six espers, CELES LEFT BEHIND, $0068=1.  Generates
+-- room set piece -> six espers, CELES left behind, $0068=1.  Generates
 -- esper_tubes.
 --
 -- _cc7a60 (event_main.asm:95456-96299) is ~850 lines and entirely
@@ -11,27 +11,27 @@
 --    (:95777-95782), six in one uninterruptible block.  EventCmd_86
 --    (field/event.asm:3238) sets bit (id-$36) of $1A69, and the ids
 --    (include/const.inc:564-585) are SHOAT $3b, MADUIN $3c, BISMARK $3d,
---    CARBUNKL $49, PHANTOM $4a, UNICORN $4d -- bits 5, 6, 7, 19, 20 and 23.
---    So the receipt is $1A69+0 gaining $E0 and $1A69+2 gaining $98, and
---    that is what is asserted, not a switch that merely says a scene ran.
+--    CARBUNKL $49, PHANTOM $4a, UNICORN $4d, which are bits 5, 6, 7, 19, 20
+--    and 23.  So the receipt is $1A69+0 gaining $E0 and $1A69+2 gaining $98,
+--    and that is what is asserted, rather than a switch that only records
+--    that a scene ran.
 --
 --  * `delete_obj CELES / char_party CELES, 0 / party_chars LOCKE /
 --    switch $02F6=0 / remove_equip CELES` (:96148-96158).  $02F6 is
---    $1EDE bit 6 -- the "available characters" word, not a story flag
---    (notes/field-ram.txt:1114-1116; field/event.asm:4443-4448) -- so this
---    is Celes leaving the ROSTER, and char_party 0 clears her $1850 party
---    nibble.  **This is where the v0.6 party size drops.**
+--    $1EDE bit 6, the "available characters" word rather than a story flag
+--    (notes/field-ram.txt:1114-1116; field/event.asm:4443-4448), so this
+--    is Celes leaving the roster, and char_party 0 clears her $1850 party
+--    nibble.  This is where the v0.6 party size drops.
 --
 --  * `switch $064B=1 / switch $0068=1` (:96298-96299) then
 --    `player_ctrl_on`.  $0068 is what unlocks the lift trigger _cc7f43 on
 --    {20,13} (`if_switch $0068=0, EventReturn`, :96313-96314), so it is
 --    both the receipt for this step and the key to the next.
 --
--- THE PARTY THIS LEAVES BEHIND is the load-bearing measurement of this
--- whole beat and it is asserted below rather than described.  Measured at
--- every entry point from the post-Opera checkpoint onward, $1850 read
--- LOCKE=$C1 CELES=$49 and every other character $00, i.e. an ACTIVE PARTY
--- OF TWO -- so what walks out of this room is LOCKE ALONE.
+-- The party this leaves behind is asserted below rather than described.
+-- Measured at every entry point from the post-Opera checkpoint onward, $1850
+-- read LOCKE=$C1 CELES=$49 and every other character $00, i.e. an active
+-- party of two, so what leaves this room is LOCKE alone.
 local H = dofile("tools/tests/lib/ot6.lua")
 
 local function map() return H.mapId() & 0x1ff end
@@ -83,10 +83,10 @@ end
 
 local DELTA = { up = { 0, -1 }, right = { 1, 0 }, down = { 0, 1 }, left = { -1, 0 } }
 
--- (a tapInto helper used to sit here, DEFINED and never called -- the same
--- dead battle toolkit the other tube-step conversions deleted; its only
+-- (a tapInto helper used to sit here, defined and never called, the same
+-- unused battle toolkit the other tube-step conversions deleted; its only
 -- battle handling was the battle-clear write.  issue #75: this file now has
--- ZERO state writes -- the scene is ridden with real input only)
+-- no state writes, and the scene is ridden with real input only)
 
 local function census(tag, targets)
   local sx, sy = H.fieldX(), H.fieldY()
@@ -131,10 +131,10 @@ H.run({ maxFrames = 90000 }, {
     H.assertEq(sw(0x0068), 0, "$0068 CLEAR at boot")
     H.assertEq(sw(0x02F6), 1, "$02F6 SET at boot -- CELES is in the roster")
     local e = espers()
-    -- MEASURED boot roster, not assumed.  $1A69+0 = $0F is RAMUH(0),
-    -- IFRIT(1), SHIVA(2), SIREN(3) -- Ifrit and Shiva are this beat's, the
-    -- other two ride in from earlier steps.  The rest is recorded rather
-    -- than asserted bit by bit, because what this step proves is the DELTA:
+    -- Measured boot roster, not assumed.  $1A69+0 = $0F is RAMUH(0),
+    -- IFRIT(1), SHIVA(2), SIREN(3); Ifrit and Shiva belong to this beat and
+    -- the other two come in from earlier steps.  The rest is recorded rather
+    -- than asserted bit by bit, because what this step checks is the delta:
     -- boot0/boot2 are captured here and the post-scene assertion is
     -- boot | the six give_genju bits, so an esper arriving from somewhere
     -- else cannot be mistaken for one of these six.
@@ -189,19 +189,19 @@ H.run({ maxFrames = 90000 }, {
       "CELES's $1850 party nibble is 0 -- she is out of the active party")
     -- ...and what is left is LOCKE, SABIN and EDGAR.
     --
-    -- THIS USED TO ASSERT ONE, AND THAT ONE WAS THE DEFECT, NOT THE RULE.
-    -- The tube-room scene takes exactly one member, CELES.  It left the
-    -- party at one character only because the chain arrived here with two
-    -- -- the party_menu at the end of the Zozo leave cutscene was answered
-    -- with a bare START, committing just the forced {LOCKE, CELES} and
-    -- leaving SABIN, EDGAR, CYAN and GAU in the pool (#21).  The number 1
-    -- was this generator recording that loss as if it were the story.
+    -- This used to assert a party of one, which was a defect rather than
+    -- the rule.  The tube-room scene takes exactly one member, CELES.  It
+    -- left the party at one character only because the chain arrived here
+    -- with two: the party_menu at the end of the Zozo leave cutscene was
+    -- answered with a bare START, committing only the forced {LOCKE, CELES}
+    -- and leaving SABIN, EDGAR, CYAN and GAU in the pool (#21).  The number
+    -- 1 was this generator recording that loss as though it were the story.
     -- gen_zozo5_ramuh now seats SABIN and EDGAR in the two free slots, so
-    -- four walk in and three walk out, and gen_n128's header note that the
+    -- four enter and three leave, and gen_n128's header note that the
     -- minecart is fought by one character is superseded from here.
     --
-    -- Named, not just counted: a count alone would go green again if the
-    -- chain lost EDGAR somewhere and picked up CYAN instead.
+    -- The characters are named as well as counted: a count alone would pass
+    -- again if the chain lost EDGAR somewhere and picked up CYAN instead.
     local cur, n, who = H.readByte(0x1A6D), 0, {}
     for c = 0, 13 do
       local b = H.readByte(0x1850 + c)
@@ -220,8 +220,8 @@ H.run({ maxFrames = 90000 }, {
     H.screenshot("esper_tubes")
   end),
   H.saveState("esper_tubes.mss"),
-  -- RELOAD-VERIFIED (gen_sabin_gau's pattern): capture-calm does NOT imply
-  -- reload-calm, so reload the parked moment and require it quiet.
+  -- Reload-verified (gen_sabin_gau's pattern): a calm capture does not imply
+  -- a calm reload, so reload the parked moment and require it quiet.
   H.call(function() verifyReq = H.requestSaveState() end),
   H.waitFrames(2),
   H.call(function()

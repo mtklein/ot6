@@ -1,48 +1,48 @@
--- gen_vector_crash.lua -- v0.7 STEP H->I (issue #31), and the generator
+-- gen_vector_crash.lua -- v0.7 step H->I (issue #31), and the generator
 -- that cuts battery checkpoint I, `vector-crash-v1`.
 --
 -- The step: cold-Continue the tracked `gate-cave-save-v1` battery (boundary
--- H -- map 386 (74,53), the area's only interior save point), assert its
+-- H, map 386 (74,53), the area's only interior save point), assert its
 -- contract, then:
 --   1. leave the save room (386 (73,59) short entrance -> 384 (64,12));
---   2. THE 384 WEST TRAVERSE (measured, probe_v07_384west/2/3/4/5 +
---      probe_v07_384toggle -- these probes are the record; the recon's own
+--   2. the 384 west traverse (measured, probe_v07_384west/2/3/4/5 and
+--      probe_v07_384toggle; these probes are the record, and the recon's own
 --      seven-lever reading was wrong):
---      the minimal switch chain is TWO levers, not seven --
+--      the minimal switch chain is two levers rather than seven:
 --        * (71,15) face-UP+A (_cb3176, event_main.asm:45276): persistent
 --          $0174, extends the x=76 column bridge; 266-tile south loop ->
 --          587 tiles, the whole east half;
---        * (104,17) face-UP+A TOGGLE (_cb33c9, :45485): session $01F5,
+--        * (104,17) face-UP+A toggle (_cb33c9, :45485): session $01F5,
 --          flips the 5x13 tower region; 587 -> 655 tiles, opening the
---          (120..121,17..23) descent.  ONE 8-frame up+A tap fires it and
---          the switch flips at the event's END (~70 frames); a second A
---          press on the tile toggles it BACK, so the drive is tap-once-
---          then-wait, never an A-spam loop;
+--          (120..121,17..23) descent.  One 8-frame up+A tap fires it and
+--          the switch flips at the event's end (~70 frames); a second A
+--          press on the tile toggles it back, so the drive taps once and
+--          then waits rather than repeating A;
 --      then the (121,23) -> (4,37) teleport (short-entrance record; the
 --      pairs are one-way: (4,36)->(121,22) is the return) and the west
---      walk to the gate door row (9..11,27) -- a 3-tile long entrance,
---      len 2 H, so the entry point must sit OFF that row.
+--      walk to the gate door row (9..11,27), a 3-tile long entrance,
+--      len 2 H, so the entry point must sit off that row.
 --      The (58,18) span switch, the (89,29)/(96,18)/(99,18) walk-overs
---      and the (112,16)/(99,13) toggles are NOT on this route: the span
+--      and the (112,16)/(99,13) toggles are not on this route: the span
 --      only opens the (46..41,11) west bridge (a dead end for the
 --      traverse) and the walk-overs serve the treasure alcove.
---   3. THE SEALED GATE SCENE (map 391; entry (8,21) IS the scene trigger,
---      _cb39ca, :45953): ridden hands-off with advanceStory, battles 121
---      and 122 in opts.spare -- the $17b dummy is unloseable and must
---      NEVER be write-cleared (its battle_event IS the scene, measured).
---      The tail sets $0079=1 and returns control at 384 (10,28);
+--   3. the sealed gate scene (map 391; entry (8,21) is the scene trigger,
+--      _cb39ca, :45953): ridden with no input via advanceStory, battles 121
+--      and 122 in opts.spare.  The $17b dummy cannot be lost and must
+--      never be write-cleared, because its battle_event is the scene
+--      (measured).  The tail sets $0079=1 and returns control at 384 (10,28);
 --   4. out the post-gate shortcut ((5,43) -> _cb2a9f -> 382 (31,41),
 --      exposed by the $0079 map-init retile), the cave mouth (25,38) ->
 --      world (169,194), the pocket, (166,194) -> the base east door;
---   5. THE BASE RE-CROSS AND THE CRASH: walking into the west trigger row
---      fires _cb280f (:44289) -- the ensemble scene, $0242=1, the
---      auto-teleport to the Blackjack, battle 123 (spare -- battle_event
---      $15 stages the DECK crew on-screen, so rosters are asserted
---      FIELD-side only, never inside), $007A/$007B/$01BA=1 $0246=0, the
---      scripted crash flight, and control back on MAP 6 (16,6) with the
+--   5. the base re-cross and the crash: walking into the west trigger row
+--      fires _cb280f (:44289), which runs the ensemble scene, $0242=1, the
+--      auto-teleport to the Blackjack, battle 123 (spared; battle_event
+--      $15 stages the deck crew on-screen, so rosters are asserted
+--      field-side only, never inside), $007A/$007B/$01BA=1 $0246=0, the
+--      scripted crash flight, and control back on map 6 (16,6) with the
 --      wreck's parent map set to world (83,239);
---   6. the airship-dead proof at the wheel (facing-LEFT+A on (14,6) opens
---      NOTHING -- _caf532 EventReturns on $007A=1/$0176=0), then off the
+--   6. the airship-dead check at the wheel (facing-LEFT+A on (14,6) opens
+--      nothing, because _caf532 EventReturns on $007A=1/$0176=0), then off the
 --      wreck: deck door (20,6) -> map 7 (40,11), the interior stairs
 --      (40,18)->(50,51) and (50,62)->(10,30), the hatch trigger (8,36)
 --      (_caf4b1: with $007A=1/$009D=0 it exits ON FOOT to the parent
@@ -54,7 +54,7 @@
 --      the recon's own proposed tile (83,238)).
 --
 -- OT6_CHECKPOINT_LAYOUT: ot6-codex-o8-v1
--- ^ run.sh refuses -- BEFORE boot -- any OT6_SRAM_CHECKPOINT whose manifest
+-- ^ run.sh refuses, before boot, any OT6_SRAM_CHECKPOINT whose manifest
 --   declares a different persistent_layout.
 local H = dofile("tools/tests/lib/ot6.lua")
 
@@ -111,8 +111,8 @@ local function pressWalk(dir, pred, maxFrames, what)
 end
 
 -- tapLever / stepOff: the measured lever and re-entry-escape idioms this
--- generator introduced now live in lib/ot6_field.lua (M.tapLever /
--- M.stepOff -- promoted 2026-07-28 when the I->J step needed both again).
+-- generator introduced now live in lib/ot6_field.lua (M.tapLever and
+-- M.stepOff, promoted 2026-07-28 when the I->J step needed both again).
 local tapLever, stepOff = H.tapLever, H.stepOff
 
 local function landed(m, n)
@@ -140,19 +140,19 @@ local function assertGateParty(where)
 end
 
 H.run({ maxFrames = 240000 }, {
-  -- ---- the cold Continue and the ENTRY CONTRACT (issue #25) -------------
+  -- ---- the cold Continue and the entry contract (issue #25) -------------
   H.waitFrames(350),
   H.repeatN(5, { H.pressButtons({ "start" }, 8), H.waitFrames(25) }),
   H.waitFrames(120),
   H.repeatN(3, { H.pressButtons({ "a" }, 8), H.waitFrames(40) }),
   H.waitFrames(300),
   H.repeatN(3, { H.pressButtons({ "a" }, 8), H.waitFrames(60) }),
-  -- The boot tile IS the SavePoint trigger: a cold Continue stands the
+  -- The boot tile is the SavePoint trigger: a cold Continue stands the
   -- party on 386 (74,53) and the trigger re-enters every frame, so
-  -- hasControl() never settles there (the re-entry-trap class: a stood-on
-  -- trigger tile whose script re-fires every frame).
-  -- Gate on map+alignment+brightness only; the contract assert is pure
-  -- reads, and the escape below is an unconditional held press.
+  -- hasControl() never settles there.  This is the stood-on-trigger class,
+  -- where a trigger tile's script re-fires every frame.
+  -- Gate on map, alignment and brightness only; the contract assert is
+  -- read-only, and the escape below is an unconditional held press.
   (function() local cnt = 0
     return H.waitUntil(function()
       local ok = map() == 386 and H.tileAligned() and bright() >= 15
@@ -203,9 +203,9 @@ H.run({ maxFrames = 240000 }, {
   end),
 
   -- ---- 3. the gate door and the scene -------------------------------------
-  -- the door row (9..11,27) is approached from the SOUTH (census G: the
+  -- the door row (9..11,27) is approached from the south (census G: the
   -- x=9..11 column below it is the only walkway; (12,27) is not walkable),
-  -- so the entry point is (10,28) -- the same tile the scene exits onto
+  -- so the entry point is (10,28), the same tile the scene exits onto
   H.navTo(10, 28, { playBattles = "flee", maxFrames = 20000 }),
   H.call(function()
     assertGateParty("the gate entry point (field side, before the scene)")
@@ -257,9 +257,9 @@ H.run({ maxFrames = 240000 }, {
   H.call(function()
     assertGateParty("the base re-cross (field side, before battle 123)")
   end),
-  -- walk west toward the trigger row; _cb280f owns everything from there
-  -- to the crash -- the scene, $0242=1, the deck, battle 123, the flight,
-  -- and control back on MAP 6 at (16,6) with parent world (83,239)
+  -- walk west toward the trigger row; _cb280f drives everything from there
+  -- to the crash: the scene, $0242=1, the deck, battle 123, the flight,
+  -- and control back on map 6 at (16,6) with parent world (83,239)
   H.navTo(9, 17, { playBattles = "flee", maxFrames = 20000 }),
   pressWalk("left", function() return not H.hasControl() or map() ~= 377 end,
     2400, "held LEFT into the west trigger row -> _cb280f"),
@@ -280,11 +280,12 @@ H.run({ maxFrames = 240000 }, {
     H.screenshot("step_hi_wreck_deck")
   end),
 
-  -- ---- the airship-dead check: the wheel refuses ---------------------------
+  -- ---- the airship-dead check: the wheel does not respond -------------------
   -- On a live chain, facing-LEFT+A on the wheel (14,6) opens the $052A
-  -- lift-off choice ($0170 is set on this chain).  Dead ($007A=1, $0176=0)
-  -- _caf532 EventReturns before any dialog (event_main.asm:36118-36127).
-  -- 300 frames of LEFT+A edges must therefore open NOTHING.
+  -- lift-off choice ($0170 is set on this chain).  With the airship dead
+  -- ($007A=1, $0176=0), _caf532 EventReturns before any dialog
+  -- (event_main.asm:36118-36127).  300 frames of LEFT+A edges must therefore
+  -- open nothing.
   H.navTo(14, 6, { playBattles = "flee", maxFrames = 6000, calmFrames = 8 }),
   (function() local n = 0
     return H.driveUntil(function() n = n + 1; return n >= 300 end, 400, {
@@ -327,12 +328,12 @@ H.run({ maxFrames = 240000 }, {
        and H.worldX() ~= 0
   end, 3600, "world at the crash site", 5),
   H.waitFrames(45),
-  -- MEASURED (probe_v07_gatescene3): the hatch drops the party ON the
-  -- wreck's own world tile (83,238) -- the route recon's proposed
-  -- checkpoint-I tile -- on foot, with $1F60/61 == $1F62/63 == (83,238).
-  -- An A tap HERE re-enters the wreck interior (it does not lift off, and
-  -- the gen never presses it); the flight refusal was proven at the wheel
-  -- above.
+  -- Measured (probe_v07_gatescene3): the hatch drops the party on the
+  -- wreck's own world tile (83,238), the route recon's proposed
+  -- checkpoint-I tile, on foot, with $1F60/61 == $1F62/63 == (83,238).
+  -- An A tap here re-enters the wreck interior (it does not lift off, and
+  -- the gen never presses it); the wheel check above already showed the
+  -- airship will not fly.
   H.call(function()
     H.log(string.format("[crash site] world (%d,%d) ship cells $1F62/63 = "
       .. "(%d,%d) $11FA=%02X $11F3=%02X $1F60/61=(%d,%d)",
@@ -346,13 +347,13 @@ H.run({ maxFrames = 240000 }, {
     H.screenshot("step_hi_crash_site")
   end),
 
-  -- ---- 7. the world battery save at the crash site -- boundary I ----------
+  -- ---- 7. the world battery save at the crash site, boundary I ------------
   H.call(function()
     H.assertExitContractPreSave("vector-crash-v1")
     H.screenshot("step_hi_i_tile")
   end),
-  -- THE STEP'S SAVESTATE IS GENERATED HERE, BEFORE THE MENU (the world menu
-  -- does not unwind on B, measured)
+  -- The step's savestate is generated here, before the menu, because the
+  -- world menu does not unwind on B (measured)
   H.saveState("vector_crash.mss"),
 
   -- ---- the real Save UI, slot 3 --------------------------------------------
@@ -374,24 +375,24 @@ H.run({ maxFrames = 240000 }, {
   H.call(function()
     H.assertEq((H.readByte(0x0201) & 0x80) ~= 0, true,
       "menu-flags $0201 bit7 SET -- the save-enable flow reached the menu")
-    -- ARM THE input-driven save receipt (issue #75): a read-only exec hook on
+    -- Arm the input-driven save receipt (issue #75): a read-only exec hook on
     -- the real CopyGameDataToSRAM entry captures the slot argument the
     -- save runs with (codex_saveas's instrument).  This replaces the old
-    -- zeroed-$307ff0 sentinel -- an SRAM write -- as the proof that the
-    -- real save ran to completion for slot 3.
+    -- zeroed-$307ff0 sentinel, which was an SRAM write, as the evidence that
+    -- the real save ran to completion for slot 3.
     local entry = H.sym("CopyGameDataToSRAM")
     emu.addMemoryCallback(function()
       saveArg = emu.getState()["cpu.a"] & 0xff
     end, emu.callbackType.exec, entry, entry)
   end),
-  -- THE PAD-DRIVEN SAVE (save-drive rule, tools/tests/README.md;
+  -- The pad-driven save (save-drive rule, tools/tests/README.md;
   -- codex_saveas and probe_banquet_timer_save are the templates): UP wraps
   -- the main-menu cursor to Save (row 6), A enters the menu's own
-  -- SelectMainMenuOption_06 path, the slot cursor is STEERED to slot 3 by
+  -- SelectMainMenuOption_06 path, the slot cursor is steered to slot 3 by
   -- pad against its live cell, and A confirms on through any overwrite
-  -- prompt.  No ZMENUSTATE poke, no cursor poke, no display-cache poke,
-  -- and no witness seeding: the codex payload the battery carries is
-  -- whatever the chain EARNED, read and logged below (issue #75).
+  -- prompt.  There is no ZMENUSTATE poke, no cursor poke, no display-cache
+  -- poke, and no witness seeding: the codex payload the battery carries is
+  -- whatever the chain earned, read and logged below (issue #75).
   H.driveUntil(function()
     return H.readByte(ZMENUSTATE) == 0x05 and H.readByte(0x4b) == 6
   end, 600, {
@@ -416,10 +417,10 @@ H.run({ maxFrames = 240000 }, {
     H.assertEq(emu.read(0x307ff0, emu.memType.snesMemory), 3,
       "SRAM $307ff0 records slot 3")
     H.assertEq(saveArg, 3, "CopyGameDataToSRAM ran for persistent slot 3")
-    -- the codex witness cells are READ, never seeded (issue #75): the
-    -- battery carries whatever the chain actually earned.  The phase-2
-    -- checkpoint re-cuts measure these and the entry contracts follow the
-    -- measurement (never the reverse).
+    -- the codex witness cells are read, never seeded (issue #75): the
+    -- battery carries whatever the chain earned.  The phase-2 checkpoint
+    -- re-cuts measure these, and the entry contracts follow the
+    -- measurement rather than the other way round.
     H.log(string.format("codex witness cells (earned): elem=%02X class=%02X",
       emu.read(0x316810 + ULTROS2, emu.memType.snesMemory),
       emu.read(0x316990 + ULTROS2, emu.memType.snesMemory)))

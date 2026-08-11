@@ -3,12 +3,12 @@
 --   camp_intro.mss  map 117 at (36,2), SABIN + SHADOW, controllable, with
 --                   $02E2 set so the gate cutscene cannot re-fire
 --
--- WALKING ONE TILE SOUTH HANDS THE GAME TO CYAN, ON ANOTHER MAP, FOR ~9,000
--- FRAMES.  This is the whole content of this step and it is not what the
+-- Walking one tile south hands the game to CYAN, on another map, for ~9,000
+-- frames.  That is the whole content of this step, and it is not what the
 -- route map suggests.  Stepping from the camp gate onto (36,3) fires
 -- _cb0c2f (event_trigger.asm:33, event_main.asm:39785), which walks the
 -- party UP 1 / RIGHT 2 to (38,2) and calls the commander scene _cb0c87
--- (:39826).  That scene's LAST act is not "give control back":
+-- (:39826).  That scene does not end by returning control:
 --
 --     fade_out / wait_fade / switch $01CC=1 / switch $04EE=1
 --     wait_1s / call _cb9aae                        (:40019-40027)
@@ -16,51 +16,51 @@
 -- and _cb9aae (:60795) is the Doma interlude:
 --     char_party CYAN, 1 / char_party SABIN, 0
 --     load_map 120, {33,42}, UP                     (:60802-60806)
--- CYAN, alone, on DOMA CASTLE's interior map.  From there it runs a long
+-- CYAN, alone, on Doma Castle's interior map.  From there it runs a long
 -- automatic stretch, detours through `load_map 123, {10,44}` (:61120), hits
 -- `name_menu CYAN` (:61204), comes back with `load_map 120, {33,49}`
 -- (:61245), parks SLOT_1 on (33,44) and the commander (NPC_1, obj 16) on
 -- (33,54) (:61246-61269), and only then reaches `player_ctrl_on` (:61482).
 --
--- WHAT THIS COST, AND WHY THE FILE IS SHAPED THIS WAY.  Run 1 of this step
+-- What this cost, and why the file is shaped this way.  Run 1 of this step
 -- pointed navTo at the LEO scene's tile and let it walk.  navTo dropped its
 -- plan on the first frame ("control lost at (36,2)") and then sat for
 -- 20,000 frames while the heartbeat printed the party object drifting
 -- (38,2) -> (33,42) -> (10,44) -> (10,39): those are _cb9aae's map-120
 -- spawn, map 123's spawn, and CYAN mid-cutscene, all read through the same
--- $0803 offset and all completely invisible as MAP CHANGES because navTo's
--- heartbeat does not print the map.  It froze for good at (10,39) --
--- `name_menu CYAN`, which navTo has no branch for and never will.  So:
+-- $0803 offset and none of them visible as map changes, because navTo's
+-- heartbeat does not print the map.  It stopped at (10,39), at
+-- `name_menu CYAN`, which navTo has no branch for.  So:
 -- nothing on this step is walked with navTo except the two short stretches
 -- where the party genuinely has control, and everything else is ridden.
 --
--- ONLY THE COMMANDER MATTERS.  Map 120 stands up twelve soldiers (NPCProp
+-- Only the commander matters.  Map 120 stands up twelve soldiers (NPCProp
 -- ::_120, npc_prop.asm), eleven of which are `battle 43` grinding
 -- (_cb9ffb.._cba073, :61739-61802) that hides one NPC each and changes no
 -- switch.  The twelfth, obj 16 at (33,54), is the commander: _cb9eb5
 -- (:61517) fights `battle 46` and its tail is the scene that ends the
--- interlude and calls _cb0bc4 (:61737) -- the CAMP's own startup event,
+-- interlude and calls _cb0bc4 (:61737), the camp's own startup event,
 -- which re-creates SABIN and SHADOW and reloads map 117 at (36,2).  So the
 -- interlude is exactly one fight long and the eleven others are skipped.
 --
--- ISSUE #75 -- BATTLE 46 IS FOUGHT, NOT WRITE-CLEARED.  Zero state writes in
--- this generator.  The fight is CYAN alone (battle slot ONE -- see the
--- inBattle note) against event battle group 46 = formation 409 = one $14E,
--- and its loss is unrecoverable in-timeline: `battle 46` is followed by
--- `call _ca5ea9` (:61522-61523), the GameOver gate, so a lost fight parks
--- the event PC at $CB9EBB forever.  The fighter is the house menu-episode
--- machine (gen_scenario's cadence: presses start only once the battle-menu
--- flag has held 4 straight pulses, then ONE button per 30-frame pulse):
--- CYAN banks boost to 2 and dumps it on Fight -- R raises pending boost,
--- A A confirms the boosted Fight on the default target -- the same
--- bank-and-dump doctrine the river fighters proved.  A loss (CYAN at 0 HP
--- for 90 straight frames) does not error: it sets `lost` and the RETRY
--- LADDER reloads the cyan_defence-moment checkpoint -- the generator
--- script's spelling of a player reloading their save -- and pokes the
+-- Issue #75: battle 46 is fought rather than write-cleared, and this
+-- generator makes no state writes.  The fight is CYAN alone (battle slot one;
+-- see the inBattle note) against event battle group 46 = formation 409 = one
+-- $14E, and a loss cannot be recovered from in-timeline: `battle 46` is
+-- followed by `call _ca5ea9` (:61522-61523), the GameOver gate, so a lost
+-- fight leaves the event PC at $CB9EBB indefinitely.  The fighter is the house
+-- menu-episode machine (gen_scenario's cadence: presses start only once the
+-- battle-menu flag has held 4 straight pulses, then one button per 30-frame
+-- pulse).  CYAN banks boost to 2 and dumps it on Fight: R raises pending
+-- boost, and A A confirms the boosted Fight on the default target, the same
+-- bank-and-dump policy the river fighters used.  A loss (CYAN at 0 HP
+-- for 90 straight frames) does not error: it sets `lost`, and the retry
+-- ladder reloads the cyan_defence-moment checkpoint, which is the script's
+-- equivalent of a player reloading a save, then pokes the
 -- commander again with the fighter escalated (attempt 2+ dumps at 1 BP,
 -- which changes every input from the first turn and reshuffles the whole
--- interleaving).  Three attempts, then fail with every attempt's numbers on
--- the record.
+-- interleaving).  Three attempts, then fail with every attempt's numbers
+-- recorded.
 local H = dofile("tools/tests/lib/ot6.lua")
 local DOOR = "build/states/sabin_camp.mss.lua"
 

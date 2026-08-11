@@ -4,28 +4,29 @@
 --   camp_cleared.mss  map 119 (DOMA CASTLE), SABIN alone, controllable,
 --                     with CYAN's defence of the gate already underway
 --
--- THE WALK IS THREE MAPS AND ONE OF THEM IS A TRAP DOOR.  From map 121 the
+-- The walk is three maps, and one of them has a door back the way it came.
+-- From map 121 the
 -- route is (short_entrance.dat, map 121):
 --   121 (37,11) -> 123 (17,38)     the castle interior
 --   123 (16,32) -> 124 (28,36)     Cyan's quarters
 -- and (28,36) on map 124 is `make_event_trigger {28,36}, _cb1283`
--- (event_trigger.asm:597) -- the family scene (event_main.asm:40863).  Its
+-- (event_trigger.asm:597), the family scene (event_main.asm:40863).  Its
 -- tail is `_cb1337` (:40991): `char_party CYAN, 0 / char_party SABIN, 1 /
 -- party_chars SABIN` and `load_map 119, {8,25}, RIGHT` (:41001), then the
 -- arrival scene that introduces CYAN to SABIN, sets $0033 and ends in
 -- `player_ctrl_on` (:41067-41068).
 --
--- THE TRAP DOOR: map 123 (17,39) goes straight back to map 121, and it is
--- one tile south of where this step ARRIVES on map 123.  The field BFS knows
+-- That door: map 123 (17,39) goes straight back to map 121, and it is
+-- one tile south of where this step arrives on map 123.  The field BFS knows
 -- tile passability and nothing about doorways, so any plan that clips that
--- tile silently un-does the step.  fieldLeg() below is the field twin of
+-- tile undoes the step.  fieldLeg() below is the field equivalent of
 -- gen_sabin_world's worldLeg: it names the map the step is allowed to end on
--- and fails loudly on any other, instead of leaving a walker to idle out
+-- and fails on any other, instead of leaving a walker to idle out
 -- its budget on the wrong map.
 --
--- WHAT IS *NOT* REQUIRED, checked rather than assumed.  Map 123 carries two
--- more scene triggers -- (4,34) _cba29f (:62120, the King) and (42,8)
--- _cba395 (:62307, "Here, too...") -- and neither gates the family scene:
+-- What is not required, checked rather than assumed.  Map 123 carries two
+-- more scene triggers, (4,34) _cba29f (:62120, the King) and (42,8)
+-- _cba395 (:62307, "Here, too..."), and neither gates the family scene:
 -- _cb1283 opens `if_switch $007D=1, EventReturn` and nothing else, so the
 -- only thing between CYAN and his house is walking there.  Both are skipped.
 local H = dofile("tools/tests/lib/ot6.lua")

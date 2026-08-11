@@ -1,6 +1,6 @@
--- probe_mrf262.lua -- read-only navigation survey of the MAGITEK FACTORY
+-- probe_mrf262.lua -- read-only navigation survey of the Magitek Factory
 -- upper floor (map 262) from the mrf_entry fixture, so the next route step
--- is planned off the LIVE tilemap rather than the offline model the route
+-- is planned off the live tilemap rather than the offline model the route
 -- recon could only build from the static incbin.
 --
 -- Dumps: the party's landing state, the full BFS step list to each
@@ -38,7 +38,7 @@ local function render(x0, x1, y0, y1, tag)
       elseif occ then c = "o"
       elseif (t & 0x07) == 0x07 then c = "#"
       else
-        -- walkable-ish: does ANY neighbour step reach it?
+        -- walkable: some neighbour step reaches it
         c = "."
       end
       row[#row + 1] = c

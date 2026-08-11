@@ -1,54 +1,55 @@
 #!/usr/bin/env python3
 """Compose a self-contained Lua test file for Mesen's testrunner.
 
-Why: runtime dofile()/loadfile() RAISE under Mesen's default setting
-Debug.ScriptWindow.AllowIoOsAccess=false (Lua/lauxlib.c:776) -- the error is
-clean and names the setting, but an unguarded dofile at script load means no
-callbacks ever register, the emulator free-runs, and the testrunner's
-wall-clock cap kills it as exit 255.  That signature is what an earlier note
-here called "intermittent emulator crashes"; it was neither intermittent nor
-a crash.
+Why: runtime dofile()/loadfile() raise under Mesen's default setting
+Debug.ScriptWindow.AllowIoOsAccess=false (Lua/lauxlib.c:776).  The error
+names the setting, but an unguarded dofile at script load means no callbacks
+ever register, the emulator free-runs, and the testrunner's wall-clock cap
+ends the run with exit 255.  An earlier note here called that signature
+"intermittent emulator crashes"; it happens on every run, and it is not a
+crash.
 
-Flipping that setting would make runtime loading work.  We do not, and
-inline instead: one flat file is hermetic, which is worth more to a
-reproducible suite than the convenience.  So this script textually inlines
-the test library -- BOTH halves: lib/ot6.lua (battle core) and
-lib/ot6_field.lua (field/world navigation) -- and any savestate sidecars the
-script references, into one file with no runtime file access at all.
+Changing that setting would make runtime loading work.  This program keeps
+the setting as it is and inlines instead, because one flat file needs no
+files at run time.  So this script textually inlines the test library, both
+halves (lib/ot6.lua, the battle core, and lib/ot6_field.lua, field/world
+navigation), and any savestate sidecars the script references, into one file
+that does no file access at run time.
 
 Transformations:
   1. The line `local H = dofile(".../lib/ot6.lua")` is replaced by the two
-     lib halves; see inline_libs() for the exact shape.  Every script gets
-     both, always -- a battle test carries nav code it never calls, which
-     costs composed-file bytes and nothing else, and keeps this step free
-     of script-inspection cleverness.
+     lib halves; see inline_libs() for the shape.  Every script gets both:
+     a battle test carries nav code it never calls, which costs
+     composed-file bytes and nothing else, and this step then needs no
+     inspection of what the script uses.
   2. For every `H.loadState("<path>.mss.lua")` reference whose sidecar file
      exists, the sidecar's base64 payload is embedded into a global table
      `OT6_STATES[basename]`; the lib's loadState() checks that table first,
-     so no loadfile() happens at runtime.  The sidecar is taken from THIS
-     tree's build/states whenever it has one -- see the precedence table at
-     the resolution loop -- and every embedded state is named, with a short
+     so no loadfile() happens at runtime.  The sidecar is taken from this
+     tree's build/states whenever it has one (see the precedence table at
+     the resolution loop), and every embedded state is named, with a short
      hash, in a comment and a print() at the head of the composed file.
 
 Usage: compose.py <script.lua> <out.lua>
 
 SCENARIO STACKING (OT6_STACK): the v0.3 scenario routes each replay one
-branch of the SAME three-way split, and the reunion gate (_caadb9,
-event_main.asm:26683) needs all three completed in ONE playthrough.  The
+branch of the same three-way split, and the reunion gate (_caadb9,
+event_main.asm:26683) needs all three completed in a single playthrough.  The
 route generators hardcode both their boot sidecar ("scenario_hub.mss.lua")
 and their output names ("rapids_done.mss"), so replaying a route from
 another scenario's endpoint used to mean either duplicating a 600-line
-generator or clobbering the input-driven single-scenario states.  Instead:
-`OT6_STACK=<prefix>` makes composition rewrite the BASENAME of every
-`.mss`/`.mss.lua` string literal in the SCRIPT (never the lib), so
+generator or overwriting the input-driven single-scenario states.
+`OT6_STACK=<prefix>` instead makes composition rewrite the basename of every
+`.mss`/`.mss.lua` string literal in the script (never in the lib), so
 `OT6_STACK=t2_` composes gen_rapids into a script that boots
 t2_scenario_hub.mss.lua and emits t2_rapids_*.mss.  The Makefile seeds
 t2_scenario_hub as a copy of locke_done, and the whole Terra chain then
-replays on top of the Locke ending -- same route logic, different boot,
-distinct artifacts.  This lives at compose time because that is where
-sidecar literals are already resolved (the tree-precedence rules above);
-the generators stay byte-identical, and the regeneration check keeps working
-because stacked artifacts are ordinary files on the same .rom-copy clock.
+replays on top of the Locke ending, with the same route logic, a different
+boot, and separate artifacts.  This runs at compose time because that is
+where sidecar literals are already resolved (the tree-precedence rules
+above); the generators stay byte-identical, and the regeneration check keeps
+working because stacked artifacts are ordinary files on the same .rom-copy
+clock.
 """
 import hashlib
 import os
@@ -61,28 +62,29 @@ HERE = Path(__file__).resolve().parent
 LIB = HERE / "ot6.lua"            # battle core; yields the module table
 FIELD = HERE / "ot6_field.lua"    # nav half; installs onto that same table
 CONTRACT = HERE / "ot6_contract.lua"  # checkpoint entry/exit contracts (#25); same shape
-SAVESTATE_STAMP = HERE / "savestate_stamp.sh"  # the ONE definition of the generator sig
+SAVESTATE_STAMP = HERE / "savestate_stamp.sh"  # the one definition of the generator sig
 ROOT = HERE.parent.parent.parent           # lib/ -> tests/ -> tools/ -> tree root
 MARKER = "-- AUTOGENERATED by lib/compose.py; edit the source script instead."
-# The ca65 debug file for THIS tree's ROM.  A whole family of tests used to
+# The ca65 debug file for this tree's ROM.  A family of tests used to
 # hardcode absolute bank-$F0 (OT6 data tables) / $C2 (battle) / $C0 (RNG)
-# addresses that SHIFT on any code/data growth, so each went stale on every
-# bank edit -- the single most recurring source of harness breakage.  We
-# derive them here instead: any symbol a script names via H.sym("Name") is
+# addresses that shift on any code/data growth, so each went stale on every
+# bank edit, which was the most frequent source of harness breakage.  They
+# are derived here instead: any symbol a script names via H.sym("Name") is
 # looked up in this file and injected as OT6_SYMS, the same mechanism
 # OT6_STATES uses for savestate sidecars.  Built by `make rom`; a test that
-# needs a symbol before the ROM is built fails loudly at H.sym (see ot6.lua).
+# needs a symbol before the ROM is built fails at H.sym with a named error
+# (see ot6.lua).
 DBG = ROOT / "ff6" / "rom" / "ff6-en.dbg"
-# The state-write burn-down list (tools/check_state_writes.py owns the
+# The state-write burn-down list (tools/check_state_writes.py defines the
 # format).  Composition reads it to decide, per script, whether to arm the
-# RUNTIME write gate below -- the same only-shrinks rule, enforced twice.
+# runtime write gate below, so the same only-shrinks rule is enforced twice.
 WAIVERS = ROOT / "tools" / "state_write_waivers.txt"
 
 
 def load_write_waivers(path):
     """The set of repo-relative paths carrying at least one state-write
-    waiver.  Tokens are irrelevant here: the runtime gate is per-SCRIPT
-    (a waived file keeps its historical write access wholesale until its
+    waiver.  Tokens are not used here: the runtime gate is per script
+    (a waived file keeps its historical write access in full until its
     burn-down entries are deleted), so only the path column is read."""
     waived = set()
     if path.exists():
@@ -93,9 +95,9 @@ def load_write_waivers(path):
     return waived
 
 
-# The write-side emu surface, kept in lockstep with check_state_writes.py's
+# The write-side emu surface, kept in sync with check_state_writes.py's
 # TOKENS (the emu.* half; the .writeByte(/H.write/M.write wrapper tokens are
-# lib entry points, which die with the lib's own burn-down instead).
+# lib entry points, which are removed with the lib's own burn-down instead).
 WRITE_GATE_SURFACE = [
     "write", "writeWord", "write16", "write32",
     "setState", "addCheat", "clearCheats",
@@ -104,27 +106,27 @@ WRITE_GATE_SURFACE = [
 
 
 def write_gate_prologue():
-    """The RUNTIME half of the issue #75 no-state-writes rule.
+    """The runtime half of the issue #75 no-state-writes rule.
 
-    The static half (tools/check_state_writes.py) refuses write TOKENS it
-    can see in a checked-in .lua; this closes what a linter cannot see --
-    a computed index like emu["wr".."ite"], a loadstring, code that grows a
+    The static half (tools/check_state_writes.py) refuses write tokens it
+    can see in a checked-in .lua; this covers what a linter cannot see: a
+    computed index like emu["wr".."ite"], a loadstring, or code that adds a
     write after the file's waivers were deleted.  The prologue runs before
-    any user or lib code: it latches the real `emu` into a file-local the
-    lib chunks alias (H.loadState and the retry-blob path keep the one
-    confined savestate-load handle the program's plan names), then swaps
-    the global for a proxy whose write surface raises loudly.  Everything
-    read-side passes through untouched.
+    any user or lib code.  It latches the real `emu` into a file-local that
+    the lib chunks alias (H.loadState and the retry-blob path keep the one
+    confined savestate-load handle the program's plan names), then replaces
+    the global with a proxy whose write surface raises an error.  Read-side
+    calls pass through untouched.
 
-    Scripts whose file still carries state-write waivers compose WITHOUT
-    the prologue -- grandfathered, exactly like the static side -- so the
-    guard arms per script as the burn-down list shrinks, and nothing red
-    can appear that the static only-shrinks rule had not already promised
-    was clean.
+    Scripts whose file still carries state-write waivers compose without
+    the prologue, grandfathered the same way as on the static side, so the
+    guard arms per script as the burn-down list shrinks, and a script can
+    only go red here if the static only-shrinks rule had already reported
+    it clean.
 
     __OT6_EMU_RAW is itself a forbidden token in check_state_writes.py, so
-    no checked-in test can reach around the proxy; it was born forbidden
-    and can never be waived.
+    no checked-in test can reach around the proxy; that token was forbidden
+    from the start and cannot be waived.
     """
     lines = [
         "-- RUNTIME WRITE GATE (issue #75): this script's file carries no\n",
@@ -157,29 +159,29 @@ def payload(sidecar: Path) -> str:
 def digest(b64: str) -> str:
     """Short fingerprint of an embedded payload, for the provenance lines.
 
-    Hashes the base64 TEXT rather than the sidecar file, so it ignores the
+    Hashes the base64 text rather than the sidecar file, so it ignores the
     `return "..."` wrapper and can be recomputed from either side of a
-    mismatch -- a composed file or a sidecar.  `compose.py --sha <sidecar>`
-    prints it, so the hash in a run log is checkable against a local state
-    instead of being a number nobody can reproduce.
+    mismatch, a composed file or a sidecar.  `compose.py --sha <sidecar>`
+    prints it, so a hash seen in a run log can be checked against a local
+    state.
     """
     return hashlib.sha256(b64.encode()).hexdigest()[:12]
 
 
 def generator_sig(gen, root, extras=()):
     """The sha256(generator ++ lib/ot6.lua ++ lib/ot6_field.lua), from the
-    ONE authority.
+    single authority.
 
-    A generated fixture's freshness stamp is compared on two sides --
-    lib/savestate_stamp.sh (shell) writes it at generation time, this
-    consume-time check (below) re-derives it -- and the two MUST agree
-    byte-for-byte or the check silently passes stale fixtures.  So rather than
-    reimplement the digest here (`cat gen lib | shasum`, an independent copy
-    that could drift), we shell out to savestate_stamp.sh's own `sig`
-    subcommand: its 64-hex prefix IS the definition.  OT6_ROOT points it at
-    the composing tree, so it reads exactly the gen/lib bytes this side would
-    have.  compose runs once per test, so the subprocess cost is negligible
-    next to the emulator run it precedes.
+    A generated fixture's freshness stamp is compared on two sides:
+    lib/savestate_stamp.sh (shell) writes it at generation time, and this
+    consume-time check (below) re-derives it.  The two must agree
+    byte-for-byte, or the check passes stale fixtures without reporting
+    them.  Rather than reimplement the digest here (`cat gen lib | shasum`,
+    an independent copy that could drift), this shells out to
+    savestate_stamp.sh's own `sig` subcommand, whose 64-hex prefix is the
+    definition.  OT6_ROOT points it at the composing tree, so it reads the
+    same gen/lib bytes this side would.  compose runs once per test, so the
+    subprocess cost is small next to the emulator run it precedes.
     """
     out = subprocess.run(
         ["sh", str(SAVESTATE_STAMP), "sig", gen, *extras],
@@ -193,35 +195,37 @@ def stamp_check(name, root):
     """Consume-time half of the issue #2 freshness check, and of the issue #75
     provenance bindings.
 
-    The generation-time check (the ninja graph + lib/savestate_stamp.sh)
-    regenerates a fixture when its generator or any lib half changes -- but
-    only when `make savestates` runs.  A fixture can still reach a test WITHOUT
-    that: the suite adds a test that needs a generated savestate the moment
-    its .mss exists, and `make test` never generates them, so a state that
-    worktree-setup seeded from another tree (and a local generator edit has
-    since drifted) would be embedded and asserted on silently.
+    The generation-time check (the ninja graph and lib/savestate_stamp.sh)
+    regenerates a fixture when its generator or any lib half changes, but
+    only when `make savestates` runs.  A fixture can still reach a test
+    without that: the suite adds a test that needs a generated savestate as
+    soon as its .mss exists, and `make test` never generates them, so a state
+    that worktree-setup seeded from another tree, and that a local generator
+    edit has since drifted from, would be embedded and asserted on with no
+    warning.
 
-    The stamp carries three claims (savestate_stamp.sh's header is the format
-    authority), and each is re-verified here, in escalating specificity:
+    The stamp carries three claims (savestate_stamp.sh's header defines the
+    format), and each is re-verified here, from the most general to the most
+    specific:
 
-      1. `<sig> <gen> [extras]` -- the SOURCES: recompute the sig via the
-         one authority and compare.  A mismatch is the classic issue-#2
-         stale fixture.
-      2. `artifact <sha256>` -- the OUTPUT: hash the .mss beside the stamp.
-         A mismatch means the artifact was replaced without a generation run
-         -- the hand-crafted-fixture hole issue #75 exists to close.  A stamp
-         with no artifact line predates the provenance format and is reported
-         unbound rather than trusted.
-      3. `ancestor <path> <sha256>` -- the CHAIN: hash the named ancestor
-         stamp (or checkpoint manifest) as it sits on disk.  Every stamp
-         vouching for its own artifact plus naming its ancestor's stamp
-         hash makes the whole chain verifiable transitively, one local
+      1. `<sig> <gen> [extras]`, the sources: recompute the sig via the
+         single authority and compare.  A mismatch is the issue-#2 stale
+         fixture.
+      2. `artifact <sha256>`, the output: hash the .mss beside the stamp.
+         A mismatch means the artifact was replaced without a generation
+         run, which is the hand-crafted-fixture hole issue #75 exists to
+         close.  A stamp with no artifact line predates the provenance
+         format and is reported unbound rather than trusted.
+      3. `ancestor <path> <sha256>`, the chain: hash the named ancestor
+         stamp (or checkpoint manifest) as it sits on disk.  Because every
+         stamp vouches for its own artifact and names its ancestor's stamp
+         hash, the whole chain can be verified transitively, one local
          check at a time.
 
-    Returns None when there is nothing to check -- no stamp at all (the
-    suite's own states), or a generator that has since been removed -- so it
-    never invents a warning; otherwise the loud line the composed file
-    prints through the [ot6] channel (and `--check-states` fails on).
+    Returns None when there is nothing to check: no stamp at all (the
+    suite's own states), or a generator that has since been removed, so it
+    never invents a warning.  Otherwise it returns the line the composed file
+    prints through the [ot6] channel, and that `--check-states` fails on.
     """
     base = name[:-len(".mss.lua")] if name.endswith(".mss.lua") else name
     stamp = root / "build" / "states" / (base + ".stamp")
@@ -289,18 +293,19 @@ def stamp_check(name, root):
 
 def check_states(root):
     """`compose.py --check-states`: the same freshness question, asked of the
-    WHOLE fixture set at once instead of one sidecar at a time.
+    whole fixture set at once instead of one sidecar at a time.
 
     stamp_check() answers "is this fixture stale?" only when something is
-    about to embed it, and answers it into a composed file that nobody reads
-    until a test has already gone red.  The question an agent actually has --
-    "is anything in this tree stale before I start?" -- had no way to be
-    asked, so it got answered by re-running tests against unmodified `main`
-    to see if they were red anyway.  Four agents did exactly that on
-    2026-07-29, independently, for the same ~10 tests.
+    about to embed it, and it writes the answer into a composed file that is
+    usually read only after a test has gone red.  Before this existed there
+    was no way to ask "is anything in this tree stale before I start?", so it
+    was answered by re-running tests against unmodified `main` to see whether
+    they were red anyway; four agents did that on 2026-07-29, independently,
+    for the same ~10 tests.
 
-    Deliberately the SAME code path as the consume-time check: one definition
-    of fresh, so a tree that reports clean here cannot warn during a run.
+    This uses the same code path as the consume-time check, so there is one
+    definition of fresh and a tree that reports clean here cannot warn during
+    a run.
 
     Exit 0 = every stamped fixture matches its sources; 1 = some do not.
     """
@@ -324,12 +329,12 @@ def check_states(root):
           f"generated from sources this tree no longer has, or carrying bytes "
           f"their stamps do not vouch for.")
 
-    # WHICH shared input moved, when it is a shared input.  ninja keeps a
-    # byte-copy of every generation input under build/ninja/src (the `latch`
-    # edges -- see savestate_ninja.py's header), so "what did the last run
-    # actually see?" is answerable without guessing.  Every generator inlines
-    # all three lib halves, so one edited half stales every generated state at
-    # once, which is exactly the case that looks alarming and is not.
+    # Name which shared input moved, when it is a shared input.  ninja keeps
+    # a byte-copy of every generation input under build/ninja/src (the
+    # `latch` edges; see savestate_ninja.py's header), so "what did the last
+    # run see?" is answerable without guessing.  Every generator inlines all
+    # three lib halves, so one edited half makes every generated state stale
+    # at once; that case looks like many separate problems but is one.
     moved = [p for p in (LIB.name, FIELD.name, CONTRACT.name)
              if (root / "build" / "ninja" / "src" / "tools" / "tests" / "lib"
                  / p).exists()
@@ -360,7 +365,7 @@ def check_states(root):
 
 
 class CrossTree(Exception):
-    """A referenced sidecar exists ONLY outside the composing tree."""
+    """A referenced sidecar exists only outside the composing tree."""
 
 
 def inline_libs(script: str, lib: str, field: str, contract: str,
@@ -378,32 +383,32 @@ def inline_libs(script: str, lib: str, field: str, contract: str,
         <lib/ot6_contract.lua>     -- same shape: checkpoint contracts (#25)
         end)(H)
 
-    The core composes exactly as it always did -- wrapped in a function so
-    its `return M` yields the module, bound to the script's H.  The field
-    half is a SECOND chunk in the same file, invoked immediately with H as
-    its argument, so it installs navTo/bfsPath/worldNavTo/... onto the very
-    table the script already holds; the contract half (#25) is a THIRD chunk
-    of exactly the same shape, installing the checkpoint entry/exit contract
-    registry.  Every script gets all three, always -- a battle test carries
-    contract code it never calls, which costs composed-file bytes and nothing
-    else, the same bargain the field half already struck.  The two-scope
-    shape keeps each source file a valid Lua chunk on its own (no
-    cross-file locals -- the one core local the field half needs, seqStep,
-    is exported on M).  The leading `;` is load-bearing: without it Lua
-    reads `(function...` as a call on the previous line's value, not a new
-    statement.
+    The core composes as it did before the other halves were added, wrapped
+    in a function so its `return M` yields the module, bound to the script's
+    H.  The field half is a second chunk in the same file, invoked
+    immediately with H as its argument, so it installs
+    navTo/bfsPath/worldNavTo/... onto the table the script already holds; the
+    contract half (#25) is a third chunk of the same shape, installing the
+    checkpoint entry/exit contract registry.  Every script gets all three: a
+    battle test carries contract code it never calls, which costs
+    composed-file bytes and nothing else, the same trade the field half
+    already makes.  The two-scope shape keeps each source file a valid Lua
+    chunk on its own (no cross-file locals; the one core local the field half
+    needs, seqStep, is exported on M).  The leading `;` is required: without
+    it Lua reads `(function...` as a call on the previous line's value rather
+    than a new statement.
 
     `raw_alias` prepends `local emu = __OT6_EMU_RAW or emu` inside each lib
-    chunk: under the runtime write gate (see write_gate_prologue) the global
-    `emu` is a write-refusing proxy, and the LIB keeps the raw handle for as
-    long as the lib's own state-write waivers survive -- its loadState /
+    chunk.  Under the runtime write gate (see write_gate_prologue) the global
+    `emu` is a write-refusing proxy, and the lib keeps the raw handle for as
+    long as the lib's own state-write waivers exist: its loadState /
     retry-blob path is the one confined savestate-load handle, and its
     legacy write sites (the memory writes that end a battle outright) stay
-    callable from steps that have not converted yet.  The alias is passed
-    only while the burn-down list still carries lib entries, so deleting the
-    last lib waiver flips every composed script to strict without touching
-    this code.  In an ungated compose __OT6_EMU_RAW is nil and the alias is
-    the identity.
+    callable from steps that have not been converted yet.  The alias is
+    passed only while the burn-down list still carries lib entries, so
+    deleting the last lib waiver switches every composed script to strict
+    without a change here.  In an ungated compose __OT6_EMU_RAW is nil and
+    the alias has no effect.
 
     Returns (composed_text, replaced); replaced False means the script never
     dofiles the lib (smoke.lua) and the text came through untouched.
@@ -432,13 +437,13 @@ def inline_libs(script: str, lib: str, field: str, contract: str,
 _MSS_LIT = re.compile(r'"((?:[^"]*/)?)([A-Za-z0-9_]+\.mss(?:\.lua)?)"')
 
 # Any H.sym("Name") / M.sym('Name') / sym("Name") reference: group 1 is the
-# ca65 symbol REFERENCE to resolve out of ff6-en.dbg -- either a bare name
-# ("RandA") or a name qualified by the ca65 SEGMENT that defines it
+# ca65 symbol reference to resolve out of ff6-en.dbg, either a bare name
+# ("RandA") or a name qualified by the ca65 segment that defines it
 # ("ExecCmd@battle_code"), which is how a caller disambiguates a name the
 # linker emits more than once.  Matches only `sym(` at a word boundary, so
-# `foo.symbolic(...)` is not a false positive.  Names found in comments
-# over-collect harmlessly (an extra OT6_SYMS entry is inert) -- see
-# comment_only_refs(), which is what keeps the ambiguity check below from
+# `foo.symbolic(...)` is not a false positive.  Names found in comments are
+# collected too, which is harmless because an extra OT6_SYMS entry is inert;
+# see comment_only_refs(), which keeps the ambiguity check below from
 # failing a compose over a name that only appears in prose.
 _SYM_REF = re.compile(
     r'\bsym\s*\(\s*["\']([A-Za-z_][A-Za-z0-9_]*(?:@[A-Za-z0-9_.]+)?)["\']')
@@ -452,8 +457,8 @@ def comment_only_refs(script, refs):
     a string literal would fool this; no test here writes one, and the cost
     of being fooled is a warning instead of an error, never the reverse.)
 
-    This exists so the ambiguity check can be FATAL for a real call while
-    staying inert for prose -- probe_dottick.lua's header documents the
+    This exists so the ambiguity check can be fatal for a real call while
+    staying inert for prose: probe_dottick.lua's header documents the
     ExecCmd hazard by naming `H.sym("ExecCmd")`, and a doc comment must not
     be able to fail a build.
     """
@@ -471,28 +476,28 @@ def parse_dbg_syms(dbg, wanted):
     Returns (resolved, ambiguous):
       resolved   ref -> integer address, for refs that name exactly one place
       ambiguous  ref -> [(segment, address), ...] sorted, for refs that name
-                 SEVERAL -- the caller must disambiguate, and until it does
-                 the ref is deliberately absent from `resolved`
+                 several places; the caller must disambiguate, and until it
+                 does the ref is absent from `resolved`
 
     A ref is either a bare ca65 name ("RandA") or `Name@segment`
     ("ExecCmd@battle_code").  The .dbg carries one record per line; a
     `.proc`/label emits several with the same name (a `scope`, an `imp`
     import, and the `lab` definition), but only the `type=lab` record carries
-    `val=0x...` -- the address we want -- so only label lines are considered.
+    the `val=0x...` address, so only label lines are considered.
 
-    WHY THIS IS NOT "take the first val", which is what it used to be: ca65
+    This does not take the first val, which is what it used to do.  ca65
     scopes names per module, so a name can be defined in two modules and the
-    linker records both.  `ExecCmd` is field code at $C09B1B AND the battle
+    linker records both.  `ExecCmd` is field code at $C09B1B and the battle
     command dispatcher at $C213EA; 3838 of this ROM's 98483 label names are
-    non-unique.  Taking the first val meant H.sym("ExecCmd") handed back the
-    field one, an exec callback on it never fired in battle, and every
-    measurement downstream of that window read a confidently wrong value with
-    nothing anywhere saying so.  Duplicate records that agree on the address
-    are NOT ambiguous -- only genuinely distinct addresses are.
+    non-unique.  Taking the first val meant H.sym("ExecCmd") returned the
+    field address, an exec callback on it never fired in battle, and every
+    measurement downstream of that window read a wrong value with nothing
+    reporting it.  Duplicate records that agree on the address are not
+    ambiguous; only distinct addresses are.
 
-    A name with no label record simply appears in neither dict, and H.sym()
-    raises for it at runtime (the same loud failure as a missing savestate
-    sidecar).  Same for an empty `wanted` or an absent .dbg (an unbuilt ROM).
+    A name with no label record appears in neither dict, and H.sym() raises
+    for it at runtime (the same failure as a missing savestate sidecar).  The
+    same holds for an empty `wanted` or an absent .dbg (an unbuilt ROM).
     """
     if not wanted or not dbg.exists():
         return {}, {}
@@ -504,14 +509,14 @@ def parse_dbg_syms(dbg, wanted):
     val_re = re.compile(r"\bval=0x([0-9A-Fa-f]+)")
     seg_re = re.compile(r"\bseg=(\d+)")
 
-    # ONE pass, collecting both kinds of record: base name -> {seg id ->
+    # One pass, collecting both kinds of record: base name -> {seg id ->
     # {addresses}}, plus the seg-id -> seg-name table needed to label them.
     # Segment names ("field_code", "battle_code") come from cfg/ff6-en.cfg and
-    # survive the bank-layout shifts that move addresses -- which is why a
-    # segment, not an address, is what a caller disambiguates with.
+    # survive the bank-layout shifts that move addresses, so a caller
+    # disambiguates with a segment rather than an address.
     #
-    # Unlike the old scan this cannot exit early: deciding "is this name
-    # unique?" is only answerable at end of file.  A 55 MB .dbg scans in
+    # Unlike the old scan this cannot exit early, because "is this name
+    # unique?" can only be answered at end of file.  A 55 MB .dbg scans in
     # ~0.1 s here, against the multi-second emulator run it precedes.
     found, segs = {}, {}
     with dbg.open() as f:
@@ -550,11 +555,11 @@ def stack_rewrite(script: str, prefix: str) -> str:
     """Prefix the basename of every .mss/.mss.lua literal in `script`.
 
     Both directions must move together: prefixing only loadState references
-    would boot gen_rapids from t2_scenario_hub and then let it OVERWRITE the
+    would boot gen_rapids from t2_scenario_hub and then let it overwrite the
     input-driven rapids_start/rapids_done with states generated from a
-    contaminated boot -- the exact silent-wrong-artifact class the resolver
+    contaminated boot, which is the silent-wrong-artifact case the resolver
     selftest exists for.  Screenshot tags carry no .mss suffix and are
-    untouched; comments mentioning state names get rewritten too, which is
+    untouched; comments mentioning state names are rewritten too, which is
     harmless.
     """
     if not prefix:
@@ -567,48 +572,46 @@ def stack_rewrite(script: str, prefix: str) -> str:
 def resolve_sidecar(ref, root):
     """Pick the sidecar file a "<path>.mss.lua" reference should embed.
 
-    Every test writes tree-relative references ("build/states/x.mss.lua") --
+    Every test writes tree-relative references ("build/states/x.mss.lua");
     the last absolute literals (the gen_*.lua's) migrated in the regeneration
-    window that followed issue #26, so an ABSOLUTE reference is now refused
-    outright rather than resolved.  That makes the whole #26 class
-    structural: an absolute path is how a test comes to mean "some other
-    tree's bytes", and the eleven stale-worktree literals that motivated
-    the issue could not have been written under this rule.  Composition is
-    already tree-local everywhere else: LIB ignores the script's literal
-    dofile path in exactly the same way.
+    window that followed issue #26, so an absolute reference is now refused
+    rather than resolved.  That makes the #26 class structural: an absolute
+    path is how a test comes to mean another tree's bytes, and the eleven
+    stale-worktree literals that motivated the issue could not have been
+    written under this rule.  Composition is tree-local elsewhere as well:
+    LIB ignores the script's literal dofile path the same way.
 
     Precedence, per reference:
-      0. an absolute literal -> raise CrossTree, always -- even one naming
-         this very tree, which would only mean "works until the tree moves"
-      1. <root>/build/states/<basename>       -- always wins if present
+      0. an absolute literal -> raise CrossTree, including one naming this
+         tree, which would work only until the tree moves
+      1. <root>/build/states/<basename>       -- wins if present
       2. the literal anchored at <root> (never the composer's cwd, which
          would make resolution depend on where make/run.sh was invoked)
       3. the anchored literal escapes <root> (via ..) or crosses into a
-         NESTED git tree inside <root> (an agent worktree under
+         nested git tree inside <root> (an agent worktree under
          .claude/worktrees/ sits inside the main tree on disk but is a
          different checkout with a different ROM) -> raise CrossTree
-      4. nowhere -> None; embed nothing, the lib raises "sidecar not
-         embedded" at loadState, which is already a clear failure
+      4. nowhere -> None; embed nothing, and the lib raises "sidecar not
+         embedded" at loadState, which is a clear failure
 
     Rule 1 is the fix.  An earlier pass consulted this tree only when the
-    literal MISSED -- but the literal (a main-tree path) essentially always
-    exists, so the fallback never fired, and a worktree that had legitimately
-    regenerated a state for its own modified ROM still composed the MAIN
-    tree's stale copy.
+    literal missed, but the literal (a main-tree path) almost always exists,
+    so the fallback never fired, and a worktree that had regenerated a state
+    for its own modified ROM still composed the main tree's stale copy.
 
-    Rule 3 refuses rather than silently borrowing.  A foreign tree's state
-    was generated from a DIFFERENT ROM, so a run against it is a green that
-    proves nothing; and reading it while that tree regenerates is a cross-tree
-    race besides.  run.sh already takes this line for the settings pin
-    ("Refusing the run beats reporting a green that never had the pins") --
-    a fixture is no weaker a guarantee than a settings file.
+    Rule 3 refuses rather than borrowing silently.  Another tree's state was
+    generated from a different ROM, so a run against it passes without
+    proving anything, and reading it while that tree regenerates is also a
+    cross-tree race.  run.sh takes the same line for the settings pin: it
+    refuses the run rather than report a pass that never had the pins, and a
+    fixture is as strong a requirement as a settings file.
 
-    Rule 0 subsumes what the nested-worktree check used to be the last line
-    of defense for (issue #26: eleven tests authored inside
+    Rule 0 covers what the nested-worktree check used to be the last defense
+    for (issue #26: eleven tests authored inside
     .claude/worktrees/agent-a7ce... kept that tree's absolute paths, which
-    passed is_relative_to(root) and silently borrowed the other checkout's
-    fixture).  The nested-.git check stays: a RELATIVE path can still be
-    spelled through a nested checkout, and refusing it must not depend on
+    passed is_relative_to(root) and borrowed the other checkout's fixture
+    with no warning).  The nested-.git check stays: a relative path can still
+    be spelled through a nested checkout, and refusing it must not depend on
     how the reference was written.
     """
     literal = Path(ref)
@@ -623,10 +626,11 @@ def resolve_sidecar(ref, root):
         resolved = literal.resolve()
         if not resolved.is_relative_to(root):
             raise CrossTree(ref)
-        # Inside root, but crossing into a nested checkout?  A git worktree
-        # (or submodule) marks its own top with a .git entry -- a FILE for
-        # worktrees, a directory for a clone -- so any .git between the
-        # literal and root means the file belongs to a different tree.
+        # Check whether the path, though inside root, crosses into a nested
+        # checkout.  A git worktree (or submodule) marks its own top with a
+        # .git entry, a file for worktrees and a directory for a clone, so
+        # any .git between the literal and root means the file belongs to a
+        # different tree.
         for parent in resolved.parents:
             if parent == root:
                 break
@@ -639,11 +643,11 @@ def resolve_sidecar(ref, root):
 def selftest() -> int:
     """Positive control for resolve_sidecar's precedence: `compose.py --selftest`.
 
-    The bug this guards is a SILENT wrong answer -- composition that quietly
-    embeds another tree's savestate -- so asserting "it composed fine" would
-    itself pass for the wrong reason.  Each case below therefore pins WHICH
-    file was chosen, and case 1 (the regression) is built so that the old
-    literal-first code would have picked the other one.
+    The bug this guards against is a wrong answer with no warning:
+    composition that embeds another tree's savestate.  Asserting "it composed
+    fine" would itself pass for the wrong reason, so each case below pins
+    which file was chosen, and case 1 (the regression) is built so that the
+    old literal-first code would have picked the other one.
     """
     import tempfile
 
@@ -662,8 +666,8 @@ def selftest() -> int:
         main_tree, work = tmp / "ot6", tmp / "ot6" / ".claude" / "wt" / "a"
         for t in (main_tree, work):
             (t / "build" / "states").mkdir(parents=True)
-        # A worktree nests INSIDE the main tree on disk, as real ones do --
-        # so "outside this tree" cannot be a naive prefix test in reverse.
+        # A worktree nests inside the main tree on disk, as real ones do, so
+        # "outside this tree" cannot be a reversed prefix test.
         m_state = main_tree / "build" / "states" / "s.mss.lua"
         w_state = work / "build" / "states" / "s.mss.lua"
         m_state.write_text('return "TUFJTg=="\n')
@@ -676,10 +680,10 @@ def selftest() -> int:
             except CrossTree:
                 check(label, "CrossTree", "CrossTree")
 
-        # 0. RULE 0: an absolute reference is refused no matter whose tree
-        # it names -- including the composing tree's own path.  The pre-#26
+        # 0. Rule 0: an absolute reference is refused no matter whose tree
+        # it names, including the composing tree's own path.  The pre-#26
         # regression (a worktree composing the main tree's hardcoded path)
-        # is now unreachable by construction rather than out-resolved.
+        # is now unreachable by construction rather than resolved around.
         refused("absolute ref refused even naming the composing tree",
                 str(w_state), work)
         refused("absolute ref into another tree refused", str(m_state), work)
@@ -697,10 +701,10 @@ def selftest() -> int:
         # 3a. Escaping the tree via .. is refused, not resolved.
         (tmp / "outside.mss.lua").write_text('return "T1VU"\n')
         refused("dot-dot escape refused", "../../../../outside.mss.lua", work)
-        # 3b. THE ISSUE #26 HOLE, relative form: a reference spelled
-        # through a NESTED worktree stays inside root but names a different
+        # 3b. The issue #26 hole, relative form: a reference spelled
+        # through a nested worktree stays inside root but names a different
         # checkout generated from a different ROM.  (A worktree's top carries
-        # .git as a FILE; model that exactly.)
+        # .git as a file; model that.)
         nested = main_tree / ".claude" / "worktrees" / "agent-b"
         (nested / "build" / "states").mkdir(parents=True)
         (nested / ".git").write_text("gitdir: /somewhere/else\n")
@@ -731,7 +735,7 @@ def selftest() -> int:
     except ValueError:
         check("stack refuses a non-word prefix", "ValueError", "ValueError")
 
-    # -- inline_libs: all three halves ride along, field and contract fed H --
+    # -- inline_libs: all three halves are inlined, field and contract fed H --
     lib_src = "-- core\nlocal M = {}\nCOREBODY\nreturn M"
     field_src = "-- field\nlocal M = ...\nFIELDBODY"
     contract_src = "-- contract\nlocal M = ...\nCONTRACTBODY"
@@ -793,7 +797,7 @@ def selftest() -> int:
                        "tools/tests/lib/ot6_field.lua"})
         check("waiver load: a missing list waives nothing (everything gated)",
               load_write_waivers(Path(tmp) / "absent.txt"), set())
-    # the wrapper's load-bearing assumptions about the REAL lib files:
+    # the assumptions the wrapper makes about the real lib files:
     check("lib/ot6.lua ends by returning its module table",
           LIB.read_text().rstrip().endswith("return M"), True)
     check("lib/ot6_field.lua opens by receiving that table (local M = ...)",
@@ -817,11 +821,11 @@ def selftest() -> int:
     check("sym refs ignore symbolic()/symtab[] look-alikes",
           "NotASym" not in refs, True)
 
-    # -- comment_only_refs: what makes the ambiguity check fatal for a CALL
+    # -- comment_only_refs: what makes the ambiguity check fatal for a call
     #    and inert for prose.  Both halves matter: a doc comment naming a
     #    duplicated symbol must not fail a build (probe_dottick.lua's header
-    #    does exactly that), and a real call must not be excused by an
-    #    unrelated comment elsewhere in the file that happens to name it.
+    #    does that), and a real call must not be excused by an unrelated
+    #    comment elsewhere in the file that names it.
     src = ('-- doc: H.sym("OnlyInProse") is the hazard\n'
            'local A = H.sym("Called")\n'
            '-- and H.sym("Called") is discussed here too\n'
@@ -836,8 +840,8 @@ def selftest() -> int:
           "Absent" in got, True)
 
     # -- parse_dbg_syms: the type=lab record's val wins; scope/imp are skipped;
-    #    an unknown name is simply absent (H.sym raises for it at runtime);
-    #    and a DUPLICATED name is ambiguous rather than silently first-wins --
+    #    an unknown name is absent (H.sym raises for it at runtime); and a
+    #    duplicated name is ambiguous rather than resolving to the first --
     with tempfile.TemporaryDirectory() as tmp:
         dbg = Path(tmp) / "ff6-en.dbg"
         dbg.write_text(
@@ -849,12 +853,12 @@ def selftest() -> int:
             'sym\tid=3,name="RandA",scope=1700,def=9,val=0xC24B98,seg=52,type=lab\n'
             'sym\tid=4,name="Ot6ShieldTbl",scope=1700,val=0xF01050,seg=67,type=lab\n'
             'sym\tid=5,name="Decoy",scope=0,val=0xDEAD00,seg=1,type=equ\n'
-            # THE REGRESSION, verbatim in shape: one name, two modules, two
-            # addresses.  The old code returned 0xC09B1B here and said nothing.
+            # The regression, in shape: one name, two modules, two addresses.
+            # The old code returned 0xC09B1B here and reported nothing.
             'sym\tid=6,name="ExecCmd",scope=228,val=0xC09B1B,seg=6,type=lab\n'
             'sym\tid=7,name="ExecCmd",scope=1700,val=0xC213EA,seg=52,type=lab\n'
-            # A name recorded twice at the SAME address is not ambiguous;
-            # only genuinely different addresses are.
+            # A name recorded twice at the same address is not ambiguous;
+            # only different addresses are.
             'sym\tid=8,name="Twice",scope=1700,val=0xC22000,seg=52,type=lab\n'
             'sym\tid=9,name="Twice",scope=1701,val=0xC22000,seg=52,type=lab\n')
         got, amb = parse_dbg_syms(
@@ -888,16 +892,17 @@ def selftest() -> int:
 
     # -- ot6.lua's accessor must know about the ambiguity table compose emits;
     #    otherwise a comment-only duplicate would fall through to the plain
-    #    "not in ff6-en.dbg" message and send the reader after a rebuild.
+    #    "not in ff6-en.dbg" message, which tells the reader to rebuild.
     check("lib/ot6.lua M.sym consults OT6_SYMS_AMBIG",
           "OT6_SYMS_AMBIG" in LIB.read_text(), True)
 
-    # -- stamp_check: the issue-#75 provenance bindings, against the REAL
-    #    savestate_stamp.sh (pointed at a mock tree via OT6_ROOT exactly the
-    #    way generator_sig points it).  The bug class is a fixture that LOOKS
-    #    generated -- stamp present, sig fresh -- while the bytes beside it
-    #    were never produced by that run, so each case pins the binding that
-    #    catches the forgery, not just "a message appeared".
+    # -- stamp_check: the issue-#75 provenance bindings, against the real
+    #    savestate_stamp.sh (pointed at a mock tree via OT6_ROOT, the same
+    #    way generator_sig points it).  The bug class is a fixture that looks
+    #    generated, with a stamp present and a fresh sig, while the bytes
+    #    beside it were never produced by that run, so each case pins the
+    #    binding that catches the replacement rather than only checking that
+    #    a message appeared.
     with tempfile.TemporaryDirectory() as tmp:
         root = Path(tmp)
         (root / "tools" / "tests" / "lib").mkdir(parents=True)
@@ -921,14 +926,14 @@ def selftest() -> int:
         check("a fresh stamp verifies clean (both name forms)",
               (stamp_check("fake", root), stamp_check("fake.mss.lua", root)),
               (None, None))
-        # THE HAND-CRAFTED FIXTURE: same stamp, replaced bytes.
+        # The hand-crafted fixture: same stamp, replaced bytes.
         (st / "fake.mss").write_bytes(b"HAND-CRAFTED bytes")
         has("a tampered .mss is UNBOUND, naming the artifact mismatch",
             stamp_check("fake", root), "was replaced without a generation run")
         (st / "fake.mss").write_bytes(b"generated bytes v1")
         check("restoring the generated bytes restores the verdict",
               stamp_check("fake", root), None)
-        # THE CHAIN: a child bound to its ancestor's stamp file.
+        # The chain: a child bound to its ancestor's stamp file.
         (st / "child.mss").write_bytes(b"child bytes v1")
         gate("write", "child", "gen_fake", "build/states/fake.stamp")
         check("a chained stamp verifies clean", stamp_check("child", root),
@@ -944,9 +949,9 @@ def selftest() -> int:
         has("a missing ancestor stamp fails the child",
             stamp_check("child", root), "is gone")
         (st / "fake.stamp").write_bytes(kept)
-        # PRE-PROVENANCE STAMPS: a bare sig line (the old format) must read
-        # as unbound even though its sig is current -- nothing ties the
-        # bytes to the run that made them, which is the #75 hole itself.
+        # Pre-provenance stamps: a bare sig line (the old format) must read
+        # as unbound even though its sig is current, because nothing ties the
+        # bytes to the run that made them, which is the #75 hole.
         (st / "old.mss").write_bytes(b"who knows")
         (st / "old.stamp").write_text(gate("sig", "gen_fake"))
         has("a sig-only (pre-provenance) stamp is UNBOUND",
@@ -963,9 +968,9 @@ def selftest() -> int:
 def main() -> int:
     if len(sys.argv) == 2 and sys.argv[1] == "--selftest":
         return selftest()
-    # --check-states: is anything in this tree's build/states stale?  Asked
-    # by tools/worktree-setup.sh right after seeding, and by hand any time a
-    # red test might not be yours.
+    # --check-states: report whether anything in this tree's build/states is
+    # stale.  Run by tools/worktree-setup.sh right after seeding, and by hand
+    # any time a red test might not be caused by your change.
     if len(sys.argv) == 2 and sys.argv[1] == "--check-states":
         return check_states(ROOT)
     # --sha <sidecar>: the same fingerprint the provenance lines carry, so a
@@ -977,17 +982,19 @@ def main() -> int:
     script = script_path.read_text()
     lib = LIB.read_text()
 
-    # Composing is NOT idempotent (the usage-example dofile line in the
-    # inlined lib header would re-trigger inlining), so refuse re-composition.
+    # Composing is not idempotent (the usage-example dofile line in the
+    # inlined lib header would re-trigger inlining), so re-composition is
+    # refused.
     # run.sh runs already-composed files (first line = MARKER) directly.
     if script.startswith(MARKER):
         print(f"error: {script_path} is already composed; refusing to re-compose")
         return 1
 
-    # Scenario stacking: rewrite state basenames BEFORE sidecar collection,
-    # so the resolver sees (and embeds) the prefixed names.  Script only --
-    # the lib's own .mss mentions are documentation, and rewriting the lib
-    # would make the composed lib differ per prefix for no behavioral reason.
+    # Scenario stacking: rewrite state basenames before sidecar collection,
+    # so the resolver sees (and embeds) the prefixed names.  The script is
+    # rewritten and the lib is not: the lib's own .mss mentions are
+    # documentation, and rewriting the lib would make the composed lib differ
+    # per prefix with no change in behavior.
     stack = os.environ.get("OT6_STACK", "")
     if stack:
         script = stack_rewrite(script, stack)
@@ -1017,17 +1024,17 @@ def main() -> int:
         if b64:
             states[Path(ref).name], sources[Path(ref).name] = b64, p
 
-    # Say WHICH sidecar got embedded, in the composed file itself.  A state
-    # mismatch otherwise looks like a ROM bug: the run loads a fixture that
-    # is subtly wrong and fails somewhere unrelated, with nothing anywhere
-    # naming the file it actually came from.  The print() lands in the run
+    # Record which sidecar was embedded, in the composed file itself.  A
+    # state mismatch otherwise looks like a ROM bug: the run loads a fixture
+    # that is wrong in a small way and fails somewhere unrelated, with
+    # nothing naming the file it came from.  The print() lands in the run
     # log (run.sh greps '^[ot6]', so it reaches the terminal too) and the
-    # comment survives in the composed artifact for later inspection.
-    # The runtime write gate (issue #75).  Armed per script by the SAME
-    # burn-down list the static checker enforces: a file with no waivers
-    # promised it never writes, and the prologue makes that promise hold at
-    # runtime too.  A script from outside the tree (a scratch probe) has no
-    # waivers by construction and is always gated.
+    # comment stays in the composed artifact for later inspection.
+    # The runtime write gate (issue #75).  Armed per script by the same
+    # burn-down list the static checker enforces: a file with no waivers is
+    # declared not to write, and the prologue enforces that at runtime too.
+    # A script from outside the tree (a scratch probe) has no waivers by
+    # construction and is always gated.
     waived_files = load_write_waivers(WAIVERS)
     try:
         rel = str(script_path.resolve().relative_to(ROOT)).replace(os.sep, "/")
@@ -1054,18 +1061,18 @@ def main() -> int:
         for name, b64 in states.items():
             preamble.append(f'print("[ot6] state {name} sha={digest(b64)} '
                             f'<- {sources[name]}")\n')
-        # issue #2: warn LOUDLY if an embedded fixture no longer matches the
+        # issue #2: warn if an embedded fixture no longer matches the
         # generator+lib it was generated from (a drift the generation step
         # refreshes only under `make savestates`, which `make test` never runs).
         # Non-fatal: the print lands in the [ot6] log run.sh and suite.sh both
         # surface.
-        # ...and record it in a table the LIB can read, so a wait that times
-        # out can name the fixture it booted and say that fixture was already
-        # known-stale.  A warning printed at frame 0 and a failure at frame 600
-        # are 600 frames of unrelated log apart, and the failure is the line
-        # someone reads: "timeout waiting for main menu" has already sent an
-        # agent looking for a menu bug that did not exist.  See M.timeoutContext
-        # in lib/ot6.lua.
+        # Also record it in a table the lib can read, so a wait that times
+        # out can name the fixture it booted and report that the fixture was
+        # already known-stale.  A warning printed at frame 0 and a failure at
+        # frame 600 are 600 frames of unrelated log apart, and the failure is
+        # the line that gets read: "timeout waiting for main menu" has
+        # previously sent an agent looking for a menu bug that did not exist.
+        # See M.timeoutContext in lib/ot6.lua.
         flagged = {}
         for name in states:
             stale = stamp_check(name, ROOT)
@@ -1080,11 +1087,11 @@ def main() -> int:
                 preamble.append(f'  ["{name}"] = "{stale}",\n')
             preamble.append("}\n")
 
-    # OT6 symbol addresses: derive them from THIS TREE's ff6-en.dbg the same
-    # way OT6_STATES embeds sidecars.  Only symbols the SCRIPT names via
-    # H.sym("...") are collected, so the injection is INERT for every test
+    # OT6 symbol addresses: derive them from this tree's ff6-en.dbg the same
+    # way OT6_STATES embeds sidecars.  Only symbols the script names via
+    # H.sym("...") are collected, so the injection is inert for every test
     # that does not use it (no reference -> no table emitted).  See ot6.lua
-    # M.sym for the accessor and the loud error on a missing symbol.
+    # M.sym for the accessor and the error on a missing symbol.
     sym_names = list(dict.fromkeys(_SYM_REF.findall(script)))
     if sym_names:
         syms, ambig = parse_dbg_syms(DBG, sym_names)
@@ -1094,29 +1101,27 @@ def main() -> int:
             if name in syms:
                 preamble.append(f'  ["{name}"] = 0x{syms[name]:06X},\n')
         preamble.append("}\n")
-        # A named-but-unresolved symbol is a loud, non-fatal warning here; the
-        # actual failure is H.sym raising at runtime (an unbuilt ROM, or a
-        # typo'd name).  Matches how a missing sidecar defers to loadState.
+        # A named-but-unresolved symbol is a non-fatal warning here; the
+        # failure comes from H.sym raising at runtime (an unbuilt ROM, or a
+        # mistyped name).  Matches how a missing sidecar defers to loadState.
         for name in sym_names:
             if name not in syms and name not in ambig:
                 msg = (f"symbol {name} not found in ff6/rom/ff6-en.dbg "
                        f"-- rebuild the ROM, or check the name")
                 preamble.append(f'print("[ot6] WARNING: {msg}")\n')
                 print(f"WARNING: {msg}")
-        # An AMBIGUOUS name is the opposite case, and it is fatal rather than
-        # deferred: the old behaviour (first val wins) produced a plausible
-        # address that simply never executed, so nothing failed and every
-        # downstream number was quietly wrong.  There is no reading of a
-        # duplicated name that is safe to guess at, so composition stops and
-        # names the choices.
+        # An ambiguous name is fatal rather than deferred: the old behaviour
+        # (first val wins) produced a plausible address that never executed,
+        # so nothing failed and every downstream number was wrong with no
+        # warning.  A duplicated name cannot be guessed at safely, so
+        # composition stops and names the choices.
         #
-        # ...unless every occurrence of the name is inside a COMMENT.  The
-        # ref collector deliberately over-collects from prose (see _SYM_REF),
-        # and probe_dottick.lua's header documents this very hazard by
-        # spelling out `H.sym("ExecCmd")`.  A doc comment must not fail a
-        # build -- so a comment-only ambiguity records itself in
-        # OT6_SYMS_AMBIG instead, and H.sym raises the same message if the
-        # name is ever actually called.
+        # The exception is a name whose every occurrence is inside a comment.
+        # The ref collector over-collects from prose (see _SYM_REF), and
+        # probe_dottick.lua's header documents this hazard by spelling out
+        # `H.sym("ExecCmd")`.  A doc comment must not fail a build, so a
+        # comment-only ambiguity is recorded in OT6_SYMS_AMBIG instead, and
+        # H.sym raises the same message if the name is called.
         if ambig:
             inert = set(comment_only_refs(script, ambig))
             for name, cands in sorted(ambig.items()):

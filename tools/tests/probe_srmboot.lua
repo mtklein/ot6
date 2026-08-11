@@ -1,8 +1,8 @@
 -- probe_srmboot: boot with the player's in-game save injected into SRAM
 -- (run.sh wipes the battery file every launch, so SRAM boots as whatever
--- RamPowerOnState filled it with -- not from disk), drive the
+-- RamPowerOnState filled it with, not from disk), drive the
 -- title into Continue, and screenshot where the save puts us. In-game
--- saves are pure data in vanilla layout — no code dependency — so this
+-- saves are data in the vanilla layout with no code dependency, so this
 -- works across ROM rebuilds, unlike savestates.
 local H = dofile("tools/tests/lib/ot6.lua")
 local SRM = "build/states/playthrough_srm.mss.lua"

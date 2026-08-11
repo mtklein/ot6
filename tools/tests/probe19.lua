@@ -1,7 +1,7 @@
 -- probe19.lua: battle-entry deep diagnostic from the entry-point savestate.
 -- Loads battle_entry.mss, walks into the battle, then samples screenshots
--- and RAM at several points to see exactly what battle entry does.
--- Always exits 0 (pure diagnostic).
+-- and RAM at several points to record what battle entry does.
+-- Always exits 0; this is a diagnostic, not a check.
 
 local H = dofile("tools/tests/lib/ot6.lua")
 local STATE = "build/states/battle_entry.mss.lua"

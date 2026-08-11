@@ -1,33 +1,33 @@
--- probe_trench_arrows.lua -- READ-ONLY instrument for the Serpent Trench
+-- probe_trench_arrows.lua -- read-only instrument for the Serpent Trench
 -- ride (issue #75 follow-on; the sabin_done blocker).  Zero state writes:
--- buttons and eyes only.
+-- buttons and observation only.
 --
--- WHY.  Five gen_sabin_trench driver permutations failed the ride five
--- ways (the record is in that file's ride() comment and commit dc07c44),
--- all reasoning about the show_arrows fork windows.  READING THE SOURCE
--- then showed the windows cannot be what freezes the ride:
+-- Background.  Five gen_sabin_trench driver permutations failed the ride in
+-- five ways (the record is in that file's ride() comment and commit
+-- dc07c44), all reasoning about the show_arrows fork windows.  The source
+-- shows the windows cannot be what freezes the ride:
 --
---   * show_arrows (VehicleCmd_da, world/event.asm:589) just sets $E8
+--   * show_arrows (VehicleCmd_da, world/event.asm:589) sets $E8
 --     bits 1|2 and clears the flash counter; lock_arrows clears bit 2,
---     hide_arrows clears bit 1.  NON-BLOCKING -- the script pattern is
+--     hide_arrows clears bit 1.  It is non-blocking: the script pattern is
 --     `show_arrows / wait 26 / lock_arrows / hide_arrows / if_switch
---     $01B7`, a TIMED input sample (event_main.asm:21212).
---   * The sample itself (world/move.asm:403-425) is LEVEL-triggered on
---     the HELD pad cell $05 every frame the arrows are shown: RIGHT
---     pressed -> $1EB6 &= $7F, LEFT pressed -> $1EB6 |= $80.  No edge,
+--     $01B7`, a timed input sample (event_main.asm:21212).
+--   * The sample itself (world/move.asm:403-425) is level-triggered on
+--     the held pad cell $05 every frame the arrows are shown: right
+--     pressed -> $1EB6 &= $7F, left pressed -> $1EB6 |= $80.  No edge,
 --     no confirm, and it is skipped while $E7 bit0 or $1E bit0 says
 --     player input is disabled.
 --
---   So holding LEFT is the correct fork input, and the measured freeze
+--   So holding left is the correct fork input, and the measured freeze
 --   (ride parked at $ed=0200 from f9143 to a 60000-frame budget, b=false
---   by the gen's inBattle()) is some OTHER waiter -- one that a blanket
---   A-tap resolved, twice, while sending the ride down the $01B7=0
---   detour.  This probe's job is to NAME that waiter.
+--   by the gen's inBattle()) is a different waiter, one that a blanket
+--   A-tap resolved twice while sending the ride down the $01B7=0
+--   detour.  This probe identifies that waiter.
 --
--- WHAT IT DOES.  Boots gau_joined, walks the gen's own route to the dive
--- (helmet scene -> jump), then rides with the ORIGINAL policy -- hold
--- LEFT, flee battles, tap-A stubborn ones -- while logging a transition
--- trace of every cell the mechanism touches:
+-- What it does.  Boots gau_joined, walks the gen's own route to the dive
+-- (helmet scene -> jump), then rides with the original policy (hold left,
+-- flee battles, tap-A the ones that will not flee) while logging a
+-- transition trace of every cell the mechanism touches:
 --
 --   $E8 (arrow show/lock bits + danger bits), $1EB6 (bit7 = the $01B7
 --   fork switch), $05 (held-pad sample the arrows read), $E7/$1E (input
@@ -37,8 +37,8 @@
 --   and CH_SEL/CH_MAX ($056E/$056F).
 --
 -- When $00ED freezes >600 frames, it holds everything for 1200 more
--- frames of clean observation, then presses ONE A and logs which cells
--- transition in the next 120 frames -- the waiter is whatever answered.
+-- frames of clean observation, then presses one A and logs which cells
+-- transition in the next 120 frames; the waiter is whichever cell responds.
 -- It repeats that (freeze -> observe -> one A) up to 8 times, then ends.
 -- PASS means "the trace was captured", not that Nikeah was reached; the
 -- exit assertion is only that the ride left the helmet room and produced

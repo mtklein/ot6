@@ -1,33 +1,33 @@
 -- gen_sabin_kefka.lua -- step 3 of SABIN's scenario: the LEO scene, the
--- poisoning of Doma, both KEFKA gags, the pursuit, and the handoff back to
+-- poisoning of Doma, both KEFKA scenes, the pursuit, and the handoff back to
 -- CYAN.  Generates one state:
---   kefka_done.mss  map 121 (DOMA CASTLE grounds), CYAN alone, controllable
---                   -- the first frame after the camp is behind us
+--   kefka_done.mss  map 121 (Doma Castle grounds), CYAN alone, controllable,
+--                   on the first frame after the camp
 --
--- THE CAMP IS A SWITCH LADDER, and the map enforces its order
+-- The camp is a switch ladder, and the map enforces its order
 -- (ff6/src/event/event_main.asm):
---   $002B  _cb0f2e :40303  trigger (36,22) -- the LEO scene
---   $002C  _cb1032 :40499  trigger (36,23) -- the poisoning, whose tail is
---          `switch $002C=1` + `call _cb1126` (:40639-40640).  THE FIRST
---          KEFKA FIGHT IS NOT SOMETHING YOU WALK UP TO: it is the last two
---          commands of the poisoning cutscene and it happens regardless.
+--   $002B  _cb0f2e :40303  trigger (36,22), the LEO scene
+--   $002C  _cb1032 :40499  trigger (36,23), the poisoning, whose tail is
+--          `switch $002C=1` + `call _cb1126` (:40639-40640).  The first
+--          KEFKA fight is not walked up to: it is the last two
+--          commands of the poisoning cutscene and happens regardless.
 --   $002D  _cb1126 :40670  `battle 56`, then KEFKA walks off DOWN_RIGHT
---   $002E  _cb1170 :40714  second talk -- NO battle, he only runs further
+--   $002E  _cb1170 :40714  second talk, with no battle; he runs further
 --   $002F  _cb1193 :40734  third talk, `battle 56` again
 --   $0155  _cb1209 :40794  `battle 44`, the Kefka/poison cutscene, and
 --          `call _cba0ec` (:40877)
 --
--- ORDER IS NOT OPTIONAL, AND THE MAP WILL SHOVE YOU.  Once $002C is set,
--- two tile strips turn into one-way barriers:
---   (35..37,14) _cb1104 :40656  pushes the party DOWN 1 -- you cannot walk
+-- The order is not optional, and the map pushes the party back.  Once $002C
+-- is set, two tile strips become one-way barriers:
+--   (35..37,14) _cb1104 :40656  pushes the party DOWN 1, so it cannot walk
 --                               back north toward the gate
---   (18,29..32) _cb1112 :40668  pushes the party RIGHT 1 *unless* $002F
+--   (18,29..32) _cb1112 :40668  pushes the party RIGHT 1 unless $002F
 -- The second is why the KEFKA talks come before the walk west: (17,29) and
 -- (17,31) are the tiles that fire the pursuit (_cb11cb/_cb11da, :40946
 -- /:40955), they sit past the x=18 strip, and the strip only opens after the
--- third gag.  Walking west first would be shoved back east forever.
+-- third scene.  Walking west first would be pushed back east each time.
 --
--- BOTH KEFKA GAGS ARE FIGHTS WITH NOTHING IN THEM.  `battle 56` is event
+-- Both KEFKA scenes are fights with no monsters in them.  `battle 56` is event
 -- battle GROUP 56 (EventBattle, field/event.asm:1910-1919, reads
 -- EventBattleGroup at group*4 as two formation words); group 56 is
 -- {504, 504}, and formation 504's record in battle_monsters.dat (stride 15)
@@ -39,24 +39,24 @@
 -- "battle up, zero monsters present" as a set-piece: hands off for 300
 -- frames, then edge-tap A.
 --
--- THE PURSUIT IS A REAL FIGHT: group 44 = formation 410, present mask $0f,
--- two $002 and two $001 -- four ordinary Imperial troops -- and since
--- issue #75 it is FOUGHT, not write-cleared: zero state writes in this
--- generator.  SABIN + SHADOW run the house menu-episode machine (bank
--- boost to 2, dump it on Fight -- R..R A A on a settled menu, one button
+-- The pursuit is a real fight: group 44 = formation 410, present mask $0f,
+-- two $002 and two $001, four ordinary Imperial troops.  Since
+-- issue #75 it is fought rather than write-cleared, and this generator makes
+-- no state writes.  SABIN + SHADOW run the house menu-episode machine (bank
+-- boost to 2, dump it on Fight: R..R A A on a settled menu, one button
 -- per 30-frame pulse); the same edge-tapped A pages dialogs and victory
--- text, and the two zero-monster KEFKA gags keep their hands-off branch
--- (nothing there ever needed a write).  A loss sets `lost` via the
+-- text, and the two zero-monster KEFKA scenes keep their no-input branch
+-- (nothing there needed a write).  A loss sets `lost` via the
 -- 90-frame party-down watch and a three-attempt retry ladder reloads a
 -- checkpoint taken just before the pursuit walk, with the fighter
 -- escalated (tier 2+ dumps at 1 BP) and a 17-frame reload stagger.
--- SHADOW's 1/16 post-battle leave roll does NOT run here: battle switch
--- $4B ("won't leave") is story-SET through the camp -- the escape's exit
+-- SHADOW's 1/16 post-battle leave roll does not run here: battle switch
+-- $4B ("won't leave") is story-set through the camp, and the escape's exit
 -- is what clears it (event_main.asm:42251, gen_sabin_forest's header).
 --
--- WHERE THIS STEP ENDS, AND WHY NOT AT DOMA.  _cba0ec (:61858) does not
--- hand SABIN to map 119.  It takes CYAN back to Doma -- `load_map 121,
--- {23,12}` (:61870) -- and gives the player control of him again at
+-- Where this step ends, and why not at Doma.  _cba0ec (:61858) does not
+-- hand SABIN to map 119.  It takes CYAN back to Doma (`load_map 121,
+-- {23,12}`, :61870) and gives the player control of him again at
 -- :62104.  Getting from there to SABIN on map 119 is another two maps of
 -- walking (121 -> 123 -> 124, where trigger (28,36) fires the family scene
 -- _cb1283 at :40863), so it is the next step's problem and this one stops

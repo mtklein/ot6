@@ -1,9 +1,9 @@
--- probe_moogle_switch.lua -- Y-party-switching mechanics + march timing at
+-- probe_moogle_switch.lua -- Y-party-switching mechanics and march timing at
 -- defense-live (issue #75, marshal-investigation).  Input is button presses
--- only (Y taps -- the mechanic a human player uses); ZERO writes.
+-- only (Y taps, the mechanic a player uses); zero writes.
 --   1. tap Y three times, logging the party-leader object offset $0803 and
---      the leader position after each: does control cycle 1 -> 2 -> 3 -> 1,
---      instantly, no menu?
+--      the leader position after each, to measure whether control cycles
+--      1 -> 2 -> 3 -> 1 immediately and without a menu;
 --   2. then hands off: watch the six guard marches (objects 19..24) every
 --      300 frames until the first collision battle engages, and log the
 --      formation words + monster ids of that wave battle.

@@ -1,9 +1,9 @@
--- probe_narshe_edge.lua -- SPIKE instrument: does the ENGINE allow steps
--- the ported model refuses at the party-region boundary?  Kefka's pocket
--- is model-unreachable (probe_narshe_map2: zero crossings), yet raider
--- o25 walked column x=18 straight through the boundary range and vanilla
+-- probe_narshe_edge.lua -- spike instrument: measures whether the engine
+-- allows steps the ported model refuses at the party-region boundary.
+-- Kefka's pocket is model-unreachable (probe_narshe_map2: zero crossings),
+-- yet raider o25 walked column x=18 through the boundary range and vanilla
 -- players descend these cliffs.  Stand at candidate boundary tiles and
--- PUSH; log what the engine does.  30-second verdict per edge.
+-- press into them; log what the engine does.  30-second verdict per edge.
 local H = dofile("tools/tests/lib/ot6.lua")
 local DEFENSE = "build/states/spike_defense.mss.lua"
 

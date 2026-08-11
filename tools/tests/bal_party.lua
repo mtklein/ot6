@@ -1,36 +1,36 @@
 -- bal_party.lua -- the multi-character balance measurement. bal_mines.lua's
 -- protocol (seeded draws, loadState-independent battles, paired samples
--- across policies) run against a PARTY instead of solo Terra, with every
+-- across policies) run against a party instead of solo Terra, with every
 -- stat attributed per party member.
 --
--- THE FIXTURE. worldmap_narshe.mss puts LOCKE (battle slot 0, L6,
+-- The fixture. worldmap_narshe.mss puts LOCKE (battle slot 0, L6,
 -- Fight/Steal/Item) and TERRA (slot 1, L4, Fight/Magic/Item, knowing Fire
 -- and Cure) on the World of Balance at (84,34), the state gen_figaro.lua
 -- walks south to Figaro. It is the closest existing fixture to the stretch
 -- balance-metrics.md wants measured next (its per-stretch coverage rule):
--- Figaro -> Mt.Kolts is Terra + Locke + Edgar -- and unlike the Figaro
+-- Figaro -> Mt.Kolts is Terra + Locke + Edgar. Unlike the Figaro
 -- interiors it sits on a map with
--- LIVE random encounters, so the fights are the real pool rather than a
--- scripted set piece. What it is missing is EDGAR (and Sabin): the states
+-- live random encounters, so the fights are the real pool rather than a
+-- scripted set piece. What it is missing is Edgar (and Sabin): the states
 -- that carry them are still being generated. So the party numbers below are
--- two thirds of the stretch party, and the Edgar/Sabin kit tiers in
--- metrics_battle.lua's KITS table remain written-but-undriven. Point this
+-- two thirds of the stretch party, and the Edgar and Sabin kit tiers in
+-- metrics_battle.lua's KITS table are written but not driven. Point this
 -- driver at a Kolts fixture when one exists; nothing else has to change.
 --
--- Protocol (deliberately boring, and the same as bal_mines):
---  * every battle starts from an identical loadState -- battles are fully
+-- Protocol (the same as bal_mines):
+--  * every battle starts from an identical loadState, so battles are fully
 --    independent (HP/MP/BP/RNG all reset).
 --  * the danger counter $1F6E is zeroed per sample (mines_pace.lua's
 --    Measurement #4 finding: the fixture's warm counter otherwise masks
 --    the pacing entirely), and $1FA1 is seeded per battle index, so
---    battle k is the SAME battle in every policy arm -- paired samples.
+--    battle k is the same battle in every policy arm: paired samples.
 --  * pacing is a dumb left/right two-tile walk at the spawn
 --    (84,34)<->(83,34); leaving the world map or running out of budget
---    VOIDS the sample (logged; the next loadState wipes it away).
+--    voids the sample (logged; the next loadState clears it).
 --  * the battle is then played to the end by POLICY x KIT, and metrics
 --    are sampled every frame (the multi-actor core from
 --    metrics_battle.lua, which documents every address and every
---    attribution rule -- read that header first).
+--    attribution rule; read that header first).
 --  * in-battle rng phase jitter: battle k arms after 240 + 7(k-1) settle
 --    frames, so same-formation battles decorrelate.
 --
@@ -39,13 +39,13 @@
 -- with the per-character fan-out riding the same `sN:` CSV convention the
 -- monster lines already use. bal_aggregate.py tabulates both.
 --
--- Policies (POLICY knob) set the BOOST discipline; the per-character KIT
+-- Policies (POLICY knob) set the boost discipline; the per-character KIT
 -- picks the action, so one named policy plays two different characters:
---   baseline  never boosts, never probes -- the denominator
+--   baseline  never boosts, never probes: the denominator
 --   boost3    bank BP to 3, then spend all 3, and use the weakness once
 --             one is revealed
 --   greedy    spend every BP the turn it appears
---   badboost  bank to 3 then dump it into a plain Fight -- Measurement
+--   badboost  bank to 3 then spend it on a plain Fight: Measurement
 --             #5's negative control, the "boost feels wasted" misplay
 local H = dofile("tools/tests/lib/ot6.lua")
 
@@ -62,9 +62,9 @@ local function envcfg(name)
 end
 local POLICY = envcfg("BAL_POLICY") or "baseline"
 -- FIXTURE names a row of FIXTURES below. The header's "point this driver at
--- a Kolts fixture; nothing else has to change" was WRONG by one thing --
--- the pacer. worldmap_narshe is on the WORLD map (worldX/worldMode); every
--- stretch fixture past it is a FIELD map (fieldX/mapId), which is
+-- a Kolts fixture; nothing else has to change" was wrong about one thing,
+-- the pacer. worldmap_narshe is on the world map (worldX/worldMode); every
+-- stretch fixture past it is a field map (fieldX/mapId), which is
 -- bal_mines' pacer, not this one's. So the pacing lane is per-fixture and
 -- the two pacers both live here; everything downstream of "a battle
 -- started" is shared and untouched.
@@ -83,27 +83,27 @@ local FIXTURES = {
   -- mountain pool has several slots, and the formation draw has to be
   -- pinned or the arms are not paired.
   --
-  -- `lane` names the direction to step OFF the spawn tile. Without it the
+  -- `lane` names the direction to step off the spawn tile. Without it the
   -- pacer takes the first direction the passability model allows, and on
-  -- shelf F that is LEFT -- onto (7,13), which is the entrance back to map
+  -- shelf F that is left, onto (7,13), which is the entrance back to map
   -- 95 (gen_kolts' mountain flood: "F ... exits (7,13)->95"). The party
   -- would leave the map on its first step, every sample. Passability cannot
-  -- see entrance records, so the safe direction is named, not derived.
+  -- see entrance records, so the safe direction is named rather than derived.
   kolts_pool = {
     state = "build/states/kolts_pool.mss.lua",
     mode = "field", map = 100, lane = "right",
     seeds = { {fa1=0x37,fa2=0x00}, {fa1=0x6e,fa2=0x01}, {fa1=0xa5,fa2=0x02},
               {fa1=0xdc,fa2=0x03}, {fa1=0x13,fa2=0x04}, {fa1=0x4a,fa2=0x05} },
   },
-  -- The OTHER Mt. Kolts pool, and the one the mountain is mostly made of.
+  -- The other Mt. Kolts pool, and the one the mountain is mostly made of.
   -- kolts_pool stands on map 100, group 63 (Brawler-pair / Tusker-pair);
-  -- maps 96/97 carry group 61, which is CIRPIUS x3 at 93.75% of draws.
-  -- Cirpius is the species the v0.3 trash pass exists for -- no vanilla
+  -- maps 96/97 carry group 61, which is Cirpius x3 at 93.75% of draws.
+  -- Cirpius is the species the v0.3 trash pass exists for: no vanilla
   -- weakness of any kind, three at a time, the mountain's most common
-  -- fight -- and it is the one place a GROUP tool answers a GROUP enemy,
+  -- fight, and the one place a group tool answers a group enemy,
   -- so it needs its own fixture. Generated by gen_kolts_cave.lua, which is
   -- gen_kolts' K2 crossing plus gen_kolts_pool's "prove an encounter
-  -- fires" tail. Arrival is (16,22); the lane is RIGHT (the generating run's own
+  -- fires" tail. Arrival is (16,22); the lane is right (the generating run's own
   -- probe picked it and paced 96 without leaving it).
   kolts_cave = {
     state = "build/states/kolts_cave.mss.lua",
@@ -111,12 +111,12 @@ local FIXTURES = {
     seeds = { {fa1=0x37,fa2=0x00}, {fa1=0x6e,fa2=0x01}, {fa1=0xa5,fa2=0x02},
               {fa1=0xdc,fa2=0x03}, {fa1=0x13,fa2=0x04}, {fa1=0x4a,fa2=0x05} },
   },
-  -- Map 95, Mt. Kolts' ENTRANCE map: a run here paced 437 tiles across six
+  -- Map 95, Mt. Kolts' entrance map: a run here paced 437 tiles across six
   -- samples and drew nothing, voiding every sample as a timeout. The
   -- diagnosis written here was "carries no encounter group" and it was
-  -- WRONG -- map 95 carries group 61, the same Cirpius/Tusker pool as maps
+  -- wrong: map 95 carries group 61, the same Cirpius/Tusker pool as maps
   -- 96/97 (`sub_battle_group.dat[95]` = 61). What it does not carry is the
-  -- ENABLE BIT: map properties are 33 bytes at `map_prop.dat[map*33]` and
+  -- enable bit: map properties are 33 bytes at `map_prop.dat[map*33]` and
   -- byte 5 bit 7 is the flag `CheckBattleSub` tests (`lda $0525 / bpl Done`,
   -- field/battle.asm:332). Map 95 reads $00; so does map 74, which likewise
   -- has a group (59) it can never draw. The observation stands, the
@@ -134,26 +134,27 @@ local FIXTURES = {
     seeds = { {fa1=0x37,fa2=0x00}, {fa1=0x6e,fa2=0x01}, {fa1=0xa5,fa2=0x02},
               {fa1=0xdc,fa2=0x03}, {fa1=0x13,fa2=0x04}, {fa1=0x4a,fa2=0x05} },
   },
-  -- v0.4 Zozo stretch. Party is LOCKE + CELES + EDGAR + SABIN (TERRA is
-  -- GONE -- she is the search target). zozo_arrival lands on the Zozo
+  -- v0.4 Zozo stretch. Party is LOCKE + CELES + EDGAR + SABIN; Terra is
+  -- absent, since she is the search target. zozo_arrival lands on the Zozo
   -- street, map 221 group 78: Gabbldegak $0DF / Harvester $04E /
   -- HadesGigas $053, all poison-weak in vanilla (Edgar's Bio Blaster is
   -- the town's break key). No lane named: the street's first walkable
-  -- neighbour is fine to oscillate on; the pacer scans for it.
+  -- neighbour is fine to oscillate on, and the pacer scans for it.
   zozo_arrival = {
     state = "build/states/zozo_arrival.mss.lua",
     mode = "field", map = 221,
     seeds = { {fa1=0x37,fa2=0x00}, {fa1=0x6e,fa2=0x01}, {fa1=0xa5,fa2=0x02},
               {fa1=0xdc,fa2=0x03}, {fa1=0x13,fa2=0x04}, {fa1=0x4a,fa2=0x05} },
   },
-  -- The Dadaluma boss ($0107, +2x $006C sidekicks it revives). Not a
+  -- The Dadaluma boss ($0107, plus the 2x $006C sidekicks it revives). Not a
   -- random encounter: the party stands at (30,13) one tile north of the
-  -- gentleman NPC (30,14); facing DOWN and pressing A opens the dialog
+  -- gentleman NPC (30,14); facing down and pressing A opens the dialog
   -- that fires battle 69 (gen_zozo4_dadaluma's own trigger). `trigger =
   -- "talk"` swaps the random-encounter pacer for that face-and-A drive.
   -- Seeds are inert here (fixed formation), so the six samples differ only
-  -- by settle jitter -- a distribution of the SAME boss fight, whelkbal's
-  -- shape. BOSS_FRAMES is longer: 3270 HP + revives + self-heal is a slog.
+  -- by settle jitter: a distribution of the same boss fight, the shape
+  -- whelkbal uses. BOSS_FRAMES is longer, because 3270 HP plus revives plus
+  -- self-heal takes a while.
   dadaluma_entry = {
     state = "build/states/dadaluma_entry.mss.lua",
     mode = "field", map = 221, trigger = "talk", face = "down",
@@ -171,27 +172,27 @@ local NBATTLES = FX.nbattles or 6
 -- fixture-buff knob and the only way to make this pool express the loop
 -- at all: the shipped species dies to one weakness hit, so BP can never
 -- reach 3 and two chips can never land on a live target. A buffed arm
--- measures the INSTRUMENT and the loop's shape; the unbuffed arm is the
+-- measures the instrument and the loop's shape; the unbuffed arm is the
 -- real stretch number. Never mix them in one table.
 local BUFF_HP = 0
 -- BUFF_SHIELDS: 0 = the shields Ot6SeedShields really seeded (authored row,
 -- or the level formula 2 + level/8 capped at 6). >0 = overwrite every
--- monster's CURRENT and MAX shield cell with this before the clock starts.
--- This is the shield-count lever measured WITHOUT a ROM edit: the formula
+-- monster's current and max shield cell with this before the clock starts.
+-- This is the shield-count lever measured without a ROM edit: the formula
 -- is inline code, so a source change would have to be rebuilt per cell,
 -- while the seeded cells are plain WRAM and the whole break system reads
--- them and nothing else. Like BUFF_HP it is a synthetic arm -- label it,
+-- them and nothing else. Like BUFF_HP it is a synthetic arm; label it and
 -- never average it with the shipped one.
 local BUFF_SHIELDS = tonumber(envcfg("BAL_BUFF_SHIELDS") or "") or 0
 -- BUFF_CLASS: 0 = the class-weakness mask Ot6SeedShields really seeded,
--- which for every FORMULA species is $00 -- no class weakness at all (the
--- @formula path explicitly clears $3e9c). >0 = OR this mask into every
--- monster's class-weak cell, i.e. simulate an authored Ot6ShieldTbl row
--- WITHOUT authoring one. OT6_SLASH $01, OT6_PIERCE $02, OT6_BLUDG $04.
+-- which for every formula species is $00, meaning no class weakness at all
+-- (the @formula path explicitly clears $3e9c). >0 = OR this mask into every
+-- monster's class-weak cell, that is, simulate an authored Ot6ShieldTbl row
+-- without authoring one. OT6_SLASH $01, OT6_PIERCE $02, OT6_BLUDG $04.
 --
 -- This is the "what would authoring buy" arm, and it is the only way to
 -- ask that question before the authoring exists. It matters because the
--- two chip channels are NOT interchangeable: an element-weak hit collects
+-- two chip channels are not interchangeable: an element-weak hit collects
 -- vanilla's x2 and a class-weak hit collects nothing ("the damage bonus
 -- for classes is the break window itself", Ot6ClassChip), so the breaking
 -- hit is 4x base through the element channel and 2x base through the class
@@ -213,27 +214,27 @@ local SEEDS = FX.seeds              -- $1FA1 (step roll) / $1FA2 (formation)
 local POKE_SHIELD = nil
 local POKE_HP = nil
 -- POKE_AUTHORING: nil = the v0.3 trash weakness rows as they ship.
--- "off" = neutralise them in the loaded ROM image, which is the BEFORE arm
+-- "off" = neutralise them in the loaded ROM image, which is the before arm
 -- of the authoring measurement. Doing it by poke rather than by two builds
 -- is not a shortcut, it is the better experiment: both arms then run
--- against the SAME generated savestate, the same party HP/MP/gil and the same
--- seeds, so the only difference between them is the ten bytes below. (Two
--- builds cannot give that -- the fixture is generated by PLAYING the game, and
--- a ROM where the trash has weaknesses is a ROM where the generating run's fights
--- go differently.) Measurement #4 established the equivalence of poking the
--- loaded image to rebuilding: the scanners read these very bytes.
---   * Ot6ElemAddTbl -- the six v0.3 rows are the LAST six, so writing the
+-- against the same generated savestate, the same party HP/MP/gil and the same
+-- seeds, so the only difference between them is the ten bytes below. Two
+-- builds cannot give that, because the fixture is generated by playing the
+-- game, and a ROM where the trash has weaknesses is a ROM where the generating
+-- run's fights go differently. Measurement #4 established the equivalence of
+-- poking the loaded image to rebuilding: the scanners read these very bytes.
+--   * Ot6ElemAddTbl: the six v0.3 rows are the last six, so writing the
 --     $FFFF terminator over the first of them hides exactly those and
 --     leaves the eight boss/armor rows above untouched.
---   * Ot6ShieldTbl -- Brawler's row is in the MIDDLE, and only $FFFF ends
+--   * Ot6ShieldTbl: Brawler's row is in the middle, and only $FFFF ends
 --     that scan, so it is disabled by rewriting its species id to $0FFF:
 --     4095 is past the 384-species table (monster_prop.dat is 12288 bytes
 --     / 32), so it can never match and the rows after it stay live.
 local POKE_AUTHORING = envcfg("BAL_AUTHORING")   -- "off" = neutralise rows
--- Bank-$F0 offsets are BUILD-SPECIFIC and drifted repeatedly (bal_mines'
--- header tells that story: eighteen bytes early, poking live code while
+-- Bank-$F0 offsets are build-specific and drifted repeatedly (bal_mines'
+-- header records one: eighteen bytes early, poking live code while
 -- reporting a grid; and these Kolts rows slid +$14 twice in the v0.4 Zozo
--- pass alone). The TABLE BASES now derive from ff6/rom/ff6-en.dbg at compose
+-- pass alone). The table bases now derive from ff6/rom/ff6-en.dbg at compose
 -- time via H.sym, so they can no longer go stale by hand; `& 0x3FFFFF` maps
 -- each CPU address to its snesPrgRom file offset (bank $F0 -> $30xxxx).
 local ROM_HPMUL  = H.sym("Ot6HpMulTbl") & 0x3FFFFF       -- band0 byte
@@ -241,18 +242,18 @@ local ROM_SHIELD = H.sym("Ot6ShieldedMulW") & 0x3FFFFF   -- word, low byte
 -- The v0.3 authoring rows, as (derived base) + (row index * 4-byte stride):
 -- Ot6ElemAddTbl row 8 = the first v0.3 trash row ($0086 cirpius); the three
 -- Ot6ShieldTbl rows are brawler ($000B, row 5), cirpius ($0086, row 6),
--- tusker ($007A, row 7). Only the ROW INDEX is written out now -- the base is
+-- tusker ($007A, row 7). Only the row index is written out now; the base is
 -- derived, and AUTHORING_OK below still verifies the species at each row
--- before the destructive poke, since a row can move WITHIN its table.
+-- before the destructive poke, since a row can move within its table.
 local ROM_ELEMADD_V3    = (H.sym("Ot6ElemAddTbl") & 0x3FFFFF) + 8 * 4
 local SHIELDTBL         = H.sym("Ot6ShieldTbl") & 0x3FFFFF
 local ROM_SHIELDROWS_V3 = { SHIELDTBL + 5 * 4, SHIELDTBL + 6 * 4, SHIELDTBL + 7 * 4 }
 -- brawler's row = ROM_SHIELDROWS_V3[1]; the knob_authoring report line reads
 -- it as the ShieldTbl check.
 local ROM_BRAWLER_ROW = ROM_SHIELDROWS_V3[1]
--- what those words MUST read before the authoring poke touches them; a
--- mismatch now means a row moved WITHIN its table (the base can't be stale --
--- it's derived), so the row indices above need bumping.
+-- what those words must read before the authoring poke touches them; a
+-- mismatch now means a row moved within its table (the base cannot be stale,
+-- since it is derived), so the row indices above need bumping.
 local AUTHORING_OK = { [ROM_ELEMADD_V3]       = 0x0086,
                        [ROM_SHIELDROWS_V3[1]] = 0x000b,
                        [ROM_SHIELDROWS_V3[2]] = 0x0086,
@@ -277,7 +278,7 @@ local WKC   = 0x3ea4               -- monster class-weak mask, +slot*2
 local RVEALC = 0x3ea5              -- monster revealed CLASSES, +slot*2
                                    --   ($3e9d's monster half; Ot6ClassChip
                                    --   ORs the matched bit in as it chips,
-                                   --   ot6.asm:736-738 -- the class twin of
+                                   --   ot6.asm:736-738; the class twin of
                                    --   RVEAL, and the check a kit needs to
                                    --   know a class weakness was found)
 local ALIVE = 0x3aa8               -- monster presence bit0, +slot*2
@@ -309,21 +310,22 @@ end
 local function pokeCmd(slot, cmd)
   for i = 0, 3 do H.writeByte(CMDTBL + slot*12 + i*3, cmd) end
 end
--- What the player KNOWS, not what is currently on screen. These read the
+-- What the player knows, not what is currently on screen. These read the
 -- battle-scoped accumulators the sampler ORs the living monsters' reveal
--- cells into every frame, and that stickiness is a correctness fix, not a
--- convenience (2026-07-19). $3E91/$3EA5 are PER-MONSTER cells: chip the
--- first of a pair, learn its weakness, kill it -- and the bit dies with it,
+-- cells into every frame, and that stickiness is a correctness fix rather than
+-- a convenience (2026-07-19). $3E91/$3EA5 are per-monster cells: chip the
+-- first of a pair, learn its weakness, kill it, and the bit dies with it,
 -- so a poll over living monsters said the board was unread again. Measured
 -- consequence, on a Brawler pair: Edgar's probe swing chipped and revealed
--- SLASH, the Brawler died, and his `slash` exploit tier then failed its
--- check and dropped him to AutoCrossbow for the rest of the fight --
+-- slash, the Brawler died, and his `slash` exploit tier then failed its
+-- check and dropped him to AutoCrossbow for the rest of the fight:
 -- `char_plan=s0:probe_bio*1+probe_swing*1+xbow*1`, 1 chip out of 4
--- available, 0 breaks. No player forgets a weakness because the monster
--- that taught it fell over; the codex (OT6_CODEX_CLASS) does not either.
--- Their own upvalues, not fields of S: S is declared BELOW these helpers, so
--- naming it here compiles to a global read and dies with "attempt to index a
--- nil value (global 'S')" on the first menu of the first battle.
+-- available, 0 breaks. A player does not forget a weakness because the monster
+-- that taught it died; the codex (OT6_CODEX_CLASS) does not either.
+-- These are their own upvalues, not fields of S: S is declared below these
+-- helpers, so naming it here compiles to a global read and fails with
+-- "attempt to index a nil value (global 'S')" on the first menu of the first
+-- battle.
 local seenElem, seenClass = 0, 0
 local function seenReset() seenElem, seenClass = 0, 0 end
 local function seenAdd(e, c) seenElem = seenElem | e seenClass = seenClass | c end
@@ -387,34 +389,34 @@ local KITS = {
     { tag = "steal", cmd = CMD.steal, want = "probe_turn" },
     { tag = "fight", cmd = CMD.fight },
   },
-  -- EDGAR carries the stretch's two DELIBERATE keys and this ladder is
+  -- Edgar carries the stretch's two deliberate keys and this ladder is
   -- what drives them. It grew two probe tiers and one exploit tier for
   -- the v0.3 trash-weakness pass, because as written the poison tier
   -- could never fire: `want = "weak_poison"` waits for poison to be
-  -- REVEALED, and the only thing in the party that casts poison is the
-  -- BioBlaster itself. Circular -- so Edgar has to be willing to SPEND a
-  -- turn finding out, exactly as Terra spends one on probe_fire and Locke
+  -- revealed, and the only thing in the party that casts poison is the
+  -- BioBlaster itself. That is circular, so Edgar has to be willing to spend
+  -- a turn finding out, exactly as Terra spends one on probe_fire and Locke
   -- one on Steal. Two turns, in the order a player would try them:
-  --   probe_swing the SWORD first. It is the cheapest probe there is -- no
-  --               menu, no item, the thing the A button already does -- and
-  --               Edgar's Mithril Blade is the party's only slashing weapon
-  --               (ot6_class.asm:59), so this tier is the sole way any
-  --               driver can discover a slash row. Brawler's, for one.
+  --   probe_swing the sword first. It is the cheapest probe available: no
+  --               menu, no item, just the A button. Edgar's Mithril Blade is
+  --               the party's only slashing weapon
+  --               (ot6_class.asm:59), so this tier is the only way any
+  --               driver can discover a slash row, Brawler's included.
   --   probe_bio   then the tool, if the blade taught nothing. Free (0 MP)
   --               and it targets the whole enemy side (magic_prop_en.dat
   --               $7d: tgt $6a), so one turn probes every monster in the
   --               formation at once.
-  -- and `bio`/`slash` exploit whichever answered. THE ORDER WAS MEASURED,
-  -- not assumed. Tool-first was tried and it is strictly worse, for a
-  -- reason worth keeping: Brawler ABSORBS poison (monster_prop.dat +$0177
-  -- = $08), so a tool-first Edgar opens every Brawler fight by HEALING both
-  -- of them -- 75 to 86 HP of it per fight, which the driver reports as
-  -- `monster_heal` -- and only reaches the blade on his second turn, by
+  -- and `bio`/`slash` exploit whichever answered. The order was measured,
+  -- not assumed. Tool-first was tried and it is worse, for a
+  -- reason worth keeping: Brawler absorbs poison (monster_prop.dat +$0177
+  -- = $08), so a tool-first Edgar opens every Brawler fight by healing both
+  -- of them, 75 to 86 HP per fight, which the driver reports as
+  -- `monster_heal`, and only reaches the blade on his second turn, by
   -- which time Locke and Terra have spent the monster's HP and the break
-  -- lands on a corpse. It made the MASH arm chip Brawlers better than the
+  -- lands on a corpse. It made the mash arm chip Brawlers better than the
   -- loop arm (3.5 chips / 1.5 breaks vs 1.0 / 0.0), which is backwards.
   -- The trap is real and stays in the game; leading with the free probe is
-  -- simply what a player does, and it is what the loop needs here.
+  -- what a player does, and it is what the loop needs here.
   [0x04] = { name = "EDGAR",
     { tag = "bio", cmd = CMD.tools, want = "weak_poison",
       pick = function(slot) return toolsCursor(slot, TOOL.bioblaster) end },
@@ -431,16 +433,16 @@ local KITS = {
       pick = function(slot) return toolsCursor(slot, BLITZ.pummel) end },
     { tag = "fight", cmd = CMD.fight },
   },
-  -- CELES is the v0.4 Zozo party's ICE carrier -- the deliberate key the A
-  -- button does not swing, the twin of Terra's Fire one stretch earlier
-  -- (Terra is GONE this stretch, so there is no native fire at all). Her
+  -- Celes is the v0.4 Zozo party's ice carrier: the deliberate key the A
+  -- button does not swing, the counterpart to Terra's Fire one stretch earlier
+  -- (Terra is absent this stretch, so there is no native fire at all). Her
   -- natural list is Ice 1 / Cure 4 / Antdot 8 / Scan 18 / Ice2 26 / Ice3 42
-  -- (field/event.asm NaturalMagic, celes block), so ICE is her whole
+  -- (field/event.asm NaturalMagic, celes block), so ice is her whole
   -- offensive ring here; the pick takes the strongest ice she owns. Ice
   -- answers the corridor's fire-absorbing Bombs/Grenades (ice|water weak),
-  -- FossilFang (ice among its weaks, and it ABSORBS the poison answer), and
+  -- FossilFang (ice among its weaks, and it absorbs the poison answer), and
   -- the Zozo outlier Crawler ($05b, ice-only). In the poison town her ice
-  -- reveals nothing, so she probes once and falls to her SLASH Fight --
+  -- reveals nothing, so she probes once and falls back to her slash Fight;
   -- Edgar's Bio Blaster carries that pool, not her.
   [0x06] = { name = "CELES",
     { tag = "ice", cmd = CMD.magic, mp = 5, want = "weak_ice",
@@ -463,14 +465,14 @@ POLICIES.greedy   = { boost = function(slot)
   return bp(slot) >= 1 and math.min(bp(slot), 3) or 0 end, probe = true }
 POLICIES.badboost = { boost = function(slot)
   return bp(slot) >= 3 and 3 or 0 end, probe = false, force = "fight" }
--- mash: LITERALLY holding A. Every character Fights with what is equipped,
--- nobody boosts, nobody opens a menu. Added 2026-07-19 for the trash
+-- mash: holding A and nothing else. Every character Fights with what is
+-- equipped, nobody boosts, nobody opens a menu. Added 2026-07-19 for the trash
 -- weakness pass, which has to answer "does the mash arm chip by accident?"
 -- and could not: `baseline` has no probe discipline but still lets Edgar
 -- fall through to AutoCrossbow, because that tier carries no `want` check.
--- That is a fine denominator (and stays one -- every published measurement
--- uses it) but it is not a masher: it swings PIERCE from Edgar where a
--- masher swings his Mithril Blade's SLASH. The two arms differ by exactly
+-- That is still a usable denominator, and every published measurement
+-- uses it, but it is not a masher: it swings pierce from Edgar where a
+-- masher swings his Mithril Blade's slash. The two arms differ by exactly
 -- that, so run both and read `chips` in each.
 POLICIES.mash     = { boost = function() return 0 end,
                       probe = false, force = "fight" }
@@ -489,9 +491,9 @@ local function resetBattleState()
     t0 = 0, frames = 0,
     playerActions = 0, enemyActions = 0, counterActions = 0,
     -- "breaks per fight" is a misleading number on its own: Measurement #6
-    -- broke 6/6 fights and every break landed on the killing blow, so the
-    -- reward the whole system is built around was never once collected.
-    -- These two say whether a WINDOW existed, not whether a break fired:
+    -- broke 6 of 6 fights and every break landed on the killing blow, so the
+    -- reward the system is built around was never collected.
+    -- These two say whether a window existed, not whether a break fired:
     -- actions the party got to take against a broken target, and enemy
     -- turns skipped while it was broken.
     playerActionsBroken = 0, enemyActionsBroken = 0,
@@ -547,8 +549,8 @@ local function entryOk(rec, entry, pol)
   -- ice is element bit $02 (fire $01, ice $02, bolt $04, poison $08 ...);
   -- Celes's exploit tier, the twin of Terra's weak_fire.
   if entry.want == "weak_ice" then return pol.probe and anyRevealed(0x02) end
-  -- poison is element bit $08. This read $20 (PEARL) until 2026-07-19 --
-  -- the bit order is fire $01, ice $02, bolt $04, poison $08, wind $10,
+  -- poison is element bit $08. This read $20 (pearl) until 2026-07-19.
+  -- The bit order is fire $01, ice $02, bolt $04, poison $08, wind $10,
   -- pearl $20, earth $40, water $80 (Ot6Chip walks it from bit 0 at
   -- ot6.asm:627-633, and Ot6ElemAddTbl's own rows read $08 for the poison
   -- armor line). The tier had never been driven, so the wrong bit had
@@ -557,15 +559,15 @@ local function entryOk(rec, entry, pol)
   if entry.want == "weak_slash" then
     return pol.probe and anyRevealedClass(0x01)     -- OT6_SLASH
   end
-  -- probe1/probe2: Edgar's FIRST and SECOND information turns. The check is
-  -- "nothing *Edgar* can exploit is known yet", not Terra's "nothing at all
-  -- is known" -- and that distinction is load-bearing, not pedantry. Edgar's
-  -- ladder can act on poison and on a class; it can do nothing whatever with
-  -- a revealed FIRE, which is Terra's key. Under the board-wide check, Terra
+  -- probe1/probe2: Edgar's first and second information turns. The check is
+  -- "nothing Edgar can exploit is known yet", not Terra's "nothing at all
+  -- is known", and that distinction matters. Edgar's
+  -- ladder can act on poison and on a class; it can do nothing with
+  -- a revealed fire, which is Terra's key. Under the board-wide check, Terra
   -- probing first and finding fire (Tusker is fire-weak) stopped Edgar
   -- probing before he ever opened Tools, so the poison tier stayed dead for
-  -- exactly the species it was authored for. Reading only REVEALED bits
-  -- keeps this faithful: the check sees what the player sees, never the
+  -- exactly the species it was authored for. Reading only revealed bits
+  -- keeps this accurate: the check sees what the player sees, never the
   -- monster's hidden weak byte.
   if entry.want == "probe1" or entry.want == "probe2" then
     local unread = not anyRevealed(0x08) and not anyRevealedClass(0xff)
@@ -574,8 +576,8 @@ local function entryOk(rec, entry, pol)
   end
   if entry.want == "probe_turn" then
     -- this actor's opening information turn, taken only while the board
-    -- is unread. Covers Locke's Steal and Terra's Fire alike -- an
-    -- element is only REVEALED by hitting it, so an exploit tier alone
+    -- is unread. Covers Locke's Steal and Terra's Fire alike: an
+    -- element is only revealed by hitting it, so an exploit tier alone
     -- can never fire. One probe per actor, then stop. (Full rationale in
     -- metrics_battle.lua.)
     return pol.probe and not anyRevealed(0xff) and rec.actions == 0
@@ -674,7 +676,7 @@ end
 -- ------------------------------------------------- per-frame sampler --
 local function sample()
   S.frames = H.frame - S.t0
-  -- read the broken state BEFORE walking the queues, so an action dequeued
+  -- read the broken state before walking the queues, so an action dequeued
   -- this frame is credited against the board it is actually acting on
   local brokenNow = false
   for _, m in ipairs(mons) do
@@ -731,16 +733,16 @@ local function sample()
     else S.unattributedBreaks = S.unattributedBreaks + 1 end
     pendBreaks[i] = nil
   end
-  -- `monsterAlive and broken`, not bare `broken` -- the same predicate
-  -- brokenNow above uses, and it was NOT the same before 2026-07-19. The
+  -- `monsterAlive and broken`, not bare `broken`: the same predicate
+  -- brokenNow above uses, and it was not the same before 2026-07-19. The
   -- broken timer is $10 ticks decremented on the monster's own turn
-  -- (ot6.asm:20, :1140), so a monster that breaks and DIES to the breaking
+  -- (ot6.asm:20, :1140), so a monster that breaks and dies to the breaking
   -- hit never ticks it down: the corpse stays "broken" for the rest of the
   -- fight and every frame of it was counted as break uptime. That is the
-  -- worst possible failure mode for this metric, because break-and-die is
-  -- precisely the pathology the uptime number exists to detect -- it
+  -- worst failure mode for this metric, because break-and-die is
+  -- the pathology the uptime number exists to detect. It
   -- reported 58% uptime on a Brawler pair where `player_actions_broken`
-  -- was 0, i.e. where the window never existed at all.
+  -- was 0, that is, where the window never existed at all.
   -- accumulate what the player has been told, before anyone dies of it
   for slot = 0, 5 do
     if monsterAlive(slot) then
@@ -802,11 +804,11 @@ local function sample()
   local aliveC = 0
   for _, c in ipairs(C) do if c.hp > 0 then aliveC = aliveC + 1 end end
   if aliveC == 0 then S.result = "wiped" return true end
-  -- The teardown probe scans the WHOLE party, not slot 0. lib/ot6.lua's
-  -- H.battleLoadStarted() reads one word -- M.BATTLE_HP = $3BF4, which is
-  -- battle slot 0's current HP (lib/ot6.lua:301,:336) -- and calls a zero
+  -- The teardown probe scans the whole party, not slot 0. lib/ot6.lua's
+  -- H.battleLoadStarted() reads one word, M.BATTLE_HP = $3BF4, which is
+  -- battle slot 0's current HP (lib/ot6.lua:301,:336), and calls a zero
   -- there "no battle". That held for every fixture before this one because
-  -- no slot-0 character ever died in them. On kolts_pool slot 0 is EDGAR
+  -- no slot-0 character ever died in them. On kolts_pool slot 0 is Edgar
   -- and a Tusker pair kills him in four enemy actions, so the driver
   -- declared `torn_down` and abandoned battles that were still being
   -- fought: 9 of 48 samples in the first authoring sweep, each one cut at
@@ -929,12 +931,12 @@ local function report()
     tSum = tSum + c.taken
     wSum = wSum + c.bpWrites
   end
-  -- bp_action_skew reads a steady -1 on a won fight and that is
-  -- EXPECTED, not slack: the sampler's stop condition fires the frame the
+  -- bp_action_skew reads a steady -1 on a won fight, which is expected
+  -- rather than slack: the sampler's stop condition fires the frame the
   -- last monster dies, which is before the killing action reaches
   -- Ot6ActionEnd, so its bp write is never observed. Measured constant at
-  -- -1 across 6/6 world-pool battles regardless of action count (1 or 2)
-  -- and on battle2_entry. A skew that GROWS with actions would mean
+  -- -1 across 6 of 6 world-pool battles regardless of action count (1 or 2)
+  -- and on battle2_entry. A skew that grows with actions would mean
   -- the dequeue pairing is wrong; a steady -1 means it is right.
   mline("actions_sum", aSum)
   mline("actions_residual", S.playerActions - aSum)
@@ -956,8 +958,8 @@ end
 assert(POLICIES[POLICY], "unknown POLICY: " .. tostring(POLICY))
 
 -- seqStepList: plain sequential composition.  (H.seqStep is public now, but
--- the lib reserves it for ot6_field's route(); tests keep this trivial copy
--- -- same as bal_mines.lua.)
+-- the library reserves it for ot6_field's route(); tests keep this small copy,
+-- the same as bal_mines.lua.)
 local function seqStepList(steps)
   return {
     i = 1,
@@ -972,7 +974,7 @@ local function seqStepList(steps)
   }
 end
 
--- "the party is standing still, in control, on the map we expect" -- the
+-- "the party is standing still, in control, on the map we expect": the
 -- world and field halves ask different modules, so the settle predicate is
 -- per-fixture the same way the pacer is.
 local function calmField(n)
@@ -1015,16 +1017,16 @@ local BACK = { left = "right", right = "left", up = "down", down = "up" }
 local LANE_ORDER = { "left", "right", "up", "down" }
 
 local function paceField(k)
-  -- bal_mines' field pacer, with the lane chosen LIVE instead of hardcoded.
-  -- bal_mines could name (78,58)<->(77,58) because it owns one fixture;
-  -- this driver is pointed at whatever stretch is being measured, and a
-  -- fixture whose spawn tile has a wall to its left would otherwise pace
+  -- bal_mines' field pacer, with the lane chosen at run time instead of
+  -- hardcoded. bal_mines could name (78,58)<->(77,58) because it owns one
+  -- fixture; this driver is pointed at whatever stretch is being measured, and
+  -- a fixture whose spawn tile has a wall to its left would otherwise pace
   -- zero steps and void every sample as a timeout while looking like an
   -- encounter-free map. H.canStep models the live z-level and the object
   -- map, so the first direction it allows is a lane the party can really
   -- walk; the party oscillates spawn <-> that neighbour.
   --
-  -- A random encounter fires THROUGH an event script (EventScript_RandBattle,
+  -- A random encounter fires through an event script (EventScript_RandBattle,
   -- field/battle.asm), so eventRunning alone is normal here: pacing goes
   -- hands-off during any event and only voids if no battle follows within
   -- 600 frames.
@@ -1131,11 +1133,11 @@ local function battleBlock(k)
         H.assertEq(H.readRomByte(ROM_SHIELD), POKE_SHIELD, "resistance poked")
       end
       -- the authoring arm keeps a row-species guard before its destructive
-      -- poke: the table BASE is H.sym-derived (can't be stale), but these
-      -- addresses are base + a hardcoded ROW INDEX, and a row can move within
-      -- its table. Guard on the SHIPPED value, so a re-run after the poke (the
-      -- ROM image is not savestate-backed, so battle 2 sees battle 1's poke)
-      -- is a no-op rather than a false alarm.
+      -- poke: the table base is H.sym-derived and cannot be stale, but these
+      -- addresses are base plus a hardcoded row index, and a row can move
+      -- within its table. Guard on the shipped value, so a re-run after the
+      -- poke (the ROM image is not savestate-backed, so battle 2 sees battle
+      -- 1's poke) is a no-op rather than a false alarm.
       if POKE_AUTHORING == "off" then
         for addr, want in pairs(AUTHORING_OK) do
           local seen = H.readRomWord(addr)
@@ -1193,9 +1195,9 @@ local function battleBlock(k)
         for slot = 0, 5 do
           if monsterAlive(slot) then
             -- (the BUFF_HP / BUFF_CLASS write branches that lived here were
-            -- gated on hard-coded 0 constants -- dead code, deleted per the
-            -- issue #75 burn-down rather than waived.  BUFF_SHIELDS is the
-            -- one LIVE knob, env-gated, default off.)
+            -- gated on hard-coded 0 constants, so they were dead code and were
+            -- deleted per the issue #75 burn-down rather than waived.
+            -- BUFF_SHIELDS is the one live knob, env-gated, default off.)
             if BUFF_SHIELDS > 0 then
               H.writeByte(SHLD + slot*2, BUFF_SHIELDS)      -- current
               H.writeByte(SHLD + slot*2 + 1, BUFF_SHIELDS)  -- max (refill)

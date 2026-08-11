@@ -6,10 +6,10 @@
 # * Composes the script with the lib (ot6.lua + ot6_field.lua) into one
 #   flat file in the invocation workspace first. Runtime dofile()/loadfile() raise under
 #   Mesen's default AllowIoOsAccess=false setting (a raise at script load
-#   registers no callbacks, so the run then dies on the wall-clock cap --
-#   that is the "255 crash", not a crash).  Inlining keeps runs hermetic;
-#   see compose.py.  A script that is
-#   ALREADY composed (first line carries compose.py's marker) runs as-is --
+#   registers no callbacks, so the run then dies on the wall-clock cap, which
+#   is the kill usually reported as the "255 crash").  Inlining keeps runs
+#   hermetic; see compose.py.  A script that is
+#   already composed (first line carries compose.py's marker) runs as-is.
 #   suite.sh pre-composes every test once so a mid-suite lib edit can't split
 #   a suite across two libs.
 # * Runs build/ot6.sfc (rebuild with `make rom` if you changed sources).
@@ -23,34 +23,35 @@
 #   emulator: they all exec ONE shared read-only bundle and are kept apart by
 #   CFFIXED_USER_HOME instead (see "shared emulator" below).
 # * Exit code: 0 = pass, 1 = assertion/Lua error, 2 = frame budget exceeded.
-#   The [ot6] PASS/FAIL verdict in the log wins over the raw process code
-#   (a 255 with unflushed stdout is a wall-clock cap, not a crash).
+#   The [ot6] PASS/FAIL verdict in the log takes precedence over the raw
+#   process code (a 255 with unflushed stdout means the wall-clock cap killed
+#   the run).
 set -u
 ROOT="$(cd "$(dirname "$0")/../.." && pwd)"
 ROM="${OT6_ROM:-$ROOT/build/ot6.sfc}"
-# THE VERDICT PATTERNS ARE EXACT, AND THAT IS LOAD-BEARING.  lib/ot6.lua
-# emits exactly two terminal lines -- `PASS (frame N)` and `FAIL: <why>` --
+# The verdict patterns must match a whole verdict line rather than a prefix.
+# lib/ot6.lua emits two terminal lines, `PASS (frame N)` and `FAIL: <why>`,
 # through M.log, so they arrive as `[ot6] PASS (frame N)` / `[ot6] FAIL: ...`.
-# This used to be matched with `^\[ot6\] PASS`, a PREFIX, and that is a
-# false-green generator: battle_thief logs `PASSED phase 1: ...` per phase,
-# so a run KILLED BY THE WALL-CLOCK CAP after phase 1 matched the pass
-# pattern and was scored green -- measured 2026-08-10 (testrunner exit 255,
-# verdict 0, on a deliberately short OT6_TIMEOUT).  A truncated run reporting
-# success is the exact failure #75 exists to abolish, so the patterns below
-# anchor on the parenthesis and the colon that only the real verdicts carry.
+# This used to be matched with `^\[ot6\] PASS`, a prefix, and that produced a
+# false green: battle_thief logs `PASSED phase 1: ...` per phase, so a run
+# killed by the wall-clock cap after phase 1 matched the pass pattern and was
+# scored green, measured 2026-08-10 (testrunner exit 255, verdict 0, on a
+# deliberately short OT6_TIMEOUT).  Issue #75 exists to stop a truncated run
+# reporting success, so the patterns below anchor on the parenthesis and the
+# colon that only the real verdicts carry.
 PASS_RE='^\[ot6\] PASS \(frame '
 FAIL_RE='^\[ot6\] FAIL: '
 verdict_spoken() { grep -qE "$PASS_RE|$FAIL_RE" "$1"; }
 
-# --verdict-selftest: falsify the PASS/FAIL parsing WITHOUT launching Mesen.
-# This exists because the parsing did not have one, and the gap shipped a
-# false green: `^\[ot6\] PASS` is a PREFIX, battle_thief logs `PASSED phase
+# --verdict-selftest: falsify the PASS/FAIL parsing without launching Mesen.
+# This exists because the parsing did not have a selftest, and the gap shipped
+# a false green: `^\[ot6\] PASS` is a prefix, battle_thief logs `PASSED phase
 # 1: ...` per phase, and a run killed by the wall-clock cap after phase 1 was
 # therefore scored PASS (measured 2026-08-10: testrunner exit 255, verdict 0).
-# Every other mechanical check in this repo carries a selftest -- the
-# state-write checker, compose, the ninja graph, runner isolation -- and the
-# one component that decides pass-vs-fail for every test in the project did
-# not.  Wired into `make test` beside the others.
+# Every other mechanical check in this repo carries a selftest (the
+# state-write checker, compose, the ninja graph, runner isolation), and this
+# one decides pass-vs-fail for every test in the project.  Wired into
+# `make test` beside the others.
 if [ "${1:-}" = "--verdict-selftest" ]; then
   fails=0
   vcheck() {  # <label> <log body> <want: pass|fail|none>
@@ -65,7 +66,7 @@ if [ "${1:-}" = "--verdict-selftest" ]; then
   vcheck "a real PASS verdict scores pass"        '[ot6] PASS (frame 309)'            pass
   vcheck "a real FAIL verdict scores fail"        '[ot6] FAIL: assertEq failed: x'     fail
   vcheck "the budget FAIL scores fail"            '[ot6] FAIL: frame budget exceeded (900 frames)' fail
-  # THE REGRESSION, verbatim in shape: a truncated run that announced phases.
+  # The regression, in its original shape: a truncated run that announced phases.
   vcheck "PASSED-phase lines alone score NONE"    '[ot6] PASSED phase 1: the submenu
 [ot6] PASSED phase 2: the ledger' none
   vcheck "a phase line plus a real verdict passes" '[ot6] PASSED phase 1: the submenu
@@ -82,8 +83,8 @@ fi
 
 SCRIPT="${1:?usage: run.sh <script.lua> [logfile]}"
 
-# A worker id used to select a persistent directory and was therefore an
-# isolation key.  It is now deliberately only a human-readable prefix.
+# A worker id used to select a persistent directory, which made it an
+# isolation key.  It is now only a human-readable prefix.
 label=$(printf '%s' "${OT6_WORKER:-run}" | tr -c 'A-Za-z0-9_.-' '_')
 RUN_ROOT="$ROOT/build/test-runs"
 mkdir -p "$RUN_ROOT"
@@ -121,47 +122,47 @@ else
 fi
 
 # ------------------------------------------------------------ shared emulator
-# Every worker on this machine execs ONE read-only Mesen bundle, and nothing
+# Every worker on this machine execs one read-only Mesen bundle, and nothing
 # ever writes inside it.  Workers are kept apart by giving each its own Mesen
-# CONFIG HOME rather than its own copy of the app.
+# config home rather than its own copy of the app.
 #
-# Mesen picks that home exactly one of two ways, both measured here:
-#   * PORTABLE -- a settings.json sitting beside the binary wins over
+# Mesen picks that home one of two ways, both measured here:
+#   * Portable: a settings.json sitting beside the binary wins over
 #     everything else, unconditionally.  That is how this script used to
 #     isolate workers, and it is why each needed a private 413MB bundle: the
-#     config lived INSIDE the app, so sharing an app meant sharing (and
+#     config lived inside the app, so sharing an app meant sharing (and
 #     racing on) one settings.json.  See 2bf5045 for what that cost.
-#   * otherwise -- ~/Library/Application Support/Mesen2, resolved through
-#     CoreFoundation.  $HOME does NOT move it: with HOME set to a scratch dir
+#   * Otherwise: ~/Library/Application Support/Mesen2, resolved through
+#     CoreFoundation.  $HOME does not move it; with HOME set to a scratch dir
 #     a run still wrote its .srm and Debugger/*.cdl into the real profile,
 #     because .NET reaches SpecialFolder.ApplicationData via
 #     NSSearchPathForDirectoriesInDomains, which takes the home from the
-#     password database (the binary carries the giveaway symbol
+#     password database (the binary carries the symbol
 #     GetHomeDirectory:TryGetHomeDirectoryFromPasswd).  CFFIXED_USER_HOME,
-#     Core Foundation's own home override, DOES move it -- settings, saves,
-#     Debugger/*.cdl, the lot.
+#     Core Foundation's own home override, does move it: settings, saves,
+#     Debugger/*.cdl, and the rest.
 #
-# So: strip settings.json from the shared copy, which makes it non-portable,
-# and hand each worker its own CFFIXED_USER_HOME.  The isolation is strictly
-# stronger than the copy scheme it replaces -- there is no per-worker state
-# inside the app to race on, because there is no per-worker app.
+# So strip settings.json from the shared copy, which makes it non-portable,
+# and hand each worker its own CFFIXED_USER_HOME.  That isolates workers more
+# strongly than the copy scheme it replaces, because there is no per-worker
+# app and so no per-worker state inside the app to race on.
 #
-# Why a COPY of tools/Mesen.app and not tools/Mesen.app itself: the user's
-# manual-play profile (`make run`) lives in that bundle as precisely the
-# settings.json that forces portable mode, so execing it would put every
-# worker back on one shared config.  The harness must not depend on the
-# mutable state of the play bundle, so it keeps its own stripped copy.
+# Why a copy of tools/Mesen.app rather than tools/Mesen.app itself: the user's
+# manual-play profile (`make run`) lives in that bundle as the settings.json
+# that forces portable mode, so execing it would put every worker back on one
+# shared config.  The harness must not depend on the mutable state of the play
+# bundle, so it keeps its own stripped copy.
 #
-# ONE copy, machine-wide, under ~/Library/Caches -- not one per worker, and
-# not one per worktree.  Mesen is ad-hoc signed but NOT notarized (see
+# One copy, machine-wide, under ~/Library/Caches, rather than one per worker
+# or one per worktree.  Mesen is ad-hoc signed but not notarized (see
 # docs/TOOLING.md), so macOS runs a first-launch Gatekeeper assessment on
-# every NEW bundle path: a user-visible "Verifying Mesen..." dialog and a
+# every new bundle path: a user-visible "Verifying Mesen..." dialog and a
 # multi-second scan of all 413MB (measured: 4.7s and 6.1s on two fresh paths
 # against 0.3-0.5s once the path is known).  The old scheme created four of
 # those per tree and four more every time an agent made a worktree.  Clearing
-# quarantine does not help -- `xattr -cr` before first launch still cost 5.5s,
-# and the kernel puts com.apple.provenance straight back on exec -- because
-# the trigger is the new bundle path, not the flag.
+# quarantine does not help: `xattr -cr` before first launch still cost 5.5s,
+# and the kernel puts com.apple.provenance straight back on exec.  The trigger
+# is the new bundle path rather than the flag.
 SRC_APP="$ROOT/tools/Mesen.app"
 MESEN_CACHE="$HOME/Library/Caches/ot6"
 SHARED_APP="$MESEN_CACHE/Mesen-test.app"
@@ -203,9 +204,9 @@ if ! shared_app_ready; then
     # a worktree the source is a symlink and cp -R would copy the LINK.
     cp -c -RL "$SRC_APP" "$TMP" 2>/dev/null || cp -RL "$SRC_APP" "$TMP" || {
       rm -rf "$TMP"; echo "could not copy $SRC_APP"; exit 2; }
-    # The whole point: no settings.json (nor the .bak rotation Mesen leaves
-    # beside it) may survive into the copy, or portable mode wins and every
-    # worker is back on one shared config.
+    # No settings.json (nor the .bak rotation Mesen leaves beside it) may
+    # survive into the copy, or portable mode wins and every worker is back
+    # on one shared config.
     rm -f "$TMP/Contents/MacOS/settings.json" "$TMP"/Contents/MacOS/settings.*.bak
     # Profile dirs the source bundle accumulated while it was portable belong
     # to the user's play profile, not to the tests; they must not ride along.
@@ -218,21 +219,21 @@ if ! shared_app_ready; then
 fi
 shared_app_ready || { echo "shared test emulator missing at $SHARED_APP"; exit 2; }
 
-# A tree from before this scheme still has a 413MB per-worker bundle sitting
-# in build/.  Nothing reads it any more, so reclaim it on the way past rather
-# than leave it to rot -- and, more to the point, so a tree can never quietly
-# keep running the old private-copy path.  Test -L as well as -e: the bug in
-# 2bf5045 left some of these as symlinks, and -e alone is false for a symlink
-# whose target has since gone.
+# A tree from before this scheme still has a 413MB per-worker bundle in
+# build/.  Nothing reads it any more, so remove it here, both to reclaim the
+# space and so that a tree cannot go on running the old private-copy path
+# without anyone noticing.  Test -L as well as -e: the bug in 2bf5045 left
+# some of these as symlinks, and -e alone is false for a symlink whose target
+# has since gone.
 if [ -L "$STALE_APP" ] || [ -e "$STALE_APP" ]; then rm -rf "$STALE_APP"; fi
 
 # The worker's private Mesen config home.  Mesen copies its native libs and
 # the Satellaview firmware into a fresh home on first use (~29MB); pre-clone
 # them (cp -c again, so eight worker homes cost eight sets of pointers rather
-# than 232MB) and Mesen leaves them alone -- its copy is
-# copy-if-missing, and -p keeps the mtimes it stamps them with.  Re-seed from
-# scratch when the emulator changes, so a home can never serve a stale
-# MesenCore.dylib to a newer binary.
+# than 232MB) and Mesen leaves them alone, because its copy is copy-if-missing
+# and -p keeps the mtimes it stamps them with.  Re-seed from scratch when the
+# emulator changes, so a home cannot serve a stale MesenCore.dylib to a newer
+# binary.
 MESEN2="$MESEN_HOME/Library/Application Support/Mesen2"
 if [ "$(cat "$MESEN_HOME/.stamp" 2>/dev/null)" != "$SRC_STAMP" ]; then
   rm -rf "$MESEN_HOME"; mkdir -p "$MESEN2"
@@ -246,8 +247,8 @@ fi
 
 # (Re)write this worker's settings every run so the pins can't drift.  Its
 # exit code is checked: a failed pin leaves whatever settings.json the home
-# already had, which is exactly the unpinned state the determinism guarantees
-# exclude.  Refusing the run beats reporting a green that never had the pins.
+# already had, which is the unpinned state the determinism guarantees exclude.
+# Refusing the run is better than reporting a green that never had the pins.
 # With no settings.json at all Mesen ignores --testrunner and opens the GUI
 # setup wizard, so this is also what keeps a fresh home headless.
 python3 "$ROOT/tools/tests/lib/pin_test_saves.py" \
@@ -256,62 +257,63 @@ python3 "$ROOT/tools/tests/lib/pin_test_saves.py" \
   "$TEST_SAVES" || { echo "pin_test_saves.py failed; refusing to run unpinned"; exit 2; }
 
 # Fresh battery every run: the testrunner flushes SRAM to <saves>/*.srm on
-# exit and silently reloads it next boot -- a stale srm is a hidden
-# cross-run coupling channel (and fossilizes into generated savestates).
-# Tests that need a save inject it explicitly (SRM sidecars).
+# exit and reloads it on the next boot without reporting that it did, so a
+# stale srm couples one run to the next and gets baked into generated
+# savestates.  Tests that need a save inject it explicitly (SRM sidecars).
 rm -f "$TEST_SAVES"/*.srm
 if [ -n "${OT6_SRAM_CHECKPOINT:-}" ]; then
-  # THE persistent_layout CHECK (issue #25).  A generator step declares the
+  # The persistent_layout check (issue #25).  A generator step declares the
   # persistent-SRAM layout it understands with a marker comment in its script,
   #
   #     [dash][dash] OT6_CHECKPOINT_LAYOUT: ot6-codex-o8-v1
   #
   # (spelled as a real Lua comment at the start of a line; not written out
-  # here so THIS file can never satisfy the grep).  The declaration rides
-  # the script itself rather than an env var, so every consumer -- savestate
-  # generation, smoke, a bare manual run.sh -- gets the same refusal with no
-  # caller wiring, and it survives composition (comments do).  sram_checkpoint.py
-  # compares it against the checkpoint manifest's persistent_layout and refuses
-  # a mismatch NAMING BOTH STRINGS, here, before the emulator boots: a
-  # schema-drift stale checkpoint must be a named refusal, never an in-emulator
-  # timeout.  A step with no marker declares support for nothing and is
-  # refused too -- fail closed, or the check only guards steps that opted in.
+  # here so this file can never satisfy the grep).  The declaration rides
+  # the script itself rather than an env var, so every consumer (savestate
+  # generation, smoke, a bare manual run.sh) gets the same refusal with no
+  # caller wiring, and it survives composition, since comments do.
+  # sram_checkpoint.py compares it against the checkpoint manifest's
+  # persistent_layout and refuses a mismatch here, before the emulator boots,
+  # naming both strings: a checkpoint left stale by schema drift should give a
+  # named refusal rather than an in-emulator timeout.  A step with no marker
+  # declares support for nothing and is refused too, so the check fails closed
+  # instead of guarding only the steps that opted in.
   CHECKPOINT_LAYOUT=$(sed -n 's/^-- OT6_CHECKPOINT_LAYOUT: *\([^ ]*\).*$/\1/p' "$COMPOSED" | head -n 1)
   python3 "$ROOT/tools/tests/lib/sram_checkpoint.py" materialize \
     "$OT6_SRAM_CHECKPOINT" "$TEST_SAVES/$(basename "$ROM" .sfc).srm" \
     "$CHECKPOINT_LAYOUT" ||
     { echo "invalid SRAM checkpoint: $OT6_SRAM_CHECKPOINT (refused BEFORE boot)"; exit 2; }
 fi
-# --timeout: Mesen's testrunner has a hard DEFAULT 100-second wall-clock
-# cap (exit -1/255 + truncated stdout on expiry) that killed long runs; keep
-# a cap as the only defense against a genuinely hung emulator, just a roomy one.
-# OT6_TIMEOUT raises it for a run you already know is competing for cores --
-# the cap is WALL clock, so `nice` does not protect it (see the timeout
+# --timeout: Mesen's testrunner has a default 100-second wall-clock cap
+# (exit -1/255 and truncated stdout on expiry) that killed long runs.  Keep a
+# cap as the only defense against a hung emulator, but a roomy one.
+# OT6_TIMEOUT raises it for a run already known to be competing for cores;
+# the cap is wall clock, so `nice` does not protect it (see the timeout
 # diagnosis below).
-# --enableStdout mirrors the EMULATOR message log to stdout.  It does NOT
-# carry Lua errors or watchdog kills -- those go to the script log, which
-# nothing reads headless.  A script that goes quiet has told you nothing;
-# print() is the only channel out.  Kept for the ROM-info banner.
+# --enableStdout mirrors the emulator message log to stdout.  It does not
+# carry Lua errors or watchdog kills; those go to the script log, which
+# nothing reads headless.  print() is the only channel out of a script, so a
+# script that stops printing reports nothing.  Kept for the ROM-info banner.
 # CFFIXED_USER_HOME is the isolation boundary measured above.
 CAP="${OT6_TIMEOUT:-600}"
-# A TIMEOUT KILL IS NOT A RESULT, SO THE HARNESS RESOLVES IT INSTEAD OF
-# REPORTING IT.  The cap is WALL clock and `nice` does not slow the wall, so
+# A timeout kill carries no result, so the harness retries it instead of
+# reporting it.  The cap is wall clock and `nice` does not slow the wall, so
 # concurrent jobs starve each other: a savestate generation that takes 400s
 # alone can cross 600s when a dozen share ten cores.  That used to surface as
 # a red edge with a paragraph of explanation, and every reader had to re-learn
-# that "exit 255, truncated stdout" is not a crash.
-# Isolation was already solved -- every invocation
-# gets its own workspace and CFFIXED_USER_HOME (dd2266a, 10ce17c) -- which is
-# exactly what makes a retry SAFE and deterministic: the same inputs, run
-# again, with nothing shared to have been disturbed.  So retry it.
+# that "exit 255, truncated stdout" is a kill rather than a crash.
+# Isolation was already solved: every invocation gets its own workspace and
+# CFFIXED_USER_HOME (dd2266a, 10ce17c), which is what makes a retry safe and
+# deterministic, since it is the same inputs run again with nothing shared to
+# have been disturbed.
 #
-# RETRIED ONLY ON THE TIMEOUT-KILL SIGNATURE, and this distinction is
-# load-bearing: no verdict in the log AND the run lived to the cap.
-# A real FAIL is NEVER
-# retried -- retrying failures until they pass is the #74 mistake in harness
-# clothing, and it would silently launder a flaky test into a green one.  A
-# no-verdict run that died WELL SHORT of the cap is not retried either: that
-# is a Lua load error, which is deterministic and will fail identically.
+# The retry fires only on the timeout-kill signature, and that distinction
+# matters: no verdict in the log, and the run lived to the cap.  A real FAIL
+# is never retried, because retrying failures until they pass is the #74
+# mistake in harness form and would turn a flaky test into a green one with no
+# notice.  A no-verdict run that died well short of the cap is not retried
+# either: that is a Lua load error, which is deterministic and will fail
+# identically.
 RETRIES="${OT6_TIMEOUT_RETRIES:-1}"
 attempt=0
 retried=0
@@ -335,8 +337,8 @@ done
 python3 "$ROOT/tools/tests/lib/decode_b64.py" "$RUN_LOG" "$ART"
 
 if [ "$retried" -gt 0 ] && verdict_spoken "$RUN_LOG"; then
-  # Never let a retry be silent: a machine killing runs on the timeout is a
-  # fact worth seeing even when the retry rescued the result.
+  # Report every retry: a machine killing runs on the timeout is worth seeing
+  # even when the retry rescued the result.
   printf '[ot6] this run was KILLED %s time(s) by the %ss wall-clock cap and retried; the verdict below is from attempt %s.\n' \
     "$retried" "$CAP" "$attempt" >> "$RUN_LOG"
 fi
@@ -346,27 +348,28 @@ elif grep -qE "$FAIL_RE" "$RUN_LOG"; then
   verdict=1
 else
   verdict=$code
-  # NO VERDICT IN THE LOG.  The script never reached PASS or FAIL, so the
-  # emulator was killed rather than finishing -- and if it lived roughly to
-  # the cap, the killer was the cap.  Say so, because the raw signature is
-  # "exit 255, truncated stdout" and that reads exactly like a crash: the
-  # brief has to keep re-teaching agents that it is not one, and it is the
-  # documented top cause of a savestate generation failing for reasons that
-  # are not the generation.
+  # No verdict in the log.  The script never reached PASS or FAIL, so the
+  # emulator was killed rather than finishing, and if it lived roughly to the
+  # cap, the cap is what killed it.  Say so, because the raw signature is
+  # "exit 255, truncated stdout", which reads like a crash: the brief has to
+  # keep re-teaching agents that it is a kill, and it is the documented top
+  # cause of a savestate generation failing for reasons other than the
+  # generation.
   #
-  # WHY THIS IS USUALLY CONTENTION AND NOT THE TEST: the cap is WALL clock,
+  # This is usually contention rather than the test.  The cap is wall clock,
   # and `nice` does not slow the wall.  Niced work yields to the owner's
-  # game, but every agent's jobs are equally niced, so they starve EACH
-  # OTHER -- a generation that takes 400s alone can cross 600s when a dozen of
+  # game, but every agent's jobs are equally niced, so they starve each
+  # other: a generation that takes 400s alone can cross 600s when a dozen of
   # them share ten cores.  Observed 2026-07-29: nine states generated fine,
   # four killed by the timeout, all four green when re-run alone.
-  # "Lived to the cap" with 5s of slack for rounding -- not a fixed 30s
-  # margin, which goes negative and always fires under a small OT6_TIMEOUT.
+  # "Lived to the cap" allows 5s of slack for rounding, rather than a fixed
+  # 30s margin, which goes negative and always fires under a small
+  # OT6_TIMEOUT.
   #
   # It goes into $RUN_LOG with the [ot6] prefix rather than straight to
   # stdout, because stdout is not where it would be read: suite.sh runs every
   # test as `"$RUN" ... >/dev/null 2>&1` and keeps only the log.  Written
-  # here it reaches BOTH readers -- the `grep '^\[ot6\]'` at the end of this
+  # here it reaches both readers: the `grep '^\[ot6\]'` at the end of this
   # script prints it for a direct invocation, and it is inside
   # build/states/suite_<test>.log for a suite one.  decode_b64 has already
   # read the log, so appending now is safe.
@@ -410,17 +413,17 @@ if [ "$verdict" -eq 0 ] && [ -n "${OT6_CAPTURE_SRM:-}" ]; then
   if [ -f "$captured" ] && [ "$(wc -c < "$captured" | tr -d ' ')" -eq 32768 ]; then
     mkdir -p "$(dirname "$OT6_CAPTURE_SRM")"
     publish_file "$captured" "$OT6_CAPTURE_SRM"
-    # Provenance sidecar (issue #75 step 5): record MECHANICALLY what cut
-    # this battery -- the capturing generator's provenance signature (from
-    # the one authority, savestate_stamp.sh), plus the hash of everything the
-    # run booted FROM: the stamp of each savestate compose embedded (read off
-    # the composed file's own `-- state` provenance lines) and, when the
-    # run Continued from a prior checkpoint, that checkpoint's manifest.  The
-    # sidecar lands beside the payload; `sram_checkpoint.py seal` folds it
-    # into manifest.json.  A capture that cannot state its provenance is
-    # refused outright -- a checkpoint is a root of the generated chain, and
-    # an unprovable root is the exact thing this program exists to stop
-    # generating.
+    # Provenance sidecar (issue #75 step 5): record mechanically what cut
+    # this battery.  That is the capturing generator's provenance signature
+    # (from the one authority, savestate_stamp.sh), plus the hash of
+    # everything the run booted from: the stamp of each savestate compose
+    # embedded (read off the composed file's own `-- state` provenance lines)
+    # and, when the run Continued from a prior checkpoint, that checkpoint's
+    # manifest.  The sidecar lands beside the payload; `sram_checkpoint.py
+    # seal` folds it into manifest.json.  A capture that cannot state its
+    # provenance is refused, because a checkpoint is a root of the generated
+    # chain and this program exists to stop generating roots whose provenance
+    # cannot be proven.
     gen=$(basename "$SCRIPT" .lua)
     checkpoint_extras=""
     adir=""
@@ -458,31 +461,31 @@ $ancestors"
   fi
 fi
 publish_file "$RUN_LOG" "$LOG"
-# OT6_NO_PUBLISH=1 runs a generator for its VERDICT ONLY, leaving build/states
+# OT6_NO_PUBLISH=1 runs a generator for its verdict only, leaving build/states
 # untouched.  `make smoke` uses it to falsify a lib change in minutes without
 # half-updating the chain: a state generated mid-smoke would be fresher than
-# its neighbours and make the tree harder to reason about, for no benefit --
-# the stamp check would regenerate it anyway.
+# its neighbours and make the tree harder to reason about, for no benefit,
+# since the stamp check would regenerate it anyway.
 #
-# A GENERATING EDGE PUBLISHES ONLY ITS OWN ARTIFACTS (issue #30).
-# OT6_EXPECT_ARTIFACT is set exactly by savestate_ninja.py's `generate` rule, naming
-# the ONE state the invoking ninja edge is for.  A script that generates several
-# states emits EVERY sibling state on every invocation (gen_edgar plays the
-# whole Figaro chapter and emits all
-# three figaro states no matter which edge invoked it), and each sibling is
-# its own ninja edge running this same script -- so publishing the whole
-# workspace let one edge rewrite ANOTHER edge's declared outputs with fresh
-# mtimes.  For gen_edgar's figaro_cleared edge that meant republishing
-# figaro_matron.mss -- its own INPUT -- after its own outputs (the "$ART"/*
-# glob publishes cleared before matron), so ninja saw input-newer-than-output
-# forever and consecutive `make savestates` runs regenerated every such
-# multi-state family and its downstream trunk with zero content changes.
-# The sibling copies this run just emitted are deliberately DISCARDED, not
-# moved: every sibling has its own edge, so the published copy is always the one whose
+# A generating edge publishes only its own artifacts (issue #30).
+# OT6_EXPECT_ARTIFACT is set by savestate_ninja.py's `generate` rule, naming
+# the one state the invoking ninja edge is for.  A script that generates
+# several states emits every sibling state on every invocation (gen_edgar
+# plays the whole Figaro chapter and emits all three figaro states no matter
+# which edge invoked it), and each sibling is its own ninja edge running this
+# same script, so publishing the whole workspace let one edge rewrite another
+# edge's declared outputs with fresh mtimes.  For gen_edgar's figaro_cleared
+# edge that meant republishing figaro_matron.mss, its own input, after its own
+# outputs (the "$ART"/* glob publishes cleared before matron), so ninja saw
+# input-newer-than-output forever and consecutive `make savestates` runs
+# regenerated every such multi-state family and its downstream trunk with zero
+# content changes.
+# The sibling copies this run just emitted are discarded rather than moved:
+# every sibling has its own edge, so the published copy is always the one whose
 # edge ninja scheduled and whose stamp savestate_stamp.sh wrote.  Screenshots
-# still publish either way -- they are forensic output, not scheduled ninja
-# outputs, and no edge declares them.
-# savestate_ninja_selftest.sh's stub run.sh MIRRORS this block; keep in lockstep.
+# still publish either way, because they are forensic output rather than
+# scheduled ninja outputs, and no edge declares them.
+# savestate_ninja_selftest.sh's stub run.sh mirrors this block; keep in lockstep.
 if [ "$verdict" -eq 0 ] && [ -z "${OT6_NO_PUBLISH:-}" ]; then
   if [ -n "${OT6_EXPECT_ARTIFACT:-}" ]; then
     for src in $OT6_EXPECT_ARTIFACT; do
@@ -504,7 +507,7 @@ grep '^\[ot6\]' "$RUN_LOG"
 
 echo "testrunner exit: $code (verdict: $verdict)"
 [ "$verdict" -eq 0 ] || {
-  # Failed workspaces are valuable forensic evidence and bounded to this exact
+  # Failed workspaces are forensic evidence and are bounded to this
   # invocation.  Retain them without weakening successful-run cleanup.
   OT6_KEEP_RUNS=1
   echo "failed run retained: $WDIR"

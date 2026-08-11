@@ -2,33 +2,33 @@
 -- battle_flyin: the under-enemy hud must not paint a monster that has not
 -- entered yet.
 --
--- THE BUG (v0.3-rc1 playtest, Figaro<->South Figaro cave): "a bunch of
+-- The bug (v0.3-rc1 playtest, Figaro to South Figaro cave): "a bunch of
 -- characters overdrawn on the screen in white text ... when there are a bunch
 -- of enemies".  At battle entry a monster is flagged present ($3AA8) from
 -- init, but its sprite is not drawn until its fly-in animation runs; the
 -- "monsters shown" mask $201E (notes/battle-ram.txt:422; the sprite drawers
 -- gate on it, btlgfx_main.asm:5639/:5772) stays 0 for that whole fade-in
 -- window.  Ot6BgHudLine gated only on $3AA8, so it painted each entering
--- monster's shield/'?' cells into empty space -- a scatter of white glyphs on
--- the still-dark battlefield, worst with the cave's 3-5 fly-in trash.  The
--- entry ANIMATION was already veiled (Ot6EntryExitVeil, battle_whelkwipe's
--- test); the gap this closes is the window BEFORE it.  Fix: gate the hud on
--- $201E, the same mask the sprites use.
+-- monster's shield/'?' cells into empty space, showing as white glyphs
+-- scattered on the still-dark battlefield, worst with the cave's 3-5 fly-in
+-- trash.  The entry animation was already veiled (Ot6EntryExitVeil,
+-- battle_whelkwipe's test); the gap this closes is the window before it.
+-- Fix: gate the hud on $201E, the same mask the sprites use.
 --
--- The coverage gap was "nobody ever fought fly-in enemies under instruments":
+-- The coverage gap was that no test fought fly-in enemies under instruments:
 -- the suite's other fights either enter behind the veil (the whelk) or do not
 -- fly in.  kolts_cave's map-96 pool is 93.75% Cirpius x3 (gen_kolts_cave),
--- three birds that fly in together -- so the natural encounter here spends
--- ~45 frames with every monster present-but-not-shown, exactly the window the
+-- three birds that fly in together, so the natural encounter here spends
+-- ~45 frames with every monster present but not shown, which is the window the
 -- bug lived in.  Needs kolts_cave.mss (make savestates), the
 -- battle_vargas pattern.
 --
 -- Assert, every frame of that window: any present-but-unshown monster's hud
--- line is DISABLED (shadow cur == 0), and while ALL present monsters are
--- unshown the bg3 field map holds ZERO OT6 glyph chars (cell-level, the
--- battle_whelkwipe technique).  Positive controls so a quiet pass cannot hide
--- a real regression: the window must actually be sampled (>= 12 frames with a
--- present-but-unshown monster), AND once the birds enter the hud must come
+-- line is disabled (shadow cur == 0), and while all present monsters are
+-- unshown the bg3 field map holds no OT6 glyph chars (cell-level, the
+-- battle_whelkwipe technique).  Positive controls, so that a pass cannot hide
+-- a regression: the window must be sampled (>= 12 frames with a
+-- present-but-unshown monster), and once the birds enter the hud must come
 -- back (fieldHudPresent + glyphCanary).
 local H = dofile("tools/tests/lib/ot6.lua")
 local STATE = "build/states/kolts_cave.mss.lua"
@@ -38,7 +38,8 @@ local ROM = emu.memType.snesPrgRom
 local function map() return H.mapId() & 0x1ff end
 
 -- OT6-claimed field-map glyph chars, read from rom (battle_whelkwipe's scan):
--- 8 element icons + 16 hud glyphs + '?' -- the whole set the hud may draw.
+-- 8 element icons, 16 hud glyphs and '?', which is the whole set the hud may
+-- draw.
 local function claimedCharSet()
   local function findSig(sig)
     for base = 0x300000, 0x303FF0 do
@@ -94,7 +95,7 @@ local function checkEntryFrame()
   local unshown = present & (~shown & 0x3f)
   if unshown == 0 then return end
   gateFrames = gateFrames + 1
-  -- every present-but-unshown monster's hud line must be OFF
+  -- every present-but-unshown monster's hud line must be off
   for s = 0, 5 do
     if (unshown & (1 << s)) ~= 0 then
       local cur = H.readWord(H.shadowLine(s))
@@ -103,7 +104,7 @@ local function checkEntryFrame()
         .. "disabled, cur=%04x", s, cur))
     end
   end
-  -- while the WHOLE field is still entering, the bg3 map must be glyph-free
+  -- while the whole field is still entering, the bg3 map must be glyph-free
   if (present & shown & 0x3f) == 0 then
     pureFrames = pureFrames + 1
     local g = fieldGlyphCount()
@@ -137,9 +138,9 @@ H.run({ maxFrames = 30000 }, {
         -- issue #75: the danger counter ($1f6e) used to be pinned to 0xff00
         -- here so the first step forced the roll.  The engine rolls it
         -- on its own now: pacing the lane accrues danger per step, and from a
-        -- fixed fixture plus this deterministic pace the encounter -- and
-        -- its formation -- land on the same frame every run, so the pin
-        -- bought nothing but a head start.
+        -- fixed fixture plus this deterministic pace the encounter and its
+        -- formation land on the same frame every run, so the pin only saved
+        -- time.
         local x, y = H.fieldX(), H.fieldY()
         if lane == nil then
           for _, d in ipairs({ "right", "left", "up", "down" }) do
@@ -171,8 +172,8 @@ H.run({ maxFrames = 30000 }, {
     H.call(checkEntryFrame),
   }, "all present monsters shown"),
 
-  -- Phase C: let the entry animation + its veil finish, then the hud must be
-  -- back for real -- the positive control that this isn't a vacuous pass.
+  -- Phase C: let the entry animation and its veil finish, then the hud must be
+  -- back; this is the positive control against a pass that checks nothing.
   H.waitUntil(function() return H.readByte(0x57be) == 0 end, 600, "entry veil clears", 5),
   H.waitFrames(90),
   H.call(function()

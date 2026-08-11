@@ -1,4 +1,4 @@
--- probe_opera_occ.lua -- boot aria_postfork; dump the OBJECT-COLLISION map
+-- probe_opera_occ.lua -- boot aria_postfork; dump the object-collision map
 -- ($7E2000 bit7: '.'=free '#'=occupied) over x[4..15] y[6..27], and test canStep
 -- for the transitions the climb needs, to learn which tiles NPCs block.
 local H = dofile("tools/tests/lib/ot6.lua")

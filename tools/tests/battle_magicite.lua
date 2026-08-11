@@ -1,44 +1,44 @@
 -- @suite slow savestate=n024_entry
--- battle_magicite.lua -- the v0.6 Ifrit/Shiva magicite redesigns, the halves
--- battle_esperstats.lua does not reach: the ABILITY PRICES their kits are built
--- on, and the SUMMONS.  Design: docs/design/magicite-ifrit-shiva.md (issue #16).
--- battle_esperstats owns "which spells and which stat"; this file owns "what
--- they cost and what the divine does".
+-- battle_magicite.lua -- the v0.6 Ifrit and Shiva magicite redesigns, the
+-- halves battle_esperstats.lua does not reach: the ability prices their kits
+-- are built on, and the summons.  Design: docs/design/magicite-ifrit-shiva.md
+-- (issue #16).  battle_esperstats covers which spells and which stat; this file
+-- covers what they cost and what the divine does.
 --
--- Issue #75 conversion.  The old apparatus faked everything on the magitek
+-- Issue #75 conversion.  The old apparatus staged everything on the magitek
 -- entry point: char 0's equipped-esper byte and field MP poked before the
--- drive-in, Terra's command list rewritten, allies STOPped, guard HP/MP
--- pinned, the Slow-immunity words WRITTEN both ways, saved-cursor pokes,
--- and $3f2e/$3204 poked for the latch A/B.  On n024_entry every input
+-- drive-in, Terra's command list rewritten, allies stopped, guard HP and MP
+-- pinned, the Slow-immunity words written both ways, saved-cursor pokes,
+-- and $3f2e and $3204 poked for the latch A/B.  On n024_entry every input
 -- is real:
 --
---   * THE STONES ARE REALLY IN THE BAG ($1A69 bits, give_genju receipts
---     from the alcove hand-off) and are equipped through the REAL FIELD
---     MENU: X -> Skills -> character -> Espers -> stone -> detail -> A
---     (MenuState_1e/4d, field_menu.asm:2504 / skills.asm:2641).  IFRIT
---     goes on LOCKE -- an equipped stone GRANTS its kit (genju_prop.asm),
---     so his Magic row appears with Ifrit's spells -- and SHIVA on CELES.
---   * THE FIGHT IS NUMBER 024 (battle 72), the fixture's own one-A-press
---     boss, and it is the SPECIES CHOICE the design decoded: its authored
+--   * the stones are in the bag ($1A69 bits, give_genju receipts
+--     from the alcove hand-off) and are equipped through the real field
+--     menu: X -> Skills -> character -> Espers -> stone -> detail -> A
+--     (MenuState_1e/4d, field_menu.asm:2504 and skills.asm:2641).  Ifrit
+--     goes on Locke, and an equipped stone grants its kit (genju_prop.asm),
+--     so his Magic row appears with Ifrit's spells; Shiva goes on Celes.
+--   * the fight is Number 024 (battle 72), the fixture's own one-A-press
+--     boss, and it is the species the design chose: its authored
 --     allowed-status word blocks Slow (monster_prop +$16; live $3330
---     reads $FFE1, bit 2 clear -- READ as the experiment's control, not
+--     reads $FFE1, bit 2 clear, read as the experiment's control rather than
 --     written), and its real 777-MP pool is the Facility-scale target the
 --     Osmose reprice exists for.
---   * The 7-MP boundary is EARNED: Celes's real 106-MP pool is walked
---     down by real casts of her own kit (Shell 15 / Cure 5 / Scan 3 --
+--   * the 7-MP boundary is earned: Celes's real 106-MP pool is walked
+--     down by real casts of her own kit (Shell 15, Cure 5, Scan 3, whose
 --     gcd reaches every residue) until it reads 5..7, and the greys are
 --     then read off the live list.
---   * The once-per-battle latch: the summon is offered at battle start,
---     spent on camera, and the row greys at her NEXT real window (the
---     natural refresh -- no $3204 pokes).  The re-offer half is a SECOND
+--   * the once-per-battle latch: the summon is offered at battle start,
+--     spent during the run, and the row greys at her next real window, from
+--     the natural refresh with no $3204 pokes.  The re-offer half is a second
 --     battle: the fixture reloads and battle 72 re-enters, and the fresh
---     battle's init offers the row again ($3f2e read clear) -- the plan's
---     "re-summon arms become second battles".
+--     battle's init offers the row again ($3f2e read clear), which is the
+--     plan's "re-summon arms become second battles".
 --
--- The one loss against the original: the Slow-LANDS half of the immunity
--- pair.  No Slow-permitting enemy is reachable from this fixture (maps
--- 264/269/271/273 are measured encounter-free by the chain's own steps);
--- the design's allowing species -- Number 128, the Cranes, the blades --
+-- The one thing lost against the original is the Slow-lands half of the
+-- immunity pair.  No Slow-permitting enemy is reachable from this fixture
+-- (maps 264/269/271/273 are measured encounter-free by the chain's own steps),
+-- and the design's allowing species, Number 128, the Cranes and the blades,
 -- live in later set pieces.  The refused half (species-authored immunity
 -- consulted on a landed divine) is asserted here; the landing half is
 -- follow-up work on a deeper fixture.
@@ -61,8 +61,8 @@ local MAGIC_PROP_REC = 14
 local STATUS3_SLOW = 0x04
 
 -- field menu route (probe-measured on this fixture 2026-08-10: the menu
--- OPENS with the command cursor on Item and $4b is not the command cursor
--- until a press has happened, so the route is one blind DOWN then A)
+-- opens with the command cursor on Item, and $4b is not the command cursor
+-- until a press has happened, so the route is one unchecked down then A)
 local ZMENUSTATE, ZCURSOR, GENJULIST = 0x26, 0x4b, 0x9d89
 local MST_MAIN, MST_CHAR, MST_SKILLS, MST_LIST, MST_DETAIL = 0x05, 0x06, 0x0a, 0x1e, 0x4d
 local function mst() return H.readByte(ZMENUSTATE) end
@@ -204,23 +204,23 @@ end
 -- ------------------------------------------------------ the battle drive --
 local spells, mpWrites = {}, {}
 local R = {}   -- results; declared BEFORE enterBoss so its $3410 callback
-               -- closes over THIS table (a later declaration left the
-               -- callback holding a nil global, and Mesen swallows
-               -- callback errors whole -- measured: hpMid never captured)
+               -- closes over this table (a later declaration left the
+               -- callback holding a nil global, and Mesen discards
+               -- callback errors; measured: hpMid was never captured)
 local function sawSpell(id)
   for _, v in ipairs(spells) do if v == id then return true end end
   return false
 end
 
--- modes: locke is the MEDIC (item turns aimed at the worst-hp living ally
--- -- a two-man fight against a L24 boss does not survive a deferring
--- bench); celes runs the arms.
+-- modes: Locke heals, using item turns aimed at the worst-hp living ally,
+-- because a two-man fight against a L24 boss does not survive a deferring
+-- bench; Celes runs the arms.
 local mf = 0
 local celesMode = "defer"                -- "defer"|"summon"|"cast"|"park"
 local lockeMode = "medic"                -- "medic"|"summon"
 local castRec = nil                      -- list record to cast in "cast"
--- the character-target latch/steer machine (battle_steal's lesson,
--- promoted into the lib as H.targetCursor)
+-- the character-target latch and steer code (measured in battle_steal and
+-- moved into the library as H.targetCursor)
 local tc = H.targetCursor({ mask = 0x7B7D,
                             dirs = { "down", "up", "left", "right" } })
 local function decide()
@@ -252,9 +252,9 @@ local function decide()
     return btn and { [btn] = true } or {}
   end
   if act == locke then                          -- the medic line
-    -- heal only when somebody is really hurt; a healthy party defers so
+    -- heal only when somebody is hurt; a healthy party defers so
     -- the arms finish before the L24 boss's focus fire adds up (measured:
-    -- boot A's always-item medic died before the Inferno arm)
+    -- boot A's always-item healer died before the Inferno arm)
     local hurt = false
     for s2 = 0, 3 do
       local h, m = hp(s2), H.readWord(0x3C1C + s2*2)
@@ -276,7 +276,7 @@ local function decide()
         else btn = "a" end
       end
     elseif st == ST_TGT then
-      -- steer the heal onto the worst-hp LIVING character
+      -- steer the heal onto the worst-hp living character
       local worst, wpct = nil, 101
       for s = 0, 3 do
         local h, m = hp(s), H.readWord(0x3C1C + s*2)
@@ -297,7 +297,7 @@ local function decide()
         if cur == want then btn = "a"
         else btn = (cur < want) and "down" or "up" end
       elseif st == ST_MAGIC then
-        -- scroll the list to the top, then UP opens the esper window
+        -- scroll the list to the top, then up opens the esper window
         if H.readByte(MSCROLL + celes) + H.readByte(MROW + celes) > 0 then
           btn = "up"
         else btn = "up" end
@@ -368,7 +368,8 @@ local function enterBoss(tag)
       emu.addMemoryCallback(function(_, v)
         spells[#spells + 1] = v
         -- actions serialize, so the boss HP at Inferno's own queue write is
-        -- "after DDust fully resolved" -- the per-summon damage baseline
+        -- the value after DDust fully resolved, which is the per-summon
+        -- damage baseline
         if v == INFERNO and R.hpMid == nil then R.hpMid = bossHp() end
       end, emu.callbackType.write, 0x7e3410, 0x7e3410)
       emu.addMemoryCallback(function(_, v) mpWrites[#mpWrites + 1] = v end,
@@ -398,7 +399,7 @@ H.run({ maxFrames = 150000 }, {
     H.assertEq(fld(OSMOSE, 5), OSMOSE_MP, "Osmose ($29) repriced to 8 MP in the record")
   end),
 
-  -- ============================= BOOT A: the kits, the divine, the latch ==
+  -- ============================= boot A: the kits, the divine, the latch ==
   H.loadState(STATE),
   H.waitFrames(60),
   H.call(function()
@@ -409,13 +410,13 @@ H.run({ maxFrames = 150000 }, {
   equipOn(2, IFRIT, 1, "A/locke-ifrit"),
   enterBoss("bootA"),
   H.call(function()
-    -- 1. IFRIT: the Furnace's bill, on LOCKE's real granted list
+    -- 1. Ifrit: the Furnace's prices, on Locke's real granted list
     H.assertEq(esperRow(locke), IFRIT, "[ifrit] list record 0 is Ifrit's summon row")
     H.assertEq(esperCost(locke), INFERNO_MP, "[ifrit] Inferno priced at 26 MP")
     H.assertEq(esperEnabled(locke), true, "[ifrit] the summon is offered at battle start")
     H.assertEq(costOf(locke, FIRE), FIRE_MP, "[ifrit] granted Fire costs 4 MP (base tier)")
     H.assertEq(costOf(locke, DRAIN), DRAIN_MP, "[ifrit] granted Drain costs 15 MP")
-    -- 2. SHIVA's kit on CELES's real list
+    -- 2. Shiva's kit on Celes's real list
     H.assertEq(esperRow(celes), SHIVA, "[shiva] list record 0 is Shiva's summon row")
     H.assertEq(esperCost(celes), DDUST_MP, "[shiva] Diamond Dust published at 27 MP")
     H.assertEq(esperEnabled(celes), true,
@@ -425,7 +426,7 @@ H.run({ maxFrames = 150000 }, {
     H.assertEq(costOf(celes, SHELL), SHELL_MP, "[shiva] Shell published at 15 MP")
     H.assertEq(H.readWord(SUMMONED) & (mask(locke) | mask(celes)), 0,
       "[latch] $3f2e clear: nobody has summoned yet")
-    -- 3. the species facts the divine arm leans on, READ not written
+    -- 3. the species facts the divine arm depends on, read not written
     H.assertEq(bossAllow34() & STATUS3_SLOW, 0,
       "[ddust] NUMBER 024's own authored status word BLOCKS Slow "
       .. "(monster_prop +$16 -- the species choice, read live)")
@@ -434,9 +435,9 @@ H.run({ maxFrames = 150000 }, {
       "[osmose] the real Facility-scale MP pool the reprice exists for")
     R.hp0, R.mp0 = bossHp(), mp(celes)
   end),
-  -- 4. both divines, driven through the real menus BACK TO BACK -- the
-  -- boss's focus fire is real, so the arms run before the attrition does
-  -- (measured: an always-healing medic died before a late Inferno arm).
+  -- 4. both divines, driven through the real menus one after the other; the
+  -- boss's focus fire is real, so the arms run before the attrition builds up
+  -- (measured: an always-healing party died before a late Inferno arm).
   (function()
     local lm0
     return H.repeatN(1, {
@@ -477,7 +478,7 @@ H.run({ maxFrames = 150000 }, {
       end),
     })
   end)(),
-  -- 5. the spent summon greys at her NEXT real window (natural refresh)
+  -- 5. the spent summon greys at her next real window (natural refresh)
   H.call(function() celesMode = "park" end),
   driveTo(function()
     return (H.readByte(ACTOR) & 3) == celes and H.readByte(MSTATE) == ST_MAGIC
@@ -492,13 +493,13 @@ H.run({ maxFrames = 150000 }, {
       "[latch] her Ice row stays live -- the grey is the summon row's own")
   end),
 
-  -- ==================== BOOT B: the re-offer, Osmose, and the boundary ==
+  -- ==================== boot B: the re-offer, Osmose, and the boundary ==
   H.loadState(STATE),
   H.waitFrames(60),
   equipOn(3, SHIVA, 6, "B/celes-shiva"),
   enterBoss("bootB"),
   H.call(function()
-    -- 7. the re-offer half of once-per-battle: a FRESH battle offers the
+    -- 7. the re-offer half of once-per-battle: a fresh battle offers the
     -- summon again (boot A's was spent and greyed when its battle ended)
     H.assertEq(esperEnabled(celes), true,
       "[latch] a NEW battle offers the summon again -- the latch is "
@@ -541,14 +542,14 @@ H.run({ maxFrames = 150000 }, {
       end),
     })
   end)(),
-  -- 9. the 7-MP boundary, EARNED.  The Osmose refill clamped her to the
+  -- 9. the 7-MP boundary, earned.  The Osmose refill clamped her to the
   -- full 106, and 106 = 1 (mod 5): Shell (15) and Cure (5) both preserve
-  -- that residue, so pure kit casts land the pool at EXACTLY 6 -- inside
-  -- the 5..7 window with no fine-grained op needed.  (Scan was tried as
-  -- the 3-MP adjuster and measured NOT CHARGING at all -- published 3 in
-  -- the list, pool unmoved across repeated real casts; noted as its own
-  -- follow-up.)  The residue invariant is asserted so a future wallet
-  -- change fails loudly here instead of wedging the drive.
+  -- that residue, so kit casts alone land the pool at exactly 6, inside
+  -- the 5..7 window with no finer adjustment needed.  (Scan was tried as
+  -- the 3-MP adjuster and measured as charging nothing: it publishes 3 in
+  -- the list but the pool did not move across repeated real casts; that is
+  -- its own follow-up.)  The residue invariant is asserted so a future wallet
+  -- change fails here instead of wedging the drive.
   H.call(function()
     H.assertEq(mp(celes) % 5, 1,
       "[boundary] the pool's mod-5 residue makes a pure Shell/Cure walk "
@@ -596,7 +597,7 @@ H.run({ maxFrames = 150000 }, {
       "[boundary] Osmose (8) is GREYED -- vanilla's 1 MP would not be")
     H.assertEq(recEnabled(celes, recOf(celes, SHELL)), false,
       "[boundary] Shell (15) is greyed")
-    -- no summon was spent this battle, so this grey is PURELY the MP gate
+    -- no summon was spent this battle, so this grey comes only from the MP gate
     H.assertEq(esperEnabled(celes), false,
       "[boundary] and the 27 MP summon is greyed too (no latch spent in "
       .. "this battle -- the grey is the price alone)")

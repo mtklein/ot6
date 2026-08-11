@@ -6,25 +6,25 @@
 --
 -- Protocol (bal_mines discipline, adapted to a scripted boss):
 --  * every battle starts from an identical loadState(whelk_entry);
---    battles are fully independent (HP/RNG reset; loadState re-virgins
---    the codex). The formation is scripted ($0100 shell + $0134 head),
---    so there are no encounter seeds: battle k decorrelates by SETTLE
---    JITTER alone (k*11 field frames before the trigger step, and
+--    battles are independent (HP and RNG reset; loadState resets
+--    the codex). The formation is scripted ($0100 shell plus $0134 head),
+--    so there are no encounter seeds: battle k decorrelates by settle
+--    jitter alone (k*11 field frames before the trigger step, and
 --    240 + 7(k-1) in-battle settle frames before the driver arms).
---  * the fight is played to the end by POLICY (below), all-legit: no
---    HP pins, no writes of the battle-clearing flag. A wipe is a sample,
---    not a failure.
---  * battle menus eat input during their open animation EVERY turn:
---    presses are gated on the menu flag holding 4 consecutive 30-frame
---    pulses (bal_mines' hard-won settle rule). When no menu is up, A is
---    edge-tapped every other pulse (the opener battle dialog and the
---    shell's mid-fight "Gruuu……" dialogs need it; on a running battle
---    a stray A is inert).
---  * the whelk's shell hides/shows the head on a monster-timer cycle
+--  * the fight is played to the end by POLICY (below), with no
+--    HP pins and no writes of the battle-clearing flag. A wipe is a sample
+--    rather than a failure.
+--  * battle menus drop input during their open animation every turn,
+--    so presses are gated on the menu flag holding 4 consecutive 30-frame
+--    pulses (bal_mines' settle rule). When no menu is up, A is
+--    edge-tapped every other pulse, which the opener battle dialog and the
+--    shell's mid-fight "Gruuu……" dialogs need; on a running battle
+--    a stray A has no effect.
+--  * the whelk's shell hides and shows the head on a monster-timer cycle
 --    (vanilla AI). While the head is hidden the default target is the
---    shell, and any shell hit draws a MegaVolt counter. Deliberate
---    policies (beams/pierce) spend hidden-phase turns on Heal Force;
---    naive keeps mashing A into the shell, exactly like the player it
+--    shell, and any shell hit draws a MegaVolt counter. The beams and
+--    pierce policies spend hidden-phase turns on Heal Force;
+--    naive keeps mashing A into the shell, like the player it
 --    models.
 --
 -- Per battle the log carries greppable lines:
@@ -32,16 +32,16 @@
 --
 -- Policies (POLICY knob):
 --   beams   fire beam at the default target every turn (never tek);
---           Heal Force while the head hides. "ignores the pierce
---           weakness" control. (With the head's fire-weak ADD, beams
---           now chip too -- this is no longer a zero-chip control.)
+--           Heal Force while the head hides.  This is the control that
+--           ignores the pierce weakness.  With the head's fire-weak add,
+--           beams chip too, so it is no longer a zero-chip control.
 --   pierce  terra: TekMissile at the head until it breaks, beams into
 --           the break window, TekMissile again as shields re-arm;
 --           vicks/wedge: fire beams. Heal Force while the head hides.
---   tutorial the designed line the fire-weak ADD exists for: everyone
+--   tutorial the designed line the fire-weak add exists for: everyone
 --           beams the head (3 fire chips), and terra spends her action
---           on TekMissile exactly when one shield remains -- the 4th
---           chip. beams into the break window; Heal Force while the
+--           on TekMissile exactly when one shield remains, which is the
+--           4th chip. beams into the break window; Heal Force while the
 --           head hides.
 --   naive   everyone confirms their first beam at the default target
 --           (A-A-A), always. The mash-through player.
@@ -102,10 +102,10 @@ end
 -- ---------------------------------------------------------- policies --
 -- Sequences run from the settled top command menu (cursor on MagiTek):
 --   beam at default target        A A A
---   heal force (2,0), BOTH lists  A dn dn A A   (self-target by default;
---     the soldiers' 4-cell list stages sparse -- Fire|Bolt / Ice / Heal --
---     so Heal Force is (2,0) for everyone; (1,1) is a BLANK cell the
---     cursor can walk onto and wedge, measured the hard way)
+--   heal force (2,0), both lists  A dn dn A A   (self-target by default;
+--     the soldiers' 4-cell list stages sparsely, as Fire|Bolt / Ice / Heal,
+--     so Heal Force is (2,0) for everyone; (1,1) is a blank cell the
+--     cursor can walk onto and wedge, which was measured)
 --   tekmissile  terra (3,1)       A dn dn dn rt A A
 local function seqFor(actor)
   local hidden = not headAlive()
@@ -126,7 +126,7 @@ local function seqFor(actor)
   return { "a", "a", "a" }
 end
 
--- the menu-episode machine (bal_mines settle discipline)
+-- the menu-episode driver (bal_mines settle discipline)
 local mStreak, mSeq, mIdx, mStall, mNoMenu = 0, nil, 1, 0, 0
 local function policyPulse()
   if H.readByte(MENU) == 0 then
@@ -240,12 +240,12 @@ local function sample()
     while qShadow[qi] ~= cur do
       local v = H.readByte(q.base + qShadow[qi])
       if (v & 0x80) == 0 then
-        -- each real action passes through TWO queues (advance-wait +
-        -- action; measured in this fight: raw player dequeues == 2x the
-        -- exec-verified cast counters). player/enemy/head/shell action
-        -- lines emit REAL actions: every second dequeue of a bucket
-        -- credits one. counter_actions stays a raw counter-queue
-        -- dequeue tally (subset diagnostics).
+        -- each real action passes through two queues (advance-wait and
+        -- action; measured in this fight: raw player dequeues equal 2x the
+        -- exec-verified cast counters).  The player, enemy, head and shell
+        -- action lines emit real actions: every second dequeue of a bucket
+        -- credits one.  counter_actions stays a raw counter-queue
+        -- dequeue tally, for diagnostics.
         if q.counter then S.counterActions = S.counterActions + 1 end
         if v < 8 then
           S.playerDequeues = S.playerDequeues + 1
@@ -330,8 +330,8 @@ local function sample()
     S.result = tdead and "gameover_terra" or "torn_down"
     return true
   end
-  -- "won" needs a 3-frame debounce: the head flickers through dead-ish
-  -- states when the shell's script hides it
+  -- "won" needs a 3-frame debounce: the head flickers through states that
+  -- read as dead when the shell's script hides it
   local aliveM = 0
   for _, m in ipairs(mons) do
     if monsterAlive(m.slot) then aliveM = aliveM + 1 end
@@ -426,7 +426,8 @@ local function report()
 end
 
 -- ----------------------------------------------------- battle blocks --
--- seqStepList: plain sequential composition (H.seqStep is public, but the lib reserves it for ot6_field's route())
+-- seqStepList: plain sequential composition (H.seqStep is public, but the
+-- library reserves it for ot6_field's route())
 local function seqStepList(steps)
   return {
     i = 1,
@@ -457,11 +458,11 @@ local function stepToWhelk(k)
       aPhase = (aPhase + 1) % 8
       if H.battleLoadStarted() then
         if whelkUp() then H.setPad({}); return end
-        -- battleLoadStarted flips true BEFORE the formation words land, so
+        -- battleLoadStarted flips true before the formation words land, so
         -- the whelk's own load window looks like a stray fight for a few
-        -- dozen frames: hands off until the non-whelk state HOLDS. A real
-        -- random encounter (shouldn't happen on this one-step route) gets
-        -- kill-bitted to unstick, and the sample is voided.
+        -- dozen frames; hands off until the non-whelk state holds.  A real
+        -- random encounter, which should not happen on this one-step route,
+        -- gets kill-bitted to unstick, and the sample is voided.
         strayN = strayN + 1
         if strayN >= 120 and H.monstersPresent() > 0 then
           voidReason = "stray_encounter"

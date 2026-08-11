@@ -3,45 +3,45 @@
 -- moment Celes is freed and joins.  The second link of the v0.3 Locke chain.
 -- Generates one state:
 --   celes_freed.mss  map 83 (56,9), LOCKE + CELES, the sleeping soldier's
---                    clock key taken -- the entry point of the escape to the
---                    Figaro cave where TunnelArmr waits
+--                    clock key taken.  This is the entry point of the escape
+--                    to the Figaro cave where TunnelArmr waits
 --
--- SIX THINGS THIS SCRIPT MEASURED, four of them map-maze facts the entrance
--- tables do not give and two of them harness blockers the brief warned about.
+-- Six things this script measured: four are map-maze facts the entrance
+-- tables do not give, and two are harness blockers the brief warned about.
 --
--- 1. THE RICH MAN'S MANSION (map 81) IS A WARP MAZE, and the entrance table
+-- 1. The rich man's mansion (map 81) is a warp maze, and the entrance table
 --    lists its rooms but not which reach which.  The secret passage
 --    (map 86 (3,53), event _ca798e) lands the party in the rich man's house
 --    (map 86 (6,36)); its (8,25) door returns to town (map 75 (22,13)).  The
---    mansion door there -- town (23,15) -> map 81 (16,15) -- is a DEEP DOOR
---    (see 2).  Inside, the way down is three same-map warps, and BFS proved
---    the order the hard way (each landing floods a disjoint room):
+--    mansion door there, town (23,15) -> map 81 (16,15), is a deep door
+--    (see 2).  Inside, the way down is three same-map warps, and BFS
+--    established the order (each landing floods a disjoint room):
 --      (16,15) -> warp (3,5)->(5,54) -> warp (13,51)->(39,17) -> (27,10)
 --      -> map 83 (7,5).
 --
--- 2. THAT MANSION DOOR IS A "DEEP" DOOR -- a CheckDoor tile with the
---    entrance source ANOTHER tile beyond it.  Town (23,15) is the entrance
+-- 2. That mansion door is a "deep" door: a CheckDoor tile with the
+--    entrance source another tile beyond it.  Town (23,15) is the entrance
 --    source and reads a solid wall; (23,16) is the CheckDoor door (tilemap
 --    byte $15, player.asm:958); (23,17) is the only standable floor.  So the
 --    crossing is: stand on (23,17), hold UP, and one continuous press opens
---    (23,16) AND carries the party through (23,15) in a single glide.  A
---    normal crossDoor stages on a neighbour of the source (23,16) -- which
---    is the door itself, unreachable -- and never moves.
+--    (23,16) and carries the party through (23,15) in a single glide.  A
+--    normal crossDoor stages on a neighbour of the source (23,16), which
+--    is the door itself and unreachable, so it never moves.
 --
--- 3. THE CELES CUTSCENE IS A STEP-ON TRIGGER WITH A NUISANCE ON THE ONLY
---    PATH TO IT.  Map 83's basement is warp-linked rooms; from the (18,5)
---    landing the corridor at y=14-15 is reached ONLY down column x=29, and
+-- 3. The Celes cutscene is a step-on trigger, with another trigger on the
+--    only path to it.  Map 83's basement is warp-linked rooms; from the
+--    (18,5) landing the corridor at y=14-15 is reached only down column x=29, and
 --    (29,9) on that column fires _ca8632 -> _ca8661 "Change clothes?" (once,
 --    $01B5 latches it).  navTo taps A through it (option 0 changes Locke
 --    back to plain clothes, harmless from here).  The real trigger is
 --    (35,14)/(35,15) -> _ca869c, gated `if_any $0105=0 / $001C=1` -- it runs
 --    the "she's a general" scene, the name_menu, and the chains cutscene,
---    ending with control at (37,14) and $001C=1.  Arrival is a SUSTAINED
+--    ending with control at (37,14) and $001C=1.  Arrival is a sustained
 --    control loss (>=90 frames), debounced past the async object-script
 --    flicker that toggles $087C between 2 and 4 on this map (gen_kolts's
---    finding), and NOT the brief change-clothes dialog.
+--    finding), rather than the brief change-clothes dialog.
 --
--- 4. THE NAMING MENU is the one beat advanceStory cannot tap through: $0059
+-- 4. The naming menu is the one beat advanceStory cannot tap through: $0059
 --    goes nonzero as it opens and stays until a name is committed.  START
 --    commits the default (name_change.asm exits on START unless blank), the
 --    same idiom gen_narshe_escape uses for Terra.
@@ -80,7 +80,7 @@
 local H = dofile("tools/tests/lib/ot6.lua")
 local DOOR = "build/states/sfigaro_passage.mss.lua"
 
--- map compares stay MASKED: loaders ride flag bits in $1F64's high byte
+-- map compares stay masked: loaders leave flag bits in $1F64's high byte
 local function map() return H.mapId() & 0x1ff end
 local function bright() return emu.getState()["ppu.screenBrightness"] or 0 end
 -- event switch id -> live bit (event bitfield base $1E80, bit = id & 7)

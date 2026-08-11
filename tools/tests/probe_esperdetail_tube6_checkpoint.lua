@@ -1,10 +1,10 @@
 -- probe_esperdetail_tube6_checkpoint.lua -- issue #31's verification instrument.
 --
--- The SAME menu drive and the SAME cell-level assertions as
--- menu_esperdetail_tube6.lua (the suite test), booted instead from a COLD
+-- The same menu drive and the same cell-level assertions as
+-- menu_esperdetail_tube6.lua (the suite test), booted instead from a cold
 -- Continue off the tracked post-Opera battery checkpoint, which survives ROM
 -- changes (issue #9) where savestate fixtures do not.  This build changes ROM
--- DATA in two banks (genju_prop, ot6_progression), so it is exactly the class
+-- data in two banks (genju_prop, ot6_progression), which is the class
 -- of change that can leave a generated .mss describing the previous ROM;
 -- run this to check the page from a boot that cannot be stale:
 --
@@ -13,20 +13,20 @@
 --
 -- The Continue sequence is gen_vector_entry.lua's, copied from
 -- probe_esperdetail_checkpoint.lua.  The party is LOCKE CELES SABIN EDGAR on the
--- world map at (137,203); the field menu opens from the world map exactly as
--- from a field map.  The esper inventory is pinned to exactly MADUIN (+5
--- mag.pwr, the crown), TERRATO (Ot6EsperStatTbl $0000 -- still the no-mod
--- control after this pass) and UNICORN (the Pearl grant, branch A).
+-- world map at (137,203); the field menu opens from the world map the same
+-- way as from a field map.  The esper inventory is pinned to MADUIN (+5
+-- mag.pwr, the largest mod), TERRATO (Ot6EsperStatTbl $0000, still the
+-- no-mod control after this pass) and UNICORN (the Pearl grant, branch A).
 --
 -- Name tiles and stat-line geometry: see menu_esperdetail_tube6.lua's header.
 --
 -- OT6_CHECKPOINT_LAYOUT: ot6-codex-o8-v1
 -- ^ the persistent-SRAM layout this step understands (issue #25).  run.sh
 -- reads
---   the marker line above and refuses -- BEFORE the emulator boots -- any
+--   the marker line above and refuses, before the emulator boots, any
 --   OT6_SRAM_CHECKPOINT whose manifest.json declares a different persistent_layout.
---   NOTE: probe_esperdetail_checkpoint.lua, the #27 probe this file mirrors, has
---   NO such marker and is therefore refused by run.sh today; see this build's
+--   Note: probe_esperdetail_checkpoint.lua, the #27 probe this file mirrors, has
+--   no such marker and is therefore refused by run.sh today; see this build's
 --   report Follow-ups.
 local H = dofile("tools/tests/lib/ot6.lua")
 

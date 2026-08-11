@@ -1,10 +1,10 @@
--- probe_setinput: the MOST minimal input test possible. No srm, no boot, no
--- game logic. Just: inject "up" via emu.setInput inside inputPolled, run a
--- few frames, and read the CPU-visible auto-joypad registers $4218/$4219 to
--- see whether the ROM would observe our buttons. This isolates the input
--- PRIMITIVE from everything else. SNES auto-joypad layout for $4218 (JOY1L)
--- high byte $4219: bit order (byte1=$4219) B Y Sel Sta Up Dn Lt Rt,
--- (byte0=$4218) A X L R ---- . We assert the injected direction shows up.
+-- probe_setinput: the minimal input test. No srm, no boot, no game logic:
+-- inject "up" via emu.setInput inside inputPolled, run a few frames, and
+-- read the CPU-visible auto-joypad registers $4218/$4219 to see whether the
+-- ROM would observe the buttons. This isolates the input primitive from
+-- everything else. SNES auto-joypad layout for $4218 (JOY1L) high byte
+-- $4219: bit order (byte1=$4219) B Y Sel Sta Up Dn Lt Rt, (byte0=$4218)
+-- A X L R ---- . The probe asserts the injected direction shows up.
 local H = dofile("tools/tests/lib/ot6.lua")
 
 local function joyRegs()

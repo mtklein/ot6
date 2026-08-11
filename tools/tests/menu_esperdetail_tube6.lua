@@ -1,81 +1,82 @@
 -- @suite savestate=esper_tubes
--- menu_esperdetail_tube6.lua -- the SIX TUBE-ROOM STONES on the esper detail
+-- menu_esperdetail_tube6.lua -- the six tube-room stones on the esper detail
 -- page (docs/design/magicite-tube-six.md §11, issue #31).
 --
--- The design doc's closing claim is "menu copy: zero work required" -- the
+-- The design doc's closing claim is "menu copy: zero work required": the
 -- detail page renders the granted spell names and the while-worn stat mod
 -- straight out of GenjuProp and Ot6EsperStatTbl, so authoring those two tables
--- IS the whole player-facing job.  That claim is only worth anything if
--- something checks it, which is this file: it drives the real menu UI to three
--- detail pages and asserts the rendered TILES, not the tables.
+-- is the whole player-facing job.  This file checks that claim: it drives the
+-- real menu UI to three detail pages and asserts the rendered tiles rather
+-- than the tables.
 --
--- #62 CHANGED WHAT "the stat mod" LOOKS LIKE.  Ot6EsperStatTbl is now two bytes
--- per esper in vanilla's own equipment layout (four SIGNED nibbles, -7..+7
+-- #62 changed what the stat mod looks like.  Ot6EsperStatTbl is now two bytes
+-- per esper in vanilla's own equipment layout (four signed nibbles, -7..+7
 -- each), so a stone carries up to four deltas and any of them can be negative.
 -- The page's single "While worn...<Stat> + N" line at row 27 is gone; in its
--- place the caption rides the TITLE row and one term per nonzero delta packs
+-- place the caption rides the title row and one term per nonzero delta packs
 -- downward from row 17, in the columns vanilla used for its dead learn-rate
 -- data.  Every stat-line assertion below was rewritten to that layout, and the
--- three pages now assert MORE than before, not less: each checks the exact
--- tiles of every term it should have, that the rows it should NOT have are
--- blank, and (Maduin) that a MINUS sign renders.
+-- three pages now assert more than before: each checks the exact
+-- tiles of every term it should have, that the rows it should not have are
+-- blank, and, for Maduin, that a minus sign renders.
 --
 -- Same drive and same instrument as menu_esperdetail.lua (issue #27): X ->
--- Skills -> character -> Espers -> list -> detail -- but from the esper_tubes
+-- Skills -> character -> Espers -> list -> detail, but from the esper_tubes
 -- fixture now (issue #75 conversion), the input-driven v0.6 savestate of the
--- tube-room set piece itself: its bag REALLY holds the boot roster (RAMUH
+-- tube-room set piece itself: its bag holds the boot roster (RAMUH
 -- IFRIT SHIVA SIREN) plus the six give_genju grants SHOAT MADUIN BISMARK
 -- CARBUNKL PHANTOM UNICORN (gen_esper_tubes_done asserts the delta bit by
 -- bit).  So the MADUIN
 -- and UNICORN pages below are rendered for stones the save owns, with no
 -- inventory write at all.  menu_esperdetail.lua stays as #27's test on the
--- page's SHAPE (against magicite_ifrit_shiva's three stones) and this one is
--- #31's test on the page's CONTENT.
+-- page's shape (against magicite_ifrit_shiva's three stones) and this one is
+-- #31's test on the page's content.
 --
--- *** ONE LABELED ISOLATION ARM (issue #75) -- a single state write STAYS ***
--- The TERRATO page is the page's genuinely-empty control: Ot6EsperStatTbl $0000,
--- NO caption, NO terms -- and no stone any reachable save owns carries a
--- $0000 row (ot6_progression.asm authors Terrato as "THE NO-MOD CONTROL"
--- precisely because he arrives far beyond how far the game is playable).  Per the
+-- One labeled isolation arm (issue #75): a single state write stays.
+-- The TERRATO page is the page's empty control: Ot6EsperStatTbl $0000,
+-- no caption and no terms, and no stone any reachable save owns carries a
+-- $0000 row (ot6_progression.asm authors Terrato as the no-mod control
+-- because he arrives beyond how far the game is playable).  Per the
 -- burn-down plan's observation-window ruling (docs/waiver-burndown-plan.md,
--- systemic call 2: a RENDERER mechanism claim may stay as a loudly-labeled
--- isolation arm), the single write below ORs Terrato's bit into $1a69 --
--- adding one list row -- so the genuinely-empty path stays exercised until a
+-- systemic call 2: a renderer mechanism claim may stay as a labeled
+-- isolation arm), the single write below ORs Terrato's bit into $1a69,
+-- adding one list row, so the empty path stays exercised until a
 -- fixture deep enough to own a no-mod stone exists.  It is one OR of one bit
--- (the old test REPLACED the whole bitfield); this file keeps its .writeByte(
--- waiver line for exactly that site and MAY NEVER PRODUCE FIXTURES.
+-- (the old test replaced the whole bitfield); this file keeps its .writeByte(
+-- waiver line for that site and may never produce fixtures.
 --
--- THE THREE PAGES:
---   MADUIN  (6)  the marquee, twice over.  Three spell rows that must read Fire
+-- The three pages:
+--   MADUIN  (6)  three spell rows that must read Fire
 --                / Ice / Bolt where the shipped ROM drew Fire 2 / Ice 2 / Bolt
---                2, and after #62 a THREE-TERM stat block whose first term is
---                NEGATIVE: vigor -3, stamina +3, mag.pwr +7 (the encoding's
+--                2, and after #62 a three-term stat block whose first term is
+--                negative: vigor -3, stamina +3, mag.pwr +7 (the encoding's
 --                ceiling and vanilla's own per-stat ceiling).  Speed is zero, so
---                it must cost no line -- which is what proves the walk packs.
+--                it must cost no line, which is what shows the walk packs.
 --   TERRATO (4)  the surviving no-mod control.  Its Ot6EsperStatTbl row is
---                still $0000 after #62 (deliberately -- ot6_progression.asm
---                says so on the row), so the genuinely-empty path is still
---                exercised: NO caption and no term anywhere.  Revisited after
---                Maduin, it proves the page overwrites rather than leaving the
+--                still $0000 after #62, on purpose, as ot6_progression.asm
+--                says on the row, so the empty path is still
+--                exercised: no caption and no term anywhere.  Revisited after
+--                Maduin, it shows the page overwrites rather than leaving the
 --                previous stone's block behind.
---   UNICORN (23) the Pearl grant -- branch A of the cross-doc holy decision
+--   UNICORN (23) the Pearl grant, branch A of the cross-doc holy decision
 --                (§9's DECIDED box).  Two spell rows where the shipped ROM
 --                drew five, so rows 3-5 must be blank: the deletions are
---                asserted on screen, not just in the table.  Its stat block is
---                the two-term shape (stamina +5, mag.pwr +2) with no downside.
+--                asserted on screen and not only in the table.  Its stat block
+--                is the two-term shape (stamina +5, mag.pwr +2) with no
+--                downside.
 --
--- HOW NAMES ARE ASSERTED.  DrawGenjuMagicName (skills.asm:2759) blits a
--- 7-tile MagicName record -- icon byte then up to 6 name tiles, $ff-padded
--- (ff6/src/text/magic_name_en.dat, 7-byte stride) -- to cols 5-11 of the row,
+-- How names are asserted.  DrawGenjuMagicName (skills.asm:2759) blits a
+-- 7-tile MagicName record (icon byte then up to 6 name tiles, $ff-padded;
+-- ff6/src/text/magic_name_en.dat, 7-byte stride) to cols 5-11 of the row,
 -- then blanks cols 12-19; empty slots blank all 15.  Rows are y=17,19,21,23,25
 -- (the $f5 loop, skills.asm:2578-2612 stepping $0011 -> $001b by 2).  The
--- expected byte runs below are those records verbatim, so a wrong spell id in
--- GenjuProp cannot pass: Fire is `e9 85 a2 ab 9e ff ff` and Fire 2 is
--- `e9 85 a2 ab 9e fe b6`, which differ only in the last two tiles -- exactly
+-- expected byte runs below are those records copied exactly, so a wrong spell
+-- id in GenjuProp cannot pass: Fire is `e9 85 a2 ab 9e ff ff` and Fire 2 is
+-- `e9 85 a2 ab 9e fe b6`, which differ only in the last two tiles, which are
 -- the tiles this file compares.
 --
--- THE STAT BLOCK (#62, skills.asm's DrawEsperDetailMenu tail):
---   caption "While worn..." right-aligned in the 16-cell field at {13,15} --
+-- The stat block (#62, skills.asm's DrawEsperDetailMenu tail):
+--   caption "While worn..." right-aligned in the 16-cell field at {13,15}:
 --     cols 13-14 blank, cols 15-27 the 13 caption tiles;
 --   one term per nonzero delta, packed downward over rows 17/19/21/23/25:
 --     7-tile stat name at cols 17-23 (Ot6GenjuStatNameTbl, space-padded), a
@@ -83,12 +84,12 @@
 --     26-27 with the leading zero blanked;
 --   unused term rows: cols 17-27 blank.  Row 27, the old line's home: blank.
 --
--- NOTE ON assertRowEmpty BELOW.  It asserts cols 5-19 of an unused SPELL row,
+-- Note on assertRowEmpty below: it asserts cols 5-19 of an unused spell row,
 -- and cols 18-19 of that range are now inside the stat block's field.  That is
--- still correct and is not a coincidence: the block writes all eleven cells
+-- still correct, and not a coincidence: the block writes all eleven cells
 -- 17-27 of every row it touches, and blanks all eleven on rows it does not.  The
 -- two ranges therefore agree, and a term landing on a row this file expects
--- empty would fail here loudly.
+-- empty would fail here.
 local H = dofile("tools/tests/lib/ot6.lua")
 local STATE = "build/states/esper_tubes.mss.lua"
 
@@ -114,7 +115,7 @@ local CH_MINUS = 0xc4                   -- #62: a delta can be negative
 -- digit tiles: '0' = $b4 .. '9' = $bd (text_en.json)
 local function digit(n) return 0xb4 + n end
 
--- MagicName records, verbatim from ff6/src/text/magic_name_en.dat (7-byte
+-- MagicName records, copied from ff6/src/text/magic_name_en.dat (7-byte
 -- stride; byte 0 is the school icon: $e9 attack, $ea effect, $e8 heal).
 local NAME = {
   FIRE   = { 0xe9, 0x85, 0xa2, 0xab, 0x9e, 0xff, 0xff },
@@ -129,7 +130,7 @@ local NAME = {
 }
 
 -- Ot6GenjuStatNameTbl entries (skills.asm:3058, menu_text_en.inc:110-113),
--- 7 tiles each, space-padded -- space is $ff, the same tile as blank.
+-- 7 tiles each, space-padded; space is $ff, the same tile as blank.
 local STAT = {
   VIGOR   = { 0x95, 0xa2, 0xa0, 0xa8, 0xab, 0xff, 0xff },
   SPEED   = { 0x92, 0xa9, 0x9e, 0x9e, 0x9d, 0xff, 0xff },
@@ -142,7 +143,7 @@ local function st() return H.readByte(ZMENUSTATE) end
 -- Walk the esper list cursor onto the slot holding esper `idx`.  Two-column
 -- grid (GenjuCursorProp `cursor_prop {0,0},{2,8}`): $4b is a linear slot index
 -- whose parity is the column, so down/up move by 2 and a parity change needs a
--- left/right press first.  Lifted verbatim from menu_esperdetail.lua.
+-- left/right press first.  Taken unchanged from menu_esperdetail.lua.
 local function listSeek(idx, what)
   local ph = 0
   return H.driveUntil(function()
@@ -172,7 +173,7 @@ local function listSeek(idx, what)
   }, what)
 end
 
--- Dump a spell row's 7 name tiles as hex.  Called BEFORE the matching assert so
+-- Dump a spell row's 7 name tiles as hex.  Called before the matching assert so
 -- a run against a pre-change ROM leaves the rendered bytes in the log rather
 -- than only a verdict.
 local function rowHex(slot)
@@ -245,8 +246,9 @@ local function assertTermRowBlank(tag, slot)
   end
 end
 
--- Row 27 was #27's single-line home; #62 draws nothing there, so the page must
--- clear it -- asserted for a stone WITH a block as well as without.
+-- Row 27 was where #27's single line was drawn; #62 draws nothing there, so
+-- the page must clear it, asserted for a stone with a block as well as
+-- without.
 local function assertOldLineGone(tag)
   for x = 5, 27 do
     H.assertEq(cell(x, 27), BLANK,
@@ -274,10 +276,10 @@ local toList = {
   H.waitFrames(10),
   H.waitUntil(function() return H.hasControl() end, 400, "field control", 5),
 
-  -- POSITIVE CONTROL, read-only: the tube-room set piece really granted its
+  -- positive control, read-only: the tube-room set piece granted its
   -- six stones on top of the boot roster (gen_esper_tubes_done's own exit
   -- assertion, re-made at consume time).  MADUIN (bit 6 of byte 0) and
-  -- UNICORN (bit 7 of byte 2) -- the two genuinely-owned pages below -- are owned.
+  -- UNICORN (bit 7 of byte 2), the two owned pages below, are owned.
   H.call(function()
     H.log(string.format("[espers] $1a69 = %02x %02x %02x %02x (read)",
       H.readByte(ESPERS), H.readByte(ESPERS + 1), H.readByte(ESPERS + 2),
@@ -288,8 +290,8 @@ local toList = {
       "... and CARBUNKL PHANTOM UNICORN (the give_genju receipts)")
   end),
 
-  -- *** THE LABELED ISOLATION ARM'S ONE WRITE (see header) ***  OR Terrato's
-  -- bit (esper 4, bit 4 of byte 0) into the owned set so the genuinely-empty
+  -- the labeled isolation arm's one write (see header): OR Terrato's
+  -- bit (esper 4, bit 4 of byte 0) into the owned set so the empty
   -- no-mod page can be visited; nothing else is written, and the ten real
   -- stones are untouched.
   H.call(function()
@@ -298,14 +300,14 @@ local toList = {
       .. "control, unreachable on this savestate chain (see header)")
   end),
 
-  -- driveUntil, not one press: the X that opens the field menu is the first
-  -- step in these tests that needs a SPECIFIC frame, so it is where a
-  -- fixture generated against a different ROM surfaces -- as "timeout waiting
-  -- for main menu", which reads like a menu bug and is not one.  Retrying
-  -- the press costs nothing when the pairing is fine and removes the false
-  -- report when it is not.  Same shape probe_fieldicons.lua and
-  -- menu_blitzpage_sabin.lua already use.  The assertion is unchanged: the
-  -- main menu must still come up.
+  -- This uses driveUntil rather than one press because the X that opens the
+  -- field menu is the first step in these tests that needs a specific frame,
+  -- so it is where a fixture generated against a different ROM shows up, as
+  -- "timeout waiting for main menu", which reads like a menu bug and is not
+  -- one.  Retrying the press costs nothing when the pairing is fine and
+  -- removes the false report when it is not.  This is the shape
+  -- probe_fieldicons.lua and menu_blitzpage_sabin.lua already use.  The
+  -- assertion is unchanged: the main menu must still come up.
   H.driveUntil(function() return st() == ST_MAIN end, 1200,
     { H.pressButtons({ "x" }, 4), H.waitFrames(30) }, "main menu"),
   H.waitFrames(20),
@@ -355,7 +357,7 @@ local function backToList()
   }
 end
 
--- ---- MADUIN: the crown.  Fire/Ice/Bolt + a three-term block with a minus ---
+-- ---- MADUIN: Fire/Ice/Bolt plus a three-term block with a minus ----------
 add(page(MADUIN, "Maduin"))
 add({ H.call(function()
   H.assertEq(H.readByte(Z99), MADUIN, "detail page is MADUIN's")
@@ -366,7 +368,7 @@ add({ H.call(function()
   assertRowEmpty("maduin", 3)
   assertRowEmpty("maduin", 4)
   -- Maduin's row is vig -3 / spd 0 / stm +3 / mag +7, so three terms pack onto
-  -- rows 17/19/21 with SPEED SKIPPED, and the first of them carries a MINUS.
+  -- rows 17/19/21 with speed skipped, and the first of them carries a minus.
   assertCaption("maduin", true)
   assertTerm("maduin", 0, STAT.VIGOR,   "Vigor",   CH_MINUS, 3)
   assertTerm("maduin", 1, STAT.STAMINA, "Stamina", CH_PLUS,  3)
@@ -380,8 +382,8 @@ end) })
 add(backToList())
 
 -- ---- TERRATO: the no-mod control, revisited after Maduin -----------------
--- (THE ISOLATION ARM's page -- the one row the $1a69 OR above added.  Every
--- cell assertion below is the mechanism claim the arm exists to keep.)
+-- (This is the isolation arm's page, the one row the $1a69 OR above added.
+-- Every cell assertion below is the mechanism claim the arm exists to keep.)
 add(page(TERRATO, "Terrato"))
 add({ H.call(function()
   H.assertEq(H.readByte(Z99), TERRATO, "detail page is TERRATO's")
@@ -391,8 +393,8 @@ add({ H.call(function()
   assertRow("terrato", 2, NAME.W_WIND, "W Wind (untouched vanilla row)")
   assertRowEmpty("terrato", 3)
   assertRowEmpty("terrato", 4)
-  -- No mod ($0000): NO caption and no term anywhere -- INCLUDING the cells
-  -- Maduin's page just filled, which is what proves the revisit overwrote them.
+  -- No mod ($0000): no caption and no term anywhere, including the cells
+  -- Maduin's page just filled, which shows the revisit overwrote them.
   assertCaption("terrato", false)
   for slot = 0, 4 do assertTermRowBlank("terrato", slot) end
   assertOldLineGone("terrato")
@@ -401,7 +403,7 @@ add({ H.call(function()
 end) })
 add(backToList())
 
--- ---- UNICORN: the Pearl grant (branch A) + three deleted rows ------------
+-- ---- UNICORN: the Pearl grant (branch A) and three deleted rows ---------
 add(page(UNICORN, "Unicorn"))
 add({ H.call(function()
   H.assertEq(H.readByte(Z99), UNICORN, "detail page is UNICORN's")
@@ -413,8 +415,8 @@ add({ H.call(function()
   assertRowEmpty("unicorn", 2)
   assertRowEmpty("unicorn", 3)
   assertRowEmpty("unicorn", 4)
-  -- Unicorn is vig 0 / spd 0 / stm +5 / mag +2: the two-term shape, no downside,
-  -- and the two leading zeros must cost no line.
+  -- Unicorn is vig 0 / spd 0 / stm +5 / mag +2: the two-term shape, with no
+  -- downside, and the two leading zeros must cost no line.
   assertCaption("unicorn", true)
   assertTerm("unicorn", 0, STAT.STAMINA, "Stamina", CH_PLUS, 5)
   assertTerm("unicorn", 1, STAT.MAGPWR,  "Mag.Pwr", CH_PLUS, 2)

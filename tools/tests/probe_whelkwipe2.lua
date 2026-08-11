@@ -5,9 +5,9 @@
 -- tile regions are bit-identical base-vs-ot6 through both transitions, yet
 -- the ot6 image renders a sweeping strip of glyph garbage.  The remaining
 -- suspects are the per-scanline BG3 scroll HDMA table (w7e4af5, 224 x
--- [hofs.w vofs.w], channel #2 -> $2111/$2112) and the tile-region STATE at
+-- [hofs.w vofs.w], channel #2 -> $2111/$2112) and the tile-region state at
 -- burst start (round 1's drive-phase shadow refresh absorbed pre-burst
--- writes silently).  This probe logs, per transition:
+-- writes without logging them).  This probe logs, per transition:
 --   * a full BG3 field-map dump ($5400-$57ff) at burst start
 --   * a whole-font compare against SmallFontGfx at burst start (which
 --     cells differ from the vanilla font; ot6's claimed cells will show

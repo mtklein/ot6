@@ -1,28 +1,28 @@
 ; ------------------------------------------------------------------------------
-; BUSHIDO LOADOUT CONFIGURATOR -- the FIELD-menu side, plus the row-price shims
+; Bushido loadout configurator: the field-menu side, plus the row-price shims
 ;
 ; The bank-$F0 state logic behind the field configurator (field_menu.asm holds
 ; only the tilemap/DMA/cursor shell and jsl's in here for every decision), and
 ; the two OT6_MP_COSTS-gated row-price leaves the menus draw with. The battle
-; side that READS the word this file writes is ot6_bushido.asm.
+; side that reads the word this file writes is ot6_bushido.asm.
 ; ------------------------------------------------------------------------------
-; Carved out of ot6_kits.asm (v0.9, 3037 lines) with the emission order of
+; Split out of ot6_kits.asm (v0.9, 3037 lines) with the emission order of
 ; every instruction preserved: ot6.asm includes these files in exactly the
-; order their text sat in the old one, so the assembler sees the identical
-; token stream and the linker the identical segment. Proven, not argued --
-; ROM CRC32 0x2E9B5A7F and ff6-en.map are byte-identical across the split.
+; order their text sat in the old one, so the assembler receives the identical
+; token stream and the linker the identical segment. ROM CRC32 0x2E9B5A7F and
+; ff6-en.map are byte-identical across the split.
 ; ------------------------------------------------------------------------------
 
 ; ==============================================================================
-; BUSHIDO LOADOUT CONFIGURATOR -- OT6-owned bank-F0 logic (issue #8 Layer B)
+; Bushido loadout configurator: OT6-owned bank-F0 logic (issue #8 Layer B)
 ;
-; The field-menu configurator's STATE logic lives here in F0; the C3 menu-state
+; The field-menu configurator's state logic lives here in F0; the C3 menu-state
 ; handler (field_menu.asm) is a thin shim that jsl's these for every decision
-; and only performs the tilemap/DMA/cursor framework calls that MUST run in the
+; and only performs the tilemap/DMA/cursor framework calls that must run in the
 ; menu bank.  All entries are a8/i16, D = 0 (the menu's direct page, so $08/$09
 ; new-press joypad and $4d/$4e cursor position are reachable), rtl.  These read
-; the learned set from $1cf7 (NOT $2020 -- battle-only) and price with the
-; shared Ot6CostFor leaf, exactly as the spec requires.
+; the learned set from $1cf7 (not $2020, which is battle-only) and price with
+; the shared Ot6CostFor leaf, as the spec requires.
 ; ------------------------------------------------------------------------------
 
 ; [ menu-side ceiling: popcount($1cf7) - 1, floored at 0 (0..7) ]
@@ -51,16 +51,16 @@
 .endproc
 
 ; [ auto-window tech for a slot: base = max(0,ceil-2), tech = min(base+slot-1,ceil) ]
-; The very math Ot6BushidoTech runs in AUTO mode, replicated menu-side off
+; The same math Ot6BushidoTech runs in AUTO mode, replicated menu-side off
 ; $1cf7 so the seed baseline matches what battle would pick.  #38: the slot
-; index IS the boost (1..3) and slot 0 is retired, so a 0 clamps to 1 exactly
-; as the battle leaf does -- Ot6LoadoutSeedWord still walks 0..3 and relies on
-; that clamp to mirror slot 1 into the dead slot 0 (see there).
+; index is the boost (1..3) and slot 0 is retired, so a 0 clamps to 1 the same
+; way the battle leaf does; Ot6LoadoutSeedWord still walks 0..3 and relies on
+; that clamp to mirror slot 1 into the unused slot 0 (see there).
 ; in: A = slot (0..3).  out: A = tech (0..ceiling).  clobbers X.  preserves Y.
 .proc Ot6LoadoutAutoTech
         .a8
         .i16
-        cmp     #$01                ; #38: 1-BP floor -- clamp the retired slot 0
+        cmp     #$01                ; #38: 1-BP floor, clamp the retired slot 0
         bcs     :+
         lda     #$01
 :       pha                         ; park slot ($01,s)
@@ -105,7 +105,7 @@
 
 ; [ unpack a slot's 3-bit tech field from the packed loadout word ]
 ; slot s occupies bits s*3 .. s*3+2 of the $7e1e1d word.  Both the battle read
-; hook (Ot6BushidoTech) and the menu draw route through here, so they can never
+; hook (Ot6BushidoTech) and the menu draw route through here, so they cannot
 ; decode the word differently.  Uses only registers + its own stack cell, no
 ; direct-page scratch, so it is safe to call mid-draw (the C3 loop parks its
 ; slot index in $e2).
@@ -127,26 +127,26 @@
         dex
         bra     @sh
 @msk:   and     #$0007              ; A = this slot's 3-bit field
-        shorta                      ; plain SEP #$20 -- keeps A (shorta0's tdc wipes it)
+        shorta                      ; plain SEP #$20, keeps A (shorta0's tdc wipes it)
         sta     $01,s               ; overwrite the parked slot with the tech
         pla                         ; A = tech (0..7)
         rtl
 .endproc
 
 ; [ #49: is the SwdTech loadout AUTO?  the packed word is zero ]
-; The exact twin of Ot6RageIsAuto below, and it decodes AUTO the same way every
-; other reader of this word already does -- Ot6LoadoutSlotTech branches @auto on
+; The twin of Ot6RageIsAuto below, and it decodes AUTO the same way every
+; other reader of this word already does: Ot6LoadoutSlotTech branches @auto on
 ; a zero word (:1081-1083) and Ot6LoadoutCycleCore seeds on one (:1190-1193).
-; It exists so the PAGE can state the mode without re-deriving it: a second
+; It exists so the page can state the mode without re-deriving it: a second
 ; `lda OT6_LOADOUT / beq` in the C3 shim would be a second definition of AUTO,
-; and the two could drift the day the stored format changes.
+; and the two could drift when the stored format changes.
 ; out: carry set = AUTO.  clobbers A.  preserves X and Y.
 .proc Ot6LoadoutIsAuto
         .a8
         .i16
         longa
         lda     f:OT6_LOADOUT       ; packed word (0 = AUTO)
-        shorta                      ; plain SEP #$20 -- keeps Z (shorta0 wipes it)
+        shorta                      ; plain SEP #$20, keeps Z (shorta0 wipes it)
         beq     @auto
         clc
         rtl
@@ -154,7 +154,7 @@
         rtl
 .endproc
 
-; [ the tech shown/used for a slot, validated -- the single source of truth ]
+; [ the tech shown/used for a slot, validated: the single source of truth ]
 ; Mirrors the battle read hook: MANUAL returns the stored, learned tech, else
 ; falls back to the auto window for that slot.  Used by the C3 draw so the
 ; screen never names a tech the battle would not fire.
@@ -165,7 +165,7 @@
         pha                         ; park slot ($01,s)
         longa
         lda     f:OT6_LOADOUT       ; packed word (0 = AUTO)
-        shorta                      ; plain SEP #$20 -- keeps Z (shorta0's tdc wipes it)
+        shorta                      ; plain SEP #$20, keeps Z (shorta0's tdc wipes it)
         beq     @auto
         lda     $01,s               ; slot
         jsl     Ot6LoadoutUnpack    ; A = stored tech (clobbers X, preserves Y)
@@ -181,8 +181,8 @@
 
 ; [ pack a new tech into one slot's 3-bit field of the loadout word ]
 ; Read-modify-write: clears slot s's field (bits s*3..s*3+2) and ORs in the new
-; tech, leaving the other three slots untouched.  A nonzero result is, by
-; definition, MANUAL.  Uses menu scratch $e0..$e4 (D=0), free during input.
+; tech, leaving the other three slots untouched.  A nonzero result means
+; MANUAL by definition.  Uses menu scratch $e0..$e4 (D=0), free during input.
 ; in: A = new tech (0..7), X = slot (0..3).  clobbers A,X,Y.
 .proc Ot6LoadoutAssign
         .a8
@@ -221,11 +221,11 @@
 ; [ pack the whole auto window into the word (the first edit out of AUTO) ]
 ; So that after the first manual edit the un-touched slots keep the auto
 ; techs they were displaying, not zero.  Result is nonzero = MANUAL (unless the
-; auto window is all tech 0 -- a ceiling-0 degenerate that reads auto either way).
+; auto window is all tech 0, a ceiling-0 case that reads auto either way).
 ; #38: the loop still walks slots 0..3 even though slot 0 is retired.  That is
-; deliberate -- the STORED FORMAT MUST NOT MOVE (persistent_layout
+; deliberate, because the stored format must not move (persistent_layout
 ; ot6-codex-o8-v1), and Ot6LoadoutAutoTech's clamp makes slot 0 a harmless
-; mirror of slot 1, which keeps the word nonzero (= MANUAL) in exactly the
+; mirror of slot 1, which keeps the word nonzero (= MANUAL) in the same
 ; cases it did before.  Nothing ever reads slot 0 back.
 ; clobbers A,X,Y.
 .proc Ot6LoadoutSeedWord
@@ -247,9 +247,9 @@
 
 ; [ open the configurator: reset the cursor to the top slot ]
 ; Leaves the loadout word as-is: AUTO (word 0) stays AUTO until the first edit,
-; MANUAL stays MANUAL.  The display needs no seeding -- Ot6LoadoutSlotTech
+; MANUAL stays MANUAL.  The display needs no seeding: Ot6LoadoutSlotTech
 ; computes the auto tech per slot on the fly whenever the word is 0, so the
-; player still edits a sensible auto baseline without anything being written.
+; player still edits the auto baseline without anything being written.
 ; clobbers A.
 .proc Ot6LoadoutOpen
         .a8
@@ -263,7 +263,7 @@
         rtl
 .endproc
 
-; [ cycle the cursored slot's tech to the prev/next LEARNED tech; go MANUAL ]
+; [ cycle the cursored slot's tech to the prev/next learned tech; go MANUAL ]
 ; The first edit out of AUTO packs the current auto window into the word first
 ; (Ot6LoadoutSeedWord), so the three un-touched slots keep their auto techs;
 ; then the cursored slot is cycled and repacked, leaving a nonzero MANUAL word.
@@ -274,10 +274,10 @@
         pha                         ; park delta ($01,s)
         longa
         lda     f:OT6_LOADOUT       ; still AUTO?
-        shorta                      ; plain SEP #$20 -- keeps Z (shorta0's tdc wipes it)
+        shorta                      ; plain SEP #$20, keeps Z (shorta0's tdc wipes it)
         bne     :+
-        jsl     Ot6LoadoutSeedWord  ; first edit: freeze the auto window into the word
-:       lda     $4e                 ; cursored ROW (0..2)
+        jsl     Ot6LoadoutSeedWord  ; first edit: store the auto window in the word
+:       lda     $4e                 ; cursored row (0..2)
         inc     a                   ; #38: row i -> word slot i+1 (slot 0 retired)
         jsl     Ot6LoadoutUnpack    ; A = the slot's current stored tech
         ldy     #$0008              ; try every residue once
@@ -321,7 +321,7 @@ Ot6LoadoutPrev:                     ; L shoulder -> previous learned tech
         beq     @dn
         lda     $4e
         bne     :+
-        lda     #$03                ; wrap 0 -> 2 (pre-decrement) -- #38: 3 rows
+        lda     #$03                ; wrap 0 -> 2 (pre-decrement).  #38: 3 rows
 :       dec     a
         sta     $4e
         lda     #$01
@@ -338,10 +338,10 @@ Ot6LoadoutPrev:                     ; L shoulder -> previous learned tech
         lda     #$01
         rtl
 @sel:   lda     $09
-        bit     #$40                ; Y -> revert to AUTO.  (NOT Select: FF6's
+        bit     #$40                ; Y -> revert to AUTO.  (not Select: FF6's
                                     ;   default config aliases physical Select
-                                    ;   onto the R bit, so it can't be told apart
-                                    ;   from the R-shoulder cycle -- Y is clean.)
+                                    ;   onto the R bit, so it cannot be told
+                                    ;   apart from the R-shoulder cycle.)
         beq     @lr
         longa
         lda     #$0000
@@ -365,18 +365,19 @@ Ot6LoadoutPrev:                     ; L shoulder -> previous learned tech
         rtl
 .endproc
 
-; [ price a loadout row -- ALWAYS defined, flag-gated body ]
-; The configurator lives in the SHARED menu object (built once, flag-agnostic),
+; [ price a loadout row: always defined, flag-gated body ]
+; The configurator lives in the shared menu object (built once, flag-agnostic),
 ; but Ot6CostFor is OT6_MP_COSTS-only.  So the menu prices every row through
-; this always-present shim -- exactly the Ot6BlitzRowDecorate/Ot6ToolRowDecorate
-; pattern.  ON: tail-call Ot6CostFor (its rtl returns to the menu).  nomp: return
-; 0 (no cost table referenced, so the shared menu object links against either
-; battle object, and the row simply draws no number).
+; this always-present shim, the same as the
+; Ot6BlitzRowDecorate/Ot6ToolRowDecorate pattern.  On: tail-call Ot6CostFor
+; (its rtl returns to the menu).  nomp: return 0 (no cost table referenced, so
+; the shared menu object links against either battle object, and the row draws
+; no number).
 ; in: A = attack id.  out: A = MP cost (0 under nomp).  rtl.
 .proc Ot6LoadoutCost
         .a8
         .i16
-.if ::OT6_MP_COSTS                  ; :: -- the file-scope flag, from in-proc
+.if ::OT6_MP_COSTS                  ; :: is the file-scope flag, from in-proc
         jmp     Ot6CostFor          ; tail-call: same bank, its rtl returns for us
 .else
         lda     #$00
@@ -384,25 +385,25 @@ Ot6LoadoutPrev:                     ; L shoulder -> previous learned tech
 .endif
 .endproc
 
-; [ #55: price a THIEF submenu row -- ALWAYS defined, flag-gated body ]
+; [ #55: price a thief submenu row: always defined, flag-gated body ]
 ; Ot6LoadoutCost's twin, for the second keyed table.  Ot6ThiefListOpen is
 ; assembled in both builds (the C1 stub jsl's it either way), but the cost
 ; leaves are OT6_MP_COSTS-only, so the list prices its rows through this shim:
-; ON, resolve the row; nomp, return 0 so cmd $02 draws two blanks and the row
+; on, resolve the row; nomp, return 0 so cmd $02 draws two blanks and the row
 ; keeps the byte-identical unpriced layout.
 ;
-; THE BRANCH HERE IS THE SAME BRANCH Ot6AbilityCost's @steal arm makes, and that
-; is the point.  The Steal row is NOT in Ot6ThiefCostTbl -- Ot6StealCost is its
-; one authority (#52) -- so a shim that only scanned the thief table would draw
+; The branch here is the same branch Ot6AbilityCost's @steal arm makes.  The
+; Steal row is not in Ot6ThiefCostTbl, because Ot6StealCost is its
+; one authority (#52), so a shim that only scanned the thief table would draw
 ; Steal at 0 while the charge took 4.  Splitting on Ot6ThiefIsNew in both places
 ; means the drawn price and the charged price come out of the same leaf for every
-; row, which is the whole reason #52 left Steal's price as a callable leaf
+; row, which is why #52 left Steal's price as a callable leaf
 ; instead of an inline immediate.
 ; in: A = row id.  out: A = MP cost (0 under nomp).  preserves X and Y.  rtl.
 .proc Ot6ThiefCost
         .a8
         .i16
-.if ::OT6_MP_COSTS                  ; :: -- the file-scope flag, from in-proc
+.if ::OT6_MP_COSTS                  ; :: is the file-scope flag, from in-proc
         jsl     Ot6ThiefIsNew       ; carry set = filch/bestow (A preserved)
         bcc     @steal
         jmp     Ot6ThiefCostFor     ; tail-call: same bank, its rtl returns for us

@@ -1,33 +1,32 @@
--- probe_v07_385win.lua -- the map-385 REWRITE-WINDOW instrument (issue
--- #31, step G->H).  NOT a suite test.  Tests the crossing hypothesis that
+-- probe_v07_385win.lua -- the map-385 rewrite-window instrument (issue
+-- #31, step G->H).  Not a suite test.  Tests the crossing hypothesis that
 -- probe_v07_385walk.lua's phaseWalk was missing:
 --
---   1. Every swap callback rewrites the tilemap BEFORE it flips the phase
+--   1. Every swap callback rewrites the tilemap before it flips the phase
 --      switches (_cb2bb2 event_main.asm:44700: `call _cb2b24` then
 --      `switch $01F5=0 / $01F6=1`; same shape at _cb2c57:44735,
---      _cb2d1e:44812, _cb2d97:44853).  The ASYNC mod_bg_tiles + wait_bg
+--      _cb2d1e:44812, _cb2d97:44853).  The async mod_bg_tiles plus wait_bg
 --      take the ~14 frames by which the measured period (158) exceeds the
---      timer's 144.  So there is a WINDOW where the NEXT phase's floor is
---      already physically in place -- H.canStep sees it, because the
---      passability model reads the live tilemap -- while $01F5/$01F6
---      still show the OLD phase.
+--      timer's 144.  So there is a window where the next phase's floor is
+--      already in place, which H.canStep sees because the passability
+--      model reads the live tilemap, while $01F5/$01F6 still show the old
+--      phase.
 --   2. Every hurt tile is an event-trigger tile (_cb2dbb/_cb2dd2,
 --      event_trigger.asm:1849-1883), and a stood-on trigger tile re-enters
---      its script every frame (the re-entry-trap class)
---      -- which kills hasControl(), which is why phaseWalk went
---      PASSIVE at (6,2) and ate the swap.  The documented escape is an
---      UNCONDITIONAL HELD PRESS.
+--      its script every frame (the re-entry-trap class), which clears
+--      hasControl(), which is why phaseWalk went passive at (6,2) and took
+--      the swap.  The documented escape is an unconditional held press.
 --
--- So the crossing should be: stand at (6,2) during $01F5 holding RIGHT
+-- So the crossing should be: stand at (6,2) during $01F5 holding right
 -- unconditionally; the engine takes the step the frame the rewrite opens
 -- (7,2), ~14 frames before $01F6=1 arms (6,2)'s hurt trigger; then keep
--- holding RIGHT through the fresh $01F6 stretch to (11,2), where the east
+-- holding right through the fresh $01F6 stretch to (11,2), where the east
 -- column is walkable in both phases.
 --
--- Part 2: arm cycle B at (11,3) and dump the east half's tilemap +
--- reachable set in BOTH phases -- the data the (11,3) -> (13,13) plan
--- needs, which no prior run has measured (cycle B has never been armed
--- with the room in a driveable state).
+-- Part 2: arm cycle B at (11,3) and dump the east half's tilemap and
+-- reachable set in both phases, which is the data the (11,3) -> (13,13)
+-- plan needs and which no prior run has measured (cycle B has never been
+-- armed with the room in a driveable state).
 -- OT6_CHECKPOINT_LAYOUT: ot6-codex-o8-v1
 local H = dofile("tools/tests/lib/ot6.lua")
 
@@ -39,7 +38,7 @@ local function hpsum()
        + H.readWord(0x1609 + 74) + H.readWord(0x1609 + 111)
 end
 
--- the flip clock: an edge on $01F6 (either direction) is a swap instant --
+-- the flip clock: an edge on $01F6 (either direction) is a swap instant;
 -- only the four timer callbacks touch $01F6 (the arming scripts' trailing
 -- `wait 144 / switch $01F5=1` touches $01F5 alone).
 local lastF6, lastFlipFrame, flips = nil, nil, 0
@@ -135,10 +134,10 @@ H.run({ maxFrames = 60000 }, {
     H.log(string.format("[boot] hpsum=%d", hpsum()))
   end),
 
-  -- arm cycle A at (3,2).  Release the pad on ARRIVAL (x flips at step
-  -- completion moving right), not on $01F0 -- the switch sets a few frames
-  -- into the arming script, and a hold still up would walk the party onto
-  -- (4,2), a hurt-$01F6 tile, right as timer 0 fires _cb2bb2.
+  -- arm cycle A at (3,2).  Release the pad on arrival (x flips at step
+  -- completion moving right) rather than on $01F0, because the switch sets
+  -- a few frames into the arming script, and a hold still up would walk the
+  -- party onto (4,2), a hurt-$01F6 tile, as timer 0 fires _cb2bb2.
   holdWalk("right", function() return H.fieldX() >= 3 end, 1800, nil,
     "held RIGHT onto the cycle-A trigger (3,2)"),
   H.waitUntil(function() return sw(0x01F0) == 1 end, 900,
@@ -149,7 +148,7 @@ H.run({ maxFrames = 60000 }, {
   end),
 
   -- settle onto (3,2) exactly (the hold can overshoot the trigger fire),
-  -- then wait for a FRESH $01F5 stretch: a $01F6 1->0 edge.
+  -- then wait for a fresh $01F5 stretch: a $01F6 1->0 edge.
   (function()
     local seen10 = false
     return H.driveUntil(function() return seen10 end, 2000, {
@@ -171,9 +170,9 @@ H.run({ maxFrames = 60000 }, {
       H.frame, H.fieldX(), H.fieldY()))
   end),
 
-  -- THE CROSSING ATTEMPT: hold RIGHT from (3,2).  The party walks 4,5,6
-  -- (open in $01F5), stalls against the (7,2) wall, and -- hypothesis --
-  -- steps through the moment the rewrite window opens it, ~14 frames
+  -- The crossing attempt: hold right from (3,2).  The party walks 4,5,6
+  -- (open in $01F5), stalls against the (7,2) wall, and, per the
+  -- hypothesis, steps through when the rewrite window opens it, ~14 frames
   -- before $01F6 arms (6,2)'s hurt trigger.  Then it keeps walking the
   -- fresh $01F6 stretch 7,8,9,10 to (11,2).  Trace every frame once past
   -- x=5 or once fsf>=120.

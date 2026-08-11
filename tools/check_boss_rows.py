@@ -10,13 +10,13 @@ The doc authors, per boss (and per boss part / per add), three numbers:
   * a weapon-class      -> Ot6ShieldTbl's class byte, else the generated
     weakness              break floor (ot6_break_floor.inc)
 
-...and occasionally an *absorb* claim, which is monster_prop.dat +23.
+The doc also makes occasional absorb claims, which are monster_prop.dat +23.
 
 This script parses every such claim out of the prose and the markdown tables
-and prints one loud line per disagreement, naming the doc line, the claim, the
+and prints one line per disagreement, naming the doc line, the claim, the
 data, and the file/offset that proves it.
 
-Nothing here writes; it is a read-only linter.  Exit status 0 = clean.
+Nothing here writes.  It is a read-only linter.  Exit status 0 = clean.
 
 Wired into `make test` (Makefile's test target, alongside the compose.py and
 sram_checkpoint.py selftests) as of the issue #23 pass that emptied WAIVERS.
@@ -137,7 +137,7 @@ class Data:
         return "%s +$%04x (rom $%06x)" % (MONSTER_PROP, fileoff,
                                           MONSTER_PROP_ADDR + fileoff)
 
-    # -- effective (what the game actually seeds) ----------------------
+    # -- effective (what the game seeds) -------------------------------
     def effective_weak(self, sp):
         return self.vanilla_weak(sp) | self.elem_add.get(sp, (0, None))[0]
 
@@ -242,8 +242,8 @@ class Data:
 #
 # Rows that carry an id inline (`$003A`, `($10D)`) resolve themselves.  The
 # rest are resolved from this table, keyed by (section key, row label).  A row
-# that resolves to nothing is a LOUD failure, never a silent skip -- that is
-# the whole point of the exercise.
+# that resolves to nothing is reported as a failure rather than skipped, which
+# is why this table exists.
 
 RESOLVE = {
     # boss section -> {row label (lowercased, trimmed) -> species id}
@@ -291,25 +291,25 @@ CURVE_ADDS = {
 }
 
 # "the row" = Ultros's authored row, stated in full at Ultros ①.  Rows that
-# say "the row" are claiming exactly that, so resolve them to it rather than
-# silently skipping.
+# say "the row" are claiming that row, so resolve them to it rather than
+# skipping them.
 ULTROS_ROW_ELEMS = ELEMENT_BIT["fire"] | ELEMENT_BIT["bolt"]
 ULTROS_ROW_CLASSES = CLASS_BIT["slash"] | CLASS_BIT["pierce"]
 
 
 # --------------------------------------------------------------------------
 # Acknowledged open decisions: (species, "ELEMENT"|"CLASS"|"SHIELDS") ->
-# reason.  A waived mismatch is still PRINTED, loudly and in full, in its own
-# section -- it just does not fail the run, so this can join `make test`
-# without being permanently red.  Every entry names the doc block that
-# argues it; delete the entry when the decision lands either way.
+# reason.  A waived mismatch is still printed in full in its own section.  It
+# does not fail the run, so this script can join `make test` without being
+# permanently red.  Every entry names the doc block that discusses it; delete
+# the entry when the decision lands either way.
 #
-# Nothing is waived by default in bulk: waiving is per species AND per axis,
-# so an unrelated drift on the same boss still fails.
+# Waiving is never done in bulk: it is per species and per axis, so an
+# unrelated drift on the same boss still fails.
 
 WAIVERS = {
-    # EMPTY, and that is the point.  Every row bosses-wob.md authors in prose
-    # is authored into Ot6ElemAddTbl, so nothing needs waiving.
+    # This table is empty.  Every row bosses-wob.md authors in prose is
+    # authored into Ot6ElemAddTbl, so nothing needs waiving.
     #
     # With no waivers left this script is a plain check, and it is registered in
     # `make test` (the Makefile's test target, next to the compose/sram_checkpoint
@@ -335,7 +335,7 @@ class Claim:
         self.elems = None      # None = not claimed
         self.classes = None
         self.absorbs = None
-        self.elem_add = None   # doc claims THIS element comes from ElemAddTbl
+        self.elem_add = None   # doc claims this element comes from ElemAddTbl
         self.note = ""
 
     def __repr__(self):
@@ -353,8 +353,8 @@ def parse_masks(text):
     """Split a 'a, b + c, d' weakness phrase into (element mask, class mask).
 
     Returns (elems, classes, ok).  ok=False when the phrase carries no
-    recognisable token at all -- the caller decides whether that is prose
-    (fine) or a broken regex (loud)."""
+    recognisable token.  The caller decides whether that means prose, which is
+    fine, or a broken regex, which is not."""
     elems = 0
     classes = 0
     for m in ELEM_TOKEN.finditer(text):
@@ -621,8 +621,8 @@ def _table_row(hdr, cells, lineno, section, claims, shapes):
         if m:
             cl.shields = int(m.group(1))
             body = m.group(2)
-            # "(+bolt)" is an element-ADD claim, not the full weak row --
-            # split it off before reading the class tokens.
+            # "(+bolt)" claims an element add rather than the full weak row,
+            # so split it off before reading the class tokens.
             plus = re.search(r"\(\+\s*([a-z|, ]+)\)", body)
             if plus:
                 body = body.replace(plus.group(0), " ")
@@ -680,8 +680,8 @@ def _table_row(hdr, cells, lineno, section, claims, shapes):
                 if not ok:
                     cl.note = "UNPARSED weak cell: %r" % weak
                 else:
-                    # a cell that names only classes is not claiming "no
-                    # element" -- it is silent about the element row.
+                    # a cell that names only classes says nothing about the
+                    # element row; it is not claiming "no element".
                     cl.elems = e if e else None
                     cl.classes = c if c else None
             claims.append(cl)
@@ -712,7 +712,7 @@ def check(root, verbose=False):
         else:
             problems.append(text)
 
-    # ---- self-check: the parser must actually have matched things ----
+    # ---- self-check: the parser must have matched things ----
     MINIMUM = {"curve": 20, "prose": 14, "parts": 12, "species": 12, "decode": 3}
     for shape, need in MINIMUM.items():
         if shapes.get(shape, 0) < need:
@@ -735,8 +735,8 @@ def check(root, verbose=False):
         if c.note.startswith("UNPARSED"):
             problems.append("%s\n    %s" % (tag, c.note))
 
-        # a row that names classes but no element, for a species that HAS
-        # one: not a contradiction, but a hole worth naming.
+        # a row that names classes but no element, for a species that has
+        # one, is not a contradiction, but it is still worth naming.
         if (c.elems is None and c.classes is not None
                 and c.where in ("part-table", "prose")
                 and data.effective_weak(c.species)):
@@ -751,7 +751,7 @@ def check(root, verbose=False):
             eff = van | add
             if c.where == "decode":
                 # a decode note quotes monster_prop.dat directly: compare it
-                # to the VANILLA byte, not the seeded (vanilla|add) row.
+                # to the vanilla byte, not the seeded (vanilla|add) row.
                 eff, add, addline = van, 0, None
             if c.elems != eff:
                 missing = c.elems & ~eff
@@ -773,7 +773,7 @@ def check(root, verbose=False):
                        "%s\n    ELEMENT: doc says %s, data says %s\n    %s\n    %s"
                        % (tag, elem_str(c.elems), elem_str(eff), "; ".join(bits), proof))
 
-        # -- claimed element ADD ---------------------------------------
+        # -- claimed element add ---------------------------------------
         if c.elem_add is not None:
             add, addline = data.elem_add.get(c.species, (0, None))
             if c.elem_add & ~add:
@@ -815,7 +815,7 @@ def check(root, verbose=False):
                     % (tag, elem_str(c.absorbs), elem_str(eff),
                        data.prop_cite(c.species, OFF_ABSORB), eff))
 
-        # -- an element weakness the party would HEAL --------------------
+        # -- an element weakness the party would heal --------------------
         if c.elems:
             heal = c.elems & data.vanilla_absorb(c.species)
             if heal:
@@ -836,7 +836,7 @@ def check(root, verbose=False):
                      class_str(c.classes) if c.classes is not None else "-",
                      c.note))
 
-    # a waiver nobody trips any more is stale: say so rather than rot.
+    # a waiver nobody trips any more is stale; report it.
     for key in sorted(WAIVERS):
         if key not in seen_waivers:
             problems.append(

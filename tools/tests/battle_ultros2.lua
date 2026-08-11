@@ -1,36 +1,36 @@
 -- @suite savestate=ultros2_entry slow
--- battle_ultros2.lua -- Beat A's boss test: the OPERA's ULTROS 2 break gauge.
+-- battle_ultros2.lua -- Beat A's boss test: the Opera's Ultros 2 break gauge.
 -- Boots ultros2_entry (the rafter framework, one interaction short of
 -- battle 104), rides into the fight, and asserts:
 --
---   1. THE GAUGE IS AUTHORED, not formula.  Ultros 2 ($012d) seeds 6/6 with
---      class-weak OT6_SLASH|OT6_PIERCE straight off Ot6ShieldTbl
---      (ot6.asm:4757 -- "ultros 2: same row, one more shield" than Ultros 1's
---      5).  The formula value for a body this size would not be 6, so a
---      dropped row fails here first.
---   2. THE CODEX CARRIES the recurring-Ultros weakness row.  bosses-wob's
+--   1. The gauge is authored rather than computed by the formula.  Ultros 2
+--      ($012d) seeds 6/6 with class-weak OT6_SLASH|OT6_PIERCE straight off
+--      Ot6ShieldTbl (ot6.asm:4757, "ultros 2: same row, one more shield" than
+--      Ultros 1's 5).  The formula value for a body this size would not be 6,
+--      so a dropped row fails here first.
+--   2. The codex carries the recurring-Ultros weakness row.  bosses-wob's
 --      contract is "Ultros keeps one weakness row, revealed at the Lete,
---      remembered forever."  The codex seen here is the FIXTURE's own
+--      remembered forever."  The codex seen here is the fixture's own
 --      SRAM bytes (SRAM rides Mesen savestates; lib/ot6.lua): on the
 --      generated chain no upstream step has chipped $012d's row, so nothing is
---      revealed at seed -- asserted -- and the first class-matching chip
+--      revealed at seed, which is asserted, and the first class-matching chip
 --      reveals it.  If a future input-driven chain reveals Ultros at the Lete
---      and the row genuinely recurs, this assertion is the place that
---      finds out, by failing with the fixture's true state.
+--      and the row recurs, this assertion is where that shows up, by failing
+--      with the fixture's true state.
 --
--- WHY THIS FIXTURE.  Ultros 2 ends the Opera performance -- "same fight,
--- real difficulty, no Banon healer" (bosses-wob).  The chosen party is
--- LOCKE + up to three; AutoCrossbow (pierce) trivially chips, and any slash
--- weapon does too, so the class row is reachable by the party that faces it
--- (issue #6).  Battle 104 is the WoB Ultros-2 formation ($012d present);
+-- Why this fixture: Ultros 2 ends the Opera performance, described in
+-- bosses-wob as "same fight, real difficulty, no Banon healer".  The chosen
+-- party is LOCKE plus up to three others; AutoCrossbow (pierce) chips, and any
+-- slash weapon does too, so the class row is reachable by the party that faces
+-- it (issue #6).  Battle 104 is the WoB Ultros-2 formation ($012d present);
 -- battle 134 is the unrelated WoR Opera House dragon event.
 --
--- NOTE: this test is authored against the confirmed Ot6ShieldTbl row and the
--- battle-class read addresses proven by battle_vargas/battle_class; it
+-- Note: this test is authored against the confirmed Ot6ShieldTbl row and the
+-- battle-class read addresses proven by battle_vargas and battle_class; it
 -- reports "skipped" (suite.sh) until ultros2_entry is generated, and the
--- kit-specific chip drive is intentionally class-generic (it credits ANY
--- landed swing whose Ot6-resolved class meets slash|pierce) so it does not
--- hard-code which of LOCKE's party carries the handhold.
+-- kit-specific chip drive is class-generic (it credits any landed swing whose
+-- Ot6-resolved class meets slash|pierce) so it does not hard-code which of
+-- LOCKE's party carries the handhold.
 local H = dofile("tools/tests/lib/ot6.lua")
 local DOOR = "build/states/ultros2_entry.mss.lua"
 
@@ -69,7 +69,7 @@ H.run({ maxFrames = 60000 }, {
   H.waitUntil(function() return H.battleActive() end, 3000, "Ultros 2 up", 10),
   H.waitFrames(120),
 
-  -- 1 + 2: the seed, read BEFORE anything is poked.
+  -- 1 + 2: the seed, read before anything is poked.
   H.call(function()
     local w = {}
     for s = 0, 5 do w[s] = H.readWord(0x57C0 + s * 2) end

@@ -1,92 +1,92 @@
 -- gen_rapids.lua -- from scenario_hub.mss into TERRA/BANON/EDGAR's scenario:
--- the resumed raft ride down the lower LETE RIVER and the landing on the
+-- the resumed raft ride down the lower Lete River and the landing on the
 -- World of Balance north-east of Narshe.
 -- Generates two states:
 --   rapids_start.mss  map 113 at the ride's re-entry tile (104,61), TERRA +
 --                     EDGAR + BANON aboard with the RAFT sprite, upstream of
---                     the step's one FORCED fight -- the cheap entry point
---                     for anything that wants `battle 8, RIVER` without
---                     replaying the hub.
+--                     the step's one forced fight.  This is the cheap entry
+--                     point for anything that wants `battle 8, RIVER`
+--                     without replaying the hub.
 --   rapids_done.mss   the World of Balance at (93,41), on foot and
 --                     controllable: the ride finished, the overland walk to
 --                     Narshe not started.  gen_terra_narshe rides from here.
 --
--- ONE EVENT, THREE DOORS.  BANON {8,10}, TERRA {7,11} and EDGAR {9,11} on the
--- hub map are three NPCs with ONE `set_npc_event _cb094e` between them
--- (npc_prop.asm:489, :497, :505) -- the split is three ways, not five, and
--- which of the three you talk to cannot matter.  TERRA (obj 19) is the one
--- taken here, and only because the states are named for her.
+-- One event, three doors.  BANON {8,10}, TERRA {7,11} and EDGAR {9,11} on the
+-- hub map are three NPCs sharing one `set_npc_event _cb094e`
+-- (npc_prop.asm:489, :497, :505), so the split is three ways rather than
+-- five, and which of the three is talked to does not matter.  TERRA (obj 19)
+-- is the one used here, because the states are named for her.
 --
--- ==================== THE UPSTREAM STEP'S TWO TRAPS ARE NOT HERE ==========
+-- The upstream step's two hazards do not occur here.
 -- gen_scenario.lua's river needed a steering driver and two hand-walked
--- handoffs.  This continuation needs NEITHER, and the reason is worth
--- writing down rather than rediscovering: _cb094e (:39355-39461) contains no
+-- handoffs.  This continuation needs neither, and the reason is worth
+-- recording: _cb094e (:39355-39461) contains no
 -- `choice` opcode and no `player_ctrl_on` between its map load and its last
 -- `wait_obj`.  Read the whole event and what is left is four
 -- `obj_script SLOT_1, ASYNC { move … }` / `wait_obj SLOT_1` pairs with
 -- battles between them.  Specifically:
 --
---   * THE VANILLA GRIND LOOP IS UPSTREAM.  It is _cb07f2's option 0
+--   * The vanilla grind loop is upstream.  It is _cb07f2's option 0
 --     (:39152-39197, `if_switch $0176=0, _cb07f2`), reached from the ride
---     _cb0657 starts.  This event re-enters map 113 at (104,61) -- past it.
---     Nothing on this step ever asks the player which way to go, so the
---     driver below does not steer a cursor; it ASSERTS that no multiple
---     choice ever opens ($056F >= 2 while the dialog is input-ready is a
---     hard error), which is the same fact stated as a test.
---   * THE FACING-DOWN HANDOFFS ARE MAP 114'S.  _cb051c/_cb055c both open
---     `if_switch $01B2=0, EventReturn` -- $01B2 being bit 2 of $1EB6, the
---     engine's live control-flags byte, i.e. "facing down"
---     (field/event.asm:5415-5432) -- and they are EventTrigger::_114's
+--     _cb0657 starts.  This event re-enters map 113 at (104,61), past it.
+--     Nothing on this step asks the player which way to go, so the
+--     driver below does not steer a cursor; it asserts that no multiple
+--     choice opens ($056F >= 2 while the dialog is input-ready is a
+--     hard error), which states the same fact as a test.
+--   * The facing-down handoffs belong to map 114.  _cb051c/_cb055c both open
+--     `if_switch $01B2=0, EventReturn`, where $01B2 is bit 2 of $1EB6, the
+--     engine's live control-flags byte, meaning "facing down"
+--     (field/event.asm:5415-5432), and they are EventTrigger::_114's
 --     (event_trigger.asm:464-468).  This step never loads map 114.  It runs
 --     113 -> world, end of story.
 --
--- CONTROL IS ON FOR THE ENTIRE RIDE, so hasControl() is not a progress gate
+-- Control is on for the entire ride, so hasControl() is not a progress gate
 -- here and is never used as one below.  :39391 `call _cacb95`, and _cacb95
--- ends `update_party / player_ctrl_on` (:31276-31283), runs BEFORE
+-- ends `update_party / player_ctrl_on` (:31276-31283), runs before
 -- `load_map 113`.  The field control flag therefore reads true from the
 -- first frame on the raft while the object script owns SLOT_1's movement
 -- anyway.  Every gate in this script is map id + position + the world-mode
 -- word; the pad is neutral except for A into a battle or an open dialog.
 --
--- THE STEP HAS ONE FORCED FIGHT AND UP TO TWO MORE ON A COIN FLIP.  The
+-- The step has one forced fight and up to two more on a coin flip.  The
 -- survey called `battle 8, RIVER` (:39412) "the scenario's only combat",
--- which is true of the FORCED ones and not of the step:
+-- which is true of the forced fights but not of the step:
 --       :39428  call _cb048f   ->  if_rand ; battle 8, RIVER   (:38659-38666)
 --       :39446  call _cb0486   ->  if_rand ; battle 7, RIVER   (:38653-38658)
 -- are both real, both on this step's critical path, and each fires about half
--- the time.  So the driver names and logs EVERY battle it meets, and the
+-- the time.  So the driver names and logs every battle it meets, and the
 -- run's battle count is reported rather than assumed.
 --
--- ISSUE #75 -- THE FIGHTS ARE PLAYED, NOT WRITE-CLEARED.  Zero state writes
--- in this generator.  The driver's edge-tapped A is the fighter (A opens
--- the acting character's command list, A confirms its first entry, A takes
--- the default target): TERRA and EDGAR Fight the default enemy while
--- BANON's first command is Health, the free party heal his presence exists
--- for -- and BANON'S DEATH IS AN INSTANT GAME OVER, which is why the
+-- Issue #75: the fights are played rather than write-cleared, and this
+-- generator makes no state writes.  The driver's edge-tapped A is the fighter
+-- (A opens the acting character's command list, A confirms its first entry, A
+-- takes the default target): TERRA and EDGAR Fight the default enemy while
+-- BANON's first command is Health, the free party heal his presence provides.
+-- Banon's death is an immediate game over, which is why the
 -- battle-clear write was here at all.  The driver watches his battle HP
 -- every frame (slot found via $3ED8+2s == 14 on each fight's rising edge)
--- and fails the run loudly with the fight's numbers if he ever stays at 0
--- -- the #74-style balance finding, at the moment of loss, instead of a
+-- and fails the run with the fight's numbers if he stays at 0, giving a
+-- #74-style balance finding at the moment of loss instead of a
 -- timeout at the game-over screen.  gen_scenario's river fights the same
 -- way and carries the fuller rationale.
 --
--- AND rapids_done IS VERIFIED BY RELOAD.  Calm-at-capture provably does
--- not imply calm-at-boot on the world map: gen_sabin_gau measured a
+-- rapids_done is verified by reload.  A calm capture does not imply a calm
+-- boot on the world map: gen_sabin_gau measured a
 -- reproducible boot-into-battle from a capture whose live timeline sailed
 -- on calm (2026-08-03, the input-driven-root pilot).  So the world-map
 -- generation here is captured in memory, reloaded (becoming the consumer's
 -- timeline), and only emitted once the reload sits calm at (93,41) for 300
--- frames; a boot battle is FLED with real input (hold L+R -- WoB randoms
--- are runnable) and the post-battle world reload restores this exact tile
+-- frames; a boot battle is fled with real input (hold L+R, since WoB randoms
+-- are runnable) and the post-battle world reload restores this tile
 -- with the danger counter zeroed, where the next attempt recaptures.
 --
--- WHAT `battle N` RESOLVES TO (field/event.asm EventBattle, :1910-1922): the
--- group index is scaled by FOUR -- two formation words per group -- and
+-- What `battle N` resolves to (field/event.asm EventBattle, :1910-1922): the
+-- group index is scaled by four (two formation words per group) and
 -- UpdateBattleGrpRng takes the second word 1/4 of the time.  So from
 -- event_battle_group.dat: group 8 -> formation 35 (3/4) or 37 (1/4); group 7
 -- -> formation 38 (3/4) or 39 (1/4).  The species, hp and OT6 shield counts
 -- are read off battle RAM on each fight's rising edge and logged, because a
--- balance claim about this step has to rest on what the ROM actually seeds.
+-- balance claim about this step has to rest on what the ROM seeds.
 local H = dofile("tools/tests/lib/ot6.lua")
 local HUB = "build/states/scenario_hub.mss.lua"
 

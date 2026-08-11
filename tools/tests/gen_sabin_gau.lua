@@ -1,23 +1,23 @@
 -- gen_sabin_gau.lua -- step 10 of SABIN's scenario: GAU.  Generates:
 --   gau_joined.mss   world (214,147), Crescent Mountain's entry point, party
---                    SABIN+CYAN+GAU -- the trench step steps in from here.
+--                    SABIN+CYAN+GAU.  The trench step starts from here.
 --
 -- Every Crescent Mountain helmet-scene variant gates on $01AB (GAU in the
 -- party), so the trench cannot open without him.  The route: off the shore
--- (159's y=14 edge row -- its "map 0" long-entrance records return to the
--- PARENT slot, which this chain last pushed at DOMA, so the landing is
--- (240,16), not the record's coords), Mobliz (world (220,115) -> map 157;
+-- (159's y=14 edge row; its "map 0" long-entrance records return to the
+-- parent slot, which this chain last pushed at Doma, so the landing is
+-- (240,16) rather than the record's coords), Mobliz (world (220,115) -> map 157;
 -- the item shop 164 via (26,21); keeper (29,48) talked across his counter
 -- from (29,50); shop 12 row 0 = DRIED MEAT, row 1 = TONIC), then the
 -- Veldt grind.
 --
--- THE APPEARANCE, measured at battle_main.asm:11940-11960: GAU shows up at
--- the END of a veldt battle -- after every monster dies -- with 3/8 odds
--- (Rand cmp #$a0), party < 4, GAU not yet in the roster ($1EDF bit 3).
--- $2f49/$2f4a arm his character-ai on EVERY veldt battle; $2f4e going
+-- The appearance, measured at battle_main.asm:11940-11960: GAU shows up at
+-- the end of a veldt battle, after every monster dies, with 3/8 odds
+-- (Rand cmp #$a0), party < 4, and GAU not yet in the roster ($1EDF bit 3).
+-- $2f49/$2f4a arm his character-ai on every veldt battle; $2f4e going
 -- nonzero is the appearance itself.
 --
--- ================ THE DRIED-MEAT FEED, DRIVEN FOR REAL (#75) ================
+-- The dried-meat feed, driven with real input (#75).
 -- A controller-only probe found the engine's two-stage target model.  Gau's
 -- appearance first exposes him through the one-shot $2F4E mask, before
 -- UpdateDead has installed him in $3A42.  An item submitted in that state has
@@ -34,24 +34,24 @@
 -- encounter.  Every gameplay change is controller input; all addresses here
 -- are observations used to close the loop.
 --
--- THE GRIND IS FOUGHT, NOT WRITE-CLEARED (#75): the appearance rolls only
--- at a WIN, so wins are earned by the house menu-episode machine (bank
+-- The grind is fought rather than write-cleared (#75): the appearance rolls
+-- only at a win, so wins are earned by the house menu-episode machine (bank
 -- boost to 2, dump on Fight), with a self-heal branch (Item -> TONIC,
--- default self target) under 40% HP -- the Tonics are bought in Mobliz
+-- default self target) under 40% HP.  The Tonics are bought in Mobliz
 -- alongside the meat.  A wipe reloads a pre-grind checkpoint (three
--- attempts, 17-frame stagger).  SHADOW is gone before this step, so no
--- leave roll exists to manage.
+-- attempts, 17-frame stagger).  SHADOW is gone before this step, so there is
+-- no leave roll to manage.
 --
--- THE GENERATE IS VERIFIED BY RELOAD, because calm-at-capture provably does
--- not imply calm-at-boot.  Measured landing the input-driven-root pilot
--- (2026-08-03):  a capture taken at (214,149) with full world control --
--- $E8 gate clear, aligned, the entry point guard below satisfied in 0
--- frames -- REPRODUCIBLY boots into a battle: every reload read $E8=$28
--- (bit5, battle pending)  within a frame and battle_gaufight's 'world
+-- The generate is verified by reload, because a calm capture does not imply
+-- a calm boot.  Measured during the input-driven-root pilot
+-- (2026-08-03): a capture taken at (214,149) with full world control ($E8
+-- gate clear, aligned, and the entry point guard below satisfied in 0
+-- frames) boots into a battle reproducibly.  Every reload read $E8=$28
+-- (bit5, battle pending) within a frame and battle_gaufight's 'world
 -- control' wait timed out at 4000 frames, while the live generation
--- timeline sailed on calm past the same capture point.  The only test that
--- matters for a fixture is the consumer's-eye one: reload what you captured
--- and require the calm you promised.
+-- timeline continued past the same capture point with no battle.  The test
+-- that matters for a fixture is the consumer's: reload what was captured
+-- and require the calm the fixture promises.
 local H = dofile("tools/tests/lib/ot6.lua")
 local DOOR = "build/states/falls_done.mss.lua"
 local ZMENUSTATE, MAIN_MENU, CONFIG_MENU = 0x26, 0x05, 0x0E

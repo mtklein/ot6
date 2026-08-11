@@ -1,8 +1,10 @@
--- probe23.lua: POSITIVE CONTROL for input injection after loadSavestate.
+-- probe23.lua: positive control for input injection after loadSavestate.
 -- Loads first_battle.mss (command menu open, cursor on MagiTek), then:
---   press A -> screenshot (submenu must OPEN -> differs from baseline)
---   press B -> screenshot (submenu must CLOSE -> differs from the A shot)
--- Fails loudly if any press has no visible effect.
+--   press A -> screenshot (the submenu must open, so the shot differs from
+--              the baseline)
+--   press B -> screenshot (the submenu must close, so the shot differs from
+--              the A shot)
+-- Fails if any press has no visible effect.
 local H = dofile("tools/tests/lib/ot6.lua")
 local STATE = "build/states/first_battle.mss.lua"
 

@@ -1,10 +1,10 @@
 -- probe_vargas.lua -- the measurement instrument behind battle_vargas: walk
 -- the Mt. Kolts scene into `battle 66` and read out everything the fight is
--- made of, asserting nothing.  Its job is to answer the questions the
--- sources alone do not: what slot Vargas seeds into, what his gauge and
--- element/class rows actually read after Ot6SeedShields and Ot6ElemAdd have
--- run, what LEVEL Sabin joins at (AuraBolt is a level-6 Blitz, so the holy
--- proof stands or falls on it), and what the two candidate win paths do.
+-- made of, asserting nothing.  It measures what the sources alone do not:
+-- what slot Vargas seeds into, what his gauge and element/class rows read
+-- after Ot6SeedShields and Ot6ElemAdd have run, what level Sabin joins at
+-- (AuraBolt is a level-6 Blitz, so the holy proof depends on it), and what
+-- the two candidate win paths do.
 local H = dofile("tools/tests/lib/ot6.lua")
 local DOOR = "build/states/vargas_entry.mss.lua"
 
@@ -23,7 +23,7 @@ local MENU, ACTOR, MSTATE = 0x7BCA, 0x62CA, 0x7BC2
 local SABIN_E = 3                      -- entity index SABIN joined into
 local spells, shWrites = {}, {}
 
--- keep the party upright while we drive: Vargas hits hard and a wipe ends
+-- keep the party alive while driving: Vargas hits hard and a wipe ends
 -- the probe before it has measured anything.  Current HP <- max HP, every
 -- frame, for the four party entities (offset 2e; max at $3C1C).
 local function pinParty()
@@ -115,7 +115,7 @@ H.run({ maxFrames = 60000 }, {
   end),
 
   -- ===================================================================== --
-  -- One interaction: the party is already standing at (22,32) facing RIGHT
+  -- One interaction: the party is already standing at (22,32) facing right
   -- at VARGAS (map 98's only NPC, object 16, `set_npc_event _ca828f`,
   -- npc_prop.asm:4006).  A -> dialogs $00F8..$00FC -> `char_party SABIN,0`
   -- (event_main.asm:19906) -> `battle 66, MOUNTAINS_EXT` (:19909).
@@ -144,13 +144,13 @@ H.run({ maxFrames = 60000 }, {
   end),
 
   -- ===================================================================== --
-  -- INTO PHASE TWO.  Measured here and recorded because no source says it:
-  -- from the opening bell entities 0/1/2 take turns and entity 3 (SABIN)
-  -- NEVER gets a menu -- 9000 frames of it.  His turns begin only after
-  -- Vargas's own reaction script runs `battle_event $07` at hp <= 10880 and
+  -- Into phase two.  Measured here and recorded because no source states
+  -- it: from the start of the fight entities 0/1/2 take turns and entity 3
+  -- (SABIN) gets no menu for 9000 frames.  His turns begin only after
+  -- Vargas's reaction script runs `battle_event $07` at hp <= 10880 and
   -- `battle_event $08` at hp <= 10368 (ai_script.asm:4392-4404), the beat
-  -- that blows the trio offstage.  Clamp his HP under the second gate and
-  -- let his script do the rest.
+  -- that removes the other three.  Clamp his HP under the second gate and
+  -- let his script run.
   -- ===================================================================== --
   H.driveUntil(function()
     return H.readByte(MENU) ~= 0 and H.readByte(ACTOR) == SABIN_E
@@ -174,14 +174,14 @@ H.run({ maxFrames = 60000 }, {
   end),
 
   -- ===================================================================== --
-  -- THE battle-clear-write QUESTION.  The harness's standard way to end a
+  -- The battle-clear-write question.  The harness's standard way to end a
   -- fight is to set $3EEC+off bit7 on every live monster (H.clearBattle).
   -- Vargas's reaction script opens with `if_self_dead / boss_death`
   -- (ai_script.asm :4382-4384) BEFORE the `if_attack PUMMEL` branch, so
   -- what a kill bit does to a boss whose death is scripted was an open
-  -- question.  It is asked here, once, and whatever it answers is logged
-  -- rather than assumed -- battle_vargas.lua does not depend on it either
-  -- way, because the Pummel path is proven and is the one the story means.
+  -- question.  It is measured here once and the result is logged rather
+  -- than assumed.  battle_vargas.lua does not depend on it either way,
+  -- because the Pummel path is verified and is the intended one.
   -- ===================================================================== --
   H.call(function()
     for slot = 0, 5 do

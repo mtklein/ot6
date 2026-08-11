@@ -1,20 +1,20 @@
 -- probe_moogle_stations.lua -- the Moogle defense played with real input
--- the way the set-piece was DESIGNED: pre-position all three squads at
+-- the way the set-piece was designed: pre-position all three squads at
 -- separate interception stations before the marches arrive (issue #75,
 -- marshal-investigation).  Zero writes; walking, Y-taps, and tap-A only.
 --
--- Why stations and not mid-defense goalie swaps (probe_moogle_rotation's
--- lesson): waves 1-3 queue up nose-to-tail in the lane, so the aside-walk
--- after wave 2 crosses the very tile wave 3's guard is entering -- the
--- swap loses the race and the walking party eats the collision.  Instead,
--- the first ~2000 frames of the defense are quiet (wave 1 needs ~2100
--- field-frames to arrive), and the march scripts split cleanly by arm:
+-- Why stations rather than mid-defense goalie swaps (from
+-- probe_moogle_rotation): waves 1-3 queue up nose-to-tail in the lane, so
+-- the aside-walk after wave 2 crosses the tile wave 3's guard is entering,
+-- the swap loses the race, and the walking party takes the collision.
+-- Instead, the first ~2000 frames of the defense are quiet (wave 1 needs
+-- ~2100 field-frames to arrive), and the march scripts split by arm:
 --   east loop  (20,19..23):        NPC_4 and NPC_9    -> P3 parks (20,20)
 --   west loop  (10,19..23):        NPC_7 and NPC_8    -> P2 parks (10,21)
 --   middle column + tail (15,y):   NPC_5 and NPC_6    -> P1 keeps (14,14)
--- Collisions auto-engage the COLLIDED party (measured: parked inactive P1
--- fought and its exact HP table showed in battle), so once parked, no
--- input choreography is needed during the storm -- tap-A rides every
+-- Collisions auto-engage the collided party (measured: parked inactive P1
+-- fought and its own HP table showed in battle), so once parked, no
+-- input choreography is needed during the wave phase; tap-A rides every
 -- fight, two per squad.  The choke stays manned throughout because an
 -- unintercepted march ends in the GameOver exec at (14,13).
 local H = dofile("tools/tests/lib/ot6.lua")
@@ -135,7 +135,7 @@ H.run({ maxFrames = 140000 }, {
   logGuards("deployed"),
   logPools("deployed"),
 
-  -- --------------------------------------------------------- the storm --
+  -- ---------------------------------------------------- the wave phase --
   -- hands off; collisions engage whichever squad each march runs into,
   -- tap-A wins each fight, the win path despawns that guard.
   H.advanceStory(function()
@@ -148,7 +148,7 @@ H.run({ maxFrames = 140000 }, {
   logGuards("waves complete"),
 
   -- ------------------------------------------------------- the Marshal --
-  -- the healthier of P2/P3 walks the emptied corridor and pokes him
+  -- the healthier of P2/P3 walks the emptied corridor and engages him
   H.cond(function()
     local c2 = poolOf(2)
     local c3 = poolOf(3)

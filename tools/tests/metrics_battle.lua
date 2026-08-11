@@ -1,21 +1,21 @@
--- metrics_battle: auto-battler balance probe. loads an entry-point state,
--- enters the fight, and PLAYS it with a swappable input policy while
+-- metrics_battle: auto-battler balance probe.  It loads an entry-point state,
+-- enters the fight, and plays it with a swappable input policy while
 -- recording what the balance work needs (docs/design/balance-metrics.md):
--- actions per side, damage split broken/unbroken, bp regen/spends by
--- level, shield chips, breaks, break uptime. no asserts -- the run
--- "passes" whenever the battle resolves or the budget ends; the product
+-- actions per side, damage split broken and unbroken, bp regen and spends by
+-- level, shield chips, breaks, and break uptime.  There are no asserts: the
+-- run passes whenever the battle resolves or the budget ends, and the output
 -- is the report at the bottom of the log, one stat per line, greppable:
 --   [ot6] [metrics] key=value
 --
--- MULTI-ACTOR (2026-07-18). The v1 instrument assumed a SOLO party: the
--- policies asked "what does the character whose menu is open do" but had
--- one answer for everyone, and every stat above was a single scalar. The
--- Figaro->Kolts stretch is Terra + Locke + Edgar (+ Sabin at Vargas), so
+-- Multi-actor (2026-07-18).  The v1 instrument assumed a solo party: the
+-- policies asked what the character whose menu is open does, but had
+-- one answer for everyone, and every stat above was a single scalar.  The
+-- Figaro to Kolts stretch is Terra, Locke and Edgar (plus Sabin at Vargas), so
 -- both halves are now per-actor:
---  * POLICIES are asked per (slot, character): the policy sets the BOOST
---    discipline, the character's KIT (below) picks the action. Terra
+--  * policies are asked per (slot, character): the policy sets the boost
+--    plan, and the character's kit (below) picks the action.  Terra
 --    casts Fire at a revealed fire-weakness, Locke Fights (and Steals to
---    probe), Edgar's Tools carry pierce/poison, Sabin Blitzes.
+--    probe), Edgar's Tools carry pierce and poison, and Sabin Blitzes.
 --  * every stat fans out per party slot: char_actions / char_dmg /
 --    char_chips / char_breaks / char_boosts / char_bp_* / char_dmg_taken.
 --    The aggregate keys keep their old meaning and old name, so logs and
@@ -34,50 +34,50 @@
 --    +8..+$12: cur hp $3bf4 (battle_main.asm:2934) puts monster slot i
 --    at $3bfc+i*2 (the guards: $3c00/$3c02); ot6.asm's shield tables
 --    $3e38/timer $3e88 put monster slots at $3e40/$3e90.
---  * a battle slot's CHARACTER index is $3ed9+slot*2 (battle_main.asm:
+--  * a battle slot's character index is $3ed9+slot*2 (battle_main.asm:
 --    6218 "character index", :11902 "character number"); the character's
 --    own data block is $1600+37c, name at +2, level at +8, the four
 --    battle commands at +$16 (gen_arvis.lua's roster dump).
 --  * executed actions: the battle loop dequeues entity offsets from
 --    three queues (battle_main.asm @0092/@00a6/@0049): advance-wait
 --    $3720 (start ptr $3a64), action $3820 ($3a66), counter $3920
---    ($3a68). ptrs are 8-bit (the loop runs shortai). sampling each
---    START ptr per frame and reading the bytes it walked past counts
---    what actually ran; $ff bytes are removed/cancelled entries (actor
---    died with actions queued) and don't count. offset < 8 = player,
---    and offset/2 is the party slot -- which is what makes the per-
---    character fan-out possible at all.
+--    ($3a68).  The ptrs are 8-bit (the loop runs shortai).  Sampling each
+--    start ptr per frame and reading the bytes it walked past counts
+--    what ran; $ff bytes are removed or cancelled entries (an actor
+--    died with actions queued) and do not count.  An offset below 8 is a
+--    player, and offset/2 is the party slot, which is what makes the
+--    per-character fan-out possible.
 --
--- ATTRIBUTION, and what it can and cannot see:
---  * the battle loop executes exactly ONE dequeued entity's action at a
+-- Attribution, and what it can and cannot see:
+--  * the battle loop executes exactly one dequeued entity's action at a
 --    time (battle_main.asm BattleLoop @0049/@0092/@00a6 each dispatch and
---    return), so the most recently dequeued entity offset IS the actor
---    whose action is running. That shadow (`curActor`) is what credits
---    damage, chips and breaks to a character. This REPLACES v1's
---    victim-only attribution and, as a side effect, makes monster-on-
---    monster damage (muddle) visible instead of silently landing in
---    player_dmg: it is reported separately as monster_self_dmg.
---  * the shadow is FRAME-GRANULAR: the sampler walks the queue pointers
+--    return), so the most recently dequeued entity offset is the actor
+--    whose action is running.  That shadow (`curActor`) is what credits
+--    damage, chips and breaks to a character.  This replaces v1's
+--    victim-only attribution and also makes monster-on-monster damage
+--    (muddle) visible instead of landing in player_dmg: it is reported
+--    separately as monster_self_dmg.
+--  * the shadow is frame-granular: the sampler walks the queue pointers
 --    once per frame, so an event landing in the same frame as the
 --    dequeue that began its action can be credited to the previous
---    actor. Actions run tens of frames, so the exposure is one frame per
+--    actor.  Actions run tens of frames, so the exposure is one frame per
 --    action boundary; char_actions is cross-checked two independent ways
---    (dequeue pairs vs Ot6ActionEnd's per-actor bp write) and the
---    disagreement is reported as bp_action_skew, not hidden.
+--    (dequeue pairs against Ot6ActionEnd's per-actor bp write) and any
+--    disagreement is reported as bp_action_skew rather than hidden.
 --
--- TODO (real gaps, deliberately not guessed around):
+-- TODO (real gaps, not guessed around):
 --  * exact per-hit attribution is still unavailable: ApplyDmg reads the
---    attacker off the STACK (`lda $02,s` -- battle_main.asm:2960), and
+--    attacker off the stack (`lda $02,s`, battle_main.asm:2960), and
 --    the only per-target attacker byte ($32e0,y, _c2362f "save previous
---    attacker" :8662) is a retaliation blacklist written on death, not
---    on every hit. $3406 ("currently acting character/monster" :133) is
---    NOT it either: ExecAction's `sec / ror $3406` (:194) marks it
+--    attacker" :8662) is a retaliation blacklist written on death rather
+--    than on every hit.  $3406 ("currently acting character/monster" :133)
+--    is not it either: ExecAction's `sec / ror $3406` (:194) marks it
 --    invalid on entry and only @01d5 (:290) restores it for actions that
 --    span loop iterations, so it reads negative across the damage
---    frames. Hence the dequeue shadow above.
---  * "immediate" actions ($340a, battle_main.asm @0033) bypass all
---    three queues (battle-start scripts, final attacks). rare in wob
---    trash; uncounted, and they also leave the shadow stale.
+--    frames.  Hence the dequeue shadow above.
+--  * immediate actions ($340a, battle_main.asm @0033) bypass all
+--    three queues (battle-start scripts, final attacks).  They are rare in
+--    WoB trash, are uncounted, and also leave the shadow stale.
 local H = dofile("tools/tests/lib/ot6.lua")
 
 -- ------------------------------------------------------------- knobs --
@@ -90,13 +90,13 @@ local STATE = STATES.entry2
 local ROUNDS = 0                   -- player actions to record; 0 = to the end
 local SETTLE_EXTRA = 0             -- extra pre-arm frames (rng phase jitter)
 local METRICS_FRAMES = 20000       -- metrics-window frame budget
--- BUFF turns the demo entry point (40-hp guards, no party-hittable
--- weakness -> break/boost never engage) into a MEASURABLE fixture:
+-- BUFF turns the demo entry point (40-hp guards, with no party-hittable
+-- weakness, so break and boost never engage) into a measurable fixture:
 -- inject a fire weakness and enough hp that the fight lasts long
--- enough for banking to pay off. this is a stand-in until real
+-- enough for banking to pay off.  This is a stand-in until real
 -- post-magitek states exist; the delta between baseline and boost3
--- here is the first "how much juice" number.
--- (The BUFF_HP / BUFF_FIRE fixture knobs that once lived here are gone --
+-- here is the first measurement of how much boost is worth.
+-- (The BUFF_HP and BUFF_FIRE fixture knobs that once lived here are gone:
 -- both were hard-coded off, so their write branches were dead code, and
 -- issue #75's burn-down deletes dead writes rather than waiving them.)
 
@@ -116,13 +116,13 @@ local ALIVE = 0x3aa8               -- monster presence bit0, +slot*2
 local MSTAT = 0x3eec               -- monster status-1, +slot*2 ($c2 = gone)
 local CHARIX = 0x3ed9              -- battle slot -> character index, +slot*2
 local CHARBLK = 0x1600             -- character data blocks, 37 bytes each
--- dequeue-side action counting (see header). `shadow` marks the queues
--- whose dequeue actually NAMES the running actor: $3820 dispatches
+-- dequeue-side action counting (see header).  `shadow` marks the queues
+-- whose dequeue names the running actor: $3820 dispatches
 -- ExecAction and $3920 dispatches ExecRetal, both of which run an
--- attack. $3720 does NOT -- it dispatches _c22188 (`_gaugefull`,
+-- attack.  $3720 does not: it dispatches _c22188 (`_gaugefull`,
 -- battle_main.asm:5734), the atb-gauge-full handler that only calls
--- QueueAction and sets up a jump, never damage. Letting it move the
--- shadow was measurably wrong: on battle2_entry a Wedge gauge-fill
+-- QueueAction and sets up a jump, never damage.  Letting it move the
+-- shadow was measured wrong: on battle2_entry a Wedge gauge-fill
 -- landed between Terra's action dequeue and Terra's beam, and Terra's
 -- shield chip was credited to Wedge, who had taken no action at all.
 local QUEUES = {
@@ -130,8 +130,8 @@ local QUEUES = {
   { base = 0x3820, ptr = 0x3a66, counter = false, shadow = true },
   { base = 0x3920, ptr = 0x3a68, counter = true,  shadow = true },
 }                                  -- counters land in the per-side totals
-                                   -- TOO; the counter_actions line is a
-                                   -- subset, not a third bucket
+                                   -- too; the counter_actions line is a
+                                   -- subset rather than a third bucket
 
 local function bp(slot) return H.readByte(BP + slot*2) end
 local function pend(slot) return H.readByte(PEND + slot*2) end
@@ -141,8 +141,8 @@ local function monsterAlive(slot)
   return (H.readByte(ALIVE + slot*2) & 0x01) == 1
      and (H.readByte(MSTAT + slot*2) & 0xc2) == 0
 end
--- canonical roster, by character index. The RAM name is the player's (or
--- the intro's: pre-Arvis Terra's name bytes are placeholder glyphs that
+-- canonical roster, by character index.  The RAM name is the player's, or the
+-- intro's (pre-Arvis Terra's name bytes are placeholder glyphs that
 -- decode to nothing), so reports key on the index and only fall back to
 -- RAM when the index is off-roster.
 local ROSTER = {
@@ -162,12 +162,12 @@ local function charName(cix)
   end
   return s == "" and string.format("c%02X", cix) or s
 end
--- The IN-BATTLE command list: $202E + slot*12 + i*3, four [cmd,cmd,
--- targeting] triples. It is indexed by BATTLE SLOT, not by character
--- index -- probed live on battle2_entry, where slot 1 (Wedge, char
--- $0E) reads Magitek/--/--/Item by slot and garbage by char index. It is
+-- The in-battle command list: $202E + slot*12 + i*3, four [cmd,cmd,
+-- targeting] triples.  It is indexed by battle slot rather than by character
+-- index, probed live on battle2_entry, where slot 1 (Wedge, char
+-- $0E) reads Magitek/--/--/Item by slot and garbage by char index.  It is
 -- also the only correct source: a magitek-armor body's battle commands
--- are NOT its character block's (Terra's block says Fight/Morph/Magic/
+-- are not its character block's (Terra's block says Fight/Morph/Magic/
 -- Item, her armor says Magitek/--/Magic/Item), so the character block
 -- would mis-describe every magitek-era fixture.
 local CMDTBL = 0x202e
@@ -178,11 +178,11 @@ local function hasCmd(rec, want)
 end
 
 -- ------------------------------------------------------ menu driving --
--- The battle menu is driven by STATE, not by counting button presses.
+-- The battle menu is driven by state rather than by counting button presses.
 -- $7BC2 is the battle menu state (btlgfx_main.asm:12536 UpdateMenuState
 -- dispatches on it; ot6.asm:1279 and :2728 already read it), so the turn
--- machine below always knows which window is open and presses only in
--- the stable "select" states -- which is also what keeps input out of a
+-- driver below always knows which window is open and presses only in
+-- the stable select states.  That is also what keeps input out of a
 -- just-opening window, the wedge bal_mines.lua:123-127 works around with
 -- timers.
 local MSTATE = 0x7bc2
@@ -190,19 +190,19 @@ local MSTATE = 0x7bc2
 local ST = { root = 0x05, spell = 0x0e, tools = 0x30, magitek = 0x2a,
              item = 0x0a, target = 0x38 }
 
--- HOW A COMMAND IS SELECTED. The command window is a 1-column x 4-row
+-- How a command is selected.  The command window is a 1-column x 4-row
 -- list whose cursor lives at $890F+slot (btlgfx_main.asm:18707/18897,
--- UP=dec DOWN=inc, auto-skipping disabled rows) -- so a cursor walk would
--- have to model which of the four rows are enabled for this actor. It is
--- both simpler and more robust to use battle_class.lua:603-607's proven
--- idiom: write the wanted command into ALL FOUR of the actor's command
--- cells, and whatever row the cursor rests on opens the right window
--- with one 'a'. The poke is per turn into battle scratch that battle
+-- up decrements and down increments, skipping disabled rows), so a cursor
+-- walk would have to model which of the four rows are enabled for this actor.
+-- It is simpler and more robust to use battle_class.lua:603-607's
+-- idiom: write the wanted command into all four of the actor's command
+-- cells, so whatever row the cursor rests on opens the right window
+-- with one 'a'.  The poke is per turn into battle scratch that battle
 -- init rebuilds (InitCmdList, battle_main.asm:13719), so nothing leaks
--- between battles; the ORIGINAL list is read once at arm time and gates
+-- between battles, and the original list is read once at arm time and gates
 -- what a kit may ask for, so this can never hand a character a command
--- they do not own. What it does mean: the instrument measures "this
--- character used this command", not "a human navigated to it" -- menu
+-- they do not own.  What it does mean is that the instrument measures which
+-- command a character used rather than how a human navigated to it; menu
 -- travel is not a balance number.
 --
 -- Command ids: Fight $00, Item $01, Magic $02, Steal $05, Tools $09,
@@ -217,20 +217,21 @@ local function restoreCmds(rec)
   for i = 0, 3 do H.writeByte(CMDTBL + rec.slot*12 + i*3, rec.cmds[i]) end
 end
 
--- SUB-LIST CURSORS. Every battle list shares one movement routine
+-- Sub-list cursors.  Every battle list shares one movement routine
 -- (GetCursorInput, btlgfx_main.asm:19534) over a per-slot (scroll, col,
--- row) triple, so a wanted entry is reached by WRITING that triple
--- rather than by pressing the d-pad toward it -- no wrap rules, no
--- blank-cell walking, no dependence on where the previous turn left the
+-- row) triple, so a wanted entry is reached by writing that triple
+-- rather than by pressing the d-pad toward it, with no wrap rules, no
+-- blank-cell walking, and no dependence on where the previous turn left the
 -- cursor.
 --   spell list  scroll $8913+slot, col $8917+slot, row $891B+slot;
 --               2 columns x 4 visible rows of 27; entries live at
 --               $2092 + SPELLBASE[slot] + i*4 with the spell id at +0 and
---               $FF for "not known" -- the array is fixed-slot and never
+--               $FF for not known.  The array is fixed-slot and never
 --               compacted (ValidateSpellList, battle_main.asm:14228), so
---               the wanted spell is found by scanning, not by arithmetic.
+--               the wanted spell is found by scanning rather than by
+--               arithmetic.
 --   tools list  scroll $895F (always 0), col $8963+slot, row $8967+slot;
---               2 columns x 4 rows, entries PACKED at $4005 + i*3.
+--               2 columns x 4 rows, with entries packed at $4005 + i*3.
 local SPELLBASE = { [0] = 0x0000, [1] = 0x013c, [2] = 0x0278, [3] = 0x03b4 }
 local function magicCursor(slot, spellId)
   local base = 0x2092 + SPELLBASE[slot]
@@ -259,21 +260,21 @@ local function toolsCursor(slot, itemId)
 end
 
 -- ------------------------------------------------------------- kits --
--- What a character DOES with a turn, independent of the boost discipline
--- the policy sets. An entry is { tag, cmd, pick = <cursor setter>,
+-- What a character does with a turn, independent of the boost plan
+-- the policy sets.  An entry is { tag, cmd, pick = <cursor setter>,
 -- mp = <mp floor>, want = <condition> }; the first entry whose command the
--- actor actually owns and whose condition passes is taken, so a kit reads as a
--- preference ladder and an actor without the command falls through to the
+-- actor owns and whose condition passes is taken, so a kit reads as a
+-- preference list and an actor without the command falls through to the
 -- next line.
 --
--- KITS[character index] = that ladder. Written for the whole
--- Figaro->Kolts party; a fixture only exercises the members it carries,
--- and the report's char_plan line says which lines actually fired.
+-- KITS[character index] is that list.  It is written for the whole
+-- Figaro to Kolts party; a fixture only exercises the members it carries,
+-- and the report's char_plan line says which lines fired.
 local SPELL = { fire = 0x00, cure = 0x2d }
 local TOOL  = { autocrossbow = 0xaa, bioblaster = 0xa4 }  -- item_name_en.json
 local BLITZ = { pummel = 0x5d, aurabolt = 0x5e }          -- resolved attack ids
 local KITS = {
-  -- TERRA: Fire is the party's elemental probe and its weakness nuke.
+  -- TERRA: Fire is the party's elemental probe and its weakness damage.
   [0x00] = { name = "TERRA",
     { tag = "fire", cmd = CMD.magic, mp = 4, want = "weak_fire",
       pick = function(slot) return magicCursor(slot, SPELL.fire) end },
@@ -283,14 +284,14 @@ local KITS = {
     -- in magitek armor she has no Fight at all; the beam is the swing
     { tag = "tek", cmd = CMD.magitek },
   },
-  -- LOCKE: a pierce Fight is his chip; Steal is his opening probe turn.
+  -- LOCKE: a pierce Fight is his chip, and Steal is his opening probe turn.
   [0x01] = { name = "LOCKE",
     { tag = "steal", cmd = CMD.steal, want = "probe_turn" },
     { tag = "fight", cmd = CMD.fight },
   },
-  -- EDGAR: BioBlaster carries poison, AutoCrossbow is pierce AND
+  -- EDGAR: BioBlaster carries poison, and AutoCrossbow is pierce and
   -- multi-hit, so it chips per hit (weapon-classes.md "Multi-hit actions
-  -- chip per hit"). UNEXERCISED: no fixture carries Edgar yet, so the
+  -- chip per hit").  Unexercised: no fixture carries Edgar yet, so the
   -- tools-cursor path is written from the window shape the disassembly
   -- gives (btlgfx_main.asm:20607) and has never been driven.
   [0x04] = { name = "EDGAR",
@@ -300,10 +301,10 @@ local KITS = {
       pick = function(slot) return toolsCursor(slot, TOOL.autocrossbow) end },
     { tag = "fight", cmd = CMD.fight },
   },
-  -- SABIN: Blitz is a menu now (v0.3) -- it reuses the Tools window shell
-  -- (state $30), rows PACKED at $4005 like the tools list but keyed by the
-  -- resolved attack id, so it points at a cell exactly like a tool.
-  -- UNEXERCISED for the same reason as Edgar; flagged, not assumed.
+  -- SABIN: Blitz is a menu now (v0.3), reusing the Tools window shell
+  -- (state $30), with rows packed at $4005 like the tools list but keyed by
+  -- the resolved attack id, so it points at a cell as a tool does.
+  -- Unexercised for the same reason as Edgar, and marked rather than assumed.
   [0x05] = { name = "SABIN",
     { tag = "blitz", cmd = CMD.blitz,
       pick = function(slot) return toolsCursor(slot, BLITZ.pummel) end },
@@ -328,33 +329,36 @@ local function anyRevealed(mask)
 end
 
 -- ---------------------------------------------------------- policies --
--- a policy is a function(slot) -> boost target for THIS actor's turn, or
--- nil for "no boost". The kit picks the action; the policy picks how much
--- bp rides on it. Both are consulted per actor as their menu opens, so a
+-- a policy is a function(slot) -> boost target for this actor's turn, or
+-- nil for no boost.  The kit picks the action and the policy picks how much
+-- bp rides on it.  Both are consulted per actor as their menu opens, so a
 -- party plays three different characters under one named policy.
 local S                            -- accumulators (reset in resetRun)
 local C = {}                       -- per-slot character records
 local bySlot = {}                  -- slot -> C entry
 
 local POLICIES = {}
--- baseline: confirm through every menu unboosted. vanilla-speed play;
--- the denominator for every boost comparison.
+-- baseline: confirm through every menu unboosted.  This is vanilla-speed
+-- play, and the denominator for every boost comparison.
 POLICIES.baseline = { boost = function() return 0 end, probe = false }
--- boost3: bank bp on plain turns, and the moment 3 are spendable,
--- commit all 3 (fold to tier 3 / x8) and fire into the best-known
--- weakness. the always-boost-3 numerator: maximum per-action throughput.
+-- boost3: bank bp on plain turns, and as soon as 3 are spendable,
+-- commit all 3 (fold to tier 3, x8) and fire into the best-known
+-- weakness.  This is the always-boost-3 numerator: maximum per-action
+-- throughput.
 POLICIES.boost3 = { boost = function(slot)
   return bp(slot) >= 3 and 3 or 0
 end, probe = true }
--- greedy: spend whatever is there, every turn (in practice a stream of
--- 1-boosts after the opener). the "player who never banks" datapoint.
+-- greedy: spend whatever is there, every turn, which in practice is a stream
+-- of 1-boosts after the opener.  This is the datapoint for a player who never
+-- banks.
 POLICIES.greedy = { boost = function(slot)
   return bp(slot) >= 1 and math.min(bp(slot), 3) or 0
 end, probe = true }
--- badboost (Measurement #5's negative control): bank to 3, then dump the
--- boost into a plain Fight -- i.e. deliberately into a shielded, unweak
--- target, the misplay the resistance constant is tuned to punish. Never
--- probes, never casts: `probe = false` forces the kit's Fight fallback.
+-- badboost (Measurement #5's negative control): bank to 3, then spend the
+-- boost on a plain Fight, that is, on a shielded and unweak
+-- target, which is the play the resistance constant is tuned to punish.  It
+-- never probes and never casts: `probe = false` forces the kit's Fight
+-- fallback.
 POLICIES.badboost = { boost = function(slot)
   return bp(slot) >= 3 and 3 or 0
 end, probe = false, force = "fight" }
@@ -393,8 +397,8 @@ end
 local function newChar(slot)
   local cix = H.readByte(CHARIX + slot*2)
   local kit = KITS[cix] or FALLBACK_KIT
-  -- the UNPOKED battle command list: read once, before any turn rewrites
-  -- it, and never re-read. It is both the check on what the kit may ask
+  -- the unpoked battle command list: read once, before any turn rewrites
+  -- it, and never re-read.  It is both the check on what the kit may ask
   -- for and the value restored at teardown.
   local cmds = {}
   for i = 0, 3 do cmds[i] = battleCmd(slot, i) end
@@ -412,14 +416,14 @@ local function newChar(slot)
 end
 
 -- ------------------------------------------------- turn state machine --
--- One "episode" per open menu. The driver decides (boost target, kit
--- entry) once when the menu opens, then reacts to $7BC2: raise pending
+-- One episode per open menu.  The driver decides the boost target and kit
+-- entry once when the menu opens, then reacts to $7BC2: raise pending
 -- with R at the root, open the poked command with A, place the sub-list
--- cursor by writing it, confirm, confirm the target. Every press is
+-- cursor by writing it, confirm, and confirm the target.  Every press is
 -- gated on a stable select state, so an input can never land in a
--- window that is still opening -- the wedge bal_mines.lua:123-127 has to
--- dodge with timers. `nudge` is the only fallback left: if a state
--- persists far longer than a menu ever should, back out with B and
+-- window that is still opening, which is the wedge bal_mines.lua:123-127
+-- avoids with timers.  `nudge` is the only fallback left: if a state
+-- persists much longer than a menu should, back out with B and
 -- replan.
 local ep = { slot = nil, entry = nil, want = 0, placed = false, pulses = 0 }
 
@@ -431,7 +435,7 @@ end
 -- is this kit entry playable for this actor, under this policy, now?
 local function entryOk(rec, entry, pol)
   -- a policy that forces one tag (badboost) may only take that tag or
-  -- the Fight fallback -- it must never wander into a weakness
+  -- the Fight fallback; it must never end up using a weakness
   if pol.force and entry.tag ~= pol.force and entry.tag ~= "fight" then
     return false
   end
@@ -440,16 +444,16 @@ local function entryOk(rec, entry, pol)
   if entry.want == "weak_fire" then return pol.probe and anyRevealed(0x01) end
   if entry.want == "weak_poison" then return pol.probe and anyRevealed(0x20) end
   if entry.want == "probe_turn" then
-    -- THE information turn: this actor's opening move, taken only while
-    -- the board is still unread. It covers both kinds of probe, because
-    -- the predicate is the same for both -- Locke's Steal (information
+    -- the information turn: this actor's opening move, taken only while
+    -- the board is still unread.  It covers both kinds of probe, because
+    -- the predicate is the same for both: Locke's Steal (information
     -- and loot) and Terra's Fire (information and damage).
     --
-    -- The element half is the one a first draft forgot, and it matters:
-    -- an elemental weakness is only REVEALED by hitting it, so a kit
-    -- that casts Fire "once fire is revealed" never casts Fire at all.
-    -- Measured -- 6/6 world-pool fights against a fire-weak monster with
-    -- Terra casting zero times. One probe per actor, then stop: if the
+    -- The element half is the one a first draft missed, and it matters:
+    -- an elemental weakness is only revealed by hitting it, so a kit
+    -- that casts Fire once fire is revealed never casts Fire at all.
+    -- Measured: 6 of 6 world-pool fights against a fire-weak monster with
+    -- Terra casting zero times.  One probe per actor, then stop: if the
     -- probe revealed nothing there is nothing to exploit and the MP is
     -- better kept, which is bal_mines.lua's probe1 rotation per
     -- character.
@@ -522,21 +526,21 @@ local function pulse()
 end
 
 -- -------------------------------------------------- event watchers --
--- chips and breaks are WRITE events, not per-frame states: a boosted
+-- chips and breaks are write events rather than per-frame states: a boosted
 -- multi-hit can chip more than once between frames, and a break's
--- 0 -> OT6_BREAK_TICKS store is the only unambiguous "break happened"
--- signal (per-frame timer>0 also sees mid-window decrements).
+-- 0 -> OT6_BREAK_TICKS store is the only unambiguous signal that a break
+-- happened (a per-frame timer>0 also sees mid-window decrements).
 --
--- The callbacks do NOT attribute; they only QUEUE. A write callback
+-- The callbacks do not attribute; they only queue.  A write callback
 -- fires the instant the store executes, mid-frame, whereas the sampler
--- reads the dequeue pointers at the next frame boundary -- so a chip
+-- reads the dequeue pointers at the next frame boundary, so a chip
 -- landing in the same frame as the dequeue that began its action would
--- see a stale shadow. Measured, not theorised: on battle2_entry that
+-- see a stale shadow.  Measured rather than assumed: on battle2_entry that
 -- lost Terra's opening chip to "unattributed" every run while her damage
--- attributed correctly one frame later. Queuing the event and draining it
--- in the sampler AFTER the queue walk puts both on the same shadow. The
--- callback body stays a table insert -- no emu API, no logging, so the
--- lib's callback-logging crash suspicion is not provoked.
+-- attributed correctly one frame later.  Queuing the event and draining it
+-- in the sampler after the queue walk puts both on the same shadow.  The
+-- callback body stays a table insert, with no emu API and no logging, so the
+-- library's callback-logging crash suspicion does not apply.
 local function arm()
   S.t0 = H.frame
   for i = 0, 5 do
@@ -565,9 +569,9 @@ local function arm()
     local prev = tmSeen[slot]
     tmSeen[slot] = value
     if prev == 0 and value > 0 then
-      -- pure accumulation only: printing from inside a memory callback
-      -- is unproven here (the lib flags callback logging as a crash
-      -- suspect); break_frames in the report carries the same info
+      -- accumulation only: printing from inside a memory callback
+      -- is untested here (the library flags callback logging as a crash
+      -- suspect), and break_frames in the report carries the same info
       S.breaks = S.breaks + 1
       local at = H.frame - S.t0
       S.breakFrames[#S.breakFrames + 1] = at
@@ -584,16 +588,16 @@ local function disarm()
 end
 
 -- ------------------------------------------------- per-frame sampler --
--- runs as the metrics drive's predicate, so it fires EVERY frame while
--- the policy plays. hp and bp move at most once per entity per frame
--- (one store per action-end / damage-apply), so frame deltas lose
+-- runs as the metrics drive's predicate, so it fires every frame while
+-- the policy plays.  hp and bp move at most once per entity per frame
+-- (one store per action-end or damage-apply), so frame deltas lose
 -- nothing there; the sampler also walks the dequeue pointers and calls
 -- the stop conditions.
 --
--- ORDER MATTERS: the queue walk runs FIRST so an action dequeued last
+-- The order matters: the queue walk runs first so an action dequeued last
 -- frame owns the damage that landed after it, and only then are the hp
--- deltas read. That is what makes curActor the right actor for the
--- deltas being attributed in the same pass.
+-- deltas read.  That is what makes curActor the right actor for the
+-- deltas attributed in the same pass.
 local function sample()
   S.frames = H.frame - S.t0
   for qi, q in ipairs(QUEUES) do
@@ -602,25 +606,25 @@ local function sample()
       local v = H.readByte(q.base + qShadow[qi])
       if (v & 0x80) == 0 then
         -- the executing entity: one action runs at a time, so the last
-        -- ACTION-dispatching dequeue names the actor until the next one
-        -- (header note; the advance-wait queue is deliberately not one)
+        -- action-dispatching dequeue names the actor until the next one
+        -- (see the header; the advance-wait queue is not one of them)
         if q.shadow then
           curActor = v
           curSlot = (v < 8) and (v // 2) or nil
         end
-        -- each real action passes through TWO queues (advance-wait +
-        -- action), so raw dequeues run exactly 2x real actions.
-        -- player_actions/enemy_actions emit REAL actions: every second
-        -- dequeue of a side credits one. counter_actions stays a raw
-        -- counter-queue dequeue tally (subset diagnostics).
+        -- each real action passes through two queues (advance-wait and
+        -- action), so raw dequeues run at exactly 2x real actions.
+        -- player_actions and enemy_actions emit real actions: every second
+        -- dequeue of a side credits one.  counter_actions stays a raw
+        -- counter-queue dequeue tally, for diagnostics.
         if q.counter then S.counterActions = S.counterActions + 1 end
         if v < 8 then
           S.playerDequeues = S.playerDequeues + 1
           if S.playerDequeues % 2 == 0 then
             S.playerActions = S.playerActions + 1
           end
-          -- the same every-2nd rule PER SLOT: each actor contributes its
-          -- own advance-wait + action pair, so the per-slot counters sum
+          -- the same every-second rule per slot: each actor contributes its
+          -- own advance-wait and action pair, so the per-slot counters sum
           -- to player_actions (asserted as actions_sum in the report)
           local rec = bySlot[v // 2]
           if rec then
@@ -677,7 +681,7 @@ local function sample()
   end
   if anyBroken then S.brokenUptime = S.brokenUptime + 1 end
   for _, c in ipairs(C) do
-    -- damage TAKEN needs no shadow: the victim is the slot being read
+    -- damage taken needs no shadow: the victim is the slot being read
     local hp = H.readWord(PHP + c.slot*2)
     if hp < c.hp then
       S.enemyDmg = S.enemyDmg + (c.hp - hp)
@@ -784,9 +788,9 @@ local function report()
     return string.format("%d/%d/%d", c.boosts[1], c.boosts[2], c.boosts[3]) end))
   mline("char_bp_spent", charCsv(function(c) return c.bpSpent end))
   mline("char_bp_regen", charCsv(function(c) return c.regens end))
-  -- start/end bp explain bp_action_skew: Ot6ActionEnd's regen branch is
+  -- start and end bp explain bp_action_skew: Ot6ActionEnd's regen branch is
   -- `cmp #$05 / bcs done` (ot6.asm:1552), so an actor already at the cap
-  -- ends its action with NO bp write and the cross-check under-counts
+  -- ends its action with no bp write and the cross-check under-counts
   mline("char_bp_start", charCsv(function(c) return c.bp0 end))
   mline("char_bp_end", charCsv(function(c) return c.bp end))
   mline("char_dmg_taken", charCsv(function(c) return c.taken end))
@@ -804,9 +808,9 @@ local function report()
   -- reader having to add them up. `dmg_residual` is player_dmg minus
   -- everything attributed; `bp_action_skew` is the independent
   -- cross-check on char_actions (Ot6ActionEnd writes bp once per
-  -- character action -- ot6.asm:1529 -- except when bp is already
+  -- character action, ot6.asm:1529, except when bp is already
   -- capped at 5, so a nonzero skew is expected late in long fights and
-  -- a LARGE one means the dequeue pairing is wrong).
+  -- a large one means the dequeue pairing is wrong).
   local aSum, dSum, cSum, bSum, tSum, wSum = 0, 0, 0, 0, 0, 0
   for _, c in ipairs(C) do
     aSum = aSum + c.actions

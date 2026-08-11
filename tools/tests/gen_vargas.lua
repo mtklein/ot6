@@ -1,36 +1,36 @@
--- gen_vargas.lua -- from vargas_entry.mss: FIGHT VARGAS FOR REAL, ride
+-- gen_vargas.lua -- from vargas_entry.mss: fight Vargas with real input, ride
 -- the reunion, and generate vargas_won.mss on the first controllable frame
--- after it.  The last tier-2 link in the generated chain, and the first
--- boss in the chain of generated savestates won by an actual strategy under
--- issue #75's rule: inputs in, observations out, zero writes to emulated
+-- after it.  This is the last tier-2 link in the generated chain, and the
+-- first boss in the chain of generated savestates won by a played strategy
+-- under issue #75's rule: inputs in, observations out, no writes to emulated
 -- game state.  The old generator pinned party HP/MP every frame, clamped
 -- Vargas to 10300 to force his phase-2 event, and poked the Blitz cursor
 -- cells; all of that is gone.
 --
--- THE FIGHT (bosses-wob.md section 3, both human playtests loved it):
+-- The fight (bosses-wob.md section 3, which both human playtests rated well):
 -- Vargas (11600 hp, 5 shields, weak poison|holy + bludgeoning) plus two
 -- Ipoohs (360 hp, 2 shields, slash-weak).  Two phases; only the second
 -- has SABIN in it.  His turns start after Vargas's own reaction script
 -- runs `battle_event $07` at hp <= 10880 and `$08` at hp <= 10368
--- (ai_script.asm:4392-4404) -- REAL damage has to cross those gates now.
+-- (ai_script.asm:4392-4404), so real damage has to cross those thresholds.
 -- The kill is Pummel: the script answers `if_attack PUMMEL` with
--- `battle_event $09 / kill_monsters ALL` (:4385-4388); he dies to the
--- script, not to hp, which is the story's point ("Jank: the Blitz gate
--- stays").
+-- `battle_event $09 / kill_monsters ALL` (:4385-4388), so he dies to the
+-- script rather than to hp, which is the intended design ("Jank: the Blitz
+-- gate stays").
 --
--- THE STRATEGY, all closed-loop on readable menu state (every cell below
+-- The strategy, all closed-loop on readable menu state (every cell below
 -- was located in btlgfx_main.asm and verified live by probe runs):
 --   * the trio spends Boost Points on Fights: R presses raise pending
 --     ($3E9D+slot, bank $3E9C+slot, cap 3) and a boosted Fight is what
 --     killed both Ipoohs in about a round each, measured;
 --   * Potions (bag carries 3; battle inventory $2686, 5 bytes/entry, qty
 --     at +3) go to whoever is under 30% -- selected in the item window
---     (mstate $0A, row cursor $894F), aimed through the REAL target
+--     (mstate $0A, row cursor $894F), aimed through the real target
 --     cursor ($38: char mask $7B7D / monster mask $7B7E, walked with the
 --     pad until the mask is the wanted ally);
 --   * TERRA plays medic once the potions thin out: Magic (her cmd cell,
 --     found in $202E and reached by the command cursor $890F+slot) ->
---     Cure -- her battle spell list is PACKED at $2092+$0278 (4
+--     Cure.  Her battle spell list is packed at $2092+$0278 (4
 --     bytes/entry: id, flags bit7=disabled, targeting, cost), Cure ($2D)
 --     is entry 0, grid cell (idx//2, idx%2) via the magic cursor triple
 --     $8913/$8917/$891B+slot -- aimed at the weakest hurt ally;
@@ -39,30 +39,29 @@
 --     and reached by walking the real cursor triple $895F/$8963/$8967 --
 --     pad edges only, then A, then A on the target.  No cell is ever
 --     written; every press is verified by re-reading the cursor.
--- Timing note the whole machine leans on: submenus (item/magic/tools/
--- target) FREEZE battle time (wait-mode), the command list does not --
+-- Timing note the whole machine depends on: submenus (item/magic/tools/
+-- target) freeze battle time (wait-mode) and the command list does not,
 -- so menu navigation is safe however long it takes, and the fight's
--- danger lives only in the open field between menus.
+-- risk is confined to the open field between menus.
 --
--- MEASURED (probe_vargas_win2/win5 off the tier-2 fixture): the policy
+-- Measured (probe_vargas_win2/win5 off the tier-2 fixture): the policy
 -- wins in ~13000 battle frames.  Both Ipoohs die to boosted Fights by
 -- ~f3300; three potions and two Cures carry the trio through Gale Cut;
 -- Vargas crosses his own script's gates at real hp (11600 -> 10304); the
 -- trio is blown offstage; Sabin's first menu picks Pummel from the real
 -- blitz list and the script ends the fight.  Terra fell to a Gale Cut
--- burst in both winning runs -- a real player's scar, and the fixture
--- keeps it if it happens: the roster dump below records what the party
--- actually looked like.
+-- burst in both winning runs; the fixture keeps that outcome if it happens,
+-- and the roster dump below records what the party looked like.
 --
--- THE RETRY LADDER is the game's own defeat flow made explicit: the
--- entry point is captured ONCE at boot (a savestate blob in memory, zero
+-- The retry ladder is the game's own defeat flow made explicit: the
+-- entry point is captured once at boot (a savestate blob in memory, with no
 -- writes); a party wipe tears the battle down into Game Over instead of
 -- the reunion, the attempt's post-fight ride times out on "map 98, calm,
 -- SABIN in the party", and the next attempt reloads the entry point blob
--- and idles a different number of frames before the opening A-press --
--- shifting every RNG draw downstream.  Four attempts, then fail loudly.
+-- and idles a different number of frames before the opening A-press,
+-- shifting every RNG draw downstream.  Four attempts, then fail.
 --
--- THE GENERATE IS VERIFIED BY RELOAD (gen_sabin_gau's discipline): capture,
+-- The generate is verified by reload (gen_sabin_gau's discipline): capture,
 -- reload the capture as the consumer timeline, give it 300 frames, and
 -- require the same calm map-98 field before accepting the blob.
 local H = dofile("tools/tests/lib/ot6.lua")
@@ -135,7 +134,7 @@ end
 -- and whenever the menu closes; the plan is decided once per fresh menu
 -- from live reads.  Presses are 5-on/5-off edges; every cursor move is
 -- verified by re-reading the cell it targets, and a watchdog backs out
--- with B and falls back to a plain Fight rather than wedging.
+-- with B and falls back to a plain Fight rather than stalling.
 local M = {}
 local function resetM()
   M.actor, M.n, M.plan, M.via, M.d = nil, 0, nil, nil, 0
@@ -197,8 +196,8 @@ local function pulse()
       end
       return (ph < 5) and { "a" } or {}
     end
-    -- move the command cursor; a direction that provably moves nothing
-    -- rotates to the next, so the window's d-pad semantics are never
+    -- move the command cursor; a direction that is measured not to move
+    -- rotates to the next, so the window's d-pad semantics are not
     -- assumed
     local DIRS = { "down", "up", "left", "right" }
     if ph == 0 then
@@ -317,7 +316,7 @@ local function fightAttempt(n)
       sabinPummeled = false
       for k in pairs(healBusy) do healBusy[k] = nil end
     end),
-    -- ONE interaction -> the scene -> battle 66
+    -- one interaction -> the scene -> battle 66
     H.driveUntil(function() return H.battleLoadStarted() end, 20000, {
       H.call(function()
         aPh = (aPh + 1) % 8
@@ -331,7 +330,7 @@ local function fightAttempt(n)
       H.assertEq(H.readWord(0x57C0), VARGAS, "VARGAS ($0103) leads the formation")
       H.log("[vargas seed]" .. hpLine())
     end),
-    -- play it to teardown -- win or wipe, the pred is the same
+    -- play it to teardown; the pred is the same for a win or a wipe
     (function()
       local hb = -600
       return H.driveUntil(function()
@@ -357,8 +356,8 @@ local function fightAttempt(n)
       H.log(string.format("[vargas] teardown at f%d (pummeled=%s)",
         H.frame, tostring(sabinPummeled)))
     end),
-    -- the verdict: a WIN rides _ca828f's tail to a settled map-98 field
-    -- with SABIN in the party; a WIPE rides the defeat flow to Game Over
+    -- the verdict: a win rides _ca828f's tail to a settled map-98 field
+    -- with SABIN in the party; a wipe rides the defeat flow to Game Over
     -- and this soft-bounded ride gives up instead of erroring.
     (function()
       local calmN, giveUp = 0, 0
@@ -431,8 +430,8 @@ end
 H.run({ maxFrames = 700000 }, {
   H.loadState(DOOR),
   H.waitFrames(30),
-  -- capture the entry point ONCE: the retry ladder's rewind point.  The blob
-  -- is this boot's own state -- nothing is written to the game.
+  -- capture the entry point once: the retry ladder's rewind point.  The blob
+  -- is this boot's own state, and nothing is written to the game.
   (function()
     local req
     return H.cond(function() return true end, {
@@ -458,15 +457,15 @@ H.run({ maxFrames = 700000 }, {
   H.waitFrames(30),
 
   -- ===================================================================== --
-  -- PICK THE PARTY UP.  TERRA falls to a Gale Cut burst in most winning
-  -- runs -- a real scar, and this generator has always kept it -- but
-  -- "keep the scar" was only ever forced by an empty bag: until gen_kolts
+  -- Heal the party.  TERRA falls to a Gale Cut burst in most winning
+  -- runs, and this generator keeps that outcome, but leaving her down was
+  -- only ever a consequence of an empty bag: until gen_kolts
   -- started shopping there was no Fenix Down within three chapters of
-  -- here, so the party walked into the Returner caves carrying a corpse
-  -- because nothing could raise her, not because a player would.  A player
-  -- raises her on the spot.  H.fieldCare does it through the real Item
-  -- windows, threshold 0.9, and it is a no-op that does not even open the
-  -- menu if the fight happened to end clean.
+  -- here, so the party walked into the Returner caves with her dead
+  -- because nothing could raise her, not because a player would leave her.
+  -- A player raises her immediately.  H.fieldCare does that through the real
+  -- Item windows, threshold 0.9, and it is a no-op that does not open the
+  -- menu if the fight ended with no casualties.
   H.fieldCare({ tag = "post-vargas care", threshold = 0.9 }),
 
   -- ===================================================================== --
@@ -479,7 +478,7 @@ H.run({ maxFrames = 700000 }, {
     H.assertEq(H.battleLoadStarted(), false, "no battle")
     H.assertEq((H.readByte(0x1855) & 0x07) ~= 0, true,
       "SABIN is in the party ($1855)")
-    -- and the whole party walks out of here on its feet
+    -- and the whole party leaves here alive
     for _, c in ipairs(H.partyMembers()) do
       H.assertEq(H.charHp(c) > 0, true,
         string.format("char %d leaves Mt. Kolts alive", c))

@@ -1,18 +1,18 @@
--- probe_train_tail.lua -- what happens AFTER the minecart's sixth fight.
+-- probe_train_tail.lua -- what happens after the minecart's sixth fight.
 --
 -- gen_n128's first run rode `cutscene TRAIN` correctly: six battles in
--- order, the last one formation `010B 0140 292A 013F` -- NUMBER 128 with
--- both blades -- and then the run wedged.  From ~frame 8800 to the 80000
+-- order, the last one formation `010B 0140 292A 013F`, which is Number 128
+-- with both blades, and then the run wedged.  From ~frame 8800 to the 80000
 -- budget the state never changed: map id 0, worldMode true, hasControl
 -- false, no battle.  Map 240 never loaded and $0069 never set.
 --
--- Two candidate causes, and they need different fixes, so this measures
--- rather than guesses:
---   (a) the party was WIPED and the game is sitting on GAME OVER / the
+-- Two candidate causes, which need different fixes, so this probe measures
+-- which:
+--   (a) the party was wiped and the game is sitting on game over or the
 --       title screen.  The Makefile's tier-3 notes already record that
---       shape -- "battles 15/16/17 are each WON BY TAP-A (battle-clear
---       write -> GameOver softlock)" -- and this fight is LOCKE ALONE, so
---       it is the obvious suspect;
+--       shape ("battles 15/16/17 are each WON BY TAP-A (battle-clear
+--       write -> GameOver softlock)"), and this fight is Locke alone, so
+--       it is the leading candidate;
 --   (b) the train script never reached its `$ff` item, so TrainCmd_ff's
 --       `stz $f0 / stz $22 / inc $19` (world/train_script.asm:951-957)
 --       never ran and the cutscene is still nominally live.
@@ -20,7 +20,7 @@
 -- Distinguishing evidence dumped below: party battle HP ($3BF4), the
 -- field character HP table ($1609 + 37*c), the raw map word $1F64, the
 -- fade/exit byte $19, the event PC {$e5,$e6,$e7}, screen brightness, and
--- screenshots -- a GAME OVER or title screen is unmistakable in a shot.
+-- screenshots; a game over or title screen is identifiable in a screenshot.
 local H = dofile("tools/tests/lib/ot6.lua")
 
 local function map() return H.mapId() & 0x1ff end

@@ -12,8 +12,9 @@ this into a general folklore-driven bug-fix sweep."
 
 ## Method, and why the list is short
 
-FF6 bug lore is enormous and much of it describes the **v1.1 (rev 1) US ROM**,
-the Japanese ROM, or fan retranslations — not our base. OT6 builds US **1.0**:
+There is a large body of FF6 bug lore, and much of it describes the
+**v1.1 (rev 1) US ROM**, the Japanese ROM, or fan retranslations rather than
+OT6's base. OT6 builds US **1.0**:
 
 - `Makefile:2` pins SHA-1 `4f37e4274ac3b2ea1bedb08aa149d8fc5bb676e7`.
 - `ff6/Makefile:285` builds with `-D ROM_VERSION=0`, so
@@ -23,17 +24,17 @@ Two rules were applied:
 
 1. **Confirmed** means the defect is visible in instructions or data under
    `ff6/`, cited by file and line. Everything else is in
-   [REPORTED, UNVERIFIED](#reported-unverified) with a note on what would
+   [Reported, unverified](#reported-unverified) with a note on what would
    settle it.
-2. **Destructive** means it clears #13's bar. Being a bug is not enough.
-   Cosmetic garbage, wrong tables that only change a shake pattern, dead code,
+2. **Destructive** means it clears #13's bar; being a bug is not sufficient.
+   Cosmetic defects, wrong tables that only change a shake pattern, dead code,
    and balance oddities stay.
 
-### The single most useful evidence source
+### The main evidence source
 
 The vendored disassembly encodes every US rev-1 change as a
-`.if LANG_EN_REV1` block. That is *Square's own list* of what they thought was
-worth fixing between 1.0 and 1.1, expressed as code. There are exactly **12**
+`.if LANG_EN_REV1` block. That is Square's own list of what they thought was
+worth fixing between 1.0 and 1.1, expressed as code. There are exactly 12
 such sites, and all 12 are in one file:
 
 ```
@@ -45,15 +46,15 @@ ff6/src/btlgfx/btlgfx_main.asm:4229, 4261, 5102, 5125, 5166, 5188,
 Of those, **five** (`5188`, `5199`, `5255`, `5291`, `47880`) are the Sketch
 guard and its supporting restructure; one (`32872`) is a raster-timing
 hardening; the rest are a graphics-routine reorganization. Nothing outside
-`btlgfx` was changed for rev 1. That is a strong negative result: the famous
-"1.0 is the buggy one" reputation is, in code terms, almost entirely about the
+`btlgfx` was changed for rev 1, which is a strong negative result: in code
+terms, the "1.0 is the buggy one" reputation is almost entirely about the
 Sketch path.
 
 ---
 
 ## Summary
 
-Confirmed in source but **below the bar or not player-reachable** — recorded so
+Confirmed in source but **below the bar or not player-reachable**, recorded so
 they are not rediscovered and re-argued:
 
 | # | Defect | Why it does not qualify |
@@ -70,7 +71,7 @@ they are not rediscovered and re-argued:
 | 12 | `InitTask` / Colosseum self-branch hang traps | Confirmed traps, triggers undemonstrated; the Colosseum one is post-WoB. |
 | 13 | `InitSkills` `$2020 = $ff`; `BitToTargetID` `Y = $fe` | One-byte out-of-bounds *reads*. No write, no fault. Cosmetic. |
 
-Everything else that came up is in [REPORTED, UNVERIFIED](#reported-unverified).
+Everything else that came up is in [Reported, unverified](#reported-unverified).
 
 ---
 
@@ -111,9 +112,9 @@ random encounter. By the time the Veldt is reachable the bitmap has dozens of
 bits.
 
 **Classification: confirmed no-termination loop, no vanilla path to it.** It is
-a live hazard for **OT6 fixtures**, though: a savestate or generated fixture
+a hazard for **OT6 fixtures**: a savestate or generated fixture
 that warps a party onto a Veldt sector without the encounter history that
-populates the bitmap hangs the headless test runner with no error — precisely
+populates the bitmap hangs the headless test runner with no error, which is
 the "quiet test" failure mode `CONTRIBUTING.md` warns about.
 
 ### 4. `SetControlCmd` builds a WRAM write address from an unguarded index
@@ -146,9 +147,9 @@ data.** The only way a monster runs a character command is AI command `$f4`
 command byte), and every vanilla `cmd` in `ff6/src/battle/ai_script.asm` is
 `STEAL`, `CAPTURE`, `JUMP`, or `GP_RAIN`.
 
-**This is the single most important entry for OT6.** OT6 authors enemy AI and
+**This is the most important entry for OT6.** OT6 authors enemy AI and
 boss contracts through every remaining milestone. `cmd CONTROL` in an authored
-script is an arbitrary WRAM write, silently.
+script is a silent arbitrary WRAM write.
 
 ### 5. `BattleEnd_02` calls `RemoveChar` without the guard its siblings use
 
@@ -178,8 +179,8 @@ which is save-block data.
 `ff6/src/battle/battle_main.asm:9626-9627`), Leap is command `$11` with flags
 `NONE` in `ff6/src/battle/battle_cmd_prop.asm:95-96` (not Gogo-assignable, not
 Mimic-able), and the confusion table cannot select it. So Gau's presence is
-guaranteed — by data, not by code. Another hazard for OT6 kit authoring, though
-OT6 has retired Leap outright (`docs/design/kits.md`).
+guaranteed by data rather than by code. This is another hazard for OT6 kit
+authoring, though OT6 has retired Leap (`docs/design/kits.md`).
 
 ### 6. `OptimizeCharEquip` has a hard hang trap
 
@@ -199,8 +200,8 @@ OptimizeCharEquip:
 ```
 
 Reached from event command `$9c` (`ff6/src/field/event.asm:3674-3681`). If the
-named character is not in one of the four active party slots, the game hangs
-hard — reset, and everything since the last save is gone.
+named character is not in one of the four active party slots, the game hangs;
+the only recovery is a reset, which loses everything since the last save.
 
 Vanilla never triggers it: both real call sites do `char_party X, 1`
 immediately before (`ff6/src/event/event_main.asm:15933-15934` at the Figaro
@@ -210,8 +211,8 @@ flashback). The only other uses are in the DEBUG new-game block
 
 **Classification: not a vanilla defect for #13's purposes. It is an authoring
 hazard for OT6.** Any OT6 route change that reorders party composition around
-an `opt_equip` is a hard lockup, not a visible glitch. Worth a line in the
-route-authoring notes.
+an `opt_equip` produces a hard lockup rather than a visible glitch. Worth a
+line in the route-authoring notes.
 
 ### 7. `AnimCmd_f7` raster wait is unsynchronized in 1.0
 
@@ -226,11 +227,11 @@ hblank-edge wait before latching the H/V counters; 1.0 latches immediately:
         bcc     @db50
 ```
 
-The code difference is certain. The *consequence* is not established from
-source — an unstable latch could in principle spin this loop. **Classification:
-unverified effect.** To settle: instrument the loop's iteration count in Mesen
-across a battery of animations that use command `$f7`. Until then this is not
-an inventory item, it is a watch item.
+The code difference is certain. The consequence is not established from
+source; an unstable latch could in principle spin this loop. **Classification:
+unverified effect.** To settle it, instrument the loop's iteration count in
+Mesen across a range of animations that use command `$f7`. Until then it is a
+watch item rather than an inventory item.
 
 ### 8. Battle "items obtained" list is under-cleared
 
@@ -248,8 +249,8 @@ initialized to `$ff`. The consumer
 (`ff6/src/btlgfx/btlgfx_main.asm:9463-9509`) indexes `(counter & $0f) * 5` and
 stops at the first `$ff`, so entries 13-15 are only read after 13 real item
 events in one battle, and an uninitialized non-`$ff` byte there would be added
-to the inventory as a real item with a garbage quantity — persistent, and
-saved.
+to the inventory as a real item with a garbage quantity, which is persistent
+and saved.
 
 **Classification: confirmed defect, below the bar on reachability.** Thirteen
 item events in a single battle is not a state a player reaches. Worth a note
@@ -285,8 +286,9 @@ stepping off a save point diagonally leaves Save enabled off the save point.
 map, so a stuck value suppresses the next trigger walked onto.
 
 **Classification: confirmed asymmetry, below the bar.** Both latches clear on
-the first orthogonal step, and neither outcome is destructive — FF6 already
-permits saving anywhere on the world map. No progression-loss path was found.
+the first orthogonal step, and neither outcome is destructive, since FF6
+already permits saving anywhere on the world map. No progression-loss path was
+found.
 
 ### 10. `magic_tmp_buf_clr` writes to the wrong bank
 
@@ -299,8 +301,8 @@ effects: the numeral state is not cleared, and 40 bytes of `$7f7b3f-$7f7b66`
 are zeroed — which per `ff6/notes/battle-ram.txt:2189` is inside
 "$7F6000-$7F7FFF Character 4 Graphics".
 
-**Classification: cosmetic, below the bar.** Recorded because it is a live
-trap for OT6's "Claiming RAM" rule: anything OT6 ever parks at
+**Classification: cosmetic, below the bar.** Recorded because it is a hazard
+for OT6's "Claiming RAM" rule: anything OT6 stores at
 `$7f7b3f-$7f7b66` will be zeroed at unpredictable times by vanilla code.
 
 
@@ -312,8 +314,9 @@ Five upstream-annotated sites where an object script branches to
 `11318`, `11321`, `35144`, `94287`.
 
 **Classification: confirmed in data, below the bar.** These are async NPC
-animation scripts; the scenes demonstrably complete in the retail game. No
-evidence of a lock. Recorded so nobody "fixes" them and changes scene timing.
+animation scripts; the scenes complete in the retail game. No
+evidence of a lock. Recorded so that they are not corrected in a way that
+changes scene timing.
 
 ### 12. Two more self-branch hang traps
 
@@ -324,8 +327,8 @@ evidence of a lock. Recorded so nobody "fixes" them and changes scene timing.
   routine hangs if Shadow is not found among the 16 character-prop entries.
   Post-WoB, outside the supported route.
 
-Both are confirmed traps with undemonstrated triggers. Not inventory items;
-watch items.
+Both are confirmed traps with undemonstrated triggers, so they are watch items
+rather than inventory items.
 
 ### 13. Two one-byte out-of-bounds reads
 
@@ -344,23 +347,24 @@ Both are reads, not writes, and neither faults. Listed so they are on record.
   X = `$fe`. Every caller pre-checks the mask except `AttackerEffect_2a`
   (Flare Star, `ff6/src/battle/battle_main.asm:10659-10673`), which then does
   `lda $3b18,y` out of range and calls `Div` with a zero divisor. The SNES
-  divider returns `$ffff` rather than faulting. Bad damage number at worst.
+  divider returns `$ffff` rather than faulting. The worst outcome is a bad
+  damage number.
 
 ---
 
 ## Explicitly preserved (the other half of the policy)
 
 #13 says the policy must not create an expectation that every harmless vanilla
-bug gets modernized. Named examples, so the boundary is on record:
+bug gets modernized. Named examples follow, so the boundary is on record:
 
 - **Vanish + Doom/X-Zone/Demi on bosses.** A balance exploit. #13 lists "minor
   balance oddities" as preserved.
 - **Useless / mis-wired stats.** `CONTRIBUTING.md` already names these.
-  Note: the common claim that Evade is *never* read is not what the code shows
-  — `ff6/src/battle/battle_main.asm:6016` reads `$3b54` (evade) or
-  `$3b55` (mblock) depending on carry. Whatever the truth is, it is benign and
-  out of #13's scope; recorded here only so the folklore version doesn't get
-  written down as fact.
+  Note: the common claim that Evade is never read is not what the code shows.
+  `ff6/src/battle/battle_main.asm:6016` reads `$3b54` (evade) or
+  `$3b55` (mblock) depending on carry. Either way the behaviour is benign and
+  out of #13's scope; recorded here so the folklore version is not written
+  down as fact.
 - **Row jank, animation quirks, the "Ragers" text-erase bug**
   (`ff6/notes/ff3u.asm:98592-98593`), the screen-shake wrong-table bug
   (`ff6/src/field/screen.asm:1134`, upstream-annotated
@@ -370,21 +374,21 @@ bug gets modernized. Named examples, so the boundary is on record:
   decision, priced into the MP economy (`docs/design/mp-economy.md`, the Dance
   row of "The verb survey" — one payment per battle, not per step). It is
   a within-battle state, not a soft lock.
-- **Leap removing Gau.** Not a defect; and vanilla already guards the
-  degenerate case — `TargetEffect_54` refuses Leap when fewer than two party
+- **Leap removing Gau.** Not a defect, and vanilla already guards the
+  degenerate case: `TargetEffect_54` refuses Leap when fewer than two party
   members remain (`ff6/src/battle/battle_main.asm:9614-9620`).
 
 ---
 
 ## OT6-side findings (not vanilla, found in passing)
 
-Three things turned up here that are OT6's, not Square's, and belong in
+Three findings here are OT6's rather than Square's, and belong in
 the record.
 
 1. **`OT6_LOADOUT` survives a New Game.** `ff6/src/battle/ot6_memory.inc:38`
    puts Cyan's Bushido loadout word at `$7e1e1d`. It is correctly inside the
-   checksum window (asserted at `ot6_memory.inc:39-40`), but it is cleared by
-   nothing:
+   checksum window (asserted at `ot6_memory.inc:39-40`), but nothing clears
+   it:
    - `InitNewGame`'s event-flag clear is `ff6/src/field/init.asm:143-148`,
      `stz $1dc9,x` for `$0054` bytes — `$1dc9` through `$1e1c`. `$1e1d` is the
      very next byte.
@@ -392,36 +396,36 @@ the record.
      (`ff6/src/field/reset.asm:758-768`, `ldx #$0120` × 16 bytes).
    
    So: load a save with a manual loadout → soft reset → New Game inherits the
-   previous game's loadout. Bounded in effect, because the battle-side read
-   validates each stored tech and falls back to AUTO
-   (`ff6/src/battle/ot6_kits.asm:69-74`). Config hygiene, not a soft lock — but
-   it is exactly the class of thing #13's "persistent game-state" clause is
-   about, and it is ours.
+   previous game's loadout. The effect is bounded, because the battle-side
+   read validates each stored tech and falls back to AUTO
+   (`ff6/src/battle/ot6_kits.asm:69-74`). This is a configuration-hygiene
+   problem rather than a soft lock, but it is the class of thing #13's
+   "persistent game-state" clause covers, and it is OT6's own.
 
 2. **The codex commits to SRAM outside the save transaction.**
    `ff6/src/battle/ot6_break.asm:876` and `:984` write `f:OT6_CODEX` /
    `f:OT6_CODEX_CLASS` the instant a weakness is learned, mid-battle. Weakness
    knowledge therefore survives a reset-without-saving and survives a party
    wipe, diverging from the checksummed block it nominally belongs to. That may
-   well be the intended product behaviour — it is worth being deliberate about
-   rather than incidental.
+   be the intended product behaviour; either way it should be a deliberate
+   decision rather than an incidental one.
 
 3. **`ClearSRAM` does not reach bank `$31`.** `ff6/src/menu/menu_sram.asm:30-45`
    zeroes `$306000-$307fff` only, so a cartridge-level SRAM wipe leaves the
    codex pages intact. Recovery then rests entirely on the per-page `'O8'`
-   magic (`ff6/src/battle/ot6_codex.asm:33 (constant), :62-101 (ensure)`). Not reachable in practice —
-   bank `$30` is wiped, so no slot can be loaded — but the two banks have no
-   shared validity story, and adding one is cheap while the codex is young.
+   magic (`ff6/src/battle/ot6_codex.asm:33 (constant), :62-101 (ensure)`). Not reachable in practice,
+   because bank `$30` is wiped so no slot can be loaded, but the two banks have
+   no shared validity rule, and adding one is cheap while the codex is small.
 
 Also noted: `ff6/src/menu/save.asm:50` adds `sta wSaveSlotToLoad` inside
 `CopyGameDataToSRAM`. Vanilla set that variable only on *load*. The effect is
 that after a New Game's first save, a party wipe now reloads that slot instead
-of resetting to the title. Coherent with the codex lifecycle and arguably
-better, but it is a real behaviour change and should be deliberate.
+of resetting to the title. This is coherent with the codex lifecycle and
+arguably better, but it is a behaviour change and should be deliberate.
 
 ---
 
-## REPORTED, UNVERIFIED
+## Reported, unverified
 
 Claims that circulate but that this pass could **not** confirm from `ff6/`.
 None of these should be treated as facts, cited, or fixed on this basis.

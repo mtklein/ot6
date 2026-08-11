@@ -1,17 +1,17 @@
 -- probe_57ba_strip.lua -- write-watcher for the $7E57BA-$7E57BF strip
 -- (one spare word, OT6_RANDPEND, OT6_RANDBTL, two flag bytes).
--- Verifies the strip has ONLY bank-$F0 (OT6) and hook-shim writers
+-- Verifies the strip has only bank-$F0 (OT6) and hook-shim writers
 -- across the write-heavy battle paths:
---   phase 1: mines_chase field pacing -> a RANDOM encounter (exercises
---            Ot6MarkRandom's $57BC write from the field trigger, the
+--   phase 1: mines_chase field pacing -> a random encounter (exercises
+--            Ot6MarkRandom's $57BC write from the field trigger, and the
 --            InitBP consume into $57BD) ->
 --            fight mashed to victory (exercises Ot6RewardScale reads).
 --   phase 2: whelk_entry -> the dialog-opening boss fight, mashed
---            for ~6000 frames: battle DIALOGS ($0B6E/$0B6F + the
---            shell's "Gruuu......") and fire-beam attack-name BANNERS
---            both run, the exact family that clobbered $57D5+.
--- $7E57D5 rides along as the positive control: banner machinery MUST
--- hit it. FAIL if any strip write comes from outside bank $F0.
+--            for ~6000 frames.  Battle dialogs ($0B6E/$0B6F plus the
+--            shell's "Gruuu......") and fire-beam attack-name banners
+--            both run; this is the family of code that clobbered $57D5+.
+-- $7E57D5 rides along as the positive control; banner machinery must
+-- write it. FAIL if any strip write comes from outside bank $F0.
 
 local H = dofile("tools/tests/lib/ot6.lua")
 local MINES = "build/states/mines_chase.mss.lua"

@@ -1,5 +1,5 @@
--- probe_v07_386tile.lua -- why does held-UP from (74,54) not reach the
--- map-386 save point at (74,53)?  NOT a suite test.
+-- probe_v07_386tile.lua -- measures why held up from (74,54) does not reach
+-- the map-386 save point at (74,53).  Not a suite test.
 -- OT6_CHECKPOINT_LAYOUT: ot6-codex-o8-v1
 local H = dofile("tools/tests/lib/ot6.lua")
 

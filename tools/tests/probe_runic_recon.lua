@@ -1,46 +1,47 @@
--- probe_runic_recon.lua -- READ-ONLY recon for battle_runic's #75 conversion
+-- probe_runic_recon.lua -- read-only recon for battle_runic's #75 conversion
 -- (the measured redirect off n024_entry, where a two-man party dies
--- inside runic's multi-arm exposure).  Buttons and eyes only.
+-- inside runic's multi-arm exposure).  Buttons and observation only.
 --
--- RUN 1 (vector_sneak) settled the field facts and one dispatch error:
---   * party EDGAR SABIN LOCKE CELES; CELES's real command list is
---     {Fight, Runic, Magic, Item} -- Runic $0B on row 1;
---   * Ramuh IS owned ($1A69 mask $0109 -> espers 0, 3, 8: Ramuh, Siren,
---     +1) and NOBODY holds a stone (all esper bytes $FF);
---   * map 242 (Vector town) has NO random encounters: map_prop byte 5
---     bit 7 is CLEAR (the $0525 gate, field/battle.asm:333) -- 40000
---     frames of real pacing drew nothing.  The dispatch's "map-242
---     corridor encounters" live one door north, map 262 (flag SET).
+-- Run 1 (vector_sneak) settled the field facts and one dispatch error:
+--   * party EDGAR SABIN LOCKE CELES; CELES's command list is
+--     {Fight, Runic, Magic, Item}, with Runic $0B on row 1;
+--   * Ramuh is owned ($1A69 mask $0109 -> espers 0, 3, 8: Ramuh, Siren,
+--     +1) and nobody holds a stone (all esper bytes $FF);
+--   * map 242 (Vector town) has no random encounters: map_prop byte 5
+--     bit 7 is clear (the $0525 gate, field/battle.asm:333), and 40000
+--     frames of pacing drew nothing.  The dispatch's "map-242
+--     corridor encounters" are one door north, on map 262 (flag set).
 --
--- RUN 2 (mrf_entry, map 262) measured the factory encounter:
+-- Run 2 (mrf_entry, map 262) measured the factory encounter:
 --   * formation $073 = Garm x2 (615hp L19) + Commando x2 (580hp L18);
---   * TEMPER FATAL: unattended, the whole party is dead by f2400 -- 18
---     physicals, zero spell casts.
+--   * temper: unattended, the whole party is dead by f2400, from 18
+--     physicals and zero spell casts.
 --
--- RUN 3 (mrf_entry) proved the machinery and the two clocks:
+-- Run 3 (mrf_entry) established the machinery and the two clocks:
 --   * Ramuh equipped on LOCKE through the real field menu grants him a
---     battle Magic ROW (rows {00 05 02 01}) with Bolt/Rasp castable;
---   * the park-the-open-list policy HOLDS: 1200 frames under an open
---     Magic list = zero monster actions, party HP flat (Wait config);
---   * the bag is EMPTY (no item turns anywhere on this lineage);
+--     battle Magic row (rows {00 05 02 01}) with Bolt/Rasp castable;
+--   * the park-the-open-list policy holds: 1200 frames under an open
+--     Magic list gave zero monster actions and flat party HP (Wait config);
+--   * the bag is empty (no item turns anywhere on this lineage);
 --   * group-80 formations can be fled (L+R, 724 frames).
 --
--- RUNS 4a/4b (battle_runic drafts on mrf_entry, both wiped): the kill
--- race is unwinnable (a real Fight chips ~15 HP off a 615 HP Garm; two
--- deaths before one kill) and the Siren sleep-park LEAKS (sleep wears
--- off after ~3000 frames of battle time and only one hover position was
--- reachable by cursor rotation -- $7B7E bit-to-slot mapping is NOT the
+-- Runs 4a/4b (battle_runic drafts on mrf_entry, both wiped): the kill
+-- race is unwinnable (a Fight chips ~15 HP off a 615 HP Garm; two
+-- deaths before one kill) and the Siren sleep-park leaks (sleep wears
+-- off after ~3000 frames of battle time, and only one hover position was
+-- reachable by cursor rotation; the $7B7E bit-to-slot mapping is not the
 -- 1<<slot the steal family measured on its own formation).
 --
--- RUN 5 (this file): the pivot candidate.  The post-opera-v1 checkpoint cold
--- Continues to the WORLD MAP at Vector's west entry point with the same
--- four -- and world-area trash is leveled for this party where the
--- factory area is not.  Questions:
---   1. Does the checkpoint's config carry Wait mode (park policy viable)?
---   2. What does the area serve: species, levels, HP, MP -- and do any
---      of them CAST (absorbable strays would foul runic baselines)?
---   3. Temper: what does an unattended party eat here?
---   4. Do the formations flee on their own, and does L+R work?
+-- Run 5 (this file): the candidate replacement.  The post-opera-v1
+-- checkpoint cold Continues to the world map at Vector's west entry point
+-- with the same four, and world-area trash is levelled for this party
+-- where the factory area is not.  Measured here:
+--   1. whether the checkpoint's config carries Wait mode (so the park
+--      policy is viable);
+--   2. what the area serves: species, levels, HP, MP, and whether any
+--      of them cast (absorbable strays would foul runic baselines);
+--   3. temper: what an unattended party takes here;
+--   4. whether the formations flee on their own, and whether L+R works.
 --
 --   OT6_SRAM_CHECKPOINT=tools/tests/checkpoints/post-opera-v1 \
 --     tools/tests/run.sh tools/tests/probe_runic_recon.lua
@@ -57,7 +58,7 @@ local spells = {}
 local hpTrace = {}
 
 H.run({ maxFrames = 90000 }, {
-  -- cold Continue (the checkpoint's $307ff0=3 preselects slot 3) -- the
+  -- cold Continue (the checkpoint's $307ff0=3 preselects slot 3), the
   -- probe_mp_universal boot, verbatim from battle_slotsboot
   H.waitFrames(350),
   H.repeatN(5, { H.pressButtons({ "start" }, 8), H.waitFrames(25) }),
@@ -93,7 +94,7 @@ H.run({ maxFrames = 90000 }, {
   end),
 
   -- find the nearest battle-enabled tile (world tile-prop bit6) and pace
-  -- on it -- the entry-point tile itself drew nothing in 40000 frames
+  -- on it; the entry-point tile itself drew nothing in 40000 frames
   H.call(function()
     local x0, y0 = H.worldX(), H.worldY()
     local best, bd = nil, 1e9
@@ -115,9 +116,9 @@ H.run({ maxFrames = 90000 }, {
       best[1], best[2]))
   end),
   H.call(function()
-    -- pick a pacing partner tile: a passable neighbor that is NOT toward
-    -- the Vector entrance column (x 138/139, an event trigger, not a
-    -- battle -- stepping onto it leaves the world and wedges the pace)
+    -- pick a pacing partner tile: a passable neighbor that is not toward
+    -- the Vector entrance column (x 138/139, an event trigger rather than
+    -- a battle; stepping onto it leaves the world and wedges the pace)
     local x, y = H.vars.bandX, H.vars.bandY
     local pair = nil
     for _, d in ipairs({ { "left", -1, 0 }, { "up", 0, -1 }, { "down", 0, 1 } }) do
@@ -181,8 +182,8 @@ H.run({ maxFrames = 90000 }, {
     end
   end),
 
-  -- temper: unattended for 3600 frames -- what resolves, what it costs,
-  -- and whether the formation flees on its own
+  -- temper: unattended for 3600 frames, recording what resolves, what it
+  -- costs, and whether the formation flees on its own
   (function()
     local t0 = nil
     return H.repeatN(12, {

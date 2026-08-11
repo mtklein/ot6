@@ -1,4 +1,4 @@
--- probe_opera_dance5.lua -- boot aria_postfork (fast), dump ALL 16 field objects
+-- probe_opera_dance5.lua -- boot aria_postfork (fast), dump all 16 field objects
 -- unconditionally over time to locate Draco (NPC_4) and the guests, and test
 -- whether the lib's own bfsPath/navTo can reach flowers (12,19) and balcony (8,9).
 local H = dofile("tools/tests/lib/ot6.lua")

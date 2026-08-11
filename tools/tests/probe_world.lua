@@ -23,7 +23,7 @@ local STATE = "build/states/worldmap_narshe.mss.lua"
 
 local function P(fmt, ...) print("[probe] " .. string.format(fmt, ...)) end
 
--- raw world position reads (zero page; world module keeps DP=$0000 --
+-- raw world position reads (zero page; world module keeps DP=$0000, since
 -- world_start.asm has no phd/pld, and the menu path reads $e0 plain)
 local function wx() return H.readByte(0x00e0) end
 local function wy() return H.readByte(0x00e2) end
@@ -131,10 +131,10 @@ H.run({ maxFrames = 30000 }, {
   -- ------------------------------------------------------------------ --
   -- 4. random encounter: pace over battle-enabled plains until one
   -- fires, write-clear it, and measure the aftermath frame by frame.
-  -- The up-step trace above parked us on (84,33), the Narshe GATE
-  -- STRIP -- prop $0007, battles DISABLED -- and this probe's first
-  -- revision paced right/left along it for 12000 fruitless frames
-  -- (that non-result is itself recorded in world-map-nav.md).  Step
+  -- The up-step trace above parked the party on (84,33), the Narshe gate
+  -- strip, which has prop $0007 and battles disabled, and this probe's
+  -- first revision paced right/left along it for 12000 frames with no
+  -- encounter (that non-result is recorded in world-map-nav.md).  Step
   -- back down to the enabled row first and pace down/up: the danger
   -- word grows +$30 per landing there (probe_world2) and the roll wins
   -- within a handful of cycles.

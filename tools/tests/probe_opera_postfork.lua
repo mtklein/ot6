@@ -1,6 +1,6 @@
 -- probe_opera_postfork.lua -- generate aria_postfork (opera_stage -> aria
--- -> forks {0,1,0} -> control on 236), then GREEDY-climb toward the balcony
--- (8,9) with A-mashing, logging switches + position to crack the
+-- -> forks {0,1,0} -> control on 236), then greedy-climb toward the balcony
+-- (8,9) with A-mashing, logging switches and position to work out the
 -- flower-dance stair nav.
 local H = dofile("tools/tests/lib/ot6.lua")
 local function map() return H.mapId() & 0x1ff end

@@ -1,7 +1,7 @@
 -- probe_896f.lua -- write-watcher over the battlefield $2105 shadow
--- ($7E896F): every writer PC and value through one Cirpius battle with a
--- Terra cast, so the 16x16 flips name their own writers (the instrument
--- behind battle_hudanim16's file:line citations).
+-- ($7E896F): logs every writer PC and value through one Cirpius battle with
+-- a Terra cast, which identifies the code responsible for the 16x16 flips.
+-- This probe produced the file:line citations in battle_hudanim16.
 local H = dofile("tools/tests/lib/ot6.lua")
 local STATE = "build/states/kolts_cave.mss.lua"
 local DANGER = 0x1f6e

@@ -14,9 +14,10 @@ $40 Earth · $80 Water
 Key fields: +0x00 speed, +0x01 attack, +0x05/06 def/mdef, +0x08 HP,
 +0x10 level, +0x14–16 status immunities, **+0x17 absorb / +0x18 null /
 +0x19 WEAK elements**, +0x1B–1D auto-statuses, +0x1F special attack.
-Free bits only (+0x12: $02/$08/$20; +0x1E: $08–$40), no free bytes —
-shield/weapon-weakness data goes in new parallel tables (trivial from
-source). Monster names $CFC050 (10 B × 384).
+Free bits only (+0x12: $02/$08/$20; +0x1E: $08–$40) and no free bytes, so
+shield/weapon-weakness data goes in new parallel tables, which is
+straightforward when building from source. Monster names $CFC050
+(10 B × 384).
 
 ## Items — $D85000, 30 B × 256
 
@@ -32,8 +33,8 @@ nibble + block/parry anim · +0x1C price.
 
 **No weapon-category (sword/spear/…) field exists.** The only category-ish
 datum is the icon glyph prefixed to names at $D2B300. OT6's 8-class table
-is a new parallel table keyed by item ID. Note the glyph is *not* a
-category either: daggers carry `{spear}` in `item_name_en.json`. `$28` is a
+is a new parallel table keyed by item ID. The glyph is not a category
+either: daggers carry `{spear}` in `item_name_en.json`, and `$28` is a
 katana.
 
 ### The equippable-by mask
@@ -69,12 +70,12 @@ override: `GetCharEquipMask` ends with `lda $11d8 / and #$20 / ora
 #$8000` (`equip.asm:2300-2306`), and `$11d8` is the relic-effect byte
 fed from item +$0C (`battle_main.asm:2522-2523`), where Merit Award `$da`
 carries `$20` (Gauntlet `$d0` = `$08`, Genji Glove `$d1` = `$10`).
-Decoding bit 15 as a character therefore reports a phantom Leo on
+Decoding bit 15 as a character therefore reports a spurious Leo on
 almost every weapon. Bit 14 (Banon) is real but appears on exactly four
-items — the imp gear `$24 / $65 / $83 / $9b`, all mask `$dfff`
+items: the imp gear `$24 / $65 / $83 / $9b`, all mask `$dfff`
 (everyone but Umaro).
 
-Pinned against items whose wielders cannot be argued with:
+Pinned against items whose wielders are unambiguous:
 
 | item | id | mask at +$01 | reading at +$01 (correct) | reading at +$00 (wrong) |
 |---|---|---|---|---|
@@ -85,17 +86,17 @@ Pinned against items whose wielders cannot be argued with:
 | Imp Halberd | `$24` | `$dfff` | everyone but Umaro | `$ff11` = nonsense |
 | Heavy Shld | `$5b` | `$8257` | Terra/Locke/Cyan/Edgar/Celes/Setzer | `$5703` = seven wrong names |
 
-The +$00 column is what the byte-0 reading produces — `type | mask<<8`,
-low byte shifted out and the type byte shifted in. It always *looks*
-like a mask, it always claims Terra (every weapon's type byte has bit 0
-set), and it is always wrong. `$28` Hardened is the canonical trap:
-+$01 says Shadow, which is right for a ninja katana; +$00 says
-Terra/Edgar/Gau, which is a ghost.
+The +$00 column is what the byte-0 reading produces: `type | mask<<8`,
+with the low byte shifted out and the type byte shifted in. That value
+resembles a mask and always includes Terra, because every weapon's type
+byte has bit 0 set, and it is always wrong. `$28` Hardened shows the
+failure clearly: +$01 says Shadow, correct for a ninja katana, while
++$00 says Terra/Edgar/Gau, which is wrong.
 
 Corollary already used downstream: **Gau's only legal weapon in the
-whole game is the Imp Halberd `$24`** — no other item with type 1 has
-bit 11 set. The +$01 column is the offset any character × weapon-category
-matrix must be decoded off.
+game is the Imp Halberd `$24`**, because no other item with type 1 has
+bit 11 set. Any character × weapon-category matrix must be decoded from
+the +$01 offset.
 
 ## Espers — $D86E00, 11 B × 27
 

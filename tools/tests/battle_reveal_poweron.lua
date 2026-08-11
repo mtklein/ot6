@@ -1,44 +1,45 @@
 -- @suite slow
 -- battle_reveal_poweron.lua -- the dirty-RAM, fresh-battle reveal test.
--- Reproduces the USER'S condition (RamPowerOnState != AllZeros) that a
--- savestate-loading test structurally cannot: it boots from POWER-ON -- no
--- state load, because a state restores the RAM it was generated with (AllZeros)
--- and the fill never reaches battle init -- into the intro Guard fight, and
+-- Reproduces the user's condition (RamPowerOnState != AllZeros) that a
+-- savestate-loading test cannot: it boots from power-on, with no state load,
+-- because a state restores the RAM it was generated with (AllZeros) and the
+-- fill never reaches battle init.  It boots into the intro Guard fight and
 -- asserts a fresh, never-chipped enemy shows '?'.
 --
--- suite.sh runs this under OT6_RAM_POWERON=AllOnes (deterministic AND dirty)
+-- suite.sh runs this under OT6_RAM_POWERON=AllOnes (deterministic and dirty)
 -- and OT6_SRAM_CHECKPOINT=tools/tests/checkpoints/post-opera-v1.  Issue #75
--- conversion: the SRAM save used to be FORGED -- slot 1's codex hand-stamped
--- 'O8' with all 384 species knowing everything, and the transient page's
--- magic zeroed to force the invalid path.  It is now the REAL tracked
+-- conversion: the SRAM save used to be forged, with slot 1's codex hand-stamped
+-- 'O8' so all 384 species knew everything, and the transient page's
+-- magic zeroed to force the invalid path.  It is now the tracked
 -- post-opera checkpoint (an SRAM save written by the game's own Save UI on
--- the input-driven chain, provenance in its manifest), whose slot 3 carries a real
--- earned codex page and whose TRANSIENT page arrives VALID with the
+-- the input-driven chain, provenance in its manifest), whose slot 3 carries an
+-- earned codex page and whose transient page arrives valid with the
 -- pre-save chain's knowledge still in it.  That valid stale transient is
--- the truer real-world hazard: it is exactly what a cartridge holds after
+-- the closer match to the real-world hazard: it is what a cartridge holds after
 -- someone plays a New Game without saving and powers off.  New Game must
--- (a) leave the saved slot's knowledge untouched, and (b) WIPE the stale
+-- (a) leave the saved slot's knowledge untouched, and (b) wipe the stale
 -- transient page (Ot6CodexNewGame, ot6_codex.asm) so an unsaved game
--- cannot inherit knowledge from EITHER source.  Both are asserted against
--- byte-level snapshots of the checkpoint's real content -- reads, not writes.
+-- cannot inherit knowledge from either source.  Both are asserted against
+-- byte-level snapshots of the checkpoint's content, using reads rather than
+-- writes.
 --
--- (The old staging populated slot 1 specifically; nothing in the claim
--- needs slot 1 -- "the persistent page survives and is not consulted" is
+-- (The old staging populated slot 1 specifically.  Nothing in the claim
+-- needs slot 1: "the persistent page survives and is not consulted" is
 -- slot-agnostic, and the checkpoint's slot 3 pins it against real bytes.)
 --
--- Complements battle_reveal, which pokes the masks at SEED entry (AFTER
--- InitBattle's clear) to exercise the seed's own zeroing / Cmd_20 reload
--- path.  THIS test lets the power-on fill flow through InitBattle's clear
+-- This complements battle_reveal, which pokes the masks at seed entry, after
+-- InitBattle's clear, to exercise the seed's own zeroing and the Cmd_20 reload
+-- path.  This test lets the power-on fill flow through InitBattle's clear
 -- untouched: the seed-entry snapshot reads 0 because InitBattle cleared
 -- the dirt (a live write-trace showed its clear storing $00 to these bytes
 -- before the seed), and the fresh enemy draws '?'.
 --
--- BOOT DRIVE, measured: with a valid SRAM save the title no longer skips the
--- select screen -- Start lands on the load menu (ZMENUSTATE $21, cursor
+-- Boot drive, measured: with a valid SRAM save the title no longer skips the
+-- select screen, and Start lands on the load menu (ZMENUSTATE $21, cursor
 -- $4b) showing New Game / Empty / Empty / the checkpoint's slot-3 save, with
--- the cursor preselecting the saved slot (row 3).  UP edges walk it to
+-- the cursor preselecting the saved slot (row 3).  Up edges walk it to
 -- row 0 = New Game, A commits, and Ot6CodexNewGame's wipe is observable
--- in SRAM the moment it runs.
+-- in SRAM as soon as it runs.
 --
 -- Monster slot s -> entity $08+2s: revealed elems $3e91+2s, revealed classes
 -- $3ea5+2s, broken timer $3e90+2s, class-weak $3ea4+2s. HUD row s at $5762+14s,
@@ -53,9 +54,9 @@ local function sram(a) return emu.read(a, emu.memType.snesMemory) end
 local function present(slot) return (H.readByte(0x3aa8 + slot * 2) & 1) == 1 end
 local function wcell(slot, k) return H.readByte(H.shadowLine(slot) + 6 + k * 2) end
 
--- Snapshot every monster reveal mask at the FIRST seed entry: AFTER
--- InitBattle's clear, BEFORE any seed zeroing. Under the AllOnes fill these
--- read 0 iff InitBattle's clear actually covers the mask bytes.
+-- Snapshot every monster reveal mask at the first seed entry, after
+-- InitBattle's clear and before any seed zeroing. Under the AllOnes fill these
+-- read 0 iff InitBattle's clear covers the mask bytes.
 local SEED = H.sym("Ot6SeedShields")
 local seedRef, snap = nil, nil
 local function armSeedSnapshot()
@@ -75,8 +76,8 @@ local slot3Boot = nil                   -- the checkpoint page, byte for byte
 H.run({ maxFrames = 70000 }, {
   H.call(function()
     armSeedSnapshot()
-    -- The checkpoint's REAL content, read and latched (the forged staging this
-    -- replaces could not fail; these positive controls can):
+    -- The checkpoint's content, read and latched.  The forged staging this
+    -- replaces could not fail; these positive controls can.
     H.assertEq(sram(SLOT3), 0x4f, "checkpoint slot-3 codex magic 'O'")
     H.assertEq(sram(SLOT3 + 1), 0x38, "checkpoint slot-3 codex magic '8'")
     H.assertEq(sram(TEMP), 0x4f, "checkpoint transient codex magic 'O' (VALID)")
@@ -99,19 +100,19 @@ H.run({ maxFrames = 70000 }, {
 
   H.waitFrames(355),
   H.repeatN(5, { H.pressButtons({ "start" }, 8), H.waitFrames(25) }),
-  -- with an SRAM save present the title leads to the load menu -- but only
-  -- an A press summons it once the title settles (measured three ways:
-  -- the menu pops ZMENUSTATE $21 ~366 frames after an A; five Starts
+  -- with an SRAM save present the title leads to the load menu, but only
+  -- an A press brings it up once the title settles (measured three ways:
+  -- the menu reaches ZMENUSTATE $21 ~366 frames after an A; five Starts
   -- plus 1800 idle frames never reach it; Start edges every 128 frames
-  -- never reach it either).  Press A edges, well spaced so at most one
+  -- never reach it either).  Press A edges, spaced so at most one
   -- stray lands in the menu fade; the cursor walk below asserts $21 in
-  -- its own pred, so a stray that somehow confirmed the saved slot
-  -- fails loudly instead of continuing into a Continue.
+  -- its own predicate, so a stray press that confirmed the saved slot
+  -- fails instead of continuing into a Continue.
   H.driveUntil(function() return H.readByte(0x26) == 0x21 end, 3600, {
     H.pressButtons({ "a" }, 8), H.waitFrames(160),
   }, "load menu (ZMENUSTATE $21)"),
-  -- walk the cursor to row 0 = New Game (it preselects the checkpoint's
-  -- saved slot, row 3 -- measured) and commit
+  -- walk the cursor to row 0 = New Game (measured: it preselects the
+  -- checkpoint's saved slot, row 3) and commit
   H.driveUntil(function()
     return H.readByte(0x26) == 0x21 and H.readByte(0x4b) == 0
   end, 600, {
@@ -127,7 +128,7 @@ H.run({ maxFrames = 70000 }, {
         string.format("New Game preserved the checkpoint's slot-3 page (+%03X)",
           off))
     end
-    -- (b) the stale VALID transient page was wiped, not inherited:
+    -- (b) the stale valid transient page was wiped rather than inherited:
     -- Ot6CodexNewGame's signature is magic 'O8' over all-zero content
     H.assertEq(sram(TEMP), 0x4f, "New Game re-stamped transient magic 'O'")
     H.assertEq(sram(TEMP + 1), 0x38, "New Game re-stamped transient magic '8'")

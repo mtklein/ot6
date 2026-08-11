@@ -6,28 +6,28 @@
 --                       v0.3 Locke scenario will want)
 --   kolts_entry.mss  map 95 (14,35), the mountain's entrance map
 --   vargas_entry.mss map 98, party tile-aligned next to VARGAS with his
---                       approach event already run -- one interaction short
+--                       approach event already run, one interaction short
 --                       of `battle 66`
 --
--- THREE THINGS THIS SCRIPT HAD TO MEASURE OR DERIVE.  The entrance tables
--- give the door graph and nothing else, and all three of these are places
--- where the graph alone sends you into a wall.
+-- Three things this script had to measure or derive.  The entrance tables
+-- give the door graph and nothing else, and in all three of these the graph
+-- alone is not enough to reach the destination.
 --
--- 1. THE PARTY ARRIVES ON A CHOCOBO, AND THE NAVIGATOR CANNOT SEE IT.
---    figaro_cleared is generated riding one (the submerge scene's
+-- 1. The party arrives on a chocobo, and the world navigator cannot read its
+--    position.  figaro_cleared is generated riding one (the submerge scene's
 --    `vehicle ... CHOCOBO`, event_main.asm:14330-14405).  The world module
 --    then boots through InitChoco (world/init.asm:402) instead of InitWorld,
---    and InitChoco NEVER WRITES $E0/$E2 -- only InitWorld does, from $1F60
+--    and InitChoco never writes $E0/$E2; only InitWorld does, from $1F60
 --    (init.asm:758-762).  So H.worldX/worldY read 0 from that state and
 --    worldNavTo has nothing to plan from; a route that trusts them walks
 --    the party off tile (0,0).  (gen_edgar asserts the zeros when it
---    generates its state so this stops being true loudly.)  THE DISMOUNT is
---    B, and it is a whole state machine, verified frame by frame in
---    probe_dismount.lua:
+--    generates its state, so a change here would fail there.)  The dismount
+--    button is B, and the dismount itself is a state machine, verified frame
+--    by frame in probe_dismount.lua:
 --      * riding, input goes through GetChocoInput (world/ctrl.asm:451),
 --        whose last branch (:562-563) is `lda $05 / bit #$0080 / jsr
---        LandAirship`.  $05 is the HELD-button low byte (bit7 = B) -- not an
---        edge -- so a plain hold is enough.
+--        LandAirship`.  $05 is the held-button low byte (bit7 = B) rather
+--        than an edge, so a plain hold is enough.
 --      * LandAirship's chocobo branch (world/init.asm:1868) sets $19 = 3,
 --        locks input out ($1E bit0), and converts the VEHICLE's mode-7
 --        position into a tile pair at $1F60/$1F61 (:1878-1888).
@@ -40,99 +40,100 @@
 --    Measured: B seen at +1 frame, $19 = 6 by +9, $11FA clear at +80, on
 --    foot / lit / controllable at +120, standing at WoB (65,77).
 --
--- 2. THE FIGARO DESERT DOES NOT REACH SOUTH FIGARO ON FOOT.  This is the
---    finding that reshaped the route, and it is not a modelling artifact:
+-- 2. The Figaro desert does not reach South Figaro on foot.  This is a
+--    property of the map data, not of the passability model:
 --    the live tilemap at $7F0000 is byte-identical to world_1_tilemap.dat
 --    (ModifyMap has changed nothing yet), and flood-filling it with the
---    engine's own rule -- destination property bit4 clear, `bit #$0010 /
+--    engine's own rule (destination property bit4 clear, `bit #$0010 /
 --    branch if tile is impassable on foot`, GetPlayerInput move.asm:1013,
---    1042, and the two below them -- gives the party a 1165-tile region
+--    1042, and the two below them) gives the party a 1165-tile region
 --    bounded at y<=95.  South Figaro (86,111) and Mt. Kolts (102,100) sit
---    in a DIFFERENT 422-tile region.  Narshe (84,33) is in ours; they are
---    not.  A first pass planned the world step straight there and got
---    "worldBfs: no path", which is the accurate answer.
---    The link is the cave the castle's own NPC names -- "To the south
---    there's a cave that leads to South Figaro", event_main.asm:15156 --
---    and it is three field maps, not a road:
+--    in a different 422-tile region.  Narshe (84,33) is in the party's
+--    region; those two are not.  A first pass planned the world step
+--    straight there and got "worldBfs: no path", which is correct.
+--    The link is the cave the castle's own NPC names ("To the south
+--    there's a cave that leads to South Figaro", event_main.asm:15156),
+--    and it is three field maps rather than a road:
 --      world (73,93) -> map 71 (10,54)          [short entrance]
 --      map 71 (10,48)/(11,48) -> EVENT _ca5ef7  [event_trigger.asm _71]
 --        which is `if_switch $001A=1 -> load_map 70` else `load_map 73,
---        {47,39}` (event_main.asm:14218-14224) -- 70/73 are two copies of
---        the same cave and carry IDENTICAL entrance coordinates, so the
+--        {47,39}` (event_main.asm:14218-14224).  70 and 73 are two copies of
+--        the same cave and carry identical entrance coordinates, so the
 --        route below is written once and works on either
 --      map 73 (41,14) -> map 72 (4,5)           [short entrance]
 --      map 72 (16,43) -> world (75,103)         [short entrance]
 --    Only maps 69/72 and Mt. Kolts itself have exits landing in the south
 --    region (checked by walking every record in short_entrance.dat), so
---    this cave is the only way through, exactly as the story says.
+--    this cave is the only way through.
 --
--- 2b. AND THE CAVE MOUTH IS GUARDED -- a wall made of NPCs, which no
+-- 2b. The cave mouth is guarded by NPCs, which no
 --    entrance or trigger table mentions.  Map 71's lobby has exactly one
 --    way north, the two floor tiles (10,49)/(11,49) (prop $02/$8F, ordinary
---    floor, all four exits) below the trigger pair, and TWO FIGARO GUARDS
+--    floor, all four exits) below the trigger pair, and two Figaro guards
 --    stand on them: NPCProp::_71's third and fourth records, both spawn
 --    switch $0312 (npc_prop.asm:3064-3076).  The party's object map
 --    ($7E2000, bit7 set = tile free) reads occupied there, H.canStep
---    refuses the step, and BFS reports "no path (10,54)->(11,48)" -- which
---    is what the first run did.  It is not the model being shy: holding UP
---    at (10,50) for 600 frames moved the party zero tiles (measured).
---    The guards leave when TALKED TO.  The one at (10,49) runs _ca75ee
---    (event_main.asm:17853), gated `if_switch $0108=0 -> _ca7668` -- and
+--    refuses the step, and BFS reports "no path (10,54)->(11,48)", which
+--    is what the first run did.  The model is not being conservative here:
+--    holding UP at (10,50) for 600 frames moved the party zero tiles
+--    (measured).
+--    The guards leave when talked to.  The one at (10,49) runs _ca75ee
+--    (event_main.asm:17853), gated `if_switch $0108=0 -> _ca7668`, and
 --    _ca7668 is the "It's closed now due to construction" brush-off
---    (:17936-17939), so $0108 is the whole difference between a cave and a
---    wall and is asserted below.  With it set, EDGAR gets recognised
+--    (:17936-17939), so $0108 decides whether the cave is open, and it is
+--    asserted below.  With it set, EDGAR gets recognised
 --    ("Through the cave, and eastward to South Figaro", :17882), NPC_3
 --    jumps clear and hides, NPC_4 rides off on its chocobo, and the scene
---    ends `switch $0312=0` (:17933) -- despawning both guards for good.
+--    ends `switch $0312=0` (:17933), despawning both guards permanently.
 --    So the lobby is: walk under the guard, face UP, talk, then walk
 --    through the tile he was standing on.
 --
--- 3. TWO MORE WORLD-EXIT ROWS TO STAY OFF, the same hazard map 55's y=43
+-- 3. Two more world-exit rows to stay off, the same hazard map 55's y=43
 --    was for gen_edgar: BFS knows nothing about entrance triggers, so a
 --    step planned across one silently leaves the map.
 --      * map 75 (South Figaro): long entrances (0,0) len $AF and (56,0)
---        len $AF are VERTICAL (the length byte's bit7 selects vertical,
---        entrance.asm CheckLongEntrance:66) -- columns x=0 and x=56, y=0..47
+--        len $AF are vertical (the length byte's bit7 selects vertical,
+--        entrance.asm CheckLongEntrance:66): columns x=0 and x=56, y=0..47
 --        -> world (84,112)/(87,112); plus horizontal y=1 -> (85,111).  The
---        party enters at (1,28), ONE tile from the x=0 column, so the
+--        party enters at (1,28), one tile from the x=0 column, so the
 --        generation happens on arrival and the exit is a single deliberate
 --        press.
 --      * map 95 (Mt. Kolts entrance): long entrance (0,37) len $1B is
---        horizontal -- row y=37, x=0..27 -> world (102,101).  The party
+--        horizontal: row y=37, x=0..27 -> world (102,101).  The party
 --        enters at (14,35), two rows above it, and every step on this map
 --        is asserted to stay off y=37 before it is walked.
 --
--- ENCOUNTER POLICY (issue #75, the input-driven test conversion).  Zero
--- state writes on this whole route: the battle-clear write is gone, and
--- every encounter is answered by the pad.  WHICH answer is per-region, and
--- each half is measured:
+-- Encounter policy (issue #75, the input-driven test conversion).  There are
+-- no state writes on this route: the battle-clear write is gone, and
+-- every encounter is answered by the pad.  Which answer is used varies by
+-- region, and each is measured:
 --
---   * the CAVE, the TOWN and the WORLD steps RUN, playBattles="flee" --
---     L+R, the engine's own mechanic.  They are cheap; the cave cost the
---     party ten hit points end to end.
---   * MT. KOLTS AND MAP 98 ARE FOUGHT, playBattles="tactical" -- the real
+--   * the cave, the town and the world steps run, playBattles="flee",
+--     using L+R, the engine's own mechanic.  They are cheap; the cave cost
+--     the party ten hit points end to end.
+--   * Mt. Kolts and map 98 are fought, playBattles="tactical", using the real
 --     command menus, EDGAR's Tools, boosted Fights, and the fight driver's
 --     own Potion medic line.  The first input-driven version of this route
---     fled the mountain too, and fleeing is not free: it is standing still
---     while the formation takes free rounds.  Measured 2026-08-09, three
---     runs:  fled, the party reached VARGAS with TERRA dead and EDGAR on 1
---     hp (and lost the fight four times); fled with a healing layer, it
---     reached him with LOCKE dead on the final fifty-three steps; fought,
---     everyone arrived alive and two levels up.  A player crossing Mt.
---     Kolts kills Triliums -- that is where the levels for VARGAS come from
---     -- so the fought version is both the input-driven one and the one
+--     fled the mountain too.  Fleeing costs hit points, because the party
+--     stands still while the formation takes free rounds.  Measured
+--     2026-08-09, three runs: fled, the party reached VARGAS with TERRA dead
+--     and EDGAR on 1 hp, and lost the fight four times; fled with a healing
+--     layer, it reached him with LOCKE dead on the final fifty-three steps;
+--     fought, everyone arrived alive and two levels up.  A player crossing
+--     Mt. Kolts kills Triliums, which is where the levels for VARGAS come
+--     from, so the fought version is both the input-driven one and the one
 --     that works.
 --
 -- A formation that will not release the party inside M.FLEE_CAP frames is
--- fought out by the same tactical driver rather than held against; the cap
--- exists because a 90-second hold WIPED a full-health party here once.
+-- fought out by the same tactical driver.  The cap exists because a
+-- 90-second hold wiped a full-health party here once.
 --
--- THE LAYER OF CARE that goes with it is below: every crossing ends with a
--- look at the party, and the shop in South Figaro is no longer walked past.
+-- The care layer that goes with it is below: every crossing ends with a check
+-- of the party's hit points, and the route stops at the shop in South Figaro.
 local H = dofile("tools/tests/lib/ot6.lua")
 local CLEARED = "build/states/figaro_cleared.mss.lua"
 
--- map compares stay MASKED: loaders ride flag bits in $1F64's high byte
+-- map compares stay masked: loaders leave flag bits in $1F64's high byte
 local function map() return H.mapId() & 0x1ff end
 local function bright() return emu.getState()["ppu.screenBrightness"] or 0 end
 -- event switch id -> live bit (event bitfield base $1E80, bit = id & 7)
@@ -153,15 +154,14 @@ local function gil()
        + (H.readByte(0x1862) << 16)
 end
 
--- Roster line, printed by EVERY `where` so the damage profile of the route
--- is legible step by step rather than only at generation time.  This
--- route's whole risk is arriving at VARGAS with a party that cannot fight
--- -- the input-driven 2026-08-06 chain reached his ledge with TERRA dead
--- and EDGAR on 1 hp and lost four straight attempts (issue #75) -- so "who
--- is hurt, and where did it happen" is the measurement this generator most
--- needs to emit.  $1600 + 37*c: +8 level, +9/+11 cur/max hp, +13/+15
--- cur/max mp; a character is in the party when $1850+c has a low nibble bit
--- set.
+-- Roster line, printed by every `where` so the damage profile of the route
+-- is legible step by step rather than only at generation time.  The risk on
+-- this route is arriving at VARGAS with a party that cannot fight: the
+-- input-driven 2026-08-06 chain reached his ledge with TERRA dead and EDGAR
+-- on 1 hp, and lost four straight attempts (issue #75).  Who is hurt and
+-- where it happened is the measurement this generator needs to emit.
+-- $1600 + 37*c: +8 level, +9/+11 cur/max hp, +13/+15 cur/max mp; a character
+-- is in the party when $1850+c has a low nibble bit set.
 local function rosterLine()
   local out = {}
   for c = 0, 15 do
@@ -185,21 +185,21 @@ local function where(tag)
   H.log(string.format("[%s] %s", tag, rosterLine()))
 end
 
--- THE LAYER OF CARE (issue #75, 2026-08-09).  Running from encounters is
--- not free -- the party eats a round or two every time the run roll says no
--- -- and this route used to walk the whole mountain without ever opening the
--- item menu.  Measured: TERRA left the cave at 84/94, reached the mountain
--- at 65/94, arrived on map 98 at 39/94 and was DEAD by the entry point, with
--- EDGAR on 1/145 beside her, while seven Potions and five Tonics sat unused
--- in the bag; the four input-driven VARGAS attempts that followed all
--- wiped.  So every crossing now ends the way a player's would: check the
+-- The care layer (issue #75, 2026-08-09).  Running from encounters costs hit
+-- points, because the party takes a round or two every time the run roll
+-- fails, and this route used to walk the whole mountain without ever opening
+-- the item menu.  Measured: TERRA left the cave at 84/94, reached the
+-- mountain at 65/94, arrived on map 98 at 39/94 and was dead by the entry
+-- point, with EDGAR on 1/145 beside her, while seven Potions and five Tonics
+-- sat unused in the bag; the four input-driven VARGAS attempts that followed
+-- all wiped.  So every crossing now ends the way a player's would: check the
 -- party, and if anyone is meaningfully hurt, heal them through the real
--- Item windows (H.fieldCare -- no state writes, and a no-op that does not
--- even open the menu when nobody needs it).
+-- Item windows (H.fieldCare writes no state, and does not open the menu when
+-- nobody needs it).
 --
--- The Potion RESERVE is the other half of the contract: gen_vargas's medic
--- line spends Potions inside the fight, so the walk is only allowed to
--- spend down to three of them and leans on Tonics for small holes.
+-- The Potion reserve is the other half of the contract: gen_vargas's medic
+-- line spends Potions inside the fight, so the walk may only spend down to
+-- three of them and uses Tonics for small holes.
 local POTION = 0xE9
 local function care(tag, threshold)
   return H.fieldCare({ tag = "care " .. tag, threshold = threshold or 0.85,
@@ -209,7 +209,7 @@ end
 -- crossDoor/seq: a bare step list cannot be spliced into a step list (Lua
 -- truncates a non-final table.unpack to one value, silently dropping every
 -- step but the first).  H.cond with an always-true predicate is the
--- library's public way to wrap a list into ONE step object.
+-- library's public way to wrap a list into a single step object.
 local function seq(steps) return H.cond(function() return true end, steps) end
 
 -- An `arrive` predicate that fires when the map id changes from whatever it
@@ -225,18 +225,20 @@ local function mapChanged()
 end
 
 -- Settle after a map load: control + alignment + a fully lit screen, held
--- for 20 CONSECUTIVE frames, then the 30-frame margin every field fixture
--- uses.  Both halves of that are load-bearing:
---   * brightness is not optional -- a cutscene can report control on a black
+-- for 20 consecutive frames, then the 30-frame margin every field fixture
+-- uses.  Both halves are needed:
+--   * brightness is checked because a cutscene can report control on a black
 --     screen (gen_edgar's header documents the 5700-frame-early generation
---     that cost), so control and a lit screen have to hold SIMULTANEOUSLY;
---   * and they have to hold for a WHILE.  A first cut checked each gate once
---     with separate waitUntils and both passed instantly on the far side of
---     an entrance -- the field module still had the old map's control byte
---     and the fade had not begun -- so the crossing "settled" mid-load and
---     the next BFS ran against a half-written map.  (Measured: settle
---     satisfied after 0 + 0 frames, then brightness read 0 thirty frames
---     later.)  A consecutive-frame counter cannot be fooled by a transient.
+--     that caused), so control and a lit screen have to hold at the same
+--     time;
+--   * and they have to hold for a stretch of frames.  A first cut checked
+--     each gate once with separate waitUntils and both passed immediately on
+--     the far side of an entrance, because the field module still had the old
+--     map's control byte and the fade had not begun.  The crossing settled
+--     mid-load and the next BFS ran against a half-written map.  (Measured:
+--     settle satisfied after 0 + 0 frames, then brightness read 0 thirty
+--     frames later.)  A consecutive-frame counter is not satisfied by a
+--     transient.
 local function settled(n, extra)
   local cnt = 0
   return function()
@@ -246,28 +248,27 @@ local function settled(n, extra)
   end
 end
 
--- The settle DRIVES rather than waits: Mt. Kolts and the cave are encounter
--- territory, and an encounter that rolls on the arrival tile stalls a
--- passive waitUntil forever -- the battle holds control, the counter never
--- climbs, nobody is pressing anything (measured: map 96's arrival, 3600
+-- The settle drives rather than waits.  Mt. Kolts and the cave have
+-- encounters, and an encounter that rolls on the arrival tile stalls a
+-- passive waitUntil indefinitely: the battle holds control, the counter never
+-- climbs, and nothing is pressing the pad (measured: map 96's arrival, 3600
 -- frames, timeout).  advanceStory write-clears whatever came up and edge-taps
 -- through the victory text, and on a quiet field it holds the pad empty, so
--- it is the strictly safer settle.
--- The crossing settle does NOT wait for player control, and that is a
--- deliberate correction.  Mt. Kolts's caves each open with a glimpse of the
--- figure on the peak -- map 96's (16,22) and (14,12) triggers and map 97's
--- (34,24) run `obj_script NPC_1, ASYNC` (_ca820f/_ca8252/_ca8230,
--- event_main.asm:19739/19781/19757) -- and while an async object script is
--- live the event engine takes the party's movement-type byte ($087C&$0F)
--- from 2 to 4 for a frame at a time.  H.hasControl() reads that byte, so it
--- FLICKERS: measured on map 96, two good frames then a bad one, forever, and
--- a 20-consecutive-frame control gate sat at cnt=1..2 for 12000 frames while
--- every other term (brightness 15, aligned, right map, no battle) held
--- steady the whole time.
--- So the settle asserts what a settle is actually for -- the load landed and
--- the screen is up -- and leaves "can I step THIS frame" to navTo, which
--- already debounces control and re-plans.  The three GENERATED STATES below
--- still demand real control, explicitly, at the moment they save.
+-- it is the safer settle.
+-- The crossing settle does not wait for player control.  Mt. Kolts's caves
+-- each open with a view of the figure on the peak: map 96's (16,22) and
+-- (14,12) triggers and map 97's (34,24) run `obj_script NPC_1, ASYNC`
+-- (_ca820f/_ca8252/_ca8230, event_main.asm:19739/19781/19757).  While an
+-- async object script is live the event engine takes the party's
+-- movement-type byte ($087C&$0F) from 2 to 4 for a frame at a time.
+-- H.hasControl() reads that byte, so it flickers: measured on map 96, two
+-- good frames then a bad one, repeating, and a 20-consecutive-frame control
+-- gate sat at cnt=1..2 for 12000 frames while every other term (brightness
+-- 15, aligned, right map, no battle) held steady the whole time.
+-- So the settle checks that the load landed and the screen is up, and leaves
+-- "can I step this frame" to navTo, which already debounces control and
+-- re-plans.  The three states generated below still assert real control at
+-- the moment they save.
 local function settleField(what, dstMap, maxF, mode)
   return seq({
     H.waitFrames(90),
@@ -290,12 +291,12 @@ local function settleWorld(what, maxF)
 end
 
 -- Walk to (tx,ty) on the current field map, expecting the map to change on
--- arrival (an entrance record fires when the party STANDS on its source
+-- arrival (an entrance record fires when the party stands on its source
 -- tile, entrance.asm CheckShortEntrance).  Mt. Kolts and the cave use plain
--- walkable floor for their entrances -- unlike Figaro's castle doors, which
--- are walls until CheckDoor -- so BFS can route straight onto them and the
--- crossing is one navTo, not a staging tile plus a hold.  Asserted after,
--- by map id, so a silently-missed crossing cannot pass for one.
+-- walkable floor for their entrances, unlike Figaro's castle doors, which are
+-- walls until CheckDoor, so BFS can route straight onto them and the crossing
+-- is one navTo rather than a staging tile plus a hold.  The map id is
+-- asserted afterwards, so a missed crossing cannot pass for one.
 local function crossTo(tx, ty, dstMap, what, mode, maxF)
   return seq({
     H.logStep(function()
@@ -315,18 +316,18 @@ local function crossTo(tx, ty, dstMap, what, mode, maxF)
 end
 
 -- Stand on (sx,sy), turn to face `dir`, and edge-tap A until the event
--- ENGAGES (an event script or a dialog is up).  Riding the scene out is the
--- caller's advanceStory, not this: a first cut drove until the scene's
--- closing switch instead, and hung -- once the event takes control this
--- loop's own "no control -> hands off the pad" rule stops mashing, so the
--- multi-page dlg $00AC never advanced and the switch never came.
--- Two measured facts from gen_edgar's header shape the rest: NPC activation
--- is decided by the party FACING byte ($087F through the $0803 party-object
+-- engages (an event script or a dialog is up).  Running the scene out is the
+-- caller's advanceStory, not this.  A first cut drove until the scene's
+-- closing switch instead and hung: once the event takes control, this loop's
+-- own "no control -> hands off the pad" rule stops tapping, so the multi-page
+-- dlg $00AC never advanced and the switch never came.
+-- Two measured facts from gen_edgar's header shape the rest.  NPC activation
+-- is decided by the party facing byte ($087F through the $0803 party-object
 -- offset; 0 up 1 right 2 down 3 left, player.asm:456-505) and a two-frame
--- turn press does not set it, so the direction is HELD until the byte reads
--- back; and activation is edge-driven like dialogs, so A is tapped 4 on /
--- 4 off rather than held.  (Measured here: from (10,50) already facing UP,
--- four frames of tapping engage the guard.)
+-- turn press does not set it, so the direction is held until the byte reads
+-- back.  Activation is edge-driven like dialogs, so A is tapped 4 on / 4 off
+-- rather than held.  (Measured here: from (10,50) already facing up, four
+-- frames of tapping engage the guard.)
 local FACE = { up = 0, right = 1, down = 2, left = 3 }
 local function talkAt(sx, sy, dir, what, maxF)
   local aPh, started = 0, 0
@@ -352,9 +353,9 @@ local function talkAt(sx, sy, dir, what, maxF)
   })
 end
 
--- Cross an entrance whose destination is THE SAME MAP -- map 72 is built out
--- of four of them, and `map changed` is no signal at all there.  Arrival is
--- the destination TILE instead.
+-- Cross an entrance whose destination is the same map.  Map 72 is built out
+-- of four of them, so `map changed` is no signal there.  Arrival is the
+-- destination tile instead.
 local function warpTo(sx, sy, dx, dy, what, maxF)
   return seq({
     H.logStep(function()
@@ -376,10 +377,9 @@ local function warpTo(sx, sy, dx, dy, what, maxF)
   })
 end
 
--- Assert the BFS plan to (tx,ty) exists and never touches row `badY` -- the
+-- Assert the BFS plan to (tx,ty) exists and never touches row `badY`, the
 -- map's world-exit row.  BFS models passability, not entrance triggers, so
--- this is the only thing standing between a shortest path and a route that
--- quietly walks out of the mountain.
+-- this check is what keeps a shortest path from walking out of the mountain.
 local function planAvoidsRow(tx, ty, badY, what)
   return H.call(function()
     local p = H.bfsPath(tx, ty)
@@ -405,13 +405,13 @@ end
 -- them): $25 options, $26 buy list, $27 quantity, $28 post-buy wait -> $26.
 -- The list row is $4B; row r's item id is $7E9D89+r.  The quantity widget
 -- is zSelIndex, DP $28 -- RIGHT +1, LEFT -1, UP +10, DOWN -10, gil-clamped
--- by the handler.  Both cells are READ and steered toward a target, never
--- press-counted: menu auto-repeat overshoots, measurably (gen_sabin_train
--- bought 25 Tonics on a counted hold that asked for 14).
+-- by the handler.  Both cells are read and steered toward a target, never
+-- press-counted: menu auto-repeat overshoots (gen_sabin_train bought 25
+-- Tonics on a counted hold that asked for 14).
 --
--- The five map-75 short entrances a BFS would happily route through.  Four
--- of them are far from this walk; (8..10,32) is not -- it is sixteen steps
--- from the spawn, in the quadrant the shop walk crosses.
+-- The five map-75 short entrances a BFS would route through.  Four of them
+-- are far from this walk.  (8..10,32) is sixteen steps from the spawn, in the
+-- quadrant the shop walk crosses.
 local M75_AVOID = {
   { 8, 32 }, { 9, 32 }, { 10, 32 },        -- -> map 80
   { 18, 55 }, { 19, 55 }, { 20, 55 },      -- -> map 91
@@ -431,9 +431,9 @@ local function tapUntil(btn, pred, what, maxF)
 end
 
 -- Walk off the current map by holding each direction in turn until the map
--- id changes.  Deliberately NOT H.stepOff, whose battle branch still sets
--- the kill bit -- nothing on this route may write game state (issue #75),
--- and maps 75/85 have no encounters for it to answer anyway.
+-- id changes.  This is not H.stepOff, whose battle branch still sets the kill
+-- bit; nothing on this route may write game state (issue #75), and maps 75/85
+-- have no encounters for it to answer.
 local function leaveTo(dstMap, dirs, what, maxF)
   local n = 0
   return seq({
@@ -447,11 +447,11 @@ local function leaveTo(dstMap, dirs, what, maxF)
   })
 end
 
--- Buy up to `target` of item `id`, sitting on buy-list row `row`.  Closed
--- loop at every step: the row is verified to hold the item we think it does
--- BEFORE any money moves, the quantity is steered to the number we want and
--- read back, and the purchase is confirmed by gil actually falling by
--- quantity x price.  A short purse buys what it can and says so.
+-- Buy up to `target` of item `id`, sitting on buy-list row `row`.  Every step
+-- is checked: the row is verified to hold the expected item before any money
+-- moves, the quantity is steered to the number we want and read back, and the
+-- purchase is confirmed by gil falling by quantity x price.  With too little
+-- gil it buys what it can and logs the count.
 local function buyTo(id, row, target, unit, name)
   local want, before = 0, 0
   return seq({
@@ -521,11 +521,11 @@ local function shopTrip()
     end),
     H.navTo(106, 54, { maxFrames = 20000, playBattles = "flee" }),
     H.release(), H.waitFrames(20),
-    -- COUNTER TALK: the merchant is at (106,52) with the counter tile
+    -- Counter talk: the merchant is at (106,52) with the counter tile
     -- (106,53) between him and the party, and CheckNPCs reaches through it
-    -- (player.asm:188-200).  UP is held until the facing byte reads back --
-    -- a two-frame turn press does not set it -- and (106,53) is impassable,
-    -- so the hold cannot walk anyone into the counter.
+    -- (player.asm:188-200).  UP is held until the facing byte reads back,
+    -- because a two-frame turn press does not set it, and (106,53) is
+    -- impassable, so the hold cannot walk anyone into the counter.
     H.driveUntil(inState(0x25), 6000, {
       H.call(function()
         if not (H.hasControl() and H.tileAligned()) then H.setPad({}); return end
@@ -545,20 +545,19 @@ local function shopTrip()
       for r = 0, 7 do rows[#rows + 1] = string.format("%02X", rowItem(r)) end
       H.log("[shop] stock: " .. table.concat(rows, " "))
     end),
-    -- FIVE, not three.  Measured 2026-08-09: with three, the mountain's own
-    -- fights spent every one of them before the summit and the party stood
-    -- on VARGAS's ledge with no answer to a death -- and gen_vargas needs
-    -- one AFTER the fight to raise TERRA.  The wallet can carry it; the
-    -- mountain pays the gil back twice over on the way up.
-    -- The mix is measured, not guessed.  A death costs a Fenix Down (500
-    -- gil); NOT dying costs a Tonic (50).  The first pass bought three
-    -- revives and spent all three; the second bought five and spent all
-    -- five, every one of them on map 98.  So the wallet goes mostly on
-    -- Tonics and the driver heals earlier (M.setRows' sibling change:
-    -- playBattles="tactical" now heals at 55%, not 35%), with five revives as
-    -- the floor because gen_vargas needs one AFTER the fight to raise
-    -- TERRA and the entry-point contract below refuses to generate without
-    -- it.
+    -- Five Fenix Downs, not three.  Measured 2026-08-09: with three, the
+    -- mountain's own fights spent every one of them before the summit and the
+    -- party stood on VARGAS's ledge with no way to answer a death, and
+    -- gen_vargas needs one after the fight to raise TERRA.  The gil is
+    -- available, and the mountain returns more than that on the way up.
+    -- The mix is measured.  A death costs a Fenix Down (500 gil); not dying
+    -- costs a Tonic (50).  The first pass bought three revives and spent all
+    -- three; the second bought five and spent all five, every one of them on
+    -- map 98.  So most of the gil goes on Tonics and the driver heals earlier
+    -- (M.setRows' sibling change: playBattles="tactical" now heals at 55%,
+    -- not 35%), with five revives as the minimum because gen_vargas needs one
+    -- after the fight to raise TERRA and the entry-point contract below
+    -- refuses to generate without it.
     buyTo(0xF0, 5, 5, 500, "FENIX DOWN to 5"),
     buyTo(0xE8, 0, 25, 50, "TONIC to 25"),
     tapUntil("b", inState(0x25), "shop: back to the options window"),
@@ -593,7 +592,7 @@ H.run({ maxFrames = 400000 }, {
   end),
 
   -- ===================================================================== --
-  -- PHASE 1: GET OFF THE BIRD.  Hold B; LandAirship stages the tile into
+  -- PHASE 1: get off the chocobo.  Hold B; LandAirship stages the tile into
   -- $1F60/$1F61, the descent releases the exit, ExitVehicle clears $11FA
   -- and ReloadMap comes back through InitWorld with $E0/$E2 finally live.
   -- ===================================================================== --
@@ -614,7 +613,7 @@ H.run({ maxFrames = 400000 }, {
   end),
 
   -- ===================================================================== --
-  -- PHASE 2: THE SOUTH FIGARO CAVE.  The desert's only way south.  Four
+  -- PHASE 2: the South Figaro cave, the desert's only way south.  Four
   -- steps; the middle one is an event trigger, not an entrance, so it is
   -- driven as a plain navTo whose arrival is the map change.
   -- ===================================================================== --
@@ -633,7 +632,7 @@ H.run({ maxFrames = 400000 }, {
   end),
   care("cave lobby"),
 
-  -- The guards first: they stand ON the only two tiles that reach the
+  -- The guards first: they stand on the only two tiles that reach the
   -- trigger.  Stage at (10,50), directly under the one with the event, face
   -- UP, talk; the scene ends by clearing their spawn switch $0312.
   H.call(function()
@@ -654,8 +653,8 @@ H.run({ maxFrames = 400000 }, {
     H.screenshot("kolts_cave_guards")
   end),
 
-  -- map 71's event trigger at (10,48)/(11,48) is what actually opens the
-  -- cave (_ca5ef7); the lobby has no short entrance onward at all.
+  -- map 71's event trigger at (10,48)/(11,48) opens the cave (_ca5ef7); the
+  -- lobby has no short entrance onward.
   H.navTo(11, 48, { maxFrames = 20000, arrive = mapChanged(),
            playBattles = "flee" }),
   H.release(),
@@ -669,15 +668,15 @@ H.run({ maxFrames = 400000 }, {
 
   -- Map 73 offers three exits and the spawn only reaches one.  Landing at
   -- (47,39) the model reaches 50 tiles: (55,32) -> map 72 (10,3) and
-  -- (47,40) -> back to the lobby, but NOT (41,14) -- that mouth belongs to
-  -- a stretch of the cave this end does not connect to.  Measured, after a
+  -- (47,40) -> back to the lobby, but not (41,14), which belongs to a stretch
+  -- of the cave this end does not connect to.  This was measured after a
   -- first pass picked (41,14) off the table and got "no path".
   crossTo(55, 32, 72, "cave body -> cave exit hall"),
 
-  -- Map 72 is FOUR DISCONNECTED REGIONS stitched by same-map warps, and the
-  -- one the party lands in does not touch the world exit.  Measured from
-  -- (10,3): 276 reachable tiles, and of the map's seven entrance records
-  -- only (10,2)/(4,4) back to map 73 and (17,20) are among them -- (16,43),
+  -- Map 72 is four disconnected regions stitched together by same-map warps,
+  -- and the one the party lands in does not touch the world exit.  Measured
+  -- from (10,3): 276 reachable tiles, and of the map's seven entrance records
+  -- only (10,2)/(4,4) back to map 73 and (17,20) are among them.  (16,43),
   -- the way out, is not.  The chain that does reach it, each hop confirmed
   -- by re-running the reachability dump on the far side:
   --   (10,3)  --walk--> (17,20) --warp--> (61,56)   [31 tiles reachable]
@@ -710,7 +709,7 @@ H.run({ maxFrames = 400000 }, {
   end),
 
   -- ===================================================================== --
-  -- PHASE 3: SOUTH FIGARO.  One world tile of the four that lead in
+  -- PHASE 3: South Figaro.  One world tile of the four that lead in
   -- ((86,111)/(85,112)/(86,112)/(85,113) -> map 75 (1,28)); generate on
   -- arrival, then leave by the x=0 column the party is already beside.
   -- ===================================================================== --
@@ -734,54 +733,55 @@ H.run({ maxFrames = 400000 }, {
   end),
 
   -- ===================================================================== --
-  -- PHASE 3b: THE ITEM SHOP.  The party walks THROUGH a town on the way to
-  -- a boss with a bag that cannot answer a death, and until now it walked
-  -- straight back out again.  Measured 2026-08-09: with the care layer in
-  -- and map 98 fought rather than fled, everyone reached VARGAS alive --
-  -- but the Tonics were gone and the Potions were down to the reserve, and
-  -- the run before that lost LOCKE outright with no Fenix Down to raise
-  -- him.  Running out of supplies is a real finding, and the answer a
-  -- player has is the shop that is thirty seconds off the path.
+  -- PHASE 3b: the item shop.  The party walks through a town on the way to a
+  -- boss carrying a bag that cannot answer a death, and until now it walked
+  -- straight back out again.  Measured 2026-08-09: with the care layer in and
+  -- map 98 fought rather than fled, everyone reached VARGAS alive, but the
+  -- Tonics were gone and the Potions were down to the reserve, and the run
+  -- before that lost LOCKE outright with no Fenix Down to raise him.  Running
+  -- out of supplies is a real finding, and the shop is thirty seconds off the
+  -- path.
   --
   -- The route is derived in docs/research/south-figaro-shop-route.md and
-  -- the traps it names are honoured here:
-  --   * SHOP 8 (event_main.asm:18308), NOT 15 -- the shop ids at :21595
-  --     belong to another town entirely.  Its stock is Tonic / Antidote /
-  --     Soft / Eyedrop / Echo Screen / FENIX DOWN / Sleeping Bag / Tent,
-  --     rows 0..7, and it does NOT sell Potions: shop 63, the $00A4
-  --     alternate, is the only South Figaro record that ever does, and
+  -- the hazards it names are handled here:
+  --   * shop 8 (event_main.asm:18308), not 15; the shop ids at :21595
+  --     belong to another town.  Its stock is Tonic / Antidote /
+  --     Soft / Eyedrop / Echo Screen / Fenix Down / Sleeping Bag / Tent,
+  --     rows 0..7, and it does not sell Potions.  Shop 63, the $00A4
+  --     alternate, is the only South Figaro record that sells them, and
   --     $00A4 is set inside the Locke/Celes escape, chapters from here.
   --     So Tonics are the refill and Fenix Downs are the insurance.
-  --   * map 75 hides FIVE short entrances a BFS would happily route
-  --     through, and (8..10,32) sits sixteen steps from the spawn in the
-  --     quadrant this walk crosses.  They are passed to navTo as `avoid`.
-  --   * (44,30) is a BUMP DOOR ($F7): a wall until CheckDoor opens it, so
+  --   * map 75 has five short entrances a BFS would route through, and
+  --     (8..10,32) sits sixteen steps from the spawn in the quadrant this
+  --     walk crosses.  They are passed to navTo as `avoid`.
+  --   * (44,30) is a bump door ($F7): a wall until CheckDoor opens it, so
   --     BFS cannot plan onto it and the crossing is navTo(44,32) plus one
-  --     held UP -- the same shape gen_edgar's crossDoor uses for Figaro.
-  --   * the merchant is a COUNTER talk.  He stands at (106,52); the party
+  --     held UP, the same shape gen_edgar's crossDoor uses for Figaro.
+  --   * the merchant is a counter talk.  He stands at (106,52); the party
   --     stands at (106,54) and faces UP, and CheckNPCs reaches the tile
-  --     BEYOND the counter at (106,53) (player.asm:188-200).  Standing
-  --     next to him is not possible; there is a counter in the way.
-  --   * maps 75 and 85 have no encounters at all (map_prop byte 5 = 0), so
-  --     this whole detour is walked, not fought.
+  --     beyond the counter at (106,53) (player.asm:188-200).  The counter
+  --     is in the way, so the party cannot stand next to him.
+  --   * maps 75 and 85 have no encounters (map_prop byte 5 = 0), so this
+  --     detour is walked, not fought.
   shopTrip(),
 
-  -- THE ROWS, once, here -- and they ride the save from here to the end of
-  -- the chain (the bit is $1850+c bit $20, party state, not battle state).
-  -- Owner note, 2026-08-09: "a lot of ranged attackers can just sit in the
-  -- back row forever at no cost."  In this ROM the exemption is even wider
+  -- The rows are set once, here, and they carry in the save from here to the
+  -- end of the chain (the bit is $1850+c bit $20, party state, not battle
+  -- state).  Owner note, 2026-08-09: "a lot of ranged attackers can just sit
+  -- in the back row forever at no cost."  In this ROM the exemption is wider
   -- than that: ExecCmd sets $B3 = $FF for every command and only the weapon
   -- swing clears the "ignore attacker row" bit, so Tools, Magic, Blitz,
-  -- SwdTech, Throw and Steal are ALL exempt (battle_main.asm:3131-3133,
-  -- :7127-7133).  EDGAR fights this whole arc with Tools and TERRA with
-  -- Magic, so the back row halves the physical damage they take and costs
-  -- them exactly nothing.  LOCKE stays in FRONT on purpose: Steal deals no
-  -- damage at all, so Fight is the only damage he has, and the Dirk carries
-  -- no BACK_ROW flag.  docs/research/row-menu.md has the citations.
+  -- SwdTech, Throw and Steal are all exempt (battle_main.asm:3131-3133,
+  -- :7127-7133).  EDGAR fights this arc with Tools and TERRA with Magic, so
+  -- the back row halves the physical damage they take at no cost.  LOCKE
+  -- stays in front: Steal deals no damage, so Fight is his only damage, and
+  -- the Dirk carries no BACK_ROW flag.  docs/research/row-menu.md has the
+  -- citations.
   H.setRows({ [0] = true, [1] = false, [4] = true }, { tag = "rows" }),
 
   -- Out the way we came: x=0 is the vertical long entrance -> world
-  -- (84,112).  One press, not a navTo: the target tile IS the trigger.
+  -- (84,112).  One press, not a navTo, because the target tile is the
+  -- trigger.
   H.navTo(1, 28, { maxFrames = 20000, playBattles = "flee", avoid = M75_AVOID }),
   H.release(),
   H.waitFrames(30),
@@ -793,7 +793,7 @@ H.run({ maxFrames = 400000 }, {
   H.call(function() where("left south figaro") end),
 
   -- ===================================================================== --
-  -- PHASE 4: MT. KOLTS.  World (102,100) -> map 95 (14,35).  Map 95's own
+  -- PHASE 4: Mt. Kolts.  World (102,100) -> map 95 (14,35).  Map 95's own
   -- exit row y=37 is two tiles south of the spawn, so every step here is
   -- pre-checked against it.
   -- ===================================================================== --
@@ -815,12 +815,11 @@ H.run({ maxFrames = 400000 }, {
   end),
 
   -- ===================================================================== --
-  -- THE MOUNTAIN.  Nine crossings, and the shape of them is the whole
-  -- reason this took measuring: map 100 is not a map you walk across, it is
-  -- SIX disconnected shelves, and the caves 96/97/102 are the stitching.
+  -- The mountain.  Nine crossings.  Map 100 cannot be walked across: it is
+  -- six disconnected shelves, and the caves 96/97/102 connect them.
   -- Flooding the passability model out of every arrival tile (150 nodes per
-  -- frame -- a whole flood in one Lua slice trips Mesen's script watchdog
-  -- silently) partitions it exactly:
+  -- frame, because a whole flood in one Lua slice trips Mesen's script
+  -- watchdog silently) partitions it as:
   --   F  (8,13)/(19,16)   exits (7,13)->95, (19,17)->96
   --   D  (35,7)/(44,24)/(51,33), 166 tiles -- exits (43,24)/(50,33)/(34,7)
   --                       ->96 and (56,7)->100(30,36)
@@ -830,12 +829,12 @@ H.run({ maxFrames = 400000 }, {
   --   A  (8,48), 60 tiles  -- exits (7,48)->98, (17,59)->101 (the east exit)
   -- and map 96 into four: P (16,22)/(21,21), R (14,12), Q (25,16),
   -- S (28,25), each with one or two exits back to a named shelf.
-  -- The consequence: (7,48)->98, which the entrance table advertises as
-  -- "map 100 -> Vargas's map", lives in shelf A, and NOTHING in the graph
-  -- reaches A except map 98 itself.  Walking in through it is impossible;
-  -- it is the way OUT, and Vargas's walk-on parks him on top of it.
-  -- THE LINK THAT DOES WORK IS A LONG ENTRANCE, which is why a short-table
-  -- reading of the mountain dead-ends in D: map 96 (12,8), VERTICAL, length
+  -- So (7,48)->98, which the entrance table lists as "map 100 -> Vargas's
+  -- map", lives in shelf A, and nothing in the graph reaches A except map 98
+  -- itself.  Walking in through it is impossible; it is the way out, and
+  -- Vargas's walk-on parks him on top of it.
+  -- The link that does work is a long entrance, which is why reading only the
+  -- short table dead-ends the mountain in D: map 96 (12,8), vertical, length
   -- 1 -> map 102 (51,46).  From 102 the bridge drops back onto shelf B, and
   -- B carries the summit chain 97 -> 103 -> 98.
   planAvoidsRow(11, 26, 37, "map 95 -> (11,26)"),
@@ -850,19 +849,19 @@ H.run({ maxFrames = 400000 }, {
   crossTo(60, 9, 98, "K9 summit -> VARGAS's ledge", "tactical"),
 
   -- ===================================================================== --
-  -- PHASE 5: THE VARGAS ENTRY POINT.  The party lands on map 98 at (11,10);
+  -- PHASE 5: the Vargas entry point.  The party lands on map 98 at (11,10);
   -- the approach trigger is (10,32)/(11,32) -> _ca8267 (event_main.asm
   -- :19794, event_trigger.asm _98), gated on $010A.  It sets $010A/$031C,
   -- creates NPC_1 and runs him ASYNC from (29,35) around to (23,32) facing
-  -- LEFT (:19802-19816) -- which puts him ON the tile back to map 100, so
-  -- he blocks the retreat exactly the way the scene wants.  There is no
-  -- player_ctrl_off in that event, so control never leaves.
+  -- left (:19802-19816), which puts him on the tile back to map 100, so he
+  -- blocks the retreat.  There is no player_ctrl_off in that event, so
+  -- control never leaves.
   -- Then walk back east to (22,32), the tile beside him, and generate: one
-  -- interaction (face RIGHT, press A -> _ca828f) short of `battle 66`.
-  -- VARGAS IS OBJECT 16, not 17: object number is map-NPC index + 16 and
+  -- interaction (face right, press A -> _ca828f) short of `battle 66`.
+  -- Vargas is object 16, not 17: object number is map-NPC index + 16 and
   -- NPCProp::_98 holds exactly one record (npc_prop.asm:4006, {23,32},
   -- spawn $031C, `set_npc_event _ca828f`), so he is index 0.  Watching 17
-  -- waits forever on an object that does not exist -- measured, 20000
+  -- waits on an object that does not exist; that was measured as 20000
   -- frames of a party standing correctly at (11,32) with $010A already set.
   -- ===================================================================== --
   H.call(function()
@@ -871,19 +870,19 @@ H.run({ maxFrames = 400000 }, {
     where("map 98 arrival")
   end),
   care("map 98 arrival"),
-  -- MAP 98 IS FOUGHT, NOT FLED, and that is a measured decision rather than
-  -- a mood.  Its encounter group is 62 -- Trilium pairs and Trilium + Tusker
-  -- + two Cirpius -- and the approach is 96 steps followed by another 53,
-  -- the longest unbroken walk on the route.  Running from those packs means
+  -- Map 98 is fought, not fled, and that is a measured decision.  Its
+  -- encounter group is 62 (Trilium pairs, and Trilium + Tusker + two
+  -- Cirpius), and the approach is 96 steps followed by another 53, the
+  -- longest unbroken walk on the route.  Running from those formations means
   -- standing still and being hit for as many rounds as the run roll takes:
-  -- measured 2026-08-09, the party crossed the whole mountain at full HP
+  -- measured 2026-08-09, the party crossed the whole mountain at full hp
   -- under the care layer and then lost LOCKE outright (122 -> 0) on the
   -- final 53 steps, and with no Fenix Down in the bag no amount of care can
-  -- answer that.  A player walking this ledge kills Triliums; they are trash
-  -- with two shields.  So these three steps run playBattles="tactical" -- the
-  -- real command menus, EDGAR's Tools, boosted Fights, and the fight
-  -- driver's own Potion medic line at 35% -- and the party arrives having
-  -- actually played the mountain instead of absorbing it.
+  -- answer that.  A player walking this ledge kills Triliums, which are weak
+  -- enemies with two shields.  So these three steps run
+  -- playBattles="tactical", using the real command menus, EDGAR's Tools,
+  -- boosted Fights, and the fight driver's own Potion medic line at 35%, and
+  -- the party arrives having fought the mountain rather than absorbed it.
   H.navTo(11, 32, { maxFrames = 40000, playBattles = "tactical",
     reserve = { [POTION] = 5 },
     arrive = function() return sw(0x010A) == 1 end }),
@@ -904,12 +903,12 @@ H.run({ maxFrames = 400000 }, {
   H.navTo(22, 32, { maxFrames = 40000, playBattles = "tactical",
                     reserve = { [POTION] = 5 } }),
   H.release(),
-  -- Face him.  NPC activation is decided by the party FACING byte ($087F
+  -- Face him.  NPC activation is decided by the party facing byte ($087F
   -- through the $0803 party-object offset; 0 up 1 right 2 down 3 left, from
   -- the four movement branches at player.asm:456-505) and a two-frame turn
-  -- press does not set it at all -- gen_edgar measured 1800 frames of A
-  -- against a mis-faced Edgar.  So HOLD right until the byte reads 1, and
-  -- leave the state facing him: the fight test then only has to press A.
+  -- press does not set it; gen_edgar measured 1800 frames of A against a
+  -- mis-faced Edgar.  So hold right until the byte reads 1, and leave the
+  -- state facing him, so the fight test only has to press A.
   -- (Vargas occupies (23,32), so the hold cannot walk the party into him.)
   H.driveUntil(function()
     return H.readByte(0x087f + H.readWord(0x0803)) == 1
@@ -921,11 +920,11 @@ H.run({ maxFrames = 400000 }, {
   H.release(),
   H.waitFrames(30),
 
-  -- The LAST care stop, and the one the fight actually depends on: the walk
-  -- from the approach trigger to his tile is 53 steps of Trilium/Tusker
-  -- country and is where TERRA died outright on the 2026-08-06 chain.  Heal
-  -- here, then re-establish the facing the menu visit cannot have changed
-  -- but which the fixture's contract will not take on trust.
+  -- The last care stop, and the one the fight depends on: the walk from the
+  -- approach trigger to his tile is 53 steps through Trilium/Tusker
+  -- encounters, and is where TERRA died on the 2026-08-06 chain.  Heal here,
+  -- then re-establish the facing.  The menu visit should not have changed it,
+  -- but the fixture's contract checks rather than assumes.
   care("vargas entry point", 0.95),
   H.driveUntil(function()
     return H.readByte(0x087f + H.readWord(0x0803)) == 1
@@ -946,7 +945,7 @@ H.run({ maxFrames = 400000 }, {
     H.assertEq(H.tileAligned(), true, "tile-aligned")
     H.assertEq(H.readByte(0x087f + H.readWord(0x0803)), 1, "facing RIGHT, at him")
     H.assertEq(H.battleLoadStarted(), false, "not in a battle")
-    -- the tools this whole route exists to carry
+    -- the tools this route carries to the fight
     H.assertEq(invCount(0xA4), 1, "BioBlaster still carried (the poison key)")
     H.assertEq(invCount(0xA3), 1, "NoiseBlaster still carried")
     H.assertEq(invCount(0xAA), 1, "AutoCrossbow still carried")
@@ -958,15 +957,14 @@ H.run({ maxFrames = 400000 }, {
           H.readWord(base + 9), H.readWord(base + 11)))
       end
     end
-    -- THE ENTRY POINT CONTRACT (issue #75).  A fixture that hands
-    -- gen_vargas a corpse and a one-hit-point EDGAR is not an entry point,
-    -- it is a loss already recorded, and the 2026-08-06 chain shipped
-    -- exactly that and then blamed the fight for losing four times.  So the
-    -- walk has to deliver a party that can fight, and say so here rather
-    -- than three edges downstream: everyone standing, and nobody below
-    -- half.  If this ever fails the finding is "the route ran out of
-    -- supplies", which is a real thing to know and not something to widen
-    -- the bound around.
+    -- The entry point contract (issue #75).  A fixture that hands gen_vargas
+    -- a dead character and a one-hit-point EDGAR has already lost the fight.
+    -- The 2026-08-06 chain shipped that and the four losses were attributed
+    -- to the fight instead.  So the walk has to deliver a party that can
+    -- fight, and check it here rather than three edges downstream: everyone
+    -- alive, and nobody below half hp.  A failure here means the route ran
+    -- out of supplies, which is worth knowing and is not a reason to widen
+    -- the bound.
     for _, c in ipairs(H.partyMembers()) do
       H.assertEq(H.charHp(c) > 0, true,
         string.format("char %d reached VARGAS alive", c))
@@ -974,9 +972,9 @@ H.run({ maxFrames = 400000 }, {
         string.format("char %d is at or above half hp (%d/%d)",
           c, H.charHp(c), H.charMaxHp(c)))
     end
-    -- and it still has something to answer a death with.  gen_vargas
-    -- raises TERRA after the fight; an entry point with an empty bag makes
-    -- that impossible and the failure would surface an edge later.
+    -- The party also still has a way to answer a death.  gen_vargas raises
+    -- TERRA after the fight; an entry point with an empty bag makes that
+    -- impossible, and the failure would surface an edge later.
     H.assertEq(invCount(0xF0) >= 1, true,
       string.format("a Fenix Down is still in reserve for the fight (%d)",
         invCount(0xF0)))

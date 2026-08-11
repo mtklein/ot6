@@ -1,31 +1,32 @@
 -- @suite
--- probe_ctrboost.lua -- does a pending boost leak into COUNTERATTACKS?
+-- probe_ctrboost.lua -- measures whether a pending boost leaks into
+-- counterattacks.
 --
 -- Counterattacks execute through ExecRetal (battle_main.asm:12430), which
--- ends at its own `jmp EndAction` -- not the hooked one -- so they never
--- reach Ot6ActionEnd: a counter neither charges pending boost nor earns
--- the +1 regen.  Right for the charge; but the EXEC-time hooks read
--- pending with x = the countering character, so the boost is DELIVERED
--- without ever being paid:
+-- ends at its own `jmp EndAction` rather than the hooked one, so they
+-- never reach Ot6ActionEnd; a counter neither charges pending boost nor
+-- earns the +1 regen.  That is correct for the charge, but the exec-time
+-- hooks read pending with x = the countering character, so the boost is
+-- delivered without being paid:
 --   - black belt counters are command $00 fight (battle_main.asm:12621
 --     `stz $3a7a`), so Ot6FightBoost adds 2*pending swings to the free
---     counter -- measured here via the $3a70 swing count;
---   - INTERCEPTOR counters are command $02 attack $fc/$fd (:12606), no
---     Ot6BoostDmg exemption -- same class, x2/x4/x8 on the dog (not
---     measurable on this fixture: synthetic $3416 procs load the attack
---     but its damage never applies without the real dog state);
---   - retort counters are command $07 -- exempt only because bushido
+--     counter; measured here via the $3a70 swing count;
+--   - Interceptor counters are command $02 attack $fc/$fd (:12606), with
+--     no Ot6BoostDmg exemption, so the same class applies: x2/x4/x8 on
+--     the dog (not measurable on this fixture: synthetic $3416 procs load
+--     the attack but its damage never applies without the real dog state);
+--   - retort counters are command $07, exempt only because bushido
 --     already is.
--- Pending boost is compose-time state: it is nonzero exactly while the
--- player is lining up their NEXT action, which is exactly when a counter
--- can fire.  Black Belt is a WoB relic and Cyan's retort stance makes
--- "hit while composing" the common case in the v0.3 arc.
+-- Pending boost is compose-time state: it is nonzero while the player is
+-- lining up their next action, which is when a counter can fire.  Black
+-- Belt is a WoB relic, and Cyan's retort stance makes being hit while
+-- composing the common case in the v0.3 arc.
 --
 -- Measured: slot 0 wears a synthetic black belt ($3c58 bit 1), guards
 -- swing at the parked party.  Phase A pending 0, phase B pending 3.
 -- Every $3a70 write is logged with the counterattack flag ($b1.0):
 -- FightAttack stores the vanilla swing count (1), then Ot6FightBoost
--- stores 1+2*pending -- a [1,7] pair on a $b1.0=1 action is the leak.
+-- stores 1+2*pending; a [1,7] pair on a $b1.0=1 action indicates the leak.
 local H = dofile("tools/tests/lib/ot6.lua")
 local STATE = "build/states/battle_entry.mss.lua"
 
@@ -59,7 +60,7 @@ end
 local function maxCounterSwing()
   -- max $3a70 on a counterattack, excluding the $ff end sentinel: the
   -- peak is the swing count Ot6FightBoost left (1 vanilla; 1+2*pending
-  -- when the leak is live -- the countdown 7,6,..,0 follows it)
+  -- when the leak is present, followed by the countdown 7,6,..,0)
   local m = nil
   for _, w in ipairs(swings) do
     if w.ctr == 1 and w.v < 255 and (m == nil or w.v > m) then m = w.v end

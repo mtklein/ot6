@@ -1,14 +1,14 @@
 #!/bin/sh
-# savestate_stamp_selftest.sh -- prove the provenance signature in isolation,
+# savestate_stamp_selftest.sh: check the provenance signature in isolation,
 # no emulator, on a mock tree (OT6_ROOT).
 #
-# The signature is compared on two sides -- the ninja `generate` edge `write`s it,
-# lib/compose.py re-derives it at embed time to catch a drifted
-# worktree-seeded fixture -- so what matters is that it reacts to CONTENT on
+# The signature is compared on two sides: the ninja `generate` edge `write`s it,
+# and lib/compose.py re-derives it at embed time to catch a drifted
+# worktree-seeded fixture.  So what matters is that it reacts to content on
 # every axis a generated savestate depends on (generator, all three composed-in
-# lib halves, declared extras) and NEVER to a bare mtime bump.  The old
-# `needsgen` generate-or-skip DECISION this file also used to pin now belongs
-# to ninja; its axes are proven end-to-end against real ninja
+# lib halves, declared extras) and never to a bare mtime bump.  The
+# `needsgen` generate-or-skip decision this file also used to pin now belongs
+# to ninja; its axes are checked end-to-end against real ninja
 # in savestate_ninja_selftest.sh, which is this file's other half.
 set -u
 GATE="$(cd "$(dirname "$0")" && pwd)/savestate_stamp.sh"
@@ -32,7 +32,7 @@ export OT6_ROOT="$TMP"
 
 base=$(sh "$GATE" sig gen_fake)
 
-# 1. mtime-only touches change NOTHING: a checkout or worktree cp must not
+# 1. mtime-only touches change nothing: a checkout or worktree cp must not
 #    look like an edit on any axis.
 for f in tools/tests/gen_fake.lua tools/tests/lib/ot6.lua \
          tools/tests/lib/ot6_field.lua tools/tests/lib/ot6_contract.lua; do
@@ -79,16 +79,16 @@ sh "$GATE" sig gen_fake /etc/passwd >/dev/null 2>&1
 [ "$?" -ne 0 ] && echo "  pass absolute extra -> hard error" ||
   { echo "  FAIL absolute extra accepted"; ok=0; }
 
-# 6. the GATE_CONTRACT version is a real input: the digest is NOT the bare
+# 6. the GATE_CONTRACT version is a real input: the digest is not the bare
 #    hash of the concatenated files, so bumping the constant moves every
-#    signature (issue #75 step 5 -- the deliberate invalidate-the-world knob).
+#    signature (issue #75 step 5, the deliberate invalidate-everything knob).
 bare=$(cat "$TMP/tools/tests/gen_fake.lua" "$TMP/tools/tests/lib/ot6.lua" \
            "$TMP/tools/tests/lib/ot6_field.lua" \
            "$TMP/tools/tests/lib/ot6_contract.lua" | shasum -a 256 | cut -c1-64)
 check "GATE_CONTRACT version participates in the sig" DIFF \
   "${base%% *}" "$bare"
 
-# 7. write records the signature AND the provenance bindings (issue #75
+# 7. write records the signature and the provenance bindings (issue #75
 #    step 5): line 1 is byte-identical to `sig` (the side compose.py
 #    re-derives), line 2 binds the artifact, line 3 binds the ancestor.
 printf 'generated state bytes v1\n' > "$TMP/build/states/fake.mss"
@@ -104,8 +104,8 @@ want_art="artifact $(shasum -a 256 "$TMP/build/states/fake.mss" | cut -c1-64)"
   echo "  pass a root state (ancestor -) carries no ancestor line" ||
   { echo "  FAIL unexpected ancestor line on a root state"; ok=0; }
 
-# 8. a chained state binds its predecessor's STAMP FILE -- transitivity on
-#    disk: child stamp -> parent stamp -> parent artifact, down to the root.
+# 8. a chained state binds its predecessor's stamp file, giving transitivity
+#    on disk: child stamp -> parent stamp -> parent artifact, down to the root.
 printf 'child state bytes v1\n' > "$TMP/build/states/child.mss"
 sh "$GATE" write child gen_fake build/states/fake.stamp
 want_anc="ancestor build/states/fake.stamp $(shasum -a 256 "$TMP/build/states/fake.stamp" | cut -c1-64)"

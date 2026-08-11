@@ -2,19 +2,18 @@
 """pin_test_saves.py <src_settings> <dst_settings> <saves_dir>
 
 Copy the user's Mesen settings into a worker's private Mesen config home,
-but FORCE the battery-save folder to a dedicated testing directory. The user
-was burned twice by the testrunner flushing battery to their real ot6.srm;
-this makes the manual-play save (~/Library/.../Saves) and the
-repeatable-testing saves (build/test-workers/w<id>/saves) physically
-incapable of sharing a file, regardless of what the source settings say now
-or grow to say later.
+and set the battery-save folder to a dedicated testing directory. The
+testrunner twice flushed battery data to the user's real ot6.srm; this makes
+the manual-play save (~/Library/.../Saves) and the repeatable-testing saves
+(build/test-workers/w<id>/saves) unable to share a file, regardless of what
+the source settings say now or grow to say later.
 
 <dst_settings> is the worker's own
-<home>/Library/Application Support/Mesen2/settings.json -- run.sh points
+<home>/Library/Application Support/Mesen2/settings.json.  run.sh points
 Mesen at that home with CFFIXED_USER_HOME, so writing here isolates a worker
 without giving it a private copy of the emulator (see run.sh's
-"shared emulator" note).  It used to be a settings.json INSIDE a per-worker
-app bundle, which is what made the copies necessary in the first place.
+"shared emulator" note).  It used to be a settings.json inside a per-worker
+app bundle, which is what made the copies necessary.
 """
 import json, os, sys
 
@@ -32,35 +31,36 @@ prefs = cfg.setdefault("Preferences", {})
 prefs["OverrideSaveDataFolder"] = True
 prefs["SaveDataFolder"] = saves          # dedicated, isolated from the user's
 
-# Mesen's per-Lua-slice watchdog defaults to 1 SECOND; a slow frame callback
-# (e.g. a BFS over the collision grid) can be killed SILENTLY at that setting
-# (the error only goes to the invisible script-window log), wedging the run.
-# 30 s keeps the watchdog as a hang backstop without biting real work.
+# Mesen's per-Lua-slice watchdog defaults to 1 second; a slow frame callback
+# (e.g. a BFS over the collision grid) can be killed at that setting with no
+# visible message (the error only goes to the script-window log, which is not
+# displayed), wedging the run.  30 s keeps the watchdog as a hang backstop
+# without stopping real work.
 cfg.setdefault("Debug", {}).setdefault("ScriptWindow", {})["ScriptTimeout"] = 30
 
-# Determinism pins -- test profiles deliberately diverge from the user's play
-# profile on these three, whatever the source settings say:
+# Determinism pins.  Test profiles diverge from the user's play profile on
+# these three, whatever the source settings say:
 snes = cfg.setdefault("Snes", {})
 # FF6 reads RAM it has never written, so RamPowerOnState=Random makes identical
 # runs drift (extra encounters, +-frames) and embeds garbage in the savestates
 # we generate.  Default AllZeros for reproducibility; OT6_RAM_POWERON overrides
-# it for the dirty-RAM reveal investigation/check (AllOnes = deterministic AND
+# it for the dirty-RAM reveal investigation/check (AllOnes = deterministic and
 # dirty, so it exercises what a real power-on garbage boot hands the
 # battle-init clear).
 ram = os.environ.get("OT6_RAM_POWERON", "AllZeros")
-# RamPowerOnState is the ONLY thing that picks the fill -- for WRAM, SPC RAM,
+# RamPowerOnState is the only setting that picks the fill, for WRAM, SPC RAM,
 # VRAM/CGRAM/OAM and cartridge SRAM alike. EnableRandomPowerOnState does not
-# touch RAM at all; its one use on the SNES path is randomising PPU registers
+# touch RAM; its one use on the SNES path is randomising PPU registers
 # (brightness, Mode7 matrices, BG mode, layer enables), so leaving it on for
-# Random deliberately dirties the PPU too. This once wrote "AllZeros" whenever
+# Random also dirties the PPU. This once wrote "AllZeros" whenever
 # Random was asked for, so no headless run had ever exercised random RAM.
 snes["EnableRandomPowerOnState"] = (ram == "Random")
 snes["RamPowerOnState"] = ram
-# Frame-skip picks which frames actually render based on HOST timing, so
+# Frame-skip picks which frames render based on host timing, so
 # screenshots and the framebuffer embedded in savestates vary run-to-run
 # (and under parallel load) unless every frame renders.
 snes["DisableFrameSkipping"] = True
-# Audio is inert under --testrunner (no device opened); pinned off as hygiene.
+# Audio is inert under --testrunner (no device opened); pinned off anyway.
 cfg.setdefault("Audio", {})["EnableAudio"] = False
 
 with open(dst, "w", encoding="utf-8") as f:

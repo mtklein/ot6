@@ -1,5 +1,5 @@
 -- probe_bg3anim.lua -- measurement instrument: what happens to the bg3
--- battlefield MAP region ($5400-$57FF words) and the OT6-borrowed font tiles
+-- battlefield map region ($5400-$57FF words) and the OT6-borrowed font tiles
 -- during a BG3-scripted attack animation (Fire Beam, attack $83: sprite
 -- $14D / bg1 $14B / bg3 $14C in AttackAnimProp) in a plain fight with no
 -- dialogue.

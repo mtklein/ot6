@@ -1,8 +1,9 @@
--- probe_57b9.lua -- write-watcher: is $7E57B9 (candidate OT6_FONTDIRTY
--- relocation target, spare byte in the m2 trace-verified strip) free of
--- vanilla writers?  Watches $7E57B9-$7E57BF through entry point -> battle ->
--- Fire Beam banner -> resolution.  $7E57D5 rides along as the positive
--- control: the banner machinery MUST hit it (GfxCmd_01 et al).
+-- probe_57b9.lua -- write-watcher for $7E57B9, a candidate OT6_FONTDIRTY
+-- relocation target and a spare byte in the m2 trace-verified strip.
+-- Measures whether any vanilla code writes it.  Watches $7E57B9-$7E57BF
+-- through entry point -> battle -> Fire Beam banner -> resolution.
+-- $7E57D5 rides along as the positive control; the banner machinery must
+-- write it (GfxCmd_01 and others).
 
 local H = dofile("tools/tests/lib/ot6.lua")
 local STATE = "build/states/battle_entry.mss.lua"

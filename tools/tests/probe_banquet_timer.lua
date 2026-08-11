@@ -1,33 +1,35 @@
 -- probe_banquet_timer.lua -- banquet-timer destructive-bug probe, phase A
--- (issue #31; the route recon's first-named hazard).  NOT a suite test.
+-- (issue #31; the route recon's first-named hazard).  Not a suite test.
 --
--- QUESTION: a player inside the banquet's 4-minute window can walk out of
--- the castle (243 row y=31 -> 253 -> world, all ungated during $007B=1)
--- and world-save with the event timer LIVE.  Does that save round-trip?
+-- Question measured: whether a save taken with the event timer live
+-- round-trips.  A player inside the banquet's 4-minute window can walk
+-- out of the castle (243 row y=31 -> 253 -> world, all ungated during
+-- $007B=1) and world-save with the event timer live.
 --
--- STAGING, stated plainly: the banquet is 5 ungenerated steps downstream of
--- terra-returned-v1, so this probe does NOT reach it.  It cold-Continues
+-- Staging: the banquet is 5 ungenerated steps downstream of
+-- terra-returned-v1, so this probe does not reach it.  It cold-Continues
 -- the terra-returned checkpoint (world (24,121), on foot at the parked
 -- Blackjack) and hand-writes the timer-0 block exactly as
 -- `start_timer 0, N, _cc8a96, {FIELD_VISIBLE, BANQUET,
 -- MENU_BATTLE_VISIBLE}` would (EventCmd_a0, field/event.asm:3736-3757:
 -- flags $72 = f|r|m + bank bits 2, ptr $028A96 = _cc8a96), plus switch
--- $007C=1 and score var 0 = 17 ($1FC2).  That staging proves the SAVE/LOAD
--- MECHANISM for a live banquet timer; it proves nothing about banquet
+-- $007C=1 and score var 0 = 17 ($1FC2).  That staging tests the save/load
+-- mechanism for a live banquet timer.  It says nothing about banquet
 -- reachability, the castle-exit walk, or the dinner scene's behavior with
--- this party -- those are separate claims (the exit rows are source-cited
+-- this party; those are separate claims (the exit rows are source-cited
 -- in banquet-decode.md; the scene is only ridden to its first latch in
 -- phase B).
 --
 -- Phase A measures:
---   A1  the WORLD module does not tick timer 0 (no DecTimers call in
---       ff6/src/world/ -- measured here, not just grepped);
---   A2  the MENU does tick it (menu_common.asm:3466);
---   A3  the real Save UI (gen_post_opera_checkpoint's exact drive) writes the
---       timer block into the slot-3 save: PushTimers (menu/save.asm:108)
---       copies $1188-$119F to $1FA8, CopyGameDataToSRAM copies
---       $1600-$1FFF to SRAM -- asserted by reading the slot-3 bytes back
---       at $307400+$9A8 and comparing flags/pointer byte-exactly.
+--   A1  the world module does not tick timer 0 (no DecTimers call in
+--       ff6/src/world/; measured here rather than only grepped);
+--   A2  the menu does tick it (menu_common.asm:3466);
+--   A3  the real Save UI (the same drive as gen_post_opera_checkpoint)
+--       writes the timer block into the slot-3 save: PushTimers
+--       (menu/save.asm:108) copies $1188-$119F to $1FA8,
+--       CopyGameDataToSRAM copies $1600-$1FFF to SRAM.  Asserted by
+--       reading the slot-3 bytes back at $307400+$9A8 and comparing the
+--       flags and pointer byte for byte.
 -- run.sh's OT6_CAPTURE_SRM then captures the battery for phase B
 -- (probe_banquet_timer2.lua), which cold-boots it and watches the timer
 -- resume, tick on a field map, and fire _cc8a96.
@@ -63,8 +65,8 @@ local function sram(off) return emu.read(off, emu.memType.snesMemory) end
 local menuT0 = 0
 
 H.run({ maxFrames = 30000 }, {
-  -- cold Continue (the checkpoint's $307ff0=3 preselects slot 3) -- the exact
-  -- boot step probe_mp_universal measured: restores ON FOOT at (24,121).
+  -- cold Continue (the checkpoint's $307ff0=3 preselects slot 3), the boot
+  -- step probe_mp_universal measured: restores on foot at (24,121).
   H.waitFrames(350),
   H.repeatN(5, { H.pressButtons({ "start" }, 8), H.waitFrames(25) }),
   H.waitFrames(120),
@@ -82,7 +84,7 @@ H.run({ maxFrames = 30000 }, {
     H.assertEq(H.worldHasControl(), true, "world control at the checkpoint")
   end),
 
-  -- STAGE the live banquet timer + window state (see header for staging).
+  -- Stage the live banquet timer and window state (see header for staging).
   H.call(function()
     H.writeByte(0x1188, 0x72)          -- pfrmxxee = 0111 0010
     H.writeWord(0x1189, STAGE_FRAMES)  -- counter
@@ -97,7 +99,7 @@ H.run({ maxFrames = 30000 }, {
       H.readByte(0x118C), H.readByte(0x118B), sw(0x007C), H.readWord(0x1FC2)))
   end),
 
-  -- A1: the world module must NOT tick the timer (150 idle world frames).
+  -- A1: the world module must not tick the timer (150 idle world frames).
   H.waitFrames(150),
   H.call(function()
     H.assertEq(timerCount(), STAGE_FRAMES,
@@ -105,7 +107,7 @@ H.run({ maxFrames = 30000 }, {
     H.log("[A1] 150 world frames, counter unchanged: PASS")
   end),
 
-  -- A2: the menu DOES tick it (DecTimersMenuBattle, menu_common.asm:3466).
+  -- A2: the menu does tick it (DecTimersMenuBattle, menu_common.asm:3466).
   H.repeatN(3, { H.pressButtons({ "x" }, 6), H.waitFrames(50) }),
   H.waitUntil(function() return H.readByte(0x59) ~= 0 end,
     500, "world menu open", 5),
@@ -140,7 +142,7 @@ H.run({ maxFrames = 30000 }, {
   }, "save confirmed (slot marker back to 3)"),
   H.waitFrames(60),
 
-  -- the verdict reads: did the save carry the LIVE timer?
+  -- verdict: whether the save carried the live timer
   H.call(function()
     local wf  = H.readByte(0x1188)
     local wc  = timerCount()

@@ -4,19 +4,19 @@
 -- (Terra) L5, alone, normal Fight/Magic/Item commands, Mithril Knife
 -- (pierce), spells Fire + Cure, MP 34.
 --
--- Protocol (docs in the report; deliberately boring):
---  * every battle starts from an identical loadState(mines_chase) --
---    battles are fully independent (HP/MP/XP/RNG all reset).
---  * the encounter draw is seeded, not paced-for: FF6 draws the battle
+-- Protocol (documented in the report):
+--  * every battle starts from an identical loadState(mines_chase), so
+--    battles are independent (HP, MP, XP and RNG all reset).
+--  * the encounter draw is seeded rather than paced for: FF6 draws the battle
 --    step from RNG stream $1fa1 and the formation from stream $1fa2
---    (tools note: NOTHING else consumes these streams on this map, so
+--    (tools note: nothing else consumes these streams on this map, so
 --    pacing patterns alone cannot vary the draw from a fixed state).
 --    Battle k writes documented seed values before pacing; the seed
 --    list below covers every formation slot of the map's encounter
---    group, including the 1/16 slot. Reproducible by construction.
---  * pacing is a dumb left/right two-tile walk at the map entry
+--    group, including the 1/16 slot, so it is reproducible by construction.
+--  * pacing is a simple left/right two-tile walk at the map entry
 --    (78,58)<->(77,58); a guard-catch event or an off-pool formation
---    VOIDS the sample (logged; the next loadState wipes it away).
+--    voids the sample (logged; the next loadState clears it).
 --  * the battle is then played to the end by POLICY (below), metrics
 --    sampled every frame (adapted from metrics_battle.lua).
 --  * in-battle rng phase jitter: battle k arms after 240 + 7(k-1)
@@ -45,19 +45,20 @@ local NBATTLES = 8
 -- Proven equivalent to a rebuild by mines_pace.lua (Measurement #4).
 local POKE_HP = nil
 local POKE_SHIELD = nil
--- ROM offsets are BUILD-SPECIFIC (bank F0 layout) and DO drift: these two
--- were once $300173/$30033C, both exactly $12 low, and read $6A/$88 -- live
--- code bytes, not knobs. A sweep at those offsets would have poked eighteen
--- bytes early and reported nonsense knob values while claiming to measure a
--- co-tune grid. They now derive from ff6/rom/ff6-en.dbg at compose time
--- (H.sym), so they are always correct and need no drift guard. `& 0x3FFFFF`
+-- ROM offsets are build-specific (bank F0 layout) and do drift: these two
+-- were once $300173 and $30033C, both exactly $12 low, and read $6A and $88,
+-- which are code bytes rather than knobs.  A sweep at those offsets would have
+-- poked eighteen bytes early and reported wrong knob values while claiming to
+-- measure a co-tune grid.  They now derive from ff6/rom/ff6-en.dbg at compose
+-- time (H.sym), so they are correct and need no drift guard. `& 0x3FFFFF`
 -- turns the CPU address into the snesPrgRom file offset (bank $F0 -> $30xxxx).
 local ROM_HPMUL  = H.sym("Ot6HpMulTbl") & 0x3FFFFF       -- band0 byte
 local ROM_SHIELD = H.sym("Ot6ShieldedMulW") & 0x3FFFFF   -- word, low byte
--- $1fa2 seeds (formation draw): group slots for map 50 at $1fa3=0x61 --
+-- $1fa2 seeds (formation draw): group slots for map 50 at $1fa3=0x61 are
 -- slot0 = Vaporite x2, slot1 = Were-Rat x2, slot2/3 = RepoMan+Vaporite.
--- false = leave the state's natural values (draw = Were-Rat x2 after 9
--- paced steps, measured). Chosen mix ~ the pool's own 5/16,5/16,6/16.
+-- false leaves the state's natural values (draw = Were-Rat x2 after 9
+-- paced steps, measured).  The chosen mix approximates the pool's own
+-- 5/16, 5/16, 6/16.
 local SEEDS = {
   { },                              -- b=1 natural: Were-Rat x2
   { fa2 = 0x00, fa1 = 0x90 },       -- b=2 slot0: Vaporite x2
@@ -124,14 +125,14 @@ local function commitThenConfirm(slot, want)
 end
 
 -- Fire cast: from the command menu, the magic list opens with the
--- cursor on Cure at grid (0,0); Fire sits at (1,1) (measured; the list
--- is a sparse fixed-slot grid and the cursor walks blank cells). The
+-- cursor on Cure at grid (0,0), and Fire sits at (1,1) (measured; the list
+-- is a sparse fixed-slot grid and the cursor walks blank cells).  The
 -- sequence below commits base Fire on the default enemy target.
--- Two hard-won rules:
---  * input into a JUST-opened battle window is eaten (and can wedge the
---    menu) -- the same window-open animation metrics_battle's 240-frame
---    settle dodges at battle start recurs on EVERY turn's menu. So the
---    machine waits for the menu flag to hold 4 consecutive pulses
+-- Two measured rules:
+--  * input into a just-opened battle window is dropped (and can wedge the
+--    menu), from the same window-open animation metrics_battle's 240-frame
+--    settle avoids at battle start, and it recurs on every turn's menu.  So
+--    the driver waits for the menu flag to hold 4 consecutive pulses
 --    (~120 frames) before its first press of an episode.
 --  * if the sequence runs dry with the menu still open (a press still
 --    got eaten), nudge with A twice (a lost target-confirm), then back
@@ -192,12 +193,12 @@ function POLICIES.fire()
   if H.readWord(PMP + slot*2) < 4 then return { "a" } end
   return fireCastPulse()
 end
--- the deliberate BAD-PLAYER (Measurement #5): bank to 3, then dump a 3-BP
--- boosted FIGHT at the default target. Fight is pierce, and every mines-pool
--- species is formula (no class weakness), so this boost ALWAYS lands in a
--- shielded-unweak target -- the canonical "boost feels wasted" misplay. For
+-- the deliberately poor play (Measurement #5): bank to 3, then spend a 3-BP
+-- boosted Fight at the default target.  Fight is pierce, and every mines-pool
+-- species is formula (no class weakness), so this boost always lands on a
+-- shielded-unweak target, which is the case where boost is wasted.  For
 -- this pool it coincides with boost3 (Fight matches nothing either way);
--- the point is the framing and the outcome-vs-baseline comparison.
+-- what it adds is the framing and the comparison against baseline.
 function POLICIES.badboost()
   local slot = menuSlot()
   if slot == nil then return nil end
@@ -288,12 +289,13 @@ local function sample()
     while qShadow[qi] ~= cur do
       local v = H.readByte(q.base + qShadow[qi])
       if (v & 0x80) == 0 then
-        -- each real action passes through TWO queues (advance-wait +
-        -- action), so raw dequeues run exactly 2x real actions (verified
+        -- each real action passes through two queues (advance-wait and
+        -- action), so raw dequeues run at exactly 2x real actions (verified
         -- against BP-regen stamps and the whelk driver's exec-verified
-        -- cast counters). player_actions/enemy_actions emit REAL actions:
-        -- every second dequeue of a side credits one. counter_actions
-        -- stays a raw counter-queue dequeue tally (subset diagnostics).
+        -- cast counters).  player_actions and enemy_actions emit real
+        -- actions: every second dequeue of a side credits one.
+        -- counter_actions stays a raw counter-queue dequeue tally, for
+        -- diagnostics.
         if q.counter then S.counterActions = S.counterActions + 1 end
         if v < 8 then
           S.playerDequeues = S.playerDequeues + 1
@@ -342,8 +344,8 @@ local function sample()
       local lvl = c.bp - b
       if lvl >= 1 and lvl <= 3 then S.boosts[lvl] = S.boosts[lvl] + 1 end
       -- classify the default target's state at the moment BP was spent, so
-      -- every boosted action is logged (Measurement #5). Fight matches no
-      -- pool weakness, so a boosted Fight here is "shielded-unweak".
+      -- every boosted action is logged (Measurement #5).  Fight matches no
+      -- pool weakness, so a boosted Fight here is shielded-unweak.
       local tgt
       for _, m in ipairs(mons) do
         if monsterAlive(m.slot) then tgt = m.slot break end
@@ -365,8 +367,8 @@ local function sample()
       bpTrace[#bpTrace + 1] = string.format("f%d:%d", S.frames, b0)
     end
   end
-  -- party death first: a wipe's game-over teardown must read "wiped",
-  -- not "torn_down" (fire-policy postmortem: a death raced the label)
+  -- party death first: a wipe's game-over teardown must read "wiped"
+  -- rather than "torn_down" (fire-policy postmortem: a death raced the label)
   local aliveC = 0
   for _, c in ipairs(chars) do if c.hp > 0 then aliveC = aliveC + 1 end end
   if aliveC == 0 then S.result = "wiped" return true end
@@ -442,13 +444,13 @@ end
 assert(POLICIES[POLICY], "unknown POLICY: " .. tostring(POLICY))
 
 local function paceStep(k)
-  -- pace (78,58)<->(77,58) until a battle starts loading. A random
-  -- encounter fires THROUGH an event script (EventScript_RandBattle,
+  -- pace (78,58)<->(77,58) until a battle starts loading.  A random
+  -- encounter fires through an event script (EventScript_RandBattle,
   -- field/battle.asm), so eventRunning alone is normal here: pacing goes
   -- hands-off during any event and only voids if no battle follows
-  -- within 600 frames (a guard-catch's chatter would stall that long;
+  -- within 600 frames (a guard-catch's dialogue would stall that long;
   -- its battle, if one comes, is caught by the formation pool check).
-  -- Never raises from the predicate: void reasons flow into the report.
+  -- The predicate never raises: void reasons flow into the report.
   local battN, evHold, waited, lastX = 0, 0, 0, nil
   return H.driveUntil(function()
     waited = waited + 1
@@ -486,9 +488,10 @@ local function battleBlock(k)
     H.waitFrames(10),
     H.waitUntil(calm(20), 1200, "field control (b=" .. k .. ")"),
     H.call(function()
-      -- co-tune poke (survives loadState: ROM is not savestate-backed). The
-      -- offsets are H.sym-derived, so poking can no longer land on stale
-      -- bytes -- the drift guard that used to gate this is gone.
+      -- co-tune poke (it survives loadState, because ROM is not
+      -- savestate-backed).  The offsets are H.sym-derived, so poking can no
+      -- longer land on stale bytes, and the drift guard that used to gate
+      -- this is gone.
       if POKE_HP ~= nil then
         emu.write(ROM_HPMUL, POKE_HP, emu.memType.snesPrgRom)
         H.assertEq(H.readRomByte(ROM_HPMUL), POKE_HP, "hp band0 poked")
@@ -564,7 +567,7 @@ local function battleBlock(k)
 end
 
 -- seqStepList: plain sequential composition.  (H.seqStep is public now, but
--- the lib reserves it for ot6_field's route(); tests keep this trivial copy.)
+-- the library reserves it for ot6_field's route(); tests keep this copy.)
 function seqStepList(steps)
   return {
     i = 1,

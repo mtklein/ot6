@@ -1,7 +1,7 @@
 -- probe_opera_dance2.lua -- boot aria_postfork; drive the flower dance
 -- adaptively: chase the nearest play-stage NPC (Draco), A-mash to advance
 -- _cabd35 ($01F0/1/2) and _cabf27 ($0057), then head to balcony (8,9)=_cabe6d
--- ($0111).  Heavy logging: a failure still reveals the mechanic.
+-- ($0111).  Heavy logging, so a failure still records the mechanic.
 local H = dofile("tools/tests/lib/ot6.lua")
 local function map() return H.mapId() & 0x1ff end
 local function sw(id) return (H.readByte(0x1E80 + math.floor(id/8)) >> (id%8)) & 1 end
@@ -45,7 +45,7 @@ H.run({ maxFrames = 12000 }, {
   H.waitFrames(30),
   H.call(function() H.assertEq(map(),236,"boot 236"); dumpsw("start") end),
 
-  -- PHASE 1: chase & touch the nearest play NPC until $01F2 or $0057 sets
+  -- Phase 1: chase and touch the nearest play NPC until $01F2 or $0057 sets
   (function() local ph,last,stuck,hb=0,nil,0,0
     return H.driveUntil(function()
       return sw(0x0057)==1 or sw(0x01F2)==1 or sw(0x0111)==1 or map()~=236
@@ -65,7 +65,7 @@ H.run({ maxFrames = 12000 }, {
   end)(),
   H.call(function() dumpsw("after chase"); H.screenshot("dance2_chase") end),
 
-  -- PHASE 2: head to balcony (8,9); A-mash to catch $0057 en route
+  -- Phase 2: head to balcony (8,9); A-mash to catch $0057 en route
   (function() local ph,last,stuck,hb=0,nil,0,0
     return H.driveUntil(function() return sw(0x0111)==1 or map()~=236 end, 5000, {
       H.call(function() ph=(ph+1)%6; hb=hb+1

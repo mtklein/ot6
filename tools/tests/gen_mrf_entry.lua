@@ -2,22 +2,22 @@
 -- -> the column north to the factory door -> map 262, the MAGITEK FACTORY
 -- upper floor, at {28,8}.  Generates mrf_entry.
 --
--- The door is map 242's LONG entrance, decoded from LongEntrance
+-- The door is map 242's long entrance, decoded from LongEntrance
 -- ($EDF480/$EDF882): src {57,2}, horizontal, length 2 -> map 262 dest
 -- {28,8}.  So x=57..59 on row y=2 all fire it.  From the sneak exit at
--- {57,34} the column is clean -- the party is already north of the guard
--- lanes (y=39..41) and of the "You!? How'd you get in here?" trap row
--- (56..58,39), which is the entire reason step 2 exists.
+-- {57,34} the column is clear: the party is already north of the guard
+-- lanes (y=39..41) and of the "You!? How'd you get in here?" trigger row
+-- (56..58,39), which is why step 2 exists.
 --
--- This step also carries the live NAVIGATION CENSUS the route recon asked
+-- This step also runs the live navigation census the route recon asked
 -- for as its probe 2.  Offline BFS over
 -- the static tilemap said map 262 has only ~130 tiles reachable from the
 -- door and that (4,22), (11,45), (12,60), (22,53) and (22,54) are all
--- NO-PATH -- because the map is stitched by scripted obj_script
+-- NO-PATH, because the map is joined by scripted obj_script
 -- transitions and because several of its triggers rewrite BG1 at runtime
 -- with `mod_bg_tiles` (event_main.asm:94962-95060).  The census below is
--- measured against the LIVE tilemap the engine actually loaded, so the
--- next step can be routed off a fact instead of an offline guess.
+-- measured against the live tilemap the engine loaded, so the next step
+-- can be routed from a measurement rather than an offline estimate.
 local H = dofile("tools/tests/lib/ot6.lua")
 
 local function map() return H.mapId() & 0x1ff end
@@ -69,12 +69,12 @@ end
 
 local DELTA = { up = { 0, -1 }, right = { 1, 0 }, down = { 0, 1 }, left = { -1, 0 } }
 
--- Flood the live map with H.canStep from the party's tile.  This is the
--- LIB's own passability model against the tilemap the engine has actually
--- loaded (including anything mod_bg_tiles rewrote), so it answers "is this
--- map statically navigable from here" for real.  Caveat, stated: canStep
--- uses the party's CURRENT z-level for every node, where bfsPath tracks z
--- along the path -- so this is a lower bound on a z-split map.
+-- Flood the live map with H.canStep from the party's tile.  This runs the
+-- library's own passability model against the tilemap the engine has
+-- loaded (including anything mod_bg_tiles rewrote), so it answers whether
+-- the map is navigable from here.  Caveat: canStep uses the party's
+-- current z-level for every node, where bfsPath tracks z along the path,
+-- so this is a lower bound on a z-split map.
 local function census(tag, targets)
   local sx, sy = H.fieldX(), H.fieldY()
   local seen, q, qi = { [sy * 256 + sx] = true }, { { sx, sy } }, 1
@@ -158,9 +158,9 @@ H.run({ maxFrames = 60000 }, {
   end),
   H.saveState("mrf_entry.mss"),
 
-  -- 3. THE CENSUS (recon probe 2).  Run AFTER the state is generated so the
-  --    banked state is untouched by it.  The targets are every tile the
-  --    recon's offline pass called NO-PATH plus the two doors onward.
+  -- 3. The census (recon probe 2).  Run after the state is generated so the
+  --    banked state is unaffected by it.  The targets are every tile the
+  --    recon's offline pass called NO-PATH, plus the two doors onward.
   H.call(function()
     census("mrf_entry", {
       { 22, 53, "the scripted 263 transition trigger" },

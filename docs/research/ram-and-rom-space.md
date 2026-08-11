@@ -44,11 +44,12 @@ the battle **graphics** module (HDMA/sprite/animation buffers).
 
 - `$3ECB-$3ED3` — 9 bytes explicitly marked "unused local battle variables"
   (only range explicitly free inside the battle-variable region).
-- 7E:2000-5FFF is **mode-overlaid** with field RAM — anything free-in-battle
-  is only free *during battle*. Fine for shields/BP (battle-only by design).
+- 7E:2000-5FFF is **mode-overlaid** with field RAM, so anything free in
+  battle is free only during battle. That is acceptable for shields/BP,
+  which are battle-only by design.
 - Persistent state: community practice is SRAM expansion (vanilla: 8 Kb at
-  $306000-$307FFF); see https://www.ff6hacking.com/forums/thread-3694-post-37598.html
-  — but OT6's JP reuses existing AP storage, so we likely never need this.
+  $306000-$307FFF); see https://www.ff6hacking.com/forums/thread-3694-post-37598.html.
+  OT6's JP reuses existing AP storage, so this is probably not needed.
 - Save-region scraps: $1E1D-$1E3F (~35 bytes), $1E70-$1E7F (madsiur,
   https://www.ff6hacking.com/forums/printthread.php?tid=1408).
 
@@ -58,12 +59,13 @@ the battle **graphics** module (HDMA/sprite/animation buffers).
   — ~60 fragments, ~29 KB total (<1% of ROM). Largest: $C4A4C0-$C4B9FF
   (5440 B), $C3F091-$C3FFFF (3951 B), $D4F646-$D4FFFF (2496 B),
   $C0D613-$C0DF9F (2445 B), $C47FE8-$C487BF (2008 B).
-- **Expansion to 32 Mbit (4 MB) is the standard move**: adds banks $F0-$FF,
-  stays plain HiROM; Lunar Expand / SNEStuff / FF3usME all do it
+- Expansion to 32 Mbit (4 MB) is the standard approach: it adds banks
+  $F0-$FF and stays plain HiROM; Lunar Expand / SNEStuff / FF3usME all do it
   (https://www.ff6hacking.com/wiki/doku.php?id=hacking_faq).
-- Beyond 32 Mbit = ExHiROM; real hacks do it (Return of the Dark Sorcerer is
-  8 MB) but long addressing needs bank-byte care
-  (https://github.com/Dizzy611/DancingMadFF6/issues/71). Avoid unless forced.
+- Beyond 32 Mbit = ExHiROM. Published hacks do this (Return of the Dark
+  Sorcerer is 8 MB), but long addressing needs bank-byte care
+  (https://github.com/Dizzy611/DancingMadFF6/issues/71). Avoid unless
+  required.
 - Collision conventions: the community "patchmap" registry documents which
   ranges existing patches occupy —
   https://www.ff6hacking.com/wiki/doku.php?id=ff3:ff3us:patches:patchmap.

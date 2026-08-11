@@ -1,39 +1,40 @@
 -- @suite savestate=kolts_cave slow
 -- battle_toolsgrey.lua -- v0.5 MP costs: the Tools window greys what Edgar
--- can't afford, the twin of battle_blitzgrey on the REAL tools window.
+-- cannot afford, the counterpart to battle_blitzgrey on the real tools window.
 --
 -- Same mechanism as Blitz (see battle_blitzgrey's header): Ot6AbilityGrey
 -- (ot6.asm) compares each row's MP cost to the active caster's current MP
 -- ($3c08,slot*2) and returns magic's $04/$00, which Ot6ToolRowDecorate OR's into
--- the column's $21 font byte -> $25 grey.  The tools decorator additionally lays
+-- the column's $21 font byte to give $25 grey.  The tools decorator also lays
 -- each column out [font][cost][name] so the one font command colors the price
--- and the name together; the just-landed price display had put the cost tile
--- ahead of the font, out of greying's reach.
+-- and the name together; the price display that landed just before had put the
+-- cost tile ahead of the font, outside greying's reach.
 --
--- ISSUE #75 CONVERSION -- the boundary is SPENT to, not written.  This file
--- used to install an all-Edgar party into the magitek intro fight, hand-write
--- the tool records, and PIN current MP to 8 -- which proved the grey follows
--- a poked number.  It now boots kolts_cave (real TERRA/LOCKE/EDGAR, real
--- bag: AutoCrossbow 4 / NoiseBlaster 6 / Bio Blaster 8, Ot6AbilityCostTbl
--- prices read from the ROM), fights real encounters, and drives the pool to
--- the affordability line WITH THE TOOLS THEMSELVES: Bio Blaster casts while
--- the pool is rich, one AutoCrossbow to finish, until current MP lands in
--- [4,7] -- Bio Blaster (8) unaffordable, AutoCrossbow (4) still affordable.
--- That is strictly stronger than the pin: it proves the CHARGE and the GREY
--- agree -- the very cell CalcAttackEffect debits is the cell the decorator
+-- Issue #75 conversion: the boundary is spent to rather than written.  This
+-- file used to install an all-Edgar party into the magitek intro fight,
+-- hand-write the tool records, and pin current MP to 8, which only showed the
+-- grey follows a poked number.  It now boots kolts_cave (real TERRA, LOCKE and
+-- EDGAR, real bag: AutoCrossbow 4, NoiseBlaster 6, Bio Blaster 8, with
+-- Ot6AbilityCostTbl prices read from the ROM), fights real encounters, and
+-- drives the pool to the affordability line using the tools themselves: Bio
+-- Blaster casts while the pool is rich, one AutoCrossbow to finish, until
+-- current MP lands in [4,7], where Bio Blaster (8) is unaffordable and
+-- AutoCrossbow (4) is still affordable.
+-- That is stronger than the pin: it shows the charge and the grey
+-- agree, because the cell CalcAttackEffect debits is the cell the decorator
 -- reads.  If a fight ends before the pool is down, the lane is paced to the
 -- next natural encounter and the spend continues (MP writes back to the
--- field and loads again -- battle_naturalmp's proven path).
+-- field and loads again, battle_naturalmp's path).
 --
 -- What is asserted (attribute = the odd byte of a name tile's tilemap word,
 -- $21 white / $25 grey):
---   1. RICH POOL: every owned tool the pool can afford renders WHITE at the
---      first open -- the same rows that later grey, so the grey is proven
---      affordability-driven, not unconditional.
---   2. SPENT-TO BOUNDARY: with MP really spent into [4,7], Bio Blaster
---      renders GREY and AutoCrossbow WHITE on one screen; NoiseBlaster
+--   1. rich pool: every owned tool the pool can afford renders white at the
+--      first open, and those are the same rows that later grey, so the grey
+--      is affordability-driven rather than unconditional.
+--   2. spent-to boundary: with MP spent into [4,7], Bio Blaster
+--      renders grey and AutoCrossbow white on one screen; NoiseBlaster
 --      follows its own line (white iff mp >= 6).
---   3. THE GREY IS THE DISABLED BIT.  grey - white == $04, magic's own delta.
+--   3. the grey is the disabled bit: grey - white == $04, magic's own delta.
 local H = dofile("tools/tests/lib/ot6.lua")
 local STATE = "build/states/kolts_cave.mss.lua"
 
@@ -102,7 +103,7 @@ local function map() return H.mapId() & 0x1ff end
 
 local edgarSlot, edgarOfs = nil, nil
 -- Edgar's live pool: the battle cell when a battle is up, else his field MP
--- (writeback keeps them one number -- battle_naturalmp phase 3).
+-- (writeback keeps them one number; see battle_naturalmp phase 3).
 local function pool()
   if H.battleLoadStarted() and edgarSlot then
     return H.readWord(0x3C08 + edgarSlot * 2)
@@ -111,8 +112,8 @@ local function pool()
 end
 
 -- the spend plan, from the pool as read: park the pool in [4,7].
---   while mp >= 12: Bio Blaster (8) -- ends in [4,11]
---   then if mp >= 8: AutoCrossbow (4) -- [8,11] -> [4,7]
+--   while mp >= 12: Bio Blaster (8), which ends in [4,11]
+--   then if mp >= 8: AutoCrossbow (4), which takes [8,11] to [4,7]
 local function planCast(mp)
   if mp >= 12 then return BIOBLASTER end
   if mp >= 8 then return AUTOCROSSBOW end
@@ -120,10 +121,11 @@ local function planCast(mp)
 end
 
 -- ------------------------------------------------------------------------
--- THE PER-FRAME MACHINE.  mode "spend": on Edgar's menu, walk the real
+-- The per-frame driver.  mode "spend": on Edgar's menu, walk the real
 -- cursors to planCast's tool and confirm it; everyone else Defends (right
--- swaps Fight->Def, then A -- battle_naturalmp's consumption).  mode
--- "open": walk to the Tools list and HOLD it open (the assert window).
+-- swaps Fight->Def, then A, which is battle_naturalmp's turn consumption).
+-- mode "open": walk to the Tools list and hold it open, which is the window
+-- the asserts run in.
 -- Off-battle: pace the detected lane until the next natural encounter.
 -- ------------------------------------------------------------------------
 local mode = "spend"
@@ -157,12 +159,12 @@ local function pulse()
     return
   end
   lane = nil          -- re-anchor at the next field return (the walletmp
-                      -- run-5 hazard: a stale anchor walks off the map)
+                      -- run-5 hazard, where a stale anchor walks off the map)
   if H.readByte(MENU) == 0 then
-    -- no menu up: page any battle dialog with A -- measured on the first run
-    -- of this conversion, the exact battle_vargas hazard: a monster's dialog
+    -- no menu up: page any battle dialog with A.  Measured on the first run
+    -- of this conversion, this is the battle_vargas hazard: a monster's dialog
     -- blocked the whole queue for 20k+ frames of menu=00/mstate=00 with the
-    -- fight otherwise alive and this machine's hands off.
+    -- fight otherwise alive and this driver's hands off.
     H.setPad(ph % 8 < 4 and { a = true } or {})
     return
   end
@@ -213,7 +215,7 @@ local function pulse()
   end
 end
 
--- drive until Edgar's Tools window is OPEN and settled (for the asserts)
+-- drive until Edgar's Tools window is open and settled (for the asserts)
 local function openToolsWindow(what)
   return H.repeatN(1, {
     H.call(function() mode = "open" end),
@@ -262,7 +264,7 @@ H.run({ maxFrames = 200000 }, {
     H.log(string.format("EDGAR slot %d, battle pool %d", edgarSlot, pool()))
   end),
 
-  -- 1. RICH POOL: the first open, everything affordable renders white -------
+  -- 1. rich pool: the first open, everything affordable renders white -------
   openToolsWindow("edgar's tools window, rich pool"),
   H.call(function()
     local mp = pool()
@@ -280,7 +282,7 @@ H.run({ maxFrames = 200000 }, {
       "the rich-pool pass had Bio Blaster white -- the row that must grey below")
   end),
 
-  -- 2. SPEND to the boundary with the tools themselves ----------------------
+  -- 2. spend to the boundary with the tools themselves ----------------------
   H.call(function() mode = "spend" end),
   H.driveUntil(function() return pool() <= 7 end, 120000,
     { H.call(pulse), H.waitFrames(1) }, "the pool is spent into the boundary"),

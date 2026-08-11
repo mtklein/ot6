@@ -1,19 +1,19 @@
 -- gen_opera3_backstage.lua -- v0.5 Beat A step 3: opera_open (map 237, one
--- A-press below the IMPRESARIO _caae15) -> RIDE THE PERFORMANCE INTRO -> the
--- party lands controllable BACKSTAGE in the theater, map 234 at {16,46},
+-- A-press below the IMPRESARIO _caae15) -> ride the performance intro -> the
+-- party lands controllable backstage in the theater, map 234 at {16,46},
 -- $0055=1 (performance underway).  Generates opera_backstage.mss.
 --
--- MEASURED (probe_opera_aria):
+-- Measured (probe_opera_aria):
 --  * Talking the impresario fires _caae15; the long intro cutscene (Locke's
 --    plan, "we'll let him grab her", the scene-set) rides on the same
---    hasControl-gated A/START stall fallback gen_opera2 used, and DROPS the
---    party controllable on map 234 -- the THEATER SEATING (audience above,
---    the party in the stalls) -- at {16,46} facing DOWN, $0055=1, $0340=0.
---  * The intro is NOT ~14,400 frames of the survey's guess; it settles to
---    control near frame ~6k.  The ride terminates on 30 straight settled()
+--    hasControl-gated A/START stall fallback gen_opera2 used, and drops the
+--    party controllable on map 234, the theater seating (audience above,
+--    the party in the stalls), at {16,46} facing DOWN, $0055=1, $0340=0.
+--  * The intro does not take the ~14,400 frames the survey guessed; it settles
+--    to control near frame ~6k.  The ride terminates on 30 straight settled()
 --    frames on a non-237 map so a transient control blip cannot generate
 --    early.
---  * The two STAGE doors out of 234 sit at its top corners {4,24} (left) and
+--  * The two stage doors out of 234 sit at its top corners {4,24} (left) and
 --    {28,24} (right); the theater floor exits {7,49}/{25,49} lead to the
 --    opera-house interior (237).  gen_opera4 routes 234 -> 237 -> the stage.
 local H = dofile("tools/tests/lib/ot6.lua")
@@ -26,10 +26,10 @@ local function settled()
   return H.hasControl() and H.tileAligned() and bright()>=15
      and not H.dialogWaiting() and not H.battleLoadStarted() and not H.worldMode()
 end
--- the generic "advance everything" ride (gen_opera2's rideOpen idiom).
--- Issue #75: the battle-clear-write helper this file DEFINED but whose
--- branch never fired on the measured intro (no battle exists on this ride)
--- is stripped;  a stray battle would now be fought by the same edge-tapped
+-- the generic advance-everything ride (gen_opera2's rideOpen idiom).
+-- Issue #75: this file used to define a battle-clear-write helper, but its
+-- branch never fired on the measured intro (no battle occurs on this ride), so
+-- the helper is stripped.  A stray battle is now fought by the same edge-tapped
 -- A.
 local function rideOpen(pred, maxFrames, what)
   local aPh,sPh,stallN,lx,ly = 0,0,0,-1,-1

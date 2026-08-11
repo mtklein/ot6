@@ -6,31 +6,31 @@ OT6_BREAK_TICKS := $10          ; a bit under vanilla stop duration ($12)
 ; OT6 scales three different 16-bit quantities by a byte "in 16ths" ($10 = 1x,
 ; $28 = 2.5x): monster HP (hpmul, off Ot6ShieldTbl), the per-step danger rate
 ; (Ot6DangerStep, off Ot6DangerMulW) and shielded damage (Ot6ShieldedDmg, off
-; Ot6ShieldedMulW).  All three ran the SAME twenty-two instructions inline --
-; byte-for-byte the same, only the final branch's label spelling differed
-; (@fits at two sites, :+ at the third; both target the very next
+; Ot6ShieldedMulW).  All three ran the same twenty-two instructions inline,
+; byte-for-byte the same, with only the final branch's label spelling differing
+; (@fits at two sites, :+ at the third; both target the next
 ; instruction, so the emitted branch is identical).  This is that code, once.
 ;
-; A MACRO AND NOT A PROC, deliberately.  Ot6ShieldedDmg runs inside the
+; A macro rather than a proc, deliberately.  Ot6ShieldedDmg runs inside the
 ; per-target damage loop and Ot6DangerStep runs on every field step; a jsr
 ; here would add ~12 cycles to both for nothing, and this codebase has
-; measured that a jsr into a hot path is already over the line.  A macro
-; expands to the identical bytes at the identical addresses -- which is also
-; how this refactor is verified, by a byte-identical ROM rather than by a
+; measured that a jsr into a per-frame path is already over budget.  A macro
+; expands to the identical bytes at the identical addresses, which is also
+; how this refactor is verified: by a byte-identical ROM rather than by a
 ; passing suite.
 ;
-; in:  a16/i16.  A = the multiplicand's low word, ALREADY also stored to
+; in:  a16/i16.  A = the multiplicand's low word, already also stored to
 ;      OT6_SCR_SLOT2; OT6_SCR_BIT = mult << 8 (an msb-first bit walker);
 ;      OT6_SCR_COLS = 0 (product bits 16-23).  Setting all three up is the
-;      caller's job -- each of the three sites loads its multiplier from a
+;      caller's job: each of the three sites loads its multiplier from a
 ;      different place, and Ot6DangerStep folds an unrelated store into the
-;      same run, so only the loop below is genuinely common.
-; out: A = clamp16(product / 16).  The /16 comes AFTER the multiply on
+;      same run, so only the loop below is common.
+; out: A = clamp16(product / 16).  The /16 comes after the multiply on
 ;      purpose: (hp/16)*mult would zero the 15-hp intro trash.  The product
-;      really does need bits 16+ (8000 hp x 2.5 fits in 16 bits; the product
+;      does need bits 16+ (8000 hp x 2.5 fits in 16 bits; the product
 ;      does not), which is why OT6_SCR_COLS carries the top byte.
 ; clobbers X and the three scratch cells; preserves Y.  Exits with X = the
-; overflow word (0 unless clamped) -- no caller reads it.
+; overflow word (0 unless clamped); no caller reads it.
 ; ------------------------------------------------------------------------------
 .macro ot6_mul16ths
         ldx     #$0008
@@ -54,7 +54,7 @@ OT6_BREAK_TICKS := $10          ; a bit under vanilla stop duration ($12)
         ror
         ldx     OT6_SCR_COLS
         beq     @fits
-        lda     #$ffff          ; clamp: 16-bit cells, 16-bit truth
+        lda     #$ffff          ; clamp: the destination cells are 16-bit
 @fits:
 .endmacro
 
@@ -95,13 +95,13 @@ OT6_BREAK_TICKS := $10          ; a bit under vanilla stop duration ($12)
         lda     f:Ot6ShieldTbl+2,x
         bra     @seed
 @formula:
-        ; no AUTHORED class row: seed the generated break-floor class so a
-        ; formula species is still breakable by SOME weapon class. the byte
+        ; no authored class row: seed the generated break-floor class so a
+        ; formula species is still breakable by some weapon class. the byte
         ; is species-indexed: OT6_FLOOR_CLASS[species] (gen_break_floor.py).
-        ; written UNCONDITIONALLY every seed -- like the reveal masks below
-        ; it must not survive a Cmd_20 reload (no InitBattle clear) or the
-        ; hud draws a STALE class-weakness cell from the slot's prior
-        ; occupant. the authored @hit path OVERWRITES OT6_BP_CLASS (store above) so
+        ; written unconditionally at every seed: like the reveal masks below
+        ; it must not survive a Cmd_20 reload (no InitBattle clear), or the
+        ; hud draws a stale class-weakness cell from the slot's prior
+        ; occupant. the authored @hit path overwrites OT6_BP_CLASS (store above) so
         ; its mask wins; the floor is only the fallback for un-authored ids.
         ldx     OT6_SPECIES-8,y ; species id -> index (i16: 16-bit X)
         shorta0
@@ -121,16 +121,16 @@ OT6_BREAK_TICKS := $10          ; a bit under vanilla stop duration ($12)
         ; per-monster battle-start state the seed must not inherit on the
         ; Cmd_20 scene-change reload (multi-phase bosses, reinforcements, the
         ; whelk head's retract cycle): it re-runs the seed via InitMonsters
-        ; with NO InitBattle $3a20-$3ed3 clear. on the FRESH path InitBattle
+        ; with no InitBattle $3a20-$3ed3 clear. on the fresh path InitBattle
         ; already zeroes these (write-trace confirms: its clear stores $00 here
-        ; before the seed runs), so this is belt-and-suspenders there and
-        ; load-bearing only on reload. monster path only (y >= $08 past @on):
+        ; before the seed runs), so this is redundant there and
+        ; required only on reload. monster path only (y >= $08 past @on):
         ; the character rows are never touched. with 32k sram the codex
-        ; re-merge below restores genuinely-earned reveals (chips write them
+        ; re-merge below restores reveals that were earned (chips write them
         ; through), so a same-monster retract cycle keeps its reveals.
         lda     #$00
         sta     OT6_BROKEN_TICKS,y         ; broken timer: a stale nonzero reload-starts
-                                ;   the monster BROKEN (Ot6Gate skips its turn,
+                                ;   the monster broken (Ot6Gate skips its turn,
                                 ;   2x damage, the hud shield cell draws the
                                 ;   broken glyph). the seed otherwise never
                                 ;   writes it, so a reload inherits the slot's
@@ -141,12 +141,12 @@ OT6_BREAK_TICKS := $10          ; a bit under vanilla stop duration ($12)
                                 ;   (the hud '?'-gate reads OT6_REVEALED_ELEM/OT6_BOOST_REVEALED)
         sta     OT6_BOOST_REVEALED,y         ; revealed classes (monster half)
         sta     OT6_RVPEND_ELEM-8,y  ; #33: pending reveals must not survive a
-        sta     OT6_RVPEND_CLS-8,y   ;   Cmd_20 reload either -- a stale bank
+        sta     OT6_RVPEND_CLS-8,y   ;   Cmd_20 reload either; a stale bank
                                      ;   would commit the prior occupant's
                                      ;   weakness onto the new species
         sta     OT6_BRKTICK-8,y      ; #48: nor a pending or live break flash.
         sta     OT6_BRKPAL-8,y       ;   these two sit past InitBP's shadow
-                                     ;   clear, so this is ALSO their only
+                                     ;   clear, so this is also their only
                                      ;   power-on clear: junk here would flash
                                      ;   a monster white on the first frames of
                                      ;   the first battle after a cold boot,
@@ -185,40 +185,40 @@ done:   rtl
 ; idempotent by construction.
 ;
 ; the whelk head ($134) gains fire: the boss tutorial's designed line
-; -- three fire beams and a TekMissile, broken inside one head-present
-; phase -- needs four chippable hits, and the head has no vanilla fire
-; weak (measurement #2 called this add load-bearing m6 data). vargas
+; (three fire beams and a TekMissile, broken inside one head-present
+; phase) needs four chippable hits, and the head has no vanilla fire
+; weak (measurement #2 called this add required m6 data). vargas
 ; ($103) gains holy: bosses-wob.md's vargas entry reads "poison, holy +
 ; bludgeoning", and vanilla gives him poison only (monster_prop.dat +25
-; = $08) -- holy is the chip sabin's arrival is supposed to switch on,
+; = $08). holy is the chip sabin's arrival is supposed to switch on,
 ; and aurabolt already carries it ($5e element byte = $20 in vanilla
-; spell data), so this row is the whole remaining distance. proven at
+; spell data), so this row is the remaining distance. verified at
 ; runtime by battle_vargas.lua.
 ;
-; the v0.3 arc added ARMOR-LINE rows here under a doctrine the v0.6
-; break-coverage pass has since RETIRED. the doctrine was the narshe
+; the v0.3 arc added armor-line rows here under a doctrine the v0.6
+; break-coverage pass has since retired. the doctrine was the narshe
 ; school's tier-2 seed: "their armored machines shrug off blade and fire
 ; alike ... every armor fears one right tool" (the school's superseded
 ; tier-2 copy; narshe-school.md now carries the replacement),
 ; the tool being edgar's bio blaster (item $a4 -> attack $7d, element $08
-; poison -- battle_main.asm:6577). that made POISON the sole key to the
+; poison, battle_main.asm:6577). that made poison the sole key to the
 ; imperial line, and the fixed-party audit found the hole: the forced
-; parties that fight this line -- Cyan solo at Doma, Sabin's whole
-; scenario, Locke solo in South Figaro, two of the three Narshe squads --
+; parties that fight this line (Cyan solo at Doma, Sabin's whole
+; scenario, Locke solo in South Figaro, two of the three Narshe squads)
 ; carry no Edgar and so no poison, and could not break armored trash at
-; all. v0.6 moves the SOLDIER LINE onto weapon-CLASS rows in Ot6ShieldTbl
-; (pierce/slash/bludg, chosen per the party that actually fights each --
-; the decode and rationale live there and in bosses-wob.md). poison is
-; now one Edgar key among several, not the one; the school's old "shrug
-; off blade / one right tool" seed contradicted the new fiction ("a blade
-; finds the gaps"), so it took a dialog revision under the school's own
-; sanction (2026-07-22, narshe-school.md) -- $0276 now teaches "every
-; plate has its seam ... bring the weapon that fits."
+; all. v0.6 moves the soldier line onto weapon-class rows in Ot6ShieldTbl
+; (pierce/slash/bludg, chosen per the party that fights each; the decode
+; and rationale live there and in bosses-wob.md). poison is
+; now one Edgar key among several rather than the only one; the school's
+; old "shrug off blade / one right tool" seed contradicted the new fiction
+; ("a blade finds the gaps"), so it took a dialog revision under the
+; school's own sanction (2026-07-22, narshe-school.md): $0276 now teaches
+; "every plate has its seam ... bring the weapon that fits."
 ;
-; what REMAINS poison-keyed in this table are the two MACHINES, where a
-; party that fights them can actually cast it, each row keeping every
+; what remains poison-keyed in this table are the two machines, where a
+; party that fights them can cast it, each row keeping every
 ; vanilla bit (decoded from monster_prop.dat at species*32 +$19; the
-; offset is vanilla's own -- battle_main.asm:7517 loads MonsterProp+25):
+; offset is vanilla's own, battle_main.asm:7517 loads MonsterProp+25):
 ;
 ;   $042 m-tekarmor  +$0859  vanilla $04 bolt        -> $0c bolt|poison
 ;   $09f heavyarmor  +$13f9  vanilla $84 bolt|water  -> $8c (+ slash|pierce
@@ -227,58 +227,58 @@ done:   rtl
 ;                            (+bolt: metal conducts, Shadow's Bolt Edge;
 ;                            + a pierce class row in Ot6ShieldTbl)
 ;
-; leader ($14e) and grunt ($14f) had poison ADDS here in v0.3 -- they had
-; no vanilla weakness of any kind, so poison was their only gauge -- and
-; v0.6 REMOVED both: their forced fights (Cyan's solo duel; Cyan+Sabin's
+; leader ($14e) and grunt ($14f) had poison adds here in v0.3, because they
+; had no vanilla weakness of any kind and poison was their only gauge, and
+; v0.6 removed both: their forced fights (Cyan's solo duel; Cyan+Sabin's
 ; Doma courtyard defense) carry no poison, so the add was dead data that
 ; also drew an unresolvable '?' on a swordfight. both are class-keyed now
-; (leader slash; grunt slash|bludg -- Ot6ShieldTbl).
+; (leader slash; grunt slash|bludg; Ot6ShieldTbl).
 ;
 ; and two boss rows bosses-wob.md already specified but m6 never entered:
 ;
 ;   $14a kefka       +$2959  vanilla $00 none        -> $09 poison|fire
 ;   $104 tunnelarmor +$2099  vanilla $84 bolt|water  -> $86 (+ice)
 ;
-; $14a is MONSTER::KEFKA_NARSHE and nothing else -- the imperial camp
+; $14a is MONSTER::KEFKA_NARSHE and nothing else; the imperial camp
 ; gags load no monster record at all (Ot6ShieldTbl's block comment has
 ; the full decode). he is the v0.3 stop line, and vanilla left him with
-; no weakness whatsoever. tunnelarmor's ice is celes's join spell buying
+; no weakness at all. tunnelarmor's ice is celes's join spell buying
 ; a socket: vanilla's bolt and water are both dead keys for the
-; locke+celes duo, so without the add the fight's only element chip is
-; nothing at all (bosses-wob.md "5. TunnelArmor").
+; locke+celes duo, so without the add the fight has no element chip at
+; all (bosses-wob.md "5. TunnelArmor").
 ;
-; EVERY row here was checked against +$17 (absorb) and +$18 (null) before
+; every row here was checked against +$17 (absorb) and +$18 (null) before
 ; authoring; every one reads $00/$00 (templar included), so no row here
-; puts a chip trigger on an absorber. that check is not ceremony -- it is
-; the exact error bosses-wob.md caught twice in draft (nerapa listed fire,
+; puts a chip trigger on an absorber. that check is not a formality: it is
+; the error bosses-wob.md caught twice in draft (nerapa listed fire,
 ; which it absorbs; the cranes' absorb pair was read as their weak pair).
 ;
-; ---- the v0.3 TRASH pass: six rows that make the break happen ----
+; ---- the v0.3 trash pass: six rows that make the break happen ----
 ;
 ; everything above is a boss or a set-piece. these six are ordinary
 ; random encounters, and they exist because measurement #7 established
-; that the break -- the mechanic this hack is named for -- had never once
+; that the break, the mechanic this hack is named for, had never once
 ; happened in play: `player_actions_broken` was 0.0 across 168 battles,
 ; because every species without an authored row takes Ot6SeedShields'
-; @formula path, which CLEARS OT6_BP_CLASS (:76-85), so formula trash carries no
+; @formula path, which clears OT6_BP_CLASS (:76-85), so formula trash carries no
 ; class weakness and most of it carries no reachable element either.
 ;
-; WHY ELEMENT ROWS AND NOT Ot6ShieldTbl CLASS ROWS. the party that walks
+; why element rows and not Ot6ShieldTbl class rows. the party that walks
 ; this stretch is terra, locke and edgar, and they arrive at mt. kolts
 ; carrying a mithril knife, a dirk and a mithril blade (char_prop.asm:152,
-; :162, :197) -- which ot6_class.asm:49, :48 and :59 make PIERCE, PIERCE
-; and SLASH. so the party's three default swings already cover half the
+; :162, :197), which ot6_class.asm:49, :48 and :59 make pierce, pierce
+; and slash. so the party's three default swings already cover half the
 ; class ring, and the other half has no wielder at all: bludgeoning
-; arrives with sabin, who joins at the TOP of the mountain, and special
-; not until setzer. a class row on this stretch is therefore either a
-; FREEBIE (slash/pierce -- holding A chips it, which is measurement #7's
-; own +PIERCE finding: the mash arm started chipping by accident and the
-; mash-vs-loop gap CLOSED) or a REPO MAN (bludg/special -- nothing in the
+; arrives with sabin, who joins at the top of the mountain, and special
+; not until setzer. a class row on this stretch is therefore either free
+; (slash/pierce: holding A chips it, which is measurement #7's
+; own +pierce finding, where the mash arm started chipping by accident and
+; the mash-vs-loop gap closed) or unreachable (bludg/special: nothing in the
 ; party can chip it, and the fight has no loop at all). the class axis is
 ; degenerate here. the element axis is not: terra's fire costs 4 mp and a
 ; magic menu, edgar's bio blaster costs a tools dive (item $a4 -> attack
-; $7d, magic_prop_en.dat record $7d: element $08, targets $6a = ALL
-; enemies, power 20, 0 mp), and NEITHER of them is what the A button does.
+; $7d, magic_prop_en.dat record $7d: element $08, targets $6a = all
+; enemies, power 20, 0 mp), and neither of them is what the A button does.
 ;
 ; so the stretch gets exactly two live keys and this table splits it
 ; between them. fire is vanilla's and already opens eight of the fifteen
@@ -294,55 +294,55 @@ done:   rtl
 ;   $012 rhodox    +$0259  vanilla $00 none       -> $08   119 hp
 ;   $015 rhinotaur +$02B9  vanilla $00 none       -> $08   232 hp
 ;
-; four of those six had NO weakness the stretch party could reach --
-; cirpius and rhodox had no weakness at all, sand ray and areneid are
-; ice|water and nobody carries either (terra's natural list is cure 1,
-; fire 3, antdot 6, drain 12 -- field/event.asm:1248-1251, so FIRE is her
+; four of those six had no weakness the stretch party could reach:
+; cirpius and rhodox had no weakness at all, and sand ray and areneid are
+; ice|water with nobody carrying either (terra's natural list is cure 1,
+; fire 3, antdot 6, drain 12, field/event.asm:1248-1251, so fire is her
 ; whole offensive element ring at this point in the story). they are the
 ; coverage rule's live counterexamples on the route the v0.2 demo ships,
-; and cirpius is the worst of them: it is 93.75% of the draws on mt.
-; kolts maps 95/96/97 and it comes THREE AT A TIME, so the mountain's
+; and cirpius is the most common of them: it is 93.75% of the draws on mt.
+; kolts maps 95/96/97 and it comes three at a time, so the mountain's
 ; most common fight was three unchippable birds.
 ;
-; the two that already had fire are here for a different reason, and it
-; is arithmetic. an element chip that empties the last shield takes
+; the two that already had fire are here for a different reason, which is
+; arithmetic. an element chip that empties the last shield takes
 ; vanilla's weak x2, then skips Ot6ShieldedDmg (shields are already 0),
-; then takes Ot6BrokenDmg's x2 -- 4x base on the breaking hit itself. at
-; terra's ~110 base that is ~440, and NOTHING on this mountain except
+; then takes Ot6BrokenDmg's x2, so 4x base on the breaking hit itself. at
+; terra's ~110 base that is ~440, and nothing on this mountain except
 ; tusker has the hp to survive its own break through the fire channel.
 ; bio blaster's per-target damage is a fraction of that (power 20, split
 ; over the whole enemy side), so poison is the channel that can open a
-; window instead of closing the fight. tusker at 270 hp is the one body
+; window rather than closing the fight. tusker at 270 hp is the one body
 ; big enough for that window to be wide, which is why it gets poison on
-; TOP of vanilla's fire: fire stays the burst answer to a 270-hp wall,
+; top of vanilla's fire: fire stays the burst answer to a 270-hp wall,
 ; poison becomes the break answer, and the player picks.
 ;
-; and the shelf-F read that falls out of it, which is the best accident
-; in this table: brawler ($00b) ABSORBS poison (+$0177 = $08). map 100
+; and the shelf-F read that falls out of it: brawler ($00b) absorbs poison
+; (+$0177 = $08). map 100
 ; draws brawler-pair 62.5% and tusker-pair 37.5%, so on the same shelf the
-; same tool breaks one formation and HEALS the other. brawler's answer is
-; a class row in Ot6ShieldTbl instead (see there); the trap is vanilla's
+; same tool breaks one formation and heals the other. brawler's answer is
+; a class row in Ot6ShieldTbl instead (see there); the absorb is vanilla's
 ; own byte and stays untouched.
 ;
 ; every one of the six was checked at +$17/+$18 the same way the boss rows
 ; were. five read $00/$00; rhinotaur absorbs BOLT (+$02B7 = $04) and nulls
 ; nothing, so poison is clear on it too. no row here feeds an absorber.
 ;
-; deliberately NOT authored, so the next author does not re-litigate:
+; deliberately not authored, so the next author does not re-open it:
 ;   - trooper ($065, +$0cb9 = $08) and rider ($03f, +$07f9 = $09) are
-;     already poison-weak in VANILLA, so no ELEMENT add is authored for
-;     them. but v0.6 DID give both a slash|pierce CLASS row (Ot6ShieldTbl):
+;     already poison-weak in vanilla, so no element add is authored for
+;     them. but v0.6 did give both a slash|pierce class row (Ot6ShieldTbl):
 ;     the Narshe defense is a player-assigned 3-way split, and the squads
 ;     without Edgar (e.g. Cyan+Sabin, Locke+Gau) reach neither poison nor
-;     any vanilla element on these bodies -- only a weapon class. vanilla
+;     any vanilla element on these bodies, only a weapon class. vanilla
 ;     poison stays the Edgar-squad's key; the class row is every other
 ;     squad's. formation 88 (trooper+heavyarmor) now opens to whatever a
-;     squad holds, not to Edgar alone.
-;   - specter ($156) ABSORBS poison (+$2ad7 = $08) and is fire|holy weak
+;     squad holds rather than to Edgar alone.
+;   - specter ($156) absorbs poison (+$2ad7 = $08) and is fire|holy weak
 ;     (+$2ad9 = $21). it is a monster-in-a-box on the phantom train (map
-;     153, treasure 114 -> event battle group 34 -> formation 476) --
-;     the same train whose boss also absorbs poison. the train is a
-;     poison DEAD ZONE, boss and chest alike; vanilla's fire|holy are
+;     153, treasure 114 -> event battle group 34 -> formation 476),
+;     the same train whose boss also absorbs poison. the train has no
+;     poison key at all, boss or chest; vanilla's fire|holy are
 ;     live keys there (shadow's fire skean, sabin's aurabolt) so it
 ;     needs no add, and the one element this arc is about would heal it.
 ;   - siegfried ($131) has no vanilla weakness, absorb or null ($00 at
@@ -350,25 +350,25 @@ done:   rtl
 ;     event_main.asm:65247) and bosses-wob.md gives him no block. the
 ;     formula's 2 shields stand: unlisted species are meant to fall
 ;     through, and inventing a key for a fight the player is supposed to
-;     walk away from is spec no design doc asked for.
-;   - the stretch's ALREADY-FIRE-WEAK trash: leafer ($017 +$02F9 = $81),
+;     walk away from is not something any design doc asked for.
+;   - the stretch's already-fire-weak trash: leafer ($017 +$02F9 = $81),
 ;     dark wind ($028 = $01), hornet ($02e = $01), bleary ($063 = $01),
 ;     crawly ($062 = $01), trilium ($032 = $01), vaporite ($046 = $21).
 ;     the coverage rule is already satisfied for every one of them by
-;     terra's fire, and a SECOND key would only make the probe a formality.
-;     none of them can hold a break window either -- 33 to 147 hp against
-;     a 4x breaking hit -- and measurement #7 proved that directly on
+;     terra's fire, and a second key would make the probe a formality.
+;     none of them can hold a break window either (33 to 147 hp against
+;     a 4x breaking hit), and measurement #7 showed that directly on
 ;     leafer: a synthetic class row there produced 0.7 breaks a fight and
 ;     every one landed at 100% of fight length, `player_actions_broken`
-;     still 0. these are texture, not tuning material, the same
+;     still 0. these are texture rather than tuning material, the same
 ;     disposition measurement #1 gave the mines pool.
-;   - brawler ($00b) is the one species on the mountain that gets a CLASS
+;   - brawler ($00b) is the one species on the mountain that gets a class
 ;     row rather than an element one, because poison is the one element it
 ;     must not have (it absorbs it, +$0177 = $08) and its vanilla ice
 ;     (+$0179 = $02) has no wielder until celes. see Ot6ShieldTbl.
-;   - greasemonk ($0a8 +$1519 = $08) is already poison-weak in VANILLA, so
+;   - greasemonk ($0a8 +$1519 = $08) is already poison-weak in vanilla, so
 ;     the south-figaro plains had one live key before this pass and an
-;     add here would be a no-op ora that lies about who authored it --
+;     add here would be a no-op ora that misstates who authored it,
 ;     the same rule the trooper/rider rows above are held to.
 ;
 ; called from the tail of Ot6SeedShields, monster path only. a8/i16,
@@ -406,32 +406,32 @@ Ot6ElemAddTbl:
         .byte   $01, $00        ; whelk head: + fire (the tutorial probe)
         .word   $0103
         .byte   $20, $00        ; vargas: + holy (sabin's aurabolt)
-        ; the armor line -- v0.6 break-coverage pass (block comment above).
-        ; the soldier line is CLASS-keyed now (Ot6ShieldTbl); what stays
-        ; here is poison on the two MACHINES plus templar's conducting bolt.
+        ; the armor line, v0.6 break-coverage pass (block comment above).
+        ; the soldier line is class-keyed now (Ot6ShieldTbl); what stays
+        ; here is poison on the two machines plus templar's conducting bolt.
         .word   $0042
         .byte   $08, $00        ; m-tekarmor: + poison (keeps bolt; Shadow's
                                 ;   Bolt Edge is the live camp key)
         .word   $009f
         .byte   $08, $00        ; heavyarmor: + poison (keeps bolt|water;
-                                ;   Edgar's key at the Narshe waves. ALSO a
-                                ;   slash|pierce class row -- Ot6ShieldTbl)
+                                ;   Edgar's key at the Narshe waves. also a
+                                ;   slash|pierce class row, Ot6ShieldTbl)
         .word   $0002
         .byte   $04, $00        ; templar: + bolt (vanilla $08 poison ->
                                 ;   $0c bolt|poison; metal conducts, Shadow's
-                                ;   Bolt Edge. ALSO a pierce class row)
+                                ;   Bolt Edge. also a pierce class row)
         ; the arc's stop line, and the scenario boss that had no key
         .word   $014a
         .byte   $09, $00        ; kefka (narshe defense): + poison|fire
         .word   $0104
         .byte   $02, $00        ; tunnelarmor: + ice (keeps bolt|water)
-        ; the v0.3 trash pass -- the break made reachable in ordinary
+        ; the v0.3 trash pass: the break made reachable in ordinary
         ; fights. poison is edgar's bio blaster, the stretch's only
         ; deliberate key the A button does not already swing.
         .word   $0086
-        .byte   $08, $00        ; cirpius: + poison. had NO weakness at
+        .byte   $08, $00        ; cirpius: + poison. had no weakness at
                                 ;   all, and it is 93.75% of mt. kolts
-                                ;   maps 95/96/97 THREE at a time -- one
+                                ;   maps 95/96/97, three at a time; one
                                 ;   group tool chips the whole flock
         .word   $007a
         .byte   $08, $00        ; tusker: + poison (keeps fire). 270 hp,
@@ -452,40 +452,40 @@ Ot6ElemAddTbl:
         .word   $0015
         .byte   $08, $00        ; rhinotaur: + poison. had no weakness;
                                 ;   232 hp is the plains' break-capable
-                                ;   body (absorbs BOLT, not poison)
-        ; ---- the v0.4 SEARCH-FOR-TERRA corridor: five poison rows for the
+                                ;   body (absorbs bolt, not poison)
+        ; ---- the v0.4 search-for-terra corridor: five poison rows for the
         ; western-WoB overworld the party roams looking for terra before Zozo.
-        ; the party is LOCKE+CELES+EDGAR+SABIN and its two DELIBERATE keys are
-        ; poison (edgar's bio blaster) and ice (celes) -- there is NO fire,
-        ; terra is the search target. these five draw across the western/
+        ; the party is Locke+Celes+Edgar+Sabin and its two deliberate keys are
+        ; poison (edgar's bio blaster) and ice (celes); there is no fire,
+        ; because terra is the search target. these five draw across the western/
         ; southern WoB sectors and every one is a coverage hole: no vanilla
-        ; weakness of ANY element, and a formula species carries no class
+        ; weakness of any element, and a formula species carries no class
         ; weakness, so before this row the terra-less party could not chip them
-        ; at all. poison is the natural key (a Tools dive, not the A button) and
-        ; the group target answers the packs. verified against monster_prop.dat
-        ; +$19/$18/$17 -- weak/null/absorb all read $00 on all five, so no row
-        ; here feeds an absorber (the GhostTrain trap):
+        ; at all. poison is the available key (a Tools dive, not the A button)
+        ; and the group target answers the packs. verified against
+        ; monster_prop.dat +$19/$18/$17: weak/null/absorb all read $00 on all
+        ; five, so no row here feeds an absorber (the GhostTrain case):
         ;   $018 stray cat  156 hp    $01d baskervor 750 hp
         ;   $01f chimera   2237 hp    $078 red fang  325 hp
         ;   $07b ralph      620 hp
-        ; NOT poisoned, because they already have a reachable answer and poison
-        ; would be the WRONG one: iron fist $06c ABSORBS poison (+$0d97 = $08)
-        ; and wears a class row in Ot6ShieldTbl (locke's pierce / sabin's
-        ; bludg); fossilfang $023 ABSORBS poison too but is ICE-weak, which
+        ; not poisoned, because they already have a reachable answer and poison
+        ; would be the wrong one: iron fist $06c absorbs poison (+$0d97 = $08)
+        ; and carries a class row in Ot6ShieldTbl (locke's pierce / sabin's
+        ; bludg); fossilfang $023 absorbs poison too but is ice-weak, which
         ; celes casts, so ice is its key. sand ray $05c / areneid $05d are
-        ; already +poison above AND ice-weak. the desert half of this region is
+        ; already +poison above and ice-weak. the desert half of this region is
         ; covered without a row here.
-        ; UNMEASURED, and said plainly: no world-map fixture stands in this
+        ; UNMEASURED: no world-map fixture stands in this
         ; region (the search arc is not on any generated savestate), so these
         ; five are coverage on the same census+arithmetic footing measurement #8
-        ; gave the figaro-desert rows -- shields left to the formula, element
-        ; table only (no HpScale exemption), numbers to be taken once a corridor
-        ; fixture is generated. THE FIRE HOLE, flagged: a few western-WoB
-        ; bodies are fire- or wind-weak ONLY ($090 fire, $08c fire|wind, $02a
-        ; wind) and this party casts neither, so their vanilla weakness is dead
-        ; for it. they are left as-is rather than blindly double-keyed: whether
-        ; they even sit on the walked route is exactly what the missing fixture
-        ; would settle. see measurement #9.
+        ; gave the figaro-desert rows: shields left to the formula, element
+        ; table only (no HpScale exemption), and numbers to be taken once a
+        ; corridor fixture is generated. the fire hole, flagged: a few
+        ; western-WoB bodies are fire- or wind-weak only ($090 fire, $08c
+        ; fire|wind, $02a wind) and this party casts neither, so their vanilla
+        ; weakness is dead for it. they are left as-is rather than double-keyed
+        ; without evidence: whether they sit on the walked route at all is what
+        ; the missing fixture would settle. see measurement #9.
         .word   $0018
         .byte   $08, $00        ; stray cat: no weakness, absorbs nothing
         .word   $001d
@@ -496,13 +496,13 @@ Ot6ElemAddTbl:
         .byte   $08, $00        ; red fang: on the task census and the tables
         .word   $007b
         .byte   $08, $00        ; ralph: no weakness, absorbs nothing
-        ; ---- the v0.6 BOSS-ELEMENT pass (issue #23). four sets that
-        ; bosses-wob.md authored in prose and nobody ever wrote into the
+        ; ---- the v0.6 boss-element pass (issue #23). four sets that
+        ; bosses-wob.md authored in prose and nobody wrote into the
         ; data; check_boss_rows.py found them and carried them as waivers
         ; until now. every row below was re-decoded from monster_prop.dat
-        ; +$17 (absorb) / +$18 (null) / +$19 (weak) at authoring time, NOT
-        ; recalled -- the Crane pair in that same document was wrong in
-        ; exactly the absorb direction once already, and the GhostTrain rule
+        ; +$17 (absorb) / +$18 (null) / +$19 (weak) at authoring time rather
+        ; than recalled: the Crane pair in that same document was already
+        ; wrong in the absorb direction once, and the GhostTrain rule
         ; (never put a chip trigger on an absorber, where vanilla reverses
         ; the damage sign) is what these checks enforce:
         ;
@@ -515,24 +515,24 @@ Ot6ElemAddTbl:
         ;   $168 ultros 4    $80 WAT $00                     $09    $04
         ;
         ; no add bit intersects that row's absorb or null byte. the last
-        ; line is the one with teeth: $168 ABSORBS WATER, so the water half
-        ; of the family row would HEAL him and only bolt is restorable.
-        ; battle_breaktbl.lua now walks this whole table and asserts the
-        ; add-vs-absorb/null invariant on EVERY row, future ones included.
+        ; line matters most: $168 absorbs water, so the water half
+        ; of the family row would heal him and only bolt is restorable.
+        ; battle_breaktbl.lua walks this whole table and asserts the
+        ; add-vs-absorb/null invariant on every row, future ones included.
         .word   $0117
-        .byte   $07, $00        ; atmaweapon: + fire|ice|bolt. THE capstone
-                                ;   fix -- 11 shields, the biggest gauge in
+        .byte   $07, $00        ; atmaweapon: + fire|ice|bolt. the capstone
+                                ;   fix: 11 shields, the largest gauge in
                                 ;   the arc, and vanilla gives it no element
                                 ;   at all, so before this row a free-pick
                                 ;   party holding neither slash nor pierce
-                                ;   had NO break on the WoB final exam.
+                                ;   had no break on the WoB final exam.
                                 ;   absorbs and nulls nothing: all three
                                 ;   bits are free (bosses-wob.md §21)
         .word   $010b
         .byte   $84, $00        ; number 128 body: + bolt|water. the espers
                                 ;   zozo just paid out (ramuh) are the key
                                 ;   the fight was written around; absorbs
-                                ;   ICE, which is neither bit (§15)
+                                ;   ice, which is neither bit (§15)
         .word   $013f
         .byte   $04, $00        ; right blade: + bolt (the narrower row the
                                 ;   doc authors for the limbs; same ice
@@ -541,19 +541,19 @@ Ot6ElemAddTbl:
         .byte   $04, $00        ; left blade: + bolt
         .word   $0116
         .byte   $80, $00        ; flameeater: + water. strago's debut fight
-                                ;   and Aqua Breath is the lesson the doc
-                                ;   frames it on; water was NEUTRAL on $116
+                                ;   and Aqua Breath is what the doc frames
+                                ;   it on; water was neutral on $116
                                 ;   (not weak, not nulled, not absorbed), so
                                 ;   the Lore read a row it could not use.
-                                ;   it absorbs FIRE and nulls bolt|poison|
-                                ;   holy|earth -- water is in neither (§18)
+                                ;   it absorbs fire and nulls bolt|poison|
+                                ;   holy|earth; water is in neither (§18)
         .word   $0168
-        .byte   $04, $00        ; ultros 4: + bolt ONLY. $168 is a different
+        .byte   $04, $00        ; ultros 4: + bolt only. $168 is a different
                                 ;   species from $12c/$12d/$12e and vanilla
-                                ;   gave it fire|POISON, not fire|bolt, so
+                                ;   gave it fire|poison, not fire|bolt, so
                                 ;   the running gag's element half was never
                                 ;   true. bolt restores it. water is the rest
-                                ;   of the family row and is NOT added here:
+                                ;   of the family row and is not added here:
                                 ;   every Ultros record absorbs water (+$17 =
                                 ;   $80), so that bit would heal him (§19)
         .word   $ffff
@@ -563,27 +563,27 @@ Ot6ElemAddTbl:
 ; [ difficulty transform: scale trash battle hp at monster seed time ]
 
 ; Enemy narrative role, visual identity, and recognizable behavior are
-; useful design anchors, not immutable constraints. OT6 may author combat
-; properties when the break grammar or pacing benefits. This particular
-; broad difficulty pass is applied as a runtime transform —
-; both battle-ram copies of the loaded hp ($3bf4 current, $3c1c max —
-; LoadMonsterProp's only hp stores; every monster load funnels through
+; useful design anchors rather than fixed constraints. OT6 may author combat
+; properties when the break grammar or pacing benefits. This
+; broad difficulty pass is applied as a runtime transform:
+; both battle-ram copies of the loaded hp ($3bf4 current, $3c1c max,
+; LoadMonsterProp's only hp stores; every monster load goes through
 ; it) are multiplied by a per-band value in 16ths, clamped at $ffff.
 ;
 ; exemptions, by construction:
-;   - authored species (any Ot6ShieldTbl row: bosses + tutorial trash)
-;     — boss difficulty is bosses-wob.md's job (it plans hp CUTS), and
+;   - authored species (any Ot6ShieldTbl row: bosses + tutorial trash),
+;     because boss difficulty is bosses-wob.md's job (it plans hp cuts) and
 ;     the gate's battle fixtures are authored species, so their damage
 ;     arithmetic stays byte-stable
 ;   - $3a47.7 battles (Cmd_20 scene change, monsters carry hp): the
-;     cells hold prior-stage hp, transformed once already —
+;     cells hold prior-stage hp, transformed once already, and
 ;     LoadMonsterProp's own hp store honors the same gate
 ;   - rage loads never reach here (character path exits the seed hook)
 ;
-; stamina stays vanilla: LoadMonsterProp derives it from max hp BEFORE
-; this hook runs — deliberate (a stat, not an hp copy). fraction-of-hp
-; attacks (doom gaze etc.) read the transformed cells at cast time and
-; scale with the monster: correct.
+; stamina stays vanilla: LoadMonsterProp derives it from max hp before
+; this hook runs, deliberately, since it is a stat rather than an hp copy.
+; fraction-of-hp attacks (doom gaze etc.) read the transformed cells at
+; cast time and scale with the monster, which is correct.
 ;
 ; called from the tail of Ot6SeedShields, monster path only. a8/i16,
 ; y = entity offset ($08+), species already stashed at OT6_SPECIES-8,y.
@@ -635,8 +635,8 @@ Ot6ElemAddTbl:
 done:   rts
 
 ; [ a = clamp16(a * mult / 16), mult byte in OT6_SCR_IDX ]
-; a16/i16. the multiplicand is monster HP, so the product genuinely needs
-; bit 16+ (8000 hp x 2.5 = 20000 fits, but its product doesn't) — see
+; a16/i16. the multiplicand is monster HP, so the product needs
+; bit 16+ (8000 hp x 2.5 = 20000 fits, but its product does not). see
 ; ot6_mul16ths at the top of this file for the shift-add and for why the
 ; /16 comes after the multiply. clobbers x + scratch; preserves y.
 hpmul:  .a16
@@ -653,30 +653,30 @@ hpmul:  .a16
 ; hp multiplier per species-id band, in 16ths ($10 = 1x, $28 = 2.5x).
 ; bands follow the species census: $00-$5f the wob trash the demo
 ; fights, $60-$bf mid trash, $c0-$ff late trash, $100+ bosses/events.
-; authored rows are exempt above this table ever applies; $100+ stays
-; 1x so unauthored event species (doom gaze's saved-hp reload
-; especially — it re-seeds current hp AFTER LoadMonsterProp's store)
+; authored rows are exempt before this table applies; $100+ stays
+; 1x so unauthored event species (doom gaze's saved-hp reload in
+; particular, which re-seeds current hp after LoadMonsterProp's store)
 ; never compound across encounters.
 ;
-; measurement #5 stood the multiplier DOWN to 1x. it and shielded
+; measurement #5 took the multiplier down to 1x. it and shielded
 ; resistance both lengthen fights, and stacking 2x hp with the 0.5x
-; resistance overshot the snappy-fight range (baseline mines TTK ~6 real
-; actions, a slog). the co-tune sweep found 1x hp x 0.5x resistance is
-; the sweet spot: shielded resistance now carries the "fights are
-; longer" load (it halves off-weakness damage, so the loop-IGNORER's
-; fight runs ~2x longer — matching measurement #4's pace-knob regime —
-; while a weakness-exploiting player stays vanilla-fast). the multiplier
-; had done that job by inflating EVERY player's hp bar equally, which
-; did not reward the loop; resistance does. band1 tracks band0 to 1x so
-; the global danger/reward knobs stay conserved across bands (a mixed
+; resistance put fights well past the intended length (baseline mines TTK
+; ~6 real actions). the co-tune sweep found 1x hp x 0.5x resistance works
+; best: shielded resistance now carries the "fights are
+; longer" load (it halves off-weakness damage, so a player who ignores the
+; loop has fights that run ~2x longer, matching measurement #4's pace-knob
+; regime, while a weakness-exploiting player stays vanilla-fast). the
+; multiplier had done that job by inflating every player's hp bar equally,
+; which did not reward the loop; resistance does. band1 tracks band0 to 1x
+; so the global danger/reward knobs stay conserved across bands (a mixed
 ; 1x/2x table would put mid-trash fights at ~4x length). band1 mid-trash
-; stays unmeasured — parity extrapolation pending stretch fixtures.
+; stays unmeasured: parity extrapolation pending stretch fixtures.
 Ot6HpMulTbl:
-        .byte   $10             ; $000-$05f: 1x — swept (measurement #5:
+        .byte   $10             ; $000-$05f: 1x, swept (measurement #5:
                                 ;   resistance carries the lengthening)
-        .byte   $10             ; $060-$0bf: 1x — tracks band0 (parity;
+        .byte   $10             ; $060-$0bf: 1x, tracks band0 (parity;
                                 ;   mid trash unmeasured, fixtures pending)
-        .byte   $10             ; $0c0-$0ff: 1x — wor, unmeasured
+        .byte   $10             ; $0c0-$0ff: 1x, wor, unmeasured
         .byte   $10             ; $100+ (keep 1x: see doom gaze note)
 
 ; ------------------------------------------------------------------------------
@@ -684,10 +684,10 @@ Ot6HpMulTbl:
 ; [ encounter-rate knob + reward conservation ]
 
 ; fights at 2x hp run ~2x longer (measurement #3: 1456f vs 744f), so the
-; per-step encounter danger increment is scaled DOWN and random-battle
-; rewards are scaled UP by the inverse: combat time per step and xp/gil
+; per-step encounter danger increment is scaled down and random-battle
+; rewards are scaled up by the inverse: combat time per step and xp/gil
 ; per step both track vanilla. the two knobs are 16ths and their product
-; is pinned at $100 (1.0) by the conservation rule — change them as a
+; is pinned at $100 (1.0) by the conservation rule; change them as a
 ; pair or the level/shop pacing drifts.
 
 Ot6DangerMulW:
@@ -706,7 +706,7 @@ Ot6RewardMulW:
 ; unchanged. at $10 the scale is exact identity (product/16 = rate).
 ; preserves x/y and db; the 24-bit shift-add uses the OT6_SCR battle
 ; scratch (no battle is live during a field step; field/world code
-; never touches $3ecc-$3ed3 — grepped).
+; never touches $3ecc-$3ed3, checked by grep).
 
 .proc Ot6DangerStep
         .a16
@@ -815,7 +815,7 @@ scale24:
         lda     OT6_SCR_COLS
         cmp     #$0100
         bcc     @fit
-        lda     #$00ff          ; clamp: 24-bit sums, 24-bit truth
+        lda     #$00ff          ; clamp: the sums are 24-bit
         sta     OT6_SCR_COLS
         lda     #$ffff
         sta     OT6_SCR_IDX
@@ -833,8 +833,8 @@ scale24:
 ; [ chip shields on an elemental weakness hit ]
 
 ; called from the weak-element branch of CalcTargetDmg (match confirmed).
-; a8, y = target, $11a1 = attack elements, preserves x/y. INDEX WIDTH
-; VARIES: the per-target damage loop runs i8 (CalcAttackEffect is .i8),
+; a8, y = target, $11a1 = attack elements, preserves x/y. index width
+; varies: the per-target damage loop runs i8 (CalcAttackEffect is .i8),
 ; so everything here is width-agnostic except the codex store, which
 ; pins i16 for its word-sized species load.
 
@@ -861,17 +861,17 @@ scale24:
         bcs     merge           ; message index for the lowest new element
         inc     $3401
         bra     @bit
-merge:  pla                     ; bank the matched weaknesses as PENDING (#33):
+merge:  pla                     ; bank the matched weaknesses as pending (#33):
         ora     OT6_RVPEND_ELEM-8,y     ;   the on-screen reveal must land on
-        sta     OT6_RVPEND_ELEM-8,y     ;   the DAMAGE frame, and this runs at
-                                ;   damage CALC -- hundreds of frames earlier
+        sta     OT6_RVPEND_ELEM-8,y     ;   the damage frame, and this runs at
+                                ;   damage calc, hundreds of frames earlier
                                 ;   (measured: probe_clockwork, calc f704 vs
                                 ;   first numeral f1006).  Ot6RevealCommit
                                 ;   moves pending into OT6_REVEALED_ELEM (and
                                 ;   every same-species slot) at the numeral.
         ; learn it forever: codex entry = everything known so far, pending
         ; included (seed merged the old codex bits in, so this is monotonic).
-        ; species is a word: pin i16 for the load — under the caller's
+        ; species is a word: pin i16 for the load.  under the caller's
         ; i8 the ldx truncated species >= $100 onto the wrong codex
         ; slot (m1 latent bug; guard/lobo were too small to catch it).
         ; entity offsets survive the rep: 8-bit index mode forces the
@@ -899,9 +899,9 @@ merge:  pla                     ; bank the matched weaknesses as PENDING (#33):
         sta     OT6_SHIELD_CUR,y
         bne     done
         lda     #OT6_BREAK_TICKS
-        sta     OT6_BROKEN_TICKS,y         ; shields down: BREAK
-        lda     #$ff                       ; #48: and bank the FLASH as pending
-        sta     OT6_BRKTICK-8,y            ;   -- see Ot6BreakArm.  width-
+        sta     OT6_BROKEN_TICKS,y         ; shields down: break
+        lda     #$ff                       ; #48: and bank the flash as pending;
+        sta     OT6_BRKTICK-8,y            ;   see Ot6BreakArm.  width-
                                            ;   agnostic (abs,y in both index
                                            ;   widths), like every other store
                                            ;   in this proc but the codex one
@@ -913,12 +913,12 @@ done:   rtl
 ; [ every landed hit: weapon-class chip, then broken double ]
 
 ; replaces the bare broken-double jsl at the elemental join @0c1e, so it
-; runs for every damaging hit against every target — including hits whose
+; runs for every damaging hit against every target, including hits whose
 ; element was absorbed/nulled/forcefielded (the blade still lands) and
 ; hits with no element at all (most weapons). a8 (CalcTargetDmg pins it);
 ; the damage loop runs i8, so pin i16 here for the chip's species/codex
-; indexing — entity offsets survive the rep, 8-bit index mode forces the
-; high bytes to zero. preserves x/y.
+; indexing; entity offsets survive the rep, because 8-bit index mode forces
+; the high bytes to zero. preserves x/y.
 
 .proc Ot6HitJoin
         .a8
@@ -940,13 +940,14 @@ done:   rtl
 ; (set at load time by Ot6WeaponClass/Ot6SkillClass/Ot6ItemClass).
 ; preserves x/y. same flow as the elements: reveal, message, codex,
 ; chip, break. differences, by design:
-;   - no vanilla x2 on a class-weak hit — the damage bonus for classes
+;   - no vanilla x2 on a class-weak hit: the damage bonus for classes
 ;     is the break window itself (elemental weak x2 is vanilla's rule
 ;     and stays vanilla's alone)
-;   - wound/petrify and heal-flagged hits never chip (elements can't
-;     reach their weak branch in those states, so this is parity, not
-;     a new rule; the one asymmetry is undead drain-reversal, which
-;     element chip allows — vanilla jank — and class chip doesn't)
+;   - wound/petrify and heal-flagged hits never chip (elements cannot
+;     reach their weak branch in those states, so this matches rather
+;     than adds a rule; the one difference is undead drain-reversal,
+;     which element chip allows, following vanilla, and class chip
+;     does not)
 
 .proc Ot6ClassChip
         .a8
@@ -966,12 +967,12 @@ done:   rtl
         bit     #$c0
         bne     done            ; wound/petrify: the hit was theater
         lda     $f2             ; resolved spell flags3 (absorb/undead-drain
-        lsr                     ;   reversals already folded in); ONLY bit 0
-        bcs     done            ; means heal — $20 can't-dodge etc. ride the
-                                ; same byte, and gating on the whole byte
+        lsr                     ;   reversals already folded in); only bit 0
+        bcs     done            ; means heal.  $20 can't-dodge and others ride
+                                ; the same byte, and gating on the whole byte
                                 ; silenced every flagged skill's chip
         lda     OT6_BOOST_REVEALED,y
-        ora     OT6_RVPEND_CLS-8,y      ; #33: banked-this-action isn't new
+        ora     OT6_RVPEND_CLS-8,y      ; #33: banked this action is not new
         eor     #$ff
         and     OT6_SCR_BIT
         beq     merge           ; matched class already revealed
@@ -982,7 +983,7 @@ done:   rtl
         bcs     merge           ; message index for the matched class
         inc     $3401
         bra     @bit
-merge:  lda     OT6_SCR_BIT     ; bank the matched class as PENDING (#33):
+merge:  lda     OT6_SCR_BIT     ; bank the matched class as pending (#33):
         ora     OT6_RVPEND_CLS-8,y      ;   committed to the revealed byte on
         sta     OT6_RVPEND_CLS-8,y      ;   the damage frame, like the elements
         ; learn it forever, like the elements (join already pinned i16)
@@ -1006,7 +1007,7 @@ merge:  lda     OT6_SCR_BIT     ; bank the matched class as PENDING (#33):
         sta     OT6_SHIELD_CUR,y
         bne     done
         lda     #OT6_BREAK_TICKS
-        sta     OT6_BROKEN_TICKS,y         ; shields down: BREAK
+        sta     OT6_BROKEN_TICKS,y         ; shields down: break
         lda     #$ff                       ; #48: flash pending (see Ot6BreakArm)
         sta     OT6_BRKTICK-8,y
 done:   rts
@@ -1014,20 +1015,21 @@ done:   rts
 
 ; ------------------------------------------------------------------------------
 
-; [ commit pending reveals on the damage frame -- per-species, one frame (#33) ]
+; [ commit pending reveals on the damage frame: per-species, one frame (#33) ]
 ;
-; the chips above run at damage CALC, inside CalcAttackEffect's per-target
-; loop; the damage the player SEES lands when GfxCmd_0b allocates its numeral
+; the chips above run at damage calc, inside CalcAttackEffect's per-target
+; loop; the damage the player sees lands when GfxCmd_0b allocates its numeral
 ; thread, hundreds of frames later (measured on the shipped ROM,
-; probe_clockwork: hp/reveal writes f704-705, first numeral f1006 -- the '?'
+; probe_clockwork: hp/reveal writes f704-705, first numeral f1006, so the '?'
 ; flipped ~300 frames before any number appeared).  so the chips bank into
-; OT6_RVPEND_* and THIS walker moves pending into the revealed bytes:
-;   - called from GfxCmd_0b's entry (C1 shim) -- the damage frame proper;
-;   - and from Ot6ActionEnd -- the backstop for numeral-less actions, so
+; OT6_RVPEND_* and this walker moves pending into the revealed bytes:
+;   - called from GfxCmd_0b's entry (C1 shim), the damage frame proper;
+;   - and from Ot6ActionEnd, the backstop for numeral-less actions, so
 ;     pending never outlives the action that banked it.
-; the codex is per-species, so the commit writes every SAME-SPECIES slot's
-; revealed byte in the same pass -- all siblings' icons appear on one frame
-; (the display agreeing with the knowledge model, issue #33's third demand).
+; the codex is per-species, so the commit writes every same-species slot's
+; revealed byte in the same pass, and all siblings' icons appear on one frame
+; (the display agreeing with the knowledge model, issue #33's third
+; requirement).
 ; absent slots are written too when their species matches: harmless (their
 ; hud lines are disabled) and cheaper than a presence test.
 ;
@@ -1036,14 +1038,14 @@ done:   rts
 .proc Ot6RevealCommit
         .a8
         .i16
-        phb                     ; PIN DB=$7e: every cell below is absolute
+        phb                     ; pin db=$7e: every cell below is absolute
         phx                     ;   (battle RAM + the shadow tail), and one
-        phy                     ;   caller is the C1 SCRIPT engine, whose DB
+        phy                     ;   caller is the C1 script engine, whose DB
         lda     #$7e            ;   is not ours to assume.  measured: without
         pha                     ;   this the walker read junk species and
-        plb                     ;   scribbled outside battle RAM, and the
-                                ;   Vargas fight WEDGED the moment a monster
-                                ;   hit 0 hp -- deaths never completed, no
+        plb                     ;   wrote outside battle RAM, and the
+                                ;   Vargas fight locked up the moment a monster
+                                ;   hit 0 hp: deaths never completed, no
                                 ;   menu ever reopened (probe_vargasstall:
                                 ;   24000 frames at menu=00 vs 6737 to
                                 ;   ipoohs-down on the pre-change ROM).
@@ -1055,12 +1057,12 @@ done:   rts
 @sib:   longa
         lda     OT6_SPECIES,x
         cmp     OT6_SPECIES,y
-        shorta                  ; plain SEP #$20 -- shorta0's `tdc` SETS Z from
+        shorta                  ; plain SEP #$20; shorta0's `tdc` sets Z from
                                 ;   D and would wipe the compare.  measured, not
                                 ;   reasoned: with shorta0 here every slot read
                                 ;   as same-species, and a dying Ipooh's pending
-                                ;   SLASH propagated onto VARGAS (his row is
-                                ;   BLUDG) -- battle_vargas's revClass control
+                                ;   slash propagated onto Vargas (whose row is
+                                ;   bludg); battle_vargas's revClass control
                                 ;   caught it.
         bne     @skip
         lda     OT6_RVPEND_ELEM,y
@@ -1080,12 +1082,12 @@ done:   rts
         iny
         cpy     #$000c
         bcc     @src
-        jsr     Ot6BreakArm     ; #48: the break flash rides the SAME edge, and
+        jsr     Ot6BreakArm     ; #48: the break flash rides the same edge, and
                                 ;   rides it from here rather than from a second
                                 ;   call site so it inherits both of this proc's
-                                ;   callers for free -- Ot6RevealPoll's numeral
+                                ;   callers (Ot6RevealPoll's numeral
                                 ;   frame, and Ot6ActionEnd's numeral-less
-                                ;   backstop -- without touching ot6_boost.asm
+                                ;   backstop) without touching ot6_boost.asm
         ply
         plx
         plb
@@ -1096,43 +1098,43 @@ done:   rts
 
 ; [ the break moment: fire every pending monster's break, sound it once (#48) ]
 ;
-; WHY IT IS DEFERRED AT ALL.  The chips above empty the gauge inside
-; CalcAttackEffect's per-target loop, at damage CALC -- measured hundreds of
+; Why it is deferred.  The chips above empty the gauge inside
+; CalcAttackEffect's per-target loop, at damage calc, measured hundreds of
 ; frames before the player sees anything (probe_clockwork, #33: calc f704 vs
-; first numeral f1006).  Flashing there would fire the signature moment while
+; first numeral f1006).  Flashing there would fire the effect while
 ; the attacker was still winding up.  So the chips bank $ff in OT6_BRKTICK and
-; this proc converts pending into a live flash on the DAMAGE frame, which is
-; exactly the OT6_PIPPEND / Ot6RvPend* shape #33 and #42 already established.
+; this proc converts pending into a live flash on the damage frame, which is
+; the OT6_PIPPEND / Ot6RvPend* shape #33 and #42 already established.
 ;
-; THE CLEAVE IS NOT CONDITIONAL ON THE FLASH (#63).  Ot6BreakStart returns
-; carry for "a break happened at this monster", which is a WEAKER condition
-; than "the flash armed" -- it decides on its own whether it may drive the
+; The cleave is not conditional on the flash (#63).  Ot6BreakStart returns
+; carry for "a break happened at this monster", which is a weaker condition
+; than "the flash armed": it decides on its own whether it may drive the
 ; sprite, and on a break that also killed the monster it may not.  This pass
-; sounds and pans off the weaker condition, so the break is never silent
+; sounds and pans off the weaker condition, so the break is not silent
 ; merely because the death animation owns the palette.  See there.
 ;
-; THE SOUND IS ONCE PER PASS, NOT ONCE PER SLOT.  Two monsters broken by the
+; The sound is once per pass, not once per slot.  Two monsters broken by the
 ; same action arm on the same numeral and share one cleave; a multi-hit action
 ; cannot double it either, because a chip only banks pending when
 ; OT6_BROKEN_TICKS is still zero, so hits 2..n of a combo find the target
 ; already broken and bank nothing.
 ;
-; THE SFX ID IS A DELIBERATE BORROW, NOT AN AUDITION.  $be is vanilla's
-; Odin/Raiden cleave (btlgfx_main.asm:26049-26055 -- the only site that plays
+; The sfx id is borrowed deliberately.  $be is vanilla's
+; Odin/Raiden cleave (btlgfx_main.asm:26049-26055, the only site that plays
 ; it), which makes it the heaviest single-impact sound in the battle bank that
-; is not ALREADY spoken for by something a player hears every fight: $a0 is
+; is not already used by something a player hears every fight: $a0 is
 ; every connecting swing (BlockSfxTbl, :27078), $2d is a monster dying (:22295)
-; and would read as a kill, $0d is the whiff.  Odin is not obtainable until the
-; WoR Ancient Castle, so through the whole supported part of the game this
+; and would read as a kill, and $0d is the whiff.  Odin is not obtainable until
+; the WoR Ancient Castle, so through the whole supported part of the game this
 ; sound has no prior meaning to overwrite.  It is one constant (OT6_BREAK_SFX)
 ; if the owner wants a different one after hearing it.
 ;
 ; It is queued by writing PlayAnimSfx's own four bytes (btlgfx_main.asm:3175-
 ; 3182) rather than by jsl-ing that routine, because PlayAnimSfx takes its pan
-; in direct-page $10 and we do not own $10 in either of this proc's contexts.
-; The pan is the BROKEN MONSTER'S SCREEN X, which is vanilla's own idiom for a
+; in direct-page $10 and this proc does not own $10 in either of its contexts.
+; The pan is the broken monster's screen x, which is vanilla's own idiom for a
 ; monster-local sound (the death animation pans to w7e80c3 the same way,
-; :22287-22294) -- so the cleave comes from where the enemy is standing.
+; :22287-22294), so the cleave comes from where the enemy is standing.
 ;
 ; a8/i16, db=$7e (Ot6RevealCommit pins it).  clobbers a/y.
 .proc Ot6BreakArm
@@ -1148,7 +1150,7 @@ done:   rts
         bne     @next           ; idle, or already a live countdown
         jsr     Ot6BreakStart   ; y = slot offset; carry set = a break happened
         bcc     @next           ;   here (#63: the flash may still have been
-                                ;   refused on its own -- the CLEAVE is not
+                                ;   refused on its own; the cleave is not
                                 ;   conditional on owning the sprite)
         lda     $01,s
         bne     @next           ; the first broken slot owns the pan
@@ -1162,8 +1164,8 @@ done:   rts
         bcc     @slot
         pla                     ; did anything break this pass?
         beq     @quiet
-        pla                     ; pan -- write it only when we really sound,
-        sta     $e9ea           ;   so a silent pass cannot stomp a pan the
+        pla                     ; pan: written only when a sound is queued,
+        sta     $e9ea           ;   so a silent pass cannot overwrite a pan the
                                 ;   animation engine queued this same frame
         lda     #OT6_BREAK_SFX
         sta     $e9e9           ; w7ee9e9: sound effect number
@@ -1178,59 +1180,59 @@ done:   rts
 
 ; ------------------------------------------------------------------------------
 
-; [ start one monster's break moment -- y = monster slot offset (#48, #63) ]
+; [ start one monster's break moment; y = monster slot offset (#48, #63) ]
 ;
-; The pending byte is consumed on EVERY path, armed or not: a pending flash
+; The pending byte is consumed on every path, armed or not: a pending flash
 ; must never outlive the action that banked it (Ot6PipPending's rule).
 ;
-; TWO TIERS, and #63 is what forced the split.  A break is an EVENT, and it
-; happened at a place on the screen; the CLEAVE is sounded from here whatever
-; the sprite is doing.  The white FLASH additionally has to OWN the sprite, and
-; is refused -- silently, on its own -- when it cannot.
+; Two tiers, and #63 is what forced the split.  A break is an event that
+; happened at a place on the screen, and the cleave is sounded from here
+; whatever the sprite is doing.  The white flash additionally has to own the
+; sprite, and is refused on its own, without a message, when it cannot.
 ;
-; SOUNDED, FLASH REFUSED ("this sprite is not ours to drive"):
+; Sounded, flash refused (this sprite is not ours to drive):
 ;   - the monster is wound/petrified ($3eec & $c2, the hud's own dead test);
-;   - the breaking blow ALSO killed it (hp is already zero by the numeral
-;     frame -- damage lands at calc).  Death has its own 32-frame animation
-;     which loads MonsterDeathPal into THIS palette slot and repoints
-;     w7e80db at it for the whole fade (btlgfx_main.asm:22259-22266 and
-;     :22452-22458), so flashing here would paint the death fade WHITE and
-;     leave the sprite on whichever of us wrote last;
+;   - the breaking blow also killed it (hp is already zero by the numeral
+;     frame, because damage lands at calc).  Death has its own 32-frame
+;     animation which loads MonsterDeathPal into this palette slot and
+;     repoints w7e80db at it for the whole fade (btlgfx_main.asm:22259-22266
+;     and :22452-22458), so flashing here would paint the death fade white and
+;     leave the sprite on whichever writer went last;
 ;   - the engine has already repointed the monster at palette 3 for an
 ;     animation of its own (AnimCmd_80_3b, :31329).  Same reason.
 ;
-; REFUSED OUTRIGHT: the slot is not on the field ($3aa8 bit 0, the hud's own
+; Refused outright: the slot is not on the field ($3aa8 bit 0, the hud's own
 ; presence gate).  There is no monster and no screen position for a
 ; monster-local sound to come from, so nothing happens at all.
 ;
-; WHY THE SPLIT, measured (#63).  v0.8-rc1 shipped all four of these as one
-; refusal, so a break whose blow also killed produced NOTHING -- no flash and
-; no sound.  That is the common case in play, not a corner: the breaking hit
-; collects vanilla's elemental x2 and then Ot6BrokenDmg's x2, 4x base, and
-; this file's own trash-pass note already recorded that nothing on Mt. Kolts
-; except tusker has the hp to survive its own break.  probe_breakplay drove
-; the same entry-point laboratory battle_breakflash uses with hp left unpinned
+; Why the split, measured (#63).  v0.8-rc1 shipped all four of these as one
+; refusal, so a break whose blow also killed produced nothing: no flash and
+; no sound.  That is the common case in play rather than a corner: the
+; breaking hit collects vanilla's elemental x2 and then Ot6BrokenDmg's x2, 4x
+; base, and this file's own trash-pass note already recorded that nothing on
+; Mt. Kolts except tusker has the hp to survive its own break.  probe_breakplay
+; drove the same entry point battle_breakflash uses with hp left unpinned
 ; and caught the refusal directly (hp=0000, status $80, Ot6BreakStart refused
 ; at the hp gate, zero cleaves queued), while the two cells that kept the
-; monster alive both armed and both queued their $be.  The flash is STILL
+; monster alive both armed and both queued their $be.  The flash is still
 ; correctly refused on a kill; what was wrong is that the event went silent
 ; with it, which is what the owner reported as "no effect happening when i
 ; break enemies".
 ;
-; NOT the cause, and ruled out by the same probe rather than by argument:
+; Not the cause, and ruled out by the same probe rather than by argument:
 ;   - "the arm only runs when a reveal is pending".  Ot6RevealPoll calls
-;     Ot6RevealCommit on EVERY damage-numeral edge (:Ot6RevealPoll below,
-;     ot6_hud.asm:204) and Ot6BreakArm rides its tail unconditionally --
+;     Ot6RevealCommit on every damage-numeral edge (:Ot6RevealPoll below,
+;     ot6_hud.asm:204) and Ot6BreakArm rides its tail unconditionally,
 ;     measured at 5 to 9 passes per staged break, including passes with
 ;     nothing pending at entry.  Breaks landing on a hit that revealed
 ;     nothing new armed normally.
 ;   - palette-3 contention with vanilla's own turn flash.  A cell with
 ;     vanilla's per-monster turn-flash latch (w7e618b) deliberately left
-;     UNPINNED -- battle_breakflash pins it as a lab control -- armed and
+;     unpinned (battle_breakflash pins it as a control) armed and
 ;     flashed normally.
 ;
 ; a8/i16, db=$7e.  preserves y; clobbers a.
-; out: CARRY SET = a break happened here; sound it, panned to this monster.
+; out: carry set = a break happened here; sound it, panned to this monster.
 .proc Ot6BreakStart
         .a8
         .i16
@@ -1274,15 +1276,15 @@ done:   rts
 ; fade (:22264).  Nothing else can be pointing at it, because monsters are only
 ; ever assigned palettes 0/1/2 (:4917-4921).
 ;
-; ZERO EXTRA VBLANK TRAFFIC, which is the #33 constraint this had to clear.
+; No extra vblank traffic, which is the #33 constraint this had to clear.
 ; The PPU update DMAs sprite palettes as one unconditional fixed $100-byte
 ; block from w7e7e00::_8 every frame (btlgfx_main.asm:1512-1518), so the whole
-; effect -- palette and the w7e80db repoint the OAM builder reads -- is WRAM
+; effect (the palette and the w7e80db repoint the OAM builder reads) is WRAM
 ; writes that ride transfers the engine was making anyway.  Measured, not
 ; assumed: see battle_breakflash's nmi budget phase.
 ;
 ; $7fff is white in BGR555; colour 0 stays transparent by the PPU's own rule,
-; so the monster reads as a solid white cut-out -- the critical flash's colour,
+; so the monster reads as a solid white cut-out: the critical flash's colour,
 ; scoped to one enemy, which is the owner's direction for #48.
 ;
 ; a8/i16, db=$7e.  preserves y; clobbers a.
@@ -1307,27 +1309,27 @@ done:   rts
 
 ; [ drive every live break flash, one main-loop frame (#48) ]
 ;
-; Called from Ot6BgHud_ext, the frame ticker #33 established for exactly this
-; kind of work: our own context in bank F0 with db=$7e, OUTSIDE the C1 battle
-; script engine whose re-entrancy around WaitFrame wedged the fight the last
+; Called from Ot6BgHud_ext, the frame ticker #33 established for this
+; kind of work: our own context in bank F0 with db=$7e, outside the C1 battle
+; script engine whose re-entrancy around WaitFrame locked up the fight the last
 ; time OT6 ran a walk inside it (see Ot6RevealPoll's header).
 ;
 ; Cadence: countdown 24..0, sprite on the flash palette while bit 2 of the
-; counter is set -- 4 frames white, 4 frames normal, three times, ~0.4s.  That
+; counter is set, so 4 frames white, 4 frames normal, three times, ~0.4s.  That
 ; is vanilla's own flash rhythm (set_one_mon_pal waits 4 frames a phase,
 ; :23400-23410) with a third pulse, because a break is a bigger event than a
 ; monster taking its turn and has to be distinguishable from it.
 ;
 ; The hand-back is guarded: it only rewrites w7e80db if the palette bits are
-; still the 3 WE wrote.  If the engine took the sprite over mid-flash we leave
-; it entirely alone rather than restoring stale bits over its work.
+; still the 3 this proc wrote.  If the engine took the sprite over mid-flash
+; the proc leaves it alone rather than restoring stale bits over its work.
 ;
-; IT IS NOT EVEN CALLED WHEN NOTHING IS FLASHING, and the gate lives INLINE at
-; the call site rather than at the top of this proc, because `jsr` + one load
-; here (20 cycles) was already over the line while 12 bare NOPs were not.  The
-; margin is that thin; the whole measurement is written up at OT6_BRKLIVE in
+; It is not called at all when nothing is flashing, and the gate lives inline at
+; the call site rather than at the top of this proc, because `jsr` plus one load
+; here (20 cycles) was already over budget while 12 bare NOPs were not.  The
+; margin is that small; the whole measurement is written up at OT6_BRKLIVE in
 ; ot6_memory.inc.  The walk recomputes OT6_BRKLIVE from what survives each
-; tick, so a stale flag costs exactly one walk and the byte needs no init
+; tick, so a stale flag costs one walk and the byte needs no init
 ; clear.
 ;
 ; a8/i16, db=$7e (Ot6BgHud_ext's context).  clobbers a; preserves x/y.
@@ -1353,12 +1355,12 @@ done:   rts
         dec     a
         sta     OT6_BRKTICK,y
         beq     @off            ; the flash is over: hand the sprite back
-        sta     OT6_BRKLIVE     ; still counting -- keep the painter awake
+        sta     OT6_BRKLIVE     ; still counting: keep the painter awake
                                 ;   (nonzero, and it leaves n/z alone for the
                                 ;   phase test below)
         and     #$04
         beq     @off
-        lda     $80db,y         ; ON: point the monster at the white palette
+        lda     $80db,y         ; on: point the monster at the white palette
         and     #$f1
         ora     #$06
         sta     $80db,y
@@ -1384,36 +1386,36 @@ done:   rts
 
 ; [ the damage-frame trigger: poll the numeral counter, main loop (#33) ]
 ;
-; WHY A POLL AND NOT A HOOK IN GfxCmd_0b.  The obvious site is that command's
-; own entry -- it IS the numeral -- and that is where this first landed.  It
-; wedges the fight: measured with probe_vargasstall on the Vargas formation,
-; the moment any monster reached 0 hp the battle stopped dead (menu=$00,
+; Why a poll and not a hook in GfxCmd_0b.  The obvious site is that command's
+; own entry, since it is the numeral, and that is where this first landed.  It
+; locks up the fight: measured with probe_vargasstall on the Vargas formation,
+; the moment any monster reached 0 hp the battle stopped (menu=$00,
 ; mstate=$00, deaths never completing, 24000 frames and counting) against
 ; 6737 frames to ipoohs-down on the pre-change ROM.  Bisected in three builds:
 ; the same hook replaced by four NOPs runs clean, the hook with the walker
 ; body skipped runs clean, and the walker body (even with its reveal stores
-; removed, leaving only the species walk and the pending clear) wedges.  So
-; the defect is EXECUTING THIS WALK INSIDE THE C1 BATTLE-SCRIPT ENGINE, whose
-; re-entrancy and register/stack contract around its WaitFrame yields we do
-; not own.  Cause not established below that; what IS established is the
-; boundary, so the work moved to our own context and stays out of the engine.
+; removed, leaving only the species walk and the pending clear) locks up.  So
+; the defect is executing this walk inside the C1 battle-script engine, whose
+; re-entrancy and register/stack contract around its WaitFrame yields this
+; code does not own.  The cause below that is not established; the boundary is,
+; so the work moved to our own context and stays out of the engine.
 ;
 ; The trigger is equivalent and observable: GfxCmd_0b's first act is to
 ; advance the numeral thread counter $632e, so a change in that byte since
-; the last main-loop tick means a numeral was allocated -- the damage frame.
+; the last main-loop tick means a numeral was allocated, i.e. the damage frame.
 ; The hud builder already runs every main-loop frame in bank F0 with DB=$7e,
-; which is exactly the context the walk wants, and battle_clockwork pins the
+; which is the context the walk wants, and battle_clockwork pins the
 ; resulting timing (the commit lands on a numeral frame, and after the damage
 ; calc that banked it).  Cost: at most one frame later than the hook would
-; have been, against a wedge -- the trade is not close.
+; have been, against a lock-up.
 ;
 ; the shadow byte is not init-cleared (it sits past InitBP's clear); a stale
 ; value costs one spurious commit at battle start, which finds pending empty
 ; (Ot6SeedShields zeroes it per slot) and does nothing.
 ; a8/i16, db=$7e (Ot6BgHud_ext's own context).  preserves x/y.
-; out: CARRY SET if this tick saw a numeral (#42).  The counter can only be
+; out: carry set if this tick saw a numeral (#42).  The counter can only be
 ; consumed once, and #42 needs the same edge to commit a deferred cover pip, so
-; the edge is REPORTED rather than duplicated into a second last-seen byte --
+; the edge is reported rather than duplicated into a second last-seen byte, and
 ; the one caller (Ot6BgHud) fans it out.
 .proc Ot6RevealPoll
         .a8
@@ -1437,7 +1439,7 @@ done:   rts
 ; every hit). a8, y = target, $f0 = 16-bit damage, $f2 = resolved spell
 ; flags3 (bit 0 = this hit heals, absorb/undead-drain reversals folded
 ; in); width-agnostic on the index side (the damage loop runs i8).
-; plain drains (bit 1, bit 0 clear) DO double — vanilla's elemental-weak
+; plain drains (bit 1, bit 0 clear) do double: vanilla's elemental-weak
 ; x2 applies to drains too, and the break window follows vanilla's rule.
 
 .proc Ot6BrokenDmg
@@ -1447,7 +1449,7 @@ done:   rts
         bcc     done
         lda     OT6_BROKEN_TICKS,y
         beq     done            ; not broken
-        lda     $f2             ; heal bit ONLY — the whole-byte gate let
+        lda     $f2             ; heal bit only; the whole-byte gate let
         lsr                     ;   $20 can't-dodge block the double for
         bcs     done            ;   every beam and skill that carries it
         lda     $f1
@@ -1464,17 +1466,17 @@ done:   rtl
 ; the sturdiness half of the break loop (measurement #5): while a monster
 ; has shields remaining and is not broken, every damaging hit it takes is
 ; multiplied by Ot6ShieldedMulW/16. one global knob, no per-species
-; column until a sweep demands one. the emergent ordering IS the design:
-;   off-weakness hit        x0.5        (feels wasted)
-;   element-weak hit        ~x1         (vanilla weak x2, then x0.5 —
+; column until a sweep calls for one. the resulting ordering is the design:
+;   off-weakness hit        x0.5        (reads as wasted)
+;   element-weak hit        ~x1         (vanilla weak x2, then x0.5;
 ;                                        the chip is the real payoff)
 ;   broken                  x2+         (Ot6BrokenDmg, shields down)
 ; gates, all by construction:
 ;   - OT6_SHIELD_CUR nonzero = shields up and not broken. shieldless species
 ;     (authored 0 rows: whelk shell, tritoch, formula 0s) and broken
-;     monsters both sit at 0 and pass through untouched — shields==0
-;     means NO shield system, never "attenuate"
-;   - the breaking hit itself is NOT attenuated: both chip procs run
+;     monsters both sit at 0 and pass through untouched; shields==0
+;     means no shield system rather than "attenuate"
+;   - the breaking hit itself is not attenuated: both chip procs run
 ;     before this tail, so its read of OT6_SHIELD_CUR already sees 0 with the
 ;     broken timer up, and Ot6BrokenDmg doubles it instead
 ;   - resolved heals pass through (the $f2 bit-0 discipline, same as
@@ -1488,26 +1490,26 @@ done:   rtl
 Ot6ShieldedMulW:
         .word   $0008           ; damage x 8/16 (0.5x) while shielded;
                                 ;   $10 = identity (vanilla arithmetic).
-                                ;   measurement #5 FINALIZED 0.5x: it makes
+                                ;   measurement #5 settled on 0.5x: it makes
                                 ;   the damage-per-BP ladder a clean doubling
                                 ;   (broken:weak:unweak = 4:2:1), so boosting
                                 ;   to break and hitting the weakness both
                                 ;   pay and boosting into shielded-unweak is
                                 ;   visibly the worst return. 0.75x/1x flatten
                                 ;   the ladder (at 1x a weakness hit ties a
-                                ;   broken one — no reason to break).
-                                ;   measurement #7 RE-SWEPT it under a
-                                ;   playtest that read as "the loop doesn't
+                                ;   broken one, so there is no reason to
+                                ;   break).  measurement #7 re-swept it under
+                                ;   a playtest that read as "the loop doesn't
                                 ;   matter" (1x/0.5x/0.375x/0.25x/0.1875x/
                                 ;   0.125x x 4 policies x 2 pools) and kept
-                                ;   0.5x: on the mt kolts pool, mashing WIPES
+                                ;   0.5x: on the mt kolts pool, mashing loses
                                 ;   3 of 6 encounters here while engaging the
                                 ;   loop wins 6/6 and takes 40% less damage,
                                 ;   so lowering it only deepens a hole the
-                                ;   playtester already fell into. the thing
-                                ;   that reads as "the loop doesn't matter"
-                                ;   on EARLY trash is not this constant —
-                                ;   it's that formula species carry no class
+                                ;   playtester already fell into. what reads
+                                ;   as "the loop doesn't matter"
+                                ;   on early trash is not this constant;
+                                ;   it is that formula species carry no class
                                 ;   weakness (@formula clears OT6_BP_CLASS), so
                                 ;   fight/tools chip nothing and the break
                                 ;   never fires. that is Ot6ShieldTbl
@@ -1521,12 +1523,12 @@ Ot6ShieldedMulW:
         bcc     done            ; characters carry no shields
         lda     OT6_SHIELD_CUR,y
         beq     done            ; 0 = broken or shieldless: no attenuation
-        lda     $f2             ; resolved heal bit ONLY (chip-gate rule)
+        lda     $f2             ; resolved heal bit only (chip-gate rule)
         lsr
         bcs     done
         lda     f:Ot6ShieldedMulW
         cmp     #$10
-        beq     done            ; identity: vanilla arithmetic, exactly
+        beq     done            ; identity: vanilla arithmetic
         phx
         longa
         lda     $f0             ; 16-bit damage
@@ -1549,8 +1551,8 @@ done:   rts
 
 ; [ note the executing attack's weapon class, at load time ]
 
-; three loaders cover every damage path, and each STORES ALWAYS — zero
-; for the classless — so a stale class can never leak between attacks:
+; three loaders cover every damage path, and each always stores, using zero
+; for the classless, so a stale class cannot leak between attacks:
 ;   Ot6SkillClass   LoadMagicProp: every spell-record attack (magic,
 ;                   skills, lores, dances, espers, enemy attacks, the
 ;                   $ee "battle" record that fronts fight/steal/jump,
@@ -1560,7 +1562,7 @@ done:   rts
 ;   Ot6ItemClass    CalcItemEffect: items, tools, thrown weapons
 ; the chip itself reads OT6_ATKCLASS per target in Ot6ClassChip.
 
-; a = ability id (preserved). caller a8; index width varies — pin.
+; a = ability id (preserved). caller a8; index width varies, so pin it.
 
 .proc Ot6SkillClass
         .a8
@@ -1592,10 +1594,10 @@ done:   rts
 
 ; called right after _magicpunch banks the hand's weapon element, so
 ; $3ca8,x is the swinging hand's item id. monsters keep a graphics code
-; there (MonsterProp+26), not an item — their swings carry no class.
+; there (MonsterProp+26) rather than an item, so their swings carry no class.
 ; (raged gau inherits the rage monster's graphics code into both hands
-; — SetRage — so his raged fights can read a junk class: a known wart
-; until rage is retired for capture. plain gau punches bludgeon, $ff.)
+; through SetRage, so his raged fights can read a junk class: a known
+; defect until rage is retired for capture. plain gau punches bludgeon, $ff.)
 
 .proc Ot6WeaponClass
         .a8
@@ -1679,7 +1681,7 @@ done:   rtl
 .endproc
 
 ; ------------------------------------------------------------------------------
-; (m1's monster-window shield digit — the $3ecb row-glyph buffer, its
-; builder, and the MenuTextCmd_0b glyph hook — is retired: it was
-; redundant with the under-enemy hud and read as an enemy COUNT.
+; (m1's monster-window shield digit, the $3ecb row-glyph buffer, its
+; builder, and the MenuTextCmd_0b glyph hook, are retired: they were
+; redundant with the under-enemy hud and read as an enemy count.
 ; $3ecb-$3ed3 stays ours; the odd bytes below still serve as scratch.)

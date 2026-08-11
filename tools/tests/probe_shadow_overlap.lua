@@ -1,54 +1,56 @@
 -- @suite slow
 -- probe_shadow_overlap.lua -- regression test for the OT6_SHADOW overlap.
 --
--- HISTORY.  OT6_SHADOW used to live at $5762, annotated "trace-verified
--- free".  It was not: $5762 sits 13 bytes inside vanilla's `ram_res
--- w7e5755, 128` (btlgfx/btlgfx_ram.inc:71), and the battle command-list
--- text drawers write $5755-$576a.  This probe reproduced it -- with the
--- party's top command repointed at Item, DrawItemListText ran and bank C1
--- wrote $7E5762-$7E5767, leaving the HUD line-0 checkpoint at $00FF, which
--- the latch at Ot6BgHudLine's @done then made permanent for the battle.
--- OT6_SHADOW now lives at $ecf1, past the end of vanilla's battle-graphics
--- RAM chain.  See the block comment at the symbol for the evidence.
+-- History.  OT6_SHADOW used to live at $5762, annotated "trace-verified
+-- free".  That annotation was wrong: $5762 sits 13 bytes inside vanilla's
+-- `ram_res w7e5755, 128` (btlgfx/btlgfx_ram.inc:71), and the battle
+-- command-list text drawers write $5755-$576a.  This probe reproduced it:
+-- with the party's top command repointed at Item, DrawItemListText ran and
+-- bank C1 wrote $7E5762-$7E5767, leaving the HUD line-0 checkpoint at $00FF,
+-- which the latch at Ot6BgHudLine's @done then made permanent for the
+-- battle.  OT6_SHADOW now lives at $ecf1, past the end of vanilla's
+-- battle-graphics RAM chain.  See the block comment at the symbol for the
+-- evidence.
 --
--- WHAT THIS ASSERTS NOW, both directions:
---   1. nothing but bank F0 writes the NEW home ($7eecf1+)
---   2. nothing from bank F0 writes the OLD home ($7e5762+) -- we vacated
+-- What this asserts now, in both directions:
+--   1. nothing but bank F0 writes the new home ($7eecf1+)
+--   2. nothing from bank F0 writes the old home ($7e5762+), which OT6
+--      vacated
 --
--- THE FIXTURE MATTERS.  The magitek list drawer writes only $5755..$5761
--- (`cpx #$000d`, madou_line_mess_set), one byte short of the old buffer --
+-- The fixture matters.  The magitek list drawer writes only $5755..$5761
+-- (`cpx #$000d`, madou_line_mess_set), one byte short of the old buffer,
 -- so a Fight-only or magitek-only battle sees nothing and reads as an
--- all-clear.  That is exactly how the original trace got it wrong.  This
+-- all-clear.  That is how the original trace got it wrong.  This
 -- probe therefore clears magitek status, repoints the party's commands at
--- Item/Magic, and FAILS LOUDLY if the overlap path was not exercised: a
--- quiet result must never be mistaken for a clean one.
+-- Item/Magic, and fails if the overlap path was not exercised, so a run
+-- that saw nothing cannot be read as a clean run.
 --
--- HOW THE POSITIVE CONTROL IS DERIVED, and why it is not an exec watch.
+-- How the positive control is derived, and why it is not an exec watch.
 -- Until 2026-07-19 the control was two exec callbacks on hand-copied bank-C1
 -- instruction addresses, `DrawItemListText` at $C14C7A and
 -- `DrawMagicListText` at $C14DC4, transcribed from ff6/notes/ff3u.asm.  Both
--- were wrong, because THIS ROM'S bank C1 sits 11 bytes below the vanilla
+-- were wrong, because this ROM's bank C1 sits 11 bytes below the vanilla
 -- notes: DrawMagicListText is at C1/4DC0 (ff6/rom/ff6-en.map:539, and the
 -- built image reads 5A 0A 85 40 there = phy/asl/sta $40) and
 -- DrawItemListText at C1/4C76, whose row loop head is C1/4C85.  So $C14C7A
--- was the OPERAND byte of `sta $40` at C1/4C79 -- never an opcode fetch, so
--- that half of the control could never fire on any ROM, and never did.
--- $C14DC4 landed on `lda $62ca` four bytes into DrawMagicListText purely by
--- luck, which left "did a drawer run?" secretly meaning "did the MAGIC list
--- open?".  That is a coin flip: only TERRA carries a Magic command in this
--- fight (measured, $202e+slot*12: Terra reads 1d,ff,02,01 and VICKS reads
--- 1d,ff,ff,01), and which of them holds the first menu follows from the
--- battle RNG seed, which battle init takes from the game-time frame counter
--- (`lda $021e / asl2 / sta $be`, battle_main.asm:6092-6094).  On
+-- was the operand byte of `sta $40` at C1/4C79, never an opcode fetch, so
+-- that half of the control could not fire on any ROM, and did not.
+-- $C14DC4 landed on `lda $62ca` four bytes into DrawMagicListText by
+-- chance, which left "did a drawer run?" meaning "did the magic list
+-- open?".  That varies between runs: only TERRA carries a Magic command in
+-- this fight (measured, $202e+slot*12: Terra reads 1d,ff,02,01 and VICKS
+-- reads 1d,ff,ff,01), and which of them holds the first menu follows from
+-- the battle RNG seed, which battle init takes from the game-time frame
+-- counter (`lda $021e / asl2 / sta $be`, battle_main.asm:6092-6094).  On
 -- release-0.2.1 the roll gave VICKS, the magic list never opened, and this
--- probe failed -- while the ITEM list had drawn EIGHT rows into $5762-$5767
--- and exercised the overlap path more thoroughly than the runs it passed.
+-- probe failed, while the item list had drawn eight rows into $5762-$5767
+-- and exercised the overlap path more thoroughly than the runs that passed.
 --
--- So the control now keys on the DATA the mechanism touches instead of the
--- ADDRESS of the code that touches it: ROM code layout moves under you (the
--- +11 above), vanilla's RAM reservations do not.  Both assertions get one,
--- derived from the assertion itself:
---   * "OT6 vacated the old home" is vacuous unless VANILLA wrote it, so
+-- So the control now keys on the data the mechanism touches rather than the
+-- address of the code that touches it: ROM code layout moves between builds
+-- (the +11 above), while vanilla's RAM reservations do not.  Each assertion
+-- gets a control derived from the assertion itself:
+--   * "OT6 vacated the old home" is vacuous unless vanilla wrote it, so
 --     require >= 1 write into $7e5762+ from a bank other than F0.
 --   * "nothing foreign writes the new home" is vacuous unless OT6 wrote it,
 --     so require >= 1 write into $7eecf1+ from bank F0.
@@ -62,8 +64,8 @@ local function whelk()
 end
 
 -- OT6_SHADOW now lives at $ecf1 (see ot6.asm). Two assertions:
---   1. nothing but bank F0 writes the NEW home
---   2. nothing from bank F0 writes the OLD home -- i.e. we really vacated
+--   1. nothing but bank F0 writes the new home
+--   2. nothing from bank F0 writes the old home, that is, OT6 vacated it
 local NEW_LO, NEW_HI = 0x7EECF1, 0x7EECFE   -- new line 0 (checkpoint+prev+cells)
 local OLD_LO, OLD_HI = 0x7E5762, 0x7E576F   -- old line 0, now vanilla's alone
 
@@ -74,7 +76,7 @@ local hits = {}           -- addr -> { count, pcs = {pcstr -> n} }
 local vanillaOldHome, ot6NewHome = 0, 0
 -- The PC a write callback reports is the instruction AFTER the store: the
 -- item row loop's `sta $5755,x` sits at C1/4C89 and every one of its writes
--- logs as C1:4C8C, the following `inx`.  Only the BANK is load-bearing here,
+-- logs as C1:4C8C, the following `inx`.  Only the bank matters here,
 -- and that is unaffected.
 local function watch(lo, hi)
   emu.addMemoryCallback(function(addr, value)
@@ -132,12 +134,12 @@ H.run({ maxFrames = 30000 }, {
   H.call(function() H.setPad({}) end),
   H.waitFrames(120),
 
-  -- The whelk/entry point party rides magitek armor, and the MAGITEK list
-  -- drawer is not one of the overlapping ones -- it writes only +5/+11,
+  -- The whelk/entry point party rides magitek armor, and the magitek list
+  -- drawer is not one of the overlapping ones: it writes only +5/+11,
   -- stopping at $5761, one byte below OT6_SHADOW.  The drawers that reach
   -- into the buffer are the Item/Magic/Tools family (indexed loops bounded
-  -- `cpx #$0013` = offsets 0-18, plus explicit stores to +21).  So force a
-  -- real Item list: clear magitek status and repoint every character's
+  -- `cpx #$0013` = offsets 0-18, plus explicit stores to +21).  So force an
+  -- Item list: clear magitek status and repoint every character's
   -- top command at Item, the way battle_fold repoints Terra's at Magic.
   H.call(function()
     for c = 0, 3 do
@@ -150,7 +152,7 @@ H.run({ maxFrames = 30000 }, {
   end),
   H.waitFrames(60),
   -- Nothing before this point may have written the old home, or the control
-  -- below would be satisfied by something other than a command list -- the
+  -- below would be satisfied by something other than a command list; the
   -- field walk and the battle intro both run with this watch armed.  Logged
   -- rather than assumed; it reads 0 on every ROM measured so far.
   H.call(function()
@@ -159,22 +161,22 @@ H.run({ maxFrames = 30000 }, {
     H.assertEq(vanillaOldHome, 0, "old home untouched before the list drive")
   end),
 
-  -- Open a command list -- CLOSED-LOOP, until the buffer is actually
-  -- written.  This used to be four open-loop presses (A, B, down, A) on the
-  -- assumption that row 0 and row 1 are both live commands for whoever holds
-  -- the menu.  They are not: InitCmdList REMOVES commands a character does
-  -- not have (`lda #$ff / sta $fc,x`, battle_main.asm:13778-13780), the
-  -- cursor skips the removed rows, and VICKS reads 1d,ff,ff,01 where TERRA
-  -- reads 1d,ff,02,01.  On a VICKS roll `down` therefore walked to the Item
-  -- row again and the second A re-opened the list the first A had just
-  -- opened -- harmless in itself, but it is what made the old exec-address
+  -- Open a command list, closed-loop, until the buffer is written.  This
+  -- used to be four open-loop presses (A, B, down, A) on the assumption
+  -- that row 0 and row 1 are both live commands for whoever holds the menu.
+  -- They are not: InitCmdList removes commands a character does not have
+  -- (`lda #$ff / sta $fc,x`, battle_main.asm:13778-13780), the cursor skips
+  -- the removed rows, and VICKS reads 1d,ff,ff,01 where TERRA reads
+  -- 1d,ff,02,01.  On a VICKS roll `down` therefore walked to the Item row
+  -- again and the second A re-opened the list the first A had just opened,
+  -- which is harmless in itself but is what made the old exec-address
   -- control read as "no drawer ran".  So cycle A / B / down instead and stop
-  -- the moment vanilla has written the old home, which is the only thing
-  -- this probe actually needs and is true for every roll.
+  -- once vanilla has written the old home, which is all this probe needs
+  -- and is true for every roll.
   --
-  -- Stopping at the first list costs no coverage: the ITEM template is the
+  -- Stopping at the first list costs no coverage: the Item template is the
   -- deepest-reaching of the three ($5755-$5767 against magic's $5764 and
-  -- magitek's $5761), so it covers strictly more of the old home than the
+  -- magitek's $5761), so it covers more of the old home than the
   -- Item-then-Magic pair the open-loop sequence was aiming for.
   H.driveUntil(function() return vanillaOldHome > 0 end, 2400, {
     H.pressButtons({ "a" }, 4), H.waitFrames(90),
@@ -203,9 +205,10 @@ H.run({ maxFrames = 30000 }, {
     end
     H.log(string.format("new anchor $ecf1 = $%04X   old $5762 = $%04X (vanilla's now)",
       H.readWord(0xecf1), H.readWord(0x5762)))
-    -- POSITIVE CONTROLS, one per assertion (see the header).  Each says
-    -- "the thing I claim nobody else touches was actually touched by the
-    -- one who should".  A run that fails either is not clean, it is blind.
+    -- Positive controls, one per assertion (see the header).  Each checks
+    -- that the address the assertion claims nobody else touches was written
+    -- by the code that should write it.  A run that fails either control
+    -- measured nothing rather than passing.
     H.log(string.format("exercised: vanilla wrote the old home %dx, "
       .. "bank F0 wrote the new home %dx", vanillaOldHome, ot6NewHome))
     if vanillaOldHome == 0 then

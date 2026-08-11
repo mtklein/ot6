@@ -17,7 +17,7 @@ inc_lang "text/char_title_%s.inc"
 inc_lang "text/item_name_%s.inc"
 ; issue #40: the rage loadout page blanks a slot row to MonsterName::ITEM_SIZE
 ; tiles.  skills.asm includes this too (the .inc is .ifndef-guarded), but it is
-; assembled AFTER this file, so the scope has to be pulled in here as well.
+; assembled after this file, so the scope has to be pulled in here as well.
 inc_lang "text/monster_name_%s.inc"
 
 .import GenjuName, MagicProp
@@ -1171,7 +1171,7 @@ SkillsOption_02:
         sty     zBG2HScroll
         sty     zBG3HScroll
 .if LANG_EN
-        ; issue #8 Layer B: SwdTech opens the loadout CONFIGURATOR, not the
+        ; issue #8 Layer B: SwdTech opens the loadout configurator, not the
         ; vanilla browse list.  The configurator names the learned techs too
         ; (the pool), so the browse list's only job is subsumed.  All state
         ; logic is bank-F0; Ot6LoadoutInitC3 does the C3 framework draw.
@@ -1196,7 +1196,7 @@ SkillsOption_02:
 SkillsOption_03:
 @2105:  stz     $4a
 .if LANG_EN
-        ; issue #46: the page is ONE column of eight rows now (name, break class,
+        ; issue #46: the page is one column of eight rows now (name, break class,
         ; MP price), not vanilla's 2x4 grid of button-combo glyphs, so it wants
         ; its own cursor.  LoadAbilityCursor's {2,4} table is still Dance's
         ; (SkillsOption_06) and must not move with this page.
@@ -1336,13 +1336,13 @@ SkillsOption_04:
 SkillsOption_05:
 @21a6:  stz     $4a
 .if LANG_EN
-        ; issue #40: Rage opens the 8-slot LOADOUT CONFIGURATOR, not the
-        ; vanilla browse list -- the SkillsOption_02 repoint, re-applied.  The
+        ; issue #40: Rage opens the 8-slot loadout configurator, not the
+        ; vanilla browse list; the SkillsOption_02 repoint, re-applied.  The
         ; browse list's only job was naming what Gau knows; the configurator
         ; names it too (and prices it, and lets him carry eight of it into the
         ; fight).  All state logic is bank-F0; Ot6RageInitC3 does the C3
         ; framework draw.  The vanilla browse (InitRageList / ExpandRageList /
-        ; menu state $1d) stays assembled for the non-EN branch, exactly as the
+        ; menu state $1d) stays assembled for the non-EN branch, as the
         ; SwdTech browse did.
         ldy     #$0100
         sty     zBG2HScroll
@@ -2692,15 +2692,15 @@ ReloadSkillsMenu:
         jmp     _c35807
 
 ; ==============================================================================
-; THE TWO OT6 CONFIGURATOR PAGES (issues #8 Layer B, #40)
+; The two OT6 configurator pages (issues #8 Layer B, #40)
 ;
 ; Everything else in this file is vanilla FF6 disassembly; these ~780 lines were
-; the only OT6-authored region in it, and they are self-contained -- the pages
+; the only OT6-authored region in it, and they are self-contained: the pages
 ; are entered from SkillsOption_02/_05 above (:1181, :1353) and reference
 ; nothing between here and there.  Split out so the OT6 surface is findable and
 ; so a vanilla-side diff stops straddling it.
 ;
-; The `.if LANG_EN` stays HERE rather than inside the two files: it is one
+; The `.if LANG_EN` stays here rather than inside the two files: it is one
 ; conditional spanning both pages (it also guards MENU_STATE_LOADOUT and
 ; MENU_STATE_RAGELOAD, which SkillsOption_02/_05 reference from outside it),
 ; and splitting it into two independent conditionals would be two things to

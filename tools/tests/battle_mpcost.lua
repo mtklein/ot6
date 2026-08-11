@@ -1,15 +1,15 @@
 -- @suite slow savestate=camp_escaped
 -- battle_mpcost.lua -- v0.5 "every ability costs MP": the OT6_MP_COSTS A/B.
 --
--- ONE self-detecting instrument, run on BOTH builds (this is the whole A/B the
--- task asks for).  v0.5 flipped the flag ON by default, so the A/B's premise
--- INVERTS: the SHIPPED ROM charges, and the flag-OFF build is the control.
---   * on the shipped, flag-ON ROM (build/ot6.sfc, the suite's default) the
---     cost table is PRESENT in bank F0 with kits.md's numbers, so the test
---     asserts the CHARGE and the insufficient-mp REFUSAL.
---   * on the flag-OFF baseline (ff6/rom/ff6-en-nomp.sfc, handed here via
---     OT6_ROM) the cost table is ABSENT -- so the identical SwdTech tech is
---     FREE.  This is the negative control.
+-- One self-detecting instrument, run on both builds, which is the whole A/B the
+-- task asks for.  v0.5 flipped the flag on by default, so the A/B's premise is
+-- inverted: the shipped ROM charges, and the flag-off build is the control.
+--   * on the shipped, flag-on ROM (build/ot6.sfc, the suite's default) the
+--     cost table is present in bank F0 with kits.md's numbers, so the test
+--     asserts the charge and the insufficient-mp refusal.
+--   * on the flag-off baseline (ff6/rom/ff6-en-nomp.sfc, handed here via
+--     OT6_ROM) the cost table is absent, so the identical SwdTech tech is
+--     free.  This is the negative control.
 --
 -- The mechanism under test: vanilla's GetMPCost prices only magic/lore/
 -- summon/x-magic; Blitz/SwdTech/Tools fall through it at 0, so the universal
@@ -19,27 +19,28 @@
 -- Issue #75 conversion.  The old apparatus installed a triple-CYAN party by
 -- poke ($3ED8, SwdTech-only $202E, the SWDTECH weapon flag written, $2020
 -- ceiling pinned), stopped and HP-pinned the guards, and pinned each
--- scenario's MP.  On camp_escaped CYAN IS REAL (battle_bushidogrey's
+-- scenario's MP.  On camp_escaped Cyan is real (battle_bushidogrey's
 -- measured kit: katana SWDTECH flag $3BA4 bit 1 reads $82; the real learned
--- window is Dispatch $55 @ 4 MP boost 1 / Retort $56 @ 10 MP boost 2), the
+-- window is Dispatch $55 at 4 MP boost 1 and Retort $56 at 10 MP boost 2), the
 -- fights are real world encounters, and both scenarios' MP states are the
 -- fight's own:
 --
---   CHARGE  the battle's FIRST Cyan turn -- before any enemy has acted --
+--   charge  the battle's first Cyan turn, before any enemy has acted,
 --           casts a real Dispatch off the opening 1-bp bank against his
---           real 67-MP pool.  ON: debited to exactly mp0-4 (write watch +
---           direct read inside the clean window).  OFF: the pool does not
---           move.  Both: the tech lands its hit.
---   REFUSAL (ON only) *** LABELED ISOLATION ARM (owner calibration). ***
---           battle_bushidogrey measured the input-driven routes to a broke
---           kit-caster out of reach on this pool's economy: a deferring
---           party is ground down before any real poverty arrives (the
---           'enemy MP drain' first blamed was battle-teardown zeroes read
+--           real 67-MP pool.  ON: debited to exactly mp0-4 (write watch plus
+--           a direct read inside the clean window).  OFF: the pool does not
+--           move.  In both cases the tech lands its hit.
+--   refusal (ON only), a labeled isolation arm (owner calibration).
+--           battle_bushidogrey measured that the input-driven routes to a
+--           broke kit-caster are out of reach on this pool's economy: a
+--           deferring party is ground down before any real poverty arrives
+--           (the enemy MP drain first blamed was battle-teardown zeroes read
 --           ungated), and a six-battle Dispatch walk never spends the
---           pool down -- the trash dies first.  So this arm keeps ONE
---           write, said loudly: MP := 1 (< Dispatch's 4) with the pip
+--           pool down, because the trash dies first.  So this arm keeps one
+--           write, recorded here: MP := 1 (below Dispatch's 4) with the pip
 --           rebanked by a real item turn; the retried Dispatch must
---           fizzle -- no damage, the 1 MP untouched, never negative.
+--           fizzle, dealing no damage, leaving the 1 MP untouched and never
+--           negative.
 local H = dofile("tools/tests/lib/ot6.lua")
 local STATE = "build/states/camp_escaped.mss.lua"
 
@@ -83,11 +84,11 @@ local function refindSlots()
   end
 end
 
--- battle_bushidogrey's drive machine, verbatim shape
+-- battle_bushidogrey's drive, unchanged in shape
 local mf = 0
 local cyanMode = "defer"                 -- "defer" | "item" | "tech:<row>"
 local quietA = false                     -- suppress the menu-idle A-mash: it
-                                         -- can land on a JUST-opened window
+                                         -- can land on a just-opened window
                                          -- and confirm a bystander's Fight
                                          -- (measured: 104 stray damage inside
                                          -- the refusal window)
@@ -242,8 +243,8 @@ H.run({ maxFrames = 200000 }, {
     R.mp0 = mp()
     R.g0 = monsterHpSum()
     -- ON: the real pool must afford the priced tech.  OFF: the nomp
-    -- baseline's battle-MP init reads this ON-build save's pool as 0 --
-    -- and a FREE Dispatch executing from 0 MP is exactly the control
+    -- baseline's battle-MP init reads this ON-build save's pool as 0,
+    -- and a free Dispatch executing from 0 MP is the control
     -- (battle_stealmp measured the same wallet shape on its OFF half).
     if mode == "on" then
       H.assertEq(R.mp0 >= DISPATCH_COST, true, "his real pool affords the tech")
@@ -256,10 +257,10 @@ H.run({ maxFrames = 200000 }, {
       R.mp0, R.g0))
   end),
 
-  -- ------------------------------------ 2. CHARGE (ON) / FREE (OFF, control) --
+  -- ------------------------------ 2. charge (ON) / free (OFF, the control) --
   -- The battle's first Cyan turn, before any enemy action can touch the
-  -- pool (this species drains MP -- the first drain measured ~2200 frames
-  -- in, the first tech resolves well before it).
+  -- pool (this species drains MP; the first drain was measured ~2200 frames
+  -- in, and the first tech resolves well before it).
   H.call(function() cyanMode = "tech:0" end),
   driveTo(function() return sawSpell(DISPATCH) end, 20000,
     "the real Dispatch reaches $3410"),
@@ -286,8 +287,8 @@ H.run({ maxFrames = 200000 }, {
     H.screenshot("mpcost_" .. mode .. "_affordable")
   end),
 
-  -- ------------------------------------------------- 3. REFUSAL (ON only) --
-  -- LABELED ISOLATION ARM -- see the header.  The pip is still rebanked by
+  -- ------------------------------------------------- 3. refusal (ON only) --
+  -- The labeled isolation arm; see the header.  The pip is still rebanked by
   -- a real item turn and the attempt is a real menu drive; only the
   -- poverty itself is staged.
   H.cond(function() return mode == "on" end, {
@@ -308,7 +309,7 @@ H.run({ maxFrames = 200000 }, {
             return H.battleLoadStarted() and bp() >= 1
           end, {
             H.call(function()
-              -- ISOLATION WRITE (waived, labeled): the broke pool
+              -- the isolation write (waived, labeled): the broke pool
               H.writeWord(0x3C08 + cyan*2, 1)
             end),
             H.cond(function()
@@ -323,11 +324,11 @@ H.run({ maxFrames = 200000 }, {
                     spells = {}
                     cyanMode = "tech:0"
                   end),
-                  -- the fizzled tech has no grant to signal on: drive on
-                  -- the latch (pending banks 1 at the submenu confirm) --
-                  -- the damage baseline is captured AT the latch, and the
+                  -- the fizzled tech has no grant to signal on, so drive on
+                  -- the latch (pending banks 1 at the submenu confirm).
+                  -- The damage baseline is captured at the latch, and the
                   -- pad goes quiet for the whole bounded window so nothing
-                  -- but the (non-)fizzle can touch the monsters
+                  -- but the fizzle, or its absence, can touch the monsters
                   driveTo(function()
                     if not H.battleLoadStarted() then return true end
                     if pend() >= 1 and not latched then

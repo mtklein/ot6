@@ -1,7 +1,7 @@
 -- probe_opera_rafter.lua -- boot opera_dance_done (map 238 {98,7} $0111=1);
 -- observe the post-aria state and what triggers the rafter chase.  Dump switches
--- + position; walk LEFT/around A-mashing to see if Ultros (_cabf31 dlg $04C8,
--- $0058=1) fires, tracking map/switch changes.
+-- and position; walk left and around while A-mashing to see whether Ultros
+-- (_cabf31 dlg $04C8, $0058=1) fires, tracking map/switch changes.
 local H = dofile("tools/tests/lib/ot6.lua")
 local function map() return H.mapId() & 0x1ff end
 local function sw(id) return (H.readByte(0x1E80 + math.floor(id/8)) >> (id%8)) & 1 end

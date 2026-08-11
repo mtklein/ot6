@@ -1,42 +1,43 @@
--- probe_battleitem.lua -- WHICH ITEM does battle-menu row N actually use?
+-- probe_battleitem.lua -- measures which item battle-menu row N uses.
 -- Reads and pad presses only (issue #75).
 --
--- THE OPEN QUESTION.  newFightDriver picks a heal by scanning the BATTLE
+-- Background.  newFightDriver picks a heal by scanning the battle
 -- inventory ($2686, 5 bytes/entry) for the item id it wants, and then
--- steers the item window's cursor -- the documented SUM of $8947 (scroll)
--- and $894F (row) -- to that index.  Traced at battle 11 (solo LOCKE), the
--- whole sequence lands: command list -> Item, item window ($0A), steer,
--- A, target select ($38), confirm.  And the Potion is still in the bag
--- afterwards and his HP never moved.  So the navigation is right and the
--- INDEX is wrong: the row the window confirms is not the $2686 index the
--- driver counted to.
+-- steers the item window's cursor, documented as the sum of $8947
+-- (scroll) and $894F (row), to that index.  Traced at battle 11 (solo
+-- Locke), the whole sequence runs: command list -> Item, item window
+-- ($0A), steer, A, target select ($38), confirm.  The Potion is still in
+-- the bag afterwards and his HP did not move, so the navigation is right
+-- and the index is wrong: the row the window confirms is not the $2686
+-- index the driver counted to.
 --
--- The other candidate ordering is the FIELD inventory ($1869 ids / $1969
+-- The other candidate ordering is the field inventory ($1869 ids / $1969
 -- counts), which is a different list with different holes in it.  This
--- probe settles it by ground truth rather than by reading menu code: park
--- the cursor on a KNOWN row, use it, and see which item's count went down.
+-- probe settles it by measurement rather than by reading menu code: park
+-- the cursor on a known row, use it, and read which item's count went
+-- down.
 --
--- ANSWER, measured 2026-08-09: the mapping is CORRECT.  Cursor sum 1
+-- Answer, measured 2026-08-09: the mapping is correct.  Cursor sum 1
 -- consumed $2686 index 1 ($E9, a Potion, 5 -> 4).  The driver's indexing
--- is not the bug, and the whole item path -- command list -> Item -> row
--- -> target -> confirm -> the count going down -- works on this party
--- through exactly the cells newFightDriver uses.
+-- is not the bug, and the whole item path (command list -> Item -> row ->
+-- target -> confirm -> the count going down) works on this party through
+-- the same cells newFightDriver uses.
 --
--- So whatever fails at battle 11 is specific to that fight, and the two
--- things it does not share with this one are worth the next probe: LOCKE
--- is SOLO there (this party is three), and his target mask therefore has
--- one bit in it.  Read newFightDriver's ST_TGT branch with that in mind --
--- if `chars` ever reads 0 for a solo party, the steer loop compares 0 < 0,
--- presses UP forever and never confirms, and the turn simply expires.
--- That is a hypothesis, NOT a measurement; it has not been observed.
+-- So whatever fails at battle 11 is specific to that fight.  The two
+-- things it does not share with this one are worth the next probe: Locke
+-- is solo there (this party is three), so his target mask has one bit in
+-- it.  Read newFightDriver's ST_TGT branch with that in mind: if `chars`
+-- reads 0 for a solo party, the steer loop compares 0 < 0, presses up
+-- indefinitely and never confirms, and the turn expires.  That is a
+-- hypothesis, not a measurement; it has not been observed.
 --
 --   OT6_KEEP_RUNS=1 OT6_NO_PUBLISH=1 tools/tests/run.sh tools/tests/probe_battleitem.lua
 local H = dofile("tools/tests/lib/ot6.lua")
--- vargas_entry, not first_battle: the opening battle carries an EMPTY
+-- vargas_entry, not first_battle: the opening battle carries an empty
 -- bag ($2686 reads FF x0 straight across, measured), so there is nothing
--- to select and the target window never opens.  The Vargas entry point is one
--- A press from `battle 66` and the party walks in with Tonics, Potions and
--- Fenix Downs -- a real bag to index into.
+-- to select and the target window never opens.  The Vargas entry point is
+-- one A press from `battle 66`, and the party walks in with Tonics,
+-- Potions and Fenix Downs, so there are entries to index into.
 local STATE = "build/states/vargas_entry.mss.lua"
 
 local MSTATE, ACTOR = 0x7BC2, 0x62CA
@@ -126,7 +127,7 @@ H.run({ maxFrames = 40000 }, {
     H.screenshot("bi_item_row0")
   end),
 
-  -- walk to a KNOWN row and photograph it
+  -- walk to a known row and screenshot it
   H.driveUntil(function() return sum() == TARGET_ROW end, 2400, {
     H.call(function()
       local cur = sum()
@@ -142,7 +143,7 @@ H.run({ maxFrames = 40000 }, {
     H.screenshot("bi_item_parked")
   end),
 
-  -- use it on whoever the target cursor offers, then read the ground truth
+  -- use it on whoever the target cursor offers, then read which count moved
   tapUntil("a", function() return st() == ST_TGT end, "target select"),
   H.release(), H.waitFrames(20),
   tapUntil("a", function() return st() ~= ST_TGT end, "confirm"),

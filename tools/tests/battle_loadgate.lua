@@ -1,29 +1,29 @@
 -- @suite
 -- Regression for #24.  M.battleLoadStarted() is the harness's "is a battle
--- up?" gate, and worldHasControl()/worldNavTo both hang off it.  It used to
--- read ONLY party slot 0 and reject a 0, which conflates three states:
+-- up?" gate, and worldHasControl() and worldNavTo both depend on it.  It used
+-- to read only party slot 0 and reject a 0, which conflates three states:
 --
 --   * battle module not loaded   -- all four words read $FFFF
---   * party slot 0 is EMPTY      -- that word reads 0000
---   * slot 0's character is DEAD -- that word reads 0000
+--   * party slot 0 is empty      -- that word reads 0000
+--   * slot 0's character is dead -- that word reads 0000
 --
 -- Measured on battle_entry: field = FFFF FFFF FFFF FFFF, live battle =
 -- 003F 0044 003D 0000 (slot 3 empty).  So a dead or absent first character
--- made the gate say "no battle" while the battle was still running -- and
--- worldNavTo then stopped tapping A and pressed directions into it forever.
+-- made the gate report no battle while the battle was still running, after
+-- which worldNavTo stopped tapping A and pressed directions into it forever.
 --
 -- This test drives a real battle and then forces the table into each shape.
 --
--- *** QUARANTINED MECHANISM TEST (issue #75) -- state writes SANCTIONED ***
--- This is a unit test of the HARNESS's own gate predicate, not a claim
--- about gameplay: it forces the party-HP table into the three measured
--- shapes ($FFFF / 0000-empty / 0000-dead) that the gate must distinguish,
--- because the question is "does battleLoadStarted() decode these bytes
--- correctly", not "can a player reach them".  Reaching slot-0-dead
--- through real play means killing the lead character on cue every run -- a
--- performance that would test nothing this test does not already pin.
--- Per the owner-ratified policy on #75, it keeps its waiver, says so
--- loudly here, and MAY NEVER PRODUCE FIXTURES.
+-- Quarantined mechanism test (issue #75); state writes are sanctioned.
+-- This is a unit test of the harness's own gate predicate rather than a
+-- claim about gameplay: it forces the party-HP table into the three
+-- measured shapes ($FFFF, 0000-empty, 0000-dead) that the gate must
+-- distinguish, because the question is whether battleLoadStarted() decodes
+-- these bytes correctly, not whether a player can reach them.  Reaching
+-- slot-0-dead through real play means killing the lead character on cue
+-- every run, which would test nothing this test does not already cover.
+-- Per the owner-ratified policy on #75, it keeps its waiver, records that
+-- here, and must never produce fixtures.
 local H = dofile("tools/tests/lib/ot6.lua")
 local STATE = "battle_entry.mss.lua"
 local HP = 0x3BF4
@@ -62,15 +62,16 @@ H.run({ maxFrames = 30000 }, {
     local saved = { H.readWord(HP), H.readWord(HP+2), H.readWord(HP+4), H.readWord(HP+6) }
     H.log("[ot6] live table: " .. tbl())
 
-    -- 3. slot 0 dead.  THE REGRESSION: the old gate returned false here.
+    -- 3. slot 0 dead.  This is the regression: the old gate returned false
+    --    here.
     setTbl(0x0000, saved[2], saved[3], saved[4])
     H.assertEq(H.battleLoadStarted(), true,
       "slot 0 at 0 HP (dead/empty) is still a live battle")
 
-    -- 4. ALL ZEROS is what a MENU leaves in these bytes -- the party menu and
+    -- 4. all zeros is what a menu leaves in these bytes; the party menu and
     --    the world arrival redraw both do it.  Reading that as a battle turned
-    --    ridePartyMenu into a blind A-hammer over the menu (it drove onto a
-    --    Status page).  So all-zero must read as NO battle.  The cost is that a
+    --    ridePartyMenu into a blind A-hammer over the menu, which drove onto a
+    --    Status page.  So all-zero must read as no battle.  The cost is that a
     --    total party wipe is indistinguishable here and also reads false; that
     --    needs a check outside this table, and a wiped fixture is a failure
     --    anyway.
@@ -83,15 +84,15 @@ H.run({ maxFrames = 30000 }, {
     H.assertEq(H.battleLoadStarted(), true,
       "one live slot anywhere is still a live battle")
 
-    -- 4c. the MEASURED moogle-defense field scribble.  $0020 in slots 1 and 3
+    -- 4c. the measured moogle-defense field scribble.  $0020 in slots 1 and 3
     --     is a plausible HP, so an any-slot rule accepts it and hangs
     --     gen_moogle; $FF00 in slots 0 and 2 is what gives it away.
     setTbl(0xFF00, 0x0020, 0xFF00, 0x0020)
     H.assertEq(H.battleLoadStarted(), false,
       "the moogle field scribble (FF00 0020 FF00 0020) is not a battle")
 
-    -- 5. POSITIVE CONTROL: the gate must still be able to say NO.  Without
-    --    this the test would pass against a gate hardcoded to true.
+    -- 5. positive control: the gate must still be able to return false.
+    --    Without this the test would pass against a gate hardcoded to true.
     setTbl(0xFFFF, 0xFFFF, 0xFFFF, 0xFFFF)
     H.assertEq(H.battleLoadStarted(), false,
       "control: an all-$FFFF table still reads as no battle")

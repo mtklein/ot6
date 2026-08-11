@@ -1,11 +1,11 @@
 -- gen_ifrit_magicite.lua -- v0.6 step 8, the step OUT of boundary B (#25):
 -- cold battery Continue from the tracked mrf-save-room-v1 checkpoint (the
--- map-270 save room, slot 3), the boundary's ENTRY CONTRACT asserted as
--- the first real act, then down through the {3,5} door to the alcove ->
+-- map-270 save room, slot 3), the boundary's entry contract asserted
+-- first, then down through the {3,5} door to the alcove ->
 -- battle 70 -> the four-interaction esper hand-off -> both magicite in
 -- the bag.  Generates magicite_ifrit_shiva.
 --
--- GENERATED FROM A CHECKPOINT (savestate_graph.py:
+-- Generated from a checkpoint (savestate_graph.py:
 -- checkpoint="mrf-save-room-v1").  The step used to boot ifrit_entry.mss; it
 -- now starts from power-on and lets Mesen load the checkpoint battery
 -- run.sh materialized, so a ROM change re-runs this step from its own
@@ -14,7 +14,7 @@
 -- generated as A->B's terminal; the ~15-step walk from the save tile to the
 -- fight is replayed here from the checkpoint instead.
 --
--- THE HAND-OFF IS FOUR SEPARATE NPC INTERACTIONS, not one scene, and the
+-- The hand-off is four separate NPC interactions rather than one scene, and the
 -- gates interlock (event_main.asm:95260-95385):
 --
 --   _cc7937  IFRIT {3,8}, sw $0646   first talk: walks SLOT_1 five tiles
@@ -22,22 +22,22 @@
 --            `battle 70`, then dlg $055F and `switch $0060=1 / $0273=1`
 --   _cc7986  IFRIT, second talk      `switch $0272=1`; if $0274 also set,
 --                                    fall into _cc79a4
---   _cc7992  SHIVA {9,6}, sw $0646   `if_switch $0060=0, EventReturn` --
---                                    she will not talk before the fight --
+--   _cc7992  SHIVA {9,6}, sw $0646   `if_switch $0060=0, EventReturn`, so
+--                                    she will not talk before the fight;
 --                                    then `switch $0274=1`; if $0272 also
 --                                    set, fall into _cc79a4
---   _cc79a4  the hand-off            `$0646=0 / $0647=1 / $0648=1 / $0273=0`
---                                    -- swaps both esper NPCs for MAGICITE
---                                    NPCs on the same two tiles
+--   _cc79a4  the hand-off            `$0646=0 / $0647=1 / $0648=1 / $0273=0`,
+--                                    which swaps both esper NPCs for
+--                                    MAGICITE NPCs on the same two tiles
 --   _cc79cd  MAGICITE {3,8}, sw $0647   give_genju IFRIT, `$0647=0`
 --   _cc79dd  MAGICITE {9,6}, sw $0648   give_genju SHIVA, `$0648=0`
 --
 -- `give_genju` (EventCmd_86, field/event.asm:3238) sets bit (id-$36) of
 -- $1A69, and GENJU::RAMUH=$36 / IFRIT=$37 / SHIVA=$38 (include/const.inc
 -- :564-566), so the receipts are $1A69 bits 1 and 2 and they are what this
--- step asserts -- not a switch that merely says a scene ran.
+-- step asserts, rather than a switch that only records that a scene ran.
 --
--- CORRECTION to the route recon's battle-70 decode, which read it as
+-- Correction to the route recon's battle-70 decode, which read it as
 -- formation 439 containing "species $0109 Ifrit only", said
 -- "Shiva $0108 is NOT in the formation ... she is not in any formation in
 -- the game -- I swept all 576", and listed "does Shiva enter via the AI
@@ -148,9 +148,9 @@ end
 
 local DELTA = { up = { 0, -1 }, right = { 1, 0 }, down = { 0, 1 }, left = { -1, 0 } }
 
--- Tap `dir` whenever the party has control, hands off while a scene owns
--- it, edge-A through dialogs.  Used to walk INTO a trigger whose scene then
--- takes over -- the tap keeps the party from sliding past the tile.
+-- Tap `dir` whenever the party has control, hold off while a scene controls
+-- it, edge-A through dialogs.  Used to walk into a trigger whose scene then
+-- takes over; the tap keeps the party from sliding past the tile.
 -- A battle here (never yet seen on these two maps) is FLED with the real
 -- L+R run mechanic -- gen_ifrit_entry's idiom, zero writes.
 local function tapInto(dir, pred, maxFrames, what)
@@ -178,11 +178,11 @@ local function tapInto(dir, pred, maxFrames, what)
       end
       if phase == 0 then
         H.setPad({})
-        -- STOP TAPPING once we are where we were going.  The terminator
-        -- wants 16 consecutive calm frames on the target, and an eager tap
-        -- walks straight off it before the count gets there: the first
-        -- version of this rode the chute correctly to (10,45) and then
-        -- tapped itself to (10,46) and timed out.
+        -- Stop tapping once the party is on the target tile.  The
+        -- terminator needs 16 consecutive calm frames there, and a further
+        -- tap walks off it before the count completes: the first version of
+        -- this rode the chute correctly to (10,45), then tapped itself to
+        -- (10,46) and timed out.
         if pred() then return end
         if settled() then phase, n = 1, 0 end
         return

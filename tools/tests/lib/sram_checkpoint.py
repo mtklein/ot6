@@ -1,12 +1,12 @@
 #!/usr/bin/env python3
 """Validate and materialize OT6's small, versioned battery-save checkpoints.
 
-PROVENANCE (issue #75 step 5).  An checkpoint is the ancestor of a chain of
+PROVENANCE (issue #75 step 5).  A checkpoint is the ancestor of a chain of
 generated savestates: states are generated from it, and states are generated
-from those, so an checkpoint's provenance is the root of every chain above it.
-Historically the manifest's `provenance` field was PROSE -- a paragraph
-describing the run that cut the battery -- which a human can read and
-nothing can verify.  The mechanical form is a dict:
+from those, so a checkpoint's provenance is the root of every chain above it.
+Historically the manifest's `provenance` field was prose: a paragraph
+describing the run that cut the battery, which a person can read but no tool
+can check.  The mechanical form is a dict:
 
     "provenance": {
       "format": "ot6-provenance/v1",
@@ -21,20 +21,20 @@ nothing can verify.  The mechanical form is a dict:
       ]
     }
 
-run.sh's OT6_CAPTURE_SRM mode writes exactly this object to
+run.sh's OT6_CAPTURE_SRM mode writes this object to
 `<payload>.provenance.json` beside the captured battery, hashed from the
-real files of the capture run -- no hand-typing.  `seal CHECKPOINT` folds the
-sidecar into manifest.json (recomputing size/sha256 while it is there), so
-re-cutting an checkpoint with verifiable provenance is: run the capture, run
-seal, commit.
+real files of the capture run, so no field is typed by hand.  `seal
+CHECKPOINT` folds the sidecar into manifest.json and recomputes size/sha256,
+so re-cutting a checkpoint with verifiable provenance is three steps: run the
+capture, run seal, commit.
 
 A manifest whose `provenance` is still prose (or absent) is LEGACY-V0:
-grandfathered with a loud warning, never a failure, because the existing
+grandfathered with a warning on stderr, never a failure, because the existing
 checkpoints' generators are still being converted to input-driven play (#75) and
-re-cutting them is the burn-down, not a precondition.  A manifest whose
-`provenance` IS a dict gets verified at load -- i.e. before every boot that
-materializes it: format string, payload hash agreement, well-formed sig and
-ancestor records.  Malformed mechanical provenance fails closed; only the
+re-cutting them is part of that burn-down rather than a precondition.  A
+manifest whose `provenance` is a dict is verified at load, before every boot
+that materializes it: format string, payload hash agreement, well-formed sig
+and ancestor records.  Malformed mechanical provenance fails closed; only the
 explicitly-legacy shape is excused.
 """
 
@@ -50,7 +50,7 @@ import tempfile
 from pathlib import Path
 
 SCHEMA = "ot6.sram-checkpoint/v1"
-# Must match savestate_stamp.sh's GATE_CONTRACT -- the one version string the
+# Must match savestate_stamp.sh's GATE_CONTRACT, the one version string the
 # whole provenance program bumps together (issue #75).
 PROVENANCE_FORMAT = "ot6-provenance/v1"
 SRAM_SIZE = 32768
@@ -64,11 +64,10 @@ class CheckpointError(ValueError):
 def provenance_problem(prov: dict, payload_sha256: str) -> str | None:
     """Why `prov` is not a valid mechanical provenance record, or None.
 
-    Shape-checks everything and cross-checks the one hash that is locally
-    checkable (the payload's).  Ancestor FILES are deliberately not re-read
-    here: the record documents what the capture run saw in ITS tree, and
-    the consuming tree's build/states legitimately moves on every
-    regeneration.
+    Shape-checks every field and cross-checks the one hash that is locally
+    checkable (the payload's).  Ancestor files are not re-read here: the
+    record documents what the capture run saw in its own tree, and the
+    consuming tree's build/states changes on every regeneration.
     """
     if prov.get("format") != PROVENANCE_FORMAT:
         return (f"provenance format {prov.get('format')!r} is not "
@@ -93,16 +92,16 @@ def provenance_problem(prov: dict, payload_sha256: str) -> str | None:
 
 
 def load(checkpoint: Path, expected_layout: str | None = None) -> tuple[dict, Path]:
-    """Validate an checkpoint directory; return (manifest, payload path).
+    """Validate a checkpoint directory; return (manifest, payload path).
 
-    expected_layout is the persistent-SRAM layout string the CONSUMING STEP
+    expected_layout is the persistent-SRAM layout string the consuming step
     declares support for (issue #25, checkpoint-fixtures.md "Checkpoints carry a
     version").  None means "no consumer, structural checks only" (the bare
-    CLI `validate CHECKPOINT` form).  Anything else -- including the empty
-    string, i.e. a step that declares nothing -- must match the manifest's
+    CLI `validate CHECKPOINT` form).  Any other value, including the empty
+    string for a step that declares nothing, must match the manifest's
     persistent_layout exactly, and the refusal names both strings.  This
-    check runs BEFORE the emulator boots: a layout mismatch is a schema-drift
-    correctness bug and must never surface as an in-emulator timeout.
+    check runs before the emulator boots: a layout mismatch is a schema-drift
+    correctness bug and must not surface as an in-emulator timeout.
     """
     manifest_path = checkpoint / "manifest.json"
     try:
@@ -128,8 +127,8 @@ def load(checkpoint: Path, expected_layout: str | None = None) -> tuple[dict, Pa
         raise CheckpointError("payload SHA-256 mismatch")
     layout = manifest.get("persistent_layout")
     if not isinstance(layout, str) or not layout:
-        # An checkpoint without a layout string can never be refused by version,
-        # which defeats the whole #25 schema-drift check.  Fail closed.
+        # A checkpoint without a layout string can never be refused by version,
+        # which defeats the #25 schema-drift check.  Fail closed.
         raise CheckpointError(f"{manifest_path} declares no persistent_layout")
     if expected_layout is not None and layout != expected_layout:
         raise CheckpointError(
@@ -140,8 +139,8 @@ def load(checkpoint: Path, expected_layout: str | None = None) -> tuple[dict, Pa
                     "script; a step that consumes an checkpoint must declare "
                     "the layout it understands)")
         )
-    # Provenance (issue #75): a mechanical record is verified, right here,
-    # before any boot; a prose one is grandfathered LOUDLY.  See the module
+    # Provenance (issue #75): a mechanical record is verified here, before
+    # any boot; a prose one is grandfathered with a warning.  See the module
     # docstring for the record's shape and the legacy-v0 policy.
     prov = manifest.get("provenance")
     if isinstance(prov, dict):
@@ -169,8 +168,8 @@ def capture(root: Path, out: Path, payload: Path, generator_sig: str,
     the record can never be typed wrong.  `ancestors` are tree-relative
     paths (stamps of the states the capture run booted, and/or the manifest
     of the checkpoint it Continued from); they are hashed against `root`.
-    The finished record is self-checked through the same validator load()
-    uses -- a sidecar this function emits can never be one seal() refuses.
+    The finished record is checked through the same validator load() uses,
+    so a sidecar this function emits cannot be one seal() refuses.
     """
     try:
         data = payload.read_bytes()
@@ -198,11 +197,11 @@ def seal(checkpoint: Path) -> None:
 
     The re-cut flow's second half: the capture run published
     `<payload>` and `<payload>.provenance.json` into the checkpoint directory;
-    seal verifies the sidecar against the payload bytes actually there,
+    seal verifies the sidecar against the payload bytes present there,
     recomputes size/sha256, and writes the manifest with `provenance` as
     the mechanical record.  The authored fields (schema, slot, milestone,
-    persistent_layout...) pass through untouched -- those are the human's
-    claims; the hashes are the machine's.
+    persistent_layout...) pass through untouched; only the hashes are
+    recomputed.
     """
     manifest_path = checkpoint / "manifest.json"
     try:
@@ -260,9 +259,9 @@ def selftest() -> None:
         root = Path(td)
         payload = bytes(range(256)) * 128
         (root / "save.srm").write_bytes(payload)
-        # The positive-control manifest carries MECHANICAL provenance (#75)
-        # built by the real capture path, so every clean load below is also
-        # the proof that a well-formed record loads silently.
+        # The positive-control manifest carries mechanical provenance (#75)
+        # built by the real capture path, so every clean load below also
+        # shows that a well-formed record loads silently.
         (root / "ancestor.stamp").write_text("sig gen\nartifact ab\n")
         capture(root, root / "save.srm.provenance.json", root / "save.srm",
                 "ab" * 32 + " gen_cut extras", ["ancestor.stamp"])
@@ -305,8 +304,9 @@ def selftest() -> None:
             else:
                 raise AssertionError(f"negative validation accepted bad {field}")
 
-        # THE LAYOUT CHECK (#25).  A mismatch must refuse AND NAME BOTH
-        # strings -- asserting the raise alone would pass a mute refusal.
+        # The layout check (#25).  A mismatch must refuse and name both
+        # strings; asserting the raise alone would pass a refusal that named
+        # neither.
         (root / "manifest.json").write_text(json.dumps(base))
         for expected, must_name in (
             ("ot6-test-layout/v2", ["ot6-test-layout/v1", "ot6-test-layout/v2"]),
@@ -333,8 +333,8 @@ def selftest() -> None:
                 load(checkpoint)
             return err.getvalue()
 
-        # 1. a mechanical record is the QUIET state; legacy prose (or no
-        #    provenance at all) is grandfathered, but LOUDLY -- the warning
+        # 1. a mechanical record loads with no output; legacy prose (or no
+        #    provenance at all) is grandfathered but warns, and the warning
         #    must name the marker and the burn-down.
         (root / "manifest.json").write_text(json.dumps(base))
         assert load_warns(root) == "", (
@@ -347,8 +347,8 @@ def selftest() -> None:
             assert "legacy-v0" in warned and "issue #75" in warned, (
                 f"legacy checkpoint did not warn loudly: {warned!r}")
 
-        # 2. seal folds the capture sidecar into the manifest -- the re-cut
-        #    flow's second half -- recomputing the payload hash on the way.
+        # 2. seal folds the capture sidecar into the manifest, the re-cut
+        #    flow's second half, recomputing the payload hash as it goes.
         (root / "manifest.json").write_text(json.dumps(stripped))
         seal(root)
         sealed = json.loads((root / "manifest.json").read_text())
@@ -358,7 +358,7 @@ def selftest() -> None:
             "seal must pass authored fields through untouched")
         assert load_warns(root) == "", "a sealed checkpoint must load silently"
 
-        # 3. malformed MECHANICAL provenance fails closed -- only the
+        # 3. malformed mechanical provenance fails closed; only the
         #    explicitly-legacy prose shape is excused, never a bad record.
         for tweak, why in (
             ({"format": "ot6-provenance/v99"}, "unknown format"),
@@ -380,8 +380,8 @@ def selftest() -> None:
             else:
                 raise AssertionError(f"bad provenance accepted: {why}")
 
-        # 4. seal only trusts a sidecar that matches the payload NOW: a
-        #    payload swapped after capture must be refused, not re-blessed.
+        # 4. seal only trusts a sidecar that matches the payload as it is
+        #    now: a payload swapped after capture is refused, not accepted.
         (root / "manifest.json").write_text(json.dumps(base))
         (root / "save.srm").write_bytes(bytes(SRAM_SIZE))
         try:
@@ -404,8 +404,9 @@ def main(argv: list[str]) -> int:
         elif len(argv) in (2, 3) and argv[0] == "validate":
             # The optional third argument is the consuming step's declared
             # persistent_layout; run.sh passes it (possibly empty, meaning
-            # the step declared nothing -- refused) so the check fires before
-            # the emulator boots.  Absent entirely = structural checks only.
+            # the step declared nothing, which is refused) so the check runs
+            # before the emulator boots.  Absent entirely means structural
+            # checks only.
             manifest, _ = load(Path(argv[1]),
                                argv[2] if len(argv) == 3 else None)
             prov = manifest.get("provenance")

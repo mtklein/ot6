@@ -4,7 +4,7 @@
 -- The measurement instrument behind the whelk-wipe bug hunt: drive the
 -- whelk fight passively (Heal Force every turn, whelkbal's settle
 -- discipline), trip an exec callback on DoMonsterEntryExit (vanilla
--- C2/E668, byte-identical on base and ot6 images), then screenshot EVERY
+-- C2/E668, byte-identical on base and ot6 images), then screenshot every
 -- frame of the transition while diffing the battle-field BG3 tilemap
 -- (vram words $5400-$57ff) and the small-font tile region (vram words
 -- $5800-$5fff) against pre-transition shadows.  Two transitions are
@@ -24,8 +24,8 @@ local SHOT_EVERY = 1               -- screenshot cadence inside a burst
 -- ------------------------------------------------------------ trip wire --
 -- DoMonsterEntryExit entry point (vanilla bank-C2 code, verified
 -- byte-identical in both images).  Fires once per entry/exit animation.
--- Registered AFTER the savestate load (ordering is historical; loads do NOT
--- detach memory callbacks -- nothing in Mesen's load path clears them).
+-- Registered after the savestate load (the ordering is historical; loads do
+-- not detach memory callbacks, and nothing in Mesen's load path clears them).
 local TRIP_PC = 0xC2E668
 local trips = {}                   -- { {frame=, type=, mask=}, ... }
 local tripped = false

@@ -1,11 +1,11 @@
--- probe_input: verify the INPUT LAYER stays alive over a LONG, REALISTIC run.
--- The old $4218/$4219 read-hack silently died after ~7000 frames, freezing
--- the party mid-navigation. With emu.setInput(input, port) inside an
--- inputPolled event callback, held input reaches the ROM every frame for the
--- whole run. Boot into the mine and pace the party; random encounters WILL
--- fire, so clear them inline (the clearBattle idiom) and keep going. Assert
--- the party keeps racking up tile transitions -- including in the run's
--- second half, the exact window where the old hack went dead.
+-- probe_input: verify the input layer stays alive over a long, realistic run.
+-- The old $4218/$4219 read-hack stopped working after ~7000 frames with no
+-- error, freezing the party mid-navigation. With emu.setInput(input, port)
+-- inside an inputPolled event callback, held input reaches the ROM every
+-- frame for the whole run. Boot into the mine and pace the party; random
+-- encounters do fire, so clear them inline (the clearBattle idiom) and keep
+-- going. Assert the party keeps accumulating tile transitions, including in
+-- the run's second half, the window where the old hack stopped working.
 local H = dofile("tools/tests/lib/ot6.lua")
 local SRM = "build/states/playthrough_srm.mss.lua"
 
@@ -69,7 +69,7 @@ H.run({ maxFrames = 40000 }, {
   H.call(function()
     H.log(string.format("pace: firstHalf=%d, secondHalf=%d, battles=%d, ended (%d,%d)",
       firstHalf, secondHalf, battles, H.fieldX(), H.fieldY()))
-    -- input alive the WHOLE run: it must still drive movement in the 2nd half
+    -- input alive for the whole run: it must still drive movement in the 2nd half
     H.assertEq(secondHalf >= 5, true,
       "input stays alive: party still moving in the run's second half")
   end),

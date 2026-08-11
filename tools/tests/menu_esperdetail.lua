@@ -1,81 +1,84 @@
 -- @suite savestate=magicite_ifrit_shiva
 -- menu_esperdetail.lua -- issue #27, rebuilt for #62: the esper detail page
--- shows the while-worn stat BLOCK and never the dead learn-rate columns.
+-- shows the while-worn stat block and never the dead learn-rate columns.
 --
 -- M5 made espers while-equipped sub-jobs: every GenjuProp learn rate is 0 and
 -- every level-up bonus byte is $ff (ff6/src/menu/genju_prop.asm), but the
 -- vanilla esper detail page (skills.asm DrawEsperDetailMenu) still drew the
 -- "Learn.Rate"/"Skill" captions, a ":  {times}00" rate after every spell, a
--- "  0%" skill column, and a blank bonus line -- so Ifrit's vigor bonus
+-- "  0%" skill column, and a blank bonus line, so Ifrit's vigor bonus
 -- (Ot6EsperStatTbl, ff6/src/battle/ot6_progression.asm) was invisible in
--- game.  #27 drew the spell names bare and put ONE line, "While worn...<stat>
+-- game.  #27 drew the spell names bare and put one line, "While worn...<stat>
 -- +<n>", where the dead bonus line had been.
 --
--- #62 WIDENED THE TABLE AND THIS PAGE WITH IT.  Ot6EsperStatTbl is now two
--- bytes per esper in vanilla's own equipment layout -- four SIGNED nibbles,
--- -7..+7 each -- so a stone carries up to four deltas and any of them can be
+-- #62 widened the table and this page with it.  Ot6EsperStatTbl is now two
+-- bytes per esper in vanilla's own equipment layout, four signed nibbles of
+-- -7..+7 each, so a stone carries up to four deltas and any of them can be
 -- negative.  Four terms do not fit on one line, so the page draws a right-hand
--- COLUMN: the caption rides the title row (in the very cells vanilla used for
--- its Learn.Rate/Skill captions and #27 blanked), and one term per nonzero
+-- column: the caption rides the title row (in the cells vanilla used for
+-- its Learn.Rate and Skill captions and #27 blanked), and one term per nonzero
 -- delta packs downward from row 17.
 --
--- ISSUE #75 CONVERSION -- the stones are OWNED, not poked.  This file used to
--- boot arvis_wake (which owns no espers) and write the $1a69 inventory
--- bitfield directly to stage IFRIT + TERRATO.  It now boots
--- magicite_ifrit_shiva, the input-driven v0.6 savestate whose bag REALLY
+-- Issue #75 conversion: the stones are owned rather than poked.  This file used
+-- to boot arvis_wake (which owns no espers) and write the $1a69 inventory
+-- bitfield directly to stage IFRIT and TERRATO.  It now boots
+-- magicite_ifrit_shiva, the input-driven v0.6 savestate whose bag
 -- holds RAMUH, IFRIT and SHIVA (gen_ifrit_magicite: give_genju receipts,
--- $1A69 = $07), and asserts the pages of all three -- zero state writes.
--- What each owned stone buys the test:
---   IFRIT  (+6 vigor / +4 stamina / -3 mag.pwr) -- #62's marquee, the row
+-- $1A69 = $07), and asserts the pages of all three, with no state writes.
+-- What each owned stone gives the test:
+--   IFRIT  (+6 vigor / +4 stamina / -3 mag.pwr), the row
 --          magicite-ifrit-shiva.md's ledger recorded as unbuildable under
---          the old encoding: three terms, SPEED SKIPPED (packing proof), and a
---          MINUS sign.  Every assertion of the old Ifrit page, unchanged.
---   SHIVA  (-3 vigor / +4 speed / +6 mag.pwr) -- Ifrit's authored mirror:
---          three terms again but with STAMINA skipped (a MIDDLE zero costs no
+--          the old encoding: three terms, speed skipped (which exercises the
+--          packing), and a minus sign.  Every assertion of the old Ifrit page
+--          is unchanged.
+--   SHIVA  (-3 vigor / +4 speed / +6 mag.pwr), Ifrit's authored mirror:
+--          three terms again but with stamina skipped (a middle zero costs no
 --          line) and the minus leading the block.  Visited right after Ifrit,
---          her slot-1 term must read "Speed" where his read "Stamina" -- the
---          revisit-overwrites proof the old TERRATO page carried, now made
---          with content instead of blankness.
---   RAMUH  (+4 stamina / +2 mag.pwr) -- the two-term shape: the walk must
---          SKIP two leading zeros (vigor, speed) before its first term, and
---          -- visited after two three-term pages -- its row-17+2*2 slot MUST
---          be blanked, proving the page CLEARS a term row the previous stone
---          filled.  That is the other half of what the Terrato page proved.
--- What no owned stone can show: the NO-MOD page (Ot6EsperStatTbl $0000 -- no
--- caption at all).  Terrato, the authored no-mod control, is not in any
+--          her slot-1 term must read "Speed" where his read "Stamina", which
+--          is the revisit-overwrites check the old TERRATO page made, now made
+--          with content rather than with blankness.
+--   RAMUH  (+4 stamina / +2 mag.pwr), the two-term shape: the walk must
+--          skip two leading zeros (vigor, speed) before its first term, and,
+--          visited after two three-term pages, its row-17+2*2 slot must
+--          be blanked, which shows the page clears a term row the previous
+--          stone filled.  That is the other half of what the Terrato page
+--          covered.
+-- What no owned stone can show: the no-mod page (Ot6EsperStatTbl $0000, with
+-- no caption at all).  Terrato, the authored no-mod control, is not in any
 -- reachable bag as far as the game is playable; that arm lives on as
--- menu_esperdetail_tube6.lua's loudly-labeled isolation arm.
+-- menu_esperdetail_tube6.lua's labeled isolation arm.
 --
--- THE ASSERTIONS THAT CHANGED IN #62, AND WHY -- deliberately, not loosened:
---   * cell(13,15) was asserted BLANK ("no Learn.Rate caption"); it is now the
+-- The assertions that changed in #62, and why; they were changed rather than
+-- loosened:
+--   * cell(13,15) was asserted blank (no Learn.Rate caption); it is now the
 --     left pad of the caption field, and the caption's own 'W' is asserted at
---     {15,15} with {13,15}/{14,15} still blank.  The thing that check existed
---     to catch -- vanilla's caption TEXT coming back -- is now covered by
---     asserting the exact tiles that ARE there.
---   * cell(16,17) and cell(26,17)/cell(27,17) were asserted BLANK (no
+--     {15,15} with {13,15} and {14,15} still blank.  What that check existed
+--     to catch, vanilla's caption text coming back, is now covered by
+--     asserting the exact tiles that are there.
+--   * cell(16,17) and cell(26,17)/cell(27,17) were asserted blank (no
 --     "{times}NN" rate, no percent digits, no percent sign).  Cols 26/27 of row
---     17 now hold a term's magnitude digits.  The percent SIGN at {27,17} is
+--     17 now hold a term's magnitude digits.  The percent sign at {27,17} is
 --     replaced by an exact-value assertion on the digit; the rate colon at
 --     {12,17}, which nothing draws to, stays a blank assertion, and a new
 --     no-percent-glyph sweep replaces the two cells that moved.
---   * the single line at row 27 is gone, so row 27 is now asserted BLANK for
---     every stone, including the stones WITH a mod -- which is a strictly new
---     check: #27's own line lived there, so nothing could previously prove that
+--   * the single line at row 27 is gone, so row 27 is now asserted blank for
+--     every stone, including the stones with a mod, which is a new
+--     check: #27's own line lived there, so nothing could previously check that
 --     region gets cleared on a page that has something to say.
 --
--- This test drives the REAL menu UI (X -> Skills -> character -> Espers ->
+-- This test drives the real menu UI (X -> Skills -> character -> Espers ->
 -- list -> detail) from the magicite_ifrit_shiva fixture.  Rendering is
 -- asserted at cell level in the BG1 screen-B tilemap shadow the menu draws
 -- into (wBG1Tiles::ScreenB = $7e4049, ff6-en.dbg; 2 bytes per cell, char then
--- color, 64 bytes per row) and proven visually with screenshots of the pages.
+-- color, 64 bytes per row) and recorded with screenshots of the pages.
 --
--- LAYOUT, from skills.asm's DrawEsperDetailMenu tail:
+-- Layout, from skills.asm's DrawEsperDetailMenu tail:
 --   caption "While worn..." right-aligned in the 16-cell field at {13,15}:
 --     cols 13-14 blank, cols 15-27 the 13 caption tiles, col 28 blank
 --   one term per nonzero delta, packed downward from tilemap row 17 over the
 --   odd rows 17/19/21/23/25 (one window row = two tilemap rows):
 --     stat name cols 17-23 (7 tiles, Ot6GenjuStatNameTbl, space-padded)
---     a SPACER at col 24 -- "Stamina" and "Mag.Pwr" fill all seven name cells,
+--     a spacer at col 24: "Stamina" and "Mag.Pwr" fill all seven name cells,
 --       so without it the sign sits flush against the label
 --     sign col 25: '+' $ca or '-' $c4
 --     magnitude cols 26-27, leading zero blanked
@@ -105,9 +108,9 @@ local CH_PLUS, CH_MINUS, CH_DOT = 0xca, 0xc4, 0xc5
 local BLANK = 0xff
 local function digit(n) return 0xb4 + n end      -- '0' = $b4 .. '9' = $bd
 
--- Stat name tiles, verbatim from menu_text_en.inc.raw:111-114 (7 tiles each,
+-- Stat name tiles, copied from menu_text_en.inc.raw:111-114 (7 tiles each,
 -- space-padded with $ff, the terminator dropped).  Spelled out rather than read
--- from the ROM so a table that silently moved could not make this test agree
+-- from the ROM, so that a table that moved could not make this test agree
 -- with itself.
 local STAT = {
   VIGOR   = { 0x95, 0xa2, 0xa0, 0xa8, 0xab, 0xff, 0xff },   -- "Vigor  "
@@ -121,7 +124,7 @@ local function st() return H.readByte(ZMENUSTATE) end
 
 -- Walk the esper list cursor down to the row holding esper `idx`.
 -- Walk the esper list cursor onto the slot holding esper `idx`.  The list is
--- a TWO-COLUMN grid (GenjuCursorProp `cursor_prop {0,0},{2,8}`, skills.asm):
+-- a two-column grid (GenjuCursorProp `cursor_prop {0,0},{2,8}`, skills.asm):
 -- $4b is a linear slot index whose parity is the column, so down/up move by
 -- 2 and a parity change needs a left/right press first.  Direction-aware
 -- because the slot the list restores after a detail-page exit is not
@@ -156,13 +159,13 @@ local function listSeek(idx, what)
   }, what)
 end
 
--- The shared page shape: vanilla's dead learn-rate machinery is gone.  #62 took
+-- The shared page shape: vanilla's dead learn-rate drawing is gone.  #62 took
 -- over cols 17-27 of the spell rows and cols 13-28 of the title row, so the
 -- three cells the old version of this check used there have been replaced with
--- checks of the same class that survive the new layout:
---   * col 12 of a spell row is where vanilla's rate colon sat, and NOTHING in
---     the OT6 page draws there -- so it stays a blank assertion;
---   * the percent glyph $cd (the "0%" column's sign) must not appear ANYWHERE
+-- checks of the same kind that survive the new layout:
+--   * col 12 of a spell row is where vanilla's rate colon sat, and nothing in
+--     the OT6 page draws there, so it stays a blank assertion;
+--   * the percent glyph $cd (the "0%" column's sign) must not appear anywhere
 --     in the window's rows.  That is a stronger statement than the two cells it
 --     replaces, and it cannot be satisfied by accident;
 --   * the rate colon glyph $c1 likewise must not appear anywhere in the window.
@@ -181,8 +184,8 @@ end
 -- ---- #62: the while-worn stat block ----------------------------------------
 
 -- The caption field at {13,15}: 2 blanks, then "While worn..." on cols 15-27.
--- (The `present = false` arm -- the truly no-mod page -- is exercised by
--- menu_esperdetail_tube6.lua's labeled Terrato isolation arm: no stone this
+-- (The `present = false` arm, the no-mod page, is exercised by
+-- menu_esperdetail_tube6.lua's labeled Terrato isolation arm; no stone this
 -- save owns carries a $0000 row.)
 local function assertCaption(tag, present)
   if present then
@@ -231,8 +234,8 @@ local function assertTermRowBlank(tag, slot)
 end
 
 -- Row 27 is where #27's single line lived.  Nothing draws there now, and the
--- page must CLEAR it -- asserted on every stone, all of which have a mod,
--- which #27 could not do because its own line was there.
+-- page must clear it.  This is asserted on every stone, all of which have a
+-- mod, which #27 could not do because its own line was there.
 local function assertOldLineGone(tag)
   for x = 5, 27 do
     H.assertEq(cell(x, 27), BLANK,
@@ -240,7 +243,7 @@ local function assertOldLineGone(tag)
   end
 end
 
--- A stat whose delta is zero must appear NOWHERE in the term column: without
+-- A stat whose delta is zero must appear nowhere in the term column; without
 -- this, a walk that drew all four stats with a "+ 0" would still satisfy every
 -- positive assertion above.
 local function assertStatAbsent(tag, statTiles, statName)
@@ -257,10 +260,10 @@ H.run({ maxFrames = 30000 }, {
   H.waitFrames(10),
   H.waitUntil(function() return H.hasControl() end, 400, "field control", 5),
 
-  -- POSITIVE CONTROL on the fixture, read-only: the bag really holds the
+  -- positive control on the fixture, read-only: the bag holds the
   -- three stones (gen_ifrit_magicite's own exit assertion, re-made at consume
-  -- time).  A fixture that lost them fails HERE with a clear message, not in
-  -- a list that silently has no rows.
+  -- time).  A fixture that lost them fails here with a clear message rather
+  -- than in a list that has no rows.
   H.call(function()
     H.log(string.format("[espers] $1a69 = %02x %02x %02x %02x (read, not pinned)",
       H.readByte(ESPERS), H.readByte(ESPERS + 1), H.readByte(ESPERS + 2),
@@ -270,14 +273,14 @@ H.run({ maxFrames = 30000 }, {
   end),
 
   -- X opens the field menu; ride the fade to the main-menu steady state.
-  -- driveUntil, not one press: the X that opens the field menu is the first
-  -- step in these tests that needs a SPECIFIC frame, so it is where a
-  -- fixture generated against a different ROM surfaces -- as "timeout waiting
-  -- for main menu", which reads like a menu bug and is not one.  Retrying
-  -- the press costs nothing when the pairing is fine and removes the false
-  -- report when it is not.  Same shape probe_fieldicons.lua and
-  -- menu_blitzpage_sabin.lua already use.  The assertion is unchanged: the
-  -- main menu must still come up.
+  -- This uses driveUntil rather than one press because the X that opens the
+  -- field menu is the first step in these tests that needs a specific frame,
+  -- so it is where a fixture generated against a different ROM shows up, as
+  -- "timeout waiting for main menu", which reads like a menu bug and is not
+  -- one.  Retrying the press costs nothing when the pairing is fine and
+  -- removes the false report when it is not.  This is the shape
+  -- probe_fieldicons.lua and menu_blitzpage_sabin.lua already use.  The
+  -- assertion is unchanged: the main menu must still come up.
   H.driveUntil(function() return st() == ST_MAIN end, 1200,
     { H.pressButtons({ "x" }, 4), H.waitFrames(30) }, "main menu"),
   H.waitFrames(20),
@@ -291,7 +294,7 @@ H.run({ maxFrames = 30000 }, {
   H.waitUntil(function() return st() == ST_SKILLS end, 300, "skills submenu", 5),
   H.waitFrames(10),
 
-  -- POSITIVE CONTROL: the Espers row is enabled -- because the save owns
+  -- positive control: the Espers row is enabled because the save owns
   -- stones, not because anything was written.
   H.call(function()
     H.assertEq(H.readByte(SKILLCOLOR), 0x20, "Espers row enabled (color $20)")
@@ -307,7 +310,7 @@ H.run({ maxFrames = 30000 }, {
     H.assertEq(H.readByte(ZLISTTYPE), 4, "list type GENJU (menu_ram.inc)")
   end),
 
-  -- ---- IFRIT: three terms, a skipped SPEED, and the minus (#62's marquee) --
+  -- ---- IFRIT: three terms, a skipped speed, and the minus ----------------
   listSeek(IFRIT, "cursor to IFRIT's row"),
   H.waitFrames(20),                     -- let any list scroll finish (A is
                                         -- ignored while ScrollListPage runs)
@@ -320,9 +323,9 @@ H.run({ maxFrames = 30000 }, {
     -- Spell list: Fire's name cell is drawn (grant list still present).
     H.assertEq(cell(5, 17) ~= BLANK, true, "ifrit: spell 1 name drawn at {5,17}")
     -- Ifrit's row is +6 vigor / 0 speed / +4 stamina / -3 mag.pwr, so the three
-    -- nonzero deltas pack onto rows 17/19/21 -- SPEED IS SKIPPED, which is what
-    -- proves the walk packs rather than reserving a line per stat -- and the
-    -- third term carries a MINUS, the sign the old encoding could not express.
+    -- nonzero deltas pack onto rows 17/19/21.  Speed is skipped, which shows
+    -- the walk packs rather than reserving a line per stat, and the
+    -- third term carries a minus, the sign the old encoding could not express.
     assertCaption("ifrit", true)
     assertTerm("ifrit", 0, STAT.VIGOR,   "Vigor",   CH_PLUS,  6)
     assertTerm("ifrit", 1, STAT.STAMINA, "Stamina", CH_PLUS,  4)
@@ -340,11 +343,11 @@ H.run({ maxFrames = 30000 }, {
   H.waitUntil(function() return st() == ST_LIST end, 300, "back to list", 5),
   H.waitFrames(10),
 
-  -- ---- SHIVA: the mirror -- a leading minus, STAMINA skipped, and the ------
-  -- revisit-overwrite proof: her slot-1 term must read "Speed" in the very
-  -- cells Ifrit's page just drew "Stamina" into, and her slot-0 sign must be
-  -- the minus where his was a plus.  A page that failed to redraw would still
-  -- show his tiles and fail every one of these exact-value checks.
+  -- ---- SHIVA: the mirror, a leading minus with stamina skipped ------------
+  -- This is the revisit-overwrite check: her slot-1 term must read "Speed" in
+  -- the cells Ifrit's page just drew "Stamina" into, and her slot-0 sign must
+  -- be the minus where his was a plus.  A page that failed to redraw would
+  -- still show his tiles and fail every one of these exact-value checks.
   listSeek(SHIVA, "cursor to SHIVA's row"),
   H.waitFrames(20),
   H.driveUntil(function() return st() == ST_DETAIL end, 600,
@@ -355,7 +358,7 @@ H.run({ maxFrames = 30000 }, {
     assertDeadColumnsGone("shiva")
     H.assertEq(cell(5, 17) ~= BLANK, true, "shiva: spell 1 name drawn at {5,17}")
     -- Shiva's row is -3 vigor / +4 speed / 0 stamina / +6 mag.pwr: three terms
-    -- with the MIDDLE zero skipped this time, and the minus leading the block.
+    -- with the middle zero skipped this time, and the minus leading the block.
     assertCaption("shiva", true)
     assertTerm("shiva", 0, STAT.VIGOR,  "Vigor",   CH_MINUS, 3)
     assertTerm("shiva", 1, STAT.SPEED,  "Speed",   CH_PLUS,  4)
@@ -373,11 +376,11 @@ H.run({ maxFrames = 30000 }, {
   H.waitFrames(10),
 
   -- ---- RAMUH: the two-term shape, after two three-term pages ---------------
-  -- +4 stamina / +2 mag.pwr: the walk must skip TWO leading zeros before its
-  -- first term, and -- the load-bearing new check -- slot 2 must be BLANK in
-  -- the very cells the last two pages both filled.  This is the "the page
-  -- clears what it does not draw" proof the old no-mod TERRATO page made with
-  -- an all-blank block; blankness after fullness proves the same clear.
+  -- +4 stamina / +2 mag.pwr: the walk must skip two leading zeros before its
+  -- first term, and slot 2 must be blank in the cells the last two pages both
+  -- filled.  That is the new check here.  It covers the same property the old
+  -- no-mod TERRATO page covered with an all-blank block: the page clears what
+  -- it does not draw, and blankness after fullness shows the same clear.
   listSeek(RAMUH, "cursor to RAMUH's row"),
   H.waitFrames(20),
   H.driveUntil(function() return st() == ST_DETAIL end, 600,
@@ -391,7 +394,7 @@ H.run({ maxFrames = 30000 }, {
     assertTerm("ramuh", 0, STAT.STAMINA, "Stamina", CH_PLUS, 4)
     assertTerm("ramuh", 1, STAT.MAGPWR,  "Mag.Pwr", CH_PLUS, 2)
     -- slot 2 held "Mag.Pwr -3" on Ifrit's page and "Mag.Pwr +6" on Shiva's;
-    -- for Ramuh it MUST be blank -- the clear, checked against real content.
+    -- for Ramuh it must be blank, which checks the clear against real content.
     assertTermRowBlank("ramuh", 2)
     assertTermRowBlank("ramuh", 3)
     assertTermRowBlank("ramuh", 4)

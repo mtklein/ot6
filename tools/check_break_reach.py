@@ -1,56 +1,56 @@
 #!/usr/bin/env python3
 """Encounter-and-party break-class reachability check.
 
-The break floor's regression tests prove nonzero table bytes; nothing static
-proved that the party who actually walks a section of a route can FIELD a
-class some body in every formation is weak to.  This linter closes that gap
-for the declared areas (docs/design/break-coverage-vector.md SS10.2 item 3):
+The break floor's regression tests prove nonzero table bytes.  No static check
+proved that the party who walks a section of a route can field a class that
+some body in every formation is weak to.  This linter checks that for the
+declared areas (docs/design/break-coverage-vector.md SS10.2 item 3):
 
   * walk SubBattleGroup -> RandBattleGroup -> BattleMonsters for the area's
     named encounter maps (field/battle.asm:392,:408; battle_main.asm:16610),
-  * PLUS the forced-battle list: EventBattleGroup entries reached by event
+  * plus the forced-battle list: EventBattleGroup entries reached by event
     `battle` commands (field/event.asm EventBattle) and by the magitek train
-    ride script's $e0/$e1/$e2 items (world/train_script.asm TrainCmd_e0/e1/e2)
-    -- the minecart writes $0011e0 directly and is invisible to any
+    ride script's $e0/$e1/$e2 items (world/train_script.asm TrainCmd_e0/e1/e2),
+    because the minecart writes $0011e0 directly and is invisible to any
     event-script scan,
   * take the declared party for each step and compute the weapon/ability
     classes each member can field (item_prop_en.dat equip mask at +$01,
-    16-bit, bit N = actor N -- docs/research/data-formats.md; classes from
+    16-bit, bit N = actor N, per docs/research/data-formats.md; classes from
     Ot6WeapClassTbl / Ot6SkillClassTbl in ot6_class.asm),
   * and assert every formation has at least one break-class key
     (Ot6ShieldTbl row's class byte, else the generated floor) that some
     member can field.
 
-"Can field" is game-wide equippability plus command ownership, and BOTH halves
-are read out of the same place the game reads them: the four battle-command
+"Can field" is game-wide equippability plus command ownership.  Both halves
+are read from the same place the game reads them, the four battle-command
 slots in ff6/src/field/char_prop.asm.  A weapon (and an empty hand) only
-probes anything if its holder owns a command that SWINGS it, so the weapon
+probes anything if its holder owns a command that swings it, so the weapon
 mask and the bare-fist bludgeon are credited to FIGHT owners only; SwdTech,
 Blitz and Tools classes are credited to whoever the table gives those commands
-to, rather than to hardcoded names.  This was a real lie until issue #47: GAU
-had no Fight in vanilla (RAGE/LEAP/MAGIC/ITEM), so "bare fists are a
-bludgeoning probe for anyone" credited him two classes he could not swing, and
-GOGO and UMARO were credited the same way.  Giving Gau Fight made the model
-true for him; the two exceptions that remain are named in AUTO_SWINGERS and
-MIMIC_ONLY below.  It is NOT inventory: whether the item is in the bag is a
-runtime fixture assertion (break-coverage-vector.md SS10.3), not a static one.
-Weapons carrying OT6_NULLBRK chip nothing (ot6_class.asm:14-17) and grant no
-class here.
+to, rather than to hardcoded names.  This was wrong until issue #47: GAU had
+no Fight in vanilla (RAGE/LEAP/MAGIC/ITEM), so "bare fists are a bludgeoning
+probe for anyone" credited him two classes he could not swing, and GOGO and
+UMARO were credited the same way.  Giving Gau Fight made the model correct for
+him; the two exceptions that remain are named in AUTO_SWINGERS and MIMIC_ONLY
+below.  This does not cover inventory: whether the item is in the bag is a
+runtime fixture assertion (break-coverage-vector.md SS10.3) rather than a
+static one.  Weapons carrying OT6_NULLBRK chip nothing (ot6_class.asm:14-17)
+and grant no class here.
 
 Areas are declared in AREAS below; add an area by adding an entry, nothing
 else changes.  The vector-factory area's map set and forced list are the
 survey's SS1.1/SS2 decode; the party is docs/design/bosses-wob.md SS13-16
 (LOCKE CELES SABIN EDGAR, three after the tube room takes Celes).
 
-Nothing here writes; it is a read-only linter.  Exit status 0 = clean.
-One loud block per formation with no reachable break class.
+Nothing here writes.  It is a read-only linter.  Exit status 0 = clean.
+It prints one block per formation with no reachable break class.
 
 Usage:  python3 tools/check_break_reach.py [--repo ROOT] [-v]
                 [--area NAME] [--party A,B,C] [--drop-class CLS]
 
---party and --drop-class exist to demonstrate failure (an impoverished
-party, or "nobody can field bludgeon") and for what-if probes; the bare
-invocation is the check.
+--party and --drop-class exist to demonstrate failure (a party that lacks
+classes, or "nobody can field bludgeon") and for what-if probes.  The check
+itself is the bare invocation.
 """
 
 from __future__ import annotations
@@ -82,10 +82,10 @@ ACTORS = ["TERRA", "LOCKE", "CYAN", "SHADOW", "EDGAR", "SABIN", "CELES",
           "STRAGO", "RELM", "SETZER", "MOG", "GAU", "GOGO", "UMARO"]
 ACTOR_ID = {n: i for i, n in enumerate(ACTORS)}
 
-# command ownership: which BATTLE COMMAND resolves each classed ability id in
+# command ownership: which battle command resolves each classed ability id in
 # Ot6SkillClassTbl (ot6_class.asm:185-195).  Who owns that command is read
 # from char_prop.asm, not written down here.
-# TekMissile $8a is Magitek-armor only -- no walking party owns it, so it
+# TekMissile $8a is Magitek-armor only.  No walking party owns it, so it
 # appears in no row below and is credited to nobody.
 COMMAND_ABILITIES = {
     "BUSHIDO": tuple(range(0x55, 0x5D)),        # swdtech
@@ -103,14 +103,15 @@ TOOLS_RANGE = range(0xA3, 0xAB)
 SWING_COMMAND = "FIGHT"
 
 # actors who swing without owning the command.  UMARO never opens a battle
-# menu at all (CheckPlayerAction returns early on CHAR::UMARO,
+# menu (CheckPlayerAction returns early on CHAR::UMARO,
 # battle_main.asm:1465-1467) and attacks through his own character AI every
-# turn, so his weapon and his fists are genuinely fieldable.
+# turn, so his weapon and his fists are fieldable.
 AUTO_SWINGERS = {"UMARO"}
 
-# actors whose only verb is derivative.  GOGO can equip weapons but owns only
-# MIMIC, so every class he "fields" is one somebody else fielded first; he is
-# credited nothing of his own.  No declared area seats him.
+# actors who can only repeat another member's action.  GOGO can equip weapons
+# but owns only MIMIC, so every class he fields is one somebody else fielded
+# first, and he is credited with nothing of his own.  No declared area seats
+# him.
 MIMIC_ONLY = {"GOGO"}
 
 # --------------------------------------------------------------------------
@@ -150,15 +151,15 @@ AREAS = {
         ],
     },
     # The Cave to the Sealed Gate (issue #31, v0.7).  Map set verified from
-    # data, not the recon: 382/383/384/385 are the only maps in the area
-    # with the enable bit set AND an entrance or load_map reaching them
-    # (379/380/381/387/388 carry enable bits or groups but nothing targets
-    # them -- the map-275 pattern).  The Imperial Base (377/378) has the
-    # enable bit CLEAR, so it contributes no encounters.  Battles 121/122/123
+    # data rather than from the recon: 382/383/384/385 are the only maps in
+    # the area with the enable bit set and an entrance or load_map reaching
+    # them (379/380/381/387/388 carry enable bits or groups but nothing
+    # targets them, the map-275 pattern).  The Imperial Base (377/378) has the
+    # enable bit clear, so it contributes no encounters.  Battles 121/122/123
     # (the gate scene and the esper attack) decode to dummy-only formations
     # ($17b L1 HP1) and their real contents live in battle-event scripts
-    # being probed by a separate agent -- deliberately NOT declared here;
-    # add them when the probe lands.  Battle 149 is the map-384 (66,11)
+    # being probed by a separate agent, so they are deliberately not declared
+    # here; add them when the probe lands.  Battle 149 is the map-384 (66,11)
     # trap-switch Ninja ambush (event_main.asm:45177) and is real.
     "sealed-gate": {
         "doc": "docs/design/break-coverage-sealed-gate.md SS1-2, SS5",
@@ -344,8 +345,8 @@ class Data:
 
         Records are emitted in actor order, one `; N: name` header and one
         optional `set_char_prop_cmds` per record.  An actor with no
-        set_char_prop_cmds line (UMARO) owns no commands at all -- that is
-        real data, not a parse miss, so it is recorded as the empty set.
+        set_char_prop_cmds line (UMARO) owns no commands.  That is real data
+        rather than a parse miss, so it is recorded as the empty set.
         """
         out = {}
         who = None
@@ -412,7 +413,7 @@ class Data:
 
     # -- party -------------------------------------------------------------
     def actor_classes(self, name):
-        """Classes actor NAME can field: equippable weapons + bare fists IF he
+        """Classes actor NAME can field: equippable weapons + bare fists if he
         owns a command that swings them, plus the classes of the abilities his
         commands resolve.  NULLBRK weapons chip nothing and grant nothing."""
         a = ACTOR_ID[name]

@@ -1,33 +1,33 @@
 #!/usr/bin/env python3
-"""Is anybody walking the story BARE-HANDED?
+"""Report party members who are walking the story bare-handed.
 
-WHY THIS EXISTS.  The game strips characters and returns their gear to the
-inventory at story beats -- `remove_equip` / EventCmd_8d, 58 sites in 15
-clusters across event_main.asm -- and the chain of generated savestates has
+Why this exists.  The game strips characters and returns their gear to the
+inventory at story beats (`remove_equip` / EventCmd_8d, 58 sites in 15
+clusters across event_main.asm), and the chain of generated savestates has
 never once put it back on.  battle_brokendeath found this at the Vector
 infiltration in 2026-07 and drove Equip -> Optimum by hand to fix its own
-fixture.  Nobody checked whether it was a general problem.
+fixture.  Nobody checked whether it was a general problem; it is one.
 
-It is.  On 2026-08-09 the first end-to-end run of the input-driven chain
-stalled at `sfigaro_town`, where solo LOCKE lost the gate soldier three
-times running.  It read exactly like a balance wall -- a level-13 machine
-with 495 hp against a level-8 thief -- and it was nothing of the sort:
-LOCKE's whole equipment block read `FF FF FF FF FF` and his own Dirk was
-sitting in the bag.  He was punching it.  Armed, his swing went 8 -> 21.
+On 2026-08-09 the first end-to-end run of the input-driven chain stalled at
+`sfigaro_town`, where solo LOCKE lost the gate soldier three times running.
+It read like a balance wall, a level-13 machine with 495 hp against a
+level-8 thief, but the cause was different: LOCKE's whole equipment block
+read `FF FF FF FF FF` and his own Dirk was sitting in the bag.  He was
+punching it.  Armed, his swing went 8 -> 21.
 
-A wrong fixture reads exactly like a balance finding.  That is the trap
-this file exists to close, and closing it cheaply matters -- so this reads
-the SAVESTATES DIRECTLY, with no emulator: 110 fixtures in about a second,
-against a `make savestates` measured in hours.
+A wrong fixture reads like a balance finding, and this script is here to
+catch that case.  To keep it cheap, it reads the savestates directly, with
+no emulator: 110 fixtures in about a second, against a `make savestates`
+measured in hours.
 
-HOW IT FINDS THE DATA.  A .mss is a short header then zlib streams; the
+How it finds the data.  A .mss is a short header then zlib streams; the
 biggest one carries WRAM.  The character table ($1600, 16 records of 37
 bytes) is located by its own shape rather than by a hardcoded offset,
-which would rot the first time Mesen changed its state layout: record c's
-actor-id byte has LOW NIBBLE c for the first eleven records (the high
+which would break the first time Mesen changed its state layout: record c's
+actor-id byte has low nibble c for the first eleven records (the high
 nibble is join state, which is why a plain equality test finds nothing).
-That signature is unique in every fixture in the tree -- asserted below,
-so a second candidate is an error and not a coin flip.
+That signature is unique in every fixture in the tree, and the code below
+asserts that, so a second candidate is an error rather than a guess.
 
 Then, per record: +8 level, +9/+11 hp, +$1F weapon, +$20..$23 the rest.
 $FF means empty.  Party membership is $1850 + c, low three bits.
@@ -62,9 +62,9 @@ ITEM_PROP = "ff6/src/menu/item_prop_en.dat"
 
 
 def load_waivers(repo: str) -> dict[tuple[str, str], str]:
-    """(fixture, CHARACTER) pairs where bare-handed is the story itself.
+    """(fixture, character) pairs where bare-handed is what the story does.
 
-    A burn-down, exactly like the state-write list: a line that matches
+    A burn-down list, like the state-write list: a line that matches
     nothing is an error, so a fixture that gets armed upstream cannot keep
     a stale exemption.
     """
@@ -87,14 +87,14 @@ WEAPON_IDS = range(0x00, 0x60)
 def equippable_weapons(repo: str) -> dict[int, int]:
     """How many weapon records each actor may hold, read from the ROM data.
 
-    UMARO is bare-handed in ten fixtures and that is CORRECT -- the game
-    will not let him hold anything.  Rather than hardcode that as lore,
-    derive it: the equip mask is `item_prop_en.dat` offset +$01, 16-bit,
+    UMARO is bare-handed in ten fixtures, and that is correct, because the
+    game will not let him hold anything.  That is derived here rather than
+    hardcoded: the equip mask is `item_prop_en.dat` offset +$01, 16-bit,
     bit N = actor N (HANDOFF, "canonical facts you should not re-derive";
     byte +$00 always looks like a mask and always claims Terra, which is
-    the trap that entry exists for).  An actor who can hold one weapon or
-    none cannot be re-equipped and must not be reported as a finding --
-    otherwise the real signal drowns.
+    the mistake that entry exists to prevent).  An actor who can hold one
+    weapon or none cannot be re-equipped and must not be reported as a
+    finding, or the real findings get buried.
     """
     path = os.path.join(repo, ITEM_PROP)
     try:
@@ -131,27 +131,27 @@ def biggest_stream(path: str) -> bytes | None:
 def find_char_block(raw: bytes) -> int | None:
     """Offset of $1600 inside the blob, located by the table's own shape.
 
-    Records 0..10 carry actor ids whose LOW NIBBLE is the record index; the
+    Records 0..10 carry actor ids whose low nibble is the record index; the
     high nibble is join state (a fixture mid-chain reads 00 01 12 13 04 15
     ..., which is why an equality test on the whole byte finds nothing).
 
-    The run length is not fixed: the earliest fixtures (power-on, the first
+    The run length varies: the earliest fixtures (power-on, the first
     battle, Arvis's house) have not filled the whole table yet, so an
-    eleven-record signature finds nothing there.  Try long first -- long is
-    the least ambiguous -- and shorten only until exactly one candidate
+    eleven-record signature finds nothing there.  Try the longest run first,
+    since it is the least ambiguous, and shorten it only until one candidate
     survives.  Stop at six: below that the signature starts matching
     ordinary counting data elsewhere in WRAM, and a wrong offset would
-    report confident nonsense, which is worse than reporting nothing.
+    report wrong results, which is worse than reporting nothing.
     """
     for n in range(11, 7, -1):
         hits = [b for b in range(0, len(raw) - REC * n)
                 if all((raw[b + REC * c] & 0x0F) == c for c in range(n))]
         if len(hits) == 1:
             return hits[0]
-    # EARLY fixtures have no such run -- at power-on only TERRA exists and
+    # Early fixtures have no such run: at power-on only TERRA exists and
     # the rest of the table is $FF, so there is no sequence to match.  The
     # dump is a fixed 348964 bytes with a fixed layout, so fall back to the
-    # offset the signature RESOLVES TO everywhere it does work, and prove
+    # offset the signature resolves to everywhere it does work, and check
     # it here rather than trusting it: record 0 must be actor 0, and
     # somebody must be in the party.
     if len(raw) > FALLBACK_CB + REC * 16 + 0x300:

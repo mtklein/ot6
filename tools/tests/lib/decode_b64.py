@@ -36,25 +36,25 @@ def main() -> int:
             if m:
                 chunks[m.group(1)].append(m.group(2))
 
-    # ONE TAG CAN CARRY SEVERAL EMISSIONS (found 2026-08-09 the expensive
-    # way).  A retry-ladder generator calls H.screenshot("train_b68_up")
-    # once per ATTEMPT, so three complete base64 payloads -- each with its
-    # own '=' padding -- land in the log under one tag.  Naive
-    # concatenation puts padding mid-stream, b64decode raises "Incorrect
-    # padding", and (before this fix) that one bad tag killed the WHOLE
-    # decode: gen_sabin_train's input-driven battle-68 WIN wrote its state
-    # into the log and run.sh still reported "did not emit expected artifact",
-    # because a screenshot two tags earlier had been emitted three times.
-    # The Aug 4 lineage never hit this only because it won on attempt 1.
+    # One tag can carry several emissions (found 2026-08-09).  A retry-ladder
+    # generator calls H.screenshot("train_b68_up") once per attempt, so three
+    # complete base64 payloads, each with its own '=' padding, land in the
+    # log under one tag.  Concatenating them puts padding mid-stream,
+    # b64decode raises "Incorrect padding", and before this fix that one bad
+    # tag failed the whole decode: gen_sabin_train's input-driven battle-68
+    # WIN wrote its state into the log and run.sh still reported "did not
+    # emit expected artifact", because a screenshot two tags earlier had been
+    # emitted three times.  The Aug 4 lineage did not hit this because it won
+    # on attempt 1.
     #
     # '=' is legal in base64 only as terminal padding, so a chunk line
     # ending in '=' is an emission boundary.  (An emission whose byte
-    # length is a multiple of 3 has no padding and its boundary is
-    # invisible -- those still decode as one concatenated blob, which is
-    # exactly the old behavior.)  Each tag is also fault-isolated now: a
-    # tag that still fails to decode is reported and SKIPPED, and the
-    # expected-artifact check in run.sh catches the case where the skipped
-    # tag was one the savestate the run was generating needed.
+    # length is a multiple of 3 has no padding, so its boundary cannot be
+    # detected; those still decode as one concatenated blob, which is the
+    # old behavior.)  Each tag is also fault-isolated now: a tag that still
+    # fails to decode is reported and skipped, and the expected-artifact
+    # check in run.sh catches the case where the skipped tag was one the
+    # savestate the run was generating needed.
     failures = 0
     for tag, parts in chunks.items():
         if "/" in tag or "\\" in tag or ".." in tag:

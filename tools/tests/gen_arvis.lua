@@ -1,33 +1,33 @@
--- gen_arvis.lua -- WIN the Whelk and ride the esper scene to Terra's wake-up
+-- gen_arvis.lua -- win the Whelk and ride the esper scene to Terra's wake-up
 -- in Arvis's house.  From whelk_entry.mss (party calm at (42,6), map 41):
 -- step onto the trigger at (42,5), edge-tap the guard dialogs $0B6E/$0B6F,
--- then BEAT the Whelk BY PLAYING IT (issue #75: zero state writes -- the
+-- then beat the Whelk by playing it (issue #75: no state writes; the
 -- battle-clear-write clearBattle this used to call is gone).  The strategy
 -- is the measured "tutorial" policy from whelkbal_run.lua, the designed
--- line the head's fire-weak add exists for (the whelk balance measurement +
--- the resistance re-check: 3/3 real wins, ~6 beams + 1-2 teks):
+-- line the head's fire-weak add exists for (the whelk balance measurement
+-- and the resistance re-check: 3/3 real wins, ~6 beams and 1-2 teks):
 --   * head up: everyone fires their first beam at the default target (the
---     head -- chips land, measured); when exactly ONE shield remains and
+--     head; chips land, measured).  When exactly one shield remains and
 --     the head is not yet broken, TERRA's turn walks the 2x4 magitek grid
---     to TekMissile (3,1) for the 4th chip -> break -> the x2 window
---     finishes the fight.
+--     to TekMissile (3,1) for the 4th chip, which breaks the head, and the
+--     x2 window finishes the fight.
 --   * head hidden (the shell's retract cycle): spend the turn on Heal
---     Force (2,0) -- ANY attack would default into the shell and draw the
---     MegaVolt counter, the fight's whole danger budget (whelkbal's
---     mixed-naive policy lost 5/5 to it.  Its claim that a Terra KO
---     game-overs this fight measured FALSE here, twice: runs 5-6 both
---     lost her mid-fight and the soldiers finished the head, the event
---     epilogue ran, and the wake-up generated clean -- but her survival
---     still buys a third beam per window, so the policy protects her).
+--     Force (2,0).  Any attack would default into the shell and draw the
+--     MegaVolt counter, which is the fight's main danger (whelkbal's
+--     mixed-naive policy lost 5/5 to it).  Its claim that a Terra KO
+--     game-overs this fight measured false here, twice: runs 5-6 both
+--     lost her mid-fight, the soldiers finished the head, the event
+--     epilogue ran, and the wake-up generated correctly.  Her survival
+--     still buys a third beam per window, so the policy protects her.
 -- The event epilogue sets switch $0135 ($1EA6 bit $20, asserted).  North
 -- of the fight, tiles (41..43, y=4) exit to map 0x2A at (86,28), the
 -- Tritoch chamber; the single event trigger at (87,12) starts the long
--- automatic esper scene: the party is zapped (scripted battle 77 --
+-- automatic esper scene: the party is zapped (scripted battle 77,
 -- Tritoch, spared so it plays itself out), flashback, and Terra wakes
 -- alone in Arvis's house (map 30).  advanceStory rides all of it out
--- (playBattles=true -- no route battle is write-cleared anywhere in this
+-- (playBattles=true; no route battle is write-cleared anywhere in this
 -- gen).  Emits arvis_wake.mss at the first calm control point, plus
--- progress screenshots, and logs the roster + command lists the fixture
+-- progress screenshots, and logs the roster and command lists the fixture
 -- has.
 local H = dofile("tools/tests/lib/ot6.lua")
 local ENTRY = "build/states/whelk_entry.mss.lua"
@@ -39,12 +39,14 @@ local function whelk()
   return H.battleLoadStarted() and H.formationHas(WHELK)
 end
 
--- the esper zap (event battle 77) contains Tritoch -- species 0x114/0x115/
--- 0x144 depending on version; spare them all, the set-piece ends itself
+-- the esper zap (event battle 77) contains Tritoch, species 0x114/0x115/
+-- 0x144 depending on version; spare them all, since the set-piece ends
+-- itself
 local TRITOCH = { 0x0114, 0x0115, 0x0144 }
 
 -- pred factory: n consecutive calm frames (control, at rest), optionally
--- with an extra condition -- one-frame control blips mustn't generate states
+-- with an extra condition, so a one-frame control blip cannot generate a
+-- state
 local function calm(n, extra)
   local cnt = 0
   return function()
@@ -54,8 +56,8 @@ local function calm(n, extra)
   end
 end
 
--- pred factory: n consecutive frames of a running event script (one-frame
--- event-PC pulses from map plumbing mustn't count as the scene)
+-- pred factory: n consecutive frames of a running event script, so one-frame
+-- event-PC pulses from map setup do not count as the scene
 local function eventFor(n)
   local cnt = 0
   return function()
@@ -95,8 +97,9 @@ local function cmdName(b) return CMDNAME[b] or string.format("%02X?", b) end
 
 -- roster + command lists: character data blocks ($1600 + 37n; commands at
 -- +$16, battle_main.asm), party/battle-slot byte $1850+n, and the battle
--- command table at $202E (12 bytes/char -- 4 x [cmd,cmd,targeting]; battle
--- scratch, so on the field it shows the LAST battle's menus, not the next)
+-- command table at $202E (12 bytes/char, 4 x [cmd,cmd,targeting]; battle
+-- scratch, so on the field it shows the previous battle's menus rather than
+-- the next)
 local function logPartyDump()
   H.log(string.format("chars available $1EDC=%04X $1EDE=%04X",
     H.readWord(0x1edc), H.readWord(0x1ede)))
@@ -123,7 +126,7 @@ end
 
 local aPhase = 0
 
--- -------------------------------------------------- the real Whelk win --
+-- ------------------------------------------------- the input-driven win --
 -- Addresses and menu-episode discipline lifted from whelkbal_run.lua (the
 -- instrument that measured this exact fight 3/3 winnable on this policy).
 local MENU  = 0x7bca               -- battle menu open flag
@@ -134,7 +137,7 @@ local TIMER = 0x3e90               -- monster broken timer, +slot*2
 local ALIVE = 0x3aa8               -- monster presence bit0, +slot*2
 local MSTAT = 0x3eec               -- monster status-1, +slot*2 (READ-only
                                    -- here: $c2 = gone/hidden; the
-                                   -- battle-clear write WROTE bit7 -- this
+                                   -- battle-clear write set bit7, which this
                                    -- gen never does)
 local SPEC  = 0x57c0               -- formation species words
 local CHID  = 0x3ed8               -- char id, +slot*2 (0 = terra)
@@ -147,16 +150,16 @@ local function headAlive()
      and (H.readByte(MSTAT + hs * 2) & 0xc2) == 0
 end
 
--- RETRACT-CYCLE DISCIPLINE (measured the expensive way, run 3 of this
--- gen): an attack queued while the head is up can still EXECUTE after the
--- retract -- the turn engine retargets it into the shell, and every shell
--- hit draws the MegaVolt counter.  whelkbal_run knew this ("queued attacks
--- retarget into the shell and eat counters") but its policy only keyed on
--- head-up-right-now; from a gauntlet-worn party that lost Terra at f5085
--- and ended in an unwinnable one-soldier loop: the survivor's beams
--- queued in each up-window, executed into the next hidden phase, and the
--- head sat at 63 HP for ten thousand frames while counters ground the
--- party down.  So attacks are gated on a FRESH window instead:
+-- Retract-cycle handling (measured over run 3 of this gen): an attack
+-- queued while the head is up can still execute after the
+-- retract, because the turn engine retargets it into the shell, and every
+-- shell hit draws the MegaVolt counter.  whelkbal_run recorded this ("queued
+-- attacks retarget into the shell and eat counters") but its policy only
+-- keyed on whether the head was up at queue time.  From a worn party that
+-- lost Terra at f5085 and ended in an unwinnable one-soldier loop: the
+-- survivor's beams queued in each up-window, executed into the next hidden
+-- phase, and the head sat at 63 HP for ten thousand frames while counters
+-- reduced the party.  So attacks are gated on a fresh window instead:
 --   * lastShow marks the hidden->up edge; attacks only queue within
 --     FRESH frames of it (a window runs ~1600 frames; queue latency is a
 --     few hundred, so early casts land while the head is still out);
@@ -189,17 +192,17 @@ local function observeHead()
 end
 
 -- Sequences run from the settled top command menu (cursor on MagiTek).
--- Cell coordinates, decoded the expensive way (runs 3-4 of this gen):
--- TERRA's 8-cell grid stages COLUMN-MAJOR -- col 0 = FireBeam/BoltBeam/
+-- Cell coordinates, decoded over runs 3-4 of this gen:
+-- TERRA's 8-cell grid stages column-major, col 0 = FireBeam/BoltBeam/
 -- IceBeam/BIO BLAST ($83-$86), col 1 = HEAL FORCE/Banisher/Confuser/
--- TekMissile ($87-$8A) -- which whelkbal_run's own cast counters imply
--- (casts_tek = $8A at its measured (3,1)) but its "(2,0) Heal Force for
--- everyone" contradicts: for Terra, (2,0) is ICE BEAM and (3,0) is BIO
+-- TekMissile ($87-$8A).  whelkbal_run's own cast counters imply this
+-- (casts_tek = $8A at its measured (3,1)), but its "(2,0) Heal Force for
+-- everyone" contradicts it: for Terra, (2,0) is ICE BEAM and (3,0) is BIO
 -- BLAST, an all-enemies attack.  Run 4 cast that "heal" every hidden
--- phase, hit the shell with it, and fed Terra to her own MegaVolt
--- counters.  Her real Heal Force is (0,1).  The soldiers' 4-cell list
--- stages sparse -- Fire|Bolt / Ice / Heal -- so theirs is (2,0), which
--- run 4's soldier HP curves confirm healing.
+-- phase, hit the shell with it, and exposed Terra to her own MegaVolt
+-- counters.  Her Heal Force is (0,1).  The soldiers' 4-cell list
+-- stages sparse (Fire|Bolt / Ice / Heal), so theirs is (2,0), which
+-- run 4's soldier HP curves confirm as healing.
 --   beam at default target        A A A
 --   heal force  soldier (2,0)     A dn dn A A     (self-target default)
 --   heal force  terra   (0,1)     A rt A A
@@ -220,7 +223,7 @@ local function seqFor(actor)
 end
 
 -- The menu-episode machine (bal_mines settle discipline, via whelkbal_run):
--- battle menus eat input during their open animation EVERY turn, so presses
+-- battle menus ignore input during their open animation every turn, so presses
 -- only start after the menu flag holds 4 consecutive pulses; when no menu is
 -- up, A is edge-tapped every other pulse (the opening battle dialog and the
 -- shell's "Gruuu……" dialogs need it; on a running battle a stray A is inert).
@@ -257,27 +260,27 @@ local function policyPulse()
   return { "a" }
 end
 
--- STEP: play the Whelk to the win.  Slots are found on the first open menu
--- (the formation words and char ids are battle scratch -- they are only
--- read once the battle module demonstrably owns them); until then the
+-- Step: play the Whelk to the win.  Slots are found on the first open menu
+-- (the formation words and char ids are battle scratch, so they are only
+-- read once the battle module owns them); until then the
 -- pulse machine's no-menu branch pages the opening dialog.  Terminates on
 -- battle teardown; the caller asserts the whelk-done switch, which is what
--- separates a WIN from a game-over teardown.
+-- distinguishes a win from a game-over teardown.
 local function winWhelk()
   return H.driveUntil(function()
     return hs ~= nil and not H.battleLoadStarted()
   end, 40000, {
     H.call(function()
-      -- Arming deliberately keys on the EARLY, garbage-prone menu read:
-      -- $7bca is field-scribbled scratch through the load, so this fires
+      -- Arming deliberately keys on the early, unreliable menu read:
+      -- $7bca is field-written scratch through the load, so this fires
       -- ~f400 and stamps lastShow ~1400 frames before the first real
-      -- menu, which makes the opening spread come out as HEALS.  That is
-      -- measured as load-bearing, not sloppiness: run 6 (this arming)
-      -- won at f19101 with the party standing; run 7 "fixed" it with a
+      -- menu, which makes the opening spread come out as heals.  That
+      -- timing is required, not an oversight: run 6 (this arming)
+      -- won at f19101 with the party standing; run 7 changed it to a
       -- battleActive gate, spent the opening window on three beams, and
-      -- the earlier break pulled the retract+counter chain forward into
+      -- the earlier break pulled the retract and counter chain forward into
       -- a full party wipe at f11188.  The fight is deterministic from
-      -- the fixture, so the winning trajectory replays exactly; do not
+      -- the fixture, so the winning trajectory replays exactly.  Do not
       -- re-tune this without re-measuring the whole fight.
       if hs == nil and H.battleLoadStarted() and H.monstersPresent() > 0
          and H.readByte(MENU) ~= 0 then
@@ -292,7 +295,7 @@ local function winWhelk()
         H.log(string.format(
           "whelk armed: head slot %d (hp=%d sh=%d), terra char slot %d",
           hs, H.readWord(MHP + hs * 2), shields(), terra))
-        -- the boot state of the window tracker: the head is UP at battle
+        -- the boot state of the window tracker: the head is up at battle
         -- start, and that opening spread counts as a fresh window
         lastUp, lastShow, hitsSinceShow = true, H.frame, 0
       end
@@ -315,11 +318,11 @@ H.run({ maxFrames = 120000 }, {
     H.assertEq(H.readByte(0x1ea6) & 0x20, 0, "whelk-done switch clear")
   end),
 
-  -- the deliberate step onto (42,5); the event force-walks us to (42,7) and
-  -- opens the guard dialogs.  A random encounter on the step is FOUGHT
-  -- inline by the same edge-tapped A (real input; nothing on this one-step
-  -- route should draw one); the goal fight is hands-off (whelk() stops the
-  -- loop; winWhelk plays it).
+  -- the deliberate step onto (42,5); the event force-walks the party to
+  -- (42,7) and opens the guard dialogs.  A random encounter on the step is
+  -- fought inline by the same edge-tapped A (real input; nothing on this
+  -- one-step route should draw one); the goal fight is left alone here
+  -- (whelk() stops the loop and winWhelk plays it).
   H.driveUntil(function() return whelk() end, 8000, {
     H.call(function()
       aPhase = (aPhase + 1) % 8
@@ -338,9 +341,10 @@ H.run({ maxFrames = 120000 }, {
     end),
   }, "whelk event fires"),
 
-  -- WIN the fight for real: the first real boss kill in the generated chain's
-  -- history.  Real menus, real target defaults, real turns; the retract
-  -- cycle is the fight's clock and Heal Force spends the hidden phases.
+  -- Win the fight with real input: the first input-driven boss kill in the
+  -- generated chain.  Real menus, real target defaults, real turns; the
+  -- retract cycle sets the fight's pace and Heal Force spends the hidden
+  -- phases.
   H.logStep("whelk battle up; playing it (tutorial policy)"),
   winWhelk(),
   H.call(function()

@@ -1,7 +1,7 @@
--- whelkbal_tek.lua -- the tutorial's first mechanical win, live: TekMissile
--- (flags3 $20, skill class PIERCE) chips the Whelk head's authored shields
--- 4 -> 3. This is the exact hit the boss measurement caught dealing ~517
--- with ZERO shield movement under the whole-byte $f2 gate.
+-- whelkbal_tek.lua -- the tutorial's first mechanical win, driven live:
+-- TekMissile (flags3 $20, skill class PIERCE) chips the Whelk head's authored
+-- shields 4 -> 3. This is the hit the boss measurement caught dealing ~517
+-- with no shield movement at all under the whole-byte $f2 gate.
 --
 --   tools/tests/run.sh tools/tests/whelkbal_tek.lua build/states/whelkbal_tek.log
 --
@@ -10,7 +10,7 @@
 -- vanilla element weakness, so beams cannot move shields) -> when terra's
 -- menu comes up, walk her 2x4 magitek grid to the bottom-right cell
 -- (TekMissile) and fire. Laps rotate a target nudge (none/down/up) so the
--- missile finds the HEAD no matter which part the cursor defaults to.
+-- missile finds the head whichever part the cursor defaults to.
 
 local H = dofile("tools/tests/lib/ot6.lua")
 local STATE = "build/states/whelk_entry.mss.lua"

@@ -1,26 +1,26 @@
 -- gen_mrf_kefka.lua -- v0.6 step 6: mrf_263 (map 263, {22,18}) -> the
--- {24,18} ride down to {40,30} -> the {40,32} trigger -> KEFKA'S
--- ESPER-DRAIN SCENE -> $005F=1.  Generates mrf_kefka.
+-- {24,18} ride down to {40,30} -> the {40,32} trigger -> Kefka's
+-- esper-drain scene -> $005F=1.  Generates mrf_kefka.
 --
--- MEASURED at (22,18) (census in gen_mrf_263's log): 493 tiles reachable,
+-- Measured at (22,18) (census in gen_mrf_263's log): 493 tiles reachable,
 -- and of the waypoints this beat needs, only {24,17} (3 steps) and
--- {24,18} (2 steps) are among them.  {36,44}/{37,44}/{38,44} -- the chute
--- to map 264 -- and {40,32}/{41,32}/{42,32} -- the Kefka trigger row --
+-- {24,18} (2 steps) are among them.  {36,44}/{37,44}/{38,44} (the chute
+-- to map 264) and {40,32}/{41,32}/{42,32} (the Kefka trigger row)
 -- are all NO PATH from the landing.  Map 263 is two disconnected walking
--- regions joined by a ride, which is the third time this beat has had that
--- shape (the {19,25} chute, the {11,45} conveyor, and now this).
+-- regions joined by a ride, the third time this beat has had that
+-- shape (the {19,25} chute, the {11,45} conveyor, and this one).
 --
 -- _cc75c9 (event_main.asm:94694), on {24,18}, is ungated and falls into
 -- _cc75d0 (:94701): `layer 3 / move RIGHT 8 / move RIGHT 7`, then
 -- `hide_obj SLOT_1`, a camera pan, and a hard `pos {40,26}` teleport,
--- then `move DOWN 3 / jump_low / move DOWN 1` -- so it ends at {40,30}
+-- then `move DOWN 3 / jump_low / move DOWN 1`, so it ends at {40,30}
 -- with `player_ctrl_on`.  ({24,17}'s _cc75bb is the same ride entered one
 -- tile north; it walks DOWN_RIGHT into the same code.)
 --
 -- The trigger row {40,32}/{41,32}/{42,32} (_cc7431/_cc73e1/_cc7409,
 -- :94388/:94340/:94364) is guarded `if_switch $005F=1, EventReturn` and
 -- each walks SLOT_1 a step or two UP_LEFT before falling into _cc7451
--- (:94409) -- the scene where Kefka drains the espers.  Its tail
+-- (:94409), the scene where Kefka drains the espers.  Its tail
 -- (:94620-94622) is `switch $005F=1 / unlock_camera / player_ctrl_on`,
 -- and $005F is what this step banks.
 local H = dofile("tools/tests/lib/ot6.lua")
@@ -74,9 +74,9 @@ end
 
 local DELTA = { up = { 0, -1 }, right = { 1, 0 }, down = { 0, 1 }, left = { -1, 0 } }
 
--- Tap `dir` whenever the party has control, hands off while a scene owns
--- it, edge-A through dialogs.  Used to walk INTO a trigger whose scene then
--- takes over -- the tap keeps the party from sliding past the tile.
+-- Tap `dir` whenever the party has control, hold off while a scene controls
+-- it, edge-A through dialogs.  Used to walk into a trigger whose scene then
+-- takes over; the tap keeps the party from sliding past the tile.
 local function tapInto(dir, pred, maxFrames, what)
   local phase, n, ph, calm, hb = 0, 0, 0, 0, 0
   return H.driveUntil(function()
@@ -102,11 +102,11 @@ local function tapInto(dir, pred, maxFrames, what)
       end
       if phase == 0 then
         H.setPad({})
-        -- STOP TAPPING once we are where we were going.  The terminator
-        -- wants 16 consecutive calm frames on the target, and an eager tap
-        -- walks straight off it before the count gets there: the first
-        -- version of this rode the chute correctly to (10,45) and then
-        -- tapped itself to (10,46) and timed out.
+        -- Stop tapping once the party is on the target tile.  The
+        -- terminator needs 16 consecutive calm frames there, and a further
+        -- tap walks off it before the count completes: the first version of
+        -- this rode the chute correctly to (10,45), then tapped itself to
+        -- (10,46) and timed out.
         if pred() then return end
         if settled() then phase, n = 1, 0 end
         return

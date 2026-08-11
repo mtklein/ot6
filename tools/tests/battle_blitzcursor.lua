@@ -1,47 +1,47 @@
 -- @suite savestate=vargas_won slow
 -- battle_blitzcursor.lua -- v0.3 Blitz-as-menu: it obeys Config>Cursor.
 --
--- Vanilla's battle command lists (Magic, Tools, Item, ...) REMEMBER where the
--- cursor sat across a character's turns when Config>Cursor = MEMORY, and snap
--- back to the top when it = RESET.  The whole decision is made once per turn,
+-- Vanilla's battle command lists (Magic, Tools, Item, ...) remember where the
+-- cursor sat across a character's turns when Config>Cursor = Memory, and snap
+-- back to the top when it = Reset.  The decision is made once per turn,
 -- in the command-window-open state UpdateMenuState_04 (btlgfx_main.asm:13343):
--- it long-reads the config byte f:$001d4e and, when bit6 (#$40) is CLEAR
+-- it long-reads the config byte f:$001d4e and, when bit6 (#$40) is clear
 -- (Reset), stz-loops the entire 92-byte saved-cursor block $890f..$896a to
--- zero; when SET (Memory) it SKIPS that loop, so every list's saved cursor
+-- zero; when set (Memory) it skips that loop, so every list's saved cursor
 -- survives.  Each list then loads its own per-slot saved cursor unconditionally
--- on open.  (Sense proven from that branch: set = keep = Memory.)
+-- on open.  (The sense comes from that branch: set = keep = Memory.)
 --
--- Blitz reuses the TOOLS shell, so its cursor lives in the Tools triple
--- ($895f scroll / $8963 col / $8967 row, indexed by the active slot $62ca) --
--- the very bytes UpdateMenuState_04 keeps-or-clears.  Ot6BlitzListOpen (ot6.asm)
--- used to zero that triple UNCONDITIONALLY on every open, which overrode the
--- shell's decision and made Blitz ALWAYS reset -- ignoring the setting.  That
--- was the owner's playtest bug; the fix deletes the reset and lets the shell's
--- gated clear stand.  This test drives the config bit BOTH ways and asserts on
--- the actual cursor RAM, never a screenshot.
+-- Blitz reuses the Tools shell, so its cursor lives in the Tools triple
+-- ($895f scroll, $8963 col, $8967 row, indexed by the active slot $62ca),
+-- which are the bytes UpdateMenuState_04 keeps or clears.  Ot6BlitzListOpen
+-- (ot6.asm) used to zero that triple unconditionally on every open, which
+-- overrode the shell's decision and made Blitz always reset, ignoring the
+-- setting.  That was the owner's playtest bug; the fix deletes the reset and
+-- lets the shell's gated clear stand.  This test drives the config bit both
+-- ways and asserts on the cursor RAM rather than on a screenshot.
 --
--- ISSUE #75 CONVERSION -- every input is the game's own.  The old file poked
+-- Issue #75 conversion: every input is the game's own.  The old file poked
 -- the config byte every frame, installed a synthetic four-Blitz Sabin,
--- normalized the cursor triple by writing it, and forced the "fresh
--- command-window open" by writing the menu-state index $7bc2.  All four
+-- normalized the cursor triple by writing it, and forced a fresh
+-- command-window open by writing the menu-state index $7bc2.  All four
 -- stagings are gone:
---   * the CONFIG BIT is set in the REAL field Config menu (main menu ->
+--   * the config bit is set in the real field Config menu (main menu ->
 --     Config -> the Cursor row -> dpad; ChangeConfigOption_06, config.asm:
 --     Right = tsb $40 = Memory, Left = trb = Reset), gated on reading
---     $1d4e back -- and flipped BETWEEN battles, because that is the only
+--     $1d4e back, and flipped between battles, because that is the only
 --     place a player can flip it;
---   * SABIN is the real one (vargas_won), his real two-blitz list -- a
---     1x2 grid, so the MOVED coordinate is the COLUMN, not the row;
+--   * SABIN is the real one (vargas_won), with his real two-blitz list, a
+--     1x2 grid, so the moved coordinate is the column rather than the row;
 --   * the normalize is a d-pad walk verified by re-reading the cell;
---   * the "fresh open" is SABIN'S NEXT TURN: he commits a real Defend, the
+--   * the fresh open is Sabin's next turn: he commits a real Defend, the
 --     bystanders take their turns, and his next command window runs
---     UpdateMenuState_04's gated clear exactly as every turn does.
--- A measured consequence reshaped the phases: battle RAM is reinitialized
--- per battle, so a NEW battle's cursor says nothing about the setting --
--- each variant must prove itself WITHIN one battle.  Hence: battle 1 under
--- MEMORY (moved column survives a fresh open), flee, flip to Reset in the
--- field, battle 2 under RESET (moved column snaps back).  The pair still
--- pins the bit sense: the old unconditional reset fails MEMORY, an
+--     UpdateMenuState_04's gated clear as every turn does.
+-- A measured consequence shaped the phases: battle RAM is reinitialized
+-- per battle, so a new battle's cursor says nothing about the setting, and
+-- each variant must show its behavior within one battle.  So: battle 1 under
+-- Memory (moved column survives a fresh open), flee, flip to Reset in the
+-- field, battle 2 under Reset (moved column snaps back).  The pair still
+-- pins the bit sense: the old unconditional reset fails Memory, and an
 -- inverted-sense fix fails one of the two.
 local H = dofile("tools/tests/lib/ot6.lua")
 local STATE = "build/states/vargas_won.mss.lua"
@@ -65,7 +65,7 @@ local slotOf = {}
 local ph, hb = 0, -600
 local function sab() return slotOf[SABIN] end
 
--- bystander turns: real Defends; dialogs paged (the family machine's core)
+-- bystander turns: real Defends; dialogs paged (the family driver's core)
 local function consume()
   ph = ph + 1
   if H.readByte(MENU) == 0 then
@@ -82,7 +82,7 @@ local function consume()
   return false                            -- Sabin's own window: caller's turn
 end
 
--- wait for Sabin's command window (a FRESH open -- through UpdateMenuState_04)
+-- wait for Sabin's command window (a fresh open, through UpdateMenuState_04)
 local function sabinWindow(what)
   return H.driveUntil(function()
     return H.battleLoadStarted() and H.readByte(MENU) ~= 0
@@ -118,7 +118,7 @@ local function openBlitz(what)
 end
 
 -- commit a real Defend from Sabin's command window (closes his turn, so the
--- NEXT window is a fresh UpdateMenuState_04 open)
+-- next window is a fresh UpdateMenuState_04 open)
 local function sabinDefends(what)
   return H.driveUntil(function()
     return H.readByte(MENU) == 0 or H.readByte(ACTOR) ~= sab()
@@ -148,8 +148,8 @@ local function sabinDefends(what)
   }, what)
 end
 
--- field: drive the REAL Config menu until the cursor bit reads `wantMem`.
--- The check is $1d4e read back -- the test never writes it.
+-- field: drive the real Config menu until the cursor bit reads `wantMem`.
+-- The check is $1d4e read back; the test never writes it.
 local function setConfigCursor(wantMem, what)
   return H.repeatN(1, {
     H.driveUntil(function() return H.readByte(ZMENUSTATE) == ST_MAIN end, 1200,
@@ -222,9 +222,9 @@ local function encounter(what)
   end)()
 end
 
--- the positive control + move, shared by both variants: normalize the cursor
--- to col 0 with the d-pad (verified by reading it back), then one RIGHT walks
--- it to col 1 -- the list is live, and the moved coordinate is real.
+-- the positive control and move, shared by both variants: normalize the cursor
+-- to col 0 with the d-pad (verified by reading it back), then one right walks
+-- it to col 1, which shows the list is live and the moved coordinate is real.
 local function moveCursorRight(tag)
   return H.repeatN(1, {
     H.driveUntil(function()
@@ -269,7 +269,7 @@ H.run({ maxFrames = 200000 }, {
       "two learned blitzes -- the 1x2 grid gives RIGHT a cell to land on")
   end),
 
-  -- ---- battle 1, under MEMORY (set in the real Config menu first) --------
+  -- ---- battle 1, under Memory (set in the real Config menu first) --------
   setConfigCursor(true, "pre-battle config"),
   encounter("a ledge encounter fires (memory variant)"),
   sabinWindow("sabin's first command window (memory)"),
@@ -294,14 +294,14 @@ H.run({ maxFrames = 200000 }, {
     H.screenshot("blitzcursor_memory")
   end),
 
-  -- ---- between battles: flee, and flip the real Config to RESET ----------
+  -- ---- between battles: flee, and flip the real Config to Reset ----------
   H.call(function() H.setPad({}) end),
   H.driveUntil(function() return not H.battleLoadStarted() end, 12000, {
     H.call(function()
-      -- back out of any open LIST first -- wait mode freezes battle time
+      -- back out of any open list first: wait mode freezes battle time
       -- while a list is up, so held L+R can never count down under one
       -- (measured: run 2 held for 9000 frames beneath the reopened blitz
-      -- window).  The command window does NOT freeze time (battle_vargas's
+      -- window).  The command window does not freeze time (battle_vargas's
       -- header), so once the state is back at $05 the L+R hold runs.
       ph = ph + 1
       local st = H.readByte(MSTATE)
@@ -318,7 +318,7 @@ H.run({ maxFrames = 200000 }, {
   H.waitFrames(30),
   setConfigCursor(false, "mid-test config flip"),
 
-  -- ---- battle 2, under RESET ---------------------------------------------
+  -- ---- battle 2, under Reset ---------------------------------------------
   encounter("a ledge encounter fires (reset variant)"),
   sabinWindow("sabin's first command window (reset)"),
   openBlitz("blitz list opens (reset)"),

@@ -1,13 +1,13 @@
 -- @suite
--- battle_entry.lua -- FAST battle-entry regression test (~30s wall clock).
+-- battle_entry.lua -- fast battle-entry regression test (~30s wall clock).
 --
 --   tools/tests/run.sh tools/tests/battle_entry.lua
 --
 -- Loads build/states/battle_entry.mss (field, just south of the first
 -- guard-battle trigger; produced by gen_battle_state.lua), walks north into
--- the battle, and passes iff the battle engine actually comes up (screen
--- rendering + battle RAM).  This is the quick iteration loop for battle/
--- break-system changes -- no 4.5-minute intro replay.
+-- the battle, and passes iff the battle engine comes up (screen rendering +
+-- battle RAM).  This is the quick iteration loop for battle and break-system
+-- changes; it does not replay the 4.5-minute intro.
 --
 -- Exit codes: 0 = battle came up, 1 = battle load began but engine never
 -- became active (the current break-ROM crash signature) or no entry-point
@@ -41,18 +41,18 @@ H.run({ maxFrames = 8000 }, {
       H.log(string.format("party battle hp: %d %d %d %d", hp[1], hp[2], hp[3], hp[4]))
       H.log(string.format("guard shields $7E3E44,$7E3E46 = %d,%d",
         H.readByte(0x3E44), H.readByte(0x3E46)))
-      -- ASSERT the break system, do not merely print it.  Until 2026-07-30
-      -- these three were H.log lines and nothing else, which made every
-      -- reachable check in this file true of a break-system-free ROM:
-      -- measured by deleting `jsl Ot6SeedShields` (battle_main.asm:7710) and
-      -- rebuilding -- shields read 0,0 and this test reported PASS on a ROM
-      -- where nothing in the game is breakable.  That is the exact opposite
-      -- of what the header promises ("the quick iteration loop for battle/
-      -- break-system changes").
+      -- Assert the break system rather than only printing it.  Until
+      -- 2026-07-30 these three values were H.log lines only, which made
+      -- every reachable check in this file true of a ROM with no break
+      -- system: measured by deleting `jsl Ot6SeedShields`
+      -- (battle_main.asm:7710) and rebuilding, after which shields read 0,0
+      -- and this test still reported PASS on a ROM where nothing is
+      -- breakable.  The header says this file is the quick iteration loop
+      -- for battle and break-system changes, so it has to check them.
       --
-      -- The values are Ot6SeedShields' own output on THIS fixture's opening
-      -- guard pair, and are the same ones battle_class.lua:234-240 asserts on
-      -- the same battle -- 2 shields each, class row PIERCE ($02).  Kept to
+      -- The values are Ot6SeedShields' output on this fixture's opening
+      -- guard pair, and are the same ones battle_class.lua:234-240 asserts
+      -- on the same battle: 2 shields each, class row PIERCE ($02).  Kept to
       -- what the seed writes, so this stays a 2-second entry check and not a
       -- second copy of battle_class.
       H.assertEq(H.readByte(0x3E44), 2, "guard 1 shields seeded (Ot6SeedShields ran)")

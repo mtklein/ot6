@@ -1,42 +1,44 @@
 -- @suite savestate=worldmap_narshe
--- battle_levelup.lua -- v0.4 test: FULL HP/MP RESTORE ON LEVEL UP.
+-- battle_levelup.lua -- v0.4 test: full HP and MP restore on level up.
 --
 -- The mechanic (docs/design/mp-economy.md "Full HP/MP restore on level up"):
 -- when a character gains a level, current HP and MP refill to the new maxima.
 -- OT6 implements it as a jsl at the tail of vanilla DoLevelUp
 -- (battle_main.asm) into Ot6LevelUpHeal (ff6/src/battle/ot6.asm), which writes
--- the battle current-HP/MP cells ($3bf4,y / $3c08,y) -- NOT the $1600 record --
--- because the victory sequence copies those battle cells back over the record
--- (UpdateSRAM, battle_main.asm:12136-12141) right after WinBattle returns.
+-- the battle current-HP and MP cells ($3bf4,y and $3c08,y) rather than the
+-- $1600 record, because the victory sequence copies those battle cells back
+-- over the record (UpdateSRAM, battle_main.asm:12136-12141) right after
+-- WinBattle returns.
 --
--- ISSUE #75 CONVERSION -- the level is EARNED, and the record is its own
+-- Issue #75 conversion: the level is earned, and the record is its own
 -- check.  The old file pinned XP one threshold over, planted a $3FFF record
 -- sentinel, forced the win by writing the battle-clearing flag, and faked the
 -- negative with a level-50 poke.  All of it is replaced by the fixture's own
 -- arithmetic:
 -- worldmap_narshe's TERRA stands 23 XP short of level 5 (measured 2026-08-10:
--- exp=377, threshold=400 via LevelUpExp -- the genuine near-boundary save the
+-- exp=377, threshold=400 via LevelUpExp, the near-boundary save the
 -- burn-down plan hoped a recon would find), while LOCKE needs 342 more, so
 -- one grass-area battle levels her and cannot level him.  Real world
 -- encounters are walked into (battle_fold's grass-area loop), fought through
--- the real menus (newFightDriver -- Terra casts her real Fire so her MP is
--- visibly SPENT, everyone else Fights), and won by damage.
+-- the real menus (newFightDriver, where Terra casts her real Fire so her MP is
+-- visibly spent and everyone else Fights), and won by damage.
 --
---   POSITIVE  the battle where a character's level rises: the $1600 record
---             afterwards holds current HP == the NEW max and current MP ==
---             the NEW max.  Both are sharp: DoLevelUp grows the maxima and
+--   positive  the battle where a character's level rises: the $1600 record
+--             afterwards holds current HP == the new max and current MP ==
+--             the new max.  Both are exact: DoLevelUp grows the maxima and
 --             UpdateSRAM copies the battle cells, so without Ot6LevelUpHeal
---             the record's currents keep their pre-level values (< new max --
---             for MP provably so, since Fire was cast this battle).
---   UPDATESRAM CONTROL (the sentinel's replacement, cb8e605 baseline-latch):
+--             the record's currents keep their pre-level values, which are
+--             below the new max, and for MP certainly so, since Fire was cast
+--             this battle.
+--   UpdateSRAM control (the sentinel's replacement, cb8e605 baseline-latch):
 --             the record's 3-byte XP cell is latched before each battle and
---             must MOVE across a won battle -- a quiet win that skipped the
---             reward path would leave it, and every assertion above would be
---             reading stale bytes.
---   NEGATIVE  in the same battles, a character whose level did NOT rise keeps
---             spent state: current HP/MP never exceed the latched pre-battle
---             values (no refill for non-levelers), and the arm is only
---             counted NON-VACUOUS when a non-leveler really ended a battle
+--             must move across a won battle.  A win that skipped the
+--             reward path would leave it unchanged, and every assertion above
+--             would be reading stale bytes.
+--   negative  in the same battles, a character whose level did not rise keeps
+--             spent state: current HP and MP never exceed the latched
+--             pre-battle values, since non-levelers get no refill, and the arm
+--             only counts as exercised when a non-leveler ended a battle
 --             below max (HP: enemy hits land on whoever the AI picks; MP:
 --             Terra's own casts in her post-level battles).
 --
@@ -88,12 +90,12 @@ local function latch()
   end
 end
 
--- ---- the in-battle action machine: codex_ctx's measured pulse ----
--- TERRA casts her real Fire through the live magic menu (so MP is SPENT --
--- the thing the refill has to visibly restore), everyone else Fights;
--- 5-on/5-off held presses, A through messages.  One addition: the cast is
+-- ---- the in-battle action driver: codex_ctx's measured pulse ----
+-- TERRA casts her real Fire through the live magic menu, so MP is spent and
+-- the refill has something visible to restore, and everyone else Fights;
+-- 5-on/5-off held presses, with A through messages.  One addition: the cast is
 -- planned only while her battle MP covers the list's own cost cell (entry+3
--- of the $2092 spell list -- ot6_boost.asm:725's price authority), so a
+-- of the $2092 spell list, the price source at ot6_boost.asm:725), so a
 -- drained pool falls back to Fight instead of buzzing the greyed row.
 local MENU, ACTOR, MSTATE, CMDTBL = 0x7BCA, 0x62CA, 0x7BC2, 0x202E
 local ST_CMD, ST_MAGIC, ST_TGT = 0x05, 0x0E, 0x38
@@ -193,8 +195,9 @@ add({
         "char " .. c .. " max MP carries no boost tier")
       if deficit == nil or d < deficit then nearest, deficit = c, d end
     end
-    -- the input-driven arm's precondition the burn-down plan asked a recon to find:
-    -- somebody is near enough that a couple of grass battles cross the line.
+    -- the precondition the burn-down plan asked a recon to find for the
+    -- input-driven arm: somebody is near enough that a couple of grass battles
+    -- cross the line.
     H.assertEq(deficit <= 200, true, string.format(
       "char %d is within reach of a level (deficit %d) -- if this "
       .. "fires, the fixture regeneration moved the XP and the fixture choice "
@@ -249,14 +252,14 @@ local function battleLeg(n)
           .. "hp %d->%d/%d mp %d->%d/%d", n, c, b.level, level(c), b.exp,
           exp(c), b.hp, curHp(c), maxHp(c) & 0x3FFF, b.mp, curMp(c),
           maxMp(c) & 0x3FFF))
-        -- the sentinel's replacement: a won battle MUST move the record's
+        -- the sentinel's replacement: a won battle must move the record's
         -- XP cell.  If it did not, UpdateSRAM never ran and every claim
         -- below would be reading stale bytes.
         H.assertEq(exp(c) > b.exp, true, string.format(
           "char %d's record XP moved across the win (UpdateSRAM ran) -- "
           .. "the baseline-latch control", c))
         if level(c) > b.level then
-          -- POSITIVE: leveled this battle -> currents == the NEW maxima.
+          -- positive: leveled this battle, so currents == the new maxima.
           positives = positives + 1
           H.assertEq(curHp(c), maxHp(c) & 0x3FFF, string.format(
             "char %d leveled (L%d->L%d): HP refilled to the NEW max",
@@ -264,7 +267,7 @@ local function battleLeg(n)
           H.assertEq(curMp(c), maxMp(c) & 0x3FFF, string.format(
             "char %d leveled: MP refilled to the NEW max", c))
         else
-          -- NEGATIVE: no level -> nothing refills.  Currents can only have
+          -- negative: no level, so nothing refills.  Currents can only have
           -- fallen (damage taken, MP spent) or held; a rise means a refill
           -- fired without a level.
           H.assertEq(level(c), b.level,
@@ -303,7 +306,7 @@ add({
     H.assertEq(positives >= 1, true, string.format(
       "a level was EARNED and its refill observed (%d level-ups across %d "
       .. "battles)", positives, battles))
-    -- the negative arms must have been exercised for real, or their <=
+    -- the negative arms must have been exercised, or their <=
     -- comparisons above were comparing full to full
     H.assertEq(hpNegSeen, true,
       "a non-leveler really ended a battle below max HP -- the HP negative "

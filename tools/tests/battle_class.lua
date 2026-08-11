@@ -3,13 +3,13 @@
 --
 --   tools/tests/run.sh tools/tests/battle_class.lua
 --
--- The entry-point guards are AUTHORED piercing-weak (Ot6ShieldTbl now carries
--- a class byte), so the seed itself is under test before any pokes. The
+-- The entry-point guards are authored piercing-weak (Ot6ShieldTbl now carries
+-- a class byte), so the seed itself is under test before any pokes.  The
 -- magitek party has no Fight command, so this borrows battle_hits's
 -- driver: rewrite the live command lists to Fight-only and berserk the
--- party (RandCharAction -> Cmd_00 -> FightAttack, no menus). The class
--- read is the LIVE $3ca8 hand item, so poking a hand mid-battle swaps the
--- probe class without touching damage stats -- each phase re-arms the
+-- party (RandCharAction -> Cmd_00 -> FightAttack, with no menus).  The class
+-- read is the live $3ca8 hand item, so poking a hand mid-battle swaps the
+-- probe class without touching damage stats, and each phase re-arms the
 -- party with a different weapon and watches the shield counter:
 --
 --   0. seed: shields 2/2, class-weak $02 (authored), revealed-class 0,
@@ -18,24 +18,24 @@
 --   2. pierce phase (Dirk $00): chip + reveal ($3ea9 bit $02) + class
 --      codex byte learned
 --   3. keep swinging: shields 0 -> broken timer
---   4. recovery: shields restore, revealed class SURVIVES
+--   4. recovery: shields restore and the revealed class survives
 --   5. null-break phase (Fixed Dice $52 = class $88, guards re-poked
 --      ¤-weak): swings land, nothing chips, nothing revealed
 --   6. ¤ phase (Dice $51 = class $08): the chip fires
---   7. heal-reversal phase: slash-weak guards ABSORB fire, swings carry
---      fire (hand element poked) -- every hit resolves as a heal, and a
---      resolved heal must chip NOTHING (the $f2 bit-0 gate; per-frame HP
---      watcher proves heals actually landed, so the assert is not vacuous)
+--   7. heal-reversal phase: slash-weak guards absorb fire and swings carry
+--      fire (hand element poked), so every hit resolves as a heal, and a
+--      resolved heal must chip nothing (the $f2 bit-0 gate; the per-frame HP
+--      watcher shows heals landed, so the assert is not empty)
 --   8. flagged-skill phase (TekMissile $8a, flags3 $20 "can't dodge"):
 --      terra is un-berserked, her real commands restored, and her menu
---      driven to TekMissile -- a flags3-nonzero classed skill MUST chip a
---      pierce-weak guard (the whole-byte $f2 gate silently blocked every
---      such chip; this is the regression test for the bit-0 narrowing).
---      the drive traverses terra's magitek list, so its rendered rows
+--      driven to TekMissile.  A flags3-nonzero classed skill must chip a
+--      pierce-weak guard, where the whole-byte $f2 gate blocked every
+--      such chip; this is the regression test for the bit-0 narrowing.
+--      The drive traverses terra's magitek list, so its rendered rows
 --      also carry the v0.2 ability-list assert: TekMissile (elementless,
 --      Ot6SkillClassTbl pierce) wears the pierce class icon after its
 --      name, where elemental abilities wear their element icon
---   9. tools-list phase (STAGED -- no fixture reaches a Tools user):
+--   9. tools-list phase (staged, since no fixture reaches a Tools user):
 --      three tool items are poked into the battle inventory ($2686
 --      stride 5: id / usage flags, bit $40 = the tools-window scan bit /
 --      targeting / qty) and terra's command slot 0 becomes Tools ($09).
@@ -47,29 +47,29 @@
 -- The under-enemy HUD is asserted around phases 0-2: an authored-pierce
 -- guard with no element weakness shows [shield]['?'] before any probe,
 -- and the '?' becomes the pierce class icon ($da, white like the '?')
--- once the class is revealed -- the class slots ride the exact
--- revealed-vs-'?' machinery the element slots use.
+-- once the class is revealed, because the class slots use the same
+-- revealed-versus-'?' code the element slots use.
 --
 -- Element weaknesses are zeroed on both guards at setup so the magitek
--- holder's stale beams (and poison DoT) can't move shields: every shield
--- transition below is the CLASS path or a bug.
+-- holder's stale beams and poison DoT cannot move shields: every shield
+-- transition below is the class path or a bug.
 --
 -- Guesses pending a real run (marked GUESS below):
 --   - GUESS(seed-2): guards still seed 2/2 with the extended 4-byte
 --     records (battle_break asserts the same; if this fails the record
 --     stride is wrong and everything after is noise)
---   - swing-cadence (RESOLVED): the no-chip phases no longer wait a fixed
---     1500-frame budget. The berserk gauge is accelerated (bumpAtb pokes the
---     ATB fill constant $3ac8) and each no-chip phase now DRIVES UNTIL it has
---     watched two probe-class Fights actually resolve ($57b8 write counter),
---     then asserts nothing chipped -- so a slow cadence fails the driveUntil
---     loudly instead of passing the negative vacuously. Measured cadence:
---     ~700 frozen frames of gauge spin-up at each phase entry ($3aa0.3 held),
---     then swings land every few dozen frames.
---   - GUESS(dice): poking $3ca8 to dice ids swaps the CLASS lookup but
+--   - swing cadence (resolved): the no-chip phases no longer wait a fixed
+--     1500-frame budget.  The berserk gauge is accelerated (bumpAtb pokes the
+--     ATB fill constant $3ac8) and each no-chip phase now drives until it has
+--     watched two probe-class Fights resolve ($57b8 write counter),
+--     then asserts nothing chipped, so a slow cadence fails the driveUntil
+--     rather than letting the negative pass without testing anything.
+--     Measured cadence: ~700 frozen frames of gauge spin-up at each phase
+--     entry ($3aa0.3 held), then swings land every few dozen frames.
+--   - GUESS(dice): poking $3ca8 to dice ids swaps the class lookup but
 --     not the init-time special-effect bytes, so dice phases swing like
---     normal weapons here; real equipped-dice behavior (the dice damage
---     effect reaching the join hook) still wants a manual phase-2 look.
+--     normal weapons here; real equipped-dice behaviour (the dice damage
+--     effect reaching the join hook) still needs a manual phase-2 check.
 --
 -- Entity map (same fight as battle_break): guards in monster slots 2/3
 -- -> entities $0c/$0e. shields $3E44/$3E46 - timers $3E94/$3E96 -
@@ -109,7 +109,7 @@ local function report(tag)
 end
 
 -- arm every party right hand with one item id (class probe swap); left
--- hands stay untouched -- a single swing always picks the right hand
+-- hands stay untouched, since a single swing always picks the right hand
 local function armRightHands(item)
   return H.call(function()
     for _, a in ipairs({ 0x3CA8, 0x3CAA, 0x3CAC }) do H.writeByte(a, item) end
@@ -117,18 +117,18 @@ local function armRightHands(item)
   end)
 end
 
--- 5000 hp: a break window's x2 fights (~100/hit) can't wound a guard
--- between re-pokes; a wounded guard would never chip again (by design)
--- and starve the later phases
+-- 5000 hp: a break window's x2 fights (~100/hit) cannot wound a guard
+-- between re-pokes; a wounded guard would never chip again, by design,
+-- and would starve the later phases
 -- Bump the berserk party's ATB fill constant ($3ac8,x, 16-bit, stride 2,
--- normally set by CalcSpeed from Speed) so a gauge that is ALLOWED to run
--- tops off in ~16 frames instead of ~770. This is engine-native: the engine
+-- normally set by CalcSpeed from Speed) so a gauge that is allowed to run
+-- fills in ~16 frames instead of ~770.  This uses the engine's own path: it
 -- still runs the overflow -> queue-action -> reset cycle and a character still
 -- only acts when idle (the swing animation gates the real rate), so every
--- counted swing is a genuine resolved Fight -- we just stop waiting on a slow
--- gauge. (Forcibly clearing $3aa0.3, the gauge-stop bit, to skip the ~700f
--- per-phase spin-up does NOT work: it races the action-commit cycle and no
--- Fight ever resolves, so that spin-up is left intact.)
+-- counted swing is a resolved Fight; only the wait on a slow gauge is removed.
+-- (Clearing $3aa0.3, the gauge-stop bit, to skip the ~700f per-phase spin-up
+-- does not work: it races the action-commit cycle and no Fight ever resolves,
+-- so that spin-up is left intact.)
 local ATB_FAST = 0x1000
 local function bumpAtb()
   for slot = 0, 3 do H.writeWord(0x3AC8 + slot * 2, ATB_FAST) end
@@ -146,7 +146,7 @@ local driveStep = {
   H.waitFrames(30),
 }
 
--- party keepalive for the long late phases: top anyone low BEFORE the
+-- party keepalive for the long late phases: top anyone low up before the
 -- wound bit can land (re-poking hp does not revive the dead)
 local function pinParty()
   for c = 0, 2 do
@@ -192,9 +192,9 @@ local function findName(seq)
   return nil
 end
 
--- non-vacuity watcher: record every value the attack-class byte ($57b8)
--- is loaded with, so the no-chip phases can PROVE swings of the expected
--- class actually resolved while they ran
+-- the watcher that keeps the negative phases from passing on an empty run:
+-- record every value the attack-class byte ($57b8) is loaded with, so the
+-- no-chip phases can show swings of the expected class resolved while they ran
 local classWrites, classRef = {}, nil
 local function watchClasses(on)
   return H.call(function()
@@ -229,7 +229,7 @@ H.run({ maxFrames = 90000 }, {
     "battle active", 30),
   H.waitFrames(240),
 
-  -- 0. seeding: authored shields AND the authored class row
+  -- 0. seeding: authored shields and the authored class row
   H.call(function()
     local s1, s2 = shields()
     H.assertEq(s1, 2, "guard 1 shields seeded")           -- GUESS(seed-2)
@@ -247,8 +247,8 @@ H.run({ maxFrames = 90000 }, {
   report("seeded"),
 
   -- hud: guards carry no element weakness, so each line's first slot is
-  -- the CLASS slot -- '?' until a probe reveals it (the entry-point fixture
-  -- is generated from a cold boot, codex-virgin by construction)
+  -- the class slot, showing '?' until a probe reveals it (the entry-point
+  -- fixture is generated from a cold boot, so its codex is empty)
   H.waitUntil(function() return #hudSlotWords() >= 2 end, 300,
     "both guard hud lines up", 10),
   H.call(function()
@@ -261,7 +261,7 @@ H.run({ maxFrames = 90000 }, {
   end),
 
   -- lab setup: no element chip possible, tough guards, berserk Fight.
-  -- terra's real commands + status are saved first: phase 8 restores
+  -- Terra's real commands and status are saved first, and phase 8 restores
   -- them to drive her menu to TekMissile.
   H.call(function()
     H.writeByte(0x3BEC, 0)                 -- guards lose their element
@@ -285,9 +285,9 @@ H.run({ maxFrames = 90000 }, {
       H.writeByte(st2, H.readByte(st2) | 0x10)          -- berserk
       if slot ~= holder then
         -- magitek status routes berserk to random beams; clear it so
-        -- berserk picks Fight (the holder keeps replaying its stale
-        -- staged beam -- battle_hits's C1-staging wart -- which is
-        -- harmless here: beams have no class and no element weakness)
+        -- berserk picks Fight.  The holder keeps replaying its stale
+        -- staged beam (battle_hits's C1-staging quirk), which is
+        -- harmless here, because beams have no class and no element weakness
         local st1 = 0x3EE4 + slot * 2
         H.writeByte(st1, H.readByte(st1) & 0xF7)
       end
@@ -300,12 +300,13 @@ H.run({ maxFrames = 90000 }, {
   armRightHands(0x0A),                     -- MithrilBlade: slashing
   H.call(function() s1c, s2c = shields() end),
   watchClasses(true),
-  -- Drive until TWO slashing Fights have actually RESOLVED (not a fixed
-  -- padded budget): the negative "nothing chips" below is only meaningful if
-  -- swings of the probe class landed, so we make that a hard precondition --
-  -- if two do not resolve within the cap this driveUntil FAILS LOUDLY instead
-  -- of the old fixed wait passing vacuously. (Measured swing cadence with the
-  -- accelerated gauge: ~700f cold-start spin-up, then swings land fast.)
+  -- Drive until two slashing Fights have resolved, rather than waiting a fixed
+  -- padded budget: the negative "nothing chips" below is only meaningful if
+  -- swings of the probe class landed, so that is a hard precondition.  If two
+  -- do not resolve within the cap this driveUntil fails, where the old fixed
+  -- wait would have passed without testing anything.  (Measured swing cadence
+  -- with the accelerated gauge: ~700f cold-start spin-up, then swings land
+  -- quickly.)
   H.driveUntil(function() return (classWrites[0x01] or 0) >= 2 end,
     2000, driveStep, "two slashing swings to resolve"),
   watchClasses(false),
@@ -337,8 +338,9 @@ H.run({ maxFrames = 90000 }, {
   end),
 
   -- hud: the revealed class replaces its '?' with the pierce icon ($da,
-  -- white -- the same glyph the menus use for piercing weapons). waitUntil:
-  -- the revealing swing's animation can contest bg3 for a few dozen frames.
+  -- white, the same glyph the menus use for piercing weapons).  This uses
+  -- waitUntil because the revealing swing's animation can contest bg3 for a
+  -- few dozen frames.
   H.waitUntil(function()
     for _, w in ipairs(hudSlotWords()) do
       if w == 0x21DA then return true end
@@ -363,9 +365,9 @@ H.run({ maxFrames = 90000 }, {
   end),
 
   -- 4. recovery: shields restore, the revealed class survives.
-  -- (driveUntil, not waitUntil: the re-pokes must keep running or the
-  -- x2 break window kills the guards and wound-dead monsters never
-  -- chip again -- exactly what the first live run demonstrated)
+  -- (This uses driveUntil rather than waitUntil because the re-pokes must
+  -- keep running, or the x2 break window kills the guards, and wound-dead
+  -- monsters never chip again, which is what the first live run showed.)
   H.driveUntil(function()
     local t1, t2 = timers()
     local s1, s2 = shields()
@@ -388,8 +390,8 @@ H.run({ maxFrames = 90000 }, {
   armRightHands(0x52),                     -- Fixed Dice: ¤ + null-break
   H.call(function() s1c, s2c = shields() end),
   watchClasses(true),
-  -- Same non-vacuity guard as the slash phase: require two null-break ¤ Fights
-  -- to actually resolve before trusting "nothing chips", or fail loudly.
+  -- The same guard as the slash phase: require two null-break ¤ Fights
+  -- to resolve before accepting "nothing chips", or fail.
   H.driveUntil(function() return (classWrites[0x88] or 0) >= 2 end,
     2000, driveStep, "two null-break ¤ swings to resolve"),
   watchClasses(false),
@@ -417,11 +419,11 @@ H.run({ maxFrames = 90000 }, {
     H.screenshot("class_special")
   end),
 
-  -- 7. heal-reversal phase: a hit that RESOLVES as a heal must not chip.
-  -- slash-weak guards absorb fire; the right hands are slash blades whose
-  -- pre-baked hand element ($3b90) is poked to fire. every landed swing
+  -- 7. heal-reversal phase: a hit that resolves as a heal must not chip.
+  -- Slash-weak guards absorb fire, and the right hands are slash blades whose
+  -- pre-baked hand element ($3b90) is poked to fire, so every landed swing
   -- heals the guard (CalcTargetDmg's absorb path flips $f2 bit 0) and the
-  -- class gate must skip it. the per-frame HP watcher proves heals landed:
+  -- class gate must skip it.  The per-frame HP watcher shows heals landed:
   -- a heal clamps the poked 5000 hp down to the guard's natural max.
   H.call(function()
     H.writeByte(0x3E44, 2); H.writeByte(0x3E46, 2)   -- stage shields clean
@@ -440,10 +442,11 @@ H.run({ maxFrames = 90000 }, {
   armRightHands(0x0A),                     -- MithrilBlade: slashing
   H.call(function() s1c, s2c = shields() end),
   watchClasses(true),
-  -- Drive until at least one swing has resolved as a HEAL *and* two slashing
-  -- Fights have resolved -- both are hard preconditions for the "no chip"
-  -- negative below, so a too-short window can no longer pass vacuously (it
-  -- times out and fails). Replaces a flat 1500-frame budget.
+  -- Drive until at least one swing has resolved as a heal and two slashing
+  -- Fights have resolved.  Both are hard preconditions for the "no chip"
+  -- negative below, so a too-short window now times out and fails rather than
+  -- passing without testing anything.  This replaces a flat 1500-frame
+  -- budget.
   H.driveUntil(function()
     return H.vars.healSeen and (classWrites[0x01] or 0) >= 2
   end, 2500, {
@@ -452,8 +455,8 @@ H.run({ maxFrames = 90000 }, {
       for _, a in ipairs({ 0x3C00, 0x3C02 }) do
         local hp = H.readWord(a)
         if hp ~= 5000 then
-          -- a heal clamps 5000 down to natural max (tiny); a stray
-          -- damage hit only nibbles. either way, re-pin.
+          -- a heal clamps 5000 down to the natural max, which is small; a
+          -- stray damage hit takes only a little.  Either way, re-pin.
           if hp < 1000 or hp > 5000 then H.vars.healSeen = true end
           H.writeWord(a, 5000)
         end
@@ -475,24 +478,24 @@ H.run({ maxFrames = 90000 }, {
     H.assertEq((r1 | r2) & 0x01, 0, "and reveal nothing")
   end),
 
-  -- 7b. edge: a resolved HEAL is never scaled by the shielded-resistance
-  -- multiplier. Ot6ShieldedDmg gates on $f2 bit 0 exactly as the chip
-  -- procs do, so an absorbed hit (which flips that bit) must add the SAME
-  -- hp whether the target still holds shields or not. same-guard proof
-  -- (guard 1 is the reliably-swung target; berserk rarely picks guard 2):
-  -- two windows on guard 1, shielded then shieldless, both fire-absorbing
-  -- from phase 7 so every fire slash heals it. a roomy max hp keeps the
-  -- heal off the clamp. while shielded the heal survives ONLY via the
-  -- $f2 gate -- if that gate were broken the shielded window's heal would
-  -- come back ~half the shieldless window's, far under the 0.75x floor.
-  -- (the shieldless-DAMAGE half of the edge -- 0 shields takes full,
-  -- unattenuated damage -- is proven in battle_break: the breaking hit
+  -- 7b. edge case: a resolved heal is never scaled by the shielded-resistance
+  -- multiplier.  Ot6ShieldedDmg gates on $f2 bit 0 as the chip
+  -- procs do, so an absorbed hit, which flips that bit, must add the same
+  -- hp whether the target still holds shields or not.  This is a same-guard
+  -- comparison (guard 1 is the reliably-swung target; berserk rarely picks
+  -- guard 2): two windows on guard 1, shielded then shieldless, both
+  -- fire-absorbing from phase 7 so every fire slash heals it.  A high max hp
+  -- keeps the heal off the clamp.  While shielded the heal survives only via
+  -- the $f2 gate; if that gate were broken the shielded window's heal would
+  -- come back at about half the shieldless window's, far under the 0.75x
+  -- floor.  (The shieldless-damage half of this, that 0 shields takes full
+  -- unattenuated damage, is covered in battle_break: the breaking hit
   -- lands at broken x2 with the shields already at 0, and its ~4x ratio
-  -- only holds because that 0-shield hit is NOT attenuated.)
-  -- the metric is the AVERAGE hp per absorbed hit, not the single biggest:
-  -- the vanilla heal roll (224..255/256 of the formula) makes the max a
-  -- noisy one-sample estimator, but the per-hit mean over a window
-  -- converges to the same value regardless of shield state -- unless the
+  -- only holds because that 0-shield hit is not attenuated.)
+  -- The metric is the average hp per absorbed hit rather than the largest:
+  -- the vanilla heal roll (224..255/256 of the formula) makes the maximum a
+  -- noisy one-sample estimate, but the per-hit mean over a window
+  -- converges to the same value regardless of shield state, unless the
   -- shielded window's heals were scaled, which would halve its mean.
   H.call(function()
     H.writeByte(0x3E94, 0)                        -- guard 1 not broken
@@ -503,8 +506,8 @@ H.run({ maxFrames = 90000 }, {
   end),
   -- adaptive windows: drive each state until it has banked enough heals
   -- (guard 1's berserk hit-rate drifts across the fight, so a fixed frame
-  -- count under-samples one window). 12 heals each keeps the mean stable.
-  -- window 1: SHIELDED (the heal survives whole ONLY via the $f2 gate)
+  -- count under-samples one window).  12 heals each keeps the mean stable.
+  -- window 1: shielded (the heal survives whole only via the $f2 gate)
   H.call(function()
     H.writeByte(0x3E44, 2)
     H.writeWord(0x3C00, 3000); H.vars.ph = 3000
@@ -522,7 +525,7 @@ H.run({ maxFrames = 90000 }, {
     end),
     H.waitFrames(1),
   }, "12 heals on the shielded guard"),
-  -- window 2: SHIELDLESS (heal passes the $3e38==0 gate instead)
+  -- window 2: shieldless (the heal passes the $3e38==0 gate instead)
   H.call(function()
     H.writeByte(0x3E44, 0)
     H.writeWord(0x3C00, 3000); H.vars.ph = 3000
@@ -545,17 +548,17 @@ H.run({ maxFrames = 90000 }, {
     local avgno = H.vars.sumno / H.vars.cntno
     H.log(string.format("guard 1 mean heal/hit: shielded=%.1f (n=%d) shieldless=%.1f (n=%d)",
       avgsh, H.vars.cntsh, avgno, H.vars.cntno))
-    -- unattenuated: the means match within the roll spread. an 0.5x
-    -- attenuation of the shielded window would drop its mean to ~half,
+    -- unattenuated: the means match within the roll spread.  A 0.5x
+    -- attenuation of the shielded window would drop its mean to about half,
     -- far under this floor (0.8x).
     H.assertEq(avgsh * 5 >= avgno * 4, true,
       "mean heal while shielded is NOT attenuated (>= 0.8x the shieldless mean)")
   end),
 
-  -- 8. flagged-skill phase: TekMissile (flags3 $20) must chip. restore
-  -- the lab to pierce-weak, hand terra her real menu back, and walk it:
+  -- 8. flagged-skill phase: TekMissile (flags3 $20) must chip.  Restore
+  -- the lab to pierce-weak, hand Terra her real menu back, and walk it:
   -- MagiTek -> down x3, right (her 2x4 grid's bottom-right cell) -> fire
-  -- at the default target. the drive retries the lap until the skill
+  -- at the default target.  The drive retries the lap until the skill
   -- loader's $02 lands and a shield moves.
   H.call(function()
     H.writeByte(0x3EA8, 0x02); H.writeByte(0x3EAA, 0x02)  -- pierce-weak
@@ -622,11 +625,11 @@ H.run({ maxFrames = 90000 }, {
     local species = H.readWord(0x57C4)
     H.assertEq(sram(codexBase() + 0x190 + species) & 0x02, 0x02,
       "class codex holds piercing after the skill chip")
-    -- ability list: the drive rendered terra's magitek list on the way
+    -- ability list: the drive rendered Terra's magitek list on the way
     -- to TekMissile, and rendered rows persist in the menu map (the
-    -- battle_break precedent). TekMissile is elementless, so its icon
-    -- column must carry the Ot6SkillClassTbl pierce glyph in white --
-    -- exactly where Fire Beam carries its red element icon.
+    -- battle_break precedent).  TekMissile is elementless, so its icon
+    -- column must carry the Ot6SkillClassTbl pierce glyph in white,
+    -- where Fire Beam carries its red element icon.
     local tek = findName({0x93,0x9e,0xa4,0x8c,0xa2,0xac,0xac,0xa2,0xa5,0x9e})
     H.assertEq(tek ~= nil, true, "TekMissile row rendered in the menu map")
     H.assertEq(emu.readWord((tek + 10) * 2, emu.memType.snesVideoRam), 0x21DA,
@@ -635,23 +638,23 @@ H.run({ maxFrames = 90000 }, {
   end),
 
   -- 9. tools-list phase: stage the cheapest reachable Tools render.
-  -- no fixture carries a Tools user (magitek intro party), so the
+  -- No fixture carries a Tools user (the magitek intro party), so the
   -- inventory and command list are poked: battle items $2686 stride 5
-  -- gain Chain Saw / Drill / NoiseBlaster with the $40 tools-scan flag
-  -- (LoadItemProp derives it from item type 0; poked directly), and ALL
-  -- of terra's command slots become Tools ($09). the in-battle command
-  -- cursor persists across turns (phase 8 left it on the MagiTek cell),
-  -- so poking only slot 0 would let the drive's 'a' open the wrong
-  -- window -- with every slot Tools, whatever cell the cursor rests on
+  -- gain Chain Saw, Drill and NoiseBlaster with the $40 tools-scan flag
+  -- (LoadItemProp derives it from item type 0; here it is poked directly),
+  -- and all of Terra's command slots become Tools ($09).  The in-battle
+  -- command cursor persists across turns (phase 8 left it on the MagiTek
+  -- cell), so poking only slot 0 would let the drive's 'a' open the wrong
+  -- window; with every slot Tools, whatever cell the cursor rests on
   -- opens the tools window (menu state $2e), whose rows render through
-  -- ListTextCmd_0e + Ot6ToolListIcon_ext.
+  -- ListTextCmd_0e and Ot6ToolListIcon_ext.
   --
-  -- The battle tools window is a TWO-COLUMN grid and only its first row
+  -- The battle tools window is a two-column grid and only its first row
   -- is on-screen (verified live: a third tool lands in an unrendered
-  -- second row). So the two asserted tools ride slots 0/1 -- Chain Saw
-  -- (col 0, slashing) and Drill (col 1, piercing) -- and both wear their
-  -- class icon after the name, exactly where a magitek skill wears its
-  -- element icon. NoiseBlaster fills slot 2 (the hidden row) purely so
+  -- second row).  So the two asserted tools sit in slots 0 and 1, Chain Saw
+  -- (col 0, slashing) and Drill (col 1, piercing), and both wear their
+  -- class icon after the name, where a magitek skill wears its
+  -- element icon.  NoiseBlaster fills slot 2, the hidden row, so
   -- the list has the 3-entry shape that renders cleanly.
   H.call(function()
     local inv = { 0xa6, 0xa8, 0xa3 }   -- Chain Saw, Drill, NoiseBlaster
@@ -670,11 +673,11 @@ H.run({ maxFrames = 90000 }, {
     -- the first row is drawn once Chain Saw (col 0) renders
     return findName({0x82,0xa1,0x9a,0xa2,0xa7}) ~= nil   -- "Chain"
   end, 20000, {
-    -- same scripted-lap discipline the TekMissile drive (phase 8) proved:
-    -- when terra holds the menu, converge to the root command list, then
-    -- one 'a' opens Tools (every slot is Tools). the long idle tail lets
-    -- the rows render before the predicate fires; input mid window-open
-    -- wedges the staged rows, so the settle after 'a' is generous.
+    -- the same scripted-lap approach the TekMissile drive (phase 8) uses:
+    -- when Terra holds the menu, converge to the root command list, then
+    -- one 'a' opens Tools (every slot is Tools).  The long idle tail lets
+    -- the rows render before the predicate fires; input during window-open
+    -- wedges the staged rows, so the settle after 'a' is long.
     H.call(function()
       repokeHp()
       pinParty()
@@ -703,15 +706,15 @@ H.run({ maxFrames = 90000 }, {
   H.waitFrames(20),
   H.call(function()
     -- both first-row tools wear their class glyph in the name field's
-    -- last column ({tool} leading icon + name, then the class icon), so
-    -- findName lands on the letters and the glyph rides at +11 -- the
-    -- same column the '{tool}Chain Saw' / '{tool}Drill' names leave blank.
+    -- last column ({tool} leading icon plus name, then the class icon), so
+    -- findName lands on the letters and the glyph sits at +11, the
+    -- same column the '{tool}Chain Saw' and '{tool}Drill' names leave blank.
     -- Chain Saw (col 0): slashing -> the slash icon $d9.
     local saw = findName({0x82,0xa1,0x9a,0xa2,0xa7})       -- "Chain"
     H.assertEq(saw ~= nil, true, "Chain Saw row rendered")
     H.assertEq(emu.readWord((saw + 11) * 2, emu.memType.snesVideoRam), 0x21D9,
       "slash class icon after Chain Saw in the tools list")
-    -- Drill (col 1): piercing -> the spear icon $da, exactly as TekMissile
+    -- Drill (col 1): piercing -> the spear icon $da, as TekMissile
     -- wears it in the magitek list above.
     local drill = findName({0x83,0xab,0xa2,0xa5,0xa5})     -- "Drill"
     H.assertEq(drill ~= nil, true, "Drill row rendered")
@@ -720,13 +723,13 @@ H.run({ maxFrames = 90000 }, {
     H.screenshot("class_tools")
   end),
 
-  -- LIVENESS, and it is not decoration. Every assertion in this phase reads
-  -- a tilemap the window already drew -- which a FROZEN machine satisfies
+  -- Liveness, and it matters here. Every assertion in this phase reads
+  -- a tilemap the window already drew, which a frozen machine satisfies
   -- just as well as a running one, and did: Ot6ToolListIcon_ext (ot6.asm)
-  -- spun the battle NMI forever on a CLASSLESS tool row, and this test came
-  -- back green straight through it. MEASURED, by reverting that fix and
-  -- re-running: all 40 assertions above pass -- both tools rows, both class
-  -- icons -- with $98 not advancing at all. The fixture is why it never
+  -- spun the battle NMI forever on a tool row with no class, and this test
+  -- came back green straight through it. Measured by reverting that fix and
+  -- re-running: all 40 assertions above pass (both tools rows, both class
+  -- icons) with $98 not advancing at all. The fixture is why it never
   -- showed: its only classless tool (NoiseBlaster) sits in the list's
   -- unrendered second row while the two asserted tools ride the first, so
   -- the lock lands after the last thing this test looks at. It surfaced in

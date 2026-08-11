@@ -2311,7 +2311,7 @@ DrawHPMP:
 
 ; ot6 (#35): under the MP economy every character spends MP from battle one
 ; (Ot6MpUniversal made the battle pool universal; Ot6AbilityCost prices every
-; verb), so the field menu shows every pool unconditionally -- vanilla's
+; verb), so the field menu shows every pool unconditionally; vanilla's
 ; esper/Gogo/knows-a-spell gate below hid Locke's and Edgar's MP through the
 ; entire pre-Zozo stretch while Steal and Tools charged it (owner-verified at
 ; the Moogle defense).  Same idiom as Ot6MpUniversal: gated on OT6_MP_COSTS,
@@ -2319,7 +2319,7 @@ DrawHPMP:
 ; the battle object is ever rebuilt with the flag forced off; the shared
 ; menu object always assembles flag-set).
 ;
-; SIZE-NEUTRAL on purpose: the 2-byte sec/rts head is repaid by dropping the
+; Size-neutral on purpose: the 2-byte sec/rts head is repaid by dropping the
 ; now-unreachable @0d63 tail, so every later C3 address is UNCHANGED.  A
 ; plain insert shifted the whole menu bank and broke booting the seeded
 ; savestates `make savestates` generates (gen_zozo5_ramuh loaded dadaluma_won

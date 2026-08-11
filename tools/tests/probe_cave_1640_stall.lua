@@ -1,11 +1,11 @@
--- probe_cave_1640_stall.lua -- REPRODUCTION INSTRUMENT, temporary.
+-- probe_cave_1640_stall.lua -- reproduction instrument, temporary.
 -- The flee-doctrine escape run parked at map 69 (16,40) for 20000 frames
--- with control lost, NO battle flag and NO dialog -- a different shape
--- from the map-87 park (which had a live battle).  The same tile hosted a
--- real battle in the tactical run, so the tile itself is fine.  This
+-- with control lost, no battle flag and no dialog, a different shape
+-- from the map-87 park, which had a live battle.  The same tile hosted a
+-- battle in the tactical run, so the tile itself is not the problem.  This
 -- replays from the freshly-generated sfigaro_escape (world map), crosses to
--- the cave, walks toward warp A, and dumps everything the moment control
--- goes away: field cells, world-module cells, the $3BF4 battle-HP words
+-- the cave, walks toward warp A, and dumps state as soon as control is
+-- lost: field cells, world-module cells, the $3BF4 battle-HP words
 -- battleLoadStarted() reads, the event PC, and screenshots.
 local H = dofile("tools/tests/lib/ot6.lua")
 local DOOR = "build/states/sfigaro_escape.mss.lua"

@@ -1,7 +1,7 @@
--- probe_moogle_fadewatch.lua -- WHO lights the field after a wave loss?
--- (issue #74 instrument, not a test.)  From moogle_defense: idle so wave 1
--- wipes party 1, A-mash through the Annihilated screen until the loss
--- bench lands at (14,11), then hands off and log EVERY change of
+-- probe_moogle_fadewatch.lua -- measures what lights the field after a wave
+-- loss (issue #74 instrument, not a test).  From moogle_defense: idle so
+-- wave 1 wipes party 1, A-mash through the Annihilated screen until the
+-- loss bench lands at (14,11), then hands off and log every change of
 -- (brightness, ev, batt, pos, $1F41) for 1500 frames, screenshotting each
 -- brightness transition.  Read-only + pad input.
 local H = dofile("tools/tests/lib/ot6.lua")

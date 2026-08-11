@@ -1,84 +1,85 @@
 -- @suite savestate=gau_joined slow
--- battle_gaufight.lua -- issue #47: GAU HAS A FREE ACTION, IN BOTH TERRITORIES.
+-- battle_gaufight.lua -- issue #47: Gau has a free action in both territories.
 --
--- THE HOLE.  Vanilla gives Gau four command slots and no Fight among them:
--- RAGE / LEAP / MAGIC / ITEM (char_prop.asm, record 11).  The third row LOOKS
+-- The problem: vanilla gives Gau four command slots and no Fight among them:
+-- RAGE / LEAP / MAGIC / ITEM (char_prop.asm, record 11).  The third row looks
 -- empty in vanilla only because InitCmd_03 removes MAGIC from a character who
 -- knows no spells (battle_main.asm), and off the Veldt InitCmd_01 removes LEAP
--- as well -- so the real menu a v0.7 player saw was RAGE / - / - / ITEM.  That
--- was survivable while Rage was free.  It is not survivable now that Rage
--- costs a flat 8 MP (#40): an out-of-MP Gau had literally no action to take,
--- and mp-economy.md's stated target -- "Fight must sometimes be the right
--- move" -- requires that every character be able to DECLINE to spend.
+-- as well, so the menu a v0.7 player saw was RAGE / - / - / ITEM.  That
+-- worked while Rage was free.  It does not work now that Rage
+-- costs a flat 8 MP (#40): an out-of-MP Gau had no action to take,
+-- and mp-economy.md's stated target, that Fight must sometimes be the right
+-- move, requires that every character be able to decline to spend.
 --
--- THE FIX: Gau now carries FIGHT / RAGE / MAGIC / ITEM, and LEAP SHARES THE
--- FIGHT ROW (owner reversal 2026-07-29 -- on the Veldt Leap IS the free
--- action, so Fight is the row that can afford to share; Magic must never be
--- the sacrificed row):
+-- The fix: Gau now carries FIGHT / RAGE / MAGIC / ITEM, and Leap shares the
+-- Fight row (owner reversal 2026-07-29: on the Veldt, Leap is the free
+-- action, so Fight is the row that can share; Magic must never be
+-- the row given up):
 --
 --      on the Veldt:     LEAP  / RAGE / MAGIC / ITEM
 --      everywhere else:  FIGHT / RAGE / MAGIC / ITEM
 --
--- THE MECHANISM.  Ot6VeldtRow (battle_main.asm), called from InitCmdList's own
+-- The mechanism: Ot6VeldtRow (battle_main.asm), called from InitCmdList's own
 -- row loop; the row it writes is $11, which is in InitCmdIDTbl, so Leap's own
--- vanilla availability test (InitCmd_01) runs on it for free.
+-- vanilla availability test (InitCmd_01) runs on it without extra code.
 --
--- ISSUE #75 CONVERSION.  All the staging is gone: no monster stop bits, no
--- HP floors, no bench-wounding, no berserk/row-blank/ATB-hurry lab, no rage
--- cursor pokes.  Battle A is entirely natural (the trance's survivability
--- comes from CHOOSING the draw: unsuitable formations are resolved -- fled,
--- or won through the real menus when the Veldt roster deals an unrunnable
--- set-piece formation, a measured hazard -- and the walk resumes).  The
+-- Issue #75 conversion: all the staging is gone, with no monster stop bits, no
+-- HP floors, no bench-wounding, no berserk, row-blank or ATB-hurry lab, and no
+-- rage cursor pokes.  Battle A is natural; the trance survives because the
+-- draw is chosen: unsuitable formations are resolved, either fled or won
+-- through the real menus when the Veldt roster deals an unrunnable set-piece
+-- formation, which is a measured hazard, and the walk resumes.  The
 -- bench is parked with X, vanilla's own turn-cycling key, which also makes
--- arm 4's claim SHARP: focus is actively cycled all trance long and must
--- never land on Gau.  Arm 2's Fight is picked from the REAL menu.
+-- arm 4's claim precise: focus is cycled all trance long and must
+-- never land on Gau.  Arm 2's Fight is picked from the real menu.
 --
--- *** ONE LABELED ISOLATION ARM (issue #75) -- one write site STAYS ***
--- THE OFF-VELDT VERDICT (arms 1d/2/3) CANNOT BE REACHED BY GEOGRAPHY from
+-- One labeled isolation arm (issue #75): one write site stays.
+-- The off-Veldt verdict (arms 1d, 2 and 3) cannot be reached by geography from
 -- any generated fixture: gau_joined's entire walkable component was enumerated
--- live (2026-08-10, BFS over worldPassable from (214,149)) -- 1239 tiles
+-- live (2026-08-10, BFS over worldPassable from (214,149)), giving 1239 tiles
 -- spanning exactly three 32x32 sectors, and WorldBattleGroup reads $ff
 -- (Veldt) for all three; the component is walled by Crescent Mountain and
 -- the sea, and no other fixture fields Gau at all (sabin_done is the bare
--- scenario hub).  "Walk off the Veldt" is therefore IMPOSSIBLE from the
+-- scenario hub).  Walking off the Veldt is therefore not possible from the
 -- input-driven tree today, and battle B keeps the burn-down plan's instrumented
--- bit as a loudly-labeled isolation arm: an exec callback on InitCmdList
--- clears $11e4 bit 1 at the exact moment the code under test reads it (the
--- callback COUNTS its firings and asserts the bit really was set, so it
--- cannot be vacuous), and the bit is restored the moment the lists are
--- read.  It MAY NEVER PRODUCE FIXTURES; it converts organically when the
--- chain crosses the Serpent Trench and generates a world-side Gau fixture off
--- the Veldt.  This is the file's only write site (.writeByte( waiver).
+-- bit as a labeled isolation arm: an exec callback on InitCmdList
+-- clears $11e4 bit 1 at the moment the code under test reads it (the
+-- callback counts its firings and asserts the bit was set, so it
+-- cannot pass without testing anything), and the bit is restored as soon as
+-- the lists are read.  It may never produce fixtures; it converts organically
+-- when the chain crosses the Serpent Trench and generates a world-side Gau
+-- fixture off the Veldt.  This is the file's only write site (.writeByte(
+-- waiver).
 --
 -- Asserted:
---   1a. THE SAVE RECORD, unpoked: $00 $10 $02 $01 -- FIGHT / RAGE / MAGIC /
---      ITEM, read straight out of the character record at $1616+$3010[slot].
---      FAILS PRE-#47: the record reads $10 $11 $02 $01 and holds no $00.
---   1b. THE BUILT LIST, ON THE VELDT (battle A, natural).  Row 0 is LEAP --
---      the SHARED row, asserted as the rule: LEAP when $11e4 bit 1 is set,
+--   1a. the save record, unpoked: $00 $10 $02 $01, that is FIGHT / RAGE /
+--      MAGIC / ITEM, read from the character record at $1616+$3010[slot].
+--      Fails pre-#47: the record reads $10 $11 $02 $01 and holds no $00.
+--   1b. the built list, on the Veldt (battle A, natural).  Row 0 is LEAP,
+--      the shared row, asserted as the rule: LEAP when $11e4 bit 1 is set,
 --      else FIGHT.  Row 1 RAGE, row 2 MAGIC's own vanilla verdict (removed,
 --      no spells), row 3 ITEM.
---   1c. THE NEGATIVE CONTROL: SABIN and CYAN keep FIGHT in row 0 and carry
---      LEAP nowhere -- the substitution is CHAR::GAU-gated.
---   1d. THE BUILT LIST, OFF THE VELDT (battle B, the labeled arm's one
---      instrumented bit).  Row 0 is FIGHT; rows 1-3 unchanged; the save
---      record re-read and byte-identical to 1a -- the SAME data, a
---      different verdict, which is what "shared row" has to mean.
---   2. FIGHT EXECUTES AND CARRIES A REAL WEAPON CLASS (battle B, where row
---      0 really is Fight): picked through the live $7BC2 menu, target
---      steered onto the monster side, the bench deferred with X so every
+--   1c. the negative control: SABIN and CYAN keep FIGHT in row 0 and carry
+--      LEAP nowhere, so the substitution is gated on CHAR::GAU.
+--   1d. the built list, off the Veldt (battle B, the labeled arm's one
+--      instrumented bit).  Row 0 is FIGHT, rows 1-3 are unchanged, and the
+--      save record is re-read and byte-identical to 1a: the same data with a
+--      different verdict, which is what a shared row means.
+--   2. Fight executes and carries a real weapon class (battle B, where row
+--      0 is Fight): picked through the live $7BC2 menu, with the target
+--      steered onto the monster side and the bench deferred with X, so every
 --      monster HP drop is Gau's.  OT6_ATKCLASS ($57b8) reads OT6_BLUDG and
---      ONLY OT6_BLUDG for the window -- Gau equips nothing at join and
---      Ot6WeapClassTbl[$ff] is OT6_BLUDG: bare fists are a bludgeoning
---      probe, through the same per-swing $3ca8 hand lookup as everyone.
---   3. THE SHIELD LEDGER AGREES WITH THE CLASS: the body he hit is MEASURED
+--      only OT6_BLUDG for the window: Gau equips nothing at join and
+--      Ot6WeapClassTbl[$ff] is OT6_BLUDG, so bare fists are a bludgeoning
+--      probe, through the same per-swing $3ca8 hand lookup as everyone else.
+--   3. the shield ledger agrees with the class: the body he hit is measured
 --      (whoever lost HP), and its shield counter moves iff its class-
---      weakness byte carries bludgeoning -- both ways.
---   4. RAGE POSSESSION IS UNAFFECTED (battle A): rage started from row 1 of
---      the real menu, the window's cursor STEERED to entry 0 by d-pad
---      against the live cursor cells (no pokes), the RAGE status latches,
---      Cmd_10 re-enters on its own >= 3 times, and the actively-X-cycled
---      focus never once lands on Gau -- CheckPlayerAction's STATUS34
+--      weakness byte carries bludgeoning, checked both ways.
+--   4. rage possession is unaffected (battle A): rage is started from row 1 of
+--      the real menu, the window's cursor is steered to entry 0 by d-pad
+--      against the live cursor cells with no pokes, the RAGE status latches,
+--      Cmd_10 re-enters on its own at least 3 times, and the X-cycled
+--      focus never lands on Gau, so CheckPlayerAction's STATUS34
 --      {DANCE, HIDE, RAGE} gate holds.
 local H = dofile("tools/tests/lib/ot6.lua")
 local STATE = "build/states/gau_joined.mss.lua"
@@ -106,7 +107,7 @@ local classWrites, cmd10Hits, gauMenus = {}, 0, 0
 local saveRecA = nil                  -- battle A's read of the save record
 local veldtCleared = 0                -- battle B: times the instrument fired
 
--- Gau's four command bytes AS THE SAVE HOLDS THEM (InitCmdList's own two
+-- Gau's four command bytes as the save holds them (InitCmdList's own two
 -- lines: `ldy $3010,x` then `lda $1616,y`).
 local function saveRecord(slot)
   local ptr = H.readWord(0x3010 + slot * 2)
@@ -148,7 +149,7 @@ local function walkIntoEncounter(what)
     H.call(function() H.setPad({}) end),
     H.waitUntil(function() return H.battleActive() end, 1200,
       what .. ": battle armed", 5),
-    -- 90 frames is after InitChars/InitCmdList and BEFORE the first
+    -- 90 frames is after InitChars and InitCmdList and before the first
     -- command window opens.
     H.waitFrames(90),
   }
@@ -156,8 +157,8 @@ end
 
 -- resolve an unwanted battle: flee (L+R), and when the Veldt roster deals
 -- an unrunnable set-piece formation (measured 2026-08-10: the fled Guard
--- formation from Sabin's own scripted fights timed a 9000-frame L+R hold
--- out), fall back to winning it through the real menus.
+-- formation from Sabin's own scripted fights timed out a 9000-frame L+R
+-- hold), fall back to winning it through the real menus.
 local function resolveBattle(tag)
   local n, F = 0, nil
   return H.repeatN(1, {
@@ -181,7 +182,7 @@ local function resolveBattle(tag)
   })
 end
 
--- find Gau, enumerate the bodies.  Shared by both battles.  READS ONLY.
+-- find Gau, enumerate the bodies.  Shared by both battles.  Reads only.
 local function surveyBattle()
   gauSlot, msPresent = nil, {}
   for s = 0, 3 do
@@ -210,7 +211,7 @@ local function deferBench()
   return false
 end
 
--- wait for GAU's own menu, X-cycling the bench out of the way.
+-- wait for Gau's own menu, X-cycling the bench out of the way.
 local function menuForGau(what)
   local ph = 0
   return H.driveUntil(function()
@@ -243,12 +244,12 @@ add({
   end),
 })
 
--- ============================================================== BATTLE A ==
--- Entirely natural, ON the Veldt.  The draw is CHOSEN for the trance: the
--- ride needs the fight alive for >= 3 possessed turns, so a draw under 500
--- total monster HP is resolved and re-walked (measured pool: 3x $02f = 729
+-- ============================================================== battle A ==
+-- Entirely natural, on the Veldt.  The draw is chosen for the trance: the
+-- ride needs the fight alive for at least 3 possessed turns, so a draw under
+-- 500 total monster HP is resolved and re-walked (measured pool: 3x $02f = 729
 -- and $038+$039 = 432 recur; trash draws run 107).  Nothing is poked in any
--- draw -- selection is play.
+-- draw; the selection is done by playing.
 add({ H.call(function() H.vars.suitable = false end) })
 for n = 1, 6 do
   local w = {}
@@ -272,7 +273,7 @@ add({
   end),
 })
 
--- -------- 1a/1b/1c. THE SAVE RECORD, THE VELDT LIST, AND THE GAU GATE ------
+-- -------- 1a/1b/1c. the save record, the Veldt list, and the Gau gate -----
 add({
   H.call(function()
     local onVeldt = (H.readByte(VELDT) & 0x02) ~= 0
@@ -312,7 +313,7 @@ add({
       .. "vanilla")
     H.assertEq(rows[3], CMD_ITEM, "row 3 is ITEM -- the free floor is intact")
 
-    -- 1c. the negative control: the substitution is CHAR::GAU-gated.
+    -- 1c. the negative control: the substitution is gated on CHAR::GAU.
     for s = 0, 3 do
       local id = H.readByte(0x3ED8 + s * 2)
       if id ~= 0xFF and s ~= gauSlot then
@@ -331,7 +332,7 @@ add({
   end),
 })
 
--- ----------------------------------- 4. RAGE POSSESSION IS UNAFFECTED --
+-- ----------------------------------- 4. rage possession is unaffected --
 add({
   H.waitFrames(60),
   menuForGau("gau_menu_for_rage"),
@@ -352,10 +353,10 @@ add({
     H.call(function() H.setPad({}) end),
     H.waitFrames(14),
   }, "the rage window opens from row 1"),
-  -- STEER the rage window's cursor to entry 0 with the d-pad against the
-  -- live cursor cells (scroll $892b / col $892f / row $8933 indexed by the
-  -- actor slot -- _c18438, btlgfx_main.asm:20096-20111).  This replaces the
-  -- old three cursor pokes: same triple, read instead of written.
+  -- Steer the rage window's cursor to entry 0 with the d-pad against the
+  -- live cursor cells (scroll $892b, col $892f, row $8933, indexed by the
+  -- actor slot; _c18438, btlgfx_main.asm:20096-20111).  This replaces the
+  -- old three cursor pokes with the same triple, read instead of written.
   H.driveUntil(function()
     return H.readByte(MSTATE) == ST_RAGE
        and H.readByte(0x892B + gauSlot) + H.readByte(0x8933 + gauSlot) == 0
@@ -377,7 +378,7 @@ add({
     return (H.readByte(ST4(gauSlot * 2)) & 0x01) ~= 0
   end, 4000, {
     H.call(function()
-      -- press A on ANY window Gau still has open: the rage list ($1e) hands
+      -- press A on any window Gau still has open: the rage list ($1e) hands
       -- off to a follow-up state ($38) that also waits on a confirm.
       H.setPad((H.readByte(MENU) ~= 0 and (H.readByte(ACTOR) & 3) == gauSlot)
                and { a = true } or {})
@@ -387,7 +388,7 @@ add({
     H.waitFrames(16),
   }, "the RAGE status latches (Cmd_10 ran)"),
   H.call(function() gauMenus = 0 end),   -- count openings from the trance on
-  -- ride the trance: the bench is actively X-CYCLED, so if the four-row
+  -- ride the trance: the bench is X-cycled, so if the four-row
   -- menu ever offered a possessed Gau a window, the cycling would land
   -- focus on him and the counter below would catch it.
   H.repeatN(150, {
@@ -420,9 +421,9 @@ add({
   end),
 })
 
--- ============================================================== BATTLE B ==
--- *** LABELED ISOLATION ARM (issue #75) -- see the header. ***  A FRESH
--- load, with one bit instrumented at the exact moment the code under test
+-- ============================================================== battle B ==
+-- The labeled isolation arm (issue #75); see the header.  This is a fresh
+-- load, with one bit instrumented at the moment the code under test
 -- reads it, because the off-Veldt verdict is unreachable by geography from
 -- the generated tree (the component enumeration in the header).
 add({
@@ -443,7 +444,7 @@ add({
 })
 add(walkIntoEncounter("battle B"))
 
--- --------------------- 1d. THE BUILT LIST, OFF THE VELDT -------------------
+-- --------------------- 1d. the built list, off the Veldt ------------------
 add({
   H.call(function()
     surveyBattle()
@@ -479,7 +480,7 @@ add({
     -- and arms 2/3 do not care either way.
     H.writeByte(VELDT, H.readByte(VELDT) | 0x02)
 
-    -- arms 2/3 observe through the real menu now -- no berserk, no row
+    -- arms 2 and 3 observe through the real menu now: no berserk, no row
     -- blanking, no ATB hurry, no bench wounds.  The class byte watch:
     emu.addMemoryCallback(function(_, v)
       classWrites[#classWrites + 1] = v
@@ -487,7 +488,7 @@ add({
   end),
 })
 
--- ------------------------- 2/3. FIGHT swings, chips, and carries a class --
+-- ------------------------- 2/3. Fight swings, chips, and carries a class --
 add({
   H.call(function()
     hpPre, shieldPre = {}, {}
@@ -501,9 +502,9 @@ add({
       .. "real menu", #msPresent, gauSlot))
   end),
   -- Gau's Fight, picked from the real four-row menu: cursor to row 0, A,
-  -- then the target cursor steered onto the MONSTER side before confirming
-  -- (the old menu drive confirmed blind and punched Gau himself -- measured;
-  -- $7b7e is the monster-side target mask the cursor state exposes).
+  -- then the target cursor steered onto the monster side before confirming
+  -- (the old menu drive confirmed without checking and hit Gau himself,
+  -- measured; $7b7e is the monster-side target mask the cursor state exposes).
   H.driveUntil(function()
     for _, m in ipairs(msPresent) do
       if H.readWord(MHP(m)) < hpPre[m] then return true end

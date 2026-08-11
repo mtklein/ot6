@@ -1,7 +1,7 @@
 -- probe_opera_dance7.lua -- boot aria_postfork; climb to (11,19) [reachable edge
--- of the basin, adjacent to the occupied (12,19)]; then TALK toward (12,19) and
--- observe: scan objects 0..31, log who is at (12,19), who MOVES on touch, and
--- the $01F0/1/2/$0057 switches.  Learn the real waltz mechanic + Draco slot.
+-- of the basin, adjacent to the occupied (12,19)]; then talk toward (12,19) and
+-- observe: scan objects 0..31, log who is at (12,19), who moves on touch, and
+-- the $01F0/1/2/$0057 switches.  Determines the waltz mechanic and Draco's slot.
 local H = dofile("tools/tests/lib/ot6.lua")
 local function map() return H.mapId() & 0x1ff end
 local function sw(id) return (H.readByte(0x1E80 + math.floor(id/8)) >> (id%8)) & 1 end
@@ -17,7 +17,7 @@ local CLIMB={}
 local function c(x,y,d) CLIMB[key(x,y)]=d end
 c(5,21,{"right"}); c(6,21,{"right"}); c(7,21,{"right"}); c(8,21,{"right"}); c(9,21,{"right"})
 c(10,21,{"right"}); c(11,21,{"up"}); c(11,20,{"up"})
--- objects with vis bit7 set (active) OR nonzero low-area position, in dance-region range
+-- objects with vis bit7 set (active) or nonzero low-area position, in dance-region range
 local function activeObjs()
   local t={}
   for i=0,31 do

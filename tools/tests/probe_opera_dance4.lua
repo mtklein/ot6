@@ -1,5 +1,5 @@
--- probe_opera_dance4.lua -- LAST dance attempt + diagnosis.  Climb the x=12
--- column to Draco (12,14), talk UP to advance _cabd35 ($01F0->1->2), tracking
+-- probe_opera_dance4.lua -- final dance attempt and diagnosis.  Climb the x=12
+-- column to Draco (12,14), talk up to advance _cabd35 ($01F0->1->2), tracking
 -- every object so Draco's movement is visible.  Then flowers -> balcony.
 local H = dofile("tools/tests/lib/ot6.lua")
 local function map() return H.mapId() & 0x1ff end
@@ -29,7 +29,7 @@ local function greedyStep(tx,ty, jitter)
     if dist<bd then bd=dist; best=mv end end end
   return best
 end
--- climb to (tx,ty); when within `near`, tap A facing UP (talk Draco above); done on `doneFn`
+-- climb to (tx,ty); when within `near`, tap A facing up (talk Draco above); done on `doneFn`
 local function climbTalk(tx,ty,near,fdir, doneFn,maxF,what)
   local ph,last,stuck,hb=0,nil,0,0
   return H.driveUntil(doneFn, maxF, { H.call(function() ph=(ph+1)%6; hb=hb+1
@@ -52,7 +52,7 @@ H.run({ maxFrames = 14000 }, {
   H.loadState("build/states/aria_postfork.mss.lua"),
   H.waitFrames(30),
   H.call(function() H.assertEq(map(),236,"boot 236"); dumpsw("start") end),
-  -- talk Draco up the column: aim (12,15), talk UP, until $01F2 (waltz done)
+  -- talk Draco up the column: aim (12,15), talk up, until $01F2 (waltz done)
   climbTalk(12,15,1,"up", function() return sw(0x01F2)==1 or sw(0x0057)==1 or sw(0x0111)==1 or map()~=236 end, 5000, "waltz"),
   H.call(function() dumpsw("after waltz"); H.screenshot("dance4_waltz") end),
   -- flowers (12,19) from above

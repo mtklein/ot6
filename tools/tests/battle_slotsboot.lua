@@ -1,37 +1,38 @@
 -- @suite slow
--- battle_slotsboot.lua -- boost-tiered Slot on a NATURAL boot: cold-Continue
+-- battle_slotsboot.lua -- boost-tiered Slot on a natural boot: cold-Continue
 -- the terra-returned-v1 SRAM checkpoint (party LOCKE EDGAR SABIN SETZER,
 -- save-point boundary F, lettered in tools/tests/savestate_graph.py; the
--- Continue restores the party ON FOOT at the grounded Blackjack's tile),
--- walk the plain south of Zozo into a REAL world encounter, and drive real Slot spins with real button
--- presses.  NO pokes on either side (issue #75): BP accumulates through
--- Ot6ActionEnd's own regen (battle opens at 1, +1 per unboosted turn), boost
--- is spent with real R presses, and the reels are stopped by real A presses
--- -- whatever icons they land on, the tier promises are asserted as
--- invariants of the mechanism's own cells.
+-- Continue restores the party on foot at the grounded Blackjack's tile),
+-- walk the plain south of Zozo into a world encounter, and drive real Slot
+-- spins with real button presses.  No pokes on either side (issue #75): BP
+-- accumulates through Ot6ActionEnd's own regen (battle opens at 1, +1 per
+-- unboosted turn), boost is spent with real R presses, and the reels are
+-- stopped by real A presses.  Whatever icons they land on, the tier promises
+-- are asserted as invariants of the mechanism's own cells.
 --
--- ISSUE #75 CONVERSION -- headroom by TARGET SELECTION, not staging.  The
--- monster-side stop/death-proof/HP-floor pins are gone; in their place the
--- encounter is CHOSEN: unsuitable draws are fled (L+R, the engine's own run
--- mechanic -- battle_steal's formation-variance idiom) until the plain
--- south of Zozo deals a formation with enough bodies and HP to survive
--- three Slot resolutions with the enemy side acting freely.  Unforced
--- spins overwhelmingly resolve Lagomorph (a party heal) and the boosted
+-- Issue #75 conversion: headroom comes from target selection rather than
+-- staging.  The monster-side stop, death-proof and HP-floor pins are gone; in
+-- their place the encounter is chosen: unsuitable draws are fled (L+R, the
+-- engine's own run mechanic, battle_steal's formation-variance idiom) until
+-- the plain south of Zozo deals a formation with enough bodies and HP to
+-- survive three Slot resolutions with the enemy side acting freely.  Unforced
+-- spins mostly resolve Lagomorph (a party heal) and the boosted
 -- spin's chosen triple is reel 1's real stop, so the fight's damage
 -- budget is small; the check below is calibrated from the pool's measured
 -- draws.  The bench still answers its menus with real Defends and the
 -- party takes the enemy's real hits.
 --
 -- The three spins:
---   spin 1 (0 bp): the plumbing is invisible -- nothing pending, the turn
---     REGENS +1 bp (1 -> 2), the spin resolves whatever vanilla dealt.
+--   spin 1 (0 bp): nothing is pending, the turn regens +1 bp (1 -> 2), and
+--     the spin resolves whatever vanilla dealt.
 --   spin 2 (0 bp): bp 2 -> 3.
---   spin 3 (3 bp, three real R presses): the reel is CHOSEN -- whatever icon
+--   spin 3 (3 bp, three real R presses): the reel is chosen, so whatever icon
 --     reel 1 was stopped on, reels 2 and 3 must find it (whole-strip drift
 --     budget), the queued result is that icon's triple, and Ot6ActionEnd
 --     charges exactly 3 with no regen.  If reel 1 lands the 7 in a battle
---     whose $2f49.2 forbids joker doom, the promise is DOCUMENTED to fold
---     (the battle gate outranks boost) -- asserted per that rule instead.
+--     whose $2f49.2 forbids joker doom, the promise is documented to fold,
+--     because the battle gate outranks boost, and it is asserted per that
+--     rule instead.
 --
 -- The Ot6BoostDmg exemption rides the whole run as a write-watch: the
 -- multiplier's $f0-bank OT6_SCR_BIT store must never happen under cmd $0f.
@@ -69,7 +70,7 @@ local function onFoot()
 end
 
 -- wait for a character's menu; consume any other character's menu with a
--- real Defend (right swaps Fight->Def, then A) -- probe_mp_universal's idiom
+-- real Defend (right swaps Fight->Def, then A), probe_mp_universal's idiom
 local function menuFor(charId, what)
   local ph = 0
   local function up()
@@ -90,8 +91,8 @@ local function menuFor(charId, what)
   }, what)
 end
 
--- move the command cursor onto the Slot row (VERIFIED against the live
--- cursor cell w7e890f+slot -- a fire-and-forget down-press can miss and put
+-- move the command cursor onto the Slot row (verified against the live
+-- cursor cell w7e890f+slot, because an unchecked down-press can miss and put
 -- the A taps on Fight), confirm, and wait for the live reel state.
 -- Setzer's real command list rows live at $202e+slot*12 (3 bytes per row).
 local function openSlotWindow(what)
@@ -148,8 +149,8 @@ local function waitStop(r, what)
 end
 
 H.run({ maxFrames = 400000 }, {
-  -- cold Continue (the checkpoint's $307ff0=3 preselects slot 3) -- the
-  -- probe_mp_universal boot, verbatim
+  -- cold Continue (the checkpoint's $307ff0=3 preselects slot 3), using the
+  -- probe_mp_universal boot unchanged
   H.waitFrames(350),
   H.repeatN(5, { H.pressButtons({ "start" }, 8), H.waitFrames(25) }),
   H.waitFrames(120),
@@ -180,7 +181,7 @@ H.run({ maxFrames = 400000 }, {
   H.release(),
   H.waitFrames(30),
 
-  -- walk the plain until a real encounter fires -- and CHOOSE it: a draw
+  -- walk the plain until a real encounter fires, and choose it: a draw
   -- without the headroom to survive three Slot resolutions is fled (L+R)
   -- and the walk resumes.  Check calibrated from the pool's measured draws
   -- (2026-08-10: the first draw dealt 3 bodies / 1237 total max HP, well
@@ -255,13 +256,13 @@ H.run({ maxFrames = 400000 }, {
       end)
     end, emu.callbackType.write, 0x7E2BB0, 0x7E2BC9)
     -- the exemption watch: Ot6BoostDmg's multiplier parks its counter in
-    -- OT6_SCR_BIT ($3ece) before multiplying -- a write from INSIDE the proc
-    -- under cmd $0f is the multiplier running, which the exemption forbids
+    -- OT6_SCR_BIT ($3ece) before multiplying, so a write from inside the proc
+    -- under cmd $0f means the multiplier ran, which the exemption forbids
     -- ($3ece is shared OT6 scratch, so the pc range is load-bearing)
     local BOOSTDMG = H.sym("Ot6BoostDmg")
     emu.addMemoryCallback(function(_, v)
-      -- CHEAP GUARDS FIRST -- same conjunction, reordered.  See the twin
-      -- watch in battle_slots.lua for the measurement: emu.getState()
+      -- cheap guards first: the same conjunction, reordered.  See the
+      -- matching watch in battle_slots.lua for the measurement: emu.getState()
       -- serialises the machine on every call, and $3ece is shared OT6
       -- scratch written tens of thousands of times a run.
       if not (v > 0 and H.readByte(0xB5) == 0x0F) then return end
@@ -275,7 +276,7 @@ H.run({ maxFrames = 400000 }, {
     end, emu.callbackType.write, 0x7E3ECE, 0x7E3ECE)
   end),
 
-  -- ------------------------------------------------ spin 1: 0 bp, byte-quiet
+  -- ------------------------------- spin 1: 0 bp, no boost bytes written ----
   menuFor(SETZER, "setzer menu (spin 1)"),
   H.call(function()
     H.assertEq(bp(), 1, "battle opens at 1 bp (Ot6InitBP)")
@@ -313,7 +314,7 @@ H.run({ maxFrames = 400000 }, {
   H.driveUntil(function() return bp() == 3 end, 9000,
     { H.waitFrames(1) }, "spin2: bp 2 -> 3"),
 
-  -- ------------------------------------- spin 3: three real R presses, CHOSEN
+  -- ------------------------------- spin 3: three real R presses, icon chosen
   menuFor(SETZER, "setzer menu (spin 3)"),
   H.waitFrames(20),
   H.repeatN(3, { H.pressButtons({ "r" }, 6), H.waitFrames(20) }),
@@ -335,8 +336,8 @@ H.run({ maxFrames = 400000 }, {
   end),
   pressAUntil(PRESS[2], "spin3 press2"),
   H.call(function()
-    -- the chosen icon: reel 1's real stop.  In a joker-forbidden battle a
-    -- timed 7 is the documented exception: no help, no bought triple.
+    -- the chosen icon is reel 1's real stop.  In a joker-forbidden battle a
+    -- timed 7 is the documented exception: no help and no bought triple.
     local chosen = icon(1)
     local gated = chosen == 0 and (H.readByte(JOKER) & 4) ~= 0
     if gated then

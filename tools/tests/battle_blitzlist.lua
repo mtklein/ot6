@@ -4,40 +4,40 @@
 -- Vanilla Blitz had no window: UpdateMenuState_3d (btlgfx_main.asm, now
 -- deleted) read button codes off a 64-frame rolling pad-edge buffer.  The
 -- command now hands off to Ot6BlitzListOpen (ot6.asm), which fills wItemList
--- with the LEARNED blitzes -- each row keyed by its resolved attack id $5D+i
--- (Pummel $5d .. Bum Rush $64) -- and reuses the Tools window shell (menu
--- state $30).  The row draw flips the Tools template's $0e item-name code to
+-- with the learned blitzes, each row keyed by its resolved attack id $5D+i
+-- (Pummel $5d to Bum Rush $64), and reuses the Tools window shell (menu
+-- state $30).  The row draw changes the Tools template's $0e item-name code to
 -- $0f so ListTextCmd_0f renders each row from AttackName; the confirm shim
--- subtracts $5D back to the raw index cmd $0a stores, exactly the byte
--- UpdateMenuState_3d used to write, so FixPlayerAttack (validates i against
--- $1d28, adds +$5d) and everything downstream are untouched.
+-- subtracts $5D back to the raw index cmd $0a stores, which is the byte
+-- UpdateMenuState_3d used to write, so FixPlayerAttack (which validates i
+-- against $1d28 and adds +$5d) and everything downstream are untouched.
 --
--- ISSUE #75 CONVERSION -- a REAL SABIN, his REAL learned set, real cursors.
+-- Issue #75 conversion: a real Sabin, his real learned set, and real cursors.
 -- This file used to install CHAR::SABIN into every magitek-intro slot, write
--- the known-blitz mask $1d28 by hand, pin HP, and POKE the saved-cursor
--- triple to select a row.  It now boots vargas_won -- Sabin on Mt. Kolts
--- right after his own boss fight -- paces the ledge until a natural
+-- the known-blitz mask $1d28 by hand, pin HP, and poke the saved-cursor
+-- triple to select a row.  It now boots vargas_won (Sabin on Mt. Kolts
+-- right after his own boss fight), paces the ledge until a natural
 -- encounter fires, waits for SABIN's own menu, and opens his real Blitz
--- command.  The learned set is whatever the save holds (the
--- menu_blitzpage_sabin doctrine): $1d28 is READ, the rows are derived from
+-- command.  The learned set is whatever the save holds, following
+-- menu_blitzpage_sabin: $1d28 is read, the rows are derived from
 -- it, and the not-drawn negative control is the save's own first unlearned
--- blitz.  The selection cursor is WALKED with the d-pad and verified by
--- re-reading the cell -- the battle_vargas idiom -- never written.
+-- blitz.  The selection cursor is walked with the d-pad and verified by
+-- re-reading the cell (the battle_vargas idiom) rather than written.
 --
 -- What is asserted:
---   1. LEARNED-ONLY ROWS + STAMPED COSTS.  wItemList packs exactly the
+--   1. learned-only rows and stamped costs.  wItemList packs exactly the
 --      learned attack ids in ladder order, then $ff; every learned name
---      (AttackName bytes, read from the ROM) is drawn, the first unlearned
---      name is NOT; each row's Qty cell carries its Ot6AbilityCostTbl price
---      (read from the ROM -- a retune moves both sides), and the real
+--      (AttackName bytes, read from the ROM) is drawn and the first unlearned
+--      name is not; each row's Qty cell carries its Ot6AbilityCostTbl price
+--      (read from the ROM, so a retune moves both sides), and the real
 --      ladder spans one- and two-digit prices on screen (Pummel 4,
 --      AuraBolt 10 at this fixture's level).
---   2. THE OLD CODE IS DEAD.  Mashing Pummel's vanilla combo directions
---      (LEFT RIGHT LEFT) as pad edges in the open list queues nothing: the
---      menu stays open, no action commits.  Only the cursor + A selects.
---   3. SELECTION RESOLVES.  The cursor is WALKED onto Pummel's row with the
+--   2. the old code is gone.  Mashing Pummel's vanilla combo directions
+--      (left, right, left) as pad edges in the open list queues nothing: the
+--      menu stays open and no action commits.  Only the cursor plus A selects.
+--   3. selection resolves.  The cursor is walked onto Pummel's row with the
 --      d-pad (verified by re-reading the saved-cursor cells) and A lands
---      attack $5d in $3410 ("last skill used").
+--      attack $5d in $3410, the last-skill-used cell.
 local H = dofile("tools/tests/lib/ot6.lua")
 local STATE = "build/states/vargas_won.mss.lua"
 
@@ -49,7 +49,7 @@ local SABIN = 0x05
 local PUMMEL, BLITZ_ATK0 = 0x5D, 0x5D
 local SCROLL, CUR_COL, CUR_ROW = 0x895F, 0x8963, 0x8967
 
--- the two ROM authorities: names as ListTextCmd_0f draws them, prices as
+-- the two ROM tables: names as ListTextCmd_0f draws them, prices as
 -- Ot6CostFor charges them.
 local ATKNAME = H.sym("AttackName") & 0x3FFFFF
 local ATKNAME_0, NAME_SIZE = 0x51, 10
@@ -109,7 +109,7 @@ local function menuFor(charId, what)
       ph = ph + 1
       if H.readByte(MENU) == 0 then
         -- no menu up: page any battle dialog with A (the battle_vargas
-        -- hazard -- a monster dialog blocks the queue until dismissed)
+        -- hazard, where a monster dialog blocks the queue until dismissed)
         H.setPad(ph % 8 < 4 and { a = true } or {})
       elseif H.readByte(ACTOR) ~= slotOf[charId] then
         local step = ph % 40
@@ -227,7 +227,7 @@ H.run({ maxFrames = 90000 }, {
   -- the spike deliverable: the open Blitz menu with each name's MP cost drawn.
   H.call(function() H.screenshot("blitz_cost_display") end),
 
-  -- 1. LEARNED-ONLY ROWS + STAMPED MP COST -----------------------------------
+  -- 1. learned-only rows and stamped MP cost ---------------------------------
   H.call(function()
     local ids, qty = {}, {}
     for i = 0, 7 do
@@ -256,9 +256,9 @@ H.run({ maxFrames = 90000 }, {
       .. "blitz never appears")
   end),
 
-  -- 2. THE OLD CODE IS DEAD ---------------------------------------------------
-  -- Pummel's vanilla combo was LEFT RIGHT LEFT A.  Its DIRECTIONS, mashed as
-  -- pad edges in the open list, must only walk the cursor -- never queue.
+  -- 2. the old code is gone ---------------------------------------------------
+  -- Pummel's vanilla combo was left, right, left, A.  Its directions, mashed as
+  -- pad edges in the open list, must only walk the cursor and never queue.
   H.call(function() H.assertEq(H.readByte(MSTATE), ST_TOOLS, "in the list before the mash") end),
   H.pressButtons({ "left" }, 4),  H.waitFrames(4),
   H.pressButtons({ "right" }, 4), H.waitFrames(4),
@@ -269,9 +269,9 @@ H.run({ maxFrames = 90000 }, {
     H.assertEq(H.readByte(MENU) ~= 0, true, "the battle menu is still up")
   end),
 
-  -- 3. SELECTION RESOLVES -----------------------------------------------------
-  -- The cursor is WALKED back onto Pummel's row 0 with the d-pad -- the mash
-  -- above may have moved it -- and verified by re-reading the saved-cursor
+  -- 3. selection resolves -----------------------------------------------------
+  -- The cursor is walked back onto Pummel's row 0 with the d-pad, because the
+  -- mash above may have moved it, and verified by re-reading the saved-cursor
   -- cells (issue #75: the pokes are gone).
   (function()
     local ph = 0

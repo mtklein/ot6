@@ -6,9 +6,9 @@ Scope: World of Balance. Locked ✦.
 
 The physical trio covers
 the logical attacks; **Special (¤)** catches everything the logical
-classes don't — and it's a real, breakable class, so oddball-weapon
+classes don't. It is a real, breakable class, so oddball-weapon
 parties keep a chip axis. 4 physical + 8 elemental = 12 weakness
-axes: Octopath's exact count.
+axes, which matches Octopath's count.
 
 | Class | What's in it | Wielders (WoB) | Icon |
 |---|---|---|---|
@@ -18,28 +18,28 @@ axes: Octopath's exact count.
 | **special ¤** | dice, cards, brushes, any little oddball the logical three don't claim | Setzer, Relm | $df |
 
 - **The weapon sets Fight's class; abilities carry their own ✦.**
-  Sabin with claws equipped *slashes* when he Fights — but Pummel is
-  still bludgeoning, whatever is on his hands. Ability class bytes
+  Sabin with claws equipped *slashes* when he Fights, but Pummel is
+  still bludgeoning regardless of what is equipped. Ability class bytes
   are immutable; only the basic attack reads the equipped weapon.
   (Claws are how the monk buys into a second class, the same way
   Edgar's Chainsaw buys him slashing.)
 - **Bludgeoning / piercing / slashing covers the basic physicals**
-  intuitively — players can guess a body's weakness before probing
-  (armored → bludgeon or pierce, plated → slash, soft → pierce…),
-  and probing confirms.
-- **Null-break stays, as a property, not a class ✦**: some attacks
-  are just big dumb damage that chips nothing — the physical mirror
-  of non-elemental magic. A per-weapon/per-skill flag: the wildest
-  oddballs (Fixed Dice…) roll huge and teach nothing, while ordinary
-  ¤ weapons chip Special-weak enemies.
+  in a way players can guess before probing (armored → bludgeon or
+  pierce, plated → slash, soft → pierce…), and probing confirms the
+  guess.
+- **Null-break stays, as a property rather than a class ✦**: some
+  attacks deal damage and chip nothing, the physical counterpart of
+  non-elemental magic. It is a per-weapon/per-skill flag. The most
+  extreme oddballs (Fixed Dice…) roll high numbers and reveal
+  nothing, while ordinary ¤ weapons chip Special-weak enemies.
 - Cyan is a slashing *specialist* (Quadra Slam ×4 is the best slash chip
-  in the game), never the only slashing key — Terra/Celes swords
-  cover the class when he's absent. Class-coverage balance stays a
-  standing question we re-ask every milestone ✦.
+  in the game), but he is not the only slashing key: Terra/Celes swords
+  cover the class when he's absent. Class-coverage balance is re-asked
+  every milestone ✦.
 - The 8 elements stay untouched ✦.
 - **Row jank preserved ✦**: weapons that ignore row in vanilla
-  (boomerangs, dice, cards, darts…) keep ignoring row. That charm
-  survives contact with the new system untouched.
+  (boomerangs, dice, cards, darts…) keep ignoring row. The new
+  system does not change it.
 
 ## The item icon shows the break class
 
@@ -50,10 +50,10 @@ covers every surface, and the item menu's type column reads
 SLASH / PIERCE / BLUNT / SPECIAL from the same byte. Classless
 weapons (Heal Rod) show a small dash. Armor, relic, tool, and
 consumable icons are unchanged from vanilla. v1 reuses the vanilla
-sword/spear/staff/sparkle glyphs for the four classes. Rule: if we
-ever want more visual distinction between weapon types, that is a
-reason to consider another weapon class, not to add a second
-icon set with no mechanical meaning.
+sword/spear/staff/sparkle glyphs for the four classes. Rule: if more
+visual distinction between weapon types is wanted, add another
+weapon class rather than a second icon set with no mechanical
+meaning.
 
 ## How weaknesses spread (the coverage rule)
 
@@ -68,26 +68,26 @@ scenario split is the stress test:
 | **Locke scenario** | pierce only | none | *everything* South Figaro pierces ✦ |
 | **Sabin scenario** | bludgeon, slash (Cyan), pierce (Gau) | holy, fire, wind | Phantom Train: holy + slash featured |
 | **Terra/Banon scenario** | slash, pierce, bludgeon (Banon rod) | fire, ice, bolt, poison | mage-check spread |
-| Zozo | reunited | most | first "read the room" dungeon |
+| Zozo | reunited | most | first dungeon needing a per-encounter read |
 | Opera → Vector | + special ¤ (Setzer) | — | pierce-weak fliers + the first ¤-weak enemies |
 | Magitek factory | all | all | armored spread: bludgeon/pierce featured |
 | Sealed Gate / Thamasa | + Strago/Relm | + lores | spirits: bludgeon-immune, arcane-elemental |
-| Floating Continent | final WoB party | all | the exam: every class and element locks once |
+| Floating Continent | final WoB party | all | final check: every class and element locks once |
 
 - **Elemental weaknesses**: vanilla's bits stay wherever they exist ✦;
   add only where a stretch has a hole.
-- **Weapon weaknesses** (the new byte, M3): assigned by body reading —
-  guessable, then confirmed by probe.
+- **Weapon weaknesses** (the new byte, M3): assigned by body type, so
+  a player can guess and then confirm by probing.
 - Shields ✦: trash 1–3, minibosses 4–6, bosses 6–12 with telegraphs;
   per-monster table authored in M6 against this spread.
 
 ## Weapons as chip carriers
 
-A weapon chips **its class, plus its element if it has one** ✦ — a
+A weapon chips **its class, plus its element if it has one** ✦, so a
 Flame Knife is a piercing probe and a fire probe in one swing. In
 vanilla, elemental weapons rotate in and out on raw stats; here every
-chest and shop upgrade is a tactical acquisition. Multi-hit actions
-chip per hit ✦ (Quadra Slam, boosted Fight).
+chest and shop upgrade also changes what the party can chip. Multi-hit
+actions chip per hit ✦ (Quadra Slam, boosted Fight).
 
 ## Skills carry their own class ✦
 
@@ -103,15 +103,15 @@ new battle code:
 
 1. **Skills** (above) — a kit can reach outside its weapon class.
 2. **Magicite weapon permits** (M5): an equipped esper may grant one
-   extra weapon-class permit. Kept deliberately spare ✦ — a knob to
-   gesture with, not a system to balance around.
+   extra weapon-class permit. Kept spare ✦: a small knob rather than
+   a system to balance around.
 
 ## Open questions for the driver
 
-1. ¤-weak density: how many Special-weak enemies per stretch keeps a
-   Setzer/Relm party probing happily without making ¤ a skeleton key?
-   (First instinct: rare before the Opera, steady after.)
-2. The ¤ icon needs a font cell — draw a little sparkle/asterisk in
-   the same family as the element icons, or borrow a vanilla glyph?
+1. ¤-weak density: how many Special-weak enemies per stretch give a
+   Setzer/Relm party something to probe without making ¤ answer
+   everything? (First instinct: rare before the Opera, steady after.)
+2. The ¤ icon needs a font cell. Draw a sparkle/asterisk in the same
+   family as the element icons, or borrow a vanilla glyph?
    (v1 borrows the vanilla sparkle at $df; a bespoke ¤ can replace
-   the art in place later — every consumer keys on the code.)
+   the art in place later, since every consumer keys on the code.)

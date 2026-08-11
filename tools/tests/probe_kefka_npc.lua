@@ -1,5 +1,5 @@
--- probe_kefka_npc.lua -- SPIKE instrument: why does A at (19,36) not
--- activate KEFKA (NPC_1, object 16)?  CheckNPCs (player.asm:142) has
+-- probe_kefka_npc.lua -- spike instrument: measures why A at (19,36) does
+-- not activate KEFKA (NPC_1, object 16).  CheckNPCs (player.asm:142) has
 -- three vetoes before the event dispatch: the collision bit ($087c bit6),
 -- the already-activated check ($087c low nibble == 4), and the z-level
 -- match ($b8&7 vs the object's $0888).  Read them all off

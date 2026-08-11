@@ -1,15 +1,16 @@
--- probe_cranes_water.lua -- READ-ONLY instrument (issue #75, the Cranes
--- vanilla-playbook re-test): does the fight's DESIGNED key actually turn it?
+-- probe_cranes_water.lua -- read-only instrument (issue #75, the Cranes
+-- vanilla-playbook re-test): measures whether the fight's designed key
+-- turns it.
 --
 -- The wall record (gen_terra_returned_checkpoint header) reports every
--- input-driven configuration wiping by ~f8400 and names the designed
--- counter -- water, bosses-wob.md 16 -- "unobtainable by the mandated
--- party".  probe_cranes_loadout falsified the premise: BISMARK ($1A69 bit
+-- input-driven configuration wiping by ~f8400 and describes the designed
+-- counter, water (bosses-wob.md 16), as "unobtainable by the mandated
+-- party".  probe_cranes_loadout falsified that premise: BISMARK ($1A69 bit
 -- 7) is owned at n128_won, everyone can pay Sea Song's 50 MP, and Sea Song
--- ($3d: WATER 58, all enemies) hits BOTH Cranes' shared weakness while
--- feeding NEITHER absorb ($10D absorbs bolt $04, $10E fire $01 --
--- monster_prop.dat +23).  SHIVA's Diamond Dust ($38: ice, power 34 + a
--- SLOW rider, all enemies -- battle_magicite's re-authoring) is likewise
+-- ($3d: water 58, all enemies) hits both Cranes' shared weakness while
+-- feeding neither absorb ($10D absorbs bolt $04, $10E fire $01;
+-- monster_prop.dat +23).  SHIVA's Diamond Dust ($38: ice, power 34 with a
+-- Slow rider, all enemies; battle_magicite's re-authoring) is also
 -- absorb-clean here.
 --
 -- So this probe plays the fight the way a player reading the vanilla
@@ -20,18 +21,18 @@
 --     trigger;
 --   * the fight driver's new opts.summon fires each stone's divine once
 --     (engine latch $3f2e), then falls back to the measured tactical kit
---     (boosted Tools/Blitz/Fights, bank 1) -- all of it element-clean, so
---     no absorb is ever fed by our own hand;
+--     (boosted Tools/Blitz/Fights, bank 1), all of which is element-clean,
+--     so the party never feeds an absorb;
 --   * medic doctrine healPercent 55 (the n128 boss split), cadence 12;
 --   * the standard 3-attempt retry ladder, 37-frame phase spread, off a
---     pre-trigger savestate blob (clearGateSoldier's idiom) -- a wipe
---     reloads and replays a genuinely different fight.
+--     pre-trigger savestate blob (clearGateSoldier's idiom), so a wipe
+--     reloads and replays a different fight.
 -- Instrumented like probe_cranes_wedge: battle open/close/periodic dumps
--- (party hp, per-Crane hp/shields, $3330 allowed-status words so the
+-- (party hp, per-Crane hp/shields, $3330 allowed-status words, so the
 -- Slow question is answered by data), and a wipe detector on the battle
--- module's own HP words ($3BF4 -- the persistent table lies, HANDOFF).
--- Terminates on map 219 (the flashback = the ride continued past the
--- Cranes) or after 3 losses.  NOT a suite test; no fixture output.
+-- module's own HP words ($3BF4; the persistent table is stale, HANDOFF).
+-- Terminates on map 219 (the flashback, meaning the ride continued past
+-- the Cranes) or after 3 losses.  Not a suite test; no fixture output.
 local H = dofile("tools/tests/lib/ot6.lua")
 
 local ZMENUSTATE, ZCURSOR = 0x26, 0x4b
@@ -136,18 +137,18 @@ local function equipEsper(pos, idx, what)
   })
 end
 
--- drive the real Equip menu to put a SPECIFIC weapon in char-select `pos`'s
+-- drive the real Equip menu to put a specific weapon in char-select `pos`'s
 -- main hand.  States (equip.asm): $36 options (cursor 0 = Equip) -> $55 slot
 -- select (default slot 0 = R-Hand) -> $57 item select, whose list rows at
--- $7e9d8a are BAG INDEXES into $1869 (MenuState_57 @992d reads exactly
--- that), so the seek compares the id under the cursor, not a guessed row.
--- WHY (measured 2026-08-10): H.equipOptimum armed LOCKE and EDGAR with
--- THUNDER BLADES ($0F -- slash class, LIGHTNING element), and the Left
--- Crane ABSORBS lightning: every Fight healed it (+160/+198 pair heals to
--- FULL, +943 boosted) and walked its Giga Volt counter -- the party fed
--- the nuke that wiped it, one swing at a time.  The bag carries DAGGERS
--- (Dirk/MithrilKnife/Guardian), and daggers are OT6_PIERCE -- the Cranes'
--- own class weakness: element-clean AND shield-chipping.
+-- $7e9d8a are bag indexes into $1869 (MenuState_57 @992d reads that), so
+-- the seek compares the id under the cursor rather than a guessed row.
+-- Reason (measured 2026-08-10): H.equipOptimum armed LOCKE and EDGAR with
+-- Thunder Blades ($0F, slash class, lightning element), and the Left Crane
+-- absorbs lightning: every Fight healed it (a +160/+198 pair heals it to
+-- full, +943 boosted) and charged its Giga Volt counter, so the party was
+-- feeding the attack that wiped it one swing at a time.  The bag carries
+-- daggers (Dirk/MithrilKnife/Guardian), and daggers are OT6_PIERCE, the
+-- Cranes' class weakness: element-clean and shield-chipping.
 local ST_EQOPT, ST_EQSLOT, ST_EQITEM = 0x36, 0x55, 0x57
 local function equipWeapon(pos, itemId, what)
   return H.seqStep({
@@ -227,21 +228,21 @@ local function attempt(n)
     end)(),
     H.release(),
     (function()
-      -- attempt-1 lessons (2026-08-10, this file's first run): the bag is
+      -- attempt-1 results (2026-08-10, this file's first run): the bag is
       -- 15 Tonics / 0 Potions, so an every-actor 55% medic line heal-locks
-      -- the party into a wipe at battle f+6000 -- SETZER (the 4th rider the
+      -- the party into a wipe at battle f+6000.  SETZER (the 4th rider the
       -- reunion adds) is the sole medic now, the n128 split; and Tools is
-      -- OFF because AutoCrossbow's splash feeds both retal counters (the
+      -- off because AutoCrossbow's splash feeds both retal counters (the
       -- cross-heal: +329 on the Left Crane per fed threshold).  Everything
-      -- left is single-target at the default slot -- the LEFT Crane -- which
-      -- is exactly the vanilla playbook's kill order.
-      -- focus = PIN the LEFT Crane, the vanilla kill order.  The mask is
-      -- MEASURED by the delta logger this file carries: CONFIRM mons=01
-      -- fights land -60..-90 on SLOT 0 ($010D), so mask 01 = Left = the
-      -- cursor's own default (an earlier mask=02 reading here was bad
-      -- attribution and cost three attempts).  Once Left dies the entry's
-      -- liveness check drops out and the default confirm takes the Right.
-      -- bank=2 pays off: a 2-BP Pummel lands -796 on the shielded Left.
+      -- left is single-target at the default slot, the Left Crane, which
+      -- is the vanilla playbook's kill order.
+      -- focus pins the Left Crane, the vanilla kill order.  The mask is
+      -- measured by the delta logger this file carries: CONFIRM mons=01
+      -- fights land -60..-90 on slot 0 ($010D), so mask 01 = Left, the
+      -- cursor's own default (an earlier mask=02 reading here was a
+      -- misattribution and cost three attempts).  Once Left dies the
+      -- entry's liveness check drops out and the default confirm takes the
+      -- Right.  bank=2 helps: a 2-BP Pummel lands -796 on the shielded Left.
       F = H.newFightDriver("cranes water", { tactical = true, boost = true,
         bank = 2, items = true, healer = 9, healPercent = 45, tools = false,
         cadence = 12, summon = summonChars, traceTgt = true,
@@ -269,14 +270,14 @@ local function attempt(n)
           end
           if wasBatt and battN == 0 then
             wasBatt = false; battleDump("battle CLOSED")
-            -- THE CLOSE-EDGE VERDICT (probe_cranes_wedge's paid-for lesson):
-            -- a wipe CLOSES the battle with the Cranes alive and hands the
-            -- ride to GameOver.  But do NOT read the monster table at the
-            -- edge itself -- teardown reads $FFFF everywhere (HANDOFF trap
-            -- 1), and this file's first WIN was thrown away as a "wipe" by
-            -- exactly that read.  The delta logger's LAST IN-BATTLE values
-            -- are the real checks: any Crane still above zero on its
-            -- final in-battle sample means we lost.
+            -- The close-edge verdict (from probe_cranes_wedge): a wipe
+            -- closes the battle with the Cranes alive and hands the ride to
+            -- GameOver.  Do not read the monster table at the edge itself:
+            -- teardown reads $FFFF everywhere (HANDOFF trap 1), and this
+            -- file's first win was discarded as a "wipe" because of that
+            -- read.  The delta logger's last in-battle values are the
+            -- checks to use: any Crane still above zero on its final
+            -- in-battle sample means the party lost.
             if type(lastSt) == "table" then
               for m = 0, 1 do
                 local hp = lastSt[m * 2 + 1]
@@ -289,8 +290,8 @@ local function attempt(n)
             -- frame.  The 600-frame sampled dumps cannot attribute damage
             -- (a -525 Pummel and a +294 absorb heal inside one window net
             -- to noise); the deltas, beside the driver's CONFIRM lines
-            -- (opts.traceTgt), say which mask bit is which monster and
-            -- what every action actually did.
+            -- (opts.traceTgt), identify which mask bit is which monster and
+            -- what each action did.
             for m = 0, 1 do
               local hp = H.readWord(0x3BFC + m * 2)
               local sh = H.readByte(0x3E40 + m * 2)
@@ -351,17 +352,18 @@ H.run({ maxFrames = 320000 }, {
   end),
 
   -- Char-select order at this boundary (measured): pos 0 = EDGAR, pos 1 =
-  -- SABIN, pos 2 = LOCKE.  SETZER joins in the reunion scene AFTER the last
+  -- SABIN, pos 2 = LOCKE.  SETZER joins in the reunion scene after the last
   -- menu access, so only three stones can ride in.  CARBUNKL is the
-  -- defensive key: its divine reflects the party, and the Cranes' entire
-  -- normal rotation (Bolt/Bolt2, Fire/Fire2) is reflectable spells --
-  -- only Magnitude8 and the physical counters come through.
+  -- defensive key: its divine reflects the party, and the Cranes' normal
+  -- rotation (Bolt/Bolt2, Fire/Fire2) is all reflectable spells, so only
+  -- Magnitude8 and the physical counters come through.
   equipEsper(0, BISMARK, "equip BISMARK"),
   equipEsper(1, SHIVA, "equip SHIVA"),
   equipEsper(2, CARBUNKL, "equip CARBUNKL"),
-  -- de-arm the lightning: daggers (pierce -- the Cranes' class weak) in
-  -- both swingers' main hands, replacing the Thunder Blades that healed
-  -- and charged the Left Crane every Fight (see equipWeapon's header)
+  -- remove the lightning weapons: daggers (pierce, the Cranes' class
+  -- weakness) in both swingers' main hands, replacing the Thunder Blades
+  -- that healed and charged the Left Crane on every Fight (see
+  -- equipWeapon's header)
   equipWeapon(0, 0x01, "EDGAR MithrilKnife"),
   equipWeapon(2, 0x02, "LOCKE Guardian"),
   H.call(function()
@@ -376,16 +378,16 @@ H.run({ maxFrames = 320000 }, {
       end
     end
   end),
-  -- BACK ROW, all three riders (M.setRows -- the real Order screen).  The
-  -- measured killers in every wipe are the Cranes' physical SPECIALs and
+  -- Back row for all three riders (M.setRows drives the real Order screen).
+  -- The measured cause of every wipe is the Cranes' physical specials and
   -- counters (~300 a hit against 312-457 pools); back row halves physical
-  -- taken, and this party's damage barely notices: Blitz, summons and the
-  -- medic Items are all row-exempt ($B3 bit $20, battle_main.asm:3131),
-  -- only the -66 Fights halve.  SETZER joins mid-scene and keeps his row.
+  -- damage taken and costs this party little, because Blitz, summons and
+  -- the medic Items are all row-exempt ($B3 bit $20, battle_main.asm:3131),
+  -- so only the -66 Fights halve.  SETZER joins mid-scene and keeps his row.
   H.setRows({ [1] = true, [4] = true, [5] = true },
     { tag = "cranes back row" }),
   H.call(function()
-    -- read back who actually wears what; key the summon table off the scan
+    -- read back who wears what; key the summon table off the scan
     -- rather than assuming the char-select order
     local pid = H.readByte(0x1A6D)
     for c = 0, 13 do
@@ -414,7 +416,7 @@ H.run({ maxFrames = 320000 }, {
   end),
 
   -- the retry blob: field control, stones equipped, pre-trigger
-  -- (clearGateSoldier's exact idiom)
+  -- (clearGateSoldier's idiom)
   (function()
     local req
     return H.seqStep({

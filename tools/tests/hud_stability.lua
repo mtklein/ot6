@@ -1,9 +1,9 @@
 -- @suite slow
--- hud_stability: the under-monster HUD must be rock-solid across TIME.
--- single-frame snapshots can pass while the HUD strobes (it happened);
--- this test watches the actual cell words frame by frame.
+-- hud_stability: the under-monster HUD must stay unchanged over time.
+-- Single-frame snapshots can pass while the HUD strobes, which has happened,
+-- so this test watches the cell words frame by frame.
 --   1. both guards' lines present after settle
---   2. 600 idle frames: the visible cell set never changes at all
+--   2. 600 idle frames: the visible cell set never changes
 --   3. an attack may contest BG3, but within 120 frames of the action
 --      landing the HUD is back and stays put for 300 more frames
 local H = dofile("tools/tests/lib/ot6.lua")
@@ -58,10 +58,10 @@ H.run({ maxFrames = 30000 }, {
   H.waitFrames(10),
   H.enterEncounter(),
   H.waitFrames(240),
-  -- issue #75: this call used to pin both guards' HP to 500 ("fight
-  -- longevity").  The pin bought nothing: during the idle watch the party
+  -- issue #75: this call used to pin both guards' HP to 500 for "fight
+  -- longevity".  The pin was unnecessary: during the idle watch the party
   -- takes no action (no input is pressed), so nothing can damage a guard,
-  -- and the attack round below is ONE beam into shielded guards -- which
+  -- and the attack round below is one beam into shielded guards, which
   -- battle_boost measured cannot end the fight even twice over (shielded
   -- damage is halved).  Enemy damage lands on party HP, which this test
   -- never asserts on.
@@ -76,21 +76,21 @@ H.run({ maxFrames = 30000 }, {
     H.assertEq(changes, 0, "idle hud perfectly stable for 600 frames")
   end),
   -- one attack round: BG3 is contested during the effect, then must
-  -- heal.  Issue #75: this used to berserk the whole party ($3EE5 |= $10,
-  -- forced menu-less auto-actions) and un-berserk after -- a status write
-  -- both ways.  Now ONE beam is fired through the live menu, driven BY
-  -- MENU STATE ($7BC2) -- battle_boost's measured driver, lifted whole:
-  -- a fixed button sequence lands its downs in whatever window holds the
+  -- recover.  Issue #75: this used to berserk the whole party ($3EE5 |= $10,
+  -- forced menu-less auto-actions) and un-berserk after, which is a status
+  -- write both ways.  Now one beam is fired through the live menu, driven by
+  -- menu state ($7BC2), using battle_boost's measured driver unchanged: a
+  -- fixed button sequence lands its downs in whatever window holds the
   -- cursor, so every press is chosen from the state byte.  The action is
-  -- the ROW-2 BEAM, not the no-damage Heal Force the burn-down plan
-  -- suggested -- battle_boost measured that dead end on this same fixture
-  -- (the v0.8 wallet prices Heal Force out of the opening MP; A is
-  -- refused forever).  A beam is exactly the effect art that contests
-  -- BG3, which is what this phase exists to sample, and one beam into a
-  -- shielded guard cannot end the fight.  Any OTHER ready character
-  -- defers focus with X (vanilla's own turn-cycling key), so exactly one
-  -- action ever fires; "lands" is the actor's bp moving (Ot6ActionEnd's
-  -- +1 regen on an unboosted action).
+  -- the row-2 beam rather than the no-damage Heal Force the burn-down plan
+  -- suggested, because battle_boost measured that Heal Force does not work
+  -- on this fixture (the v0.8 wallet prices Heal Force out of the opening
+  -- MP, so A is refused).  A beam is the effect art that contests BG3,
+  -- which is what this phase samples, and one beam into a shielded guard
+  -- cannot end the fight.  Any other ready character defers focus with X
+  -- (vanilla's own turn-cycling key), so exactly one action fires; "lands"
+  -- means the actor's bp moved (Ot6ActionEnd's +1 regen on an unboosted
+  -- action).
   (function()
     local mf, downs = 0, 0
     return H.driveUntil(function()
@@ -130,9 +130,9 @@ H.run({ maxFrames = 30000 }, {
   H.waitFrames(120),   -- recovery window
   -- an instantaneous check raced the queue: submitting cancels no
   -- already-queued animation, so effect art could still land between a
-  -- one-shot "hud is back" sample and the baseline.  require the settled
-  -- state -- no animation script, bg3 in 8x8, hud painted -- to hold for
-  -- 60 CONSECUTIVE frames before baselining.
+  -- one-shot "hud is back" sample and the baseline.  Require the settled
+  -- state (no animation script, bg3 in 8x8, hud painted) to hold for
+  -- 60 consecutive frames before baselining.
   (function()
     local calm = 0
     return H.waitUntil(function()

@@ -1,79 +1,80 @@
 -- gen_returner.lua -- from vargas_won.mss (TERRA + LOCKE + EDGAR + SABIN on
 -- VARGAS's ledge, map 98) down the far side of Mt. Kolts and across the world
--- to the RETURNER HIDEOUT.  The first link of the tier-3 route: everything
--- from here to the scenario split runs through this door.
+-- to the Returner Hideout.  This is the first link of the tier-3 route:
+-- everything from here to the scenario split runs through this door.
 -- Generates one state:
 --   returner_hideout.mss  map 108 (11,55), the hideout's entry hall, first
---                         controllable frame -- the fixture gen_banon starts
---                         from and the entry point for anything that wants
---                         the hideout without replaying the mountain.
+--                         controllable frame.  This is the fixture gen_banon
+--                         starts from and the entry point for anything that
+--                         wants the hideout without replaying the mountain.
 --
--- THE ROUTE, and the three places the tables alone would strand you.
+-- The route, and the three places the tables alone would leave you stuck.
 --
--- 1. THE WAY OUT OF MAP 98 IS THE TILE VARGAS WAS STANDING ON.  Map 98 holds
+-- 1. The way out of map 98 is the tile Vargas was standing on.  Map 98 holds
 --    exactly two entrance records (short_entrance.dat, ShortEntrance::_98):
 --    (10,10) -> map 103 (59,9), the summit the party came in by, and
---    (23,32) -> map 100 (8,48).  (23,32) is NPCProp::_98's only record --
---    Vargas's own spawn tile (npc_prop.asm:4006) -- so before the fight it
---    is a wall of NPC and after it is the road.  _ca828f's reunion ends
---    `hide_obj SLOT_2..4 / update_party / player_ctrl_on` via _cacb95
+--    (23,32) -> map 100 (8,48).  (23,32) is NPCProp::_98's only record,
+--    Vargas's own spawn tile (npc_prop.asm:4006), so before the fight it
+--    is blocked by his object and after it is walkable.  _ca828f's reunion
+--    ends `hide_obj SLOT_2..4 / update_party / player_ctrl_on` via _cacb95
 --    (event_main.asm:31276-31283) and never moves Vargas's object out of the
 --    way; it is `switch $031C=0` at :20147 that despawns him.  So the exit is
---    only walkable BECAUSE the fight was won, and $031C is asserted clear
+--    walkable only because the fight was won, and $031C is asserted clear
 --    below before the step is planned.
 --
--- 2. MAP 100 LANDS THE PARTY ONE TILE FROM THE WAY BACK.  The arrival tile is
---    (8,48) and (7,48) -- its immediate west neighbour -- is the entrance
+-- 2. Map 100 lands the party one tile from the way back.  The arrival tile is
+--    (8,48), and (7,48), its immediate west neighbour, is the entrance
 --    straight back to map 98.  This is the same hazard shape gen_kolts
 --    documented for South Figaro's x=0 column and map 95's y=37 row, and BFS
 --    cannot see it: entrance triggers are not passability.  Shelf A is 60
 --    tiles and the target (17,59) is well east of the spawn, so the shortest
---    path has no reason to touch (7,48) -- but "no reason to" is not a
---    guarantee, and planAvoids() below turns it into one.
+--    path is unlikely to touch (7,48), and planAvoids() below makes that a
+--    guarantee.
 --
--- 3. THE MOUNTAIN'S NORTH DOOR IS A LONG ENTRANCE, AND IT IS GUARDED LATER.
+-- 3. The mountain's north door is a long entrance, and it is guarded later.
 --    Map 101 is entered at (10,49) from map 100 (17,59) and left by its long
---    entrance (5,57), HORIZONTAL, length $12 -- row y=57, x=5..22 -> world
+--    entrance (5,57), horizontal, length $12: row y=57, x=5..22 -> world
 --    (98,93) (long_entrance.dat, LongEntrance::_101).  Its other long record,
 --    (10,48) length 1, goes straight back to map 100 (17,58), and (10,48) is
---    the tile DIRECTLY NORTH of the spawn -- so this map is bracketed by
+--    the tile directly north of the spawn, so this map is bracketed by
 --    exits the way map 100 is, and the walk south is asserted off it.
 --    NPCProp::_101 also puts two imperial SOLDIERs on (10,49)/(11,50), both
 --    spawn switch $031d, the second running _ca8473 ("Scum!  You're
 --    Returners!", event_main.asm:20159/20166) which throws the party back out
---    to world (98,93).  ONE of them spawns on the arrival tile itself.  They
---    are not a problem on THIS pass and cannot be: $031D is set by the
---    hideout -- _caf68a's walk-in at :36300 and Banon's speech _caf7dc at
---    :36712 -- both of which are still ahead of us.  Asserted clear on
---    arrival, so if that ordering ever changes this fails loudly instead of
---    walking into a scene.
+--    to world (98,93).  One of them spawns on the arrival tile itself.  They
+--    cannot fire on this pass: $031D is set by the
+--    hideout, by _caf68a's walk-in at :36300 and Banon's speech _caf7dc at
+--    :36712, both of which are still ahead.  It is asserted clear on
+--    arrival, so if that ordering ever changes this fails with an error
+--    instead of walking into a scene.
 --
--- 4. THE HIDEOUT'S WORLD TILE IS (104,64) AND IT IS A LONG WALK NORTH.
+-- 4. The hideout's world tile is (104,64), and it is a long walk north.
 --    World (104,64) -> map 108 (11,55) (ShortEntrance::_0); map 108's own way
 --    back is the long entrance (6,57) length $11 -> world (104,65).  From the
 --    mountain's north door at (98,93) that is a long stretch of overworld,
 --    and the world step is planned by worldBfs and asserted to exist before
 --    it is walked rather than discovered by holding a direction.
 --
--- ISSUE #75 -- THIS GENERATE IS ZERO-WRITE.  Every field navigator runs with
--- opts.playBattles (mid-route encounters on Mt. Kolts are FOUGHT by the
--- edge-tapped A auto-fighter, not write-cleared), and the world step never
--- lets worldNavTo's own battle branch -- which still carries the
--- battle-clear write and has no real option -- see a battle at all:
+-- Issue #75: this generator makes no state writes.  Every field navigator
+-- runs with opts.playBattles, so mid-route encounters on Mt. Kolts are fought
+-- by the edge-tapped A auto-fighter rather than write-cleared, and the world
+-- step never lets worldNavTo's own battle branch (which still carries the
+-- battle-clear write and has no input-driven option) see a battle at all.
 -- worldWalkFighting below stops the walk on the world engine's
--- battle-pending bit ($E8 bit5, set the INSTANT the encounter roll wins,
--- move.asm's `ora #$20` -- frames before worldNavTo's 3-frame debounce
+-- battle-pending bit ($E8 bit5, set as soon as the encounter roll wins,
+-- move.asm's `ora #$20`, frames before worldNavTo's 3-frame debounce
 -- could act), fights the encounter with H.fightBattle, rides out the
--- post-battle world reload (position restored, danger counter zeroed --
+-- post-battle world reload (position restored, danger counter zeroed;
 -- move.asm:916-921 / world_start.asm:465-482), and resumes.  Fighting
--- rather than fleeing is deliberate: L+R can fail on unrunnable/back-attack
--- formations and this post-Vargas four (TERRA/LOCKE/EDGAR/SABIN) one-rounds
--- the northern plains' trash, so the fight always terminates and the walk
--- stays deterministic from the fixture.
+-- rather than fleeing is deliberate: L+R can fail on unrunnable or
+-- back-attack formations, and this post-Vargas four
+-- (TERRA/LOCKE/EDGAR/SABIN) beats the northern plains' encounters in about a
+-- round, so the fight always terminates and the walk stays deterministic
+-- from the fixture.
 local H = dofile("tools/tests/lib/ot6.lua")
 local WON = "build/states/vargas_won.mss.lua"
 
--- map compares stay MASKED: loaders ride flag bits in $1F64's high byte
+-- map compares stay masked: loaders leave flag bits in $1F64's high byte
 local function map() return H.mapId() & 0x1ff end
 local function bright() return emu.getState()["ppu.screenBrightness"] or 0 end
 -- event switch id -> live bit (event bitfield base $1E80, bit = id & 7)
@@ -88,7 +89,7 @@ end
 
 -- a bare step list cannot be spliced into a step list (Lua truncates a
 -- non-final table.unpack to one value, silently dropping every step but the
--- first).  H.cond with an always-true predicate wraps a list into ONE step.
+-- first).  H.cond with an always-true predicate wraps a list into one step.
 local function seq(steps) return H.cond(function() return true end, steps) end
 
 local function mapChanged()
@@ -99,12 +100,12 @@ local function mapChanged()
   end
 end
 
--- Settle after a map load: a fully lit screen plus whatever `extra` demands,
--- held for n CONSECUTIVE frames.  Both halves are load-bearing and both cost
--- a previous agent a bad generated state -- see gen_kolts.lua's header: a
+-- Settle after a map load: a fully lit screen plus whatever `extra` requires,
+-- held for n consecutive frames.  Both halves are needed, and both caused a
+-- bad generated state in an earlier pass; see gen_kolts.lua's header.  A
 -- cutscene can report control on a black screen, and a single-shot check
--- passes mid-load while the field module still holds the OLD map's control
--- byte.
+-- passes mid-load while the field module still holds the previous map's
+-- control byte.
 local function settled(n, extra)
   local cnt = 0
   return function()
@@ -114,13 +115,15 @@ local function settled(n, extra)
   end
 end
 
--- The settle DRIVES rather than waits, for the reason gen_kolts measured on
+-- The settle drives rather than waits, for the reason gen_kolts measured on
 -- map 96: this is encounter territory, and a battle rolled on the arrival
--- tile stalls a passive waitUntil forever.  advanceStory (playBattles mode --
--- issue #75) FIGHTS whatever came up with the same edge-tapped A that pages
--- the victory text; on a quiet field it holds the pad empty.  It also deliberately does NOT require player control -- $087C&$0F
--- flickers 2<->4 while any async object script is live -- and leaves "can I
--- step THIS frame" to navTo, which debounces control itself.
+-- tile stalls a passive waitUntil indefinitely.  advanceStory (playBattles
+-- mode, issue #75) fights whatever came up with the same edge-tapped A that
+-- pages the victory text; on a quiet field it holds the pad empty.  It also
+-- does not require player control, because $087C&$0F alternates between 2 and
+-- 4 while any async object script is live, and it leaves the question of
+-- whether a step is possible this frame to navTo, which debounces control
+-- itself.
 local function settleField(dstMap, maxF)
   return seq({
     H.waitFrames(90),
@@ -145,7 +148,8 @@ end
 -- Walk to (tx,ty) expecting an entrance to fire there.  Mt. Kolts uses plain
 -- walkable floor for its entrances (unlike Figaro's castle doors, which are
 -- walls until CheckDoor), so BFS routes straight onto them and the crossing
--- is one navTo, not a staging tile plus a hold.  Asserted after by map id.
+-- is one navTo rather than a staging tile plus a hold.  The map id is
+-- asserted afterwards.
 local function crossTo(tx, ty, dstMap, what, maxF)
   return seq({
     H.logStep(function()
@@ -163,15 +167,16 @@ local function crossTo(tx, ty, dstMap, what, maxF)
   })
 end
 
--- ISSUE #75: the input-driven world walk (the header's point on zero writes).
--- One round = walk toward the hideout until either the entrance fires (off
--- the world map) or the encounter roll wins -- $E8 bit5, set the instant
--- the roll wins and checked here as the navigator's arrive() EVERY frame,
--- so worldNavTo's own 3-frame-debounced battle-clear-write branch can never
--- run -- then FIGHT the encounter for real and ride out the post-battle
--- world reload before the next round re-plans.  Rounds are written out flat:
--- navigator and driveUntil bodies latch state and cannot be replayed
--- (gen_banon's talkTo rounds, same reason).
+-- Issue #75: the input-driven world walk (see the header on zero writes).
+-- One round walks toward the hideout until either the entrance fires (the
+-- party leaves the world map) or the encounter roll wins.  $E8 bit5 is set as
+-- soon as the roll wins and is checked here as the navigator's arrive() on
+-- every frame, so worldNavTo's own 3-frame-debounced battle-clear-write
+-- branch cannot run.  The encounter is then fought with real input and the
+-- post-battle world reload is ridden out before the next round re-plans.
+-- Rounds are written out flat because navigator and driveUntil bodies latch
+-- state and cannot be replayed (the same reason as gen_banon's talkTo
+-- rounds).
 local function battlePending()
   return (H.readByte(0x00e8) & 0x20) ~= 0 or H.battleLoadStarted()
 end
@@ -200,10 +205,11 @@ local function worldRound(n, tx, ty)
 end
 
 -- Assert the BFS plan to (tx,ty) exists and never steps on any tile in
--- `bad` -- this map's OTHER entrance records.  BFS models passability, not
--- entrance triggers, so this is the only thing between a shortest path and a
--- route that quietly leaves the map.  (gen_kolts's planAvoidsRow, generalised
--- from a row to a tile set: map 98's neighbours are point exits, not rows.)
+-- `bad`, this map's other entrance records.  BFS models passability, not
+-- entrance triggers, so this check is the only thing stopping a shortest path
+-- from becoming a route that leaves the map.  (gen_kolts's planAvoidsRow,
+-- generalised from a row to a tile set: map 98's neighbours are point exits
+-- rather than rows.)
 local function planAvoids(tx, ty, bad, what)
   return H.call(function()
     local p = H.bfsPath(tx, ty)
@@ -231,7 +237,7 @@ local function planAvoids(tx, ty, bad, what)
 end
 
 -- 120000 was the battle-clear-write budget; input-driven fights spend real
--- ATB rounds, so the ceiling carries headroom for every encounter the route
+-- ATB rounds, so the limit carries headroom for every encounter the route
 -- can roll
 H.run({ maxFrames = 220000 }, {
   H.loadState(WON),
@@ -240,15 +246,15 @@ H.run({ maxFrames = 220000 }, {
     H.assertEq(map(), 98, "booted on map 98, VARGAS's ledge")
     H.assertEq(H.hasControl(), true, "controllable")
     H.assertEq(H.tileAligned(), true, "tile-aligned")
-    -- the fight is what opens the road: $031C despawns Vargas's object, and
-    -- his spawn tile (23,32) IS the exit to map 100
+    -- the fight is what opens the route: $031C despawns Vargas's object, and
+    -- his spawn tile (23,32) is the exit to map 100
     H.assertEq(sw(0x031C), 0, "$031C clear -- VARGAS despawned, (23,32) walkable")
     H.assertEq((H.readByte(0x1855) & 0x07) ~= 0, true, "SABIN in the party")
     where("booted")
   end),
 
   -- ===================================================================== --
-  -- PHASE 1: OFF THE MOUNTAIN.  98 -> 100 (shelf A) -> 101 -> world.
+  -- Phase 1: off the mountain.  98 -> 100 (shelf A) -> 101 -> world.
   -- ===================================================================== --
   -- (10,10) is the other exit on this map (back up to the summit, map 103);
   -- keep the plan off it as well.
@@ -288,10 +294,10 @@ H.run({ maxFrames = 220000 }, {
   end),
 
   -- ===================================================================== --
-  -- PHASE 2: THE WORLD STEP.  (98,93) -> (104,64), the hideout's door.
-  -- Asserted reachable before it is walked: worldBfs answering nil here
-  -- would mean the north door does not open into the hideout's region, and
-  -- that is worth failing on rather than holding UP and hoping.
+  -- Phase 2: the world step.  (98,93) -> (104,64), the hideout's door.
+  -- It is asserted reachable before it is walked: worldBfs answering nil here
+  -- would mean the north door does not open into the hideout's region, which
+  -- should fail rather than be worked around by holding UP.
   -- ===================================================================== --
   H.call(function()
     local p = H.worldBfs(104, 64)
@@ -299,9 +305,9 @@ H.run({ maxFrames = 220000 }, {
     H.log(string.format("world segment: (%d,%d) -> (104,64), %d steps",
       H.worldX(), H.worldY(), #p))
   end),
-  -- Twelve input-driven rounds: ~45 tiles of encounter territory has never
+  -- Twelve input-driven rounds: ~45 tiles of encounter territory has not
   -- rolled more than a handful of fights, and a spent round costs nothing
-  -- (its cond sees the world already left).  A 13th battle would surface
+  -- (its cond sees the world already left).  A 13th battle would show up
   -- as the settle below timing out on map 108.
   worldRound(1, 104, 64), worldRound(2, 104, 64), worldRound(3, 104, 64),
   worldRound(4, 104, 64), worldRound(5, 104, 64), worldRound(6, 104, 64),

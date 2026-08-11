@@ -1,12 +1,12 @@
--- probe_climb.lua -- the maze crack: arrival -> building door (44,48) ->
+-- probe_climb.lua -- the maze route: arrival -> building door (44,48) ->
 -- 225(12,43) diagonal-stair interior -> onward door -> a 221 rooftop.
--- DIAGONAL-flood the landing and report reachable jumps/Dadaluma/doors.
--- navTo IS diagonal-aware (bfsPath uses the 8 MOVES); only my probe floods
--- were cardinal, which is what made the interiors look sealed.
+-- Diagonal-flood the landing and report reachable jumps/Dadaluma/doors.
+-- navTo is diagonal-aware (bfsPath uses the 8 MOVES); only the probe
+-- floods were cardinal, which made the interiors look sealed.
 --
--- SUCCESSOR ROUTE NOTES -- the EXACT Zozo door tables (from
--- short_entrance.dat; my early probes used off-by-one guesses, hence the
--- dead crossings).  Doors are two-way; a crossing is navTo-a-neighbour +
+-- Successor route notes: the Zozo door tables (from short_entrance.dat;
+-- earlier probes used off-by-one guesses, which produced the dead
+-- crossings).  Doors are two-way; a crossing is navTo-a-neighbour +
 -- one held press onto the source tile.
 --
 -- map 221 (rooftops) -> map 225 (interiors), source(221) -> dest(225):
@@ -25,27 +25,27 @@
 --   (83,62)->221(23,18)   (124,56)->221(13,22)  (98,62)->221(42,29)
 --   (110,55)->221(43,25)* (66,57)->221(54,36)   (11,62)->221(35,34)
 --   (30,62)->221(31,31)   (30,34)->221(30,22)** (35,14)->221(35,16)**
---   * measured DEAD 2-3 tile pockets (44,42) and (43,25).
---   ** the DADALUMA-region exits (221 x30-35): the 225 interior holding
---      (46,9)/(30,34)/(35,14) is the one to reach; it is NOT the (44,48)
---      building (that one only reaches (12,44)/(21,15)/(11,17)).  Which
---      rooftop enters it (via 221 (30,43)/(30,22)/(35,16)) is the open
---      question -- reached across the jump-39/33 rows and/or the crane.
+--   * measured dead 2-3 tile pockets (44,42) and (43,25).
+--   ** the Dadaluma-region exits (221 x30-35): the 225 interior holding
+--      (46,9)/(30,34)/(35,14) is the one to reach; it is not the (44,48)
+--      building, which only reaches (12,44)/(21,15)/(11,17).  Which
+--      rooftop enters it (via 221 (30,43)/(30,22)/(35,16)) is not yet
+--      known; it is reached across the jump-39/33 rows and/or the crane.
 --
--- THE DOOR-CROSSING TECHNIQUE (measured working): navTo the DOOR SOURCE
--- tile itself with { arrive = function() return map()==<dest> end } --
--- stepping onto a 221<->225 door tile transitions immediately (these are
--- walk-on transitions, NOT CheckDoor walls, so no held press is needed,
--- unlike castle doors).  navTo-to-a-NEIGHBOUR then a held press does NOT
--- work here and wasted several runs.
+-- The door-crossing technique (measured working): navTo the door source
+-- tile itself with { arrive = function() return map()==<dest> end }.
+-- Stepping onto a 221<->225 door tile transitions immediately; these are
+-- walk-on transitions rather than CheckDoor walls, so no held press is
+-- needed, unlike castle doors.  navTo to a neighbour followed by a held
+-- press does not work here and cost several runs.
 --
--- CONFIRMED HOP CHAIN so far (all measured, each a clean crossing):
+-- Confirmed hop chain so far (all measured, each a clean crossing):
 --   arrival street (61,44)
 --     -navTo(44,48)->            225 (12,44) interior  [159-tile diagonal]
 --     -navTo(21,15) arrive 221-> 221 (49,39) rooftop   [26 tiles]
---       this roof's only onward door is (54,35)->225(66,56) -- the NEXT
+--       this roof's only onward door is (54,35)->225(66,56), the next
 --       building; the jump rows and Dadaluma are still hops beyond it.
---   The (44,48) building's other exits are DEAD ((11,17)->pocket (44,42);
+--   The (44,48) building's other exits are dead ((11,17)->pocket (44,42);
 --   the (12,44) side is the entrance).  A successor continues from
 --   221(49,39): cross (54,35)->225(66,56), flood, follow its onward doors,
 --   and keep hopping toward a rooftop bearing 221(30,43)/(30,22)/(35,16).

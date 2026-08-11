@@ -1,76 +1,75 @@
 ; ------------------------------------------------------------------------------
-; SETZER -- THE BOOST-TIERED SLOT REELS (a chance verb buys certainty)
+; Setzer: the boost-tiered slot reels (a chance verb buys certainty)
 ; ------------------------------------------------------------------------------
-; Carved out of ot6_kits.asm (v0.9, 3037 lines) with the emission order of
+; Split out of ot6_kits.asm (v0.9, 3037 lines) with the emission order of
 ; every instruction preserved: ot6.asm includes these files in exactly the
-; order their text sat in the old one, so the assembler sees the identical
-; token stream and the linker the identical segment. Proven, not argued --
-; ROM CRC32 0x2E9B5A7F and ff6-en.map are byte-identical across the split.
+; order their text sat in the old one, so the assembler receives the identical
+; token stream and the linker the identical segment. ROM CRC32 0x2E9B5A7F and
+; ff6-en.map are byte-identical across the split.
 ; ------------------------------------------------------------------------------
 
 ; ==============================================================================
-; BOOST-TIERED SLOT (Setzer) -- the chance-verb canon applied to the reels
+; Boost-tiered Slot (Setzer): the chance-verb canon applied to the reels
 ;
 ; ROADMAP.md "Design canon" / kits.md "Boost-tiered Steal": on chance verbs
-; boost buys CERTAINTY in the verb's own vocabulary. Slot's vocabulary is the
+; boost buys certainty in the verb's own terms. Slot's terms are the
 ; reel rig, and vanilla's
-; rig is ONE byte: w7e6179, a single Rand() drawn at the first A press of a
-; spin (btlgfx_main.asm, UpdateMenuState_08 @7f16 -- OR'd with $3c when the
-; battle disables joker doom, $2f49.2). Every cheat the machine pulls
-; flows from `rig AND SlotRateTbl[icon]` ($1f,$03,$01,$01,$00,$00 for icons
+; rig is one byte: w7e6179, a single Rand() drawn at the first A press of a
+; spin (btlgfx_main.asm, UpdateMenuState_08 @7f16, OR'd with $3c when the
+; battle disables joker doom, $2f49.2). Every way the machine is rigged
+; follows from `rig AND SlotRateTbl[icon]` ($1f,$03,$01,$01,$00,$00 for icons
 ; 0-5, btlgfx_main.asm SlotRateTbl @7ee1):
-;   == 0 (blessed): the machine helps -- reel 2 drifts up to w7e617d = 4 extra
-;        icons to MATCH reel 1's icon (@8053), and a landed pair drifts reel 3
-;        the same way toward the TRIPLE (@808c);
-;   != 0 (cursed): reel 2 gets no help, and -- the rigged miss proper -- a
-;        landed pair marks w7e617c bit 7 so reel 3 REFUSES to stop on the
-;        completing icon (@80c6): the triple is untimeable, by design.
+;   == 0 (blessed): the rig favours the player.  reel 2 drifts up to
+;        w7e617d = 4 extra icons to match reel 1's icon (@8053), and a landed
+;        pair drifts reel 3 the same way toward the triple (@808c);
+;   != 0 (cursed): reel 2 gets no help, and a landed pair marks w7e617c bit 7
+;        so reel 3 does not stop on the completing icon (@80c6), which makes
+;        the triple untimeable.  That is the rigged miss.
 ; Reel 1 always stops exactly where the player timed it. The tiers escalate
-; the machine's own drift/avoid vocabulary, one step at a time:
+; the machine's own drift/avoid behaviour, one step at a time:
 ;
 ;   0 BP  vanilla to the byte. Ot6SlotRig hands the drawn rig byte back
 ;         untouched; every downstream compare, drift and refusal is vanilla's.
-;   1 BP  the machine stops cheating AGAINST you: the rigged miss is removed
-;         (Ot6SlotMiss blesses any landed pair instead of avoid-marking it, so
-;         reel 3 drifts toward the triple you earned). Reel 2's help is still
-;         rig-rolled, exactly vanilla.
-;   2 BP  the machine cheats FOR you: the rig byte is forced to 0, so EVERY
-;         icon is blessed -- reel 2 drifts toward the pair and reel 3 toward
-;         the triple, within vanilla's own 4-icon nudge physics. Still a
-;         gamble (the drift budget can run out), just one tilted your way.
-;   3 BP  the reel is CHOSEN: drift budget becomes $ff (the whole strip, every
-;         icon appears on every reel -- SlotReelTbl @a800), so reels 2 and 3
-;         spin until they MATCH. The triple of whatever icon the player
+;   1 BP  the rig no longer works against the player: the rigged miss is
+;         removed (Ot6SlotMiss blesses any landed pair instead of avoid-marking
+;         it, so reel 3 drifts toward the triple the player earned). Reel 2's
+;         help is still rig-rolled, exactly vanilla.
+;   2 BP  the rig works for the player: the rig byte is forced to 0, so every
+;         icon is blessed. reel 2 drifts toward the pair and reel 3 toward
+;         the triple, within vanilla's own 4-icon nudge physics. It is still a
+;         gamble (the drift budget can run out), but tilted toward the player.
+;   3 BP  the reel is chosen: drift budget becomes $ff (the whole strip, and
+;         every icon appears on every reel, SlotReelTbl @a800), so reels 2 and
+;         3 spin until they match. The triple of whatever icon the player
 ;         stopped reel 1 on is guaranteed: the selection is reel 1's unrigged,
-;         vanilla-timed stop, so "the player's selection lands" with zero UI
-;         change. (True per-reel choice needs no new UI -- choosing the
-;         outcome IS choosing reel 1's icon, since the result vocabulary is
+;         vanilla-timed stop, so the player's selection lands with no UI
+;         change. (Per-reel choice needs no new UI, because choosing the
+;         outcome is choosing reel 1's icon, since the result vocabulary is
 ;         triples; the non-triple results, 7-7-BAR self-doom and lagomorph,
-;         are the machine's punishments, and certainty is exactly their
-;         removal.)
+;         are the machine's penalties, and certainty removes them.)
 ;
 ; The joker-doom battle gate outranks boost at every tier: where vanilla ORs
 ; the rig with $3c ($2f49.2 set), tier 2/3 force $3c instead of 0, and
-; Ot6SlotMiss keeps the avoid mark on a 7-pair -- a battle that forbids
+; Ot6SlotMiss keeps the avoid mark on a 7-pair, so a battle that forbids
 ; joker doom cannot be bought out of it (vanilla's own prohibition, kept).
 ;
-; THE CHARGE. The tier is LATCHED from OT6_BOOST_REVEALED at the first A
-; press (the spin cannot be backed out of after that -- B exits only while
+; The charge. The tier is latched from OT6_BOOST_REVEALED at the first A
+; press (the spin cannot be backed out of after that: B exits only while
 ; w7e7b92/93/94 are all clear, @7fec), and Ot6SlotCommit writes the latch
 ; back to OT6_BOOST_REVEALED at the commit press, so Ot6ActionEnd charges
-; exactly the tier the reels were spun with. Without the latch an L/R edge
-; during the multi-second spin changes the charge without changing the reels
-; -- battle_lateboost's delivered-vs-charged theft, reopened through the reel
-; window (Ot6Boost's $32cc/$2bae commit gates only close AFTER the queue
-; write). NO MP price on Slot in this change (mp-economy.md's Slots pricing
-; waits on the price-display surface -- one gap at a time).
+; the tier the reels were spun with. Without the latch an L/R edge
+; during the multi-second spin changes the charge without changing the reels,
+; which is battle_lateboost's delivered-vs-charged mismatch reopened through
+; the reel window (Ot6Boost's $32cc/$2bae commit gates only close after the
+; queue write). There is no MP price on Slot in this change (mp-economy.md's
+; Slots pricing waits on the price-display surface).
 ;
 ; The latch lives in the $57ba spare byte of the init-exempt OT6 strip
 ; ($57ba-$57bf, ot6_hud.asm's block comment; probe_57ba_strip's bank-F0-only
-; writer invariant holds -- these procs assemble into bank $f0). Stale values
-; are harmless: every read below happens inside a spin, and every spin's
-; first press rewrites the latch. TODO(ABI): fold into ot6_memory.inc beside
-; the other strip names when that file's owner takes it.
+; writer invariant holds, because these procs assemble into bank $f0). Stale
+; values are harmless: every read below happens inside a spin, and every
+; spin's first press rewrites the latch. TODO(ABI): fold into ot6_memory.inc
+; beside the other strip names when that file's owner takes it.
 ; OT6_SLOTTIER lives in ot6_memory.inc with the rest of the $57xx strip.
 
 ; ------------------------------------------------------------------------------
@@ -109,10 +108,10 @@
         lda     $2f49
         and     #$04            ; joker doom disabled this battle?
         beq     :+              ;   (vanilla's `beq` = enabled)
-        lda     #$3c            ; disabled: everything blessed EXCEPT the 7s
+        lda     #$3c            ; disabled: everything blessed except the 7s
         bra     @sto            ;   ($3c & SlotRateTbl: $1f traps, $03/$01 pass)
 :       lda     #$00            ; enabled: every icon blessed
-@sto:   sta     $6179           ; w7e6179 -- the rig byte the two rate checks AND
+@sto:   sta     $6179           ; w7e6179, the rig byte the two rate checks and
         plp                     ;   the reel-2/3 drift logic read all spin long
         rtl
 .endproc
@@ -123,9 +122,9 @@
 ;
 ; replaces both `lda #$04 / sta w7e617d` blessed-arm stores (reel-2 @7f5f and
 ; reel-3 @7f9b). w7e617d is how many extra icons a blessed reel may spin past
-; while hunting the match; vanilla's 4 makes the help a nudge. Tier 3 spends
-; $ff -- longer than the 16-icon strip, and every icon appears on every strip
-; (SlotReelTbl), so the hunt ALWAYS lands: that is the whole "chosen" tier.
+; while looking for the match; vanilla's 4 limits the help to a nudge. Tier 3
+; uses $ff, longer than the 16-icon strip, and every icon appears on every
+; strip (SlotReelTbl), so the search always lands. That is the "chosen" tier.
 ; a8, db=$7e. clobbers a only.
 .proc Ot6SlotDrift
         .a8
@@ -144,11 +143,11 @@
 ; [ the rigged miss, removed at 1+ BP (third press, pair landed, rig cursed) ]
 ;
 ; replaces the avoid arm's `lda $3a / ora #$80` (@7fa6): vanilla marks the
-; pair's icon with bit 7 so the reel-3 spin driver (@80c6) SKIPS it -- the
-; player physically cannot time the triple. Tier 0 keeps that mark to the
+; pair's icon with bit 7 so the reel-3 spin driver (@80c6) skips it, and the
+; player cannot time the triple. Tier 0 keeps that mark to the
 ; byte. Tier 1+ blesses the pair instead: drift budget via Ot6SlotDrift, and
 ; the plain icon falls through to the caller's `sta w7e617c`, the same bytes
-; the blessed arm stores -- reel 3 now seeks the triple the player earned.
+; the blessed arm stores, so reel 3 seeks the triple the player earned.
 ; A 7-pair in a joker-doom-disabled battle keeps the vanilla mark at every
 ; tier (the battle gate outranks boost; see the region comment).
 ; a8, db=$7e, d = the menu's (its $3a scratch = the pair's icon, GetSlotReel2's
@@ -158,10 +157,10 @@
         lda     f:$7e0000+OT6_SLOTTIER
         beq     @avoid          ; tier 0: the vanilla rigged miss stands
         lda     $3a             ; the landed pair's icon
-        bne     @bless          ; not the 7s: the miss is bought off
+        bne     @bless          ; not the 7s: the miss is removed
         lda     $2f49
         and     #$04            ; a 7-pair under the joker-doom battle gate
-        bne     @avoid          ;   stays refused at any price
+        bne     @avoid          ;   stays refused at any tier
 @bless: jsl     Ot6SlotDrift    ; budget: 4 (tier 1/2) or the strip (tier 3)
         lda     $3a             ; bless: reel 3 seeks the completing icon
         rtl
@@ -177,10 +176,10 @@
 ; replaces the commit press's `lda w7e62ca / sta $2bae,y` (@7fd9): the vanilla
 ; store first (y = the queue row _c16d56 just computed), then the charge fix:
 ; OT6_BOOST_REVEALED = the latch, so Ot6ActionEnd charges the tier the reels
-; were actually spun with. An L edge mid-spin can no longer buy a chosen
+; were spun with. An L edge mid-spin can no longer buy a chosen
 ; triple at a discount, and an R edge mid-spin (banked but never read by the
-; already-latched spin) is handed back rather than charged for nothing --
-; delivered == charged, both directions (battle_lateboost's rule).
+; already-latched spin) is handed back rather than charged for nothing.
+; Delivered equals charged in both directions (battle_lateboost's rule).
 ; a8, db=$7e; y preserved (the sta uses it before any width games).
 .proc Ot6SlotCommit
         .a8

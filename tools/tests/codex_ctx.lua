@@ -1,10 +1,11 @@
 -- @suite savestate=worldmap_narshe slow
--- codex_ctx.lua -- a battle entered from the world map AFTER a menu save
--- selects the SAVED game's codex page, not the transient page (issue #29).
+-- codex_ctx.lua -- a battle entered from the world map after a menu save
+-- selects the saved game's codex page rather than the transient page
+-- (issue #29).
 --
--- THE GUARANTEE THIS PINS.  Ot6CodexActive (ff6/src/battle/ot6_codex.asm)
+-- The guarantee this pins: Ot6CodexActive (ff6/src/battle/ot6_codex.asm)
 -- picks the per-save codex page by reading $7e021f, and its three callers
--- all run in BATTLE context (ot6_break.asm:86/:849/:949).  $021f is a menu
+-- all run in battle context (ot6_break.asm:86/:849/:949).  $021f is a menu
 -- module variable, so issue #29 asked whether any other module overlays it
 -- between the menu's lifecycle write and the battle's read.  The 2026-07-28
 -- audit measured the full module matrix (field/world/battle/menu, fresh and
@@ -15,38 +16,38 @@
 -- module's DP swap covers only $0000-$00FF (world/init.asm:1446-1516), and
 -- the menu's own clock tick stops at $021e (menu_common.asm:3494-3522, .a8).
 -- The overlay measured in issue #29 (value 5, then a 36/37 oscillation) was
--- reproduced ONLY under codex_saveas's then-forced-ZMENUSTATE save drive
+-- reproduced only under codex_saveas's then-forced-ZMENUSTATE save drive
 -- (since converted to pad input), whose corrupted exit path left menu tasks
--- running -- not in any real flow.
+-- running.  It does not occur in any real flow.
 --
--- THE DRIVE (issue #75 conversion: the discriminator used to be FORGED --
+-- The drive (issue #75 conversion: the discriminator used to be forged, with
 -- fire written into all 384 slot-3 species and ice into all 384 transient
--- species -- and the closing fight was kill-bitted.  Both pages' content is
--- now produced BY PLAY, cb8e605's baseline-change doctrine, and the fight
--- is fled):
---   0. the boot state is itself the pre-save control, read not staged: the
---      never-saved chain's fights populated the TRANSIENT page (lifecycle
---      0 writes really go there) while all three save-slot pages read
---      empty -- asserted byte-for-byte.
+-- species, and the closing fight was ended with the kill bit.  Both pages'
+-- content is now produced by play, following cb8e605's baseline-change
+-- approach, and the fight is fled):
+--   0. the boot state is the pre-save control, read rather than staged: the
+--      never-saved chain's fights populated the transient page (lifecycle
+--      0 writes go there) while all three save-slot pages read
+--      empty, asserted byte-for-byte.
 --   1. walk onto the grass area (82,52) and save into empty slot 3 via the
---      REAL Save command, pad input only (save-drive rule).  SaveAs copies
---      the transient payload, so at this instant the two pages are EQUAL.
---   2. walk back into the grass area and fight until a battle TEACHES
+--      real Save command, pad input only (save-drive rule).  SaveAs copies
+--      the transient payload, so at this instant the two pages are equal.
+--   2. walk back into the grass area and fight until a battle teaches
 --      something (Terra's real Fire on the pool's fire-weak staple, species
---      $17, measured weak $81 with 2 shields).  The chip path's "learn it
---      forever" store consults Ot6CodexActive mid-battle -- so the page
---      diff is the WRITE half of the guarantee: every changed byte must
---      land in the SLOT-3 page and none in the transient page (lifecycle
---      3 now).  After this battle the pages DIFFER by exactly the earned
---      bytes: knowledge slot 3 holds and the transient page provably
---      lacks (asserted by SRAM read).
---   3. fight again and read the seed BEFORE any input: a present monster
+--      $17, measured weak $81 with 2 shields).  The chip path's persistent
+--      store consults Ot6CodexActive mid-battle, so the page
+--      diff is the write half of the guarantee: every changed byte must
+--      land in the slot-3 page and none in the transient page (lifecycle
+--      3 now).  After this battle the pages differ by exactly the earned
+--      bytes: knowledge slot 3 holds and the transient page lacks, asserted
+--      by SRAM read.
+--   3. fight again and read the seed before any input: a present monster
 --      of a just-taught species must enter pre-revealed with the taught
---      bits -- the READ half.  Only the slot-3 page carries those bits, so
---      if any module had overlaid $021f between the save and this battle,
---      Ot6CodexActive would fall back to the transient page and the
+--      bits, which is the read half.  Only the slot-3 page carries those
+--      bits, so if any module had overlaid $021f between the save and this
+--      battle, Ot6CodexActive would fall back to the transient page and the
 --      pre-reveal would be missing.  (Species not in the taught set defer
---      the check to the next encounter -- bounded retries, fled with the
+--      the check to the next encounter, with bounded retries, fled with the
 --      real run mechanic.)
 local H = dofile("tools/tests/lib/ot6.lua")
 local STATE = "build/states/worldmap_narshe.mss.lua"
@@ -88,23 +89,23 @@ local function spellIndexOf(slot, id)
   return nil
 end
 
--- taught[species] = { elem = bits, class = bits } -- what step 2 earned,
+-- taught[species] = { elem = bits, class = bits }: what step 2 earned,
 -- keyed for step 3's seed check
 local taught, taughtN = {}, 0
 local slot3Before, tempBefore = nil, nil
 
--- the in-battle action machine (codex_saveas's, measured): TERRA casts
+-- the in-battle action driver (codex_saveas's, measured): TERRA casts
 -- Fire through the live magic menu, everyone else Fights; 4-frame-held
 -- presses on a 5-on/5-off cadence
 local lastActor, mfM, actM = nil, 0, nil
 -- TERRA's cast is the only teach this kit has in the fire-weak area, and
--- it only lands reliably in the FIRST battle after a stretch of world
--- control -- measured across five drive variants: in back-to-back
+-- it only lands reliably in the first battle after a stretch of world
+-- control, measured across five drive variants: in back-to-back
 -- battles her window sits in the queue-wait state $01 for whole fights
 -- (X-defers, committed Defends, and a fully parked partner all measured
--- WORSE, not better), while battle one of every timeline casts within
+-- worse), while battle one of every timeline casts within
 -- two turns.  So the route below is arranged to make the first
--- post-save encounter a GRASS one, and the machine stays plain.
+-- post-save encounter a grass one, and the driver stays simple.
 local function battleReset()
   lastActor = nil
 end
@@ -160,20 +161,20 @@ local function battlePulse()
   elseif st == ST_TGT then
     btn = "a"
   else
-    -- transitional states and battle MESSAGES (the reveal banner blocks
-    -- the queue until dismissed -- measured: st=$01 held for 30000 frames
+    -- transitional states and battle messages (the reveal banner blocks
+    -- the queue until dismissed; measured: st=$01 held for 30000 frames
     -- with no press): tap A through them
     btn = "a"
   end
   H.setPad((hold and btn) and { [btn] = true } or {})
 end
 
--- a world patrol beat along the proven Narshe<->Figaro corridor (the
+-- a world patrol beat along the Narshe to Figaro corridor (the
 -- fixture nav's own waypoints: x=82 from the grass area down to the
 -- desert edge).  A goal that cannot be planned rotates to the next, so
 -- an unreachable point stalls nothing.
 -- the grass area's two-point beat along the corridor column x=82 (the
--- fixture nav's own proven waypoints)
+-- fixture nav's own waypoints)
 local GOALS = { { 82, 44 }, { 82, 60 } }
 local plan, planIdx, goalI = nil, 1, 1
 local hbP = -600
@@ -213,7 +214,7 @@ H.run({ maxFrames = 90000 }, {
   H.waitFrames(10),
   H.waitUntil(worldReady, 500, "world-map control", 5),
 
-  -- 0. the pre-save control, READ: lifecycle-0 fights taught the transient
+  -- 0. the pre-save control, read: lifecycle-0 fights taught the transient
   -- page and only it.  (The forged all-species staging this replaces could
   -- not fail; these reads can.)
   H.call(function()
@@ -236,15 +237,15 @@ H.run({ maxFrames = 90000 }, {
       known))
   end),
 
-  -- Park ON THE GRASS AREA, off the Narshe entrance tile: closing a world
+  -- Park on the grass area, off the Narshe entrance tile: closing a world
   -- menu ends in ReloadMap, which re-fires the entrance under the party's
   -- feet (measured: closing on the fixture tile dropped the party into a
   -- town), so the save happens on a plain corridor tile.  Grass rather
-  -- than the old Figaro park because the FIRST post-save encounter must
+  -- than the old Figaro park because the first post-save encounter must
   -- be a teachable one (see the drive note above): from Figaro the nav's
   -- accrued danger popped a desert fight ~300 frames out, and that pool
   -- (species $5C/$5D, weak $8A, slash-only class rows) cannot be taught
-  -- by fire-and-pierce -- measured across two timelines.
+  -- by fire and pierce, measured across two timelines.
   H.worldNavTo(82, 52, { maxFrames = 15000 }),
 
   -- 1. save into slot 3, pad input only (save-drive rule; the cursor is
@@ -274,8 +275,9 @@ H.run({ maxFrames = 90000 }, {
     H.assertEq(sram(0x307ff0), 3, "SRAM last-saved-slot marker is 3")
     H.assertEq(sram(SLOT3), 0x4f, "slot 3 codex magic 'O'")
     H.assertEq(sram(SLOT3 + 1), 0x38, "slot 3 codex magic '8'")
-    -- SaveAs copied the transient payload: the pages are EQUAL right now,
-    -- so any later divergence is a post-save codex write, page-attributed
+    -- SaveAs copied the transient payload, so the pages are equal right now,
+    -- and any later divergence is a post-save codex write, attributable to a
+    -- page
     for off = 0x10, PAGE_USED - 1 do
       H.assertEq(sram(SLOT3 + off), sram(TEMP + off),
         "SaveAs left the pages equal at " .. offName(off))
@@ -283,9 +285,9 @@ H.run({ maxFrames = 90000 }, {
     slot3Before, tempBefore = snapPage(SLOT3), snapPage(TEMP)
   end),
 
-  -- Close the menu.  worldReady()/worldHasControl() read menu-module
+  -- Close the menu.  worldReady() and worldHasControl() read menu-module
   -- garbage while the menu owns the zero page (measured), so the positive
-  -- check that the world module is really back is the exact parked tile.
+  -- check that the world module is back is the exact parked tile.
   H.driveUntil(function()
     return H.worldMode() and H.worldAligned() and bright() >= 15
        and H.worldX() == 82 and H.worldY() == 52
@@ -293,16 +295,16 @@ H.run({ maxFrames = 90000 }, {
     H.pressButtons({ "b" }, 4), H.waitFrames(20),
   }, "world control after menu close"),
 
-  -- 2. THE WRITE HALF: walk back toward the grass area; fight whatever
-  -- interrupts; after each battle, diff both pages.  The first battle that
-  -- teaches must have written the SLOT-3 page and only it.  (Desert
-  -- encounters on the way teach nothing to this kit -- measured: species
-  -- $5C/$5D are weak $8A/slash and Terra has fire, Locke pierce -- so the
-  -- loop simply keeps walking.)
-  -- one single-call state machine: H.cond LATCHES its branch on first tick
-  -- inside a driveUntil body (measured: the branch chosen on frame one
-  -- replayed for the whole loop and the battle accounting never ran), so
-  -- the battle edge is detected inline instead
+  -- 2. the write half: walk back toward the grass area, fight whatever
+  -- interrupts, and after each battle diff both pages.  The first battle that
+  -- teaches must have written the slot-3 page and only it.  (Desert
+  -- encounters on the way teach nothing to this kit; measured: species
+  -- $5C/$5D are weak $8A and slash, while Terra has fire and Locke pierce,
+  -- so the loop keeps walking.)
+  -- This is one single-call state machine: H.cond latches its branch on the
+  -- first tick inside a driveUntil body (measured: the branch chosen on frame
+  -- one replayed for the whole loop and the battle accounting never ran), so
+  -- the battle edge is detected inline instead.
   (function()
     local fights, wasInBattle = 0, false
     local function account()
@@ -358,15 +360,15 @@ H.run({ maxFrames = 90000 }, {
     end
   end),
 
-  -- 3. THE READ HALF: a fresh battle's seed pre-reveals the taught bits --
+  -- 3. the read half: a fresh battle's seed pre-reveals the taught bits,
   -- knowledge only the slot-3 page carries.  Encounters without a taught
-  -- species are FLED (1914283's idiom; no submenu is open at seed, so a
-  -- bare L+R hold releases) and retried, bounded.
-  -- same single-call shape (H.cond latches, see above): patrol; at each
+  -- species are fled (1914283's idiom; no submenu is open at seed, so a
+  -- bare L+R hold releases) and retried, with a bound on the retries.
+  -- Same single-call shape (H.cond latches, see above): patrol; at each
   -- encounter, sample the seed ~90 frames after the monsters populate and
-  -- BEFORE any input, then FLEE (1914283's idiom -- no submenu is open at
+  -- before any input, then flee (1914283's idiom; no submenu is open at
   -- seed, so a bare L+R hold releases); untaught pools defer to the next
-  -- encounter, bounded
+  -- encounter, with a bound.
   (function()
     local tries, checked = 0, 0
     local wasIn, seedFrame, sampled = false, nil, false

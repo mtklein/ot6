@@ -1,27 +1,27 @@
 -- @suite slow
--- battle_dlgmenu: battles that OPEN with a scripted battle dialogue must
+-- battle_dlgmenu: battles that open with a scripted battle dialogue must
 -- come back with intact, working menus.  Regression test for the whelk
 -- garbled-menu bug (first bad: 0666392): Ot6MarkFontDirty_ext was hooked
--- BETWEEN _c143b9's parameter setup and its jmp WaitTfrVRAM and clobbered
--- A -- WaitTfrVRAM's SOURCE BANK -- so every dialogue-close "restore"
+-- between _c143b9's parameter setup and its jmp WaitTfrVRAM and clobbered
+-- A, which is WaitTfrVRAM's source bank, so every dialogue-close "restore"
 -- streamed $1000 bytes of bank-$01 open bus over the small font at vram
--- $5800 and all later menu/list text rendered as noise (the map words
--- stayed correct; deep list picks read as "rejected" only because nobody
--- could see which rows were real).
+-- $5800 and all later menu and list text rendered as noise.  The map words
+-- stayed correct; deep list picks read as rejected only because nobody
+-- could see which rows were real.
 --   flow: whelk entry point -> step onto the trigger -> edge-tap the opening
 --   dialogues -> first menu entirely hands-off -> whole-font byte scan
 --   (every claimed OT6 cell == its bank-F0 data, every other byte ==
 --   SmallFontGfx) -> open the magitek list -> staged-row map-word asserts
---   -> a deep row selects, targets, and EXECUTES ($3410 exec watch).
+--   -> a deep row selects, targets, and executes ($3410 exec watch).
 --
--- MENU OWNER DOES NOT MATTER, deliberately.  The battle-start ATB roll
+-- The menu owner does not matter, by design.  The battle-start ATB roll
 -- decides whose menu opens first, and every assert here is written to hold
 -- for any of them: everyone in this fight rides magitek armor, so the top
 -- command opens a magitek list whoever holds it; the "Ice" probe and the
 -- $83-$8a exec watch are beam-family checks common to all those lists; and
 -- assertStagingSane accepts the element icons any of those lists stages.
--- It was not always so -- see the block comment there -- and the fixture
--- generator must NOT be tuned to steer the roll on this test's behalf.
+-- This was not always true (see the block comment there), and the fixture
+-- generator must not be tuned to steer the roll on this test's behalf.
 local H = dofile("tools/tests/lib/ot6.lua")
 local STATE = "build/states/whelk_entry.mss.lua"
 local WHELK = { [0x0134] = true }
@@ -30,8 +30,8 @@ local function whelk()
 end
 
 -- Whole-font correctness: vram $5800-$5fff words (bytes $B000-$BFFF) must
--- be SmallFontGfx (rom C4/7FC0) everywhere EXCEPT the 24 OT6-claimed cells
--- (8 element icons + 16 hud glyphs), which must equal their bank-F0 data.
+-- be SmallFontGfx (rom C4/7FC0) everywhere except the 24 OT6-claimed cells
+-- (8 element icons and 16 hud glyphs), which must equal their bank-F0 data.
 -- Derivation mirrors H.glyphCanary (signature scan; cell table precedes
 -- the glyph data in rom) so art edits never stale this test.
 local SMALLFONT_ROM = 0x047FC0          -- C4/7FC0 in the headerless image
@@ -86,7 +86,7 @@ local function assertFontIntact(what)
 end
 
 -- staged magitek-list map words (rows 32+ off vram word $7800): "Ice"
--- (I=$88 c=$9c e=$9e) proves real text landed in the staging rows
+-- (I=$88 c=$9c e=$9e) shows real text landed in the staging rows
 local function iceStaged()
   local vr = emu.memType.snesVideoRam
   for w = 0x400, 0x5fc do
@@ -99,33 +99,33 @@ local function iceStaged()
   return false
 end
 -- Whole-map scan of the staging rows.  Every word must be a cell that
--- really carries art: a small-font text tile ($80+), or one of the eight
+-- carries art: a small-font text tile ($80+), or one of the eight
 -- OT6 element icons.  Anything else means garbage got staged.
 --
--- The icon half is not a concession, it is the rule.  Ability list rows
--- are drawn by Ot6ListIconCommon / Ot6AbilityPad_ext (ot6.asm), which
--- append the ability's element glyph from Ot6ElemGlyphTbl -- and that
--- table puts POISON at font cell $64, below the text range, with the
--- comment that says why: "$ee is vanilla's border junk fill!"
--- (ot6.asm:1158).  The other seven icons happen to land at $eb $ec $ed
--- $ef $fb $fc $fd, all >= $80, which is the only reason a $80+-only rule
--- ever looked correct.
+-- The icon half is part of the rule, not an exception to it.  Ability list
+-- rows are drawn by Ot6ListIconCommon and Ot6AbilityPad_ext (ot6.asm), which
+-- append the ability's element glyph from Ot6ElemGlyphTbl, and that
+-- table puts poison at font cell $64, below the text range, with a
+-- comment giving the reason: "$ee is vanilla's border junk fill!"
+-- (ot6.asm:1158).  The other seven icons land at $eb $ec $ed
+-- $ef $fb $fc $fd, all >= $80, which is why a $80+-only rule
+-- looked correct.
 --
 -- Measured on this fixture (probe dump of $7c00-$7d3f with the magitek
--- list open): row $7c70 reads "Bio Blast" followed by word $3964 --
--- tile $164 = font cell $64, palette 6, which is exactly
+-- list open): row $7c70 reads "Bio Blast" followed by word $3964, that is
+-- tile $164 = font cell $64, palette 6, which is
 -- Ot6ElemPalTbl's ".byte 6 << 2 ; poison: green".  That word is correct,
--- intentional, player-visible art.  The old rule called it garbage, so
+-- intended, player-visible art.  The old rule called it garbage, so
 -- the test could only pass on the battle-start ATB rolls where somebody
--- OTHER than Terra held the first menu -- i.e. it was a coin flip on
--- which ROM bytes happened to be assembled, which is the one thing
--- CONTRIBUTING.md says a test must never be.
+-- other than Terra held the first menu, which made it depend on which ROM
+-- bytes happened to be assembled, which CONTRIBUTING.md says a test
+-- must never depend on.
 --
--- The allowed set is derived, not listed here: claimedCells() finds the
--- icon data in bank F0 by signature scan, and assertFontIntact() then
--- byte-compares every claimed cell's vram against that rom data -- so a
--- wrong cell list fails the font check loudly rather than quietly
--- widening this one.
+-- The allowed set is derived rather than listed here: claimedCells() finds
+-- the icon data in bank F0 by signature scan, and assertFontIntact() then
+-- byte-compares every claimed cell's vram against that rom data, so a
+-- wrong cell list fails the font check rather than quietly widening this
+-- one.
 local function assertStagingSane()
   local vr = emu.memType.snesVideoRam
   local _, elemIcons = claimedCells()
@@ -161,11 +161,11 @@ H.run({ maxFrames = 12000 }, {
       aPhase = (aPhase + 1) % 8
       if H.battleLoadStarted() then
         if whelk() then H.setPad({}); return end
-        -- an incidental encounter on the way to the trigger is FLED, not
-        -- ended by writing the battle-clearing flag (issue #75): L+R is the
-        -- engine's own run mechanic, the idiom every converted traversal step
-        -- uses.  If the formation refuses to release, the driveUntil budget
-        -- fails this loudly rather than a poke papering over it.
+        -- an incidental encounter on the way to the trigger is fled rather
+        -- than ended by writing the battle-clearing flag (issue #75): L+R is
+        -- the engine's own run mechanic, the idiom every converted traversal
+        -- step uses.  If the formation refuses to release, the driveUntil
+        -- budget fails instead of a poke hiding the problem.
         H.setPad({ l = true, r = true })
         return
       end
@@ -182,7 +182,7 @@ H.run({ maxFrames = 12000 }, {
   H.waitUntil(function() return H.battleActive() end, 900, "whelk up", 30),
   H.waitFrames(240),
   -- edge-tap A only until the first menu appears, then hands off: the
-  -- original bug garbled this screen with ZERO further input
+  -- original bug garbled this screen with no further input
   H.driveUntil(function() return H.readByte(0x7bca) ~= 0 end, 4000, {
     H.call(function()
       local n = (H.vars.mn or 0) + 1
@@ -194,7 +194,7 @@ H.run({ maxFrames = 12000 }, {
   H.waitFrames(300),
   H.call(function()
     -- name the menu owner: nothing asserts on it (see the header), but a
-    -- failure that IS roll-dependent should say so in its own log instead
+    -- failure that is roll-dependent should say so in its own log instead
     -- of making the next reader re-measure the ATB phase
     local actor = H.readByte(0x62ca)
     H.log(string.format("first menu: actor slot %d, char id $%02x", actor,
@@ -215,8 +215,8 @@ H.run({ maxFrames = 12000 }, {
     assertStagingSane()
     H.screenshot("dlgmenu_list")
   end),
-  -- deep selection: two rows down, select, confirm target -- and prove a
-  -- magitek beam actually EXECUTES (the turn engine accepted the pick)
+  -- deep selection: two rows down, select, confirm target, and check that a
+  -- magitek beam executes, which means the turn engine accepted the pick
   H.pressButtons({ "down" }, 4), H.waitFrames(20),
   H.pressButtons({ "down" }, 4), H.waitFrames(20),
   H.pressButtons({ "a" }, 4), H.waitFrames(30),

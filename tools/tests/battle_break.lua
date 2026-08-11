@@ -1,5 +1,5 @@
 -- @suite slow
--- battle_break.lua -- THE M1 acceptance test: chip -> break -> recover, live.
+-- battle_break.lua -- the M1 acceptance test: chip -> break -> recover, live.
 --
 --   tools/tests/run.sh tools/tests/battle_break.lua
 --
@@ -16,23 +16,23 @@
 --   2. a fire hit chips the target's shield and reveals the fire weakness
 --      (mask $01 in $3E95/$3E97)
 --   3. shields reach 0 -> broken timer nonzero
---   3b. THE BROKEN X2 FOR A FLAGS3-$20 ATTACK: Fire Beam carries flags3
---      $20 (can't dodge), and the old whole-byte $f2 gate silently denied
---      it the broken double. The breaking hit lands with the timer already
+--   3b. the broken x2 for a flags3-$20 attack: Fire Beam carries flags3
+--      $20 (can't dodge), and the old whole-byte $f2 gate denied it the
+--      broken double. The breaking hit lands with the timer already
 --      set, so its recorded drop must be ~4x the first (unbroken) chip's
---      drop on the same guard: the first chip is elemental-weak x2 THEN
+--      drop on the same guard: the first chip is elemental-weak x2 then
 --      shielded-resistance x0.5 (guards are authored 2-shield species, so
---      Ot6ShieldedDmg attenuates while their shields hold) = ~1x base,
---      while the breaking hit's chip empties the shields BEFORE the damage
---      tail runs, so it collects weak x2 AND broken x2 unattenuated = ~4x
---      base. Bounded 3x-6x (vanilla's 224..255/256 damage spread keeps the
---      true ratio inside [3.51, 4.55]; measured live: 134 -> 536B).
---   4. the broken timer expires -> shields restore to max, revealed mask
---      SURVIVES recovery
+--      Ot6ShieldedDmg attenuates while their shields hold), giving ~1x base,
+--      while the breaking hit's chip empties the shields before the damage
+--      tail runs, so it collects weak x2 and broken x2 unattenuated, giving
+--      ~4x base. Bounded 3x-6x (vanilla's 224..255/256 damage spread keeps
+--      the true ratio inside [3.51, 4.55]; measured live: 134 -> 536B).
+--   4. the broken timer expires -> shields restore to max, and the revealed
+--      mask survives recovery
 --
 -- Entity map for this fight: guards in monster slots 2/3 -> entity offsets
--- $0C/$0E. shields $3E44/$3E46 - timers $3E94/$3E96 - revealed $3E95/$3E97
--- - weak elems $3BEC/$3BEE - HP $3C00/$3C02. party levels $3B18+2i,
+-- $0C/$0E. shields $3E44/$3E46, timers $3E94/$3E96, revealed $3E95/$3E97,
+-- weak elems $3BEC/$3BEE, HP $3C00/$3C02. party levels $3B18+2i,
 -- mag.pwr $3B41+2i.
 
 local H = dofile("tools/tests/lib/ot6.lua")
@@ -55,11 +55,11 @@ local function report(tag)
 end
 
 -- per-frame HP watcher: every discrete drop on a guard is recorded with
--- that guard's broken-timer state at observation time. the breaking hit's
+-- that guard's broken-timer state at observation time. The breaking hit's
 -- damage is computed in the same CalcTargetDmg call that sets the timer
 -- (chip runs before the broken-double join), and the HP write lands
--- frames later during the animation -- so a drop observed with the timer
--- up IS a hit that ran the broken-double path.
+-- frames later during the animation, so a drop observed with the timer
+-- up is a hit that ran the broken-double path.
 local drops = { [1] = {}, [2] = {} }
 local prevHp = {}
 local function sampleDrops()
@@ -100,8 +100,8 @@ H.run({ maxFrames = 30000 }, {
   report("seeded"),
 
   -- lab setup: fire-weak, tough guards, uniform casters. 4000 hp because
-  -- the breaking hit now carries elemental x2 AND broken x2; equalized
-  -- level/mag.pwr make the drop-ratio assert caster-independent.
+  -- the breaking hit now carries elemental x2 and broken x2; equalized
+  -- level and mag.pwr make the drop-ratio assert caster-independent.
   H.call(function()
     H.writeByte(0x3BEC, H.readByte(0x3BEC) | 0x01)
     H.writeByte(0x3BEE, H.readByte(0x3BEE) | 0x01)
@@ -131,8 +131,8 @@ H.run({ maxFrames = 30000 }, {
   H.repeatN(240, { H.call(sampleDrops), H.waitFrames(1) }),
   -- the beams that broke the guard went through the magitek list, whose
   -- rendered rows persist in the menu map: assert the colored element
-  -- icon right of "Fire Beam" (a blank icon here = the pre-render only,
-  -- meaning the real list draw lost its icon column)
+  -- icon right of "Fire Beam".  A blank icon here would mean only the
+  -- pre-render is present, so the real list draw lost its icon column.
   H.call(function()
     local vr = emu.memType.snesVideoRam
     local best = nil
@@ -169,11 +169,11 @@ H.run({ maxFrames = 30000 }, {
     local first, last = seq[1], seq[#seq]
     H.assertEq(first.broken, false, "first chip landed unbroken")
     H.assertEq(last.broken, true, "breaking hit landed with the timer up")
-    -- shielded resistance moved these bounds deliberately (measurement
-    -- #5): unbroken chip = weak x2 * shielded x0.5 = ~1x base; breaking
-    -- hit = weak x2 * broken x2, unattenuated (its chip zeroed the
-    -- shields before the damage tail) = ~4x base. ratio ~4x, true range
-    -- [3.51, 4.55] under vanilla's 224..255/256 spread.
+    -- shielded resistance moved these bounds (measurement #5): the
+    -- unbroken chip is weak x2 * shielded x0.5 = ~1x base; the breaking
+    -- hit is weak x2 * broken x2, unattenuated because its chip zeroed the
+    -- shields before the damage tail, giving ~4x base. Ratio ~4x, true
+    -- range [3.51, 4.55] under vanilla's 224..255/256 spread.
     H.assertEq(last.d > first.d * 3, true,
       "broken beam hit > 3x the shielded chip (0.5x lifted, x2 collected)")
     H.assertEq(last.d < first.d * 6, true,

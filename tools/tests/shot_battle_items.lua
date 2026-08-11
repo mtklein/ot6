@@ -1,19 +1,19 @@
--- shot_battle_items.lua -- SCREENSHOT EVIDENCE for weapon-class icons in the
+-- shot_battle_items.lua -- screenshot evidence for weapon-class icons in the
 -- battle Item list.
 --
--- ISSUE #75 CONVERSION.  This script used to poke one weapon per break class
+-- Issue #75 conversion.  This script used to poke one weapon per break class
 -- into the magitek entry point's empty bag and shoot the forged list.  It now
--- boots vector_entry -- the class-richest REAL bag on the chain (see
--- shot_field_items.lua's header for the recon; PIERCE + SLASH is everything
--- any v0.6 save owns in normal play) -- walks one step south out of Vector onto the
--- world map (the fixture stands on the long entrance at map 242 (32,61);
--- measured: a held DOWN reaches the world in ~30 frames), walks the
--- random-battle area into a REAL world encounter, and shoots the Item list
--- the battle menu builds from the save's own $1869 bag.
+-- boots vector_entry, which carries the class-richest real bag on the chain
+-- (see shot_field_items.lua's header for the recon; PIERCE and SLASH are
+-- everything any v0.6 save owns in normal play).  It walks one step south out
+-- of Vector onto the world map (the fixture stands on the long entrance at
+-- map 242 (32,61); measured: a held DOWN reaches the world in ~30 frames),
+-- walks the random-battle area until a world encounter fires, and shoots the
+-- Item list the battle menu builds from the save's own $1869 bag.
 --
 -- The weapon rows in the measured bag order (battle list order = bag order):
 --   row  9 Dirk PIERCE, row 19 ThunderBlade SLASH, row 23 MithrilKnife
---   PIERCE, row 26 Ashura SLASH -- with TOOL/RELIC/consumable rows around
+--   PIERCE, row 26 Ashura SLASH, with tool, relic and consumable rows around
 --   them for the no-class face.
 local H = dofile("tools/tests/lib/ot6.lua")
 local STATE = "build/states/vector_entry.mss.lua"
@@ -59,8 +59,8 @@ H.run({ maxFrames = 60000 }, {
   H.waitUntil(function() return H.readByte(MENU) ~= 0 end, 1200,
     "command window ready", 10),
   H.call(function()
-    -- battle command table: 4 x [cmd, ?, targeting] per slot -- logged so the
-    -- shot is self-describing (real kits now, not installs)
+    -- battle command table: 4 x [cmd, ?, targeting] per slot, logged so the
+    -- shot is self-describing (these are the save's real kits, not installs)
     for slot = 0, 3 do
       local base = 0x202e + 12 * slot
       H.log(string.format("cmds slot %d: %02X %02X %02X %02X", slot,
@@ -69,7 +69,7 @@ H.run({ maxFrames = 60000 }, {
     end
   end),
 
-  -- Item is the LAST command row for this real party (FIGHT/kit/MAGIC/ITEM);
+  -- Item is the last command row for this party (FIGHT/kit/MAGIC/ITEM);
   -- up from the top wraps straight to it
   H.pressButtons({ "up" }, 4), H.waitFrames(12),
   H.pressButtons({ "a" }, 4),
@@ -81,7 +81,7 @@ H.run({ maxFrames = 60000 }, {
   H.waitFrames(30),
   H.call(function() H.screenshot("battle_items_pierce") end),
 
-  -- and to the SLASH rows (ThunderBlade row 19 .. Ashura row 26)
+  -- and to the SLASH rows (ThunderBlade row 19 to Ashura row 26)
   H.repeatN(12, { H.pressButtons({ "down" }, 4), H.waitFrames(12) }),
   H.waitFrames(30),
   H.call(function() H.screenshot("battle_items_slash") end),

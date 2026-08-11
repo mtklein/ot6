@@ -1,47 +1,46 @@
 -- @suite savestate=vector_entry
 -- menu_blitzpage_sabin.lua -- issue #53: the field Skills->Blitz page, opened
--- for A REAL SABIN.
+-- for a real Sabin.
 --
--- WHY THIS FILE EXISTS.  menu_blitzpage.lua asserts the page thoroughly and
--- every one of its three phases is SYNTHETIC: arvis_wake's party is Terra
+-- Why this file exists: menu_blitzpage.lua asserts the page thoroughly, but
+-- all three of its phases are synthetic.  arvis_wake's party is Terra
 -- alone, so that test installs the Blitz command onto her third battle-command
--- byte and writes the known-blitz mask $1D28 by hand.  Correct as staging --
--- it is the only way to reach the eight-learned and none-learned states at
--- all, and both are real states a Sabin passes through -- but it means the
--- page had never once been rendered for the character it is FOR.  The owner
--- spotted it the way anyone would: Terra's portrait, on the Blitz page, in a
--- screenshot.
+-- byte and writes the known-blitz mask $1D28 by hand.  That staging is
+-- correct, since it is the only way to reach the eight-learned and
+-- none-learned states at all, and both are real states a Sabin passes through,
+-- but it meant the page had never been rendered for the character it is for.
+-- The owner noticed Terra's portrait on the Blitz page in a screenshot.
 --
--- So this test pokes NOTHING.  Its whole job is that every input is the
--- game's own:
+-- So this test pokes nothing.  Every input is the game's own:
 --   * the fixture is vector_entry, cold-booted from the tracked
 --     post-opera-v1 SRAM save (savestate_graph.py:390), whose manifest names its
---     party LOCKE CELES SABIN EDGAR -- one step from that checkpoint, no story
---     replay;
---   * SABIN is FOUND, not assumed: zCharID ($69, four bytes, one per party
---     slot) is read and searched for CHAR::SABIN, and the character cursor is
---     driven to that slot.  A party reshuffle moves the row, not the test;
+--     party LOCKE CELES SABIN EDGAR, one step from that checkpoint, with no
+--     story replay;
+--   * SABIN is found rather than assumed: zCharID ($69, four bytes, one per
+--     party slot) is read and searched for CHAR::SABIN, and the character
+--     cursor is driven to that slot.  A party reshuffle moves the row, not the
+--     test;
 --   * the Blitz row is enabled because Sabin's own character record carries
 --     BATTLE_CMD::BLITZ, which this test asserts rather than arranges;
 --   * the learned set is whatever the save holds.  The rows are checked
 --     against $1D28 as read, so a level or a story beat can move which tiers
 --     are lit without touching this file.
 --
--- WHAT IT ADDS OVER menu_blitzpage.lua.  Only the realness -- deliberately.
+-- What it adds over menu_blitzpage.lua is only the use of real data.
 -- The geometry canaries, the cursor-gutter pairing and the price arithmetic
 -- are asserted there, on three learned-counts this fixture cannot produce, and
 -- duplicating them here would be two copies to keep in step for no new
--- coverage.  What is genuinely only checkable HERE is that the page a player
--- actually opens agrees with the ROM: the names, the #53 probe icons, and the
+-- coverage.  What is only checkable here is that the page a player
+-- opens agrees with the ROM: the names, the #53 probe icons, and the
 -- locked marker on tiers a mid-game Sabin has not reached.
 --
--- THE ICONS (#53) are the reason a real Sabin matters more than usual now.
--- Three of his eight Blitzes carry an ELEMENT and no break class -- AuraBolt
--- holy, Fire Dance fire, Air Blade wind -- and until #53 uploaded the element
--- tiles into the FIELD font (Ot6MenuIcons4bpp_ext, ot6_icons.asm) those three
+-- The icons (#53) are the main reason a real Sabin matters here.
+-- Three of his eight Blitzes carry an element and no break class (AuraBolt
+-- holy, Fire Dance fire, Air Blade wind), and until #53 uploaded the element
+-- tiles into the field font (Ot6MenuIcons4bpp_ext, ot6_icons.asm) those three
 -- rows drew a blank cell.  A mid-game Sabin has learned them, so this fixture
 -- puts real element icons on a real page; the test asserts each named cell
--- both in the tilemap AND as art present in the menu font's vram copy.
+-- both in the tilemap and as art present in the menu font's vram copy.
 local H = dofile("tools/tests/lib/ot6.lua")
 local STATE = "build/states/vector_entry.mss.lua"
 
@@ -66,7 +65,7 @@ local NAME_COL, ICON_COL, COST_COL = 3, 14, 16
 local NAME_SIZE, PAD = 10, 0xff
 local function blitzRow(i) return 1 + i * 2 end
 
--- ---- the ROM authorities, all read, none written down ----
+-- ---- the ROM tables, all read, none written down ----
 local ATKNAME = H.sym("AttackName") & 0x3FFFFF
 local ATKNAME_0, BLITZ_ATK0 = 0x51, 0x5d
 local SKILLCLASS = H.sym("Ot6SkillClassTbl") & 0x3FFFFF
@@ -195,9 +194,9 @@ H.run({ maxFrames = 40000 }, {
   H.waitUntil(function() return H.worldHasControl() or H.hasControl() end,
     600, "control at the vector entry point", 5),
 
-  -- the player's path in: X opens the menu.  driveUntil, not one press: this
-  -- fixture is a cold checkpoint boot and the frame the state lands on is not
-  -- something a single 4-frame press can be pinned to.
+  -- the player's path in: X opens the menu.  This uses driveUntil rather than
+  -- one press, because this fixture is a cold checkpoint boot and the frame the
+  -- state lands on cannot be pinned to a single 4-frame press.
   H.driveUntil(function() return st() == ST_MAIN end, 1200,
     { H.pressButtons({ "x" }, 4), H.waitFrames(30) }, "main menu"),
   H.waitFrames(20),
@@ -207,7 +206,7 @@ H.run({ maxFrames = 40000 }, {
   H.waitUntil(function() return st() == ST_CHAR end, 300, "character select", 5),
   H.waitFrames(10),
 
-  -- FIND Sabin rather than assume his row.
+  -- find Sabin rather than assume his row.
   H.call(function()
     local ids = {}
     for s = 0, 3 do
@@ -234,10 +233,10 @@ H.run({ maxFrames = 40000 }, {
       learnedMask))
   end),
 
-  -- walk the character cursor onto his slot.  $4b is the LIVE cursor index on
-  -- the character page; zSelIndex ($28) is where the confirm LATCHES it, and is
-  -- asserted below once A has been pressed -- the two together are what proves
-  -- the page opened for the row the sprite was on.
+  -- walk the character cursor onto his slot.  $4b is the live cursor index on
+  -- the character page; zSelIndex ($28) is where the confirm latches it, and is
+  -- asserted below once A has been pressed.  The two together show the page
+  -- opened for the row the sprite was on.
   H.driveUntil(function() return H.readByte(ZCURSOR) == sabinSlot end, 900,
     { H.pressButtons({ "down" }, 2), H.waitFrames(8) }, "cursor onto SABIN"),
   H.pressButtons({ "a" }, 2),
@@ -263,7 +262,7 @@ H.run({ maxFrames = 40000 }, {
   H.waitFrames(90),
 
   H.call(function()
-    -- the page must be showing SOMETHING, or the assertions below are empty
+    -- the page must be showing learned rows, or the assertions below are empty
     local nLearned = 0
     for i = 0, 7 do if (learnedMask >> i) & 1 == 1 then nLearned = nLearned + 1 end end
     H.assertEq(nLearned > 0, true,
@@ -285,8 +284,8 @@ H.run({ maxFrames = 40000 }, {
       end
     end
 
-    -- #53's point, stated as a property of this render: a real Sabin's real
-    -- page carries at least one real ELEMENT icon.  Before #53 the field font
+    -- #53's point, stated as a property of this render: a real Sabin's
+    -- page carries at least one element icon.  Before #53 the field font
     -- had no element tiles and every one of these rows drew a blank cell.
     H.assertEq(elemRows > 0, true,
       "at least one learned Blitz shows an ELEMENT icon -- AuraBolt is holy, "

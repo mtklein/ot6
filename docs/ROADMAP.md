@@ -2,13 +2,13 @@
 
 Every milestone ends with a buildable ROM, a distributable `.bps` patch, and
 a save/savestate that demos the new behavior. Order is chosen so the two
-signature systems (Break, BP) are playable against vanilla content early —
-menus, data entry, and balance come after the fun is proven.
+signature systems (Break, BP) are playable against vanilla content early;
+menus, data entry, and balance come after those systems are shown to work.
 
-## The headline metric: how far the game is playable
+## The main metric: how far the game is playable
 
-Progress is measured in playtest terms: **how far into the game we'd tell a
-playtester to play before stopping.** A tier is reached when the fixture
+Progress is measured in playtest terms: how far into the game we would tell a
+playtester to play before stopping. A tier is reached when the fixture
 pipeline reaches it, the balance measurements are green in that section of
 the game, and every recruited character's kit is in place there.
 
@@ -19,41 +19,41 @@ the game, and every recruited character's kit is in place there.
 | 3 | scenario split → Kefka at Narshe | reached |
 | 4 | through Zozo — Dadaluma beaten, sub-jobs in hand | reached |
 | 5 | end of the Opera sequence — Ultros ② beaten, Setzer joined, Blackjack acquired | reached |
-| **6 (current)** | **end of WoB (Vector → Floating Continent)** | the game is playable up to **Terra's return**: Vector and the Magitek Research Facility through Number 128, the Cranes and the escape are playable. Remaining: the rest of the kits and espers; the wide weakness/telegraph pass (boss data already reaches Nerapa); route and tune from there through the Floating Continent |
+| **6 (current)** | **end of WoB (Vector → Floating Continent)** | the game is playable up to Terra's return: Vector and the Magitek Research Facility through Number 128, the Cranes and the escape are playable. Remaining: the rest of the kits and espers; the wide weakness/telegraph pass (boss data already reaches Nerapa); route and tune from there through the Floating Continent |
 
-Releases are named for their **theme**, not for a tier: the owner plays,
+Releases are named for their theme rather than for a tier. The owner plays,
 files findings, and a themed release folds them in within a day or two, so a
-release need not extend how far the game is playable at all. **v0.9 is
-released; the push to the end of the World of Balance is v0.10's job.**
+release need not extend how far the game is playable at all. v0.9 is
+released; extending play to the end of the World of Balance is v0.10's goal.
 
-**On versions:** 0.9 is followed by **0.10**, not 1.0 — these are ordinary
+**On versions:** 0.9 is followed by 0.10, not 1.0; these are ordinary
 increments, not a countdown. 1.0 is a long way off: the end of the World of
 Balance is roughly the game's halfway point, and the World of Ruin is
-entirely unstarted. (1.0 is still the line where saves become
-forward-compatible — see CONTRIBUTING — it is just nowhere near next.)
+entirely unstarted. 1.0 is still the line where saves become
+forward-compatible (see CONTRIBUTING); it is just not the next release.
 
-Tiers are useful stopping points, not a promise to ship every number
+Tiers are stopping points, not a promise to ship every number
 separately. Adjacent tiers may combine when implementation and playtesting
 make that the better release.
 
-**Design canon:** *on damage verbs boost multiplies; on chance verbs
-boost guarantees.* Steal ships it (3 BP = a guaranteed steal of the rare);
+**Design canon:** on damage verbs boost multiplies; on chance verbs
+boost guarantees. Steal ships it (3 BP = a guaranteed steal of the rare);
 Dance / Sketch / Slot / Rage inherit it when their characters arrive.
 
 **Release discipline:** every distributable is built through `make patch`,
 which refuses any ROM the test suite has not stamped green. The human bar
-is the owner's no-regression rule: never release an inferior experience — a
-tag must be at least as good as previous releases as far as the owner has
-played; stretches he has not played yet ship on the automated tests alone,
-with their gaps documented, and the owner's playthrough trails behind.
+is the owner's no-regression rule: a tag must be at least as good as previous
+releases as far as the owner has played. Stretches he has not played yet ship
+on the automated tests alone, with their gaps documented, and the owner's
+playthrough trails behind.
 
 ## M4 — Skill lists on the native verbs — shipping piecemeal
 
 Landing across releases rather than as one block. Still open:
 
 - **Per-character 8-skill kits enforced** with scripted learn
-  schedules (levels/items/deeds/story — design/kits.md): **likely no JP
-  system**; JP returns only if playtesting wants a pacing knob.
+  schedules (levels/items/deeds/story; design/kits.md): likely no JP
+  system. JP returns only if playtesting wants a pacing control.
 - **Curated-kit machinery** for Gau/Strago (learn many, equip ~5 — the
   Ochette/Hikari model); menu-bank work remains in ca65.
 - **Passives** unlock at 2/4/6/8 skills learned.
@@ -65,14 +65,15 @@ Landing across releases rather than as one block. Still open:
 - Esper equip grants its spell list live (usable while equipped, gone
   when unequipped); permanent learning and level-up esper bonuses
   removed; summon stays a once-per-battle divine.
-- **Augment, not replace** (owner call): the born mages (Terra/Celes)
-  keep their innate spells and the esper adds a second job; everyone
-  else's magic *is* whatever magicite they hold — pure Octopath sub-job.
+- **Add to the born mages, do not replace them** (owner call): Terra and
+  Celes keep their innate spells and the esper adds a second job; everyone
+  else's magic is whatever magicite they hold, which is the Octopath
+  sub-job model.
 - **Stat mods are the simple while-equipped kind** (hold it, get the
-  bump); the "earn-it-by-carrying" passive version is deferred.
+  bump); the earn-it-by-carrying passive version is deferred.
 - Boost spell-folding is source-agnostic, so a borrowed Fire folds to
-  Firaga under boost — not for free: the fold reaches untaught tiers
-  (kept, deliberately: it is what lets every spell list stay at 8) but
+  Firaga under boost. The fold reaches untaught tiers, which is kept
+  deliberately because it is what lets every spell list stay at 8, and it
   pays that tier's real MP for them.
 - Every esper receives its own complete redesign in the release where it
   becomes available. The while-equipped spell/stat model is canon;
@@ -82,9 +83,9 @@ Landing across releases rather than as one block. Still open:
 
 ## M6 — Tuning pass — per-stretch, alongside each release
 
-Runs with each tier's balance pass rather than as one late block; the
-lesson is that break/boost only *land* with authored weaknesses, and only
-measured against real fixtures. Still open:
+Runs with each tier's balance pass rather than as one late block, because
+break and boost only work with authored weaknesses, and only when measured
+against real fixtures. Still open:
 
 - **Sealed Gate / banquet**, **Thamasa**, and **IAF / Floating
   Continent**: extend the same measured authoring discipline to each newly

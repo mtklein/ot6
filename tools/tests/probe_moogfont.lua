@@ -1,12 +1,14 @@
--- probe_moogfont.lua -- ROOT-CAUSE the OT6 HUD font-tile corruption seen in the
--- moogle_entry fight (Narshe, Kefka + Soldiers): probe_hudspray6 measured the
--- 24 OT6 glyph cells at vram $B000 diverging from their bank-F0 source for 5104
--- of 9000 frames, with OT6_FONTDIRTY==0 (no re-lay pending) -- so the HUD map,
--- which still references those cells, renders junk over the enemies.
+-- probe_moogfont.lua -- finds the root cause of the OT6 HUD font-tile
+-- corruption seen in the moogle_entry fight (Narshe, Kefka + Soldiers):
+-- probe_hudspray6 measured the 24 OT6 glyph cells at vram $B000 diverging
+-- from their bank-F0 source for 5104 of 9000 frames, with OT6_FONTDIRTY==0
+-- (no re-lay pending), so the HUD map, which still references those cells,
+-- renders junk over the enemies.
 --
--- Here: catch the clean->dirty transition, dump what the cells BECAME (blank?
--- dialogue font? sprite/monster art?), and log the battle context (dialogue
--- state, active gfx command) so the clobber can be named.
+-- This probe catches the clean->dirty transition, dumps what the cells were
+-- replaced with (blank, dialogue font, or sprite/monster art), and logs the
+-- battle context (dialogue state, active gfx command) so the clobber can be
+-- identified.
 
 local H = dofile("tools/tests/lib/ot6.lua")
 local STATE = "build/states/moogle_entry.mss.lua"

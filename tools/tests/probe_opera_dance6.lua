@@ -1,7 +1,8 @@
--- probe_opera_dance6.lua -- boot aria_postfork; drive the HAND-CODED climb table
+-- probe_opera_dance6.lua -- boot aria_postfork; drive the hand-coded climb table
 -- (5,21)->(12,14) across the z-split stair tiles (canStep-gated, live z, pulsed
--- pad -- corridorFollow precedent), then chase+mash to observe the Draco waltz:
--- log all visible objects + switches so we SEE how the waltz fires and moves.
+-- pad, following corridorFollow), then chase and mash to observe the Draco
+-- waltz: log all visible objects and switches, recording how the waltz fires
+-- and moves.
 local H = dofile("tools/tests/lib/ot6.lua")
 local function map() return H.mapId() & 0x1ff end
 local function sw(id) return (H.readByte(0x1E80 + math.floor(id/8)) >> (id%8)) & 1 end
@@ -13,7 +14,7 @@ local DELTA={up={0,-1},down={0,1},left={-1,0},right={1,0},upright={1,-1},upleft=
 local MOVES={"up","upleft","upright","left","right","downleft","downright","down"}
 local function key(x,y) return y*256+x end
 
--- the CLIMB corridor (5,21) -> (12,14): per-tile ordered candidate moves
+-- the climb corridor (5,21) -> (12,14): per-tile ordered candidate moves
 local CLIMB={}
 local function c(x,y,d) CLIMB[key(x,y)]=d end
 c(5,21,{"right"}); c(6,21,{"right"}); c(7,21,{"right"}); c(8,21,{"right"}); c(9,21,{"right"})

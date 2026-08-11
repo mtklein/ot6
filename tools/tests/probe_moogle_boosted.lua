@@ -1,13 +1,13 @@
--- probe_moogle_boosted.lua -- stations deployment + BOOSTED fighting
+-- probe_moogle_boosted.lua -- stations deployment plus boosted fighting
 -- (issue #75, marshal-investigation).  probe_moogle_stations proved the
 -- wave phase (three squads at three interception stations, two waves
 -- each, all six down by ~f14.6k) and then lost the Marshal to plain
--- tap-A at 330/543.  This run upgrades every fight to the input-driven tactic
--- a human uses on a hard fight in OT6: spend boost.  The pad cycle in
--- battle is R (raise pending boost -- characters open with 1 bp and
+-- tap-A at 330/543.  This run changes every fight to the input-driven
+-- tactic a player uses on a hard fight in OT6: spending boost.  The pad
+-- cycle in battle is R (raise pending boost; characters open with 1 bp and
 -- regen 1 per unboosted turn, Ot6InitBP/Ot6ActionEnd), then A-A to
--- confirm the boosted Fight; R presses outside a command menu click
--- harmlessly.  Zero writes, buttons only.
+-- confirm the boosted Fight.  R presses outside a command menu have no
+-- effect.  Zero writes, buttons only.
 local H = dofile("tools/tests/lib/ot6.lua")
 local DEFENSE = "build/states/moogle_defense.mss.lua"
 
@@ -140,7 +140,7 @@ H.run({ maxFrames = 140000 }, {
   H.navTo(14, 14, { maxFrames = 2500, playBattles = true }),
   logPools("deployed"),
 
-  -- the storm, boosted
+  -- the wave phase, boosted
   boostedDrive(function()
     return (H.readByte(0x1f41) & 0xFC) == 0
   end, 60000, "all six waves (boosted)"),

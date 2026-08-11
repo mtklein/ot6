@@ -5,44 +5,45 @@
 --   camp_escaped.mss   world map (179,71), on foot toward the Phantom Forest,
 --                      $0037=1 (the escape is done).
 --
--- THE BLOCKER YOUR PREDECESSOR HIT, SOLVED -- and the fix is geometric, not a
--- state machine.  The escape is a wall of event triggers (event_trigger.asm
+-- The blocker an earlier attempt hit, and its fix, which is geometric rather
+-- than a state machine.  The escape is a series of event triggers
+-- (event_trigger.asm
 -- :564-573): battle 15 at the x=24 column (24,28)-(24,31)+(23,32) (_cb1955),
 -- battle 16 at (33,29)/(33,30) (_cb19af), battle 17 at (36,22) (_cb19e6), and
 -- the world-exit finale on the y=14 row (35/36/37,14) (_cb1a23, :42119 ->
 -- player_ctrl_on + load_map 0 {179,71} + set_script_mode WORLD, :42253-42255).
--- Between them the party WALKS with real user control ($087C nibble 2) -- the
--- escape is walked, not ridden.  Three facts, all measured (probe_esc):
+-- Between them the party walks with real user control ($087C nibble 2); the
+-- escape is walked rather than ridden.  Three facts, all measured (probe_esc):
 --
---  1. EACH BATTLE MUST BE WON BY TAP-A, NEVER WRITE-CLEARED.  _cb1955's tail
---     (event_main.asm:42026) is `call _ca5ea9`, which is `if_b_switch $40,
---     ...; call GameOver` (:14171): a battle that exits WITHOUT the win bit
---     $40 -- which is exactly what write-clearing during load produces --
---     calls GameOver and parks the event forever.  That silent park is the
---     "$CB1955 forever" the predecessor measured.  Auto-battle (edge-tap A)
---     lets the Magitek party win cleanly; then the teardown sets $01F4=1
---     and control returns a few frames after fade-in.
+--  1. Each battle must be won by tap-A rather than write-cleared.  _cb1955's
+--     tail (event_main.asm:42026) is `call _ca5ea9`, which is `if_b_switch
+--     $40, ...; call GameOver` (:14171): a battle that exits without the win
+--     bit $40, which is what write-clearing during load produces,
+--     calls GameOver and leaves the event stalled with no message.  That
+--     stall is the "$CB1955 forever" the earlier attempt measured.
+--     Auto-battle (edge-tap A) lets the Magitek party win; the teardown then
+--     sets $01F4=1 and control returns a few frames after fade-in.
 --
---  2. THE TRIGGER RE-FIRES EVERY ALIGNED FRAME (CheckEventTriggers has no
+--  2. The trigger re-fires every aligned frame (CheckEventTriggers has no
 --     once-per-tile latch, field/event.asm:5740-5786; its guard fires
 --     whenever the party is tile-aligned AND $087C nibble==2 AND no event
---     runs).  So while the party STANDS aligned on a fired trigger tile the
---     guarded re-fire (`if_switch $01F4=1, EventReturn`) grabs $087C for ~3 of
---     every 4 frames -- control flaps at ~25% duty.  navTo reads that as
---     "control lost" and DROPS its plan every cycle (lib line ~1042), so it
---     thrashes in place and never completes a step.  This is the whole reason
---     a plain navTo could not leave (24,30).
+--     runs).  So while the party stands aligned on a fired trigger tile the
+--     guarded re-fire (`if_switch $01F4=1, EventReturn`) takes $087C for
+--     about 3 of every 4 frames, leaving control available ~25% of the time.
+--     navTo reads that as control lost and drops its plan every cycle (lib
+--     line ~1042), so it repeats in place and never completes a step.  That
+--     is why a plain navTo could not leave (24,30).
 --
---  3. YOU LEAVE A TRIGGER BY HOLDING A *WALKABLE* DIRECTION PERSISTENTLY.
---     The corridor runs along y=28, not the start row y=30.  (24,30) has NO
---     right exit (a wall -- canStep proved it); (24,28) DOES.  Holding the
---     corridor-forward direction through the flap, a step begins on each clean
---     frame, un-aligns the party, and the re-fire (which needs alignment)
---     stops -- the step completes and the party is off the trigger.  navTo's
---     give-up is the bug; a hold that never gives up is the fix.
+--  3. Leave a trigger by holding a walkable direction persistently.
+--     The corridor runs along y=28, not the start row y=30.  (24,30) has no
+--     right exit (a wall; canStep confirmed it), while (24,28) does.  Holding
+--     the corridor-forward direction through the intermittent control, a step
+--     begins on each clean frame, un-aligns the party, and the re-fire (which
+--     needs alignment) stops, so the step completes and the party is off the
+--     trigger.  The fix is a hold that does not give up on control loss.
 --
--- So the drive is: navTo the CLEAN segment up to each trigger's near side
--- (navTo works perfectly off the triggers), then holdCross the trigger itself
+-- So the drive is: navTo the clean segment up to each trigger's near side
+-- (navTo works reliably off the triggers), then holdCross the trigger itself
 -- (persistent hold of the corridor direction + tap-A the fight), landing on
 -- the clean far side.  Repeat for battles 15/16/17, then holdCross UP into the
 -- finale row and ride the dismount cutscene (tap-A its dialogs) onto the world
@@ -74,9 +75,10 @@ local function inBattle()
   return false
 end
 
--- FLAP-TOLERANT PERSISTENT HOLD.  Hold `dir` every field frame; edge-tap A
--- (4 on / 4 off) through any battle or dialog, never write-cleared; never
--- give up on control loss.  On each clean frame the held direction begins a
+-- Persistent hold that tolerates intermittent control.  Hold `dir` every
+-- field frame; edge-tap A (4 on / 4 off) through any battle or dialog rather
+-- than write-clearing; do not give up on control loss.  On each clean frame
+-- the held direction begins a
 -- step into the walkable corridor tile, un-aligning the party off the
 -- re-firing trigger.
 local battles = {}
@@ -115,10 +117,10 @@ local function holdCross(dir, donePred, what, budget)
   }, what)
 end
 
--- a clean-segment nav that refuses to write-clear an escape fight (species
--- $0042): if one ever fires mid-segment it hands off and we notice via the
--- budget, rather than corrupting a teardown.  The segments are chosen off the
--- triggers, where control does not flap and navTo is reliable.
+-- a clean-segment nav that does not write-clear an escape fight (species
+-- $0042): if one fires mid-segment it hands off and the budget makes it
+-- visible, rather than corrupting a teardown.  The segments are chosen off
+-- the triggers, where control is continuous and navTo is reliable.
 local IMP = 0x0042
 local function seg(tx, ty, what)
   return H.cond(function() return true end, {
@@ -146,7 +148,7 @@ H.run({ maxFrames = 120000 }, {
       H.frame, H.fieldX(), H.fieldY(), tostring(H.hasControl())))
   end),
 
-  -- BATTLE 15: cross the x=24 wall at y=28 (its right exit is open).
+  -- Battle 15: cross the x=24 wall at y=28 (its right exit is open).
   seg(23, 28, "b15 approach"),
   holdCross("right", function()
     return map() == 119 and H.fieldX() >= 27 and H.fieldY() == 28
@@ -158,7 +160,7 @@ H.run({ maxFrames = 120000 }, {
       H.fieldY(), H.frame))
   end),
 
-  -- BATTLE 16: corridor turns down at x=32; cross (33,29) holding right.
+  -- Battle 16: corridor turns down at x=32; cross (33,29) holding right.
   seg(32, 29, "b16 approach"),
   holdCross("right", function()
     return map() == 119 and H.fieldX() >= 35 and H.fieldY() == 29
@@ -170,7 +172,7 @@ H.run({ maxFrames = 120000 }, {
       H.fieldY(), H.frame))
   end),
 
-  -- BATTLE 17: up the east side; cross (36,22) holding up.
+  -- Battle 17: up the east side; cross (36,22) holding up.
   seg(36, 23, "b17 approach"),
   holdCross("up", function()
     return map() == 119 and H.fieldY() <= 21 and H.fieldX() == 36
@@ -182,7 +184,7 @@ H.run({ maxFrames = 120000 }, {
       H.fieldY(), H.frame))
   end),
 
-  -- FINALE: up the x=37 column into the y=14 row -> _cb1a23 dismount cutscene
+  -- Finale: up the x=37 column into the y=14 row -> _cb1a23 dismount cutscene
   -- -> world (179,71).  holdCross UP rides it (tap-A the dialogs) onto the
   -- world map; done when the world module owns the party.
   seg(37, 16, "finale approach"),

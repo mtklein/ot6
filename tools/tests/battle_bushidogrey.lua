@@ -1,49 +1,50 @@
 -- @suite slow savestate=camp_escaped
--- battle_bushidogrey.lua -- v0.5 MP costs + BP gating: the SwdTech submenu greys
--- what Cyan cannot reach, for TWO reasons -- not enough MP (like Magic/Blitz),
--- and not enough BP (the boost the row would spend).
+-- battle_bushidogrey.lua -- v0.5 MP costs and BP gating: the SwdTech submenu
+-- greys what Cyan cannot reach, for two reasons: not enough MP (as in Magic
+-- and Blitz), and not enough BP (the boost the row would spend).
 --
 -- Vanilla Magic greys a spell whose MP cost exceeds current MP; the tools-shell
 -- verbs never inherited that.  Ot6AbilityGrey (ot6.asm, bank F0) ports it, and
 -- the row decorator OR's the $00/$04 it returns into the name's font scope.
--- The Bushido submenu adds a SECOND grey reason on top: each row IS a boost
+-- The Bushido submenu adds a second grey reason: each row is a boost
 -- level (row r spends r+1 BP, #38's 1-BP floor), so a row whose boost exceeds
--- the caster's current bp ($3e9c) is unreachable too -- Ot6BushidoRowGrey OR's
+-- the caster's current bp ($3e9c) is unreachable too.  Ot6BushidoRowGrey OR's
 -- the same $04, and Ot6BushidoConfirm refuses to commit it.
 --
 -- Issue #75 conversion.  The old apparatus installed CYAN into the magitek
 -- party by poke (char id, Bushido-only $202E, the weapon SWDTECH flag
--- written, $2020 ceiling pinned to 4) and set bp/MP per pass.  On
--- camp_escaped CYAN IS REAL: his katana carries the SWDTECH flag ($3BA4
--- bit 1 reads $82, never written), his real learned window is TWO rows --
--- Dispatch ($55, 4 MP, boost 1) and Retort ($56, 10 MP, boost 2), the
--- menu_blitzpage doctrine: the window is whatever the save holds -- and
--- every knob below is a LEDGER of real actions:
+-- written, $2020 ceiling pinned to 4) and set bp and MP per pass.  On
+-- camp_escaped Cyan is real: his katana carries the SWDTECH flag ($3BA4
+-- bit 1 reads $82, never written), his real learned window is two rows,
+-- Dispatch ($55, 4 MP, boost 1) and Retort ($56, 10 MP, boost 2), following
+-- menu_blitzpage: the window is whatever the save holds.  Every value below
+-- is a ledger of real actions:
 --
---   bp: opens at Ot6InitBP's 1; +1 per item turn; -row's boost per tech
---       (every tech is a boosted action, so its turn regens nothing).
---   MP: his real 67, walked down by real Retort casts (5 x 10 MP + the
+--   bp: opens at Ot6InitBP's 1; +1 per item turn; minus the row's boost per
+--       tech (every tech is a boosted action, so its turn regens nothing).
+--   MP: his real 67, walked down by real Retort casts (5 x 10 MP plus the
 --       ledger's two Dispatches = 59 -> 9, inside the 4..9 window where
 --       Dispatch is payable and Retort is not).
 --
 -- Battles are real world encounters off the fixture tile; when the ledger's
 -- casts end one (Dispatch kills; Retort is the counter stance and mostly
--- does not), the drive paces to the next -- bp and MP persist across
--- battles, so the ledger just continues.  SHADOW medics with real items;
--- KO'd SABIN sits the fight out (his real state at this fixture).
+-- does not), the drive paces to the next.  bp and MP persist across
+-- battles, so the ledger continues.  SHADOW heals with real items, and
+-- KO'd SABIN sits the fight out, which is his real state at this fixture.
 --
 -- What is asserted (attribute byte = the odd/high byte of each name tile's
--- tilemap word, $21 white / $25 grey), the original's four passes mapped
--- onto the REAL two-row window:
---   1. BP GREY at the natural bank: bp 1, MP 67 -- Retort (boost 2 > 1) is
+-- tilemap word, $21 white / $25 grey), with the original's four passes mapped
+-- onto the real two-row window:
+--   1. BP grey at the natural bank: bp 1, MP 67, so Retort (boost 2 > 1) is
 --      grey while Dispatch (boost 1) is white.  grey - white == $04.
---   2. BOTH CLEAR: one real item turn banks bp 2 -- Retort goes white (the
---      grey tracks the bank, it is not unconditional).
---   3. ZERO BP GREYS EVERYTHING (#38): two Dispatches spend the bank to 0
---      -- BOTH rows grey, names still DRAWN (greyed, not absent).
---   4. MP GREY: the bank is rebuilt (bp >= 2, isolating MP) while real
---      Retorts walk the pool to 9 -- Dispatch (4) white, Retort (10) grey,
---      and this time for the OTHER reason.
+--   2. both clear: one real item turn banks bp 2, and Retort goes white, so
+--      the grey tracks the bank rather than being unconditional.
+--   3. zero BP greys everything (#38): two Dispatches spend the bank to 0,
+--      both rows grey, and the names are still drawn, greyed rather than
+--      absent.
+--   4. MP grey: the bank is rebuilt (bp >= 2, isolating MP) while real
+--      Retorts walk the pool to 9, so Dispatch (4) is white and Retort (10)
+--      is grey, this time for the other reason.
 local H = dofile("tools/tests/lib/ot6.lua")
 local STATE = "build/states/camp_escaped.mss.lua"
 
@@ -120,7 +121,7 @@ local function attrOf(seq)
   return m[1].attr
 end
 
--- ------------------------------------------------------ the drive machine --
+-- ------------------------------------------------------------- the drive --
 -- cyanMode: "defer" | "item" | "tech:<row>" | "park" (open submenu, hold)
 local mf = 0
 local cyanMode = "defer"
@@ -140,7 +141,7 @@ local function decide()
     if (mf - 1) % 8 >= 4 then return {} end
   end
   local btn
-  if act == shadow then                          -- threshold medic
+  if act == shadow then                          -- heals below a threshold
     local hurt = false
     for s2 = 0, 3 do
       local h, m = hp(s2), H.readWord(0x3C1C + s2*2)
@@ -221,11 +222,11 @@ local function driveTo(pred, maxF, tag)
   }, tag)
 end
 -- park at the submenu (battle must be up) and settle for a VRAM read.
--- SETTLE THE LEDGER FIRST: the window can open mid-resolution and the
--- decorator then correctly draws the PRE-charge bank (measured: the pass-3
+-- Settle the ledger first: the window can open mid-resolution and the
+-- decorator then correctly draws the pre-charge bank (measured: the pass-3
 -- window drew at f8375 with the second Dispatch's charge still in flight,
--- and the kit window does not repaint on a bank change while open -- a
--- follow-up noted in the report, distinct from #64's live magic re-price).
+-- and the kit window does not repaint on a bank change while open, a
+-- follow-up noted in the report and distinct from #64's live magic re-price).
 local function parkRead(tag)
   return H.repeatN(1, {
     H.call(function() cyanMode = "defer" end),
@@ -269,7 +270,7 @@ H.run({ maxFrames = 150000 }, {
       cyan, bp(), mp(), shadow))
   end),
 
-  -- 1. BP GREY at the natural bank -----------------------------------------
+  -- 1. BP grey at the natural bank -----------------------------------------
   parkRead("submenu at the opening bank"),
   H.call(function()
     local aD, aR = attrOf(NM.Dispatch), attrOf(NM.Retort)
@@ -282,7 +283,7 @@ H.run({ maxFrames = 150000 }, {
     H.screenshot("bushidogrey_bp")
   end),
 
-  -- 2. BOTH CLEAR: one real item turn banks the second pip ------------------
+  -- 2. both clear: one real item turn banks the second pip ------------------
   H.call(function() cyanMode = "item" end),
   driveTo(function() return bp() >= 2 end, 30000,
     "one real item turn banks bp 2"),
@@ -293,7 +294,7 @@ H.run({ maxFrames = 150000 }, {
     H.assertEq(attrOf(NM.Dispatch), WHITE, "Dispatch stays white")
   end),
 
-  -- 3. ZERO BP GREYS EVERYTHING (#38) ---------------------------------------
+  -- 3. zero BP greys everything (#38) ---------------------------------------
   -- two real Dispatches spend the bank to 0 (each row-0 tech is a 1-boost
   -- action: it charges a pip and its turn regens nothing)
   H.call(function() cyanMode = "tech:0" end),
@@ -311,21 +312,21 @@ H.run({ maxFrames = 150000 }, {
     H.screenshot("bushidogrey_zero")
   end),
 
-  -- 4. MP GREY -- *** LABELED ISOLATION ARM (owner calibration). ***
-  -- The input-driven walk was tried three ways and measured out of reach on this
-  -- pool's economy: a Retort walk's counters end the battle; a deferring
-  -- party is ground down (and battle-RAM teardown zeroes masquerade as
-  -- "enemy MP drains" to any ungated read); and a six-battle Dispatch
-  -- ladder never lands the pool under 10 -- this trash flees or dies
+  -- 4. MP grey: a labeled isolation arm (owner calibration).
+  -- The input-driven walk was tried three ways and measured out of reach on
+  -- this pool's economy: a Retort walk's counters end the battle; a deferring
+  -- party is ground down (and battle-RAM teardown zeroes read as
+  -- enemy MP drains to any ungated read); and a six-battle Dispatch
+  -- ladder never lands the pool under 10, because this trash flees or dies
   -- before enough real casts spend it.  A precise low pool on a
   -- kit-bearing caster is an input this fixture cannot produce on cue,
-  -- and the grey is a RENDERER decode, so the arm keeps ONE write, said
-  -- loudly: MP := 7, inside the 4..9 window, with the bank at pass 2's
+  -- and the grey is a renderer decode, so the arm keeps one write, recorded
+  -- here: MP := 7, inside the 4..9 window, with the bank at pass 2's
   -- real 2 (rebanked by one real item turn off the fresh battle's
-  -- Ot6InitBP 1).  The trash also FLEES on its own schedule, so the arm
-  -- is a tight fresh-battle sprint -- enter, one item turn, write, park,
-  -- read -- retried up to five times; the medic threshold drops for the
-  -- sprint so heal turns do not hog the pre-flee window.
+  -- Ot6InitBP 1).  The trash also flees on its own schedule, so the arm
+  -- is a short fresh-battle sequence (enter, one item turn, write, park,
+  -- read) retried up to five times; the heal threshold drops for it so heal
+  -- turns do not consume the pre-flee window.
   H.call(function() shadowThreshold = 40 end),
   (function()
     local done = false
@@ -349,7 +350,7 @@ H.run({ maxFrames = 150000 }, {
         end, 40000, "the bank is rebuilt (attempt " .. n .. ")"),
         H.cond(function() return liveBattle() and bp() >= 2 end, {
           H.call(function()
-            -- ISOLATION WRITE (waived, labeled): the boundary pool
+            -- the isolation write (waived, labeled): the boundary pool
             H.writeWord(0x3C08 + cyan*2, 7)
             cyanMode = "park:"
           end),

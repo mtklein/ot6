@@ -1,115 +1,117 @@
 -- @suite savestate=gau_joined
--- menu_ragepage.lua -- issue #40: the field Skills->Rage LOADOUT page RENDERS.
+-- menu_ragepage.lua -- issue #40: the field Skills->Rage loadout page renders.
 --
--- The page (MenuState_7c / Ot6Rage* in ot6_kits.asm, the C3 shim at
+-- The page (MenuState_7c and Ot6Rage* in ot6_kits.asm, the C3 shim at
 -- field_menu.asm:2907-3075) was wired, assembled and shipped without one
--- rendered cell ever being asserted.  That is exactly the hole issue #39 fell
+-- rendered cell ever being asserted.  That is the gap issue #39 fell
 -- through on the SwdTech configurator: menu_bushidoloadout force-jumped
 -- zMenuState and asserted only stored bytes, so a page whose every label
 -- streamed the ending-credits charmap into the tilemap stayed green.  This
--- test gives the Rage page the menu_swdtechpage treatment:
+-- test treats the Rage page the way menu_swdtechpage treats its page:
 --
---   * PATH: it drives the real UI -- X -> Skills -> character -> the Rage row
---     -> A -- so SkillsOption_05 (field_menu.asm:1327-1348) opens the
---     configurator, not a forced state;
---   * RENDER: it asserts the BG1A tilemap shadow cell-by-cell -- the title,
---     each slot's MONSTER name, the flat "8 MP" cost suffix, the LEARNED
---     caption and its three-digit count -- and, the class-closer, that every
---     row the page never draws on is still all-zero (a runaway unterminated
---     draw cannot leave them blank).
+--   * path: it drives the real UI (X -> Skills -> character -> the Rage row
+--     -> A) so SkillsOption_05 (field_menu.asm:1327-1348) opens the
+--     configurator rather than a forced state;
+--   * render: it asserts the BG1A tilemap shadow cell by cell (the title,
+--     each slot's monster name, the flat "8 MP" cost suffix, the LEARNED
+--     caption and its three-digit count) and also that every
+--     row the page never draws on is still all-zero, which a runaway
+--     unterminated draw cannot leave blank.
 --
--- ISSUE #75 CONVERSION -- a REAL GAU, and the InitRage floor.  This file used
+-- Issue #75 conversion: a real Gau, and the InitRage floor.  This file used
 -- to stage everything onto arvis_wake's lead: the Rage command, a hand-picked
--- learned bitfield, and zeroed loadout bytes.  It now boots gau_joined -- the
--- input-driven post-join savestate, world map, CYAN + SABIN + GAU -- finds GAU in
--- zCharID, and reads everything off his save:
+-- learned bitfield, and zeroed loadout bytes.  It now boots gau_joined, the
+-- input-driven post-join savestate on the world map with CYAN, SABIN and GAU,
+-- finds Gau in zCharID, and reads everything off his save:
 --   * the Rage command is his record's own;
---   * the learned set is `InitRage` (field/init.asm InitRage table): NINE
---     rages at New Game -- ids 11, 14, 19, 21, 25, 46, 54, 57, 66 -- and
---     hunting only ever ADDS, so >= 9 is a floor for every real save and is
+--   * the learned set is `InitRage` (field/init.asm InitRage table): nine
+--     rages at New Game, ids 11, 14, 19, 21, 25, 46, 54, 57, 66, and
+--     hunting only adds, so >= 9 is a floor for every real save and is
 --     asserted as one.  The expected names are still read out of the ROM's
 --     MonsterName records, now for ids taken from the save's own bitfield;
---   * the loadout bytes are $00 AS SAVED (no real save has configured a
+--   * the loadout bytes are $00 as saved (no real save has configured a
 --     loadout), so AUTO needs no zeroing and the revert is driven with the
---     page's own Y command, never a write.
--- The nine-rage floor makes the page FULL from its first open: AUTO's window
+--     page's own Y command rather than a write.
+-- The nine-rage floor makes the page full from its first open: AUTO's window
 -- always fills all eight slots, and the LEARNED count (009) exceeding the
--- eight drawn is now asserted on the FIRST render -- the "count counts the
--- whole bitfield, not the slots" claim the old test needed a second, staged
--- visit to make.
+-- eight drawn is now asserted on the first render.  That is the claim that the
+-- count counts the whole bitfield rather than the slots, which the old test
+-- needed a second, staged visit to make.
 --
--- *** ONE LABELED ISOLATION ARM (issue #75) -- one write site STAYS ***
--- The "- EMPTY -" marker (#44) is UNREACHABLE BY PLAY, in both of its
+-- One labeled isolation arm (issue #75): one write site stays.
+-- The "- EMPTY -" marker (#44) is unreachable by play, in both of its
 -- documented causes: AUTO shows an empty slot only below eight known rages,
 -- and InitRage's floor is nine; MANUAL shows one only for a stored $00 byte,
--- and Ot6RageCycleCore can only ever store a LEARNED id + 1.  A renderer
+-- and Ot6RageCycleCore can only store a learned id + 1.  A renderer
 -- state no controller can produce is a mechanism claim (burn-down plan
--- systemic call 2), so the marker's assertions live in a loudly-labeled tail
--- arm that writes the $1d2c bitfield down to five species -- the one write
--- this file keeps its .writeByte( waiver line for.  It MAY NEVER PRODUCE
--- FIXTURES.  (Follow-up filed in the conversion report: given the floor, the
--- marker may be permanently dead UI.)
+-- systemic call 2), so the marker's assertions live in a labeled tail
+-- arm that writes the $1d2c bitfield down to five species, which is the one
+-- write this file keeps its .writeByte( waiver line for.  It may never produce
+-- fixtures.  (Follow-up filed in the conversion report: given the floor, the
+-- marker may be permanently unreachable UI.)
 --
--- THE 12-PIXEL CADENCE (found by this test's first run, and the reason the
--- page's layout changed).  The tilemap was always CORRECT; what was wrong was
--- WHERE on it the page drew.  The EN field-menu window does not show BG1
--- ScreenA one tile row per eight scanlines: a row PAIR occupies twelve
--- scanlines, the ODD row getting eight and the even row four, and nothing past
+-- The 12-pixel cadence (found by this test's first run, and the reason the
+-- page's layout changed).  The tilemap was correct; what was wrong was
+-- where on it the page drew.  The EN field-menu window does not show BG1
+-- ScreenA one tile row per eight scanlines: a row pair occupies twelve
+-- scanlines, the odd row getting eight and the even row four, and nothing past
 -- row 15 is inside the window at all (measured with a glyph drawn in every
--- row, probe_ragegeom.lua; vanilla's own cursor tables say it from the other
--- side -- every EN list for this window is `cursor_pos {x, 116 + n*12}`,
--- skills.asm:125-126, and DrawRageName biases its row `.if LANG_EN`,
--- skills.asm:1571-1574).  The page shipped with eight slots on EVEN rows
--- 4..18 and LEARNED on row 20, so through the player's path every beast name
--- rendered as a three-scanline sliver and the collection counter was off the
--- bottom of the window.  It now draws two columns of four on odd rows 5/7/9/11
--- with LEARNED on 15 -- vanilla's own shape for this very window.  Hence the
--- EVEN-ROW CANARY below: it is not decoration, it is the regression.
+-- row, probe_ragegeom.lua; vanilla's own cursor tables say the same from the
+-- other side, since every EN list for this window is
+-- `cursor_pos {x, 116 + n*12}`, skills.asm:125-126, and DrawRageName biases
+-- its row `.if LANG_EN`, skills.asm:1571-1574).  The page shipped with eight
+-- slots on even rows 4..18 and LEARNED on row 20, so through the player's path
+-- every beast name rendered as a three-scanline sliver and the collection
+-- counter was off the bottom of the window.  It now draws two columns of four
+-- on odd rows 5/7/9/11 with LEARNED on 15, which is vanilla's shape for this
+-- window.  Hence the even-row canary below: it is the regression check.
 --
--- THE CURSOR GUTTER (#43 round 3) -- the same cadence story, in x.  The cursor
--- is a 16x16 SPRITE and `cursor_pos {x,y}` is its top-left corner, so an entry
+-- The cursor gutter (#43 round 3) is the same cadence story in x.  The cursor
+-- is a 16x16 sprite and `cursor_pos {x,y}` is its top-left corner, so an entry
 -- at x owns tilemap columns x/8 and x/8+1 and the row it points at must start
 -- at x/8+2.  Vanilla's arithmetic is cursor_x = 8*col - 16 everywhere in this
 -- window: magic draws at cols 3/16 under cursors 8/112 (skills.asm:831, :836 vs
 -- :125-126), espers at 3/17 under 8/120 (:1733, :1737 vs :249-250), rage at
--- 5/19 under 24/136 (:1544, :1548 vs :292-293), config's value column 14 under
--- 96 (config.asm:50); measured the same way on the shipped ROM, where the magic
--- list's `cursor_pos {8, 116}` lights screen x 8..23, y 116..131
--- (tools/tests/probe_menucols.lua).  This page's RIGHT column was already
--- right -- col 16 under x=112 is vanilla's magic pair verbatim -- but its LEFT
+-- 5/19 under 24/136 (:1544, :1548 vs :292-293), and config's value column 14
+-- under 96 (config.asm:50); measured the same way on the shipped ROM, where the
+-- magic list's `cursor_pos {8, 116}` lights screen x 8..23, y 116..131
+-- (tools/tests/probe_menucols.lua).  This page's right column was already
+-- correct, since col 16 under x=112 is vanilla's magic pair, but its left
 -- column drew at col 2 under x=8, so the sprite covered the first letter of
 -- every left-hand beast name.  The left column is 3 now; the cursor table did
--- not move.  THE CURSOR GUTTER CANARY below reads Ot6RageCursorPos out of the
+-- not move.  The cursor gutter canary below reads Ot6RageCursorPos out of the
 -- ROM and checks both halves against the tilemap, so neither can move alone.
 -- It is duplicated from menu_swdtechpage.lua rather than shared: the only lua
 -- the runner inlines is lib/ot6{,_field,_contract}.lua, and those three files
--- ARE the savestate generation signature (lib/savestate_stamp.sh:82-85), so a
+-- are the savestate generation signature (lib/savestate_stamp.sh:82-85), so a
 -- helper added there would mark every generated fixture drifted.
 --
--- THE NAME SOURCE, and why it is not the SwdTech one.  Ot6DrawRageName
+-- The name source, and why it is not the SwdTech one.  Ot6DrawRageName
 -- (field_menu.asm:2992-3016) calls GetMonsterNamePtr (skills.asm:1557-1565),
--- which points LoadArrayItem at MonsterName -- a 384-entry, 10-byte fixed
--- record table (include/text/monster_name_en.inc:13-14), NOT BushidoName and
--- not any spell table.  So the expected bytes are read out of the ROM's own
--- MonsterName records at runtime (H.sym + readRomByte): the assertion is
--- against the very bytes the drawing code streams, and a text re-encode
--- cannot silently invalidate a hardcoded literal here.  LoadArrayItem copies
--- all ten bytes including the $ff pad tail (item.asm:1255-1276), so a name's
--- full 10-cell field is asserted, pads and all.
+-- which points LoadArrayItem at MonsterName, a 384-entry, 10-byte fixed
+-- record table (include/text/monster_name_en.inc:13-14), rather than
+-- BushidoName or any spell table.  So the expected bytes are read out of the
+-- ROM's own MonsterName records at runtime (H.sym and readRomByte): the
+-- assertion is against the bytes the drawing code streams, and a text
+-- re-encode cannot invalidate a hardcoded literal here without being noticed.
+-- LoadArrayItem copies all ten bytes including the $ff pad tail
+-- (item.asm:1255-1276), so a name's full 10-cell field is asserted, pads and
+-- all.
 --
--- issue #44 -- THE CONTROL HINT and THE EMPTY MARKER.  Two owner-playtest
+-- issue #44: the control hint and the empty marker.  Two owner-playtest
 -- findings on a page that already rendered correctly.  L/R cycling the
--- cursored slot is the page's only real interaction and nothing named it; and
+-- cursored slot is the page's only real interaction and nothing named it, and
 -- an unset slot was a run of $ff pads, which reads as a rendering bug rather
 -- than as "you have not hunted eight species yet".  Row 3 was spare (the page
--- draws on 1/5/7/9/11/15), so the hint cost nothing but that row; the marker
--- replaces the pad fill over exactly the same ten cells.
--- issue #49 -- THE MODE BLOCK.  All eight bytes zero is AUTO -- the game
+-- draws on 1/5/7/9/11/15), so the hint cost only that row, and the marker
+-- replaces the pad fill over the same ten cells.
+-- issue #49: the mode block.  All eight bytes zero is AUTO: the game
 -- picks the first eight species in id order and keeps re-picking as Gau
--- hunts -- and the first cycle calls Ot6RageSeed and freezes that window into
--- the save, permanently, until Y clears it.  Row 13 carries the mode word and
--- the Y=AUTO control, worded identically to the Bushido page's (the #44 rule:
--- one idiom, one wording, or a player has to learn it twice).
+-- hunts, and the first cycle calls Ot6RageSeed and freezes that window into
+-- the save until Y clears it.  Row 13 carries the mode word and
+-- the Y=AUTO control, worded identically to the Bushido page's, per the #44
+-- rule that one idiom gets one wording so a player does not have to learn it
+-- twice.
 local H = dofile("tools/tests/lib/ot6.lua")
 local STATE = "build/states/gau_joined.mss.lua"
 
@@ -139,26 +141,26 @@ local LEARNED = { T.L,T.E,T.A,T.R,T.N,T.E,T.D }
 local EACH_TX = { T.E,T.A,T.C,T.H }
 -- #44: the control hint, character for character the same string the Bushido
 -- loadout page draws.  Both pages cycle the cursored entry with L/R and both
--- shipped without saying so; a player who learns the idiom on one must not
+-- shipped without saying so; a player who learns the idiom on one should not
 -- have to re-learn it on the other, so the strings are asserted to be equal by
 -- being written out identically in both tests.
 local HINT    = { T.L,T.SLASH,T.R,T.SP,T.S,T.W,T.A,T.P,T.S }  -- L/R SWAPS
--- #49: both mode words are six cells, "AUTO" space-padded, so a MANUAL ->
+-- #49: both mode words are six cells, "AUTO" space-padded, so a MANUAL to
 -- AUTO revert overwrites the whole field; asserted as an equality below
--- rather than trusted.  Written out character for character in BOTH page
--- tests on purpose, the #44 rule.
+-- rather than assumed.  Written out character for character in both page
+-- tests on purpose, per the #44 rule.
 local MODE_AUTO   = { T.A,T.U,T.T,T.O,T.SP,T.SP }
 local MODE_MANUAL = { T.M,T.A,T.N,T.U,T.A,T.L }
 local MODE_HINT   = { T.Y,T.EQ,T.A,T.U,T.T,T.O }              -- Y=AUTO
--- #44: what an UNSET slot draws, in place of a run of $ff pads.  Exactly
+-- #44: what an unset slot draws, in place of a run of $ff pads.  Exactly
 -- MonsterName::ITEM_SIZE (10) cells, so it still overwrites a name completely
--- and a revert wipes what was there -- the property the pad fill had.
+-- and a revert clears what was there, which is the property the pad fill had.
 local EMPTY_TX = { T.DASH,T.SP,T.E,T.M,T.P,T.T,T.Y,T.SP,T.DASH,T.SP }
 local ZERO_CHAR = 0xb4
 local MP_SUFFIX = { T.SP, T.M, T.P }
 local PAD = 0xff                        -- fixed_length_en.json: 0xFF = {pad}
 
--- MonsterName, verbatim, out of the ROM the drawing code reads.
+-- MonsterName, read out of the ROM the drawing code reads.
 -- H.sym gives the 24-bit CPU address; & 0x3FFFFF is the snesPrgRom file offset.
 local MONNAME = H.sym("MonsterName") & 0x3FFFFF
 local NAME_SIZE = 10                    -- MonsterName::ITEM_SIZE
@@ -178,8 +180,8 @@ local function nameText(id)             -- for the log only
   return s
 end
 
--- The save's own collection, derived at boot: KNOWN = every learned id in
--- ascending order (AUTO's window is its first eight).
+-- The save's own collection, derived at boot: KNOWN is every learned id in
+-- ascending order, and AUTO's window is its first eight.
 local KNOWN = {}
 local gauSlot = nil
 
@@ -187,7 +189,7 @@ local gauSlot = nil
 -- bitfield bytes and short of eight so the marker has slots to appear in.
 local ARM_KNOWN = { 3, 20, 41, 90, 130 }  -- Ninja Ursus Beakor Ghost Zombone
 
--- teach() survives ONLY for the labeled isolation arm at the tail.
+-- teach() survives only for the labeled isolation arm at the tail.
 local function teach(ids)
   for i = 0, 31 do H.writeByte(RAGES + i, 0) end
   for _, id in ipairs(ids) do
@@ -203,8 +205,8 @@ local function assertRun(x0, y, bytes, what)
   end
 end
 
--- The class-closer: a row the configurator never draws on must be untouched
--- ($00 from ClearBG1ScreenA).  #39's runaway draws carpeted BG1A with ROM code
+-- A row the configurator never draws on must be untouched
+-- ($00 from ClearBG1ScreenA).  #39's runaway draws filled BG1A with ROM code
 -- bytes, so every one of these would fail on a garbled page.
 local function assertRowBlank(y, what)
   for x = 0, 31 do
@@ -213,36 +215,38 @@ local function assertRowBlank(y, what)
 end
 
 -- Page geometry, mirroring field_menu.asm's Ot6RageDrawSlots: two columns of
--- four on ODD rows.  slot even = left column (name col 3), slot odd = right
--- (col 16); row = 5 + (slot & ~1).  {3, 16} under cursors {8, 112} is vanilla's
--- magic list verbatim -- see the cursor-gutter note in the header.  The price
--- is stated ONCE on the title row ("8 MP EACH") rather than per row: two
--- 10-cell names plus two cursor gutters plus two cost fields does not fit
--- inside the window's right border, which is column 30 (measured at screen
--- x = 245).  The price is flat by design, so one copy teaches the same rule.
+-- four on odd rows.  An even slot is the left column (name col 3) and an odd
+-- slot the right (col 16); row = 5 + (slot & ~1).  {3, 16} under cursors
+-- {8, 112} is vanilla's magic list unchanged; see the cursor-gutter note in
+-- the header.  The price is stated once on the title row ("8 MP EACH") rather
+-- than per row, because two 10-cell names plus two cursor gutters plus two
+-- cost fields does not fit inside the window's right border, which is column
+-- 30 (measured at screen x = 245).  The price is flat by design, so one copy
+-- states the same rule.
 local TITLE_ROW, LEARNED_ROW = 1, 15
 local HINT_ROW = 3                      -- #44: row 3 was spare; the hint has it
 local LEFT_COL = 3                      -- the page's left margin (gutter = 1-2)
--- #56: the price field is FIVE cells, "nn MP", not four -- Ot6LoadoutDrawCost
--- is the one price drawer in the field menu now and it carries a tens place.
--- It moved LEFT (17 -> 16) rather than growing rightwards, because "EACH" is a
--- fixed pos_text at 22 and a five-cell field starting at 17 would have rendered
--- "8 MPEACH".  This page's number is 8 today and can reach two digits without
--- anyone editing it: Ot6RageCost tail-calls Ot6DanceCost (ot6_boost.asm:600-619)
--- deliberately, and mp-economy.md's range for a flat possess-verb price is 4-10.
+-- #56: the price field is five cells, "nn MP", rather than four, because
+-- Ot6LoadoutDrawCost is the one price drawer in the field menu now and it
+-- carries a tens place.  It moved left (17 -> 16) rather than growing
+-- rightwards, because "EACH" is a fixed pos_text at 22 and a five-cell field
+-- starting at 17 would have rendered "8 MPEACH".  This page's number is 8
+-- today and can reach two digits without anyone editing it: Ot6RageCost
+-- tail-calls Ot6DanceCost (ot6_boost.asm:600-619) on purpose, and
+-- mp-economy.md's range for a flat possess-verb price is 4-10.
 local COST_COL, EACH_COL = 16, 22
 local COUNT_COL = 11                    -- just past "LEARNED " at 3..9
 local MODE_ROW, MODE_COL, MODE_HINT_COL = 13, 3, 16
 local function slotRow(slot) return 5 + (slot & ~1) end
 local function slotCol(slot) return (slot % 2 == 0) and LEFT_COL or 16 end
 
--- THE CURSOR GUTTER CANARY (#43 round 3).  Both sides are read, not written:
+-- The cursor gutter canary (#43 round 3).  Both sides are read, not written:
 -- the cursor table comes out of the ROM the menu itself indexes, and the text
 -- comes out of the tilemap the menu itself drew.
 --
 -- `cursor_pos {x, y}` assembles to `.byte x, y` (menu_ram.inc:582-584), two
 -- bytes per entry, in the framework's index order ($4b = 2*row + col).  It is
--- the TOP-LEFT of a 16x16 sprite, so entry x owns tilemap columns x/8 and
+-- the top-left of a 16x16 sprite, so entry x owns tilemap columns x/8 and
 -- x/8+1 and the slot it points at must start at x/8+2.  y is 116 + n*12 and
 -- tilemap row = 2n+1, so the row an entry points at is (y-116)/6 + 1.
 local CURSOR_POS = H.sym("Ot6RageCursorPos") & 0x3FFFFF
@@ -258,13 +262,13 @@ local function assertCursorGutter(n, what)
     .. "does not show whole", what, n, cy, y))
   H.assertEq(y, slotRow(n), string.format(
     "%s: cursor entry %d must point at slot %d's row", what, n, n))
-  -- the two columns UNDER the sprite carry no glyph ...
+  -- the two columns under the sprite carry no glyph ...
   for _, x in ipairs({ col, col + 1 }) do
     H.assertEq(cell(x, y), 0, string.format(
       "%s: cursor entry %d sits at x=%d, so tilemap {%d,%d} is under the "
       .. "sprite and must be blank", what, n, cx, x, y))
   end
-  -- ... and the slot it points at begins in the very next one.  An UNFILLED
+  -- ... and the slot it points at begins in the next one.  An unfilled
   -- slot is $ff-blanked across its width, which is still a drawn cell, so this
   -- holds at any known-rage count.
   H.assertEq(cell(col + 2, y) ~= 0, true, string.format(
@@ -283,7 +287,7 @@ local function assertCursorGutter(n, what)
   end
 end
 
--- #49: row 13, asserted as a whole row -- the mode word, the control, and every
+-- #49: row 13, asserted as a whole row: the mode word, the control, and every
 -- other cell on the row still blank, so neither half can grow into the other or
 -- into the window's border column 30.
 local function assertModeBlock(auto, what)
@@ -309,9 +313,9 @@ local function assertFilledRow(slot, id)
   local y, c = slotRow(slot), slotCol(slot)
   assertRun(c, y, nameBytes(id), string.format("slot %d name %s", slot, nameText(id)))
 end
--- An UNSET slot (#44): "- EMPTY - " over exactly the ten name cells, so the
--- overwrite property is unchanged and the row says what it means.  Reachable
--- only through the isolation arm now -- see the header.
+-- An unset slot (#44): "- EMPTY - " over exactly the ten name cells, so the
+-- overwrite property is unchanged and the row says what it means.  It is
+-- reachable only through the isolation arm now; see the header.
 local function assertEmptyRow(slot)
   local y, c = slotRow(slot), slotCol(slot)
   H.assertEq(#EMPTY_TX, NAME_SIZE,
@@ -331,13 +335,13 @@ local function assertCount(n, what)
     string.format("%s: LEARNED count = %03d", what, n))
 end
 
--- The shared chrome + geometry sweep, parameterized by how many of the eight
+-- The shared chrome and geometry sweep, parameterized by how many of the eight
 -- slots are filled and with which ids (win[1..8], nil = empty).
 local function assertPage(win, nKnown, what)
   assertRun(LEFT_COL, TITLE_ROW, TITLE, what .. ": title RAGE LOADOUT")
   -- the flat price, stated once: "8 MP EACH" on the title row.  #56: five
-  -- cells, right-aligned -- the tens cell is BLANK for a one-digit price and
-  -- must not be '0' (vanilla's own rule: HexToDec3 overwrites leading zeroes
+  -- cells, right-aligned, with the tens cell blank for a one-digit price and
+  -- never '0' (vanilla's own rule: HexToDec3 overwrites leading zeroes
   -- with $ff, menu_common.asm:906-918).
   H.assertEq(cell(COST_COL, TITLE_ROW), PAD,
     what .. ": the trance price is one digit, so its tens cell is blank, not '0'")
@@ -361,12 +365,12 @@ local function assertPage(win, nKnown, what)
     end
   end
 
-  -- THE EVEN-ROW CANARY -- the regression this test exists for.  An even
+  -- The even-row canary, the regression this test exists for.  An even
   -- tilemap row is shown as three scanlines in this window, so nothing the
   -- page draws may land on one.  Rows past 15 are outside the window
   -- entirely, so nothing may land there either.  Both were violated before
   -- (slots on 4..18, LEARNED on 20), and a plain tilemap assertion could
-  -- not see it -- only the geometry rule can.
+  -- not see it; only the geometry rule can.
   for y = 0, 27 do
     if y % 2 == 0 or y > 15 then
       assertRowBlank(y, string.format(
@@ -400,7 +404,7 @@ local function assertPage(win, nKnown, what)
     H.assertEq(cell(x, LEARNED_ROW), 0,
       string.format("%s: LEARNED row gap/tail blank {%d,%d}", what, x, LEARNED_ROW))
   end
-  -- THE CURSOR GUTTER CANARY, every slot -- filled rows and $ff-blanked ones.
+  -- The cursor gutter canary, on every slot: filled rows and $ff-blanked ones.
   for n = 0, 7 do assertCursorGutter(n, what) end
 end
 
@@ -434,17 +438,17 @@ H.run({ maxFrames = 40000 }, {
   end),
 
   -- the player's path: X -> main menu -> Skills -> GAU -> the Rage row -> A.
-  -- driveUntil, not one press: the X that opens the field menu is the first
-  -- step in these tests that needs a SPECIFIC frame, so it is where a
-  -- fixture generated against a different ROM surfaces -- as "timeout waiting
-  -- for main menu", which reads like a menu bug and is not one.  Retrying
-  -- the press costs nothing when the pairing is fine and removes the false
-  -- report when it is not.  Same shape probe_fieldicons.lua and
-  -- menu_blitzpage_sabin.lua already use.
+  -- This uses driveUntil rather than one press because the X that opens the
+  -- field menu is the first step in these tests that needs a specific frame,
+  -- so it is where a fixture generated against a different ROM shows up, as
+  -- "timeout waiting for main menu", which reads like a menu bug and is not
+  -- one.  Retrying the press costs nothing when the pairing is fine and
+  -- removes the false report when it is not.  This is the shape
+  -- probe_fieldicons.lua and menu_blitzpage_sabin.lua already use.
   H.driveUntil(function() return st() == ST_MAIN end, 1200,
     { H.pressButtons({ "x" }, 4), H.waitFrames(30) }, "main menu"),
   H.waitFrames(20),
-  -- FIND Gau rather than assume his row.
+  -- Find Gau rather than assume his row.
   H.call(function()
     local ids = {}
     for s = 0, 3 do
@@ -471,7 +475,7 @@ H.run({ maxFrames = 40000 }, {
   end),
 
   -- cursor down to the Rage row, A opens the configurator through
-  -- SkillsOption_05 -- the exact edge no test has ever driven.
+  -- SkillsOption_05, the edge no test had driven before.
   H.driveUntil(function()
     return st() == ST_SKILLS and H.readByte(ZCURSOR) == SKILLS_ROW_RAGE
   end, 900, { H.pressButtons({ "down" }, 2), H.waitFrames(6) },
@@ -481,25 +485,25 @@ H.run({ maxFrames = 40000 }, {
     "rage configurator open via the player path", 5),
   H.waitFrames(90),                         -- draws + DMA settle
 
-  -- ---- the FULL page every real Gau opens: AUTO's window = KNOWN[1..8] ----
+  -- ---- the full page every real Gau opens: AUTO's window = KNOWN[1..8] ----
   H.call(function()
     local win = {}
     for s = 1, 8 do win[s] = KNOWN[s] end
     assertPage(win, #KNOWN, "real save")
-    -- the marker appears NOWHERE: a filled slot starts with a name's first
-    -- letter, never the marker's leading dash (the old staged full-page
-    -- phase's closer, now true of the first render).
+    -- the marker appears nowhere: a filled slot starts with a name's first
+    -- letter, never the marker's leading dash.  That was the old staged
+    -- full-page phase's final check, and it is now true of the first render.
     for slot = 0, 7 do
       H.assertEq(cell(slotCol(slot), slotRow(slot)) ~= T.DASH, true,
         string.format("slot %d is filled, so it must not draw the empty "
           .. "marker at {%d,%d}", slot, slotCol(slot), slotRow(slot)))
     end
-    -- ... and the count exceeds the slots: #KNOWN >= 9 > 8, so this render
-    -- alone proves LEARNED counts the whole bitfield, not the loadout.
+    -- and the count exceeds the slots: #KNOWN >= 9 > 8, so this render
+    -- alone shows LEARNED counts the whole bitfield rather than the loadout.
     H.assertEq(#KNOWN > 8, true,
       "the collection exceeds the eight slots, so the count above is counting "
       .. "the bitfield, not the page")
-    -- opening the page WRITES NOTHING: AUTO is computed per slot on the fly
+    -- opening the page writes nothing: AUTO is computed per slot on the fly
     -- (Ot6RageShow), so an un-edited page leaves every save byte at zero.
     for i = 0, 7 do
       H.assertEq(H.readByte(RAGELOAD + i), 0,
@@ -514,10 +518,10 @@ H.run({ maxFrames = 40000 }, {
       .. "nothing in the border column, nothing in either cursor's gutter")
   end),
 
-  -- ---- the page is LIVE, not a one-shot draw: R cycles the cursored slot ----
+  -- ---- the page redraws rather than drawing once: R cycles the slot ------
   -- The first edit out of AUTO freezes the window into the eight bytes
   -- (Ot6RageSeed) and then walks the bitfield, so slot 0 must move from the
-  -- first known species to the second and the row must REDRAW to match.
+  -- first known species to the second and the row must redraw to match.
   H.pressButtons({ "r" }, 3),
   H.waitFrames(40),
   H.call(function()
@@ -528,9 +532,9 @@ H.run({ maxFrames = 40000 }, {
         string.format("the first edit froze AUTO's window into slot %d", i - 1))
     end
     assertFilledRow(0, KNOWN[2])
-    -- #49: and the page must SAY it went manual, on this same redraw and
+    -- #49: and the page must say it went manual, on this same redraw and
     -- without being reopened.  A mode drawn once at page-init would still read
-    -- AUTO here, which is the exact failure this assertion exists for.
+    -- AUTO here, which is the failure this assertion exists for.
     assertModeBlock(false, "after the first edit")
     H.assertEq(H.readByte(ZMENUSTATE), ST_RAGELOAD, "still on the rage page")
     H.screenshot("rage_page_after_cycle")
@@ -540,8 +544,8 @@ H.run({ maxFrames = 40000 }, {
   end),
 
   -- ---- #49: Y reverts, and the indicator comes back with it ----
-  -- The revert is the half a player cannot guess -- which is why the control is
-  -- named on screen -- and it is the half that proves the two mode words are the
+  -- The revert is the half a player cannot guess, which is why the control is
+  -- named on screen, and it is the half that shows the two mode words are the
   -- same width: a five-cell "AUTO " would leave MANUAL's trailing L behind.
   -- Ot6RageInput's Y arm zeroes all eight bytes (ot6_kits.asm), so the window
   -- goes back to being computed on the fly and the first eight known species
@@ -563,7 +567,8 @@ H.run({ maxFrames = 40000 }, {
 
   -- put the page back into MANUAL for the phases below, which assert on the
   -- frozen bytes R wrote.  (Re-cycling slot 0 lands on the same species the
-  -- first edit did: the walk is deterministic from the same starting point.)
+  -- first edit did, because the walk is deterministic from the same starting
+  -- point.)
   H.pressButtons({ "r" }, 3),
   H.waitFrames(40),
   H.call(function()
@@ -572,10 +577,10 @@ H.run({ maxFrames = 40000 }, {
     assertModeBlock(false, "re-edited after the revert")
   end),
 
-  -- ---- the SECOND column is reachable and maps to the right slot ----
+  -- ---- the second column is reachable and maps to the right slot ----
   -- Two columns only exist because the window has eight text rows; the
-  -- cursor index is $4b = 2*row + col, so dpad-Right from slot 0 must land on
-  -- slot 1 -- the row-5 RIGHT cell -- and R must edit THAT byte and no other.
+  -- cursor index is $4b = 2*row + col, so dpad-right from slot 0 must land on
+  -- slot 1, the row-5 right cell, and R must edit that byte and no other.
   H.pressButtons({ "right" }, 3),
   H.waitFrames(20),
   H.call(function() _G.__before = H.readByte(RAGELOAD + 1) end),
@@ -595,11 +600,11 @@ H.run({ maxFrames = 40000 }, {
       .. "the right cursor's gutter (columns 14-15) is clear too")
   end),
 
-  -- ---- and a LOWER row, so the shipped screenshots cover more than row 5 ----
+  -- ---- and a lower row, so the shipped screenshots cover more than row 5 --
   -- The canary above reads the whole cursor table, but only the row the sprite
-  -- is parked on shows up in a picture.  Walk back to the LEFT column -- the
-  -- half that moved -- and down to slot 4, so the shot shows the cursor
-  -- abutting a name.
+  -- is parked on shows up in a picture.  Walk back to the left column, the
+  -- half that moved, and down to slot 4, so the shot shows the cursor
+  -- next to a name.
   H.pressButtons({ "left" }, 3),
   H.waitFrames(20),
   H.pressButtons({ "down" }, 3),
@@ -617,13 +622,13 @@ H.run({ maxFrames = 40000 }, {
   end),
 
   -- ======================================================================= --
-  -- *** LABELED ISOLATION ARM (issue #75, renderer-mechanism doctrine) *** --
-  -- The "- EMPTY -" marker, in BOTH its documented causes -- neither of which
-  -- a controller can produce (see header: InitRage's nine-rage floor kills
-  -- the AUTO cause, and Ot6RageCycleCore only ever stores learned ids, which
-  -- kills the MANUAL cause).  The one write: the $1d2c bitfield is set to
-  -- five species.  The loadout bytes are NOT written -- Y is pressed first so
-  -- the page's own revert leaves them $00, asserted.
+  -- Labeled isolation arm (issue #75, the renderer-mechanism rule).
+  -- The "- EMPTY -" marker, in both its documented causes, neither of which
+  -- a controller can produce (see header: InitRage's nine-rage floor rules out
+  -- the AUTO cause, and Ot6RageCycleCore only stores learned ids, which rules
+  -- out the MANUAL cause).  The one write sets the $1d2c bitfield to
+  -- five species.  The loadout bytes are not written: Y is pressed first so
+  -- the page's own revert leaves them $00, which is asserted.
   -- ======================================================================= --
   H.pressButtons({ "y" }, 3),               -- the page's own revert, not a write
   H.waitFrames(20),
@@ -659,9 +664,9 @@ H.run({ maxFrames = 40000 }, {
       .. "'- EMPTY -', the count reads 005, and the page still wrote nothing")
   end),
 
-  -- ... and the MANUAL cause: the first R freezes only the five-window
+  -- and the MANUAL cause: the first R freezes only the five-slot window
   -- (Ot6RageSeed stops when the window runs out), leaving stored $00 tails
-  -- that Ot6RageList skips -- and the marker must read the same over them.
+  -- that Ot6RageList skips, and the marker must read the same over them.
   H.pressButtons({ "r" }, 3),
   H.waitFrames(40),
   H.call(function()

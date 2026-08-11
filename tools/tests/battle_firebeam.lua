@@ -1,9 +1,10 @@
--- battle_firebeam.lua -- enter the first guard battle FRESH (no mid-battle
--- savestate load) and fire the first MagiTek command (Fire Beam) at a guard.
+-- battle_firebeam.lua -- enter the first guard battle from the field, with no
+-- mid-battle savestate load, and fire the first MagiTek command (Fire Beam) at
+-- a guard.
 --
 --   tools/tests/run.sh tools/tests/battle_firebeam.lua
 --
--- Loads build/states/battle_entry.mss (a FIELD state), walks north into
+-- Loads build/states/battle_entry.mss (a field state), walks north into
 -- the scripted guard battle, waits for the battle to come up, then presses
 -- A (command: MagiTek) / A (Fire Beam) / A (confirm target) and watches the
 -- action resolve.  Screenshots before/during/after plus break-system RAM:
@@ -11,12 +12,12 @@
 --   $7E3C00/$7E3C02  guard HP words
 --   $7E3E95/$7E3E97  revealed masks
 --
--- This doubles as the key input experiment: driving the battle with buttons
--- when NO savestate was loaded mid-battle (the entry-point load happens in the
+-- This also covers the input experiment: driving the battle with buttons when
+-- no savestate was loaded mid-battle (the entry-point load happens in the
 -- field, long before battle init).
 --
 -- Exit codes: 0 = battle came up, input drove the menus, and the action
--- visibly resolved; 1 = any stage failed (each is asserted loudly).
+-- visibly resolved; 1 = any stage failed (each stage is asserted).
 
 local H = dofile("tools/tests/lib/ot6.lua")
 local STATE = "build/states/battle_entry.mss.lua"
@@ -56,7 +57,7 @@ H.run({ maxFrames = 12000 }, {
   }, "battle load from entry point"),
   ramReport("load+0"),
 
-  -- 2. Battle must actually come up (this is where broken builds die).
+  -- 2. Battle must come up (this is the stage broken builds fail at).
   H.waitUntil(function() return H.battleActive() end, 900,
     "battle to become active (screen rendering)", 30),
   -- let the ATB fill and the first command menu open

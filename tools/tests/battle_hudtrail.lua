@@ -1,42 +1,43 @@
 -- @suite savestate=rapids_start
--- battle_hudtrail: cells the under-enemy hud ABANDONS must hold vanilla's
--- $01EE fill -- never a priority-set word -- so an animation's bg3-16x16
--- window can't render them.
+-- battle_hudtrail: cells the under-enemy hud abandons must hold vanilla's
+-- $01EE fill, never a priority-set word, so an animation's bg3-16x16
+-- window cannot render them.
 --
--- THE BUG (the owner's v0.3 sighting, surviving all three prior hud fixes:
--- fly-in gate, dialogue font-clobber veil, 16x16 anim veil): "white flash
--- in combat ... at the START of the fight, before anyone has made any
+-- The bug (the owner's v0.3 sighting, which survived all three prior hud
+-- fixes: fly-in gate, dialogue font-clobber veil, 16x16 anim veil): "white
+-- flash in combat ... at the START of the fight, before anyone has made any
 -- attacks ... as the enemies are appearing ... too quick to get a
 -- screenshot."  Reliable on the Lete River forced fight (event battle
--- group 8), BOTH die rolls: formation 35 (Pterodon x2) and formation 37
+-- group 8), on both die rolls: formation 35 (Pterodon x2) and formation 37
 -- (Nautiloid+Exocite+Pterodon).
 --
--- MECHANISM (probe_lete_entrance, frame-exact on the fixed-main image):
--- this entrance SLIDES the shown monsters in.  The hud anchors track the
+-- Mechanism (probe_lete_entrance, frame-exact on the fixed-main image):
+-- this entrance slides the shown monsters in.  The hud anchors track the
 -- slide, so every live line's cur address walks sideways across the field
 -- map, and each step one-shot-blanks the abandoned cells.  The blank word
--- was $21FF: priority-SET char $1FF -- invisible in 8x8 (a blank font
--- cell), but the same slide holds $896F=$59 (bg3 16x16 + priority), and a
--- 16x16 map cell renders char n plus n+1/n+$10/n+$11: $1FF pulls tiles
--- $200/$20F/$210, past the font page into animation gfx, at top priority.
--- 63-92 abandoned cells accumulate over the slide (map dumps in the probe
--- log) and render as a full-width band of white junk over the entering
--- monsters for the effect's last ~15 frames -- one quarter second, gone
--- when the effect's own cleanup refills the buffer.  The anim veil
--- (battle_hudanim16's fix) covers only LIVE cells; abandoned cells were
--- nobody's.
+-- was $21FF, a priority-set char $1FF.  That is invisible in 8x8, being a
+-- blank font cell, but the same slide holds $896F=$59 (bg3 16x16 plus
+-- priority), and a 16x16 map cell renders char n plus n+1, n+$10 and n+$11,
+-- so $1FF pulls tiles $200/$20F/$210, past the font page into animation
+-- gfx, at top priority.  63-92 abandoned cells accumulate over the slide
+-- (map dumps in the probe log) and render as a full-width band of white
+-- junk over the entering monsters for the effect's last ~15 frames, about a
+-- quarter second, and it goes away when the effect's own cleanup refills the
+-- buffer.  The anim veil (battle_hudanim16's fix) covers only live cells;
+-- abandoned cells were covered by nothing.
 --
--- THE FIX: the flush's one-shot blank writes $01EE -- the word vanilla
--- holds in every field cell it did not draw, priority-clear, safe in both
--- tile modes.  An abandoned cell is word-identical to one never touched.
+-- The fix: the flush's one-shot blank writes $01EE, the word vanilla
+-- holds in every field cell it did not draw.  It is priority-clear and safe
+-- in both tile modes, so an abandoned cell is word-identical to one that was
+-- never touched.
 --
--- THE TEST, which needs rapids_start.mss: ride into the forced
--- fight (no menu input -- the flash is before any turn), track every cell
+-- The test needs rapids_start.mss: ride into the forced fight with no menu
+-- input, since the flash happens before any turn, track every cell
 -- a hud line abandons, and assert on every mid-battle bg3-16x16 frame
--- that no abandoned cell holds a priority-set word ($21FF or otherwise)
--- -- each must read exactly $01EE or have been reclaimed/rewritten by
--- vanilla.  Rides the cur-cell invariant along (no painted glyph at cur
--- while 16x16 -- battle_hudanim16's clause, here on the entrance).
+-- that no abandoned cell holds a priority-set word ($21FF or any other).
+-- Each must read exactly $01EE or have been reclaimed or rewritten by
+-- vanilla.  It also carries the cur-cell invariant (no painted glyph at cur
+-- while 16x16), which is battle_hudanim16's clause applied to the entrance.
 -- Positive controls: the slide abandoned >= 20 cells inside the 16x16
 -- window, >= 10 veiled entry frames, >= 20 16x16 frames sampled, the hud
 -- paints after settle, glyphCanary.  Pre-fix: 63+ violations in the first
@@ -107,7 +108,7 @@ local function watchFrame()
   if (m2105 & 0x40) == 0 then return end
   frames16 = frames16 + 1
 
-  -- THE INVARIANT: no abandoned cell priority-set while bg3 is 16x16
+  -- the invariant: no abandoned cell priority-set while bg3 is 16x16
   local nAb = 0
   for a in pairs(abandoned) do
     nAb = nAb + 1
@@ -197,8 +198,8 @@ H.run({ maxFrames = 45000 }, {
       "[hudtrail] frames16=%d veiled16=%d veilFrames=%d abandonedIn16=%d "
       .. "trailViol=%d curViol=%d", frames16, veiled16, veilFrames,
       abandonedIn16, trailViol, curViol))
-    -- the invariant first, so a pre-fix image fails ON the bug (805
-    -- violations measured on it), not on a positive control
+    -- the invariant first, so a pre-fix image fails on the bug itself (805
+    -- violations measured on it) rather than on a positive control
     H.assertEq(trailViol, 0,
       "no abandoned cell held a priority-set word on a 16x16 frame ("
       .. trailViol .. " violations) -- the white entrance band")
@@ -221,7 +222,7 @@ H.run({ maxFrames = 45000 }, {
       "at least one live line read veiled inside the window")
   end),
 
-  -- release edge: the hud must actually paint once the effect ends
+  -- release edge: the hud must paint once the effect ends
   H.waitUntil(function()
     return H.readByte(0x896f) % 128 < 64 and H.readByte(0x57be) == 0
        and H.fieldHudPresent()

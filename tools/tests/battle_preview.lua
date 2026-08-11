@@ -1,41 +1,42 @@
 -- @suite savestate=worldmap_narshe
--- battle_preview: the un-made choice telegraphs its boost.  With BP
+-- battle_preview: the un-made choice shows its boost.  With BP
 -- pending, opening Terra's magic list renders the folded tier in Fire's
--- row (Ot6PreviewList_ext folds the render-scoped id) — and since #64 the
--- rest of the row tells the same story: the PRICE is the folded tier's,
--- and the row GREYS when she cannot pay it.
+-- row (Ot6PreviewList_ext folds the render-scoped id), and since #64 the
+-- rest of the row matches: the price is the folded tier's,
+-- and the row greys when she cannot pay it.
 --
--- WHY THE ROW HAD TO CATCH UP WITH THE NAME.  The preview shipped in v0.1
+-- Why the row had to catch up with the name: the preview shipped in v0.1
 -- folding only the render-scoped id, with cost and selectability left on the
--- base spell.  That was fine while the fold also CHARGED the base spell.
--- #64 made the fold cost the tier's real MP, and the moment it did, a row
--- reading "Fire 3" beside Fire's 4 MP — and confirming happily however broke
--- Terra was — became the lying-surface class we have spent three releases
--- removing.  Ot6FoldPrices (ot6_boost.asm) moves spell-list byte 3, the one
--- cell the grey, the number, the confirm gate and GetMPCost all read, so the
--- four cannot disagree.
+-- base spell.  That was consistent while the fold also charged the base spell.
+-- #64 made the fold cost the tier's real MP, and at that point a row
+-- reading "Fire 3" beside Fire's 4 MP, and confirming however broke
+-- Terra was, showed the player something false, the class of bug the last
+-- three releases have been removing.  Ot6FoldPrices (ot6_boost.asm) moves
+-- spell-list byte 3, the one cell the grey, the number, the confirm gate and
+-- GetMPCost all read, so the four cannot disagree.
 --
--- Issue #75 conversion.  On worldmap_narshe Terra really owns Magic with
--- Fire, so every write is gone: no guard stops, no bp/pending pokes, no
--- 300-MP solvency pumps, no 20-MP poverty pokes.  Her REAL pool is the
+-- Issue #75 conversion.  On worldmap_narshe Terra owns Magic with
+-- Fire, so every write is gone: no guard stops, no bp or pending pokes, no
+-- 300-MP solvency pumps, no 20-MP poverty pokes.  Her real pool is the
 -- test's whole price ladder: 29 MP pays Fire's 4 and Fire 2's 20 but can
--- never pay Fire 3's 51 — so pending 2 is the grey phase for free, and
--- the grey provably marks the FOLD's price and not poverty (the same
--- wallet pays both cheaper tiers, asserted un-greyed either side of it).
+-- never pay Fire 3's 51, so pending 2 is the grey phase without any staging,
+-- and the grey marks the fold's price rather than poverty, since the same
+-- wallet pays both cheaper tiers, asserted un-greyed either side of it.
 -- The bank is earned: one real Tonic turn (zero MP, so the ladder's
 -- arithmetic never moves) banks the second bp; pending only ever comes
--- from real R/L edges at her open list.  The one assertion that cannot
--- survive on real inputs is the old "a poked pending has not re-priced anything
--- yet" control — its subject was the poke itself.  Its replacement is the
--- pending-0 baseline read before any R edge: price 4, tier 1, ungreyed.
+-- from real R and L edges at her open list.  The one assertion that cannot
+-- survive on real inputs is the old control that a poked pending had not
+-- re-priced anything yet, because its subject was the poke.  Its replacement
+-- is the pending-0 baseline read before any R edge: price 4, tier 1,
+-- ungreyed.
 --
 --   asserts: pending 0/1/2 render tier 1/2/3 with prices 4/20/51 live in
---   the same open list; the unaffordable folded row is greyed AND refuses
+--   the same open list; the unaffordable folded row is greyed and refuses
 --   the confirm (state stays in-list, $32cc stays $ff); both cheaper
 --   tiers stay ungreyed on the same wallet; the walk is self-restoring
 --   and idempotent (L back down restores each price exactly); and the
---   menu still works — a re-folded cast lands at the tier the wallet
---   buys (Fire 2, $05).  Screenshots for the eyeball record.
+--   menu still works, with a re-folded cast landing at the tier the wallet
+--   buys (Fire 2, $05).  Screenshots are taken for the visual record.
 local H = dofile("tools/tests/lib/ot6.lua")
 local STATE = "build/states/worldmap_narshe.mss.lua"
 
@@ -93,8 +94,8 @@ end
 
 -- Fire's rendered tier in the ability-list staging rows (map rows 32+).
 -- Names render spaces as $fe and pad with $ff: "Fire 2" = F,i,r,e,$fe,$b6
--- and plain "Fire" = F,i,r,e,$ff… — cell 4 being a true pad ($ff) also
--- cleanly excludes any stale "Fire Beam"-shaped rows (space+B).
+-- and plain "Fire" = F,i,r,e,$ff and so on.  Cell 4 being a true pad ($ff)
+-- also excludes any stale "Fire Beam"-shaped rows (space+B).
 local function fireTier()
   local vr = emu.memType.snesVideoRam
   for w = 0x400, 0x51c do
@@ -119,15 +120,15 @@ local spells = {}
 
 -- Drive L/R until the PENDING BOOST reaches `want`.
 --
--- Deliberately NOT keyed on fireTier().  The list restages one row-pair per
--- frame (Ot6RestageGate_ext, ot6_hud.asm), so a VRAM read taken mid-cycle can
--- momentarily report a neighbouring tier -- measured: a `driveUntil fireTier()
+-- This is not keyed on fireTier() on purpose.  The list restages one row-pair
+-- per frame (Ot6RestageGate_ext, ot6_hud.asm), so a VRAM read taken mid-cycle
+-- can briefly report a neighbouring tier.  Measured: a `driveUntil fireTier()
 -- == 2` loop reported itself satisfied after 4 frames without ever pressing
 -- L, and every price assertion downstream then passed or failed for reasons
--- that had nothing to do with the price.  The pending byte is the ground
--- truth for "an L/R edge really happened", which is what these phases are
--- about; the rendered tier is then ASSERTED at each stop rather than waited
--- on, which is the stronger statement anyway.
+-- unrelated to the price.  The pending byte is the ground truth for whether an
+-- L or R edge happened, which is what these phases are about; the rendered
+-- tier is then asserted at each stop rather than waited on, which is a
+-- stronger statement.
 local function boostTo(want, label)
   return H.driveUntil(function() return pend(terra) == want end, 3000, {
     H.call(function()
@@ -141,12 +142,12 @@ local function boostTo(want, label)
   }, label)
 end
 
--- the banking machine: Locke defers with X, Terra takes one real Tonic
--- turn (zero MP -- the price ladder's arithmetic never moves), which with
+-- the banking drive: Locke defers with X, and Terra takes one real Tonic
+-- turn (zero MP, so the price ladder's arithmetic never moves), which with
 -- the opening Ot6InitBP bp banks the 2 the pending phases need.
--- cadence note: the ITEM window refuses a 4-on/4-off edge train (measured:
--- 995 A presses at st=0a moved nothing) -- newFightDriver's 6-held pace is
--- the proven one, so the bank machine presses 6-on/24-off.
+-- Cadence note: the item window refuses a 4-on/4-off edge train (measured:
+-- 995 A presses at st=0a moved nothing), and newFightDriver's 6-held pace
+-- works, so the bank drive presses 6-on/24-off.
 local mf = 0
 local function bankDecide()
   if H.readByte(MENU) == 0 then
@@ -271,8 +272,8 @@ H.run({ maxFrames = 60000 }, {
   }, "her open list parked on Fire"),
   H.waitFrames(30),
   -- ------------------------------------------------ pending 0: the baseline --
-  -- the input-driven replacement for the old poked-pending control: before any R
-  -- edge the row must carry Fire's own name and price, ungreyed.
+  -- the input-driven replacement for the old poked-pending control: before any
+  -- R edge the row must carry Fire's own name and price, ungreyed.
   H.call(function()
     H.assertEq(pend(terra), 0, "no pending before any R edge")
     H.log(string.format("baseline: tier %d, price %d MP", fireTier(),
@@ -284,7 +285,7 @@ H.run({ maxFrames = 60000 }, {
     H.screenshot("preview_list")
   end),
   -- ------------------------------- the list is open: real L/R edges re-fold --
-  -- Each stop asserts BOTH halves of the row: the name the player reads and
+  -- Each stop asserts both halves of the row: the name the player reads and
   -- the price the game will charge.  Before #64 only the first moved.
   boostTo(1, "R raises the pending to 1"),
   H.waitFrames(40),
@@ -293,10 +294,10 @@ H.run({ maxFrames = 60000 }, {
       fireTier(), rowCost(terra, FIRE)))
     H.assertEq(fireTier(), 2, "one boost re-folds the NAME to Fire 2, live")
     -- and the price, live in the same open list.  Ot6Boost sets OT6_RESTAGE
-    -- for the name AND bit 7 of $3204 for the price; the main loop's
+    -- for the name and bit 7 of $3204 for the price; the main loop's
     -- `asl $3204,x / bcc / jsr UpdateEnabledMagic` (battle_main.asm:1367-1369)
-    -- runs the walk.  That the recheck lands WITH A LIST OPEN is the thing
-    -- this assert really establishes -- it is the whole live half of #64.
+    -- runs the walk.  What this assert establishes is that the recheck lands
+    -- with a list open, which is the live half of #64.
     H.assertEq(rowCost(terra, FIRE), FIRE2_MP,
       "...and PRICES it as Fire 2 -- 20 MP, not Fire's 4")
     H.assertEq(rowGreyed(terra, FIRE), false,
@@ -312,8 +313,8 @@ H.run({ maxFrames = 60000 }, {
     H.assertEq(pend(terra), 2, "still just a preview: boost not consumed")
     H.assertEq(rowCost(terra, FIRE), FIRE3_MP,
       "...priced as Fire 3 -- 51 MP")
-    -- #64's GREY, on the REAL wallet: 29 MP pays base Fire and Fire 2 but
-    -- not Fire 3, so the grey is about the FOLD and not about being broke.
+    -- #64's grey, on the real wallet: 29 MP pays base Fire and Fire 2 but
+    -- not Fire 3, so the grey is about the fold rather than about being broke.
     -- bit 7 of list entry+1 is the bit GetTextColor turns into the $04 the
     -- drawer ORs into the row's $21 white palette to make $25 grey
     -- (btlgfx_main.asm:11271-11278, :10704) AND the bit the A-button
@@ -343,7 +344,7 @@ H.run({ maxFrames = 60000 }, {
   boostTo(0, "L drops the pending to 0"),
   H.waitFrames(40),
   H.call(function()
-    -- THE FALLBACK.  Ot6FoldPrices recomputes absolutely from MagicProp every
+    -- the fallback.  Ot6FoldPrices recomputes from MagicProp every
     -- pass rather than mutating the previous value, so 0 tier steps restores
     -- the base price by the same code path that raised it.  There is no
     -- stale folded price that can leak into the next turn.
@@ -368,8 +369,8 @@ H.run({ maxFrames = 60000 }, {
       if value == FIRE2 then sawFold = true end
     end, emu.callbackType.write, 0x7e3410, 0x7e3410)
   end),
-  -- the menu must still be fully functional: confirm the (re-folded) fire
-  -- and a target, and the fold lands at execution -- at the tier the
+  -- the menu must still work: confirm the re-folded Fire
+  -- and a target, and the fold lands at execution, at the tier the
   -- wallet buys
   H.driveUntil(function() return pend(terra) == 0 end, 4000, {
     H.call(function() if pend(terra) ~= 0 then H.setPad({ "a" }) end end),

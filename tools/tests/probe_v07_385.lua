@@ -1,16 +1,16 @@
--- probe_v07_385.lua -- the BASEMENT 2 timed-floor instrument (issue #31,
--- step G->H).  NOT a suite test.  Boots v07q_385_entry.mss (map 385 (1,2),
--- party TERRA LOCKE EDGAR SABIN) and answers, live:
---   * what the room's reachable set is in the UNARMED state (map-init
+-- probe_v07_385.lua -- the basement 2 timed-floor instrument (issue #31,
+-- step G->H).  Not a suite test.  Boots v07q_385_entry.mss (map 385 (1,2),
+-- party TERRA LOCKE EDGAR SABIN) and measures, live:
+--   * what the room's reachable set is in the unarmed state (map-init
 --     _cb2b0f -> _cb2bc9, event_main.asm:44714 region);
 --   * which arming trigger the entry tile can reach ((3,2)/(10,2) arm
 --     cycle A via _cb2aca/_cb2ae8 :44634/:44646; (11,3)/(13,11) arm cycle
 --     B via _cb2c6e/_cb2c8c :44746/:44758);
 --   * how the live tilemap differs between phase $01F5 and phase $01F6,
 --     and whether a path to the (13,13) exit exists in either;
---   * whether a SAFE path exists that never steps on a hurt trigger
+--   * whether a safe path exists that never steps on a hurt trigger
 --     (_cb2dbb tiles hurt while $01F5, _cb2dd2 while $01F6, (15,10)
---     always -- event_trigger.asm:1844-1885).
+--     always; event_trigger.asm:1844-1885).
 -- Everything is a dump; it never tries to cross.
 -- OT6_CHECKPOINT_LAYOUT: ot6-codex-o8-v1
 local H = dofile("tools/tests/lib/ot6.lua")
@@ -37,7 +37,7 @@ local function dumpRoom(tag)
   end
 end
 
--- reachable set from the party tile over the LIVE model (H.canStep)
+-- reachable set from the party tile over the live model (H.canStep)
 local function reach(tag)
   local sx, sy = H.fieldX(), H.fieldY()
   local seen = { [sy * 64 + sx] = true }
@@ -110,7 +110,7 @@ H.run({ maxFrames = 40000 }, {
     H.screenshot("v07_385_armed")
   end),
 
-  -- watch the phase flip and dump the room in BOTH phases
+  -- watch the phase flip and dump the room in both phases
   H.waitUntil(function() return sw(0x01F5) == 1 end, 900, "phase $01F5", 1),
   H.call(function() dumpRoom("phase5"); reach("phase5") end),
   H.waitUntil(function() return sw(0x01F6) == 1 end, 900, "phase $01F6", 1),
@@ -118,7 +118,7 @@ H.run({ maxFrames = 40000 }, {
   H.waitUntil(function() return sw(0x01F5) == 1 end, 900, "phase $01F5 again", 1),
   H.call(function() reach("phase5b") end),
 
-  -- how long is a phase?  count frames between flips
+  -- phase length: count frames between flips
   (function()
     local n, flips, last = 0, 0, 1
     return H.driveUntil(function() return flips >= 4 end, 3000, {

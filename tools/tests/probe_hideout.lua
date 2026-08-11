@@ -1,21 +1,21 @@
--- probe_hideout.lua -- what the party can actually reach inside the RETURNER
--- HIDEOUT, measured rather than read off the entrance table.
+-- probe_hideout.lua -- what the party can reach inside the Returner
+-- Hideout, measured rather than read off the entrance table.
 --
 -- gen_banon's first cut planned map 109 (9,29) -> (25,15) straight off
--- ShortEntrance::_109 and got "no path" -- the same way gen_kolts's first cut
--- planned Mt. Kolts off its table.  Two things turned out to be true and
--- neither is in any table:
---   * the greeter NPC at map 109 (9,25) is a WALL.  The arrival vestibule
+-- ShortEntrance::_109 and got "no path", the same way gen_kolts's first cut
+-- planned Mt. Kolts off its table.  Two things are true here and neither is
+-- in any table:
+--   * the greeter NPC at map 109 (9,25) is a wall.  The arrival vestibule
 --     reaches exactly one tile besides itself, (9,26), which is the tile
 --     directly under him.  Talking to him runs the escort (_caf68a,
 --     event_main.asm:36275) which walks the party to (22,21) and opens the
---     map -- the same shape as map 71's Figaro guards.
---   * both 109 and 110 are PARTITIONED, so "the map has a door to X" says
+--     map, the same shape as map 71's Figaro guards.
+--   * both 109 and 110 are partitioned, so "the map has a door to X" says
 --     nothing about whether this end of it can get there.
 -- So this floods the engine's own passability model from wherever the party
--- is standing, ~200 nodes per frame (a whole flood in one Lua slice is what
--- gen_kolts warns trips Mesen's script watchdog silently), and prints the
--- reachable set as a map.  '@' party, '.' reachable, ' ' not.
+-- is standing, ~200 nodes per frame (gen_kolts warns that a whole flood in
+-- one Lua slice trips Mesen's script watchdog with no message), and prints
+-- the reachable set as a map.  '@' party, '.' reachable, ' ' not.
 local H = dofile("tools/tests/lib/ot6.lua")
 local DOOR = "build/states/returner_hideout.mss.lua"
 
@@ -181,7 +181,7 @@ H.run({ maxFrames = 60000 }, {
     { 25, 23, "P", "the paper trigger" },
   }),
 
-  -- WHO is standing where, and what exactly walls off the upper half
+  -- who is standing where, and what walls off the upper half
   H.call(function()
     H.log("map 109 objects and spawn switches:")
     local SWI = { [16] = 0x0413, [17] = 0x0414, [18] = 0x0415, [19] = 0x0416,
@@ -195,7 +195,7 @@ H.run({ maxFrames = 60000 }, {
   end),
   (function()
     -- one z-correct bfsPath per frame (H.bfsPath tracks the carried z-level;
-    -- the flood above uses the LIVE z for every tile and is only a sketch)
+    -- the flood above uses the live z for every tile and is approximate)
     local pts = {
       { 11, 16, "under the (11,15) NPC" }, { 11, 15, "the (11,15) NPC tile" },
       { 11, 14, "north of him" },          { 10, 15, "west of him" },
@@ -217,10 +217,10 @@ H.run({ maxFrames = 60000 }, {
     return seq(steps)
   end)(),
 
-  -- DOOR C (25,15) is a door TILE -- a wall until CheckDoor swaps it open
-  -- for a party pressing into it (player.asm:959), which is why bfsPath says
-  -- NO PATH to it while (25,16) directly under it is 8 steps away.  So it is
-  -- crossed gen_edgar-style: stage on the neighbour, then HOLD into it.
+  -- Door C (25,15) is a door tile, a wall until CheckDoor swaps it open
+  -- for a party pressing into it (player.asm:959), which is why bfsPath
+  -- reports NO PATH to it while (25,16) directly under it is 8 steps away.
+  -- It is crossed gen_edgar-style: stage on the neighbour, then hold into it.
   H.navTo(25, 16, { maxFrames = 20000 }),
   H.release(),
   (function()

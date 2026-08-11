@@ -1,5 +1,5 @@
 -- probe_opera_aria3.lua -- boots opera_stage, fires the aria (step 97,7 -> map
--- 236), drives the three lyric forks {0,1,0}, then OBSERVES the post-fork state
+-- 236), drives the three lyric forks {0,1,0}, then observes the post-fork state
 -- (the flower dance): CELES pos, $0057/$0111/$01F0-2, NPCs.  Tight budgets.
 local H = dofile("tools/tests/lib/ot6.lua")
 local function map() return H.mapId() & 0x1ff end
@@ -51,8 +51,9 @@ H.run({ maxFrames = 50000 }, {
   ariaFork(0, "fork3(0)"),
   H.call(function() dumpsw("after fork3"); H.screenshot("aria_after_forks") end),
 
-  -- OBSERVE the flower dance: log state for a while WITHOUT driving (see if it
-  -- auto-advances, where CELES/NPCs are, whether control returns)
+  -- Observe the flower dance: log state for a while without driving, to see
+  -- whether it auto-advances, where CELES and the NPCs are, and whether
+  -- control returns
   (function() local n=0
     return H.driveUntil(function() return sw(0x0111)==1 or (map()~=236) end, 4000, {
       H.call(function() n=n+1

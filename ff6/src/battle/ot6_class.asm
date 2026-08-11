@@ -1,17 +1,17 @@
 ; ------------------------------------------------------------------------------
-; OT6 — weapon/ability class data (M3)
+; OT6: weapon/ability class data (M3)
 ;
 ; four physical classes, one bit each, sharing a byte with the null-break
 ; property. together with the 8 elements these are octopath's 12 probe axes.
-; the WEAPON sets Fight's class; ABILITIES keep their own class byte
-; (sabin with claws equipped slashes on Fight — Pummel stays bludgeoning).
+; the weapon sets Fight's class; abilities keep their own class byte
+; (sabin with claws equipped slashes on Fight, and Pummel stays bludgeoning).
 ; ------------------------------------------------------------------------------
 
 OT6_SLASH   := $01              ; swords, katanas, claws
 OT6_PIERCE  := $02              ; spears, daggers, thrown edges, bolts, darts
 OT6_BLUDG   := $04              ; fists, staves, rods, flails, boomerangs
-OT6_SPECIAL := $08              ; ¤: dice, cards, brushes — real and breakable
-OT6_NULLBRK := $80              ; property, not a class: big dumb damage that
+OT6_SPECIAL := $08              ; ¤: dice, cards, brushes; real and breakable
+OT6_NULLBRK := $80              ; property, not a class: high damage that
                                 ;   chips nothing (the physical mirror of
                                 ;   non-elemental magic). class bits stay set
                                 ;   for future consumers (equip permits, hud).
@@ -24,22 +24,22 @@ OT6_NULLBRK := $80              ; property, not a class: big dumb damage that
 
 ; one byte per item id, directly indexed (no scan: Fight reads this per
 ; swing). non-weapons are $00. classified per docs/design/weapon-classes.md
-; v2.1; WoR-only weapons are classified too — the rules cover them for free.
+; v2.1; WoR-only weapons are classified too, since the rules already cover them.
 ;
-; judgment calls (v2.1 leaves these to taste — driver review welcome):
-;   - heal rod $33: NO class. a healing stick teaches nothing; also dodges
-;     the undead/heal-reversal ambiguity until someone actually wants it.
+; judgment calls (v2.1 leaves these to taste; driver review welcome):
+;   - heal rod $33: no class. a healing rod teaches nothing, and leaving it
+;     classless avoids the undead/heal-reversal ambiguity until it is needed.
 ;   - the returning-arc family (full moon, boomerang, rising sun, sniper,
 ;     wing edge) is all bludgeoning per "boomerangs (ranged bludgeon)",
 ;     even the edgy-looking discs; one-way thrown points (shuriken, stars,
 ;     darts, hawk eye) are piercing per "thrown edges, darts".
 ;   - hawk eye $49: piercing (a thrown blade, not a returning arc).
 ;   - air anchor $a9: piercing (it fires a harpoon).
-;   - atma weapon $1c: plain slashing. it's "big dumb damage" in spirit,
-;     but v2.1 only names fixed dice for null-break — driver call.
+;   - atma weapon $1c: plain slashing. it resembles the null-break case,
+;     but v2.1 only names fixed dice for null-break; driver call.
 ;   - empty hand $ff: bludgeoning. fists are a real class ("claws are how
-;     the monk buys into a second class" — bare knuckles stay bludgeon,
-;     and umaro punches things correctly for free).
+;     the monk buys into a second class"), so bare knuckles stay bludgeon
+;     and umaro is classified correctly with no special case.
 ;   - dried meat is $fe and "empty" is $ff in equipment slots; only $ff
 ;     ever appears in a hand.
 
@@ -135,7 +135,7 @@ Ot6WeapClassTbl:
         .byte   OT6_PIERCE      ; $4f doom darts
         .byte   OT6_SPECIAL     ; $50 trump
         .byte   OT6_SPECIAL     ; $51 dice (ordinary ¤: chips)
-        .byte   OT6_SPECIAL|OT6_NULLBRK ; $52 fixed dice: rolls huge, teaches nothing
+        .byte   OT6_SPECIAL|OT6_NULLBRK ; $52 fixed dice: high damage, teaches nothing
         ; claws $53-$59
         .byte   OT6_SLASH       ; $53 metalknuckle
         .byte   OT6_SLASH       ; $54 mithril claw
@@ -167,16 +167,16 @@ Ot6WeapClassTbl:
 ; [ ability id -> class byte ]
 
 ; (id, class) pairs, $ff-terminated. abilities carry their own class no
-; matter what's equipped ✦ — this table is scanned once per attack load,
+; matter what is equipped ✦. this table is scanned once per attack load,
 ; and anything absent is classless: its element byte carries the probe
 ; (aurabolt is a holy chip, not a punch). WoB physical skills only;
 ; slots attacks, dances, and rage specials stay unclassified in v1.
 ;
 ;   - swdtechs are all slashing: cyan is the slashing specialist, and
-;     quadra slam/slice are the best slash chips in the game.
+;     quadra slam/slice are the strongest slash chips in the game.
 ;   - $55 dispatch doubles as slots' "joker doom" (vanilla reuses the
-;     record, and renamed its attack-name slot) — so a failed joker doom
-;     is a slashing probe. vanilla jank, preserved by inheritance.
+;     record, and renamed its attack-name slot), so a failed joker doom
+;     is a slashing probe. that is vanilla behaviour, kept as it is.
 ;   - pummel/suplex/bum rush bludgeon regardless of claws ✦.
 ;   - tekmissile is piercing: the whelk tutorial's fourth chip
 ;     ("three beams and a tekmissile").
@@ -185,13 +185,13 @@ Ot6SkillClassTbl:
         .byte   $55, OT6_SLASH  ; dispatch (fang)
         .byte   $56, OT6_SLASH  ; retort (sky)
         .byte   $57, OT6_SLASH  ; slash (tiger)
-        .byte   $58, OT6_SLASH  ; quadra slam (flurry — chips per hit)
+        .byte   $58, OT6_SLASH  ; quadra slam (flurry: chips per hit)
         .byte   $59, OT6_SLASH  ; empowerer (dragon)
         .byte   $5a, OT6_SLASH  ; stunner (eclipse)
         .byte   $5b, OT6_SLASH  ; quadra slice (tempest)
         .byte   $5c, OT6_SLASH  ; cleave (oblivion)
         .byte   $5d, OT6_BLUDG  ; pummel
-        .byte   $5f, OT6_BLUDG  ; suplex (the train is bludgeon-weak. yes.)
+        .byte   $5f, OT6_BLUDG  ; suplex (the train is bludgeon-weak)
         .byte   $64, OT6_BLUDG  ; bum rush
         .byte   $8a, OT6_PIERCE ; tekmissile
         .byte   $ff

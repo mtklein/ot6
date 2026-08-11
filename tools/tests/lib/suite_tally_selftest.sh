@@ -2,19 +2,19 @@
 # Positive control for suite.sh's bookkeeping: the tally line, and the
 # discovered-vs-reported cross-check that guards it.
 #
-# WHY A SELFTEST AND NOT "just read the suite output": the tally is the thing
-# people will quote instead of counting, so it has to be right when nobody is
-# checking -- and the interesting cases (a FAIL, an xfail, a worker that never
-# reports) are exactly the ones a green suite run never exercises.  Proving
+# Why a selftest rather than reading the suite output: the tally is the thing
+# people quote instead of counting, so it has to be right when nobody is
+# checking, and the interesting cases (a FAIL, an xfail, a worker that never
+# reports) are the ones a green suite run never exercises.  Checking
 # them against the real suite would mean deliberately breaking a test and
-# burning an emulator run per case.
+# spending an emulator run per case.
 #
-# So this builds a MINIATURE tree -- $TMP/tools/tests/{suite.sh,run.sh,*.lua}
-# -- and lets suite.sh discover and "run" it.  suite.sh derives ROOT from its
+# So this builds a small tree ($TMP/tools/tests/{suite.sh,run.sh,*.lua})
+# and lets suite.sh discover and "run" it.  suite.sh derives ROOT from its
 # own path (`dirname $0/../..`), so a copy placed there is rooted in the fake
 # tree and never touches the real one.  The stub run.sh exits with whatever
 # code the test's filename asks for, so every verdict branch is reachable in
-# milliseconds with no Mesen anywhere in the picture.
+# milliseconds with no Mesen involved.
 set -u
 ROOT="$(cd "$(dirname "$0")/../../.." && pwd)"
 TMP=$(mktemp -d "${TMPDIR:-/tmp}/ot6-tally-selftest.XXXXXXXX") || exit 1
@@ -24,10 +24,10 @@ mkdir -p "$TMP/tools/tests" "$TMP/build/states"
 cp "$ROOT/tools/tests/suite.sh" "$TMP/tools/tests/suite.sh"
 chmod +x "$TMP/tools/tests/suite.sh"
 # The OT6_JOBS>1 path composes each test up front, and suite.sh now opens with
-# a fixture-freshness check, so the fake tree needs a lib/.  COPIED, not
+# a fixture-freshness check, so the fake tree needs a lib/.  It is copied, not
 # symlinked: compose.py finds its tree root with Path(__file__).resolve(),
-# which follows a symlink straight back to the real checkout -- a symlinked
-# lib would have this selftest reporting on the REAL tree's fixtures.
+# which follows a symlink back to the real checkout, and a symlinked
+# lib would have this selftest reporting on the real tree's fixtures.
 cp -R "$ROOT/tools/tests/lib" "$TMP/tools/tests/lib"
 
 # Stub runner: `pass_*` exits 0, `fail_*` exits 1.  It also writes the log
@@ -74,9 +74,9 @@ check "green run says GREEN" \
 
 # ---- 1b. fixture freshness is stated up front, not left in a per-test log --
 # An unstamped tree says so and stays quiet; a tree holding a fixture whose
-# recorded signature does not match its sources says THAT, before any test
+# recorded signature does not match its sources reports that, before any test
 # runs.  The stale case is built by hand: a stamp naming a real generator,
-# carrying a signature that is simply not the one those bytes hash to.
+# carrying a signature that is not the one those bytes hash to.
 check "an unstamped tree says so and does not cry stale" \
   "$(grep -c 'no generated fixtures in this tree' "$TMP/out.3")" "1"
 echo '-- a generator' > "$TMP/tools/tests/gen_fake.lua"
@@ -95,9 +95,9 @@ check "...and does NOT by itself fail the suite" \
   "3 ran: 3 pass, 0 fail; 1 skipped (need \`make savestates\`)"
 rm "$TMP/build/states/fake_leg.stamp" "$TMP/tools/tests/gen_fake.lua"
 
-# ---- 1c. a compose failure must print WHY.  suite.sh used to send compose's
-#          stdout to /dev/null and report a bare "compose failed: <test>",
-#          which is the whole diagnosis thrown away one line before it is
+# ---- 1c. a compose failure must print the reason.  suite.sh used to send
+#          compose's stdout to /dev/null and report a bare "compose failed:
+#          <test>", discarding the diagnosis one line before it is
 #          printed.  An absolute sidecar literal is a compose error with a
 #          long, specific message; assert the message survives.
 printf -- '-- @suite\nlocal S = "/elsewhere/build/states/x.mss.lua"\n' \
@@ -137,9 +137,9 @@ check "tally's fail count matches the per-test lines" "$listed_fail" "1"
 
 # ---- 5. A worker that dies mid-test still costs its claimed test a result
 #         file.  suite.sh calls that "worker never reported"; it must land in
-#         the tally as a failure, not vanish from the denominator.  The stub
-#         kills its PARENT -- the worker subshell -- after the claim is taken
-#         and before the result is written, which is the real shape of this.
+#         the tally as a failure rather than vanish from the denominator.  The
+#         stub kills its parent, the worker subshell, after the claim is taken
+#         and before the result is written, which is how this happens.
 cat > "$TMP/tools/tests/run.sh" <<'STUB'
 #!/bin/sh
 : > "$2"
@@ -161,13 +161,13 @@ check "...and is counted, so the total still covers every discovered test" \
 check "...via the 'worker never reported' line, not a plain FAIL" \
   "$(grep -c 'worker never reported' "$TMP/out.vanish")" "1"
 
-# ---- 6. NON-VACUITY for the cross-check itself.  Every case above keeps
-#         ran == discovered, so nothing has yet watched the BUG branch fire.
-#         Force the mismatch: take the SAME vanishing worker, but neuter the
-#         "worker never reported" accounting so the test really does fall out
+# ---- 6. Non-vacuity for the cross-check itself.  Every case above keeps
+#         ran == discovered, so nothing has yet observed the BUG branch fire.
+#         Force the mismatch: take the same vanishing worker, but disable the
+#         "worker never reported" accounting so the test does fall out
 #         of the total.  If the cross-check is doing nothing, this run reports
-#         "3 ran" and exits 0 -- a green suite that quietly skipped a test,
-#         which is the failure mode the line exists to make impossible.
+#         "3 ran" and exits 0, a green suite that skipped a test without
+#         saying so, which is the failure mode the line exists to prevent.
 sed 's/n_fail=$((n_fail + 1)); fail=1$/:/' \
   "$ROOT/tools/tests/suite.sh" > "$TMP/tools/tests/suite.sh"
 chmod +x "$TMP/tools/tests/suite.sh"

@@ -1,51 +1,52 @@
 -- @suite slow savestate=camp_escaped
--- battle_bushido.lua -- v0.5 Bushido submenu (issue #8): SwdTech is a tools-shell
--- SUBMENU, not the vanilla numeral gauge.
+-- battle_bushido.lua -- v0.5 Bushido submenu (issue #8): SwdTech is a
+-- tools-shell submenu rather than the vanilla numeral gauge.
 --
 -- Vanilla SwdTech ran a free bar (btlgfx_main.asm UpdateMenuState_35/37); OT6
 -- deletes that path (OpenCmdMenuTbl[7] -> _c1_bushido_open) and drives SwdTech
--- through the Tools window shell (menu state $30).  Each row IS a boost level,
--- weakest at TOP; #38's 1-BP floor makes row i = boost i+1, no free tier.
+-- through the Tools window shell (menu state $30).  Each row is a boost level,
+-- weakest at the top; #38's 1-BP floor makes row i = boost i+1, with no free
+-- tier.
 --
 -- Issue #75 conversion.  The old apparatus installed a triple-CYAN party by
 -- poke, wrote the katana flag, pinned $2020/bp/MP/HP/shields, stopped the
--- guards, and poked every cursor.  On camp_escaped CYAN IS REAL (the
--- bushidogrey/mpcost kit: katana SWDTECH flag $3BA4 bit 1 reads $82; two
--- techs really learned -- $2020's low byte reads HIS true ceiling 1, under
+-- guards, and poked every cursor.  On camp_escaped Cyan is real (the
+-- bushidogrey and mpcost kit: katana SWDTECH flag $3BA4 bit 1 reads $82; two
+-- techs learned, with $2020's low byte reading his true ceiling of 1, under
 -- the same garbage high byte issue #4 documents InitSkills leaving), and
--- the input-driven arms run against his REAL window {Dispatch $55 @4, Retort
--- $56 @10} with cursor rows WALKED, never poked:
+-- the input-driven arms run against his real window {Dispatch $55 at 4, Retort
+-- $56 at 10} with cursor rows walked rather than poked:
 --
---   1. THE NUMERAL GAUGE IS GONE: opening SwdTech lands in $30; a watch
---      proves $37 never appears on the way.
---   2. THE REAL WINDOW: WIN[1] = {Dispatch, Retort} at rows 0/1 with
---      their authored costs, right column and rows 2-3 $ff -- the
---      short-learned-set arm of the enumeration, previously only
+--   1. the numeral gauge is gone: opening SwdTech lands in $30, and a watch
+--      shows $37 never appears on the way.
+--   2. the real window: WIN[1] = {Dispatch, Retort} at rows 0 and 1 with
+--      their authored costs, and the right column and rows 2-3 $ff.  This is
+--      the short-learned-set arm of the enumeration, previously only
 --      reachable by poke.
---   3. NAMES: Dispatch and Retort draw (from BushidoName); "Slash" -- the
---      first tech he has NOT learned -- is nowhere in the window.
---   4. A ROW BEYOND CURRENT BP CANNOT COMMIT: at the natural opening bank
---      of 1, confirming row 1 (boost 2) is refused -- submenu stays,
---      nothing banked.
---   5. CONFIRM RESOLVES: row 0 at bank 1 banks boost 1, latches Dispatch,
+--   3. names: Dispatch and Retort draw (from BushidoName), and "Slash", the
+--      first tech he has not learned, is nowhere in the window.
+--   4. a row beyond current BP cannot commit: at the natural opening bank
+--      of 1, confirming row 1 (boost 2) is refused, the submenu stays, and
+--      nothing is banked.
+--   5. confirm resolves: row 0 at bank 1 banks boost 1, latches Dispatch,
 --      reaches $3410, deals real damage under the no-multiplier cap, and
 --      the boost is consumed with no regen that turn (1 -> 0).
---   6. #38's LOAD-BEARING CASE, on the bank arm 5 just spent: at 0 bp
---      even row 0 is refused -- there is no free Bushido -- while the
---      rows still enumerate (shown, not emptied).
+--   6. #38's main case, on the bank arm 5 just spent: at 0 bp
+--      even row 0 is refused, because there is no free Bushido, while the
+--      rows still enumerate, shown rather than emptied.
 --
---   *** LABELED ISOLATION ARMS (owner ruling 2026-08-10). ***  Cyan's real
+--   Labeled isolation arms (owner ruling 2026-08-10).  Cyan's real
 --   learned set is two techs and stays that way without the leveled-grind
---   tier the owner declined, so the CEILING SWEEP -- the moving-window
+--   tier the owner declined, so the ceiling sweep, the moving-window
 --   enumeration at N=1,3,4,5,6,8, including Oblivion (tech 7, id $5c,
---   the named tech-8 ceiling arm) -- keeps its $2020 pokes, said loudly,
---   with the real ceiling restored after.  The CLASS-CHIP/REVEAL half of
---   the old confirm arm is also labeled: every SwdTech is authored SLASH
+--   the named tech-8 ceiling arm), keeps its $2020 pokes, recorded here,
+--   with the real ceiling restored after.  The class-chip and reveal half of
+--   the old confirm arm is also labeled: every SwdTech is authored slash
 --   (Ot6SkillClassTbl, $01) and this pool's species author weak-class
---   $02, so no chip can fire here in normal play -- the arm stages the $01 bit
+--   $02, so no chip can fire here in normal play.  The arm stages the $01 bit
 --   into every live monster's weak mask (every one, because the tech's
---   default target is the engine's pick -- measured: staging one monster
---   read 3->3 while the hit landed elsewhere) and the REAL Dispatch then
+--   default target is the engine's pick; measured: staging one monster
+--   read 3->3 while the hit landed elsewhere) and the real Dispatch then
 --   chips and reveals through the engine's own path.  Convert both
 --   organically as higher-level content lands.
 local H = dofile("tools/tests/lib/ot6.lua")
@@ -120,7 +121,7 @@ local function findName(seq)
   return nil
 end
 
--- the shared drive machine (battle_bushidogrey's)
+-- the shared drive (battle_bushidogrey's)
 local mf = 0
 local cyanMode = "defer"                 -- "defer"|"item"|"tech:<row>"|"park:"
 local quietA = false
@@ -230,7 +231,7 @@ local function park(tag)
     H.waitFrames(20),
   })
 end
--- shove the parked cursor onto `row` and edge one A, WITHOUT the tech
+-- move the parked cursor onto `row` and edge one A, without the tech
 -- steering (for the refusal arms, whose confirm must be refused)
 local function pressRowOnce(row)
   return H.repeatN(1, {
@@ -315,7 +316,7 @@ H.run({ maxFrames = 150000 }, {
       cyan, R.ceiling, monsterHpSum()))
   end),
 
-  -- 1/2/3. the gauge is dead; the REAL window and its names ----------------
+  -- 1/2/3. the gauge is gone; the real window and its names ----------------
   park("swdtech opens as the tools-shell submenu"),
   H.call(function()
     H.screenshot("bushido_window")
@@ -340,8 +341,8 @@ H.run({ maxFrames = 150000 }, {
   end),
 
   -- 5. confirm resolves: row 0 at the real bank ----------------------------
-  -- (the chip/reveal halves live in the LABELED arm below: every SwdTech
-  -- is authored SLASH $01 and this pool's species author $02, so no
+  -- (the chip and reveal halves live in the labeled arm below: every SwdTech
+  -- is authored slash $01 and this pool's species author $02, so no
   -- chip can fire here in normal play)
   (function()
     local g0
@@ -374,7 +375,7 @@ H.run({ maxFrames = 150000 }, {
     })
   end)(),
 
-  -- 6. #38's load-bearing case, on the bank arm 5 just spent ---------------
+  -- 6. #38's main case, on the bank arm 5 just spent ----------------------
   park("reopen at the 0 bank arm 5 earned"),
   H.call(function()
     H.assertEq(bp(), 0, "the ledger: the bank really reads 0")
@@ -389,9 +390,9 @@ H.run({ maxFrames = 150000 }, {
     H.screenshot("bushido_zero_refused")
   end),
 
-  -- ============ LABELED ISOLATION ARMS (see the header) ===================
-  -- (a) the ceiling sweep + Oblivion: $2020 pokes, real ceiling restored.
-  --     The submenu re-enumerates at every open, so each poke + reopen
+  -- ============ labeled isolation arms (see the header) ===================
+  -- (a) the ceiling sweep and Oblivion: $2020 pokes, real ceiling restored.
+  --     The submenu re-enumerates at every open, so each poke and reopen
   --     reads one window of the WIN table.
   (function()
     local steps = {}
@@ -402,7 +403,7 @@ H.run({ maxFrames = 150000 }, {
       steps[#steps+1] = H.pressButtons({ "b" }, 4)   -- close the parked window
       steps[#steps+1] = H.waitFrames(16)
       steps[#steps+1] = H.call(function()
-        -- ISOLATION WRITE (waived, labeled): the swept ceiling, in
+        -- the isolation write (waived, labeled): the swept ceiling, in
         -- InitSkills' own garbage-high-byte shape (#4)
         H.writeWord(KNOWN, 0xFF00 | ceil)
       end)
@@ -418,16 +419,16 @@ H.run({ maxFrames = 150000 }, {
       H.assertEq(findName(glyphs("Dispatch")), nil,
         "at ceiling 7 the retired \"Dispatch\" is no longer drawn (the "
         .. "window slid weakest-out)")
-      -- restore his REAL ceiling before anything else runs
+      -- restore his real ceiling before anything else runs
       H.writeWord(KNOWN, R.ceiling)
       H.log("sweep done; real ceiling restored")
     end)
     return H.repeatN(1, steps)
   end)(),
-  -- (b) the class-chip/reveal half of the old confirm arm (labeled): the
-  --     tech class is SLASH ($01, Ot6SkillClassTbl) and this pool authors
-  --     $02, so the $01 bit is staged into EVERY live monster's weak mask
-  --     (the tech's default target is the engine's pick) and the REAL
+  -- (b) the class-chip and reveal half of the old confirm arm (labeled): the
+  --     tech class is slash ($01, Ot6SkillClassTbl) and this pool authors
+  --     $02, so the $01 bit is staged into every live monster's weak mask
+  --     (the tech's default target is the engine's pick) and the real
   --     Dispatch then runs the engine's own chip path.
   (function()
     local sh0, rv0 = {}, {}
@@ -444,9 +445,9 @@ H.run({ maxFrames = 150000 }, {
             sh0[m] = H.readByte(0x3E38 + (8 + m*2))
             rv0[m] = H.readByte(0x3E9D + (8 + m*2))
             if H.readWord(0x3BFC + m*2) > 0 then
-              -- ISOLATION WRITE (waived, labeled): add the slash bit to
-              -- the authored mask (never clobber it -- a $01 := overwrote
-              -- $02 in an earlier draft and silenced the chip mid-diagnosis)
+              -- the isolation write (waived, labeled): add the slash bit to
+              -- the authored mask rather than replacing it; a $01 assignment
+              -- overwrote $02 in an earlier draft and suppressed the chip
               local a = 0x3E9C + (8 + m*2)
               H.writeByte(a, H.readByte(a) | OT6_SLASH)
             end

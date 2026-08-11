@@ -1,17 +1,17 @@
 # OT6 Tooling
 
-Everything below is working on this machine (macOS arm64). Research trail
+Everything below is working on this machine (macOS arm64). Research notes
 with URLs: [research/toolchain.md](research/toolchain.md).
 
 ## The build
 
 We build the whole game from source via the **everything8215/ff6
-disassembly** (GPL-3.0), vendored directly at `ff6/` (upstream 1ea47b5).
+disassembly** (GPL-3.0), vendored at `ff6/` (upstream 1ea47b5).
 The base ROM lives
 in `ff6/vanilla/` (git-ignored) and assets are ripped from it once
 (`make rip`). Verified: the unmodified tree's `make ff6-en` reproduces
-retail FF3us 1.0 **byte-for-byte** (CRC32 A27F1C7A), including retail's
-famously wrong internal SNES checksum. OT6 code lives in
+retail FF3us 1.0 byte-for-byte (CRC32 A27F1C7A), including retail's
+incorrect internal SNES checksum. OT6 code lives in
 the ordered `ff6/src/battle/ot6_*.asm` modules (emitted by `ot6.asm` into
 expanded bank $F0) plus minimal jsl shims in
 vanilla banks.
@@ -30,7 +30,7 @@ Top-level `Makefile` targets:
 | `make savestates` | generate the deep story-chain savestate fixtures past the whelk (slow; nothing in `make test` depends on them) |
 | `make savestates-test` | `make savestates`, then run the suite with those fixtures present (so the tests that need the generated savestates run) |
 
-Hello-world proof: default name TERRA→OCTO in
+Hello-world check: default name TERRA→OCTO in
 `ff6/src/text/char_name_en.json` → rebuild → exactly 7 bytes differ from
 vanilla (5 at the name table $C478C0 + auto-fixed checksum pair), BPS is
 45 bytes, smoke test asserts the change from inside the emulator (negative
@@ -43,7 +43,7 @@ the repo root installs them in one go (the non-brew pieces below still need
 the manual steps at each bullet).
 
 - **cc65** (ca65/ld65) — via Homebrew. The build's only python requirement
-  is any `python3` ≥3.9 — Command Line Tools 3.9.6 suffices. numpy is
+  is any `python3` ≥3.9; Command Line Tools 3.9.6 suffices. numpy is
   imported only by the asset re-encoders (`brr.py`, `monster_stencil.py`,
   `shuffle_rng.py`), whose outputs are tracked.
 - **ninja** — via Homebrew. Runs the generated savestate graph
@@ -72,17 +72,17 @@ the manual steps at each bullet).
   stores only what differs from the base ROM (measured on v0.1: 8,650
   literal bytes of ~20 KB).
 
-## Gotchas learned the hard way
+## Gotchas
 
 - **Mesen first-run wizard vs testrunner**: with no config file, Mesen
   ignores `--testrunner` and launches the GUI setup wizard (hangs any
   script). Its home folder on macOS is `~/Library/Application
   Support/Mesen2/`; an existing `settings.json` (even `{}`) skips the
   wizard. Already handled here.
-- **Moving that home folder: `CFFIXED_USER_HOME`, never `$HOME`.** Mesen
+- **Move that home folder with `CFFIXED_USER_HOME`, not `$HOME`.** Mesen
   resolves it via .NET's `SpecialFolder.ApplicationData`, which on macOS
   goes through `NSSearchPathForDirectoriesInDomains` and reads the home
-  from the password database — so `$HOME` is simply ignored (a testrunner
+  from the password database, so `$HOME` is ignored (a testrunner
   run with `HOME` redirected still wrote its `.srm` into the real
   profile). Core Foundation's `CFFIXED_USER_HOME` does move it. A
   `settings.json` beside the binary (portable mode) overrides both.
@@ -90,30 +90,30 @@ the manual steps at each bullet).
   emulator" header.
 - Mesen is ad-hoc signed but **not notarized** (no Team ID), so Gatekeeper
   rejects it: the **first GUI launch** may need right-click → Open. Headless testrunner runs fine from the terminal.
-  It also means every **new bundle path** costs a first-launch assessment —
+  It also means every **new bundle path** costs a first-launch assessment:
   a "Verifying Mesen…" dialog and a ~5s scan of the whole 413MB bundle
   (measured against 0.3-0.5s for an already-known path). `xattr -cr` does
   not suppress it; the trigger is the path, not the quarantine flag. This
-  is why the harness keeps ONE shared test bundle machine-wide instead of
+  is why the harness keeps one shared test bundle machine-wide instead of
   a copy per worker.
 - macOS has no `timeout`; testrunner also has its own `timeout=N` arg if a
   test ever wedges.
-- `make distclean` in `ff6/` deletes ripped assets including modified ones
-  — recoverable via `git restore` now that they're tracked, but still
-  don't run it casually.
+- `make distclean` in `ff6/` deletes ripped assets including modified ones.
+  They are recoverable with `git restore` now that they are tracked, but
+  do not run it casually.
 - **ca65 width state is inherited across `.include`**: any asm file pulled
   into a module inherits the `.a8/.a16/.i8/.i16` assumptions active at the
-  inclusion point. ALWAYS declare the expected widths at the top of a new
-  file — we lost a debugging round to `cpy #imm` assembling a 1-byte
-  operand while the CPU ran 16-bit indexes (instruction-stream desync,
-  hung battle init).
+  inclusion point. Always declare the expected widths at the top of a new
+  file. A debugging round was lost to `cpy #imm` assembling a 1-byte
+  operand while the CPU ran 16-bit indexes, which desynced the instruction
+  stream and hung battle init.
 - Mesen Lua: `emu.createSavestate`/`loadSavestate` must run inside an
   exec memory callback, not event callbacks (Mesen enforces this and says
   so). `dofile` and file writes are blocked by a **default-off setting**,
   `Debug.ScriptWindow.AllowIoOsAccess`, not by a fixed sandbox — flipping
   it enables both. We leave it off and compose scripts flat, tunnelling
   artifacts as base64 over stdout, because hermetic runs are worth more
-  than the convenience — see tools/tests/run.sh.
+  than the convenience; see tools/tests/run.sh.
 
 ## Reference docs for the asm work (see research/)
 

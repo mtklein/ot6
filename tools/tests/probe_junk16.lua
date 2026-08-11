@@ -1,25 +1,25 @@
 -- probe_junk16.lua -- reproduction attempt for the owner's "junk over and
--- around the enemies" in a PLAIN random battle (no dialogue, no boss, no
--- fly-in dependence): boot kolts_cave.mss (map 96, the Cirpius-x3 pool --
+-- around the enemies" in a plain random battle (no dialogue, no boss, no
+-- fly-in dependence): boot kolts_cave.mss (map 96, the Cirpius-x3 pool;
 -- 93.75% of draws, hud lines measured at row 5-6 of the bg3 field map) and
 -- fight it out with plain Fight commands.  probe_aurabolt measured that
--- ORDINARY attack animations (any with bg1 graphics, and every bg3-scripted
+-- ordinary attack animations (any with bg1 graphics, and every bg3-scripted
 -- one) set $2105 = $59: battlefield BG3 in 16x16 tile mode for 15-70 frames
 -- while BG3 stays on the main screen and the under-enemy hud cells stay
--- painted in the $5400 map with the PRIORITY attr bit set (attr $21).
--- Vanilla's own junk fill ($01EE) is priority-CLEAR, invisible behind the
--- battle bg -- OT6's hud cells are the only priority-set content besides
+-- painted in the $5400 map with the priority attr bit set (attr $21).
+-- Vanilla's own junk fill ($01EE) is priority-clear and invisible behind
+-- the battle bg.  OT6's hud cells are the only priority-set content besides
 -- the effect's own cells, so any hud cell inside the scrolled 16x16 window
--- renders as a doubled-size block: the glyph tile plus three neighbor
+-- renders as a doubled-size block: the glyph tile plus three neighbour
 -- tiles.  Cirpius hud rows 5-6 sit inside the window rows 0-9 at scroll 0.
 --
 -- Detector, every frame of every battle:
---   * dangerous-display flag: $2105 bit $40 (bg3 16x16) AND $898D bit 2
---     (bg3 on main screen) AND any live hud line cell inside the visible
+--   * dangerous-display flag: $2105 bit $40 (bg3 16x16) and $898D bit 2
+--     (bg3 on main screen) and any live hud line cell inside the visible
 --     window given the live bg3 scroll ($4AF5/$4AF7) -> log + screenshot.
 --   * borrowed-font canary (tiles $64/$6D/$71/$EB vs ROM, 4 bytes each).
 --   * quadrant uploads ($7B21/$62C9) that would stomp map rows in vram.
--- Every animation logs its attack number ($626A) -- events name themselves.
+-- Every animation logs its attack number ($626A).
 local H = dofile("tools/tests/lib/ot6.lua")
 local STATE = "build/states/kolts_cave.mss.lua"
 local VR  = emu.memType.snesVideoRam
@@ -80,14 +80,14 @@ local function mapBase() -- word address
   return (reg - (reg % 4)) * 256
 end
 
--- is 16x16 map cell (r,c) inside the battlefield window at scroll (x,y)?
+-- true when 16x16 map cell (r,c) is inside the battlefield window at (x,y)
 local function cellVisible16(r, c, x, y)
   local dx = (c*16 - x) % 512
   local dy = (r*16 - y) % 512
   return (dx < 256 or dx > 512 - 16) and (dy < 152 or dy > 512 - 16)
 end
 
--- hud cells visible under 16x16 display? returns descriptive string or nil
+-- hud cells visible under 16x16 display: a descriptive string, or nil
 local function hudVisible16()
   local m2105 = H.readByte(0x896f)
   local main = H.readByte(0x898d)
@@ -103,7 +103,7 @@ local function hudVisible16()
       local r = math.floor(off / 32)
       local c = off % 32
       for k = 0, 4 do
-        -- painted glyph in vram at this cell? (veil writes $01EE, blanks $21FF)
+        -- a painted glyph in vram at this cell (veil writes $01EE, blanks $21FF)
         local lo = emu.read((cur + k) * 2, VR)
         local hi = emu.read((cur + k) * 2 + 1, VR)
         if hi == 0x21 and claimed[lo] and cellVisible16(r, (c + k) % 32, x, y) then
@@ -176,9 +176,9 @@ end
 -- --------------------------------------------------------- battle drive --
 -- TERRA casts FIRE every turn (Magic $02 -> first spell -> confirm);
 -- everyone else Fights.  Fire's animation carries bg1 graphics, and
--- InitAnimType's bg1-gfx path sets $2105 |= $50 -- battlefield BG3 to
--- 16x16 -- which against the Cirpius pool (hud rows 5-6) puts painted hud
--- cells inside the 16x16 window.  Phased edge driver: 3 on / 3 off.
+-- InitAnimType's bg1-gfx path sets $2105 |= $50, putting battlefield BG3
+-- into 16x16, which against the Cirpius pool (hud rows 5-6) puts painted
+-- hud cells inside the 16x16 window.  Phased edge driver: 3 on / 3 off.
 local ST_SPELL = 0x0e
 local function bcmd(slot, i) return H.readByte(CMDTBL + slot*12 + i*3) end
 local lastSt, lastActor, phase = -1, -1, 0
@@ -201,7 +201,7 @@ local function driveMenus()
     if st == ST_SPELL then return {"a"} end          -- Fire is first
     if st == ST_TGT then return {"a"} end
     -- command menu: walk to the Magic row ($02), then A.  the cursor
-    -- SKIPS blank ($ff) rows, so count the non-blank rows above it.
+    -- skips blank ($ff) rows, so count the non-blank rows above it.
     local downs = nil
     local seen = 0
     for i = 0, 3 do

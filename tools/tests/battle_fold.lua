@@ -1,32 +1,32 @@
 -- @suite savestate=worldmap_narshe
--- battle_fold: boost folds tiered spells — Terra casting with pending BP
+-- battle_fold: boost folds tiered spells.  Terra casting with pending BP
 -- executes the spell a tier up (queued as the -ra/-ga id in CreateAction,
--- so name, animation, and power are the higher tier's own), is CHARGED
--- THAT TIER'S OWN MP (issue #64), and tier-family spells never take the
+-- so name, animation, and power are the higher tier's own), is charged
+-- that tier's own MP (issue #64), and tier-family spells never take the
 -- generic damage multiplier.
 --
 -- Issue #75 conversion.  The old apparatus lived on battle_entry,
--- where TERRA has no Magic command: it rewrote her $202E rows, cleared
--- her magitek bit, MUDDLED her to force menu-less casts, pinned guards
--- at 3000 HP / stopped them, handed her bp:=3/pending:=2, and pumped her
+-- where Terra has no Magic command: it rewrote her $202E rows, cleared
+-- her magitek bit, muddled her to force menu-less casts, pinned guards
+-- at 3000 HP and stopped them, handed her bp:=3/pending:=2, and pumped her
 -- pool to 300 so a folded tier-3 could be observed at all.  On
--- worldmap_narshe she really owns Magic (row 2) with Fire ($00, 4 MP)
--- and Cure ($2D, 5 MP), so the cast goes through the LIVE MENU and every
+-- worldmap_narshe she owns Magic (row 2) with Fire ($00, 4 MP)
+-- and Cure ($2D, 5 MP), so the cast goes through the live menu and every
 -- write drops out.  The wallet is real too, and that moves the tier under
 -- observation: her measured pool is 29 MP, which pays Fire 2's 20 once
--- and can never pay Fire 3's 51 -- so the fold this test watches is the
--- one a player at this point in the game can actually buy: pending 1,
+-- and can never pay Fire 3's 51, so the fold this test watches is the
+-- one a player at this point in the game can buy: pending 1,
 -- Fire -> Fire 2 ($00 -> $05, Ot6FoldTbl row 0), priced at Fire 2's own
--- 20.  "She can afford it once and not twice" is asserted against the
--- real pool; the tier-3 grey/refusal on this same wallet is
--- battle_preview's arm.  The boost is the OPENING bp (Ot6InitBP gives 1;
+-- 20.  That she can afford it once and not twice is asserted against the
+-- real pool; the tier-3 greying and refusal on this same wallet is
+-- battle_preview's subject.  The boost is the opening bp (Ot6InitBP gives 1;
 -- pending caps at bp), so no banking turns are needed: one real R edge
 -- at her window arms the fold.
 --
---   asserts: $3410 sees the folded tier id at execution, the TIER's own
+--   asserts: $3410 sees the folded tier id at execution, the tier's own
 --   mp cost is both queued ($3620 page, Ot6QueueFold -> Ot6SpellMP) and
---   spent (pool delta == 20, exact -- no muddle noise anymore), the
---   damage lands in tier-2-potency-without-multiplier bounds, the boost
+--   spent (pool delta == 20 exactly, since there is no muddle noise now),
+--   the damage lands in tier-2-potency-without-multiplier bounds, the boost
 --   is consumed with regen skipped, and the leftover pool cannot pay the
 --   tier again.
 local H = dofile("tools/tests/lib/ot6.lua")
@@ -67,14 +67,14 @@ end
 
 local terra, mp0, mhp0
 local spells, queued = {}, {}
--- the computed per-target damage, from $33D0,y -- the pre-HP-clamp
+-- the computed per-target damage, from $33D0,y, the pre-HP-clamp
 -- "damage taken" cell ApplyDmg caps at 9999 (battle_main.asm:1965-1975).
 -- The grass trash opens at ~33 total HP (measured), so an HP-drop bound
--- SATURATES on a kill; the numeral cell does not.  Monsters are entities
+-- saturates on a kill; the numeral cell does not.  Monsters are entities
 -- 4..9 -> $33D8 + slot*2; $FFFF = no damage, $4000 = the miss flag.
 -- The cell is written and consumed within a frame (measured: a per-frame
--- poll saw nothing while 33 hp of damage demonstrably landed), so this is
--- a WRITE WATCH; the 16-bit sta arrives as lo,hi byte pairs.
+-- poll saw nothing while 33 hp of damage landed), so this is a write watch;
+-- the 16-bit sta arrives as lo,hi byte pairs.
 local maxDmg, dmgSeen, lastLo = 0, {}, {}
 local function armDamageWatch()
   emu.addMemoryCallback(function(addr, value)
@@ -176,7 +176,7 @@ H.run({ maxFrames = 45000 }, {
     mhp0 = monsterHp()
     H.log(string.format("terra slot %d: bp=%d mp=%d, monsters open at %d hp",
       terra, bp(terra), mp0, mhp0))
-    -- the wallet facts every price assert below leans on: she can pay the
+    -- the wallet facts every price assert below depends on: she can pay the
     -- one-tier fold, and could never pay the two-tier one
     H.assertEq(bp(terra), 1, "she opens with the 1 bp Ot6InitBP grants")
     H.assertEq(mp0 >= FIRE2_MP, true, "the real pool pays Fire 2 once...")
@@ -208,8 +208,8 @@ H.run({ maxFrames = 45000 }, {
     local fold2 = false
     for _, v in ipairs(spells) do if v == FIRE2 then fold2 = true end end
     H.assertEq(fold2, true, "the base Fire folded to its next tier ($05)")
-    -- THE PROPERTY UNDER TEST (#64): the folded tier's own MP is charged.
-    -- (a) THE MECHANISM, exactly.  Ot6QueueFold re-prices $3620,y off
+    -- the property under test (#64): the folded tier's own MP is charged.
+    -- (a) the mechanism.  Ot6QueueFold re-prices $3620,y off
     --     MagicProp after the fold rewrites $3a7b, so a 20 in this strip is
     --     unambiguous: base Fire is 4, Cure is 5, and nothing else this
     --     party can queue costs 20.
@@ -219,9 +219,9 @@ H.run({ maxFrames = 45000 }, {
     H.assertEq(sawQueuedCost(FIRE2_MP), true,
       "Fire 2 was QUEUED at its own 20 MP -- boost buys the tempo, not the "
       .. "magnitude (#64)")
-    -- (b) THE EFFECT.  The pool really moved by exactly that much: with the
+    -- (b) the effect.  The pool moved by exactly that much: with the
     --     muddle apparatus gone there is no trailing-cast noise, so the old
-    --     >= bound sharpens to equality.
+    --     >= bound becomes an equality.
     local mp1 = mp(terra)
     H.log(string.format("mp %d -> %d = %d spent", mp0, mp1, mp0 - mp1))
     H.assertEq(mp0 - mp1, FIRE2_MP,
@@ -229,12 +229,13 @@ H.run({ maxFrames = 45000 }, {
     H.assertEq(mp1 < FIRE2_MP, true,
       "the real wallet after one fold cannot buy a second (#64's economy)")
     -- potency: the fold executed the tier's own record against the
-    -- monsters.  The COMPUTED damage (numeral cell $33D0,y, pre-HP-clamp)
+    -- monsters.  The computed damage (numeral cell $33D0,y, pre-HP-clamp)
     -- is the check, because the trash's ~33 HP saturates any HP-drop
-    -- bound.  MEASURED 2026-08-10: the folded Fire 2 computes 234 here.
+    -- bound.  Measured 2026-08-10: the folded Fire 2 computes 234 here.
     -- Base Fire (power 21 vs Fire 2's 60) would land near 234*21/60 ~ 82,
-    -- so the floor is 150 -- above any base-fire roll, half the tier-2
-    -- measurement.  A x4 double-dip would compute ~936, over the 700 cap.
+    -- so the floor is 150, which is above any base-fire roll and half the
+    -- tier-2 measurement.  A x4 double-dip would compute ~936, over the 700
+    -- cap.
     local dv = {}
     for _, v in ipairs(dmgSeen) do dv[#dv + 1] = tostring(v) end
     H.log(string.format("monsters %d -> %d hp; computed damage seen: %s",

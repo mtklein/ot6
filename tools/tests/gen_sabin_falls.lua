@@ -1,44 +1,46 @@
 -- gen_sabin_falls.lua -- step 9 of SABIN's scenario: Baren Falls.  Generates:
 --   falls_done.mss   map 159 (the Veldt shore), SABIN+CYAN, $003C/$003F set
---                    -- SHADOW left at the overlook, GAU named but NOT
---                    joined (he grabs nothing and runs; recruitment is the
+--                    SHADOW left at the overlook, GAU named but not
+--                    joined (he takes nothing and runs; recruitment is the
 --                    next step's Veldt work).
 --
--- THE ROUTE (entrances decoded from trigger/*.dat; events read at the
+-- The route (entrances decoded from trigger/*.dat; events read at the
 -- cited lines):
---   world (178,93) -- train_done's landing -- walk E to (185,93)
+--   world (178,93), train_done's landing, walk east to (185,93)
 --     -> map 166 (9,13)                       [world short-entrance]
 --   166 (7,4)  -> map 155 (11,11)             [long entrance, len 1]
 --   155 (10,4) -> map 156 (15,20)             [short entrance; (10,5) is a
 --                                              sound trigger, harmless]
 --   156: walking UP crosses the y=12 row -> _cbbef1/_cbbfa5
 --     (event_main.asm:66235/66317): "This must be Baren Falls", $003C=1,
---     and SHADOW LEAVES ("I have served my purpose…", char_party SHADOW,0,
---     $02F3=0) -- the party is SABIN+CYAN from here.
+--     and SHADOW leaves ("I have served my purpose…", char_party SHADOW,0,
+--     $02F3=0), so the party is SABIN+CYAN from here.
 --   156 y=10 row, facing up -> _cbc03f (:66422): "Jump?"; option 0
---     (_cbc058) rides the fall.  The $01B5 once-latch is per-standing --
---     player.asm:529 clears it every step -- so no stale-state hazard.
+--     (_cbc058) rides the fall.  The $01B5 once-latch applies per standing
+--     position, because player.asm:529 clears it every step, so there is no
+--     stale-state hazard.
 --   battle 18 fires mid-fall (:66479) and its tail is _ca5ea9's win-bit
---     check, so the fight MUST be won -- and since issue #75 it is won by
---     PLAY: zero state writes in this generator.  SABIN + CYAN run the
+--     check, so the fight has to be won, and since issue #75 it is won by
+--     play, with no state writes in this generator.  SABIN + CYAN run the
 --     house menu-episode machine (bank boost to 2, dump it on Fight; one
 --     button per 30-frame pulse from a settled menu), the piranhas die to
 --     boosted Fights, their death script surfaces RIZOPAS, and the same
 --     Fights finish it on real HP.  A loss (90 straight frames of both
---     party slots at 0 -- battle 18's loss is a GameOver) sets `lost` and
+--     party slots at 0; battle 18's loss is a game over) sets `lost` and
 --     a three-attempt retry ladder reloads a checkpoint taken before the
 --     jump with a 17-frame stagger and the fighter escalated (tier 2+
---     dumps at 1 BP).  Random encounters elsewhere on the route are FLED
---     (hold L+R / playBattles="flee") -- no win needed, no writes.
---     RIZOPAS ($0155) HIDES
---     IN SLOT 5 behind two visible Piranhas and is surfaced by the
---     piranhas' own death script, so the watch below KEYS ON THE
---     SURFACING (slot-5 present bit), never on battle-up formation words.
+--     dumps at 1 BP).  Random encounters elsewhere on the route are fled
+--     (hold L+R / playBattles="flee"), so no win is needed and no writes
+--     occur.
+--     RIZOPAS ($0155) is hidden
+--     in slot 5 behind two visible Piranhas and is surfaced by the
+--     piranhas' own death script, so the watch below keys on the
+--     surfacing (slot-5 present bit) rather than on battle-up formation words.
 --     Its authored row (Ot6ShieldTbl: 5 shields, SLASH|BLUDG) is read the
 --     frame it surfaces.
 --   Then the shore: load 159 {15,0}, the wash-ashore cinematic, GAU's
---     intro (dlg $02E6), `name_menu GAU` -- driven by the menu module's own
---     state ($0026/$0027 == $5F -> press START, gen_sabin_camp's idiom) --
+--     intro (dlg $02E6), `name_menu GAU` (driven by the menu module's own
+--     state: $0026/$0027 == $5F -> press START, gen_sabin_camp's idiom),
 --     "And you are?", GAU runs off, $003F=1, control returns.
 local H = dofile("tools/tests/lib/ot6.lua")
 local DOOR = "build/states/train_done.mss.lua"

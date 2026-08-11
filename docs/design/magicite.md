@@ -1,9 +1,9 @@
 # Magicite as sub-jobs
 
 Scope: World of Balance espers. Locked ✦. Pillar (DESIGN.md ✦):
-equipping a magicite grants its kit *while equipped* — spells are
+equipping a magicite grants its kit *while equipped*. Spells are
 never taught permanently, level-up stat bonuses are deleted, one
-copy of each exists, summon = once per battle as the sub-job's
+copy of each exists, and summon = once per battle as the sub-job's
 divine. One proposed later exception below is that **passives may be
 learned**; that system is not implemented, and the while-equipped
 spell/stat model is canon.
@@ -13,40 +13,42 @@ spell/stat model is canon.
 Five slots, all data-table work (menu plumbing lands M5):
 
 1. **Spells** — 2–3 *base-tier* spells (boost folds the tiers, so a
-   Ramuh bearer with 2 BP already casts Bolt 3). While-equipped only,
-   always.
+   Ramuh bearer with 2 BP already casts Bolt 3). They are available
+   only while the magicite is equipped.
 2. **Stat passive** — a fixed, constant stat bump (+magic, +speed…)
-   that behaves exactly like the passive below: active while
-   equipped, and learnable ✦. The *only* stat growth magicite
-   grants — vanilla's per-level bonuses stay deleted, and there is
-   no while-equipped-only stat mod either. Octopath's Support-Skill
-   shape: chunky but non-compounding. OT sizes these ~+50 on a
-   999-scale stat; translate to FF6's stat ranges at tuning —
-   roster magnitudes below are placeholders.
+   that behaves like the passive below: active while
+   equipped, and learnable ✦. This is the only stat growth a
+   magicite grants. Vanilla's per-level bonuses stay deleted, and
+   there is no while-equipped-only stat mod either. It follows
+   Octopath's Support-Skill shape: a large bump that does not
+   compound. Octopath sizes these at about +50 on a 999-scale stat;
+   translate to FF6's stat ranges at tuning, so the roster
+   magnitudes below are placeholders.
 3. **Passive** — active while equipped, and **teachable ✦**: carry
-   the esper long enough and its passives are learned — they join
+   the esper long enough and its passives are learned. They join
    the character's permanent passive pool and can be slotted even
    with a different esper equipped. This is Octopath's job+subjob
-   passive mix-and-match, gestured at through espers: your build is
-   your history of who you've carried.
+   passive mix-and-match expressed through espers, so a character's
+   passive pool records which espers they have carried.
    - **Learning meter**: a fixed count of *battles fought while
-     equipped* (a deed, like dances and lores — not levels). Trash
-     espers ~15 battles, marquee ones ~25. Stored per character?
-     **No — per esper, party-wide ✦-leaning**: one copy of each
-     esper exists, so "who carried it" barely matters and party-wide
-     keeps the save format trivial.
+     equipped*, which makes it a deed like dances and lores rather
+     than a level. Minor espers ~15 battles, major ones ~25. The
+     count is stored **per esper, party-wide ✦-leaning**, not per
+     character: one copy of each esper exists, so which character
+     carried it barely matters, and party-wide storage keeps the
+     save format simple.
    - Passive slots per character stay capped (up to 4, DESIGN.md),
-     so learning more passives deepens *choice*, not power — and
-     stat passives compete for those same slots, which is the
-     non-compounding backstop.
+     so learning more passives widens the player's choice without
+     raising total power. Stat passives compete for those same
+     slots, which is what stops the bonuses compounding.
 4. **Weapon permit** — at most one extra weapon class in the equip
    menu (see weapon-classes.md; battle code never checks it). Kept
-   deliberately spare ✦ — a development knob, not a pillar.
+   spare ✦: it is a development knob rather than a pillar.
 5. **Summon** — the divine, once per battle ✦.
 
-Sub-job fantasy check: a magicite should read as a *job*, not a
-spell bag — its spells, passives, and permit should rhyme, and the
-passives are the part of the job you keep.
+Sub-job check: a magicite should read as a *job* rather than a bag
+of spells. Its spells, passives, and permit should fit one theme,
+and the passives are the part of that job the character keeps.
 
 ## The WoB roster
 
@@ -76,39 +78,39 @@ describes the *proposed* system, not the shipped one.
 The tube room grants Unicorn, Maduin, Shoat, Phantom, Carbunkl and Bismark
 together, in one scene; see `magicite-tube-six.md`.
 
-- The **kit-forming question** per character: which esper completes
-  them? (Celes+Carbunkl = the rune fortress; Locke+Stray = the
+- The **kit-forming question** per character is which esper completes
+  them (Celes+Carbunkl = the rune fortress; Locke+Stray = the
   ghost thief; Edgar+Golem = the siege engine; Sabin+Ifrit = the
-  fire fist.) The one-copy rule ✦ makes those choices exclusive —
-  that's the party puzzle.
-- Espers granting *permits* stay rare (3 in WoB) so multi-weapon
-  characters feel like builds, not defaults.
-- Summon-as-divine cadence ✦: the summon replaces the character's own
-  divine for the battle? **No** — both exist, but both share the
-  "once per battle, apex moment" register. Playtest for redundancy
-  in M6.
+  fire fist). The one-copy rule ✦ makes those choices exclusive, so
+  the party has to divide the espers between characters.
+- Espers granting *permits* stay rare (3 in WoB) so that a
+  multi-weapon character reads as a deliberate build.
+- Summon-as-divine cadence ✦: the summon does not replace the
+  character's own divine for the battle. Both exist, and both are
+  once-per-battle abilities used at the same point in a fight.
+  Playtest for redundancy in M6.
 
 ## Learning summary
 
 Spells, permits, summons: while-equipped, never learned ✦.
-Passives, the stat bump included: learned by battles-carried
-(above) — the one form of esper permanence, replacing vanilla's
-stat-bonus grind with build collection. Character passives
-(kits.md) and esper passives share the same slots; the M6 pass
-watches for degenerate pairs (Facet + Rune Eater = 3 BP per Runic
-— probably fine, Runic still eats the turn).
+Passives, including the stat bump: learned by battles-carried
+(above). That is the one form of esper permanence, and it replaces
+vanilla's stat-bonus grind with collecting passives. Character
+passives (kits.md) and esper passives share the same slots; the M6
+pass checks for degenerate pairs (Facet + Rune Eater = 3 BP per
+Runic, probably fine because Runic still eats the turn).
 
 ## Open questions for the driver
 
 1. Battle-count tuning: is ~15/~25 right, and should the count show
-   on the esper screen as a little meter (recommended: yes, meters
-   are the fun part)?
+   on the esper screen as a meter (recommended: yes, so the player
+   can see the progress)?
 2. Water has no base spell in vanilla's list (it's lore/esper
    territory). Bismark either grants the only Water spell in the
-   game (special!) or a Slow/Haste utility pair instead. Which?
-3. Maduin's *Trinity* (first cast +1 tier free) — too strong a
-   folding interaction, or exactly the flavor of "Terra's blood"?
-4. The stat ruling gives every esper *two* passives riding one
-   learning meter, which was tuned for a single payoff. Land
-   together at the threshold, or staggered — the stat bump early
-   (~10 battles) as a drip, the named passive at the full count?
+   game or a Slow/Haste utility pair instead. Which?
+3. Maduin's *Trinity* (first cast +1 tier free): too strong a
+   folding interaction, or the right flavor for "Terra's blood"?
+4. The stat ruling gives every esper *two* passives on one
+   learning meter, which was tuned for a single payoff. Should they
+   land together at the threshold, or staggered, with the stat bump
+   early (~10 battles) and the named passive at the full count?

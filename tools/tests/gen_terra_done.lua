@@ -1,60 +1,60 @@
 -- gen_terra_done.lua -- from terra_clifftop.mss: the last short walk of the
--- TERRA/BANON scenario -- across the ledge into ARVIS'S HOUSE, onto the
+-- TERRA/BANON scenario, across the ledge into Arvis's house, onto the
 -- meeting trigger, and out the far side of the scenario.
 -- Generates one state:
 --   terra_done.mss  map 9 (8,3), SCENARIO_MOG alone, controllable, with
---                   $0021 SET and the BANON/TERRA/EDGAR hub NPCs gone -- the
---                   TERRA/BANON scenario complete and the hub back on two
---                   choices.  The same beat gen_scenario generates
---                   scenario_hub at, so the two states are directly
---                   comparable.
+--                   $0021 set and the BANON/TERRA/EDGAR hub NPCs gone, so
+--                   the TERRA/BANON scenario is complete and the hub is back
+--                   on two choices.  This is the same beat gen_scenario
+--                   generates scenario_hub at, so the two states are
+--                   directly comparable.
 --
--- TWO HOPS.
+-- Two hops.
 --
--- 1. THE CLIFFTOP -> ARVIS'S HOUSE.  The party is on map 20 (27,8), the ledge
---    the caves come out on, which is the SAME ledge Terra escaped onto in the
+-- 1. The clifftop -> Arvis's house.  The party is on map 20 (27,8), the ledge
+--    the caves come out on, which is the same ledge Terra escaped onto in the
 --    intro (gen_mines_chase walks it west, narshe_streets sits on it).  Its
 --    door into Arvis's back corridor is (53,9) -> map 30 (67,28)
---    (ShortEntrance::_20, DestX read as SEVEN bits -- see gen_terra_clifftop
---    for why $3F is wrong on this 128-wide map).  ARRIVAL IS BRACKETED: map
---    30 (67,26) is the reciprocal door straight back to the ledge, two tiles
---    north of the (67,28) we land on, so the hop to the meeting is planned
---    clear of it.
+--    (ShortEntrance::_20, DestX read as seven bits; see gen_terra_clifftop
+--    for why $3F is wrong on this 128-wide map).  The arrival is bracketed:
+--    map 30 (67,26) is the reciprocal door straight back to the ledge, two
+--    tiles north of the (67,28) the party lands on, so the hop to the meeting
+--    is planned clear of it.
 --
--- 2. ARVIS'S HOUSE -> _ccb3fa AT (66,35), AND THE SCENARIO ENDS.
+-- 2. Arvis's house -> _ccb3fa at (66,35), and the scenario ends.
 --    EventTrigger::_30 puts _ccb3fa on {66,35} (event_trigger.asm:163); it
 --    needs $00A4=0, $0019=1 and $0021=0 (event_main.asm:104805-104809), plays
 --    the Arvis meeting (dlg $01A5..$01A9), and ends `switch $0021=1 / switch
 --    $032B=0 / switch $032C=0 / switch $032D=0 / call _caad4c`
---    (:104954-104959).  That `switch $0021=1` is the ONLY assignment to the
+--    (:104954-104959).  That `switch $0021=1` is the only assignment to the
 --    scenario-complete flag in the whole event bank (every other $0021 line
---    is an if_any condition), so this trigger is not a way to finish the
---    scenario -- it is the way.
+--    is an if_any condition), so this trigger is the only way to finish the
+--    scenario.
 --
--- WHERE IT LANDS.  _caad4c (:26626) tears the party down to SCENARIO_MOG and
--- reloads map 9; with $0021 set (and NOT all three scenario flags set -- the
+-- Where it lands.  _caad4c (:26626) reduces the party to SCENARIO_MOG and
+-- reloads map 9; with $0021 set and not all three scenario flags set (the
 -- `if_all` at :26654 to the reunion _caadb9 only opens on $0021 && $001E &&
 -- $0044) it takes the `if_any` at :26665 to _caadb4 and plays dlg $0B8C,
 -- "Choose a scenario… kupo!", skipping the first-visit recap $016F.  The
 -- state is generated on the first controllable frame after that.
 --
--- STACK-CLEAN: this generator also runs under OT6_STACK (booted from a
+-- Stack-clean: this generator also runs under OT6_STACK (booted from a
 -- t2_terra_clifftop that descends from locke_done, $001E=1), so every claim
--- about the OTHER scenarios' flags is asserted as UNCHANGED-SINCE-BOOT, not
--- as zero -- "this route never touches Locke's or Sabin's state" is the
--- real invariant, and it is the same assertion in both runs.
+-- about the other scenarios' flags is asserted as unchanged since boot rather
+-- than as zero.  The invariant is that this route never touches Locke's or
+-- Sabin's state, and it is the same assertion in both runs.
 --
--- THE ALL-THREE BOOT (the t3_ stack, once Sabin's chain lands): with
+-- The all-three boot (the t3_ stack, once Sabin's chain lands): with
 -- $001E and $0044 both carried in, _ccb3fa's `switch $0021=1 / call
--- _caad4c` opens the if_all at :26654 and the hub return IS THE REUNION
+-- _caad4c` opens the if_all at :26654 and the hub return is the reunion
 -- (_caadb9 -> "The three have reached Narshe" -> _ccb4da, ~10,400 frames
--- of pure cutscene measured on the poked twin, probe_narshe_spike).  On
--- that boot this file takes its REUNION FORK below: instead of the hub
--- gate it rides the cutscene to the map-22 staging -- party at (20,9),
--- $0045 set, first controllable frame -- and generates reunion_ready.mss,
--- the state gen_narshe_battle boots.  The fork is written from the
--- measured spike ride; it has not yet had a live all-three run (that
--- needs Sabin's ending), which is exactly the run that will prove it.
+-- of cutscene with no input, measured on the poked twin,
+-- probe_narshe_spike).  On that boot this file takes its reunion fork below:
+-- instead of the hub gate it rides the cutscene to the map-22 staging, with
+-- the party at (20,9), $0045 set, on the first controllable frame, and
+-- generates reunion_ready.mss, the state gen_narshe_battle boots.  The fork
+-- is written from the measured spike ride; it has not yet had a live
+-- all-three run, which needs Sabin's ending.
 local H = dofile("tools/tests/lib/ot6.lua")
 local CLIFF = "build/states/terra_clifftop.mss.lua"
 
@@ -109,9 +109,9 @@ local function where(tag)
     sw(0x00A4)))
 end
 
--- the other scenarios' completion flags and hub NPCs, sampled at boot:
--- asserted UNCHANGED at the finish (see STACK-CLEAN above).  When BOTH
--- other completions ride in, the finish is the REUNION FORK instead.
+-- the other scenarios' completion flags and hub NPCs, sampled at boot and
+-- asserted unchanged at the finish (see the stack-clean note above).  When
+-- both other completions are carried in, the finish is the reunion fork.
 local boot = {}
 local function reunionBoot()
   return boot[0x001E] == 1 and boot[0x0044] == 1
@@ -143,15 +143,15 @@ H.run({ maxFrames = 60000 }, {
   end),
 
   -- ===================================================================== --
-  -- 1. INTO ARVIS'S HOUSE.  (53,9) IS ITSELF the door tile (its neighbours
+  -- 1. Into Arvis's house.  (53,9) is itself the door tile: its neighbours
   --    below are solid ledge, so there is no entry point to stop one short
-  --    on -- a first cut aimed at (53,10) and BFS answered "no path").  So
-  --    navTo walks onto (53,9) directly and terminates on the map change it
-  --    fires.
+  --    on, and a first version aimed at (53,10) and BFS answered "no path".
+  --    So navTo walks onto (53,9) directly and terminates on the map change
+  --    it fires.
   -- ===================================================================== --
-  -- issue #75: playBattles=true on every navigator and story ride -- this
-  -- step's maps draw no encounters, so nothing changes on the happy path,
-  -- but a battle that ever did fire would be fought by real input, never
+  -- issue #75: playBattles=true on every navigator and story ride.  This
+  -- step's maps draw no encounters, so nothing changes on the expected path,
+  -- but a battle that did fire would be fought by real input rather than
   -- write-cleared.
   H.navTo(53, 9, { maxFrames = 20000, playBattles = true,
     arrive = function() return map() ~= 20 end }),
@@ -168,7 +168,7 @@ H.run({ maxFrames = 60000 }, {
   end),
 
   -- ===================================================================== --
-  -- 2. ONTO _ccb3fa AT (66,35), AND THE SCENARIO ENDS.  Arrival is bracketed
+  -- 2. Onto _ccb3fa at (66,35), and the scenario ends.  Arrival is bracketed
   --    by the reciprocal door back to the ledge at (67,26), planned clear.
   -- ===================================================================== --
   planAvoids(66, 35, { { 67, 26 } }, "Arvis's house: (67,28) -> (66,35)"),
@@ -180,7 +180,7 @@ H.run({ maxFrames = 60000 }, {
 
   H.cond(reunionBoot, {
     -- ------------------------------------------------------------------ --
-    -- THE REUNION FORK (all-three boot): _caad4c's if_all fires _caadb9 ->
+    -- The reunion fork (all-three boot): _caad4c's if_all fires _caadb9 ->
     -- _ccb4da, ~10,400 frames of dialog-tap cutscene ending on the map-22
     -- staging (measured on the poked twin, probe_narshe_spike).  Generate
     -- reunion_ready.mss at the first controllable frame.
@@ -206,7 +206,7 @@ H.run({ maxFrames = 60000 }, {
     end),
   }, {
     -- ------------------------------------------------------------------ --
-    -- THE HUB RETURN (one or two completions): "Choose a scenario…kupo!"
+    -- The hub return (one or two completions): "Choose a scenario…kupo!"
     -- ------------------------------------------------------------------ --
     H.advanceStory(function()
       return sw(0x0021) == 1 and settleHub()

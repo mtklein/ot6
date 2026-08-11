@@ -1,87 +1,87 @@
 -- @suite slow
--- battle_dotchip.lua -- #60: A POISON DOT TICK CHIPS A SHIELD.  Pinned on
+-- battle_dotchip.lua -- #60: a poison DOT tick chips a shield.  Pinned on
 -- purpose.
 --
 --   tools/tests/run.sh tools/tests/battle_dotchip.lua
 --
--- Nobody designed this.  The owner found it in play at Zozo --
--- Bio Blaster's poison damage plus its status ticks breaking a
--- 2-shield poison-weak enemy between them -- called it a "neat
+-- Nobody designed this.  The owner found it in play at Zozo, where
+-- Bio Blaster's poison damage plus its status ticks broke a
+-- 2-shield poison-weak enemy between them, called it a "neat
 -- interaction", and #60 established it is real: the poison status tick
 -- routes through the ordinary damage path carrying element $08, so it
 -- reaches the weak branch and chips like any other poison hit.  This test
--- exists so a future refactor of the chip path FAILS LOUDLY instead of
--- silently deleting a behaviour the owner likes.  It is the Vargas-tutorial
--- pattern (bosses-wob.md): charm with no mechanical excuse gets pinned
--- deliberately.
+-- exists so a future refactor of the chip path fails rather than
+-- silently deleting a behaviour the owner likes.  It follows the
+-- Vargas-tutorial pattern (bosses-wob.md): behaviour kept for its own sake
+-- gets pinned explicitly.
 --
--- THE MECHANISM, so a reader knows what is being defended:
---   Cmd_22, the DOT command, stores the poison element itself --
+-- The mechanism, so a reader knows what is being defended:
+--   Cmd_22, the DOT command, stores the poison element itself with
 --   `lda #$08 / sta $11a1` (battle_main.asm:13390-13393, reached only on
---   the poison branch of $b6) -- then tail-jumps ExecSelfAttack (:13429).
+--   the poison branch of $b6), then tail-jumps ExecSelfAttack (:13429).
 --   That runs CalcTargetDmg, whose weak-element branch is
 --   `lda $3be0,y / bit $11a1 / beq @0c1e / jsl Ot6Chip`
 --   (battle_main.asm:1891-1893).  Nothing about the tick is special-cased;
 --   it is a poison hit that happens to have no attacker.
---   The class axis is NOT reached: OT6_ATKCLASS is 0 for the DOT record
---   (the LoadMagicProp path), so Ot6ClassChip bails at
---   its `beq done` -- a tick chips exactly one axis.
+--   The class axis is not reached: OT6_ATKCLASS is 0 for the DOT record
+--   (the LoadMagicProp path), so Ot6ClassChip returns at
+--   its `beq done`, and a tick chips exactly one axis.
 --
--- SAP DOES NOT CHIP, and that is asserted too, because it is the half that
--- proves the element gate is doing the work: the seize/phantasm branch of
+-- Sap does not chip, and that is asserted too, because it is the half that
+-- shows the element gate is doing the work: the seize/phantasm branch of
 -- Cmd_22 never reaches the element store, so its tick lands damage with
 -- $11a1 = 0.  If someone "fixes" DOT chipping by chipping on any DOT, this
--- half goes red.
+-- half fails.
 --
--- LABORATORY (battle_break's guards, battle_hits's berserk driver so
+-- Laboratory (battle_break's guards, battle_hits's berserk driver so
 -- battle time keeps running with no menu holding wait-mode ATB):
---   guard A, entity $0c: weak = POISON ONLY, class-weak 0, absorb/null/
---     resist cleared, 2 shields, POISON status set
---   guard B, entity $0e: weak = FIRE only, class-weak 0, 2 shields, POISON
---     status set -- the NEGATIVE CONTROL.  It takes the same ticks, and it
---     must never lose a shield.
---   party: Fight-only command lists + berserk, magitek status cleared (so
---     berserk cannot roll Bio Blast, which IS poison and would forge the
---     whole result), weapon elements zeroed.  With class-weak 0 on both
---     guards and no weapon element, no party swing can chip either guard:
---     every shield transition here is a DOT tick or a bug.
+--   guard A, entity $0c: weak = poison only, class-weak 0, absorb, null and
+--     resist cleared, 2 shields, poison status set
+--   guard B, entity $0e: weak = fire only, class-weak 0, 2 shields, poison
+--     status set.  This is the negative control: it takes the same ticks, and
+--     it must never lose a shield.
+--   party: Fight-only command lists plus berserk, magitek status cleared (so
+--     berserk cannot roll Bio Blast, which is poison and would produce the
+--     result by another route), weapon elements zeroed.  With class-weak 0 on
+--     both guards and no weapon element, no party swing can chip either guard,
+--     so every shield transition here is a DOT tick or a bug.
 --
--- ATTRIBUTION: Cmd_22 tail-jumps its damage resolution, so a tick's chip
--- lands on the SAME emulated frame as the Cmd_22 exec callback.  Every
--- recorded chip must satisfy BOTH that and the DOT record's own signature
--- ($11a2 = $68, $11a6 = 2 -- Cmd_22's literal stores), which no ordinary
+-- Attribution: Cmd_22 tail-jumps its damage resolution, so a tick's chip
+-- lands on the same emulated frame as the Cmd_22 exec callback.  Every
+-- recorded chip must satisfy both that and the DOT record's own signature
+-- ($11a2 = $68, $11a6 = 2, Cmd_22's literal stores), which no ordinary
 -- action carries.  (Bracketing this with a bare exec callback on ExecCmd is
--- what an earlier version did, and it never fired: that name is defined
--- twice in ff6-en.dbg.  H.sym used to return the wrong module's address in
--- silence; it now refuses a duplicated name and tells you to write
+-- what an earlier version did, and it never fired, because that name is
+-- defined twice in ff6-en.dbg.  H.sym used to return the wrong module's
+-- address without saying so; it now refuses a duplicated name and asks for
 -- H.sym("ExecCmd@battle_code").  probe_dottick.lua's header has the
--- forensics.)
+-- details.)
 --
 -- Asserts:
 --   1. seed: A poison-weak only, class-weak 0, 2/2 shields, poison set
---   2. ticks actually arrive -- >= 2 on A and >= 1 on B (non-vacuity for
---      everything below, including the negative control)
---   3. every Ot6Chip seen is a DOT tick on A: same-frame as a Cmd_22,
+--   2. ticks arrive: >= 2 on A and >= 1 on B, which keeps everything below,
+--      including the negative control, from passing on an empty run
+--   3. every Ot6Chip seen is a DOT tick on A: same frame as a Cmd_22,
 --      elem & $08, flags2 $68, power 2, y = A.  No party chip anywhere.
---   4. A's shields walk 2 -> 1 -> 0, both writes inside a tick
---   5. the emptying tick BREAKS A (broken timer nonzero)
---   6. A learns poison ($3E89+A bit $08) -- a tick teaches, not just chips
+--   4. A's shields walk 2 -> 1 -> 0, with both writes inside a tick
+--   5. the emptying tick breaks A (broken timer nonzero)
+--   6. A learns poison ($3E89+A bit $08), so a tick teaches as well as chips
 --   7. OT6_ATKCLASS is 0 in every DOT chip: one axis, never two
---   8. B keeps both shields, AND its ticks reached the damage join
---      (Ot6ClassChip entered on B's frames with elem $08) -- so the
---      negative is "the element did not match", not "no hit happened"
---   9. SAP/SEIZE: >= 2 ticks, zero Ot6Chip, zero shield writes, and
---      >= 2 Ot6ClassChip entries inside those ticks carrying elem 0 --
---      damage landed, no element, no chip
+--   8. B keeps both shields, and its ticks reached the damage join
+--      (Ot6ClassChip entered on B's frames with elem $08), so the
+--      negative is an unmatched element rather than a missing hit
+--   9. sap/seize: >= 2 ticks, no Ot6Chip, no shield writes, and
+--      >= 2 Ot6ClassChip entries inside those ticks carrying elem 0, so
+--      damage landed with no element and no chip
 --
--- Fail-before OBSERVED, not assumed: with `lda $11a2 / cmp #$68 / beq done`
--- spliced at the head of Ot6Chip (a three-line stand-in for "a refactor
--- stopped DOT ticks reaching the chip") the test exits 1 on
+-- Fail-before observed, not assumed: with `lda $11a2 / cmp #$68 / beq done`
+-- spliced at the head of Ot6Chip (a three-line stand-in for a refactor that
+-- stopped DOT ticks reaching the chip) the test exits 1 on
 --   assertEq failed: A's shields walked 2 -> 1 -> 0: got , want 1,0
 -- Splice reverted, ROM rebuilt, green after (frame 2856, 10.7 s).
--- Note what that fail-before also taught: the Ot6Chip exec callback still
+-- That fail-before also showed that the Ot6Chip exec callback still
 -- fired four times on the broken ROM, because a suppressed chip still
--- ENTERS the proc.  Counting entries is therefore not a check; the shield
+-- enters the proc.  Counting entries is therefore not a check; the shield
 -- byte moving is.  Hence the ordering and the `>= 2` at assertion 6.
 
 local H = dofile("tools/tests/lib/ot6.lua")
@@ -193,7 +193,7 @@ local function setupLab()
   keepAlive()
   H.writeByte(0x3BCC + A, 0x00)   -- absorbed elements
   H.writeByte(0x3BCD + A, 0x00)   -- nullified elements
-  H.writeByte(0x3BE0 + A, 0x08)   -- weak: poison ONLY
+  H.writeByte(0x3BE0 + A, 0x08)   -- weak: poison only
   H.writeByte(0x3BE1 + A, 0x00)   -- resisted elements
   H.writeByte(0x3E9C + A, 0x00)   -- class-weak: none
   H.writeByte(0x3E38 + A, 2)
@@ -203,7 +203,7 @@ local function setupLab()
   H.writeByte(0x3E9D + A, 0)
   H.writeByte(0x3BCC + B, 0x00)
   H.writeByte(0x3BCD + B, 0x00)
-  H.writeByte(0x3BE0 + B, 0x01)   -- weak: FIRE only -- the control
+  H.writeByte(0x3BE0 + B, 0x01)   -- weak: fire only, the control
   H.writeByte(0x3BE1 + B, 0x00)
   H.writeByte(0x3E9C + B, 0x00)
   H.writeByte(0x3E38 + B, 2)
@@ -231,7 +231,7 @@ local function repokePoison()
   keepAlive()
   H.writeByte(0x3EE4 + A, H.readByte(0x3EE4 + A) | POISON)
   H.writeByte(0x3EE4 + B, H.readByte(0x3EE4 + B) | POISON)
-  -- shields are NOT re-poked: their motion is the measurement
+  -- shields are not re-poked: their motion is the measurement
 end
 
 local broke = { seen = false, timer = 0 }
@@ -261,9 +261,9 @@ H.run({ maxFrames = 60000 }, {
 
   -- Drive until A has broken from ticks alone.  Measured: two ticks, ~1050
   -- frames apart per entity, so a healthy ROM leaves here around f2300.
-  -- The drive ALSO stops once four ticks have hit A without breaking it --
-  -- so a ROM where ticks no longer chip fails on the named assertion
-  -- ("two DOT chips landed on A") rather than on an anonymous drive
+  -- The drive also stops once four ticks have hit A without breaking it, so
+  -- a ROM where ticks no longer chip fails on the named assertion
+  -- ("two DOT chips landed on A") rather than on an unnamed drive
   -- timeout, which is what the fail-before run originally produced.
   H.driveUntil(function()
     watchBreak()
@@ -279,17 +279,17 @@ H.run({ maxFrames = 60000 }, {
       "B shields=%d", shieldA(), timerA(), revA(), shieldB()))
     H.screenshot("dotchip_poison")
 
-    -- 2. ticks actually arrived
+    -- 2. ticks arrived
     local nA, nB = countDots(A), countDots(B)
     H.log(string.format("poison ticks: A=%d B=%d", nA, nB))
     H.assertEq(nA >= 2, true, "at least two poison ticks landed on A")
     H.assertEq(nB >= 1, true, "at least one poison tick landed on B (control)")
 
-    -- 3. THE BEHAVIOUR ITSELF, asserted first so it owns the failure
+    -- 3. the behaviour itself, asserted first so it owns the failure
     -- message: A's shields walked down inside ticks, and nothing else's
-    -- moved.  (Assertion order matters here -- the fail-before run with
+    -- moved.  Assertion order matters here: the fail-before run with
     -- the chip suppressed reports "A's shields walked 2 -> 1 -> 0: got ,
-    -- want 1,0", which names the deleted behaviour.)
+    -- want 1,0", which names the deleted behaviour.
     local seq = {}
     for _, w in ipairs(shieldWrites) do
       H.assertEq(w.e, A, "only A's shield byte moved")
@@ -306,10 +306,10 @@ H.run({ maxFrames = 60000 }, {
     -- 5. the tick taught the weakness as well as chipping it
     H.assertEq(revA() & 0x08, 0x08, "A's poison weakness is revealed")
 
-    -- 6. and every chip that ran was a DOT tick on A -- so nothing the
+    -- 6. and every chip that ran was a DOT tick on A, so nothing the
     -- party did can be what moved those shields.  `>= 2` rather than `== 2`
-    -- on purpose: the count of Ot6Chip ENTRIES is an implementation detail
-    -- (a suppressed chip still enters), while their context is not.
+    -- on purpose: the count of Ot6Chip entries is an implementation detail,
+    -- since a suppressed chip still enters, while their context is not.
     H.assertEq(#chips >= 2, true, "at least two chips ran")
     for i, c in ipairs(chips) do
       H.assertEq(c.dot, true, "chip " .. i .. " ran inside a Cmd_22 tick")
@@ -321,7 +321,7 @@ H.run({ maxFrames = 60000 }, {
       H.assertEq(c.cls, 0x00, "chip " .. i .. " carried no attack class")
     end
 
-    -- 8. the control: B held both shields, but its ticks DID land
+    -- 8. the control: B held both shields, but its ticks did land
     H.assertEq(shieldB(), 2, "B (poisoned, not poison-weak) kept both shields")
     local bJoin = 0
     for _, c in ipairs(classChips) do
@@ -333,7 +333,7 @@ H.run({ maxFrames = 60000 }, {
       "is an unmatched weakness, not a missing hit)")
   end),
 
-  -- SAP/SEIZE: damage with no element must chip nothing
+  -- sap/seize: damage with no element must chip nothing
   H.call(function()
     dots, chips, classChips, shieldWrites = {}, {}, {}, {}
     for _, e in ipairs({ A, B }) do

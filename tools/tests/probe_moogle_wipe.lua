@@ -1,13 +1,13 @@
--- probe_moogle_wipe.lua -- what actually happens when a player LOSES a
+-- probe_moogle_wipe.lua -- what happens when a player loses a
 -- wave battle in the Moogle defense (issue #75, marshal-investigation).
 --
 -- The pilot's revert (7e596bd) reported a corpse-jam softlock: wiped
 -- party 1 blocking the corridor, guards jammed 38k frames.  The event
--- script says otherwise: the loss path _ccaaba revives all four slots at
--- 1 HP, clears status, and teleports the party to (14,11) -- and the
--- winning guard should then finish its march to (14,13) and exec
--- _cccb82 = the real GameOver.  One of those stories is wrong; this
--- probe measures which.  A real player's inputs only: nothing during the
+-- script disagrees: the loss path _ccaaba revives all four slots at
+-- 1 HP, clears status, and teleports the party to (14,11), after which the
+-- winning guard should finish its march to (14,13) and exec
+-- _cccb82, the real GameOver.  One of those accounts is wrong; this
+-- probe measures which.  Player inputs only: nothing during the
 -- battle (the party idles and wipes), A-taps on dialogs after.  Zero
 -- writes; the GameOver detector is an exec callback on the event
 -- routine's own address, read-only.
@@ -52,9 +52,9 @@ H.run({ maxFrames = 45000 }, {
     return battN >= 3
   end, 8000, { H.call(function() H.setPad({}) end) }, "wave 1 collision"),
   H.call(function() snap("battle up") end),
-  -- the player freezes: no input at all; the wave wipes the idle party.
-  -- Terminator = the battle module gone (a total wipe zeroes the HP table,
-  -- which battleLoadStarted reads as no-battle) AND the field back (map 51
+  -- the player gives no input at all; the wave wipes the idle party.
+  -- Terminator: the battle module gone (a total wipe zeroes the HP table,
+  -- which battleLoadStarted reads as no-battle) and the field back (map 51
   -- position reads sane again), debounced.
   H.driveUntil((function()
     local calm = 0
@@ -64,8 +64,8 @@ H.run({ maxFrames = 45000 }, {
     end
   end)(), 30000, { H.call(function() H.setPad({}) end) }, "party wiped, battle gone"),
   H.call(function() snap("post-wipe") end),
-  -- now be a player staring at the aftermath: A-tap dialogs, else hands
-  -- off, and watch for the GameOver exec.  Snapshot every 300 frames.
+  -- now play the aftermath as a player would: A-tap dialogs, otherwise
+  -- hands off, and watch for the GameOver exec.  Snapshot every 300 frames.
   H.driveUntil(function()
     return gameOverAt ~= nil
   end, 25000, {

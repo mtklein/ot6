@@ -1,49 +1,49 @@
 -- gen_zozo5_ramuh.lua -- v0.4 step 4, the arc's last: dadaluma_won (map 221,
 -- the roof clear) -> the top door (33,9) -> TERRA's tower (map 226, landing
--- {82,37}) -> up to TERRA at {81,17} -> THE RAMUH SCENE -> the four
+-- {82,37}) -> up to TERRA at {81,17} -> the Ramuh scene -> the four
 -- magicite -> the gather room -> the leave-Zozo walk-down -> $0054=1 ->
 -- map 221 {57,45} -> generate zozo_done.mss, v0.4's chain tail.
 --
--- Everything below was MEASURED end to end (probe_ramuh/tower3/gather/leave),
--- not predicted.  Four surprises the predecessor's source-read missed:
+-- Everything below was measured end to end (probe_ramuh/tower3/gather/leave)
+-- rather than predicted.  Four things the earlier source-read missed:
 --
---  1. THE TOWER PORCH ROLLS RANDOM ENCOUNTERS.  The (33,10)->(33,9) door
+--  1. The tower porch rolls random encounters.  The (33,10)->(33,9) door
 --     step fired battle 19-class trash on the first run (event PC parked at
 --     $CA0029 = RandBattle).  Every player-controlled drive write-clears a
 --     stray before its own work.
---  2. TERRA IS TALKED FROM THE WEST, not below.  Her tile {81,17} is
+--  2. TERRA is talked to from the west, not from below.  Her tile {81,17} is
 --     z=UPPER ($0888=1, prop $01); {81,18} below is z=LOWER ($0A), and
 --     CheckNPCs' z-match (player.asm @477c) rejects a lower-z party
 --     reaching an upper-z NPC.  Stand on the both-z tile {80,17} ($0B)
 --     and face RIGHT.
---  3. THE RAMUH SCENE (_ca9749) IS pure dialog -- the prediction held: 30+
---     pages, obj/camera choreography, NO battle/menu/choice.  BUT its
+--  3. The Ramuh scene (_ca9749) is pure dialog, as predicted: 30+
+--     pages, obj and camera movement, and no battle, menu or choice.  But its
 --     TEXT_ONLY pages ($0432/$044A-$044D) park the event PC in a WRAM
---     MIRROR ($80xxxx) that eventRunning() reads as "not an event", so the
+--     mirror ($80xxxx) that eventRunning() reads as "not an event", so the
 --     original stall fallback (gated on eventRunning, 600 frames) never
 --     fired and the scene hung at 40000 frames.  rideScene now gates the
 --     stall counter on hasControl() instead (the party is event-controlled
 --     the whole cutscene, so it can never spuriously tap a field NPC) at a
 --     180-frame threshold.  End: $031F/$0320/$0321/$0322=1 (four stones),
 --     $0053=1, control returns on map 226.
---  4. THE MAGICITE stones' COLLISION TILES sit ONE ROW BELOW their NPC
+--  4. The magicite stones' collision tiles sit one row below their NPC
 --     prop coords: SIREN {82,11}->{82,12}, KIRIN {81,12}->{81,13}, STRAY
 --     {83,12}->{83,13}.  They wall the chamber mouth and are all bumped
 --     from the single floor tile {82,13} (up/left/right).  RAMUH's stone
 --     {84,17} -> _caa7f5 grants RAMUH ($031F=0, $0691=1) and spawns the
 --     absent members' gather doubles (CYAN/GAU here).  Each of
 --     _caac91/a0/af clears its own vis switch + give_genju.
---  5. THE LEAVE (_caa890, bumped via CYAN's double {83,33} from {83,34})
---     is NOT pure dialog: it pins LOCKE (the tracked leader) in place while
---     the others walk (so rideScene's leader-stall heuristic misfires and
---     wedges it), AND runs a party_menu 1 NO_RESET {LOCKE,CELES}.  End: the
+--  5. The leave (_caa890, bumped via CYAN's double {83,33} from {83,34})
+--     is not pure dialog: it pins LOCKE (the tracked leader) in place while
+--     the others walk, so rideScene's leader-stall heuristic misfires and
+--     stalls it, and it runs a party_menu 1 NO_RESET {LOCKE,CELES}.  End: the
 --     CELES/LOCKE Jidoor dialog -> $0054=1 -> load_map 221 {57,45} RIGHT
---     (:26449-:26452).  TERRA does NOT rejoin -- retrieved, catatonic; that
---     is the arc.
+--     (:26449-:26452).  TERRA does not rejoin; she is retrieved but
+--     catatonic.
 --
--- ISSUE #21 -- THAT MENU IS NOT A CONFIRM MENU.  It was driven with START
+-- Issue #21: that menu is not a confirm menu.  It was driven with START
 -- (commit whatever is there) on the reading that {LOCKE, CELES} made it a
--- forced-member confirmation.  It does not.  event_main.asm:26280-26287
+-- forced-member confirmation.  It is not.  event_main.asm:26280-26287
 -- reads
 --
 --     char_party LOCKE, 1     char_party CYAN,  0
@@ -51,31 +51,31 @@
 --     char_party GAU,   0     char_party CELES, 1
 --     party_menu 1, NO_RESET, {LOCKE, CELES}
 --
--- -- four slots with LOCKE and CELES FORCED and two FREE, and CYAN, EDGAR,
--- SABIN and GAU all sitting in the pool the char_party 0 lines just put
--- them in.  Answering it with START committed a party of TWO, and the whole
+-- which is four slots with LOCKE and CELES forced and two free, and CYAN,
+-- EDGAR, SABIN and GAU all in the pool the char_party 0 lines just put
+-- them in.  Answering it with START committed a party of two, and the whole
 -- v0.5 tail plus every v0.6 step then ran two characters (one after the tube
--- room takes CELES).  Nothing counted the party, so it read as normal for a
--- release and a half; gen_vector_entry now asserts the COUNT at the
--- post-Opera checkpoint so this cannot go quiet again.
+-- room takes CELES).  Nothing counted the party, so it went unnoticed for a
+-- release and a half; gen_vector_entry now asserts the count at the
+-- post-Opera checkpoint so this cannot go unnoticed again.
 --
--- OWNER DECISION (#21, 2026-07-27): the canonical fixture party is LOCKE,
--- CELES, SABIN, EDGAR.  SABIN fills the free BLUDGEON slot that
+-- Owner decision (#21, 2026-07-27): the canonical fixture party is LOCKE,
+-- CELES, SABIN, EDGAR.  SABIN fills the free bludgeon slot that
 -- docs/design/break-coverage-vector.md makes the Vector area's one deliberate
--- class -- the Rhinox row (OT6_BLUDG, no weakness, absorbs bolt, 8.93% of
+-- class: the Rhinox row (OT6_BLUDG, no weakness, absorbs bolt, 8.93% of
 -- area draws) exists to ask for it, and bare fists plus Pummel/Suplex/Bum
 -- Rush answer it with no shop trip.  EDGAR brings pierce and Tools.  This
 -- is the baseline every downstream balance number is measured on; changing
 -- it regenerates the chain and invalidates all of them.
 --
--- Issue #75: this file writes NO emulated game state.  The porch/tower
--- random encounters the old file write-clear are FOUGHT -- the same
+-- Issue #75: this file writes no emulated game state.  The porch and tower
+-- random encounters the old file write-cleared are fought: the same
 -- edge-tapped A that pages dialogs opens the command list, confirms
--- Fight and takes the default target -- and every walk runs under
+-- Fight and takes the default target, and every walk runs under
 -- navTo's playBattles mode.  Budgets grew where a fight can now interrupt.
 --
 -- The menu driver is gen_kefka_won's state-fed one, but it looks the layout
--- up LIVE rather than hard-coding cells: NO_RESET opens with the forced two
+-- up live rather than hard-coding cells: NO_RESET opens with the forced two
 -- already seated, so which pool cell holds SABIN and which party slot is
 -- free are properties of the run, not constants.  It asserts the character
 -- it moved and the slot it landed in, so a cursor that wandered fails

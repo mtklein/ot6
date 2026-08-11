@@ -1,56 +1,56 @@
--- gen_banquet_done.lua -- v0.7 STEP I->J (issue #31), and the generator
+-- gen_banquet_done.lua -- v0.7 step I->J (issue #31), and the generator
 -- that cuts battery checkpoint J, `banquet-done-v1`.
 --
--- THE input-driven rebuild (issue #75, 2026-08-09).  The previous version of
+-- The input-driven rebuild (issue #75, 2026-08-09).  The previous version of
 -- this file encoded banquet-decode.md's old ≥90 route, which that doc
--- WITHDREW after live measurement (control returns inside the throne
+-- withdrew after live measurement (control returns inside the throne
 -- tower, the castle is severed until _cc8490, map 243 is a one-way
 -- pocket, and ≥90 needs 41 of the window's 44 points against a measured
 -- best of 26).  Canon is the ≥67 tier (banquet-decode.md §5.2).  This
--- rebuild drives the canon tier WITH REAL INPUT -- zero state writes
--- outside the Save-UI checkpoint block -- and the arithmetic that makes ≥67
--- the input-driven target is worth stating up front, because it is
--- different from the battle-clear-write era's:
+-- rebuild drives the canon tier with real input, with no state writes
+-- outside the Save-UI checkpoint block.  The arithmetic that makes ≥67
+-- the input-driven target is stated here, because it differs from the
+-- battle-clear-write version's:
 --
 --   * A battle-clear-write window fight cost ~3 frames for +6 points.  An
---     input-driven fight against even a lone Commando costs real ATB rounds
---     -- 2000+ frames of a 14400-frame window -- for the same +6, while a
+--     input-driven fight against even a lone Commando costs real ATB rounds,
+--     2000+ frames of a 14400-frame window, for the same +6, while a
 --     talk costs ~210 frames (measured, §9.2) for +1.  Points per frame the
---     two are comparable, but the fight carries wipe/timer risk INSIDE the
---     window and the talk carries none.  So the input-driven window is
---     TALK-ONLY: the four fight soldiers are skipped outright, capping the
+--     two are comparable, but the fight carries wipe and timer risk inside
+--     the window and the talk carries none.  So the input-driven window is
+--     talk-only: the four fight soldiers are skipped, capping the
 --     window at 20 and the step total at 20 + 44 (Q&A) + 5 (the troopers'
 --     challenge) = 69.
---   * The tier ledger under that cap:  total >= 67 needs window >= 18
---     (of 20) with a PERFECT Q&A and a CLEAN challenge win.  The ≥77
---     Tintinabar tier is out of input-driven talk-only reach BY CONSTRUCTION
---     (69 < 77), which suits the contract: `banquet-done-v1` asserts the
---     Tintinabar and Charm Bangle ABSENT.
---   * The window driver is probe_banquet_greedy.lua's, lifted whole:
+--   * The tier ledger under that cap: total >= 67 needs window >= 18
+--     (of 20) with a perfect Q&A and a clean challenge win.  The ≥77
+--     Tintinabar tier cannot be reached by an input-driven talk-only run
+--     (69 < 77), which matches the contract: `banquet-done-v1` asserts the
+--     Tintinabar and Charm Bangle are absent.
+--   * The window driver is probe_banquet_greedy.lua's, used unchanged:
 --     nearest reachable un-latched soldier, least-used reachable
---     crossing, 243 LAST (it is a one-way pocket), one strike per
---     soldier, never plan on a transition frame.  Its measured best was
---     26 points from 16 soldiers WITH the fight NPCs in the pool; a
+--     crossing, 243 last (it is a one-way pocket), one strike per
+--     soldier, and never plan on a transition frame.  Its measured best was
+--     26 points from 16 soldiers with the fight NPCs in the pool; a
 --     talk-only pass of the same driver is the step's own measurement,
---     logged at expiry -- and a window under 18 fails RIGHT THERE with
---     var0, the timer, the soldier count and the full route log, never
---     as a quietly lower tier at the messenger.
+--     logged at expiry, and a window under 18 fails at that point with
+--     var0, the timer, the soldier count and the full route log, rather
+--     than as a lower tier at the messenger.
 --   * The troopers' challenge (battle 30: 3x Sp Forces $0c2, 700 hp
---     each, weak poison -- §5.4) runs AFTER the window inside its own
+--     each, weak poison; §5.4) runs after the window inside its own
 --     7200-frame timer and is fought with the library fighter
---     (H.newFightDriver tactical/boost/bank/items -- the configuration
+--     (H.newFightDriver tactical/boost/bank/items, the configuration
 --     that has beaten every boss in this conversion wave).  The clean
 --     flags ($1dd1 & $31 == 0) are asserted: a win that arrived by
---     timer-expiry pays nothing and must fail loudly.
---   * The party PREPARES before entering the castle -- H.equipOptimum
+--     timer-expiry pays nothing and must fail.
+--   * The party prepares before entering the castle, with H.equipOptimum
 --     and H.fieldCare through the real menus, outside the window, where
---     frames are free (the checkpoint-descended party arrives hurt and part
---     bare on every step this wave has measured).
+--     frames are free (the checkpoint-descended party arrives hurt and
+--     partly unequipped on every step this wave has measured).
 --
 -- The step (banquet-decode.md is the script; the route recon's steps 5-6 the
 -- route): cold-Continue the tracked `vector-crash-v1` battery
--- (boundary I -- world (83,238), standing ON the dead Blackjack; NO A
--- press on the boot tile, it re-enters the wreck -- measured),
+-- (boundary I, world (83,238), standing on the dead Blackjack; do not press
+-- A on the boot tile, because that re-enters the wreck, measured),
 -- assert its contract, then: the world grind to Vector (120,187), the
 -- castle escort, the dais face-UP+A (window opens, timer 14400), the
 -- talk-only greedy circuit to expiry, the dinner Q&A driven perfect
@@ -59,27 +59,26 @@
 -- pay; Tintinabar/Charm Bangle do NOT), out to world (120,188), and the
 -- world battery save -- boundary J.
 --
--- THE RECALL QUESTION, SETTLED (probe_banquet_recall.lua, 2026-08-10):
--- the record mechanic works exactly as decoded -- the first question
--- latches $0230 + one of $0231/2/3, and recall pays +5 iff the answer
+-- The recall question is settled (probe_banquet_recall.lua, 2026-08-10):
+-- the record mechanic works as decoded.  The first question latches $0230
+-- plus one of $0231/2/3, and recall pays +5 if and only if the answer
 -- matches, deterministically (+5/+0/+0 measured against a first=0
 -- record).  This gen's earlier "no record bit ever sets" reading was an
--- INSTRUMENTATION RACE: add_var runs BEFORE the switch lines in the
+-- instrumentation race: add_var runs before the switch lines in the
 -- script, so a read taken the frame var0 crosses its +2 milestone can
 -- see zeros (captured live: first=1/2 read $1EC6=20/40 at the milestone
 -- and 25/49 settled).  The recall drive below still asserts nothing
--- about its points and the tier arithmetic still clears >=67 at
--- recall=0 -- belt and braces that costs nothing -- but the uncertainty
--- was ours, not the game's.
+-- about its points and the tier arithmetic still clears >=67 at recall=0,
+-- which costs nothing to keep.
 --
--- THE SAVE-UI BLOCK AT THE END KEEPS ITS POKES AND ITS WAIVERS: it is
+-- The Save-UI block at the end keeps its pokes and its waivers: it is
 -- the legacy-checkpoint apparatus (codex witness seeding + deterministic
 -- slot-3 drive), its own listed line of #75, converted with the checkpoint
--- re-cut program, not here.  (The timer is DEAD by then -- the §5.3
+-- re-cut program, not here.  (The timer has expired by then, so the §5.3
 -- harness hazard about poked menus inside a live window does not apply.)
 --
 -- OT6_CHECKPOINT_LAYOUT: ot6-codex-o8-v1
--- ^ run.sh refuses -- BEFORE boot -- any OT6_SRAM_CHECKPOINT whose manifest
+-- ^ run.sh refuses, before boot, any OT6_SRAM_CHECKPOINT whose manifest
 --   declares a different persistent_layout.
 local H = dofile("tools/tests/lib/ot6.lua")
 
@@ -101,10 +100,10 @@ local function objAt(idx)
   return H.readWord(0x086a + off) >> 4, H.readWord(0x086d + off) >> 4
 end
 
--- VERIFIED-STEP world grinder (see the long comment in gen_vector_crash's
--- sibling; consumes a plan entry only when the party LANDS on it).  An
--- encounter on the grind is FLED with the real L+R run -- fleeing is the
--- design for world trash (issue #75).
+-- Verified-step world grinder (see the long comment in gen_vector_crash's
+-- sibling; consumes a plan entry only when the party lands on it).  An
+-- encounter on the grind is fled with the real L+R run, which is the
+-- design for world encounters (issue #75).
 local function worldGrind(tx, ty, what)
   local plan, idx, ph, hb = nil, 1, 0, -600
   local step = nil
@@ -159,8 +158,8 @@ local function worldGrind(tx, ty, what)
   }, what or string.format("worldGrind (%d,%d)", tx, ty))
 end
 
--- unconditional held walk (dialogs absorbed; a battle -- none has ever
--- fired on these maps -- is fled with the real L+R run)
+-- unconditional held walk (dialogs absorbed; a battle, none of which has
+-- fired on these maps, is fled with the real L+R run)
 local function pressWalk(dir, pred, maxFrames, what)
   local ph = 0
   return H.driveUntil(pred, maxFrames, {
@@ -175,8 +174,8 @@ local function pressWalk(dir, pred, maxFrames, what)
   }, what)
 end
 
--- The DAIS is a face-UP+A trigger the party must be STANDING ON (the
--- GESTAHL NPC at (54,15) blocks the step, so holding UP only pins the
+-- The dais is a face-up+A trigger the party must be standing on (the
+-- GESTAHL NPC at (54,15) blocks the step, so holding UP only sets the
 -- facing); the A is released 2 frames in 8 so the edge re-arms.
 local function holdUpA(swId, maxFrames, what)
   local n = 0
@@ -220,11 +219,11 @@ local function settle(maxFrames, what)
   }, what)
 end
 
--- ---- the TALK-ONLY greedy window (probe_banquet_greedy's driver) ---------
+-- ---- the talk-only greedy window (probe_banquet_greedy's driver) ---------
 -- The 24-soldier census of banquet-decode §3, with the four fight
--- soldiers KEPT IN THE TABLE but marked -- the input-driven window skips them
--- (see the header arithmetic); they stay listed so the skip is explicit
--- data, not a silent omission.
+-- soldiers kept in the table but marked, because the input-driven window
+-- skips them (see the header arithmetic).  They stay listed so the skip is
+-- explicit data rather than a silent omission.
 local SOLDIERS = {
   { map = 250, obj = 0x10, latch = 0x0217, name = "250 (21,24)" },
   { map = 250, obj = 0x11, latch = 0x0218, name = "250 (25,24)" },
@@ -266,36 +265,36 @@ local CROSS = {
 local DOOR243 = { { 22, 34 }, { 23, 34 }, { 24, 34 } }
 
 local latchedLog, crossUse, failCount, routeLog = {}, {}, {}, {}
-local windowScore, windowSoldiers = nil, nil   -- THE MEASUREMENT
+local windowScore, windowSoldiers = nil, nil   -- the measurement
 
 local function circuitSettled()
   return H.hasControl() and H.tileAligned() and bright() >= 15
      and not H.dialogWaiting() and not H.battleLoadStarted()
 end
 
--- THE range guard, split so the tier is robust to the ONE unverified Q&A
--- mechanic (recall's +5 -- see the Q&A section; the first-question record
--- $0231/2/3 that recall matches against does NOT latch under live play,
--- measured, so recall's +5 is NOT assumed).  Arithmetic:
---   * TALKS fill to 23:  a talk-terminated window is >= 23, and
---     23 + (Q&A WITHOUT recall = 39) + (challenge 5) = 67 -- the tier
+-- The range guard, split so the tier is robust to the one unverified Q&A
+-- mechanic (recall's +5; see the Q&A section.  The first-question record
+-- $0231/2/3 that recall matches against does not latch under live play,
+-- measured, so recall's +5 is not assumed).  Arithmetic:
+--   * talks fill to 23:  a talk-terminated window is >= 23, and
+--     23 + (Q&A without recall = 39) + (challenge 5) = 67, so the tier
 --     clears even if recall pays nothing.
---   * FIGHTS engage only below 18: a +6 Commando from <=17 lands <= 23,
+--   * fights engage only below 18: a +6 Commando from <=17 lands <= 23,
 --     so the window never exceeds ~24, and 24 + (perfect Q&A 44) + 5 = 73
---     < 77 -- the >=77 Tintinabar tier stays out of reach, which the exit
+--     < 77, so the >=77 Tintinabar tier stays out of reach, which the exit
 --     contract asserts.  With recall working the total is ~72; without,
 --     ~67; either way in [67, 77).
 local TALK_BELOW, FIGHT_BELOW = 23, 18
 
 local function soldierDone(s) return sw(s.latch) == 1 end
--- ELIGIBLE: talks, plus the COMMANDO fights ($0c7) -- measured (run
+-- Eligible: talks, plus the Commando fights ($0c7).  Measured (run
 -- tgW7P8hV), a talk-only window yields 15 of the 18 points the tier
 -- needs: the effective talk rate is ~960 frames/point once travel and
 -- crossing churn are paid, while a real Commando (580 hp, weak
 -- bolt+water, fought by the section's equipped party) is +6 for ~2000-2500
--- frames -- a better rate -- and both route-side Commandos sit ON the
+-- frames, a better rate, and both route-side Commandos sit on the
 -- corridor the talk circuit already walks.  The B26 Mega Armor stays
--- excluded: it lives in the one-way 243 pocket and is 1000 hp.
+-- excluded: it is in the one-way 243 pocket and has 1000 hp.
 local function eligible(s)
   if soldierDone(s) or (failCount[s.latch] or 0) >= 1 then return false end
   if s.fight == 0x0c7 then return var0() < FIGHT_BELOW end  -- Commando
@@ -352,12 +351,12 @@ local function leastUsedCrossing()
   return best, bestKey
 end
 
--- the greedy runner: talk every reachable un-latched TALK soldier on this
+-- the greedy runner: talk every reachable un-latched talk soldier on this
 -- map nearest-first; when none, take the least-used reachable crossing;
 -- terminate on $013C (the dinner fired).  A raising sub-step (navTo
 -- no-path, a chase timeout) is caught and the driver re-picks; one strike
--- per soldier (a soldier that does not answer promptly is never worth a
--- retry inside a fixed window -- measured, greedy run 5).
+-- per soldier, because a soldier that does not answer promptly is not
+-- worth a retry inside a fixed window (measured, greedy run 5).
 
 local function circuitRunner()
   local cur, curWhat, curLatch = nil, nil, nil
@@ -368,9 +367,9 @@ local function circuitRunner()
   return {
     tick = function(self)
       -- a fight soldier's talk opens battle 26/27 mid-chase: hand the
-      -- battle to the library fighter (the timer keeps ticking -- that is
+      -- battle to the library fighter (the timer keeps ticking, which is
       -- the real cost), then resume the circuit when it ends.  The +1
-      -- and the clean +5 both land in the script tail AFTER the battle.
+      -- and the clean +5 both land in the script tail after the battle.
       if H.battleLoadStarted() then
         if not inFight then
           inFight = true
@@ -416,10 +415,10 @@ local function circuitRunner()
         return "frame"
       end
       if not circuitSettled() then
-        -- a dialog with no chase in flight is the post-FIGHT canned line
+        -- a dialog with no chase in flight is the post-fight canned line
         -- (the chase step was dropped when the battle opened): page it.
-        -- Measured (run SchLMrE6): without this the runner idled forever
-        -- on that dialog with the timer NOT ticking it away.
+        -- Measured (run SchLMrE6): without this the runner idled on that
+        -- dialog indefinitely, with the timer not ticking it away.
         ph = (ph + 1) % 8
         H.setPad(H.dialogWaiting() and (ph < 4 and { "a" } or {}) or {})
         return "frame"
@@ -484,9 +483,9 @@ local function circuitRunner()
 end
 
 -- ---- the Q&A choice machinery (gen_zozo3_clock's cursor cells) -----------
--- Battles cannot start inside the dinner dialogs; the challenge battle is
--- driven explicitly below, so this machine carries no battle branch at
--- all -- zero writes.
+-- Battles cannot start inside the dinner dialogs, and the challenge battle
+-- is driven explicitly below, so this machine carries no battle branch and
+-- writes no state.
 local function picks(targets, done, maxFrames, what)
   local ph, ti, wasUp = 0, 0, false
   return H.driveUntil(function()
@@ -514,7 +513,7 @@ local function picks(targets, done, maxFrames, what)
   }, what)
 end
 
--- the Q&A scores are RELATIVE to whatever the window earned: w0 is
+-- the Q&A scores are relative to whatever the window earned: w0 is
 -- captured at the dinner table and every later checkpoint is w0+delta
 local dinner = { w0 = nil, preChallenge = nil, preBattle30 = nil,
                  b30Species = nil, b30Clean = nil, preWish = nil,
@@ -530,7 +529,7 @@ end
 
 -- --------------------------------------------------------------------------
 local steps = {
-  -- ---- the cold Continue and the ENTRY CONTRACT (issue #25) ---------------
+  -- ---- the cold Continue and the entry contract (issue #25) ---------------
   H.waitFrames(350),
   H.repeatN(5, { H.pressButtons({ "start" }, 8), H.waitFrames(25) }),
   H.waitFrames(120),
@@ -564,9 +563,9 @@ local steps = {
   H.waitUntil(landed(253, 10), 2400, "Vector 253 (post-attack)", 1),
   H.waitFrames(30),
 
-  -- ---- 1b. the player's prep, OUTSIDE the window, where frames are free ----
-  -- (the checkpoint-descended party arrives hurt and part bare on every step
-  -- this wave has measured; the challenge is a real fight now)
+  -- ---- 1b. the player's prep, outside the window, where frames are free ----
+  -- (the checkpoint-descended party arrives hurt and partly unequipped on
+  -- every step this wave has measured, and the challenge is a real fight now)
   H.equipOptimum({ tag = "banquet kit" }),
   H.fieldCare({ tag = "care before the banquet", threshold = 0.95 }),
 
@@ -591,14 +590,14 @@ local steps = {
   H.call(function()
     H.assertEq(sw(0x013B), 1, "$013B -- 250 map-init opened the {22,29} door")
   end),
-  -- THE MEASURED ROUTE TO THE DAIS (probe_banquet_stage, iterations 1-8;
+  -- The measured route to the dais (probe_banquet_stage, iterations 1-8;
   -- the first input-driven run of this gen failed here with "no path
   -- (23,33)-> (54,17)" because the pre-window 250 entry is a 131-tile
-  -- component and the dais is NOT in it): the {22,29} doorway is a door
+  -- component and the dais is not in it): the {22,29} doorway is a door
   -- tile the BFS model reads as a wall (held UP crosses it); (23,12) is the
   -- gated-off messenger trigger that re-enters at every rest frame and
   -- wedges navTo (a held press skips walk-over triggers, so it and the
-  -- (23,9) stairs are crossed in ONE pressWalk); (23,9) short-entrances to
+  -- (23,9) stairs are crossed in one pressWalk); (23,9) short-entrances to
   -- (54,34)  inside the throne tower, and the dais is an ordinary navTo
   -- from there.
   H.navTo(23, 30, { maxFrames = 6000, playBattles = "flee" }),
@@ -657,10 +656,10 @@ local steps = {
   H.waitFrames(45),
   circuitRunner(),
 
-  -- THE FEASIBILITY CHECK (issue #75, and the §8 measurement): the tier
+  -- The feasibility check (issue #75, and the §8 measurement): the tier
   -- ledger needs window >= 18 given a perfect Q&A (+44) and a clean
-  -- challenge (+5).  A short window fails HERE, with the numbers, never
-  -- as a quietly lower tier at the messenger.
+  -- challenge (+5).  A short window fails here, with the numbers, rather
+  -- than as a lower tier at the messenger.
   H.call(function()
     H.assertEq(windowScore ~= nil, true, "the window expired ($013C)")
     H.log(string.format(
@@ -697,10 +696,10 @@ local steps = {
     H.assertEq(var0(), windowScore, "var0 carried into dinner")
     dinner.w0 = var0()
   end),
-  -- DEV SCRATCH (probe_banquet_recall boots this): the dinner table with
-  -- the toast choice up and a KNOWN var0.  Not a fixture: no graph edge,
-  -- no stamp, never a suite boot -- probes may never produce fixtures and
-  -- this is a probe INPUT, cut by a generator.
+  -- Dev scratch state (probe_banquet_recall boots this): the dinner table
+  -- with the toast choice up and a known var0.  This is not a fixture: no
+  -- graph edge, no stamp, and never a suite boot.  Probes may not produce
+  -- fixtures, and this is a probe input cut by a generator.
   H.saveState("banquet_dinner_scratch.mss"),
 
   -- ---- 5. the Q&A, perfect, relative to the window --------------------------
@@ -712,26 +711,26 @@ local steps = {
   ckPlus("doma", 15),
   picks({ 1 }, atPlus(20), 6000, "Celes: one of us (+5)"),
   ckPlus("celes", 20),
-  -- THE THREE QUESTIONS, as a group (+6): the first question and the two
+  -- The three questions, as a group (+6): the first question and the two
   -- "one more question please!" re-asks, each +2 (banquet-decode.md §4
-  -- items 5-6).  Driven as ONE stretch that ends when var0 has risen +6,
-  -- because the per-item choice->question map is NOT verified live (the
-  -- ≥90 gen that hard-asserted $0231 was withdrawn and never ran; this
-  -- gen's first live run showed the +2 landing but NO $0231/2/3 record
+  -- items 5-6).  Driven as one stretch that ends when var0 has risen +6,
+  -- because the per-item choice->question map is not verified live (the
+  -- ≥90 gen that hard-asserted $0231 was withdrawn and never ran, and this
+  -- gen's first live run showed the +2 landing but no $0231/2/3 record
   -- bit setting).  The group +6 is what the tier ledger counts.
   picks({ 0, 0, 1, 0, 2 }, atPlus(26), 9000, "the three questions (+6 group)"),
   ckPlus("questions", 26),
   picks({ 1, 0 }, atPlus(31), 9000, "Espers: gone too far (+5)"),
   ckPlus("espers", 31),
-  -- capture the score entering RECALL (recall may or may not pay; every
+  -- capture the score entering recall (recall may or may not pay; every
   -- later delta is measured from here, not from an assumed baseline)
   H.call(function() dinner.preChallenge = var0() end),
-  -- RECALL + the rest break, one cursor-0 drive.  Recall is the one Q&A
-  -- point this gen does NOT assume: it scores +5 ONLY if the answer
+  -- Recall plus the rest break, one cursor-0 drive.  Recall is the one Q&A
+  -- point this gen does not assume: it scores +5 only if the answer
   -- matches the first-question record ($0231/2/3), and that record does
-  -- not latch under live play (measured -- see the header finding), so
+  -- not latch under live play (measured; see the header finding), so
   -- recall may pay 0.  Recall flows straight into Cid's break offer with
-  -- no field control between, and BOTH want cursor 0 (recall option 0 =
+  -- no field control between, and both want cursor 0 (recall option 0 =
   -- first-listed question; break option 0 = "Yes"), so a single
   -- cursor-0 pick carries both and ends on control returning to the
   -- dinner floor.  Its points are not asserted; the tier is made robust
@@ -759,10 +758,10 @@ local steps = {
       20000, {
       H.call(function()
         hb = hb + 1
-        -- capture the formation and clean-flag DURING the battle: after
+        -- capture the formation and clean-flag during the battle: after
         -- teardown $57C0 reads the field and $1dd1 is stale.  sawSpForces
         -- is a max-seen count; the clean flag is sampled every frame and
-        -- the LAST battle-active reading is the outcome.
+        -- the last battle-active reading is the outcome.
         if H.battleLoadStarted() then
           local found = 0
           for m = 0, 5 do
@@ -801,7 +800,7 @@ local steps = {
       .. "'win' pays nothing and must fail here)")
     H.assertEq(var0(), dinner.preBattle30 + 5, "challenge +5 (clean)")
   end),
-  -- back to the table; wish +5, accompany +3, measured from a fresh
+  -- back to the table: wish +5, accompany +3, measured from a fresh
   -- capture so recall's uncertainty does not propagate into these asserts
   H.navTo(80, 20, { maxFrames = 9000, calmFrames = 4 }),
   H.waitUntil(function() return H.readByte(0x056f) >= 2 end, 1200,
@@ -819,10 +818,10 @@ local steps = {
     9000, "accompany: Yes on the first ask (+3)") end)(),
   H.call(function()
     H.assertEq(var0(), dinner.preAccompany + 3, "accompany +3")
-    -- THE TIER, measured: window + everything the dinner actually paid.
-    -- Robust to recall by construction (range guard); assert BOTH bounds so
-    -- an accidental >=77 (which would give Tintinabar, contradicting the
-    -- exit contract) fails just as loudly as a short one.
+    -- The tier, measured: window plus everything the dinner paid.
+    -- Robust to recall by construction (range guard).  Both bounds are
+    -- asserted, so an accidental >=77 (which would give Tintinabar,
+    -- contradicting the exit contract) fails the same way a short one does.
     local total = var0()
     H.assertEq(total >= 67, true, string.format(
       "THE TIER: total %d (window %d + dinner %d) >= 67",
@@ -854,12 +853,12 @@ local steps = {
   end),
 
   -- ---- 7. the messenger -----------------------------------------------------
-  -- The 251->250 door lands the party at (53,11), INSIDE the throne tower
+  -- The 251->250 door lands the party at (53,11), inside the throne tower
   -- (the 199-tile pocket, x48..60 y9..35); the messenger at (23,12) is in
   -- the corridor.  So exit the tower the same way the window circuit
-  -- entered it -- the (53,35) long entrance down to the corridor (23,11)
-  -- -- before walking to the messenger.  (A direct navTo (53,12)->(23,12)
-  -- has no path; measured, run QkbMFqWb.)
+  -- entered it, through the (53,35) long entrance down to the corridor
+  -- (23,11), before walking to the messenger.  (A direct navTo
+  -- (53,12)->(23,12) has no path; measured, run QkbMFqWb.)
   H.navTo(80, 26, { maxFrames = 9000, playBattles = "flee" }),
   pressWalk("down", function() return map() == 250 end, 900,
     "251 door row -> 250 (53,11)"),
@@ -928,13 +927,13 @@ local steps = {
   H.call(function()
     H.assertExitContractPreSave("banquet-done-v1")
   end),
-  -- THE STEP'S SAVESTATE IS GENERATED HERE, BEFORE THE MENU (the world menu
+  -- The step's savestate is generated here, before the menu (the world menu
   -- does not unwind on B, measured)
   H.saveState("banquet_done.mss"),
-  -- RELOAD-VERIFIED (gen_sabin_gau's pattern, a trap this program has
-  -- paid for): capture-calm does NOT imply reload-calm, so reload the
-  -- parked moment and require the consumer's boot to find it quiet;
-  -- the Save-UI below then proceeds from the reloaded (equivalent) state.
+  -- Reload-verified (gen_sabin_gau's pattern, from a failure this program
+  -- has hit): a calm capture does not imply a calm reload, so reload the
+  -- parked moment and require the consumer's boot to find it quiet.
+  -- The Save-UI below then proceeds from the reloaded (equivalent) state.
   (function()
     local saveReq, loadReq
     return H.cond(function() return true end, {
@@ -978,24 +977,24 @@ local steps = {
   H.call(function()
     H.assertEq((H.readByte(0x0201) & 0x80) ~= 0, true,
       "menu-flags $0201 bit7 SET -- the save-enable flow reached the menu")
-    -- ARM THE input-driven save receipt (issue #75): a read-only exec hook on
+    -- Arm the input-driven save receipt (issue #75): a read-only exec hook on
     -- the real CopyGameDataToSRAM entry captures the slot argument the
     -- save runs with (codex_saveas's instrument).  This replaces the old
-    -- zeroed-$307ff0 sentinel -- an SRAM write -- as the proof that the
-    -- real save ran to completion for slot 3.
+    -- zeroed-$307ff0 sentinel, which was an SRAM write, as the evidence that
+    -- the real save ran to completion for slot 3.
     local entry = H.sym("CopyGameDataToSRAM")
     emu.addMemoryCallback(function()
       saveArg = emu.getState()["cpu.a"] & 0xff
     end, emu.callbackType.exec, entry, entry)
   end),
-  -- THE PAD-DRIVEN SAVE (save-drive rule, tools/tests/README.md;
+  -- The pad-driven save (save-drive rule, tools/tests/README.md;
   -- codex_saveas and probe_banquet_timer_save are the templates): UP wraps
   -- the main-menu cursor to Save (row 6), A enters the menu's own
-  -- SelectMainMenuOption_06 path, the slot cursor is STEERED to slot 3 by
+  -- SelectMainMenuOption_06 path, the slot cursor is steered to slot 3 by
   -- pad against its live cell, and A confirms on through any overwrite
-  -- prompt.  No ZMENUSTATE poke, no cursor poke, no display-cache poke,
-  -- and no witness seeding: the codex payload the battery carries is
-  -- whatever the chain EARNED, read and logged below (issue #75).
+  -- prompt.  There is no ZMENUSTATE poke, no cursor poke, no display-cache
+  -- poke, and no witness seeding: the codex payload the battery carries is
+  -- whatever the chain earned, read and logged below (issue #75).
   H.driveUntil(function()
     return H.readByte(ZMENUSTATE) == 0x05 and H.readByte(0x4b) == 6
   end, 600, {
@@ -1020,10 +1019,10 @@ local steps = {
     H.assertEq(emu.read(0x307ff0, emu.memType.snesMemory), 3,
       "SRAM $307ff0 records slot 3")
     H.assertEq(saveArg, 3, "CopyGameDataToSRAM ran for persistent slot 3")
-    -- the codex witness cells are READ, never seeded (issue #75): the
-    -- battery carries whatever the chain actually earned.  The phase-2
-    -- checkpoint re-cuts measure these and the entry contracts follow the
-    -- measurement (never the reverse).
+    -- the codex witness cells are read, never seeded (issue #75): the
+    -- battery carries whatever the chain earned.  The phase-2 checkpoint
+    -- re-cuts measure these, and the entry contracts follow the
+    -- measurement rather than the other way round.
     H.log(string.format("codex witness cells (earned): elem=%02X class=%02X",
       emu.read(0x316810 + ULTROS2, emu.memType.snesMemory),
       emu.read(0x316990 + ULTROS2, emu.memType.snesMemory)))

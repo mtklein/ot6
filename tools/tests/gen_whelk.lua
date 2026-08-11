@@ -1,21 +1,21 @@
--- gen_whelk.lua -- reach the Whelk fight DETERMINISTICALLY: BFS-navigate on
+-- gen_whelk.lua -- reach the Whelk fight deterministically: BFS-navigate on
 -- the engine's own passability rules (H.canStep / H.bfsPath / H.navTo) to
--- (42,6), one tile SOUTH of the Whelk event trigger at (42,5), generate the
+-- (42,6), one tile south of the Whelk event trigger at (42,5), generate the
 -- entry point savestate there, then take one deliberate step onto the trigger
 -- and let the event run: it force-walks the party down to (42,7), shows
 -- dialogs $0B6E ("We won't hand over the Esper!!") / $0B6F ("Whelk! Get
--- them!") -- both EDGE-tapped through -- and starts the Whelk battle
+-- them!"), both tapped through on edges, and starts the Whelk battle
 -- (formation $01B0; species words 0x0100/0x0134 land in $57C0).  Random
 -- encounters en route are cleared with the battle-clear-write idiom; the goal
--- formation is spared by guard.  Emits whelk_entry.mss + whelk_battle
+-- formation is spared by guard.  Emits whelk_entry.mss and the whelk_battle
 -- screenshot.  Deterministic by construction (the harness pins AllZeros
--- power-on RAM + no frame skipping + a pre-launch srm wipe): PASS at
+-- power-on RAM, no frame skipping, and a pre-launch srm wipe): PASS at
 -- frame 2813 with byte-identical artifacts every run, ~8.5 s wall.
 local H = dofile("tools/tests/lib/ot6.lua")
 local SRM = "build/states/playthrough_srm.mss.lua"
 
 -- goal-fight signature: during the Whelk fight the six formation species
--- words at $57C0 read 0x0100 and 0x0134 (NOT 0x135 -- measured, the old
+-- words at $57C0 read 0x0100 and 0x0134, not 0x135 (measured; the old
 -- predicate was wrong).  0x134 is the distinctive one; both are spared.
 local WHELK = { [0x0134] = true }
 local SPARE = { 0x0134, 0x0100 }
@@ -54,9 +54,9 @@ H.run({ maxFrames = 9000 }, {
   H.navTo(42, 6, { arrive = whelk, maxFrames = 6000, spare = SPARE }),
 
   H.cond(function() return whelk() end, {
-    -- shouldn't happen (BFS from the south never crosses (42,5)) but if the
-    -- event fired en route, the fight is already the goal -- just no entry
-    -- point
+    -- BFS from the south never crosses (42,5), so this branch is not
+    -- expected; if the event did fire en route the fight is already the
+    -- goal, but no entry point state is produced
     H.logStep("whelk fired en route; NO entry point state generated this run"),
   }, {
     H.call(function()
@@ -100,7 +100,7 @@ H.run({ maxFrames = 9000 }, {
     }, "whelk event fires"),
   }),
 
-  -- the fight is loading; let it come up on screen and prove it's Whelk
+  -- the fight is loading; let it come up on screen and check it is Whelk
   H.call(function() H.setPad({}) end),
   H.waitUntilSoft(function() return H.battleActive() end, 900, "whelk_up", 30),
   H.call(function()

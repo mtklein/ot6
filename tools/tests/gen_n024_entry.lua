@@ -8,27 +8,27 @@
 --     264 {9,5}   -> 269 {44,53}
 --     269 {42,12} -> 271 {31,28}
 --     271 {3,27}  -> 273 {30,60}
--- Unlike maps 262/263, 269/271/273 really are single walking regions --
--- the census after each landing is logged below as the evidence.
+-- Unlike maps 262/263, 269/271/273 are single walking regions; the census
+-- after each landing is logged below as the evidence.
 --
 -- NUMBER 024 is npc_prop.asm:12478, map 273 NPC_1 at {25,51}, behind
 -- switch $0649 (1 at new game, cleared only at event_main.asm:95390), with
 -- event _cc79ed (:95385):
 --     battle 72 / call _ca5ea9 / hide_obj NPC_1 / sort_obj / switch $0649=0
 -- It stands directly below the {25,50} short entrance to map 274 (the
--- esper tube room), so it physically plugs the only way on -- the same
--- shape as Shiva on {9,6} last step, and the same positive control: the
--- entry point asserts {25,50} is NO-PATH now, so "the fight opened it" will
--- mean something.
+-- esper tube room), so it blocks the only way on, the same shape as Shiva
+-- on {9,6} last step and with the same positive control: the entry point
+-- asserts {25,50} is NO-PATH now, so a later claim that the fight opened it
+-- can be checked.
 --
--- ISSUE #75 (the input-driven test conversion): ZERO state writes.  The
--- battle-clear write helper is gone; any encounter on the walk is FLED with
--- the real L+R run (playBattles="flee" on every navTo, the same branch in
--- the two inline drives).  No route battle has ever actually fired on maps
--- 264/269/271/ 273 -- the branch exists so the day one does, it is played,
--- not rigged.  This pass also deleted two helpers this file DEFINED and
--- never called (tapInto and a stub `door`) -- the same dead-toolkit pattern
--- gen_tunnelarmr's conversion cleaned out of its own file.
+-- Issue #75 (the input-driven test conversion): no state writes.  The
+-- battle-clear write helper is gone; any encounter on the walk is fled with
+-- the real L+R run (playBattles="flee" on every navTo, and the same branch in
+-- the two inline drives).  No route battle has fired on maps
+-- 264/269/271/273 so far; the branch exists so that if one does, it is
+-- played rather than rigged.  This pass also deleted two helpers this file
+-- defined and never called (tapInto and a stub `door`), the same unused
+-- toolkit pattern gen_tunnelarmr's conversion cleaned out of its own file.
 local H = dofile("tools/tests/lib/ot6.lua")
 
 local function map() return H.mapId() & 0x1ff end
@@ -157,11 +157,11 @@ H.run({ maxFrames = 90000 }, {
     })
   end),
 
-  -- THE BOUNDARY DETOUR (issue #25).  This step is B->C's terminal, so
-  -- before parking on the 024 entry point it stands on the NEW #10 save point
-  -- at {26,53} and asserts the n024-entry-save-v1 boundary table -- the
+  -- The boundary detour (issue #25).  This step is B->C's terminal, so
+  -- before parking on the 024 entry point it stands on the new #10 save point
+  -- at {26,53} and asserts the n024-entry-save-v1 boundary table, the
   -- same table gen_n024_save_checkpoint saves under and gen_esper_tubes'
-  -- checkpoint boot asserts as its ENTRY contract.  The sram witnesses are
+  -- checkpoint boot asserts as its entry contract.  The sram witnesses are
   -- products of the boundary save, so the pre-save variant is asserted
   -- (lib/ot6_contract.lua).  Standing on a save tile re-enters SavePoint
   -- every frame and hasControl() flickers, so arrival is judged on
@@ -187,9 +187,9 @@ H.run({ maxFrames = 90000 }, {
     H.assertEq(sw(0x01BF), 1,
       "$01BF SET -- the NEW 273 save point runs the SavePoint script")
     H.assertEq(sw(0x01B5), 1, "$01B5 SET -- the once-per-tile latch took")
-    -- the sparkle NPC is LIVE at the authored tile: 273's NPCs are object
-    -- $10 (NUMBER 024) and the APPENDED $11 (the sparkle -- order is
-    -- identity, HANDOFF trap 2)
+    -- the sparkle NPC is present at the authored tile: 273's NPCs are object
+    -- $10 (NUMBER 024) and the appended $11 (the sparkle; record order is
+    -- the object's identity, handoff hazard 2)
     local off = 0x29 * 0x11
     H.assertEq(H.readWord(0x086a + off) >> 4, 26, "sparkle object $11 x")
     H.assertEq(H.readWord(0x086d + off) >> 4, 53, "sparkle object $11 y")
@@ -232,7 +232,7 @@ H.run({ maxFrames = 90000 }, {
   end),
   H.saveState("n024_entry.mss"),
 
-  -- VERIFY the entry point is one A-press from battle 72, after the state
+  -- Verify the entry point is one A-press from battle 72, after the state
   -- is generated.
   (function() local aPh = 0
     return H.driveUntil(function()

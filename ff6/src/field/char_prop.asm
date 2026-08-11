@@ -270,22 +270,22 @@ CharProp:
 ; 11: gau
         make_char_prop
         set_char_prop_hp_mp 45, 10
-        ; ot6 #47: GAU GETS FIGHT.  Vanilla's four slots were RAGE/LEAP/
-        ;   MAGIC/ITEM -- no Fight at all -- which was survivable while Rage
+        ; ot6 #47: Gau gets Fight.  Vanilla's four slots were RAGE/LEAP/
+        ;   MAGIC/ITEM, with no Fight at all, which was workable while Rage
         ;   was free and is not now that it costs 8 MP (#40): an out-of-MP Gau
-        ;   had literally no action, and mp-economy.md's target ("Fight must
+        ;   had no action at all, and mp-economy.md's target ("Fight must
         ;   sometimes be the right move") requires every character be able to
-        ;   decline to spend.  There is no spare slot -- vanilla's "blank"
+        ;   decline to spend.  There is no spare slot (vanilla's "blank"
         ;   third row is MAGIC removed by InitCmd_03 for a Gau who knows no
-        ;   spells -- so LEAP shares the FIGHT row: Leap only works on the
+        ;   spells), so Leap shares the Fight row: Leap only works on the
         ;   Veldt (its own vanilla availability test), and on the Veldt Leap
-        ;   IS the free action, so Fight and Leap are the redundant pair
+        ;   is the free action, so Fight and Leap are the redundant pair
         ;   there and nothing is lost.  Ot6VeldtRow (battle_main.asm) does
         ;   the substitution in InitCmdList's own row loop.  MAGIC is never
-        ;   sacrificed anywhere -- the first pass shared the magic row and
+        ;   sacrificed anywhere; the first pass shared the magic row and
         ;   the owner reversed it on 2026-07-29 (kits.md's row-sharing rule).
-        ;   THIS RECORD IS THE OFF-VELDT LAYOUT and does not change; the
-        ;   sharing is a runtime verdict, never a rewrite of the save.
+        ;   This record is the off-Veldt layout and does not change; the
+        ;   sharing is a runtime decision, never a rewrite of the save.
         set_char_prop_cmds FIGHT, RAGE, MAGIC, ITEM
         set_char_prop_stats 44, 38, 36, 34, 99, 44, 34, 21, 18
         set_char_prop_run_factor HIGH

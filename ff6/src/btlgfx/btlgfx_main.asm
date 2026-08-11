@@ -89,7 +89,7 @@ BtlGfxTbl:
         .addr   BtlGfx_01
         .addr   BtlGfx_02
         .addr   BtlGfx_03
-        .addr   Ot6BtlGfx04_c1  ; ot6: same-size repoint -- brackets the
+        .addr   Ot6BtlGfx04_c1  ; ot6: same-size repoint; brackets the
                                 ;   battle script with OT6_SCRIPTBUSY so
                                 ;   the hud anchor holds while animation
                                 ;   scripts can impose coord transients
@@ -17260,8 +17260,8 @@ CheckBlitzCode:
 
 ; ------------------------------------------------------------------------------
 
-; ot6 (blitz-as-menu): UpdateMenuState_3d -- the vanilla pad-edge blitz input
-; state -- was deleted here. Nothing sets menu state $3d anymore (its only
+; ot6 (blitz-as-menu): UpdateMenuState_3d, the vanilla pad-edge blitz input
+; state, was deleted here. Nothing sets menu state $3d anymore (its only
 ; setter, _c1776b, now opens the tools-shell menu), so its dispatch slot points
 ; at UpdateMenuState_00 (rts). ~158 bytes reclaimed from btlgfx_code.
 
@@ -18237,12 +18237,12 @@ _c1_bushido_open:
         jsl     Ot6BushidoListOpen
         jmp     OpenToolsWindow
 
-; ot6 (#55, locke's kit): Steal is the FIRST ROW of a thief submenu, not a bare
+; ot6 (#55, locke's kit): Steal is the first row of a thief submenu, not a bare
 ; command.  OpenCmdMenuTbl[5] hits this stub instead of the target-select state
 ; it used to; bank $f0 fills wItemList with Steal/Filch/Bestow (+ costs and each
 ; row's own targeting byte) and raises thief mode w7e6168=3, then the Tools
-; window shell picks one and its NON-blitz confirm arm carries the picked row
-; through target select exactly as a real tool does.
+; window shell picks one and its non-blitz confirm arm carries the picked row
+; through target select the same way a real tool does.
 _c1_thief_open:
         jsl     Ot6ThiefListOpen
         jmp     OpenToolsWindow
@@ -19424,10 +19424,10 @@ UpdateMenuState_08:
         jsr     _c16d56       ; get pointer to current character slot data (battle menu)
         pla
         sta     $2bb0,y     ; attack
-        jsl     Ot6SlotCommit ; ot6: was `lda w7e62ca / sta $2bae,y` -- the
+        jsl     Ot6SlotCommit ; ot6: was `lda w7e62ca / sta $2bae,y`, the
                             ;   vanilla actor store, plus the charge fix:
                             ;   OT6_BOOST_REVEALED = the tier latched at the
-                            ;   first press, so Ot6ActionEnd charges exactly
+                            ;   first press, so Ot6ActionEnd charges
                             ;   what the reels were spun with (an L/R edge
                             ;   mid-spin changes neither delivery nor price)
         inc     w7e7b80       ; increment character slot
@@ -49063,14 +49063,15 @@ ItemJumpThrowAnim:
 ; [ ot6: battle-script bracket for the hud anchor ]
 
 ; BtlGfxTbl's $04 entry is repointed here (a same-size .addr edit) so
-; that OT6_SCRIPTBUSY brackets exactly the frames on which an animation
-; script can impose monster-coordinate transients -- BtlGfx_04 "execute
+; that OT6_SCRIPTBUSY brackets the frames on which an animation
+; script can impose monster-coordinate transients: BtlGfx_04 "execute
 ; battle script" is the container every action animation, monster
 ; special, entry/exit effect and battle event runs under.  bracketing
-; the CONTAINER rather than tick provenance is a measured correction:
+; the container rather than tick provenance is a measured correction:
 ; probe_animtick showed ~101 of 120 menu-idle frames tick through
 ; WaitFrame (the battle menu is modal inside a gfx command), so "ticked
-; by WaitFrame" meant "most of an interactive battle", not "animating".
+; by WaitFrame" meant "most of an interactive battle" rather than
+; "animating".
 ;
 ; discipline: no btlgfx_code size change (battle_banner and probe_banner
 ; pin battle-NMI code addresses $C10BA7/$C10C17/$C10C1B/$C10CA4, and the

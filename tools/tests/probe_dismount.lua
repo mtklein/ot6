@@ -1,37 +1,38 @@
--- probe_dismount.lua -- the measurement instrument for getting OFF the
+-- probe_dismount.lua -- the measurement instrument for getting off the
 -- chocobo.  figaro_cleared.mss leaves the party riding one (the submerge
 -- scene's `vehicle ... CHOCOBO`), and InitChoco (world/init.asm:402) never
--- writes the on-foot tile registers $E0/$E2 -- only InitWorld does, from
--- $1F60 (init.asm:758-762) -- so H.worldX/worldY read 0 and worldNavTo
--- cannot plan a thing until the party is on its feet.  Everything on tier 2
--- past Figaro depends on undoing that, so it gets measured before it gets
+-- writes the on-foot tile registers $E0/$E2 (only InitWorld does, from
+-- $1F60, init.asm:758-762), so H.worldX/worldY read 0 and worldNavTo
+-- cannot plan a route until the party is on foot.  Everything on tier 2
+-- past Figaro depends on undoing that, so it is measured before it is
 -- used.
 --
--- THE DISMOUNT, read out of the source and confirmed here frame by frame:
+-- The dismount, read out of the source and confirmed here frame by frame:
 --   * riding, the world module runs MoveVehicle (world/move.asm:361), whose
 --     input handler for $20 == 2 is GetChocoInput (world/ctrl.asm:451).  Its
 --     last branch, ctrl.asm:562-563, is `lda $05 / bit #$0080 / jsr
---     LandAirship` -- $05 is the held-button low byte (bit7 = B) and the
---     test is on the HELD state, not an edge, so a multi-frame hold is fine.
+--     LandAirship`; $05 is the held-button low byte (bit7 = B) and the
+--     test is on the held state rather than an edge, so a multi-frame hold
+--     works.
 --   * LandAirship (world/init.asm:1823) forks on $20 at :1827 and takes the
 --     chocobo branch @93d4 (:1868): it sets `$19 = 3` (the world's exit
 --     trigger), sets $1E bit0 to lock input out, zeroes the rotation and
---     speed vars -- and, the load-bearing part, converts the VEHICLE's
---     mode-7 position into a tile pair and stores it at $1F60/$1F61
+--     speed vars, and converts the vehicle's mode-7 position into a tile
+--     pair and stores it at $1F60/$1F61
 --     (:1878-1888: `lda $34 / lsr4 / and #$00ff / sta $1f60` then
 --     `lda $38 / asl4 / and #$ff00 / clc / adc $1f60 / sta $1f60`).
---   * $19=3 alone does NOT exit: the world main loop wants bit2
+--   * $19=3 alone does not exit: the world main loop wants bit2
 --     (world_start.asm:224-235, `lda $19 / and #$04 / cmp #$04 / bne`).
---     Bit0 instead runs _ee1c56 (move.asm:695), the descent -- it lowers
---     altitude $2D each frame and only when the bird is on the ground does
---     `$19 = ($19 & $FE) | $04` (:672-677) release the exit.
+--     Bit0 instead runs _ee1c56 (move.asm:695), the descent, which lowers
+--     altitude $2D each frame and only releases the exit with
+--     `$19 = ($19 & $FE) | $04` (:672-677) once the bird is on the ground.
 --   * ExitVehicle (init.asm:1596) then plays DismountChocoAnim, and because
---     $19 ~= $FF takes the reload branch: `stz $11fa` (:1616 -- the vehicle
---     byte, cleared) and `jmp ReloadMap` (:1620).  ReloadMap re-dispatches
---     on $11FA & 3 (:118-126), which is now 0, so this time it is InitWorld
---     -- and InitWorld reads $1F60 into $E0/$E2.
--- So: hold B, wait out the descent, and the party is standing on the tile
--- the bird was over with the registers the navigator needs.
+--     $19 ~= $FF takes the reload branch: `stz $11fa` (:1616, clearing the
+--     vehicle byte) and `jmp ReloadMap` (:1620).  ReloadMap re-dispatches
+--     on $11FA & 3 (:118-126), which is now 0, so this time it runs
+--     InitWorld, and InitWorld reads $1F60 into $E0/$E2.
+-- So hold B and wait out the descent; the party then stands on the tile
+-- the bird was over, with the registers the navigator needs.
 --
 -- The probe also plans (does not walk) the two tier-2 world steps from the
 -- landing tile, so a route bug shows up here rather than 10000 frames into
@@ -92,10 +93,10 @@ H.run({ maxFrames = 12000 }, {
   H.call(function() snap("vehicle byte cleared") end),
 
   -- ===================================================================== --
-  -- Settle exactly the way route()'s world step does -- control AND full
-  -- brightness AND alignment, then the 30-frame margin.  (A world module
-  -- can report control on a black screen mid-cutscene; gen_edgar's header
-  -- documents the 5700-frame generation that cost.)
+  -- Settle the way route()'s world step does: control, full brightness and
+  -- alignment, then the 30-frame margin.  (A world module can report
+  -- control on a black screen mid-cutscene; gen_edgar's header documents
+  -- the 5700-frame generation that cost.)
   -- ===================================================================== --
   H.waitUntil(function()
     return H.worldHasControl() and H.worldAligned() and bright() >= 15
@@ -117,8 +118,8 @@ H.run({ maxFrames = 12000 }, {
   end),
 
   -- ===================================================================== --
-  -- Plan both tier-2 steps from here.  Planning only: a path that exists is
-  -- the claim being checked, and it costs nothing to check it now.
+  -- Plan both tier-2 steps from here.  Planning only: the claim being
+  -- checked is that a path exists.
   -- ===================================================================== --
   H.call(function()
     for _, t in ipairs({ { 86, 111, "South Figaro (map 75)" },
@@ -132,8 +133,8 @@ H.run({ maxFrames = 12000 }, {
   end),
 
   -- ===================================================================== --
-  -- Positive control: one real step, so "the registers look sane" is not
-  -- the whole story -- the engine has to actually move the party.
+  -- Positive control: one step, so the check covers the engine moving the
+  -- party and not only the register values.
   -- ===================================================================== --
   H.call(function()
     local p = H.worldBfs(86, 111)

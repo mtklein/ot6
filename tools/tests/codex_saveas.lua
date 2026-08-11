@@ -3,26 +3,26 @@
 -- real in-game save into the chosen slot.
 --
 -- The world-map fixture supplies a legitimate Save menu.  Issue #75
--- conversion: the knowledge used to be FORGED (a fire bit written into the
+-- conversion: the knowledge used to be forged (a fire bit written into the
 -- transient page for species 0, $021f forced to 0, and slot 3's bytes
--- zeroed to "assert" an emptiness) -- now every precondition is READ and
--- the payload is EARNED.  The chain that generates worldmap_narshe never
+-- zeroed to "assert" an emptiness).  Now every precondition is read and
+-- the payload is earned.  The chain that generates worldmap_narshe never
 -- saves, so the lifecycle cell already reads 0 and the transient page
--- already carries the chain's genuinely earned reveals (measured: species
--- $019/$01B/$064/$134 -- mines, whelk, moogle-defense fights); slot 3 is
--- really empty and is asserted so by reading it.  On top of that
--- inherited payload the test earns one byte ON CAMERA: it patrols the
+-- already carries the chain's earned reveals (measured: species
+-- $019/$01B/$064/$134, from the mines, whelk and moogle-defense fights);
+-- slot 3 is empty and is asserted so by reading it.  On top of that
+-- inherited payload the test earns one byte during the run: it patrols the
 -- grass area south of Narshe (measured: an encounter fires ~230 frames
 -- off the fixture tile; the pool's staple species $17 seeds weak
 -- $81 = fire|water with 2 shields), Terra casts a real Fire, and the chip
--- path's own "learn it forever" store (ot6_break.asm, Ot6Chip) writes the
--- transient page -- observed as a before/after page diff, not assumed.
--- Then the ordinary field menu's Save command is driven with PAD INPUT
--- ONLY (save-drive rule, tools/tests/README; probe_banquet_timer_save is
--- the template -- the old forced-ZMENUSTATE shortcut skipped the menu
+-- path's own persistent store (ot6_break.asm, Ot6Chip) writes the
+-- transient page, observed as a before/after page diff rather than assumed.
+-- Then the ordinary field menu's Save command is driven with pad input
+-- only (save-drive rule, tools/tests/README; probe_banquet_timer_save is
+-- the template, and the old forced-ZMENUSTATE shortcut skipped the menu
 -- entry's own writes and left menu tasks running on a corrupted exit),
--- saving into empty slot 3, and the test asserts the FULL transient
--- payload -- inherited bytes and the earned one alike -- arrived in the
+-- saving into empty slot 3.  The test then asserts that the full transient
+-- payload, both the inherited bytes and the earned one, arrived in the
 -- slot 3 page, along with the lifecycle marker.  This exercises
 -- CopyGameDataToSRAM's real Ot6CodexSaveAs hook rather than calling an
 -- OT6 helper directly.
@@ -71,8 +71,8 @@ local function spellIndexOf(slot, id)
 end
 
 -- one grass-area fight: patrol until an encounter, then TERRA casts Fire
--- and everyone else Fights, all through the live menus (4-frame-held
--- presses -- 1-frame presses are provably lost at the poll), until the
+-- and everyone else Fights, all through the live menus, with 4-frame-held
+-- presses because 1-frame presses are lost at the poll, until the
 -- battle ends.  Trash here dies to the same drive, so no flee is needed.
 local function grassFight(n)
   local plan, idx, goal = nil, 1, { 82, 56 }
@@ -181,7 +181,7 @@ H.run({ maxFrames = 90000 }, {
       local st = emu.getState()
       saveArg = st["cpu.a"] & 0xff
     end, emu.callbackType.exec, entry, entry)
-    -- The preconditions the old code wrote are READ now:
+    -- The preconditions the old code wrote are read now:
     H.assertEq(H.readByte(ACTIVE), 0,
       "lifecycle 0: this chain has never saved, the transient page is active")
     H.assertEq(sram(TEMP), 0x4f, "transient codex magic 'O' (Ot6CodexEnsure)")
@@ -211,7 +211,7 @@ H.run({ maxFrames = 90000 }, {
   end),
   -- the post-battle world fade eats early presses (measured: an X at
   -- +30 frames never opened the menu), so wait for settled world control
-  -- and then RETRY the open until the menu state answers
+  -- and then retry the open until the menu state answers
   (function()
     local calm = 0
     return H.waitUntil(function()
@@ -226,10 +226,11 @@ H.run({ maxFrames = 90000 }, {
   end, 1200, {
     H.pressButtons({ "x" }, 4), H.waitFrames(40),
   }, "main menu"),
-  -- UP wraps the main-menu cursor from Items straight down to Save (row 6);
+  -- up wraps the main-menu cursor from Items straight down to Save (row 6);
   -- A then runs SelectMainMenuOption_06 itself (field_menu.asm), so the
   -- $9e/$9f exit bookkeeping and the save-enabled check are the real code
-  -- path, not an imitation.  World-map saving is legal, so it lets us in.
+  -- path rather than an imitation.  World-map saving is legal, so the menu
+  -- allows it.
   H.driveUntil(function()
     return H.readByte(ZMENUSTATE) == MAIN_MENU and H.readByte(0x4b) == 6
   end, 600, {
@@ -239,10 +240,10 @@ H.run({ maxFrames = 90000 }, {
   H.waitUntil(function() return H.readByte(ZMENUSTATE) == SAVE_SELECT end,
     600, "save-slot selection", 5),
   -- Walk the slot cursor to slot 3 (zero-based 2) by pad, confirming by
-  -- READING the cursor back each frame -- no cursor pokes, no checksum-cache
-  -- pokes.  This run's SRAM is fresh so slot 3 saves instantly; were it
-  -- occupied, the driveUntil below presses A on through the overwrite
-  -- confirm, same as probe_banquet_timer_save.
+  -- reading the cursor back each frame, with no cursor pokes and no
+  -- checksum-cache pokes.  This run's SRAM is fresh so slot 3 saves instantly;
+  -- were it occupied, the driveUntil below presses A on through the overwrite
+  -- confirm, as probe_banquet_timer_save does.
   H.driveUntil(function()
     return H.readByte(ZMENUSTATE) == SAVE_SELECT and H.readByte(0x4b) == 2
   end, 600, {
@@ -256,9 +257,9 @@ H.run({ maxFrames = 90000 }, {
       tostring(saveArg), H.readByte(ACTIVE), sram(0x307ff0),
       sram(SLOT3 + 1), sram(SLOT3)))
   end),
-  -- $021f is wSaveSlotToLoad ONLY while the menu module owns that RAM.
+  -- $021f is wSaveSlotToLoad only while the menu module owns that RAM.
   -- The moment the world module resumes (menu close + ~30 frames), a block
-  -- restore puts the world's own variable back in that cell -- measured
+  -- restore puts the world's own variable back in that cell. Measured
   -- 2026-07-27: CopyGameDataToSRAM stores 3 from c3:1538, and at world
   -- resume the cell reads 5 with no CPU write ever firing. The old fixture
   -- happened to hold 3 there, so reading it post-menu passed by
@@ -275,8 +276,8 @@ H.run({ maxFrames = 90000 }, {
     H.assertEq(sram(0x307ff0), 3, "SRAM last-saved-slot marker is 3")
     H.assertEq(sram(SLOT3), 0x4f, "slot 3 codex magic 'O'")
     H.assertEq(sram(SLOT3 + 1), 0x38, "slot 3 codex magic '8'")
-    -- THE TRANSFER: every byte the transient page holds -- the chain's
-    -- inherited reveals and the byte this run earned on camera -- must
+    -- the transfer: every byte the transient page holds, both the chain's
+    -- inherited reveals and the byte this run earned, must
     -- appear in slot 3, and the source page must survive intact.
     local moved = 0
     for off = 0x10, PAGE_USED - 1 do

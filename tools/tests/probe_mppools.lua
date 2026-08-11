@@ -1,8 +1,8 @@
--- probe_mppools.lua -- MEASUREMENT, not an assertion.  Boots generated states
--- across the WoB areas and dumps every character's $1600 record (level,
--- cur/max HP, cur/max MP) so the MP economy can be priced against REAL
--- pools instead of against the base-stat estimate mp-economy.md's "Early
--- pools" section carries.
+-- probe_mppools.lua -- a measurement, not an assertion.  Boots generated
+-- states across the WoB areas and dumps every character's $1600 record
+-- (level, cur/max HP, cur/max MP) so the MP economy can be priced against
+-- measured pools rather than against the base-stat estimate in
+-- mp-economy.md's "Early pools" section.
 --
 -- Record layout ($1600 + 37*charId, field-ram.txt:885-898, same fields
 -- battle_levelup.lua reads): +$08 level, +$09/$0b cur/max HP,
@@ -18,10 +18,10 @@ local CHARS = {
   [10] = "Mog", [11] = "Gau", [12] = "Gogo", [13] = "Umaro",
 }
 
--- One state per area.  BATTLE-time states are deliberately absent: inside a
+-- One state per area.  Battle-time states are deliberately absent: inside a
 -- battle the $1600 block is not the field record layout, so it reads as
--- nonsense (narshe_battle dumps every character at "LV7, 1799/1799") -- use a
--- field entry point for every area.
+-- nonsense (narshe_battle dumps every character at "LV7, 1799/1799").  Use
+-- a field entry point for every area.
 local STATES = {
   "build/states/worldmap_narshe.mss.lua",   -- Narshe area (opening)
   "build/states/kolts_entry.mss.lua",    -- Mt Kolts area

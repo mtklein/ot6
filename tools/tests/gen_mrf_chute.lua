@@ -2,24 +2,24 @@
 -- {28,8}) -> the conveyor chute at {19,25} -> the factory's lower half,
 -- control back at {10,45}.  Generates mrf_chute.
 --
--- MAP 262 IS NOT ONE WALKABLE REGION, and the reason is scripted
+-- Map 262 is not one walkable region, because of scripted
 -- transitions rather than a maze.  Measured live off the loaded tilemap
 -- (probe_mrf262, booted on mrf_entry), from the landing tile {28,8}:
 --
 --   (19,23) door anim _cc7753      39 steps      (11,16) _cc7862   32 steps
 --   (19,24) door anim _cc7735      40 steps      (11,17) _cc784a   33 steps
---   (19,25) THE CHUTE   _cc7771    41 steps      (11,21) _cc78a5   43 steps
+--   (19,25) the chute   _cc7771    41 steps      (11,21) _cc78a5   43 steps
 --   (21,25) short chute _cc77ec    43 steps       (9,22) platform  44 steps
 --   (11,45) _cc78d0    NO PATH     (10,54) _cc7682 NO PATH
 --   (6,31)  _cc76a7    NO PATH     (21,27) _cc781b  NO PATH
 --
--- So the recon's offline "only 130 tiles reachable" understated it -- the
+-- So the recon's offline "only 130 tiles reachable" understated it: the
 -- upper floor is a single connected region containing both chutes, both
--- door-animation pairs and the east end of the platform gap -- but its
--- conclusion holds where it matters: everything below y~27 is unreachable
--- on foot and has to be entered through a script.
+-- door-animation pairs and the east end of the platform gap.  Its
+-- conclusion still holds where it matters: everything below y~27 is
+-- unreachable on foot and has to be entered through a script.
 --
--- THE CHUTE.  event_trigger.asm's map-262 block puts _cc7771
+-- The chute.  event_trigger.asm's map-262 block puts _cc7771
 -- (event_main.asm:94990) on {19,25}; unlike its neighbours {19,23}/{19,24}
 -- (which are `if_switch $01B5=1, EventReturn`-latched door animations that
 -- only run `mod_bg_tiles`), it is ungated and runs an obj_script that
@@ -33,10 +33,10 @@
 -- trigger _cc78d0 that the upper floor could not reach.  It is one-way:
 -- the party is walked over non-walkable tiles with `layer 2`/`layer 3`.
 --
--- Stepping onto {19,23} and {19,24} on the way in is harmless and expected
--- -- both are `mod_bg_tiles BG1/BG2 {19,24}` door frames guarded by the
--- once-per-tile latch $01B5 (which is $1EB6 bit 5, cleared by player.asm
--- :529-531 on every step, NOT a story switch -- see gen_vector_sneak.lua).
+-- Stepping onto {19,23} and {19,24} on the way in is harmless and expected:
+-- both are `mod_bg_tiles BG1/BG2 {19,24}` door frames guarded by the
+-- once-per-tile latch $01B5, which is $1EB6 bit 5, cleared by player.asm
+-- :529-531 on every step and not a story switch (see gen_vector_sneak.lua).
 local H = dofile("tools/tests/lib/ot6.lua")
 
 local function map() return H.mapId() & 0x1ff end
@@ -88,9 +88,9 @@ end
 
 local DELTA = { up = { 0, -1 }, right = { 1, 0 }, down = { 0, 1 }, left = { -1, 0 } }
 
--- Tap `dir` whenever the party has control, hands off while a scene owns
--- it, edge-A through dialogs.  Used to walk INTO a trigger whose scene then
--- takes over -- the tap keeps the party from sliding past the tile.
+-- Tap `dir` whenever the party has control, hold off while a scene controls
+-- it, edge-A through dialogs.  Used to walk into a trigger whose scene then
+-- takes over; the tap keeps the party from sliding past the tile.
 local function tapInto(dir, pred, maxFrames, what)
   local phase, n, ph, calm, hb = 0, 0, 0, 0, 0
   return H.driveUntil(function()
@@ -116,11 +116,11 @@ local function tapInto(dir, pred, maxFrames, what)
       end
       if phase == 0 then
         H.setPad({})
-        -- STOP TAPPING once we are where we were going.  The terminator
-        -- wants 16 consecutive calm frames on the target, and an eager tap
-        -- walks straight off it before the count gets there: the first
-        -- version of this rode the chute correctly to (10,45) and then
-        -- tapped itself to (10,46) and timed out.
+        -- Stop tapping once the party is on the target tile.  The
+        -- terminator needs 16 consecutive calm frames there, and a further
+        -- tap walks off it before the count completes: the first version of
+        -- this rode the chute correctly to (10,45), then tapped itself to
+        -- (10,46) and timed out.
         if pred() then return end
         if settled() then phase, n = 1, 0 end
         return
@@ -170,9 +170,9 @@ H.run({ maxFrames = 60000 }, {
     H.assertEq(H.fieldX(), 28, "boot x")
     H.assertEq(H.fieldY(), 8, "boot y")
     -- Positive control for the step itself: the chute's landing zone must be
-    -- unreachable on foot RIGHT NOW.  If it ever becomes reachable this
-    -- generator is walking somewhere it thinks it is riding, and the
-    -- assertion below that we ended at (10,45) would stop proving anything.
+    -- unreachable on foot at this point.  If it becomes reachable, this
+    -- generator is walking a route it treats as a ride, and the assertion
+    -- below that the party ended at (10,45) would no longer mean anything.
     H.assertEq(H.bfsPath(10, 45), nil,
       "CONTROL: (10,45) is NO-PATH on foot from the landing -- the chute "
       .. "is the only way down")
@@ -209,7 +209,7 @@ H.run({ maxFrames = 60000 }, {
   end),
   H.saveState("mrf_chute.mss"),
 
-  -- 3. census of the lower half, to plan the next step off measurement.
+  -- 3. census of the lower half, so the next step is planned from measurement.
   H.call(function()
     census("mrf_chute", {
       { 11, 45, "_cc78d0" },

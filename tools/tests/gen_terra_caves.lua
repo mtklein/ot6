@@ -2,11 +2,11 @@
 -- once used and go under Narshe through the mines.
 -- Generates one state:
 --   terra_caves.mss  map 41 (7,33), the Narshe mines, first controllable
---                    frame inside -- the entry point for the run to Arvis's
---                    house, and the only fixture in the chain that stands in
---                    this scenario's random-encounter pool.
+--                    frame inside.  This is the entry point for the run to
+--                    Arvis's house, and the only fixture in the chain that
+--                    stands in this scenario's random-encounter pool.
 --
--- ================== THE WAY ON IS AN EXAMINE, NOT A DOOR ==================
+-- The way on is an examine action, not a door.
 -- gen_terra_narshe leaves the party at (39,53) with the checkpoint sealed
 -- behind an event that shoves it back every time.  The 231-tile southern
 -- strip it is confined to holds exactly one way out, and it is not on any
@@ -14,35 +14,36 @@
 -- and _ccb133 (:104337) reads
 --     if_any  $01F0=1 / $01B4=0 / $01B0=0 / $0020=0  -> _ccb154
 --     _ccb154 if_any  $0019=0 / $01F0=1 / $01B4=0 / $01B0=0 -> EventReturn
--- $01B0-$01B7 ARE NOT STORY SWITCHES.  Switch N lives at bit N&7 of
--- $1E80+(N>>3), so $01B0..$01B7 alias $1EB6 -- the field engine's live
+-- $01B0-$01B7 are not story switches.  Switch N lives at bit N&7 of
+-- $1E80+(N>>3), so $01B0..$01B7 alias $1EB6, the field engine's live
 -- control-flags byte, rewritten every frame by UpdateCtrlFlags
 -- (field/event.asm:5415-5432): bits 0-3 are the party's facing one-hot in
 -- the engine's 0=up 1=right 2=down 3=left order, bit 4 is "A is held", bit 5
 -- is the once-per-tile latch.  So
 --     $01B0 = facing UP      $01B4 = A held
--- and both of those guards say the same thing: THE PARTY MUST BE STANDING ON
--- (15,57) PRESSING A WHILE IT FACES UP.  Walk onto the tile and nothing
--- happens -- the trigger runs, sees $01B4=0, and returns -- which is exactly
--- what "the scenario dead-ends outside Narshe" looks like from the outside.
+-- and both guards require the same thing: the party must be standing on
+-- (15,57) pressing A while facing up.  Walking onto the tile does nothing
+-- visible, because the trigger runs, sees $01B4=0, and returns; from outside
+-- that looks like the scenario dead-ending outside Narshe.
 -- The scenario brief predicted this reading would be needed on the river; it
--- is needed here instead, and it is the same $1EB6.
+-- is needed here instead, on the same $1EB6.
 --
--- WHY THE $0020 TERM MATTERS.  _ccb133's first if_any routes on $0020: with
--- it SET the fall-through runs _ccb148 (a bare shake/sfx that just re-opens
+-- Why the $0020 term matters.  _ccb133's first if_any routes on $0020: with
+-- it set the fall-through runs _ccb148 (a bare shake/sfx that re-opens
 -- the wall for the later Kefka approach, gated on $0076/$006B), and with it
--- CLEAR the branch is _ccb154, this scenario's scene -- TERRA remembering
+-- clear the branch is _ccb154, this scenario's scene: TERRA remembering
 -- Locke, EDGAR finding the switch (dlg $01AA/$01AB, :104396/:104412),
--- `call _ccb1e7` re-tiling BG1/BG2 at {14,54} 3x3 to punch the hole open
+-- `call _ccb1e7` re-tiling BG1/BG2 at {14,54} 3x3 to open the hole
 -- (:104450), and finally `switch $01F0=1 / switch $0020=1 / switch $0608=0`
--- (:104447-104449).  terra_narshe asserts both clear so the branch is not a
--- guess.
+-- (:104447-104449).  terra_narshe asserts both clear, so the branch is known
+-- rather than assumed.
 --
--- THE HOLE OPENS AT (15,56), which is map 20's short entrance to map 41
--- (7,33) -- and map 41's own (7,34) leads straight back to map 20 (15,57),
--- so the arrival tile is one step from the way home.  BFS models passability
+-- The hole opens at (15,56), which is map 20's short entrance to map 41
+-- (7,33).  Map 41's own (7,34) leads straight back to map 20 (15,57),
+-- so the arrival tile is one step from the way back.  BFS models passability
 -- and knows nothing about entrance triggers, so the walk into the mines is a
--- single deliberate held step, not a navTo that might wander back through.
+-- single deliberate held step rather than a navTo that might walk back
+-- through.
 local H = dofile("tools/tests/lib/ot6.lua")
 local DOOR = "build/states/terra_narshe.mss.lua"
 
@@ -99,30 +100,31 @@ H.run({ maxFrames = 60000 }, {
   end),
 
   -- ===================================================================== --
-  -- TO THE WALL, then FACE UP AND PRESS A.  Facing is set by a press into
-  -- (15,56), which is still solid rock at this point -- a blocked press
+  -- To the wall, then face up and press A.  Facing is set by a press into
+  -- (15,56), which is still solid rock at this point: a blocked press
   -- turns the party without moving it, the same idiom gen_narshe_escape
   -- uses to face Arvis.  Only then is A edge-pressed, and the phase ends
   -- when the scene picks up rather than after a fixed number of tries.
   -- ===================================================================== --
-  -- issue #75: playBattles=true on every navigator -- map 20's streets draw
-  -- no encounters, so nothing changes on the happy path, but a battle that
-  -- ever did fire here would be fought by real input, never write-cleared.
+  -- issue #75: playBattles=true on every navigator.  Map 20's streets draw
+  -- no encounters, so nothing changes on the expected path, but a battle
+  -- that did fire here would be fought by real input rather than
+  -- write-cleared.
   H.navTo(15, 57, { maxFrames = 12000, playBattles = true }),
   H.release(),
   H.call(function() where("at the wall") end),
   --
-  -- A MUST STAY DOWN AFTER THE TRIGGER FIRES.  $01B4 is not a latch -- it is
-  -- bit 4 of $1EB6, rewritten from the live pad every frame -- and _ccb154
-  -- re-reads it in its OWN guard, a couple of opcodes after _ccb133 jumped
-  -- there.  A first cut ended this phase on `H.eventRunning()` and released
-  -- the pad, and the measurement is unambiguous: at f739 $1EB6 read $11
+  -- A must stay held after the trigger fires.  $01B4 is not a latch; it is
+  -- bit 4 of $1EB6, rewritten from the live pad every frame, and _ccb154
+  -- re-reads it in its own guard a couple of opcodes after _ccb133 jumped
+  -- there.  A first version ended this phase on `H.eventRunning()` and
+  -- released the pad.  The measurement: at f739 $1EB6 read $11
   -- (facing up + A held) and the event started, then A came up, _ccb154's
-  -- `if_any $01B4=0` took EventReturn, and the trigger simply re-fired and
-  -- re-returned for 20,000 frames -- eventRunning() flapping true/false on
-  -- alternate samples with the party standing still on (15,57) and $01F0
-  -- never set.  So this phase ends on $01F0 ALONE and keeps edge-pressing A
-  -- straight through the scene, where it doubles as the tap for dlg $01AA
+  -- `if_any $01B4=0` took EventReturn, and the trigger re-fired and
+  -- re-returned for 20,000 frames, with eventRunning() alternating
+  -- true/false between samples, the party standing still on (15,57), and
+  -- $01F0 never set.  So this phase ends on $01F0 only and keeps
+  -- edge-pressing A through the scene, where the same press taps dlg $01AA
   -- and $01AB.
   H.driveUntil(function() return sw(0x01F0) == 1 end, 8000, (function()
     local aPh = 0
@@ -136,10 +138,10 @@ H.run({ maxFrames = 60000 }, {
             tostring(H.hasControl()), tostring(H.eventRunning()),
             tostring(H.dialogWaiting())))
         end
-        -- 0 = up (BitOrTbl's order, field/event.asm:5523).  UP is only
-        -- pressed to TURN, and only while the party is ours to turn: (15,56)
+        -- 0 = up (BitOrTbl's order, field/event.asm:5523).  UP is pressed
+        -- only to turn, and only while the party is controllable: (15,56)
         -- is solid rock until the scene runs, so the press turns without
-        -- moving -- but once the hole is open the same press would walk the
+        -- moving.  Once the hole is open the same press would walk the
         -- party into map 41 ahead of the asserts below.
         if H.hasControl() and H.tileAligned() and facing() ~= 0 then
           H.setPad({ "up" }); return
@@ -150,16 +152,16 @@ H.run({ maxFrames = 60000 }, {
   end)(), "press A facing UP on (15,57) -- _ccb133 -> _ccb154"),
   H.release(),
   --
-  -- NO SETTLE ON (15,57), AND THAT IS DELIBERATE.  The party is standing ON
+  -- There is deliberately no settle on (15,57).  The party is standing on
   -- _ccb133's trigger tile, and with $01F0 now set the trigger re-fires and
-  -- immediately EventReturns every time it is looked at -- so eventRunning()
-  -- and hasControl() flap on alternate samples forever.  A settle predicate
-  -- wanting 20 consecutive calm frames here never gets 2: measured as a
-  -- 20,000-frame timeout with the party motionless, `ctl=false ev=true` and
-  -- `ctl=true ev=false` three frames apart.  The cure is not a better
-  -- predicate, it is to stop standing on the trigger -- so the asserts below
-  -- are on switches (which do not flap) and the very next thing this script
-  -- does is walk off the tile.
+  -- immediately EventReturns each time it is checked, so eventRunning()
+  -- and hasControl() alternate between samples indefinitely.  A settle
+  -- predicate wanting 20 consecutive calm frames here never gets 2:
+  -- measured as a 20,000-frame timeout with the party motionless,
+  -- `ctl=false ev=true` and `ctl=true ev=false` three frames apart.  The fix
+  -- is to stop standing on the trigger rather than to write a better
+  -- predicate, so the asserts below read switches (which are stable) and the
+  -- next thing this script does is walk off the tile.
   H.waitFrames(90),
   H.call(function()
     H.assertEq(sw(0x01F0), 1, "$01F0 set -- _ccb154 ran (:104447)")
@@ -177,10 +179,10 @@ H.run({ maxFrames = 60000 }, {
   end),
 
   -- ===================================================================== --
-  -- INTO THE MINES.  A held step, not a navTo: (15,56) is an entrance tile
-  -- and map 41's arrival (7,33) sits one tile from (7,34), the way straight
-  -- back out -- the same bracketed-arrival shape gen_lete and gen_returner
-  -- both had to plan around.
+  -- Into the mines, with a held step rather than a navTo: (15,56) is an
+  -- entrance tile and map 41's arrival (7,33) sits one tile from (7,34), the
+  -- way straight back out.  This is the same bracketed-arrival shape
+  -- gen_lete and gen_returner both had to plan around.
   -- ===================================================================== --
   H.driveUntil(function() return map() ~= 20 end, 3000, {
     H.hold({ "up" }), H.waitFrames(8), H.release(), H.waitFrames(4),

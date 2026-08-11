@@ -1,50 +1,50 @@
 -- @suite savestate=kefka_entry
--- battle_kefka.lua -- the generated-savestate test for v0.3's stop-line boss: the
--- Battle for Narshe's KEFKA, fought for REAL from kefka_entry.mss
--- (party 1 = TERRA+EDGAR+CELES at (19,36), KEFKA one tile below --
--- gen_narshe_battle generates it; suite.sh adds this test when the fixture
+-- battle_kefka.lua -- the generated-savestate test for v0.3's stop-line boss:
+-- the Battle for Narshe's KEFKA, fought for real from kefka_entry.mss
+-- (party 1 = TERRA+EDGAR+CELES at (19,36), KEFKA one tile below;
+-- gen_narshe_battle generates it, and suite.sh adds this test when the fixture
 -- exists and reports `skip` when it does not, the battle_vargas pattern).
 --
--- What it asserts, and why each line is the one that matters:
+-- What it asserts:
 --   1. battle 57 seeds formation 505: KEFKA_NARSHE $014A alone, gauge
 --      6/6 and class row $03 = OT6_SLASH|OT6_PIERCE straight off
---      Ot6ShieldTbl (ot6.asm) -- the authored row, not the formula.
---   2. THE ELEMENT ADD IS LIVE.  His weak byte reads EXACTLY $09 =
---      fire|poison.  Vanilla KEFKA_NARSHE has NO weakness, so the whole
---      byte is Ot6ElemAddTbl's row -- this is the assertion that fails
---      if that row is dropped (battle_vargas's poison|holy $28, one boss
+--      Ot6ShieldTbl (ot6.asm), which is the authored row rather than the
+--      formula.
+--   2. the element add is live.  His weak byte reads exactly $09 =
+--      fire|poison.  Vanilla KEFKA_NARSHE has no weakness, so the whole
+--      byte comes from Ot6ElemAddTbl's row, and this assertion fails
+--      if that row is dropped (battle_vargas checks poison|holy $28, one boss
 --      later).
---   3. CLASS SHIELDS CHIP UNDER REAL INPUT.  The party's own weapon
+--   3. class shields chip under real input.  The party's own weapon
 --      swings must remove two gauge points and reveal the class before
 --      the fight ends.  Axis-by-axis coverage belongs to battle_class;
 --      tying this story test to incidental party equipment and ATB order
 --      made it brittle.
---   4. THE SCRIPTED WIN TAKES IT, on real damage.  The fight is PLAYED
---      to its own end (if_b_switch $40 -> _ccbcb1): the party is NOT
---      warped to the {25,5} lose-path save point and the win scene owns
---      the stage.
+--   4. the scripted win branch runs, on real damage.  The fight is played
+--      to its own end (if_b_switch $40 -> _ccbcb1): the party is not
+--      warped to the {25,5} lose-path save point and the win scene runs.
 --
 -- Issue #75 conversion.  Three write idioms are gone:
---   * party HP := max + ATB := $1000 every frame ("keep the rotation
---     moving") -- replaced by gen_narshe_battle's input-driven fighter, the
---     machine that beats this exact battle to generate the fixture: one
+--   * party HP := max and ATB := $1000 every frame, to keep the rotation
+--     moving, replaced by gen_narshe_battle's input-driven fighter, the
+--     code that beats this battle to generate the fixture: one
 --     button per 30-frame pulse once the menu flag holds, a per-turn
 --     sequence built live from the actor's id and banked BP (boost to
 --     2-3 and dump; EDGAR's AutoCrossbow at tier 2+; CELES's Runic at
---     tier 3+ -- it eats KEFKA's Ice 2; Fight otherwise), and a
+--     tier 3+, which absorbs KEFKA's Ice 2; Fight otherwise), and a
 --     stall-recovery tail (A, A, B, rebuild).
---   * KEFKA MHP := 1 after two chips ("the vargas clamp idiom") -- the
+--   * KEFKA MHP := 1 after two chips (the vargas clamp idiom).  The
 --     fight now runs on real damage until his own script ends it.
 --   * losses are handled the way the generator handles them: the
---     entry point is captured ONCE at boot (a savestate blob in memory,
---     zero writes) and a lost attempt reloads it and escalates the
---     policy tier, three attempts total -- the same ladder that generated
---     the fixture, so a fixture this test can boot is a fixture this
---     ladder can beat.
+--     entry point is captured once at boot (a savestate blob in memory,
+--     with no writes) and a lost attempt reloads it and escalates the
+--     policy tier, for three attempts total.  That is the same ladder that
+--     generated the fixture, so a fixture this test can boot is a fixture
+--     this ladder can beat.
 --
--- FIXTURE VINTAGE NOTE (2026-08-10): kefka_entry.mss is the July 30
--- generation -- stamp-fresh against current sources, but generated before
--- the chain's own input-driven conversion caught up to this tier.  The
+-- Fixture vintage note (2026-08-10): kefka_entry.mss is the July 30
+-- generation, stamp-fresh against current sources, but generated before
+-- the chain's own input-driven conversion reached this tier.  The
 -- input-driven regeneration replaces the bytes, not this test.
 local H = dofile("tools/tests/lib/ot6.lua")
 local DOOR = "build/states/kefka_entry.mss.lua"
@@ -200,8 +200,8 @@ local function attempt(n)
         0, -1, false, 0, 0
       lostWhy = nil
     end),
-    -- activation: face down once, then CLEAN edge-A (a held direction
-    -- starves CheckNPCs -- measured, probe_kefka_npc)
+    -- activation: face down once, then a clean edge-A (a held direction
+    -- starves CheckNPCs; measured in probe_kefka_npc)
     H.hold({ "down" }), H.waitFrames(4), H.release(), H.waitFrames(8),
     H.driveUntil(function() return H.battleLoadStarted() end, 2000, {
       H.hold({ "a" }), H.waitFrames(8), H.release(), H.waitFrames(8),
@@ -273,7 +273,7 @@ H.run({ maxFrames = 300000 }, {
       "at (19,36), KEFKA's entry point")
     H.assertEq(H.readByte(0x1a6d), 1, "party 1 (TERRA+EDGAR+CELES) active")
   end),
-  -- capture the entry point ONCE: the retry ladder's rewind point (this
+  -- capture the entry point once: the retry ladder's rewind point (this
   -- boot's own state; nothing is written to the game)
   (function()
     local req
@@ -291,7 +291,7 @@ H.run({ maxFrames = 300000 }, {
   attempt(2),
   attempt(3),
 
-  -- the win verdict: chips actually happened, and the WIN branch ran
+  -- the win verdict: chips happened, and the win branch ran
   H.call(function()
     H.assertEq(won, true,
       "KEFKA beaten within 3 attempts (real damage, real menus)")

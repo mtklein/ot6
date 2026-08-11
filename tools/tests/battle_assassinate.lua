@@ -2,56 +2,56 @@
 --
 --   tools/tests/run.sh tools/tests/battle_assassinate.lua
 --
--- STATUS: evidence scaffold, not in suite.sh (unchanged by the #75
--- conversion; promoting it is a separate call).
+-- Status: evidence scaffold, not in suite.sh (unchanged by the #75
+-- conversion; promoting it is a separate decision).
 --
 -- Ot6Assassinate (ot6_divine.asm:174) is hooked at the same seam Oblivion
--- uses -- just after ChooseTarget in CalcAttackEffect -- and fires when
+-- uses, just after ChooseTarget in CalcAttackEffect, and fires when
 -- SHADOW (char id $03) lands an attack on a Broken (OT6_BROKEN_TICKS $3e88
 -- nonzero) non-boss ($3aa1 bit 2 clear) while his once-per-battle divine
 -- (OT6_DIVINE_USED, $3ecb) is unspent.  It marks Death in the target's
 -- $3dd4 and spends the latch.
 --
--- ISSUE #75 CONVERSION -- a REAL SHADOW, and the break is EARNED.  The old
+-- Issue #75 conversion: a real Shadow, and the break is earned.  The old
 -- scaffold installed CHAR::SHADOW into every slot of the entry-point
--- fixture, forged command rows, pinned guard HP to $F000, and painted
--- Broken/boss states on with
--- writes.  It now boots camp_escaped -- the input-driven post-Magitek savestate,
--- world (179,71), SABIN + SHADOW + CYAN, Shadow's own record carrying
--- Fight and his Imperial ($25, PIERCE per Ot6WeapClassTbl) -- and walks
+-- fixture, forged command rows, pinned guard HP to $F000, and wrote the
+-- Broken and boss states directly.
+-- It now boots camp_escaped, the input-driven post-Magitek savestate at
+-- world (179,71), party SABIN + SHADOW + CYAN, with Shadow's own record
+-- carrying Fight and his Imperial ($25, PIERCE per Ot6WeapClassTbl), and walks
 -- into the real local pool (measured 2026-08-10: species $2f 243hp
--- PIERCE-weak x3 / $29+$18 SLASH-weak mixes, all 3 shields, none
--- death-protected).  Draws without >= 2 PIERCE-weak 200+hp bodies are
--- fled; on a suitable draw SHADOW HIMSELF chips a real gauge to Broken
+-- PIERCE-weak x3, and $29+$18 SLASH-weak mixes, all 3 shields, none
+-- death-protected).  Draws without at least two PIERCE-weak 200+hp bodies are
+-- fled; on a suitable draw Shadow chips a real gauge to Broken
 -- with his own weapon class while the bench answers its menus with real
--- Defends (slotsboot's idiom -- no damage, so every monster HP drop is
--- Shadow's).
+-- Defends (slotsboot's idiom; they deal no damage, so every monster HP drop
+-- is Shadow's).
 --
--- OBSERVATION is read-only and mechanism-exact: a pc-gated write watch on
--- the monster $3dd4 cells counts Death marks written FROM INSIDE
+-- The observation is read-only and mechanism-exact: a pc-gated write watch on
+-- the monster $3dd4 cells counts Death marks written from inside
 -- Ot6Assassinate (the divine's own kill), and the $3ecb latch byte is
--- read.  That replaces the old "did the guard's wound bit set" assert,
--- which a plain 4x-broken damage kill would confound (243hp bodies die
--- to plain damage too).
+-- read.  That replaces the old check on whether the guard's wound bit set,
+-- which a plain 4x-broken damage kill would also satisfy, since 243hp bodies
+-- die to plain damage too.
 --
---   1. BROKEN NON-BOSS: Shadow chips a body to Broken, and his next landed
---      attack on it divine-kills: exactly one in-proc Death mark, on a
---      body whose Broken state was live, and the latch is SET.
---   2. ONCE PER BATTLE (loud): the same battle continues -- Shadow breaks
---      and strikes further bodies, monster HP keeps falling (the loud
---      control that he still acts and lands), yet the in-proc kill count
+--   1. Broken non-boss: Shadow chips a body to Broken, and his next landed
+--      attack on it divine-kills, giving exactly one in-proc Death mark on a
+--      body whose Broken state was live, with the latch set.
+--   2. once per battle: the same battle continues, Shadow breaks
+--      and strikes further bodies, and monster HP keeps falling (the control
+--      showing he still acts and lands), yet the in-proc kill count
 --      stays 1 and the latch byte never changes again.
 --
--- *** ONE LABELED ISOLATION ARM (issue #75) -- one write site STAYS ***
--- 3. THE BOSS CHECK.  No boss shares a battle with Shadow anywhere
+-- One labeled isolation arm (issue #75); one write site stays.
+-- 3. the boss check.  No boss shares a battle with Shadow anywhere
 --    in the generated tree (the camp pursuit is four troops; the Ghost Train
 --    boss has no entry-point fixture; the local pool carries no $3aa1.2
---    species -- measured), so the non-boss check's negative is an isolation
---    arm: a FRESH battle, a body chipped Broken by real play, then the ONE
---    write -- its $3aa1 bit 2 set, the exact bit a boss carries
---    (ScimitarEffect reads the same bit, battle_main.asm:9147) -- and
---    Shadow's next landed hit on it must fire NO divine and spend NO
---    latch.  It MAY NEVER PRODUCE FIXTURES; it converts organically when
+--    species, measured), so the non-boss check's negative is an isolation
+--    arm: a fresh battle, a body chipped Broken by real play, then the one
+--    write, setting its $3aa1 bit 2, the bit a boss carries
+--    (ScimitarEffect reads the same bit, battle_main.asm:9147), and
+--    Shadow's next landed hit on it must fire no divine and spend no
+--    latch.  It must never produce fixtures; it converts organically when
 --    a chain step generates a boss-with-Shadow entry point.  This is the file's
 --    only surviving write (.writeByte( waiver line).
 local H = dofile("tools/tests/lib/ot6.lua")
@@ -74,7 +74,7 @@ local function latchByte() return H.readByte(DIVINE_USED) end
 
 local shadowSlot, msPresent = nil, {}
 
--- ---- the in-proc kill watch: Death marks written BY the divine ----------
+-- ---- the in-proc kill watch: Death marks written by the divine ----------
 local ASSN = H.sym("Ot6Assassinate")
 local divineKills = {}          -- { m = body, brkAtKill = its last-seen brk }
 local lastBrk, lastHp = {}, {}
@@ -106,7 +106,7 @@ local function scanBodies()
   end
 end
 
--- ---- the action machine: SHADOW Fights, the bench Defends ---------------
+-- ---- the action driver: SHADOW Fights, the bench Defends ---------------
 local mf, hb = 0, -1200
 local function fightPulse()
   scanBodies()
@@ -226,7 +226,7 @@ add({
   H.waitFrames(20),
   H.loadState(STATE),
   H.waitFrames(20),
-  -- SHADOW to the BACK ROW, through the real Order screen (H.setRows).
+  -- SHADOW to the back row, through the real Order screen (H.setRows).
   -- Measured: his front-row Fight lands ~110 on a shielded 243-hp body, so
   -- a 3-shield gauge (chips are -1 per landed weak-class hit) damage-kills
   -- at shield 1 and nothing ever breaks.  The back row halves his physical
@@ -236,7 +236,7 @@ add({
   H.setRows({ [SHADOW] = true }, { tag = "shadow back row" }),
 })
 
--- ===================== BATTLE 1: arms 1 + 2 ================================
+-- ===================== battle 1: arms 1 and 2 ==============================
 add(encounter("battle 1"))
 add({
   H.call(function()
@@ -248,8 +248,8 @@ add({
   end),
   -- arm 1: chip to Broken and let the next landed hit assassinate.  The
   -- drive also exits on battle end, so a fight that damage-kills everything
-  -- before a break fails on the assert below with the ledger in the log,
-  -- not on a mute timeout.
+  -- before a break fails on the assert below with the ledger in the log
+  -- rather than on a silent timeout.
   H.driveUntil(function()
     return #divineKills >= 1 or not H.battleLoadStarted()
   end, 30000, { H.call(fightPulse), H.waitFrames(2) },
@@ -299,10 +299,10 @@ add({
   end),
 })
 
--- ============== BATTLE 3: *** LABELED ISOLATION ARM (issue #75) ***
--- The boss check, with the one injected bit -- see the header.  A fresh
--- battle (fresh latch), a body Broken by real chips, then $3aa1.2 is SET on
--- it and Shadow's next landed hit must decline: no in-proc Death mark, no
+-- ============== battle 3: the labeled isolation arm (issue #75)
+-- The boss check, with the one injected bit; see the header.  A fresh
+-- battle (fresh latch), a body Broken by real chips, then $3aa1.2 is set on
+-- it and Shadow's next landed hit must decline: no in-proc Death mark and no
 -- latch spend.  The write below is this file's only one and may never
 -- produce fixtures.
 add({
@@ -318,12 +318,11 @@ add({
       .. "is what routes execution to the boss check)")
     H.vars.bossBody = nil
   end),
-  -- chip until SOME body is Broken, with no divine yet possible?  The
-  -- divine WOULD fire on the first post-break hit -- so the injection must
-  -- land in the same frame the break is first seen.  The pulse's per-frame
-  -- scan gives exactly that window: inject as soon as brk != 0 and before
-  -- the next landed hit resolves (hit resolution takes whole action rounds;
-  -- one frame is comfortably inside it).
+  -- chip until some body is Broken.  The divine would fire on the first
+  -- post-break hit, so the injection must land in the same frame the break is
+  -- first seen.  The pulse's per-frame scan gives that window: inject as soon
+  -- as brk != 0 and before the next landed hit resolves (hit resolution takes
+  -- whole action rounds, so one frame is well inside it).
   H.driveUntil(function()
     for _, m in ipairs(msPresent) do
       if present(m) and brk(m) ~= 0 and mhp(m) > 0 then
@@ -336,7 +335,7 @@ add({
     "a body breaks by real chips (isolation arm)"),
   H.call(function()
     local m = H.vars.bossBody
-    H.writeByte(0x3AA1 + ent(m), aa1(m) | 0x04)   -- THE arm's write (header)
+    H.writeByte(0x3AA1 + ent(m), aa1(m) | 0x04)   -- the arm's one write (header)
     lastBrk, lastHp = {}, {}
     hpDrops, brokenHits = 0, 0
     divineKills = {}

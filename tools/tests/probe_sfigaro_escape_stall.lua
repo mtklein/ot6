@@ -1,8 +1,8 @@
--- probe_sfigaro_escape_stall.lua -- REPRODUCTION INSTRUMENT, temporary.
+-- probe_sfigaro_escape_stall.lua -- reproduction instrument, temporary.
 -- gen_tunnelarmr's escape step parks at (41,43) with no control and no plan
 -- for 20000 frames on the "map 87 (57,48) -> map 86 (49,31)" crossing.
--- Map 87 has NO event triggers and NO npcs in the tables, so nothing
--- SHOULD be able to take control there.  This replays the route to the
+-- Map 87 has no event triggers and no NPCs in the tables, so nothing
+-- should be able to take control there.  This replays the route to the
 -- park and dumps every control-gate cell hasControl() reads, the event PC,
 -- the dialog/choice cells, and the whole object table, plus screenshots.
 local H = dofile("tools/tests/lib/ot6.lua")
@@ -110,7 +110,7 @@ H.run({ maxFrames = 80000 }, {
   go(15, 51, 87, 20, 33, "clock passage -> map 87"),
   H.call(function() dump("map 87 landing") end),
 
-  -- Walk toward (57,48) the way navTo would, but STOP the moment control
+  -- Walk toward (57,48) the way navTo would, but stop as soon as control
   -- goes away for 30 consecutive frames, then observe without touching
   -- the pad.
   (function()
@@ -149,7 +149,7 @@ H.run({ maxFrames = 80000 }, {
     dump("t+1020")
     H.screenshot("stall_t1020")
   end),
-  -- would an A press clear it?  tap A for a while, then dump again.
+  -- test whether an A press clears it: tap A for a while, then dump again.
   (function()
     local ph, waited = 0, 0
     return H.driveUntil(function()

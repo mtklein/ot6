@@ -1,22 +1,21 @@
 -- gen_lete.lua -- from banon_joined.mss (map 112, the passage out of the
--- Returner Hideout) onto the LETE RIVER map, one tile from the raft.
+-- Returner Hideout) onto the Lete River map, one tile from the raft.
 -- Generates one state:
 --   lete_river.mss  map 113 (30,50), controllable, with the raft's boarding
---                   trigger at (31,51) unfired -- the entry point
---                   gen_scenario rides from, and the fixture anything that
---                   wants to study the river (or the vanilla loop) should
---                   start at.
+--                   trigger at (31,51) unfired.  This is the entry point
+--                   gen_scenario rides from, and the fixture to start from
+--                   when studying the river or the vanilla loop.
 --
--- A SHORT LINK ON PURPOSE.  The ride itself is long, forced, and full of
--- battles, and it is the part worth iterating on; keeping the walk to it in
--- its own script means a failed experiment on the river costs ~400 frames of
--- replay instead of the whole hideout.
+-- This script is deliberately short.  The ride itself is long, forced, and
+-- full of battles, and it is the part worth iterating on; keeping the walk to
+-- it in its own script means a failed experiment on the river costs ~400
+-- frames of replay instead of the whole hideout.
 --
--- THE ONE HAZARD IS THE TILE THE PARTY IS STANDING NEXT TO.  Map 112 has two
--- entrance records (ShortEntrance::_112): (7,42) -> map 110 (50,52) and
+-- Hazard: the tile the party stands next to.  Map 112 has two entrance
+-- records (ShortEntrance::_112): (7,42) -> map 110 (50,52) and
 -- (8,60) -> map 113 (30,50).  _cafff0 lands the party at (7,42) and walks it
 -- `move DOWN, 1` (event_main.asm:37872-37879), so it comes to rest on (7,43)
--- with the way back to the hideout DIRECTLY NORTH of it -- the same shape
+-- with the way back to the hideout directly north of it, the same shape
 -- gen_returner hit twice on Mt. Kolts.  BFS models passability and knows
 -- nothing about entrance triggers, so the plan south is checked against
 -- (7,42) before a step is taken.
@@ -24,10 +23,11 @@
 -- Map 112 has no NPCs and no event triggers at all (NPCProp::_112 and
 -- EventTrigger::_112 are both empty), so nothing else here can fire.
 --
--- ISSUE #75 -- ZERO-WRITE: both navigators run with opts.playBattles.  Map
--- 112 rolls no encounters, so the battle branch should never fire --
--- playBattles mode makes that a property of the code path, not a hope: a
--- battle here would be fought with real input, never write-cleared.
+-- Issue #75, zero-write: both navigators run with opts.playBattles.  Map
+-- 112 rolls no encounters, so the battle branch should never fire.
+-- playBattles mode makes that a property of the code path rather than an
+-- assumption: a battle here would be fought with real input, never
+-- write-cleared.
 local H = dofile("tools/tests/lib/ot6.lua")
 local DOOR = "build/states/banon_joined.mss.lua"
 
@@ -106,7 +106,7 @@ H.run({ maxFrames = 40000 }, {
     H.assertEq(H.tileAligned(), true, "tile-aligned")
     H.assertEq(H.battleLoadStarted(), false, "no battle")
     -- the boarding trigger is (31,51), _cb059f (event_trigger.asm:462);
-    -- it has NOT fired, which is exactly what makes this an entry point
+    -- it has not fired, which is what makes this an entry point
     H.assertEq(sw(0x01B5), 0,
       "$01B5 clear -- _cb059f's re-entry guard is unarmed, the raft is unboarded")
     H.assertEq(sw(0x0019), 0, "$0019 clear -- the ride has not started")

@@ -1,33 +1,34 @@
 -- gen_opera6_rafter.lua -- v0.5 Beat A step 6: opera_dance_done (map 238
--- {98,7}, $0111=1) -> the RAFTER CHASE -> generate ultros2_entry one
+-- {98,7}, $0111=1) -> the rafter chase -> generate ultros2_entry one
 -- interaction before battle 104 (Ultros②, $012d, 6 shields, slash|pierce).
 --
 -- Measured route: touch Ultros's letter, return through the active theater to
 -- alert the Impresario, ride the briefing, talk to the stage master, operate
 -- the far-right switch, enter the left framework, and cross map 235 to Ultros.
 --
--- THE RAT GATES ARE PLAYED (issue #75).  The five rat NPCs ({8,11} {11,15}
--- {18,14} {21,7} {13,12}, switches $034C-$0350, npc_prop.asm _235) used to
--- be switched off before map 235 instantiated; now they wander live.  Each
--- is a no_react collision NPC whose event is `battle 25` -> win despawns it
--- and clears its switch, loss restarts the chase (_caba0b).  The catwalk
--- crossing simply FIGHTS whichever rats collide -- navTo's playBattles mode
--- taps the fight like any encounter -- inside the same 5-minute timer
--- (start_timer 0, 18000, event_main.asm:28736; it ticks through battles, so
--- the route stays lean and un-collided rats are left alone).  Before the
--- entry point generate the script WAITS until no live rat stands within 4
--- tiles of (14,7), so the banked state cannot boot into a rat collision
--- under battle_ultros2's immediate A-taps.
+-- The rat gates are played rather than switched off (issue #75).  The five rat
+-- NPCs ({8,11} {11,15} {18,14} {21,7} {13,12}, switches $034C-$0350,
+-- npc_prop.asm _235) used to be switched off before map 235 instantiated; now
+-- they wander live.  Each is a no_react collision NPC whose event is
+-- `battle 25`: a win despawns it and clears its switch, and a loss restarts
+-- the chase (_caba0b).  The catwalk crossing fights whichever rats collide,
+-- with navTo's playBattles mode tapping the fight like any encounter, inside
+-- the same 5-minute timer (start_timer 0, 18000, event_main.asm:28736; it
+-- ticks through battles, so the route stays short and rats that do not
+-- collide are left alone).  Before the entry point generate, the script waits
+-- until no live rat stands within 4 tiles of (14,7), so the banked state
+-- cannot boot into a rat collision under battle_ultros2's immediate A-taps.
 --
--- THE FACING IS EARNED, NOT POKED: the old generator wrote the object facing
--- byte and $0743 to point the party at Ultros; now the last act at the
--- entry point is a short RIGHT press against his occupied tile {15,7} -- a
--- blocked press turns the party in place -- and the facing is asserted
--- from RAM afterwards.  This file writes no emulated game state.
+-- The facing is produced by input rather than poked: the old generator wrote
+-- the object facing byte and $0743 to point the party at Ultros; now the last
+-- action at the entry point is a short RIGHT press against his occupied tile
+-- {15,7}, which is a blocked press that turns the party in place, and the
+-- facing is asserted from RAM afterwards.  This file writes no emulated game
+-- state.
 --
--- IMPORTANT: the WoB story encounter is `_cabf4b` -> battle 104.  Battle 134
+-- Note: the WoB story encounter is `_cabf4b` -> battle 104.  Battle 134
 -- belongs to the WoR Opera House dragon/weight event (`$0387=1`); older route
--- notes incorrectly conflated the two.
+-- notes conflated the two.
 local H = dofile("tools/tests/lib/ot6.lua")
 
 local function map() return H.mapId() & 0x1ff end
@@ -49,7 +50,7 @@ end
 
 -- rat bookkeeping: NPC_9..NPC_13 ride objects 24..28 (NPC_n = object
 -- n+15, gen_moogle's measured map), gates $034C..$0350 in list order.
--- A rat is LIVE while its gate switch is still set.
+-- A rat is live while its gate switch is still set.
 local function ratLine()
   local t = {}
   for k = 0, 4 do
@@ -73,8 +74,9 @@ local function ratNear(x, y, r)
   return false
 end
 
--- rideScene: the gen_zozo5_ramuh stall-safe cutscene rider (stall counter gated
--- on hasControl(), NOT eventRunning() -- issue #3, REQUIRED for v0.5 cutscenes).
+-- rideScene: the gen_zozo5_ramuh stall-safe cutscene rider.  The stall counter
+-- is gated on hasControl() rather than eventRunning(); see issue #3.  v0.5
+-- cutscenes require this.
 local function rideScene(pred, maxFrames, what)
   local aPh, stallN, lx, ly = 0, 0, -1, -1
   return H.driveUntil(function() local d=pred(); if d then H.setPad({}) end; return d end,
@@ -144,7 +146,7 @@ H.run({ maxFrames = 250000 }, {
   H.loadState("build/states/opera_dance_done.mss.lua"),
   H.waitFrames(60),
   H.call(function()
-    -- BOOT INVARIANTS (these are the only lines this file can guarantee until
+    -- Boot invariants (the only lines this file can guarantee until
     -- opera_dance_done can be generated).
     H.assertEq(map(), 238, "boot on the stage (map 238)")
     H.assertEq(sw(0x0111), 1, "$0111 SET -- the aria is solved (opera_dance_done)")
@@ -153,7 +155,7 @@ H.run({ maxFrames = 250000 }, {
     dumpsw("BOOT"); H.screenshot("rafter_boot")
   end),
 
-  -- STEP 1: walk into the envelope at {99,20} -> _cabf31 -> $0058=1.
+  -- Step 1: walk into the envelope at {99,20} -> _cabf31 -> $0058=1.
   bumpInto(99, 19, "down", function() return sw(0x0058)==1 or map()~=238 end, 6000,
     "touch the envelope -> $0058"),
   rideScene(function() return H.hasControl() and not H.dialogWaiting() end, 4000,
@@ -162,10 +164,10 @@ H.run({ maxFrames = 250000 }, {
     H.assertEq(sw(0x0058), 1, "$0058 SET -- Ultros threatened the opera")
     dumpsw("AFTER-ENVELOPE"); H.screenshot("rafter_ultros_dropped")
   end),
-  -- CHECKPOINT: this is a clean, cheap replay point for the steps below.
+  -- Checkpoint: a cheap replay point for the steps below.
   H.saveState("ultros_dropped.mss"),
 
-  -- STEP 2 (measured): 238 stage door -> 237, then the audience-floor step
+  -- Step 2 (measured): 238 stage door -> 237, then the audience-floor step
   -- trigger at {72,30}.  Since $0057=1, _ca5f48 loads map 233 (the active-opera
   -- variant of the theater), whose IMPRESARIO is still _cab724 at {15,46}.
   -- Stand above him at {15,45} and talk; the long 5-minute briefing lands on
@@ -189,7 +191,7 @@ H.run({ maxFrames = 250000 }, {
   end),
   H.saveState("rafter_briefing.mss"),
 
-  -- STEP 3: stage master, far-right switch, then the newly-opened far-left
+  -- Step 3: stage master, far-right switch, then the newly-opened far-left
   -- framework.  The room landings and stairs are Z-split, so the short raw
   -- presses below are measured joins around otherwise ordinary navTo steps.
   H.navTo(28,24,{maxFrames=6000,playBattles=true,arrive=function() return map()==232 end}),
@@ -217,8 +219,8 @@ H.run({ maxFrames = 250000 }, {
   H.waitUntil(function() return map()==232 and settled() end,1000,"left room",3),
   H.driveUntil(function() return H.fieldY()==13 end,500,{H.hold({"up"})},"leave left landing"),
   H.navTo(117,5,{maxFrames=2500,playBattles=true}),
-  -- The five rat gates stay LIVE (see the header): the catwalk is crossed
-  -- with navTo's playBattles mode, and a rat that collides fires battle 25 --
+  -- The five rat gates stay live (see the header): the catwalk is crossed
+  -- with navTo's playBattles mode, and a rat that collides fires battle 25,
   -- fought by the same taps; a win despawns it and clears its gate.
   H.navTo(117,3,{maxFrames=6000,playBattles=true,arrive=function() return map()==235 end}),
   H.waitUntil(function() return map()==235 and settled() end,1500,"framework",3),
@@ -240,7 +242,7 @@ H.run({ maxFrames = 250000 }, {
         H.setPad({down=true}) end) }, "step onto rafters") end)(),
 
   H.navTo(14,7,{maxFrames=30000,playBattles=true}),
-  -- face Ultros by INPUT: his NPC occupies {15,7}, so a short RIGHT press
+  -- face Ultros by input: his NPC occupies {15,7}, so a short RIGHT press
   -- is a blocked step that turns the party in place
   H.hold({ "right" }), H.waitFrames(6), H.release(), H.waitFrames(6),
   H.call(function()
@@ -250,8 +252,8 @@ H.run({ maxFrames = 250000 }, {
       "facing RIGHT at Ultros (EVENT_DIR 1), earned by the blocked press")
   end),
   -- the banked state must not boot into a rat collision: wait until no
-  -- LIVE rat stands within 4 tiles of the entry point (they wander off; the
-  -- timer has headroom for this wait, and the log shows the field)
+  -- live rat stands within 4 tiles of the entry point (they wander off; the
+  -- timer has headroom for this wait, and the log shows the positions)
   (function() local calm=0
     return H.driveUntil(function()
       calm = (settled() and not ratNear(14,7,4)) and calm+1 or 0

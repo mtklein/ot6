@@ -1,11 +1,12 @@
 #!/usr/bin/env python3
-"""Multi-hit audit: how many times does each ability actually strike? (#54)
+"""Multi-hit audit: how many times each ability strikes (#54)
 
-Phase 1 of docs/design/multi-hit.md.  Hit count is break rate -- each landed
-hit that matches a weakness chips a shield -- so the design pass needs the
-SHIPPED numbers, not the ones the kit docs assert.  This reads them out.
+Phase 1 of docs/design/multi-hit.md.  Hit count sets break rate, because each
+landed hit that matches a weakness chips a shield, so the design pass needs
+the shipped numbers rather than the ones the kit docs assert.  This script
+reads them out.
 
-WHAT DECIDES A HIT COUNT, and it is not a data field.  The engine has one
+Hit counts are set by code, not by a data field.  The engine has one
 multi-hit register: `$3a70`, "number of attacks (0 = 1 attack)"
 (battle_main.asm:6404).  The attack loop is
 
@@ -15,26 +16,26 @@ multi-hit register: `$3a70`, "number of attacks (0 = 1 attack)"
             pea  ExecAttack-1        ; battle_main.asm:8322-8328
     @3291:  rts
 
-so every extra count is a whole extra ExecAttack -> CalcTargetDmg pass, and
-therefore a whole extra chip opportunity.  Grepping the tree for every write
-to $3a70 is thus an EXHAUSTIVE enumeration of single-target multi-hit, and
+so every extra count is an extra ExecAttack -> CalcTargetDmg pass, and
+therefore an extra chip opportunity.  Grepping the tree for every write to
+$3a70 is therefore an exhaustive enumeration of single-target multi-hit, and
 there are only six writers (this script re-checks that the set has not
-grown, so the audit cannot silently go stale):
+grown, so the audit cannot go stale unnoticed):
 
     battle_main.asm:3495   FightAttack        = 1 (two hands), = 7 (Offering)
     ot6_boost.asm:247      Ot6FightBoost     += 2 per pending BP
     battle_main.asm:3943+  Jump/Dragon Horn  += 1..3 (random)
     battle_main.asm:8870   CheckWeaponMagic  += 1 (random weapon spellcast)
     battle_main.asm:10547  AttackerEffect_49 += 1 (magicite / random summon)
-    battle_main.asm:10784  AttackerEffect_32  = 3  -> FOUR attacks, random
+    battle_main.asm:10784  AttackerEffect_32  = 3  -> four attacks, random
                                                      target (quadra slam,
                                                      quadra slice)
     battle_main.asm:10987  AttackerEffect_36 += 1 (empowerer, at 1/4 power)
 
-TARGETS ARE NOT HITS.  An ability that strikes the whole enemy side lands
-ONE hit on each body -- four chips spread over four monsters, and exactly
-one against a boss.  That is a different lever from four hits on one target
-and the audit keeps them in separate columns.  Breadth comes from the
+Targets are not hits.  An ability that strikes the whole enemy side lands one
+hit on each body: four chips spread over four monsters, and one against a
+boss.  That is a different lever from four hits on one target, so the audit
+keeps them in separate columns.  Breadth comes from the
 targeting byte's INIT field (const.inc:1298-1302): INIT_SINGLE ($00)
 collapses the mask to one random body (ChooseTarget's `bit #$0c` /
 RandBit, battle_main.asm:14879-14889), anything else keeps every target in
@@ -75,8 +76,8 @@ MAGIC_NAMES = "ff6/src/text/magic_name_en.json"
 
 MAGIC_REC, ITEM_REC = 14, 30
 
-# AttackName index 0 is attack id $51 (index 12 = $5d = "Pummel", which is
-# the anchor -- Ot6SkillClassTbl:$5d and kits.md agree).
+# AttackName index 0 is attack id $51 (index 12 = $5d = "Pummel" is the
+# anchor; Ot6SkillClassTbl:$5d and kits.md agree).
 ATTACK_NAME_BASE = 0x51
 
 # special-effect ids that add attacks (see the header enumeration)
@@ -127,8 +128,8 @@ def target_desc(t):
 def parse_costs(root):
     """Ot6AbilityCostTbl (ot6_boost.asm): (key, cost) pairs, $ff-terminated.
 
-    Keyed by attack id for Blitz/SwdTech and by tool ITEM id for Tools --
-    the same keying ot6_class.asm uses, so a tool and a blitz can share a
+    Keyed by attack id for Blitz/SwdTech and by tool item id for Tools, the
+    same keying ot6_class.asm uses, so a tool and a blitz can share a
     number without colliding here (the ranges are disjoint: $55-$64 vs
     $a3-$aa).
     """
@@ -154,7 +155,7 @@ def parse_costs(root):
 
 
 def load_reach(root):
-    """Reuse check_break_reach's table parsers -- one parser, one truth."""
+    """Reuse check_break_reach's table parsers, so there is only one parser."""
     path = os.path.join(root, "tools", "check_break_reach.py")
     spec = importlib.util.spec_from_file_location("check_break_reach", path)
     mod = importlib.util.module_from_spec(spec)
@@ -174,7 +175,7 @@ def names(root, rel):
 
 
 def check_writers(root):
-    """Re-derive the $3a70 writer set; loudly refuse to be stale."""
+    """Re-derive the $3a70 writer set and fail if it has changed."""
     hits = []
     for dirpath, _dirs, files in os.walk(os.path.join(root, "ff6", "src")):
         for fn in files:
@@ -297,11 +298,11 @@ def main():
              r[14], elem_names(r[15]), class_names(data.weap_class[i]),
              r[20], eff, costs.get(i, 0))
 
-    # ---- 2b. the tools that resolve as SPELLS ----------------------------
+    # ---- 2b. the tools that resolve as spells ----------------------------
     # InitTarget_03 (battle_main.asm:6551-6558) rewrites five item ids into
-    # magic ids before the record is even loaded, so their real properties
-    # are in MagicProp, not ItemProp -- including Bio Blaster's, which is the
-    # ability #60 is about.
+    # magic ids before the record is loaded, so their real properties are in
+    # MagicProp rather than ItemProp.  That includes Bio Blaster, the ability
+    # #60 is about.
     print()
     print("== tools/throwables that resolve as a SPELL "
           "(ThrowToolsItemTbl, battle_main.asm:6635-6642) ==")

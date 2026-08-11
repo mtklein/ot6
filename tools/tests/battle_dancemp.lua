@@ -1,65 +1,68 @@
 -- @suite savestate=moogle_cleared slow
--- battle_dancemp.lua -- issue #34: Dance costs MP -- flat, paid at
--- dance-START, per docs/design/mp-economy.md's verb survey (Dance: "flat,
+-- battle_dancemp.lua -- issue #34: Dance costs MP, a flat amount paid at
+-- dance start, per docs/design/mp-economy.md's verb survey (Dance: "flat,
 -- paid at start", 4-10).
 --
 -- Ot6AbilityCost's cmd-$13 arm charges Ot6DanceCost (8 MP) when the
--- actor's DANCE status ($3ef8 bit 0) is still clear -- the commit moment --
--- and 0 on every mid-dance turn (RandDanceAction re-queues cmd $13 through
+-- actor's DANCE status ($3ef8 bit 0) is still clear, which is the commit
+-- moment, and 0 on every mid-dance turn (RandDanceAction re-queues cmd $13
+-- through
 -- the same CreateAction with the bit set).  The Dance menu shows the cost
 -- through the #35 display pattern's second consumer: Ot6DanceRowDecorate
 -- re-lays each column to [font][cost][name] (the Ot6ToolRowDecorate
 -- transform) and greys an unaffordable row via Ot6AbilityGrey; the #35
 -- wallet paints the actor's current MP on the window's top edge.
 --
--- ISSUE #75 CONVERSION -- the REAL MOG, and the game's own dance-learning.
--- The old header said Mog was not reachable yet; that is
--- STALE -- he leads P2 of the Narshe moogle defense (gen_moogle,
--- moogle_defense.mss, generated en route to moogle_cleared -- hence the
+-- Issue #75 conversion: the real Mog, and the game's own dance-learning.
+-- The old header said Mog was not reachable yet; that is no longer true,
+-- because he leads P2 of the Narshe moogle defense (gen_moogle,
+-- moogle_defense.mss, generated en route to moogle_cleared, hence the
 -- savestate=moogle_cleared line above, whose run refreshes both).  So every
 -- staging is gone: no CHAR::MOG installs, no command-row writes, no monster
--- stop/HP/death-proof pins, no $1d4c pin, no $267e rebuild.  In their
--- place, the game's own arming:
---   * the defense is DEPLOYED exactly as gen_moogle deploys it (P3 east,
+-- stop, HP or death-proof pins, no $1d4c pin, no $267e rebuild.  In their
+-- place, the game's own setup:
+--   * the defense is deployed as gen_moogle deploys it (P3 east,
 --     P2 west, P1 back to the choke), and the wave storm is fought with
---     plain tap-A -- except P2's battles, which are this test's subject;
---   * P2's FIRST wave battle is won with plain Fights, and the VICTORY is
+--     plain tap-A, except P2's battles, which are this test's subject;
+--   * P2's first wave battle is won with plain Fights, and the victory is
 --     what teaches Mog his first dance: the battle-end path sets the
 --     current background's dance in $1d4c ("mastered a new dance!",
---     battle_main.asm:15842) -- asserted as the delta, 0 before, the
---     BattleBGDance bit after.  Until then Mog has NO Dance command at all
---     (InitCmd_02 removes it on a zero mask, battle_main.asm:14129) --
---     also asserted, because it is the reason no earlier fixture could
+--     battle_main.asm:15842), asserted as a delta, 0 before and the
+--     BattleBGDance bit after.  Until then Mog has no Dance command at all
+--     (InitCmd_02 removes it on a zero mask, battle_main.asm:14129), which
+--     is also asserted, because it is the reason no earlier fixture could
 --     host this file with real inputs;
---   * P2's SECOND wave battle is the measurement: the known dance now
---     MATCHES the battle background BY CONSTRUCTION (it was learned on
---     this very terrain), so Cmd_13's 50% bg-mismatch stumble never fires
---     and the multi-turn phases are deterministic -- the property the old
---     file bought with a pinned mask, earned from the game's own rule.
+--   * P2's second wave battle is the measurement: the known dance now
+--     matches the battle background by construction, since it was learned on
+--     this terrain, so Cmd_13's 50% bg-mismatch stumble never fires
+--     and the multi-turn phases are deterministic.  That is the property the
+--     old file bought with a pinned mask, obtained here from the game's own
+--     rule.
 --
--- Asserted (phases 1-3 in P2's second wave battle, zero writes):
---   1. MENU: the learned dance's row renders [cost 8][name] with the #35
---      pattern, white (affordable at Mog's real pool); the wallet paints
---      his real MP; the name is DanceName's own record, read from the ROM.
---   2. CHARGE AT START: the cost queue prices the commit at 8, MP drops
---      exactly 8 from the REAL pool, and the DANCE status locks in.
---   3. FREE STEPS: two further auto-queued dance turns price at 0 and MP
---      stays put (one payment per battle).
+-- Asserted (phases 1-3 in P2's second wave battle, with no writes):
+--   1. menu: the learned dance's row renders [cost 8][name] with the #35
+--      pattern, in white because it is affordable at Mog's real pool; the
+--      wallet paints his real MP; and the name is DanceName's own record,
+--      read from the ROM.
+--   2. charge at start: the cost queue prices the commit at 8, MP drops
+--      exactly 8 from the real pool, and the dance status locks in.
+--   3. free steps: two further auto-queued dance turns price at 0 and MP
+--      stays put, so there is one payment per battle.
 --
--- *** ONE LABELED ISOLATION ARM (issue #75) -- two writes STAY ***
---   4. REFUSAL: the below-price fizzle (row greys $25, the commit still
---      queues at 8, the universal insufficient-MP gate refuses: no dance
---      status, MP unmoved).  The input-driven case is a Mog whose pool is under
---      8 -- trivially reachable in open play by dancing across fights, but
---      NOT inside this set piece: the defense gives P2 exactly TWO wave
---      battles, the first is spent learning the dance (the game's own
---      precondition), and once Mog is dancing his turns auto-queue and his
---      menu never reopens.  Per the burn-down plan's observation-window
---      ruling (systemic call 2), the arm runs BEFORE the real dance in
---      the same battle: Mog's pool is written to 7, the refusal is
---      measured, and the pool is restored to the value read at battle
---      start.  Both writes are this file's .writeWord( waiver; it MAY
---      NEVER PRODUCE FIXTURES.
+-- One labeled isolation arm (issue #75): two writes stay.
+--   4. refusal: the below-price fizzle, where the row greys $25, the commit
+--      still queues at 8, and the universal insufficient-MP gate refuses, so
+--      there is no dance status and MP is unmoved.  The input-driven case is
+--      a Mog whose pool is under 8, which is reachable in open play by
+--      dancing across fights but not inside this set piece: the defense gives
+--      P2 exactly two wave battles, the first is spent learning the dance
+--      (the game's own precondition), and once Mog is dancing his turns
+--      auto-queue and his menu never reopens.  Per the burn-down plan's
+--      observation-window ruling (systemic call 2), the arm runs before the
+--      real dance in the same battle: Mog's pool is written to 7, the refusal
+--      is measured, and the pool is restored to the value read at battle
+--      start.  Both writes are this file's .writeWord( waiver, and it may
+--      never produce fixtures.
 local H = dofile("tools/tests/lib/ot6.lua")
 local STATE = "build/states/moogle_defense.mss.lua"
 
@@ -93,8 +96,8 @@ local function danceNameText(id)
   return s
 end
 
--- find a glyph run in the $7c00 menu MAP (the dance window stages there;
--- rows 1/3/5/7).  Returns the word address, or nil.
+-- find a glyph run in the $7c00 menu map (the dance window stages there,
+-- on rows 1/3/5/7).  Returns the word address, or nil.
 local function findInMap(seq)
   for w = 0x7C00, 0x7CF0 do
     local hit = true
@@ -125,9 +128,10 @@ local mogSlot = nil
 local function mpOf(slot) return H.readWord(0x3C08 + slot * 2) end
 
 -- ------------------------------------------------------------------------
--- the storm driver: fight every NON-P2 battle with plain tap-A; STOP the
--- moment a battle engages P2 (this test's subject).  Off-battle, hands off
--- (the defense choreography moves the waves itself); dialogs are paged.
+-- the storm driver: fight every non-P2 battle with plain tap-A, and stop the
+-- moment a battle engages P2, which is this test's subject.  Off-battle it
+-- keeps hands off, because the defense sequence moves the waves itself;
+-- dialogs are paged.
 -- ------------------------------------------------------------------------
 local ph, hb = 0, -600
 local function untilP2Battle(what)
@@ -167,8 +171,8 @@ local function winByTapA(what)
   }, what)
 end
 
--- wait for MOG's own menu; bystander moogles DEFEND (the pack must live
--- through the dance turns); dialogs paged.
+-- wait for MOG's own menu; bystander moogles Defend, since the pack must live
+-- through the dance turns; dialogs are paged.
 local function mogMenu(what)
   return H.driveUntil(function()
     return H.battleLoadStarted() and H.readByte(MENU) ~= 0
@@ -223,13 +227,13 @@ end
 local danceId, mp0 = nil, nil
 local costs = {}                        -- cost-queue stores while cmd $13 queues
 
--- walk the dance cursor onto the KNOWN dance's cell.  The $267e list is
--- POSITIONAL -- entry i holds dance i or $ff (UpdateMenuState_21's confirm
--- reads $267e,x and BUZZES on a $ff cell) -- so the one learned dance sits
--- at CELL danceId (row danceId//2, col danceId%2 on the 2-column grid), not
--- at cell 0.  Cursor vars: col $8937+slot, row $893b+slot (the state's own
--- w7e8937,y / w7e893b,y).  Measured the hard way: an A-mash at cell 0
--- buzzed forever on the first run of this conversion.
+-- walk the dance cursor onto the known dance's cell.  The $267e list is
+-- positional: entry i holds dance i or $ff (UpdateMenuState_21's confirm
+-- reads $267e,x and buzzes on a $ff cell), so the one learned dance sits
+-- at cell danceId (row danceId//2, col danceId%2 on the 2-column grid) and
+-- not at cell 0.  Cursor vars: col $8937+slot, row $893b+slot (the state's own
+-- w7e8937,y and w7e893b,y).  Measured: an A-mash at cell 0
+-- buzzed indefinitely on the first run of this conversion.
 local function danceCursorToKnown(what)
   -- danceId is discovered at runtime, so the target row/col are computed
   -- inside the callbacks, not at step-construction time.
@@ -281,7 +285,7 @@ H.run({ maxFrames = 250000 }, {
   H.navTo(14, 14, { maxFrames = 2500, playBattles = true }),
   H.logStep("deployed; letting the storm come"),
 
-  -- ---- P2's FIRST wave battle: win it, and the WIN teaches the dance ----
+  -- ---- P2's first wave battle: win it, and the win teaches the dance ----
   untilP2Battle("the west arm's first wave engages MOG's squad"),
   H.waitFrames(240),
   H.call(function()
@@ -289,8 +293,8 @@ H.run({ maxFrames = 250000 }, {
       if H.readByte(0x3ED8 + s * 2) == MOG then mogSlot = s end
     end
     assert(mogSlot, "MOG is in P2's battle party")
-    -- the reason this file needed the defense: no dance known -> no Dance
-    -- command at all (InitCmd_02's zero-mask removal)
+    -- the reason this file needed the defense: with no dance known there is
+    -- no Dance command at all (InitCmd_02's zero-mask removal)
     local hasDance = false
     for i = 0, 3 do
       if H.readByte(CMDTBL + mogSlot * 12 + i * 3) == CMD_DANCE then hasDance = true end
@@ -315,7 +319,7 @@ H.run({ maxFrames = 250000 }, {
       danceNameText(danceId), H.readByte(DANCES)))
   end),
 
-  -- ---- P2's SECOND wave battle: the measurement -------------------------
+  -- ---- P2's second wave battle: the measurement -------------------------
   untilP2Battle("the west arm's second wave engages MOG's squad"),
   H.waitFrames(240),
   H.call(function()
@@ -327,19 +331,19 @@ H.run({ maxFrames = 250000 }, {
     H.log(string.format("MOG slot %d, real pool %d MP", mogSlot, mp0))
     H.assertEq(mp0 >= DANCE_COST, true,
       "positive control: the real pool funds the dance-start charge")
-    -- the learned dance matches THIS background by construction: same
-    -- terrain, same BattleBGDance row -- the determinism the old file
-    -- bought with a pinned mask.
+    -- the learned dance matches this background by construction: same
+    -- terrain, same BattleBGDance row, which gives the determinism the old
+    -- file bought with a pinned mask.
     local bg = H.readByte(0x11E2)
     H.assertEq(H.readRomByte((H.sym("BattleBGDance") & 0x3FFFFF) + bg), danceId,
       "same terrain, same dance: the bg-mismatch stumble cannot fire")
   end),
 
   -- ======================================================================
-  -- *** THE LABELED ISOLATION ARM (see header): the below-price refusal.
+  -- The labeled isolation arm (see header): the below-price refusal.
   -- Mog's pool is written to 7, the refusal is measured through the
   -- standard surfaces, and the pool is restored to the value read above.
-  -- Runs BEFORE the real dance because a dancing Mog's menu never
+  -- This runs before the real dance because a dancing Mog's menu never
   -- reopens (RandDanceAction auto-queues his turns).
   -- ======================================================================
   mogMenu("mog's command window (isolation arm)"),
@@ -351,7 +355,7 @@ H.run({ maxFrames = 250000 }, {
   H.waitFrames(20),
   H.call(function()
     costs = {}
-    -- the one learned dance's row: cost tile and name, both GREY ($25)
+    -- the one learned dance's row: cost tile and name, both grey ($25)
     local w = findInMap(danceNameSeq(danceId))
     H.assertEq(w ~= nil, true, "the learned dance's name is drawn in the list")
     H.assertEq(mapWord(w) >> 8, GREY,
@@ -362,8 +366,8 @@ H.run({ maxFrames = 250000 }, {
       "...and the cost greys with it (one font colors the pair)")
     H.screenshot("dancemp_grey")
   end),
-  -- the menu lets the commit through (the block deliberately stays out of
-  -- C1 -- Ot6AbilityGrey's SCOPE comment); the refusal is the universal
+  -- the menu lets the commit through, since the block stays out of
+  -- C1 (see Ot6AbilityGrey's scope comment); the refusal is the universal
   -- execution-time fizzle.
   danceCursorToKnown("cursor onto the learned dance's cell (isolation arm)"),
   H.driveUntil(function()
@@ -407,12 +411,12 @@ H.run({ maxFrames = 250000 }, {
       "the universal insufficient-MP gate refused: MP unmoved")
     H.assertEq(H.readByte(0x3EF8 + mogSlot * 2) & 0x01, 0,
       "and the dance never started (no whole-battle state for free)")
-    -- restore the REAL pool read at battle start -- the arm's second write
+    -- restore the real pool read at battle start; the arm's second write
     H.writeWord(0x3C08 + mogSlot * 2, mp0)
     H.log("[isolation arm] MOG's pool restored to the real " .. mp0)
   end),
 
-  -- ---- 1. the menu, at the REAL pool: white row, cost, wallet ----------
+  -- ---- 1. the menu, at the real pool: white row, cost, wallet ----------
   mogMenu("mog's command window (input-driven phases)"),
   openDance("the dance list opens"),
   H.waitFrames(20),
@@ -437,7 +441,7 @@ H.run({ maxFrames = 250000 }, {
   end),
 
   -- ---- 2. charge at dance start ----------------------------------------
-  -- walk onto the known dance's POSITIONAL cell (see danceCursorToKnown)
+  -- walk onto the known dance's positional cell (see danceCursorToKnown)
   -- and confirm; the dance self-targets, so one confirm queues it.
   danceCursorToKnown("cursor onto the learned dance's cell"),
   H.driveUntil(function()

@@ -1,38 +1,38 @@
 #!/bin/sh
-# savestate_ninja_selftest.sh -- prove the generated ninja graph's SEMANTICS
-# end-to-end, in seconds, with no emulator: the REAL generator
-# (savestate_ninja.py) and the REAL `generate` command shape run against a mock tree
-# whose run.sh is a stub that journals every invocation.
+# savestate_ninja_selftest.sh: check the generated ninja graph's semantics
+# end-to-end, in seconds, with no emulator.  The real generator
+# (savestate_ninja.py) and the real `generate` command shape run against a mock
+# tree whose run.sh is a stub that journals every invocation.
 #
 # This is the other half of savestate_stamp_selftest.sh: that file pins the
-# provenance SIGNATURE, this one pins the generate-or-skip DECISION the retired
-# `needsgen` used to make -- now ninja's own scheduling -- on every axis:
+# provenance signature, and this one pins the generate-or-skip decision the
+# retired `needsgen` used to make, now ninja's own scheduling, on every axis:
 #
 #   * a fresh tree generates every step; an untouched tree regenerates
 #     nothing;
-#   * an mtime-only touch of ANY source regenerates nothing (restat latches);
-#   * a ROM content change re-runs EVERY transitive dependent -- the class
+#   * an mtime-only touch of any source regenerates nothing (restat latches);
+#   * a ROM content change re-runs every transitive dependent, the class
 #     behind 2026-07-27's "rom content changed, then booted an old-ROM
 #     savestate anyway" failure; there is no stamp to disagree with;
 #   * a generator edit re-runs its own step and everything downstream of it,
-#     and NOTHING else;
-#   * an edit to any of the three composed-in lib halves -- ot6.lua,
-#     ot6_field.lua, and the invariant-contract half ot6_contract.lua
-#     (issue #25) -- re-runs every step;
+#     and nothing else;
+#   * an edit to any of the three composed-in lib halves (ot6.lua,
+#     ot6_field.lua, and the invariant-contract half ot6_contract.lua,
+#     issue #25) re-runs every step;
 #   * a checkpoint manifest/payload edit re-runs only the step that uses it;
-#   * a failing generation FAILS the build, blocks its dependents, and is
-#     retried on the next run -- no way to record success without executing;
+#   * a failing generation fails the build, blocks its dependents, and is
+#     retried on the next run, so success cannot be recorded without executing;
 #   * an unknown target is a hard error (the `smoke-%: rom` silent .PHONY
 #     no-op class make allowed);
-#   * MULTI-STATE SIBLINGS CONVERGE (issue #30): a script that generates
-#     several states gets one edge per state, every invocation emits EVERY
+#   * multi-state siblings converge (issue #30): a script that generates
+#     several states gets one edge per state, every invocation emits every
 #     sibling artifact, and the publish step must not let one edge touch another
-#     edge's outputs -- or an edge that republishes its own sibling INPUT
-#     after its own outputs is input-newer-than-output forever and
+#     edge's outputs.  An edge that republishes its own sibling input
+#     after its own outputs is input-newer-than-output forever, and
 #     consecutive runs regenerate the family and its downstream trunk with
-#     zero content changes.  The stub below emits siblings exactly like a
-#     real multi-state generator so the quiescence cases prove this class
-#     stays dead.
+#     no content changes.  The stub below emits siblings the same way a
+#     real multi-state generator does, so the quiescence cases cover this
+#     class.
 set -u
 command -v ninja >/dev/null 2>&1 || {
   echo "savestate_ninja selftest: ninja not installed -- brew bundle"; exit 1; }
@@ -57,13 +57,13 @@ printf 'sram v1'  > "$TMP/tools/tests/checkpoints/toy-v1/toy.sram"
 
 # The stub run.sh: journal the invocation (worker + stack/checkpoint env), honor
 # an injected failure, then behave like the real one where it matters here:
-#  * the SCRIPT half -- a multi-state generator emits EVERY sibling artifact
-#    on EVERY invocation (gen_edgar plays the whole Figaro chapter and emits
+#  * the script half: a multi-state generator emits every sibling artifact
+#    on every invocation (gen_edgar plays the whole Figaro chapter and emits
 #    all three figaro states no matter which edge invoked it).  A mock gen
 #    declares its siblings on a `generates:` line; single-state gens omit it.
-#  * the PUBLISH half -- MIRRORS tools/tests/run.sh's publish step (the
-#    block tagged issue #30); keep the two in lockstep, because this stub is
-#    how the publish policy's scheduling consequences get proven without an
+#  * the publish half: mirrors tools/tests/run.sh's publish step (the
+#    block tagged issue #30).  Keep the two in step, because this stub is
+#    how the publish policy's scheduling consequences are checked without an
 #    emulator.  Workspace files are iterated in the same "$ART"/* glob order
 #    the real script uses.
 cat > "$TMP/tools/tests/run.sh" <<'EOF'
@@ -97,13 +97,14 @@ EOF
 chmod +x "$TMP/tools/tests/run.sh"
 
 # The toy graph: a plain power-on state, a chained state, a state grown from a
-# checkpoint, a stack seed, a stacked state off the seed -- one of every edge
-# kind -- plus a MULTI-STATE FAMILY (issue #30): gen_g generates g2 then g1
-# from one run, one edge each, and h chains off the family's ending.  The sibling names are
-# chosen so the SECOND state sorts BEFORE the first, exactly the real
-# figaro family's shape (figaro_cleared sorts before figaro_matron, its own
-# input): a publish-everything policy writes edge g1's own outputs first and
-# then re-bumps g2 -- g1's INPUT -- so g1 could never be clean again.
+# checkpoint, a stack seed, and a stacked state off the seed, one of every edge
+# kind, plus a multi-state family (issue #30): gen_g generates g2 then g1
+# from one run, one edge each, and h chains off the family's ending.  The
+# sibling names are chosen so the second state sorts before the first, the
+# same shape as the real figaro family (figaro_cleared sorts before
+# figaro_matron, its own input): a publish-everything policy writes edge g1's
+# own outputs first and then re-bumps g2, which is g1's input, so g1 could
+# never be clean again.
 cat > "$TMP/tools/tests/savestate_graph.py" <<'EOF'
 def S(state, **kw):
     e = {"state": state, "gen": None, "prev": None, "checkpoint": None,
@@ -143,8 +144,8 @@ edit() { printf '%s\n' "$2" > "$TMP/$1"; }
 run
 check "fresh tree generates every step" "a b c e g1 g2 h " "$ran"
 check "fresh tree build succeeds" 0 "$rc"
-# both multi-state siblings were published by their OWN edges -- restricting
-# what one edge publishes must never leave a sibling's artifact missing.
+# both multi-state siblings were published by their own edges; restricting
+# what one edge publishes must not leave a sibling's artifact missing.
 [ -f "$TMP/build/states/g1.mss" ] && [ -f "$TMP/build/states/g2.mss" ] &&
   grep -q "for g1" "$TMP/build/states/g1.mss" &&
   grep -q "for g2" "$TMP/build/states/g2.mss" &&
@@ -164,9 +165,9 @@ grep -q '^e stack=t9_$' "$TMP/journal.last" &&
   { echo "  FAIL checkpoint stamp extras missing"; ok=0; }
 
 # 2. quiescent: nothing re-runs.  With the multi-state family in the graph
-#    this is ALSO the issue-#30 sibling regression: before run.sh published
+#    this is also the issue-#30 sibling regression: before run.sh published
 #    only the invoking edge's own artifacts, edge g1's publish pass re-bumped
-#    g2.mss -- its own input -- after its own outputs, and this run generated
+#    g2.mss, its own input, after its own outputs, and this run generated
 #    "g1 " (then "g1 h ", then "g1 h " ...) forever on an untouched tree.
 run
 check "untouched tree regenerates nothing (#30: g1 must not regenerate)" "" "$ran"
@@ -184,7 +185,7 @@ touch "$TMP/build/ot6.sfc" "$TMP/tools/tests/gen_a.lua" \
 run
 check "mtime-only touch regenerates nothing (restat)" "" "$ran"
 
-# 4. ROM content change: EVERY step re-runs -- chained, checkpointed, stacked --
+# 4. ROM content change: every step re-runs (chained, checkpointed, stacked)
 #    and the seed refreshes.  The 2026-07-27 failure class: there is no way
 #    to note "rom content changed" and still skip a state generated under the
 #    old ROM, because the decision and the execution are one graph.
@@ -197,15 +198,15 @@ cmp -s "$TMP/build/states/d.mss" "$TMP/build/states/b.mss" &&
   { echo "  FAIL seed d stale after the source regenerated"; ok=0; }
 
 # 5. one generator edit: its step regenerates, the seed off it refreshes, the
-#    stacked step downstream regenerates -- and the unrelated steps do not.
+#    stacked step downstream regenerates, and the unrelated steps do not.
 sleep 1
 edit tools/tests/gen_b.lua "gen b v2"
 run
 check "gen_b edit re-runs b and its dependents only" "b e " "$ran"
 
-# 5a. NO UNDER-GENERATION (#30's other half): a genuinely stale multi-state
-#     family regenerates exactly its own members and their dependents.  The
-#     per-edge publish restriction must not have turned "publish less" into
+# 5a. No under-generation (#30's other half): a stale multi-state
+#     family regenerates its own members and their dependents.  The
+#     per-edge publish restriction must not turn "publish less" into
 #     "generate less".
 sleep 1
 printf 'gen g v2\ngenerates: g1 g2\n' > "$TMP/tools/tests/gen_g.lua"
@@ -233,8 +234,8 @@ edit tools/tests/checkpoints/toy-v1/manifest.json '{"v":2}'
 run
 check "checkpoint manifest edit re-runs only that step" "c " "$ran"
 
-# 8. a failing generation fails the BUILD and blocks dependents; the retry
-#    runs it again -- failure is never recorded as success.
+# 8. a failing generation fails the build and blocks dependents; the retry
+#    runs it again, so failure is never recorded as success.
 sleep 1
 : > "$TMP/build/fail.b"
 edit tools/tests/gen_b.lua "gen b v3"
@@ -254,11 +255,11 @@ check "retry build succeeds" 0 "$rc"
   echo "  pass unknown target is a hard error" ||
   { echo "  FAIL unknown target did not error"; ok=0; }
 
-# 10. provenance: the stamp a `generate` edge writes opens with the exact sig
+# 10. provenance: the stamp a `generate` edge writes opens with the sig
 #     compose.py will re-derive (the two sides of the consume-time guard),
-#     and carries the #75 bindings -- its own artifact's hash, and the hash
-#     of the stamp it grew from -- so the chain verifies transitively from
-#     files on disk alone.
+#     and carries the #75 bindings: its own artifact's hash, and the hash
+#     of the stamp it was generated from, so the chain verifies transitively
+#     from files on disk alone.
 want=$(cd "$TMP" && OT6_ROOT="$TMP" sh tools/tests/lib/savestate_stamp.sh sig gen_b)
 [ "$(head -n 1 "$TMP/build/states/b.stamp")" = "$want" ] &&
   echo "  pass generate-edge stamp matches sig" ||

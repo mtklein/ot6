@@ -52,7 +52,7 @@ H.run({ maxFrames = 5000 }, {
       H.readByte(0x19), H.readByte(0xe7), H.readByte(0x59), H.readByte(0x26),
       H.fieldX(), H.fieldY(), H.worldX(), H.worldY()))
   end),
-  -- Cross Vector's entrance once, then immediately leave.  Besides proving
+  -- Cross Vector's entrance once, then immediately leave.  Besides fixing
   -- the exact checkpoint entry point, the field/world handoff leaves the
   -- ordinary world menu available (the Blackjack-arrival frame itself still
   -- carries special vehicle state that rejects X).
@@ -79,24 +79,24 @@ H.run({ maxFrames = 5000 }, {
   H.call(function()
     H.assertEq((H.readByte(0x0201) & 0x80) ~= 0, true,
       "menu-flags $0201 bit7 SET -- the save-enable flow reached the menu")
-    -- ARM THE input-driven save receipt (issue #75): a read-only exec hook on
+    -- Arm the input-driven save receipt (issue #75): a read-only exec hook on
     -- the real CopyGameDataToSRAM entry captures the slot argument the
     -- save runs with (codex_saveas's instrument).  This replaces the old
-    -- zeroed-$307ff0 sentinel -- an SRAM write -- as the proof that the
-    -- real save ran to completion for slot 3.
+    -- zeroed-$307ff0 sentinel, which was an SRAM write, as the evidence that
+    -- the real save ran to completion for slot 3.
     local entry = H.sym("CopyGameDataToSRAM")
     emu.addMemoryCallback(function()
       saveArg = emu.getState()["cpu.a"] & 0xff
     end, emu.callbackType.exec, entry, entry)
   end),
-  -- THE PAD-DRIVEN SAVE (save-drive rule, tools/tests/README.md;
+  -- The pad-driven save (save-drive rule, tools/tests/README.md;
   -- codex_saveas and probe_banquet_timer_save are the templates): UP wraps
   -- the main-menu cursor to Save (row 6), A enters the menu's own
-  -- SelectMainMenuOption_06 path, the slot cursor is STEERED to slot 3 by
+  -- SelectMainMenuOption_06 path, the slot cursor is steered to slot 3 by
   -- pad against its live cell, and A confirms on through any overwrite
-  -- prompt.  No ZMENUSTATE poke, no cursor poke, no display-cache poke,
-  -- and no witness seeding: the codex payload the battery carries is
-  -- whatever the chain EARNED, read and logged below (issue #75).
+  -- prompt.  There is no ZMENUSTATE poke, no cursor poke, no display-cache
+  -- poke, and no witness seeding: the codex payload the battery carries is
+  -- whatever the chain earned, read and logged below (issue #75).
   H.driveUntil(function()
     return H.readByte(ZMENUSTATE) == 0x05 and H.readByte(0x4b) == 6
   end, 600, {
@@ -125,10 +125,10 @@ H.run({ maxFrames = 5000 }, {
     H.assertEq(emu.read(0x316801, emu.memType.snesMemory), 0x38,
       "slot 3 has OT6 codex magic 8")
     H.assertEq(saveArg, 3, "CopyGameDataToSRAM ran for persistent slot 3")
-    -- the codex witness cells are READ, never seeded (issue #75): the
-    -- battery carries whatever the chain actually earned.  The phase-2
-    -- checkpoint re-cuts measure these and the entry contracts follow the
-    -- measurement (never the reverse).
+    -- the codex witness cells are read, never seeded (issue #75): the
+    -- battery carries whatever the chain earned.  The phase-2 checkpoint
+    -- re-cuts measure these, and the entry contracts follow the
+    -- measurement rather than the other way round.
     H.log(string.format("codex witness cells (earned): elem=%02X class=%02X",
       emu.read(0x316810 + ULTROS2, emu.memType.snesMemory),
       emu.read(0x316990 + ULTROS2, emu.memType.snesMemory)))

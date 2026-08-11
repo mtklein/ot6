@@ -2,21 +2,21 @@
 --
 --   tools/tests/run.sh tools/tests/probe_bushido.lua build/states/probe_bushido.log
 --
--- Cyan is not recruitable until the v0.3 arc, so he is INSTALLED into the
+-- Cyan is not recruitable until the v0.3 arc, so he is installed into the
 -- opening guard fight: every party slot gets CHAR::CYAN ($3ED8), a
 -- Bushido-only command list ($202E stride 12), the weapon SWDTECH flag
--- ($3BA4/$3BA5 bit 1 -- UpdateCmd_02 greys the command without it,
+-- ($3BA4/$3BA5 bit 1; UpdateCmd_02 greys the command without it,
 -- battle_main.asm:13690), and a pinned $2020 (techs known - 1).
 --
--- What this probe answers, none of which the source alone settles:
---   1. does the command list actually offer Bushido after the poke, and
---      does one A press land in menu state $37 (the swdtech window)?
---   2. is $7BCA (menu open, Ot6Boost's gate) still nonzero INSIDE that
---      window -- i.e. does L/R still move the boost there?
---   3. what does w7e7b82 do over time now?  vanilla ticked it every 4
---      frames; the conversion should leave it dead flat.
---   4. what does a short A press in the window latch, and what attack id
---      reaches $3410 ("last spell used", InitTarget_02 battle_main.asm:6545)?
+-- What this probe measures, none of which the source alone settles:
+--   1. whether the command list offers Bushido after the poke, and
+--      whether one A press lands in menu state $37 (the swdtech window);
+--   2. whether $7BCA (menu open, Ot6Boost's gate) is still nonzero inside
+--      that window, that is, whether L/R still moves the boost there;
+--   3. what w7e7b82 does over time now.  Vanilla ticked it every 4
+--      frames; the conversion should leave it constant;
+--   4. what a short A press in the window latches, and what attack id
+--      reaches $3410 ("last spell used", InitTarget_02 battle_main.asm:6545).
 local H = dofile("tools/tests/lib/ot6.lua")
 local STATE = "build/states/battle_entry.mss.lua"
 
@@ -76,10 +76,10 @@ H.run({ maxFrames = 40000 }, {
     snap("menu-open")
     H.screenshot("bushido_cmdlist")
   end),
-  -- (2a) does R move the boost from the COMMAND menu?
+  -- (2a) whether R moves the boost from the command menu
   H.pressButtons({ "r" }, 6), H.waitFrames(20),
   H.call(function() snap("after-R") end),
-  -- (1) short A presses: does one reach the swdtech window?
+  -- (1) short A presses: whether one reaches the swdtech window
   H.driveUntil(function() return H.readByte(MSTATE) == 0x37 end, 900, {
     H.call(function() pinCyan(); H.setPad({ "a" }) end),
     H.waitFrames(2),
@@ -90,7 +90,7 @@ H.run({ maxFrames = 40000 }, {
     snap("window-open")
     H.screenshot("bushido_window")
   end),
-  -- (3) is the bar dead?  sample every frame for two seconds.
+  -- (3) whether the bar still ticks: sample every frame for two seconds
   H.repeatN(120, { H.call(function() pinCyan(); sampleBar() end), H.waitFrames(1) }),
   H.call(function()
     local parts = {}
@@ -100,7 +100,8 @@ H.run({ maxFrames = 40000 }, {
     table.sort(parts)
     H.log("[probe] bar values over 120 frames in-window: " .. table.concat(parts, ", "))
   end),
-  -- (2b) does R still move the boost INSIDE the window, and does the bar follow?
+  -- (2b) whether R still moves the boost inside the window, and whether the
+  -- bar follows
   H.pressButtons({ "r" }, 6), H.waitFrames(20),
   H.call(function() snap("in-window-R") end),
   H.pressButtons({ "r" }, 6), H.waitFrames(20),

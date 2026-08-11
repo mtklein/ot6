@@ -1,6 +1,6 @@
 -- probe_mpu_boot.lua -- measurement instrument for probe_mp_universal's
 -- boot step: what state does a cold Continue of terra-returned-v1 land in,
--- and which inputs take off / land / disembark.  NOT a suite test.
+-- and which inputs take off / land / disembark.  Not a suite test.
 -- OT6_CHECKPOINT_LAYOUT: ot6-codex-o8-v1
 local H = dofile("tools/tests/lib/ot6.lua")
 
@@ -30,11 +30,11 @@ H.run({ maxFrames = 40000 }, {
   H.waitFrames(60),
   st("boot"),
 
-  -- try movement: does holding a direction taxi/fly the ship?
+  -- try movement: whether holding a direction taxis or flies the ship
   H.hold({ "down" }), H.waitFrames(120), H.release(),
   st("after_hold_down"),
 
-  -- try A: takeoff?
+  -- try A: whether it takes off
   H.pressButtons({ "a" }, 8), H.waitFrames(180),
   st("after_a"),
 
@@ -42,7 +42,7 @@ H.run({ maxFrames = 40000 }, {
   H.hold({ "down" }), H.waitFrames(120), H.release(),
   st("after_a_down"),
 
-  -- try B: land / disembark?
+  -- try B: whether it lands or disembarks
   H.pressButtons({ "b" }, 8), H.waitFrames(240),
   st("after_b"),
 

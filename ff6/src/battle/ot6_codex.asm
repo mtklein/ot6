@@ -4,17 +4,17 @@
 ; inherits slot 1. The active page is 0 for transient or 1..3 for a saved
 ; game, read from wSaveSlotToLoad ($7e021f).
 ;
-; WHY THAT READ IS SAFE FROM BATTLE CONTEXT (issue #29, audited 2026-07-28).
+; Why that read is safe from battle context (issue #29, audited 2026-07-28).
 ; $021f is a menu-module variable, and Ot6CodexActive's callers all run in
-; battle (ot6_break.asm:155/:884/:992) -- so the guarantee is not "the menu
-; owns it", it is "nothing else ever writes it":
+; battle (ot6_break.asm:155/:884/:992), so the guarantee rests on nothing else
+; ever writing the cell:
 ;   * it has exactly four writers, all lifecycle moments: New Game
 ;     (menu/menu_common.asm:250, menu/field_menu.asm:2756), validated load
 ;     confirm (menu/field_menu.asm:2794), and save (menu/save.asm:50, the
 ;     OT6 line that makes a first save leave the transient page);
 ;   * the world module's direct-page swap covers $0000-$00FF only
 ;     (world/init.asm:1446-1516 PushDP/PopDP) and its mode-7 var block is
-;     $0520-$0bff (world/init.asm:1413-1440) -- neither reaches $021f, and
+;     $0520-$0bff (world/init.asm:1413-1440), so neither reaches $021f, and
 ;     the world->battle path (world/move.asm:860-940) restores DP before
 ;     Battle_ext without touching it;
 ;   * the menu's own live clock stops one byte short: wGameTimeHours..
@@ -24,9 +24,9 @@
 ; lifecycle value at every consumer read across field/world/battle/menu,
 ; fresh and slot-3-loaded, pre/post menu, pre/post save, including battles
 ; entered from the world map right after an in-menu save.  The overlaid
-; values issue #29 reported (5; then 36/37 oscillation) reproduced ONLY
+; values issue #29 reported (5; then 36/37 oscillation) reproduced only
 ; under codex_saveas's forced-ZMENUSTATE save drive, whose corrupted menu
-; exit leaves menu tasks running -- not in any player-reachable flow.
+; exit leaves menu tasks running, and in no player-reachable flow.
 ; tools/tests/codex_ctx.lua pins the guarantee end to end: world save into
 ; slot 3, menu close, encounter, and the battle's seed must surface the
 ; slot-3 page's knowledge, not the transient page's.
@@ -61,8 +61,8 @@ OT6_CODEX_GLOBAL := $374f       ; 'O7': legacy cartridge-global layout
 
 ; Ensure codex page X is signed 'O8'.  The one-time O7 migration clones the
 ; former global knowledge into all three slots: existing players lose nothing,
-; while discoveries made after migration remain isolated.  A genuinely fresh
-; page is zeroed independently.
+; while discoveries made after migration remain isolated.  A fresh page is
+; zeroed independently.
 .proc Ot6CodexEnsure
         php
         longi

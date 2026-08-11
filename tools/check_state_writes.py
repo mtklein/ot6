@@ -1,15 +1,15 @@
 #!/usr/bin/env python3
-"""No test may WRITE emulated game state.  This is the check that enforces it.
+"""No test may write emulated game state.  This is the check that enforces it.
 
 The rule (owner directive, 2026-08): test and savestate-generating Lua scripts
-may inject controller input and READ emulated memory; they may never write it.
-A test that pokes HP, warps the party, or plants an item is not testing the
-game, it is testing its own poke -- every fixture and every green mark
-downstream of a poked state is vouching for a game nobody played.
+may inject controller input and read emulated memory; they may never write it.
+A test that pokes HP, warps the party, or plants an item tests its own poke
+rather than the game, and every fixture and every pass downstream of a poked
+state describes a game nobody played.
 
 This linter scans every tools/tests/**/*.lua (lib/ included), strips Lua
-comments and string literals first (the corpus talks ABOUT write APIs far
-more often than it calls them -- prose must not trip the check), and then
+comments and string literals first (the corpus mentions write APIs far more
+often than it calls them, and prose must not trip the check), and then
 flags the write-side surface:
 
     emu.write / emu.writeWord / emu.write16 / emu.write32
@@ -18,33 +18,33 @@ flags the write-side surface:
     .writeByte( / .writeWord(          (any receiver -- the ot6.lua wrappers)
     H.write / M.write                  (helper-module write entry points)
 
-One loud line per finding: file:line: token.  Exit 0 clean, exit 1 dirty.
+One line per finding: file:line: token.  Exit 0 clean, exit 1 dirty.
 
 WAIVERS.  The corpus predates the rule, so every existing violation is
-grandfathered into tools/state_write_waivers.txt, a BURN-DOWN list of
+grandfathered into tools/state_write_waivers.txt, a burn-down list of
 (file, token) pairs that must only ever shrink:
 
-  * a hit whose (file, token) pair is not in the list fails the run --
-    new writes are impossible to land, anywhere, from day one;
-  * a listed pair that no longer matches anything also fails the run --
-    the stale line must be deleted, so the list only ever shrinks and a
-    cleaned-up file can never quietly regress back onto its old waiver.
+  * a hit whose (file, token) pair is not in the list fails the run, so no
+    new write can land anywhere, from day one;
+  * a listed pair that no longer matches anything also fails the run, so the
+    stale line must be deleted.  The list then only ever shrinks, and a
+    cleaned-up file cannot regress back onto its old waiver.
 
-Granularity is per (file, token), not per line: line numbers churn with
-every unrelated edit, while "this file still calls this write API" is
-exactly the fact the burn-down tracks.  The cost is that a waived file can
-add MORE calls to a token it already uses -- accepted, because the burn-down
-cleans whole files and the waiver dies with the last call.
+Granularity is per (file, token) rather than per line: line numbers churn
+with every unrelated edit, while "this file still calls this write API" is
+the fact the burn-down tracks.  The cost is that a waived file can add more
+calls to a token it already uses.  That is accepted, because the burn-down
+cleans whole files and the waiver goes away with the last call.
 
 --regen-waivers rewrites the list from the current corpus.  That is for
-the cleanup waves (delete writes, regen, watch the list shrink); running it
-to LAUNDER a new write is visible in the diff of a checked-in file.
+the cleanup waves (delete writes, regen, and the list shrinks); running it
+to cover a new write is visible in the diff of a checked-in file.
 
 Wired into `make test` (both the check and --selftest) and into `make
 savestates` (so savestate generation cannot run from a poking generator even
 when the suite was skipped).  It lives in the Makefile rather than suite.sh
 because suite discovery globs *.lua for a `-- @suite` marker and cannot see
-a .py file -- same reason check_boss_rows.py sits there.
+a .py file, the same reason check_boss_rows.py sits there.
 
 Nothing here writes game state; it is a read-only linter (only
 --regen-waivers touches anything, and only the waiver file).
@@ -68,8 +68,8 @@ WAIVER_FILE = os.path.join("tools", "state_write_waivers.txt")
 # reported under its most specific name (emu.writeWord, not emu.write), and
 # tokens that end in an identifier character take a trailing boundary so
 # emu.reset does not claim emu.resetAccessCounters (a counter reset is not a
-# state write) and M.write does not claim M.writeByte( -- the .writeByte(
-# token owns that site instead.
+# state write) and M.write does not claim M.writeByte(, since the
+# .writeByte( token owns that site instead.
 
 TOKENS = [
     "emu.write",
@@ -88,9 +88,9 @@ TOKENS = [
     "M.write",
     # The runtime write gate's confined raw-emu handle (lib/compose.py
     # injects it at compose time; no checked-in .lua may name it).  A test
-    # that reaches for it is reaching AROUND the gate, and since this token
-    # was born forbidden it can never legitimately appear in the burn-down
-    # list -- the static side closes the runtime side's one escape hatch.
+    # that reaches for it is reaching around the gate.  This token was
+    # forbidden from the start, so it can never appear in the burn-down
+    # list; the static check closes the runtime gate's one escape hatch.
     "__OT6_EMU_RAW",
 ]
 
@@ -112,7 +112,7 @@ TOKEN_RE = re.compile("|".join(
 
 def canon_token(matched: str) -> str:
     """Map a regex match back to its TOKENS entry (they are equal today;
-    this is the seam that keeps waiver keys stable if a pattern grows)."""
+    this function keeps waiver keys stable if a pattern grows)."""
     return matched
 
 
@@ -383,7 +383,7 @@ local sneak = __OT6_EMU_RAW.write(0x1a, 4)
         expect(not unwaived and not stale,
                "regenerated waivers must pass: %r %r" % (unwaived, stale))
 
-        # a NEW token in a waived file still fails (granularity is per pair)
+        # a new token in a waived file still fails (granularity is per pair)
         with open(os.path.join(tdir, "lib", "dirty.lua"), "a") as f:
             f.write("emu.setState(blob)\n")
         hits, _ = scan_tree(tmp)

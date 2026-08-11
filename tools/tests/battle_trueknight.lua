@@ -4,70 +4,71 @@
 --
 --   tools/tests/run.sh tools/tests/battle_trueknight.lua
 --
--- VANILLA'S COVER PATH (battle_main.asm):
+-- Vanilla's cover path (battle_main.asm):
 --   CalcAttackEffect calls CoverEffect (:8325).  CoverEffect (:2855) drops out
 --   unless the attack can crit ($b2.1 clear, :2859-2861), has targets (:2862),
---   and the target is NEAR FATAL and not vanished ($3ee4,y bits $0200 / $0010,
---   :2875-2879).  It then builds the candidate mask -- every character except
---   the target and the attacker (:2882-2889) -- and walks all ten entities
+--   and the target is near fatal and not vanished ($3ee4,y bits $0200 / $0010,
+--   :2875-2879).  It then builds the candidate mask, every character except
+--   the target and the attacker (:2882-2889), and walks all ten entities
 --   looking for the True Knight relic bit, $3c58,x & $0040 (:2891-2893).
 --   Survivors of CheckCoverTarget (:2931: presence, control, seize and status
---   gates, keeping the HIGHEST-hp candidate in $f2/$f4) reach SetCoverTarget
---   (:2911), which COMMITS the cover: past its `bmi` (no candidate) and its
---   `cpy $f8 / bne` (the original target moved), $f8/$a8/$b8 are retargeted
---   onto the blocker (:2916-2922).  That commit IS the block, and it is where
---   OT6 hooks Ot6CoverBP -- the same shape as Ot6RunicBP at RunicEffect's
---   enrolment instruction.
+--   gates, keeping the highest-hp candidate in $f2/$f4) reach SetCoverTarget
+--   (:2911), which commits the cover: past its `bmi` (no candidate) and its
+--   `cpy $f8 / bne` (the original target moved), $f8, $a8 and $b8 are
+--   retargeted onto the blocker (:2916-2922).  That commit is the block, and it
+--   is where OT6 hooks Ot6CoverBP, the same shape as Ot6RunicBP at
+--   RunicEffect's enrolment instruction.
 --
--- THE FIXTURE IS LABELLED, NOT NATURAL.  Nobody in the entry-point party wears
--- True Knight, so the blocker's relic-effect word is STAGED: $3c58,slot |= $40,
--- the bit LoadCharProp would have written from the relic (:6868).  The rest of
--- the staging only makes covers HAPPEN often enough to measure:
---   - VICTIM: hp 10 against a 3000 max AND status-2 bit 1 written directly.
---     Vanilla only recomputes NEAR FATAL inside a status update (:11444-11452)
---     and the whole point of the fixture is that this victim never takes a hit
---     to trigger one, so the flag is pinned rather than inferred.  Stopped, so
---     his own menu never opens.
---   - ATTACKER: a MUDDLED ally with a Fight-only command list (battle_runic's
---     idiom) -- swings arrive on a character ATB rather than monster AI, and
+-- The fixture is staged rather than natural.  Nobody in the entry-point party
+-- wears True Knight, so the blocker's relic-effect word is staged:
+-- $3c58,slot |= $40, the bit LoadCharProp would have written from the relic
+-- (:6868).  The rest of the staging only makes covers happen often enough to
+-- measure:
+--   - victim: hp 10 against a 3000 max, and status-2 bit 1 written directly.
+--     Vanilla only recomputes near fatal inside a status update (:11444-11452)
+--     and the point of the fixture is that this victim never takes a hit
+--     to trigger one, so the flag is pinned rather than inferred.  He is
+--     stopped, so his own menu never opens.
+--   - attacker: a muddled ally with a Fight-only command list (battle_runic's
+--     idiom), so swings arrive on a character ATB rather than monster AI, and
 --     roughly one in three lands on the near-fatal victim.  The monsters are
 --     left alive and unstopped and contribute covers too.
---   - BLOCKER: never stopped (CheckCoverTarget rejects $3ef8,x & $3210, :2944,
---     so stopping him would delete the mechanic under test -- battle_runic's
---     lesson) and held off the turn order by his ATB byte instead ($3219,x),
---     except in phase 4 where taking a turn is the point.
---   MEASURED DEAD END, recorded so it is not re-tried: marking every character
---   but the victim un-targettable ($2f4c) to force every swing into a cover
---   FREEZES the action queue -- 20949 frames, ATB full on four entities, zero
---   CalcAttackEffect calls (probe_cover).  Cover frequency is bought with
---   patience here, not with $2f4c.
+--   - blocker: never stopped (CheckCoverTarget rejects $3ef8,x & $3210, :2944,
+--     so stopping him would delete the mechanic under test, measured in
+--     battle_runic) and held off the turn order by his ATB byte instead
+--     ($3219,x), except in phase 4 where taking a turn is the point.
+--   One approach was measured and rejected, recorded so it is not re-tried:
+--   marking every character but the victim un-targettable ($2f4c) to force
+--   every swing into a cover freezes the action queue: 20949 frames, ATB full
+--   on four entities, and zero CalcAttackEffect calls (probe_cover).  Cover
+--   frequency is obtained here by waiting rather than by $2f4c.
 --
--- The cover DETECTOR is the ROM's own commit condition, evaluated at
--- SetCoverTarget's ENTRY out of CPU state: $f4 valid (not $ff) and Y still ==
--- $f8.  H.sym() resolves the entry from ff6-en.dbg per build, so the same
--- script reads the pre-change and post-change ROMs.
+-- The cover detector is the ROM's own commit condition, evaluated at
+-- SetCoverTarget's entry out of CPU state: $f4 valid (not $ff) and Y still
+-- equal to $f8.  H.sym() resolves the entry from ff6-en.dbg per build, so the
+-- same script reads the pre-change and post-change ROMs.
 --
--- Asserted, in order, so a fixture failure never masquerades as a product one:
---   1. the cover really commits, onto OUR knight;
---   2. the bank rises by exactly 1, in the SAME FRAME as the commit;
---   3. the PIP is deferred to the damage frame (issue #42): NOT armed on the
---      commit frame any more, banked into OT6_PIPPEND there and committed onto
---      the live cell on the numeral-counter edge -- with the measured gap
---      between the two named in the log's frame table;
---   4. ONCE PER ROUND: further covers in the same round still redirect the hit
+-- Asserted, in order, so a fixture failure is never reported as a product one:
+--   1. the cover commits, onto our knight;
+--   2. the bank rises by exactly 1, in the same frame as the commit;
+--   3. the pip is deferred to the damage frame (issue #42): it is no longer
+--      armed on the commit frame, but banked into OT6_PIPPEND there and
+--      committed onto the live cell on the numeral-counter edge, with the
+--      measured gap between the two named in the log's frame table;
+--   4. once per round: further covers in the same round still redirect the hit
 --      but bank nothing;
---   4b. and -- unrelated to True Knight, deliberately -- THE FRAME BUDGET.
+--   4b. and, separately from True Knight, the frame budget.
 --      That phase's span is this fixture's most sensitive probe of the battle
---      main loop's per-frame budget, and it used to be asserted only by
---      accident, through phase 6a's delivery path.  It is stated outright
---      now, in its own words, so a performance regression stops being
+--      main loop's per-frame budget, and it used to be asserted only
+--      indirectly, through phase 6a's delivery path.  It is stated outright
+--      now, in its own terms, so a performance regression stops being
 --      reported as a True Knight failure (issue #67);
---   5. and the round boundary is REAL -- after the blocker takes his own turn
+--   5. and the round boundary is real: after the blocker takes his own turn
 --      (Ot6ActionEnd), the next cover pays again.  Without 5, "once per round"
 --      and "once per battle" would both pass 4;
---   6. a scheduled pip is always DELIVERED -- the property that makes #42's
---      miss ruling safe (a covered attack that misses still pays, so it must
---      still paint; see that arm for the ruling and its ROM grounding).
+--   6. a scheduled pip is always delivered, which is the property that makes
+--      #42's miss ruling safe (a covered attack that misses still pays, so it
+--      must still paint; see that arm for the ruling and its ROM grounding).
 --
 -- #42 measured the pre-change timing with this same instrument: the commit
 -- preceded the numeral by 83-147 frames while OT6_PIPTAIL is 32, so the pip
@@ -147,9 +148,9 @@ local function armCover()
   H.log(string.format("cover detector armed at SetCoverTarget $%06X", addr))
 end
 
--- lastBp is sampled at every frame START, so a write recorded during the frame
--- carries the value the bank held going into it: an earn is v == prev + 1 no
--- matter what the absolute bank happens to be.
+-- lastBp is sampled at every frame start, so a write recorded during the frame
+-- carries the value the bank held going into it: an earn is v == prev + 1
+-- whatever the absolute bank happens to be.
 local lastBp = nil
 local function armBank()
   emu.addMemoryCallback(function(_, v)
@@ -159,9 +160,9 @@ end
 
 -- ------------------------------------------------------- #42 instruments --
 -- The three OT6 cells the deferral moves through (ot6_memory.inc):
---   OT6_PIPTAIL $57bb   frames of live pip painting left; a write of 32 IS an
+--   OT6_PIPTAIL $57bb   frames of live pip painting left; a write of 32 is an
 --                       arm (Ot6ActionEnd and Ot6PipPending are its only ones)
---   OT6_PIPSLOT $ed6b   the slot that cell follows -- written just BEFORE the
+--   OT6_PIPSLOT $ed6b   the slot that cell follows, written just before the
 --                       tail by both armers, so reading it in the tail's
 --                       callback names who was armed
 --   OT6_PIPPEND $ed74   #42's own deferral cell: blocker slot + 1 at the cover
@@ -173,12 +174,12 @@ local pipArms = {}    -- { f = frame, slot = who } per OT6_PIPTAIL arm
 local pendWrites = {} -- { f = frame, v = value } per OT6_PIPPEND write
 local numerals = {}   -- frames on which $632e changed -- the damage frames
 
--- THE NUMERAL SUPPRESSOR (arm 6b).  Ot6RevealPoll fires on a CHANGE in $632e
+-- The numeral suppressor (arm 6b).  Ot6RevealPoll fires on a change in $632e
 -- against its last-seen copy OT6_NUMCTR ($ed71); mirroring every write to
 -- $632e straight into that copy means the poll never sees an edge, so the
 -- numeral path is switched off deterministically and only Ot6ActionEnd's
--- backstop can deliver a pending pip.  This is how the numeral-LESS action --
--- the one real hole in "a scheduled pip is always delivered" -- gets exercised
+-- backstop can deliver a pending pip.  That is how the action with no numeral,
+-- the one gap in "a scheduled pip is always delivered", gets exercised
 -- without needing a script that happens not to draw a number.
 local NUMCTR_SHADOW = 0xED71
 local numSuppress = false
@@ -197,9 +198,9 @@ local function armPip()
   end, emu.callbackType.write, 0x7E0000 + PIPPEND, 0x7E0000 + PIPPEND)
 end
 
--- The numeral EDGE, sampled the way Ot6RevealPoll sees it: once per frame,
+-- The numeral edge, sampled the way Ot6RevealPoll sees it: once per frame,
 -- from the main loop.  GfxCmd_0b's last act is `inc w7e632e`
--- (btlgfx_main.asm:24799) -- and the MISS arm reaches that same tail
+-- (btlgfx_main.asm:24799), and the miss arm reaches that same tail
 -- (:24725-24735 `bra @a589`), so a missed attack raises this counter exactly
 -- like a damaging one.  That is why #42's ruling is that a missed cover still
 -- paints its pip, and why it needs no separate path to do so.
@@ -242,18 +243,18 @@ local function sample()
     local lo, hi = pipCells()
     if lo and ((lo & 0xFF) == watchGlyph or (hi & 0xFF) == watchGlyph) then
       glyphFirstF = H.frame
-      -- WHOSE paint was it?  With a battle menu open the party window stages
-      -- every row's TRUE bank (Ot6PipGlyph_ext), which is correct and is not
-      -- the live cell #42 governs -- so the glyph is corroboration, and the
-      -- deferral is asserted on OT6_PIPPEND / OT6_PIPTAIL instead.
+      -- whose paint was it?  With a battle menu open the party window stages
+      -- every row's true bank (Ot6PipGlyph_ext), which is correct and is not
+      -- the live cell #42 governs, so the glyph is corroboration and the
+      -- deferral is asserted on OT6_PIPPEND and OT6_PIPTAIL instead.
       glyphMenu = H.readByte(MENU) ~= 0
     end
   end
 end
 
--- SERVICE FOREIGN MENUS: a ready character's open menu parks the whole action
--- queue (battle_runic's measurement).  Never the knight's own, except when
--- phase 4 wants his turn.
+-- Service other characters' menus: a ready character's open menu parks the
+-- whole action queue (battle_runic's measurement).  Never the knight's own,
+-- except when phase 4 wants his turn.
 local serviceKnight = false
 local function service()
   if H.readByte(MENU) ~= 0
@@ -341,21 +342,22 @@ H.run({ maxFrames = 60000 }, {
     H.assertEq(#bpWrites, 1, "exactly one bank write")
     H.assertEq(bpWrites[1].f, c.f,
       "and it lands on the COMMIT frame -- the block frame, not near it")
-    -- 3. THE PIP, DEFERRED TO THE DAMAGE FRAME (#42).
+    -- 3. the pip, deferred to the damage frame (#42).
     --
-    -- #37 armed OT6_PIPSLOT/OT6_PIPTAIL inside Ot6CoverBP, on the commit
+    -- #37 armed OT6_PIPSLOT and OT6_PIPTAIL inside Ot6CoverBP, on the commit
     -- instruction itself.  Measured here, that commit precedes the damage
-    -- numeral by 83-147 frames while the tail is 32 -- so the pip flashed and
-    -- faded roughly two seconds BEFORE the block visibly landed.  The bank
-    -- stays on the commit (asserted just above, unchanged); only the PAINT
+    -- numeral by 83-147 frames while the tail is 32, so the pip flashed and
+    -- faded roughly two seconds before the block visibly landed.  The bank
+    -- stays on the commit (asserted just above, unchanged); only the paint
     -- moves, banked into OT6_PIPPEND and committed off the numeral-counter
-    -- edge by Ot6PipPending, the same shape Ot6RevealCommit/Ot6RevealPoll use.
+    -- edge by Ot6PipPending, the same shape Ot6RevealCommit and Ot6RevealPoll
+    -- use.
     --
-    -- The measurement is on the MECHANISM cells, not on the screen glyph: with
-    -- a battle menu open the party window paints every row's true bank anyway
-    -- (Ot6PipGlyph_ext), which is correct behaviour and not the live cell this
-    -- issue governs.  So the glyph is logged as corroboration and the frames
-    -- are asserted on OT6_PIPPEND / OT6_PIPTAIL.
+    -- The measurement is on the mechanism cells rather than the screen glyph:
+    -- with a battle menu open the party window paints every row's true bank
+    -- anyway (Ot6PipGlyph_ext), which is correct behaviour and not the live
+    -- cell this issue governs.  So the glyph is logged as corroboration and
+    -- the frames are asserted on OT6_PIPPEND and OT6_PIPTAIL.
     local nf = firstAtOrAfter(numerals, c.f)
     H.assertEq(nf ~= nil, true, "a damage numeral followed the covered hit")
     H.log(string.format(
@@ -368,7 +370,7 @@ H.run({ maxFrames = 60000 }, {
         t[#t + 1] = string.format("f%d=%d", w.f, w.v) end
         return "{" .. table.concat(t, ",") .. "}" end)()))
 
-    -- the deferral cell: armed on the COMMIT frame, consumed on the NUMERAL
+    -- the deferral cell: armed on the commit frame, consumed on the numeral
     -- frame.  Both halves named, so a regression in either direction shows.
     H.assertEq(pendWrites[1] ~= nil and pendWrites[1].f == c.f, true,
       "OT6_PIPPEND is banked on the commit frame")
@@ -381,8 +383,8 @@ H.run({ maxFrames = 60000 }, {
     H.assertEq(cleared, nf,
       "and it is consumed on the numeral frame, not before")
 
-    -- THE REGRESSION #42 EXISTS FOR: no live-cell arm for the knight on the
-    -- commit frame.  Before the fix there was exactly one, right there.
+    -- the regression #42 exists for: no live-cell arm for the knight on the
+    -- commit frame.  Before the fix there was exactly one, on that frame.
     H.assertEq(#armsFor(knight, c.f, c.f), 0,
       "the pip is NOT armed on the commit frame any more (it was, and faded "
       .. "83-147 frames before the hit landed)")
@@ -415,52 +417,53 @@ H.run({ maxFrames = 60000 }, {
     H.assertEq(#bpWrites, 1,
       "and the bank was written exactly once across the whole round")
 
-    -- 4b. THE FRAME-BUDGET CANARY, now asserted in its own words (#67).
+    -- 4b. the frame-budget canary, now asserted in its own terms (#67).
     --
     -- This span is the fixture's most sensitive frame-budget probe, and it
-    -- used to be measured only BY ACCIDENT: nothing asserted it, but a shift
-    -- moved where phase 6a's hand-staged pip landed, so 6a failed instead --
+    -- used to be measured only indirectly: nothing asserted it, but a shift
+    -- moved where phase 6a's hand-staged pip landed, so 6a failed instead,
     -- reporting a True Knight regression for what was a performance
-    -- regression somewhere else entirely.  That made 6a a veto on bank $C2
+    -- regression elsewhere.  That made 6a a veto on bank $C2
     -- and cost a reverted feature (8d8a570) plus the investigation behind
-    -- issue #67.  The measurement was always worth keeping; only the thing
+    -- issue #67.  The measurement was worth keeping; only the thing
     -- it was attached to was wrong.
     --
-    -- WHAT MOVES IT: the battle main loop's per-iteration budget is close
-    -- enough to full that a hair over makes WaitVblank miss and the whole
-    -- iteration costs an extra hardware frame (ot6_memory.inc:206-230).  The
-    -- penalty SATURATES -- 20 cycles and 110 cycles both cost exactly 163
-    -- frames -- so this quantity is bimodal, not continuous:
+    -- What moves it: the battle main loop's per-iteration budget is close
+    -- enough to full that going slightly over makes WaitVblank miss and the
+    -- whole iteration costs an extra hardware frame
+    -- (ot6_memory.inc:206-230).  The penalty saturates: 20 cycles and 110
+    -- cycles both cost exactly 163 frames, so this quantity is bimodal rather
+    -- than continuous:
     --
     --     budget intact ............................ 1635   (measured, four
     --                                                        separate builds)
     --     any overrun, however small ............... 1798   (= 1635 + 163)
     --
-    -- The threshold therefore sits in an EMPTY region 163 frames wide, which
-    -- is why it is a threshold and not a fudge factor.  1715 leaves 80 frames
-    -- of headroom for legitimate drift below and still lands 83 frames clear
-    -- of the cliff.  It is deliberately NOT an equality on 1635: this must
-    -- survive a few bytes of legitimate growth off the per-battle-frame path (the
-    -- v0.9 merge added ~49 bytes of $C2 at four per-action sites and this span
-    -- did not move at all), and it must NOT survive a real overrun.
+    -- The threshold therefore sits in an empty region 163 frames wide, which
+    -- is why it is a threshold and not an arbitrary margin.  1715 leaves 80
+    -- frames of headroom for legitimate drift below and still lands 83 frames
+    -- clear of the cliff.  It is not an equality on 1635 on purpose: this must
+    -- survive a few bytes of legitimate growth off the per-battle-frame path
+    -- (the v0.9 merge added ~49 bytes of $C2 at four per-action sites and this
+    -- span did not move at all), and it must not survive a real overrun.
     --
-    -- WATCHED TO FAIL, 2026-07-30, on the v0.9 ROM:
+    -- Watched to fail, 2026-07-30, on the v0.9 ROM:
     --   80 bare NOPs before the OT6_BRKLIVE gate in Ot6BgHud_ext
-    --   (ot6_hud.asm:221, the once-per-battle-frame site) -> 1798, and the
-    --   hand-staged pip in 6a then lands at f4512 via the backstop -- the
-    --   exact frame issue #67 records for every failing build.  So the
+    --   (ot6_hud.asm:221, the once-per-battle-frame site) gave 1798, and the
+    --   hand-staged pip in 6a then lands at f4512 via the backstop, which is
+    --   the frame issue #67 records for every failing build.  So the
     --   mechanism here is the same one, caught by the right assertion now.
     --
-    -- WHAT NO LONGER REPRODUCES, which matters for whoever reads #67 next:
-    --   five bare NOPs in the $C2 ACTION path (immediately before
-    --   `jsr CheckRetal` in _dispatcher, battle_main.asm:3146) -- #67's
-    --   headline control -- came back 1635, PASS, with every frame number in
-    --   the run byte-identical to the unmodified build.  That control was
+    -- What no longer reproduces, which matters for whoever reads #67 next:
+    --   five bare NOPs in the $C2 action path (immediately before
+    --   `jsr CheckRetal` in _dispatcher, battle_main.asm:3146), which was
+    --   #67's main control, came back 1635 and passed, with every frame number
+    --   in the run byte-identical to the unmodified build.  That control was
     --   real when it was taken (8d8a570), but it does not reproduce on v0.9.
-    --   It is the same direction as the correction comment on #67: the ~49
-    --   bytes v0.9 added at per-action sites were free too.  Per-ACTION
-    --   cycles are no longer near the cliff; per-battle-FRAME cycles still
-    --   are.  Which is the rule this canary now states outright.
+    --   It agrees with the correction comment on #67: the ~49
+    --   bytes v0.9 added at per-action sites were free too.  Per-action
+    --   cycles are no longer near the cliff; per-battle-frame cycles still
+    --   are, which is the rule this canary now states outright.
     H.vars.coversSpan = H.frame - H.vars.coversF0
     H.log(string.format("frame-budget canary: the covers phase took %d frames "
       .. "(intact 1635, missed-vblank cliff 1798, threshold 1715)",
@@ -511,9 +514,10 @@ H.run({ maxFrames = 60000 }, {
       (function() local t = {} for _, w in ipairs(bpWrites) do
         t[#t + 1] = string.format("f%d:%s->%d", w.f, tostring(w.prev), w.v) end
         return table.concat(t, " ") end)()))
-    -- assert on the WRITE, not the absolute bank: the blocker's own turn also
-    -- pays him a regen tick, and a settle long enough to guarantee that landed
-    -- first would be a timing bet.  prev+1 on the commit frame is the earn.
+    -- assert on the write rather than the absolute bank: the blocker's own
+    -- turn also pays him a regen tick, and a settle long enough to guarantee
+    -- that landed first would depend on timing.  prev+1 on the commit frame is
+    -- the earn.
     local w = nil
     for _, x in ipairs(bpWrites) do if x.f == c.f then w = x end end
     H.assertEq(w ~= nil, true,
@@ -524,13 +528,13 @@ H.run({ maxFrames = 60000 }, {
     H.screenshot("trueknight_next_round")
   end),
 
-  -- ------------------------ 6. A SCHEDULED PIP IS ALWAYS DELIVERED (#42) --
-  -- THE MISS RULING.  A cover whose attack then MISSES still pays the BP --
-  -- the earn is banked at SetCoverTarget's commit, which is upstream of any
-  -- hit roll, and that is deliberate: the knight stepped in front of his ally
+  -- ------------------------ 6. a scheduled pip is always delivered (#42) --
+  -- The miss ruling: a cover whose attack then misses still pays the BP,
+  -- because the earn is banked at SetCoverTarget's commit, upstream of any
+  -- hit roll, and that is intended: the knight stepped in front of his ally
   -- whether or not the blow connected.  So the pip must paint too; suppressing
-  -- it would leave a silent +1 BP, which is a worse desync than the early pip
-  -- #42 removes -- invisible rather than merely mistimed.
+  -- it would leave a +1 BP with no feedback, which is worse than the early pip
+  -- #42 removes, being invisible rather than merely mistimed.
   --
   -- It needs no separate path.  FF6 draws "Miss" through GfxCmd_0b: the miss
   -- arm copies the glyph and branches into the very tail that increments the
@@ -538,13 +542,13 @@ H.run({ maxFrames = 60000 }, {
   -- attack raises the counter exactly like a damaging one, and the deferred
   -- pip lands on the frame the word "Miss" appears over the blocker.
   --
-  -- What CAN strand a pending paint is an action that issues no numeral at all
-  -- (or a $ffff "hide numerals" one, :24707-24710), so Ot6ActionEnd flushes it
+  -- What can strand a pending paint is an action that issues no numeral at all
+  -- (or a $ffff hide-numerals one, :24707-24710), so Ot6ActionEnd flushes it
   -- for the same reason it flushes pending reveals.  This arm asserts the
   -- resulting property directly, on a hand-staged pending value: whatever the
-  -- attack did, a scheduled pip is DELIVERED -- OT6_PIPPEND returns to 0 and
+  -- attack did, a scheduled pip is delivered, OT6_PIPPEND returns to 0 and
   -- the live cell is armed on the blocker.  The log names which path paid it.
-  -- First let the round-5 cover's OWN deferred pip land -- which is itself the
+  -- First let the round-5 cover's own deferred pip land, which is itself the
   -- assertion that a real cover's pending value never stalls: arm 5 checked
   -- the bank 30 frames after the commit, and the numeral is ~85 frames out.
   H.driveUntil(function() return H.readByte(PIPPEND) == 0 end, 6000, DRIVE,
@@ -573,31 +577,31 @@ H.run({ maxFrames = 60000 }, {
       at, H.vars.stagedF, at - H.vars.stagedF,
       viaNumeral and "the numeral frame (the damage/'Miss' path)"
                   or "Ot6ActionEnd's backstop (a numeral-less action)"))
-    -- WHICH of the two paths pays a HAND-STAGED pip is not a property of the
+    -- Which of the two paths pays a hand-staged pip is not a property of the
     -- feature (#67).  This pip is written straight into OT6_PIPPEND at an
     -- arbitrary moment in the action cycle, so whether the next numeral edge
     -- or Ot6ActionEnd reaches it first depends on where in that cycle the
-    -- staging happened -- which any shift in battle timing moves.  Asserting
-    -- `viaNumeral` here therefore asserted the frame budget, in the wrong
-    -- words: it failed as "the pip landed via the backstop" for changes that
+    -- staging happened, which any shift in battle timing moves.  Asserting
+    -- `viaNumeral` here therefore asserted the frame budget under the wrong
+    -- name: it failed as "the pip landed via the backstop" for changes that
     -- had nothing to do with pips, and vetoed a whole bank (8d8a570).
     --
-    -- The property it was meant to protect -- the paint lands on the frame
-    -- the player sees the blow -- is asserted where it is actually a
-    -- property, on a REAL cover in phase 3 above: OT6_PIPPEND is consumed on
+    -- The property it was meant to protect, that the paint lands on the frame
+    -- the player sees the blow, is asserted where it is a
+    -- property, on a real cover in phase 3 above: OT6_PIPPEND is consumed on
     -- the numeral frame (`cleared == nf`) and the live cell is armed on it
     -- (`#armsFor(knight, nf, nf) >= 1`).  Both are computed against the
-    -- OBSERVED numeral frame rather than an absolute one, so they hold
+    -- observed numeral frame rather than an absolute one, so they hold
     -- whatever the battle's frame count is.  Nothing is lost by dropping the
     -- duplicate here, and the frame-budget canary it was standing in for now
     -- lives in phase 4b, where it says what it means.
     --
-    -- In its place, the path-INDEPENDENT half of what viaNumeral was reaching
-    -- for, which is the half with teeth: whichever path pays the pip, the
-    -- pending byte must be cleared ON the very frame the live cell is armed.
-    -- The clear and the paint are one event or they are a bug -- a clear
-    -- without an arm is exactly the "silent +1 BP" this phase's header calls
-    -- a worse desync than a mistimed pip, because it is invisible rather than
+    -- In its place is the path-independent half of what viaNumeral was
+    -- reaching for: whichever path pays the pip, the
+    -- pending byte must be cleared on the frame the live cell is armed.
+    -- The clear and the paint are one event or there is a bug; a clear
+    -- without an arm is the +1 BP with no feedback this phase's header calls
+    -- worse than a mistimed pip, because it is invisible rather than
     -- merely early.  Nothing here refers to an absolute frame, so a shift in
     -- battle timing moves both sides together and the assertion stands.
     local clearedAt = nil
@@ -610,9 +614,9 @@ H.run({ maxFrames = 60000 }, {
       .. "is a BP that was earned and never shown)")
   end),
 
-  -- 6b. THE BACKSTOP, ISOLATED.  Switch the numeral trigger off (see the
+  -- 6b. the backstop, isolated.  Switch the numeral trigger off (see the
   -- suppressor above) and stage another pending paint: now nothing but
-  -- Ot6ActionEnd can deliver it, which is the numeral-less action -- the only
+  -- Ot6ActionEnd can deliver it, which is the numeral-less action, the only
   -- way a scheduled pip could otherwise be stranded past the action that
   -- banked it.  Without this arm the backstop is code nothing ever runs.
   H.call(function()

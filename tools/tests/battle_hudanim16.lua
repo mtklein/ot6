@@ -2,45 +2,44 @@
 -- battle_hudanim16: the under-enemy hud must never render while the
 -- battlefield BG3 is in 16x16 tile mode.
 --
--- THE BUG (the owner's residual v0.2 sighting, surviving both the fly-in
+-- The bug (the owner's residual v0.2 sighting, which survived both the fly-in
 -- gate and the dialogue font-clobber veil): "junk showing up every once in
 -- a while during battle, drawing over and around the enemies -- break
 -- icons amongst other things that look like junk memory ... happening in
 -- fights with no dialog too, just ordinary random battles."
 --
--- MECHANISM (probe_junk16 / probe_bg3anim / probe_aurabolt).  Battle
+-- Mechanism (probe_junk16, probe_bg3anim, probe_aurabolt).  Battle
 -- animation inits flip the battlefield's $2105 shadow ($896F) to 16x16
 -- BG3 tiles while an effect uses BG3 as its canvas or color-math mask
 -- (InitAnimType btlgfx_main.asm:26304/:26348, circle families :47410/
 -- :48362).  Vanilla clears the field map first and its $01EE fill is
--- priority-clear -- invisible under the battle bg -- but OT6's hud cells
--- are priority-set, and a 16x16 map cell renders at doubled size/position
--- pulling three neighbor tiles.  Any live hud line inside the effect's
--- scroll window becomes doubled break-icon blocks flanked by neighbor
--- junk.  A plain CURE in the map-96 Cirpius x3 pool (hud rows 5/8, both
--- inside the idle (0,0) window) showed it for 42 straight frames; Fire's
--- $51 phase (priority flag dropped) and plain Fights ($19, bg1-only) are
--- invisible, which is why the sighting was intermittent.  No dialogue, no
--- boss, no fly-in required.
+-- priority-clear, so it is invisible under the battle bg, but OT6's hud
+-- cells are priority-set, and a 16x16 map cell renders at doubled size and
+-- position, pulling three neighbor tiles.  Any live hud line inside the
+-- effect's scroll window becomes doubled break-icon blocks flanked by
+-- neighbor junk.  A plain Cure in the map-96 Cirpius x3 pool (hud rows 5
+-- and 8, both inside the idle (0,0) window) showed it for 42 straight
+-- frames; Fire's $51 phase (priority flag dropped) and plain Fights ($19,
+-- bg1-only) are invisible, which is why the sighting was intermittent.  No
+-- dialogue, boss or fly-in is required.
 --
--- THE FIX (Ot6BgHudFlush_ext): while $896F bit $40 is up, the flush veils
--- every live line with vanilla's $01EE fill -- the same veil entry/exit
--- effects and dialogue windows get -- and repaints the instant the mode
+-- The fix (Ot6BgHudFlush_ext): while $896F bit $40 is up, the flush veils
+-- every live line with vanilla's $01EE fill, the same veil entry and exit
+-- effects and dialogue windows get, and repaints as soon as the mode
 -- comes back.
 --
--- THE TEST, which needs kolts_cave.mss (battle_flyin's fixture --
--- the natural pool IS the sighting's formation class): pace into the
--- Cirpius fight, let the entry finish, then run ~2 player turns with
--- TERRA CASTING (her spells carry the 16x16-with-priority anims) under a
--- per-frame watch:
---   * INVARIANT: on every mid-fight frame with $896F bit6 set and BG3 on
+-- The test needs kolts_cave.mss (battle_flyin's fixture; its natural pool is
+-- the sighting's formation class): pace into the Cirpius fight, let the entry
+-- finish, then run ~2 player turns with Terra casting (her spells carry the
+-- 16x16-with-priority anims) under a per-frame watch:
+--   * invariant: on every mid-fight frame with $896F bit6 set and BG3 on
 --     the battlefield main screen, no live hud line cell in vram holds a
---     painted OT6 glyph (attr $21 + claimed char).  Pre-fix this fails in
---     the first Cure window (424 flagged frames on the probe).
---   * POSITIVE CONTROLS: >= 24 such 16x16 frames actually sampled, at
---     least one with a live veiled line ($01EE at cur, proving the veil
+--     painted OT6 glyph (attr $21 plus a claimed char).  Pre-fix this fails
+--     in the first Cure window (424 flagged frames on the probe).
+--   * positive controls: >= 24 such 16x16 frames sampled, at
+--     least one with a live veiled line ($01EE at cur, which shows the veil
 --     painted rather than the lines being disabled); the dialogue latch
---     $64D5 stays 0 the whole run (this is the no-dialogue clause); the
+--     $64D5 stays 0 the whole run, which is the no-dialogue clause; the
 --     hud is present before and after; glyphCanary at the end.
 local H = dofile("tools/tests/lib/ot6.lua")
 local STATE = "build/states/kolts_cave.mss.lua"
@@ -113,7 +112,7 @@ local function watchFrame()
 end
 
 -- --------------------------------------------------------- menu driver --
--- TERRA casts her first spell every turn; everyone else Fights.  Command
+-- Terra casts her first spell every turn; everyone else Fights.  The command
 -- cursor skips blank ($ff) rows.  12-frame cadence: hold 4, release 8.
 local function bcmd(slot, i) return H.readByte(CMDTBL + slot*12 + i*3) end
 local lastSt, lastActor, phase = -1, -1, 0
@@ -161,7 +160,7 @@ H.run({ maxFrames = 40000 }, {
     end, 8600, {
       H.call(function()
         if not (H.hasControl() and H.tileAligned()) then H.setPad({}) return end
-        -- issue #75: the $1f6e danger pin is gone -- the pace rolls the
+        -- issue #75: the $1f6e danger pin is gone; the pace rolls the
         -- encounter on its own (deterministic from the fixture; see
         -- battle_flyin's note at the same loop).
         local x, y = H.fieldX(), H.fieldY()

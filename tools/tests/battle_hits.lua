@@ -1,37 +1,37 @@
 -- @suite slow savestate=worldmap_narshe
--- battle_hits: a boosted Fight swings again — +2 swings per pending BP
--- (one real hit per BP for a one-weapon character; a genji pair swings
--- both hands again).
+-- battle_hits: a boosted Fight adds 2 swings per pending BP (one extra hit
+-- per BP for a one-weapon character; a genji pair swings both hands
+-- again).
 --
--- Issue #75 conversion.  The old apparatus existed only because the
--- magitek intro party has no Fight command: it rewrote every $202E
--- command list to Fight-only, berserked the party, cleared the magitek
--- status bit, handed the subject bp:=3/pending:=2, and pinned the guards
--- at 500 HP so the rigged auto-Fights had something to hit.  On
--- worldmap_narshe none of that is needed: LOCKE (chid $01) really carries
--- Fight on row 0 and Steal on row 1 (measured 2026-08-10: cmds
--- 00,05,FF,01), so the whole berserk/Fight-only machine drops out and the
--- boost bank is EARNED the way battle_boost earns it -- every character
--- opens with 1 bp (Ot6InitBP) and each unboosted action regens +1
--- (Ot6ActionEnd).  Locke banks with STEAL: a real command, zero MP, zero
--- damage, so two banking turns cannot end the fight however weak the
--- grass-area trash is.  TERRA defers every turn with X (vanilla's own
--- turn-cycling key), so the subject's boost accounting is the only party
--- arithmetic in flight -- "only the subject has pending" is now true by
--- play, not by poke.
+-- Issue #75 conversion.  The old apparatus existed because the magitek
+-- intro party has no Fight command: it rewrote every $202E command list to
+-- Fight-only, berserked the party, cleared the magitek status bit, handed
+-- the subject bp:=3/pending:=2, and pinned the guards at 500 HP so the
+-- rigged auto-Fights had something to hit.  On worldmap_narshe none of
+-- that is needed: LOCKE (chid $01) carries Fight on row 0 and Steal on
+-- row 1 (measured 2026-08-10: cmds 00,05,FF,01), so the berserk and
+-- Fight-only setup drops out and the boost bank is earned the way
+-- battle_boost earns it: every character opens with 1 bp (Ot6InitBP) and
+-- each unboosted action regens +1 (Ot6ActionEnd).  Locke banks with Steal,
+-- a real command that costs zero MP and deals zero damage, so two banking
+-- turns cannot end the fight however weak the grass-area trash is.  TERRA
+-- defers every turn with X (vanilla's own turn-cycling key), so the
+-- subject's boost accounting is the only party arithmetic in flight, and
+-- "only the subject has pending" holds by play rather than by poke.
 --
 --   asserts (all four originals, same numbers): $3a70 gets the boosted
 --   swing count 1 + 2*pending = 5 exactly once, never more, the boost is
 --   consumed (3-2 = 1) with no regen after the swing, and pending clears.
---   Plus the earn-on-camera controls: bp really reached 3 by two steals,
---   pending really reached 2 by two R presses.
+--   Plus the earn-on-camera controls: bp reached 3 by two steals, and
+--   pending reached 2 by two R presses.
 local H = dofile("tools/tests/lib/ot6.lua")
 local STATE = "build/states/worldmap_narshe.mss.lua"
 
 local MENU, ACTOR, MSTATE, CMDROW = 0x7BCA, 0x62CA, 0x7BC2, 0x890F
--- $30 is the THIEF SUBMENU (tools shell): since #55 the Steal row opens it
--- with Steal on row 0, so one attempt is A (submenu), A (row 0), A (target)
--- -- gen_sfigaro.lua's measured drive.  $01 is transitional: hands off.
+-- $30 is the thief submenu (tools shell): since #55 the Steal row opens it
+-- with Steal on row 0, so one attempt is A (submenu), A (row 0), A (target),
+-- which is gen_sfigaro.lua's measured drive.  $01 is transitional, so the
+-- driver leaves the pad alone during it.
 local ST_CMD, ST_THIEF, ST_TGT, ST_TRANS = 0x05, 0x30, 0x38, 0x01
 local CMD_FIGHT, CMD_STEAL = 0x00, 0x05
 local function pend(slot) return H.readByte(0x3e9d + slot*2) end

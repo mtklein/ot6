@@ -1,54 +1,55 @@
 -- gen_sabin_world.lua -- step 1 of SABIN's scenario: the hub dispatch, the
 -- overworld landing, SHADOW's house, and the walk to the Imperial Camp gate.
 -- Generates two states:
---   sabin_world.mss  world map 0 at (161,36), SABIN alone -- the first
+--   sabin_world.mss  world map 0 at (161,36), SABIN alone: the first
 --                    controllable frame of the scenario
 --   sabin_camp.mss   map 117 (IMPERIAL CAMP) just inside the north gate,
 --                    SABIN + SHADOW, controllable
 --
--- WHY TWO, AND WHY THIS STEP IS ITS OWN FILE.  The Sabin arc is ~15 maps and
--- a single generator for it would be tens of thousands of frames long: every
+-- Why two states, and why this step is its own file.  The Sabin arc is ~15
+-- maps and a single generator for it would be tens of thousands of frames
+-- long: every
 -- experiment on the Phantom Train would replay the hub, the house and the
 -- camp first.  So the arc is cut at the points where the game itself hands
 -- control back on a fresh map, and each cut is a link in the generated chain.
 --
--- THE ROUTE, read off the event script (ff6/src/event/event_main.asm):
+-- The route, read off the event script (ff6/src/event/event_main.asm):
 --   hub obj 17 SABIN  $032a -> _cb0a1c            (:39463)
 --     ... dlg $01B1, fade, `party_chars SABIN`,
 --         `load_map 0, {161,36}, DOWN, ASYNC` + `set_script_mode WORLD`
 --                                                 (:39501-39503)
---     => THE SCENARIO STARTS ON THE OVERWORLD.  Not a field map: every
---        field predicate in the lib is meaningless until we leave it, and
---        worldNavTo is needed from the very first controllable frame.
+--     => the scenario starts on the overworld, not a field map.  Every
+--        field predicate in the lib is meaningless until the party leaves
+--        it, and worldNavTo is needed from the first controllable frame.
 --   world (165,35) -> map 115 at (7,13)           (short_entrance.dat, map 0)
 --     map 115 is the house.  Its one NPC, obj 16 at {4,12} with
---     `set_npc_event _cb0a5f` (npc_prop.asm:4553), is SHADOW -- drawn with
---     `set_npc_gfx SHADOW` but spoken of as "MAN" until the game names him.
+--     `set_npc_event _cb0a5f` (npc_prop.asm:4553), is SHADOW: drawn with
+--     `set_npc_gfx SHADOW` but referred to as "MAN" until the game names him.
 --   _cb0a5f (:39496): dlg $01C4/$01C5, the dog, `name_menu SHADOW` (:39531),
 --     then dlg $01CA "Welcome a partner?" with `choice _cb0aca, _cb0b07`
---     (:39549).  OPTION 0 = Yes = _cb0aca (:39570) is the branch that does
+--     (:39549).  Option 0 = Yes = _cb0aca (:39570) is the branch that does
 --     `char_party SHADOW, 1`; option 1 = _cb0b07 (:39601) deletes him again.
 --   map 115 long entrance y=15, x 0..14 -> world (165,36)
 --   world (179,71) -> event trigger _cb0bb7 (event_trigger.asm:30, :39715)
 --     -> `load_map 117, {36,2}, DOWN` and the camp startup event _cb0bc4
 --        re-creates SABIN (+ SHADOW if $02F3) and walks the party DOWN 1.
 --
--- THE NAME MENU IS NOT A DIALOG AND NOT A FIELD MENU.  `name_menu` is event
+-- The name menu is neither a dialog nor a field menu.  `name_menu` is event
 -- command $98 (ff6/src/field/event.asm:3600), which stores #$01 to $0200 and
 -- calls OpenMenu; OpenMenu ends in `jsl OpenMenu_ext` (field/menu.asm:322),
--- a BLOCKING call -- the field module stops running entirely while the menu
--- is up.  So every signal the lib's drivers watch goes quiet at once:
+-- a blocking call, so the field module stops running entirely while the menu
+-- is up.  Every signal the lib's drivers watch goes quiet at once:
 -- hasControl() false, dialogWaiting() false, battleLoadStarted() false,
 -- screen at full brightness, event PC parked on the name_menu command.  A
 -- plain advanceStory() sits there holding a neutral pad until its budget
 -- runs out.  The menu is dismissed with START (name_change.asm:85, "jump if
 -- start button is pressed").
 --
--- MEASURED, run 1 of this file, at the moment SHADOW's menu was up:
+-- Measured, run 1 of this file, at the moment SHADOW's menu was up:
 --     $0200=1  $0059=1  $0084=0  $0026=$5F  $0027=$5F  $00BA=0  $00D3=0
 -- $0200 is event command $98's own marker ("#$01 = name change menu"), and
--- $0059 is the field's menu-open gate -- the same byte hasControl() already
--- watches.  $0026/$0027 are the MENU module's zMenuState/zNextMenuState
+-- $0059 is the field's menu-open gate, the same byte hasControl() already
+-- watches.  $0026/$0027 are the menu module's zMenuState/zNextMenuState
 -- (menu/menu_ram.inc:112-113, direct-page $26 by the ram_byte running
 -- offset), and $5F is exactly the state MenuState_5d parks in after its
 -- fade ("lda #$5f / sta zNextMenuState", name_change.asm:60-61).  So the
@@ -56,16 +57,17 @@
 -- menu closes, and $0059 alone is true of any menu.  CYAN (:61204) and GAU
 -- (:66618) hit the same menu later in the arc.
 --
--- ISSUE #75 -- ZERO STATE WRITES.  This step's only battles are random
+-- Issue #75: no state writes.  This step's only battles are random
 -- encounters on the two overworld walks (the hub, the house and the camp
--- have none), and every one of them is FLED -- hold L+R, the engine's own
--- run mechanic (worldNavTo's playBattles="flee"; the same hold in the step
+-- have none), and every one of them is fled with a held L+R, the engine's own
+-- run mechanic (worldNavTo's playBattles="flee", and the same hold in the step
 -- driver's own battle branch).  Fleeing is chosen over fighting on
--- purpose: WoB overworld trash is runnable, a fled battle earns no WIN,
+-- purpose: WoB overworld encounters are runnable, a fled battle earns no win,
 -- and SHADOW's 1/16 post-battle leave roll (battle_main.asm:11976) runs
--- only at a win -- so from the moment he joins mid-step, this route never
--- rolls it at all.  The field walks pass playBattles=true besides; their maps
--- have no encounter pools, so the flag is documentation, not behavior.
+-- only at a win, so from the moment he joins mid-step this route never
+-- rolls it.  The field walks pass playBattles=true as well; their maps
+-- have no encounter pools, so the flag documents intent rather than changing
+-- behavior.
 local H = dofile("tools/tests/lib/ot6.lua")
 local DOOR = "build/states/scenario_hub.mss.lua"
 
@@ -79,7 +81,7 @@ local function inParty(c) return (H.readByte(0x1850 + c) & 0x07) ~= 0 end
 local function seq(steps) return H.cond(function() return true end, steps) end
 
 -- multiple-choice state (src/field/text.asm), same addresses gen_scenario
--- uses: $056E = cursor row, $056F = option count.  $056F is only FINAL once
+-- uses: $056E = cursor row, $056F = option count.  $056F is only final once
 -- the prompt is input-ready, so nothing is read off it before dialogWaiting().
 local CH_SEL, CH_MAX = 0x056E, 0x056F
 local NAME_MENU = 0x0200          -- field/event.asm:3607, #$01 = name change
@@ -91,8 +93,9 @@ local NEIGHBOURS = {
 
 -- gen_banon's talkToObj by way of gen_scenario_locke, unchanged in shape:
 -- the approach tile is re-resolved every 30 frames (NPCs walk), facing is
--- computed from the LIVE delta, and a soft activation round precedes a hard
--- one.  Flat, never repeatN -- repeatN cannot replay navTo/driveUntil bodies.
+-- computed from the live delta, and a soft activation round precedes a hard
+-- one.  Written flat rather than with repeatN, because repeatN cannot replay
+-- navTo/driveUntil bodies.
 local function talkToObj(obj, what, maxF)
   local engaged = false
   local function objAt() return objX(obj), objY(obj) end
@@ -155,7 +158,7 @@ local function talkToObj(obj, what, maxF)
 end
 
 -- Every `choice` this step can reach, answered in order.  `max` is asserted
--- against $056F, so a fork the route does not know about fails loudly
+-- against $056F, so a fork the route does not know about fails with an error
 -- instead of being answered blind.
 local CHOICES = {
   { want = 0, max = 2,
@@ -165,7 +168,7 @@ local CHOICES = {
 local ci, inChoice = 0, false
 local nameMenusSeen = 0
 
--- The step driver.  Steers choices, FLEES battles (see the header -- no win,
+-- The step driver.  Steers choices, flees battles (see the header: no win,
 -- no leave roll, no writes), taps dialogs, and dismisses the name menu.
 -- Everything the arc's later steps need is here so they can copy one
 -- function rather than five special cases.
@@ -217,10 +220,10 @@ local function rideUntil(pred, what, budget)
         H.log(string.format("sabin: choice #%d resolved at f%d", ci, H.frame))
       end
 
-      -- 2. battle: FLEE it with real input (hold L+R) -- WoB overworld
-      --    trash is runnable, and a fled battle earns no win for SHADOW's
-      --    leave roll to run at.  A zero-monster table (shouldn't happen on
-      --    this step) just gets its text paged.
+      -- 2. battle: flee it with real input (hold L+R).  WoB overworld
+      --    encounters are runnable, and a fled battle earns no win for
+      --    SHADOW's leave roll to run at.  A zero-monster table (not
+      --    expected on this step) gets its text paged.
       if battN >= 3 then
         quiet = 0
         if battN == 3 then
@@ -240,7 +243,7 @@ local function rideUntil(pred, what, budget)
       -- 3. plain dialog: edge-tap A
       if dlgN >= 3 then quiet = 0; H.setPad(phase < 4 and { "a" } or {}); return end
 
-      -- 4. THE NAME MENU: $0200 == 1 (event cmd $98's marker) AND $0059 ~= 0
+      -- 4. the name menu: $0200 == 1 (event cmd $98's marker) and $0059 ~= 0
       --    (a menu is open).  Debounced 30 frames so the fade into the menu
       --    is not mistaken for the menu itself.
       if H.readByte(NAME_MENU) == 1 and H.readByte(0x0059) ~= 0 then
@@ -269,8 +272,8 @@ local function rideUntil(pred, what, budget)
   }, what)
 end
 
--- n consecutive settled frames of real FIELD control on map m: control,
--- tile-aligned, fully faded in, no battle.  Brightness is not optional -- a
+-- n consecutive settled frames of real field control on map m: control,
+-- tile-aligned, fully faded in, no battle.  Brightness is required, because a
 -- cutscene can report control on a black screen (gen_kolts.lua header).
 local function landedField(m, n)
   local cnt, hb = 0, -600
@@ -298,18 +301,18 @@ local function landedWorld(n)
   end
 end
 
--- worldNavTo with a WRONG-MAP GUARD.  The overworld BFS knows only tile
--- passability -- it has no idea that some passable tiles are doorways -- so
--- a plan that clips a town entrance silently walks into that town, and from
--- then on worldHasControl() is false forever and the walker idles out its
--- whole budget with nothing in the log but a frozen coordinate.  That is
--- exactly how run 1 of this file burned 30,000 frames: leaving SHADOW's
--- house drops the party at (164,35), one tile WEST of the door tile
+-- worldNavTo with a wrong-map guard.  The overworld BFS knows only tile
+-- passability and cannot tell that some passable tiles are doorways, so
+-- a plan that clips a town entrance walks into that town, and from
+-- then on worldHasControl() is false and the walker idles out its
+-- whole budget with nothing in the log but a fixed coordinate.  That is
+-- how run 1 of this file spent 30,000 frames: leaving SHADOW's
+-- house drops the party at (164,35), one tile west of the door tile
 -- (165,35), and the BFS toward the camp went east through the door on its
 -- second step.  Landing on any map other than `want` now fails immediately
--- and says which one.
--- `want` is the field map this step is ALLOWED to end on (nil = the step ends
--- on the overworld, at the target tile, and any field map at all is wrong).
+-- and names the map.
+-- `want` is the field map this step is allowed to end on (nil = the step ends
+-- on the overworld, at the target tile, and any field map is wrong).
 local function worldLeg(tx, ty, want, what, budget)
   return H.worldNavTo(tx, ty, {
     maxFrames = budget or 30000,
@@ -340,7 +343,7 @@ H.run({ maxFrames = 90000 }, {
   end),
 
   -- ==================================================================== --
-  -- 1. PICK SABIN.  _cb0a1c ends on the OVERWORLD, not a field map.
+  -- 1. Pick SABIN.  _cb0a1c ends on the overworld, not a field map.
   -- ==================================================================== --
   talkToObj(17, "SABIN's scenario NPC"),
   rideUntil(landedWorld(10), "the overworld landing", 30000),
@@ -362,7 +365,7 @@ H.run({ maxFrames = 90000 }, {
   end),
 
   -- ==================================================================== --
-  -- 2. SHADOW'S HOUSE.  world (165,35) -> map 115 (7,13).
+  -- 2. Shadow's house.  world (165,35) -> map 115 (7,13).
   -- ==================================================================== --
   worldLeg(165, 35, 115, "to SHADOW's house", 12000),
   rideUntil(landedField(115, 10), "inside the house (map 115)", 12000),
@@ -394,19 +397,19 @@ H.run({ maxFrames = 90000 }, {
   end),
 
   -- ==================================================================== --
-  -- 3. OUT AND SOUTH-EAST.  map 115's long entrance is the whole of row
-  -- y=15 (x 0..15, `len+1` tiles inclusive -- entrance.asm:69-102) and its
-  -- record's destination is used VERBATIM: the run offset is computed into
+  -- 3. Out and south-east.  Map 115's long entrance is the whole of row
+  -- y=15 (x 0..15, `len+1` tiles inclusive; entrance.asm:69-102) and its
+  -- record's destination is used verbatim: the run offset is computed into
   -- $26 and then never read (entrance.asm:78 vs :132).  The record says
-  -- (165,36); the party actually lands at (164,35), which is one tile west
-  -- of the door -- so the table's DestPos is not the whole story and the
-  -- route trusts the measurement, not the record.
+  -- (165,36); the party lands at (164,35), one tile west
+  -- of the door, so the table's DestPos is not the whole story and the
+  -- route uses the measurement rather than the record.
   --
-  -- THE WAYPOINT AT (161,36) IS LOAD-BEARING, not scenery.  It is the
-  -- landing tile from step 1, so it is proven passable, and it lies WEST of
+  -- The waypoint at (161,36) is required.  It is the
+  -- landing tile from step 1, so it is known passable, and it lies west of
   -- the door: from there every shortest path to the camp runs south-east,
   -- and none of them can pass back through (165,35).  Going straight from
-  -- (164,35) does not have that property -- see worldLeg's comment.
+  -- (164,35) does not have that property; see worldLeg's comment.
   -- ==================================================================== --
   H.navTo(7, 15, {
     maxFrames = 8000,

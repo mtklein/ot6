@@ -1,46 +1,46 @@
--- gen_gate_cave_save.lua -- v0.7 STEP G->H (issue #31), and the generator
+-- gen_gate_cave_save.lua -- v0.7 step G->H (issue #31), and the generator
 -- that cuts battery checkpoint H, `gate-cave-save-v1`.
 --
 -- The step: cold-Continue the tracked `narshe-mission-v1` battery (boundary
--- G -- world (84,34), the Narshe exit spawn, ship parked at (84,36)),
+-- G, world (84,34), the Narshe exit spawn, ship parked at (84,36)),
 -- assert its contract, then:
 --   1. board the parked Blackjack (one A tap boards AND lifts off) and X
 --      to the deck; the interior chain 6 (20,6) -> 7 (40,11) -> (40,18)
 --      stairs -> the party-swap room;
---   2. seat TERRA and bench SETZER: chase-talk the WANDERING Terra NPC
---      (obj $16 -- H.chaseTalk re-plans every aligned frame and stops on
---      the $0528 choice), answer YES (index 1 -- blind A answers No),
---      then drive `party_menu 1, NO_RESET, {LOCKE, CELES}` -- which opens
---      with ALL FOUR cells empty (measured; the {LOCKE, CELES} list
---      pre-fills nothing on this chain) -- to TERRA LOCKE EDGAR SABIN by
+--   2. seat TERRA and bench SETZER: chase-talk the wandering Terra NPC
+--      (obj $16; H.chaseTalk re-plans every aligned frame and stops on
+--      the $0528 choice), answer Yes (index 1; blind A answers No),
+--      then drive `party_menu 1, NO_RESET, {LOCKE, CELES}`, which opens
+--      with all four cells empty (measured; the {LOCKE, CELES} list
+--      pre-fills nothing on this chain), to TERRA LOCKE EDGAR SABIN by
 --      runtime cell lookup, and commit with START;
---   3. wheel LEFT+A (the $052A "(Lift-off)" choice -- $0170 is set, so
---      the wheel ASKS now; a bare hold would strand the choice open),
+--   3. wheel LEFT+A (the $052A "(Lift-off)" choice; $0170 is set, so
+--      the wheel asks now, and a bare hold would leave the choice open),
 --      strafe-fly to the base pass, land (163,194), walk east into the
---      Imperial Base 377 -- TERRA IS THE HARD GATE here (_cb25d6,
---      event_main.asm:44004-44016; a party without her bounces) -- ride
+--      Imperial Base 377, where TERRA is a hard requirement (_cb25d6,
+--      event_main.asm:44004-44016; a party without her is turned back), ride
 --      the $0172 "No Imperial soldiers…" beat, leave the re-entry-trap
 --      trigger row with unconditional holds, cross to the east door, the
 --      world pocket, and the cave: 382 -> 383 -> 385;
---   4. THE TIMED FLOOR (map 385): arm cycle A at (3,2), phaseWalk the
+--   4. the timed floor (map 385): arm cycle A at (3,2), phaseWalk the
 --      union graph to (11,3) (arming cycle B), phaseWalk to (13,12), and
 --      out the (13,13) door -- lib/ot6_field.lua's M.phaseWalk, the
 --      rewrite-window mechanism measured by probe_v07_385win;
---   5. BASEMENT 3 (map 384): the south loop to the (62,11) face-UP+A
---      switch (_cb3062 -- its _cb303e patch IS the save-room door,
+--   5. basement 3 (map 384): the south loop to the (62,11) face-UP+A
+--      switch (_cb3062; its _cb303e patch is the save-room door,
 --      persistent $0173), the (64,10) door, and map 386's vanilla save
---      point: tapInto (74,53) -- a HELD press walks straight THROUGH the
+--      point: tapInto (74,53), because a held press walks through the
 --      SavePoint trigger without firing it (measured,
---      probe_v07_386tile); only a tap-and-settle stops on the tile;
+--      probe_v07_386tile) and only a tap-and-settle stops on the tile;
 --   6. the ordinary Save UI into slot 3; run.sh captures the battery.
 --
--- Checkpoint H is the route recon's gate-cave-save boundary: the ONLY
+-- Checkpoint H is the route recon's gate-cave-save boundary: the only
 -- interior save point in the whole v0.7 section (386 (74,53), off 384
--- (64,10)).  ONE generator does the step AND cuts the checkpoint,
+-- (64,10)).  One generator does the step and cuts the checkpoint, following
 -- gen_narshe_mission's shape.
 --
 -- OT6_CHECKPOINT_LAYOUT: ot6-codex-o8-v1
--- ^ run.sh refuses -- BEFORE boot -- any OT6_SRAM_CHECKPOINT whose manifest
+-- ^ run.sh refuses, before boot, any OT6_SRAM_CHECKPOINT whose manifest
 --   declares a different persistent_layout.
 local H = dofile("tools/tests/lib/ot6.lua")
 
@@ -537,24 +537,24 @@ H.run({ maxFrames = 200000 }, {
   H.call(function()
     H.assertEq((H.readByte(0x0201) & 0x80) ~= 0, true,
       "menu-flags $0201 bit7 SET -- the save-enable flow reached the menu")
-    -- ARM THE input-driven save receipt (issue #75): a read-only exec hook on
+    -- Arm the input-driven save receipt (issue #75): a read-only exec hook on
     -- the real CopyGameDataToSRAM entry captures the slot argument the
     -- save runs with (codex_saveas's instrument).  This replaces the old
-    -- zeroed-$307ff0 sentinel -- an SRAM write -- as the proof that the
-    -- real save ran to completion for slot 3.
+    -- zeroed-$307ff0 sentinel, which was an SRAM write, as the evidence that
+    -- the real save ran to completion for slot 3.
     local entry = H.sym("CopyGameDataToSRAM")
     emu.addMemoryCallback(function()
       saveArg = emu.getState()["cpu.a"] & 0xff
     end, emu.callbackType.exec, entry, entry)
   end),
-  -- THE PAD-DRIVEN SAVE (save-drive rule, tools/tests/README.md;
+  -- The pad-driven save (save-drive rule, tools/tests/README.md;
   -- codex_saveas and probe_banquet_timer_save are the templates): UP wraps
   -- the main-menu cursor to Save (row 6), A enters the menu's own
-  -- SelectMainMenuOption_06 path, the slot cursor is STEERED to slot 3 by
+  -- SelectMainMenuOption_06 path, the slot cursor is steered to slot 3 by
   -- pad against its live cell, and A confirms on through any overwrite
-  -- prompt.  No ZMENUSTATE poke, no cursor poke, no display-cache poke,
-  -- and no witness seeding: the codex payload the battery carries is
-  -- whatever the chain EARNED, read and logged below (issue #75).
+  -- prompt.  There is no ZMENUSTATE poke, no cursor poke, no display-cache
+  -- poke, and no witness seeding: the codex payload the battery carries is
+  -- whatever the chain earned, read and logged below (issue #75).
   H.driveUntil(function()
     return H.readByte(ZMENUSTATE) == 0x05 and H.readByte(0x4b) == 6
   end, 600, {
@@ -579,10 +579,10 @@ H.run({ maxFrames = 200000 }, {
     H.assertEq(emu.read(0x307ff0, emu.memType.snesMemory), 3,
       "SRAM $307ff0 records slot 3")
     H.assertEq(saveArg, 3, "CopyGameDataToSRAM ran for persistent slot 3")
-    -- the codex witness cells are READ, never seeded (issue #75): the
-    -- battery carries whatever the chain actually earned.  The phase-2
-    -- checkpoint re-cuts measure these and the entry contracts follow the
-    -- measurement (never the reverse).
+    -- the codex witness cells are read, never seeded (issue #75): the
+    -- battery carries whatever the chain earned.  The phase-2 checkpoint
+    -- re-cuts measure these, and the entry contracts follow the
+    -- measurement rather than the other way round.
     H.log(string.format("codex witness cells (earned): elem=%02X class=%02X",
       emu.read(0x316810 + ULTROS2, emu.memType.snesMemory),
       emu.read(0x316990 + ULTROS2, emu.memType.snesMemory)))

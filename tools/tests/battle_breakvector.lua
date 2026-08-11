@@ -1,22 +1,22 @@
 -- @suite
 -- battle_breakvector.lua -- the v0.6 Vector / Magitek Factory break section,
--- asserted against the REAL encounter chain in ROM.
--- (school.lua / battle_breaktbl.lua pattern: pure ROM bytes, no savestate.)
+-- asserted against the encounter chain in ROM.
+-- (school.lua and battle_breaktbl.lua pattern: pure ROM bytes, no savestate.)
 --
 -- Issue #11 asks for authored, encounter-aware rows to replace the generated
--- floor one route section at a time, and its acceptance criteria are explicit
+-- floor one route section at a time, and its acceptance criteria state
 -- that "tests cover encounter/party reachability, not only nonzero table
--- bytes".  So this test does not merely read back the twelve bytes the pass
+-- bytes".  So this test does not only read back the twelve bytes the pass
 -- wrote.  It walks
 --
 --   SubBattleGroup[map] -> RandBattleGroup[group*8] -> BattleMonsters[form*15]
 --
 -- out of the shipped ROM, plus the minecart's five forced formations, and
--- asserts properties OF THE SECTION: that every body in it is authored rather
+-- asserts properties of the section: that every body in it is authored rather
 -- than falling through to the floor, that every formation is answerable by
 -- some buildable party, that the one formation which demands a blunt weapon
--- is exactly the one the design says it is, and that slash has stopped being
--- the automatic answer.  Those are the claims that were false before the pass
+-- is the one the design says it is, and that slash is no longer the
+-- automatic answer.  Those are the claims that were false before the pass
 -- and that a byte-equality check alone would not notice going false again.
 --
 -- Survey, arithmetic and per-formation reading: docs/design/break-coverage-vector.md.
@@ -60,9 +60,9 @@ local function classStr(m)
 end
 
 -- ------------------------------------------------------------- Ot6ShieldTbl
--- Self-located by its opening anchor (guard/lobo/whelk-shell), so row
--- insertions anywhere below it cannot break this test -- same technique
--- battle_breaktbl.lua uses.
+-- Located by its opening anchor (guard/lobo/whelk-shell), so row
+-- insertions anywhere below it cannot break this test; this is the same
+-- technique battle_breaktbl.lua uses.
 local function find(seq, lo, hi)
   for o = lo, hi do
     local hit = true
@@ -100,8 +100,8 @@ check(shieldRows >= 70, string.format(
   shieldRows))
 
 -- --------------------------------------------------------- the authored rows
--- Exact shields AND class: a missing row reads nil, a drifted one reads a
--- different byte, and both fail.  Rationale for each is in ot6_hud.asm beside
+-- Exact shields and class: a missing row reads nil, a drifted one reads a
+-- different byte, and both fail.  The reason for each is in ot6_hud.asm beside
 -- the row and in break-coverage-vector.md §8.1.
 local want = {
   { 0x00cb, 2, PIERCE | BLUDG, "garm (magitek quadruped, entrance)" },
@@ -128,7 +128,7 @@ end
 -- -------------------------------------------------- the encounter chain, live
 -- Seven encounter-bearing maps (break-coverage-vector.md §1.1).  Map 275 carries
 -- group 106 and the enable bit but no entrance record targets it, so it is
--- excluded; 270/272/274 carry a group with the enable bit CLEAR.
+-- excluded; 270/272/274 carry a group with the enable bit clear.
 local AREA_MAPS = { 262, 263, 264, 269, 271, 273, 240 }
 local WANT_GROUP = { [262] = 80, [263] = 81, [264] = 104, [269] = 105,
                      [271] = 106, [273] = 106, [240] = 108 }
@@ -148,7 +148,7 @@ end
 
 -- Every section map must still point at the group this pass was authored against.
 -- If a map is ever repointed, every distribution claim below is stale and the
--- test says so rather than quietly measuring a different dungeon.
+-- test says so rather than measuring a different dungeon.
 for _, m in ipairs(AREA_MAPS) do
   local g = rb(SUBGRP + m)
   check(g == WANT_GROUP[m], string.format(
@@ -173,7 +173,7 @@ check(#randForms == 28, string.format(
 local MINECART_FORMS = { 0x06f, 0x075, 0x196, 0x197 }
 
 -- ------------------------------------------------------ authored, not floored
--- Acceptance criterion: the section's encounter groups have REVIEWED rows.  Any
+-- Acceptance criterion: the section's encounter groups have reviewed rows.  Any
 -- body in it still falling through to the generated floor fails here.
 do
   local unauthored = {}
@@ -198,8 +198,8 @@ end
 -- ------------------------------------------------------------- party model
 -- Fixed core Locke + Celes, two free picks from Edgar/Sabin/Cyan/Gau
 -- (break-coverage-vector.md §6.1; Terra is not yet active and Setzer is flying the
--- getaway).  These are the classes each brings for FREE -- joining kit and
--- abilities only, no shop trip:
+-- getaway).  These are the classes each brings for free, from the joining kit
+-- and abilities only, with no shop trip:
 --   Locke  swords + daggers            slash|pierce
 --   Celes  swords + daggers            slash|pierce
 --   Edgar  spears + Tools, Chain Saw   slash|pierce
@@ -236,7 +236,7 @@ end
 -- ------------------------------------------------- reachability, the real one
 -- "No encounter chippable only by a class no party can field."  Setzer's Cards
 -- are the game's only ¤ source and he is flying the getaway, so a formation
--- whose ONLY key is ¤ would be unbreakable for this whole section.
+-- whose only key is ¤ would be unbreakable for this whole section.
 do
   local bad = 0
   local function sweep(f, where)
@@ -253,7 +253,7 @@ do
   check(bad == 0, "no area formation is keyed only by a class no party can field")
 end
 
--- Every formation is answerable by SOME buildable four-party.
+-- Every formation is answerable by at least one buildable four-party.
 do
   local uncovered = 0
   local function sweep(f, where)
@@ -276,11 +276,11 @@ end
 
 -- --------------------------------------------------- the one deliberate cost
 -- Formation $168 (Rhinox x2) is the section's single hard demand: bludgeon or
--- nothing.  Asserted from BOTH sides so it stays deliberate --
---   * it really is bludgeon-only on the class axis, and
+-- nothing.  Asserted from both sides so it stays intentional:
+--   * it is bludgeon-only on the class axis, and
 --   * no element substitutes, because Rhinox has no vanilla weakness at all
---     AND absorbs bolt, the element the rest of the facility teaches.
--- If someone ever softens Rhinox, this is the assertion that objects.
+--     and absorbs bolt, the element the rest of the facility teaches.
+-- If someone softens Rhinox, this is the assertion that fails.
 do
   local keys = formationKeys(0x168)
   check(keys == BLUDG, string.format(
@@ -292,7 +292,7 @@ do
   check(rb(MPROP + 0x0075 * MREC + OFF_ABSORB) & BOLT ~= 0,
     "rhinox $075 ABSORBS bolt -- the area's taught element would heal it, "
     .. "which is why bludgeon alone is legitimate here")
-  -- and that a party CAN pay it: Sabin or Gau bring bludgeon for free.
+  -- and that a party can pay it: Sabin or Gau bring bludgeon for free.
   local payable = 0
   for _, p in ipairs(parties) do
     if p.cls & BLUDG ~= 0 then payable = payable + 1 end
@@ -302,10 +302,10 @@ do
     .. "Edgar+Cyan, buys a Flail or Full Moon in any of four towns)", payable))
 end
 
--- ------------------------------------------- slash is no longer the A button
--- The failure this pass exists to fix: under the generated floor, SLASH
+-- --------------------------------- slash is no longer the automatic answer
+-- The failure this pass exists to fix: under the generated floor, slash
 -- answered 100% of the draws in group 106, the deepest third of the facility
--- (Gobbler by outright default, Rhinox by a `rhino` keyword on the wrong
+-- (Gobbler by default, Rhinox by a `rhino` keyword on the wrong
 -- body), and the dungeon hands the player four swords on the way in.
 do
   local slashW, bludgW, pierceW, total = 0, 0, 0, 0
@@ -334,7 +334,7 @@ do
     100 * slashW))
 end
 
--- Group 106 specifically: the deep pool must NOT be uniformly slash again.
+-- Group 106 specifically: the deep pool must not be uniformly slash again.
 do
   local slashAll = true
   for i = 0, 3 do
@@ -348,10 +348,10 @@ end
 
 -- ------------------------------------------------- the minecart's element puzzle
 -- Both Mag Roaders are named "Mag Roader", so the name-keyed floor generator
--- could not tell them apart even in principle.  They are OPPOSED: $006 is
--- fire-weak and ABSORBS ice, $0af is ice-weak, and formation $075 puts them in
+-- could not tell them apart even in principle.  They are opposed: $006 is
+-- fire-weak and absorbs ice, $0af is ice-weak, and formation $075 puts them in
 -- one fight, so the wrong splash heals half the screen.  The class rows are
--- deliberately identical so the class axis does not flatten that puzzle.
+-- identical on purpose so the class axis does not flatten that puzzle.
 do
   check(rb(MPROP + 0x0006 * MREC + OFF_WEAK) & FIRE ~= 0
     and rb(MPROP + 0x0006 * MREC + OFF_ABSORB) & ICE ~= 0,

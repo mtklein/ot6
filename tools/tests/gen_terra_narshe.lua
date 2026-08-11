@@ -1,21 +1,21 @@
 -- gen_terra_narshe.lua -- from rapids_done.mss across the World of Balance
--- into NARSHE, and through the townsfolk's turn-away at the checkpoint.
+-- into Narshe, and through the townsfolk's turn-away at the checkpoint.
 -- Generates one state:
 --   terra_narshe.mss  map 20 (39,53), EDGAR leading TERRA and BANON, first
 --                     controllable frame after the "Get out of here!" scene,
---                     with $001F set.  The entry point for the rest of the
---                     scenario, and deliberately its own link: everything
---                     past here goes through the secret wall and the mines,
---                     which is the part worth iterating on.
+--                     with $001F set.  This is the entry point for the rest
+--                     of the scenario, kept as its own link because
+--                     everything past here goes through the secret wall and
+--                     the mines, which is the part worth iterating on.
 --
--- THE WORLD STEP is short and dull: `load_map 0, {93,41}` drops the party
--- north-east of Narshe and the town's world tile is (84,33) -> map 20
--- (38,61) (ShortEntrance::_0).  21 steps, planned by worldBfs and asserted
--- to exist before it is walked.
+-- The world step is short: `load_map 0, {93,41}` drops the party north-east
+-- of Narshe and the town's world tile is (84,33) -> map 20 (38,61)
+-- (ShortEntrance::_0).  21 steps, planned by worldBfs and asserted to exist
+-- before it is walked.
 --
--- ============ THE CHECKPOINT IS A WALL, NOT A SPEED BUMP ============
--- Map 20's south strip and the rest of Narshe are joined by ONE three-tile
--- corridor, and the checkpoint sits on it.  Measured, not assumed: a flood
+-- The checkpoint seals the route completely.
+-- Map 20's south strip and the rest of Narshe are joined by one three-tile
+-- corridor, and the checkpoint sits on it.  This was measured: a flood
 -- over the engine's own passability rules (transcribed from
 -- field/player.asm, reachability probe run during development) reaches 834
 -- tiles spanning y 0..63 from the arrival tile, and 231 tiles spanning
@@ -26,17 +26,17 @@
 --     _ccb205  once $001F=1      -> goto _ccb35c -> _ccb37f, the short one
 --     _ccb37f  guard: $0019=1 AND $001F=1 AND $0021=0   (:104721-104726)
 -- and _ccb37f ends by shoving SLOT_1 five tiles south (:104768).  So the
--- party cannot walk into Narshe at all during this scenario -- which is the
--- point of the scene, and why the way onward is the secret wall at (15,57)
--- that gen_terra_done handles, not a smarter path north.
+-- party cannot walk into Narshe at all during this scenario.  That is the
+-- purpose of the scene, and it is why the way onward is the secret wall at
+-- (15,57) that gen_terra_done handles rather than a different path north.
 --
--- THE SCENE NEEDS A, NOT JUST A DIRECTION.  _ccb230 opens with five dialogs
--- ($01A0 at :104526 through $01A4 at :104607) and every one waits for a
--- keypress.  A first cut drove the step onto the checkpoint by holding UP
--- alone and timed out after 3000 frames sitting at (38,51) with $001F still
--- clear -- the trigger had fired and the scene was parked on "Hey, lady…".
--- So the held-UP phase ends the moment the event picks up, and advanceStory
--- (which taps dialogs) owns everything after that.
+-- The scene needs A presses as well as a direction.  _ccb230 opens with five
+-- dialogs ($01A0 at :104526 through $01A4 at :104607) and every one waits for
+-- a keypress.  A first version drove the step onto the checkpoint by holding
+-- UP alone and timed out after 3000 frames sitting at (38,51) with $001F
+-- still clear: the trigger had fired and the scene was waiting on "Hey,
+-- lady…".  So the held-UP phase ends the moment the event picks up, and
+-- advanceStory (which taps dialogs) handles everything after that.
 local H = dofile("tools/tests/lib/ot6.lua")
 local DONE = "build/states/rapids_done.mss.lua"
 
@@ -68,12 +68,12 @@ local function landed(m, n)
   end
 end
 
--- ONE INSTANCE PER USE SITE.  landed() returns a closure with a consecutive
--- frame counter in it; calling landed(20)() inline builds a fresh counter
--- every frame, so it reads 1 forever.  That is exactly how the first cut of
--- this file failed: the party sat at (39,53) with ctl/algn/bright/batt all
--- reading fine for 30,000 frames and the settle predicate never once
--- returned true.
+-- Use one instance per use site.  landed() returns a closure with a
+-- consecutive frame counter in it; calling landed(20)() inline builds a fresh
+-- counter every frame, so it reads 1 permanently.  The first version of this
+-- file failed that way: the party sat at (39,53) with ctl/algn/bright/batt
+-- all reading fine for 30,000 frames and the settle predicate never returned
+-- true.
 local settleArrival, settleScene = landed(20), landed(20)
 
 local function where(tag)
@@ -101,11 +101,11 @@ H.run({ maxFrames = 60000 }, {
   end),
 
   -- ===================================================================== --
-  -- THE WORLD STEP: (93,41) -> (84,33) -> map 20 (38,61).
+  -- The world step: (93,41) -> (84,33) -> map 20 (38,61).
   -- ===================================================================== --
-  -- issue #75: playBattles=true -- an encounter in the WoB area is FOUGHT by
+  -- issue #75: playBattles=true, so an encounter in the WoB area is fought by
   -- real input (TERRA/EDGAR attack, BANON's first command is his Health
-  -- heal), never write-cleared; the budget carries the ATB rounds.
+  -- heal) rather than write-cleared; the budget carries the ATB rounds.
   H.worldNavTo(84, 33, { maxFrames = 60000, playBattles = true,
     arrive = function() return not H.worldMode() end }),
   H.release(),
@@ -120,9 +120,9 @@ H.run({ maxFrames = 60000 }, {
   end),
 
   -- ===================================================================== --
-  -- THE CHECKPOINT.  navTo stops one tile short at (38,51) so the trigger
-  -- fires on OUR held step rather than in the middle of a plan, then the
-  -- scene is handed to advanceStory the instant it picks up.
+  -- The checkpoint.  navTo stops one tile short at (38,51) so the trigger
+  -- fires on the script's held step rather than in the middle of a plan; the
+  -- scene is handed to advanceStory as soon as it starts.
   -- ===================================================================== --
   H.navTo(38, 51, { maxFrames = 12000, playBattles = true }),
   H.release(),

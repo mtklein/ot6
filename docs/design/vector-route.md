@@ -2,8 +2,8 @@
 
 ## 7. Switches `$01B0`-`$01B7` are not story bits
 
-They are never set by a `switch` opcode, and reading them as story flags is a
-category error.
+They are never set by a `switch` opcode. Reading them as story flags is
+incorrect.
 
 Switch `$01B0` = `$1E80 + ($1B0>>3)` = **`$1EB6` bit 0**. `$1EB6` is an engine
 state byte:
@@ -58,8 +58,8 @@ Therefore:
 | `$01B6` | map object data needs loading (map-init guard) |
 | `$01B7` | serpent-trench arrow direction |
 
-This is what arms the opera weight trap (`_cab497` needs `$01B0=1 && $01B4=1` =
-*face up and hold A*), and it is load-bearing across the Vector area:
+These bits are what the opera weight trap checks (`_cab497` needs `$01B0=1 &&
+$01B4=1`, meaning face up and hold A), and they are used across the Vector area:
 
 - `_cc96c9` (Vector sneak ledge): `$01B2` = face DOWN.
 - `_cc7a60` (esper tube room): `$01B0 && $01B4` = face UP + hold A.
@@ -69,12 +69,12 @@ This is what arms the opera weight trap (`_cab497` needs `$01B0=1 && $01B4=1` =
 
 **Consequence for the driver:** `navTo` releases the pad between steps and never
 presses A on the open field (`ot6_field.lua:340-351`). Every one of these
-triggers needs a bespoke "arrive facing D, then hold A" step. This is not
-optional and it is not discoverable by walking.
+triggers needs its own "arrive facing D, then hold A" step. That step is
+required, and walking the map will not reveal that it is needed.
 
-`$022F` note, while on the subject: `if_switch $022F=0, X` appears 83 times in
-`event_main.asm` and **`switch $022F=…` appears zero times**. It is the
-disassembly's rendering of an unconditional long jump. Read those as `goto X`.
+`$022F`: `if_switch $022F=0, X` appears 83 times in
+`event_main.asm`, and `switch $022F=…` appears zero times. It is the
+disassembly's rendering of an unconditional long jump, so read those as `goto X`.
 
 ---
 
@@ -90,7 +90,7 @@ disassembly's rendering of an unconditional long jump. Read those as `goto X`.
 | Kefka esper-drain | `event_main.asm:94409` `_cc7451`, `switch $005F=1` `:94620` |
 | Chute 263→264 | `event_main.asm:94649` `_cc7588`, `load_map 264` `:94665` |
 | Ifrit / Shiva NPCs | `npc_prop.asm:12289`, `:12298` (map 264) |
-| Ifrit fight | `event_main.asm:95260` `_cc7937`, **`battle 70` `:95283`** → formation 439; the live species words `$57C0` read `0109 0108 0109 0108 FFFF FFFF` — **Ifrit and Shiva are both present from the first frame**, no AI-script entrance |
+| Ifrit fight | `event_main.asm:95260` `_cc7937`, **`battle 70` `:95283`** → formation 439; the live species words `$57C0` read `0109 0108 0109 0108 FFFF FFFF`, so Ifrit and Shiva are both present from the first frame, with no AI-script entrance |
 | esper hand-off | `event_main.asm:95331` `_cc79a4`; magicite `_cc79cd` `:95359`, `_cc79dd` `:95372` |
 | Number 024 | `npc_prop.asm:12478` → `event_main.asm:95385` `_cc79ed`, **`battle 72`** → formation 441 = `$010a` |
 | tube-room switch | `event_trigger.asm:1216` → `event_main.asm:95456` `_cc7a60` (facing UP + A) |

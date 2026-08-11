@@ -1,32 +1,32 @@
--- probe_fieldicons.lua -- REFERENCE PROBE, not a suite test (no `-- @suite`).
+-- probe_fieldicons.lua -- reference probe, not a suite test (no `-- @suite`).
 --
--- Issue #53's measurement: where the FIELD MENU's small font lives in vram,
+-- Issue #53's measurement: where the field menu's small font lives in vram,
 -- whether the eight element icon cells are free there, and what a field page
--- actually draws in its icon column.  Run it on the shipped ROM and on a
+-- draws in its icon column.  Run it on the shipped ROM and on a
 -- pre-change ROM (OT6_ROM=...) to get both halves of the before/after.
 --
--- WHAT IT MEASURES
---   1. FONT SPACE.  The menu keeps TWO copies of the small font, neither of
+-- What it measures
+--   1. Font space.  The menu keeps two copies of the small font, neither of
 --      them the battle font at word $5800: LoadFontGfx2bpp lays 256 2bpp
 --      tiles at word $6000 and LoadFontGfx4bpp expands the same art into
 --      4bpp tiles at word $5000 (menu_gfx.asm:120,:139; the char bases are
 --      hBG12NBA = $65 / hBG34NBA = $66, menu_init_2.asm:433-435).  For each
 --      of the eight cells Ot6ElemGlyphTbl claims, the probe prints the tile
---      as it stands in vram in BOTH copies, and prints cell $d9 (the sword,
---      which ships IN the vanilla art) as the positive control that the
+--      as it stands in vram in both copies, and prints cell $d9 (the sword,
+--      which ships in the vanilla art) as the positive control that the
 --      addresses are right.
---   2. STRAY REFERENCES.  Every cell of the BG1 A/B and BG3 A tilemap
+--   2. Stray references.  Every cell of the BG1 A/B and BG3 A tilemap
 --      shadows is scanned for the eight icon codes.  A vanilla surface that
 --      spelled one of them would start drawing an element icon the moment
---      the tiles arrive, which is the risk the battle path had to dodge
+--      the tiles arrive, which is the risk the battle path had to avoid
 --      ($ee is vanilla's battle-tilemap junk fill, hence poison at $64).
---   3. THE BLITZ PAGE'S ICON COLUMN, cell by cell, against the ROM tables.
+--   3. The Blitz page's icon column, cell by cell, against the ROM tables.
 local H = dofile("tools/tests/lib/ot6.lua")
 local STATE = "build/states/arvis_wake.mss.lua"
 
 local VR, ROM = emu.memType.snesVideoRam, emu.memType.snesPrgRom
 
--- byte addresses of the two menu font copies (vram WORD address * 2)
+-- byte addresses of the two menu font copies (vram word address * 2)
 local F4BPP, F4STRIDE = 0x5000 * 2, 32     -- BG1: 16 words per tile
 local F2BPP, F2STRIDE = 0x6000 * 2, 16     -- BG2/BG3: 8 words per tile
 
@@ -62,7 +62,7 @@ local function reportFont(tag)
   local cells = iconCells()
   H.log("---- " .. tag .. ": the two menu font copies ----")
   -- positive control first: the sword cell ships in the vanilla art, so it
-  -- must be NONZERO in both copies or the addresses below mean nothing.
+  -- must be nonzero in both copies, or the addresses below are wrong.
   H.log(string.format("control  cell $d9 (sword) 4bpp[%s] 2bpp[%s]",
     hex16(F4BPP, 0xd9 * F4STRIDE), hex16(F2BPP, 0xd9 * F2STRIDE)))
   for i = 1, 8 do
@@ -108,7 +108,7 @@ local function scanStray(tag)
   return hits
 end
 
--- the icon an ability SHOULD show, derived the way the ROM derives it
+-- the icon an ability should show, derived the way the ROM derives it
 local MAGICPROP = H.sym("MagicProp") & 0x3FFFFF
 local function wantIcon(id)
   local e = H.readRomByte(MAGICPROP + id * 14 + 1)
@@ -141,8 +141,8 @@ H.run({ maxFrames = 30000 }, {
     H.writeByte(CMD3, BATTLE_CMD_BLITZ)
     H.writeByte(BLITZES, 0xff)          -- all eight learned: every row is data
   end),
-  -- driveUntil, not a single press: this probe is meant to be run against a
-  -- DIFFERENT ROM too (OT6_ROM=<pre-change>.sfc), where the fixture's timing
+  -- driveUntil rather than a single press: this probe is also run against a
+  -- different ROM (OT6_ROM=<pre-change>.sfc), where the fixture's timing
   -- is not the timing it was generated for and one X can land on a dead
   -- frame.
   H.driveUntil(function() return st() == ST_MAIN end, 1200,

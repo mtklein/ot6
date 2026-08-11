@@ -1,23 +1,23 @@
 -- @suite
 -- battle_reveal.lua -- the reveal-gate regression test. Guards against the
--- GUI bug where every enemy weakness icon showed REVEALED from battle start
+-- GUI bug where every enemy weakness icon showed as revealed from battle start
 -- instead of '?'.
 --
 -- Root cause: Ot6SeedShields OR's the persistent codex into the reveal masks
--- $3e89 (elements) / $3e9d (classes) but relied on the CALLER having zeroed
+-- $3e89 (elements) and $3e9d (classes) but relied on the caller having zeroed
 -- them. InitBattle's $3a20-$3ed3 clear does that for a normal battle, so the
--- AllZeros harness (and any normal fight) never saw the leak -- but the Cmd_20
--- scene-change reload (multi-phase bosses / reinforcements, AI cmd $f2) re-runs
--- the seed with NO such clear, and real uninitialized RAM would too. The seed
--- now zeroes the masks itself before the codex merge.
+-- AllZeros harness and any normal fight never saw the leak.  The Cmd_20
+-- scene-change reload (multi-phase bosses and reinforcements, AI cmd $f2)
+-- re-runs the seed with no such clear, and real uninitialized RAM would too.
+-- The seed now zeroes the masks itself before the codex merge.
 --
--- This test EXERCISES that exact dirty condition regardless of RAM power-on
+-- This test exercises that dirty condition regardless of RAM power-on
 -- state: a one-shot exec callback at Ot6SeedShields ($F00000) re-dirties every
--- monster reveal mask to $FF the instant the seed starts, AFTER InitBattle's
--- clear -- the same bytes the Cmd_20 reload hands over stale. The assertion is
--- deterministic (it holds for ANY garbage): a virgin-codex, un-chipped enemy
--- must show '?'. Then a real fire chip must still reveal, proving the fix
--- didn't just blanket-hide everything.
+-- monster reveal mask to $FF the instant the seed starts, after InitBattle's
+-- clear, which is the same stale state the Cmd_20 reload hands over. The
+-- assertion holds for any garbage: an enemy with a virgin codex and no chips
+-- must show '?'. Then a fire chip must still reveal, which shows the fix does
+-- not simply hide everything.
 --
 -- Guards sit in monster slots 2/3 -> entity $0C/$0E. revealed elems
 -- $3E95/$3E97, weak elems $3BEC/$3BEE, HP $3C00/$3C02, party levels $3B18+2i,
@@ -65,7 +65,7 @@ H.run({ maxFrames = 45000 }, {
   H.waitUntil(function() return H.battleActive() end, 900, "battle active", 30),
   H.waitFrames(240),
 
-  -- 1. THE CHECK: garbage was handed to the seed and the codex is virgin, so
+  -- 1. the check: garbage was handed to the seed and the codex is virgin, so
   -- every un-chipped weakness must still read hidden and draw '?'.
   H.call(function()
     local checked = 0
@@ -82,15 +82,16 @@ H.run({ maxFrames = 45000 }, {
         H.assertEq(relm, 0, "slot "..slot.." revealed-elements hidden despite seed garbage")
         H.assertEq(rcls, 0, "slot "..slot.." revealed-classes hidden despite seed garbage")
         -- broken timer ($3e88): the seed now clears it, so a monster handed
-        -- $FF at seed (as a Cmd_20 reload would) must NOT start BROKEN.
+        -- $FF at seed (as a Cmd_20 reload would) must not start broken.
         H.assertEq(brk, 0, "slot "..slot.." broken timer cleared (not broken) despite seed garbage")
-        -- class-weak mask ($3e9c): the $FF must be REPLACED, never OR'd, by the
-        -- seed's authoritative value -- else the hud draws phantom class cells.
-        -- The entry-point Guards are AUTHORED (species 0, class PIERCE $02): the
-        -- @hit path OVERWRITES, so it lands exactly $02 over the $FF (confirming
-        -- overwrite-not-OR). A formula species would land 0 via the @formula
-        -- clear; no formula species is reachable in this fixture, but the clear
-        -- is the same lda#0/sta idiom the reveal masks above exercise.
+        -- class-weak mask ($3e9c): the $FF must be replaced, not OR'd, by the
+        -- seed's authoritative value, or the hud draws class cells that are not
+        -- there.  The entry-point Guards are authored (species 0, class PIERCE
+        -- $02) and the @hit path overwrites, so it lands exactly $02 over the
+        -- $FF, which confirms it overwrites rather than ORs.  A formula species
+        -- would land 0 via the @formula clear; no formula species is reachable
+        -- in this fixture, but the clear is the same lda#0/sta idiom the reveal
+        -- masks above exercise.
         H.assertEq(clsW ~= 0xFF, true, "slot "..slot.." class-weak mask replaced, not OR'd (got FF)")
         if sp == 0 then
           H.assertEq(clsW, 0x02, "slot "..slot.." authored Guard class-weak overwritten to PIERCE $02")
@@ -109,9 +110,10 @@ H.run({ maxFrames = 45000 }, {
     H.screenshot("reveal_gate_hidden")
   end),
 
-  -- 2. THE REVEAL still works: fire-chip a guard and watch its fire weakness
-  -- flip from '?' to the fire glyph. Guards carry no natural fire weak, so poke
-  -- one; equalize casters + toughen HP like battle_break for a clean chip.
+  -- 2. the reveal still works: fire-chip a guard and watch its fire weakness
+  -- change from '?' to the fire glyph. Guards carry no natural fire weakness,
+  -- so poke one in; equalize casters and toughen HP as battle_break does, for
+  -- a clean chip.
   H.call(function()
     H.writeByte(0x3BEC, H.readByte(0x3BEC) | 0x01)
     H.writeByte(0x3BEE, H.readByte(0x3BEE) | 0x01)
@@ -140,20 +142,19 @@ H.run({ maxFrames = 45000 }, {
     for k = 0, 3 do if wcell(guard, k) == 0xEB then drewFire = true end end
     H.assertEq(drewFire, true, "chipped guard's HUD row shows the fire glyph, not '?'")
 
-    -- ...AND ONLY FIRE.  Everything above this line was satisfiable by a ROM
-    -- that reveals the WHOLE weakness strip on the first matched chip, which
-    -- is the same shape as the bug this file was written for -- the assert at
-    -- :137 is literally the driveUntil predicate at :125-127, so it is
-    -- guaranteed by construction, and `drewFire` only asks that ONE cell
+    -- and only fire.  Everything above this line was satisfiable by a ROM
+    -- that reveals the whole weakness strip on the first matched chip, which
+    -- is the same shape as the bug this file was written for: the assert at
+    -- :137 is the same condition as the driveUntil predicate at :125-127, so
+    -- it is guaranteed by construction, and `drewFire` only asks that one cell
     -- turned over.  A reveal that leaked every element would satisfy both.
     --
-    -- The fixture already contains the control: the guards carry an AUTHORED
-    -- second element weakness in bit 3 (measured $3BEC/$3BEE = $09 -- $01 is
-    -- the fire bit this test pokes in at :114, $08 is the species' own), and
-    -- a fire chip must not disclose it.  Asserted as the pair: the second
-    -- weakness is really there, and it is really still hidden.  Measured
-    -- three times, frame-identical (PASS at frame 1028, revElem $01 against
-    -- weakElem $09).
+    -- The fixture already contains the control: the guards carry an authored
+    -- second element weakness in bit 3 (measured $3BEC/$3BEE = $09, where $01
+    -- is the fire bit this test pokes in at :114 and $08 is the species' own),
+    -- and a fire chip must not disclose it.  Asserted as a pair: the second
+    -- weakness is present, and it is still hidden.  Measured three times,
+    -- frame-identical (PASS at frame 1028, revElem $01 against weakElem $09).
     local OTHER = 0x08
     local w = ((r2 & 1) == 1) and H.readByte(0x3BEC) or H.readByte(0x3BEE)
     local r = ((r2 & 1) == 1) and r2 or r3

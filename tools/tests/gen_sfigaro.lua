@@ -8,96 +8,97 @@
 --   sfigaro_passage.mss  map 86 (7,51), inside the secret passage the
 --                        grandson's password opens
 --
--- FIVE THINGS THIS SCRIPT HAD TO MEASURE, every one of which sent a first
--- attempt into a wall.
+-- Five things this script had to measure, each of which broke a first
+-- attempt.
 --
--- 1. THE DISGUISES COME OFF A *STEAL*, NOT OFF A WIN.  This is the finding
---    that shapes the whole file.  Merchant $13A and Officer $175 each carry
+-- 1. The disguises come from a steal, not from a win.  This shapes the whole
+--    file.  Merchant $13A and Officer $175 each carry
 --    a reaction script whose only branch is `if_cmd STEAL`
 --    (battle/ai_script.asm AIScript::_314 / _373): it sets battle switch
 --    (13,4) / (13,5), swaps the monster for the b.day suit and ends the
 --    fight.  Those are b_switch $4C / $4D, and the event script reads
 --    exactly them -- `if_b_switch $4C, _ca8617` (event_main.asm:20385),
 --    `if_b_switch $4D, _ca7ecf` (:19340).  EventCmd_b7 jumps when the bit is
---    CLEAR (field/event.asm:4053-4060), and the jump target is the branch
---    that SKIPS `obj_gfx LOCKE, MERCHANT` / `switch $0104=1`.  So a fight
+--    clear (field/event.asm:4053-4060), and the jump target is the branch
+--    that skips `obj_gfx LOCKE, MERCHANT` / `switch $0104=1`.  So a fight
 --    finished any other way leaves Locke in his own clothes: measured, the
---    harness's battle-clear-write idiom beat the officer clean and $0103
---    stayed 0.  In battle those flags live at $3EB4+n -- the field copy
---    $1DC9+n is loaded in at battle start and written back at the end
---    (battle_main.asm:6088, :12182) -- so $4C is bit 4 of $3EBD live and of
+--    harness's battle-clear-write idiom beat the officer and $0103
+--    stayed 0.  In battle those flags live at $3EB4+n (the field copy
+--    $1DC9+n is loaded in at battle start and written back at the end,
+--    battle_main.asm:6088, :12182), so $4C is bit 4 of $3EBD live and of
 --    $1DD2 afterwards.  Both are asserted below.
 --
--- 2. AND THE MERCHANT'S CLOTHES ARE NOT OPTIONAL SCENERY.  Map 86's
+-- 2. The merchant's clothes are required, not decoration.  Map 86's
 --    grandson, npc 4 at {6,10}, is the gate: `if_switch $0104=1, _ca7bf8`
 --    else "Only people dressed as merchants may pass through"
 --    (event_main.asm:18747-18752).  Nothing else on the route opens.
 --
--- 3. ONE FIGHT PAYS FOR BOTH ERRANDS.  The cafe's cider runner -- map 78
---    npc 6 at {75,39}, spawn switch $0307, `_ca7d7d` -> `_ca7db8` -- runs
+-- 3. One fight covers both errands.  The cafe's cider runner (map 78
+--    npc 6 at {75,39}, spawn switch $0307, `_ca7d7d` -> `_ca7db8`) runs
 --    `battle 10` and then, win or steal, ends `switch $01D0=1` ("Took the
 --    old man's cider!", :19061).  Steal it and the same scene also hands
 --    over the clothes.  The item-shop merchant on map 85 gives the clothes
 --    alone, so the cafe is strictly the cheaper stop.
 --
--- 4. THE TOWN IS NOT ONE-WAY -- THE PATHFINDER'S NODE CAP JUST LOOKS LIKE
---    IT.  H.bfsPath gives up at 4096 dequeues, and map 75 is a 64x64 town
+-- 4. The town is not one-way; the pathfinder's node cap makes it look that
+--    way.  H.bfsPath gives up at 4096 dequeues, and map 75 is a 64x64 town
 --    with z-levels, so a long query runs the queue dry and answers "no
---    path" for a tile that is plainly walkable.  Measured, and it is a
---    ONE-TILE cliff: from (22,43) the plan to (37,41) is 49 steps and
+--    path" for a tile that is walkable.  Measured, and the boundary is one
+--    tile wide: from (22,43) the plan to (37,41) is 49 steps and
 --    found; from (22,44), one tile further along that same plan, the same
---    query returns nil.  A first cut read that as "the SE quarter is behind
---    a one-way z step" and rebuilt the route around a wall that is not
---    there.  Every long step here is therefore walked as SHORT HOPS through
---    named waypoints, which keeps each query far inside the cap.
+--    query returns nil.  A first version read that as "the SE quarter is
+--    behind a one-way z step" and rebuilt the route around a wall that does
+--    not exist.  Every long step here is therefore walked as short hops
+--    through named waypoints, which keeps each query well inside the cap.
 --
--- 5. A DESTINATION COORDINATE IS NOT AN ARRIVAL TEST.  `go` used to call
---    "standing on (dx,dy)" arrival for every crossing; map 78's front room
---    contains a walkable (22,44), the same tile the town door lands on, so
---    the walk to the exit "arrived" twenty tiles early on the wrong map and
---    the settle then waited 12000 frames for a map id that was never
---    coming.  Only a SAME-MAP warp has no map change to watch.
+-- 5. A destination coordinate is not an arrival test.  `go` used to treat
+--    "standing on (dx,dy)" as arrival for every crossing; map 78's front
+--    room contains a walkable (22,44), the same tile the town door lands on,
+--    so the walk to the exit registered arrival twenty tiles early on the
+--    wrong map and the settle then waited 12000 frames for a map id that
+--    never came.  Only a same-map warp has no map change to watch.
 --
--- ISSUE #75 (the input-driven test conversion): ZERO state writes.  The two
--- fights on this route are PLAYED now:
---   * battle 11 (the gate soldier's HeavyArmor, up to three times -- he
---     respawns on every map-75 reload) is won by solo LOCKE on boosted
---     Fights: R raises pending boost out of the 1 bp Ot6InitBP grants,
---     A-A-A confirms the boosted Fight -- gen_moogle's Marshal drive.
---     The old HP pin is gone, so a loss is REAL (the _ca85ba scenario
+-- Issue #75 (the input-driven test conversion): no state writes.  The two
+-- fights on this route are played:
+--   * battle 11 (the gate soldier's HeavyArmor, up to three times, because
+--     he respawns on every map-75 reload) is won by solo LOCKE on boosted
+--     Fights: R raises pending boost out of the 1 bp Ot6InitBP grants, and
+--     A-A-A confirms the boosted Fight, which is gen_moogle's Marshal drive.
+--     The old HP pin is gone, so a loss now happens (the _ca85ba scenario
 --     reset: dumped on (47,43), disguises cleared) and is handled the
---     way a TAS handles it -- every engagement rides a phase-spread
---     retry ladder (a blob captured before the talk, reloaded with a
+--     way a player handles it, with a phase-spread retry ladder around
+--     every engagement (a blob captured before the talk, reloaded with a
 --     different frame offset; the battle RNG seed is the frame phase at
 --     init, gen_whelk_poweron's measurement).
---   * the cider runner's Merchant is STOLEN from by real menu input
+--   * the cider runner's Merchant is stolen from by real menu input
 --     through the #55 thief submenu, with the boost banked by real input:
 --     LOCKE opens with 1 bp and regens +1 per unboosted action
---     (Ot6ActionEnd), and a steal ATTEMPT is itself an action -- so the
+--     (Ot6ActionEnd), and a steal attempt is itself an action, so the
 --     driver steals unboosted while the bank grows (each attempt rolls
---     vanilla odds and may simply land), and from 3 bp on it presses
---     R-R-R first, which Ot6StealBoostLevel converts to a GUARANTEED
+--     vanilla odds and may land), and from 3 bp on it presses
+--     R-R-R first, which Ot6StealBoostLevel converts to a guaranteed
 --     steal (kits.md's tier table).  Steal costs 4 MP (Ot6StealCost),
---     paid from LOCKE's own pool -- the driver logs bank/MP per attempt
---     so an empty wallet is visible in the generation log, not pinned over.
+--     paid from LOCKE's own pool, and the driver logs bank and MP per
+--     attempt so an empty pool is visible in the generation log rather than
+--     being written over.
 -- The stealDriver that poked STEAL into every command cell and forced
 -- banked+pending boost to the cap, and the pinParty HP writes, are gone.
 local H = dofile("tools/tests/lib/ot6.lua")
 local DOOR = "build/states/locke_scenario.mss.lua"
 
--- map compares stay MASKED: loaders ride flag bits in $1F64's high byte
+-- map compares stay masked: loaders leave flag bits in $1F64's high byte
 local function map() return H.mapId() & 0x1ff end
 local function bright() return emu.getState()["ppu.screenBrightness"] or 0 end
 -- event switch id -> live bit (event bitfield base $1E80, bit = id & 7)
 local function sw(id) return (H.readByte(0x1e80 + (id >> 3)) >> (id & 7)) & 1 end
 -- a bare step list cannot be spliced into a step list (Lua truncates a
 -- non-final table.unpack to one value); H.cond with an always-true
--- predicate is the library's public way to wrap a list into ONE step
+-- predicate is the library's public way to wrap a list into a single step
 local function seq(steps) return H.cond(function() return true end, steps) end
 
--- all EIGHT for door staging: a door at the head of a stair can only be
+-- all eight for door staging: a door at the head of a stair can only be
 -- entered diagonally (gen_edgar's finding), and a diagonal candidate has to
--- clear one extra test -- the engine must actually produce that move there
+-- clear one extra test, that the engine produces that move there
 local DIAGSTAGE = {
   { 0, 1, "up" }, { 0, -1, "down" }, { -1, 0, "right" }, { 1, 0, "left" },
   { -1, 1, "upright" }, { -1, -1, "downright" },
@@ -115,11 +116,11 @@ local function where(tag)
 end
 
 -- Settle after a map load: a fully lit screen plus whatever else the caller
--- names, held for 20 CONSECUTIVE frames, then the 30-frame margin every
--- field fixture uses.  Both halves are load-bearing (gen_kolts's header):
--- a cutscene can report control on a black screen, and a single-sample gate
+-- names, held for 20 consecutive frames, then the 30-frame margin every
+-- field fixture uses.  Both halves are needed (gen_kolts's header): a
+-- cutscene can report control on a black screen, and a single-sample gate
 -- passes mid-load while the field module still holds the old map's state.
--- It DRIVES rather than waits so a dialog on the arrival tile cannot stall
+-- It drives rather than waits so a dialog on the arrival tile cannot stall
 -- it; on a quiet field advanceStory holds the pad empty.
 local function settled(n, extra)
   local cnt = 0
@@ -143,11 +144,11 @@ end
 
 local aPhase = 0
 
--- rideOut -- ride a scene out to a settled, controllable field, fighting
--- anything that comes up with real input -- is H.rideOut now (promoted to
--- lib/ot6_field.lua with its full measured history, 2026-08-09).
+-- rideOut, which rides a scene out to a settled, controllable field and
+-- fights anything that comes up with real input, is H.rideOut now (promoted
+-- to lib/ot6_field.lua with its measured history, 2026-08-09).
 
--- One SHORT step to a waypoint on the current map.  See note 4: long BFS
+-- One short step to a waypoint on the current map.  See note 4: long BFS
 -- queries on map 75 run the 4096-node cap dry and answer "no path" for
 -- tiles that are plainly walkable, so every cross-town walk is a chain of
 -- these rather than one query.
@@ -162,28 +163,28 @@ local function hop(tx, ty, what)
   })
 end
 
--- One crossing, all three flavours in one step:
+-- One crossing, all three kinds in one step:
 --   * ordinary walkable entrance tile    -> navTo straight onto it
 --   * door tile (a wall until CheckDoor)  -> stage on a neighbour, hold in
 --   * same-map warp (maps 78/83/86 are built out of them)
--- CheckDoor (field/player.asm:958-1010) only opens a tile whose TILEMAP
--- BYTE is $15/$17/$1C, and only for a party standing directly above or
--- below it; anything else is a wall no amount of holding will move.
+-- CheckDoor (field/player.asm:958-1010) only opens a tile whose tilemap
+-- byte is $15/$17/$1C, and only for a party standing directly above or
+-- below it; anything else stays a wall however long the button is held.
 local function go(sx, sy, dm, dx, dy, what)
   local pick, startMap
   local function arrived()                       -- see note 5
     if dm ~= startMap then return map() ~= startMap end
     return H.fieldX() == dx and H.fieldY() == dy
   end
-  -- THE STAGING TILE IS RE-RESOLVED, NOT LATCHED.  Town NPCs wander, and
-  -- the object map they occupy is an input to every passability query, so
-  -- the answer is only true for the instant it was asked: measured, the
-  -- cafe's annex warp (33,46) resolved as "walkable, stand on it" on one
-  -- run and, 36 frames earlier on the next, as "unreachable -- stage at
-  -- (33,47)" -- and then navTo could not reach (33,47) either, because the
-  -- npc had moved again by the time it planned.  Latching the first answer
-  -- turns a transient into a route failure; re-asking every 90 frames lets
-  -- the walk recover on its own.
+  -- The staging tile is re-resolved rather than latched.  Town NPCs wander,
+  -- and the object map they occupy is an input to every passability query, so
+  -- the answer is only true for the instant it was asked.  Measured: the
+  -- cafe's annex warp (33,46) resolved as "walkable, stand on it" on one run
+  -- and, 36 frames earlier on the next, as "unreachable, stage at (33,47)",
+  -- and then navTo could not reach (33,47) either, because the npc had moved
+  -- again by the time it planned.  Latching the first answer turns a
+  -- transient into a route failure; re-asking every 90 frames lets the walk
+  -- recover.
   local pickAt = -1000
   local function stage()
     if pick == nil or (H.frame - pickAt >= 90 and not arrived()) then
@@ -222,12 +223,12 @@ local function go(sx, sy, dm, dx, dy, what)
         H.call(function()
           aPhase = (aPhase + 1) % 8
           if H.dialogWaiting() then H.setPad(aPhase < 4 and { "a" } or {}); return end
-          -- stage() RE-PICKS every call, so the H.cond above (which admitted
-          -- us because the pick had a hold direction) does not guarantee the
-          -- pick still has one now: a nav outcome can switch this to the
-          -- walk-straight-onto-the-entrance variant mid-drive, and
-          -- `{ [nil] = true }` is a "table index is nil" abort.  Observed
-          -- 2026-07-29 -- the pick flipped at f2072 after the nav library
+          -- stage() re-picks on every call, so the H.cond above (which
+          -- admitted us because the pick had a hold direction) does not
+          -- guarantee the pick still has one now: a nav outcome can switch
+          -- this to the walk-straight-onto-the-entrance variant mid-drive,
+          -- and `{ [nil] = true }` is a "table index is nil" abort.  Observed
+          -- 2026-07-29: the pick flipped at f2072 after the nav library
           -- gained its avoid-set, which changed which staging tile it
           -- reached first.  A directionless pick means walk straight, so
           -- hold nothing.
@@ -246,13 +247,13 @@ local function go(sx, sy, dm, dx, dy, what)
   })
 end
 
--- talkToObj -- approach a posted NPC and activate it -- is H.talkToObj
+-- talkToObj, which approaches a posted NPC and activates it, is H.talkToObj
 -- now (promoted to lib/ot6_field.lua, 2026-08-09).
 
 -- gen_scenario.lua's choice-steering idiom, unchanged in shape.  $056F is
 -- the option count and is only final once dialogWaiting() is true (it is
 -- built up as the text types out, and it is meaningless during a battle);
--- $056E is the 0-based selection; the steering presses are EDGES because
+-- $056E is the 0-based selection; the steering presses are edges because
 -- $056D latches a held direction to exactly one row (field/text.asm:368-425).
 local CH_SEL, CH_MAX = 0x056E, 0x056F
 local function rideUntil(pred, what, budget, choices)
@@ -308,38 +309,38 @@ local function talkThrough(obj, what, choices, budget)
   })
 end
 
--- THE GATE SOLDIER -- his respawn-on-reload mechanism, the retry ladder,
--- and the his-own-tile branch, with their full measured history -- is
+-- The gate soldier, with his respawn-on-reload mechanism, the retry ladder,
+-- and the his-own-tile branch, and their measured history, is
 -- H.clearGateSoldier now (promoted to lib/ot6_field.lua, 2026-08-09;
 -- gen_tunnelarmr re-enters the same town and needed the same answer).
 
 -- ------------------------------------------------------------- the steal --
--- THE input-driven steal (issue #75).  Locke's command window is `FIGHT,
+-- The input-driven steal (issue #75).  Locke's command window is `FIGHT,
 -- STEAL, MAGIC, ITEM` (char_prop.asm:157); MAGIC is removed at runtime for
 -- a spell-less Locke (InitCmd_03), the rows stay four, and STEAL is one
--- DOWN from the resting cursor.  Since #55 the Steal row opens the THIEF
--- SUBMENU (tools shell, state $30) with Steal on row 0, so one attempt is
+-- down from the resting cursor.  Since #55 the Steal row opens the thief
+-- submenu (tools shell, state $30) with Steal on row 0, so one attempt is
 -- the edge sequence  down, A (submenu opens), A (row 0 = Steal), A (the
 -- target cursor opens MANUAL|ONE_SIDE|ENEMY on the lone Merchant).
 --
--- THE BOOST IS BANKED FOR REAL.  Steal is the shipped boost-tiered chance
--- verb (Ot6StealBoostLevel): 0 bp rolls raw vanilla odds, 3 bp clamps the
--- level term so vanilla's own `bcs` GUARANTEES the steal.  LOCKE opens
--- the fight with 1 bp (Ot6InitBP) and regens +1 per unboosted action
--- (Ot6ActionEnd) -- and a steal ATTEMPT is itself an action -- so the
--- driver simply steals unboosted while the bank grows (attempts 1-2 may
--- land on their own dice; each pays Ot6StealCost's 4 MP), and once the
--- bank reads >= 3 it presses R-R-R first and takes the guaranteed steal.
--- Worst case is three attempts, 12 MP, against the pool the fixture logs.
--- The merchant's reaction script (`if_cmd STEAL`, AIScript::_314) sets
--- b_switch $4C and ends the fight; the caller asserts $1DD2 bit 4.
+-- The boost is banked with real input.  Steal is the shipped boost-tiered
+-- chance verb (Ot6StealBoostLevel): 0 bp rolls raw vanilla odds, and 3 bp
+-- clamps the level term so vanilla's own `bcs` guarantees the steal.  LOCKE
+-- opens the fight with 1 bp (Ot6InitBP) and regens +1 per unboosted action
+-- (Ot6ActionEnd), and a steal attempt is itself an action, so the driver
+-- steals unboosted while the bank grows (attempts 1-2 may land on their own
+-- dice, and each pays Ot6StealCost's 4 MP); once the bank reads >= 3 it
+-- presses R-R-R first and takes the guaranteed steal.  Worst case is three
+-- attempts, 12 MP, against the pool the fixture logs.  The merchant's
+-- reaction script (`if_cmd STEAL`, AIScript::_314) sets b_switch $4C and
+-- ends the fight; the caller asserts $1DD2 bit 4.
 --
 -- The menu machine is armr-style: presses start only after the menu flag
--- holds 4 consecutive pulses, a NEW sequence is only built while the menu
--- is the COMMAND WINDOW (state $05 -- a stray A from any other state
--- could queue FIGHT and kill the merchant, the one outcome this fight
--- must never produce), and any other state without a running sequence is
--- backed out with B.
+-- holds 4 consecutive pulses, a new sequence is only built while the menu
+-- is the command window (state $05, because a stray A from any other state
+-- could queue FIGHT and kill the merchant, which this fight must never
+-- produce), and any other state without a running sequence is backed out
+-- with B.
 local MENU, ACTOR, MSTATE = 0x7BCA, 0x62CA, 0x7BC2
 local ST_CMD = 0x05
 local B_SWITCH_LIVE = 0x3EBD          -- $3EB4 + ($4C >> 3); bit4 = $4C
@@ -379,7 +380,7 @@ local function stealDriver(what, maxF)
             H.readByte(B_SWITCH_LIVE)))
         end
         if mIdx <= #mSeq then
-          -- one button per 16-frame window: 6 held, 10 released -- the
+          -- one button per 16-frame window: 6 held, 10 released, the
           -- edge cadence the old driver's measured prog used (a held
           -- d-pad does not move this cursor; a 6-frame edge does)
           H.setPad(mSub < 6 and { mSeq[mIdx] } or {})
@@ -397,7 +398,7 @@ end
 
 -- ========================================================================= --
 -- Budget note (issue #75): input-driven fights cost real ATB rounds, and the
--- retry ladders can replay them -- the ceiling covers the worst case of
+-- retry ladders can replay them, so the frame cap covers the worst case of
 -- three three-attempt ladders plus the steal's.
 H.run({ maxFrames = 350000 }, {
   H.loadState(DOOR),
@@ -408,36 +409,35 @@ H.run({ maxFrames = 350000 }, {
     H.assertEq(sw(0x0105), 1, "$0105 -- LOCKE's scenario is live")
     H.assertEq(sw(0x001E), 0, "$001E clear -- the scenario is not done")
   end),
-  -- LOCKE IS ALONE HERE, and alone is exactly when the back row is worth
-  -- the trade.  He fights a level-13 HeavyArmor with 495 hp on 168 of his
-  -- own; halving the physical damage he takes buys the turns his Tonics
-  -- need to matter.  He gives up half his Fight for it -- Steal deals no
-  -- damage, so Fight is all he has -- and this is the one stretch of the
-  -- game where that is clearly the right side of the trade.
-  -- LOCKE ARRIVES BARE-HANDED and nobody had ever noticed, because nobody
-  -- had ever looked: measured 2026-08-09, $1600+37*1+$1F..$23 all read $FF
-  -- at this fixture -- no weapon, no armor, no relics -- with his own Dirk
-  -- sitting in the bag.  He then punched the gate soldier's level-13,
-  -- 495-hp HeavyArmor for EIGHT damage a swing and lost three attempts
-  -- running, which reads exactly like a balance finding and is nothing of
-  -- the sort.  The story's own remove_equip returns gear to inventory
-  -- (EventCmd_8d) and the chain of generated savestates never put it back
-  -- on.  A player opens the Equip menu before walking into an occupied
-  -- town; so does this.
+  -- LOCKE is alone here, which is when the back row is worth the trade.  He
+  -- fights a level-13 HeavyArmor with 495 hp on 168 of his own, and halving
+  -- the physical damage he takes buys the turns his Tonics need.  He gives
+  -- up half his Fight for it, and Steal deals no damage, so Fight is all he
+  -- has; this is the one stretch of the game where the trade is clearly
+  -- worth it.
+  -- LOCKE arrives with no equipment, which had not been noticed because it
+  -- had not been checked: measured 2026-08-09, $1600+37*1+$1F..$23 all read
+  -- $FF at this fixture (no weapon, no armor, no relics) with his own Dirk
+  -- in the bag.  He then punched the gate soldier's level-13, 495-hp
+  -- HeavyArmor for eight damage a swing and lost three attempts in a row,
+  -- which looks like a balance finding and is not one.  The story's own
+  -- remove_equip returns gear to inventory (EventCmd_8d) and the chain of
+  -- generated savestates never put it back on.  A player opens the Equip
+  -- menu before walking into an occupied town, and so does this script.
   H.equipOptimum({ tag = "locke kit" }),
 
-  -- AND THE BACK ROW, which is what wins battle 11.  The note that used to
-  -- sit here said front row on a comparison that was never run: "front and
-  -- back measure identically" came from two BARE-HANDED runs where LOCKE
+  -- The back row is what wins battle 11.  The note that used to sit here
+  -- said front row, on a comparison that was never run: "front and back
+  -- measure identically" came from two runs with no equipment, where LOCKE
   -- did eight damage either way because he was punching.
   --
-  -- Armed and in the back: the HeavyArmor's ~110 a hit becomes ~53, so
-  -- instead of one hit leaving him where the next one kills -- healing
-  -- every turn, never swinging -- he survives three and attacks two turns
-  -- in three.  His Fight halves too, and it does not matter: the fight is
-  -- decided by BREAKING (one chip per boosted Fight, measured) and a broken
-  -- HeavyArmor takes 4x.  Measured end to end: shields 3 -> 0 three times
-  -- over, 495 hp -> 0, LOCKE never below 112.
+  -- Armed and in the back, the HeavyArmor's ~110 a hit becomes ~53, so
+  -- instead of one hit leaving him where the next one kills (healing every
+  -- turn, never swinging) he survives three and attacks two turns in three.
+  -- His Fight halves too, and that does not matter: the fight is decided by
+  -- breaking (one chip per boosted Fight, measured) and a broken HeavyArmor
+  -- takes 4x.  Measured end to end: shields 3 -> 0 three times over, 495 hp
+  -- -> 0, LOCKE never below 112.
   H.setRows({ [1] = true }, { tag = "locke solo rows" }),
   H.call(function()
     where("boot")
@@ -447,10 +447,10 @@ H.run({ maxFrames = 350000 }, {
   -- BEAT 1: the soldier who bars the gate.  Map 75 npc 10 = obj 26, spawn
   -- switch $030C, at {30,42}: _ca854f (event_main.asm:20296) opens
   -- `dlg $0174 "Halt!"` + `battle 11, TOWN_EXT` -> formation 64,
-  -- HeavyArmor $09F.  He is a PLUG, not scenery: (30,42) is the only tile
-  -- joining the starting pocket to the rest of town, and BFS reaches
-  -- exactly 107 tiles until he is gone.  Won any way at all -- the clothes
-  -- branches are a different fight -- but "any way" is INPUT-DRIVEN now: solo
+  -- HeavyArmor $09F.  He blocks the route: (30,42) is the only tile joining
+  -- the starting pocket to the rest of town, and BFS reaches exactly 107
+  -- tiles until he is gone.  The fight can be won any way (the clothes
+  -- branches belong to a different fight), and it is input-driven now: solo
   -- LOCKE on boosted Fights, with the retry ladder around the engagement.
   -- The probe tile is the cafe entry point the win must open.
   -- ===================================================================== --
@@ -466,14 +466,14 @@ H.run({ maxFrames = 350000 }, {
   -- BEAT 2: the cafe's cider runner.  Map 78 npc 6 = obj 22 at {75,39},
   -- behind the annex warp (33,46)->(74,43).  `battle 10, TOWN_INT` ->
   -- formation 43, Merchant $13A (slot 1, $13B, is the b.day suit the steal
-  -- swaps him for).  STEAL, do not kill: see note 1.
+  -- swaps him for).  Steal from him rather than killing him; see note 1.
   -- ===================================================================== --
   go(22, 42, 78, 26, 52, "C1 town (22,42) -> map 78 (26,52) [CAFE]"),
   go(33, 46, 78, 74, 43, "C2 map 78 (33,46) -> (74,43) [annex warp]"),
-  -- THE STEAL, on its own retry ladder: an attempt that ends the fight
-  -- without b_switch $4C (LOCKE down, or the fight somehow won another
-  -- way) reloads the pre-talk blob and re-engages at a different frame
-  -- phase.  The formation assert stays HARD on every attempt.
+  -- The steal has its own retry ladder: an attempt that ends the fight
+  -- without b_switch $4C (LOCKE down, or the fight won another way) reloads
+  -- the pre-talk blob and re-engages at a different frame phase.  The
+  -- formation assert still runs on every attempt.
   (function()
     local blob, stolen = nil, false
     local function stealAttempt(n)
@@ -491,9 +491,9 @@ H.run({ maxFrames = 350000 }, {
           H.waitFrames((n - 1) * 37),    -- vary the battle RNG seed
         }) or seq({}),
         H.talkToObj(22, "the cider runner"),
-        -- ride the two dialogs into the fight BY HAND: advanceStory's
+        -- ride the two dialogs into the fight directly: advanceStory's
         -- playBattles mode would blind-tap A in the fight, and A on the
-        -- resting cursor is FIGHT -- the merchant must never be killed
+        -- resting cursor is FIGHT, which would kill the merchant
         (function()
           local ph = 0
           return H.driveUntil(function() return H.battleLoadStarted() end, 9000, {
@@ -516,11 +516,11 @@ H.run({ maxFrames = 350000 }, {
             w[1], w[2], w[3], w[4], w[5], w[6], H.readByte(B_SWITCH_LIVE)))
         end),
         stealDriver("the cider runner"),
-        -- SOFT aftermath ride: on the steal the scene settles back on map
-        -- 78; on a surprise loss the game-over screen never settles, and a
-        -- hard timeout here would abort the whole generate instead of letting
-        -- the ladder reload and retry -- so this ride gives up quietly
-        -- after its budget and lets the $1DD2 check below decide.
+        -- The aftermath ride is soft: on the steal the scene settles back on
+        -- map 78, and on a loss the game-over screen never settles.  A hard
+        -- timeout here would abort the whole generate instead of letting the
+        -- ladder reload and retry, so this ride gives up after its budget
+        -- and lets the $1DD2 check below decide.
         (function()
           local ph, calm, waited = 0, 0, 0
           return H.driveUntil(function()
@@ -603,13 +603,13 @@ H.run({ maxFrames = 350000 }, {
 
   -- ===================================================================== --
   -- BEAT 3: the cider buys the old man's story.  Map 86 npc 1 = obj 17 at
-  -- {28,17}, reached ONLY through town (37,40) -> map 86 (36,22) -- the
+  -- {28,17}, reached only through town (37,40) -> map 86 (36,22).  The
   -- room has one outside door and one same-map warp, and the warp only
-  -- leads to the little (9,8) landing and back.  _ca7b88 (:18670) takes the
+  -- leads to the (9,8) landing and back.  _ca7b88 (:18670) takes the
   -- $01D0 branch _ca7bae: "there is one that leads to the rich man's
   -- house... give my grandson the password", ending `switch $0107=1`.
-  -- The walk there is HOPPED (note 4): (22,44) -> (37,41) is a 49-step
-  -- query and it is exactly the one that runs the BFS cap dry.
+  -- The walk there is broken into hops (note 4): (22,44) -> (37,41) is a
+  -- 49-step query and it is the one that runs the BFS cap dry.
   -- ===================================================================== --
   hop(19, 44, "W1 west along the canal"),
   hop(19, 34, "W2 north to the main street"),
@@ -630,14 +630,14 @@ H.run({ maxFrames = 350000 }, {
 
   -- ===================================================================== --
   -- BEAT 4: the grandson and the password.  Map 86 npc 4 = obj 20 at
-  -- {6,10}, in the OTHER map-86 house -- the one town (34,35) enters at
-  -- (4,6) -- so this is out to town and back in, not a warp.  _ca7bcd
-  -- (:18738) tests $0107 BEFORE the "you may proceed" branch, so with the
+  -- {6,10}, in the other map-86 house, the one town (34,35) enters at
+  -- (4,6), so this is out to town and back in, not a warp.  _ca7bcd
+  -- (:18738) tests $0107 before the "you may proceed" branch, so with the
   -- old man already told, one conversation goes straight to the prompt.
   -- ===================================================================== --
   go(36, 23, 75, 37, 42, "E2 map 86 (36,23) -> town (37,42)"),
   hop(34, 43, "W9 back west across the SE quarter"),
-  -- and back OUT of the SE quarter, so the same plug is in the way again
+  -- and back out of the SE quarter, so the same soldier is in the way again
   H.clearGateSoldier(34, 35, "R2 (out of the SE quarter)"),
   go(34, 35, 86, 4, 6, "E3 town (34,35) -> map 86 (4,6)"),
   talkThrough(20, "the grandson (the password)", {

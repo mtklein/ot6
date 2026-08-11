@@ -1,8 +1,8 @@
 #!/bin/sh
-# Positive concurrency control for issue #14.  It deliberately overlaps two
-# run.sh calls carrying the SAME worker label, then two suite.sh calls, and
-# proves each pair owns distinct live directories.  Probe modes stop before
-# Mesen/test discovery, so this is fast and deterministic.
+# Positive concurrency control for issue #14.  It overlaps two
+# run.sh calls carrying the same worker label, then two suite.sh calls, and
+# checks that each pair owns distinct live directories.  Probe modes stop
+# before Mesen/test discovery, so this is fast and deterministic.
 set -u
 ROOT="$(cd "$(dirname "$0")/../../.." && pwd)"
 TMP=$(mktemp -d "${TMPDIR:-/tmp}/ot6-runner-selftest.XXXXXXXX") || exit 1

@@ -1,11 +1,11 @@
 -- probe_opera_rafter2.lua -- Beat A rafter-chase recon, step 1 (Ultros
 -- drop-in).  Boots opera_dance_done (238 {98,7} $0111=1, $0345=1).
--- MECHANISM (measured from ff6/src/event, event_main.asm + npc_prop.asm +
+-- Mechanism (measured from ff6/src/event, event_main.asm + npc_prop.asm +
 -- event_trigger.asm):
---  * 238 {99,20}: ENVELOPE NPC (vis gate $0345=1) event _cabf31 -> dlg
+--  * 238 {99,20}: envelope NPC (vis gate $0345=1) event _cabf31 -> dlg
 --    $04C8/$04C9, sets $0345=0, $0058=1 (Ultros threatens; "tell the
 --    Impresario").  no_react NPC: fires on contact/bump.
---  * IMPRESARIO (_cab724) lives on MAP 234 {15,46}.  With $0058=1 & $0110=0 he
+--  * the Impresario (_cab724) is on map 234 {15,46}.  With $0058=1 & $0110=0 he
 --    runs _cab744 -> the 5-min cutscene -> $0110=1 $02BA=1 $02BC=1 +
 --    start_timer 0,18000,_caba09 (expiry = Ultros wins).  Reached 238->237->234.
 -- This probe: dump boot, object-scan 238, drive to {99,20}, touch the envelope,
@@ -57,7 +57,7 @@ H.run({ maxFrames = 20000 }, {
         if x<99 and H.canStep(x,y,"right") then H.setPad({right=true}); return end
         if x>99 and H.canStep(x,y,"left") then H.setPad({left=true}); return end
         if y<19 and H.canStep(x,y,"down") then H.setPad({down=true}); return end
-        -- at/near (99,19): bump DOWN into the envelope at (99,20) + A
+        -- at/near (99,19): bump down into the envelope at (99,20), plus A
         H.setPad(hb%2==0 and {"down"} or {"a"})
       end) }, "touch envelope -> $0058")
   end)(),

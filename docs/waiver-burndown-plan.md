@@ -2,7 +2,7 @@
 
 The work-order source for the conversion waves: each entry names the write
 sites, why they exist, and either the input-driven replacement or the
-quarantine justification.  gen_* and probe_* files are out of scope here —
+quarantine justification.  gen_* and probe_* files are out of scope here;
 gens convert step-by-step with the chain of generated savestates.
 
 Scope: the waiver file's unique suite-test paths yield **60 files**.
@@ -11,14 +11,14 @@ Scope: the waiver file's unique suite-test paths yield **60 files**.
 scaffold), `metrics_battle`, `mines_pace`, `shot_battle_items`,
 `shot_field_items`.
 
-## Cross-cutting facts the table leans on
+## Cross-cutting facts the table depends on
 
 - **`battle_entry`/`first_battle` is a MAGITEK party** (Terra/Biggs/
-  Wedge, no Fight, no Magic, no kits).  That single fact causes ~30 of the
+  Wedge, no Fight, no Magic, no kits).  That fact causes ~30 of the
   60 waivers: every "install CHAR::X into $3ED8 + rewrite $202E command
   rows + clear the magitek status bit" block exists only because the
-  input-driven root has no kit.  Every one of those is fixed by a
-  **fixture swap**, not by cleverness.
+  input-driven root has no kit.  Each of those is fixed by a
+  fixture swap.
 - **Real-kit fixtures exist**: Cyan →
   `cyan_defence` / `doma_defended` / `camp_escaped`; Sabin → `vargas_won`
   (L9, Blitz) and `vector_entry` (LOCKE CELES SABIN EDGAR, post-opera
@@ -31,44 +31,44 @@ scaffold), `metrics_battle`, `mines_pace`, `shot_battle_items`,
 - **Saved-cursor pokes are one shared conversion.**  `$8913/$8917/$891b`
   (magic), `$895F/$8963/$8967` (tools/blitz/bushido), `$892B/$892F/$8933`
   (rage), esper-list CURSOR_* — poked in ~14 files to select a list row.
-  All convert to d-pad edges driven by the menu-state bank `$7BC2` — the
+  All convert to d-pad edges driven by the menu-state bank `$7BC2`, the
   idiom `battle_boost` uses.
 - **`H.enterEncounter()` is input-driven** (hold up + A).  Nothing below is
   blocked on the lib.
 - **Precedents already landed** that decide several calls: `77bc4f9`
-  (danger pin bought nothing — natural roll), `1914283` (incidental
+  (danger pin gained nothing; natural roll), `1914283` (incidental
   encounters flee), `cb8e605` (baseline-latch beats scratch-blanking),
   `gen_narshe_battle` (input-driven Kefka, zero writes), `gen_vargas` (real
   Pummel), `battle_hudtrail` (real monster slide on `rapids_start`).
 
-## REDUNDANT (delete, don't convert)
+## Redundant (delete, don't convert)
 
 - **battle_bp** → superseded by the converted `battle_boost` (opens-with-1,
   +1 regen, boost consumed/no-regen/pending-cleared all covered).  The one
-  uncovered line (`dmg > 250`) lives more precisely in `battle_fold` and
+  uncovered line (`dmg > 250`) is covered more precisely by `battle_fold` and
   `bal_dpb`.  Writes it carried: guard HP := 500 (fight longevity), actor
   bp := 4 / pending := 3 (handed bank).
 
-## CONVERT-CHEAP — real input, existing fixture, no new savestate
+## Convert-cheap: real input, existing fixture, no new savestate
 
 - **field_navstep** — one write: the flag that kills off incidental
   encounters during the corridor walk on `vector_sneak`.  Swap for
   `H.fleeBattle()` (L+R).  The subject (navTo release timing on map 242)
-  is unaffected by how the interrupting fight ends.  The single cheapest
+  is unaffected by how the interrupting fight ends.  This is the cheapest
   waiver line in the set.
 - **battle_kefka** (`savestate=kefka_entry`) — party-HP max pin (likely
   a no-op: the fixture is generated one tile from the trigger with a full
-  party — measure and delete), ATB hurry, Kefka MHP := 1 after two chips.
-  `gen_narshe_battle` beats this exact Kefka on real input; lift that drive.
+  party, so measure and delete), ATB hurry, Kefka MHP := 1 after two chips.
+  `gen_narshe_battle` beats this Kefka on real input; reuse that drive.
 - **battle_vargas** (`savestate=vargas_entry`) — HP/MP pins at open,
   Ipooh kill-clamp, Vargas MHP clamp under the phase threshold, cursor
   pokes, $202E command installs.  The party just before that fight
-  genuinely holds Edgar-with-Tools and Sabin-with-Blitz: read the rows
+  holds Edgar-with-Tools and Sabin-with-Blitz: read the rows
   instead of installing them; `gen_vargas` kills the boss with a real
   Pummel; cursor → $7BC2 d-pad.  Only the MP pin may need a real check
   first.
-- **battle_naturalmp** (`savestate=kolts_cave`) — the identical danger pin
-  `77bc4f9` deleted on this very fixture, plus monster stop/HP-floor.
+- **battle_naturalmp** (`savestate=kolts_cave`) — the same danger pin
+  `77bc4f9` deleted on this fixture, plus monster stop/HP-floor.
   The MP survey happens at battle init: read MP in the first ~120 frames,
   then flee.
 - **hud_stability** — guard HP := 500 twice, berserk toggled to force
@@ -91,36 +91,36 @@ scaffold), `metrics_battle`, `mines_pace`, `shot_battle_items`,
   does not inherit it.  Moves to NEEDS-FIXTURE only if slot 1 specifically is
   required.
 
-## CONVERT-NEEDS-FIXTURE — a different/new fixture or a headroom swap
+## Convert-needs-fixture: a different or new fixture, or a headroom swap
 
 **Group A — "the character is not in the party just before the fight."**
-Same conversion everywhere: boot the fixture where the character is really
+Same conversion everywhere: boot the fixture where the character is
 in the party with the real command row, fight a real encounter, drive lists
 with a $7BC2-driven d-pad.  Per-file specifics:
 
 - **battle_toolslist / battle_toolsgrey** → `figaro_cleared` /
-  `vector_entry` (gen_edgar BUYS BioBlaster/NoiseBlaster — real tools
-  exist).  Grey knob: spend MP with real casts until the row greys —
-  stronger than a poked pool (proves charge and grey agree).
+  `vector_entry` (gen_edgar buys BioBlaster/NoiseBlaster, so real tools
+  exist).  Grey knob: spend MP with real casts until the row greys.  This is
+  stronger than a poked pool because it proves charge and grey agree.
 - **battle_blitzlist / battle_blitzgrey / battle_blitzcursor** →
   `vargas_won` / `vector_entry`.  Learned set = whatever the save
   holds (the `menu_blitzpage_sabin` doctrine); the 2x2-grid geometry
   claim needs ≥4 learned blitzes (Sabin L10+ → `vector_entry`).
   blitzcursor's Config bit is set in the real field Config menu; a fresh
   command-window open is the next turn, not a $7BC2 poke.
-- **battle_walletmp** → `vector_entry`.  Poking $3C08 proves the paint
-  follows a poke; SPENDING MP proves it follows the game.  The 47→123
+- **battle_walletmp** → `vector_entry`.  Poking $3C08 proves only that the
+  paint follows a poke; spending MP proves it follows the game.  The 47→123
   switch becomes two casters with different pools.
 - **battle_bushidogrey / battle_bushido / battle_bushidoloadout /
   battle_mpcost** → `cyan_defence` / `doma_defended`.  A real katana
   carries the SWDTECH flag; BP-grey is earned +1/action and asserted as
-  the bank climbs; the stored loadout word is really written by the field
-  configurator `menu_bushidoloadout` drives — chain field-configure →
+  the bank climbs; the stored loadout word is written by the field
+  configurator that `menu_bushidoloadout` drives, so chain field-configure →
   fight → assert battle reads it.  battle_bushido/mpcost need slash-weak
   HP-heavy targets (Vargas 5/5 + slash-weak Ipoohs, or Doma courtyard).
 - **battle_divines** → `cyan_defence` + a **leveled-Cyan** savestate.
   Everything converts except Oblivion = tech 8 (L68); either generate a
-  leveled Cyan (a grind, not an impossible input) or split that one arm
+  leveled Cyan (a grind, but possible with input) or split that one arm
   into a labeled quarantine.  The "make this guard a boss" $3AA1.2 poke
   should become a real boss target instead.
 - **battle_clockwork** → `vector_entry` (Setzer) + Cyan fixture.  The
@@ -130,18 +130,18 @@ with a $7BC2-driven d-pad.  Per-file specifics:
   Steal slots and level are species properties — pick a formation whose
   rare/common slots are populated; Sneak Ring is a real relic equipped in
   the field menu; the $BE RNG arming becomes N sampled attempts and a
-  rate assertion (the 3-BP guaranteed arm draws no RNG at all); Bestow
+  rate assertion (the 3-BP guaranteed arm draws no RNG); Bestow
   arithmetic: drive two characters to known banks by counting actions.
 - **battle_runic** → `celes_freed` / `vector_entry`.  Muddle exists
-  only to force menu-less casts — with a real party, pick Magic from the
-  menu; Runic is a real command and must be issued, not written.
+  only to force menu-less casts.  With a real party, pick Magic from the
+  menu.  Runic is a real command and must be issued rather than written.
 - **battle_dancemp** → `moogle_defense` (the header's claim that Mog is
-  unsupported is STALE — he leads P2 there).  Dances are terrain-derived
+  unsupported is stale; he leads P2 there).  Dances are terrain-derived
   and real; the cost boundary is earned by dancing twice.
 - **battle_rage / battle_gaufight / menu_ragepage** → `gau_joined` (no
   rage-collecting savestate needed: `InitRage` already grants nine rages
   at New Game).  The 8-slot loadout is really written by the
-  field Rage page; the Veldt bit is geography — walk off the Veldt
+  field Rage page; the Veldt bit is geography, so walk off the Veldt
   instead of clearing $11E4 in a callback; bench-wounding → X-defer.
 - **battle_slots** (install half) / **battle_slotsboot** — the Setzer
   install and bp banks convert onto the terra-returned-v1 checkpoint
@@ -150,7 +150,7 @@ with a $7BC2-driven d-pad.  Per-file specifics:
   a formation that survives three Slot resolutions.  Delete battle_slots
   arms slotsboot already covers (tier latch, forced-benevolent at 3, 3bp
   charged); the forced-icon arms → quarantine, below.
-- **battle_magicite** → `magicite_ifrit_shiva` (both stones really in
+- **battle_magicite** → `magicite_ifrit_shiva` (both stones are in
   the bag).  Equipping is a real field-menu action; re-summon arms become
   second battles; Osmose targets and Slow-immunity are species choices
   (MRF species carry 447-810 MP per the file's own header).
@@ -158,15 +158,15 @@ with a $7BC2-driven d-pad.  Per-file specifics:
   Re-point grant assertions at the owned stone's authored spells.
 - **battle_levelup** → a "one real fight short of a level" savestate (any
   step in the chain can emit it as a side artifact).  The record-sentinel
-  writes are textbook baseline-change detection (`cb8e605`) — latch and
+  writes are baseline-change detection (`cb8e605`): latch and
   compare, no writes.  HP 1 / MP 0 by real hits and casts.
 - **battle_hits** → any real-party fixture (`worldmap_narshe`): Fight is
-  on row 0; berserk/Fight-only installs drop out entirely.
+  on row 0; berserk/Fight-only installs drop out.
 - **battle_class** → real party + big-boss headroom.  Four real weapons
-  of different classes equipped in the field menu between phases ARE the
+  of different classes equipped in the field menu between phases are the
   probe-class swap; class weaknesses and absorbs are species selection.
   Expect a split into 2-3 input-driven tests.
-- **battle_dotchip** → the owner FOUND this in real play at Zozo with the
+- **battle_dotchip** → the owner found this in real play at Zozo with the
   Bio Blaster: `gen_edgar` buys the tool, the Zozo fixtures regenerate on
   the input-driven chain, poison arrives by using it; the fire-weak control
   is a second species in the same formation.
@@ -175,8 +175,8 @@ with a $7BC2-driven d-pad.  Per-file specifics:
   pool, the Whelk).  One work order, one fixture decision.
 - **battle_breakflash** → a multi-target spell against two 1-gauge
   enemies breaks both on one damage frame (the input-driven arming of the
-  double-flash); `regauge` becomes a fresh battle.  Its own #63 comment
-  admits the pins hid a real bug — prioritize.
+  double-flash); `regauge` becomes a fresh battle.  Its #63 comment
+  records that the pins hid a real bug; prioritize.
 - **battle_hudtrack** → `rapids_start`: `battle_hudtrail` already proves
   the entrance slide is a real battlefield move; assert anchor adoption
   against the slide instead of the injected $80C3 coordinate bump.
@@ -184,10 +184,10 @@ with a $7BC2-driven d-pad.  Per-file specifics:
   relic (field menu makes $3C58 an assertion); near-fatal by real hits;
   bp earned.  Arm 6b (numeral-suppressed backstop) may be a legitimate
   single-arm quarantine if measurement shows no numeral-less covering
-  action exists — split it if so.
-- **battle_crosslist** → a party with real Magic AND Tools
-  (`figaro_cleared`/`vector_entry`).  Kill first: L163's "greyed row
-  forced selectable" — the same lying surface the grey tests prevent.
+  action exists; split it if so.
+- **battle_crosslist** → a party with real Magic and Tools
+  (`figaro_cleared`/`vector_entry`).  Delete first: L163's "greyed row
+  forced selectable", which is the same false surface the grey tests prevent.
 - **battle_fold / battle_preview / battle_lateboost** →
   `worldmap_narshe` (real Terra, real Fire/Cure).  The fold's ≥51-MP
   charge is only meaningful against a real pool: "she can afford it once
@@ -196,8 +196,8 @@ with a $7BC2-driven d-pad.  Per-file specifics:
   → `esper_tubes` (the six stones the set piece grants).  One-line
   fixture swaps.
 - **menu_swdtechpage / menu_bushidoloadout** → Cyan fixtures (the headers
-  saying no Cyan field fixture exists are STALE).  NOT redundant with
-  each other: bushidoloadout uniquely owns the packed-word semantics.
+  saying no Cyan field fixture exists are stale).  They are not redundant
+  with each other: bushidoloadout uniquely owns the packed-word semantics.
   The all-eight phases wait on the learn-ceiling call.
 - **menu_blitzpage** → convert zero/partial-learned phases onto
   `vargas_won`; the all-eight phase (L70) waits on the learn-ceiling
@@ -206,23 +206,23 @@ with a $7BC2-driven d-pad.  Per-file specifics:
   three shared conversions: (a) the "vanilla arm" ROM patches become a
   second ROM build via OT6_ROM (battle_mpcost's A/B pattern), (b) danger
   zeroing goes, (c) seeded RNG draws become unseeded sampling with more
-  battles.  mines_chase.mss is a Jul-27 fixture — regenerate before landing.
+  battles.  mines_chase.mss is a Jul-27 fixture; regenerate before landing.
 - **battle_assassinate** (not in suite) → `camp_intro` (real SHADOW with
   a real Fight).  Good low-risk first proof of the real-kit pattern.
 - **shot_battle_items / shot_field_items** (evidence scripts) → a late
-  fixture whose bag really holds class-covering weapons, or buy from a
+  fixture whose bag holds class-covering weapons, or buy from a
   real shop; four classes instead of five is not a coverage loss (the
   assertions live in battle_class/battle_breaktbl).
 
-## QUARANTINE-CANDIDATE
+## Quarantine-candidate
 
 - **battle_reveal phase 1** — masks dirtied inside the Ot6SeedShields
   exec callback.  InitBattle clears $3A20-$3ED3 before every normal
   battle; only a Cmd_20 scene reload or uninitialized RAM presents dirty
-  masks, and neither is a button.  **Measure first** whether any
-  reachable formation runs Cmd_20 (Number 128's train chain, MRF fights)
-  — if one does, this converts to a real multi-phase fight instead.
-  Split the lab half out regardless.
+  masks, and neither can be produced by player input.  **Measure first**
+  whether any reachable formation runs Cmd_20 (Number 128's train chain,
+  MRF fights); if one does, this converts to a real multi-phase fight
+  instead.  Split the lab half out regardless.
 - **battle_slots reel arms** — the rig byte is a single Rand at the first
   A press; no player input selects a reel icon, so the icon-specific arms
   (joker-doom triggering, cursed-icon refusal) cannot be produced on cue.
@@ -231,7 +231,7 @@ with a $7BC2-driven d-pad.  Per-file specifics:
 - **bal_dpb** (labeled lab) — a ratio between target states with base
   damage held constant; no reachable encounter holds a species
   simultaneously unbroken/weak/broken for N samples against equalized
-  casters.  Keep waiver + loud label + a header ban on quoting its
+  casters.  Keep the waiver, a clear label, and a header ban on quoting its
   numbers as player experience without a live-pool cross-check.
 
 ## Dead / deletable writes (free waiver reductions)
@@ -243,70 +243,72 @@ with a $7BC2-driven d-pad.  Per-file specifics:
 
 ## Two systemic calls — both now decided
 
-1. **The learn-ceiling tier: RULED, owner, 2026-08-10.**  No
-   leveled-fixture grind tier.  The bar is AREA-level real play ("when we
+1. **The learn-ceiling tier: ruled by owner, 2026-08-10.**  No
+   leveled-fixture grind tier.  The bar is area-level real play ("when we
    say we've rebalanced an area, we have played through it in a way that
    is possible for a person with a controller to do"); targeted feature
    questions answered via isolated memory-hack tests are acceptable, and
    as the project expands toward higher-level content we look for
-   opportunities to exercise those features organically instead.  So the
-   true ceiling arms — Cyan tech 8 (L68) in battle_divines /
-   battle_bushido / menu_swdtechpage's all-eight phase, Sabin's eighth
-   Blitz (L70) in menu_blitzpage — stay waived as labeled isolation
-   arms, converted organically later.
-   The 8-slot rage loadout is NOT in that class: `InitRage`
+   opportunities to exercise those features organically instead.  The
+   true ceiling arms (Cyan tech 8 (L68) in battle_divines /
+   battle_bushido / menu_swdtechpage's all-eight phase, and Sabin's eighth
+   Blitz (L70) in menu_blitzpage) stay waived as labeled isolation
+   arms, to be converted organically later.
+   The 8-slot rage loadout is not in that class: `InitRage`
    (field/init.asm:355) grants Gau NINE rages at New Game, so battle_rage
    and menu_ragepage convert against the existing input-driven gau_joined
    with no rage-collecting savestate.
 2. **The observation-window doctrine.**  "Monsters STOPped + HP floored +
-   death-protected" appears in ~20 files — the single most common
+   death-protected" appears in ~20 files and is the most common
    remaining waiver.  Under the owner's area-vs-mechanism calibration,
-   these are per-file judgment: where the observation is a MECHANISM
+   these are per-file judgment: where the observation is a mechanism
    claim (a decode, a renderer), the staging may stay as a labeled
    isolation arm; where it claims play behavior, convert via no-damage
    actions, a real high-gauge boss for headroom, or one observation per
-   battle.  Decide per file in the wave, not twenty separate doctrines.
+   battle.  Decide per file in the wave rather than writing twenty
+   separate doctrines.
 
 ## Deleting the monster-kill flag: what still blocks it
 
 The last structural #75 item is deleting the shared paths that flag a
-mid-route battle's monsters as dead — 7 sites in `lib/ot6_field.lua` and
-`M.clearBattle` (`lib/ot6.lua`) — which also flips the compose-time
+mid-route battle's monsters as dead: 7 sites in `lib/ot6_field.lua` and
+`M.clearBattle` (`lib/ot6.lua`).  Deleting them also flips the compose-time
 runtime write check strict everywhere with no further compose change.
-Two separate blockers, measured, not guessed:
+Two blockers remain, both measured:
 
 **1. `M.clearBattle` is nearly free.**  Of seven files mentioning it,
-**exactly one is a live call** — `probe_world.lua:166` (`H.clearBattle(9000)`).
+one is a live call: `probe_world.lua:166` (`H.clearBattle(9000)`).
 The other six are prose citing it historically (battle_naturalmp,
 battle_subjob, gen_arvis, gen_whelk_poweron, probe_input, probe_vargas).
-So this half costs one probe conversion, or the probe's retirement.
+This half costs one probe conversion, or the probe's retirement.
 
-**2. The field kill fires only for callers that pass NO `playBattles`
+**2. The field kill fires only for callers that pass no `playBattles`
 option** (`if M.monstersPresent() > 0 and not opts.playBattles`), and **36
-files still make at least one bare navigator call** — `navTo`,
+files still make at least one bare navigator call**: `navTo`,
 `advanceStory`, `worldNavTo`, `worldWalkFight`.  Roughly: ~17 kept
-probes, ~17 gens (notably `gen_edgar` with 12, the Zozo trio, several
+probes, ~17 gens (including `gen_edgar` with 12, the Zozo trio, several
 Sabin segments), and 2 already-converted tests.
 
-**Scan method and its limits, so nobody treats "36" as gospel:** a
+**Scan method and its limits, so "36" is not read as exact:** a
 regex for `[HM].<nav>(` whose following ~400 characters contain no
 `playBattles`.  It over-reports where a long multi-line call carries the
 option past that window, and it says nothing about whether a battle can
-actually occur on that segment — the kill only fires if one does.
-Verified by hand on two: `gen_edgar` genuinely passes no opts table at
-all (`H.advanceStory(menuUp, 20000)`), and `field_navstep` — whose OWN
-kill write the convert-cheap wave replaced with `H.fleeBattle` — still
+occur on that segment; the kill only fires if one does.
+Verified by hand on two: `gen_edgar` passes no opts table at
+all (`H.advanceStory(menuUp, 20000)`), and `field_navstep`, whose own
+kill write the convert-cheap wave replaced with `H.fleeBattle`, still
 calls `H.navTo(tx, ty, { maxFrames = 3000 })` bare.
 
-**The lesson that generalizes:** converting a test's own kill write does
+**The general rule:** converting a test's own kill write does
 not make its segment input-driven if it still calls a navigator bare; the
 library will kill a battle that fires mid-nav.  A conversion is complete
 only when both halves are covered.
 
 **Landing order this implies:** (a) sweep the bare calls, adding
 `playBattles="flee"` (corridor trash) or `"tactical"` (fights that
-matter) — cheap per site, and for segments that never draw a battle it is
-a no-op that makes the intent explicit; (b) convert or retire
-`probe_world`; (c) then delete both paths and watch the runtime write
-check go strict.  Do NOT attempt (c) before (a) — a segment that silently
-relied on the kill becomes a wipe, and the deletion would be blamed for it.
+matter); this is cheap per site, and for segments that never draw a battle
+it is a no-op that makes the intent explicit.  (b) Convert or retire
+`probe_world`.  (c) Delete both paths, after which the runtime write
+check goes strict.  Do not attempt (c) before (a): a segment that silently
+relied on the kill becomes a party wipe, and the deletion would be blamed
+for it.

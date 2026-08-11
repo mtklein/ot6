@@ -1,20 +1,20 @@
 -- gen_mines_chase.lua -- from narshe_streets.mss (OCTO alone at (53,8),
 -- map 20, high on the cliffs): walk west along the clifftop into the
--- "She's up there!" guard scene at (38,8) (_cca279 -- guards surround,
--- posture, and leave; pure cutscene, ridden hands-off), continue to the
+-- "She's up there!" guard scene at (38,8) (_cca279: guards surround,
+-- posture, and leave; a cutscene with no input needed), continue to the
 -- mine mouth at (26,8) -> map 50 (mines chase map) at (78,58), and generate
 -- mines_chase.mss at the first calm tile inside.  Then north through the
--- mines -- random encounters cleared and their species logged -- to
--- (55,12), ONE TILE short of the trigger at (55,11) that starts the
+-- mines, clearing random encounters and logging their species, to
+-- (55,12), one tile short of the trigger at (55,11) that starts the
 -- bridge-collapse -> Kefka flashback -> Moogle-defense chain (a
--- THREE-PARTY set-piece this harness does not enter).  Generate
+-- three-party set-piece this harness does not enter).  Generate
 -- moogle_entry.mss there, calm, trigger unfired.
 --
--- Issue #75: every navigator step passes playBattles=true -- the map-50
--- random pool is FOUGHT (tap-A = Fight, confirm at default target), never
--- write-cleared.  That is bal_mines.lua's measured 'baseline' policy:  8/8
--- wins, 0 deaths, ~2 real turns / ~744 frames per battle for solo L5 Terra
--- against the full pool (the mines balance measurement), so the real cost
+-- Issue #75: every navigator step passes playBattles=true, so the map-50
+-- random pool is fought (tap-A = Fight, confirm at default target) rather
+-- than write-cleared.  That is bal_mines.lua's measured baseline policy:
+-- 8/8 wins, 0 deaths, ~2 real turns / ~744 frames per battle for solo L5
+-- Terra against the full pool (the mines balance measurement), so the cost
 -- is roughly +1-2k frames per encounter drawn and the step budgets below
 -- carry it.  This gen has no write idiom of its own.
 local H = dofile("tools/tests/lib/ot6.lua")
@@ -63,13 +63,14 @@ H.run({ maxFrames = 50000 }, {
   end),
 
   -- west along the clifftop; stepping on (38,8) fires the guard scene.
-  -- The scene ends by setting switch $012D -- and that, not calm, is the
-  -- terminator: the party is left STANDING ON the trigger, and a stood-on
-  -- trigger re-fires every 4 frames forever (a no-op once its switch is
-  -- set, but the event engine still grabs the party for 3 frames of each
-  -- cycle, so hasControl never holds).  Walk OFF with a raw held
-  -- direction -- the field module latches the pad in the 1-frame control
-  -- windows -- and only then expect calm.
+  -- The scene ends by setting switch $012D, and that switch is the
+  -- terminator rather than calm: the party is left standing on the
+  -- trigger, and a stood-on trigger re-fires every 4 frames indefinitely
+  -- (a no-op once its switch is set, but the event engine still grabs the
+  -- party for 3 frames of each cycle, so hasControl never holds).  Walk
+  -- off it with a raw held direction, which works because the field module
+  -- latches the pad in the 1-frame control windows, and only then expect
+  -- calm.
   H.navTo(38, 8, { arrive = eventFor(30), maxFrames = 8000, playBattles = true }),
   H.advanceStory(function()
     return (H.readByte(0x1ea5) & 0x20) ~= 0    -- switch $012D
@@ -99,13 +100,13 @@ H.run({ maxFrames = 50000 }, {
   H.saveState("mines_chase.mss"),
 
   -- north to one tile short of the collapse trigger at (55,11).  Guards
-  -- CHASE through this map (vanilla: mobile NPCs whose touch fires a
+  -- chase through this map (vanilla: mobile NPCs whose touch fires a
   -- catch event with a battle inside); navTo rides those like anything
-  -- else -- control loss, dialogs, FIGHT the battle with real input -- and
-  -- re-plans, so the only terminator is standing calm on the entry-point
-  -- tile.  BFS never detours through (55,11): the approach is from the
-  -- south and the trigger sits beyond the target.  arrive here is a pure
-  -- logging hook.
+  -- else, handling control loss and dialogs and fighting the battle with
+  -- real input, then re-plans, so the only terminator is standing calm on
+  -- the entry-point tile.  BFS never detours through (55,11): the approach
+  -- is from the south and the trigger sits beyond the target.  arrive here
+  -- is only a logging hook.
   H.navTo(55, 12, { arrive = function() logBattles(); return false end,
                     maxFrames = 24000, playBattles = true }),
   H.call(function()

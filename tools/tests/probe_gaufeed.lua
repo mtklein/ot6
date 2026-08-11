@@ -11,10 +11,9 @@
 -- party menu.  The probe therefore parks a Tonic for the normalizing action,
 -- preserves Dried Meat, then selects and submits Dried Meat from the fresh
 -- menu.  AIScript::_370 consumes it, sets battle switch 13, and recruits Gau
--- in the same encounter.  All gameplay changes are controller input; RAM is
--- observed only, apart from ordinary savestate capture/reload acceleration.
--- Everything here is pad presses and RAM reads; the only state ops are
--- savestate capture/reload, the same accelerator every gen uses.
+-- in the same encounter.  All gameplay changes are controller input and RAM
+-- is only read; the only state operations are savestate capture and reload,
+-- the same accelerator every gen uses.
 local H = dofile("tools/tests/lib/ot6.lua")
 local DOOR = "build/states/falls_done.mss.lua"
 local FAST_STAGE = false
@@ -54,7 +53,7 @@ local function gil()
        + (H.readByte(0x1862) << 16)
 end
 
--- battle-menu model (battle_vargas / gen_sabin_train's map; all READS)
+-- battle-menu model (battle_vargas / gen_sabin_train's map; all reads)
 local MENU, ACTOR, MSTATE = 0x7BCA, 0x62CA, 0x7BC2
 local ST_CMD, ST_ITEM, ST_TGT, ST_TOOLS = 0x05, 0x0A, 0x38, 0x30
 local CMD_ITEM, CMD_SWDTECH, CMD_BLITZ = 0x01, 0x07, 0x0A
@@ -92,7 +91,7 @@ end
 -- world map, then reads $ff during the post-battle ownership gap.  Gau is on
 -- stage only when the targettable-character and enemy-character masks agree
 -- on a real, initialized character bit.  He is not monster slot 5: the old
--- monPresent(5) gate is what hid every usable command-menu frame.
+-- monPresent(5) gate hid every usable command-menu frame.
 local function gauOn()
   local targettable = H.readByte(0x2f4e)
   local enemyChar = H.readByte(0x3a40)
@@ -102,8 +101,8 @@ end
 -- The first action after GauAppears runs UpdateDead.  That converts Gau from
 -- the one-shot $2f4e "can be targeted" exception into an ordinary present
 -- enemy-character: $2f4e clears, while his character entity gains $3aa0.0 and
--- remains in $3a40.  This is not Gau leaving; it is the target model becoming
--- internally consistent for subsequent actions.
+-- remains in $3a40.  The target model becomes internally consistent for
+-- subsequent actions; Gau does not leave.
 local function gauPresent()
   local slot = H.readByte(0x300b)
   if slot == 0xff or slot > 6 then return false end
@@ -234,7 +233,7 @@ local function moveMeatToFront()
   }, {})
 end
 
--- closed-loop shop buy (verbatim from gen_sabin_gau -- measured there)
+-- closed-loop shop buy (verbatim from gen_sabin_gau, measured there)
 local function buyItem(id, row, qtyFn, name)
   local phase = 0
   local seen27, bought = false, false
@@ -384,7 +383,7 @@ local function worldWalkFight(tx, ty, budget, what)
   }, "walk fighting -> " .. what)
 end
 
--- --------------------------- grind to the FIRST appearance, then measure --
+-- --------------------------- grind to the first appearance, then measure --
 local grind = { fights = 0, appearances = 0 }
 local appeared = false
 local function grindToAppearance()
@@ -678,12 +677,12 @@ local function grindToAppearance()
         tick = tick + 1
         local ph = tick % 30
         local nmon, mhp = liveMonsters()
-        -- Gau's arrival runs ResetForVeldtGau, which removes every QUEUED
+        -- Gau's arrival runs ResetForVeldtGau, which removes every queued
         -- party action.  It cannot create a new menu afterward because the
         -- battle-end path has already frozen normal ATB processing.  Vanilla
         -- therefore expects the player to have one command menu open while a
-        -- previously queued action lands the final blow.  Bank exactly that
-        -- state: one live monster, this actor has a command menu, and another
+        -- previously queued action lands the final blow.  Bank that state:
+        -- one live monster, this actor has a command menu, and another
         -- living actor already has an action pending.  If the pending action
         -- does not kill, release the bank and continue fighting.
         if bankedActor ~= nil then
@@ -706,8 +705,8 @@ local function grindToAppearance()
           if attackUnresolved then
             -- Spend the queued attack's animation time opening Item, selecting
             -- Dried Meat, and parking in target selection.  Arrival otherwise
-            -- gives us only ~74 frames before battle event $1b closes a plain
-            -- command menu -- too short for both window animations.
+            -- gives only ~74 frames before battle event $1b closes a plain
+            -- command menu, which is too short for both window animations.
             local st = H.readByte(MSTATE)
             local pulse = tick % 8 < 2
             if st == ST_CMD then
@@ -729,7 +728,7 @@ local function grindToAppearance()
               elseif cur == want then
                 H.setPad(pulse and { "a" } or {})
               else
-                -- HOLD so the menu's native auto-repeat accelerates through
+                -- Hold, so the menu's native auto-repeat accelerates through
                 -- the long inventory; short pulses reset its repeat timer.
                 local dir = cur == 0 and want > 0 and "up"
                          or cur < want and "down" or "up"
@@ -837,9 +836,9 @@ local function grindToAppearance()
   }, "grind to GAU's first appearance")
 end
 
--- observation: does a command menu open while GAU is on stage?  Stage 1 is
--- PURE hands-off (12000 frames).  If no menu opens, stage 2 taps A gently
--- (a human dismissing GAU's "Ooh_I'm hungry!" turn dialogs) -- this
+-- observation: whether a command menu opens while GAU is on stage.  Stage 1
+-- is hands-off (12000 frames).  If no menu opens, stage 2 taps A at a human
+-- rate (dismissing GAU's "Ooh_I'm hungry!" turn dialogs), which
 -- distinguishes "menu blocked behind an un-dismissed battle dialog" from
 -- "the engine never reopens menus post-appearance".
 local menuOpenedAt, windowEndedAt, menuStage = nil, nil, nil
@@ -1034,7 +1033,7 @@ H.run({ maxFrames = 700000 }, {
     if lost ~= nil then error("staging walk lost -- " .. tostring(lost), 0) end
   end),
 
-  -- emit the grind-staging accelerator FIRST -- iteration currency
+  -- emit the grind-staging accelerator first, to save iteration time
   (function()
     local req
     return H.cond(function() return true end, {

@@ -5,14 +5,14 @@
 -- after migration. Fight 2 runs as slot 1 and must see the migrated knowledge
 -- but not slot 2's new learning.
 --
--- *** QUARANTINED MECHANISM TEST (issue #75) -- state writes SANCTIONED ***
+-- Quarantined mechanism test (issue #75); state writes are sanctioned.
 -- Owner-named on the #75 policy list: legacy-format codex migration.  The
--- input under test is a CARTRIDGE from the O7 era -- a layout no current
--- build can produce by play, only inherit -- so seeding it is the only
+-- input under test is a cartridge from the O7 era, a layout no current
+-- build can produce by play and can only inherit, so seeding it is the only
 -- way the migration path can run at all.  (The post-migration teaching
 -- half writes knowledge a real fight could learn; it converts if this
--- test ever splits.)  It keeps its waivers, and it MAY NEVER PRODUCE
--- FIXTURES.
+-- test ever splits.)  It keeps its waivers, and it must never produce
+-- fixtures.
 local H = dofile("tools/tests/lib/ot6.lua")
 local STATE = "build/states/battle_entry.mss.lua"
 local function sram(addr) return emu.read(addr, emu.memType.snesMemory) end
@@ -22,10 +22,10 @@ H.run({ maxFrames = 45000 }, {
   H.waitFrames(10),
   H.call(function()
     -- Plant legacy O7 over the entry-point fixture's codex pages (the fixture
-    -- is generated from a cold boot, so they arrive unformatted; this write fully
-    -- specifies page 1 either way).
+    -- is generated from a cold boot, so they arrive unformatted; this write
+    -- fully specifies page 1 either way).
     -- Poison is old global knowledge; O8 migration must preserve it in all
-    -- slots.  Deliberately load slot 2 first: migration must not depend on
+    -- slots.  Slot 2 is loaded first on purpose: migration must not depend on
     -- slot 1 being the first page exercised.
     H.writeByte(0x0224, 2)
     H.writeByte(0x021f, 2)
@@ -66,7 +66,7 @@ H.run({ maxFrames = 45000 }, {
     local learned = sram(0x316410+species)
     H.assertEq(learned & 1, 1, "slot 2 codex learned the guard's fire weakness")
     -- Teach every species FIRE in slot 2 only, after O7 migration.  Slot 1
-    -- must not acquire this knowledge merely because we switch to it.
+    -- must not acquire this knowledge from switching to it.
     for i = 0, 0x17f do
       emu.write(0x316410+i, sram(0x316410+i) | 0x01, emu.memType.snesMemory)
     end

@@ -2,13 +2,13 @@
 
 ; 16 2bpp tiles (shield-with-count 1-6/B, pip clusters 0-5, boost cells)
 ; written to the battle font at vram $5800 + cell*8, as two 8-tile
-; slices (~128 bytes each — one fits a vblank-tail re-lay stage).
+; slices (~128 bytes each, one of which fits a vblank-tail re-lay stage).
 ; a8/i16, db = $00, vmainc $80. exits a8. clobbers a/x/y.
 ;
 ; The macro lived in ot6_kits.asm (its only two uses are the two procs right
 ; below) until the kits split; a macro definition emits nothing, so moving it
-; next to its callers is address-neutral by construction -- proven, the ROM
-; CRC32 is unchanged at 0x2E9B5A7F.
+; next to its callers changes no address.  The ROM CRC32 was unchanged at
+; 0x2E9B5A7F.
 
 .macro ot6_glyph_slice first, last
         ldx     #first          ; glyph index
@@ -59,10 +59,9 @@
 
 ; [ retired: the over-character boost marks ]
 
-; v0.2 RC playtest: "the boost chevrons sometimes turn into numbers", at
-; no pattern the player could name.  They were not chevrons turning into
-; numbers -- they were vanilla's damage numerals, drawn in tiles OT6 had
-; taken.
+; v0.2 RC playtest: "the boost chevrons sometimes turn into numbers", with
+; no pattern the player could name.  They were vanilla's damage numerals,
+; drawn in tiles OT6 had taken.
 ;
 ; Three 16x16 arrow sprites used to live in obj tiles 200/202/204 (quads
 ; with 216-221), i.e. vram words $2c80-$2dd0.  ff6/notes/battle-ram.txt:
@@ -75,23 +74,23 @@
 ; $80 bytes each (:1021).  Counter phase 2 covers boost-1 and boost-2;
 ; phase 3 covers boost-3.  Between them the four-phase rotation
 ; overwrites every one of the twelve tiles, so half of all damage numbers
-; shown stamped digits over the chevrons -- intermittent, and keyed to a
+; shown stamped digits over the chevrons, intermittently and keyed to a
 ; counter the player cannot see.  probe_objarrow.lua measured it: first
 ; divergence with counter=2 and dest=$2d80 exactly as predicted, and
 ; 2141 of 3000 sampled frames held clobbered art.
 ;
 ; The old comment here claimed these tiles were "verified blank +
 ; unreferenced by any oam entry ... idle and through attack effects".
-; Both halves were true and neither was sufficient: battle init CLEARS
+; Both halves were true and neither was sufficient: battle init clears
 ; $2c00-$3000 (btlgfx_main.asm:2244), so the tiles do read blank, and
-; they are unreferenced right up until a numeral fires.  A snapshot
-; cannot see a destination chosen at run time -- the exact "something was
+; they are unreferenced until a numeral fires.  A snapshot
+; cannot see a destination chosen at run time, which is the "something was
 ; absent, so it was assumed free" failure CONTRIBUTING.md warns about.
 ;
 ; There is nowhere to move them.  Measured, not assumed: probe_objsentinel
-; .lua fills the whole obj region with a sentinel AFTER init and plays a
-; battle, so a zero-over-zero write cannot masquerade as untouched.  Only
-; tiles 224-511 survive, and both blocks are spoken for --
+; .lua fills the whole obj region with a sentinel after init and plays a
+; battle, so a zero-over-zero write cannot look like untouched memory.  Only
+; tiles 224-511 survive, and both blocks are in use:
 ; $2e00-$3000 is a blanket $400-byte init load (btlgfx_main.asm:2347) of
 ; hand-pointer/page-indicator/reflect/shield art, and probe_objtail.lua
 ; finds every tile in it either non-blank or oam-referenced;
@@ -100,9 +99,9 @@
 ; apparent slack is only this formation's art being small.
 ;
 ; So the marks are gone rather than relocated.  Boost feedback keeps the
-; channel that provably works: the party-window pip cell, which swaps to
+; channel that works: the party-window pip cell, which swaps to
 ; an arrow cluster pulsing yellow/white while a boost is pending (Ot6Boost
-; @show) out of OT6's own 2bpp font cells -- glyph-canary verified, and
+; @show) out of OT6's own 2bpp font cells; glyph-canary verified, and
 ; battle_boost.lua gates it.  A future re-do wanting the floating badge
 ; back should draw it on the bg3 field map through the existing
 ; Ot6BgHud shadow/flush machinery (already OT6 territory, already veiled
@@ -115,13 +114,13 @@
 ; the hud lives on the bg3 field tilemap; this main-loop pass fills a
 ; shadow buffer in bank $7f, and the nmi flush copies it to vram during
 ; vblank. shadow at OT6_SHADOW, 6 lines x 14 bytes:
-; (this line once read "$7f:fe00, 10 lines x 12 bytes" -- stale on both
+; (this line once read "$7f:fe00, 10 lines x 12 bytes", stale on both
 ;  counts, and $7ffe00 was never free: it is 1536 bytes into the LZ
 ;  decompression ring $7ff800-$7fffff, which battle init alone rewrites
 ;  when it decompresses StatusGfx.)
 ;   +0  vram word address of the line's first cell (0 = line disabled)
 ;   +2  five tilemap words (glyph | attr << 8)
-; monsters: [shield-with-count][up to 4 weakness slots — elements, then
+; monsters: [shield-with-count][up to 4 weakness slots: elements, then
 ; weapon classes, revealed icon or '?' on both axes]. heroes: one
 ; pip-cluster cell. entities animate and drift, so each line remembers
 ; its previous address; the flush blanks the old cells when it moves.
@@ -131,7 +130,7 @@
 ; Four independent lines of evidence, since a bad answer here is what put
 ; this buffer inside live vanilla RAM the first time (see below):
 ;   1. btlgfx_ram.inc's chain ends at label w7eecf0 and is capped by
-;      `.assert _ram_offset <= $7ef800` (btlgfx_ram.inc:1001) -- an
+;      `.assert _ram_offset <= $7ef800` (btlgfx_ram.inc:1001), an
 ;      assembler-enforced invariant, so btlgfx cannot grow in without
 ;      failing the build. menu_ram.inc's chain tops out near $7e9849.
 ;   2. notes/battle-ram.txt:2183 documents "$ECF1-$F7FF -" (nothing),
@@ -139,29 +138,29 @@
 ;   3. no literal reference, symbol, mvn/mvp target, or DMA/WRAM-port
 ;      loop in ff6/src or ff6/include lands in the range.
 ;   4. runtime write-watch over $7eecf1-$7ef7ff across a boss fight, four
-;      forced command lists, a soak and a victory: zero writes -- while
+;      forced command lists, a soak and a victory: zero writes, while
 ;      the positive controls fired in the same run (DrawItemListText ran,
 ;      bank C1 wrote $5755-$576a).
 ;
 ; DO NOT extend past $7ef11f. PushMode7Vars (world/init.asm:1414) block-
 ; moves $7ef120-$7ef7ff via `mvn`, which no `sta` grep can find and which
 ; a fixture without a world-map battle never exercises. 1071 bytes are
-; available; we use 84 and stop well short.
+; available; this uses 84.
 ;
-; WHY IT MOVED: this was $5762, annotated "trace-verified free". It was
-; not -- $5762 sits 13 bytes inside vanilla's `ram_res w7e5755, 128`
+; Why it moved: this was $5762, annotated "trace-verified free". It was
+; not: $5762 sits 13 bytes inside vanilla's `ram_res w7e5755, 128`
 ; (btlgfx/btlgfx_ram.inc:71), and the battle command-list text drawers
 ; write $5755-$576a. The original trace ran a Fight-only fixture, where
 ; no command list ever opens, so it never saw them. Reproduced in
 ; tools/tests/probe_shadow_overlap.lua: DrawItemListText ran and bank C1
 ; wrote $5762-$5767, leaving the anchor at $00FF; the anchor latch that
 ; lived at Ot6BgHudLine's @done then drove every NMI flush from $00FF
-; for the rest of the battle. The magitek list drawer alone does NOT
+; for the rest of the battle. The magitek list drawer alone does not
 ; reproduce it (it stops at $5761), which is why a magitek-only fixture
 ; reads as an all-clear. (The latch has since become recompute-and-
-; compare -- see @done -- so an equivalent anchor stomp today would
-; self-heal on the next main-loop tick. The relocation stays load-
-; bearing all the same: an overlap corrupts continuously in both
+; compare; see @done.  An equivalent anchor overwrite today would
+; correct itself on the next main-loop tick. The relocation is still
+; needed: an overlap corrupts continuously in both
 ; directions, and OT6 writing vanilla's live buffer was the worse half.)
                                 ; OT6_SHADOW: lines, stride 14
                                 ; OT6_MAPBASE: field bg3 map-base word
@@ -169,33 +168,33 @@
 ; [ battle-script bracket: is an animation script executing? ]
 
 ; every coordinate transient the animation engine imposes on the monster
-; position arrays -- magic_init_131long zeroing/setting the $8057
-; priority shifts and displacing $80cf by -$0100 (btlgfx_main.asm:
-; 39277-39297), AnimCmd_80_82's all-slot x shove (:29906), AnimCmd_e2/
-; e3's per-frame y animation (:33206-33279), the PushObjPos/PopObjPos
-; block-hop family (:28045/:28081) -- runs from a battle animation
+; position arrays (magic_init_131long zeroing/setting the $8057
+; priority shifts and displacing $80cf by -$0100, btlgfx_main.asm:
+; 39277-39297; AnimCmd_80_82's all-slot x shove, :29906; AnimCmd_e2/
+; e3's per-frame y animation, :33206-33279; the PushObjPos/PopObjPos
+; block-hop family, :28045/:28081) runs from a battle animation
 ; script, and every such script executes inside BtlGfx_04 "execute
 ; battle script" (btlgfx_main @9512): action animations, monster
 ; specials, entry/exit effects, battle events.  scripts restore their
 ; transients before they end (PopObjPos restores what PushObjPos saved,
 ; $80/$84 restores $80/$83's y displacement, $e3 restores from
-; w7e64e8), so script-free frames see settled coords by construction --
-; and a script that ended WITHOUT restoring has visibly parked the
-; monster there in vanilla too, at which point following it is correct,
-; not stale.  so the anchor holds while OT6_SCRIPTBUSY is up and adopts
-; on script-free frames.
+; w7e64e8), so script-free frames see settled coords by construction,
+; and a script that ended without restoring has visibly parked the
+; monster there in vanilla too, at which point following it is correct
+; rather than stale.  so the anchor holds while OT6_SCRIPTBUSY is up and
+; adopts on script-free frames.
 ;
 ; the flag is raised/cleared by the Ot6BtlGfx04_c1 wrapper behind
 ; BtlGfxTbl's $04 entry (same-size .addr repoint; see the block comment
-; there for the C1 layout discipline).  DESIGN HISTORY, measured not
-; guessed: the first cut here keyed on tick provenance instead --
-; BtlGfx_01 ("called from main battle loop") = settled, WaitFrame
+; there for the C1 layout discipline).  design history, measured rather
+; than guessed: the first cut here keyed on tick provenance instead,
+; with BtlGfx_01 ("called from main battle loop") = settled and WaitFrame
 ; ("used during animations") = transient, via same-size repoints of
-; their two `jsr UpdateCharText` sites.  probe_animtick killed it: with
+; their two `jsr UpdateCharText` sites.  probe_animtick ruled it out: with
 ; a battle menu open, ~101 of 120 idle frames tick through WaitFrame
-; (the menu is MODAL inside a gfx command), so the anchor held through
+; (the menu is modal inside a gfx command), so the anchor held through
 ; the whole interactive battle and battle_hudtrack's phase 3 stayed
-; red -- the sprite moved, the "recompute" never got a frame it was
+; red: the sprite moved, and the recompute never got a frame it was
 ; willing to adopt on.  the script container is the discriminator the
 ; tick path only approximated.
 
@@ -247,18 +246,18 @@
         bcc     @slot
         jsr     Ot6Boost        ; l/r boost input
         jsr     Ot6RevealPoll   ; #33: a numeral appeared? commit the reveals
-        bcc     :+              ; #42: carry = THIS tick saw the numeral, so
+        bcc     :+              ; #42: carry = this tick saw the numeral, so
         jsr     Ot6PipPending   ;   a deferred cover pip paints on it too
 :       jsr     Ot6PipStage     ; #33: stage the four live pip-row words
         jsr     Ot6WalletStage  ; #35: stage the costed-list MP wallet
-        ; #48: drive any live break flash.  AFTER the poll above on purpose --
+        ; #48: drive any live break flash.  after the poll above on purpose:
         ; a break armed by this tick's numeral gets its first white frame on
-        ; that same frame, not the next one.  The gate is INLINE and not a
-        ; `jsr` into a proc that early-outs, because THIS SITE IS INSIDE THE
-        ; BATTLE LOOP'S FRAME BUDGET AND IT IS FULL: WaitFrame calls
-        ; UpdateCharText -> Ot6BgHud_ext once per battle frame
+        ; that same frame rather than the next one.  The gate is inline rather
+        ; than a `jsr` into a proc that early-outs, because this site is inside
+        ; the battle loop's frame budget and that budget is full: WaitFrame
+        ; calls UpdateCharText -> Ot6BgHud_ext once per battle frame
         ; (btlgfx_main.asm:432-445), and battle_trueknight measures the
-        ; margin at somewhere between 12 and 80 cycles -- 40 bare NOPs added
+        ; margin at between 12 and 80 cycles; 40 bare NOPs added
         ; right here, with no OT6 feature at all, stretch that fixture's fight
         ; by 10% (1635 -> 1798 frames to the same three covers) and flip its
         ; 6a numeral-frame assertion.  8 cycles is what this costs when no
@@ -281,24 +280,24 @@
         lda     $3aa8,y
         lsr
         bcc     @gone           ; slot empty
-        ; the slot is filled -- but is the monster ON SCREEN yet?  at battle
+        ; the slot is filled, but is the monster on screen yet?  at battle
         ; entry a monster is flagged present ($3aa8) from init, while its
         ; sprite is not drawn until its fly-in animation runs: the "monsters
         ; shown" mask $201e (notes/battle-ram.txt:422 "--654321 monsters
         ; shown"; the sprite drawers gate on it, btlgfx_main.asm:5639/:5772,
         ; and DoMonsterEntryExit SETS a monster's bit as its entry completes,
-        ; :45554) holds 0 for that whole fade-in window -- measured $00
-        ; across probe_caveentry f84..128, while the sprites are absent.  the
+        ; :45554) holds 0 for that whole fade-in window (measured $00
+        ; across probe_caveentry f84..128, while the sprites are absent).  the
         ; hud gated only on $3aa8, so it painted each entering monster's
         ; shield/'?' cells into empty space: a scatter of white glyphs on the
-        ; still-dark battlefield BEFORE the fight resolved, worst with the
+        ; still-dark battlefield before the fight resolved, worst with the
         ; cave's 3-5 fly-in trash (Cirpius/Hornet/Bleary), which is where the
         ; v0.3-rc1 playtest first caught it ("a bunch of characters overdrawn
         ; in white text ... when there are a bunch of enemies").  the entry
-        ; ANIMATION itself is already veiled (Ot6EntryExitVeil); this closes
-        ; the gap BEFORE it by gating the hud on the same mask the sprites
+        ; animation itself is already veiled (Ot6EntryExitVeil); this closes
+        ; the gap before it by gating the hud on the same mask the sprites
         ; use.  (a dead monster also clears its $201e bit, but the $3eec
-        ; dead-cell path below already blanks that line -- the two agree.)
+        ; dead-cell path below already blanks that line, so the two agree.)
         phx                     ; save the shadow line base
         longa
         tya
@@ -312,10 +311,10 @@
 @gone:  ; monster gone, or present but not yet entered: disable the line
         ; (flush blanks the old cells once). compare-before-store like the
         ; anchor commit at @done: an already-disabled line writes nothing, so
-        ; a static battlefield means ZERO anchor stores across all six lines
-        ; -- the exact invariant battle_hudtrack's write watch asserts. (this
+        ; a static battlefield means no anchor stores across all six lines,
+        ; which is the invariant battle_hudtrack's write watch asserts. (this
         ; store ran unconditionally for years; empty slots were rewriting
-        ; $0000 over $0000 every frame, invisible but noisy.)
+        ; $0000 over $0000 every frame, which was invisible but noisy.)
         longa
         lda     f:$7e0000+OT6_SHADOW,x
         beq     @off
@@ -358,9 +357,9 @@
 @shld:  sta     f:$7e0000+OT6_SHADOW+4,x
         ; weakness slots into cells 1-4: elements first (vanilla's own
         ; data), then the class weaknesses, sharing the same four cells.
-        ; a fifth weakness truncates — the deliberate cap: the row is
-        ; five cells wide (the shadow strip has no room for more without
-        ; moving the $57c0+ occupants), and no authored WoB species
+        ; a fifth weakness is truncated, which is the deliberate cap: the
+        ; row is five cells wide (the shadow strip has no room for more
+        ; without moving the $57c0+ occupants), and no authored WoB species
         ; exceeds 4 total today (speck's 4 classes ride an element-free
         ; body). revealed-vs-'?' behavior is identical on both axes.
 @slots: phx                     ; base on stack for the cap test
@@ -378,7 +377,7 @@
         sec
         sbc     $01,s           ; cells used so far (byte diff, same page)
         cmp     #$09
-        jcs     @edone          ; past slot cell 4 (offsets +6..+12) —
+        jcs     @edone          ; past slot cell 4 (offsets +6..+12);
                                 ;   long branch: the class loop sits between
         lda     OT6_SCR_BIT
         and     $3e91,y
@@ -407,8 +406,8 @@
         ; class mask (OT6_BP_CLASS monster half, seeded at battle init) and the
         ; revealed-classes byte the chips and codex maintain. the icons
         ; are the vanilla item-class glyphs, white like the '?' (the
-        ; default $21 attr from the fill is already in place — only the
-        ; glyph byte is written, exactly like the '?' cell).
+        ; default $21 attr from the fill is already in place, so only the
+        ; glyph byte is written, as with the '?' cell).
         lda     #$01
         sta     OT6_SCR_BIT
         lda     #$00
@@ -445,48 +444,48 @@
         bra     @cbit
 @edone: plx
 @done:  ; commit: recompute-and-compare, adopted only on quiet ticks.
-        ; HISTORY. this was a once-per-battle latch ("recomputing every
+        ; history. this was a once-per-battle latch ("recomputing every
         ; frame made the line jitter and blink on attack-animation coord
         ; transients"), which also made any post-arm divergence permanent:
         ; the founding $5762 overlap corruption (probe_shadow_overlap), a
         ; Cmd_20 reload swapping a slot's monster, any scripted move. the
-        ; transients are now READ and NAMED (Ot6ScriptBegin_ext's block
+        ; transients are now read and named (Ot6ScriptBegin_ext's block
         ; comment lists them with line numbers): every one runs inside a
-        ; battle animation script, so the anchor HOLDS while one executes
+        ; battle animation script, so the anchor holds while one executes
         ; (OT6_SCRIPTBUSY, bracketing BtlGfx_04) and recomputes on
         ; script-free frames, where coords are settled by construction
-        ; (probe_animtick MEASURED the beat: menu-idle frames are mostly
-        ; WaitFrame ticks, so tick provenance was the wrong gate -- the
+        ; (probe_animtick measured it: menu-idle frames are mostly
+        ; WaitFrame ticks, so tick provenance was the wrong gate and the
         ; script container is the right one). identical frames
-        ; compare equal and write nothing -- the jitter fix -- while a
-        ; genuine change (one that survives into a quiet frame) is
-        ; adopted within a frame or two -- the staleness fix. gated by
-        ; battle_hudtrack (all three directions), hud_stability,
+        ; compare equal and write nothing, which fixes the jitter, while
+        ; a change that survives into a quiet frame is
+        ; adopted within a frame or two, which fixes the staleness. gated
+        ; by battle_hudtrack (all three directions), hud_stability,
         ; battle_whelkwipe, battle_banner, and the visual goldens.
         ;
-        ; the row source is NOT the frame's raw $804b: cur_poi_set
+        ; the row source is not the frame's raw $804b: cur_poi_set
         ; (btlgfx_main.asm:1032, run every frame at :1738) derives it as
         ; $80cf + height*8 - 8 + $8057, and $8057 is a sprite-priority
-        ; bias with a PATH-DEPENDENT value -- seeded per species from
+        ; bias whose value is path-dependent: seeded per species from
         ; MonsterOverlap at monster load (btlgfx_main.asm:4671; whelk
-        ; head = 8, guards = 0), zeroed for ALL slots by every $80/$83
+        ; head = 8, guards = 0), zeroed for all slots by every $80/$83
         ; animation init (magic_init_131long, :39277), and never re-
         ; seeded until the next monster load (the whelk retract's Cmd_20
         ; reload among them). raw $804b would therefore hop the whelk
         ; head's line one row the first time any spell lands and park it
-        ; there. so: strip the LIVE $8057 back out and re-apply the
-        ; LOAD-TIME species seed -- exactly the row the latch captured
-        ; at arm time, now stable across the whole $8057 lifecycle. the
+        ; there. so: strip the live $8057 back out and re-apply the
+        ; load-time species seed, which is the row the latch captured
+        ; at arm time and is stable across the whole $8057 lifecycle. the
         ; column source $800f = $80c3 + width*4 has no such term. 8-bit
         ; low-byte reads throughout, as always: transients riding the
         ; high bytes ($80/$83's -$0100 y displacement, stashed/restored
-        ; at :39292/:29884) never see us. (the slot-5 leap/seize writer
-        ; at btlgfx_main.asm:1133 bypasses monster load, so its species
-        ; stash is stale -- unowned territory, same as under the latch:
+        ; at :39292/:29884) never reach this code. (the slot-5 leap/seize
+        ; writer at btlgfx_main.asm:1133 bypasses monster load, so its
+        ; species stash is stale; that was also true under the latch, and
         ; no WoB-covered content drives it.)
         lda     f:$7e0000+OT6_SCRIPTBUSY
         bne     @keep           ; a battle script owns this frame:
-                                ;   coords may be transients -- hold
+                                ;   coords may be transients, so hold
         phx                     ; save shadow line base
         longa
         lda     OT6_SPECIES,y   ; slot species (== monster index)
@@ -527,7 +526,7 @@
         cmp     f:$7e0000+OT6_SHADOW,x
         beq     @asis           ; unchanged: write nothing at all
         sta     f:$7e0000+OT6_SHADOW,x  ; adopt (atomic word: the enable
-                                        ;   is still the commit -- the
+                                        ;   is still the commit; the
                                         ;   nmi flush can fire mid-frame,
                                         ;   and the flush's prev/cur pass
                                         ;   blanks the vacated cells)
@@ -549,7 +548,7 @@ Ot6ShownBitTbl:
 
 ; called from the battle nmi right after the oam dma.
 
-                                ; OT6_HUDCOPY ($57de) is retired and NOT ours:
+                                ; OT6_HUDCOPY ($57de) is retired and not ours:
                                 ;  $57de is
                                 ;  inside vanilla's `ram_res w7e57d5, 128`.
                                 ;  kept only so the memory map records that
@@ -559,7 +558,7 @@ Ot6ShownBitTbl:
                                 ;   $01/$02/$04/$08 (+$80 null-break), 0 =
                                 ;   classless. set by the three load hooks,
                                 ;   read per target by Ot6ClassChip. lives
-                                ;   in retired OT6_HUDDIRTY's byte — inside
+                                ;   in retired OT6_HUDDIRTY's byte, inside
                                 ;   the m2 trace-verified strip and the
                                 ;   InitBP clear. (first pick $57d6 turned
                                 ;   out to be live vanilla scratch: the
@@ -570,15 +569,15 @@ Ot6ShownBitTbl:
 ; can find the active save page's species entry at reveal time.
                                 ; OT6_SPECIES: per-slot species stash (6 words)
                                 ; OT6_PIPCUR/PIPPREV/PIPCELL: retired
-                                ;   (#33 -- see ot6_memory.inc)
+                                ;   (#33; see ot6_memory.inc)
                                 ; OT6_LASTLR: last frame's L/R bits
                                 ; OT6_RESTAGE: open list wants a re-render
                                 ; OT6_FONTDIRTY: font re-lay stages remaining.
                                 ; RELOCATED from $57d5: vanilla reserves
                                 ; $57d5..$5854 as the battle name-scratch
-                                ; string (ram_res w7e57d5,128 — GfxCmd_01
+                                ; string (ram_res w7e57d5,128: GfxCmd_01
                                 ; attack names, GfxCmd_11 monster specials,
-                                ; swdtech/esper name loaders ALL write
+                                ; and swdtech/esper name loaders all write
                                 ; byte 0 nonzero), so every named-attack
                                 ; banner spuriously triggered a full
                                 ; ~46-scanline font re-lay in the nmi tail
@@ -589,12 +588,12 @@ Ot6ShownBitTbl:
                                 ; trace-verified strip and the InitBP @clr
                                 ; (probe_57b9 write-watch: only bank-F0
                                 ; writers).
-; CAREFUL: the boundary is NOT "$57d5+ is vanilla's alone" (an earlier
+; Note: the boundary is not "$57d5+ is vanilla's alone" (an earlier
 ; note here said that, and it is what made $5762 look safe). btlgfx_ram.inc
-; reserves TWO buffers: w7e5755,128 AND w7e57d5,128 -- both vanilla's.
-; What the probes actually establish is narrower and still holds:
+; reserves two buffers, w7e5755,128 and w7e57d5,128, both vanilla's.
+; What the probes establish is narrower and still holds:
 ; vanilla's writes into the $5755 buffer stop at $576b, so the OT6 strip
-; from $57b6 up is empirically clear. Below $576b is NOT. See OT6_SHADOW.
+; from $57b6 up is empirically clear. Below $576b is not. See OT6_SHADOW.
 OT6_RELAY_STAGES := 3           ; icons, glyphs x2 (~128b each). was 6:
                                 ;   three arrow-tile stages retired with
                                 ;   the over-character boost marks.
@@ -612,7 +611,7 @@ OT6_RELAY_STAGES := 3           ; icons, glyphs x2 (~128b each). was 6:
                                 ;   Ot6MarkRandom from the two field/world
                                 ;   random-battle triggers; consumed
                                 ;   (compared + cleared) by InitBP.
-                                ; OT6_RANDBTL marks THIS battle as random
+                                ; OT6_RANDBTL marks this battle as random
                                 ;   (InitBP's normalized 0/1 copy of the
                                 ;   marker; read at victory by
                                 ;   Ot6RewardScale_ext). the copy-and-
@@ -624,7 +623,7 @@ OT6_RELAY_STAGES := 3           ; icons, glyphs x2 (~128b each). was 6:
                                 ;   0. two junk defenses on top (the
                                 ;   strip is init-exempt, so power-on/
                                 ;   menu junk lives here until the first
-                                ;   battle -- probe_57ba_strip measured
+                                ;   battle; probe_57ba_strip measured
                                 ;   $ff on the srm-boot line): the marker
                                 ;   is a magic value, not "nonzero", and
                                 ;   Ot6DangerStep word-clears both bytes
@@ -659,23 +658,23 @@ OT6_RANDMAGIC := $a5            ; the marker value (junk is $00/$ff in
 ; [ monster entry/exit animations: veil the under-enemy hud ]
 
 ; every jsl DoMonsterEntryExit site in bank c1 is re-pointed here (same
-; four bytes, no code motion). the entry/exit effect family — the whelk
-; retract's FADE_DOWN/FADE_UP wipes especially — sweeps the battle-field
+; four bytes, no code motion). the entry/exit effect family, and the whelk
+; retract's FADE_DOWN/FADE_UP wipes in particular, sweeps the battle-field
 ; bg3 region with a per-scanline scroll wave (hdma #2, fed from the
 ; w7e4af5 table the effect animates), and it assumes the field map holds
 ; nothing visible but its own mask tiles: vanilla blanks even its banner
 ; rows to the $01ee junk fill before scrolling. our under-enemy hud
 ; lines ride that same map, so the wipe smeared their glyphs across the
-; screen (v0.1 whelk playtest; battle_whelkwipe is the regression test —
-; veiling exactly the hud words removed every stray pixel, measured
+; screen (v0.1 whelk playtest; battle_whelkwipe is the regression test:
+; veiling the hud words removed every stray pixel, measured
 ; against the base image frame by frame). while the veil byte is set the
 ; nmi flush writes the $01ee fill over each live line instead of its
-; cells — the field map is word-identical to vanilla's for the whole
-; animation — and the shadow itself is untouched, so the first flush
-; after the effect repaints the hud exactly as built (or blanks it, if
+; cells, so the field map is word-identical to vanilla's for the whole
+; animation, and the shadow itself is untouched, so the first flush
+; after the effect repaints the hud as built (or blanks it, if
 ; the monster left with the effect). a8/i16 at every call site (battle
-; gfx script context); the anim returns a8/i16 on every path, sep #$20
-; is belt and suspenders.
+; gfx script context); the anim returns a8/i16 on every path, so the
+; sep #$20 is redundant.
 
 .proc Ot6EntryExitVeil_ext
         .a8
@@ -703,10 +702,10 @@ OT6_RANDMAGIC := $a5            ; the marker value (junk is $00/$ff in
         plb                     ; db = 0 for hardware registers
         lda     #$80
         sta     hVMAINC         ; word writes for the stages and the lines
-        ; a battle dialogue clobbered our font cells? re-lay them ONE
+        ; a battle dialogue clobbered our font cells? re-lay them one
         ; ~128-byte slice per nmi (OT6_FONTDIRTY counts stages left).
-        ; the full 768-byte re-lay is ~46 scanlines of PIO — more than
-        ; a whole vblank — so a single-shot re-lay tore the frame it
+        ; the full 768-byte re-lay is ~46 scanlines of PIO, more than
+        ; a whole vblank, so a single-shot re-lay tore the frame it
         ; ran on (probe_banner measured flush end at scanline 292/262).
         ; staging self-heals over 6 frames and each slice is gated on
         ; the live v counter: only start one with >= 14 lines of vblank
@@ -739,30 +738,30 @@ OT6_RANDMAGIC := $a5            ; the marker value (junk is $00/$ff in
         bra     @nofont
 @s0:    jsr     Ot6LoadBgGlyphsB        ; 0: hud pip/boost glyphs
 @nofont:
-        ; TWO WRITE DISCIPLINES BELOW, on purpose (audit 2026-07-19).
-        ; steady-state cell writes (prev == cur) are NOT v-gated: a write
+        ; two write disciplines below, on purpose (audit 2026-07-19).
+        ; steady-state cell writes (prev == cur) are not v-gated: a write
         ; spilled past vblank is dropped by the PPU, and the rewrite-
-        ; every-nmi design heals it next frame -- rewriting every nmi is
-        ; already mandatory because the animation-bg restore junk-fills
+        ; every-nmi design heals it next frame.  rewriting every nmi is
+        ; already required because the animation-bg restore junk-fills
         ; the area every other frame during monster actions (see the
         ; call-site comment, btlgfx_main @0c17). one-shot transitions
         ; (prev != cur: a line moved, enabled at a new address after a
-        ; move, or disabled) have NO next-frame rewrite to heal them --
-        ; a dropped blank-at-prev would strand stale glyphs -- so they
-        ; are admission-gated on the live v counter and DEFERRED when
+        ; move, or disabled) have no next-frame rewrite to heal them, and
+        ; a dropped blank-at-prev would leave stale glyphs, so they
+        ; are admission-gated on the live v counter and deferred when
         ; late: prev only advances after the blank ran inside an
         ; admitted window, so the whole transition redoes next nmi
         ; until it lands. within the window a drop is impossible by
         ; arithmetic: admission ends at v=248, the worst burst (all six
         ; lines + pip transitioning at once) is ~70 words ~ 9 scanlines
         ; at the measured PIO rate (~8 words/scanline, the font-slice
-        ; numbers above), ending ~257 < 262. residual accepted risk,
-        ; documented not hidden: a transition deferred into a veil
-        ; window leaves old glyphs one extra frame if the nmi is ALSO
-        ; late -- needs a genuine move adopted on the exact frame an
+        ; numbers above), ending ~257 < 262. one residual risk,
+        ; accepted and recorded: a transition deferred into a veil
+        ; window leaves old glyphs one extra frame if the nmi is also
+        ; late.  that needs a real move adopted on the exact frame an
         ; entry effect starts plus consecutive late nmis; no covered
         ; content produces the first half, and defer-retry bounds it
-        ; at frames, not battles.
+        ; at frames rather than battles.
         ldx     #$0000
 @line:  longa
         lda     f:$7e0000+OT6_SHADOW+2,x         ; prev
@@ -779,32 +778,32 @@ OT6_RANDMAGIC := $a5            ; the marker value (junk is $00/$ff in
         longa
         lda     f:$7e0000+OT6_SHADOW+2,x         ; reload prev (gate ate a)
         sta     hVMADDL                          ; blank the old cells
-        ; the blank word is vanilla's $01ee junk fill, NOT $21ff.  cells a
-        ; line abandons (a move or a disable) are rewritten ONCE, here, and
-        ; then belong to nobody: no next-nmi repaint heals them, so whatever
-        ; word this writes sits in the field map until vanilla's next
-        ; ClearBG3TileBuf.  $21ff -- priority-set char $1ff -- was invisible
+        ; the blank word is vanilla's $01ee junk fill rather than $21ff.
+        ; cells a line abandons (a move or a disable) are rewritten once,
+        ; here, and then belong to nobody: no next-nmi repaint heals them, so
+        ; whatever word this writes sits in the field map until vanilla's next
+        ; ClearBG3TileBuf.  $21ff (priority-set char $1ff) was invisible
         ; in 8x8 (the char is a blank cell in the $5800 font page), but under
         ; an animation's bg3-16x16 window (the $896f flips the veil below
-        ; already handles for LIVE cells) a 16x16 map cell renders char n
-        ; plus n+1/n+$10/n+$11: $1ff pulls tiles $200/$20f/$210 -- past the
-        ; font page, into the animation-gfx region -- at TOP priority.  the
-        ; measured face (probe_lete_entrance, the Lete River forced battle 8,
+        ; already handles for live cells) a 16x16 map cell renders char n
+        ; plus n+1/n+$10/n+$11, so $1ff pulls tiles $200/$20f/$210, past the
+        ; font page and into the animation-gfx region, at top priority.  the
+        ; measured case (probe_lete_entrance, the Lete River forced battle 8,
         ; both die rolls): the monster-entrance slide walks every hud line
         ; sideways across the map, abandoning 63-92 cells ($21ff each, map
-        ; dump in the probe log) while the slide itself holds $896f=$59 --
+        ; dump in the probe log) while the slide itself holds $896f=$59,
         ; and those cells render as a full-width band of white junk over the
         ; entering monsters for the effect's last ~15 frames, until the
-        ; effect's own cleanup refills the buffer.  the owner's "white flash
-        ; at the START of the fight, as the enemies are appearing ... too
-        ; quick to screenshot" -- reliable in exactly the fights whose
-        ; entrance slides shown monsters under live hud lines.  $01ee is the
+        ; effect's own cleanup refills the buffer.  that is the owner's "white
+        ; flash at the start of the fight, as the enemies are appearing ... too
+        ; quick to screenshot", reliable in the fights whose
+        ; entrance slides showed monsters under live hud lines.  $01ee is the
         ; word vanilla holds in every field cell it did not draw itself,
-        ; priority-CLEAR, safe in BOTH tile modes (its 16x16 neighbors
-        ; $1ef/$1fe/$1ff are priority-clear with it, under the battle bg) --
-        ; the same word the veil below writes over live cells and the entry
-        ; wipes sweep.  an abandoned cell is now word-identical to a cell we
-        ; never touched.
+        ; priority-clear, and safe in both tile modes (its 16x16 neighbors
+        ; $1ef/$1fe/$1ff are priority-clear with it, under the battle bg).
+        ; It is the same word the veil below writes over live cells and the
+        ; entry wipes sweep.  an abandoned cell is now word-identical to a
+        ; cell this code never touched.
         lda     #$01ee
         sta     hVMDATAL
         sta     hVMDATAL
@@ -819,23 +818,23 @@ OT6_RANDMAGIC := $a5            ; the marker value (junk is $00/$ff in
         lda     f:$7e0000+OT6_HUDVEIL-1          ; veil rides the high byte
         and     #$ff00                           ;   (low byte = randbtl)
         bne     @veil
-        ; hud glyph TILES unreliable? veil (hide) the hud, don't draw from them.
-        ; a battle dialog window (window_mess_open_init, _c142e4, btlgfx_main
-        ; .asm:9264) opens by ClearDlgGfxBuf-ing the whole small font and
-        ; re-uploading it to $5800 in four TfrDlgTextGfx passes -- a full
-        ; $5800-$5fff blank + message glyphs, which zeroes OUR borrowed glyph
+        ; hud glyph tiles unreliable? veil (hide) the hud rather than drawing
+        ; from them.  a battle dialog window (window_mess_open_init, _c142e4,
+        ; btlgfx_main.asm:9264) opens by ClearDlgGfxBuf-ing the whole small font
+        ; and re-uploading it to $5800 in four TfrDlgTextGfx passes: a full
+        ; $5800-$5fff blank plus message glyphs, which zeroes the borrowed glyph
         ; cells ($64-$79, $eb-$fd: all blank in SmallFontGfx).  the vanilla
         ; staged restore (Ot6FontRestoreMark, hooking _c143b9) fires on the
-        ; dialog CLOSE only, and the window keeps re-uploading as it prints, so
-        ; from open until the close re-lay finishes -- and for the WHOLE fight
+        ; dialog close only, and the window keeps re-uploading as it prints, so
+        ; from open until the close re-lay finishes, and for the whole fight
         ; when the script never issues a close (measured: probe_moogfont /
-        ; probe_moogjunk, battle 115 Kefka flashback -- the under-enemy hud
+        ; probe_moogjunk, battle 115 Kefka flashback, where the under-enemy hud
         ; drew break/shield/icon glyphs from blanked tiles for ~5000/9000
         ; frames: junk over and around the enemies).  so while a dialog window
         ; is up (w7e64d5, the open latch: _c14312 sets it, _c143cc/BattleEvent
-        ; Cmd_10 re-lay then clear it) OR a re-lay is mid-flight (OT6_FONTDIRTY,
-        ; the close's staged restore), hold the veil: the hud is cleanly hidden
-        ; (vanilla's $01ee fill, exactly like an entry/exit anim), never junk,
+        ; Cmd_10 re-lay then clear it) or a re-lay is mid-flight (OT6_FONTDIRTY,
+        ; the close's staged restore), hold the veil: the hud is hidden
+        ; (vanilla's $01ee fill, as for an entry/exit anim) rather than junk,
         ; and repaints once the tiles are whole again.  neither flag is set by
         ; the attack-name banner (battle_banner: FONTDIRTY stays 0, hud stays
         ; painted).  the dialog draws in $80+ letter cells, disjoint from ours.
@@ -845,34 +844,34 @@ OT6_RANDMAGIC := $a5            ; the marker value (junk is $00/$ff in
         lda     f:$7e0000+OT6_FONTDIRTY          ; font re-lay in flight?
         and     #$00ff
         bne     @veil
-        ; battlefield bg3 in 16x16 TILE MODE?  an animation owns the layer --
+        ; battlefield bg3 in 16x16 tile mode?  an animation owns the layer, so
         ; veil.  the animation inits flip the battlefield's $2105 shadow
-        ; ($896f) to 16x16 bg3 tiles for an effect's run -- InitAnimType's
-        ; bg1-target and bg1-gfx paths (btlgfx_main.asm:26304/:26348,
-        ; `ora #$40`/`ora #$50`) and the circle/mask init families
-        ; (:47410 `ora #$48`, :48362 `and #$f7 / ora #$40`) -- because the
+        ; ($896f) to 16x16 bg3 tiles for an effect's run (InitAnimType's
+        ; bg1-target and bg1-gfx paths, btlgfx_main.asm:26304/:26348,
+        ; `ora #$40`/`ora #$50`, and the circle/mask init families
+        ; :47410 `ora #$48`, :48362 `and #$f7 / ora #$40`) because the
         ; effect uses bg3 as its own canvas/color-math mask.  vanilla clears
         ; the field map first (ClearBG3TileBuf/TfrBG3Tiles) and can assume
-        ; nothing of its own shows: its $01ee fill is priority-CLEAR,
-        ; underneath the opaque battle bg in every mode.  our hud cells are
-        ; priority-SET ($21xx), and in 16x16 mode a map cell renders at
-        ; DOUBLED size and position pulling three NEIGHBOR tiles (char n
-        ; draws n, n+1, n+$10, n+$11) -- so any live line inside the
+        ; nothing of its own shows: its $01ee fill is priority-clear,
+        ; underneath the opaque battle bg in every mode.  the hud cells are
+        ; priority-set ($21xx), and in 16x16 mode a map cell renders at
+        ; doubled size and position, pulling three neighbour tiles (char n
+        ; draws n, n+1, n+$10, n+$11), so any live line inside the
         ; effect's scroll window paints doubled break-icon blocks flanked by
-        ; neighbor-tile bars: "break icons amongst other things that look
+        ; neighbour-tile bars: "break icons amongst other things that look
         ; like junk memory", over and around the monsters, in fights with no
-        ; dialogue -- the owner's residual v0.2 sighting after the fly-in
-        ; and dialogue-clobber fixes.  measured (probe_junk16, map 96's
+        ; dialogue.  that was the owner's residual v0.2 sighting after the
+        ; fly-in and dialogue-clobber fixes.  measured (probe_junk16, map 96's
         ; natural Cirpius x3, hud rows 5/8): a plain CURE runs 42 frames at
-        ; $2105=$59 with both rows inside the (0,0) window -- 424 flagged
-        ; frames, screenshots match the report; Fire's $51 phase (priority
+        ; $2105=$59 with both rows inside the (0,0) window, 424 flagged
+        ; frames, and screenshots match the report; Fire's $51 phase (priority
         ; flag dropped) and plain Fights ($19: bg1-only 16x16) stay
         ; invisible, which is why the sighting was intermittent.  while the
-        ; bit is up, hold the veil: $01ee is exactly the word vanilla wants
+        ; bit is up, hold the veil: $01ee is the word vanilla wants
         ; in every cell it did not draw itself, in both tile modes.  (the
         ; main loop can flip $896f mid-frame between our nmi reads; the
         ; exposure is bounded at one partial frame at effect onset, below
-        ; per-frame sampling -- battle_hudanim16 samples per frame and
+        ; per-frame sampling, and battle_hudanim16 samples per frame and
         ; passes.)
         lda     f:$7e0000+$896f                  ; battlefield $2105 shadow
         and     #$0040                           ;   bg3 tile size 16x16?
@@ -904,29 +903,29 @@ OT6_RANDMAGIC := $a5            ; the marker value (junk is $00/$ff in
         cpx     #$0054          ; 6 monster lines x 14
         jcc     @line           ; (veil branch grew the body past bcc)
         ; #35 wallet pseudo-line: current MP over the open costed list
-        ; ($7c00 ability-list map, single band -- measured, probe_wallet:
+        ; ($7c00 ability-list map, single band, measured by probe_wallet:
         ; no +$100 twin renders).  the one-shot close/switch blank uses the
-        ; same defer-when-late cure as the lines (a magic or item list
+        ; same defer-when-late fix as the lines (a magic or item list
         ; opening over a stale wallet would show it); the steady-state cell
         ; writes rewrite every nmi like everything else here.
         ;
-        ; the WHOLE wallet+rows pass is v-gated as a unit: it grew the nmi
+        ; the whole wallet+rows pass is v-gated as a unit: it grew the nmi
         ; tail to ~13 words, and on a late-entry nmi (entry at v=225, flush
-        ; start 256 -- battle_banner caught the one frame) the tail wrapped
+        ; start 256; battle_banner caught the one frame) the tail wrapped
         ; past vblank.  everything here is steady-state or defer-retry, so
         ; a skipped nmi repaints in full on the next one.
 @pip:
         ; #35 wallet pseudo-line: current MP over the open costed list
-        ; ($7c00 ability-list map, single band -- measured, probe_wallet).
-        ; PAINTED ONLY WHEN IT CHANGES, never per frame.  The steady-state
-        ; repaint every other cell here uses cost the battle cannot afford:
+        ; ($7c00 ability-list map, single band, measured by probe_wallet).
+        ; Painted only when it changes, never per frame.  The steady-state
+        ; repaint every other cell here uses costs the battle cannot afford:
         ; with ~13 extra words a frame the engine's own line transfers got
         ; pushed past vblank and the window state machines that wait on them
-        ; hung -- battle_runic's negative phase sat with a menu open and every
+        ; hung; battle_runic's negative phase sat with a menu open and every
         ; ATB frozen (2/2 runs; clean with just this block disabled, bisected
         ; in five builds).  A change-only write costs zero words on a quiet
         ; frame, and the value only moves on open/close and when the charge
-        ; debits MP -- which is exactly the moment #33 wants it to move.
+        ; debits MP, which is the moment #33 wants it to move.
         longa
         lda     f:$7e0000+OT6_WALLETCUR
         cmp     f:$7e0000+OT6_WALLETPREV
@@ -944,7 +943,7 @@ OT6_RANDMAGIC := $a5            ; the marker value (junk is $00/$ff in
         cmp     f:$7e0000+OT6_WALLETCUR
         beq     @wcur
         sta     hVMADDL                  ; closed/moved: blank the old cells
-        lda     #$21ff          ; $21ff: this is a MENU map (no anim flips its
+        lda     #$21ff          ; $21ff: this is a menu map (no anim flips its
         sta     hVMDATAL        ;   $2105 sections to 16x16), so the field
         sta     hVMDATAL        ;   map's $01ee rule does not apply here
         sta     hVMDATAL
@@ -967,20 +966,20 @@ OT6_RANDMAGIC := $a5            ; the marker value (junk is $00/$ff in
         lda     f:$7e0000+OT6_WALLETCELLS+8
         sta     hVMDATAL
 @pipline:
-        ; live pip pseudo-line: ONE cell in the party-window menu map --
-        ; deliberately the same footprint vanilla-era OT6 always had.  #33's
-        ; first cut painted all four rows every nmi and BROKE THE FIGHT: with
+        ; live pip pseudo-line: one cell in the party-window menu map,
+        ; deliberately the same footprint earlier OT6 versions had.  #33's
+        ; first cut painted all four rows every nmi and broke the fight: with
         ; 13 words a frame going into this map, battle_runic's negative phase
         ; hung with a menu open and every ATB frozen (2/2 runs, against 2/2
         ; passes on the pre-change ROM and a clean pass with just this block
-        ; disabled -- bisected in four builds).  The map is the menu engine's
-        ; own; we paint one cell in it, as before.  WHICH cell is what #33
-        ; changed: Ot6PipStage points it at the active character while a menu
-        ; is open, and at the character who just spent BP for a few frames
-        ; after (OT6_PIPTAIL), so the drop still lands on the charge frame.
-        ; the party window is double-buffered -- each name row is staged at
-        ; map row 1+2r AND at 9+2r (+$100 words) and the scroll picks a band
-        ; -- so paint BOTH (the M2 lesson: writing only the low band made
+        ; disabled, bisected in four builds).  The map is the menu engine's
+        ; own, and this code paints one cell in it, as before.  Which cell is
+        ; what #33 changed: Ot6PipStage points it at the active character while
+        ; a menu is open, and at the character who just spent BP for a few
+        ; frames after (OT6_PIPTAIL), so the drop lands on the charge frame.
+        ; the party window is double-buffered: each name row is staged at
+        ; map row 1+2r and at 9+2r (+$100 words) and the scroll picks a band,
+        ; so paint both (the M2 finding: writing only the low band made
         ; boost feedback invisible whenever the high band was up).
         longa
         lda     f:$7e0000+OT6_PIPPREV
@@ -993,12 +992,12 @@ OT6_RANDMAGIC := $a5            ; the marker value (junk is $00/$ff in
         longa
         lda     f:$7e0000+OT6_PIPPREV            ; reload (gate ate a)
         sta     hVMADDL                  ; moved/closed: blank the old cell
-        lda     #$21ff          ; $21ff HERE is correct, on purpose: the pip
-                                ;   lives in the party-window MENU map, whose
+        lda     #$21ff          ; $21ff is correct here, on purpose: the pip
+                                ;   lives in the party-window menu map, whose
                                 ;   hdma $2105 sections ($8973/$8977) no anim
-                                ;   ever flips to 16x16 -- the field-map blank
+                                ;   ever flips to 16x16.  the field-map blank
                                 ;   above had to become $01ee (the entrance-
-                                ;   flash fix), but $01ee is the FIELD map's
+                                ;   flash fix), but $01ee is the field map's
                                 ;   fill, not this map's
         sta     hVMDATAL
         lda     f:$7e0000+OT6_PIPPREV
@@ -1026,8 +1025,8 @@ OT6_RANDMAGIC := $a5            ; the marker value (junk is $00/$ff in
         plp
         rtl
 ; local: enough vblank left for a one-shot transition write? (a8, db=0;
-; clobbers a; carry SET = too late, defer.) constants mirror the font
-; slice gate above: v must be in [225,248] -- past 248 the worst-case
+; clobbers a; carry set = too late, defer.) constants mirror the font
+; slice gate above: v must be in [225,248]; past 248 the worst-case
 ; transition burst (~9 scanlines at the measured PIO rate, see the
 ; @nofont comment) could run into active display, where the PPU drops
 ; VRAM writes and a one-shot has no next-frame rewrite to heal it.
@@ -1040,7 +1039,7 @@ OT6_RANDMAGIC := $a5            ; the marker value (junk is $00/$ff in
         xba                     ; a = v low byte (xba preserves carry)
         bcs     @l1             ; v >= 256: too late (carry already set)
         cmp     #$e1
-        bcc     @l0             ; v < 225: not vblank (defensive) -- defer
+        bcc     @l0             ; v < 225: not vblank (defensive), so defer
         cmp     #$f9            ; carry = (v >= 249) = too late
         rts
 @l0:    sec
@@ -1050,13 +1049,13 @@ OT6_RANDMAGIC := $a5            ; the marker value (junk is $00/$ff in
 ; [ l/r boost input ]
 
 ; runs every main-loop frame from the hud builder (db=$7e, a8/i16).
-; while a battle menu is open AND the actor's action is still being
+; while a battle menu is open and the actor's action is still being
 ; composed, R raises the active character's pending boost (cap 3, and
-; never past their bp) and L lowers it.  DISPLAY is no longer here: the
+; never past their bp) and L lowers it.  Display is no longer here: the
 ; live cell painter (Ot6PipStage -> the flush's one-cell pseudo-line)
 ; points that cell at the active character while composing and at the
-; character who just charged for a few frames after, showing the FULL
-; bank either way -- so the visible drop is Ot6ActionEnd's charge frame
+; character who just charged for a few frames after, showing the full
+; bank either way, so the visible drop is Ot6ActionEnd's charge frame
 ; (#33). window_open still re-stages every row on the next open
 ; (Ot6PipGlyph_ext, same bp reading).
 ;
@@ -1071,21 +1070,21 @@ OT6_RANDMAGIC := $a5            ; the marker value (junk is $00/$ff in
 ; after selecting the ability" / "it looks cosmetic"). Two different
 ; things were happening either side of the confirm, and only one was a
 ; bug:
-;   * DURING target select the spend is fully effective and stays legal
-;     -- DESIGN.md prices boost "when confirming an action", and
+;   * during target select the spend is fully effective and stays legal:
+;     DESIGN.md prices boost "when confirming an action", and
 ;     Ot6QueueFold reads pending from CreateAction, which runs after
 ;     target select. Measured: R at the target cursor folded Fire to
 ;     Fire 3 ($09 at $3410), charged 2 bp (5 -> 3), and dealt tier-3
 ;     damage. The playtester read it as cosmetic because the spell-list
-;     preview -- the thing the Narshe school teaches them to watch -- is
-;     closed by then, and because the over-character chevrons they WERE
+;     preview, the thing the Narshe school teaches them to watch, is
+;     closed by then, and because the over-character chevrons they were
 ;     watching were rendering as damage numerals (the other defect).
-;   * AFTER the confirm it was theft. CreateAction has already frozen
-;     the tier, but Ot6ActionEnd still charges whatever pending reads at
-;     action end. Measured: two more R presses post-confirm took pending
-;     2 -> 3, the queued spell stayed Fire 3, damage was identical (319
-;     both ways), and bp fell 5 -> 2. Three points paid, two points'
-;     worth delivered.
+;   * after the confirm the player was overcharged. CreateAction has
+;     already frozen the tier, but Ot6ActionEnd still charges whatever
+;     pending reads at action end. Measured: two more R presses
+;     post-confirm took pending 2 -> 3, the queued spell stayed Fire 3,
+;     damage was identical (319 both ways), and bp fell 5 -> 2. Three
+;     points paid, two points' worth delivered.
 ; Refusing silently rather than buzzing: the menu lingers open for a few
 ; frames after every confirm, so a buzz here would fire on ordinary play
 ; and teach the player that a legal boost had been rejected.
@@ -1115,11 +1114,11 @@ OT6_RANDMAGIC := $a5            ; the marker value (junk is $00/$ff in
         ; the action is committed once the actor has a command-list
         ; pointer: the tier is already frozen, so a spend here would be
         ; charged and buy nothing. display only from that point on.
-        ; (the $32cc + $2bae-ring test lives in Ot6CommittedSlot now --
-        ; the live pip painter needs the same answer per row, and the two
-        ; readings must never diverge. history of the ring half: an L/R
-        ; edge between the C1 confirm and C2's ring drain changed the
-        ; CHARGE without changing the tech -- probe_bushidobusy.)
+        ; (the $32cc + $2bae-ring test lives in Ot6CommittedSlot now,
+        ; because the live pip painter needs the same answer per row and
+        ; the two readings must not diverge. history of the ring half: an
+        ; L/R edge between the C1 confirm and C2's ring drain changed the
+        ; charge without changing the tech; probe_bushidobusy.)
         pha
         lda     $62ca
         and     #$03
@@ -1127,11 +1126,11 @@ OT6_RANDMAGIC := $a5            ; the marker value (junk is $00/$ff in
         bcc     :+
         pla
         rts                     ; committed: display only
-        ; ...and a LATCHED SLOT SPIN is committed the same way (#33): the
+        ; ...and a latched slot spin is committed the same way (#33): the
         ; first reel press latched the spin's tier (Ot6SlotRig ->
         ; OT6_SLOTTIER) and Ot6SlotCommit re-banks that latch at the queue
-        ; write, so an L/R edge mid-spin changes NOTHING the reels or the
-        ; charge will see -- yet it still chinged/clicked (the slot-tiers
+        ; write, so an L/R edge mid-spin changes nothing the reels or the
+        ; charge will see, yet it still chinged/clicked (the slot-tiers
         ; landing, 9229881, silenced the charge but not the acknowledgment).
         ; input goes fully inert from the first press: no bank, no sound.
 :       lda     $7bc2           ; menu state $08 = the reel spin
@@ -1166,32 +1165,32 @@ OT6_RANDMAGIC := $a5            ; the marker value (junk is $00/$ff in
 @refold:
         lda     #$80
         sta     OT6_RESTAGE     ; open lists re-fold their names
-        ; ...and re-PRICE them (#64).  The folded name was only ever half the
+        ; ...and re-price them (#64).  The folded name was only half the
         ; row: the MP number, the grey and the A-button's refusal all read
         ; spell-list byte 3, which Ot6FoldPrices rewrites off this same
-        ; pending value -- and the enabled bits are then re-derived from it by
+        ; pending value, and the enabled bits are then re-derived from it by
         ; vanilla's own UpdateEnabledMagic, which Ot6FoldPrices hangs off.
         ;
-        ; DIRECTLY, not through vanilla's $3204 bit-7 request.  That request
-        ; is the obvious move and it is wrong here: the main loop consumes it
-        ; in AfterAction2, "update targets after each command", so the list
-        ; would re-price at the end of the NEXT action rather than under the
-        ; player's cursor.  Measured on exactly that version -- an L press
+        ; Called directly rather than through vanilla's $3204 bit-7 request.
+        ; That request is the obvious move and it is wrong here: the main loop
+        ; consumes it in AfterAction2, "update targets after each command", so
+        ; the list would re-price at the end of the next action rather than
+        ; under the player's cursor.  Measured on that version: an L press
         ; refolded Fire 3 to Fire 2 and left the row priced at 4 MP for the
         ; rest of the menu (battle_preview.lua's ladder is the test).
         ; Ot6ActionEnd still uses the request bit, because there the timing
         ; is right: an action has just ended, so AfterAction2 is next.
         ;
-        ; ON THE FRAME BUDGET (#48's lesson, whose evidence is 60 lines below
+        ; On the frame budget (#48's finding, whose evidence is 60 lines below
         ; this one): this site is inside Ot6BgHud_ext and the battle loop's
         ; per-frame budget is close enough to full that ~80 idle cycles cost
         ; a whole extra hardware frame.  UpdateEnabledMagic's 78-row walk is
-        ; far more than 80 cycles -- but it is a BURST ON AN L/R EDGE, not a
-        ; per-frame cost, and #48's regression was per-frame.  The worst case
-        ; is one dropped frame on the frame the player presses R, which is
-        ; not something a player can perceive and is not something a fixture
-        ; can accumulate.  If that ever stops being true, the move is to
-        ; defer the walk to the next frame, not to re-derive the grey here.
+        ; far more than 80 cycles, but it is a burst on an L/R edge rather
+        ; than a per-frame cost, and #48's regression was per-frame.  The
+        ; worst case is one dropped frame on the frame the player presses R,
+        ; which a player cannot perceive and a fixture cannot accumulate.  If
+        ; that ever stops being true, the move is to defer the walk to the
+        ; next frame rather than to re-derive the grey here.
         tya                     ; the boosting character's entity offset
         jsl     Ot6RecheckMagic
 @show:  rts                     ; display is Ot6PipStage's job now (#33)
@@ -1200,16 +1199,16 @@ OT6_RANDMAGIC := $a5            ; the marker value (junk is $00/$ff in
 
 ; ------------------------------------------------------------------------------
 
-; [ is a character slot's action committed? -- the one reading (#33) ]
+; [ is a character slot's action committed?  the one reading (#33) ]
 ;
 ; committed = the actor has a live command-list pointer ($32cc != $ff: C2
-; holds the action) OR the confirmed action still sits in the user-action
-; ring ($2bae + 0/8/$10/$18, char slot or $ff -- GetPlayerAction's ring,
+; holds the action) or the confirmed action still sits in the user-action
+; ring ($2bae + 0/8/$10/$18, char slot or $ff; GetPlayerAction's ring,
 ; battle_main.asm:12643; the C1 confirm freezes the payload but $32cc only
 ; goes live when C2 drains the ring).  Ot6Boost gates input on this (a spend
 ; after commit is charged but buys nothing) and Ot6PipStage picks each row's
-; glyph with it (a committed bank displays FULL until the charge lands --
-; the pip drop then IS the Ot6ActionEnd frame).  a8/i16, db=$7e.
+; glyph with it (a committed bank displays full until the charge lands, so
+; the pip drop is the Ot6ActionEnd frame).  a8/i16, db=$7e.
 ; in: A = character slot (0-3).  out: carry set = committed.  preserves x/y.
 .proc Ot6CommittedSlot
         .a8
@@ -1248,38 +1247,38 @@ OT6_RANDMAGIC := $a5            ; the marker value (junk is $00/$ff in
 
 ; ------------------------------------------------------------------------------
 
-; [ commit a DEFERRED pip paint onto the live cell (#42) ]
+; [ commit a deferred pip paint onto the live cell (#42) ]
 ;
-; WHY THE PAINT DEFERS AND THE BANK DOES NOT.  #37 banks the True Knight's BP
-; at SetCoverTarget's commit, which is correct and stays: that instruction IS
+; Why the paint defers and the bank does not.  #37 banks the True Knight's BP
+; at SetCoverTarget's commit, which is correct and stays: that instruction is
 ; the block as the engine understands it, and Runic's template governs the
-; mechanic.  But the engine's decision to retarget precedes the DAMAGE NUMERAL
+; mechanic.  But the engine's decision to retarget precedes the damage numeral
 ; by 83-147 frames (measured, battle_trueknight's frame table), and OT6_PIPTAIL
-; is 32 -- so arming the cell at the commit made the pip flash and fade about
+; is 32, so arming the cell at the commit made the pip flash and fade about
 ; two seconds before the blow visibly landed on the knight.  #33's rule is that
 ; a pip moves when the thing it represents happens, and what a player perceives
-; as "the block" is the hit landing on the blocker, not the retarget.
+; as "the block" is the hit landing on the blocker rather than the retarget.
 ;
 ; So Ot6CoverBP banks the blocker's slot into OT6_PIPPEND and this proc moves
-; it into OT6_PIPSLOT/OT6_PIPTAIL -- the same bank-then-commit shape
+; it into OT6_PIPSLOT/OT6_PIPTAIL, the same bank-then-commit shape
 ; Ot6RvPend*/Ot6RevealCommit already use for weakness reveals, driven off the
 ; same trigger (Ot6RevealPoll's numeral-counter change, ot6_break.asm).
 ;
-; A MISS PAINTS TOO, and lands on the right frame for free.  FF6 draws "Miss"
-; through GfxCmd_0b -- the miss arm branches into the very tail that increments
-; the numeral counter (btlgfx_main.asm:24725-24735 -> :24799) -- so the numeral
-; frame for a missed attack is the frame the word "Miss" appears over the
-; knight.  That is the ruling #42 asked for: the earn pays whether or not the
-; blow connects (he stepped in front of his ally either way), and suppressing
-; the pip would leave a silent +1 BP -- a worse desync than the early one this
-; fixes, and invisible rather than merely mistimed.
+; A miss paints too, and lands on the right frame without extra work.  FF6
+; draws "Miss" through GfxCmd_0b, and the miss arm branches into the same tail
+; that increments the numeral counter (btlgfx_main.asm:24725-24735 -> :24799),
+; so the numeral frame for a missed attack is the frame the word "Miss" appears
+; over the knight.  That is the ruling #42 asked for: the earn pays whether or
+; not the blow connects (he stepped in front of his ally either way), and
+; suppressing the pip would leave a +1 BP with no display at all, which is
+; worse than the early paint this fixes.
 ;
-; TWO CALLERS, the second a backstop.  GfxCmd_0b returns without touching the
+; Two callers, the second a backstop.  GfxCmd_0b returns without touching the
 ; counter when the numeral value is $ffff ("hide numerals", :24707-24710), and
-; some scripts issue no numeral at all -- so Ot6ActionEnd calls this at the end
-; of every action for exactly the reason it already calls Ot6RevealCommit: a
+; some scripts issue no numeral at all, so Ot6ActionEnd calls this at the end
+; of every action for the reason it already calls Ot6RevealCommit: a
 ; pending paint must never outlive the action that banked it.  It runs there
-; AFTER that proc's own charge arm, so the rarer out-of-turn cover wins the one
+; after that proc's own charge arm, so the rarer out-of-turn cover takes the one
 ; live cell; the actor's own bank is restaged at the next window open anyway
 ; (Ot6PipGlyph_ext), while a cover earn has no other moment.
 ;
@@ -1300,17 +1299,17 @@ OT6_RANDMAGIC := $a5            ; the marker value (junk is $00/$ff in
 
 ; ------------------------------------------------------------------------------
 
-; [ stage the live pip cell -- the drop lands on the charge frame (#33) ]
+; [ stage the live pip cell: the drop lands on the charge frame (#33) ]
 ;
-; ONE cell (the flush paints it into both window bands), pointed at:
-;   - the ACTIVE character while a battle menu is open -- the compose-time
-;     feedback, arrow cluster while a boost is pending and uncommitted;
-;   - the character who just SPENT bp for OT6_PIPTAIL frames after their
+; One cell (the flush paints it into both window bands), pointed at:
+;   - the active character while a battle menu is open, giving compose-time
+;     feedback, an arrow cluster while a boost is pending and uncommitted;
+;   - the character who just spent bp for OT6_PIPTAIL frames after their
 ;     action resolved (Ot6ActionEnd arms both), so the drop is visible even
 ;     though no menu is open at resolution.
-; The glyph is the FULL bank, not bank-minus-pending: a committed spend keeps
-; showing its pips until Ot6ActionEnd's charge writes bp, which is exactly
-; what makes the visible drop and the mechanical event the same frame.  The
+; The glyph is the full bank rather than bank-minus-pending: a committed spend
+; keeps showing its pips until Ot6ActionEnd's charge writes bp, which is what
+; makes the visible drop and the mechanical event the same frame.  The
 ; measured desync this replaces: the staged party rows painted the spent
 ; value at the menu restage, ~570 frames before the charge (probe_clockwork
 ; on the pre-change ROM: spent glyph f605, charge f1169).
@@ -1318,10 +1317,10 @@ OT6_RANDMAGIC := $a5            ; the marker value (junk is $00/$ff in
 .proc Ot6PipStage
         .a8
         .i16
-        ; the CHARGE WINDOW WINS.  While OT6_PIPTAIL runs, the cell follows
-        ; the character who just spent BP even if a menu is open for someone
-        ; else: one cell can only show one row, and the drop landing on the
-        ; resolution frame is the whole point of #33.  The other rows are
+        ; the charge window takes priority.  While OT6_PIPTAIL runs, the cell
+        ; follows the character who just spent BP even if a menu is open for
+        ; someone else: one cell can only show one row, and the drop landing on
+        ; the resolution frame is the point of #33.  The other rows are
         ; re-staged at the next window open (Ot6PipGlyph_ext), and the tail
         ; is ~half a second, so a boost being composed elsewhere gets its
         ; arrow back immediately after.
@@ -1399,7 +1398,7 @@ OT6_RANDMAGIC := $a5            ; the marker value (junk is $00/$ff in
         ply
         plx
         rts
-@pips:  lda     OT6_BP_CLASS,y  ; the FULL bank (see the block comment)
+@pips:  lda     OT6_BP_CLASS,y  ; the full bank (see the block comment)
         cmp     #$06
         bcc     :+
         lda     #$05
@@ -1425,16 +1424,16 @@ OT6_RANDMAGIC := $a5            ; the marker value (junk is $00/$ff in
 
 ; [ stage the costed-list MP wallet (#35: current MP where the costs are) ]
 ;
-; while a costed ability list is open -- the tools shell (menu state $30:
-; Blitz, Bushido, and real Tools) or the Dance list (#34) -- the actor's
-; CURRENT MP is painted as [M][P][d][d][d] into the list window's top row,
+; while a costed ability list is open (the tools shell, menu state $30:
+; Blitz, Bushido, and real Tools, or the Dance list, #34) the actor's
+; current MP is painted as [M][P][d][d][d] into the list window's top row,
 ; right side: map words $7c16-$7c1a, i.e. row 0 cols 22-26 of the $7c00
 ; ability-list map (measured live, probe_wallet: the list rows stage at
 ; $7c00 rows 1/3/5/7 cols 2-26, row 0 is never staged and renders legibly
-; on the window's top edge).  the value is read from $3c08 -- the very cell
-; CalcAttackEffect's universal charge debits -- so the wallet drops on the
-; exact frame the queued verb's cost is paid (#33's clockwork rule for
-; free).  cells stage here in the main loop; the nmi flush paints them
+; on the window's top edge).  the value is read from $3c08, the cell
+; CalcAttackEffect's universal charge debits, so the wallet drops on the
+; frame the queued verb's cost is paid, which is #33's clockwork rule with
+; no extra work.  cells stage here in the main loop; the nmi flush paints them
 ; every frame and one-shot-blanks on close/switch, so a follow-up Magic or
 ; Item list never inherits a stale wallet.
 ; a8/i16, db=$7e.  clobbers a; preserves x/y.
@@ -1461,7 +1460,7 @@ OT6_RANDMAGIC := $a5            ; the marker value (junk is $00/$ff in
         longa
         and     #$00ff
         tax
-        lda     $3c08,x         ; current MP -- the charge's own cell
+        lda     $3c08,x         ; current MP: the charge's own cell
         cmp     #999+1
         bcc     :+
         lda     #999            ; display cap (three digits)
@@ -1544,18 +1543,18 @@ OT6_RANDMAGIC := $a5            ; the marker value (junk is $00/$ff in
 ; [ re-render the open magic list when boost moved ]
 
 ; polled once per frame from the battle main loop just before the
-; menu-text pump. runs menu state $0d's WORK — clear the line
+; menu-text pump. runs menu state $0d's work (clear the line
 ; transfer buffer, stage the four visible row-pairs from the scroll
-; top, arm each line's vram transfer — without its completion
-; transitions (those queue window-flow steps that eventually walk
-; the window shut; re-entering the state taught us that the hard
-; way). the re-staged rows run through Ot6PreviewList_ext, so the
+; top, arm each line's vram transfer) without its completion
+; transitions, which queue window-flow steps that eventually walk
+; the window shut; re-entering the state closed the window. the
+; re-staged rows run through Ot6PreviewList_ext, so the
 ; fold preview redraws with the current pending; the window stays
 ; parked in browse the whole time. a8/i16, db = $7e.
 
 ; the staging routines are jsr-linkage C1 locals; call them from here
-; with the rts->rtl thunk: [bank][ret16][thunk16] on the stack, jml —
-; their rts lands on Ot6C1Rtl, whose rtl comes home.
+; with the rts->rtl thunk: [bank][ret16][thunk16] on the stack, then jml;
+; their rts lands on Ot6C1Rtl, whose rtl returns here.
 .macro jsr_c1 target
         phk
         pea     :+ -1
@@ -1607,12 +1606,12 @@ OT6_RANDMAGIC := $a5            ; the marker value (junk is $00/$ff in
 @drop:  lda     f:$7e0000+OT6_RESTAGE
         bmi     :+              ; $80 = cycle never started: $7ba5 not ours
         ; a started cycle (flag 1-3) ends here, complete or abandoned.  the
-        ; staging byte $7ba5 is SHARED: every window-open state trusts
+        ; staging byte $7ba5 is shared: every window-open state trusts
         ; `lda $7ba5 / bmi` to mean "my own init already ran" (OpenMagicWindow
-        ; @57c4, MakeToolsList_04 @58be, ...).  an abandoned cycle strands it
-        ; at $81-$83, so the NEXT list to open skips its init and draws only
-        ; the cycle's remaining 4-n lines over n of OUR stale magic rows --
-        ; issue #36's "Tools shows Cure 2".  hand the byte back CLOSED; a
+        ; @57c4, MakeToolsList_04 @58be, ...).  an abandoned cycle leaves it
+        ; at $81-$83, so the next list to open skips its init and draws only
+        ; the cycle's remaining 4-n lines over n stale magic rows, which was
+        ; issue #36's "Tools shows Cure 2".  hand the byte back closed; a
         ; complete cycle already left it 0 and the stz is a no-op.
         stz     $7ba5
 :       lda     #$00            ; cycle complete (or abandoned mid-way)
@@ -1653,7 +1652,7 @@ OT6_RANDMAGIC := $a5            ; the marker value (junk is $00/$ff in
         and     #$0006
         tax
         shorta0
-        lda     f:$7e3e9c,x     ; bp -- the FULL bank (#33): the staged cell
+        lda     f:$7e3e9c,x     ; bp: the full bank (#33).  the staged cell
                                 ;   agrees with the live painter, which shows
                                 ;   a committed spend at full strength until
                                 ;   Ot6ActionEnd's charge lands (the old
@@ -1676,44 +1675,44 @@ OT6_RANDMAGIC := $a5            ; the marker value (junk is $00/$ff in
 
 ; per-species shield + class-weakness overrides: bosses get authored
 ; counts, marked trash gets flavor, and shields 0 means explicitly
-; shieldless (no display — whelk's shell stays the wrong answer, exactly
-; as vanilla intended; scripted set-pieces draw no gauge: a silent hud
-; says "this one is theater"). format: .word species id (monster prop
-; offset / 32), .byte shields, .byte class weaknesses; $ffff terminates.
-; unlisted species use the 2 + level/8 formula and carry no class
-; weakness. elemental rows are NOT here — vanilla element bits stay in
-; monster data, and the element ADDS in bosses-wob.md are m6 data entry.
+; shieldless (no display; whelk's shell stays the wrong answer, as
+; vanilla intended, and scripted set-pieces draw no gauge, so a blank hud
+; means the fight is not a break fight). format: .word species id (monster
+; prop offset / 32), .byte shields, .byte class weaknesses; $ffff
+; terminates.  unlisted species use the 2 + level/8 formula and carry no
+; class weakness. elemental rows are not here: vanilla element bits stay in
+; monster data, and the element adds in bosses-wob.md are m6 data entry.
 ; shields/classes follow docs/design/bosses-wob.md v1; deviations:
 ;   - lobo keeps 3 (authored pre-bosses-wob; the doc proposes 2)
-;   - piranha and iron fist wear their boss-block's class row (the doc
+;   - piranha and iron fist take their boss-block's class row (the doc
 ;     gives fight-level rows, not per-add rows): judgment calls.
-;   - guardian/tritoch: multiple records each, WoB story order can't
-;     tell them apart from here — ALL drawn shieldless for the WoB;
+;   - guardian/tritoch: multiple records each, and WoB story order cannot
+;     tell them apart from here, so all are drawn shieldless for the WoB;
 ;     the WoR pass must re-author the real WoR fights' records.
 ;
 ; not a deviation, but it reads like a gap: kefka has one row and the
-; imperial camp gags are NOT it — they need none. $14a is
+; imperial camp gags are not it, because they need none. $14a is
 ; MONSTER::KEFKA_NARSHE (const.inc:1222), and it appears in exactly two
-; of the 576 formation records — 489 and 505 — with `battle 57` -> group
+; of the 576 formation records, 489 and 505, with `battle 57` -> group
 ; 57 -> 505 the narshe defense. the camp gags run `battle 56`
-; (event_main.asm:40683 and :40743) -> group 56, whose two slots BOTH
-; point at formation 504 — and 504 has no monster in it: present mask $00
+; (event_main.asm:40683 and :40743) -> group 56, whose two slots both
+; point at formation 504, and 504 has no monster in it: present mask $00
 ; and all six id slots the $01ff empty sentinel (battle_monsters.dat
 ; +$1d88 = 00 00 ff ff ff ff ff ff 00 00 00 00 00 00 3f; the mask is
 ; rolled into $3aa8 at battle_main.asm:7692, and the sentinel skips
-; LoadMonsterProp at :7718). nothing is loaded, so Ot6SeedShields —
-; reached only from the monster/rage load — never sees them. what those
+; LoadMonsterProp at :7718). nothing is loaded, so Ot6SeedShields, which
+; is reached only from the monster/rage load, never sees them. what those
 ; fights run on instead is character ai: battle_prop.dat +$7e0 sets $2f49
 ; bit 7 with $2f4a = $04 (LoadBattleProp :7994, dispatch :7813), script
 ; kefka_imp_camp_1, whose slot 0 is
-; CHAR_PROP::KEFKA_1|CHAR_AI_FLAG_ENEMY_CHAR (char_ai.asm:163) — the
+; CHAR_PROP::KEFKA_1|CHAR_AI_FLAG_ENEMY_CHAR (char_ai.asm:163); the
 ; event has already dressed a party slot as him (char_prop VICKS,
 ; KEFKA_1, event_main.asm:40675; CHAR::VICKS = 15, CHAR_PROP::KEFKA_1 =
 ; $29) and revives that actor between rounds (clr_status VICKS, DEAD /
 ; max_hp VICKS, :40739) because he has character hp. gauging a character
 ; actor would be a per-formation feature, not a table row.
 ;
-; this comment used to say vanilla shared ONE species between the camp
+; this comment used to say vanilla shared one species between the camp
 ; and narshe and that the camp fights "inherited" the $14a row. they
 ; cannot: the camp has its own id ($16f, MONSTER::KEFKA_IMP_CAMP,
 ; const.inc:1259) and even that is only the actor's ai script, never a
@@ -1735,16 +1734,17 @@ Ot6ShieldTbl:
                                 ;   m1 authored $0135, the WoR
                                 ;   presenter's head, so the real head
                                 ;   had been seeding by formula (2).
-                                ;   note: $0134 has NO vanilla fire
-                                ;   weak — the tutorial's fire probe
-                                ;   is an m6 element ADD, not vanilla
+                                ;   note: $0134 has no vanilla fire
+                                ;   weak; the tutorial's fire probe
+                                ;   is an m6 element add, not vanilla
         .word   $0064
         .byte   4, OT6_PIERCE   ; marshal: mog's fight, mog's class
         ; mt. kolts / lete river
         ; ---- mt. kolts trash: the v0.3 rows that make the break happen.
-        ; all three carry TWO shields, and that number is the finding, not
-        ; a taste. a break only opens a WINDOW if the target still has more
-        ; hp than the breaking hit; the breaking hit is 4x base through the
+        ; all three carry two shields, and that number is a measurement
+        ; rather than a preference. a break only opens a window if the target
+        ; still has more hp than the breaking hit; the breaking hit is 4x base
+        ; through the
         ; element channel (vanilla weak x2, no Ot6ShieldedDmg because the
         ; shields are already gone, then Ot6BrokenDmg x2) and 2x through
         ; the class one. so the count is really "how late does the break
@@ -1761,55 +1761,55 @@ Ot6ShieldTbl:
         ;
         ; the formula's 3 is one chip too many: by the time the last shield
         ; falls the party has already spent the monster, so the break lands
-        ; on a corpse -- which is exactly what "breaks 6/6, uptime 1 frame"
+        ; on a corpse, which is what "breaks 6/6, uptime 1 frame"
         ; meant in measurements #5 and #6, restated with a cause. and 1 is
-        ; one too few for the ELEMENT channel: with no chip to soften it
+        ; one too few for the element channel: with no chip to soften it
         ; first, 4x base (bio blaster measures ~87 a target on a poison-weak
-        ; body, so ~350) simply exceeds a 270-hp tusker outright and the
+        ; body, so ~350) exceeds a 270-hp tusker outright and the
         ; break is the kill again. 2 is the count where the loop exists.
         ;
         ; brawler takes 2 for consistency with its pool-mates, and it is
-        ; the one authored species whose window does NOT open at it: 137 hp
+        ; the one authored species whose window does not open at it: 137 hp
         ; against an 84-point breaking hit has the margin in principle, but
-        ; terra and locke spend it before edgar's SECOND swing lands, and
+        ; terra and locke spend it before edgar's second swing lands, and
         ; with one chipper against a pair the two chips often land on
         ; different brawlers and neither breaks. measured, `boost3`: 2.0
         ; chips, 0 breaks. what would close it is a slashing carrier whose
-        ; per-hit damage is small enough to chip twice cheaply -- cyan's
-        ; flurry, edgar's chainsaw -- and neither exists at mt. kolts. the
+        ; per-hit damage is small enough to chip twice cheaply (cyan's
+        ; flurry, edgar's chainsaw), and neither exists at mt. kolts. the
         ; row still buys the reveal, the chips, and (when mashed, where
         ; edgar swings the blade every turn) a real break: 3.0 chips, 1.0
-        ; breaks. it is coverage plus a lesson, not a window; said plainly
-        ; rather than tuned until the number looked right.
+        ; breaks. it is coverage and a teaching case rather than a window,
+        ; recorded as it measured rather than tuned to look right.
         .word   $000b
-        .byte   2, OT6_SLASH    ; brawler: the mountain's one CLASS row,
+        .byte   2, OT6_SLASH    ; brawler: the mountain's one class row,
                                 ;   and the only one on the stretch. it
-                                ;   is here because brawler ABSORBS
+                                ;   is here because brawler absorbs
                                 ;   poison (monster_prop.dat +$0177 =
                                 ;   $08), so the bio-blaster answer the
-                                ;   rest of mt. kolts teaches would HEAL
+                                ;   rest of mt. kolts teaches would heal
                                 ;   it, and its vanilla ice (+$0179 =
                                 ;   $02) has no wielder until celes.
                                 ;   slash, not pierce, because slash is
                                 ;   the scarce key: terra's mithril knife
-                                ;   and locke's dirk are both PIERCE
+                                ;   and locke's dirk are both pierce
                                 ;   (ot6_class.asm:49,:48) and so is
                                 ;   edgar's autocrossbow, while edgar's
                                 ;   mithril blade (:59) is the party's
-                                ;   ONLY slashing weapon -- so the answer
+                                ;   only slashing weapon, so the answer
                                 ;   to a brawler is edgar closing the
                                 ;   tools menu, which is a move nothing
                                 ;   else on this mountain asks for.
                                 ;   the class channel is also the only one
-                                ;   on this mountain that CAN hold a
+                                ;   on this mountain that can hold a
                                 ;   window: Ot6ClassChip takes no vanilla
                                 ;   weak x2, so the breaking hit is 2x
                                 ;   base, and edgar's blade measures ~42
-                                ;   base here -- ~84 against 137 hp fits,
+                                ;   base here, so ~84 against 137 hp fits,
                                 ;   where fire (~110 base -> ~440) and the
                                 ;   bio blaster (~87 -> ~350) do not.
         .word   $0086
-        .byte   2, $00          ; cirpius: SHIELDS ONLY, no class byte --
+        .byte   2, $00          ; cirpius: shields only, no class byte;
                                 ;   its weakness is the poison row in
                                 ;   Ot6ElemAddTbl and this row exists
                                 ;   purely to take the count off the
@@ -1829,16 +1829,15 @@ Ot6ShieldTbl:
                                 ; species from Ot6HpScale. inert today
                                 ; (every band ships $10 = 1x) but real if
                                 ; the hp dial ever reopens, and it is why
-                                ; the four OVERWORLD species in this pass
-                                ; took Ot6ElemAddTbl rows only -- an
+                                ; the four overworld species in this pass
+                                ; took Ot6ElemAddTbl rows only: an
                                 ; element add carries no such exemption,
                                 ; so where a species needs a weakness but
                                 ; not a shield count, the element table is
                                 ; the cheaper instrument. these three need
                                 ; the count.
         .word   $0103
-        .byte   5, OT6_BLUDG    ; vargas: you couldn't break him without
-                                ;   the monk
+        .byte   5, OT6_BLUDG    ; vargas: not breakable without the monk
         .word   $014d
         .byte   2, OT6_SLASH    ; ipooh
         .word   $012c
@@ -1847,36 +1846,36 @@ Ot6ShieldTbl:
         .word   $0104
         .byte   5, OT6_PIERCE   ; tunnelarmor: mug and daggers
         .word   $014a
-        .byte   6, OT6_SLASH|OT6_PIERCE ; kefka: the NARSHE DEFENSE record
+        .byte   6, OT6_SLASH|OT6_PIERCE ; kefka: the Narshe defense record
                                 ;   only (MONSTER::KEFKA_NARSHE). the
                                 ;   imperial camp gags carry no monster
-                                ;   entity at all — see block comment
+                                ;   entity at all; see the block comment
         .word   $0044
         .byte   4, OT6_BLUDG    ; telstar
         .word   $001a
         .byte   2, OT6_PIERCE   ; doberman
         .word   $0106
-        .byte   6, OT6_BLUDG    ; ghosttrain: suplex is CORRECT now
+        .byte   6, OT6_BLUDG    ; ghosttrain: suplex is correct now
         .word   $0155
-        .byte   5, OT6_SLASH|OT6_BLUDG  ; rizopas: the coverage-rule poster child
+        .byte   5, OT6_SLASH|OT6_BLUDG  ; rizopas: the coverage rule's example
         .word   $0154
         .byte   1, OT6_SLASH|OT6_BLUDG  ; piranha: the chum wave
-        ; ---- the v0.6 BREAK-COVERAGE pass: class rows that close the
+        ; ---- the v0.6 break-coverage pass: class rows that close the
         ; fixed-party gaps the audit found across the three scenarios. every
-        ; species below was a FORMULA monster (no class weakness) whose
-        ; forced party could reach none of its vanilla/added ELEMENTS -- so
-        ; it was unbreakable by the exact party the game hands you. the fix
+        ; species below was a formula monster (no class weakness) whose
+        ; forced party could reach none of its vanilla/added elements, so
+        ; it was unbreakable by the party the game hands the player. the fix
         ; is a weapon class, chosen per that party (class chips ignore
         ; absorb/null, so the water/bolt these bodies absorb never matters).
         ; shields track the early-war trash/miniboss tier (2 basic, 3
-        ; elite). NOTE the trade: an Ot6ShieldTbl row exempts a species from
+        ; elite). note the trade: an Ot6ShieldTbl row exempts a species from
         ; Ot6HpScale, which the armor-line ElemAddTbl block deliberately
-        ; avoided -- but a class weakness has nowhere else to live, so
+        ; avoided, but a class weakness has nowhere else to live, so
         ; per-party breakability takes that trade here (HpScale ships 1x,
-        ; inert today). palette: armored soldiers read PIERCE (a blade finds
-        ; the gaps) + lightning where a party can conduct it; the Cyan SOLO
-        ; duel is SLASH (the samurai out-cuts them); Sabin's brawls add
-        ; BLUDG (a monk caves the plate). decode + rationale: bosses-wob.md.
+        ; inert today). palette: armored soldiers read pierce (a blade finds
+        ; the gaps) plus lightning where a party can conduct it; the Cyan solo
+        ; duel is slash (the samurai out-cuts them); Sabin's brawls add
+        ; bludg (a monk caves the plate). decode + rationale: bosses-wob.md.
         ;
         ; -- imperial soldier line --
         .word   $0001
@@ -1887,26 +1886,26 @@ Ot6ShieldTbl:
         .byte   3, OT6_PIERCE   ; templar: camp elite (b44); Shadow's throw
                                 ;   (pierce) / Bolt Edge (+bolt in ElemAddTbl)
         .word   $014e
-        .byte   3, OT6_SLASH    ; leader: Cyan SOLO Doma duel (b46). slash
-                                ;   only -- the samurai out-cuts the
+        .byte   3, OT6_SLASH    ; leader: Cyan solo Doma duel (b46). slash
+                                ;   only; the samurai out-cuts the
                                 ;   commander; no other party fights him, so
                                 ;   no unreachable '?' clutters the swordfight
         .word   $014f
         .byte   2, OT6_SLASH|OT6_BLUDG ; grunt: Doma courtyard defense (b13),
-                                ;   held by Cyan (slash) + Sabin (bludg) --
+                                ;   held by Cyan (slash) + Sabin (bludg);
                                 ;   neither reaches pierce/bolt, so the
                                 ;   palette bends to who holds the line
         .word   $0176
         .byte   3, OT6_SLASH|OT6_BLUDG ; cadet: same Doma defense (b14), same
                                 ;   two heroes, a bigger body
         .word   $0175
-        .byte   2, OT6_PIERCE   ; officer: Locke SOLO occupied South Figaro
-                                ;   (b9). pierce -- Locke's dagger is his one
+        .byte   2, OT6_PIERCE   ; officer: Locke solo occupied South Figaro
+                                ;   (b9). pierce: Locke's dagger is his one
                                 ;   key, so it is the one weakness shown
         .word   $0065
         .byte   2, OT6_SLASH|OT6_PIERCE ; trooper: Narshe defense waves. the
-                                ;   player-assigned 3-way split needs BOTH
-                                ;   classes -- slash for a Cyan/Sabin squad,
+                                ;   player-assigned 3-way split needs both
+                                ;   classes: slash for a Cyan/Sabin squad,
                                 ;   pierce for a Locke/Gau squad. keeps
                                 ;   vanilla poison (the Edgar squad's key)
         .word   $003f
@@ -1915,38 +1914,38 @@ Ot6ShieldTbl:
                                 ;   so Shadow's Fire Skean still breaks it on
                                 ;   the Phantom Train
         .word   $009f
-        .byte   3, OT6_SLASH|OT6_PIERCE ; heavyarmor: Locke SOLO S.Figaro
-                                ;   guards (b11 -> pierce) AND a Narshe wave
+        .byte   3, OT6_SLASH|OT6_PIERCE ; heavyarmor: Locke solo S.Figaro
+                                ;   guards (b11 -> pierce) and a Narshe wave
                                 ;   (formation 88 -> slash for a Cyan/Sabin
                                 ;   squad). keeps vanilla bolt|water + poison
         .word   $013a
-        .byte   2, OT6_PIERCE   ; merchant: Locke SOLO disguise fight (b10). a
-                                ;   civilian with NO vanilla weakness at all,
+        .byte   2, OT6_PIERCE   ; merchant: Locke solo disguise fight (b10). a
+                                ;   civilian with no vanilla weakness at all,
                                 ;   unbreakable by anyone before this row;
                                 ;   pierce is Locke's dagger, kept simple
         ; -- Serpent Trench (Sabin + Cyan + Gau). the trio's ring is
-        ; BLUDGEON + SLASH, and that is the whole ring -- corrected in the
+        ; bludgeon and slash, and that is the whole ring, corrected in the
         ; v0.6 pass (issue #23) after the earlier "three keys, three
         ; creatures" claim turned out to rest on a wielder that does not
         ; exist. decoded, not recalled: Gau cannot equip Hardened ($28 is a
         ; katana whose equip mask reads $8008 = Shadow + Merit Award only, at
-        ; item_prop_en.dat[$28*30]+1), his ONLY legal weapon in the entire
-        ; game is the Imp Halberd $24 -- which IS pierce (ot6_class.asm:86)
-        ; but is stocked by ZERO of the 128 shop records and is a WoB-late
+        ; item_prop_en.dat[$28*30]+1), his only legal weapon in the entire
+        ; game is the Imp Halberd $24, which is pierce (ot6_class.asm:86)
+        ; but is stocked by none of the 128 shop records and is a WoB-late
         ; treasure, so it cannot be in the bag on a scenario that runs on
-        ; rails -- and bare-handed his Fight reads item $ff = empty hand =
+        ; rails, and bare-handed his Fight reads item $ff = empty hand =
         ; OT6_BLUDG (ot6_class.asm:163). Sabin brings fists and Pummel/
         ; Suplex/Bum Rush (bludg) plus claws (slash), Cyan brings katanas
-        ; and all eight SwdTechs (slash). NOBODY here pierces.
+        ; and all eight SwdTechs (slash). nobody here pierces.
         ;
         ; so one key each is arithmetically impossible with two keys, and
-        ; the workable shape is 2 bludg + 1 slash -- which is also the party's
+        ; the workable shape is 2 bludg + 1 slash, which is also the party's
         ; own shape (two bludgeon wielders, one slash specialist), so every
         ; member's A button still answers a creature. all three absorb water
         ; and their vanilla element (bolt/fire) is dead or L15-gated for
         ; this party, so class is the only reliable break; the vanilla bits
         ; stay for a later party that carries the element.
-        ; the failure worth remembering is the RATIONALE, not the byte: the
+        ; what went wrong was the rationale rather than the byte: the
         ; byte was authored to a wielder claim that was recalled instead of
         ; decoded. (bosses-wob.md "Serpent Trench".)
         .word   $003a
@@ -1958,18 +1957,18 @@ Ot6ShieldTbl:
         .word   $0059
         .byte   2, OT6_BLUDG    ; aspik: a constrictor, crushed by a monk's
                                 ;   fists. was PIERCE, authored to a Gau
-                                ;   "fanged strike" that bludgeons -- a dead
+                                ;   "fanged strike" that bludgeons: a dead
                                 ;   row for the only party that fights it
                                 ;   (vanilla fire needs L15)
         ; zozo / opera / the factory
         ; ---- the v0.4 ZOZO TOWN pass: four poison-trash rows, shields only.
-        ; the search-for-terra party is LOCKE+CELES+EDGAR+SABIN -- TERRA IS
-        ; GONE, she is the search target -- so there is no native fire at all,
+        ; the search-for-terra party is Locke+Celes+Edgar+Sabin, and Terra is
+        ; gone, being the search target, so there is no native fire at all,
         ; and poison = edgar's bio blaster is the town's break key. every town
         ; thug is ALREADY poison-weak in vanilla (slamdancer $052, harvester
         ; $04e, gabbldegak $0df, hadesgigas $053), so unlike the kolts pass this
-        ; is NOT an element add: the weakness is there and reachable, and what
-        ; the formula got wrong is the shield COUNT. these are L15-16 trash, so
+        ; is not an element add: the weakness is there and reachable, and what
+        ; the formula got wrong is the shield count. these are L15-16 trash, so
         ; 2 + level/8 seeds 3 (gabbldegak/slamdancer, L15) or 4 (harvester/hades-
         ; gigas, L16). swept live on zozo_arrival (map 221) with bal_party's
         ; BUFF_SHIELDS, boost3, 6 battles a cell:
@@ -1979,19 +1978,19 @@ Ot6ShieldTbl:
         ;   3         6/6     554         0.17             89-100% (corpse)
         ;   2         6/6     433         1.83             62-84% (WINDOW)
         ;
-        ; the tanks are the tell: at the formula's 4, hadesgigas (1200 hp) and
-        ; harvester never broke at all, and the two-tank draw WIPED even the
-        ; loop -- MASH wipes 6/6 in this town (the terra-less party has no fire
+        ; the tanks show it: at the formula's 4, hadesgigas (1200 hp) and
+        ; harvester never broke at all, and the two-tank draw wiped even the
+        ; loop.  mashing wipes 6/6 in this town (the terra-less party has no fire
         ; and no reachable class weakness here, so holding A never chips), the
         ; loop 5/6. at 2 shields they break penultimate, the wipe becomes a
         ; clean win, and the loop takes 48% less damage than mashing does. this
         ; is measurement #8's kolts finding on a bigger body: the formula's
         ; count lands the break on a corpse, 2 is where the loop exists.
-        ; ABSORB/NULL re-check (+$17/+$18), the boss-row discipline: hadesgigas
-        ; absorbs EARTH and the rest absorb nothing; NONE of the four absorb or
+        ; absorb/null re-check (+$17/+$18), the boss-row discipline: hadesgigas
+        ; absorbs earth and the rest absorb nothing; none of the four absorb or
         ; null poison, so the count change never turns the town's answer sour.
         ; shields-only, no class byte (like cirpius/tusker): the answer is the
-        ; TOOL, never the A button -- see measurement #9.
+        ; tool rather than the A button; see measurement #9.
         .word   $0052
         .byte   2, $00          ; slamdancer (map 225 sibling of the measured
                                 ;   pool, bracketed by $04e 428hp / $0df 350hp)
@@ -2030,17 +2029,17 @@ Ot6ShieldTbl:
         ; route section authored off the generated floor. survey, arithmetic and
         ; per-formation reading: docs/design/break-coverage-vector.md.
         ;
-        ; THE PROBLEM this replaces: in the deepest third of the facility
+        ; The problem this replaces: in the deepest third of the facility
         ; (group 106, maps 271/273) the generated floor answered 100% of
-        ; encounters with SLASH -- Gobbler by outright default, Rhinox by a
-        ; `rhino` keyword that fired on the wrong body -- and the dungeon
+        ; encounters with slash (Gobbler by default, Rhinox by a
+        ; `rhino` keyword that fired on the wrong body) and the dungeon
         ; hands the player four swords on the way in. Nothing was unbreakable
-        ; (the floor works); the failure was that "hold A" was the whole game.
+        ; (the floor works); the problem was that "hold A" was the whole game.
         ;
-        ; THE SHAPE: vanilla already labels six of the ten random-pool bodies
-        ; as machines -- exactly Garm/Commando/ProtoArmor/Pipsqueak/Trapper/
+        ; The shape: vanilla already labels six of the ten random-pool bodies
+        ; as machines (Garm/Commando/ProtoArmor/Pipsqueak/Trapper/
         ; Chaser carry a `Program NN` special-attack name, 6 of 384 in the
-        ; game -- so "the machines do not care about your sword" is a rule
+        ; game), so "the machines do not care about your sword" is a rule
         ; the player can guess before probing. bludgeon carries the section,
         ; pierce is the second key on the imperial line, slash comes off the
         ; machines, and ¤ sits the beat out (Setzer is flying the getaway, so
@@ -2053,21 +2052,21 @@ Ot6ShieldTbl:
         ; (recomputed from sub_battle_group/rand_battle_group/battle_monsters
         ; at authoring time, not copied from the survey.)
         ;
-        ; REACHABILITY, and the one hard demand: 33.04% of draws become
+        ; Reachability, and the one firm requirement: 33.04% of draws become
         ; bludgeon-only on the class axis, and every one of them except the
         ; Rhinox pair keeps a reachable vanilla element (ProtoArmor/Trapper
         ; bolt = Ramuh, owned since Zozo; Flan fire and the Mag Roaders'
         ; fire/ice = Ifrit and Shiva, both awarded upstream of the ride).
-        ; formation $168 -- Rhinox x2, 8.93% of all draws -- is the one that
+        ; formation $168 (Rhinox x2, 8.93% of all draws) is the one that
         ; blunt instruments alone answer, because Rhinox has no vanilla
-        ; weakness AND ABSORBS BOLT ($075 +$17 = $04), the element the rest
+        ; weakness and absorbs bolt ($075 +$17 = $04), the element the rest
         ; of the facility teaches. that is deliberate: Sabin's fists and
         ; Blitz cost nothing to bring, Gau's fists likewise, and Locke's
         ; Full Moon / Celes' Flail are on sale in four towns before the walk.
         ;
-        ; SHIELD COUNTS: all twelve at 2 against a formula value of 4 (L18/19
-        ; both give 2 + level/8 = 4). UNMEASURED and said plainly -- this is
-        ; precedent-following, not a sweep: the Mt. Kolts and Zozo balance
+        ; Shield counts: all twelve at 2 against a formula value of 4 (L18/19
+        ; both give 2 + level/8 = 4). UNMEASURED: this follows precedent
+        ; rather than a sweep.  the Mt. Kolts and Zozo balance
         ; passes (where a 1200-hp HadesGigas went 4 -> 2) both found
         ; independently that the formula's count
         ; lands the break on a corpse. Landing this wants a Vector entry-point
@@ -2076,89 +2075,89 @@ Ot6ShieldTbl:
         ; count breaks later). break-coverage-vector.md §8.2/§10.3.
         .word   $00cb
         .byte   2, OT6_PIERCE|OT6_BLUDG ; garm: a magitek quadruped
-                                ;   (Program 95), not a hound -- pierce the
+                                ;   (Program 95) rather than a hound: pierce the
                                 ;   joints or cave the housing. commonest
                                 ;   body at the entrance, where the section
                                 ;   teaches its rule, so it teaches both
                                 ;   halves. keeps vanilla bolt|water
         .word   $00c7
         .byte   2, OT6_PIERCE   ; commando: imperial rank keeps the imperial
-                                ;   answer -- templar $0002 and officer
-                                ;   $0175 are both pierce above. consistency,
-                                ;   not novelty
+                                ;   answer: templar $0002 and officer
+                                ;   $0175 are both pierce above, so this is
+                                ;   consistent with them
         .word   $0165
         .byte   2, OT6_BLUDG    ; protoarmor: a sealed suit has no seam to
-                                ;   put a point in; you dent it. retires
-                                ;   pierce so the armored MACHINE and the
-                                ;   armored MAN stop having one answer.
+                                ;   put a point in, so it dents. retires
+                                ;   pierce so the armored machine and the
+                                ;   armored man stop having one answer.
                                 ;   vanilla bolt stays the ranged key
         .word   $0041
         .byte   2, OT6_PIERCE   ; pipsqueak: the swarm body, up to x5 and
                                 ;   22% of all bodies in the section. pierce so
-                                ;   Edgar's AutoCrossbow -- whole enemy side,
-                                ;   chipping per hit -- is the designed
+                                ;   Edgar's AutoCrossbow (whole enemy side,
+                                ;   chipping per hit) is the designed
                                 ;   answer to a five-stack
         .word   $0047
-        .byte   2, OT6_BLUDG    ; flan: you cannot cut an ooze (keeps the
+        .byte   2, OT6_BLUDG    ; flan: an ooze cannot be cut (keeps the
                                 ;   generator's own read). its element is
                                 ;   fire, which the Flame Sabre two maps
                                 ;   upstream and Ifrit's magicite both
-                                ;   supply -- and this pool is the floor
+                                ;   supply, and this pool is the floor
                                 ;   Ifrit & Shiva are fought on
         .word   $0066
         .byte   2, OT6_PIERCE|OT6_BLUDG ; general: an officer in plate.
-                                ;   vanilla poison answers him IF Edgar was
+                                ;   vanilla poison answers him if Edgar was
                                 ;   picked (Bio Blaster is his Tool); the
                                 ;   class row is what makes him breakable
-                                ;   when he wasn't
+                                ;   when Edgar was not picked
         .word   $002d
         .byte   2, OT6_BLUDG    ; trapper: a fixed trap mechanism (Program
-                                ;   18) -- you smash a device, you do not
-                                ;   stab it. comes x3, vanilla bolt|water
+                                ;   18): a device is smashed rather than
+                                ;   stabbed. comes x3, vanilla bolt|water
                                 ;   backs it up
         .word   $00a0
         .byte   2, OT6_PIERCE|OT6_BLUDG ; chaser: 1202 hp, the widest break
-                                ;   window in the section, on the ESCAPE map
+                                ;   window in the section, on the escape map
                                 ;   where no shop trip is possible mid-
                                 ;   sequence. two keys so whatever three
                                 ;   walked out of the tube room hold one
         .word   $0088
         .byte   2, OT6_SLASH|OT6_PIERCE ; gobbler: no vanilla weakness at
-                                ;   all, so this row is its ONLY key. the
-                                ;   one soft body in a dungeon of machines
-                                ;   -- cut it or stick it. deliberately the
+                                ;   all, so this row is its only key. the
+                                ;   one soft body in a dungeon of machines:
+                                ;   cut it or stick it. deliberately the
                                 ;   section's slash target, placed in the
                                 ;   deepest pool so the blade has work in
                                 ;   the room where the machines stopped
                                 ;   caring about it
         .word   $0075
-        .byte   2, OT6_BLUDG    ; rhinox: THE FLAGSHIP. no weakness of any
-                                ;   kind AND it absorbs bolt, so the answer
-                                ;   the rest of the facility teaches would
-                                ;   HEAL it. armoured bulk with no seam ->
+        .byte   2, OT6_BLUDG    ; rhinox: the section's main case. no weakness
+                                ;   of any kind, and it absorbs bolt, so the
+                                ;   answer the rest of the facility teaches
+                                ;   would heal it. armoured bulk, no seam, so
                                 ;   bludgeon, and bludgeon alone: the one
                                 ;   body in the section that asks the player to
                                 ;   have brought a blunt instrument, and the
                                 ;   reason to bring Sabin
         .word   $0006
         .byte   2, OT6_BLUDG    ; mag roader (minecart, 5 forced fights): a
-                                ;   thing on wheels -- you smash the wheel.
-                                ;   its vanilla FIRE stays the reward for
+                                ;   thing on wheels: smash the wheel.
+                                ;   its vanilla fire stays the reward for
                                 ;   reading the fight (Ifrit, or the Flame
-                                ;   Sabre) and its ICE ABSORB stays a trap
+                                ;   Sabre) and its ice absorb stays a trap
         .word   $00af
         .byte   2, OT6_BLUDG    ; mag roader (the other one): same creature,
-                                ;   same class -- the ELEMENT is what
+                                ;   same class; the element is what
                                 ;   distinguishes the pair ($006 weak fire /
                                 ;   absorbs ice, $0af weak ice), and
                                 ;   formation $075 puts them in one fight so
                                 ;   the wrong splash heals half the screen.
                                 ;   flattening that onto the class axis
-                                ;   would waste the best puzzle in the section.
+                                ;   would lose the section's best puzzle.
                                 ;   NB both are named "Mag Roader", so the
                                 ;   name-keyed floor generator could not
-                                ;   have told them apart even if it wanted
-                                ;   to -- 15 names cover 42 species
+                                ;   have told them apart in any case:
+                                ;   15 names cover 42 species
         ; sealed gate / thamasa / the floating continent
         .word   $012e
         .byte   7, OT6_SLASH|OT6_PIERCE ; ultros 3: the row, third verse
@@ -2169,7 +2168,7 @@ Ot6ShieldTbl:
         .word   $0168
         .byte   7, OT6_SLASH|OT6_PIERCE ; ultros 4: one last time
         .word   $012f
-        .byte   4, OT6_BLUDG    ; chupon: no bludgeon, no bragging rights
+        .byte   4, OT6_BLUDG    ; chupon: bludgeon is the only key
         .word   $0113
         .byte   8, OT6_PIERCE   ; airforce
         .word   $0145
@@ -2181,8 +2180,8 @@ Ot6ShieldTbl:
                                 ; speck: any weapon in the game breaks it
         .word   $0117
         .byte   11, OT6_SLASH|OT6_PIERCE ; atmaweapon: the WoB final exam
-                                ;   (hud shield glyphs cap at 6 — display
-                                ;   saturates, the count is true)
+                                ;   (hud shield glyphs cap at 6, so the
+                                ;   display saturates but the count is true)
         .word   $0118
         .byte   5, OT6_SLASH|OT6_PIERCE ; nerapa: sprint fight, low gauge
         ; scripted set-pieces: no gauge drawn
@@ -2201,7 +2200,7 @@ Ot6ShieldTbl:
 ; break-floor class table: one class byte per species (0..383), directly
 ; indexed by species id. the @formula seed reads this as f:OT6_FLOOR_CLASS,x
 ; so an un-authored monster is still breakable by SOME weapon class.
-; GENERATED by tools/gen_break_floor.py -- do not edit the .inc by hand.
+; generated by tools/gen_break_floor.py; do not edit the .inc by hand.
         .include "ot6_break_floor.inc"
 
 ; shield-with-count glyph cells (counts 1-6)
@@ -2216,7 +2215,7 @@ Ot6PipCellTbl:
 Ot6ArrowCellTbl:
         .byte   $68,$6c,$6d
 
-; bg hud glyph cells (2bpp, verified junk-free in both formations —
+; bg hud glyph cells (2bpp, verified junk-free in both formations;
 ; probe_cells.lua rechecks candidates idle + post-action)
 Ot6BgGlyphCellTbl:
         .byte   $65
@@ -2255,27 +2254,27 @@ Ot6BgGlyphData:
 ; shield-6
         .byte   $7e,$00,$99,$7e,$a1,$7e,$b9,$7e
         .byte   $6a,$3c,$3c,$38,$18,$00,$00,$00
-; shield-broken -- the plain grey shield, no numeral, with a big white X
+; shield-broken: the plain grey shield, no numeral, with a big white X
 ; struck corner to corner across the whole cell. owner's call,
 ; 2026-07-30: "a big white X that just crosses the whole shield sprite
 ; area".
 ;
-; it was a shield with a 'B' in it, which reads as a 3 at HUD size. the
-; reason is structural, not a matter of drawing a better letter: all six
-; count glyphs share one silhouette -- full-width top bar, full-width
-; body, taper to a point -- and differ only in three interior rows, so
-; ANY symbol-inside-a-shield competes with the digits on interior detail
-; alone, inside a 6x6 interior. shield-B and shield-3 were byte-identical
-; on rows 0, 1 and 5.
+; it was a shield with a 'B' in it, which reads as a 3 at hud size. the
+; reason is structural rather than a matter of drawing a better letter:
+; all six count glyphs share one silhouette (full-width top bar,
+; full-width body, taper to a point) and differ only in three interior
+; rows, so any symbol inside a shield competes with the digits on
+; interior detail alone, inside a 6x6 interior. shield-B and shield-3
+; were byte-identical on rows 0, 1 and 5.
 ;
-; the X sidesteps that competition rather than trying to win it. it is
-; not a symbol placed INSIDE the shield -- it is drawn OVER the whole
+; the X avoids that competition rather than trying to win it. it is
+; not a symbol placed inside the shield; it is drawn over the whole
 ; tile, so its arms leave the silhouette at all four corners and land on
 ; the background. nothing else in the strip has ink out there, so the
 ; cell reads as struck-through before the eye resolves any detail.
 ;
 ; the arms run the full 8x8 on purpose. a 7x7 X with a true single-pixel
-; centre was drawn first, and it is the better X in isolation -- but odd
+; centre was drawn first, and it is the better X in isolation, but odd
 ; against this even-width shield it sits a half-pixel off centre and
 ; reads as scatter rather than a cross.
         .byte   $ff,$81,$c3,$7e,$a5,$7e,$99,$7e

@@ -11,7 +11,7 @@ local actor
 local cellSeen, cellFrames = {}, 0
 local markSeen, parkFrames = {}, 0
 
--- sfx request counters: boost feedback must be audible. each request is an
+-- sfx request counters: boost feedback must be audible. Each request is an
 -- inc (nonzero write) consumed by UpdateSfx's stz, so count nonzero writes.
 local sfx = { ching = 0, click = 0, error = 0 }
 local sfxRefs = {}
@@ -38,28 +38,26 @@ H.run({ maxFrames = 30000 }, {
   H.waitFrames(10),
   H.enterEncounter(),
   H.waitFrames(240),
-  -- issue #75: the actor used to be HANDED 3 bp and two party HP words
-  -- pinned to 500.  The bank is EARNED now: every character opens with 1
+  -- issue #75: the actor used to be handed 3 bp, with two party HP words
+  -- pinned to 500.  The bank is earned now: every character opens with 1
   -- bp (Ot6InitBP) and an unboosted action regens +1 (Ot6ActionEnd), so
   -- the first slot whose menu opens takes two real actions and arrives at
-  -- this test's window holding 3.  The action is HEAL FORCE (list row 3,
-  -- shared by all three riders' magitek lists) picked through the live
-  -- menu: it deals no damage -- the fight cannot end under the bank --
-  -- and it heals, so the party needs no pin to survive the extra rounds.
-  -- The submit is driven BY MENU STATE ($7BC2), not by a blind button
-  -- sequence -- measured: a fixed sequence lands its downs in whatever
-  -- window holds the cursor.  Three dead ends taught this shape its
-  -- choices: Heal Force (list row 3) leaves A refused forever -- the v0.8
-  -- wallet prices it out of the opening MP -- so the bank action is the
-  -- ROW-2 BEAM, the pick a plain A-mash was measured to land; the item
-  -- window is a trap twice over (the intro bag is EMPTY, and Wait mode
-  -- stops time while a list is open, so "A forever in $0a" freezes the
-  -- whole fight); and nobody else may act, so any OTHER ready character
-  -- defers focus with X, vanilla's own turn-cycling key.  Two beams into
-  -- shielded guards cannot end the fight (shielded damage is halved), and
-  -- each is an ordinary unboosted action: +1 bp (Ot6ActionEnd), twice,
-  -- on top of the 1 bp the actor opened with (Ot6InitBP).  $01 is
-  -- transitional (hands off); anything unknown gets B to back out.
+  -- this test's window holding 3.  The submit is driven by menu state
+  -- ($7BC2) rather than by a fixed button sequence, because a fixed
+  -- sequence was measured to land its downs in whatever window holds the
+  -- cursor.  Three measurements settled the choices here.  Heal Force
+  -- (list row 3, shared by all three riders' magitek lists) leaves A
+  -- refused, because the v0.8 wallet prices it out of the opening MP, so
+  -- the bank action is the row-2 beam, which is the pick a plain A-mash
+  -- was measured to land on.  The item window fails two ways: the intro
+  -- bag is empty, and Wait mode stops time while a list is open, so
+  -- holding A in state $0a freezes the fight.  And nobody else may act, so
+  -- any other ready character defers focus with X, vanilla's own
+  -- turn-cycling key.  Two beams into shielded guards cannot end the fight
+  -- (shielded damage is halved), and each is an ordinary unboosted action
+  -- worth +1 bp (Ot6ActionEnd), twice, on top of the 1 bp the actor opened
+  -- with (Ot6InitBP).  $01 is transitional, so the driver leaves the pad
+  -- alone; anything unknown gets B to back out.
   (function()
     local mf, downs = 0, 0
     return H.driveUntil(function()
@@ -115,14 +113,14 @@ H.run({ maxFrames = 30000 }, {
   H.call(function()
     H.assertEq(pend(actor), 3, "cap: spend at most 3 (and never past bp)")
   end),
-  -- live cell while boosting: the arrow-3 glyph, pulsing yellow/white, in
-  -- BOTH window bands (rows 1+2r and 9+2r — the visible copy alternates).
-  -- temporal sample (single frames can't see a pulse — or a strobe).
-  -- the same window checks that the RETIRED over-character sprite mark
-  -- stays retired: oam entry 96+slot must remain parked (y $e0).  It used
-  -- to carry the pending-3 tile $cc at attr $36, out of obj tiles that
-  -- turned out to be vanilla's damage-numeral vram -- the "chevrons turn
-  -- into numbers" bug; battle_dmgnum.lua is the dedicated test.
+  -- live cell while boosting: the arrow-3 glyph, pulsing yellow and white, in
+  -- both window bands (rows 1+2r and 9+2r; the visible copy alternates).
+  -- This is a temporal sample, because single frames cannot see a pulse or a
+  -- strobe.  The same window checks that the retired over-character sprite
+  -- mark stays retired: oam entry 96+slot must remain parked (y $e0).  It used
+  -- to carry the pending-3 tile $cc at attr $36, out of obj tiles that are
+  -- vanilla's damage-numeral vram, which caused the bug where chevrons turned
+  -- into numbers; battle_dmgnum.lua is the dedicated test.
   H.waitUntil(function()
     local reg = H.readByte(0x897f)
     local base = ((reg - (reg % 4)) * 256) * 2
@@ -154,8 +152,8 @@ H.run({ maxFrames = 30000 }, {
     local mparts, other = {}, 0
     for k, n in pairs(markSeen) do
       mparts[#mparts + 1] = k .. " x" .. n
-      -- tile/attr bytes are vanilla's leftovers now; only "is it on
-      -- screen" matters, and it never may be
+      -- tile/attr bytes are vanilla's leftovers now; only whether the entry
+      -- is on screen matters, and it never may be
       if k:sub(-3) == "yon" then other = other + n end
     end
     H.log("sprite mark states seen: " .. table.concat(mparts, ", "))

@@ -13,7 +13,7 @@ no per-tile map flag; the tilemap is untouched.
 (`ff6/src/event/event_trigger.asm:7-10`). The per-map blocks
 (`EventTrigger::_N`) are indexed by an auto-generated pointer table at
 `c4/0000` (`event_trigger.asm:19-22`), so inserting a record into a map's
-block is safe at assembly time — every downstream pointer recomputes.
+block is safe at assembly time, because every downstream pointer recomputes.
 
 ### The `SavePoint` event script (shared by all 38 save points in the game)
 
@@ -26,7 +26,7 @@ block is safe at assembly time — every downstream pointer recomputes.
 - the first save point the player ever touches (`$0133=0`) also shows the
   "eerie glow" info dialog `$000A`/`$06D4` (`:100759-100773`).
 
-`$01BF` is `$1EB7` bit 7 — the **save-enable bit**. It is consumed, not
+`$01BF` is `$1EB7` bit 7, the **save-enable bit**. It is consumed rather than
 stored: `OpenMainMenu` copies it into the menu-flags byte `$0201`
 (`ff6/src/field/menu.asm:229-235`), the Save command tests that flag
 (`ff6/src/menu/field_menu.asm:3641-3643`), and Tent/Sleeping Bag are gated
@@ -34,7 +34,8 @@ on the same bit 7 of `$0201` (`ff6/src/menu/item.asm:579-582`, the
 white/gray item-text gate; the field-side tent handler is the `cmp #$02`
 branch after `OpenMenu`, `field/menu.asm:236-240`). The bit is cleared again on every orthogonal step
 (`ff6/src/field/player.asm:532-534`); the diagonal-step gap in that clear is
-known and below-the-bar (`docs/research/vanilla-destructive-bugs.md` §9).
+known and is below the bar for fixing
+(`docs/research/vanilla-destructive-bugs.md` §9).
 
 ### The sparkle
 
@@ -61,8 +62,8 @@ game** (`ff6/src/field/init_npc_switch.dat` byte 6 bit 2), used by 30
 save-point NPCs, and **never written by any event** (`switch $0632=` appears
 nowhere in `event_main.asm`). A new save point can reuse it and needs no
 switch of its own. Map 240's save point instead uses `$06AE`, which the
-escape scene sets (`event_main.asm:96688`) — the pattern for a save point
-that must not exist before a story beat.
+escape scene sets (`event_main.asm:96688`); that is the pattern for a save
+point that must not exist before a story beat.
 
 ### The world map
 

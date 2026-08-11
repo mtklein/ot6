@@ -1,61 +1,62 @@
 -- @suite slow savestate=n024_entry
--- battle_subjob.lua -- M5 espers-as-sub-jobs, the FORK-INDEPENDENT core: an
--- equipped esper GRANTS its spells to the in-battle Magic list (additively), the
+-- battle_subjob.lua -- M5 espers-as-sub-jobs, the fork-independent core: an
+-- equipped esper grants its spells to the in-battle Magic list additively, the
 -- grant never teaches permanently, and level-up esper stat bonuses are gone.
 --
 -- Issue #75 conversion.  The old fixture poked char 0's equipped-esper byte
 -- ($161e) in the field, rewrote command lists, muddled the caster for
 -- menu-less casts, pinned guards, and handed bp/pending/MP.  On
--- n024_entry the inputs are real: RAMUH is genuinely owned ($1A69 bit 0,
+-- n024_entry the inputs are real: RAMUH is owned ($1A69 bit 0,
 -- gifted at Zozo and asserted in the alcove savestate), and it is equipped on
--- CELES through the REAL FIELD MENU (battle_magicite.lua's measured route:
+-- CELES through the real field menu (battle_magicite.lua's measured route:
 -- X -> Skills -> character -> Espers -> stone -> detail -> A).  Ramuh is
--- authored to base-tier Bolt ($02) + Rasp ($1a); Celes innately knows
--- NEITHER (scenario A reads her real no-esper list as the control), so any
--- Bolt/Rasp in her list is the grant's doing.  The fold cast goes through
--- her LIVE menu -- real R edges for the pending, real cursor walk to the
--- granted Bolt -- against the fixture's own boss, NUMBER 024.
+-- authored to base-tier Bolt ($02) and Rasp ($1a), and Celes innately knows
+-- neither (scenario A reads her real no-esper list as the control), so any
+-- Bolt or Rasp in her list comes from the grant.  The fold cast goes through
+-- her live menu, with real R edges for the pending and a real cursor walk to
+-- the granted Bolt, against the fixture's own boss, Number 024.
 --
--- Two hooks make this work, MEASURED necessary (probe_subjob): the in-battle
--- Magic list is COMPACTED to the union of party-known spells, so a borrowed
--- spell nobody knows has no slot at all -- Ot6UnionEspers (ot6.asm) seeds the
--- union with equipped espers' spells, and Ot6EsperSpellKnown then keeps each
--- one only for its esper's holder.
+-- Two hooks make this work, and probe_subjob measured both as necessary: the
+-- in-battle Magic list is compacted to the union of party-known spells, so a
+-- borrowed spell nobody knows has no slot at all.  Ot6UnionEspers (ot6.asm)
+-- seeds the union with equipped espers' spells, and Ot6EsperSpellKnown then
+-- keeps each one only for its esper's holder.
 --
--- SCENARIOS (independent loads; CONTRIBUTING: a quiet test is not a passing
--- test, so every positive carries its negative control):
---   A NEGATIVE  no esper: Celes's list has neither Bolt nor Rasp (== vanilla).
---   B GRANT     Ramuh: Bolt AND Rasp appear; the list is A's list PLUS exactly
---               {summon, Bolt, Rasp} -- additive, innate untouched; Bolt is
---               priced at vanilla MP (no double-charge); the summon slot is
---               registered ($3344,entity).
---   C FOLD      the granted Bolt cast with 2 real BP executes as Bolt3 ($0b)
---               via the fold, and since #64 is charged BOLT3's own 53 MP --
---               which also proves the untaught tier is CASTABLE and now a
+-- Scenarios (independent loads; per CONTRIBUTING, every positive carries its
+-- negative control):
+--   A negative  no esper: Celes's list has neither Bolt nor Rasp, as in
+--               vanilla.
+--   B grant     Ramuh: Bolt and Rasp appear; the list is A's list plus exactly
+--               {summon, Bolt, Rasp}, so it is additive with the innate list
+--               untouched; Bolt is priced at vanilla MP with no double-charge;
+--               and the summon slot is registered ($3344,entity).
+--   C fold      the granted Bolt cast with 2 real BP executes as Bolt3 ($0b)
+--               via the fold, and since #64 is charged Bolt3's own 53 MP,
+--               which also shows the untaught tier is castable and is now a
 --               purchase.  Her real 106-MP pool pays it; the bank is earned
---               (Ot6InitBP's 1 + one real item turn), the pending is two real
---               R edges, the cast a real cursor walk.  The charge is EXACT
---               (== 53): with the muddle apparatus gone there is no
---               trailing-cast noise, so the old >= bound sharpens.
---   D DELETIONS win a level-up with Ramuh: no esper stat bonus (Stamina AND
---               Mag.Pwr both flat in the persistent record -- vanilla Ramuh's
---               STAMINA_1 would bump stamina) and no spell learned (Bolt/Rasp
---               stay unlearned).
+--               (Ot6InitBP's 1 plus one real item turn), the pending is two
+--               real R edges, and the cast is a real cursor walk.  The charge
+--               is exactly 53: with the muddle apparatus gone there is no
+--               trailing-cast noise, so the old >= bound becomes an equality.
+--   D deletions win a level-up with Ramuh: no esper stat bonus (stamina and
+--               mag.pwr both flat in the persistent record, where vanilla
+--               Ramuh's STAMINA_1 would bump stamina) and no spell learned
+--               (Bolt and Rasp stay unlearned).
 --
---               *** LABELED ISOLATION ARM (owner ruling 2026-08-10, the
---               waiver-burndown plan names this exact arm). ***  No fixture
+--               Labeled isolation arm (owner ruling 2026-08-10; the
+--               waiver-burndown plan names this arm).  No fixture
 --               sits one real fight short of a level, the n024 maps are
---               measured encounter-free, and winning the boss by play is a whole
---               generator's job (gen_esper_tubes).  So this arm keeps two
---               memory-hack stagings, said loudly: the XP pin (one threshold
---               over, so the next win levels) and the lib's clearBattle win.
---               The ASSERTIONS still read only persistent-record facts the
---               level-up wrote.  Convert organically when a near-threshold
---               fixture exists.
+--               measured encounter-free, and winning the boss by play is a
+--               whole generator's job (gen_esper_tubes).  So this arm keeps
+--               two memory-hack stagings, recorded here: the XP pin (one
+--               threshold over, so the next win levels) and the library's
+--               clearBattle win.  The assertions still read only
+--               persistent-record facts the level-up wrote.  Convert
+--               organically when a near-threshold fixture exists.
 --
--- #62 strengthened D's stat half: Ramuh's while-worn row moves TWO stats
--- (+4 stamina, +2 mag.pwr) and NEITHER may ever reach the $16xx record, so D
--- reads both cells -- two independent windows onto the same rule.
+-- #62 strengthened D's stat half: Ramuh's while-worn row moves two stats
+-- (+4 stamina, +2 mag.pwr) and neither may ever reach the $16xx record, so D
+-- reads both cells, giving two independent views of the same rule.
 local H = dofile("tools/tests/lib/ot6.lua")
 local STATE = "build/states/n024_entry.mss.lua"
 
@@ -140,7 +141,7 @@ local function neededXp(L)
 end
 
 -- ------------------------------------------------ real field esper equip --
--- battle_magicite.lua's measured drive, verbatim shape
+-- battle_magicite.lua's measured drive, unchanged in shape
 local function listSeek(idx, what)
   local ph = 0
   return H.driveUntil(function()
@@ -365,7 +366,7 @@ local baseSet
 local R = {}
 
 H.run({ maxFrames = 150000 }, {
-  ----------------------------------------------------------------- A: NEGATIVE --
+  ----------------------------------------------------------------- A: negative --
   H.waitFrames(20),
   H.loadState(STATE),
   H.waitFrames(60),
@@ -396,9 +397,9 @@ H.run({ maxFrames = 150000 }, {
     H.log("[B] Ramuh celes list: " .. fmt(set))
     H.assertEq(has(set, BOLT), true, "Ramuh grants Bolt into the list")
     H.assertEq(has(set, RASP), true, "Ramuh grants Rasp into the list")
-    -- MULTISET diff base->Ramuh: additive means no innate entry removed, and
-    -- the only additions are Bolt, Rasp, and the esper's SUMMON slot (id =
-    -- esper index 0 -- which collides with Fire's 0, hence counting).
+    -- multiset diff base->Ramuh: additive means no innate entry was removed,
+    -- and the only additions are Bolt, Rasp, and the esper's summon slot
+    -- (id = esper index 0, which collides with Fire's 0, hence the counting).
     local function counts(t)
       local c = {}; for _, v in ipairs(t) do c[v] = (c[v] or 0) + 1 end; return c
     end
@@ -454,19 +455,18 @@ H.run({ maxFrames = 150000 }, {
       "granted Bolt at 2 real BP executed as Bolt3 ($0b) via the fold")
     H.assertEq(seen[(R.mp0 - BOLT3_MP) & 0xff], true,
       "[C] the pool was debited to exactly mp0-53 (the write watch)")
-    -- #64, sharpened to equality: no muddle noise remains, so the delta IS
-    -- Bolt3's own price.  This also settles the untaught-tier question in
-    -- the affirmative: an esper-GRANTED Bolt still reaches Bolt3, and pays
-    -- Bolt3's price for it.
+    -- #64, as an equality: no muddle noise remains, so the delta is
+    -- Bolt3's own price.  This also answers the untaught-tier question: an
+    -- esper-granted Bolt still reaches Bolt3, and pays Bolt3's price for it.
     H.assertEq(R.mp0 - mp1, BOLT3_MP,
       "the folded Bolt3 was charged Bolt3's own 53 MP -- an untaught tier "
       .. "is still reachable by folding, and is now a purchase (#64)")
     H.screenshot("subjob_fold")
   end),
 
-  ---------------------------------------------------------------- D: DELETIONS --
-  -- LABELED ISOLATION ARM -- see the header.  The equip is still real; the
-  -- XP pin and the lib's clearBattle win are the two memory-hack stagings
+  ---------------------------------------------------------------- D: deletions --
+  -- Labeled isolation arm; see the header.  The equip is still real, and the
+  -- XP pin and the library's clearBattle win are the two memory-hack stagings
   -- the owner ruling keeps for level-up mechanism decodes.
   H.loadState(STATE),
   H.waitFrames(60),

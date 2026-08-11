@@ -71,9 +71,9 @@ end
 -- Exact single-tile stepping (see gen_vector_sneak.lua for the measurement).
 local DELTA = { up = { 0, -1 }, right = { 1, 0 }, down = { 0, 1 }, left = { -1, 0 } }
 
--- Tap `dir` whenever the party has control, hands off while a scene owns
--- it, edge-A through dialogs.  Used to walk INTO a trigger whose scene then
--- takes over -- the tap keeps the party from sliding past the tile.
+-- Tap `dir` whenever the party has control, hold off while a scene controls
+-- it, edge-A through dialogs.  Used to walk into a trigger whose scene then
+-- takes over; the tap keeps the party from sliding past the tile.
 local function tapInto(dir, pred, maxFrames, what)
   local phase, n, ph, calm, hb = 0, 0, 0, 0, 0
   return H.driveUntil(function()
@@ -99,11 +99,11 @@ local function tapInto(dir, pred, maxFrames, what)
       end
       if phase == 0 then
         H.setPad({})
-        -- STOP TAPPING once we are where we were going.  The terminator
-        -- wants 16 consecutive calm frames on the target, and an eager tap
-        -- walks straight off it before the count gets there: the first
-        -- version of this rode the chute correctly to (10,45) and then
-        -- tapped itself to (10,46) and timed out.
+        -- Stop tapping once the party is on the target tile.  The
+        -- terminator needs 16 consecutive calm frames there, and a further
+        -- tap walks off it before the count completes: the first version of
+        -- this rode the chute correctly to (10,45), then tapped itself to
+        -- (10,46) and timed out.
         if pred() then return end
         if settled() then phase, n = 1, 0 end
         return
@@ -175,13 +175,13 @@ H.run({ maxFrames = 60000 }, {
 
   -- 1. onto {20,13} -> the lift -> map 266 -> map 272.
   --    The trigger is stepped onto with an explicit DOWN tap rather than a
-  --    navTo whose goal IS the trigger tile: navTo terminates on the party
+  --    navTo whose goal is the trigger tile: navTo terminates on the party
   --    coming to rest, and a tile that loads a map is one it never rests
-  --    on.  (Before #22 this step had a second reason -- a downward navTo
+  --    on.  (Before #22 this step had a second reason: a downward navTo
   --    step overshot by a tile, so navTo "arrived" at {20,13} from {20,14}
-  --    and the map never changed, measured at 219 frames.  That half is
-  --    fixed in the library now; the entry point-then-tap shape is not a
-  --    workaround, it is how a trigger tile is entered.)
+  --    and the map never changed, measured at 219 frames.  That part is
+  --    fixed in the library now; the entry-point-then-tap shape is how a
+  --    trigger tile is entered.)
   H.navTo(20, 12, { maxFrames = 15000, playBattles = "flee", arrive = function() return map() ~= 274 end }),
   tapInto("down", function() return map() ~= 274 end, 9000,
     "DOWN onto {20,13} -> the lift"),
@@ -206,16 +206,16 @@ H.run({ maxFrames = 60000 }, {
     H.screenshot("minecart_platform")
   end),
 
-  -- 1b. THE BOUNDARY DETOUR (issue #25).  This step is C->D's terminal, so
+  -- 1b. The boundary detour (issue #25).  This step is C->D's terminal, so
   --     before parking beside CID it stands on the platform save point at
-  --     {3,55} and asserts the minecart-platform-v1 boundary table -- the
+  --     {3,55} and asserts the minecart-platform-v1 boundary table, the
   --     same table gen_minecart_platform_checkpoint saves under and gen_n128's
-  --     checkpoint boot asserts as its ENTRY contract.  The sram witnesses
+  --     checkpoint boot asserts as its entry contract.  The sram witnesses
   --     are products of the boundary save, so the pre-save variant is
   --     asserted (lib/ot6_contract.lua).  (3,54) is a wall (measured); the
   --     tile is entered from the east.  Standing on a save tile re-enters
   --     SavePoint every frame and hasControl() flickers, so arrival is
-  --     judged on position + $01BF + alignment.
+  --     judged on position, $01BF and alignment.
   H.navTo(4, 55, { maxFrames = 9000, playBattles = "flee" }),
   (function() local calm = 0
     return H.driveUntil(function()
@@ -242,7 +242,7 @@ H.run({ maxFrames = 60000 }, {
 
   -- 2. park beside CID.  His {9,51} is occupied by his own object, so the
   --    entry point is whichever of its four neighbours the live object map
-  --    and tilemap leave open -- resolved here rather than read off an
+  --    and tilemap leave open.  It is resolved here rather than read off an
   --    obj_script, because _cc7f43's tail repositions him and the recon's
   --    {9,46} is NO PATH from the landing.
   H.call(function()
@@ -293,8 +293,8 @@ H.run({ maxFrames = 60000 }, {
     H.screenshot("minecart_entry")
   end),
   H.saveState("minecart_entry.mss"),
-  -- RELOAD-VERIFIED (gen_sabin_gau's pattern): capture-calm does NOT imply
-  -- reload-calm, so reload the parked moment and require it quiet.
+  -- Reload-verified (gen_sabin_gau's pattern): a calm capture does not imply
+  -- a calm reload, so reload the parked moment and require it quiet.
   H.call(function() verifyReq = H.requestSaveState() end),
   H.waitFrames(2),
   H.call(function()

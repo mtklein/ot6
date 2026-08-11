@@ -1,29 +1,29 @@
--- probe_fieldheal.lua -- LEARN the field Item/Use/target UI by driving it and
+-- probe_fieldheal.lua -- learn the field Item/Use/target UI by driving it and
 -- watching, so the input-driven routes can heal the party between steps
 -- with real presses (issue #75: inputs in, observations out; this probe
 -- writes nothing).
 --
 -- It boots vargas_entry.mss, which the input-driven Mt. Kolts route
 -- currently delivers with TERRA dead (0/94) and EDGAR on 1/145 and seven
--- Potions and five Tonics unspent -- exactly the state a player would open
--- the menu on.
+-- Potions and five Tonics unspent, the state a player would open the menu
+-- on.
 --
--- WHAT THE FIRST TWO PASSES ESTABLISHED (and where they went wrong):
+-- What the first two passes established, and where they went wrong:
 --   * ZMENUSTATE is DP $26, the shared cursor row is DP $4B.
---   * main menu is $05 with Item on row 0; ONE A lands on $08, which is the
---     item list itself -- there is no options window in front of it.
+--   * main menu is $05 with Item on row 0; one A lands on $08, which is the
+--     item list itself; there is no options window in front of it.
 --   * pass 1 tapped A repeatedly toward $08 and then pressed A again, which
---     entered $19 and would have SWAPPED two items (gen_sabin_gau uses that
+--     entered $19 and would have swapped two items (gen_sabin_gau uses that
 --     same state as move mode).  Pass 2 pressed one edge at a time and saw
---     $08 -> A -> $19 -> A -> $70, with EDGAR healed exactly +50 -- a Tonic,
---     the row the cursor happened to be on -- so one of $19/$70 is the
---     target cursor and the other is something pass 2 could not name.
--- This pass isolates that: it parks on a KNOWN row (Potion), presses A once,
+--     $08 -> A -> $19 -> A -> $70, with EDGAR healed exactly +50 (a Tonic,
+--     the row the cursor happened to be on), so one of $19/$70 is the
+--     target cursor and the other was not identified by pass 2.
+-- This pass isolates that: it parks on a known row (Potion), presses A once,
 -- screenshots, presses A once more, screenshots, and prints the inventory
 -- counts and the roster around every press.
 --
 -- Not a suite test: no `-- @suite` marker.  Run it directly, keeping the
--- artifacts so the windows can actually be looked at:
+-- artifacts so the windows can be inspected:
 --   OT6_KEEP_RUNS=1 OT6_NO_PUBLISH=1 tools/tests/run.sh tools/tests/probe_fieldheal.lua
 local H = dofile("tools/tests/lib/ot6.lua")
 local STATE = "build/states/vargas_entry.mss.lua"
@@ -118,8 +118,8 @@ H.run({ maxFrames = 60000 }, {
   press("a", 150, "enter Item"),
   snap("list"),
 
-  -- park on the POTION row: a heal of +250 (Potion) vs +50 (Tonic) is how
-  -- the roster tells us WHICH row was actually consumed
+  -- park on the Potion row: a heal of +250 (Potion) against +50 (Tonic)
+  -- shows in the roster which row was consumed
   toRow(invSlot(POTION) or 0, "list cursor -> Potion"),
   H.release(), H.waitFrames(20),
   snap("list_on_potion"),
@@ -141,7 +141,7 @@ H.run({ maxFrames = 60000 }, {
   press("a", 250, "A#3 (confirm)"),
   snap("after_a3"),
 
-  -- back out to the field so the probe ends somewhere legible
+  -- back out to the field so the probe ends in a known state
   H.repeatN(4, {
     H.pressButtons({ "b" }, 4),
     H.release(),

@@ -1,12 +1,12 @@
 -- probe_banquet_timer_save.lua -- third instrument behind
 -- probe_banquet_timer.  probe_banquet_timer (ZMENUSTATE-poked save) left
 -- the live timer block corrupted; probe_banquet_timer_cancel (natural
--- navigation, cancel-only) left it intact.  This one completes a SAVE via
--- pure pad input -- X, UP (wrap to Save), A, A on the preselected slot 3,
--- A through the overwrite confirm -- and reads the block after, isolating
--- "save completion corrupts" from "the menu-state poke corrupts".
--- Staging identical to probe_banquet_timer (see its header).  NOT a
--- suite test.
+-- navigation, cancel-only) left it intact.  This one completes a save
+-- using pad input only (X, up to wrap onto Save, A, A on the preselected
+-- slot 3, A through the overwrite confirm) and reads the block
+-- afterwards, isolating "save completion corrupts" from "the menu-state
+-- poke corrupts".  Staging identical to probe_banquet_timer (see its
+-- header).  Not a suite test.
 -- OT6_CHECKPOINT_LAYOUT: ot6-codex-o8-v1
 local H = dofile("tools/tests/lib/ot6.lua")
 

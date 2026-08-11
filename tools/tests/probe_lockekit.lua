@@ -1,12 +1,12 @@
--- probe_lockekit.lua -- what is solo LOCKE actually holding, and what are his
--- stats, at the top of his own scenario?  Reads only (issue #75).
+-- probe_lockekit.lua -- reports what solo LOCKE is holding and what his
+-- stats are at the top of his scenario.  Reads only (issue #75).
 --
--- Asked because the first full savestate run that ever reached sfigaro_town
--- measured him doing EIGHT damage a swing to the gate soldier's HeavyArmor
--- (495 hp, level 13, weak to bolt|water -- neither of which LOCKE can
+-- Asked because the first full savestate run to reach sfigaro_town
+-- measured him doing eight damage a swing to the gate soldier's HeavyArmor
+-- (495 hp, level 13, weak to bolt|water, neither of which LOCKE can
 -- reach).  Eight is low enough that "he is unarmed" and "the fight is tuned
--- past him" are both live explanations, and they call for very different
--- responses, so look before concluding.
+-- past him" are both possible explanations, and they call for different
+-- responses, so this probe measures the loadout first.
 --
 -- Character block is $1600 + 37*c: +8 level, +9/+11 hp, +13/+15 mp,
 -- +$0C..$0F the four battle powers, +$1F/$20 weapon/shield, +$21..$23 the

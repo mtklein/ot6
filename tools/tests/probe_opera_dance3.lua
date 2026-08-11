@@ -1,6 +1,7 @@
--- probe_opera_dance3.lua -- CORRECTED flower dance.  NPC(12,19)=FLOWERS
--- (_cabf27 -> $0057).  balcony (8,9)=_cabe6d needs only $0057 -> $0111.
--- Ignore Draco.  Touch flowers from (12,18) facing DOWN, then climb to (8,9).
+-- probe_opera_dance3.lua -- corrected flower dance.  NPC(12,19) is the
+-- flowers (_cabf27 -> $0057).  Balcony (8,9)=_cabe6d needs only
+-- $0057 -> $0111.  Ignore Draco.  Touch flowers from (12,18) facing down,
+-- then climb to (8,9).
 local H = dofile("tools/tests/lib/ot6.lua")
 local function map() return H.mapId() & 0x1ff end
 local function sw(id) return (H.readByte(0x1E80 + math.floor(id/8)) >> (id%8)) & 1 end
@@ -51,11 +52,11 @@ H.run({ maxFrames = 12000 }, {
   H.waitFrames(30),
   H.call(function() H.assertEq(map(),236,"boot 236"); dumpsw("start") end),
 
-  -- PHASE 1: touch the FLOWERS (12,19) from above -> $0057=1
+  -- Phase 1: touch the flowers (12,19) from above -> $0057=1
   driveTo(12,19, 1, function() return sw(0x0057)==1 or sw(0x0111)==1 or map()~=236 end, 4000, "toFlowers"),
   H.call(function() dumpsw("after flowers"); H.screenshot("dance3_flowers") end),
 
-  -- PHASE 2: climb to the balcony (8,9) -> _cabe6d -> $0111=1
+  -- Phase 2: climb to the balcony (8,9) -> _cabe6d -> $0111=1
   driveTo(8,9, 0, function() return sw(0x0111)==1 or map()~=236 end, 6000, "toBalcony"),
   H.waitFrames(150),
   H.call(function() dumpsw("DONE"); H.screenshot("dance3_done") end),

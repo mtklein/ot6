@@ -1,18 +1,18 @@
 -- gen_opera2_open.lua -- v0.5 Beat A step 2: opera_entry (map 209, one
--- A-press below the map-209 IMPRESARIO) -> DRIVE THE OPERA-OPEN CUTSCENE
+-- A-press below the map-209 IMPRESARIO) -> drive the opera-open cutscene
 -- (_ca9337 "Maria!?" -> the letter $0331 -> the Setzer intro + name_menu ->
--- $0340=1) -> travel 209 -> Jidoor (198) -> world -> the OPERA HOUSE (map 237,
--- world {45,154}) -> parked at {60,49} facing UP below the now-VISIBLE
--- IMPRESARIO ({60,48}, _caae15).  Generates opera_open.mss -- one A-press
--- from the performance proper (the aria).
+-- $0340=1) -> travel 209 -> Jidoor (198) -> world -> the opera house (map 237,
+-- world {45,154}) -> parked at {60,49} facing UP below the now-visible
+-- IMPRESARIO ({60,48}, _caae15).  Generates opera_open.mss, one A-press
+-- from the performance itself (the aria).
 --
--- MEASURED (probe_opera_intro): the intro rides on a hasControl-gated stall
--- fallback that alternates A and START, which clears BOTH the dialog pages and
+-- Measured (probe_opera_intro): the intro rides on a hasControl-gated stall
+-- fallback that alternates A and START, which clears both the dialog pages and
 -- the name_menu SETZER without special-casing either; it ends on map 209
 -- {118,24} with control and $0340=1/$010E=1.  Travel checkpoints: 209's
--- {118,29} door -> Jidoor {16,14}; Jidoor's SOUTH edge (long-entrance
+-- {118,29} door -> Jidoor {16,14}; Jidoor's south edge (long-entrance
 -- src{0,63} HORIZ len31) -> world {27,132}; world -> opera approach
--- {45,153} -> step DOWN.  Issue #75: no state writes -- strays are fought
+-- {45,153} -> step DOWN.  Issue #75: no state writes; strays are fought
 -- by the drivers' own edge-tapped A, and walks run under the playBattles
 -- nav modes.
 local H = dofile("tools/tests/lib/ot6.lua")
@@ -30,17 +30,17 @@ end
 -- when parked flag-less with no field control, alternate A/START (clears the
 -- name_menu too).  Stall gated on hasControl (gen_zozo5's issue-#3 fix).
 --
--- THE MENU TEST COMES FIRST, and it has to.  Since 62ccab7 (#24)
--- battleLoadStarted() is "$7E3BF4 is not $FFFF", and the MENU MODULE zeroes
--- that word: measured on the Zozo leave cutscene, $7E3BF4 reads $FFFF for
--- every field frame and $0000 for every frame a menu is up.  So the battle
--- branch answers true throughout the Setzer name_menu, and with it on top
+-- The menu test must come first.  Since 62ccab7 (#24) battleLoadStarted()
+-- means "$7E3BF4 is not $FFFF", and the menu module zeroes that word:
+-- measured on the Zozo leave cutscene, $7E3BF4 reads $FFFF for every field
+-- frame and $0000 for every frame a menu is up.  The battle branch therefore
+-- returns true throughout the Setzer name_menu, and if it were tested first
 -- this driver would edge-A the name grid instead of committing it with
--- START (and, in the battle-clear-write era, scribble $7E3EEC.. while those
--- bytes belonged to the menu -- the writes are gone, the ordering lesson
--- stays).  gen_zozo5_ramuh's leave cutscene is the case that measured it:
--- blind A on a party_menu walks into a character's Status page and never
--- comes out.
+-- START (and, in the battle-clear-write era, would also write $7E3EEC..
+-- while those bytes belonged to the menu; those writes are gone, but the
+-- ordering still matters).  gen_zozo5_ramuh's leave cutscene is where this
+-- was measured: blind A on a party_menu enters a character's Status page
+-- and does not leave it.
 local function rideOpen(pred, maxFrames, what)
   local aPh,sPh,stallN,lx,ly = 0,0,0,-1,-1
   return H.driveUntil(function() local d=pred(); if d then H.setPad({}) end; return d end,
@@ -106,7 +106,7 @@ H.run({ maxFrames = 250000 }, {
   H.waitFrames(150),
   H.call(function() H.log(string.format("[jidoor] at (%d,%d)", H.fieldX(), H.fieldY())) end),
 
-  -- 3. Jidoor -> the SOUTH edge -> world {27,132}: navTo above the edge, push down
+  -- 3. Jidoor -> the south edge -> world {27,132}: navTo above the edge, push down
   H.navTo(16, 61, { maxFrames=24000, playBattles=true }),
   (function() local hb=0
     return H.driveUntil(function() return H.worldMode() end, 6000, {
@@ -134,7 +134,7 @@ H.run({ maxFrames = 250000 }, {
     H.log(string.format("[237] landed (%d,%d) $0340=%d $0341=%d", H.fieldX(), H.fieldY(), sw(0x0340), sw(0x0341)))
   end),
 
-  -- 5. up to {60,49}, below the now-VISIBLE IMPRESARIO ({60,48}); face UP
+  -- 5. up to {60,49}, below the now-visible IMPRESARIO ({60,48}); face UP
   H.navTo(60, 49, { maxFrames=9000, playBattles=true }),
   H.hold({"up"}), H.waitFrames(8), H.release(), H.waitFrames(6),
   (function() local calm=0

@@ -1,13 +1,13 @@
--- probe_moogle_wipe2.lua -- the wave-loss aftermath, played like a HUMAN
--- who lost: mash A at whatever is on screen (issue #75).  probe_moogle_wipe
--- established that an idle party wipes in-battle and the machine then sits
--- with the event engine stuck (ev=true, marches jammed, no GameOver exec,
--- field HP never written back) for 24k+ frames -- but that probe only
--- tapped A on FIELD dialogs, and a battle-side prompt (annihilated text,
--- a battle message) would not register there.  This one mashes A
--- unconditionally from the moment the wipe lands and photographs the
--- screen every 3000 frames, so "softlock" cannot be an artifact of a
--- polite pad.  Zero writes.
+-- probe_moogle_wipe2.lua -- the wave-loss aftermath, played the way a
+-- player who lost would: mash A at whatever is on screen (issue #75).
+-- probe_moogle_wipe established that an idle party wipes in-battle and the
+-- machine then sits with the event engine stuck (ev=true, marches jammed,
+-- no GameOver exec, field HP never written back) for 24k+ frames, but that
+-- probe only tapped A on field dialogs, and a battle-side prompt
+-- (annihilated text, a battle message) would not register there.  This one
+-- mashes A unconditionally from the moment the wipe lands and screenshots
+-- every 3000 frames, so a "softlock" reading cannot be an artifact of too
+-- little input.  Zero writes.
 local H = dofile("tools/tests/lib/ot6.lua")
 local DEFENSE = "build/states/moogle_defense.mss.lua"
 
@@ -56,7 +56,7 @@ H.run({ maxFrames = 50000 }, {
     snap("post-wipe")
     H.screenshot("wipe_post")
   end),
-  -- now MASH A like a stuck player, screenshotting as we go
+  -- now mash A the way a stuck player would, screenshotting as we go
   H.driveUntil(function()
     return gameOverAt ~= nil
   end, 15000, {

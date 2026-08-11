@@ -1,20 +1,21 @@
 -- gen_sabin_forest.lua -- step 7 of SABIN's scenario: the Phantom Forest,
 -- from the World-of-Balance landing to boarding the Phantom Train.
 -- Generates:
---   forest_done.mss   map 145 (26,11), the Phantom Train interior -- the
---                     party has just boarded; the train step builds from
+--   forest_done.mss   map 145 (26,11), the Phantom Train interior, with the
+--                     party just boarded; the train step builds from
 --                     here.
 --
--- THE ROUTE (verified from the entrance tables + event scripts, decoded by a
+-- The route (verified from the entrance tables and event scripts, decoded by a
 -- read-only source pass; short-entrance record = [SrcX,SrcY,Map,Flags,DestX,
 -- DestY] in trigger/short_entrance.dat):
---   world (179,71) -- walk S; the drop tile _cb0bb7 is inert now ($0037=1)
+--   world (179,71): walk south; the drop tile _cb0bb7 is inert now ($0037=1)
 --   world (178,82) -> map 132 (1,9)               [world short-entrance]
 --   132 (28,7)     -> map 133 (3,13)
 --   133 (20,14)    -> map 134 (5,8)               [past the recovery spring]
 --   134 (11,7)     -> map 135 (3,12)  via event _cba3c4 (event_main.asm:62340,
---                     `if_switch $003A=1, EventReturn` -- $003A=0 pre-train, so
---                     it loads 135; AFTER the Ghost Train it diverts to world)
+--                     `if_switch $003A=1, EventReturn`; $003A=0 pre-train, so
+--                     it loads 135, and after the Ghost Train it diverts to
+--                     the world)
 --   135 (23,7)     -> map 140 (79,14)
 --   140: (79,13) door _cba852 ($01F0), (79,11) discovery cutscene _cba864
 --        (dlg $02A4, $0038), then W to (72,10) _cba8f1 boarding cutscene ->
@@ -22,21 +23,20 @@
 -- No scripted battles/choices/name-menus on the walk; only random
 -- encounters and the boarding dialogs (tap-A).
 --
--- ISSUE #75 -- EVERY ENCOUNTER IS FLED, AND THAT RETIRES THE SHADOW PIN.
--- Zero state writes in this generator.  The old file pinned $1DD2 bit $08
+-- Issue #75: every encounter is fled, which retires the SHADOW pin.
+-- This generator makes no state writes.  The old file pinned $1DD2 bit $08
 -- ("shadow won't leave") for the walk and restored the boot byte before
--- the save, because every write-cleared WIN rolled SHADOW's 1/16 walk-off
+-- the save, because every write-cleared win rolled SHADOW's 1/16 walk-off
 -- (battle_main.asm:11976-11991; the camp exit ran `clr_b_switch $4B` at
--- event_main.asm:42251, so the bit is story-CLEAR for this whole step).
--- The input-driven replacement is not to fight better -- it is to never WIN a
--- random battle at all: every encounter is FLED (hold L+R, the engine's
--- own run mechanic; navTo/worldNavTo playBattles="flee" plus the same hold in
--- the local drivers), the leave roll runs only at a win, so this route
--- rolls it ZERO times and SHADOW's presence at generation time is
--- deterministic with no pin and no timing games.  Cost: a few real flee
--- rounds per encounter (budgets grew), and an unrunnable formation would
--- time out loudly -- the forest/overworld pools here are all runnable
--- trash.
+-- event_main.asm:42251, so the bit is story-clear for this whole step).
+-- The input-driven replacement never wins a random battle: every encounter is
+-- fled (hold L+R, the engine's own run mechanic; navTo/worldNavTo
+-- playBattles="flee" plus the same hold in the local drivers).  The leave roll
+-- runs only at a win, so this route rolls it zero times and SHADOW's presence
+-- at generation time is deterministic with no pin and no timing dependence.
+-- The cost is a few real flee rounds per encounter (the budgets grew), and an
+-- unrunnable formation would time out with an error; the forest and overworld
+-- pools here are all runnable.
 local H = dofile("tools/tests/lib/ot6.lua")
 local DOOR = "build/states/camp_escaped.mss.lua"
 
@@ -45,10 +45,10 @@ local function bright() return emu.getState()["ppu.screenBrightness"] or 0 end
 local function sw(id) return (H.readByte(0x1e80 + (id >> 3)) >> (id & 7)) & 1 end
 local function inParty(c) return (H.readByte(0x1850 + c) & 0x07) ~= 0 end
 
--- drive the world toward (tx,ty), FLEEING random encounters (hold L+R --
--- no win, no leave roll, no writes; see the header), and STOP when the map
--- index leaves the world (an entrance fired) or we arrive.  worldBfs
--- plans; hold-through per the world latch.
+-- drive the world toward (tx,ty), fleeing random encounters (hold L+R: no
+-- win, no leave roll, no writes; see the header), and stop when the map
+-- index leaves the world (an entrance fired) or the party arrives.  worldBfs
+-- plans; the press is held through per the world latch.
 local function worldToMap(tx, ty, what, budget)
   local plan, idx, phase, hb = nil, 1, 0, -600
   return H.driveUntil(function()
@@ -80,12 +80,12 @@ local function worldToMap(tx, ty, what, budget)
   }, "world->" .. what)
 end
 
--- edge tiles double as MAP EXITS, so a naive navTo whose target sits next to
--- a back-exit walks the party out the wrong door (navTo's BFS is blind to
--- which floor tiles are entrances).  crossVia sidesteps that: navTo to an
--- INTERIOR waypoint reached without touching any exit, then hold `dir` one
--- step onto the real exit.  Battles (FLED -- see the header) and cutscene
--- dialogs (tap-A) handled throughout; done when the map becomes `toMap`.
+-- edge tiles double as map exits, so a navTo whose target sits next to
+-- a back-exit walks the party out the wrong door (navTo's BFS does not know
+-- which floor tiles are entrances).  crossVia avoids that: navTo to an
+-- interior waypoint reached without touching any exit, then hold `dir` one
+-- step onto the real exit.  Battles (fled; see the header) and cutscene
+-- dialogs (tap-A) are handled throughout; done when the map becomes `toMap`.
 local function crossVia(wx, wy, dir, toMap, what)
   return H.cond(function() return true end, {
     H.logStep(function()
@@ -127,7 +127,7 @@ end
 
 -- walk to field edge tile (tx,ty) on the current map and cross; done when the
 -- map index becomes `toMap`.  navTo handles the walk, random encounters
--- (FLED, playBattles="flee"), and any cutscene dialogs (tap-A); the
+-- (fled, playBattles="flee"), and any cutscene dialogs (tap-A); the
 -- short-entrance fires on arrival, so control is never handed back on
 -- (tx,ty) itself.  Use this only where the path to (tx,ty) does not brush
 -- another exit; else use crossVia.
@@ -159,11 +159,11 @@ H.run({ maxFrames = 120000 }, {
   H.call(function()
     H.assertEq(H.worldMode(), true, "start on the World of Balance")
     H.assertEq(sw(0x0037), 1, "$0037 set -- escape done")
-    -- NO SHADOW PIN (issue #75; see the header).  Battle switch $4B is
-    -- story-CLEAR here, and the accurate answer is that this route never
-    -- WINS a random battle -- every encounter is fled, the 1/16 walk-off
-    -- rolls only at a win, so SHADOW's presence at generation time is
-    -- deterministic without writing a byte.
+    -- No SHADOW pin (issue #75; see the header).  Battle switch $4B is
+    -- story-clear here, and this route never wins a random battle: every
+    -- encounter is fled and the 1/16 walk-off rolls only at a win, so
+    -- SHADOW's presence at generation time is deterministic without writing
+    -- a byte.
     H.log(string.format("[forest] start world (%d,%d) $1dd2&08=%d (story's own)",
       H.worldX(), H.worldY(), H.readByte(0x1dd2) & 0x08))
   end),
@@ -183,12 +183,13 @@ H.run({ maxFrames = 120000 }, {
   -- forest map chain
   crossTo(28, 7, 133, "132->133"),
 
-  -- MAP 133 IS A ONE-WAY SPRING PUZZLE.  Arrival (3,13) can only step UP (to
+  -- Map 133 is a one-way spring puzzle.  Arrival (3,13) can only step UP (to
   -- the spring (3,12)) or DOWN (to (3,14), the back-exit to 132); east along
   -- y=13 is walled.  So the recovery spring _cba3d1 (event_main.asm:62344,
   -- `move UP,3 move RIGHT,2` then `switch $0192=1` + heal dlg $0B83) is a
-  -- MANDATORY conveyor: stepping onto (3,12) auto-walks the party to (5,9),
-  -- past the (3,14) trap, from where east+down to the (20,14) exit is open.
+  -- mandatory conveyor: stepping onto (3,12) auto-walks the party to (5,9),
+  -- past the (3,14) back-exit, from where east and down to the (20,14) exit
+  -- is open.
   H.cond(function() return true end, {
     H.logStep(function()
       return string.format("[forest] map 133 spring: hold UP from (%d,%d) f%d",
@@ -225,10 +226,10 @@ H.run({ maxFrames = 120000 }, {
   crossVia(11, 8, "up", 135, "134->135"),
   crossTo(23, 7, 140, "135->140"),
 
-  -- BOARD THE TRAIN.  Map 140: walk UP from arrival (79,14) through the door
+  -- Board the train.  Map 140: walk UP from arrival (79,14) through the door
   -- (79,13) _cba852 (opens the platform tiles, $01F0) and the discovery
-  -- cutscene (79,11) _cba864 (dlg $02A4, $0038) -- only AFTER $0038 does the
-  -- west path to the boarding tile open (measured) -- then WEST to (72,11)
+  -- cutscene (79,11) _cba864 (dlg $02A4, $0038); the west path to the
+  -- boarding tile opens only after $0038 (measured).  Then WEST to (72,11)
   -- _cba8e7 (auto-steps up to (72,10) _cba8f1) which runs the boarding
   -- cutscene (dlg $02AB/$02A5/$02A6/$02D2) and load_map 145 {26,11}.  navTo
   -- reaches (72,11) via the discovery; a generous cutscene-tolerant settle

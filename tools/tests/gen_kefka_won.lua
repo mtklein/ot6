@@ -1,49 +1,49 @@
--- gen_kefka_won.lua -- v0.4's FIRST link: boot kefka_entry, win battle 57
--- again -- FOR REAL (issue #75: this file writes no emulated game state;
+-- gen_kefka_won.lua -- v0.4's first link: boot kefka_entry, win battle 57
+-- again with real input (issue #75: this file writes no emulated game state;
 -- the fight is played with gen_narshe_battle's menu-episode fighter and a
--- three-attempt retry ladder off the booted entry point, exactly the real
--- win that file just proved from the same state) -- then ride the whole
--- win tail -- the esper cliff on map 23, TERRA's morph, the flight across
--- the world, the regroup in Arvis's house -- through the party-select menu
+-- three-attempt retry ladder off the booted entry point, the same win that
+-- file demonstrated from the same state).  Then ride the whole
+-- win tail (the esper cliff on map 23, TERRA's morph, the flight across
+-- the world, the regroup in Arvis's house) through the party-select menu
 -- to the first controllable frame, and generate kefka_won.mss on map 30 at
 -- (60,37).
 --
--- THE WIN TAIL IS THREE DIFFERENT WAITS, none of them a field dialog with
--- missing flags (issue #3's original theory).  Each one measured
--- (probe_esper_stall + this file's own bring-up, 2026-07-20):
+-- The win tail contains three different waits, none of them a field dialog
+-- with missing flags (issue #3's original theory).  Each one is measured
+-- (probe_esper_stall and this file's own bring-up, 2026-07-20):
 --
---  1. battle 78 at $CCBEB7 (event_main.asm:106707) -- the event PC parks at
---     $CCBEBA, the resume address AFTER the battle command, until the
+--  1. battle 78 at $CCBEB7 (event_main.asm:106707): the event PC parks at
+--     $CCBEBA, the resume address after the battle command, until the
 --     battle returns.  Battle 78 = group $4E -> formation 448 both slots =
 --     TRITOCH_MORPH ($0115) alone vs TERRA alone.  Its whole AI is
 --     `battle_event $12 / end_battle` on its first main turn
---     (ai_script.asm:5077): the set-piece ends ITSELF, but its battle-event
---     dialogs are BATTLE text -- they never raise the field's $00BA/$00D3
---     (that is the real story behind "dialogs present but flags read 0").
---     And battleLoadStarted() is BLIND to this battle: it reads party
+--     (ai_script.asm:5077): the set-piece ends itself, but its battle-event
+--     dialogs are battle text and never raise the field's $00BA/$00D3
+--     (which explains "dialogs present but flags read 0").
+--     battleLoadStarted() also cannot see this battle: it reads party
 --     battle-HP slot 0, and TERRA alone leaves slot 0 at $FFFF.  So
---     advanceStory neither taps (no dialogWaiting, no battN) nor write-clears
---     -- hands off forever was the ORIGINAL $CCBEBA stall (632af69).  The
---     set-piece is detected here by its formation word instead ($57C0
---     slot 0 in the TRITOCH set -- $FFFF outside the fight on this route,
---     measured f600..f11600): hands off through the load (A queued during
---     a set-piece load wedges the turn engine -- the intro-Tritoch twin's
---     measured failure, see advanceStory's spare notes), then edge-tap the
---     battle-event text.
+--     advanceStory neither taps (no dialogWaiting, no battN) nor
+--     write-clears, and holding off indefinitely was the original $CCBEBA
+--     stall (632af69).  The set-piece is detected here by its formation word
+--     instead ($57C0 slot 0 in the TRITOCH set, which reads $FFFF outside
+--     the fight on this route, measured f600..f11600): hands off through the
+--     load (A queued during a set-piece load stalls the turn engine, the
+--     intro-Tritoch twin's measured failure; see advanceStory's spare
+--     notes), then edge-tap the battle-event text.
 --  2. The vehicle flight (map 0, ~900 frames) and every field dialog: the
---     dialogs DO raise $00BA/$00D3 and park the event PC at $CA0001
+--     dialogs do raise $00BA/$00D3 and park the event PC at $CA0001
 --     (WaitDlg), so dialogWaiting-gated taps advance them.  Nothing else
---     wants input.
+--     needs input.
 --  3. party_menu 1, RESET at _cacb9f (event_main.asm:31284, called from
---     _ccc1b5) -- the "who hunts TERRA" selection.  632af69's
---     tap-A-at-everything drive DID clear waits 1 and 2, then wedged HERE:
+--     _ccc1b5), the "who hunts TERRA" selection.  632af69's
+--     tap-A-at-everything drive cleared waits 1 and 2, then stalled here:
 --     blind A walks into the menu and parks on a character's Status page
---     (screenshotted), where A never exits and Start never commits --
---     $0059 stays $81, $0602/$0048/$010B stay clear, timeout.  The menu
---     wants gen_narshe_battle's state-fed driver: cursor cell = $4b+$4a+
---     $5a, cells verified in $7E9D89, Start commits.  LOCKE+CELES+EDGAR+
---     SABIN go in -- the story-canonical search party and a full bench for
---     the Zozo arc this fixture boots.
+--     (screenshotted), where A does not exit and Start does not commit, so
+--     $0059 stays $81, $0602/$0048/$010B stay clear, and the run times out.
+--     The menu needs gen_narshe_battle's state-fed driver: cursor cell =
+--     $4b+$4a+$5a, cells verified in $7E9D89, Start commits.  LOCKE+CELES+
+--     EDGAR+SABIN go in: the story-canonical search party and a full bench
+--     for the Zozo arc this fixture boots.
 --
 -- After the menu: _ccc1b5 reloads map 30 at {60,37} facing DOWN, sets
 -- $0602/$010B/$0048, set_parent_map 0 {84,33}, player_ctrl_on, return
@@ -61,8 +61,8 @@ end
 local function bright() return emu.getState()["ppu.screenBrightness"] or 0 end
 
 -- ----------------------------------------------- the input-driven fighter --
--- gen_narshe_battle's menu-episode machine (gen_scenario's cadence), cut to
--- what this file fights: KEFKA, with P1 = TERRA+EDGAR+CELES.  Boost banked
+-- gen_narshe_battle's menu-episode machine (gen_scenario's cadence), reduced
+-- to what this file fights: KEFKA, with P1 = TERRA+EDGAR+CELES.  Boost banked
 -- to 2 and dumped; EDGAR on Tools -> AutoCrossbow from tier 2, CELES on
 -- Runic (eats the Ice 2 telegraph) from tier 3, everyone else on Fight.
 local KEFKA = 0x014A
@@ -276,10 +276,10 @@ end
 
 -- ------------------------------------------------------ the KEFKA ladder --
 -- gen_narshe_battle's input-driven attempt shape: activation by clean edge-A,
--- the fight PLAYED, the verdict read off the scripted branch (the win
--- scene owning the stage vs the {25,5} lose-path save point), and a loss
--- reloading the booted entry point -- the generator script's spelling of a
--- player reloading their save -- with the fighter's tier escalated.
+-- the fight played with real input, the verdict read off the scripted branch
+-- (the win scene on the stage vs the {25,5} lose-path save point), and a loss
+-- reloading the booted entry point with the fighter's tier escalated; this is
+-- the script's equivalent of a player reloading a save.
 local kefkaBlob, kefkaWon = nil, false
 local kefkaLost = nil
 local function kefkaBody(tier)
@@ -355,8 +355,8 @@ H.run({ maxFrames = 400000 }, {
   H.loadState("build/states/kefka_entry.mss.lua"),
   H.waitFrames(30),
 
-  -- the ladder's checkpoint IS the booted entry point (gen_narshe_battle
-  -- generated it one clean edge-A from battle 57 and proved the activation)
+  -- the ladder's checkpoint is the booted entry point (gen_narshe_battle
+  -- generated it one clean edge-A from battle 57 and verified the activation)
   (function()
     local ckReq
     return H.cond(function() return true end, {
@@ -381,14 +381,15 @@ H.run({ maxFrames = 400000 }, {
     end
   end),
 
-  -- THE WIN TAIL, wait by wait (see the header): dialog-gated taps for the
-  -- field dialogs, the zap recipe for battle 78, hands off otherwise, and
-  -- STOP at the party menu -- blind A must never reach it.
-  -- The menu detector is a COMPOSITE on purpose: $0059 alone rises to $52
-  -- during battle 78's transition (measured f3499) and blips $FF/$01 at the
-  -- vehicle handoff (f7037), so menuUp() alone fires 7000 frames early.
-  -- The real party menu shows $59=$81 with menu mode $0200=4 and the pick
-  -- state $26=$2d once interactive -- all three together only there.
+  -- The win tail, wait by wait (see the header): dialog-gated taps for the
+  -- field dialogs, the zap recipe for battle 78, no input otherwise, and
+  -- stop at the party menu, which blind A must never reach.
+  -- The menu detector combines three conditions on purpose: $0059 alone
+  -- rises to $52 during battle 78's transition (measured f3499) and blips
+  -- $FF/$01 at the vehicle handoff (f7037), so menuUp() alone fires 7000
+  -- frames early.  The real party menu shows $59=$81 with menu mode $0200=4
+  -- and the pick state $26=$2d once interactive, and all three hold together
+  -- only there.
   (function()
     local aPh, zapN, battN, hb = 0, 0, 0, -600
     return H.driveUntil(function()
@@ -413,8 +414,8 @@ H.run({ maxFrames = 400000 }, {
           return
         end
         if battN >= 3 then
-          -- no other battle exists on this route; a stray would be FOUGHT
-          -- with real input by the same edge-tapped A (issue #75 -- no
+          -- no other battle exists on this route; a stray would be fought
+          -- with real input by the same edge-tapped A (issue #75: no
           -- battle-clear write)
           H.setPad(aPh < 4 and { "a" } or {})
           return

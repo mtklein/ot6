@@ -1,6 +1,6 @@
--- probe_narshe_map.lua -- SPIKE instrument: renders map 22's passability
+-- probe_narshe_map.lua -- spike instrument: renders map 22's passability
 -- around the defense (the model's own view: prop bytes + object map) and
--- asks bfsPath for routes from the start line.  Pure reads off
+-- asks bfsPath for routes from the start line.  Reads only from
 -- spike_defense.mss; no walking.
 local H = dofile("tools/tests/lib/ot6.lua")
 local DEFENSE = "build/states/spike_defense.mss.lua"
@@ -39,7 +39,7 @@ H.run({ maxFrames = 2000 }, {
     end
     -- flood-fill the party-walkable region from the start tile (the same
     -- moves bfsPath uses, via canStep) and paint it over the map: '*' =
-    -- reachable.  Shows exactly where the walking region ENDS.
+    -- reachable.  Shows where the walking region ends.
     local MOVES = { "up", "right", "down", "left",
                     "upright", "downright", "downleft", "upleft" }
     local DD = { up = { 0, -1 }, right = { 1, 0 }, down = { 0, 1 },

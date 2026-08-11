@@ -1,44 +1,44 @@
 -- @suite slow savestate=figaro_cleared
 -- battle_stealmp.lua -- v0.5 "every ability costs MP": Steal (cmd $05) joins the
--- cost gate. The SAME self-detecting A/B as battle_mpcost.lua, aimed at the one
--- costed verb that test does NOT drive -- Locke's Steal -- proving the flat-cost
--- path added to Ot6AbilityCost (cmd $05 -> 4 MP, keyed on the command, NOT an
--- id-table row) charges and refuses through the universal machinery, and stays
--- free on the OFF baseline.
+-- cost gate. This is the same self-detecting A/B as battle_mpcost.lua, aimed at
+-- the one costed verb that test does not drive, Locke's Steal.  It checks that
+-- the flat-cost path added to Ot6AbilityCost (cmd $05 -> 4 MP, keyed on the
+-- command rather than an id-table row) charges and refuses through the universal
+-- code, and stays free on the OFF baseline.
 --
--- REPRICED BY #52 (2026-07-29): 2 -> 4. The flat path now reads the Ot6StealCost
+-- Repriced by #52 (2026-07-29): 2 -> 4. The flat path now reads the Ot6StealCost
 -- leaf (the Ot6DanceCost shape) instead of an inline immediate, so this test,
 -- battle_costtable.lua and #55's future row decorator all price one number.
 --
---   * ON  (build/ot6.sfc, the suite default): a Steal is QUEUED at cost 4
---     (Ot6AbilityCost's flat path), DEDUCTS 4 MP when it executes, and a caster
---     below 4 MP is REFUSED -- the universal insufficient-mp fizzle
+--   * ON  (build/ot6.sfc, the suite default): a Steal is queued at cost 4
+--     (Ot6AbilityCost's flat path), deducts 4 MP when it executes, and a caster
+--     below 4 MP is refused: the universal insufficient-mp fizzle
 --     (CalcAttackEffect) skips the steal effect, so no item is taken and MP is
 --     not driven negative.
 --   * OFF (ff6/rom/ff6-en-nomp.sfc, handed in via OT6_ROM): Ot6AbilityCost is
---     not assembled, so cmd $05 keeps vanilla's 0 -- the identical Steal is
---     FREE (0 MP deducted). The refusal half has nothing to refuse and is
+--     not assembled, so cmd $05 keeps vanilla's 0 and the identical Steal is
+--     free, deducting 0 MP. The refusal half has nothing to refuse and is
 --     skipped. This is the negative control.
 --
--- Issue #75 conversion.  battle_steal.lua's fixture move, drive and
+-- Issue #75 conversion.  This uses battle_steal.lua's fixture move, drive and
 -- observation rig, minus the RNG decode: on figaro_cleared LOCKE's real
--- Steal runs against real desert species, and the MP LEDGER IS THE REAL
--- POOL.  The old writes -- party/enemy installs, slot sentinels, HP pins,
--- STOP bits, bp/pending hands, and above all the per-drive MP :=
--- 50 / := 1 writes -- are all gone.  The affordable arm charges his real
--- 31-MP pool; the refusal arm EARNS its poverty: real steal attempts
--- drain 4 MP each until the pool reads < 4, then a FRESH battle (fresh
--- species loot) hosts the refused attempt.  The refused steal is 3-bp
--- guaranteed (bank earned by zero-MP item turns), so "no item granted on
--- a populated, would-always-succeed steal" is an unambiguous refusal
--- signal -- a 0-bp attempt could just have missed its roll.
+-- Steal runs against real desert species, and the MP ledger is his real
+-- pool.  The old writes (party and enemy installs, slot sentinels, HP pins,
+-- stop bits, bp and pending hands, and the per-drive MP := 50 and := 1
+-- writes) are all gone.  The affordable arm charges his real
+-- 31-MP pool; the refusal arm earns its poverty: real steal attempts
+-- drain 4 MP each until the pool reads below 4, then a fresh battle with fresh
+-- species loot hosts the refused attempt.  The refused steal is 3-bp
+-- guaranteed (the bank earned by zero-MP item turns), so no item granted on
+-- a populated, would-always-succeed steal is an unambiguous refusal
+-- signal, whereas a 0-bp attempt could have missed its roll.
 --
--- THE COST IS READ AT THE SOURCE, unchanged: a write watch on the mp-cost
+-- The cost is read at the source, unchanged: a write watch on the mp-cost
 -- queue ($3620,y, stored in CreateAction) filtered to command $05
--- captures EXACTLY what Ot6AbilityCost returned -- 4 on ON, 0 on OFF --
+-- captures what Ot6AbilityCost returned, 4 on ON and 0 on OFF,
 -- and the MP delta then confirms the charge landed.  That store fires for
--- both the affordable and the refused steal (the refusal is downstream,
--- at execution), so it is also the uniform "the action was created"
+-- both the affordable and the refused steal, since the refusal is downstream
+-- at execution, so it also serves as the "the action was created"
 -- signal both scenarios wait on.
 local H = dofile("tools/tests/lib/ot6.lua")
 local STATE = "build/states/figaro_cleared.mss.lua"
@@ -102,8 +102,8 @@ local function armWatches()
 end
 
 -- ------------------------------------------------------ the menu drive --
--- battle_steal.lua's measured machine: latched blink-proof target mask
--- (H.targetCursor, the lib promotion of that copy), slow item-window
+-- battle_steal.lua's measured driver: latched blink-proof target mask
+-- (H.targetCursor, the library version of that code), with a slow item-window
 -- cadence.
 local mf = 0
 local drive = { wantBp = 0, wantPend = 0, target = nil }
@@ -157,9 +157,9 @@ local function decide()
   return btn and { [btn] = true } or {}
 end
 
--- drive one steal until its action is QUEUED, then hold while it executes
--- (grant) or fizzles (bounded wait -- a refused steal grants nothing to
--- signal on).  The original's own completion shape.
+-- drive one steal until its action is queued, then hold while it executes
+-- (a grant) or fizzles (a bounded wait, since a refused steal grants nothing
+-- to signal on).  This is the original's completion shape.
 local function oneSteal(tag, wantBp, wantPend, execWait)
   local execFrames = 0
   return H.repeatN(1, {
@@ -248,13 +248,13 @@ H.run({ maxFrames = 150000 }, {
 
   -- ------------------------------------------------ 1. detect the build --
   H.call(function()
-    -- Ot6AbilityCostTbl is present in bank F0 IFF OT6_MP_COSTS was on, and a
+    -- Ot6AbilityCostTbl is present in bank F0 iff OT6_MP_COSTS was on, and a
     -- byte scan is the only way to ask: OT6_SYMS is scraped from the ON build's
     -- ff6-en.dbg, so H.sym would hand back an address that means nothing in the
     -- nomp ROM this test also runs against.
     --
-    -- THE SIGNATURE IS KEYS ONLY, WITH THE COSTS WILDCARDED (see #45): the
-    -- KEYS ($5d..$64, the Blitz attack ids) are structural -- they are
+    -- The signature is keys only, with the costs wildcarded (see #45): the
+    -- keys ($5d..$64, the Blitz attack ids) are structural, since they are
     -- FixPlayerAttack's +$5d run and cannot move without the verb moving.
     local keys = { 0x5d, 0x5e, 0x5f, 0x60, 0x61, 0x62, 0x63, 0x64 }
     local base
@@ -282,14 +282,14 @@ H.run({ maxFrames = 150000 }, {
   H.release(),
   H.waitFrames(120),
 
-  -- ---------------------------------- 2. CHARGE (ON) / FREE (OFF, control) --
+  -- ------------------------------ 2. charge (ON) / free (OFF, the control) --
   enterDesertBattle(1),
   H.call(function()
     armWatches()
     mp0 = mp()
     -- ON: the real pool must afford the priced steal (measured 31).
-    -- OFF: vanilla gives spell-less LOCKE a 0-MP pool -- and a FREE steal
-    -- executing from 0 MP is exactly the control this half asserts.
+    -- OFF: vanilla gives spell-less LOCKE a 0-MP pool, and a free steal
+    -- executing from 0 MP is the control this half asserts.
     if mode == "on" then
       H.assertEq(mp0 >= STEAL_COST, true,
         "his real pool affords the priced steal")
@@ -308,22 +308,22 @@ H.run({ maxFrames = 150000 }, {
         "ON: Ot6AbilityCost priced cmd $05 at 4 (flat path)")
       H.assertEq(left, mp0 - STEAL_COST, "ON: the steal deducted exactly 4 MP")
     else
-      -- If this trips with a NONZERO qcost, suspect the build probe above
-      -- before you suspect Steal.
+      -- If this trips with a nonzero qcost, check the build probe above
+      -- before checking Steal.
       H.assertEq(rec.qcost, 0, "OFF: cmd $05 keeps vanilla's 0 (Ot6AbilityCost absent)")
       H.assertEq(left, mp0, "OFF: the steal is FREE -- vanilla behavior, the control")
     end
     H.screenshot("stealmp_" .. mode .. "_affordable")
   end),
 
-  -- ------------------------------------------------- 3. REFUSAL (ON only) --
-  -- Poverty is EARNED: real unboosted attempts drain 4 MP each (target
-  -- irrelevant -- the universal charge lands before the steal effect looks
-  -- at the loot) until the pool cannot pay one more.  Then a FRESH battle
-  -- re-seeds real loot, and a 3-bp GUARANTEED steal -- which can never
-  -- miss -- is refused by the universal insufficient-mp fizzle: nothing
+  -- ------------------------------------------------- 3. refusal (ON only) --
+  -- Poverty is earned: real unboosted attempts drain 4 MP each (the target does
+  -- not matter, because the universal charge lands before the steal effect
+  -- looks at the loot) until the pool cannot pay one more.  Then a fresh battle
+  -- re-seeds real loot, and a 3-bp guaranteed steal, which cannot
+  -- miss, is refused by the universal insufficient-mp fizzle: nothing
   -- taken, MP untouched.  The OFF build charges 0, so there is nothing to
-  -- refuse -- run this half only under the flag (battle_mpcost.lua ditto).
+  -- refuse, and this half runs only under the flag, as in battle_mpcost.lua.
   H.cond(function() return mode == "on" end, {
     H.call(function()
       drive.target = nil                         -- any monster will do

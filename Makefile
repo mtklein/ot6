@@ -4,7 +4,7 @@ FLIPS   := tools/bin/flips
 MESEN   := tools/Mesen.app/Contents/MacOS/Mesen
 VERSION := 0.5
 
-# A failed recipe (e.g. the checksum step dying mid-build) leaves a half-built target the next make treats as up-to-date — bit us twice on 2026-07-18.
+# A failed recipe (e.g. the checksum step dying mid-build) leaves a half-built target the next make treats as up-to-date. That happened twice on 2026-07-18.
 .DELETE_ON_ERROR:
 
 .PHONY: all rom patch run test tested verify clean release release-test savestates savestates-test nomp-rom
@@ -33,7 +33,7 @@ rom: verify
 # ROM on disk is still that one.  This is structural on purpose: a human
 # (or an agent) reading "green" off a scrolled-past terminal, or piping
 # the suite through `tail` so the shell reports tail's exit status, is
-# how v0.2 got tagged without anyone actually knowing the check was green.
+# how v0.2 got tagged without anyone knowing whether the check was green.
 # Nothing here is allowed to depend on remembering to look.
 STAMP := build/.suite-pass
 
@@ -54,7 +54,7 @@ patch: tested
 	$(FLIPS) --create --bps "$(BASE)" build/ot6.sfc build/dist/ot6-from-ff3us10.bps
 	@ls -la build/dist/ot6-from-ff3us10.bps
 
-# release: build the ROM, run BOTH checks, then emit the distribution patch.
+# release: build the ROM, run both checks, then emit the distribution patch.
 # `test` is intentionally the fast development check and lets the tests that
 # need generated savestates skip when those fixtures are absent.  A release
 # must also generate the complete advertised story chain and rerun the suite
@@ -76,7 +76,7 @@ release: release-test tested
 	@ls -la build/release/
 
 # One GUI instance only: battery saves flush on exit, so a second instance
-# exiting later silently clobbers the first one's in-game saves.
+# exiting later overwrites the first one's in-game saves with no warning.
 run: rom
 	@if ps -axo command | grep "MacOS/Mesen" | grep -v grep | grep -qv testrunner; then \
 		echo "Mesen is already running - use that window (a second instance"; \
@@ -86,35 +86,35 @@ run: rom
 	fi
 
 # ------------------------------------------------- the savestate graph -----
-# EVERY generated savestate -- the suite's own three fixtures and the whole
-# story chain -- lives in ONE generated ninja graph (issue #25):
+# Every generated savestate, the suite's own three fixtures and the whole
+# story chain, lives in one generated ninja graph (issue #25):
 #
 #   tools/tests/savestate_graph.py        the graph, as data (one entry/state)
 #   tools/tests/lib/savestate_ninja.py    emits it as build/build.ninja
 #
-# Why ninja and not make macros: this Makefile had already bypassed make's
-# core value proposition -- a content stamp beside a `touch` (two staleness
-# mechanisms that could disagree, and on 2026-07-27 did: "rom content
-# changed" printed, then an old-ROM savestate booted against the new ROM), a
-# grep-generated include whose only job was making make reconsider targets,
-# and a .PHONY pattern rule that silently matched nothing.  In the ninja
-# graph the staleness decision and the execution are one mechanism: every
-# input is a declared dependency, content-vs-mtime is ninja's own `restat`
-# on cheap latch edges, an unknown target is a hard error, and nothing can
-# report success without its command running.  savestate_ninja.py's header
-# holds the full story; savestate_ninja_selftest.sh proves the semantics on
-# a mock tree in seconds, no emulator.
+# Why ninja rather than make macros: this Makefile had already bypassed
+# make's core value proposition, with a content stamp beside a `touch` (two
+# staleness mechanisms that could disagree, and on 2026-07-27 did: "rom
+# content changed" printed, then an old-ROM savestate booted against the new
+# ROM), a grep-generated include whose only job was making make reconsider
+# targets, and a .PHONY pattern rule that matched nothing without saying so.
+# In the ninja graph the staleness decision and the execution are one
+# mechanism: every input is a declared dependency, content-vs-mtime is
+# ninja's own `restat` on cheap latch edges, an unknown target is a hard
+# error, and nothing can report success without its command running.
+# savestate_ninja.py's header has the details; savestate_ninja_selftest.sh
+# proves the semantics on a mock tree in seconds, with no emulator.
 #
 # The targets here stay thin entry points.  Parallelism is ninja's own
 # (all cores by default); pass NINJAFLAGS=-j2 to throttle it.
 NINJA_FILE := build/build.ninja
 NINJAFLAGS ?=
-# first_battle is gen_battle_state's SECOND artifact (battle_levelup and
+# first_battle is gen_battle_state's second artifact (battle_levelup and
 # battle_smoke boot it).  It has its own graph edge since #30's
-# one-edge-one-artifact publish rule, but it was missing here -- so
-# `make test` never freshened it and every ROM change left it stale,
-# red-herringing battle_levelup (issue #41, found twice: the Slot landing
-# and the tube-six build).
+# one-edge-one-artifact publish rule, but it was missing here, so
+# `make test` never freshened it and every ROM change left it stale, which
+# made battle_levelup go red for a reason that was not the change under test
+# (issue #41, found twice: the Slot landing and the tube-six build).
 SUITE_STATES := battle_entry first_battle battle2_entry whelk_entry
 
 .PHONY: graph
@@ -124,19 +124,19 @@ graph:
 	@python3 tools/tests/lib/savestate_ninja.py
 
 # compose.py's selftest is pure python and guards the suite: it is the positive
-# control for sidecar resolution, and a wrong resolution silently tests the
-# wrong ROM's savestates rather than failing.
-# ot6 v0.5 "every ability costs MP": now LIVE in the shipped ROM. This builds
-# the INVERSE control -- the OT6_MP_COSTS=0 baseline (ff6-en-nomp), the
+# control for sidecar resolution, and a wrong resolution tests the wrong ROM's
+# savestates instead of failing.
+# ot6 v0.5 "every ability costs MP" is live in the shipped ROM. This builds
+# the inverse control, the OT6_MP_COSTS=0 baseline (ff6-en-nomp), which is the
 # pre-feature vanilla-OT6 build. Only the battle module reads the flag, so
 # ff6-en-nomp rebuilds just that object and relinks against the stock en
-# objects (see ff6/Makefile). The shipped ON ROM MUST differ from this OFF
-# baseline or the flag is dead code. The suite runs battle_mpcost.lua on the
-# shipped (ON, default) ROM -- asserting the CHARGE and the insufficient-mp
-# REFUSAL; the `test` recipe below runs the SAME self-detecting script on this
-# OFF baseline, asserting the verb stays FREE and the cost table is ABSENT
-# (the pre-feature negative control). Two runs, both states, one instrument --
-# the fix_checksum rewrite's A/B technique lifted to behavior.
+# objects (see ff6/Makefile). The shipped ON ROM must differ from this OFF
+# baseline, or the flag is dead code. The suite runs battle_mpcost.lua on the
+# shipped (ON, default) ROM, asserting the charge and the insufficient-mp
+# refusal; the `test` recipe below runs the same self-detecting script on this
+# OFF baseline, asserting the verb stays free and the cost table is absent
+# (the pre-feature negative control). That is two runs, both states, one
+# instrument, applying the fix_checksum rewrite's A/B technique to behavior.
 nomp-rom: rom
 	$(MAKE) -C ff6 ff6-en-nomp
 	@if cmp -s build/ot6.sfc ff6/rom/ff6-en-nomp.sfc; then \
@@ -205,31 +205,32 @@ test: rom nomp-rom graph
 
 # --------------------------------------------------------------- savestates --
 # The story chain past the whelk, produced by the generated ninja graph
-# above.  `test` deliberately depends on none of it: every state in it is
+# above.  `test` depends on none of it, on purpose: every state in it is
 # a multi-minute scripted playthrough, and the suite's regeneration cost has
-# to stay what it was.  Build it on demand -- everything with `make savestates`,
+# to stay what it was.  Build it on demand: everything with `make savestates`,
 # or one state (and its stale transitive predecessors) by naming it:
 #
 #   ninja -f build/build.ninja vargas_entry
 #
 # The play-order chain, the checkpoint keys, the per-state route notes and the
-# scenario-stacking story all live with the data: tools/tests/savestate_graph.py.
-# SAVESTATES_JOBS bounds `make savestates` -- and ONLY that target -- by default.
+# scenario-stacking notes all live with the data: tools/tests/savestate_graph.py.
+# SAVESTATES_JOBS bounds `make savestates`, and only that target, by default.
 # Every other ninja target here is cheap and stays on ninja's own default.
 #
-# WHY A BOUND AT ALL.  Each savestate generation is a Mesen process racing a
-# WALL-CLOCK cap (run.sh --timeout=600).  nice(1) does not slow the wall, and
-# every one of them is equally niced, so they starve EACH OTHER: unbounded,
+# Why bound it at all.  Each savestate generation is a Mesen process racing a
+# wall-clock cap (run.sh --timeout=600).  nice(1) does not slow the wall, and
+# every one of them is equally niced, so they starve each other: unbounded,
 # `savestates` fans out to cores+2 emulators, each gets well under a core, and
-# the longest steps cross 600s and are killed by the timeout -- `savestates` is
+# the longest steps cross 600s and are killed by the timeout.  `savestates` is
 # the one target that reliably provokes this, because it is the one that
 # parallelises hard on its own.
-# "Green" then depends on how loaded the machine happened to be.
+# Whether the run comes out green then depends on how loaded the machine
+# happened to be.
 #
-# WHY 4.  It is the number that has been measured, not derived: 109 states
-# generated in ~60 min with ZERO timeout kills (2026-07-29, M4 Max, other
+# Why 4.  It is a measured number rather than a derived one: 109 states
+# generated in ~60 min with no timeout kills (2026-07-29, M4 Max, other
 # agents live).  Raise it
-# on an idle machine -- NINJAFLAGS still overrides everything, and
+# on an idle machine; NINJAFLAGS still overrides everything, and
 # `make savestates SAVESTATES_JOBS=8` overrides just this.
 SAVESTATES_JOBS ?= 4
 savestates: rom graph
@@ -241,21 +242,20 @@ savestates: rom graph
 	@echo "savestates up to date"
 
 # ---------------------------------------------------------------- smoke ----
-# The FAST FALSIFICATION LOOP.  `make savestates` is authoritative but serial and
-# costs over an hour, which is what makes a wrong guess expensive -- and a wrong
-# guess is only ever a problem when checking it is slow.
+# The fast falsification loop.  `make savestates` is authoritative but serial
+# and costs over an hour, which is what makes a wrong guess expensive to check.
 #
-# For a LIB-ONLY change the existing savestates still boot, because they are tied
+# For a lib-only change the existing savestates still boot, because they are tied
 # to ROM contents and the ROM has not moved.  So any generator can be run
 # directly, right now, from the state already on disk.  These are the ones that
-# have historically caught harness regressions, each exercising a DIFFERENT way
-# the harness can be lied to:
+# have caught harness regressions before, each exercising a different way
+# the harness can report something that did not happen:
 #
 #   gen_moogle           multi-party field scribble in the battle-HP table
 #   gen_narshe_battle    NPC activation that depended on navTo's mid-glide handoff
 #   gen_sabin_gau        a navTo aimed at a tile you step through, never rest on
 #   gen_zozo5_ramuh      the party menu, where a false battle reading A-hammers
-#   gen_opera7_blackjack the world arrival redraw, same lie on the world map
+#   gen_opera7_blackjack the world arrival redraw, same wrong reading on the world map
 #   gen_vector_entry     worldGrind, an event trigger, and the party-count control
 #   gen_n128             cutscene TRAIN and six scripted battles
 #
@@ -265,11 +265,12 @@ SMOKE := gen_moogle gen_narshe_battle gen_sabin_gau gen_zozo5_ramuh \
          gen_opera7_blackjack gen_vector_entry gen_n128
 SMOKE_TARGETS := $(addprefix smoke-,$(SMOKE))
 
-# NB: a STATIC pattern rule, not an implicit one.  GNU make does not apply
-# implicit pattern rules to .PHONY targets, so `smoke-%: rom` silently matched
-# nothing and `smoke` reported "all 7 passed" in 0.036s having run nothing at
-# all.  The receipt count below exists because of that: a smoke target that can
-# report success without executing is the exact failure this suite keeps finding.
+# NB: a static pattern rule rather than an implicit one.  GNU make does not
+# apply implicit pattern rules to .PHONY targets, so `smoke-%: rom` matched
+# nothing without saying so, and `smoke` reported "all 7 passed" in 0.036s
+# having run nothing.  The receipt count below exists because of that: a smoke
+# target that can report success without executing is the failure this suite
+# keeps finding.
 .PHONY: smoke $(SMOKE_TARGETS)
 smoke: $(SMOKE_TARGETS)
 	@n=`ls build/states/smoke_*.receipt 2>/dev/null | wc -l | tr -d ' '`; \
@@ -280,10 +281,11 @@ smoke: $(SMOKE_TARGETS)
 
 # Generators that start from a checkpoint cold-load a tracked battery instead
 # of booting a predecessor savestate, so smoke must hand each one its
-# checkpoint exactly as the graph's checkpoint edges do (OT6_SRAM_CHECKPOINT) --
-# without it the run times out waiting for the cold Continue.  One entry per
-# such smoke generator, keyed by gen name; a gen with no entry boots
-# savestates.  This map is what retired gen_n128's dual-boot battery probe:
+# checkpoint the same way the graph's checkpoint edges do
+# (OT6_SRAM_CHECKPOINT).  Without it the run times out waiting for the cold
+# Continue.  One entry per such smoke generator, keyed by gen name; a gen with
+# no entry boots savestates.  This map is what retired gen_n128's dual-boot
+# battery probe:
 # smoke now hands every such generator its battery instead of asking the
 # generator to guess its boot from SRAM contents.
 SMOKE_CHECKPOINT_gen_vector_entry := tools/tests/checkpoints/post-opera-v1
@@ -301,7 +303,7 @@ $(SMOKE_TARGETS): smoke-%: rom
 
 # ---- SRAM checkpoints, keyed by milestone (issue #25) ---------------------
 # tools/tests/checkpoints/<key>/ is one milestone checkpoint: manifest.json plus a
-# 32 KiB battery payload generated through the game's own Save UI (#9 -- never
+# 32 KiB battery payload generated through the game's own Save UI (#9: never
 # synthesised).  The key is the milestone name; post-opera-v1 is the only
 # real one today, and savestate_graph.py's A-F boundary section names the states
 # this convention must hold (mrf-save-room, n024-entry-save, ...).  Dirs
@@ -314,16 +316,17 @@ $(SMOKE_TARGETS): smoke-%: rom
 # generator does not declare the checkpoint's layout.  Smoke's checkpoint
 # generators get theirs through the SMOKE_CHECKPOINT_* map above.
 
-# The stale-checkpoint regression (#25): prove both refusal paths FAIL, loudly,
-# naming what differed -- the pre-boot persistent_layout check and the
-# in-emulator entry contract.  A check is only evidence when its negative has
-# been observed failing; a green run from a checkpoint alone cannot show that.
+# The stale-checkpoint regression (#25): prove that both refusal paths fail
+# and that each names what differed.  The two paths are the pre-boot
+# persistent_layout check and the in-emulator entry contract.  A check is only
+# evidence when its negative has been observed failing, and a green run from a
+# checkpoint alone does not show that.
 # Costs one short emulator boot (~1 min); not part of smoke.
 .PHONY: checkpoint-negatives
 checkpoint-negatives: rom
 	sh tools/tests/lib/checkpoint_negatives.sh
 
-# The suite INCLUDING the tests that need generated savestates.  battle_vargas
+# The suite including the tests that need generated savestates.  battle_vargas
 # asserts on vargas_entry, and `test` deliberately does not depend on it:
 # generating it replays the whole story chain, which is the cost `make
 # savestates` exists to keep out of `make test`.  suite.sh picks the test up

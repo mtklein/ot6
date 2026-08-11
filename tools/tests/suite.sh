@@ -4,21 +4,22 @@
 # explicit expected-fail list. Nonzero exit on any unexpected result.
 #
 # OT6_JOBS=N fans the tests out across N isolated run.sh workers
-# (OT6_WORKER; 1 = serial). Every suite test is a pure savestate load -- the
-# savestate generators (gen_battle_state, gen_battle2) run as Makefile
-# prerequisites BEFORE the suite -- so tests are independent and fan out
+# (OT6_WORKER; 1 = serial). Every suite test is a pure savestate load, since
+# the savestate generators (gen_battle_state, gen_battle2) run as Makefile
+# prerequisites before the suite, so tests are independent and fan out
 # freely. Tests are composed once up front:
 # composing reads lib/ot6.lua + lib/ot6_field.lua live, and a
 # mid-suite edit must not split the suite across two libs.
 #
-# The default is the machine's P-core count (perflevel0), not a fixed number.
-# Measured on an M4 Max (10 P-cores, 42-test suite): the LPT makespan is
-# CPU-bound until ~6 workers (113s at 4 -> 83s at 6) and then FLAT -- past that
-# the wall is a single test, battle_class (~78s), which no fan-out can split.
-# So the P-core count auto-sizes to the CPU-bound region and self-caps at the
-# floor; over-provisioning workers is harmless (idle pull-queue slots), the old
-# hardcoded 4 just left P-cores idle on anything bigger than a 4-core part. To
-# push under the floor you must shorten battle_class itself, not add workers.
+# The default is the machine's P-core count (perflevel0) rather than a fixed
+# number. Measured on an M4 Max (10 P-cores, 42-test suite): the LPT makespan
+# is CPU-bound until ~6 workers (113s at 4 -> 83s at 6) and flat past that,
+# where the limit is a single test, battle_class (~78s), which no fan-out can
+# split. So the P-core count auto-sizes to the CPU-bound region and self-caps
+# at the floor; over-provisioning workers is harmless (idle pull-queue slots),
+# and the old hardcoded 4 left P-cores idle on anything bigger than a 4-core
+# part. To push under the floor, shorten battle_class itself; adding workers
+# will not do it.
 set -u
 ROOT="$(cd "$(dirname "$0")/../.." && pwd)"
 RUN="$ROOT/tools/tests/run.sh"
@@ -44,26 +45,26 @@ if [ "${1:-}" = "--isolation-probe" ]; then
   exit 0
 fi
 # -------------------------------------------------------------- test discovery
-# Suite membership is SELF-DECLARED, one marker per test file, so adding a test
-# is a one-line edit to that test's OWN .lua -- never the shared list that every
-# integration used to edit in lockstep (the merge magnet this replaced).  A test
-# opts in with a directive comment on its first line:
+# Suite membership is self-declared, one marker per test file, so adding a test
+# is a one-line edit to that test's own .lua rather than an edit to the shared
+# list that every integration used to change in lockstep, which drew merge
+# conflicts.  A test opts in with a directive comment on its first line:
 #
 #   -- @suite                          plain member
 #   -- @suite slow                     member; a long-runner (LPT ordering hint)
-#   -- @suite savestate=<fixture>      member IFF build/states/<fixture>.mss
-#                                      exists -- else reported SKIPPED, never
-#                                      silently dropped (see the savestate=
-#                                      section below)
+#   -- @suite savestate=<fixture>      member if and only if
+#                                      build/states/<fixture>.mss exists;
+#                                      otherwise reported SKIPPED rather than
+#                                      dropped without notice (see the
+#                                      savestate= section below)
 #   -- @suite savestate=<fixture> slow savestate= member, also a long-runner
 #
-# The four lists suite.sh used to hand-sync -- TESTS, SAVESTATE_TESTS,
-# savestate_fixture(), SCHED_LONG -- are ALL derived here in one pass from those
-# markers.  The glob expands in sorted order, so discovery is deterministic; and
-# because every suite test is a pure savestate load that run.sh isolates, the
-# order tests run and print in carries no meaning (README: "order doesn't
-# matter").  Membership and the fixture condition are what must be exact, and
-# they are.
+# The four lists suite.sh used to hand-sync (TESTS, SAVESTATE_TESTS,
+# savestate_fixture(), SCHED_LONG) are all derived here in one pass from those
+# markers.  The glob expands in sorted order, so discovery is deterministic,
+# and because every suite test is a pure savestate load that run.sh isolates,
+# the order tests run and print in carries no meaning (README: "order doesn't
+# matter").  Membership and the fixture condition are what must be exact.
 SUITE=""; SAVESTATE_TESTS=""; SAVESTATE_FIX=""; SLOW=""
 for f in "$ROOT"/tools/tests/*.lua; do
   grep -q '^-- @suite' "$f" || continue
@@ -100,17 +101,17 @@ ram_env_for() {
     *) echo "" ;;
   esac
 }
-# TESTS THAT NEED THE GENERATED SAVESTATES.  Such a test asserts on a fixture
-# that only `make savestates` generates -- reaching it replays the whole story
-# chain, many multi-minute scripted playthroughs, the very cost `make savestates`
-# exists to keep out of `make test`.  Such a test declares
+# Tests that need the generated savestates.  Such a test asserts on a fixture
+# that only `make savestates` generates; reaching it replays the whole story
+# chain, many multi-minute scripted playthroughs, which is the cost
+# `make savestates` exists to keep out of `make test`.  Such a test declares
 # `-- @suite savestate=<fixture>` and
-# joins the suite the instant build/states/<fixture>.mss exists; until then it is
-# reported SKIPPED (below), never silently dropped.  `make savestates-test`
-# generates the chain first, so it always runs whatever can be generated.  The
-# per-test WHY -- which fixture, and why that formation is the one that
-# exercises the check -- lives in each test's own header now, right under its
-# @suite marker.
+# joins the suite once build/states/<fixture>.mss exists; until then it is
+# reported SKIPPED (below) rather than dropped without notice.
+# `make savestates-test` generates the chain first, so it always runs whatever
+# can be generated.  The reason for each such test, which fixture it uses and
+# why that formation is the one that exercises the check, lives in that test's
+# own header, under its @suite marker.
 savestate_fixture() {   # test name -> the abs .mss path from its @suite marker
   for pair in $SAVESTATE_FIX; do
     case "$pair" in "$1="*) echo "$ROOT/build/states/${pair#*=}.mss"; return ;; esac
@@ -125,7 +126,7 @@ for t in $SAVESTATE_TESTS; do
   fi
 done
 
-# `suite.sh --list` -- print what discovery resolved, run nothing, exit.  A fast
+# `suite.sh --list`: print what discovery resolved, run nothing, exit.  A fast
 # check that a new @suite marker took: which tests would run, which are SKIPPED
 # for an absent fixture, which count as long-runners.  `make test` calls suite.sh
 # with no args, so this never touches the correctness check.
@@ -140,12 +141,12 @@ XFAIL=""   # keep empty; XPASS fails the suite to force cleanup
 fail=0; summary=""
 # Tally, printed as one line under the per-test list.  Establishing "82 pass,
 # 0 fail" used to mean grepping the output for '": pass ["' and counting, and
-# an agent who does that from a scrolled terminal is doing arithmetic on a
-# window rather than on the run.  Same reasoning as the $(STAMP) machinery in
+# an agent doing that from a scrolled terminal counts what is in the window
+# rather than what the run did.  Same reasoning as the $(STAMP) machinery in
 # the Makefile ("nothing here is allowed to depend on remembering to look"),
 # one level down: the exit status is still what decides, but the number is now
-# stated rather than reconstructed.  Counted in verdict()/result() so no
-# category can be added later and quietly stay out of the total -- the
+# stated rather than reconstructed.  Counted in verdict()/result() so that a
+# category added later cannot stay out of the total without notice; the
 # breakdown is summed at print time and cross-checked against it.
 n_pass=0; n_fail=0; n_xfail=0; n_xpass=0; n_skip=0
 
@@ -169,10 +170,10 @@ verdict() {
   fi
 }
 
-# Fixture freshness, stated BEFORE the run rather than discovered after it.
-# A stale generated fixture makes a test red for a reason that is not the
-# reader's change, and the only notice of it used to be a print() buried in
-# build/states/suite_<t>.log -- which nobody opens for a test they did not
+# Fixture freshness, stated before the run rather than discovered after it.
+# A stale generated fixture makes a test red for a reason other than the
+# reader's change, and the only notice of it used to be a print() inside
+# build/states/suite_<t>.log, which nobody opens for a test they did not
 # expect to fail.  ~2s for ~105 fixtures, against a multi-minute suite.
 if [ -d "$ROOT/build/states" ]; then
   python3 "$ROOT/tools/tests/lib/compose.py" --check-states || {
@@ -186,10 +187,10 @@ if [ "$JOBS" -gt 1 ]; then
   CLAIMS="$SROOT/claims"; LDIR="$SROOT/logs"
   mkdir -p "$CDIR" "$RDIR" "$CLAIMS" "$LDIR"
   for t in $TESTS; do
-    # Keep the whole compose log.  `>/dev/null` used to eat it -- including,
-    # on failure, the only line saying WHY, leaving "compose failed: <test>"
-    # and nothing else.  That is the exact shape of the mistake the brief
-    # warns about ("do not let a pipe eat your failure"), and it got worse
+    # Keep the whole compose log.  `>/dev/null` used to discard it, including,
+    # on failure, the only line saying why, leaving "compose failed: <test>"
+    # and nothing else.  That is the shape of the mistake the brief warns
+    # about ("do not let a pipe eat your failure"), and it got worse
     # when an ambiguous symbol became a fatal compose error: the message
     # naming both candidate addresses would have gone straight to /dev/null.
     if ! python3 "$ROOT/tools/tests/lib/compose.py" \
@@ -199,8 +200,8 @@ if [ "$JOBS" -gt 1 ]; then
       cat "$SROOT/compose.$t"
       exit 1
     fi
-    # Warnings that are NOT the fixture staleness already reported above --
-    # an unresolvable symbol, say.  Deduped across tests: ~100 tests share
+    # Warnings other than the fixture staleness already reported above, such
+    # as an unresolvable symbol.  Deduped across tests: ~100 tests share
     # ~30 fixtures, so an undeduped list is the same line a hundred times.
     grep '^WARNING' "$SROOT/compose.$t" | grep -v 'is STALE' | grep -v 'is UNBOUND' >> "$SROOT/warn" || :
   done
@@ -210,23 +211,23 @@ if [ "$JOBS" -gt 1 ]; then
     echo
   fi
   # Execution order for the pull queue below: front-load the known long
-  # runners. Workers used to get a STATIC i%JOBS slice, and that was the whole
-  # problem -- it pinned battle_class (~156s) AND battle_vargas (~64s) AND four
+  # runners. Workers used to get a static i%JOBS slice, which was the problem:
+  # it pinned battle_class (~156s), battle_vargas (~64s) and four
   # more onto one worker (~311s of work) while another drained in ~60s and then
-  # sat idle. The fix is two things: (1) a dynamic claim queue -- each worker
-  # grabs the NEXT unclaimed test as it frees up, so fast workers pull more --
-  # and (2) longest-first order, so no worker ever starts a 156s test after the
-  # rest have drained. That is textbook LPT scheduling: measured makespan
+  # sat idle. The fix is two things: (1) a dynamic claim queue, in which each
+  # worker grabs the next unclaimed test as it frees up, so fast workers pull
+  # more, and (2) longest-first order, so no worker starts a 156s test after the
+  # rest have drained. That is LPT scheduling: measured makespan
   # ~311s -> ~168s at JOBS=4, against a ~156s floor (the single longest test,
-  # which no amount of fan-out can split). The long-runner set is ONLY a hint,
+  # which no amount of fan-out can split). The long-runner set is only a hint,
   # and it now comes from the `slow` attribute on tests' @suite markers ($SLOW,
-  # discovered up top) instead of a hand-kept list here -- the list that used to
+  # discovered up top) instead of a hand-kept list here, which used to
   # drift out of sync with TESTS. Every test still runs whether or not it is
-  # marked slow (unmarked ones are appended below); a mis-marked duration just
-  # costs a little idle tail, never a lost or double-run test. $SLOW is in sorted
-  # order, which still front-loads the two longest (battle_class, battle_divines)
-  # into the first wave -- all LPT needs; exact order past that barely moves the
-  # makespan.
+  # marked slow (unmarked ones are appended below); a mis-marked duration
+  # costs a little idle tail and never loses or double-runs a test. $SLOW is in
+  # sorted order, which still front-loads the two longest (battle_class,
+  # battle_divines) into the first wave, which is all LPT needs; exact order
+  # past that barely moves the makespan.
   in_list() { case " $2 " in *" $1 "*) return 0 ;; *) return 1 ;; esac; }
   ORDER=""
   for t in $SLOW; do in_list "$t" "$TESTS" && ORDER="$ORDER $t"; done
@@ -280,9 +281,9 @@ printf "OT6 suite:%b\n" "$summary"
 
 # The tally.  `ran` is summed from the categories rather than counted
 # separately, and then checked against the discovered TESTS list: if the two
-# disagree, a test was discovered and never accounted for, which is the one
-# failure mode a summary line can have that is worse than no summary line at
-# all.  Say so and fail rather than print a number that is quietly short.
+# disagree, a test was discovered and never accounted for, which is worse
+# than printing no summary line at all.  Say so and fail rather than print a
+# number that is short without saying so.
 set -- $TESTS; discovered=$#
 ran=$((n_pass + n_fail + n_xfail + n_xpass))
 line="$ran ran: $n_pass pass, $n_fail fail"

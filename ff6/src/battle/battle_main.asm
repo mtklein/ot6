@@ -18,15 +18,15 @@
 .include "macros.inc"
 .include "code_ext.inc"
 
-; ot6 (v0.5): "every ability costs MP" -- now LIVE by default. The charge
+; ot6 (v0.5): "every ability costs MP", live by default. The charge
 ; machinery (Ot6AbilityCost + Ot6AbilityCostTbl, ot6.asm) prices Blitz,
-; Bushido and Tools at queue time. v0.4 shipped it DORMANT (default off)
+; Bushido and Tools at queue time. v0.4 shipped it dormant (default off)
 ; because a charge on a menu that shows no cost is a hidden tax; v0.5 turns it
-; ON as the headline combat-economy change, alongside the menu-bank cost
-; display that ends the silence. This symbol stays the ONE build-time gate:
+; on as the headline combat-economy change, alongside the menu-bank cost
+; display. This symbol stays the one build-time gate:
 ; the default (1) is the shipped, charging ROM, and an explicit
-; `-D OT6_MP_COSTS=0` reassembles the pre-feature vanilla-OT6 baseline -- NOT
-; one byte of the machinery -- kept as the differ-checked regression control
+; `-D OT6_MP_COSTS=0` reassembles the pre-feature vanilla-OT6 baseline, without
+; one byte of the machinery, kept as the differ-checked regression control
 ; (ff6-en-nomp; tools/tests/battle_mpcost.lua proves both halves). See
 ; docs/design/mp-economy.md.
 .ifndef OT6_MP_COSTS
@@ -3361,21 +3361,22 @@ _c21554:
 
 Cmd_10:
 .if OT6_MP_COSTS
-        ; ot6 #40: an unpayable rage START must not lock the hunter.  Exactly
-        ; #34's dance lesson -- the universal insufficient-MP fizzle refuses the
-        ; CAST but runs after this command body, so a broke Gau would keep the
-        ; whole-battle RAGE status for free and every possessed turn after it is
-        ; priced at 0.  Skip the beast latch AND the status set and run the
+        ; ot6 #40: an unpayable rage start must not lock the hunter.  This is
+        ; #34's dance finding: the universal insufficient-MP fizzle refuses the
+        ; cast but runs after this command body, so a Gau who cannot pay would
+        ; keep the whole-battle RAGE status for free and every possessed turn
+        ; after it is
+        ; priced at 0.  Skip the beast latch and the status set and run the
         ; plain exec, whose fizzle is the standard refusal surface.
         jsl     Ot6RageStartGate        ; carry set = cannot pay the start
         bcc     @ot6_paid
         jmp     Cmd_02
 @ot6_paid:
 .endif
-        ; ot6 #40: latch the trance's boost tier before anything else -- and
-        ; only on the START turn (the proc's own RAGE-bit test), because a
+        ; ot6 #40: latch the trance's boost tier before anything else, and
+        ; only on the start turn (the proc's own RAGE-bit test), because a
         ; mid-trance re-entry would read the already-consumed pending byte and
-        ; silently drop the possession to tier 0.  Slot's OT6_SLOTTIER pattern
+        ; drop the possession to tier 0.  Slot's OT6_SLOTTIER pattern
         ; at whole-battle range.
         jsl     Ot6RageTierLatch
 @1560:  lda     $33a8,y
@@ -3760,12 +3761,12 @@ _1765:  sta     $3412
 
 Cmd_13:
 .if OT6_MP_COSTS
-        ; ot6 #34: an unpayable dance START must not lock the dancer.  the
+        ; ot6 #34: an unpayable dance start must not lock the dancer.  the
         ; universal insufficient-MP fizzle (CalcAttackEffect @32ca) refuses
-        ; the CAST, but it runs after this command body -- measured: a 7-MP
+        ; the cast, but it runs after this command body.  measured: a 7-MP
         ; dancer kept the whole-battle dance state for free while the charge
         ; was refused (battle_dancemp's refusal phase, first cut).  when the
-        ; queued cost exceeds the pool, skip the status set AND the
+        ; queued cost exceeds the pool, skip the status set and the
         ; background roll and run the plain exec, whose fizzle shows the
         ; standard refusal.  mid-dance turns queue at 0 (Ot6AbilityCost's
         ; cmd-$13 arm), so this gate never fires on a locked-in step.
@@ -6959,14 +6960,14 @@ LoadMagicProp:
 .export MagicProp
 
 ; ------------------------------------------------------------------------------
-; OT6 v0.6 -- MagicProp is the vanilla blob PLUS three named byte overrides.
+; OT6 v0.6: MagicProp is the vanilla blob plus three named byte overrides.
 ;
-; WHY THE SPLICE AND NOT AN EDITED .dat.  magic_prop_en.dat is 256 fixed 14-byte
+; Why the splice and not an edited .dat.  magic_prop_en.dat is 256 fixed 14-byte
 ; records with no source form; a byte changed inside it is invisible in a diff,
 ; unattributable in review, and indistinguishable from bit-rot.  Every OT6 change
-; to it therefore lives HERE, named, with the vanilla value it replaces and the
+; to it therefore lives here, named, with the vanilla value it replaces and the
 ; reason, and the .dat stays byte-identical to the FF3us 1.0 base.  Splitting the
-; incbin costs nothing at runtime -- the linker emits the same 3584 bytes -- and
+; incbin costs nothing at runtime (the linker emits the same 3584 bytes) and
 ; the sum of the pieces is asserted below, so a mis-typed offset is a build
 ; error rather than a silently corrupted table.
 ;
@@ -6980,21 +6981,21 @@ MAGIC_PROP_COUNT = 256
 
 ; ---- override 1: Osmose ($29) MP cost, 1 -> 8 -------------------------------
 ; docs/design/magicite-ifrit-shiva.md §6.  Shiva grants Osmose, and Osmose is
-; the party's only MP income at a release where OT6_MP_COSTS made EVERY verb but
+; the party's only MP income at a release where OT6_MP_COSTS made every verb but
 ; Fight cost MP.  Vanilla priced it at 1 MP in a game where four characters
-; spent MP at all.  Under OT6 that 1 MP buys a FULL REFILL: Facility boss MP
+; spent MP at all.  Under OT6 that 1 MP buys a full refill: Facility boss MP
 ; pools run 447-810 (monster_prop.dat +$0a) against party pools of 40-60, and
 ; magic damage at these levels computes for several hundred, so one cast is many
-; times the caster's entire bar.  A 1-MP full refill is not a spell, it is an
-; off switch for the currency v0.5 just turned on.
+; times the caster's entire bar.  A 1-MP full refill removes the currency v0.5
+; had just turned on.
 ;
-; THIS IS AN EXPLICIT, ARGUED EXCEPTION to mp-economy.md's house rule "magic
-; keeps its vanilla MP costs".  It is recorded as an exception rather than taken
-; quietly: the rule was written 2026-07-17, BEFORE costs went live and before
+; This is an explicit exception to mp-economy.md's house rule "magic
+; keeps its vanilla MP costs".  It is recorded as an exception rather than made
+; quietly: the rule was written 2026-07-17, before costs went live and before
 ; the "only Fight is free" absolute, and the ground moved under it.  8 MP keeps
 ; Osmose strongly net-positive (still a refill), keeps it castable on a nearly
 ; empty pool, and stops it from being free.  It applies globally, so ZoneSeek
-; ($12, genju_prop.asm) inherits it -- correctly, it is the same spell.
+; ($12, genju_prop.asm) inherits it, which is correct: it is the same spell.
 ; Rejected: dropping Osmose from Shiva (loses her whole identity at the exact
 ; release the MP economy went live); gating Ot6BoostDmg off MP-targeting spells
 ; (worth doing as well, but it does not touch the unboosted case, which IS the
@@ -7004,30 +7005,30 @@ OSMOSE_MP_OT6      = 8
 OSMOSE_MP_VANILLA  = 1                  ; the byte this replaces
 
 ; ---- overrides 2 & 3: Diamond Dust ($38), Shiva's summon --------------------
-; docs/design/magicite-ifrit-shiva.md §5.3.  Vanilla $38 is a straight MIRROR of
+; docs/design/magicite-ifrit-shiva.md §5.3.  Vanilla $38 mirrors
 ; Ifrit's Inferno ($37): same targeting $6e, same unblockable flag, power 52 vs
 ; 51, 27 MP vs 26.  Two apex moments that are the same moment in two colours is
-; the exact failure this pair's redesign exists to avoid, so Diamond Dust is
-; re-authored as the TEMPO divine while Inferno stays the damage divine:
-;   power  52 -> 34   (still a real nuke at a 3-BP x8, just not THE nuke)
+; the failure this pair's redesign exists to avoid, so Diamond Dust is
+; re-authored as the tempo divine while Inferno stays the damage divine:
+;   power  52 -> 34   (still large damage at a 3-BP x8, but not the largest)
 ;   status3 $00 -> STATUS3::SLOW
 ; Slow is element-independent, which is the point: it is worth something against
 ; the machines that shrug off ice, and it buys the party actions inside every
 ; telegraph fuse.  Decoded from monster_prop.dat +$16 (STATUS3 immunities):
-; Number 128 $10, both Cranes $10, both blades $00 -> Slow LANDS; Number 024
-; $14 -> Slow is BLOCKED, which is correct, that boss's contract is that classes
+; Number 128 $10, both Cranes $10, both blades $00 -> Slow lands; Number 024
+; $14 -> Slow is blocked, which is correct: that boss's contract is that classes
 ; are the handhold.
 ;
-; The application path was READ, not assumed (the design flagged it UNVERIFIED
-; and load-bearing).  $38's +$04 carries $20, so CheckHit's multi-target arm
-; (`bit #$20` at @22a1) branches straight to the carry-clear exit @22e8 -- an
-; unconditional hit, no roll.  The per-target loop at @3440 then calls
+; The application path was read rather than assumed (the design flagged it
+; UNVERIFIED).  $38's +$04 carries $20, so CheckHit's multi-target arm
+; (`bit #$20` at @22a1) branches straight to the carry-clear exit @22e8, an
+; unconditional hit with no roll.  The per-target loop at @3440 then calls
 ; MagicStatusEffect unconditionally, which stages $11ac into $3de8 ("status 3/4
 ; to set"), and InitStatusVars masks THAT against $3330 ("blocked status 3/4",
 ; the per-monster immunity) before it is applied.  So an unblockable damage
-; spell does apply its status bytes without a roll, AND per-monster immunity is
-; still consulted -- both halves the design needed.  battle_magicite.lua's
-; DDUST scenario is the behavioural proof.
+; spell does apply its status bytes without a roll, and per-monster immunity is
+; still consulted, which is both halves the design needed.  battle_magicite.lua's
+; DDUST scenario is the behavioural check.
 ;
 ; Boost canon is unaffected: Diamond Dust is a damage verb, so Ot6BoostDmg
 ; multiplies its damage and does not touch the rider.  Because the record is
@@ -12947,12 +12948,12 @@ FixPlayerAttack:
         pha
         xba
         sta     $33a8,y
-        ; ot6 #40: THE START TURN'S COIN IS ROLLED HERE, not in Cmd_10.  The
+        ; ot6 #40: the start turn's coin is rolled here, not in Cmd_10.  The
         ; menu's beast lands in $33a8,y and vanilla rolls the attack right
-        ; away -- so this RandRage runs BEFORE Cmd_10 (and before its
-        ; Ot6RageTierLatch).  Measured (battle_rage.lua): with 1 BP pending,
-        ; roll 1 saw tier 0 and took no extra draw while rolls 2..5 saw tier 1
-        ; -- the very turn the BP was spent on was the one turn it did not buy.
+        ; away, so this RandRage runs before Cmd_10 and before its
+        ; Ot6RageTierLatch.  Measured (battle_rage.lua): with 1 BP pending,
+        ; roll 1 saw tier 0 and took no extra draw while rolls 2..5 saw tier 1,
+        ; so the turn the BP was spent on was the one turn it did not buy.
         ; Latching here as well fixes it: the proc only latches while the RAGE
         ; status is still clear, so this is the start turn by construction and
         ; Cmd_10's own latch (which re-reads the not-yet-consumed pending byte)
@@ -13939,14 +13940,14 @@ InitCmdList:
         cmp     #$12
         beq     @539a       ; branch if mimic
         ; ot6 #47: vanilla read the actor number into B here and converted a
-        ;   GAU slot holding RAGE into FIGHT, so that the rewrite below would
-        ;   hand him SOMETHING in magitek armour or the Fanatics' Tower -- he
-        ;   owned no Fight of his own.  He owns one now (char_prop.asm), so
-        ;   the conversion is not only redundant, it is wrong: it would turn
-        ;   BOTH his Fight row and his Rage row into Magitek (or, magic-only,
+        ;   Gau slot holding RAGE into FIGHT, so that the rewrite below would
+        ;   hand him something in magitek armour or the Fanatics' Tower, since
+        ;   he owned no Fight of his own.  He owns one now (char_prop.asm), so
+        ;   the conversion is redundant and also wrong: it would turn
+        ;   both his Fight row and his Rage row into Magitek (or, magic-only,
         ;   both into Magic) and draw the same command on two rows.  Rage is
         ;   neither a magitek nor a magic-only command, so it now drops out
-        ;   below exactly like every other kit verb.
+        ;   below like every other kit verb.
         cmp     #$00
         bne     @537a       ; branch if command is not fight
         lda     #$1d        ; change command to magitek
@@ -14034,29 +14035,29 @@ InitCmdList:
 
 ; ------------------------------------------------------------------------------
 
-; [ ot6 #47/#51: gau's FIGHT row is shared -- LEAP on the veldt ]
+; [ ot6 #47/#51: gau's Fight row is shared, carrying Leap on the Veldt ]
 ;
 ; Gau carries FIGHT / RAGE / MAGIC / ITEM (char_prop.asm) and all four slots
-; are full, so Leap has no row of its own.  It shares the FIGHT row, not the
-; magic row (which is where #47 first put it -- the owner reversed that on
-; 2026-07-29, and he is right): ON the Veldt, Fight and Leap are redundant,
-; because Leap is the free thing you can always do there and is the reason Gau
-; is standing on the Veldt at all.  Magic is the row you might want in BOTH
+; are full, so Leap has no row of its own.  It shares the Fight row rather than
+; the magic row (which is where #47 first put it; the owner reversed that on
+; 2026-07-29): on the Veldt, Fight and Leap are redundant,
+; because Leap is the free action always available there and is the reason Gau
+; is standing on the Veldt at all.  Magic is the row a player might want in both
 ; places, so Magic is never the row that gets sacrificed.  Off the Veldt the
-; row is Fight; on it, Leap -- and Leap costs nothing (Ot6AbilityCost no longer
+; row is Fight; on it, Leap, and Leap costs nothing (Ot6AbilityCost no longer
 ; has a cmd-$11 arm), so the Veldt's free action is Leap and the free floor
 ; holds in both territories.
 ;
-; SITED IN THE ROW LOOP, not in an init function, because Fight ($00) has no
-; init function at all -- InitCmdIDTbl lists only morph/leap/dance/magic/
+; Sited in the row loop rather than in an init function, because Fight ($00) has
+; no init function at all: InitCmdIDTbl lists only morph/leap/dance/magic/
 ; x-magic/lore.  Running here has three consequences worth naming:
 ;
-;   * it runs BEFORE the relic pass, so a Gau in Dragoon Boots keeps Leap on
-;     the Veldt instead of having it silently replaced by Jump ($00 -> $16,
+;   * it runs before the relic pass, so a Gau in Dragoon Boots keeps Leap on
+;     the Veldt instead of having it replaced by Jump ($00 -> $16,
 ;     RelicCmdTbl1/2).  Off the Veldt the boots still work normally.
-;   * the rewritten row is $11, which IS in InitCmdIDTbl, so the dispatcher
-;     below runs Leap's own vanilla availability test (InitCmd_01) on it for
-;     free -- no duplicated Veldt check, no carry protocol.
+;   * the rewritten row is $11, which is in InitCmdIDTbl, so the dispatcher
+;     below runs Leap's own vanilla availability test (InitCmd_01) on it,
+;     with no duplicated Veldt check and no carry protocol.
 ;   * the magitek / Fanatics' Tower rewrite above has already run and leaves
 ;     no $00 in the list on either path, so this never fires there.  A Gau in
 ;     magitek armour cannot leap out of it, which is correct.
@@ -14688,12 +14689,12 @@ UpdateEnabledMagic:
 
 ; ------------------------------------------------------------------------------
 
-; ot6 #64: an rtl DOOR onto UpdateEnabledMagic, for bank F0.
+; ot6 #64: an rtl entry point onto UpdateEnabledMagic, for bank F0.
 ;
-; Ot6Boost must re-derive an open magic list's prices AND its enabled bits on
+; Ot6Boost must re-derive an open magic list's prices and its enabled bits on
 ; the L/R edge.  Vanilla consumes its own $3204 bit-7 recheck request only in
-; AfterAction2 (:1367-1369) -- "update targets after each command" -- which is
-; far too late for a list the player is looking at RIGHT NOW.  Measured: with
+; AfterAction2 (:1367-1369), "update targets after each command", which is
+; too late for a list the player is looking at.  Measured: with
 ; the request set from Ot6Boost and nothing else, an L press refolded the
 ; name and left the price at the base spell's for the rest of the menu.
 ;
@@ -14702,7 +14703,7 @@ UpdateEnabledMagic:
 ; (CheckMagicEnabled, below) stay in one place, so the grey the player sees
 ; and the grey the A button obeys can never come from two different rules.
 ;
-; $3a4c and $ef are UpdateEnabledMagic's scratch and BOTH are live elsewhere
+; $3a4c and $ef are UpdateEnabledMagic's scratch and both are live elsewhere
 ; -- $3a4c is the in-flight action's staged MP cost (:425) -- and this runs
 ; mid-frame from the HUD path, with another character's action possibly
 ; resolving.  So they are saved across the call rather than trusted.
@@ -14836,15 +14837,15 @@ InitSkills:
 @582f:  sta     $267e,x     ; set known dances
         dex
         bpl     @5828
-        ; ot6 #40 (kit-gau.md §2.2): the ONE choke point for Gau's 8-slot rage
+        ; ot6 #40 (kit-gau.md §2.2): the one choke point for Gau's 8-slot rage
         ; loadout.  Ot6RageList writes at most eight ids to $257e and the count
-        ; to $3a9a, and everything downstream narrows itself for free -- the
+        ; to $3a9a, and everything downstream narrows itself: the
         ; window draw, the confirm (which refuses an $ff cell), the scroll cap,
-        ; and even RandRage's confused-rager pick.
+        ; and RandRage's confused-rager pick.
         ;
-        ; 2026-07-28 ruling: an all-zero loadout (AUTO -- the state every
+        ; 2026-07-28 ruling: an all-zero loadout (AUTO, the state every
         ; existing save and every tracked checkpoint is in) no longer hands back to
-        ; the vanilla walk.  AUTO is the FIRST EIGHT known rages, so the
+        ; the vanilla walk.  AUTO is the first eight known rages, so the
         ; 200-entry wall is not reachable through inaction.  Ot6RageList
         ; therefore always returns carry set and the walk below is unreachable
         ; from here; it stays as the reference the AUTO arm of battle_rage.lua
@@ -15213,8 +15214,8 @@ DecCounters:
 ; GATE.  Vanilla ordered it presence-then-accumulator; this is the same
 ; instructions in the other order, same byte count, and every vanilla
 ; consumer below (stop, condemn, run-away, dot) still sits behind the
-; presence test exactly as before.  What changes is that Ot6Tick now reaches
-; a monster that is OFF STAGE.  Tag fights clear $3aa0.0 on the sibling that
+; presence test as before.  What changes is that Ot6Tick now reaches
+; a monster that is off stage.  Tag fights clear $3aa0.0 on the sibling that
 ; leaves (battle 70's swap is an AI turn, ai_script.asm:4523-4529), and a
 ; Broken one used to freeze there: measured with a paired control in
 ; probe_ifrittag, the on-stage timer ran 16 -> 0 in 2159 frames while the

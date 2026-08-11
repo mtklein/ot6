@@ -1,7 +1,7 @@
 -- probe_esperdetail_checkpoint.lua -- issue #27's verification instrument.
 --
--- The SAME menu drive and cell-level assertions as menu_esperdetail.lua (the
--- suite test), booted instead from a COLD Continue off the tracked post-Opera
+-- The same menu drive and cell-level assertions as menu_esperdetail.lua (the
+-- suite test), booted instead from a cold Continue off the tracked post-Opera
 -- battery checkpoint, which survives ROM changes (issue #9) where savestate
 -- fixtures do not.  Run it in a tree whose fixtures are stale against a fresh
 -- menu-bank build:
@@ -11,14 +11,14 @@
 --
 -- The Continue sequence is gen_vector_entry.lua's.  The party is LOCKE
 -- CELES SABIN EDGAR on the world map at (137,203); the field menu opens from
--- the world map exactly as from a field map.  The esper inventory is pinned
--- to exactly IFRIT and TERRATO (no mod) as in the suite test.
+-- the world map the same way as from a field map.  The esper inventory is
+-- pinned to IFRIT and TERRATO (no mod) as in the suite test.
 --
 -- #62 rebuilt what this asserts: Ot6EsperStatTbl is now two bytes per esper in
--- vanilla's equipment layout (four SIGNED nibbles), so the single
+-- vanilla's equipment layout (four signed nibbles), so the single
 -- "While worn...<Stat> + N" line at row 27 became a caption on the title row
 -- plus one term per nonzero delta packed down from row 17.  Ifrit's row is
--- +6 vigor / +4 stamina / -3 mag.pwr -- three terms and a minus sign.  The
+-- +6 vigor / +4 stamina / -3 mag.pwr, three terms including a minus sign.  The
 -- assertions here track menu_esperdetail.lua's cell for cell.
 -- OT6_CHECKPOINT_LAYOUT: ot6-codex-o8-v1
 local H = dofile("tools/tests/lib/ot6.lua")
@@ -53,7 +53,7 @@ local STAT = {
 local function st() return H.readByte(ZMENUSTATE) end
 
 -- Walk the esper list cursor onto the slot holding esper `idx`.  The list is
--- a TWO-COLUMN grid (GenjuCursorProp `cursor_prop {0,0},{2,8}`, skills.asm):
+-- a two-column grid (GenjuCursorProp `cursor_prop {0,0},{2,8}`, skills.asm):
 -- $4b is a linear slot index whose parity is the column, so down/up move by
 -- 2 and a parity change needs a left/right press first.  Direction-aware
 -- because the slot the list restores after a detail-page exit is not
@@ -89,9 +89,9 @@ local function listSeek(idx, what)
 end
 
 -- #62 took over cols 17-27 of the spell rows and cols 13-28 of the title row,
--- so the cells the old form of this check used there are replaced by a stronger
--- statement of the same class: neither the percent glyph nor the learn-rate
--- colon may appear ANYWHERE in the window's rows.
+-- so the cells the old form of this check used there are replaced by a broader
+-- check of the same class: neither the percent glyph nor the learn-rate
+-- colon may appear anywhere in the window's rows.
 local function assertDeadColumnsGone(tag)
   H.assertEq(cell(12, 17), BLANK, tag .. ": no rate colon after spell 1's name")
   for y = 15, 27, 2 do
@@ -205,7 +205,7 @@ H.run({ maxFrames = 80000 }, {
     H.assertEq(H.readByte(ZLISTTYPE), 4, "list type GENJU (menu_ram.inc)")
   end),
 
-  -- ---- IFRIT: the stone WITH a while-worn mod (+5 vigor) ----------------
+  -- ---- IFRIT: the stone with a while-worn mod (+5 vigor) ----------------
   listSeek(IFRIT, "cursor to IFRIT's row"),
   H.waitFrames(20),                     -- let any list scroll finish (A is
                                         -- ignored while ScrollListPage runs)
@@ -231,7 +231,7 @@ H.run({ maxFrames = 80000 }, {
   H.waitUntil(function() return st() == ST_LIST end, 300, "back to list", 5),
   H.waitFrames(10),
 
-  -- ---- TERRATO: a stone with NO mod (Ot6EsperStatTbl $00) ---------------
+  -- ---- TERRATO: a stone with no mod (Ot6EsperStatTbl $00) ---------------
   listSeek(TERRATO, "cursor to TERRATO's row"),
   H.waitFrames(20),                     -- let any list scroll finish (A is
                                         -- ignored while ScrollListPage runs)

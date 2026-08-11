@@ -1,14 +1,14 @@
--- probe_reveal_trace.lua -- LIVE trace of who writes the revealed-weakness
--- bytes on the first battle, under Random RAM on HEAD, with a WIPED codex.
--- Answers the coordinator's discriminator: with NO codex entry, does a fresh
--- Guard show revealed? If yes -> a real garbage source (trace the writer). If
--- '?' -> the reveal the user sees comes from their populated codex (correct
--- persistence), not RAM.
+-- probe_reveal_trace.lua -- live trace of what writes the revealed-weakness
+-- bytes on the first battle, under Random RAM on HEAD, with a wiped codex.
+-- Answers the coordinator's discriminator: whether a fresh Guard shows
+-- revealed with no codex entry.  If it does, there is a garbage source to
+-- trace to its writer.  If it shows '?', the reveal the user sees comes from
+-- their populated codex, which is correct persistence, rather than from RAM.
 --
--- Boots from POWER-ON (no state load, so Random RAM actually reaches battle
--- init). Watches WRITES to the monster revealed-elems ($7E3E91-9B), revealed-
+-- Boots from power-on (no state load, so Random RAM reaches battle
+-- init). Watches writes to the monster revealed-elems ($7E3E91-9B), revealed-
 -- classes ($7E3EA5-AF) and weak-elems ($7E3BE8-F2) ranges, logging each
--- writer's bank:PC and value. Snapshots masks + codex at the seed entry.
+-- writer's bank:PC and value. Snapshots masks and codex at the seed entry.
 local H = dofile("tools/tests/lib/ot6.lua")
 
 local hits = {}
@@ -53,7 +53,7 @@ end
 H.run({ maxFrames = 70000 }, {
   H.call(function()
     armSeedSnapshot()
-    -- WIPE the codex so no species has a learned weakness: the discriminator's
+    -- Wipe the codex so no species has a learned weakness: the discriminator's
     -- clean condition. Under power-on the seed re-checks the magic; a 0 magic
     -- forces the wipe path (codex all 0), guaranteeing no merge source.
     emu.write(0x316000, 0, emu.memType.snesMemory)

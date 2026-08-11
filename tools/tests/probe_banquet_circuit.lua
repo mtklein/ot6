@@ -1,21 +1,21 @@
 -- probe_banquet_circuit.lua -- I->J step development (issue #31): the ≥90
--- WINDOW CIRCUIT, driven from the staged banquet_window savestate
+-- window circuit, driven from the staged banquet_window savestate
 -- (probe_banquet_stage.lua) so iteration does not replay the world grind.
 --
 -- The drive is banquet-decode.md §5.2's circuit: talk to all 24 scoring
 -- soldiers (banquet-decode §3 census) and win the four fights clean,
 -- inside the 14400-frame timer.  Every soldier is a chaseTalk against its
--- OBJECT INDEX (0x10 + npc_prop record position, extracted 2026-07-28 --
--- eleven of the 24 wander), terminated on the soldier's OWN latch switch
--- OR on $013C (the dinner fired = the window expired: fail loudly with
--- the var0/timer measurement, the banquet-decode §8 feasibility ledger's
--- missing number).
+-- object index (0x10 + npc_prop record position, extracted 2026-07-28;
+-- eleven of the 24 wander), terminated on the soldier's own latch switch
+-- or on $013C.  $013C means the dinner fired and the window expired; in
+-- that case the probe fails and reports the var0/timer measurement, which
+-- is the number missing from the banquet-decode §8 feasibility table.
 --
 -- Per-fight asserts (§5.4): formation species at $3F46, clean-win
 -- b-switches $1dd1 & $31 == 0, var0 delta +6.
 --
 -- Ends: var0==44 checkpoint, ride the expiry to the dinner table, stop on
--- the TOAST choice ($056F>=2), generate banquet_dinner.mss for the Q&A probe.
+-- the toast choice ($056F>=2), generate banquet_dinner.mss for the Q&A probe.
 --
 --   tools/tests/run.sh tools/tests/probe_banquet_circuit.lua
 local H = dofile("tools/tests/lib/ot6.lua")
@@ -27,7 +27,7 @@ local function timerCount() return H.readWord(0x1189) end
 local function var0() return H.readWord(0x1fc2) end
 
 -- expected var0, running (talk +1, clean fight +6); each step logs
--- timer/var0 so an over-budget run reports its own arithmetic
+-- timer/var0 so an over-budget run records where the budget went
 local expect = 0
 local lastName = "start"
 
@@ -38,8 +38,8 @@ local function logCheckpoint(name)
   end)
 end
 
--- one scoring soldier: chase its object, talk, terminate on its latch
--- (or on $013C = window died -- then fail with the measurement)
+-- one scoring soldier: chase its object, talk, terminate on its latch,
+-- or on $013C (window expired), in which case fail with the measurement
 local function soldier(objIdx, latch, what)
   expect = expect + 1
   local want = expect
@@ -60,7 +60,7 @@ local function soldier(objIdx, latch, what)
   }
 end
 
--- one FIGHT soldier: same chase; the battle is battle-clear-write cleared by
+-- one fight soldier: same chase; the battle is battle-clear-write cleared by
 -- chaseTalk itself; afterwards assert species, clean flags, +6
 local function fightSoldier(objIdx, latch, species, what)
   expect = expect + 6
@@ -179,8 +179,8 @@ local steps = {
     end, 40000, {
       H.call(function()
         ph = (ph + 1) % 8
-        -- hands off until the dinner fires; then A through the scene text
-        -- (never when a choice is up -- that would answer the toast)
+        -- hands off until the dinner fires; then A through the scene text,
+        -- but not when a choice is up, since that would answer the toast
         if sw(0x013C) == 1 and H.dialogWaiting()
            and H.readByte(0x056f) < 2 then
           H.setPad(ph < 4 and { "a" } or {})

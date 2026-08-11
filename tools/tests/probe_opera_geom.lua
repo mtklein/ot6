@@ -1,5 +1,5 @@
 -- probe_opera_geom.lua -- boot opera_stage, drive the aria forks {0,1,0} to
--- control on map 236, GENERATE aria_postfork.mss, then dump ground truth
+-- control on map 236, generate aria_postfork.mss, then dump measured data
 -- for the flower-dance nav: every field object (vis/x/y/face/movetype), and
 -- the p1/p2 passability grid over the pocket+stairs+balcony region x[3..18]
 -- y[6..27].

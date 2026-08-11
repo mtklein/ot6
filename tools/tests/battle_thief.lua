@@ -1,22 +1,22 @@
 -- @suite slow savestate=figaro_cleared
--- battle_thief.lua -- #55, Locke's kit, first slice: the THIEF SUBMENU behind
+-- battle_thief.lua -- #55, Locke's kit, first slice: the thief submenu behind
 -- the Steal row, and the two merchant verbs in it.
 --
--- WHY A SUBMENU BEHIND STEAL AND NOT A NEW COMMAND.  Locke's four command rows
--- are FIGHT, STEAL, MAGIC, ITEM (char_prop.asm:157); InitCmd_03 removes MAGIC
--- at runtime for a spell-less Locke, the battle menu is still hard-wired to
--- four rows, so Steal becomes the kit ladder's first ROW: OpenCmdMenuTbl[$05]
--- opens the Tools-window shell with Steal / Filch / Bestow in it, and the row
--- rides the queued action's ATTACK byte ($2bb0 -> $3a7b -> $b6).
+-- Why a submenu behind Steal rather than a new command: Locke's four command
+-- rows are FIGHT, STEAL, MAGIC, ITEM (char_prop.asm:157); InitCmd_03 removes
+-- MAGIC at runtime for a spell-less Locke, the battle menu is still hard-wired
+-- to four rows, so Steal becomes the kit ladder's first row: OpenCmdMenuTbl[$05]
+-- opens the Tools-window shell with Steal, Filch and Bestow in it, and the row
+-- rides the queued action's attack byte ($2bb0 -> $3a7b -> $b6).
 --
 -- Issue #75 conversion.  The old apparatus installed LOCKE into all three
--- magitek slots, forged all-Steal command lists, pinned MP/HP/bank every
--- frame, stopped the enemies, wrote sentinel shield counts, and zeroed the
--- shared cursor block.  On figaro_cleared the whole cast is real: LOCKE
--- carries the real submenu, the desert species SEED THEIR OWN SHIELDS
--- (Ot6SeedShields gives each 2 -- three monsters, sum 6, enough for both
--- Filch arms), and every bank number below is EARNED and COUNTED -- the
--- whole test is one long deterministic ledger:
+-- magitek slots, forged all-Steal command lists, pinned MP, HP and the bank
+-- every frame, stopped the enemies, wrote sentinel shield counts, and zeroed
+-- the shared cursor block.  On figaro_cleared the whole cast is real: LOCKE
+-- carries the real submenu, the desert species seed their own shields
+-- (Ot6SeedShields gives each 2, and three monsters sum to 6, enough for both
+-- Filch arms), and every bank number below is earned and counted, so the
+-- whole test is one deterministic ledger:
 --
 --   open 1 bp -> [white Bestow @1] -> R+Steal spends it (0, regen skipped)
 --   -> [grey Bestow @0] -> one Tonic turn (+1) -> [white again] -> Filch
@@ -27,19 +27,20 @@
 --   to the capped ally (a genuine no-op costing Locke nothing).
 --
 -- Every original assertion survives:
---   1. THE SUBMENU OPENS: tools-shell state $30, thief mode w7e6168 == 3,
---      three rows packed left-column with ids/costs/targeting, rest $ff.
---   2. THE PRICES ARE THE CHARGED PRICES: Steal 4 (Ot6StealCost, #52),
+--   1. the submenu opens: tools-shell state $30, thief mode w7e6168 == 3,
+--      three rows packed in the left column with ids, costs and targeting,
+--      and the rest $ff.
+--   2. the prices are the charged prices: Steal 4 (Ot6StealCost, #52),
 --      Filch 6, Bestow 5 (Ot6ThiefCostTbl).
---   3. THE ROWS DRAW THEIR NAMES from AttackName pad slots $56-$58.
---   4. BESTOW GREYS AT 0 BP and only at 0 BP (Ot6BushidoRowGrey's thief
---      arm); Steal/Filch stay white either way.
---   5. FILCH MOVES A SHIELD INTO A BOOST POINT: shield sum -1, bank +2
---      (pip + regen), no damage.
---   6. BESTOW MOVES A PIP BETWEEN ACTORS: ally +1, Locke charged through
---      the pending byte (regen skipped) -- never free.
---   7. THE CAPS AND NO-REGEN RULE: Filch at 5 still chips, banks nothing;
---      Bestow to a capped ally is a genuine no-op costing Locke nothing.
+--   3. the rows draw their names from AttackName pad slots $56-$58.
+--   4. Bestow greys at 0 BP and only at 0 BP (Ot6BushidoRowGrey's thief
+--      arm); Steal and Filch stay white either way.
+--   5. Filch moves a shield into a boost point: shield sum -1, bank +2
+--      (pip plus regen), and no damage.
+--   6. Bestow moves a pip between actors: ally +1, and Locke is charged
+--      through the pending byte with regen skipped, so it is never free.
+--   7. the caps and the no-regen rule: Filch at 5 still chips and banks
+--      nothing; Bestow to a capped ally is a no-op costing Locke nothing.
 local H = dofile("tools/tests/lib/ot6.lua")
 local STATE = "build/states/figaro_cleared.mss.lua"
 
@@ -127,18 +128,18 @@ local function row(i)
 end
 
 -- ------------------------------------------------------ the menu drive --
--- One machine, mode-driven.  Modes:
+-- One driver, selected by mode.  Modes:
 --   "defer"      -- this slot X-defers (never acts)
 --   "item"       -- one item turn (Tonic/Potion, default target)
 --   "kit:<row>"  -- open the thief submenu, pick row, confirm target
 --   "boostkit:<row>" -- R once first (pending 1), then kit row
---   "park"       -- open the thief submenu and STOP there (for the reads)
+--   "park"       -- open the thief submenu and stop there (for the reads)
 local mf = 0
 local modeOf = {}                        -- slot -> mode
 local target = nil                       -- character-target slot for Bestow
--- blink-proof latch/steer of the character-target mask (battle_steal's
--- lesson, promoted into the lib as H.targetCursor; the character column
--- walks {down,up,left,right})
+-- blink-proof latch and steer of the character-target mask (measured in
+-- battle_steal and moved into the library as H.targetCursor; the character
+-- column walks {down,up,left,right})
 local tc = H.targetCursor({ mask = TCURSOR,
                             dirs = { "down", "up", "left", "right" } })
 local function decide()
@@ -205,14 +206,14 @@ local function decide()
   return btn and { [btn] = true } or {}
 end
 
--- run the machine until pred; modes are set by the caller
+-- run the driver until pred; modes are set by the caller
 local function driveTo(pred, maxF, tag)
   return H.driveUntil(pred, maxF, {
     H.call(function() H.setPad(decide()) end),
   }, tag)
 end
 -- wait for LOCKE's window in "park" mode at the submenu.  (locke is nil
--- at step-construction time -- the steps must read it at RUN time.)
+-- at step-construction time, so the steps must read it at run time.)
 local function parkAtSubmenu(_, tag)
   return H.repeatN(1, {
     H.call(function() modeOf[locke] = "park" end),
@@ -259,7 +260,7 @@ H.run({ maxFrames = 120000 }, {
       locke, mp(), ally, H.vars.sh0))
   end),
 
-  -- 1/2/3: the submenu opens on the REAL kit; rows, prices, names ----------
+  -- 1/2/3: the submenu opens on the real kit; rows, prices, names ----------
   parkAtSubmenu(locke, "his real thief submenu opens"),
   H.call(function() H.screenshot("thief_submenu") end),
   H.call(function()
@@ -285,13 +286,13 @@ H.run({ maxFrames = 120000 }, {
     H.assertEq(findName(NM.Steal) ~= nil, true, "the Steal row draws its name")
     H.assertEq(findName(NM.Filch) ~= nil, true, "the Filch row draws its name")
     H.assertEq(findName(NM.Bestow) ~= nil, true, "the Bestow row draws its name")
-    -- 4a, the free half: at his real 1-bp bank Bestow is WHITE
+    -- 4a, the free half: at his real 1-bp bank Bestow is white
     H.assertEq(attrOf(NM.Bestow), WHITE,
       "at 1 real bp Bestow is white -- the grey is not unconditional")
     H.log("PASSED phase 1: the submenu, its three priced rows, their names")
   end),
 
-  -- 4: Bestow greys at 0 BP -- the bank is SPENT there, not written --------
+  -- 4: Bestow greys at 0 BP; the bank is spent there rather than written ---
   H.call(function() modeOf[locke] = "boostkit:0" end),   -- R + Steal: 1-1=0
   driveTo(function() return bp(locke) == 0 end, 20000,
     "a boosted Steal spends the bank to 0 (regen skipped)"),
@@ -316,9 +317,9 @@ H.run({ maxFrames = 120000 }, {
     H.log("PASSED phase 2: Bestow's grey is its own BP reason and tracks the bank")
   end),
 
-  -- 5: FILCH -- one shield off the target, one pip into Locke ---------------
+  -- 5: Filch takes one shield off the target and puts one pip into Locke ----
   -- Which monster the cursor lands on is the game's choice; the chip is a
-  -- SUM over the enemy side, which also catches a double chip.
+  -- sum over the enemy side, which also catches a double chip.
   H.call(function()
     H.vars.shA = shieldSum()
     H.vars.hpA = monsterHpSum()
@@ -343,7 +344,7 @@ H.run({ maxFrames = 120000 }, {
     H.log("PASSED phase 3: Filch moves a shield into a boost point")
   end),
 
-  -- 6: BESTOW -- a pip from Locke to the never-acted ally -------------------
+  -- 6: Bestow moves a pip from Locke to the never-acted ally ---------------
   H.call(function()
     H.assertEq(bp(locke), 3, "the ledger: Locke holds 3 (1+2)")
     H.assertEq(bp(ally), 1,
@@ -365,13 +366,13 @@ H.run({ maxFrames = 120000 }, {
     H.log("PASSED phase 4: Bestow moves a boost point from Locke to an ally")
   end),
 
-  -- 7: THE CAPS.  Bank BOTH actors to Ot6ActionEnd's cap of 5 by counted
-  -- item turns, INTERLEAVED -- a deferred ally who waits her turn out for
-  -- another 30k frames dies to the desert chip damage (measured: the
-  -- serial version timed out on her bank), while item turns self-heal.
-  -- Then a FOURTH Locke turn must bank nothing (the cap, asserted);
+  -- 7: the caps.  Bank both actors to Ot6ActionEnd's cap of 5 by counted
+  -- item turns, interleaved, because a deferred ally who waits her turn out
+  -- for another 30k frames dies to the desert chip damage (measured: the
+  -- serial version timed out on her bank), while item turns heal.
+  -- Then a fourth Locke turn must bank nothing, which is the cap, asserted;
   -- Filch at cap chips but banks nothing; and a Bestow to the capped
-  -- ally is a genuine no-op.
+  -- ally is a no-op.
   H.call(function() modeOf[locke] = "item"; modeOf[ally] = "item" end),
   driveTo(function() return bp(locke) == 5 and bp(ally) == 5 end, 60000,
     "interleaved item turns walk both banks to the cap"),

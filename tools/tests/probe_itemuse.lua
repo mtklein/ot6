@@ -1,7 +1,7 @@
 -- probe_itemuse.lua -- measure the battle Item menu's press semantics, on
--- the exact fixture that wedged: cyan_defence (CYAN alone, battle 46).
+-- the fixture that wedged: cyan_defence (CYAN alone, battle 46).
 -- Drives the commander talk, waits for CYAN's command menu, steers to the
--- ITEM row, and then logs EVERY relevant byte per A-press pulse while
+-- item row, and then logs every relevant byte per A-press pulse while
 -- trying to use the top item: menu state $7BC2, cursor cells, the
 -- select-mode cells w7e7b02/w7e7baf/w7e7ba8/w7e7b03, and the first two
 -- battle-inventory rows ($2686 stride 5).  PASS = target select ($38)
@@ -52,7 +52,7 @@ local reached38, resolved = false, false
 H.run({ maxFrames = 40000 }, {
   H.loadState("build/states/cyan_defence.mss.lua"),
   H.waitFrames(30),
-  -- walk to the commander (obj 16) and poke him
+  -- walk to the commander (obj 16) and talk to him
   H.navTo(function() return objXf(16) end, function() return objYf(16) - 1 end,
     { maxFrames = 15000, playBattles = true }),
   (function()
@@ -76,7 +76,7 @@ H.run({ maxFrames = 40000 }, {
   end, 3000, "CYAN's command menu", 5),
   H.waitFrames(30),
   H.call(function() snap("cmd") end),
-  -- steer to the ITEM row (closed loop with absolute-jump fallback)
+  -- steer to the item row (closed loop with absolute-jump fallback)
   (function()
     local tick, btn, stall = 0, nil, 0
     return H.driveUntil(function()
@@ -111,7 +111,7 @@ H.run({ maxFrames = 40000 }, {
   end)(),
   H.waitFrames(20),
   H.call(function() snap("item-open") end),
-  -- now: EXACT fighter cadence -- steer to row 1 (Potion) then A pulses,
+  -- fighter cadence: steer to row 1 (Potion) then A pulses,
   -- 30-frame pulses with 6-frame holds, button recomputed at ph==0
   (function()
     local tick, pulses, btn = 0, 0, nil

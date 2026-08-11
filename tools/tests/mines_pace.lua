@@ -3,35 +3,35 @@
 -- (mines_chase.mss: Terra L5 alone at the map entry), same two-tile
 -- pacing route (78,58)<->(77,58), same seeded RNG discipline.
 --
--- Two arms, selected by the ARM knob (one arm per run, like whelkbal's
--- POLICY):
---   vanilla  the three OT6 balance knobs are poked to identity IN THE
---            LOADED ROM IMAGE before every sample (emu.write to
+-- Two arms, selected by the ARM knob (one arm per run, as whelkbal selects
+-- its policy):
+--   vanilla  the three OT6 balance knobs are poked to identity in the
+--            loaded ROM image before every sample (emu.write to
 --            snesPrgRom; verified by readback and by the danger-counter
 --            delta): Ot6HpMulTbl band0 = $10 (1x trash HP), Ot6DangerMulW
 --            = $10 (1x per-step danger), Ot6RewardMulW = $10 (1x
 --            rewards). With all three at identity the encounter
---            arithmetic, fight HP, and rewards are vanilla's exactly
+--            arithmetic, fight HP, and rewards match vanilla exactly
 --            (the scale routines are exact at $10).
 --   ours     the shipped values ($10 = 1x HP, $08 = 0.5x danger, $20 =
 --            2x rewards); the ROM bytes are re-poked to shipped values
---            defensively in case a vanilla run preceded in this process.
+--            in case a vanilla run preceded in this process.
 --            An earlier measurement ran this arm when band0 shipped $20
---            (2x HP); the next one stood it down to $10 (ot6.asm:352),
+--            (2x HP); the next one set it to $10 (ot6.asm:352),
 --            so at the current ship point the
---            two arms differ in danger and reward only -- a re-run
---            measures the rate/reward half of the parity product, not
+--            two arms differ in danger and reward only, and a re-run
+--            measures the rate and reward half of the parity product, not
 --            the fight-length half #4 also reported.
 --
 -- Per sample: loadState -> poke arm -> seed $1fa1/$1fa2 -> pace until a
 -- random encounter fires (steps counted) -> mash A (baseline policy) to
--- victory -> read the exp/gil the save data actually gained (character
--- exp $1611-13 delta, party gil $1860-62 delta -- ground truth, after
--- AddExp/gil clamps). Greppable lines: [ot6] [pace] b=<k> <key>=<value>.
+-- victory -> read the exp and gil the save data gained (character
+-- exp $1611-13 delta, party gil $1860-62 delta, read after the AddExp and
+-- gil clamps). Greppable lines: [ot6] [pace] b=<k> <key>=<value>.
 --
--- ROM knob offsets are BUILD-SPECIFIC (bank F0 layout) and DO drift: all
+-- ROM knob offsets are build-specific (bank F0 layout) and do drift: all
 -- three below were once exactly $12 low ($300173/$300177/$300179) against
--- the build of 2026-07-18 -- the same drift bal_mines.lua and bal_dpb.lua
+-- the build of 2026-07-18, the same drift bal_mines.lua and bal_dpb.lua
 -- carried (fixed in 8e405a9, which handed this file off). $12 low is
 -- inside Ot6HpScale's /16 tail, which ends where Ot6HpMulTbl begins:
 -- they read $6A/$6A/$D2, the `ror` of a `lsr OT6_SCR_COLS / ror` pair
@@ -223,8 +223,8 @@ local function sampleBlock(k)
       -- cold danger counter: the fixture carries ~$05B0 accumulated by
       -- the gen walk, and a warm counter near the roll threshold hides
       -- the rate knob (measured: paired steps came out identical).
-      -- vanilla zeroes the counter at every battle trigger, so a cold
-      -- start IS the steady-state inter-encounter interval.
+      -- Vanilla zeroes the counter at every battle trigger, so a cold
+      -- start gives the steady-state inter-encounter interval.
       H.writeWord(DANGER, 0)
       if seed.fa1 then H.writeByte(0x1fa1, seed.fa1) end
       if seed.fa2 then H.writeByte(0x1fa2, seed.fa2) end

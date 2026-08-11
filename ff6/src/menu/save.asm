@@ -757,11 +757,11 @@ CalcSaveSlotChecksum:
         cpx     #$09fe
         bne     @19d8
         ; OT6 (#18): $0000 is CheckSaveSlotChecksum's "invalid" answer.  That
-        ; routine returns the checksum ITSELF as its validity token and zero for
-        ; invalid -- there is no separate flag -- and every caller tests it with
+        ; routine returns the checksum itself as its validity token and zero for
+        ; invalid, with no separate flag, and every caller tests it with
         ; beq.  So a perfectly intact save whose 2558-byte sum happens to land
         ; on $0000 is drawn as an empty slot, refuses to load, and is
-        ; overwritten with NO confirmation prompt: field_menu.asm:1981-1988
+        ; overwritten with no confirmation prompt: field_menu.asm:1981-1988
         ; branches on a zero straight into `; slot is empty, save instantly`.
         ; About 1 in 65,536 per save, independent per save, silent, and
         ; unrecoverable.  Live since v0.1.

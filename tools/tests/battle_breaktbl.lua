@@ -2,23 +2,23 @@
 -- battle_breaktbl.lua -- the v0.6 break-coverage tables, asserted in ROM.
 -- (school.lua pattern: pure ROM bytes, no savestate, exit 0 = pass.)
 --
--- Proves the authored weaknesses that close the fixed-party break gaps
--- actually land in the assembled ROM. The audit found a class of enemies
--- that no forced party could break -- formula species (no class weakness)
--- whose party could reach none of their vanilla/added ELEMENTS. This test
--- is the regression test for the fix: every gap enemy now carries the
--- weapon class its forced party can reach, TEMPLAR gained the conducting
--- bolt half of the armor palette, and the LEADER/GRUNT poison adds -- the
--- retired "one right tool" artifacts on enemies whose forced parties
--- carry no poison -- are gone.
+-- Checks that the authored weaknesses that close the fixed-party break gaps
+-- land in the assembled ROM. The audit found a class of enemies
+-- that no forced party could break: formula species (no class weakness)
+-- whose party could reach none of their vanilla or added elements. This is
+-- the regression test for the fix: every gap enemy now carries the
+-- weapon class its forced party can reach, templar gained the conducting
+-- bolt half of the armor palette, and the leader and grunt poison adds are
+-- gone.  Those adds were retired "one right tool" artifacts on enemies whose
+-- forced parties carry no poison.
 --
 -- Ot6ShieldTbl (word id, byte shields, byte class) and Ot6ElemAddTbl
 -- (word id, byte element, byte pad) both live in bank $F0 (segment
 -- ot6_code); HiROM PRG file offset = SNES addr - 0xC00000, so bank $F0 ->
 -- 0x300000+ (school.lua documents the same mapping for the dialog banks).
--- The test SELF-LOCATES both tables by their opening anchor records, so
--- it survives future row insertions/shifts the way school self-locates
--- through the dialog pointer table.
+-- The test locates both tables itself by their opening anchor records, so
+-- it survives future row insertions and shifts the way school locates its
+-- data through the dialog pointer table.
 
 local PRG = emu.memType.snesPrgRom
 local SLASH, PIERCE, BLUDG = 0x01, 0x02, 0x04
@@ -61,10 +61,10 @@ end
 
 local function check(cond, msg)
   if not cond then fails = fails + 1 end
-  -- emu.log goes to Mesen's SCRIPT log, which nothing reads headless (run.sh's
-  -- --enableStdout mirrors the EMULATOR log only).  print() is the channel that
-  -- actually reaches the run log, so a failure here names itself instead of
-  -- being a bare exit code.
+  -- emu.log goes to Mesen's script log, which nothing reads headless (run.sh's
+  -- --enableStdout mirrors the emulator log only).  print() is the channel that
+  -- reaches the run log, so a failure here names itself instead of appearing
+  -- only as an exit code.
   local line = string.format("breaktbl: %s %s", cond and "OK  " or "FAIL", msg)
   emu.log(line)
   print(line)
@@ -106,9 +106,9 @@ local want = {
   [0x003a] = { 2, SLASH,          "anguiform (trench)" },
   [0x005e] = { 2, BLUDG,          "actaneon (trench)" },
   -- issue #23: was PIERCE, authored to a Gau "fanged strike" that bludgeons.
-  -- The trench trio is Sabin + Cyan + Gau and NOBODY in it pierces: Gau's
+  -- The trench trio is Sabin + Cyan + Gau and none of them pierces: Gau's
   -- only legal weapon is the Imp Halberd $24 (no shop stocks it) and bare
-  -- hands read $ff -> OT6_BLUDG.  A PIERCE row here is a dead row.
+  -- hands read $ff -> OT6_BLUDG.  A PIERCE row here would be unreachable.
   [0x0059] = { 2, BLUDG,          "aspik (trench) -- #23, was a dead PIERCE" },
 }
 for id, w in pairs(want) do
@@ -119,7 +119,8 @@ for id, w in pairs(want) do
       r and string.format("%02X", r[2]) or "-", w[1], w[2]))
 end
 
--- element table: templar gained conducting bolt; leader/grunt poison GONE
+-- element table: templar gained conducting bolt; leader and grunt poison is
+-- gone
 check(E[0x0002] ~= nil and E[0x0002][1] == BOLT,
   string.format("templar $0002 elem-add = bolt $04 (got %s)",
     E[0x0002] and string.format("%02X", E[0x0002][1]) or "MISSING"))
@@ -135,11 +136,11 @@ check(S[0x0134] ~= nil and S[0x0134][2] == PIERCE, "regression: whelk head $0134
 check(E[0x0134] ~= nil and E[0x0134][1] == FIRE, "regression: whelk head fire add")
 
 -- ---------------------------------------------------------------- issue #23
--- The four boss element sets bosses-wob.md authored in prose and nobody ever
--- wrote into the data.  check_boss_rows.py carried them as WAIVERS for three
--- releases; these assertions are what keeps them from silently regressing to
--- prose again.  Each is exact-mask: a missing row reads nil and a wrong row
--- reads a different byte, so both directions fail.
+-- The four boss element sets bosses-wob.md authored in prose and that were
+-- never written into the data.  check_boss_rows.py carried them as waivers for
+-- three releases; these assertions keep them from regressing to prose again.
+-- Each is an exact mask: a missing row reads nil and a wrong row reads a
+-- different byte, so both directions fail.
 local elemWant = {
   -- id       mask                 why this row exists
   { 0x0117, FIRE | ICE | BOLT, "atmaweapon: the WoB capstone had ELEVEN "
@@ -160,19 +161,19 @@ for _, w in ipairs(elemWant) do
       r and string.format("$%02X", r[1]) or "MISSING", w[3]))
 end
 
--- The trap, asserted in the direction it actually bites: every Ultros record
--- ABSORBS water, so the family row's water half must never reach $168.  A row
--- that "completes" the row by adding $84 would HEAL him, and would still pass
+-- Asserted in the direction that matters: every Ultros record absorbs water,
+-- so the family row's water half must never reach $168.  A row that
+-- "completes" the row by adding $84 would heal him, and would still pass
 -- a mask-nonzero check.
 check(E[0x0168] ~= nil and (E[0x0168][1] & WATER) == 0,
   "ultros 4 $0168 elem-add must NOT carry water -- $168 absorbs it")
 
--- ...and the same rule as a GENERAL invariant, not a spot-check.  The
+-- The same rule as a general invariant rather than a spot-check.  The
 -- GhostTrain rule: an element add must never intersect its species' absorb or
 -- null byte, or the chip trigger lands where vanilla reverses the damage sign
--- (absorb) or zeroes it (null).  Walking the whole table means every FUTURE
--- row is covered too -- the Crane pair in bosses-wob.md was wrong in exactly
--- this direction once already.
+-- (absorb) or zeroes it (null).  Walking the whole table covers every future
+-- row too; the Crane pair in bosses-wob.md was already wrong in this
+-- direction once.
 local addRows, badAdds = 0, 0
 do
   local o = elemBase
@@ -195,14 +196,14 @@ end
 check(badAdds == 0, string.format(
   "GhostTrain rule: all %d Ot6ElemAddTbl rows are absorb-safe and null-safe",
   addRows))
--- guard the guard: if the walk found nothing, the loop above proves nothing.
--- 24 rows as of the issue #23 pass (18 before it, + the 6 boss rows above).
+-- guard the guard: if the walk found nothing, the loop above checks nothing.
+-- 24 rows as of the issue #23 pass (18 before it, plus the 6 boss rows above).
 check(addRows >= 24, string.format(
   "elem-add walk saw %d rows (expected >= 24; a mislocated base proves nothing)",
   addRows))
 
--- and prove the MonsterProp base is really MonsterProp, so the invariant above
--- is comparing against real absorb bytes rather than an arbitrary window.
+-- and check that the MonsterProp base is MonsterProp, so the invariant above
+-- compares against real absorb bytes rather than an arbitrary window.
 check(rb(MPROP + 0x0168 * MREC + OFF_ABSORB) == WATER,
   "monster_prop base sane: $168 Ultros absorb byte reads water $80")
 check(rb(MPROP + 0x0117 * MREC + OFF_WEAK) == 0x00,

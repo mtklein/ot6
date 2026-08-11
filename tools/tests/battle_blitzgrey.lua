@@ -4,40 +4,40 @@
 -- MP.
 --
 -- Vanilla Magic: UpdateEnabledMagic (battle_main.asm) compares each spell's MP
--- cost to the caster's current MP and rolls a "disabled" bit; DrawMagicListText's
+-- cost to the caster's current MP and sets a disabled bit; DrawMagicListText's
 -- GetTextColor turns that bit into $04, OR'd into the row's $21 white
 -- font-palette byte to make $25 (grey).  Blitz and Tools draw through the
--- tools-window shell, never the magic list, so they never inherited that
--- machinery.  Ot6AbilityGrey (ot6.asm, bank F0) is it, ported to the menu bank:
+-- tools-window shell rather than the magic list, so they never inherited that
+-- code.  Ot6AbilityGrey (ot6.asm, bank F0) supplies it in the menu bank:
 -- the Blitz row decorator feeds each row's MP cost to it and OR's the $00/$04 it
 -- returns into that column's font byte, so an unaffordable name (and its
 -- trailing MP cost, which shares the font scope) renders $25 grey instead of
 -- $21 white.  The caster is $62ca (the active slot the decorators and magic's
--- own draw both index) and its live MP is $3c08,slot*2 -- the very cell the
+-- own draw both index) and its live MP is $3c08,slot*2, the cell the
 -- universal charge at CalcAttackEffect later subtracts from, so the menu greys
--- precisely what the charge would refuse.
+-- exactly what the charge would refuse.
 --
--- ISSUE #75 CONVERSION -- the boundary is SPENT to, not written.  This file
--- used to install an all-Sabin party into the magitek intro fight, write the
--- known-blitz mask, and PIN current MP -- first low (grey pass), then high
--- (white pass) -- which proved the grey follows a poked number.  It now
--- boots vargas_won (the REAL post-boss Sabin, learned set read off $1d28:
--- Pummel 4 MP / AuraBolt 10 MP at his real level), fights real ledge
--- encounters, and drives his pool across the affordability line WITH THE
--- BLITZES THEMSELVES: AuraBolts while the pool is rich, one Pummel to
--- finish, until current MP lands in [4,9] -- AuraBolt unaffordable, Pummel
--- still affordable.  Strictly stronger than the pins: the charge and the
--- grey are proven to read the same cell, in both directions on the same
--- rows (rich pool = every row white; spent pool = the expensive row grey).
+-- Issue #75 conversion: the boundary is spent to rather than written.  This
+-- file used to install an all-Sabin party into the magitek intro fight, write
+-- the known-blitz mask, and pin current MP, first low (grey pass) and then high
+-- (white pass), which only showed the grey follows a poked number.  It now
+-- boots vargas_won (the real post-boss Sabin, learned set read off $1d28:
+-- Pummel 4 MP and AuraBolt 10 MP at his real level), fights real ledge
+-- encounters, and drives his pool across the affordability line using the
+-- blitzes themselves: AuraBolts while the pool is rich, one Pummel to
+-- finish, until current MP lands in [4,9], where AuraBolt is unaffordable and
+-- Pummel is still affordable.  That is stronger than the pins: the charge and
+-- the grey are shown to read the same cell, in both directions on the same
+-- rows (rich pool: every row white; spent pool: the expensive row grey).
 --
 -- What is asserted (attribute byte = the odd/high byte of each name tile's
 -- tilemap word, $21 white / $25 grey):
---   1. RICH POOL: every learned blitz the real pool affords renders WHITE --
---      including the very row that greys below (grey tracks MP, the old
+--   1. rich pool: every learned blitz the real pool affords renders white,
+--      including the row that greys below (so grey tracks MP, the old
 --      pass-2 claim, made first).
---   2. SPENT-TO BOUNDARY: with MP really spent into [4,9], the expensive
---      learned blitz renders GREY and the cheap one WHITE on one screen.
---   3. THE GREY IS THE DISABLED BIT.  grey - white == $04, magic's own delta.
+--   2. spent-to boundary: with MP spent into [4,9], the expensive
+--      learned blitz renders grey and the cheap one white on one screen.
+--   3. the grey is the disabled bit: grey - white == $04, magic's own delta.
 local H = dofile("tools/tests/lib/ot6.lua")
 local STATE = "build/states/vargas_won.mss.lua"
 
@@ -117,7 +117,7 @@ local function planCast(mp)
 end
 
 -- ------------------------------------------------------------------------
--- the per-frame machine (battle_toolsgrey's, retargeted at the Blitz shell):
+-- the per-frame driver (battle_toolsgrey's, retargeted at the Blitz shell):
 -- "spend" casts planCast's blitz on Sabin's menu; "open" holds the list up.
 -- Bystanders Defend; battle dialogs are paged with A (the battle_vargas
 -- hazard, measured on this family's first run); off-battle the lane is
@@ -154,7 +154,7 @@ local function pulse()
     return
   end
   lane = nil          -- re-anchor at the next field return (the walletmp
-                      -- run-5 hazard: a stale anchor walks off the map)
+                      -- run-5 hazard, where a stale anchor walks off the map)
   if H.readByte(MENU) == 0 then
     H.setPad(ph % 8 < 4 and { a = true } or {})     -- page battle dialogs
     return
@@ -261,7 +261,7 @@ H.run({ maxFrames = 200000 }, {
     H.log(string.format("SABIN slot %d, battle pool %d", sabinSlot, pool()))
   end),
 
-  -- 1. RICH POOL: every affordable row white --------------------------------
+  -- 1. rich pool: every affordable row white --------------------------------
   openBlitzWindow("sabin's blitz window, rich pool"),
   H.call(function()
     local mp = pool()
@@ -279,7 +279,7 @@ H.run({ maxFrames = 200000 }, {
       "the rich-pool pass had the dear row white -- the row that greys below")
   end),
 
-  -- 2. SPEND to the boundary with the blitzes themselves --------------------
+  -- 2. spend to the boundary with the blitzes themselves --------------------
   H.call(function() mode = "spend" end),
   H.driveUntil(function() return pool() < costOf(dear) end, 150000,
     { H.call(pulse), H.waitFrames(1) }, "the pool is spent into the boundary"),

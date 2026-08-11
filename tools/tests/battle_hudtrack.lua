@@ -1,51 +1,52 @@
 -- @suite savestate=rapids_start
--- battle_hudtrack: the under-monster HUD anchor must TRACK the battlefield.
+-- battle_hudtrack: the under-monster HUD anchor must track the battlefield.
 --
--- THE DEBT THIS COVERS.  Ot6BgHudLine's anchor word (OT6_SHADOW+0 per line)
--- was a one-shot latch: computed once per battle, never again, because
+-- The debt this covers: Ot6BgHudLine's anchor word (OT6_SHADOW+0 per line)
+-- was a one-shot latch, computed once per battle and never again, because
 -- recomputing every frame made the line jitter on attack-animation coord
--- transients ($8057 priority shifts, $80/$82 x shoves, $e2/$e3 y bounces --
+-- transients ($8057 priority shifts, $80/$82 x shoves, $e2/$e3 y bounces;
 -- see the block comment at Ot6BgHudLine's @done for citations).  The latch
--- traded that jitter for permanent staleness: any genuine battlefield
+-- traded that jitter for permanent staleness: any real battlefield
 -- change after arm time was kept for the rest of the battle.  The
 -- recompute-and-compare design recomputes every frame, holds while a battle
 -- animation script is executing (OT6_SCRIPTBUSY brackets BtlGfx_04), and
--- writes only on real change.
+-- writes only on a real change.
 --
--- ISSUE #75 CONVERSION -- the genuine move is the GAME'S OWN.  The old file
--- proved adoption by writing a monster's position word ($80c3+slot*2) and
--- kept its stage standing with guard-HP pins and berserk bits.  All of that
--- is gone: this test now boots rapids_start and rides into the Lete River's
--- forced fight, whose entrance SLIDES the shown monsters across the field --
--- the exact class of change the latch left stale, delivered by the engine
--- itself (battle_hudtrail covers the abandoned-cell blanking of this same
--- slide; this file covers the anchors).  Measured on this fixture
+-- Issue #75 conversion: the move now comes from the game itself.  The old
+-- file showed adoption by writing a monster's position word ($80c3+slot*2)
+-- and kept its setup in place with guard-HP pins and berserk bits.  All of
+-- that is gone: this test now boots rapids_start and rides into the Lete
+-- River's forced fight, whose entrance slides the shown monsters across the
+-- field.  That is the class of change the latch left stale, delivered by the
+-- engine itself (battle_hudtrail covers the abandoned-cell blanking of this
+-- same slide; this file covers the anchors).  Measured on this fixture
 -- (2026-08-10): battle load zero-inits all six lines' anchors once (2 byte
 -- writes each), then the slide walks the live lines' anchors in 17 word-
 -- store adoptions each across ~30 frames, then every line is silent.
 --
--- THREE PHASES, asserted as write-count DELTAS against a watch over all six
+-- Three phases, asserted as write-count deltas against a watch over all six
 -- lines' anchor words:
---   1. ENTRANCE = GENUINE MOVE: the slide's adoptions happen (>= 8 word
---      stores per live line -- half the measured 17, safe against formation
---      variance between the fight's two die rolls), the anchors really
---      MOVED (first adopted value ~= settled value is not required -- the
---      slide may return; what is required is that adoption tracked change:
---      >= 8 distinct stores is that), and the writes then STOP (a settle
---      point of 90 consecutive quiet frames is found).
---   2. STATIC: 600 more idle frames, ZERO anchor writes on any line -- the
---      jitter non-regression on the live lines and the compare-before-store
---      discipline on the empty ones (an empty line must not rewrite $0000
---      every frame; its whole-run budget is the one init pair).
---   3. ANIMATION: a real no-damage action -- BANON's own Health command,
+--   1. entrance as the real move: the slide's adoptions happen (>= 8 word
+--      stores per live line, half the measured 17, which is safe against
+--      formation variance between the fight's two die rolls), the anchors
+--      moved (the first adopted value need not differ from the settled
+--      value, since the slide may return; what is required is that adoption
+--      tracked change, which >= 8 distinct stores shows), and the writes
+--      then stop (a settle point of 90 consecutive quiet frames is found).
+--   2. static: 600 more idle frames with no anchor writes on any line, which
+--      is the jitter non-regression on the live lines and the
+--      compare-before-store discipline on the empty ones (an empty line must
+--      not rewrite $0000 every frame; its whole-run budget is the one init
+--      pair).
+--   3. animation: a no-damage action, Banon's own Health command,
 --      picked through the live $7BC2 menu (hud_stability's conversion
---      shape; no-damage so no monster dies and disables a line mid-watch)
---      -- resolves while the enemy side acts freely.  Positive controls:
---      Banon's bp regens +1 (Ot6ActionEnd -- the action really resolved)
---      and OT6_SCRIPTBUSY was observed up (animation scripts really ran).
---      Still ZERO anchor writes: transients are held, never chased.
+--      shape; no damage, so no monster dies and disables a line mid-watch),
+--      resolves while the enemy side acts freely.  Positive controls:
+--      Banon's bp regens +1 (Ot6ActionEnd, so the action resolved)
+--      and OT6_SCRIPTBUSY was observed up, so animation scripts ran.
+--      Still no anchor writes: transients are held rather than chased.
 --
--- Whole-run accounting closes it: every byte-write the run ever saw belongs
+-- Whole-run accounting closes it: every byte-write the run saw belongs
 -- to the init (12) or to the entrance adoptions counted at settle.
 local H = dofile("tools/tests/lib/ot6.lua")
 local STATE = "build/states/rapids_start.mss.lua"
@@ -105,7 +106,7 @@ local function rideStep()
   }, "the forced river fight loads")
 end
 
--- phase 3's action machine: BANON (char $0e) picks Health (his own row-1
+-- phase 3's action driver: Banon (char $0e) picks Health (his own row-1
 -- command $1a) through the live menu; everyone else defers with X.
 local MENU, ACTOR, MSTATE = 0x7BCA, 0x62CA, 0x7BC2
 local ST_CMD, ST_TGT = 0x05, 0x38
@@ -143,14 +144,14 @@ H.run({ maxFrames = 60000 }, {
   H.waitFrames(20),
   H.call(function()
     H.assertEq(H.mapId() & 0x1ff, 113, "rapids_start boots on the Lete River")
-    armed = true                -- armed BEFORE battle load: the init pairs
+    armed = true                -- armed before battle load: the init pairs
   end),                         -- and every adoption are on the books
   rideStep(),
   H.call(function() H.setPad({}) end),
   H.waitUntil(function() return H.battleActive() end, 900, "battle active", 30),
 
-  -- ---- phase 1: the ENTRANCE SLIDE is the genuine move ----
-  -- wait for the writes to STOP: 90 consecutive quiet frames = settled.
+  -- ---- phase 1: the entrance slide is the move under test ----
+  -- wait for the writes to stop: 90 consecutive quiet frames means settled.
   H.waitUntil(function()
     local sig = delta({ [0] = 0, 0, 0, 0, 0, 0 }, ALL)
     local s = H.vars.settle
@@ -190,7 +191,7 @@ H.run({ maxFrames = 60000 }, {
     liveMark = snap()
   end),
 
-  -- ---- phase 2: STATIC -- 600 idle frames, zero writes anywhere ----
+  -- ---- phase 2: static, 600 idle frames with no writes anywhere ----
   H.waitFrames(600),
   H.call(function()
     local d = delta(liveMark, ALL)
@@ -200,7 +201,7 @@ H.run({ maxFrames = 60000 }, {
     H.screenshot("hudtrack_static")
   end),
 
-  -- ---- phase 3: ANIMATION -- a real action, transients held ----
+  -- ---- phase 3: animation, a real action with transients held ----
   H.call(function()
     for s = 0, 3 do
       if H.readByte(0x3ED8 + s * 2) == 0x0E then banonSlot = s end

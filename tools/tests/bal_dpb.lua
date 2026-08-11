@@ -1,8 +1,8 @@
 -- bal_dpb.lua -- damage-per-BP by target state (Measurement #5, the core
--- boost-pedagogy result). A controlled A/B lab, NOT a live auto-battler:
--- the mines pool is too fragile to express boosts (trash dies in 2 actions)
--- and its formula species carry no class weakness, so the ordering is
--- measured here in a pinned laboratory instead.
+-- boost-pedagogy result). This is a controlled A/B lab rather than a live
+-- auto-battler: the mines pool is too fragile to express boosts (trash dies in
+-- 2 actions) and its formula species carry no class weakness, so the ordering
+-- is measured here in a pinned laboratory instead.
 --
 --   tools/tests/run.sh tools/tests/bal_dpb.lua build/states/bal_dpb.log
 --
@@ -10,12 +10,12 @@
 -- Fire Beam is the default magitek skill (cursor opens on it), so mashing A
 -- fires an unboosted or boosted Fire Beam at the default target every turn.
 --
--- Per frame the driver PINS the target guards into an exact state and pins
--- the party's BP/pending, then records every discrete HP drop with the
+-- Per frame the driver pins the target guards into an exact state and pins
+-- the party's BP and pending, then records every discrete HP drop with the
 -- (state, boost) label live at the moment the hit landed. Pinning holds the
 -- state constant across many casts: shields never deplete (chips are re-
--- pinned), the broken timer never expires, HP never runs out. This turns a
--- chaotic fight into a clean damage bench.
+-- pinned), the broken timer never expires, and HP never runs out, which makes
+-- the fight usable as a damage bench.
 --
 -- Three states x two boost levels = six phases; each collects N damage
 -- samples. Fire Beam base is the same in every phase (casters pinned equal),
@@ -24,9 +24,9 @@
 --   shielded-weak     base x2 x 0.5 = x1   (vanilla fire-weak, then shielded)
 --   broken            base x2              (Ot6BrokenDmg, shields down)
 -- Boost raises Fire Beam's potency tier the same way in every state, so the
--- MARGINAL damage a boost buys (boosted - unboosted) tracks the state
--- multiplier: the ordering broken >> shielded-weak >> shielded-unweak is the
--- design goal, measured as damage-per-BP.
+-- marginal damage a boost buys (boosted - unboosted) tracks the state
+-- multiplier. The design goal is the ordering broken > shielded-weak >
+-- shielded-unweak, measured as damage-per-BP.
 --
 -- The resistance byte is read live from ROM and logged, so this lab reports
 -- the ordering at whatever Ot6ShieldedMulW the ROM (or a poke) carries.
@@ -44,12 +44,12 @@ local MENU  = 0x7BCA
 local ACTOR = 0x62CA
 local PIN_HP = 0xF000               -- guards pinned here; a hit never kills
 
--- resistance / hp knobs, read live from ROM for the log.
--- Bank-$F0 offsets DRIFT on any code/data edit: these were once $12 low
--- ($30033C/$300173) and read live code bytes ($88/$6A) instead of knobs, so
+-- resistance and hp knobs, read live from ROM for the log.
+-- Bank-$F0 offsets drift on any code or data edit: these were once $12 low
+-- ($30033C/$300173) and read code bytes ($88/$6A) instead of knobs, so
 -- this lab's header line reported a resistance it was not measuring at. They
 -- now derive from ff6/rom/ff6-en.dbg at compose time (H.sym), so they cannot
--- go stale -- no re-derivation and no drift guard needed. `& 0x3FFFFF` turns
+-- go stale, and no re-derivation or drift guard is needed. `& 0x3FFFFF` turns
 -- the CPU address into the snesPrgRom file offset (bank $F0 -> $30xxxx).
 local ROM_SHIELD = H.sym("Ot6ShieldedMulW") & 0x3FFFFF   -- word, low byte
 local ROM_HPMUL  = H.sym("Ot6HpMulTbl") & 0x3FFFFF       -- band0 byte
@@ -107,7 +107,7 @@ end
 local function frameLogic()
   local p = PHASES[pIdx]
   local settling = settleFrames > 0
-  -- 1) record drops FIRST (read the result of last frame's hit), before re-pin.
+  -- 1) record drops first (read the result of last frame's hit), before re-pin.
   --    Suppressed while settling so a beam in flight from the previous phase
   --    can't land in this phase's bucket.
   for _, slot in ipairs(GUARDS) do
@@ -165,10 +165,10 @@ local function report()
   H.log(string.format("[dpb] ratios broken:weak:unweak = %.2f : %.2f : 1.00",
     order.broken / math.max(order.unweak, 0.01),
     order.weak / math.max(order.unweak, 0.01)))
-  -- broken is 2x at every resistance (shields down); weak is 2*R, unweak is R.
-  -- so broken >= weak always, and weak is ~2x unweak always. tolerant bounds
-  -- so the resistance sweep (0.5/0.75/1x) all pass; the logged ratios carry
-  -- the real story (at 1x, weak ties broken and the ladder collapses).
+  -- broken is 2x at every resistance (shields down); weak is 2*R and unweak is
+  -- R.  So broken >= weak always, and weak is ~2x unweak always. The bounds are
+  -- loose so the whole resistance sweep (0.5/0.75/1x) passes; the logged ratios
+  -- carry the detail, and at 1x weak ties broken and the ordering collapses.
   H.assertEq(order.broken >= order.weak * 0.9, true, "broken buys at least as much per BP as shielded-weak")
   H.assertEq(order.weak >= order.unweak * 1.5, true, "shielded-weak clearly outbuys shielded-unweak")
   H.screenshot("bal_dpb")

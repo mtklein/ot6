@@ -2,26 +2,26 @@
 -- battle_fontrestore: a battle dialogue uploads its text over our font
 local goodFire, goodShield
 -- cells at vram $5800, and the vanilla small-font restore on close brings
--- back only the vanilla glyphs — so our element icons / hud glyphs
+-- back only the vanilla glyphs, so our element icons and hud glyphs
 -- vanish until the next battle (the Whelk-dialogue bug the user hit).
 -- The fix: the dialogue-close path (_c143b9 -> Ot6FontRestoreMark_ext)
--- runs the vanilla small-font restore to COMPLETION, then sets
--- OT6_FONTDIRTY ($57b9; relocated from $57d5, which turned out to be
--- byte 0 of vanilla's banner name scratch — see battle_banner), and the
--- battle NMI re-lays our icons in vblank, ONE ~128-byte slice per frame
--- (6 stages; a single-shot re-lay was ~46 scanlines and tore the frame).
--- (flag-after-restore ordering matters: battle_dlgmenu tests the real
--- dialogue flow). This test drives the MECHANISM directly: corrupt the
+-- runs the vanilla small-font restore to completion, then sets
+-- OT6_FONTDIRTY ($57b9; relocated from $57d5, which is byte 0 of
+-- vanilla's banner name scratch, see battle_banner), and the battle NMI
+-- re-lays our icons in vblank, one ~128-byte slice per frame (6 stages; a
+-- single-shot re-lay was ~46 scanlines and tore the frame).  The
+-- flag-after-restore ordering matters; battle_dlgmenu tests the real
+-- dialogue flow.  This test drives the mechanism directly: corrupt the
 -- icon cells in vram, raise the flag, and confirm the NMI restores them
 -- and clears the flag.
 --
--- *** QUARANTINED MECHANISM TEST (issue #75) -- state writes SANCTIONED ***
+-- Quarantined mechanism test (issue #75); state writes are sanctioned.
 -- Owner-named on the #75 policy list: deliberate VRAM corruption for the
 -- font-restore path.  The input under test (our font cells overwritten in
 -- vram) is produced in real play only by a battle dialogue's own upload,
--- which battle_dlgmenu drives for real; THIS test isolates the restore
--- machinery itself and needs the corruption on cue.  It keeps its
--- waivers, and it MAY NEVER PRODUCE FIXTURES.
+-- which battle_dlgmenu drives for real; this test isolates the restore
+-- code itself and needs the corruption on cue.  It keeps its waivers, and
+-- it must never produce fixtures.
 local H = dofile("tools/tests/lib/ot6.lua")
 local STATE = "build/states/battle_entry.mss.lua"
 local vr = emu.memType.snesVideoRam
@@ -51,7 +51,7 @@ H.run({ maxFrames = 30000 }, {
       "fire icon present before corruption")
   end),
   -- simulate the dialogue clobber: overwrite our cells with garbage, as a
-  -- font-restore DMA would. (writing vram directly from lua is fine.)
+  -- font-restore DMA would (writing vram directly from lua is allowed)
   H.call(function()
     for _, cell in ipairs({ 0xeb, 0xec, 0xed, 0x64, 0xef, 0xfb, 0xfc, 0xfd,
                             0x65, 0x66, 0x67, 0x71 }) do
@@ -74,7 +74,7 @@ H.run({ maxFrames = 30000 }, {
     H.assertEq(H.readByte(FONTDIRTY), 0, "dirty flag cleared")
     H.glyphCanary()   -- full VRAM-vs-ROM check of every OT6 font cell
   end),
-  -- and it must NOT re-lay every frame (flag stays clear when quiet)
+  -- and it must not re-lay every frame (flag stays clear when quiet)
   H.waitFrames(120),
   H.call(function()
     H.assertEq(H.readByte(FONTDIRTY), 0, "flag stays clear when no dialogue")

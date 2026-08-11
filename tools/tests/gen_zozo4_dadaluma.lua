@@ -3,24 +3,24 @@
 -- one A-press from the fight, and dadaluma_won.mss on the same tile after
 -- battle 69's scripted win clears him off the tower porch.
 --
--- THE MAZE (probe_climb5/9/11/15/16 -- every claim below walked):
---  * The city is a DIRECTED graph once door source tiles are modeled as
---    what they are -- walk-on teleports.  Flooding with doors-as-floor
+-- The maze (probe_climb5/9/11/15/16; every claim below was walked):
+--  * The city is a directed graph once door source tiles are modeled as
+--    walk-on teleports.  Flooding with doors-as-floor
 --    fuses regions only a teleport connects (that error hid the route);
 --    with doors as walls the islands and their only bridges appear:
 --      street --P9(38,57)--> 225 --P10b(47,47)--> roof (35,54)
---      --P11a(34,50)--> the STAIR ROOM --P12b(46,9)--> U1 crane roof
---      --J39 jumps west--> P17a(15,39) --> WEST ROOM --> P18b(104,27)
---      --> W33 strip --J33 jumps east--> U2 --P14a(31,30)--> BRIDGE ROOM
---      --P15b(30,34)--> TOP roof (30,22) --z-loop corridor--> (30,13).
---  * THE STAIR ROOM is a bandit conveyor: init event _caefb8 keeps seven
+--      --P11a(34,50)--> the stair room --P12b(46,9)--> U1 crane roof
+--      --J39 jumps west--> P17a(15,39) --> west room --> P18b(104,27)
+--      --> W33 strip --J33 jumps east--> U2 --P14a(31,30)--> bridge room
+--      --P15b(30,34)--> top roof (30,22) --z-loop corridor--> (30,13).
+--  * The stair room is a bandit conveyor: init event _caefb8 keeps seven
 --    walkers climbing its one-wide stair column (x=53, y=18..29) and the
 --    top "\" beam forever, so a snapshot BFS almost never sees a clear
 --    path (probe_climb8 starved on 20 straight no-paths).  The engine
 --    itself queues a held direction behind a moving body, so that step is
 --    driven as follow-the-queue: press the route direction for the
 --    current tile and wait out whoever is standing in it.
---  * THE JUMPS ($01B0-$01B5 = the live $1EB6 control bits, event_trigger
+--  * The jumps ($01B0-$01B5 = the live $1EB6 control bits, event_trigger
 --    _221 + _ca95c6..): {28,y}/{25,y} high pair, {21,y}/{19,y} low pair,
 --    rows y=39 and y=33, each side firing only with the facing bit
 --    toward the gap set -- so a jump is "walk onto the tile holding the
@@ -29,31 +29,32 @@
 --    the obj_script arcs dip a row (25,40 / 28,34) and settle facing up
 --    ($1EB6 bit0), which is why the twin trigger never re-fires on
 --    landing.  A held direction CHAINS the whole row -- both jumps of a
---    row fire under one hold, and the row is pure transit.
---  * THE TALK: Dadaluma's tile (30,14) seals the roof from the tower
---    porch, (29,14)/(30,15) are $F7 -- and $F7 is the one prop byte
---    CheckNPCs' talk-across-a-counter extension explicitly rejects
+--    row fire under one hold, and the row is transit only.
+--  * The talk: Dadaluma's tile (30,14) seals the roof from the tower
+--    porch, and (29,14)/(30,15) are $F7, which is the one prop byte
+--    CheckNPCs' talk-across-a-counter extension rejects
 --    (player.asm @478e), so there is no south-side talk.  The authored
---    approach is a Z-LEVEL LOOP (probe_climb15): west along y=16 on the
+--    approach is a z-level loop (probe_climb15): west along y=16 on the
 --    lower level, drop to (30,17), climb the "/" beam at (31,17) (zAfter
---    flips the party to upper), then the SAME tiles again as upright
---    diagonals -- (32,16)/(33,15)/(34,14) carry $44/$49 bridge-diag props
---    that only engage at z=1 -- onto the y=13 strip and west to (30,13),
---    facing DOWN at him.  That loop is the LAST tier of THREE: the whole
+--    flips the party to upper), then the same tiles again as upright
+--    diagonals ((32,16)/(33,15)/(34,14) carry $44/$49 bridge-diag props
+--    that only engage at z=1), onto the y=13 strip and west to (30,13),
+--    facing DOWN at him.  That loop is the last of three tiers: the whole
 --    corridor from the (30,22) landing is a switchback ladder of the same
---    motif (full measured tile dump at corridorDir below), and it is
---    driven SCRIPTED, not pathfound -- the bridge-diag tiles move
---    differently per z, so followPath's all-z-seeded BFS mispredicts the
---    live engine there and oscillates at y=19 forever (measured twice,
---    9000-frame timeouts, x wandering 30..35).  Dadaluma's (30,14) stays
+--    shape (full measured tile dump at corridorDir below), and it is
+--    driven from a script rather than pathfound, because the bridge-diag
+--    tiles move differently per z, so followPath's all-z-seeded BFS
+--    mispredicts the live engine there and oscillates at y=19 indefinitely
+--    (measured twice, 9000-frame timeouts, x wandering 30..35).  Dadaluma's
+--    (30,14) stays
 --    object-occupied until the win; the scripted route never aims at it.
---  * THE FIGHT: battle 69 = formation 438 = DADALUMA $0107 + two $006C
+--  * The fight: battle 69 = formation 438 = DADALUMA $0107 + two $006C
 --    sidekicks (measured words 0107 006C 006C FFFF FFFF FFFF).  The
 --    post-battle event _ca5ea9 gates on battle-switch $40 exactly like
 --    Kefka/Vargas: a real win despawns him (hide_obj NPC_14, $034A=0,
 --    fade_in, control back on (30,13) -- the porch opens); a loss is
---    `call GameOver`.  Since issue #75 the fight is PLAYED -- see the
---    fighter + retry ladder at the fight site; this file writes no
+--    `call GameOver`.  Since issue #75 the fight is played; see the
+--    fighter and retry ladder at the fight site.  This file writes no
 --    emulated game state anywhere, and every mid-route encounter on the
 --    climb is fought by the same edge-tapped A that pages dialogs.
 local H = dofile("tools/tests/lib/ot6.lua")

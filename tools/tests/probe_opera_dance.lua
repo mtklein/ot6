@@ -1,5 +1,5 @@
 -- probe_opera_dance.lua -- opera_stage -> aria -> forks {0,1,0} -> then the
--- FLOWER DANCE on map 236: dump geometry, reach NPC(12,19)=_cabf27 ($0057=1) and
+-- flower dance on map 236: dump geometry, reach NPC(12,19)=_cabf27 ($0057=1) and
 -- Draco NPC(12,14)=_cabd35, then the balcony trigger (8,9)=_cabe6d -> $0111=1.
 local H = dofile("tools/tests/lib/ot6.lua")
 local function map() return H.mapId() & 0x1ff end

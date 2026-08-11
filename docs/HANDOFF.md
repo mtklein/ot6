@@ -1,145 +1,148 @@
-# Hard-won facts
+# Facts that are expensive to rediscover
 
-The things that cost real time to rediscover. Start with
+These cost real time to work out the first time. Start with
 [README.md](../README.md) for what OT6 is, [CONTRIBUTING.md](../CONTRIBUTING.md)
 for the house rules, and [ROADMAP.md](ROADMAP.md) for the release plan.
 
-## Doctrine (measured; do not re-derive)
+## Measured facts (do not re-derive)
 
-- **fieldCare** drives the real Item→use→target windows; A on the field
-  item list PICKS A SLOT UP, only a second A on the same slot uses it.
-  Its world-map exit is BROKEN (careBackOnMap's check passes at a moment
-  that isn't "world module running") — care on the field, not the world,
-  until fixed. Its exit also reads a one-frame transient and can leave the
-  menu open; it wants a debounce.
-- **`opts.playBattles="flee"` vs `"tactical"` vs `true`**: fleeing is standing
-  still while the formation takes free rounds; blind-A
-  `opts.playBattles=true` is a foot-gun that stalls or wipes on any segment
-  that can draw an encounter.
+- **fieldCare** drives the real Item→use→target windows. On the field item
+  list, A picks a slot up; only a second A on the same slot uses it.
+  Its world-map exit is broken: `careBackOnMap`'s check passes at a moment
+  that is not "world module running". Use care on the field, not on the
+  world map, until that is fixed. Its exit also reads a one-frame transient
+  and can leave the menu open; it needs a debounce.
+- **`opts.playBattles="flee"` vs `"tactical"` vs `true`**: fleeing means
+  standing still while the formation takes free rounds. Blind-A
+  `opts.playBattles=true` stalls or wipes the party on any segment that can
+  draw an encounter.
   `M.FLEE_CAP` default 1800, per-call `opts.fleeCap` (the South Figaro
-  escape route uses 420). Cave pincer formations cannot be fled at all —
-  FF6's own rule.
+  escape route uses 420). Cave pincer formations cannot be fled at all,
+  which is FF6's own rule.
 - **Rows**: `$B3 = $FF` for every command and only the weapon swing
-  clears it — Tools, Magic, Blitz, SwdTech, Throw, Steal are row-exempt.
-  Where damage is break-driven, back row wins; where the chipper is a
-  weapon swing, it loses (South Figaro vs Phantom Train, both measured).
-  Rows are persistent state — set them per segment on purpose.
+  clears it, so Tools, Magic, Blitz, SwdTech, Throw and Steal are
+  row-exempt. Back row wins where damage is break-driven and loses where the
+  chipper is a weapon swing (South Figaro vs Phantom Train, both measured).
+  Rows are persistent state, so set them deliberately per segment.
 - **The equip audit** (`tools/audit_equipment.py`, a `make test` check with its
-  own only-shrinks story-waiver list): any red segment gets checked against it
-  BEFORE being called balance.
-- **A party wipe must say so**: the navigators' `M.partyWiped()` canary
-  misses IN-BATTLE wipes (`$1600` keeps pre-battle HP); a battle-module
-  check (`$3BF4` under `battleLoadStarted()`) is the filed fix. Three
-  wipes have impersonated stuck navigators.
+  own only-shrinks story-waiver list): check any red segment against it
+  before calling the result balance.
+- **A party wipe must be reported as a wipe.** The navigators'
+  `M.partyWiped()` check misses in-battle wipes, because `$1600` keeps
+  pre-battle HP. The filed fix is a battle-module check (`$3BF4` under
+  `battleLoadStarted()`). Three wipes have been mistaken for stuck
+  navigators.
 - **Retry ladders are 3 attempts, phase-spread by 37 frames** (battle RNG
-  seed = frame phase at init). Widening a ladder until it gets lucky is not
-  acceptable; a ladder that loses all three reports a finding.
+  seed = frame phase at init). Do not widen a ladder until it succeeds by
+  chance; a ladder that loses all three attempts is reporting a finding.
 - **Every saved checkpoint is generated through the game's own save routine,
   never synthesised.**
 
-## The things that will cost you a day
+## Traps
 
-**1. Module WRAM ownership lies to you.** `$7E3BF4` is the party battle-HP
-table only while the battle module owns that RAM. `$021f` has exactly four
-writers, all menu lifecycle — forcing `ZMENUSTATE` mid-flow leaves corrupted
-menu tasks running and the cell reads as overlaid. Ask which module owns a
-`$02xx` cell before trusting it, verify by instrumenting (block moves are
-invisible to Mesen write callbacks — sample, don't watchpoint), and confirm
-persistent facts through SRAM (`$307ff0`, the codex pages) when a
-context-free channel exists.
+**1. A WRAM cell means what its owning module says it means.** `$7E3BF4` is
+the party battle-HP table only while the battle module owns that RAM. `$021f`
+has exactly four writers, all menu lifecycle, so forcing `ZMENUSTATE` mid-flow
+leaves corrupted menu tasks running and the cell reads as overlaid. Ask which
+module owns a `$02xx` cell before trusting it, verify by instrumenting (block
+moves are invisible to Mesen write callbacks, so sample rather than set a
+watchpoint), and confirm persistent facts through SRAM (`$307ff0`, the codex
+pages) when a context-free channel exists.
 
-**2. Cycle budgets are PER SITE, and only one site has a measured number.**
+**2. Cycle budgets are per site, and only one site has a measured number.**
 `Ot6BgHud_ext` runs from `WaitFrame` immediately after `WaitVblank` returns,
-once per battle frame, and has under 80 cycles of slack — possibly under 20.
+once per battle frame, and has under 80 cycles of slack, possibly under 20.
 Measured with bare-NOP controls carrying no feature at all: 12 NOPs pass, 80
-NOPs fail, and the penalty **saturates** (20 and 110 cycles both cost the
-same 163 frames). The symptom is not a crash or a wrong result — it is
-everything running ~10% slower, which flips timing-sensitive tests elsewhere
-and looks like their bug. Keep work there INLINE at the call site; a `jsr`
-into a proc that early-outs is already over the line.
+NOPs fail, and the penalty saturates (20 and 110 cycles both cost the
+same 163 frames). The symptom is not a crash or a wrong result. Everything
+runs about 10% slower, which flips timing-sensitive tests elsewhere and looks
+like a bug in those tests. Keep work there inline at the call site; a `jsr`
+into a proc that early-outs is already too expensive.
 
-12 NOPs being safe *there* does not make 12 NOPs safe anywhere: the same
-bare-NOP control in bank `$C2`'s **action** path fails at **five** NOPs, so
-that path's margin is under 10 cycles. But `$C2` growth per se is not the
-trigger — four `$C2` call sites were added (`battle_main.asm:514`, `:3409`,
+12 NOPs being safe at that site does not make 12 NOPs safe anywhere else: the
+same bare-NOP control in bank `$C2`'s **action** path fails at **five** NOPs,
+so that path's margin is under 10 cycles. Growth in `$C2` by itself is not
+the trigger: four `$C2` call sites were added (`battle_main.asm:514`, `:3409`,
 `:4152`, `:14652`, plus `Ot6RecheckMagic` at `:14715`) with no degradation at
-all. **Hypothesis, UNVERIFIED:** what costs is per-battle-*frame* code, not
-per-action or per-menu-redraw code; nobody has run the NOP control at those
-four sites, and that is the experiment that would settle it. The full record
-is the block comment over `OT6_BRKLIVE` in
-`ff6/src/battle/ot6_memory.inc`. (Distinct from the vblank-TRANSFER budget,
-which is about VRAM words, not cycles.)
+all. **Hypothesis, UNVERIFIED:** the cost comes from per-battle-*frame* code
+rather than per-action or per-menu-redraw code. Nobody has run the NOP control
+at those four sites, and that is the experiment that would settle it. The full
+record is the block comment over `OT6_BRKLIVE` in
+`ff6/src/battle/ot6_memory.inc`. (This is distinct from the vblank-TRANSFER
+budget, which is about VRAM words, not cycles.)
 
-**3. `H.sym` resolves a duplicate symbol name silently wrong.**
-`parse_dbg_syms` (`tools/tests/lib/compose.py:218-250`) walks `ff6-en.dbg`
-taking **the first** `type=lab` record for each wanted name and then skips
-that name forever (`if name in out: continue`, `:241`). `ExecCmd` is defined
-twice — `$C09B1B` and the battle one at `$C213E6` — so a probe that hooks
-`ExecCmd` gets the wrong module's address, its instrumentation window never
-closes, and every later event is misattributed. Silently. Before you hook a
-symbol by name, check how many label records in the `.dbg` carry it; if more
-than one, use the address directly or attribute by something else.
+**3. `H.sym` resolves a duplicate symbol name to the wrong address, with no
+error.** `parse_dbg_syms` (`tools/tests/lib/compose.py:218-250`) walks
+`ff6-en.dbg` taking **the first** `type=lab` record for each wanted name and
+then skips that name forever (`if name in out: continue`, `:241`). `ExecCmd`
+is defined twice — `$C09B1B` and the battle one at `$C213E6` — so a probe that
+hooks `ExecCmd` gets the wrong module's address, its instrumentation window
+never closes, and every later event is misattributed without anything
+reporting a problem. Before hooking a symbol by name, check how many label
+records in the `.dbg` carry it; if more than one, use the address directly or
+attribute by something else.
 
 **4. A mismatched ROM/fixture pair presents as "timeout waiting for main
-menu".** Savestates are genuinely ROM-coupled. When a fixture was generated
-from a different ROM than the one under test, the failure you see is a menu
-that never opens — nothing says "stale state". If a menu drive times out and
-you have recently changed ROM-affecting source, regenerate before you debug
-the menu. `tools/worktree-setup.sh` prints a matching warning when it seeds
-savestates generated on a different branch — read it.
+menu".** Savestates are ROM-coupled. When a fixture was generated from a
+different ROM than the one under test, the failure you see is a menu that
+never opens, and nothing in the output mentions stale state. If a menu drive
+times out and you have recently changed ROM-affecting source, regenerate
+before you debug the menu. `tools/worktree-setup.sh` prints a matching warning
+when it seeds savestates generated on a different branch.
 
-**5. NPC record order is NPC identity.** Event scripts address NPCs as
+**5. NPC record order determines NPC identity.** Event scripts address NPCs as
 {map, index-within-block}, so a record inserted ahead of an existing NPC
-renumbers everything after it. **Append, never insert.**
+renumbers everything after it. **Append records; never insert them.**
 
-**6. `navTo` lands at rest; a tile that takes the party away is entered with a
-held press, not a `navTo` whose goal it is.** Position samples are only valid
-at rest on a tile (`tools/tests/lib/ot6_field.lua:459`, `:616`).
+**6. `navTo` lands at rest, so a tile that takes the party away must be
+entered with a held press rather than made the goal of a `navTo`.** Position
+samples are only valid at rest on a tile
+(`tools/tests/lib/ot6_field.lua:459`, `:616`).
 
 **7. `event_main.asm` is a dump of separately-addressed scripts.** Adjacency
-means nothing. Party composition is runtime state: read `$1850` at a fixture.
-`bosses-wob.md` is authoritative on party composition.
+in it means nothing. Party composition is runtime state: read `$1850` at a
+fixture. `bosses-wob.md` is authoritative on party composition.
 
-**8. `LoadMagicProp` fills one shared buffer** — freeze the rest of the party
-when measuring an ability, or an ally's action mid-window reads as "the
-summon was free". Documented at `freezeOthers`
+**8. `LoadMagicProp` fills one shared buffer.** Freeze the rest of the party
+when measuring an ability, or an ally's action inside the measurement window
+will read as the summon costing nothing. Documented at `freezeOthers`
 (`tools/tests/battle_magicite.lua:232`).
 
-**9. The 600-second timeout starves agents against each other, not against the
+**9. The 600-second timeout makes agents starve each other, though not the
 owner.** `nice` fixes contention with the owner's game; it does not fix
 Mesen's testrunner wall-clock kill. The signature is several savestates
 failing to generate with `code=255` at once while the same ones succeed in
 isolation. Lower `-j` and retry rather than debugging the generator. Bound a
 full `make savestates` with `NINJAFLAGS=-j4` when other agents are live.
 
-Also paid for, and cheaper to read than to rediscover: capture-calm does NOT
-imply reload-calm — every generator reloads its own capture and verifies; a
-stale seeded fixture reads exactly like a product bug (`--check-states`
-first); the battle Item cursor is a SUM (`$8947` scroll + `$894F` row);
-command row zero is not universally Fight; concurrent worktree suites can
-SIGTERM each other's Mesen runs (stagger the heavy runs, `nice` everything,
-one heavy run at a time per machine).
+Also measured, and cheaper to read here than to rediscover: capture-calm does
+not imply reload-calm, so every generator reloads its own capture and
+verifies; a stale seeded fixture looks exactly like a product bug, so run
+`--check-states` first; the battle Item cursor is a sum (`$8947` scroll +
+`$894F` row); command row zero is not universally Fight; concurrent worktree
+suites can SIGTERM each other's Mesen runs, so stagger the heavy runs, `nice`
+everything, and keep to one heavy run at a time per machine.
 
 ## Canonical facts you should not re-derive
 
 - **The fixture party is LOCKE, CELES, SABIN, EDGAR** (four through the
   Facility, three once the tube room takes Celes), measured at each fight's
   entry point in `design/wob-route.md`; the post-opera checkpoint's entry
-  contract counts the `$1850` assignments so a chain that loses members
-  fails loudly.
+  contract counts the `$1850` assignments, so a chain that loses members
+  fails with an error rather than continuing.
 - **Map 323 is Albrook; Vector is 242 and 253** (`design/vector-route.md`,
   both title index 49).
 - **The item equip mask is `item_prop_en.dat` offset `+$01`, 16-bit, bit N =
-  actor N** (`research/data-formats.md`). Byte `+$00` always looks like a mask
+  actor N** (`research/data-formats.md`). Byte `+$00` also looks like a mask
   and always claims Terra.
 - **`monster_prop.dat` `+23` is absorb, `+25` is weak** — `check_boss_rows.py`
   and `check_break_reach.py` enforce doc/data agreement inside `make test`.
-- **`OT6_BREAK_TICKS` is `$10`** (`ff6/src/battle/ot6_break.asm:1`) and buys
-  a **2159-frame** window, ~36 s. Not "roughly one turn".
-- **There are exactly three multi-hit abilities in the game** — Quadra Slam
-  ×4, Quadra Slice ×4, Empowerer ×2. `tools/audit_multihit.py` proves it and
-  fails if that changes.
-- **SwdTech has a 1-BP floor** — there is no 0-BP tier. `Ot6BushidoTech`
+- **`OT6_BREAK_TICKS` is `$10`** (`ff6/src/battle/ot6_break.asm:1`) and gives
+  a **2159-frame** window, about 36 s, not roughly one turn.
+- **There are three multi-hit abilities in the game:** Quadra Slam
+  ×4, Quadra Slice ×4, and Empowerer ×2. `tools/audit_multihit.py` checks
+  this and fails if it changes.
+- **SwdTech has a 1-BP floor**; there is no 0-BP tier. `Ot6BushidoTech`
   (`ff6/src/battle/ot6_kits.asm:74-79`) clamps a stray 0 up, and boost 1/2/3
   selects Cyan's *top three learned* techs, so a given tier's price slides as
   he learns more.
@@ -149,8 +152,8 @@ one heavy run at a time per machine).
 - **The `event_triggers` fixed block has room for 2 more triggers
   game-wide** — 13 trailing `$FF` bytes in the block at `C40000`+`$1A10`, and
   a trigger is 5 bytes. (`npc_prop` has 76 trailing bytes ≈ 8 more NPC
-  records, an upper bound — an NPC record's last byte could legitimately be
-  `$FF`.) Any further save-point work needs segment relocation first
+  records, an upper bound, since an NPC record's last byte could legitimately
+  be `$FF`.) Any further save-point work needs segment relocation first
   (`design/save-points-vector.md` §1).
 - **The suite is self-registering**, discovered from each test's `-- @suite`
   marker; `tools/tests/suite.sh --list` reports what runs. Tests that load a
@@ -158,8 +161,8 @@ one heavy run at a time per machine).
 
 ## Working agreements
 
-- Delegated work gets [agent-brief.md](agent-brief.md) included by reference —
-  **cite the copy in the agent's own worktree**, never the owner's checkout,
+- Delegated work gets [agent-brief.md](agent-brief.md) included by reference.
+  **Cite the copy in the agent's own worktree**, never the owner's checkout,
   which sits on the release branch he is playtesting and can be weeks stale.
 - Agents commit to their own branches in revertible units, file exclusivity is
   "declare your hunks and expect merges", and regenerating a single savestate
@@ -172,27 +175,27 @@ one heavy run at a time per machine).
   of `~/ot6` or anywhere else in the home directory.
 - Keep `main`, the integration branch, and the owner's checkout
   fast-forwarded together at every checkpoint where the tests are green.
-- Commit messages here run long and explain the why, including what was ruled
-  out. Match that.
+- Commit messages here run long and explain why the change was made,
+  including what was ruled out. Match that.
 
-## The failure mode worth knowing about
+## The most common failure mode
 
-Nearly every wrong turn in this project has been the same one: **reasoning
-substituted for looking, when looking was cheap.** Both of the most expensive
-entries in the case file are about *absence* being read as information — a
-symbol lookup that silently returned the wrong module's address, so an
-instrumentation window never closed and every later event was attributed to
-it (trap 3); and a design table that stated intent as shipped fact for months
-because nobody had enumerated the records. In both, one grep or one audit
-script would have settled it.
+Nearly every wrong turn in this project has been the same one: reasoning used
+in place of looking, when looking was cheap. The two most expensive cases both
+read an absence as information. One was a symbol lookup that returned the
+wrong module's address without reporting an error, so an instrumentation
+window never closed and every later event was attributed to it (trap 3). The
+other was a design table that stated intent as shipped fact for months because
+nobody had enumerated the records. One grep or one audit script would have
+settled either.
 
-If a conclusion requires believing a documented measurement is wrong, the odds
-strongly favor your instrumentation over the record — verify with the cheapest
-possible look (a probe, a byte read, a re-run). Trust the mechanical checks
-over reasoning: the state-write checker and its only-shrinks list, the
+If a conclusion requires believing a documented measurement is wrong, the
+instrumentation is more likely to be at fault than the record. Verify with the
+cheapest available look: a probe, a byte read, a re-run. Prefer the mechanical
+checks to reasoning: the state-write checker and its only-shrinks list, the
 equipment audit, `compose.py --check-states` before debugging any red test,
 the runtime write guard, and `make savestates NINJAFLAGS="-k 0"` to enumerate
 blockers rather than hitting them one per run.
 
-The rules in CONTRIBUTING under *"your job is not to write correct code, it
-is to prove the code is correct"* exist because of specific incidents.
+The rules in CONTRIBUTING under "Prove the code is correct" exist because of
+specific incidents.

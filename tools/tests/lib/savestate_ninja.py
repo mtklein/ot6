@@ -4,60 +4,59 @@
 
 Replaces the Makefile's generate/generate_checkpoint/stackseed macros, the SAVESTATES
 lists, the ~104 hand-written rules, and the grep-generated dependency include
-(issue #25).  Why ninja and not make, in one sentence each -- these are the
-four failure modes the old shape kept producing, and the mechanism here that
-kills each one:
+(issue #25).  The old shape kept producing four failure modes; each is listed
+below with the mechanism here that prevents it:
 
- * "content stamp beside a touch": make decides staleness by mtime, so the
+ * A content stamp beside a touch: make decides staleness by mtime, so the
    content check (savestate_stamp.sh needsgen) had to `touch` the target to
-   stop make re-deciding -- two mechanisms that could disagree, and did
+   stop make re-deciding.  The two mechanisms could disagree, and did
    (2026-07-27: a resumed run printed "rom content changed" then booted an
-   old-ROM savestate against the new ROM).  Here the DECISION and the
-   EXECUTION are one mechanism: every generated state declares its real
-   inputs, and the only "is the content the same?" question is answered by
+   old-ROM savestate against the new ROM).  Here the decision and the
+   execution are one mechanism: every generated state declares its real
+   inputs, and the "is the content the same?" question is answered by
    `restat` latch edges (below), inside ninja's own scheduler.
- * "make never reconsiders": a target with no newer prerequisite is skipped
-   without its recipe running, so that generated include existed only to graft
+ * make never reconsiders: a target with no newer prerequisite is skipped
+   without its recipe running, so that generated include existed only to add
    generator/lib prerequisites back on.  Ninja edges list every input
-   directly, emitted from the same data entry that defines the step -- there
-   is no second list to rot.
- * "silent .PHONY no-op": GNU make does not apply implicit pattern rules to
+   directly, emitted from the same data entry that defines the step, so
+   there is no second list to go stale.
+ * A silent .PHONY no-op: GNU make does not apply implicit pattern rules to
    .PHONY targets, so `smoke-%: rom` matched nothing and reported success in
    0.036s.  Ninja has no implicit rules: every target is an explicit edge,
    an unknown target is a hard error, and a dirty edge either runs its
    command or fails.
- * "the graph in three places": macros + rules + a generated include.  The
-   graph is now ONE data list; this script is mechanical.
+ * The graph in three places: macros, rules and a generated include.  The
+   graph is now one data list, which this script translates.
 
-The content-staleness idiom (`restat`): git checkouts and rebuilds bump
+The content-staleness mechanism (`restat`): git checkouts and rebuilds bump
 mtimes without changing bytes, and generating a savestate costs minutes to
-hours, so mtime alone must never schedule one.  Every SOURCE input to a
-generated state -- the ROM, the generator .lua, the three composed-in lib
-halves, checkpoint manifests and payloads -- is therefore routed through a latch
+hours, so mtime alone must never schedule one.  Every source input to a
+generated state (the ROM, the generator .lua, the three composed-in lib
+halves, checkpoint manifests and payloads) is therefore routed through a latch
 edge:
 
     build build/ninja/src/<path>: latch <path>      (cmp -s || cp; restat=1)
 
 The latch re-runs on any mtime bump (cheap: one cmp), rewrites its output
-ONLY when bytes differ, and `restat = 1` tells ninja to re-stat the output
+only when bytes differ, and `restat = 1` tells ninja to re-stat the output
 and prune everything downstream when it did not move.  A touched-but-equal
 file regenerates nothing; a changed ROM re-runs every transitive dependent,
-because a state's staleness IS its position in this graph.  Generated
-states themselves are not latched: a regenerated .mss is genuinely new bytes
+because a state's staleness is determined by its position in this graph.
+Generated states themselves are not latched: a regenerated .mss is new bytes,
 and everything booted from it must replay.
 
-What deliberately does NOT participate in staleness (same as the stamp check
-this replaces): the harness itself (run.sh, compose.py, decode_b64.py,
+What does not participate in staleness (same as the stamp check this
+replaces): the harness itself (run.sh, compose.py, decode_b64.py,
 pin_test_saves.py, sram_checkpoint.py) and ff6-en.dbg.  A harness edit has never
-invalidated a generated state; widening that would regenerate the world on
-every tooling tweak.
+invalidated a generated state, and widening the input set would regenerate
+every state on any tooling change.
 
-savestate_stamp.sh survives with a narrower job: each state-generating edge
+savestate_stamp.sh has a narrower job now: each state-generating edge
 still `write`s build/states/<state>.stamp after success, because
 lib/compose.py re-derives that signature at embed time to catch a fixture
-that reached a test WITHOUT passing any freshness check (a worktree-seeded
-state a local edit has since drifted).  The stamp is provenance for that
-consume-time check -- it no longer schedules anything.
+that reached a test without passing any freshness check (a worktree-seeded
+state that a local edit has since drifted from).  The stamp is provenance for
+that consume-time check, and it no longer schedules anything.
 
 Usage:
     python3 tools/tests/lib/savestate_ninja.py             # (re)write build/build.ninja
@@ -68,7 +67,7 @@ The write is compare-and-conditionally-write, so an unchanged graph leaves
 build/build.ninja's mtime alone; build.ninja also regenerates itself via a
 `generator = 1` edge when this script or the graph data changes, so bare
 `ninja -f build/build.ninja` stays correct without the make wrapper.
-Emitted paths are RELATIVE to the repo root: run ninja from the root (the
+Emitted paths are relative to the repo root: run ninja from the root (the
 make wrappers do), or a state-generating edge's run.sh invocation will not
 resolve.
 """
@@ -87,7 +86,7 @@ GRAPH = "tools/tests/savestate_graph.py"
 OUT = "build/build.ninja"
 ROM = "build/ot6.sfc"
 LATCH_DIR = "build/ninja/src"
-# The three lib halves compose.py inlines into EVERY composed generator, in
+# The three lib halves compose.py inlines into every composed generator, in
 # inline order.  ot6_contract.lua is the invariant-contract half: an edit to
 # a contract must re-run every step that asserts it (issue #25), which the old
 # stamp signature never covered.
@@ -103,8 +102,8 @@ FIELDS = {"state", "gen", "prev", "checkpoint", "seed", "stack", "after"}
 
 
 def checkpoint_inputs(root, key):
-    """manifest first, then sorted payloads -- the exact order the Makefile's
-    checkpoint_inputs always hashed, so no checkpointed state's signature changes."""
+    """Manifest first, then sorted payloads, the same order the Makefile's
+    checkpoint_inputs hashed, so no checkpointed state's signature changes."""
     adir = f"tools/tests/checkpoints/{key}"
     payloads = sorted(p.name for p in (root / adir).glob("*.sram"))
     return [f"{adir}/manifest.json"] + [f"{adir}/{p}" for p in payloads]
@@ -112,8 +111,8 @@ def checkpoint_inputs(root, key):
 
 def validate(states, root):
     """Every error is fatal and named; a malformed entry must never emit as
-    some other kind of edge (the quiet-no-op class this design exists to
-    kill)."""
+    some other kind of edge, which is the quiet-no-op class this design
+    prevents."""
     errors = []
     seen = set()
 
@@ -344,7 +343,7 @@ def main(argv):
 
 def selftest():
     """Validation negatives: every malformed-entry class is a refusal, never
-    a differently-shaped edge.  Pure python; the ninja-semantics proofs live
+    a differently-shaped edge.  Pure python; the ninja-semantics proofs are
     in savestate_ninja_selftest.sh."""
     ok = True
 
@@ -403,7 +402,7 @@ def selftest():
         for label, graph in bad:
             check(label, validate(graph, root) != [])
 
-        # the emitted text carries the load-bearing pieces
+        # the emitted text contains the pieces the build depends on
         text = emit(good, root)
         check("latch rule is restat", "rule latch" in text and
               text.split("rule latch")[1].split("rule ")[0].count(

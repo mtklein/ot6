@@ -1,11 +1,11 @@
 #!/bin/sh
 # Make a fresh git worktree of this repo buildable/testable. Run from the
 # worktree root. The gitignored pieces a worktree lacks are seeded from the
-# main tree: the base ROM (copied — make verify hashes it) plus Mesen.app
-# and tools/bin (symlinked — the source bundle really is read-only now:
-# run.sh execs ONE shared, non-portable copy under ~/Library/Caches/ot6 and
-# isolates workers with CFFIXED_USER_HOME instead of per-worker bundles, so
-# a worktree costs no emulator copies and no Gatekeeper scans at all). That
+# main tree: the base ROM (copied, because make verify hashes it) plus
+# Mesen.app and tools/bin (symlinked, because the source bundle is read-only
+# now: run.sh execs one shared, non-portable copy under ~/Library/Caches/ot6
+# and isolates workers with CFFIXED_USER_HOME instead of per-worker bundles,
+# so a worktree costs no emulator copies and no Gatekeeper scans). That
 # shared copy is machine-wide, so it is already warm by the time a second
 # worktree exists. Generated build products (.lz compression, ca65 depfiles)
 # need no seeding: ff6/Makefile schedules them from tracked sources, so
@@ -22,12 +22,12 @@ ROM="Final Fantasy III (USA).sfc"
 [ -e "$HERE/tools/bin" ] || ln -s "$MAIN/tools/bin" "$HERE/tools/bin"
 
 # Seed the main tree's generated savestates so boot-chain fixtures don't
-# replay the whole game, PLUS the ninja bookkeeping for `make savestates`
+# replay the whole game, plus the ninja bookkeeping for `make savestates`
 # (build/ninja: the content latches and .ninja_log).  Ninja treats an edge
 # with no build-log entry as never built, so seeded states without the log
-# would genuinely -- and expensively, hours -- replay the whole chain.  -p
+# would replay the whole chain, which takes hours.  -p
 # preserves mtimes so the log's recorded times still describe the copied
-# files; any REAL drift (a local edit after seeding) still regenerates
+# files; real drift (a local edit after seeding) still regenerates
 # through the latch edges' content compare, proven in
 # savestate_ninja_selftest.sh.
 MAIN_BRANCH=$(git -C "$MAIN" branch --show-current 2>/dev/null || echo '?')
@@ -43,27 +43,27 @@ fi
 echo "worktree ready: ROM copied, Mesen/flips linked"
 echo "seeded from $MAIN ($MAIN_BRANCH) into $HERE_BRANCH"
 
-# ------------------------------------------------------- is the seed FRESH?
+# ------------------------------------------------------- is the seed fresh?
 # This block used to be a branch-name guess: "$MAIN_BRANCH != $HERE_BRANCH,
 # so SOME tests MAY be red, confirm by regenerating."  Both halves were wrong
-# in the way that costs time.
+# in ways that cost time.
 #
 #   * Wrong direction.  Equal branch names proved nothing.  Measured
-#     2026-07-30: `git diff main release/v0.9` was EMPTY, so the heuristic
-#     stayed silent -- and every one of the 105 seeded fixtures was stale
+#     2026-07-30: `git diff main release/v0.9` was empty, so the heuristic
+#     stayed silent, and every one of the 105 seeded fixtures was stale
 #     anyway, because the main checkout's own last `make savestates` (its
 #     stamps: 2026-07-28 09:15) predates commit b085cac (2026-07-28 19:47),
-#     which edited tools/tests/lib/ot6.lua.  The staleness never came from
-#     the branch; it came from the seed source not having regenerated since a
-#     shared input moved.  A worktree cut from a tree in that state inherits
+#     which edited tools/tests/lib/ot6.lua.  The staleness came from the seed
+#     source not having regenerated since a shared input moved, rather than
+#     from the branch.  A worktree cut from a tree in that state inherits
 #     it whatever branch either side is on.
 #   * "MAY be red" is not actionable.  An agent told that some unnamed tests
 #     might be stale, with no cheap way to check which, does the expensive
 #     thing: re-runs tests against unmodified `main` to see if they are red
-#     there too.  Four agents did precisely that, independently, for the same
+#     there too.  Four agents did that, independently, for the same
 #     ~10 tests, on 2026-07-29.
 #
-# So: ask, do not guess -- and ask with the SAME code the runtime check uses,
+# So ask rather than guess, and ask with the same code the runtime check uses,
 # so this script and compose.py cannot disagree about what "fresh" means.
 # ~2s for 105 fixtures, once, at setup.
 if [ -d "$HERE/build/states" ]; then

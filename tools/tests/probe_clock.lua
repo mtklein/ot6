@@ -1,6 +1,6 @@
 -- probe_clock.lua -- instrument the Zozo clock's three chained choice
 -- dialogs: open it, then drive the hour cursor to 2 by watching $056E move
--- one step per d-pad EDGE ($056D latch), logging the menu bytes throughout.
+-- one step per d-pad edge ($056D latch), logging the menu bytes throughout.
 local H = dofile("tools/tests/lib/ot6.lua")
 local function map() return H.mapId() & 0x1ff end
 local function bright() return emu.getState()["ppu.screenBrightness"] or 0 end
@@ -53,14 +53,14 @@ H.run({ maxFrames = 30000 }, {
   -- confirm with a clean A edge
   H.hold({ "a" }), H.waitFrames(4), H.release(), H.waitFrames(4),
   H.call(function() H.log("[after A hour] " .. bytes() .. " map=" .. map()) end),
-  -- now log the MINUTE menu bytes as it renders in, without touching the pad
+  -- now log the minute menu bytes as it renders in, without touching the pad
   H.waitFrames(4),
   H.call(function() H.log("[min +4]  " .. bytes()) end),
   H.waitFrames(20),
   H.call(function() H.log("[min +24] " .. bytes()) end),
   H.waitFrames(40),
   H.call(function() H.log("[min +64] " .. bytes()) end),
-  -- the minute target is index 0 = cursor start.  Press ONE clean A edge.
+  -- the minute target is index 0 = cursor start.  Press one clean A edge.
   H.hold({ "a" }), H.waitFrames(4), H.release(), H.waitFrames(8),
   H.call(function()
     H.log("[after A min] " .. bytes() .. " map=" .. map())

@@ -1,33 +1,33 @@
 # OT6 — Octopath Traveler mechanics in Final Fantasy VI
 
-A mechanics-overhaul ROM hack of Final Fantasy VI (SNES, US "FF3" ROM): FF6's
-cast, story, and world played through Octopath Traveler's combat grammar —
-sharp per-character job identities, shield/break tactics, and a boost-point
-turn economy.
+A mechanics-overhaul ROM hack of Final Fantasy VI (SNES, US "FF3" ROM). It
+keeps FF6's cast, story, and world, and replaces the combat system with
+Octopath Traveler's: per-character job identities, shield/break tactics, and a
+boost-point turn economy.
 
 ## Status
 
-**v0.9 is the current release**
+v0.9 is the current release
 ([tag](https://github.com/mtklein/ot6/releases/tag/v0.9)). The game is
-playable from the start through the Raid on Vector — the Magitek Research
+playable from the start through the Raid on Vector: the Magitek Research
 Facility, Number 024, the minecart and Number 128, the Cranes, the escape,
 and Terra's return.
 
-Break and boost are the spine: enemies carry shields and hidden weaknesses,
-hitting a weakness chips a shield, and breaking drops defenses hard; boost
-banks turns and folds spell tiers (Fire → Fira → Firaga). Magicite are
-sub-jobs — equip an esper and its spells join your Magic list, with a stat
-bump, while you hold it, augmenting the born mages rather than replacing
-them. Blitz is a menu, Steal guarantees the rare at three boost pips, and
-level-ups fully restore HP and MP.
+Break and boost are the two central systems. Enemies carry shields and hidden
+weaknesses, hitting a weakness chips a shield, and breaking drops defenses
+hard. Boost banks turns and folds spell tiers (Fire → Fira → Firaga).
+Magicite work as sub-jobs: equip an esper and its spells join your Magic list,
+along with a stat bump, while you hold it. That adds to what the born mages
+can already do rather than replacing it. Blitz is a menu, Steal guarantees the
+rare at three boost pips, and level-ups fully restore HP and MP.
 
-Route work follows the Sealed Gate: the Narshe mission handoff, the cave,
-the Esper attack, the Imperial banquet, and the Thamasa handoff. Getting the
-game playable to the end of the World of Balance is v0.10's job.
+Route work is on the Sealed Gate: the Narshe mission handoff, the cave, the
+Esper attack, the Imperial banquet, and the Thamasa handoff. v0.10 is meant to
+make the game playable to the end of the World of Balance.
 
 See [docs/ROADMAP.md](docs/ROADMAP.md) for milestones and how far the game is
 playable, [docs/DESIGN.md](docs/DESIGN.md) for the mechanics design,
-and [docs/HANDOFF.md](docs/HANDOFF.md) for the traps that cost real time to
+and [docs/HANDOFF.md](docs/HANDOFF.md) for facts that are expensive to
 rediscover.
 
 ## Quick start
@@ -50,11 +50,11 @@ make run     # launch the built ROM in Mesen (GUI)
 make patch   # emit a distributable .bps
 ```
 
-`make test` runs the whole suite headlessly under Mesen's testrunner — no
-window, no clicking. It takes a few minutes. Tests self-register with a
-`-- @suite` marker, so `tools/tests/suite.sh --list` shows exactly what runs;
-see [tools/tests/README.md](tools/tests/README.md) for how the harness works
-and how to write a test.
+`make test` runs the whole suite headlessly under Mesen's testrunner, with no
+window and no input from you. It takes a few minutes. Tests self-register with
+a `-- @suite` marker, so `tools/tests/suite.sh --list` shows what runs; see
+[tools/tests/README.md](tools/tests/README.md) for how the harness works and
+how to write a test.
 
 ## Layout
 
@@ -76,5 +76,5 @@ notes.
 ## Contributing
 
 See [CONTRIBUTING.md](CONTRIBUTING.md). Issues are tracked
-[here](https://github.com/mtklein/ot6/issues) — including known defects with
+[here](https://github.com/mtklein/ot6/issues), including known defects with
 reproductions, which are a reasonable place to start.

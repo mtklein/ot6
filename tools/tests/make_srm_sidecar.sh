@@ -1,20 +1,20 @@
 #!/bin/sh
 # make_srm_sidecar.sh -- snapshot the live in-game battery save and turn
 # its front 8 KB (vanilla save-slot data only) into an embeddable base64
-# sidecar the legacy headless probes can inject at boot.  This deliberately
-# DOES NOT include bank $31 or OT6's per-slot codex pages.  New durable route
+# sidecar the legacy headless probes can inject at boot.  By design it
+# excludes bank $31 and OT6's per-slot codex pages.  New durable route
 # checkpoints use the complete 32 KiB format under tools/tests/checkpoints/.
 #
 #   tools/tests/make_srm_sidecar.sh
 #
-# Mesen loads battery saves headless exactly as it does in the GUI (the
-# testrunner takes the ordinary LoadRom path), but run.sh deliberately wipes
+# Mesen loads battery saves headless the same way it does in the GUI (the
+# testrunner takes the ordinary LoadRom path), but run.sh wipes
 # <saves>/*.srm every launch and pins the save folder away from the user's,
-# so no battery file is ever there to load -- SRAM comes up holding whatever
+# so no battery file is ever there to load, and SRAM comes up holding whatever
 # RamPowerOnState filled it with (zeros by default; 0xFF under AllOnes).
 # gen_whelk / probe_slots / probe_srmboot inject this sidecar instead. In-game
-# saves are pure vanilla-layout data with no code dependency, so a sidecar
-# made once keeps loading across ROM rebuilds -- regenerate only when you
+# saves are vanilla-layout data with no code dependency, so a sidecar
+# made once keeps loading across ROM rebuilds.  Regenerate it when you
 # save further in the GUI and want the harness to start from there.
 set -eu
 ROOT="$(cd "$(dirname "$0")/../.." && pwd)"

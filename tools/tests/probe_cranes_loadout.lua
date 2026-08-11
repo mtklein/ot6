@@ -1,21 +1,22 @@
--- probe_cranes_loadout.lua -- READ-ONLY instrument (issue #75, the Cranes
--- vanilla-playbook re-test): what does the party n128_won actually carries
--- bring to the reunion fight?
+-- probe_cranes_loadout.lua -- read-only instrument (issue #75, the Cranes
+-- vanilla-playbook re-test): reports what the n128_won party brings to the
+-- reunion fight.
 --
 -- The wall record (gen_terra_returned_checkpoint header, probe_cranes_wedge)
--- says the fight's designed key -- water, bosses-wob.md 16 -- is
--- unobtainable by this party.  The vanilla playbook says otherwise:
--- BISMARK ($1A69 bit 7, the tube-room give_genju per gen_esper_tubes_done)
--- carries Sea Song ($3d: WATER, power 58, 50 MP, all enemies -- the game's
--- only water verb, magicite-tube-six.md section 8).  Whether the key exists
--- here reduces to three readable facts, dumped below:
---   * esper ownership ($1A69/$1A6A) -- is BISMARK owned at this boundary?
---   * per-character MP -- can anyone PAY the 50 MP Sea Song costs?
---   * known spells ($1a6e + 54*actor) -- does anyone know BOLT (the Right
---     Crane's second weakness) or any element that would FEED an absorb
---     (Left absorbs bolt 0x04, Right absorbs fire 0x01 -- monster_prop.dat
---     +23, read 2026-08-10)?
--- NOT a suite test; no fixture output.
+-- says the fight's designed key, water (bosses-wob.md 16), is unobtainable
+-- by this party.  The vanilla playbook disagrees: BISMARK ($1A69 bit 7,
+-- the tube-room give_genju per gen_esper_tubes_done) carries Sea Song
+-- ($3d: water, power 58, 50 MP, all enemies), the game's only water spell
+-- (magicite-tube-six.md section 8).  Whether the key exists here reduces
+-- to three readable facts, dumped below:
+--   * esper ownership ($1A69/$1A6A): whether BISMARK is owned at this
+--     boundary;
+--   * per-character MP: whether anyone can pay the 50 MP Sea Song costs;
+--   * known spells ($1a6e + 54*actor): whether anyone knows Bolt (the
+--     Right Crane's second weakness) or any element that would feed an
+--     absorb (Left absorbs bolt 0x04, Right absorbs fire 0x01;
+--     monster_prop.dat +23, read 2026-08-10).
+-- Not a suite test; no fixture output.
 local H = dofile("tools/tests/lib/ot6.lua")
 
 local NAMES = { [0]="TERRA","LOCKE","CYAN","SHADOW","EDGAR","SABIN","CELES",
@@ -55,7 +56,7 @@ H.run({ maxFrames = 900 }, {
     H.log(string.format("[switches] $006B(reunion)=%d $02F6(celes)=%d",
       (H.readByte(0x1E80 + (0x6B >> 3)) >> (0x6B & 7)) & 1,
       (H.readByte(0x1E80 + (0x2F6 >> 3)) >> (0x2F6 & 7)) & 1))
-    -- the whole bag, weapon-range ids: what could re-arm the riders?
+    -- the whole bag, weapon-range ids: what is available to re-arm the riders
     local bag = {}
     for i = 0, 255 do
       local id, qty = H.readByte(0x1869 + i), H.readByte(0x1969 + i)

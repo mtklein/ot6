@@ -1,27 +1,29 @@
 -- gen_zozo3_clock.lua -- v0.4 step 2a: zozo_arrival (map 221 street) -> the
--- CAFE building door (42,28) -> the clock room (map 225, landing {98,61})
--- -> THE CLOCK at {98,59}: an A+facing-up tile interaction (NOT an NPC),
--- solved 6:10:50 -> the hidden staircase opens -> generate zozo_clock_solved.
+-- cafe building door (42,28) -> the clock room (map 225, landing {98,61})
+-- -> the clock at {98,59}, an A+facing-up tile interaction rather than an
+-- NPC, solved 6:10:50, which opens the hidden staircase; generate
+-- zozo_clock_solved.
 --
--- THE CLOCK, from source (event_main.asm _ca96bd:22895 + event_trigger
+-- The clock, from source (event_main.asm _ca96bd:22895 + event_trigger
 -- _225 {98,59}):
---  * the trigger runs EVERY frame the party stands on {98,59}; its gate is
---    $01B4 & $01B0 & !$01F0 -- and $01B0-$01B7 are NOT story switches but
---    the LIVE control-flag bits of $1EB6 (field/event.asm UpdateCtrlFlags:
+--  * the trigger runs every frame the party stands on {98,59}; its gate is
+--    $01B4 & $01B0 & !$01F0.  $01B0-$01B7 are not story switches; they are
+--    the live control-flag bits of $1EB6 (field/event.asm UpdateCtrlFlags:
 --    bit0-3 = facing up/right/down/left, bit4 = A held, bit5 = tile
---    latch).  So "activate the clock" = stand on it, face up, hold A.
---  * every time-telling NPC in town LIES; the truth is authored straight
---    into the choice graph: hour dlg $041D -- ONLY index 2 ("6:00") sets
---    $01F1; minute dlg $041F -- ONLY index 0 ("0:10") sets $01F2; second
---    dlg $0420 -- ONLY index 4 ("0:00:50") reaches the `if_all $01F1 &
---    $01F2` success at _ca970e.  6:10:50, hard-coded.
+--    latch).  Activating the clock means standing on it, facing up, and
+--    holding A.
+--  * the time-telling NPCs in town all give the wrong time; the correct
+--    answer is hard-coded in the choice graph: hour dlg $041D, only index 2
+--    ("6:00"), sets $01F1; minute dlg $041F, only index 0 ("0:10"), sets
+--    $01F2; second dlg $0420, only index 4 ("0:00:50"), reaches the
+--    `if_all $01F1 & $01F2` success at _ca970e.  The answer is 6:10:50.
 --  * $01F1/$01F2 are zeroed on every entry, so a botched menu just retries.
 --  * success (_ca9725): 4 mod_bg_tiles calls reveal a staircase at
---    x=101-102, y=45..56 (_cad067/79/8b/9d) and set $01F0 (map-local) --
---    the BFS model reads the live tilemap, so the stairs are walkable to
+--    x=101-102, y=45..56 (_cad067/79/8b/9d) and set $01F0 (map-local).
+--    The BFS model reads the live tilemap, so the stairs are walkable to
 --    it immediately.
 --  * dialog choices track in $056E (EventCmd_b6); the driver below moves
---    the cursor by VALUE (edge-presses, re-reading $056E) so the clock's
+--    the cursor by value (edge-presses, re-reading $056E) so the clock's
 --    two-per-row layout needs no geometry knowledge.
 local H = dofile("tools/tests/lib/ot6.lua")
 
@@ -49,25 +51,26 @@ local function landed(m, n)
 end
 
 -- Drive one clock choice dialog to `idx` and confirm, terminating when the
--- switch `doneId` latches (NOT on "dialog closed": the three menus are
--- CHAINED and $BA/$D3 dip both during each menu's text render and in the
--- gap between them, so a dialogWaiting terminator confirms into the void --
--- the first measured bug, probe_clock).
+-- switch `doneId` latches rather than when the dialog closes: the three
+-- menus are chained and $BA/$D3 dip both during each menu's text render and
+-- in the gap between them, so a dialogWaiting terminator confirms with no
+-- menu up (the first measured bug, probe_clock).
 --
--- Each menu is a PROMPT PAGE ("Please reset the minute.") that waits for A,
--- THEN the choice list.  $056F (choice count) reads 0 through the prompt
--- and only grows >=2 once the choices render (measured: the minute prompt
--- sat at $056F=0 / $D3=1 for 60+ frames until an A advanced it, then
+-- Each menu is a prompt page ("Please reset the minute.") that waits for A,
+-- followed by the choice list.  $056F (choice count) reads 0 through the
+-- prompt and only grows >=2 once the choices render (measured: the minute
+-- prompt sat at $056F=0 / $D3=1 for 60+ frames until an A advanced it, then
 -- $056F=5).  The hour menu looked different only because the clock-trigger
 -- drive's repeated A+up presses had already advanced its prompt.  The
--- cursor $056E is a LINEAR index, one step per d-pad EDGE (the $056D latch
+-- cursor $056E is a linear index, one step per d-pad edge (the $056D latch
 -- blocks until release, text.asm:383).  So:
 --   * prompt page ($D3=1, $056F<2): edge-A to advance to the choices;
 --   * choices up ($056F>=2): edge the cursor to idx, then edge-A to confirm;
 --   * anything else (text scrolling): wait.
--- idx 0 is safe under this order -- only the minute's target is 0, and
--- confirming choice 0 is exactly right; hour(2)/second(4) start below idx
--- so they step DOWN before any confirm-A, never a stray pick.
+-- idx 0 is safe under this order: only the minute's target is 0, and
+-- confirming choice 0 is the correct pick there; hour(2) and second(4)
+-- start below idx, so they step down before any confirm-A and cannot pick
+-- the wrong entry.
 local function clockPick(idx, doneId, what)
   local ph = 0
   return H.driveUntil(function() return sw(doneId) == 1 end, 3000, {
@@ -134,11 +137,11 @@ H.run({ maxFrames = 60000 }, {
   -- 4. the success shake runs ~2s; $01F0 is already latched by clockPick
   H.waitUntil(function() return sw(0x01F0) == 1 end, 900,
     "$01F0 -- the staircase revealed", 5),
-  -- step OFF the clock tile {98,59}: its trigger _ca96bd re-fires every
-  -- frame the party stands on it (now a no-op -- $01F0=1 hits its early
-  -- EventReturn -- but the event PC still bounces in, so eventRunning
-  -- flickers and hasControl never holds).  The same stood-on-trigger trap
-  -- gen_mines_chase documents; walk one tile south to escape it.
+  -- step off the clock tile {98,59}: its trigger _ca96bd re-fires every
+  -- frame the party stands on it.  It is a no-op now, because $01F0=1 hits
+  -- its early EventReturn, but the event PC still enters, so eventRunning
+  -- flickers and hasControl never holds.  This is the same stood-on-trigger
+  -- hazard gen_mines_chase documents; walk one tile south to leave it.
   H.driveUntil(function()
     return H.fieldY() > 59 and H.hasControl() and H.tileAligned()
   end, 900, { H.hold({ "down" }), H.waitFrames(4) }, "off the clock tile"),

@@ -68,7 +68,7 @@ H.run({ maxFrames = 8000 }, {
       H.log(string.format("    %-9s = %s", mv, tostring(H.canStep(29,41,mv))))
     end
   end),
-  -- hold RIGHT for 200 frames, trace position + z each 10 frames
+  -- hold right for 200 frames, trace position + z each 10 frames
   (function()
     local hb = 0
     return H.driveUntil(function() return hb >= 220 end, 400, {

@@ -118,19 +118,19 @@ MENU_TEXT_INC = 1
 ; field_menu.asm assembles under the ending-credits .charmap that
 ; ending_anim.asm installs earlier in menu_main.asm's include order (and gets
 ; no $00 terminator), which is exactly issue #39's garbled SwdTech page.
-; #43: rows must be ODD and <= 15 -- the EN window shows a tilemap row PAIR in
+; #43: rows must be odd and <= 15: the EN window shows a tilemap row pair in
 ; twelve scanlines (odd eight, even four) and stops after row 15.  These labels
 ; shipped on rows 4/6/8 and the LEARNED caption on 13 with its grid running to
 ; 21, so every slot rendered as a four-scanline sliver and most of the pool was
 ; off the bottom.  See Ot6LoadoutDrawSlots' cadence note in field_menu.asm.
 ;
-; THE CURSOR GUTTER (#43, third round).  Columns 1-2 belong to the cursor
-; SPRITE, not to text.  The menu cursor is 16x16 and `cursor_pos {x,y}` is its
-; top-left corner -- measured on the shipped ROM's own magic list, whose
+; The cursor gutter (#43, third round).  Columns 1-2 belong to the cursor
+; sprite, not to text.  The menu cursor is 16x16 and `cursor_pos {x,y}` is its
+; top-left corner, measured on the shipped ROM's own magic list, whose
 ; `cursor_pos {8, 116}` puts the sprite at screen x 8..23, y 116..131
 ; (tools/tests/probe_menucols.lua).  So a cursor at x=8 covers tilemap columns
 ; 1 and 2, and the row it points at must begin at column 3.  Vanilla is
-; unanimous on the arithmetic -- cursor_x = 8*col - 16:
+; consistent on the arithmetic, cursor_x = 8*col - 16:
 ;
 ;   magic   text cols 3 / 16  (skills.asm:831, :836)   cursors 8 / 112  (:125-126)
 ;   espers  text cols 3 / 17  (skills.asm:1733, :1737) cursors 8 / 120  (:249-250)
@@ -139,29 +139,29 @@ MENU_TEXT_INC = 1
 ;
 ; These labels shipped at column 2 under a cursor at x=8, so the sprite drew
 ; over the leading glyph -- the "1" of "1x".  The page's left margin is column 3
-; now and everything right of it moved with it; the CURSOR table did not move,
+; now and everything right of it moved with it; the cursor table did not move,
 ; because it was already vanilla's.
-; #44: THE TITLE PAYS FOR THE CONTROL HINT.  L/R cycling the cursored tier is
-; this page's only real interaction and nothing on screen said so ("that part
-; was not obvious" -- owner playtest, v0.7).  All eight of the window's text
-; rows are already spoken for, so the hint needed FOUND space, and the title
+; #44: the title pays for the control hint.  L/R cycling the cursored tier is
+; this page's only interaction and nothing on screen said so ("that part
+; was not obvious", owner playtest, v0.7).  All eight of the window's text
+; rows are already in use, so the hint needed space from somewhere, and the title
 ; was the cheapest source: "BUSHIDO LOADOUT" spanned columns 3-17 to say what
 ; the 1x/2x/3x tiers and the LEARNED pool below it already show.
 ;
-; Shortening it to "SWDTECH" is also a NAMING FIX that was owed anyway.  Every
-; other player-facing string in the EN build calls this skill SwdTech --
-; SKILLS_LIST_BUSHIDO (:81), SKILLS_BUSHIDO_TITLE (:93), ITEM_BUSHIDO (:204) --
+; Shortening it to "SWDTECH" is also a naming fix that was owed anyway.  Every
+; other player-facing string in the EN build calls this skill SwdTech
+; (SKILLS_LIST_BUSHIDO :81, SKILLS_BUSHIDO_TITLE :93, ITEM_BUSHIDO :204)
 ; and "Bushido" is the internal/JP name.  This page was the one place the EN
-; player was shown it, and it is the page reached by picking the row LABELLED
+; player was shown it, and it is the page reached by picking the row labelled
 ; "SwdTech", so the shorter title also matches the way in.
 ;
 ; The row is now three blue chrome words with one- and two-column gaps:
 ;   SWDTECH   3-9 | L/R SWAPS  11-19 | LEARNED  22-28
 .define OT6_LOADOUT_TITLE               BG1A, {3, 1},  {"SWDTECH"}
 ; #44: the control hint.  Same wording, character for character, as the Rage
-; page's OT6_RAGE_HINT below -- both pages teach the same idiom and a player who
+; page's OT6_RAGE_HINT below: both pages teach the same idiom and a player who
 ; learns it on one must not have to re-learn it on the other.  "SWAPS" is the
-; owner's own verb for what L/R does (issue #44's title).  Drawn BLUE, with the
+; owner's own verb for what L/R does (issue #44's title).  Drawn blue, with the
 ; title and the pool caption, so it reads as chrome and not as a slot's data.
 .define OT6_LOADOUT_HINT                BG1A, {11, 1}, {"L/R SWAPS"}
 ; The caption rides the TITLE row (the Rage page's own resolution for its price
@@ -171,8 +171,8 @@ MENU_TEXT_INC = 1
 ; only row where a second blue chrome caption cannot be misread as data.
 .define OT6_LOADOUT_POOL                BG1A, {22, 1}, {"LEARNED"}
 ; #38: every Bushido tech costs at least 1 BP, so the 0x row is retired and the
-; page is three rows deep -- 1x/2x/3x at tilemap rows 3/5/7 (#43).  These three
-; ARE the cursored rows, so column 3 is not cosmetic here: it is the gutter rule
+; page is three rows deep: 1x/2x/3x at tilemap rows 3/5/7 (#43).  These three
+; are the cursored rows, so column 3 is not cosmetic here: it is the gutter rule
 ; above, and the overlap the owner saw was on this exact glyph.
 ;
 ; #56: the tech name now starts at column 5, immediately after these two cells,
@@ -180,7 +180,7 @@ MENU_TEXT_INC = 1
 ; instead of four and this row had exactly one cell of slack in it; the full
 ; derivation of which of the row's three gaps could be the donor is over
 ; Ot6LoadoutDrawSlots (field_menu.asm).  Do not re-introduce a blank at column 5
-; without taking the cell back from somewhere -- the price field would go back
+; without taking the cell back from somewhere; the price field would go back
 ; to overwriting the mode block's separator.
 .define OT6_LOADOUT_LBL1                BG1A, {3, 3},  {"1x"}
 .define OT6_LOADOUT_LBL2                BG1A, {3, 5},  {"2x"}
@@ -189,63 +189,63 @@ MENU_TEXT_INC = 1
 ; ride in front of it (Ot6LoadoutDrawCost), so the field is five cells: a tens
 ; digit or a blank, a ones digit, then this.
 .define OT6_LOADOUT_MP_SUFFIX           {" MP"}
-; #49: the mode indicator and the revert control, in the ONE free block this
-; page has -- columns 23-29 of the three slot rows.  Row 3 carries the mode,
+; #49: the mode indicator and the revert control, in the one free block this
+; page has: columns 23-29 of the three slot rows.  Row 3 carries the mode,
 ; row 5 the control that changes it; row 7 stays clear so the pair reads as a
 ; two-line group rather than a third column of data.
 ;
-; COLUMN 24, not 23, and the difference is the whole legibility of the row.
+; Column 24, not 23, and the difference decides whether the row is legible.
 ; The slot's price field abuts column 23, so a block starting there renders the
-; row as "7 MPMANUAL" -- measured, first screenshot of that change.  Column 23
+; row as "7 MPMANUAL" (measured, first screenshot of that change).  Column 23
 ; is spent as the separator and the block runs 24-29, which is exactly as wide
 ; as the free run allows: column 30 is the window's own right border.
 ;
 ; #56 widened the price from four cells at 19-22 to five at 18-22, and took the
-; extra cell off the OTHER side of the row rather than out of column 23, so
+; extra cell off the other side of the row rather than out of column 23, so
 ; this block is where it was.
 ;
-; Both halves are drawn by Ot6LoadoutDrawMode (field_menu.asm) AFTER the slot
+; Both halves are drawn by Ot6LoadoutDrawMode (field_menu.asm) after the slot
 ; loop rather than by DrawPosText at init, because Ot6LoadoutDrawCost's
 ; zero-cost arm blanks the whole five-cell price field on every redraw of the
-; nomp build -- which before #56 ran through column 23 -- and because that is
-; what keeps the mode LIVE (the slot loop is the only thing a redraw runs).
+; nomp build (which before #56 ran through column 23) and because that is
+; what keeps the mode live (the slot loop is the only thing a redraw runs).
 .define OT6_LOADOUT_MODE_HINT           BG1A, {24, 5}, {"Y=AUTO"}
 
 ; OT6 (#40): Gau's 8-slot rage loadout page.  Same encode-pipeline rule as the
-; Bushido labels above -- a bare literal in field_menu.asm picks up
+; Bushido labels above: a bare literal in field_menu.asm picks up
 ; ending_anim.asm's credits charmap and carries no terminator (issue #39).
-; Rows must be ODD and <= 15: the EN window shows a tilemap row PAIR in twelve
+; Rows must be odd and <= 15: the EN window shows a tilemap row pair in twelve
 ; scanlines and stops after row 15 (Ot6RageDrawSlots' cadence note).  {2,20}
 ; put LEARNED off the bottom of the window entirely.
 ;
 ; Column 3 for the left margin, for the cursor-gutter reason spelled out over
-; OT6_LOADOUT_TITLE above: this page's LEFT slot column is cursored at x=8, so
-; nothing of its rows may sit in columns 1-2.  The page's RIGHT slot column was
-; already right -- col 16 under `cursor_pos {112, ...}` is vanilla's magic-list
-; pair verbatim -- which is why only the left half moves.  The title and the
-; LEARNED caption follow it so the page has ONE left margin.
+; OT6_LOADOUT_TITLE above: this page's left slot column is cursored at x=8, so
+; nothing of its rows may sit in columns 1-2.  The page's right slot column was
+; already correct (col 16 under `cursor_pos {112, ...}` is vanilla's magic-list
+; pair), which is why only the left half moves.  The title and the
+; LEARNED caption follow it so the page has one left margin.
 .define OT6_RAGE_TITLE                  BG1A, {3, 1},  {"RAGE LOADOUT"}
 .define OT6_RAGE_EACH                   BG1A, {22, 1}, {"EACH"}
 .define OT6_RAGE_LEARNED                BG1A, {3, 15}, {"LEARNED"}
 ; #44: the control hint, on row 3.  This page uses six of the window's eight
 ; text rows (1 title, 5/7/9/11 slots, 15 LEARNED); rows 3 and 13 are its
 ; deliberate breathing space, so unlike the Bushido page nothing had to be
-; shortened to make room -- row 3 sits directly under the title and directly
-; above the first slot, which is where a first-timer's eye lands next.
+; shortened to make room; row 3 sits directly under the title and directly
+; above the first slot, which is where a first-time player looks next.
 ;
-; NOTE for anyone re-deriving the budget: row 1 is NOT free on this page.  The
-; flat trance price occupies it -- a five-cell price field at columns 16-20
+; Note for anyone re-deriving the budget: row 1 is not free on this page.  The
+; flat trance price occupies it: a five-cell price field at columns 16-20
 ; (#56: five, not four, and one column further left so the EACH label below
-; keeps its gap) and OT6_RAGE_EACH at 22-25 (Ot6RagePrice, field_menu.asm) --
+; keeps its gap) and OT6_RAGE_EACH at 22-25 (Ot6RagePrice, field_menu.asm),
 ; so the title row's only spare runs are 15, 21 and 26-29.  None of them fits a
 ; legible hint.
 ;
 ; Identical wording to OT6_LOADOUT_HINT above, on purpose: the L/R idiom is the
 ; same on both loadout pages and is worth teaching once.
 .define OT6_RAGE_HINT                   BG1A, {3, 3},  {"L/R SWAPS"}
-; #44: what an UNSET slot says.  It is NOT "-default-": nothing defaults into
-; an unset slot.  A blank row on this page has exactly two causes and both mean
-; the same thing -- the slot is EMPTY and contributes nothing to the battle
+; #44: what an unset slot says.  It is not "-default-": nothing defaults into
+; an unset slot.  A blank row on this page has two causes and both mean
+; the same thing: the slot is empty and contributes nothing to the battle
 ; list:
 ;   * AUTO (all eight bytes zero) with fewer than eight rages hunted:
 ;     Ot6RageNth returns carry clear past the end of the window
@@ -254,8 +254,8 @@ MENU_TEXT_INC = 1
 ;     Ot6RageList's @manual arm SKIPS the slot outright (:1993-2002).  Reachable
 ;     because Ot6RageSeed stops as soon as the window runs out (:2075), so
 ;     editing a loadout while fewer than eight are known leaves the tail unset.
-; Calling either state "default" would be the #27/#32 class of lie -- the page
-; would name something the battle menu does not contain.  The marker is exactly
+; Calling either state "default" would be the #27/#32 class of error: the page
+; would name something the battle menu does not contain.  The marker is
 ; MonsterName::ITEM_SIZE (10) cells wide so it overwrites a name completely,
 ; keeping the property the old $ff fill had: a revert wipes what was there.
 .define OT6_RAGE_EMPTY                  {"- EMPTY - "}

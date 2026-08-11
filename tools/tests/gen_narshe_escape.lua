@@ -1,22 +1,21 @@
 -- gen_narshe_escape.lua -- from arvis_wake.mss: talk to Arvis and ride the
 -- wake-flow event (_cca06f) through its dialogs, the character-naming menu
--- (default OCTO; START commits it -- name_change.asm exits on START unless
+-- (default OCTO; START commits it, since name_change.asm exits on START unless
 -- the name is blank), the guards-at-the-gate scene and the knocking at the
 -- door, until control returns downstairs with switch $0001 set.  Generate
 -- narshe_escape_start.mss there, then leave the way Arvis pointed: the
 -- front door at (55,35) stays blocked by its invisible door-NPC (the
 -- soldiers are behind it), so the way out is the corridor above the
--- bedroom -- exit (67,26) -> map 20 (Narshe outdoors) at (53,8), high on
+-- bedroom, exit (67,26) -> map 20 (Narshe outdoors) at (53,8), high on
 -- the cliffs.  Generate narshe_streets.mss at the first calm tile outside.
--- The naming menu is the one story beat advanceStory cannot tap through --
--- $0059 goes 1 while it opens, so the script splits there and presses
--- START itself.
+-- advanceStory cannot tap through the naming menu, because $0059 goes 1 while
+-- it opens, so the script splits there and presses START itself.
 --
 -- Issue #75: every navTo/advanceStory step passes playBattles=true, so if any
--- encounter ever fires on this stretch it is FOUGHT by tap-A rather than
--- write-cleared (the wake-flow maps drew none in any measured run -- the
--- flag is the guarantee, not a behavior change).  This gen contains no
--- write idiom of its own.
+-- encounter ever fires on this stretch it is fought by tap-A rather than
+-- write-cleared.  The wake-flow maps drew no encounters in any measured run,
+-- so the flag is a guarantee rather than a behavior change.  This gen contains
+-- no write idiom of its own.
 local H = dofile("tools/tests/lib/ot6.lua")
 local WAKE = "build/states/arvis_wake.mss.lua"
 

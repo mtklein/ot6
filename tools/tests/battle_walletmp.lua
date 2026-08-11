@@ -1,42 +1,42 @@
 -- @suite savestate=vargas_won slow
--- battle_walletmp.lua -- issue #35: the costed submenus carry a WALLET --
--- the actor's CURRENT MP painted at the top of the open list window,
+-- battle_walletmp.lua -- issue #35: the costed submenus carry a wallet, which
+-- is the actor's current MP painted at the top of the open list window,
 -- beside the per-row costs those windows already show.
 --
 -- Placement (measured, probe_wallet): the ability-list windows stage their
 -- rows into the $7c00 menu map at rows 1/3/5/7, cols 2-26; row 0 is never
 -- staged and renders on the window's top edge.  The wallet is
--- [M][P][d][d][d] at row 0 cols 22-26 = vram words $7c16-$7c1a, staged by
--- Ot6WalletStage from $3c08 -- the very cell CalcAttackEffect's universal
--- charge debits -- and painted every nmi by the flush (blanked one-shot on
--- close/switch so Magic/Item lists never inherit it).
+-- [M][P][d][d][d] at row 0 cols 22-26, which is vram words $7c16-$7c1a, staged
+-- by Ot6WalletStage from $3c08, the cell CalcAttackEffect's universal
+-- charge debits, and painted every nmi by the flush (blanked one-shot on
+-- close or switch so Magic and Item lists never inherit it).
 --
--- ISSUE #75 CONVERSION -- the wallet follows SPENT MP, and real casters.
--- This file used to install synthetic all-Sabin/all-Terra parties into the
--- magitek intro, STOP the monsters, pin HP/monster HP, stage the pools with
--- one labeled poke (47), poke a live change (123) to watch the repaint, and
--- bench bystanders by writing their status bits.  It now boots vargas_won:
--- the REAL party (TERRA LOCKE EDGAR SABIN), a real ledge encounter, and the
--- pools the save carries.  Poking $3c08 proved the paint follows a poke;
--- SPENDING MP proves it follows the game -- so the "live tracking" poke arm
+-- Issue #75 conversion: the wallet follows spent MP, and real casters.
+-- This file used to install synthetic all-Sabin and all-Terra parties into the
+-- magitek intro, stop the monsters, pin party and monster HP, stage the pools
+-- with one labeled poke (47), poke a live change (123) to watch the repaint,
+-- and bench bystanders by writing their status bits.  It now boots vargas_won:
+-- the real party (TERRA LOCKE EDGAR SABIN), a real ledge encounter, and the
+-- pools the save carries.  Poking $3c08 only showed the paint follows a poke;
+-- spending MP shows it follows the game, so the live-tracking poke arm
 -- is retired in favor of the drop arm, and the old 47 -> 123 mid-run switch
--- becomes TWO CASTERS with genuinely different pools (Sabin's Blitz window,
--- then Edgar's Tools window -- both tools-shell $30 consumers of the same
+-- becomes two casters with different pools (Sabin's Blitz window,
+-- then Edgar's Tools window, both tools-shell $30 consumers of the same
 -- wallet).  Bystander turns are consumed with real Defends; battle dialogs
 -- are paged with A (the battle_vargas hazard).
 --
 -- Asserted:
---   1. WALLET: SABIN's open Blitz list paints M P <his current MP> -- the
---      value read live from $3c08 at the moment of the assert, white $21.
---   2. DROP: after his real Pummel resolves (4 MP, Ot6AbilityCostTbl),
---      HIS OWN reopened Blitz window shows exactly the charge less -- the
---      payer's window, the assertion that spent its old life dead behind an
---      `if who == actor` guard (see the pre-conversion header's forensics).
---   3. TWO CASTERS: EDGAR's Tools window, opened next, paints EDGAR's pool
---      -- a different number (asserted different), read from his cell.  The
---      wallet is per-actor, not a stale singleton.
---   4. CLEANUP: the vanilla Magic list, opened after a wallet was up, does
---      NOT carry the wallet cells (the one-shot blank on switch).
+--   1. wallet: SABIN's open Blitz list paints M P <his current MP>, with the
+--      value read live from $3c08 at the moment of the assert, in white $21.
+--   2. drop: after his real Pummel resolves (4 MP, Ot6AbilityCostTbl),
+--      his own reopened Blitz window shows exactly the charge less.  This is
+--      the payer's window, and the assertion spent its old life unreachable
+--      behind an `if who == actor` guard (see the pre-conversion header).
+--   3. two casters: EDGAR's Tools window, opened next, paints EDGAR's pool,
+--      a different number (asserted different), read from his cell.  The
+--      wallet is per-actor rather than a stale singleton.
+--   4. cleanup: the vanilla Magic list, opened after a wallet was up, does
+--      not carry the wallet cells (the one-shot blank on switch).
 local H = dofile("tools/tests/lib/ot6.lua")
 local STATE = "build/states/vargas_won.mss.lua"
 
@@ -92,8 +92,8 @@ local function assertWallet(tag, v)
 end
 
 -- ------------------------------------------------------------------------
--- the family machine (battle_toolsgrey's), driven by a MODE table: reach
--- `char`'s window for command `cmd`, then either HOLD the target state open
+-- the family driver (battle_toolsgrey's), controlled by a mode table: reach
+-- `char`'s window for command `cmd`, then either hold the target state open
 -- or pick `entry` and confirm.  Bystanders Defend; dialogs are paged.
 -- ------------------------------------------------------------------------
 local slotOf = {}
@@ -111,9 +111,9 @@ local function pulse()
   local edge = ph % 10 < 5
   if not H.battleLoadStarted() then
     -- a pack died under the drives (measured: run 3's pack ended before the
-    -- Edgar arm) -- pace the lane to the next natural encounter; the pools
+    -- Edgar arm), so pace the lane to the next natural encounter; the pools
     -- ride the writeback, so every arm continues where it stood.  Until
-    -- control returns, page the victory/EXP/level-up dialogs with A
+    -- control returns, page the victory, EXP and level-up dialogs with A
     -- (measured: run 4 sat behind them for 40k frames with hands off).
     if not (H.hasControl() and H.tileAligned()) then
       H.setPad(ph % 8 < 4 and { a = true } or {})
@@ -129,7 +129,7 @@ local function pulse()
     H.setPad({ [(x == lane.ax and y == lane.ay) and lane.out or lane.back] = true })
     return
   end
-  lane = nil          -- re-anchor the lane at wherever the NEXT field return
+  lane = nil          -- re-anchor the lane at wherever the next field return
                       -- stands: a stale anchor walks one direction forever
                       -- (measured: run 5 marched off map 98 onto map 19)
   if H.readByte(MENU) == 0 then
@@ -138,12 +138,12 @@ local function pulse()
   end
   local a = H.readByte(ACTOR)
   if a ~= slotOf[mode.char] then
-    -- bystander: back OUT of any submenu a previous held-open arm left up
+    -- bystander: back out of any submenu a previous held-open arm left up
     -- (measured: arm 3 holds Edgar's tools list, and a blind cadence then
-    -- oscillates $30<->$38 in it forever), then a real FIGHT -- not a
-    -- Defend: an all-defend party erodes to a wipe over a long run
+    -- oscillates $30 and $38 in it forever), then a real Fight rather than a
+    -- Defend, because an all-defend party erodes to a wipe over a long run
     -- (measured, run 6: ~5k frames of victory-screen garbage then map 19),
-    -- while Fights end packs fast and the machine just re-encounters.
+    -- while Fights end packs fast and the driver re-encounters.
     local st = H.readByte(MSTATE)
     if st == ST_TGT then
       H.setPad(ph % 10 < 5 and { a = true } or {})
@@ -261,7 +261,7 @@ H.run({ maxFrames = 150000 }, {
     H.screenshot("walletmp_blitz")
   end),
 
-  -- 2. the drop: a real Pummel, then THE PAYER'S OWN reopened window --------
+  -- 2. the drop: a real Pummel, then the payer's own reopened window --------
   reachWindow({ char = SABIN, cmd = CMD_BLITZ, state = ST_TOOLS, cast = PUMMEL },
     "sabin's blitz window (casting)"),
   H.driveUntil(function()
@@ -294,11 +294,11 @@ H.run({ maxFrames = 150000 }, {
   end),
 
   -- 4. the vanilla Magic list stays wallet-free -----------------------------
-  -- TERRA's Magic command (the party's innate mage -- measured: a spell-less
-  -- Edgar's BATTLE command row carries no $02 even though his field record
-  -- does, so only a real spell-knower can open this list), the next window
-  -- after a wallet was up: the one-shot blank on switch must have wiped the
-  -- wallet cells.
+  -- TERRA's Magic command (the party's innate mage; measured: a spell-less
+  -- Edgar's battle command row carries no $02 even though his field record
+  -- does, so only a character who knows a spell can open this list) is the next
+  -- window after a wallet was up, so the one-shot blank on switch must have
+  -- wiped the wallet cells.
   reachWindow({ char = 0x00, cmd = CMD_MAGIC, state = ST_MAGIC, hold = true },
     "terra's magic list (browse $0e)"),
   H.call(function()
@@ -308,7 +308,7 @@ H.run({ maxFrames = 150000 }, {
     H.log("magic window wallet cells: " .. table.concat(got, " "))
     for i = 1, 5 do
       -- the magic window paints its own fill over the area ($25ff observed
-      -- for an empty list); what must NOT survive is the wallet's glyphs
+      -- for an empty list); what must not survive is the wallet's glyphs
       H.assertEq(w[i] & 0xFF, 0xFF, string.format(
         "magic list cell %d carries no wallet glyph -- blanked on switch", i))
     end

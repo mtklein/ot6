@@ -1,6 +1,6 @@
 -- gen_moogle.lua -- from moogle_entry.mss (TERRA in Magitek armor at
 -- (55,12), map 50, one south of the collapse trigger): step onto (55,11)
--- and ride the WHOLE opening set-piece chain to its far side, generating two
+-- and ride the whole opening set-piece chain to its far side, generating two
 -- states on the way:
 --
 --   moogle_defense.mss  -- the three-party Moogle defense, first player-
@@ -9,16 +9,16 @@
 --   moogle_cleared.mss  -- the far side: LOCKE leads TERRA on the Narshe
 --                          streets (map 20), defense won, control returned
 --
--- SEQUENCE (all one event, _cca2e5, event_trigger.asm map 50 {55,11},
+-- Sequence (all one event, _cca2e5, event_trigger.asm map 50 {55,11},
 -- body event_main.asm:102027-103283):
 --   * bridge collapse choreography; TERRA falls (map 51 mosaic scene)
 --   * Kefka slave-crown flashback (map 250), then the scripted Magitek
---     flashback fight `battle 115` (map 5, event_main.asm:102351) --
+--     flashback fight `battle 115` (map 5, event_main.asm:102351):
 --     plain soldiers, won with real input by tap-A (TERRA's beams one-shot
 --     them, the same arithmetic as the intro gauntlet)
 --   * Gestahl rally (map 244), TERRA wakes in the caves (map 51)
 --   * Arvis recruits LOCKE (map 30): dialogs, then `name_menu LOCKE`
---     (event_main.asm:102678) -- the ONE beat advanceStory cannot tap
+--     (event_main.asm:102678), the one beat advanceStory cannot tap
 --     ($0059 flips as the menu opens; START commits the default name,
 --     same split as gen_narshe_escape.lua:47-52)
 --   * moogle cave scenes; choice dialog $0036 (A picks "Yes", the extra
@@ -28,60 +28,61 @@
 --     map 51 loads with STARTUP_EVENT (its map-init _ccab6f starts the
 --     six guard marches), fade in, player_ctrl_on (:103280-103283)
 --
--- THE DEFENSE, PLAYED THE WAY IT WAS DESIGNED (issue #75, the input-driven
+-- The defense, played as designed (issue #75, the input-driven
 -- test conversion; every number below measured by probe_moogle_geom /
 -- _switch / _rotation / _stations / _marshal on a fresh fixture):
 --   * guards NPC_4..NPC_9 spawn at (15,34)..(15,39) (npc_prop.asm map
 --     51) and march scripted paths (map-init _ccab6f) that converge on
 --     the single-file tail (15,17)->(15,16)->(14,16)->(14,15)->(14,14)
---     ->(14,13); a guard COMPLETING the tail execs _cccb82 = GAME OVER
---     (event_main.asm:108640), so the choke (14,14) stays manned
---   * the marches split by arm: NPC_4/NPC_9 climb the EAST loop through
---     (20,19..23), NPC_7/NPC_8 the WEST loop through (10,19..23),
+--     ->(14,13); a guard that completes the tail execs _cccb82, which is
+--     game over (event_main.asm:108640), so the choke (14,14) stays manned
+--   * the marches split by arm: NPC_4/NPC_9 climb the east loop through
+--     (20,19..23), NPC_7/NPC_8 the west loop through (10,19..23),
 --     NPC_5/NPC_6 the middle column (15,16..23).  Wave 1 needs ~2100
 --     field-frames to reach anything, so there is time to deploy:
 --     P3 -> (20,20) east (passed ~f1400), P2 -> (10,21) west (~f1800),
 --     P1 keeps the choke.  (15,15) and the mound tiles are off-path.
 --   * touching a marching guard fires `battle 5, DEFAULT, COLLISION`
 --     (npc events _ccaadf.._ccab57): Vomammoth + Lobo, and the battle
---     AUTO-ENGAGES THE COLLIDED PARTY (measured: a parked, inactive
+--     auto-engages the collided party (measured: a parked, inactive
 --     squad fought with its own exact HP table).  So once deployed, the
---     storm needs no choreography: hands off, tap-A each fight, two
---     waves per squad (~90-190 HP each), win path despawns the guard
---     ($060A..$060F=0).  Mid-defense goalie swaps do NOT work: waves
---     1-3 queue nose-to-tail and the aside walk eats wave 3's collision
---     (probe_moogle_rotation measured exactly that).
+--     waves need no further positioning: no input beyond tap-A per fight,
+--     two waves per squad (~90-190 HP each), and the win path despawns the
+--     guard ($060A..$060F=0).  Mid-defense goalie swaps do not work: waves
+--     1-3 queue nose-to-tail and the aside walk consumes wave 3's collision
+--     (probe_moogle_rotation measured that).
 --   * the Marshal (NPC_3) stands at (15,40) facing UP, npc event
 --     _ccada8 -> `battle 6` = Marshal (420 HP) + 2 Lobos.  Plain tap-A
---     LOSES this fight from a two-wave-worn pool (~330/543, measured
---     twice); the winning input-driven tactic is OT6's own boost -- R raises
---     the active character's pending boost (1 bp at battle start,
---     Ot6InitBP), A-A-A confirms the boosted Fight -- which won with
+--     loses this fight from a two-wave-worn pool (~330/543, measured
+--     twice); the winning input-driven tactic uses OT6's boost, where R
+--     raises the active character's pending boost (1 bp at battle start,
+--     Ot6InitBP) and A-A-A confirms the boosted Fight.  That won with
 --     MOG alone standing at 89 HP (probe_moogle_marshal).  The margin
---     is thin, so a LOSS is handled the way a player handles it: the
+--     is thin, so a loss is handled the way a player handles it: the
 --     loss path _ccada8->_ccaaba revives the squad at 1 HP on (14,11)
---     (NOT game over -- battle 6 and battle 5 both continue on defeat),
+--     (not game over; battle 6 and battle 5 both continue on defeat),
 --     and the next squad walks in and pokes him again: P2 (MOG, 543
 --     pool), then P1 (LOCKE, ~281 left), then P3 (~149 left).
 --   * a lost battle parks on the "Annihilated" screen until a keypress
 --     (the battle-HP table zeroes, which battleLoadStarted reads as
---     no-battle -- the pilot's 38k-frame "softlock" was this screen
+--     no-battle; the pilot's 38k-frame apparent hang was this screen
 --     unattended), so every post-fight settle keeps tapping A.
 --   * winning battle 6 runs _ccadbf: guards despawn, switch $0631=0
---     (the defense-won marker, :103782 -- its ONLY clear), "Thanks,
+--     (the defense-won marker, :103782, its only clear), "Thanks,
 --     Moogles!", the mine switch scene, TERRA's amnesia dialogs, the
 --     secret-entrance reveal on map 20, force-walk DOWN 2 + RIGHT 23
 --     from {15,56}, then max_hp/and_status on TERRA+LOCKE+MOG,
 --     player_ctrl_on, $01CC=1 (:103769-104188).  First calm control:
 --     map 20, LOCKE + TERRA.
 --
--- Issue #75: every battle in this unit is PLAYED -- zero state writes.
--- Battle 115 is beam one-shots, the six waves are won by whichever
+-- Issue #75: every battle in this unit is played and there are no state
+-- writes.  Battle 115 is beam one-shots, the six waves are won by whichever
 -- squad each march collides with, and the Marshal falls to boosted
--- Fights; beating him IS winning battle 6, so unlike gen_arvis there is
--- NO spare list anywhere; the fight logger below still names every
--- formation for the record.  input-driven fights cost real ATB rounds, so
--- every budget in this file grew against its battle-clear-write ancestor.
+-- Fights.  Beating him is winning battle 6, so unlike gen_arvis there is
+-- no spare list anywhere; the fight logger below still names every
+-- formation for the record.  Input-driven fights cost real ATB rounds, so
+-- every budget in this file is larger than in its battle-clear-write
+-- ancestor.
 --
 -- Switch -> RAM derivations (event bitfield base $1E80, bit = switch&7):
 --   $012E -> $1EA5 mask $40      $0631 -> $1F46 mask $02
@@ -178,8 +179,8 @@ local function marshalAdjacent()
 end
 
 -- one activation attempt: while adjacent, cycle 2 frames facing-press /
--- 4 frames A / 2 neutral until a battle actually loads (3-frame debounce
--- on monsters-present: the load signal lives in field-scribbled RAM) or
+-- 4 frames A / 2 neutral until a battle loads (3-frame debounce
+-- on monsters-present: the load signal lives in field-written RAM) or
 -- the defense is already won.  `round` only names the log line.
 local function pokeStep(round)
   local battN = 0
@@ -202,10 +203,10 @@ local function pokeStep(round)
 end
 
 -- the input-driven battle-6 driver: R raises the active character's pending
--- boost (characters open with 1 bp, regen 1 per unboosted turn --
+-- boost (characters open with 1 bp and regen 1 per unboosted turn;
 -- Ot6InitBP/Ot6ActionEnd), then three edge-tapped A's confirm the
--- boosted Fight and page victory text.  Once the battle module reads
--- gone (a WIN's teardown -- or a WIPE, which zeroes the HP table), keep
+-- boosted Fight and page victory text.  Once the battle module reads as
+-- gone (a win's teardown, or a wipe, which zeroes the HP table), keep
 -- tapping A: a loss parks on the Annihilated screen until a keypress.
 -- Ends on the won-switch or on 240 settled no-battle frames.
 local function marshalFight(maxFrames)
@@ -232,7 +233,7 @@ local function marshalFight(maxFrames)
   }, "Marshal fight (boosted Fights)")
 end
 
--- post-attempt settle: on a WIN $0631 clears early in _ccadbf; on a LOSS
+-- post-attempt settle: on a win $0631 clears early in _ccadbf; on a loss
 -- the squad is revived at 1 HP on (14,11) and control returns.  A-taps
 -- ride the Annihilated screen and any dialog either way.
 local function settleStep()
@@ -252,7 +253,7 @@ end
 -- one full Marshal attempt by squad p: activate it, walk beside the
 -- Marshal, poke, fight boosted, settle.  Written flat (cond/driveUntil/
 -- navTo steps carry no reset(), so repeated bodies replay latched
--- state -- the same reason the battle-clear-write ancestor wrote its two poke
+-- state, the same reason the battle-clear-write ancestor wrote its two poke
 -- rounds out flat).
 local function attempt(p, round)
   return H.cond(function() return defenseWon() end, {}, {
@@ -284,9 +285,9 @@ H.run({ maxFrames = 200000 }, {
 
   -- ===================================================================== --
   -- Phase 1: the deliberate step onto (55,11).  A random encounter on the
-  -- step is FOUGHT inline by the same edge-tapped A (real input -- bal_mines'
-  -- baseline policy beats this map's whole pool); the trigger fires the
-  -- moment we stand on the tile, so the terminator is a sustained event.
+  -- step is fought inline by the same edge-tapped A (real input; bal_mines'
+  -- baseline policy beats this map's whole pool).  The trigger fires as soon
+  -- as the party stands on the tile, so the terminator is a sustained event.
   -- ===================================================================== --
   H.driveUntil(eventFor(30), 4000, {
     H.call(function()
@@ -307,18 +308,18 @@ H.run({ maxFrames = 200000 }, {
 
   -- ===================================================================== --
   -- Phase 2: everything up to the LOCKE naming menu.  advanceStory taps
-  -- dialogs, FIGHTS battle 115's soldiers (real tap-A), and stays
-  -- hands-off through the choreography.  The menu detector is NOT the
+  -- dialogs, fights battle 115's soldiers (real tap-A), and stays
+  -- hands off through the scripted movement.  The menu detector is not the
   -- $0059 idiom gen_narshe_escape used: $59 is also battle-module
-  -- scratch, and run 1 measured it flipping nonzero DURING battle 115 --
+  -- scratch, and run 1 measured it flipping nonzero during battle 115, so
   -- the pred fired mid-fight and the real menu later sat unattended
-  -- forever.  The reliable signature is the menu itself: it SUSPENDS the
+  -- indefinitely.  The reliable signature is the menu itself: it suspends the
   -- field module, so control, the event PC, dialogs and battle all read
-  -- dead at once -- a combination no scene shows for long (event waits
-  -- hold the PC in CA-range; ambient ev=false pulses last a frame or
-  -- two) -- sustained for 120 consecutive frames on map 30 (run 1
+  -- dead at once, a combination no scene shows for long (event waits
+  -- hold the PC in CA-range, and ambient ev=false pulses last a frame or
+  -- two).  The detector requires 120 consecutive such frames on map 30 (run 1
   -- measured the stall holding for 20k+ frames; nothing else on map 30
-  -- goes quiet at all: the walk-in choreography and the four Arvis
+  -- goes quiet at all, because the walk-in movement and the four Arvis
   -- dialogs keep ev/dlg live).
   -- ===================================================================== --
   H.advanceStory((function()
@@ -334,9 +335,9 @@ H.run({ maxFrames = 200000 }, {
   H.logStep("naming menu open (field module suspended); committing LOCKE"),
   H.call(function() H.screenshot("moogle_naming") end),
   -- START commits the default name (name_change.asm exits on START unless
-  -- the name is blank -- the gen_narshe_escape precedent); pressed on
-  -- repeat until the event engine audibly resumes, because a single press
-  -- during any residual menu fade would vanish
+  -- the name is blank; the gen_narshe_escape precedent).  It is pressed
+  -- repeatedly until the event engine resumes, because a single press
+  -- during any residual menu fade would be lost
   H.driveUntil(eventFor(10), 1200, {
     H.pressButtons({ "start" }, 8),
     H.waitFrames(12),
@@ -346,7 +347,7 @@ H.run({ maxFrames = 200000 }, {
   -- Phase 3: the rest of the recruitment + moogle scenes to the defense.
   -- Done = calm control on map 51 with $012E set: the switch lands three
   -- event commands before player_ctrl_on (event_main.asm:103278-103283),
-  -- so calm+switch is exactly "the defense is live and ours to play".
+  -- so calm plus the switch means the defense is live and controllable.
   -- ===================================================================== --
   H.advanceStory(calm(30, function()
     return H.mapId() == 51 and collapseStarted()
@@ -374,7 +375,7 @@ H.run({ maxFrames = 200000 }, {
   -- ===================================================================== --
   -- Phase 4a: deployment, in march order.  Wave 1 (NPC_4) passes the east
   -- station ~1400 field-frames after control, the west arm's first guard
-  -- ~1800, the choke ~2100 -- so P1 sidesteps to the off-path (15,15) to
+  -- ~1800, the choke ~2100, so P1 sidesteps to the off-path (15,15) to
   -- unbox the mound, P3 walks east, P2 west, and P1 re-mans the choke
   -- with ~800 frames to spare (probe_moogle_stations measured f1515
   -- deployed against the f1630 first collision).
@@ -389,11 +390,11 @@ H.run({ maxFrames = 200000 }, {
   logPools("deployed"),
 
   -- ===================================================================== --
-  -- Phase 4b: the storm.  Hands off: each march collides with its arm's
-  -- squad, the collision auto-engages that squad, tap-A wins the wave
-  -- (Vomammoth + Lobo), and the win path despawns the guard --
-  -- $060A..$060F clear one by one, two waves per squad at ~90-190 HP
-  -- each.  advanceStory's playBattles mode is exactly this driver.
+  -- Phase 4b: the waves.  No positioning input is needed: each march
+  -- collides with its arm's squad, the collision auto-engages that squad,
+  -- tap-A wins the wave (Vomammoth + Lobo), and the win path despawns the
+  -- guard, so $060A..$060F clear one by one, two waves per squad at ~90-190
+  -- HP each.  advanceStory's playBattles mode is this driver.
   -- ===================================================================== --
   H.advanceStory(function()
     return (H.readByte(0x1f41) & 0xFC) == 0
@@ -407,11 +408,11 @@ H.run({ maxFrames = 200000 }, {
 
   -- ===================================================================== --
   -- Phase 4c: the Marshal, up to three input-driven attempts.  P2 first
-  -- (MOG's squad, the biggest pool -- it won at 330/543 with MOG alone
+  -- (MOG's squad, the biggest pool; it won at 330/543 with MOG alone
   -- standing at 89 HP, probe_moogle_marshal), then P1, then P3 if a wipe
-  -- lands:  battle 6's loss path revives the loser at 1 HP on (14,11) and
-  -- the Marshal still stands, so retrying with the next squad is the same
-  -- move a human player makes.  Attempts 2 and 3 are no-ops (cond on the
+  -- lands.  Battle 6's loss path revives the loser at 1 HP on (14,11) and
+  -- the Marshal still stands, so retrying with the next squad is what a
+  -- player would do.  Attempts 2 and 3 are no-ops (cond on the
   -- won-switch) when an earlier one already cleared it.
   -- ===================================================================== --
   attempt(2, 1),

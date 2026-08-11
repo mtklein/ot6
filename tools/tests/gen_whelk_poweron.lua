@@ -1,29 +1,30 @@
--- gen_whelk_poweron.lua -- reach the Whelk entry point from COLD POWER-ON,
--- fully scripted, with NO save sidecar.  This is the SRM-free replacement
+-- gen_whelk_poweron.lua -- reach the Whelk entry point from cold power-on,
+-- fully scripted, with no save sidecar.  This is the SRM-free replacement
 -- for gen_whelk.lua: same output (build/states/whelk_entry.mss, the
--- field state one tile SOUTH of the Whelk trigger at map 41 (42,5)),
+-- field state one tile south of the Whelk trigger at map 41 (42,5)),
 -- reached by playing the opening from New Game instead of injecting a human
--- play save into SRAM.  The SRM path was a fresh-clone trap -- gen_whelk
+-- play save into SRAM.  The SRM path did not work on a fresh clone: gen_whelk
 -- boots from build/states/playthrough_srm.mss.lua, a git-ignored fixture
 -- generated from a human save by make_srm_sidecar.sh, so a fresh checkout
 -- could not generate STATE3.
 --
--- ROUTE (all New-Game, all automatic input; trigger tiles from
+-- Route (all New-Game, all automatic input; trigger tiles from
 -- event_trigger.asm, scene bodies from event_main.asm, both verified):
 --   power-on -> title Start-presses -> ~15.5k frames of automatic intro
 --     march (the "1000 years have passed..." narration + Magitek credits walk)
 --   -> blind UP+A masher (gen_battle_state's proven step) lands the
 --     game-starting keypress, rides the cliff dialogs, and walks into the
---     first scripted guard fight -- frame 15500 is still MID-CREDITS and a
---     hands-off pad loops the attract forever (both measured, see Phase 2a)
+--     first scripted guard fight.  Frame 15500 is still mid-credits, and a
+--     neutral pad loops the attract sequence indefinitely (both measured,
+--     see Phase 2a)
 --   -> map 19 (Narshe approach): scripted fights fire at the x=38 column
 --     triggers {38,38} {38,26} {38,17} (event_trigger.asm map 19); blind
 --     held-UP climbs y=38 -> 1 into map 39, and every fight on the way is
---     WON WITH REAL INPUT by edge-tapped A (issue #75: this generator makes
---     zero state writes).  Tap-A is a real strategy here, not a shortcut: A
+--     won with real input by edge-tapped A (issue #75: this generator makes
+--     no state writes).  Tap-A works here rather than being a shortcut: A
 --     opens the magitek command, A confirms the first beam, A takes the
 --     default target, and the vanilla-faithful intro guards die to one beam
---     each -- fleeing (L+R) is NOT used on this step because these are
+--     each.  Fleeing (L+R) is not used on this step because these are
 --     event `battle` fights whose win the script chain expects.
 --   -> map 39 (Narshe town): blind-UP stalls at (26,42) (measured), so BFS
 --     to (31,23), one south of the mines-approach trigger line {30..32,22}
@@ -32,24 +33,24 @@
 --     (dialog $0010, WEDGE/VICKS walk UP into the mine door and hide,
 --     switch $012B=1) plays out, and the door north of (31,22) loads
 --     map 41 at (38,33) facing up (load_map 41, event_main.asm:101393).
---   -> map 41 (Narshe mines): the security door at {41,5}x{3,4} boots CLOSED
+--   -> map 41 (Narshe mines): the security door at {41,5}x{3,4} boots closed
 --     (map-init draws wall tiles while switch $012C=0, _cc9ef2), so the
---     entry point (42,6) is BFS-UNREACHABLE until the door-blast scene at
+--     entry point (42,6) is unreachable by BFS until the door-blast scene at
 --     trigger {42,9} (_cc9e23) runs: choreography + dialog $0011, the BG mod
 --     opens the x=42 column, TERRA ends force-marched to (42,8), and
 --     switch $012C=1 marks it done.  So: navTo(42,9) with arrive=blastDone,
---     THEN navTo(42,6) -- two tiles, never touching (42,5).
---   -> assert the entry point is calm and the whelk-done switch is CLEAR,
+--     then navTo(42,6), two tiles, never touching (42,5).
+--   -> assert the entry point is calm and the whelk-done switch is clear,
 --   generate
---     whelk_entry.mss, then (positive control) take the one deliberate
---     step onto the trigger and prove the Whelk fight comes up.
+--     whelk_entry.mss, then (as a positive control) take the one deliberate
+--     step onto the trigger and confirm the Whelk fight comes up.
 --
--- WHELK trigger, verbatim semantics from gen_whelk / the disassembly:
+-- The Whelk trigger, with semantics taken from gen_whelk and the disassembly:
 --   * map 41 event trigger {42,5} -> _cc9f37 (event_trigger.asm map 41,
 --     event_main.asm:101417).  It force-walks the party down, shows dialogs
 --     $0B6E ("We won't hand over the Esper!!") then $0B6F ("Whelk! Get them!"),
 --     runs `battle 64` (event_main.asm:101431-101442), and on completion sets
---     `switch $0135=1` (event_main.asm:101449) -- the whelk-done switch, which
+--     `switch $0135=1` (event_main.asm:101449), the whelk-done switch, which
 --     guards the trigger (`if_switch $0135=1, EventReturn`, event_main.asm
 --     101418).  Event switch $0135 lives at $1E80 + ($135>>3) = $1EA6, bit
 --     ($135&7)=5 -> mask $20 (event bitfield base $1E80, src/world/event.asm).
@@ -57,12 +58,12 @@
 --     and 0x0134 (0x0134 is the distinctive one); both are spared so the
 --     auto-fight clears never blind-mash the goal fight.  $57C0 is battle scratch
 --     (garbage before the first fight, stale after), so gate every read on
---     battleLoadStarted() -- see gen_whelk.lua:16-26 and ot6.lua:670-681.
+--     battleLoadStarted(); see gen_whelk.lua:16-26 and ot6.lua:670-681.
 --
 -- Deterministic by construction, same as every harness run: AllZeros power-on
 -- RAM + no frame skip + a pre-launch srm wipe (docs/playing-headless.md
 -- "Runtime limits").  Because SRAM boots zeroed and empty, the title's Start
--- press goes straight to New Game with no save-select -- the same clean boot
+-- press goes straight to New Game with no save-select, the same clean boot
 -- gen_battle_state relies on (gen_battle_state.lua:6-10, README "Input
 -- injection").
 local H = dofile("tools/tests/lib/ot6.lua")

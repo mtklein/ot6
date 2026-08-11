@@ -1,42 +1,41 @@
--- gen_kolts_pool.lua -- one crossing past kolts_entry, for a fixture that
--- actually HAS a random-encounter pool.
+-- gen_kolts_pool.lua -- one crossing past kolts_entry, for a fixture on a map
+-- that has a random-encounter pool.
 --
 --   kolts_pool.mss   map 100 shelf F, the first walkable stretch of the
 --                    mountain, party in control and tile-aligned.
 --
--- WHY THIS EXISTS.  kolts_entry.mss (map 95) is the mountain's ENTRANCE
+-- Why this exists.  kolts_entry.mss (map 95) is the mountain's entrance
 -- map, and it is transit only: a balance run paced 437 tiles on it across
 -- six samples and drew zero encounters, voiding every one as a timeout.
--- That is not a pacing bug and not a rate to tune -- map 95 simply carries
--- no encounter group, so no amount of walking on it can measure the Kolts
--- trash pool.  gen_kolts' own map-100 flood (its THE MOUNTAIN header) names
--- shelf F as the first partition past the entrance; K1 is the single
--- crossing that reaches it, and this script is exactly gen_kolts' K1 with a
--- save on the far side.
+-- That is not a pacing bug or a rate to tune; map 95 carries no encounter
+-- group, so walking on it cannot measure the Kolts trash pool.  gen_kolts'
+-- own map-100 flood (its mountain header) names shelf F as the first
+-- partition past the entrance; K1 is the single crossing that reaches it,
+-- and this script is gen_kolts' K1 with a save on the far side.
 --
--- The party is whatever kolts_entry carries -- the Figaro->Kolts three,
--- TERRA + LOCKE + EDGAR -- which is the point: every party number in
--- the balance harness before this fixture was solo Terra or the two-thirds
--- Locke+Terra of worldmap_narshe, so Edgar's Tools tiers (the pierce and
--- poison CLASS chips, the only class-chip carrier the stretch has) had
+-- The party is whatever kolts_entry carries, the Figaro->Kolts three of
+-- TERRA + LOCKE + EDGAR.  That is the reason for the fixture: every party
+-- number in the balance harness before it was solo Terra or the
+-- Locke+Terra pair of worldmap_narshe, so Edgar's Tools tiers (the pierce
+-- and poison class chips, the only class-chip carrier the stretch has) had
 -- never been driven against a live pool.
 --
--- ENCOUNTERS ON THE CROSSING ARE FLED with real input (issue #75).  The old
+-- Encounters on the crossing are fled with real input (issue #75).  The old
 -- generator held the danger accumulator $1F6E at zero so no encounter could
--- fire at all -- a state write, and a party no player ever walks in with.
--- Now the crossing runs the lib's playBattles="flee" mode: an encounter that
--- rolls is RUN FROM with held L+R (the engine's own mechanic, zero
--- writes), which is exactly what a player protecting a fresh party does,
--- and what it costs is what it costs a player -- a few battle frames and
--- whatever hits land before the run succeeds.  The fixture's party is
--- therefore a real player's near-pristine party, not a lab-pure one, and
--- the generation log below records exactly what it carried.  (An unrunnable
--- formation falls back to the lib's tap-A fight after FLEE_CAP frames.)
+-- fire at all, which was a state write and gave a party no player walks in
+-- with.  The crossing now runs the lib's playBattles="flee" mode: an
+-- encounter that rolls is run from with held L+R, the engine's own mechanic
+-- and no writes, which is what a player protecting a fresh party does, and
+-- it costs what it costs a player: a few battle frames and whatever hits
+-- land before the run succeeds.  The fixture's party is therefore a party a
+-- player could have, and the generation log below records what it carried.
+-- (An unrunnable formation falls back to the lib's tap-A fight after
+-- FLEE_CAP frames.)
 local H = dofile("tools/tests/lib/ot6.lua")
 
 local ENTRY = "build/states/kolts_entry.mss.lua"
 
--- map compares stay MASKED: loaders ride flag bits in $1F64's high byte
+-- map compares stay masked: loaders leave flag bits in $1F64's high byte
 local function map() return H.mapId() & 0x1ff end
 
 local function where(tag)
@@ -95,7 +94,7 @@ H.run({ maxFrames = 60000 }, {
   -- shelf F.  gen_kolts pre-checks this plan against the map's world-exit
   -- row (y=37, two tiles south of the spawn) before walking it; the same
   -- check runs here, because a BFS shortest path that clips that row walks
-  -- the party off the mountain and the generator would save the WORLD map.
+  -- the party off the mountain and the generator would save the world map.
   H.call(function()
     local p = H.bfsPath(11, 26)
     H.assertEq(p ~= nil, true, "a path to (11,26) exists")
@@ -131,20 +130,20 @@ H.run({ maxFrames = 60000 }, {
     return string.format("kolts_pool generated at frame %d", H.frame)
   end),
 
-  -- PROOF THE FIXTURE IS WHAT IT CLAIMS: pace the shelf and show an
-  -- encounter actually fires.  Map 95 looked fine by every other check and
-  -- was still unmeasurable, so "this map has a pool" is asserted here, once,
-  -- at generation time -- not discovered as six voided samples in a balance
-  -- run.
+  -- Check the fixture is what it claims: pace the shelf and show an
+  -- encounter fires.  Map 95 passed every other check and was still
+  -- unmeasurable, so the claim that this map has a pool is asserted here,
+  -- once, at generation time, rather than discovered as six voided samples
+  -- in a balance run.
   --
-  -- The lane is RIGHT, and that is not a coin flip.  The passability model
-  -- allows LEFT from the (8,13) arrival tile, and (7,13) is shelf F's
-  -- entrance back to map 95 (gen_kolts' mountain flood: "F ... exits
-  -- (7,13)->95").  A first cut scanned left-first, walked straight off the
-  -- mountain on step one, and then paced 7000 encounterless frames on map
-  -- 95 -- which reads exactly like "shelf F has no pool" and is not.
-  -- H.canStep models terrain and objects; it cannot see entrance records,
-  -- so the safe direction is named here and the map is guarded below.
+  -- The lane is deliberately RIGHT.  The passability model allows LEFT from
+  -- the (8,13) arrival tile, and (7,13) is shelf F's entrance back to map 95
+  -- (gen_kolts' mountain flood: "F ... exits (7,13)->95").  A first version
+  -- scanned left-first, walked off the mountain on step one, and then paced
+  -- 7000 encounterless frames on map 95, which looks like shelf F having no
+  -- pool but is not.  H.canStep models terrain and objects; it cannot see
+  -- entrance records, so the safe direction is named here and the map is
+  -- guarded below.
   (function()
     local battN, waited, lane, lastXY, steps = 0, 0, nil, nil, 0
     local BACK = { left = "right", right = "left", up = "down", down = "up" }

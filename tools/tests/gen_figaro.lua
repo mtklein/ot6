@@ -2,30 +2,30 @@
 -- WoB (84,34)): world-nav south across the plains to Figaro Castle's
 -- gate trigger, ride the entry event into the castle complex, and generate
 -- figaro_entry.mss at the first controllable interior moment.  The
--- Edgar/Kefka sequence beyond is the NEXT stretch, not this script's.
+-- Edgar/Kefka sequence beyond is handled by the next script.
 --
--- THE GATE (read + live-probed, see world-map-nav.md "Warp / teleport levers"):
---   * Figaro is a WORLD EVENT TRIGGER, not a short entrance: tiles
+-- The gate (read + live-probed, see world-map-nav.md "Warp / teleport levers"):
+--   * Figaro is a world event trigger, not a short entrance: tiles
 --     (64,76)/(65,76) -> _ca5eb5 (event_main.asm:14184), gated
---     `if_switch $010B=0, WorldReturn` -- $010B was set by the
+--     `if_switch $010B=0, WorldReturn`.  $010B was set by the
 --     game-start event (:14157), so it is live on this route ($010B ->
 --     $1EA1 mask $08, asserted before the walk)
 --   * the event body: `load_map 55, {28,42}, UP, {Z_UPPER, SHOW_TITLE,
---     SET_PARENT, STARTUP_EVENT}` -- so the arrival map is 55, the
---     castle-complex exterior; its map-init (_caea1a) just starts two
---     patrol NPC loops.  $1F64 measured $0037 raw on arrival (the
---     SET_PARENT bit is consumed by the load, not stored); compares
---     stay MASKED (& $1FF) anyway -- other loaders DO leave flag bits
---     in the word (the Narshe exit leaves $2000).
---     Map 54 -- which an earlier route note called the interior -- has
---     ZERO entrances and is only used mid-submerge (event_main.asm:
---     14633); the enterable castle is 55, its inner doors lead to the
---     throne wing map 59 (short-entrance table).
+--     SET_PARENT, STARTUP_EVENT}`, so the arrival map is 55, the
+--     castle-complex exterior; its map-init (_caea1a) starts two
+--     patrol NPC loops and nothing else.  $1F64 measured $0037 raw on
+--     arrival (the SET_PARENT bit is consumed by the load, not stored);
+--     compares stay masked (& $1FF) anyway, because other loaders do
+--     leave flag bits in the word (the Narshe exit leaves $2000).
+--     Map 54, which an earlier route note called the interior, has
+--     zero entrances and is only used mid-submerge (event_main.asm:
+--     14633); the enterable castle is 55, and its inner doors lead to
+--     the throne wing map 59 (short-entrance table).
 --   * the route (84,34) -> (64,77) BFS'd 63 steps over the verified
---     1-bit passability rule and was DRIVEN end to end by probe_world3,
---     random encounter + world reload included, before this script
---     existed.  worldNavTo targets (64,77) -- one tile SOUTH of the
---     trigger -- then takes the deliberate step north, the same
+--     1-bit passability rule and was driven end to end by probe_world3,
+--     random encounter and world reload included, before this script
+--     existed.  worldNavTo targets (64,77), one tile south of the
+--     trigger, then takes the deliberate step north, the same
 --     entry point discipline every trigger fixture uses.
 local H = dofile("tools/tests/lib/ot6.lua")
 local WORLD = "build/states/worldmap_narshe.mss.lua"
@@ -53,11 +53,12 @@ H.run({ maxFrames = 90000 }, {
 
   -- ===================================================================== --
   -- The world step: (84,34) -> (64,77), one south of the gate trigger.
-  -- Random encounters are FOUGHT inline by worldNavTo (real tap-A play,
-  -- issue #75 -- the plains trash dies to a swing or two and the XP is the
-  -- XP a walking player banks; the world reloads itself after each fight
-  -- and position survives, measured).  An input-driven fight costs real ATB
-  -- rounds, so the step budget triples over the battle-clear-write era's.
+  -- Random encounters are fought inline by worldNavTo (tap-A play, issue
+  -- #75).  The plains encounters die in a swing or two and award the XP a
+  -- walking player would bank; the world reloads itself after each fight
+  -- and position survives, measured.  An input-driven fight costs real ATB
+  -- rounds, so the step budget is triple what the battle-clear-write
+  -- version used.
   -- ===================================================================== --
   H.worldNavTo(64, 77, { maxFrames = 45000, playBattles = true }),
   H.logStep(function()
@@ -68,10 +69,10 @@ H.run({ maxFrames = 90000 }, {
   -- ===================================================================== --
   -- The deliberate step onto (64,76): the world event takes over ($E7
   -- bit0), fades, and loads map 55.  A last-tile random encounter is
-  -- FOUGHT inline by the same edge-tapped A that pages the victory text
-  -- (real play, zero writes -- issue #75); the world reload then puts
-  -- the party back on the tile and the step re-presses.  Budget covers a
-  -- full input-driven fight plus the entry event.
+  -- fought inline by the same edge-tapped A that pages the victory text
+  -- (input-driven, zero writes; issue #75); the world reload then puts
+  -- the party back on the tile and the step re-presses.  The budget covers
+  -- a full input-driven fight plus the entry event.
   -- ===================================================================== --
   H.driveUntil(function() return not H.worldMode() end, 9000, {
     H.call(function()

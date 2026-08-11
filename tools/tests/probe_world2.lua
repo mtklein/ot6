@@ -1,10 +1,10 @@
--- probe_world2.lua -- why did 428 paced world steps roll zero encounters?
--- (probe_world run 1: zone rate byte $45 says rate 1, WorldBattleRateTbl
--- says +96 vanilla / +48 ot6-scaled per step, yet nothing fired.)  Walk a
--- few steps and watch every gate in the chain: $1EB9 bit5 (the battles-
--- disabled switch move.asm:870 checks), $11DF & 3 (moogle charm / charm
--- bangle row select -- rows 2/3 of WorldBattleRateTbl are all zeros), and
--- the $1F6E danger word itself.
+-- probe_world2.lua -- measures why 428 paced world steps rolled zero
+-- encounters.  (probe_world run 1: zone rate byte $45 says rate 1,
+-- WorldBattleRateTbl says +96 vanilla / +48 ot6-scaled per step, yet
+-- nothing fired.)  Walk a few steps and watch every gate in the chain:
+-- $1EB9 bit5 (the battles-disabled switch move.asm:870 checks), $11DF & 3
+-- (moogle charm / charm bangle row select; rows 2/3 of WorldBattleRateTbl
+-- are all zeros), and the $1F6E danger word itself.
 local H = dofile("tools/tests/lib/ot6.lua")
 local STATE = "build/states/worldmap_narshe.mss.lua"
 

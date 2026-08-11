@@ -1,19 +1,19 @@
 -- gen_sabin_escape.lua -- step 5 of SABIN's scenario: the Doma courtyard
--- defence -- three fights, CYAN joins, everyone mounts Magitek.  Generates
+-- defence: three fights, CYAN joins, everyone mounts Magitek.  Generates
 -- one state:
 --   doma_defended.mss  map 119 at (14,30), SABIN + CYAN mounted on Magitek,
---                      controllable -- the starting line of the escape to
---                      the overworld
+--                      controllable.  This is the starting point of the
+--                      escape to the overworld
 --
--- SCOPE NOTE: this step stops at the moment the escape hands the player
--- control, NOT at the overworld.  The escape's walk from (14,30) to the
+-- Scope note: this step stops at the moment the escape hands the player
+-- control, not at the overworld.  The escape's walk from (14,30) to the
 -- world exit is a fight/scripted-interlude/fight sequence whose interlude
 -- holds the party in an obj-script a plain navTo never sees end (measured;
 -- see the long comment at generation time below).  That walk is the next
 -- step.
 --
--- THE DEFENCE IS THREE TALKS TO CYAN, AND THE TALK DETECTOR IS THE WHOLE
--- TRICK.  SABIN arrives at (8,29) on map 119 with CYAN (the warrior NPC,
+-- The defence is three talks to CYAN, and the talk detector is the part that
+-- matters.  SABIN arrives at (8,29) on map 119 with CYAN (the warrior NPC,
 -- object carrying event _cb1483, npc_prop.asm:4712) fighting off Imperial
 -- troops.  Facing CYAN and pressing A runs _cb1483, which chains on the
 -- fight-count switches (event_main.asm):
@@ -23,60 +23,60 @@
 -- After each fight CYAN walks to a new spot and the next wave's soldiers are
 -- placed beside him (:41255-41312).
 --
--- WHY A PLAIN talkToObj FAILS HERE, measured over a dozen probe runs.  The
--- whole courtyard floor (y 19..29) is paved with _cb13b9 triggers
+-- Why a plain talkToObj fails here, measured over a dozen probe runs.  The
+-- whole courtyard floor (y 19..29) is covered with _cb13b9 triggers
 -- (event_trigger.asm) that fire a soldier-jump animation as SABIN walks.
 -- gen_banon's talkToObj declares "engaged" as soon as `eventRunning() or
--- dialogWaiting()` holds for six frames -- which a floor trigger satisfies
--- -- so it walks up to CYAN, clips a floor tile, mistakes THAT for the talk,
+-- dialogWaiting()` holds for six frames, which a floor trigger satisfies,
+-- so it walks up to CYAN, clips a floor tile, treats that as the talk,
 -- and moves on having fought nothing.  The fix is a talk whose success test
--- is the FIGHT SWITCH ITSELF (or a battle actually loading), not "some event
+-- is the fight switch itself (or a battle loading) rather than "some event
 -- ran": walk cleanly onto a tile adjacent to CYAN, then hold a tight
--- face-then-edge-A loop -- no re-planning, no bfs mid-poke -- until the
+-- face-then-edge-A loop, with no re-planning and no bfs mid-poke, until the
 -- wanted switch flips.  Measured: from (9,26) that loop reaches _cb152c
--- (event PC $CB154D) in ~150 frames; a re-planning driver never did.
+-- (event PC $CB154D) in ~150 frames; a re-planning driver did not.
 --
--- $01B5 IS NOT A WAVE LATCH -- it is a live control-flag bit, exactly the
--- trap the survey flagged.  _cb13b9 writes `switch $01B5=1` and reads it
--- back to fire each soldier-jump only once, and it is NEVER cleared by any
+-- $01B5 is not a wave latch; it is a live control-flag bit, which is the
+-- hazard the survey flagged.  _cb13b9 writes `switch $01B5=1` and reads it
+-- back to fire each soldier-jump only once, and it is never cleared by any
 -- `switch $01B5=0`, because it is bit 5 of $1EB6, the party control-flags
 -- byte UpdateCtrlFlags rewrites every frame (field/event.asm:5416).  Reading
 -- it as "the wave is blocked" is how a probe convinced itself the defence
 -- had deadlocked when it had not; the fights never consult it.
 --
--- THE MAGITEK ESCAPE IS ONE LONG AUTOMATIC CUTSCENE.  After CYAN joins
--- there is exactly ONE player_ctrl_on in the whole escape, at its very end
+-- The Magitek escape is one long automatic cutscene.  After CYAN joins
+-- there is exactly one player_ctrl_on in the whole escape, at its end
 -- (:42253), right before `load_map 0, {179,71}, LEFT` + `set_script_mode
--- WORLD` (:42254-42255).  Everything between -- the mount (`vehicle SABIN/
+-- WORLD` (:42254-42255).  Everything between, the mount (`vehicle SABIN/
 -- CYAN/SHADOW, {MAGITEK, SHOW_RIDER}`, :41654-41735) and the four soldier
--- fights (battle 15/16/17 at _cb1955/_cb19af/_cb19e6/_cb1985, :42025-42094)
--- -- runs on obj_scripts with control OFF.  So the escape is RIDDEN, not
--- walked: write-clear the fights, tap the dialogs, hands off otherwise, until
+-- fights (battle 15/16/17 at _cb1955/_cb19af/_cb19e6/_cb1985, :42025-42094),
+-- runs on obj_scripts with control off.  So the escape is ridden rather than
+-- walked: write-clear the fights, tap the dialogs, no input otherwise, until
 -- the world map appears.  (This confirms, on this map, the survey's note
 -- that the raft's `vehicle` opcodes are cosmetic sprite swaps on an ordinary
--- field map -- the Magitek "mode" here is likewise just a sprite the escape
--- cutscene drives, not a separate engine mode; $087C stays event-controlled
--- throughout and no MAGITEK-specific movement code ever runs.)
+-- field map.  The Magitek "mode" here is likewise a sprite the escape
+-- cutscene drives rather than a separate engine mode; $087C stays
+-- event-controlled throughout and no MAGITEK-specific movement code runs.)
 --
--- THE EXIT LANDS ON THE CAMP-ENTRY TRIGGER.  World (179,71) is the very
--- tile whose trigger _cb0bb7 (:39715) loaded the camp -- but it now opens
+-- The exit lands on the camp-entry trigger.  World (179,71) is the
+-- tile whose trigger _cb0bb7 (:39715) loaded the camp, but it now opens
 -- `if_switch $0037=1, WorldReturn`, and the escape has set $0037, so
 -- re-stepping it returns instead of re-entering.  The savestate is
 -- generated on the first settled world frame, before any walk, so the
 -- fixture is unambiguous.
 --
--- ISSUE #75 -- THE WAVES ARE FOUGHT, NOT WRITE-CLEARED.  Zero state writes
--- in this generator.  Battles 13/13/14 (Imperial troops; SABIN solo for
+-- Issue #75: the waves are fought rather than write-cleared, and this
+-- generator makes no state writes.  Battles 13/13/14 (Imperial troops; SABIN solo for
 -- waves 1-2, wave 3 is where CYAN joins) run the house menu-episode
 -- machine: bank boost to 2, dump it on Fight (R..R A A on a settled menu,
 -- one button per 30-frame pulse), edge-tapped A for every dialog and
 -- victory page.  A loss (90 straight frames of every real party slot at
 -- 0 HP) sets `lost` and the three-attempt retry ladder reloads the
--- boot-moment checkpoint -- the generator script's spelling of a player
--- reloading their save -- with the fighter escalated (tier 2+ dumps at
+-- boot-moment checkpoint, which is the script's equivalent of a player
+-- reloading a save, with the fighter escalated (tier 2+ dumps at
 -- 1 BP) and a 17-frame reload stagger; three losses fail the generation with
--- every attempt's numbers on the record.  SHADOW's leave roll does not
--- run here: battle switch $4B is story-SET until the magitek escape's
+-- every attempt's numbers recorded.  SHADOW's leave roll does not
+-- run here: battle switch $4B is story-set until the magitek escape's
 -- exit clears it (event_main.asm:42251).
 local H = dofile("tools/tests/lib/ot6.lua")
 local DOOR = "build/states/camp_cleared.mss.lua"

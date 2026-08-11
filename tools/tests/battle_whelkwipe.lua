@@ -5,23 +5,23 @@
 -- The v0.1 playtest bug: the entry/exit effect family sweeps the
 -- battle-field BG3 region with a per-scanline scroll wave (hdma #2, fed
 -- from the w7e4af5 table the effect animates), assuming the field map
--- holds nothing visible but the effect's own mask tiles -- vanilla
+-- holds nothing visible but the effect's own mask tiles; vanilla
 -- blanks even its banner rows to the $01ee junk fill first.  OT6's
 -- under-enemy hud lines ride that same map, so the wipe smeared
--- shield/'?'/icon glyphs across the screen.  The fix (Ot6EntryExitVeil):
--- while DoMonsterEntryExit runs, the nmi flush writes the $01ee fill
--- over each live hud line instead of its cells, leaving the field map
--- word-identical to vanilla's for the whole animation; the shadow is
--- untouched, so the first flush afterwards repaints the hud.
+-- shield, '?' and icon glyphs across the screen.  The fix
+-- (Ot6EntryExitVeil): while DoMonsterEntryExit runs, the nmi flush writes
+-- the $01ee fill over each live hud line instead of its cells, leaving the
+-- field map word-identical to vanilla's for the whole animation; the shadow
+-- is untouched, so the first flush afterwards repaints the hud.
 --
 -- Flow: whelk entry point -> battle -> settle -> passive Heal Force drive
--- (self-target: the only transitions are the shell's own timer cycle)
+-- (self-target, so the only transitions are the shell's own timer cycle)
 -- -> FADE_DOWN trip (exec callback on vanilla C2/E668) -> per-frame
 -- cell-level assert through the whole animation (no OT6-claimed glyph
 -- char in the field map; every live hud line reads $01ee) -> head-gone
--- hud check -> FADE_UP trip -> same asserts -> hud back + glyphCanary.
--- Cell asserts only, no pixel compares: insensitive to savestate
--- regeneration, deterministic.
+-- hud check -> FADE_UP trip -> same asserts -> hud back plus glyphCanary.
+-- Cell asserts only, no pixel compares, so the test is deterministic and
+-- unaffected by savestate regeneration.
 local H = dofile("tools/tests/lib/ot6.lua")
 local STATE = "build/states/whelk_entry.mss.lua"
 
@@ -29,8 +29,8 @@ local VR = emu.memType.snesVideoRam
 local ROM = emu.memType.snesPrgRom
 
 -- OT6-claimed font cells, read from the rom so art edits never stale
--- this test (battle_dlgmenu's signature-scan approach): 8 element icons
--- + 16 hud glyphs (cell table precedes the glyph data), + $bf -- the
+-- this test (battle_dlgmenu's signature-scan approach): 8 element icons,
+-- 16 hud glyphs (the cell table precedes the glyph data), and $bf, the
 -- '?' glyph our weakness slots borrow.  During an entry/exit animation
 -- none of these may be referenced by any field-map word.
 local function claimedCharSet()
@@ -93,7 +93,8 @@ local function assertWipeVanilla(what)
 end
 
 -- trip wire on DoMonsterEntryExit (vanilla C2/E668); registered after
--- the savestate load (ordering is historical; loads do NOT detach callbacks)
+-- the savestate load (the ordering is historical; loads do not detach
+-- callbacks)
 local trips = 0
 local tripped = false
 local function armTripWire()
@@ -194,13 +195,14 @@ local steps = {
   H.call(function() H.setPad({}) end),
   H.waitUntil(function() return H.battleActive() end, 900, "whelk up", 30),
   -- The whelk's scripted battle intro dialogue re-uploads the small font for
-  -- its whole ~13s run (window_mess_open_init), clobbering OT6's glyph tiles;
-  -- the clobber fix (battle_hudclobber) veils the under-enemy hud while it is
-  -- up, so this settle -- which used to land mid-intro and see the hud drawn
-  -- from blanked tiles ("present" but junk) -- now taps through the intro and
+  -- its whole ~13s run (window_mess_open_init), clobbering OT6's glyph tiles.
+  -- The clobber fix (battle_hudclobber) veils the under-enemy hud while it is
+  -- up, so this settle, which used to land mid-intro and see the hud drawn
+  -- from blanked tiles (present but junk), now taps through the intro and
   -- waits for a font-whole, un-veiled hud before the retract checks below.
-  -- past the intro when the first battle menu opens (7bca): the dialogue is
-  -- closed by then, the font restored (its close re-lays), the hud un-veiled.
+  -- The run is past the intro when the first battle menu opens (7bca): the
+  -- dialogue is closed by then, the font is restored by its close re-lay, and
+  -- the hud is un-veiled.
   H.driveUntil(function()
     return H.readByte(0x7bca) ~= 0 and H.readByte(0x64d5) == 0 and H.fieldHudPresent()
   end, 4000, {
@@ -210,10 +212,10 @@ local steps = {
   H.waitFrames(120),
   H.call(function()
     claimed = claimedCharSet()
-    -- Name the roll.  Nothing here asserts on it -- the retract cycle is the
-    -- head's own timer and policyPulse is menu-agnostic, which is why this
-    -- test passed unchanged on a ROM where the roll handed the first menu to
-    -- three different characters.  But if this ever DOES time out waiting for
+    -- Name the roll.  Nothing here asserts on it, because the retract cycle
+    -- is the head's own timer and policyPulse is menu-agnostic, which is why
+    -- this test passed unchanged on a ROM where the roll handed the first menu
+    -- to three different characters.  If this ever does time out waiting for
     -- a transition, the next reader should not have to re-measure the ATB
     -- phase to find out who was holding the menu (battle_dlgmenu:196-202 logs
     -- the same thing for the same reason).

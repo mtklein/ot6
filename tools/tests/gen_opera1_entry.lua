@@ -4,32 +4,33 @@
 -- A-press below the IMPRESARIO ({117,19}, _ca9337).  Generates
 -- opera_entry.mss.
 --
--- WHY HERE, NOT THE OPERA-HOUSE FOYER (the survey's guess).  Measured: the
--- opera house is map 237 (world {45,154}, "far to the south" of Jidoor), and
--- ITS impresario ({60,48}, _caae15 -- the performance trigger) is HIDDEN
+-- Why here rather than the opera-house foyer (the survey's guess).  Measured:
+-- the opera house is map 237 (world {45,154}, far to the south of Jidoor), and
+-- its impresario ({60,48}, _caae15, the performance trigger) is hidden
 -- behind switch $0340, showing only a "The Opera House's closed" sign
--- (_caadf1, $0341).  $0340 is set to 1 ONLY by the opera-open cutscene, which
--- BEGINS by talking the IMPRESARIO on map 209 (_ca9337: "Maria!?" -> CELES's
+-- (_caadf1, $0341).  $0340 is set to 1 only by the opera-open cutscene, which
+-- begins by talking to the IMPRESARIO on map 209 (_ca9337: "Maria!?" -> CELES's
 -- resemblance -> the letter NPC appears, $0331=1 -> reading it -> the Setzer
--- intro/name-menu -> $0340=1).  Map 209 is reached from JIDOOR's north door,
--- not the opera house.  So the true "one A-press from the performance
--- sequence" is here, at the map-209 impresario -- the whole opera cutscene
--- chain hangs off this single talk.
+-- intro/name-menu -> $0340=1).  Map 209 is reached from Jidoor's north door,
+-- not the opera house.  The state one A-press from the performance sequence
+-- is therefore here, at the map-209 impresario; the whole opera cutscene
+-- chain follows from that one talk.
 --
--- ROUTE checkpoints (source + measured, probe_opera_route/jidoor_door):
---  * Zozo world-exit: VERTICAL long-entrance column x=63, y=32..63 -> world
+-- Route checkpoints (source + measured, probe_opera_route/jidoor_door):
+--  * Zozo world-exit: vertical long-entrance column x=63, y=32..63 -> world
 --    {23,92}.  navTo {62,45}, step RIGHT.
 --  * world {~22,91} -> Jidoor approach {27,129}; step DOWN onto {27,130}
---    (short_entrance _0) -> map 198 {15,61}.  worldNavTo BFS'd it clean.
---  * Jidoor: the {16,12}->209 door is a BUMP entrance -- {16,12} is a $F7
+--    (short_entrance _0) -> map 198 {15,61}.  worldNavTo BFS'd it without
+--    trouble.
+--  * Jidoor: the {16,12}->209 door is a bump entrance: {16,12} is a $F7
 --    wall flanked by $F7, triggered by walking UP into it from {16,13} (the
 --    reachable approach, 51 steps from the entrance).  Landing map 209 {118,28}.
 --  * map 209: the IMPRESARIO stands at {117,19} (faces LEFT).  navTo {117,20},
---    face UP.  The entry point VERIFIES (after the state is generated) that
---    one A-press fires _ca9337 -- so the banked state can never be a dead
---    one A-press short.
+--    face UP.  The entry point verifies, after the state is generated, that
+--    one A-press fires _ca9337, so the banked state cannot be one A-press
+--    short of working.
 --
--- ROSTER: LOCKE+CELES+SABIN+EDGAR, #21's canonical four (the leave menu
+-- Roster: LOCKE+CELES+SABIN+EDGAR, #21's canonical four (the leave menu
 -- seats all four since gen_zozo5's issue-#21 fix).
 --
 -- Issue #75: no state writes.  World encounters are fled by the engine's
@@ -46,21 +47,21 @@ local function settled()
      and not H.dialogWaiting() and not H.battleLoadStarted() and not H.worldMode()
 end
 
--- Robust world walk to (tx,ty).  worldNavTo's verified-step BLOCKLIST breaks
+-- Robust world walk to (tx,ty).  worldNavTo's verified-step blocklist breaks
 -- on the Zozo->Jidoor route: the area around (34,103) is a dense
 -- random-battle zone (world tile prop bit6 $40), and every encounter
--- snapshots+restores the party to the same tile, so worldNavTo reads "the
--- press never moved us", condemns all four edges and loops forever
--- (measured, probe_opera_world.lua).  This grinds through instead: re-plan
--- a worldBfs each time the plan runs out, press the next step -- no edge is
--- ever condemned, so a battle-restored tile just gets retried until a step
--- lands.  Arrives at (tx,ty) or when the party leaves the world (an
--- entrance fired).
+-- snapshots and restores the party to the same tile, so worldNavTo reads the
+-- press as having not moved the party, condemns all four edges and loops
+-- indefinitely (measured, probe_opera_world.lua).  This grinds through
+-- instead: re-plan a worldBfs each time the plan runs out, press the next
+-- step.  No edge is ever condemned, so a battle-restored tile is retried
+-- until a step lands.  Arrives at (tx,ty) or when the party leaves the world
+-- (an entrance fired).
 --
--- ENCOUNTERS ARE HANDLED WITH REAL INPUT (issue #75 -- no battle-clear
--- write): first the engine's own run mechanic, a held L+R, exactly what a
--- player does to world trash; a formation that has not broken after ~20
--- real seconds is treated as unrunnable and FOUGHT by edge-tapped A instead
+-- Encounters are handled with real input (issue #75; no battle-clear
+-- write): first the engine's own run mechanic, a held L+R, which is what a
+-- player does to world encounters; a formation that has not broken after ~20
+-- real seconds is treated as unrunnable and fought by edge-tapped A instead
 -- (A confirms Fight with the default target; the same taps page the victory
 -- text).  Either ending reloads the world on the same tile and the grind
 -- re-plans.
@@ -127,7 +128,8 @@ H.run({ maxFrames = 250000 }, {
     H.screenshot("opera_world_landing") end),
 
   -- 2. world walk to Jidoor entrance {27,129}, step DOWN -> map 198 {15,61}
-  -- (worldGrind, not worldNavTo -- the (34,103) battle-zone blocklist trap)
+  -- (worldGrind rather than worldNavTo, because of the (34,103) battle-zone
+  -- blocklist problem)
   worldGrind(27, 129, "world walk -> Jidoor approach (27,129)"),
   H.waitUntil(function() return H.worldHasControl() and H.worldAligned() end,
     2000, "at Jidoor approach", 5),
@@ -187,11 +189,11 @@ H.run({ maxFrames = 250000 }, {
   end),
   H.saveState("opera_entry.mss"),
 
-  -- VERIFY the banked state is truly one A-press from the plot: tap A up and
+  -- Verify the banked state is one A-press from the plot: tap A up and
   -- confirm _ca9337 fires (the "Maria!?" dialog, then $0331=1 as the letter
-  -- NPC spawns).  This runs AFTER the state is generated, so the saved blob
-  -- is untouched;  it just proves the entry point is not a dead
-  -- one-press-short state.
+  -- NPC spawns).  This runs after the state is generated, so the saved blob
+  -- is unaffected; it confirms the entry point is not one press short of
+  -- working.
   (function() local hb,aPh=0,0
     return H.driveUntil(function() return sw(0x0331)==1 or map()~=209 end, 12000, {
       H.call(function() hb=hb+1; aPh=(aPh+1)%8

@@ -1885,36 +1885,36 @@ DrawBlitzMenu:
         jmp     InitDMA1BG3ScreenB
 
 ; ==============================================================================
-; THE FIELD BLITZ PAGE (issue #46) -- what a Blitz IS, not how to input one
+; The field Blitz page (issue #46): what a Blitz is, rather than how to input one
 ;
 ; v0.4 retired Blitz's button combos: the command opens a MENU now
 ; (Ot6BlitzListOpen, ot6_cmdmenu.asm, replacing _c1776b's 64-frame pad-edge buffer
 ; and UpdateMenuState_3d's button matcher).  This page went on drawing the
-; combos anyway -- eight ten-tile strings of arrow and shoulder glyphs
+; combos anyway: eight ten-tile strings of arrow and shoulder glyphs
 ; (DrawBlitzInput / GetBlitzInputTiles / BlitzInputTileTbl below, all still
 ; assembled for the JP build, which keeps vanilla Blitz).  It was instructions
 ; for a system the player cannot use, the same class of surface as #27's dead
 ; 0%-learn columns and #39's garbled configurator.
 ;
-; It shows the three facts a player actually chooses on now, the same three the
-; BATTLE Blitz submenu already shows (Ot6BlitzRowDecorate: name + MP cost, greyed
+; It now shows the three facts a player chooses on, the same three the
+; battle Blitz submenu already shows (Ot6BlitzRowDecorate: name + MP cost, greyed
 ; when unaffordable):
 ;
-;   col  3..12   the Blitz's name, from AttackName -- the very table the battle
+;   col  3..12   the Blitz's name, from AttackName, the table the battle
 ;                list renders from (ListTextCmd_0f), so the two cannot drift
-;   col  14      its PROBE ICON: the element it strikes with, or -- when it has
-;                no element -- its BREAK CLASS glyph, or blank when it has
+;   col  14      its probe icon: the element it strikes with, or, when it has
+;                no element, its break class glyph, or blank when it has
 ;                neither.  Ot6SkillIconGlyph (F0) is a wrapper over
-;                Ot6ElemGlyphFor, the very leaf the BATTLE ability lists decide
+;                Ot6ElemGlyphFor, the leaf the battle ability lists decide
 ;                their icon with, which in turn reads MagicProp's element byte
-;                and Ot6SkillClassTbl -- the table the chip itself consults.  So
+;                and Ot6SkillClassTbl, the table the chip itself consults.  So
 ;                the page cannot promise a probe the hit does not land, and it
 ;                cannot come to a different conclusion than the battle list for
 ;                the same Blitz.
 ;
-;                #46 shipped this column CLASS-ONLY, and not by choice: the
+;                #46 shipped this column class-only, and not by choice: the
 ;                element tiles existed only in the battle font, so five of the
-;                eight rows -- three of them elemental probes -- drew nothing.
+;                eight rows, three of them elemental probes, drew nothing.
 ;                #53 uploads them into the menu font too (Ot6MenuIcons4bpp_ext,
 ;                ot6_icons.asm), and the column says what it was always meant to.
 ;                Two rows still draw blank and that is the correct answer:
@@ -1923,9 +1923,9 @@ DrawBlitzMenu:
 ;                charge and the battle row read (blank under nomp, which prices
 ;                nothing)
 ;
-; THE GEOMETRY (#43's rules, which this window taught us three times over).  The
-; EN field-menu window shows a tilemap row PAIR in twelve scanlines -- the odd
-; row getting eight and the even row four -- and nothing past row 15 is inside it
+; The geometry (#43's rules, which this window has now needed three times).  The
+; EN field-menu window shows a tilemap row pair in twelve scanlines, the odd
+; row getting eight and the even row four, and nothing past row 15 is inside it
 ; at all (measured with a per-row glyph ruler, tools/tests/probe_ragegeom.lua;
 ; vanilla says it from the other side, every EN cursor list here being
 ; `cursor_pos {x, 116 + n*12}`).  So: eight usable text rows, and eight Blitzes,
@@ -1933,12 +1933,12 @@ DrawBlitzMenu:
 ;
 ; Vanilla drew four rows of two because a combo string is ten tiles wide and two
 ; of them fit; a name plus a class glyph plus a price does not fit twice across.
-; One column per row buys the width -- and it also gives every row a full-height
+; One column per row buys the width, and it also gives every row a full-height
 ; cell instead of the half-height even rows a 2x4 grid on 1/5/9/13 leaves unused.
 ;
-; THE CURSOR GUTTER (#43 round 3).  `cursor_pos {x,y}` is the TOP-LEFT of a
-; 16x16 sprite, so a cursor at x=8 owns tilemap columns 1 AND 2 and the row it
-; points at must begin at column 3 -- cursor_x = 8*col - 16, vanilla's rule
+; The cursor gutter (#43 round 3).  `cursor_pos {x,y}` is the top-left of a
+; 16x16 sprite, so a cursor at x=8 owns tilemap columns 1 and 2 and the row it
+; points at must begin at column 3, i.e. cursor_x = 8*col - 16, vanilla's rule
 ; everywhere in this window (magic cols 3/16 under 8/112, skills.asm:831,:836 vs
 ; :125-126; espers 3/17 under 8/120; rage 5/19 under 24/136).  Vanilla's own
 ; blitz page drew at column 4 under a cursor at x=8, i.e. one column of dead
@@ -1946,18 +1946,18 @@ DrawBlitzMenu:
 ; list in this window is.  Ot6BlitzCursorPos below is the pairing's other half
 ; and menu_blitzpage.lua's canary asserts the two together.
 ;
-; WHAT AN UNLEARNED BLITZ SAYS.  Vanilla blanked the row ($ff pads).  Blank rows
-; on a page that has some filled ones read as a rendering fault -- that is the
-; owner's own report on the Rage page's unset slots (#44) -- so an unlearned tier
+; What an unlearned Blitz says.  Vanilla blanked the row ($ff pads).  Blank rows
+; on a page that has some filled ones read as a rendering fault, which is the
+; owner's own report on the Rage page's unset slots (#44), so an unlearned tier
 ; spells "- LOCKED -" in the page's chrome colour, ten cells wide, with its class
-; and price fields blanked.  It is NOT "- EMPTY -": a Rage slot with nothing in
+; and price fields blanked.  It is not "- EMPTY -": a Rage slot with nothing in
 ; it contributes nothing to the battle list, whereas this tier exists and is
 ; simply not reached yet, and one word must not carry both facts.
 ;
 ; The learned set still comes from GetBlitzList, which stages the blitz index (or
-; $ff) per row at $7e9d89 -- unchanged, because LoadBigText reads that same array
+; $ff) per row at $7e9d89, unchanged, because LoadBigText reads that same array
 ; at $4b to pick the row's description (skills.asm LoadBigText:2118-2120).  With
-; one column $4b IS the blitz index, so the descriptions keep working.
+; one column $4b is the blitz index, so the descriptions keep working.
 .if LANG_EN
 
 OT6_BLITZ_ATK0   = $5d                  ; Pummel; Bum Rush is $64
@@ -1974,7 +1974,7 @@ Ot6BlitzPageDraw:
         lda     $e2
         asl
         clc
-        adc     #$01                    ; row = 1 + i*2 -- ODD rows 1..15 (#43)
+        adc     #$01                    ; row = 1 + i*2: odd rows 1..15 (#43)
         sta     $e6
         ldx     $e2
         lda     $7e9d89,x               ; the learned-set row GetBlitzList staged
@@ -2051,7 +2051,7 @@ Ot6BlitzDrawLocked:
         shorta
         ldx     #$9e8b
         stx     hWMADDL
-        ldx     #$0000                  ; (long,X -- there is no long,Y mode)
+        ldx     #$0000                  ; (long,X: there is no long,Y mode)
 :       lda     f:Ot6BlitzLockedTiles,x
         beq     :+
         sta     hWMDATA
@@ -2061,12 +2061,12 @@ Ot6BlitzDrawLocked:
         jmp     DrawPosTextBuf
 
 Ot6BlitzLockedTiles:    raw_text OT6_BLITZ_LOCKED  ; "- LOCKED -" + $00 (issue
-                        ; #39: encoded via menu_text_en.inc -- a bare literal
+                        ; #39: encoded via menu_text_en.inc; a bare literal
                         ; here picks up ending_anim.asm's credits charmap)
 
 ; ---- one probe icon.  in: A = tile ($ff = blank), $e6 = row, X = col ----
 ; A raw font cell, not text, so it does not go through the encode pipeline (#39
-; governs STRINGS: a literal run of letters here would pick up the credits
+; governs strings: a literal run of letters here would pick up the credits
 ; charmap).  The cell code itself comes out of Ot6ElemGlyphTbl /
 ; Ot6ClassGlyphTbl by way of Ot6SkillIconGlyph, never written down here.
 Ot6BlitzDrawIcon:
@@ -2085,10 +2085,11 @@ Ot6BlitzDrawIcon:
         jmp     DrawPosTextBuf
 
 ; ---- a row's price, "nn MP" ----
-; RETIRED as a separate proc (issue #56).  #46 wrote Ot6BlitzDrawCost here
-; because field_menu.asm's Ot6LoadoutDrawCost drew a single digit -- true when
-; that one was written for costs of 1..8 -- and its report flagged the duplicate
-; as a trap: #45 had by then rescaled SwdTech to 4..46 and the OTHER page was
+; Retired as a separate proc (issue #56).  #46 wrote Ot6BlitzDrawCost here
+; because field_menu.asm's Ot6LoadoutDrawCost drew a single digit, which was true
+; when that one was written for costs of 1..8, and its report flagged the
+; duplicate as a hazard: #45 had by then rescaled SwdTech to 4..46 and the other
+; page was
 ; already rendering punctuation where its tens digit belonged.  There is one
 ; drawer now, this file's body moved into field_menu.asm under the older name,
 ; so no third page can pick up the single-digit version.  See the derivation
@@ -2096,7 +2097,7 @@ Ot6BlitzDrawIcon:
 ; right with a leading blank.
 
 ; ---- the page's own cursor: one column, eight rows ----
-; NOT AbilityCursorProp: that {2,4} table is shared with Dance (SkillsOption_06,
+; Not AbilityCursorProp: that {2,4} table is shared with Dance (SkillsOption_06,
 ; DrawDanceList), which still draws two columns of four, so this page needed its
 ; own rather than moving Dance's out from under it.
 ;
@@ -2775,7 +2776,7 @@ DrawEsperDetailMenu:
 @599f:  lda     #$20
         sta     zTextColor
 .if LANG_EN
-; OT6 (#27): M5 made espers while-equipped sub-jobs -- every GenjuProp learn
+; OT6 (#27): M5 made espers while-equipped sub-jobs, so every GenjuProp learn
 ; rate is 0 and every level-up bonus byte is $ff (genju_prop.asm), so the
 ; vanilla "Learn.Rate"/"Skill" captions would head nothing but dead 0%
 ; columns.  Blank both caption fields (cols 13-28 of the header row) instead
@@ -2852,8 +2853,8 @@ DrawEsperDetailMenu:
         ldy     $f5
         pla
 .if LANG_EN
-        lda     #$ff                    ; OT6 (#27): nothing is ever learned --
-                                        ; take _c35a84's blank path, never 0%
+        lda     #$ff                    ; OT6 (#27): nothing is ever learned,
+                                        ; so take _c35a84's blank path, not 0%
 .endif
         sta     $e1
         jsr     _c35a84
@@ -2872,14 +2873,14 @@ DrawEsperDetailMenu:
 .if LANG_EN
 ; OT6 (#27, rebuilt for #62): the level-up bonus byte is $ff for every esper (M5
 ; deleted the vanilla per-level growth, genju_prop.asm), so the vanilla line
-; below this loop could only ever draw blanks -- while the mod the stone DOES
+; below this loop could only draw blanks, while the mod the stone does
 ; carry, the while-equipped bump Ot6EsperStatMod applies out of Ot6EsperStatTbl
-; (ot6_progression.asm), had no line at all.  #27 drew ONE line there,
+; (ot6_progression.asm), had no line at all.  #27 drew one line there,
 ; "While worn...<Stat> + N", because that table could only say one stat.
 ;
 ; #62 widened the table to vanilla's own four-signed-nibble equipment layout, so
-; a stone now carries up to FOUR deltas and any of them can be NEGATIVE.  Four
-; terms do not fit on one line, so the block is a right-hand COLUMN:
+; a stone now carries up to four deltas and any of them can be negative.  Four
+; terms do not fit on one line, so the block is a right-hand column:
 ;
 ;   row 15   <esper name>          While worn...     <- caption on the title row
 ;   row 17     Fire             Vigor   + 6
@@ -2890,24 +2891,24 @@ DrawEsperDetailMenu:
 ;   row 27
 ;
 ; Why that shape and not a second line under row 27:
-;  * it is #43's own ruling for this window family -- chrome rides the title row,
-;    "the one row where a second chrome word cannot be misread as a slot's data"
-;    -- with the data in columns beneath it, which is also where vanilla put its
+;  * it is #43's own ruling for this window family: chrome sits on the title row,
+;    "the one row where a second chrome word cannot be misread as a slot's data",
+;    with the data in columns beneath it, which is also where vanilla put its
 ;    own Learn.Rate/Skill columns;
-;  * every cell it uses was ALREADY BLANK and already asserted blank by
+;  * every cell it uses was already blank and already asserted blank by
 ;    menu_esperdetail: the dead learn-rate / percent columns #27 emptied.  The
 ;    window's last row is 27 (GenjuDetailCursorPos below: seven rows, 12px
 ;    pitch), so nothing here needs a row that has never been drawn to;
 ;  * the term geometry keeps #27's sign and digit columns (25, 26-27) and moves
-;    the stat name one cell left to 17-23 so col 24 can be a spacer -- see
+;    the stat name one cell left to 17-23 so col 24 can be a spacer; see
 ;    Ot6GenjuTermPos for why that cell has to exist.
 ;
-; Terms PACK UPWARD from row 17: a stat with a zero delta costs no line.  Every
+; Terms pack upward from row 17: a stat with a zero delta costs no line.  Every
 ; row the terms do not reach is blanked to the same 10-cell width, and #27's old
 ; row-27 line is blanked outright, so a revisit always overwrites (the case the
 ; no-mod control TERRATO asserts).
 ;
-; STATE.  The walk needs two counters that survive DrawPosTextBuf.  $f5/$f6 is
+; State.  The walk needs two counters that survive DrawPosTextBuf.  $f5/$f6 is
 ; the one 16-bit scratch cell this proc has already proven safe across
 ; DrawGenjuMagicName / _c35a84 / DrawPosTextBuf (the spell loop above holds its
 ; row there and inc2s it after those calls), so $f5 = stat index 0-3 and $f6 =
@@ -3125,7 +3126,7 @@ DrawGenjuMagicName:
 .if LANG_EN
 ; OT6 (#27): a granted spell has no learn rate (genju_prop.asm zeroes them
 ; all), so the esper page draws the bare name and blanks vanilla's
-; ":  {times}NN" tail -- padded to the empty slot's 15-tile width so any
+; ":  {times}NN" tail, padded to the empty slot's 15-tile width so any
 ; previous row content is always overwritten.  Item detail (item.asm) still
 ; falls through DrawItemMagicName below and keeps its rate display.
         jsr     GetMagicNamePtr
@@ -3407,14 +3408,14 @@ GenjuAtLevelUpText:
 ; DrawEsperDetailMenu's tail in place of the dead vanilla bonus line).
 
 OT6_PLUS_CHAR  = $ca                    ; '+' (text_en 0xca)
-OT6_MINUS_CHAR = $c4                    ; '-' (text_en 0xc4) -- #62: a delta can
+OT6_MINUS_CHAR = $c4                    ; '-' (text_en 0xc4).  #62: a delta can
                                         ;   now be negative, so the sign is drawn
 
 ; ------------------------------------------------------------------------------
 
-; [ OT6 (#62): the esper detail page's while-worn stat block -- three helpers ]
+; [ OT6 (#62): the esper detail page's while-worn stat block, three helpers ]
 ;
-; Ot6EsperStatTbl is TWO bytes per esper in vanilla's ItemProp+16/+17 layout:
+; Ot6EsperStatTbl is two bytes per esper in vanilla's ItemProp+16/+17 layout:
 ; byte 0 = [speed:4][vigor:4], byte 1 = [magpwr:4][stamina:4], each nibble
 ; [sign:1][magnitude:3] (ot6_progression.asm has the derivation and the decoder
 ; it mirrors, CalcEquipEffect at battle_main.asm:2521-2539).  These read it for
@@ -3422,7 +3423,7 @@ OT6_MINUS_CHAR = $c4                    ; '-' (text_en 0xc4) -- #62: a delta can
 ; row authored once shows up in both places.
 ;
 ; All three take the displayed esper from z99 and the stat index from $f5, and
-; keep NO state of their own, so DrawEsperDetailMenu's tail needs no scratch that
+; keep no state of their own, so DrawEsperDetailMenu's tail needs no scratch that
 ; has to survive a draw helper.  a8 in, a8 out; A/X clobbered, Y set by
 ; Ot6GenjuTermPos only.
 
@@ -3445,7 +3446,7 @@ Ot6GenjuNibble:
 :       and     #$0f
         rts
 
-; Z set <=> esper z99 has no delta on ANY of the four stats ($0000 row).
+; Z set <=> esper z99 has no delta on any of the four stats ($0000 row).
 Ot6GenjuAnyStatMod:
         clr_a
         lda     z99
@@ -3456,8 +3457,8 @@ Ot6GenjuAnyStatMod:
         rts
 
 ; Y := the BG1 screen-B tilemap cell for column 17 of tilemap row $f6, which is
-; where a term's stat name starts.  The field is 11 cells: name 17-23, a SPACER
-; at 24, sign 25, magnitude 26-27.  The spacer is not decoration -- "Stamina"
+; where a term's stat name starts.  The field is 11 cells: name 17-23, a spacer
+; at 24, sign 25, magnitude 26-27.  The spacer is not decoration: "Stamina"
 ; and "Mag.Pwr" fill all seven name cells, so without it the sign sits flush
 ; against the label and the column reads "Mag.Pwr- 3" while "Vigor" (padded to
 ; seven) reads "Vigor   + 6".  Verified on a screenshot before it was added.

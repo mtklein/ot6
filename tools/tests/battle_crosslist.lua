@@ -1,52 +1,53 @@
 -- @suite savestate=figaro_cleared
 -- battle_crosslist.lua -- test for issue #36: "Tools shows Cure 2".
 --
--- MECHANISM UNDER GUARD: Ot6RestageGate_ext (ot6_hud.asm) re-renders the open
--- magic list when boost moves, by borrowing the SHARED 4-line staging cycle
+-- Mechanism under guard: Ot6RestageGate_ext (ot6_hud.asm) re-renders the open
+-- magic list when boost moves, by borrowing the shared 4-line staging cycle
 -- $7ba5/$7ba6 that every list-window open state runs (one staged line per
 -- frame, $7ba5 = $80..$83 then 0).  Leaving magic browse ($7bc2=$0e) before
--- the cycle's four frames elapse -- an R (boost) followed within ~3 frames by
--- B (cancel), a perfectly human "oops, back out" -- used to strand $7ba5 at
--- $81-$83: the gate's @drop cleared its own OT6_RESTAGE flag but not the
--- borrowed staging byte.  Every window-open state trusts `lda $7ba5 / bmi`
+-- the cycle's four frames elapse, that is, an R (boost) followed within ~3
+-- frames by B (cancel), which is an ordinary "back out", used to strand $7ba5
+-- at $81-$83: the gate's @drop cleared its own OT6_RESTAGE flag but not the
+-- borrowed staging byte.  Every window-open state relies on `lda $7ba5 / bmi`
 -- to mean "my init already ran" (OpenMagicWindow @57c4, MakeToolsList_04
--- @58be, OpenItemWindow @5769, ...), so the NEXT list to open skipped its
+-- @58be, OpenItemWindow @5769, ...), so the next list to open skipped its
 -- own init and drew only the cycle's remaining lines: the owner's Tools
--- window rendering "Cure 2" and "Fire 2" over three of its four rows
+-- window rendered "Cure 2" and "Fire 2" over three of its four rows
 -- (crosslist_tools.png from probe_crosslist.lua is the sighting, captured
--- deterministically).  Same mechanism covers the original report -- another
--- character's magic list keeping the previous caster's rows.
+-- deterministically).  The same mechanism covers the original report, where
+-- another character's magic list kept the previous caster's rows.
 --
--- The stale rows are DISPLAY-ONLY: wItemList still holds the real tools and
+-- The stale rows are display-only: wItemList still holds the real tools and
 -- Cmd_09 keys off the item id (battle_main.asm:3949 `lda $b6 / sbc #$a2`;
--- measured $3410=$83 NoiseBlaster, never $2e Cure 2) -- but a menu that says
--- Cure 2 and fires NoiseBlaster is a lying surface, the #27/#32 class.
+-- measured $3410=$83 NoiseBlaster, never $2e Cure 2).  A menu that says
+-- Cure 2 and fires NoiseBlaster still shows the player something false, the
+-- #27/#32 class of bug.
 --
 -- Issue #75 conversion.  The old apparatus faked the whole cast on the
--- magitek entry point: Magic+Tools installed into Terra's $202E rows, eight
--- tools FORGED into the bag, mp:=99, bp:=5, guard pins and stops, saved
--- cursor pokes -- and, worst of the lot, L163's "greyed row forced
--- selectable" write, which strong-armed the exact refusal surface the
--- grey tests exist to protect.  On figaro_cleared none of it is needed,
--- and the reproduction is now the SIGHTING's own shape, cross-character:
--- TERRA really owns Magic (Fire/Cure), EDGAR really owns Tools with the
--- three tools gen_edgar really bought (measured bag: BioBlaster $A4,
--- NoiseBlaster $A3, AutoCrossbow $AA), his Tools row is genuinely
+-- magitek entry point: Magic and Tools installed into Terra's $202E rows,
+-- eight tools forged into the bag, mp:=99, bp:=5, guard pins and stops, saved
+-- cursor pokes, and L163's "greyed row forced selectable" write, which
+-- overrode the refusal surface the grey tests exist to protect.  On
+-- figaro_cleared none of it is needed, and the reproduction now has the
+-- sighting's own shape, across two characters:
+-- TERRA owns Magic (Fire/Cure), EDGAR owns Tools with the
+-- three tools gen_edgar bought (measured bag: BioBlaster $A4,
+-- NoiseBlaster $A3, AutoCrossbow $AA), his Tools row is
 -- enabled, and the R edge commits a real boost off his opening-bp
 -- economy (Ot6InitBP gives Terra the 1 bp the R spends).  The fixture
 -- boots riding the chocobo; a real B dismounts (gen_kolts' drive) and a
 -- short desert pace raises a real encounter.
 --
 -- What is asserted (all four originals):
---   1. THE CYCLE REALLY RAN.  OT6_RESTAGE saw $80 and $7ba5 went mid-cycle
---      ($8x) during the R->B window -- the test cannot pass by boost or the
+--   1. the cycle ran.  OT6_RESTAGE saw $80 and $7ba5 went mid-cycle
+--      ($8x) during the R->B window, so the test cannot pass by boost or the
 --      restage gate being disabled outright.
---   2. THE STRAND IS REPAIRED.  After leaving browse mid-cycle, $7ba5 reads
+--   2. the strand is repaired.  After leaving browse mid-cycle, $7ba5 reads
 --      0 (pre-fix: $83).
---   3. THE TOOLS WINDOW IS ALL TOOLS.  Edgar's window renders his real
+--   3. the tools window contains only tools.  Edgar's window renders his real
 --      tools' names and no magic-list name survives anywhere in the BG1
---      text region (pre-fix: "Fire"/"Cure" present, tool rows absent).
---   4. THE LIST DATA WAS ALWAYS SOUND.  wItemList holds exactly the tool
+--      text region (pre-fix: "Fire" and "Cure" present, tool rows absent).
+--   4. the list data was always sound.  wItemList holds exactly the tool
 --      ids his real bag carries.
 local H = dofile("tools/tests/lib/ot6.lua")
 local STATE = "build/states/figaro_cleared.mss.lua"
@@ -133,8 +134,8 @@ H.run({ maxFrames = 60000 }, {
   H.waitFrames(20),
   H.loadState(STATE),
   H.waitFrames(30),
-  -- the fixture boots riding the chocobo out of Figaro; dismount for real
-  -- (chocobos suppress encounters) -- gen_kolts' measured B-hold drive
+  -- the fixture boots riding the chocobo out of Figaro; dismount for real,
+  -- since chocobos suppress encounters, using gen_kolts' measured B-hold drive
   H.hold({ "b" }),
   H.driveUntil(function() return H.readByte(0x11fa) & 3 == 0 end, 900, {
     H.waitFrames(1),
@@ -203,11 +204,11 @@ H.run({ maxFrames = 60000 }, {
       H.readByte(STAGE)))
   end),
 
-  -- the trigger ordering: R (a real boost off her real 1-bp bank ->
-  -- restage) then B before the 4-line cycle finishes.  The old fixture's
-  -- 2-frame R hold does not register on this fixture's poll timing
-  -- (measured: pend stayed 0, no $80 request), so R is HELD until the
-  -- commit is visible in pending -- the B then lands 1-2 frames after the
+  -- the trigger ordering: R (a real boost off her real 1-bp bank, which
+  -- requests a restage) then B before the 4-line cycle finishes.  The old
+  -- fixture's 2-frame R hold does not register on this fixture's poll timing
+  -- (measured: pend stayed 0, no $80 request), so R is held until the
+  -- commit is visible in pending, and the B then lands 1-2 frames after the
   -- restage request, well inside the 4-line cycle.
   H.hold({ "r" }),
   H.driveUntil(function() return H.readByte(0x3e9d + terra*2) == 1 end, 120, {
@@ -268,9 +269,9 @@ H.run({ maxFrames = 60000 }, {
           "\"" .. nm .. "\" renders in the tools window")
       end
     end
-    -- 3b. and no magic-list row survives -- pre-fix "Fire"/"Cure" sat in
-    --     the window (both really live in Terra's list on this fixture,
-    --     so the scan is armed, not vacuous)
+    -- 3b. and no magic-list row survives; pre-fix "Fire" and "Cure" sat in
+    --     the window (both are in Terra's list on this fixture, so the scan
+    --     has something to find)
     for _, nm in ipairs({ "Fire", "Cure" }) do
       H.assertEq(findName(glyphs(nm)), nil,
         "no stale magic row (\"" .. nm .. "\") in the tools window")

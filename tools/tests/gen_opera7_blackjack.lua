@@ -11,22 +11,22 @@
 --   $0246=0  the active airship is the Blackjack (not the Falcon)
 -- The world load is map 0 at {140,203}; the parked airship is {137,202}.
 --
--- ULTROS 2 IS FOUGHT FOR REAL (issue #75 -- this file writes no emulated
--- game state).  Battle 104's authored row (Ot6ShieldTbl "ultros 2: same
--- row, one more shield": 6 shields, OT6_SLASH|OT6_PIERCE) is exactly what
--- LOCKE+CELES+SABIN+EDGAR carry -- LOCKE's dagger and EDGAR's spear are
+-- Ultros 2 is fought with real input (issue #75: this file writes no
+-- emulated game state).  Battle 104's authored row (Ot6ShieldTbl "ultros 2:
+-- same row, one more shield": 6 shields, OT6_SLASH|OT6_PIERCE) matches what
+-- LOCKE+CELES+SABIN+EDGAR carry: LOCKE's dagger and EDGAR's spear are
 -- pierce, CELES's sword is slash, and EDGAR's Tools add pierce volume.
 -- The menu-episode fighter (gen_scenario's cadence) banks boost to 2 and
 -- dumps it every turn; tier 2 adds EDGAR's AutoCrossbow, tier 3 SABIN's
 -- Pummel.  The verdict is the event script's own fork (event_main.asm
--- :29954): `if_b_switch $40, _cac128` -- the WIN clears $034B; the loss
+-- :29954): `if_b_switch $40, _cac128`.  The win clears $034B; the loss
 -- path (_cabdba) restarts the whole opera and, on the third failure, is
--- game over.  A wipe is therefore caught by the 90-frame watch and the
--- three-attempt ladder reloads the booted entry point BEFORE the failure
--- path runs -- the generator script's spelling of a player reloading a
--- save -- with the tier escalated.  A third loss fails the generation with
--- every attempt's numbers on the record (#74).  The deeper break-mechanics
--- contract stays battle_ultros2.lua's, on the same entry point.
+-- game over.  A wipe is caught by the 90-frame watch, and the
+-- three-attempt ladder reloads the booted entry point before the failure
+-- path runs, with the tier escalated; this is the script's equivalent of a
+-- player reloading a save.  A third loss fails the generation with
+-- every attempt's numbers recorded (#74).  The break-mechanics
+-- contract remains battle_ultros2.lua's, on the same entry point.
 local H = dofile("tools/tests/lib/ot6.lua")
 local DOOR = "build/states/ultros2_entry.mss.lua"
 
@@ -179,8 +179,8 @@ local function fightBody(tier)
       return true                       -- reload beats riding the fail path
     end
     if battN > 0 or H.battleLoadStarted() then return false end
-    -- the event's own fork: the WIN branch (_cac128) clears $034B almost
-    -- immediately; the loss branch never does.  Give it 1200 post-battle
+    -- the event's own fork: the win branch (_cac128) clears $034B almost
+    -- immediately; the loss branch does not.  Give it 1200 post-battle
     -- frames to show.
     if sw(0x034B) == 0 then return true end
     postN = postN + 1
@@ -251,7 +251,7 @@ H.run({ maxFrames = 400000 }, {
     H.assertEq(sw(0x005D), 0, "$005D clear before Setzer's bargain")
   end),
 
-  -- the ladder's checkpoint IS the booted entry point
+  -- the ladder's checkpoint is the booted entry point
   (function()
     local ckReq
     return H.cond(function() return true end, {
@@ -299,9 +299,9 @@ H.run({ maxFrames = 400000 }, {
   -- _cac128 completes the Opera finale; its tail and the subsequent
   -- Blackjack scenes are linear.  Pulse both dialog advance keys while the
   -- event owns control, then release once the final world load is stable.
-  -- No battle exists on this stretch, and battleLoadStarted LIES during
-  -- the world arrival redraw (see below), so the ride keeps its hands off
-  -- monster RAM entirely.
+  -- No battle exists on this stretch, and battleLoadStarted reads wrong
+  -- during the world arrival redraw (see below), so the ride does not touch
+  -- monster RAM at all.
   (function()
     local calm,hb = 0,0
     return H.driveUntil(function()
@@ -329,29 +329,29 @@ H.run({ maxFrames = 400000 }, {
   H.release(),
   H.waitFrames(30),
 
-  -- ...and then WAIT FOR IT AGAIN, because a fixed 30-frame pause lands in a
-  -- window where the world map makes the battle gate lie.  Measured here on
-  -- the Blackjack arrival, per frame for 600 frames after the ride:
+  -- ...and then wait for it again, because a fixed 30-frame pause lands in a
+  -- window where the world map makes the battle gate read wrong.  Measured
+  -- here on the Blackjack arrival, per frame for 600 frames after the ride:
   --
   --   f19494..f19521   $7E3BF4 = $5554   worldHasControl() true
   --   f19521..f19596   $7E3BF4 = $0000   worldHasControl() FALSE  (75 frames)
   --   f19596..f20094   $7E3BF4 = $5554   worldHasControl() true
   --
-  -- $7E3BF4 is the party battle-HP table only while the BATTLE module owns
+  -- $7E3BF4 is the party battle-HP table only while the battle module owns
   -- that RAM; the world module reuses the same bytes for map data, and it
   -- zeroes them for 75 frames during the arrival redraw.  Since 62ccab7
   -- (#24) M.battleLoadStarted() is "slot 0 is not $FFFF", so it reads $0000
-  -- as a live battle, and worldHasControl() -- which is gated on it -- goes
+  -- as a live battle, and worldHasControl(), which is gated on it, goes
   -- false.  The old predicate rejected 0 and never saw this.
   --
-  -- The ride's own terminator already demands 30 consecutive good frames, so
-  -- it exits legitimately; the blind waitFrames(30) then walked straight
-  -- into the dead window and asserted there ("world map is controllable: got
+  -- The ride's own terminator already requires 30 consecutive good frames, so
+  -- it exits correctly; the blind waitFrames(30) then landed in
+  -- the dead window and asserted there ("world map is controllable: got
   -- false, want true").  Nothing here is relaxed: the run still has to reach
-  -- a genuinely controllable, aligned world frame, and now the state is
-  -- GENERATED on one too rather than possibly inside the redraw -- which
-  -- matters, because every downstream generator boots this .mss and would
-  -- inherit a first frame the battle gate calls a battle.
+  -- a controllable, aligned world frame, and the state is now
+  -- generated on one rather than possibly inside the redraw.  That matters
+  -- because every downstream generator boots this .mss and would otherwise
+  -- inherit a first frame the battle gate reports as a battle.
   (function()
     local calm = 0
     return H.waitUntil(function()

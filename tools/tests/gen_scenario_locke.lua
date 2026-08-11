@@ -1,14 +1,14 @@
--- gen_scenario_locke.lua -- one step PAST the hub: pick LOCKE's scenario and
--- generate the first controllable frame of it.  Reconnaissance, not the Locke
--- chain: it proves the hub is dispatchable and measures what "choosing a
--- scenario" actually costs, so the three v0.3 chains can be scoped.
+-- gen_scenario_locke.lua -- one step past the hub: pick LOCKE's scenario and
+-- generate the first controllable frame of it.  This is reconnaissance rather
+-- than the Locke chain; it checks that the hub dispatches and measures what
+-- choosing a scenario costs, so the three v0.3 chains can be scoped.
 -- Generates one state:
 --   locke_scenario.mss  map 75 (South Figaro) at (48,43), LOCKE alone,
---                       controllable -- the entry point of the Locke
+--                       controllable.  This is the entry point of the Locke
 --                       scenario.
 --
--- THE HUB IS SIX NPCs ON A TINY MAP (NPCProp::_9, npc_prop.asm:473-521), and
--- the party -- SCENARIO_MOG, char 13, dropped in at (8,3) by _caad4c -- walks
+-- The hub is six NPCs on a small map (NPCProp::_9, npc_prop.asm:473-521).
+-- The party (SCENARIO_MOG, char 13, dropped in at (8,3) by _caad4c) walks
 -- to whichever one it wants:
 --   obj 16  LOCKE  ( 5, 8) $0329 -> _ca84ab (:20202)   South Figaro
 --   obj 17  SABIN  (11, 8) $032a -> _cb0a1c (:39463)   the world at (161,36)
@@ -16,31 +16,31 @@
 --   obj 19  TERRA  ( 7,11) $032c -> _cb094e            (same event)
 --   obj 20  EDGAR  ( 9,11) $032d -> _cb094e            (same event)
 --   obj 21  SAVE_POINT (8,6) $0632
--- Three NPCs share _cb094e because BANON/TERRA/EDGAR are one scenario -- the
+-- Three NPCs share _cb094e because BANON/TERRA/EDGAR are one scenario: the
 -- raft ride resumed to Narshe (`load_map 113, {104,61}` + `vehicle … RAFT` +
--- `battle 8, RIVER`, :39357-39371).  So the split is genuinely three ways,
--- not five, and the completion flags are $001E (Locke), $0044 (Sabin) and
+-- `battle 8, RIVER`, :39357-39371).  The split is therefore three ways rather
+-- than five, and the completion flags are $001E (Locke), $0044 (Sabin) and
 -- $0021 (Terra); with all three set the hub takes _caadb9 (:26683) instead.
 --
--- WHAT EACH ENTRY COSTS, read off the three events -- this is the part that
--- shapes how the chains get dispatched:
+-- What each entry costs, read off the three events.  This determines how the
+-- chains get dispatched:
 --   LOCKE  _ca84ab  party_chars LOCKE / load_map 75 {48,43} / … /
---                   player_ctrl_on.  A FIELD map, and it is the same map 75
+--                   player_ctrl_on.  A field map, the same map 75
 --                   gen_kolts already generates south_figaro on.
 --   SABIN  _cb0a1c  party_chars SABIN / load_map 0 {161,36} /
---                   set_script_mode WORLD.  Starts on the OVERWORLD, so that
+--                   set_script_mode WORLD.  Starts on the overworld, so that
 --                   chain needs worldNavTo from its first frame.
 --   BANON  _cb094e  resumes the raft: map 113 at (104,61) with the RAFT
 --                   vehicle sprite and `battle 8, RIVER`, ending
 --                   `load_map 0, {93,41}`.  That chain re-enters the river
 --                   driver this file's sibling gen_scenario.lua already has.
 --
--- THE SAVE POINT AT (8,6) IS ON THE WAY and is harmless HERE, for a reason
--- worth stating because it bit gen_scenario hard one link back: SavePoint
+-- The save point at (8,6) is on the way and is harmless here.  This is worth
+-- stating because it broke gen_scenario one link back: SavePoint
 -- (event_main.asm:100749) branches on $0133, and $0133 was set by the Lete
--- River's landing.  So it now takes its short path -- sfx, flash,
--- `player_ctrl_on`, return -- rather than the one-time tutorial whose "No"
--- answer ends in a bare EventReturn and never gives control back.
+-- River's landing.  It therefore takes its short path (sfx, flash,
+-- `player_ctrl_on`, return) rather than the one-time tutorial, whose "No"
+-- answer ends in a bare EventReturn and never returns control.
 local H = dofile("tools/tests/lib/ot6.lua")
 local DOOR = "build/states/scenario_hub.mss.lua"
 
@@ -113,7 +113,7 @@ local function talkToObj(obj, what, maxF)
   return seq({
     H.call(function() engaged, apFrame, apPick = false, -1000, nil end),
     walkStep(), pokeStep(1, 600, false),
-    -- flat, not repeatN: it cannot replay navTo/driveUntil bodies
+    -- written flat because repeatN cannot replay navTo/driveUntil bodies
     H.cond(function() return not engaged end,
       { walkStep(), pokeStep(2, 900, true) }, {}),
     H.release(),
@@ -147,10 +147,9 @@ H.run({ maxFrames = 60000 }, {
   end),
 
   -- ===================================================================== --
-  -- PICK LOCKE.  One of three; chosen because it lands on a FIELD map the
-  -- generated chain already knows (75, where gen_kolts generates
-  -- south_figaro), which makes it the cheapest of the three to verify as an
-  -- entry point.
+  -- Pick LOCKE, one of the three.  It lands on a field map the generated
+  -- chain already knows (75, where gen_kolts generates south_figaro), which
+  -- makes it the cheapest of the three to verify as an entry point.
   -- ===================================================================== --
   talkToObj(16, "LOCKE's scenario NPC"),
   H.advanceStory(function()

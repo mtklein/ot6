@@ -19,7 +19,8 @@ H.run({ maxFrames = 20000 }, {
     H.glyphCanary()
     H.assertEq(H.fieldHudPresent(), true, "under-monster hud on the field map")
     H.assertEq(H.isPipGlyph(H.pipWord()), true, "party row 1 shows bp pips")
-    -- the species override table beats the level formula: lobos seed 3
+    -- the species override table takes precedence over the level formula:
+    -- lobos seed 3
     H.assertEq(H.readByte(0x3e40), 3, "lobo shields come from the species table")
   end),
   H.pressButtons({ "a" }, 6), H.waitFrames(30),
@@ -30,8 +31,9 @@ H.run({ maxFrames = 20000 }, {
     H.glyphCanary()   -- effect art must not clobber our font cells
     local alive = false
     for slot = 0, 5 do
-      -- the hud draws cells only for present AND un-dead monsters:
-      -- match the builder's own criterion ($3aa8 bit 0, $3eec $c2 clear)
+      -- the hud draws cells only for monsters that are present and not
+      -- dead: match the builder's own criterion ($3aa8 bit 0, $3eec $c2
+      -- clear)
       if (H.readByte(0x3aa8 + slot*2) & 1) == 1
         and (H.readByte(0x3eec + slot*2) & 0xc2) == 0 then alive = true end
     end

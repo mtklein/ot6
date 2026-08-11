@@ -1,12 +1,12 @@
--- probe_fieldcare.lua -- exercise H.fieldCare on the exact party the
+-- probe_fieldcare.lua -- exercise H.fieldCare on the party the
 -- input-driven Mt. Kolts route currently delivers: TERRA dead at 0/94,
 -- LOCKE untouched, EDGAR on 1/145, five Tonics and seven Potions in the bag
--- and NO Fenix Down.  Reads and pad presses only (issue #75).
+-- and no Fenix Down.  Reads and pad presses only (issue #75).
 --
 -- What this pins down:
 --   * EDGAR is healed through the real Item -> use -> target windows;
---   * TERRA is NOT, and the driver says so once and moves on instead of
---     mashing A at a window the game will never accept -- there is no Fenix
+--   * TERRA is not, and the driver logs that once and moves on rather than
+--     mashing A at a window the game will not accept: there is no Fenix
 --     Down to raise her with, and CheckCanUseItem refuses everything else
 --     on a KO'd target (item.asm:2243-2330);
 --   * the menu is left closed with the party back in control.

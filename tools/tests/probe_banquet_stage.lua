@@ -1,23 +1,23 @@
--- probe_banquet_stage.lua -- I->J step STAGING (issue #31): cold-Continue
+-- probe_banquet_stage.lua -- I->J step staging (issue #31): cold-Continue
 -- the vector-crash-v1 battery, walk the world grind to Vector 253, enter
 -- the castle, ride the escort, start the banquet at the dais, and generate
--- TWO development savestates:
+-- two development savestates:
 --
---   banquet_predais.mss  -- standing beside the dais, window NOT started
+--   banquet_predais.mss  -- standing beside the dais, window not started
 --   banquet_window.mss   -- control back after the Gestahl/Cid scene,
 --                           $007C=1, timer 0 live (the 14400 window)
 --
--- These are ITERATION fixtures for the circuit/Q&A probes, not
+-- These are iteration fixtures for the circuit/Q&A probes, not
 -- states in the generated chain; the step generator (gen_banquet_done)
 -- replays this whole route itself.  Run:
 --
 --   OT6_SRAM_CHECKPOINT=tools/tests/checkpoints/vector-crash-v1 \
 --   tools/tests/run.sh tools/tests/probe_banquet_stage.lua
 --
--- HAZARD (the H->I report's first-hazard note): the boot
--- tile world (83,238) is the dead Blackjack itself -- an A tap there
--- re-enters the wreck interior.  The Continue drive below presses A only
--- while NOT on the world map, and the grind presses directions only.
+-- Hazard (the H->I report's first-hazard note): the boot tile world
+-- (83,238) is the wrecked Blackjack, so an A tap there re-enters the
+-- wreck interior.  The Continue drive below presses A only while not on
+-- the world map, and the grind presses directions only.
 --
 -- OT6_CHECKPOINT_LAYOUT: ot6-codex-o8-v1
 local H = dofile("tools/tests/lib/ot6.lua")
@@ -35,17 +35,18 @@ end
 local function timerCount() return H.readWord(0x1189) end
 local function var0() return H.readWord(0x1fc2) end
 
--- VERIFIED-STEP world grinder.  The shared grind-and-replan idiom
--- (gen_vector_entry's) consumes one plan entry per ALIGNED FRAME, and
--- the party sits aligned for several frames before each press latches --
--- on straight lines the wasted entries agree in direction and nothing
--- shows, but every TURN of a long path desyncs the plan and forces a
+-- Verified-step world grinder.  The shared grind-and-replan idiom
+-- (gen_vector_entry's) consumes one plan entry per aligned frame, and
+-- the party sits aligned for several frames before each press latches.
+-- On straight lines the wasted entries agree in direction and have no
+-- effect, but every turn of a long path desyncs the plan and forces a
 -- 60000-node replan.  Measured on this step's ~117-step grind (run 4,
 -- 2026-07-28): ~139 frames/tile, a (73,221)<->(73,222) oscillation with
--- plan lengths jumping 86->93, and the emulator dragged to ~40fps by the
+-- plan lengths jumping 86->93, and the emulator slowed to ~40fps by the
 -- per-replan BFS.  This version consumes an entry only when the party
--- LANDS on that entry's destination tile (navTo's rule, worldized): one
--- BFS per step plus one per battle return, 16 frames/tile.
+-- lands on that entry's destination tile (navTo's rule, applied to the
+-- world map): one BFS per step plus one per battle return, 16
+-- frames/tile.
 local function worldGrind(tx, ty, what)
   local plan, idx, ph, hb = nil, 1, 0, -600
   local step = nil
@@ -74,7 +75,7 @@ local function worldGrind(tx, ty, what)
           plan = nil; step = nil                  -- drifted: replan
         else
           step.held = step.held + 1
-          if step.held > 90 then                  -- press provably dead
+          if step.held > 90 then                  -- press had no effect
             plan = nil; step = nil; H.setPad({}); return
           end
           H.setPad({ [step.dir] = true }); return
@@ -114,17 +115,16 @@ local function pressWalk(dir, pred, maxFrames, what)
   }, what)
 end
 
--- The DAIS is a face-UP+A trigger the party must be STANDING ON: the
+-- The dais is a face-up+A trigger the party must be standing on.  The
 -- gate is `$01B4=0 or $01B0=0 or $007C=1 -> EventReturn` (_cc8490,
--- event_main.asm:97243-97247) -- $01B0 = facing up, $01B4 = A HELD.
--- M.tapLever is the wrong drive here: it releases A after 8 frames and
--- then only holds UP, so the gate reads A clear forever (measured, stage
--- run 9: 9000 frames, no latch).  What makes facing-up work without
--- walking off the tile is the GESTAHL NPC standing at (54,15) -- the
--- $062E object (npc_prop map-250 record 5), which blocks the step the
--- same way gen_sabin_train's upA holds into a wall.  So: stand on
--- (54,16), hold UP+A, with a 2-frame A release every 8 so the edge
--- re-arms.
+-- event_main.asm:97243-97247), where $01B0 = facing up and $01B4 = A
+-- held.  M.tapLever does not work here: it releases A after 8 frames and
+-- then only holds up, so the gate keeps reading A clear (measured, stage
+-- run 9: 9000 frames, no latch).  Facing up without walking off the tile
+-- works because the Gestahl NPC stands at (54,15), the $062E object
+-- (npc_prop map-250 record 5), and blocks the step the same way
+-- gen_sabin_train's upA holds into a wall.  So stand on (54,16) and hold
+-- up+A, with a 2-frame A release every 8 so the edge re-arms.
 local function holdUpA(swId, maxFrames, what)
   local n = 0
   return H.driveUntil(function() return sw(swId) == 1 end, maxFrames, {
@@ -154,11 +154,11 @@ local function landed(m, n)
 end
 
 H.run({ maxFrames = 120000 }, {
-  -- ---- cold Continue; NO stray A once the crash site is up -----------------
-  -- worldMode() alone is useless as a gate here: $1F64 reads < 3 at the
+  -- ---- cold Continue; no stray A once the crash site is up -----------------
+  -- worldMode() alone is not a sufficient gate here: $1F64 reads < 3 at the
   -- title screen too (measured, this probe's first run).  The A presses are
-  -- gated on BRIGHTNESS (menus are lit; load fades are dark) and disarmed
-  -- forever once the world is up AT (83,238) -- the boot tile is the wreck
+  -- gated on brightness (menus are lit; load fades are dark) and disarmed
+  -- once the world is up at (83,238), because the boot tile is the wreck
   -- itself and one more A would walk back inside (measured).
   H.waitFrames(350),
   H.repeatN(5, { H.pressButtons({ "start" }, 8), H.waitFrames(25) }),
@@ -213,7 +213,7 @@ H.run({ maxFrames = 120000 }, {
 
   -- ---- the escort: walk onto (8,18), ride to $013A=1 -----------------------
   -- (8,18) is a stood-on trigger; the scene's dlg $06A6 blocks until
-  -- dismissed and player_ctrl_on returns MID-script, so stepOff does both
+  -- dismissed and player_ctrl_on returns mid-script, so stepOff does both
   -- jobs: A through the dialog, then an unconditional held walk off the
   -- tile while the NPC finishes and the door opens.
   H.navTo(8, 18, { maxFrames = 12000, calmFrames = 4 }),
@@ -242,15 +242,15 @@ H.run({ maxFrames = 120000 }, {
 
   -- ---- the measured route to the dais --------------------------------------
   -- MEASURED (probe_banquet_interior, iterations 1-8): the 250 entry is a
-  -- 131-tile component -- the entrance hall, the corridor, and the four
-  -- hall soldiers -- and the dais is NOT in it.  The route is the corridor
-  -- stairs, not a walk:
+  -- 131-tile component (the entrance hall, the corridor, and the four
+  -- hall soldiers), and the dais is not in it.  The route to the dais
+  -- uses the corridor stairs:
   --   * the {22,29} doorway is a door tile the BFS model reads as a wall;
-  --     a HELD UP press crosses it (the {14,8} class);
-  --   * (23,12) is the messenger trigger -- gated off ($007D=0) it still
-  --     re-enters at every rest frame and WEDGES navTo (iteration 2).  A
+  --     a held up press crosses it (the {14,8} class);
+  --   * (23,12) is the messenger trigger; even gated off ($007D=0) it
+  --     re-enters at every rest frame and wedges navTo (iteration 2).  A
   --     held press skips walk-over triggers (measured), so the
-  --     messenger tile and the (23,9) stairs are crossed in ONE pressWalk;
+  --     messenger tile and the (23,9) stairs are crossed in one pressWalk;
   --   * (23,9) -> (54,34) (short entrance), and from (54,34) the dais is
   --     an ordinary 17-step navTo inside the throne tower.
   H.navTo(23, 30, { maxFrames = 6000 }),
@@ -277,7 +277,7 @@ H.run({ maxFrames = 120000 }, {
   end),
   H.saveState("banquet_predais.mss"),
 
-  -- ---- face-UP+A on (54,16): the banquet starts -----------------------------
+  -- ---- face-up+A on (54,16): the banquet starts -----------------------------
   -- tapLever returns the moment $007C latches (:97418); the timer starts
   -- one line later and the scene tail still runs.  The dais tile is a
   -- stood-on trigger afterwards, so the ride-out is stepOff.
@@ -291,11 +291,11 @@ H.run({ maxFrames = 120000 }, {
     H.assertEq(sw(0x007C), 1, "$007C SET -- the window is live")
     H.assertEq(H.readByte(0x1188) ~= 0, true, "timer 0 flags live ($1188)")
     H.assertEq(sw(0x0634), 1, "$0634 -- the window soldier population is up")
-    -- THE CASTLE OPENS HERE.  $0630=0 (event_main.asm:97415) deletes the
-    -- two "Gestahl waits inside" servants at (16,30) and (30,30) -- and
-    -- those are EXACTLY the two tiles the pre-banquet flood found blocked
+    -- The castle opens here.  $0630=0 (event_main.asm:97415) deletes the
+    -- two "Gestahl waits inside" servants at (16,30) and (30,30).  Those
+    -- are the two tiles the pre-banquet flood found blocked
     -- (probe_banquet_interior iterations 4-8), the object-map blocks that
-    -- severed the west and east columns from the corridor.
+    -- separated the west and east columns from the corridor.
     H.assertEq(sw(0x0630), 0, "$0630 CLEAR -- the corridor servants are gone")
     H.log(string.format(
       "[window] f%d timer=%d var0=%d at (%d,%d) map=%d",

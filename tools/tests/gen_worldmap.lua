@@ -1,17 +1,17 @@
 -- gen_worldmap.lua -- from moogle_cleared.mss (LOCKE leading TERRA on the
 -- Narshe streets, map 20): walk out the south gate onto the World of
 -- Balance and generate worldmap_narshe.mss at the first controllable world
--- moment.  This is the harness's FIRST world-map state, so the script
--- doubles as the recording instrument for the transition: every mode/
--- position/flag byte the world navigator will build on gets logged.
+-- moment.  This is the harness's first world-map state, so the script also
+-- records the transition: every mode, position and flag byte the world
+-- navigator will build on gets logged.
 --
--- THE EXIT (all static, verified against the built ROM):
+-- The exit (all static, verified against the built ROM):
 --   * map 20's south edge is one long entrance: horizontal run y=62,
 --     x=0..43, destination map $1FF = "load parent map"
 --     (trigger/long_entrance.dat via parse; record semantics
 --     field/entrance.asm CheckLongEntrance -> LoadParentMap)
 --   * the parent was seeded by the game-start event: `set_parent_map 0,
---     {84, 33}, UP` (event_main.asm:14159) -- the same record entering
+--     {84, 33}, UP` (event_main.asm:14159), the same record entering
 --     Narshe from the world would write (its WoB short entrance is
 --     src=(84,33) -> map 20 dest=(38,61))
 --   * LoadParentMap inverts the saved facing and steps one tile past it
@@ -19,13 +19,13 @@
 --     the party lands at WoB (84,34) facing DOWN
 --   * $1F64 gets `Map & $FE00 | $1F69` (entrance.asm:125-…): the $1FF
 --     record's flag byte is $21 (facing DOWN in bits 4-5), so the stored
---     word is predicted $2000 -- "on the world map" is a MASKED test,
+--     word is predicted $2000.  The test for "on the world map" is masked,
 --     (word & $3FF) < 3 per the top-level dispatch (field/reset.asm:66),
 --     never a raw compare.  The live value is logged and asserted here.
 --
--- WORLD-SIDE RAM (world/move.asm MovePlayer, GetPlayerInput; the world
--- module keeps DP=$0000 -- world_start.asm has no phd/pld and its menu
--- path reads $e0 plain -- so these are absolute zero-page):
+-- World-side RAM (world/move.asm MovePlayer, GetPlayerInput; the world
+-- module keeps DP=$0000, since world_start.asm has no phd/pld and its menu
+-- path reads $e0 plain, so these are absolute zero-page):
 --   $E0/$E2 tile x/y (the 16-bit position words at $DF/$E1 are
 --   tile*256+fraction; $DF/$E1 low bytes are the sub-tile fractions),
 --   $E3/$E5 velocity, $F6 facing, $E7 bit0 = world event running,
@@ -43,8 +43,8 @@ local function calm(n, extra)
 end
 
 -- on the world map iff (mapId & $3FF) < 3 (field/reset.asm:66 masks
--- #$03ff; the doc's 0x1FF claim is the loose one -- bit9 rides along in
--- $1F64 for SET_PARENT loads, and the dispatch masks it IN)
+-- #$03ff; the doc's 0x1FF claim is the loose one, because bit9 rides along
+-- in $1F64 for SET_PARENT loads and the dispatch includes it in the mask)
 local function worldMode() return (H.readWord(0x1f64) & 0x3FF) < 3 end
 
 local function wx() return H.readByte(0x00e0) end
@@ -66,10 +66,11 @@ H.run({ maxFrames = 20000 }, {
   end),
 
   -- ===================================================================== --
-  -- To the gate: BFS to (38,61) -- the tile Narshe's world entrance drops
-  -- visitors on, one north of the y=62 exit row -- then one deliberate
+  -- To the gate: BFS to (38,61), the tile Narshe's world entrance drops
+  -- visitors on, one north of the y=62 exit row, then one deliberate
   -- held step south onto the row.  The exit row itself is left out of the
-  -- BFS target so the transition happens on OUR step, not mid-plan.
+  -- BFS target so the transition happens on this script's step rather than
+  -- mid-plan.
   -- ===================================================================== --
   H.navTo(38, 61, { maxFrames = 6000 }),
   H.logStep(function()
@@ -126,9 +127,10 @@ H.run({ maxFrames = 20000 }, {
   end),
 
   -- ===================================================================== --
-  -- Positive control (post-generation, so the state stays virgin): prove the
-  -- pad drives world movement.  Narshe sits in mountains, so try each
-  -- direction until the tile budges; log which ones worked.
+  -- Positive control (run after generation, so the saved state is
+  -- unaffected): check that the pad drives world movement.  Narshe sits in
+  -- mountains, so try each direction until the tile moves; log which ones
+  -- worked.
   -- ===================================================================== --
   H.call(function()
     local dirs = { "down", "left", "right", "up" }

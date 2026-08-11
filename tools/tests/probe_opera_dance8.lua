@@ -1,6 +1,6 @@
--- probe_opera_dance8.lua -- boot aria_postfork; the FULL flower dance:
+-- probe_opera_dance8.lua -- boot aria_postfork; the full flower dance:
 --  climb (5,21)->(11,19); waltz Draco (obj#19) x3 by greedy-chase in the basin
---  ($01F0/1/2); touch flowers (obj#16) -> $0057; then the BALCONY corridor
+--  ($01F0/1/2); touch flowers (obj#16) -> $0057; then the balcony corridor
 --  (12,19 now free) up the z-split stairs to (8,9) -> _cabe6d -> $0111=1.
 -- Validates the whole solve off the fast checkpoint (timer running).
 local H = dofile("tools/tests/lib/ot6.lua")
@@ -114,7 +114,7 @@ H.run({ maxFrames = 30000 }, {
   -- balcony corridor -> step on (8,9); done when reached / event took over / $0111
   tableDrive(BAL, 8,9, 5000, function() return sw(0x0111)==1 or map()~=236 or (H.fieldX()==8 and H.fieldY()==9) end, "balcony"),
   H.call(function() dumpsw("AT-BALCONY"); H.screenshot("dance8_balcony") end),
-  -- ride the balcony FINALE (verses + load 233 + load 238) until $0111=1 on 238
+  -- ride the balcony finale (verses + load 233 + load 238) until $0111=1 on 238
   rideOpen(function() return sw(0x0111)==1 end, 20000, "finale->$0111"),
   H.waitFrames(30),
   H.call(function() dumpsw("DONE"); H.screenshot("dance8_done") end),

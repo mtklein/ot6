@@ -1,65 +1,65 @@
--- probe_banquet_recall.lua -- READ-ONLY instrument (issue #75/#31): does
--- the banquet's first-question record latch, WHEN does it latch, and does
--- recall's +5 follow it?  Zero state writes; pad input and reads only,
--- plus in-run savestate blobs to replay the same choice point with all
--- three answers.
+-- probe_banquet_recall.lua -- read-only instrument (issue #75/#31).
+-- Measures whether the banquet's first-question record latches, when it
+-- latches, and whether recall's +5 follows it.  Zero state writes; pad
+-- input and reads only, plus in-run savestate blobs to replay the same
+-- choice point with all three answers.
 --
--- WHY THIS EXISTS.  gen_banquet_done's input-driven rebuild read $0231/2/3 as
--- ALL ZERO right after the first question's +2 landed (runs sn55GdwQ,
--- MAh3rdsY) and concluded the record mechanic might be broken --
--- "recall's +5 cannot be relied on".  The event source says otherwise
+-- Background.  gen_banquet_done's input-driven rebuild read $0231/2/3 as
+-- all zero right after the first question's +2 landed (runs sn55GdwQ,
+-- MAh3rdsY) and concluded the record mechanic might be broken, recording
+-- "recall's +5 cannot be relied on".  The event source disagrees
 -- (event_main.asm:98355-98395): each first-question branch runs
 --
 --     switch $023N=1  /  add_var 0, 2
 --     if_switch $0230=1, skip
 --     switch $0230=1  /  switch $023(1+i)=1
 --
--- -- the +2 lands BEFORE the record switches execute, so a read that
--- fires the frame var0 crosses its milestone races the latch by a few
--- event ticks.  And the later gen runs that actually DROVE recall paid
--- +5 every time (runs t90KcsXZ, QkbMFqWb, Wl8BCHxI: "recall+break
--- resolved: +36" = espers 31 + recall 5).  $0230 has NO writer outside
--- the three branches and NO clearer anywhere in the ROM, so a stale
--- pre-set $0230 would need a corrupt save, not gameplay.
+-- The +2 lands before the record switches execute, so a read taken on
+-- the frame var0 crosses its milestone races the latch by a few event
+-- ticks.  The later gen runs that drove recall paid +5 every time (runs
+-- t90KcsXZ, QkbMFqWb, Wl8BCHxI: "recall+break resolved: +36" = espers 31
+-- + recall 5).  $0230 has no writer outside the three branches and no
+-- clearer anywhere in the ROM, so a stale pre-set $0230 would require a
+-- corrupt save rather than gameplay.
 --
--- THE MEASUREMENT, in one run, from the banquet_dinner_scratch state the
+-- The measurement, in one run, from the banquet_dinner_scratch state the
 -- generator cuts (dev scratch, not a fixture):
---   1. a WRITE-WATCH on WRAM $1EC6 -- the byte carrying switches
---      $0230-$0237 -- logs every CPU write with its frame, so the latch
---      moment is measured, not inferred;
---   2. drive toast/kefka/doma/celes, blob the FIRST-QUESTION choice, and
+--   1. a write-watch on WRAM $1EC6, the byte carrying switches
+--      $0230-$0237, logs every CPU write with its frame, so the latch
+--      moment is measured rather than inferred;
+--   2. drive toast/kefka/doma/celes, blob the first-question choice, and
 --      replay it three times: pick option i, ride to the next prompt,
---      read the record bits SETTLED (expect $0230=1 and $023(1+i)=1);
---   3. from the option-0 arm, drive to RECALL, blob it, and replay three
---      answers: expect +5 for option 0 exactly, +0 for 1 and 2.
+--      read the record bits settled (expect $0230=1 and $023(1+i)=1);
+--   3. from the option-0 arm, drive to recall, blob it, and replay three
+--      answers: expect +5 for option 0 only, +0 for 1 and 2.
 --
--- ============================ VERDICT (2026-08-10) ========================
--- DECODE ERROR: NO.  DEFECT: NO.  Measured live (PASS at frame 5388, all
--- nine arms; the run log is the record):
---   * boot: $0230-$0233 all CLEAR -- no stale record entering the dinner;
---   * THE RACE, CAPTURED: for first=1 and first=2 the read taken the
---     frame var0 crosses the +2 milestone shows ALL record bits still 0
---     ($1EC6=20 / 40 -- only the per-question "asked" bit), while the
+-- ============================ Verdict (2026-08-10) ========================
+-- Decode error: no.  Defect: no.  Measured live (PASS at frame 5388, all
+-- nine arms; the run log has the detail):
+--   * boot: $0230-$0233 all clear, so no stale record entering the dinner;
+--   * the race was captured: for first=1 and first=2 the read taken on
+--     the frame var0 crosses the +2 milestone shows all record bits still
+--     0 ($1EC6=20 / 40, only the per-question "asked" bit), while the
 --     settled read at the next prompt shows the record latched
 --     ($1EC6=25 / 49).  first=0 happened to latch by its milestone frame
---     ($1EC6=13) -- which is why the race read is a coin flip, and why
---     the gen saw zeros on some runs and recall paying on others;
+--     ($1EC6=13), so the race read varies between runs, which is why the
+--     gen saw zeros on some runs and recall paying on others;
 --   * settled reads: first=0 -> $0230+$0231; first=1 -> $0230+$0232;
 --     first=2 -> $0230+$0233; the other bits stay clear;
---   * recall pays +5/+0/+0 for answers 0/1/2 against a first=0 record --
---     exactly the decoded contract, deterministic;
---   * instrument note: the $1EC6 WRITE-WATCH fired ZERO times even
---     though the byte demonstrably changed -- the event interpreter's
---     switch writes are invisible to Mesen write callbacks here, the
---     same sample-don't-watchpoint caveat as HANDOFF trap 1.  The
---     before/at/settled SAMPLES carry the proof; keep that in mind
---     before trusting any write-watch on event switch bytes.
+--   * recall pays +5/+0/+0 for answers 0/1/2 against a first=0 record,
+--     which matches the decoded contract, deterministic;
+--   * instrument note: the $1EC6 write-watch fired zero times even
+--     though the byte changed.  The event interpreter's switch writes are
+--     not visible to Mesen write callbacks here, the same
+--     sample-don't-watchpoint caveat as HANDOFF trap 1.  The
+--     before/at/settled samples carry the proof; check that before
+--     trusting any write-watch on event switch bytes.
 -- gen_banquet_done's header note is corrected in the same commit: recall
--- IS earnable and deterministic; the gen keeps its recall-robust tier
--- arithmetic anyway (belt and braces costs nothing), but the "may pay 0"
--- claim now names the instrumentation race, not the game.
--- probe_banquet_qa.lua -- which asserted the record from source-reading
--- and booted a fixture that never existed -- is retired by this probe.
+-- is earnable and deterministic.  The gen keeps its recall-robust tier
+-- arithmetic anyway, since it costs nothing, and the "may pay 0" claim
+-- now names the instrumentation race rather than the game.
+-- probe_banquet_qa.lua, which asserted the record from source-reading
+-- and booted a fixture that never existed, is retired by this probe.
 local H = dofile("tools/tests/lib/ot6.lua")
 
 local STATE = "build/states/banquet_dinner_scratch.mss.lua"
@@ -96,7 +96,7 @@ local function pick(idx, done, maxFrames, what)
   }, what)
 end
 
--- the gen's multi-target choice machine: targets consumed one per RISING
+-- the gen's multi-target choice machine: targets consumed one per rising
 -- edge of choices-up, done on a var0 milestone (reads only)
 local function picks(targets, wantAtLeast, maxFrames, what)
   local ph, ti, wasUp = 0, 0, false
@@ -125,7 +125,7 @@ local function picks(targets, wantAtLeast, maxFrames, what)
   }, what)
 end
 
--- ride to the NEXT choice prompt (a fresh rising edge, so a still-open
+-- ride to the next choice prompt (a fresh rising edge, so a still-open
 -- prompt from the pick above does not satisfy it early)
 local function toNextChoice(maxFrames, what)
   local ph, sawDown = 0, false
@@ -157,14 +157,14 @@ H.run({ maxFrames = 120000 }, {
     H.log(string.format("[boot] var0=%d (the window score) | %s", w0, recbits()))
     H.assertEq(H.readByte(0x1EC6) & 0x0F, 0,
       "boot: $0230-$0233 all CLEAR entering the dinner -- no stale record")
-    -- THE INSTRUMENT: every CPU write to the switch byte, with its frame.
-    -- This is what separates "the record never latches" from "the record
+    -- The instrument: every CPU write to the switch byte, with its frame.
+    -- This distinguishes "the record never latches" from "the record
     -- latches after the frame the +2 crosses its milestone".
     -- CPU-bus form ($7E1EC6): no nil-argument holes, and ordinary STA
-    -- writes (which these are) fire it reliably.  Block moves would not
-    -- (HANDOFF trap 1's caveat) -- if no watch line ever appears yet the
-    -- settled reads show the bits, that is the block-move signature and
-    -- worth saying in the verdict.
+    -- writes (which these are) fire it reliably.  Block moves do not
+    -- (HANDOFF trap 1's caveat); if no watch line appears yet the settled
+    -- reads show the bits, that is the block-move signature and should be
+    -- recorded in the verdict.
     emu.addMemoryCallback(function(addr, value)
       H.log(string.format("[watch] $7E1EC6 <- %02X at f%d (var0=%d)",
         value or -1, H.frame, var0()))
@@ -191,7 +191,7 @@ H.run({ maxFrames = 120000 }, {
     })
   end)(),
 
-  -- ---- arm 1: each first-question option, record bits read SETTLED ------
+  -- ---- arm 1: each first-question option, record bits read settled ------
   (function()
     local steps = {}
     for i = 0, 2 do
@@ -227,9 +227,9 @@ H.run({ maxFrames = 120000 }, {
     return H.cond(function() return true end, steps)
   end)(),
 
-  -- ---- arm 2: from first=0 (the LAST arm ran with... i=2; reload to i=0)
-  -- replay blob A, take option 0, then the two re-asks and Espers, and
-  -- blob the RECALL prompt
+  -- ---- arm 2: from first=0 (the previous arm ended at i=2, so reload to
+  -- i=0).  Replay blob A, take option 0, then the two re-asks and Espers,
+  -- and blob the recall prompt
   (function()
     local loadReq
     return H.cond(function() return true end, {

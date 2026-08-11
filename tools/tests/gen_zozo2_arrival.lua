@@ -1,20 +1,20 @@
 -- gen_zozo2_arrival.lua -- v0.4 step 1b: figaro_submerged (engine room, map
--- 61 {6,34}, castle parked WEST at ~world {30,48}) -> up and out of the
+-- 61 {6,34}, castle parked west at ~world {30,48}) -> up and out of the
 -- castle -> the western WoB -> Zozo's world tiles {21..22,92} -> generate
 -- zozo_arrival.mss on map 221 at the street landing {61,44}.
 --
--- ROUTE checkpoints (source, not survey):
+-- Route checkpoints (from source, not the survey):
 --  * 61 door (11,32) -> 59 {10,48}; 59 door (12,41) -> 55 {28,31}
 --    (short_entrance.dat _61/_59)
 --  * map 55's row y=43 is the world-exit long entrance (gen_kolts's rule:
---    keep it off every route EXCEPT when leaving on purpose) -- here it IS
+--    keep it off every route except when leaving on purpose).  Here it is
 --    the exit: navTo(28,42), hold down
---  * the world landing is MEASURED by this run's log (parent record vs the
+--  * the world landing is measured by this run's log (parent record vs the
 --    long-entrance dest {65,77} was statically ambiguous; the ride's
 --    SET_PARENT points at the west parking ~{30,48})
---  * world {30,48}/{31,48} are the WEST castle trigger tiles (_ca5ec2,
---    gated $010C=1 -- LIVE for us): triggers fire on STEP, so the exit
---    placement is safe, and the Zozo step heads SW away from them
+--  * world {30,48}/{31,48} are the west castle trigger tiles (_ca5ec2,
+--    gated $010C=1, which is set here).  Triggers fire on step, so the exit
+--    placement is safe, and the Zozo step heads south-west away from them
 --  * Zozo: world {21,92}/{22,92}/{22,93} -> map 221 {61,44}
 --    (short_entrance.dat _0)
 local H = dofile("tools/tests/lib/ot6.lua")
@@ -52,11 +52,11 @@ local function door(nx, ny, dir, m, what)
     -- ride any arrival scene out (the west castle greets with one:
     -- measured, an event walks the party to (28,28) and parks a dialog)
     H.advanceStory(landed(m, 10), 2400),
-    -- door loads finalize the decompressed prop table LATE: ~150 frames
-    -- after control+brightness the engine still walked (and modelled) on
-    -- the PREVIOUS map's props (measured, probe_n20c on map 30->20: a
+    -- door loads finalize the decompressed prop table late: ~150 frames
+    -- after control and brightness the engine still walked (and modelled)
+    -- on the previous map's props (measured, probe_n20c on map 30->20: a
     -- legal step refused at +40f, accepted at +80f; the census flipped
-    -- from all-walls to sane at ~+150f).  Settle long before any BFS.
+    -- from all-walls to correct at ~+150f).  Settle long before any BFS.
     H.waitFrames(150),
   })
 end
@@ -69,7 +69,7 @@ H.run({ maxFrames = 90000 }, {
     H.assertEq(sw(0x010C), 1, "$010C SET -- castle parked WEST")
   end),
 
-  -- 1. engine room -> keep hall -> the gate map.  (11,32) is a WALK-IN
+  -- 1. engine room -> keep hall -> the gate map.  (11,32) is a walk-in
   --    doorway (directly reachable, probe_eng61) landing at 59 {10,48};
   --    the keep->gate door (28,32)-side needs the held press.
   H.navTo(11, 32, { arrive = function() return map() == 59 end,
@@ -78,7 +78,7 @@ H.run({ maxFrames = 90000 }, {
   H.waitFrames(150),
   door(12, 42, "up", 55, "keep -> the gate map"),
 
-  -- 2. the arrival scene parks the party on the FRONT TERRACE at (28,28),
+  -- 2. the arrival scene parks the party on the front terrace at (28,28),
   --    which is walled from the gate: drop through door (28,32) -> 59
   --    {12,43}, then door (12,50) -> 55 {28,40}, the lower gate yard.
   door(28, 31, "down", 59, "terrace -> vestibule"),

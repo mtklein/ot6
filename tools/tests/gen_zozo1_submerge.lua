@@ -1,16 +1,17 @@
 -- gen_zozo1_submerge.lua -- v0.4 step 1a: kefka_won (Arvis's house, map 30
 -- {60,37}, LOCKE+CELES+EDGAR+SABIN) -> Narshe streets -> the world -> the
--- EAST Figaro castle -> the engine-room attendant -> the Kohlingen crossing
--- -> generate figaro_submerged.mss (map 61 {6,34}, castle parked WEST).
+-- east Figaro castle -> the engine-room attendant -> the Kohlingen crossing
+-- -> generate figaro_submerged.mss (map 61 {6,34}, castle parked west).
 --
--- ROUTE checkpoints, all read from source (not the survey -- the survey's
--- "underwater encounters battle 19/20/21" step does NOT exist on this route;
--- those battles are the SERPENT TRENCH's, Sabin's scenario, _ca8ae3):
+-- Route checkpoints, all read from source rather than the survey.  The
+-- survey's "underwater encounters battle 19/20/21" step does not exist on
+-- this route; those battles belong to the Serpent Trench in Sabin's
+-- scenario, _ca8ae3:
 --  * map 30 door (55,35) -> map 20 {49,14} (short_entrance.dat _30)
 --  * map 20's south edge y=62 x0..43 -> world {83,36} (long_entrance _20)
---  * world (64,76)/(65,76) = the EAST castle trigger _ca5eb5
---    (event_trigger.asm:31-32), gated $010B=1 -- which kefka_won's tail
---    SET (gen_kefka_won asserts it) -> load_map 55 {28,42}
+--  * world (64,76)/(65,76) = the east castle trigger _ca5eb5
+--    (event_trigger.asm:31-32), gated $010B=1, which kefka_won's tail
+--    sets (gen_kefka_won asserts it) -> load_map 55 {28,42}
 --  * map 55 door (28,38) -> 59 {12,49}; 59 door (9,49) -> 61 {10,33}
 --    (short_entrance.dat _55/_59); doors are walls until CheckDoor, so
 --    every crossing is navTo-a-neighbour + one held press (gen_edgar's
@@ -64,11 +65,11 @@ local function door(nx, ny, dir, m, what)
     -- ride any arrival scene out (the west castle greets with one:
     -- measured, an event walks the party to (28,28) and parks a dialog)
     H.advanceStory(landed(m, 10), 2400),
-    -- door loads finalize the decompressed prop table LATE: ~150 frames
-    -- after control+brightness the engine still walked (and modelled) on
-    -- the PREVIOUS map's props (measured, probe_n20c on map 30->20: a
+    -- door loads finalize the decompressed prop table late: ~150 frames
+    -- after control and brightness the engine still walked (and modelled)
+    -- on the previous map's props (measured, probe_n20c on map 30->20: a
     -- legal step refused at +40f, accepted at +80f; the census flipped
-    -- from all-walls to sane at ~+150f).  Settle long before any BFS.
+    -- from all-walls to correct at ~+150f).  Settle long before any BFS.
     H.waitFrames(150),
   })
 end
@@ -84,18 +85,18 @@ H.run({ maxFrames = 90000 }, {
     H.assertEq(partyOf(0x01), 1, "LOCKE aboard")
   end),
 
-  -- 1. Arvis's house -> Narshe town by the FRONT DOOR (55,35) -> map 20
+  -- 1. Arvis's house -> Narshe town by the front door (55,35) -> map 20
   --    {49,14}.  Tier 1's invisible door-NPC no longer stands there
-  --    (probe_n30: reachable in 9, tile unoccupied) -- and the tier-1
-  --    corridor exit's (53,8) clifftop perch is POST-BATTLE ISOLATED
-  --    (probe_n20 census after full settle: zero reachable tiles), so the
-  --    front door is now the only way to the streets.
+  --    (probe_n30: reachable in 9, tile unoccupied), and the tier-1
+  --    corridor exit's (53,8) clifftop position is isolated after the
+  --    battle (probe_n20 census after full settle: zero reachable tiles),
+  --    so the front door is now the only way to the streets.
   H.navTo(55, 35, { arrive = function() return map() == 20 end,
                     maxFrames = 12000 }),
   H.waitUntil(landed(20, 10), 1200, "landed on the streets", 1),
   H.waitFrames(150),
 
-  -- 2. the south gate at (38,61) (gen_worldmap's proven tile), then one
+  -- 2. the south gate at (38,61) (gen_worldmap's verified tile), then one
   --    held step south onto the y=62 exit row -> world {83,36}
   H.navTo(38, 61, { maxFrames = 20000 }),
   H.driveUntil(function() return H.worldMode() end, 900, {
@@ -109,9 +110,9 @@ H.run({ maxFrames = 90000 }, {
     H.log(string.format("[world] at (%d,%d)", H.worldX(), H.worldY()))
   end),
 
-  -- 3. to the EAST castle trigger (64,76): stop one tile NORTH, then step
+  -- 3. to the east castle trigger (64,76): stop one tile north, then step
   --    onto it (the trigger checks $010B and loads map 55 {28,42}).  The
-  --    arrive bails if a stray step fires the trigger early -- the next
+  --    arrive bails if a stray step fires the trigger early; the next
   --    drive's map-55 pred is then already true and holds nothing (holding
   --    down at the gate would step onto y=43, the world-exit row).
   H.worldNavTo(64, 75, { maxFrames = 30000,
@@ -125,10 +126,10 @@ H.run({ maxFrames = 90000 }, {
     H.log(string.format("[castle] map 55 at (%d,%d)", H.fieldX(), H.fieldY()))
   end),
 
-  -- 4. gate {28,42} -> door (28,38) -> 59 {12,49} -> the WEST engine-room
+  -- 4. gate {28,42} -> door (28,38) -> 59 {12,49} -> the west engine-room
   --    door (9,49) -> 61 {10,33}.  Measured on the scratch state: (9,49)
-  --    is a WALK-IN doorway (model-walkable, fires on step), unlike the
-  --    castle's held-press doors; and 61's EAST door (15,49) lands at
+  --    is a walk-in doorway (model-walkable, fires on step), unlike the
+  --    castle's held-press doors; and 61's east door (15,49) lands at
   --    (28,32), which is walled off from the attendant's platform.
   door(28, 39, "up", 59, "into the keep"),
   H.saveState("_scratch_keep59.mss"),   -- cheap re-entry for route iteration
@@ -138,9 +139,9 @@ H.run({ maxFrames = 90000 }, {
   H.waitFrames(150),
 
   -- 5. the attendant at {6,33}: stand below at (6,34), face up (a held up
-  --    turns in place -- the NPC blocks the step), clean edge-A.  (6,34)
-  --    keeps the route off (5,35), the "That's dangerous!" shoo trigger
-  --    (_ca69cd) that grabs the party every frame it is stood on.
+  --    turns in place, because the NPC blocks the step), then edge-A.
+  --    (6,34) keeps the route off (5,35), the "That's dangerous!" shoo
+  --    trigger (_ca69cd) that takes control every frame it is stood on.
   H.navTo(6, 34, { maxFrames = 9000 }),
   H.hold({ "up" }), H.waitFrames(8), H.release(), H.waitFrames(4),
   (function()

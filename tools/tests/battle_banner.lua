@@ -1,18 +1,19 @@
 -- @suite
--- battle_banner.lua -- TEMPORAL test: attack-name banners must not tear.
+-- battle_banner.lua -- temporal test: attack-name banners must not tear.
 --
 --   tools/tests/run.sh tools/tests/battle_banner.lua
 --
 -- The bug this pins down (single-frame asserts cannot see flicker, so the
--- invariant is checked on EVERY frame of the sequence): vanilla builds its
+-- invariant is checked on every frame of the sequence): vanilla builds its
 -- attack/special/esper name-scratch string at $7E57D5 (ram_res w7e57d5,128;
--- GfxCmd_01/GfxCmd_11 and the swdtech/esper loaders all write byte 0
--- nonzero), and OT6_FONTDIRTY used to live on that exact byte.  Every named
--- banner then spuriously triggered the full ~46-scanline font re-lay in the
--- NMI tail, blowing ~30 scanlines past the end of vblank -- VRAM writes into
--- active display, INIDISP/HDMA setup landing mid-frame: the user-visible
--- screen flash/tear.  probe_banner measured end-of-flush at scanline 292
--- (vblank ends at 262) on banner frames vs 248 +/- 5 quiet.
+-- GfxCmd_01/GfxCmd_11 and the swdtech and esper loaders all write byte 0
+-- nonzero), and OT6_FONTDIRTY used to live on that byte.  Every named
+-- banner then triggered the full ~46-scanline font re-lay in the
+-- NMI tail, running ~30 scanlines past the end of vblank, which put VRAM
+-- writes into active display and INIDISP/HDMA setup mid-frame, and the user
+-- saw the screen flash and tear.  probe_banner measured end-of-flush at
+-- scanline 292 (vblank ends at 262) on banner frames against 248 +/- 5 when
+-- quiet.
 --
 -- The fix under test: OT6_FONTDIRTY relocated to $57B9 (write-watcher
 -- verified spare byte), and the legit dialogue-close re-lay staged into six
@@ -21,17 +22,17 @@
 -- Invariants, asserted across every frame from menu-open through the Fire
 -- Beam banner and resolution:
 --   1. the battle NMI's OT6 tail work and the following INIDISP write stay
---      inside vblank (scanline 225..261) on EVERY frame;
---   2. a real banner event happened in the window ($57D5 CHANGED from its
---      armed baseline -- the positive control that we exercised the
---      vanilla writer; issue #75 made this a read, not a poke-then-poll);
---   3. OT6_FONTDIRTY ($57B9) stayed 0 throughout (no spurious re-lay);
+--      inside vblank (scanline 225..261) on every frame;
+--   2. a banner event happened in the window, seen as $57D5 changing from its
+--      armed baseline.  This is the positive control that the vanilla writer
+--      ran; issue #75 made it a read rather than a poke-then-poll;
+--   3. OT6_FONTDIRTY ($57B9) stayed 0 throughout, so no re-lay was triggered;
 --   4. right after the banner the under-monster HUD cells are still
 --      painted in VRAM (shadow line vs tilemap word compare).
 --
 -- Instrument points (bank C1 exec callbacks; C1 offsets shift only if code
--- is inserted before the battle NMI in btlgfx_main.asm -- the smoke test
--- below fails loudly if the hooks go quiet):
+-- is inserted before the battle NMI in btlgfx_main.asm, and the smoke test
+-- below fails if the hooks go quiet):
 --   $C10BA7 BattleNMI entry   $C10C17 flush jsl   $C10C1B flush return
 --   $C10CA4 first instruction after sta hINIDISP
 
@@ -49,13 +50,13 @@ local sawBanner = false         -- latched at NMI entry: the pre-relocation
                                 -- flush cleared $57D5 every NMI, so a
                                 -- main-thread poll can never see it
 local base57D5 = nil            -- $57D5 as the window opened (issue #75:
-                                -- this used to be POKED to 0 so nonzero
+                                -- this used to be poked to 0 so nonzero
                                 -- meant "banner"; the fixture arrives with
                                 -- $82 already there, so "banner happened"
-                                -- is now a CHANGE from the armed baseline.
+                                -- is now a change from the armed baseline.
                                 -- A new banner whose first char equals the
                                 -- stale one would fail the positive
-                                -- control LOUDLY, not pass silently.)
+                                -- control rather than pass silently.)
 
 local function sl() return emu.getState()["ppu.scanline"] end
 
@@ -99,11 +100,11 @@ H.run({ maxFrames = 12000 }, {
     "battle to become active (screen rendering)", 30),
   H.waitFrames(240),
 
-  -- arm the instrument.  This used to ZERO vanilla's name-scratch byte so
-  -- "nonzero = a banner happened"; issue #75 made it a READ: latch the
-  -- byte as it is (measured $82 from this fixture+drive -- the poke WAS
-  -- load-bearing, a clean-slate assert failed here) and detect the banner
-  -- as a CHANGE from that baseline in the NMI watcher.
+  -- arm the instrument.  This used to zero vanilla's name-scratch byte so
+  -- that nonzero meant a banner happened; issue #75 made it a read: latch the
+  -- byte as it is (measured $82 from this fixture and drive; the poke was
+  -- load-bearing, and a clean-slate assert failed here) and detect the banner
+  -- as a change from that baseline in the NMI watcher.
   H.call(function()
     base57D5 = H.readByte(0x57D5)
     H.log(string.format("armed: $57D5 baseline %02X", base57D5))
@@ -124,16 +125,16 @@ H.run({ maxFrames = 12000 }, {
   H.call(function() armed = false end),
 
   -- the 16x16 anim-mode veil (battle_hudanim16) hides the hud while an
-  -- animation holds battlefield bg3 in 16x16 tiles ($896F bit $40) -- an
+  -- animation holds battlefield bg3 in 16x16 tiles ($896F bit $40).  An
   -- enemy action can still be mid-effect after the fixed ride above, and
-  -- its window would read $01EE where the self-heal check wants cells.
+  -- its window would read $01EE where the self-heal check wants cells, so
   -- settle to 8x8 with the flush's repaint landed first.
   H.waitUntil(function()
     return H.readByte(0x896f) % 128 < 64 and H.fieldHudPresent()
   end, 600, "bg3 back to 8x8, hud repainted", 5),
 
   H.call(function()
-    -- 0. the instrument actually ran
+    -- 0. the instrument ran
     H.assertEq(#rec >= 250, true, "instrument recorded >=250 frames (got " ..
       #rec .. ")")
 
@@ -159,11 +160,11 @@ H.run({ maxFrames = 12000 }, {
       #rec, worstFe, worstId))
     H.assertEq(bad, 0, "every NMI tail write inside vblank")
 
-    -- 2. the window really contained a banner (positive control)
+    -- 2. the window contained a banner (positive control)
     H.assertEq(sawBanner, true,
       "vanilla banner scratch $57D5 written during the window")
 
-    -- 3. no spurious font re-lay (no dialogue ran in this fight)
+    -- 3. no font re-lay was triggered (no dialogue ran in this fight)
     H.assertEq(maxFd, 0, "OT6_FONTDIRTY stayed clear through the banners")
 
     -- 4. HUD self-heal: every enabled shadow line's first cell is live in

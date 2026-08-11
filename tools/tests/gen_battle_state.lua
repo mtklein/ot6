@@ -24,7 +24,7 @@ local entry, entryPrev, saveReq = nil, nil, nil
 
 H.run({ maxFrames = 60000 }, {
   -- 1. Title screen: press Start a few times while the logo is up.  (The
-  --    title also auto-advances into the intro, so this is belt+braces.)
+  --    title also auto-advances into the intro, so the presses are redundant.)
   H.waitFrames(355),
   H.repeatN(5, { H.pressButtons({ "start" }, 8), H.waitFrames(25) }),
   H.logStep("title handled; waiting out the opening (this takes a while)..."),
@@ -63,7 +63,7 @@ H.run({ maxFrames = 60000 }, {
   H.call(function() H.screenshot("gen_battle_entry") end),
 
   H.cond(function() return H.vars.battle_up end, {
-    -- happy path: let it settle, log the goods, save the state
+    -- expected path: let it settle, log the results, save the state
     H.waitFrames(180),
     H.call(function()
       H.screenshot("gen_first_battle")
@@ -76,7 +76,7 @@ H.run({ maxFrames = 60000 }, {
     H.saveState("first_battle.mss"),
   }, {
     -- battle load began but the engine never came up (screen stayed black):
-    -- this is the regression signature this harness exists to catch.
+    -- this is the regression signature the harness checks for.
     H.call(function()
       error("battle load started but battle never became active " ..
         "(battle_entry.mss emitted; see shots/gen_battle_entry.png)", 0)
