@@ -7,8 +7,9 @@
 -- Fight/Steal/Item) and TERRA (slot 1, L4, Fight/Magic/Item, knowing Fire
 -- and Cure) on the World of Balance at (84,34), the state gen_figaro.lua
 -- walks south to Figaro. It is the closest existing fixture to the stretch
--- balance-metrics.md wants measured next -- Figaro -> Mt.Kolts is Terra +
--- Locke + Edgar -- and unlike the Figaro interiors it sits on a map with
+-- balance-metrics.md wants measured next (its per-stretch coverage rule):
+-- Figaro -> Mt.Kolts is Terra + Locke + Edgar -- and unlike the Figaro
+-- interiors it sits on a map with
 -- LIVE random encounters, so the fights are the real pool rather than a
 -- scripted set piece. What it is missing is EDGAR (and Sabin): the states
 -- that carry them are still being minted. So the party numbers below are

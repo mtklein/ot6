@@ -11,8 +11,9 @@
 ; ==============================================================================
 ; BOOST-TIERED SLOT (Setzer) -- the chance-verb canon applied to the reels
 ;
-; ROADMAP.md:79-82 / kits.md:405-410: on chance verbs boost buys CERTAINTY in
-; the verb's own vocabulary. Slot's vocabulary is the reel rig, and vanilla's
+; ROADMAP.md "Design canon" / kits.md "Boost-tiered Steal": on chance verbs
+; boost buys CERTAINTY in the verb's own vocabulary. Slot's vocabulary is the
+; reel rig, and vanilla's
 ; rig is ONE byte: w7e6179, a single Rand() drawn at the first A press of a
 ; spin (btlgfx_main.asm, UpdateMenuState_08 @7f16 -- OR'd with $3c when the
 ; battle disables joker doom, $2f49.2). Everything dishonest the machine does

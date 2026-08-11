@@ -1,9 +1,5 @@
 # Research: battle RAM + ROM free space (FF3us 1.0)
 
-Verified 2026-07-14 against ff6hacking.com wiki and the everything8215/ff6
-disassembly notes. Kept verbatim-ish from the research pass; distilled
-takeaways for OT6 at the bottom.
-
 ## Battle RAM map
 
 Primary sources:
@@ -74,24 +70,3 @@ the battle **graphics** module (HDMA/sprite/animation buffers).
   Expanded-space etiquette from forum practice: editors claim ranges (FF3usME
   AI expansion configurable $F0-$FF); suggestions like "put stuff in $F1-$F2"
   / "$F6-$FB" (https://www.ff6hacking.com/forums/printthread.php?tid=3251).
-
-## OT6 takeaways
-
-1. **Weakness data is already per-combatant in battle RAM** ($3BE0 weak,
-   $3BE1 halved, $3BCC absorb, $3BCD immune) and the attack's element is at
-   $3B90 during resolution — the break-chip hook reads RAM that already
-   exists. This is also how Debilitator must work (it edits $3BE0). Weapon-
-   class weakness gets a parallel new table, same $14-stride convention.
-2. **Broken-state timer has two vanilla models to copy**: Stop counter
-   ($3AF1) and Freeze counter ($3F0D) are existing per-combatant countdowns.
-3. **New battle state budget**: shields-current (10 B), shields-max cache
-   (10 B), broken timer (10 B), discovered-weakness masks (20 B), BP (4 B for
-   characters, or 10 B uniform), boost-pending (4 B) ≈ 60-70 bytes. The
-   9 free bytes at $3ECB won't hold it — plan A is claiming a slice of the
-   mode-overlaid region verified unused in battle (needs a trace-based
-   audit in M0/M1), plan B is bank $7F or the graphics region's slack.
-   Battle-only lifetime makes this tractable.
-4. **Expand to 32 Mbit immediately in M0** and put all OT6 code/tables in a
-   clearly-claimed expanded bank (e.g. $F0-$F1), documented patchmap-style,
-   rather than squeezing into vanilla's 29 KB of scraps.
-5. All offsets above are for the unheadered 1.0 ROM — matches our base.

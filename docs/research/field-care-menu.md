@@ -1,46 +1,8 @@
 # Field care: driving heal/revive through the real field menu
 
-Source-reading research for issue #75 (the honesty program). Everything here
-was derived by reading `ff6/src/menu/*.asm` in **this worktree**; nothing was
-run. Every mechanism claim carries a `file:line`. Where the source did not
-settle a question I say so and name the probe that would.
-
 Scope: opening the field menu, using a consumable (Potion `$E9`, Tonic `$E8`,
 Fenix Down `$F0`) on a party member, and casting a field heal spell
 (Cure `$2D`), using **only** pad input and memory *reads*.
-
----
-
-## 0. Corrections to the dispatch brief
-
-Three things in the dispatch are wrong or incomplete; they matter:
-
-1. **The character-target states are `$6F` (init) and `$70` (select), and you
-   do not reach them from the item-options window `$17`.** You reach them from
-   `$19`. The dispatch's guess that `$17` is on the path to targeting is
-   backwards: `$17` is *above* the list, and its "USE" option merely drops you
-   back into `$08` (`field_menu.asm:2127-2168`).
-
-2. **`$19` is not only "move/rearrange" — it is also the use trigger.** In `$08`
-   press A on a slot to *pick it up* (state becomes `$19`, `$28` = the picked
-   slot); press A again **on the same slot** and the game calls `UseItem`
-   (`field_menu.asm:2334-2336`). Press A on a *different* slot and the two slots
-   swap (`field_menu.asm:2337-2366`). So "use a Potion" is A, A on one slot.
-
-3. **`$1600 + 37*char + $0B` is *not* a plain max-HP word.** The top two bits of
-   the high byte are an HP-boost code; effective max HP =
-   `base + base*boost`, then clamped to 9999
-   (`ff6/notes/field-ram.txt:889-892`, `menu_common.asm:2377-2400`,
-   `menu_common.asm:2424-2437`). Same packing for max MP at `+$0F`. A fixture
-   that reads that word raw and compares it to a displayed number will be wrong
-   for any character wearing an HP-boost relic/esper.
-
-The rest of the dispatch's known-good facts check out: `zMenuState` is DP `$26`
-(`menu_ram.inc:112`, and the file's own naming convention — `z25` lands at `$25`,
-`z45` at `$45`, `z80` at `$80`, `ze0` at `$e0` per the explicit
-`_ram_offset .set $e0` at `menu_ram.inc:269`); the generic cursor index cell is
-`$4B`; main menu is `$05`; item list is `$08`; item options is `$17`; item move
-is `$19`; inventory ids at `$1869+i`, counts at `$1969+i`.
 
 ---
 
@@ -644,9 +606,9 @@ region); Blitz got a new one-column cursor (`field_menu.asm:1199-1206`). The
 only `issue #` markers in `field_menu.asm` and `item.asm` are at
 `field_menu.asm:18`, `:1174`, `:1199`, `:1339` — none on the item or magic
 paths. `skills.asm`'s markers are `:1876`, `:1888`, `:2088`, all Blitz. So the
-Item and Magic flows described above are vanilla, and the "field ability pages"
-in the dispatch are the SwdTech/Rage/Blitz configurators, not a paged field
-magic list.
+Item and Magic flows described above are vanilla, and OT6's "field ability
+pages" are the SwdTech/Rage/Blitz configurators, not a paged field magic
+list.
 
 ---
 

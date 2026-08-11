@@ -1588,7 +1588,7 @@ function M.tapLever(swId, maxFrames, what)
   }, what)
 end
 
--- Escape a stood-on re-entry trigger tile (the addenda SS1.7 class: the
+-- Escape a stood-on re-entry trigger tile (the re-entry-trap class: the
 -- trigger re-enters every frame, hasControl never settles, and only an
 -- UNCONDITIONAL held press leaves).  Cycles dirs 40 frames each until the
 -- party tile changes and settles 10 aligned quiet frames.

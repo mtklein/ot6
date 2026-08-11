@@ -1,7 +1,8 @@
 -- gen_terra_returned_anchor.lua -- mint battery anchor F, `terra-returned-v1`
--- (save-points-vector.md §5): the WHOLE E->F leg in one run, from n128_won
+-- (the A-F save-point boundary band is lettered in
+-- tools/tests/frontier_graph.py): the WHOLE E->F leg in one run, from n128_won
 -- (the nearest minted predecessor, parked on boundary E) to a world-map
--- battery save one takeoff after Terra's return.  §5 rules this leg cannot
+-- battery save one takeoff after Terra's return.  This leg cannot
 -- be split legally -- a save inside the Esper-World flashback would save as
 -- the WEDGE-actor Maduin with the roster rewritten -- so the anchor gen IS
 -- the leg.

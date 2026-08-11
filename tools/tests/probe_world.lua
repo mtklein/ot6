@@ -1,5 +1,5 @@
 -- probe_world.lua -- the live-probe checklist from
--- docs/research/world-map-nav.md:178-191, run against worldmap_narshe.mss
+-- docs/research/world-map-nav.md, run against worldmap_narshe.mss
 -- (the party on foot on the WoB, fresh from the Narshe south gate).  This
 -- is the measurement instrument behind the worldPos/worldCanStep/worldBfs
 -- additions to lib/ot6.lua: every mechanism claim the doc's audit flagged

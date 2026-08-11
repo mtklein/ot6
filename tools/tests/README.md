@@ -20,17 +20,16 @@ has boots into a ROM whose timing it does not match, and the result is a
 red test that has nothing to do with your change -- usually a *timeout on
 some innocent step*, which reads exactly like a product bug.  This is the
 common case in a fresh worktree, not an exotic one: `tools/worktree-setup.sh`
-seeds from whatever the main checkout last minted, and on 2026-07-30 that was
-105 of 105 fixtures stale on arrival.
+seeds from whatever the main checkout last minted, which is routinely a whole
+tree of stale fixtures.
 
 `--check-states` answers it in ~2s, names the shared input that moved when
 there is one, and gives you the targeted re-mint
 (`nice -n 10 ninja -f build/build.ninja <state>`) rather than the hours-long
 full chain.  `suite.sh` and `worktree-setup.sh` both run it for you, and a
 timeout that happens on a fixture it flagged says so in the failure itself.
-The alternative -- re-running the same tests against unmodified `main` to
-see whether they were red there too -- is what four agents each did
-independently on 2026-07-29, for the same ten tests.
+Ask it before you start re-running the same tests against unmodified `main`
+to see whether they were red there too.
 
 `make test` mints only the three states the suite asserts on.  The
 STORY CHAIN past the whelk -- the Narshe escape, the Figaro chapter,
@@ -44,7 +43,7 @@ to stay what it was.
 The graph of minted states is DATA -- `tools/tests/frontier_graph.py`, one
 entry per state -- and `lib/frontier_ninja.py` emits it as
 `build/build.ninja`; `make frontier` / `make test` are thin wrappers over
-`ninja -f build/build.ninja` (issue #25).  A minted link is a function of
+`ninja -f build/build.ninja`.  A minted link is a function of
 the ROM bytes, its generator `gen_*.lua`, and all THREE lib halves
 `lib/compose.py` inlines into every composed script -- `lib/ot6.lua`
 (battle core), `lib/ot6_field.lua` (field/world navigation) and
@@ -62,7 +61,7 @@ the lib is stable (it is the rare file to change) while generators churn
 constantly.  `lib/frontier_ninja_selftest.sh` proves those semantics
 against real ninja on a mock tree in seconds, no emulator.
 `lib/frontier_stamp.sh` survives as the PROVENANCE half: each mint edge
-stamps `build/states/<state>.stamp` with three claims (issue #75 step 5) --
+stamps `build/states/<state>.stamp` with three claims --
 
     sha256(GATE_CONTRACT ++ generator ++ ot6.lua ++ ot6_field.lua ++
            ot6_contract.lua ++ extras) <generator> [extras]
@@ -80,10 +79,7 @@ whole chain verifiable transitively from files on disk).  `GATE_CONTRACT`
 (`ot6-provenance/v1`, one constant in `frontier_stamp.sh`) is a fixed sig
 input: bumping it deliberately stales every stamp and forces a full
 re-mint under new rules.  `compose.py --check-states` asks the same
-question of the whole tree and is a hard `make test` gate.  Issue #2:
-before any of this, freshness keyed on the ROM alone, so a generator or
-lib edit silently kept a stale fixture; before #75, nothing bound the
-stamp to the bytes beside it.
+question of the whole tree and is a hard `make test` gate.
 
 Some suite tests are FRONTIER-GATED: each declares
 `-- @suite frontier=<fixture>` and asserts on a state only `make frontier`
@@ -170,27 +166,24 @@ shared copy is rebuilt automatically when `tools/Mesen.app` changes (a
 size+mtime stamp beside it); `make clean` does not remove it, and it
 should not -- see the Gatekeeper note below.
 
-Two things that replaced, both easy to re-break:
+Two properties that arrangement depends on, both easy to re-break:
 
-* Workers used to each get a private 413MB copy of the bundle, because a
-  `settings.json` beside the binary puts Mesen in **portable mode** and
-  that file then *is* the config -- so a shared bundle meant one shared
-  `SaveDataFolder` for everyone to race on (`2bf5045` has the forensics).
-  Portable mode wins over every other mechanism, which is why the shared
-  copy must never be allowed to grow a `settings.json`.  It is also why
-  the copy exists at all rather than exec'ing `tools/Mesen.app` directly:
-  the user's manual-play profile (`make run`) lives in that bundle as
-  exactly such a file.
+* A `settings.json` beside the binary puts Mesen in **portable mode**, and
+  that file then *is* the config -- one shared `SaveDataFolder` for every
+  worker to race on.  Portable mode wins over every other mechanism, which
+  is why the shared copy must never be allowed to grow a `settings.json`.
+  It is also why the copy exists at all rather than exec'ing
+  `tools/Mesen.app` directly: the user's manual-play profile (`make run`)
+  lives in that bundle as exactly such a file.
 * Mesen is ad-hoc signed but **not notarized**, so macOS runs a
   first-launch Gatekeeper assessment on every *new bundle path*: a
   user-visible "Verifying Mesen…" dialog and a multi-second scan of all
-  413MB (measured 4.7s and 6.1s on fresh paths, against 0.3-0.5s once the
-  path is known).  The old scheme minted four of those per tree and four
-  more for every agent worktree.  Clearing quarantine does **not** help --
-  `xattr -cr` before first launch still cost 5.5s, and the kernel puts
+  413MB (4.7-6.1s on a fresh path, against 0.3-0.5s once the path is
+  known).  Clearing quarantine does **not** help -- `xattr -cr` before
+  first launch still costs 5.5s, and the kernel puts
   `com.apple.provenance` straight back on exec -- because the trigger is
   the new path, not the flag.  Keeping the shared copy at one stable
-  machine-wide location is the whole fix.
+  machine-wide location is the whole point.
 
 (The testrunner does NOT write settings back -- `DisableSaveSettings` is
 set -- and never creates `SaveStates/`.)
@@ -249,37 +242,34 @@ set -- and never creates `SaveStates/`.)
   seeds, and on one ROM three different menu owners).  So the mint
   proves the fixture works across rolls instead of tuning a settle to
   chase one.
-- `gen_whelk.lua` - the retired SRM-based ancestor: boot an injected
-  play save and BFS the mines to the same doorstep (see
-  `docs/playing-headless.md`).  Kept because probe_slots and the
-  balance instruments still consume `make_srm_sidecar.sh` saves;
-  requires a pre-Whelk save, which no longer exists locally.
+- `gen_whelk.lua` - the SRM-based route to the same doorstep: boot an
+  injected play save and BFS the mines (see `docs/playing-headless.md`).
+  Kept because probe_slots and the balance instruments still consume
+  `make_srm_sidecar.sh` saves; requires a pre-Whelk save, which does not
+  exist locally.
 - `gen_post_opera_anchor.lua` - provenance generator for the tracked 32 KiB
   post-Opera battery anchor. It settles `blackjack.mss`, uses the real Save UI
   to write slot 3, and relies on `run.sh`'s explicit `OT6_CAPTURE_SRM` mode to
   capture Mesen's file after shutdown.
 
-  **Save-drive rule (2026-07-28): a gen that saves anywhere near live event
-  state drives the Save UI with PAD INPUT ONLY — never by poking
-  `ZMENUSTATE`.** The forced-state shortcut skips the menu entry's own
-  writes, leaving menu tasks running on a corrupted exit; that produced
-  issue #29's phantom `$021f` overlay and, measured during the banquet
-  decode, silently corrupts the live `$1188` event-timer block in WRAM
-  (SRAM is pushed first and stays correct — which is why existing anchors
-  are fine). `probe_banquet_timer_save.lua` is the pad-input template.
+  **Save-drive rule: a gen that saves anywhere near live event state drives
+  the Save UI with PAD INPUT ONLY — never by poking `ZMENUSTATE`.** The
+  forced-state shortcut skips the menu entry's own writes, leaving menu
+  tasks running on a corrupted exit: it produces a phantom `$021f` overlay
+  and silently corrupts the live `$1188` event-timer block in WRAM (SRAM is
+  pushed first and stays correct).  `probe_banquet_timer_save.lua` is the
+  pad-input template.
 - `gen_vector_doorstep.lua` - cold boots with the verified post-Opera anchor,
   drives vanilla Continue, checks story state plus the slot-3 OT6 codex page,
   then WALKS THE WORLD to the Vector event trigger at (121,187) and mints
-  `vector_doorstep` on map 242.  Replaces `gen_vector_arrival`, which held
-  RIGHT off the anchor into map **323 = ALBROOK** and named every artifact
-  Vector (issue #17).  Vector has no entrance record at all; it is
+  `vector_doorstep` on map 242.  Vector has no entrance record at all; it is
   `event_trigger.asm:36-37` -> `_ca5ecf` -> `load_map 242 {32,61}`, so the
   opening leg is an on-foot world walk through a fully battle-enabled band
   (worldGrind, not worldNavTo).  Its positive control reads the map name the
   ENGINE would print -- the live title index `$0520`, through `MapTitlePtrs`
   into `MapTitle` -- and requires "VECTOR"; the same read is exercised on the
   Albrook gate first and required to say "ALBROOK", so it cannot pass by
-  returning nothing.  The rest of the v0.6 chain (`gen_vector_sneak`,
+  returning nothing.  The rest of the Vector chain (`gen_vector_sneak`,
   `gen_mrf_entry`, `gen_mrf_chute`, `gen_mrf_263`, `gen_mrf_kefka`,
   `gen_ifrit_doorstep`, `gen_ifrit_magicite`, `gen_n024_doorstep`,
   `gen_esper_tubes`, `gen_esper_tubes_done`, `gen_minecart_doorstep`) chains
@@ -305,8 +295,7 @@ set -- and never creates `SaveStates/`.)
   navTo-a-neighbour plus one hold, and the shop menu must be driven by
   state ($7E0026) not by timing.  It also documents the castle's
   disconnected walking regions, the diagonal staircases that join them
-  (BFS plans those itself now - the four `pushUntil` hand-holds an
-  earlier pass needed are retired), why map 55's row y=43 must stay off
+  (BFS plans those itself), why map 55's row y=43 must stay off
   every route (it is a world-exit trigger, not a wall), and maps the
   beats it stops short of.
 - `gen_kolts.lua` - rung 2's last route leg: figaro_cleared (world map,
@@ -347,30 +336,28 @@ set -- and never creates `SaveStates/`.)
   the ~45-frame fly-in, that each present-but-unshown line is DISABLED and
   the bg3 field map holds zero OT6 glyphs; positive controls that the
   window was sampled and that the hud comes back once the birds land.
-  Fails loudly on the pre-fix `cur=$54AC` (the glyphs the v0.3-rc1 cave
-  playtest saw floating on the still-dark battlefield).
+  Fails loudly on `cur=$54AC` -- glyphs floating on the still-dark
+  battlefield.
 - `battle_hudanim16.lua` - FRONTIER-GATED (kolts_cave.mss, battle_flyin's
   fixture).  Guards the anim-mode veil: battle animation inits flip the
   battlefield's $2105 shadow (`$896F`) to 16x16 bg3 tiles while an effect
   uses bg3 as its canvas or color-math mask, and in that mode a map cell
   renders at doubled size/position pulling three neighbor tiles -- so any
-  live hud line inside the effect's scroll window drew doubled break-icon
-  blocks flanked by neighbor-tile junk over and around the monsters (the
-  owner's no-dialogue "break icons amongst junk" sighting, present since
-  v0.2; a plain CURE against the Cirpius x3 pool -- hud rows 5/8, inside
-  the idle window -- showed it for 42 straight frames).  Paces the natural
+  live hud line inside the effect's scroll window draws doubled break-icon
+  blocks flanked by neighbor-tile junk over and around the monsters.  Paces
+  the natural
   pool, lets the entry veil finish, drives ~2 Terra casts, and asserts per
   frame: no live hud cell holds a painted glyph while `$896F` bit `$40` is
-  up (1338 violations pre-fix), with positive controls that >= 24 such
+  up, with positive controls that >= 24 such
   frames were sampled, at least one live line read veiled ($01EE), the
   dialogue latch stayed 0 (the no-dialogue clause), and the hud repaints
   whole (glyphCanary) after.
 - `probe_junk16.lua` - the reproduction instrument behind it: same fixture
   and drive plus per-frame $2105/$212C/scroll/anchor traces, a claimed-
   glyph-in-window detector with screenshot bursts, and a borrowed-font
-  canary.  Its `j16_*_hudvis` shots are the sighting: doubled shield/'?'
+  canary.  Its `j16_*_hudvis` shots show the failure: doubled shield/'?'
   glyphs and neighbor-tile bars over the battlefield during Cure.
-- `probe_bg3anim.lua` - the first measurement of the display state: runs
+- `probe_bg3anim.lua` - measures the display state: runs
   first_battle's Fire Beam (bg3-scripted, $2105=$59 for ~70 frames while
   bg3 stays on the main screen) with a full map-census log per frame.
 - `probe_896f.lua` - write-watcher over the battlefield $2105 shadow
@@ -411,9 +398,8 @@ set -- and never creates `SaveStates/`.)
   (named banners: vanilla writes its name scratch at $7E57D5) and assert
   the whole NMI tail stays inside vblank (scanline 225..261), plus
   OT6_FONTDIRTY ($57B9) stays clear and the under-monster HUD cells are
-  still painted in VRAM afterwards.  Pre-fix this measured the flush
-  ending at scanline 292 (30 lines into active display) on banner
-  frames -- the user-visible flash/tear.
+  still painted in VRAM afterwards.  A flush that ends past 261 is
+  the user-visible flash/tear.
 - `probe_banner.lua` - the measurement instrument behind battle_banner:
   per-frame scanline table (NMI entry / flush start / flush end / post-
   INIDISP) plus $57D5, large-transfer flag/size, and a 44-frame
@@ -421,8 +407,8 @@ set -- and never creates `SaveStates/`.)
 - `probe_57b9.lua` - write-watcher over $7E57B9-BF (OT6_FONTDIRTY's
   relocated home) with $7E57D5 as positive control; logs writer PCs.
 - `battle_bushido.lua` - gate for BP-Bushido: boost points pick Cyan's
-  tech and vanilla's charge gauge is gone.  Cyan is not recruitable
-  until v0.3, so he is INSTALLED into the opening guard fight the way
+  tech and vanilla's charge gauge is gone.  Cyan is not in the party at
+  the opening guard fight, so he is INSTALLED into it the way
   the balance labs pin state -- CHAR::CYAN into $3ED8, a Bushido-only
   command list at $202E (stride 12), the weapon SWDTECH flag in
   $3BA4/$3BA5 (without it UpdateCmd_02 greys the command out), and a
@@ -433,7 +419,7 @@ set -- and never creates `SaveStates/`.)
   cap, and that the chosen tech resolves: Quadra Slam's $58 reaches
   $3410, chips a slashing-weak guard, reveals the slash class, and
   consumes the boost with no regen.  (Names per CONTRIBUTING's FF3-US
-  vocabulary rule, 2026-07-30; the test's own filename and the upstream
+  vocabulary rule; the test's own filename and the upstream
   `Bushido*`/`Oblivion` symbols stay as they are -- renaming symbols is
   churn against upstream that naming them here already buys.)
 - `probe_bushido.lua` - the measurement instrument behind it: logs the
@@ -470,7 +456,7 @@ the two images.
 
 ## Writing a test
 
-**THE HONESTY RULE (issue #75, owner directive 2026-08-03).**  A test or
+**THE HONESTY RULE (owner directive).**  A test or
 generator may inject controller input and READ emulated memory to assert
 things.  It may NEVER WRITE emulated game state -- no HP/MP pins, no
 kill-bits, no boss clamps, no cursor or menu-state pokes, no event-flag or
@@ -513,10 +499,9 @@ does not imply reload-calm).
 
 A test is a LIST OF STEPS handed to `H.run`; a `startFrame` callback consumes
 them, one frame at a time (zero-frame steps like `H.call` chain within a
-frame).  The step style below is the house pattern.  (An older note here
-claimed coroutines crash this build; that was the exit-255 wall-clock cap
-misread as a crash -- see WORKING NOTES.  Coroutines work.  The step machine
-stays because the whole suite is written in it, not because it has to.)
+frame).  The step style below is the house pattern.  (Coroutines also work
+on this build; the step machine stays because the whole suite is written in
+it, not because it has to be.)
 
 ```lua
 local H = dofile("tools/tests/lib/ot6.lua")
@@ -537,7 +522,7 @@ H.run({ maxFrames = 60000 }, {              -- frame budget failsafe -> exit 2
 `H.log()` goes to stdout (`[ot6]` prefix); plain `print()` also works.
 
 Reference savestates TREE-RELATIVELY -- `H.loadState("build/states/x.mss.lua")`
--- never by absolute path (issue #26).  compose.py resolves every reference
+-- never by absolute path.  compose.py resolves every reference
 against the running tree's own `build/states/` and REFUSES a reference that
 resolves only outside the tree (including into a nested worktree), so a
 worktree can never quietly boot a fixture minted from another tree's ROM.
@@ -617,8 +602,8 @@ Plain functions (call from `H.call`/predicates):
   executing swap-window steps on a measured clock; `H.chaseTalk(objIdx,
   maxFrames, what)` -- talk to a WANDERING NPC, stopping the moment a
   choice list is up.  Both are documented at their definitions in
-  `lib/ot6_field.lua`, with the measured mechanism (the rewrite window)
-  in `docs/design/sealed-gate-recon-addenda.md` Addendum 2.
+  `lib/ot6_field.lua`, including the measured rewrite-window mechanism
+  `phaseWalk` plans against.
 
 ## Mesen 2.1.1 Lua API facts (all verified empirically on this binary)
 
@@ -676,8 +661,7 @@ Plain functions (call from `H.call`/predicates):
   fire for bank C1/C2 (`emu.addMemoryCallback(fn, emu.callbackType.exec,
   0xC10BA7, 0xC10BA7)` fires once per battle NMI).  They fire for bank F0
   too -- `battle_reveal`, `battle_reveal_poweron` and `probe_reveal_trace`
-  all hook $F00000 and pass.  (This bullet used to claim F0 never fires,
-  contradicting three tests in the suite.)  PRG-file-offset forms fire
+  all hook $F00000 and pass.  PRG-file-offset forms fire
   never (0x010BA7) or on the wrong thing; use the bus form.
 - Memory callbacks SURVIVE `emu.loadSavestate()`; nothing in the load path
   clears them (`SaveStateManager.cpp` only raises `StateLoaded`).
@@ -703,12 +687,10 @@ Scripts cannot write files.  The harness base64-encodes blobs to stdout as
 
 ## WORKING NOTES
 
-### Screenshots headless: YES (key question answered)
+### Screenshots headless
 
 `emu.takeScreenshot()` produces valid PNGs under `--testrunner` with no
-window/GUI, suitable for visual verification of upcoming UI work.  Proof:
-this harness screenshotted the whole intro (title logo, "1000 years have
-passed..." narration, Magitek snow walk, Narshe gate) pixel-perfect.
+window/GUI, suitable for visual verification of UI work.
 Empty-string result only occurs in the first ~2 s before the video decoder
 has a frame.  `emu.getScreenBuffer()` also exists (table of RGB ints) if raw
 pixels are ever needed.
@@ -732,18 +714,16 @@ parallel.  Three harness pins make it so:
   explicitly (SRM sidecars).
 
 Battery SRAM (the OT6 weakness codex included) RIDES Mesen savestates
-(measured 2026-08-04: markers in banks $30 and $31 both restored by
-`emu.loadSavestate`), so post-load SRAM is a pure function of the fixture's
-own minted bytes.  `H.loadState` therefore performs no codex normalization
-of its own -- an earlier version re-formatted all four codex pages after
-every load, which was both an issue-#75 state write and an overwrite of
-fixture content.  Runs that boot fresh instead of loading get their codex
+(markers in banks $30 and $31 are both restored by `emu.loadSavestate`), so
+post-load SRAM is a pure function of the fixture's own minted bytes.
+`H.loadState` therefore performs no codex normalization of its own --
+normalizing would be both a state write and an overwrite of fixture
+content.  Runs that boot fresh instead of loading get their codex
 pages formatted lazily by the ROM itself (`Ot6CodexEnsure` and friends,
 `ff6/src/battle/ot6_codex.asm`).
 
-Scripts still key off RAM *signals* rather than absolute frame numbers --
-not because frames drift at runtime anymore, but because every ROM or
-route edit shifts them.
+Scripts still key off RAM *signals* rather than absolute frame numbers,
+because every ROM or route edit shifts them.
 - `emu.createSavestate()/loadSavestate()` round-trip works from Lua, but
   ONLY inside an exec memory callback (see the trampoline above);
   `probe16.lua` is the regression test for the mechanism.
@@ -817,34 +797,12 @@ route edit shifts them.
   to the SCRIPT log, a separate 500-row buffer only the GUI script window
   ever reads.  There is no bridge.  `print()` is the only channel out of a
   script, so a test that goes quiet is telling you nothing -- add prints.
-- Retired claims, all one misdiagnosis: this section used to say coroutines
-  crashed the build, that runtime `dofile` crashed it, and that
-  `emu.getState()` in a poll loop was crash-correlated.  All three were the
-  255 cap above.  Coroutines run clean 4/4 at 20k frames; `dofile` raises a
-  tidy error naming the setting that enables it; `battle_banner` calls
+- Coroutines, runtime `dofile` and `emu.getState()` in a poll loop are all
+  fine: coroutines run clean 4/4 at 20k frames, `dofile` raises a tidy error
+  naming the setting that enables it, and `battle_banner` calls
   `getState()` four times a frame in production and passes.
 - `emu.stop()` from the initial script body works; from callbacks it works
   too (used everywhere here).
 - No `timeout` command on macOS; not needed since `H.run` guarantees exit,
   but `( cmd & pid=$!; (sleep N; kill $pid) & wait $pid )` is the fallback
   pattern if a script without the library must be watchdogged.
-
-### BATTLE-ENTRY STATUS (2026-07-15): ALL GREEN
-
-Two regressions were caught on the break-system ROM and both are fixed:
-
-1. Hard crash at battle init (CPU derailed into RAM, NMI disabled): an
-   assembler width desync (.i8 immediates in .i16 battle context) in the
-   bank-F0 break module.
-2. Battle init hang (screen never unblanked past +2400 frames while battle
-   RAM partially filled).  Isolated by A/B: the same `battle_doorstep.mss`
-   + identical scripted walk rendered the battle at ~+120 frames on the
-   base FF3us image but stayed black on ot6; a base-minted mid-battle
-   state resumed fine on ot6, pinning the hang to the init/fade-in path.
-
-On the current build the whole suite passes against ot6.sfc:
-`gen_battle_state` mints both states end-to-end, `battle_entry` PASSes in
-~460 frames, `battle_smoke` asserts shields 02/02 at $7E3E44/$7E3E46 and
-digit glyph $B6 ("2") at $7E3ECB, and `battle_firebeam` drives a full
-MagiTek turn -- `shots/fb_firing.png` shows the monster name window
-rendering "Guard    2" (name + shield digit), confirmed visually.

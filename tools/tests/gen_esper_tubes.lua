@@ -11,7 +11,8 @@
 -- second state cannot ride a predecessor edge the boot never uses).  The
 -- leg used to boot n024_doorstep.mss; that state stays minted as B->C's
 -- terminal, and the cold Continue replays its last two steps from the
--- anchor instead (save-points-vector.md §5's "C + 2 steps" hybrid).
+-- anchor instead (the "C + 2 steps" hybrid; boundary C is lettered in
+-- tools/tests/frontier_graph.py).
 --
 -- BATTLE 72 (_cc79ed, event_main.asm:95385) is `battle 72 / call _ca5ea9 /
 -- hide_obj NPC_1 / sort_obj / switch $0649=0` -- no `if_b_switch` gate at

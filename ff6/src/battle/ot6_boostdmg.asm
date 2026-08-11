@@ -62,14 +62,16 @@
                                 ;   the pending boost is still live, so without
                                 ;   it a 3-BP Rage-start would buy the
                                 ;   guaranteed special AND x8 it -- exactly the
-                                ;   double-dip kits.md:405-410 rules out.
+                                ;   double-dip kits.md's "Boost-tiered Steal"
+                                ;   rules out.
         cmp     #$0f
         beq     done            ; $0f slot: a CHANCE verb -- boost bought the
                                 ;   reel's certainty (the Ot6SlotRig tier
                                 ;   ladder), never a damage multiplier. without
                                 ;   this gate a pending boost would ALSO x2/x8
                                 ;   the slot attack it just chose -- the exact
-                                ;   double-dip kits.md:405-410 rules out
+                                ;   double-dip kits.md's "Boost-tiered Steal"
+                                ;   rules out
                                 ;   ("certainty INSTEAD of multiplication"),
                                 ;   and the bushido/$07 gate above rules out
                                 ;   for the tier ladder.

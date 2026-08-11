@@ -308,11 +308,8 @@ ULTROS_ROW_CLASSES = CLASS_BIT["slash"] | CLASS_BIT["pierce"]
 # so an unrelated drift on the same boss still fails.
 
 WAIVERS = {
-    # EMPTY, and that is the point.  The four entries that lived here --
-    # Number 128's body and both blades, and AtmaWeapon's whole element row --
-    # were all authored into Ot6ElemAddTbl by the v0.6 boss-element pass
-    # (issue #23), along with FlameEater's water and Ultros ④'s bolt.  Every
-    # OPEN DECISION block in bosses-wob.md is now a RESOLVED block.
+    # EMPTY, and that is the point.  Every row bosses-wob.md authors in prose
+    # is authored into Ot6ElemAddTbl, so nothing needs waiving.
     #
     # With no waivers left this script is a plain gate, and it is registered in
     # `make test` (the Makefile's test target, next to the compose/sram_anchor

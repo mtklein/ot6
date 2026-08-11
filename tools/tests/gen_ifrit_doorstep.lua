@@ -179,7 +179,7 @@ H.run({ maxFrames = 60000 }, {
     H.assertEq(H.fieldY(), 7, "264 landing y")
     H.assertEq(sw(0x0646), 1, "$0646 still SET -- both espers are standing")
     H.assertEq(sw(0x0060), 0, "$0060 still CLEAR")
-    -- CORRECTION to docs/design/vector-route-recon.md §2, which says the
+    -- CORRECTION to the route recon's esper-alcove decode, which says the
     -- pair "sit on the two doors ... Ifrit (3,8) is under 264 (3,5)->270,
     -- Shiva (9,6) is under 264 (9,5)->269".  Only the second is load
     -- bearing: Shiva at {9,6} is the tile directly below the {9,5} door

@@ -1,14 +1,11 @@
 # The Imperial banquet, decoded and probed
 
-Issue #31 probe-first item, 2026-07-28. Source decode of the whole banquet
-block (maps 243/244/250/251/252, `$007C=1` → `$0238=1`), the derived ≥90
-scoring circuit, the timer save/reset/load probe (run, with verdict), and
-live verification of battles 26/27/30. Written from this worktree
-(`wt/v07-banquet`, main @ 97f6d6e); line numbers are from that tree. Claims
-cite `file:line` or sit in the unverified ledger (§8). Probes live at
-`tools/tests/probe_banquet_*.lua` (§7) and their logs are quoted inline.
+Source decode of the whole banquet block (maps 243/244/250/251/252,
+`$007C=1` → `$0238=1`), the scoring circuit and its reward tiers, the timer
+save/reset/load behaviour, and battles 26/27/30. Claims cite `file:line` or
+sit in the unverified ledger (§8).
 
-Companion to `sealed-gate-recon.md` §1 leg 6; corrections to it in §6.
+Companion to `sealed-gate-recon.md`, the v0.7 route recon this block sits in.
 
 ---
 
@@ -30,20 +27,17 @@ Companion to `sealed-gate-recon.md` §1 leg 6; corrections to it in §6.
 `$007B=1` is just `load_map 253 {29,2}` (`:99389-99395`) — no `$007C` gate.
 253's world exit is an ordinary 12-wide long entrance (30,63) → world
 (120,188) (`long_entrance.dat` map-253 block). So a player mid-window can
-reach the saveable world map. Coming *back* is doubtful: the 243 (15,8)
+reach the saveable world map. Coming *back* is impossible: the 243 (15,8)
 door into 250 was opened by `_cc835c`'s transient `mod_bg_tiles`, 243's
 map-init is `EventReturn` (`map_init_event.asm:262`) and the escort is
-`$013A`-latched dead, so a reload of 243 shows the static (closed) door
-(passability of the closed tiles: unverified, §8). It does not matter for
-progress: the timer callback collects the party from **any field map** —
-measured, §5.3 B4.
+`$013A`-latched dead, so a re-entry of 243 shows the closed door and the
+map is a dead-end pocket (§5.2). It does not matter for progress: the timer
+callback collects the party from **any field map** (§5.3).
 
 **No early-out exists.** The only writer of `$013C=1` in the game is
 `_cc8a96` itself (`:98047`; every other grep hit is an `if_any` condition),
-and `_cc8a96` is reached only as the timer-0 callback. The recon's
-UNVERIFIED "no early-out found" is now verified: the 14400-frame timer is a
-hard floor on leg I→J. All 24 soldier scripts and every castle trigger were
-read.
+and `_cc8a96` is reached only as the timer-0 callback. The 14400-frame
+timer is a hard floor on leg I→J.
 
 ## 2. The timer machinery ($1188 family)
 
@@ -71,9 +65,8 @@ save/reset/load story:
   |= $20` (`battle/battle_main.asm:12049-12053`) — that is b-switch `$45`,
   the "flash BLUE, no points" path in the field scripts.
 - **world**: **nothing**. No `DecTimers`/`CheckTimer` caller exists in
-  `ff6/src/world/`, and it is measured: 150 idle world frames leave the
-  counter untouched (§5.3 A1, B2). The countdown freezes on the world map
-  and resumes on the next field map.
+  `ff6/src/world/`. The countdown freezes on the world map and resumes on
+  the next field map.
 
 Save/load: `CopyGameDataToSRAM` runs `PushTimers` — `$1188-$119F` →
 `$1FA8-$1FBF`, inside the saved `$1600-$1FFF` block
@@ -81,8 +74,8 @@ Save/load: `CopyGameDataToSRAM` runs `PushTimers` — `$1188-$119F` →
 (`:18-34, 121-128`). The score variable (var 0 = `$1FC2`,
 `field/event.asm:4453-4523`) and every `$007x/$01xx/$02xx` switch
 (`$1E80+`) also live inside that block. Only `InitNewGame` clears timers
-(`field/init.asm:184-200`); `InitSavedGame` does not. Vanilla built the
-banquet timer to survive a battery cycle — and it does (§5.3).
+(`field/init.asm:184-200`); `InitSavedGame` does not. The banquet timer
+survives a battery cycle (§5.3).
 
 ## 3. The soldier circuit — every scoring branch
 
@@ -239,28 +232,72 @@ Always: South Figaro withdrawal `$0276=1` (`:99198`). Then
 - **≥77**: Tintinabar (`give_item`, `:99236`)
 - **≥90**: **Charm Bangle** (`:99249`)
 
-### 5.2 The ≥90 walkthrough (frontier canon)
+### 5.2 The circuit and the reward tier (frontier canon)
 
-Absolute maximum = 44 (window) + 5 (challenge) + 44 (Q&A) = **93**.
-≥90 leaves **3 points of slack**, so: all four window battles clean, the
-challenge clean, and a perfect Q&A are all mandatory (each is worth ≥5);
-the slack allows at most 3 dropped talk-points (or the +3 accompany).
-Simplest robust policy for the gen: **take all 93 and assert ≥90.**
+Absolute maximum = 44 (window) + 5 (challenge) + 44 (Q&A) = **93**. The
+window half is the scarce half: the dinner reliably pays its 49, and the
+score that reaches the messenger is window + 49. So the tier thresholds
+translate into **window** requirements:
+
+| tier | reward | needs window ≥ |
+|---|---|---|
+| ≥50 | Doma withdrawal | 1 |
+| **≥67** | **Imperial-base weapons** | **18** |
+| ≥77 | Tintinabar | 28 |
+| ≥90 | Charm Bangle | 41 |
+
+**Canon is the ≥67 tier**, at a driven total of **75** (window 26, 16 of
+24 soldiers, in a driver that demonstrably wastes frames). `$0276`,
+`$0277` and `$0278` all pay; **Tintinabar and the Charm Bangle do NOT**,
+and `banquet-done-v1` asserts their ABSENCE rather than their presence.
+≥90 needs 41 of the window's 44 points, i.e. essentially a perfect
+circuit; ≥77 needs only 2 more window points than the driven best and is
+the obvious target for a tuned route, but the release ratchet says canon
+is what has been driven. Re-open the tier when a tuned circuit clears 28.
+
+Three route constraints govern the window:
+
+- **Control returns inside the throne tower**, a **199-tile pocket**
+  (x48..60, y9..35) whose only exits are the (53,9)/(55,9) doors to 251
+  and the **(53,35) long entrance back to the corridor at (23,11)**.
+  Leaving it is the circuit's first act, and it costs 393 frames.
+- **The castle is severed until the window opens.** Before `_cc8490`,
+  map 250's entry is a 131-tile pocket: the west and east columns are
+  blocked at **(16,30)** and **(30,30)** by the `$0630` "Gestahl waits
+  inside" servants. `_cc8490` clears `$0630` at `event_main.asm:97415`,
+  one line before `$007C=1`, so the castle opens exactly when the timer
+  starts and any route census taken earlier is invalid.
+- **Map 243 is a one-way pocket.** Its (15,8) door into 250 was opened by
+  the escort's transient `mod_bg_tiles` (`_cc835c`, `:97070`), and a
+  re-entry shows the closed door with no reachable exit. **243 must be
+  visited LAST**, and the (22..24,34) door row routed around until then.
+
+Per-unit costs (timer `$1189`, counting down from 14400):
+
+| item | cost |
+|---|---|
+| window at first controlled frame | **14302** |
+| throne-tower exit | 393 |
+| a talk, including its approach | ~210 avg (4 nearest: 836) |
+| a talk's dialog alone | ~110-130 |
+| field walking | ~16 frames/tile |
+| region traversals from the corridor | 38-62 **steps each way** |
 
 1. Enter 250, face UP + A at (54,16). Ride the Gestahl/Cid scene. Timer
-   starts on scene end (`:97420`), control returns at the dais.
+   starts on scene end (`:97420`), control returns in the throne pocket.
 2. Window (≤14400 frames, ticking through dialogs, menus, battles —
    frozen only on the world map, which the circuit never visits): talk to
-   all 24 soldiers of the §3 table and WIN the four fights. Suggested
-   order (passability inside 250 is mod-free but live-unverified — census
-   at mint): dais room four (21/25,18/24) → stairs (15,21)→(24,52) →
-   west wing → (9,14)→252, six there incl. battle 27 → 252 (35,60)→250
-   (9,16) → (9,52)→244, five there → 244 (13,19)→250 → (22,34)→243,
-   three there incl. battle 26 → back through 250 east: (31,21)→(81,59)
-   region for (98,51)/(110,51)/(115,16)/(120,13)/(9,49)/(51,50).
+   as many of the 24 soldiers of the §3 table as the clock allows and WIN
+   the fights taken. Suggested order: leave the throne pocket by (53,35)
+   → dais room four (21/25,18/24) → stairs (15,21)→(24,52) → west wing →
+   (9,14)→252, six there incl. battle 27 → 252 (35,60)→250 (9,16) →
+   (9,52)→244, five there → 244 (13,19)→250 → back through 250 east:
+   (31,21)→(81,59) region for
+   (98,51)/(110,51)/(115,16)/(120,13)/(9,49)/(51,50) → **243 last**,
+   three there incl. battle 26.
    Assert after each fight: `$1dd1 & $31 == 0` (b-switches $40/$44/$45
    all clear) AND var0 delta == +6 (+1 talk, +5 clean).
-   Checkpoint: var0 == 44 before expiry, with all 24 latches set.
+   Checkpoint: var0 ≥ 18 before expiry.
 3. Let the timer expire anywhere in the castle, party halted (CheckTimer
    requires a halted party and no running event). Ride: map 5 "That
    evening…" → map 251 dinner.
@@ -280,83 +317,59 @@ Simplest robust policy for the gen: **take all 93 and assert ≥90.**
    `$01A2`, `:98820-98835`), the roster rewrite, the TERRA+LOCKE scene.
    Control returns on 251 as a 2-person party, `$007D=1`.
 8. Walk out; at 250 (23,12) the messenger fires: assert `$0276/$0277/
-   $0278=1`, Tintinabar and Charm Bangle in inventory, `$0238=1`,
-   var0 back to 0.
+   $0278=1`, Tintinabar and Charm Bangle **absent** from inventory,
+   `$0238=1`, var0 back to 0.
 
 Timing constraints, for the gen's asserts rather than hopes: the window
-budget is 14400 frames minus four battles (timer runs in-battle); battle
-30 has its own 7200; a battle still running when its timer dies ends with
-`$45` set — points lost but nothing wedges. Whether 24 talks + 4 real
-(non-kill-bit) wins fit in 4 minutes for the real leg party is a
-mint-time measurement (§8); if it proves tight, the fights are the thing
-to accelerate — they are the only variable-cost item.
+budget is 14400 frames minus the battles taken (timer runs in-battle);
+battle 30 has its own 7200; a battle still running when its timer dies
+ends with `$45` set — points lost but nothing wedges. The fights are the
+only variable-cost item, so they are the thing to accelerate.
 
-### 5.3 The timer save/reset/load probe — verdict: **benign, by design**
+### 5.3 The timer across save / reset / load — benign, by design
 
-`vanilla-destructive-bugs.md` gets **no new entry**. The full result set:
+`vanilla-destructive-bugs.md` gets no entry for this.
 
-**Staging (stated honestly).** The banquet is five unminted legs
-downstream of `terra-returned-v1`, so no probe reached it naturally.
-Staging: cold-Continue the terra-returned battery (world (24,121), on
-foot), hand-write timer 0 exactly as `start_timer 0,N,_cc8a96,{…}` would
-(flags `$72`, ptr `$028A96`), plus score var 0 = 17. This proves the
-**save/load mechanism for a live banquet timer**; it does NOT prove
-banquet reachability, the castle-exit walk, or dinner-scene coherence for
-a mid-window party — the exit rows are source-cited (§1) and the dinner
-ride was only taken to its first latch. The staged save was written by the
-real Save UI via **pure pad input** (see the harness hazard below).
+- The world map does not tick a live timer; menus tick it 1:1.
+- A completed save carries the live `$1188-$119F` block into SRAM (slot
+  bytes `72 xx xx 96 8A 02` with the counter mid-tick, score var intact)
+  and the in-session timer keeps running afterwards. Entering the save
+  screen and backing out leaves the live timer untouched.
+- Cold power-on → Continue restores the block byte-for-byte via
+  `PopTimers`, minus the frames the load menu itself ticks.
+- Entering an ordinary field map resumes the countdown 1:1, and expiry
+  fires the restored callback from wherever the party stands: `$013C=1`,
+  map 5 "That evening…", dinner hall 251. `CheckTimer` only compares
+  against zero, so the path is value-independent.
 
-Measured, all logs in the probe headers' run lines:
-
-- **A1/B2** — the world map does not tick a live timer (150 idle frames,
-  counter byte-identical; twice, either side of a battery cycle).
-- **A2** — menus tick it 1:1 (120 frames in the world menu = 120 counts).
-- **A3** — a natural completed save carries the live block into SRAM:
-  slot-3 bytes `72 xx xx 96 8A 02` with the counter mid-tick, score var
-  intact; the in-session timer keeps running afterwards
-  (`probe_banquet_timer_save.lua`: WRAM `72 … count=4955` after menu
-  close, SRAM `72 count=5089`).
-- **Cancel-only visit** — entering the save screen and backing out leaves
-  the live timer untouched (`probe_banquet_timer_cancel.lua`).
-- **B1** — cold power-on → Continue restores the block byte-for-byte via
-  `PopTimers` minus the 76 frames the load menu itself ticked
-  (battery 5089 → WRAM 5013 at first world frame).
-- **B3** — entering an ordinary field map (198, a town the banquet never
-  visits) resumes the countdown 1:1.
-- **B4** — expiry fires the restored callback from that town: `$013C=1`,
-  map 5 "That evening…", dinner hall 251 loaded. The counter was forced
-  to 240 to bound the wait — `CheckTimer` only compares against zero, so
-  the path is value-independent.
-
-So: a player who walks out mid-window and saves loses nothing — reset +
+So a player who walks out mid-window and saves loses nothing — reset +
 Continue resumes the countdown and the dinner collects the party from
 wherever they are. Two behavioral notes worth the release notes, neither
 destructive: the world map **pauses** the banquet clock indefinitely
 (mild exploit), and a mid-window exit is one-way back into the castle
 (§1) — the dinner teleport is what un-strands the player.
 
-**Harness hazard found on the way** (this, not vanilla, was the scary
-reading): the anchor-gen save idiom that force-writes `ZMENUSTATE=$13`
-to enter the save selector **corrupts the live `$1188-$119F` block** —
-leftover menu-state tasks scribble on it (write-watch caught bank-C3
-writers at C3/E04F+E052 and RAM-stub block moves; exact task
+**Standing harness rule: any save made inside a timer window must drive
+the menu with pad input only.** The anchor-gen save idiom that
+force-writes `ZMENUSTATE=$13` to enter the save selector **corrupts the
+live `$1188-$119F` block** — leftover menu-state tasks scribble on it
+(bank-C3 writers at C3/E04F+E052 and RAM-stub block moves; exact task
 unidentified, ledger §8). The SRAM copy is written first (`PushTimers`
-precedes) and stays correct, which is why every existing anchor is
-unaffected — no anchor has a live timer. Rule for future gens: **any
-save made inside a timer window must drive the menu with pad input
-only** (`probe_banquet_timer_save.lua` is the template; the poke variant
-`probe_banquet_timer.lua` is kept as the failing counter-example, and
-`probe_banquet_timerwatch.lua` is the instrument).
+precedes) and stays correct, which is why anchors without a live timer
+are unaffected.
+
+**No fixture boundary belongs inside the block.** Transient switches
+(`$013C`, `$0230-$0237`, ladder rungs) plus a live timer are no place for
+an anchor.
 
 ### 5.4 Battles 26/27/30 — contents, loseability, gen asserts
 
 Event battle groups map 1:1, no 3/4-1/4 alternate
-(`event_battle_group.dat`): 26→408, 27→418, 30→157. Offline decode
-(`battle_monsters.dat` +1 present-mask, +2..+7 ids, +14 msb;
-`battle_prop.dat` aux = `0000` for all three: run allowed, no special
-flags) **confirmed live** (`probe_banquet_battles.lua`, forced via the
-`EventBattle` RAM recipe `$11e0/$11e2/$078a/$56`, `field/event.asm:
-1910-1942`):
+(`event_battle_group.dat`): 26→408, 27→418, 30→157. Decode is
+`battle_monsters.dat` +1 present-mask, +2..+7 ids, +14 msb;
+`battle_prop.dat` aux = `0000` for all three (run allowed, no special
+flags). Battles are forceable with the `EventBattle` RAM recipe
+`$11e0/$11e2/$078a/$56` (`field/event.asm:1910-1942`):
 
 | battle | formation | live contents | monster row (`monster_prop.dat`) |
 |---|---|---|---|
@@ -365,7 +378,7 @@ flags) **confirmed live** (`probe_banquet_battles.lua`, forced via the
 | 30 | 157 | 3× Sp Forces `$0c2`, HP 700 each | L21, absorb none, weak poison (`$08`) |
 
 Clean kill-bit wins end with `$1dd1 = $00` — b-switches $40/$44/$45 all
-clear (measured, all three). Loseability: a wipe is NOT a game over
+clear. Loseability: a wipe is NOT a game over
 (§3) — the script continues, the +5 is skipped, the +1 still lands, and
 the party walks away from the fade-in (post-loss party HP state:
 unverified, ledger). **The gen must assert, per fight:** formation words
@@ -374,66 +387,17 @@ match (species `$102`/`$0c7`/`$0c2` at `$3F46+`), and on the win
 timer-expiry or wipe must fail the leg, not pass quietly with a lower
 tier.
 
-## 6. Corrections to sealed-gate-recon.md
-
-1. **"+5 on win" is really "+5 on clean win, flags inverted":**
-   `if_b_switch` branches when the flag is CLEAR, so the recon's "outcome
-   read via `$40/$45/$44`, +5 clean win" had the right conclusion but the
-   bits are *failure* flags (wipe / banquet-time-up / timer-ended), all
-   required clear. Practical consequence for the gen is the §5.4 assert.
-2. **"~27 soldier NPCs spread across five maps 243,244,250,251,252"** →
-   exactly **24 scoring soldiers on four maps** (243/244/250/252). 251 is
-   the dinner hall; its only scoring content is the troopers' challenge.
-3. **"24 `add_var 0,1` sites"** → one 24-rung global ladder (`_cc88bf`);
-   the distinction matters because the +1 is capped by rung exhaustion,
-   not by NPC count.
-4. **"two live timers"** → the challenge reuses timer 0 after the master
-   is stopped; at most one timer is ever live, which is why the
-   save-probe only had to stage one block.
-5. **Base treasure unlock mechanism (recon §1 leg 2 "unread")**: answered —
-   `_cb2566` clears `$045D`, the "Locked…" object at 378 (53,40).
-6. **Hazard 1's open question** (save/reset/load inside the window) is
-   settled benign (§5.3); the hazard's "two event timers … callback
-   teleports the party" stands otherwise as written, and the #10
-   no-anchor-inside-the-block prohibition is unchanged — transient
-   switches (`$013C`, `$0230-$0237`, ladder rungs) plus a live timer are
-   still no place for a fixture boundary.
-7. Recon line refs `:97678/:97730/:97763/:97805` (fight sites) and
-   `:99199/:99211/:99224/:99237` (thresholds) re-verified exact.
-
-## 7. Probe inventory (this worktree)
-
-| file | role | result |
-|---|---|---|
-| `tools/tests/probe_banquet_timer.lua` | phase A: stage live timer, world/menu tick, poked save drive | PASS; also the counter-example — poked drive corrupts live WRAM timer |
-| `tools/tests/probe_banquet_timerwatch.lua` | write-watcher + per-frame sampler over `$1188-$119F` through the save | writer census (C0/BB57 ticks; C3/E04F+E052 + MVN stub on the poked path) |
-| `tools/tests/probe_banquet_timer_cancel.lua` | natural navigation, save screen visit, cancel | timer survives |
-| `tools/tests/probe_banquet_timer_save.lua` | natural pad-input completed save; captured the phase-B battery | timer survives in-session AND in SRAM |
-| `tools/tests/probe_banquet_timer2.lua` | phase B: cold boot the captured battery; B1-B4 | PASS end-to-end (restore, freeze, resume, fire) |
-| `tools/tests/probe_banquet_battles.lua` | force battles 26/27/30, live formation + clean-win flags | PASS, table §5.4 |
-
-Run lines are in each header. Phase A→B chaining:
-`probe_banquet_timer_save` with `OT6_CAPTURE_SRM=build/states/
-banquet_timer_live.srm`, then wrap the capture as an anchor dir
-(manifest schema `ot6.sram-anchor/v1`, layout `ot6-codex-o8-v1`) for
-`OT6_SRAM_ANCHOR` — the phase-B manifest self-describes as staged, not a
-route state. None is a suite test; none is frontier input.
-
 ## 8. Unverified-claims ledger
 
-- **Window feasibility**: 24 talks + 4 real wins inside 14400 frames for
-  the real leg party (TERRA/LOCKE/EDGAR/SABIN at band levels) is
-  UNMEASURED. The only full-circuit timing evidence will be the mint
-  itself. If ≥90 proves undrivable in-window, the score policy decision
-  (recon open question 5) reopens.
+- **A window above 26 points** is undemonstrated. ≥77 needs 28 and ≥90
+  needs 41; whether a tuned route reaches either for the real leg party
+  (TERRA/LOCKE/EDGAR/SABIN at band levels) is unmeasured, and the tier
+  ruling in §5.2 reopens only when one does.
 - **250's interior passability / route order** between the coordinate
   clusters in §5.2 is derived from entrances + NPC coordinates only; no
-  live census. 250 is not a `mod_bg_tiles` map (its init is `_cc839e`,
-  one door, latched), so offline reading should hold — but the v0.6
-  precedent says census at mint anyway.
-- **The closed 243 (15,8) door after a mid-window re-entry**: presumed
-  impassable (static tilemap, no re-opening init). Untested; only
-  matters for a player who exits and tries to return before expiry.
+  full live census. 250 is not a `mod_bg_tiles` map (its init is
+  `_cc839e`, one door, latched), so offline reading should hold — but the
+  v0.6 precedent says census at mint anyway.
 - **Post-loss party state** after a lost banquet fight (HP floor,
   status) — unread and unmeasured; the gen never loses, players can.
 - **`$44`'s full trigger set**: `BattleEnd_01` is also reachable via the
@@ -446,95 +410,10 @@ route state. None is a suite test; none is frontier input.
   neighborhood suggests a redraw task running with a stale index. The
   behavioral rule (pad-input saves inside timer windows) does not depend
   on the attribution.
-- **Dinner-scene coherence when fired from an arbitrary map** was ridden
-  only to the 251 load with a non-banquet party (staged). The real leg
-  fires it inside the castle with the real party; nothing suggests
-  map-of-origin sensitivity beyond what B4 exercised, but the full scene
-  was not ridden in staging.
-- **Menu tick during the save-slot screens** was measured only for the
-  top menu (A2); the selector screens also call `DecTimersMenuBattle`
-  (same loop) and the observed SRAM-vs-stage deltas are consistent with
-  continuous ticking, but no per-screen breakdown was taken.
-
----
-
-## 9. Correction to §5.2 — 2026-07-28, the circuit measured live (issue #31)
-
-§5.2 was written from source and entrance tables, before any run reached
-the window.  Three of its premises do not survive contact, and the
-score-tier policy it implied ("take all 93 and assert ≥90") is not
-drivable.  Measured with `tools/tests/probe_banquet_greedy.lua` against
-`banquet_window.mss` (the live window minted by
-`probe_banquet_stage.lua`); full route logs in each run's log.
-
-### 9.1 Where the party actually starts, and what is reachable
-
-**§5.2 step 1's "control returns at the dais" is right but misleading.**
-Control returns INSIDE the throne tower -- a **199-tile pocket**
-(x48..60, y9..35) whose only exits are the (53,9)/(55,9) doors to 251 and
-the **(53,35) long entrance back to the corridor at (23,11)**.  The
-circuit's first act is leaving it (measured cost: 393 frames).
-
-**The castle is severed until the window opens.**  Before `_cc8490`, map
-250's entry is a 131-tile pocket: the west and east columns are blocked
-at **(16,30)** and **(30,30)** by the `$0630` "Gestahl waits inside"
-servants.  `_cc8490` clears `$0630` at `event_main.asm:97415`, one line
-before `$007C=1` -- so the castle opens exactly when the timer starts,
-and any route census taken earlier is invalid.
-
-**Map 243 is a ONE-WAY POCKET.**  Its (15,8) door into 250 was opened by
-the escort's transient `mod_bg_tiles` (`_cc835c`, `:97070`); 243's
-map-init is `EventReturn` (`map_init_event.asm:262`) and `_cc835c` is
-`$013A`-latched dead, so a **re-entry of 243 shows the closed door**.
-Measured: a run that walked into 243 mid-window scored its three
-soldiers and then sat for **11 835 frames** with no reachable exit.  The
-recon §8's "presumed impassable … untested" is now measured, and it is a
-hard route constraint: **243 must be visited LAST**, and the (22..24,34)
-door row must be routed around until then.
-
-### 9.2 The measured circuit, and the tier arithmetic
-
-Per-unit costs (timer `$1189`, counting down from 14400):
-
-| item | measured |
-|---|---|
-| window at first controlled frame | **14302** |
-| throne-tower exit | 393 |
-| a talk, including its approach | ~210 avg (4 nearest: 836) |
-| a talk's dialog alone | ~110-130 |
-| field walking | ~16 frames/tile |
-| region traversals from the corridor | 38-62 **steps each way** |
-
-**Best measured window score: `var0` = 26, 16 of 24 soldiers**
-(`greedy5.log`; a second run wedged at 19, so 26 is a floor with
-variance, not a ceiling).  The score that reaches the messenger is the
-window plus the dinner, and the dinner is the bigger half:
-
-```
-total = window + Q&A (44) + troopers' challenge (5)
-      = 26 + 49 = 75
-```
-
-So the tier thresholds translate into **window** requirements:
-
-| tier | reward | needs window ≥ |
-|---|---|---|
-| ≥50 | Doma withdrawal | 1 |
-| **≥67** | **Imperial-base weapons** | **18** |
-| ≥77 | Tintinabar | 28 |
-| ≥90 | Charm Bangle | 41 |
-
-### 9.3 The ruling
-
-**Canon is the ≥67 tier**: measured total **75**, clearing the threshold
-by 8 points with a driver that demonstrably wastes frames.  `$0276`,
-`$0277` and `$0278` all pay; **Tintinabar and the Charm Bangle do NOT**,
-and `banquet-done-v1` must assert their ABSENCE rather than their
-presence.
-
-§5.2's "take all 93 and assert ≥90" is withdrawn: ≥90 needs 41 of the
-window's 44 points, i.e. essentially a perfect circuit, and the measured
-best is 26.  ≥77 needs only 2 more window points than measured and is
-the obvious target for a tuned route -- but it is **not demonstrated**,
-and the release ratchet says canon is what has been driven, not what
-looks close.  Re-open this section when a tuned circuit clears 28.
+- **Dinner-scene coherence when fired from an arbitrary map**: only the
+  251 load is confirmed. Nothing suggests map-of-origin sensitivity, but
+  the full scene has not been ridden from outside the castle.
+- **Menu tick during the save-slot screens**: only the top menu is
+  confirmed 1:1. The selector screens also call `DecTimersMenuBattle`
+  (same loop) and the SRAM-vs-WRAM deltas are consistent with continuous
+  ticking, but there is no per-screen breakdown.

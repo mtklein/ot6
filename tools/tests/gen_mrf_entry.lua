@@ -10,7 +10,7 @@
 -- (56..58,39), which is the entire reason leg 2 exists.
 --
 -- This leg also carries the live NAVIGATION CENSUS the route recon asked
--- for (docs/design/vector-route-recon.md §10 probe 2).  Offline BFS over
+-- for as its probe 2.  Offline BFS over
 -- the static tilemap said map 262 has only ~130 tiles reachable from the
 -- door and that (4,22), (11,45), (12,60), (22,53) and (22,54) are all
 -- NO-PATH -- because the map is stitched by scripted obj_script

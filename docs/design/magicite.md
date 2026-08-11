@@ -1,13 +1,12 @@
-# Magicite as sub-jobs — design dive v2 (2026-07-16)
+# Magicite as sub-jobs
 
 Scope: World of Balance espers. Locked ✦. Pillar (DESIGN.md ✦):
 equipping a magicite grants its kit *while equipped* — spells are
 never taught permanently, level-up stat bonuses are deleted, one
 copy of each exists, summon = once per battle as the sub-job's
 divine. One proposed later exception below is that **passives may be
-learned**. That system is not implemented or committed for v0.6: the shipped
-while-equipped spell/stat model remains canon while Ifrit and Shiva receive
-their own complete redesigns.
+learned**; that system is not implemented, and the while-equipped
+spell/stat model is canon.
 
 ## What one magicite carries
 
@@ -51,26 +50,10 @@ passives are the part of the job you keep.
 
 ## The WoB roster
 
-> **Ifrit and Shiva are BUILT as of v0.6 (issue #16).** Their rows below are
-> superseded by `docs/design/magicite-ifrit-shiva.md`, which is the authority,
-> and by the shipped data in `ff6/src/menu/genju_prop.asm` and
-> `Ot6EsperStatTbl` (`ff6/src/battle/ot6_progression.asm`). Three things in
-> this table turned out not to be buildable and were dropped as deliberate
-> design calls rather than omissions: the **named passives** (*Kindling*,
-> *Frostbite*) have no ROM behind them — there is no passive pool, no slots and
-> no learning meter — the **weapon permits** have no equip-side consumer
-> (`ot6_class.asm:17` is a forward-looking comment), and the **stat magnitudes**
-> in this column are placeholders from before the field/boss ladder existed
-> (field stones 2–3, boss stones 4–5). Every other row below still describes the
-> *proposed* system, not the shipped one.
->
-> **Source column vs shipped state (decided 2026-07-28,
-> `sealed-gate-recon.md` §4):** the v0.6 tube room grants all six of
-> Maduin/Shoat/Phantom/Carbunkl/Bismark/Unicorn at once — the shipped
-> state. The per-location Source rows below were the redistribution
-> *proposal*; redistributing now would be an event edit and full re-mint
-> buying no player-visible pacing, so v0.7 redesigns the six in place and
-> the Source column is historical.
+**Ifrit and Shiva** are built; `docs/design/magicite-ifrit-shiva.md` is the
+authority for both, alongside the data in `ff6/src/menu/genju_prop.asm` and
+`Ot6EsperStatTbl` (`ff6/src/battle/ot6_progression.asm`). Every other row
+describes the *proposed* system, not the shipped one.
 
 | Esper | Source | Spells (base) | Stat passive | Passive | Permit | Notes |
 |---|---|---|---|---|---|---|
@@ -78,17 +61,20 @@ passives are the part of the job you keep.
 | Kirin | Zozo | Cure, Regen | +1 stamina | *Mender*: heals never miss the row | — | the medic job |
 | Stray | Zozo | Muddle, Imp | +1 speed | *Alley Cat*: +5 evade | slashing (claws) | the trickster job |
 | Siren | Zozo | Mute, Sleep | +1 speed | *Lullaby*: sleepers take +50% chip | — | the controller job |
-| Ifrit | Magitek factory | Fire, Drain | **+5 vigor (SHIPPED)** | ~~*Kindling*~~ — no passive channel exists | ~~claws~~ — none, deliberately | **"the Furnace": weight. See magicite-ifrit-shiva.md** |
-| Shiva | Magitek factory | Ice, Osmose, **Shell** | **+4 mag.pwr (SHIPPED)** | ~~*Frostbite*~~ — no passive channel exists | ~~rods~~ — none, deliberately | **"the Rime": economy. Divine re-authored to power 34 + Slow** |
-| Unicorn | Zozo (late) | Remedy, Safe | +1 stamina | *Purity*: status durations halved | — | the paladin-adjacent |
-| Maduin | Sealed Gate | Fire, Ice, Bolt | +2 magic | *Trinity*: first spell each battle +1 tier | — | Terra's inheritance: the pure mage job |
-| Shoat | Vector aftermath | Break, Doom | +1 magic | *Gorgon Eye*: Break may (25%) chip 2 | — | the executioner |
-| Phantom | Magitek factory | Vanish, Sleep | +1 speed | *Ghostwalk*: first hit taken each battle misses | — | the assassin's second |
-| Carbunkl | Sealed Gate | Rflect, Shell | +1 stamina | *Facet*: Runic feeds +1 more BP | — | Celes's natural pairing |
-| Bismark | Thamasa | Slow, (Water lore-alike) | +1 vigor | *Tidal*: water chip +1 | — | see open Q2 |
+| Ifrit | Magitek factory | Fire, Drain | magicite-ifrit-shiva.md §4.2 | none, deliberately | none, deliberately | **"the Furnace": weight** |
+| Shiva | Magitek factory | Ice, Osmose, **Shell** | magicite-ifrit-shiva.md §5.2 | none, deliberately | none, deliberately | **"the Rime": economy** |
+| Unicorn | tube room | Remedy, Safe | +1 stamina | *Purity*: status durations halved | — | the paladin-adjacent |
+| Maduin | tube room | Fire, Ice, Bolt | +2 magic | *Trinity*: first spell each battle +1 tier | — | Terra's inheritance: the pure mage job |
+| Shoat | tube room | Break, Doom | +1 magic | *Gorgon Eye*: Break may (25%) chip 2 | — | the executioner |
+| Phantom | tube room | Vanish, Sleep | +1 speed | *Ghostwalk*: first hit taken each battle misses | — | the assassin's second |
+| Carbunkl | tube room | Rflect, Shell | +1 stamina | *Facet*: Runic feeds +1 more BP | — | Celes's natural pairing |
+| Bismark | tube room | Slow, (Water lore-alike) | +1 vigor | *Tidal*: water chip +1 | — | see open Q2 |
 | Golem | Jidoor auction | Safe, Protect-alike | +2 stamina | *Bulwark*: party takes −10% physical | piercing | the wall job |
 | ZoneSeek | Jidoor auction | Shell, Haste | +1 magic | *Ward*: magic taken −10% (party) | — | the abjurer |
 | Sraphim | Tzen (buy) | Cure, Life | +1 stamina | *Grace*: KO'd allies keep their BP | — | the white-mage job |
+
+The tube room grants Unicorn, Maduin, Shoat, Phantom, Carbunkl and Bismark
+together, in one scene; see `magicite-tube-six.md`.
 
 - The **kit-forming question** per character: which esper completes
   them? (Celes+Carbunkl = the rune fortress; Locke+Stray = the

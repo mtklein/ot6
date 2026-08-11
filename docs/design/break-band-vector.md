@@ -1,26 +1,11 @@
 # Break band — Vector / Magitek Research Facility (survey + authored rows)
 
-Issue #11, v0.6 scope. **The twelve rows in §8 are LANDED** — they are in
-`Ot6ShieldTbl` (`ot6_hud.asm`, the block after the Cranes). `ot6_break_floor.inc`
-and `gen_break_floor.py` are still unchanged: authored rows win by construction
-(§10.1), so the band needed no generator change. The generator/tooling items in
-§10.2 remain open.
-
-Everything below was decoded from the vendored data under `ff6/` on
-2026-07-26. Line references are to that tree. Where a claim is an inference
-rather than something read out of the source, it is labelled. Party
-composition is `docs/design/bosses-wob.md`'s to state, not this document's;
-§6 cites it rather than re-deriving it.
-
-**Independently re-verified before authoring** (2026-07-27), because this
-survey had been revised twice: every species' level/HP/weak/null/absorb byte,
-every map→group pointer, every group→formation slot, and every arithmetic
-figure in §2, §5 and §8.3 was recomputed from
-`sub_battle_group.dat` / `rand_battle_group.dat` / `battle_monsters.dat` /
-`monster_prop.dat` rather than read off the page. **All of it reproduced
-exactly** — including the 67.86 / 45.54 / 14.29 → 19.64 / 66.96 / 80.36 key
-shares and the 33.04 % / 8.93 % costs in §9. `tools/tests/battle_breakvector.lua`
-now recomputes the same shares from the shipped ROM on every `make test`.
+Everything below is decoded from the vendored data under `ff6/`. Where a claim
+is an inference rather than something read out of the source, it is labelled.
+Party composition is `docs/design/bosses-wob.md`'s to state, not this
+document's; §6 cites it rather than re-deriving it.
+`tools/tests/battle_breakvector.lua` recomputes the key shares from the shipped
+ROM on every `make test`.
 
 ---
 
@@ -39,20 +24,20 @@ the generated floor on a miss:
 
 The table itself lives at `ff6/src/battle/ot6_hud.asm:1273`. So **authoring a
 band means adding `Ot6ShieldTbl` rows; it needs no generator change at all.**
-The generator work issue #11 asks for is separate, and §10 covers it.
+The separate generator work is in §10.
 
 One coupling worth restating (documented at `ot6_hud.asm:1380-1392`): an
 `Ot6ShieldTbl` row also exempts its species from `Ot6HpScale`
 (`ot6_break.asm:466-476`). That is inert today — every band of `Ot6HpMulTbl`
-ships `$10` = 1× (`ot6_break.asm:568-575`) — but it is why the Mt. Kolts pass
-put overworld species on `Ot6ElemAddTbl` instead. Class weaknesses have
+ships `$10` = 1× (`ot6_break.asm:568-575`) — but it is why overworld species
+that need only a weakness go on `Ot6ElemAddTbl` instead. Class weaknesses have
 nowhere else to live, so the rows below take that trade knowingly.
 
 ---
 
 ## 1. The band, decoded from the tables
 
-Decode chain, per Measurement #8's method (`balance-metrics.md:820-829`):
+Decode chain:
 
 `map_prop.dat[map*33]` → byte 0 = map-title index (`field/text.asm:113`,
 `$0520`), byte 5 bit 7 = random-battle enable (`field/battle.asm:332`,
@@ -71,8 +56,8 @@ into `SubBattleRateTbl` = `$0070, $0040, $0160, $0200`
 
 ### 1.1 The route and the encounter-bearing maps
 
-Map graph and leg order are `vector-route-recon.md` §2/§4/§5; the encounter
-columns are decoded here.
+Map graph and leg order are the Vector route's own recon
+(`vector-route-recon.md`); the encounter columns are decoded here.
 
 ```
 242 Vector ─► 262 ─► 263 ─(chute)─► 264 ─► 269 ─► 271 ─► 273 ─► 274
@@ -106,8 +91,8 @@ entrance record anywhere in the game targets it, and `load_map 275` appears
 nowhere in `ff6/src/`. It carries group 106 and the battle-enable bit but
 cannot be visited. The random-encounter map set is **seven maps**.
 
-The three enable-bit-clear maps are the same shape as Measurement #8's map
-95/74 finding (`balance-metrics.md:831-840`).
+The three enable-bit-clear maps carry a group they cannot draw — the same
+shape as maps 95 and 74 elsewhere in the game.
 
 Set-piece rooms, from `event/npc_prop.asm` (its per-map blocks sit at a fixed
 +3 offset from `map_prop`; calibrated against the weapon-shop maps, where
@@ -239,15 +224,12 @@ rows for them touches this band and nothing else.
 | Crane | `$10e` | 24 | 2300 | bolt\|water / — / fire | 6 · pierce (`:1557`) |
 | Guardian | `$111`/`$112` | 71/67 | 50000/60000 | — | 0 · `$00`, gauge-less |
 
-**Every boss row in the band is already authored and reachable by the party
-that fights it** (§6.3); this pass changes none of them. The one outstanding
-boss item was elemental, not class: `bosses-wob.md` §15 specifies **bolt +
-water on Number 128's body and bolt on both blades**, and vanilla gives all
-three no weakness at all (`monster_prop.dat` +25 = `$00`). **Those three
-`Ot6ElemAddTbl` rows landed with this pass** (issue #23), along with
-AtmaWeapon's, FlameEater's and Ultros ④'s — the same M6 data-entry gap
-`wob-route.md` recorded. All three parts absorb **ice**, which is neither
-added bit, so nothing is fed.
+**Every boss row in the band is authored and reachable by the party that
+fights it** (§6.3). The elements on Number 128 are `Ot6ElemAddTbl` rows rather
+than vanilla bits: `bosses-wob.md` §15 specifies **bolt + water on the body
+and bolt on both blades**, and vanilla gives all three no weakness at all
+(`monster_prop.dat` +25 = `$00`). All three parts absorb **ice**, which is
+neither added bit, so nothing is fed.
 
 ---
 
@@ -296,21 +278,21 @@ These two carry the best elemental puzzle in the band, and it is vanilla's own:
   (`genju_prop.asm:58-66`). So Ifrit answers `$006` and Shiva answers `$0af`
   the moment they are equipped, and the chests add Flame Sabre (map 262,
   (3,25)) and Blizzard (map 263, (55,34)) for anyone who would rather swing it.
-- **The current floor flattens all of it**: both species default to slash, and
-  both elemental keys arrive on slashing swords, so "hold a sword" answers the
-  class axis and the element axis at once.
+- **The generated floor flattens all of it**: both species default to slash,
+  and both elemental keys arrive on slashing swords, so "hold a sword" answers
+  the class axis and the element axis at once.
 
 ### 3.3 Shield counts as they stand
 
-Every species above seeds **4 shields**: levels 18 and 19 both give
-`2 + level/8` = 4 (`ot6_break.asm:52-60`). Both prior authoring passes found
-the formula count is one chip too many and landed on 2
-(`balance-metrics.md:944-972` for Mt. Kolts, `ot6_hud.asm:1489-1510` for Zozo,
-where a 1200-HP HadesGigas went 4 → 2 and the break moved off the corpse).
+Every species above seeds **4 shields** under the formula: levels 18 and 19
+both give `2 + level/8` = 4 (`ot6_break.asm:52-60`). The formula count is one
+chip too many — the break lands on the corpse — and the authored count for
+trash bodies is 2 (`ot6_hud.asm:1489-1510` for the Zozo rows, where a 1200-HP
+HadesGigas sits at 2 and the break lands penultimate).
 
 ---
 
-## 4. What the generated floor currently says, and how it got there
+## 4. What the generated floor says, and how it gets there
 
 | species | current class | how |
 |---|---|---|
@@ -330,12 +312,12 @@ where a 1200-HP HadesGigas went 4 → 2 and the break moved off the corpse).
 Raw species count for the band: **7 SLASH, 4 PIERCE, 1 BLUDGEON**, of which
 **6 are defaulted** and 6 keyword-inferred. Zero are explicitly authored.
 
-### The corrected global picture
+### The global picture
 
-Issue #11 quotes `break_floor_review.txt`'s headline of 285/75/24 with 265
-defaulted. That count includes species that already carry an authored
-`Ot6ShieldTbl` row and therefore never reach `@formula`. `Ot6ShieldTbl`
-currently holds **62 rows**. Excluding them:
+`break_floor_review.txt`'s headline count of 285/75/24 with 265 defaulted is
+over all 384 species, including those that carry an authored `Ot6ShieldTbl`
+row and therefore never reach `@formula`. `Ot6ShieldTbl` holds **62 rows**.
+Excluding them:
 
 | | all 384 | floor-live (322) |
 |---|---|---|
@@ -346,8 +328,7 @@ currently holds **62 rows**. Excluding them:
 | keyword-inferred | 119 | 95 |
 
 245 of the 322 floor-live species (76 %) are slash, and 227 of those 245 (93 %)
-got there by default. Making the explicit / inferred / defaulted distinction
-visible is issue #11's first acceptance criterion.
+got there by default.
 
 ---
 
@@ -464,18 +445,19 @@ wants bludgeon anyway.
 
 **Bludgeon is therefore the band's one deliberate class, and it is properly
 reachable**: free for the cost of a party pick, or buyable for the cost of a
-weapon slot. That is exactly the shape `weapon-classes.md:75` already promises
-this stretch — *"Magitek factory: all — armored spread: bludgeon/pierce
-featured."*
+weapon slot. That is exactly the shape `weapon-classes.md`'s coverage table
+already promises this stretch — *"Magitek factory: all — armored spread:
+bludgeon/pierce featured."*
 
 **¤ has no place in this band.** Setzer is its only wielder and he is not in
 the fights that close it, so a ¤ row would be a composition lock on the one
-character the climax excludes. `weapon-classes.md:74` earmarks Opera → Vector
-for "the first ¤-weak enemies"; on this beat's roster that has to wait.
+character the climax excludes. `weapon-classes.md`'s same table earmarks
+Opera → Vector for "the first ¤-weak enemies"; on this beat's roster that
+has to wait.
 
 ### 6.3 The element ring
 
-- **Bolt** — Ramuh, owned from Zozo (`wob-route.md:30-33`), grants Bolt and
+- **Bolt** — Ramuh, owned from Zozo (`magicite.md`'s WoB roster), grants Bolt and
   Rasp on equip (`genju_prop.asm:83`). Seven of the ten random-pool species
   carry vanilla bolt|water or bolt.
 - **Fire and ice** — Ifrit and Shiva magicite, awarded inside the facility
@@ -514,18 +496,19 @@ slash comes off the machines entirely, and ¤ sits this beat out.**
 Slash does not disappear — **three of the band's six set-pieces are already
 slash rows**: Shiva 6·slash, RightBlade and Left Blade 3·slash each, and
 Number 024 slash|pierce. Cyan's Quadra Slam (four hits, and multi-hit actions
-chip per hit — `weapon-classes.md:124`) and Celes' sword have real work in this
-band. What they lose is the guarantee that holding A chips every random
+chip per hit — `weapon-classes.md`, "Weapons as chip carriers") and Celes'
+sword have real work in this band. What they lose is the guarantee that holding A chips every random
 encounter.
 
 The measurable target is not an even four-way split. It is: *every encounter
-chippable by some buildable party* (`wob-route.md:187`), *no encounter
+chippable by some buildable party* (`weapon-classes.md`'s coverage rule),
+*no encounter
 chippable only by a class no party can field*, and *slash no longer the
 automatic answer on the common bodies*.
 
 ---
 
-## 8. Proposed `Ot6ShieldTbl` rows
+## 8. The band's `Ot6ShieldTbl` rows
 
 Format matches the existing table (`ot6_hud.asm:1273`): `.word` species,
 `.byte` shields, `.byte` class mask.
@@ -549,22 +532,20 @@ Format matches the existing table (`ot6_hud.asm:1273`): `.word` species,
 
 ### 8.2 Shield counts
 
-All twelve are proposed at **2**, against a formula value of 4, following the
-finding both prior passes reached independently: the formula's count lands the
-break on a corpse (`balance-metrics.md:944-972`; `ot6_hud.asm:1489-1510`).
+All twelve sit at **2**, against a formula value of 4: the formula's count
+lands the break on a corpse (`ot6_hud.asm:1489-1510`).
 
-**Unmeasured.** Landing this should mint a Vector doorstep fixture and run
-`bal_party.lua` `boost3` with `BAL_BUFF_SHIELDS` over 1/2/3 against groups 80,
-104, 105 and 106 with a four-character party, and against group 108 and the
-minecart formations with three — exactly as Measurements #8 and #9 did. The
-three-character arm matters on its own: less damage per round means the same
-shield count breaks later.
+**Unmeasured.** Validating them wants a Vector doorstep fixture and a
+`bal_party.lua` `boost3` run with `BAL_BUFF_SHIELDS` over 1/2/3 against groups
+80, 104, 105 and 106 with a four-character party, and against group 108 and
+the minecart formations with three. The three-character arm matters on its
+own: less damage per round means the same shield count breaks later.
 
 ### 8.3 Resulting distribution
 
 Species count over the twelve authored bodies:
 
-| class | current floor | proposed |
+| class | generated floor | authored |
 |---|---|---|
 | slash | 7 | **1** |
 | pierce | 4 | **6** |
@@ -573,7 +554,7 @@ Species count over the twelve authored bodies:
 
 Share of draws in which a class is a key, over the seven random-pool maps:
 
-| class | current | proposed | current (rate-wt) | proposed (rate-wt) |
+| class | floor | authored | floor (rate-wt) | authored (rate-wt) |
 |---|---|---|---|---|
 | slash | 67.86 % | **19.64 %** | 70.47 % | **24.06 %** |
 | pierce | 45.54 % | **66.96 %** | 43.59 % | **69.38 %** |
@@ -606,13 +587,13 @@ Per-formation reading — the table to argue with:
 
 ## 9. Reachability, and what the party cannot break
 
-Under the **current** floor, nothing in the band is unbreakable — the generated
-safety net works. The failure is quality, not coverage: in the deepest third of
-the facility the answer to 100 % of encounters is "hold A with a sword", and
-the dungeon hands you four swords.
+The generated floor leaves nothing in the band unbreakable — the safety net
+works — but its failure is quality, not coverage: without the rows, the answer
+to 100 % of encounters in the deepest third of the facility is "hold A with a
+sword", and the dungeon hands you four swords.
 
-Under the proposal, **every encounter is chippable by some buildable party**,
-and the honest costs are:
+With the rows, **every encounter is chippable by some buildable party**, and
+the honest costs are:
 
 - **33.04 % of draws are bludgeon-only on the class axis**, plus all five
   minecart fights. Every one of them except the Rhinox pair keeps a reachable
@@ -663,16 +644,15 @@ keying has to move from name to species id.
 
 ### 10.2 Three generator/tooling changes this survey argues for
 
-1. **Three-way review output — explicit / inferred / defaulted.** Issue #11's
-   first acceptance criterion, and this band shows why two categories are not
-   enough. `break_floor_review.txt` triages only DEFAULT rows as "the
+1. **Three-way review output — explicit / inferred / defaulted.** This band
+   shows why two categories are not enough. `break_floor_review.txt` triages
+   only DEFAULT rows as "the
    taste-review surface" (`gen_break_floor.py:202-203`). Rhinox — no weakness at
    all, absorbs the band's key element, 68.75 % of the deep pool — is **not on
    that list**, because `rhino` matched. Inferred rows need review too.
 2. **Mark authored species as AUTHORED and exclude them from the headline
    counts.** 62 of the 384 rows the review counts never reach `@formula`; the
-   corrected floor-live numbers are 245/58/19 over 322 species (§4), and after
-   this pass another 12 leave the floor.
+   floor-live numbers are 245/58/19 over 322 species (§4).
 3. **An encounter-and-party reachability check.** The floor's failure here was
    invisible to every existing test: the bytes are nonzero, every species has a
    class, and nothing measures whether that class is the *interesting* one or
@@ -719,22 +699,21 @@ is the thing most likely to drift.
 
 ---
 
-## 11. Status
+## 11. Open items
 
-**Landed.** The twelve `Ot6ShieldTbl` rows in §8.1 are in `ot6_hud.asm`, and
-`tools/tests/battle_breakvector.lua` is the regression gate: it walks
-`SubBattleGroup → RandBattleGroup → BattleMonsters` out of the shipped ROM,
-asserts every band body is authored rather than floored, enumerates the six
-free four-parties and asserts every formation is answerable by one, pins
+`tools/tests/battle_breakvector.lua` is the regression gate on the rows: it
+walks `SubBattleGroup → RandBattleGroup → BattleMonsters` out of the shipped
+ROM, asserts every band body is authored rather than floored, enumerates the
+six free four-parties and asserts every formation is answerable by one, pins
 formation `$168` (Rhinox ×2) as bludgeon-only *and* element-less, and
-recomputes the key shares to assert bludgeon now outranks slash.
+recomputes the key shares to assert bludgeon outranks slash.
 
-Still open, and each is a separate piece of work:
+Each of these is a separate piece of work:
 
 - **The shield counts in §8.2 are UNMEASURED** — a precedent-following 2
-  against a formula 4, following Mt. Kolts and Zozo. They need their own sweep
-  with a Vector doorstep fixture and a separate three-character arm (§8.2,
-  §10.3). This is the single largest unvalidated assumption in the pass.
+  against a formula 4. They need their own sweep with a Vector doorstep
+  fixture and a separate three-character arm (§8.2, §10.3). This is the single
+  largest unvalidated assumption in the band.
 - **The §10.3 fixture assertions are not written**, because no Vector doorstep
   / minecart-boarding / Crane-doorstep fixture is minted yet. The Rhinox row's
   "a bludgeon key is in the party or the bag" assertion lives there.
@@ -744,9 +723,8 @@ Still open, and each is a separate piece of work:
   encounter/party reachability check. `battle_breakvector.lua` implements the
   third of those for *this band only*; generalising it is the remaining work.
 - Whether maps 265 / 267 / 268 actually roll their group-0 encounters (§1.1)
-  still wants one runtime check.
+  wants one runtime check.
 - The generated floor remains the documented provisional safety net for every
-  band **except this one**. Retro-authoring Narshe → Blackjack is deferred per
-  the issue.
-- **No human playtesting yet** — issue #11's last acceptance criterion. The
-  distribution is measured; whether it *feels* right is not.
+  band **except this one**. Retro-authoring Narshe → Blackjack is deferred.
+- **No human playtesting.** The distribution is measured; whether it *feels*
+  right is not.

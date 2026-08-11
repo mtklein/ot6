@@ -4,7 +4,7 @@
 -- then BEAT the Whelk BY PLAYING IT (issue #75: zero state writes -- the
 -- kill-bit clearBattle this used to call is gone).  The strategy is the
 -- measured "tutorial" policy from whelkbal_run.lua, the designed line the
--- head's fire-weak add exists for (balance-metrics.md Measurement #2 + the
+-- head's fire-weak add exists for (the whelk balance measurement + the
 -- resistance re-check: 3/3 honest wins, ~6 beams + 1-2 teks):
 --   * head up: everyone fires their first beam at the default target (the
 --     head -- chips land, measured); when exactly ONE shield remains and

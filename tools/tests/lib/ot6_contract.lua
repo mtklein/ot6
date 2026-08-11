@@ -60,8 +60,9 @@ M.contracts = {}
 
 -- post-opera-v1: the tracked battery anchor minted in #9 (world save at
 -- (137,203), slot 3, party LOCKE CELES SABIN EDGAR).  Entry contract for
--- gen_vector_doorstep (leg A->B in save-points-vector.md §5); the exit
--- contract of whatever leg someday mints this anchor is THIS SAME TABLE.
+-- gen_vector_doorstep (leg A->B of the save-point boundary band lettered
+-- in tools/tests/frontier_graph.py); the exit contract of whatever leg
+-- someday mints this anchor is THIS SAME TABLE.
 --
 -- THE PARTY COUNT IS THE CONTROL (#21).  The roster check used to be a log
 -- line and nothing else, and that is exactly how #21 survived a release and
@@ -116,7 +117,8 @@ M.contracts["post-opera-v1"] = {
   },
 }
 
--- The Vector-band battery anchors B-E (save-points-vector.md §5, issue #25).
+-- The Vector-band battery anchors B-E (issue #25; the A-F save-point boundary
+-- band is lettered in tools/tests/frontier_graph.py).
 -- Every value below is MEASURED, not derived: the boot dumps of the
 -- serial-minted boundary states (ifrit_doorstep / n024_doorstep /
 -- minecart_doorstep, probed 2026-07-27) and, for E, the n128_won mint log.
@@ -265,10 +267,10 @@ M.contracts["vector-escape-v1"] = {
 -- the plain south of Zozo (the ship strafes south from the takeoff hover
 -- until the live tile prop allows landing; measured 2026-07-27).  Saving
 -- from the grounded ship is legal ($0201 bit7 = $80 measured; airborne it
--- is $00 -- §4.5's caveat resolved).  THE ROSTER IS THE HEADLINE: TERRA is
--- available again ($02F0=1) and the ACTIVE party is LOCKE EDGAR SABIN
+-- is $00 -- the recon's open caveat, resolved).  THE ROSTER IS THE HEADLINE:
+-- TERRA is available again ($02F0=1) and the ACTIVE party is LOCKE EDGAR SABIN
 -- SETZER -- the finale restores everyone who stood at the Cranes and adds
--- SETZER, so the recon §6d's "Locke and Setzer" (a two-man-chain
+-- SETZER, so the route recon's "Locke and Setzer" (a two-man-chain
 -- measurement) undercounts it.  CELES remains gone ($02F6=0) until her
 -- later WoB beat.
 M.contracts["terra-returned-v1"] = {
@@ -312,7 +314,7 @@ M.contracts["terra-returned-v1"] = {
 }
 
 -- ===================== the v0.7 Sealed Gate band (issue #31) ==============
--- docs/design/sealed-gate-recon.md §2.2 proposes anchors G-K; these are the
+-- The v0.7 route recon proposed anchors G-K; these are the
 -- two the first slice cuts.  Every value below is MEASURED on the live
 -- chain (probe_v07_f2g / probe_v07_g2h / probe_v07_385, 2026-07-28), not
 -- derived from the recon's tables.
@@ -345,7 +347,7 @@ M.contracts["narshe-mission-v1"] = {
     { 0x1f60, 0xFF, 84, "world x (save-block cell $1f60): the Narshe exit spawn" },
     { 0x1f61, 0xFF, 34, "world y (save-block cell $1f61)" },
     -- the parked Blackjack rides its own save cells, two south of the
-    -- party (measured, addenda SS2.4); the leg OUT of this boundary
+    -- party (measured); the leg OUT of this boundary
     -- re-boards from here, so a drifted ship is a contract violation,
     -- not a mid-leg timeout
     { 0x1f62, 0xFF, 84, "parked Blackjack x (save-block cell $1f62)" },
@@ -384,14 +386,14 @@ M.contracts["narshe-mission-v1"] = {
 }
 
 -- gate-cave-save-v1: boundary H, the vanilla save point on map 386 at
--- (74,53) -- the ONLY interior save in the whole v0.7 band (recon §2.1 S3),
+-- (74,53) -- the ONLY interior save in the whole v0.7 band (the recon's S3),
 -- reached off map 384 (64,10).  Exercised by gen_gate_cave_save
 -- (2026-07-28): the 385 timed-floor crossing that blocked the first pass
--- is lib/ot6_field.lua's M.phaseWalk (the rewrite-window mechanism,
--- addenda §1.5/§1.8), and every value below was asserted at the live
+-- is lib/ot6_field.lua's M.phaseWalk (the rewrite-window mechanism),
+-- and every value below was asserted at the live
 -- boundary moment through the real anchored mint.
 --
--- THE TERRA INVARIANT (recon §2.3) IS THIS TABLE'S REASON TO EXIST.  The
+-- THE TERRA INVARIANT IS THIS TABLE'S REASON TO EXIST.  The
 -- Imperial Base entrance refuses passage to any party without TERRA in the
 -- ACTIVE four (_cb25d6, event_main.asm:44004-44016) and bounces it back to
 -- world (164,194); a stale anchor minted with the wrong four would pass
@@ -415,7 +417,7 @@ M.contracts["gate-cave-save-v1"] = {
   party = {
     size = 4,
     members = {
-      { 0x00, "TERRA (the base entrance's hard gate, recon §2.3)" },
+      { 0x00, "TERRA (the base entrance's hard gate)" },
       { 0x01, "LOCKE" },
       { 0x04, "EDGAR (pierce+Tools)" },
       { 0x05, "SABIN (bludgeon)" },
@@ -433,14 +435,14 @@ M.contracts["gate-cave-save-v1"] = {
 }
 
 -- vector-crash-v1: boundary I, the crash-site world battery save -- the
--- recon §2.2's `vector-crash` boundary, cut at its own proposed tile: the
+-- route recon's `vector-crash` boundary, cut at its own proposed tile: the
 -- party stands ON the dead Blackjack's world tile (83,238), on foot,
 -- because that is where the map-7 hatch (_caf4b1) drops them after the
 -- crash (measured, probe_v07_gatescene3: $1F60/61 == $1F62/63 == (83,238),
 -- $11FA on-foot).  Exercised by gen_vector_crash (2026-07-28): the 384
--- west traverse (two levers + the (121,23)->(4,37) teleport, addenda
--- Addendum 3), the Sealed Gate scene, the (5,43) shortcut, the base
--- re-cross, battle 123 and the scripted crash flight.
+-- west traverse (two levers + the (121,23)->(4,37) teleport, measured by
+-- probe_v07_384west/2/3/4/5), the Sealed Gate scene, the (5,43) shortcut,
+-- the base re-cross, battle 123 and the scripted crash flight.
 --
 -- THE HEADLINE IS THE DEAD AIRSHIP.  $007A=1 and $0246=0 are what every
 -- later leg plans around (recon headline 6: everything after the crash is
@@ -449,7 +451,7 @@ M.contracts["gate-cave-save-v1"] = {
 -- somehow kept the airship alive fails here by name.  The party is still
 -- the gate four (TERRA LOCKE EDGAR SABIN, SETZER benched by the G->H
 -- swap): battle_event $15 rewrites only the ON-SCREEN roster for the deck
--- scene and the field party comes back intact (addenda §1.6 verdict 5).
+-- scene and the field party comes back intact (measured).
 M.contracts["vector-crash-v1"] = {
   slot = 3,
   ram = {
@@ -494,11 +496,11 @@ M.contracts["vector-crash-v1"] = {
 }
 
 -- banquet-done-v1: boundary J, the post-banquet world battery save -- the
--- recon §2.2's own `banquet-done` name, cut at the Vector world exit's
+-- route recon's own `banquet-done` name, cut at the Vector world exit's
 -- landing tile (120,188): the first world tile after the banquet block,
 -- where the recon's leg-5-to-Albrook walk starts.  Exercised by
 -- gen_banquet_done (2026-07-28): the I->J grind, the whole banquet block
--- ($007C=1 -> $0238=1) driven to the >=67 tier (banquet-decode.md §9.3:
+-- ($007C=1 -> $0238=1) driven to the >=67 tier (banquet-decode.md §5.2:
 -- the window is worth at most 44 and measured 26, the Q&A 44 and the
 -- troopers' challenge 5, so the total lands at 75), the messenger, and
 -- the castle exit.
@@ -507,7 +509,7 @@ M.contracts["vector-crash-v1"] = {
 -- party to TERRA+LOCKE and rewrites availability wholesale
 -- (event_main.asm:99058-99067, :99079-99101): the #21 count control reads
 -- TWO here, inverted -- a chain that somehow kept Edgar/Sabin walking
--- fails by name (recon §2.3).  The >=67 tier is frontier-wide canon from
+-- fails by name.  The >=67 tier is frontier-wide canon from
 -- this boundary on: all three reward switches pay and NEITHER reward
 -- item does (the item asserts are the score receipt in BOTH directions,
 -- since var0 itself is zeroed by the messenger), and the Doma / South
@@ -551,13 +553,13 @@ M.contracts["banquet-done-v1"] = {
     { 0x02F8, 0, "RELM unavailable" },
   },
   party = {
-    size = 2,                     -- the #21 control, INVERTED (recon §2.3)
+    size = 2,                     -- the #21 control, INVERTED
     members = {
       { 0x00, "TERRA (the envoy)" },
       { 0x01, "LOCKE (the escort)" },
     },
   },
-  -- THE TIER IS WITNESSED BOTH WAYS (banquet-decode.md §9.3): the leg
+  -- THE TIER IS WITNESSED BOTH WAYS (banquet-decode.md §5.2): the leg
   -- ships the >=67 tier -- measured best window score 26 of 44, total
   -- 26+44+5 = 75 -- so the base-weapons unlock pays and the two higher
   -- rewards do NOT.  Asserting their ABSENCE is what stops a future

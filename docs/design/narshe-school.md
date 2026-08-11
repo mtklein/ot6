@@ -1,10 +1,10 @@
-# Narshe school — teaching the OT6 loop (2026-07-18)
+# Narshe school — teaching the OT6 loop
 
 The Narshe Beginner's House rewritten to teach break/boost instead of
 vanilla trivia. **The fence:** this change touches the school's tutorial
 rooms only — no story scenes, no other dialog anywhere. DESIGN.md's
-"story/dialog changes out of scope" clause (DESIGN.md:269-271) is
-amended by this sanction exactly that far and no farther.
+"story/dialog changes out of scope" clause (`DESIGN.md`, "Out of scope
+(for now)") is amended by this sanction exactly that far and no farther.
 
 Diff discipline: an advisor whose vanilla lesson is still true in OT6
 keeps vanilla text, byte for byte. Eight dialog ids change; everything
@@ -134,32 +134,13 @@ turn / cap 5 / spend ≤3 (Ot6InitBP, Ot6ActionEnd, Ot6Boost), no regen
 on a boosted turn (Ot6ActionEnd), folds per Ot6FoldTbl with base-tier
 MP (Ot6QueueFold), live list re-fold (Ot6PreviewList_ext).
 
-**The rung-2 seed ($0276) was rewritten under the school's own sanction
-(2026-07-22) to match the v0.5 break-coverage pass.** When $0276 first
-shipped, the "armored machines" it describes could not answer it, so v0.3
-gave the imperial line poison (Bio Blaster's element) and the old seed —
-"shrug off blade and fire alike… every armor fears one right tool" — read
-true. The **v0.5 break-coverage pass retired that framing.** A fixed-party
-audit found poison is Edgar-only, and the parties that fight the imperial
-line — Cyan solo at Doma, all of Sabin's scenario, Locke solo, two of
-three Narshe squads — carry no Edgar, so "one right tool = poison" would
-have left the line **unbreakable by its own forced parties.** The fix
-moved the line onto **varied, per-party** weaknesses
-(pierce/slash/bolt/bludgeon, chosen so every forced party carries a key),
-which made both of the old seed's promises false: a precise blade (pierce)
-and the samurai's cut (slash) are exactly the answer, and there is no
-single "one right tool" — poison is now one Edgar option among several,
-and Leader and Grunt no longer have poison at all.
-
-The seed now teaches the true lesson: armor turns a careless blow aside,
-but every plate has a seam, and no two are the same — bring the weapon
-your party carries. That is the *match the tool to the foe* lesson $0264
-already gestures at, not *one tool fits all armor*. The rewrite was made
-as its own change sanctioned by this doc's fence (above), not a rider on
-the data pass; `school.lua` now asserts the **new** $0276 bytes, so the
-line and its mechanics fail separately if either is reverted.
-
-Full scheme and rationale: bosses-wob.md, "The imperial soldier line."
+The rung-2 seed ($0276) rides the imperial line's **varied, per-party**
+weaknesses (pierce/slash/bolt/bludgeon, chosen so every forced party
+carries a key): armor turns a careless blow aside, but every plate has a
+seam, and no two are the same — bring the weapon your party carries. That
+is the *match the tool to the foe* lesson $0264 already gestures at, not
+*one tool fits all armor*. Full scheme and rationale: bosses-wob.md,
+"The imperial soldier line."
 
 ## Kept vanilla (lesson still true)
 
@@ -176,30 +157,21 @@ $03A5/$03A6 chocobo (shared with stables).
 When the Bushido menu or magicite sub-jobs ship, $0275 / $0274 become
 false and rejoin this exercise.
 
-## Rung 3 shipped: $026F names the Boost Point
+## $026F names the Boost Point
 
-$026F (Runic/Morph/Dance/Rage) left this list when Runic-as-BP became
-code. A playtester finishing the rewritten school reported the advisor
-"still describes runic as absorbing MP without mentioning BP" — and the
-line was accurate, which is what made it a defect: kits.md:169 has
-always specified **absorbs next spell → +1 BP**, and the ROM only ever
-did the MP half. Ot6RunicBP (ff6/src/battle/ot6.asm, hooked into
-vanilla's RunicEffect) closed that gap; only then could the text move.
-
-Page 1 only, minimal diff, Morph and Dance/Rage untouched:
+Runic absorbs the next spell for MP **and** +1 BP (Ot6RunicBP,
+ff6/src/battle/ot6.asm, hooked into vanilla's RunicEffect), so $026F
+(Runic/Morph/Dance/Rage) says so. Page 1 only, minimal diff, Morph and
+Dance/Rage untouched:
 
 > ``Runic''
 > Turns many magic attacks into MP, and earns a Boost Point! Can be
 > used repeatedly.
 
 "Boost Point" is the term $0270 already teaches, so the lesson borrows
-vocabulary the player has met rather than inventing any. Measured
-against the budget above: page 1 goes 3 → 4 rendered lines, which is
-the page maximum and exactly where the Morph page already sits, so no
-5th-line auto-pause is introduced. `tools/tests/school.lua` now asserts
-$026F's encoded bytes alongside $0257 and $0276, and
-`tools/tests/battle_runic.lua` asserts the mechanic the line promises —
-so the text and the code fail separately if either is reverted.
+vocabulary the player has met rather than inventing any. Page 1 renders
+4 lines, the page maximum and exactly where the Morph page already sits,
+so no 5th-line auto-pause is introduced.
 
 ## Text-machine constraints (measured)
 
@@ -207,8 +179,8 @@ so the text and the code fail separately if either is reverted.
   entry index = dialog id). `make text_en` runs `fix_dlg.py split` →
   `encode_text.py` (romtools) on both halves → `fix_dlg.py combine`;
   `romtools.encode_text` regenerates `include/text/dlg1_en.inc` /
-  `dlg2_en.inc` offset includes itself (same path m3-impl.md:103-104
-  verified for attack_msg). Identical strings dedup automatically.
+  `dlg2_en.inc` offset includes itself (the same path already verified
+  for `attack_msg`). Identical strings dedup automatically.
 - **Encoding:** char tables `dialog_en` + `dialog_escape` + `dte`.
   DTE pairs compress ~1.6:1; the encoder greedy-longest-matches. The
   ROM's DTE table (`dte_tbl_en.dat`) already agrees with the codec's
@@ -230,26 +202,12 @@ so the text and the code fail separately if either is reverted.
   bytes churn wholesale (harmless — everything reaches dialog data
   through DlgPtrs, cc/e602), and real slack is ~8.4 KB. Built
   post-change total: 65,554 + 53,302 = 118,856 B (slack 8,376); the
-  bank split lands at id 1715 (`Dlg1::ARRAY_LENGTH` → DlgBankInc).
+  bank split lands at id 1715 (`Dlg1::ARRAY_LENGTH` → DlgBankInc). Total
+  dialog: 65,554 + 53,302 = 118,856 B, slack 8,376.
 - **Element glyphs in dialog:** the dialog charset maps $76–$7E to
   {fire}-style escapes, but no vanilla string uses them and the M2
   icons live in battle-font cells $eb–$ef/$fb–$fd only. Unverified in
   the field font — the copy uses words, not icons.
-
-## Implementation
-
-1. Replace the eight entries in `ff6/src/text/dlg1_en.json` (indexes
-   599, 605, 612, 615, 621, 622, 624, 630).
-2. Update the stale transcription comments at the `dlg` sites in
-   `ff6/src/event/event_main.asm` (`_cc339c`, `_cc33b8`, `_cc33f0`,
-   `_cc340f`, `_cc341b`, `_cc368e`, `_cc3692`, `_cc369a`, `_cc36b9`).
-   Comments only; no script or NPC changes.
-3. `make rom` — the .dat/.inc regenerate from the json edit.
-4. Test: `tools/tests/school.lua` (smoke.lua pattern) — follows
-   DlgPtrs (PRG 0x0CE602 + 2·id) into the dialog block (PRG 0x0D0000
-   + ptr) and asserts the encoded bytes of two distinctive new
-   strings ($0257 and $0276), so it self-locates across future text
-   shifts. Added to `suite.sh` TESTS.
 
 ## Open items
 

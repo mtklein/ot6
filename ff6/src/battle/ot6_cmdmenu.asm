@@ -455,11 +455,12 @@
 ; SwdTech through the Tools window shell instead -- the twin of Ot6BlitzListOpen.
 ; OpenCmdMenuTbl[7] now hits a C1 stub that jsl's here then jmp's OpenToolsWindow.
 ;
-; The rows ARE the boost window: row r (weakest at TOP) = boost r = the tech
-; Ot6BushidoTier returns for that boost. Ot6BushidoWindow enumerates the <=4
-; techs into wItemList's LEFT column (cells r*2, so row r reads at wItemList
-; offset r*6 -- what _c18470 computes for column 0); the right column and any
-; unused rows are $ff (empty), so the window renders a clean single column of 4.
+; The rows ARE the boost window: row r (weakest at TOP) = boost r+1 = the tech
+; Ot6BushidoTier returns for that boost (#38: no 0x rung). Ot6BushidoWindow
+; enumerates the <=3 techs into wItemList's LEFT column (cells r*2, so row r
+; reads at wItemList offset r*6 -- what _c18470 computes for column 0); the
+; right column and any unused rows are $ff (empty), so the window renders a
+; clean single column of 3.
 ; Confirm (Ot6BushidoConfirm) maps the picked cell back to r, banks OT6_BOOST_REVEALED=r, and
 ; latches Ot6BushidoTier's tech -- so single-select and enumeration share the
 ; exact same base+boost math and can never diverge.

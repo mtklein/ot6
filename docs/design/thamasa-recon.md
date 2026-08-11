@@ -1,31 +1,18 @@
 # OT6 v0.8 — Thamasa route recon
 
-READ-ONLY reverse-engineering pass, 2026-07-28. No source touched, no emulator
-run, no make target invoked. Scope per ROADMAP v0.8: the v0.7 stop line —
-anchor K, world (232,150), party TERRA·LOCKE·SHADOW (`sealed-gate-recon.md`
-§1 leg 7) — through Thamasa town, Strago joining, the burning house and
-FlameEater, Relm joining, the Esper Mountain and Ultros ③, Kefka's massacre,
-and the post-massacre mission transition, ending where control returns on the
-world map beside the repaired Blackjack.
+Scope per ROADMAP v0.8: the v0.7 stop line — anchor K, world (232,150), party
+TERRA·LOCKE·SHADOW (`sealed-gate-recon.md` §1 leg 7) — through Thamasa town,
+Strago joining, the burning house and FlameEater, Relm joining, the Esper
+Mountain and Ultros ③, Kefka's massacre, and the post-massacre mission
+transition, ending where control returns on the world map beside the repaired
+Blackjack.
 
-Modeled on `sealed-gate-recon.md` and written under the same discipline:
-claims cite a file and line or are labelled **UNVERIFIED**. Line numbers are
-from this worktree at commit `97f6d6e` (main), 2026-07-28.
-
-**Method caveats, stated up front:**
-
-- Offline formation decodes have lied once before (`vector-route-recon.md`
-  §11, Shiva). Every formation table below is an offline read of
-  `battle_monsters.dat` / `event_battle_group.dat`; each set-piece formation
-  is marked verify-at-doorstep.
-- **No offline BFS was run this pass.** Distances are Manhattan lower bounds
-  or unmeasured. The ported step model from `save-points-vector.md` §3 can be
-  rerun at authoring time — but note two of the band's maps are retiled by
-  events mid-band (§7 hazard 4), so the model needs the right tile state.
-- ROM measurements (§6) come from the owner tree's shipped build
-  `/Users/mtklein/ot6/build/ot6.sfc` (SHA1 `49754546…`, the v0.6-line ROM,
-  built 2026-07-28). Vanilla identity of the band's data segments is
-  inherited from the v0.6/v0.7 segment checks, **not re-proven this pass**.
+Claims cite a file and line or are labelled **UNVERIFIED**. Every formation
+table below is an offline read of `battle_monsters.dat` /
+`event_battle_group.dat` and is marked verify-at-doorstep. Distances are
+Manhattan lower bounds or unmeasured — no offline BFS has been run for this
+band, and two of its maps are retiled by events mid-band (§7 hazard 4), so a
+step model needs the right tile state.
 
 ---
 
@@ -62,9 +49,8 @@ from this worktree at commit `97f6d6e` (main), 2026-07-28.
    entry condition (§5).
 4. **The band grants zero magicite.** No `give_genju` exists anywhere in
    `:69190-78110` (grepped). Kefka *takes* the drained espers; the player
-   gets none. `wob-route.md:54`'s beat-table column ("Kefka's massacre scene
-   → magicite") misleads, and `magicite.md`'s "Bismark — Thamasa" acquisition
-   proposal remains contradicted by shipped state (§8).
+   gets none. `magicite.md`'s "Bismark — Thamasa" acquisition proposal is
+   contradicted by shipped state.
 5. **The massacre is this band's banquet — one indivisible auto-chain.**
    From the mountain-top trigger 375 (15,17) (`_cbf2b5` `:74063`) the script
    runs the esper reveal, Yura, the return to town (`$0099=1` `:75156`), the
@@ -83,8 +69,7 @@ from this worktree at commit `97f6d6e` (main), 2026-07-28.
    are the **burning house** and the **massacre approach**. Plugging both
    costs 2 triggers + 2 NPC records — **the entire remaining game-wide
    budget** (13 trailing `$FF` bytes = 2 trigger slots, 76 = 8 NPC records,
-   re-measured this pass from `build/ot6.sfc`). §6 carries the relocation
-   design the dispatch asked for.
+   measured from `build/ot6.sfc`). §6 carries the relocation design.
 7. **The relocation is two constants and one Lua pin.** Bank C4's segments
    flow *sequentially* from `C40000` by linker config (`ff6/cfg/ff6-en.cfg:61-70`;
    only `ending_gfx_1` is pinned, at offset `$ba00`), and the chain ends at
@@ -130,9 +115,8 @@ From world (232,150), walk to the Thamasa world trigger at **(250,128)**
 (`event_trigger.asm:35` → `_cbd2ee` `:69190`) → map 343 (23,46). Manhattan
 lower bound 40 steps; **unmeasured** — no BFS run. Crescent Island world
 trash is terrain-split (decoded via `CheckBattleWorld`'s
-`(Y&$E0)|((X>>3)&$1C)` index OR'd with the terrain-group offset,
-`field/battle.asm:97-147` — the OR through `BattleBGGroupTbl` is why the
-sealed-gate recon's single-group read of this island was incomplete):
+`(Y&$E0)|((X>>3)&$1C)` index OR'd with the terrain-group offset through
+`BattleBGGroupTbl`, `field/battle.asm:97-147`):
 
 | terrain group | pool (`monster_prop` +16/+8/+23/+25) |
 |---|---|
@@ -312,7 +296,8 @@ KEFKA_VS_LEO `$173`, L1 **HP5001**. Its AI (`ai_script.asm:7952-7965`) is a
 real fight — Battle/Poison, Fire 3/Bolt, Bio/Drain — that ends only
 `if_self_dead` (→ `battle_event $17`, `end_battle`). **Leo must win it, solo,
 and losing is presumed a game over — UNVERIFIED.** Leo's Shock is a free
-guest verb by standing ruling (`mp-economy.md:106`).
+guest verb by standing ruling (`mp-economy.md`, the guest-verb row of
+"The verb survey").
 
 Then without a further save opportunity: `$009B=1` (`:76598`), theater
 **battle 105** (formation 389, dummy `$17b`) and the scripted esper flyover
@@ -348,7 +333,7 @@ world-saveable.** The natural battery anchor (§2).
 
 | # | where | what | evidence |
 |---|---|---|---|
-| S0 | world (232,150) | anchor K, the v0.7 terminal | `sealed-gate-recon.md` §2.2 |
+| S0 | world (232,150) | anchor K, the v0.7 terminal | `sealed-gate-recon.md` §1 leg 7 |
 | S1 | world, Crescent Island | save anywhere on the walk to (250,128) and on every town↔mountain crossing until `$0099` | dlg `$06D4` world-save rule (`save-points-vector.md` §1) |
 | S2 | world outside town, mid-fire | structurally open (343's exits are ungated during `$008E`) | **UNVERIFIED live** |
 | S3 | **map 375 (8,44)** | the Esper Mountain save point — before the statues, and reachable again between Ultros ③ and the massacre trigger | `event_trigger.asm:1795`; `NPCProp::_375` sparkle |
@@ -412,10 +397,9 @@ work.
 
 ### 2.4 ROM budget — the verdict
 
-Measured again this pass from the shipped `build/ot6.sfc`:
+Measured from the shipped `build/ot6.sfc`:
 `event_triggers` has **13 trailing `$FF` = 2 free trigger slots**;
-`npc_prop` has **76 = at most 8 records** — unchanged from the v0.7 recon's
-numbers (v0.7 planned zero spends and the tree has spent none since).
+`npc_prop` has **76 = at most 8 records**.
 
 v0.8's wants, priced per `save-points-vector.md` §1 (5 bytes trigger +
 9 bytes NPC each):
@@ -494,21 +478,22 @@ groups (24/25/26) — §1 legs 1 and 5 carry the full pools. The shape:
 
 ## 4. Character / kit / magicite obligations
 
-- **Strago (Blue Mage/Scholar, kits.md:422-426).** Joins leg 3 with no
-  norm_lvl and fights FlameEater within minutes — his debut showcase is
-  already designed (Analyze scout + Aqua Breath water chip, bosses-wob §18)
+- **Strago (Blue Mage/Scholar, `kits.md`'s "Curated kits").** Joins leg 3
+  with no norm_lvl and fights FlameEater within minutes — his debut showcase
+  is already designed (Analyze scout + Aqua Breath water chip, bosses-wob §18)
   but **the machinery is not built**: the curated-kit model (learn many,
-  equip ~5 — M4 ⬜, `ROADMAP.md:189-191`), Lore-by-observation, and Analyze
-  itself ("rides M4 kit work", `ROADMAP.md:171`) are all open. Aqua Breath
-  free at join, Lores MP-priced (`mp-economy.md:80-84`). Base MP 13
-  (`mp-economy.md:156-157`) under the now-universal pool (#32). This is the
-  band's largest kit build.
-- **Relm (Pictomancer, kits.md:428-430).** Joins leg 5 *inside* the Ultros
-  scene. Kit is "Sketch ✦ signature (bug preserved ✦), support/trickster kit
+  equip ~5 — M4 ⬜, `ROADMAP.md` M4's curated-kit machinery),
+  Lore-by-observation, and Analyze itself (it rides that same M4 kit work) are
+  all open. Aqua Breath free at join, Lores MP-priced (`mp-economy.md`, "The
+  verb survey"). Base MP 13 (`mp-economy.md`, "Early pools") under the
+  now-universal pool (#32). This is the band's largest kit build.
+- **Relm (Pictomancer, `kits.md`'s "Curated kits").** Joins leg 5 *inside*
+  the Ultros scene. Kit is "Sketch ✦ signature (bug preserved ✦), support/trickster kit
   TBD" — v0.8 must at minimum decide the 8-slot sketch (sic) of her kit even
   if only Sketch + basics ship. Sketch's MP price is proposed flat 2-4,
-  no refund on the bug (`mp-economy.md:99`). Control is explicitly deferred
-  ("priced when her kit lands", `:100`). Base MP 18. Boost canon: §5.5.
+  no refund on the bug (`mp-economy.md`, "The verb survey"). Control is
+  explicitly deferred there too ("priced when her kit lands"). Base MP 18.
+  Boost canon: §5.5.
 - **Shadow — the #31 entry debt.** He is party-active only from anchor K to
   the inn night (leg 1-2: one town, no mandatory fights, then gone until the
   Floating Continent). The v0.7 issue moved his kit here; the honest scope
@@ -516,9 +501,10 @@ groups (24/25/26) — §1 legs 1 and 5 carry the full pools. The shape:
   with zero required battles justifies the build now, or whether the debt
   moves once more to v0.9 (where he is forced party on the FC approach and
   the kit is load-bearing). Throw is free by ruling (item is the price,
-  `mp-economy.md:103`); Assassinate is built dormant since v0.4. Report/decision 3.
+  `mp-economy.md`, "The verb survey"); Assassinate is built dormant since v0.4.
+  Report/decision 3.
 - **General Leo.** A real, loseable solo fight on a guest. Shock free
-  (`mp-economy.md:106` — the standing guest-verb ruling covers him; no kit
+  (`mp-economy.md`'s standing guest-verb ruling covers him; no kit
   table needed). What is unsettled is presentation: battle 124's Kefka has
   no authored OT6 row, and Leo has no BP/boost tutorialization — does the
   gauge/boost HUD even behave with a WEDGE-actor solo party? Probe;
@@ -537,9 +523,8 @@ groups (24/25/26) — §1 legs 1 and 5 carry the full pools. The shape:
 ## 5. Sketch, operationally
 
 The owner's decision is final and shipped: **the Sketch bug ships unfixed,
-documented** (CONTRIBUTING.md "House rules", reaffirmed 2026-07-28; #28
-closed; `vanilla-destructive-bugs.md` §1 header). This section is the
-operational plan that decision requires, not a re-litigation.
+documented** (CONTRIBUTING.md "House rules"; `vanilla-destructive-bugs.md`).
+This section is the operational plan that decision requires.
 
 ### 5.1 Where Sketch becomes player-usable
 
@@ -569,7 +554,7 @@ decides. Direction of the division **read but not traced** — the operational
 consequence is the same either way: **at band levels (Relm ~L17-24 vs
 Ultros L25) a Sketch miss is a live outcome, plausibly ~20-30% per cast,
 and every miss walks the `$b7=$ff` path into `AnimType_2f`'s unguarded
-index** (`vanilla-destructive-bugs.md` §1 steps c-f: severity is
+index** (`vanilla-destructive-bugs.md`: severity is
 data-dependent — corrupt sprite, spawned inventory, or a bank-`$7e` sweep
 that reaches the save block and battle inventory). Ultros ③ is sketchable
 (flag bit clear — his sketch row is load-bearing for the scripted finish).
@@ -626,16 +611,17 @@ gen conventions):
    observes both outcomes (Tentacle finish on hit; on a forced miss,
    watches `($76),3` / `$b7` per the research doc's settle-list) and
    documents the shipped behavior. That probe doubles as the release-notes
-   evidence and pins the three UNVERIFIED items in
-   `vanilla-destructive-bugs.md` "What would settle the remaining Sketch
-   questions" — worth doing even though no fix will follow.
+   evidence and settles the Sketch row of
+   `vanilla-destructive-bugs.md`'s "REPORTED, UNVERIFIED" table — worth doing
+   even though no fix will follow.
 3. **Anchor O's entry contract** (and P's) should include an inventory
    checksum/spot-assert so a silent `$7e` sweep in any earlier drive fails
    loudly instead of laundering into the baseline.
 
 ### 5.5 Reconciling the boost canon with ships-unfixed
 
-The chance-verb canon (`kits.md:405-410`, ROADMAP design canon) slates
+The chance-verb canon (`kits.md`'s "chance-verb family", ROADMAP design
+canon) slates
 Sketch for boost-certainty: BP buys sketch **selection** — the hit roll and
 the 75/25 move pick (`battle_main.asm:9694-9700`: `Rand cmp #$40` selects
 between the two `MonsterSketch` entries). The bug is a **graphics-index
@@ -656,8 +642,8 @@ constraints follow for whoever builds Relm's boost tier:
   it; those exits stay vanilla (and stay bug-reachable — that is the
   shipped rule, and the release notes' "misses" language covers it).
 
-No conflict exists between the canon and the ruling; `kits.md:428`'s "bug
-preserved ✦ — canon" is already the synthesis.
+No conflict exists between the canon and the ruling; `kits.md`'s Relm sketch
+("bug preserved ✦") is already the synthesis.
 
 ---
 
@@ -677,7 +663,7 @@ preserved ✦ — canon" is already the synthesis.
 - **Free space: `C4A4C0-C4B9FF` = `$1540` (5,440) bytes**, measured as
   all-`$FF` in the shipped `build/ot6.sfc`.
 - Remaining slack inside the blocks: 13 bytes (2 trigger slots) / 76 bytes
-  (8 NPC records), re-measured this pass.
+  (8 NPC records).
 
 ### 6.2 The design: grow in place, don't relocate anything
 
@@ -705,7 +691,7 @@ spends only `$E0` of the `$1540` headroom.
    it read the address from the map file the build already produces, so the
    next growth is free.
 2. **Every savestate dies** — this is a ROM change like any other
-   (`leg-fixtures.md:9-11`); the full frontier re-mints once. **Battery
+   (`leg-fixtures.md`, "The problem"); the full frontier re-mints once. **Battery
    anchors survive** (#9's proven property) — which is precisely why the
    anchor conversion should be ahead of this change, and why the change
    should land **in v0.8's already-inevitable ROM window** (kit tables,
@@ -780,48 +766,13 @@ for no saved work.
    Leo exit fights) and every dummy-species formation (105/97) carry the
    §11 Shiva caveat; `battle_event $16/$17/$1a` contents are unread. Probe
    before asserting anything about their contents.
-10. **Stale upstream claims** — see §8; two docs still describe this band's
-    facts wrongly and will mislead the next derivation if not errata'd.
-
----
-
-## 8. Corrections owed to upstream docs
-
-1. **`wob-route.md:54`** — the v0.8 beat row's last column ("Kefka's
-   massacre scene → magicite") reads as a player acquisition; the band
-   grants zero magicite (headline 4). Reword to "massacre → Kefka takes the
-   magicite".
-2. **`magicite.md` roster table** — "Bismark — Thamasa" (and the other
-   staggered-source proposals) remain contradicted by shipped state; the
-   v0.7 recon flagged this for the six tube stones (its §4) and the v0.8
-   read confirms the band adds no acquisition sites at all.
-3. **`sealed-gate-recon.md` §1 leg 7** — "(232,150) sits beside the Thamasa
-   world trigger chain": the trigger is at **(250,128)**
-   (`event_trigger.asm:35`), a real ~40+ step walk across encounter-active
-   ground, not a doorstep. Its Crescent Island trash list
-   (Baskervor/Cephaler/Chimera) is also incomplete — the island is
-   terrain-split into three groups incl. FossilFang/Bug desert (§1 leg 1);
-   the single-sector read missed the `BattleBGGroupTbl` OR.
-4. **`sealed-gate-recon.md` §5 hazard 10 / `vanilla-destructive-bugs.md`
-   frontier table** — the checksum-`$0000` bug is described as open/
-   "needs a decision"; it was fixed and closed (#18, CONTRIBUTING "was
-   fixed (issue #18)"). The research doc's §2 verdict cell is stale.
-5. **`bosses-wob.md` §17** — the correction block is right; one addition
-   worth folding in: the fight's *scripted* end is the Tentacle/Sketch
-   surrender (`ai_script.asm:6315-6321`), so "breaking him before the
-   stampede is style points" under-describes it — there is no esper
-   stampede ending the fight in the AI script; the espers appear in the
-   field scene after. (The "espers crash the party" line appears to belong
-   to the field choreography, not the battle.) **Battle-event $16 unread**,
-   so this correction is itself probe-gated.
-
 ---
 
 ## 9. Open questions for the milestone
 
 1. **Battle 125's `battle_event $16`** — what actually happens under 10240
    HP (Relm dialog? the sketch tutorial beat?). Probe `formationWords()` +
-   ride the event. Same probe settles §8.5.
+   ride the event.
 2. **Can battle 124 be lost, and what does losing look like** (game over vs
    scripted continue)? Decides how paranoid the O→P fixture must be and
    what the release notes say about the Leo fight.

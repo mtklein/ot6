@@ -4,8 +4,8 @@
 --
 --   tools/tests/run.sh tools/tests/battle_dotchip.lua
 --
--- Nobody designed this.  The owner found it in play at Zozo (playtest-v0.7
--- row 21) -- Bio Blaster's poison damage plus its status ticks breaking a
+-- Nobody designed this.  The owner found it in play at Zozo --
+-- Bio Blaster's poison damage plus its status ticks breaking a
 -- 2-shield poison-weak enemy between them -- called it a "neat
 -- interaction", and #60 established it is real: the poison status tick
 -- routes through the ordinary damage path carrying element $08, so it
@@ -24,7 +24,7 @@
 --   (battle_main.asm:1891-1893).  Nothing about the tick is special-cased;
 --   it is a poison hit that happens to have no attacker.
 --   The class axis is NOT reached: OT6_ATKCLASS is 0 for the DOT record
---   (the LoadMagicProp path, m3-impl.md:58-61), so Ot6ClassChip bails at
+--   (the LoadMagicProp path), so Ot6ClassChip bails at
 --   its `beq done` -- a tick chips exactly one axis.
 --
 -- SAP DOES NOT CHIP, and that is asserted too, because it is the half that

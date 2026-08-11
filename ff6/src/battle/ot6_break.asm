@@ -198,7 +198,8 @@ done:   rtl
 ; the v0.3 arc added ARMOR-LINE rows here under a doctrine the v0.6
 ; break-coverage pass has since RETIRED. the doctrine was the narshe
 ; school's rung-2 seed: "their armored machines shrug off blade and fire
-; alike ... every armor fears one right tool" (narshe-school.md history),
+; alike ... every armor fears one right tool" (the school's superseded
+; rung-2 copy; narshe-school.md now carries the replacement),
 ; the tool being edgar's bio blaster (item $a4 -> attack $7d, element $08
 ; poison -- battle_main.asm:6577). that made POISON the sole key to the
 ; imperial line, and the fixed-party audit found the hole: the forced

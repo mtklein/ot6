@@ -13,8 +13,9 @@
 #   S("vector_doorstep", gen="gen_vector_doorstep", anchor="post-opera-v1")
 #       an ANCHORED mint: cold-boot the tracked battery anchor
 #       tools/tests/anchors/<key>/ instead of a predecessor savestate.
-#       Cutting a leg loose at a save-point boundary (save-points-vector.md
-#       section 5's A-F band) is exactly this: prev= becomes anchor=.
+#       Cutting a leg loose at a save-point boundary (the A-F band lettered
+#       in the boundary comments below) is exactly this: prev= becomes
+#       anchor=.
 #
 #   S("t2_rapids_start", gen="gen_rapids", prev="t2_scenario_hub", stack="t2_")
 #       a STACKED mint: compose.py replays the generator's route logic against
@@ -412,7 +413,7 @@ STATES = [
     # gen_ifrit_doorstep: the {37,44} chute -> map 264 {10,7} -> parked at
     # {3,7} facing IFRIT, one A-press from battle 70.
     S("ifrit_doorstep", gen="gen_ifrit_doorstep", prev="mrf_kefka"),
-    # ---- boundary B: the map-270 save room (save-points-vector.md §5) ----
+    # ---- boundary B: the map-270 save room ---------------------------------
     # ifrit_doorstep above is leg A->B's terminal; gen_ifrit_doorstep also
     # walks the save room and asserts B's exit contract pre-save, and
     # gen_mrf_save_room_anchor (run by hand, never by this graph) minted
@@ -467,8 +468,8 @@ STATES = [
     # save at the Narshe exit spawn, world (84,34) -- boundary G,
     # `narshe-mission-v1`.  ONE generator does the leg AND cuts the anchor,
     # gen_terra_returned_anchor's shape, because the boundary is a world
-    # battery save with nothing to author (recon §2.2/§2.4).  Re-cutting the
-    # battery itself is still a deliberate by-hand operation:
+    # battery save with nothing to author.  Re-cutting the battery itself is
+    # still a deliberate by-hand operation:
     #     OT6_SRAM_ANCHOR=tools/tests/anchors/terra-returned-v1 \
     #     OT6_CAPTURE_SRM=tools/tests/anchors/narshe-mission-v1/narshe-mission.sram \
     #     tools/tests/run.sh tools/tests/gen_narshe_mission.lua
@@ -498,8 +499,8 @@ STATES = [
     # Leg H->I, whole in one generator: cold-boot the gate-cave-save-v1
     # battery, back down to BASEMENT 3, the WEST traverse (two levers --
     # (71,15) $0174 and the (104,17) $01F5 tap-once TOGGLE -- then the
-    # (121,23)->(4,37) teleport; measured, addenda Addendum 3: the (58,18)
-    # span and the three walk-overs are NOT on the route), the Sealed Gate
+    # (121,23)->(4,37) teleport; measured (the (58,18) span and the three
+    # walk-overs are NOT on the route), the Sealed Gate
     # scene (battles 121/122 spared, never kill-bitted), the $0079 tail,
     # the (5,43) shortcut out, the base re-cross (battle 123 spared, the
     # scripted crash flight), off the wreck via the map-7 hatch (8,36),

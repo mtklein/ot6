@@ -2,13 +2,13 @@
 -- that cuts battery anchor J, `banquet-done-v1`.
 --
 -- THE HONEST REBUILD (issue #75, 2026-08-09).  The previous version of
--- this file encoded banquet-decode.md §5.2's ≥90 route, which §9 of that
--- doc WITHDREW after live measurement (control returns inside the throne
+-- this file encoded banquet-decode.md's old ≥90 route, which that doc
+-- WITHDREW after live measurement (control returns inside the throne
 -- tower, the castle is severed until _cc8490, map 243 is a one-way
 -- pocket, and ≥90 needs 41 of the window's 44 points against a measured
--- best of 26).  Canon is the ≥67 tier (§9.3).  This rebuild drives the
--- canon tier HONESTLY -- zero state writes outside the Save-UI anchor
--- block -- and the arithmetic that makes ≥67 the honest target is worth
+-- best of 26).  Canon is the ≥67 tier (banquet-decode.md §5.2).  This
+-- rebuild drives the canon tier HONESTLY -- zero state writes outside the
+-- Save-UI anchor block -- and the arithmetic that makes ≥67 the honest target is worth
 -- stating up front, because it is different from the kill-bit era's:
 --
 --   * A KILL-BIT window fight cost ~3 frames for +6 points.  An honest
@@ -46,10 +46,10 @@
 --     frames are free (the anchor-descended party arrives hurt and part
 --     bare on every leg this wave has measured).
 --
--- The leg (banquet-decode.md is the script; sealed-gate-recon.md §1 legs
--- 5-6 the route): cold-Continue the tracked `vector-crash-v1` battery
+-- The leg (banquet-decode.md is the script; the route recon's legs 5-6 the
+-- route): cold-Continue the tracked `vector-crash-v1` battery
 -- (boundary I -- world (83,238), standing ON the dead Blackjack; NO A
--- press on the boot tile, it re-enters the wreck -- addenda SS3.5),
+-- press on the boot tile, it re-enters the wreck -- measured),
 -- assert its contract, then: the world grind to Vector (120,187), the
 -- castle escort, the dais face-UP+A (window opens, timer 14400), the
 -- talk-only greedy circuit to expiry, the dinner Q&A driven perfect
@@ -927,7 +927,7 @@ local steps = {
     H.assertExitContractPreSave("banquet-done-v1")
   end),
   -- THE LEG'S SAVESTATE IS MINTED HERE, BEFORE THE MENU (the world menu
-  -- does not unwind on B -- addenda SS1.7)
+  -- does not unwind on B, measured)
   H.saveState("banquet_done.mss"),
   -- RELOAD-VERIFIED (gen_sabin_gau's pattern, a trap this program has
   -- paid for): capture-calm does NOT imply reload-calm, so reload the

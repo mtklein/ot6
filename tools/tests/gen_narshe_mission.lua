@@ -7,15 +7,17 @@
 -- to the world map, and save through the game's OWN Save UI at the Narshe
 -- exit spawn -- world (84,34) -- which is boundary G.
 --
--- WHAT THE RECON GOT RIGHT, AND WHAT IT COULD NOT KNOW
--- (docs/design/sealed-gate-recon.md §1 leg 1; corrections in
--- docs/design/sealed-gate-recon-addenda.md):
+-- WHAT THE RECON GOT RIGHT, AND WHAT IT COULD NOT KNOW.  The route recon's
+-- leg-1 entry (docs/design/sealed-gate-recon.md, since trimmed) called this
+-- leg "fly to Narshe, walk the mission meeting"; the corrections below are
+-- this pass's own measurements and supersede it:
 --  * The escort trigger row IS (37-39,51) on map 20 and the meeting IS on
 --    map 30; `$0076=1` at event_main.asm:94170 is the handoff, measured.
 --  * The recon says "fly to Narshe" but not HOW.  Measured this pass
 --    (probe_v07_fly, probe_v07_f2g):
 --      - a cold Continue of anchor F puts the party ON FOOT standing on the
---        parked ship's tile (save-points-vector.md §5's F-anchor note);
+--        parked ship's tile (the F-anchor Continue behavior, asserted
+--        below and by battle_slotsboot.lua);
 --      - ONE A tap boards AND lifts off in a single beat -- there is no
 --        separate "board" state to wait for.  The flight view zeroes
 --        $E0/$E2 (the on-foot world position cells), so "airborne" is
@@ -29,8 +31,8 @@
 --  * (83-85,34-36) beside the Narshe gate is landable -- confirmed live at
 --    (84,36), one tile south of the (84,33) short entrance's approach row.
 --
--- Anchor G is a WORLD battery save, so it needs no authoring (recon §2.4,
--- and the 2-trigger ROM budget stays untouched).  The save happens at the
+-- Anchor G is a WORLD battery save, so it needs no authoring (the
+-- 2-trigger ROM budget stays untouched).  The save happens at the
 -- Narshe exit spawn because that tile is where a cold Continue of the
 -- anchor will put the party -- the leg OUT of G starts there.
 --
@@ -142,10 +144,10 @@ H.run({ maxFrames = 40000 }, {
       .. string.format("  $1EDE=%02X $1EDF=%02X", H.readByte(0x1EDE),
         H.readByte(0x1EDF)))
     H.assertEntryContract("terra-returned-v1")
-    -- the F-anchor Continue behavior save-points-vector.md §5 records: the
-    -- party is restored ON FOOT on the parked ship's tile even though the
-    -- save was taken aboard.  This leg's first move depends on it.
-    H.assertEq(H.readByte(0x11FA) & 3, 0, "$11FA -- restored ON FOOT (§5)")
+    -- the F-anchor Continue behavior, measured: the party is restored ON
+    -- FOOT on the parked ship's tile even though the save was taken
+    -- aboard.  This leg's first move depends on it.
+    H.assertEq(H.readByte(0x11FA) & 3, 0, "$11FA -- restored ON FOOT")
     H.assertEq(H.readByte(0x11F3), 0, "$11F3 -- not forced aboard")
     H.assertEq(H.worldX(), 24, "boot world x")
     H.assertEq(H.worldY(), 121, "boot world y")

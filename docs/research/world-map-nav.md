@@ -6,15 +6,6 @@ Mode-7 engine (`ff6/src/world/`) from the field engine, but on-foot
 navigation is simpler. Pins below are from the disassembly and
 `rom/ff6-en.dbg`.
 
-> **Audited 2026-07-18; live-probed 2026-07-18.** The first audit found
-> two inferred-not-read claims wrong (the step latch; world reload on
-> random battles) and flagged three more as suspect. All flagged items
-> have now been settled by reading the code AND by live probes against
-> `worldmap_narshe.mss` (`tools/tests/probe_world.lua`,
-> `probe_world2.lua`, `probe_world3.lua`); the checklist at the bottom
-> records each answer. The executor (`H.worldNavTo`) is built and drove
-> Narshe -> Figaro end to end.
-
 ## Mode detection
 
 Top-level dispatch: `ff6/src/field/reset.asm:64-77` masks `$1F64` with
@@ -101,9 +92,6 @@ pacing there rolls zero encounters forever (measured; that was
   zeroes on the next aligned frame with no button held. A mid-tile
   release therefore strands nothing; `H.worldNavTo` just holds the
   planned direction whenever aligned and lets the latch do the rest.
-  (An earlier revision of this doc asserted the opposite and designed a
-  hold-whole-ticks control law around it; that rule solved a problem
-  the code does not have.)
 
 ## Encounters
 
@@ -170,59 +158,18 @@ POST-SNAPSHOT `$1F60/$1F61`, plus a per-BG group offset, indexing
   `$1F60`=tileX, `$1F61`=tileY, facing `$1F68`; `InitWorld` seeds the
   live position from them (ReloadMap tail, `world/init.asm`).
 
-## Sabin route breakdown (Narshe -> Vargas)
+## Concrete ids and tiles
 
-Two short world-nav legs (both WoB, on foot); the rest is field-nav
-plus one scripted-event stretch, and Vargas is a field trigger.
-
-| leg | model | status |
-|---|---|---|
-| Narshe interior/exterior to the map edge | field-nav; south-edge long entrance auto-loads the world | DONE (`gen_worldmap.lua`) |
-| Narshe world spawn -> Figaro Castle | **world-nav**: (84,34) -> the (64,76)/(65,76) trigger, ~60 steps, BFS-verified walkable | probed (`probe_world3`), scripted (`gen_figaro.lua`) |
-| Figaro entrance -> interior | the world event loads map 55 (28,42); interior doors on map 55 lead to map 59 (throne wing) etc. | doorstep minted |
-| Figaro: Edgar join, King dialogue, submerge | scripted event (`advanceStory`); map 54 is the submerge-ride map (event_main.asm:14633) | next stretch |
-| Figaro emerges -> South Figaro / world | world-nav then field-nav; South Figaro = WoB (86,111)x4 -> map 75 (1,28) | short-entrance table parsed |
-| world -> Mt. Kolts entrance | world-nav; WoB (102,100) -> map 95 (14,35) | short-entrance table parsed |
-| Mt. Kolts interior -> Vargas trigger | field-nav + event trigger, formation via `opts.spare` | future |
-
-## What ported from the field navTo vs was new
-
-Ported as-is: BFS structure, target thunks, re-plan-on-deviation,
-`opts.arrive`/`maxFrames`/`opts.spare`; kill-bit battle clearing with
-3-frame debounce; pad injection.
-
-New/rebuilt (all in `lib/ot6_field.lua`, world section): position source
-(`$E0/$E2` + `$DF/$E1` alignment); 1-bit `worldPassable`/
-`worldCanStep` with a per-world prop cache; `worldBfs` (20000-node
-cap — world legs run 60+ tiles); the hold-through-latch executor;
-`worldHasControl` (`worldMode + $19==0 + $E7 bit0 clear + ($E8 & $31)
-== 0 + no battle` — $E8 bit5 sets the INSTANT an encounter roll wins,
-long before `battleLoadStarted`'s HP-table signal, and bit4 covers the
-reload; without bit5 a battle transition masquerades as a dead edge,
-measured in gen_figaro run 1); post-battle reload stall (brightness
-gate); blocklist amnesty on no-path (world corridors run one tile
-wide — the desert pass measured so — and a single falsely-condemned
-edge would otherwise be fatal); NO dialog branch ($BA/$D3 are field
-RAM); and `H.route(legs)`, the field/world handoff driver (waits for
-each leg's declared mode + settle, then dispatches navTo/worldNavTo).
-
-## Live-probe checklist — ANSWERED (probe_world*.lua, 2026-07-18)
-
-1. Concrete ids: Narshe exterior = map 20; world after its exit:
-   `$1F64=$2000` (WoB). Figaro complex = map 55 via the world trigger
-   (raw `$1F64=$0037` measured — that loader consumes the SET_PARENT
-   bit); interior wings map 59 etc.; map 54 has NO entrances
-   (submerge-ride only). South Figaro = 75; Mt. Kolts = 95
+1. Narshe exterior = map 20; world after its exit: `$1F64=$2000` (WoB).
+   Figaro complex = map 55 via the world trigger (raw `$1F64=$0037` — that
+   loader consumes the SET_PARENT bit); interior wings map 59 etc.; map 54
+   has NO entrances (submerge-ride only). South Figaro = 75; Mt. Kolts = 95
    (short-entrance table).
 2. Figaro world tiles: (64,76)/(65,76), EVENT trigger (not entrance),
    gate switch $010B=1 from game start.
 3. Mt. Kolts world tile: (102,100) short entrance -> map 95 (14,35).
-   Vargas trigger: future stretch.
-4. Mid-tile release does NOT strand: movement latched to the step
-   (4-frame tap = full tile, measured).
 5. `$20`=$03 on the WoB on foot; vehicle = `$11FA&3`==0 plus
    `$11F3`==0 (airship force-check).
-6. Figaro-interior done-predicate: next stretch (Edgar sequence).
 7. Narshe -> world exit spawn: (84,34) facing DOWN, aligned, on foot.
 
 ## Symbol crib

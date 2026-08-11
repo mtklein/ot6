@@ -210,7 +210,8 @@ local function attempt(n)
       H.assertEq(SSLOT ~= nil, true, "a SHIVA slot resolved")
       -- NO-STAGING CONTROLS: the lab this file used to build is gone, and a
       -- relapse would show here.  Both gauges seed FULL and both HP words
-      -- read their authored values (break-band-vector.md:232 / bosses-wob 13).
+      -- read their authored values (break-band-vector.md §2 "The bosses" /
+      -- bosses-wob.md 13).
       H.assertEq(shields(ISLOT), 6, "ifrit opens with his authored 6 shields")
       H.assertEq(shields(SSLOT), 6, "shiva opens with her authored 6 shields")
       H.assertEq(mhp(ISLOT), 3300, "ifrit opens at his authored 3300 HP (no clamp)")

@@ -52,8 +52,8 @@
 -- non-walkable rooftop tiles: {43,38} -> {42,38} -> {41,38} -> {41,35} ->
 -- {49,35} -> {49,34} -> {54,34} -> {54,35} -> {57,35} -> {57,34}, then
 -- `switch $01F0=0` and `player_ctrl_on` (event_main.asm:100029-100105).
--- (57,34) confirmed live below -- it was read off the move list, which is
--- probe item 9 in docs/design/vector-route-recon.md.
+-- (57,34) confirmed live below -- it was read off the move list, which the
+-- route recon listed as an open probe.
 local H = dofile("tools/tests/lib/ot6.lua")
 
 local function map() return H.mapId() & 0x1ff end

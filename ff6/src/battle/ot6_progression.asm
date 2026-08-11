@@ -303,7 +303,7 @@
 ;
 ; THE ENCODING IS VANILLA'S OWN EQUIPMENT LAYOUT (#62, 2026-07-29).  It used to be
 ; ONE byte per esper, [selector:4][magnitude:4] -- one unsigned stat, max 15 --
-; which is why magicite-ifrit-shiva.md §12.1/§12.2 recorded two-sided and
+; which is why magicite-ifrit-shiva.md's ledger recorded two-sided and
 ; multi-stat mods as unbuildable.  #62 asked for both, and the measurement pass
 ; (docs/design/esper-stat-ruler.md) found that FF6 ALREADY HAS the object we
 ; wanted: ItemProp+16/+17 is two bytes holding FOUR SIGNED 4-BIT stat deltas, and
@@ -539,7 +539,8 @@ Ot6EsperStatTbl:
                                          ;    vanilla's own per-stat ceiling
                                          ;    (Enhancer, Magus Rod, Illumina all
                                          ;    sit at +7).  v0.7 has no conventional
-                                         ;    boss (sealed-gate-recon.md §0) and
+                                         ;    boss -- the band ends on the
+                                         ;    banquet, not a fight -- and
                                          ;    all three of his grants scale off
                                          ;    mag.pwr, so the crown stat IS the
                                          ;    band's reward.  -3 vigor: Terra's

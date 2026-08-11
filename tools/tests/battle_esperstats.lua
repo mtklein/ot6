@@ -83,8 +83,8 @@
 --   STRAY esper 8  mag.pwr +4, speed +2; grants Muddle/Imp/Float.
 --   IFRIT esper 1  vigor +6 (+12 doubled), stamina +4, MAG.PWR -3; grants
 --                  Fire(base)/Drain, and NOT Fire2.  The -3 is the marquee:
---                  the two-sided mod magicite-ifrit-shiva.md §12.1 recorded
---                  as unbuildable under the old one-stat encoding.
+--                  the two-sided mod magicite-ifrit-shiva.md's ledger
+--                  recorded as unbuildable under the old one-stat encoding.
 --   SHIVA esper 2  mag.pwr +6, speed +4, VIGOR -3 (-6 doubled); grants
 --                  Ice(base)/Osmose/Shell, and NOT Ice2 and NOT Rasp
 --                  (left to Ramuh).  Ifrit's mirror, as §5.2 asked.

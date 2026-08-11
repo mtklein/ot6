@@ -1,9 +1,9 @@
 -- @suite slow
 -- battle_slotsboot.lua -- boost-tiered Slot on a NATURAL boot: cold-Continue
 -- the terra-returned-v1 battery anchor (party LOCKE EDGAR SABIN SETZER,
--- save-points-vector.md section 5 boundary F; the Continue restores the party
--- ON FOOT at the grounded Blackjack's tile), walk the plain south of Zozo
--- into a REAL world encounter, and drive real Slot spins with real button
+-- save-point boundary F, lettered in tools/tests/frontier_graph.py; the
+-- Continue restores the party ON FOOT at the grounded Blackjack's tile),
+-- walk the plain south of Zozo into a REAL world encounter, and drive real Slot spins with real button
 -- presses.  NO pokes on either side (issue #75): BP accumulates through
 -- Ot6ActionEnd's own regen (battle opens at 1, +1 per unboosted turn), boost
 -- is spent with real R presses, and the reels are stopped by real A presses

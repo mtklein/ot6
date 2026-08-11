@@ -10,7 +10,7 @@
 --
 -- WHY GREEDY AND NOT A FIXED ROUTE: map 250's interior is several
 -- disjoint regions joined by stair/door entrances, and which region the
--- party can reach is a function of banquet state (addenda §4.4: the
+-- party can reach is a function of banquet state (measured: the
 -- $0630 servants at (16,30)/(30,30) sever the castle until _cc8490
 -- clears them).  A hand-written route would encode one guess about that
 -- topology; the greedy driver discovers it at runtime -- talk every
@@ -149,7 +149,7 @@ end
 -- dead, so a RE-ENTRY of 243 shows the static CLOSED door.  Run 1 walked
 -- into 243, scored its three soldiers, and then sat still for 11 835
 -- frames -- the whole rest of the window -- because no crossing was
--- reachable.  The recon §8's "presumed impassable ... untested" is now
+-- reachable.  The route recon's "presumed impassable ... untested" is now
 -- measured, and it is a route constraint, not a curiosity: 243 must be
 -- visited LAST.
 local function leastUsedCrossing()
@@ -270,8 +270,8 @@ H.run({ maxFrames = 40000 }, {
       map(), H.fieldX(), H.fieldY(), timerCount(), var0()))
   end),
 
-  -- leave the throne tower first: control returns inside it (addenda
-  -- §4.6) and its only circuit-side exit is the (53,35) long entrance
+  -- leave the throne tower first: control returns inside it (measured)
+  -- and its only circuit-side exit is the (53,35) long entrance
   H.navTo(53, 34, { maxFrames = 9000 }),
   (function() local ph = 0
     return H.driveUntil(function() return H.fieldX() < 40 end, 1200, {

@@ -8,7 +8,7 @@
 -- {11,45} (_cc78d0, 1 step) and {6,31} (_cc76a7, the lift back UP, 18
 -- steps).  {22,53}, {22,54}, {10,54}, {12,60}, {15,60}, {21,27}, {4,22}
 -- and {9,22} are all NO PATH.  So the lower half of map 262 is a chain of
--- scripted rides, exactly as docs/design/vector-route-recon.md §8 hazard 3
+-- scripted rides, exactly as the route recon's third traversal hazard
 -- predicted, and this leg rides the next link.
 --
 -- _cc78d0 (event_main.asm:95182), on {11,45}, is ungated -- no $01B5

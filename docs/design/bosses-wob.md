@@ -1,9 +1,8 @@
 # WoB bosses, boss by boss — design dive v1 (2026-07-16)
 
 Scope: every boss and miniboss from Whelk through the Floating
-Continent, in story order. **Status: v1 proposal for review** —
-shield counts and weakness rows here are the first draft of the M6
-hand-authored table (replacing the demo's 2+level/8 formula for
+Continent, in story order. Shield counts and weakness rows here are the
+M6 hand-authored table (replacing the demo's 2+level/8 formula for
 these fights). Nothing is locked except explicit ✦, and most ✦ below
 are jank preservations the house rule already demands.
 
@@ -69,7 +68,7 @@ and his shields grow instead. The player learns; Ultros doesn't.
 | 14 | Number 024 | Magitek factory | 7 |
 | 15 | Number 128 | minecart escape | 7 (blades 3 each) |
 | 16 | Left & Right Cranes | airship escape | 6 + 6 |
-| 17 | Ultros ③ | Esper Mountain (v0.8 — corrected 2026-07-28; battle 125's only call site is the Relm-joining scene, see sealed-gate-recon.md §3) | 7 |
+| 17 | Ultros ③ | Esper Mountain (v0.8 — corrected 2026-07-28; battle 125's only call site is the Relm-joining scene, see thamasa-recon.md §3.1) | 7 |
 | 18 | FlameEater | Thamasa | 7 (Balloons 1) |
 | 19 | Ultros ④ + Chupon | FC approach | 7 + 4 |
 | 20 | AirForce | FC approach | 8 (pods 3/3, Speck 1) |
@@ -123,13 +122,6 @@ Party: Locke, Mog, and ten moogles in three squads.
 **Shields:** 4 · **Weak:** poison + piercing. Lobos: 3 · fire +
 piercing.
 
-(Lobo's count reads **3**, not the 2 an earlier draft of this row wanted:
-`Ot6ShieldTbl` `$0019` ships `3, OT6_PIERCE` — `ot6_hud.asm:1279` — and
-`tools/tests/visual_f2.lua:23` anchors it as the M1 regression that proves
-the species table beats the level formula. The doc is corrected to the
-shipped number rather than the other way round; whether 2 was the better
-*design* is `m3-impl.md`'s open question 3, not a decode.)
-
 - **Telegraph:** the Marshal levels his blade and whistles the pack
   in → next turn he and both Lobos converge on one target. Break him
   and the dogs mill around leaderless.
@@ -146,9 +138,8 @@ shipped number rather than the other way round; whether 2 was the better
 ### 3. Vargas (+ two Ipoohs)
 
 Party: Terra, Locke, Edgar — Sabin storms in at the midpoint with
-Pummel and, at vanilla level 6, almost certainly AuraBolt too. (An
-earlier draft put AuraBolt at level 10 and treated it as a maybe; it
-is level 6, so plan the fight assuming holy chip is present.)
+Pummel and, at vanilla level 6, AuraBolt too, so the fight is planned
+assuming holy chip is present.
 
 MEASURED, in `battle_vargas.lua` off the rung-2 fixtures: he seeds
 **5/5 with class row $04 (bludgeoning)**, the Ipoohs 2/2 slash-weak,
@@ -284,10 +275,9 @@ seed — `Ot6SeedShields` is reached only from the monster/rage load and
 returns immediately for character entity offsets in any case
 (`ff6/src/battle/ot6_break.asm:6-9`).
 
-**An earlier draft gave these fights 3 shields · poison + slashing.
-That is unimplementable as written** — there is no monster entity to
-hang a species row on, and the per-formation hook that would be needed
-to gauge a character actor is a feature, not a table row.
+A gauge here is unimplementable: there is no monster entity to hang a
+species row on, and the per-formation hook that would be needed to
+gauge a character actor is a feature, not a table row.
 
 Which is the right answer anyway: the gags are theater and should read
 as theater. He takes a few hits and flees, twice, waiter line intact,
@@ -527,41 +517,6 @@ Vanilla bits are kept (dead or level-gated for this party, live for a
 later party that carries the element); class chips ignore the
 water-absorb.
 
-> **RESOLVED (issue #23) — Aspik was `2 · pierce`, and pierce has no
-> wielder here.** The old rationale ("punctured by Gau's fanged strike") was
-> wrong on two counts, both decoded rather than recalled:
->
-> 1. **Gau cannot equip Hardened.** `$28` is a *katana*, not a spear — the
->    `{spear}` glyph in `item_name_en.json` is the dagger/ninja icon, not a
->    category — and its equippable-by mask is `$8008` = Shadow (+ Merit
->    Award) only. Read at `item_prop_en.dat[$28*30]+1`, 16-bit LE, which is
->    the offset `equip.asm:1599` itself indexes; the ambiguity that made an
->    earlier pass hedge here is pinned for good in
->    `docs/research/data-formats.md`. **Gau's only legal weapon in the game
->    is the Imp Halberd `$24`** — the one weapon with bit 11 set. It *is*
->    pierce (`ot6_class.asm:86`), but a re-scan of all 128 shop records at
->    resolution time found **zero** stocking it: it is a WoB-late treasure,
->    so it cannot be in the bag on a scenario that runs on rails.
-> 2. **Bare-handed Gau bludgeons.** With no weapon his Fight reads item
->    `$ff` = empty hand = `OT6_BLUDG` (`ot6_class.asm:163`), already flagged
->    as a known wart in `m3-impl.md`'s open question 5 ("plain Gau punches
->    bludgeon, not the kit's 'fangs = piercing'").
->
-> So the trio brings **bludgeon and slash, and no pierce at all**. One key
-> each is therefore arithmetically impossible, and the shape was chosen
-> deliberately rather than left to fall out: **Anguiform slash, Actaneon
-> bludg, Aspik bludg** — 2 bludg + 1 slash, which is the *party's* own shape
-> (Sabin's fists and Pummel/Suplex/Bum Rush plus Gau's fists on one side,
-> Cyan's katanas and all eight SwdTechs on the other). Every member's A
-> button still answers a creature, which is the property the one-key-each
-> version was actually buying. The alternative split — Aspik to *slash*,
-> giving 2 slash + 1 bludg — was rejected because it points the trio's two
-> bludgeon wielders at one target and Cyan at two.
->
-> The failure mode worth remembering is the *rationale*, not the byte: the
-> byte was authored to a wielder claim that was recalled instead of decoded.
-> (Same finding, longer, in `weapon-classes-six.md` §4.7.)
-
 ## Break coverage — the free-roam floor (#6)
 
 - **The free-roam tail — now floored.** `Ot6SeedShields`' `@formula`
@@ -632,52 +587,27 @@ Party: Locke, Celes + two.
 | Shiva | 6 | fire + slashing |
 
 - Vanilla's tag fight: they swap in and out; each keeps its own
-  gauge across swaps. **A Broken sibling can't tag out** — the swap
-  is a turn, and Broken have none. Breaking pins them on stage.
-
-> **CORRECTION — 2026-07-30 (issues #66, #67): "can't tag out" is an
-> aspiration, not a mechanism. Nothing implements it, and today it is
-> false.**
->
-> The bullet above reads as design. It is not: no OT6 source references
-> the tag, the swap, or hiding at all — a case-insensitive grep for
-> `tag out` / `swap` / `hide` across `ff6/src/battle/ot6_*.asm` and
-> `ff6/src/battle/ot6_memory.inc` returns only
-> unrelated hits (a direct-page swap in `ot6_codex.asm`, HUD veiling in
-> `ot6_hud.asm`, the spent-divine rung swap in `ot6_kits.asm`).
-> Whatever "can't tag out" describes was only ever emergent from
-> `Ot6Gate` (`ot6_break.asm:1655`, consulted at `battle_main.asm:1419`)
-> refusing to queue a broken monster's turn.
->
-> **And the swap is exactly one of the turns that leaks past that gate.**
-> The tag is the first branch of Ifrit's own main AI script —
-> `if_battle_var_greater 3, 5 / kill_monsters_wait MONSTER_1 /
-> show_monsters MONSTER_2` (`ff6/src/battle/ai_script.asm:4566-4571`) —
-> so it needs a main-script turn, and #66 measured main-script turns
-> running while Broken: 103 executions with the broken timer up in one
-> battle-70 run, including **7 casts of Fire by a Broken Ifrit**, which
-> come from `attack BATTLE, FIRE, FIRE` (`ai_script.asm:4577`) in the
-> same script the tag branch heads. Worse, the counter the tag reads is
-> advanced by `add_battle_var 3, 1` in the `if_hit` retaliation block
-> (`ai_script.asm:4613`), and retaliation was 50 of those 103. So chipping
-> a Broken sibling still winds its swap timer.
->
-> **UNVERIFIED:** nobody has watched a Broken sibling actually complete a
-> tag-out. The reachability above is read from the script and from #66's
-> execution counts, not observed as a swap. What *is* observed is that the
-> script which contains the swap runs while Broken.
->
-> `Ot6MayAct` (preserved on `wt/ifritbreak`, commit `945b9ed`) drops 103 →
-> 2 and would make the bullet true, but it cannot land while
-> `battle_trueknight` 6a stands — see #67. **Treat the bullet as the
-> intent to implement, not as the fight as shipped.**
->
-> One adjacent thing that *was* fixed in v0.9 (merge `9f6971c`): a
-> tagged-out sibling's break timer used to be frozen behind the `$3aa0.0`
-> presence gate, so a broken monster that tagged out stayed broken. The
-> on-stage control recovered in 2159 frames; the tagged-out one sat at
-> timer 16 with 0 shields for 2541 more. That half is shipped; the
-> "can't tag out" half is not.
+  gauge across swaps, and a tagged-out sibling's break timer keeps
+  running (it is not frozen behind the `$3aa0.0` presence gate).
+- **"Breaking pins them on stage" is intent, not the fight as it
+  stands.** Nothing implements a tag lock: the effect would have to be
+  emergent from `Ot6Gate` (`ot6_break.asm:1655`, consulted at
+  `battle_main.asm:1419`) refusing to queue a broken monster's turn, and
+  the swap is exactly one of the turns that leaks past that gate. The tag
+  is the first branch of Ifrit's own main AI script —
+  `if_battle_var_greater 3, 5 / kill_monsters_wait MONSTER_1 /
+  show_monsters MONSTER_2` (`ff6/src/battle/ai_script.asm:4566-4571`) — so
+  it needs a main-script turn, and main-script turns run while Broken
+  (103 executions with the broken timer up in one battle-70 run, including
+  7 casts of Fire from `attack BATTLE, FIRE, FIRE`, `ai_script.asm:4577`,
+  in the same script the tag branch heads). Worse, the counter the tag
+  reads is advanced by `add_battle_var 3, 1` in the `if_hit` retaliation
+  block (`ai_script.asm:4613`) — 50 of those 103 — so chipping a Broken
+  sibling still winds its swap timer. **UNVERIFIED:** nobody has watched a
+  Broken sibling complete a tag-out; what is observed is that the script
+  containing the swap runs while Broken. `Ot6MayAct` (preserved on
+  `wt/ifritbreak`, commit `945b9ed`) drops 103 → 2 and would make the
+  pinning true, but it cannot land while `battle_trueknight` 6a stands.
 
 - **Telegraph:** Ifrit inhales, the air shimmering → **Fire 2**;
   Shiva mirrors with **Ice 2**. Whoever's out runs their own fuse.
@@ -721,26 +651,6 @@ note in `wob-route.md`.)
 |---|---|---|
 | body | 7 | bolt, water + piercing |
 | Left/Right blades | 3 each | bolt + slashing |
-
-> **RESOLVED (issue #23) — the elemental row is now in the data.** It was
-> not, for three releases. Decoded then and re-decoded at authoring time:
-> `$010b` body, `$013f` right blade and `$0140` left blade all read
-> `monster_prop.dat` +25 (weak) = **`$00`**, +24 (null) = `$00`, +23
-> (absorb) = **`$02` ice**, and none of the three had an `Ot6ElemAddTbl`
-> row — the bolt/water above was authorial intent nobody ever wrote down,
-> and the shipped fight's only break axis was the authored physical class.
->
-> Three `Ot6ElemAddTbl` rows now carry it (`ot6_break.asm`): `$84`
-> (bolt|water) on `$010b`, `$04` (bolt) on `$013f` and `$0140`. Why it was
-> worth implementing rather than striking: (a) the minecart is the first
-> fight this doc builds a *part-break* lesson on, and a single-axis fight
-> makes that lesson thinner exactly where it should be widest. (b) The
-> party here is post-Zozo with four espers just paid out, so bolt (Ramuh)
-> is a key the player has and has been taught to reach for — the same "the
-> espers you just earned are the answer" beat the Cranes deliberately
-> *invert* two fights later. (c) Nothing traps: the three parts absorb
-> **ice**, which is neither added bit, so no row feeds an absorber — the
-> GhostTrain rule holds.
 
 - Blades regenerate a few turns after dying — vanilla ✦ — and
   regrown blades return at full shields (their row stays revealed;
@@ -796,12 +706,6 @@ fire-weak. Vanilla's shared weakness is water.)
 
 ## Esper Mountain
 
-> **Location corrected 2026-07-28** (`sealed-gate-recon.md` §3): this fight
-> is NOT in the Sealed Gate band — formation 387 / battle 125's only call
-> site is the Esper-Mountain scene where RELM joins (v0.8). The Sealed
-> Gate band's gate/deck battles (121/122/123) are scripted set pieces with
-> no conventional boss. The row below is otherwise unchanged.
-
 ### 17. Ultros ③ — the rope bridge
 
 Party: Terra + three.
@@ -833,15 +737,6 @@ an OT6 add, not vanilla. `$0de` Balloon weak = `$82` = ice|water. An
 earlier draft merged the two rows and gave the FlameEater the Balloons'
 water bit *as vanilla*, which it never was.)
 
-> **RESOLVED (issue #23) — Aqua Breath's chip is real now.** The break
-> story below leans on water being a FlameEater key, and it was not one in
-> the data: water was neutral on `$116` (not weak, not nulled, not
-> absorbed), so Aqua Breath was AoE add-clear only and the Lore read a row
-> it could not use — a worse tutorial than no Lore, in Strago's own debut
-> fight. One `Ot6ElemAddTbl` row now carries it, `$0116` `.byte $80`.
-> Absorb-safe by re-decode: `$116` absorbs **fire** (`+23 = $01`) and nulls
-> **bolt|poison|holy|earth** (`+24 = $6c`); water `$80` is in neither.
-
 - **Telegraph:** it drinks the room's fire and swells white →
   **Fireball** across the party. Break to swallow the flame with it.
 - **Break story:** Strago's debut showcase — **Analyze** reads the
@@ -871,33 +766,10 @@ first three — `$168`, where the Lete/opera/gate fights are `$12c`/`$12d`/
 reads `$09` = **fire|poison**, not the `$05` = fire|bolt the other three
 carry; +23 still `$80`, water absorbed. So "the row, one last time" was
 true of the classes, which `Ot6ShieldTbl` authors identically at
-slash|pierce, and false of the elements. `$12f` Chupon weak = `$82` =
-ice|water, which the old row omitted entirely.
-
-> **RESOLVED (issue #23) — the bolt bit is added; water is not, and must
-> not be.** `$0168` now carries one `Ot6ElemAddTbl` row, `.byte $04`
-> (bolt), which restores the family row's bolt half and makes "revealed at
-> the Lete, remembered forever" literally true on the elements as well as
-> the classes. Poison stays — vanilla bits are kept, per this doc's own
-> rule at the top — so the row reads fire|bolt|poison, a superset of the
-> other three fights rather than a contradiction of them.
->
-> **The trap, and why only one bit moved: `$168` absorbs water** — as does
-> every Ultros record (`+23 = $80`, all four).
-> The family row is fire|bolt, so bolt was
-> the only bit available to restore; adding water to "complete" anything
-> here would heal him. Re-decoded at authoring time rather than carried
-> over — the Crane pair four sections up was wrong in exactly this
-> direction once already.
->
-> This row was gated in the previous draft on `m3-impl.md`'s open question
-> 2 (the species→codex alias). **Call made: land the row regardless.** That
-> question is a *when* — "this milestone or M6?" — not a whether, and the
-> dependency runs the other way from how the gating assumed: if the alias
-> ever lands without this row, the codex would show `$168` a fire|bolt row
-> it does not actually have, which is a lie the player can measure. The row
-> makes the alias honest whenever it arrives, and costs one element bit on
-> a fight that ends in a Sneeze regardless if it never does.)
+slash|pierce, and false of the elements: the bolt half of the family row
+is an `Ot6ElemAddTbl` row, `$0168` `.byte $04`. Water is NOT added and
+must not be — `$168` absorbs water, as does every Ultros record
+(`+23 = $80`, all four). `$12f` Chupon weak = `$82` = ice|water.)
 
 - **Telegraph:** Ultros's tentacles, final verse. Chupon doesn't
   telegraph — Chupon *is* the telegraph: when Ultros has had enough,
@@ -957,24 +829,6 @@ Vanilla has *no* weaknesses here; the whole row is added, and wide on
 purpose — the FC party is a free pick plus Shadow, and any lineup must
 hold at least two of these five axes. The capstone examines rhythm, not
 roster.
-
-> **RESOLVED (issue #23) — the WoB final exam shipped with two axes, not
-> five, for three releases.** Decoded: `$0117` reads `monster_prop.dat`
-> +25 (weak) = `$00`, +24 (null) = `$00`, +23 (absorb) = `$00` — the
-> paragraph above is right that vanilla gives it nothing — **and there was
-> no `Ot6ElemAddTbl` row for `$0117` either**. "The whole row is added"
-> described a data pass nobody had done. What actually shipped was
-> `Ot6ShieldTbl`'s `11, OT6_SLASH|OT6_PIERCE`: eleven shields against two
-> physical classes, and nothing else.
->
-> One row in `ot6_break.asm` now carries it, `$0117` `.byte $07`
-> (fire|ice|bolt). This is the boss where the argument was least
-> negotiable: 11 shields is two to three full break cycles, and a free-pick
-> party that happened to bring neither slash nor pierce had **no break at
-> all** on the World of Balance's capstone — the same failure the v0.6
-> coverage pass closed for trash, sitting on the biggest body in the arc.
-> Absorb-safe trivially: `$117` absorbs and nulls nothing, so all three
-> bits are free and there is no absorber to feed.
 
 - **Telegraph:** the speech is the lore; the charge is the law. It
   gathers light for a full cycle → **Flare Star**. Mind Blast stays

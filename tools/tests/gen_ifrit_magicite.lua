@@ -36,8 +36,8 @@
 -- :564-566), so the receipts are $1A69 bits 1 and 2 and they are what this
 -- leg asserts -- not a switch that merely says a scene ran.
 --
--- CORRECTION to docs/design/vector-route-recon.md §2.  The recon decoded
--- battle 70 as formation 439 containing "species $0109 Ifrit only", said
+-- CORRECTION to the route recon's battle-70 decode, which read it as
+-- formation 439 containing "species $0109 Ifrit only", said
 -- "Shiva $0108 is NOT in the formation ... she is not in any formation in
 -- the game -- I swept all 576", and listed "does Shiva enter via the AI
 -- script?" as probe 1.  Measured live at the doorstep, the formation
@@ -343,7 +343,7 @@ local function ifritAttempt(n)
       H.assertEq(SSLOT ~= nil, true, "a SHIVA slot resolved")
       -- NO-STAGING CONTROLS (issue #75): both gauges seed FULL and both HP
       -- words read their authored values -- numbers a rigged run could
-      -- never show (break-band-vector.md:232 / bosses-wob.md 13).
+      -- never show (break-band-vector.md §2 "The bosses" / bosses-wob.md 13).
       H.assertEq(mshields(ISLOT), 6, "ifrit opens with his authored 6 shields")
       H.assertEq(mshields(SSLOT), 6, "shiva opens with her authored 6 shields")
       H.assertEq(mhp(ISLOT), 3300, "ifrit opens at his authored 3300 HP")

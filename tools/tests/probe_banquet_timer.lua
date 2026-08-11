@@ -1,5 +1,5 @@
 -- probe_banquet_timer.lua -- banquet-timer destructive-bug probe, phase A
--- (issue #31 / sealed-gate-recon.md hazard 1).  NOT a suite test.
+-- (issue #31; the route recon's first-named hazard).  NOT a suite test.
 --
 -- QUESTION: a player inside the banquet's 4-minute window can walk out of
 -- the castle (243 row y=31 -> 253 -> world, all ungated during $007B=1)

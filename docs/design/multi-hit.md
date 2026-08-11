@@ -34,8 +34,8 @@ on every run — it exits nonzero if the enumeration below has gone stale).
 ## Headline findings
 
 1. **Chip is per hit. Measured, not inferred.** One boosted Fight action
-   chipped **four** shields off one guard (§1). `DESIGN.md:147` and
-   `break-impl.md:30-34` both asserted this; neither cited a run.
+   chipped **four** shields off one guard (§1). The design docs asserted
+   per-hit chip long before any run was cited; §1 is that run.
 2. **Cyan is the only character in the game with a multi-hit ability.** Not
    "the only one with a good one" — the only one at all. Pummel is ×1, Bum
    Rush is ×1, AutoCrossbow is ×1 per body (§3). Every ×2/×4/×8 in
@@ -151,7 +151,7 @@ AutoCrossbow is the case that has been misfiled: targeting byte `$6a`
 (`INIT` = one-side), `ToolsEffect_07` setting *don't split damage*
 (`battle_main.asm:7352-7355`). Against a four-stack it is four chips on four
 gauges; against a boss it is **one**. `kits.md`'s "piercing ×4" reads as rate
-and is breadth. `break-band-vector.md:540` and `break-band-sealed-gate.md:377`
+and is breadth. `break-band-vector.md` §8.1 and `break-band-sealed-gate.md` §8
 already use it correctly as the swarm answer — those two are right and
 `kits.md` is the one to correct.
 
@@ -490,9 +490,8 @@ and parity is what makes the choice interesting rather than automatic.
 2-shield poison-weak enemy, versus Sabin with Pummel ×2 *and* Edgar with Bio
 Blaster's DOT. Both now break it unaided. If the WoB trash pool stops
 presenting any resistance at all, the lever is **shield counts on the trash
-pool**, not the hit counts — `balance-metrics.md` already found that shield
-count only becomes a real lever once chip rate is nonzero, and this pass is
-what makes it nonzero.
+pool**, not the hit counts — shield count only becomes a real lever once chip
+rate is nonzero, and this pass is what makes it nonzero.
 
 ---
 
@@ -560,9 +559,8 @@ For the issue that moves data. Nothing here is done yet.
    real Drill and asserting two chips per action. Promote the probe.
 5. Re-run `tools/audit_multihit.py` — it should then report five multi-hit
    abilities, not three.
-6. Correct `kits.md`'s Chip column: AutoCrossbow "piercing ×4" →
-   "piercing, whole side"; Bum Rush "×8" → "×4"; add "×2" to Drill.
-   `DESIGN.md:147`'s "Cyan's Flurry" should read "Quadra Slam" (#50's
-   vocabulary sweep).
+6. Update `kits.md`'s Chip column to the rates this pass builds: "×2" on
+   Pummel and Drill, "×4" on Bum Rush. AutoCrossbow's row already reads
+   "piercing, whole side", which is the correct reading.
 7. `check_break_reach.py` band re-run — hit counts do not change which classes
    a party can field, but `break-band-*.md`'s feel notes will want revisiting.

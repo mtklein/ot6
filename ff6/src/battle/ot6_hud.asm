@@ -1948,8 +1948,7 @@ Ot6ShieldTbl:
         ; stay for a later party that carries the element.
         ; the failure worth remembering is the RATIONALE, not the byte: the
         ; byte was authored to a wielder claim that was recalled instead of
-        ; decoded. (bosses-wob.md "Serpent Trench"; weapon-classes-six.md
-        ; §4.7.)
+        ; decoded. (bosses-wob.md "Serpent Trench".)
         .word   $003a
         .byte   2, OT6_SLASH    ; anguiform: a slippery eel, cut by Cyan's
                                 ;   blade (vanilla bolt is dead here)
@@ -2068,9 +2067,9 @@ Ot6ShieldTbl:
         ;
         ; SHIELD COUNTS: all twelve at 2 against a formula value of 4 (L18/19
         ; both give 2 + level/8 = 4). UNMEASURED and said plainly -- this is
-        ; precedent-following, not a sweep: Mt. Kolts (balance-metrics.md
-        ; :944-972) and Zozo (:1489-1510 above, where a 1200-hp HadesGigas
-        ; went 4 -> 2) both found independently that the formula's count
+        ; precedent-following, not a sweep: the Mt. Kolts and Zozo balance
+        ; passes (where a 1200-hp HadesGigas went 4 -> 2) both found
+        ; independently that the formula's count
         ; lands the break on a corpse. Landing this wants a Vector doorstep
         ; fixture and a bal_party BAL_BUFF_SHIELDS sweep over 1/2/3, with a
         ; separate three-character arm (less damage per round means the same

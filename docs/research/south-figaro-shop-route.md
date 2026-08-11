@@ -1,24 +1,10 @@
 # South Figaro: the honest shopping / resting stop
 
-Research for issue #75 (the honesty program).  Everything below is derived
-from `ff6/src/**` and the entrance/NPC/tilemap data files in this worktree;
-**nothing here was measured on a running emulator** — the dispatch forbade
-it.  Section 9 says which claims that leaves soft and names the probe for
-each.
-
-Every coordinate is `(x,y)` in field tiles.  `file:line` citations are
-against this worktree at `claude/issue-75-9a89a6`.
+Every coordinate is `(x,y)` in field tiles.
 
 ---
 
-## 0. Two corrections to the dispatch, up front
-
-**(a) The shop ids are 5/6/7/8 (alternates 60/61/62/63), not 13/14/15/16.**
-`event_main.asm:21595-21622` (`shop_menu 13/14/15/16`, alts `56/57/58/59`)
-is a *different town*: those four labels are referenced only by
-`NPCProp::_169` (`npc_prop.asm:6871,6878,6885,6892`), and map 169's world
-exits are `LongEntrance` `+$01ea/$01f1` → world `(116,61)/(119,61)`, not
-South Figaro's `(84,112)/(85,111)/(87,112)`.
+## 0. The four shop events
 
 South Figaro's four shops are opened at **`event_main.asm:18285-18313`**:
 
@@ -29,19 +15,8 @@ South Figaro's four shops are opened at **`event_main.asm:18285-18313`**:
 | `_ca7878` | 18299 | 7 | 62 | Relics | 76 | `npc_prop.asm:3406` `{51,9}` |
 | `_ca7884` | 18306 | **8** | 63 | **Item** | **85** | **`npc_prop.asm:3758` `{106,52}`** |
 
-Cross-check, three ways: the same event region carries
-`load_map 0, {85,111}` (`event_main.asm:18280`) — South Figaro's world
-tile; the first record of `NPCProp::_75` (`npc_prop.asm:3198`) runs
-`_ca77ad` = `dlg $00B3` **"Welcome to South Figaro!"**
-(`event_main.asm:18150-18152`), with "Mt. Kolts is to the east" two
-records later (`_ca77b9`, `:18164`); and map 85 — the item shop's
-interior — is reachable only from map 75 (`ShortEntrance::_85` has exactly
-one record, `+$07e6` → map 75 `(44,32)`).
-
-**(b) The South Figaro item shop does NOT sell Potion (`$E9`).**  It sells
-**Tonic (`$E8`, 50 GP)**.  Potion appears only in the *post-`$00A4`*
-version (shop 63), which is a different story stage.  Fenix Down (`$F0`) is
-present, and is the shop's row 5.  Full stock in section 2.
+Map 85 — the item shop's interior — is reachable only from map 75
+(`ShortEntrance::_85` has exactly one record, `+$07e6` → map 75 `(44,32)`).
 
 ---
 
@@ -97,7 +72,7 @@ row price, row cell `$4B`):
   the same profile — Tonic + Fenix Down, no Potion.  The nearest Potion
   vendor reachable in the world at all is shop 3 on **map 26**, a Narshe
   interior (`ShortEntrance::_26` `+$02d6` `(44,14)` → map 20 `(41,24)`;
-  map 20 is Narshe exterior per `docs/research/world-map-nav.md:207`), and
+  map 20 is Narshe exterior per `docs/research/world-map-nav.md`), and
   Narshe is in a different walkable world region from the Figaro desert
   (`gen_kolts.lua` header, finding 2).
 
@@ -540,10 +515,9 @@ move, but every one of these deserves an explicit assert.
 Random battles are gated on `$0525` bit 7 (`ff6/src/field/battle.asm:332`,
 `lda $0525 / bpl Done`), i.e. `map_prop.dat` record `33*map + 5`.  That
 byte is `$00` for maps **75, 76, 77, 78, 80, 85, 86** — all zero, no
-encounters.  (For contrast the cave maps 70/72/73 are `$80`.)  This
-matches `docs/design/balance-metrics.md:801`.  So the shopping/resting
-stop needs no `honest="flee"` handling of its own; only the approach
-through the cave does.
+encounters.  (For contrast the cave maps 70/72/73 are `$80`.)  So the
+shopping/resting stop needs no `honest="flee"` handling of its own; only
+the approach through the cave does.
 
 ---
 
@@ -618,8 +592,6 @@ Sanity checks that the model is not fantasy, all of which passed:
   `(77,15)`, which is a `$05` tile;
 - map 85's derived room is closed except for `(104,58)`, which is exactly
   the map's single short-entrance source and its single event trigger.
-
-The scratch decoder used lives in this session's scratchpad, not the repo.
 
 ---
 

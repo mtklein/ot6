@@ -13,8 +13,8 @@
 --      still show the OLD phase.
 --   2. Every hurt tile is an event-trigger tile (_cb2dbb/_cb2dd2,
 --      event_trigger.asm:1849-1883), and a stood-on trigger tile re-enters
---      its script every frame (the re-entry-trap class, recon addenda
---      §1.7) -- which kills hasControl(), which is why phaseWalk went
+--      its script every frame (the re-entry-trap class)
+--      -- which kills hasControl(), which is why phaseWalk went
 --      PASSIVE at (6,2) and ate the swap.  The documented escape is an
 --      UNCONDITIONAL HELD PRESS.
 --

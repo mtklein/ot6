@@ -14,7 +14,7 @@
 --   OT6_SRAM_ANCHOR=tools/tests/anchors/vector-crash-v1 \
 --   tools/tests/run.sh tools/tests/probe_banquet_stage.lua
 --
--- HAZARD (addenda SS3.5, the H->I report's first-hazard note): the boot
+-- HAZARD (the H->I report's first-hazard note): the boot
 -- tile world (83,238) is the dead Blackjack itself -- an A tap there
 -- re-enters the wreck interior.  The Continue drive below presses A only
 -- while NOT on the world map, and the grind presses directions only.
@@ -159,7 +159,7 @@ H.run({ maxFrames = 120000 }, {
   -- title screen too (measured, this probe's first run).  The A presses are
   -- gated on BRIGHTNESS (menus are lit; load fades are dark) and disarmed
   -- forever once the world is up AT (83,238) -- the boot tile is the wreck
-  -- itself and one more A would walk back inside (addenda SS3.5).
+  -- itself and one more A would walk back inside (measured).
   H.waitFrames(350),
   H.repeatN(5, { H.pressButtons({ "start" }, 8), H.waitFrames(25) }),
   H.waitFrames(120),
@@ -249,7 +249,7 @@ H.run({ maxFrames = 120000 }, {
   --     a HELD UP press crosses it (the {14,8} class);
   --   * (23,12) is the messenger trigger -- gated off ($007D=0) it still
   --     re-enters at every rest frame and WEDGES navTo (iteration 2).  A
-  --     held press skips walk-over triggers (addenda SS2.3), so the
+  --     held press skips walk-over triggers (measured), so the
   --     messenger tile and the (23,9) stairs are crossed in ONE pressWalk;
   --   * (23,9) -> (54,34) (short entrance), and from (54,34) the dais is
   --     an ordinary 17-step navTo inside the throne tower.

@@ -16,7 +16,7 @@
 --
 -- The party is whatever kolts_doorstep carries -- the Figaro->Kolts three,
 -- TERRA + LOCKE + EDGAR -- which is the point: every party number in
--- balance-metrics.md before this fixture was solo Terra or the two-thirds
+-- the balance harness before this fixture was solo Terra or the two-thirds
 -- Locke+Terra of worldmap_narshe, so Edgar's Tools rungs (the pierce and
 -- poison CLASS chips, the only class-chip carrier the stretch has) had
 -- never been driven against a live pool.

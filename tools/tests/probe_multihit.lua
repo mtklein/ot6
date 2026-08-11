@@ -3,8 +3,8 @@
 --   tools/tests/run.sh tools/tests/probe_multihit.lua
 --
 -- The whole multi-hit design rests on one rule nobody had measured: when an
--- action strikes N times, does it chip N shields or one?  DESIGN.md:147 and
--- break-impl.md:30-34 both assert per-hit; neither cites a measurement.
+-- action strikes N times, does it chip N shields or one?  DESIGN.md asserts
+-- per-hit without citing a measurement.
 --
 -- WHY BOOSTED FIGHT IS THE RIGHT INSTRUMENT.  The engine has exactly one
 -- multi-hit mechanism: `$3a70`, "number of attacks (0 = 1 attack)", and one

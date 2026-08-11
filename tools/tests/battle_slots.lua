@@ -1,7 +1,8 @@
 -- @suite slow
 -- battle_slots.lua -- boost-tiered Slot (Setzer), the chance-verb canon
--- (ROADMAP.md:79-82, kits.md:405-410) applied to the reels: on chance verbs
--- boost buys CERTAINTY in the verb's own vocabulary.  Slot's vocabulary is
+-- (ROADMAP.md "Design canon", kits.md "Boost-tiered Steal") applied to the
+-- reels: on chance verbs boost buys CERTAINTY in the verb's own vocabulary.
+-- Slot's vocabulary is
 -- vanilla's single rig byte (w7e6179, one Rand at the first A press) and the
 -- drift/avoid machinery it drives:
 --   blessed icon (rig & SlotRateTbl[icon] == 0): reels 2/3 drift up to

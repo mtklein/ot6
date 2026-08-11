@@ -1,5 +1,6 @@
 -- gen_vector_escape_anchor.lua -- mint battery anchor E, `vector-escape-v1`
--- (save-points-vector.md §5): boot n128_won (the nearest minted
+-- (the A-F save-point boundary band is lettered in
+-- tools/tests/frontier_graph.py): boot n128_won (the nearest minted
 -- predecessor, which gen_n128 parks ON the escape map's save point, map
 -- 240 {58,7}, the sparkle $06AE revealed), re-arm the save-enable flow if
 -- the savestate did not carry it, and save through the game's OWN Save UI

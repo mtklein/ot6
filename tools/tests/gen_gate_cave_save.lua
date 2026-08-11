@@ -34,7 +34,7 @@
 --      probe_v07_386tile); only a tap-and-settle stops on the tile;
 --   6. the ordinary Save UI into slot 3; run.sh captures the battery.
 --
--- Anchor H is the recon §2.2 gate-cave-save boundary: the ONLY interior
+-- Anchor H is the route recon's gate-cave-save boundary: the ONLY interior
 -- save point in the whole v0.7 band (386 (74,53), off 384 (64,10)).  ONE
 -- generator does the leg AND cuts the anchor, gen_narshe_mission's shape.
 --

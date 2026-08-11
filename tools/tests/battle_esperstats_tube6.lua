@@ -57,7 +57,7 @@
 -- THE THREE BROKEN ROWS this file exists to falsify are unchanged:
 --   * Maduin carried FIRE_2/ICE_2/BOLT_2 (three dead pre-folded tiers at
 --     once) -- all three must be ABSENT and the base tiers present.
---   * Bismark granted LIFE against kits.md:262-263's revival rule
+--   * Bismark granted LIFE against kits.md's revival rule
 --     ("Terra, Fenix Downs, and Sraphim, and nowhere else") -- Life ABSENT.
 --   * Shoat granted BIO, the pre-folded cap of the poison family -- ABSENT.
 -- Run this file against a ROM built before the genju_prop change and the
@@ -367,7 +367,7 @@ add({ checkEsper("shoat", SHOAT, { spd = 6, stam = 2, vig = -4 },
   { { BIO, "Bio (pre-folded poison cap -- BROKEN ROW FIX)" } }) })
 
 -- BISMARK -- "the Tide", STORY rung: +5 vigor (+10 doubled), +3 stamina, and
--- -2 SPEED -- the leviathan is mass.  Life absent is the kits.md:262-263
+-- -2 SPEED -- the leviathan is mass.  Life absent is the kits.md
 -- revival rule, asserted.  Fire/Ice/Bolt are all "Maduin's job"
 -- (genju_prop.asm:150-151) and on this fixture ALL THREE are assertable --
 -- the old file had to omit Fire because Terra knew it innately.

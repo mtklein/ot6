@@ -1,5 +1,6 @@
 -- gen_mrf_save_room_anchor.lua -- mint battery anchor B, `mrf-save-room-v1`
--- (save-points-vector.md §5): boot ifrit_doorstep (the nearest minted
+-- (the A-F save-point boundary band is lettered in
+-- tools/tests/frontier_graph.py): boot ifrit_doorstep (the nearest minted
 -- predecessor, map 264 {3,7}), walk the {3,5} door into the map-270 save
 -- room, walk onto the vanilla save point at {25,10}, and save through the
 -- game's OWN Save UI into slot 3.  run.sh captures Mesen's complete 32 KiB

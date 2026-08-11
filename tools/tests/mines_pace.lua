@@ -16,9 +16,9 @@
 --   ours     the shipped values ($10 = 1x HP, $08 = 0.5x danger, $20 =
 --            2x rewards); the ROM bytes are re-poked to shipped values
 --            defensively in case a vanilla run preceded in this process.
---            Measurement #4 ran this arm when band0 shipped $20 (2x HP);
---            Measurement #5 stood it down to $10 (ot6.asm:352,
---            balance-metrics.md:417), so at the current ship point the
+--            An earlier measurement ran this arm when band0 shipped $20
+--            (2x HP); the next one stood it down to $10 (ot6.asm:352),
+--            so at the current ship point the
 --            two arms differ in danger and reward only -- a re-run
 --            measures the rate/reward half of the parity product, not
 --            the fight-length half #4 also reported.

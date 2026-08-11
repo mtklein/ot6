@@ -125,9 +125,8 @@ make_genju_prop {QUAKE, 0}, {QUARTR, 0}, {W_WIND, 0}, {}, {}
 ;   executioner: Break + Doom, the two deletion verbs.  BIO is DROPPED twice
 ;   over: it is the pre-folded CAP of the poison family (Ot6FoldTbl row 3,
 ;   ot6_boost.asm:344 -- a 26 MP dead tier beside a 3 MP fold) and poison is
-;   Edgar's authored key (BioBlaster, kits.md:56).  It is also poison into a
-;   cave band where four of
-;   five species ABSORB poison (magicite-tube-six.md §2.2) -- a 26 MP self-heal
+;   Edgar's authored key (Bio Blaster, kits.md's Edgar tool table).  It is
+;   also poison into a cave band where four of five species ABSORB poison (magicite-tube-six.md §2.2) -- a 26 MP self-heal
 ;   button for the enemy.  Both spells are power-0 hit-rolled death-class:
 ;   outside BOTH boost axes (no damage to multiply, no fold row, and no
 ;   chance-verb certainty mechanism exists for magic) -- ledger item (§13.4),
@@ -146,8 +145,8 @@ make_genju_prop {FIRE, 0}, {ICE, 0}, {BOLT, 0}, {}, {}
 ;   ot6_boost.asm:347-348).  Water lives in his summon (Sea Song $3d, the
 ;   game's only water verb) because no water-element player spell exists to
 ;   grant (§13.5).  LIFE is DROPPED: revival lives on Terra, Fenix Downs and
-;   Sraphim only (docs/design/kits.md:262-263) -- the vanilla row put revival
-;   on a stone anyone can wear, violating that rule.  FIRE/ICE/BOLT dropped:
+;   Sraphim only (docs/design/kits.md, Terra's revival rule) -- the vanilla
+;   row put revival on a stone anyone can wear, violating that rule.  FIRE/ICE/BOLT dropped:
 ;   Maduin's job.
 make_genju_prop {HASTE, 0}, {SLOW, 0}, {}, {}, {}
 

@@ -1,4 +1,4 @@
-# Research: battle code map — where OT6 hooks go (verified 2026-07-14)
+# Research: battle code map — where OT6 hooks go
 
 The classic commented C2 disassemblies map line-for-line onto the buildable
 everything8215/ff6 source (`src/battle/battle_main.asm` keeps `@`-hex labels
@@ -52,7 +52,7 @@ byte $B8 (https://www.ff6hacking.com/forums/thread-4176.html). We're not
 stacking that hack, so those four blank per-entity tables are available —
 though since we build from source with ld65, the cleaner move is to
 allocate new battle-RAM segments through the linker config instead of
-scavenging. (Both options open; decide in M1.)
+scavenging.
 
 Broken = per-entity timer + five surgical checks (turn gate, always-hit,
 ×2 damage, tick, wear-off) — every one at a verified address above, each

@@ -1,93 +1,22 @@
-# Ifrit & Shiva — magicite sub-job designs (v0.6) — design dive v1 (2026-07-26)
+# Ifrit & Shiva — magicite sub-job designs
 
-Scope: issue #16, the two magicite the Magitek Research Facility pays out.
-This is a **design pass**: no assembly, no data edits. Every table edit this
-document asks for is listed literally in §10 so the build pass is transcription,
-not interpretation.
+Scope: the two magicite the Magitek Research Facility pays out.
 
----
-
-## BUILD RECORD (2026-07-27) — §10 is shipped
-
-Everything §10 lists is in the ROM. What was built, and what the build learned:
-
-| §10 item | where it landed |
-|---|---|
-| Ifrit's row: Fire + Drain, Fire 2 dropped | `ff6/src/menu/genju_prop.asm:85-100` |
-| Shiva's row: Ice + Osmose + Shell; Ice 2 / Rasp / Cure dropped | `ff6/src/menu/genju_prop.asm:102-116` |
-| Ifrit `OT6_SM_VIGOR \| 5`, Shiva `OT6_SM_MAGPWR \| 4` | `ff6/src/battle/ot6_progression.asm:396-427` |
-| Osmose `$29` +$05: 1 → 8; Diamond Dust `$38` +$06: 52 → 34 and +$0c: `$00` → `$04` | `ff6/src/battle/battle_main.asm:6907-7013` |
-
-§11's test table is built across two files. `tools/tests/battle_esperstats.lua`
-gains IFRIT and SHIVA scenarios (rows 1–4) and now reads a fourth stat, vigor,
-which also strengthens the four Zozo scenarios. `tools/tests/battle_magicite.lua`
-is new and covers the rest (rows 5–9): the published MP prices, the 7-MP Osmose
-boundary, a real menu-driven Osmose cast, a real menu-driven Diamond Dust with
-its immunity control, and the `$3f2e` once-per-battle latch A/B. Row 10 —
-boosted Inferno multiplies, boosted Fire does not — was **not** added: the fold
-half is already covered by `battle_fold.lua`/`battle_subjob.lua` scenario C, and
-the summon half needs a boosted summon on a fixture that grants BP, which is
-Beat B work.
-
-**The three `.dat` bytes are an assembly splice, not an edited binary.**
-`magic_prop_en.dat` stays byte-identical to the FF3us 1.0 base; `MagicProp` is
-now four `.incbin` runs with three named `.byte` overrides between them, each
-carrying the vanilla value it replaces and the argument for replacing it, and a
-`.assert` that the pieces still reassemble to 3584 bytes. A byte changed inside
-the blob would have been invisible in a diff and unattributable in review — and
-the Osmose reprice in particular is an explicit exception to a house rule
-(§12.10), which is the last thing that should be silent. `mp-economy.md` now
-carries the matching amendment beside the rule itself.
-
-**§5.3's UNVERIFIED item is settled, and the design's reading was right.** An
-unblockable (+$04 bit `$20`, hit 0) damage spell *does* apply its status bytes
-without a roll — `CheckHit`'s multi-target arm branches on `bit #$20` straight
-to the carry-clear exit — *and* per-monster immunity is still consulted, because
-`MagicStatusEffect` only stages the rider into `$3de8` and `InitStatusVars` ANDs
-that against `$3330` before anything is set. Both halves are measured, not just
-read: `tools/tests/battle_magicite.lua` fires a real menu-driven Diamond Dust at
-two guards, one with the Slow bit set in `$3330` and one with it cleared, and
-gets Slow on the first and not the second from the same cast. **Siren's
-blockable-rider fallback is not needed.**
-
-**§6's second UNVERIFIED item is only half settled.** Measured on the shipped
-ROM at 30 MP against a 500 MP pool: caster 30 → 22 → 63, target 1000 → 959. The
-credit (41) equals the amount actually removed — but the pool was never the
-limiting factor, so this does *not* answer whether a caster draining a nearly
-empty enemy is credited the computed amount or the smaller real one. Still open;
-still only changes the size of §6's problem, not its existence.
-
-**A harness fact that will bite the next person who measures a spell here.**
-`LoadMagicProp` fills one shared property buffer (`$11a0..$11ad`), so on the
-Magitek intro mint an ally's beam resolving inside your caster's action window
-overwrites the record mid-resolution. Uninstrumented, that reads as "the summon
-charged 0 MP, applied no status, and scratched one guard" — an artifact of the
-interleave, not the spell. Freezing the rest of the party first turns the same
-cast into 27 MP charged, both guards hit, Slow staged on both. The test does
-this deliberately and says why.
-
-**Not built, deliberately: §8.2's esper-menu copy.** The detail screen still
-draws vanilla learn-% and still blanks the while-equipped line, exactly as §8.1
-and §12.9 describe. It is C3 menu-bank work of its own size, it is the one item
-in §10 that is *not* transcription, and it needs visual verification this pass
-could not run. It remains the most player-visible gap in the release: Ifrit's
-+5 vigor is currently a secret. §8.2's zero-code fallback (say it in the
-acquisition dialogue) is also not taken — that is a Beat B event-text change
-riding fixtures this pass could not mint.
-
-**Open questions §13 answered by building:** Q1 reprice — **yes, 8 MP**, with
-the house rule amended in `mp-economy.md` rather than bent. Q2 power cut —
-**taken as written**, 52 → 34. Q3 Ifrit's third slot — **two spells**, no Bserk.
-Q4 divine latches — **unchanged**, the summon still rides vanilla's `$3f2e` and
-kit divines still ride `$3ecb`; nothing was fused. Q5–Q8 are untouched: they are
-other issues' work.
-
-**Canon boundary (issue #16).** The shipped **while-equipped** spell/stat model
-is the v0.6 baseline: equip grants the spell list live, the stat mod exists only
+**Canon boundary.** The **while-equipped** spell/stat model is the baseline:
+equip grants the spell list live, the stat mod exists only
 while the stone is worn, nothing is learned, the summon is the once-per-battle
-divine. The proposed *learned-passive* system (magicite.md §3) is **not** assumed
+divine. The proposed *learned-passive* system (magicite.md) is **not** assumed
 anywhere below. Neither esper carries a named passive, because the passive
 channel does not exist in the ROM — see §12.
+
+**The three overridden `.dat` bytes are an assembly splice, not an edited
+binary.** `magic_prop_en.dat` is byte-identical to the FF3us 1.0 base;
+`MagicProp` is four `.incbin` runs with three named `.byte` overrides between
+them, each carrying the vanilla value it replaces and the argument for
+replacing it, and a `.assert` that the pieces still reassemble to 3584 bytes. A
+byte changed inside the blob would be invisible in a diff and unattributable in
+review — and the Osmose reprice in particular is an explicit exception to a
+house rule (§12.10), which is the last thing that should be silent.
 
 **Evidence rule (CONTRIBUTING.md).** Every mechanical claim below cites the file
 and line it was read from, or is labelled **UNVERIFIED**. Numbers taken out of
@@ -103,27 +32,27 @@ table implies.
 | Channel | Shipped? | Shape | Evidence |
 |---|---|---|---|
 | Spell grant | ✅ | **≤ 5 spell ids** per esper, from the vanilla esper record | `ot6_progression.asm:142-181` (`Ot6EsperSpellKnown`, scans `GenjuProp+1,+3,+5,+7,+9`) and `:203-252` (`Ot6UnionEspers`, seeds the union so a spell nobody knows still gets a list slot) |
-| Stat mod | ✅ | ~~**exactly one** stat, **unsigned**, magnitude **1–15**~~ — **superseded 2026-07-29 (#62): up to FOUR stats, SIGNED, −7..+7 each**, in vanilla's own equipment layout | `ot6_progression.asm` `Ot6EsperStatMod` + `Ot6EsperStatTbl`: two bytes per esper, `byte0 = [speed:4][vigor:4]`, `byte1 = [magpwr:4][stamina:4]`, each nibble `[sign:1][mag:3]`; `$0000` = no mod. Mirrors `CalcEquipEffect`, `battle_main.asm:2521-2539`. Ruler: `esper-stat-ruler.md` |
+| Stat mod | ✅ | up to **four** stats, **signed**, −7..+7 each, in vanilla's own equipment layout | `ot6_progression.asm` `Ot6EsperStatMod` + `Ot6EsperStatTbl`: two bytes per esper, `byte0 = [speed:4][vigor:4]`, `byte1 = [magpwr:4][stamina:4]`, each nibble `[sign:1][mag:3]`; `$0000` = no mod. Mirrors `CalcEquipEffect`, `battle_main.asm:2521-2539`. Ruler: `esper-stat-ruler.md` |
 | Summon | ✅ (vanilla) | one attack record per esper, `id = esper + $36`; once per battle **per character** | `FixPlayerAttack` sets the character's bit in `$3f2e` (`battle_main.asm:12739-12747`); the Magic menu's esper row is disabled when that bit is set (`battle_main.asm:14436-14439`) |
 | Boost-tier folding | ✅ | **8 families only**: fire, ice, bolt, poison→bio, cure, life, slow, haste | `Ot6FoldTbl`, `ot6_boost.asm:340-348`; scanned with a hard `cpx #$0018` bound at `:255`, `:317` |
 | Boost on non-folding actions | ✅ | ×2/×4/×8 on base damage; exempted commands are fight `$00`, capture `$06`, bushido `$07`, steal `$05` — **summons (`$19`) are not exempt** | `Ot6BoostDmg`, `ot6_kits.asm:1190-1256` |
 | Ability MP cost | ✅ live | Magic prices on the vanilla ruler (`GetMPCost`); `Ot6AbilityCostTbl` only keys blitz/bushido/tool ids | `ot6_boost.asm:352-400` (`Ot6AbilityCost` header); mp-economy.md "Where it lands" |
 | **Weapon permit** | ❌ **not built** | no equip-side consumer exists | `ot6_class.asm:17` names equip permits as a *future* consumer; nothing reads a permit anywhere in `ff6/src` |
 | **Named passives** | ❌ **not built** | no passive pool, no slots, no learning meter | ROADMAP M4 lists "Passives unlock at 2/4/6/8" as ⬜ |
-| **Esper menu copy** | ❌ **not touched** | the detail screen still draws vanilla learn-% and the "at level up:" bonus line | `skills.asm:2570-2645` — reads `GenjuProp` learn-rate bytes (all zeroed by M5) and blanks the bonus line when the byte is `$ff` (which M5 made universal) |
+| **Esper menu copy** | ◐ **stat block only** | the while-equipped stat block is drawn from `Ot6EsperStatTbl`; the detail screen still draws vanilla learn-% | `skills.asm:2570-2645` — reads `GenjuProp` learn-rate bytes (all zeroed by M5) |
 
 **Two consequences that shape everything below.**
 
 1. **A magicite's identity has to live in its spell list, its stat package, and
-   its summon.** (Written when the package was *one* stat; #62 made it up to
-   four, signed, which is where the downsides live now.) There is no passive channel and no permit channel to gesture with.
+   its summon.** There is no passive channel and no permit channel to gesture
+   with.
    magicite.md's *Kindling* / *Frostbite* passives and its claw/rod permits are
    design sketches with no ROM behind them; this document does not depend on
    them.
 2. **Boost folding + the live MP economy make base-tier elemental grants the
    most efficient actions in the game.** `Ot6QueueFold` runs *after* `GetMPCost`
    has already banked the **base** spell's MP (`ot6_boost.asm:211-215` header;
-   mp-economy.md, "Boost never raises MP cost"). So:
+   mp-economy.md, "BP buys tempo. MP buys power."). So:
 
    | granted spell | MP charged | at 2 BP casts as | vanilla MP of that tier |
    |---|---|---|---|
@@ -132,24 +61,11 @@ table implies.
 
    (MP and power read from `magic_prop_en.dat`, 14-byte records, +0x05 / +0x06.)
    A base-tier elemental grant is therefore worth roughly *ten times* its price
-   to a boosting caster. That is the intended shipped behaviour, and it is why
-   neither esper below needs a tier-2 spell — and why the **current** vanilla
-   rows for both are wrong.
-
-**The current rows are placeholders and they are actively broken** (`ff6/src/menu/genju_prop.asm:85-90`):
-
-```
-; 1: ifrit
-make_genju_prop {FIRE, 0}, {FIRE_2, 0}, {DRAIN, 0}, {}, {}
-; 2: shiva
-make_genju_prop {ICE, 0}, {ICE_2, 0}, {RASP, 0}, {OSMOSE, 0}, {CURE, 0}
-```
-
-The granted `FIRE_2` / `ICE_2` rows are dead weight for exactly the reason the
-Kirin pass already documented: a pre-folded tier "would otherwise sit as an
-un-foldable dead tier beside the foldable" base spell (`genju_prop.asm:130-137`).
-They cost 20/21 MP for what the base spell delivers at 4/5 MP under one boost.
-Both must go.
+   to a boosting caster. That is the intended behaviour, and it is why
+   neither esper below carries a tier-2 spell: a pre-folded tier "would
+   otherwise sit as an un-foldable dead tier beside the foldable" base spell
+   (`genju_prop.asm:130-137`), costing 20/21 MP for what the base spell
+   delivers at 4/5 MP under one boost.
 
 ---
 
@@ -174,8 +90,8 @@ The Facility party, from the repo's own route work:
 
 So the roster the two new stones are competing inside is Locke (pierce, thief),
 Celes (slash, ice + Runic), and two of {Edgar, Sabin, Cyan, Gau, Setzer}.
-**MARK UNCERTAIN:** the exact *available* set at Vector was not read out of the
-event source for this pass; `wob-route.md` §3's list is the authority used here.
+**MARK UNCERTAIN:** the exact *available* set at Vector has not been read out of
+the event source; `wob-route.md` §3's list is the authority used here.
 
 What that party already brings:
 
@@ -185,7 +101,7 @@ What that party already brings:
 | fire | **Sabin**'s Fire Dance (blitz #4, L15, 9 MP — kits.md); **Siren** currently grants base Fire as a leftover vanilla row (`genju_prop.asm:95-96`) |
 | bolt | **Ramuh** (Bolt + Rasp, `genju_prop.asm:82-83`) |
 | heal | **Kirin** (Cure/Regen/Antdot/Scan, `genju_prop.asm:138`) |
-| pierce chip | Locke, Edgar (AutoCrossbow ×4) |
+| pierce chip | Locke, Edgar (AutoCrossbow, whole side) |
 | slash chip | Celes, Cyan (Quadra Slam ×4), Sabin-with-claws |
 | **MP sustain** | **nobody** |
 | **magic mitigation** | **nobody** (Celes's Safe is L22 and is physical mitigation) |
@@ -224,8 +140,7 @@ Two findings the design has to answer:
   fire and Ramuh's bolt" is wrong on the fire half**, and contradicts the decode
   written eight lines above it in the same section. The Right Crane *absorbs*
   fire; neither Crane is fire-weak. Ramuh's bolt is a real key on the Right
-  Crane only, and the Left Crane absorbs it. Flagged for a correction pass; not
-  edited here (issue #16 is Ifrit/Shiva only).
+  Crane only, and the Left Crane absorbs it. Flagged for a correction pass.
 
 The trash is no kinder — §2.5 finds exactly one fire-weak species in the whole
 Facility and not a single ice-weak one.
@@ -253,7 +168,7 @@ From `monster_prop.dat` +0x0A/0B: Shiva 500, Ifrit 600, Number 024 777, Number
 
 ### 2.5 The random-encounter set — and the hole in it
 
-Decoded for this pass by walking `sub_battle_group.dat` (`$CF5600`, one byte per
+Decoded by walking `sub_battle_group.dat` (`$CF5600`, one byte per
 map id) → `rand_battle_group.dat` (`$CF4800`, 8 bytes per group, slot picked
 5/16 · 5/16 · 5/16 · 1/16 — the dispatch is at `ff6/notes/ff3u.asm:23211-23233`)
 → the 15-byte formation records in `battle_monsters.dat` (`$CF6200`; layout
@@ -291,7 +206,7 @@ the table's full id set stops at v0.4's search corridor) **or in
 entire stretch is unwritten, and every trash body here takes formula shields plus
 the generated weapon-class break floor.
 
-**The finding that matters for this design:**
+**The constraint that matters for this design:**
 
 > Across the Facility's ten trash species, **exactly one is fire-weak** (Flan,
 > and only in group `$68`) and **not one is ice-weak**. Six are bolt-weak — and
@@ -342,7 +257,7 @@ puzzle rather than a stat check.
 hole this stretch (Terra is the search target, absent)" for Zozo. Terra stays
 absent through the Facility (§2.1). Ifrit is the deliberate answer — but the
 answer lands *after* the dungeon, not inside it, and the doc says so rather than
-pretending otherwise. Related recommendation, **out of scope for issue #16**:
+pretending otherwise. Related recommendation:
 Siren's grant list still carries a vanilla `FIRE` in slot 4
 (`genju_prop.asm:95-96`) that magicite.md's own roster table does not list. When
 Siren gets her redesign, drop it — fire should be Ifrit's deliberate key, not a
@@ -358,7 +273,7 @@ leftover on the control esper.
 | channel | value |
 |---|---|
 | Grants | **Fire**, **Drain** |
-| Stat (while equipped) | **+5 vigor** |
+| Stat (while equipped) | **+6 vigor / +4 stamina / −3 mag.pwr** |
 | Summon (divine) | **Inferno** — fire, all enemies (vanilla record, unchanged) |
 | Weapon permit | **none** (§7) |
 
@@ -378,7 +293,7 @@ of null-break, DESIGN.md), and turns a fighter's turn into damage *and* healing.
 boss-scene esper — ships with exactly two (`genju_prop.asm:82-83`), so the
 precedent exists. More importantly the empty slots *are* the design: Ifrit is
 the stone you hold for the body, not the book, and a short list is what makes
-that read at a glance. His third "slot" is the +5 vigor. If playtest wants a
+that read at a glance. His third "slot" is the stat package. If playtest wants a
 third spell, the reserved candidate is **Bserk** (`$21`, 16 MP) for a full
 berserker read — held back deliberately because it removes player control, which
 is a worse fit for a stone meant to make a fighter *better*, not automatic.
@@ -387,39 +302,27 @@ is a worse fit for a stone meant to make a fighter *better*, not automatic.
 - *Fire 2* — the dead pre-folded tier the current row carries. Deleted for the
   Kirin reason (`genju_prop.asm:130-137`).
 - *Poison/Bio* — folds for 3 MP, which is enormous value, but poison is Edgar's
-  authored key for the early game (weapon-classes.md, Measurement #8) and
+  authored key for the early game (weapon-classes.md) and
   handing it to a second source dilutes the one element OT6 has actually
   authored encounters around.
 - *Cure* — Kirin's. Ifrit heals by taking, not by giving; that is the whole
   difference between the two stones.
 
-### 4.2 The stat: +5 vigor
+### 4.2 The stat: vigor
 
-> **SUPERSEDED 2026-07-29 (#62).** Ifrit's row is now **+6 vigor / +4 stamina /
-> −3 mag.pwr** and Shiva's **+6 mag.pwr / +4 speed / −3 vigor**, on a rung
-> measured against vanilla's own equipment ladder rather than against a
-> percentage of a base stat. The reasoning below — why *vigor* is Ifrit's stat
-> and *mag.pwr* is Shiva's, and why the pair should read as opposites — is what
-> #62 built; only the magnitudes and the two-sidedness changed. See
-> `docs/design/esper-stat-ruler.md` §4 for the rungs and
-> `ot6_progression.asm`'s `Ot6EsperStatTbl` for the per-esper reasoning.
+Ifrit's `Ot6EsperStatTbl` row is **+6 vigor / +4 stamina / −3 mag.pwr** — the
+opposite specialisation to Shiva's (§5.2), on rungs measured against vanilla's
+own equipment ladder; see `docs/design/esper-stat-ruler.md` §4.
 
-`Ot6EsperStatTbl` byte: `OT6_SM_VIGOR | 5`.
-
-- **Nobody else grants vigor.** The four shipped rows are Ramuh +3 stamina,
+- **Nobody else grants vigor.** The four Zozo rows are Ramuh +3 stamina,
   Siren +2 speed, Stray +3 mag.pwr, Kirin +3 mag.pwr
   (`ot6_progression.asm:392-409`). Vigor is the unclaimed selector and the one
   that reads as "Ifrit".
 - **Size.** Character base vigor at these levels sits at 31–47 (`char_prop.asm`:
   Terra 31, Locke 37, Cyan 40, Edgar 39, Sabin 47, Celes 34) and, with vanilla's
   per-level esper bonuses deleted (`genju_prop.asm:65-71`), those numbers barely
-  move all game. +5 is ~11–16% — one clear step above the field-stone tier.
-  Vanilla doubles vigor into the battle stat `$3b2c`
-  (`ot6_progression.asm:269-271`), so the effective bump is +10.
-- **Proposed magnitude ladder, so the tiers read:** *field stones* (Zozo,
-  picked up off the floor) = 2–3; *boss stones* (Ifrit, Shiva) = 4–5. This is
-  the first release where a player can feel that a fought-for stone is better
-  than a found one. M6 owns the final numbers.
+  move all game. Vanilla doubles vigor into the battle stat `$3b2c`
+  (`ot6_progression.asm:269-271`), so the effective bump is doubled too.
 - **It is the right bonus for this dungeon.** §2.3: every Facility boss is
   class-breakable and several have no usable element row at all. Vigor is chip
   throughput on the axis the dungeon actually rewards.
@@ -470,8 +373,8 @@ too much, the lever is the summon's MP cost, not the latch.
 | channel | value |
 |---|---|
 | Grants | **Ice**, **Osmose**, **Shell** |
-| Stat (while equipped) | **+4 magic power** |
-| Summon (divine) | **Diamond Dust** — re-authored: ice, all enemies, reduced power, **inflicts Slow** |
+| Stat (while equipped) | **+6 mag.pwr / +4 speed / −3 vigor** |
+| Summon (divine) | **Diamond Dust** — ice, all enemies, reduced power, **inflicts Slow** |
 | Weapon permit | **none** (§7) |
 
 ### 5.1 The three spells
@@ -479,7 +382,7 @@ too much, the lever is the summon's MP cost, not the latch.
 | spell | id | MP | boost behaviour | why |
 |---|---|---|---|---|
 | Ice | `$01` | **5** | **folds** to Ice 2 / Ice 3 | the element she carries out of the dungeon; the chip axis against Ifrit and everything ice-weak after |
-| Osmose | `$29` | **1** (see §6) | multiplies (MP damage) | the party's only MP income; the answer to v0.5's live MP economy |
+| Osmose | `$29` | **8** (see §6) | multiplies (MP damage) | the party's only MP income; the answer to the live MP economy |
 | Shell | `$25` | **15** | **inert** — see below | the answer to the Facility's telegraph contract |
 
 **Shell is the Facility-specific pick and it is deliberate.** Read the dungeon's
@@ -509,45 +412,29 @@ simply the first kit to walk into it.
   very much Shiva. It goes on the **divine** instead (§5.3), so the list and the
   summon do not duplicate each other, and so Siren keeps a reason to exist.
 
-### 5.2 The stat: +4 magic power
+### 5.2 The stat: magic power
 
-`Ot6EsperStatTbl` byte: `OT6_SM_MAGPWR | 4`.
+Shiva's `Ot6EsperStatTbl` row is **+6 mag.pwr / +4 speed / −3 vigor**, the
+two-sided mirror of Ifrit's: the pair read as opposite specialisations rather
+than as "a big number for fighters" and "a big number for mages". Shiva's second
+stat is *speed* rather than a mirror of Ifrit's stamina, so the two are
+opposites without being the same shape twice — Ice / Osmose / Shell is a kit
+about acting first and acting often. See `docs/design/esper-stat-ruler.md`.
 
 Base mag.pwr sits at 25–39 (`char_prop.asm`: Celes 36, Terra 39, Strago 34,
-Locke 28, Sabin 28), so +4 is ~10–16%. It is one step above Kirin's and Stray's
-+3 (`ot6_progression.asm:400`, `:409`) — the boss-stone tier from §4.2 — and it
-is the honest selector: her list is three spells, two of which scale off
-mag.pwr.
+Locke 28, Sabin 28), and mag.pwr is the honest selector: her list is three
+spells, two of which scale off it.
 
-**This was the one place the machinery forced a compromise — and it has since
-been built.** What the design wanted is a *two-sided* mod — Ifrit +vigor /
-−mag.pwr, Shiva +mag.pwr / −vigor — so that the two stones read as opposite
-specialisations rather than as "a big number for fighters" and "a big number for
-mages". `Ot6EsperStatTbl` could not express it: one selector, one unsigned 4-bit
-magnitude.
-
-**#62 (2026-07-29) shipped it verbatim.** Ifrit is **+6 vigor / +4 stamina / −3
-mag.pwr**; Shiva is **+6 mag.pwr / +4 speed / −3 vigor**. Shiva's second stat is
-*speed* rather than a mirror of Ifrit's stamina, so the pair are opposites
-without being the same shape twice — Ice / Osmose / Shell is a kit about acting
-first and acting often. See §12 item 1 and `docs/design/esper-stat-ruler.md`.
-
-### 5.3 The divine: Diamond Dust, re-authored
+### 5.3 The divine: Diamond Dust
 
 Vanilla `$38` is a straight mirror of Ifrit's `$37` — same targeting, same
 flags, power 52 vs 51, 27 MP vs 26. A mirror divine is the exact failure this
 document is trying to avoid.
 
-**Re-author it as the tempo divine:** ice, all enemies, **power 52 → 34**, and
-add **Slow** to the record's status bytes.
-
-| field | offset in record `$38` | from | to |
-|---|---|---|---|
-| spell power | +0x06 | 52 | **34** |
-| status byte 3 | +0x0C | `$00` | **`$04`** (`STATUS3::SLOW`, `const.inc:1517`) |
-
-Everything else — targeting `$6e`, element `$02`, unblockable `$20`, 27 MP —
-unchanged.
+**It is the tempo divine:** ice, all enemies, **power 34** (record `$38` +0x06),
+with **Slow** in the record's status bytes (+0x0C = `$04`, `STATUS3::SLOW`,
+`const.inc:1517`). Everything else — targeting `$6e`, element `$02`,
+unblockable `$20`, 27 MP — is vanilla.
 
 - **Why Slow.** It is element-independent, so it is worth something against the
   machines that shrug off ice, and it directly buys the party more actions
@@ -562,14 +449,15 @@ unchanged.
   keeps folded spells out of `Ot6BoostDmg`. Because the record is already
   unblockable (+0x04 = `$20`, hit 0), there is no chance axis for boost to
   guarantee, so the canon rule stays legible.
-- **UNVERIFIED and load-bearing:** whether an unblockable (+0x04 `$20`,
-  hit-rate 0) damage spell also applies its status bytes without a roll, and
-  whether per-monster STATUS3 immunity is still consulted on that path. Read the
-  status-application path off `CalcAttackEffect` / `ApplyDmg`
-  (`battle_main.asm:2964-3050` is the damage half) before building. If the
-  answer is "unblockable skips the status", the fallback is Siren's shape
-  (`magic_prop_en.dat` `$39`: +0x04 = `$00`, hit 136, status byte set), which
-  demonstrably works — at the cost of making the rider blockable.
+- **The rider lands without a roll, and immunity still applies.** An
+  unblockable (+0x04 `$20`, hit 0) damage spell *does* apply its status bytes
+  without a roll — `CheckHit`'s multi-target arm branches on `bit #$20`
+  straight to the carry-clear exit — *and* per-monster immunity is still
+  consulted, because `MagicStatusEffect` only stages the rider into `$3de8`
+  and `InitStatusVars` ANDs that against `$3330` before anything is set.
+  `tools/tests/battle_magicite.lua` fires a menu-driven Diamond Dust at two
+  guards, one with the Slow bit set in `$3330` and one with it cleared, and
+  gets Slow on the first and not the second from the same cast.
 - **Lower power is the point.** Inferno stays the damage divine; Diamond Dust
   becomes the control divine. Boosted to ×8 it is still a real nuke; it just is
   not *the* nuke, and the pair finally reads as two different apex moments.
@@ -578,42 +466,37 @@ unchanged.
 
 ## 6. Osmose, and the biggest balance risk in this design
 
-**Osmose costs 1 MP** (`magic_prop_en.dat` spell `$29`, +0x05 = `$01`), power
+**Osmose costs 8 MP** (`magic_prop_en.dat` spell `$29`, +0x05, overridden from
+vanilla's `$01` in the `MagicProp` splice), power
 26, hit 150, MP-targeting (+0x03 bit `$80`), drain-flagged (+0x04 bit `$02`).
 Facility boss MP pools run **447–810** (§2.4). Party max MP at this point is
 roughly 40–60 (mp-economy.md).
 
 FF6's magic damage scales on power, level and mag.pwr; at Facility levels a
 single unboosted Osmose computes for several hundred, which is many times the
-caster's entire pool. **One 1-MP cast is a full refill, against any enemy with
-MP, every fight.** And v0.5 flipped `OT6_MP_COSTS` on, making *every* verb but
-Fight cost MP (mp-economy.md; owner ruling 2026-07-22) — so a character who
-never runs dry is worth vastly more now than when the drain-verb ruling was
-written.
+caster's entire pool — so a cast is a full refill against any enemy with MP.
+With `OT6_MP_COSTS` live, *every* verb but Fight costs MP (mp-economy.md), so a
+character who never runs dry is worth a great deal.
 
 Compounding it: MP damage rides the same `$11b0` value the boost multiplier
 edits, so `Ot6BoostDmg` scales it too (`ot6_kits.asm:1240-1252`; MP application
 at `ApplyDmgMP`, `battle_main.asm:3021-3050`). *(**UNVERIFIED:** whether the
 drain half credits the caster with the **computed** amount or with the amount
-actually removed from a smaller pool. Read `_c213a7`'s net-damage path before
+actually removed from a smaller pool. Measured at 30 MP against a 500 MP pool —
+caster 30 → 22 → 63, target 1000 → 959, so the credit equals the amount
+removed — but the pool was never the limiting factor there, so the
+nearly-empty-enemy case is still open. Read `_c213a7`'s net-damage path before
 tuning. It changes the size of the problem, not its existence.)*
 
-Existing canon already anticipated the shape and blessed it — mp-economy.md:
-"MP-drain verbs stay… reaching one is a deliberate perk: this character can
-manage their own resources. Osmose (Shiva) and Rasp (Ramuh) sit in the esper
-pool." That ruling is from 2026-07-17, **before** costs went live and before the
-"only Fight is free" absolute. The ground moved under it.
-
-**The call: keep Osmose on Shiva — it is her identity and it is the one thing
-the party genuinely lacks — and reprice it.**
-
-> **Proposal: Osmose `$29` +0x05: 1 → 8 MP.**
+**Osmose stays on Shiva — it is her identity and it is the one thing
+the party genuinely lacks — priced at 8 MP.**
 
 This is an explicit, argued exception to mp-economy.md's "Magic keeps its
-vanilla MP costs (house rule)." The justification is that vanilla priced Osmose
+vanilla MP costs (house rule)", amended there rather than bent. The
+justification is that vanilla priced Osmose
 at 1 MP in a world where four characters spent MP at all; under OT6 every verb
-does, and a 1-MP full refill is not a spell, it is an off switch for a currency
-the release just turned on. 8 MP keeps it strongly net-positive (still a
+does, and a 1-MP full refill is not a spell, it is an off switch for the
+currency. 8 MP keeps it strongly net-positive (still a
 refill), keeps it castable on an empty-ish pool, and stops it from being free.
 It is one byte, and it applies globally (ZoneSeek inherits it, correctly).
 
@@ -632,6 +515,13 @@ measure first: `bal_party.lua` with an Osmose-cycling policy against a Facility
 fixture, watching mp-economy.md's proposed M6 bands (`mp_spent`,
 `mp_restored`, mp-zero incidence, "a refill arrives before ~70% depletion").
 
+**A harness fact for anyone measuring a spell here.** `LoadMagicProp` fills one
+shared property buffer (`$11a0..$11ad`), so on the Magitek intro mint an ally's
+beam resolving inside your caster's action window overwrites the record
+mid-resolution. Uninstrumented, that reads as "the summon charged 0 MP, applied
+no status, and scratched one guard" — an artifact of the interleave, not the
+spell. Freeze the rest of the party first.
+
 ---
 
 ## 7. Weapon permits: deliberately none
@@ -642,7 +532,7 @@ magicite.md's roster line assigns Ifrit "slashing (claws)" and Shiva
 1. **The channel does not exist.** No equip-side code reads a permit; the only
    mention in the source is a forward-looking comment (`ot6_class.asm:17`).
    Building an equip-menu permit system to serve two stones is the wrong place
-   to spend v0.6, and weapon-classes.md itself calls permits "a knob to gesture
+   to spend a release on, and weapon-classes.md itself calls permits "a knob to gesture
    with, not a system to balance around."
 2. **The headline use case is already covered without one.** magicite.md's
    argument for Ifrit's claw permit is "Sabin + Ifrit = the fire fist" — but
@@ -665,50 +555,21 @@ gap. Recorded here so the deferral is a decision, not an omission.
 
 ### 8.1 The gap
 
-The esper detail screen is **untouched by OT6** and is now actively misleading
-(`skills.asm:2570-2645`):
-
-- It draws each granted spell's **learn rate as a percent**, read from
-  `GenjuProp`'s even bytes — which M5 zeroed on purpose
-  (`genju_prop.asm:56-64`). Every esper shows five rows of nothing-per-cent, for
-  a system that no longer teaches anything.
-- It draws a **"at level up:"** line from the bonus byte, and **blanks it** when
-  the byte is `$ff` (`skills.asm:2627`, the `@5a67` path) — which M5 made
-  universally true (`genju_prop.asm:66-71`). So the while-equipped stat mod,
-  the single most important thing a player needs to know about a stone, is
-  invisible.
-
-A player equipping Ifrit today sees a fire spell, a drain spell, two `0%`
-columns, and a blank line where the reason to equip him should be.
+The esper detail screen still draws each granted spell's **learn rate as a
+percent** (`skills.asm:2570-2645`), read from `GenjuProp`'s even bytes — which
+M5 zeroed on purpose (`genju_prop.asm:56-64`). Every esper shows five rows of
+nothing-per-cent, for a system that no longer teaches anything.
 
 ### 8.2 What to change
 
-Two edits, both C3 menu-bank work of the same shape as the SwdTech submenu
-(kits.md, #8 Layer A) — i.e. real work, priced honestly:
+**Replace the learn-% column with the spell's MP cost** — C3 menu-bank work of
+the same shape as the SwdTech submenu (kits.md). The number a player
+needs is what the spell costs to cast, and MP is live for every verb.
+`Ot6CostFor`/`Ot6LoadoutCost` already exist as menu-callable pricing shims
+(`ot6_kits.asm:1167-1176`), so the menu and the charge cannot disagree.
 
-1. **Replace the learn-% column with the spell's MP cost.** The number a player
-   needs is what the spell costs to cast, and MP is now live for every verb.
-   `Ot6CostFor`/`Ot6LoadoutCost` already exist as menu-callable pricing shims
-   (`ot6_kits.asm:1167-1176`), so the menu and the charge cannot disagree.
-2. **Replace the "at level up:" line with a "while equipped:" line**, drawn from
-   `Ot6EsperStatTbl` rather than the `$ff` bonus byte. Vanilla's
-   `GenjuBonusName` strings are fixed 9-character rows indexed 0–16
-   (`genju_bonus_name_en.json`) and top out at "+2", so they cannot be reused —
-   this needs its own short string table in bank `$F0`.
-
-Proposed lines, at the 9-character width the existing column uses:
-
-| esper | line |
-|---|---|
-| Ifrit | `Vigor  +5` |
-| Shiva | `MagPwr +4` |
-
-**Zero-code fallback if the menu work slips:** the acquisition dialogue is the
-only other surface, and the two stones arrive in a scripted scene. Say it in the
-text — *"Take my fire, and my strength."* / *"Take my cold, and my sight."* —
-and file the menu work as a v0.7 item. This is a fallback, not the plan; a
-hidden stat bonus is the same hidden-tax problem that kept `OT6_MP_COSTS`
-dormant for a whole release (mp-economy.md, "Why dormant").
+The while-equipped stat block replaces vanilla's "at level up:" line and is
+drawn from `Ot6EsperStatTbl`.
 
 ### 8.3 Names
 
@@ -725,7 +586,7 @@ says otherwise.
 
 ### 9.1 Against the Factory party
 
-The test is issue #16's: *a meaningful choice, not a single answer.* Six stones,
+The test: *a meaningful choice, not a single answer.* Six stones,
 four slots.
 
 | stone | wants to be worn by | competes with | the choice |
@@ -740,7 +601,7 @@ four slots.
 The failure mode to watch is **Ifrit + Kirin + Shiva + Ramuh becoming the
 answer to everything**, with Siren and Stray retired. If measurement shows that,
 the lever is Ifrit's list (two spells is already thin; the vigor bump is the
-knob) rather than nerfing the two Zozo stones the v0.4 pass already tuned.
+knob) rather than nerfing the two already-tuned Zozo stones.
 
 ### 9.2 Against the boss keys
 
@@ -759,8 +620,8 @@ element**, which is the §3 thesis holding up.
 `$00` — it has **no vanilla element weakness**, and `Ot6ElemAddTbl` stops at
 v0.4's search corridor (`wob-route.md` §4). That bolt row has to be *authored*
 during Beat B or Ramuh's "sub-job debut" moment (`bosses-wob.md` §15) does not
-exist. Out of scope for issue #16; raised because the Ifrit/Shiva balance story
-assumes the rest of the beat's element authoring happens.
+exist. Raised because the Ifrit/Shiva balance story assumes the rest of the
+beat's element authoring happens.
 
 ### 9.3 Against the encounter set — and the authoring ask
 
@@ -770,8 +631,8 @@ bolt-weak, one bolt-absorber, two with no element row at all, and **no
 
 Two things follow, and they pull in opposite directions.
 
-**(a) The kits are already built for this, and that is the good news.** Neither
-stone's Facility value is elemental — Ifrit's is +5 vigor on the class axis the
+**(a) The kits are built for this, and that is the good news.** Neither
+stone's Facility value is elemental — Ifrit's is vigor on the class axis the
 break floor gives every one of these bodies, plus non-elemental Drain; Shiva's
 is Osmose, Shell, and Diamond Dust's Slow. A player who equips both and never
 casts Fire or Ice still gets full value out of them for the whole dungeon. That
@@ -779,14 +640,14 @@ is §3's thesis being load-bearing rather than decorative.
 
 **(b) But "your new stone chips nothing" is still a bad feeling, and the fix is
 an authoring pass, not a kit change.** Recommendation for the Beat B M6 pass,
-following Measurement #8's discipline (`balance-metrics.md:811` — author where a
-species *needs* a reachable axis, keep the keys roughly even):
+following the element-authoring discipline (author where a species *needs* a
+reachable axis, keep the keys roughly even):
 
 - Give **fire** a real footprint. The Facility is full of oiled machinery and
   organics; Flan is the only fire-weak body and it appears in one group. Two or
   three `Ot6ElemAddTbl` rows (Gobbler `$088` and Rhinox `$075` are the obvious
   candidates — they currently have **no** element weakness at all, exactly the
-  Cirpius/Rhodox hole Measurement #8 closed with poison) would make Ifrit's fire
+  Cirpius/Rhodox hole that was closed with poison) would make Ifrit's fire
   a key without displacing bolt.
 - Give **ice** a footprint too, or accept that Shiva is a support stone in this
   dungeon and say so in her acquisition copy. ProtoArmor `$165` is the natural
@@ -796,8 +657,8 @@ species *needs* a reachable axis, keep the keys roughly even):
   already close to a skeleton key here; Rhinox's bolt *absorb* is the one thing
   keeping that honest and should stay.
 
-This is out of scope for issue #16 (which is the kits), but the two issues
-should ship in the same release or Ifrit and Shiva will read as dead loot.
+That is a separate change from the kits, but the two should ship in the same
+release or Ifrit and Shiva will read as dead loot.
 
 **What still needs measuring:**
 
@@ -817,7 +678,7 @@ should ship in the same release or Ifrit and Shiva will read as dead loot.
 ### 9.4 MP arithmetic, one worked line
 
 A Celes wearing Shiva at ~50 max MP: Shell (15) on the front-liner, Ice at 1 BP
-(5) as a probe, Osmose (**8** after the reprice) to refill — net −12 MP per
+(5) as a probe, Osmose (**8**) to refill — net −12 MP per
 three actions against any enemy with a pool, versus −20 without Osmose. That is
 the intended shape: **noticeably sustaining, not free.** At vanilla's 1 MP it is
 −19 for three actions *and* a full refill, i.e. permanently net-positive, which
@@ -825,160 +686,57 @@ is §6's problem stated as a number.
 
 ---
 
-## 10. The data, literally
-
-Everything this design asks for, as edits. No new battle code is required for
-anything except the menu copy (§8.2) and — if measurement wants it — the
-optional `Ot6BoostDmg` MP-targeting gate (§6).
-
-**`ff6/src/menu/genju_prop.asm`** — replace rows 1 and 2:
-
-```
-; 1: ifrit -- the Furnace.  BASE-TIER Fire (folds to Fire2/Fire3 via Ot6FoldTbl)
-;   plus Drain, which is in no fold family and correctly takes Ot6BoostDmg's
-;   multiplier instead.  The vanilla FIRE_2 grant is DROPPED for the Kirin
-;   reason: a pre-folded tier is a dead, un-foldable row beside the base spell.
-make_genju_prop {FIRE, 0}, {DRAIN, 0}, {}, {}, {}
-
-; 2: shiva -- the Rime.  Base-tier Ice (folds) + Osmose (MP income) + Shell
-;   (the Facility's telegraphs are tier-2/3 magic).  ICE_2 dropped as above;
-;   RASP left to Ramuh; CURE left to Kirin.
-make_genju_prop {ICE, 0}, {OSMOSE, 0}, {SHELL, 0}, {}, {}
-```
-
-**`ff6/src/battle/ot6_progression.asm`**, `Ot6EsperStatTbl` rows 1 and 2:
-
-```
-        .byte   OT6_SM_VIGOR  | 5       ;  1 ifrit    +5 vigor  (the only vigor
-                                        ;    stone; boss-tier magnitude)
-        .byte   OT6_SM_MAGPWR | 4       ;  2 shiva    +4 mag.pwr (boss-tier, one
-                                        ;    step over Kirin/Stray's +3)
-```
-
-**`ff6/src/battle/magic_prop_en.dat`** — three bytes:
-
-| record | offset | from | to | why |
-|---|---|---|---|---|
-| `$29` Osmose | +0x05 (MP) | `01` | **`08`** | §6 |
-| `$38` Shiva summon | +0x06 (power) | `34` (52) | **`22`** (34) | §5.3 |
-| `$38` Shiva summon | +0x0C (status 3) | `00` | **`04`** | §5.3, `STATUS3::SLOW` |
-
-**Unchanged, explicitly:** Ifrit's summon record `$37`; every learn-rate byte
-(stays 0); every `GENJU_BONUS` byte (stays `$ff`); `Ot6FoldTbl`; `Ot6ShieldTbl`
-rows `$108`/`$109`; `Ot6AbilityCostTbl` (magic prices on the vanilla ruler).
-
----
-
-## 11. Tests (issue #16's acceptance criteria)
-
-Model on `battle_subjob.lua` (grant + deletions) and `battle_esperstats.lua`
-(the stat half), which already carry the per-esper kit confirmations for the
-four Zozo stones. Add Ifrit and Shiva as new scenarios in the same file rather
-than new files — they are the same assertions with different rows.
-
-| # | assertion | shape |
-|---|---|---|
-| 1 | equip Ifrit → Fire and Drain appear in the in-battle Magic list; **Fire 2 does not** | the `checkEsper(..., grants, absents)` shape `battle_esperstats.lua` already has (see its Kirin row, which already asserts "NOT Cure2") |
-| 2 | equip Shiva → Ice, Osmose, Shell appear; Ice 2, Rasp, Cure do not | same |
-| 3 | unequip → both lists revert; the BASE negative control | `battle_esperstats.lua`'s existing BASE scenario |
-| 4 | Ifrit worn → vigor +5 and **only** vigor; Shiva worn → mag.pwr +4 and only mag.pwr | same file's stat comparison |
-| 5 | granted Fire at 2 BP queues attack id `$09` and charges **4** MP, not 51 | extend `battle_fold.lua` / `battle_mpcost.lua`; this is the load-bearing interaction of the whole design |
-| 6 | granted Ice at 2 BP queues `$0a` and charges **5** MP | same |
-| 7 | Osmose charges **8** MP and restores the caster; refused at < 8 MP | `battle_mpcost.lua`'s charge+refusal pattern |
-| 8 | Inferno usable once per battle per character; the esper row greys after | drive `$3f2e`; positive control that the row was *offered* first (CONTRIBUTING: a quiet test is not a passing test) |
-| 9 | Diamond Dust applies Slow to a non-immune target and **not** to Number 024 | the §5.3 UNVERIFIED item is what this test exists to settle; it must fail loudly if the status silently never applies |
-| 10 | boosted Inferno takes the ×2/×4/×8 multiplier; boosted Fire does **not** (it folded) | `Ot6BoostDmg`'s tier-family scan is the thing under test |
-
-Frontier gating: these ride the Beat B fixtures (`@suite frontier=<name>`), so
-they report "skipped" until the Vector/MRF chain mints — the house pattern.
-
----
-
 ## 12. What the shipped machinery **cannot** express
 
-The important section. Every item here is a design intent this document wanted
-and had to give up, drop, or route around.
+Every item here is a design intent this document wanted and had to give up,
+drop, or route around. Numbering has gaps where an item was closed.
 
-**Struck-through items have since been built.** Items 1, 2 and 9 were closed on
-2026-07-29 by #62 (`docs/design/esper-stat-ruler.md`); the rest still stand. The
-original text is kept rather than deleted, because the reason a gap existed is
-the reason the fix took the shape it did.
-
-1. ~~**A two-sided stat mod.**~~ **CLOSED 2026-07-29 by #62.** This section's
-   prescription turned out to be exactly right, including the floor clamp:
-   `Ot6EsperStatTbl` is now two bytes per esper carrying four *signed* nibbles,
-   and `Ot6EsperStatMod` clamps at 0 as well as at `$ff`. What the fix pass
-   added was the *layout*: rather than inventing a signed encoding, it adopted
-   **vanilla's own** — `ItemProp+16/+17`, the four signed nibbles every piece of
-   equipment in the game carries, decoded by `CalcEquipEffect`
-   (`battle_main.asm:2521-2539`). Ifrit is now **+6 vigor / +4 stamina / −3
-   mag.pwr** and Shiva **+6 mag.pwr / +4 speed / −3 vigor** — the opposed
-   specialisations §5.2 asked for, in the words it asked for them.
-   `battle_esperstats.lua`'s `checkEsper` took a table of four expected deltas
-   instead of one (stat, delta) pair. Measurement and rungs:
-   `docs/design/esper-stat-ruler.md`.
-2. ~~**More than one stat per stone.**~~ **CLOSED 2026-07-29 by #62** — same
-   change. Every authored stone now moves two or three stats.
-3. **HP% / MP% mods.** Structurally deferred: the selector has no encoding for
-   them (`ot6_progression.asm:299-303`). *Max MP up* is one of mp-economy.md's
-   named MP-relief candidates and cannot be authored on either stone.
-4. **Named passives.** *Kindling* ("fire spells chip +1") and *Frostbite* ("ice
-   chip +1") from magicite.md's roster have no ROM behind them — there is no
-   passive pool, no slots, no learning meter (ROADMAP M4, ⬜). Both stones are
-   designed without them, which is why so much weight lands on the spell lists.
-5. **Weapon permits.** No equip-side consumer exists (`ot6_class.asm:17`). §7
-   turns this into a deliberate design call rather than a blocker, but it is a
-   real missing channel.
-6. **Boost on a buff.** DESIGN.md promises "Buffs/debuffs: duration per BP".
-   Nothing implements it: `Ot6QueueFold` only folds the 8 tier families and
-   `Ot6BoostDmg` only multiplies damage. **Boosting Shiva's Shell does literally
-   nothing** and the UI will happily let a player spend 3 BP on it. This is the
-   most player-visible gap in the list.
-7. **A boost/fold family for anything outside the 8 rows.** `Ot6FoldTbl` is
-   scanned with a hard `cpx #$0018` bound in three places
-   (`ot6_boost.asm:255,:317`, `ot6_kits.asm:1233`), so adding a ninth family
-   means touching all three. Not needed by this design; noted because the next
-   esper's might.
-8. **Per-esper summon gating beyond vanilla's.** The once-per-battle latch is
-   vanilla's `$3f2e` and is per-character, party-wide-uniform. There is no way
-   to say "this summon is twice per battle" or "this summon requires a Broken
-   target" the way `Ot6Oblivion` can for a kit divine.
-9. ~~**Esper menu copy.**~~ **CLOSED** — by #27 for the single-stat line, and
-   rebuilt by #62 into a multi-term stat block (caption on the title row, one
-   term per nonzero delta packed down the right-hand column, a `-` sign where the
-   delta is negative, and nothing at all for a stone with no mod).
-10. **Re-pricing magic without breaking a house rule.** Magic prices through
-    vanilla `GetMPCost` off the spell record; `Ot6AbilityCostTbl` keys only
-    blitz/bushido/tool id ranges (`ot6_boost.asm:352-400`). Repricing Osmose is
-    a one-byte `.dat` edit, so it is *possible* — but it is a global change to a
-    vanilla spell, and mp-economy.md's "magic keeps vanilla costs" rule has to
-    be explicitly amended rather than quietly bent.
+- **3. HP% / MP% mods.** Structurally deferred: the selector has no encoding for
+  them (`ot6_progression.asm:299-303`). *Max MP up* is one of mp-economy.md's
+  named MP-relief candidates and cannot be authored on either stone.
+- **4. Named passives.** *Kindling* ("fire spells chip +1") and *Frostbite* ("ice
+  chip +1") from magicite.md's roster have no ROM behind them — there is no
+  passive pool, no slots, no learning meter (ROADMAP M4, ⬜). Both stones are
+  designed without them, which is why so much weight lands on the spell lists.
+- **5. Weapon permits.** No equip-side consumer exists (`ot6_class.asm:17`). §7
+  turns this into a deliberate design call rather than a blocker, but it is a
+  real missing channel.
+- **6. Boost on a buff.** DESIGN.md promises "Buffs/debuffs: duration per BP".
+  Nothing implements it: `Ot6QueueFold` only folds the 8 tier families and
+  `Ot6BoostDmg` only multiplies damage. **Boosting Shiva's Shell does literally
+  nothing** and the UI will happily let a player spend 3 BP on it. This is the
+  most player-visible gap in the list.
+- **7. A boost/fold family for anything outside the 8 rows.** `Ot6FoldTbl` is
+  scanned with a hard `cpx #$0018` bound in three places
+  (`ot6_boost.asm:255,:317`, `ot6_kits.asm:1233`), so adding a ninth family
+  means touching all three. Not needed by this design; noted because the next
+  esper's might.
+- **8. Per-esper summon gating beyond vanilla's.** The once-per-battle latch is
+  vanilla's `$3f2e` and is per-character, party-wide-uniform. There is no way
+  to say "this summon is twice per battle" or "this summon requires a Broken
+  target" the way `Ot6Oblivion` can for a kit divine.
+- **10. Re-pricing magic without breaking a house rule.** Magic prices through
+  vanilla `GetMPCost` off the spell record; `Ot6AbilityCostTbl` keys only
+  blitz/bushido/tool id ranges (`ot6_boost.asm:352-400`). Repricing Osmose is
+  a one-byte `.dat` edit, so it is *possible* — but it is a global change to a
+  vanilla spell, and mp-economy.md's "magic keeps vanilla costs" rule has to
+  be explicitly amended rather than quietly bent.
 
 ---
 
 ## 13. Open questions for the driver
 
-1. **Osmose's price.** Is 8 MP the call, or does the house rule ("magic keeps
-   vanilla MP costs") win and the risk get carried into playtest instead?
-   Recommendation: reprice — the rule predates the release that made MP matter.
-2. **Diamond Dust's power cut.** 52 → 34 is chosen so the two divines stop being
-   mirrors. Too far? The alternative is keeping power and dropping the Slow
-   rider, which puts us back where we started.
-3. **Ifrit's third slot.** Two spells and a big body bonus, or add Bserk? This
-   document argues two; it is the most reversible decision here.
-4. **Two divine latches or one** (§4.4). Recommendation: two, because fusing
-   them punishes wearing a magicite. Flagged for M6 measurement.
-5. **Siren's leftover Fire** (`genju_prop.asm:95-96`). Drop it when Siren gets
-   her pass, so Ifrit is the deliberate fire key? magicite.md's roster table
-   already omits it, so this is arguably just finishing the v0.4 data pass.
-6. **The `bosses-wob.md` §16 correction** — "Ifrit's fire" as a Crane key is
-   contradicted by the same section's own decode. Who owns that edit?
-7. **The Beat B element-authoring pass** (§9.3). Ifrit and Shiva chip almost
-   nothing in the Facility as its data stands — one fire-weak species, zero
-   ice-weak. Does the `Ot6ElemAddTbl` pass ship in v0.6 alongside these kits, or
-   do the stones ship as deliberate support/stat rewards with copy that says so?
-   Recommendation: same release, or the reward reads as dead loot.
-8. **MRF rooms `$109`/`$10B`/`$10C`** have random battles enabled but battle
-   group `$00`, which resolves to the level-5 Leafer / Dark Wind formations. If
-   those rooms are walkable with the check live, that is a vanilla oddity worth
-   its own issue — noted here only because it turned up in the §2.5 decode.
+- **5. Siren's leftover Fire** (`genju_prop.asm:95-96`). Drop it when Siren gets
+  her pass, so Ifrit is the deliberate fire key? magicite.md's roster table
+  already omits it.
+- **6. The `bosses-wob.md` §16 correction** — "Ifrit's fire" as a Crane key is
+  contradicted by the same section's own decode. Who owns that edit?
+- **7. The Beat B element-authoring pass** (§9.3). Ifrit and Shiva chip almost
+  nothing in the Facility as its data stands — one fire-weak species, zero
+  ice-weak. Does the `Ot6ElemAddTbl` pass ship alongside these kits, or
+  do the stones ship as deliberate support/stat rewards with copy that says so?
+  Recommendation: same release, or the reward reads as dead loot.
+- **8. MRF rooms `$109`/`$10B`/`$10C`** have random battles enabled but battle
+  group `$00`, which resolves to the level-5 Leafer / Dark Wind formations. If
+  those rooms are walkable with the check live, that is a vanilla oddity worth
+  filing separately — noted here only because it turned up in the §2.5 decode.

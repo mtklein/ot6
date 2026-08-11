@@ -928,8 +928,8 @@ Ot6FoldTbl:
         ; turns queue through the same CreateAction (RandDanceAction,
         ; battle_main.asm:617), but by then Cmd_13 has set the actor's DANCE
         ; status ($3ef8 bit 0) -- one payment starts the whole-battle state,
-        ; and every locked-in step is free (mp-economy.md:96).  a stumbled
-        ; start (Cmd_13's 50% @17af arm) clears the bit, so retrying the
+        ; and every locked-in step is free (mp-economy.md's verb survey).  a
+        ; stumbled start (Cmd_13's 50% @17af arm) clears the bit, so retrying the
         ; commit pays again -- the payment moment IS the commit moment.
         ; X = attacker entity at this hook (the site contract above).
         pla                     ; drop the parked cost (0 for dance)
@@ -1109,8 +1109,9 @@ Ot6ThiefCostTbl:
 
 ; [ the Dance price -- one authority for the charge and the menu (#34) ]
 ;
-; mp-economy.md:96 rules "flat, paid at start, 4-10: one payment starts a
-; whole-battle state".  8 -- the top half of the band -- because the single
+; mp-economy.md's verb survey rules Dance "flat, paid at start, 4-10: one
+; payment starts a whole-battle state".  8 -- the top half of the band --
+; because the single
 ; payment funds every subsequent turn's verb for the rest of the battle
 ; (each locked-in step is free), so it prices above the per-use signature
 ; verbs (Steal 4 since #52, Pummel 4) while staying payable from Mog's pool
@@ -1140,8 +1141,9 @@ Ot6ThiefCostTbl:
 ; Pummel $5d, Dispatch $55, AutoCrossbow $aa, every one of them 4 -- and Steal
 ; is Locke's signature, mp-economy.md's "signatures become the cheapest rows of
 ; their kits".  That parity is load-bearing for #55: Steal is a RUNG, not the
-; ceiling (owner, 2026-07-29 -- Locke's 99 is Master's Mark, kits.md:404), so
-; it should read as rung one of an eight-rung ladder, not as its own thing.
+; ceiling (owner, 2026-07-29 -- Locke's 99 is Master's Mark, kits.md's Locke
+; ladder rung 8), so it should read as rung one of an eight-rung ladder, not
+; as its own thing.
 ;
 ; NOTE WHAT THIS PRICE STILL CANNOT DO: it cannot be SEEN.  Steal is a
 ; top-level battle command, and command_window_data_set (btlgfx_main.asm:10099)
@@ -1186,7 +1188,7 @@ Ot6ThiefCostTbl:
 ; [ the Leap price -- RETIRED.  Leap is free (owner, 2026-07-29) ]
 ;
 ; #40 gave Leap a flat 2 (Ot6LeapCost, deleted here), reasoned from "only the
-; basic Fight command is free" (mp-economy.md:30-34) and mp-economy.md:97's
+; basic Fight command is free" (mp-economy.md, as it then read) and that doc's
 ; probe-collect rung, the same row Steal sits on.  Two things retired it:
 ;
 ;   1. the price was NEVER DISPLAYED.  Leap is a top-level command row, not a
@@ -1315,8 +1317,8 @@ Ot6ThiefCostTbl:
 ; ($5c), each its kit's divine top rung.  Tools does NOT participate: its
 ; capstone is Overclock, which kits.md prices as the SUM of the two tools it
 ; fires and which is not built, and Air Anchor ($a9) is explicitly "a findable
-; item mid-kit gag, not the capstone" (kits.md:137) -- so there is no top Tools
-; ROW here to anchor.  Steal, Slot, Rage and Dance are flat verbs with no
+; item mid-kit gag, not the capstone" (kits.md, Edgar) -- so there is no top
+; Tools ROW here to anchor.  Steal, Slot, Rage and Dance are flat verbs with no
 ; ladder at all; that is a stated non-answer, not a gap.
 ;
 ; WHY 99 AND NOT 100.  Owner: "seeing things like 99, 999, and 9999 in Final

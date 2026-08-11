@@ -1,11 +1,9 @@
 # Waiver burn-down plan — the remaining suite tests, classified
 
-Produced 2026-08-09 by a read-only classification sweep over every waived
-suite-test file (issue #75).  This is the work-order source for the
-conversion waves: each entry names the write sites, why they exist, and
-either the honest replacement or the quarantine justification.  gen_* and
-probe_* files are out of scope here (gens convert leg-by-leg with the
-frontier; the probe disposition is a pending owner call on #75).
+The work-order source for the conversion waves: each entry names the write
+sites, why they exist, and either the honest replacement or the quarantine
+justification.  gen_* and probe_* files are out of scope here — gens convert
+leg-by-leg with the frontier.
 
 Scope: the waiver file's unique suite-test paths yield **60 files**.
 8 of the 60 are instruments/evidence scripts, not `@suite` tests:
@@ -21,7 +19,7 @@ scaffold), `metrics_battle`, `mines_pace`, `shot_battle_items`,
   rows + clear the magitek status bit" block exists only because the
   honest root has no kit.  Every one of those is fixed by a **fixture
   swap**, not by cleverness.
-- **Real-kit fixtures now exist and are Aug-9 re-mints**: Cyan →
+- **Real-kit fixtures exist**: Cyan →
   `cyan_defence` / `doma_defended` / `camp_escaped`; Sabin → `vargas_won`
   (L9, Blitz) and `vector_doorstep` (LOCKE CELES SABIN EDGAR, post-opera
   anchor); Edgar → `figaro_cleared`, `vector_doorstep`; Locke+Terra with
@@ -138,9 +136,9 @@ with $7BC2-gated d-pad.  Per-file specifics:
 - **battle_dancemp** → `moogle_defense` (the header's "Mog is not in the
   supported frontier" is STALE — he leads P2 there).  Dances are
   terrain-derived and real; the cost boundary is earned by dancing twice.
-- **battle_rage / battle_gaufight / menu_ragepage** → `gau_joined` + a
-  **rage-collection mint** (the Veldt grind `gen_sabin_gau` already
-  performs — known shape).  The 8-slot loadout's honest writer is the
+- **battle_rage / battle_gaufight / menu_ragepage** → `gau_joined` (no
+  collection mint: `InitRage` already grants nine rages at New Game).
+  The 8-slot loadout's honest writer is the
   field Rage page; the Veldt bit is geography — walk off the Veldt
   instead of clearing $11E4 in a callback; bench-wounding → X-defer.
 - **battle_slots** (install half) / **battle_slotsboot** — the Setzer
@@ -254,10 +252,10 @@ with $7BC2-gated d-pad.  Per-file specifics:
    battle_bushido / menu_swdtechpage's all-eight phase, Sabin's eighth
    Blitz (L70) in menu_blitzpage — stay waived as labeled isolation
    arms, converted organically later.
-   **CORRECTION that shrank the class:** `InitRage` (field/init.asm:355)
-   grants Gau NINE rages at New Game — the 8-slot rage loadout was never
-   a ceiling case.  battle_rage and menu_ragepage convert against the
-   existing honest gau_joined with no collection mint.
+   The 8-slot rage loadout is NOT in that class: `InitRage`
+   (field/init.asm:355) grants Gau NINE rages at New Game, so battle_rage
+   and menu_ragepage convert against the existing honest gau_joined with no
+   collection mint.
 2. **The observation-window doctrine.**  "Monsters STOPped + HP floored +
    death-protected" appears in ~20 files — the single most common
    remaining waiver.  Under the owner's area-vs-mechanism calibration,
@@ -267,36 +265,7 @@ with $7BC2-gated d-pad.  Per-file specifics:
    actions, a real high-gauge boss for headroom, or one observation per
    battle.  Decide per file in the wave, not twenty separate doctrines.
 
-## Probe disposition (dispatcher call, delegated by the owner 2026-08-10)
-
-Keep a named handful, retire the rest: settled one-shot probes are
-deleted (their measurements live in docs/commits, and most were taken
-against poked states — re-derivation against the honest chain is the
-right move if a number ever matters again); instruments that docs or
-current investigations actively point at stay (the stall/trench/banquet
-reproduction probes, probe_lockekit, the pad-input save template
-probe_banquet_timer_save, and kin — the retirement wave assembles the
-keep-list from actual references, not memory).
-
-**Executed 2026-08-10** (wt/probe-retire): 73 waived probes deleted, 104
-waiver lines gone (257 → 153 pairs, pure deletion).  26 waived probes
-stay, each for a concrete reference: `@suite` members (probe_ctrboost,
-probe_shadow_overlap), README-documented instruments (probe_896f,
-probe_bushido, probe_canstep, probe_input, probe_junk16,
-probe_reveal_trace, probe_slots, probe_srmboot, probe_train_tail,
-probe_vargas), the banquet timer set banquet-decode.md designates kept
-(probe_banquet_timer, probe_banquet_timerwatch, probe_banquet_timer_save)
-plus probe_banquet_stage (mints the banquet_window state the kept
-circuit/greedy probes boot), self-declared REFERENCE PROBEs
-(probe_fieldicons, probe_menucols) and kit-gau.md's isolated instrument
-(probe_cursorgutter), the anchor-verification pair
-(probe_esperdetail_anchor, probe_esperdetail_tube6_anchor), the #25
-fail-before controls for the three tracked anchors
-(probe_v07_h/i/j_negative), compose.py's canonical comment-hazard example
-(probe_dottick), and multi-hit.md's planned-suite-test template
-(probe_multihit).  Read-only probes were untouched.
-
-## The kill-bit deletion: what still blocks it (measured 2026-08-10)
+## The kill-bit deletion: what still blocks it
 
 The last structural #75 item is deleting the shared kill-bit paths from
 `lib/ot6_field.lua` (7 sites) and `M.clearBattle` (`lib/ot6.lua`), which

@@ -1,13 +1,13 @@
-# The MP economy — design dive v1 (2026-07-17)
+# The MP economy
 
 Scope: game-wide rules, WoB-sized numbers. Nothing here is
 locked, and every number is a placeholder for playtest — said
-once here instead of per row. Terminology (ruling 2026-07-17):
+once here instead of per row. Terminology:
 the pool keeps its vanilla name MP — the name existing players
 already know — enemy break counters are "shields", and SP is
 not used.
 
-## The target, stated by the owner (2026-07-29)
+## The target, stated by the owner
 
 The economy exists to buy back a choice vanilla never offered.
 
@@ -25,10 +25,7 @@ to feel like ability characters.**
 
 Both halves bind. An economy so tight that SwdTech is rationed makes Cyan
 a worse Locke; one so loose that Fight is never correct leaves vanilla's
-non-choice intact with extra bookkeeping. The v0.7 playtest found the
-loose failure: at LV14 Cyan's available techs cost 1-3 MP against a 96
-pool while BP was not scarce either, so neither currency bound him and
-Fight had no case.
+non-choice intact with extra bookkeeping.
 
 **And the owner's standing expectation: this will take a while.** Getting
 a number that is Octopath-right and FF6-right at once is a playtest loop,
@@ -36,22 +33,22 @@ not a derivation — so a pass that improves the shape and gets played is
 worth more than one that waits to be correct. Successive rescales are
 expected and are not churn.
 
-## The ceiling: 99 (SHIPPED 2026-07-29, issue #57)
+## The ceiling: 99
 
 The owner's shape for the top of every ladder: **each character's own
 ultimate costs 99 MP.** It agrees with the ruler below — 99 against a
 L70 pool of ~760 is 13%, inside the 8-20% band — so it anchors the table
 rather than recalibrating it, and it makes ladders comparable across
-characters, which they are not today.
+characters.
 
-It is also the **hard display ceiling**, and that is now measured rather
-than asserted. Every OT6 price drawer renders exactly two digits:
+It is also the **hard display ceiling**. Every OT6 price drawer renders
+exactly two digits:
 `ListText` command `$02` (`btlgfx_main.asm:15045-15073`) divides by ten
 exactly *once* and emits a tens cell and a ones cell, and
 `Ot6LoadoutDrawCost` (`field_menu.asm:3057`) has one tens loop. A cost of
 100 does not print as a big number; it prints as punctuation. So 99 is
 the largest cost that can be shown at all, and no cost anywhere may
-exceed it. `battle_costtable.lua` now asserts that bound on every row of
+exceed it. `battle_costtable.lua` asserts that bound on every row of
 the live table, not just the rows it pins by name.
 
 **Vanilla already agrees.** Measured off `magic_prop_en.dat` +$05: the
@@ -82,14 +79,13 @@ round maximum, prefer the series' own — 99, 999, 9999 — over an
 arbitrary one. If a design wants 100 or 50, it should say why the classic
 number is wrong rather than defaulting past it.
 
-**Scope (owner, 2026-07-29): 99 where it makes sense, not universal.**
+**Scope (owner): 99 where it makes sense, not universal.**
 Where a character has a genuine ultimate, that ultimate costs 99. Where
 the top verb is flat or free — Slot, Rage, Dance — the character simply
 does not participate, and that is a stated non-answer rather than a gap
 to fill with an invented capstone.
 
-**Who actually qualifies, established from the ladders rather than
-assumed:**
+**Who qualifies, from the ladders:**
 
 | kit | top row | 99? | why |
 |---|---|---|---|
@@ -98,22 +94,21 @@ assumed:**
 | Tools | **Overclock** | **no — not yet** | Edgar's divine, and it is *not built*. It has no tool item id and therefore no row in `Ot6AbilityCostTbl`; kits.md prices it as the **sum** of the two tools it fires (max 34). |
 | Steal / Slot / Rage / Dance | — | **no** | flat verbs, no ladder |
 
-**Air Anchor is not the Tools capstone**, and #57's issue text was wrong
-to name it. kits.md:137 is explicit: "Air Anchor stays a findable *item*
-mid-kit gag, not the capstone." So Tools has no top row to anchor today,
-and when Overclock is built the Σ rule and the 99 anchor collide —
-**that decision belongs to the issue that builds Overclock**, because
-either answer prices an ability that currently has no code.
+**Air Anchor is not the Tools capstone.** kits.md is explicit: "Air Anchor
+stays a findable *item* mid-kit gag, not the capstone." So Tools has no
+top row to anchor today, and when Overclock is built the Σ rule and the 99
+anchor collide — **that decision belongs to the change that builds
+Overclock**, because either answer prices an ability that currently has no
+code.
 
 Locke is the other case worth naming: Steal is flat *for now*, but his
-kit (`kits.md:404`) already designs **Master's Mark** — steal from all
+kit (`kits.md`) already designs **Master's Mark** — steal from all
 enemies and reveal everything — which is exactly a 99's shape: it fires
-once and ends the probing phase outright. That is his anchor when #55
-builds the kit, which also means repricing Steal is not wasted work:
-Steal is a rung, not the ceiling.
+once and ends the probing phase outright. That is his anchor, which also
+means Steal is a rung, not the ceiling.
 
-**Does Magic participate? No — and measurement says it should not.** The
-comparison #57 asked for, run against `magic_prop_en.dat` +$05: Ultima
+**Does Magic participate? No — and measurement says it should not.**
+Against `magic_prop_en.dat` +$05: Ultima
 80, Merton 85, W Wind 75, Meteor 62; the dearest spell of any kind is
 Quick at 99. Ultima at 80 sits *below* a 99 kit ultimate rather than
 oddly beside it, which is the right order — Ultima is a spell any
@@ -121,10 +116,10 @@ character with the esper can learn, Bum Rush is one character's once-per-
 kit divine. Nothing needs changing, and the vanilla-MP-costs house rule
 stands with its one named exception (Osmose, below).
 
-## Unresolved numbers are not blockers (owner, 2026-07-29)
+## Unresolved numbers are not blockers
 
 Where two documents disagree about a *value* — Overclock priced as the sum
-of its tools (`kits.md`) versus the 99 anchor above (#57) — that is not a
+of its tools (`kits.md`) versus the 99 anchor above — that is not a
 contradiction to resolve on paper. The owner's ruling: *"doesn't matter
 what we start with, playtesting will help make it clear."*
 
@@ -154,109 +149,51 @@ mistake, not shipping the wrong number once.
   level gate, no JP. Signatures become the cheapest rows of
   their kits (1–4 MP), not costless: the driver's directive is
   that verbs free in vanilla — Steal and Tools by name — stop
-  being free under Octopath rules. **Confirmed absolute (owner,
-  2026-07-22): only the basic Fight command is free — every
-  other verb costs MP as its character's kit comes online. (Item
-  is inventory-gated, not an MP verb.)**
+  being free under Octopath rules. **The absolute (owner): only the
+  Fight ROW is free — every other verb costs MP as its character's kit
+  comes online. (Item is inventory-gated, not an MP verb.)** The rule is
+  about the row, not about the word "Fight": on the Veldt Leap occupies
+  the Fight row (kits.md's row-sharing rule, `Ot6VeldtRow`), so on the
+  Veldt the free floor is Leap, and Leap is free. Steal is priced — it
+  is a verb *beside* Fight, not the Fight row.
+- **BP buys tempo. MP buys power.** One Fire 3 instead of three Fires
+  saves two turns — that is what the boost buys — and the magnitude is
+  paid for at the tier's own price. Measured out of `magic_prop_en.dat`:
+  the spread is **2.0×** (Life → Life 2, 30 → 60) to **8.7×** (Poison →
+  Bio, 3 → 26), with Fire 4 → 20 → 51. Dearest folded tier is Life 2 at
+  60, well under the 99 ceiling. `tools/tests/battle_foldcost.lua`
+  recomputes the whole table from the ROM and holds it to the ceiling, to
+  monotonicity, and to a two-sided check that the fold still buys
+  something without buying it too cheaply.
 
-  > **AMENDMENT (2026-07-29, owner) — the absolute is about the FIGHT
-  > ROW, not about the word "Fight". Leap is free.** Owner's words:
-  > *"I don't recall showing a cost for Leap. If it's 2 MP, let's just
-  > make it free."* Two things force it, and both are about surfaces
-  > rather than balance:
-  >
-  > 1. **The price was never displayed.** Leap is a top-level command
-  >    *row*, not a list entry, and the four-row battle command window
-  >    draws names only. `command_window_data_set`
-  >    (`btlgfx_main.asm:10099-10125`) writes exactly two things per
-  >    row — the command byte, and a colour from `GetTextColor` — on a
-  >    9-byte stride over four rows, and its template `MenuText::_4`
-  >    (`btlgfx_main.asm:45162`) is four fixed 8-byte records with no
-  >    numeric field. `GetTextColor` (`btlgfx_main.asm:10704-10707`) is
-  >    `and #$80` on the *disabled* flag, so the one grey that window has
-  >    is "command unavailable", **not** "you cannot afford it". Contrast
-  >    `Ot6BlitzRowDecorate` (`ot6_kits.asm:526-613`), where a list row
-  >    explicitly stamps a two-digit cost and greys by affordability
-  >    through `Ot6AbilityGrey`. So there was no surface that could show
-  >    Leap's 2 MP, and the only way to meet it was a refusal *after* the
-  >    turn was spent — the refusal path (`battle_main.asm:8354-8371`)
-  >    queues a generic attack message through `_setattackmes`
-  >    (`:8733`) and composes no number anywhere. *(The exact refusal
-  >    string is **unverified** — I did not trace `$3a71/$3a72` to its
-  >    text. What is verified is that no number reaches the player.)* A
-  >    price that is invisible until it refuses is a lying surface, and
-  >    this document's own economy depends on the player being able to
-  >    see what things cost.
-  > 2. **Leap now occupies the Fight row** on the Veldt (kits.md's
-  >    row-sharing rule, `Ot6VeldtRow`). The absolute exists so that
-  >    every character can always decline to spend; a priced verb
-  >    *in the Fight row* breaks exactly that, in the one territory Gau
-  >    lives in. So the honest reading of the absolute is that the
-  >    **free floor** is what is protected, and on the Veldt that floor
-  >    is Leap.
-  >
-  > **Steal stays priced** — it is a verb *beside* Fight, not the
-  > Fight row — but it shares Leap's invisibility problem exactly
-  > (same window, same "Need MP", nothing drawn). That is issue #52's,
-  > and #52 ruled on both halves: the price moves 2 → 4, and the
-  > invisibility is accepted until #55 rather than answered with a new
-  > display surface. See "Steal's price is real and invisible" below.
-- **Boost never raises MP cost** — *superseded for magic by #64
-  (v0.9); still true of every other verb.* The original wording was
-  "the shipped tier fold queues Fire 3 at Fire's cost (DEMO.md): BP is
-  the tier price, MP the cast price."
+  As %-of-pool those tiers run **8–11% at the level they are
+  naturally learned** — dead on the 8–20% vanilla ruler, which is
+  unsurprising since they *are* vanilla prices — but **40–133% at
+  the level folding reaches them**. That gap is the purchase: at L6
+  a folded Fire 3 costs more than Terra's entire bar, so it is
+  simply not castable until L8 and empties her when it is. The one
+  soft spot is **Haste2 at 12.0%**, because Haste itself is not
+  learned until Celes is L32 with a 316 pool.
 
-  > **What #64 changed, and why the rest of the rule survives it.**
-  > @vanorasc pointed out that on the magic list this made boost a
-  > *discount engine*: the folded cast beat three separate casts on
-  > **both** axes, fewer turns and less MP. The split the rule was
-  > reaching for is real, but it is drawn one step over:
-  >
-  > **BP buys tempo. MP buys power.**
-  >
-  > One Fire 3 instead of three Fires still saves two turns — that is
-  > what the boost bought — and the magnitude is paid for at the
-  > tier's own price. Measured out of `magic_prop_en.dat` rather than
-  > guessed (the issue expected ~3×/10×): the real spread is **2.0×**
-  > (Life → Life 2, 30 → 60) to **8.7×** (Poison → Bio, 3 → 26), with
-  > Fire 4 → 20 → 51. Dearest folded tier is Life 2 at 60, well under
-  > the 99 ceiling (#57). `tools/tests/battle_foldcost.lua` recomputes
-  > the whole table from the ROM and holds it to the ceiling, to
-  > monotonicity, and to a two-sided check that the fold still buys
-  > something without buying it too cheaply.
-  >
-  > As %-of-pool those tiers run **8–11% at the level they are
-  > naturally learned** — dead on #45's 8–20% vanilla ruler, which is
-  > unsurprising since they *are* vanilla prices — but **40–133% at
-  > the level folding reaches them**. That gap is the purchase: at L6
-  > a folded Fire 3 costs more than Terra's entire bar, so it is
-  > simply not castable until L8 and empties her when it is. The one
-  > soft spot is **Haste2 at 12.0%**, because Haste itself is not
-  > learned until Celes is L32 with a 316 pool — the one family where
-  > #64 barely bites.
-  >
-  > The other half of #64 is that the list stopped lying: the price,
-  > the grey-out and the A-button's refusal all follow the folded tier
-  > now, because they and `GetMPCost` read one cell and OT6 moves that
-  > cell (`Ot6FoldPrices`). And **untaught-tier access is now a
-  > decision rather than an inheritance**: folding still reaches tiers
-  > the caster never learned — that is the trick that keeps every
-  > spell list at 8 — but it is a purchase at the tier's real price
-  > instead of a freebie.
+  The list does not lie about it: the price, the grey-out and the
+  A-button's refusal all follow the folded tier, because they and
+  `GetMPCost` read one cell and OT6 moves that cell (`Ot6FoldPrices`).
+  Folding still reaches tiers the caster never learned — that is the
+  trick that keeps every spell list at 8 — but it is a purchase at the
+  tier's real price instead of a freebie.
 
-  The BP-buys-the-tier/MP-prices-the-cast split ports unchanged to every
-  costed verb —
-  including the now-shipped **boost-tiered Steal** (kits.md): its
+  The split ports unchanged to every costed verb, including
+  **boost-tiered Steal** (kits.md): its
   BP buys the guarantee, and its MP question is unchanged by the
-  boost, riding the M4 costing (the "flat small" row below)
-  exactly like every other free-in-vanilla verb. **Steal is
-  costed as of v0.5** (this change): cmd $05 takes a flat-cost
-  path in `Ot6AbilityCost` — a single verb with one price (**4 MP**
-  since #52; 2 in v0.5), keyed on the command rather than an
+  boost, riding the "flat small" row below
+  exactly like every other free-in-vanilla verb. **Steal costs 4 MP**:
+  cmd $05 takes a flat-cost
+  path in `Ot6AbilityCost` — a single verb with one price,
+  keyed on the command rather than an
   ability-id table row (Steal has no per-ability id in the disjoint
   ranges the id table keys on) — and is charged, and refused when the
   pool is short, by the same universal machinery as
-  Blitz/SwdTech/Tools. Since #52 that number lives in the
+  Blitz/SwdTech/Tools. That number lives in the
   `Ot6StealCost` leaf rather than inline, the same shape
   `Ot6DanceCost` has, so the charge and any future menu row read one
   authority. With `OT6_MP_COSTS` off it reverts to free, byte-for-byte.
@@ -270,48 +207,41 @@ Already costed, unchanged: **Magic**, **Lore**, and **summons**
 keep their vanilla MP costs (house rule); summons additionally
 stay once per battle (DESIGN.md).
 
-> **AMENDMENT (v0.6, 2026-07-27) — one named exception to the
-> vanilla-MP-costs house rule: Osmose `$29`, 1 MP → 8 MP.**
-> Recorded here rather than left implicit, because
-> magicite-ifrit-shiva.md §12.10 is right that this rule has to
-> be *amended*, not quietly bent. The rule was written on
-> 2026-07-17, **before** `OT6_MP_COSTS` went live and before the
-> "only Fight is free" absolute of 2026-07-22 — it priced magic
-> for a game in which four characters spent MP at all. Under OT6
-> every verb does, and vanilla's 1 MP Osmose is not a spell but
-> an off switch for the currency v0.5 had just turned on:
-> Magitek Research Facility boss pools run 447–810
-> (`monster_prop.dat` +$0a) against party pools of 40–60, and one
-> cast computes for many times the caster's whole bar. 8 MP keeps
-> it strongly net-positive — measured on the shipped ROM at 30 MP
-> against a 500 MP pool: 30 → 22 → 63, so a +33 net refill for 8
-> — while stopping it being free, and it stays castable on a
-> nearly empty pool. It applies globally, so ZoneSeek inherits it,
-> correctly: it is the same spell. The byte lives in
-> `battle_main.asm`'s `MagicProp` splice with its argument beside
-> it; `tools/tests/battle_magicite.lua` pins both the price and
-> the 7-MP boundary that only 8 can produce. **No other magic
-> price is touched, and the rule otherwise stands.** Strago's kit is Lores, so it
+**One named exception to the vanilla-MP-costs house rule:
+Osmose `$29` costs 8 MP, not vanilla's 1.** Under OT6 every verb
+spends MP, and a 1-MP Osmose is not a spell but an off switch for
+the currency: Magitek Research Facility boss pools run 447–810
+(`monster_prop.dat` +$0a) against party pools of 40–60, and one
+cast computes for many times the caster's whole bar. 8 MP keeps
+it strongly net-positive — measured on the shipped ROM at 30 MP
+against a 500 MP pool: 30 → 22 → 63, a +33 net refill for 8 —
+while stopping it being free, and it stays castable on a nearly
+empty pool. It applies globally, so ZoneSeek inherits it,
+correctly: it is the same spell. The byte lives in
+`battle_main.asm`'s `MagicProp` splice with its argument beside
+it; `tools/tests/battle_magicite.lua` pins both the price and
+the 7-MP boundary that only 8 can produce. **No other magic
+price is touched.**
+
+Strago's kit is Lores, so it
 is already priced — his "free signature" Aqua Rake (kits.md)
 is free at join, and costs MP like any lore. **Divines** cost
 MP in addition to their gates — broken target, the 5-BP bank,
-once per battle (ruling 2026-07-17): no free apex actions; the
+once per battle: no free apex actions; the
 gate limits frequency, MP prices the cast.
 
 Vanilla-free player verbs, with proposed cost shapes:
 
 | Verb | Shape | MP | Rationale |
 |---|---|---|---|
-| Steal (Locke #1) | flat small | **4** | **repriced by #52** (was 2): 12.9% of the 31 MP pool Locke actually joins with, and exact parity with every other kit's signature row (Pummel, Dispatch, AutoCrossbow are all 4) — see "Steal's price is real and invisible" below |
+| Steal (Locke #1) | flat small | **4** | 12.9% of the 31 MP pool Locke actually joins with, and exact parity with every other kit's signature row (Pummel, Dispatch, AutoCrossbow are all 4) — see "Steal's price is real and invisible" below |
 | New kit skills (Locke #2–7, Analyze, …) | scaled by tier | 3–20 | born costed via M4 kit tables — never free in vanilla; Analyze stays cheap (2–3) because scouting fuels the loop |
 | Tools (Edgar) | scaled by tier | 3–20 | reusable capital bought with gil; MP is the operating cost — AutoCrossbow 3–4, Drill/Chain Saw 12–20, Debilitator 8–12, Overclock costs the sum of the two tools it fires |
-| Blitz (Sabin) | scaled by tier | 4–99 | **rescaled by #45, tail re-derived by #57** (v0.4 was 2–30): Pummel 4, mid-kit 10–17, then 28/50 into **Bum Rush 99, the anchor** |
-| SwdTech (Cyan) | BP tier + MP at Blitz parity | 4–99 | **rescaled by #45, tail re-derived by #57** (v0.4 was 1–8, "discounted"): he still pays both currencies (ruling 2026-07-17, below), the ~⅓ discount is retired, and **Cleave anchors at 99** |
+| Blitz (Sabin) | scaled by tier | 4–99 | Pummel 4, mid-kit 10–17, then 28/50 into **Bum Rush 99, the anchor** |
+| SwdTech (Cyan) | BP tier + MP at Blitz parity | 4–99 | he pays both currencies (below), and **Cleave anchors at 99** |
 | Dance (Mog) | flat, paid at start | 4–10 | one payment starts a whole-battle state — vanilla's can't-stop-dancing lock is preserved, so the price is per battle, not per step |
-| ~~Capture (Gau)~~ | ~~flat small~~ | ~~2~~ | superseded — the Capture/controllable-stable model was replaced by kit-gau.md's Ochette model, so this row never shipped. The two Gau verbs that did are below |
-| Rage (Gau) | flat, paid at start | 8 | one payment starts a whole-battle possession, every possessed turn after it free — the same rule Dance takes, and `Ot6RageCost` tail-calls `Ot6DanceCost` so the two can never drift (#40) |
-| Leap (Gau) | free — exception | 0 | **the free floor, not an exemption**: Leap shares Gau's FIGHT row on the Veldt (kits.md), so on the Veldt it *is* the Fight command. It also had no surface that could ever show a price — see the amendment above (owner, 2026-07-29; was flat 2 under #40) |
-| Beast skills (Gau's stable) | flat per beast | 3–10 | authored alongside the stable curation pass (M6) |
+| Rage (Gau) | flat, paid at start | 8 | one payment starts a whole-battle possession, every possessed turn after it free — the same rule Dance takes, and `Ot6RageCost` tail-calls `Ot6DanceCost` so the two can never drift |
+| Leap (Gau) | free — exception | 0 | **the free floor, not an exemption**: Leap shares Gau's FIGHT row on the Veldt (kits.md), so on the Veldt it *is* the Fight command |
 | Sketch (Relm) | flat small | 2–4 | pay to roll; the Sketch bug stays (house rule) and does not refund |
 | Control (Relm, kit TBD) | flat moderate | 8–12 | vanilla's strongest free verb — full command of a monster; priced when her kit lands |
 | Slot (Setzer) | flat small | 1–3 | the reels stay the real price; MP only makes spins finite |
@@ -322,17 +252,13 @@ Vanilla-free player verbs, with proposed cost shapes:
 | Guest verbs: Health (Banon), Shock (Leo), magitek beams, Possess (Ghost) | free — exception | 0 | guests have no kit tables; their stretches are authored tutorial texture (the Whelk line is balanced on free beams — balance-metrics.md), and Possess already costs the ghost |
 | Relic-morphed commands (Jump, GP Rain, X Magic, …) | inherit | — | assigned at M4 data entry in the same records as everything else |
 
-### Steal's price is real and invisible (ruling, issue #52, 2026-07-29)
+### Steal's price is real and invisible
 
-**The price: 2 → 4 MP.** #52's headline was "2 MP is ~2.0% of Locke's
-LV14 pool — exactly the noise the rescale removed everywhere else". That
-number is right and the *level* is wrong: this document's ruler measures
+**The price: 4 MP.** This document's ruler measures
 an ability against the pool at the level it **arrives**, and Steal
 arrives at Narshe with Locke at **LV6 holding 31 MP** (measured,
-`probe_mppools.lua` off `worldmap_narshe`). There, 2 MP is 6.5% — under
-the 8–20% band, which is the real defect — and 4 MP is **12.9%**,
-between Fire's 10.0% and Cure's 12.5%. So the fix is the same 2× #45
-gave the Blitz floor, not a larger number chosen to look right at LV14.
+`probe_mppools.lua` off `worldmap_narshe`), where 4 MP is **12.9%**,
+between Fire's 10.0% and Cure's 12.5%.
 
 Worth stating plainly because it will come up again: **every signature
 dilutes the way Steal does.** Pummel is 4.3% of Sabin's LV14 pool and
@@ -341,8 +267,8 @@ per-level prices, which this ruler explicitly does not do.
 
 4 is also **exact parity with the cheapest row of all three ladder
 kits** — Pummel, Dispatch and AutoCrossbow are each 4 — which is what
-"signatures become the cheapest rows of their kits" means in numbers,
-and it matters for #55: Steal is rung one of Locke's ladder, not a
+"signatures become the cheapest rows of their kits" means in numbers.
+Steal is rung one of Locke's ladder, not a
 one-off, and his 99 is Master's Mark. `battle_costtable.lua` asserts
 that parity, so moving one signature without the others is a red test.
 
@@ -367,135 +293,72 @@ evidence, all read rather than recalled:
 
 Building a numeric field into that window would mean re-laying out three
 templates (short mode, window mode, and `MenuText::_4`) plus a
-command-keyed cost lookup, for **one verb**, weeks before #55 gives that
-verb a submenu that makes all of it dead code. That is the argument, and
+command-keyed cost lookup, for **one verb**, when Locke's own submenu
+makes all of it dead code. That is the argument, and
 it is why the answer is not "build the surface".
 
-Nor is it Leap's answer. Leap's invisible price was retired by making
-Leap **free**, but that ruling rested on a second reason Steal does not
-have — Leap occupies the *Fight row* on the Veldt, and the free floor
-has to survive the substitution. Steal is a verb beside Fight. Making it
-free would contradict the owner's absolute (only the Fight row is free)
-and undo #52 itself.
+Nor is it Leap's answer. Leap is free, but that ruling rests on a second
+reason Steal does not have — Leap occupies the *Fight row* on the Veldt,
+and the free floor has to survive the substitution. Steal is a verb
+beside Fight. Making it free would contradict the owner's absolute (only
+the Fight row is free).
 
-So: **the price is charged and not drawn, deliberately, until #55.** The
-mitigation is that it is now a *leaf* — `Ot6StealCost`
+So: **the price is charged and not drawn, deliberately.** The
+mitigation is that it is a *leaf* — `Ot6StealCost`
 (`ot6_boost.asm`), the `Ot6DanceCost` shape — so the day Locke gets a
 submenu its row decorator reads the same byte the charge does and the
 two cannot disagree. And the exposure is small at 4 MP: Locke affords 7
 steals from the pool he joins with, so the refusal path is somewhere a
 player has to work to reach.
 
-**The probe-collect pairing is retired.** Steal and Leap were priced
-together as "the probe-collect pair"; the owner ruled Leap free on
-2026-07-29, leaving a pair with one member. The rule that replaces it is
-the one above — Steal prices as a **kit signature**, at parity with
-Pummel/Dispatch/AutoCrossbow — which is a rule with three other members
-and a gate behind it.
+### Cyan pays in both
 
-### Cyan pays in both (ruling 2026-07-17)
+SwdTech costs both currencies: a BP rung (there is no 0-BP rung —
+`Ot6BushidoTech`, `ot6_kits.asm:74-79`, clamps a stray 0 up to 1, and the
+window is three rungs over Cyan's top three *learned* techs,
+`ot6_kits.asm:65-70`) plus an MP price on top. The ladder replaces the
+vanilla charge gauge's wait-to-charge rhythm while preserving agency:
+the wait still exists — later techs need a fuller bank, and banking to 3
+is the only way to reach the top band — but Cyan acts while it builds.
+The design consequence: Cyan is the one kit where banking BP has
+intrinsic purpose. Greedy spending beats banking against trash, measured,
+so for every other kit banking
+needs a boss to justify it; Cyan's later techs require the bank, so the
+decision exists in every fight he is in.
 
-SwdTech keeps kits.md's BP ladder — Dispatch 0 up to the 3-BP
-tier — and adds a discounted MP cost on top, lighter than
-comparable-power skills elsewhere, because the banked-BP
-requirement is the real price. The ladder replaces the vanilla
-charge gauge's wait-to-charge rhythm while preserving agency:
-the wait still exists — later techs need a fuller bank — but
-Cyan acts while it builds. The design consequence: Cyan is the
-one kit where banking BP has intrinsic purpose. Measurement #3
-(balance-metrics.md) found greedy spending beats banking
-against trash, so for every other kit banking needs a boss to
-justify it; Cyan's later techs require the bank, so the
-decision exists in every fight he is in. Roadmap rung 3's
-BP-SwdTech gate stands; the MP column joins the same data
-pass. Detailed Cyan tuning is deliberately deferred until he
-is playtestable.
+Boost *selects* the tech rather than gating a menu choice, so
+there is no surplus to scale: a spend always buys the best
+tech it can reach. SwdTech is excluded from `Ot6BoostDmg`'s
+multiplier for the same no-double-dip reason folded spells
+are. Unusable spend (three points before Cyan has learned past
+Dispatch) is consumed, not refunded — the deal a mage already
+takes on a third point on Fire. A menu that lets him pick a
+*lower* tech than his spend affords is what would revive the
+surplus case; it is not built, and it needs the menu bank.
 
-**Amended by what shipped (M3, `Ot6BushidoTier`).** The BP half
-landed; the MP half is now BUILT (v0.4) but dormant — SwdTech
-costs 0 MP in the shipped ROM and its priced column
-(kits.md, proposed there) charges only under `OT6_MP_COSTS`
-(see "Where it lands / M4" below). Two clauses of the
-ruling above did not survive contact:
+SwdTech prices at **parity with the Blitz row of the same
+index**, and ships at 4/10/13/16/18/28/50/99 (`Ot6AbilityCostTbl`,
+`ot6_boost.asm:1377-1384`). That is a *level* claim, not an index
+coincidence: `BlitzLevelTbl` is 1/6/10/15/23/30/42/70 and
+`BushidoLevelTbl` 1/6/12/15/24/34/44/70
+(`ff6/src/field/event.asm:1236-1240`), so row *n* of either kit
+arrives in the same band against nearly the same pool. Cyan
+pays BP on top; if parity plus the 1-BP floor leaves
+him starved, the lever is **BP seed/regen, not the floor, and not this
+column.**
 
-> **CORRECTION — 2026-07-30. Two things in this section are stale, and both
-> read as descriptions of the shipped ROM.**
->
-> - **"SwdTech costs 0 MP in the shipped ROM" and "dormant" have not been
->   true since v0.5.** `OT6_MP_COSTS` **defaults to 1** — `ff6/Makefile:266`
->   says so in as many words, and the `=0` build is a separate `ff6-en-nomp`
->   *control* target (`ff6/Makefile:285`), not the shipping one. SwdTech
->   ships at **4/10/13/16/18/28/50/99** (`Ot6AbilityCostTbl`,
->   `ot6_boost.asm:1377-1384`) after #45's rescale and #57's 99 anchor. This
->   file already says the flag is on further down (see "Where it lands"),
->   so this is an internal contradiction, not a disputed fact.
-> - **"SwdTech keeps kits.md's BP ladder — Dispatch 0" (above) is stale
->   since #38.** There is no 0-BP rung: `Ot6BushidoTech`
->   (`ot6_kits.asm:74-79`) clamps a stray 0 up to 1, and the window is three
->   rungs over Cyan's top three *learned* techs (`ot6_kits.asm:65-70`), not
->   four fixed prices. The #45 amendment later in this file already leans on
->   "#38's 1-BP floor", so the file half-knows.
->
-> The ruling's *intent* — Cyan pays in both currencies — stands; only its
-> magnitudes and the "dormant" framing are retired.
+One deviation from parity: **Empowerer 18 rather than Mantra's
+16**, because the SwdTech column must stay monotonic with the
+tech index — the boost window offers techs weakest→strongest
+and *the row is the boost level* (kits.md), so a 2× row dearer
+than the 3× row would read as a bug. Blitz is a free-choice
+menu and needs no such rule, which is why Mantra stays a
+cheap utility off-ramp under Fire Dance.
 
-- "BP spent beyond a tech's tier requirement boosts it with the
-  same scaling logic as any other action" is not what shipped.
-  Boost *selects* the tech rather than gating a menu choice, so
-  there is no surplus to scale: a spend always buys the best
-  tech it can reach. SwdTech is excluded from `Ot6BoostDmg`'s
-  multiplier for the same no-double-dip reason folded spells
-  are. Unusable spend (three points before Cyan has learned past
-  Dispatch) is consumed, not refunded — the deal a mage already
-  takes on a third point on Fire. A menu that lets him pick a
-  *lower* tech than his spend affords is what would revive the
-  surplus case; it is not built, and it needs the menu bank.
-- "the wait still exists — later techs need a fuller bank"
-  holds, and is now the whole mechanic rather than a
-  requirement checked against one: banking to 3 is the only way
-  to reach the top band.
+### The ruler
 
-The MP column, when it lands, prices the cast on top of the
-band the BP bought; nothing above about the split ("BP is the
-tier price, MP the cast price") changed.
-
-> **AMENDMENT (v0.8, 2026-07-29, issue #45) — the ~⅓ SwdTech
-> discount is RETIRED, and the Blitz floor is lifted.** The
-> discount above was justified by one sentence — "the banked-BP
-> requirement is the real price" — and that sentence was about
-> the *four-rung* 0×/1×/2×/3× ladder. **#38 rewrote that ladder
-> to 1×/2×/3× and explicitly deferred the MP column** ("MP costs
-> per tech unchanged"), so from that moment the discount was
-> being applied on the strength of a premise that had already
-> been edited. The v0.7 playtest found the consequence from the
-> other end (the target box at the top of this file): at LV14
-> Cyan holds 96 MP against techs costing 1/2/3, BP is not scarce
-> either, so neither currency binds him and Fight has no case.
->
-> SwdTech now prices at **parity with the Blitz row of the same
-> index**. That is a *level* claim, not an index coincidence:
-> `BlitzLevelTbl` is 1/6/10/15/23/30/42/70 and
-> `BushidoLevelTbl` 1/6/12/15/24/34/44/70
-> (`ff6/src/field/event.asm:1236-1240`), so row *n* of either kit
-> arrives in the same band against nearly the same pool. Cyan
-> still pays BP on top; if parity plus #38's 1-BP floor leaves
-> him starved, #38's own ruling names the lever — **BP
-> seed/regen, not the floor, and not this column.**
->
-> One deviation from parity: **Empowerer 18 rather than Mantra's
-> 16**, because the SwdTech column must stay monotonic with the
-> tech index — the boost window offers techs weakest→strongest
-> and *the row is the boost level* (kits.md), so a 2× row dearer
-> than the 3× row would read as a bug. Blitz is a free-choice
-> menu and needs no such rule, which is why Mantra stays a
-> cheap utility off-ramp under Fire Dance.
-
-### The ruler, finally measured (issue #45)
-
-This document has claimed since 2026-07-17 that kit skills
-"price on the vanilla spell ruler", and never said what that
-ruler *is*. Measured — cost as a fraction of the caster's real
-max MP **at the level the ability is learned**, pools computed
+Kit skills price on the vanilla spell ruler: cost as a fraction of the
+caster's real max MP **at the level the ability is learned**, pools computed
 the way `InitMaxMP` computes them (`CharProp+$01` plus the
 `LevelUpMP` running sum) and cross-checked against pools read
 out of minted saves (`tools/tests/probe_mppools.lua`):
@@ -517,61 +380,43 @@ unreachable state. MP costs are `magic_prop_en.dat` +$05.
 | Life | 30 | L18 | 148 | 20.3% |
 
 **So a vanilla spell costs roughly 8–20% of the pool it is
-first cast from.** Against that ruler, here is what the v0.5
-columns actually were and what #45 makes them. Rows 1–2 are
+first cast from.** Against that ruler, the shipped columns. Rows 1–2 are
 priced at L10, the earliest either character is in the party at
-all (measured: `gau_joined` has Cyan and Sabin both at LV11):
+all (measured: `gau_joined` has Cyan and Sabin both at LV11). Every
+figure is recomputed by `battle_costtable.lua` from the ROM's own tables
+on each `make test`, not derived by hand.
 
-**Regenerated for the 99 anchor (#57, 2026-07-29).** `v0.4` is what
-shipped before #45; `#45` is what that pass landed; `now` is the shipped
-column with the anchor in it. Every figure is recomputed by
-`battle_costtable.lua` from the ROM's own tables on each `make test` —
-the table below is transcribed from that run's log, not derived by hand.
+| Blitz | learned | pool | MP | % of pool | uses |
+|---|---|---|---|---|---|
+| Pummel | L1 | 56 | **4** | 7.1% | 14 |
+| AuraBolt | L6 | 56 | **10** | 17.9% | 5 |
+| Suplex | L10 | 56 | **13** | 23.2% | 4 |
+| Fire Dance | L15 | 104 | **17** | 16.3% | 6 |
+| Mantra | L23 | 191 | **16** | 8.4% | 11 |
+| Air Blade | L30 | 278 | **28** | 10.1% | 9 |
+| Spiraler | L42 | 449 | **50** | 11.1% | 8 |
+| Bum Rush | L70 | 760 | **99** | 13.0% | 7 |
 
-| Blitz | learned | pool | v0.4 | #45 | #45 % | **now** | **now %** | uses |
-|---|---|---|---|---|---|---|---|---|
-| Pummel | L1 | 56 | 2 | 4 | 7.1% | **4** | **7.1%** | 14 |
-| AuraBolt | L6 | 56 | 5 | 10 | 17.9% | **10** | **17.9%** | 5 |
-| Suplex | L10 | 56 | 7 | 13 | 23.2% | **13** | **23.2%** | 4 |
-| Fire Dance | L15 | 104 | 9 | 17 | 16.3% | **17** | **16.3%** | 6 |
-| Mantra | L23 | 191 | 8 | 16 | 8.4% | **16** | **8.4%** | 11 |
-| Air Blade | L30 | 278 | 12 | 22 | 7.9% | **28** | **10.1%** | 9 |
-| Spiraler | L42 | 449 | 18 | 30 | 6.7% | **50** | **11.1%** | 8 |
-| Bum Rush | L70 | 760 | 30 | 46 | 6.1% | **99** | **13.0%** | 7 |
+| SwdTech | learned | pool | MP | % of pool | uses |
+|---|---|---|---|---|---|
+| Dispatch | L1 | 58 | **4** | 6.9% | 14 |
+| Retort | L6 | 58 | **10** | 17.2% | 5 |
+| Slash | L12 | 76 | **13** | 17.1% | 5 |
+| Quadra Slam | L15 | 106 | **16** | 15.1% | 6 |
+| Empowerer | L24 | 205 | **18** | 8.8% | 11 |
+| Stunner | L34 | 334 | **28** | 8.4% | 11 |
+| Quadra Slice | L44 | 483 | **50** | 10.4% | 9 |
+| Cleave | L70 | 762 | **99** | 13.0% | 7 |
 
-| SwdTech | learned | pool | v0.4 | #45 | #45 % | **now** | **now %** | uses |
-|---|---|---|---|---|---|---|---|---|
-| Dispatch | L1 | 58 | 1 | 4 | 6.9% | **4** | **6.9%** | 14 |
-| Retort | L6 | 58 | 2 | 10 | 17.2% | **10** | **17.2%** | 5 |
-| Slash | L12 | 76 | 3 | 13 | 17.1% | **13** | **17.1%** | 5 |
-| Quadra Slam | L15 | 106 | 4 | 16 | 15.1% | **16** | **15.1%** | 6 |
-| Empowerer | L24 | 205 | 5 | 18 | 8.8% | **18** | **8.8%** | 11 |
-| Stunner | L34 | 334 | 6 | 22 | 6.6% | **28** | **8.4%** | 11 |
-| Quadra Slice | L44 | 483 | 7 | 30 | 6.2% | **50** | **10.4%** | 9 |
-| Cleave | L70 | 762 | 8 | 46 | 6.0% | **99** | **13.0%** | 7 |
+| flat verb | arrives | pool | MP | % of pool | uses |
+|---|---|---|---|---|---|
+| Steal (Locke) | L6, Narshe | 31 | **4** | 12.9% | 7 |
+| Rage / Dance | — | — | **8** | — | — |
 
-| flat verb | arrives | pool | was | was % | **now** | **now %** | uses |
-|---|---|---|---|---|---|---|---|
-| Steal (Locke) | L6, Narshe | 31 | 2 | 6.5% | **4** | **12.9%** | 7 |
-| Rage / Dance | — | — | 8 | — | **8** | — | — |
+%-of-pool climbs *into* the 13.0% anchor along each ladder (8.4 → 10.1 →
+11.1 → 13.0 for Blitz) rather than falling away from it.
 
-**How the tail was re-derived — not by scaling.** Multiplying the whole
-column by 99/46 (2.15×) would put Suplex at 28 MP, *half* a LV10 pool,
-and shove rows 2–4 clean off the top of the ruler. The column was not
-uniformly wrong: rows 1–5 already measured inside the band at the level
-they arrive, and only the tail was under it. So only rows 6–8 move.
-
-Why the tail was under it is worth recording, because it is the same
-mistake twice. #45 lifted the floor 2× and the ceiling only 1.5×, hedging
-against an owner worry that "Bum Rush 30 → 120" would outrun WoB pools —
-a worry #45's *own measurement* then disproved (Bum Rush is L70-gated and
-Sabin's L70 pool is 760). **The hedge outlived the premise that justified
-it**, exactly as the SwdTech ⅓ discount had outlived #38's ladder
-rewrite. The anchor is the correction: the tail is re-derived upward so
-%-of-pool *climbs into* the anchor's 13.0% (8.4 → 10.1 → 11.1 → 13.0 for
-Blitz) instead of falling away from it (7.9 → 6.7 → 6.1).
-
-Two deliberate non-uniformities survive untouched, both of them #45's:
+Two deliberate non-uniformities:
 
 - **Mantra stays at 16, under Fire Dance's 17.** It is a utility
   off-ramp, not a damage rung, and Blitz is a free-choice menu where all
@@ -580,37 +425,23 @@ Two deliberate non-uniformities survive untouched, both of them #45's:
   the ruler; the dip is in the *shape*, not off the scale. Empowerer
   keeps its +2 over Mantra for SwdTech's monotonicity rule.
 - **The signature rows stay at 4** (7.1% / 6.9%), just under the 8%
-  vanilla floor, and **Suplex stays at 23.2%**, just over the 20% top.
-  Those are the two ends #45 argued for explicitly — the "cheapest row"
-  floor and the thinnest row in the table — and both sit inside the 4–25%
-  bracket `battle_costtable.lua` enforces. Reopening them would be
-  re-litigating #45, not implementing #57.
+  vanilla floor, and **Suplex stays at 23.2%**, just over the 20% top —
+  the "cheapest row" floor and the thinnest row in the table. Both sit
+  inside the 4–25% bracket `battle_costtable.lua` enforces.
 
-Three things fall out of the measurement that were not visible
-from the numbers alone:
+Two things the measurement adds that the numbers alone do not show:
 
-- **Tools were already right, and are deliberately untouched.**
+- **Tools are deliberately untouched.**
   Against Edgar's real pool at the band each tool is acquired
   they run 7–21% — AutoCrossbow 11.1% at L7, Drill 18.4% and
-  Chain Saw 20.7% at L13 — i.e. dead on the ruler above. The
-  general floor lift was offered to them and the data declined
-  it: 1.5× on Chain Saw would be 31%, off the top of the scale.
-  Gil buys the tool once and MP is the per-use cost; that price
-  was correct the first time.
-- **The feared ceiling break does not exist.** The worry that a
-  4× would push "Bum Rush 30 → 120 past WoB pools" does not
-  survive contact with the level gate: Bum Rush is **L70**, and
-  Sabin's L70 pool is **760**. Every top-tier row stays payable
-  with a wide margin at the level it arrives (the thinnest row
-  in the whole table is Suplex, at 4 uses from a full L10 pool).
-  The squeeze is at the *floor* and in early WoB, exactly where
-  this document already said it was.
-- **The gate now exists.** `tools/tests/battle_costtable.lua`
+  Chain Saw 20.7% at L13 — i.e. dead on the ruler above. A general
+  floor lift does not apply to them: 1.5× on Chain Saw would be 31%,
+  off the top of the scale. Gil buys the tool once and MP is the
+  per-use cost.
+- **The gate.** `tools/tests/battle_costtable.lua`
   recomputes every one of these fractions from the ROM's own
   tables on each `make test` and refuses a column that has
-  fallen outside 4–25%. The v0.4 column drifted 3–8× under the
-  ruler with no test noticing; the owner found it by playing,
-  which is an expensive way to learn an arithmetic fact.
+  fallen outside 4–25%.
 
 Per the preamble, every number here is still a playtest
 placeholder and successive rescales are expected, not churn.
@@ -628,8 +459,7 @@ level through the 40s, so pools outgrow mid-kit costs as kits
 fill in on their level schedules (kits.md); the squeeze is
 early WoB, which is where the demo lives.
 
-**Measured, not estimated (issue #45).** The paragraph above was
-derived; these are read off the minted chain by
+Measured pools, read off the minted chain by
 `tools/tests/probe_mppools.lua`, which boots each state and dumps
 every `$1600` record. Max MP, in-party characters only (a
 character who has not joined yet carries a placeholder record —
@@ -658,8 +488,7 @@ table above checkable rather than anecdotal.
 The rule, Octopath's, ported whole: when a character gains a
 level, current HP and MP are set to the new maximums.
 
-- The pacing conservation (Measurement #4,
-  balance-metrics.md) pinned XP per step to vanilla — 2x
+- The pacing conservation pins XP per step to vanilla — 2x
   rewards at 0.5x encounter rate — so refill cadence tracks
   vanilla's leveling rhythm. The paired danger/reward knobs
   now carry a third duty: they set how often the party
@@ -668,8 +497,8 @@ level, current HP and MP are set to the new maximums.
   being the only income; they matter most inside long
   same-level stretches and least right after a level. HP
   refills too, which softens dungeon attrition — the danger
-  numbers in balance-metrics.md were measured without a
-  level-up in the window, so the M6 pass should watch it.
+  numbers were measured without a level-up in the window, so
+  the M6 pass should watch it.
 - Flagged for playtest: whether free refills make tents and
   Ethers dead stock early, and whether long boss-less
   stretches drain pools faster than the next level arrives.
@@ -696,14 +525,11 @@ Further candidates, one line each:
   channel magicite.md already defines.
 - **Broken-field regen** — +1–2 MP per turn while any enemy is
   broken; spend the window harder.
-- **Chip rebate** — a weakness chip restores 1 MP; multi-hit
-  shredders (AutoCrossbow, Quadra Slam) make this strong, so it
-  likely needs a per-action cap.
-  *(**2026-07-30:** AutoCrossbow is **not** multi-hit — it is whole-side,
-  one hit per body, `ItemProp $aa` carries no extra-attack effect
-  (`tools/audit_multihit.py`). Quadra Slam is genuinely ×4. The rebate
-  would still want a cap, but for breadth against a wave, not rate against
-  a boss — see `design/multi-hit.md`.)*
+- **Chip rebate** — a weakness chip restores 1 MP; Quadra Slam's ×4
+  makes this strong, so it likely needs a per-action cap. AutoCrossbow
+  wants one too, but for breadth against a wave rather than rate against
+  a boss: it is whole-side, one hit per body, not multi-hit — see
+  `design/multi-hit.md`.
 - kits.md's *Afterglow* (first cast each battle free) is the
   same family on the character-passive side.
 
@@ -712,16 +538,12 @@ these either displace listed candidates or ride WoR espers —
 driver's call at M5 data entry.
 
 Adjacent income, active rather than passive: MP-drain verbs
-stay (ruling 2026-07-17), on Octopath's pattern — balanced
+stay, on Octopath's pattern — balanced
 when they deal little or no damage themselves and appear on
-only a few characters. Osmose (Shiva) and Rasp (Ramuh) sit in
-the esper pool (magicite.md), and reaching one is a deliberate
+only a few characters. Osmose (Shiva, at 8 MP — above) and Rasp (Ramuh)
+sit in the esper pool (magicite.md), and reaching one is a deliberate
 perk: this character can manage their own resources. The M6
 pass still watches Osmose-cycling next to Facet + Rune Eater.
-**Superseded in part (v0.6):** that ruling predates live MP
-costs, and Osmose's *price* has since been amended to 8 MP —
-see the amendment box above. The verb itself still stays; what
-changed is that it is no longer nearly free.
 
 ## Open questions for the driver
 
@@ -752,87 +574,40 @@ changed is that it is no longer nearly free.
 4. **Refill items.** Tinctures and Ethers are vanilla-scarce.
    With costed verbs they become a real economy knob — stock
    lists and prices join the M6 tuning surface.
-5. **Terminology.** Resolved (ruling 2026-07-17, the
-   preamble): the pool is MP as in vanilla, break counters are
-   shields, SP is retired — this doc is swept. Older docs
+5. **Terminology.** The pool is MP as in vanilla, break counters are
+   shields, SP is retired. Older docs
    still write SP for shield points — DESIGN.md's break
    section — left for a later touch-up.
 
 ## Where it lands
 
-- **M4 — costs and refill. The charge side is BUILT (v0.4),
-  and v0.5 flipped it ON by default** (see "Why dormant" below —
-  the flag now ships live; the shipped ROM charges MP). The
-  prediction below held exactly:
-  the code was one dispatch change. Vanilla's `GetMPCost`
+- **M4 — costs and refill.** Vanilla's `GetMPCost`
   (battle_main.asm) prices only magic/lore/summon/x-magic;
   every other command — Blitz, SwdTech, Tools, the free floor —
   falls through it returning 0, so the universal charge at
   `CalcAttackEffect` (the `$3a4c` subtract, and its
   insufficient-MP fizzle) never fires for them. `Ot6AbilityCost`
   (`ff6/src/battle/ot6_boost.asm:878`) is the single hook, right after that
-  `GetMPCost`: for the three costed verbs it swaps the 0 for the
-  kit price. Charge AND the insufficient-MP **refusal** are both
-  already universal — they act on whatever `$3620`→`$3a4c` holds
-  — so nothing new was needed there. The cost data is NOT the
-  record's +$05 byte after all (GetMPCost reads the character
+  `GetMPCost`: for the costed verbs it swaps the 0 for the
+  kit price. Charge AND the insufficient-MP **refusal** are
+  universal — they act on whatever `$3620`→`$3a4c` holds. The cost
+  data is not the record's +$05 byte (GetMPCost reads the character
   spell-list copy for magic, ignores it for the rest); it is a
   parallel bank-$F0 table `Ot6AbilityCostTbl`, keyed by the id
   already in `$3a7b` (attack id $5d–$64 Blitz, $55–$5c SwdTech;
   tool item id $a3–$aa Tools) — the same shape as the class and
-  element tables. Numbers are kits.md's columns (Cyan's proposed
-  there for the first time).
-  - **Why dormant, not shipped enabled.** The one magic-specific
-    piece is the menu grey-out/display (`CheckMagicEnabled`):
-    the Magic menu shows an MP column and greys unaffordable
-    spells, but the Blitz/SwdTech/Tools menus show no cost and
-    check no MP. A silent charge on a menu that says nothing is a
-    hidden tax, and there is no honest subset that can ship
-    enabled now (no new verb's menu can show a cost without the
-    menu-bank work). So the whole mechanic gated on a build-time
-    flag **`OT6_MP_COSTS`**. **v0.5 flipped it: the flag now
-    defaults ON, so the shipped ROM charges MP — the headline
-    v0.5 combat-economy change, landing alongside the menu-bank
-    cost display that ends the silence.** An explicit
-    `-D OT6_MP_COSTS=0` still reassembles the pre-feature
-    vanilla-OT6 baseline (not one byte of the machinery,
-    byte-identical to what shipped before), kept as the
+  element tables. Numbers are kits.md's columns.
+  - The whole mechanic gates on the build-time flag
+    **`OT6_MP_COSTS`**, which defaults ON, so the shipped ROM
+    charges MP. An explicit
+    `-D OT6_MP_COSTS=0` reassembles the pre-feature
+    vanilla-OT6 baseline (not one byte of the machinery), kept as the
     differ-checked regression control (`make -C ff6 ff6-en-nomp`
     → `ff6-en-nomp.sfc`). The A/B is proven both ways by
     `tools/tests/battle_mpcost.lua` (self-detecting: charge+refusal
     on the shipped ON ROM, free+absent on the `nomp` baseline).
-  - The level-up refill (the income half) is NOT built here — it
-    is a separate battle-bank hook where level-ups apply
-    (DoLevelUp), and costs+refill must ship together (costs alone
-    are attrition without income). That, plus the menu display,
-    is what still gates flipping the flag on.
-  - Demo rungs 1–2 are unaffected (guest verbs stay free,
-    Terra's magic is already costed); rung 2–3 fixtures
-    re-measure when it lands.
-
-  **The menu work order.** To flip
-  `OT6_MP_COSTS` on honestly, the menu bank must show and enforce
-  these costs the way it already does for Magic:
-  - The Magic menu's cost column and grey-out are
-    `UpdateEnabledMagic` / `CheckMagicEnabled` (battle_main.asm)
-    walking the character spell list and comparing each spell's
-    MP byte against current MP. Blitz/SwdTech/Tools have no
-    equivalent — their menus (btlgfx bank C1 / menu bank C3) draw
-    no MP column and run no enable pass.
-  - Needed: (1) a per-row cost lookup for those menus that reads
-    `Ot6AbilityCostTbl` (already the runtime authority, so the
-    menu and the charge can never disagree); (2) a draw routine
-    that renders the cost string in the ability-list window
-    (the same MP-column cell Magic uses — small-font digits
-    $B4–$BD, per surgery-map.md §5); (3) a grey-out/refuse pass
-    that disables (or blocks confirm on) a row whose cost exceeds
-    current MP, mirroring `CheckMagicEnabled`. The SwdTech window
-    is special: it is `UpdateMenuState_37` (already OT6-owned via
-    `Ot6BushidoTier`), and the cost shown must track the
-    boost-selected tech, whose id is what `Ot6AbilityCost` reads.
-  - This is C3/C1 menu-bank work (research/battle-code-map.md
-    notes the C3 Compendium is fully commented, so it is
-    well-lit); it is the reason the charge shipped dormant.
+  - Costs and the level-up refill ship together: costs alone are
+    attrition without income.
 - **M5 — passives.** The anchor pair rides the esper passive
   machinery; max-MP-up rides the stat channel.
 - **M6 — numbers.** The harness (balance-metrics.md) grows MP

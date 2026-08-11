@@ -9,7 +9,7 @@ game for balance measurement.
 ## Save decoupling (manual play vs. repeatable testing)
 
 Two save worlds, physically separated so manual play can never be
-corrupted by a test run (it was zeroed twice before this split):
+corrupted by a test run:
 
 - **Your manual-play save** lives in Mesen's normal profile
   (`~/Library/Application Support/Mesen2/Saves/ot6.srm`). Tests never
@@ -72,9 +72,7 @@ payload names, wrong sizes, and hash mismatches before a run starts:
 folder when `OT6_SRAM_ANCHOR` is set. Mesen then takes its ordinary cold-load
 path; no Lua writes SRAM. `gen_vector_doorstep.lua` drives title Continue,
 validates slot 3's story/codex contract, and then walks the world map to the
-Vector event trigger. (It replaces `gen_vector_arrival.lua`, which stepped
-RIGHT off the anchor into map 323 -- ALBROOK -- and named the fixture Vector;
-issue #17.)
+Vector event trigger.
 
 The tracked anchor was produced by `gen_post_opera_anchor.lua`: it loads the
 `blackjack` tactical fixture, settles the final arrival, crosses and exits
@@ -124,15 +122,14 @@ that's `H.hasControl()`. Two event-PC subtleties, both load-bearing:
   four). `H.eventRunning()` therefore requires the PC to be inside banks
   `$CA`-`$CC`; treating any non-idle value as "event running" starves
   every consecutive-calm-frames predicate.
-  An earlier note here explained the `$80` as NPC object scripts running
-  "through the same interpreter out of their RAM queue". That mechanism is
-  wrong: object scripts use a separate interpreter with its own pointer in
-  `$2A`/`$2C` (`field/obj.asm:4516`), seeded from event-script ROM, and no
-  field-module write to `$E5`-`$E7` ever sets bank `$80`. The likely truth
-  is duller — `$E5`-`$E7` are shared direct-page scratch that 30+ files
-  write, so a non-`$CA` bank just means some other subsystem parked a
-  pointer there. The true source of `$80` is UNVERIFIED; the bank gate is
-  correct either way, so this is a comprehension hazard, not a bug.
+  The `$80` is not NPC object scripts: those use a separate interpreter
+  with its own pointer in `$2A`/`$2C` (`field/obj.asm:4516`), seeded from
+  event-script ROM, and no field-module write to `$E5`-`$E7` ever sets bank
+  `$80`. The likely truth is duller — `$E5`-`$E7` are shared direct-page
+  scratch that 30+ files write, so a non-`$CA` bank just means some other
+  subsystem parked a pointer there. The true source of `$80` is UNVERIFIED;
+  the bank gate is correct either way, so this is a comprehension hazard,
+  not a bug.
 - A stood-on **event trigger re-fires every 4 frames**. Once its switch
   makes it a no-op, the cycle is 3 frames of event (movement type 4) and
   1 frame of control, forever. Routes must step OFF a trigger tile (a
@@ -249,12 +246,9 @@ and the cardinal move of the same press happens only when the diagonal
 is refused. That is why `canStep(x, y, "right")` is *false* where the
 engine would turn a right press into a diagonal.
 
-Every staircase in Figaro Castle is built from these tiles. While the
-model knew only the cardinal branch they read as solid wall: map 55 fell
-into three regions BFS could not join, a DFS over the real door graph
-visited 14 rooms without reaching the castle ring, and `gen_edgar.lua`
-had to hand-hold four staircases with raw held presses. Those hand-holds
-are retired.
+Every staircase in Figaro Castle is built from these tiles, so a model
+that knows only the cardinal branch reads them as solid wall and splits
+map 55 into regions BFS cannot join.
 
 `probe_canstep.lua` validates both branches against real movement
 (predict, press, compare) — the cardinal one at the mines boot area
@@ -303,9 +297,7 @@ tile-aligned.
 COLD POWER-ON — no injected save, so it works on a fresh clone. It plays
 the New Game intro and the Narshe gauntlet down to the mines (map 41),
 rides the security-door blast scene, then `navTo(42, 6)` and mints
-`whelk_doorstep.mss` one tile short of the trigger. (Its retired
-SRM-based ancestor `gen_whelk.lua` instead booted an injected play save
-at (33,22) and BFS'd the mines to the same doorstep.) The Whelk event
+`whelk_doorstep.mss` one tile short of the trigger. The Whelk event
 trigger is the single tile **(42,5)**; stepping onto it tile-aligned
 while user-controlled fires the event, which force-walks the party down,
 shows dialogs `$0B6E` / `$0B6F` (edge-tapped through), and starts the

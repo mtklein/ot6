@@ -1,4 +1,4 @@
-# Research: toolchain (macOS / Apple Silicon, verified 2026-07-14)
+# Research: toolchain (macOS / Apple Silicon)
 
 ## ROM identification
 
@@ -64,24 +64,8 @@ Reference disassemblies (read-only aids):
 - ares v148: accuracy sanity-check target only (no real SNES debugger).
 - snes9x / RetroArch: player-compat check targets; no usable Lua on macOS.
 
-## Recommended stack (adopted)
-
-1. Fork/clone the disassembly; our code lives as a branch on it.
-2. `brew install cc65 sdl2`; Mesen 2 for debug + testrunner regression.
-3. FF6Tools in browser for data prototyping; final values land in source.
-4. Ship BPS patches made with Flips; never commit ripped assets
-   (`make distclean` before commits in the inner repo).
-
 ## Unverified / watch-outs
 
-- Mesen `--testrunner` on macOS specifically (verified in source/docs, not
-  yet executed here — M0 exit criterion).
-  **RESOLVED at M0 (noted 2026-07-30): it works and the whole project runs
-  on it.** `make test` gates every change on the full self-registering
-  suite — 82 tests as of today — executed headlessly under `--testrunner`
-  on this machine, and `tools/tests/run.sh` is the wrapper. Left in place
-  as the record of what was unverified at the time, but it is no longer a
-  watch-out.
 - No exhaustive public diff list of US 1.0 vs 1.1 exists; Sketch fix is the
   headline.
 - BNW's own build uses xkas 0.06; treat its asm as reference, not drop-in.

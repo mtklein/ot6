@@ -23,10 +23,9 @@
 --   naming both strings -- any OT6_SRAM_ANCHOR whose manifest.json declares
 --   a different persistent_layout.
 --
--- WHY THIS LEG IS NOT AN EVENT WALK.  docs/design/vector-route-recon.md §4
--- and §8 hazard 2 flagged this as the beat most likely to eat the minting
--- pass, and the reason is that **`battle 73` appears nowhere in
--- `event_main.asm`**.  The ride is opcode `$ae`, `CUTSCENE::TRAIN`
+-- WHY THIS LEG IS NOT AN EVENT WALK.  The route recon flagged this as the
+-- beat most likely to eat the minting pass, and the reason is that
+-- **`battle 73` appears nowhere in `event_main.asm`**.  The ride is opcode `$ae`, `CUTSCENE::TRAIN`
 -- (include/event_cmd.inc:707), issued at event_main.asm:96580; it runs in
 -- the world module's train engine off a fixed 5-byte-per-item course
 -- (world/train_script.asm:615-660), and the fights are issued by ASM

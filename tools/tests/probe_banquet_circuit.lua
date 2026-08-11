@@ -2,7 +2,7 @@
 -- WINDOW CIRCUIT, driven from the staged banquet_window savestate
 -- (probe_banquet_stage.lua) so iteration does not replay the world grind.
 --
--- The drive is banquet-decode.md §5.2 step 2: talk to all 24 scoring
+-- The drive is banquet-decode.md §5.2's circuit: talk to all 24 scoring
 -- soldiers (banquet-decode §3 census) and win the four fights clean,
 -- inside the 14400-frame timer.  Every soldier is a chaseTalk against its
 -- OBJECT INDEX (0x10 + npc_prop record position, extracted 2026-07-28 --

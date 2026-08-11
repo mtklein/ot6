@@ -1,12 +1,10 @@
-# Weapon classes & the break spread — design dive v2.1 (2026-07-16)
+# Weapon classes & the break spread
 
 Scope: World of Balance. Locked ✦.
 
 ## Four physical classes ✦
 
-v1's six classes had two problems the driver called: fists-as-blade
-felt wrong on Sabin, and a one-wielder class (katana) made Cyan feel
-mandatory wherever katana locks appeared. The physical trio covers
+The physical trio covers
 the logical attacks; **Special (¤)** catches everything the logical
 classes don't — and it's a real, breakable class, so oddball-weapon
 parties keep a chip axis. 4 physical + 8 elemental = 12 weakness
@@ -83,46 +81,13 @@ scenario split is the stress test:
 - Shields ✦: trash 1–3, minibosses 4–6, bosses 6–12 with telegraphs;
   per-monster table authored in M6 against this spread.
 
-### The Figaro → Kolts row, audited (2026-07-19)
-
-The row above used to read "slash, pierce, bludgeon (full trio by
-Sabin)". Decoding the actual encounter tables and the actual starting
-equipment corrected it in both columns, and the correction is why this
-stretch's weaknesses are authored on the **element** axis:
-
-- **The class ring is degenerate here.** Terra carries a Mithril Knife
-  and Locke a Dirk — both **piercing** (`ot6_class.asm:49,:48`) — and
-  Edgar a Mithril Blade, **slashing** (`:59`); see
-  `char_prop.asm:152,:162,:197`. So two of the four classes are what the
-  A button already swings and the other two have no wielder at all until
-  Sabin (bludgeoning) and Setzer (special). Every class row on this
-  stretch is therefore a freebie or a Repo Man. Exactly one is authored —
-  Brawler's slash, because Brawler *absorbs* the poison answer — and it
-  is deliberately the **scarce** class: Edgar's blade is the party's only
-  slashing weapon, so the answer to a Brawler is "close the Tools menu".
-- **The element ring is two keys wide, not three.** Terra's natural list
-  is Cure 1 / Fire 3 / Antdot 6 / Drain 12 (`field/event.asm:1248`), so
-  **fire** is her whole offensive element until Drain. The second key is
-  **poison**, and it is Edgar's Bio Blaster — a Figaro-shop buy the
-  frontier verifies is still carried at the mountain
-  (`gen_kolts.lua:594`).
-- **The pool was not a "generous mix" — it had four holes.** Of the
-  species this stretch actually draws, Cirpius ($086) and Rhodox ($012)
-  had *no* vanilla weakness at all, and Sand Ray ($05c) / Areneid ($05d)
-  are ice|water, which nobody here casts. Cirpius is the worst: 93.75% of
-  the draws on Mt. Kolts maps 95/96/97, three at a time. Six
-  `Ot6ElemAddTbl` rows close all four holes with poison and give the
-  stretch's two keys a roughly even split (fire opens 8 species, poison
-  7, slash 1). Full derivation and the per-species reasoning:
-  `balance-metrics.md` Measurement #8.
-
 ## Weapons as chip carriers
 
 A weapon chips **its class, plus its element if it has one** ✦ — a
 Flame Knife is a piercing probe and a fire probe in one swing. In
 vanilla, elemental weapons rotate in and out on raw stats; here every
 chest and shop upgrade is a tactical acquisition. Multi-hit actions
-chip per hit ✦ (AutoCrossbow, Quadra Slam, boosted Fight).
+chip per hit ✦ (Quadra Slam, boosted Fight).
 
 ## Skills carry their own class ✦
 

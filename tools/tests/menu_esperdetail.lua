@@ -27,8 +27,8 @@
 -- asserts the pages of all three -- zero state writes.  What each owned stone
 -- buys the test:
 --   IFRIT  (+6 vigor / +4 stamina / -3 mag.pwr) -- #62's marquee, the row
---          magicite-ifrit-shiva.md §12.1 recorded as unbuildable under the
---          old encoding: three terms, SPEED SKIPPED (packing proof), and a
+--          magicite-ifrit-shiva.md's ledger recorded as unbuildable under
+--          the old encoding: three terms, SPEED SKIPPED (packing proof), and a
 --          MINUS sign.  Every assertion of the old Ifrit page, unchanged.
 --   SHIVA  (-3 vigor / +4 speed / +6 mag.pwr) -- Ifrit's authored mirror:
 --          three terms again but with STAMINA skipped (a MIDDLE zero costs no

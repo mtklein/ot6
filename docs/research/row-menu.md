@@ -1,50 +1,9 @@
 # Front row / back row: driving the row toggle through the real menu
 
-Source-reading research for issue #75 (the honesty program). Everything here was
-derived by reading `ff6/src/`, `ff6/include/` and `ff6/notes/` **in this
-worktree**; nothing was run, no emulator was started. Every mechanism claim
-carries a `file:line`. Where the source did not settle a question I say so and
-name the probe that would.
-
 Companion to `docs/research/field-care-menu.md`, which established the shared
 conventions (`zMenuState` = DP `$26`, list cursor = DP `$4B`, `zCharID` at
 `$69..$6C`, the one-frame cursor lag, the `$B5` mosaic refusal flag). Those all
 hold here and are not re-derived.
-
----
-
-## 0. Corrections to the dispatch brief
-
-Two things in the dispatch are wrong, and the first one changes the whole
-recipe:
-
-1. **There is no main-menu *row* for the row screen.** The dispatch asks "which
-   main-menu entry (its `$4B` cursor row and its on-screen label)". The answer
-   is *none*. The order/row screen is reached by pressing **LEFT** on the main
-   menu `$05` — a handler that sits beside the A-button handler and does not go
-   through `SelectMainMenuOption` at all (`field_menu.asm:571-576` →
-   `MainMenuLeftBtn`, `field_menu.asm:3491-3508`). `$4B` is irrelevant; the
-   main-menu cursor can be sitting on any of the seven rows. The on-screen
-   affordance is the word **"Order"**, and it is drawn on **BG3 screen B** at
-   tile `{26,3}` (`menu_text_en.inc:64`, `MainMenuOrderText`,
-   `field_menu.asm:5103`) — i.e. off the right edge of the visible main menu,
-   which is why pressing LEFT *scrolls the whole menu sideways* to reveal it
-   (`zMenuScrollRate = -12`, `field_menu.asm:3500-3501`, applied by
-   `MenuState_65`, `field_menu.asm:4927-4939`).
-
-2. **The row bit is not in the `$1600 + 37*c` character block.** It lives in the
-   *party/order* byte at **`$1850 + c`** (`ff6/notes/field-ram.txt:928-932`),
-   which is a different array. The `$1600` block holds stats and equipment; the
-   row is one bit of the 16-byte object-settings array. Details in §2.
-
-Everything else in the dispatch checks out. The main menu is unmodified by this
-hack: seven rows, vanilla labels Item/Skills/Equip/Relic/Status/Config/Save
-(`MainMenuCursorProp: cursor_prop {0,0}, {1,7}, NO_X_WRAP`,
-`field_menu.asm:3615-3616`; labels `menu_text_en.inc:43-49`). There are no
-`issue #` markers anywhere on the order/row path — the only ones in
-`field_menu.asm` are at `:18`, `:1174`, `:1199`, `:1339`, all SwdTech/Rage/Blitz
-(see `field-care-menu.md` §5.5). **The row UI in OT6 is vanilla**, which is also
-the stated house rule: *"vanilla's bugs stay … row jank"* (`docs/DESIGN.md:82-85`).
 
 ---
 
@@ -127,7 +86,7 @@ character's row can be toggled. See §5.
   (`field_menu.asm:1859-1870`).
 
 This is the same "A, A on one slot" shape as using an item
-(`field-care-menu.md` §0.2). **Moving the cursor between the two A presses turns
+(`field-care-menu.md` §2.4). **Moving the cursor between the two A presses turns
 a row toggle into a party reorder.**
 
 ### 1.5 `$12` — 12 frames, then back to `$0F`
@@ -374,10 +333,9 @@ touches bit `$20`**. Confirmed exempt, with the command's own path:
 | Steal `$05` | `Cmd_05` → `_c2298a` → `ExecAttack` (`battle_main.asm:3406-3417`); no damage at all | yes |
 | Jump `$16` | `Cmd_16`, re-sets `$B3.5` (`battle_main.asm:3937-3943`) | yes |
 
-**So the owner is right, and it is worse than "ranged attackers".** In this ROM
-*every* command except Fight and Capture is row-exempt by construction, because
-`$B3` starts at `$FF`. Tools, Blitz, SwdTech, Magic, Throw — all of them do full
-damage from the back row.
+In this ROM *every* command except Fight and Capture is row-exempt by
+construction, because `$B3` starts at `$FF`. Tools, Blitz, SwdTech, Magic,
+Throw — all of them do full damage from the back row.
 
 ### 3.3 Damage **taken**: halved for physical only
 
@@ -454,8 +412,7 @@ from when a character joins (`ff6/src/field/event.asm:1031-1075`):
 | Locke (1) | FIGHT, STEAL, MAGIC, ITEM (`:157-165`) | `DIRK` `$00` |
 | Edgar (4) | FIGHT, TOOLS, MAGIC, ITEM (`:192-199`) | `MITHRILBLADE` `$0A` |
 
-(The dispatch's Fight/Magic, Fight/Steal, Fight/Tools is the same set modulo
-Morph/Item; OT6 reshapes the in-battle command *windows*
+(OT6 reshapes the in-battle command *windows*
 (`ff6/src/battle/ot6_cmdmenu.asm`) but `char_prop.asm` is unmodified vanilla for
 these three.)
 
@@ -597,7 +554,7 @@ All reads. Nothing here is written by the harness.
 ```
 field                          press X
 wait $26 == $05
-press LEFT                     (NOT a cursor row -- see §0.1)
+press LEFT                     (NOT a cursor row -- see §1.2)
 wait $26 == $0F                (~6 frames of $65)
 
 slot = the party slot you want; charID = read $69 + slot

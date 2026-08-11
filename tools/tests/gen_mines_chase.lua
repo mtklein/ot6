@@ -14,7 +14,7 @@
 -- pool is FOUGHT (tap-A = Fight, confirm at default target), never
 -- kill-bitted.  That is bal_mines.lua's measured 'baseline' policy:
 -- 8/8 wins, 0 deaths, ~2 real turns / ~744 frames per battle for solo
--- L5 Terra against the full pool (balance-metrics.md Measurement #1),
+-- L5 Terra against the full pool (the mines balance measurement),
 -- so the honest cost is roughly +1-2k frames per encounter drawn and
 -- the leg budgets below carry it.  This gen has no write idiom of its
 -- own.

@@ -12,9 +12,9 @@ Everything below was decoded from the vendored data under `ff6/` on
 group word, formation record and arithmetic figure was recomputed from
 `sub_battle_group.dat` / `rand_battle_group.dat` / `battle_monsters.dat` /
 `monster_prop.dat` / `map_prop.dat` and the entrance `.dat` pair — not read
-off `sealed-gate-recon.md` §3.2 (which it nonetheless confirms, with the
-corrections in §1.2). `monster_prop.dat +23` is absorb, `+25` is weak
-(`docs/HANDOFF.md:107`, canonical). Where a claim is an inference it is
+off `sealed-gate-recon.md`'s own encounter survey (which it nonetheless
+confirms, with the corrections in §1.2). `monster_prop.dat +23` is absorb,
+`+25` is weak (`docs/HANDOFF.md`, canonical). Where a claim is an inference it is
 labelled.
 
 ---
@@ -62,8 +62,8 @@ legs is these four cave maps plus one forced ambush (§2.2).
 ### 1.2 Recon corrections
 
 - **The dispatch's "base 381" is wrong twice over.** The Imperial Base is
-  maps **377/378** (`sealed-gate-recon.md` leg 2, confirmed by the entrance
-  scan: world `(165,194)→377`, `(166,194)→377 (30,13)`, `377 (13,18)→378`).
+  maps **377/378** (confirmed by the entrance scan: world
+  `(165,194)→377`, `(166,194)→377 (30,13)`, `377 (13,18)→378`).
   Map **381** is a Sealed-Gate-*tileset* cutscene map used only by the
   Esper-World flashback (`load_map 381` at `event_main.asm:11909`, in the
   Maduin/Madonna sequence; likewise 389 at `:11755`, 390 at `:11432`). No
@@ -81,7 +81,7 @@ legs is these four cave maps plus one forced ambush (§2.2).
   draw level-5 Narshe trash. Inference, same as v0.6: scene choreography
   never takes a free step, so it never rolls. Not authored for; worth the
   same one runtime check.
-- **`sealed-gate-recon.md` §3.2's pools, species stats and rates all
+- **The recon's pools, species stats and rates all
   reproduce exactly** — formations, counts, levels, HP, absorb/weak bytes,
   `$0070` rates. The recon's one substantive error is the reachability
   claim its design question rests on (§7).
@@ -167,9 +167,9 @@ The vanilla data tells one story three times:
   pearl-weak body (§5).
 - **Fire and poison are traps**: fire is absorbed by 4 of 5 species
   (84.38 % of draws feed a fire-splash) and poison by 4 of 5 plus the
-  Ninja. This band forces Terra into the party (the base gate,
-  `sealed-gate-recon.md` headline 3) and then punishes her fire lean
-  (`kits.md` §Terra) — the Zozo poison inversion again, and worth keeping.
+  Ninja. This band forces Terra into the party (the base gate demands her)
+  and then punishes her fire lean (`kits.md`'s Terra entry) — the Zozo
+  poison inversion again, and worth keeping.
 - **The exception is deliberate-looking**: Coelecite, the one body with no
   pearl weakness, is also the one whose absorb set (fire only) admits ice —
   and it is a *rock*, not a corpse. Vanilla built the "one fight your master
@@ -178,8 +178,8 @@ The vanilla data tells one story three times:
 Shield counts as they stand: levels 20-21 give `2 + level/8` = **4**
 (`ot6_break.asm` `@formula`); Ninja at 27 gives 5. Both prior authoring
 passes measured 4 as one-too-many on trash and landed on 2
-(`balance-metrics.md:944-972`, `ot6_hud.asm:1489-1510`, `break-band-vector.md`
-§8.2 — the third band to inherit that finding unmeasured, see §9).
+(`ot6_hud.asm:1489-1510`, `break-band-vector.md` §8.2 — the third band to
+inherit that finding unmeasured, see §9).
 
 ---
 
@@ -278,8 +278,8 @@ granted-while-worn under M5, `genju_prop.asm:56-66`).
   already load-bearing break data elsewhere: Vargas's `Ot6ElemAddTbl` holy
   add exists *because* "aurabolt already carries it"
   (`ot6_break.asm:121-127`, row at `:338`), proven at runtime by
-  `battle_vargas.lua`. `kits.md:93` lists it as Sabin's holy chip. Single
-  target, magic damage.
+  `battle_vargas.lua`. `kits.md`'s Sabin entry lists it as his holy chip.
+  Single target, magic damage.
 - **Ice** — Shiva's granted Ice (`genju_prop.asm:116`), Maduin's Ice2
   (`:128`), Bismark's Ice (`:131`).
 - **Fire** — Terra's natural Fire (L3, `field/event.asm:1249`), Ifrit,
@@ -300,7 +300,7 @@ key is not gated on a resource cliff.
 
 ## 7. The pearl/holy question, resolved
 
-The recon (`sealed-gate-recon.md` §3.2) framed the band as "keyed on
+The recon (`sealed-gate-recon.md`) framed the band as "keyed on
 pearl/holy — an element no kit in the band can currently produce" and the
 dispatch asked for three options. Laid out with the math:
 
@@ -445,7 +445,7 @@ Under the proposal:
   `$097`/`$09b` fights as the interesting arms.
 - Fixture assertions this implies (the §10.3 pattern): at the cave mouth,
   assert Sabin active (AuraBolt is the master key) and Terra active (the
-  base gate demands her anyway, `sealed-gate-recon.md` §2.3); assert Shiva
+  base gate demands her anyway); assert Shiva
   and Bismark owned (the `$09a` ice key, the Ing water key).
 
 ---

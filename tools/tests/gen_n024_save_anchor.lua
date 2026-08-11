@@ -1,5 +1,6 @@
 -- gen_n024_save_anchor.lua -- mint battery anchor C, `n024-doorstep-save-v1`
--- (save-points-vector.md §5): boot n024_doorstep (the nearest minted
+-- (the A-F save-point boundary band is lettered in
+-- tools/tests/frontier_graph.py): boot n024_doorstep (the nearest minted
 -- predecessor, map 273 {25,52} facing NUMBER 024), step off the doorstep,
 -- walk onto the NEW #10 save point at {26,53}, and save through the game's
 -- OWN Save UI into slot 3.  run.sh captures the 32 KiB battery on shutdown.

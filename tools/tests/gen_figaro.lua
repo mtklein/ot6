@@ -4,7 +4,7 @@
 -- figaro_doorstep.mss at the first controllable interior moment.  The
 -- Edgar/Kefka sequence beyond is the NEXT stretch, not this script's.
 --
--- THE GATE (read + live-probed, see world-map-nav.md "Warp levers"):
+-- THE GATE (read + live-probed, see world-map-nav.md "Warp / teleport levers"):
 --   * Figaro is a WORLD EVENT TRIGGER, not a short entrance: tiles
 --     (64,76)/(65,76) -> _ca5eb5 (event_main.asm:14184), gated
 --     `if_switch $010B=0, WorldReturn` -- $010B was set by the

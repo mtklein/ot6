@@ -1,4 +1,4 @@
-# OT6 Tooling — installed and verified 2026-07-14
+# OT6 Tooling
 
 Everything below is working on this machine (macOS arm64). Research trail
 with URLs: [research/toolchain.md](research/toolchain.md).
@@ -6,8 +6,8 @@ with URLs: [research/toolchain.md](research/toolchain.md).
 ## The build
 
 We build the whole game from source via the **everything8215/ff6
-disassembly** (GPL-3.0), vendored directly at `ff6/` (upstream 1ea47b5;
-pre-flatten commit history preserved in docs/history/). The base ROM lives
+disassembly** (GPL-3.0), vendored directly at `ff6/` (upstream 1ea47b5).
+The base ROM lives
 in `ff6/vanilla/` (git-ignored) and assets are ripped from it once
 (`make rip`). Verified: the unmodified tree's `make ff6-en` reproduces
 retail FF3us 1.0 **byte-for-byte** (CRC32 A27F1C7A), including retail's
@@ -42,12 +42,10 @@ The Homebrew pieces are captured in the root `Brewfile` — `brew bundle` from
 the repo root installs them in one go (the non-brew pieces below still need
 the manual steps at each bullet).
 
-- **cc65** (ca65/ld65) — via Homebrew. numpy is no longer needed
-  (2026-07-18): `ff6/tools/fix_checksum.py` was rewritten onto stdlib
-  `struct`, output verified byte-identical, so the build's only python
-  requirement is any `python3` ≥3.9 — Command Line Tools 3.9.6 suffices.
-  numpy imports survive only in the asset re-encoders (`brr.py`,
-  `monster_stencil.py`, `shuffle_rng.py`), whose outputs are tracked.
+- **cc65** (ca65/ld65) — via Homebrew. The build's only python requirement
+  is any `python3` ≥3.9 — Command Line Tools 3.9.6 suffices. numpy is
+  imported only by the asset re-encoders (`brr.py`, `monster_stencil.py`,
+  `shuffle_rng.py`), whose outputs are tracked.
 - **ninja** — via Homebrew. Runs the generated savestate graph
   (`build/build.ninja`, emitted by `tools/tests/lib/frontier_ninja.py` from
   `tools/tests/frontier_graph.py`); `make frontier` / `make test` are thin
@@ -60,13 +58,11 @@ the manual steps at each bullet).
   build already emits `ff6/rom/ff6-en.dbg` for source-level debugging.
 - **sdl2** — via Homebrew; a hard Mesen runtime dependency.
   MesenCore.dylib's only non-system link is
-  `/opt/homebrew/opt/sdl2/lib/libSDL2-2.0.0.dylib` (otool -L). Invisible
-  until a machine lacked it: the .app bundles no SDL, and the core dylib
-  only exists once the .NET host extracts it to
-  `~/Library/Application Support/Mesen2/` — so the first launch after the
-  2026-07-18 reformat died as DllNotFoundException → Abort trap 6.
-  [research/toolchain.md](research/toolchain.md)'s Mesen entry said
-  "needs `brew install sdl2`" all along; this list omitted it.
+  `/opt/homebrew/opt/sdl2/lib/libSDL2-2.0.0.dylib` (otool -L). It is easy
+  to miss: the .app bundles no SDL, and the core dylib only exists once the
+  .NET host extracts it to `~/Library/Application Support/Mesen2/`, so a
+  machine without sdl2 dies on first launch as DllNotFoundException →
+  Abort trap 6.
 - **ca65/ld65 is the sole production compiler/linker path.** OT6 code
   stays in assembly alongside the vendored disassembly; there is no
   secondary compiler or committed compiler-generated blob to reproduce.
@@ -105,26 +101,6 @@ the manual steps at each bullet).
 - `make distclean` in `ff6/` deletes ripped assets including modified ones
   — recoverable via `git restore` now that they're tracked, but still
   don't run it casually.
-- **Fresh clone**: all 665 `.lz` files are generated (compressed from
-  tracked sources by `ff6/tools/ff6_lzss.py`) and git-ignored, so a fresh
-  clone has none — and the vendored Makefile computes module deps with
-  `$(wildcard)`, so files that don't exist yet are not prerequisites and
-  nothing schedules the `%.lz: %` rule. The first build dies in ca65 on
-  the missing includes. Regeneration is mechanical: enumerate the sources
-  and make each `.lz` target by name — the pattern rule works when asked.
-  **FIXED — this gotcha no longer bites (noted 2026-07-30).** OT6 added an
-  **order-only** prerequisite on the module object rule —
-  `$(OBJ_DIR)/$1_%.o: … | $(LZ_FILES)` at `ff6/Makefile:142`, with the
-  reasoning at `:136-139` — which guarantees every `.lz` exists and is
-  fresh before assembly *without* making every object stale when any one
-  `.lz` changes. The nomp object carries the same guard (`ff6/Makefile:283`)
-  and there is an explicit `lz:` target (`:133`). A plain `make` on a fresh
-  clone now builds. Kept above as the record of what the bug was, since the
-  order-only trick is the non-obvious part of the fix.
-- A failed recipe used to leave a half-built, unchecksummed
-  `rom/ff6-en.sfc` that the next `make` treated as up-to-date. Both
-  Makefiles now set `.DELETE_ON_ERROR:` (added 2026-07-18), so a failed
-  recipe's target is deleted instead.
 - **ca65 width state is inherited across `.include`**: any asm file pulled
   into a module inherits the `.a8/.a16/.i8/.i16` assumptions active at the
   inclusion point. ALWAYS declare the expected widths at the top of a new
@@ -148,6 +124,3 @@ the manual steps at each bullet).
   free per-entity bytes, ROM expansion norms.
 - [data-formats.md](research/data-formats.md) — monster/item/esper/spell
   record layouts with offsets.
-- [prior-art.md](research/prior-art.md) — who has published reusable asm
-  (BNW, RoSoDude's ATB/CTB) and what's never been done (break, BP, enemy
-  gauges).

@@ -6,7 +6,8 @@
 -- contract, then:
 --   1. leave the save room (386 (73,59) short entrance -> 384 (64,12));
 --   2. THE 384 WEST TRAVERSE (measured, probe_v07_384west/2/3/4/5 +
---      probe_v07_384toggle -- sealed-gate-recon-addenda.md Addendum 3):
+--      probe_v07_384toggle -- these probes are the record; the recon's own
+--      seven-lever reading was wrong):
 --      the minimal switch chain is TWO levers, not seven --
 --        * (71,15) face-UP+A (_cb3176, event_main.asm:45276): persistent
 --          $0174, extends the x=76 column bridge; 266-tile south loop ->
@@ -28,8 +29,8 @@
 --   3. THE SEALED GATE SCENE (map 391; entry (8,21) IS the scene trigger,
 --      _cb39ca, :45953): ridden hands-off with advanceStory, battles 121
 --      and 122 in opts.spare -- the $17b dummy is unloseable and must
---      NEVER be kill-bitted (its battle_event IS the scene; addenda
---      §1.6).  The tail sets $0079=1 and returns control at 384 (10,28);
+--      NEVER be kill-bitted (its battle_event IS the scene, measured).
+--      The tail sets $0079=1 and returns control at 384 (10,28);
 --   4. out the post-gate shortcut ((5,43) -> _cb2a9f -> 382 (31,41),
 --      exposed by the $0079 map-init retile), the cave mouth (25,38) ->
 --      world (169,194), the pocket, (166,194) -> the base east door;
@@ -49,8 +50,8 @@
 --      (measured, probe_v07_gatescene3; an A tap there re-enters the
 --      wreck interior, so the generator never presses A on the world);
 --   7. the world battery save on that tile -- boundary I,
---      `vector-crash-v1` (recon §2.2's own name for the boundary, at the
---      recon's own proposed tile (83,238)).
+--      `vector-crash-v1` (the route recon's own name for the boundary, at
+--      the recon's own proposed tile (83,238)).
 --
 -- OT6_ANCHOR_LAYOUT: ot6-codex-o8-v1
 -- ^ run.sh refuses -- BEFORE boot -- any OT6_SRAM_ANCHOR whose manifest
@@ -148,7 +149,8 @@ H.run({ maxFrames = 240000 }, {
   H.repeatN(3, { H.pressButtons({ "a" }, 8), H.waitFrames(60) }),
   -- The boot tile IS the SavePoint trigger: a cold Continue stands the
   -- party on 386 (74,53) and the trigger re-enters every frame, so
-  -- hasControl() never settles there (the addenda §1.7 re-entry class).
+  -- hasControl() never settles there (the re-entry-trap class: a stood-on
+  -- trigger tile whose script re-fires every frame).
   -- Gate on map+alignment+brightness only; the contract assert is pure
   -- reads, and the escape below is an unconditional held press.
   (function() local cnt = 0
@@ -326,7 +328,7 @@ H.run({ maxFrames = 240000 }, {
   end, 3600, "world at the crash site", 5),
   H.waitFrames(45),
   -- MEASURED (probe_v07_gatescene3): the hatch drops the party ON the
-  -- wreck's own world tile (83,238) -- the recon §2.2's proposed anchor-I
+  -- wreck's own world tile (83,238) -- the route recon's proposed anchor-I
   -- tile -- on foot, with $1F60/61 == $1F62/63 == (83,238).  An A tap
   -- HERE re-enters the wreck interior (it does not lift off, and the gen
   -- never presses it); the flight refusal was proven at the wheel above.
@@ -349,7 +351,7 @@ H.run({ maxFrames = 240000 }, {
     H.screenshot("leg_hi_i_tile")
   end),
   -- THE LEG'S SAVESTATE IS MINTED HERE, BEFORE THE MENU (the world menu
-  -- does not unwind on B -- addenda §1.7)
+  -- does not unwind on B, measured)
   H.saveState("vector_crash.mss"),
 
   -- ---- the real Save UI, slot 3 --------------------------------------------

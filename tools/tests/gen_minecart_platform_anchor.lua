@@ -1,5 +1,6 @@
 -- gen_minecart_platform_anchor.lua -- mint battery anchor D,
--- `minecart-platform-v1` (save-points-vector.md §5): boot minecart_doorstep
+-- `minecart-platform-v1` (the A-F save-point boundary band is lettered in
+-- tools/tests/frontier_graph.py): boot minecart_doorstep
 -- (the nearest minted predecessor, map 272 {9,52} facing CID), walk the
 -- platform to the vanilla save point at {3,55}, and save through the
 -- game's OWN Save UI into slot 3.  run.sh captures the 32 KiB battery on

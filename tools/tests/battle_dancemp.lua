@@ -1,6 +1,7 @@
 -- @suite frontier=moogle_cleared slow
 -- battle_dancemp.lua -- issue #34: Dance costs MP -- flat, paid at
--- dance-START, per docs/design/mp-economy.md:96.
+-- dance-START, per docs/design/mp-economy.md's verb survey (Dance: "flat,
+-- paid at start", 4-10).
 --
 -- Ot6AbilityCost's cmd-$13 arm charges Ot6DanceCost (8 MP) when the
 -- actor's DANCE status ($3ef8 bit 0) is still clear -- the commit moment --

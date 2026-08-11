@@ -3,11 +3,9 @@
 Include this file by reference in every agent dispatch. Task-specific scope
 goes in the dispatch; everything here is always true.
 
-Revised 2026-07-29 after an audit of whether our rules were costing more
-than they bought (`rules-audit.md`). Three coordination rules were loosened
-deliberately. **The rules that remain are about not fooling ourselves. They
-stayed because they repeatedly caught real things — including mistakes made
-by the dispatcher writing your brief.**
+**The rules here are about not fooling ourselves. They exist because they
+repeatedly caught real things — including mistakes made by the dispatcher
+writing your brief.**
 
 ## Read THIS file from your own worktree
 
@@ -15,9 +13,7 @@ Not from `/Users/mtklein/ot6/docs/agent-brief.md`. The owner's checkout
 sits on whatever **release branch** he is playtesting, so docs read there
 can be weeks behind `main`. Every dispatch should name the copy in your
 own worktree; if one points you at the owner's tree, read your own copy
-instead and say so in your report. (This bit every agent on 2026-07-29:
-they all read a brief from two days earlier and correctly followed rules
-that had already been replaced.)
+instead and say so in your report.
 
 ## Work the way you work best
 
@@ -112,10 +108,9 @@ so no throttle arithmetic is needed from you.
 testrunner kills a run on wall-clock, and every competing job is equally
 niced — so agents can starve *each other* past that deadline even though
 none of them starves the owner. The signature is several mints failing
-`code=255` at once while the same mints pass in isolation (observed
-2026-07-29: nine states minted fine, four reaped, all four green when
-re-run alone). If you see that, it is contention, not your change —
-lower `-j` and retry rather than debugging the generator.
+`code=255` at once while the same mints pass in isolation. If you see
+that, it is contention, not your change — lower `-j` and retry rather
+than debugging the generator.
 
 A **full** `make frontier` is the case that provokes it, because it
 parallelises hard on its own. Bound it (`NINJAFLAGS=-j4`) when other
@@ -130,5 +125,5 @@ suspect is finished work; a confident guess is not.
 
 If something in the dispatch turned out to be wrong — a stale line number,
 a claim that does not hold, a file that does not exist — say so explicitly.
-**The dispatcher's brief is frequently the thing at fault**, and several of
-today's best findings were an agent proving one of its instructions wrong.
+**The dispatcher's brief is frequently the thing at fault**; some of the
+best findings here have been an agent proving one of its instructions wrong.

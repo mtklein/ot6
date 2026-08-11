@@ -298,9 +298,9 @@ $(SMOKE_TARGETS): smoke-%: rom
 # tools/tests/anchors/<key>/ is one milestone anchor: manifest.json plus a
 # 32 KiB battery payload minted through the game's own Save UI (#9 -- never
 # synthesised).  The key is the milestone name; post-opera-v1 is the only
-# real one today, and save-points-vector.md §5 names the A-F band this
-# convention must hold (mrf-save-room, n024-doorstep-save, ...).  Dirs named
-# negative-* are deliberately wrong fixtures for `make anchor-negatives`
+# real one today, and frontier_graph.py's A-F boundary band names the states
+# this convention must hold (mrf-save-room, n024-doorstep-save, ...).  Dirs
+# named negative-* are deliberately wrong fixtures for `make anchor-negatives`
 # below; frontier_ninja.py refuses a graph entry that names one.  Anchored
 # mints live in the ninja graph (anchor="<key>" in frontier_graph.py): the
 # manifest and payload ride the leg's dependency set, so editing either

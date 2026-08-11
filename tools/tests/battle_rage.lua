@@ -34,7 +34,7 @@
 -- is read back and counted, so the arm shows the album is untouched while the
 -- battle menu is capped).
 --
--- THE $ff-FILL, verified (kit-gau.md §8.3 flagged it UNVERIFIED and asked for
+-- THE $ff-FILL, verified (kit-gau.md flagged it UNVERIFIED and asked for
 -- one probe before the build relied on it).  InitSkills does NOT terminate the
 -- rage region -- unlike the dance list right above it, which explicitly writes
 -- $ff for every unknown dance (battle_main.asm:14666-14671), the rage walk only
@@ -820,8 +820,8 @@ add({
 -- ========================= 9. LEAP IS FREE ==================================
 -- REVERSED 2026-07-29 (owner): "I don't recall showing a cost for Leap.  If
 -- it's 2 MP, let's just make it free."  #40 had priced it at a flat 2 from
--- "only the basic Fight command is free" (mp-economy.md:30-34) plus
--- mp-economy.md:97's probe-collect rung.  Two things retired that:
+-- "only the basic Fight command is free" (mp-economy.md, as it then read)
+-- plus that doc's probe-collect rung.  Two things retired that:
 --
 --   * THE PRICE WAS NEVER DISPLAYED.  Leap is a top-level command ROW, not a
 --     list entry, and the four-row battle command window draws names only.

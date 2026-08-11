@@ -1,12 +1,10 @@
-# The esper stat ruler — what a gear upgrade is actually worth (2026-07-29)
+# The esper stat ruler — what a gear upgrade is actually worth
 
-Scope: issue #62. The owner's direction is *"rebalance esper passives by making
-equipping an esper feel like equipping a next-level-up piece of equipment, so
-something like maybe +10 stats across relevant stats."*
-
-This document does for esper stat mods what #45 did for MP: **measures the
-comparison the owner named before pricing anything.** The `+10` in the
-direction is treated as a hypothesis, not an input.
+The owner's direction is *"rebalance esper passives by making equipping an
+esper feel like equipping a next-level-up piece of equipment, so something
+like maybe +10 stats across relevant stats."* The `+10` in that direction is a
+hypothesis, not an input: this document measures the comparison it names
+before pricing anything.
 
 **Evidence rule (CONTRIBUTING.md).** Every number below names the file and the
 byte offset it was read from. The two measurement scripts are transcribed in
@@ -16,13 +14,13 @@ byte offset it was read from. The two measurement scripts are transcribed in
 
 ## 0. Headline findings
 
-1. **Vanilla FF6 already encodes exactly the object #62 wants**, and it is not
-   a selector-plus-magnitude: `ItemProp+16/+17` is **two bytes holding four
-   signed 4-bit stat deltas** — vigor, speed, stamina, mag.pwr — decoded by
-   `CalcEquipEffect` (`ff6/src/battle/battle_main.asm:2521-2539`). Range
+1. **Vanilla FF6 already encodes exactly the object wanted here**, and it is
+   not a selector-plus-magnitude: `ItemProp+16/+17` is **two bytes holding
+   four signed 4-bit stat deltas** — vigor, speed, stamina, mag.pwr — decoded
+   by `CalcEquipEffect` (`ff6/src/battle/battle_main.asm:2521-2539`). Range
    **−7..+7 per stat**. Every stat-bearing weapon, helmet, armour and relic in
-   the game is one of these. So the encoding question in #62 has a *measured*
-   answer rather than a designed one: adopt the game's own.
+   the game is one of these. So the encoding question has a *measured* answer
+   rather than a designed one: adopt the game's own.
 2. **A level-up grants zero base stats.** `DoLevelUp`
    (`battle_main.asm:16053-16111`) writes **max HP and max MP only**. The only
    per-level base-stat channel vanilla ever had was the esper bonus byte, and
@@ -91,9 +89,8 @@ so a design number transcribes into a table byte without conversion.
 ### 1.2 The distribution over all 256 records
 
 `ff6/src/menu/item_prop_en.dat`, 30 bytes per record, 256 records, bytes
-+16/+17. The file is byte-identical to the FF3us 1.0 base — `git log` shows one
-touch, the disassembly flatten (`fba50e7`) — so this is **vanilla's own
-distribution**, not OT6's.
++16/+17. The file is byte-identical to the FF3us 1.0 base, so this is
+**vanilla's own distribution**, not OT6's.
 
 | population | items | net-total min | q1 | **median** | q3 | max | stats touched (median) |
 |---|---|---|---|---|---|---|---|
@@ -195,21 +192,20 @@ two readings. Both were measured.
 |---|---|---|
 | **character level-up** | **max HP and max MP only.** Vigor / speed / stamina / mag.pwr do not grow with level in FF6 at all. | `DoLevelUp`, `battle_main.asm:16053-16111`: reads `LevelUpHP-2,x` / `LevelUpMP-2,x` and writes `$160b` max HP / `$160f` max MP. No `$161a-$161d` write on any path. |
 | **vanilla esper per-level bonus** | **+1 or +2 in exactly one stat, per level**, capped at 128 | `GenjuBonus_09..GenjuBonus_10`, `battle_main.asm:16198-16209`. The enum names it: `STRENGTH_1/2`, `SPEED_1/2`, `STAMINA_1/2`, `MAGPWR_1/2` (`ff6/include/const.inc:858-876`). |
-| **the OT6 status quo** | +2..+5 in exactly one stat, while worn | `Ot6EsperStatTbl`, `ot6_progression.asm:403-486` |
+| **the OT6 model** | the §4 ladder — +6..+10 gross across 2-3 stats, with a downside on the upper rungs, while worn | `Ot6EsperStatTbl`, `ot6_progression.asm` |
 
 Two consequences.
 
 1. **Reading one is dead** — measured, a level-up is worth zero base stats, so
    it cannot be the comparison. Only the *equipment* reading survives, which
    is what §1 and §2 measure.
-2. **Reading two sizes the status quo, and it is smaller than it looks.** An
-   OT6 WoB band is 1-3 levels (`wob-route.md` doorstep table: LOCKE L14 →
-   L15, EDGAR L15 → L16 across the whole v0.6 beat). Under vanilla, wearing
-   Ramuh for that band would have granted +1..+3 stamina — **permanently**.
-   OT6's flat while-worn +3 is therefore worth about one band of vanilla
-   esper growth, delivered up front and taken back on unequip. That is the
-   correct like-for-like: the current numbers are not *wrong*, they are
-   *one band's* worth, and #62 is asking for a *gear tier's* worth.
+2. **Reading two is smaller than it looks.** An OT6 WoB band is 1-3 levels
+   (`wob-route.md` doorstep table: LOCKE L14 → L15, EDGAR L15 → L16 across
+   the whole v0.6 beat). Under vanilla, wearing Ramuh for that band would have
+   granted +1..+3 stamina — **permanently**. So one band of vanilla esper
+   growth is worth about a flat while-worn +3, delivered up front and taken
+   back on unequip. That is the correct like-for-like, and it is why a *gear
+   tier's* worth is a much larger ask than one band's.
 
 ---
 
@@ -232,8 +228,7 @@ target for a magicite — a magicite is a scarce, fought-for, one-per-character
 slot, and there are twelve of them competing for four slots — but it should be
 authored knowingly and it should not be the *whole* number.
 
-**The design call this ruler supports** (built in §5 of
-`magicite-ifrit-shiva.md`'s successor rows; the values are in
+**The design call this ruler supports** (the values are in
 `ot6_progression.asm`):
 
 > Spend the owner's ~+10 as the **upside column**, and buy the top of that
@@ -266,13 +261,9 @@ the table comment beside the roster.
 
 ---
 
-## 5. What this changes about the encoding
+## 5. The encoding
 
-`Ot6EsperStatTbl` was one byte per esper, `[selector:4][magnitude:4]`, one
-unsigned stat, max 15 — which is why `magicite-ifrit-shiva.md` §12.1/§12.2
-recorded two-sided and multi-stat mods as unbuildable.
-
-**The replacement is vanilla's own equipment layout** (§1.1): two bytes per
+`Ot6EsperStatTbl` is **vanilla's own equipment layout** (§1.1): two bytes per
 esper, four signed nibbles, −7..+7 each, `$0000` = no mod. The argument is not
 that it is the cleverest packing; it is that
 
@@ -284,12 +275,11 @@ that it is the cleverest packing; it is that
 - the decode has a proven reference implementation in the ROM to mirror
   (`CalcEquipEffect`), including its exact `$8`-is-zero quirk.
 
-The cost is that the per-stat ceiling drops 15 → 7. §1.2 says nothing in
-vanilla exceeds +7 either, and the highest magnitude OT6 had authored was 5,
-so the ceiling is not binding on anything shipped or planned.
+The cost is a per-stat ceiling of 7. §1.2 says nothing in vanilla exceeds +7
+either, so the ceiling is not binding on anything shipped or planned.
 
-Bank `$f0` is 1 MB of `$ff` fill (`ff6/cfg/ff6-en.cfg:23`); 27 extra bytes is
-not a space question.
+Bank `$f0` is 1 MB of `$ff` fill (`ff6/cfg/ff6-en.cfg:23`); the second byte
+per esper is not a space question.
 
 ---
 

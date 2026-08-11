@@ -9,7 +9,7 @@ plus a full re-mint buying no player-visible pacing). This is a **design
 pass**: no assembly, no data edits. Everything the build pass needs is listed
 literally in §11.
 
-v0.7 has no conventional boss (sealed-gate-recon.md §0 headline 1), so these
+v0.7 has no conventional boss (`wob-route.md` §1's beat table), so these
 six stones **are** the band's player-facing content. The exit criterion is
 M5's: six stones sharing one acquisition moment need six distinct reasons to
 swap mid-dungeon — differentiation, not a power ranking.
@@ -121,7 +121,7 @@ same way Ifrit's and Shiva's were:
 
 ### 2.1 The band's three parties
 
-From sealed-gate-recon.md (§1, §4):
+From sealed-gate-recon.md:
 
 - **The cave: TERRA / LOCKE / EDGAR / SABIN** (dispatcher ruling; Terra is a
   hard gate at the base, recon headline 3). Terra is the band's only innate
@@ -139,7 +139,7 @@ competition every design below must name a win against.
 
 ### 2.2 The cave is an undead band that punishes the obvious buttons
 
-Species table from sealed-gate-recon.md §3.2, extended this pass with the
+Species table from `break-band-sealed-gate.md` §3, extended this pass with the
 status-immunity bytes (`monster_prop.dat` +0x14/+0x15/+0x16 = blocked
 STATUS1/2/3; element masks +0x17 absorb / +0x19 weak; STATUS1 `DEAD=$80`,
 `PETRIFY=$40`, `INVISIBLE=$10`, STATUS3 `SLOW=$04`, `STOP=$10` —

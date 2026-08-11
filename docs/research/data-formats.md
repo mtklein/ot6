@@ -1,4 +1,4 @@
-# Research: data-record formats (FF3us 1.0, verified 2026-07-14)
+# Research: data-record formats (FF3us 1.0)
 
 Cross-checked across ff6hacking wiki fmt pages, Data Crystal, ff6tools
 struct JSON, the disassembly's notes/rom-map.txt, and Beyond Chaos source.
@@ -33,14 +33,10 @@ nibble + block/parry anim · +0x1C price.
 **No weapon-category (sword/spear/…) field exists.** The only category-ish
 datum is the icon glyph prefixed to names at $D2B300. OT6's 8-class table
 is a new parallel table keyed by item ID. Note the glyph is *not* a
-category either: daggers carry `{spear}` in `item_name_en.json`, which is
-how "Hardened `$28`, a spear" has entered two write-ups. `$28` is a katana.
+category either: daggers carry `{spear}` in `item_name_en.json`. `$28` is a
+katana.
 
-### The equippable-by mask — PINNED (2026-07-26), stop re-deriving it
-
-Ambiguous twice before, because reading the record at the wrong byte
-still yields a plausible-looking mask. Settled from source, not
-inference.
+### The equippable-by mask
 
 **Offset +$01, 16-bit little-endian, i.e. bytes +$01 and +$02.**
 
@@ -98,8 +94,8 @@ Terra/Edgar/Gau, which is a ghost.
 
 Corollary already used downstream: **Gau's only legal weapon in the
 whole game is the Imp Halberd `$24`** — no other item with type 1 has
-bit 11 set. (See `docs/design/weapon-classes-six.md` §3 for the full
-character × category matrix decoded off this offset.)
+bit 11 set. The +$01 column is the offset any character × weapon-category
+matrix must be decoded off.
 
 ## Espers — $D86E00, 11 B × 27
 
