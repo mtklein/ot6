@@ -462,16 +462,15 @@ local function stepToWhelk(k)
         -- the whelk's own load window looks like a stray fight for a few
         -- dozen frames; hands off until the non-whelk state holds.  A real
         -- random encounter, which should not happen on this one-step route,
-        -- gets kill-bitted to unstick, and the sample is voided.
+        -- is run from and the sample is voided.  This used to flag the
+        -- formation's monsters dead instead, which is the write issue #75
+        -- exists to remove; since the sample is discarded either way, all
+        -- this path has to do is give the party back to the field, and L+R
+        -- is the engine's own run mechanic (lib M.fleeBattle).
         strayN = strayN + 1
         if strayN >= 120 and H.monstersPresent() > 0 then
           voidReason = "stray_encounter"
-          for slot = 0, 5 do
-            if H.readByte(0x3aa8 + slot * 2) % 2 == 1 then
-              H.writeByte(0x3eec + slot * 2, H.readByte(0x3eec + slot * 2) | 0x80)
-            end
-          end
-          H.setPad(aPhase < 4 and { "a" } or {})
+          H.setPad({ l = true, r = true })
           return
         end
         H.setPad({})

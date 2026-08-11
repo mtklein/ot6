@@ -65,7 +65,7 @@ local H = dofile("tools/tests/lib/ot6.lua")
 local STATE = "build/states/whelk_entry.mss.lua"
 
 local REVEAL, RCLASS, TIMER, CWEAK = 0x3E91, 0x3EA5, 0x3E90, 0x3EA4
-local WEAK, SHLD, MHP = 0x3BE8, 0x3E40, 0x3BFC
+local WEAK, SHLD = 0x3BE8, 0x3E40
 local ALIVE, MSTAT, SPEC = 0x3AA8, 0x3EEC, 0x57C0
 local MENU, ACTOR, CHID = 0x7BCA, 0x62CA, 0x3ED8
 local HEAD_SP, SHELL_SP = 0x0134, 0x0100

@@ -62,7 +62,7 @@ local SHLD, TIMER, REVEAL = 0x3E40, 0x3E90, 0x3E91
 local WEAK, CWEAK, MHP = 0x3BE8, 0x3EA4, 0x3BFC
 local ALIVE, MSTAT, SPEC = 0x3AA8, 0x3EEC, 0x57C0
 local MENU, ACTOR, CHID = 0x7BCA, 0x62CA, 0x3ED8
-local HEAD_SP, SHELL_SP = 0x0134, 0x0100
+local HEAD_SP = 0x0134
 local CHAR_TERRA = 0x00
 
 local hs, terra                       -- head monster slot, Terra's char slot
