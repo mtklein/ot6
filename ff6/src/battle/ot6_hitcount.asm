@@ -45,11 +45,13 @@
 ;
 ; The Cmd_09 shim's sharpest hazard is not re-entry but the carry.  `sbc #$a2`
 ; there reads the carry the dispatcher left set, so a hook that clobbered it
-; would misindex EVERY tool, not just Drill.  This proc's php/plp restores it;
-; no test drives a Tool to execution specifically to check that, but
-; M.newFightDriver's tactical plan fires AutoCrossbow through Cmd_09
-; (tools/tests/lib/ot6.lua:1172), so every savestate generated with that
-; driver and every suite test that uses it exercise the contract.
+; would misindex EVERY tool, not just Drill.  This proc's php/plp restores it.
+; No test targets that contract by name, but battle_toolsgrey.lua drives Edgar
+; down the affordability line by casting real Bio Blasters and AutoCrossbows
+; through Cmd_09 and checks each charge against the menu, so a wrong tool index
+; would fail it; it passes on this ROM.  M.newFightDriver's tactical plan fires
+; AutoCrossbow the same way (tools/tests/lib/ot6.lua:1172), so every savestate
+; generated with that driver exercises it too.
 ;
 ; SwdTech has no hook because no SwdTech count changes: Quadra Slam and Quadra
 ; Slice are already x4 through vanilla's effect $32, and Empowerer x2 through
