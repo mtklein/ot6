@@ -15,15 +15,19 @@ local SPELLS = { [0x2D] = "Cure", [0x2E] = "Cure2", [0x2F] = "Cure3",
 
 -- compose.py inlines savestate sidecars it can see as string literals, so
 -- these have to be written out rather than built by concatenation.
+--
+-- Only fixtures that tools/tests/lib/savestate_ninja.py still names are
+-- listed.  The originally surveyed set included vargas_doorstep,
+-- kolts_doorstep and tunnelarmr_doorstep, which exist in a seeded
+-- build/states from before those three were renamed to *_entry but are not
+-- targets any more, so a survey naming them would stop working the moment
+-- the chain is regenerated.
 local STATES = {
-  { "vargas_doorstep",    "build/states/vargas_doorstep.mss.lua" },
-  { "kolts_doorstep",     "build/states/kolts_doorstep.mss.lua" },
   { "sfigaro_passage",    "build/states/sfigaro_passage.mss.lua" },
   { "returner_hideout",   "build/states/returner_hideout.mss.lua" },
   { "gau_joined",         "build/states/gau_joined.mss.lua" },
   { "zozo_arrival",       "build/states/zozo_arrival.mss.lua" },
   { "reunion_ready",      "build/states/reunion_ready.mss.lua" },
-  { "tunnelarmr_doorstep", "build/states/tunnelarmr_doorstep.mss.lua" },
 }
 
 local steps = { H.waitFrames(20) }

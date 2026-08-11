@@ -1643,16 +1643,67 @@ end
 --
 --   Refusals are readable.  CheckCanUseItem (item.asm:2243-2330) allows only
 --   a Fenix Down on a KO'd target and allows Tonic/Potion only on a living
---   character below full HP; an invalid pick sets DP $B5 (zMosaic) nonzero
---   for about eight frames.  This driver watches that cell and gives up on
---   that (character, item) pair instead of pressing A at a window that will
+--   character below full HP; an invalid pick starts the mosaic task, which
+--   writes DP $B5 (zMosaic) for eight frames.  This driver watches that cell
+--   and gives up on that plan instead of pressing A at a window that will
 --   never accept it.
+--
+-- ---- casting instead of drinking ----
+--
+-- Owner, 2026-08-11: *"use tonics.  they're cheap, easy heals.  also early
+-- game as we've modded it, healing with magic is pretty economical, given
+-- the MP refresh on level up."*
+--
+-- OT6 restores HP and MP in full on every level up (Ot6LevelUpHeal,
+-- ff6/src/battle/ot6_progression.asm:3-6, called from
+-- battle_main.asm:16251).  So MP spent walking a corridor is refunded by
+-- the next level, while a Tonic drunk in that corridor is gone for good and
+-- the Phantom Train's shop is a hard gil budget.  Casting is therefore the
+-- cheap move and the bag is the fallback, which is the order this driver
+-- picks in.  Cure is 5 MP (MagicProp+5) against pools of 40-77 at the
+-- fixtures measured, so a caster covers eight to fifteen heals between
+-- level ups.
+--
+-- The magic path, same sources as above (field-care-menu.md section 5):
+--
+--   $05 main menu, Skills on row 1
+--     -A-> $06 character select: $4B is the menu slot again, and A here
+--          copies it into zSelIndex $28, which is how the drive reads back
+--          WHO the skills screens are showing (field_menu.asm:644-649)
+--     -A-> $0A skills options, Magic on row 1, enabled only when the
+--          gate byte $7A reads $20 (field_menu.asm:1091-1104)
+--     -A-> $1A the spell list.  $7E9D89+i is the spell id at list index i
+--          and $7E9E09+i is its colour; $20 there is the game's own
+--          "known, castable outside battle, and the MP is there"
+--          (skills.asm:1093-1122), and it is the gate A itself applies
+--          (field_menu.asm:2826-2831).  $4B = 2*row + column.
+--     -A-> $3B target select, the same cursor as $70.  Left and Right here
+--          jump to the all-targets state $3D, so only up and down are used
+--          (field_menu.asm:2852-2874).
+--     -A-> the spell lands and the window STAYS on $3B, so a second target
+--          for the same caster and spell costs nothing but cursor moves.
+--          That is why the driver holds a caster until they hit their MP
+--          floor rather than spreading the casts around.
 --
 -- opts.threshold  heal a living member below this fraction of max HP
 --                 (default 0.55)
+-- opts.magic      cast a cure spell when someone can, and reach for the bag
+--                 only when nobody can, the MP is short, or the target is
+--                 KO'd and needs a Fenix Down (default true).  Set false on
+--                 a step that wants its MP kept for the fight it is walking
+--                 toward.
+-- opts.mpFloor    MP a caster keeps back: a fraction of their maximum below
+--                 1, an absolute number at or above it (default 0.25).  A
+--                 caster drained to zero in a corridor walks into the next
+--                 fight with no Cure and no attack spell, and the fight
+--                 driver's own in-battle heal has nothing to spend, so the
+--                 floor is not zero.
 -- opts.reserve    { [itemId] = n } -- keep n of that item unspent, so a step
 --                 can hold Potions back for the fight it is walking toward
 -- opts.maxFrames  budget for the whole visit (default 24000)
+-- opts.maxTries   plans to attempt before giving up (default 48).  Cure
+--                 restores less than a Potion, so a magic visit runs more
+--                 plans than an item one for the same party.
 -- opts.tag        log prefix
 --
 -- It is a no-op, and does not even open the menu, when nobody needs
@@ -1687,6 +1738,28 @@ end
 -- 2400-frame timeout with ctl=true on every heartbeat).  careClose()
 -- below carries that split; careBackOnMap() is the raw predicate it and
 -- the setRows first stage build on.
+local CARE_ZM, CARE_CUR, CARE_REFUSE = 0x26, 0x4b, 0xb5
+local CARE_SEL, CARE_MAGIC_SEL = 0x28, 0x99   -- zSelIndex, chosen list index
+local CARE_MAGIC_GATE = 0x7a                  -- zSkillsTextColor[1] = Magic
+local CARE_TONIC, CARE_POTION, CARE_FENIX = 0xE8, 0xE9, 0xF0
+local CARE_CURES = { 0x2D, 0x2E, 0x2F }       -- Cure, Cure 2, Cure 3
+local MAGIC_LIST, MAGIC_COLOUR = 0x7E9D89, 0x7E9E09
+
+-- The menu screens the drive can be parked on.  Every other value of $26 is
+-- a fade ($00/$01/$02) or a one-frame init ($03/$04/$07/$09/$3A/$3C/$6F/$77)
+-- that resolves on its own, and pressing anything during one is how a drive
+-- loses a button (field-care-menu.md section 6, trap 1).  Two things read
+-- this: the router presses B on any screen that is not on the current
+-- plan's path, and the close predicate treats "not on any of these" as the
+-- menu no longer being up.
+local CARE_SCREENS = {
+  [0x05] = "main", [0x06] = "char select", [0x08] = "item list",
+  [0x0A] = "skills", [0x17] = "item options", [0x18] = "rare items",
+  [0x19] = "item picked up", [0x1A] = "spell list",
+  [0x3B] = "magic target", [0x3D] = "magic target (all)",
+  [0x64] = "item details", [0x70] = "item target",
+}
+
 local function careBackOnMap()
   if M.worldMode() then return M.worldHasControl() and M.worldAligned() end
   return M.hasControl() and M.tileAligned()
@@ -1714,7 +1787,7 @@ local function careClose(zmExtra)
     if M.worldMode() then
       local zm = M.readByte(0x26)
       local ok = M.worldHasControl() and M.worldAligned()
-             and zm ~= 0x05 and zm ~= 0x08
+             and not CARE_SCREENS[zm]
       calm = ok and calm + 1 or 0
       return calm >= 30
     end
@@ -1908,45 +1981,131 @@ function M.fieldCare(opts)
   local reserve = opts.reserve or {}
   local budget = opts.maxFrames or 24000
 
+  local useMagic = opts.magic ~= false
+  local mpFloor = opts.mpFloor or 0.25
+  local maxTries = opts.maxTries or 48
+
   local function avail(id)
     return math.max(0, M.invCountOf(id) - (reserve[id] or 0))
   end
 
-  local failed = {}                    -- "char:item" pairs the game refused
-  local function key(w) return w.char .. ":" .. w.item end
+  -- MP a caster keeps back.  Below 1 the option is a fraction of their own
+  -- maximum, so one number suits a level 7 TERRA and a level 30 one; at or
+  -- above 1 it is an absolute MP count.
+  local function floorOf(c)
+    if mpFloor < 1 then return math.floor(M.charMaxMp(c) * mpFloor) end
+    return mpFloor
+  end
 
-  -- Pick in the order a player would: revive first, then top up whoever is
-  -- worst off, spending the cheap item when the cheap item covers the gap.
-  local function pick()
+  local failed = {}         -- plans the game refused, so they are not retried
+  local function key(w)
+    if w.kind == "cast" then
+      return string.format("%d:cast:%d:%d", w.char, w.caster, w.spell)
+    end
+    return string.format("%d:item:%d", w.char, w.item)
+  end
+
+  local function planText(w)
+    if w.kind == "cast" then
+      return string.format("%s char %d by casting $%02X from char %d " ..
+        "(%d/%d hp, caster %d/%d mp)", w.why, w.char, w.spell, w.caster,
+        M.charHp(w.char), M.charMaxHp(w.char),
+        M.charMp(w.caster), M.charMaxMp(w.caster))
+    end
+    return string.format("%s char %d with $%02X (%d/%d hp)", w.why, w.char,
+      w.item, M.charHp(w.char), M.charMaxHp(w.char))
+  end
+
+  -- Whoever the drive last set the Skills screens up for stays the caster
+  -- until they hit their floor.  Holding one caster is both what a player
+  -- does and much the cheaper drive: a second cast for the same caster and
+  -- spell never leaves $3B, while switching casters unwinds to $05 and
+  -- walks $06/$0A/$1A again.
+  local activeCaster = nil
+
+  -- Can this character cast this spell on somebody right now?  Every clause
+  -- is a gate the game itself applies, so failing one is a guaranteed
+  -- refusal rather than a guess: alive and not petrified or zombie
+  -- (CheckSkillValid, field_menu.asm:722-731), knows the spell outright,
+  -- and has the MP with the floor still intact.
+  local function canCast(c, spell)
+    return M.charHp(c) > 0 and (M.charStatus1(c) & 0xC2) == 0
+       and M.knowsSpell(c, spell)
+       and M.charMp(c) - M.spellMpCost(spell) >= floorOf(c)
+  end
+
+  -- The cheapest cure the party can put on this target.  Cheapest rather
+  -- than biggest: MP is the resource being rationed and the loop simply
+  -- casts again if the target is still short, so two Cures beat one Cure 2
+  -- wherever the prices are vanilla's.  Overshoot is wasted MP.
+  local function pickCast(target)
+    local order = {}
+    for _, s in ipairs(CARE_CURES) do order[#order + 1] = s end
+    table.sort(order, function(a, b)
+      return M.spellMpCost(a) < M.spellMpCost(b)
+    end)
+    local casters = {}
+    if activeCaster ~= nil then casters[1] = activeCaster end
     for _, c in ipairs(M.partyMembers()) do
-      if M.charHp(c) == 0 and avail(CARE_FENIX) > 0
-         and not failed[c .. ":" .. CARE_FENIX] then
-        return { char = c, item = CARE_FENIX, why = "revive" }
+      if c ~= activeCaster then casters[#casters + 1] = c end
+    end
+    for _, c in ipairs(casters) do
+      for _, s in ipairs(order) do
+        local w = { kind = "cast", char = target, caster = c, spell = s,
+                    why = "heal" }
+        if canCast(c, s) and not failed[key(w)] then return w end
       end
     end
-    local best, bestR = nil, 1.0
-    for _, c in ipairs(M.partyMembers()) do
-      local hp, mx = M.charHp(c), M.charMaxHp(c)
-      if hp > 0 and mx > 0 and hp < mx then
-        local r = hp / mx
-        if r < thresh and r < bestR then best, bestR = c, r end
-      end
-    end
-    if best == nil then return nil end
-    local hole = M.charMaxHp(best) - M.charHp(best)
+    return nil
+  end
+
+  -- Everything the bag can do for this target.
+  local function pickItem(target)
+    local hole = M.charMaxHp(target) - M.charHp(target)
     local order = hole >= 120
       and { CARE_POTION, CARE_TONIC } or { CARE_TONIC, CARE_POTION }
     for _, id in ipairs(order) do
-      if avail(id) > 0 and not failed[best .. ":" .. id] then
-        return { char = best, item = id, why = "heal" }
+      local w = { kind = "item", char = target, item = id, why = "heal" }
+      if avail(id) > 0 and not failed[key(w)] then return w end
+    end
+    return nil
+  end
+
+  -- Pick in the order a player would: revive first, then top up whoever is
+  -- worst off, casting where the party can cast and reaching for the bag
+  -- where it cannot.  Members are tried worst-first rather than only the
+  -- worst being tried, so one member nobody can help does not stop the rest
+  -- from being served.
+  local function pick()
+    for _, c in ipairs(M.partyMembers()) do
+      local w = { kind = "item", char = c, item = CARE_FENIX, why = "revive" }
+      if M.charHp(c) == 0 and avail(CARE_FENIX) > 0 and not failed[key(w)] then
+        return w
       end
+    end
+    local hurt = {}
+    for _, c in ipairs(M.partyMembers()) do
+      local hp, mx = M.charHp(c), M.charMaxHp(c)
+      -- A petrified or zombie member is refused by CheckCanUseItem
+      -- (item.asm:2249-2258) and by the spell check (field_menu.asm:3076
+      -- -3081) alike, so proposing anything for them only burns attempts.
+      if hp > 0 and mx > 0 and hp < mx and hp < mx * thresh
+         and (M.charStatus1(c) & 0xC2) == 0 then
+        hurt[#hurt + 1] = { c = c, r = hp / mx }
+      end
+    end
+    table.sort(hurt, function(a, b) return a.r < b.r end)
+    for _, h in ipairs(hurt) do
+      local w = useMagic and pickCast(h.c) or nil
+      if w == nil then w = pickItem(h.c) end
+      if w ~= nil then return w end
     end
     return nil
   end
 
   local function anyNeed() return pick() ~= nil end
 
-  -- menu slot (the $70 cursor row) for a character id
+  -- menu slot (the $70 and $3B cursor row) for a character id
   local function slotOf(c)
     for s = 0, 3 do
       if M.readByte(0x69 + s) == c then return s end
@@ -1954,35 +2113,99 @@ function M.fieldCare(opts)
     return nil
   end
 
-  local phase, served, want, pending, rewind, tries = 0, false, nil, nil, false, 0
+  -- Who the Skills screens are currently showing, and which spell A in $1A
+  -- committed to.  A in $06 copies the cursor into zSelIndex
+  -- (field_menu.asm:644) and A in $1A copies it into $99
+  -- (field_menu.asm:2836); GetSelMagic is $7E9D89[$99]
+  -- (field_menu.asm:3208-3213).  Reading them back is how the router tells
+  -- "this screen belongs to my plan" from "this screen belongs to the plan
+  -- before it", which is what decides whether to press on or press B.
+  local function menuCaster()
+    local s = M.readByte(CARE_SEL)
+    if s > 3 then return nil end
+    local c = M.readByte(0x69 + s)
+    return c ~= 0xFF and c or nil
+  end
+  local function menuSpell()
+    return M.readByte(MAGIC_LIST + M.readByte(CARE_MAGIC_SEL))
+  end
+
+  -- List index of a spell in the field magic list.  CalcMagicOrder
+  -- (skills.asm:734-747) lays every id down once, and only drawing blanks
+  -- the ones this character cannot use (skills.asm:914-916), so a spell the
+  -- caster knows is always findable here.  The list order is a Config
+  -- setting ($1D54 bits 0-2), which is why this searches rather than
+  -- assuming Cure is index 0.
+  local function magicIndexOf(spell)
+    for i = 0, 0x35 do
+      if M.readByte(MAGIC_LIST + i) == spell then return i end
+    end
+    return nil
+  end
+
+  local phase, served, want, pending, tries = 0, false, nil, nil, 0
+  local refuseArmed = true
 
   local function steer(cur, wantRow)
     if cur == wantRow then return { "a" } end
     return { [cur < wantRow and "down" or "up"] = true }
   end
 
+  -- give up on this plan and let the next frame pick another
+  local function abandon(w, why)
+    M.log(string.format("[%s] dropping plan (%s): %s", tag, why, planText(w)))
+    failed[key(w)] = true
+    want, pending = nil, nil
+  end
+
   local function serveFrame()
     phase = (phase + 1) % 12
     local st = M.readByte(CARE_ZM)
 
-    -- a nonzero refusal cell means the game rejected this pair; accept it
-    if want and M.readByte(CARE_REFUSE) ~= 0 then
-      M.log(string.format("[%s] REFUSED: char %d / item $%02X (zMosaic set)",
-        tag, want.char, want.item))
+    -- Refusal.  zMosaic is not a flag the game clears: MosaicTask writes
+    -- the eight bytes $17 $27 $37 $47 $37 $27 $17 $07 and terminates
+    -- (field_menu.asm:3820-3844), and nothing re-zeroes it after menu init
+    -- (menu_init_2.asm:506).  So `$B5 ~= 0` stays true for the rest of the
+    -- visit, and testing it that way reported every plan after the first
+    -- refusal as refused too, without pressing anything, until the attempt
+    -- cap gave up.  The high nibble is nonzero only while the animation
+    -- runs, so that is the edge; re-arming when it clears keeps one
+    -- refusal's tail from being charged to the next plan.
+    local mosaic = M.readByte(CARE_REFUSE) & 0xF0
+    if mosaic == 0 then
+      refuseArmed = true
+    elseif want and refuseArmed then
+      refuseArmed = false
+      M.log(string.format("[%s] REFUSED by the game: %s", tag, planText(want)))
       failed[key(want)] = true
-      want, pending, rewind = nil, nil, true
+      want, pending = nil, nil
       M.setPad({})
       return
     end
 
     -- check whether the last confirm landed
     if pending then
-      if M.charHp(pending.char) ~= pending.hp
-         or M.invCountOf(pending.item) < pending.qty then
-        M.log(string.format("[%s] used $%02X on char %d: %d -> %d hp, %d left",
-          tag, pending.item, pending.char, pending.hp,
-          M.charHp(pending.char), M.invCountOf(pending.item)))
-        want, pending, rewind = nil, nil, true
+      local landed
+      if pending.kind == "item" then
+        landed = M.charHp(pending.char) ~= pending.hp
+              or M.invCountOf(pending.item) < pending.qty
+      else
+        landed = M.charHp(pending.char) ~= pending.hp
+              or M.charMp(pending.caster) ~= pending.mp
+      end
+      if landed then
+        if pending.kind == "item" then
+          M.log(string.format(
+            "[%s] used $%02X on char %d: %d -> %d hp, %d left",
+            tag, pending.item, pending.char, pending.hp,
+            M.charHp(pending.char), M.invCountOf(pending.item)))
+        else
+          M.log(string.format(
+            "[%s] char %d cast $%02X on char %d: %d -> %d hp, caster %d -> %d mp",
+            tag, pending.caster, pending.spell, pending.char, pending.hp,
+            M.charHp(pending.char), pending.mp, M.charMp(pending.caster)))
+        end
+        want, pending = nil, nil
       end
     end
 
@@ -1990,28 +2213,27 @@ function M.fieldCare(opts)
       want = pick()
       if want == nil then served = true; M.setPad({}); return end
       tries = tries + 1
-      if tries > 16 then
+      if tries > maxTries then
         M.log(string.format("[%s] giving up after %d attempts", tag, tries))
         served = true; M.setPad({}); return
       end
-      M.log(string.format("[%s] plan: %s char %d with $%02X (%d/%d hp)",
-        tag, want.why, want.char, want.item,
-        M.charHp(want.char), M.charMaxHp(want.char)))
+      if want.kind == "cast" then activeCaster = want.caster end
+      M.log(string.format("[%s] plan: %s", tag, planText(want)))
     end
 
+    -- Route by state.  A screen that is not on the current plan's path gets
+    -- a B, which unwinds to $05 from anywhere: B in $70 goes to $77 -> $08,
+    -- in $08 to $17, in $17 to $05, in $1A to $0A (ReloadSkillsMenu,
+    -- field_menu.asm:2855-2860) and in $0A straight to $05
+    -- (field_menu.asm:1000-1007).  That replaces the older explicit rewind
+    -- flag, which only knew how to get back to the item list.
     local held = nil
-    if rewind then
-      -- back out to the item list before selecting a different item
-      if st == 0x08 then rewind = false else held = { "b" } end
-    end
-    if held == nil then
+    if want.kind == "item" then
       if st == 0x05 then
-        held = steer(M.readByte(CARE_CUR), 0)
+        held = steer(M.readByte(CARE_CUR), 0)          -- Item is row 0
       elseif st == 0x08 then
         local slot = M.invSlotOf(want.item)
-        if slot == nil then
-          failed[key(want)] = true; want = nil; M.setPad({}); return
-        end
+        if slot == nil then abandon(want, "not in the bag"); M.setPad({}); return end
         held = steer(M.readByte(CARE_CUR), slot)
       elseif st == 0x19 then
         -- A here only uses the item if the cursor is still on the slot it
@@ -2019,23 +2241,92 @@ function M.fieldCare(opts)
         local slot = M.invSlotOf(want.item)
         held = (slot and M.readByte(CARE_CUR) == slot) and { "a" } or { "b" }
       elseif st == 0x70 then
-        local slot = slotOf(want.char)
-        if slot == nil then
-          M.log(string.format("[%s] char %d is not on the target window " ..
-            "(slots %d,%d,%d,%d)", tag, want.char, M.readByte(0x69),
-            M.readByte(0x6a), M.readByte(0x6b), M.readByte(0x6c)))
-          failed[key(want)] = true; want = nil; M.setPad({}); return
-        end
-        local cur = M.readByte(CARE_CUR)
-        if cur == slot then
-          pending = { char = want.char, item = want.item,
-                      hp = M.charHp(want.char),
-                      qty = M.invCountOf(want.item) }
-          held = { "a" }
+        -- A use leaves this window open holding the same item, so $70 is on
+        -- the path only while the item it is holding is the one planned.
+        if M.readByte(0x1869 + M.readByte(CARE_SEL)) ~= want.item then
+          held = { "b" }
         else
-          held = steer(cur, slot)
+          local slot = slotOf(want.char)
+          if slot == nil then
+            M.log(string.format("[%s] char %d is not on the target window " ..
+              "(slots %d,%d,%d,%d)", tag, want.char, M.readByte(0x69),
+              M.readByte(0x6a), M.readByte(0x6b), M.readByte(0x6c)))
+            abandon(want, "not a target"); M.setPad({}); return
+          end
+          local cur = M.readByte(CARE_CUR)
+          if cur == slot then
+            pending = { kind = "item", char = want.char, item = want.item,
+                        hp = M.charHp(want.char),
+                        qty = M.invCountOf(want.item) }
+            held = { "a" }
+          else
+            held = steer(cur, slot)
+          end
         end
-      elseif st == 0x17 or st == 0x77 then
+      elseif CARE_SCREENS[st] then
+        held = { "b" }
+      else
+        M.setPad({}); return            -- fades and transients: hands off
+      end
+    else
+      if st == 0x05 then
+        held = steer(M.readByte(CARE_CUR), 1)          -- Skills is row 1
+      elseif st == 0x06 then
+        local slot = slotOf(want.caster)
+        if slot == nil then abandon(want, "caster not on screen"); M.setPad({}); return end
+        held = steer(M.readByte(CARE_CUR), slot)
+      elseif st == 0x0A then
+        if menuCaster() ~= want.caster then
+          held = { "b" }
+        elseif M.readByte(CARE_MAGIC_GATE) ~= 0x20 then
+          abandon(want, "Magic is greyed out"); M.setPad({}); return
+        else
+          held = steer(M.readByte(CARE_CUR), 1)        -- Magic is row 1
+        end
+      elseif st == 0x1A then
+        if menuCaster() ~= want.caster then
+          held = { "b" }
+        else
+          local i = magicIndexOf(want.spell)
+          if i == nil then abandon(want, "not in the spell list"); M.setPad({}); return end
+          local cur = M.readByte(CARE_CUR)
+          if cur == i then
+            -- The colour is the game's own gate and A applies it, so read
+            -- it rather than press into a refusal.  It is only current for
+            -- rows that have been drawn, which the cursor's own page always
+            -- has been.
+            if M.readByte(MAGIC_COLOUR + i) ~= 0x20 then
+              abandon(want, string.format("row colour $%02X, not castable",
+                M.readByte(MAGIC_COLOUR + i)))
+              M.setPad({}); return
+            end
+            held = { "a" }
+          elseif (cur & 1) ~= (i & 1) then
+            -- two columns: left and right move one entry, up and down two
+            held = { [cur < i and "right" or "left"] = true }
+          else
+            held = { [cur < i and "down" or "up"] = true }
+          end
+        end
+      elseif st == 0x3B then
+        if menuCaster() ~= want.caster or menuSpell() ~= want.spell then
+          held = { "b" }
+        else
+          local slot = slotOf(want.char)
+          if slot == nil then abandon(want, "not a target"); M.setPad({}); return end
+          local cur = M.readByte(CARE_CUR)
+          if cur == slot then
+            pending = { kind = "cast", char = want.char, caster = want.caster,
+                        spell = want.spell, hp = M.charHp(want.char),
+                        mp = M.charMp(want.caster) }
+            held = { "a" }
+          else
+            -- up and down only here: left and right are the all-targets
+            -- shortcut into $3D (field_menu.asm:2852-2874)
+            held = steer(cur, slot)
+          end
+        end
+      elseif CARE_SCREENS[st] then
         held = { "b" }
       else
         M.setPad({}); return            -- fades and transients: hands off
@@ -2047,17 +2338,22 @@ function M.fieldCare(opts)
     M.setPad(phase < 4 and held or {})
   end
 
+  -- The roster line carries MP as well as HP now.  MP is what the policy
+  -- spends, so a before/after pair that prints only HP cannot show what a
+  -- visit cost or what casting saved.
+  local function roster(what)
+    local out = {}
+    for _, c in ipairs(M.partyMembers()) do
+      out[#out + 1] = string.format("c%d %d/%d hp %d/%d mp", c, M.charHp(c),
+        M.charMaxHp(c), M.charMp(c), M.charMaxMp(c))
+    end
+    return string.format("[%s] %s: %s | tonic=%d potion=%d fenix=%d",
+      tag, what, table.concat(out, "  "), M.invCountOf(CARE_TONIC),
+      M.invCountOf(CARE_POTION), M.invCountOf(CARE_FENIX))
+  end
+
   return M.cond(anyNeed, {
-    M.logStep(function()
-      local out = {}
-      for _, c in ipairs(M.partyMembers()) do
-        out[#out + 1] = string.format("c%d %d/%d", c, M.charHp(c),
-          M.charMaxHp(c))
-      end
-      return string.format("[%s] opening the menu: %s | tonic=%d potion=%d " ..
-        "fenix=%d", tag, table.concat(out, " "), M.invCountOf(CARE_TONIC),
-        M.invCountOf(CARE_POTION), M.invCountOf(CARE_FENIX))
-    end),
+    M.logStep(function() return roster("opening the menu") end),
     M.driveUntil(function() return M.readByte(CARE_ZM) == 0x05 end, 1800, {
       M.call(function()
         phase = (phase + 1) % 12
@@ -2068,11 +2364,10 @@ function M.fieldCare(opts)
     M.waitFrames(10),
     M.driveUntil(function() return served end, budget, {
       M.call(serveFrame),
-    }, tag .. ": heal/revive through the item menu"),
+    }, tag .. ": heal/revive through the field menu"),
     M.release(),
     M.driveUntil(careClose(function()
-      local zm = M.readByte(CARE_ZM)
-      return zm ~= 0x05 and zm ~= 0x08
+      return not CARE_SCREENS[M.readByte(CARE_ZM)]
     end), 2400, {
       M.call(function()
         phase = (phase + 1) % 12
@@ -2081,31 +2376,13 @@ function M.fieldCare(opts)
     }, tag .. ": back to the field"),
     M.release(),
     M.waitFrames(30),
-    M.logStep(function()
-      local out = {}
-      for _, c in ipairs(M.partyMembers()) do
-        out[#out + 1] = string.format("c%d %d/%d", c, M.charHp(c),
-          M.charMaxHp(c))
-      end
-      return string.format("[%s] done: %s | tonic=%d potion=%d fenix=%d",
-        tag, table.concat(out, " "), M.invCountOf(CARE_TONIC),
-        M.invCountOf(CARE_POTION), M.invCountOf(CARE_FENIX))
-    end),
+    M.logStep(function() return roster("done") end),
   }, {
     -- A care stop that does nothing still logs.  The first run with
     -- this driver skipped its most important stop without logging, and the
     -- roster three lines later was the only evidence, so "no log" and
     -- "nothing needed" must not look the same.
-    M.logStep(function()
-      local out = {}
-      for _, c in ipairs(M.partyMembers()) do
-        out[#out + 1] = string.format("c%d %d/%d", c, M.charHp(c),
-          M.charMaxHp(c))
-      end
-      return string.format("[%s] nothing to do: %s | tonic=%d potion=%d " ..
-        "fenix=%d", tag, table.concat(out, " "), M.invCountOf(CARE_TONIC),
-        M.invCountOf(CARE_POTION), M.invCountOf(CARE_FENIX))
-    end),
+    M.logStep(function() return roster("nothing to do") end),
   })
 end
 
