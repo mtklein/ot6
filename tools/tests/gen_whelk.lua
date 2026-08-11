@@ -13,10 +13,15 @@
 -- frame 2813 with byte-identical artifacts every run, ~8.5 s wall.
 --
 -- Issue #75, playBattles: the walk passes playBattles = true, which keeps it
--- out of the library's monster-dead flag write.  Map 41, the Narshe mines,
--- really does draw encounters -- map_prop.dat byte +5 bit 7 is set, and the
--- pool is group 57: three Were-Rats, or a Were-Rat and a Repo Man -- so this
--- is not a no-op.  "true" rather than "tactical" or "flee" because the party
+-- out of the library's monster-dead flag write.  The Narshe mines really do
+-- draw encounters -- map_prop.dat byte +5 bit 7 is set on both mine maps,
+-- with group 57 on map 41 (three Were-Rats, or a Were-Rat and a Repo Man)
+-- and group 58 on map 50 (Vaporites, Were-Rats, Repo Man) -- so this is not
+-- a no-op.  Which of the two this file starts on depends on the SRM sidecar;
+-- the goal tile (42,6) is one south of the map-41 trigger gen_whelk_poweron
+-- documents, and the sidecar currently in build/states is stale (it boots on
+-- map 50 with the Whelk already beaten, so this generator fails its own boot
+-- assertion before reaching the walk -- unchanged from before this edit).  "true" rather than "tactical" or "flee" because the party
 -- here is the Magitek trio, whose command rows carry no Fight: the tactical
 -- driver's fallback for an actor with no Fight row is to press X and pass
 -- the turn (lib/ot6.lua "kind = switch"), so with no actor able to act the
