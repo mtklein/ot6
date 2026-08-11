@@ -2305,9 +2305,89 @@ ShopOnlyOneMsgText:             pos_text SHOP_ONLY_ONE_MSG
 .pushseg
 .segment "shop_prop"
 
+; ------------------------------------------------------------------------------
+; OT6 v0.10: ShopProp is the vanilla blob plus one named byte override.
+;
+; Why the splice and not an edited .dat.  Same reason MagicProp is spliced in
+; battle_main.asm: shop_prop.dat is 128 fixed 9-byte records with no source
+; form, so a byte changed inside it is invisible in a diff, unattributable in
+; review, and indistinguishable from bit-rot.  Every OT6 change to it lives
+; here, named, with the vanilla value it replaces and the reason, and the .dat
+; stays byte-identical to the FF3us 1.0 base.  The sum of the pieces is
+; asserted below, so a mis-typed offset is a build error rather than a
+; silently re-pointed shop table.
+;
+; Record layout (9 bytes): byte 0 = shop type in bits 0-2 and price adjustment
+; in bits 3-5 (MenuState_24 does `and #$07`, :1802; AdjustShopPrice does
+; `and #$38`, :874); bytes 1-8 = eight item ids, $FF = empty (the buy loop
+; runs `cpy #8` at :846).
+; ------------------------------------------------------------------------------
+
+SHOP_PROP_REC   = 9
+SHOP_PROP_COUNT = 128
+
+; ---- override 1: the Phantom Train ghost merchant (shop 85) sells Fire Skeans
+; Issue #74, reported by @VanoraSC and reproduced by the input-driven
+; playthrough.  The Phantom Train has 6 shields keyed to bludgeoning and the
+; party that fights it delivers exactly one chip per round, all through Sabin:
+; Aura Bolt chips on the holy weakness, Pummel and Suplex chip as bludgeoning,
+; and Cyan's SwdTechs are all slashing.  bosses-wob.md §8's break story budgets
+; Shadow into that fight as the second chipper -- "Shadow's elemental skeans
+; reach two of the three element bits" -- but nothing in the scenario sold him
+; one, so unless the player had shopped in South Figaro before the scenario
+; split with foreknowledge, his key did not exist and the break never
+; completed.  The ghost merchant in car B is the scenario's last shop, so his
+; stock list is where the key has to be.
+;
+; Fire Skean and not Bolt Edge.  Vanilla left this record one slot short (byte
+; 8 is $FF), so exactly one item fits without taking something out.  Both
+; skeans chip: throwing $ab resolves to attack $51, element fire, and $ad to
+; attack $53, element bolt (ThrowToolsItemTbl / ThrowToolsOffsetTbl,
+; battle_main.asm:6648-6655; elements from magic_prop_en.dat +$01), and
+; GhostTrain $106 is weak to fire|bolt|holy (monster_prop.dat +25 = $25).  So
+; Bolt Edge chips nothing Fire Skean does not, at the same 500 GP, and fire
+; additionally covers Specter $156, the monster-in-a-box in the same scenario,
+; which is fire|holy weak.  One key that opens both bodies beats two keys that
+; open one each.
+;
+; Rejected: taking out the Sleeping Bag to fit Bolt Edge as well.  The train's
+; own save point is unreachable in this scenario (map 146's is in the caboose
+; chamber, whose only door leads to a car that detaches -- measured,
+; gen_sabin_train.lua), but the Sleeping Bag is still the party's only field
+; HP/MP restore for the world-map stretch that follows, and Sabin's MP pool is
+; the entire chip budget here because the merchant sells no Tincture.  Trading
+; MP recovery for a redundant element would cost the fight more than it gives
+; it.  Also rejected: repricing the skeans, which is item_prop_en.dat data
+; shared with the three vanilla weapon shops and the Thamasa item shop that
+; already sell them.
+;
+; The price this is being asked to fit.  The input-driven chain reaches this
+; shop with about 7,500 GP and the current buy list spends about 5,700, because
+; fleeing earns nothing and after this stop the only income before Gau joins is
+; battle 47's ~75 GP.  At 500 GP each the assumption is that a player buys two
+; or three skeans and pays for them out of the Potion line (300 GP each, the
+; marginal item in that list), not out of the Fenix Downs or the Tonics.  Two
+; chips is already more than the gap: the measured winning line ends with one
+; shield standing.  The skeans are deliberately not cheap enough to be free --
+; the break becomes something the player spends the scenario's last purse on
+; rather than something that arrives with the shop.
+GHOST_TRAIN_SHOP     = 85
+GHOST_TRAIN_SLOT8_AT = GHOST_TRAIN_SHOP * SHOP_PROP_REC + 8
+SHOP_PROP_END        = SHOP_PROP_COUNT * SHOP_PROP_REC
+
 ; c4/7ac0
 ShopProp:
-        .incbin "shop_prop.dat"
+        .incbin "shop_prop.dat", 0, GHOST_TRAIN_SLOT8_AT
+        .byte   ITEM::FIRE_SKEAN                        ; shop 85 slot 8 (was $ff)
+        .incbin "shop_prop.dat", GHOST_TRAIN_SLOT8_AT + 1, SHOP_PROP_END - GHOST_TRAIN_SLOT8_AT - 1
+
+; The splice must reassemble to the vanilla LENGTH.  This catches the dangerous
+; half of a hand-spliced binary -- a wrong .incbin COUNT, which shifts every
+; record past the splice and silently re-points every later shop.  It does NOT
+; catch a wrong offset that happens to preserve the total; the byte POSITION is
+; pinned instead by tools/tests/battle_breaktbl.lua, which reads shop 85 back
+; out of the built ROM along with the record before and after it as controls.
+.assert * - ShopProp = SHOP_PROP_END, error, "ShopProp splice changed the table length"
 
 .popseg
 
