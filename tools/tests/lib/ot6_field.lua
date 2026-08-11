@@ -1723,24 +1723,83 @@ local function careClose(zmExtra)
   end
 end
 
-local CARE_ZM, CARE_CUR, CARE_REFUSE = 0x26, 0x4b, 0xb5
-local CARE_TONIC, CARE_POTION, CARE_FENIX = 0xE8, 0xE9, 0xF0
-
 function M.charHp(c) return M.readWord(0x1600 + 37 * c + 9) end
 
--- Max HP is not a plain word: the top two bits carry an HP-boost code and
--- the effective maximum is the base plus a percentage of it, clamped to
--- 9999 (menu_common.asm:2377-2436).  Nothing in the World of Balance chain
--- has a boost set yet, since every roster dump so far reads a bare base, so
--- the percentages below are transcribed from the source, not measured, and
--- are marked as such deliberately.
-function M.charMaxHp(c)
-  local w = M.readWord(0x1600 + 37 * c + 11)
+-- M.calcMaxHpMp: unpack one of the two `bbnnnnnn nnnnnnnn` words in a
+-- character record into the effective maximum the menu draws and every
+-- can-I-use-this check compares against.  The top two bits are a boost code
+-- and the rest is the base.
+--
+-- CalcMaxHPMP (menu_common.asm:2376-2413) is a four-entry jump table whose
+-- arms fall through each other, so the percentages are not in table order:
+--
+--   MaxHPMP_00 (:2398) clr_a, then falls through all three shifts -> +0
+--   MaxHPMP_03 (:2400) lsr, lsr, lsr, adc base                    -> +12.5%
+--   MaxHPMP_01 (:2402) lsr, lsr, adc base                         -> +25%
+--   MaxHPMP_02 (:2404) lsr, adc base                              -> +50%
+--
+-- so code 2 is the 50% boost and code 3 is the 12.5% one.  This function
+-- had those two swapped, matching neither the source nor
+-- research/field-care-menu.md section 4; it is latent rather than observed,
+-- because every World of Balance roster dumped so far reads a bare base
+-- with no boost bits set, so no fixture has ever taken the wrong branch.
+-- M.calcMaxHpMp is exported separately from the two readers so the unpack
+-- can be checked against literal words without a fixture that sets a boost
+-- (probe_healpolicy.lua).
+--
+-- `cap` is ValidateMaxHP's 9999 or ValidateMaxMP's 999
+-- (menu_common.asm:2424-2447).
+function M.calcMaxHpMp(w, cap)
   local base, code = w & 0x3fff, w >> 14
-  local add = ({ [0] = 0, [1] = base // 4, [2] = base // 8,
-                 [3] = base // 2 })[code]
+  local add = ({ [0] = 0, [1] = base // 4, [2] = base // 2,
+                 [3] = base // 8 })[code]
   local v = base + add
-  return v > 9999 and 9999 or v
+  return v > cap and cap or v
+end
+
+function M.charMaxHp(c)
+  return M.calcMaxHpMp(M.readWord(0x1600 + 37 * c + 11), 9999)
+end
+
+function M.charMp(c) return M.readWord(0x1600 + 37 * c + 13) end
+function M.charMaxMp(c)
+  return M.calcMaxHpMp(M.readWord(0x1600 + 37 * c + 15), 999)
+end
+
+-- Status byte 1: $80 wound, $40 petrify, $02 zombie (item.asm:2244,
+-- ff6/notes/field-ram.txt:901-909).  `& $C2 == 0` is the gate both
+-- CheckCanUseItem (item.asm:2249-2258) and CheckSkillValid
+-- (field_menu.asm:722-731) apply, so it decides both "can be healed" and
+-- "can be picked for Skills".
+function M.charStatus1(c) return M.readByte(0x1600 + 37 * c + 20) end
+
+-- The learn array is indexed by ACTOR, the byte at the top of the character
+-- record, not by the character id (skills.asm:1030-1044).  They agree for
+-- the World of Balance roster and stop agreeing later, so read it.
+function M.charActor(c) return M.readByte(0x1600 + 37 * c) end
+
+-- Does this character know the spell outright?  $FF is fully learned;
+-- anything from 1 to 254 is a partial learn percentage and does not cast
+-- (ff6/notes/field-ram.txt:939-940).  A spell list is runtime state: it
+-- depends on level, on espers equipped along the way, and on which fixture
+-- the party arrived from, so it is read rather than inferred.  Measured at
+-- eight World of Balance fixtures (probe_healers.lua, 2026-08-11): only
+-- TERRA and CELES know Cure; LOCKE, EDGAR, SABIN, CYAN and GAU know no
+-- cure spell at any point in the chain.
+function M.knowsSpell(c, spell)
+  return M.readByte(0x1A6E + 54 * M.charActor(c) + spell) == 0xFF
+end
+
+-- MP cost of a spell, read from the ROM's own table.  The field menu prices
+-- a spell at MagicProp+5 with no OT6 hook in the path (_c3510d,
+-- skills.asm:1056-1060), then halves it for a Gold Hairpin ($11D7 bit $20)
+-- or flattens it to 1 for an Economizer (bit $40), skills.asm:1078-1090.
+-- Those two relics are not modelled here, so this over-states the price for
+-- a character wearing one, which errs toward drinking a Tonic when a cast
+-- would have been free.  The in-menu gate below ($7E9E09 == $20) is the
+-- game's own answer and catches the difference where it matters.
+function M.spellMpCost(spell)
+  return M.readRomByte((M.sym("MagicProp") & 0x3fffff) + 14 * spell + 5)
 end
 
 function M.partyMembers()
