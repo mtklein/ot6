@@ -58,8 +58,7 @@
 -- Issue #75: this generator makes no state writes.  Every field navigator
 -- runs with opts.playBattles, so mid-route encounters on Mt. Kolts are fought
 -- by the edge-tapped A auto-fighter rather than write-cleared, and the world
--- step never lets worldNavTo's own battle branch (which still carries the
--- battle-clear write and has no input-driven option) see a battle at all.
+-- step never lets worldNavTo's own battle branch see a battle at all.
 -- worldWalkFighting below stops the walk on the world engine's
 -- battle-pending bit ($E8 bit5, set as soon as the encounter roll wins,
 -- move.asm's `ora #$20`, frames before worldNavTo's 3-frame debounce
@@ -182,7 +181,14 @@ local function battlePending()
 end
 local function worldRound(n, tx, ty)
   return H.cond(function() return H.worldMode() end, {
-    H.worldNavTo(tx, ty, { maxFrames = 40000,
+    -- playBattles = "tactical" is the backstop, not the plan: arrive fires
+    -- on the battle-pending bit frames before the navigator's own 3-frame
+    -- debounce could act, so the option should never be consulted here.  It
+    -- is set anyway so that the day the flag write goes, a missed arrive
+    -- shows up as a fought battle rather than a silently killed one, and
+    -- "tactical" because this file fights its encounters on purpose (see the
+    -- header) rather than fleeing them.
+    H.worldNavTo(tx, ty, { maxFrames = 40000, playBattles = "tactical",
       arrive = function() return battlePending() or not H.worldMode() end }),
     H.cond(battlePending, {
       H.logStep(function()

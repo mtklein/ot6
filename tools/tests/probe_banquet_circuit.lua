@@ -18,6 +18,11 @@
 -- the toast choice ($056F>=2), generate banquet_dinner.mss for the Q&A probe.
 --
 --   tools/tests/run.sh tools/tests/probe_banquet_circuit.lua
+-- Issue #75: playBattles = "flee" keeps these walks out of the library's
+-- monster-dead flag write, and matches gen_banquet_done, the generator these
+-- probes prototype.  Moot either way: maps 243, 244, 250, 251, 252 and 253
+-- all have random encounters disabled (map_prop.dat byte +5 bit 7 clear;
+-- ff6/src/field/battle.asm:333-347 returns before the roll).
 local H = dofile("tools/tests/lib/ot6.lua")
 
 local function map() return H.mapId() & 0x1ff end
@@ -91,7 +96,8 @@ end
 -- hop an entrance (door/stair): navTo onto the tile, arrive on pred
 local function hop(x, y, pred, what, maxF)
   return {
-    H.navTo(x, y, { maxFrames = maxF or 20000, arrive = pred }),
+    H.navTo(x, y, { maxFrames = maxF or 20000, arrive = pred,
+                    playBattles = "flee" }),
     H.waitUntil(function()
       return pred() and H.tileAligned() and bright() >= 15
          and not H.dialogWaiting() and not H.battleLoadStarted()

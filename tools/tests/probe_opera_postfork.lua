@@ -2,6 +2,12 @@
 -- -> forks {0,1,0} -> control on 236), then greedy-climb toward the balcony
 -- (8,9) with A-mashing, logging switches and position to work out the
 -- flower-dance stair nav.
+-- Issue #75: playBattles = "tactical" keeps these walks out of the library's
+-- monster-dead flag write.  It is intent only -- the opera maps 236 and 238
+-- draw no random battles (map_prop.dat byte +5 bit 7 clear, so the field
+-- step handler at ff6/src/field/battle.asm:333-347 returns before the roll)
+-- -- and "tactical" rather than "flee" because the only battle that could
+-- reach the option there is an unscripted surprise.
 local H = dofile("tools/tests/lib/ot6.lua")
 local function map() return H.mapId() & 0x1ff end
 local function sw(id) return (H.readByte(0x1E80 + math.floor(id/8)) >> (id%8)) & 1 end
@@ -57,7 +63,8 @@ end
 H.run({ maxFrames = 60000 }, {
   H.loadState("build/states/opera_stage.mss.lua"),
   H.waitFrames(60),
-  H.navTo(97, 7, { maxFrames=8000, arrive=function() return map()~=238 end }),
+  H.navTo(97, 7, { maxFrames=8000, playBattles="tactical",
+                   arrive=function() return map()~=238 end }),
   H.waitUntil(function() return map()==236 end, 6000, "aria 236", 10),
   ariaFork(0, "fork1"), ariaFork(1, "fork2"), ariaFork(0, "fork3"),
   H.waitUntil(function() return map()==236 and H.hasControl() and H.tileAligned() end, 6000, "control after forks", 5),

@@ -1,6 +1,11 @@
 -- probe_n30.lua -- census inside map 30 (Narshe interiors) from
 -- kefka_won's {60,37}: which town doors BFS can reach, and whether the
 -- front door's blocker NPC is still present post-battle.
+-- Issue #75: playBattles = "tactical" keeps this walk out of the library's
+-- monster-dead flag write.  It is intent only -- maps 30 and 20 (Arvis's house, the Narshe streets) draw no random battles (map_prop.dat byte +5
+-- bit 7 clear, so the field step handler at ff6/src/field/battle.asm:333-347
+-- returns before the roll) -- and "tactical" rather than "flee" because the
+-- only battle that could reach the option there is an unscripted surprise.
 local H = dofile("tools/tests/lib/ot6.lua")
 
 local TARGETS = {
@@ -26,7 +31,7 @@ H.run({ maxFrames = 20000 }, {
 
   -- through the front door and census the town side
   H.navTo(55, 35, { arrive = function() return (H.mapId() & 0x1ff) == 20 end,
-                    maxFrames = 6000 }),
+                    maxFrames = 6000, playBattles = "tactical" }),
   H.waitUntil(function()
     return H.hasControl() and H.tileAligned()
        and (emu.getState()["ppu.screenBrightness"] or 0) >= 15

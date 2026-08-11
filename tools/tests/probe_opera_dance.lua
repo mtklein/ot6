@@ -1,6 +1,12 @@
 -- probe_opera_dance.lua -- opera_stage -> aria -> forks {0,1,0} -> then the
 -- flower dance on map 236: dump geometry, reach NPC(12,19)=_cabf27 ($0057=1) and
 -- Draco NPC(12,14)=_cabd35, then the balcony trigger (8,9)=_cabe6d -> $0111=1.
+-- Issue #75: playBattles = "tactical" keeps these walks out of the library's
+-- monster-dead flag write.  It is intent only -- the opera maps 236 and 238
+-- draw no random battles (map_prop.dat byte +5 bit 7 clear, so the field
+-- step handler at ff6/src/field/battle.asm:333-347 returns before the roll)
+-- -- and "tactical" rather than "flee" because the only battle that could
+-- reach the option there is an unscripted surprise.
 local H = dofile("tools/tests/lib/ot6.lua")
 local function map() return H.mapId() & 0x1ff end
 local function bright() return emu.getState()["ppu.screenBrightness"] or 0 end
@@ -33,7 +39,7 @@ end
 -- navTo a tile adjacent to (nx,ny), face it, tap A; report the target switch
 local function talkAt(ax,ay, fdir, watchId, what)
   return H.cond(function() return true end, {
-    H.navTo(ax, ay, { maxFrames=6000 }),
+    H.navTo(ax, ay, { maxFrames=6000, playBattles="tactical" }),
     (function() local ph=0
       return H.driveUntil(function() return sw(watchId)==1 or H.dialogWaiting() end, 2500, {
         H.call(function() ph=(ph+1)%10
@@ -51,7 +57,8 @@ end
 H.run({ maxFrames = 60000 }, {
   H.loadState("build/states/opera_stage.mss.lua"),
   H.waitFrames(60),
-  H.navTo(97, 7, { maxFrames=8000, arrive=function() return map()~=238 end }),
+  H.navTo(97, 7, { maxFrames=8000, playBattles="tactical",
+                   arrive=function() return map()~=238 end }),
   H.waitUntil(function() return map()==236 end, 6000, "aria loaded 236", 10),
   ariaFork(0, "fork1"), ariaFork(1, "fork2"), ariaFork(0, "fork3"),
   H.waitUntil(function() return map()==236 and H.hasControl() and H.tileAligned() end, 6000, "control after forks", 5),
@@ -71,7 +78,7 @@ H.run({ maxFrames = 60000 }, {
   -- try the flower NPC (12,19): _cabf27 ($0057=1)
   talkAt(12, 20, "up", 0x0057, "talk NPC(12,19)"),
   -- head to the balcony (8,9): _cabe6d -> $0111=1
-  H.navTo(8, 10, { maxFrames=8000 }),
+  H.navTo(8, 10, { maxFrames=8000, playBattles="tactical" }),
   H.call(function() dumpsw("at balcony approach") end),
   (function() local ph=0
     return H.driveUntil(function() return sw(0x0111)==1 or map()~=236 or H.dialogWaiting() end, 4000, {

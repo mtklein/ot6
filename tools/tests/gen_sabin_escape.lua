@@ -78,6 +78,21 @@
 -- every attempt's numbers recorded.  SHADOW's leave roll does not
 -- run here: battle switch $4B is story-set until the magitek escape's
 -- exit clears it (event_main.asm:42251).
+--
+-- Issue #75, playBattles: the one navigator call below (talkTo's approach
+-- walk) passes
+-- playBattles = "tactical", so it does not fall through to the library's
+-- monster-dead flag write.
+-- It runs on map 119, the Doma courtyard, which has random encounters
+-- disabled.
+-- A field map rolls for a random battle only when byte +5 of its 33-byte
+-- map_prop.dat record has bit 7 set: LoadMapProp copies the record to $0520
+-- (ff6/src/field/map.asm:143-158), and the step handler returns before the roll
+-- unless $0525 is negative (ff6/src/field/battle.asm:333-347).  So the option
+-- is intent only here.  "tactical" rather than "flee" because the only battle
+-- that could still reach it is an unscripted surprise -- a goal fight is taken
+-- by opts.spare or opts.arrive first -- and fighting one beats spending
+-- M.FLEE_CAP frames failing to run from it.
 local H = dofile("tools/tests/lib/ot6.lua")
 local DOOR = "build/states/camp_cleared.mss.lua"
 
@@ -167,7 +182,7 @@ local function talkToObj(obj, what, maxF)
   local function walkStep()
     return H.navTo(function() return approach()[1] end,
                    function() return approach()[2] end, {
-      maxFrames = maxF or 20000,
+      maxFrames = maxF or 20000, playBattles = "tactical",
       arrive = function()
         return engaged or (adjacent() and H.hasControl() and H.tileAligned())
       end,

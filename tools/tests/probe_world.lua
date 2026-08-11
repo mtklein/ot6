@@ -14,9 +14,9 @@
 --   3. WorldTileProp bit4 vs reality: predict passability of the four
 --      neighbors from ROM ($EE9B14 + world*512 + tile*2), then try to
 --      step each way and compare
---   4. random-encounter aftermath: walk until one fires, write-clear it,
---      measure the reload (position/facing survival, frames to control,
---      $E8 flags)
+--   4. random-encounter aftermath: walk until one fires, win it on real
+--      input, measure the reload (position/facing survival, frames to
+--      control, $E8 flags)
 --   5. misc flags: $20 world type, $11FA vehicle, $11F3, $E7/$E8/$E9
 local H = dofile("tools/tests/lib/ot6.lua")
 local STATE = "build/states/worldmap_narshe.mss.lua"
@@ -60,7 +60,7 @@ end
 
 local trace = { n = 0, active = false }
 
-H.run({ maxFrames = 30000 }, {
+H.run({ maxFrames = 45000 }, {
   H.loadState(STATE),
   H.waitFrames(10),
   H.call(function()
@@ -130,7 +130,7 @@ H.run({ maxFrames = 30000 }, {
 
   -- ------------------------------------------------------------------ --
   -- 4. random encounter: pace over battle-enabled plains until one
-  -- fires, write-clear it, and measure the aftermath frame by frame.
+  -- fires, win it, and measure the aftermath frame by frame.
   -- The up-step trace above parked the party on (84,33), the Narshe gate
   -- strip, which has prop $0007 and battles disabled, and this probe's
   -- first revision paced right/left along it for 12000 frames with no
@@ -163,9 +163,31 @@ H.run({ maxFrames = 30000 }, {
     H.hold({ "up" }), H.waitFrames(24), H.release(), H.waitFrames(4),
   }, "random encounter fires"),
 
-  H.clearBattle(9000),
+  -- Issue #75: this was H.clearBattle(9000), the last live caller of the
+  -- flag write anywhere in the tree.  H.fightBattle wins the same battle on
+  -- edge-tapped A instead, which keeps this measurement comparable with the
+  -- numbers already in docs/research/world-map-nav.md: the flag write also
+  -- ended the fight as a win (it marked the monsters dead and then tapped
+  -- through the victory text), so the reload path being measured is the same
+  -- one.  Blind A-taps rather than the menu-aware driver because this is the
+  -- ending gen_returner already measures on this terrain with this fixture's
+  -- party -- command row 0 is Fight for both TERRA and LOCKE -- and its
+  -- header records that the northern plains' encounters fall in about a
+  -- round.  The budget grows from 9000 to 20000 to match gen_returner's,
+  -- because a played-out win costs real ATB rounds where the write cost
+  -- none.
+  --
+  -- Measured before and after on worldmap_narshe, same ROM, same fixture:
+  -- the encounter fires at the same frame (304) either way, because the
+  -- pacing above it is unchanged and the roll is deterministic; the battle
+  -- takes 548 frames to end by the flag write and 756 to end by play; and
+  -- the two things this probe exists to measure are identical across the
+  -- pair -- "world reloaded" satisfied after 0 frames and the post-reload
+  -- step after 93.  So the conversion costs 208 frames and changes no
+  -- measurement.
+  H.fightBattle(20000),
   H.call(function()
-    P("battle cleared at f%d; watching the reload", H.frame)
+    P("battle won at f%d; watching the reload", H.frame)
     dumpFlags("post-battle")
   end),
   H.waitUntil(function()

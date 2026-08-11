@@ -1195,6 +1195,12 @@ end
 -- tile alignment, full screen brightness, then a 30-frame margin, the
 -- post-map-load sequence every field fixture uses), and only then
 -- dispatches the mode's navigator.
+-- Issue #75, playBattles: the two navigator calls below hand rstep.opts
+-- straight through, so the caller's own table decides whether the flag write
+-- is reachable; there is nothing to set here.  This helper currently has no
+-- callers in the tree, and it would not work if it did -- `local steps = {}`
+-- on the next line shadows the parameter, so the loop walks an empty table
+-- and every route returns an empty sequence.
 function M.route(steps)
   local steps = {}
   for _, rstep in ipairs(steps) do

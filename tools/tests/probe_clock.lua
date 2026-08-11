@@ -1,6 +1,14 @@
 -- probe_clock.lua -- instrument the Zozo clock's three chained choice
 -- dialogs: open it, then drive the hour cursor to 2 by watching $056E move
 -- one step per d-pad edge ($056D latch), logging the menu bytes throughout.
+-- Issue #75: playBattles = "tactical" keeps these walks out of the library's
+-- monster-dead flag write, and here it is not a no-op: maps 221 and 225 do
+-- draw random battles (map_prop.dat byte +5 bit 7 set), from the Zozo pools
+-- group 78 (Gabbldegak, Harvester, HadesGigas) and group 77 (SlamDancer,
+-- Harvester, Gabbldegak).  Fought rather than fled for the reason
+-- gen_zozo3_clock records: several of those formations permit a pincer,
+-- which raises run difficulty from 2 to 6 per monster, and gen_zozo5_ramuh
+-- already clears this same pool on these same maps with blind A-taps.
 local H = dofile("tools/tests/lib/ot6.lua")
 local function map() return H.mapId() & 0x1ff end
 local function bright() return emu.getState()["ppu.screenBrightness"] or 0 end
@@ -19,16 +27,16 @@ local function bytes()
     H.readByte(0x056e), H.readByte(0x056f), H.readByte(0x0026))
 end
 
-H.run({ maxFrames = 30000 }, {
+H.run({ maxFrames = 60000 }, {
   H.loadState("build/states/zozo_arrival.mss.lua"),
   H.waitFrames(150),
-  H.navTo(42, 29, { maxFrames = 20000 }),
+  H.navTo(42, 29, { maxFrames = 30000, playBattles = "tactical" }),
   H.driveUntil(function() return map() == 225 end, 900, {
     H.hold({ "up" }), H.waitFrames(4),
   }, "clock room"),
   H.waitUntil(landed(225, 10), 1500, "clock room up", 1),
   H.waitFrames(150),
-  H.navTo(98, 60, { maxFrames = 9000 }),
+  H.navTo(98, 60, { maxFrames = 20000, playBattles = "tactical" }),
   H.driveUntil(function() return H.dialogWaiting() end, 900, {
     H.hold({ "up" }), H.waitFrames(6),
     H.hold({ "a", "up" }), H.waitFrames(6),

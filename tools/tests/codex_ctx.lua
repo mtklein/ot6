@@ -22,9 +22,9 @@
 --
 -- The drive (issue #75 conversion: the discriminator used to be forged, with
 -- fire written into all 384 slot-3 species and ice into all 384 transient
--- species, and the closing fight was ended with the kill bit.  Both pages'
--- content is now produced by play, following cb8e605's baseline-change
--- approach, and the fight is fled):
+-- species, and the closing fight was ended by the monster-dead flag write.
+-- Both pages' content is now produced by play, following cb8e605's
+-- baseline-change approach, and the fight is fled):
 --   0. the boot state is the pre-save control, read rather than staged: the
 --      never-saved chain's fights populated the transient page (lifecycle
 --      0 writes go there) while all three save-slot pages read
@@ -246,7 +246,14 @@ H.run({ maxFrames = 90000 }, {
   -- accrued danger popped a desert fight ~300 frames out, and that pool
   -- (species $5C/$5D, weak $8A, slash-only class rows) cannot be taught
   -- by fire and pierce, measured across two timelines.
-  H.worldNavTo(82, 52, { maxFrames = 15000 }),
+  -- issue #75: this walk really can be interrupted -- the note above
+  -- records a desert fight popping ~300 frames out of the old Figaro park
+  -- -- and it used to be the library's flag write that ended it.  Fled
+  -- rather than fought, because a fought battle chips shields and a chip is
+  -- exactly what this test's discriminator is made of: an incidental win
+  -- here would teach the transient page before the save copies it, and
+  -- muddy the page diff step 2 asserts.  A fled battle teaches nothing.
+  H.worldNavTo(82, 52, { maxFrames = 15000, playBattles = "flee" }),
 
   -- 1. save into slot 3, pad input only (save-drive rule; the cursor is
   -- read back, never written).

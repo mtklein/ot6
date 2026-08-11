@@ -23,6 +23,11 @@
 -- can ship that tier.
 --
 --   tools/tests/run.sh tools/tests/probe_banquet_greedy.lua
+-- Issue #75: playBattles = "flee" keeps these walks out of the library's
+-- monster-dead flag write, and matches gen_banquet_done, the generator these
+-- probes prototype.  Moot either way: maps 243, 244, 250, 251, 252 and 253
+-- all have random encounters disabled (map_prop.dat byte +5 bit 7 clear;
+-- ff6/src/field/battle.asm:333-347 returns before the roll).
 local H = dofile("tools/tests/lib/ot6.lua")
 
 local function map() return H.mapId() & 0x1ff end
@@ -231,6 +236,7 @@ local function runner()
         cur = H.navTo(c[1], c[2], {
           maxFrames = 3000,
           noPathRetries = 3,
+          playBattles = "flee",
           avoid = (map() == 250 and AVOID243()) and DOOR243 or nil,
           arrive = function()
             return map() ~= fromMap
@@ -272,7 +278,7 @@ H.run({ maxFrames = 40000 }, {
 
   -- leave the throne tower first: control returns inside it (measured)
   -- and its only circuit-side exit is the (53,35) long entrance
-  H.navTo(53, 34, { maxFrames = 9000 }),
+  H.navTo(53, 34, { maxFrames = 9000, playBattles = "flee" }),
   (function() local ph = 0
     return H.driveUntil(function() return H.fieldX() < 40 end, 1200, {
       H.call(function()

@@ -24,6 +24,22 @@
 --    "Next stop, Kohlingen!", $010C=1 (event_main.asm:15577-15607)
 --  * dialog choices land in $056E (EventCmd_b6, field/event.asm:4784);
 --    index 0 is the default, so a plain A edge picks Kohlingen
+--
+-- Issue #75, playBattles: every navigator call below passes the option, so
+-- none of them falls through to the library's monster-dead flag write.
+-- Which spelling is decided per step by the map's own data.  A field map
+-- rolls for a random battle only when map_prop.dat byte +5 has bit 7 set
+-- (field/map.asm:143-158 loads the 33-byte record to $0520; the step
+-- handler at field/battle.asm:333-347 returns early unless $0525 is
+-- negative).  That bit is clear on maps 30, 20, 55, 59 and 61, so every
+-- field step here is on a map that cannot draw an encounter and the option
+-- is intent only; those pass "tactical", because the only battle that could
+-- reach the option on such a map is an unscripted surprise, and fighting it
+-- beats spending M.FLEE_CAP frames trying to run.  The one world segment
+-- (Narshe's south gate to the east castle trigger) really can draw
+-- encounters, and passes "flee": it is corridor travel, nothing on it is
+-- worth the ATB rounds a win costs, and the flee path falls back to the
+-- tactical driver by itself if a formation will not release the party.
 local H = dofile("tools/tests/lib/ot6.lua")
 
 local function map() return H.mapId() & 0x1ff end
@@ -58,13 +74,13 @@ end
 -- the held press is the only way through (gen_edgar).
 local function door(nx, ny, dir, m, what)
   return H.cond(function() return true end, {
-    H.navTo(nx, ny, { maxFrames = 12000 }),
+    H.navTo(nx, ny, { maxFrames = 12000, playBattles = "tactical" }),
     H.driveUntil(function() return map() == m end, 900, {
       H.hold({ dir }), H.waitFrames(4),
     }, what .. ": through the door"),
     -- ride any arrival scene out (the west castle greets with one:
     -- measured, an event walks the party to (28,28) and parks a dialog)
-    H.advanceStory(landed(m, 10), 2400),
+    H.advanceStory(landed(m, 10), 2400, { playBattles = "tactical" }),
     -- door loads finalize the decompressed prop table late: ~150 frames
     -- after control and brightness the engine still walked (and modelled)
     -- on the previous map's props (measured, probe_n20c on map 30->20: a
@@ -92,13 +108,13 @@ H.run({ maxFrames = 90000 }, {
   --    battle (probe_n20 census after full settle: zero reachable tiles),
   --    so the front door is now the only way to the streets.
   H.navTo(55, 35, { arrive = function() return map() == 20 end,
-                    maxFrames = 12000 }),
+                    maxFrames = 12000, playBattles = "tactical" }),
   H.waitUntil(landed(20, 10), 1200, "landed on the streets", 1),
   H.waitFrames(150),
 
   -- 2. the south gate at (38,61) (gen_worldmap's verified tile), then one
   --    held step south onto the y=62 exit row -> world {83,36}
-  H.navTo(38, 61, { maxFrames = 20000 }),
+  H.navTo(38, 61, { maxFrames = 20000, playBattles = "tactical" }),
   H.driveUntil(function() return H.worldMode() end, 900, {
     H.hold({ "down" }), H.waitFrames(4),
   }, "off the south edge to the world"),
@@ -115,7 +131,7 @@ H.run({ maxFrames = 90000 }, {
   --    arrive bails if a stray step fires the trigger early; the next
   --    drive's map-55 pred is then already true and holds nothing (holding
   --    down at the gate would step onto y=43, the world-exit row).
-  H.worldNavTo(64, 75, { maxFrames = 30000,
+  H.worldNavTo(64, 75, { maxFrames = 30000, playBattles = "flee",
     arrive = function() return not H.worldMode() end }),
   H.driveUntil(function() return not H.worldMode() and map() == 55 end, 900, {
     H.hold({ "down" }), H.waitFrames(4),
@@ -134,7 +150,7 @@ H.run({ maxFrames = 90000 }, {
   door(28, 39, "up", 59, "into the keep"),
   H.saveState("_scratch_keep59.mss"),   -- cheap re-entry for route iteration
   H.navTo(9, 49, { arrive = function() return map() == 61 end,
-                   maxFrames = 9000 }),
+                   maxFrames = 9000, playBattles = "tactical" }),
   H.waitUntil(landed(61, 10), 1500, "engine room", 1),
   H.waitFrames(150),
 
@@ -142,7 +158,7 @@ H.run({ maxFrames = 90000 }, {
   --    turns in place, because the NPC blocks the step), then edge-A.
   --    (6,34) keeps the route off (5,35), the "That's dangerous!" shoo
   --    trigger (_ca69cd) that takes control every frame it is stood on.
-  H.navTo(6, 34, { maxFrames = 9000 }),
+  H.navTo(6, 34, { maxFrames = 9000, playBattles = "tactical" }),
   H.hold({ "up" }), H.waitFrames(8), H.release(), H.waitFrames(4),
   (function()
     local aPh = 0
@@ -159,7 +175,7 @@ H.run({ maxFrames = 90000 }, {
 
   -- 6. tap through the greeting into the choice; index 0 = Kohlingen; then
   --    ride the crossing hands-off (advanceStory: dialog-gated taps only)
-  H.advanceStory(landed(61, 60), 30000),
+  H.advanceStory(landed(61, 60), 30000, { playBattles = "tactical" }),
   H.waitFrames(30),
   H.call(function()
     H.assertEq(map(), 61, "back in the engine room")

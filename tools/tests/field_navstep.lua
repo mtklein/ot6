@@ -50,6 +50,17 @@ local STATE = "build/states/vector_sneak.mss.lua"
 -- refuses to release fails the driveUntil budget rather than being poked out
 -- of existence.  The subject here, navTo's release timing on map 242, is
 -- unaffected by how an interrupting fight ends.
+--
+-- The segment's own navTo passes playBattles = "flee" for the same reason,
+-- and this file is why the sweep exists: converting watchTile's flag poke
+-- did not make the segment input-driven while the navTo beside it was still
+-- bare, because the library would have ended a mid-walk battle by the same
+-- write.  Both halves or it is not converted.  It happens to be moot on this
+-- fixture -- map 242 draws no random battles at all (map_prop.dat byte +5
+-- bit 7 clear; ff6/src/field/battle.asm:333-347 returns before the roll),
+-- and the Vector fights nearby are gate-guard event triggers south of the
+-- route -- but "moot" is a property of the map, not of the code, and the
+-- code should not read as though it were relying on the library to clean up.
 local function watchTile(tx, ty, n, what)
   local seen = 0
   return H.driveUntil(function() return seen >= n end, n * 8 + 1200, {
@@ -88,7 +99,7 @@ local function segment(fx, fy, dir, tx, ty, what)
           what .. ": the overshoot tile is passable (the bug is observable)")
       end
     end),
-    H.navTo(tx, ty, { maxFrames = 3000 }),
+    H.navTo(tx, ty, { maxFrames = 3000, playBattles = "flee" }),
     H.call(function()
       H.log(string.format("[navstep] %s: navTo returned at (%d,%d)",
         what, H.fieldX(), H.fieldY()))

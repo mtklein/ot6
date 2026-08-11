@@ -1,6 +1,12 @@
 -- probe_opera_ariafire.lua -- boots opera_stage (238, $0056=1), steps onto the
 -- aria trigger (97,7), and rides the narration to the first lyric fork, logging
 -- the choice-dialog state ($056e cursor / $056f count / $00d3).  Tight budgets.
+-- Issue #75: playBattles = "tactical" keeps these walks out of the library's
+-- monster-dead flag write.  It is intent only -- the opera maps 236 and 238
+-- draw no random battles (map_prop.dat byte +5 bit 7 clear, so the field
+-- step handler at ff6/src/field/battle.asm:333-347 returns before the roll)
+-- -- and "tactical" rather than "flee" because the only battle that could
+-- reach the option there is an unscripted surprise.
 local H = dofile("tools/tests/lib/ot6.lua")
 local function map() return H.mapId() & 0x1ff end
 local function bright() return emu.getState()["ppu.screenBrightness"] or 0 end
@@ -19,7 +25,8 @@ H.run({ maxFrames = 40000 }, {
   H.call(function() H.assertEq(map(),238,"boot 238"); dumpsw("boot") end),
 
   -- step onto the aria trigger (97,7); the aria fades + loads map 236
-  H.navTo(97, 7, { maxFrames=6000, arrive=function() return map()~=238 or not H.hasControl() end }),
+  H.navTo(97, 7, { maxFrames=6000, playBattles="tactical",
+                   arrive=function() return map()~=238 or not H.hasControl() end }),
   H.call(function() dumpsw("aria-triggered") end),
 
   -- ride the narration (edge-A) until a CHOICE appears ($056f>=2) or map settles on 236

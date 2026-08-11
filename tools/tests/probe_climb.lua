@@ -49,6 +49,14 @@
 --   the (12,44) side is the entrance).  A successor continues from
 --   221(49,39): cross (54,35)->225(66,56), flood, follow its onward doors,
 --   and keep hopping toward a rooftop bearing 221(30,43)/(30,22)/(35,16).
+-- Issue #75: playBattles = "tactical" keeps these walks out of the library's
+-- monster-dead flag write, and here it is not a no-op: maps 221 and 225 do
+-- draw random battles (map_prop.dat byte +5 bit 7 set), from the Zozo pools
+-- group 78 (Gabbldegak, Harvester, HadesGigas) and group 77 (SlamDancer,
+-- Harvester, Gabbldegak).  Fought rather than fled for the reason
+-- gen_zozo3_clock records: several of those formations permit a pincer,
+-- which raises run difficulty from 2 to 6 per monster, and gen_zozo5_ramuh
+-- already clears this same pool on these same maps with blind A-taps.
 local H = dofile("tools/tests/lib/ot6.lua")
 local function map() return H.mapId() & 0x1ff end
 local function bright() return emu.getState()["ppu.screenBrightness"] or 0 end
@@ -72,17 +80,19 @@ local function floodDiag()
   return seen
 end
 
-H.run({ maxFrames = 40000 }, {
+H.run({ maxFrames = 60000 }, {
   H.loadState("build/states/zozo_arrival.mss.lua"),
   H.waitFrames(150),
   -- into the building at street door (44,48) -> 225 (12,43)
-  H.navTo(44, 48, { arrive = function() return map() == 225 end, maxFrames = 12000 }),
+  H.navTo(44, 48, { arrive = function() return map() == 225 end,
+                    maxFrames = 12000, playBattles = "tactical" }),
   H.waitUntil(function()
     return H.hasControl() and H.tileAligned() and bright() >= 15 end, 1500, "225", 5),
   H.waitFrames(150),
   H.call(function() H.log(string.format("[225] at (%d,%d)", H.fieldX(), H.fieldY())) end),
   -- across the diagonal-stair interior to the onward door (21,14) -> 221
-  H.navTo(21, 14, { arrive = function() return map() == 221 end, maxFrames = 15000 }),
+  H.navTo(21, 14, { arrive = function() return map() == 221 end,
+                    maxFrames = 15000, playBattles = "tactical" }),
   H.waitUntil(function()
     return H.hasControl() and H.tileAligned() and bright() >= 15 end, 1500, "221 roof", 5),
   H.waitFrames(150),
