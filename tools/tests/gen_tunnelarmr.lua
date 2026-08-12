@@ -366,10 +366,12 @@ end
 -- ------------------------------------------------------------ the equips --
 -- Two menus, not one, and this drive is gen_kolts's `menuEquip` copied here
 -- rather than shared.  Sharing it means editing tools/tests/lib/ot6_field.lua,
--- which every generated state latches on, so a one-line library edit
--- regenerates all 114 of them; the promotion is worth doing once the full
--- chain regenerates anyway, and is a follow-up rather than part of this
--- change.  The states and rules are gen_kolts's, verified there:
+-- which every generated state latches on by content, so a one-line library
+-- edit regenerates all 114 of them.  ISSUE #107 OWNS THE PROMOTION: that
+-- pass has to edit the library anyway, so moving menuEquip, posOf,
+-- preferItem and fillSlot there belongs with it rather than costing a second
+-- full regeneration here.  The states and rules are gen_kolts's, verified
+-- there:
 --   Equip is main menu row 2 and reaches R-Hand / L-Hand / Head / Body
 --   (EquipSlotCursorProp is {1, 4}, equip.asm:76-77); Relic is main row 3
 --   with a two-slot cursor (RelicSlotCursorProp {1, 2}, :200-201) and its
@@ -773,15 +775,23 @@ H.run({ maxFrames = 300000 }, {
   -- this -- so his boosted Fight chips two shields where it used to chip
   -- one, and the MithrilBlade goes to CELES so that nobody is bare.
   --
-  -- Measured, both from celes_freed, both parties entering at full HP
-  -- (LOCKE 249, CELES 217), each fighting its own battle RNG seed:
+  -- Measured 2026-08-12, three configurations, all from celes_freed with the
+  -- party at full HP, each fighting its own battle RNG seed:
   --
-  --   two pierce hands (seed $CC): first boosted Fight took the shields
-  --     5 -> 1, the second took them to 0, boss dead on LOCKE's fourth turn.
-  --     Won attempt 1 with LOCKE at 186/249 and CELES untouched at 217/217.
-  --   one hand and a shield (seed $A8): first boosted Fight took the shields
-  --     5 -> 3, three turns to break them, boss dead on LOCKE's sixth turn.
-  --     Won attempt 1 with LOCKE at 20/249 and CELES DEAD.
+  --   Guardian 59 + MithrilKnife 30, what ships (seed $48): first boosted
+  --     Fight took the shields 5 -> 1 and 331 HP off, the second took them
+  --     to 0, boss dead on LOCKE's third turn.  Won attempt 1 with LOCKE
+  --     untouched at 249/249 and CELES at 212/245.
+  --   Dirk 26 + MithrilKnife 30 (seed $CC): same 5 -> 1 -> 0 shield line,
+  --     boss dead on LOCKE's fourth turn.  Won attempt 1 with LOCKE at
+  --     186/249 and CELES untouched.
+  --   one hand and a shield, the configuration this replaced (seed $A8):
+  --     first boosted Fight took the shields 5 -> 3, three turns to break
+  --     them, boss dead on LOCKE's sixth turn.  Won attempt 1 with LOCKE at
+  --     20/249 and CELES DEAD.
+  --
+  -- The two glove rows differ only in main-hand power and cost a turn; the
+  -- third differs in chip rate and costs three turns and a character.
   --
   -- The chip counts are the part that is not a seed artifact, and they match
   -- Ot6FightBoost's arithmetic exactly: at pending boost 1 a one-weapon

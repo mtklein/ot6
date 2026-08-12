@@ -126,19 +126,26 @@ for the house rules, and [ROADMAP.md](ROADMAP.md) for the release plan.
   at `field/init.asm:250`), but Empty means `EquipRemoveAll` strips all four
   gear slots, so it trades a wrong pick for a bare character and every call
   site would then owe four deliberate equips instead of two.
-- **A Genji Glove is two break classes on one character, and the route takes
-  one at the Returner Hideout.** A chip goes by weapon class looked up per
-  hand per swing (`Ot6WeaponClass` reads `$3ca8,x` with the hand in x,
-  `ot6_break.asm:1593-1619`), and `Ot6FightBoost` swings both hands per point
-  of pending boost while an empty hand whiffs (`ot6_boost.asm:481-484`). So
-  at pending boost 1 one weapon gives two hits and a glove pair gives four.
-  Measured 2026-08-12 on TunnelArmr from `celes_freed`, full-HP parties: two
-  pierce hands took the shields 5 → 1 on the first boosted Fight and the
-  party came out LOCKE 186/249 with CELES untouched; one hand and a shield
-  took them 5 → 3, needed three turns to break, and came out LOCKE 20/249
-  with CELES dead. The glove costs the Gauntlet — the hideout's two answers
-  are exclusive (`event_main.asm:37019`/`:37092` against `:37834`) — and
-  nothing in the tree has ever equipped a Gauntlet.
+- **A second weapon doubles a character's chip rate under boost, and it can
+  add a second break class.** This is a fact about boost, weapons and the
+  break loop rather than about any one fight. A chip goes by weapon class,
+  looked up per hand per swing (`Ot6WeaponClass` reads `$3ca8,x` with the
+  hand in x, `ot6_break.asm:1593-1619`), and `Ot6FightBoost` adds two swings
+  per point of pending boost while swings alternate hands and an empty hand
+  whiffs (`ot6_boost.asm:481-484`). So at pending boost 1 a one-weapon
+  character swings three times and lands two, and a Genji Glove pair swings
+  four times and lands four: twice the chips per turn, every turn, in a game
+  whose whole loop is chipping shields. Put two weapons of the same class in
+  the hands and both chip the same axis; put two classes in and the character
+  covers both.
+  Measured 2026-08-12 on TunnelArmr (`5, OT6_PIERCE`) from `celes_freed`,
+  full-HP parties: two pierce hands took the shields 5 → 1 on the first
+  boosted Fight and the party came out with LOCKE untouched at 249/249; one
+  hand and a shield took them 5 → 3, needed three turns to break, and came
+  out LOCKE 20/249 with CELES dead. The route's glove comes from the Returner
+  Hideout and costs the Gauntlet — the two answers there are exclusive
+  (`event_main.asm:37019`/`:37092` against `:37834`) — and nothing in the
+  tree has ever equipped a Gauntlet.
 - **The party-hp audit** (`tools/audit_party_hp.py`, same shape, same kind of
   waiver list) is the other half of that: no fixture ships a party member
   dead, petrified, zombie, poisoned, or at or below max HP / 8. Max/8 is the
