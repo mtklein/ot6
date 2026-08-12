@@ -349,9 +349,15 @@ everything, and keep to one heavy run at a time per machine.
 
 ## Working agreements
 
+- **Work on `main`.** It carries our best latest work and gets no special
+  protection; there is no long-lived integration branch to accumulate on.
+  Land agent branches onto it as they are reviewed. A release cuts
+  `release/v0.x` at the point it starts, so a later fix can be cherry-picked
+  onto the release without holding anything back from `main` (owner,
+  2026-08-12, replacing the rule that said otherwise).
 - Delegated work gets [agent-brief.md](agent-brief.md) included by reference.
   **Cite the copy in the agent's own worktree**, never the owner's checkout,
-  which sits on the release branch he is playtesting and can be weeks stale.
+  which can be on a release branch and weeks stale.
 - Agents commit to their own branches in revertible units, file exclusivity is
   "declare your hunks and expect merges", and regenerating a single savestate
   (`ninja -f build/build.ninja <state>`) is theirs. The full `make savestates`
@@ -361,8 +367,11 @@ everything, and keep to one heavy run at a time per machine.
   seeds the ROM, emulator links, states, and the ninja build log. **Worktrees
   live under `.claude/worktrees/<name>` inside the repo**, never as siblings
   of `~/ot6` or anywhere else in the home directory.
-- Keep `main`, the integration branch, and the owner's checkout
-  fast-forwarded together at every checkpoint where the tests are green.
+- **Close a bug as soon as it is fixed**, not when the fix ships. The
+  milestone records which release carries it, so the issue does not have to.
+  Close it with the plain explanation of what was wrong and what was
+  measured, which is the part that was always worth doing (owner,
+  2026-08-12, retracting an earlier rule that said to wait for the release).
 - Commit messages here run long and explain why the change was made,
   including what was ruled out. Match that.
 
